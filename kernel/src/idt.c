@@ -2,7 +2,7 @@
 #include <system/dbg.h>
 #include <system/io.h>
 #include <system/kb.h>
-#include <system/page.h>
+#include <system/vmm.h>
 #include <system/pmm.h>
 #include <system/printf.h>
 #include <system/shutdown.h>
@@ -99,7 +99,7 @@ __attribute__((interrupt)) void page_fault_handler(void *frame) {
     uint64_t cr3 = read_cr3();
     uint64_t cr2 = read_cr2();
     k_panic("Page fault! CR3 = 0x%zx\n              CR2 = 0x%zx", cr3, cr2);
-    paging_map_cr3(cr2, (uint64_t) pmm_alloc_page(), PAGING_X86_64_PRESENT | PAGING_X86_64_EXECUTE_DISABLE);
+    vmm_map_page(cr2, sub_offset((uint64_t) pmm_alloc_page()), PAGING_PRESENT | PAGING_XD);
     /*    uint64_t fault_addr;
         asm volatile("mov %%cr2, %0" : "=r" (fault_addr));
 
