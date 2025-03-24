@@ -1,0 +1,9 @@
+[submodule "kernel/src/flanter"]
+	path = kernel/src/flanter
+	url = https://github.com/mintsuki/flanterm
+[submodule "kernel/src/flanterm"]
+	path = kernel/src/flanterm
+	url = https://github.com/mintsuki/flanterm
+[submodule "kernel/src/uACPI"]
+	path = kernel/src/uACPI
+	url = https://github.com/uACPI/uACPI

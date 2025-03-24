@@ -1,0 +1,44 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - name: Install x86_64-unknown-none target
+        run: rustup target add x86_64-unknown-none
+
+      - name: Get nasm
+        run: sudo apt install nasm -y
+
+      - name: Get xorriso
+        run: sudo apt install xorriso -y
+
+      - name: Add submodules
+        run: git submodule init && git submodule update
+
+      - name: Compile 
+        run:  ./kernel/get-deps && mkdir -p build && cd build && cmake .. && make iso && cd .. 

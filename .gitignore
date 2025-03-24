@@ -1,0 +1,6 @@
+limine/
+ovmf/
+build/
+*.log
+compile_commands.json
+kernel/src/rust/target/
