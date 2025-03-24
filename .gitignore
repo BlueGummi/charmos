@@ -1,4 +1,3 @@
-limine/
 ovmf/
 build/
 *.log

@@ -28,7 +28,12 @@ unsigned long get_cr3(void) {
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
     return cr3;
 }
+extern uint8_t _text_start, _text_end; 
+extern uint8_t _rodata_start, _rodata_end;
+extern uint8_t _data_start, _data_end;
+extern uint8_t _bss_start, _bss_end;
 
+extern uint8_t _limine_requests_start, _limine_requests_end;
 VirtAddr vmm_extract_virtaddr(uint64_t address) {
     VirtAddr vaddr = {
         .L4 = (address >> 39) & 0x1FF,
@@ -41,6 +46,19 @@ VirtAddr vmm_extract_virtaddr(uint64_t address) {
 }
 
 void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags);
+
+void vmm_map_range(uintptr_t virt_start, uintptr_t virt_end, uint64_t flags) {
+    uintptr_t aligned_start = virt_start & ~(PAGE_SIZE - 1);
+    uintptr_t aligned_end = (virt_end + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+    
+    for (uintptr_t virt = aligned_start; virt < aligned_end; virt += PAGE_SIZE) {
+        uintptr_t phys = SUB_HHDM_OFFSET(virt);
+        if (phys == (uintptr_t)-1) continue;
+        
+        vmm_map_page(virt, phys, flags);
+    }
+}
+
 void vmm_copy_kernel_mappings(uintptr_t new_virt_base) {
     uintptr_t old_virt_start = 0xffffffff80000000;
     uintptr_t old_virt_end = 0xffffffff80102000;
@@ -73,6 +91,7 @@ void vmm_init() {
     kernel_pml4_phys = (uintptr_t) kernel_pml4 - hhdm_offset;
     memset(kernel_pml4, 0, PAGE_SIZE);
 
+    // Copy existing mappings from boot PML4
     uintptr_t boot_cr3 = get_cr3();
     PageTable *boot_pml4 = (PageTable *) (boot_cr3 + hhdm_offset);
     for (size_t i = 0; i < 512; i++) {
@@ -80,13 +99,33 @@ void vmm_init() {
             kernel_pml4->entries[i] = boot_pml4->entries[i];
         }
     }
-    debug_mappings(0xffffffff80000000, 0xffffffff80102000);
-    debug_mappings(0xffffffffc0000000, 0xffffffffc0102000);
+
+    // Map kernel sections with appropriate permissions
+    // 1. Code (.text) - Executable, Read-only
+    vmm_map_range((uintptr_t)&_text_start, (uintptr_t)&_text_end, 
+                 PAGING_PRESENT);
+    
+    // 2. Read-only data (.rodata) - Read-only, non-executable
+    vmm_map_range((uintptr_t)&_rodata_start, (uintptr_t)&_rodata_end, 
+                 PAGING_PRESENT | PAGING_XD);
+    
+    // 3. Data (.data) - Read-write, non-executable
+    vmm_map_range((uintptr_t)&_data_start, (uintptr_t)&_data_end, 
+                 PAGING_PRESENT | PAGING_WRITE | PAGING_XD);
+    
+    // 4. BSS (.bss) - Read-write, non-executable
+    vmm_map_range((uintptr_t)&_bss_start, (uintptr_t)&_bss_end, 
+                 PAGING_PRESENT | PAGING_WRITE | PAGING_XD);
+    
+    // 5. Limine requests - Read-write, non-executable
+    vmm_map_range((uintptr_t)&_limine_requests_start, (uintptr_t)&_limine_requests_end, 
+                 PAGING_PRESENT | PAGING_WRITE | PAGING_XD);
+
     vmm_copy_kernel_mappings(0xffffffffc0000000);
-    k_printf("Yo yo yo we aboutta switch cr3 please check info mem\n");
-    asm volatile("hlt");
+    
+    // Switch to our new page tables
     asm volatile("mov %0, %%cr3" : : "r"(kernel_pml4_phys) : "memory");
-    k_printf("FAM! we just reloaded CR3, with address 0x%zx\nVirt addr 0x%zx", kernel_pml4_phys, kernel_pml4);
+    k_printf("VMM initialized with new page tables at 0x%zx\n", kernel_pml4_phys);
 }
 
 void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
