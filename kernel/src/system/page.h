@@ -2,8 +2,8 @@
 unsigned long get_cr3(void);
 uint64_t add_offset(uint64_t cr3);
 void init_paging(uint64_t offset);
-void paging_map_cr3(void *cr3, uint64_t phys, uint64_t virt, uint64_t permissions);
-void paging_unmap_cr3(void *cr3, uint64_t virt);
+void paging_map_cr3(uint64_t phys, uint64_t virt, uint64_t permissions);
+void paging_unmap_cr3(uint64_t virt);
 #define PAGING_X86_64_PRESENT (0x1L)
 #define PAGING_X86_64_WRITE (0x2L)
 #define PAGING_X86_64_USER_ALLOWED (0x4L)

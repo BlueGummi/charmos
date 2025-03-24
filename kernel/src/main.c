@@ -81,11 +81,11 @@ void kmain(void) {
 
     *p = 42;
     void *rsdp_virt = pmm_alloc_page();
-    paging_map_cr3((void *) (get_cr3() + response->offset), (uint64_t) rsdp_request.response->address, (uint64_t) rsdp_virt, PAGING_X86_64_PRESENT);
+    paging_map_cr3((uint64_t) rsdp_request.response->address, (uint64_t) rsdp_virt, PAGING_X86_64_PRESENT);
     struct Rsdp rsdp = make_rsdp((void *) (((uint64_t) rsdp_virt) + ((uint64_t) rsdp_request.response->address & 0xFFF)));
 
     void *rsdt_virt = pmm_alloc_page();
-    paging_map_cr3((void *) (get_cr3() + response->offset), (uint64_t) rsdp.rsdt_address, (uint64_t) rsdt_virt, PAGING_X86_64_PRESENT);
+    paging_map_cr3((uint64_t) rsdp.rsdt_address, (uint64_t) rsdt_virt, PAGING_X86_64_PRESENT);
     struct ACPI_SDTHeader *rsdt = (struct ACPI_SDTHeader *) (((uint64_t) rsdt_virt) + (rsdp.rsdt_address & 0xFFF));
     uint32_t *entries = (uint32_t *) ((uintptr_t) rsdt + sizeof(struct ACPI_SDTHeader));
     size_t entry_count = (rsdt->length - sizeof(struct ACPI_SDTHeader)) / 4;
@@ -93,7 +93,7 @@ void kmain(void) {
     void *table_virt = pmm_alloc_page();
     struct FADT *fadt = NULL;
     for (size_t i = 0; i < entry_count; i++) {
-        paging_map_cr3((void *) (get_cr3() + response->offset), (uint64_t) entries[i], (uint64_t) table_virt, PAGING_X86_64_PRESENT);
+        paging_map_cr3((uint64_t) entries[i], (uint64_t) table_virt, PAGING_X86_64_PRESENT);
         struct ACPI_SDTHeader *table = (struct ACPI_SDTHeader *) (((uint64_t) table_virt) + (entries[i] & 0xFFF));
 
         if (memcmp(table->sig, "FACP", 4) == 0) {
@@ -104,7 +104,7 @@ void kmain(void) {
 
     // we should move this
     void *dsdt_virt = pmm_alloc_page();
-    paging_map_cr3((void *) (get_cr3() + response->offset), (uint64_t) fadt->DSDT, (uint64_t) dsdt_virt, PAGING_X86_64_PRESENT);
+    paging_map_cr3((uint64_t) fadt->DSDT, (uint64_t) dsdt_virt, PAGING_X86_64_PRESENT);
     struct ACPI_SDTHeader *dsdt = (struct ACPI_SDTHeader *) (((uint64_t) dsdt_virt) + (fadt->DSDT & 0xFFF));
 
     uint16_t SLP_TYP = find_s5_in_dsdt((uint8_t *) dsdt, dsdt->length);

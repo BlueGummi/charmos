@@ -20,14 +20,21 @@ typedef struct {
     uint64_t entries[512];
 } __attribute__((packed)) PageTable;
 
-void paging_map_cr3(void *cr3, uint64_t phys, uint64_t virt, uint64_t permissions) {
+unsigned long get_cr3(void) {
+    unsigned long cr3;
+    asm volatile("mov %%cr3, %0" : "=r"(cr3));
+    return cr3;
+}
+
+
+void paging_map_cr3(uint64_t phys, uint64_t virt, uint64_t permissions) {
     uint64_t offset = local_offset;
     uint16_t level1 = (virt >> 12) & 0x1ff;
     uint16_t level2 = (virt >> 21) & 0x1ff;
     uint16_t level3 = (virt >> 30) & 0x1ff;
     uint16_t level4 = (virt >> 39) & 0x1ff;
 
-    PageTable *pml4 = cr3;
+    PageTable *pml4 = (void*)((uint64_t) get_cr3() + (uint64_t) local_offset);
 
     uint64_t in_between_perms = PAGING_X86_64_PRESENT | PAGING_X86_64_WRITE;
     if (permissions & PAGING_X86_64_USER_ALLOWED) {
@@ -71,14 +78,8 @@ void paging_map_cr3(void *cr3, uint64_t phys, uint64_t virt, uint64_t permission
     __asm__ volatile("invlpg (%0)" ::"r"(virt) : "memory");
 }
 
-void paging_unmap_cr3(void *cr3, uint64_t virt) {
-    paging_map_cr3(cr3, 0, virt, 0);
-}
-
-unsigned long get_cr3(void) {
-    unsigned long cr3;
-    asm volatile("mov %%cr3, %0" : "=r"(cr3));
-    return cr3;
+void paging_unmap_cr3(uint64_t virt) {
+    paging_map_cr3(0, virt, 0);
 }
 
 uint64_t add_offset(uint64_t cr3) {
@@ -87,5 +88,5 @@ uint64_t add_offset(uint64_t cr3) {
 
 void init_paging(uint64_t offset) {
     local_offset = offset;
-    paging_map_cr3((void *) (get_cr3() + offset), 0x1000, 0x2000, PAGING_X86_64_PRESENT | PAGING_X86_64_EXECUTE_DISABLE);
+    paging_map_cr3(0x1000, 0x2000, PAGING_X86_64_PRESENT | PAGING_X86_64_EXECUTE_DISABLE);
 }
