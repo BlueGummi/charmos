@@ -1,6 +1,3 @@
-[submodule "kernel/src/flanter"]
-	path = kernel/src/flanter
-	url = https://github.com/mintsuki/flanterm
 [submodule "kernel/src/flanterm"]
 	path = kernel/src/flanterm
 	url = https://github.com/mintsuki/flanterm
@@ -8,6 +5,6 @@
 	path = kernel/src/uACPI
 	url = https://github.com/uACPI/uACPI
 [submodule "limine"]
-	path = limine
-	url = https://github.com/limine-bootloader/limine.git
-	branch = v9.x-binary
+    path = limine
+    url = https://github.com/limine-bootloader/limine.git
+    branch = v9.x-binary
