@@ -1,4 +1,5 @@
 ovmf/
+limine/
 build/
 *.log
 compile_commands.json

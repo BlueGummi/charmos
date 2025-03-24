@@ -5,6 +5,5 @@
 	path = kernel/src/uACPI
 	url = https://github.com/uACPI/uACPI
 [submodule "limine"]
-    path = limine
+	path = limine
 	url = https://github.com/limine-bootloader/limine.git
-	branch = v9.x-binary
