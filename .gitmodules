@@ -6,5 +6,5 @@
 	url = https://github.com/uACPI/uACPI
 [submodule "limine"]
     path = limine
-    url = https://github.com/limine-bootloader/limine.git
-    branch = v9.x-binary
+	url = https://github.com/limine-bootloader/limine.git
+	branch = v9.x-binary
