@@ -3,6 +3,7 @@
 #include <system/pmm.h>
 #include <system/printf.h>
 #include <system/vmm.h>
+#include <system/vmalloc.h>
 #define PAGING_PRESENT (0x1L)
 #define PAGING_WRITE (0x2L)
 #define PAGING_USER_ALLOWED (0x4L)
@@ -45,8 +46,9 @@ VirtAddr vmm_extract_virtaddr(uint64_t address) {
 
 void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags);
 void vmm_copy_kernel_mappings(uintptr_t new_virt_base) {
-    uintptr_t old_virt_start = 0xffffffff80000000;
-    uintptr_t old_virt_end = 0xffffffff80102000;
+    extern uint64_t __stext[], __etext[];
+    uintptr_t old_virt_start = (uintptr_t) __stext;
+    uintptr_t old_virt_end = (uintptr_t) __etext;
 
     for (uintptr_t old_virt = old_virt_start; old_virt < old_virt_end; old_virt += PAGE_SIZE) {
         uintptr_t phys = SUB_HHDM_OFFSET(old_virt);
@@ -56,7 +58,8 @@ void vmm_copy_kernel_mappings(uintptr_t new_virt_base) {
         uintptr_t new_virt = new_virt_base + (old_virt - old_virt_start);
 
         uint64_t flags = PAGING_PRESENT;
-        if (old_virt >= 0xffffffff80001000 && old_virt < 0xffffffff8000b000) {
+        if (old_virt >= (uintptr_t) (__stext + 0x1000) && 
+            old_virt < (uintptr_t) (__stext + 0xb000)) {
             flags |= PAGING_WRITE;
         }
 
@@ -133,6 +136,7 @@ void vmm_init() {
     */
     vmm_copy_kernel_mappings(0xffffffffc0000000);
 
+    vmm_bitmap_init(0xffff800000000000, 0x100000);
     k_printf("Gang... we switchin page tables...\n");
     asm volatile("mov %0, %%cr3" : : "r"(kernel_pml4_phys) : "memory");
     k_printf("YO! Homie, the CR3 has been loaded! These new pages lowk fire\nPhysaddr 0x%zx (Virt: 0x%zx)\n", kernel_pml4_phys, kernel_pml4);

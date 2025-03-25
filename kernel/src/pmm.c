@@ -102,3 +102,69 @@ void print_memory_status() {
     }
     k_printf("\n");
 }
+
+void *pmm_alloc_pages(size_t count) {
+    if (count == 0) {
+        return NULL;
+    }
+
+    if (count == 1) {
+        return pmm_alloc_page();
+    }
+
+    size_t consecutive = 0;
+    size_t start_index = 0;
+    bool found = false;
+
+    for (size_t i = 0; i < BITMAP_SIZE * 8; i++) {
+        if (!test_bit(i)) {
+            if (consecutive == 0) {
+                start_index = i;
+            }
+            consecutive++;
+            
+            if (consecutive == count) {
+                found = true;
+                break;
+            }
+        } else {
+            consecutive = 0;
+        }
+    }
+
+    if (!found) {
+        k_printf("Couldn't allocate %zu contiguous pages\n", count);
+        return NULL;
+    }
+
+    for (size_t i = 0; i < count; i++) {
+        set_bit(start_index + i);
+    }
+
+    return (void *)(offset + (start_index * PAGE_SIZE));
+}
+
+void pmm_free_pages(void *addr, size_t count) {
+    if (addr == NULL || count == 0) {
+        return;
+    }
+
+    size_t start_index = ((size_t)addr - offset) / PAGE_SIZE;
+
+    if (start_index >= BITMAP_SIZE * 8 || 
+        start_index + count > BITMAP_SIZE * 8) {
+        k_printf("Invalid address range to free: 0x%zx with count %zu\n", 
+                (size_t)addr, count);
+        return;
+    }
+
+    for (size_t i = 0; i < count; i++) {
+        size_t index = start_index + i;
+        if (test_bit(index)) {
+            clear_bit(index);
+        } else {
+            k_printf("Page at 0x%zx was already free\n",
+                   offset + (index * PAGE_SIZE));
+        }
+    }
+}

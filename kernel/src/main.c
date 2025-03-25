@@ -18,6 +18,7 @@
 #include <system/shutdown.h>
 #include <system/smap.h>
 #include <system/vmm.h>
+#include <system/vmalloc.h>
 
 __attribute__((used, section(".limine_requests_start"))) static volatile LIMINE_REQUESTS_START_MARKER;
 __attribute__((used, section(".limine_requests"))) static volatile LIMINE_BASE_REVISION(3);
@@ -77,10 +78,12 @@ void kmain(void) {
     vmm_offset_set(response->offset);
     vmm_init();
     k_printf("VMM initialized\n");
-    int *p = pmm_alloc_page();
+    int *p = vmm_alloc_pages(1);
+    k_printf("alloc worked :D, i sit at 0x%zx\n", p);
+    *p = 42;
+    k_printf("P is %d\n", *p);
     a_rsdp = rsdp_request.response->address;
 
-    *p = 42;
     void *rsdp_virt = pmm_alloc_page();
     vmm_map_page((uint64_t) rsdp_request.response->address, sub_offset((uint64_t) rsdp_virt), PAGING_PRESENT);
     struct Rsdp rsdp = make_rsdp((void *) (((uint64_t) rsdp_virt) + ((uint64_t) rsdp_request.response->address & 0xFFF)));
