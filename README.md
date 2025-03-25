@@ -1,4 +1,4 @@
-# kernel - I have not given this kernel a name
+# kernel - i have not given this kernel a name
 
 ## install
 
@@ -7,7 +7,7 @@ make sure u have nasm and xorriso :thumbsup: :zany_face:
 clone the repository and then do this
 
 ```bash
-git submodule init && git submodule update
+git submodule init && git submodule update && git clone https://github.com/limine-bootloader/limine --branch=v9.x-binary --depth=1
 
 ```
 
@@ -27,15 +27,17 @@ in the build directory and it'll bring up qemu with the kernel in it :thumbsup: 
 
 
 
-### todo
+### todo :sunglasses:
 
 - [x] gdt + idt
 
 - [x] allocator
 
 - [x] virtual memory manager
+    - [x] virtual memory allocator
+        - [ ] virtual memory slab allocator
 
-- [ ] do paging properly
+- [x] do paging properly
 
 - [ ] uACPI setup
     - [ ] parse acpi tables
@@ -47,6 +49,12 @@ in the build directory and it'll bring up qemu with the kernel in it :thumbsup: 
 
 - [x] work on some c stdlib-style functions
     - [ ] add more c stdlib functions
+
+- [ ] wake up other CPUs
+
+- [ ] start making tasks
+
+- [ ] spin lock thing
 
 - [ ] scheduler + timer
 
