@@ -23,33 +23,9 @@ typedef uint64_t PageTableEntry; // Page Table Entry
 typedef struct {
     PageTableEntry entries[512];
 } __attribute__((packed)) PageTable;
-typedef struct {
-    union { // Using unions for name aliases
-        uint16_t PageGlobalDirectory;
-        uint16_t PGD;
-        uint16_t L4;
-    };
-    union {
-        uint16_t PageUpperDirectory;
-        uint16_t PUD;
-        uint16_t L3;
-    };
-    union {
-        uint16_t PageMiddleDirectory;
-        uint16_t PMD;
-        uint16_t L2;
-    };
-    union {
-        uint16_t PageTableEntry;
-        uint16_t PTE;
-        uint16_t L1;
-    };
-    uint16_t offset;
-} VirtAddr;
 
 uint64_t sub_offset(uint64_t a);
 void vmm_offset_set(uint64_t o);
-VirtAddr vmm_extract_virtaddr(uint64_t address);
 unsigned long get_cr3(void);
 void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags);
 void vmm_init();

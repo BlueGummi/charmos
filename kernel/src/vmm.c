@@ -33,18 +33,8 @@ unsigned long get_cr3(void) {
     return cr3;
 }
 
-VirtAddr vmm_extract_virtaddr(uint64_t address) {
-    VirtAddr vaddr = {
-        .L4 = (address >> 39) & 0x1FF,
-        .L3 = (address >> 30) & 0x1FF,
-        .L2 = (address >> 21) & 0x1FF,
-        .L1 = (address >> 12) & 0x1FF,
-        .offset = address & 0xFFF,
-    };
-    return vaddr;
-}
-
 void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags);
+
 void vmm_copy_kernel_mappings(uintptr_t new_virt_base) {
     extern uint64_t __stext[], __etext[];
     uintptr_t old_virt_start = (uintptr_t) __stext;
@@ -66,6 +56,7 @@ void vmm_copy_kernel_mappings(uintptr_t new_virt_base) {
         vmm_map_page(new_virt, phys, flags);
     }
 }
+
 void debug_mappings(uintptr_t virt_start, uintptr_t virt_end) {
     for (uintptr_t virt = virt_start; virt < virt_end; virt += PAGE_SIZE) {
         uintptr_t phys = SUB_HHDM_OFFSET(virt);
@@ -85,31 +76,24 @@ void vmm_init() {
             kernel_pml4->entries[i] = boot_pml4->entries[i];
         }
     }
-    extern uint64_t __stext[], __etext[];
     extern uint64_t __srodata[], __erodata[];
     extern uint64_t __sdata[], __edata[];
     extern uint64_t __sbss[], __ebss[];
     extern uint64_t __slimine_requests[], __elimine_requests[];
-    k_printf("text starts at 0x%zx and ends at 0x%zx\n", __stext, __etext);
     k_printf("rodata starts at 0x%zx and ends at 0x%zx\n", __srodata, __erodata);
     k_printf("data starts at 0x%zx and ends at 0x%zx\n", __sdata, __edata);
     k_printf("bss starts at 0x%zx and ends at 0x%zx\n", __sbss, __ebss);
     k_printf("limine requests starts at 0x%zx and ends at 0x%zx\n", __slimine_requests, __elimine_requests);
-    /*
-    uintptr_t text_virt_start = (uintptr_t)__stext;
-    uintptr_t text_virt_end = (uintptr_t)__etext;
-    for (uintptr_t virt = text_virt_start; virt < text_virt_end; virt += PAGE_SIZE) {
-        uintptr_t phys = SUB_HHDM_OFFSET(virt);
-        vmm_map_page(virt, phys, PT_KERNEL_RX);
-    }
 
+    /* For some reason, I cannot map RODATA without a fault.
     uintptr_t rodata_virt_start = (uintptr_t)__srodata;
     uintptr_t rodata_virt_end = (uintptr_t)__erodata;
     for (uintptr_t virt = rodata_virt_start; virt < rodata_virt_end; virt += PAGE_SIZE) {
         uintptr_t phys = SUB_HHDM_OFFSET(virt);
         vmm_map_page(virt, phys, PT_KERNEL_RO);
     }
-
+    */
+    
     uintptr_t data_virt_start = (uintptr_t)__sdata;
     uintptr_t data_virt_end = (uintptr_t)__edata;
     for (uintptr_t virt = data_virt_start; virt < data_virt_end; virt += PAGE_SIZE) {
@@ -117,13 +101,14 @@ void vmm_init() {
         vmm_map_page(virt, phys, PT_KERNEL_RW);
     }
 
+    /* For some reason, I cannot map BSS without a fault
     uintptr_t bss_virt_start = (uintptr_t)__sbss;
     uintptr_t bss_virt_end = (uintptr_t)__ebss;
     for (uintptr_t virt = bss_virt_start; virt < bss_virt_end; virt += PAGE_SIZE) {
         uintptr_t phys = SUB_HHDM_OFFSET(virt);
         vmm_map_page(virt, phys, PT_KERNEL_RW);
     }
-
+    */
     uintptr_t reqs_virt_start = (uintptr_t)__slimine_requests;
     uintptr_t reqs_virt_end = (uintptr_t)__elimine_requests;
     for (uintptr_t virt = reqs_virt_start; virt < reqs_virt_end; virt += PAGE_SIZE) {
@@ -131,9 +116,6 @@ void vmm_init() {
         vmm_map_page(virt, phys, PT_KERNEL_RW);
     }
 
-    debug_mappings(0xffffffff80000000, 0xffffffff80102000);
-    debug_mappings(0xffffffffc0000000, 0xffffffffc0102000);
-    */
     vmm_copy_kernel_mappings(0xffffffffc0000000);
 
     vmm_bitmap_init(0xffff800000000000, 0x100000);
@@ -141,12 +123,22 @@ void vmm_init() {
     asm volatile("mov %0, %%cr3" : : "r"(kernel_pml4_phys) : "memory");
     k_printf("YO! Homie, the CR3 has been loaded! These new pages lowk fire\nPhysaddr 0x%zx (Virt: 0x%zx)\n", kernel_pml4_phys, kernel_pml4);
 }
+
+/* This is our virtual memory paging system. We get a virtual address, and a physical address to map it to.
+ *
+ * We can map a virtual address from anywhere we'd like, but physical addresses must be retrieved elsewhere.
+ *
+ * Offsets can be subtracted from addresses allocated by pmm_alloc_page
+    */
 void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
-    VirtAddr vaddr = vmm_extract_virtaddr(virt);
+    uint64_t L1 = (virt >> 12) & 0x1FF;
+    uint64_t L2 = (virt >> 21) & 0x1FF;
+    uint64_t L3 = (virt >> 30) & 0x1FF;
+    uint64_t L4 = (virt >> 39) & 0x1FF;
 
     PageTable *current_table = kernel_pml4;
 
-    PageTableEntry *entry = &current_table->entries[vaddr.L4];
+    PageTableEntry *entry = &current_table->entries[L4];
     if (!(*entry & PAGING_PRESENT)) {
         PageTable *new_table = (PageTable *) pmm_alloc_page();
         uintptr_t new_table_phys = (uintptr_t) new_table - hhdm_offset;
@@ -154,16 +146,7 @@ void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
         *entry = new_table_phys | PAGING_PRESENT | PAGING_WRITE;
     }
     current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
-    entry = &current_table->entries[vaddr.L3];
-    if (!(*entry & PAGING_PRESENT)) {
-        PageTable *new_table = (PageTable *) pmm_alloc_page();
-        uintptr_t new_table_phys = (uintptr_t) new_table - hhdm_offset;
-        memset(new_table, 0, PAGE_SIZE);
-        *entry = new_table_phys | PAGING_PRESENT | PAGING_WRITE;
-    }
-    current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
-
-    entry = &current_table->entries[vaddr.L2];
+    entry = &current_table->entries[L3];
     if (!(*entry & PAGING_PRESENT)) {
         PageTable *new_table = (PageTable *) pmm_alloc_page();
         uintptr_t new_table_phys = (uintptr_t) new_table - hhdm_offset;
@@ -172,33 +155,49 @@ void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     }
     current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
 
-    entry = &current_table->entries[vaddr.L1];
+    entry = &current_table->entries[L2];
+    if (!(*entry & PAGING_PRESENT)) {
+        PageTable *new_table = (PageTable *) pmm_alloc_page();
+        uintptr_t new_table_phys = (uintptr_t) new_table - hhdm_offset;
+        memset(new_table, 0, PAGE_SIZE);
+        *entry = new_table_phys | PAGING_PRESENT | PAGING_WRITE;
+    }
+    current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+
+    entry = &current_table->entries[L1];
     *entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
 
     asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
 }
 
 void vmm_unmap_page(uintptr_t virt) {
-    VirtAddr vaddr = vmm_extract_virtaddr(virt);
+    uint64_t L1 = (virt >> 12) & 0x1FF;
+    uint64_t L2 = (virt >> 21) & 0x1FF;
+    uint64_t L3 = (virt >> 30) & 0x1FF;
+    uint64_t L4 = (virt >> 39) & 0x1FF;
     PageTable *current_table = kernel_pml4;
 
-    PageTableEntry *entry = &current_table->entries[vaddr.L4];
+    PageTableEntry *entry = &current_table->entries[L4];
     if (!(*entry & PAGING_PRESENT))
         return;
     current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
 
-    entry = &current_table->entries[vaddr.L3];
+    entry = &current_table->entries[L3];
     if (!(*entry & PAGING_PRESENT))
         return;
     current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
 
-    entry = &current_table->entries[vaddr.L2];
+    entry = &current_table->entries[L2];
     if (!(*entry & PAGING_PRESENT))
         return;
     current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
 
-    entry = &current_table->entries[vaddr.L1];
+    entry = &current_table->entries[L1];
     *entry &= ~PAGING_PRESENT;
-
+    vmm_unmap_page(virt);
     asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
+}
+
+void *vmm_alloc_page() {
+    return vmm_alloc_pages(1);
 }

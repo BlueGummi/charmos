@@ -75,49 +75,19 @@ void kmain(void) {
     gdt_install();
     init_interrupts();
     init_physical_allocator(response->offset, memmap_request);
+    k_printf("press a button\n");
+    asm volatile ("hlt");
     vmm_offset_set(response->offset);
     vmm_init();
     k_printf("VMM initialized\n");
-    int *p = vmm_alloc_pages(1);
+    uint64_t*p = vmm_alloc_pages(69);
     k_printf("alloc worked :D, i sit at 0x%zx\n", p);
     *p = 42;
     k_printf("P is %d\n", *p);
-    a_rsdp = rsdp_request.response->address;
+    vmm_free_pages(p, 1);
 
-    void *rsdp_virt = pmm_alloc_page();
-    vmm_map_page((uint64_t) rsdp_request.response->address, sub_offset((uint64_t) rsdp_virt), PAGING_PRESENT);
-    struct Rsdp rsdp = make_rsdp((void *) (((uint64_t) rsdp_virt) + ((uint64_t) rsdp_request.response->address & 0xFFF)));
-
-    void *rsdt_virt = pmm_alloc_page();
-    vmm_map_page((uint64_t) rsdp.rsdt_address, sub_offset((uint64_t) rsdt_virt), PAGING_PRESENT);
-    struct ACPI_SDTHeader *rsdt = (struct ACPI_SDTHeader *) (((uint64_t) rsdt_virt) + (rsdp.rsdt_address & 0xFFF));
-    uint32_t *entries = (uint32_t *) ((uintptr_t) rsdt + sizeof(struct ACPI_SDTHeader));
-    size_t entry_count = (rsdt->length - sizeof(struct ACPI_SDTHeader)) / 4;
-
-    void *table_virt = pmm_alloc_page();
-    struct FADT *fadt = NULL;
-    for (size_t i = 0; i < entry_count; i++) {
-        vmm_map_page((uint64_t) entries[i], sub_offset((uint64_t) table_virt), PAGING_PRESENT);
-        struct ACPI_SDTHeader *table = (struct ACPI_SDTHeader *) (((uint64_t) table_virt) + (entries[i] & 0xFFF));
-
-        if (memcmp(table->sig, "FACP", 4) == 0) {
-            fadt = (struct FADT *) table;
-            break;
-        }
-    }
-
-    // we should move this
-    void *dsdt_virt = pmm_alloc_page();
-    vmm_map_page((uint64_t) fadt->DSDT, sub_offset((uint64_t) dsdt_virt), PAGING_PRESENT);
-    struct ACPI_SDTHeader *dsdt = (struct ACPI_SDTHeader *) (((uint64_t) dsdt_virt) + (fadt->DSDT & 0xFFF));
-
-    uint16_t SLP_TYP = find_s5_in_dsdt((uint8_t *) dsdt, dsdt->length);
-
-    if (SLP_TYP != 0xFFFF) {
-        k_shutdown_init(fadt->PM1a_CNT_BLK, fadt->PM1b_CNT_BLK, SLP_TYP);
-    } else {
-        k_printf("Using fallback VM shutdown method\n");
-    }
+    k_printf("Using fallback VM shutdown method\n");
+    
     while (1) {
         asm("hlt");
     }
