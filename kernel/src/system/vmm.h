@@ -1,5 +1,5 @@
-#include <stdint.h>
 #include <printf.h>
+#include <stdint.h>
 #define PAGING_PRESENT (0x1L)
 #define PAGING_WRITE (0x2L)
 #define PAGING_USER_ALLOWED (0x4L)
@@ -48,7 +48,7 @@ typedef struct {
 } VirtAddr;
 
 uint64_t sub_offset(uint64_t a);
-void vmm_offset_set(uint64_t o); 
+void vmm_offset_set(uint64_t o);
 VirtAddr vmm_extract_virtaddr(uint64_t address);
 unsigned long get_cr3(void);
 void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags);

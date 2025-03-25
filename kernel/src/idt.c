@@ -2,10 +2,10 @@
 #include <system/dbg.h>
 #include <system/io.h>
 #include <system/kb.h>
-#include <system/vmm.h>
 #include <system/pmm.h>
 #include <system/printf.h>
 #include <system/shutdown.h>
+#include <system/vmm.h>
 
 #define IDT_ENTRIES 256
 
@@ -87,7 +87,7 @@ static inline uint64_t read_cr3() {
     return cr3;
 }
 __attribute__((interrupt)) void divbyz_fault(void *frame) {
-    (void)frame;
+    (void) frame;
     k_printf("You fool! You bumbling babboon! You tried to divide a number by zero");
     k_printf(", why what an absolute goober you are!\n");
     k_panic("The system will power off now\n");
@@ -95,7 +95,7 @@ __attribute__((interrupt)) void divbyz_fault(void *frame) {
 }
 
 __attribute__((interrupt)) void page_fault_handler(void *frame) {
-    (void)frame;
+    (void) frame;
     uint64_t cr3 = read_cr3();
     uint64_t cr2 = read_cr2();
     k_panic("Page fault! CR3 = 0x%zx\n              CR2 = 0x%zx", cr3, cr2);

@@ -5,19 +5,19 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <system/a_config.h>
 #include <system/dsdt.h>
 #include <system/fadt.h>
 #include <system/gdt.h>
 #include <system/idt.h>
 #include <system/io.h>
 #include <system/memfuncs.h>
-#include <system/vmm.h>
 #include <system/pmm.h>
 #include <system/printf.h>
 #include <system/rsdp.h>
 #include <system/shutdown.h>
 #include <system/smap.h>
-#include <system/a_config.h>
+#include <system/vmm.h>
 
 __attribute__((used, section(".limine_requests_start"))) static volatile LIMINE_REQUESTS_START_MARKER;
 __attribute__((used, section(".limine_requests"))) static volatile LIMINE_BASE_REVISION(3);

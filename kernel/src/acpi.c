@@ -1,10 +1,10 @@
 #include <stdint.h>
-#include <system/vmm.h>
 #include <system/pmm.h>
 #include <system/printf.h>
+#include <system/vmm.h>
+#include <uacpi/event.h>
 #include <uacpi/status.h>
 #include <uacpi/uacpi.h>
-#include <uacpi/event.h>
 
 extern uint64_t a_rsdp;
 

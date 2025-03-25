@@ -1,8 +1,8 @@
 #include <stdint.h>
 #include <system/io.h>
-#include <system/shutdown.h>
 #include <system/memfuncs.h>
 #include <system/printf.h>
+#include <system/shutdown.h>
 
 #define KB_DOWN_LSHIFT 0x2A
 #define KB_UP_LSHIFT 0xAA

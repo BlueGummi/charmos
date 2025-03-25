@@ -14,24 +14,28 @@ SECTIONS {
     .limine_requests : ALIGN(4K) {
         __slimine_requests = .;
         KEEP(*(.limine_requests))
+        . = ALIGN(4K);
         __elimine_requests = .;
     } :limine_requests
 
     .text : ALIGN(4K) {
         __stext = .;
         *(.text .text.*)
+        . = ALIGN(4K);
         __etext = .;
     } :text
 
     .rodata : ALIGN(4K) {
         __srodata = .;
         *(.rodata .rodata.*)
+        . = ALIGN(4K);
         __erodata = .;
     } :rodata
 
     .data : ALIGN(4K) {
         __sdata = .;
         *(.data .data.*)
+        . = ALIGN(4K);
         __edata = .;
     } :data
 
@@ -39,6 +43,7 @@ SECTIONS {
         __sbss = .;
         *(.bss .bss.*)
         *(COMMON)
+        . = ALIGN(4K);
         __ebss = .;
     } :data
 
