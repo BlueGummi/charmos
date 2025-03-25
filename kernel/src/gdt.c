@@ -1,6 +1,6 @@
 #include <stdalign.h>
 #include <stdint.h>
-
+#include <system/printf.h>
 struct gdt_entry {
     uint16_t limit_low;
     uint16_t base_low;
@@ -61,4 +61,5 @@ void gdt_install() {
         "mov ss, ax\n\t"
         ".att_syntax prefix\n\t"
         : : : "rax", "ax", "memory");
+    k_info("GDT initialized");
 }

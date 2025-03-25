@@ -1,5 +1,5 @@
-#include <system/rsdt.h>
 #include <stdint.h>
+#include <system/rsdt.h>
 
 struct FADT {
     struct ACPI_SDTHeader header;

@@ -8,3 +8,4 @@ void *vmm_alloc_page();
 void vmm_free_pages(void *address, size_t count);
 size_t vmm_get_free_pages(void);
 size_t vmm_get_total_pages(void);
+#define BITMAP_SIZE (1 << 20) // four giggybites

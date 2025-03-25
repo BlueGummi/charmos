@@ -74,18 +74,26 @@ static int print_hex(char *buffer, uint64_t num) {
     return n;
 }
 
-static void apply_padding(const char *str, int len, int width, bool left_align) {
+static void apply_padding(const char *str, int len, int width, bool left_align, bool zero_pad) {
     if (len >= width) {
         flanterm_write(ft_ctx, str, len);
         return;
     }
 
     int padding = width - len;
+    char pad_char = zero_pad ? '0' : ' ';
 
     if (!left_align) {
-        for (int i = 0; i < padding; i++)
-            flanterm_write(ft_ctx, " ", 1);
-        flanterm_write(ft_ctx, str, len);
+        if (zero_pad && len > 0 && (str[0] == '-' || str[0] == '+')) {
+            flanterm_write(ft_ctx, str, 1);
+            for (int i = 0; i < padding; i++)
+                flanterm_write(ft_ctx, &pad_char, 1);
+            flanterm_write(ft_ctx, str + 1, len - 1);
+        } else {
+            for (int i = 0; i < padding; i++)
+                flanterm_write(ft_ctx, &pad_char, 1);
+            flanterm_write(ft_ctx, str, len);
+        }
     } else {
         flanterm_write(ft_ctx, str, len);
         for (int i = 0; i < padding; i++)
@@ -96,11 +104,14 @@ static void apply_padding(const char *str, int len, int width, bool left_align) 
 static void handle_format_specifier(const char **format_ptr, va_list args) {
     const char *format = *format_ptr;
     bool left_align = false;
+    bool zero_pad = false;
     int width = 0;
 
     while (*format == '-' || *format == '+' || *format == '0' || *format == ' ' || *format == '#') {
         if (*format == '-')
             left_align = true;
+        else if (*format == '0')
+            zero_pad = true;
         format++;
     }
 
@@ -187,29 +198,32 @@ static void handle_format_specifier(const char **format_ptr, va_list args) {
     case 's': {
         char *str = va_arg(args, char *);
         len = strlen(str);
-        apply_padding(str, len, width, left_align);
+        apply_padding(str, len, width, left_align, false);
         *format_ptr = format;
         return;
     }
     case 'c': {
         buffer[0] = (char) va_arg(args, int);
         len = 1;
+        zero_pad = false;
         break;
     }
     case '%': {
         buffer[0] = '%';
         len = 1;
+        zero_pad = false;
         break;
     }
     default: {
         buffer[0] = '%';
         buffer[1] = spec;
         len = 2;
+        zero_pad = false;
         break;
     }
     }
 
-    apply_padding(buffer, len, width, left_align);
+    apply_padding(buffer, len, width, left_align, zero_pad);
     *format_ptr = format;
 }
 
@@ -236,6 +250,7 @@ void k_printf(const char *format, ...) {
 
 void panic(const char *format, ...) {
     va_list args;
+    va_start(args, format);
     k_printf(format, args);
     va_end(args);
     while (1) {

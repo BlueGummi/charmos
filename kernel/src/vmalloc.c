@@ -4,9 +4,10 @@
 #include <system/pmm.h>
 #include <system/printf.h>
 #include <system/vmm.h>
-extern uint64_t hhdm_offset;
 
-#define BITMAP_SIZE (1 << 20) // four giggybites
+extern uint64_t hhdm_offset;
+extern void *kernel_pml4;
+
 #define BITS_PER_ENTRY (sizeof(uint64_t) * 8)
 
 typedef struct {
@@ -17,6 +18,36 @@ typedef struct {
 } VmmBitmapAllocator;
 
 static VmmBitmapAllocator vmm_allocator;
+
+uintptr_t vmm_get_phys(uintptr_t virt) {
+    uint64_t L1 = (virt >> 12) & 0x1FF;
+    uint64_t L2 = (virt >> 21) & 0x1FF;
+    uint64_t L3 = (virt >> 30) & 0x1FF;
+    uint64_t L4 = (virt >> 39) & 0x1FF;
+
+    PageTable *current_table = kernel_pml4;
+
+    PageTableEntry *entry = &current_table->entries[L4];
+    if (!(*entry & PAGING_PRESENT))
+        return (uintptr_t) -1;
+    current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+
+    entry = &current_table->entries[L3];
+    if (!(*entry & PAGING_PRESENT))
+        return (uintptr_t) -1;
+    current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+
+    entry = &current_table->entries[L2];
+    if (!(*entry & PAGING_PRESENT))
+        return (uintptr_t) -1;
+    current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+
+    entry = &current_table->entries[L1];
+    if (!(*entry & PAGING_PRESENT))
+        return (uintptr_t) -1;
+
+    return (*entry & PAGING_PHYS_MASK) + (virt & 0xFFF);
+}
 
 void vmm_bitmap_init(uintptr_t base_address, size_t total_pages) {
     size_t bitmap_pages = (total_pages + BITS_PER_ENTRY - 1) / BITS_PER_ENTRY;
@@ -46,10 +77,9 @@ static void bitmap_set_bit(size_t index) {
 static void bitmap_clear_bit(size_t index) {
     vmm_allocator.bitmap[index / BITS_PER_ENTRY] &= ~(1ULL << (index % BITS_PER_ENTRY));
 }
-
 void *vmm_alloc_pages(size_t count) {
     if (count == 0 || count > vmm_allocator.free_pages) {
-        return 0;
+        return NULL;
     }
 
     size_t consecutive = 0;
@@ -67,11 +97,23 @@ void *vmm_alloc_pages(size_t count) {
                     bitmap_set_bit(start_index + j);
                 }
                 vmm_allocator.free_pages -= count;
-                uint64_t address = vmm_allocator.base_address + start_index * PAGE_SIZE;
+
+                uintptr_t address = vmm_allocator.base_address + start_index * PAGE_SIZE;
                 for (size_t k = 0; k < count; k++) {
-                    uintptr_t virt = (uintptr_t) address + (PAGE_SIZE * k);
-                    uintptr_t phys = sub_offset((uint64_t) pmm_alloc_page());
-                    vmm_map_page(virt, phys, PAGING_PRESENT | PAGING_WRITE);
+                    uintptr_t virt = address + (k * PAGE_SIZE);
+                    uintptr_t phys = (uintptr_t) pmm_alloc_page() - hhdm_offset;
+                    if (phys == (uintptr_t) -1) {
+                        for (size_t l = 0; l < k; l++) {
+                            pmm_free_pages((void *) (vmm_get_phys(address + (l * PAGE_SIZE)) + hhdm_offset), count);
+                            vmm_unmap_page(address + (l * PAGE_SIZE));
+                        }
+                        for (size_t m = 0; m < count; m++) {
+                            bitmap_clear_bit(start_index + m);
+                        }
+                        vmm_allocator.free_pages += count;
+                        return NULL;
+                    }
+                    vmm_map_page(virt, phys, PT_KERNEL_RW);
                 }
                 return (void *) address;
             }
@@ -80,33 +122,31 @@ void *vmm_alloc_pages(size_t count) {
         }
     }
 
-    return 0;
+    return NULL;
 }
 
-void vmm_free_pages(void *address, size_t count) {
-    if ((uint64_t) address < vmm_allocator.base_address || count == 0) {
+void vmm_free_pages(void *addr, size_t count) {
+    if ((uintptr_t) addr < vmm_allocator.base_address || count == 0) {
         return;
     }
 
-    size_t start_index = ((uint64_t) address - vmm_allocator.base_address) / PAGE_SIZE;
+    uintptr_t address = (uintptr_t) addr;
+    size_t start_index = (address - vmm_allocator.base_address) / PAGE_SIZE;
 
     if (start_index + count > vmm_allocator.total_pages) {
         return;
     }
 
     for (size_t i = 0; i < count; i++) {
-        vmm_unmap_page(((uintptr_t) address) * i);
+        uintptr_t virt = address + (i * PAGE_SIZE);
+        uintptr_t phys = vmm_get_phys(virt);
+        if (phys != (uintptr_t) -1) {
+            pmm_free_pages((void *) (phys + hhdm_offset), count);
+        }
+        vmm_unmap_page(virt);
         if (bitmap_test_bit(start_index + i)) {
             bitmap_clear_bit(start_index + i);
             vmm_allocator.free_pages++;
         }
     }
-}
-
-size_t vmm_get_free_pages(void) {
-    return vmm_allocator.free_pages;
-}
-
-size_t vmm_get_total_pages(void) {
-    return vmm_allocator.total_pages;
 }

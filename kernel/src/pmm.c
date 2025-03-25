@@ -122,7 +122,7 @@ void *pmm_alloc_pages(size_t count) {
                 start_index = i;
             }
             consecutive++;
-            
+
             if (consecutive == count) {
                 found = true;
                 break;
@@ -141,7 +141,7 @@ void *pmm_alloc_pages(size_t count) {
         set_bit(start_index + i);
     }
 
-    return (void *)(offset + (start_index * PAGE_SIZE));
+    return (void *) (offset + (start_index * PAGE_SIZE));
 }
 
 void pmm_free_pages(void *addr, size_t count) {
@@ -149,12 +149,12 @@ void pmm_free_pages(void *addr, size_t count) {
         return;
     }
 
-    size_t start_index = ((size_t)addr - offset) / PAGE_SIZE;
+    size_t start_index = ((size_t) addr - offset) / PAGE_SIZE;
 
-    if (start_index >= BITMAP_SIZE * 8 || 
+    if (start_index >= BITMAP_SIZE * 8 ||
         start_index + count > BITMAP_SIZE * 8) {
-        k_printf("Invalid address range to free: 0x%zx with count %zu\n", 
-                (size_t)addr, count);
+        k_printf("Invalid address range to free: 0x%zx with count %zu\n",
+                 (size_t) addr, count);
         return;
     }
 
@@ -164,7 +164,7 @@ void pmm_free_pages(void *addr, size_t count) {
             clear_bit(index);
         } else {
             k_printf("Page at 0x%zx was already free\n",
-                   offset + (index * PAGE_SIZE));
+                     offset + (index * PAGE_SIZE));
         }
     }
 }

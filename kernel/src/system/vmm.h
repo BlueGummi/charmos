@@ -9,6 +9,9 @@
 #define PAGING_UNCACHABLE (1L << 4)
 #define PAGE_SIZE 4096
 #define SUB_HHDM_OFFSET(v) (v - hhdm_offset)
+#define PT_KERNEL_RO (PAGING_PRESENT | PAGING_XD)
+#define PT_KERNEL_RX (PAGING_PRESENT)
+#define PT_KERNEL_RW (PAGING_PRESENT | PAGING_WRITE | PAGING_XD)
 
 /* This needs to fix paging and setup our custom page tables
  * rather than modify existing page tables (which may disappear) as they are in bootloader-reclaimable memory.

@@ -2,25 +2,13 @@
 #include <system/memfuncs.h>
 #include <system/pmm.h>
 #include <system/printf.h>
-#include <system/vmm.h>
 #include <system/vmalloc.h>
-#define PAGING_PRESENT (0x1L)
-#define PAGING_WRITE (0x2L)
-#define PAGING_USER_ALLOWED (0x4L)
-#define PAGING_XD (1L << 63) // E(x)ecute (D)isable
-#define PAGING_PHYS_MASK (0x00FFFFFFF000)
-#define PAGING_PAGE_SIZE (1L << 7)
-#define PAGING_UNCACHABLE (1L << 4)
-#define PAGE_SIZE 4096
-#define SUB_HHDM_OFFSET(v) (v - hhdm_offset)
-#define PT_KERNEL_RO (PAGING_PRESENT | PAGING_XD)
-#define PT_KERNEL_RX (PAGING_PRESENT)
-#define PT_KERNEL_RW (PAGING_PRESENT | PAGING_WRITE | PAGING_XD)
+#include <system/vmm.h>
 
 PageTable *kernel_pml4 = NULL;
 uintptr_t kernel_pml4_phys = 0;
-
 uint64_t hhdm_offset = 0;
+
 uint64_t sub_offset(uint64_t a) {
     return a - hhdm_offset;
 }
@@ -48,7 +36,7 @@ void vmm_copy_kernel_mappings(uintptr_t new_virt_base) {
         uintptr_t new_virt = new_virt_base + (old_virt - old_virt_start);
 
         uint64_t flags = PAGING_PRESENT;
-        if (old_virt >= (uintptr_t) (__stext + 0x1000) && 
+        if (old_virt >= (uintptr_t) (__stext + 0x1000) &&
             old_virt < (uintptr_t) (__stext + 0xb000)) {
             flags |= PAGING_WRITE;
         }
@@ -65,10 +53,37 @@ void debug_mappings(uintptr_t virt_start, uintptr_t virt_end) {
         }
     }
 }
+
+void map_kernel_section(uint64_t *start, uint64_t *end, uint64_t flags) {
+    for (uintptr_t virt = (uintptr_t) start;
+         virt < (uintptr_t) end;
+         virt += PAGE_SIZE) {
+        uintptr_t phys = SUB_HHDM_OFFSET(virt);
+        if (phys == (uintptr_t) -1) {
+            k_info("Warning: Failed to get physical address for virt 0x%zx\n", virt);
+            continue;
+        }
+        vmm_map_page(virt, phys, flags);
+    }
+}
+
+void map_custom_region(uintptr_t virt_base, size_t size, uint64_t flags, const char *name) {
+    k_info("Mapping custom region \"%s\" of size 0x%zx, at base v.addr of 0x%zx", name, size, virt_base);
+    for (uintptr_t virt = virt_base; virt < virt_base + size; virt += PAGE_SIZE) {
+        uintptr_t phys = (uintptr_t) pmm_alloc_page() - hhdm_offset;
+        if (phys == (uintptr_t) -1) {
+            k_panic("Error: Out of memory mapping %s\n", name);
+            return;
+        }
+        vmm_map_page(virt, phys, flags);
+    }
+}
+
 void vmm_init() {
     kernel_pml4 = (PageTable *) pmm_alloc_page();
     kernel_pml4_phys = (uintptr_t) kernel_pml4 - hhdm_offset;
     memset(kernel_pml4, 0, PAGE_SIZE);
+
     uintptr_t boot_cr3 = get_cr3();
     PageTable *boot_pml4 = (PageTable *) (boot_cr3 + hhdm_offset);
     for (size_t i = 0; i < 512; i++) {
@@ -76,52 +91,38 @@ void vmm_init() {
             kernel_pml4->entries[i] = boot_pml4->entries[i];
         }
     }
+
+    extern uint64_t __stext[], __etext[];
     extern uint64_t __srodata[], __erodata[];
     extern uint64_t __sdata[], __edata[];
     extern uint64_t __sbss[], __ebss[];
     extern uint64_t __slimine_requests[], __elimine_requests[];
-    k_printf("rodata starts at 0x%zx and ends at 0x%zx\n", __srodata, __erodata);
-    k_printf("data starts at 0x%zx and ends at 0x%zx\n", __sdata, __edata);
-    k_printf("bss starts at 0x%zx and ends at 0x%zx\n", __sbss, __ebss);
-    k_printf("limine requests starts at 0x%zx and ends at 0x%zx\n", __slimine_requests, __elimine_requests);
 
-    /* For some reason, I cannot map RODATA without a fault.
-    uintptr_t rodata_virt_start = (uintptr_t)__srodata;
-    uintptr_t rodata_virt_end = (uintptr_t)__erodata;
-    for (uintptr_t virt = rodata_virt_start; virt < rodata_virt_end; virt += PAGE_SIZE) {
-        uintptr_t phys = SUB_HHDM_OFFSET(virt);
-        vmm_map_page(virt, phys, PT_KERNEL_RO);
-    }
-    */
-    
-    uintptr_t data_virt_start = (uintptr_t)__sdata;
-    uintptr_t data_virt_end = (uintptr_t)__edata;
-    for (uintptr_t virt = data_virt_start; virt < data_virt_end; virt += PAGE_SIZE) {
-        uintptr_t phys = SUB_HHDM_OFFSET(virt);
+    k_info("Kernel sections:\n");
+    k_printf("  text:   0x%zx - 0x%zx\n", __stext, __etext);
+    k_printf("  rodata: 0x%zx - 0x%zx\n", __srodata, __erodata);
+    k_printf("  data:   0x%zx - 0x%zx\n", __sdata, __edata);
+    k_printf("  bss:    0x%zx - 0x%zx\n", __sbss, __ebss);
+    k_printf("  limine: 0x%zx - 0x%zx\n", __slimine_requests, __elimine_requests);
+
+    map_kernel_section(__sdata, __edata, PT_KERNEL_RW);
+    k_info("Mapped kernel segment");
+    for (uintptr_t virt = (uintptr_t) __slimine_requests;
+         virt < (uintptr_t) __elimine_requests;
+         virt += PAGE_SIZE) {
+        uintptr_t phys = (uintptr_t) pmm_alloc_page() - hhdm_offset;
         vmm_map_page(virt, phys, PT_KERNEL_RW);
     }
 
-    /* For some reason, I cannot map BSS without a fault
-    uintptr_t bss_virt_start = (uintptr_t)__sbss;
-    uintptr_t bss_virt_end = (uintptr_t)__ebss;
-    for (uintptr_t virt = bss_virt_start; virt < bss_virt_end; virt += PAGE_SIZE) {
-        uintptr_t phys = SUB_HHDM_OFFSET(virt);
-        vmm_map_page(virt, phys, PT_KERNEL_RW);
-    }
-    */
-    uintptr_t reqs_virt_start = (uintptr_t)__slimine_requests;
-    uintptr_t reqs_virt_end = (uintptr_t)__elimine_requests;
-    for (uintptr_t virt = reqs_virt_start; virt < reqs_virt_end; virt += PAGE_SIZE) {
-        uintptr_t phys = SUB_HHDM_OFFSET(virt);
-        vmm_map_page(virt, phys, PT_KERNEL_RW);
-    }
-
+    map_custom_region(0xffffffff00000000, 0x100000, PT_KERNEL_RW, "Debug area");
+    map_custom_region(0xffffffff10000000, 0x40000, PT_KERNEL_RO, "Console buffer");
+    map_custom_region(0xffffffff20000000, 0x2000000, PT_KERNEL_RW | PAGING_UNCACHABLE, "Device memory");
+    map_custom_region(0xffff800000000000, BITMAP_SIZE, PT_KERNEL_RW, "VMM Allocator");
     vmm_copy_kernel_mappings(0xffffffffc0000000);
 
     vmm_bitmap_init(0xffff800000000000, 0x100000);
-    k_printf("Gang... we switchin page tables...\n");
+
     asm volatile("mov %0, %%cr3" : : "r"(kernel_pml4_phys) : "memory");
-    k_printf("YO! Homie, the CR3 has been loaded! These new pages lowk fire\nPhysaddr 0x%zx (Virt: 0x%zx)\n", kernel_pml4_phys, kernel_pml4);
 }
 
 /* This is our virtual memory paging system. We get a virtual address, and a physical address to map it to.
@@ -129,7 +130,7 @@ void vmm_init() {
  * We can map a virtual address from anywhere we'd like, but physical addresses must be retrieved elsewhere.
  *
  * Offsets can be subtracted from addresses allocated by pmm_alloc_page
-    */
+ */
 void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     uint64_t L1 = (virt >> 12) & 0x1FF;
     uint64_t L2 = (virt >> 21) & 0x1FF;
@@ -176,7 +177,6 @@ void vmm_unmap_page(uintptr_t virt) {
     uint64_t L3 = (virt >> 30) & 0x1FF;
     uint64_t L4 = (virt >> 39) & 0x1FF;
     PageTable *current_table = kernel_pml4;
-
     PageTableEntry *entry = &current_table->entries[L4];
     if (!(*entry & PAGING_PRESENT))
         return;
@@ -194,7 +194,6 @@ void vmm_unmap_page(uintptr_t virt) {
 
     entry = &current_table->entries[L1];
     *entry &= ~PAGING_PRESENT;
-    vmm_unmap_page(virt);
     asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
 }
 

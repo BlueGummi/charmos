@@ -17,8 +17,8 @@
 #include <system/rsdp.h>
 #include <system/shutdown.h>
 #include <system/smap.h>
-#include <system/vmm.h>
 #include <system/vmalloc.h>
+#include <system/vmm.h>
 
 __attribute__((used, section(".limine_requests_start"))) static volatile LIMINE_REQUESTS_START_MARKER;
 __attribute__((used, section(".limine_requests"))) static volatile LIMINE_BASE_REVISION(3);
@@ -73,21 +73,19 @@ void kmain(void) {
     k_printf_init(ft_ctx);
     enable_smap_smep_umip();
     gdt_install();
-    init_interrupts();
+    asm volatile("cli");
     init_physical_allocator(response->offset, memmap_request);
-    k_printf("press a button\n");
-    asm volatile ("hlt");
     vmm_offset_set(response->offset);
     vmm_init();
-    k_printf("VMM initialized\n");
-    uint64_t*p = vmm_alloc_pages(69);
-    k_printf("alloc worked :D, i sit at 0x%zx\n", p);
+    k_info("VMM initialized");
+    uint64_t *p = vmm_alloc_pages(69);
+    k_info("alloc worked :D, i sit at 0x%zx", p);
     *p = 42;
     k_printf("P is %d\n", *p);
     vmm_free_pages(p, 1);
+    k_info("Using fallback VM shutdown method");
+    init_interrupts();
 
-    k_printf("Using fallback VM shutdown method\n");
-    
     while (1) {
         asm("hlt");
     }
