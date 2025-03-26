@@ -70,22 +70,28 @@ void kmain(void) {
         NULL, 0, 0, 1,
         0, 0,
         0);
-    k_printf_init(ft_ctx);
-    enable_smap_smep_umip();
-    gdt_install();
     asm volatile("cli");
+    k_printf_init(ft_ctx);
+    k_info("Framebuffer initialized");
+    enable_smap_smep_umip();
+    k_info("Supervisor memory protection enabled");
+    gdt_install();
+    k_info("GDT installed");
     init_physical_allocator(response->offset, memmap_request);
     vmm_offset_set(response->offset);
     vmm_init();
     k_info("VMM initialized");
     uint64_t *p = vmm_alloc_pages(69);
-    k_info("alloc worked :D, i sit at 0x%zx", p);
+    k_info("Tested an allocation of 0x%x pages", 69);
     *p = 42;
     k_printf("P is %d\n", *p);
     vmm_free_pages(p, 1);
     k_info("Using fallback VM shutdown method");
     init_interrupts();
-
+    k_info("Interrupts enabled");
+    extern uint8_t read_cmos(uint8_t reg);
+    k_info((read_cmos(0x0) & 1) == 1 ? "Houston, Tranquility Base here. The Eagle has landed." : 
+           "If puns were deli meat, this would be the wurst.");
     while (1) {
         asm("hlt");
     }

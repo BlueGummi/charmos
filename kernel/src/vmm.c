@@ -60,7 +60,7 @@ void map_kernel_section(uint64_t *start, uint64_t *end, uint64_t flags) {
          virt += PAGE_SIZE) {
         uintptr_t phys = SUB_HHDM_OFFSET(virt);
         if (phys == (uintptr_t) -1) {
-            k_info("Warning: Failed to get physical address for virt 0x%zx\n", virt);
+            k_warn("Warning: Failed to get physical address for virt 0x%zx\n", virt);
             continue;
         }
         vmm_map_page(virt, phys, flags);

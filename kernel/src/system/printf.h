@@ -20,6 +20,18 @@
         k_printf("\n");                                      \
     } while (0)
 
+#define k_warn(fmt, ...)                                         \
+    do {                                                         \
+        k_printf("[");                                           \
+        k_printf(ANSI_GREEN);                                    \
+        print_current_time();                                    \
+        k_printf(ANSI_RESET);                                    \
+        k_printf("]");                                           \
+        k_printf(": [%sWARN%s]: ", ANSI_BRIGHT_RED, ANSI_RESET); \
+        k_printf(fmt, ##__VA_ARGS__);                            \
+        k_printf("\n");                                          \
+    } while (0)
+
 void k_printf(const char *format, ...);
 void panic(const char *format, ...);
 void k_printf_init(struct flanterm_context *f);
