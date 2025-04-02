@@ -5,8 +5,8 @@
 #include <system/pmm.h>
 #include <system/printf.h>
 #include <system/shutdown.h>
-#include <system/vmm.h>
 #include <system/vmalloc.h>
+#include <system/vmm.h>
 
 #define IDT_ENTRIES 256
 
@@ -117,8 +117,6 @@ __attribute__((interrupt)) void page_fault_handler(void *frame) {
 
 void init_interrupts() {
     remap_pic();
-    extern uint8_t *shift;
-    shift = vmm_alloc_pages(1);
     idt_set_gate(33, (uint64_t) keyboard_handler, 0x08, 0x8E);
     idt_set_gate(PAGE_FAULT_ID, (uint64_t) page_fault_handler, 0x08, 0x8E);
     idt_set_gate(DIV_BY_Z_ID, (uint64_t) divbyz_fault, 0x08, 0x8E);

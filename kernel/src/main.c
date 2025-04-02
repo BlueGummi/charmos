@@ -76,6 +76,7 @@ void kmain(void) {
     enable_smap_smep_umip();
     k_info("Supervisor memory protection enabled");
     gdt_install();
+    init_interrupts();
     k_info("GDT installed");
     init_physical_allocator(response->offset, memmap_request);
     vmm_offset_set(response->offset);
@@ -87,11 +88,9 @@ void kmain(void) {
     k_printf("P is %d\n", *p);
     vmm_free_pages(p, 1);
     k_info("Using fallback VM shutdown method");
-    init_interrupts();
     k_info("Interrupts enabled");
     extern uint8_t read_cmos(uint8_t reg);
-    k_info((read_cmos(0x0) & 1) == 1 ? "Houston, Tranquility Base here. The Eagle has landed." : 
-           "If puns were deli meat, this would be the wurst.");
+    k_info((read_cmos(0x0) & 1) == 1 ? "Houston, Tranquility Base here. The Eagle has landed." : "If puns were deli meat, this would be the wurst.");
     while (1) {
         asm("hlt");
     }
