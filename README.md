@@ -34,20 +34,25 @@ in the build directory and it'll bring up qemu with the kernel in it :thumbsup: 
 - [x] allocator
 
 - [x] virtual memory manager
+
     - [x] virtual memory allocator
+
         - [ ] virtual memory slab allocator
 
 - [x] do paging properly
 
 - [ ] uACPI setup
+
     - [ ] parse acpi tables
 
 - [ ] handle other interrupts + add some
 
 - [x] change tooling 
+
     - [ ] and reorganize codebase
 
 - [x] work on some c stdlib-style functions
+
     - [ ] add more c stdlib functions
 
 - [ ] wake up other CPUs
