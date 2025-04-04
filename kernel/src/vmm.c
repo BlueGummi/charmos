@@ -119,6 +119,11 @@ void vmm_init() {
  *
  * Offsets can be subtracted from addresses allocated by pmm_alloc_page
  */
+
+/* TODO
+ *
+ * we can avoid the multiple page allocs by allocating one and doing offsets 
+ */
 void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     uint64_t L1 = (virt >> 12) & 0x1FF;
     uint64_t L2 = (virt >> 21) & 0x1FF;
