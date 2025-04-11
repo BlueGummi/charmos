@@ -14,11 +14,13 @@
 #define PT_KERNEL_RW (PAGING_PRESENT | PAGING_WRITE | PAGING_XD)
 
 /* This needs to fix paging and setup our custom page tables
- * rather than modify existing page tables (which may disappear) as they are in bootloader-reclaimable memory.
- * We need to create types to define page tables, and then setup each table with incrementing addresses.
+ * rather than modify existing page tables (which may disappear) as they are in
+ * bootloader-reclaimable memory. We need to create types to define page tables,
+ * and then setup each table with incrementing addresses.
  *
  * I will attempt to make this as clear as I possibly can
- * (type aliases, and favoring duplicate types for clarity over reusing uint64_t)
+ * (type aliases, and favoring duplicate types for clarity over reusing
+ * uint64_t)
  */
 
 typedef uint64_t PageTableEntry; // Page Table Entry

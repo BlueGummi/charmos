@@ -2,7 +2,8 @@
 
 void cpuid(uint32_t eax, uint32_t ecx, uint32_t *abcd) {
     __asm__ volatile("cpuid"
-                     : "=a"(abcd[0]), "=b"(abcd[1]), "=c"(abcd[2]), "=d"(abcd[3])
+                     : "=a"(abcd[0]), "=b"(abcd[1]), "=c"(abcd[2]),
+                       "=d"(abcd[3])
                      : "a"(eax), "c"(ecx));
 }
 

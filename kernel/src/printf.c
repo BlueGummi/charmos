@@ -74,7 +74,8 @@ static int print_hex(char *buffer, uint64_t num) {
     return n;
 }
 
-static void apply_padding(const char *str, int len, int width, bool left_align, bool zero_pad) {
+static void apply_padding(const char *str, int len, int width, bool left_align,
+                          bool zero_pad) {
     if (len >= width) {
         flanterm_write(ft_ctx, str, len);
         return;
@@ -107,7 +108,8 @@ static void handle_format_specifier(const char **format_ptr, va_list args) {
     bool zero_pad = false;
     int width = 0;
 
-    while (*format == '-' || *format == '+' || *format == '0' || *format == ' ' || *format == '#') {
+    while (*format == '-' || *format == '+' || *format == '0' ||
+           *format == ' ' || *format == '#') {
         if (*format == '-')
             left_align = true;
         else if (*format == '0')
@@ -123,12 +125,7 @@ static void handle_format_specifier(const char **format_ptr, va_list args) {
         }
     }
 
-    enum { LEN_NONE,
-           LEN_HH,
-           LEN_H,
-           LEN_L,
-           LEN_LL,
-           LEN_Z } len_mod = LEN_NONE;
+    enum { LEN_NONE, LEN_HH, LEN_H, LEN_L, LEN_LL, LEN_Z } len_mod = LEN_NONE;
     if (*format == 'z') {
         len_mod = LEN_Z;
         format++;

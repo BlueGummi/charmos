@@ -5,21 +5,21 @@
 void debug_print_registers() {
     uint64_t rax, rbx, rcx, rdx, rsi, rdi, rsp, rbp, rip, rflags;
 
-    __asm__ volatile(
-        "movq %%rax, %0\n\t"
-        "movq %%rbx, %1\n\t"
-        "movq %%rcx, %2\n\t"
-        "movq %%rdx, %3\n\t"
-        "movq %%rsi, %4\n\t"
-        "movq %%rdi, %5\n\t"
-        "movq %%rsp, %6\n\t"
-        "movq %%rbp, %7\n\t"
-        "leaq (%%rip), %8\n\t"
-        "pushfq\n\t"
-        "popq %9\n\t"
-        : "=r"(rax), "=r"(rbx), "=r"(rcx), "=r"(rdx), "=r"(rsi), "=r"(rdi), "=r"(rsp), "=r"(rbp), "=r"(rip), "=r"(rflags)
-        :
-        : "memory");
+    __asm__ volatile("movq %%rax, %0\n\t"
+                     "movq %%rbx, %1\n\t"
+                     "movq %%rcx, %2\n\t"
+                     "movq %%rdx, %3\n\t"
+                     "movq %%rsi, %4\n\t"
+                     "movq %%rdi, %5\n\t"
+                     "movq %%rsp, %6\n\t"
+                     "movq %%rbp, %7\n\t"
+                     "leaq (%%rip), %8\n\t"
+                     "pushfq\n\t"
+                     "popq %9\n\t"
+                     : "=r"(rax), "=r"(rbx), "=r"(rcx), "=r"(rdx), "=r"(rsi),
+                       "=r"(rdi), "=r"(rsp), "=r"(rbp), "=r"(rip), "=r"(rflags)
+                     :
+                     : "memory");
 
     k_printf("Registers:\n");
     k_printf("RAX: 0x%lx\n", rax);

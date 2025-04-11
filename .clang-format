@@ -7,4 +7,4 @@ AllowShortBlocksOnASingleLine: Empty
 AllowShortCaseLabelsOnASingleLine: true
 AllowShortFunctionsOnASingleLine: Inline
 BreakBeforeBraces: Attach
-ColumnLimit: 0
+ColumnLimit: 80

@@ -18,7 +18,8 @@ struct gdt_ptr {
 alignas(8) struct gdt_entry gdt[3];
 struct gdt_ptr gp;
 
-void gdt_set_gate(int num, uint64_t base, uint32_t limit, uint8_t access, uint8_t gran) {
+void gdt_set_gate(int num, uint64_t base, uint32_t limit, uint8_t access,
+                  uint8_t gran) {
     gdt[num].limit_low = (limit & 0xFFFF);
     gdt[num].base_low = (base & 0xFFFF);
     gdt[num].base_middle = (base >> 16) & 0xFF;
@@ -45,21 +46,22 @@ void gdt_install() {
 
     asm volatile("lgdt %0" : : "m"(gp));
 
-    asm volatile(
-        ".intel_syntax noprefix\n\t"
-        "lea rax, [0x8]\n\t"
-        "push rax\n\t"
-        "lea rax, [rip + this]\n\t"
-        "push rax\n\t"
-        "retfq\n\t"
-        "this:\n\t"
-        "mov ax, 0x10\n\t"
-        "mov ds, ax\n\t"
-        "mov es, ax\n\t"
-        "mov fs, ax\n\t"
-        "mov gs, ax\n\t"
-        "mov ss, ax\n\t"
-        ".att_syntax prefix\n\t"
-        : : : "rax", "ax", "memory");
+    asm volatile(".intel_syntax noprefix\n\t"
+                 "lea rax, [0x8]\n\t"
+                 "push rax\n\t"
+                 "lea rax, [rip + this]\n\t"
+                 "push rax\n\t"
+                 "retfq\n\t"
+                 "this:\n\t"
+                 "mov ax, 0x10\n\t"
+                 "mov ds, ax\n\t"
+                 "mov es, ax\n\t"
+                 "mov fs, ax\n\t"
+                 "mov gs, ax\n\t"
+                 "mov ss, ax\n\t"
+                 ".att_syntax prefix\n\t"
+                 :
+                 :
+                 : "rax", "ax", "memory");
     k_info("GDT initialized");
 }

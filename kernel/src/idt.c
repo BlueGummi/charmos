@@ -36,12 +36,12 @@ struct idt_ptr {
 struct idt_entry idt[IDT_ENTRIES];
 struct idt_ptr idtp;
 
-#define YELL                                              \
-    do {                                                  \
-        k_printf("========== MANUAL HALT! ==========\n"); \
-        while (1) {                                       \
-            asm("hlt");                                   \
-        }                                                 \
+#define YELL                                                                   \
+    do {                                                                       \
+        k_printf("========== MANUAL HALT! ==========\n");                      \
+        while (1) {                                                            \
+            asm("hlt");                                                        \
+        }                                                                      \
     } while (0)
 
 void remap_pic() {
@@ -89,7 +89,8 @@ static inline uint64_t read_cr3() {
 }
 __attribute__((interrupt)) void divbyz_fault(void *frame) {
     (void) frame;
-    k_printf("You fool! You bumbling babboon! You tried to divide a number by zero");
+    k_printf(
+        "You fool! You bumbling babboon! You tried to divide a number by zero");
     k_printf(", why what an absolute goober you are!\n");
     k_panic("The system will power off now\n");
     k_shutdown();
@@ -100,7 +101,8 @@ __attribute__((interrupt)) void page_fault_handler(void *frame) {
     uint64_t cr3 = read_cr3();
     uint64_t cr2 = read_cr2();
     k_panic("Page fault! CR3 = 0x%zx\n              CR2 = 0x%zx", cr3, cr2);
-    vmm_map_page(cr2, sub_offset((uint64_t) pmm_alloc_page()), PAGING_PRESENT | PAGING_XD);
+    vmm_map_page(cr2, sub_offset((uint64_t) pmm_alloc_page()),
+                 PAGING_PRESENT | PAGING_XD);
     /*    uint64_t fault_addr;
         asm volatile("mov %%cr2, %0" : "=r" (fault_addr));
 
@@ -112,7 +114,8 @@ __attribute__((interrupt)) void page_fault_handler(void *frame) {
             }
         }
 
-        k_panic("Unhandled page fault at 0x%llx, error code: 0x%llx", fault_addr, error_code);*/
+        k_panic("Unhandled page fault at 0x%llx, error code: 0x%llx",
+       fault_addr, error_code);*/
 }
 
 void init_interrupts() {

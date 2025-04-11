@@ -51,31 +51,38 @@ uintptr_t vmm_get_phys(uintptr_t virt) {
 
 void vmm_bitmap_init(uintptr_t base_address, size_t total_pages) {
     size_t bitmap_pages = (total_pages + BITS_PER_ENTRY - 1) / BITS_PER_ENTRY;
-    bitmap_pages = (bitmap_pages * sizeof(uint64_t) + PAGE_SIZE - 1) / PAGE_SIZE;
+    bitmap_pages =
+        (bitmap_pages * sizeof(uint64_t) + PAGE_SIZE - 1) / PAGE_SIZE;
 
     vmm_allocator.bitmap = (uint64_t *) pmm_alloc_pages(bitmap_pages);
     memset(vmm_allocator.bitmap, 0, bitmap_pages * PAGE_SIZE);
     vmm_allocator.base_address = base_address;
     vmm_allocator.total_pages = total_pages;
     vmm_allocator.free_pages = total_pages;
-    uintptr_t bitmap_start = (uintptr_t) vmm_allocator.bitmap /* - hhdm_offset*/;
+    uintptr_t bitmap_start =
+        (uintptr_t) vmm_allocator.bitmap /* - hhdm_offset*/;
     for (size_t i = 0; i < bitmap_pages; i++) {
-        size_t page_idx = (bitmap_start + i * PAGE_SIZE - base_address) / PAGE_SIZE;
-        vmm_allocator.bitmap[page_idx / BITS_PER_ENTRY] |= (1ULL << (page_idx % BITS_PER_ENTRY));
+        size_t page_idx =
+            (bitmap_start + i * PAGE_SIZE - base_address) / PAGE_SIZE;
+        vmm_allocator.bitmap[page_idx / BITS_PER_ENTRY] |=
+            (1ULL << (page_idx % BITS_PER_ENTRY));
         vmm_allocator.free_pages--;
     }
 }
 
 static bool bitmap_test_bit(size_t index) {
-    return (vmm_allocator.bitmap[index / BITS_PER_ENTRY] & (1ULL << (index % BITS_PER_ENTRY))) != 0;
+    return (vmm_allocator.bitmap[index / BITS_PER_ENTRY] &
+            (1ULL << (index % BITS_PER_ENTRY))) != 0;
 }
 
 static void bitmap_set_bit(size_t index) {
-    vmm_allocator.bitmap[index / BITS_PER_ENTRY] |= (1ULL << (index % BITS_PER_ENTRY));
+    vmm_allocator.bitmap[index / BITS_PER_ENTRY] |=
+        (1ULL << (index % BITS_PER_ENTRY));
 }
 
 static void bitmap_clear_bit(size_t index) {
-    vmm_allocator.bitmap[index / BITS_PER_ENTRY] &= ~(1ULL << (index % BITS_PER_ENTRY));
+    vmm_allocator.bitmap[index / BITS_PER_ENTRY] &=
+        ~(1ULL << (index % BITS_PER_ENTRY));
 }
 void *vmm_alloc_pages(size_t count) {
     if (count == 0 || count > vmm_allocator.free_pages) {
@@ -98,13 +105,18 @@ void *vmm_alloc_pages(size_t count) {
                 }
                 vmm_allocator.free_pages -= count;
 
-                uintptr_t address = vmm_allocator.base_address + start_index * PAGE_SIZE;
+                uintptr_t address =
+                    vmm_allocator.base_address + start_index * PAGE_SIZE;
                 for (size_t k = 0; k < count; k++) {
                     uintptr_t virt = address + (k * PAGE_SIZE);
                     uintptr_t phys = (uintptr_t) pmm_alloc_page() - hhdm_offset;
                     if (phys == (uintptr_t) -1) {
                         for (size_t l = 0; l < k; l++) {
-                            pmm_free_pages((void *) (vmm_get_phys(address + (l * PAGE_SIZE)) + hhdm_offset), count);
+                            pmm_free_pages(
+                                (void *) (vmm_get_phys(address +
+                                                       (l * PAGE_SIZE)) +
+                                          hhdm_offset),
+                                count);
                             vmm_unmap_page(address + (l * PAGE_SIZE));
                         }
                         for (size_t m = 0; m < count; m++) {
