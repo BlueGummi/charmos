@@ -77,12 +77,12 @@ void idt_install() {
     asm volatile("lidt %0" : : "m"(idtp));
 }
 
-static inline uint64_t read_cr2() {
+static uint64_t read_cr2() {
     uint64_t cr2;
     asm volatile("mov %%cr2, %0" : "=r"(cr2));
     return cr2;
 }
-static inline uint64_t read_cr3() {
+static uint64_t read_cr3() {
     uint64_t cr3;
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
     return cr3;
@@ -92,7 +92,6 @@ __attribute__((interrupt)) void divbyz_fault(void *frame) {
     k_printf(
         "You fool! You bumbling babboon! You tried to divide a number by zero");
     k_printf(", why what an absolute goober you are!\n");
-    k_panic("The system will power off now\n");
     k_shutdown();
 }
 
@@ -101,8 +100,6 @@ __attribute__((interrupt)) void page_fault_handler(void *frame) {
     uint64_t cr3 = read_cr3();
     uint64_t cr2 = read_cr2();
     k_panic("Page fault! CR3 = 0x%zx\n              CR2 = 0x%zx", cr3, cr2);
-    vmm_map_page(cr2, sub_offset((uint64_t) pmm_alloc_page()),
-                 PAGING_PRESENT | PAGING_XD);
     /*    uint64_t fault_addr;
         asm volatile("mov %%cr2, %0" : "=r" (fault_addr));
 

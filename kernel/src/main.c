@@ -1,3 +1,4 @@
+#include "uacpi/internal/log.h"
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
 #include <limine.h>
@@ -6,6 +7,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <system/a_config.h>
+#include <system/dbg.h>
 #include <system/dsdt.h>
 #include <system/fadt.h>
 #include <system/gdt.h>
@@ -52,12 +54,16 @@ __attribute__((
     rsdp_request = {.id = LIMINE_RSDP_REQUEST, .revision = 0};
 
 __attribute__((
+    used, section(".limine_requests"))) static volatile struct limine_mp_request
+    mp_request = {.id = LIMINE_MP_REQUEST, .revision = 0};
+
+__attribute__((
     used,
     section(
         ".limine_requests_end"))) static volatile LIMINE_REQUESTS_END_MARKER;
 
 void kmain(void) {
-    struct limine_hhdm_response *response = hhdm_request.response;
+
     if (LIMINE_BASE_REVISION_SUPPORTED == false) {
         asm("hlt");
     }
@@ -81,26 +87,52 @@ void kmain(void) {
     k_info("Framebuffer initialized");
     enable_smap_smep_umip();
     k_info("Supervisor memory protection enabled");
+
     gdt_install();
-    init_interrupts();
     k_info("GDT installed");
+    init_interrupts();
+    k_info("Interrupts enabled");
+
+    struct limine_hhdm_response *response = hhdm_request.response;
     init_physical_allocator(response->offset, memmap_request);
+
+    struct limine_mp_response mp_response;
+    {
+        struct limine_mp_response *mp = mp_request.response;
+        mp_response.revision = mp->revision;
+        mp_response.flags = mp->flags;
+        mp_response.bsp_lapic_id = mp->bsp_lapic_id;
+        mp_response.cpu_count = mp->cpu_count;
+        mp_response.cpus = pmm_alloc_page();
+
+        /*for (uint64_t i = 0; i < mp_response.cpu_count; i++) {
+            mp_response.cpus[i]->processor_id = mp->cpus[i]->processor_id;
+            mp_response.cpus[i]->lapic_id = mp->cpus[i]->lapic_id;
+            mp_response.cpus[i]->reserved = mp->cpus[i]->reserved;
+            mp_response.cpus[i]->goto_address = mp->cpus[i]->goto_address;
+            mp_response.cpus[i]->extra_argument = mp->cpus[i]->extra_argument;
+        }*/
+    }
+
     vmm_offset_set(response->offset);
     vmm_init();
-    k_info("VMM initialized");
+    k_info("we have %d cores", mp_response.cpu_count);
     uint64_t *p = vmm_alloc_pages(6);
     k_info("Tested an allocation of 0x%x pages", 6);
     *p = 42;
     k_printf("P is %d, at address 0x%zx\n", *p, p);
     vmm_free_pages(p, 6);
+
     extern unsigned char keyboard_shift_map[128];
     extern unsigned char keyboard_map[128];
-    k_info("Keyboard map at 0x%zx, shift map at 0x%zx", keyboard_map, keyboard_shift_map);
-    k_info("Interrupts enabled");
+    k_info("Keyboard map at 0x%zx, shift map at 0x%zx", keyboard_map,
+           keyboard_shift_map);
+
     extern uint8_t read_cmos(uint8_t reg);
     k_info((read_cmos(0x0) & 1) == 1
                ? "Houston, Tranquility Base here. The Eagle has landed."
                : "If puns were deli meat, this would be the wurst.");
+
     while (1) {
         asm("hlt");
     }

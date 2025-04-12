@@ -13,7 +13,7 @@ SECTIONS {
 
     .limine_requests : ALIGN(4K) {
         __slimine_requests = .;
-        KEEP(*(.limine_requests))
+        *(.limine_requests .limine_requests*)
         . = ALIGN(4K);
         __elimine_requests = .;
     } :limine_requests

@@ -1,3 +1,4 @@
+#include <limine.h>
 #include <stdint.h>
 #include <system/memfuncs.h>
 #include <system/pmm.h>
@@ -21,8 +22,6 @@ unsigned long get_cr3(void) {
     return cr3;
 }
 
-void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags);
-
 void vmm_copy_kernel_mappings(uintptr_t new_virt_base) {
     extern uint64_t __stext[], __etext[];
     uintptr_t old_virt_start = (uintptr_t) __stext;
@@ -43,15 +42,6 @@ void vmm_copy_kernel_mappings(uintptr_t new_virt_base) {
         }
 
         vmm_map_page(new_virt, phys, flags);
-    }
-}
-
-void debug_mappings(uintptr_t virt_start, uintptr_t virt_end) {
-    for (uintptr_t virt = virt_start; virt < virt_end; virt += PAGE_SIZE) {
-        uintptr_t phys = SUB_HHDM_OFFSET(virt);
-        if (phys != (uintptr_t) -1) {
-            k_printf("0x%llx -> 0x%llx\n", virt, phys);
-        }
     }
 }
 
@@ -103,11 +93,11 @@ void vmm_init() {
         uintptr_t phys = (uintptr_t) pmm_alloc_page() - hhdm_offset;
         vmm_map_page(virt, phys, PT_KERNEL_RW);
     }
-    
+    vmm_copy_kernel_mappings(0xffffffffc0000000);
     vmm_bitmap_init(0xffff800000000000, 0x100000);
     asm volatile("sti; hlt");
     asm volatile("mov %0, %%cr3" : : "r"(kernel_pml4_phys) : "memory");
-    k_info("My value is 0x%zx", kernel_pml4);
+    k_printf("PML4 is at 0x%zx\n", kernel_pml4_phys);
 }
 
 /* This is our virtual memory paging system. We get a virtual address, and a
@@ -117,11 +107,6 @@ void vmm_init() {
  * must be retrieved elsewhere.
  *
  * Offsets can be subtracted from addresses allocated by pmm_alloc_page
- */
-
-/* TODO
- *
- * we can avoid the multiple page allocs by allocating one and doing offsets
  */
 void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     uint64_t L1 = (virt >> 12) & 0x1FF;

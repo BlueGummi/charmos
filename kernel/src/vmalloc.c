@@ -131,8 +131,6 @@ void *vmm_alloc_pages(const size_t count) {
                 for (size_t k = 0; k < count; k++) {
                     uintptr_t virt = address + (k * PAGE_SIZE);
                     uintptr_t phys = (uintptr_t) pmm_alloc_page() - hhdm_offset;
-                    k_printf("Allocated one page at 0x%zx\n",
-                             phys + hhdm_offset);
 
                     // Allocation failed
                     if (phys == (uintptr_t) -1) {
