@@ -88,12 +88,14 @@ void kmain(void) {
     vmm_offset_set(response->offset);
     vmm_init();
     k_info("VMM initialized");
-    uint64_t *p = vmm_alloc_pages(69);
-    k_info("Tested an allocation of 0x%x pages", 69);
+    uint64_t *p = vmm_alloc_pages(6);
+    k_info("Tested an allocation of 0x%x pages", 6);
     *p = 42;
-    k_printf("P is %d\n", *p);
-    vmm_free_pages(p, 1);
-    k_info("Using fallback VM shutdown method");
+    k_printf("P is %d, at address 0x%zx\n", *p, p);
+    vmm_free_pages(p, 6);
+    extern unsigned char keyboard_shift_map[128];
+    extern unsigned char keyboard_map[128];
+    k_info("Keyboard map at 0x%zx, shift map at 0x%zx", keyboard_map, keyboard_shift_map);
     k_info("Interrupts enabled");
     extern uint8_t read_cmos(uint8_t reg);
     k_info((read_cmos(0x0) & 1) == 1

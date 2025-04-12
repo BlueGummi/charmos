@@ -52,6 +52,7 @@ void init_physical_allocator(uint64_t o, struct limine_memmap_request m) {
         }
     }
 }
+
 void *pmm_alloc_page() {
     for (size_t i = 0; i < BITMAP_SIZE * 8; i++) {
         if (!test_bit(i)) {
@@ -103,6 +104,9 @@ void print_memory_status() {
     k_printf("\n");
 }
 
+/*
+ * Allocate `count` pages.
+ */
 void *pmm_alloc_pages(size_t count) {
     if (count == 0) {
         return NULL;
@@ -144,6 +148,11 @@ void *pmm_alloc_pages(size_t count) {
     return (void *) (offset + (start_index * PAGE_SIZE));
 }
 
+/*
+ * Free `count` pages, starting at `addr`.
+ *
+ * Addresses should have the HHDM offset added to them.
+ */
 void pmm_free_pages(void *addr, size_t count) {
     if (addr == NULL || count == 0) {
         return;

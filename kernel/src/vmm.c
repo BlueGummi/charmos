@@ -90,7 +90,7 @@ void vmm_init() {
     extern uint64_t __sbss[], __ebss[];
     extern uint64_t __slimine_requests[], __elimine_requests[];
 
-    k_info("Kernel sections:\n");
+    k_info("Kernel sections:");
     k_printf("  text:   0x%zx - 0x%zx\n", __stext, __etext);
     k_printf("  rodata: 0x%zx - 0x%zx\n", __srodata, __erodata);
     k_printf("  data:   0x%zx - 0x%zx\n", __sdata, __edata);
@@ -103,26 +103,11 @@ void vmm_init() {
         uintptr_t phys = (uintptr_t) pmm_alloc_page() - hhdm_offset;
         vmm_map_page(virt, phys, PT_KERNEL_RW);
     }
-
-    map_custom_region(0xffffffff00000000, 0x100000, PT_KERNEL_RW, "Debug area");
-    map_custom_region(0xffffffff10000000, 0x40000, PT_KERNEL_RO,
-                      "Console buffer");
-    map_custom_region(0xffffffff20000000, 0x2000000,
-                      PT_KERNEL_RW | PAGING_UNCACHABLE, "Device memory");
-    map_custom_region(0xffff800000000000, BITMAP_SIZE, PT_KERNEL_RW,
-                      "VMM Allocator");
-    map_custom_region((uintptr_t) __stext,
-                      (uint64_t) __etext - (uint64_t) __stext, PT_KERNEL_RO,
-                      "Text segment");
-    map_custom_region((uintptr_t) __sdata,
-                      (uint64_t) __edata - (uint64_t) __sdata, PT_KERNEL_RO,
-                      "Data segment");
-    vmm_copy_kernel_mappings(0xffffffffc0000000);
-
+    
     vmm_bitmap_init(0xffff800000000000, 0x100000);
-    k_info("My value is 0x%zu", kernel_pml4);
+    asm volatile("sti; hlt");
     asm volatile("mov %0, %%cr3" : : "r"(kernel_pml4_phys) : "memory");
-    k_info("My value is 0x%zu", kernel_pml4);
+    k_info("My value is 0x%zx", kernel_pml4);
 }
 
 /* This is our virtual memory paging system. We get a virtual address, and a

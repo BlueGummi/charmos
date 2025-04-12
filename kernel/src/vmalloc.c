@@ -10,6 +10,10 @@ extern void *kernel_pml4;
 
 #define BITS_PER_ENTRY (sizeof(uint64_t) * 8)
 
+/*
+ * The VMM bitmap allocator, containing page counts, free page counts, addresses
+ * for the first index, and the bitmap address
+ */
 typedef struct {
     uint64_t *bitmap;
     uintptr_t base_address;
@@ -19,6 +23,9 @@ typedef struct {
 
 static VmmBitmapAllocator vmm_allocator;
 
+/*
+ * Return the physical address of a mapped page
+ */
 uintptr_t vmm_get_phys(uintptr_t virt) {
     uint64_t L1 = (virt >> 12) & 0x1FF;
     uint64_t L2 = (virt >> 21) & 0x1FF;
@@ -49,6 +56,10 @@ uintptr_t vmm_get_phys(uintptr_t virt) {
     return (*entry & PAGING_PHYS_MASK) + (virt & 0xFFF);
 }
 
+/*
+ * Initialize the bitmap for the VMM with a base address of the map
+ * and the number of pages it will map
+ */
 void vmm_bitmap_init(uintptr_t base_address, size_t total_pages) {
     size_t bitmap_pages = (total_pages + BITS_PER_ENTRY - 1) / BITS_PER_ENTRY;
     bitmap_pages =
@@ -59,8 +70,7 @@ void vmm_bitmap_init(uintptr_t base_address, size_t total_pages) {
     vmm_allocator.base_address = base_address;
     vmm_allocator.total_pages = total_pages;
     vmm_allocator.free_pages = total_pages;
-    uintptr_t bitmap_start =
-        (uintptr_t) vmm_allocator.bitmap /* - hhdm_offset*/;
+    uintptr_t bitmap_start = (uintptr_t) vmm_allocator.bitmap;
     for (size_t i = 0; i < bitmap_pages; i++) {
         size_t page_idx =
             (bitmap_start + i * PAGE_SIZE - base_address) / PAGE_SIZE;
@@ -70,21 +80,32 @@ void vmm_bitmap_init(uintptr_t base_address, size_t total_pages) {
     }
 }
 
+/*
+ * Return 1 if the bit at an index is on, else 0 in the VMM bitmap
+ */
 static bool bitmap_test_bit(size_t index) {
     return (vmm_allocator.bitmap[index / BITS_PER_ENTRY] &
             (1ULL << (index % BITS_PER_ENTRY))) != 0;
 }
-
+/*
+ * Set a bit to 1 at an index in the VMM bitmap
+ */
 static void bitmap_set_bit(size_t index) {
     vmm_allocator.bitmap[index / BITS_PER_ENTRY] |=
         (1ULL << (index % BITS_PER_ENTRY));
 }
-
+/*
+ * Set a bit to 0 at an index in the VMM bitmap
+ */
 static void bitmap_clear_bit(size_t index) {
     vmm_allocator.bitmap[index / BITS_PER_ENTRY] &=
         ~(1ULL << (index % BITS_PER_ENTRY));
 }
-void *vmm_alloc_pages(size_t count) {
+
+/*
+ * Allocate `count` consecutive pages
+ */
+void *vmm_alloc_pages(const size_t count) {
     if (count == 0 || count > vmm_allocator.free_pages) {
         return NULL;
     }
@@ -110,6 +131,10 @@ void *vmm_alloc_pages(size_t count) {
                 for (size_t k = 0; k < count; k++) {
                     uintptr_t virt = address + (k * PAGE_SIZE);
                     uintptr_t phys = (uintptr_t) pmm_alloc_page() - hhdm_offset;
+                    k_printf("Allocated one page at 0x%zx\n",
+                             phys + hhdm_offset);
+
+                    // Allocation failed
                     if (phys == (uintptr_t) -1) {
                         for (size_t l = 0; l < k; l++) {
                             pmm_free_pages(
@@ -137,24 +162,28 @@ void *vmm_alloc_pages(size_t count) {
     return NULL;
 }
 
+/*
+ * Free `count` pages, starting from `addr`
+ */
 void vmm_free_pages(void *addr, size_t count) {
-    if ((uintptr_t) addr < vmm_allocator.base_address || count == 0) {
+    if ((uintptr_t) addr < vmm_allocator.base_address ||
+        count == 0) { // Freeing zero pages, nuh uh
         return;
     }
 
-    uintptr_t address = (uintptr_t) addr;
+    const uintptr_t address = (uintptr_t) addr;
+    const uintptr_t phys = vmm_get_phys(address);
     size_t start_index = (address - vmm_allocator.base_address) / PAGE_SIZE;
 
     if (start_index + count > vmm_allocator.total_pages) {
         return;
     }
 
+    if (phys != (uintptr_t) -1) {
+        pmm_free_pages((void *) (phys + hhdm_offset), count);
+    }
     for (size_t i = 0; i < count; i++) {
         uintptr_t virt = address + (i * PAGE_SIZE);
-        uintptr_t phys = vmm_get_phys(virt);
-        if (phys != (uintptr_t) -1) {
-            pmm_free_pages((void *) (phys + hhdm_offset), count);
-        }
         vmm_unmap_page(virt);
         if (bitmap_test_bit(start_index + i)) {
             bitmap_clear_bit(start_index + i);

@@ -63,5 +63,4 @@ void gdt_install() {
                  :
                  :
                  : "rax", "ax", "memory");
-    k_info("GDT initialized");
 }
