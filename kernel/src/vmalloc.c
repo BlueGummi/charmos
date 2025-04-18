@@ -130,7 +130,7 @@ void *vmm_alloc_pages(const size_t count) {
                     vmm_allocator.base_address + start_index * PAGE_SIZE;
                 for (size_t k = 0; k < count; k++) {
                     uintptr_t virt = address + (k * PAGE_SIZE);
-                    uintptr_t phys = (uintptr_t) pmm_alloc_page() - hhdm_offset;
+                    uintptr_t phys = (uintptr_t) pmm_alloc_page();
 
                     // Allocation failed
                     if (phys == (uintptr_t) -1) {
@@ -148,6 +148,7 @@ void *vmm_alloc_pages(const size_t count) {
                         vmm_allocator.free_pages += count;
                         return NULL;
                     }
+		    phys -= hhdm_offset;
                     vmm_map_page(virt, phys, PT_KERNEL_RW);
                 }
                 return (void *) address;
