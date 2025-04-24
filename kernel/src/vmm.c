@@ -45,16 +45,12 @@ void vmm_copy_kernel_mappings(uintptr_t new_virt_base) {
     }
 }
 
-void map_custom_region(uintptr_t virt_base, size_t size, uint64_t flags,
-                       const char *name) {
-    k_info(
-        "Mapping custom region \"%s\" of size 0x%zx, at base v.addr of 0x%zx",
-        name, size, virt_base);
+void vmm_map_region(uintptr_t virt_base, uint64_t size, uint64_t flags) {
     for (uintptr_t virt = virt_base; virt < virt_base + size;
          virt += PAGE_SIZE) {
-        uintptr_t phys = (uintptr_t) pmm_alloc_page() - hhdm_offset;
+        uintptr_t phys = (uintptr_t) pmm_alloc_page(false);
         if (phys == (uintptr_t) -1) {
-            k_panic("Error: Out of memory mapping %s\n", name);
+            k_panic("Error: Out of memory mapping region\n");
             return;
         }
         vmm_map_page(virt, phys, flags);
@@ -62,7 +58,7 @@ void map_custom_region(uintptr_t virt_base, size_t size, uint64_t flags,
 }
 
 void vmm_init() {
-    kernel_pml4 = (PageTable *) pmm_alloc_page();
+    kernel_pml4 = (PageTable *) pmm_alloc_page(true);
     kernel_pml4_phys = (uintptr_t) kernel_pml4 - hhdm_offset;
     memset(kernel_pml4, 0, PAGE_SIZE);
 
@@ -90,14 +86,13 @@ void vmm_init() {
 
     for (uintptr_t virt = (uintptr_t) __slimine_requests;
          virt < (uintptr_t) __elimine_requests; virt += PAGE_SIZE) {
-        uintptr_t phys = (uintptr_t) pmm_alloc_page() - hhdm_offset;
+        uintptr_t phys = (uintptr_t) pmm_alloc_page(false);
         vmm_map_page(virt, phys, PT_KERNEL_RW);
     }
     vmm_copy_kernel_mappings(0xffffffffc0000000);
     vmm_bitmap_init(0xffff800000000000, 0x100000);
     asm volatile("sti; hlt");
     asm volatile("mov %0, %%cr3" : : "r"(kernel_pml4_phys) : "memory");
-    k_printf("PML4 is at 0x%zx\n", kernel_pml4_phys);
 }
 
 /* This is our virtual memory paging system. We get a virtual address, and a
@@ -118,7 +113,7 @@ void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
 
     PageTableEntry *entry = &current_table->entries[L4];
     if (!(*entry & PAGING_PRESENT)) {
-        PageTable *new_table = (PageTable *) pmm_alloc_page();
+        PageTable *new_table = (PageTable *) pmm_alloc_page(true);
         uintptr_t new_table_phys = (uintptr_t) new_table - hhdm_offset;
         memset(new_table, 0, PAGE_SIZE);
         *entry = new_table_phys | PAGING_PRESENT | PAGING_WRITE;
@@ -126,7 +121,7 @@ void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
     entry = &current_table->entries[L3];
     if (!(*entry & PAGING_PRESENT)) {
-        PageTable *new_table = (PageTable *) pmm_alloc_page();
+        PageTable *new_table = (PageTable *) pmm_alloc_page(true);
         uintptr_t new_table_phys = (uintptr_t) new_table - hhdm_offset;
         memset(new_table, 0, PAGE_SIZE);
         *entry = new_table_phys | PAGING_PRESENT | PAGING_WRITE;
@@ -135,7 +130,7 @@ void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
 
     entry = &current_table->entries[L2];
     if (!(*entry & PAGING_PRESENT)) {
-        PageTable *new_table = (PageTable *) pmm_alloc_page();
+        PageTable *new_table = (PageTable *) pmm_alloc_page(true);
         uintptr_t new_table_phys = (uintptr_t) new_table - hhdm_offset;
         memset(new_table, 0, PAGE_SIZE);
         *entry = new_table_phys | PAGING_PRESENT | PAGING_WRITE;
@@ -148,6 +143,9 @@ void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
 }
 
+/*
+ * Unmap a singular 4KB page
+ */
 void vmm_unmap_page(uintptr_t virt) {
     uint64_t L1 = (virt >> 12) & 0x1FF;
     uint64_t L2 = (virt >> 21) & 0x1FF;
@@ -172,8 +170,4 @@ void vmm_unmap_page(uintptr_t virt) {
     entry = &current_table->entries[L1];
     *entry &= ~PAGING_PRESENT;
     asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
-}
-
-void *vmm_alloc_page() {
-    return vmm_alloc_pages(1);
 }

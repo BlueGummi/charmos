@@ -1,4 +1,4 @@
-#include "uacpi/internal/log.h"
+//#include "uacpi/internal/log.h"
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
 #include <limine.h>
@@ -63,7 +63,6 @@ __attribute__((
         ".limine_requests_end"))) static volatile LIMINE_REQUESTS_END_MARKER;
 
 void kmain(void) {
-
     if (LIMINE_BASE_REVISION_SUPPORTED == false) {
         asm("hlt");
     }
@@ -85,6 +84,7 @@ void kmain(void) {
     asm volatile("cli");
     k_printf_init(ft_ctx);
     k_info("Framebuffer initialized");
+    debug_print_stack();
     enable_smap_smep_umip();
     k_info("Supervisor memory protection enabled");
 
@@ -103,7 +103,7 @@ void kmain(void) {
         mp_response.flags = mp->flags;
         mp_response.bsp_lapic_id = mp->bsp_lapic_id;
         mp_response.cpu_count = mp->cpu_count;
-        mp_response.cpus = pmm_alloc_page();
+        mp_response.cpus = pmm_alloc_page(true);
 
         /*for (uint64_t i = 0; i < mp_response.cpu_count; i++) {
             mp_response.cpus[i]->processor_id = mp->cpus[i]->processor_id;
@@ -115,7 +115,10 @@ void kmain(void) {
     }
 
     vmm_offset_set(response->offset);
+
     vmm_init();
+    vmm_map_region(0x123123123, 0x7700, PAGING_WRITE);
+    vmm_map_region(0x4444446969, 0x33333, PAGING_XD);
     k_info("we have %d cores", mp_response.cpu_count);
     uint64_t *p = vmm_alloc_pages(6);
     k_info("Tested an allocation of 0x%x pages", 6);
@@ -132,7 +135,7 @@ void kmain(void) {
     k_info((read_cmos(0x0) & 1) == 1
                ? "Houston, Tranquility Base here. The Eagle has landed."
                : "If puns were deli meat, this would be the wurst.");
-
+    debug_print_stack();
     while (1) {
         asm("hlt");
     }

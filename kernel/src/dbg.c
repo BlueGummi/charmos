@@ -34,19 +34,17 @@ void debug_print_registers() {
     k_printf("RFLAGS: 0x%lx\n", rflags);
 }
 
-void debug_print_stack(int num_frames) {
-    uint64_t *rbp;
-    __asm__ volatile("movq %%rbp, %0" : "=r"(rbp));
+void debug_print_stack() {
+    uint64_t *rsp;
 
-    k_printf("Stack Trace:\n");
-    for (int i = 0; i < num_frames; i++) {
-        if (rbp == NULL)
-            break;
-        k_printf("Frame %d: RBP = 0x%lx, RIP = 0x%lx\n", i, rbp, *(rbp + 1));
-        rbp = (uint64_t *) *rbp;
+    __asm__ volatile("mov %%rsp, %0" : "=r"(rsp));
+
+    k_printf("Stack (from rsp):\n");
+    for (int i = 0; i < 32; i++) {
+        if (rsp[i] != 0)
+            k_printf("  [%2d] 0x%016lx\n", i, rsp[i]);
     }
 }
-
 void debug_print_memory(void *addr, size_t size) {
     uint8_t *ptr = (uint8_t *) addr;
     k_printf("Memory at 0x%lx:\n", (uint64_t) addr);

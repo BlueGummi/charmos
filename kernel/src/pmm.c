@@ -53,11 +53,11 @@ void init_physical_allocator(uint64_t o, struct limine_memmap_request m) {
     }
 }
 
-void *pmm_alloc_page() {
+void *pmm_alloc_page(bool add_offset) {
     for (size_t i = 0; i < BITMAP_SIZE * 8; i++) {
         if (!test_bit(i)) {
             set_bit(i);
-            void *page = (void *) offset + (i * PAGE_SIZE);
+            void *page = (void *) ((add_offset ? offset : 0) + (i * PAGE_SIZE));
             return page;
         }
     }
@@ -65,6 +65,9 @@ void *pmm_alloc_page() {
     return NULL;
 }
 
+/*
+ * Free a non-offsetted page from the PMM bitmap
+ */
 void free_page(void *addr) {
     size_t index = (size_t) addr / PAGE_SIZE;
     if (index >= BITMAP_SIZE * 8) {
@@ -75,6 +78,10 @@ void free_page(void *addr) {
     k_printf("Freed page at 0x%zx\n", (size_t) addr);
 }
 
+/*
+ * Give an overview of the PMM's bitmap state.
+ * Used for debug and log.
+ */
 void print_memory_status() {
     size_t total_pages = BITMAP_SIZE * 8;
     size_t free_pages = 0;
@@ -113,7 +120,7 @@ void *pmm_alloc_pages(size_t count) {
     }
 
     if (count == 1) {
-        return pmm_alloc_page();
+        return pmm_alloc_page(false);
     }
 
     size_t consecutive = 0;
