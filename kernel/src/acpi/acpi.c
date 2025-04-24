@@ -1,7 +1,7 @@
 #include <stdint.h>
-#include <system/pmm.h>
-#include <system/printf.h>
-#include <system/vmm.h>
+#include <pmm.h>
+#include <printf.h>
+#include <vmm.h>
 #include <uacpi/event.h>
 #include <uacpi/status.h>
 #include <uacpi/uacpi.h>

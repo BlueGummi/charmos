@@ -1,6 +1,6 @@
 #include <stddef.h>
 #include <stdint.h>
-#include <system/printf.h>
+#include <printf.h>
 
 void debug_print_registers() {
     uint64_t rax, rbx, rcx, rdx, rsi, rdi, rsp, rbp, rip, rflags;

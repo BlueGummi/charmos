@@ -2,8 +2,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <system/memfuncs.h>
-#include <system/printf.h>
+#include <memfuncs.h>
+#include <printf.h>
 
 #define PAGE_SIZE 4096
 

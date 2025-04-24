@@ -1,3 +1,5 @@
+#ifndef COLORS_H
+#define COLORS_H
 #include <stdbool.h>
 typedef enum {
     COLOR_RED,
@@ -50,3 +52,4 @@ typedef enum {
 #define ANSI_BRIGHT_WHITE "\033[97m"
 #define ANSI_RED_CONST "\033[31m"
 #define ANSI_BOLD_CONST "\033[1m"
+#endif

@@ -1,7 +1,7 @@
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
-#include <misc/colors.h>
-#include <system/time.h>
+#include <colors.h>
+#include <time.h>
 #define k_panic(fmt, ...)                                                      \
     do {                                                                       \
         k_printf("\n+-\033[31m!!!\033[0m[\033[91mPANIC\033[0m]\033[31m!!!"     \

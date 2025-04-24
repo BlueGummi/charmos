@@ -1,10 +1,10 @@
 #include <limine.h>
 #include <stdint.h>
-#include <system/memfuncs.h>
-#include <system/pmm.h>
-#include <system/printf.h>
-#include <system/vmalloc.h>
-#include <system/vmm.h>
+#include <memfuncs.h>
+#include <pmm.h>
+#include <printf.h>
+#include <vmalloc.h>
+#include <vmm.h>
 
 PageTable *kernel_pml4 = NULL;
 uintptr_t kernel_pml4_phys = 0;

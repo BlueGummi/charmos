@@ -6,21 +6,18 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <system/a_config.h>
-#include <system/dbg.h>
-#include <system/dsdt.h>
-#include <system/fadt.h>
-#include <system/gdt.h>
-#include <system/idt.h>
-#include <system/io.h>
-#include <system/memfuncs.h>
-#include <system/pmm.h>
-#include <system/printf.h>
-#include <system/rsdp.h>
-#include <system/shutdown.h>
-#include <system/smap.h>
-#include <system/vmalloc.h>
-#include <system/vmm.h>
+#include <dbg.h>
+#include <gdt.h>
+#include <idt.h>
+#include <io.h>
+#include <memfuncs.h>
+#include <pmm.h>
+#include <printf.h>
+#include <rsdp.h>
+#include <shutdown.h>
+#include <smap.h>
+#include <vmalloc.h>
+#include <vmm.h>
 
 __attribute__((used,
                section(".limine_requests_"

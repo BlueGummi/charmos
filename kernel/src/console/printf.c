@@ -2,7 +2,7 @@
 #include <flanterm/flanterm.h>
 #include <stdarg.h>
 #include <stddef.h>
-#include <system/memfuncs.h>
+#include <memfuncs.h>
 
 struct flanterm_context *ft_ctx;
 

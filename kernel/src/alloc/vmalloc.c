@@ -1,9 +1,9 @@
 #include <stdbool.h>
 #include <stdint.h>
-#include <system/memfuncs.h>
-#include <system/pmm.h>
-#include <system/printf.h>
-#include <system/vmm.h>
+#include <memfuncs.h>
+#include <pmm.h>
+#include <printf.h>
+#include <vmm.h>
 
 extern uint64_t hhdm_offset;
 extern void *kernel_pml4;

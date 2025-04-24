@@ -1,12 +1,12 @@
 #include <stdint.h>
-#include <system/dbg.h>
-#include <system/io.h>
-#include <system/kb.h>
-#include <system/pmm.h>
-#include <system/printf.h>
-#include <system/shutdown.h>
-#include <system/vmalloc.h>
-#include <system/vmm.h>
+#include <dbg.h>
+#include <io.h>
+#include <kb.h>
+#include <pmm.h>
+#include <printf.h>
+#include <shutdown.h>
+#include <vmalloc.h>
+#include <vmm.h>
 
 #define IDT_ENTRIES 256
 
