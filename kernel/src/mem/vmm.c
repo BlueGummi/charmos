@@ -91,7 +91,6 @@ void vmm_init() {
     }
     vmm_copy_kernel_mappings(0xffffffffc0000000);
     vmm_bitmap_init(0xffff800000000000, 0x100000);
-    asm volatile("sti; hlt");
     asm volatile("mov %0, %%cr3" : : "r"(kernel_pml4_phys) : "memory");
 }
 

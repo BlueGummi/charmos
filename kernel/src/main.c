@@ -10,15 +10,16 @@
 #include <pmm.h>
 #include <printf.h>
 #include <shutdown.h>
+#include <slock.h>
 #include <smap.h>
 #include <stdalign.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <task.h>
 #include <vmalloc.h>
 #include <vmm.h>
-#include <slock.h>
 
 __attribute__((used,
                section(".limine_requests_"
@@ -65,7 +66,20 @@ spinlock_t cpu_id_lock = SPINLOCK_INIT;
 volatile uint32_t cpus_woken = 0;
 int glob_cpu_c = 0;
 volatile uint32_t expected_cpu_id = 0;
-
+struct task_t *current_task = NULL;
+struct task_t *first_task = NULL;
+void task1() {
+    while (1) {
+        k_printf("t1\n");
+        asm("hlt");
+    }
+}
+void task2() {
+    while (1) {
+        k_printf("t2\n");
+        asm("hlt");
+    }
+}
 void wakeup() {
     uint32_t my_cpu_id;
 
@@ -89,7 +103,6 @@ void wakeup() {
     while (1)
         asm("hlt");
 }
-
 void kmain(void) {
     if (LIMINE_BASE_REVISION_SUPPORTED == false) {
         asm("hlt");
@@ -115,7 +128,7 @@ void kmain(void) {
 
     struct limine_mp_response *mpr = mp_request.response;
 
-    for (atomic_int_least64_t i; i < mpr->cpu_count; i++) {
+    for (uint64_t i = 0; i < mpr->cpu_count; i++) {
         struct limine_mp_info *curr_cpu = mpr->cpus[i];
         curr_cpu->goto_address = wakeup;
     }
@@ -150,6 +163,32 @@ void kmain(void) {
                ? "Houston, Tranquility Base here. The Eagle has landed."
                : "If puns were deli meat, this would be the wurst.");
     debug_print_stack();
+    struct task_t *t1 = create_task(task1);
+    struct task_t *t2 = create_task(task2);
+    t1->next = t2;
+    t2->next = t1;
+    first_task = t1;
+    current_task = first_task;
+    asm volatile("mov %0, %%rsp\n"
+                 "pop %%r15\n"
+                 "pop %%r14\n"
+                 "pop %%r13\n"
+                 "pop %%r12\n"
+                 "pop %%r11\n"
+                 "pop %%r10\n"
+                 "pop %%r9\n"
+                 "pop %%r8\n"
+                 "pop %%rbp\n"
+                 "pop %%rdi\n"
+                 "pop %%rsi\n"
+                 "pop %%rdx\n"
+                 "pop %%rcx\n"
+                 "pop %%rbx\n"
+                 "pop %%rax\n"
+                 "iretq\n"
+                 :
+                 : "r"(&current_task->regs)
+                 : "memory");
     while (1) {
         asm("hlt");
     }

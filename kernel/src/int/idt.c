@@ -1,10 +1,10 @@
-#include <stdint.h>
 #include <dbg.h>
 #include <io.h>
 #include <kb.h>
 #include <pmm.h>
 #include <printf.h>
 #include <shutdown.h>
+#include <stdint.h>
 #include <vmalloc.h>
 #include <vmm.h>
 
@@ -45,20 +45,26 @@ struct idt_ptr idtp;
     } while (0)
 
 void remap_pic() {
-    outb(PIC1_COMMAND, 0x11); // Start initialization of master PIC
-    outb(PIC2_COMMAND, 0x11); // Start initialization of slave PIC
+    uint8_t a1, a2;
 
-    outb(PIC1_DATA, 0x20); // Set master PIC offset to 0x20
-    outb(PIC2_DATA, 0x28); // Set slave PIC offset to 0x28
+    a1 = inb(PIC1_DATA); // Save master PIC mask
+    a2 = inb(PIC2_DATA); // Save slave PIC mask
 
-    outb(PIC1_DATA, 0x04); // Master PIC IRQ2 connected to slave
-    outb(PIC2_DATA, 0x02); // Slave PIC connected to IRQ2 on master
+    outb(PIC1_COMMAND, 0x11); // Start init
+    outb(PIC2_COMMAND, 0x11);
 
-    outb(PIC1_DATA, 0x01); // Set 8086 mode for master PIC
-    outb(PIC2_DATA, 0x01); // Set 8086 mode for slave PIC
+    outb(PIC1_DATA, 0x20); // Master offset: 0x20 (32)
+    outb(PIC2_DATA, 0x28); // Slave offset: 0x28 (40)
 
-    outb(PIC1_DATA, 0xFD); // Enable IRQ1 (keyboard) on master PIC
-    outb(PIC2_DATA, 0xFF); // Disable all interrupts on slave PIC
+    outb(PIC1_DATA, 0x04); // Tell master about slave on IRQ2
+    outb(PIC2_DATA, 0x02); // Tell slave its cascade identity
+
+    outb(PIC1_DATA, 0x01); // 8086/88 mode
+    outb(PIC2_DATA, 0x01);
+
+    // Restore saved masks
+    outb(PIC1_DATA, a1);
+    outb(PIC2_DATA, a2);
 }
 
 void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags) {
@@ -101,28 +107,36 @@ __attribute__((interrupt)) void page_fault_handler(void *frame) {
     uint64_t cr2 = read_cr2();
     debug_print_registers();
     k_panic("Page fault! CR3 = 0x%zx\n              CR2 = 0x%zx", cr3, cr2);
-    /*    uint64_t fault_addr;
-        asm volatile("mov %%cr2, %0" : "=r" (fault_addr));
-
-        if (!(error_code & PAGE_PRESENT)) {
-            if (is_valid_fault_address(fault_addr)) {
-                uint64_t *phys = pmm_alloc_page();
-                map_page(fault_addr, *phys, PAGE_PRESENT | PAGE_WRITE);
-                return;
-            }
-        }
-
-        k_panic("Unhandled page fault at 0x%llx, error code: 0x%llx",
-       fault_addr, error_code);*/
 }
+
+void unmask_timer_and_keyboard() {
+    uint8_t mask = inb(PIC1_DATA);
+
+    mask &= ~(1 << 0);
+    mask &= ~(1 << 1);
+
+    outb(PIC1_DATA, mask);
+}
+
 
 void init_interrupts() {
     remap_pic();
-    idt_set_gate(33, (uint64_t) keyboard_handler, 0x08, 0x8E);
-    idt_set_gate(PAGE_FAULT_ID, (uint64_t) page_fault_handler, 0x08, 0x8E);
-    idt_set_gate(DIV_BY_Z_ID, (uint64_t) divbyz_fault, 0x08, 0x8E);
+
+    extern void timer_interrupt_handler();
+
+    idt_set_gate(32, (uint64_t)timer_interrupt_handler, 0x08, 0x8E); // IRQ0
+    idt_set_gate(33, (uint64_t)keyboard_handler, 0x08, 0x8E);         // IRQ1
+    idt_set_gate(PAGE_FAULT_ID, (uint64_t)page_fault_handler, 0x08, 0x8E);
 
     idt_install();
 
+    outb(0x43, 0x36);
+    uint16_t divisor = 1193180 / 100;
+    outb(0x40, divisor & 0xFF);
+    outb(0x40, (divisor >> 8) & 0xFF);
+
+    unmask_timer_and_keyboard();
+
     asm volatile("sti");
 }
+
