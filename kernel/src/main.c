@@ -1,23 +1,24 @@
-//#include "uacpi/internal/log.h"
+// #include "uacpi/internal/log.h"
+#include <dbg.h>
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
-#include <limine.h>
-#include <stdalign.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <dbg.h>
 #include <gdt.h>
 #include <idt.h>
 #include <io.h>
+#include <limine.h>
 #include <memfuncs.h>
 #include <pmm.h>
 #include <printf.h>
-#include <rsdp.h>
 #include <shutdown.h>
 #include <smap.h>
+#include <stdalign.h>
+#include <stdatomic.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <vmalloc.h>
 #include <vmm.h>
+#include <slock.h>
 
 __attribute__((used,
                section(".limine_requests_"
@@ -59,6 +60,36 @@ __attribute__((
     section(
         ".limine_requests_end"))) static volatile LIMINE_REQUESTS_END_MARKER;
 
+spinlock_t wakeup_lock = SPINLOCK_INIT;
+spinlock_t cpu_id_lock = SPINLOCK_INIT;
+volatile uint32_t cpus_woken = 0;
+int glob_cpu_c = 0;
+volatile uint32_t expected_cpu_id = 0;
+
+void wakeup() {
+    uint32_t my_cpu_id;
+
+    spinlock_lock(&cpu_id_lock);
+    my_cpu_id = glob_cpu_c++;
+    spinlock_unlock(&cpu_id_lock);
+
+    while (expected_cpu_id != my_cpu_id)
+        asm volatile("pause");
+
+    spinlock_lock(&wakeup_lock);
+    switch (my_cpu_id) {
+    case 0: k_printf("CPU %d says: bing bop\n", my_cpu_id + 1); break;
+    case 1: k_printf("CPU %d says: boom boom\n", my_cpu_id + 1); break;
+    case 2: k_printf("CPU %d says: boom bop\n", my_cpu_id + 1); break;
+    }
+    cpus_woken++;
+    expected_cpu_id++;
+    spinlock_unlock(&wakeup_lock);
+
+    while (1)
+        asm("hlt");
+}
+
 void kmain(void) {
     if (LIMINE_BASE_REVISION_SUPPORTED == false) {
         asm("hlt");
@@ -81,6 +112,19 @@ void kmain(void) {
     asm volatile("cli");
     k_printf_init(ft_ctx);
     k_info("Framebuffer initialized");
+
+    struct limine_mp_response *mpr = mp_request.response;
+
+    for (atomic_int_least64_t i; i < mpr->cpu_count; i++) {
+        struct limine_mp_info *curr_cpu = mpr->cpus[i];
+        curr_cpu->goto_address = wakeup;
+    }
+
+    while (cpus_woken < mpr->cpu_count - 1) {
+        asm volatile("pause");
+    }
+
+    k_info("bam!");
     debug_print_stack();
     enable_smap_smep_umip();
     k_info("Supervisor memory protection enabled");
@@ -92,42 +136,15 @@ void kmain(void) {
 
     struct limine_hhdm_response *response = hhdm_request.response;
     init_physical_allocator(response->offset, memmap_request);
-
-    struct limine_mp_response mp_response;
-    {
-        struct limine_mp_response *mp = mp_request.response;
-        mp_response.revision = mp->revision;
-        mp_response.flags = mp->flags;
-        mp_response.bsp_lapic_id = mp->bsp_lapic_id;
-        mp_response.cpu_count = mp->cpu_count;
-        mp_response.cpus = pmm_alloc_page(true);
-
-        /*for (uint64_t i = 0; i < mp_response.cpu_count; i++) {
-            mp_response.cpus[i]->processor_id = mp->cpus[i]->processor_id;
-            mp_response.cpus[i]->lapic_id = mp->cpus[i]->lapic_id;
-            mp_response.cpus[i]->reserved = mp->cpus[i]->reserved;
-            mp_response.cpus[i]->goto_address = mp->cpus[i]->goto_address;
-            mp_response.cpus[i]->extra_argument = mp->cpus[i]->extra_argument;
-        }*/
-    }
-
     vmm_offset_set(response->offset);
-
     vmm_init();
+    k_info("Virtual memory initialized");
     vmm_map_region(0x123123123, 0x7700, PAGING_WRITE);
-    vmm_map_region(0x4444446969, 0x33333, PAGING_XD);
-    k_info("we have %d cores", mp_response.cpu_count);
     uint64_t *p = vmm_alloc_pages(6);
     k_info("Tested an allocation of 0x%x pages", 6);
     *p = 42;
     k_printf("P is %d, at address 0x%zx\n", *p, p);
     vmm_free_pages(p, 6);
-
-    extern unsigned char keyboard_shift_map[128];
-    extern unsigned char keyboard_map[128];
-    k_info("Keyboard map at 0x%zx, shift map at 0x%zx", keyboard_map,
-           keyboard_shift_map);
-
     extern uint8_t read_cmos(uint8_t reg);
     k_info((read_cmos(0x0) & 1) == 1
                ? "Houston, Tranquility Base here. The Eagle has landed."
