@@ -9,6 +9,7 @@
 #include <memfuncs.h>
 #include <pmm.h>
 #include <printf.h>
+#include <requests.h>
 #include <shutdown.h>
 #include <slock.h>
 #include <smap.h>
@@ -21,46 +22,6 @@
 #include <vmalloc.h>
 #include <vmm.h>
 
-__attribute__((used,
-               section(".limine_requests_"
-                       "start"))) static volatile LIMINE_REQUESTS_START_MARKER;
-__attribute__((
-    used, section(".limine_requests"))) static volatile LIMINE_BASE_REVISION(3);
-
-__attribute__((
-    used,
-    section(
-        ".limine_requests"))) static volatile struct limine_framebuffer_request
-    framebuffer_request = {.id = LIMINE_FRAMEBUFFER_REQUEST, .revision = 0};
-
-__attribute__((
-    used,
-    section(".limine_requests"))) static volatile struct limine_memmap_request
-    memmap_request = {.id = LIMINE_MEMMAP_REQUEST, .revision = 0};
-
-__attribute__((used, section(".limine_requests"))) static volatile struct
-    limine_executable_address_request addr_request = {
-        .id = LIMINE_EXECUTABLE_ADDRESS_REQUEST, .revision = 0};
-
-__attribute__((
-    used,
-    section(".limine_requests"))) static volatile struct limine_hhdm_request
-    hhdm_request = {.id = LIMINE_HHDM_REQUEST, .revision = 0};
-
-__attribute__((
-    used,
-    section(".limine_requests"))) static volatile struct limine_rsdp_request
-    rsdp_request = {.id = LIMINE_RSDP_REQUEST, .revision = 0};
-
-__attribute__((
-    used, section(".limine_requests"))) static volatile struct limine_mp_request
-    mp_request = {.id = LIMINE_MP_REQUEST, .revision = 0};
-
-__attribute__((
-    used,
-    section(
-        ".limine_requests_end"))) static volatile LIMINE_REQUESTS_END_MARKER;
-
 spinlock_t wakeup_lock = SPINLOCK_INIT;
 spinlock_t cpu_id_lock = SPINLOCK_INIT;
 volatile uint32_t cpus_woken = 0;
@@ -69,18 +30,18 @@ volatile uint32_t expected_cpu_id = 0;
 struct task_t *current_task = NULL;
 struct task_t *first_task = NULL;
 
-void task1() {
-    while (1) {
-        k_printf("task 1 says MAYOOOOO\n");
-        asm("hlt");
+#define make_task(id, sauce)                                                   \
+    void task##id() {                                                          \
+        while (1) {                                                            \
+            k_printf("task %d says %s\n", id, sauce);                          \
+            asm("hlt");                                                        \
+        }                                                                      \
     }
-}
-void task2() {
-    while (1) {
-        k_printf("task 2 says MUSTAAAAARD\n");
-        asm("hlt");
-    }
-}
+make_task(1, "MAYOOOO");
+make_task(2, "MUSTAAARD");
+make_task(3, "KETCHUUUP");
+make_task(4, "RAAAANCH");
+make_task(5, "SAUERKRAAAUUUT");
 
 void wakeup() {
     uint32_t my_cpu_id;
@@ -167,8 +128,14 @@ void kmain(void) {
     debug_print_stack();
     struct task_t *t1 = create_task(task1);
     struct task_t *t2 = create_task(task2);
+    struct task_t *t3 = create_task(task3);
+    struct task_t *t4 = create_task(task4);
+    struct task_t *t5 = create_task(task5);
     t1->next = t2;
-    t2->next = t1;
+    t2->next = t3;
+    t3->next = t4;
+    t4->next = t5;
+    t5->next = t1;
     first_task = t1;
     current_task = first_task;
     asm volatile("mov %0, %%rsp\n"
