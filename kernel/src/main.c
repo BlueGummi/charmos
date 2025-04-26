@@ -68,18 +68,20 @@ int glob_cpu_c = 0;
 volatile uint32_t expected_cpu_id = 0;
 struct task_t *current_task = NULL;
 struct task_t *first_task = NULL;
+
 void task1() {
     while (1) {
-        k_printf("t1\n");
+        k_printf("task 1 says MAYOOOOO\n");
         asm("hlt");
     }
 }
 void task2() {
     while (1) {
-        k_printf("t2\n");
+        k_printf("task 2 says MUSTAAAAARD\n");
         asm("hlt");
     }
 }
+
 void wakeup() {
     uint32_t my_cpu_id;
 

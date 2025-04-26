@@ -45,23 +45,25 @@ in the build directory and it'll bring up qemu with the kernel in it :thumbsup: 
 
     - [ ] parse acpi tables
 
-- [ ] handle other interrupts + add some
+- [x] handle other interrupts + add some
 
 - [x] change tooling 
 
-    - [ ] and reorganize codebase
+    - [x] and reorganize codebase
+
+    - [ ] and do janitor work to cleanup headers and such
 
 - [x] work on some c stdlib-style functions
 
     - [ ] add more c stdlib functions
 
-- [ ] wake up other CPUs
+- [x] wake up other CPUs
 
-- [ ] start making tasks
+- [x] start making tasks
 
-- [ ] spin lock thing
+- [x] spin lock thing
 
-- [ ] scheduler + timer
+- [x] scheduler + timer
 
 - [ ] vfs
 

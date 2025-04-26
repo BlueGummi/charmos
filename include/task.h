@@ -1,3 +1,5 @@
+#ifndef TASK_H
+#define TASK_H
 #include <stdint.h>
 struct cpu_state_t {
     uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
@@ -12,3 +14,4 @@ struct task_t {
 struct task_t *create_task(void (*entry_point)());
 
 void schedule(struct cpu_state_t *cpu);
+#endif
