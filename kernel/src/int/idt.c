@@ -131,12 +131,11 @@ void init_interrupts() {
     idt_install();
 
     outb(0x43, 0x36);
-    uint16_t divisor = 1193180 / 1;
+    uint16_t divisor = 1193180;
     outb(0x40, divisor & 0xFF);
     outb(0x40, (divisor >> 8) & 0xFF);
 
     unmask_timer_and_keyboard();
 
-    asm volatile("sti");
 }
 

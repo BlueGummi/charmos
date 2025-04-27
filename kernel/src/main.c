@@ -67,6 +67,7 @@ void wakeup() {
         asm("hlt");
 }
 void kmain(void) {
+    asm volatile("cli");
     if (LIMINE_BASE_REVISION_SUPPORTED == false) {
         asm("hlt");
     }
@@ -85,7 +86,6 @@ void kmain(void) {
         framebuffer->green_mask_shift, framebuffer->blue_mask_size,
         framebuffer->blue_mask_shift, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
         NULL, 0, 0, 1, 0, 0, 0);
-    asm volatile("cli");
     k_printf_init(ft_ctx);
     k_info("Framebuffer initialized");
 
@@ -154,6 +154,7 @@ void kmain(void) {
                  "pop %%rcx\n"
                  "pop %%rbx\n"
                  "pop %%rax\n"
+                 "sti\n"
                  "iretq\n"
                  :
                  : "r"(&current_task->regs)

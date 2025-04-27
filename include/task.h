@@ -13,5 +13,5 @@ struct task_t {
 };
 struct task_t *create_task(void (*entry_point)());
 
-void schedule(struct cpu_state_t *cpu);
+uint64_t schedule(struct cpu_state_t *cpu);
 #endif

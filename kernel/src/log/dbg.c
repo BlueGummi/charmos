@@ -1,9 +1,10 @@
+#include <printf.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <printf.h>
 
 void debug_print_registers() {
     uint64_t rax, rbx, rcx, rdx, rsi, rdi, rsp, rbp, rip, rflags;
+    uint64_t r8, r9, r10, r11, r12, r13, r14, r15;
 
     __asm__ volatile("movq %%rax, %0\n\t"
                      "movq %%rbx, %1\n\t"
@@ -21,17 +22,38 @@ void debug_print_registers() {
                      :
                      : "memory");
 
+    __asm__ volatile("movq %%r8, %0\n\t"
+                     "movq %%r9, %1\n\t"
+                     "movq %%r10, %2\n\t"
+                     "movq %%r11, %3\n\t"
+                     "movq %%r12, %4\n\t"
+                     "movq %%r13, %5\n\t"
+                     "movq %%r14, %6\n\t"
+                     "movq %%r15, %7\n\t"
+                     : "=r"(r8), "=r"(r9), "=r"(r10), "=r"(r11), "=r"(r12),
+                       "=r"(r13), "=r"(r14), "=r"(r15)
+                     :
+                     : "memory");
+
     k_printf("Registers:\n");
-    k_printf("RAX: 0x%lx\n", rax);
-    k_printf("RBX: 0x%lx\n", rbx);
-    k_printf("RCX: 0x%lx\n", rcx);
-    k_printf("RDX: 0x%lx\n", rdx);
-    k_printf("RSI: 0x%lx\n", rsi);
-    k_printf("RDI: 0x%lx\n", rdi);
-    k_printf("RSP: 0x%lx\n", rsp);
-    k_printf("RBP: 0x%lx\n", rbp);
-    k_printf("RIP: 0x%lx\n", rip);
-    k_printf("RFLAGS: 0x%lx\n", rflags);
+    k_printf("   RAX: 0x%lx\n", rax);
+    k_printf("   RBX: 0x%lx\n", rbx);
+    k_printf("   RCX: 0x%lx\n", rcx);
+    k_printf("   RDX: 0x%lx\n", rdx);
+    k_printf("   RSI: 0x%lx\n", rsi);
+    k_printf("   RDI: 0x%lx\n", rdi);
+    k_printf("   RSP: 0x%lx\n", rsp);
+    k_printf("   RBP: 0x%lx\n", rbp);
+    k_printf("   RIP: 0x%lx\n", rip);
+    k_printf("   RFLAGS: 0x%lx\n", rflags);
+    k_printf("   R8: 0x%lx\n", r8);
+    k_printf("   R9: 0x%lx\n", r9);
+    k_printf("   R10: 0x%lx\n", r10);
+    k_printf("   R11: 0x%lx\n", r11);
+    k_printf("   R12: 0x%lx\n", r12);
+    k_printf("   R13: 0x%lx\n", r13);
+    k_printf("   R14: 0x%lx\n", r14);
+    k_printf("   R15: 0x%lx\n", r15);
 }
 
 void debug_print_stack() {

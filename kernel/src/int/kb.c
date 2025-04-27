@@ -1,9 +1,9 @@
-#include <stdint.h>
 #include <io.h>
 #include <memfuncs.h>
 #include <printf.h>
 #include <shutdown.h>
-
+#include <stdint.h>
+#include <dbg.h>
 #define KB_DOWN_LSHIFT 0x2A
 #define KB_UP_LSHIFT 0xAA
 #define KB_CAPSLOCK 0x3A
@@ -63,6 +63,10 @@ __attribute__((interrupt)) void keyboard_handler(void *a) {
             memset(buffer, 0, sizeof(buffer));
             index = 0;
         } else {
+            if (character == '1') {
+                debug_print_registers();
+                asm volatile("cli;hlt");
+            }
             buffer[index++] = character;
         }
     }

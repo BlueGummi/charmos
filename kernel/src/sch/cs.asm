@@ -1,7 +1,6 @@
 extern schedule
 global timer_interrupt_handler
 timer_interrupt_handler:
-    ; Push all general-purpose registers
     push rax
     push rbx
     push rcx
@@ -21,10 +20,11 @@ timer_interrupt_handler:
     ; Save segment registers, rip, rflags, rsp, etc, already pushed by CPU
     mov rdi, rsp   ; Pass pointer to cpu_state_t to C
     call schedule
+    cmp eax, 0
+    je end
     mov dx, 0x20
     mov ax, 0x20
     out dx, ax
-    ; Pop all registers
     pop r15
     pop r14
     pop r13
@@ -40,6 +40,10 @@ timer_interrupt_handler:
     pop rcx
     pop rbx
     pop rax
-    ; Return from interrupt
+    iretq
+end:
+    mov dx, 0x20
+    mov ax, 0x20
+    out dx, ax
     iretq
 
