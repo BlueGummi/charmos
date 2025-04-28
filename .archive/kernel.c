@@ -8,7 +8,8 @@ unsigned int k_printf(const char *format, unsigned int line, ...);
 void k_main() {
     k_clear_screen();
     k_printf("I like to make walks in the morning, ja? with my legs", 0);
-    k_printf("Integer: %d, String: %s, Char: %c, Hex: %x\n", 1, 42, "test", 'A', 0xDEADBEEF);
+    k_printf("Integer: %d, String: %s, Char: %c, Hex: %x\n", 1, 42, "test", 'A',
+             0xDEADBEEF);
 };
 
 void k_clear_screen() {

@@ -1,7 +1,7 @@
-#include <stdbool.h>
-#include <stdint.h>
 #include <io.h>
 #include <printf.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 #define CMOS_ADDRESS 0x70
 #define CMOS_DATA 0x71

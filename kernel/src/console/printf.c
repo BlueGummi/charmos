@@ -1,8 +1,8 @@
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
+#include <memfuncs.h>
 #include <stdarg.h>
 #include <stddef.h>
-#include <memfuncs.h>
 
 struct flanterm_context *ft_ctx;
 

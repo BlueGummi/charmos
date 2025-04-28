@@ -118,15 +118,14 @@ void unmask_timer_and_keyboard() {
     outb(PIC1_DATA, mask);
 }
 
-
 void init_interrupts() {
     remap_pic();
 
     extern void timer_interrupt_handler();
 
-    idt_set_gate(32, (uint64_t)timer_interrupt_handler, 0x08, 0x8E); // IRQ0
-    idt_set_gate(33, (uint64_t)keyboard_handler, 0x08, 0x8E);         // IRQ1
-    idt_set_gate(PAGE_FAULT_ID, (uint64_t)page_fault_handler, 0x08, 0x8E);
+    idt_set_gate(32, (uint64_t) timer_interrupt_handler, 0x08, 0x8E); // IRQ0
+    idt_set_gate(33, (uint64_t) keyboard_handler, 0x08, 0x8E);        // IRQ1
+    idt_set_gate(PAGE_FAULT_ID, (uint64_t) page_fault_handler, 0x08, 0x8E);
 
     idt_install();
 
@@ -136,6 +135,4 @@ void init_interrupts() {
     outb(0x40, (divisor >> 8) & 0xFF);
 
     unmask_timer_and_keyboard();
-
 }
-

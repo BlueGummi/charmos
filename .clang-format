@@ -6,5 +6,6 @@ SpaceAfterCStyleCast: true
 AllowShortBlocksOnASingleLine: Empty
 AllowShortCaseLabelsOnASingleLine: true
 AllowShortFunctionsOnASingleLine: Inline
+KeepEmptyLinesAtTheStartOfBlocks: true
 BreakBeforeBraces: Attach
 ColumnLimit: 80
