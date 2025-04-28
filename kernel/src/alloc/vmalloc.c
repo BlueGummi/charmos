@@ -22,7 +22,7 @@ typedef struct {
 
 static VmmBitmapAllocator vmm_allocator;
 
-void vmmalloc_set_offset(uint64_t o) {
+void vmalloc_set_offset(uint64_t o) {
     hhdm_offset = o;
 }
 
