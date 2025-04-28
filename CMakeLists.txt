@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
-project(OS C ASM_NASM)
+project(chiarOS C ASM_NASM)
 
 set(CMAKE_C_STANDARD 11)
 set(ARCH "x86_64")
-set(IMAGE_NAME "os-${ARCH}")
+set(IMAGE_NAME "chiaros-${ARCH}")
 set(CMAKE_SYSTEM_NAME Generic)
 set(CMAKE_SYSTEM_PROCESSOR x86_64)
 
