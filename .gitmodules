@@ -1,6 +1,6 @@
 [submodule "kernel/src/flanterm"]
 	path = kernel/src/flanterm
-	url = https://github.com/mintsuki/flanterm
+	url = https://codeberg.org/mintsuki/flanterm
 [submodule "kernel/src/uACPI"]
 	path = kernel/src/uACPI
 	url = https://github.com/uACPI/uACPI
