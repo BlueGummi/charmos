@@ -1,4 +1,6 @@
-# kernel - i have not given this kernel a name
+# chiaros - Compact, Hobbyist, Independent, And Recreational Operating System
+
+A from-scratch OS
 
 ## install
 
