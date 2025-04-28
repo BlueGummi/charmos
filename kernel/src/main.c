@@ -34,7 +34,12 @@ struct task_t *first_task = NULL;
     void task##id() {                                                          \
         while (1) {                                                            \
             k_printf("task %d says %s\n", id, sauce);                          \
-            asm("hlt");                                                        \
+            for (int i = 0; i < 10; i++)                                       \
+                asm("hlt");                                                    \
+            for (int i = 0; i < 50; i++) {                                     \
+                asm("hlt");                                                    \
+                k_printf("task %d runs the %dth loop!\n", id, i);              \
+            }                                                                  \
         }                                                                      \
     }
 make_task(1, "MAYOOOO");

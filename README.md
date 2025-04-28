@@ -27,7 +27,9 @@ in the build directory and it'll bring up qemu with the kernel in it :thumbsup: 
 
 
 
-### todo :sunglasses:
+### todo-list: THE GAME :sunglasses:
+
+#### level 1: "The Basics"
 
 - [x] gdt + idt
 
@@ -37,9 +39,11 @@ in the build directory and it'll bring up qemu with the kernel in it :thumbsup: 
 
     - [x] virtual memory allocator
 
-        - [ ] virtual memory slab allocator
+        - [ ] virtual memory slab allocator in rust
 
 - [x] do paging properly
+
+#### level 2: "IO Intricacies"
 
 - [ ] uACPI setup
 
@@ -47,15 +51,21 @@ in the build directory and it'll bring up qemu with the kernel in it :thumbsup: 
 
 - [x] handle other interrupts + add some
 
+#### dlc: "Toolfoolery and QOL"
+
 - [x] change tooling 
 
     - [x] and reorganize codebase
 
     - [ ] and do janitor work to cleanup headers and such
 
+    - [ ] formalize a style specification
+
 - [x] work on some c stdlib-style functions
 
     - [ ] add more c stdlib functions
+
+#### level 3: "Parallel Predicaments"
 
 - [x] wake up other CPUs
 
@@ -63,8 +73,28 @@ in the build directory and it'll bring up qemu with the kernel in it :thumbsup: 
 
 - [x] spin lock thing
 
-- [x] scheduler + timer
+- [ ] multithread more core functions
+
+#### level 4: "Task Troubles"
+
+- [x] beginnings of scheduler + timer
+
+    - [ ] add more robust scheduling that keeps track of more context and doesn't just do a circular LL
+    
+        - [ ] implement smarter scheduler (maybe)
+    
+    - [ ] allow an adjustable scheduler timer firing interval
+
+#### level 5: "Persistency Problems"
 
 - [ ] vfs
 
+- [ ] fat filesystem
+
+- [ ] ext2
+
 - [ ] probably should make a shell
+
+#### boss 1: "Lord of the Third Ring"
+
+- [ ] enter userspace

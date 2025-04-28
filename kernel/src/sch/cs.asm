@@ -20,8 +20,6 @@ timer_interrupt_handler:
     ; Save segment registers, rip, rflags, rsp, etc, already pushed by CPU
     mov rdi, rsp   ; Pass pointer to cpu_state_t to C
     call schedule
-    cmp eax, 0
-    je end
     mov dx, 0x20
     mov ax, 0x20
     out dx, ax
@@ -40,10 +38,5 @@ timer_interrupt_handler:
     pop rcx
     pop rbx
     pop rax
-    iretq
-end:
-    mov dx, 0x20
-    mov ax, 0x20
-    out dx, ax
     iretq
 
