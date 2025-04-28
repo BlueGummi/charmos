@@ -8,12 +8,13 @@
 
 PageTable *kernel_pml4 = NULL;
 uintptr_t kernel_pml4_phys = 0;
-uint64_t hhdm_offset = 0;
+static uint64_t hhdm_offset = 0;
 
 uint64_t sub_offset(uint64_t a) {
     return a - hhdm_offset;
 }
 void vmm_offset_set(uint64_t o) {
+    vmalloc_set_offset(o);
     hhdm_offset = o;
 }
 unsigned long get_cr3(void) {
@@ -29,6 +30,7 @@ void vmm_copy_kernel_mappings(uintptr_t new_virt_base) {
 
     for (uintptr_t old_virt = old_virt_start; old_virt < old_virt_end;
          old_virt += PAGE_SIZE) {
+
         uintptr_t phys = SUB_HHDM_OFFSET(old_virt);
         if (phys == (uintptr_t) -1)
             continue;
@@ -36,6 +38,7 @@ void vmm_copy_kernel_mappings(uintptr_t new_virt_base) {
         uintptr_t new_virt = new_virt_base + (old_virt - old_virt_start);
 
         uint64_t flags = PAGING_PRESENT;
+
         if (old_virt >= (uintptr_t) (__stext + 0x1000) &&
             old_virt < (uintptr_t) (__stext + 0xb000)) {
             flags |= PAGING_WRITE;
@@ -47,8 +50,10 @@ void vmm_copy_kernel_mappings(uintptr_t new_virt_base) {
 
 void *vmm_map_region(uintptr_t virt_base, uint64_t size, uint64_t flags) {
     void *first;
+
     for (uintptr_t virt = virt_base; virt < virt_base + size;
          virt += PAGE_SIZE) {
+
         uintptr_t phys = (uintptr_t) pmm_alloc_page(false);
         if (virt == virt_base) {
             first = (void *) phys;
@@ -57,8 +62,10 @@ void *vmm_map_region(uintptr_t virt_base, uint64_t size, uint64_t flags) {
             k_panic("Error: Out of memory mapping region\n");
             return NULL;
         }
+
         vmm_map_page(virt, phys, flags);
     }
+
     return first;
 }
 
@@ -95,7 +102,7 @@ void vmm_init() {
         vmm_map_page(virt, phys, PT_KERNEL_RW);
     }
     vmm_copy_kernel_mappings(0xffffffffc0000000);
-    vmm_bitmap_init(0xffff800000000000, 0x100000);
+    vmm_bitmap_init(0xffff800000000000, 0x100000); // TODO: Make this dynamic
     asm volatile("mov %0, %%cr3" : : "r"(kernel_pml4_phys) : "memory");
 }
 
@@ -108,6 +115,7 @@ void vmm_init() {
  * Offsets can be subtracted from addresses allocated by pmm_alloc_page
  */
 void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
+
     uint64_t L1 = (virt >> 12) & 0x1FF;
     uint64_t L2 = (virt >> 21) & 0x1FF;
     uint64_t L3 = (virt >> 30) & 0x1FF;
@@ -117,26 +125,33 @@ void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
 
     PageTableEntry *entry = &current_table->entries[L4];
     if (!(*entry & PAGING_PRESENT)) {
+
         PageTable *new_table = (PageTable *) pmm_alloc_page(true);
         uintptr_t new_table_phys = (uintptr_t) new_table - hhdm_offset;
         memset(new_table, 0, PAGE_SIZE);
+
         *entry = new_table_phys | PAGING_PRESENT | PAGING_WRITE;
     }
     current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+
     entry = &current_table->entries[L3];
     if (!(*entry & PAGING_PRESENT)) {
+
         PageTable *new_table = (PageTable *) pmm_alloc_page(true);
         uintptr_t new_table_phys = (uintptr_t) new_table - hhdm_offset;
         memset(new_table, 0, PAGE_SIZE);
+
         *entry = new_table_phys | PAGING_PRESENT | PAGING_WRITE;
     }
     current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
 
     entry = &current_table->entries[L2];
     if (!(*entry & PAGING_PRESENT)) {
+
         PageTable *new_table = (PageTable *) pmm_alloc_page(true);
         uintptr_t new_table_phys = (uintptr_t) new_table - hhdm_offset;
         memset(new_table, 0, PAGE_SIZE);
+
         *entry = new_table_phys | PAGING_PRESENT | PAGING_WRITE;
     }
     current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
@@ -151,10 +166,12 @@ void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
  * Unmap a singular 4KB page
  */
 void vmm_unmap_page(uintptr_t virt) {
+
     uint64_t L1 = (virt >> 12) & 0x1FF;
     uint64_t L2 = (virt >> 21) & 0x1FF;
     uint64_t L3 = (virt >> 30) & 0x1FF;
     uint64_t L4 = (virt >> 39) & 0x1FF;
+
     PageTable *current_table = kernel_pml4;
     PageTableEntry *entry = &current_table->entries[L4];
     if (!(*entry & PAGING_PRESENT))

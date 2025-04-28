@@ -37,3 +37,4 @@ void vmm_init();
 void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags);
 void *vmm_map_region(uintptr_t virt_base, uint64_t size, uint64_t flags);
 void vmm_unmap_page(uintptr_t virt);
+extern PageTable *kernel_pml4;

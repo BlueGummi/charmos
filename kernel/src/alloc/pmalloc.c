@@ -25,6 +25,7 @@ static bool test_bit(size_t index) {
 
 uint64_t offset = 0;
 void init_physical_allocator(uint64_t o, struct limine_memmap_request m) {
+
     offset = o;
     memset(bitmap, 0xFF, BITMAP_SIZE);
 
@@ -54,6 +55,7 @@ void init_physical_allocator(uint64_t o, struct limine_memmap_request m) {
 }
 
 void *pmm_alloc_page(bool add_offset) {
+
     for (size_t i = 0; i < BITMAP_SIZE * 8; i++) {
         if (!test_bit(i)) {
             set_bit(i);
@@ -69,6 +71,7 @@ void *pmm_alloc_page(bool add_offset) {
  * Free a non-offsetted page from the PMM bitmap
  */
 void free_page(void *addr) {
+
     size_t index = (size_t) addr / PAGE_SIZE;
     if (index >= BITMAP_SIZE * 8) {
         k_printf("Invalid address to free: 0x%zx\n", (size_t) addr);
@@ -83,6 +86,7 @@ void free_page(void *addr) {
  * Used for debug and log.
  */
 void print_memory_status() {
+
     size_t total_pages = BITMAP_SIZE * 8;
     size_t free_pages = 0;
     size_t allocated_pages = 0;
@@ -115,6 +119,7 @@ void print_memory_status() {
  * Allocate `count` pages.
  */
 void *pmm_alloc_pages(size_t count) {
+
     if (count == 0) {
         return NULL;
     }
@@ -128,6 +133,7 @@ void *pmm_alloc_pages(size_t count) {
     bool found = false;
 
     for (size_t i = 0; i < BITMAP_SIZE * 8; i++) {
+
         if (!test_bit(i)) {
             if (consecutive == 0) {
                 start_index = i;
@@ -161,6 +167,7 @@ void *pmm_alloc_pages(size_t count) {
  * Addresses should have the HHDM offset added to them.
  */
 void pmm_free_pages(void *addr, size_t count) {
+
     if (addr == NULL || count == 0) {
         return;
     }
