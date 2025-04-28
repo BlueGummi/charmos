@@ -27,74 +27,92 @@ in the build directory and it'll bring up qemu with the kernel in it :thumbsup: 
 
 
 
-### todo-list: THE GAME :sunglasses:
+## todo-list: THE GAME :sunglasses:
 
-#### level 1: "The Basics"
+> The :trophy: means the task is a challenge and would earn one challenge point
+each level has at least one challenge point to earn
 
-- [x] gdt + idt
+> The :broom: means something is trivial
 
-- [x] allocator
+## Total points: 22/128
+### Challenge points: 0/9 
 
-- [x] virtual memory manager
+### [ ] level 1: "The Basics" (8/13 points)
 
-    - [x] virtual memory allocator
+- [x] gdt + idt (1 point)
 
-        - [ ] virtual memory slab allocator in rust
+- [x] physical memory allocator (1 point)
 
-- [x] do paging properly
+- [x] virtual memory manager (2 points)
 
-#### level 2: "IO Intricacies"
+    - [x] virtual memory allocator (2 points)
 
-- [ ] uACPI setup
+        - [ ] :trophy: virtual memory slab allocator in rust (5 points) 
 
-    - [ ] parse acpi tables
+- [x] do paging properly (2 points)
 
-- [x] handle other interrupts + add some
+### [ ] level 2: "IO Intricacies" (2/7 points)
 
-#### dlc: "Toolfoolery and QOL"
+- [ ] uACPI setup (2 points)
 
-- [x] change tooling 
+    - [ ] :trophy: parse acpi tables (3 points)
 
-    - [x] and reorganize codebase
+- [x] handle other interrupts + add some (2 points)
 
-    - [ ] and do janitor work to cleanup headers and such
+### [ ] dlc: "Toolfoolery and QOL" (5/12 points)
 
-    - [ ] formalize a style specification
+- [x] change tooling (2 points)
 
-- [x] work on some c stdlib-style functions
+    - [x] and reorganize codebase (1 point)
 
-    - [ ] add more c stdlib functions
+    - [ ] :broom: and do janitor work to cleanup headers and such (1 point)
 
-#### level 3: "Parallel Predicaments"
+    - [ ] :trophy: formalize a style specification (3 points)
 
-- [x] wake up other CPUs
+- [x] work on some c stdlib-style functions (2 points)
 
-- [x] start making tasks
+    - [ ] :trophy: add more c stdlib functions (3 points)
 
-- [x] spin lock thing
+### [ ] level 3: "Parallel Predicaments" (5/15 points)
 
-- [ ] multithread more core functions
+- [x] wake up other CPUs (2 points)
 
-#### level 4: "Task Troubles"
+    - [ ] do something useful with them (1 point)
 
-- [x] beginnings of scheduler + timer
+- [x] start making tasks (2 points)
 
-    - [ ] add more robust scheduling that keeps track of more context and doesn't just do a circular LL
+    - [ ] :broom: add more detail to tasks (1 point)
+
+- [x] spin lock thing (1 point)
+
+    - [ ] :broom: lock more things (1 point)
+
+- [ ] :trophy: multithread more core functions (7 points) 
+
+### [ ] level 4: "Task Troubles" (2/21 points)
+
+- [x] beginnings of scheduler + timer (2 points)
+
+    - [ ] add more robust scheduling that keeps track of more context and doesn't just do a circular LL (3 points)
     
-        - [ ] implement smarter scheduler (maybe)
+        - [ ] :trophy: implement smarter scheduler (maybe) (6 points)
     
-    - [ ] allow an adjustable scheduler timer firing interval
+    - [ ] allow an adjustable scheduler timer firing interval (2 points)
 
-#### level 5: "Persistency Problems"
+- [ ] vfs :trophy: (8 points)
 
-- [ ] vfs
+### [ ] level 5: "Persistency Problems" (0/60 points)
 
-- [ ] fat filesystem
+- [ ] :trophy: fat filesystem (10 points)
+    
+    - [ ] userland interface for fs interaction (5 points)
 
-- [ ] ext2
+- [ ] :trophy: ext2 (15 points)
 
-- [ ] probably should make a shell
+- [ ] probably should make a shell (30 points)
 
-#### boss 1: "Lord of the Third Ring"
+### [ ] boss 1: "Lord of the Third Ring" (??? points)
 
-- [ ] enter userspace
+- [ ] enter userspace 
+
+#### to be continued...
