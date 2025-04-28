@@ -14,9 +14,7 @@ uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
 }
 
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
-    uint64_t first_addr = (uint64_t) pmm_alloc_page(false);
-    vmm_map_region(addr, (uint64_t) len, PAGING_PRESENT | PAGING_WRITE);
-    return (void *) first_addr;
+    return vmm_map_region(addr, (uint64_t) len, PAGING_PRESENT | PAGING_WRITE);
 }
 
 void uacpi_kernel_unmap(void *addr, uacpi_size len) {

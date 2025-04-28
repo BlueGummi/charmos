@@ -1,8 +1,8 @@
 #include <limine.h>
-#include <stdint.h>
 #include <memfuncs.h>
 #include <pmm.h>
 #include <printf.h>
+#include <stdint.h>
 #include <vmalloc.h>
 #include <vmm.h>
 
@@ -45,16 +45,21 @@ void vmm_copy_kernel_mappings(uintptr_t new_virt_base) {
     }
 }
 
-void vmm_map_region(uintptr_t virt_base, uint64_t size, uint64_t flags) {
+void *vmm_map_region(uintptr_t virt_base, uint64_t size, uint64_t flags) {
+    void *first;
     for (uintptr_t virt = virt_base; virt < virt_base + size;
          virt += PAGE_SIZE) {
         uintptr_t phys = (uintptr_t) pmm_alloc_page(false);
+        if (virt == virt_base) {
+            first = (void *) phys;
+        }
         if (phys == (uintptr_t) -1) {
             k_panic("Error: Out of memory mapping region\n");
-            return;
+            return NULL;
         }
         vmm_map_page(virt, phys, flags);
     }
+    return first;
 }
 
 void vmm_init() {
