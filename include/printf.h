@@ -1,6 +1,6 @@
+#include <colors.h>
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
-#include <colors.h>
 #include <time.h>
 #define k_panic(fmt, ...)                                                      \
     do {                                                                       \

@@ -38,4 +38,3 @@ __attribute__((
     used,
     section(
         ".limine_requests_end"))) static volatile LIMINE_REQUESTS_END_MARKER;
-

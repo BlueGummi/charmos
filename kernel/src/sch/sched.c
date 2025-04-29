@@ -6,7 +6,7 @@
 // TODO: we need to free memory allocated for tasks
 //
 __attribute__((noreturn)) void enter_first_task(void) {
-    struct cpu_state_t *regs = &global_sched.current->regs;
+    struct cpu_state *regs = &global_sched.current->regs;
 
     asm volatile(
         "push %[rax]\n\t"
@@ -45,7 +45,7 @@ __attribute__((noreturn)) void enter_first_task(void) {
     __builtin_unreachable();
 }
 
-uint64_t schedule(struct cpu_state_t *cpu) {
+uint64_t schedule(struct cpu_state *cpu) {
     static uint8_t iteration = 0;
 
     if (iteration++ < 10) {
@@ -54,27 +54,27 @@ uint64_t schedule(struct cpu_state_t *cpu) {
     iteration = 0;
 
     if (global_sched.current) {
-        memcpy(&global_sched.current->regs, cpu, sizeof(struct cpu_state_t));
+        memcpy(&global_sched.current->regs, cpu, sizeof(struct cpu_state));
         global_sched.current = global_sched.current->next
                                    ? global_sched.current->next
                                    : global_sched.head;
     }
 
     if (global_sched.current) {
-        memcpy(cpu, &global_sched.current->regs, sizeof(struct cpu_state_t));
+        memcpy(cpu, &global_sched.current->regs, sizeof(struct cpu_state));
         return 1;
     }
 
     return 0;
 }
 
-void scheduler_init(struct scheduler_t *sched) {
+void scheduler_init(struct scheduler *sched) {
     sched->head = NULL;
     sched->tail = NULL;
     sched->current = NULL;
 }
 
-void scheduler_add_task(struct scheduler_t *sched, struct task_t *task) {
+void scheduler_add_task(struct scheduler *sched, struct task *task) {
     task->next = NULL;
     task->prev = sched->tail;
 
@@ -89,7 +89,7 @@ void scheduler_add_task(struct scheduler_t *sched, struct task_t *task) {
         sched->current = task;
 }
 
-void scheduler_remove_task(struct scheduler_t *sched, struct task_t *task) {
+void scheduler_remove_task(struct scheduler *sched, struct task *task) {
     if (task->prev)
         task->prev->next = task->next;
     else
@@ -104,8 +104,8 @@ void scheduler_remove_task(struct scheduler_t *sched, struct task_t *task) {
         sched->current = task->next ? task->next : sched->head;
 }
 
-void scheduler_remove_task_by_id(struct scheduler_t *sched, uint64_t task_id) {
-    struct task_t *task = sched->head;
+void scheduler_remove_task_by_id(struct scheduler *sched, uint64_t task_id) {
+    struct task *task = sched->head;
     while (task) {
         if (task->id == task_id) {
             scheduler_remove_task(sched, task);
@@ -115,11 +115,11 @@ void scheduler_remove_task_by_id(struct scheduler_t *sched, uint64_t task_id) {
     }
 }
 
-void scheduler_remove_last_task(struct scheduler_t *sched) {
+void scheduler_remove_last_task(struct scheduler *sched) {
     if (!sched->tail)
         return;
 
-    struct task_t *task = sched->tail;
+    struct task *task = sched->tail;
 
     sched->tail = task->prev;
 

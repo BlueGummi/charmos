@@ -28,8 +28,8 @@ spinlock_t cpu_id_lock = SPINLOCK_INIT;
 volatile uint32_t cpus_woken = 0;
 int glob_cpu_c = 0;
 volatile uint32_t expected_cpu_id = 0;
-struct scheduler_t global_sched;
-struct task_t *t1;
+struct scheduler global_sched;
+struct task *t1;
 #define make_task(id, sauce, terminate)                                        \
     void task##id() {                                                          \
         while (1) {                                                            \
@@ -132,12 +132,12 @@ void kmain(void) {
                : "If puns were deli meat, this would be the wurst.");
     debug_print_stack();
     t1 = create_task(task1);
-    struct task_t *t2 = create_task(task2);
+    struct task *t2 = create_task(task2);
     scheduler_init(&global_sched);
     scheduler_add_task(&global_sched, t1);
     scheduler_add_task(&global_sched, t2);
-//    volatile int *ptr = (int *) 0xDEADBEEF;
-//    *ptr = 42;
+    //    volatile int *ptr = (int *) 0xDEADBEEF;
+    //    *ptr = 42;
     enter_first_task();
     while (1) {
         asm("hlt");

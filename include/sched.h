@@ -2,19 +2,19 @@
 #define SCHED_H
 #include <memfuncs.h>
 #include <task.h>
-struct scheduler_t {
-    struct task_t *head;
-    struct task_t *tail;
-    struct task_t *current;
+struct scheduler {
+    struct task *head;
+    struct task *tail;
+    struct task *current;
 };
 
-void scheduler_init(struct scheduler_t *sched);
-struct task_t *create_task(void (*entry_point)(void));
-void scheduler_add_task(struct scheduler_t *sched, struct task_t *task);
-void scheduler_remove_task(struct scheduler_t *sched, struct task_t *task);
-uint64_t scheduler_schedule(struct scheduler_t *sched, struct cpu_state_t *cpu);
+void scheduler_init(struct scheduler *sched);
+struct task *create_task(void (*entry_point)(void));
+void scheduler_add_task(struct scheduler *sched, struct task *task);
+void scheduler_remove_task(struct scheduler *sched, struct task *task);
+uint64_t scheduler_schedule(struct scheduler *sched, struct cpu_state *cpu);
 __attribute__((noreturn)) void enter_first_task(void);
-void scheduler_remove_last_task(struct scheduler_t *sched);
-extern struct task_t *current_task;
-extern struct scheduler_t global_sched;
+void scheduler_remove_last_task(struct scheduler *sched);
+extern struct task *current_task;
+extern struct scheduler global_sched;
 #endif
