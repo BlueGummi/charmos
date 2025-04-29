@@ -136,8 +136,8 @@ void kmain(void) {
     scheduler_init(&global_sched);
     scheduler_add_task(&global_sched, t1);
     scheduler_add_task(&global_sched, t2);
-    volatile int *ptr = (int *) 0xDEADBEEF;
-    *ptr = 42;
+//    volatile int *ptr = (int *) 0xDEADBEEF;
+//    *ptr = 42;
     enter_first_task();
     while (1) {
         asm("hlt");
