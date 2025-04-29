@@ -1,4 +1,5 @@
 #include <dbg.h>
+#include <idt.h>
 #include <io.h>
 #include <kb.h>
 #include <pmm.h>
@@ -83,16 +84,6 @@ void idt_install() {
     asm volatile("lidt %0" : : "m"(idtp));
 }
 
-static uint64_t read_cr2() {
-    uint64_t cr2;
-    asm volatile("mov %%cr2, %0" : "=r"(cr2));
-    return cr2;
-}
-static uint64_t read_cr3() {
-    uint64_t cr3;
-    asm volatile("mov %%cr3, %0" : "=r"(cr3));
-    return cr3;
-}
 __attribute__((interrupt)) void divbyz_fault(void *frame) {
     (void) frame;
     k_printf(
@@ -101,12 +92,28 @@ __attribute__((interrupt)) void divbyz_fault(void *frame) {
     k_shutdown();
 }
 
-__attribute__((interrupt)) void page_fault_handler(void *frame) {
-    (void) frame;
-    uint64_t cr3 = read_cr3();
-    uint64_t cr2 = read_cr2();
-    debug_print_registers();
-    k_panic("Page fault! CR3 = 0x%zx\n              CR2 = 0x%zx", cr3, cr2);
+void decode_error_code(uint64_t error_code) {
+    k_printf("Error Code: 0x%lx\n", error_code);
+    k_printf("  - Page not Present (P): %s\n",
+             (error_code & 0x01) ? "Yes" : "No");
+    k_printf("  - Write Access (W/R): %s\n",
+             (error_code & 0x02) ? "Write" : "Read");
+    k_printf("  - User Mode (U/S): %s\n",
+             (error_code & 0x04) ? "User" : "Supervisor");
+    k_printf("  - Reserved Bit Set (RSVD): %s\n",
+             (error_code & 0x08) ? "Yes" : "No");
+    k_printf("  - Instruction Fetch (I/D): %s\n",
+             (error_code & 0x10) ? "Yes" : "No");
+    k_printf("  - Protection Key Violation (PK): %s\n",
+             (error_code & 0x20) ? "Yes" : "No");
+}
+
+void page_fault_handler(uint64_t error_code, uint64_t fault_addr) {
+    k_printf("\n=== PAGE FAULT ===\n");
+    k_printf("Faulting Address (CR2): 0x%lx\n", fault_addr);
+    decode_error_code(error_code);
+
+    asm volatile("cli; hlt");
 }
 
 void unmask_timer_and_keyboard() {
@@ -122,10 +129,12 @@ void init_interrupts() {
     remap_pic();
 
     extern void timer_interrupt_handler();
+    extern void page_fault_handler_wrapper();
 
     idt_set_gate(32, (uint64_t) timer_interrupt_handler, 0x08, 0x8E); // IRQ0
     idt_set_gate(33, (uint64_t) keyboard_handler, 0x08, 0x8E);        // IRQ1
-    idt_set_gate(PAGE_FAULT_ID, (uint64_t) page_fault_handler, 0x08, 0x8E);
+    idt_set_gate(PAGE_FAULT_ID, (uint64_t) page_fault_handler_wrapper, 0x08,
+                 0x8E);
 
     idt_install();
 
