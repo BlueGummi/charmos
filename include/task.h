@@ -8,8 +8,11 @@ struct cpu_state_t {
 };
 
 struct task_t {
+    uint64_t id;
+    void *entry;
     struct cpu_state_t regs;
     struct task_t *next;
+    struct task_t *prev;
 };
 struct task_t *create_task(void (*entry_point)());
 

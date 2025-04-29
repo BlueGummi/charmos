@@ -1,4 +1,5 @@
 // #include "uacpi/internal/log.h"
+#include "sched.h"
 #include <dbg.h>
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
@@ -27,10 +28,9 @@ spinlock_t cpu_id_lock = SPINLOCK_INIT;
 volatile uint32_t cpus_woken = 0;
 int glob_cpu_c = 0;
 volatile uint32_t expected_cpu_id = 0;
-struct task_t *current_task = NULL;
-struct task_t *first_task = NULL;
-
-#define make_task(id, sauce)                                                   \
+struct scheduler_t global_sched;
+struct task_t *t1;
+#define make_task(id, sauce, terminate)                                        \
     void task##id() {                                                          \
         while (1) {                                                            \
             k_printf("task %d says %s\n", id, sauce);                          \
@@ -40,13 +40,15 @@ struct task_t *first_task = NULL;
                 asm("hlt");                                                    \
                 k_printf("task %d runs the %dth loop!\n", id, i);              \
             }                                                                  \
+            if (terminate)                                                     \
+                scheduler_remove_task(&global_sched, t1);                      \
         }                                                                      \
     }
-make_task(1, "MAYOOOO");
-make_task(2, "MUSTAAARD");
-make_task(3, "KETCHUUUP");
-make_task(4, "RAAAANCH");
-make_task(5, "SAUERKRAAAUUUT");
+make_task(1, "MAYOOOO", true);
+make_task(2, "MUSTAAARD", false);
+make_task(3, "KETCHUUUP", false);
+make_task(4, "RAAAANCH", false);
+make_task(5, "SAUERKRAAAUUUT", false);
 
 void wakeup() {
     uint32_t my_cpu_id;
@@ -129,39 +131,12 @@ void kmain(void) {
                ? "Houston, Tranquility Base here. The Eagle has landed."
                : "If puns were deli meat, this would be the wurst.");
     debug_print_stack();
-    struct task_t *t1 = create_task(task1);
+    t1 = create_task(task1);
     struct task_t *t2 = create_task(task2);
-    struct task_t *t3 = create_task(task3);
-    struct task_t *t4 = create_task(task4);
-    struct task_t *t5 = create_task(task5);
-    t1->next = t2;
-    t2->next = t3;
-    t3->next = t4;
-    t4->next = t5;
-    t5->next = t1;
-    first_task = t1;
-    current_task = first_task;
-    asm volatile("mov %0, %%rsp\n"
-                 "pop %%r15\n"
-                 "pop %%r14\n"
-                 "pop %%r13\n"
-                 "pop %%r12\n"
-                 "pop %%r11\n"
-                 "pop %%r10\n"
-                 "pop %%r9\n"
-                 "pop %%r8\n"
-                 "pop %%rbp\n"
-                 "pop %%rdi\n"
-                 "pop %%rsi\n"
-                 "pop %%rdx\n"
-                 "pop %%rcx\n"
-                 "pop %%rbx\n"
-                 "pop %%rax\n"
-                 "sti\n"
-                 "iretq\n"
-                 :
-                 : "r"(&current_task->regs)
-                 : "memory");
+    scheduler_init(&global_sched);
+    scheduler_add_task(&global_sched, t1);
+    scheduler_add_task(&global_sched, t2);
+    enter_first_task();
     while (1) {
         asm("hlt");
     }
