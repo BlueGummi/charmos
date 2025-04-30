@@ -1,6 +1,3 @@
-#ifndef SCHED_H
-#define SCHED_H
-#include <memfuncs.h>
 #include <task.h>
 struct scheduler {
     struct task *head;
@@ -17,4 +14,4 @@ __attribute__((noreturn)) void enter_first_task(void);
 void scheduler_remove_last_task(struct scheduler *sched);
 extern struct task *current_task;
 extern struct scheduler global_sched;
-#endif
+#pragma once

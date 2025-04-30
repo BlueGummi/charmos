@@ -1,6 +1,6 @@
 #include <dbg.h>
 #include <io.h>
-#include <memfuncs.h>
+#include <string.h>
 #include <printf.h>
 #include <shutdown.h>
 #include <stdint.h>

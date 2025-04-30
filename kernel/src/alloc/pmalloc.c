@@ -1,5 +1,5 @@
 #include <limine.h>
-#include <memfuncs.h>
+#include <string.h>
 #include <printf.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -68,20 +68,6 @@ void *pmm_alloc_page(bool add_offset) {
 }
 
 /*
- * Free a non-offsetted page from the PMM bitmap
- */
-void free_page(void *addr) {
-
-    size_t index = (size_t) addr / PAGE_SIZE;
-    if (index >= BITMAP_SIZE * 8) {
-        k_printf("Invalid address to free: 0x%zx\n", (size_t) addr);
-        return;
-    }
-    clear_bit(index);
-    k_printf("Freed page at 0x%zx\n", (size_t) addr);
-}
-
-/*
  * Give an overview of the PMM's bitmap state.
  * Used for debug and log.
  */
@@ -118,7 +104,7 @@ void print_memory_status() {
 /*
  * Allocate `count` pages.
  */
-void *pmm_alloc_pages(size_t count) {
+void *pmm_alloc_pages(size_t count, bool add_offset) {
 
     if (count == 0) {
         return NULL;
@@ -158,7 +144,7 @@ void *pmm_alloc_pages(size_t count) {
         set_bit(start_index + i);
     }
 
-    return (void *) (offset + (start_index * PAGE_SIZE));
+    return (void *) ((add_offset ? offset : 0) + (start_index * PAGE_SIZE));
 }
 
 /*
@@ -166,13 +152,14 @@ void *pmm_alloc_pages(size_t count) {
  *
  * Addresses should have the HHDM offset added to them.
  */
-void pmm_free_pages(void *addr, size_t count) {
+void pmm_free_pages(void *addr, size_t count, bool has_offset) {
 
     if (addr == NULL || count == 0) {
         return;
     }
 
-    size_t start_index = ((size_t) addr - offset) / PAGE_SIZE;
+    size_t start_index =
+        ((size_t) addr - (has_offset ? offset : 0)) / PAGE_SIZE;
 
     if (start_index >= BITMAP_SIZE * 8 ||
         start_index + count > BITMAP_SIZE * 8) {

@@ -1,26 +1,14 @@
-#include <memfuncs.h>
 #include <pmm.h>
 #include <printf.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
+#include <vmalloc.h>
 #include <vmm.h>
 
 uint64_t hhdm_offset;
 
-#define BITS_PER_ENTRY (sizeof(uint64_t) * 8)
-
-/*
- * The VMM bitmap allocator, containing page counts, free page counts, addresses
- * for the first index, and the bitmap address
- */
-typedef struct {
-    uint64_t *bitmap;
-    uintptr_t base_address;
-    size_t total_pages;
-    size_t free_pages;
-} VmmBitmapAllocator;
-
-static VmmBitmapAllocator vmm_allocator;
+static struct vmalloc_bitmap vmm_allocator;
 
 void vmalloc_set_offset(uint64_t o) {
     hhdm_offset = o;
@@ -36,23 +24,26 @@ uintptr_t vmm_get_phys(uintptr_t virt) {
     uint64_t L3 = (virt >> 30) & 0x1FF;
     uint64_t L4 = (virt >> 39) & 0x1FF;
 
-    PageTable *current_table = kernel_pml4;
+    struct page_table *current_table = kernel_pml4;
 
-    PageTableEntry *entry = &current_table->entries[L4];
+    pte_t *entry = &current_table->entries[L4];
     if (!(*entry & PAGING_PRESENT))
         return (uintptr_t) -1;
 
-    current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+    current_table =
+        (struct page_table *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
     entry = &current_table->entries[L3];
     if (!(*entry & PAGING_PRESENT))
         return (uintptr_t) -1;
 
-    current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+    current_table =
+        (struct page_table *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
     entry = &current_table->entries[L2];
     if (!(*entry & PAGING_PRESENT))
         return (uintptr_t) -1;
 
-    current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+    current_table =
+        (struct page_table *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
     entry = &current_table->entries[L1];
     if (!(*entry & PAGING_PRESENT))
         return (uintptr_t) -1;
@@ -71,7 +62,7 @@ void vmm_bitmap_init(uintptr_t base_address, size_t total_pages) {
     bitmap_pages =
         (bitmap_pages * sizeof(uint64_t) + PAGE_SIZE - 1) / PAGE_SIZE;
 
-    vmm_allocator.bitmap = (uint64_t *) pmm_alloc_pages(bitmap_pages);
+    vmm_allocator.bitmap = (uint64_t *) pmm_alloc_pages(bitmap_pages, true);
     memset(vmm_allocator.bitmap, 0, bitmap_pages * PAGE_SIZE);
     vmm_allocator.base_address = base_address;
     vmm_allocator.total_pages = total_pages;
@@ -137,10 +128,8 @@ static void *vmm_start_idx_alloc(const size_t count, size_t start_index) {
         if (phys == (uintptr_t) -1) {
 
             for (size_t l = 0; l < k; l++) {
-                pmm_free_pages(
-                    (void *) (vmm_get_phys(address + (l * PAGE_SIZE)) +
-                              hhdm_offset),
-                    count);
+                pmm_free_pages((void *) vmm_get_phys(address + (l * PAGE_SIZE)),
+                               count, false);
                 vmm_unmap_page(address + (l * PAGE_SIZE));
             }
 
@@ -209,7 +198,7 @@ void vmm_free_pages(void *addr, size_t count) {
     }
 
     if (phys != (uintptr_t) -1) {
-        pmm_free_pages((void *) (phys + hhdm_offset), count);
+        pmm_free_pages((void *) phys, count, false);
     }
 
     for (size_t i = 0; i < count; i++) {

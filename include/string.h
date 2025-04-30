@@ -10,3 +10,4 @@ int strncmp(const char *s1, const char *s2, size_t n);
 char *strncpy(char *dest, const char *src, size_t n);
 void *memchr(const void *s, int c, size_t n);
 void *memrchr(const void *s, int c, size_t n);
+#pragma once

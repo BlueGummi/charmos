@@ -7,3 +7,4 @@ typedef struct {
 #define SPINLOCK_INIT {0}
 void spinlock_lock(spinlock_t *lock);
 void spinlock_unlock(spinlock_t *lock);
+#pragma once

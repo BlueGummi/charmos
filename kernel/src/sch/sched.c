@@ -1,4 +1,4 @@
-#include <memfuncs.h>
+#include <string.h>
 #include <printf.h>
 #include <sched.h>
 #include <vmalloc.h>

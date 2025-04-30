@@ -7,7 +7,7 @@
 #include <idt.h>
 #include <io.h>
 #include <limine.h>
-#include <memfuncs.h>
+#include <string.h>
 #include <pmm.h>
 #include <printf.h>
 #include <requests.h>

@@ -1,12 +1,12 @@
 #include <limine.h>
-#include <memfuncs.h>
 #include <pmm.h>
 #include <printf.h>
 #include <stdint.h>
+#include <string.h>
 #include <vmalloc.h>
 #include <vmm.h>
 
-PageTable *kernel_pml4 = NULL;
+struct page_table *kernel_pml4 = NULL;
 uintptr_t kernel_pml4_phys = 0;
 static uint64_t hhdm_offset = 0;
 
@@ -49,7 +49,7 @@ void vmm_copy_kernel_mappings(uintptr_t new_virt_base) {
 }
 
 void *vmm_map_region(uintptr_t virt_base, uint64_t size, uint64_t flags) {
-    void *first;
+    void *first = NULL;
 
     for (uintptr_t virt = virt_base; virt < virt_base + size;
          virt += PAGE_SIZE) {
@@ -70,12 +70,13 @@ void *vmm_map_region(uintptr_t virt_base, uint64_t size, uint64_t flags) {
 }
 
 void vmm_init() {
-    kernel_pml4 = (PageTable *) pmm_alloc_page(true);
+    kernel_pml4 = (struct page_table *) pmm_alloc_page(true);
     kernel_pml4_phys = (uintptr_t) kernel_pml4 - hhdm_offset;
     memset(kernel_pml4, 0, PAGE_SIZE);
 
     uintptr_t boot_cr3 = get_cr3();
-    PageTable *boot_pml4 = (PageTable *) (boot_cr3 + hhdm_offset);
+    struct page_table *boot_pml4 =
+        (struct page_table *) (boot_cr3 + hhdm_offset);
     for (size_t i = 0; i < 512; i++) {
         if (boot_pml4->entries[i] & PAGING_PRESENT) {
             kernel_pml4->entries[i] = boot_pml4->entries[i];
@@ -121,40 +122,46 @@ void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     uint64_t L3 = (virt >> 30) & 0x1FF;
     uint64_t L4 = (virt >> 39) & 0x1FF;
 
-    PageTable *current_table = kernel_pml4;
+    struct page_table *current_table = kernel_pml4;
 
-    PageTableEntry *entry = &current_table->entries[L4];
+    pte_t *entry = &current_table->entries[L4];
     if (!(*entry & PAGING_PRESENT)) {
 
-        PageTable *new_table = (PageTable *) pmm_alloc_page(true);
+        struct page_table *new_table =
+            (struct page_table *) pmm_alloc_page(true);
         uintptr_t new_table_phys = (uintptr_t) new_table - hhdm_offset;
         memset(new_table, 0, PAGE_SIZE);
 
         *entry = new_table_phys | PAGING_PRESENT | PAGING_WRITE;
     }
-    current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+    current_table =
+        (struct page_table *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
 
     entry = &current_table->entries[L3];
     if (!(*entry & PAGING_PRESENT)) {
 
-        PageTable *new_table = (PageTable *) pmm_alloc_page(true);
+        struct page_table *new_table =
+            (struct page_table *) pmm_alloc_page(true);
         uintptr_t new_table_phys = (uintptr_t) new_table - hhdm_offset;
         memset(new_table, 0, PAGE_SIZE);
 
         *entry = new_table_phys | PAGING_PRESENT | PAGING_WRITE;
     }
-    current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+    current_table =
+        (struct page_table *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
 
     entry = &current_table->entries[L2];
     if (!(*entry & PAGING_PRESENT)) {
 
-        PageTable *new_table = (PageTable *) pmm_alloc_page(true);
+        struct page_table *new_table =
+            (struct page_table *) pmm_alloc_page(true);
         uintptr_t new_table_phys = (uintptr_t) new_table - hhdm_offset;
         memset(new_table, 0, PAGE_SIZE);
 
         *entry = new_table_phys | PAGING_PRESENT | PAGING_WRITE;
     }
-    current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+    current_table =
+        (struct page_table *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
 
     entry = &current_table->entries[L1];
     *entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
@@ -172,21 +179,24 @@ void vmm_unmap_page(uintptr_t virt) {
     uint64_t L3 = (virt >> 30) & 0x1FF;
     uint64_t L4 = (virt >> 39) & 0x1FF;
 
-    PageTable *current_table = kernel_pml4;
-    PageTableEntry *entry = &current_table->entries[L4];
+    struct page_table *current_table = kernel_pml4;
+    pte_t *entry = &current_table->entries[L4];
     if (!(*entry & PAGING_PRESENT))
         return;
-    current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+    current_table =
+        (struct page_table *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
 
     entry = &current_table->entries[L3];
     if (!(*entry & PAGING_PRESENT))
         return;
-    current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+    current_table =
+        (struct page_table *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
 
     entry = &current_table->entries[L2];
     if (!(*entry & PAGING_PRESENT))
         return;
-    current_table = (PageTable *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+    current_table =
+        (struct page_table *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
 
     entry = &current_table->entries[L1];
     *entry &= ~PAGING_PRESENT;

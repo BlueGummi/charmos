@@ -9,3 +9,17 @@ size_t vmm_get_free_pages(void);
 size_t vmm_get_total_pages(void);
 void vmalloc_set_offset(uint64_t o);
 #define BITMAP_SIZE (1 << 20) // four giggybites
+#define BITS_PER_ENTRY (sizeof(uint64_t) * 8)
+
+/*
+ * The VMM bitmap allocator, containing page counts, free page counts, addresses
+ * for the first index, and the bitmap address
+ */
+struct vmalloc_bitmap {
+    uint64_t *bitmap;
+    uintptr_t base_address;
+    size_t total_pages;
+    size_t free_pages;
+};
+
+#pragma once

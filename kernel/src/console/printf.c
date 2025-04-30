@@ -1,6 +1,6 @@
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
-#include <memfuncs.h>
+#include <string.h>
 #include <stdarg.h>
 #include <stddef.h>
 
