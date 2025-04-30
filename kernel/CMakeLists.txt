@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(chiarOS-kernel C ASM_NASM)
+project(charmOS-kernel C ASM_NASM)
 set(CARGO_TARGET x86_64-unknown-none)
 set(CMAKE_C_STANDARD 11)
 
