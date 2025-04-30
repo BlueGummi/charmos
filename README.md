@@ -1,4 +1,4 @@
-# chiaros - Compact, Hobbyist, Independent, And Recreational Operating System
+# chiaros - Compact, Hobbyist, And Recreational Microkernel Operating System
 
 A from-scratch OS
 
