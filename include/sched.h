@@ -11,7 +11,8 @@ void scheduler_add_task(struct scheduler *sched, struct task *task);
 void scheduler_remove_task(struct scheduler *sched, struct task *task);
 uint64_t scheduler_schedule(struct scheduler *sched, struct cpu_state *cpu);
 __attribute__((noreturn)) void enter_first_task(void);
-void scheduler_remove_last_task(struct scheduler *sched);
+void scheduler_remove_task_by_id(struct scheduler *sched, uint64_t task_id);
 extern struct task *current_task;
 extern struct scheduler global_sched;
 #pragma once
+

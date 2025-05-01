@@ -1,8 +1,9 @@
-#include <string.h>
 #include <printf.h>
 #include <sched.h>
+#include <string.h>
 #include <vmalloc.h>
-
+#define CLI asm volatile("cli")
+#define STI asm volatile("sti")
 // TODO: we need to free memory allocated for tasks
 //
 __attribute__((noreturn)) void enter_first_task(void) {
@@ -46,9 +47,11 @@ __attribute__((noreturn)) void enter_first_task(void) {
 }
 
 uint64_t schedule(struct cpu_state *cpu) {
+    CLI;
     static uint8_t iteration = 0;
 
     if (iteration++ < 10) {
+        STI;
         return 0;
     }
     iteration = 0;
@@ -62,9 +65,11 @@ uint64_t schedule(struct cpu_state *cpu) {
 
     if (global_sched.current) {
         memcpy(cpu, &global_sched.current->regs, sizeof(struct cpu_state));
+        STI;
         return 1;
     }
 
+    STI;
     return 0;
 }
 
@@ -75,60 +80,62 @@ void scheduler_init(struct scheduler *sched) {
 }
 
 void scheduler_add_task(struct scheduler *sched, struct task *task) {
+    CLI;
     task->next = NULL;
     task->prev = sched->tail;
 
-    if (sched->tail)
+    if (sched->tail) {
         sched->tail->next = task;
-    else
+    } else {
         sched->head = task;
+    }
 
     sched->tail = task;
 
     if (!sched->current)
         sched->current = task;
+
+    struct task *iter_task = sched->head;
+    struct task *prev_task = sched->tail;
+    uint64_t loop = 0;
+    while (iter_task) {
+        if (iter_task == sched->head && loop > 0) {
+            break; // wraparound
+        }
+        if (iter_task->next)
+            iter_task->prev = prev_task;
+        loop++;
+        prev_task = iter_task;
+        iter_task = iter_task->next;
+    }
+    STI;
 }
 
 void scheduler_remove_task(struct scheduler *sched, struct task *task) {
-    if (task->prev)
-        task->prev->next = task->next;
-    else
-        sched->head = task->next;
-
-    if (task->next)
-        task->next->prev = task->prev;
-    else
-        sched->tail = task->prev;
-
-    if (sched->current == task)
-        sched->current = task->next ? task->next : sched->head;
+    CLI;
+    struct task *iter_task = sched->head;
+    while (iter_task) {
+        if (iter_task == task) {
+            k_printf("task has prev 0x%lx, next is 0x%lx\n", iter_task->prev,
+                     iter_task->next);
+            iter_task->prev->next = iter_task->next;
+            iter_task->next->prev = iter_task->prev;
+            break;
+        }
+        iter_task = task->next;
+    }
+    STI;
 }
 
 void scheduler_remove_task_by_id(struct scheduler *sched, uint64_t task_id) {
+    CLI;
     struct task *task = sched->head;
     while (task) {
         if (task->id == task_id) {
             scheduler_remove_task(sched, task);
-            return;
+            break;
         }
         task = task->next;
     }
-}
-
-void scheduler_remove_last_task(struct scheduler *sched) {
-    if (!sched->tail)
-        return;
-
-    struct task *task = sched->tail;
-
-    sched->tail = task->prev;
-
-    if (task->prev)
-        task->prev->next = NULL;
-    else
-        sched->head = NULL;
-
-    if (sched->current == task)
-        sched->current = sched->head;
-    // TODO: Free memory
+    STI;
 }

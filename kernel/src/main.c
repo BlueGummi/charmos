@@ -7,7 +7,6 @@
 #include <idt.h>
 #include <io.h>
 #include <limine.h>
-#include <string.h>
 #include <pmm.h>
 #include <printf.h>
 #include <requests.h>
@@ -19,6 +18,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include <task.h>
 #include <vmalloc.h>
 #include <vmm.h>
@@ -27,6 +27,7 @@ spinlock_t wakeup_lock = SPINLOCK_INIT;
 spinlock_t cpu_id_lock = SPINLOCK_INIT;
 volatile uint32_t cpus_woken = 0;
 int glob_cpu_c = 0;
+uint64_t t1_id;
 volatile uint32_t expected_cpu_id = 0;
 struct scheduler global_sched;
 struct task *t1;
@@ -38,10 +39,9 @@ struct task *t1;
                 asm("hlt");                                                    \
             for (int i = 0; i < 50; i++) {                                     \
                 asm("hlt");                                                    \
-                k_printf("task %d runs the %dth loop!\n", id, i);              \
             }                                                                  \
             if (terminate)                                                     \
-                scheduler_remove_task(&global_sched, t1);                      \
+                scheduler_remove_task_by_id(&global_sched, t1_id);             \
         }                                                                      \
     }
 make_task(1, "MAYOOOO", true);
@@ -132,9 +132,12 @@ void kmain(void) {
                : "If puns were deli meat, this would be the wurst.");
     debug_print_stack();
     t1 = create_task(task1);
+    t1_id = t1->id;
     struct task *t2 = create_task(task2);
+    struct task *t3 = create_task(task3);
     scheduler_init(&global_sched);
     scheduler_add_task(&global_sched, t1);
+    scheduler_add_task(&global_sched, t3);
     scheduler_add_task(&global_sched, t2);
     //    volatile int *ptr = (int *) 0xDEADBEEF;
     //    *ptr = 42;
