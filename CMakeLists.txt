@@ -4,11 +4,18 @@ project(charmOS C ASM_NASM)
 set(CMAKE_C_STANDARD 11)
 set(ARCH "x86_64")
 set(IMAGE_NAME "charmos-${ARCH}")
-set(CMAKE_SYSTEM_NAME Generic)
-set(CMAKE_SYSTEM_PROCESSOR x86_64)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -pipe -Wall -Wextra -ffreestanding -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -mno-red-zone -fno-stack-protector -fno-stack-check -fno-PIC -ffunction-sections -fdata-sections -g -m64 -mcmodel=kernel -std=gnu11 -mgeneral-regs-only -DLIMINE_API_REVISION=2 -DUACPI_BAREBONES_MODE -Wno-address-of-packed-member")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--build-id=none -nostdlib -static -z max-page-size=0x1000 -Wl,--gc-sections -T ../../kernel/linker-${ARCH}.ld")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -pipe -Wall -Wextra -ffreestanding -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -mno-red-zone -fno-stack-protector -fno-stack-check -fno-PIC -ffunction-sections -fdata-sections -g -m64 -mcmodel=kernel -std=gnu11 -mgeneral-regs-only -DLIMINE_API_REVISION=2 -DUACPI_BAREBONES_MODE -Wno-address-of-packed-member -Wno-unused-command-line-argument")
+
+if(APPLE)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -target x86_64-unknown-unknown")
+    set(CMAKE_LINKER "x86_64-elf-ld")
+    set(CMAKE_EXE_LINKER_FLAGS
+    "-nostdlib -static -Wl,--gc-sections -z max-page-size=0x1000 -T ${CMAKE_SOURCE_DIR}/kernel/linker-${ARCH}.ld"
+)
+else()
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--build-id=none -nostdlib -static -z max-page-size=0x1000 -Wl,--gc-sections -T ../../kernel/linker-${ARCH}.ld")
+endif()
 
 enable_language(ASM_NASM)
 set(CMAKE_ASM_NASM_FLAGS "-F dwarf -g -Wall -f elf64")
