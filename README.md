@@ -9,15 +9,11 @@ make sure u have nasm and xorriso :thumbsup: :zany_face:
 clone the repository and then do this
 
 ```bash
-git submodule init && git submodule update && git clone https://github.com/limine-bootloader/limine --branch=v9.x-binary --depth=1
+./build.sh
 
 ```
 
-then pull one of these to compile the thingy
-
-```bash
-./kernel/get-deps && mkdir -p build && cd build && cmake .. && make iso 
-```
+it's that shrimple
 
 now u can run 
 
