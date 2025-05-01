@@ -45,7 +45,7 @@ add_custom_target(iso
 
 add_custom_target(run
     DEPENDS iso
-    COMMAND qemu-system-${ARCH} -M q35 -cdrom ${IMAGE_NAME}.iso -boot d -m 2G -machine smm=off
+    COMMAND qemu-system-${ARCH} -M q35 -cdrom ${IMAGE_NAME}.iso -boot d -m 2G -machine smm=off -s
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 

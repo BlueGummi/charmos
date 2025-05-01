@@ -35,13 +35,10 @@ struct task *t1;
     void task##id() {                                                          \
         while (1) {                                                            \
             k_printf("task %d says %s\n", id, sauce);                          \
-            for (int i = 0; i < 10; i++)                                       \
+            for (int i = 0; i < 50; i++)                                       \
                 asm("hlt");                                                    \
-            for (int i = 0; i < 50; i++) {                                     \
-                asm("hlt");                                                    \
-            }                                                                  \
             if (terminate)                                                     \
-                scheduler_remove_task_by_id(&global_sched, t1_id);             \
+                scheduler_remove_task_by_id(&global_sched, 3);                 \
         }                                                                      \
     }
 make_task(1, "MAYOOOO", true);
@@ -135,10 +132,14 @@ void kmain(void) {
     t1_id = t1->id;
     struct task *t2 = create_task(task2);
     struct task *t3 = create_task(task3);
+    struct task *t4 = create_task(task4);
+    struct task *t5 = create_task(task5);
     scheduler_init(&global_sched);
     scheduler_add_task(&global_sched, t1);
-    scheduler_add_task(&global_sched, t3);
     scheduler_add_task(&global_sched, t2);
+    scheduler_add_task(&global_sched, t3);
+    scheduler_add_task(&global_sched, t4);
+    scheduler_add_task(&global_sched, t5);
     //    volatile int *ptr = (int *) 0xDEADBEEF;
     //    *ptr = 42;
     enter_first_task();

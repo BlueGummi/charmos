@@ -1,11 +1,12 @@
 #include <printf.h>
 #include <sched.h>
+#include <stdint.h>
 #include <string.h>
 #include <vmalloc.h>
 #define CLI asm volatile("cli")
 #define STI asm volatile("sti")
 // TODO: we need to free memory allocated for tasks
-//
+// TODO: we need to implement logic to avoid dup-ing
 __attribute__((noreturn)) void enter_first_task(void) {
     struct cpu_state *regs = &global_sched.current->regs;
 
@@ -79,63 +80,92 @@ void scheduler_init(struct scheduler *sched) {
     sched->current = NULL;
 }
 
-void scheduler_add_task(struct scheduler *sched, struct task *task) {
+void scheduler_add_task(struct scheduler *scheduler, struct task *new_task) {
     CLI;
-    task->next = NULL;
-    task->prev = sched->tail;
+    if (scheduler == NULL || new_task == NULL) {
+        return;
+    }
 
-    if (sched->tail) {
-        sched->tail->next = task;
+    new_task->next = NULL;
+    new_task->prev = NULL;
+
+    if (scheduler->head == NULL) {
+        scheduler->head = new_task;
+        scheduler->tail = new_task;
+        new_task->next = new_task;
+        new_task->prev = new_task;
     } else {
-        sched->head = task;
+        new_task->prev = scheduler->tail;
+        new_task->next = scheduler->head;
+
+        scheduler->tail->next = new_task;
+        scheduler->head->prev = new_task;
+
+        scheduler->tail = new_task;
     }
 
-    sched->tail = task;
+    if (!scheduler->current)
+        scheduler->current = new_task;
 
-    if (!sched->current)
-        sched->current = task;
-
-    struct task *iter_task = sched->head;
-    struct task *prev_task = sched->tail;
-    uint64_t loop = 0;
-    while (iter_task) {
-        if (iter_task == sched->head && loop > 0) {
-            break; // wraparound
-        }
-        if (iter_task->next)
-            iter_task->prev = prev_task;
-        loop++;
-        prev_task = iter_task;
-        iter_task = iter_task->next;
-    }
     STI;
 }
 
-void scheduler_remove_task(struct scheduler *sched, struct task *task) {
-    CLI;
-    struct task *iter_task = sched->head;
-    while (iter_task) {
-        if (iter_task == task) {
-            k_printf("task has prev 0x%lx, next is 0x%lx\n", iter_task->prev,
-                     iter_task->next);
-            iter_task->prev->next = iter_task->next;
-            iter_task->next->prev = iter_task->prev;
-            break;
-        }
-        iter_task = task->next;
+void scheduler_remove_task(struct scheduler *scheduler,
+                           struct task *task_to_remove) {
+    if (scheduler == NULL || task_to_remove == NULL) {
+        return;
     }
-    STI;
+
+    if (scheduler->head == NULL) {
+        return;
+    }
+
+    if (scheduler->head == scheduler->tail &&
+        scheduler->head == task_to_remove) {
+        scheduler->head = NULL;
+        scheduler->tail = NULL;
+        return;
+    }
+
+    if (scheduler->head == task_to_remove) {
+        scheduler->head = scheduler->head->next;
+        scheduler->head->prev = scheduler->tail;
+        scheduler->tail->next = scheduler->head;
+    } else if (scheduler->tail == task_to_remove) {
+        scheduler->tail = scheduler->tail->prev;
+        scheduler->tail->next = scheduler->head;
+        scheduler->head->prev = scheduler->tail;
+    } else {
+        struct task *current = scheduler->head->next;
+        while (current != scheduler->head && current != task_to_remove) {
+            current = current->next;
+        }
+
+        if (current == task_to_remove) {
+            current->prev->next = current->next;
+            current->next->prev = current->prev;
+        }
+    }
 }
 
 void scheduler_remove_task_by_id(struct scheduler *sched, uint64_t task_id) {
     CLI;
-    struct task *task = sched->head;
-    while (task) {
-        if (task->id == task_id) {
-            scheduler_remove_task(sched, task);
+
+    if (sched == NULL || sched->head == NULL) {
+        STI;
+        return;
+    }
+
+    struct task *current = sched->head;
+    struct task *start = current;
+
+    do {
+        if (current->id == task_id) {
+            scheduler_remove_task(sched, current);
             break;
         }
-        task = task->next;
-    }
+        current = current->next;
+    } while (current != start);
+
     STI;
 }
