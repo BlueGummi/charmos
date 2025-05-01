@@ -42,6 +42,9 @@ cd build || exit
 # Run CMake
 if [ ! -f "CMakeCache.txt" ]; then
     echo -e "${YELLOW}Running CMake...${NC}"
+    if uname -s | grep -q "Darwin"; then
+        cmake -DCMAKE_TOOLCHAIN_FILE=../toolchain.cmake ..
+    fi
     cmake ..
 else
     echo -e "${GREEN}CMake is already configured.${NC}"
