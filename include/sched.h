@@ -1,5 +1,8 @@
 #include <task.h>
+#include <stdbool.h>
+
 struct scheduler {
+    bool off;
     struct task *head;
     struct task *tail;
     struct task *current;

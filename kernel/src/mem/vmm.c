@@ -89,14 +89,6 @@ void vmm_init() {
     extern uint64_t __sbss[], __ebss[];
     extern uint64_t __slimine_requests[], __elimine_requests[];
 
-    k_info("Kernel sections:");
-    k_printf("  text:   0x%zx - 0x%zx\n", __stext, __etext);
-    k_printf("  rodata: 0x%zx - 0x%zx\n", __srodata, __erodata);
-    k_printf("  data:   0x%zx - 0x%zx\n", __sdata, __edata);
-    k_printf("  bss:    0x%zx - 0x%zx\n", __sbss, __ebss);
-    k_printf("  limine: 0x%zx - 0x%zx\n", __slimine_requests,
-             __elimine_requests);
-
     for (uintptr_t virt = (uintptr_t) __slimine_requests;
          virt < (uintptr_t) __elimine_requests; virt += PAGE_SIZE) {
         uintptr_t phys = (uintptr_t) pmm_alloc_page(false);

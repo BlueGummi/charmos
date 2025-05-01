@@ -49,6 +49,10 @@ __attribute__((noreturn)) void enter_first_task(void) {
 
 uint64_t schedule(struct cpu_state *cpu) {
     CLI;
+    if (global_sched.off) {
+        STI;
+        return 0;
+    }
     static uint8_t iteration = 0;
 
     if (iteration++ < 10) {
