@@ -1,7 +1,7 @@
+#include <gdt.h>
 #include <printf.h>
 #include <stdalign.h>
 #include <stdint.h>
-#include <gdt.h>
 
 alignas(8) struct gdt_entry gdt[3];
 struct gdt_ptr gp;

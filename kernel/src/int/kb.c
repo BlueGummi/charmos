@@ -1,9 +1,9 @@
 #include <dbg.h>
 #include <io.h>
-#include <string.h>
 #include <printf.h>
 #include <shutdown.h>
 #include <stdint.h>
+#include <string.h>
 #define KB_DOWN_LSHIFT 0x2A
 #define KB_UP_LSHIFT 0xAA
 #define KB_CAPSLOCK 0x3A

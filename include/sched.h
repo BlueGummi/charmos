@@ -1,5 +1,5 @@
-#include <task.h>
 #include <stdbool.h>
+#include <task.h>
 
 struct scheduler {
     bool off;
@@ -18,4 +18,3 @@ void scheduler_remove_task_by_id(struct scheduler *sched, uint64_t task_id);
 extern struct task *current_task;
 extern struct scheduler global_sched;
 #pragma once
-

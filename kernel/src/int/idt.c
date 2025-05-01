@@ -8,7 +8,6 @@
 #include <stdint.h>
 #include <vmalloc.h>
 #include <vmm.h>
-#include <idt.h>
 
 struct idt_entry idt[IDT_ENTRIES];
 struct idt_ptr idtp;
