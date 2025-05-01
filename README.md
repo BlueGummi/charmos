@@ -94,6 +94,8 @@ each level has at least one challenge point to earn
 
 - [x] beginnings of scheduler + timer 
 
+    - [x] implement task removal
+
     - [ ] add more robust scheduling that keeps track of more context and doesn't just do a circular LL 
     
         - [ ] :trophy: implement smarter scheduler 
