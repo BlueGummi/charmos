@@ -4,11 +4,11 @@
 #include <kb.h>
 #include <pmm.h>
 #include <printf.h>
+#include <sched.h>
 #include <shutdown.h>
 #include <stdint.h>
 #include <vmalloc.h>
 #include <vmm.h>
-#include <idt.h>
 
 struct idt_entry idt[IDT_ENTRIES];
 struct idt_ptr idtp;
@@ -68,7 +68,9 @@ __attribute__((interrupt)) void divbyz_fault(void *frame) {
     k_shutdown();
 }
 
-void decode_error_code(uint64_t error_code) {
+void page_fault_handler(uint64_t error_code, uint64_t fault_addr) {
+    k_printf("\n=== PAGE FAULT ===\n");
+    k_printf("Faulting Address (CR2): 0x%lx\n", fault_addr);
     k_printf("Error Code: 0x%lx\n", error_code);
     k_printf("  - Page not Present (P): %s\n",
              (error_code & 0x01) ? "Yes" : "No");
@@ -82,14 +84,9 @@ void decode_error_code(uint64_t error_code) {
              (error_code & 0x10) ? "Yes" : "No");
     k_printf("  - Protection Key Violation (PK): %s\n",
              (error_code & 0x20) ? "Yes" : "No");
-}
-
-void page_fault_handler(uint64_t error_code, uint64_t fault_addr) {
-    k_printf("\n=== PAGE FAULT ===\n");
-    k_printf("Faulting Address (CR2): 0x%lx\n", fault_addr);
-    decode_error_code(error_code);
-
-    asm volatile("cli; hlt");
+    if (global_sched.active) {
+        scheduler_remove_task(&global_sched, global_sched.current);
+    }
 }
 
 void unmask_timer_and_keyboard() {
@@ -115,7 +112,7 @@ void init_interrupts() {
     idt_install();
 
     outb(0x43, 0x36);
-    uint16_t divisor = 1193180;
+    uint16_t divisor = 1193180 / 100;
     outb(0x40, divisor & 0xFF);
     outb(0x40, (divisor >> 8) & 0xFF);
 

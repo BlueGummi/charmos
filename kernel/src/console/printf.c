@@ -1,12 +1,45 @@
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
-#include <string.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+#include <io.h>
 
 struct flanterm_context *ft_ctx;
 
+void serial_init() {
+    outb(0x3F8 + 1, 0x00); 
+    outb(0x3F8 + 3, 0x80);
+    outb(0x3F8 + 0, 0x03);
+    outb(0x3F8 + 1, 0x00);
+    outb(0x3F8 + 3, 0x03);
+    outb(0x3F8 + 2, 0xC7);
+    outb(0x3F8 + 4, 0x0B);
+}
+
+static int serial_is_transmit_empty() {
+    return inb(0x3F8 + 5) & 0x20;
+}
+
+static void serial_putc(char c) {
+    while (serial_is_transmit_empty() == 0);
+    outb(0x3F8, c);
+}
+
+static void serial_puts(const char* str, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        serial_putc(str[i]);
+    }
+}
+
+void double_print(struct flanterm_context *f, const char *str, size_t len) {
+    serial_puts(str, len);
+    flanterm_write(f, str, len);
+}
+
 void k_printf_init(struct flanterm_context *f) {
+    serial_init();
     ft_ctx = f;
 }
 
@@ -77,7 +110,7 @@ static int print_hex(char *buffer, uint64_t num) {
 static void apply_padding(const char *str, int len, int width, bool left_align,
                           bool zero_pad) {
     if (len >= width) {
-        flanterm_write(ft_ctx, str, len);
+        double_print(ft_ctx, str, len);
         return;
     }
 
@@ -86,19 +119,19 @@ static void apply_padding(const char *str, int len, int width, bool left_align,
 
     if (!left_align) {
         if (zero_pad && len > 0 && (str[0] == '-' || str[0] == '+')) {
-            flanterm_write(ft_ctx, str, 1);
+            double_print(ft_ctx, str, 1);
             for (int i = 0; i < padding; i++)
-                flanterm_write(ft_ctx, &pad_char, 1);
-            flanterm_write(ft_ctx, str + 1, len - 1);
+                double_print(ft_ctx, &pad_char, 1);
+            double_print(ft_ctx, str + 1, len - 1);
         } else {
             for (int i = 0; i < padding; i++)
-                flanterm_write(ft_ctx, &pad_char, 1);
-            flanterm_write(ft_ctx, str, len);
+                double_print(ft_ctx, &pad_char, 1);
+            double_print(ft_ctx, str, len);
         }
     } else {
-        flanterm_write(ft_ctx, str, len);
+        double_print(ft_ctx, str, len);
         for (int i = 0; i < padding; i++)
-            flanterm_write(ft_ctx, " ", 1);
+            double_print(ft_ctx, " ", 1);
     }
 }
 
@@ -234,9 +267,9 @@ void k_printf(const char *format, ...) {
             handle_format_specifier(&format, args);
         } else {
             if (*format == '\n') {
-                flanterm_write(ft_ctx, "\n", 1);
+                double_print(ft_ctx, "\n", 1);
             } else {
-                flanterm_write(ft_ctx, format, 1);
+                double_print(ft_ctx, format, 1);
             }
             format++;
         }

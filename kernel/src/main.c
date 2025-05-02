@@ -20,17 +20,17 @@
 #include <stdint.h>
 #include <string.h>
 #include <task.h>
+#include <vfs.h>
 #include <vmalloc.h>
 #include <vmm.h>
 
-spinlock_t wakeup_lock = SPINLOCK_INIT;
-spinlock_t cpu_id_lock = SPINLOCK_INIT;
+struct spinlock wakeup_lock = SPINLOCK_INIT;
+struct spinlock cpu_id_lock = SPINLOCK_INIT;
 volatile uint32_t cpus_woken = 0;
 int glob_cpu_c = 0;
 uint64_t t1_id;
 volatile uint32_t expected_cpu_id = 0;
 struct scheduler global_sched;
-struct task *t1;
 #define make_task(id, sauce, terminate)                                        \
     void task##id() {                                                          \
         while (1) {                                                            \
@@ -46,7 +46,6 @@ make_task(2, "MUSTAAARD", false);
 make_task(3, "KETCHUUUP", false);
 make_task(4, "RAAAANCH", false);
 make_task(5, "SAUERKRAAAUUUT", false);
-
 void wakeup() {
     uint32_t my_cpu_id;
 
@@ -70,6 +69,7 @@ void wakeup() {
     while (1)
         asm("hlt");
 }
+
 void kmain(void) {
     asm volatile("cli");
     if (LIMINE_BASE_REVISION_SUPPORTED == false) {
@@ -89,7 +89,6 @@ void kmain(void) {
         fb->green_mask_shift, fb->blue_mask_size, fb->blue_mask_shift, NULL,
         NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 1, 0, 0, 0);
     k_printf_init(ft_ctx);
-    k_info("Framebuffer initialized");
 
     struct limine_mp_response *mpr = mp_request.response;
 
@@ -102,34 +101,21 @@ void kmain(void) {
         asm volatile("pause");
     }
 
-    k_info("bam!");
-    debug_print_stack();
     enable_smap_smep_umip();
-    k_info("Supervisor memory protection enabled");
-
     gdt_install();
-    k_info("GDT installed");
     init_interrupts();
-    k_info("Interrupts enabled");
-
     struct limine_hhdm_response *response = hhdm_request.response;
     init_physical_allocator(response->offset, memmap_request);
     vmm_offset_set(response->offset);
     vmm_init();
-    k_info("Virtual memory initialized");
-    vmm_map_region(0x123123123, 0x7700, PAGING_WRITE);
-    uint64_t *p = vmm_alloc_pages(6);
-    k_info("Tested an allocation of 0x%x pages", 6);
-    *p = 42;
-    k_printf("P is %d, at address 0x%zx\n", *p, p);
-    vmm_free_pages(p, 6);
     extern uint8_t read_cmos(uint8_t reg);
-    k_info((read_cmos(0x0) & 1) == 1
+    /*k_info((read_cmos(0x0) & 1) == 1
                ? "Houston, Tranquility Base here. The Eagle has landed."
-               : "If puns were deli meat, this would be the wurst.");
-    debug_print_stack();
-    t1 = create_task(task1);
-    t1_id = t1->id;
+               : "If puns were deli meat, this would be the wurst.");*/
+    vfs_init();
+    read_test();
+    global_sched.active = true;
+    struct task *t1 = create_task(task1);
     struct task *t2 = create_task(task2);
     struct task *t3 = create_task(task3);
     struct task *t4 = create_task(task4);
@@ -140,9 +126,7 @@ void kmain(void) {
     scheduler_add_task(&global_sched, t3);
     scheduler_add_task(&global_sched, t4);
     scheduler_add_task(&global_sched, t5);
-    //    volatile int *ptr = (int *) 0xDEADBEEF;
-    //    *ptr = 42;
-    enter_first_task();
+    scheduler_start();
     while (1) {
         asm("hlt");
     }
