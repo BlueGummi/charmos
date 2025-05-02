@@ -31,7 +31,21 @@ int glob_cpu_c = 0;
 uint64_t t1_id;
 volatile uint32_t expected_cpu_id = 0;
 struct scheduler global_sched;
-
+#define make_task(id, sauce, terminate)                                        \
+    void task##id() {                                                          \
+        while (1) {                                                            \
+            k_printf("task %d says %s\n", id, sauce);                          \
+            for (int i = 0; i < 50; i++)                                       \
+                asm("hlt");                                                    \
+            if (terminate)                                                     \
+                scheduler_remove_task_by_id(&global_sched, 3);                 \
+        }                                                                      \
+    }
+make_task(1, "MAYOOOO", true);
+make_task(2, "MUSTAAARD", false);
+make_task(3, "KETCHUUUP", false);
+make_task(4, "RAAAANCH", false);
+make_task(5, "SAUERKRAAAUUUT", false);
 void wakeup() {
     uint32_t my_cpu_id;
 
@@ -100,6 +114,18 @@ void kmain(void) {
                : "If puns were deli meat, this would be the wurst.");*/
     vfs_init();
     read_test();
+    struct task *t1 = create_task(task1);
+    struct task *t2 = create_task(task2);
+    struct task *t3 = create_task(task3);
+    struct task *t4 = create_task(task4);
+    struct task *t5 = create_task(task5);
+    scheduler_init(&global_sched);
+    scheduler_add_task(&global_sched, t1);
+    scheduler_add_task(&global_sched, t2);
+    scheduler_add_task(&global_sched, t3);
+    scheduler_add_task(&global_sched, t4);
+    scheduler_add_task(&global_sched, t5);
+    scheduler_start();
     while (1) {
         asm("hlt");
     }

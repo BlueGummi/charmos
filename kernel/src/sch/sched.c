@@ -48,9 +48,14 @@ __attribute__((noreturn)) void scheduler_start(void) {
 }
 
 uint64_t schedule(struct cpu_state *cpu) {
-    if (!global_sched.active) {
+    CLI;
+    static uint8_t iteration = 0;
+
+    if (iteration++ < 10) {
+        STI;
         return 0;
     }
+    iteration = 0;
 
     if (global_sched.current) {
         memcpy(&global_sched.current->regs, cpu, sizeof(struct cpu_state));
@@ -61,9 +66,11 @@ uint64_t schedule(struct cpu_state *cpu) {
 
     if (global_sched.current) {
         memcpy(cpu, &global_sched.current->regs, sizeof(struct cpu_state));
+        STI;
         return 1;
     }
 
+    STI;
     return 0;
 }
 

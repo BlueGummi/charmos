@@ -50,6 +50,14 @@ add_custom_target(run
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
+add_custom_target(headless
+    DEPENDS iso
+    COMMAND clear
+    COMMAND qemu-system-${ARCH} -M q35 -cdrom ${IMAGE_NAME}.iso -boot d -m 2G -machine smm=off -s -nographic
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
+
 add_custom_target(clean-full
     COMMAND rm -rf iso_root ${IMAGE_NAME}.iso ${IMAGE_NAME}.hdd kernel-deps limine ovmf
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
