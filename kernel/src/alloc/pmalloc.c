@@ -1,9 +1,9 @@
 #include <limine.h>
-#include <string.h>
 #include <printf.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #define PAGE_SIZE 4096
 

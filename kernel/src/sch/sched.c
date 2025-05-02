@@ -7,9 +7,8 @@
 #define STI asm volatile("sti")
 // TODO: we need to free memory allocated for tasks
 // TODO: we need to implement logic to avoid dup-ing
-__attribute__((noreturn)) void enter_first_task(void) {
+__attribute__((noreturn)) void scheduler_start(void) {
     struct cpu_state *regs = &global_sched.current->regs;
-
     asm volatile(
         "push %[rax]\n\t"
         "push %[rbx]\n\t"
@@ -32,7 +31,6 @@ __attribute__((noreturn)) void enter_first_task(void) {
         "push %[rflags]\n\t"
         "push %[cs]\n\t"
         "push %[rip]\n\t"
-
         "iretq\n\t"
         :
         : [rax] "m"(regs->rax), [rbx] "m"(regs->rbx), [rcx] "m"(regs->rcx),
@@ -47,15 +45,16 @@ __attribute__((noreturn)) void enter_first_task(void) {
     __builtin_unreachable();
 }
 
-uint64_t schedule(struct cpu_state *cpu) {
-    CLI;
-    static uint8_t iteration = 0;
-
-    if (iteration++ < 10) {
-        STI;
-        return 0;
+void schedule(struct cpu_state *cpu) {
+    if (!global_sched.active) {
+        return;
     }
-    iteration = 0;
+
+    if (!global_sched.begun) {
+        global_sched.begun = true;
+        return;
+    }
+    
 
     if (global_sched.current) {
         memcpy(&global_sched.current->regs, cpu, sizeof(struct cpu_state));
@@ -66,12 +65,10 @@ uint64_t schedule(struct cpu_state *cpu) {
 
     if (global_sched.current) {
         memcpy(cpu, &global_sched.current->regs, sizeof(struct cpu_state));
-        STI;
-        return 1;
+        return;
     }
 
-    STI;
-    return 0;
+    return;
 }
 
 void scheduler_init(struct scheduler *sched) {
@@ -81,7 +78,6 @@ void scheduler_init(struct scheduler *sched) {
 }
 
 void scheduler_add_task(struct scheduler *scheduler, struct task *new_task) {
-    CLI;
     if (scheduler == NULL || new_task == NULL) {
         return;
     }
@@ -107,7 +103,6 @@ void scheduler_add_task(struct scheduler *scheduler, struct task *new_task) {
     if (!scheduler->current)
         scheduler->current = new_task;
 
-    STI;
 }
 
 void scheduler_remove_task(struct scheduler *scheduler,
