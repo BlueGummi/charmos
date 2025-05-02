@@ -14,5 +14,4 @@ struct task {
 };
 struct task *create_task(void (*entry_point)());
 
-uint64_t schedule(struct cpu_state *cpu);
 #pragma once

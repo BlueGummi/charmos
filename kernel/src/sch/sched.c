@@ -47,9 +47,14 @@ __attribute__((noreturn)) void scheduler_start(void) {
     __builtin_unreachable();
 }
 
-uint64_t schedule(struct cpu_state *cpu) {
-    CLI;
-
+void schedule(struct cpu_state *cpu) {
+    if (!global_sched.active) {
+        return;
+    }
+    if (!global_sched.started_first) {
+        global_sched.started_first = true;
+        return;
+    }
     if (global_sched.current) {
         memcpy(&global_sched.current->regs, cpu, sizeof(struct cpu_state));
         global_sched.current = global_sched.current->next
@@ -60,11 +65,10 @@ uint64_t schedule(struct cpu_state *cpu) {
     if (global_sched.current) {
         memcpy(cpu, &global_sched.current->regs, sizeof(struct cpu_state));
         STI;
-        return 1;
+        return;
     }
 
-    STI;
-    return 0;
+    return;
 }
 
 void scheduler_init(struct scheduler *sched) {
