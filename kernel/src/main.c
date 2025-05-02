@@ -55,6 +55,7 @@ void wakeup() {
     while (1)
         asm("hlt");
 }
+
 void kmain(void) {
     asm volatile("cli");
     if (LIMINE_BASE_REVISION_SUPPORTED == false) {
@@ -94,8 +95,6 @@ void kmain(void) {
     vmm_offset_set(response->offset);
     vmm_init();
     extern uint8_t read_cmos(uint8_t reg);
-    global_sched.off = true;
-    asm volatile("sti");
     /*k_info((read_cmos(0x0) & 1) == 1
                ? "Houston, Tranquility Base here. The Eagle has landed."
                : "If puns were deli meat, this would be the wurst.");*/
