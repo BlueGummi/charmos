@@ -115,6 +115,7 @@ void kmain(void) {
     vfs_init();
     read_test();
     global_sched.active = true;
+    global_sched.started_first = false;
     struct task *t1 = create_task(task1);
     struct task *t2 = create_task(task2);
     struct task *t3 = create_task(task3);
