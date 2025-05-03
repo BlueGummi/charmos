@@ -23,6 +23,27 @@ else
     echo -e "${GREEN}Limine is already cloned.${NC}"
 fi
 
+
+if [ ! -d "kernel/src/uACPI" ]; then
+    echo -e "${YELLOW}Cloning uACPI...${NC}"
+    cd kernel/src/
+    git clone https://github.com/uacpi/uACPI --depth=1
+    cd -
+else
+    echo -e "${GREEN}uACPI is already cloned.${NC}"
+fi
+
+if [ ! -d "kernel/src/flanterm" ]; then
+    echo -e "${YELLOW}Cloning flanterm...${NC}"
+    cd kernel/src/
+    git clone https://codeberg.org/mintsuki/flanterm --depth=1
+    cd -
+else
+    echo -e "${GREEN}flanterm is already cloned.${NC}"
+fi
+
+
+
 if [ -f "./kernel/get-deps" ]; then
     echo -e "${YELLOW}Fetching dependencies...${NC}"
     ./kernel/get-deps
