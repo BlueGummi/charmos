@@ -1,6 +1,8 @@
 ovmf/
 limine/
 build/
+kernel/src/uACPI
+kernel/src/flanterm
 *.log
 compile_commands.json
 kernel/src/rust/target/
