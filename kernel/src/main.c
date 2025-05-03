@@ -1,4 +1,3 @@
-// #include "uacpi/internal/log.h"
 #include "sched.h"
 #include <dbg.h>
 #include <flanterm/backends/fb.h>
@@ -49,14 +48,14 @@ make_task(5, "SAUERKRAAAUUUT", false);
 void wakeup() {
     uint32_t my_cpu_id;
 
-    spinlock_lock(&cpu_id_lock);
+    spin_lock(&cpu_id_lock);
     my_cpu_id = glob_cpu_c++;
-    spinlock_unlock(&cpu_id_lock);
+    spin_unlock(&cpu_id_lock);
 
     while (expected_cpu_id != my_cpu_id)
         asm volatile("pause");
 
-    spinlock_lock(&wakeup_lock);
+    spin_lock(&wakeup_lock);
     switch (my_cpu_id) {
     case 0: k_printf("CPU %d says: bing bop\n", my_cpu_id + 1); break;
     case 1: k_printf("CPU %d says: boom boom\n", my_cpu_id + 1); break;
@@ -64,23 +63,13 @@ void wakeup() {
     }
     cpus_woken++;
     expected_cpu_id++;
-    spinlock_unlock(&wakeup_lock);
+    spin_unlock(&wakeup_lock);
 
     while (1)
         asm("hlt");
 }
 
 void kmain(void) {
-    asm volatile("cli");
-    if (LIMINE_BASE_REVISION_SUPPORTED == false) {
-        asm("hlt");
-    }
-
-    if (framebuffer_request.response == NULL ||
-        framebuffer_request.response->framebuffer_count < 1) {
-        asm("hlt");
-    }
-
     struct limine_framebuffer *fb =
         framebuffer_request.response->framebuffers[0];
     struct flanterm_context *ft_ctx = flanterm_fb_init(
@@ -108,10 +97,6 @@ void kmain(void) {
     init_physical_allocator(response->offset, memmap_request);
     vmm_offset_set(response->offset);
     vmm_init();
-    extern uint8_t read_cmos(uint8_t reg);
-    /*k_info((read_cmos(0x0) & 1) == 1
-               ? "Houston, Tranquility Base here. The Eagle has landed."
-               : "If puns were deli meat, this would be the wurst.");*/
     vfs_init();
     read_test();
     global_sched.active = true;

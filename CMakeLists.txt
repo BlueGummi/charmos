@@ -46,14 +46,14 @@ add_custom_target(iso
 add_custom_target(run
     DEPENDS iso
     COMMAND clear
-    COMMAND qemu-system-${ARCH} -M q35 -cdrom ${IMAGE_NAME}.iso -boot d -m 2G -machine smm=off -s -serial stdio
+    COMMAND qemu-system-${ARCH} -M q35 -cdrom ${IMAGE_NAME}.iso -boot d -m 2G -machine smm=off -smp 4 -s -serial stdio
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
 add_custom_target(headless
     DEPENDS iso
     COMMAND clear
-    COMMAND qemu-system-${ARCH} -M q35 -cdrom ${IMAGE_NAME}.iso -boot d -m 2G -machine smm=off -s -nographic
+    COMMAND qemu-system-${ARCH} -M q35 -cdrom ${IMAGE_NAME}.iso -boot d -m 2G -machine smm=off -smp 4 -s -nographic
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 

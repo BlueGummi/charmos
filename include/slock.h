@@ -5,6 +5,6 @@ struct spinlock {
 };
 
 #define SPINLOCK_INIT {0}
-void spinlock_lock(struct spinlock *lock);
-void spinlock_unlock(struct spinlock *lock);
+void spin_lock(struct spinlock *lock);
+void spin_unlock(struct spinlock *lock);
 #pragma once
