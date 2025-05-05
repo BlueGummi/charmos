@@ -1,7 +1,5 @@
 #! /bin/sh
 
-set -ex
-
 srcdir="$(dirname "$0")"
 test -z "$srcdir" && srcdir=.
 
@@ -9,9 +7,9 @@ cd "$srcdir"
 
 clone_repo_commit() {
     if test -d "$2/.git"; then
-        git -C "$2" reset --hard
-        git -C "$2" clean -fd
-        if ! git -C "$2" checkout $3; then
+        git -C "$2" reset --hard --quiet
+        git -C "$2" clean -fd --quiet
+        if ! git -C "$2" checkout --quiet $3; then
             rm -rf "$2"
         fi
     else
@@ -22,8 +20,8 @@ clone_repo_commit() {
         fi
     fi
     if ! test -d "$2"; then
-        git clone $1 "$2"
-        if ! git -C "$2" checkout $3; then
+        git clone $1 "$2" --quiet
+        if ! git -C "$2" checkout --quiet $3; then
             rm -rf "$2"
             exit 1
         fi
