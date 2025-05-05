@@ -37,9 +37,9 @@ add_custom_target(iso
                     -no-emul-boot -boot-load-size 4 -boot-info-table -hfsplus
                     -apm-block-size 2048 --efi-boot boot/limine/limine-uefi-cd.bin
                     -efi-boot-part --efi-boot-image --protective-msdos-label
-                    iso_root -o ${IMAGE_NAME}.iso
+                    iso_root -o ${IMAGE_NAME}.iso 2>&1 >/dev/null
     COMMAND cd ../limine && make && cd -
-    COMMAND ../limine/limine bios-install ${IMAGE_NAME}.iso
+    COMMAND ../limine/limine bios-install ${IMAGE_NAME}.iso 2>&1 >/dev/null
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
