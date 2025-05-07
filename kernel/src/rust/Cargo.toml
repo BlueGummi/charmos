@@ -8,9 +8,11 @@ crate-type = ["staticlib"]
 
 [profile.dev]
 panic = "abort"
+target = "x86_64-unknown-none"
 
 [profile.release]
 panic = "abort"
+target = "x86_64-unknown-none"
 
 [unstable]
 build-std = ["core", "compiler_builtins"]

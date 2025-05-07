@@ -45,6 +45,8 @@ make_task(2, "MUSTAAARD", false);
 make_task(3, "KETCHUUUP", false);
 make_task(4, "RAAAANCH", false);
 make_task(5, "SAUERKRAAAUUUT", false);
+extern void test_alloc();
+void sad_loop() { while(1) { asm("hlt");}}
 void wakeup() {
     uint32_t my_cpu_id;
 
@@ -99,6 +101,7 @@ void kmain(void) {
     vmm_init();
     vfs_init();
     read_test();
+    test_alloc();
     global_sched.active = true;
     global_sched.started_first = false;
     struct task *t1 = create_task(task1);

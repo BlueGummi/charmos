@@ -1,40 +1,51 @@
 #![no_std]
-use core::arch::asm;
+#![feature(allocator_api)]
+extern crate alloc;
+use alloc::vec::Vec;
 use core::panic::PanicInfo;
-use core::ptr;
 
 unsafe extern "C" {
     pub fn k_printf(fmt: *const u8, ...);
+    pub fn sad_loop() -> !;
 }
 
-#[repr(C, packed)]
-#[derive(Debug)]
-pub struct Rsdp {
-    signature: [u8; 8],
-    checksum: u8,
-    oem_id: [u8; 6],
-    revision: u8,
-    rsdt_address: u32, // ACPI 1.0
+unsafe extern "C" {
+    pub unsafe fn pmm_alloc_pages(n: usize) -> *mut u8;
+    pub unsafe fn pmm_free_pages(ptr: *mut u8, n: usize);
+    pub unsafe fn vmm_alloc_pages(n: usize) -> *mut u8;
+    pub unsafe fn vmm_free_pages(ptr: *mut u8, n: usize);
 }
 
+use core::alloc::{GlobalAlloc, Layout};
+const PAGE_SIZE: usize = 4096;
+pub struct BitmapAllocator;
+
+unsafe impl GlobalAlloc for BitmapAllocator {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        let size = layout.size().max(layout.align());
+        let pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
+        vmm_alloc_pages(pages)
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        let size = layout.size().max(layout.align());
+        let pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
+        vmm_free_pages(ptr, pages);
+    }
+}
+
+#[global_allocator]
+pub static ALLOCATOR: BitmapAllocator = BitmapAllocator;
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn make_rsdp(rsdp_addr: *const u8) -> Rsdp {
-    unsafe {
-        if rsdp_addr.is_null() {
-            panic!("rsdp ptr null");
-        }
-
-        let rsdp = &*(rsdp_addr as *const Rsdp); // safe if properly aligned, but risky
-
-        let rsdt_address = ptr::read_unaligned((rsdp_addr as usize + 16) as *const u32);
-
-        Rsdp {
-            signature: rsdp.signature,
-            checksum: rsdp.checksum,
-            oem_id: rsdp.oem_id,
-            revision: rsdp.revision,
-            rsdt_address,
-        }
+unsafe extern "C" fn test_alloc() {
+    let layout = Layout::new::<u32>();
+    let ptr = ALLOCATOR.alloc(layout);
+    if !ptr.is_null() {
+        *(ptr as *mut u32) = 33;
+        k_printf("allocated value: %d\n".as_ptr(), *(ptr as *mut u32));
+        ALLOCATOR.dealloc(ptr, layout);
+    } else {
+        k_printf("allocation failed\n".as_ptr());
     }
 }
 
@@ -44,33 +55,24 @@ static EMPTY_PANIC: &str = "Panic! No known location\n\0";
 
 #[panic_handler]
 unsafe fn panic(info: &PanicInfo) -> ! {
-    if let Some(location) = info.location() {
-        let file = location.file();
-        let line = location.line();
+    unsafe {
+        if let Some(location) = info.location() {
+            let file = location.file();
+            let line = location.line();
 
-        if !info.message().as_str().is_some_and(|v| v.is_empty()) {
-            unsafe {
+            if !info.message().as_str().is_some_and(|v| v.is_empty()) {
                 k_printf(
                     COMPLETE_PANIC.as_ptr(),
                     file,
                     line,
                     info.message().as_str().unwrap_or("empty").as_ptr(),
                 );
-            }
-        } else {
-            unsafe {
+            } else {
                 k_printf(INCOMPLETE_PANIC.as_ptr(), file, line);
             }
-        }
-    } else {
-        unsafe {
+        } else {
             k_printf(EMPTY_PANIC.as_ptr());
         }
-    }
-
-    loop {
-        unsafe {
-            asm!("hlt");
-        }
+        sad_loop();
     }
 }
