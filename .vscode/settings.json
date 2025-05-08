@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "spin_lock.h": "c",
+        "flanterm.h": "c"
+    }
+}

@@ -64,10 +64,8 @@ void schedule(struct cpu_state *cpu) {
 
     if (global_sched.current) {
         memcpy(cpu, &global_sched.current->regs, sizeof(struct cpu_state));
-        STI;
         return;
     }
-
     return;
 }
 

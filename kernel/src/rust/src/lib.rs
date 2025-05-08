@@ -47,9 +47,6 @@ unsafe extern "C" fn test_alloc() {
     } else {
         k_printf("allocation failed\n".as_ptr());
     }
-    let mut v = Vec::new();
-    v.push(33);
-    k_printf("We got a %d\n".as_ptr(), v.pop());
 }
 
 static COMPLETE_PANIC: &str = "Panic! %s:%d - %s\n\0";
