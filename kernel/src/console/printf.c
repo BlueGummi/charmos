@@ -267,6 +267,7 @@ static void handle_format_specifier(const char **format_ptr, va_list args) {
 
 void k_printf(const char *format, ...) {
     spin_lock(&k_printf_lock);
+    asm("cli");
     va_list args;
     va_start(args, format);
 
@@ -285,6 +286,7 @@ void k_printf(const char *format, ...) {
     }
 
     va_end(args);
+    asm("sti");
     spin_unlock(&k_printf_lock);
 }
 
