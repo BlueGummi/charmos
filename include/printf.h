@@ -1,7 +1,9 @@
 #include <colors.h>
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
+#include <limine.h>
 #include <time.h>
+
 #define k_panic(fmt, ...)                                                      \
     do {                                                                       \
         k_printf("\n+-\033[31m!!!\033[0m[\033[91mPANIC\033[0m]\033[31m!!!"     \
@@ -38,5 +40,5 @@
 
 void k_printf(const char *format, ...);
 void panic(const char *format, ...);
-void k_printf_init(struct flanterm_context *f);
+void k_printf_init(struct limine_framebuffer *fb);
 #pragma once

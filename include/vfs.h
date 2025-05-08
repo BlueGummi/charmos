@@ -9,6 +9,11 @@ struct vfs_node;
 typedef uint64_t (*read_fn_t)(struct vfs_node *, void *, size_t, size_t);
 typedef uint64_t (*write_fn_t)(struct vfs_node *, const void *, size_t, size_t);
 
+enum file_state {
+    IN_USE,
+    AVAILABLE,
+};
+
 struct vfs_node {
     char name[64];
     uint32_t flags;
@@ -22,6 +27,7 @@ struct vfs_node {
     struct vfs_node *next_sibling;
 
     void *data;
+    enum file_state state;
 };
 
 uint64_t memfs_read(struct vfs_node *node, void *buf, size_t size,

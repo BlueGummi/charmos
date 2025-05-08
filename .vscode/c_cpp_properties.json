@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "**"
+            ],
+            "defines": [],
+            "cppStandard": "c++14",
+            "intelliSenseMode": "linux-clang-x64",
+            "compileCommands": [
+                "compile_commands.json"
+            ],
+            "cStandard": "gnu11",
+            "mergeConfigurations": false,
+            "recursiveIncludes": {},
+            "compilerPath": "",
+            "browse": {
+                "limitSymbolsToIncludedHeaders": false
+            }
+        }
+    ],
+    "version": 4
+}

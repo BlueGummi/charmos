@@ -42,8 +42,6 @@ each level has at least one challenge point to earn
 
     - [x] virtual memory allocator 
 
-        - [ ] :trophy: virtual memory slab allocator in rust 
-
 - [x] do paging properly 
 
 ### level 2: "IO Intricacies" 
@@ -76,6 +74,8 @@ each level has at least one challenge point to earn
 
     - [ ] do something useful with them 
 
+        - [ ] thread structure
+
 - [x] start making tasks 
 
     - [ ] :broom: add more detail to tasks 
@@ -84,6 +84,8 @@ each level has at least one challenge point to earn
 
     - [ ] :broom: lock more things 
 
+    - [ ] schedule kernel events
+
 - [ ] :trophy: multithread more core functions 
 
 ### level 4: "Task Troubles" 
@@ -91,22 +93,18 @@ each level has at least one challenge point to earn
 - [x] beginnings of scheduler + timer 
 
     - [x] implement task removal
-
-    - [ ] add more robust scheduling that keeps track of more context and doesn't just do a circular LL 
     
-        - [ ] :trophy: implement smarter scheduler 
-    
-    - [ ] allow an adjustable scheduler timer firing interval 
+    - [ ] :trophy: implement smarter scheduler 
 
-- [ ] vfs :trophy: 
+- [x] vfs beginnings
+
+    - [ ] create system calls for interaction with these
 
 ### level 5: "Persistency Problems" 
 
 - [ ] :trophy: fat filesystem 
-    
-    - [ ] userland interface for fs interaction 
 
-- [ ] :trophy: ext2 
+- [ ] drivers
 
 - [ ] probably should make a shell 
 

@@ -1,15 +1,18 @@
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
+#include <io.h>
+#include <limine.h>
+#include <spin_lock.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-#include <io.h>
 
+struct spinlock k_printf_lock = SPINLOCK_INIT;
 struct flanterm_context *ft_ctx;
 
 void serial_init() {
-    outb(0x3F8 + 1, 0x00); 
+    outb(0x3F8 + 1, 0x00);
     outb(0x3F8 + 3, 0x80);
     outb(0x3F8 + 0, 0x03);
     outb(0x3F8 + 1, 0x00);
@@ -23,11 +26,12 @@ static int serial_is_transmit_empty() {
 }
 
 static void serial_putc(char c) {
-    while (serial_is_transmit_empty() == 0);
+    while (serial_is_transmit_empty() == 0)
+        ;
     outb(0x3F8, c);
 }
 
-static void serial_puts(const char* str, size_t len) {
+static void serial_puts(const char *str, size_t len) {
     for (size_t i = 0; i < len; i++) {
         serial_putc(str[i]);
     }
@@ -38,9 +42,13 @@ void double_print(struct flanterm_context *f, const char *str, size_t len) {
     flanterm_write(f, str, len);
 }
 
-void k_printf_init(struct flanterm_context *f) {
+void k_printf_init(struct limine_framebuffer *fb) {
     serial_init();
-    ft_ctx = f;
+    ft_ctx = flanterm_fb_init(
+        NULL, NULL, fb->address, fb->width, fb->height, fb->pitch,
+        fb->red_mask_size, fb->red_mask_shift, fb->green_mask_size,
+        fb->green_mask_shift, fb->blue_mask_size, fb->blue_mask_shift, NULL,
+        NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 1, 0, 0, 0);
 }
 
 static int print_signed(char *buffer, int64_t num) {
@@ -258,6 +266,7 @@ static void handle_format_specifier(const char **format_ptr, va_list args) {
 }
 
 void k_printf(const char *format, ...) {
+    spin_lock(&k_printf_lock);
     va_list args;
     va_start(args, format);
 
@@ -276,6 +285,7 @@ void k_printf(const char *format, ...) {
     }
 
     va_end(args);
+    spin_unlock(&k_printf_lock);
 }
 
 void panic(const char *format, ...) {

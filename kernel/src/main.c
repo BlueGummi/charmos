@@ -1,4 +1,3 @@
-#include "sched.h"
 #include <dbg.h>
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
@@ -9,8 +8,9 @@
 #include <pmm.h>
 #include <printf.h>
 #include <requests.h>
+#include <sched.h>
 #include <shutdown.h>
-#include <slock.h>
+#include <spin_lock.h>
 #include <smap.h>
 #include <stdalign.h>
 #include <stdatomic.h>
@@ -24,12 +24,11 @@
 #include <vmm.h>
 
 struct spinlock wakeup_lock = SPINLOCK_INIT;
-struct spinlock cpu_id_lock = SPINLOCK_INIT;
-volatile uint32_t cpus_woken = 0;
 int glob_cpu_c = 0;
 uint64_t t1_id;
-volatile uint32_t expected_cpu_id = 0;
 struct scheduler global_sched;
+atomic_char do_work = 0;
+atomic_uint_fast64_t current_cpu = 0;
 #define make_task(id, sauce, terminate)                                        \
     void task##id() {                                                          \
         while (1) {                                                            \
@@ -45,39 +44,30 @@ make_task(2, "MUSTAAARD", false);
 make_task(3, "KETCHUUUP", false);
 make_task(4, "RAAAANCH", false);
 make_task(5, "SAUERKRAAAUUUT", false);
+extern void test_alloc();
+void sad_loop() { while(1) { asm("hlt");}}
+
 void wakeup() {
-    uint32_t my_cpu_id;
-
-    spin_lock(&cpu_id_lock);
-    my_cpu_id = glob_cpu_c++;
-    spin_unlock(&cpu_id_lock);
-
-    while (expected_cpu_id != my_cpu_id)
-        asm volatile("pause");
-
     spin_lock(&wakeup_lock);
-    switch (my_cpu_id) {
-    case 0: k_printf("CPU %d says: bing bop\n", my_cpu_id + 1); break;
-    case 1: k_printf("CPU %d says: boom boom\n", my_cpu_id + 1); break;
-    case 2: k_printf("CPU %d says: boom bop\n", my_cpu_id + 1); break;
-    }
-    cpus_woken++;
-    expected_cpu_id++;
+    enable_smap_smep_umip();
+    gdt_install();
+    current_cpu++;
+    k_printf("I am the %lu cpu\n", current_cpu);
+    int cpu = current_cpu;
     spin_unlock(&wakeup_lock);
 
-    while (1)
-        asm("hlt");
+    while (1) {
+        spin_lock(&wakeup_lock);
+        if (do_work) {
+            k_printf("CPU %d says: I need to do work!\n", cpu);
+            do_work = 0;
+        }
+        spin_unlock(&wakeup_lock);
+    }
 }
 
 void kmain(void) {
-    struct limine_framebuffer *fb =
-        framebuffer_request.response->framebuffers[0];
-    struct flanterm_context *ft_ctx = flanterm_fb_init(
-        NULL, NULL, fb->address, fb->width, fb->height, fb->pitch,
-        fb->red_mask_size, fb->red_mask_shift, fb->green_mask_size,
-        fb->green_mask_shift, fb->blue_mask_size, fb->blue_mask_shift, NULL,
-        NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 1, 0, 0, 0);
-    k_printf_init(ft_ctx);
+    k_printf_init(framebuffer_request.response->framebuffers[0]);
 
     struct limine_mp_response *mpr = mp_request.response;
 
@@ -86,19 +76,21 @@ void kmain(void) {
         curr_cpu->goto_address = wakeup;
     }
 
-    while (cpus_woken < mpr->cpu_count - 1) {
+    while (current_cpu != mpr->cpu_count - 1) {
         asm volatile("pause");
     }
+    k_printf("We have woken up everybody\n");
 
     enable_smap_smep_umip();
     gdt_install();
     init_interrupts();
-    struct limine_hhdm_response *response = hhdm_request.response;
-    init_physical_allocator(response->offset, memmap_request);
-    vmm_offset_set(response->offset);
+    struct limine_hhdm_response *r = hhdm_request.response;
+    init_physical_allocator(r->offset, memmap_request);
+    vmm_offset_set(r->offset);
     vmm_init();
     vfs_init();
     read_test();
+    test_alloc();
     global_sched.active = true;
     global_sched.started_first = false;
     struct task *t1 = create_task(task1);
@@ -112,6 +104,7 @@ void kmain(void) {
     scheduler_add_task(&global_sched, t3);
     scheduler_add_task(&global_sched, t4);
     scheduler_add_task(&global_sched, t5);
+    do_work = 1;
     scheduler_start();
     while (1) {
         asm("hlt");

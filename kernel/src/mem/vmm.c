@@ -1,11 +1,13 @@
 #include <limine.h>
 #include <pmm.h>
 #include <printf.h>
+#include <spin_lock.h>
 #include <stdint.h>
 #include <string.h>
 #include <vmalloc.h>
 #include <vmm.h>
 
+struct spinlock vmm_lock = SPINLOCK_INIT;
 struct page_table *kernel_pml4 = NULL;
 uintptr_t kernel_pml4_phys = 0;
 static uint64_t hhdm_offset = 0;
@@ -17,8 +19,9 @@ void vmm_offset_set(uint64_t o) {
     vmalloc_set_offset(o);
     hhdm_offset = o;
 }
-unsigned long get_cr3(void) {
-    unsigned long cr3;
+
+uint64_t get_cr3(void) {
+    uint64_t cr3;
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
     return cr3;
 }
@@ -83,10 +86,10 @@ void vmm_init() {
         }
     }
 
-    extern uint64_t __stext[], __etext[];
+/*  extern uint64_t __stext[], __etext[];
     extern uint64_t __srodata[], __erodata[];
     extern uint64_t __sdata[], __edata[];
-    extern uint64_t __sbss[], __ebss[];
+    extern uint64_t __sbss[], __ebss[];*/
     extern uint64_t __slimine_requests[], __elimine_requests[];
 
     for (uintptr_t virt = (uintptr_t) __slimine_requests;

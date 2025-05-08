@@ -8,17 +8,18 @@ enable_language(ASM_NASM)
 file(GLOB_RECURSE C_SOURCES src/*.c)
 file(GLOB_RECURSE ASM_SOURCES src/*.S)
 file(GLOB_RECURSE NASM_SOURCES src/*.asm)
-file(GLOB_RECURSE RS_SOURCES src/rust/src/*.rs)
+file(GLOB_RECURSE RS_SOURCES src/*.rs)
 
 include_directories(src freestnd-c-hdrs)
 include(src/uACPI/uacpi.cmake)
-add_executable(kernel ${C_SOURCES} ${ASM_SOURCES} ${NASM_SOURCES})
+add_executable(kernel ${C_SOURCES} ${ASM_SOURCES} ${NASM_SOURCES} ${RS_SOURCES})
 
 add_custom_command(
     OUTPUT ${CMAKE_BINARY_DIR}/kernel_rust.a
     COMMAND cargo build --release --target ${CARGO_TARGET} --quiet
     COMMAND cp ${CMAKE_SOURCE_DIR}/kernel/src/rust/target/${CARGO_TARGET}/release/libkernel_rust.a ${CMAKE_BINARY_DIR}/kernel_rust.a
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/kernel/src/rust
+    DEPENDS ${RS_SOURCES}
     COMMENT "Building Rust kernel module"
     VERBATIM
 )

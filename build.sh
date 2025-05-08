@@ -1,78 +1,105 @@
 #!/bin/bash
+cli_quiet_arg=''
+make_quiet_arg=''
+cmake_quiet_arg=''
+
+print_help() {
+    local color_supported=$(tput colors 2>/dev/null)
+
+    if [[ -t 1 && (${color_supported:-0} -ge 8) ]]; then
+        underline=$(tput smul)
+        reset=$(tput sgr0)
+    else
+        underline=""
+        reset=""
+    fi
+
+    printf "The build script for charmOS\n\n"
+    printf "${underline}Usage${reset}: $1 [OPTIONS] [TARGETS]\n"
+    printf "Options:\n"
+    printf "  -c, --cleanup      Clean directories after building\n"
+    printf "  -q, -s, --quiet    Suppress command output\n"
+    exit 0
+}
+
+for arg in "$@"; do
+    case $arg in
+        --quiet|-q|-s)
+            quiet=true
+            cli_quiet_arg='--quiet'
+            make_quiet_arg=true
+            cmake_quiet_arg=true
+            ;;
+        --help|-h|help)
+            print_help "$0"
+            ;;
+        --clean|-c)
+            clean=true
+            ;;
+    esac
+done
 
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-if [ -f .gitmodules ]; then
-    if [ ! -d ".git/modules" ]; then
-        echo -e "${YELLOW}Initializing Git submodules...${NC}"
-        git submodule init && git submodule update
-    else
-        echo -e "${GREEN}Git submodules are already initialized.${NC}"
+cond_print() {
+    if [ ! "$quiet" ]; then
+        echo -e "$1"
     fi
-else
-    echo -e "${RED}No .gitmodules file found, skipping submodule initialization.${NC}"
-fi
+}
+
+cond_print "${GREEN}getting dependencies${NC}"
 
 if [ ! -d "limine" ]; then
-    echo -e "${YELLOW}Cloning Limine...${NC}"
-    git clone https://github.com/limine-bootloader/limine --branch=v9.x-binary --depth=1
-else
-    echo -e "${GREEN}Limine is already cloned.${NC}"
+    cond_print "${YELLOW}downloading limine${NC}"
+    git clone https://github.com/limine-bootloader/limine --branch=v9.x-binary --depth=1 $cli_quiet_arg
 fi
 
 
 if [ ! -d "kernel/src/uACPI" ]; then
-    echo -e "${YELLOW}Cloning uACPI...${NC}"
+    cond_print "${YELLOW}downloading uacpi${NC}"
     cd kernel/src/
-    git clone https://github.com/uacpi/uACPI --depth=1
+    git clone https://github.com/uacpi/uACPI --depth=1 $cli_quiet_arg
     cd -
-else
-    echo -e "${GREEN}uACPI is already cloned.${NC}"
 fi
 
 if [ ! -d "kernel/src/flanterm" ]; then
-    echo -e "${YELLOW}Cloning flanterm...${NC}"
+    cond_print "${YELLOW}downloading flanterm${NC}"
     cd kernel/src/
-    git clone https://codeberg.org/mintsuki/flanterm --depth=1
+    git clone https://codeberg.org/mintsuki/flanterm --depth=1 $cli_quiet_arg
     cd -
-else
-    echo -e "${GREEN}flanterm is already cloned.${NC}"
 fi
 
-
-
-if [ -f "./kernel/get-deps" ]; then
-    echo -e "${YELLOW}Fetching dependencies...${NC}"
-    ./kernel/get-deps
-else
-    echo -e "${RED}Dependency script not found! Skipping...${NC}"
-fi
+./kernel/get-deps
 
 if [ ! -d "build" ]; then
-    echo -e "${YELLOW}Creating build directory...${NC}"
     mkdir -p build
-else
-    echo -e "${GREEN}Build directory already exists.${NC}"
 fi
 
 cd build || exit
 
-# Run CMake
+cond_print "${GREEN}configuring cmake${NC}"
+
 if [ ! -f "CMakeCache.txt" ]; then
-    echo -e "${YELLOW}Running CMake...${NC}"
     if uname -s | grep -q "Darwin"; then
-        cmake -DCMAKE_TOOLCHAIN_FILE=../toolchain.cmake ..
+        if [ "$cmake_quiet_arg" ]; then 
+            cmake -DCMAKE_TOOLCHAIN_FILE=../toolchain.cmake .. 2>&1 >/dev/null
+        else
+            cmake -DCMAKE_TOOLCHAIN_FILE=../toolchain.cmake ..
+        fi
     fi
-    cmake ..
-else
-    echo -e "${GREEN}CMake is already configured.${NC}"
+    if [ "$cmake_quiet_arg" ]; then 
+        cmake .. 2>&1 >/dev/null
+    else
+        cmake ..
+    fi
 fi
 
-echo -e "${YELLOW}Building...${NC}"
-make iso
-
-echo -e "${GREEN}Build complete!${NC}"
-
+cond_print "${YELLOW}Building...${NC}"
+if [ "$make_quiet_arg" ]; then
+    make iso 2>&1 >/dev/null
+else
+    make iso
+fi
