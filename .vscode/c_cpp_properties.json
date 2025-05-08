@@ -3,13 +3,13 @@
         {
             "name": "Linux",
             "includePath": [
-                "/workspaces/charmos/**"
+                "**"
             ],
             "defines": [],
             "cppStandard": "c++14",
             "intelliSenseMode": "linux-clang-x64",
             "compileCommands": [
-                "${workspaceFolder}/compile_commands.json"
+                "compile_commands.json"
             ],
             "cStandard": "gnu11",
             "mergeConfigurations": false,
