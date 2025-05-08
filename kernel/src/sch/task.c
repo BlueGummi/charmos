@@ -16,6 +16,7 @@ struct task *create_task(void (*entry_point)(void)) {
     new_task->regs.rflags = 0x202;
     new_task->regs.rsp = stack_top;
     new_task->regs.ss = 0x10;
+    new_task->stack = (void *) stack_top - 0x1000;
     new_task->entry = entry_point;
     new_task->id = globid++;
 

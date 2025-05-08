@@ -10,14 +10,12 @@
 #include <requests.h>
 #include <sched.h>
 #include <shutdown.h>
-#include <spin_lock.h>
 #include <smap.h>
+#include <spin_lock.h>
 #include <stdalign.h>
 #include <stdatomic.h>
 #include <stdbool.h>
-#include <stddef.h>
 #include <stdint.h>
-#include <string.h>
 #include <task.h>
 #include <vfs.h>
 #include <vmalloc.h>
@@ -45,7 +43,11 @@ make_task(3, "KETCHUUUP", false);
 make_task(4, "RAAAANCH", false);
 make_task(5, "SAUERKRAAAUUUT", false);
 extern void test_alloc();
-void sad_loop() { while(1) { asm("hlt");}}
+void sad_loop() {
+    while (1) {
+        asm("hlt");
+    }
+}
 
 void wakeup() {
     spin_lock(&wakeup_lock);

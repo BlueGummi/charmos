@@ -75,70 +75,69 @@ void scheduler_init(struct scheduler *sched) {
     sched->current = NULL;
 }
 
-void scheduler_add_task(struct scheduler *scheduler, struct task *new_task) {
-    if (scheduler == NULL || new_task == NULL) {
+void scheduler_add_task(struct scheduler *sched, struct task *task) {
+    if (sched == NULL || task == NULL) {
         return;
     }
 
-    new_task->next = NULL;
-    new_task->prev = NULL;
+    task->next = NULL;
+    task->prev = NULL;
 
-    if (scheduler->head == NULL) {
-        scheduler->head = new_task;
-        scheduler->tail = new_task;
-        new_task->next = new_task;
-        new_task->prev = new_task;
+    if (sched->head == NULL) {
+        sched->head = task;
+        sched->tail = task;
+        task->next = task;
+        task->prev = task;
     } else {
-        new_task->prev = scheduler->tail;
-        new_task->next = scheduler->head;
+        task->prev = sched->tail;
+        task->next = sched->head;
 
-        scheduler->tail->next = new_task;
-        scheduler->head->prev = new_task;
+        sched->tail->next = task;
+        sched->head->prev = task;
 
-        scheduler->tail = new_task;
+        sched->tail = task;
     }
 
-    if (!scheduler->current)
-        scheduler->current = new_task;
-
+    if (!sched->current)
+        sched->current = task;
 }
 
-void scheduler_remove_task(struct scheduler *scheduler,
-                           struct task *task_to_remove) {
-    if (scheduler == NULL || task_to_remove == NULL) {
+void scheduler_remove_task(struct scheduler *sched, struct task *task) {
+    if (sched == NULL || task == NULL) {
         return;
     }
 
-    if (scheduler->head == NULL) {
+    if (sched->head == NULL) {
         return;
     }
 
-    if (scheduler->head == scheduler->tail &&
-        scheduler->head == task_to_remove) {
-        scheduler->head = NULL;
-        scheduler->tail = NULL;
+    if (sched->head == sched->tail && sched->head == task) {
+        sched->head = NULL;
+        sched->tail = NULL;
         return;
     }
 
-    if (scheduler->head == task_to_remove) {
-        scheduler->head = scheduler->head->next;
-        scheduler->head->prev = scheduler->tail;
-        scheduler->tail->next = scheduler->head;
-    } else if (scheduler->tail == task_to_remove) {
-        scheduler->tail = scheduler->tail->prev;
-        scheduler->tail->next = scheduler->head;
-        scheduler->head->prev = scheduler->tail;
+    if (sched->head == task) {
+        sched->head = sched->head->next;
+        sched->head->prev = sched->tail;
+        sched->tail->next = sched->head;
+    } else if (sched->tail == task) {
+        sched->tail = sched->tail->prev;
+        sched->tail->next = sched->head;
+        sched->head->prev = sched->tail;
     } else {
-        struct task *current = scheduler->head->next;
-        while (current != scheduler->head && current != task_to_remove) {
+        struct task *current = sched->head->next;
+        while (current != sched->head && current != task) {
             current = current->next;
         }
 
-        if (current == task_to_remove) {
+        if (current == task) {
             current->prev->next = current->next;
             current->next->prev = current->prev;
         }
     }
+    vmm_free_pages(task->stack, 1);
+    vmm_free_pages(task, 1);
 }
 
 void scheduler_remove_task_by_id(struct scheduler *sched, uint64_t task_id) {

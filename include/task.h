@@ -8,6 +8,7 @@ struct cpu_state {
 struct task {
     uint64_t id;
     void *entry;
+    void *stack;
     struct cpu_state regs;
     struct task *next;
     struct task *prev;
