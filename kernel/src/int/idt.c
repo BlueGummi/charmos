@@ -101,10 +101,10 @@ void unmask_timer_and_keyboard() {
 void init_interrupts() {
     remap_pic();
 
-    extern void timer_interrupt_handler();
+    extern void context_switch();
     extern void page_fault_handler_wrapper();
 
-    idt_set_gate(32, (uint64_t) timer_interrupt_handler, 0x08, 0x8E); // IRQ0
+    idt_set_gate(32, (uint64_t) context_switch, 0x08, 0x8E); // IRQ0
     idt_set_gate(33, (uint64_t) keyboard_handler, 0x08, 0x8E);        // IRQ1
     idt_set_gate(PAGE_FAULT_ID, (uint64_t) page_fault_handler_wrapper, 0x08,
                  0x8E);

@@ -19,4 +19,5 @@ void schedule(struct cpu_state *cpu);
 void scheduler_remove_task_by_id(struct scheduler *sched, uint64_t task_id);
 extern struct task *current_task;
 extern struct scheduler global_sched;
+extern void timer_interrupt_handler(void);
 #pragma once

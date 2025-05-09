@@ -3,6 +3,7 @@
 #include <task.h>
 #include <vmalloc.h>
 
+
 uint64_t globid = 1;
 
 struct task *create_task(void (*entry_point)(void)) {
@@ -11,6 +12,7 @@ struct task *create_task(void (*entry_point)(void)) {
 
     memset(new_task, 0, sizeof(struct task)); // zero out the task
 
+    new_task->state = READY;
     new_task->regs.rip = (uint64_t) entry_point;
     new_task->regs.cs = 0x08;
     new_task->regs.rflags = 0x202;
@@ -21,4 +23,9 @@ struct task *create_task(void (*entry_point)(void)) {
     new_task->id = globid++;
 
     return new_task;
+}
+
+void delete_task(struct task *t) {
+    vmm_free_pages(t->stack, 1);
+    vmm_free_pages(t,1);
 }
