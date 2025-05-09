@@ -7,7 +7,7 @@ struct cpu_state {
 
 struct task {
     uint64_t id;
-    void *entry;
+    void (*entry)(void);
     void *stack;
     struct cpu_state regs;
     struct task *next;

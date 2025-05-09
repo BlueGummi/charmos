@@ -1,5 +1,5 @@
-#include <stdint.h>
 #include <spin_lock.h>
+#include <stdint.h>
 #include <task.h>
 
 enum core_state {
@@ -12,3 +12,4 @@ struct core {
     struct task *current_task;
     enum core_state state;
 };
+#pragma once

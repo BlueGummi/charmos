@@ -1,12 +1,11 @@
 #![no_std]
 #![feature(allocator_api)]
 extern crate alloc;
-use alloc::vec::Vec;
+use core::arch::asm;
 use core::panic::PanicInfo;
 
 unsafe extern "C" {
     pub fn k_printf(fmt: *const u8, ...);
-    pub fn sad_loop() -> !;
 }
 
 unsafe extern "C" {
@@ -24,13 +23,15 @@ unsafe impl GlobalAlloc for BitmapAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let size = layout.size().max(layout.align());
         let pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
-        vmm_alloc_pages(pages)
+        unsafe { vmm_alloc_pages(pages) }
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         let size = layout.size().max(layout.align());
         let pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
-        vmm_free_pages(ptr, pages);
+        unsafe {
+            vmm_free_pages(ptr, pages);
+        }
     }
 }
 
@@ -38,14 +39,16 @@ unsafe impl GlobalAlloc for BitmapAllocator {
 pub static ALLOCATOR: BitmapAllocator = BitmapAllocator;
 #[unsafe(no_mangle)]
 unsafe extern "C" fn test_alloc() {
-    let layout = Layout::new::<u32>();
-    let ptr = ALLOCATOR.alloc(layout);
-    if !ptr.is_null() {
-        *(ptr as *mut u32) = 33;
-        k_printf("allocated value: %d\n".as_ptr(), *(ptr as *mut u32));
-        ALLOCATOR.dealloc(ptr, layout);
-    } else {
-        k_printf("allocation failed\n".as_ptr());
+    unsafe {
+        let layout = Layout::new::<u32>();
+        let ptr = ALLOCATOR.alloc(layout);
+        if !ptr.is_null() {
+            *(ptr as *mut u32) = 33;
+            k_printf("allocated value: %d\n".as_ptr(), *(ptr as *mut u32));
+            ALLOCATOR.dealloc(ptr, layout);
+        } else {
+            k_printf("allocation failed\n".as_ptr());
+        }
     }
 }
 
@@ -73,6 +76,8 @@ unsafe fn panic(info: &PanicInfo) -> ! {
         } else {
             k_printf(EMPTY_PANIC.as_ptr());
         }
-        sad_loop();
+        loop {
+            asm!("hlt");
+        }
     }
 }

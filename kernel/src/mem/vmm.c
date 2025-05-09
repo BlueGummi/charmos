@@ -86,10 +86,10 @@ void vmm_init() {
         }
     }
 
-/*  extern uint64_t __stext[], __etext[];
-    extern uint64_t __srodata[], __erodata[];
-    extern uint64_t __sdata[], __edata[];
-    extern uint64_t __sbss[], __ebss[];*/
+    /*  extern uint64_t __stext[], __etext[];
+        extern uint64_t __srodata[], __erodata[];
+        extern uint64_t __sdata[], __edata[];
+        extern uint64_t __sbss[], __ebss[];*/
     extern uint64_t __slimine_requests[], __elimine_requests[];
 
     for (uintptr_t virt = (uintptr_t) __slimine_requests;

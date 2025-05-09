@@ -1,3 +1,4 @@
+#include <core.h>
 #include <dbg.h>
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
@@ -5,6 +6,7 @@
 #include <idt.h>
 #include <io.h>
 #include <limine.h>
+#include <mp.h>
 #include <pmm.h>
 #include <printf.h>
 #include <requests.h>
@@ -21,12 +23,14 @@
 #include <vmalloc.h>
 #include <vmm.h>
 
+struct core **core_data = NULL;
+uint64_t cr3 = 0;
 struct spinlock wakeup_lock = SPINLOCK_INIT;
-int glob_cpu_c = 0;
 uint64_t t1_id;
 struct scheduler global_sched;
-atomic_char do_work = 0;
+atomic_char cr3_ready = 0;
 atomic_uint_fast64_t current_cpu = 0;
+
 #define make_task(id, sauce, terminate)                                        \
     void task##id() {                                                          \
         while (1) {                                                            \
@@ -43,30 +47,6 @@ make_task(3, "KETCHUUUP", false);
 make_task(4, "RAAAANCH", false);
 make_task(5, "SAUERKRAAAUUUT", false);
 extern void test_alloc();
-void sad_loop() {
-    while (1) {
-        asm("hlt");
-    }
-}
-
-void wakeup() {
-    spin_lock(&wakeup_lock);
-    enable_smap_smep_umip();
-    gdt_install();
-    current_cpu++;
-    k_printf("I am the %lu cpu\n", current_cpu);
-    int cpu = current_cpu;
-    spin_unlock(&wakeup_lock);
-
-    while (1) {
-        spin_lock(&wakeup_lock);
-        if (do_work) {
-            k_printf("CPU %d says: I need to do work!\n", cpu);
-            do_work = 0;
-        }
-        spin_unlock(&wakeup_lock);
-    }
-}
 
 void kmain(void) {
     k_printf_init(framebuffer_request.response->framebuffers[0]);
@@ -77,12 +57,6 @@ void kmain(void) {
         struct limine_mp_info *curr_cpu = mpr->cpus[i];
         curr_cpu->goto_address = wakeup;
     }
-
-    while (current_cpu != mpr->cpu_count - 1) {
-        asm volatile("pause");
-    }
-    k_printf("We have woken up everybody\n");
-
     enable_smap_smep_umip();
     gdt_install();
     init_interrupts();
@@ -93,6 +67,12 @@ void kmain(void) {
     vfs_init();
     read_test();
     test_alloc();
+    core_data = vmm_alloc_pages(1);
+    asm volatile("mov %%cr3, %0" : "=r"(cr3));
+    cr3_ready = 1;
+    while (current_cpu != mpr->cpu_count - 1) {
+        asm volatile("pause");
+    }
     global_sched.active = true;
     global_sched.started_first = false;
     struct task *t1 = create_task(task1);
@@ -106,7 +86,6 @@ void kmain(void) {
     scheduler_add_task(&global_sched, t3);
     scheduler_add_task(&global_sched, t4);
     scheduler_add_task(&global_sched, t5);
-    do_work = 1;
     scheduler_start();
     while (1) {
         asm("hlt");

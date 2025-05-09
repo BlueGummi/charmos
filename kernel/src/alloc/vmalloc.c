@@ -111,7 +111,6 @@ static void bitmap_clear_bit(size_t index) {
 static void *vmm_start_idx_alloc(const size_t count, size_t start_index) {
 
     for (size_t j = 0; j < count; j++) {
-
         bitmap_set_bit(start_index + j);
     }
 
@@ -149,7 +148,6 @@ static void *vmm_start_idx_alloc(const size_t count, size_t start_index) {
 /*
  * Allocate `count` consecutive pages
  */
-
 void *vmm_alloc_pages(const size_t count) {
     if (count == 0 || count > vmm_allocator.free_pages) {
         return NULL;

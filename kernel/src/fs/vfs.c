@@ -43,8 +43,6 @@ void vfs_init() {
     root->children = home;
 }
 
-
-
 struct vfs_node *vfs_lookup(const char *name) {
     if (!root || !name)
         return NULL;

@@ -72,17 +72,17 @@ each level has at least one challenge point to earn
 
 - [x] wake up other CPUs 
 
-    - [ ] do something useful with them 
+    - [x] do something useful with them 
 
         - [ ] thread structure
 
 - [x] start making tasks 
 
-    - [ ] :broom: add more detail to tasks 
+    - [x] :broom: add more detail to tasks 
 
 - [x] spin lock thing 
 
-    - [ ] :broom: lock more things 
+    - [x] :broom: lock more things 
 
     - [ ] schedule kernel events
 
