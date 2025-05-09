@@ -55,6 +55,7 @@ void schedule(struct cpu_state *cpu) {
         global_sched.started_first = true;
         return;
     }
+    global_sched.current->state = READY;
     if (global_sched.current) {
         memcpy(&global_sched.current->regs, cpu, sizeof(struct cpu_state));
         global_sched.current = global_sched.current->next
@@ -64,8 +65,8 @@ void schedule(struct cpu_state *cpu) {
 
     if (global_sched.current) {
         memcpy(cpu, &global_sched.current->regs, sizeof(struct cpu_state));
-        return;
     }
+    global_sched.current->state = RUNNING;
     return;
 }
 

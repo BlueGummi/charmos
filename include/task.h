@@ -5,6 +5,12 @@ struct cpu_state {
     uint64_t rip, cs, rflags, rsp, ss;
 };
 
+enum task_state {
+    READY,
+    RUNNING,
+    HALTED,
+};
+
 struct task {
     uint64_t id;
     void (*entry)(void);
@@ -12,7 +18,8 @@ struct task {
     struct cpu_state regs;
     struct task *next;
     struct task *prev;
+    enum task_state state;
 };
 struct task *create_task(void (*entry_point)());
-
+void delete_task(struct task *t);
 #pragma once

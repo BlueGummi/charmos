@@ -1,6 +1,6 @@
 extern schedule
-global timer_interrupt_handler
-timer_interrupt_handler:
+global context_switch
+context_switch:
     push rax
     push rbx
     push rcx

@@ -266,8 +266,8 @@ static void handle_format_specifier(const char **format_ptr, va_list args) {
 }
 
 void k_printf(const char *format, ...) {
+    asm volatile("cli");
     spin_lock(&k_printf_lock);
-    asm("cli");
     va_list args;
     va_start(args, format);
 
@@ -284,10 +284,9 @@ void k_printf(const char *format, ...) {
             format++;
         }
     }
-
-    va_end(args);
-    asm("sti");
     spin_unlock(&k_printf_lock);
+    asm volatile("sti");
+    va_end(args);
 }
 
 void panic(const char *format, ...) {

@@ -1,5 +1,6 @@
 #include <pmm.h>
 #include <printf.h>
+#include <spin_lock.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -9,6 +10,8 @@
 uint64_t hhdm_offset;
 
 static struct vmalloc_bitmap vmm_allocator;
+
+static struct spinlock vmalloc_lock = SPINLOCK_INIT;
 
 void vmalloc_set_offset(uint64_t o) {
     hhdm_offset = o;
@@ -153,6 +156,8 @@ void *vmm_alloc_pages(const size_t count) {
         return NULL;
     }
 
+    spin_lock(&vmalloc_lock);
+
     size_t consecutive = 0;
     size_t start_index = 0;
 
@@ -166,6 +171,9 @@ void *vmm_alloc_pages(const size_t count) {
             consecutive++;
 
             if (consecutive == count) {
+
+                spin_unlock(&vmalloc_lock);
+
                 return vmm_start_idx_alloc(count, start_index);
             }
 
@@ -174,6 +182,8 @@ void *vmm_alloc_pages(const size_t count) {
             consecutive = 0;
         }
     }
+
+    spin_unlock(&vmalloc_lock);
 
     return NULL;
 }

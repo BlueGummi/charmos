@@ -30,6 +30,7 @@ uint64_t t1_id;
 struct scheduler global_sched;
 atomic_char cr3_ready = 0;
 atomic_uint_fast64_t current_cpu = 0;
+uint64_t t3_id = 0;
 
 #define make_task(id, sauce, terminate)                                        \
     void task##id() {                                                          \
@@ -38,7 +39,7 @@ atomic_uint_fast64_t current_cpu = 0;
             for (int i = 0; i < 50; i++)                                       \
                 asm("hlt");                                                    \
             if (terminate)                                                     \
-                scheduler_remove_task_by_id(&global_sched, 3);                 \
+                scheduler_remove_task_by_id(&global_sched, t3_id);             \
         }                                                                      \
     }
 make_task(1, "MAYOOOO", true);
@@ -46,11 +47,24 @@ make_task(2, "MUSTAAARD", false);
 make_task(3, "KETCHUUUP", false);
 make_task(4, "RAAAANCH", false);
 make_task(5, "SAUERKRAAAUUUT", false);
+
+#define make_mp_task(id, os)                                                   \
+    void task_mp##id() {                                                       \
+        k_printf("multiprocessor task %d says %s\n", id, os);                  \
+        while (1)                                                              \
+            asm("cli;hlt");                                                    \
+    }
+
+make_mp_task(1, "linux");
+make_mp_task(2, "macos");
+make_mp_task(3, "freebsd");
+make_mp_task(4, "openbsd");
+make_mp_task(5, "solaris");
+
 extern void test_alloc();
 
 void kmain(void) {
     k_printf_init(framebuffer_request.response->framebuffers[0]);
-
     struct limine_mp_response *mpr = mp_request.response;
 
     for (uint64_t i = 0; i < mpr->cpu_count; i++) {
@@ -59,7 +73,6 @@ void kmain(void) {
     }
     enable_smap_smep_umip();
     gdt_install();
-    init_interrupts();
     struct limine_hhdm_response *r = hhdm_request.response;
     init_physical_allocator(r->offset, memmap_request);
     vmm_offset_set(r->offset);
@@ -73,6 +86,11 @@ void kmain(void) {
     while (current_cpu != mpr->cpu_count - 1) {
         asm volatile("pause");
     }
+
+    mp_work_start(task_mp1);
+    mp_work_start(task_mp2);
+    mp_work_start(task_mp3);
+    mp_work_start(task_mp4);
     global_sched.active = true;
     global_sched.started_first = false;
     struct task *t1 = create_task(task1);
@@ -80,12 +98,14 @@ void kmain(void) {
     struct task *t3 = create_task(task3);
     struct task *t4 = create_task(task4);
     struct task *t5 = create_task(task5);
+    t3_id = t3->id;
     scheduler_init(&global_sched);
     scheduler_add_task(&global_sched, t1);
     scheduler_add_task(&global_sched, t2);
     scheduler_add_task(&global_sched, t3);
     scheduler_add_task(&global_sched, t4);
-    scheduler_add_task(&global_sched, t5);
+    scheduler_add_task(&global_sched, t5);    
+    init_interrupts();
     scheduler_start();
     while (1) {
         asm("hlt");
