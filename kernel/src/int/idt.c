@@ -13,14 +13,6 @@
 struct idt_entry idt[IDT_ENTRIES];
 struct idt_ptr idtp;
 
-#define YELL                                                                   \
-    do {                                                                       \
-        k_printf("========== MANUAL HALT! ==========\n");                      \
-        while (1) {                                                            \
-            asm("hlt");                                                        \
-        }                                                                      \
-    } while (0)
-
 void remap_pic() {
     uint8_t a1, a2;
 
@@ -54,7 +46,7 @@ void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags) {
     idt[num].reserved = 0;
 }
 
-void idt_install() {
+void idt_load() {
     idtp.limit = sizeof(struct idt_entry) * IDT_ENTRIES - 1;
     idtp.base = (uint64_t) &idt;
     asm volatile("lidt %0" : : "m"(idtp));
@@ -98,7 +90,7 @@ void unmask_timer_and_keyboard() {
     outb(PIC1_DATA, mask);
 }
 
-void init_interrupts() {
+void idt_install() {
     remap_pic();
 
     extern void context_switch();
@@ -109,7 +101,7 @@ void init_interrupts() {
     idt_set_gate(PAGE_FAULT_ID, (uint64_t) page_fault_handler_wrapper, 0x08,
                  0x8E);
 
-    idt_install();
+    idt_load();
 
     outb(0x43, 0x36);
     uint16_t divisor = 1193180 / 100;

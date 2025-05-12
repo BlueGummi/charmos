@@ -6,15 +6,24 @@
 #include <spin_lock.h>
 #include <vmalloc.h>
 
-void mp_work_start(void(task)(void)) {
+struct core **core_data = NULL;
+uint64_t cr3 = 0;
+atomic_char cr3_ready = 0;
+struct spinlock wakeup_lock = SPINLOCK_INIT;
+atomic_uint_fast64_t current_cpu = 0;
+
+/*
+ * Return an available core # that is idle
+ */
+uint64_t mp_available_core() {
     int i = 1;
     while (core_data[i] != NULL) {
         if (core_data[i]->state == IDLE && core_data[i]->current_task == NULL) {
-            core_data[i]->current_task = create_task(task);
-            break;
+            return i;
         }
         i++;
     }
+    return -1;
 }
 
 void wakeup() {

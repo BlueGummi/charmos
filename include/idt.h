@@ -24,6 +24,5 @@ struct idt_ptr {
     uint64_t base;
 } __attribute__((packed));
 
-void init_interrupts();
 void idt_install();
 #pragma once

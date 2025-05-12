@@ -284,9 +284,9 @@ void k_printf(const char *format, ...) {
             format++;
         }
     }
+    va_end(args);
     spin_unlock(&k_printf_lock);
     asm volatile("sti");
-    va_end(args);
 }
 
 void panic(const char *format, ...) {

@@ -23,13 +23,7 @@
 #include <vmalloc.h>
 #include <vmm.h>
 
-struct core **core_data = NULL;
-uint64_t cr3 = 0;
-struct spinlock wakeup_lock = SPINLOCK_INIT;
-uint64_t t1_id;
 struct scheduler global_sched;
-atomic_char cr3_ready = 0;
-atomic_uint_fast64_t current_cpu = 0;
 uint64_t t3_id = 0;
 
 #define make_task(id, sauce, terminate)                                        \
@@ -71,8 +65,10 @@ void kmain(void) {
         struct limine_mp_info *curr_cpu = mpr->cpus[i];
         curr_cpu->goto_address = wakeup;
     }
+
     enable_smap_smep_umip();
     gdt_install();
+    idt_install();
     struct limine_hhdm_response *r = hhdm_request.response;
     init_physical_allocator(r->offset, memmap_request);
     vmm_offset_set(r->offset);
@@ -87,10 +83,7 @@ void kmain(void) {
         asm volatile("pause");
     }
 
-    mp_work_start(task_mp1);
-    mp_work_start(task_mp2);
-    mp_work_start(task_mp3);
-    mp_work_start(task_mp4);
+    k_printf("Core %lu is available..\n", mp_available_core());
     global_sched.active = true;
     global_sched.started_first = false;
     struct task *t1 = create_task(task1);
@@ -104,8 +97,7 @@ void kmain(void) {
     scheduler_add_task(&global_sched, t2);
     scheduler_add_task(&global_sched, t3);
     scheduler_add_task(&global_sched, t4);
-    scheduler_add_task(&global_sched, t5);    
-    init_interrupts();
+    scheduler_add_task(&global_sched, t5); 
     scheduler_start();
     while (1) {
         asm("hlt");
