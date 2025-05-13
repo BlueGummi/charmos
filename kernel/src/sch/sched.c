@@ -84,12 +84,12 @@ void scheduler_add_task(struct scheduler *sched, struct task *task) {
     task->next = NULL;
     task->prev = NULL;
 
-    if (sched->head == NULL) {
+    if (sched->head == NULL) { // Empty list
         sched->head = task;
         sched->tail = task;
         task->next = task;
         task->prev = task;
-    } else {
+    } else { // non-empty list
         task->prev = sched->tail;
         task->next = sched->head;
 
@@ -99,20 +99,16 @@ void scheduler_add_task(struct scheduler *sched, struct task *task) {
         sched->tail = task;
     }
 
-    if (!sched->current)
+    if (!sched->current) // Nothing running
         sched->current = task;
 }
 
 void scheduler_rm_task(struct scheduler *sched, struct task *task) {
-    if (sched == NULL || task == NULL) {
+    if (sched == NULL || task == NULL || sched->head == NULL) { // Invalid
         return;
     }
 
-    if (sched->head == NULL) {
-        return;
-    }
-
-    if (sched->head == sched->tail && sched->head == task) {
+    if (sched->head == sched->tail && sched->head == task) { // Only task
         sched->head = NULL;
         sched->tail = NULL;
         return;

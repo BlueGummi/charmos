@@ -2,11 +2,11 @@
 #include <task.h>
 
 struct scheduler {
-    bool active;
-    bool started_first;
-    struct task *head;
-    struct task *tail;
-    struct task *current;
+    bool active; // Currently should be run?
+    bool started_first; // Begun?
+    struct task *head; // First task
+    struct task *tail; // Last task
+    struct task *current; // One to run
 };
 
 void scheduler_init(struct scheduler *sched);

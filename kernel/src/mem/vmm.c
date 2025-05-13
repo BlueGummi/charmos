@@ -197,3 +197,42 @@ void vmm_unmap_page(uintptr_t virt) {
     *entry &= ~PAGING_PRESENT;
     asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
 }
+
+/*
+ * Return the physical address of a mapped page
+ */
+uintptr_t vmm_get_phys(uintptr_t virt) {
+
+    uint64_t L1 = (virt >> 12) & 0x1FF;
+    uint64_t L2 = (virt >> 21) & 0x1FF;
+    uint64_t L3 = (virt >> 30) & 0x1FF;
+    uint64_t L4 = (virt >> 39) & 0x1FF;
+
+    struct page_table *current_table = kernel_pml4;
+
+    pte_t *entry = &current_table->entries[L4];
+    if (!(*entry & PAGING_PRESENT))
+        return (uintptr_t) -1;
+
+    current_table =
+        (struct page_table *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+    entry = &current_table->entries[L3];
+    if (!(*entry & PAGING_PRESENT))
+        return (uintptr_t) -1;
+
+    current_table =
+        (struct page_table *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+    entry = &current_table->entries[L2];
+    if (!(*entry & PAGING_PRESENT))
+        return (uintptr_t) -1;
+
+    current_table =
+        (struct page_table *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+    entry = &current_table->entries[L1];
+    if (!(*entry & PAGING_PRESENT))
+        return (uintptr_t) -1;
+
+    return (*entry & PAGING_PHYS_MASK) + (virt & 0xFFF);
+}
+
+
