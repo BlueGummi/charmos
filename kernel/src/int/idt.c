@@ -77,7 +77,7 @@ void page_fault_handler(uint64_t error_code, uint64_t fault_addr) {
     k_printf("  - Protection Key Violation (PK): %s\n",
              (error_code & 0x20) ? "Yes" : "No");
     if (global_sched.active) {
-        scheduler_remove_task(&global_sched, global_sched.current);
+        scheduler_rm_task(&global_sched, global_sched.current);
     }
 }
 

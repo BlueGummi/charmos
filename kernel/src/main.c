@@ -33,7 +33,7 @@ uint64_t t3_id = 0;
             for (int i = 0; i < 50; i++)                                       \
                 asm("hlt");                                                    \
             if (terminate)                                                     \
-                scheduler_remove_task_by_id(&global_sched, t3_id);             \
+                scheduler_rm_id(&global_sched, t3_id);             \
         }                                                                      \
     }
 make_task(1, "MAYOOOO", true);

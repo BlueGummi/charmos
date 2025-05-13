@@ -25,7 +25,7 @@ struct task *create_task(void (*entry_point)(void)) {
     return new_task;
 }
 
-void delete_task(struct task *t) {
+void task_free(struct task *t) {
     vmm_free_pages(t->stack, 1);
     vmm_free_pages(t,1);
 }

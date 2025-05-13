@@ -103,7 +103,7 @@ void scheduler_add_task(struct scheduler *sched, struct task *task) {
         sched->current = task;
 }
 
-void scheduler_remove_task(struct scheduler *sched, struct task *task) {
+void scheduler_rm_task(struct scheduler *sched, struct task *task) {
     if (sched == NULL || task == NULL) {
         return;
     }
@@ -137,11 +137,10 @@ void scheduler_remove_task(struct scheduler *sched, struct task *task) {
             current->next->prev = current->prev;
         }
     }
-    vmm_free_pages(task->stack, 1);
-    vmm_free_pages(task, 1);
+    task_free(task);
 }
 
-void scheduler_remove_task_by_id(struct scheduler *sched, uint64_t task_id) {
+void scheduler_rm_id(struct scheduler *sched, uint64_t task_id) {
     CLI;
 
     if (sched == NULL || sched->head == NULL) {
@@ -154,7 +153,7 @@ void scheduler_remove_task_by_id(struct scheduler *sched, uint64_t task_id) {
 
     do {
         if (current->id == task_id) {
-            scheduler_remove_task(sched, current);
+            scheduler_rm_task(sched, current);
             break;
         }
         current = current->next;

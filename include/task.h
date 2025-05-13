@@ -21,5 +21,5 @@ struct task {
     enum task_state state;
 };
 struct task *create_task(void (*entry_point)());
-void delete_task(struct task *t);
+void task_free(struct task *t);
 #pragma once
