@@ -1,6 +1,6 @@
 #include <core.h>
 #include <stdatomic.h>
-#include <task.h>
+#include <thread.h>
 #include <stdint.h>
 
 extern struct core **core_data;

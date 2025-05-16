@@ -1,22 +1,21 @@
 #include <stdbool.h>
-#include <task.h>
+#include <thread.h>
 
 struct scheduler {
     bool active; // Currently should be run?
     bool started_first; // Begun?
-    struct task *head; // First task
-    struct task *tail; // Last task
-    struct task *current; // One to run
+    struct thread *head; // First task
+    struct thread *tail; // Last task
+    struct thread *current; // One to run
 };
 
 void scheduler_init(struct scheduler *sched);
-struct task *create_task(void (*entry_point)(void));
-void scheduler_add_task(struct scheduler *sched, struct task *task);
-void scheduler_rm_task(struct scheduler *sched, struct task *task);
+void scheduler_add_thread(struct scheduler *sched, struct thread *thread);
+void scheduler_rm_thread(struct scheduler *sched, struct thread *thread);
 __attribute__((noreturn)) void scheduler_start(void);
 void schedule(struct cpu_state *cpu);
-void scheduler_rm_id(struct scheduler *sched, uint64_t task_id);
-extern struct task *current_task;
+void scheduler_rm_id(struct scheduler *sched, uint64_t thread_id);
+extern struct thread *current_thread;
 extern struct scheduler global_sched;
 extern void timer_interrupt_handler(void);
 #pragma once

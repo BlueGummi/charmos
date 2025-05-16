@@ -49,7 +49,7 @@ void wakeup() {
             current_core->state = BUSY;
             spin_unlock(&wakeup_lock);
             current_core->current_task->entry();
-            task_free(current_core->current_task);
+            thread_free(current_core->current_task);
             current_core->current_task = NULL;
             current_core->state = IDLE;
         }

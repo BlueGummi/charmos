@@ -18,7 +18,7 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <task.h>
+#include <thread.h>
 #include <vfs.h>
 #include <vmalloc.h>
 #include <vmm.h>
@@ -33,7 +33,7 @@ uint64_t t3_id = 0;
             for (int i = 0; i < 50; i++)                                       \
                 asm("hlt");                                                    \
             if (terminate)                                                     \
-                scheduler_rm_id(&global_sched, t3_id);             \
+                scheduler_rm_id(&global_sched, t3_id);                         \
         }                                                                      \
     }
 make_task(1, "MAYOOOO", true);
@@ -82,22 +82,21 @@ void kmain(void) {
     while (current_cpu != mpr->cpu_count - 1) {
         asm volatile("pause");
     }
-
     k_printf("Core %lu is available..\n", mp_available_core());
     global_sched.active = true;
     global_sched.started_first = false;
-    struct task *t1 = create_task(task1);
-    struct task *t2 = create_task(task2);
-    struct task *t3 = create_task(task3);
-    struct task *t4 = create_task(task4);
-    struct task *t5 = create_task(task5);
+    struct thread *t1 = thread_create(task1);
+    struct thread *t2 = thread_create(task2);
+    struct thread *t3 = thread_create(task3);
+    struct thread *t4 = thread_create(task4);
+    struct thread *t5 = thread_create(task5);
     t3_id = t3->id;
     scheduler_init(&global_sched);
-    scheduler_add_task(&global_sched, t1);
-    scheduler_add_task(&global_sched, t2);
-    scheduler_add_task(&global_sched, t3);
-    scheduler_add_task(&global_sched, t4);
-    scheduler_add_task(&global_sched, t5); 
+    scheduler_add_thread(&global_sched, t1);
+    scheduler_add_thread(&global_sched, t2);
+    scheduler_add_thread(&global_sched, t3);
+    scheduler_add_thread(&global_sched, t4);
+    scheduler_add_thread(&global_sched, t5);
     scheduler_start();
     while (1) {
         asm("hlt");

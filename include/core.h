@@ -1,6 +1,6 @@
 #include <spin_lock.h>
 #include <stdint.h>
-#include <task.h>
+#include <thread.h>
 
 enum core_state {
     IDLE,
@@ -9,7 +9,8 @@ enum core_state {
 
 struct core {
     uint64_t id;
-    struct task *current_task;
+    struct thread *current_task;
     enum core_state state;
 };
+
 #pragma once

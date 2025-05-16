@@ -76,7 +76,7 @@ void scheduler_init(struct scheduler *sched) {
     sched->current = NULL;
 }
 
-void scheduler_add_task(struct scheduler *sched, struct task *task) {
+void scheduler_add_thread(struct scheduler *sched, struct thread *task) {
     if (sched == NULL || task == NULL) {
         return;
     }
@@ -103,7 +103,7 @@ void scheduler_add_task(struct scheduler *sched, struct task *task) {
         sched->current = task;
 }
 
-void scheduler_rm_task(struct scheduler *sched, struct task *task) {
+void scheduler_rm_thread(struct scheduler *sched, struct thread *task) {
     if (sched == NULL || task == NULL || sched->head == NULL) { // Invalid
         return;
     }
@@ -123,7 +123,7 @@ void scheduler_rm_task(struct scheduler *sched, struct task *task) {
         sched->tail->next = sched->head;
         sched->head->prev = sched->tail;
     } else {
-        struct task *current = sched->head->next;
+        struct thread *current = sched->head->next;
         while (current != sched->head && current != task) {
             current = current->next;
         }
@@ -133,7 +133,7 @@ void scheduler_rm_task(struct scheduler *sched, struct task *task) {
             current->next->prev = current->prev;
         }
     }
-    task_free(task);
+    thread_free(task);
 }
 
 void scheduler_rm_id(struct scheduler *sched, uint64_t task_id) {
@@ -144,12 +144,12 @@ void scheduler_rm_id(struct scheduler *sched, uint64_t task_id) {
         return;
     }
 
-    struct task *current = sched->head;
-    struct task *start = current;
+    struct thread *current = sched->head;
+    struct thread *start = current;
 
     do {
         if (current->id == task_id) {
-            scheduler_rm_task(sched, current);
+            scheduler_rm_thread(sched, current);
             break;
         }
         current = current->next;
