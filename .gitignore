@@ -1,4 +1,3 @@
-ovmf/
 limine/
 build/
 kernel/uACPI
