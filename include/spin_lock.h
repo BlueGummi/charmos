@@ -1,7 +1,7 @@
-#include <stdint.h>
+#include <stdatomic.h>
 
 struct spinlock {
-    volatile uint32_t lock;
+    atomic_flag lock;
 };
 
 #define SPINLOCK_INIT {0}

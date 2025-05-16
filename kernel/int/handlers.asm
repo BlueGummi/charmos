@@ -1,5 +1,5 @@
 default rel
-%include "../kernel/src/int/int_mac.mac"
+%include "../kernel/int/int_mac.mac"
 
 extern page_fault_handler
 global page_fault_handler_wrapper

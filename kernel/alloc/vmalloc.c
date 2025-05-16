@@ -18,6 +18,32 @@ void vmalloc_set_offset(uint64_t o) {
 }
 
 /*
+ * Return 1 if the bit at an index is on, else 0 in the VMM bitmap
+ */
+static bool bitmap_test_bit(size_t index) {
+
+    return (vmm_allocator.bitmap[index / BITS_PER_ENTRY] &
+
+            (1ULL << (index % BITS_PER_ENTRY))) != 0;
+}
+
+/*
+ * Set a bit to 1 at an index in the VMM bitmap
+ */
+static void bitmap_set_bit(size_t index) {
+    vmm_allocator.bitmap[index / BITS_PER_ENTRY] |=
+        (1ULL << (index % BITS_PER_ENTRY));
+}
+
+/*
+ * Set a bit to 0 at an index in the VMM bitmap
+ */
+static void bitmap_clear_bit(size_t index) {
+    vmm_allocator.bitmap[index / BITS_PER_ENTRY] &=
+        ~(1ULL << (index % BITS_PER_ENTRY));
+}
+
+/*
  * Initialize the bitmap for the VMM with a base address of the map
  * and the number of pages it will map
  */
@@ -45,30 +71,6 @@ void vmm_bitmap_init(uintptr_t base_address, size_t total_pages) {
 
         vmm_allocator.free_pages--;
     }
-}
-
-/*
- * Return 1 if the bit at an index is on, else 0 in the VMM bitmap
- */
-static bool bitmap_test_bit(size_t index) {
-
-    return (vmm_allocator.bitmap[index / BITS_PER_ENTRY] &
-
-            (1ULL << (index % BITS_PER_ENTRY))) != 0;
-}
-/*
- * Set a bit to 1 at an index in the VMM bitmap
- */
-static void bitmap_set_bit(size_t index) {
-    vmm_allocator.bitmap[index / BITS_PER_ENTRY] |=
-        (1ULL << (index % BITS_PER_ENTRY));
-}
-/*
- * Set a bit to 0 at an index in the VMM bitmap
- */
-static void bitmap_clear_bit(size_t index) {
-    vmm_allocator.bitmap[index / BITS_PER_ENTRY] &=
-        ~(1ULL << (index % BITS_PER_ENTRY));
 }
 
 /*
@@ -160,6 +162,8 @@ void vmm_free_pages(void *addr, size_t count) {
         return;
     }
 
+    spin_lock(&vmalloc_lock);
+
     const uintptr_t address = (uintptr_t) addr;
     const uintptr_t phys = vmm_get_phys(address);
 
@@ -183,4 +187,18 @@ void vmm_free_pages(void *addr, size_t count) {
             vmm_allocator.free_pages++;
         }
     }
+
+    spin_unlock(&vmalloc_lock);
+}
+
+void *kmalloc(size_t size) {
+    if (size == 0)
+        return NULL;
+    return vmm_alloc_pages((size + PAGE_SIZE - 1) / PAGE_SIZE);
+}
+
+void kfree(void *addr, size_t size) {
+    if (size == 0)
+        return;
+    vmm_free_pages(addr, (size + PAGE_SIZE - 1) / PAGE_SIZE);
 }

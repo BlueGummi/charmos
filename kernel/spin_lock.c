@@ -1,11 +1,11 @@
 #include <spin_lock.h>
 
 void spin_lock(struct spinlock *lock) {
-    while (__sync_lock_test_and_set(&lock->lock, 1)) {
+    while (atomic_flag_test_and_set(&lock->lock)) {
         asm volatile("pause");
     }
 }
 
 void spin_unlock(struct spinlock *lock) {
-    __sync_lock_release(&lock->lock);
+    atomic_flag_clear(&lock->lock);
 }

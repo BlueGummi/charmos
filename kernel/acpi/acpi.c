@@ -24,6 +24,6 @@ void uacpi_kernel_unmap(void *addr, uacpi_size len) {
 }
 
 void uacpi_kernel_log(uacpi_log_level level, const uacpi_char *data) {
-    k_printf("UACPI LOG: LEVEL = %d ", (int) level);
-    k_printf(data);
+    k_printf(">> UACPI LOG: LEVEL = %d\n", (int) level);
+    k_printf(">> %s\n", data);
 }

@@ -76,13 +76,13 @@ each level has at least one challenge point to earn
 
         - [ ] thread structure
 
-- [ ] create a separate thread/task struct
+- [x] create a separate thread/task struct
 
     - [ ] each task has its own address space
 
     - [ ] threads with their own registers and state
 
-    - [ ] schedule threads not tasks
+    - [x] schedule threads not tasks
 
 - [x] start making tasks 
 

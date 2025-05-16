@@ -58,16 +58,16 @@ if [ ! -d "limine" ]; then
 fi
 
 
-if [ ! -d "kernel/src/uACPI" ]; then
+if [ ! -d "kernel/uACPI" ]; then
     cond_print "${YELLOW}downloading uacpi${NC}"
-    cd kernel/src/
+    cd kernel
     git clone https://github.com/uacpi/uACPI --depth=1 $cli_quiet_arg
     cd -
 fi
 
-if [ ! -d "kernel/src/flanterm" ]; then
+if [ ! -d "kernel/flanterm" ]; then
     cond_print "${YELLOW}downloading flanterm${NC}"
-    cd kernel/src/
+    cd kernel
     git clone https://codeberg.org/mintsuki/flanterm --depth=1 $cli_quiet_arg
     cd -
 fi
