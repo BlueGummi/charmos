@@ -3,7 +3,6 @@
 #include <thread.h>
 #include <vmalloc.h>
 
-
 uint64_t globid = 1;
 
 struct thread *thread_create(void (*entry_point)(void)) {
@@ -27,5 +26,5 @@ struct thread *thread_create(void (*entry_point)(void)) {
 
 void thread_free(struct thread *t) {
     vmm_free_pages(t->stack, 1);
-    vmm_free_pages(t,1);
+    vmm_free_pages(t, 1);
 }

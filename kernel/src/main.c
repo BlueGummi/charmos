@@ -29,6 +29,7 @@ uint64_t t3_id = 0;
 extern void test_alloc();
 
 void k_sch_main() {
+    k_printf("Welcome to the idle task!\n");
     while (1) {
         asm volatile("hlt");
     }

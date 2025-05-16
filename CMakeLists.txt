@@ -18,7 +18,7 @@ else()
 endif()
 
 enable_language(ASM_NASM)
-set(CMAKE_ASM_NASM_FLAGS "-F dwarf -g -Wall -f elf64")
+set(CMAKE_ASM_NASM_FLAGS "-F dwarf -g -Wall -f elf64 -wno-reloc-rel-dword")
 
 add_subdirectory(kernel)
 

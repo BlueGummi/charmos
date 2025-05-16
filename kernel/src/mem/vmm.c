@@ -234,5 +234,3 @@ uintptr_t vmm_get_phys(uintptr_t virt) {
 
     return (*entry & PAGING_PHYS_MASK) + (virt & 0xFFF);
 }
-
-

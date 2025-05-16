@@ -18,7 +18,8 @@ atomic_uint_fast64_t current_cpu = 0;
 uint64_t mp_available_core() {
     int i = 1;
     while (core_data[i] != NULL) {
-        if (core_data[i]->state == IDLE && core_data[i]->current_task == NULL) {
+        if (core_data[i]->state == IDLE &&
+            core_data[i]->current_thread == NULL) {
             return i;
         }
         i++;
@@ -39,18 +40,19 @@ void wakeup() {
     struct core *current_core = vmm_alloc_pages(1);
     current_core->id = cpu;
     current_core->state = IDLE;
-    current_core->current_task = NULL;
+    current_core->current_thread = NULL;
     core_data[cpu] = current_core;
+    k_printf("Core %d waking up...\n", cpu);
     spin_unlock(&wakeup_lock);
 
     while (1) {
         spin_lock(&wakeup_lock);
-        if (current_core->current_task != NULL) {
+        if (current_core->current_thread != NULL) {
             current_core->state = BUSY;
             spin_unlock(&wakeup_lock);
-            current_core->current_task->entry();
-            thread_free(current_core->current_task);
-            current_core->current_task = NULL;
+            current_core->current_thread->entry();
+            thread_free(current_core->current_thread);
+            current_core->current_thread = NULL;
             current_core->state = IDLE;
         }
         spin_unlock(&wakeup_lock);

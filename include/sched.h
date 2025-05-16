@@ -2,10 +2,10 @@
 #include <thread.h>
 
 struct scheduler {
-    bool active; // Currently should be run?
-    bool started_first; // Begun?
-    struct thread *head; // First task
-    struct thread *tail; // Last task
+    bool active;            // Currently should be run?
+    bool started_first;     // Begun?
+    struct thread *head;    // First task
+    struct thread *tail;    // Last task
     struct thread *current; // One to run
 };
 

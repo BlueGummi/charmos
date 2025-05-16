@@ -9,7 +9,7 @@ enum core_state {
 
 struct core {
     uint64_t id;
-    struct thread *current_task;
+    struct thread *current_thread;
     enum core_state state;
 };
 

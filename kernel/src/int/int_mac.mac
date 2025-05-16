@@ -1,7 +1,5 @@
-extern page_fault_handler
-
-global page_fault_handler_wrapper
-page_fault_handler_wrapper:
+default rel
+%macro pass_err_to_routine 1
     push rax
     push rbx
     push rcx
@@ -18,10 +16,9 @@ page_fault_handler_wrapper:
     push r14
     push r15
 
-    ; Extract error code (stored at [rsp + 120] due to pushes above)
-    mov rdi, [rsp + 120]  ; Error code (1st argument)
-    mov rsi, cr2          ; Faulting address (2nd argument)
-    call page_fault_handler
+    mov rdi, [rsp + 120]  ; Error code
+    mov rsi, cr2          ; Faulting address 
+    call %1
 
     pop r15
     pop r14
@@ -41,4 +38,5 @@ page_fault_handler_wrapper:
 
     add rsp, 8
 
-    iretq
+    iretq   
+%endmacro
