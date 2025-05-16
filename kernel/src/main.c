@@ -57,7 +57,13 @@ make_mp_task(5, "solaris");
 
 extern void test_alloc();
 
-void kmain(void) {
+void k_sch_main() {
+    while (1) {
+        asm volatile("hlt");
+    }
+}
+
+void k_main(void) {
     k_printf_init(framebuffer_request.response->framebuffers[0]);
     struct limine_mp_response *mpr = mp_request.response;
 
@@ -82,9 +88,10 @@ void kmain(void) {
     while (current_cpu != mpr->cpu_count - 1) {
         asm volatile("pause");
     }
-    k_printf("Core %lu is available..\n", mp_available_core());
+    k_printf("Core %lu is available...\n", mp_available_core());
     global_sched.active = true;
     global_sched.started_first = false;
+    struct thread *k_idle = thread_create(k_sch_main);
     struct thread *t1 = thread_create(task1);
     struct thread *t2 = thread_create(task2);
     struct thread *t3 = thread_create(task3);
@@ -92,6 +99,7 @@ void kmain(void) {
     struct thread *t5 = thread_create(task5);
     t3_id = t3->id;
     scheduler_init(&global_sched);
+    scheduler_add_thread(&global_sched, k_idle);
     scheduler_add_thread(&global_sched, t1);
     scheduler_add_thread(&global_sched, t2);
     scheduler_add_thread(&global_sched, t3);
