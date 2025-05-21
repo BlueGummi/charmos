@@ -51,7 +51,9 @@ cond_print() {
 }
 
 cond_print "${GREEN}getting dependencies${NC}"
+
 git submodule init && git submodule update
+rm -rf kernel/uACPI/tests
 if [ ! -d "limine" ]; then
     cond_print "${YELLOW}downloading limine${NC}"
     git clone https://github.com/limine-bootloader/limine --branch=v9.x-binary --depth=1 $cli_quiet_arg
