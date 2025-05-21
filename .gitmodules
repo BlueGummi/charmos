@@ -4,3 +4,7 @@
 [submodule "kernel/flanterm"]
 	path = kernel/flanterm
 	url = https://codeberg.org/mintsuki/flanterm
+[submodule "limine"]
+	path = limine
+	url = https://github.com/limine-bootloader/limine.git
+	branch = v9.x-binary

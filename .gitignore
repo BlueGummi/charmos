@@ -1,8 +1,5 @@
-limine/
 build/
-kernel/uACPI
 kernel/limine.h
-kernel/flanterm
 *.log
 compile_commands.json
 kernel/rust/target/
