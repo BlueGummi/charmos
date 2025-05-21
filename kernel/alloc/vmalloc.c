@@ -7,6 +7,8 @@
 #include <vmalloc.h>
 #include <vmm.h>
 
+// TODO: realloc
+
 uint64_t hhdm_offset;
 
 static struct vmalloc_bitmap vmm_allocator;

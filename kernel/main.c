@@ -19,7 +19,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <thread.h>
-#include <vfs.h>
+#include <vfs/vfs.h>
 #include <vmalloc.h>
 #include <vmm.h>
 
@@ -29,6 +29,7 @@ uint64_t t3_id = 0;
 extern void test_alloc();
 
 void k_sch_main() {
+    read_test();
     k_printf("Welcome to the idle task!\n");
     while (1) {
         asm volatile("hlt");
@@ -52,7 +53,6 @@ void k_main(void) {
     vmm_offset_set(r->offset);
     vmm_init();
     vfs_init();
-    read_test();
     test_alloc();
     core_data = vmm_alloc_pages(1);
     asm volatile("mov %%cr3, %0" : "=r"(cr3));

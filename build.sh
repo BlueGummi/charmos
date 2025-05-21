@@ -51,28 +51,13 @@ cond_print() {
 }
 
 cond_print "${GREEN}getting dependencies${NC}"
-
+git submodule init && git submodule update
 if [ ! -d "limine" ]; then
     cond_print "${YELLOW}downloading limine${NC}"
     git clone https://github.com/limine-bootloader/limine --branch=v9.x-binary --depth=1 $cli_quiet_arg
 fi
 
 
-if [ ! -d "kernel/uACPI" ]; then
-    cond_print "${YELLOW}downloading uacpi${NC}"
-    cd kernel
-    git clone https://github.com/uacpi/uACPI --depth=1 $cli_quiet_arg
-    cd -
-fi
-
-if [ ! -d "kernel/flanterm" ]; then
-    cond_print "${YELLOW}downloading flanterm${NC}"
-    cd kernel
-    git clone https://codeberg.org/mintsuki/flanterm --depth=1 $cli_quiet_arg
-    cd -
-fi
-
-./kernel/get-deps
 
 if [ ! -d "build" ]; then
     mkdir -p build
