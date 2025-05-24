@@ -24,6 +24,35 @@ uint64_t vfs_read(struct vfs_node *node, void *buf, size_t size,
     return to_copy;
 }
 
+uint64_t vfs_write(struct vfs_node *node, const void *buf, size_t size,
+                   size_t offset) {
+    if (!node || !buf || node->type != VFS_FILE)
+        return 0;
+
+    size_t required_size = offset + size;
+
+    if (required_size > node->size) {
+        void *new_data = kmalloc(required_size);
+        if (!new_data)
+            return 0;
+
+        if (node->internal_data) {
+            memcpy(new_data, node->internal_data, node->size);
+            kfree(node->internal_data, node->size);
+        }
+
+        if (offset > node->size) {
+            memset((char *) new_data + node->size, 0, offset - node->size);
+        }
+
+        node->internal_data = new_data;
+        node->size = required_size;
+    }
+
+    memcpy((char *) node->internal_data + offset, buf, size);
+    return size;
+}
+
 struct vfs_node *vfs_create_node(const char *name, enum vnode_type type,
                                  uint64_t size, void *data) {
     struct vfs_node *node = kmalloc(sizeof(struct vfs_node));
@@ -39,8 +68,6 @@ struct vfs_node *vfs_create_node(const char *name, enum vnode_type type,
     node->gid = 0;
     node->size = size;
     node->inode = 0;
-    node->parent = NULL;
-    node->children = NULL;
     node->ops = &dummy_ops;
     node->internal_data = data;
     node->ref_count = 1;
@@ -54,152 +81,47 @@ void vfs_delete_node(struct vfs_node *node) {
     kfree(node, sizeof(struct vfs_node));
 }
 
-// TODO: allocate more space if the parent has ran out of space to hold children
-void vfs_add(struct vfs_node *parent, struct vfs_node *child) {
-    if (!parent || !child)
-        return;
-
-    if (parent->type != VFS_DIRECTORY) // Why are you adding children to a file
-        return;
-
-    if (parent->children == NULL) {
-        parent->children = kmalloc(sizeof(struct vfs_node *) * 2);
-        parent->children[0] = child;
-        parent->children[1] = NULL;
-        parent->child_count++;
-    } else {
-        // TODO: we should make the children a list of pointers that are arrays
-        // of pointers to files, so that reallocation problems will not be an
-        // issue
-        parent->children[parent->child_count++] = child;
-        parent->children[parent->child_count] = NULL;
-    }
-    child->parent = parent;
-}
-
-uint64_t vfs_find_child_index(struct vfs_node *parent, struct vfs_node *child) {
-    uint64_t child_index = UINT64_MAX;
-    for (uint64_t i = 0; i < parent->child_count; i++) {
-        if (parent->children[i] == child) {
-            child_index = i;
-            break;
-        }
-    }
-    return child_index;
-}
-
-void vfs_remove(struct vfs_node *parent, struct vfs_node *child) {
-    if (!parent || !child)
-        return;
-
-    if (parent->type != VFS_DIRECTORY)
-        return; // We are only removing files in directories
-
-    uint64_t child_index = vfs_find_child_index(parent, child);
-
-    if (child_index == UINT64_MAX) {
-        return;
-    }
-
-    for (uint64_t i = child_index; i < parent->child_count - 1; i++) {
-        // Everyone over one to the left
-        parent->children[i] = parent->children[i + 1];
-    }
-    parent->children[--parent->child_count] = NULL;
-    vfs_delete_node(child);
-}
-
-void vfs_remove_recurse(struct vfs_node *parent, struct vfs_node *child) {
-    if (!parent || !child)
-        return;
-    
-    uint64_t child_index = vfs_find_child_index(parent, child);
-
-    if (child_index == UINT64_MAX) {
-        return;
-    }
-
-    if (child->type == VFS_DIRECTORY) {
-        for (uint64_t i = 0; i < child->child_count; i++) {
-            vfs_remove_recurse(child, child->children[i]);
-        }
-        vfs_remove(parent, child);
-    } else {
-        // File
-        vfs_remove(parent, child);
-    }
-
-}
-
 void vfs_init() {
     root = vfs_create_node("/", VFS_DIRECTORY, 0, NULL);
 }
 
-struct vfs_node *vfs_lookup(const char *name) {
-    if (!root || !name)
-        return NULL;
+int vfs_lookup(struct vfs_node *dir, const char *name,
+               struct vfs_node **result) {
+    if (!dir || !name || !result || dir->type != VFS_DIRECTORY)
+        return -1;
 
-    struct vfs_node **children = root->children;
+    if (!dir->ops || !dir->ops->lookup)
+        return -2;
 
-    if (!children)
-        return NULL;
-
-    for (int i = 0; children[i] != NULL; i++) {
-        if (strcmp(children[i]->name, name) == 0)
-            return children[i];
-    }
-    return NULL;
+    return dir->ops->lookup(dir, name, result);
 }
 
-void debug_print_fs(struct vfs_node *node, int depth) {
-    if (!node)
-        return;
+struct vfs_node *vfs_resolve_path(const char *path) {
+    if (!path || path[0] != '/')
+        return NULL;
 
-    for (int i = 0; i < depth; i++)
-        k_printf("  ");
+    struct vfs_node *current = root;
+    char component[256];
 
-    k_printf("%s (%s)\n", node->name,
-             node->type == VFS_DIRECTORY ? "dir" : "file");
+    path++;
 
-    if (node->type == VFS_DIRECTORY && node->children) {
-        for (int i = 0; node->children[i]; i++) {
-            debug_print_fs(node->children[i],
-                           depth + 1); // recursion ok here - this for tests
+    while (*path) {
+        size_t len = 0;
+        while (*path && *path != '/') {
+            component[len++] = *path++;
         }
+        component[len] = '\0';
+
+        if (*path == '/')
+            path++;
+
+        struct vfs_node *next = NULL;
+        if (vfs_lookup(current, component, &next) != 0) {
+            return NULL;
+        }
+
+        current = next;
     }
-}
 
-void lookie() {
-    struct vfs_node *file = vfs_lookup("test.txt");
-    if (!file) {
-        k_printf("test.txt not found.\n");
-        return;
-    }
-
-    char buf[20] = {0};
-    uint64_t bytes = file->ops->read(file, buf, sizeof(buf) - 1, 0);
-
-    if (bytes > 0) {
-        buf[bytes] = '\0';
-        k_printf("Read %llu bytes: '%s'\n", bytes, buf);
-    }
-}
-
-void read_test() {
-
-    struct vfs_node *new_file =
-        vfs_create_node("test.txt", VFS_FILE, 11, "MUSTAAARD");
-    
-    
-    struct vfs_node *new_file_2 =
-        vfs_create_node("ketchup.txt", VFS_FILE, 11, "KETCHUUPPP");
-
-    struct vfs_node *new_dir =
-        vfs_create_node("try_it", VFS_DIRECTORY, 11, "");
-    vfs_add(root, new_dir);
-    vfs_add(new_dir, new_file);
-    vfs_add(new_dir, new_file_2);
-    debug_print_fs(root, 0);
-    vfs_remove_recurse(root, new_dir);
-    debug_print_fs(root, 0);
+    return current;
 }

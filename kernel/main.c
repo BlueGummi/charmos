@@ -1,5 +1,7 @@
 #include <core.h>
 #include <dbg.h>
+#include <disk.h>
+#include <ext2.h>
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
 #include <gdt.h>
@@ -29,7 +31,6 @@ uint64_t t3_id = 0;
 extern void test_alloc();
 
 void k_sch_main() {
-    read_test();
     k_printf("Welcome to the idle task!\n");
     while (1) {
         asm volatile("hlt");
@@ -60,9 +61,19 @@ void k_main(void) {
     while (current_cpu != mpr->cpu_count - 1) {
         asm volatile("pause");
     }
+    struct ext2_sblock superblock;
+
+    if (read_ext2_superblock(0, &superblock)) {
+        k_printf("fire\n");
+    } else {
+        k_printf("ts pmo\n");
+    }
+    print_ext2_sblock(&superblock);
+
+
+    struct thread *k_idle = thread_create(k_sch_main);
     global_sched.active = true;
     global_sched.started_first = false;
-    struct thread *k_idle = thread_create(k_sch_main);
     scheduler_init(&global_sched);
     scheduler_add_thread(&global_sched, k_idle);
     scheduler_start();

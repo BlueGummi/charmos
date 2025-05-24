@@ -12,7 +12,7 @@
 
 uint8_t shift = 1;
 uint16_t index = 0;
-char buffer[512] = {0};
+char kbuffer[512] = {0};
 unsigned char keyboard_map[128] = {
     '\0', '\e', '1',  '2',  '3',  '4',  '5',  '6',  '7',  '8',  '9',  '0',
     '-',  '=',  '\b', '\t', 'q',  'w',  'e',  'r',  't',  'y',  'u',  'i',
@@ -53,21 +53,21 @@ __attribute__((interrupt)) void keyboard_handler(void *a) {
             shift ? keyboard_map[keycode] : keyboard_shift_map[keycode];
         k_printf("%c", character);
         if (character == '\n') {
-            if (memcmp(buffer, "shutdown", 8) == 0 ||
-                memcmp(buffer, "poweroff", 8) == 0) {
+            if (memcmp(kbuffer, "shutdown", 8) == 0 ||
+                memcmp(kbuffer, "poweroff", 8) == 0) {
                 k_info("Poweroff signal received\n");
                 k_shutdown();
-            } else if (memcmp(buffer, ":3", 2) == 0) {
+            } else if (memcmp(kbuffer, ":3", 2) == 0) {
                 k_info("silly!");
             }
-            memset(buffer, 0, sizeof(buffer));
+            memset(kbuffer, 0, sizeof(kbuffer));
             index = 0;
         } else {
             if (character == '1') {
                 debug_print_registers();
                 asm volatile("cli;hlt");
             }
-            buffer[index++] = character;
+            kbuffer[index++] = character;
         }
     }
 finish:

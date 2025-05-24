@@ -1,7 +1,7 @@
+#include <spin_lock.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
-#include <spin_lock.h>
 
 typedef uint64_t off_t;
 
@@ -21,21 +21,17 @@ struct vfs_node {
     uint64_t size;
     uint64_t inode;
 
-    struct vfs_node *parent;
-    struct vfs_node **children;
-    uint64_t child_count;
-
+    uint64_t atime, mtime, ctime;
     struct vnode_ops *ops;
     void *internal_data;
 
     uint32_t ref_count;
     bool is_mountpoint;
-    
+
     struct spinlock lock;
 };
 
-uint64_t vfs_read(struct vfs_node *node, void *buf, size_t size,
-                    size_t offset);
+uint64_t vfs_read(struct vfs_node *node, void *buf, size_t size, size_t offset);
 void vfs_init();
 void read_test();
 #pragma once
