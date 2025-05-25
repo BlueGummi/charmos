@@ -1,5 +1,8 @@
 #include <stdint.h>
 
+#define PCI_CONFIG_ADDRESS 0xCF8
+#define PCI_CONFIG_DATA 0xCFC
+
 // =========| IN - BYTE, WORD, LONG, QWORD, SB, SW, SL, SQ |=========
 
 static inline uint8_t inb(uint16_t port) {
@@ -74,6 +77,32 @@ static inline void outsl(uint16_t port, const void *addr, uint32_t count) {
 
 static inline void outsq(uint16_t port, const void *addr, uint32_t count) {
     asm volatile("rep outsq" : "+S"(addr), "+c"(count) : "d"(port) : "memory");
+}
+
+// ============| PCI |==============
+
+static inline uint32_t pci_config_address(uint8_t bus, uint8_t slot,
+                                          uint8_t func, uint8_t offset) {
+    return (uint32_t) ((1U << 31) | (bus << 16) | (slot << 11) | (func << 8) |
+                       (offset & 0xFC));
+}
+
+static inline uint32_t pci_read(uint8_t bus, uint8_t slot, uint8_t func,
+                                uint8_t offset) {
+    outl(PCI_CONFIG_ADDRESS, pci_config_address(bus, slot, func, offset));
+    return inl(PCI_CONFIG_DATA);
+}
+
+static inline uint16_t pci_read_word(uint8_t bus, uint8_t slot, uint8_t func,
+                                     uint8_t offset) {
+    uint32_t value = pci_read(bus, slot, func, offset & 0xFC);
+    return (value >> ((offset & 2) * 8)) & 0xFFFF;
+}
+
+static inline uint8_t pci_read_byte(uint8_t bus, uint8_t slot, uint8_t func,
+                                    uint8_t offset) {
+    uint32_t value = pci_read(bus, slot, func, offset & 0xFC);
+    return (value >> ((offset & 3) * 8)) & 0xFF;
 }
 
 #pragma once

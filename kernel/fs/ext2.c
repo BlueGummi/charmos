@@ -10,22 +10,23 @@ uint64_t PTRS_PER_BLOCK;
 
 void ext2_print_inode(const struct ext2_inode *inode);
 
-bool block_read(uint32_t lba, uint8_t *buffer, uint32_t sector_count) {
+bool block_read(struct ide_drive *d, uint32_t lba, uint8_t *buffer, uint32_t sector_count) {
     if (!buffer)
         return false;
 
     for (uint32_t i = 0; i < sector_count; ++i) {
-        if (!ide_read_sector(lba + i, buffer + (i * 512))) {
+        if (!ide_read_sector(d, lba + i, buffer + (i * 512))) {
             return false;
         }
     }
     return true;
 }
 
-bool ext2_mount(struct ext2_fs *fs, struct ext2_sblock *sblock) {
+bool ext2_mount(struct ide_drive *d, struct ext2_fs *fs, struct ext2_sblock *sblock) {
     if (!fs || !sblock)
         return false;
 
+    fs->drive = d;
     fs->sblock = sblock;
     fs->inodes_count = sblock->inodes_count;
     fs->inodes_per_group = sblock->inodes_per_group;
@@ -45,7 +46,7 @@ bool ext2_mount(struct ext2_fs *fs, struct ext2_sblock *sblock) {
     if (!fs->group_desc)
         return false;
 
-    if (!block_read(gdt_block * fs->sectors_per_block,
+    if (!block_read(fs->drive, gdt_block * fs->sectors_per_block,
                     (uint8_t *) fs->group_desc,
                     gdt_blocks * fs->sectors_per_block)) {
         kfree(fs->group_desc, gdt_blocks * fs->block_size);
@@ -60,7 +61,7 @@ bool read_block_ptrs(struct ext2_fs *fs, uint32_t block_num, uint32_t *buf) {
         return false;
 
     uint32_t lba = block_num * fs->sectors_per_block;
-    return block_read(lba, (uint8_t *) buf, fs->sectors_per_block);
+    return block_read(fs->drive, lba, (uint8_t *) buf, fs->sectors_per_block);
 }
 
 bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
@@ -88,7 +89,7 @@ bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
     if (!buf)
         return false;
 
-    if (!block_read(inode_lba, buf, fs->sectors_per_block)) {
+    if (!block_read(fs->drive, inode_lba, buf, fs->sectors_per_block)) {
         kfree(buf, fs->block_size);
         return false;
     }
@@ -107,7 +108,7 @@ static bool search_dir_block(struct ext2_fs *fs, uint32_t block_num,
     uint8_t dir_buf[fs->block_size];
     uint32_t dir_lba = block_num * fs->sectors_per_block;
 
-    if (!block_read(dir_lba, dir_buf, fs->sectors_per_block))
+    if (!block_read(fs->drive, dir_lba, dir_buf, fs->sectors_per_block))
         return false;
 
     uint32_t offset = 0;
@@ -278,7 +279,7 @@ void ext2_dump_file_data(struct ext2_fs *fs, const struct ext2_inode *inode,
 
         uint32_t lba = block_num * fs->sectors_per_block;
         uint8_t buf[block_size];
-        if (!block_read(lba, buf, fs->sectors_per_block)) {
+        if (!block_read(fs->drive, lba, buf, fs->sectors_per_block)) {
             k_printf("failed to read block %u (LBA %u)\n", block_num, lba);
             break;
         }
@@ -401,9 +402,9 @@ struct ext2_inode *ext2_path_lookup(struct ext2_fs *fs, struct ext2_inode *node,
     return ext2_path_lookup(fs, next, path);
 }
 
-void ext2_test(struct ext2_sblock *sblock) {
+void ext2_test(struct ide_drive *d, struct ext2_sblock *sblock) {
     struct ext2_fs fs;
-    if (!ext2_mount(&fs, sblock)) {
+    if (!ext2_mount(d, &fs, sblock)) {
         return;
     }
 

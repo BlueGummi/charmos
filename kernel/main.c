@@ -10,9 +10,11 @@
 #include <limine.h>
 #include <misc/logo.h>
 #include <mp.h>
+#include <pci.h>
 #include <pmm.h>
 #include <printf.h>
 #include <requests.h>
+#include <rust.h>
 #include <sched.h>
 #include <shutdown.h>
 #include <smap.h>
@@ -27,9 +29,6 @@
 #include <vmm.h>
 
 struct scheduler global_sched;
-uint64_t t3_id = 0;
-
-extern void test_alloc();
 
 void k_sch_main() {
     k_printf("Welcome to the idle task!\n");
@@ -63,17 +62,17 @@ void k_main(void) {
     while (current_cpu != mpr->cpu_count - 1) {
         asm volatile("pause");
     }
+    scan_pci_devices();
+    struct ide_drive primary_master = {
+        .io_base = 0x1F0, .ctrl_base = 0x3F6, .slave = 0};
     struct ext2_sblock superblock;
 
-    if (read_ext2_superblock(0, &superblock)) {
-        ext2_test(&superblock);
+    if (read_ext2_superblock(&primary_master, 0, &superblock)) {
+        ext2_test(&primary_master, &superblock);
     }
 
-    struct thread *k_idle = thread_create(k_sch_main);
-    global_sched.active = true;
-    global_sched.started_first = false;
     scheduler_init(&global_sched);
-    scheduler_add_thread(&global_sched, k_idle);
+    scheduler_add_thread(&global_sched, thread_create(k_sch_main));
     scheduler_start();
     while (1) {
         asm("hlt");

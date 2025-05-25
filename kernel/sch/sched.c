@@ -71,6 +71,8 @@ void schedule(struct cpu_state *cpu) {
 }
 
 void scheduler_init(struct scheduler *sched) {
+    sched->active = true;
+    sched->started_first = false;
     sched->head = NULL;
     sched->tail = NULL;
     sched->current = NULL;

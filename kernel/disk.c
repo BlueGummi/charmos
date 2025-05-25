@@ -6,76 +6,67 @@
 #include <stdint.h>
 #include <string.h>
 
-bool ide_wait_ready() {
-    while (inb(STATUS_PORT) & STATUS_BSY)
+bool ide_wait_ready(struct ide_drive *d) {
+    while (inb(REG_STATUS(d->io_base)) & STATUS_BSY)
         ;
-    return (inb(STATUS_PORT) & STATUS_DRDY);
+    return (inb(REG_STATUS(d->io_base)) & STATUS_DRDY);
 }
 
-bool ide_read_sector(uint32_t lba, uint8_t *b) {
-    if (!ide_wait_ready()) {
+bool ide_read_sector(struct ide_drive *d, uint32_t lba, uint8_t *b) {
+    if (!ide_wait_ready(d))
+        return false;
+
+    outb(REG_DRIVE_HEAD(d->io_base),
+         0xE0 | (d->slave << 4) | ((lba >> 24) & 0x0F));
+    outb(REG_SECTOR_COUNT(d->io_base), 1);
+    outb(REG_LBA_LOW(d->io_base), lba & 0xFF);
+    outb(REG_LBA_MID(d->io_base), (lba >> 8) & 0xFF);
+    outb(REG_LBA_HIGH(d->io_base), (lba >> 16) & 0xFF);
+    outb(REG_COMMAND(d->io_base), COMMAND_READ);
+
+    if (!ide_wait_ready(d) || !(inb(REG_STATUS(d->io_base)) & STATUS_DRQ))
+        return false;
+
+    insw(REG_DATA(d->io_base), b, 256);
+    return true;
+}
+
+bool ide_write_sector(struct ide_drive *d, uint32_t lba, const uint8_t *b) {
+    if (!ide_wait_ready(d)) {
         return false;
     }
 
-    outb(DRIVE_HEAD, 0xE0 | ((lba >> 24) & 0x0F));
+    outb(REG_DRIVE_HEAD(d->io_base), 0xE0 | ((lba >> 24) & 0x0F));
 
-    outb(SECTOR_COUNT, 1);
+    outb(REG_SECTOR_COUNT(d->io_base), 1);
 
-    outb(LBA_LOW, lba & 0xFF);
-    outb(LBA_MID, (lba >> 8) & 0xFF);
-    outb(LBA_HIGH, (lba >> 16) & 0xFF);
+    outb(REG_LBA_LOW(d->io_base), lba & 0xFF);
+    outb(REG_LBA_MID(d->io_base), (lba >> 8) & 0xFF);
+    outb(REG_LBA_HIGH(d->io_base), (lba >> 16) & 0xFF);
 
-    outb(COMMAND_PORT, COMMAND_READ);
+    outb(REG_COMMAND(d->io_base), COMMAND_WRITE);
 
-    if (!ide_wait_ready() || !(inb(STATUS_PORT) & STATUS_DRQ)) {
+    if (!ide_wait_ready(d) || !(inb(REG_STATUS(d->io_base)) & STATUS_DRQ)) {
         return false;
     }
 
-    insw(DATA_PORT, b, 256);
+    outsw(REG_DATA(d->io_base), b, 256);
 
     return true;
 }
 
-bool ide_write_sector(uint32_t lba, const uint8_t *b) {
-    if (!ide_wait_ready()) {
-        return false;
-    }
-
-    outb(DRIVE_HEAD, 0xE0 | ((lba >> 24) & 0x0F));
-
-    outb(SECTOR_COUNT, 1);
-
-    outb(LBA_LOW, lba & 0xFF);
-    outb(LBA_MID, (lba >> 8) & 0xFF);
-    outb(LBA_HIGH, (lba >> 16) & 0xFF);
-
-    outb(COMMAND_PORT, COMMAND_WRITE);
-
-    if (!ide_wait_ready() || !(inb(STATUS_PORT) & STATUS_DRQ)) {
-        return false;
-    }
-
-    outsw(DATA_PORT, b, 256);
-
-    return true;
-}
-
-bool read_ext2_superblock(uint32_t partition_start_lba,
+bool read_ext2_superblock(struct ide_drive *d, uint32_t partition_start_lba,
                           struct ext2_sblock *sblock) {
     uint8_t buffer[SECTOR_SIZE];
     uint32_t superblock_lba =
         partition_start_lba + (EXT2_SUPERBLOCK_OFFSET / SECTOR_SIZE);
     uint32_t superblock_offset = EXT2_SUPERBLOCK_OFFSET % SECTOR_SIZE;
 
-    if (!ide_read_sector(superblock_lba, buffer)) {
+    if (!ide_read_sector(d, superblock_lba, buffer)) {
         return false;
     }
 
     memcpy(sblock, buffer + superblock_offset, sizeof(struct ext2_sblock));
 
-    if (sblock->magic != 0xEF53) {
-        return false;
-    }
-
-    return true;
+    return (sblock->magic == 0xEF53);
 }
