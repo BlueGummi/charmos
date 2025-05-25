@@ -77,6 +77,9 @@ struct vfs_node *vfs_create_node(const char *name, enum vnode_type type,
 }
 
 void vfs_delete_node(struct vfs_node *node) {
+    if (!node)
+        return;
+
     kfree(node->name, strlen(node->name) + 1);
     kfree(node, sizeof(struct vfs_node));
 }

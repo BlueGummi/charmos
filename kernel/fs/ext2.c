@@ -7,6 +7,9 @@
 #include <vmalloc.h>
 
 bool block_read(uint32_t lba, uint8_t *buffer, uint32_t sector_count) {
+    if (!buffer)
+        return false;
+
     for (uint32_t i = 0; i < sector_count; ++i) {
         if (!ide_read_sector(lba + i, buffer + (i * 512))) {
             return false;
@@ -16,6 +19,9 @@ bool block_read(uint32_t lba, uint8_t *buffer, uint32_t sector_count) {
 }
 
 bool ext2_mount(struct ext2_fs *fs, struct ext2_sblock *sblock) {
+    if (!fs || !sblock)
+        return false;
+
     fs->inodes_count = sblock->inodes_count;
     fs->inodes_per_group = sblock->inodes_per_group;
     fs->inode_size = sblock->inode_size;
@@ -28,7 +34,6 @@ bool ext2_mount(struct ext2_fs *fs, struct ext2_sblock *sblock) {
 
     if (!block_read(gdt_block * fs->sectors_per_block, gdt_buf,
                     fs->sectors_per_block)) {
-        k_printf("Failed to read GDT\n");
         return false;
     }
 
@@ -36,8 +41,19 @@ bool ext2_mount(struct ext2_fs *fs, struct ext2_sblock *sblock) {
     return true;
 }
 
+bool read_block_ptrs(struct ext2_fs *fs, uint32_t block_num, uint32_t *buf) {
+    if (!fs || !buf)
+        return false;
+
+    uint32_t lba = block_num * fs->sectors_per_block;
+    return block_read(lba, (uint8_t *) buf, fs->sectors_per_block);
+}
+
 bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
                      struct ext2_inode *inode_out) {
+    if (!fs || !inode_out)
+        return false;
+
     uint32_t inode_table_block = fs->group_desc.inode_table;
     uint32_t inode_size = fs->sblock->inode_size;
 
@@ -50,7 +66,6 @@ bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
 
     uint8_t inode_buf[fs->block_size];
     if (!block_read(inode_lba, inode_buf, fs->sectors_per_block)) {
-        k_printf("Failed to read inode block\n");
         return false;
     }
 
@@ -58,51 +73,124 @@ bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
     return true;
 }
 
+static bool search_dir_block(struct ext2_fs *fs, uint32_t block_num,
+                             const char *fname, struct ext2_inode **out_node) {
+    if (!fs || !fname || !out_node)
+        return false;
+
+    uint8_t dir_buf[fs->block_size];
+    uint32_t dir_lba = block_num * fs->sectors_per_block;
+
+    if (!block_read(dir_lba, dir_buf, fs->sectors_per_block))
+        return false;
+
+    uint32_t offset = 0;
+    while (offset < fs->block_size) {
+        struct ext2_dir_entry *entry =
+            (struct ext2_dir_entry *) (dir_buf + offset);
+
+        if (entry->rec_len == 0 || offset + entry->rec_len > fs->block_size)
+            break;
+
+        if (entry->inode != 0 &&
+            memcmp(entry->name, fname, entry->name_len) == 0 &&
+            fname[entry->name_len] == '\0') {
+
+            *out_node = kmalloc(sizeof(struct ext2_inode));
+            ext2_read_inode(fs, entry->inode, *out_node);
+            return true;
+        }
+
+        offset += entry->rec_len;
+    }
+
+    return false;
+}
+
 struct ext2_inode *ext2_find_file_in_dir(struct ext2_fs *fs,
                                          const struct ext2_inode *dir_inode,
                                          const char *fname) {
-    if ((dir_inode->mode & 0xF000) != 0x4000) {
-        k_printf("Error: inode is not a directory (mode=0x%x)\n",
-                 dir_inode->mode);
+    if ((dir_inode->mode & 0xF000) != 0x4000 || !fs || dir_inode || fname) {
         return NULL;
     }
 
+    struct ext2_inode *found = NULL;
+
+    // Direct blocks (0..11)
     for (uint32_t i = 0; i < 12; ++i) {
-        if (dir_inode->block[i] == 0)
-            continue;
+        if (dir_inode->block[i] != 0 &&
+            search_dir_block(fs, dir_inode->block[i], fname, &found))
+            return found;
+    }
 
-        uint32_t dir_block_num = dir_inode->block[i];
-        uint32_t dir_lba = dir_block_num * fs->sectors_per_block;
-        uint8_t dir_buf[fs->block_size];
-
-        if (!block_read(dir_lba, dir_buf, fs->sectors_per_block)) {
-            k_printf("Failed to read directory block\n");
-            continue;
-        }
-
-        uint32_t offset = 0;
-        while (offset < fs->block_size) {
-            struct ext2_dir_entry *entry =
-                (struct ext2_dir_entry *) (dir_buf + offset);
-
-            if (entry->rec_len == 0 || offset + entry->rec_len > fs->block_size)
-                break;
-
-            if (entry->inode != 0 &&
-                memcmp(entry->name, fname, entry->name_len) == 0) {
-                struct ext2_inode *node = kmalloc(sizeof(struct ext2_inode));
-                ext2_read_inode(fs, entry->inode, node);
-                return node;
+    // Singly indirect
+    if (dir_inode->block[12]) {
+        uint32_t ptrs[PTRS_PER_BLOCK];
+        if (read_block_ptrs(fs, dir_inode->block[12], ptrs)) {
+            for (uint32_t i = 0; i < PTRS_PER_BLOCK; ++i) {
+                if (ptrs[i] != 0 &&
+                    search_dir_block(fs, ptrs[i], fname, &found))
+                    return found;
             }
-
-            offset += entry->rec_len;
         }
     }
+
+    // Doubly indirect
+    if (dir_inode->block[13]) {
+        uint32_t level1[PTRS_PER_BLOCK];
+        if (read_block_ptrs(fs, dir_inode->block[13], level1)) {
+            for (uint32_t i = 0; i < PTRS_PER_BLOCK; ++i) {
+                if (level1[i] == 0)
+                    continue;
+
+                uint32_t level2[PTRS_PER_BLOCK];
+                if (read_block_ptrs(fs, level1[i], level2)) {
+                    for (uint32_t j = 0; j < PTRS_PER_BLOCK; ++j) {
+                        if (level2[j] != 0 &&
+                            search_dir_block(fs, level2[j], fname, &found))
+                            return found;
+                    }
+                }
+            }
+        }
+    }
+
+    // Triply indirect
+    if (dir_inode->block[14]) {
+        uint32_t level1[PTRS_PER_BLOCK];
+        if (read_block_ptrs(fs, dir_inode->block[14], level1)) {
+            for (uint32_t i = 0; i < PTRS_PER_BLOCK; ++i) {
+                if (level1[i] == 0)
+                    continue;
+
+                uint32_t level2[PTRS_PER_BLOCK];
+                if (read_block_ptrs(fs, level1[i], level2)) {
+                    for (uint32_t j = 0; j < PTRS_PER_BLOCK; ++j) {
+                        if (level2[j] == 0)
+                            continue;
+
+                        uint32_t level3[PTRS_PER_BLOCK];
+                        if (read_block_ptrs(fs, level2[j], level3)) {
+                            for (uint32_t k = 0; k < PTRS_PER_BLOCK; ++k) {
+                                if (level3[k] != 0 &&
+                                    search_dir_block(fs, level3[k], fname,
+                                                     &found))
+                                    return found;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     return NULL;
-    // TODO: Go through the other inodes at different 'depths' or whatever
 }
 
 void ext2_print_inode(const struct ext2_inode *inode) {
+    if (!inode)
+        return;
+
     k_printf("Inode Information:\n");
     k_printf("  Mode: 0x%04x\n", inode->mode);
     k_printf("  UID: %u\n", inode->uid);
@@ -146,6 +234,9 @@ void ext2_print_inode(const struct ext2_inode *inode) {
 
 void ext2_dump_file_data(struct ext2_fs *fs, const struct ext2_inode *inode,
                          uint32_t start_block_index, uint32_t length) {
+    if (!fs || !inode)
+        return;
+
     uint32_t bytes_remaining = length;
     uint32_t block_size = fs->block_size;
     uint32_t block_index = start_block_index;
@@ -181,6 +272,9 @@ void ext2_dump_file_data(struct ext2_fs *fs, const struct ext2_inode *inode,
 }
 
 void print_ext2_sblock(struct ext2_sblock *sblock) {
+    if (!sblock)
+        return;
+
     k_printf("Ext2 superblock information:\n");
     k_printf("  Inodes Count: %u\n", sblock->inodes_count);
     k_printf("  Blocks Count: %u\n", sblock->blocks_count);
@@ -251,21 +345,49 @@ void print_ext2_sblock(struct ext2_sblock *sblock) {
     }
 }
 
+struct ext2_inode *ext2_path_lookup(struct ext2_fs *fs, struct ext2_inode *node,
+                                    const char *path) {
+    if (!path || !fs || !node)
+        return NULL;
+
+    bool seen_first_slash = false;
+    uintptr_t first_idx, last_idx = 0;
+
+    while (*path++) {
+        if (*path == '/') {
+            if (!seen_first_slash) {
+                first_idx = (uintptr_t) path;
+                seen_first_slash = true;
+            } else {
+                last_idx = (uintptr_t) path;
+            }
+        }
+    }
+
+    uint64_t len = last_idx - first_idx;
+    char next_dir[len];
+
+    memcpy(next_dir, (void *) first_idx, len);
+
+    k_printf("I found %s\n", next_dir);
+
+    return NULL;
+}
+
 void ext2_test(struct ext2_sblock *sblock) {
     struct ext2_fs fs;
     if (!ext2_mount(&fs, sblock)) {
-        k_printf("Mount failed\n");
         return;
     }
 
     struct ext2_inode root_inode;
     if (!ext2_read_inode(&fs, EXT2_ROOT_INODE, &root_inode)) {
-        k_printf("Failed to read root inode\n");
         return;
     }
 
     struct ext2_inode *node =
         ext2_find_file_in_dir(&fs, &root_inode, "hello.txt");
-//    ext2_print_inode(node);
+    ext2_print_inode(node);
     ext2_dump_file_data(&fs, node, 0, node->size);
+    ext2_path_lookup(&fs, node, "/hello.txt");
 }
