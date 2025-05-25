@@ -1,6 +1,6 @@
 # charmos - Compact, Hobbyist, And Recreational Microkernel Operating System
 
-![image](https://github.com/BlueGummi/charmos/blob/main/charmos.png)
+<img src="https://github.com/BlueGummi/charmos/blob/main/charmos.png" width="480">
 
 ## install
 
