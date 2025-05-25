@@ -1,7 +1,6 @@
 #include <stdint.h>
 
-// ================| IN - BYTE, WORD, LONG, QWORD, SB, SW, SL, SQ
-// |================
+// =========| IN - BYTE, WORD, LONG, QWORD, SB, SW, SL, SQ |=========
 
 static inline uint8_t inb(uint16_t port) {
     uint8_t ret;
@@ -43,8 +42,7 @@ static inline void insq(uint16_t port, void *addr, uint32_t count) {
     asm volatile("rep insq" : "+D"(addr), "+c"(count) : "d"(port) : "memory");
 }
 
-// ===============| OUT - BYTE, WORD, LONG, QWORD, SB, SW, SL, SQ
-// |===============
+// ========| OUT - BYTE, WORD, LONG, QWORD, SB, SW, SL, SQ |========
 
 static inline void outb(uint16_t port, uint8_t value) {
     asm volatile("outb %0, %1" : : "a"(value), "Nd"(port));
