@@ -1,9 +1,6 @@
 #include <printf.h>
 #include <stdint.h>
-
-static inline void outw(uint16_t port, uint16_t value) {
-    asm volatile("outw %1, %0" ::"dN"(port), "a"(value));
-}
+#include <io.h>
 
 void k_shutdown(void) {
     outw(0x604, 0x2000);

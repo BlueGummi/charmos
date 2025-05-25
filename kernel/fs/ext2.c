@@ -4,6 +4,7 @@
 #include <printf.h>
 #include <stdint.h>
 #include <string.h>
+
 bool block_read(uint32_t lba, uint8_t *buffer, uint32_t sector_count) {
     for (uint32_t i = 0; i < sector_count; ++i) {
         if (!ide_read_sector(lba + i, buffer + (i * 512))) {

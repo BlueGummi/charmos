@@ -35,6 +35,29 @@ bool ide_read_sector(uint32_t lba, uint8_t *b) {
 
     return true;
 }
+bool ide_write_sector(uint32_t lba, const uint8_t *b) {
+    if (!ide_wait_ready()) {
+        return false;
+    }
+
+    outb(DRIVE_HEAD, 0xE0 | ((lba >> 24) & 0x0F));
+
+    outb(SECTOR_COUNT, 1);
+
+    outb(LBA_LOW, lba & 0xFF);
+    outb(LBA_MID, (lba >> 8) & 0xFF);
+    outb(LBA_HIGH, (lba >> 16) & 0xFF);
+
+    outb(COMMAND_PORT, COMMAND_WRITE);
+
+    if (!ide_wait_ready() || !(inb(STATUS_PORT) & STATUS_DRQ)) {
+        return false;
+    }
+
+    outsw(DATA_PORT, b, 256);
+
+    return true;
+}
 
 bool read_ext2_superblock(uint32_t partition_start_lba,
                           struct ext2_sblock *sblock) {
