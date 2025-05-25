@@ -4,7 +4,7 @@
 <img src="https://github.com/BlueGummi/charmos/blob/main/charmos.png" width="240">
 </p>
 
-## install
+## build
 
 `nasm` and `xorriso` need to be present on the machine, currently Linux and macOS only.
 
@@ -12,7 +12,7 @@
 ./build.sh
 
 ```
-## running
+## run
 
 ```bash
 make run # run this in the build directory
