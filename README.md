@@ -6,35 +6,24 @@
 
 ## install
 
-make sure u have nasm and xorriso :thumbsup: :zany_face:
-
-clone the repository and then do this
+`nasm` and `xorriso` need to be present on the machine, currently Linux and macOS only.
 
 ```bash
 ./build.sh
 
 ```
-
-it's that shrimple
-
-now u can run 
+## running
 
 ```bash
-make run
+make run # run this in the build directory
 ```
 
-in the build directory and it'll bring up qemu with the kernel in it :thumbsup: :DDD B)))
+## roadmap 
 
+> The :trophy: means the task is a challenge
+  The :broom: means something is trivial
 
-
-## todo-list: THE GAME :sunglasses:
-
-> The :trophy: means the task is a challenge and would earn one challenge point
-each level has at least one challenge point to earn
-
-> The :broom: means something is trivial
-
-### level 1: "The Basics" 
+### "The Basics" 
 
 - [x] gdt + idt 
 
@@ -46,7 +35,7 @@ each level has at least one challenge point to earn
 
 - [x] do paging properly 
 
-### level 2: "IO Intricacies" 
+### "IO Intricacies" 
 
 - [ ] uACPI setup 
 
@@ -54,7 +43,7 @@ each level has at least one challenge point to earn
 
 - [x] handle other interrupts + add some 
 
-### dlc: "Toolfoolery and QOL" 
+### "QOL Quarrels" 
 
 - [x] change tooling 
 
@@ -70,7 +59,7 @@ each level has at least one challenge point to earn
 
     - [ ] :trophy: add more c stdlib functions 
 
-### level 3: "Parallel Predicaments" 
+### "Parallel Predicaments" 
 
 - [x] wake up other CPUs 
 
@@ -98,7 +87,7 @@ each level has at least one challenge point to earn
 
 - [ ] :trophy: multithread more core functions 
 
-### level 4: "Task Troubles" 
+### "Task Troubles" 
 
 - [x] beginnings of scheduler + timer 
 
@@ -110,7 +99,7 @@ each level has at least one challenge point to earn
 
     - [ ] create system calls for interaction with these
 
-### level 5: "Persistency Problems" 
+### "Persistency Problems" 
 
 - [x] begin filesystem abstractions
 
@@ -124,7 +113,7 @@ each level has at least one challenge point to earn
 
 - [ ] probably should make a shell 
 
-### boss 1: "Lord of the Third Ring" 
+### "Lord of the Third Ring" 
 
 - [ ] enter userspace 
 
