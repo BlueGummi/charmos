@@ -176,8 +176,7 @@ void ext2_dump_file_data(struct ext2_fs *fs, const struct ext2_inode *inode,
     }
 
     if (bytes_remaining > 0) {
-        k_printf(
-            "\nrequested length exceeds direct blocks available\n");
+        k_printf("\nrequested length exceeds direct blocks available\n");
     }
 }
 
@@ -250,6 +249,9 @@ void print_ext2_sblock(struct ext2_sblock *sblock) {
                  sblock->prealloc_dir_blocks);
         k_printf("  Padding: %u\n", sblock->padding);
     }
+}
+
+void ext2_test(struct ext2_sblock *sblock) {
     struct ext2_fs fs;
     if (!ext2_mount(&fs, sblock)) {
         k_printf("Mount failed\n");
@@ -264,6 +266,6 @@ void print_ext2_sblock(struct ext2_sblock *sblock) {
 
     struct ext2_inode *node =
         ext2_find_file_in_dir(&fs, &root_inode, "hello.txt");
-    ext2_print_inode(node);
+//    ext2_print_inode(node);
     ext2_dump_file_data(&fs, node, 0, node->size);
 }

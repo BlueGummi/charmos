@@ -103,4 +103,5 @@ struct ext2_fs {
 };
 
 void print_ext2_sblock(struct ext2_sblock *sblock);
+void ext2_test(struct ext2_sblock *sblock);
 #pragma once

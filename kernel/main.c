@@ -1,13 +1,14 @@
 #include <core.h>
 #include <dbg.h>
 #include <disk.h>
-#include <fs/ext2.h>
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
+#include <fs/ext2.h>
 #include <gdt.h>
 #include <idt.h>
 #include <io.h>
 #include <limine.h>
+#include <misc/logo.h>
 #include <mp.h>
 #include <pmm.h>
 #include <printf.h>
@@ -39,6 +40,7 @@ void k_sch_main() {
 
 void k_main(void) {
     k_printf_init(framebuffer_request.response->framebuffers[0]);
+    k_printf("%s", OS_LOGO);
     struct limine_mp_response *mpr = mp_request.response;
 
     for (uint64_t i = 0; i < mpr->cpu_count; i++) {
@@ -64,7 +66,7 @@ void k_main(void) {
     struct ext2_sblock superblock;
 
     if (read_ext2_superblock(0, &superblock)) {
-        print_ext2_sblock(&superblock);
+        ext2_test(&superblock);
     }
 
     struct thread *k_idle = thread_create(k_sch_main);
