@@ -35,6 +35,7 @@ bool ide_read_sector(uint32_t lba, uint8_t *b) {
 
     return true;
 }
+
 bool ide_write_sector(uint32_t lba, const uint8_t *b) {
     if (!ide_wait_ready()) {
         return false;

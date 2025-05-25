@@ -58,7 +58,7 @@ each level has at least one challenge point to earn
 
     - [x] and reorganize codebase 
 
-    - [ ] :broom: and do janitor work to cleanup headers and such 
+    - [x] :broom: and do janitor work to cleanup headers and such 
     
     - [ ] :broom: clean up formatting in the code for readability (newlines and such)
 
@@ -74,13 +74,13 @@ each level has at least one challenge point to earn
 
     - [x] do something useful with them 
 
-        - [ ] thread structure
+        - [x] thread structure
 
 - [x] create a separate thread/task struct
 
     - [ ] each task has its own address space
 
-    - [ ] threads with their own registers and state
+    - [x] threads with their own registers and state
 
     - [x] schedule threads not tasks
 
@@ -110,7 +110,13 @@ each level has at least one challenge point to earn
 
 ### level 5: "Persistency Problems" 
 
-- [ ] :trophy: fat filesystem 
+- [x] begin filesystem abstractions
+
+    - [x] begin ext2 filesystem
+
+    - [ ] :trophy: complete ext2 filesystem
+
+- [ ] create fat filesystem cuz why not
 
 - [ ] drivers
 
