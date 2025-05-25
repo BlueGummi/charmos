@@ -1,7 +1,7 @@
 #include <core.h>
 #include <dbg.h>
 #include <disk.h>
-#include <ext2.h>
+#include <fs/ext2.h>
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
 #include <gdt.h>
@@ -64,12 +64,8 @@ void k_main(void) {
     struct ext2_sblock superblock;
 
     if (read_ext2_superblock(0, &superblock)) {
-        k_printf("fire\n");
-    } else {
-        k_printf("ts pmo\n");
+        print_ext2_sblock(&superblock);
     }
-    print_ext2_sblock(&superblock);
-
 
     struct thread *k_idle = thread_create(k_sch_main);
     global_sched.active = true;

@@ -1,4 +1,4 @@
-#include <ext2.h>
+#include <fs/ext2.h>
 #include <io.h>
 #include <printf.h>
 #include <stdbool.h>
@@ -19,11 +19,6 @@
 #define STATUS_DRDY 0x40
 #define STATUS_DRQ 0x08
 #define COMMAND_READ 0x20
-
-#define SECTOR_SIZE 512
-#define EXT2_SUPERBLOCK_OFFSET 1024
-#define EXT2_SIGNATURE_OFFSET 0x38
-#define EXT2_SIGNATURE 0xEF53
 
 bool ide_wait_ready();
 

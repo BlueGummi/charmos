@@ -1,5 +1,5 @@
 #include <disk.h>
-#include <ext2.h>
+#include <fs/ext2.h>
 #include <io.h>
 #include <printf.h>
 #include <stdbool.h>
