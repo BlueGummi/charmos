@@ -95,8 +95,11 @@ struct ext2_dir_entry {
 struct ext2_fs {
     struct ext2_sblock *sblock;
     struct ext2_group_desc group_desc;
+    uint32_t inodes_count;
+    uint32_t inodes_per_group;
     uint32_t block_size;
     uint32_t sectors_per_block;
+    uint16_t inode_size;
 };
 
 void print_ext2_sblock(struct ext2_sblock *sblock);
