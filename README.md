@@ -20,8 +20,7 @@ make run # run this in the build directory
 
 ## roadmap 
 
-> The :trophy: means the task is a challenge
-  The :broom: means something is trivial
+> The :trophy: means the task is a challenge, the :broom: means something is trivial
 
 ### "The Basics" 
 
