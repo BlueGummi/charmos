@@ -7,6 +7,15 @@
 #define EXT2_SIGNATURE 0xEF53
 #define EXT2_NAME_LEN 255
 #define EXT2_ROOT_INODE 2
+#define EXT2_S_IFSOCK  0xC000  // socket
+#define EXT2_S_IFLNK   0xA000  // symbolic link
+#define EXT2_S_IFREG   0x8000  // regular file
+#define EXT2_S_IFBLK   0x6000  // block device
+#define EXT2_S_IFDIR   0x4000  // directory
+#define EXT2_S_IFCHR   0x2000  // character device
+#define EXT2_S_IFIFO   0x1000  // FIFO
+#define EXT2_S_IFMT    0xF000  // mask to extract file type from i_mode
+
 
 struct ext2_sblock {
     uint32_t inodes_count;
@@ -94,7 +103,8 @@ struct ext2_dir_entry {
 
 struct ext2_fs {
     struct ext2_sblock *sblock;
-    struct ext2_group_desc group_desc;
+    struct ext2_group_desc *group_desc;
+    uint32_t num_groups;
     uint32_t inodes_count;
     uint32_t inodes_per_group;
     uint32_t block_size;
