@@ -1,6 +1,7 @@
 #include <disk.h>
 #include <stdint.h>
 
+extern uint64_t PTRS_PER_BLOCK;
 #define EXT2_NBLOCKS 15
 #define SECTOR_SIZE 512
 #define EXT2_SUPERBLOCK_OFFSET 1024
@@ -113,7 +114,37 @@ struct ext2_fs {
     uint16_t inode_size;
 };
 
-void print_ext2_sblock(struct ext2_sblock *sblock);
+bool block_read(struct ide_drive *d, uint32_t lba, uint8_t *buffer,
+                uint32_t sector_count);
+
+bool block_write(struct ide_drive *d, uint32_t lba, const uint8_t *buffer,
+                 uint32_t sector_count);
+
+bool ext2_write_superblock(struct ext2_fs *fs);
+bool ext2_write_group_desc(struct ext2_fs *fs);
+
+bool ext2_mount(struct ide_drive *d, struct ext2_fs *fs,
+                struct ext2_sblock *sblock);
+
+bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
+                     struct ext2_inode *inode_out);
+
+bool ext2_write_inode(struct ext2_fs *fs, uint32_t inode_num,
+                      const struct ext2_inode *inode);
+
+bool ext2_create_file(struct ext2_fs *fs, struct ext2_inode *parent_dir,
+                      const char *name, uint16_t mode);
+
+bool ext2_write_file(struct ext2_fs *fs, struct ext2_inode *inode,
+                     const void *data, uint32_t size, uint32_t offset);
+
+struct ext2_inode *ext2_find_file_in_dir(struct ext2_fs *fs,
+                                         const struct ext2_inode *dir_inode,
+                                         const char *fname);
+
+uint32_t ext2_alloc_block(struct ext2_fs *fs);
+uint32_t ext2_alloc_inode(struct ext2_fs *fs);
+
 void ext2_test(struct ide_drive *d, struct ext2_sblock *sblock);
 
 #pragma once

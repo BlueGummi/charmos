@@ -1,5 +1,9 @@
 #include <io.h>
+#include <pci.h>
 #include <printf.h>
+
+static struct pci_device pci_devices[MAX_PCI_DEVICES];
+static uint64_t pci_device_count;
 
 const char *pci_class_name(uint8_t class_code, uint8_t subclass) {
     switch (class_code) {
@@ -27,13 +31,15 @@ const char *pci_class_name(uint8_t class_code, uint8_t subclass) {
     return "Unknown Device";
 }
 
-void scan_pci_devices() {
+void scan_pci_devices(struct pci_device **devices_out, uint64_t *count_out) {
+    pci_device_count = 0;
+
     for (uint8_t bus = 0; bus < 255; ++bus) {
         for (uint8_t device = 0; device < 32; ++device) {
             for (uint8_t function = 0; function < 8; ++function) {
                 uint16_t vendor_id = pci_read_word(bus, device, function, 0x00);
                 if (vendor_id == 0xFFFF)
-                    continue; // no device
+                    continue;
 
                 uint16_t device_id = pci_read_word(bus, device, function, 0x02);
                 uint8_t class_code = pci_read_byte(bus, device, function, 0x0B);
@@ -41,15 +47,18 @@ void scan_pci_devices() {
                 uint8_t prog_if = pci_read_byte(bus, device, function, 0x09);
                 uint8_t revision = pci_read_byte(bus, device, function, 0x08);
 
-                const char *type = pci_class_name(class_code, subclass);
-
-                k_printf("PCI Device: bus %u, device %u, function %u\n", bus,
-                         device, function);
-                k_printf("  Vendor ID: 0x%04x, Device ID: 0x%04x\n", vendor_id,
-                         device_id);
-                k_printf("  Class: 0x%02x (%s), Subclass: 0x%02x, ProgIF: "
-                         "0x%02x, Revision: 0x%02x\n\n",
-                         class_code, type, subclass, prog_if, revision);
+                if (pci_device_count < MAX_PCI_DEVICES) {
+                    pci_devices[pci_device_count++] =
+                        (struct pci_device) {.bus = bus,
+                                             .device = device,
+                                             .function = function,
+                                             .vendor_id = vendor_id,
+                                             .device_id = device_id,
+                                             .class_code = class_code,
+                                             .subclass = subclass,
+                                             .prog_if = prog_if,
+                                             .revision = revision};
+                }
 
                 if (function == 0) {
                     uint8_t header_type =
@@ -60,4 +69,7 @@ void scan_pci_devices() {
             }
         }
     }
+
+    *devices_out = pci_devices;
+    *count_out = pci_device_count;
 }

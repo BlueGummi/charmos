@@ -62,7 +62,10 @@ void k_main(void) {
     while (current_cpu != mpr->cpu_count - 1) {
         asm volatile("pause");
     }
-    scan_pci_devices();
+
+    struct pci_device *devices;
+    uint64_t count;
+    scan_pci_devices(&devices, &count);
     struct ide_drive primary_master = {
         .io_base = 0x1F0, .ctrl_base = 0x3F6, .slave = 0};
     struct ext2_sblock superblock;
