@@ -11,19 +11,13 @@ struct link_ctx {
     bool success;
 };
 
-static bool nop_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
-                         void *ctx_ptr, uint32_t block_num) {
-    (void) fs;
-    (void) entry;
-    (void) ctx_ptr;
-    (void) block_num;
-    return false;
-}
+MAKE_NOP_CALLBACK;
 
 static bool link_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
-                          void *ctx_ptr, uint32_t block_num) {
+                          void *ctx_ptr, uint32_t block_num, uint32_t e) {
     (void) fs; // dont complain compiler
     (void) block_num;
+    (void) e;
     struct link_ctx *ctx = (struct link_ctx *) ctx_ptr;
 
     uint32_t actual_size = 8 + ((entry->name_len + 3) & ~3); // alignment
@@ -120,10 +114,4 @@ bool ext2_create_inode(struct ext2_fs *fs, uint32_t inode_num, uint16_t mode,
         inode.block[i] = 0;
 
     return ext2_write_inode(fs, inode_num, &inode);
-}
-
-bool ext2_create_file(struct ext2_fs *fs, struct k_full_inode *parent_dir,
-                      const char *name, uint16_t mode) {
-    if (!fs)
-        return false;
 }

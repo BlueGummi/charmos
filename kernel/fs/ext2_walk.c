@@ -1,4 +1,5 @@
 #include <fs/ext2.h>
+#include <printf.h>
 #include <stdint.h>
 #include <vmalloc.h>
 
@@ -23,7 +24,7 @@ static bool walk_dir(struct ext2_fs *fs, uint32_t block_num,
         if (entry->rec_len < 8 || offset + entry->rec_len > fs->block_size)
             break;
 
-        if (callback(fs, entry, ctx, block_num)) {
+        if (callback(fs, entry, ctx, block_num, entry->inode)) {
             modified = true;
             break;
         }
@@ -47,7 +48,7 @@ static bool walk_direct_blocks(struct ext2_fs *fs, struct k_full_inode *inode,
             inode->node.block[i] = *(uint32_t *) ctx;
             inode->node.blocks += fs->block_size / fs->drive->sector_size;
             inode->node.size += fs->block_size;
-            ext2_write_inode(fs, inode->inode_num, &inode->node);
+            ext2_write_inode(fs, inode->node.block[i], &inode->node);
             return true;
         }
 

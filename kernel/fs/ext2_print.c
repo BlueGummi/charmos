@@ -56,6 +56,8 @@ void ext2_dump_file_data(struct ext2_fs *fs, const struct ext2_inode *inode,
     if (!fs || !inode)
         return;
 
+    k_printf("\n==== file dump ====\n");
+
     uint32_t bytes_remaining = length;
     uint32_t block_size = fs->block_size;
     uint32_t block_index = start_block_index;
@@ -66,7 +68,6 @@ void ext2_dump_file_data(struct ext2_fs *fs, const struct ext2_inode *inode,
             k_printf("block %u is not allocated\n", block_index);
             break;
         }
-
         uint32_t lba = block_num * fs->sectors_per_block;
         uint8_t buf[block_size];
         if (!block_read(fs->drive, lba, buf, fs->sectors_per_block)) {
@@ -88,6 +89,8 @@ void ext2_dump_file_data(struct ext2_fs *fs, const struct ext2_inode *inode,
     if (bytes_remaining > 0) {
         k_printf("\nrequested length exceeds direct blocks available\n");
     }
+
+    k_printf("\n== file dump end ==\n");
 }
 
 void ext2_print_superblock(struct ext2_sblock *sblock) {

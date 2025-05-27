@@ -25,6 +25,17 @@ extern uint64_t PTRS_PER_BLOCK;
 #define EXT2_FT_SOCK 6       // Unix domain socket
 #define EXT2_FT_SYMLINK 7    // Symbolic link
 #define EXT2_FT_MAX 8        // Number of defined file types
+#define MIN(x, y) ((x > y) ? y : x)
+
+#define MAKE_NOP_CALLBACK                                                      \
+    static bool nop_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry, \
+                             void *ctx_ptr, uint32_t block_num, uint32_t entry_num) {              \
+        (void) fs;                                                             \
+        (void) entry;                                                          \
+        (void) ctx_ptr;                                                        \
+        (void) block_num;                                                      \
+        return false;                                                          \
+    }
 
 struct ext2_sblock {
     uint32_t inodes_count;
@@ -42,7 +53,7 @@ struct ext2_sblock {
     uint32_t wtime;
     uint16_t mnt_count;
     uint16_t max_mnt_count;
-    uint16_t magic; // 0xEF53
+    uint16_t magic;
     uint16_t state;
     uint16_t errors;
     uint16_t minor_rev_level;
@@ -65,7 +76,26 @@ struct ext2_sblock {
     uint8_t prealloc_blocks;
     uint8_t prealloc_dir_blocks;
     uint16_t padding;
-    uint32_t reserved[204];
+
+    union {
+        struct {
+            uint32_t journal_uuid[4];
+            uint32_t journal_inum;
+            uint32_t journal_dev;
+            uint32_t last_orphan;
+            uint32_t hash_seed[4];
+            uint8_t def_hash_version;
+            uint8_t journal_backup_type;
+            uint16_t desc_size;
+            uint32_t default_mount_opts;
+            uint32_t first_meta_bg;
+            uint32_t mkfs_time;
+            uint32_t journal_blocks[17];
+            uint32_t quota_group_inode;   // [4] → offset 0x258
+            uint32_t quota_project_inode; // [5] → offset 0x25C
+        };
+        uint32_t reserved[204];
+    };
 } __attribute__((packed));
 
 struct ext2_group_desc {
@@ -129,17 +159,17 @@ struct ext2_fs {
 
 typedef bool (*dir_entry_callback)(struct ext2_fs *fs,
                                    struct ext2_dir_entry *entry, void *ctx,
-                                   uint32_t block_num);
+                                   uint32_t block_num, uint32_t entry_num);
 
 bool block_read(struct ide_drive *d, uint32_t lba, uint8_t *buffer,
                 uint32_t sector_count);
 
-bool block_ptr_read(struct ext2_fs *fs, uint32_t block_num, uint32_t *buf);
+bool block_ptr_read(struct ext2_fs *fs, uint32_t block_num, void *buf);
 
 bool block_write(struct ide_drive *d, uint32_t lba, const uint8_t *buffer,
                  uint32_t sector_count);
 
-bool block_ptr_write(struct ext2_fs *fs, uint32_t block_num, uint32_t *buf);
+bool block_ptr_write(struct ext2_fs *fs, uint32_t block_num, void *buf);
 
 bool ext2_write_superblock(struct ext2_fs *fs);
 bool ext2_write_group_desc(struct ext2_fs *fs);
@@ -160,7 +190,7 @@ bool ext2_create_file(struct ext2_fs *fs, struct k_full_inode *parent_dir,
                       const char *name, uint16_t mode);
 
 bool ext2_write_file(struct ext2_fs *fs, struct k_full_inode *inode,
-                     const void *data, uint32_t size, uint32_t offset);
+                     uint32_t offset, const uint8_t *src, uint32_t size);
 
 struct k_full_inode *ext2_find_file_in_dir(struct ext2_fs *fs,
                                            struct k_full_inode *dir_inode,

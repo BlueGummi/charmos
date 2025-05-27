@@ -72,7 +72,6 @@ void k_main(void) {
     struct ext2_sblock superblock;
 
     if (read_ext2_superblock(&primary_master, 0, &superblock)) {
-        ext2_print_superblock(&superblock);
         ext2_test(&primary_master, &superblock);
     }
 

@@ -1,4 +1,5 @@
 #include <fs/ext2.h>
+#include <printf.h>
 #include <string.h>
 #include <vmalloc.h>
 
@@ -13,14 +14,15 @@ struct contains_ctx {
 };
 
 static bool search_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
-                            void *ctx_ptr, uint32_t block_num) {
+                            void *ctx_ptr, uint32_t b, uint32_t e_num) {
+    (void) b;
     struct search_ctx *ctx = (struct search_ctx *) ctx_ptr;
 
     if (entry->inode != 0 &&
         memcmp(entry->name, ctx->target, entry->name_len) == 0 &&
         ctx->target[entry->name_len] == '\0') {
-        ctx->result->inode_num = block_num;
         ctx->result = kmalloc(sizeof(struct ext2_inode));
+        ctx->result->inode_num = e_num;
         ext2_read_inode(fs, entry->inode, &ctx->result->node);
         return true;
     }
@@ -29,9 +31,10 @@ static bool search_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
 }
 
 static bool contains_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
-                              void *ctx_ptr, uint32_t block_num) {
+                              void *ctx_ptr, uint32_t b, uint32_t e) {
     struct contains_ctx *ctx = (struct contains_ctx *) ctx_ptr;
-    (void) block_num;
+    (void) b;
+    (void) e;
     (void) fs;
     if (entry->inode != 0 &&
         memcmp(entry->name, ctx->target, entry->name_len) == 0 &&
@@ -47,7 +50,9 @@ static bool contains_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
 struct k_full_inode *ext2_find_file_in_dir(struct ext2_fs *fs,
                                            struct k_full_inode *dir_inode,
                                            const char *fname) {
-    struct search_ctx ctx = {.target = fname, .result = NULL};
+    struct k_full_inode out_node = {0};
+
+    struct search_ctx ctx = {.target = fname, .result = &out_node};
 
     ext2_walk_dir(fs, dir_inode, search_callback, &ctx, false);
     return ctx.result;

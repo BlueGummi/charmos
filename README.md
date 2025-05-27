@@ -44,6 +44,8 @@ make run # run this in the build directory
 
 ### "QOL Quarrels" 
 
+- [ ] implement returned error codes for specific error kinds on things like the fs
+
 - [x] change tooling 
 
     - [x] and reorganize codebase 

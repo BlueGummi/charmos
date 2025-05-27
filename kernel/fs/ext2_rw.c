@@ -17,7 +17,7 @@ bool block_read(struct ide_drive *d, uint32_t lba, uint8_t *buffer,
     return true;
 }
 
-bool block_ptr_read(struct ext2_fs *fs, uint32_t block_num, uint32_t *buf) {
+bool block_ptr_read(struct ext2_fs *fs, uint32_t block_num, void *buf) {
     if (!fs || !buf)
         return false;
 
@@ -74,7 +74,7 @@ bool block_write(struct ide_drive *d, uint32_t lba, const uint8_t *buffer,
     return true;
 }
 
-bool block_ptr_write(struct ext2_fs *fs, uint32_t block_num, uint32_t *buf) {
+bool block_ptr_write(struct ext2_fs *fs, uint32_t block_num, void *buf) {
     if (!fs || !buf)
         return false;
 
