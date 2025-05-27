@@ -62,7 +62,7 @@ bool ext2_link_file(struct ext2_fs *fs, struct ext2_inode *dir_inode,
     for (int i = 0; i < 12; i++) {
         if (dir_inode->block[i] == 0) {
             dir_inode->block[i] = new_block;
-            dir_inode->blocks += fs->block_size / 512;
+            dir_inode->blocks += fs->block_size / fs->drive->sector_size;
             dir_inode->size += fs->block_size;
             added = true;
             break;
@@ -84,8 +84,8 @@ bool ext2_link_file(struct ext2_fs *fs, struct ext2_inode *dir_inode,
     new_entry->file_type = EXT2_FT_REG_FILE;
     memcpy(new_entry->name, name, new_entry->name_len);
 
-    uint32_t lba = (new_block * fs->block_size) / 512;
-    if (!block_write(fs->drive, lba, block_data, fs->block_size / 512)) {
+    uint32_t lba = (new_block * fs->block_size) / fs->drive->sector_size;
+    if (!block_write(fs->drive, lba, block_data, fs->block_size / fs->drive->sector_size)) {
         kfree(block_data, fs->block_size);
         for (int i = 0; i < 12; i++) {
             if (dir_inode->block[i] == new_block) {

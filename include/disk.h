@@ -1,17 +1,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define DATA_PORT 0x1F0
-#define ERROR_PORT 0x1F1
-#define SECTOR_COUNT 0x1F2
-#define LBA_LOW 0x1F3
-#define LBA_MID 0x1F4
-#define LBA_HIGH 0x1F5
-#define DRIVE_HEAD 0x1F6
-#define STATUS_PORT 0x1F7
-#define COMMAND_PORT 0x1F7
-#define CONTROL_PORT 0x3F6
-
 #define REG_DATA(base) (base + 0)
 #define REG_ERROR(base) (base + 1)
 #define REG_SECTOR_COUNT(base) (base + 2)
@@ -27,11 +16,27 @@
 #define STATUS_BSY 0x80
 #define STATUS_DRDY 0x40
 #define STATUS_DRQ 0x08
+#define STATUS_ERR  0x01
 #define COMMAND_READ 0x20
 #define COMMAND_WRITE 0x30
 
+#define ATA_CMD_READ_PIO          0x20
+#define ATA_CMD_READ_PIO_EXT      0x24
+#define ATA_CMD_READ_DMA          0xC8
+#define ATA_CMD_READ_DMA_EXT      0x25
+#define ATA_CMD_WRITE_PIO         0x30
+#define ATA_CMD_WRITE_PIO_EXT     0x34
+#define ATA_CMD_WRITE_DMA         0xCA
+#define ATA_CMD_WRITE_DMA_EXT     0x35
+#define ATA_CMD_CACHE_FLUSH       0xE7
+#define ATA_CMD_CACHE_FLUSH_EXT   0xEA
+#define ATA_CMD_PACKET            0xA0
+#define ATA_CMD_IDENTIFY_PACKET   0xA1
+#define ATA_CMD_IDENTIFY          0xEC
+
 struct ext2_sblock;
 struct ide_drive {
+    uint32_t sector_size;
     uint16_t io_base;
     uint16_t ctrl_base;
     uint16_t slave;

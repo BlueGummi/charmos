@@ -67,8 +67,8 @@ void k_main(void) {
     struct pci_device *devices;
     uint64_t count;
     scan_pci_devices(&devices, &count);
-    struct ide_drive primary_master = {
-        .io_base = 0x1F0, .ctrl_base = 0x3F6, .slave = 0};
+    struct ide_drive primary_master;
+    setup_primary_ide(&primary_master, devices, count);
     struct ext2_sblock superblock;
 
     if (read_ext2_superblock(&primary_master, 0, &superblock)) {

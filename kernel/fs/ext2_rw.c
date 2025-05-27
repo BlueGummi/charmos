@@ -10,7 +10,7 @@ bool block_read(struct ide_drive *d, uint32_t lba, uint8_t *buffer,
         return false;
 
     for (uint32_t i = 0; i < sector_count; ++i) {
-        if (!ide_read_sector(d, lba + i, buffer + (i * 512))) {
+        if (!ide_read_sector(d, lba + i, buffer + (i * d->sector_size))) {
             return false;
         }
     }
@@ -66,7 +66,7 @@ bool block_write(struct ide_drive *d, uint32_t lba, const uint8_t *buffer, uint3
         return false;
 
     for (uint32_t i = 0; i < sector_count; ++i) {
-        if (!ide_write_sector(d, lba + i, buffer + (i * 512))) {
+        if (!ide_write_sector(d, lba + i, buffer + (i * d->sector_size))) {
             return false;
         }
     }

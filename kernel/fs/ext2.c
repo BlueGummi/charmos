@@ -21,7 +21,7 @@ bool ext2_write_group_desc(struct ext2_fs *fs) {
 
     uint32_t size = fs->num_groups * sizeof(struct ext2_group_desc);
 
-    uint32_t sector_count = (size + 511) / 512;
+    uint32_t sector_count = (size + 511) / fs->drive->sector_size;
 
     return block_write(fs->drive, lba, (uint8_t *) fs->group_desc,
                        sector_count);
@@ -38,7 +38,7 @@ bool ext2_mount(struct ide_drive *d, struct ext2_fs *fs,
     fs->inodes_per_group = sblock->inodes_per_group;
     fs->inode_size = sblock->inode_size;
     fs->block_size = 1024 << sblock->log_block_size;
-    fs->sectors_per_block = fs->block_size / 512;
+    fs->sectors_per_block = fs->block_size / d->sector_size;
 
     fs->num_groups =
         (fs->inodes_count + fs->inodes_per_group - 1) / fs->inodes_per_group;

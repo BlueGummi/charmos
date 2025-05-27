@@ -22,7 +22,7 @@ void ext2_print_inode(const struct ext2_inode *inode) {
     k_printf("  Deletion Time: ");
     ptime(inode->dtime);
     k_printf("  Links Count: %u\n", inode->links_count);
-    k_printf("  Blocks (512-byte units): %u\n", inode->blocks);
+    k_printf("  Blocks: %u\n", inode->blocks);
     k_printf("  Flags: 0x%08x\n", inode->flags);
     k_printf("  osd1: 0x%08x\n", inode->osd1);
 

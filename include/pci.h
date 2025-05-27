@@ -1,7 +1,8 @@
 #include <stdint.h>
-#include <stdint.h>
+
 #define MAX_PCI_DEVICES 256
 
+struct ide_drive;
 struct pci_device {
     uint8_t bus;
     uint8_t device;
@@ -16,8 +17,8 @@ struct pci_device {
     uint8_t revision;
 };
 
-
-
 const char *pci_class_name(uint8_t class_code, uint8_t subclass);
 
 void scan_pci_devices(struct pci_device **devices_out, uint64_t *count_out);
+void setup_primary_ide(struct ide_drive *ide, struct pci_device *devices,
+                       uint64_t count);
