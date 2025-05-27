@@ -128,7 +128,7 @@ void ext2_test(struct ide_drive *d, struct ext2_sblock *sblock) {
 
     struct k_full_inode i = {.node = inode, .inode_num = inode_num};
 
-    ext2_link_file(&fs, &root_inode, &i, "fragmentation segmentation");
+    ext2_link_file(&fs, &root_inode, &i, "segmentation");
 
     k_printf("Created inode number: %u\n", inode_num);
 }
