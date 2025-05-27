@@ -68,7 +68,7 @@ bool ext2_link_file(struct ext2_fs *fs, struct ext2_inode *dir_inode,
         return false;
     }
 
-    uint32_t *block_data = kzalloc(fs->block_size);
+    uint8_t *block_data = kzalloc(fs->block_size);
 
     struct ext2_dir_entry *new_entry = (struct ext2_dir_entry *) block_data;
     new_entry->inode = file_inode;
@@ -77,7 +77,7 @@ bool ext2_link_file(struct ext2_fs *fs, struct ext2_inode *dir_inode,
     new_entry->file_type = EXT2_FT_REG_FILE;
     memcpy(new_entry->name, name, new_entry->name_len);
 
-    /*if (!*/ block_ptr_write(fs, new_block, block_data); /*) {
+    /*if (!*/ block_ptr_write(fs, new_block, (uint32_t*) block_data); /*) {
           kfree(block_data, fs->block_size);
           for (int i = 0; i < 12; i++) {
               if (dir_inode->block[i] == new_block) {
