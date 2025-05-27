@@ -162,28 +162,3 @@ bool ext2_free_inode(struct ext2_fs *fs, uint32_t inode_num) {
 
     return true;
 }
-
-bool ext2_create_inode(struct ext2_fs *fs, uint32_t inode_num, uint16_t mode,
-                       uint16_t uid, uint16_t gid, uint32_t size,
-                       uint32_t flags) {
-    if (!fs)
-        return false;
-
-    struct ext2_inode inode = {0};
-
-    inode.mode = mode;
-    inode.uid = uid;
-    inode.gid = gid;
-    inode.size = size;
-    inode.atime = inode.ctime = inode.mtime = 0;
-    inode.dtime = 0;
-    inode.links_count = 1;
-    inode.flags = flags;
-    inode.blocks = 0;
-    inode.osd1 = 0;
-
-    for (int i = 0; i < EXT2_NBLOCKS; i++)
-        inode.block[i] = 0;
-
-    return ext2_write_inode(fs, inode_num, &inode);
-}

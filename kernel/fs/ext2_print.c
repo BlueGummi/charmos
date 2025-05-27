@@ -4,47 +4,49 @@
 #include <printf.h>
 #include <stdint.h>
 
-void ext2_print_inode(const struct ext2_inode *inode) {
-    if (!inode)
+void ext2_print_inode(const struct k_full_inode *node) {
+    if (!node)
         return;
 
+    struct ext2_inode inode = node->node;
     k_printf("Inode Information:\n");
-    k_printf("  Mode: 0x%04x\n", inode->mode);
-    k_printf("  UID: %u\n", inode->uid);
-    k_printf("  GID: %u\n", inode->gid);
-    k_printf("  Size: %u bytes\n", inode->size);
+    k_printf("  Block number: %u\n", node->inode_num);
+    k_printf("  Mode: 0x%04x\n", inode.mode);
+    k_printf("  UID: %u\n", inode.uid);
+    k_printf("  GID: %u\n", inode.gid);
+    k_printf("  Size: %u bytes\n", inode.size);
     k_printf("  Access Time: ");
-    ptime(inode->atime);
+    ptime(inode.atime);
     k_printf("  Creation Time: ");
-    ptime(inode->ctime);
+    ptime(inode.ctime);
     k_printf("  Modification Time: ");
-    ptime(inode->mtime);
+    ptime(inode.mtime);
     k_printf("  Deletion Time: ");
-    ptime(inode->dtime);
-    k_printf("  Links Count: %u\n", inode->links_count);
-    k_printf("  Blocks: %u\n", inode->blocks);
-    k_printf("  Flags: 0x%08x\n", inode->flags);
-    k_printf("  osd1: 0x%08x\n", inode->osd1);
+    ptime(inode.dtime);
+    k_printf("  Links Count: %u\n", inode.links_count);
+    k_printf("  Blocks: %u\n", inode.blocks);
+    k_printf("  Flags: 0x%08x\n", inode.flags);
+    k_printf("  osd1: 0x%08x\n", inode.osd1);
 
     k_printf("  Block Pointers:\n");
     for (int i = 0; i < EXT2_NBLOCKS; ++i) {
-        k_printf("    [%-2d] = %u\n", i, inode->block[i]);
+        k_printf("    [%-2d] = %u\n", i, inode.block[i]);
     }
 
-    k_printf("  Generation: %u\n", inode->generation);
-    k_printf("  File ACL: %u\n", inode->file_acl);
-    k_printf("  Directory ACL: %u\n", inode->dir_acl);
-    k_printf("  Fragment Address: %u\n", inode->faddr);
+    k_printf("  Generation: %u\n", inode.generation);
+    k_printf("  File ACL: %u\n", inode.file_acl);
+    k_printf("  Directory ACL: %u\n", inode.dir_acl);
+    k_printf("  Fragment Address: %u\n", inode.faddr);
 
     k_printf("  Fragment (raw): ");
     for (int i = 0; i < 16; ++i) {
-        k_printf("%02x ", inode->frag[i]);
+        k_printf("%02x ", inode.frag[i]);
     }
     k_printf("\n");
 
     k_printf("  OS Specific 2: ");
     for (int i = 0; i < 12; ++i) {
-        k_printf("%02x ", inode->osd2[i]);
+        k_printf("%02x ", inode.osd2[i]);
     }
     k_printf("\n");
 }
@@ -161,4 +163,3 @@ void ext2_print_superblock(struct ext2_sblock *sblock) {
         k_printf("  Padding: %u\n", sblock->padding);
     }
 }
-

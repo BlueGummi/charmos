@@ -62,7 +62,7 @@ bool ext2_mount(struct ide_drive *d, struct ext2_fs *fs,
     return true;
 }
 
-struct ext2_inode *ext2_path_lookup(struct ext2_fs *fs, struct ext2_inode *node,
+struct k_full_inode *ext2_path_lookup(struct ext2_fs *fs, struct k_full_inode *node,
                                     const char *path) {
     if (!path || !fs || !node)
         return NULL;
@@ -81,7 +81,8 @@ struct ext2_inode *ext2_path_lookup(struct ext2_fs *fs, struct ext2_inode *node,
     char next_dir[len + 1];
     memcpy(next_dir, start, len);
     next_dir[len] = '\0';
-    struct ext2_inode *next = ext2_find_file_in_dir(fs, node, -1, next_dir);
+    struct k_full_inode *next =
+        ext2_find_file_in_dir(fs, node, next_dir);
 
     if (!next) {
         k_printf("Did not find %s\n", next_dir);
@@ -97,10 +98,12 @@ void ext2_test(struct ide_drive *d, struct ext2_sblock *sblock) {
         return;
     }
 
-    struct ext2_inode root_inode;
-    if (!ext2_read_inode(&fs, EXT2_ROOT_INODE, &root_inode)) {
+    struct ext2_inode r;
+    if (!ext2_read_inode(&fs, EXT2_ROOT_INODE, &r)) {
         return;
     }
+
+    struct k_full_inode root_inode = {.node = r, .inode_num = EXT2_ROOT_INODE};
 
     uint32_t inode_num = ext2_alloc_inode(&fs);
     if (inode_num == (uint32_t) -1) {
@@ -114,7 +117,7 @@ void ext2_test(struct ide_drive *d, struct ext2_sblock *sblock) {
     inode.size = 0;
     inode.links_count = 1;
     inode.blocks = 0;
-    uint32_t now = 563824800;
+    uint32_t now = 563824800; // was that the bite of '87?
     inode.atime = now;
     inode.ctime = now;
     inode.mtime = now;
@@ -122,7 +125,10 @@ void ext2_test(struct ide_drive *d, struct ext2_sblock *sblock) {
     if (!ext2_write_inode(&fs, inode_num, &inode)) {
         return;
     }
-    ext2_link_file(&fs, &root_inode, EXT2_ROOT_INODE, inode_num, "fragmentation");
+
+    struct k_full_inode i = {.node = inode, .inode_num = inode_num};
+
+    ext2_link_file(&fs, &root_inode, &i, "fragmentation segmentation");
 
     k_printf("Created inode number: %u\n", inode_num);
 }
