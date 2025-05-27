@@ -17,7 +17,7 @@ bool block_read(struct ide_drive *d, uint32_t lba, uint8_t *buffer,
     return true;
 }
 
-bool read_block_ptrs(struct ext2_fs *fs, uint32_t block_num, uint32_t *buf) {
+bool block_ptr_read(struct ext2_fs *fs, uint32_t block_num, uint32_t *buf) {
     if (!fs || !buf)
         return false;
 
@@ -61,7 +61,8 @@ bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
     return true;
 }
 
-bool block_write(struct ide_drive *d, uint32_t lba, const uint8_t *buffer, uint32_t sector_count) {
+bool block_write(struct ide_drive *d, uint32_t lba, const uint8_t *buffer,
+                 uint32_t sector_count) {
     if (!buffer)
         return false;
 
@@ -73,6 +74,14 @@ bool block_write(struct ide_drive *d, uint32_t lba, const uint8_t *buffer, uint3
     return true;
 }
 
+bool block_ptr_write(struct ext2_fs *fs, uint32_t block_num, uint32_t *buf) {
+    if (!fs || !buf)
+        return false;
+
+    uint32_t lba = block_num * fs->sectors_per_block;
+    return block_write(fs->drive, lba, (const uint8_t *) buf,
+                       fs->sectors_per_block);
+}
 
 bool ext2_write_inode(struct ext2_fs *fs, uint32_t inode_num,
                       const struct ext2_inode *inode) {

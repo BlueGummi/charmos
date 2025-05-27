@@ -81,7 +81,7 @@ struct ext2_inode *ext2_path_lookup(struct ext2_fs *fs, struct ext2_inode *node,
     char next_dir[len + 1];
     memcpy(next_dir, start, len);
     next_dir[len] = '\0';
-    struct ext2_inode *next = ext2_find_file_in_dir(fs, node, next_dir);
+    struct ext2_inode *next = ext2_find_file_in_dir(fs, node, -1, next_dir);
 
     if (!next) {
         k_printf("Did not find %s\n", next_dir);
@@ -101,12 +101,6 @@ void ext2_test(struct ide_drive *d, struct ext2_sblock *sblock) {
     if (!ext2_read_inode(&fs, EXT2_ROOT_INODE, &root_inode)) {
         return;
     }
-
-    struct ext2_inode *node =
-        ext2_path_lookup(&fs, &root_inode, "/crashout/rand.txt");
-
-    if (node)
-        ext2_dump_file_data(&fs, node, 0, node->size);
 
     uint32_t inode_num = ext2_alloc_inode(&fs);
     if (inode_num == (uint32_t) -1) {
@@ -128,7 +122,7 @@ void ext2_test(struct ide_drive *d, struct ext2_sblock *sblock) {
     if (!ext2_write_inode(&fs, inode_num, &inode)) {
         return;
     }
-    ext2_link_file(&fs, &root_inode, EXT2_ROOT_INODE, inode_num, "again");
+    ext2_link_file(&fs, &root_inode, EXT2_ROOT_INODE, inode_num, "ru");
 
     k_printf("Created inode number: %u\n", inode_num);
 }

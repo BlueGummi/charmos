@@ -44,21 +44,22 @@ static bool contains_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
 }
 
 struct ext2_inode *ext2_find_file_in_dir(struct ext2_fs *fs,
-                                         const struct ext2_inode *dir_inode,
+                                         struct ext2_inode *dir_inode,
+                                         uint32_t dir_inode_num,
                                          const char *fname) {
     struct search_ctx ctx = {.target = fname, .result = NULL};
 
-    walk_directory_entries(fs, dir_inode, search_callback, &ctx);
+    ext2_walk_dir(fs, dir_inode, dir_inode_num, search_callback, &ctx, false);
 
     return ctx.result;
 }
 
 bool ext2_dir_contains_file(struct ext2_fs *fs,
-                            const struct ext2_inode *dir_inode,
-                            const char *fname) {
+                            struct ext2_inode *dir_inode,
+                            uint32_t dir_inode_num, const char *fname) {
     struct contains_ctx ctx = {.target = fname, .found = false};
 
-    walk_directory_entries(fs, dir_inode, contains_callback, &ctx);
+    ext2_walk_dir(fs, dir_inode, dir_inode_num, contains_callback, &ctx, false);
 
     return ctx.found;
 }
