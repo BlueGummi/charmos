@@ -204,3 +204,11 @@ void kfree(void *addr, size_t size) {
         return;
     vmm_free_pages(addr, (size + PAGE_SIZE - 1) / PAGE_SIZE);
 }
+
+void *kzalloc(size_t size) {
+    if (size == 0)
+        return NULL;
+    void *ret = vmm_alloc_pages((size + PAGE_SIZE - 1) / PAGE_SIZE);
+    memset(ret, 0, size);
+    return ret;
+}

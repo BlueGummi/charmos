@@ -1,7 +1,7 @@
 #include <disk.h>
 #include <fs/ext2.h>
 
-void print_ext2_sblock(struct ext2_sblock *sblock);
+void ext2_print_superblock(struct ext2_sblock *sblock);
 
 void ext2_print_inode(const struct ext2_inode *inode);
 

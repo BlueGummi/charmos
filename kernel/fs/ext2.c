@@ -32,7 +32,6 @@ bool ext2_mount(struct ide_drive *d, struct ext2_fs *fs,
     if (!fs || !sblock)
         return false;
 
-    PTRS_PER_BLOCK = (1024 << sblock->log_block_size) / 4;
     fs->drive = d;
     fs->sblock = sblock;
     fs->inodes_count = sblock->inodes_count;
@@ -83,6 +82,7 @@ struct ext2_inode *ext2_path_lookup(struct ext2_fs *fs, struct ext2_inode *node,
     memcpy(next_dir, start, len);
     next_dir[len] = '\0';
     struct ext2_inode *next = ext2_find_file_in_dir(fs, node, next_dir);
+
     if (!next) {
         k_printf("Did not find %s\n", next_dir);
         return NULL;
@@ -104,8 +104,9 @@ void ext2_test(struct ide_drive *d, struct ext2_sblock *sblock) {
 
     struct ext2_inode *node =
         ext2_path_lookup(&fs, &root_inode, "/crashout/rand.txt");
-    ext2_print_inode(node);
-    ext2_dump_file_data(&fs, node, 0, node->size);
+
+    if (node)
+        ext2_dump_file_data(&fs, node, 0, node->size);
 
     uint32_t inode_num = ext2_alloc_inode(&fs);
     if (inode_num == (uint32_t) -1) {
@@ -113,21 +114,21 @@ void ext2_test(struct ide_drive *d, struct ext2_sblock *sblock) {
     }
 
     struct ext2_inode inode = {0};
-    inode.mode = EXT2_S_IFREG | 0644; // regular file with 644 permissions
-    inode.uid = 0;                    // root user for example
-    inode.gid = 0;                    // root group
-    inode.size = 0; 
-    inode.links_count = 1; 
+    inode.mode = EXT2_S_IFREG | 0644;
+    inode.uid = 0;
+    inode.gid = 0;
+    inode.size = 0;
+    inode.links_count = 1;
     inode.blocks = 0;
     uint32_t now = 563824800;
     inode.atime = now;
     inode.ctime = now;
     inode.mtime = now;
     inode.dtime = 0;
-
     if (!ext2_write_inode(&fs, inode_num, &inode)) {
         return;
     }
+    ext2_link_file(&fs, &root_inode, EXT2_ROOT_INODE, inode_num, "again");
 
     k_printf("Created inode number: %u\n", inode_num);
 }

@@ -17,6 +17,15 @@ extern uint64_t PTRS_PER_BLOCK;
 #define EXT2_S_IFCHR 0x2000  // character device
 #define EXT2_S_IFIFO 0x1000  // FIFO
 #define EXT2_S_IFMT 0xF000   // mask to extract file type from i_mode
+#define EXT2_FT_UNKNOWN 0    // Unknown file type
+#define EXT2_FT_REG_FILE 1   // Regular file
+#define EXT2_FT_DIR 2        // Directory
+#define EXT2_FT_CHRDEV 3     // Character device
+#define EXT2_FT_BLKDEV 4     // Block device
+#define EXT2_FT_FIFO 5       // FIFO (named pipe)
+#define EXT2_FT_SOCK 6       // Unix domain socket
+#define EXT2_FT_SYMLINK 7    // Symbolic link
+#define EXT2_FT_MAX 8        // Number of defined file types
 
 struct ext2_sblock {
     uint32_t inodes_count;
@@ -114,8 +123,13 @@ struct ext2_fs {
     uint16_t inode_size;
 };
 
+typedef bool (*dir_entry_callback)(struct ext2_fs *fs,
+                                   struct ext2_dir_entry *entry, void *ctx);
+
 bool block_read(struct ide_drive *d, uint32_t lba, uint8_t *buffer,
                 uint32_t sector_count);
+
+bool read_block_ptrs(struct ext2_fs *fs, uint32_t block_num, uint32_t *buf);
 
 bool block_write(struct ide_drive *d, uint32_t lba, const uint8_t *buffer,
                  uint32_t sector_count);
@@ -132,6 +146,9 @@ bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
 bool ext2_write_inode(struct ext2_fs *fs, uint32_t inode_num,
                       const struct ext2_inode *inode);
 
+bool ext2_link_file(struct ext2_fs *fs, struct ext2_inode *dir_inode, uint32_t dir_inode_num,
+                    uint32_t inode, char *name);
+
 bool ext2_create_file(struct ext2_fs *fs, struct ext2_inode *parent_dir,
                       const char *name, uint16_t mode);
 
@@ -143,7 +160,12 @@ struct ext2_inode *ext2_find_file_in_dir(struct ext2_fs *fs,
                                          const char *fname);
 
 uint32_t ext2_alloc_block(struct ext2_fs *fs);
+bool ext2_free_block(struct ext2_fs *fs, uint32_t block_num);
 uint32_t ext2_alloc_inode(struct ext2_fs *fs);
+
+bool walk_directory_entries(struct ext2_fs *fs,
+                            const struct ext2_inode *dir_inode,
+                            dir_entry_callback cb, void *ctx);
 
 void ext2_test(struct ide_drive *d, struct ext2_sblock *sblock);
 

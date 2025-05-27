@@ -10,6 +10,7 @@ size_t vmm_get_free_pages(void);
 size_t vmm_get_total_pages(void);
 void vmalloc_set_offset(uint64_t o);
 void *kmalloc(size_t size);
+void *kzalloc(size_t size);
 void kfree(void *addr, size_t size);
 
 #define BITMAP_SIZE (1 << 20) // four giggybites

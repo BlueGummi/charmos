@@ -3,18 +3,18 @@
 #include <stdint.h>
 #include <vmalloc.h>
 
-static int find_free_bit(uint8_t *bitmap, uint32_t size, uint32_t *byte_pos,
-                         uint32_t *bit_pos) {
+static bool find_free_bit(uint8_t *bitmap, uint32_t size, uint32_t *byte_pos,
+                          uint32_t *bit_pos) {
     for (*byte_pos = 0; *byte_pos < size; ++(*byte_pos)) {
         if (bitmap[*byte_pos] != 0xFF) {
             for (*bit_pos = 0; *bit_pos < 8; ++(*bit_pos)) {
                 if (!(bitmap[*byte_pos] & (1 << *bit_pos))) {
-                    return 1;
+                    return true;
                 }
             }
         }
     }
-    return 0;
+    return false;
 }
 
 static uint32_t alloc_from_bitmap(struct ext2_fs *fs, uint32_t bitmap_block,
@@ -69,6 +69,48 @@ uint32_t ext2_alloc_block(struct ext2_fs *fs) {
     return -1;
 }
 
+bool ext2_free_block(struct ext2_fs *fs, uint32_t block_num) {
+    if (!fs || block_num == 0)
+        return false;
+
+    uint32_t group = block_num / fs->sblock->blocks_per_group;
+    uint32_t index = block_num % fs->sblock->blocks_per_group;
+
+    uint32_t bitmap_block = fs->group_desc[group].block_bitmap;
+
+    uint8_t *bitmap = kmalloc(fs->block_size);
+    if (!bitmap)
+        return false;
+
+    block_read(fs->drive, bitmap_block, bitmap, fs->sectors_per_block);
+
+    uint32_t byte = index / 8;
+    uint8_t bit = 1 << (index % 8);
+    if (!(bitmap[byte] & bit)) {
+        k_printf("Block %u already free\n", block_num);
+        return false;
+    }
+
+    bitmap[byte] &= ~bit;
+    block_write(fs->drive, bitmap_block, bitmap, fs->sectors_per_block);
+
+    kfree(bitmap, fs->block_size);
+
+    uint8_t *zero_buf = kzalloc(fs->block_size);
+    if (zero_buf) {
+        block_write(fs->drive, block_num * fs->sectors_per_block, zero_buf,
+                    fs->sectors_per_block);
+        kfree(zero_buf, fs->block_size);
+    }
+
+    fs->group_desc[group].free_blocks_count++;
+    fs->sblock->free_blocks_count++;
+
+    ext2_write_group_desc(fs);
+    ext2_write_superblock(fs);
+    return true;
+}
+
 uint32_t ext2_alloc_inode(struct ext2_fs *fs) {
     if (!fs)
         return -1;
@@ -84,9 +126,49 @@ uint32_t ext2_alloc_inode(struct ext2_fs *fs) {
     return -1;
 }
 
+bool ext2_free_inode(struct ext2_fs *fs, uint32_t inode_num) {
+    if (!fs || inode_num == 0)
+        return false;
+
+    inode_num -= 1; 
+    uint32_t group = inode_num / fs->inodes_per_group;
+    uint32_t index = inode_num % fs->inodes_per_group;
+
+    uint32_t bitmap_block = fs->group_desc[group].inode_bitmap;
+    uint8_t *bitmap = kmalloc(fs->block_size);
+
+    block_read(fs->drive, bitmap_block, bitmap, fs->sectors_per_block);
+    if (!bitmap)
+        return false;
+
+    uint32_t byte = index / 8;
+    uint8_t bit = 1 << (index % 8);
+    if (!(bitmap[byte] & bit)) {
+        k_printf("Inode %u already free\n", inode_num + 1);
+        return false;
+    }
+
+    bitmap[byte] &= ~bit;
+    block_write(fs->drive, bitmap_block, bitmap, fs->sectors_per_block);
+    kfree(bitmap, fs->block_size);
+
+    fs->group_desc[group].free_inodes_count++;
+    fs->sblock->free_inodes_count++;
+    ext2_write_group_desc(fs);
+    ext2_write_superblock(fs);
+
+    struct ext2_inode empty = {0};
+    ext2_write_inode(fs, inode_num + 1, &empty);
+
+    return true;
+}
+
 bool ext2_create_inode(struct ext2_fs *fs, uint32_t inode_num, uint16_t mode,
                        uint16_t uid, uint16_t gid, uint32_t size,
                        uint32_t flags) {
+    if (!fs)
+        return false;
+
     struct ext2_inode inode = {0};
 
     inode.mode = mode;

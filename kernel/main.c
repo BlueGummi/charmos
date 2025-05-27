@@ -4,6 +4,7 @@
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
 #include <fs/ext2.h>
+#include <fs/ext2_print.h>
 #include <gdt.h>
 #include <idt.h>
 #include <io.h>
@@ -71,6 +72,7 @@ void k_main(void) {
     struct ext2_sblock superblock;
 
     if (read_ext2_superblock(&primary_master, 0, &superblock)) {
+        ext2_print_superblock(&superblock);
         ext2_test(&primary_master, &superblock);
     }
 

@@ -88,7 +88,7 @@ void ext2_dump_file_data(struct ext2_fs *fs, const struct ext2_inode *inode,
     }
 }
 
-void print_ext2_sblock(struct ext2_sblock *sblock) {
+void ext2_print_superblock(struct ext2_sblock *sblock) {
     if (!sblock)
         return;
 
