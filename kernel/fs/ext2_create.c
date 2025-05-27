@@ -11,6 +11,11 @@ struct link_ctx {
     bool success;
 };
 
+static bool nop_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
+                         void *ctx_ptr) {
+    return false;
+}
+
 static bool link_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
                           void *ctx_ptr) {
     (void) fs; // dont complain compiler
@@ -60,11 +65,7 @@ bool ext2_link_file(struct ext2_fs *fs, struct ext2_inode *dir_inode,
     }
 
     uint32_t new_block = ext2_alloc_block(fs);
-    if (new_block == 0)
-        return false;
-
-    if (!ext2_walk_dir(fs, dir_inode, dir_inode_num, NULL, &new_block, true)) {
-        ext2_free_block(fs, new_block);
+    if (new_block == 0) {
         return false;
     }
 
@@ -77,20 +78,17 @@ bool ext2_link_file(struct ext2_fs *fs, struct ext2_inode *dir_inode,
     new_entry->file_type = EXT2_FT_REG_FILE;
     memcpy(new_entry->name, name, new_entry->name_len);
 
-    /*if (!*/ block_ptr_write(fs, new_block, (uint32_t*) block_data); /*) {
-          kfree(block_data, fs->block_size);
-          for (int i = 0; i < 12; i++) {
-              if (dir_inode->block[i] == new_block) {
-                  dir_inode->block[i] = 0;
-                  break;
-              }
-          }
-          ext2_free_block(fs, new_block);
-          return false;
-      }*/
+    if (block_ptr_write(fs, new_block, (uint32_t *) block_data)) {
+        if (!ext2_walk_dir(fs, dir_inode, dir_inode_num, nop_callback,
+                           &new_block, true)) {
+            ext2_free_block(fs, new_block);
+            return false;
+        }
+    } else {
+        return false;
+    }
 
     kfree(block_data, fs->block_size);
-    k_printf("gotta make some space...\n");
     dir_inode->links_count += 1;
     return ext2_write_inode(fs, dir_inode_num, dir_inode);
 }

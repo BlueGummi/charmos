@@ -122,7 +122,7 @@ void ext2_test(struct ide_drive *d, struct ext2_sblock *sblock) {
     if (!ext2_write_inode(&fs, inode_num, &inode)) {
         return;
     }
-    ext2_link_file(&fs, &root_inode, EXT2_ROOT_INODE, inode_num, "ru");
+    ext2_link_file(&fs, &root_inode, EXT2_ROOT_INODE, inode_num, "fragmentation");
 
     k_printf("Created inode number: %u\n", inode_num);
 }
