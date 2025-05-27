@@ -158,6 +158,10 @@ struct ext2_inode *ext2_find_file_in_dir(struct ext2_fs *fs,
                                          const struct ext2_inode *dir_inode,
                                          const char *fname);
 
+bool ext2_dir_contains_file(struct ext2_fs *fs,
+                                          const struct ext2_inode *dir_inode,
+                                          const char *fname);
+
 uint32_t ext2_alloc_block(struct ext2_fs *fs);
 bool ext2_free_block(struct ext2_fs *fs, uint32_t block_num);
 uint32_t ext2_alloc_inode(struct ext2_fs *fs);

@@ -50,6 +50,9 @@ bool ext2_link_file(struct ext2_fs *fs, struct ext2_inode *dir_inode,
         .dir_inode = dir_inode_num,
     };
 
+    if (ext2_dir_contains_file(fs, dir_inode, name))
+        return false;
+
     walk_directory_entries(fs, dir_inode, link_callback, &ctx);
     if (ctx.success)
         return true;
@@ -85,7 +88,8 @@ bool ext2_link_file(struct ext2_fs *fs, struct ext2_inode *dir_inode,
     memcpy(new_entry->name, name, new_entry->name_len);
 
     uint32_t lba = (new_block * fs->block_size) / fs->drive->sector_size;
-    if (!block_write(fs->drive, lba, block_data, fs->block_size / fs->drive->sector_size)) {
+    if (!block_write(fs->drive, lba, block_data,
+                     fs->block_size / fs->drive->sector_size)) {
         kfree(block_data, fs->block_size);
         for (int i = 0; i < 12; i++) {
             if (dir_inode->block[i] == new_block) {
