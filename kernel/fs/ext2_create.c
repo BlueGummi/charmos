@@ -33,7 +33,7 @@ static bool link_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
         new_entry->rec_len = original_rec_len - actual_size;
         new_entry->file_type = EXT2_FT_REG_FILE;
         memcpy(new_entry->name, ctx->name, new_entry->name_len);
-
+        new_entry->name[new_entry->name_len] = '\0';
         ctx->success = true;
         return true;
     }
