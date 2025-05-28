@@ -1,7 +1,7 @@
+#include <alloc.h>
 #include <fs/ext2.h>
 #include <printf.h>
 #include <string.h>
-#include <vmalloc.h>
 
 struct search_ctx {
     const char *target;

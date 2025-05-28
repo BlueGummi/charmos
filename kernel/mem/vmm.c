@@ -17,7 +17,6 @@ uint64_t sub_offset(uint64_t a) {
     return a - hhdm_offset;
 }
 void vmm_offset_set(uint64_t o) {
-    vmalloc_set_offset(o);
     hhdm_offset = o;
 }
 
@@ -87,9 +86,7 @@ void vmm_init() {
         }
     }
 
-
     vmm_copy_kernel_mappings(0xffffffffc0000000);
-    vmm_bitmap_init(0xffff800000000000, 0x100000); // TODO: Make this dynamic
 
     asm volatile("mov %0, %%cr3" : : "r"(kernel_pml4_phys) : "memory");
 }

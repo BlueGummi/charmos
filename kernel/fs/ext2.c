@@ -1,9 +1,9 @@
+#include <alloc.h>
 #include <fs/ext2.h>
 #include <fs/ext2_print.h>
 #include <printf.h>
 #include <stdint.h>
 #include <string.h>
-#include <vmalloc.h>
 
 uint64_t PTRS_PER_BLOCK;
 
@@ -55,7 +55,7 @@ bool ext2_mount(struct ide_drive *d, struct ext2_fs *fs,
     if (!block_read(fs->drive, gdt_block * fs->sectors_per_block,
                     (uint8_t *) fs->group_desc,
                     gdt_blocks * fs->sectors_per_block)) {
-        kfree(fs->group_desc, gdt_blocks * fs->block_size);
+        kfree(fs->group_desc);
         return false;
     }
 

@@ -1,10 +1,10 @@
+#include <alloc.h>
 #include <gdt.h>
 #include <mp.h>
 #include <printf.h>
 #include <sched.h>
 #include <smap.h>
 #include <spin_lock.h>
-#include <vmalloc.h>
 
 struct core **core_data = NULL;
 uint64_t cr3 = 0;
@@ -37,7 +37,7 @@ void wakeup() {
     current_cpu++;
     asm volatile("mov %0, %%cr3" ::"r"(cr3));
     int cpu = current_cpu;
-    struct core *current_core = vmm_alloc_pages(1);
+    struct core *current_core = kmalloc(sizeof(struct core));
     current_core->id = cpu;
     current_core->state = IDLE;
     current_core->current_thread = NULL;

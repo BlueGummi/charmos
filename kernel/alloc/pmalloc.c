@@ -191,7 +191,3 @@ void pmm_free_pages(void *addr, size_t count, bool has_offset) {
         }
     }
 }
-
-void pmm_set_bit(uint64_t a){
-    set_bit(a);
-}

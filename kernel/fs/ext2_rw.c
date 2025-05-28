@@ -1,8 +1,8 @@
+#include <alloc.h>
 #include <disk.h>
 #include <fs/ext2.h>
 #include <stdint.h>
 #include <string.h>
-#include <vmalloc.h>
 
 bool block_read(struct ide_drive *d, uint32_t lba, uint8_t *buffer,
                 uint32_t sector_count) {
@@ -52,12 +52,12 @@ bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
         return false;
 
     if (!block_read(fs->drive, inode_lba, buf, fs->sectors_per_block)) {
-        kfree(buf, fs->block_size);
+        kfree(buf);
         return false;
     }
 
     memcpy(inode_out, buf + offset_in_block, sizeof(struct ext2_inode));
-    kfree(buf, fs->block_size);
+    kfree(buf);
     return true;
 }
 

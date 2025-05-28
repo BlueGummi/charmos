@@ -9,10 +9,8 @@ unsafe extern "C" {
 }
 
 unsafe extern "C" {
-    pub unsafe fn pmm_alloc_pages(n: usize) -> *mut u8;
-    pub unsafe fn pmm_free_pages(ptr: *mut u8, n: usize);
-    pub unsafe fn vmm_alloc_pages(n: usize) -> *mut u8;
-    pub unsafe fn vmm_free_pages(ptr: *mut u8, n: usize);
+    pub unsafe fn kmalloc(n: usize) -> *mut u8;
+    pub unsafe fn kfree(ptr: *mut u8);
 }
 
 use core::alloc::{GlobalAlloc, Layout};
@@ -23,14 +21,12 @@ unsafe impl GlobalAlloc for BitmapAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let size = layout.size().max(layout.align());
         let pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
-        unsafe { vmm_alloc_pages(pages) }
+        unsafe { kmalloc(pages) }
     }
 
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        let size = layout.size().max(layout.align());
-        let pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
+    unsafe fn dealloc(&self, ptr: *mut u8, _: Layout) {
         unsafe {
-            vmm_free_pages(ptr, pages);
+            kfree(ptr);
         }
     }
 }

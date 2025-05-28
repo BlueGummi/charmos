@@ -40,8 +40,8 @@ uint64_t measure_tsc_freq_pit(void) {
     outb(0x43, 0x30);
 
     uint16_t pit_count = 0xFFFF;
-    outb(0x40, (uint8_t)(pit_count & 0xFF));
-    outb(0x40, (uint8_t)(pit_count >> 8));
+    outb(0x40, (uint8_t) (pit_count & 0xFF));
+    outb(0x40, (uint8_t) (pit_count >> 8));
 
     uint64_t start_tsc = rdtsc();
 
@@ -53,4 +53,3 @@ uint64_t measure_tsc_freq_pit(void) {
 
     return tsc_frequency;
 }
-

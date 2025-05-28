@@ -1,13 +1,14 @@
+#include <alloc.h>
 #include <stdint.h>
 #include <string.h>
 #include <thread.h>
-#include <vmalloc.h>
 
 uint64_t globid = 1;
 
 struct thread *thread_create(void (*entry_point)(void)) {
-    struct thread *new_thread = (struct thread *) vmm_alloc_pages(1);
-    uint64_t stack_top = (uint64_t) vmm_alloc_pages(1) + 0x1000;
+    struct thread *new_thread =
+        (struct thread *) kmalloc(sizeof(struct thread));
+    uint64_t stack_top = (uint64_t) kmalloc(1024) + 0x1000;
 
     memset(new_thread, 0, sizeof(struct thread)); // zero out the task
 
@@ -25,6 +26,6 @@ struct thread *thread_create(void (*entry_point)(void)) {
 }
 
 void thread_free(struct thread *t) {
-    vmm_free_pages(t->stack, 1);
-    vmm_free_pages(t, 1);
+    kfree(t->stack);
+    kfree(t);
 }

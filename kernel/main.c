@@ -1,3 +1,4 @@
+#include <alloc.h>
 #include <core.h>
 #include <dbg.h>
 #include <disk.h>
@@ -20,6 +21,7 @@
 #include <rust.h>
 #include <sched.h>
 #include <shutdown.h>
+#include <slab.h>
 #include <smap.h>
 #include <spin_lock.h>
 #include <stdalign.h>
@@ -30,7 +32,6 @@
 #include <uacpi/event.h>
 #include <uacpi/uacpi.h>
 #include <vfs/vfs.h>
-#include <vmalloc.h>
 #include <vmm.h>
 
 struct scheduler global_sched;
@@ -64,6 +65,7 @@ void k_main(void) {
     print_memory_status();
     vmm_offset_set(r->offset);
     vmm_init();
+    slab_init();
     test_alloc();
 
     for (uintptr_t virt = (uintptr_t) __slimine_requests;
@@ -84,30 +86,32 @@ void k_main(void) {
     while (current_cpu != mpr->cpu_count - 1) {
         asm volatile("pause");
     }*/
+    /*
+        tsc_freq = measure_tsc_freq_pit();
+        uacpi_status ret = uacpi_initialize(0);
+        if (uacpi_unlikely_error(ret)) {
+            k_printf("uacpi_initialize error: %s\n",
+       uacpi_status_to_string(ret));
+        }
 
-    tsc_freq = measure_tsc_freq_pit();
-    uacpi_status ret = uacpi_initialize(0);
-    if (uacpi_unlikely_error(ret)) {
-        k_printf("uacpi_initialize error: %s\n", uacpi_status_to_string(ret));
-    }
+        ret = uacpi_namespace_load();
+        if (uacpi_unlikely_error(ret)) {
+            k_printf("uacpi_namespace_load error: %s",
+       uacpi_status_to_string(ret));
+        }
 
-    ret = uacpi_namespace_load();
-    if (uacpi_unlikely_error(ret)) {
-        k_printf("uacpi_namespace_load error: %s", uacpi_status_to_string(ret));
-    }
+        ret = uacpi_namespace_initialize();
+        if (uacpi_unlikely_error(ret)) {
+            k_printf("uacpi_namespace_initialize error: %s",
+                     uacpi_status_to_string(ret));
+        }
 
-    ret = uacpi_namespace_initialize();
-    if (uacpi_unlikely_error(ret)) {
-        k_printf("uacpi_namespace_initialize error: %s",
-                 uacpi_status_to_string(ret));
-    }
-
-    ret = uacpi_finalize_gpe_initialization();
-    if (uacpi_unlikely_error(ret)) {
-        k_printf("uACPI GPE initialization error: %s",
-                 uacpi_status_to_string(ret));
-    }
-
+        ret = uacpi_finalize_gpe_initialization();
+        if (uacpi_unlikely_error(ret)) {
+            k_printf("uACPI GPE initialization error: %s",
+                     uacpi_status_to_string(ret));
+        }
+    */
     struct pci_device *devices;
     uint64_t count;
     scan_pci_devices(&devices, &count);
@@ -116,7 +120,8 @@ void k_main(void) {
     struct ext2_sblock superblock;
 
     if (read_ext2_superblock(&primary_master, 0, &superblock)) {
-        ext2_test(&primary_master, &superblock);
+        ext2_print_superblock(&superblock);
+        //        ext2_test(&primary_master, &superblock);
     }
 
     scheduler_init(&global_sched);

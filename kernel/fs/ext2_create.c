@@ -1,8 +1,8 @@
+#include <alloc.h>
 #include <fs/ext2.h>
 #include <printf.h>
 #include <stdint.h>
 #include <string.h>
-#include <vmalloc.h>
 
 struct link_ctx {
     char *name;
@@ -86,7 +86,7 @@ bool ext2_link_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
         return false;
     }
 
-    kfree(block_data, fs->block_size);
+    kfree(block_data);
     dir_inode->node.links_count += 1;
     return ext2_write_inode(fs, dir_inode->inode_num, &dir_inode->node);
 }

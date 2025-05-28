@@ -32,6 +32,8 @@ make run # run this in the build directory
 
     - [x] virtual memory allocator 
 
+    - [x] slab allocator
+
 - [x] do paging properly 
 
 ### "IO Intricacies" 

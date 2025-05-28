@@ -1,9 +1,9 @@
+#include <alloc.h>
 #include <printf.h>
 #include <stdint.h>
 #include <string.h>
 #include <vfs/ops.h>
 #include <vfs/vfs.h>
-#include <vmalloc.h>
 
 static struct vfs_node *root = NULL;
 
@@ -38,7 +38,7 @@ uint64_t vfs_write(struct vfs_node *node, const void *buf, size_t size,
 
         if (node->internal_data) {
             memcpy(new_data, node->internal_data, node->size);
-            kfree(node->internal_data, node->size);
+            kfree(node->internal_data);
         }
 
         if (offset > node->size) {
@@ -80,8 +80,8 @@ void vfs_delete_node(struct vfs_node *node) {
     if (!node)
         return;
 
-    kfree(node->name, strlen(node->name) + 1);
-    kfree(node, sizeof(struct vfs_node));
+    kfree(node->name);
+    kfree(node);
 }
 
 void vfs_init() {

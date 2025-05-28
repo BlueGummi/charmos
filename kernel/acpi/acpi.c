@@ -1,3 +1,4 @@
+#include <alloc.h>
 #include <idt.h>
 #include <io.h>
 #include <pmm.h>
@@ -8,7 +9,6 @@
 #include <uacpi/internal/types.h>
 #include <uacpi/status.h>
 #include <uacpi/uacpi.h>
-#include <vmalloc.h>
 #include <vmm.h>
 
 typedef struct { // typedefing it because of consistency with uacpi naming
@@ -68,16 +68,13 @@ void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
     uacpi_size page_aligned_len =
         (adjusted_len + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
 
-    unset_map_location(); // this makes malloc just return an aligned page
     void *base = kmalloc(page_aligned_len);
-    set_map_location(); // makes malloc revert to its original function
 
     for (uacpi_size i = 0; i < page_aligned_len; i += PAGE_SIZE) {
 
         vmm_map_page((uint64_t) base + i, aligned_addr + i,
                      PAGING_PRESENT | PAGING_WRITE);
     }
-    pmm_set_bit((uint64_t) aligned_addr / PAGE_SIZE);
     return (void *) ((uint8_t *) base + offset);
 }
 
@@ -92,9 +89,7 @@ void uacpi_kernel_unmap(void *addr, uacpi_size len) {
         vmm_unmap_page(aligned_addr + i);
     }
 
-    unset_map_location();
-    kfree((void *) aligned_addr, len);
-    set_map_location();
+    kfree((void *) aligned_addr);
 }
 
 void uacpi_kernel_log(uacpi_log_level level, const uacpi_char *data) {
@@ -104,14 +99,12 @@ void uacpi_kernel_log(uacpi_log_level level, const uacpi_char *data) {
 
 void *uacpi_kernel_alloc(uacpi_size size) {
 
-    set_map_location();
     void *x = kmalloc(size);
     return x;
 }
 
-void uacpi_kernel_free(void *mem, uacpi_size size_hint) {
-    set_map_location();
-    kfree(mem, (uint64_t) size_hint);
+void uacpi_kernel_free(void *mem) {
+    kfree(mem);
 }
 
 uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
@@ -151,7 +144,7 @@ void uacpi_kernel_pci_device_close(uacpi_handle handle) {
     }
 
     dev->is_open = false;
-    uacpi_kernel_free(dev, sizeof(uacpi_pci_device));
+    uacpi_kernel_free(dev);
 }
 
 uacpi_status uacpi_kernel_pci_read8(uacpi_handle device, uacpi_size offset,
@@ -337,7 +330,7 @@ uacpi_handle uacpi_kernel_create_mutex(void) {
 }
 void uacpi_kernel_free_mutex(uacpi_handle a) {
 
-    kfree(a, 8);
+    kfree(a);
 }
 uacpi_handle uacpi_kernel_create_event(void) {
 
@@ -345,7 +338,7 @@ uacpi_handle uacpi_kernel_create_event(void) {
 }
 void uacpi_kernel_free_event(uacpi_handle a) {
 
-    kfree(a, 8);
+    kfree(a);
 }
 uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle, uacpi_u16) {
 
@@ -432,7 +425,7 @@ uacpi_handle uacpi_kernel_create_spinlock(void) {
 
 void uacpi_kernel_free_spinlock(uacpi_handle a) {
 
-    kfree(a, sizeof(struct spinlock));
+    kfree(a);
 }
 
 uacpi_cpu_flags uacpi_kernel_lock_spinlock(uacpi_handle a) {

@@ -1,7 +1,7 @@
+#include <alloc.h>
 #include <fs/ext2.h>
 #include <printf.h>
 #include <stdint.h>
-#include <vmalloc.h>
 
 static bool find_free_bit(uint8_t *bitmap, uint32_t size, uint32_t *byte_pos,
                           uint32_t *bit_pos) {
@@ -94,13 +94,13 @@ bool ext2_free_block(struct ext2_fs *fs, uint32_t block_num) {
     bitmap[byte] &= ~bit;
     block_write(fs->drive, bitmap_block, bitmap, fs->sectors_per_block);
 
-    kfree(bitmap, fs->block_size);
+    kfree(bitmap);
 
     uint8_t *zero_buf = kzalloc(fs->block_size);
     if (zero_buf) {
         block_write(fs->drive, block_num * fs->sectors_per_block, zero_buf,
                     fs->sectors_per_block);
-        kfree(zero_buf, fs->block_size);
+        kfree(zero_buf);
     }
 
     fs->group_desc[group].free_blocks_count++;
@@ -150,7 +150,7 @@ bool ext2_free_inode(struct ext2_fs *fs, uint32_t inode_num) {
 
     bitmap[byte] &= ~bit;
     block_write(fs->drive, bitmap_block, bitmap, fs->sectors_per_block);
-    kfree(bitmap, fs->block_size);
+    kfree(bitmap);
 
     fs->group_desc[group].free_inodes_count++;
     fs->sblock->free_inodes_count++;

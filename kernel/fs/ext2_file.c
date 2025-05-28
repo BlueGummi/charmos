@@ -1,7 +1,7 @@
+#include <alloc.h>
 #include <fs/ext2.h>
 #include <printf.h>
 #include <string.h>
-#include <vmalloc.h>
 
 static uint32_t get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
                                  uint32_t block_index, uint32_t new_block_num,
@@ -48,7 +48,7 @@ static uint32_t get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
             if (new_block_num == 0) {
                 new_block_num = ext2_alloc_block(fs);
                 if (new_block_num == 0) {
-                    kfree(indirect_block, fs->block_size);
+                    kfree(indirect_block);
                     return 0;
                 }
             }
@@ -58,7 +58,7 @@ static uint32_t get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
             block_num = new_block_num;
         }
 
-        kfree(indirect_block, fs->block_size);
+        kfree(indirect_block);
         return block_num;
     }
 
@@ -85,12 +85,12 @@ static uint32_t get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
 
         if (double_indirect_block[first_index] == 0) {
             if (!allocate) {
-                kfree(double_indirect_block, fs->block_size);
+                kfree(double_indirect_block);
                 return 0;
             }
             double_indirect_block[first_index] = ext2_alloc_block(fs);
             if (double_indirect_block[first_index] == 0) {
-                kfree(double_indirect_block, fs->block_size);
+                kfree(double_indirect_block);
                 return 0;
             }
             block_ptr_write(fs, inode->block[13],
@@ -99,7 +99,7 @@ static uint32_t get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
 
         uint32_t *single_indirect_block = kmalloc(fs->block_size);
         if (!single_indirect_block) {
-            kfree(double_indirect_block, fs->block_size);
+            kfree(double_indirect_block);
             return 0;
         }
 
@@ -111,8 +111,8 @@ static uint32_t get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
             if (new_block_num == 0) {
                 new_block_num = ext2_alloc_block(fs);
                 if (new_block_num == 0) {
-                    kfree(single_indirect_block, fs->block_size);
-                    kfree(double_indirect_block, fs->block_size);
+                    kfree(single_indirect_block);
+                    kfree(double_indirect_block);
                     return 0;
                 }
             }
@@ -123,8 +123,8 @@ static uint32_t get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
             block_num = new_block_num;
         }
 
-        kfree(single_indirect_block, fs->block_size);
-        kfree(double_indirect_block, fs->block_size);
+        kfree(single_indirect_block);
+        kfree(double_indirect_block);
         return block_num;
     }
 
@@ -156,12 +156,12 @@ static uint32_t get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
 
         if (triple_indirect_block[first_index] == 0) {
             if (!allocate) {
-                kfree(triple_indirect_block, fs->block_size);
+                kfree(triple_indirect_block);
                 return 0;
             }
             triple_indirect_block[first_index] = ext2_alloc_block(fs);
             if (triple_indirect_block[first_index] == 0) {
-                kfree(triple_indirect_block, fs->block_size);
+                kfree(triple_indirect_block);
                 return 0;
             }
             block_ptr_write(fs, inode->block[14],
@@ -170,7 +170,7 @@ static uint32_t get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
 
         uint32_t *double_indirect_block = kmalloc(fs->block_size);
         if (!double_indirect_block) {
-            kfree(triple_indirect_block, fs->block_size);
+            kfree(triple_indirect_block);
             return 0;
         }
 
@@ -179,14 +179,14 @@ static uint32_t get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
 
         if (double_indirect_block[second_index] == 0) {
             if (!allocate) {
-                kfree(double_indirect_block, fs->block_size);
-                kfree(triple_indirect_block, fs->block_size);
+                kfree(double_indirect_block);
+                kfree(triple_indirect_block);
                 return 0;
             }
             double_indirect_block[second_index] = ext2_alloc_block(fs);
             if (double_indirect_block[second_index] == 0) {
-                kfree(double_indirect_block, fs->block_size);
-                kfree(triple_indirect_block, fs->block_size);
+                kfree(double_indirect_block);
+                kfree(triple_indirect_block);
                 return 0;
             }
             block_ptr_write(fs, triple_indirect_block[first_index],
@@ -195,8 +195,8 @@ static uint32_t get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
 
         uint32_t *single_indirect_block = kmalloc(fs->block_size);
         if (!single_indirect_block) {
-            kfree(double_indirect_block, fs->block_size);
-            kfree(triple_indirect_block, fs->block_size);
+            kfree(double_indirect_block);
+            kfree(triple_indirect_block);
             return 0;
         }
 
@@ -208,9 +208,9 @@ static uint32_t get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
             if (new_block_num == 0) {
                 new_block_num = ext2_alloc_block(fs);
                 if (new_block_num == 0) {
-                    kfree(single_indirect_block, fs->block_size);
-                    kfree(double_indirect_block, fs->block_size);
-                    kfree(triple_indirect_block, fs->block_size);
+                    kfree(single_indirect_block);
+                    kfree(double_indirect_block);
+                    kfree(triple_indirect_block);
                     return 0;
                 }
             }
@@ -226,9 +226,9 @@ static uint32_t get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
         block_ptr_write(fs, inode->block[14],
                         (uint8_t *) triple_indirect_block);
 
-        kfree(single_indirect_block, fs->block_size);
-        kfree(double_indirect_block, fs->block_size);
-        kfree(triple_indirect_block, fs->block_size);
+        kfree(single_indirect_block);
+        kfree(double_indirect_block);
+        kfree(triple_indirect_block);
         return block_num;
     }
 
@@ -276,7 +276,7 @@ bool ext2_write_file(struct ext2_fs *fs, struct k_full_inode *inode,
         memcpy(block_buf + block_offset, src + bytes_written, to_write);
         block_ptr_write(fs, block_num, block_buf);
 
-        kfree(block_buf, fs->block_size);
+        kfree(block_buf);
 
         bytes_written += to_write;
     }

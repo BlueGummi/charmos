@@ -1,3 +1,5 @@
+// NOTE: This is deprecated, use slab.c
+
 #include <pmm.h>
 #include <printf.h>
 #include <spin_lock.h>
@@ -6,8 +8,6 @@
 #include <string.h>
 #include <vmalloc.h>
 #include <vmm.h>
-
-// TODO: realloc
 
 uint64_t hhdm_offset;
 
@@ -120,7 +120,7 @@ static void *vmm_start_idx_alloc(const size_t count, size_t start_index) {
 /*
  * Allocate `count` consecutive pages
  */
-void *vmm_alloc_pages(const size_t count) {
+void *bitmap_alloc_pages(const size_t count) {
     if (count == 0 || count > vmm_allocator.free_pages) {
         return NULL;
     }
@@ -160,7 +160,7 @@ void *vmm_alloc_pages(const size_t count) {
 /*
  * Free `count` pages, starting from `addr`
  */
-void vmm_free_pages(void *addr, size_t count) {
+void bitmap_free_pages(void *addr, size_t count) {
     if ((uintptr_t) addr < vmm_allocator.base_address || count == 0) {
         // Freeing zero pages, nuh uh
         return;
@@ -193,25 +193,25 @@ void vmm_free_pages(void *addr, size_t count) {
             vmm_allocator.free_pages++;
         }
     }
-
 }
 
+/*
 void *kmalloc(size_t size) {
     if (size == 0)
         return NULL;
-    return vmm_alloc_pages((size + PAGE_SIZE - 1) / PAGE_SIZE);
+    return bitmap_alloc_pages((size + PAGE_SIZE - 1) / PAGE_SIZE);
 }
 
 void kfree(void *addr, size_t size) {
     if (size == 0 || addr == 0)
         return;
-    vmm_free_pages(addr, (size + PAGE_SIZE - 1) / PAGE_SIZE);
+    bitmap_free_pages(addr, (size + PAGE_SIZE - 1) / PAGE_SIZE);
 }
 
 void *kzalloc(size_t size) {
     if (size == 0)
         return NULL;
-    void *ret = vmm_alloc_pages((size + PAGE_SIZE - 1) / PAGE_SIZE);
+    void *ret = bitmap_alloc_pages((size + PAGE_SIZE - 1) / PAGE_SIZE);
     memset(ret, 0, size);
     return ret;
 }
@@ -224,7 +224,7 @@ void unset_map_location() {
     map_location = false;
 }
 
-void vmm_print_memory_status() {
+void bitmap_print_memory_status() {
     size_t total_pages = vmm_allocator.total_pages;
     size_t free_pages = vmm_allocator.free_pages;
     size_t allocated_pages = total_pages - free_pages;
@@ -265,4 +265,4 @@ void vmm_print_memory_status() {
     }
 
     k_printf("\n");
-}
+}*/
