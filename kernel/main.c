@@ -51,12 +51,12 @@ void k_main(void) {
     struct limine_hhdm_response *r = hhdm_request.response;
     k_printf("%s", OS_LOGO_SMALL);
     a_rsdp = rsdp_request.response->address;
-    /*struct limine_mp_response *mpr = mp_request.response;
+    struct limine_mp_response *mpr = mp_request.response;
 
-        for (uint64_t i = 0; i < mpr->cpu_count; i++) {
-            struct limine_mp_info *curr_cpu = mpr->cpus[i];
-            curr_cpu->goto_address = wakeup;
-        }*/
+    for (uint64_t i = 0; i < mpr->cpu_count; i++) {
+        struct limine_mp_info *curr_cpu = mpr->cpus[i];
+        curr_cpu->goto_address = wakeup;
+    }
 
     enable_smap_smep_umip();
     gdt_install();
@@ -68,7 +68,6 @@ void k_main(void) {
     slab_init();
     test_alloc();
 
-    /*
     for (uintptr_t virt = (uintptr_t) __slimine_requests;
          virt < (uintptr_t) __elimine_requests; virt += PAGE_SIZE) {
         uintptr_t phys = (uintptr_t) pmm_alloc_page(false);
@@ -81,38 +80,36 @@ void k_main(void) {
         vmm_map_page(virt, phys, PT_KERNEL_RW);
     }
 
-    core_data = vmm_alloc_pages(1);
+    core_data = kmalloc(sizeof(struct core) * mpr->cpu_count);
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
     cr3_ready = 1;
     while (current_cpu != mpr->cpu_count - 1) {
         asm volatile("pause");
     }
-    
-        tsc_freq = measure_tsc_freq_pit();
-        uacpi_status ret = uacpi_initialize(0);
-        if (uacpi_unlikely_error(ret)) {
-            k_printf("uacpi_initialize error: %s\n",
-       uacpi_status_to_string(ret));
-        }
 
-        ret = uacpi_namespace_load();
-        if (uacpi_unlikely_error(ret)) {
-            k_printf("uacpi_namespace_load error: %s",
-       uacpi_status_to_string(ret));
-        }
+    tsc_freq = measure_tsc_freq_pit();
+    uacpi_status ret = uacpi_initialize(0);
+    if (uacpi_unlikely_error(ret)) {
+        k_printf("uacpi_initialize error: %s\n", uacpi_status_to_string(ret));
+    }
 
-        ret = uacpi_namespace_initialize();
-        if (uacpi_unlikely_error(ret)) {
-            k_printf("uacpi_namespace_initialize error: %s",
-                     uacpi_status_to_string(ret));
-        }
+    ret = uacpi_namespace_load();
+    if (uacpi_unlikely_error(ret)) {
+        k_printf("uacpi_namespace_load error: %s", uacpi_status_to_string(ret));
+    }
 
-        ret = uacpi_finalize_gpe_initialization();
-        if (uacpi_unlikely_error(ret)) {
-            k_printf("uACPI GPE initialization error: %s",
-                     uacpi_status_to_string(ret));
-        }
-    */
+    ret = uacpi_namespace_initialize();
+    if (uacpi_unlikely_error(ret)) {
+        k_printf("uacpi_namespace_initialize error: %s",
+                 uacpi_status_to_string(ret));
+    }
+
+    ret = uacpi_finalize_gpe_initialization();
+    if (uacpi_unlikely_error(ret)) {
+        k_printf("uACPI GPE initialization error: %s",
+                 uacpi_status_to_string(ret));
+    }
+
     struct pci_device *devices;
     uint64_t count;
     scan_pci_devices(&devices, &count);
