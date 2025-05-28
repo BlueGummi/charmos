@@ -68,6 +68,7 @@ void k_main(void) {
     slab_init();
     test_alloc();
 
+    /*
     for (uintptr_t virt = (uintptr_t) __slimine_requests;
          virt < (uintptr_t) __elimine_requests; virt += PAGE_SIZE) {
         uintptr_t phys = (uintptr_t) pmm_alloc_page(false);
@@ -80,13 +81,13 @@ void k_main(void) {
         vmm_map_page(virt, phys, PT_KERNEL_RW);
     }
 
-    /*core_data = vmm_alloc_pages(1);
+    core_data = vmm_alloc_pages(1);
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
     cr3_ready = 1;
     while (current_cpu != mpr->cpu_count - 1) {
         asm volatile("pause");
-    }*/
-    /*
+    }
+    
         tsc_freq = measure_tsc_freq_pit();
         uacpi_status ret = uacpi_initialize(0);
         if (uacpi_unlikely_error(ret)) {
