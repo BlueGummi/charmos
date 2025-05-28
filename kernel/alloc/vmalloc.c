@@ -75,6 +75,8 @@ void vmm_bitmap_init(uintptr_t base_address, size_t total_pages) {
     }
 }
 
+static bool map_location = true;
+
 /*
  * Helper function once a viable start address in the map is found
  */
@@ -109,8 +111,8 @@ static void *vmm_start_idx_alloc(const size_t count, size_t start_index) {
             vmm_allocator.free_pages += count;
             return NULL;
         }
-
-        vmm_map_page(virt, phys, PT_KERNEL_RW);
+        if (map_location)
+            vmm_map_page(virt, phys, PT_KERNEL_RW);
     }
     return (void *) address;
 }
@@ -196,19 +198,30 @@ void vmm_free_pages(void *addr, size_t count) {
 void *kmalloc(size_t size) {
     if (size == 0)
         return NULL;
+    map_location = true;
     return vmm_alloc_pages((size + PAGE_SIZE - 1) / PAGE_SIZE);
 }
 
 void kfree(void *addr, size_t size) {
     if (size == 0)
         return;
+    map_location = true;
     vmm_free_pages(addr, (size + PAGE_SIZE - 1) / PAGE_SIZE);
 }
 
 void *kzalloc(size_t size) {
     if (size == 0)
         return NULL;
+    map_location = true;
     void *ret = vmm_alloc_pages((size + PAGE_SIZE - 1) / PAGE_SIZE);
     memset(ret, 0, size);
     return ret;
+}
+
+void set_map_location() {
+    map_location = true;
+}
+
+void unset_map_location() {
+    map_location = false;
 }

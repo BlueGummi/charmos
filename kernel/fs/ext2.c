@@ -129,26 +129,26 @@ void ext2_test(struct ide_drive *d, struct ext2_sblock *sblock) {
 
     struct k_full_inode *i = ext2_path_lookup(&fs, &root_inode, "/k");
     if (i) {
-        uint8_t *data =
-            (uint8_t
-                 *) "Lorem ipsum dolor sit amet, consectetur adipiscing elit. "
-                    "Curabitur ornare vulputate purus, ut condimentum mauris "
-                    "mattis ac. Nullam ut nisi lectus. Mauris luctus congue "
-                    "turpis ac aliquet. Phasellus congue velit sed magna "
-                    "aliquam, quis imperdiet felis bibendum. Cras justo "
-                    "ligula, pulvinar eget luctus egestas, laoreet id sem. "
-                    "Nulla sed ultrices metus, ultricies lobortis massa. Nunc "
-                    "tincidunt lobortis purus, hendrerit bibendum orci euismod "
-                    "vitae. Class aptent taciti sociosqu ad litora torquent "
-                    "per conubia nostra, per inceptos himenaeos. Morbi varius "
-                    "ornare orci nec imperdiet. Integer consectetur ultrices "
-                    "tellus, non vestibulum neque aliquam non. Nullam non nisl "
-                    "nec nulla lacinia euismod pretium a massa. Vestibulum "
-                    "ante ipsum primis in faucibus orci luctus et ultrices "
-                    "posuere cubilia curae; Quisque suscipit tempor tellus sit "
-                    "amet venenatis.";
+        char *data =
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit. "
+            "Curabitur ornare vulputate purus, ut condimentum mauris "
+            "mattis ac. Nullam ut nisi lectus. Mauris luctus congue "
+            "turpis ac aliquet. Phasellus congue velit sed magna "
+            "aliquam, quis imperdiet felis bibendum. Cras justo "
+            "ligula, pulvinar eget luctus egestas, laoreet id sem. "
+            "Nulla sed ultrices metus, ultricies lobortis massa. Nunc "
+            "tincidunt lobortis purus, hendrerit bibendum orci euismod "
+            "vitae. Class aptent taciti sociosqu ad litora torquent "
+            "per conubia nostra, per inceptos himenaeos. Morbi varius "
+            "ornare orci nec imperdiet. Integer consectetur ultrices "
+            "tellus, non vestibulum neque aliquam non. Nullam non nisl "
+            "nec nulla lacinia euismod pretium a massa. Vestibulum "
+            "ante ipsum primis in faucibus orci luctus et ultrices "
+            "posuere cubilia curae; Quisque suscipit tempor tellus sit "
+            "amet venenatis.";
+
         k_printf("B size is %u\n", fs.block_size);
-        ext2_write_file(&fs, i, 0, data, strlen(data));
+        ext2_write_file(&fs, i, 0, (uint8_t *) data, strlen(data));
         ext2_print_inode(i);
         ext2_dump_file_data(&fs, &i->node, 0, strlen(data));
         k_printf("Created inode number: %u\n", inode_num);

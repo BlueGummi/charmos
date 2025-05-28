@@ -12,7 +12,8 @@ void vmalloc_set_offset(uint64_t o);
 void *kmalloc(size_t size);
 void *kzalloc(size_t size);
 void kfree(void *addr, size_t size);
-
+void set_map_location();
+void unset_map_location();
 #define BITMAP_SIZE (1 << 20) // four giggybites
 #define BITS_PER_ENTRY (sizeof(uint64_t) * 8)
 

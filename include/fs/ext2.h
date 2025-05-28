@@ -35,6 +35,7 @@ extern uint64_t PTRS_PER_BLOCK;
         (void) entry;                                                          \
         (void) ctx_ptr;                                                        \
         (void) block_num;                                                      \
+        (void) entry_num;                                                      \
         return false;                                                          \
     }
 

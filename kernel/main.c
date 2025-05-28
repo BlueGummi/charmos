@@ -25,6 +25,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <thread.h>
+#include <uacpi/event.h>
+#include <uacpi/uacpi.h>
 #include <vfs/vfs.h>
 #include <vmalloc.h>
 #include <vmm.h>
@@ -38,9 +40,13 @@ void k_sch_main() {
     }
 }
 
+uint64_t a_rsdp = 0;
+
 void k_main(void) {
     k_printf_init(framebuffer_request.response->framebuffers[0]);
+    struct limine_hhdm_response *r = hhdm_request.response;
     k_printf("%s", OS_LOGO_SMALL);
+    a_rsdp = r->offset;
     struct limine_mp_response *mpr = mp_request.response;
 
     for (uint64_t i = 0; i < mpr->cpu_count; i++) {
@@ -51,11 +57,10 @@ void k_main(void) {
     enable_smap_smep_umip();
     gdt_install();
     idt_install();
-    struct limine_hhdm_response *r = hhdm_request.response;
     init_physical_allocator(r->offset, memmap_request);
     vmm_offset_set(r->offset);
     vmm_init();
-    vfs_init();
+    uacpi_initialize(0);
     test_alloc();
     core_data = vmm_alloc_pages(1);
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
@@ -74,6 +79,9 @@ void k_main(void) {
     if (read_ext2_superblock(&primary_master, 0, &superblock)) {
         ext2_test(&primary_master, &superblock);
     }
+
+    //   uacpi_namespace_load();
+    //   uacpi_namespace_initialize();
 
     scheduler_init(&global_sched);
     scheduler_add_thread(&global_sched, thread_create(k_sch_main));

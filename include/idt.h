@@ -1,7 +1,7 @@
 #include <stdint.h>
 
 #define IDT_ENTRIES 256
-
+#define MAX_IRQ 224
 #define PIC1_COMMAND 0x20
 #define PIC1_DATA 0x21
 #define PIC2_COMMAND 0xA0
@@ -33,6 +33,7 @@ struct idt_ptr {
 } __attribute__((packed));
 
 void idt_install();
+void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags);
 
 static inline void trigger_interrupt(uint8_t code) {
     asm volatile("int %0" : : "i"(code));
