@@ -36,7 +36,7 @@ make run # run this in the build directory
 
 ### "IO Intricacies" 
 
-- [ ] uACPI setup 
+- [x] uACPI setup 
 
     - [ ] :trophy: parse acpi tables 
 
