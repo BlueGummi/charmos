@@ -198,21 +198,18 @@ void vmm_free_pages(void *addr, size_t count) {
 void *kmalloc(size_t size) {
     if (size == 0)
         return NULL;
-    map_location = true;
     return vmm_alloc_pages((size + PAGE_SIZE - 1) / PAGE_SIZE);
 }
 
 void kfree(void *addr, size_t size) {
     if (size == 0)
         return;
-    map_location = true;
     vmm_free_pages(addr, (size + PAGE_SIZE - 1) / PAGE_SIZE);
 }
 
 void *kzalloc(size_t size) {
     if (size == 0)
         return NULL;
-    map_location = true;
     void *ret = vmm_alloc_pages((size + PAGE_SIZE - 1) / PAGE_SIZE);
     memset(ret, 0, size);
     return ret;

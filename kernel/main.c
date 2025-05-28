@@ -60,7 +60,11 @@ void k_main(void) {
     init_physical_allocator(r->offset, memmap_request);
     vmm_offset_set(r->offset);
     vmm_init();
-    uacpi_initialize(0);
+    uacpi_status ret = uacpi_initialize(0);
+    if (uacpi_unlikely_error(ret)) {
+        k_printf("uacpi_initialize error: %s\n", uacpi_status_to_string(ret));
+    }
+
     test_alloc();
     core_data = vmm_alloc_pages(1);
     asm volatile("mov %%cr3, %0" : "=r"(cr3));

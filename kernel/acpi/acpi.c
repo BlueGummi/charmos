@@ -60,13 +60,25 @@ uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
 }
 
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
-    addr &= ~0x1FF;
+    uacpi_phys_addr aligned_addr = addr & ~(PAGE_SIZE - 1);
+
+    uacpi_size offset = addr - aligned_addr;
+
+    uacpi_size adjusted_len = len + offset;
+
+    uacpi_size page_aligned_len =
+        (adjusted_len + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+
     unset_map_location();
-    void *a = kmalloc(len);
-    for (uint64_t i = 0; i < len; i += PAGE_SIZE) {
-        vmm_map_page((uint64_t) a + i, addr + i, PAGING_PRESENT | PAGING_WRITE);
+    void *base = kmalloc(page_aligned_len);
+    set_map_location();
+
+    for (uacpi_size i = 0; i < page_aligned_len; i += PAGE_SIZE) {
+        vmm_map_page((uint64_t) base + i, aligned_addr + i,
+                     PAGING_PRESENT | PAGING_WRITE);
     }
-    return a;
+
+    return (void *) ((uint8_t *) base + offset);
 }
 
 void uacpi_kernel_unmap(void *addr, uacpi_size len) {
