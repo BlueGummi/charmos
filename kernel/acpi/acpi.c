@@ -11,6 +11,8 @@
 #include <vmalloc.h>
 #include <vmm.h>
 
+#define DBG_PRINT_FNAME k_printf("%s(): I was called\n", __func__)
+
 typedef struct { // typedefing it because of consistency with uacpi naming
     uint8_t bus, slot, func;
     bool is_open;
@@ -32,7 +34,7 @@ static irq_entry_t irq_table[IDT_ENTRIES];
 extern uint64_t a_rsdp;
 
 static uacpi_io_handle global_io_handle;
-static uint64_t tsc_freq = 0;
+extern uint64_t tsc_freq;
 
 #define DEFINE_IRQ_HANDLER(n)                                                  \
     __attribute__((interrupt)) void irq##n##_entry(void *);                    \
@@ -42,8 +44,8 @@ static uint64_t tsc_freq = 0;
         }                                                                      \
     }
 #include "irq_handlers.h"
-
 void irq_common_handler(uint8_t irq_num) {
+    DBG_PRINT_FNAME;
     if (irq_num >= MAX_IRQ || !irq_table[irq_num].installed)
         return;
 
@@ -51,6 +53,7 @@ void irq_common_handler(uint8_t irq_num) {
 }
 
 uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
+    DBG_PRINT_FNAME;
     if (a_rsdp == 0) {
         k_printf("no rsdp set\n");
         return UACPI_STATUS_INTERNAL_ERROR;
@@ -60,6 +63,7 @@ uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
 }
 
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
+    DBG_PRINT_FNAME;
     uacpi_phys_addr aligned_addr = addr & ~(PAGE_SIZE - 1);
 
     uacpi_size offset = addr - aligned_addr;
@@ -82,6 +86,7 @@ void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
 }
 
 void uacpi_kernel_unmap(void *addr, uacpi_size len) {
+    DBG_PRINT_FNAME;
     uint64_t aligned_addr = (uint64_t) addr & ~(PAGE_SIZE - 1);
     uacpi_size offset = (uint64_t) addr - aligned_addr;
     uacpi_size adjusted_len = len + offset;
@@ -103,19 +108,23 @@ void uacpi_kernel_log(uacpi_log_level level, const uacpi_char *data) {
 }
 
 void *uacpi_kernel_alloc(uacpi_size size) {
+    DBG_PRINT_FNAME;
     return kmalloc(size);
 }
 
 void *uacpi_kernel_alloc_zeroed(uacpi_size size) {
+    DBG_PRINT_FNAME;
     return kzalloc(size);
 }
 
 void uacpi_kernel_free(void *mem, uacpi_size size_hint) {
+    DBG_PRINT_FNAME;
     kfree(mem, (uint64_t) size_hint);
 }
 
 uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
                                           uacpi_handle *out_handle) {
+    DBG_PRINT_FNAME;
     if (!out_handle)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
@@ -148,6 +157,8 @@ uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
 }
 
 void uacpi_kernel_pci_device_close(uacpi_handle handle) {
+
+    DBG_PRINT_FNAME;
     uacpi_pci_device *dev = (uacpi_pci_device *) handle;
 
     if (!dev->is_open) {
@@ -160,6 +171,7 @@ void uacpi_kernel_pci_device_close(uacpi_handle handle) {
 
 uacpi_status uacpi_kernel_pci_read8(uacpi_handle device, uacpi_size offset,
                                     uacpi_u8 *value) {
+    DBG_PRINT_FNAME;
     uacpi_pci_device *dev = (uacpi_pci_device *) device;
     if (!dev || !value || !dev->is_open || offset >= 256)
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -169,6 +181,7 @@ uacpi_status uacpi_kernel_pci_read8(uacpi_handle device, uacpi_size offset,
 
 uacpi_status uacpi_kernel_pci_read16(uacpi_handle device, uacpi_size offset,
                                      uacpi_u16 *value) {
+    DBG_PRINT_FNAME;
     uacpi_pci_device *dev = (uacpi_pci_device *) device;
     if (!dev || !value || !dev->is_open || offset >= 256 || (offset & 1))
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -179,6 +192,7 @@ uacpi_status uacpi_kernel_pci_read16(uacpi_handle device, uacpi_size offset,
 
 uacpi_status uacpi_kernel_pci_read32(uacpi_handle device, uacpi_size offset,
                                      uacpi_u32 *value) {
+    DBG_PRINT_FNAME;
     uacpi_pci_device *dev = (uacpi_pci_device *) device;
     if (!dev || !value || !dev->is_open || offset >= 256 || (offset & 3))
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -189,6 +203,7 @@ uacpi_status uacpi_kernel_pci_read32(uacpi_handle device, uacpi_size offset,
 
 uacpi_status uacpi_kernel_pci_write8(uacpi_handle device, uacpi_size offset,
                                      uacpi_u8 value) {
+    DBG_PRINT_FNAME;
     uacpi_pci_device *dev = (uacpi_pci_device *) device;
     if (!dev || !dev->is_open || offset >= 256)
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -199,6 +214,7 @@ uacpi_status uacpi_kernel_pci_write8(uacpi_handle device, uacpi_size offset,
 
 uacpi_status uacpi_kernel_pci_write16(uacpi_handle device, uacpi_size offset,
                                       uacpi_u16 value) {
+    DBG_PRINT_FNAME;
     uacpi_pci_device *dev = (uacpi_pci_device *) device;
     if (!dev || !dev->is_open || offset >= 256 || (offset & 1))
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -209,6 +225,7 @@ uacpi_status uacpi_kernel_pci_write16(uacpi_handle device, uacpi_size offset,
 
 uacpi_status uacpi_kernel_pci_write32(uacpi_handle device, uacpi_size offset,
                                       uacpi_u32 value) {
+    DBG_PRINT_FNAME;
     uacpi_pci_device *dev = (uacpi_pci_device *) device;
     if (!dev || !dev->is_open || offset >= 256 || (offset & 3))
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -219,6 +236,7 @@ uacpi_status uacpi_kernel_pci_write32(uacpi_handle device, uacpi_size offset,
 
 uacpi_status uacpi_kernel_io_map(uacpi_io_addr base, uacpi_size len,
                                  uacpi_handle *out_handle) {
+    DBG_PRINT_FNAME;
     if (!out_handle)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
@@ -231,12 +249,14 @@ uacpi_status uacpi_kernel_io_map(uacpi_io_addr base, uacpi_size len,
 }
 
 void uacpi_kernel_io_unmap(uacpi_handle handle) {
+    DBG_PRINT_FNAME;
     (void) handle;
     global_io_handle.valid = false;
 }
 
 uacpi_status uacpi_kernel_io_read8(uacpi_handle h, uacpi_size offset,
                                    uacpi_u8 *out) {
+    DBG_PRINT_FNAME;
     uacpi_io_handle *handle = (uacpi_io_handle *) h;
     if (!handle || !handle->valid || offset >= handle->len)
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -247,6 +267,7 @@ uacpi_status uacpi_kernel_io_read8(uacpi_handle h, uacpi_size offset,
 
 uacpi_status uacpi_kernel_io_read16(uacpi_handle h, uacpi_size offset,
                                     uacpi_u16 *out) {
+    DBG_PRINT_FNAME;
     uacpi_io_handle *handle = (uacpi_io_handle *) h;
     if (!handle || !handle->valid || (offset + 1) >= handle->len)
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -257,6 +278,7 @@ uacpi_status uacpi_kernel_io_read16(uacpi_handle h, uacpi_size offset,
 
 uacpi_status uacpi_kernel_io_read32(uacpi_handle h, uacpi_size offset,
                                     uacpi_u32 *out) {
+    DBG_PRINT_FNAME;
     uacpi_io_handle *handle = (uacpi_io_handle *) h;
     if (!handle || !handle->valid || (offset + 3) >= handle->len)
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -267,6 +289,7 @@ uacpi_status uacpi_kernel_io_read32(uacpi_handle h, uacpi_size offset,
 
 uacpi_status uacpi_kernel_io_write8(uacpi_handle h, uacpi_size offset,
                                     uacpi_u8 val) {
+    DBG_PRINT_FNAME;
     uacpi_io_handle *handle = (uacpi_io_handle *) h;
     if (!handle || !handle->valid || offset >= handle->len)
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -277,6 +300,7 @@ uacpi_status uacpi_kernel_io_write8(uacpi_handle h, uacpi_size offset,
 
 uacpi_status uacpi_kernel_io_write16(uacpi_handle h, uacpi_size offset,
                                      uacpi_u16 val) {
+    DBG_PRINT_FNAME;
     uacpi_io_handle *handle = (uacpi_io_handle *) h;
     if (!handle || !handle->valid || (offset + 1) >= handle->len)
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -287,6 +311,7 @@ uacpi_status uacpi_kernel_io_write16(uacpi_handle h, uacpi_size offset,
 
 uacpi_status uacpi_kernel_io_write32(uacpi_handle h, uacpi_size offset,
                                      uacpi_u32 val) {
+    DBG_PRINT_FNAME;
     uacpi_io_handle *handle = (uacpi_io_handle *) h;
     if (!handle || !handle->valid || (offset + 3) >= handle->len)
         return UACPI_STATUS_INVALID_ARGUMENT;
@@ -302,10 +327,12 @@ static inline uint64_t rdtsc(void) {
 }
 
 uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void) {
+    DBG_PRINT_FNAME;
     return (rdtsc() * 1000000000ull) / tsc_freq;
 }
 
 void uacpi_kernel_stall(uacpi_u8 usec) {
+    DBG_PRINT_FNAME;
     uint64_t start = rdtsc();
     uint64_t target = start + ((tsc_freq / 1000000ull) * usec);
 
@@ -313,47 +340,49 @@ void uacpi_kernel_stall(uacpi_u8 usec) {
         __asm__ volatile("pause");
 }
 
-void read_tsc_freq_cpuid() {
-    uint32_t eax, ebx, ecx;
-    __asm__ volatile("cpuid"
-                     : "=a"(eax), "=b"(ebx), "=c"(ecx)
-                     : "a"(0x15)
-                     : "edx");
-
-    if (eax != 0 && ebx != 0) {
-        tsc_freq = ((uint64_t) ecx * (uint64_t) ebx) / (uint64_t) eax;
-    }
-}
-
 void uacpi_kernel_sleep(uacpi_u64 msec) {
+    DBG_PRINT_FNAME;
     for (uacpi_u64 i = 0; i < msec * 10; ++i)
         uacpi_kernel_stall(100);
 }
 
 uacpi_handle uacpi_kernel_create_mutex(void) {
+    DBG_PRINT_FNAME;
     return kzalloc(8);
 }
 void uacpi_kernel_free_mutex(uacpi_handle a) {
+    DBG_PRINT_FNAME;
     kfree(a, 8);
 }
 uacpi_handle uacpi_kernel_create_event(void) {
+    DBG_PRINT_FNAME;
     return kzalloc(8);
 }
 void uacpi_kernel_free_event(uacpi_handle a) {
+    DBG_PRINT_FNAME;
     kfree(a, 8);
 }
 uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle, uacpi_u16) {
+    DBG_PRINT_FNAME;
     return UACPI_STATUS_OK;
 }
-void uacpi_kernel_release_mutex(uacpi_handle) {}
+void uacpi_kernel_release_mutex(uacpi_handle) {
+    DBG_PRINT_FNAME;
+}
 uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle, uacpi_u16) {
+    DBG_PRINT_FNAME;
     return false;
 }
-void uacpi_kernel_signal_event(uacpi_handle) {}
+void uacpi_kernel_signal_event(uacpi_handle) {
+    DBG_PRINT_FNAME;
+}
 
-void uacpi_kernel_reset_event(uacpi_handle) {}
+void uacpi_kernel_reset_event(uacpi_handle) {
+    DBG_PRINT_FNAME;
+}
 
 uacpi_status uacpi_kernel_handle_firmware_request(uacpi_firmware_request *) {
+    DBG_PRINT_FNAME;
     return UACPI_STATUS_UNIMPLEMENTED;
 }
 
@@ -366,6 +395,7 @@ void (*isr_trampolines[])(void *) = {
 uacpi_status uacpi_kernel_install_interrupt_handler(
     uacpi_u32 irq, uacpi_interrupt_handler handler, uacpi_handle ctx,
     uacpi_handle *out_irq_handle) {
+    DBG_PRINT_FNAME;
     if (irq >= IDT_ENTRIES)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
@@ -387,6 +417,7 @@ uacpi_status uacpi_kernel_install_interrupt_handler(
 uacpi_status
 uacpi_kernel_uninstall_interrupt_handler(uacpi_interrupt_handler handler,
                                          uacpi_handle irq_handle) {
+    DBG_PRINT_FNAME;
     uint32_t irq = (uint32_t) (uintptr_t) irq_handle;
     if (irq >= IDT_ENTRIES || !irq_table[irq].installed)
         return UACPI_STATUS_NOT_FOUND;
@@ -404,6 +435,7 @@ uacpi_kernel_uninstall_interrupt_handler(uacpi_interrupt_handler handler,
 }
 
 uacpi_thread_id uacpi_kernel_get_thread_id(void) {
+    DBG_PRINT_FNAME;
     uint32_t eax, ebx, ecx, edx;
 
     __asm__ volatile("cpuid"
@@ -414,25 +446,35 @@ uacpi_thread_id uacpi_kernel_get_thread_id(void) {
 }
 
 uacpi_handle uacpi_kernel_create_spinlock(void) {
+    DBG_PRINT_FNAME;
     struct spinlock *lock = kzalloc(sizeof(struct spinlock));
     return lock;
 }
 
 void uacpi_kernel_free_spinlock(uacpi_handle a) {
+    DBG_PRINT_FNAME;
     kfree(a, sizeof(struct spinlock));
 }
 
 uacpi_cpu_flags uacpi_kernel_lock_spinlock(uacpi_handle a) {
+    DBG_PRINT_FNAME;
     spin_lock((struct spinlock *) a);
     return 0;
 }
 
 void uacpi_kernel_unlock_spinlock(uacpi_handle a, uacpi_cpu_flags b) {
+    DBG_PRINT_FNAME;
     (void) b;
     spin_unlock((struct spinlock *) a);
 }
 
 uacpi_status uacpi_kernel_schedule_work(uacpi_work_type, uacpi_work_handler,
-                                        uacpi_handle ctx) {}
+                                        uacpi_handle) {
+    DBG_PRINT_FNAME;
+    return UACPI_STATUS_OK;
+}
 
-uacpi_status uacpi_kernel_wait_for_work_completion(void) {}
+uacpi_status uacpi_kernel_wait_for_work_completion(void) {
+    DBG_PRINT_FNAME;
+    return UACPI_STATUS_OK;
+}

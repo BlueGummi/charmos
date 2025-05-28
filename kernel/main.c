@@ -11,6 +11,7 @@
 #include <limine.h>
 #include <misc/logo.h>
 #include <mp.h>
+#include <pit.h>
 #include <pci.h>
 #include <pmm.h>
 #include <printf.h>
@@ -24,7 +25,6 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <string.h>
 #include <thread.h>
 #include <uacpi/event.h>
 #include <uacpi/uacpi.h>
@@ -42,6 +42,7 @@ void k_sch_main() {
 }
 
 uint64_t a_rsdp = 0;
+uint64_t tsc_freq = 0;
 
 void k_main(void) {
     k_printf_init(framebuffer_request.response->framebuffers[0]);
@@ -62,9 +63,24 @@ void k_main(void) {
     vmm_offset_set(r->offset);
     vmm_init();
 
+    tsc_freq = measure_tsc_freq_pit();
     uacpi_status ret = uacpi_initialize(0);
     if (uacpi_unlikely_error(ret)) {
         k_printf("uacpi_initialize error: %s\n", uacpi_status_to_string(ret));
+    }
+    ret = uacpi_namespace_load();
+    if (uacpi_unlikely_error(ret)) {
+        k_printf("uacpi_namespace_load error: %s", uacpi_status_to_string(ret));
+    }
+    ret = uacpi_namespace_initialize();
+    if (uacpi_unlikely_error(ret)) {
+        k_printf("uacpi_namespace_initialize error: %s",
+                 uacpi_status_to_string(ret));
+    }
+    ret = uacpi_finalize_gpe_initialization();
+    if (uacpi_unlikely_error(ret)) {
+        k_printf("uACPI GPE initialization error: %s",
+                 uacpi_status_to_string(ret));
     }
 
     test_alloc();

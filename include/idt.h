@@ -27,6 +27,8 @@ struct idt_entry {
     uint32_t reserved;
 } __attribute__((packed));
 
+extern struct idt_entry idt[IDT_ENTRIES];
+
 struct idt_ptr {
     uint16_t limit;
     uint64_t base;
