@@ -23,9 +23,7 @@ void vmalloc_set_offset(uint64_t o) {
  * Return 1 if the bit at an index is on, else 0 in the VMM bitmap
  */
 static bool bitmap_test_bit(size_t index) {
-
     return (vmm_allocator.bitmap[index / BITS_PER_ENTRY] &
-
             (1ULL << (index % BITS_PER_ENTRY))) != 0;
 }
 
@@ -208,7 +206,7 @@ void *kmalloc(size_t size) {
 }
 
 void kfree(void *addr, size_t size) {
-    if (size == 0)
+    if (size == 0 || addr == 0)
         return;
     vmm_free_pages(addr, (size + PAGE_SIZE - 1) / PAGE_SIZE);
 }

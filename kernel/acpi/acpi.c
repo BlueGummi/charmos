@@ -135,12 +135,6 @@ uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
     uint8_t slot = address.device;
     uint8_t func = address.function;
 
-    uint16_t vendor_id = pci_read_word(bus, slot, func, 0x00);
-    if (vendor_id == 0xFFFF) {
-        k_printf("PCI device %02x:%02x.%x does not exist\n", bus, slot, func);
-        return UACPI_STATUS_NOT_FOUND;
-    }
-
     uacpi_pci_device *dev = uacpi_kernel_alloc_zeroed(sizeof(*dev));
     if (!dev)
         return UACPI_STATUS_OUT_OF_MEMORY;
