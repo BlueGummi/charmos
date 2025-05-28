@@ -24,6 +24,7 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 #include <thread.h>
 #include <uacpi/event.h>
 #include <uacpi/uacpi.h>
@@ -46,7 +47,7 @@ void k_main(void) {
     k_printf_init(framebuffer_request.response->framebuffers[0]);
     struct limine_hhdm_response *r = hhdm_request.response;
     k_printf("%s", OS_LOGO_SMALL);
-    a_rsdp = r->offset;
+    a_rsdp = rsdp_request.response->address;
     struct limine_mp_response *mpr = mp_request.response;
 
     for (uint64_t i = 0; i < mpr->cpu_count; i++) {
@@ -60,6 +61,7 @@ void k_main(void) {
     init_physical_allocator(r->offset, memmap_request);
     vmm_offset_set(r->offset);
     vmm_init();
+
     uacpi_status ret = uacpi_initialize(0);
     if (uacpi_unlikely_error(ret)) {
         k_printf("uacpi_initialize error: %s\n", uacpi_status_to_string(ret));

@@ -93,7 +93,9 @@ static void *vmm_start_idx_alloc(const size_t count, size_t start_index) {
     for (size_t k = 0; k < count; k++) {
 
         uintptr_t virt = address + (k * PAGE_SIZE);
-        uintptr_t phys = (uintptr_t) pmm_alloc_page(false);
+        uintptr_t phys = 0;
+        if (map_location)
+            phys = (uintptr_t) pmm_alloc_page(false);
 
         // Allocation failed
         if (phys == (uintptr_t) -1) {
@@ -177,14 +179,18 @@ void vmm_free_pages(void *addr, size_t count) {
         return;
     }
 
-    if (phys != (uintptr_t) -1) {
-        pmm_free_pages((void *) phys, count, false);
+    if (map_location) {
+        if (phys != (uintptr_t) -1) {
+            pmm_free_pages((void *) phys, count, false);
+        }
     }
 
     for (size_t i = 0; i < count; i++) {
 
         uintptr_t virt = address + (i * PAGE_SIZE);
-        vmm_unmap_page(virt);
+        if (map_location)
+            vmm_unmap_page(virt);
+
         if (bitmap_test_bit(start_index + i)) {
 
             bitmap_clear_bit(start_index + i);

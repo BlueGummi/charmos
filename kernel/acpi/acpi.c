@@ -69,9 +69,9 @@ void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
     uacpi_size page_aligned_len =
         (adjusted_len + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
 
-    unset_map_location();
+    unset_map_location(); // this makes malloc just return an aligned page
     void *base = kmalloc(page_aligned_len);
-    set_map_location();
+    set_map_location(); // makes malloc revert to its original function
 
     for (uacpi_size i = 0; i < page_aligned_len; i += PAGE_SIZE) {
         vmm_map_page((uint64_t) base + i, aligned_addr + i,
@@ -82,9 +82,19 @@ void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
 }
 
 void uacpi_kernel_unmap(void *addr, uacpi_size len) {
-    for (uint64_t i = 0; i < (uint64_t) len / 4096; i++) {
-        vmm_unmap_page((uint64_t) addr);
+    uint64_t aligned_addr = (uint64_t) addr & ~(PAGE_SIZE - 1);
+    uacpi_size offset = (uint64_t) addr - aligned_addr;
+    uacpi_size adjusted_len = len + offset;
+    uacpi_size page_aligned_len =
+        (adjusted_len + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+
+    for (uint64_t i = 0; i < page_aligned_len; i += PAGE_SIZE) {
+        vmm_unmap_page(aligned_addr + i);
     }
+
+    unset_map_location();
+    kfree((void *) aligned_addr, len);
+    set_map_location();
 }
 
 void uacpi_kernel_log(uacpi_log_level level, const uacpi_char *data) {
@@ -320,18 +330,32 @@ void uacpi_kernel_sleep(uacpi_u64 msec) {
         uacpi_kernel_stall(100);
 }
 
-uacpi_handle uacpi_kernel_create_mutex(void) {}
-void uacpi_kernel_free_mutex(uacpi_handle) {}
-uacpi_handle uacpi_kernel_create_event(void) {}
-void uacpi_kernel_free_event(uacpi_handle) {}
-uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle, uacpi_u16) {}
+uacpi_handle uacpi_kernel_create_mutex(void) {
+    return kzalloc(8);
+}
+void uacpi_kernel_free_mutex(uacpi_handle a) {
+    kfree(a, 8);
+}
+uacpi_handle uacpi_kernel_create_event(void) {
+    return kzalloc(8);
+}
+void uacpi_kernel_free_event(uacpi_handle a) {
+    kfree(a, 8);
+}
+uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle, uacpi_u16) {
+    return UACPI_STATUS_OK;
+}
 void uacpi_kernel_release_mutex(uacpi_handle) {}
-uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle, uacpi_u16) {}
+uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle, uacpi_u16) {
+    return false;
+}
 void uacpi_kernel_signal_event(uacpi_handle) {}
 
 void uacpi_kernel_reset_event(uacpi_handle) {}
 
-uacpi_status uacpi_kernel_handle_firmware_request(uacpi_firmware_request *) {}
+uacpi_status uacpi_kernel_handle_firmware_request(uacpi_firmware_request *) {
+    return UACPI_STATUS_UNIMPLEMENTED;
+}
 
 void (*isr_trampolines[])(void *) = {
 #define X(n) [n] = irq##n##_entry,
