@@ -127,37 +127,27 @@ void ext2_test(struct ide_drive *d, struct ext2_sblock *sblock) {
         return;
     }
 
-    struct k_full_inode *i = ext2_path_lookup(&fs, &root_inode, "/k/");
+    struct k_full_inode *i = ext2_path_lookup(&fs, &root_inode, "/k");
     if (i) {
         uint8_t *data =
             (uint8_t
-                 *) "The missile knows where it is at all times. It knows this "
-                    "because it knows where it isn't, by subtracting where it "
-                    "is, from where it isn't, or where it isn't, from where it "
-                    "is, whichever is greater, it obtains a difference, or "
-                    "deviation. The guidance sub-system uses deviations to "
-                    "generate corrective commands to drive the missile from a "
-                    "position where it is, to a position where it isn't, and "
-                    "arriving at a position where it wasn't, it now is. "
-                    "Consequently, the position where it is, is now the "
-                    "position that it wasn't, and it follows that the position "
-                    "where it was, is now the position that it isn't. In the "
-                    "event of the position that it is in is not the position "
-                    "that it wasn't, the system has required a variation. The "
-                    "variation being the difference between where the missile "
-                    "is, and where it wasn't. If variation is considered to be "
-                    "a significant factor, it too, may be corrected by the "
-                    "GEA. However, the missile must also know where it was. "
-                    "The missile guidance computance scenario works as "
-                    "follows: Because a variation has modified some of the "
-                    "information the missile has obtained, it is not sure just "
-                    "where it is, however it is sure where it isn't, within "
-                    "reason, and it knows where it was. It now subracts where "
-                    "it should be, from where it wasn't, or vice versa. By "
-                    "differentiating this from the algebraic sum og where it "
-                    "shouldn't be, and where it was. It is able to obtain a "
-                    "deviation, and a variation, which is called \"air\"";
-
+                 *) "Lorem ipsum dolor sit amet, consectetur adipiscing elit. "
+                    "Curabitur ornare vulputate purus, ut condimentum mauris "
+                    "mattis ac. Nullam ut nisi lectus. Mauris luctus congue "
+                    "turpis ac aliquet. Phasellus congue velit sed magna "
+                    "aliquam, quis imperdiet felis bibendum. Cras justo "
+                    "ligula, pulvinar eget luctus egestas, laoreet id sem. "
+                    "Nulla sed ultrices metus, ultricies lobortis massa. Nunc "
+                    "tincidunt lobortis purus, hendrerit bibendum orci euismod "
+                    "vitae. Class aptent taciti sociosqu ad litora torquent "
+                    "per conubia nostra, per inceptos himenaeos. Morbi varius "
+                    "ornare orci nec imperdiet. Integer consectetur ultrices "
+                    "tellus, non vestibulum neque aliquam non. Nullam non nisl "
+                    "nec nulla lacinia euismod pretium a massa. Vestibulum "
+                    "ante ipsum primis in faucibus orci luctus et ultrices "
+                    "posuere cubilia curae; Quisque suscipit tempor tellus sit "
+                    "amet venenatis.";
+        k_printf("B size is %u\n", fs.block_size);
         ext2_write_file(&fs, i, 0, data, strlen(data));
         ext2_print_inode(i);
         ext2_dump_file_data(&fs, &i->node, 0, strlen(data));

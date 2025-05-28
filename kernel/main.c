@@ -32,7 +32,7 @@
 struct scheduler global_sched;
 
 void k_sch_main() {
-    k_printf("Welcome to the idle task!\n");
+    k_printf("idle task\n");
     while (1) {
         asm volatile("hlt");
     }
@@ -40,7 +40,7 @@ void k_sch_main() {
 
 void k_main(void) {
     k_printf_init(framebuffer_request.response->framebuffers[0]);
-    k_printf("%s", OS_LOGO);
+    k_printf("%s", OS_LOGO_SMALL);
     struct limine_mp_response *mpr = mp_request.response;
 
     for (uint64_t i = 0; i < mpr->cpu_count; i++) {

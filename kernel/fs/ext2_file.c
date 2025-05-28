@@ -250,8 +250,9 @@ bool ext2_write_file(struct ext2_fs *fs, struct k_full_inode *inode,
         bool allocate = (size - bytes_written > 0);
         uint32_t block_num = get_or_set_block(fs, &inode->node, block_index, 0,
                                               allocate, &new_block);
-        if (new_block)
+        if (new_block) {
             new_block_counter += 1;
+        }
 
         if (block_num == 0 && allocate) {
             return false;
@@ -277,13 +278,11 @@ bool ext2_write_file(struct ext2_fs *fs, struct k_full_inode *inode,
 
         kfree(block_buf, fs->block_size);
 
-        k_printf("wrote %u bytes\n", to_write);
-        k_printf("bytes written is %u and size is %u\n", bytes_written, size);
         bytes_written += to_write;
     }
 
     inode->node.size = offset + size;
-    inode->node.blocks += new_block_counter;
+    inode->node.blocks += new_block_counter * (fs->block_size / 512);
 
     return ext2_write_inode(fs, inode->inode_num, &inode->node);
 }

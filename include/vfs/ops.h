@@ -10,7 +10,7 @@ struct vnode_ops {
     int (*mkdir)(struct vfs_node *vn, const char *name);
     int (*unlink)(struct vfs_node *vn);
     int (*lookup)(struct vfs_node *vn, const char *name,
-                               struct vfs_node **result);
+                  struct vfs_node **result);
 };
 
 #pragma once

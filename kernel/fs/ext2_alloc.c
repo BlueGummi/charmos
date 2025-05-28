@@ -130,7 +130,7 @@ bool ext2_free_inode(struct ext2_fs *fs, uint32_t inode_num) {
     if (!fs || inode_num == 0)
         return false;
 
-    inode_num -= 1; 
+    inode_num -= 1;
     uint32_t group = inode_num / fs->inodes_per_group;
     uint32_t index = inode_num % fs->inodes_per_group;
 

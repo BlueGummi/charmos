@@ -39,5 +39,3 @@ void fat32_print_dirent(const struct fat_dirent *ent) {
     k_printf("Dirent: %-11s | Attr: 0x%02x | Cluster: %u | Size: %u\n", name,
              ent->attr, cluster, ent->filesize);
 }
-
-

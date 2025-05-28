@@ -41,4 +41,3 @@ void ptime(uint64_t timestamp) {
     k_printf("%04d-%02d-%02d %02d:%02d:%02d\n", year, month + 1, day, hour,
              minute, second);
 }
-
