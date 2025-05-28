@@ -72,7 +72,6 @@ void *pmm_alloc_page(bool add_offset) {
  * Used for debug and log.
  */
 void print_memory_status() {
-
     size_t total_pages = BITMAP_SIZE * 8;
     size_t free_pages = 0;
     size_t allocated_pages = 0;
@@ -91,13 +90,27 @@ void print_memory_status() {
     k_printf("  Allocated Pages: %zu\n", allocated_pages);
     k_printf("  Memory Usage: %d%%\n", (allocated_pages * 100) / total_pages);
 
-    k_printf("\nDetailed Allocation Map:\n");
-    for (size_t i = 0; i < total_pages; i++) {
-        if (i % 64 == 0) {
-            k_printf("\n");
+    k_printf("\nMemory Segments (contiguous):\n");
+
+    size_t segment_start = 0;
+    int segment_state = test_bit(0);
+
+    for (size_t i = 1; i <= total_pages; i++) {
+        int current_state = (i < total_pages) ? test_bit(i) : -1;
+        if (current_state != segment_state) {
+
+            uintptr_t start_addr = segment_start * PAGE_SIZE;
+            uintptr_t end_addr = (i - 1) * PAGE_SIZE + PAGE_SIZE - 1;
+
+            k_printf("  %c: 0x%016lx - 0x%016lx (%zu pages)\n",
+                     segment_state ? 'A' : 'F', (unsigned long) start_addr,
+                     (unsigned long) end_addr, i - segment_start);
+
+            segment_start = i;
+            segment_state = current_state;
         }
-        k_printf("%c", test_bit(i) ? 'X' : '.');
     }
+
     k_printf("\n");
 }
 

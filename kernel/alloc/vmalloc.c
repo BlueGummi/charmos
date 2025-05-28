@@ -228,3 +228,46 @@ void set_map_location() {
 void unset_map_location() {
     map_location = false;
 }
+
+void vmm_print_memory_status() {
+    size_t total_pages = vmm_allocator.total_pages;
+    size_t free_pages = vmm_allocator.free_pages;
+    size_t allocated_pages = total_pages - free_pages;
+
+    k_printf("VMM Memory Status:\n");
+    k_printf("  Total Pages: %zu\n", total_pages);
+    k_printf("  Free Pages: %zu\n", free_pages);
+    k_printf("  Allocated Pages: %zu\n", allocated_pages);
+    k_printf("  Memory Usage: %d%%\n", (allocated_pages * 100) / total_pages);
+
+    k_printf("\nMemory Segments (contiguous):\n");
+
+    if (total_pages == 0) {
+        k_printf("  (No pages managed)\n");
+        return;
+    }
+
+    size_t segment_start = 0;
+    bool segment_state = bitmap_test_bit(0);
+
+    for (size_t i = 1; i <= total_pages; i++) {
+        bool current_state =
+            (i < total_pages) ? bitmap_test_bit(i) : !segment_state;
+
+        if (current_state != segment_state) {
+            uintptr_t start_addr =
+                vmm_allocator.base_address + segment_start * PAGE_SIZE;
+            uintptr_t end_addr = vmm_allocator.base_address +
+                                 (i - 1) * PAGE_SIZE + PAGE_SIZE - 1;
+
+            k_printf("  %c: 0x%016lx - 0x%016lx (%zu pages)\n",
+                     segment_state ? 'A' : 'F', (unsigned long) start_addr,
+                     (unsigned long) end_addr, i - segment_start);
+
+            segment_start = i;
+            segment_state = current_state;
+        }
+    }
+
+    k_printf("\n");
+}

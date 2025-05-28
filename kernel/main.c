@@ -58,16 +58,19 @@ void k_main(void) {
 
     enable_smap_smep_umip();
     gdt_install();
-    idt_install();
+//    idt_install();
     init_physical_allocator(r->offset, memmap_request);
+    print_memory_status();
     vmm_offset_set(r->offset);
     vmm_init();
 
     tsc_freq = measure_tsc_freq_pit();
+    vmm_print_memory_status();
     uacpi_status ret = uacpi_initialize(0);
     if (uacpi_unlikely_error(ret)) {
         k_printf("uacpi_initialize error: %s\n", uacpi_status_to_string(ret));
     }
+    vmm_print_memory_status();
     ret = uacpi_namespace_load();
     if (uacpi_unlikely_error(ret)) {
         k_printf("uacpi_namespace_load error: %s", uacpi_status_to_string(ret));
