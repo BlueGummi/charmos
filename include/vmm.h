@@ -1,14 +1,14 @@
 #include <printf.h>
 #include <stdint.h>
-#define PAGING_PRESENT (0x1L)
-#define PAGING_WRITE (0x2L)
-#define PAGING_USER_ALLOWED (0x4L)
-#define PAGING_ALL 0xFFF
+#define PAGING_PRESENT (0x1UL)
+#define PAGING_WRITE (0x2UL)
+#define PAGING_USER_ALLOWED (0x4UL)
+#define PAGING_ALL 0xFFFUL
 #define PAGING_EXECUTABLE 0x80000000
-#define PAGING_XD (1L << 63) // E(x)ecute (D)isable
-#define PAGING_PHYS_MASK (0x00FFFFFFF000)
-#define PAGING_PAGE_SIZE (1L << 7)
-#define PAGING_UNCACHABLE (1L << 4)
+#define PAGING_XD (1UL << 63) // E(x)ecute (D)isable
+#define PAGING_PHYS_MASK (0x00FFFFFFF000UL)
+#define PAGING_PAGE_SIZE (1UL << 7)
+#define PAGING_UNCACHABLE (1UL << 4)
 #define PAGE_SIZE 4096
 #define SUB_HHDM_OFFSET(v) (v - hhdm_offset)
 #define PT_KERNEL_RO (PAGING_PRESENT | PAGING_XD)

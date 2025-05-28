@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <uacpi/event.h>
 #include <uacpi/internal/types.h>
+#include <uacpi/platform/arch_helpers.h>
 #include <uacpi/status.h>
 #include <uacpi/uacpi.h>
 #include <vmm.h>
@@ -407,14 +408,7 @@ uacpi_kernel_uninstall_interrupt_handler(uacpi_interrupt_handler handler,
 }
 
 uacpi_thread_id uacpi_kernel_get_thread_id(void) {
-
-    uint32_t eax, ebx, ecx, edx;
-
-    __asm__ volatile("cpuid"
-                     : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
-                     : "a"(1), "c"(0));
-
-    return (uacpi_thread_id) ((ebx >> 24) & 0xFF);
+    return (uacpi_thread_id) 0;
 }
 
 uacpi_handle uacpi_kernel_create_spinlock(void) {

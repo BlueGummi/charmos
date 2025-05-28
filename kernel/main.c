@@ -60,7 +60,7 @@ void k_main(void) {
 
     enable_smap_smep_umip();
     gdt_install();
-    //    idt_install();
+    idt_install();
     init_physical_allocator(r->offset, memmap_request);
     print_memory_status();
     vmm_offset_set(r->offset);
