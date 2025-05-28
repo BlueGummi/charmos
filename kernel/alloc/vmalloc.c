@@ -166,8 +166,6 @@ void vmm_free_pages(void *addr, size_t count) {
         return;
     }
 
-    spin_lock(&vmalloc_lock);
-
     const uintptr_t address = (uintptr_t) addr;
     const uintptr_t phys = vmm_get_phys(address);
 
@@ -196,7 +194,6 @@ void vmm_free_pages(void *addr, size_t count) {
         }
     }
 
-    spin_unlock(&vmalloc_lock);
 }
 
 void *kmalloc(size_t size) {

@@ -42,7 +42,6 @@ void wakeup() {
     current_core->state = IDLE;
     current_core->current_thread = NULL;
     core_data[cpu] = current_core;
-    k_printf("Core %d waking up...\n", cpu);
     spin_unlock(&wakeup_lock);
 
     while (1) {

@@ -1,4 +1,5 @@
 #include <limine.h>
+#include <misc/linker_consts.h>
 #include <pmm.h>
 #include <printf.h>
 #include <spin_lock.h>
@@ -86,19 +87,10 @@ void vmm_init() {
         }
     }
 
-    /*  extern uint64_t __stext[], __etext[];
-        extern uint64_t __srodata[], __erodata[];
-        extern uint64_t __sdata[], __edata[];
-        extern uint64_t __sbss[], __ebss[];*/
-    extern uint64_t __slimine_requests[], __elimine_requests[];
 
-    for (uintptr_t virt = (uintptr_t) __slimine_requests;
-         virt < (uintptr_t) __elimine_requests; virt += PAGE_SIZE) {
-        uintptr_t phys = (uintptr_t) pmm_alloc_page(false);
-        vmm_map_page(virt, phys, PT_KERNEL_RW);
-    }
     vmm_copy_kernel_mappings(0xffffffffc0000000);
     vmm_bitmap_init(0xffff800000000000, 0x100000); // TODO: Make this dynamic
+
     asm volatile("mov %0, %%cr3" : : "r"(kernel_pml4_phys) : "memory");
 }
 

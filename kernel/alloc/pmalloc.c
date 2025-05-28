@@ -124,7 +124,7 @@ void *pmm_alloc_pages(size_t count, bool add_offset) {
     }
 
     if (count == 1) {
-        return pmm_alloc_page(false);
+        return pmm_alloc_page(add_offset);
     }
 
     size_t consecutive = 0;
@@ -190,4 +190,8 @@ void pmm_free_pages(void *addr, size_t count, bool has_offset) {
                      offset + (index * PAGE_SIZE));
         }
     }
+}
+
+void pmm_set_bit(uint64_t a){
+    set_bit(a);
 }

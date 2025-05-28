@@ -3,6 +3,8 @@
 #define PAGING_PRESENT (0x1L)
 #define PAGING_WRITE (0x2L)
 #define PAGING_USER_ALLOWED (0x4L)
+#define PAGING_ALL 0xFFF
+#define PAGING_EXECUTABLE 0x80000000
 #define PAGING_XD (1L << 63) // E(x)ecute (D)isable
 #define PAGING_PHYS_MASK (0x00FFFFFFF000)
 #define PAGING_PAGE_SIZE (1L << 7)

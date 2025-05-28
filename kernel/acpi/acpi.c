@@ -63,11 +63,8 @@ uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
 
     uacpi_phys_addr aligned_addr = addr & ~(PAGE_SIZE - 1);
-
     uacpi_size offset = addr - aligned_addr;
-
     uacpi_size adjusted_len = len + offset;
-
     uacpi_size page_aligned_len =
         (adjusted_len + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
 
@@ -76,15 +73,15 @@ void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
     set_map_location(); // makes malloc revert to its original function
 
     for (uacpi_size i = 0; i < page_aligned_len; i += PAGE_SIZE) {
+
         vmm_map_page((uint64_t) base + i, aligned_addr + i,
                      PAGING_PRESENT | PAGING_WRITE);
     }
-
+    pmm_set_bit((uint64_t) aligned_addr / PAGE_SIZE);
     return (void *) ((uint8_t *) base + offset);
 }
 
 void uacpi_kernel_unmap(void *addr, uacpi_size len) {
-
     uint64_t aligned_addr = (uint64_t) addr & ~(PAGE_SIZE - 1);
     uacpi_size offset = (uint64_t) addr - aligned_addr;
     uacpi_size adjusted_len = len + offset;
@@ -107,16 +104,13 @@ void uacpi_kernel_log(uacpi_log_level level, const uacpi_char *data) {
 
 void *uacpi_kernel_alloc(uacpi_size size) {
 
-    return kmalloc(size);
-}
-
-void *uacpi_kernel_alloc_zeroed(uacpi_size size) {
-
-    return kzalloc(size);
+    set_map_location();
+    void *x = kmalloc(size);
+    return x;
 }
 
 void uacpi_kernel_free(void *mem, uacpi_size size_hint) {
-
+    set_map_location();
     kfree(mem, (uint64_t) size_hint);
 }
 
@@ -135,7 +129,7 @@ uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
     uint8_t slot = address.device;
     uint8_t func = address.function;
 
-    uacpi_pci_device *dev = uacpi_kernel_alloc_zeroed(sizeof(*dev));
+    uacpi_pci_device *dev = kzalloc(sizeof(*dev));
     if (!dev)
         return UACPI_STATUS_OUT_OF_MEMORY;
 
