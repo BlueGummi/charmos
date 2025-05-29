@@ -40,7 +40,7 @@ make run # run this in the build directory
 
 - [x] uACPI setup 
 
-    - [ ] :trophy: parse acpi tables 
+    - [x] :trophy: parse acpi tables 
 
 - [x] handle other interrupts + add some 
 
