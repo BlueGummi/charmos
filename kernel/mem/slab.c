@@ -7,6 +7,13 @@
 struct slab_cache slab_caches[SLAB_CLASS_COUNT];
 uintptr_t slab_heap_top = 0xFFFF800000000000;
 
+#define KMALLOC_PAGE_MAGIC 0xC0FFEE42
+
+struct kmalloc_page_header {
+    uint32_t magic;
+    size_t pages;
+};
+
 static void *slab_map_new_page() {
     uintptr_t phys = (uintptr_t) pmm_alloc_pages(1, false);
     if (!phys) {
@@ -156,10 +163,31 @@ void slab_init() {
 void *kmalloc(size_t size) {
     if (size == 0)
         return NULL;
+
     int idx = size_to_index(size);
-    if (idx < 0)
+    if (idx >= 0) {
+        return slab_alloc(&slab_caches[idx]);
+    }
+
+    size_t total_size = size + sizeof(struct kmalloc_page_header);
+    size_t pages = (total_size + PAGE_SIZE - 1) / PAGE_SIZE;
+
+    uintptr_t phys = (uintptr_t) pmm_alloc_pages(pages, false);
+    if (!phys)
         return NULL;
-    return slab_alloc(&slab_caches[idx]);
+
+    uintptr_t virt = slab_heap_top;
+    for (size_t i = 0; i < pages; i++) {
+        vmm_map_page(virt + i * PAGE_SIZE, phys + i * PAGE_SIZE,
+                     PAGING_PRESENT | PAGING_WRITE);
+    }
+
+    struct kmalloc_page_header *hdr = (struct kmalloc_page_header *) virt;
+    hdr->magic = KMALLOC_PAGE_MAGIC;
+    hdr->pages = pages;
+
+    slab_heap_top += pages * PAGE_SIZE;
+    return (void *) (hdr + 1);
 }
 
 void *kzalloc(size_t size) {
@@ -176,10 +204,23 @@ void kfree(void *ptr) {
     if (!ptr)
         return;
 
+    struct kmalloc_page_header *hdr =
+        (struct kmalloc_page_header *) ((uint8_t *) ptr -
+                                        sizeof(struct kmalloc_page_header));
+
+    if (hdr->magic == KMALLOC_PAGE_MAGIC) {
+        uintptr_t virt = (uintptr_t) hdr;
+        for (size_t i = 0; i < hdr->pages; i++) {
+            pmm_free_pages((void *) vmm_get_phys(virt + i * PAGE_SIZE), 1,
+                           false);
+        }
+        return;
+    }
+
     void *raw_obj = (uint8_t *) ptr - sizeof(struct slab *);
     struct slab *slab = *((struct slab **) raw_obj);
     if (!slab) {
-        k_panic("kfree: no slab header found for %p\n", ptr);
+        k_panic("kfree: no slab header found for 0x%lx\n", ptr);
     }
 
     struct slab_cache *cache = slab->parent_cache;

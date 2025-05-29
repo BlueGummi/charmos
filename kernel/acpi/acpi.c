@@ -106,7 +106,6 @@ void uacpi_kernel_log(uacpi_log_level level, const uacpi_char *data) {
 }
 
 void *uacpi_kernel_alloc(uacpi_size size) {
-
     void *x = kmalloc(size);
     return x;
 }
@@ -131,8 +130,10 @@ uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
     uint8_t func = address.function;
 
     uacpi_pci_device *dev = kzalloc(sizeof(*dev));
-    if (!dev)
+
+    if (!dev) {
         return UACPI_STATUS_OUT_OF_MEMORY;
+    }
 
     dev->bus = bus;
     dev->slot = slot;
