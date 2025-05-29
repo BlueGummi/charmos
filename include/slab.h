@@ -6,6 +6,7 @@
 #define SLAB_CLASS_COUNT (SLAB_MAX_SHIFT - SLAB_MIN_SHIFT + 1)
 #define UACPI_MAP_BASE 0xFFFFA00000000000
 #define UACPI_MAP_LIMIT 0xFFFFA00000100000
+#define KMALLOC_PAGE_MAGIC 0xC0FFEE42
 
 enum slab_state { SLAB_FREE, SLAB_PARTIAL, SLAB_FULL };
 
@@ -26,6 +27,10 @@ struct slab_cache {
     struct slab *slabs_full;
 };
 
+struct kmalloc_page_header {
+    uint32_t magic;
+    size_t pages;
+};
 void slab_init();
 extern struct slab_cache slab_caches[SLAB_CLASS_COUNT];
 extern uintptr_t slab_heap_top;

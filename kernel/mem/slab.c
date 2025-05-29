@@ -4,15 +4,9 @@
 #include <string.h>
 #include <vmm.h>
 
+
 struct slab_cache slab_caches[SLAB_CLASS_COUNT];
 uintptr_t slab_heap_top = 0xFFFF800000000000;
-
-#define KMALLOC_PAGE_MAGIC 0xC0FFEE42
-
-struct kmalloc_page_header {
-    uint32_t magic;
-    size_t pages;
-};
 
 static void *slab_map_new_page() {
     uintptr_t phys = (uintptr_t) pmm_alloc_pages(1, false);

@@ -65,7 +65,6 @@ void k_main(void) {
     init_physical_allocator(r->offset, memmap_request);
     vmm_offset_set(r->offset);
     vmm_init();
-    k_printf("h\n");
     slab_init();
     test_alloc();
 
@@ -102,7 +101,7 @@ void k_main(void) {
 
     if (read_ext2_superblock(&primary_master, 0, &superblock)) {
         ext2_print_superblock(&superblock);
-        //        ext2_test(&primary_master, &superblock);
+        ext2_test(&primary_master, &superblock);
     }
 
     scheduler_init(&global_sched);

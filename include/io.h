@@ -1,9 +1,21 @@
 #include <stdint.h>
 
+// TODO: rename this (duh)
+
 #define PCI_CONFIG_ADDRESS 0xCF8
 #define PCI_CONFIG_DATA 0xCFC
 
+//
+//
+//
+//
+//
 // =========| IN - BYTE, WORD, LONG, QWORD, SB, SW, SL, SQ |=========
+//
+//
+//
+//
+//
 
 static inline uint8_t inb(uint16_t port) {
     uint8_t ret;
@@ -45,7 +57,17 @@ static inline void insq(uint16_t port, void *addr, uint32_t count) {
     asm volatile("rep insq" : "+D"(addr), "+c"(count) : "d"(port) : "memory");
 }
 
+//
+//
+//
+//
+//
 // ========| OUT - BYTE, WORD, LONG, QWORD, SB, SW, SL, SQ |========
+//
+//
+//
+//
+//
 
 static inline void outb(uint16_t port, uint8_t value) {
     asm volatile("outb %0, %1" : : "a"(value), "Nd"(port));
@@ -79,7 +101,17 @@ static inline void outsq(uint16_t port, const void *addr, uint32_t count) {
     asm volatile("rep outsq" : "+S"(addr), "+c"(count) : "d"(port) : "memory");
 }
 
-// ============| PCI |==============
+//
+//
+//
+//
+//
+//
+// =============================| PCI |===============================
+//
+//
+//
+//
 
 static inline uint32_t pci_config_address(uint8_t bus, uint8_t slot,
                                           uint8_t func, uint8_t offset) {
@@ -127,10 +159,39 @@ static inline void pci_write_byte(uint8_t bus, uint8_t slot, uint8_t func,
     pci_write(bus, slot, func, offset & 0xFC, tmp);
 }
 
+//
+//
+//
+//
+//
+// =============================| MISC |==============================
+//
+//
+//
+//
+//
+
 static inline uint64_t rdtsc(void) {
     uint32_t lo, hi;
     __asm__ volatile("rdtsc" : "=a"(lo), "=d"(hi));
     return ((uint64_t) hi << 32) | lo;
+}
+
+static inline void cpuid(uint32_t eax, uint32_t ecx, uint32_t *abcd) {
+    __asm__ volatile("cpuid"
+                     : "=a"(abcd[0]), "=b"(abcd[1]), "=c"(abcd[2]),
+                       "=d"(abcd[3])
+                     : "a"(eax), "c"(ecx));
+}
+
+static inline uint64_t read_cr4() {
+    uint64_t cr4;
+    __asm__ volatile("mov %%cr4, %0" : "=r"(cr4));
+    return cr4;
+}
+
+static inline void write_cr4(uint64_t cr4) {
+    __asm__ volatile("mov %0, %%cr4" : : "r"(cr4));
 }
 
 
