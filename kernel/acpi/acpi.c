@@ -33,7 +33,6 @@ static irq_entry_t irq_table[IDT_ENTRIES];
 
 extern uint64_t a_rsdp;
 
-static uacpi_io_handle global_io_handle;
 extern uint64_t tsc_freq;
 
 #define DEFINE_IRQ_HANDLER(n)                                                  \
@@ -235,69 +234,84 @@ uacpi_status uacpi_kernel_pci_write32(uacpi_handle device, uacpi_size offset,
 
 uacpi_status uacpi_kernel_io_map(uacpi_io_addr base, uacpi_size len,
                                  uacpi_handle *out_handle) {
-
-    if (!out_handle) {
-        k_panic("Uh oh\n");
+    if (!out_handle || len == 0) {
         return UACPI_STATUS_INVALID_ARGUMENT;
     }
 
-    global_io_handle.base = base;
-    global_io_handle.len = len;
-    global_io_handle.valid = true;
+    uacpi_io_handle *handle =
+        (uacpi_io_handle *) kmalloc(sizeof(uacpi_io_handle));
+    if (!handle) {
+        k_panic("Failed to allocate I/O handle");
+        return UACPI_STATUS_INVALID_ARGUMENT;
+    }
 
-    *out_handle = &global_io_handle;
+    handle->base = base;
+    handle->len = len;
+    handle->valid = true;
+
+    *out_handle = (uacpi_handle) handle;
     return UACPI_STATUS_OK;
 }
 
-void uacpi_kernel_io_unmap(uacpi_handle handle) {
-    (void) handle;
-    global_io_handle.valid = false;
+void uacpi_kernel_io_unmap(uacpi_handle h) {
+    if (!h)
+        return;
+
+    uacpi_io_handle *handle = (uacpi_io_handle *) h;
+    handle->valid = false;
+    kfree(handle);
 }
+
+#define IO_ACCESS_GUARD()                                                      \
+    if (!handle || !handle->valid || offset >= handle->len ||                  \
+        (handle->base + offset) > 0xFFFF) {                                    \
+        return UACPI_STATUS_INVALID_ARGUMENT;                                  \
+    }
 
 uacpi_status uacpi_kernel_io_read8(uacpi_handle h, uacpi_size offset,
                                    uacpi_u8 *out) {
-
     uacpi_io_handle *handle = (uacpi_io_handle *) h;
+    IO_ACCESS_GUARD();
     *out = inb((uint16_t) (handle->base + offset));
     return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_kernel_io_read16(uacpi_handle h, uacpi_size offset,
                                     uacpi_u16 *out) {
-
     uacpi_io_handle *handle = (uacpi_io_handle *) h;
+    IO_ACCESS_GUARD();
     *out = inw((uint16_t) (handle->base + offset));
     return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_kernel_io_read32(uacpi_handle h, uacpi_size offset,
                                     uacpi_u32 *out) {
-
     uacpi_io_handle *handle = (uacpi_io_handle *) h;
+    IO_ACCESS_GUARD();
     *out = inl((uint16_t) (handle->base + offset));
     return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_kernel_io_write8(uacpi_handle h, uacpi_size offset,
                                     uacpi_u8 val) {
-
     uacpi_io_handle *handle = (uacpi_io_handle *) h;
+    IO_ACCESS_GUARD();
     outb((uint16_t) (handle->base + offset), val);
     return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_kernel_io_write16(uacpi_handle h, uacpi_size offset,
                                      uacpi_u16 val) {
-
     uacpi_io_handle *handle = (uacpi_io_handle *) h;
+    IO_ACCESS_GUARD();
     outw((uint16_t) (handle->base + offset), val);
     return UACPI_STATUS_OK;
 }
 
 uacpi_status uacpi_kernel_io_write32(uacpi_handle h, uacpi_size offset,
                                      uacpi_u32 val) {
-
     uacpi_io_handle *handle = (uacpi_io_handle *) h;
+    IO_ACCESS_GUARD();
     outl((uint16_t) (handle->base + offset), val);
     return UACPI_STATUS_OK;
 }
