@@ -1,5 +1,6 @@
 #include <printf.h>
 #include <stdint.h>
+
 #define PAGING_PRESENT (0x1UL)
 #define PAGING_WRITE (0x2UL)
 #define PAGING_USER_ALLOWED (0x4UL)
@@ -14,6 +15,9 @@
 #define PT_KERNEL_RO (PAGING_PRESENT | PAGING_XD)
 #define PT_KERNEL_RX (PAGING_PRESENT)
 #define PT_KERNEL_RW (PAGING_PRESENT | PAGING_WRITE | PAGING_XD)
+
+#define PAGE_ALIGN_DOWN(x) ((x) & ~(PAGE_SIZE - 1))
+#define PAGE_ALIGN_UP(x) (((x) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1))
 
 typedef uint64_t pte_t; // Page Table Entry
 

@@ -26,31 +26,6 @@ uint64_t get_cr3(void) {
     return cr3;
 }
 
-void vmm_copy_kernel_mappings(uintptr_t new_virt_base) {
-    extern uint64_t __stext[], __etext[];
-    uintptr_t old_virt_start = (uintptr_t) __stext;
-    uintptr_t old_virt_end = (uintptr_t) __etext;
-
-    for (uintptr_t old_virt = old_virt_start; old_virt < old_virt_end;
-         old_virt += PAGE_SIZE) {
-
-        uintptr_t phys = SUB_HHDM_OFFSET(old_virt);
-        if (phys == (uintptr_t) -1)
-            continue;
-
-        uintptr_t new_virt = new_virt_base + (old_virt - old_virt_start);
-
-        uint64_t flags = PAGING_PRESENT;
-
-        if (old_virt >= (uintptr_t) (__stext + 0x1000) &&
-            old_virt < (uintptr_t) (__stext + 0xb000)) {
-            flags |= PAGING_WRITE;
-        }
-
-        vmm_map_page(new_virt, phys, flags);
-    }
-}
-
 void *vmm_map_region(uintptr_t virt_base, uint64_t size, uint64_t flags) {
     void *first = NULL;
 
@@ -85,8 +60,6 @@ void vmm_init() {
             kernel_pml4->entries[i] = boot_pml4->entries[i];
         }
     }
-
-    vmm_copy_kernel_mappings(0xffffffffc0000000);
 
     asm volatile("mov %0, %%cr3" : : "r"(kernel_pml4_phys) : "memory");
 }

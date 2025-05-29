@@ -3,6 +3,7 @@
 #include <io.h>
 #include <pmm.h>
 #include <printf.h>
+#include <slab.h>
 #include <spin_lock.h>
 #include <stdint.h>
 #include <uacpi/event.h>
@@ -61,36 +62,42 @@ uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
     return UACPI_STATUS_OK;
 }
 
+static uintptr_t uacpi_map_top = 0;
+
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
+    uintptr_t phys_start = PAGE_ALIGN_DOWN(addr);
+    uintptr_t offset = addr - phys_start;
 
-    uacpi_phys_addr aligned_addr = addr & ~(PAGE_SIZE - 1);
-    uacpi_size offset = addr - aligned_addr;
-    uacpi_size adjusted_len = len + offset;
-    uacpi_size page_aligned_len =
-        (adjusted_len + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+    size_t total_len = len + offset;
+    size_t total_pages = (total_len + PAGE_SIZE - 1) / PAGE_SIZE;
 
-    void *base = kmalloc(page_aligned_len);
+    if (uacpi_map_top + total_pages * PAGE_SIZE > UACPI_MAP_LIMIT) {
+        k_panic("uACPI: out of virtual space in uacpi_kernel_map");
+        return NULL;
+    }
 
-    for (uacpi_size i = 0; i < page_aligned_len; i += PAGE_SIZE) {
+    uintptr_t virt_start = uacpi_map_top;
+    uacpi_map_top += total_pages * PAGE_SIZE;
 
-        vmm_map_page((uint64_t) base + i, aligned_addr + i,
+    for (size_t i = 0; i < total_pages; i++) {
+        vmm_map_page(virt_start + i * PAGE_SIZE, phys_start + i * PAGE_SIZE,
                      PAGING_PRESENT | PAGING_WRITE);
     }
-    return (void *) ((uint8_t *) base + offset);
+
+    return (void *) (virt_start + offset);
 }
 
 void uacpi_kernel_unmap(void *addr, uacpi_size len) {
-    uint64_t aligned_addr = (uint64_t) addr & ~(PAGE_SIZE - 1);
-    uacpi_size offset = (uint64_t) addr - aligned_addr;
-    uacpi_size adjusted_len = len + offset;
-    uacpi_size page_aligned_len =
-        (adjusted_len + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+    uintptr_t virt_addr = (uintptr_t) addr;
+    uintptr_t page_offset = virt_addr & (PAGE_SIZE - 1);
+    uintptr_t aligned_virt = PAGE_ALIGN_DOWN(virt_addr);
 
-    for (uint64_t i = 0; i < page_aligned_len; i += PAGE_SIZE) {
-        vmm_unmap_page(aligned_addr + i);
+    size_t total_len = len + page_offset;
+    size_t total_pages = (total_len + PAGE_SIZE - 1) / PAGE_SIZE;
+
+    for (size_t i = 0; i < total_pages; i++) {
+        vmm_unmap_page(aligned_virt + i * PAGE_SIZE);
     }
-
-    kfree((void *) aligned_addr);
 }
 
 void uacpi_kernel_log(uacpi_log_level level, const uacpi_char *data) {

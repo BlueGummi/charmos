@@ -1,36 +1,11 @@
 #include <pmm.h>
 #include <printf.h>
 #include <slab.h>
-#include <stdint.h>
 #include <string.h>
 #include <vmm.h>
 
-#define SLAB_MIN_SHIFT 4
-#define SLAB_MAX_SHIFT 12
-#define SLAB_CLASS_COUNT (SLAB_MAX_SHIFT - SLAB_MIN_SHIFT + 1)
-#define PAGE_SIZE 4096
-
-enum slab_state { SLAB_FREE, SLAB_PARTIAL, SLAB_FULL };
-
-struct slab {
-    struct slab *next;
-    uint8_t *bitmap;
-    void *mem;
-    size_t used;
-    enum slab_state state;
-    struct slab_cache *parent_cache;
-};
-
-struct slab_cache {
-    size_t obj_size;
-    size_t objs_per_slab;
-    struct slab *slabs_free;
-    struct slab *slabs_partial;
-    struct slab *slabs_full;
-};
-
-static struct slab_cache slab_caches[SLAB_CLASS_COUNT];
-static uintptr_t slab_heap_top = 0xFFFF800000000000;
+struct slab_cache slab_caches[SLAB_CLASS_COUNT];
+uintptr_t slab_heap_top = 0xFFFF800000000000;
 
 static void *slab_map_new_page() {
     uintptr_t phys = (uintptr_t) pmm_alloc_pages(1, false);
