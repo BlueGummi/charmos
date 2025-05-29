@@ -11,7 +11,7 @@
 #include <idt.h>
 #include <io.h>
 #include <limine.h>
-#include <misc/linker_consts.h>
+#include <misc/linker_symbols.h>
 #include <misc/logo.h>
 #include <mp.h>
 #include <pci.h>
@@ -30,12 +30,10 @@
 #include <stdint.h>
 #include <thread.h>
 #include <uacpi/event.h>
-#include <uacpi/namespace.h>
-#include <uacpi/resources.h>
 #include <uacpi/uacpi.h>
-#include <uacpi/utilities.h>
 #include <vfs/vfs.h>
 #include <vmm.h>
+
 struct scheduler global_sched;
 
 void k_sch_main() {

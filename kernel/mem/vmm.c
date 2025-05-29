@@ -1,5 +1,5 @@
 #include <limine.h>
-#include <misc/linker_consts.h>
+#include <misc/linker_symbols.h>
 #include <pmm.h>
 #include <printf.h>
 #include <spin_lock.h>

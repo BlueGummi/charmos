@@ -1,6 +1,22 @@
 #include <printf.h>
 #include <uacpi/utilities.h>
 
+/*
+#define UACPI_NS_NODE_INFO_HAS_ADR (1 << 0)
+#define UACPI_NS_NODE_INFO_HAS_HID (1 << 1)
+#define UACPI_NS_NODE_INFO_HAS_UID (1 << 2)
+#define UACPI_NS_NODE_INFO_HAS_CID (1 << 3)
+#define UACPI_NS_NODE_INFO_HAS_CLS (1 << 4)
+#define UACPI_NS_NODE_INFO_HAS_SXD (1 << 5)
+#define UACPI_NS_NODE_INFO_HAS_SXW (1 << 6)
+*/
+
+#define uacpi_print_str(string)                                                \
+    for (uint32_t i = 0; i < string.size; i++) {                               \
+        k_printf("%c", string.value[i]);                                       \
+    }                                                                          \
+    k_printf("\n");
+
 uacpi_iteration_decision acpi_print_ctx(void *ctx, uacpi_namespace_node *node,
                                         uacpi_u32 node_depth) {
     uacpi_namespace_node_info *info;
@@ -19,39 +35,56 @@ uacpi_iteration_decision acpi_print_ctx(void *ctx, uacpi_namespace_node *node,
     k_printf(">> UACPI Device Info |\n");
     k_printf("   Size  : %u\n", info->size);
     k_printf("   Name  : ");
+
     for (int i = 0; i < 4; i++) {
         k_printf("%c", info->name.text[i]);
     }
+    
     k_printf("\n");
+    
     k_printf("   Name ID: %u\n", info->name.id);
     k_printf("   Type  : %u\n", info->type);
     k_printf("   Flags : 0x%x\n", info->flags);
-    k_printf("   SXD   :\n");
-    for (int i = 0; i < 4; i++) {
-        k_printf("      SXD Byte %d: 0x%x\n", i, info->sxd[i]);
-    }
-    k_printf("   SXW   :\n");
-    for (int i = 0; i < 4; i++) {
-        k_printf("      SXW Byte %d: 0x%x\n", i, info->sxw[i]);
-    }
-    k_printf("   Address: 0x%lx\n", info->adr);
 
-#define uacpi_print_str(string)                                                \
-    for (uint32_t i = 0; i < string.size; i++) {                               \
-        k_printf("%c", string.value[i]);                                       \
-    }                                                                          \
-    k_printf("\n");
+    if (info->flags & UACPI_NS_NODE_INFO_HAS_SXD) {
+        k_printf("   SXD   :\n");
+        for (int i = 0; i < 4; i++) {
+            k_printf("      SXD Byte %d: 0x%x\n", i, info->sxd[i]);
+        }
+    }
 
-    k_printf("   HID str : ");
-    uacpi_print_str(info->hid);
-    k_printf("   UID str : ");
-    uacpi_print_str(info->uid);
-    k_printf("   CLS str : ");
-    uacpi_print_str(info->cls);
+    if (info->flags & UACPI_NS_NODE_INFO_HAS_SXW) {
+        k_printf("   SXW   :\n");
+        for (int i = 0; i < 5; i++) {
+            k_printf("      SXW Byte %d: 0x%x\n", i, info->sxw[i]);
+        }
+    }
+
+    if (info->flags & UACPI_NS_NODE_INFO_HAS_ADR) {
+        k_printf("   Address: 0x%lx\n", info->adr);
+    }
+
+    if (info->flags & UACPI_NS_NODE_INFO_HAS_HID) {
+        k_printf("   HID str : ");
+        uacpi_print_str(info->hid);
+    }
+
+    if (info->flags & UACPI_NS_NODE_INFO_HAS_UID) {
+        k_printf("   UID str : ");
+        uacpi_print_str(info->uid);
+    }
+
+    if (info->flags & UACPI_NS_NODE_INFO_HAS_CLS) {
+        k_printf("   CLS str : ");
+        uacpi_print_str(info->cls);
+    }
 
     k_printf("   PNP NUM : %u\n", info->cid.num_ids);
-    for (uint32_t i = 0; i < info->cid.size; i++) {
-        k_printf("      ID %u: %x\n", i, info->cid.ids[i]);
+
+    if (info->flags & UACPI_NS_NODE_INFO_HAS_CID) {
+        for (uint32_t i = 0; i < info->cid.size; i++) {
+            k_printf("      ID %u: %x\n", i, info->cid.ids[i]);
+        }
     }
 
     uacpi_free_namespace_node_info(info);
