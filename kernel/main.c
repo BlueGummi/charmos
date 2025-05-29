@@ -20,7 +20,6 @@
 #include <requests.h>
 #include <rust.h>
 #include <sched.h>
-#include <shutdown.h>
 #include <slab.h>
 #include <smap.h>
 #include <spin_lock.h>
@@ -49,7 +48,6 @@ uint64_t tsc_freq = 0;
 void k_main(void) {
     k_printf_init(framebuffer_request.response->framebuffers[0]);
     struct limine_hhdm_response *r = hhdm_request.response;
-    uint64_t offset = r->offset;
     k_printf("%s", OS_LOGO_SMALL);
     a_rsdp = rsdp_request.response->address;
     struct limine_mp_response *mpr = mp_request.response;
@@ -99,7 +97,7 @@ void k_main(void) {
     setup_primary_ide(&primary_master, devices, count);
     struct ext2_sblock superblock;
 
-    if (read_ext2_superblock(&primary_master, 0, &superblock)) {
+    if (ext2_read_superblock(&primary_master, 0, &superblock)) {
         ext2_print_superblock(&superblock);
         ext2_test(&primary_master, &superblock);
     }

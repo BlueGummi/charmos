@@ -162,8 +162,6 @@ void (*isr_trampolines[])(void *) = {
 #undef X
 };
 
-// TODO: actually use our IDT we have elsewhere
-
 uacpi_status uacpi_kernel_install_interrupt_handler(
     uacpi_u32 irq, uacpi_interrupt_handler handler, uacpi_handle ctx,
     uacpi_handle *out_irq_handle) {
@@ -206,10 +204,6 @@ uacpi_kernel_uninstall_interrupt_handler(uacpi_interrupt_handler handler,
     return UACPI_STATUS_OK;
 }
 
-uacpi_thread_id uacpi_kernel_get_thread_id(void) {
-    return (uacpi_thread_id) 0;
-}
-
 uacpi_handle uacpi_kernel_create_spinlock(void) {
 
     struct spinlock *lock = kzalloc(sizeof(struct spinlock));
@@ -232,6 +226,20 @@ void uacpi_kernel_unlock_spinlock(uacpi_handle a, uacpi_cpu_flags b) {
     (void) b;
     spin_unlock((struct spinlock *) a);
 }
+uacpi_thread_id uacpi_kernel_get_thread_id(void) {
+    return (uacpi_thread_id) 0;
+}
+
+//
+//
+//
+// stuff down here is unfinished/not complete
+// vvvvvvvvvvv
+//
+//
+//
+//
+//
 
 uacpi_status uacpi_kernel_schedule_work(uacpi_work_type, uacpi_work_handler,
                                         uacpi_handle) {
@@ -264,8 +272,8 @@ uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle, uacpi_u16) {
     return UACPI_STATUS_OK;
 }
 void uacpi_kernel_release_mutex(uacpi_handle) {}
-uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle, uacpi_u16) {
 
+uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle, uacpi_u16) {
     return false;
 }
 void uacpi_kernel_signal_event(uacpi_handle) {}

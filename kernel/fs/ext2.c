@@ -7,6 +7,23 @@
 
 uint64_t PTRS_PER_BLOCK;
 
+
+bool ext2_read_superblock(struct ide_drive *d, uint32_t partition_start_lba,
+                          struct ext2_sblock *sblock) {
+    uint8_t buffer[d->sector_size];
+    uint32_t superblock_lba =
+        partition_start_lba + (EXT2_SUPERBLOCK_OFFSET / d->sector_size);
+    uint32_t superblock_offset = EXT2_SUPERBLOCK_OFFSET % d->sector_size;
+
+    if (!ide_read_sector(d, superblock_lba, buffer)) {
+        return false;
+    }
+
+    memcpy(sblock, buffer + superblock_offset, sizeof(struct ext2_sblock));
+
+    return (sblock->magic == 0xEF53);
+}
+
 bool ext2_write_superblock(struct ext2_fs *fs) {
     uint32_t superblock_block = 1;
     uint32_t lba = superblock_block * fs->sectors_per_block;

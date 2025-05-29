@@ -5,7 +5,6 @@
 #include <pmm.h>
 #include <printf.h>
 #include <sched.h>
-#include <shutdown.h>
 #include <stdint.h>
 #include <vmalloc.h>
 #include <vmm.h>

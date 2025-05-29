@@ -173,6 +173,9 @@ bool block_write(struct ide_drive *d, uint32_t lba, const uint8_t *buffer,
 
 bool block_ptr_write(struct ext2_fs *fs, uint32_t block_num, void *buf);
 
+bool ext2_read_superblock(struct ide_drive *d, uint32_t partition_start_lba,
+                          struct ext2_sblock *sblock);
+
 bool ext2_write_superblock(struct ext2_fs *fs);
 bool ext2_write_group_desc(struct ext2_fs *fs);
 

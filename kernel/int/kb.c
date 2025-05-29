@@ -1,7 +1,6 @@
 #include <dbg.h>
 #include <io.h>
 #include <printf.h>
-#include <shutdown.h>
 #include <stdint.h>
 #include <string.h>
 #define KB_DOWN_LSHIFT 0x2A
@@ -56,7 +55,6 @@ __attribute__((interrupt)) void keyboard_handler(void *a) {
             if (memcmp(kbuffer, "shutdown", 8) == 0 ||
                 memcmp(kbuffer, "poweroff", 8) == 0) {
                 k_info("Poweroff signal received\n");
-                k_shutdown();
             } else if (memcmp(kbuffer, ":3", 2) == 0) {
                 k_info("silly!");
             }

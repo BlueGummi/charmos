@@ -54,19 +54,3 @@ bool ide_write_sector(struct ide_drive *d, uint32_t lba, const uint8_t *b) {
 
     return true;
 }
-
-bool read_ext2_superblock(struct ide_drive *d, uint32_t partition_start_lba,
-                          struct ext2_sblock *sblock) {
-    uint8_t buffer[d->sector_size];
-    uint32_t superblock_lba =
-        partition_start_lba + (EXT2_SUPERBLOCK_OFFSET / d->sector_size);
-    uint32_t superblock_offset = EXT2_SUPERBLOCK_OFFSET % d->sector_size;
-
-    if (!ide_read_sector(d, superblock_lba, buffer)) {
-        return false;
-    }
-
-    memcpy(sblock, buffer + superblock_offset, sizeof(struct ext2_sblock));
-
-    return (sblock->magic == 0xEF53);
-}
