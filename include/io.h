@@ -127,4 +127,11 @@ static inline void pci_write_byte(uint8_t bus, uint8_t slot, uint8_t func,
     pci_write(bus, slot, func, offset & 0xFC, tmp);
 }
 
+static inline uint64_t rdtsc(void) {
+    uint32_t lo, hi;
+    __asm__ volatile("rdtsc" : "=a"(lo), "=d"(hi));
+    return ((uint64_t) hi << 32) | lo;
+}
+
+
 #pragma once

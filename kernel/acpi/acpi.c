@@ -44,6 +44,7 @@ extern uint64_t tsc_freq;
         }                                                                      \
     }
 #include "irq_handlers.h"
+
 void irq_common_handler(uint8_t irq_num) {
 
     if (irq_num >= MAX_IRQ || !irq_table[irq_num].installed)
@@ -117,8 +118,10 @@ void uacpi_kernel_free(void *mem) {
 uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
                                           uacpi_handle *out_handle) {
 
-    if (!out_handle)
+    if (!out_handle) {
+        k_panic("Uh oh\n");
         return UACPI_STATUS_INVALID_ARGUMENT;
+    }
 
     if (address.segment != 0) {
         k_printf("PCI segment %u not supported\n", address.segment);
@@ -145,13 +148,10 @@ uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
 }
 
 void uacpi_kernel_pci_device_close(uacpi_handle handle) {
-
     uacpi_pci_device *dev = (uacpi_pci_device *) handle;
-
     if (!dev->is_open) {
         return;
     }
-
     dev->is_open = false;
     uacpi_kernel_free(dev);
 }
@@ -160,8 +160,10 @@ uacpi_status uacpi_kernel_pci_read8(uacpi_handle device, uacpi_size offset,
                                     uacpi_u8 *value) {
 
     uacpi_pci_device *dev = (uacpi_pci_device *) device;
-    if (!dev || !value || !dev->is_open || offset >= 256)
+    if (!dev || !value || !dev->is_open || offset >= 256) {
+        k_panic("Uh oh\n");
         return UACPI_STATUS_INVALID_ARGUMENT;
+    }
     *value = pci_read_byte(dev->bus, dev->slot, dev->func, offset);
     return UACPI_STATUS_OK;
 }
@@ -170,8 +172,10 @@ uacpi_status uacpi_kernel_pci_read16(uacpi_handle device, uacpi_size offset,
                                      uacpi_u16 *value) {
 
     uacpi_pci_device *dev = (uacpi_pci_device *) device;
-    if (!dev || !value || !dev->is_open || offset >= 256 || (offset & 1))
+    if (!dev || !value || !dev->is_open || offset >= 256 || (offset & 1)) {
+        k_panic("Uh oh\n");
         return UACPI_STATUS_INVALID_ARGUMENT;
+    }
 
     *value = pci_read_word(dev->bus, dev->slot, dev->func, offset);
     return UACPI_STATUS_OK;
@@ -181,8 +185,10 @@ uacpi_status uacpi_kernel_pci_read32(uacpi_handle device, uacpi_size offset,
                                      uacpi_u32 *value) {
 
     uacpi_pci_device *dev = (uacpi_pci_device *) device;
-    if (!dev || !value || !dev->is_open || offset >= 256 || (offset & 3))
+    if (!dev || !value || !dev->is_open || offset >= 256 || (offset & 3)) {
+        k_panic("Uh oh\n");
         return UACPI_STATUS_INVALID_ARGUMENT;
+    }
 
     *value = pci_read(dev->bus, dev->slot, dev->func, offset);
     return UACPI_STATUS_OK;
@@ -192,8 +198,10 @@ uacpi_status uacpi_kernel_pci_write8(uacpi_handle device, uacpi_size offset,
                                      uacpi_u8 value) {
 
     uacpi_pci_device *dev = (uacpi_pci_device *) device;
-    if (!dev || !dev->is_open || offset >= 256)
+    if (!dev || !dev->is_open || offset >= 256) {
+        k_panic("Uh oh\n");
         return UACPI_STATUS_INVALID_ARGUMENT;
+    }
 
     pci_write_byte(dev->bus, dev->slot, dev->func, offset, value);
     return UACPI_STATUS_OK;
@@ -203,8 +211,10 @@ uacpi_status uacpi_kernel_pci_write16(uacpi_handle device, uacpi_size offset,
                                       uacpi_u16 value) {
 
     uacpi_pci_device *dev = (uacpi_pci_device *) device;
-    if (!dev || !dev->is_open || offset >= 256 || (offset & 1))
+    if (!dev || !dev->is_open || offset >= 256 || (offset & 1)) {
+        k_panic("Uh oh\n");
         return UACPI_STATUS_INVALID_ARGUMENT;
+    }
 
     pci_write_word(dev->bus, dev->slot, dev->func, offset, value);
     return UACPI_STATUS_OK;
@@ -214,8 +224,10 @@ uacpi_status uacpi_kernel_pci_write32(uacpi_handle device, uacpi_size offset,
                                       uacpi_u32 value) {
 
     uacpi_pci_device *dev = (uacpi_pci_device *) device;
-    if (!dev || !dev->is_open || offset >= 256 || (offset & 3))
+    if (!dev || !dev->is_open || offset >= 256 || (offset & 3)) {
+        k_panic("Uh oh\n");
         return UACPI_STATUS_INVALID_ARGUMENT;
+    }
 
     pci_write(dev->bus, dev->slot, dev->func, offset, value);
     return UACPI_STATUS_OK;
@@ -224,8 +236,10 @@ uacpi_status uacpi_kernel_pci_write32(uacpi_handle device, uacpi_size offset,
 uacpi_status uacpi_kernel_io_map(uacpi_io_addr base, uacpi_size len,
                                  uacpi_handle *out_handle) {
 
-    if (!out_handle)
+    if (!out_handle) {
+        k_panic("Uh oh\n");
         return UACPI_STATUS_INVALID_ARGUMENT;
+    }
 
     global_io_handle.base = base;
     global_io_handle.len = len;
@@ -236,7 +250,6 @@ uacpi_status uacpi_kernel_io_map(uacpi_io_addr base, uacpi_size len,
 }
 
 void uacpi_kernel_io_unmap(uacpi_handle handle) {
-
     (void) handle;
     global_io_handle.valid = false;
 }
@@ -245,9 +258,6 @@ uacpi_status uacpi_kernel_io_read8(uacpi_handle h, uacpi_size offset,
                                    uacpi_u8 *out) {
 
     uacpi_io_handle *handle = (uacpi_io_handle *) h;
-    if (!handle || !handle->valid || offset >= handle->len)
-        return UACPI_STATUS_INVALID_ARGUMENT;
-
     *out = inb((uint16_t) (handle->base + offset));
     return UACPI_STATUS_OK;
 }
@@ -256,9 +266,6 @@ uacpi_status uacpi_kernel_io_read16(uacpi_handle h, uacpi_size offset,
                                     uacpi_u16 *out) {
 
     uacpi_io_handle *handle = (uacpi_io_handle *) h;
-    if (!handle || !handle->valid || (offset + 1) >= handle->len)
-        return UACPI_STATUS_INVALID_ARGUMENT;
-
     *out = inw((uint16_t) (handle->base + offset));
     return UACPI_STATUS_OK;
 }
@@ -267,9 +274,6 @@ uacpi_status uacpi_kernel_io_read32(uacpi_handle h, uacpi_size offset,
                                     uacpi_u32 *out) {
 
     uacpi_io_handle *handle = (uacpi_io_handle *) h;
-    if (!handle || !handle->valid || (offset + 3) >= handle->len)
-        return UACPI_STATUS_INVALID_ARGUMENT;
-
     *out = inl((uint16_t) (handle->base + offset));
     return UACPI_STATUS_OK;
 }
@@ -278,9 +282,6 @@ uacpi_status uacpi_kernel_io_write8(uacpi_handle h, uacpi_size offset,
                                     uacpi_u8 val) {
 
     uacpi_io_handle *handle = (uacpi_io_handle *) h;
-    if (!handle || !handle->valid || offset >= handle->len)
-        return UACPI_STATUS_INVALID_ARGUMENT;
-
     outb((uint16_t) (handle->base + offset), val);
     return UACPI_STATUS_OK;
 }
@@ -289,9 +290,6 @@ uacpi_status uacpi_kernel_io_write16(uacpi_handle h, uacpi_size offset,
                                      uacpi_u16 val) {
 
     uacpi_io_handle *handle = (uacpi_io_handle *) h;
-    if (!handle || !handle->valid || (offset + 1) >= handle->len)
-        return UACPI_STATUS_INVALID_ARGUMENT;
-
     outw((uint16_t) (handle->base + offset), val);
     return UACPI_STATUS_OK;
 }
@@ -300,17 +298,8 @@ uacpi_status uacpi_kernel_io_write32(uacpi_handle h, uacpi_size offset,
                                      uacpi_u32 val) {
 
     uacpi_io_handle *handle = (uacpi_io_handle *) h;
-    if (!handle || !handle->valid || (offset + 3) >= handle->len)
-        return UACPI_STATUS_INVALID_ARGUMENT;
-
     outl((uint16_t) (handle->base + offset), val);
     return UACPI_STATUS_OK;
-}
-
-static inline uint64_t rdtsc(void) {
-    uint32_t lo, hi;
-    __asm__ volatile("rdtsc" : "=a"(lo), "=d"(hi));
-    return ((uint64_t) hi << 32) | lo;
 }
 
 uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void) {
