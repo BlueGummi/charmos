@@ -46,14 +46,14 @@ add_custom_target(iso
 add_custom_target(run
     DEPENDS iso
     COMMAND clear
-    COMMAND qemu-system-${ARCH} -cdrom ${IMAGE_NAME}.iso -drive file=disk.img,if=ide,format=raw -m 2G -M smm=off -smp cores=4 -no-shutdown -no-reboot -serial stdio -s -monitor telnet:127.0.0.1:1234,server,nowait
+    COMMAND qemu-system-${ARCH} -cdrom ${IMAGE_NAME}.iso -drive file=disk.img,if=ide,format=raw -m 2G -M smm=off -smp cores=4 -no-shutdown -no-reboot -serial stdio -s -monitor telnet:127.0.0.1:1234,server,nowait -device qemu-xhci,id=xhci -device usb-kbd,id=usbkbd -device usb-mouse,id=usbmouse
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
 add_custom_target(headless
     DEPENDS iso
     COMMAND clear
-    COMMAND qemu-system-${ARCH} -cdrom ${IMAGE_NAME}.iso -drive file=disk.img,if=ide,format=raw -m 2G -M smm=off -smp cores=4 -no-shutdown -no-reboot -nographic -s -monitor telnet:127.0.0.1:1234,server,nowait 
+    COMMAND qemu-system-${ARCH} -cdrom ${IMAGE_NAME}.iso -drive file=disk.img,if=ide,format=raw -m 2G -M smm=off -smp cores=4 -no-shutdown -no-reboot -nographic -s -monitor telnet:127.0.0.1:1234,server,nowait -device qemu-xhci,id=xhci -device usb-kbd,id=usbkbd -device usb-mouse,id=usbmouse
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 

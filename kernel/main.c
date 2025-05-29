@@ -1,3 +1,4 @@
+#include <acpi_print.h>
 #include <alloc.h>
 #include <core.h>
 #include <dbg.h>
@@ -29,10 +30,12 @@
 #include <stdint.h>
 #include <thread.h>
 #include <uacpi/event.h>
+#include <uacpi/namespace.h>
+#include <uacpi/resources.h>
 #include <uacpi/uacpi.h>
+#include <uacpi/utilities.h>
 #include <vfs/vfs.h>
 #include <vmm.h>
-
 struct scheduler global_sched;
 
 void k_sch_main() {
@@ -89,6 +92,10 @@ void k_main(void) {
         k_printf("uACPI GPE initialization error: %s",
                  uacpi_status_to_string(ret));
     }
+
+    uacpi_namespace_for_each_child(uacpi_namespace_root(), acpi_print_ctx,
+                                   UACPI_NULL, UACPI_OBJECT_DEVICE_BIT,
+                                   UACPI_MAX_DEPTH_ANY, UACPI_NULL);
 
     struct pci_device *devices;
     uint64_t count;
