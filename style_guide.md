@@ -20,7 +20,7 @@ For things not specified here, such as multi-line comments, simply use the same 
 
 > A "group" refers to a collection of behaviors under a related context
 
-### Create comments for code comprehension, not for explanation
+### Create comments to rationalize and reason, not to explain
 
 Comments should exist to explain **why** something exists, not **how** it functions. Avoid writing comments in the following style, or similar styles:
 ```c
