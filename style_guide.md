@@ -1,6 +1,6 @@
 # Style Guide
 
-This is a style **guide**, not a set of style **rules**. It is not entirely prohibited from having small segments of code that deviate from the guidelines specified here.
+This is a style **guide**, not a set of style **rules**. It is not entirely prohibited to have small segments of code that deviate from the guidelines specified here.
 
 ## General naming conventions
 
