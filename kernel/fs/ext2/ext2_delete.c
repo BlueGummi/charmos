@@ -22,8 +22,22 @@ void free_block_visitor(struct ext2_fs *fs, struct ext2_inode *inode,
     }
 }
 
+static void ext2_dump_dir(struct ext2_dir_entry *dir) {
+    k_printf("File type is 0x%hhx\n", dir->file_type);
+    k_printf("Inode is %u\n", dir->inode);
+    k_printf("Name len is %u\n", dir->name_len);
+    k_printf("Rec len is %u\n", dir->rec_len);
+    k_printf("Name: ");
+    for (int i = 0; i < dir->name_len; i++) {
+        k_printf("%c", dir->name[i]);
+    }
+    k_printf("\n");
+}
+
 bool unlink_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
-                     void *arg, uint32_t block_num, uint32_t entry_offset) {
+                     void *arg, uint32_t block_num, uint32_t e,
+                     uint32_t entry_offset) {
+    (void) e;
     struct unlink_ctx *ctx = (struct unlink_ctx *) arg;
 
     if (ctx->found)
@@ -41,6 +55,8 @@ bool unlink_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
     ctx->prev_offset = entry_offset;
     return false;
 }
+
+// TODO: Add deletion time (dtime) to deleted node
 
 bool ext2_unlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
                       const char *name) {
@@ -92,8 +108,8 @@ bool ext2_unlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
                                    NULL);
         ext2_free_inode(fs, ctx.inode_num);
     }
-    ext2_write_inode(fs, ctx.inode_num, &target_inode.node);
 
+    ext2_write_inode(fs, ctx.inode_num, &target_inode.node);
     ext2_write_inode(fs, dir_inode->inode_num, &dir_inode->node);
 
     return true;

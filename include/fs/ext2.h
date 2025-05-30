@@ -30,8 +30,9 @@ extern uint64_t PTRS_PER_BLOCK;
 #define MAKE_NOP_CALLBACK                                                      \
     static bool nop_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry, \
                              void *ctx_ptr, uint32_t block_num,                \
-                             uint32_t entry_num) {                             \
+                             uint32_t entry_num, uint32_t entry_offset) {      \
         (void) fs;                                                             \
+        (void) entry_offset;                                                   \
         (void) entry;                                                          \
         (void) ctx_ptr;                                                        \
         (void) block_num;                                                      \
@@ -161,7 +162,8 @@ struct ext2_fs {
 
 typedef bool (*dir_entry_callback)(struct ext2_fs *fs,
                                    struct ext2_dir_entry *entry, void *ctx,
-                                   uint32_t block_num, uint32_t entry_num);
+                                   uint32_t block_num, uint32_t entry_num,
+                                   uint32_t entry_offset);
 
 typedef void (*ext2_block_visitor)(struct ext2_fs *fs, struct ext2_inode *inode,
                                    uint32_t depth, uint32_t *block_ptr,

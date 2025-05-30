@@ -24,7 +24,7 @@ static bool walk_dir(struct ext2_fs *fs, uint32_t block_num,
         if (entry->rec_len < 8 || offset + entry->rec_len > fs->block_size)
             break;
 
-        if (callback(fs, entry, ctx, block_num, entry->inode)) {
+        if (callback(fs, entry, ctx, block_num, entry->inode, offset)) {
             modified = true;
             break;
         }

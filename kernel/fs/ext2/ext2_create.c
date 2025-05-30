@@ -14,10 +14,12 @@ struct link_ctx {
 MAKE_NOP_CALLBACK;
 
 static bool link_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
-                          void *ctx_ptr, uint32_t block_num, uint32_t e) {
+                          void *ctx_ptr, uint32_t block_num, uint32_t e,
+                          uint32_t o) {
     (void) fs; // dont complain compiler
     (void) block_num;
     (void) e;
+    (void) o;
     struct link_ctx *ctx = (struct link_ctx *) ctx_ptr;
 
     uint32_t actual_size = 8 + ((entry->name_len + 3) & ~3); // alignment

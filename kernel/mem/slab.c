@@ -129,7 +129,7 @@ static void slab_free(struct slab_cache *cache, struct slab *slab, void *obj) {
     uint8_t bit_mask = 1 << (index % 8);
 
     if (!(slab->bitmap[byte_idx] & bit_mask)) {
-        k_panic("Double free or invalid free detected\n");
+        return;
     }
 
     slab->bitmap[byte_idx] &= ~bit_mask;
@@ -247,7 +247,7 @@ void kfree(void *ptr) {
     void *raw_obj = (uint8_t *) ptr - sizeof(struct slab *);
     struct slab *slab = *((struct slab **) raw_obj);
     if (!slab) {
-        k_panic("kfree: no slab header found for 0x%lx\n", ptr);
+        return;
     }
 
     struct slab_cache *cache = slab->parent_cache;

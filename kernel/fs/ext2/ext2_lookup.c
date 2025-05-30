@@ -14,7 +14,9 @@ struct contains_ctx {
 };
 
 static bool search_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
-                            void *ctx_ptr, uint32_t b, uint32_t e_num) {
+                            void *ctx_ptr, uint32_t b, uint32_t e_num,
+                            uint32_t c) {
+    (void) c;
     (void) b;
     struct search_ctx *ctx = (struct search_ctx *) ctx_ptr;
 
@@ -31,11 +33,13 @@ static bool search_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
 }
 
 static bool contains_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
-                              void *ctx_ptr, uint32_t b, uint32_t e) {
+                              void *ctx_ptr, uint32_t b, uint32_t e,
+                              uint32_t c) {
     struct contains_ctx *ctx = (struct contains_ctx *) ctx_ptr;
     (void) b;
     (void) e;
     (void) fs;
+    (void) c;
     if (entry->inode != 0 &&
         memcmp(entry->name, ctx->target, entry->name_len) == 0 &&
         ctx->target[entry->name_len] == '\0') {
