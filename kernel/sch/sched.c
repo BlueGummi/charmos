@@ -5,8 +5,7 @@
 #include <vmalloc.h>
 #define CLI asm volatile("cli")
 #define STI asm volatile("sti")
-// TODO: we need to free memory allocated for tasks
-// TODO: we need to implement logic to avoid dup-ing
+
 __attribute__((noreturn)) void scheduler_start(void) {
     struct cpu_state *regs = &global_sched.current->regs;
 

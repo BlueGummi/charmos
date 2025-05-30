@@ -8,7 +8,7 @@ int system_shutdown(void) {
     if (uacpi_unlikely_error(ret)) {
         k_printf("failed to prepare for sleep: %s",
                  uacpi_status_to_string(ret));
-        return -EIO;
+        return ERR_IO;
     }
 
     asm volatile("cli");
@@ -16,7 +16,7 @@ int system_shutdown(void) {
     ret = uacpi_enter_sleep_state(UACPI_SLEEP_STATE_S5);
     if (uacpi_unlikely_error(ret)) {
         k_printf("failed to enter sleep: %s", uacpi_status_to_string(ret));
-        return -EIO;
+        return ERR_IO;
     }
 
     return 0;
@@ -33,7 +33,7 @@ int power_button_init(void) {
     if (uacpi_unlikely_error(ret)) {
         k_printf("failed to install power button event callback: %s",
                  uacpi_status_to_string(ret));
-        return -ENODEV;
+        return -ERR_NO_DEV;
     }
 
     return 0;
