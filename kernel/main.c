@@ -7,6 +7,8 @@
 #include <flanterm/flanterm.h>
 #include <fs/ext2.h>
 #include <fs/ext2_print.h>
+#include <fs/fat32.h>
+#include <fs/fat32_print.h>
 #include <gdt.h>
 #include <idt.h>
 #include <io.h>
@@ -60,8 +62,7 @@ match_rtc(void *user, uacpi_namespace_node *node, uacpi_u32 a) {
                  uacpi_status_to_string(ret));
         return UACPI_ITERATION_DECISION_NEXT_PEER;
     }
-
-    k_printf("Length is %lu\n", rtc_data->length);
+    k_printf("Len is %u\n", rtc_data->length);
     uacpi_free_resources(rtc_data);
 
     return UACPI_ITERATION_DECISION_CONTINUE;
@@ -120,13 +121,27 @@ void k_main(void) {
     uacpi_find_devices(RTC_ID, match_rtc, NULL);
     struct pci_device *devices;
     uint64_t count;
-    scan_pci_devices(&devices, &count);
+    pci_scan_devices(&devices, &count);
+
+    for (uint64_t i = 0; i < count; i++) {
+        k_printf("Device %lu is a %s\n", i,
+                 pci_class_name(devices[i].class_code, devices[i].subclass));
+    }
+    ide_detect_drives();
+
     struct ide_drive primary_master;
-    setup_primary_ide(&primary_master, devices, count);
+    struct ide_drive primary_slave;
+    ide_setup_drive(&primary_master, devices, count, 0, 0);
+    ide_setup_drive(&primary_slave, devices, count, 0, 1);
     struct ext2_sblock superblock;
 
     if (ext2_read_superblock(&primary_master, 0, &superblock)) {
         ext2_test(&primary_master, &superblock);
+    }
+
+    struct fat32_bpb *bpb = fat32_read_bpb(&primary_slave);
+    if (bpb) {
+        fat32_print_bpb(bpb);
     }
 
     scheduler_init(&global_sched);

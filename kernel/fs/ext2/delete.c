@@ -1,10 +1,10 @@
 #include <alloc.h>
 #include <errno.h>
 #include <fs/ext2.h>
+#include <misc/time.h>
 #include <printf.h>
 #include <stdint.h>
 #include <string.h>
-#include <time.h>
 
 struct unlink_ctx {
     const char *name;
@@ -58,8 +58,6 @@ bool unlink_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
     ctx->prev_offset = entry_offset;
     return false;
 }
-
-// TODO: Add deletion time (dtime) to deleted node
 
 enum errno ext2_unlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
                             const char *name) {

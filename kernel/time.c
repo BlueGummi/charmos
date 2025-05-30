@@ -1,5 +1,5 @@
 #include <io.h>
-#include <print.h>
+#include <misc/print.h>
 #include <printf.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -66,8 +66,6 @@ uint32_t get_unix_time() {
     year = cmos_read(0x09);
 
     century = cmos_read(0x32);
-    if (century == 0 || century == 0xFF)
-        century = 20; // assume 20xx
 
     uint8_t status_b = cmos_read(0x0B);
     bool bcd = !(status_b & 0x04);

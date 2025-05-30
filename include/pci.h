@@ -19,6 +19,8 @@ struct pci_device {
 
 const char *pci_class_name(uint8_t class_code, uint8_t subclass);
 
-void scan_pci_devices(struct pci_device **devices_out, uint64_t *count_out);
-void setup_primary_ide(struct ide_drive *ide, struct pci_device *devices,
-                       uint64_t count);
+void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out);
+uint32_t pci_read_bar(uint8_t bus, uint8_t device, uint8_t function,
+                      uint8_t bar_index);
+
+#pragma once

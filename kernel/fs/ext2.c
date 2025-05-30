@@ -2,11 +2,10 @@
 #include <errno.h>
 #include <fs/ext2.h>
 #include <fs/ext2_print.h>
+#include <misc/time.h>
 #include <printf.h>
 #include <stdint.h>
 #include <string.h>
-
-// TODO: Implement errno.h return codes or custom return codes
 
 uint64_t PTRS_PER_BLOCK;
 
@@ -50,7 +49,7 @@ enum errno ext2_mount(struct ide_drive *d, struct ext2_fs *fs,
                       struct ext2_sblock *sblock) {
     if (!fs || !sblock)
         return ERR_INVAL;
-    
+
     sblock->mtime = get_unix_time();
     sblock->wtime = get_unix_time();
     fs->drive = d;
@@ -60,7 +59,7 @@ enum errno ext2_mount(struct ide_drive *d, struct ext2_fs *fs,
     fs->inode_size = sblock->inode_size;
     fs->block_size = 1024 << sblock->log_block_size;
     fs->sectors_per_block = fs->block_size / d->sector_size;
-    
+
     fs->num_groups =
         (fs->inodes_count + fs->inodes_per_group - 1) / fs->inodes_per_group;
 

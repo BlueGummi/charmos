@@ -1,3 +1,4 @@
+#include <disk.h>
 #include <stdint.h>
 
 struct fat32_bpb {
@@ -46,4 +47,5 @@ struct fat_dirent {
     uint32_t filesize;
 } __attribute__((packed));
 
+struct fat32_bpb *fat32_read_bpb(struct ide_drive *drive);
 #pragma once

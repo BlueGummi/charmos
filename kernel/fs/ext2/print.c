@@ -1,6 +1,6 @@
 #include <disk.h>
 #include <fs/ext2.h>
-#include <print.h>
+#include <misc/print.h>
 #include <printf.h>
 #include <stdint.h>
 

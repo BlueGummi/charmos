@@ -2,7 +2,7 @@
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
 #include <limine.h>
-#include <time.h>
+#include <misc/time.h>
 
 #define k_panic(fmt, ...)                                                      \
     do {                                                                       \

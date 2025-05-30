@@ -1,9 +1,10 @@
+#include <alloc.h>
 #include <disk.h>
 #include <io.h>
 #include <pci.h>
 #include <printf.h>
 
-static struct pci_device pci_devices[MAX_PCI_DEVICES];
+static struct pci_device *pci_devices = NULL;
 static uint64_t pci_device_count;
 
 const char *pci_class_name(uint8_t class_code, uint8_t subclass) {
@@ -32,8 +33,21 @@ const char *pci_class_name(uint8_t class_code, uint8_t subclass) {
     return "Unknown Device";
 }
 
-void scan_pci_devices(struct pci_device **devices_out, uint64_t *count_out) {
+void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
     pci_device_count = 0;
+
+    uint64_t space_to_alloc = 0;
+
+    for (uint8_t bus = 0; bus < 255; ++bus) {
+        for (uint8_t device = 0; device < 32; ++device) {
+            for (uint8_t function = 0; function < 8; ++function) {
+                if (pci_read_word(bus, device, function, 0x0) != 0xFFFF)
+                    space_to_alloc++;
+            }
+        }
+    }
+
+    pci_devices = kmalloc(space_to_alloc);
 
     for (uint8_t bus = 0; bus < 255; ++bus) {
         for (uint8_t device = 0; device < 32; ++device) {
@@ -79,38 +93,4 @@ uint32_t pci_read_bar(uint8_t bus, uint8_t device, uint8_t function,
                       uint8_t bar_index) {
     uint8_t offset = 0x10 + (bar_index * 4);
     return pci_read(bus, device, function, offset);
-}
-
-void setup_primary_ide(struct ide_drive *ide, struct pci_device *devices,
-                       uint64_t count) {
-    ide->sector_size = 512;
-    for (uint64_t i = 0; i < count; i++) {
-        struct pci_device *curr = &devices[i];
-
-        if (curr->class_code == 1 && curr->subclass == 1) {
-            uint32_t bar0 =
-                pci_read_bar(curr->bus, curr->device, curr->function, 0);
-            uint32_t bar1 =
-                pci_read_bar(curr->bus, curr->device, curr->function, 1);
-
-            if ((bar0 & 1) == 1) {
-                ide->io_base = (uint16_t) (bar0 & 0xFFFFFFFC);
-            } else {
-                ide->io_base = 0x1F0;
-            }
-
-            if ((bar1 & 1) == 1) {
-                ide->ctrl_base = (uint16_t) (bar1 & 0xFFFFFFFC);
-            } else {
-                ide->ctrl_base = 0x3F6;
-            }
-
-            ide->slave = 0;
-            return;
-        }
-    }
-
-    ide->io_base = 0x1F0;
-    ide->ctrl_base = 0x3F6;
-    ide->slave = 0;
 }
