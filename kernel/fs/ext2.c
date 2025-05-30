@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <string.h>
 
+// TODO: Implement errno.h return codes or custom return codes
+
 uint64_t PTRS_PER_BLOCK;
 
 bool ext2_read_superblock(struct ide_drive *d, uint32_t partition_start_lba,

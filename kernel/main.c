@@ -30,7 +30,9 @@
 #include <stdint.h>
 #include <thread.h>
 #include <uacpi/event.h>
+#include <uacpi/resources.h>
 #include <uacpi/uacpi.h>
+#include <uacpi/utilities.h>
 #include <vfs/vfs.h>
 #include <vmm.h>
 
@@ -45,6 +47,25 @@ void k_sch_main() {
 
 uint64_t a_rsdp = 0;
 uint64_t tsc_freq = 0;
+
+static uacpi_iteration_decision
+match_rtc(void *user, uacpi_namespace_node *node, uacpi_u32 a) {
+    (void) a;
+    (void) user;
+    uacpi_resources *rtc_data;
+
+    uacpi_status ret = uacpi_get_current_resources(node, &rtc_data);
+    if (uacpi_unlikely_error(ret)) {
+        k_printf("unable to retrieve RTC resources: %s",
+                 uacpi_status_to_string(ret));
+        return UACPI_ITERATION_DECISION_NEXT_PEER;
+    }
+
+    k_printf("Length is %lu\n", rtc_data->length);
+    uacpi_free_resources(rtc_data);
+
+    return UACPI_ITERATION_DECISION_CONTINUE;
+}
 
 void k_main(void) {
     k_printf_init(framebuffer_request.response->framebuffers[0]);
@@ -95,6 +116,8 @@ void k_main(void) {
                                        UACPI_NULL, UACPI_OBJECT_DEVICE_BIT,
                                        UACPI_MAX_DEPTH_ANY, UACPI_NULL);*/
 
+#define RTC_ID "PNP0B00"
+    uacpi_find_devices(RTC_ID, match_rtc, NULL);
     struct pci_device *devices;
     uint64_t count;
     scan_pci_devices(&devices, &count);

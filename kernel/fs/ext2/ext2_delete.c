@@ -60,6 +60,10 @@ bool unlink_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
 
 bool ext2_unlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
                       const char *name) {
+
+    if (!ext2_dir_contains_file(fs, dir_inode, name))
+        return false;
+
     struct unlink_ctx ctx = {name, false, 0, 0, 0, 0};
 
     if (!ext2_walk_dir(fs, dir_inode, unlink_callback, &ctx, false))
