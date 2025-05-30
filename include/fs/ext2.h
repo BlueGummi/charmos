@@ -163,6 +163,10 @@ typedef bool (*dir_entry_callback)(struct ext2_fs *fs,
                                    struct ext2_dir_entry *entry, void *ctx,
                                    uint32_t block_num, uint32_t entry_num);
 
+typedef void (*ext2_block_visitor)(struct ext2_fs *fs, struct ext2_inode *inode,
+                                   uint32_t depth, uint32_t *block_ptr,
+                                   void *user_data);
+
 bool block_read(struct ide_drive *d, uint32_t lba, uint8_t *buffer,
                 uint32_t sector_count);
 
@@ -191,8 +195,14 @@ bool ext2_write_inode(struct ext2_fs *fs, uint32_t inode_num,
 bool ext2_link_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
                     struct k_full_inode *inode, char *name);
 
+bool ext2_unlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
+                      const char *name);
+
 bool ext2_create_file(struct ext2_fs *fs, struct k_full_inode *parent_dir,
                       const char *name, uint16_t mode);
+
+bool ext2_symlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
+                       const char *name, char *target);
 
 bool ext2_write_file(struct ext2_fs *fs, struct k_full_inode *inode,
                      uint32_t offset, const uint8_t *src, uint32_t size);
@@ -211,6 +221,9 @@ bool ext2_free_inode(struct ext2_fs *fs, uint32_t inode_num);
 
 bool ext2_walk_dir(struct ext2_fs *fs, struct k_full_inode *dir_inode,
                    dir_entry_callback cb, void *ctx, bool ff_avail);
+
+void ext2_traverse_inode_blocks(struct ext2_fs *fs, struct ext2_inode *inode,
+                                ext2_block_visitor visitor, void *user_data);
 
 void ext2_test(struct ide_drive *d, struct ext2_sblock *sblock);
 

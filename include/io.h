@@ -194,5 +194,4 @@ static inline void write_cr4(uint64_t cr4) {
     __asm__ volatile("mov %0, %%cr4" : : "r"(cr4));
 }
 
-
 #pragma once

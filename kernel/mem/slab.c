@@ -4,7 +4,6 @@
 #include <string.h>
 #include <vmm.h>
 
-
 struct slab_cache slab_caches[SLAB_CLASS_COUNT];
 uintptr_t slab_heap_top = 0xFFFF800000000000;
 
@@ -23,9 +22,11 @@ static void *slab_map_new_page() {
 
 static void slab_cache_init(struct slab_cache *cache, size_t obj_size) {
     cache->obj_size = obj_size + sizeof(struct slab *);
-    size_t bitmap_size =
-        (PAGE_SIZE - sizeof(struct slab)) / (cache->obj_size + 1 / 8);
-    cache->objs_per_slab = bitmap_size;
+
+    size_t available = PAGE_SIZE - sizeof(struct slab);
+
+    cache->objs_per_slab = (available * 8) / (8 * cache->obj_size + 1);
+
     cache->slabs_free = NULL;
     cache->slabs_partial = NULL;
     cache->slabs_full = NULL;
@@ -43,6 +44,9 @@ static struct slab *slab_create(struct slab_cache *cache) {
     size_t bitmap_bytes = (cache->objs_per_slab + 7) / 8;
     slab->bitmap = (uint8_t *) ((uint8_t *) page + sizeof(struct slab));
 
+    if ((cache->obj_size > 0) &&
+        ((cache->obj_size & (cache->obj_size - 1)) == 0))
+        k_panic("PANIC\n");
     uintptr_t mem_ptr = (uintptr_t) (slab->bitmap + bitmap_bytes);
     mem_ptr = (mem_ptr + cache->obj_size - 1) & ~(cache->obj_size - 1);
     slab->mem = (void *) mem_ptr;
@@ -61,6 +65,7 @@ static void slab_list_remove(struct slab **list, struct slab *slab) {
     }
     if (*list == slab) {
         *list = slab->next;
+        slab->next = NULL;
     }
 }
 
@@ -69,20 +74,42 @@ static void slab_list_add(struct slab **list, struct slab *slab) {
     *list = slab;
 }
 
+static void slab_move_slab(struct slab_cache *cache, struct slab *slab,
+                           int new_state) {
+    switch (slab->state) {
+    case SLAB_FREE: slab_list_remove(&cache->slabs_free, slab); break;
+    case SLAB_PARTIAL: slab_list_remove(&cache->slabs_partial, slab); break;
+    case SLAB_FULL: slab_list_remove(&cache->slabs_full, slab); break;
+    default: k_panic("Unknown slab state %d\n", slab->state);
+    }
+
+    slab->state = new_state;
+
+    switch (new_state) {
+    case SLAB_FREE: slab_list_add(&cache->slabs_free, slab); break;
+    case SLAB_PARTIAL: slab_list_add(&cache->slabs_partial, slab); break;
+    case SLAB_FULL: slab_list_add(&cache->slabs_full, slab); break;
+    default: k_panic("Unknown new slab state %d\n", new_state);
+    }
+}
+
 static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
+    if (slab->state == SLAB_FULL) {
+        return NULL;
+    }
+
     for (size_t i = 0; i < cache->objs_per_slab; i++) {
-        if (!(slab->bitmap[i / 8] & (1 << (i % 8)))) {
-            slab->bitmap[i / 8] |= (1 << (i % 8));
+        size_t byte_idx = i / 8;
+        uint8_t bit_mask = 1 << (i % 8);
+
+        if (!(slab->bitmap[byte_idx] & bit_mask)) {
+            slab->bitmap[byte_idx] |= bit_mask;
             slab->used++;
 
             if (slab->used == cache->objs_per_slab) {
-                slab->state = SLAB_FULL;
-                slab_list_remove(&cache->slabs_partial, slab);
-                slab_list_add(&cache->slabs_full, slab);
+                slab_move_slab(cache, slab, SLAB_FULL);
             } else if (slab->used == 1) {
-                slab->state = SLAB_PARTIAL;
-                slab_list_remove(&cache->slabs_free, slab);
-                slab_list_add(&cache->slabs_partial, slab);
+                slab_move_slab(cache, slab, SLAB_PARTIAL);
             }
 
             uint8_t *obj = (uint8_t *) slab->mem + i * cache->obj_size;
@@ -90,17 +117,45 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
             return obj + sizeof(struct slab *);
         }
     }
+
     return NULL;
+}
+
+static void slab_free(struct slab_cache *cache, struct slab *slab, void *obj) {
+    obj = (uint8_t *) obj - sizeof(struct slab *);
+
+    size_t index = ((uintptr_t) obj - (uintptr_t) slab->mem) / cache->obj_size;
+    size_t byte_idx = index / 8;
+    uint8_t bit_mask = 1 << (index % 8);
+
+    if (!(slab->bitmap[byte_idx] & bit_mask)) {
+        k_panic("Double free or invalid free detected\n");
+    }
+
+    slab->bitmap[byte_idx] &= ~bit_mask;
+    slab->used--;
+
+    if (slab->used == 0) {
+        slab_move_slab(cache, slab, SLAB_FREE);
+    } else if (slab->state == SLAB_FULL) {
+        slab_move_slab(cache, slab, SLAB_PARTIAL);
+    }
 }
 
 static void *slab_alloc(struct slab_cache *cache) {
     for (struct slab *slab = cache->slabs_partial; slab; slab = slab->next) {
+        if (slab->state == SLAB_FULL) {
+            continue;
+        }
         void *obj = slab_alloc_from(cache, slab);
         if (obj)
             return obj;
     }
 
     for (struct slab *slab = cache->slabs_free; slab; slab = slab->next) {
+        if (slab->state == SLAB_FULL) {
+            continue;
+        }
         void *obj = slab_alloc_from(cache, slab);
         if (obj)
             return obj;
@@ -112,28 +167,6 @@ static void *slab_alloc(struct slab_cache *cache) {
 
     slab_list_add(&cache->slabs_free, slab);
     return slab_alloc_from(cache, slab);
-}
-
-static void slab_free(struct slab_cache *cache, struct slab *slab, void *obj) {
-    obj = (uint8_t *) obj - sizeof(struct slab *);
-
-    size_t index = ((uintptr_t) obj - (uintptr_t) slab->mem) / cache->obj_size;
-    if (!(slab->bitmap[index / 8] & (1 << (index % 8)))) {
-        k_panic("Double free or invalid free\n");
-    }
-
-    slab->bitmap[index / 8] &= ~(1 << (index % 8));
-    slab->used--;
-
-    if (slab->used == 0) {
-        slab->state = SLAB_FREE;
-        slab_list_remove(&cache->slabs_partial, slab);
-        slab_list_add(&cache->slabs_free, slab);
-    } else if (slab->state == SLAB_FULL) {
-        slab->state = SLAB_PARTIAL;
-        slab_list_remove(&cache->slabs_full, slab);
-        slab_list_add(&cache->slabs_partial, slab);
-    }
 }
 
 static int size_to_index(size_t size) {

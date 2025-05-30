@@ -1,5 +1,5 @@
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <uacpi/internal/types.h>
 
 typedef struct { // typedefing it because of consistency with uacpi naming
@@ -18,4 +18,3 @@ typedef struct {
     uacpi_handle ctx;
     bool installed;
 } irq_entry_t;
-

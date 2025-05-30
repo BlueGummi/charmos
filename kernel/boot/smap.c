@@ -1,5 +1,5 @@
-#include <stdint.h>
 #include <io.h>
+#include <stdint.h>
 
 void enable_smap_smep_umip() {
     uint32_t abcd[4];

@@ -91,9 +91,9 @@ void k_main(void) {
                  uacpi_status_to_string(ret));
     }
 
-    uacpi_namespace_for_each_child(uacpi_namespace_root(), acpi_print_ctx,
-                                   UACPI_NULL, UACPI_OBJECT_DEVICE_BIT,
-                                   UACPI_MAX_DEPTH_ANY, UACPI_NULL);
+    /*    uacpi_namespace_for_each_child(uacpi_namespace_root(), acpi_print_ctx,
+                                       UACPI_NULL, UACPI_OBJECT_DEVICE_BIT,
+                                       UACPI_MAX_DEPTH_ANY, UACPI_NULL);*/
 
     struct pci_device *devices;
     uint64_t count;
@@ -103,7 +103,6 @@ void k_main(void) {
     struct ext2_sblock superblock;
 
     if (ext2_read_superblock(&primary_master, 0, &superblock)) {
-        ext2_print_superblock(&superblock);
         ext2_test(&primary_master, &superblock);
     }
 

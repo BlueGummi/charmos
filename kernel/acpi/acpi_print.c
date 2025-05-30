@@ -39,12 +39,12 @@ uacpi_iteration_decision acpi_print_ctx(void *ctx, uacpi_namespace_node *node,
     for (int i = 0; i < 4; i++) {
         k_printf("%c", info->name.text[i]);
     }
-    
+
     k_printf("\n");
-    
+
     k_printf("   Name ID: %u\n", info->name.id);
     k_printf("   Type  : %u\n", info->type);
-    k_printf("   Flags : 0x%x\n", info->flags);
+    k_printf("   Flags : 0b%b\n", info->flags);
 
     if (info->flags & UACPI_NS_NODE_INFO_HAS_SXD) {
         k_printf("   SXD   :\n");

@@ -1,13 +1,12 @@
 //
 //
 //
-// Source: https://github.com/rayanmargham/NyauxKC/blob/master/kernel/src/mem/sanitizers/UBsan/ubsan.c
+// Source:
+// https://github.com/rayanmargham/NyauxKC/blob/master/kernel/src/mem/sanitizers/UBsan/ubsan.c
 //
 // Thank you Nyaux!
 //
 //
-
-
 
 #include <printf.h>
 #include <stdint.h>

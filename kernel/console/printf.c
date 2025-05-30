@@ -115,6 +115,27 @@ static int print_hex(char *buffer, uint64_t num) {
     return n;
 }
 
+static int print_binary(char *buffer, uint64_t num) {
+    const char *digits = "01";
+    int n = 0;
+
+    if (num == 0) {
+        buffer[n++] = '0';
+    } else {
+        while (num > 0) {
+            buffer[n++] = digits[num % 2];
+            num /= 2;
+        }
+        for (int i = 0; i < n / 2; i++) {
+            char tmp = buffer[i];
+            buffer[i] = buffer[n - 1 - i];
+            buffer[n - 1 - i] = tmp;
+        }
+    }
+
+    return n;
+}
+
 static void apply_padding(const char *str, int len, int width, bool left_align,
                           bool zero_pad) {
     if (len >= width) {
@@ -149,6 +170,7 @@ static void handle_format_specifier(const char **format_ptr, va_list args) {
     bool zero_pad = false;
     int width = 0;
 
+    // Align
     while (*format == '-' || *format == '+' || *format == '0' ||
            *format == ' ' || *format == '#') {
         if (*format == '-')
@@ -166,6 +188,7 @@ static void handle_format_specifier(const char **format_ptr, va_list args) {
         }
     }
 
+    // Width
     enum { LEN_NONE, LEN_HH, LEN_H, LEN_L, LEN_LL, LEN_Z } len_mod = LEN_NONE;
     if (*format == 'z') {
         len_mod = LEN_Z;
@@ -189,9 +212,10 @@ static void handle_format_specifier(const char **format_ptr, va_list args) {
     }
 
     char spec = *format++;
-    char buffer[32];
+    char buffer[64];
     int len = 0;
 
+    // Style
     switch (spec) {
     case 'd':
     case 'i': {
@@ -231,6 +255,19 @@ static void handle_format_specifier(const char **format_ptr, va_list args) {
         default: num = va_arg(args, unsigned int); break;
         }
         len = print_hex(buffer, num);
+        break;
+    }
+    case 'b': {
+        uint64_t num;
+        switch (len_mod) {
+        case LEN_HH: num = (unsigned char) va_arg(args, unsigned int); break;
+        case LEN_H: num = (unsigned short) va_arg(args, unsigned int); break;
+        case LEN_L: num = va_arg(args, unsigned long); break;
+        case LEN_LL: num = va_arg(args, unsigned long long); break;
+        case LEN_Z: num = va_arg(args, size_t); break;
+        default: num = va_arg(args, unsigned int); break;
+        }
+        len = print_binary(buffer, num);
         break;
     }
     case 's': {

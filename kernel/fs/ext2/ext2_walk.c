@@ -205,3 +205,46 @@ bool ext2_walk_dir(struct ext2_fs *fs, struct k_full_inode *dir_inode,
 
     return false;
 }
+
+static void traverse_indirect(struct ext2_fs *fs, struct ext2_inode *inode,
+                              uint32_t block_num, int depth,
+                              ext2_block_visitor visitor, void *user_data) {
+    if (depth <= 0 || block_num == 0)
+        return;
+
+    uint32_t *block = kmalloc(fs->block_size);
+    if (!block)
+        return;
+
+    block_ptr_read(fs, block_num, (uint8_t *) block);
+
+    for (uint32_t i = 0; i < fs->block_size / sizeof(uint32_t); i++) {
+        if (block[i] || depth == 1) {
+            visitor(fs, inode, depth, &block[i], user_data);
+        }
+
+        if (depth > 1 && block[i]) {
+            traverse_indirect(fs, inode, block[i], depth - 1, visitor,
+                              user_data);
+        }
+    }
+
+    block_ptr_write(fs, block_num, (uint8_t *) block);
+    kfree(block);
+}
+
+void ext2_traverse_inode_blocks(struct ext2_fs *fs, struct ext2_inode *inode,
+                                ext2_block_visitor visitor, void *user_data) {
+    for (int i = 0; i < 12; i++) {
+        visitor(fs, inode, 0, &inode->block[i], user_data);
+    }
+
+    if (inode->block[12])
+        traverse_indirect(fs, inode, inode->block[12], 1, visitor, user_data);
+
+    if (inode->block[13])
+        traverse_indirect(fs, inode, inode->block[13], 2, visitor, user_data);
+
+    if (inode->block[14])
+        traverse_indirect(fs, inode, inode->block[14], 3, visitor, user_data);
+}

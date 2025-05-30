@@ -91,27 +91,37 @@ bool ext2_link_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
     return ext2_write_inode(fs, dir_inode->inode_num, &dir_inode->node);
 }
 
-bool ext2_create_inode(struct ext2_fs *fs, uint32_t inode_num, uint16_t mode,
-                       uint16_t uid, uint16_t gid, uint32_t size,
-                       uint32_t flags) {
-    if (!fs)
+bool ext2_symlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
+                       const char *name, char *target) {
+    uint32_t inode_num = ext2_alloc_inode(fs);
+    if (inode_num == 0)
         return false;
 
-    struct ext2_inode inode = {0};
+    struct ext2_inode new_inode = {0};
+    new_inode.mode = EXT2_S_IFLNK | 0777;
+    new_inode.links_count = 1;
+    new_inode.size = strlen(target);
+    new_inode.blocks = 0;
 
-    inode.mode = mode;
-    inode.uid = uid;
-    inode.gid = gid;
-    inode.size = size;
-    inode.atime = inode.ctime = inode.mtime = 0;
-    inode.dtime = 0;
-    inode.links_count = 1;
-    inode.flags = flags;
-    inode.blocks = 0;
-    inode.osd1 = 0;
+    if (strlen(target) <= sizeof(new_inode.block)) {
+        memcpy(new_inode.block, target, strlen(target));
+    } else {
+        uint32_t block = ext2_alloc_block(fs);
+        if (block == 0)
+            return false;
 
-    for (int i = 0; i < EXT2_NBLOCKS; i++)
-        inode.block[i] = 0;
+        block_ptr_write(fs, block, target);
+        new_inode.block[0] = block;
+        new_inode.blocks = fs->block_size / 512;
+    }
 
-    return ext2_write_inode(fs, inode_num, &inode);
+    if (!ext2_write_inode(fs, inode_num, &new_inode))
+        return false;
+
+    struct k_full_inode wrapped_inode = {
+        .inode_num = inode_num,
+        .node = new_inode,
+    };
+
+    return ext2_link_file(fs, dir_inode, &wrapped_inode, (char *) name);
 }
