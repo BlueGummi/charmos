@@ -1,4 +1,5 @@
 #include <alloc.h>
+#include <errno.h>
 #include <fs/ext2.h>
 #include <printf.h>
 #include <string.h>
@@ -235,10 +236,11 @@ static uint32_t get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
     return (uint32_t) -1;
 }
 
-bool ext2_write_file(struct ext2_fs *fs, struct k_full_inode *inode,
-                     uint32_t offset, const uint8_t *src, uint32_t size) {
+enum errno ext2_write_file(struct ext2_fs *fs, struct k_full_inode *inode,
+                           uint32_t offset, const uint8_t *src, uint32_t size) {
     if (!fs || !inode || !src)
-        return false;
+        return ERR_INVAL;
+
     uint32_t bytes_written = 0;
     uint32_t new_block_counter = 0;
     while (bytes_written < size) {
@@ -255,7 +257,7 @@ bool ext2_write_file(struct ext2_fs *fs, struct k_full_inode *inode,
         }
 
         if (block_num == 0 && allocate) {
-            return false;
+            return ERR_FS_NO_INODE;
         }
 
         if (block_num == 0) {
@@ -270,7 +272,7 @@ bool ext2_write_file(struct ext2_fs *fs, struct k_full_inode *inode,
 
         uint8_t *block_buf = kmalloc(fs->block_size);
         if (!block_buf)
-            return false;
+            return ERR_NO_MEM;
 
         block_ptr_read(fs, block_num, block_buf);
         memcpy(block_buf + block_offset, src + bytes_written, to_write);
@@ -284,5 +286,7 @@ bool ext2_write_file(struct ext2_fs *fs, struct k_full_inode *inode,
     inode->node.size = offset + size;
     inode->node.blocks += new_block_counter * (fs->block_size / 512);
 
-    return ext2_write_inode(fs, inode->inode_num, &inode->node);
+    return ext2_write_inode(fs, inode->inode_num, &inode->node)
+               ? ERR_OK
+               : ERR_FS_INTERNAL;
 }

@@ -1,4 +1,5 @@
 #include <alloc.h>
+#include <errno.h>
 #include <fs/ext2.h>
 #include <fs/ext2_print.h>
 #include <printf.h>
@@ -45,10 +46,10 @@ bool ext2_write_group_desc(struct ext2_fs *fs) {
                        sector_count);
 }
 
-bool ext2_mount(struct ide_drive *d, struct ext2_fs *fs,
+enum errno ext2_mount(struct ide_drive *d, struct ext2_fs *fs,
                 struct ext2_sblock *sblock) {
     if (!fs || !sblock)
-        return false;
+        return ERR_INVAL;
 
     fs->drive = d;
     fs->sblock = sblock;
@@ -68,16 +69,16 @@ bool ext2_mount(struct ide_drive *d, struct ext2_fs *fs,
 
     fs->group_desc = kmalloc(gdt_blocks * fs->block_size);
     if (!fs->group_desc)
-        return false;
+        return ERR_NO_MEM;
 
     if (!block_read(fs->drive, gdt_block * fs->sectors_per_block,
                     (uint8_t *) fs->group_desc,
                     gdt_blocks * fs->sectors_per_block)) {
         kfree(fs->group_desc);
-        return false;
+        return ERR_FS_INTERNAL;
     }
 
-    return true;
+    return ERR_OK;
 }
 
 struct k_full_inode *ext2_path_lookup(struct ext2_fs *fs,
@@ -113,7 +114,7 @@ struct k_full_inode *ext2_path_lookup(struct ext2_fs *fs,
 
 void ext2_test(struct ide_drive *d, struct ext2_sblock *sblock) {
     struct ext2_fs fs;
-    if (!ext2_mount(d, &fs, sblock)) {
+    if (ERR_IS_FATAL(ext2_mount(d, &fs, sblock))) {
         return;
     }
 
@@ -231,7 +232,6 @@ void ext2_test(struct ide_drive *d, struct ext2_sblock *sblock) {
     ext2_symlink_file(&fs, &root_inode, "fold", "./lost+found");
     struct k_full_inode *n = ext2_path_lookup(&fs, &root_inode, "file");
     ext2_print_inode(&root_inode);
-
     //    ext2_write_file(&fs, &i, 0, (uint8_t *) data, strlen(data));
     //    ext2_dump_file_data(&fs, &i.node, 0, strlen(data));
 }

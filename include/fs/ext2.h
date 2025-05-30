@@ -1,4 +1,5 @@
 #include <disk.h>
+#include <errno.h>
 #include <stdint.h>
 
 extern uint64_t PTRS_PER_BLOCK;
@@ -169,6 +170,12 @@ typedef void (*ext2_block_visitor)(struct ext2_fs *fs, struct ext2_inode *inode,
                                    uint32_t depth, uint32_t *block_ptr,
                                    void *user_data);
 
+//
+//
+// R/W + Mount
+//
+//
+
 bool block_read(struct ide_drive *d, uint32_t lba, uint8_t *buffer,
                 uint32_t sector_count);
 
@@ -185,8 +192,8 @@ bool ext2_read_superblock(struct ide_drive *d, uint32_t partition_start_lba,
 bool ext2_write_superblock(struct ext2_fs *fs);
 bool ext2_write_group_desc(struct ext2_fs *fs);
 
-bool ext2_mount(struct ide_drive *d, struct ext2_fs *fs,
-                struct ext2_sblock *sblock);
+enum errno ext2_mount(struct ide_drive *d, struct ext2_fs *fs,
+                      struct ext2_sblock *sblock);
 
 bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
                      struct ext2_inode *inode_out);
@@ -194,20 +201,26 @@ bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
 bool ext2_write_inode(struct ext2_fs *fs, uint32_t inode_num,
                       const struct ext2_inode *inode);
 
-bool ext2_link_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
-                    struct k_full_inode *inode, char *name);
+//
+//
+// Higher level stuff
+//
+//
 
-bool ext2_unlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
-                      const char *name);
+enum errno ext2_link_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
+                          struct k_full_inode *inode, char *name);
 
-bool ext2_create_file(struct ext2_fs *fs, struct k_full_inode *parent_dir,
-                      const char *name, uint16_t mode);
+enum errno ext2_unlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
+                            const char *name);
 
-bool ext2_symlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
-                       const char *name, char *target);
+enum errno ext2_create_file(struct ext2_fs *fs, struct k_full_inode *parent_dir,
+                            const char *name, uint16_t mode);
 
-bool ext2_write_file(struct ext2_fs *fs, struct k_full_inode *inode,
-                     uint32_t offset, const uint8_t *src, uint32_t size);
+enum errno ext2_symlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
+                             const char *name, char *target);
+
+enum errno ext2_write_file(struct ext2_fs *fs, struct k_full_inode *inode,
+                           uint32_t offset, const uint8_t *src, uint32_t size);
 
 struct k_full_inode *ext2_find_file_in_dir(struct ext2_fs *fs,
                                            struct k_full_inode *dir_inode,
@@ -215,6 +228,13 @@ struct k_full_inode *ext2_find_file_in_dir(struct ext2_fs *fs,
 
 bool ext2_dir_contains_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
                             const char *fname);
+
+//
+//
+//
+// Alloc/dealloc
+//
+//
 
 uint32_t ext2_alloc_block(struct ext2_fs *fs);
 bool ext2_free_block(struct ext2_fs *fs, uint32_t block_num);

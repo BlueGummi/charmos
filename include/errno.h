@@ -1,5 +1,7 @@
 #pragma once
 
+#define ERR_IS_FATAL(e) (e != ERR_OK && e != ERR_AGAIN)
+
 enum errno {
     ERR_OK = 0,        // Success
     ERR_UNKNOWN = 1,   // Unknown or unspecified error
@@ -19,9 +21,10 @@ enum errno {
     ERR_NOSPC = 15,    // No space left on device
     ERR_OVERFLOW = 16, // Value too large
 
-    ERR_NO_INODE = 100,     // Inode not found
-    ERR_CORRUPT = 101,      // Filesystem corruption
-    ERR_SYMLINK_LOOP = 102, // Too many symlink levels
+    ERR_FS_NO_INODE = 100,     // Inode not found
+    ERR_FS_CORRUPT = 101,      // Filesystem corruption
+    ERR_FS_SYMLINK_LOOP = 102, // Too many symlink levels
+    ERR_FS_INTERNAL = 103,     // Internal filesystem error
 
 };
 
@@ -45,9 +48,9 @@ static inline const char *errno_to_str(enum errno err) {
     case ERR_NOSPC: return "No space left";
     case ERR_OVERFLOW: return "Value too large";
 
-    case ERR_NO_INODE: return "Inode not found";
-    case ERR_CORRUPT: return "Filesystem corruption";
-    case ERR_SYMLINK_LOOP: return "Symlink loop";
+    case ERR_FS_NO_INODE: return "Inode not found";
+    case ERR_FS_CORRUPT: return "Filesystem corruption";
+    case ERR_FS_SYMLINK_LOOP: return "Symlink loop";
 
     default: return "Unrecognized error code";
     }

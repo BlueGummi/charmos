@@ -1,4 +1,5 @@
 #include <alloc.h>
+#include <errno.h>
 #include <fs/ext2.h>
 #include <printf.h>
 #include <stdint.h>
@@ -55,8 +56,8 @@ static bool link_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
     return false;
 }
 
-bool ext2_link_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
-                    struct k_full_inode *inode, char *name) {
+enum errno ext2_link_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
+                          struct k_full_inode *inode, char *name) {
     struct link_ctx ctx = {
         .name = name,
         .inode = inode->inode_num,
@@ -65,17 +66,17 @@ bool ext2_link_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
     };
 
     if (ext2_dir_contains_file(fs, dir_inode, name))
-        return false;
+        return ERR_NO_ENT;
 
     ext2_walk_dir(fs, dir_inode, link_callback, &ctx, false);
     if (ctx.success) {
         dir_inode->node.links_count += 1;
-        return true;
+        return ERR_OK;
     }
 
     uint32_t new_block = ext2_alloc_block(fs);
     if (new_block == 0) {
-        return false;
+        return ERR_FS_NO_INODE;
     }
 
     uint8_t *block_data = kzalloc(fs->block_size);
@@ -96,22 +97,24 @@ bool ext2_link_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
     if (block_ptr_write(fs, new_block, (uint32_t *) block_data)) {
         if (!ext2_walk_dir(fs, dir_inode, nop_callback, &new_block, true)) {
             ext2_free_block(fs, new_block);
-            return false;
+            return ERR_FS_INTERNAL;
         }
     } else {
-        return false;
+        return ERR_FS_INTERNAL;
     }
 
     kfree(block_data);
     dir_inode->node.links_count += 1;
-    return ext2_write_inode(fs, dir_inode->inode_num, &dir_inode->node);
+    return ext2_write_inode(fs, dir_inode->inode_num, &dir_inode->node)
+               ? ERR_OK
+               : ERR_FS_INTERNAL;
 }
 
-bool ext2_symlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
-                       const char *name, char *target) {
+enum errno ext2_symlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
+                             const char *name, char *target) {
     uint32_t inode_num = ext2_alloc_inode(fs);
     if (inode_num == 0)
-        return false;
+        return ERR_FS_NO_INODE;
 
     struct ext2_inode new_inode = {0};
     new_inode.ctime = get_unix_time();
@@ -126,7 +129,7 @@ bool ext2_symlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
     } else {
         uint32_t block = ext2_alloc_block(fs);
         if (block == 0)
-            return false;
+            return ERR_FS_NO_INODE;
 
         block_ptr_write(fs, block, target);
         new_inode.block[0] = block;
@@ -134,7 +137,7 @@ bool ext2_symlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
     }
 
     if (!ext2_write_inode(fs, inode_num, &new_inode))
-        return false;
+        return ERR_FS_INTERNAL;
 
     struct k_full_inode wrapped_inode = {
         .inode_num = inode_num,
@@ -142,7 +145,8 @@ bool ext2_symlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
     };
 
     make_symlink = true;
-    bool ret = ext2_link_file(fs, dir_inode, &wrapped_inode, (char *) name);
+    enum errno ret =
+        ext2_link_file(fs, dir_inode, &wrapped_inode, (char *) name);
     make_symlink = false;
     return ret;
 }

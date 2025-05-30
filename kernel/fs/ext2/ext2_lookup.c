@@ -55,9 +55,7 @@ struct k_full_inode *ext2_find_file_in_dir(struct ext2_fs *fs,
                                            struct k_full_inode *dir_inode,
                                            const char *fname) {
     struct k_full_inode out_node = {0};
-
     struct search_ctx ctx = {.target = fname, .result = &out_node};
-
     ext2_walk_dir(fs, dir_inode, search_callback, &ctx, false);
     return ctx.result;
 }

@@ -1,4 +1,5 @@
 #include <alloc.h>
+#include <errno.h>
 #include <fs/ext2.h>
 #include <printf.h>
 #include <stdint.h>
@@ -60,21 +61,21 @@ bool unlink_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
 
 // TODO: Add deletion time (dtime) to deleted node
 
-bool ext2_unlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
-                      const char *name) {
+enum errno ext2_unlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
+                            const char *name) {
 
     if (!ext2_dir_contains_file(fs, dir_inode, name))
-        return false;
+        return ERR_NO_ENT;
 
     struct unlink_ctx ctx = {name, false, 0, 0, 0, 0};
 
     if (!ext2_walk_dir(fs, dir_inode, unlink_callback, &ctx, false))
-        return false;
+        return ERR_FS_INTERNAL;
 
     uint8_t *block = kmalloc(fs->block_size);
     if (!block_ptr_read(fs, ctx.block_num, block)) {
         kfree(block);
-        return false;
+        return ERR_FS_INTERNAL;
     }
 
     struct ext2_dir_entry *entry =
@@ -95,18 +96,18 @@ bool ext2_unlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
 
     if (!block_ptr_write(fs, ctx.block_num, block)) {
         kfree(block);
-        return false;
+        return ERR_FS_INTERNAL;
     }
     kfree(block);
 
     struct k_full_inode target_inode;
     if (!ext2_read_inode(fs, ctx.inode_num, &target_inode.node))
-        return false;
+        return ERR_FS_INTERNAL;
 
     target_inode.inode_num = ctx.inode_num;
     if (target_inode.node.links_count == 0) {
         kfree(block);
-        return false;
+        return ERR_FS_NO_INODE;
     }
 
     target_inode.node.dtime = get_unix_time();
@@ -117,8 +118,11 @@ bool ext2_unlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
         ext2_free_inode(fs, ctx.inode_num);
     }
 
-    ext2_write_inode(fs, ctx.inode_num, &target_inode.node);
-    ext2_write_inode(fs, dir_inode->inode_num, &dir_inode->node);
+    if (!ext2_write_inode(fs, ctx.inode_num, &target_inode.node))
+        return ERR_FS_INTERNAL;
 
-    return true;
+    if (!ext2_write_inode(fs, dir_inode->inode_num, &dir_inode->node))
+        return ERR_FS_INTERNAL;
+
+    return ERR_OK;
 }
