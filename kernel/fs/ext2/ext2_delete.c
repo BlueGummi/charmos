@@ -3,6 +3,7 @@
 #include <printf.h>
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
 
 struct unlink_ctx {
     const char *name;
@@ -38,6 +39,7 @@ bool unlink_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
                      void *arg, uint32_t block_num, uint32_t e,
                      uint32_t entry_offset) {
     (void) e;
+    (void) fs;
     struct unlink_ctx *ctx = (struct unlink_ctx *) arg;
 
     if (ctx->found)
@@ -106,6 +108,8 @@ bool ext2_unlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
         kfree(block);
         return false;
     }
+
+    target_inode.node.dtime = get_unix_time();
 
     if (--target_inode.node.links_count == 0) {
         ext2_traverse_inode_blocks(fs, &target_inode.node, free_block_visitor,

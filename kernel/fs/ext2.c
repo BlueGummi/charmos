@@ -228,8 +228,8 @@ void ext2_test(struct ide_drive *d, struct ext2_sblock *sblock) {
         "dictum pulvinar.\n\n";
 
     //    ext2_link_file(&fs, &root_inode, &i, "file");
+    ext2_symlink_file(&fs, &root_inode, "fold", "./lost+found");
     struct k_full_inode *n = ext2_path_lookup(&fs, &root_inode, "file");
-    ext2_unlink_file(&fs, &root_inode, "file");
     ext2_print_inode(&root_inode);
 
     //    ext2_write_file(&fs, &i, 0, (uint8_t *) data, strlen(data));

@@ -11,6 +11,8 @@ struct link_ctx {
     bool success;
 };
 
+static bool make_symlink = false;
+
 MAKE_NOP_CALLBACK;
 
 static bool link_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
@@ -37,7 +39,13 @@ static bool link_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
         new_entry->inode = ctx->inode;
         new_entry->name_len = strlen(ctx->name);
         new_entry->rec_len = original_rec_len - actual_size;
-        new_entry->file_type = EXT2_FT_REG_FILE;
+
+        if (make_symlink) {
+            new_entry->file_type = EXT2_FT_SYMLINK;
+        } else {
+            new_entry->file_type = EXT2_FT_REG_FILE;
+        }
+
         memcpy(new_entry->name, ctx->name, new_entry->name_len);
         new_entry->name[new_entry->name_len] = '\0';
         ctx->success = true;
@@ -76,7 +84,13 @@ bool ext2_link_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
     new_entry->inode = inode->inode_num;
     new_entry->name_len = strlen(name);
     new_entry->rec_len = fs->block_size;
-    new_entry->file_type = EXT2_FT_REG_FILE;
+
+    if (make_symlink) {
+        new_entry->file_type = EXT2_FT_SYMLINK;
+    } else {
+        new_entry->file_type = EXT2_FT_REG_FILE;
+    }
+
     memcpy(new_entry->name, name, new_entry->name_len);
 
     if (block_ptr_write(fs, new_block, (uint32_t *) block_data)) {
@@ -100,6 +114,7 @@ bool ext2_symlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
         return false;
 
     struct ext2_inode new_inode = {0};
+    new_inode.ctime = get_unix_time();
     new_inode.mode = EXT2_S_IFLNK | 0777;
     new_inode.links_count = 1;
     new_inode.size = strlen(target);
@@ -107,6 +122,7 @@ bool ext2_symlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
 
     if (strlen(target) <= sizeof(new_inode.block)) {
         memcpy(new_inode.block, target, strlen(target));
+        new_inode.block[strlen(target)] = '\0';
     } else {
         uint32_t block = ext2_alloc_block(fs);
         if (block == 0)
@@ -125,5 +141,8 @@ bool ext2_symlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
         .node = new_inode,
     };
 
-    return ext2_link_file(fs, dir_inode, &wrapped_inode, (char *) name);
+    make_symlink = true;
+    bool ret = ext2_link_file(fs, dir_inode, &wrapped_inode, (char *) name);
+    make_symlink = false;
+    return ret;
 }
