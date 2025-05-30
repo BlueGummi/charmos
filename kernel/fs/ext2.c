@@ -50,7 +50,9 @@ enum errno ext2_mount(struct ide_drive *d, struct ext2_fs *fs,
                       struct ext2_sblock *sblock) {
     if (!fs || !sblock)
         return ERR_INVAL;
-
+    
+    sblock->mtime = get_unix_time();
+    sblock->wtime = get_unix_time();
     fs->drive = d;
     fs->sblock = sblock;
     fs->inodes_count = sblock->inodes_count;
@@ -58,7 +60,7 @@ enum errno ext2_mount(struct ide_drive *d, struct ext2_fs *fs,
     fs->inode_size = sblock->inode_size;
     fs->block_size = 1024 << sblock->log_block_size;
     fs->sectors_per_block = fs->block_size / d->sector_size;
-
+    
     fs->num_groups =
         (fs->inodes_count + fs->inodes_per_group - 1) / fs->inodes_per_group;
 
@@ -229,9 +231,7 @@ void ext2_test(struct ide_drive *d, struct ext2_sblock *sblock) {
         "dictum pulvinar.\n\n";
 
     //    ext2_link_file(&fs, &root_inode, &i, "file");
-    ext2_symlink_file(&fs, &root_inode, "fold", "./lost+found");
-    struct k_full_inode *n = ext2_path_lookup(&fs, &root_inode, "file");
-    ext2_print_inode(&root_inode);
+    ext2_print_superblock(sblock);
     //    ext2_write_file(&fs, &i, 0, (uint8_t *) data, strlen(data));
     //    ext2_dump_file_data(&fs, &i.node, 0, strlen(data));
 }

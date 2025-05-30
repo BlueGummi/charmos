@@ -1,30 +1,41 @@
 #include <io.h>
 #include <print.h>
+#include <printf.h>
 #include <stdbool.h>
 #include <stdint.h>
 #define CMOS_ADDRESS 0x70
 #define CMOS_DATA 0x71
 
-int is_leap(int year) {
-    return (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0));
+static uint32_t is_leap(int year) {
+    return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
 }
 
-uint32_t datetime_to_unix(int year, int month, int day, int hour, int min,
-                          int sec) {
-    static const int days_per_month[] = {0,   31,  59,  90,  120, 151, 181,
-                                         212, 243, 273, 304, 334, 365};
-    uint32_t days = 0;
+static uint32_t days_in_month(int year, int month) {
+    if (month == 2) {
+        return is_leap(year) ? 29 : 28;
+    }
+    return (month == 4 || month == 6 || month == 9 || month == 11) ? 30 : 31;
+}
 
-    for (int y = 1970; y < year; y++)
-        days += is_leap(y) ? 366 : 365;
+uint32_t datetime_to_unix(int year, int month, int day, int hour, int minute,
+                          int second) {
+    unsigned int timestamp = 0;
 
-    days += days_per_month[month - 1];
-    if (month > 2 && is_leap(year))
-        days++;
+    for (int y = 1970; y < year; y++) {
+        timestamp += is_leap(y) ? 366 * 24 * 3600 : 365 * 24 * 3600;
+    }
 
-    days += day - 1;
+    for (int m = 1; m < month; m++) {
+        timestamp += days_in_month(year, m) * 24 * 3600;
+    }
 
-    return ((days * 24 + hour) * 60 + min) * 60 + sec;
+    timestamp += (day - 1) * 24 * 3600;
+
+    timestamp += hour * 3600;
+    timestamp += minute * 60;
+    timestamp += second;
+
+    return timestamp;
 }
 
 static inline uint8_t cmos_read(uint8_t reg) {
@@ -72,7 +83,6 @@ uint32_t get_unix_time() {
     }
 
     int full_year = century * 100 + year;
-
     return datetime_to_unix(full_year, month, day, hour, minute, second);
 }
 
