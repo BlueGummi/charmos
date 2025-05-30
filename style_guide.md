@@ -60,7 +60,7 @@ Header files should all contain the overall group of functionality of the header
 Source files can optionally have their prefix, primarily depending on if their path already provides sufficient context around the group of the function.
 e.g. it isn't necessary to have a prefix on `kernel/fs/ext/ext2_lookup.c`, but it is also not disallowed to keep the prefix.
 
-### Prefix functions by group, prefer shortened private functions
+### Prefix functions by group
 
 Kernel-specific implementations of functions typically present in userspace C-stdlibs should have the `k_` or `k` prefix.
 This may avoid collisions once userspace functions are introduced, and also clarifies that it is a kernel implementation.
