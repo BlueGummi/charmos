@@ -4,21 +4,21 @@
 <img src="https://github.com/BlueGummi/charmos/blob/main/charmos.png" width="240">
 </p>
 
-## build
+## Build
 
-`nasm` and `xorriso` need to be present on the machine, currently Linux and macOS only.
+Prerequisites: `nasm` and `xorriso`
 
 ```bash
 ./build.sh
 
 ```
-## run
+## Run
 
 ```bash
 make run # run this in the build directory
 ```
 
-## roadmap 
+## Roadmap 
 
 > The :trophy: means the task is a challenge, the :broom: means something is trivial
 
@@ -46,7 +46,7 @@ make run # run this in the build directory
 
 ### "QOL Quarrels" 
 
-- [ ] implement returned error codes for specific error kinds on things like the fs
+- [x] implement returned error codes for specific error kinds on things like the fs
 
 - [x] change tooling 
 
@@ -56,7 +56,7 @@ make run # run this in the build directory
     
     - [ ] :broom: clean up formatting in the code for readability (newlines and such)
 
-    - [ ] :trophy: formalize a style specification 
+    - [x] :trophy: formalize a style specification 
 
 - [x] work on some c stdlib-style functions 
 
