@@ -70,7 +70,7 @@ void ext2_dump_file_data(struct ext2_fs *fs, const struct ext2_inode *inode,
         }
         uint32_t lba = block_num * fs->sectors_per_block;
         uint8_t buf[block_size];
-        if (!block_read(fs->drive, lba, buf, fs->sectors_per_block)) {
+        if (!ext2_block_read(fs->drive, lba, buf, fs->sectors_per_block)) {
             k_printf("failed to read block %u (LBA %u)\n", block_num, lba);
             break;
         }

@@ -73,7 +73,7 @@ enum errno ext2_unlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
         return ERR_FS_INTERNAL;
 
     uint8_t *block = kmalloc(fs->block_size);
-    if (!block_ptr_read(fs, ctx.block_num, block)) {
+    if (!ext2_block_ptr_read(fs, ctx.block_num, block)) {
         kfree(block);
         return ERR_FS_INTERNAL;
     }
@@ -94,7 +94,7 @@ enum errno ext2_unlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
         prev->rec_len += entry->rec_len;
     }
 
-    if (!block_ptr_write(fs, ctx.block_num, block)) {
+    if (!ext2_block_ptr_write(fs, ctx.block_num, block)) {
         kfree(block);
         return ERR_FS_INTERNAL;
     }

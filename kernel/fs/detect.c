@@ -20,7 +20,7 @@ const char *detect_fstr(enum fs_type type) {
 }
 
 enum fs_type detect_fs(struct ide_drive *drive) {
-    uint8_t sector[512];
+    uint8_t sector[drive->sector_size];
 
     if (!ide_read_sector(drive, 0, sector)) {
         k_printf("Failed to read sector 0\n");

@@ -1,3 +1,4 @@
+#include <misc/magic_numbers.h>
 #include <pmm.h>
 #include <printf.h>
 #include <slab.h>
@@ -210,7 +211,7 @@ void *kmalloc(size_t size) {
     }
 
     struct kmalloc_page_header *hdr = (struct kmalloc_page_header *) virt;
-    hdr->magic = KMALLOC_PAGE_MAGIC;
+    hdr->magic = MAGIC_KMALLOC_PAGE;
     hdr->pages = pages;
 
     slab_heap_top += pages * PAGE_SIZE;
@@ -235,7 +236,7 @@ void kfree(void *ptr) {
         (struct kmalloc_page_header *) ((uint8_t *) ptr -
                                         sizeof(struct kmalloc_page_header));
 
-    if (hdr->magic == KMALLOC_PAGE_MAGIC) {
+    if (hdr->magic == MAGIC_KMALLOC_PAGE) {
         uintptr_t virt = (uintptr_t) hdr;
         for (size_t i = 0; i < hdr->pages; i++) {
             pmm_free_pages((void *) vmm_get_phys(virt + i * PAGE_SIZE), 1,

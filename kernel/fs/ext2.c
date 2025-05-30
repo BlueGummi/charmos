@@ -30,8 +30,8 @@ bool ext2_write_superblock(struct ext2_fs *fs) {
     uint32_t superblock_block = 1;
     uint32_t lba = superblock_block * fs->sectors_per_block;
 
-    return block_write(fs->drive, lba, (uint8_t *) fs->sblock,
-                       fs->sectors_per_block);
+    return ext2_block_write(fs->drive, lba, (uint8_t *) fs->sblock,
+                            fs->sectors_per_block);
 }
 
 bool ext2_write_group_desc(struct ext2_fs *fs) {
@@ -39,15 +39,15 @@ bool ext2_write_group_desc(struct ext2_fs *fs) {
     uint32_t lba = group_desc_block * fs->sectors_per_block;
 
     uint32_t size = fs->num_groups * sizeof(struct ext2_group_desc);
+    uint32_t sector_size = fs->drive->sector_size;
+    uint32_t sector_count = (size + (sector_size - 1)) / sector_size;
 
-    uint32_t sector_count = (size + 511) / fs->drive->sector_size;
-
-    return block_write(fs->drive, lba, (uint8_t *) fs->group_desc,
-                       sector_count);
+    return ext2_block_write(fs->drive, lba, (uint8_t *) fs->group_desc,
+                            sector_count);
 }
 
 enum errno ext2_mount(struct ide_drive *d, struct ext2_fs *fs,
-                struct ext2_sblock *sblock) {
+                      struct ext2_sblock *sblock) {
     if (!fs || !sblock)
         return ERR_INVAL;
 
@@ -71,9 +71,9 @@ enum errno ext2_mount(struct ide_drive *d, struct ext2_fs *fs,
     if (!fs->group_desc)
         return ERR_NO_MEM;
 
-    if (!block_read(fs->drive, gdt_block * fs->sectors_per_block,
-                    (uint8_t *) fs->group_desc,
-                    gdt_blocks * fs->sectors_per_block)) {
+    if (!ext2_block_read(fs->drive, gdt_block * fs->sectors_per_block,
+                         (uint8_t *) fs->group_desc,
+                         gdt_blocks * fs->sectors_per_block)) {
         kfree(fs->group_desc);
         return ERR_FS_INTERNAL;
     }

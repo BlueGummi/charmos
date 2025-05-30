@@ -94,7 +94,7 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
 
     memcpy(new_entry->name, name, new_entry->name_len);
 
-    if (block_ptr_write(fs, new_block, (uint32_t *) block_data)) {
+    if (ext2_block_ptr_write(fs, new_block, (uint32_t *) block_data)) {
         if (!ext2_walk_dir(fs, dir_inode, nop_callback, &new_block, true)) {
             ext2_free_block(fs, new_block);
             return ERR_FS_INTERNAL;
@@ -131,9 +131,9 @@ enum errno ext2_symlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
         if (block == 0)
             return ERR_FS_NO_INODE;
 
-        block_ptr_write(fs, block, target);
+        ext2_block_ptr_write(fs, block, target);
         new_inode.block[0] = block;
-        new_inode.blocks = fs->block_size / 512;
+        new_inode.blocks = fs->block_size / fs->drive->sector_size;
     }
 
     if (!ext2_write_inode(fs, inode_num, &new_inode))

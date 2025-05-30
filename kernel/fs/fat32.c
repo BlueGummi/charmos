@@ -6,7 +6,7 @@
 
 void fat32_ls(struct ide_drive *drive) {
     struct fat32_bpb bpb;
-    uint8_t sector[512];
+    uint8_t sector[drive->sector_size];
 
     if (!ide_read_sector(drive, 0, sector)) {
         k_printf("Failed to read boot sector.\n");

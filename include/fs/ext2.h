@@ -176,15 +176,15 @@ typedef void (*ext2_block_visitor)(struct ext2_fs *fs, struct ext2_inode *inode,
 //
 //
 
-bool block_read(struct ide_drive *d, uint32_t lba, uint8_t *buffer,
-                uint32_t sector_count);
+bool ext2_block_read(struct ide_drive *d, uint32_t lba, uint8_t *buffer,
+                     uint32_t sector_count);
 
-bool block_ptr_read(struct ext2_fs *fs, uint32_t block_num, void *buf);
+bool ext2_block_ptr_read(struct ext2_fs *fs, uint32_t block_num, void *buf);
 
-bool block_write(struct ide_drive *d, uint32_t lba, const uint8_t *buffer,
-                 uint32_t sector_count);
+bool ext2_block_write(struct ide_drive *d, uint32_t lba, const uint8_t *buffer,
+                      uint32_t sector_count);
 
-bool block_ptr_write(struct ext2_fs *fs, uint32_t block_num, void *buf);
+bool ext2_block_ptr_write(struct ext2_fs *fs, uint32_t block_num, void *buf);
 
 bool ext2_read_superblock(struct ide_drive *d, uint32_t partition_start_lba,
                           struct ext2_sblock *sblock);
@@ -200,6 +200,10 @@ bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
 
 bool ext2_write_inode(struct ext2_fs *fs, uint32_t inode_num,
                       const struct ext2_inode *inode);
+
+uint32_t ext2_get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
+                               uint32_t block_index, uint32_t new_block_num,
+                               bool allocate, bool *was_allocated);
 
 //
 //
