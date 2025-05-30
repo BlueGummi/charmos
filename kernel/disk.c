@@ -55,7 +55,7 @@ bool ide_write_sector(struct ide_drive *d, uint32_t lba, const uint8_t *b) {
     return true;
 }
 
-void ide_setup_drive(struct ide_drive *ide, struct pci_device *devices,
+bool ide_setup_drive(struct ide_drive *ide, struct pci_device *devices,
                      uint64_t count, int channel, int is_slave) {
     ide->sector_size = 512;
 
@@ -81,13 +81,14 @@ void ide_setup_drive(struct ide_drive *ide, struct pci_device *devices,
             }
 
             ide->slave = is_slave;
-            return;
+            return true;
         }
     }
 
-    ide->io_base = (channel == 0) ? 0x1F0 : 0x170;
-    ide->ctrl_base = (channel == 0) ? 0x3F6 : 0x376;
-    ide->slave = is_slave;
+    ide->io_base = 0;
+    ide->ctrl_base = 0;
+    ide->slave = 0;
+    return false;
 }
 
 #define ATA_PRIMARY_IO 0x1F0
@@ -136,24 +137,27 @@ bool ata_identify(uint16_t base, uint16_t ctrl, bool slave) {
     return true;
 }
 
-void ide_detect_drives(void) {
+uint8_t ide_detect_drives(void) {
     const char *channel_names[] = {"Primary", "Secondary"};
     const char *drive_names[] = {"Master", "Slave"};
-
+    uint8_t ret = 0;
     uint16_t io_bases[] = {ATA_PRIMARY_IO, ATA_SECONDARY_IO};
     uint16_t ctrl_bases[] = {ATA_PRIMARY_CTRL, ATA_SECONDARY_CTRL};
 
     for (int channel = 0; channel < 2; channel++) {
         for (int drive = 0; drive < 2; drive++) {
+            int ind = channel * 2 + drive;
             bool found =
                 ata_identify(io_bases[channel], ctrl_bases[channel], drive);
             if (found) {
                 k_printf("IDE %s %s detected\n", channel_names[channel],
                          drive_names[drive]);
+                ret |= (1 << (3 - ind));
             } else {
                 k_printf("IDE %s %s not present\n", channel_names[channel],
                          drive_names[drive]);
             }
         }
     }
+    return ret;
 }

@@ -1,3 +1,4 @@
+#include <alloc.h>
 #include <disk.h>
 #include <fs/detect.h>
 #include <printf.h>
@@ -20,45 +21,58 @@ const char *detect_fstr(enum fs_type type) {
 }
 
 enum fs_type detect_fs(struct ide_drive *drive) {
-    uint8_t sector[drive->sector_size];
-
+    uint8_t *sector = kmalloc(drive->sector_size);
+    enum fs_type type = FS_UNKNOWN;
     if (!ide_read_sector(drive, 0, sector)) {
-        k_printf("Failed to read sector 0\n");
-        return FS_UNKNOWN;
+        goto end;
     }
 
-    if (memcmp(&sector[0x36], "FAT12", 5) == 0)
-        return FS_FAT12;
-    if (memcmp(&sector[0x36], "FAT16", 5) == 0)
-        return FS_FAT16;
-    if (memcmp(&sector[0x52], "FAT32", 5) == 0)
-        return FS_FAT32;
+    if (memcmp(&sector[0x36], "FAT12", 5) == 0) {
+        type = FS_FAT12;
+        goto end;
+    }
+    if (memcmp(&sector[0x36], "FAT16", 5) == 0) {
+        type = FS_FAT16;
+        goto end;
+    }
+    if (memcmp(&sector[0x52], "FAT32", 5) == 0) {
+        type = FS_FAT32;
+        goto end;
+    }
+    if (memcmp(&sector[3], "EXFAT   ", 8) == 0) {
+        type = FS_EXFAT;
+        goto end;
+    }
 
-    if (memcmp(&sector[3], "EXFAT   ", 8) == 0)
-        return FS_EXFAT;
-
-    if (memcmp(&sector[3], "NTFS    ", 8) == 0)
-        return FS_NTFS;
+    if (memcmp(&sector[3], "NTFS    ", 8) == 0) {
+        type = FS_NTFS;
+        goto end;
+    }
 
     if (!ide_read_sector(drive, 2, sector)) {
-        k_printf("failed to read sector 2\n");
-        return FS_UNKNOWN;
+        goto end;
     }
 
     uint16_t magic = *(uint16_t *) &sector[56];
     if (magic == 0xEF53) {
         uint32_t features = *(uint32_t *) &sector[96];
-        if (features & (1 << 6))
-            return FS_EXT3;
-        if (features & (1 << 0))
-            return FS_EXT2;
-        return FS_EXT4;
+        uint32_t ro_compat = *(uint32_t *) &sector[104];
+
+        if (ro_compat & (1 << 0)) {
+            type = FS_EXT4;
+        } else if (features & (1 << 6)) {
+            type = FS_EXT3;
+        } else {
+            type = FS_EXT2;
+        }
     }
 
     if (!ide_read_sector(drive, 16, sector))
-        return FS_UNKNOWN;
-    if (memcmp(&sector[1], "CD001", 5) == 0)
-        return FS_ISO9660;
+        goto end;
 
-    return FS_UNKNOWN;
+    if (memcmp(&sector[1], "CD001", 5) == 0)
+        type = FS_ISO9660;
+end:
+    kfree(sector);
+    return type;
 }

@@ -48,8 +48,8 @@ bool ide_wait_ready(struct ide_drive *d);
 bool ide_read_sector(struct ide_drive *d, uint32_t lba, uint8_t *b);
 bool ide_write_sector(struct ide_drive *d, uint32_t lba, const uint8_t *b);
 
-void ide_detect_drives();
+uint8_t ide_detect_drives();
 
-void ide_setup_drive(struct ide_drive *ide, struct pci_device *devices,
+bool ide_setup_drive(struct ide_drive *ide, struct pci_device *devices,
                      uint64_t count, int channel, int is_slave);
 #pragma once

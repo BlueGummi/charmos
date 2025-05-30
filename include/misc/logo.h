@@ -1,3 +1,4 @@
+#pragma once
 // clang-format off
 
 const char *OS_LOGO = 
