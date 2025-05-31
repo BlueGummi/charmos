@@ -90,6 +90,7 @@ void k_main(void) {
     enable_smap_smep_umip();
     gdt_install();
     idt_install();
+    asm volatile("sti");
     init_physical_allocator(r->offset, memmap_request);
     vmm_offset_set(r->offset);
     vmm_init();
@@ -108,7 +109,6 @@ void k_main(void) {
     struct pci_device *devices;
     uint64_t count;
     pci_scan_devices(&devices, &count);
-    asm volatile("sti");
     uint8_t drive_status = ide_detect_drives();
 
     struct ide_drive drives[4] = {0};
@@ -171,7 +171,6 @@ void k_main(void) {
     }
 
     nvme_scan_pci();
-    sleep(1);
     ahci_pci_discover();
 
     scheduler_init(&global_sched);

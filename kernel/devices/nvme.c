@@ -6,8 +6,7 @@
 #include <mem/vmm.h>
 #include <sleep.h>
 #include <stdint.h>
-
-#define ADMIN_QUEUE_ENTRIES 64
+#include <string.h>
 
 static void nvme_parse_cap(struct nvme_device *dev) {
     uint64_t cap = dev->cap;
@@ -26,30 +25,19 @@ void nvme_discover_device(uint8_t bus, uint8_t slot, uint8_t func) {
     k_printf("Found NVMe device: vendor=0x%04X, device=0x%04X\n", vendor,
              device);
 
-    uint32_t bar0_low = pci_read(bus, slot, func, 0x10) & ~0xF;
-    uint32_t bar0_high = pci_read(bus, slot, func, 0x14);
-    uint64_t bar0 = ((uint64_t) bar0_high << 32) | bar0_low;
-
+    uint32_t bar0 = pci_read(bus, slot, func, 0x10) & ~0xF;
     void *mmio = vmm_map_phys(bar0, 4096);
-    if (!mmio) {
-        k_printf("Bar0 is 0x%lx\n", bar0);
-        k_printf("Failed to map NVMe MMIO space!\n");
-        return;
-    }
+
+    uint32_t *regs = (uint32_t *) mmio;
 
     struct nvme_device *nvme = kmalloc(sizeof(struct nvme_device));
-    if (!nvme) {
-        k_printf("Failed to allocate nvme_device!\n");
-        return;
-    }
+    nvme->regs = regs;
 
-    nvme->regs = (volatile uint32_t *) mmio;
-
-    uint32_t cap_lo = nvme->regs[NVME_REG_CAP / 4];
-    uint32_t cap_hi = nvme->regs[(NVME_REG_CAP + 4) / 4];
+    uint32_t cap_lo = regs[NVME_REG_CAP / 4];
+    uint32_t cap_hi = regs[(NVME_REG_CAP + 4) / 4];
     nvme->cap = ((uint64_t) cap_hi << 32) | cap_lo;
 
-    nvme->version = nvme->regs[NVME_REG_VER / 4];
+    nvme->version = regs[NVME_REG_VER / 4];
 
     nvme_parse_cap(nvme);
 

@@ -1,8 +1,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// TODO: rename this (duh)
-
 #define PCI_CONFIG_ADDRESS 0xCF8
 #define PCI_CONFIG_DATA 0xCFC
 
@@ -11,7 +9,7 @@
 //
 //
 //
-// =========| IN - BYTE, WORD, LONG, QWORD, SB, SW, SL, SQ |=========
+// =========| IN - BYTE, WORD, LONG, SB, SW, SL |=========
 //
 //
 //
@@ -36,12 +34,6 @@ static inline uint32_t inl(uint16_t port) {
     return ret;
 }
 
-static inline uint64_t inq(uint16_t port) {
-    uint64_t ret;
-    asm volatile("inq %1, %0" : "=A"(ret) : "Nd"(port));
-    return ret;
-}
-
 static inline void insb(uint16_t port, void *addr, uint32_t count) {
     asm volatile("rep insb" : "+D"(addr), "+c"(count) : "d"(port) : "memory");
 }
@@ -54,16 +46,12 @@ static inline void insl(uint16_t port, void *addr, uint32_t count) {
     asm volatile("rep insl" : "+D"(addr), "+c"(count) : "d"(port) : "memory");
 }
 
-static inline void insq(uint16_t port, void *addr, uint32_t count) {
-    asm volatile("rep insq" : "+D"(addr), "+c"(count) : "d"(port) : "memory");
-}
-
 //
 //
 //
 //
 //
-// ========| OUT - BYTE, WORD, LONG, QWORD, SB, SW, SL, SQ |========
+// ========| OUT - BYTE, WORD, LONG, SB, SW, SL |========
 //
 //
 //
@@ -82,10 +70,6 @@ static inline void outl(uint16_t port, uint32_t value) {
     asm volatile("outl %0, %1" : : "a"(value), "Nd"(port));
 }
 
-static inline void outq(uint16_t port, uint64_t value) {
-    asm volatile("outq %0, %1" : : "A"(value), "Nd"(port));
-}
-
 static inline void outsw(uint16_t port, const void *addr, uint32_t count) {
     asm volatile("rep outsw" : "+S"(addr), "+c"(count) : "d"(port) : "memory");
 }
@@ -96,10 +80,6 @@ static inline void outsb(uint16_t port, const void *addr, uint32_t count) {
 
 static inline void outsl(uint16_t port, const void *addr, uint32_t count) {
     asm volatile("rep outsl" : "+S"(addr), "+c"(count) : "d"(port) : "memory");
-}
-
-static inline void outsq(uint16_t port, const void *addr, uint32_t count) {
-    asm volatile("rep outsq" : "+S"(addr), "+c"(count) : "d"(port) : "memory");
 }
 
 //
@@ -158,6 +138,50 @@ static inline void pci_write_byte(uint8_t bus, uint8_t slot, uint8_t func,
     uint32_t shift = (offset & 3) * 8;
     tmp = (tmp & ~(0xFF << shift)) | ((uint32_t) value << shift);
     pci_write(bus, slot, func, offset & 0xFC, tmp);
+}
+
+//
+//
+//
+//
+//
+// ========================| MMIO  |=========================
+//
+//
+//
+//
+//
+
+static inline void mmio_write_64(void *address, uint64_t value) {
+    *(uint64_t *) address = value;
+}
+
+static inline void mmio_write_32(void *address, uint32_t value) {
+    *(uint32_t *) address = value;
+}
+
+static inline void mmio_write_16(void *address, uint16_t value) {
+    *(uint16_t *) address = value;
+}
+
+static inline void mmio_write_8(void *address, uint8_t value) {
+    *(uint8_t *) address = value;
+}
+
+static inline uint64_t mmio_read_64(void *address) {
+    return *(uint64_t *) address;
+}
+
+static inline uint32_t mmio_read_32(void *address) {
+    return *(uint32_t *) address;
+}
+
+static inline uint16_t mmio_read_16(void *address) {
+    return *(uint16_t *) address;
+}
+
+static inline uint8_t mmio_read_8(void *address) {
+    return *(uint8_t *) address;
 }
 
 //
