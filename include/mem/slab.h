@@ -32,6 +32,7 @@ struct kmalloc_page_header {
     uint32_t magic;
     size_t pages;
 };
+
 void slab_init();
 extern struct slab_cache slab_caches[SLAB_CLASS_COUNT];
 extern uintptr_t slab_heap_top;

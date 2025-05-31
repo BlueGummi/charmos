@@ -254,3 +254,17 @@ void kfree(void *ptr) {
     struct slab_cache *cache = slab->parent_cache;
     slab_free(cache, slab, ptr);
 }
+
+void *krealloc(void *ptr, size_t size) {
+    if (!ptr)
+        return NULL;
+
+    void *new_ptr = kmalloc(size);
+
+    if (!new_ptr)
+        return NULL;
+
+    memcpy(new_ptr, ptr, size);
+    kfree(ptr);
+    return new_ptr;
+}

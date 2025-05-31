@@ -43,53 +43,39 @@ add_custom_target(iso
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
+set(QEMU_COMMON_FLAGS
+    -cdrom ${IMAGE_NAME}.iso
+    -boot order=d
+    -m 2G
+    -M smm=off
+    -smp cores=4
+    -no-shutdown
+    -no-reboot
+    -s
+    -monitor telnet:127.0.0.1:1234,server,nowait
+    -device qemu-xhci,id=xhci
+    -device usb-kbd,id=usbkbd
+    -device usb-mouse,id=usbmouse
+    -drive id=disk0,file=disk.img,format=raw,if=none
+    -device ahci,id=ahci
+    -device ide-hd,drive=disk0,bus=ahci.0
+    -drive id=fatdisk,file=fat32_disk.img,format=raw,if=none
+    -device ide-hd,drive=fatdisk,bus=ide.0,unit=1
+)
+
 add_custom_target(run
     DEPENDS iso
     COMMAND clear
-    COMMAND qemu-system-${ARCH}
-        -cdrom ${IMAGE_NAME}.iso
-        -boot order=d
-        -m 2G
-        -M smm=off
-        -smp cores=4
-        -no-shutdown
-        -no-reboot
+    COMMAND qemu-system-${ARCH} ${QEMU_COMMON_FLAGS}
         -serial stdio
-        -s
-        -monitor telnet:127.0.0.1:1234,server,nowait
-        -device qemu-xhci,id=xhci
-        -device usb-kbd,id=usbkbd
-        -device usb-mouse,id=usbmouse
-        -drive id=disk0,file=disk.img,format=raw,if=none
-        -device ahci,id=ahci
-        -device ide-hd,drive=disk0,bus=ahci.0
-        -drive id=fatdisk,file=fat32_disk.img,format=raw,if=none
-        -device ide-hd,drive=fatdisk,bus=ide.0,unit=1
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
 add_custom_target(headless
     DEPENDS iso
     COMMAND clear
-    COMMAND qemu-system-${ARCH}
-        -cdrom ${IMAGE_NAME}.iso
-        -boot order=d
-        -m 2G
-        -M smm=off
-        -smp cores=4
-        -no-shutdown
-        -no-reboot
+    COMMAND qemu-system-${ARCH} ${QEMU_COMMON_FLAGS}
         -nographic
-        -s
-        -monitor telnet:127.0.0.1:1234,server,nowait
-        -device qemu-xhci,id=xhci
-        -device usb-kbd,id=usbkbd
-        -device usb-mouse,id=usbmouse
-        -drive id=disk0,file=disk.img,format=raw,if=none
-        -device ahci,id=ahci
-        -device ide-hd,drive=disk0,bus=ahci.0
-        -drive id=fatdisk,file=fat32_disk.img,format=raw,if=none
-        -device ide-hd,drive=fatdisk,bus=ide.0,unit=1
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
