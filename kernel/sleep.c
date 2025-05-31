@@ -1,5 +1,5 @@
-#include <stdint.h>
 #include <sleep.h>
+#include <stdint.h>
 
 extern uint64_t time_tick_count;
 

@@ -1,7 +1,7 @@
 #include <asm.h>
 #include <console/printf.h>
-#include <disk/generic_disk.h>
-#include <disk/ide.h>
+#include <devices/generic_disk.h>
+#include <devices/ide.h>
 #include <fs/ext2.h>
 #include <mem/alloc.h>
 #include <pci/pci.h>

@@ -4,8 +4,9 @@
 #include <boot/gdt.h>
 #include <boot/smap.h>
 #include <console/printf.h>
-#include <disk/generic_disk.h>
-#include <disk/ide.h>
+#include <devices/generic_disk.h>
+#include <devices/ide.h>
+#include <devices/nvme.h>
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
 #include <fs/detect.h>
@@ -166,6 +167,7 @@ void k_main(void) {
         }
     }
 
+    nvme_scan_pci();
     ahci_pci_discover();
 
     scheduler_init(&global_sched);

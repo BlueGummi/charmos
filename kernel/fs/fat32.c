@@ -1,5 +1,5 @@
 #include <console/printf.h>
-#include <disk/generic_disk.h>
+#include <devices/generic_disk.h>
 #include <fs/fat32.h>
 #include <fs/fat32_print.h>
 #include <fs/mbr.h>

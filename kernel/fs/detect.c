@@ -1,5 +1,5 @@
 #include <console/printf.h>
-#include <disk/generic_disk.h>
+#include <devices/generic_disk.h>
 #include <fs/detect.h>
 #include <mem/alloc.h>
 #include <stdint.h>
