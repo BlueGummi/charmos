@@ -1,3 +1,5 @@
+#include <acpi/print.h>
+#include <ahci.h>
 #include <asm.h>
 #include <boot/gdt.h>
 #include <boot/smap.h>
@@ -85,7 +87,7 @@ void k_main(void) {
 
     enable_smap_smep_umip();
     gdt_install();
-    //    idt_install();
+    idt_install();
     init_physical_allocator(r->offset, memmap_request);
     vmm_offset_set(r->offset);
     vmm_init();
@@ -95,9 +97,9 @@ void k_main(void) {
     uacpi_initialize(0);
     uacpi_namespace_load();
     uacpi_namespace_initialize();
-    /*    uacpi_namespace_for_each_child(uacpi_namespace_root(), acpi_print_ctx,
-                                       UACPI_NULL, UACPI_OBJECT_DEVICE_BIT,
-                                       UACPI_MAX_DEPTH_ANY, UACPI_NULL);*/
+    uacpi_namespace_for_each_child(uacpi_namespace_root(), acpi_print_ctx,
+                                   UACPI_NULL, UACPI_OBJECT_DEVICE_BIT,
+                                   UACPI_MAX_DEPTH_ANY, UACPI_NULL);
 
     uacpi_find_devices("PNP0B00", match_rtc, NULL);
     struct pci_device *devices;
@@ -163,6 +165,8 @@ void k_main(void) {
         default: continue;
         }
     }
+
+    ahci_pci_discover();
 
     scheduler_init(&global_sched);
     scheduler_add_thread(&global_sched, thread_create(k_sch_main));

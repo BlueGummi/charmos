@@ -1,7 +1,7 @@
 #include <console/printf.h>
 #include <limine.h>
-#include <mem/bitmap_alloc.h>
 #include <mem/pmm.h>
+#include <mem/slab.h>
 #include <mem/vmm.h>
 #include <misc/linker_symbols.h>
 #include <spin_lock.h>
@@ -12,6 +12,7 @@ struct spinlock vmm_lock = SPINLOCK_INIT;
 struct page_table *kernel_pml4 = NULL;
 uintptr_t kernel_pml4_phys = 0;
 static uint64_t hhdm_offset = 0;
+uintptr_t vmm_map_top = 0;
 
 uint64_t sub_offset(uint64_t a) {
     return a - hhdm_offset;
@@ -195,4 +196,27 @@ uintptr_t vmm_get_phys(uintptr_t virt) {
         return (uintptr_t) -1;
 
     return (*entry & PAGING_PHYS_MASK) + (virt & 0xFFF);
+}
+
+void *vmm_map_phys(uint64_t addr, uint64_t len) {
+
+    uintptr_t phys_start = PAGE_ALIGN_DOWN(addr);
+    uintptr_t offset = addr - phys_start;
+
+    size_t total_len = len + offset;
+    size_t total_pages = (total_len + PAGE_SIZE - 1) / PAGE_SIZE;
+
+    if (vmm_map_top + total_pages * PAGE_SIZE > VMM_MAP_LIMIT) {
+        return NULL;
+    }
+
+    uintptr_t virt_start = vmm_map_top;
+    vmm_map_top += total_pages * PAGE_SIZE;
+
+    for (size_t i = 0; i < total_pages; i++) {
+        vmm_map_page(virt_start + i * PAGE_SIZE, phys_start + i * PAGE_SIZE,
+                     PAGING_PRESENT | PAGING_WRITE);
+    }
+
+    return (void *) (virt_start + offset);
 }

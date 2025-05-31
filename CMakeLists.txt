@@ -61,7 +61,8 @@ add_custom_target(run
         -device usb-kbd,id=usbkbd
         -device usb-mouse,id=usbmouse
         -drive id=disk0,file=disk.img,format=raw,if=none
-        -device ide-hd,drive=disk0,bus=ide.0,unit=0
+        -device ahci,id=ahci
+        -device ide-hd,drive=disk0,bus=ahci.0
         -drive id=fatdisk,file=fat32_disk.img,format=raw,if=none
         -device ide-hd,drive=fatdisk,bus=ide.0,unit=1
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
@@ -85,7 +86,8 @@ add_custom_target(headless
         -device usb-kbd,id=usbkbd
         -device usb-mouse,id=usbmouse
         -drive id=disk0,file=disk.img,format=raw,if=none
-        -device ide-hd,drive=disk0,bus=ide.0,unit=0
+        -device ahci,id=ahci
+        -device ide-hd,drive=disk0,bus=ahci.0
         -drive id=fatdisk,file=fat32_disk.img,format=raw,if=none
         -device ide-hd,drive=fatdisk,bus=ide.0,unit=1
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}

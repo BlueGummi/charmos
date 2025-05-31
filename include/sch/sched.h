@@ -18,4 +18,5 @@ void scheduler_rm_id(struct scheduler *sched, uint64_t thread_id);
 extern struct thread *current_thread;
 extern struct scheduler global_sched;
 extern void timer_interrupt_handler(void);
+#define PIT_HZ 100
 #pragma once

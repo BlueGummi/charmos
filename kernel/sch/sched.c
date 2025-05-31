@@ -3,6 +3,9 @@
 #include <sch/sched.h>
 #include <stdint.h>
 #include <string.h>
+
+uint64_t time_tick_count = 0;
+
 #define CLI asm volatile("cli")
 #define STI asm volatile("sti")
 
@@ -47,6 +50,7 @@ __attribute__((noreturn)) void scheduler_start(void) {
 }
 
 void schedule(struct cpu_state *cpu) {
+    time_tick_count += 1;
     if (!global_sched.active) {
         return;
     }

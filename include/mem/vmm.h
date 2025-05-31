@@ -34,5 +34,6 @@ void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags);
 void *vmm_map_region(uintptr_t virt_base, uint64_t size, uint64_t flags);
 void vmm_unmap_page(uintptr_t virt);
 uintptr_t vmm_get_phys(uintptr_t virt);
+void *vmm_map_phys(uint64_t addr, uint64_t len);
 extern struct page_table *kernel_pml4;
 #pragma once

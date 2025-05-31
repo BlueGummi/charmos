@@ -96,7 +96,7 @@ void idt_install() {
     idt_set_gate(KB_ID, (uint64_t) keyboard_handler, 0x08, 0x8E);
 
     outb(0x43, 0x36);
-    uint16_t divisor = 1193180 / 100;
+    uint16_t divisor = 1193180 / PIT_HZ;
     outb(0x40, divisor & 0xFF);
     outb(0x40, (divisor >> 8) & 0xFF);
     uint8_t mask = inb(PIC1_DATA);
