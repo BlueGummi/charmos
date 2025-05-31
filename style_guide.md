@@ -169,6 +169,12 @@ The commonly used style of `{type}({scope}): {subject}` is helpful, but it is no
 
 ## Miscellaneous
 
+### Integer sizes
+
+In cases where the size of an integer matters, it is better to use the `stdint.h` type, as it is easier to read and understand. However, if a short-lived integer is being used, it is acceptable to use the standard `int` type or other default C types.
+
+Some examples of this are in loops where the limit is a 32-bit integer or smaller, or in array indexing.
+
 ### Magic numbers
 
 Put them in `include/misc/magic_numbers.h` to avoid collisions. Prefix them with `MAGIC_`.
