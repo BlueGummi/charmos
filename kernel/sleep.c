@@ -1,3 +1,5 @@
+#include <asm.h>
+#include <console/printf.h>
 #include <sleep.h>
 #include <stdint.h>
 

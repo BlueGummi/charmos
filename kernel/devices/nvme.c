@@ -1,8 +1,23 @@
 #include <asm.h>
 #include <console/printf.h>
 #include <devices/nvme.h>
+#include <mem/alloc.h>
+#include <mem/pmm.h>
 #include <mem/vmm.h>
+#include <sleep.h>
 #include <stdint.h>
+
+#define ADMIN_QUEUE_ENTRIES 64
+
+static void nvme_parse_cap(struct nvme_device *dev) {
+    uint64_t cap = dev->cap;
+
+    uint32_t mpsmin = (cap >> 48) & 0xF;
+    dev->page_size = 1 << (12 + mpsmin);
+
+    uint32_t dstrd = (cap >> 32) & 0xF;
+    dev->doorbell_stride = 1 << dstrd;
+}
 
 void nvme_discover_device(uint8_t bus, uint8_t slot, uint8_t func) {
     uint16_t vendor = pci_read_word(bus, slot, func, 0x00);
@@ -11,16 +26,37 @@ void nvme_discover_device(uint8_t bus, uint8_t slot, uint8_t func) {
     k_printf("Found NVMe device: vendor=0x%04X, device=0x%04X\n", vendor,
              device);
 
-    uint32_t bar0 = pci_read(bus, slot, func, 0x10) & ~0xF;
+    uint32_t bar0_low = pci_read(bus, slot, func, 0x10) & ~0xF;
+    uint32_t bar0_high = pci_read(bus, slot, func, 0x14);
+    uint64_t bar0 = ((uint64_t) bar0_high << 32) | bar0_low;
+
     void *mmio = vmm_map_phys(bar0, 4096);
+    if (!mmio) {
+        k_printf("Bar0 is 0x%lx\n", bar0);
+        k_printf("Failed to map NVMe MMIO space!\n");
+        return;
+    }
 
-    volatile uint32_t *regs = (volatile uint32_t *) mmio;
-    uint32_t cap_lo = regs[NVME_REG_CAP / 4];
-    uint32_t cap_hi = regs[(NVME_REG_CAP + 4) / 4];
-    uint64_t cap = ((uint64_t) cap_hi << 32) | cap_lo;
+    struct nvme_device *nvme = kmalloc(sizeof(struct nvme_device));
+    if (!nvme) {
+        k_printf("Failed to allocate nvme_device!\n");
+        return;
+    }
 
-    k_printf("NVMe CAP: 0x%016llx\n", cap);
-    k_printf("NVMe version: %08x\n", regs[NVME_REG_VER / 4]);
+    nvme->regs = (volatile uint32_t *) mmio;
+
+    uint32_t cap_lo = nvme->regs[NVME_REG_CAP / 4];
+    uint32_t cap_hi = nvme->regs[(NVME_REG_CAP + 4) / 4];
+    nvme->cap = ((uint64_t) cap_hi << 32) | cap_lo;
+
+    nvme->version = nvme->regs[NVME_REG_VER / 4];
+
+    nvme_parse_cap(nvme);
+
+    k_printf("NVMe CAP: 0x%016llx\n", nvme->cap);
+    k_printf("NVMe version: %08x\n", nvme->version);
+    k_printf("Doorbell stride: %u bytes\n", nvme->doorbell_stride * 4);
+    k_printf("Page size: %u bytes\n", nvme->page_size);
 }
 
 void nvme_scan_pci() {

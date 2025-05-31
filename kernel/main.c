@@ -32,6 +32,7 @@
 #include <rust.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
+#include <sleep.h>
 #include <spin_lock.h>
 #include <stdalign.h>
 #include <stdatomic.h>
@@ -95,17 +96,19 @@ void k_main(void) {
     slab_init();
     test_alloc();
     tsc_freq = measure_tsc_freq_pit();
-    uacpi_initialize(0);
-    uacpi_namespace_load();
-    uacpi_namespace_initialize();
-    uacpi_namespace_for_each_child(uacpi_namespace_root(), acpi_print_ctx,
-                                   UACPI_NULL, UACPI_OBJECT_DEVICE_BIT,
-                                   UACPI_MAX_DEPTH_ANY, UACPI_NULL);
+    /*   uacpi_initialize(0);
+        uacpi_namespace_load();
+        uacpi_namespace_initialize();
+
+        uacpi_namespace_for_each_child(uacpi_namespace_root(), acpi_print_ctx,
+                                       UACPI_NULL, UACPI_OBJECT_DEVICE_BIT,
+                                       UACPI_MAX_DEPTH_ANY, UACPI_NULL);*/
 
     uacpi_find_devices("PNP0B00", match_rtc, NULL);
     struct pci_device *devices;
     uint64_t count;
     pci_scan_devices(&devices, &count);
+    asm volatile("sti");
     uint8_t drive_status = ide_detect_drives();
 
     struct ide_drive drives[4] = {0};
@@ -168,6 +171,7 @@ void k_main(void) {
     }
 
     nvme_scan_pci();
+    sleep(1);
     ahci_pci_discover();
 
     scheduler_init(&global_sched);

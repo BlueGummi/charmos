@@ -127,7 +127,7 @@ void page_fault_handler(uint64_t error_code, uint64_t fault_addr) {
     if (!(error_code & 0x04))
         while (1)
             asm("cli;hlt");
-    if (global_sched.active) {
-        scheduler_rm_thread(&global_sched, global_sched.current);
-    }
+    /*    if (global_sched.active) {
+            scheduler_rm_thread(&global_sched, global_sched.current);
+        }*/
 }

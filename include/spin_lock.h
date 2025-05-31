@@ -1,7 +1,9 @@
 #include <stdatomic.h>
+#include <stdbool.h>
 
 struct spinlock {
     atomic_flag lock;
+    bool interrupts_changed;
 };
 
 #define SPINLOCK_INIT {0}

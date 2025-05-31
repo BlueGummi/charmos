@@ -12,7 +12,7 @@ struct spinlock vmm_lock = SPINLOCK_INIT;
 struct page_table *kernel_pml4 = NULL;
 uintptr_t kernel_pml4_phys = 0;
 static uint64_t hhdm_offset = 0;
-uintptr_t vmm_map_top = 0;
+uintptr_t vmm_map_top = VMM_MAP_BASE;
 
 uint64_t sub_offset(uint64_t a) {
     return a - hhdm_offset;
@@ -74,6 +74,9 @@ void vmm_init() {
  * Offsets can be subtracted from addresses allocated by pmm_alloc_page
  */
 void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
+    if (virt == 0) {
+        k_panic("CANNOT MAP PAGE 0x0!!!\n");
+    }
 
     uint64_t L1 = (virt >> 12) & 0x1FF;
     uint64_t L2 = (virt >> 21) & 0x1FF;

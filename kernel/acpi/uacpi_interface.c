@@ -50,26 +50,7 @@ uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
 extern uintptr_t vmm_map_top;
 
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
-    uintptr_t phys_start = PAGE_ALIGN_DOWN(addr);
-    uintptr_t offset = addr - phys_start;
-
-    size_t total_len = len + offset;
-    size_t total_pages = (total_len + PAGE_SIZE - 1) / PAGE_SIZE;
-
-    if (vmm_map_top + total_pages * PAGE_SIZE > UACPI_MAP_LIMIT) {
-        k_panic("uACPI: out of virtual space in uacpi_kernel_map");
-        return NULL;
-    }
-
-    uintptr_t virt_start = vmm_map_top;
-    vmm_map_top += total_pages * PAGE_SIZE;
-
-    for (size_t i = 0; i < total_pages; i++) {
-        vmm_map_page(virt_start + i * PAGE_SIZE, phys_start + i * PAGE_SIZE,
-                     PAGING_PRESENT | PAGING_WRITE);
-    }
-
-    return (void *) (virt_start + offset);
+    return vmm_map_phys(addr, len);
 }
 
 void uacpi_kernel_unmap(void *addr, uacpi_size len) {

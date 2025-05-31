@@ -2,6 +2,9 @@
 #include <pit.h>
 #include <stdint.h>
 
+#define PIT_DEFAULT_MODE 0x34
+#define PIT_DEFAULT_COUNT 0x4AF2
+
 static uint16_t pit_read_count() {
     outb(0x43, 0x00);
 
@@ -32,6 +35,10 @@ uint64_t measure_tsc_freq_pit(void) {
     pit_wait_until_zero();
 
     uint64_t end_tsc = rdtsc();
+
+    outb(0x43, PIT_DEFAULT_MODE);
+    outb(0x40, (uint8_t) (PIT_DEFAULT_COUNT & 0xFF));
+    outb(0x40, (uint8_t) (PIT_DEFAULT_COUNT >> 8));
 
     uint64_t tsc_frequency = (end_tsc - start_tsc) * PIT_FREQUENCY / pit_count;
 

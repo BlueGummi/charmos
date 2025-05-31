@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdint.h>
 
 // TODO: rename this (duh)
@@ -192,6 +193,16 @@ static inline uint64_t read_cr4() {
 
 static inline void write_cr4(uint64_t cr4) {
     __asm__ volatile("mov %0, %%cr4" : : "r"(cr4));
+}
+
+static inline bool are_interrupts_enabled() {
+    unsigned long flags;
+    __asm__ volatile("pushf\n\t"
+                     "pop %0\n\t"
+                     : "=r"(flags)
+                     :
+                     :);
+    return (flags & (1 << 9)) != 0;
 }
 
 #pragma once

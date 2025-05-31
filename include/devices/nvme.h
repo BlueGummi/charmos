@@ -1,4 +1,6 @@
+#pragma once
 #include <stdint.h>
+#define DIV_ROUND_UP(x, y) (((x) + (y) - 1) / (y))
 
 struct nvme_command {
     uint8_t opc;      // Opcode
@@ -13,12 +15,7 @@ struct nvme_command {
     uint64_t prp1; // PRP entry 1
     uint64_t prp2; // PRP entry 2
 
-    uint32_t cdw10; // Command-specific
-    uint32_t cdw11;
-    uint32_t cdw12;
-    uint32_t cdw13;
-    uint32_t cdw14;
-    uint32_t cdw15;
+    uint32_t cdw[6]; // Command-specific
 };
 
 struct nvme_completion {
@@ -29,6 +26,23 @@ struct nvme_completion {
     uint16_t sq_id;   // SQ ID
     uint16_t cid;     // Command identifier
     uint16_t status;  // Status and phase tag (bit 0)
+};
+
+struct nvme_device {
+    volatile uint32_t *regs;
+    uint64_t cap;
+    uint32_t version;
+    uint32_t doorbell_stride;
+    uint32_t page_size;
+
+    struct nvme_command *admin_sq;
+    struct nvme_completion *admin_cq;
+    uint64_t admin_sq_phys;
+    uint64_t admin_cq_phys;
+
+    uint16_t admin_sq_tail;
+    uint16_t admin_cq_head;
+    uint16_t admin_q_depth;
 };
 
 #define NVME_REG_CAP 0x0000  // Controller capabilities
