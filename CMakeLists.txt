@@ -60,13 +60,15 @@ set(QEMU_COMMON_FLAGS
     -device nvme,drive=disk0,serial=nvme0
     -drive id=fatdisk,file=fat32_disk.img,format=raw,if=none
     -device ide-hd,drive=fatdisk,bus=ide.0,unit=1
+    -d trace:*mmio*
+    -trace file=trace.log
 )
 
 add_custom_target(run
     DEPENDS iso
     COMMAND clear
     COMMAND qemu-system-${ARCH} ${QEMU_COMMON_FLAGS}
-        -serial stdio
+         -serial stdio
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 

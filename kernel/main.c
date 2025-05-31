@@ -97,11 +97,11 @@ void k_main(void) {
     slab_init();
     test_alloc();
     tsc_freq = measure_tsc_freq_pit();
-    /*   uacpi_initialize(0);
-        uacpi_namespace_load();
-        uacpi_namespace_initialize();
+    uacpi_initialize(0);
+    uacpi_namespace_load();
+    uacpi_namespace_initialize();
 
-        uacpi_namespace_for_each_child(uacpi_namespace_root(), acpi_print_ctx,
+    /*    uacpi_namespace_for_each_child(uacpi_namespace_root(), acpi_print_ctx,
                                        UACPI_NULL, UACPI_OBJECT_DEVICE_BIT,
                                        UACPI_MAX_DEPTH_ANY, UACPI_NULL);*/
 
