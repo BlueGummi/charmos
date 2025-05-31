@@ -1,5 +1,5 @@
 #include "limine.h"
-#include <printf.h>
+#include <console/printf.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

@@ -1,8 +1,8 @@
-#include <colors.h>
+#include <misc/colors.h>
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
 #include <limine.h>
-#include <misc/time.h>
+#include <time/time.h>
 
 #define k_panic(fmt, ...)                                                      \
     do {                                                                       \

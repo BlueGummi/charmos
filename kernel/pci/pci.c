@@ -1,8 +1,8 @@
-#include <alloc.h>
-#include <disk.h>
-#include <io.h>
-#include <pci.h>
-#include <printf.h>
+#include <mem/alloc.h>
+#include <disk/generic_disk.h>
+#include <asm.h>
+#include <pci/pci.h>
+#include <console/printf.h>
 
 static struct pci_device *pci_devices = NULL;
 static uint64_t pci_device_count;

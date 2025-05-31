@@ -1,5 +1,5 @@
-#include <gdt.h>
-#include <printf.h>
+#include <boot/gdt.h>
+#include <console/printf.h>
 #include <stdalign.h>
 #include <stdint.h>
 

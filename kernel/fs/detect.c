@@ -1,7 +1,7 @@
-#include <alloc.h>
-#include <disk.h>
+#include <mem/alloc.h>
+#include <disk/generic_disk.h>
 #include <fs/detect.h>
-#include <printf.h>
+#include <console/printf.h>
 #include <stdint.h>
 #include <string.h>
 

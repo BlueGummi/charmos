@@ -54,7 +54,7 @@ make run # run this in the build directory
 
     - [x] :broom: and do janitor work to cleanup headers and such 
     
-    - [ ] :broom: clean up formatting in the code for readability (newlines and such)
+    - [x] :broom: clean up formatting in the code for readability (newlines and such)
 
     - [x] :trophy: formalize a style specification 
 

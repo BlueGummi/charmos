@@ -1,9 +1,9 @@
-#include <alloc.h>
-#include <disk.h>
+#include <mem/alloc.h>
+#include <disk/generic_disk.h>
 #include <fs/fat32.h>
 #include <fs/fat32_print.h>
-#include <mbr.h>
-#include <printf.h>
+#include <fs/mbr.h>
+#include <console/printf.h>
 #include <string.h>
 
 struct fat32_bpb *fat32_read_bpb(struct generic_disk *drive) {

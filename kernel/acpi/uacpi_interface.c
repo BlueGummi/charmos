@@ -1,9 +1,9 @@
-#include <alloc.h>
-#include <idt.h>
-#include <io.h>
-#include <pmm.h>
-#include <printf.h>
-#include <slab.h>
+#include <mem/alloc.h>
+#include <int/idt.h>
+#include <asm.h>
+#include <mem/pmm.h>
+#include <console/printf.h>
+#include <mem/slab.h>
 #include <spin_lock.h>
 #include <stdint.h>
 #include <uacpi/event.h>
@@ -11,8 +11,8 @@
 #include <uacpi/platform/arch_helpers.h>
 #include <uacpi/status.h>
 #include <uacpi/uacpi.h>
-#include <uacpi_interface.h>
-#include <vmm.h>
+#include <acpi/uacpi_interface.h>
+#include <mem/vmm.h>
 
 static irq_entry_t irq_table[IDT_ENTRIES];
 

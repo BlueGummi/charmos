@@ -1,7 +1,7 @@
-#include <disk.h>
+#include <disk/generic_disk.h>
 #include <fs/ext2.h>
-#include <misc/print.h>
-#include <printf.h>
+#include <time/print.h>
+#include <console/printf.h>
 #include <stdint.h>
 
 void ext2_print_inode(const struct k_full_inode *node) {

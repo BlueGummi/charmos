@@ -1,9 +1,9 @@
-#include <alloc.h>
-#include <gdt.h>
-#include <mp.h>
-#include <printf.h>
-#include <sched.h>
-#include <smap.h>
+#include <mem/alloc.h>
+#include <boot/gdt.h>
+#include <mp/mp.h>
+#include <console/printf.h>
+#include <sch/sched.h>
+#include <boot/smap.h>
 #include <spin_lock.h>
 
 struct core **core_data = NULL;

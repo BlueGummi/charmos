@@ -1,4 +1,4 @@
-#include <io.h>
+#include <asm.h>
 #include <pit.h>
 #include <stdint.h>
 

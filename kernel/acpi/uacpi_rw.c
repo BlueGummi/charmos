@@ -1,8 +1,8 @@
-#include <alloc.h>
-#include <io.h>
-#include <printf.h>
+#include <mem/alloc.h>
+#include <asm.h>
+#include <console/printf.h>
 #include <uacpi/kernel_api.h>
-#include <uacpi_interface.h>
+#include <acpi/uacpi_interface.h>
 
 uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
                                           uacpi_handle *out_handle) {

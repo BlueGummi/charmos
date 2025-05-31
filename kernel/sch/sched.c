@@ -1,8 +1,8 @@
-#include <printf.h>
-#include <sched.h>
+#include <console/printf.h>
+#include <sch/sched.h>
 #include <stdint.h>
 #include <string.h>
-#include <vmalloc.h>
+#include <mem/bitmap_alloc.h>
 #define CLI asm volatile("cli")
 #define STI asm volatile("sti")
 

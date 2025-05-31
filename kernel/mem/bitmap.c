@@ -1,13 +1,13 @@
 // NOTE: This is deprecated, use slab.c
 
-#include <pmm.h>
-#include <printf.h>
+#include <mem/pmm.h>
+#include <console/printf.h>
 #include <spin_lock.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <vmalloc.h>
-#include <vmm.h>
+#include <mem/bitmap_alloc.h>
+#include <mem/vmm.h>
 
 uint64_t hhdm_offset;
 

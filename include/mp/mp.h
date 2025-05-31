@@ -1,7 +1,7 @@
-#include <core.h>
+#include <mp/core.h>
 #include <stdatomic.h>
 #include <stdint.h>
-#include <thread.h>
+#include <sch/thread.h>
 
 extern struct core **core_data;
 extern uint64_t cr3;

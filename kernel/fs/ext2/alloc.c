@@ -1,6 +1,6 @@
-#include <alloc.h>
+#include <mem/alloc.h>
 #include <fs/ext2.h>
-#include <printf.h>
+#include <console/printf.h>
 #include <stdint.h>
 
 static bool find_free_bit(uint8_t *bitmap, uint32_t size, uint32_t *byte_pos,

@@ -1,9 +1,9 @@
 #include <misc/magic_numbers.h>
-#include <pmm.h>
-#include <printf.h>
-#include <slab.h>
+#include <mem/pmm.h>
+#include <console/printf.h>
+#include <mem/slab.h>
 #include <string.h>
-#include <vmm.h>
+#include <mem/vmm.h>
 
 struct slab_cache slab_caches[SLAB_CLASS_COUNT];
 uintptr_t slab_heap_top = 0xFFFF800000000000;

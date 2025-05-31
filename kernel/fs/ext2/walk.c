@@ -1,6 +1,6 @@
-#include <alloc.h>
+#include <mem/alloc.h>
 #include <fs/ext2.h>
-#include <printf.h>
+#include <console/printf.h>
 #include <stdint.h>
 
 static bool walk_dir(struct ext2_fs *fs, uint32_t block_num,

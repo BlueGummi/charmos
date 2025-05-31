@@ -1,13 +1,13 @@
-#include <dbg.h>
-#include <idt.h>
-#include <io.h>
-#include <kb.h>
-#include <pmm.h>
-#include <printf.h>
-#include <sched.h>
+#include <misc/dbg.h>
+#include <int/idt.h>
+#include <asm.h>
+#include <int/kb.h>
+#include <mem/pmm.h>
+#include <console/printf.h>
+#include <sch/sched.h>
 #include <stdint.h>
-#include <vmalloc.h>
-#include <vmm.h>
+#include <mem/bitmap_alloc.h>
+#include <mem/vmm.h>
 
 extern void context_switch();
 extern void page_fault_handler_wrapper();

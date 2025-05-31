@@ -1,5 +1,5 @@
 #pragma once
-#include <disk.h>
+#include <disk/generic_disk.h>
 
 enum fs_type {
     FS_UNKNOWN = 0,

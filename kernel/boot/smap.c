@@ -1,4 +1,4 @@
-#include <io.h>
+#include <asm.h>
 #include <stdint.h>
 
 void enable_smap_smep_umip() {

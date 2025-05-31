@@ -1,7 +1,7 @@
-#include <alloc.h>
+#include <mem/alloc.h>
 #include <stdint.h>
 #include <string.h>
-#include <thread.h>
+#include <sch/thread.h>
 
 uint64_t globid = 1;
 

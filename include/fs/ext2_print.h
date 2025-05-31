@@ -1,4 +1,4 @@
-#include <disk.h>
+#include <disk/generic_disk.h>
 #include <fs/ext2.h>
 
 void ext2_print_superblock(struct ext2_sblock *sblock);

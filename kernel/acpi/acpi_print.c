@@ -1,4 +1,4 @@
-#include <printf.h>
+#include <console/printf.h>
 #include <uacpi/utilities.h>
 
 /*

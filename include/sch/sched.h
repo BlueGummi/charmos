@@ -1,5 +1,5 @@
 #include <stdbool.h>
-#include <thread.h>
+#include <sch/thread.h>
 
 struct scheduler {
     bool active;            // Currently should be run?

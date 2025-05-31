@@ -1,4 +1,4 @@
-#include <disk.h>
+#include <disk/generic_disk.h>
 #include <stdint.h>
 
 struct fat32_bpb {

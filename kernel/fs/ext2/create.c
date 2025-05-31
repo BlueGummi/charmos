@@ -1,8 +1,8 @@
-#include <alloc.h>
+#include <mem/alloc.h>
 #include <errno.h>
 #include <fs/ext2.h>
-#include <misc/time.h>
-#include <printf.h>
+#include <time/time.h>
+#include <console/printf.h>
 #include <stdint.h>
 #include <string.h>
 

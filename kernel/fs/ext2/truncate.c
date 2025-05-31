@@ -1,7 +1,7 @@
-#include <alloc.h>
+#include <mem/alloc.h>
 #include <errno.h>
 #include <fs/ext2.h>
-#include <printf.h>
+#include <console/printf.h>
 
 #define EXT2_NDIR_BLOCKS 12
 #define EXT2_IND_BLOCK EXT2_NDIR_BLOCKS

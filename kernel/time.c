@@ -1,6 +1,6 @@
-#include <io.h>
-#include <misc/print.h>
-#include <printf.h>
+#include <asm.h>
+#include <time/print.h>
+#include <console/printf.h>
 #include <stdbool.h>
 #include <stdint.h>
 #define CMOS_ADDRESS 0x70
