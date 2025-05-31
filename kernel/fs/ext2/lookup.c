@@ -1,6 +1,6 @@
-#include <mem/alloc.h>
-#include <fs/ext2.h>
 #include <console/printf.h>
+#include <fs/ext2.h>
+#include <mem/alloc.h>
 #include <string.h>
 
 struct search_ctx {

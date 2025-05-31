@@ -1,8 +1,9 @@
-#include <time/print.h>
-#include <mem/alloc.h>
-#include <mp/core.h>
-#include <misc/dbg.h>
+#include <asm.h>
+#include <boot/gdt.h>
+#include <boot/smap.h>
+#include <console/printf.h>
 #include <disk/generic_disk.h>
+#include <disk/ide.h>
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
 #include <fs/detect.h>
@@ -11,35 +12,34 @@
 #include <fs/fat32.h>
 #include <fs/fat32_print.h>
 #include <fs/supersector.h>
-#include <boot/gdt.h>
-#include <disk/ide.h>
 #include <int/idt.h>
-#include <asm.h>
 #include <limine.h>
+#include <mem/alloc.h>
+#include <mem/pmm.h>
+#include <mem/slab.h>
+#include <mem/vmm.h>
+#include <misc/dbg.h>
 #include <misc/linker_symbols.h>
 #include <misc/logo.h>
+#include <mp/core.h>
 #include <mp/mp.h>
 #include <pci/pci.h>
 #include <pit.h>
-#include <mem/pmm.h>
-#include <console/printf.h>
 #include <requests.h>
 #include <rust.h>
 #include <sch/sched.h>
-#include <mem/slab.h>
-#include <boot/smap.h>
+#include <sch/thread.h>
 #include <spin_lock.h>
 #include <stdalign.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <sch/thread.h>
+#include <time/print.h>
 #include <uacpi/event.h>
 #include <uacpi/resources.h>
 #include <uacpi/uacpi.h>
 #include <uacpi/utilities.h>
 #include <vfs/vfs.h>
-#include <mem/vmm.h>
 
 struct scheduler global_sched;
 

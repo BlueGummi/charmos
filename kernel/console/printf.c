@@ -1,6 +1,6 @@
+#include <asm.h>
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
-#include <asm.h>
 #include <limine.h>
 #include <spin_lock.h>
 #include <stdarg.h>

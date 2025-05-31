@@ -1,5 +1,5 @@
-#include <errno.h>
 #include <console/printf.h>
+#include <errno.h>
 #include <uacpi/event.h>
 #include <uacpi/sleep.h>
 

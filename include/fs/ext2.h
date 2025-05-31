@@ -181,8 +181,8 @@ bool ext2_block_read(struct generic_disk *d, uint32_t lba, uint8_t *buffer,
 
 bool ext2_block_ptr_read(struct ext2_fs *fs, uint32_t block_num, void *buf);
 
-bool ext2_block_write(struct generic_disk *d, uint32_t lba, const uint8_t *buffer,
-                      uint32_t sector_count);
+bool ext2_block_write(struct generic_disk *d, uint32_t lba,
+                      const uint8_t *buffer, uint32_t sector_count);
 
 bool ext2_block_ptr_write(struct ext2_fs *fs, uint32_t block_num, void *buf);
 

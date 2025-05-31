@@ -1,7 +1,7 @@
-#include <mem/alloc.h>
+#include <console/printf.h>
 #include <errno.h>
 #include <fs/ext2.h>
-#include <console/printf.h>
+#include <mem/alloc.h>
 #include <string.h>
 
 enum errno ext2_write_file(struct ext2_fs *fs, struct k_full_inode *inode,

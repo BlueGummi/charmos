@@ -1,12 +1,12 @@
-#include <limine.h>
-#include <misc/linker_symbols.h>
-#include <mem/pmm.h>
 #include <console/printf.h>
+#include <limine.h>
+#include <mem/bitmap_alloc.h>
+#include <mem/pmm.h>
+#include <mem/vmm.h>
+#include <misc/linker_symbols.h>
 #include <spin_lock.h>
 #include <stdint.h>
 #include <string.h>
-#include <mem/bitmap_alloc.h>
-#include <mem/vmm.h>
 
 struct spinlock vmm_lock = SPINLOCK_INIT;
 struct page_table *kernel_pml4 = NULL;

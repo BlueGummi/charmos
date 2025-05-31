@@ -1,8 +1,8 @@
 #include <asm.h>
-#include <time/print.h>
 #include <console/printf.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <time/print.h>
 #define CMOS_ADDRESS 0x70
 #define CMOS_DATA 0x71
 

@@ -1,5 +1,5 @@
-#include <mem/alloc.h>
 #include <fs/ext2.h>
+#include <mem/alloc.h>
 
 uint32_t ext2_get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
                                uint32_t block_index, uint32_t new_block_num,

@@ -1,10 +1,10 @@
-#include <mem/alloc.h>
-#include <disk/generic_disk.h>
-#include <fs/ext2.h>
-#include <disk/ide.h>
 #include <asm.h>
-#include <pci/pci.h>
 #include <console/printf.h>
+#include <disk/generic_disk.h>
+#include <disk/ide.h>
+#include <fs/ext2.h>
+#include <mem/alloc.h>
+#include <pci/pci.h>
 #include <stdbool.h>
 #include <stdint.h>
 

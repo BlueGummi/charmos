@@ -1,6 +1,6 @@
+#include <sch/thread.h>
 #include <spin_lock.h>
 #include <stdint.h>
-#include <sch/thread.h>
 
 enum core_state {
     IDLE,

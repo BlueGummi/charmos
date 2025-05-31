@@ -1,5 +1,5 @@
-#include <fs/fat32.h>
 #include <console/printf.h>
+#include <fs/fat32.h>
 #include <string.h>
 
 void fat32_print_bpb(const struct fat32_bpb *bpb) {

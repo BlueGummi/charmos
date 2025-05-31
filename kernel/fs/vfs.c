@@ -1,5 +1,5 @@
-#include <mem/alloc.h>
 #include <console/printf.h>
+#include <mem/alloc.h>
 #include <stdint.h>
 #include <string.h>
 #include <vfs/ops.h>

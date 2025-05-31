@@ -1,8 +1,8 @@
+#include <console/printf.h>
 #include <disk/generic_disk.h>
 #include <fs/ext2.h>
-#include <time/print.h>
-#include <console/printf.h>
 #include <stdint.h>
+#include <time/print.h>
 
 void ext2_print_inode(const struct k_full_inode *node) {
     if (!node)
