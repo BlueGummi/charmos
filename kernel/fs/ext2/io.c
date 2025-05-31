@@ -4,13 +4,13 @@
 #include <stdint.h>
 #include <string.h>
 
-bool ext2_block_read(struct ide_drive *d, uint32_t lba, uint8_t *buffer,
+bool ext2_block_read(struct generic_disk *d, uint32_t lba, uint8_t *buffer,
                      uint32_t sector_count) {
     if (!buffer)
         return false;
 
     for (uint32_t i = 0; i < sector_count; ++i) {
-        if (!ide_read_sector(d, lba + i, buffer + (i * d->sector_size))) {
+        if (!d->read_sector(d, lba + i, buffer + (i * d->sector_size))) {
             return false;
         }
     }
@@ -62,13 +62,13 @@ bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
     return true;
 }
 
-bool ext2_block_write(struct ide_drive *d, uint32_t lba, const uint8_t *buffer,
-                      uint32_t sector_count) {
+bool ext2_block_write(struct generic_disk *d, uint32_t lba,
+                      const uint8_t *buffer, uint32_t sector_count) {
     if (!buffer)
         return false;
 
     for (uint32_t i = 0; i < sector_count; ++i) {
-        if (!ide_write_sector(d, lba + i, buffer + (i * d->sector_size))) {
+        if (!d->write_sector(d, lba + i, buffer + (i * d->sector_size))) {
             return false;
         }
     }

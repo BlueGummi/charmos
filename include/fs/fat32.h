@@ -47,5 +47,5 @@ struct fat_dirent {
     uint32_t filesize;
 } __attribute__((packed));
 
-struct fat32_bpb *fat32_read_bpb(struct ide_drive *drive);
+struct fat32_bpb *fat32_read_bpb(struct generic_disk *drive);
 #pragma once

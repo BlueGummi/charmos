@@ -1,0 +1,65 @@
+#include <stdint.h>
+
+struct ata_identify {
+    uint16_t config;
+    uint16_t cylinders;
+    uint16_t reserved1;
+    uint16_t heads;
+    uint16_t vendor1[2];
+    uint16_t sectors_per_track;
+    uint16_t vendor2[3];
+    uint16_t serial_number[10];
+    uint16_t vendor3[2];
+    uint16_t obsolete1;
+    uint16_t firmware_revision[4];
+    uint16_t model_number[20];
+    uint16_t max_rw_multiple;
+    uint16_t reserved2;
+    uint16_t capabilities[2];
+    uint16_t obsolete2[2];
+    uint16_t field_validity;
+    uint16_t current_cylinders;
+    uint16_t current_heads;
+    uint16_t current_sectors;
+    uint16_t current_capacity_lo;
+    uint16_t current_capacity_hi;
+    uint16_t rw_multiple;
+    uint32_t lba28_capacity;
+    uint16_t dma_supported;
+    uint16_t advanced_pio_modes;
+    uint16_t min_dma_cycle_time;
+    uint16_t recommended_dma_cycle_time;
+    uint16_t min_pio_cycle_time;
+    uint16_t min_pio_cycle_time_iordy;
+    uint16_t additional_supported;
+    uint16_t reserved3[5];
+    uint16_t queue_depth;
+    uint16_t sata_capabilities;
+    uint16_t sata_additional;
+    uint16_t sata_features_supported;
+    uint16_t sata_features_enabled;
+    uint16_t major_version;
+    uint16_t minor_version;
+    uint16_t command_set_supported[3];
+    uint16_t command_set_enabled[3];
+    uint16_t features_supported_extension;
+    uint16_t security_erase_time;
+    uint16_t enhanced_security_erase_time;
+    uint16_t current_advanced_power_mgmt;
+    uint16_t master_password_revision;
+    uint16_t hardware_reset_result;
+    uint16_t acoustic_management;
+    uint16_t stream_min_req_size;
+    uint16_t stream_transfer_time_dma;
+    uint16_t stream_access_latency;
+    uint32_t streaming_performance_gran;
+    uint64_t lba48_sector_count;
+    uint16_t streaming_transfer_time;
+    uint16_t dsm_cap;
+    uint16_t phys_log_sector_size;
+    uint16_t inter_seek_delay;
+    uint16_t world_wide_name[4];
+    uint16_t reserved4[144];
+} __attribute__((packed));
+
+#pragma once

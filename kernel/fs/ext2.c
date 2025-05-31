@@ -9,14 +9,14 @@
 
 uint64_t PTRS_PER_BLOCK;
 
-bool ext2_read_superblock(struct ide_drive *d, uint32_t partition_start_lba,
+bool ext2_read_superblock(struct generic_disk *d, uint32_t partition_start_lba,
                           struct ext2_sblock *sblock) {
     uint8_t buffer[d->sector_size];
     uint32_t superblock_lba =
         partition_start_lba + (EXT2_SUPERBLOCK_OFFSET / d->sector_size);
     uint32_t superblock_offset = EXT2_SUPERBLOCK_OFFSET % d->sector_size;
 
-    if (!ide_read_sector(d, superblock_lba, buffer)) {
+    if (!d->read_sector(d, superblock_lba, buffer)) {
         return false;
     }
 
@@ -45,7 +45,7 @@ bool ext2_write_group_desc(struct ext2_fs *fs) {
                             sector_count);
 }
 
-enum errno ext2_mount(struct ide_drive *d, struct ext2_fs *fs,
+enum errno ext2_mount(struct generic_disk *d, struct ext2_fs *fs,
                       struct ext2_sblock *sblock) {
     if (!fs || !sblock)
         return ERR_INVAL;
@@ -113,7 +113,7 @@ struct k_full_inode *ext2_path_lookup(struct ext2_fs *fs,
     return ext2_path_lookup(fs, next, path);
 }
 
-void ext2_test(struct ide_drive *d, struct ext2_sblock *sblock) {
+void ext2_test(struct generic_disk *d, struct ext2_sblock *sblock) {
     struct ext2_fs fs;
     if (ERR_IS_FATAL(ext2_mount(d, &fs, sblock))) {
         return;

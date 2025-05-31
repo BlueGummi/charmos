@@ -6,12 +6,12 @@
 #include <printf.h>
 #include <string.h>
 
-struct fat32_bpb *fat32_read_bpb(struct ide_drive *drive) {
+struct fat32_bpb *fat32_read_bpb(struct generic_disk *drive) {
     uint8_t *sector = kmalloc(SECTOR_SIZE);
     if (!sector)
         return NULL;
 
-    if (!ide_read_sector(drive, 0, sector)) {
+    if (!drive->read_sector(drive, 0, sector)) {
         kfree(sector);
         return NULL;
     }
@@ -30,7 +30,7 @@ struct fat32_bpb *fat32_read_bpb(struct ide_drive *drive) {
         }
     }
 
-    if (fat32_lba != 0 && ide_read_sector(drive, fat32_lba, sector)) {
+    if (fat32_lba != 0 && drive->read_sector(drive, fat32_lba, sector)) {
         struct fat32_bpb *bpb = (struct fat32_bpb *) sector;
 
         if (bpb->boot_signature == 0x29 &&
@@ -47,7 +47,7 @@ struct fat32_bpb *fat32_read_bpb(struct ide_drive *drive) {
     }
 
     for (uint32_t lba = 0; lba < 32; ++lba) {
-        if (!ide_read_sector(drive, lba, sector))
+        if (!drive->read_sector(drive, lba, sector))
             continue;
 
         struct fat32_bpb *bpb = (struct fat32_bpb *) sector;

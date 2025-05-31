@@ -12,6 +12,7 @@
 #include <fs/fat32_print.h>
 #include <fs/supersector.h>
 #include <gdt.h>
+#include <ide.h>
 #include <idt.h>
 #include <io.h>
 #include <limine.h>
@@ -118,10 +119,11 @@ void k_main(void) {
             if ((drive_status >> (3 - ind) & 1) == 0) {
                 continue;
             }
-            enum fs_type fst = detect_fs(&drives[ind]);
+            struct generic_disk *d = ide_create_generic(&drives[ind]);
+            enum fs_type fst = detect_fs(d);
             switch (fst) {
             case FS_FAT32: {
-                supersectors[ind].supersector = fat32_read_bpb(&drives[ind]);
+                supersectors[ind].supersector = fat32_read_bpb(d);
                 supersectors[ind].type = SSFS_FAT32;
                 break;
             }
@@ -129,8 +131,7 @@ void k_main(void) {
                 supersectors[ind].type = SSFS_EXT2;
                 supersectors[ind].supersector =
                     kmalloc(sizeof(struct ext2_sblock));
-                ext2_read_superblock(&drives[ind], 0,
-                                     supersectors[ind].supersector);
+                ext2_read_superblock(d, 0, supersectors[ind].supersector);
                 break;
             }
             case FS_EXFAT:

@@ -15,4 +15,4 @@ enum fs_type {
 };
 
 const char *detect_fstr(enum fs_type type);
-enum fs_type detect_fs(struct ide_drive *drive);
+enum fs_type detect_fs(struct generic_disk *drive);

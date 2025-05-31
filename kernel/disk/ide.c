@@ -1,10 +1,17 @@
+#include <alloc.h>
 #include <disk.h>
 #include <fs/ext2.h>
+#include <ide.h>
 #include <io.h>
 #include <pci.h>
 #include <printf.h>
 #include <stdbool.h>
 #include <stdint.h>
+
+#define ATA_PRIMARY_IO 0x1F0
+#define ATA_PRIMARY_CTRL 0x3F6
+#define ATA_SECONDARY_IO 0x170
+#define ATA_SECONDARY_CTRL 0x376
 
 bool ide_wait_ready(struct ide_drive *d) {
     while (inb(REG_STATUS(d->io_base)) & STATUS_BSY)
@@ -91,11 +98,6 @@ bool ide_setup_drive(struct ide_drive *ide, struct pci_device *devices,
     return false;
 }
 
-#define ATA_PRIMARY_IO 0x1F0
-#define ATA_PRIMARY_CTRL 0x3F6
-#define ATA_SECONDARY_IO 0x170
-#define ATA_SECONDARY_CTRL 0x376
-
 static void io_wait(void) {
     for (int i = 0; i < 1000; i++)
         inb(0x80);
@@ -160,4 +162,25 @@ uint8_t ide_detect_drives(void) {
         }
     }
     return ret;
+}
+
+bool ide_read_sector_wrapper(struct generic_disk *d, uint32_t lba,
+                             uint8_t *buf) {
+    struct ide_drive *ide = d->driver_data;
+    return ide_read_sector(ide, lba, buf);
+}
+
+bool ide_write_sector_wrapper(struct generic_disk *d, uint32_t lba,
+                              const uint8_t *buf) {
+    struct ide_drive *ide = d->driver_data;
+    return ide_write_sector(ide, lba, buf);
+}
+
+struct generic_disk *ide_create_generic(struct ide_drive *ide) {
+    struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
+    d->driver_data = ide;
+    d->sector_size = ide->sector_size;
+    d->read_sector = ide_read_sector_wrapper;
+    d->write_sector = ide_write_sector_wrapper;
+    return d;
 }
