@@ -82,6 +82,30 @@ enum errno ext2_mount(struct generic_disk *d, struct ext2_fs *fs,
     return ERR_OK;
 }
 
+// TODO: reorganize generic disks
+
+enum errno ext2_g_mount(struct generic_disk *d) {
+    if (!d)
+        return ERR_INVAL;
+    d->fs_data = kmalloc(sizeof(struct ext2_fs));
+    struct ext2_fs *fs = d->fs_data;
+    fs->sblock = kmalloc(sizeof(struct ext2_sblock));
+
+    if (!ext2_read_superblock(d, 0,
+                              fs->sblock)) // TODO: Dynamic partition stuff
+        return ERR_FS_INTERNAL;
+
+    return ext2_mount(d, fs, fs->sblock);
+}
+
+void ext2_g_print(struct generic_disk *d) {
+    if (!d)
+        return;
+
+    struct ext2_fs *fs = d->fs_data;
+    ext2_print_superblock(fs->sblock);
+}
+
 struct k_full_inode *ext2_path_lookup(struct ext2_fs *fs,
                                       struct k_full_inode *node,
                                       const char *path) {
@@ -123,111 +147,6 @@ void ext2_test(struct generic_disk *d, struct ext2_sblock *sblock) {
     if (!ext2_read_inode(&fs, EXT2_ROOT_INODE, &r)) {
         return;
     }
-
-    struct k_full_inode root_inode = {.node = r, .inode_num = EXT2_ROOT_INODE};
-    /*
-        uint32_t inode_num = ext2_alloc_inode(&fs);
-        if (inode_num == (uint32_t) -1) {
-            return;
-        }
-
-        struct ext2_inode inode = {0};
-        inode.mode = EXT2_S_IFREG | 0644;
-        inode.uid = 0;
-        inode.gid = 0;
-        inode.size = 0;
-        inode.links_count = 1;
-        inode.blocks = 0;
-        uint32_t now = 563824800; // was that the bite of '87?
-        inode.atime = now;
-        inode.ctime = now;
-        inode.mtime = now;
-        inode.dtime = 0;
-        struct k_full_inode i;
-        i.node = inode;
-        i.inode_num = inode_num;
-        if (!ext2_write_inode(&fs, inode_num, &inode)) {
-            return;
-        }
-    */
-    char *data =
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec lorem "
-        "sapien, sollicitudin vitae leo ac, malesuada euismod erat. Fusce "
-        "hendrerit sapien nec nulla scelerisque, vitae tempor lorem pretium. "
-        "Vivamus egestas nulla ac leo dignissim, nec rutrum elit ullamcorper. "
-        "Cras id suscipit arcu. Nulla at pharetra erat. Cras leo lectus, "
-        "imperdiet id dapibus eu, venenatis et velit. Nulla dignissim pulvinar "
-        "dui, eget condimentum nisi tincidunt ac. Fusce at leo porttitor elit "
-        "scelerisque accumsan id ac dolor.\n\nIn sed consequat leo. Aenean "
-        "porta augue elit, vitae rutrum nisi dictum placerat. Donec faucibus "
-        "id est consequat viverra. Aenean fringilla dolor vel ipsum commodo "
-        "feugiat. Sed faucibus lobortis metus eget iaculis. Morbi ac dui "
-        "aliquam, vehicula nibh sed, lacinia felis. Ut eu sodales magna. "
-        "Quisque bibendum risus ac sodales porta. Aenean tempor molestie felis "
-        "at laoreet. Pellentesque at ligula quam. Proin vitae nulla ac odio "
-        "accumsan rutrum. Fusce vulputate lectus sit amet enim vulputate "
-        "fringilla. Nullam ac lectus lacinia, dignissim leo ac, sollicitudin "
-        "lorem. Nam consectetur diam libero, id euismod felis auctor "
-        "non.\n\nDuis laoreet pretium nulla ac elementum. Donec vel diam "
-        "ipsum. Etiam ac erat sem. Praesent tempus nunc ex, eget viverra mi "
-        "auctor efficitur. Suspendisse id cursus sapien. Aenean accumsan dolor "
-        "ac arcu semper malesuada. Mauris hendrerit, turpis et finibus "
-        "ullamcorper, leo nisi sollicitudin mauris, in commodo mauris mauris "
-        "in felis. Proin vel facilisis eros. Integer luctus urna vel eros "
-        "interdum, vel maximus quam volutpat.\n\nIn in suscipit leo. Cras "
-        "varius nulla quis venenatis varius. Integer finibus elementum "
-        "egestas. Suspendisse odio velit, bibendum a purus in, lobortis "
-        "vestibulum elit. Sed ultricies metus eu orci pharetra placerat. Etiam "
-        "iaculis cursus mi sed commodo. Duis at mi sed lacus bibendum eleifend "
-        "eget vitae risus. Cras auctor pulvinar dictum. Fusce et finibus "
-        "lorem, sit amet sodales ante. Morbi sed tristique lorem, ac fringilla "
-        "libero.\n\nVestibulum tincidunt tincidunt maximus. Maecenas sagittis "
-        "laoreet sapien, eget efficitur nisi mattis eu. Morbi arcu risus, "
-        "congue venenatis posuere in, feugiat ut sapien. Donec urna arcu, "
-        "aliquet in interdum in, vulputate nec nibh. Ut eu diam et ante "
-        "lacinia scelerisque. Vivamus posuere egestas nunc. Mauris a convallis "
-        "arcu. Fusce et accumsan augue. In sed sapien in lectus hendrerit "
-        "commodo. Nullam non finibus quam. Duis vel neque ut felis convallis "
-        "blandit et nec turpis. Curabitur vel pellentesque justo, at euismod "
-        "erat. Quisque luctus mi erat, a interdum quam sodales non. Morbi "
-        "consectetur dui nec erat interdum feugiat.\n\nSed eget nunc nunc. "
-        "Etiam eget est ut eros vestibulum sodales eu a diam. Curabitur luctus "
-        "sapien neque, ut molestie ex tincidunt quis. Nunc ultricies molestie "
-        "diam. Sed vitae orci sed nisi suscipit fermentum in a turpis. Vivamus "
-        "rhoncus odio nisi, fermentum facilisis lorem molestie nec. Donec quis "
-        "lacinia felis, a vestibulum dolor.\n\nAenean ac lacus at nunc "
-        "facilisis dignissim. Integer ac ex condimentum, viverra velit id, "
-        "laoreet risus. Sed porta lobortis lorem, non posuere elit rutrum ut. "
-        "Aliquam sit amet pellentesque tortor, nec lobortis diam. Nam tempus "
-        "mollis eros eu vulputate. Pellentesque condimentum, turpis dictum "
-        "fringilla aliquet, urna est consequat dolor, non vulputate lectus "
-        "enim id neque. Integer gravida felis orci, quis cursus risus placerat "
-        "in.\n\nVestibulum semper pellentesque ligula. Vestibulum convallis "
-        "dolor sed scelerisque ullamcorper. Nullam bibendum imperdiet tortor "
-        "vel euismod. Cras ut risus vel ex vehicula porta. Donec in tellus "
-        "arcu. Vivamus maximus congue libero vel ornare. Quisque vel molestie "
-        "tellus. Phasellus vel semper dolor, eu hendrerit ex.\n\nQuisque "
-        "congue sodales lorem sed facilisis. Praesent fringilla tellus quis "
-        "dapibus semper. Praesent ac odio eget ligula molestie dignissim. "
-        "Quisque porttitor gravida urna, id aliquet velit condimentum "
-        "vulputate. Ut sagittis tristique auctor. Nam placerat, tortor at "
-        "facilisis suscipit, felis dui blandit odio, id varius metus leo a "
-        "elit. Nullam sed tellus gravida, pulvinar erat eget, varius metus. "
-        "Proin laoreet elementum dui, at molestie dolor. Praesent lacinia "
-        "fringilla dui eget pharetra. Sed ipsum ligula, laoreet eu iaculis "
-        "vitae, convallis non dui. Proin eu mollis dui. Proin at malesuada ex. "
-        "Cras in ex eu leo facilisis ultrices ac facilisis dolor. Praesent ut "
-        "luctus odio, nec suscipit ante.\n\nPhasellus tristique ultricies "
-        "diam. Pellentesque tincidunt ex quis lacus auctor, at hendrerit felis "
-        "lobortis. Morbi a porttitor magna. Integer ante est, convallis at "
-        "interdum vitae, rutrum in urna. Sed vel ante lectus. Praesent vel "
-        "metus eget odio egestas efficitur. Donec eu diam eget ante mattis "
-        "auctor non in lorem. Phasellus eu pellentesque leo, ultricies semper "
-        "nisl. In vitae turpis ante. In tincidunt, orci et malesuada viverra, "
-        "leo libero dignissim nisl, a hendrerit urna nulla quis orci. Aliquam "
-        "vehicula leo tempor nunc faucibus, eu semper ante euismod. Nam "
-        "ultricies ante tortor. Vestibulum ut justo nunc. Nunc tristique "
-        "dictum pulvinar.\n\n";
 
     //    ext2_link_file(&fs, &root_inode, &i, "file");
     ext2_print_superblock(sblock);

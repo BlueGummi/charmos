@@ -47,5 +47,11 @@ struct fat_dirent {
     uint32_t filesize;
 } __attribute__((packed));
 
+struct fat32_fs {
+    struct fat32_bpb *bpb;
+};
+
 struct fat32_bpb *fat32_read_bpb(struct generic_disk *drive);
+enum errno fat32_g_mount(struct generic_disk *d);
+void fat32_g_print(struct generic_disk *d);
 #pragma once

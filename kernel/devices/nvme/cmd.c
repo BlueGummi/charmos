@@ -48,7 +48,6 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
                 volatile uint32_t *cq_head_db =
                     (volatile uint32_t *) ((uint8_t *) nvme->regs + 0x1000 +
                                            (2 * 0 + 1) * stride);
-                k_printf("---> 0x%lx\n", cq_head_db);
                 *cq_head_db = nvme->admin_cq_head;
 
                 return status;

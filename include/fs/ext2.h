@@ -194,6 +194,7 @@ bool ext2_write_group_desc(struct ext2_fs *fs);
 
 enum errno ext2_mount(struct generic_disk *d, struct ext2_fs *fs,
                       struct ext2_sblock *sblock);
+enum errno ext2_g_mount(struct generic_disk *d);
 
 bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
                      struct ext2_inode *inode_out);
@@ -252,5 +253,5 @@ void ext2_traverse_inode_blocks(struct ext2_fs *fs, struct ext2_inode *inode,
                                 ext2_block_visitor visitor, void *user_data);
 
 void ext2_test(struct generic_disk *d, struct ext2_sblock *sblock);
-
+void ext2_g_print(struct generic_disk *d);
 #pragma once

@@ -15,7 +15,6 @@
 #include <fs/ext2_print.h>
 #include <fs/fat32.h>
 #include <fs/fat32_print.h>
-#include <fs/supersector.h>
 #include <int/idt.h>
 #include <limine.h>
 #include <mem/alloc.h>
@@ -66,7 +65,7 @@ void k_main(void) {
     mp_wakeup_processors(mp_request.response);
     enable_smap_smep_umip();
     gdt_install();
-    idt_install();
+    //    idt_install();
     init_physical_allocator(r->offset, memmap_request);
     vmm_offset_set(r->offset);
     vmm_init();
@@ -83,7 +82,6 @@ void k_main(void) {
 
     registry_setup();
     registry_print_devices();
-    registry_detect_fs();
 
     scheduler_init(&global_sched);
     scheduler_add_thread(&global_sched, thread_create(k_sch_main));

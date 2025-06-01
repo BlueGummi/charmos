@@ -1,5 +1,6 @@
 #include <console/printf.h>
 #include <devices/generic_disk.h>
+#include <errno.h>
 #include <fs/fat32.h>
 #include <fs/fat32_print.h>
 #include <fs/mbr.h>
@@ -74,4 +75,21 @@ struct fat32_bpb *fat32_read_bpb(struct generic_disk *drive) {
 
     kfree(sector);
     return NULL;
+}
+
+enum errno fat32_g_mount(struct generic_disk *d) {
+    if (!d)
+        return ERR_INVAL;
+    d->fs_data = kmalloc(sizeof(struct fat32_fs));
+    struct fat32_fs *fs = (struct fat32_fs *) d->fs_data;
+    fs->bpb = kmalloc(sizeof(struct fat32_bpb));
+    fs->bpb = fat32_read_bpb(d);
+    return ERR_OK; // TODO: Mounting
+}
+
+void fat32_g_print(struct generic_disk *d) {
+    if (!d)
+        return;
+    struct fat32_fs *fs = (struct fat32_fs *) d->fs_data;
+    fat32_print_bpb(fs->bpb);
 }

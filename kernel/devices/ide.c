@@ -130,6 +130,10 @@ void ide_print_info(struct generic_disk *d) {
 }
 
 struct generic_disk *ide_create_generic(struct ide_drive *ide) {
+    ide_identify(ide);
+    if (!ide->actually_exists)
+        return NULL;
+
     struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
     d->type = G_IDE_DRIVE;
     d->driver_data = ide;

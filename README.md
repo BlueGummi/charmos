@@ -22,6 +22,14 @@ make run # run this in the build directory
 
 > The :trophy: means the task is a challenge, the :broom: means something is trivial
 
+### TODO:
+
+- [ ] precalculate nvme fields
+
+- [ ] reorganize filesystem generic operations
+
+- [ ] reorganize vfs to integrate with generic disks
+
 - [ ] big problem - free and unmap memory once you are done
 
 ### "The Basics" 

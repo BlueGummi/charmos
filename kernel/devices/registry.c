@@ -4,7 +4,6 @@
 #include <devices/nvme.h>
 #include <devices/registry.h>
 #include <fs/detect.h>
-#include <fs/supersector.h>
 #include <mem/alloc.h>
 #include <pci/pci.h>
 #include <string.h>
@@ -80,10 +79,18 @@ void registry_setup() {
         for (int j = 0; j < 2; j++) {
             int ind = i * 2 + j;
             if (ide_setup_drive(&drives[ind], devices, count, i, j)) {
-                ide_identify(&drives[ind]);
-                registry_register(ide_create_generic(&drives[ind]));
+                struct generic_disk *d = ide_create_generic(&drives[ind]);
+                if (!d)
+                    continue;
+                registry_register(d);
             }
         }
+    }
+
+    for (uint64_t i = 0; i < disk_count; i++) {
+        struct generic_disk *disk = registry_get_by_index(i);
+        detect_fs(disk);
+        disk->mount(disk);
     }
 
     // TODO: AHCI
@@ -93,25 +100,6 @@ void registry_print_devices() {
     for (uint64_t i = 0; i < disk_count; i++) {
         struct generic_disk *disk = registry_get_by_index(i);
         disk->print(disk);
+        disk->print_fs(disk);
     }
 }
-
-void registry_detect_fs() {
-    for (uint64_t i = 0; i < disk_count; i++) {
-        struct generic_disk *disk = registry_get_by_index(i);
-        enum fs_type t = detect_fs(disk);
-        k_printf("FS is %s\n", detect_fstr(t));
-    }
-}
-
-void registry_read_fs() {
-    for (uint64_t i = 0; i < disk_count; i++) {
-        struct generic_disk *disk = registry_get_by_index(i);
-        struct generic_supersector ss = {0};
-        switch (disk->fs) {
-            
-        }
-    }
-}
-
-

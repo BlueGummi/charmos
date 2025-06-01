@@ -1,6 +1,8 @@
 #include <console/printf.h>
 #include <devices/generic_disk.h>
 #include <fs/detect.h>
+#include <fs/ext2.h>
+#include <fs/fat32.h>
 #include <mem/alloc.h>
 #include <stdint.h>
 #include <string.h>
@@ -73,7 +75,18 @@ enum fs_type detect_fs(struct generic_disk *drive) {
     if (memcmp(&sector[1], "CD001", 5) == 0)
         type = FS_ISO9660;
 end:
-    drive->fs = type;   
+    drive->fs_type = type;
+    switch (type) {
+    case FS_EXT2:
+        drive->mount = ext2_g_mount;
+        drive->print_fs = ext2_g_print;
+        break;
+    case FS_FAT32:
+        drive->mount = fat32_g_mount;
+        drive->print_fs = fat32_g_print;
+        break;
+    default: break;
+    }
     kfree(sector);
     return type;
 }
