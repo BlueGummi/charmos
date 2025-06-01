@@ -190,7 +190,7 @@ void nvme_discover_device(uint8_t bus, uint8_t slot, uint8_t func) {
 
     uint32_t bar0 = pci_read(bus, slot, func, 0x10) & ~0xF;
 
-    void *mmio = vmm_map_phys(bar0, 4096);
+    void *mmio = vmm_map_phys(bar0, 4096 * 2);
     struct nvme_regs *regs = (struct nvme_regs *) mmio;
     uint64_t cap = ((uint64_t) regs->cap_hi << 32) | regs->cap_lo;
     uint32_t version = regs->version;
