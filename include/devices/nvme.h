@@ -17,7 +17,7 @@ struct nvme_command {
     uint32_t cdw13;
     uint32_t cdw14;
     uint32_t cdw15;
-};
+} __attribute__((packed));
 
 struct nvme_completion {
     uint32_t result;
@@ -26,10 +26,28 @@ struct nvme_completion {
     uint16_t sq_id;
     uint16_t cid;
     uint16_t status;
-};
+} __attribute__((packed));
+
+struct nvme_regs {
+    volatile uint32_t cap_lo;          // 0x00
+    volatile uint32_t cap_hi;          // 0x04
+    volatile uint32_t version;         // 0x08
+    volatile uint32_t intms;           // 0x0C
+    volatile uint32_t intmc;           // 0x10
+    volatile uint32_t cc;              // 0x14
+    volatile uint32_t nssr;            // 0x18
+    volatile uint32_t csts;            // 0x1C
+    volatile uint32_t reserved1;       // 0x20 - 0x24
+    volatile uint32_t aqa;             // 0x24
+    volatile uint32_t asq_lo;          // 0x28
+    volatile uint32_t asq_hi;          // 0x2C
+    volatile uint32_t acq_lo;          // 0x30
+    volatile uint32_t acq_hi;          // 0x34
+    volatile uint32_t reserved4[1016]; // pad to 4KB total
+} __attribute__((aligned));
 
 struct nvme_device {
-    volatile uint32_t *regs;
+    struct nvme_regs *regs;
     uint64_t cap;
     uint32_t version;
     uint32_t doorbell_stride;
@@ -97,19 +115,6 @@ struct nvme_identify_controller {
     uint8_t cqes; // Completion Queue Entry Size
     // TODO: there is more but me lazy and dont need it
 };
-
-#define NVME_REG_CAP 0x0000  // Controller capabilities
-#define NVME_REG_VER 0x0008  // Version
-#define NVME_REG_CC 0x0014   // Controller Configuration
-#define NVME_REG_CSTS 0x001C // Controller Status
-#define NVME_REG_AQA 0x0024  // Admin Queue Attributes
-#define NVME_REG_ASQ 0x0028  // Admin Submission Queue Base Address
-#define NVME_REG_ACQ 0x0030  // Admin Completion Queue Base Address
-
-#define NVME_DOORBELL_SQ_TAIL(nvme, qid)                                       \
-    (0x1000 + (qid) * (nvme->doorbell_stride * 4))
-#define NVME_DOORBELL_CQ_HEAD(nvme, qid)                                       \
-    (0x1004 + (qid) * (nvme->doorbell_stride * 4))
 
 #define NVME_COMPLETION_PHASE(cpl) ((cpl)->status & 0x1)
 #define NVME_COMPLETION_STATUS(cpl) (((cpl)->status >> 1) & 0x7FFF)

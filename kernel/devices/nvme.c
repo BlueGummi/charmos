@@ -17,47 +17,61 @@ void print_nvme_controller_info(uint8_t *b) {
     k_printf("Model Number: %s\n", ctrl->mn);
     k_printf("Firmware Revision: %s\n", ctrl->fr);
 }
-
-void nvme_add_command(struct nvme_device *nvme, struct nvme_command *cmd) {
-    uint16_t tail = nvme->admin_sq_tail;
-    struct nvme_command *sq_cmd = &nvme->admin_sq[tail];
-    *sq_cmd = *cmd;
-
-    nvme->admin_sq_tail = (tail + 1) % nvme->admin_q_depth;
-
-    nvme->regs[NVME_DOORBELL_SQ_TAIL(nvme, 0) / 4] = nvme->admin_sq_tail;
+static inline volatile uint32_t *nvme_doorbell_sq_tail(struct nvme_device *nvme,
+                                                       uint32_t qid) {
+    uintptr_t base = (uintptr_t) nvme->regs;
+    uintptr_t offset = 0x1000 + qid * (4 << (nvme->doorbell_stride));
+    return (volatile uint32_t *) (base + offset);
 }
 
-void nvme_admin_identify(struct nvme_device *nvme, uint32_t cns) {
-    uint64_t ident_buf_phys = (uint64_t) pmm_alloc_page(false);
-    uint8_t *ident_buf = vmm_map_phys(ident_buf_phys, 1);
+static inline volatile uint32_t *nvme_doorbell_cq_head(struct nvme_device *nvme,
+                                                       uint32_t qid) {
+    uintptr_t base = (uintptr_t) nvme->regs;
+    uintptr_t offset = 0x1000 + (qid * 2 + 1) * (4 << (nvme->doorbell_stride));
+    return (volatile uint32_t *) (base + offset);
+}
+
+void nvme_admin_identify(struct nvme_device *nvme) {
+    uint64_t ident_phys = (uint64_t) pmm_alloc_page(false);
+    if (!ident_phys) {
+        k_printf("Failed to allocate page for identify buffer\n");
+        return;
+    }
+
+    uint8_t *ident_virt = vmm_map_phys(ident_phys, 1);
+    if (!ident_virt) {
+        k_printf("Failed to map identify buffer virtual memory\n");
+        return;
+    }
+    memset(ident_virt, 0, 4096);
 
     uint16_t tail = nvme->admin_sq_tail;
     struct nvme_command *cmd = &nvme->admin_sq[tail];
     memset(cmd, 0, sizeof(*cmd));
+
     cmd->opc = NVME_ADMIN_IDENTIFY;
     cmd->cid = tail;
-
-    cmd->cdw10 = cns;
-
-    cmd->prp1 = ident_buf_phys;
+    cmd->cdw10 = 1;
+    cmd->prp1 = ident_phys;
     cmd->prp2 = 0;
 
     nvme->admin_sq_tail = (tail + 1) % nvme->admin_q_depth;
-    nvme->regs[NVME_DOORBELL_SQ_TAIL(nvme, 0) / 4] = nvme->admin_sq_tail;
+    *nvme_doorbell_sq_tail(nvme, 0) = nvme->admin_sq_tail;
 
-    while (true) {
+    uint64_t timeout = 1000000;
+    while (timeout--) {
         struct nvme_completion *cqe = &nvme->admin_cq[nvme->admin_cq_head];
 
         if (cqe->cid == tail &&
             NVME_COMPLETION_PHASE(cqe) == nvme->admin_cq_phase) {
 
             uint16_t status = NVME_COMPLETION_STATUS(cqe);
+
             if (status != 0) {
-                k_printf("Identify command failed, status 0x%x\n", status);
+                k_printf("Identify command failed with status 0x%x\n", status);
             } else {
                 k_printf("Identify command succeeded.\n");
-                print_nvme_controller_info(ident_buf);
+                print_nvme_controller_info(ident_virt);
             }
 
             nvme->admin_cq_head =
@@ -65,24 +79,22 @@ void nvme_admin_identify(struct nvme_device *nvme, uint32_t cns) {
             if (nvme->admin_cq_head == 0) {
                 nvme->admin_cq_phase ^= 1;
             }
-            nvme->regs[NVME_DOORBELL_CQ_HEAD(nvme, 0) / 4] =
-                nvme->admin_cq_head;
+            *nvme_doorbell_cq_head(nvme, 0) = nvme->admin_cq_head;
             return;
         }
         sleep(1);
     }
-}
 
+    k_printf("Identify command timed out.\n");
+}
 void nvme_enable_controller(struct nvme_device *nvme) {
     uint32_t cc = 0;
 
-    cc |= 1;
-
+    cc |= 1 << 0; // EN = 1
     uint32_t mpsmin = (nvme->cap >> 48) & 0xF;
     cc |= (mpsmin & 0xF) << 4;
-    nvme->regs[NVME_REG_CC / 4] = cc;
-
-    while ((nvme->regs[NVME_REG_CSTS / 4] & 1) == 0) {
+    nvme->regs->cc = cc;
+    while ((nvme->regs->csts & 1) == 0) {
         sleep(1);
     }
 }
@@ -91,15 +103,13 @@ void nvme_setup_admin_queues(struct nvme_device *nvme) {
     uint32_t q_depth_minus_1 = nvme->admin_q_depth - 1;
 
     uint32_t aqa = (q_depth_minus_1 << 16) | q_depth_minus_1;
-    nvme->regs[NVME_REG_AQA / 4] = aqa;
+    nvme->regs->aqa = aqa;
 
-    nvme->regs[NVME_REG_ASQ / 4] =
-        (uint32_t) (nvme->admin_sq_phys & 0xFFFFFFFF);
-    nvme->regs[(NVME_REG_ASQ + 4) / 4] = (uint32_t) (nvme->admin_sq_phys >> 32);
+    nvme->regs->asq_lo = (uint32_t) (nvme->admin_sq_phys & 0xFFFFFFFF);
+    nvme->regs->asq_hi = (uint32_t) (nvme->admin_sq_phys >> 32);
 
-    nvme->regs[NVME_REG_ACQ / 4] =
-        (uint32_t) (nvme->admin_cq_phys & 0xFFFFFFFF);
-    nvme->regs[(NVME_REG_ACQ + 4) / 4] = (uint32_t) (nvme->admin_cq_phys >> 32);
+    nvme->regs->acq_lo = (uint32_t) (nvme->admin_cq_phys & 0xFFFFFFFF);
+    nvme->regs->acq_hi = (uint32_t) (nvme->admin_cq_phys >> 32);
 }
 
 void nvme_alloc_admin_queues(struct nvme_device *nvme) {
@@ -160,9 +170,9 @@ void nvme_discover_device(uint8_t bus, uint8_t slot, uint8_t func) {
     uint32_t bar0 = pci_read(bus, slot, func, 0x10) & ~0xF;
 
     void *mmio = vmm_map_phys(bar0, 4096);
-    uint32_t *regs = (uint32_t *) mmio;
-    uint64_t cap = ((uint64_t) regs[1] << 32) | regs[0];
-    uint32_t version = regs[2];
+    struct nvme_regs *regs = (struct nvme_regs *) mmio;
+    uint64_t cap = ((uint64_t) regs->cap_hi << 32) | regs->cap_lo;
+    uint32_t version = regs->version;
 
     uint32_t mpsmin = (cap >> 48) & 0xF;
     uint32_t page_size = 1 << (12 + mpsmin);
@@ -175,7 +185,7 @@ void nvme_discover_device(uint8_t bus, uint8_t slot, uint8_t func) {
     k_printf("Page size: %u bytes\n", page_size);
 
     struct nvme_device *nvme = kmalloc(sizeof(struct nvme_device));
-    nvme->doorbell_stride = 1 << dstrd;
+    nvme->doorbell_stride = doorbell_stride;
     nvme->page_size = page_size;
     nvme->cap = cap;
     nvme->version = version;
@@ -183,11 +193,10 @@ void nvme_discover_device(uint8_t bus, uint8_t slot, uint8_t func) {
     nvme->admin_q_depth = ((nvme->cap) & 0xFFFF) + 1;
     if (nvme->admin_q_depth > 64)
         nvme->admin_q_depth = 64;
-
     nvme_alloc_admin_queues(nvme);
     nvme_setup_admin_queues(nvme);
     nvme_enable_controller(nvme);
-    nvme_admin_identify(nvme, 1);
+    nvme_admin_identify(nvme);
 }
 
 void nvme_scan_pci() {
