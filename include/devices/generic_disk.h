@@ -1,7 +1,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+
+enum generic_disk_type {
+    IDE_DRIVE,
+    NVME_DRIVE,
+    AHCI_DRIVE,
+};
+
 struct generic_disk {
+    enum generic_disk_type type;
+
     void *driver_data;
     uint32_t sector_size;
 

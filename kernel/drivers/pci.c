@@ -1,6 +1,6 @@
-#include <devices/ahci.h>
 #include <asm.h>
 #include <console/printf.h>
+#include <devices/ahci.h>
 #include <devices/generic_disk.h>
 #include <devices/nvme.h>
 #include <mem/alloc.h>
@@ -40,14 +40,12 @@ void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
     pci_device_count = 0;
     uint64_t space_to_alloc = 0;
 
-    // First pass: count devices
     for (uint16_t bus = 0; bus < 256; ++bus) {
         for (uint8_t device = 0; device < 32; ++device) {
             for (uint8_t function = 0; function < 8; ++function) {
                 if (pci_read_word(bus, device, function, 0x00) != 0xFFFF)
                     space_to_alloc++;
 
-                // Stop scanning functions if not a multi-function device
                 if (function == 0) {
                     uint8_t header_type =
                         pci_read_byte(bus, device, function, 0x0E);
@@ -60,7 +58,6 @@ void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
 
     pci_devices = kmalloc(space_to_alloc * sizeof(struct pci_device));
 
-    // Second pass: enumerate, store info, detect NVMe and AHCI
     for (uint16_t bus = 0; bus < 256; ++bus) {
         for (uint8_t device = 0; device < 32; ++device) {
             for (uint8_t function = 0; function < 8; ++function) {
@@ -88,14 +85,13 @@ void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
                                              .revision = revision};
                 }
 
-                // Detect NVMe
                 if (class_code == PCI_CLASS_MASS_STORAGE &&
                     subclass == PCI_SUBCLASS_NVM &&
                     prog_if == PCI_PROGIF_NVME) {
                     nvme_discover_device(bus, device, function);
                 }
 
-                // Detect AHCI
+                // TODO: #define constants for these
                 if (class_code == 0x01 && subclass == 0x06 && prog_if == 0x01) {
                     uint32_t abar =
                         pci_read(bus, device, function, 0x24) & ~0xF;
@@ -105,7 +101,6 @@ void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
                     ahci_print_ctrlr(ctrl);
                 }
 
-                // Stop scanning functions if not a multi-function device
                 if (function == 0) {
                     uint8_t header_type =
                         pci_read_byte(bus, device, function, 0x0E);
