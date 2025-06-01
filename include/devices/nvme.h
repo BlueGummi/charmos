@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include <devices/generic_disk.h>
 #define DIV_ROUND_UP(x, y) (((x) + (y) - 1) / (y))
 
 struct nvme_command {
@@ -62,6 +63,14 @@ struct nvme_device {
     uint16_t admin_cq_head;
     uint16_t admin_q_depth;
     uint8_t admin_cq_phase;
+
+    struct nvme_command *io_sq;
+    struct nvme_completion *io_cq;
+    uint64_t io_sq_phys;
+    uint64_t io_cq_phys;
+    uint16_t io_sq_tail;
+    uint16_t io_cq_head;
+    uint8_t io_cq_phase;
 };
 
 struct nvme_queue {
@@ -138,4 +147,25 @@ struct nvme_identify_controller {
 #define NVME_CSTS_RDY (1 << 0)
 #define NVME_CSTS_CFS (1 << 1)
 
+#define NVME_CC_EN_SHIFT 0
+#define NVME_CC_EN_MASK (1 << NVME_CC_EN_SHIFT)
+#define NVME_CC_CSS_SHIFT 4
+#define NVME_CSTS_RDY_SHIFT 0
+#define NVME_DOORBELL_BASE 0x1000
+
+uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
+                               struct nvme_command *cmd);
+
+uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd);
+
+uint8_t *nvme_identify_controller(struct nvme_device *nvme);
+void nvme_enable_controller(struct nvme_device *nvme);
+void nvme_setup_admin_queues(struct nvme_device *nvme);
+void nvme_alloc_admin_queues(struct nvme_device *nvme);
+void nvme_alloc_io_queues(struct nvme_device *nvme);
+void nvme_discover_device(uint8_t bus, uint8_t slot, uint8_t func);
+void nvme_print_identify(const struct nvme_identify_controller *ctrl);
+bool nvme_read_sector(struct generic_disk *disk, uint32_t lba, uint8_t *buffer);
+bool nvme_write_sector(struct generic_disk *disk, uint32_t lba,
+                       const uint8_t *buffer);
 void nvme_scan_pci();
