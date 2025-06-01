@@ -43,7 +43,7 @@ struct nvme_regs {
     volatile uint32_t asq_hi;          // 0x2C
     volatile uint32_t acq_lo;          // 0x30
     volatile uint32_t acq_hi;          // 0x34
-    volatile uint32_t reserved4[1016]; // pad to 4KB total
+    volatile uint32_t reserved4[1018]; // pad to 4KB total
 } __attribute__((aligned));
 
 struct nvme_device {
@@ -62,6 +62,18 @@ struct nvme_device {
     uint16_t admin_cq_head;
     uint16_t admin_q_depth;
     uint8_t admin_cq_phase;
+};
+
+struct nvme_queue {
+    struct nvme_command *sq;    // Submission queue (virtual)
+    struct nvme_completion *cq; // Completion queue (virtual)
+    uint64_t sq_phys;           // Submission queue physical address
+    uint64_t cq_phys;           // Completion queue physical address
+
+    uint16_t sq_tail; // Tail index for submission
+    uint16_t cq_head; // Head index for completion
+    uint16_t q_depth; // Queue depth (entries)
+    uint8_t cq_phase; // Phase bit for completion
 };
 
 struct nvme_identify {
@@ -123,5 +135,7 @@ struct nvme_identify_controller {
 #define PCI_PROGIF_NVME 0x02
 #define NVME_ADMIN_IDENTIFY 0x06
 #define NVME_ADMIN_GET_FEATURES 0x0A
+#define NVME_CSTS_RDY (1 << 0)
+#define NVME_CSTS_CFS (1 << 1)
 
 void nvme_scan_pci();
