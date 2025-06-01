@@ -47,12 +47,28 @@ struct nvme_regs {
     volatile uint32_t reserved4[1018]; // pad to 4KB total
 } __attribute__((aligned));
 
+struct nvme_queue {
+    struct nvme_command *sq;    // Submission queue (virtual)
+    struct nvme_completion *cq; // Completion queue (virtual)
+    uint64_t sq_phys;           // Submission queue physical address
+    uint64_t cq_phys;           // Completion queue physical address
+
+    uint16_t sq_tail; // Tail index for submission
+    uint16_t cq_head; // Head index for completion
+    uint16_t q_depth; // Queue depth (entries)
+    uint8_t cq_phase; // Phase bit for completion
+    volatile uint32_t *sq_db;
+    volatile uint32_t *cq_db;
+};
+
 struct nvme_device {
     struct nvme_regs *regs;
     uint64_t cap;
     uint32_t version;
     uint32_t doorbell_stride;
     uint32_t page_size;
+    volatile uint32_t *admin_sq_db;
+    volatile uint32_t *admin_cq_db;
 
     struct nvme_command *admin_sq;
     struct nvme_completion *admin_cq;
@@ -64,25 +80,7 @@ struct nvme_device {
     uint16_t admin_q_depth;
     uint8_t admin_cq_phase;
 
-    struct nvme_command *io_sq;
-    struct nvme_completion *io_cq;
-    uint64_t io_sq_phys;
-    uint64_t io_cq_phys;
-    uint16_t io_sq_tail;
-    uint16_t io_cq_head;
-    uint8_t io_cq_phase;
-};
-
-struct nvme_queue {
-    struct nvme_command *sq;    // Submission queue (virtual)
-    struct nvme_completion *cq; // Completion queue (virtual)
-    uint64_t sq_phys;           // Submission queue physical address
-    uint64_t cq_phys;           // Completion queue physical address
-
-    uint16_t sq_tail; // Tail index for submission
-    uint16_t cq_head; // Head index for completion
-    uint16_t q_depth; // Queue depth (entries)
-    uint8_t cq_phase; // Phase bit for completion
+    struct nvme_queue **io_queues;
 };
 
 struct nvme_identify {
@@ -168,14 +166,15 @@ struct nvme_identify_controller {
 uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
                                struct nvme_command *cmd);
 
-uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd);
+uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
+                            uint32_t qid);
 
 uint8_t *nvme_identify_controller(struct nvme_device *nvme);
 uint8_t *nvme_identify_namespace(struct nvme_device *nvme, uint32_t nsid);
 void nvme_enable_controller(struct nvme_device *nvme);
 void nvme_setup_admin_queues(struct nvme_device *nvme);
 void nvme_alloc_admin_queues(struct nvme_device *nvme);
-void nvme_alloc_io_queues(struct nvme_device *nvme);
+void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid);
 struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
                                          uint8_t func);
 struct generic_disk *nvme_create_generic(struct nvme_device *nvme);

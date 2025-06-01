@@ -47,12 +47,19 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme->version = version;
     nvme->regs = regs;
     nvme->admin_q_depth = ((nvme->cap) & 0xFFFF) + 1;
+    nvme->io_queues = kmalloc(sizeof(struct nvme_queue *));
+    nvme->admin_sq_db =
+        (volatile uint32_t *) ((uint8_t *) nvme->regs + NVME_DOORBELL_BASE);
+    nvme->admin_cq_db =
+        (volatile uint32_t *) ((uint8_t *) nvme->regs + NVME_DOORBELL_BASE +
+                               nvme->doorbell_stride);
+
     if (nvme->admin_q_depth > 64)
         nvme->admin_q_depth = 64;
     nvme_alloc_admin_queues(nvme);
     nvme_setup_admin_queues(nvme);
     nvme_enable_controller(nvme);
-    nvme_alloc_io_queues(nvme);
+    nvme_alloc_io_queues(nvme, 1); // TODO: many IO queues
     nvme_identify_controller(nvme);
     return nvme;
 }

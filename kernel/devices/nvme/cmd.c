@@ -22,14 +22,7 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
 
     nvme->admin_sq_tail = next_tail;
 
-    uint32_t stride = nvme->doorbell_stride;
-
-    // TODO: Isolate doorbell calculation
-    volatile uint32_t *sq_tail_db =
-        (volatile uint32_t *) ((uint8_t *) nvme->regs + 0x1000 +
-                               (2 * 0) * stride);
-
-    *sq_tail_db = nvme->admin_sq_tail;
+    *nvme->admin_sq_db = nvme->admin_sq_tail;
 
     while (true) {
         struct nvme_completion *entry = &nvme->admin_cq[nvme->admin_cq_head];
@@ -45,10 +38,7 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
                     nvme->admin_cq_phase ^= 1;
                 }
 
-                volatile uint32_t *cq_head_db =
-                    (volatile uint32_t *) ((uint8_t *) nvme->regs + 0x1000 +
-                                           (2 * 0 + 1) * stride);
-                *cq_head_db = nvme->admin_cq_head;
+                *nvme->admin_cq_db = nvme->admin_cq_head;
 
                 return status;
             }
@@ -56,41 +46,38 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
     }
 }
 
-uint16_t nvme_submit_io_cmd(struct nvme_device *nvme,
-                            struct nvme_command *cmd) {
-    uint16_t tail = nvme->io_sq_tail;
+uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
+                            uint32_t qid) {
+    if (!qid)
+        k_panic("Cannot submit command to queue zero!\n");
+
+    struct nvme_queue *this_queue = nvme->io_queues[qid];
+
+    uint16_t tail = this_queue->sq_tail;
     uint16_t next_tail = (tail + 1) % nvme->admin_q_depth;
 
-    if (next_tail == nvme->io_cq_head) {
+    if (next_tail == this_queue->cq_head) {
         return 0xFFFF;
     }
 
     cmd->cid = tail;
-    nvme->io_sq[tail] = *cmd;
+    this_queue->sq[tail] = *cmd;
 
-    nvme->io_sq_tail = next_tail;
+    this_queue->sq_tail = next_tail;
 
-    uint32_t stride = nvme->doorbell_stride;
-
-    volatile uint32_t *sq_tail_db =
-        (volatile uint32_t *) ((uint8_t *) nvme->regs + 0x1000 +
-                               (2 * 1) * stride);
-
-    *sq_tail_db = nvme->io_sq_tail;
+    *this_queue->sq_db = this_queue->sq_tail;
 
     while (true) {
-        struct nvme_completion *entry = &nvme->io_cq[nvme->io_cq_head];
-        if ((entry->status & 1) == nvme->io_cq_phase) {
+        struct nvme_completion *entry = &this_queue->cq[this_queue->cq_head];
+        if ((entry->status & 1) == this_queue->cq_phase) {
             if (entry->cid == cmd->cid) {
                 uint16_t status = entry->status & 0xFFFE;
-                nvme->io_cq_head = (nvme->io_cq_head + 1) % nvme->admin_q_depth;
-                if (nvme->io_cq_head == 0)
-                    nvme->io_cq_phase ^= 1;
+                this_queue->cq_head =
+                    (this_queue->cq_head + 1) % nvme->admin_q_depth;
+                if (this_queue->cq_head == 0)
+                    this_queue->cq_phase ^= 1;
 
-                volatile uint32_t *cq_head_db =
-                    (volatile uint32_t *) ((uint8_t *) nvme->regs + 0x1000 +
-                                           (2 * 1 + 1) * stride);
-                *cq_head_db = nvme->io_cq_head;
+                *this_queue->cq_db = this_queue->cq_head;
 
                 return status;
             }

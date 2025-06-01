@@ -86,24 +86,35 @@ void nvme_alloc_admin_queues(struct nvme_device *nvme) {
 
 #define MAX(a, b) (a > b ? a : b)
 
-void nvme_alloc_io_queues(struct nvme_device *nvme) {
+void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
+    if (!qid)
+        k_panic("Can't allocate IO queue zero!\n");
+
+    nvme->io_queues[qid] = kmalloc(sizeof(struct nvme_queue));
+    struct nvme_queue *this_queue = nvme->io_queues[qid];
 
     uint64_t sq_pages = 2;
     uint64_t cq_pages = 2;
 
     uint64_t sq_phys = (uint64_t) pmm_alloc_pages(sq_pages, false);
-    nvme->io_sq = vmm_map_phys(sq_phys, sq_pages * nvme->page_size);
-    memset(nvme->io_sq, 0, sq_pages * nvme->page_size);
+    this_queue->sq = vmm_map_phys(sq_phys, sq_pages * nvme->page_size);
+    memset(this_queue->sq, 0, sq_pages * nvme->page_size);
 
     uint64_t cq_phys = (uint64_t) pmm_alloc_pages(cq_pages, false);
-    nvme->io_cq = vmm_map_phys(cq_phys, cq_pages * nvme->page_size);
-    memset(nvme->io_cq, 0, cq_pages * nvme->page_size);
+    this_queue->cq = vmm_map_phys(cq_phys, cq_pages * nvme->page_size);
+    memset(this_queue->cq, 0, cq_pages * nvme->page_size);
 
-    nvme->io_sq_phys = sq_phys;
-    nvme->io_cq_phys = cq_phys;
-    nvme->io_sq_tail = 0;
-    nvme->io_cq_head = 0;
-    nvme->io_cq_phase = 1;
+    this_queue->sq_phys = sq_phys;
+    this_queue->cq_phys = cq_phys;
+    this_queue->sq_tail = 0;
+    this_queue->cq_head = 0;
+    this_queue->cq_phase = 1;
+    this_queue->sq_db =
+        (volatile uint32_t *) ((uint8_t *) nvme->regs + NVME_DOORBELL_BASE +
+                               (2 * qid * nvme->doorbell_stride));
+    this_queue->cq_db =
+        (volatile uint32_t *) ((uint8_t *) nvme->regs + NVME_DOORBELL_BASE +
+                               ((2 * qid + 1) * nvme->doorbell_stride));
 
     // complete queue
     struct nvme_command cq_cmd = {0};
