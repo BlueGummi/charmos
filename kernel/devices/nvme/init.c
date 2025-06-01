@@ -88,8 +88,6 @@ void nvme_alloc_admin_queues(struct nvme_device *nvme) {
 
 void nvme_alloc_io_queues(struct nvme_device *nvme) {
 
-    uint32_t qs =
-        4096 / MAX(sizeof(struct nvme_completion), sizeof(struct nvme_command));
     uint64_t sq_pages = 2;
     uint64_t cq_pages = 2;
 
@@ -110,10 +108,9 @@ void nvme_alloc_io_queues(struct nvme_device *nvme) {
     // complete queue
     struct nvme_command cq_cmd = {0};
     cq_cmd.opc = 0x05;
-    cq_cmd.nsid = 0;
     cq_cmd.prp1 = cq_phys;
 
-    cq_cmd.cdw10 = (16) << 16 | 1;
+    cq_cmd.cdw10 = (15) << 16 | 1;
     cq_cmd.cdw11 = 1;
     if (nvme_submit_admin_cmd(nvme, &cq_cmd) != 0) {
         k_printf("nvme: failed to create IO Completion Queue\n");
@@ -123,7 +120,6 @@ void nvme_alloc_io_queues(struct nvme_device *nvme) {
     // submit queue
     struct nvme_command sq_cmd = {0};
     sq_cmd.opc = 0x01;
-    sq_cmd.nsid = 0;
     sq_cmd.prp1 = sq_phys;
 
     sq_cmd.cdw10 = (63) << 16 | 1;

@@ -32,7 +32,6 @@ void nvme_print_identify(const struct nvme_identify_controller *ctrl) {
     k_printf("  Number of Power States Supported: %u\n", ctrl->npss);
     k_printf("  Host Memory Buffer Preferred Size: %u\n", ctrl->hmpre);
     k_printf("  Host Memory Buffer Minimum Size: %u\n", ctrl->hmmin);
-
     k_printf("  SQ Entry Size: %u bytes\n", ctrl->sqes);
     k_printf("  CQ Entry Size: %u bytes\n", ctrl->cqes);
 }

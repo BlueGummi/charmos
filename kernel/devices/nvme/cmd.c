@@ -4,6 +4,7 @@
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
+#include <sleep.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -21,10 +22,13 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
 
     nvme->admin_sq_tail = next_tail;
 
-    uint32_t stride = 4 << nvme->doorbell_stride;
+    uint32_t stride = nvme->doorbell_stride;
+
+    // TODO: Isolate doorbell calculation
     volatile uint32_t *sq_tail_db =
         (volatile uint32_t *) ((uint8_t *) nvme->regs + 0x1000 +
                                (2 * 0) * stride);
+
     *sq_tail_db = nvme->admin_sq_tail;
 
     while (true) {
@@ -44,6 +48,7 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
                 volatile uint32_t *cq_head_db =
                     (volatile uint32_t *) ((uint8_t *) nvme->regs + 0x1000 +
                                            (2 * 0 + 1) * stride);
+                k_printf("---> 0x%lx\n", cq_head_db);
                 *cq_head_db = nvme->admin_cq_head;
 
                 return status;
@@ -66,7 +71,7 @@ uint16_t nvme_submit_io_cmd(struct nvme_device *nvme,
 
     nvme->io_sq_tail = next_tail;
 
-    uint32_t stride = 4 << nvme->doorbell_stride;
+    uint32_t stride = nvme->doorbell_stride;
 
     volatile uint32_t *sq_tail_db =
         (volatile uint32_t *) ((uint8_t *) nvme->regs + 0x1000 +
@@ -112,7 +117,7 @@ uint8_t *nvme_identify_controller(struct nvme_device *nvme) {
     struct nvme_command cmd = {0};
     cmd.opc = 0x06; // IDENTIFY opcode
     cmd.fuse = 0;   // normal
-    cmd.nsid = 0;   // not used for controller ID
+    cmd.nsid = 1;   // not used for controller ID
     cmd.prp1 = buffer_phys;
     cmd.cdw10 = 1; // identify controller
 

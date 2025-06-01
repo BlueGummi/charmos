@@ -23,7 +23,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
 
     pci_write(bus, slot, func, 0x10, original_bar0);
 
-    uint32_t size = ~(size_mask & ~0xF) + 1; 
+    uint32_t size = ~(size_mask & ~0xF) + 1;
 
     if (size == 0) {
         k_panic("bar0 reports zero size ?");
@@ -33,16 +33,15 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     void *mmio = vmm_map_phys(phys_addr, size);
     struct nvme_regs *regs = (struct nvme_regs *) mmio;
     uint64_t cap = ((uint64_t) regs->cap_hi << 32) | regs->cap_lo;
-    k_printf("Capacity is 0x%lx\n", cap);
     uint32_t version = regs->version;
 
     uint32_t mpsmin = (cap >> 48) & 0xF;
     uint32_t page_size = 1 << (12 + mpsmin);
+
     uint32_t dstrd = (cap >> 32) & 0xF;
-    uint32_t doorbell_stride = 1 << dstrd;
 
     struct nvme_device *nvme = kmalloc(sizeof(struct nvme_device));
-    nvme->doorbell_stride = doorbell_stride;
+    nvme->doorbell_stride = 4 << dstrd;
     nvme->page_size = page_size;
     nvme->cap = cap;
     nvme->version = version;
@@ -54,6 +53,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme_setup_admin_queues(nvme);
     nvme_enable_controller(nvme);
     nvme_alloc_io_queues(nvme);
+    nvme_identify_controller(nvme);
     return nvme;
 }
 
