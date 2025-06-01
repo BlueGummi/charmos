@@ -13,10 +13,6 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
     uint16_t tail = nvme->admin_sq_tail;
     uint16_t next_tail = (tail + 1) % nvme->admin_q_depth;
 
-    if (next_tail == nvme->admin_cq_head) {
-        return 0xFFFF;
-    }
-
     cmd->cid = tail;
     nvme->admin_sq[tail] = *cmd;
 
@@ -34,10 +30,6 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
                 nvme->admin_cq_head =
                     (nvme->admin_cq_head + 1) % nvme->admin_q_depth;
 
-                if (nvme->admin_cq_head == 0) {
-                    nvme->admin_cq_phase ^= 1;
-                }
-
                 *nvme->admin_cq_db = nvme->admin_cq_head;
 
                 return status;
@@ -48,17 +40,10 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
 
 uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
                             uint32_t qid) {
-    if (!qid)
-        k_panic("Cannot submit command to queue zero!\n");
-
     struct nvme_queue *this_queue = nvme->io_queues[qid];
 
     uint16_t tail = this_queue->sq_tail;
     uint16_t next_tail = (tail + 1) % nvme->admin_q_depth;
-
-    if (next_tail == this_queue->cq_head) {
-        return 0xFFFF;
-    }
 
     cmd->cid = tail;
     this_queue->sq[tail] = *cmd;
@@ -69,13 +54,13 @@ uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
 
     while (true) {
         struct nvme_completion *entry = &this_queue->cq[this_queue->cq_head];
+
         if ((entry->status & 1) == this_queue->cq_phase) {
             if (entry->cid == cmd->cid) {
                 uint16_t status = entry->status & 0xFFFE;
+
                 this_queue->cq_head =
                     (this_queue->cq_head + 1) % nvme->admin_q_depth;
-                if (this_queue->cq_head == 0)
-                    this_queue->cq_phase ^= 1;
 
                 *this_queue->cq_db = this_queue->cq_head;
 
@@ -87,16 +72,8 @@ uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
 
 uint8_t *nvme_identify_controller(struct nvme_device *nvme) {
     uint64_t buffer_phys = (uint64_t) pmm_alloc_page(false);
-    if (!buffer_phys) {
-        k_printf("Failed to allocate IDENTIFY buffer\n");
-        return NULL;
-    }
 
     void *buffer = vmm_map_phys(buffer_phys, 4096);
-    if (!buffer) {
-        k_printf("Failed to map IDENTIFY buffer\n");
-        return NULL;
-    }
 
     memset(buffer, 0, 4096);
 
@@ -120,16 +97,8 @@ uint8_t *nvme_identify_controller(struct nvme_device *nvme) {
 
 uint8_t *nvme_identify_namespace(struct nvme_device *nvme, uint32_t nsid) {
     uint64_t buffer_phys = (uint64_t) pmm_alloc_page(false);
-    if (!buffer_phys) {
-        k_printf("Failed to allocate IDENTIFY buffer\n");
-        return NULL;
-    }
 
     void *buffer = vmm_map_phys(buffer_phys, 4096);
-    if (!buffer) {
-        k_printf("Failed to map IDENTIFY buffer\n");
-        return NULL;
-    }
 
     memset(buffer, 0, 4096);
 
