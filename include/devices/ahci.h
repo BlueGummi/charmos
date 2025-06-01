@@ -134,5 +134,4 @@ struct ahci_cmd_table {
     uint8_t reserved[48];
     struct ahci_prdt_entry prdt[];
 } __attribute__((packed));
-
-void ahci_pci_discover();
+void ahci_print_ctrlr(struct ahci_controller *ctrl);

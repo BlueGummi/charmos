@@ -1,4 +1,4 @@
-#include <ahci.h>
+#include <devices/ahci.h>
 #include <asm.h>
 #include <console/printf.h>
 #include <mem/alloc.h>

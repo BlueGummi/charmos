@@ -1,9 +1,9 @@
 #include <acpi/print.h>
-#include <ahci.h>
 #include <asm.h>
 #include <boot/gdt.h>
 #include <boot/smap.h>
 #include <console/printf.h>
+#include <devices/ahci.h>
 #include <devices/generic_disk.h>
 #include <devices/ide.h>
 #include <devices/nvme.h>
@@ -169,9 +169,6 @@ void k_main(void) {
         default: continue;
         }
     }
-
-    nvme_scan_pci();
-    ahci_pci_discover();
 
     scheduler_init(&global_sched);
     scheduler_add_thread(&global_sched, thread_create(k_sch_main));

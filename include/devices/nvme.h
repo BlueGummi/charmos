@@ -168,4 +168,3 @@ void nvme_print_identify(const struct nvme_identify_controller *ctrl);
 bool nvme_read_sector(struct generic_disk *disk, uint32_t lba, uint8_t *buffer);
 bool nvme_write_sector(struct generic_disk *disk, uint32_t lba,
                        const uint8_t *buffer);
-void nvme_scan_pci();
