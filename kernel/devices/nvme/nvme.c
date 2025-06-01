@@ -33,6 +33,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     void *mmio = vmm_map_phys(phys_addr, size);
     struct nvme_regs *regs = (struct nvme_regs *) mmio;
     uint64_t cap = ((uint64_t) regs->cap_hi << 32) | regs->cap_lo;
+    k_printf("Capacity is 0x%lx\n", cap);
     uint32_t version = regs->version;
 
     uint32_t mpsmin = (cap >> 48) & 0xF;
