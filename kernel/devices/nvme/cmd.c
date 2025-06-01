@@ -122,3 +122,35 @@ uint8_t *nvme_identify_controller(struct nvme_device *nvme) {
     uint8_t *data = (uint8_t *) buffer;
     return data;
 }
+
+uint8_t *nvme_identify_namespace(struct nvme_device *nvme, uint32_t nsid) {
+    uint64_t buffer_phys = (uint64_t) pmm_alloc_page(false);
+    if (!buffer_phys) {
+        k_printf("Failed to allocate IDENTIFY buffer\n");
+        return NULL;
+    }
+
+    void *buffer = vmm_map_phys(buffer_phys, 4096);
+    if (!buffer) {
+        k_printf("Failed to map IDENTIFY buffer\n");
+        return NULL;
+    }
+
+    memset(buffer, 0, 4096);
+
+    struct nvme_command cmd = {0};
+    cmd.opc = 0x06;  // IDENTIFY opcode
+    cmd.fuse = 0;    // normal
+    cmd.nsid = nsid; // namespace ID to identify
+    cmd.prp1 = buffer_phys;
+    cmd.cdw10 = 0; // Identify Namespace (CNS=0)
+
+    uint16_t status = nvme_submit_admin_cmd(nvme, &cmd);
+
+    if (status) {
+        k_printf("IDENTIFY namespace failed! Status: 0x%04X\n", status);
+        return NULL;
+    }
+
+    return (uint8_t *) buffer;
+}

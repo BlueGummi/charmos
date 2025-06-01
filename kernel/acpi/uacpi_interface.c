@@ -54,16 +54,7 @@ void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
 }
 
 void uacpi_kernel_unmap(void *addr, uacpi_size len) {
-    uintptr_t virt_addr = (uintptr_t) addr;
-    uintptr_t page_offset = virt_addr & (PAGE_SIZE - 1);
-    uintptr_t aligned_virt = PAGE_ALIGN_DOWN(virt_addr);
-
-    size_t total_len = len + page_offset;
-    size_t total_pages = (total_len + PAGE_SIZE - 1) / PAGE_SIZE;
-
-    for (size_t i = 0; i < total_pages; i++) {
-        vmm_unmap_page(aligned_virt + i * PAGE_SIZE);
-    }
+    vmm_unmap_virt(addr, len);
 }
 
 void uacpi_kernel_log(uacpi_log_level level, const uacpi_char *data) {

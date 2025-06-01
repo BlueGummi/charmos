@@ -1,6 +1,6 @@
 #pragma once
-#include <stdint.h>
 #include <devices/generic_disk.h>
+#include <stdint.h>
 #define DIV_ROUND_UP(x, y) (((x) + (y) - 1) / (y))
 
 struct nvme_command {
@@ -89,6 +89,18 @@ struct nvme_identify {
     uint8_t data[4096];
 };
 
+struct nvme_identify_namespace {
+    uint64_t nsze; // Namespace Size (number of logical blocks)
+    uint64_t ncap; // Namespace Capacity (number of logical blocks)
+    uint64_t nuse; // Namespace Utilization (number of logical blocks)
+    uint8_t flbas; // Formatted LBA Size (lower 4 bits = LBA format index)
+    uint8_t rsvd1[3];
+    uint8_t nmic;   // Metadata Indicator Capabilities
+    uint8_t rescap; // Reservation Capabilities
+    uint8_t rsvd2[88];
+    // more but lazy :p
+};
+
 struct nvme_identify_controller {
     uint16_t vid;    // PCI Vendor ID
     uint16_t ssvid;  // Subsystem Vendor ID
@@ -135,7 +147,7 @@ struct nvme_identify_controller {
     uint8_t sqes; // Submission Queue Entry Size
     uint8_t cqes; // Completion Queue Entry Size
     // TODO: there is more but me lazy and dont need it
-};
+} __attribute__((packed));
 
 #define NVME_COMPLETION_PHASE(cpl) ((cpl)->status & 0x1)
 #define NVME_COMPLETION_STATUS(cpl) (((cpl)->status >> 1) & 0x7FFF)
@@ -159,12 +171,16 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
 uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd);
 
 uint8_t *nvme_identify_controller(struct nvme_device *nvme);
+uint8_t *nvme_identify_namespace(struct nvme_device *nvme, uint32_t nsid);
 void nvme_enable_controller(struct nvme_device *nvme);
 void nvme_setup_admin_queues(struct nvme_device *nvme);
 void nvme_alloc_admin_queues(struct nvme_device *nvme);
 void nvme_alloc_io_queues(struct nvme_device *nvme);
-void nvme_discover_device(uint8_t bus, uint8_t slot, uint8_t func);
+struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
+                                         uint8_t func);
+struct generic_disk *nvme_create_generic(struct nvme_device *nvme);
 void nvme_print_identify(const struct nvme_identify_controller *ctrl);
+void nvme_print_namespace(const struct nvme_identify_namespace *ns);
 bool nvme_read_sector(struct generic_disk *disk, uint32_t lba, uint8_t *buffer);
 bool nvme_write_sector(struct generic_disk *disk, uint32_t lba,
                        const uint8_t *buffer);

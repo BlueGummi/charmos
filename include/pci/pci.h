@@ -1,7 +1,5 @@
 #include <stdint.h>
 
-#define MAX_PCI_DEVICES 256
-
 struct ide_drive;
 struct pci_device {
     uint8_t bus;

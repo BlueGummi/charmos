@@ -1,6 +1,7 @@
 #include <boot/gdt.h>
 #include <boot/smap.h>
 #include <console/printf.h>
+#include <limine.h>
 #include <mem/alloc.h>
 #include <mp/mp.h>
 #include <sch/sched.h>
@@ -55,5 +56,12 @@ void wakeup() {
             current_core->state = IDLE;
         }
         spin_unlock(&wakeup_lock);
+    }
+}
+
+void mp_wakeup_processors(struct limine_mp_response *mpr) {
+    for (uint64_t i = 0; i < mpr->cpu_count; i++) {
+        struct limine_mp_info *curr_cpu = mpr->cpus[i];
+        curr_cpu->goto_address = wakeup;
     }
 }

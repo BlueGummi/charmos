@@ -7,13 +7,8 @@
 #include <mem/vmm.h>
 #include <stdint.h>
 
-void nvme_discover_device(uint8_t bus, uint8_t slot, uint8_t func) {
-    uint16_t vendor = pci_read_word(bus, slot, func, 0x00);
-    uint16_t device = pci_read_word(bus, slot, func, 0x02);
-
-    k_printf("Found NVMe device: vendor=0x%04X, device=0x%04X\n", vendor,
-             device);
-
+struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
+                                         uint8_t func) {
     uint32_t bar0 = pci_read(bus, slot, func, 0x10) & ~0xF;
 
     void *mmio = vmm_map_phys(bar0, 4096 * 2); // two pages coz doorbell thingy
@@ -25,11 +20,6 @@ void nvme_discover_device(uint8_t bus, uint8_t slot, uint8_t func) {
     uint32_t page_size = 1 << (12 + mpsmin);
     uint32_t dstrd = (cap >> 32) & 0xF;
     uint32_t doorbell_stride = 1 << dstrd;
-
-    k_printf("NVMe CAP: 0x%016llx\n", cap);
-    k_printf("NVMe version: %08x\n", version);
-    k_printf("Doorbell stride: %u bytes\n", doorbell_stride * 4);
-    k_printf("Page size: %u bytes\n", page_size);
 
     struct nvme_device *nvme = kmalloc(sizeof(struct nvme_device));
     nvme->doorbell_stride = doorbell_stride;
@@ -44,24 +34,23 @@ void nvme_discover_device(uint8_t bus, uint8_t slot, uint8_t func) {
     nvme_setup_admin_queues(nvme);
     nvme_enable_controller(nvme);
     nvme_alloc_io_queues(nvme);
-
-    nvme_print_identify(
-        (struct nvme_identify_controller *) nvme_identify_controller(nvme));
+    return nvme;
 }
 
-void nvme_scan_pci() {
-    for (uint16_t bus = 0; bus < 256; bus++) {
-        for (uint8_t slot = 0; slot < 32; slot++) {
-            for (uint8_t func = 0; func < 8; func++) {
-                uint8_t class = pci_read_byte(bus, slot, func, 0x0B);
-                uint8_t subclass = pci_read_byte(bus, slot, func, 0x0A);
-                uint8_t progif = pci_read_byte(bus, slot, func, 0x09);
+void nvme_print_wrapper(struct generic_disk *d) {
+    struct nvme_device *dev = (struct nvme_device *) d->driver_data;
+    uint8_t *n = nvme_identify_namespace(dev, 1);
+    nvme_print_namespace((struct nvme_identify_namespace *) n);
+    uint8_t *i = nvme_identify_controller(dev);
+    nvme_print_identify((struct nvme_identify_controller *) i);
+}
 
-                if (class == PCI_CLASS_MASS_STORAGE &&
-                    subclass == PCI_SUBCLASS_NVM && progif == PCI_PROGIF_NVME) {
-                    nvme_discover_device(bus, slot, func);
-                }
-            }
-        }
-    }
+struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {
+    struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
+    d->driver_data = nvme;
+    d->sector_size = 512;
+    d->read_sector = nvme_read_sector;
+    d->write_sector = nvme_write_sector;
+    d->print = nvme_print_wrapper;
+    return d;
 }

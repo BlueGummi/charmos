@@ -37,10 +37,20 @@
 
 struct pci_device;
 struct ide_drive {
+    bool actually_exists; // it picks everything up
     uint32_t sector_size;
     uint16_t io_base;
     uint16_t ctrl_base;
     uint16_t slave;
+
+    char model[41];   // 40 chars + null
+    char serial[21];  // 20 chars + null
+    char firmware[9]; // 8 chars + null
+    uint64_t total_sectors;
+    uint8_t supports_lba48;
+    uint8_t supports_dma;
+    uint8_t udma_mode;
+    uint8_t pio_mode;
 };
 
 bool ide_wait_ready(struct ide_drive *d);
@@ -55,4 +65,6 @@ bool ide_setup_drive(struct ide_drive *ide, struct pci_device *devices,
 
 struct generic_disk *ide_create_generic(struct ide_drive *ide);
 
+void ide_identify(struct ide_drive *drive);
+void ide_print_info(struct generic_disk *d);
 #pragma once

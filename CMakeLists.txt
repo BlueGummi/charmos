@@ -56,12 +56,15 @@ set(QEMU_COMMON_FLAGS
     -device qemu-xhci,id=xhci
     -device usb-kbd,id=usbkbd
     -device usb-mouse,id=usbmouse
+
     -drive id=disk0,file=disk.img,format=raw,if=none
     -device nvme,drive=disk0,serial=nvme0
+
     -drive id=fatdisk,file=fat32_disk.img,format=raw,if=none
     -device ide-hd,drive=fatdisk,bus=ide.0,unit=1
-    -d trace:*nvme*
-    -trace file=trace.log
+
+    #    -d trace:*nvme*
+    #    -trace file=trace.log
 )
 
 add_custom_target(run

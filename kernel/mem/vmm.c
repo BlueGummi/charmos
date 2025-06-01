@@ -223,3 +223,16 @@ void *vmm_map_phys(uint64_t addr, uint64_t len) {
 
     return (void *) (virt_start + offset);
 }
+
+void vmm_unmap_virt(void *addr, size_t len) {
+    uintptr_t virt_addr = (uintptr_t) addr;
+    uintptr_t page_offset = virt_addr & (PAGE_SIZE - 1);
+    uintptr_t aligned_virt = PAGE_ALIGN_DOWN(virt_addr);
+
+    size_t total_len = len + page_offset;
+    size_t total_pages = (total_len + PAGE_SIZE - 1) / PAGE_SIZE;
+
+    for (size_t i = 0; i < total_pages; i++) {
+        vmm_unmap_page(aligned_virt + i * PAGE_SIZE);
+    }
+}

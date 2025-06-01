@@ -3,6 +3,7 @@
 #include <devices/ahci.h>
 #include <devices/generic_disk.h>
 #include <devices/nvme.h>
+#include <devices/registry.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
 #include <pci/pci.h>
@@ -72,26 +73,17 @@ void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
                 uint8_t prog_if = (class_info >> 8) & 0xFF;
                 uint8_t revision = class_info & 0xFF;
 
-                if (pci_device_count < MAX_PCI_DEVICES) {
-                    pci_devices[pci_device_count++] =
-                        (struct pci_device) {.bus = bus,
-                                             .device = device,
-                                             .function = function,
-                                             .vendor_id = vendor_id,
-                                             .device_id = device_id,
-                                             .class_code = class_code,
-                                             .subclass = subclass,
-                                             .prog_if = prog_if,
-                                             .revision = revision};
-                }
+                pci_devices[pci_device_count++] =
+                    (struct pci_device) {.bus = bus,
+                                         .device = device,
+                                         .function = function,
+                                         .vendor_id = vendor_id,
+                                         .device_id = device_id,
+                                         .class_code = class_code,
+                                         .subclass = subclass,
+                                         .prog_if = prog_if,
+                                         .revision = revision};
 
-                if (class_code == PCI_CLASS_MASS_STORAGE &&
-                    subclass == PCI_SUBCLASS_NVM &&
-                    prog_if == PCI_PROGIF_NVME) {
-                    nvme_discover_device(bus, device, function);
-                }
-
-                // TODO: #define constants for these
                 if (class_code == 0x01 && subclass == 0x06 && prog_if == 0x01) {
                     uint32_t abar =
                         pci_read(bus, device, function, 0x24) & ~0xF;

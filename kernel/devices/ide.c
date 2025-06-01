@@ -78,13 +78,15 @@ bool ide_setup_drive(struct ide_drive *ide, struct pci_device *devices,
             if ((bar & 1) == 1) {
                 ide->io_base = (uint16_t) (bar & 0xFFFFFFFC);
             } else {
-                ide->io_base = (channel == 0) ? 0x1F0 : 0x170;
+                ide->io_base =
+                    (channel == 0) ? ATA_PRIMARY_IO : ATA_SECONDARY_IO;
             }
 
             if ((ctrl_bar & 1) == 1) {
                 ide->ctrl_base = (uint16_t) (ctrl_bar & 0xFFFFFFFC);
             } else {
-                ide->ctrl_base = (channel == 0) ? 0x3F6 : 0x376;
+                ide->ctrl_base =
+                    (channel == 0) ? ATA_PRIMARY_CTRL : ATA_SECONDARY_IO;
             }
 
             ide->slave = is_slave;
@@ -103,67 +105,6 @@ static void io_wait(void) {
         inb(0x80);
 }
 
-bool ata_identify(uint16_t base, uint16_t ctrl, bool slave) {
-    outb(REG_DRIVE_HEAD(base), slave ? 0xB0 : 0xA0);
-    io_wait();
-
-    outb(REG_SECTOR_COUNT(base), 0);
-    outb(REG_LBA_LOW(base), 0);
-    outb(REG_LBA_MID(base), 0);
-    outb(REG_LBA_HIGH(base), 0);
-
-    outb(REG_COMMAND(base), ATA_CMD_IDENTIFY);
-    io_wait();
-
-    uint8_t status = inb(REG_STATUS(base));
-    if (status == 0) {
-        return false;
-    }
-
-    while (status & STATUS_BSY) {
-        status = inb(REG_STATUS(base));
-    }
-
-    while (!(status & STATUS_DRQ) && !(status & STATUS_ERR)) {
-        status = inb(REG_STATUS(base));
-    }
-
-    if (status & STATUS_ERR) {
-        return false;
-    }
-
-    for (int i = 0; i < 256; i++) {
-        inw(REG_DATA(base));
-    }
-
-    return true;
-}
-
-uint8_t ide_detect_drives(void) {
-    const char *channel_names[] = {"Primary", "Secondary"};
-    const char *drive_names[] = {"Master", "Slave"};
-    uint8_t ret = 0;
-    uint16_t io_bases[] = {ATA_PRIMARY_IO, ATA_SECONDARY_IO};
-    uint16_t ctrl_bases[] = {ATA_PRIMARY_CTRL, ATA_SECONDARY_CTRL};
-
-    for (int channel = 0; channel < 2; channel++) {
-        for (int drive = 0; drive < 2; drive++) {
-            int ind = channel * 2 + drive;
-            bool found =
-                ata_identify(io_bases[channel], ctrl_bases[channel], drive);
-            if (found) {
-                k_printf("IDE %s %s detected\n", channel_names[channel],
-                         drive_names[drive]);
-                ret |= (1 << (3 - ind));
-            } else {
-                k_printf("IDE %s %s not present\n", channel_names[channel],
-                         drive_names[drive]);
-            }
-        }
-    }
-    return ret;
-}
-
 bool ide_read_sector_wrapper(struct generic_disk *d, uint32_t lba,
                              uint8_t *buf) {
     struct ide_drive *ide = d->driver_data;
@@ -176,11 +117,93 @@ bool ide_write_sector_wrapper(struct generic_disk *d, uint32_t lba,
     return ide_write_sector(ide, lba, buf);
 }
 
+void ide_print_info(struct generic_disk *d) {
+    struct ide_drive *drive = (struct ide_drive *) d->driver_data;
+    if (!drive->actually_exists)
+        return;
+    k_printf("IDE Drive identify:\n");
+    k_printf("  IDE Drive Model: %s\n", drive->model);
+    k_printf("  Serial: %s\n", drive->serial);
+    k_printf("  Firmware: %s\n", drive->firmware);
+    k_printf("  Sectors: %llu\n", drive->total_sectors);
+    k_printf("  Size: %llu MB\n",
+             (drive->total_sectors * drive->sector_size) / (1024 * 1024));
+    k_printf("  LBA48: %s\n", drive->supports_lba48 ? "Yes" : "No");
+    k_printf("  DMA: %s\n", drive->supports_dma ? "Yes" : "No");
+    k_printf("  UDMA Mode: %u\n", drive->udma_mode);
+    k_printf("  PIO Mode: %u\n", drive->pio_mode);
+}
+
 struct generic_disk *ide_create_generic(struct ide_drive *ide) {
     struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
     d->driver_data = ide;
     d->sector_size = ide->sector_size;
     d->read_sector = ide_read_sector_wrapper;
     d->write_sector = ide_write_sector_wrapper;
+    d->print = ide_print_info;
     return d;
+}
+
+void ide_identify(struct ide_drive *drive) {
+    uint16_t buf[256];
+    uint16_t io = drive->io_base;
+
+    outb(REG_DRIVE_HEAD(io), 0xA0 | (drive->slave ? 0x10 : 0x00));
+
+    outb(REG_COMMAND(io), ATA_CMD_IDENTIFY);
+
+    uint8_t status;
+    while ((status = inb(REG_STATUS(io))) & STATUS_BSY)
+        ;
+
+    if (status == 0 || (status & STATUS_ERR)) {
+        return;
+    }
+
+    while (!((status = inb(REG_STATUS(io))) & STATUS_DRQ))
+        ;
+
+    insw(REG_DATA(io), buf, 256);
+
+#define copy_and_swap(dst, src, len)                                           \
+    for (int i = 0; i < (len) / 2; ++i) {                                      \
+        (dst)[2 * i] = ((src)[i] >> 8) & 0xFF;                                 \
+        (dst)[2 * i + 1] = (src)[i] & 0xFF;                                    \
+    }                                                                          \
+    (dst)[len] = '\0';
+
+    copy_and_swap(drive->serial, &buf[10], 20);
+    copy_and_swap(drive->firmware, &buf[23], 8);
+    copy_and_swap(drive->model, &buf[27], 40);
+
+    for (int i = 39; i >= 0 && drive->model[i] == ' '; i--)
+        drive->model[i] = '\0';
+
+    drive->supports_lba48 = (buf[83] & (1 << 10)) ? 1 : 0;
+
+    if (drive->supports_lba48) {
+        drive->total_sectors =
+            ((uint64_t) buf[100]) | ((uint64_t) buf[101] << 16) |
+            ((uint64_t) buf[102] << 32) | ((uint64_t) buf[103] << 48);
+    } else {
+        drive->total_sectors =
+            ((uint32_t) buf[60]) | ((uint32_t) buf[61] << 16);
+    }
+
+    drive->actually_exists = drive->total_sectors != 0;
+
+    drive->sector_size = 512;
+
+    drive->supports_dma = (buf[49] & (1 << 8)) ? 1 : 0;
+
+    drive->udma_mode = 0;
+    if (buf[88] & (1 << 13)) {
+        for (int i = 0; i < 8; ++i) {
+            if (buf[88] & (1 << i)) {
+                drive->udma_mode = i;
+            }
+        }
+    }
+
+    drive->pio_mode = buf[64] & 0x03;
 }

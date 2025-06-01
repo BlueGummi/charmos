@@ -22,6 +22,8 @@ make run # run this in the build directory
 
 > The :trophy: means the task is a challenge, the :broom: means something is trivial
 
+- [ ] big problem - free and unmap memory once you are done
+
 ### "The Basics" 
 
 - [x] gdt + idt 
