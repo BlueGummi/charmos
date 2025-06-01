@@ -57,17 +57,21 @@ uint16_t nvme_submit_io_cmd(struct nvme_device *nvme,
     uint16_t tail = nvme->io_sq_tail;
     uint16_t next_tail = (tail + 1) % nvme->admin_q_depth;
 
-    if (next_tail == nvme->io_cq_head)
+    if (next_tail == nvme->io_cq_head) {
         return 0xFFFF;
+    }
 
     cmd->cid = tail;
     nvme->io_sq[tail] = *cmd;
+
     nvme->io_sq_tail = next_tail;
 
     uint32_t stride = 4 << nvme->doorbell_stride;
+
     volatile uint32_t *sq_tail_db =
         (volatile uint32_t *) ((uint8_t *) nvme->regs + 0x1000 +
                                (2 * 1) * stride);
+
     *sq_tail_db = nvme->io_sq_tail;
 
     while (true) {

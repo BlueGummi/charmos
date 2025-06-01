@@ -19,7 +19,7 @@ void nvme_enable_controller(struct nvme_device *nvme) {
     uint32_t mpsmin = (nvme->cap >> 48) & 0xF;
     cc |= (mpsmin & 0xF) << 7;
 
-    cc |= (6 << 20);
+    cc |= (4 << 20); // IO queue spot stuff
 
     cc |= (4 << 16);
 
@@ -83,15 +83,9 @@ void nvme_alloc_admin_queues(struct nvme_device *nvme) {
     nvme->admin_cq = acq_virt;
     nvme->admin_cq_phys = acq_phys;
 }
-
 void nvme_alloc_io_queues(struct nvme_device *nvme) {
-    size_t q_depth = nvme->admin_q_depth;
-
-    size_t sq_size = q_depth * sizeof(struct nvme_command);
-    size_t cq_size = q_depth * sizeof(struct nvme_completion);
-
-    size_t sq_pages = DIV_ROUND_UP(sq_size, nvme->page_size);
-    size_t cq_pages = DIV_ROUND_UP(cq_size, nvme->page_size);
+    uint64_t sq_pages = 2;
+    uint64_t cq_pages = 2;
 
     uint64_t sq_phys = (uint64_t) pmm_alloc_pages(sq_pages, false);
     nvme->io_sq = vmm_map_phys(sq_phys, sq_pages * nvme->page_size);
@@ -106,4 +100,32 @@ void nvme_alloc_io_queues(struct nvme_device *nvme) {
     nvme->io_sq_tail = 0;
     nvme->io_cq_head = 0;
     nvme->io_cq_phase = 1;
+
+    // complete queue
+    struct nvme_command cq_cmd = {0};
+    cq_cmd.opc = 0x05;
+    cq_cmd.nsid = 0;
+    cq_cmd.prp1 = cq_phys;
+
+    cq_cmd.cdw10 = (16) << 16 | 1; // bro needs 8 queue spots
+    //    cq_cmd.cdw11 = 1; interrupt
+
+    if (nvme_submit_admin_cmd(nvme, &cq_cmd) != 0) {
+        k_printf("nvme: failed to create IO Completion Queue\n");
+        return;
+    }
+
+    // submit queue
+    struct nvme_command sq_cmd = {0};
+    sq_cmd.opc = 0x01;
+    sq_cmd.nsid = 0;
+    sq_cmd.prp1 = sq_phys;
+
+    sq_cmd.cdw10 = (16) << 16 | 1; // bro needs 8 queue spots
+    //    sq_cmd.cdw11 = 1;
+
+    if (nvme_submit_admin_cmd(nvme, &sq_cmd) != 0) {
+        k_printf("nvme: failed to create IO Submission Queue\n");
+        return;
+    }
 }

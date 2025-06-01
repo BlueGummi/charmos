@@ -8,3 +8,4 @@ struct generic_disk *registry_get_by_index(uint64_t index);
 uint64_t registry_get_disk_cnt(void);
 void registry_setup();
 void registry_print_devices();
+void registry_detect_fs();

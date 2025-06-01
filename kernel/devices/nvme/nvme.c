@@ -52,5 +52,6 @@ struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {
     d->read_sector = nvme_read_sector;
     d->write_sector = nvme_write_sector;
     d->print = nvme_print_wrapper;
+    d->type = G_NVME_DRIVE; 
     return d;
 }

@@ -3,6 +3,7 @@
 #include <devices/ide.h>
 #include <devices/nvme.h>
 #include <devices/registry.h>
+#include <fs/detect.h>
 #include <mem/alloc.h>
 #include <pci/pci.h>
 #include <string.h>
@@ -91,5 +92,13 @@ void registry_print_devices() {
     for (uint64_t i = 0; i < disk_count; i++) {
         struct generic_disk *disk = registry_get_by_index(i);
         disk->print(disk);
+    }
+}
+
+void registry_detect_fs() {
+    for (uint64_t i = 0; i < disk_count; i++) {
+        struct generic_disk *disk = registry_get_by_index(i);
+        enum fs_type t = detect_fs(disk);
+        k_printf("FS is %s\n", detect_fstr(t));
     }
 }

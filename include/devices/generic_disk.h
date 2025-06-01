@@ -2,9 +2,9 @@
 #include <stdint.h>
 
 enum generic_disk_type {
-    IDE_DRIVE,
-    NVME_DRIVE,
-    AHCI_DRIVE,
+    G_IDE_DRIVE,
+    G_NVME_DRIVE,
+    G_AHCI_DRIVE,
 };
 
 struct generic_disk {

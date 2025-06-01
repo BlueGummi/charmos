@@ -100,11 +100,6 @@ bool ide_setup_drive(struct ide_drive *ide, struct pci_device *devices,
     return false;
 }
 
-static void io_wait(void) {
-    for (int i = 0; i < 1000; i++)
-        inb(0x80);
-}
-
 bool ide_read_sector_wrapper(struct generic_disk *d, uint32_t lba,
                              uint8_t *buf) {
     struct ide_drive *ide = d->driver_data;
@@ -136,6 +131,7 @@ void ide_print_info(struct generic_disk *d) {
 
 struct generic_disk *ide_create_generic(struct ide_drive *ide) {
     struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
+    d->type = G_IDE_DRIVE;
     d->driver_data = ide;
     d->sector_size = ide->sector_size;
     d->read_sector = ide_read_sector_wrapper;

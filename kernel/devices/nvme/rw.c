@@ -28,10 +28,13 @@ bool nvme_read_sector(struct generic_disk *disk, uint32_t lba,
     cmd.cdw11 = 0;
     cmd.cdw12 = 0; // 0 = read 1 block (0-based)
 
-    if (nvme_submit_io_cmd(nvme, &cmd) != 0)
+    if (nvme_submit_io_cmd(nvme, &cmd) != 0) {
+        vmm_unmap_page((uint64_t) virt);
         return false;
+    }
 
     memcpy(buffer, virt, 512);
+    vmm_unmap_page((uint64_t) virt);
     return true;
 }
 
@@ -54,8 +57,11 @@ bool nvme_write_sector(struct generic_disk *disk, uint32_t lba,
     cmd.cdw11 = 0;
     cmd.cdw12 = 0; // 0 = write 1 block
 
-    if (nvme_submit_io_cmd(nvme, &cmd) != 0)
+    if (nvme_submit_io_cmd(nvme, &cmd) != 0) {
+        vmm_unmap_page((uint64_t) virt);
         return false;
+    }
 
+    vmm_unmap_page((uint64_t) virt);
     return true;
 }
