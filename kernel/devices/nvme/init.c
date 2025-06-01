@@ -118,7 +118,7 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
 
     // complete queue
     struct nvme_command cq_cmd = {0};
-    cq_cmd.opc = 0x05;
+    cq_cmd.opc = NVME_OP_ADMIN_CREATE_IOCQ;
     cq_cmd.prp1 = cq_phys;
 
     cq_cmd.cdw10 = (15) << 16 | 1;
@@ -130,7 +130,7 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
 
     // submit queue
     struct nvme_command sq_cmd = {0};
-    sq_cmd.opc = 0x01;
+    sq_cmd.opc = NVME_OP_ADMIN_CREATE_IOSQ;
     sq_cmd.prp1 = sq_phys;
 
     sq_cmd.cdw10 = (63) << 16 | 1;

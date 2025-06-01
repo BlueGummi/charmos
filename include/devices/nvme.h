@@ -152,16 +152,23 @@ struct nvme_identify_controller {
 #define PCI_CLASS_MASS_STORAGE 0x01
 #define PCI_SUBCLASS_NVM 0x08
 #define PCI_PROGIF_NVME 0x02
-#define NVME_ADMIN_IDENTIFY 0x06
-#define NVME_ADMIN_GET_FEATURES 0x0A
-#define NVME_CSTS_RDY (1 << 0)
-#define NVME_CSTS_CFS (1 << 1)
 
-#define NVME_CC_EN_SHIFT 0
-#define NVME_CC_EN_MASK (1 << NVME_CC_EN_SHIFT)
-#define NVME_CC_CSS_SHIFT 4
-#define NVME_CSTS_RDY_SHIFT 0
 #define NVME_DOORBELL_BASE 0x1000
+
+#define NVME_OP_ADMIN_DELETE_IOSQ 0x0
+#define NVME_OP_ADMIN_CREATE_IOSQ 0x1
+
+#define NVME_OP_ADMIN_GET_LOG_PG 0x2
+
+#define NVME_OP_ADMIN_DELETE_IOCQ 0x4
+#define NVME_OP_ADMIN_CREATE_IOCQ 0x5
+
+#define NVME_OP_ADMIN_IDENT 0x6
+#define NVME_OP_ADMIN_SET_FEATS 0x9
+#define NVME_OP_ADMIN_GET_FEATS 0x10
+
+#define NVME_OP_IO_READ 0x02
+#define NVME_OP_IO_WRITE 0x01
 
 uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
                                struct nvme_command *cmd);

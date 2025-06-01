@@ -78,9 +78,9 @@ uint8_t *nvme_identify_controller(struct nvme_device *nvme) {
     memset(buffer, 0, 4096);
 
     struct nvme_command cmd = {0};
-    cmd.opc = 0x06; // IDENTIFY opcode
-    cmd.fuse = 0;   // normal
-    cmd.nsid = 1;   // not used for controller ID
+    cmd.opc = NVME_OP_ADMIN_IDENT; // IDENTIFY opcode
+    cmd.fuse = 0;                  // normal
+    cmd.nsid = 1;                  // not used for controller ID
     cmd.prp1 = buffer_phys;
     cmd.cdw10 = 1; // identify controller
 
@@ -103,9 +103,9 @@ uint8_t *nvme_identify_namespace(struct nvme_device *nvme, uint32_t nsid) {
     memset(buffer, 0, 4096);
 
     struct nvme_command cmd = {0};
-    cmd.opc = 0x06;  // IDENTIFY opcode
-    cmd.fuse = 0;    // normal
-    cmd.nsid = nsid; // namespace ID to identify
+    cmd.opc = NVME_OP_ADMIN_IDENT; // IDENTIFY opcode
+    cmd.fuse = 0;                  // normal
+    cmd.nsid = nsid;               // namespace ID to identify
     cmd.prp1 = buffer_phys;
     cmd.cdw10 = 0; // Identify Namespace (CNS=0)
 

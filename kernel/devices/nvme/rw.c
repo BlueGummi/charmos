@@ -21,11 +21,11 @@ bool nvme_read_sector(struct generic_disk *disk, uint64_t lba,
     memset(virt, 0, 4096);
 
     struct nvme_command cmd = {0};
-    cmd.opc = 0x02; // READ
+    cmd.opc = NVME_OP_IO_READ;
     cmd.nsid = 1;
     cmd.prp1 = buffer_phys;
     cmd.cdw10 = lba;
-    cmd.cdw11 = 0;
+    cmd.cdw11 = lba >> 32;
     cmd.cdw12 = 0; // 0 = read 1 block (0-based)
 
     if (nvme_submit_io_cmd(nvme, &cmd, 1) !=
@@ -51,14 +51,15 @@ bool nvme_write_sector(struct generic_disk *disk, uint64_t lba,
     memcpy(virt, buffer, 512);
 
     struct nvme_command cmd = {0};
-    cmd.opc = 0x01; // WRITE
+    cmd.opc = NVME_OP_IO_WRITE;
     cmd.nsid = 1;
     cmd.prp1 = buffer_phys;
-    cmd.cdw10 = lba;
-    cmd.cdw11 = 0;
+    cmd.cdw10 = lba & 0xFFFFFFFF;
+    cmd.cdw11 = lba >> 32;
     cmd.cdw12 = 0; // 0 = write 1 block
 
-    if (nvme_submit_io_cmd(nvme, &cmd, 1) != 0) {
+    if (nvme_submit_io_cmd(nvme, &cmd, 1) !=
+        0) { // TODO: Dynamic queue selection
         vmm_unmap_page((uint64_t) virt);
         return false;
     }
