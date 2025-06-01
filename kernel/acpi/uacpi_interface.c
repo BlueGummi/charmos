@@ -189,14 +189,12 @@ void uacpi_kernel_free_spinlock(uacpi_handle a) {
 
 uacpi_cpu_flags uacpi_kernel_lock_spinlock(uacpi_handle a) {
 
-    spin_lock((struct spinlock *) a);
-    return 0;
+    bool flag = spin_lock((struct spinlock *) a);
+    return flag;
 }
 
 void uacpi_kernel_unlock_spinlock(uacpi_handle a, uacpi_cpu_flags b) {
-
-    (void) b;
-    spin_unlock((struct spinlock *) a);
+    spin_unlock((struct spinlock *) a, b);
 }
 uacpi_thread_id uacpi_kernel_get_thread_id(void) {
     return (uacpi_thread_id) 0;

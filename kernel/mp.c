@@ -29,7 +29,7 @@ uint64_t mp_available_core() {
 }
 
 void wakeup() {
-    spin_lock(&wakeup_lock);
+    bool ints = spin_lock(&wakeup_lock);
     enable_smap_smep_umip();
     gdt_install();
     serial_init();
@@ -43,19 +43,19 @@ void wakeup() {
     current_core->state = IDLE;
     current_core->current_thread = NULL;
     core_data[cpu] = current_core;
-    spin_unlock(&wakeup_lock);
+    spin_unlock(&wakeup_lock, ints);
 
     while (1) {
-        spin_lock(&wakeup_lock);
+        bool ints_enabled = spin_lock(&wakeup_lock);
         if (current_core->current_thread != NULL) {
             current_core->state = BUSY;
-            spin_unlock(&wakeup_lock);
+            spin_unlock(&wakeup_lock, ints_enabled);
             current_core->current_thread->entry();
             thread_free(current_core->current_thread);
             current_core->current_thread = NULL;
             current_core->state = IDLE;
         }
-        spin_unlock(&wakeup_lock);
+        spin_unlock(&wakeup_lock, ints_enabled);
     }
 }
 
