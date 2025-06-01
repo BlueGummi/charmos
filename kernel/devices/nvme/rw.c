@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <string.h>
 
-bool nvme_read_sector(struct generic_disk *disk, uint32_t lba,
+bool nvme_read_sector(struct generic_disk *disk, uint64_t lba,
                       uint8_t *buffer) {
     struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
 
@@ -38,7 +38,7 @@ bool nvme_read_sector(struct generic_disk *disk, uint32_t lba,
     return true;
 }
 
-bool nvme_write_sector(struct generic_disk *disk, uint32_t lba,
+bool nvme_write_sector(struct generic_disk *disk, uint64_t lba,
                        const uint8_t *buffer) {
     struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
 

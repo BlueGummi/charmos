@@ -73,6 +73,7 @@ enum fs_type detect_fs(struct generic_disk *drive) {
     if (memcmp(&sector[1], "CD001", 5) == 0)
         type = FS_ISO9660;
 end:
+    drive->fs = type;   
     kfree(sector);
     return type;
 }

@@ -1,6 +1,6 @@
 #pragma once
-#include <devices/generic_disk.h>
 
+struct generic_disk;
 enum fs_type {
     FS_UNKNOWN = 0,
     FS_FAT32 = 1,

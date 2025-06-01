@@ -1,3 +1,4 @@
+default rel
 extern schedule
 global context_switch
 context_switch:

@@ -1,6 +1,7 @@
 #pragma once
+#include <stdint.h>
 
-#include <devices/generic_disk.h>
+struct generic_disk;
 void registry_register(struct generic_disk *disk);
 void registry_unregister(struct generic_disk *disk);
 struct generic_disk *registry_get_by_name(const char *name);

@@ -4,6 +4,7 @@
 #include <devices/nvme.h>
 #include <devices/registry.h>
 #include <fs/detect.h>
+#include <fs/supersector.h>
 #include <mem/alloc.h>
 #include <pci/pci.h>
 #include <string.h>
@@ -102,3 +103,15 @@ void registry_detect_fs() {
         k_printf("FS is %s\n", detect_fstr(t));
     }
 }
+
+void registry_read_fs() {
+    for (uint64_t i = 0; i < disk_count; i++) {
+        struct generic_disk *disk = registry_get_by_index(i);
+        struct generic_supersector ss = {0};
+        switch (disk->fs) {
+            
+        }
+    }
+}
+
+

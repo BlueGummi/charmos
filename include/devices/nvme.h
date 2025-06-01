@@ -181,6 +181,6 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
 struct generic_disk *nvme_create_generic(struct nvme_device *nvme);
 void nvme_print_identify(const struct nvme_identify_controller *ctrl);
 void nvme_print_namespace(const struct nvme_identify_namespace *ns);
-bool nvme_read_sector(struct generic_disk *disk, uint32_t lba, uint8_t *buffer);
-bool nvme_write_sector(struct generic_disk *disk, uint32_t lba,
+bool nvme_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer);
+bool nvme_write_sector(struct generic_disk *disk, uint64_t lba,
                        const uint8_t *buffer);

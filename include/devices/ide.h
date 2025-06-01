@@ -55,8 +55,8 @@ struct ide_drive {
 
 bool ide_wait_ready(struct ide_drive *d);
 
-bool ide_read_sector(struct ide_drive *d, uint32_t lba, uint8_t *b);
-bool ide_write_sector(struct ide_drive *d, uint32_t lba, const uint8_t *b);
+bool ide_read_sector(struct ide_drive *d, uint64_t lba, uint8_t *b);
+bool ide_write_sector(struct ide_drive *d, uint64_t lba, const uint8_t *b);
 
 uint8_t ide_detect_drives();
 

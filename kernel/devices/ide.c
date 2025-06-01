@@ -19,7 +19,7 @@ bool ide_wait_ready(struct ide_drive *d) {
     return (inb(REG_STATUS(d->io_base)) & STATUS_DRDY);
 }
 
-bool ide_read_sector(struct ide_drive *d, uint32_t lba, uint8_t *b) {
+bool ide_read_sector(struct ide_drive *d, uint64_t lba, uint8_t *b) {
     if (!ide_wait_ready(d))
         return false;
 
@@ -38,7 +38,7 @@ bool ide_read_sector(struct ide_drive *d, uint32_t lba, uint8_t *b) {
     return true;
 }
 
-bool ide_write_sector(struct ide_drive *d, uint32_t lba, const uint8_t *b) {
+bool ide_write_sector(struct ide_drive *d, uint64_t lba, const uint8_t *b) {
     if (!ide_wait_ready(d)) {
         return false;
     }
@@ -100,13 +100,13 @@ bool ide_setup_drive(struct ide_drive *ide, struct pci_device *devices,
     return false;
 }
 
-bool ide_read_sector_wrapper(struct generic_disk *d, uint32_t lba,
+bool ide_read_sector_wrapper(struct generic_disk *d, uint64_t lba,
                              uint8_t *buf) {
     struct ide_drive *ide = d->driver_data;
     return ide_read_sector(ide, lba, buf);
 }
 
-bool ide_write_sector_wrapper(struct generic_disk *d, uint32_t lba,
+bool ide_write_sector_wrapper(struct generic_disk *d, uint64_t lba,
                               const uint8_t *buf) {
     struct ide_drive *ide = d->driver_data;
     return ide_write_sector(ide, lba, buf);
