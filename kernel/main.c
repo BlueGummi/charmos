@@ -1,4 +1,5 @@
 #include <acpi/print.h>
+#include <acpi/uacpi_interface.h>
 #include <asm.h>
 #include <boot/gdt.h>
 #include <boot/smap.h>
@@ -46,16 +47,7 @@
 #include <vfs/vfs.h>
 
 struct scheduler global_sched;
-
-void k_sch_main() {
-    k_printf("idle task\n");
-    while (1) {
-        asm volatile("hlt");
-    }
-}
-
 uint64_t a_rsdp = 0;
-uint64_t tsc_freq = 0;
 
 void k_main(void) {
     k_printf_init(framebuffer_request.response->framebuffers[0]);
@@ -71,18 +63,9 @@ void k_main(void) {
     vmm_init();
     slab_init();
     test_alloc();
-    tsc_freq = measure_tsc_freq_pit();
-    uacpi_initialize(0);
-    uacpi_namespace_load();
-    uacpi_namespace_initialize();
-
-    /*    uacpi_namespace_for_each_child(uacpi_namespace_root(), acpi_print_ctx,
-                                       UACPI_NULL, UACPI_OBJECT_DEVICE_BIT,
-                                       UACPI_MAX_DEPTH_ANY, UACPI_NULL);*/
-
+    uacpi_init();
     registry_setup();
     registry_print_devices();
-
     scheduler_init(&global_sched);
     scheduler_add_thread(&global_sched, thread_create(k_sch_main));
     scheduler_start();

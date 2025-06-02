@@ -6,8 +6,36 @@
 
 uint64_t time_tick_count = 0;
 
-#define CLI asm volatile("cli")
-#define STI asm volatile("sti")
+void k_sch_main() {
+    k_printf("idle task\n");
+    while (1) {
+        asm volatile("hlt");
+    }
+}
+
+void schedule(struct cpu_state *cpu) {
+    time_tick_count += 1;
+    if (!global_sched.active) {
+        return;
+    }
+    if (!global_sched.started_first) {
+        global_sched.started_first = true;
+        return;
+    }
+    global_sched.current->state = READY;
+    if (global_sched.current) {
+        memcpy(&global_sched.current->regs, cpu, sizeof(struct cpu_state));
+        global_sched.current = global_sched.current->next
+                                   ? global_sched.current->next
+                                   : global_sched.head;
+    }
+
+    if (global_sched.current) {
+        memcpy(cpu, &global_sched.current->regs, sizeof(struct cpu_state));
+    }
+    global_sched.current->state = RUNNING;
+    return;
+}
 
 __attribute__((noreturn)) void scheduler_start(void) {
     struct cpu_state *regs = &global_sched.current->regs;
@@ -47,30 +75,6 @@ __attribute__((noreturn)) void scheduler_start(void) {
         : "memory");
 
     __builtin_unreachable();
-}
-
-void schedule(struct cpu_state *cpu) {
-    time_tick_count += 1;
-    if (!global_sched.active) {
-        return;
-    }
-    if (!global_sched.started_first) {
-        global_sched.started_first = true;
-        return;
-    }
-    global_sched.current->state = READY;
-    if (global_sched.current) {
-        memcpy(&global_sched.current->regs, cpu, sizeof(struct cpu_state));
-        global_sched.current = global_sched.current->next
-                                   ? global_sched.current->next
-                                   : global_sched.head;
-    }
-
-    if (global_sched.current) {
-        memcpy(cpu, &global_sched.current->regs, sizeof(struct cpu_state));
-    }
-    global_sched.current->state = RUNNING;
-    return;
 }
 
 void scheduler_init(struct scheduler *sched) {

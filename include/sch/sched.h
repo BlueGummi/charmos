@@ -15,8 +15,11 @@ void scheduler_rm_thread(struct scheduler *sched, struct thread *thread);
 __attribute__((noreturn)) void scheduler_start(void);
 void schedule(struct cpu_state *cpu);
 void scheduler_rm_id(struct scheduler *sched, uint64_t thread_id);
+void k_sch_main();
 extern struct thread *current_thread;
 extern struct scheduler global_sched;
 extern void timer_interrupt_handler(void);
 #define PIT_HZ 100
+#define CLI asm volatile("cli")
+#define STI asm volatile("sti")
 #pragma once

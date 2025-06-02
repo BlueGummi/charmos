@@ -1,3 +1,4 @@
+#include <acpi/print.h>
 #include <acpi/uacpi_interface.h>
 #include <asm.h>
 #include <console/printf.h>
@@ -6,6 +7,7 @@
 #include <mem/pmm.h>
 #include <mem/slab.h>
 #include <mem/vmm.h>
+#include <pit.h>
 #include <spin_lock.h>
 #include <stdint.h>
 #include <uacpi/event.h>
@@ -14,6 +16,20 @@
 #include <uacpi/status.h>
 #include <uacpi/uacpi.h>
 
+uint64_t tsc_freq = 0;
+
+void uacpi_init() {
+    tsc_freq = measure_tsc_freq_pit();
+    uacpi_initialize(0);
+    uacpi_namespace_load();
+    uacpi_namespace_initialize();
+}
+
+void uacpi_print_devs() {
+    uacpi_namespace_for_each_child(uacpi_namespace_root(), acpi_print_ctx,
+                                   UACPI_NULL, UACPI_OBJECT_DEVICE_BIT,
+                                   UACPI_MAX_DEPTH_ANY, UACPI_NULL);
+}
 static irq_entry_t irq_table[IDT_ENTRIES];
 
 extern uint64_t a_rsdp;
@@ -132,7 +148,8 @@ void (*isr_trampolines[])(void *) = {
 #undef X
 };
 
-void uacpi_mark_irq_installed(uint8_t irq) { // this is used in idt.c to avoid overwriting
+void uacpi_mark_irq_installed(
+    uint8_t irq) { // this is used in idt.c to avoid overwriting
     irq_table[irq].installed = true;
 }
 
