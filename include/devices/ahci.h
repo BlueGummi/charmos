@@ -182,13 +182,19 @@ volatile struct ahci_port {
     uint32_t vendor[4]; // 0x70 ~ 0x7F, vendor specific
 } __attribute__((packed));
 
-// one disk
+// one controller
 struct ahci_device {
     uint8_t type;                   // Device type
     uint32_t signature;             // Device signature
     uint32_t sectors;               // Total sectors (for disks)
     uint16_t sector_size;           // Sector size in bytes
     struct ahci_full_port regs[32]; // Pointer to port registers
+};
+
+// one disk
+struct ahci_disk {
+    struct ahci_device *device;
+    uint32_t port;
 };
 
 struct ahci_controller {
@@ -238,5 +244,7 @@ struct ahci_cmd_header {
 STATIC_ASSERT((sizeof(struct ahci_cmd_header) == 32),
               "AHCI command header must be 28 bytes large!");
 
-void ahci_print_ctrlr(struct ahci_controller *ctrl);
 void ahci_discover(struct ahci_controller *ctrl);
+uint32_t find_free_cmd_slot(struct ahci_port *port);
+struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl, uint32_t *d_cnt);
+void ahci_identify(struct ahci_disk *disk);

@@ -102,11 +102,13 @@ void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
                     size_t map_size = (abar_size + 0xFFF) & ~0xFFF;
 
                     void *abar_virt = vmm_map_phys(abar_base, map_size);
-                    k_printf("abar is at 0x%lx\n", abar_base);
-
+                    uint32_t d_cnt = 0;
                     struct ahci_controller *ctrl =
                         (struct ahci_controller *) abar_virt;
-                    ahci_print_ctrlr(ctrl);
+                    struct ahci_disk *disks = ahci_setup_controller(ctrl, &d_cnt);
+                    for (uint32_t i = 0; i < d_cnt; i++) {
+                        ahci_identify(&disks[i]);
+                    }
                 }
 
                 if (function == 0) {

@@ -12,17 +12,6 @@
 // TODO: Hand this off to IDE if the GHC bit 31 is OFF
 // It won't be AHCI - Sometimes we are in IDE emul mode
 
-uint32_t find_free_cmd_slot(struct ahci_port *port) {
-    uint32_t slots_in_use = port->sact | port->ci;
-    for (int slot = 0; slot < 32; slot++) {
-        if ((slots_in_use & (1U << slot)) == 0) {
-            return slot; // free slot found
-        }
-    }
-
-    return -1;
-}
-
 static void setup_port_slots(struct ahci_device *dev, uint32_t port_id) {
     struct ahci_full_port *port = &dev->regs[port_id];
     for (int slot = 0; slot < 32; slot++) {
@@ -67,14 +56,34 @@ static void allocate_port(struct ahci_device *dev, struct ahci_port *port,
     dev->regs[port_num] = p;
 }
 
-static void ahci_device_setup(struct ahci_device *dev,
-                              struct ahci_controller *ctrl) {
+static struct ahci_disk *device_setup(struct ahci_device *dev,
+                                      struct ahci_controller *ctrl,
+                                      uint32_t *disk_count) {
     uint32_t pi = ctrl->pi;
+
+    uint32_t total_disks = 0;
+
     for (uint32_t i = 0; i < 32; i++) {
         uint32_t ssts = ctrl->ports[i].ssts;
         if (pi & (1U << i) && (ssts & 0x0F) == AHCI_DET_PRESENT &&
             ((ssts >> 8) & 0x0F) == AHCI_IPM_ACTIVE) {
+            total_disks += 1;
+        }
+    }
 
+    if (!total_disks)
+        return NULL;
+    *disk_count = total_disks;
+
+    struct ahci_disk *disks = kzalloc(sizeof(struct ahci_disk) * total_disks);
+    uint32_t disks_ind = 0;
+
+    for (uint32_t i = 0; i < 32; i++) {
+        uint32_t ssts = ctrl->ports[i].ssts;
+        if (pi & (1U << i) && (ssts & 0x0F) == AHCI_DET_PRESENT &&
+            ((ssts >> 8) & 0x0F) == AHCI_IPM_ACTIVE) {
+            disks[disks_ind].port = i;
+            disks[disks_ind].device = dev;
             struct ahci_port *port = &ctrl->ports[i];
             port->cmd &= ~AHCI_CMD_ST;
             port->cmd &= ~AHCI_CMD_FRE;
@@ -91,25 +100,17 @@ static void ahci_device_setup(struct ahci_device *dev,
             setup_port_slots(dev, i);
         }
     }
+    return disks;
 }
 
 // TODO: big time reorganization
 
-void ahci_print_ctrlr(struct ahci_controller *ctrl) {
-    uint32_t version_major = (ctrl->vs >> 16) & 0xFFFF;
-    uint32_t version_minor = ctrl->vs & 0xFFFF;
-    uint32_t cap_np = (ctrl->cap >> 8) & 0x1F;
-
-    k_printf("AHCI Controller Information:\n");
-    k_printf("  Version: %d.%d\n", version_major, version_minor);
-    k_printf("  Ports Implemented: 0x%08X\n", ctrl->pi);
-    k_printf("  Number of Ports: %d\n", cap_np + 1);
-    k_printf("  Capabilities: 0x%08X\n", ctrl->cap);
-
-    bool s64a = !!(ctrl->cap & (1U << 31));
+struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
+                                        uint32_t *d_cnt) {
+    bool s64a = ctrl->cap & (1U << 31);
     if (!s64a) {
         k_printf("AHCI controller does not support 64-bit addressing\n");
-        return;
+        return NULL;
     }
 
     while ((ctrl->ghc & AHCI_GHC_HR) != 0)
@@ -117,34 +118,9 @@ void ahci_print_ctrlr(struct ahci_controller *ctrl) {
     ctrl->ghc |= AHCI_GHC_AE;
 
     struct ahci_device *dev = kzalloc(sizeof(struct ahci_device));
-    ahci_device_setup(dev, ctrl);
+    uint32_t disk_count = 0;
+    struct ahci_disk *d = device_setup(dev, ctrl, &disk_count);
+    *d_cnt = disk_count;
+    return d;
 
-    // We know port 0 is always going to be available for now
-    struct ahci_full_port *port = &dev->regs[0];
-    // TODO: Each AHCI SATA disk gets its own port
-    uint32_t slot = find_free_cmd_slot(port->port);
-    struct ahci_cmd_header *hdr = port->cmd_hdrs[slot];
-    struct ahci_cmd_table *cmd_tbl = port->cmd_tables[slot];
-    uint64_t buffer_phys = (uint64_t) pmm_alloc_page(false);
-    void *buffer = vmm_map_phys(buffer_phys, 4096);
-    hdr->cfl = sizeof(struct ahci_fis_reg_h2d) / sizeof(uint32_t);
-    hdr->w = 0;
-    hdr->p = 0;
-    hdr->a = 0;
-    hdr->c = 1;
-    hdr->prdbc = 0;
-    cmd_tbl->prdt_entry[0].dba = (uint32_t) (buffer_phys & 0xFFFFFFFF);
-    cmd_tbl->prdt_entry[0].dbau = (uint32_t) (buffer_phys >> 32);
-    cmd_tbl->prdt_entry[0].dbc = 511;
-    cmd_tbl->prdt_entry[0].i = 1;
-    struct ahci_fis_reg_h2d *fis = (struct ahci_fis_reg_h2d *) cmd_tbl->cfis;
-    memset(fis, 0, sizeof(struct ahci_fis_reg_h2d));
-    fis->fis_type = FIS_TYPE_REG_H2D; // 0x27
-    fis->c = 1;                       // Command (not control)
-    fis->command = 0xEC;
-    port->port->is = (uint32_t) -1; // Clear pending interrupt bits
-    port->port->ci |= 1 << slot;    // go go go!
-    while (port->port->ci & (1 << slot)) {}
-    struct ata_identify *ident = buffer;
-    ata_ident_print(ident);
 }
