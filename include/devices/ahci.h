@@ -37,6 +37,7 @@
 #define AHCI_DEV_NULL 0
 #define AHCI_DEV_SATA 1
 #define AHCI_DEV_BUSY (1 << 30)
+#define AHCI_DEV_DRDY     0x40   
 #define AHCI_DEV_SATAPI 2
 #define AHCI_DEV_SEMB 3
 #define AHCI_DEV_PM 4
@@ -45,6 +46,16 @@
 #define AHCI_CMD_TABLE_ATAPI_SIZE 16
 #define AHCI_MAX_PRDT_ENTRIES 65535
 
+#define AHCI_GHC_HR (1U << 0)
+#define AHCI_GHC_AE (1U << 31)
+
+#define AHCI_DET_NO_DEVICE 0x0
+#define AHCI_DET_PRESENT 0x3
+
+#define AHCI_IPM_NO_INTERFACE 0x0
+#define AHCI_IPM_ACTIVE 0x1
+
+#define AHCI_CMD_IDENTIFY  0xEC  
 #define AHCI_CMD_ST (1 << 0)  // Start
 #define AHCI_CMD_SUD (1 << 1) // Spin-Up Device
 #define AHCI_CMD_FRE (1 << 4) // FIS Receive Enable
@@ -62,6 +73,9 @@
 #define FIS_REG_CMD 0x80
 #define LBA_MODE 0x40
 #define CONTROL_BIT 0x80
+
+#define AHCI_CMD_FLAGS_CFL_MASK 0x1F
+#define AHCI_CMD_FLAGS_W_BIT    0x40
 
 struct ahci_fis_reg_h2d {
     uint8_t fis_type; // 0x27
@@ -113,15 +127,13 @@ volatile struct ahci_port {
 struct ahci_device {
     uint8_t type;           // Device type
     uint8_t port;           // Port number
-    bool implemented;       // Is this port implemented?
-    bool active;            // Is this port active?
     uint32_t signature;     // Device signature
     uint32_t sectors;       // Total sectors (for disks)
     uint16_t sector_size;   // Sector size in bytes
-    struct ahci_port *regs; // Pointer to port registers
+    struct ahci_port *regs[32]; // Pointer to port registers
 };
 
-volatile struct ahci_controller {
+struct ahci_controller {
     uint32_t cap;       // Host Capabilities
     uint32_t ghc;       // Global Host Control
     uint32_t is;        // Interrupt Status
@@ -135,9 +147,8 @@ volatile struct ahci_controller {
     uint32_t bohc;      // BIOS/OS Handoff Control
     uint8_t rsv[0xA0 - 0x2C];
     uint8_t vendor[0x100 - 0xA0];
-    struct ahci_port ports[1];
-
-} __attribute__((packed));
+    struct ahci_port ports[32];
+};
 
 struct ahci_cmd_header {
     uint16_t flags; // Bitfield: 0x1 = write, 0x5 = prefetch, etc.

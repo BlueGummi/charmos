@@ -102,6 +102,7 @@ void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
                     size_t map_size = (abar_size + 0xFFF) & ~0xFFF;
 
                     void *abar_virt = vmm_map_phys(abar_base, map_size);
+                    k_printf("abar is at 0x%lx\n", abar_base);
 
                     struct ahci_controller *ctrl =
                         (struct ahci_controller *) abar_virt;

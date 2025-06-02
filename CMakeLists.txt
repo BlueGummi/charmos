@@ -64,7 +64,7 @@ set(QEMU_COMMON_FLAGS
     -drive id=fatdisk,file=fat32_disk.img,format=raw,if=none
     -device ide-hd,drive=fatdisk,bus=ide.0,unit=1
 
-       -d trace:*nvme*
+       -d trace:*ahci*
        -trace file=trace.log
 )
 

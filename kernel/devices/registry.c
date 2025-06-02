@@ -99,7 +99,10 @@ void registry_setup() {
 void registry_print_devices() {
     for (uint64_t i = 0; i < disk_count; i++) {
         struct generic_disk *disk = registry_get_by_index(i);
-        disk->print(disk);
+        k_printf("Disk %lu is a %s. Filesystem:\n", i,
+                 disk->type == G_IDE_DRIVE    ? "IDE DRIVE"
+                 : disk->type == G_NVME_DRIVE ? "NVME DRIVE"
+                                              : "AHCI DRIVE");
         disk->print_fs(disk);
     }
 }
