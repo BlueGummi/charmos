@@ -88,7 +88,7 @@ struct ahci_fis_reg_h2d {
     uint8_t reserved2[4];
 };
 
-struct ahci_port {
+volatile struct ahci_port {
     uint32_t clb;       // Command List Base (lower 32 bits)
     uint32_t clbu;      // Command List Base (upper 32 bits)
     uint32_t fb;        // FIS Base (lower 32 bits)
@@ -121,22 +121,22 @@ struct ahci_device {
     struct ahci_port *regs; // Pointer to port registers
 };
 
-struct ahci_controller {
-    uint32_t cap;                // Host Capabilities
-    uint32_t ghc;                // Global Host Control
-    uint32_t is;                 // Interrupt Status
-    uint32_t pi;                 // Ports Implemented
-    uint32_t vs;                 // Version
-    uint32_t ccc_ctl;            // Command Completion Coalescing Control
-    uint32_t ccc_ports;          // CCC Ports
-    uint32_t em_loc;             // Enclosure Management Location
-    uint32_t em_ctl;             // Enclosure Management Control
-    uint32_t cap2;               // Extended Host Capabilities
-    uint32_t bohc;               // BIOS/OS Handoff Control
-    struct ahci_port *ports;     // Array of ports
-    struct ahci_device *devices; // Array of devices
-    uint8_t num_ports;           // Number of ports
-    uintptr_t abar;              // ABAR (AHCI Base Address Register)
+volatile struct ahci_controller {
+    uint32_t cap;       // Host Capabilities
+    uint32_t ghc;       // Global Host Control
+    uint32_t is;        // Interrupt Status
+    uint32_t pi;        // Ports Implemented
+    uint32_t vs;        // Version
+    uint32_t ccc_ctl;   // Command Completion Coalescing Control
+    uint32_t ccc_ports; // CCC Ports
+    uint32_t em_loc;    // Enclosure Management Location
+    uint32_t em_ctl;    // Enclosure Management Control
+    uint32_t cap2;      // Extended Host Capabilities
+    uint32_t bohc;      // BIOS/OS Handoff Control
+    uint8_t rsv[0xA0 - 0x2C];
+    uint8_t vendor[0x100 - 0xA0];
+    struct ahci_port ports[1];
+
 } __attribute__((packed));
 
 struct ahci_cmd_header {

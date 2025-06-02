@@ -58,7 +58,8 @@ set(QEMU_COMMON_FLAGS
     -device usb-mouse,id=usbmouse
 
     -drive id=disk0,file=disk.img,format=raw,if=none
-    -device nvme,drive=disk0,serial=nvme0
+    -device ahci,id=ahci
+    -device ide-hd,drive=disk0,bus=ahci.0
 
     -drive id=fatdisk,file=fat32_disk.img,format=raw,if=none
     -device ide-hd,drive=fatdisk,bus=ide.0,unit=1

@@ -16,4 +16,13 @@ void ahci_print_ctrlr(struct ahci_controller *ctrl) {
     k_printf("  Ports Implemented: 0x%08X\n", ctrl->pi);
     k_printf("  Number of Ports: %d\n", cap_np + 1);
     k_printf("  Capabilities: 0x%08X\n", ctrl->cap);
+    // TODO: Hand this off to IDE if the GHC bit 31 is OFF
+    // It won't be AHCI - Sometimes we are in IDE emul mode
+    uint8_t* ctrlb = (uint8_t*) ctrl;
+    for (unsigned int i = 0; i < sizeof(struct ahci_controller); i++) {
+        k_printf("%02x ", ctrlb[i]);
+        if ((i + 1) % 32 == 0)
+            k_printf("\n");
+    }
+    k_printf("\n");
 }
