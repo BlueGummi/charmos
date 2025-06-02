@@ -63,3 +63,4 @@ struct ata_identify {
 } __attribute__((packed));
 
 #pragma once
+void ata_ident_print(struct ata_identify *id);
