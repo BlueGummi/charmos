@@ -37,7 +37,7 @@
 #define AHCI_DEV_NULL 0
 #define AHCI_DEV_SATA 1
 #define AHCI_DEV_BUSY (1 << 30)
-#define AHCI_DEV_DRDY     0x40   
+#define AHCI_DEV_DRDY 0x40
 #define AHCI_DEV_SATAPI 2
 #define AHCI_DEV_SEMB 3
 #define AHCI_DEV_PM 4
@@ -55,7 +55,7 @@
 #define AHCI_IPM_NO_INTERFACE 0x0
 #define AHCI_IPM_ACTIVE 0x1
 
-#define AHCI_CMD_IDENTIFY  0xEC  
+#define AHCI_CMD_IDENTIFY 0xEC
 #define AHCI_CMD_ST (1 << 0)  // Start
 #define AHCI_CMD_SUD (1 << 1) // Spin-Up Device
 #define AHCI_CMD_FRE (1 << 4) // FIS Receive Enable
@@ -66,6 +66,7 @@
 #define AHCI_PORT_IPM_ACTIVE 1
 #define AHCI_PORT_DET_PRESENT 3
 
+#define AHCI_CMD_CTBA_MASK 0xFFFFFFF
 #define AHCI_CMD_FLAGS_WRITE (1 << 6)
 #define AHCI_CMD_FLAGS_PRDTL 1
 
@@ -75,7 +76,7 @@
 #define CONTROL_BIT 0x80
 
 #define AHCI_CMD_FLAGS_CFL_MASK 0x1F
-#define AHCI_CMD_FLAGS_W_BIT    0x40
+#define AHCI_CMD_FLAGS_W_BIT 0x40
 
 struct ahci_fis_reg_h2d {
     uint8_t fis_type; // 0x27
@@ -102,6 +103,140 @@ struct ahci_fis_reg_h2d {
     uint8_t reserved2[4];
 };
 
+struct ahci_fis_reg_d2h {
+    // DWORD 0
+    uint8_t fis_type; // FIS_TYPE_REG_D2H
+
+    uint8_t pmport : 4; // Port multiplier
+    uint8_t rsv0 : 2;   // Reserved
+    uint8_t i : 1;      // Interrupt bit
+    uint8_t rsv1 : 1;   // Reserved
+
+    uint8_t status; // Status register
+    uint8_t error;  // Error register
+
+    // DWORD 1
+    uint8_t lba0;   // LBA low register, 7:0
+    uint8_t lba1;   // LBA mid register, 15:8
+    uint8_t lba2;   // LBA high register, 23:16
+    uint8_t device; // Device register
+
+    // DWORD 2
+    uint8_t lba3; // LBA register, 31:24
+    uint8_t lba4; // LBA register, 39:32
+    uint8_t lba5; // LBA register, 47:40
+    uint8_t rsv2; // Reserved
+
+    // DWORD 3
+    uint8_t countl;  // Count register, 7:0
+    uint8_t counth;  // Count register, 15:8
+    uint8_t rsv3[2]; // Reserved
+
+    // DWORD 4
+    uint8_t rsv4[4]; // Reserved
+};
+
+struct ahci_fis_data {
+    // DWORD 0
+    uint8_t fis_type; // FIS_TYPE_DATA
+
+    uint8_t pmport : 4; // Port multiplier
+    uint8_t rsv0 : 4;   // Reserved
+
+    uint8_t rsv1[2]; // Reserved
+
+    // DWORD 1 ~ N
+    uint32_t data[1]; // Payload
+};
+struct ahci_fis_pio_setup {
+    // DWORD 0
+    uint8_t fis_type; // FIS_TYPE_PIO_SETUP
+
+    uint8_t pmport : 4; // Port multiplier
+    uint8_t rsv0 : 1;   // Reserved
+    uint8_t d : 1;      // Data transfer direction, 1 - device to host
+    uint8_t i : 1;      // Interrupt bit
+    uint8_t rsv1 : 1;
+
+    uint8_t status; // Status register
+    uint8_t error;  // Error register
+
+    // DWORD 1
+    uint8_t lba0;   // LBA low register, 7:0
+    uint8_t lba1;   // LBA mid register, 15:8
+    uint8_t lba2;   // LBA high register, 23:16
+    uint8_t device; // Device register
+
+    // DWORD 2
+    uint8_t lba3; // LBA register, 31:24
+    uint8_t lba4; // LBA register, 39:32
+    uint8_t lba5; // LBA register, 47:40
+    uint8_t rsv2; // Reserved
+
+    // DWORD 3
+    uint8_t countl;   // Count register, 7:0
+    uint8_t counth;   // Count register, 15:8
+    uint8_t rsv3;     // Reserved
+    uint8_t e_status; // New value of status register
+
+    // DWORD 4
+    uint16_t tc;     // Transfer count
+    uint8_t rsv4[2]; // Reserved
+};
+struct ahci_fis_dma_setup {
+    // DWORD 0
+    uint8_t fis_type; // FIS_TYPE_DMA_SETUP
+
+    uint8_t pmport : 4; // Port multiplier
+    uint8_t rsv0 : 1;   // Reserved
+    uint8_t d : 1;      // Data transfer direction, 1 - device to host
+    uint8_t i : 1;      // Interrupt bit
+    uint8_t a : 1; // Auto-activate. Specifies if DMA Activate FIS is needed
+
+    uint8_t rsved[2]; // Reserved
+
+    // DWORD 1&2
+
+    uint64_t DMAbufferID; // DMA Buffer Identifier. Used to Identify DMA buffer
+                          // in host memory. SATA Spec says host specific and
+                          // not in Spec. Trying AHCI spec might work.
+
+    // DWORD 3
+    uint32_t rsvd; // More reserved
+
+    // DWORD 4
+    uint32_t DMAbufOffset; // Byte offset into buffer. First 2 bits must be 0
+
+    // DWORD 5
+    uint32_t TransferCount; // Number of bytes to transfer. Bit 0 must be 0
+
+    // DWORD 6
+    uint32_t resvd; // Reserved
+};
+
+volatile struct ahci_fis_hba {
+    // 0x00
+    struct ahci_fis_dma_setup dsfis; // DMA Setup FIS
+    uint8_t pad0[4];
+
+    // 0x20
+    struct ahci_fis_pio_setup psfis; // PIO Setup FIS
+    uint8_t pad1[12];
+
+    // 0x40
+    struct ahci_fis_reg_d2h rfis; // Register – Device to Host FIS
+    uint8_t pad2[4];
+
+    // 0x58
+    uint16_t sdbfis; // Set Device Bit FIS
+
+    // 0x60
+    uint8_t ufis[64];
+
+    // 0xA0
+    uint8_t rsv[0x100 - 0xA0];
+};
+
 volatile struct ahci_port {
     uint32_t clb;       // Command List Base (lower 32 bits)
     uint32_t clbu;      // Command List Base (upper 32 bits)
@@ -125,11 +260,11 @@ volatile struct ahci_port {
 } __attribute__((packed));
 
 struct ahci_device {
-    uint8_t type;           // Device type
-    uint8_t port;           // Port number
-    uint32_t signature;     // Device signature
-    uint32_t sectors;       // Total sectors (for disks)
-    uint16_t sector_size;   // Sector size in bytes
+    uint8_t type;               // Device type
+    uint8_t port;               // Port number
+    uint32_t signature;         // Device signature
+    uint32_t sectors;           // Total sectors (for disks)
+    uint16_t sector_size;       // Sector size in bytes
     struct ahci_port *regs[32]; // Pointer to port registers
 };
 
@@ -151,13 +286,31 @@ struct ahci_controller {
 };
 
 struct ahci_cmd_header {
-    uint16_t flags; // Bitfield: 0x1 = write, 0x5 = prefetch, etc.
-    uint16_t prdtl; // Physical region descriptor table length
-    uint32_t prdbc; // Physical region descriptor byte count
-    uint32_t ctba;  // Command table base address
-    uint32_t ctbau; // Upper 32 bits of CTBA
-    uint32_t reserved[4];
-} __attribute__((packed));
+    // DW0
+    uint8_t cfl : 5; // Command FIS length in DWORDS, 2 ~ 16
+    uint8_t a : 1;   // ATAPI
+    uint8_t w : 1;   // Write, 1: H2D, 0: D2H
+    uint8_t p : 1;   // Prefetchable
+
+    uint8_t r : 1;    // Reset
+    uint8_t b : 1;    // BIST
+    uint8_t c : 1;    // Clear busy upon R_OK
+    uint8_t rsv0 : 1; // Reserved
+    uint8_t pmp : 4;  // Port multiplier port
+
+    uint16_t prdtl; // Physical region descriptor table length in entries
+
+    // DW1
+    volatile uint32_t
+        prdbc; // Physical region descriptor byte count transferred
+
+    // DW2, 3
+    uint32_t ctba;  // Command table descriptor base address
+    uint32_t ctbau; // Command table descriptor base address upper 32 bits
+
+    // DW4 - 7
+    uint32_t rsv1[4]; // Reserved
+};
 
 struct ahci_prdt_entry {
     uint32_t dba;  // Data base address
@@ -172,7 +325,7 @@ struct ahci_cmd_table {
     uint8_t cfis[AHCI_CMD_TABLE_FIS_SIZE];   // Command FIS (host to device)
     uint8_t acmd[AHCI_CMD_TABLE_ATAPI_SIZE]; // ATAPI command
     uint8_t reserved[48];
-    struct ahci_prdt_entry prdt_entry[];
+    struct ahci_prdt_entry prdt_entry[]; // up to 65535
 } __attribute__((packed));
 
 void ahci_print_ctrlr(struct ahci_controller *ctrl);

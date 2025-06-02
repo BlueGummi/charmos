@@ -12,7 +12,6 @@
 
 uint32_t find_free_cmd_slot(struct ahci_port *port) {
     uint32_t slots_in_use = port->sact | port->ci;
-
     for (int slot = 0; slot < 32; slot++) {
         if ((slots_in_use & (1U << slot)) == 0) {
             return slot; // free slot found
@@ -32,6 +31,13 @@ void ahci_print_ctrlr(struct ahci_controller *ctrl) {
     k_printf("  Ports Implemented: 0x%08X\n", ctrl->pi);
     k_printf("  Number of Ports: %d\n", cap_np + 1);
     k_printf("  Capabilities: 0x%08X\n", ctrl->cap);
+
+    bool s64a = !!(ctrl->cap & (1U << 31));
+    if (!s64a) {
+        k_printf("AHCI controller does not support 64-bit addressing\n");
+        return;
+    }
+
     while ((ctrl->ghc & AHCI_GHC_HR) != 0)
         ;
     ctrl->ghc |= AHCI_GHC_AE;
@@ -75,8 +81,9 @@ void ahci_print_ctrlr(struct ahci_controller *ctrl) {
                         (struct ahci_cmd_header
                              *) (cmdlist +
                                  slot * sizeof(struct ahci_cmd_header));
-                    cmd_header->ctba = (uint32_t) (cmdtbl_phys & 0xFFFFFFFF);
-                    cmd_header->ctbau = (uint32_t) (cmdtbl_phys >> 32);
+                    cmd_header->ctba =
+                        (uint32_t) ((cmdtbl_phys & AHCI_CMD_CTBA_MASK) << 6);
+                    cmd_header->ctbau = (uint32_t) (cmdtbl_phys >> (32 - 6));
                     cmd_header->prdtl = 1;
                 }
             }

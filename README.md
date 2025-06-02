@@ -32,6 +32,12 @@ make run # run this in the build directory
 
 - [ ] big problem - free and unmap memory once you are done
 
+- [ ] bitfields - i forgot these existed
+
+- [ ] change disk io interface to allow for possible r/w of multiple blocks and change fs code to accomodate for this
+
+- [ ] disk I/O IRQ handlers to avoid blocking for unnecessary periods of time (optimization)
+
 ### "The Basics" 
 
 - [x] gdt + idt 
