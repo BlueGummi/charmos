@@ -19,3 +19,5 @@ typedef struct {
     uacpi_handle ctx;
     bool installed;
 } irq_entry_t;
+
+void uacpi_mark_irq_installed(uint8_t irq); 

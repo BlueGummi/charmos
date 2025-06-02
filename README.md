@@ -38,6 +38,8 @@ make run # run this in the build directory
 
 - [ ] disk I/O IRQ handlers to avoid blocking for unnecessary periods of time (optimization)
 
+- [ ] we can reserve something like IRQs 200-223 or whatever...
+
 ### "The Basics" 
 
 - [x] gdt + idt 

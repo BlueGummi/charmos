@@ -35,7 +35,9 @@ struct idt_ptr {
 } __attribute__((packed));
 
 void idt_install();
+void idt_load();
 void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags);
+void idt_set_and_mark(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags);
 
 static inline void trigger_interrupt(uint8_t code) {
     asm volatile("int %0" : : "i"(code));

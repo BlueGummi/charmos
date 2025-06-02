@@ -126,13 +126,15 @@ void uacpi_kernel_sleep(uacpi_u64 msec) {
         uacpi_kernel_stall(100);
 }
 
-// TODO: get this to talk to idt.c
-
 void (*isr_trampolines[])(void *) = {
 #define X(n) [n] = irq##n##_entry,
 #include "irq_list.h"
 #undef X
 };
+
+void uacpi_mark_irq_installed(uint8_t irq) { // this is used in idt.c to avoid overwriting
+    irq_table[irq].installed = true;
+}
 
 uacpi_status uacpi_kernel_install_interrupt_handler(
     uacpi_u32 irq, uacpi_interrupt_handler handler, uacpi_handle ctx,

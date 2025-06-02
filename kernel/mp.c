@@ -6,6 +6,7 @@
 #include <mp/mp.h>
 #include <sch/sched.h>
 #include <spin_lock.h>
+#include <int/idt.h>
 
 struct core **core_data = NULL;
 uint64_t cr3 = 0;
@@ -32,6 +33,7 @@ void wakeup() {
     bool ints = spin_lock(&wakeup_lock);
     enable_smap_smep_umip();
     gdt_install();
+    idt_load();
     serial_init();
     while (!cr3_ready)
         ;

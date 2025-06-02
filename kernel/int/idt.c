@@ -1,3 +1,4 @@
+#include <acpi/uacpi_interface.h> // mark handlers as installed
 #include <asm.h>
 #include <console/printf.h>
 #include <int/idt.h>
@@ -74,6 +75,11 @@ void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags) {
     idt[num].reserved = 0;
 }
 
+void idt_set_and_mark(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags) {
+    idt_set_gate(num, base, sel, flags);
+    uacpi_mark_irq_installed(num);
+}
+
 void idt_load() {
     idtp.limit = sizeof(struct idt_entry) * IDT_ENTRIES - 1;
     idtp.base = (uint64_t) &idt;
@@ -83,17 +89,25 @@ void idt_load() {
 void idt_install() {
     remap_pic();
 
-    idt_set_gate(DIV_BY_Z_ID, (uint64_t) divbyz_fault, 0x08, 0x8E);
-    idt_set_gate(DEBUG_ID, (uint64_t) debug_fault, 0x08, 0x8E);
-    idt_set_gate(BREAKPOINT_ID, (uint64_t) breakpoint_fault, 0x08, 0x8E);
-    idt_set_gate(DOUBLEFAULT_ID, (uint64_t) double_fault_handler_wrapper, 0x08,
-                 0x8E);
-    idt_set_gate(SSF_ID, (uint64_t) ss_handler_wrapper, 0x08, 0x8E);
-    idt_set_gate(GPF_ID, (uint64_t) gpf_handler_wrapper, 0x08, 0x8E);
-    idt_set_gate(PAGE_FAULT_ID, (uint64_t) page_fault_handler_wrapper, 0x08,
-                 0x8E);
-    idt_set_gate(TIMER_ID, (uint64_t) context_switch, 0x08, 0x8E);
-    idt_set_gate(KB_ID, (uint64_t) keyboard_handler, 0x08, 0x8E);
+    idt_set_and_mark(DIV_BY_Z_ID, (uint64_t) divbyz_fault, 0x08, 0x8E);
+
+    idt_set_and_mark(DEBUG_ID, (uint64_t) debug_fault, 0x08, 0x8E);
+
+    idt_set_and_mark(BREAKPOINT_ID, (uint64_t) breakpoint_fault, 0x08, 0x8E);
+
+    idt_set_and_mark(DOUBLEFAULT_ID, (uint64_t) double_fault_handler_wrapper,
+                     0x08, 0x8E);
+
+    idt_set_and_mark(SSF_ID, (uint64_t) ss_handler_wrapper, 0x08, 0x8E);
+
+    idt_set_and_mark(GPF_ID, (uint64_t) gpf_handler_wrapper, 0x08, 0x8E);
+
+    idt_set_and_mark(PAGE_FAULT_ID, (uint64_t) page_fault_handler_wrapper, 0x08,
+                     0x8E);
+
+    idt_set_and_mark(TIMER_ID, (uint64_t) context_switch, 0x08, 0x8E);
+
+    idt_set_and_mark(KB_ID, (uint64_t) keyboard_handler, 0x08, 0x8E);
 
     outb(0x43, 0x36);
     uint16_t divisor = 1193180 / PIT_HZ;
