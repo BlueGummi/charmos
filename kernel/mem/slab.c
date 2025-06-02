@@ -197,7 +197,7 @@ void *kmalloc(size_t size) {
         return slab_alloc(&slab_caches[idx]);
     }
 
-    size_t total_size = size + sizeof(struct kmalloc_page_header);
+    size_t total_size = size + sizeof(struct slab_phdr);
     size_t pages = (total_size + PAGE_SIZE - 1) / PAGE_SIZE;
 
     uintptr_t phys = (uintptr_t) pmm_alloc_pages(pages, false);
@@ -210,7 +210,7 @@ void *kmalloc(size_t size) {
                      PAGING_PRESENT | PAGING_WRITE);
     }
 
-    struct kmalloc_page_header *hdr = (struct kmalloc_page_header *) virt;
+    struct slab_phdr *hdr = (struct slab_phdr *) virt;
     hdr->magic = MAGIC_KMALLOC_PAGE;
     hdr->pages = pages;
 
@@ -232,9 +232,8 @@ void kfree(void *ptr) {
     if (!ptr)
         return;
 
-    struct kmalloc_page_header *hdr =
-        (struct kmalloc_page_header *) ((uint8_t *) ptr -
-                                        sizeof(struct kmalloc_page_header));
+    struct slab_phdr *hdr =
+        (struct slab_phdr *) ((uint8_t *) ptr - sizeof(struct slab_phdr));
 
     if (hdr->magic == MAGIC_KMALLOC_PAGE) {
         uintptr_t virt = (uintptr_t) hdr;

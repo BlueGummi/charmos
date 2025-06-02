@@ -28,7 +28,7 @@ struct slab_cache {
     struct slab *slabs_full;
 };
 
-struct kmalloc_page_header {
+struct slab_phdr {
     uint32_t magic;
     size_t pages;
 };
