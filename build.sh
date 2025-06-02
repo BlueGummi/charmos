@@ -3,6 +3,8 @@ cli_quiet_arg=''
 make_quiet_arg=''
 cmake_quiet_arg=''
 
+# TODO: Change this to account for rust things and whether or not the compiler exists
+
 print_help() {
     local color_supported=$(tput colors 2>/dev/null)
 

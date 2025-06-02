@@ -1,3 +1,4 @@
+#include "requests.h"
 #include <acpi/print.h>
 #include <acpi/uacpi_interface.h>
 #include <asm.h>
@@ -29,7 +30,6 @@
 #include <mp/mp.h>
 #include <pci/pci.h>
 #include <pit.h>
-#include <requests.h>
 #include <rust.h>
 #include <sch/sched.h>
 #include <sch/thread.h>

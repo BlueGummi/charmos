@@ -20,7 +20,7 @@ add_custom_command(
     COMMAND cp ${CMAKE_SOURCE_DIR}/kernel/rust/target/${CARGO_TARGET}/release/libkernel_rust.a ${CMAKE_BINARY_DIR}/kernel_rust.a
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/kernel/rust
     DEPENDS ${RS_SOURCES}
-    COMMENT "Building Rust kernel module"
+    COMMENT "Compiling rust things"
     VERBATIM
 )
 
