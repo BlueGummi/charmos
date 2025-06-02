@@ -1,4 +1,5 @@
 #include <console/printf.h>
+#include <devices/ahci.h>
 #include <devices/generic_disk.h>
 #include <devices/ide.h>
 #include <devices/nvme.h>
@@ -71,6 +72,16 @@ void registry_setup() {
             struct nvme_device *d =
                 nvme_discover_device(dev.bus, dev.device, dev.function);
             registry_register(nvme_create_generic(d));
+            continue;
+        }
+        if (dev.class_code == 0x01 && dev.subclass == 0x06 &&
+            dev.prog_if == 0x01) {
+            uint32_t d_cnt = 0;
+            struct ahci_disk *disks =
+                ahci_discover_device(dev.bus, dev.device, dev.function, &d_cnt);
+            for (uint32_t i = 0; i < d_cnt; i++) {
+                registry_register(ahci_create_generic(&disks[i]));
+            }
             continue;
         }
     }

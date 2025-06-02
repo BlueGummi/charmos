@@ -20,6 +20,6 @@ typedef struct {
     bool installed;
 } irq_entry_t;
 
-void uacpi_mark_irq_installed(uint8_t irq); 
+void uacpi_mark_irq_installed(uint8_t irq);
 void uacpi_init();
 void uacpi_print_devs();

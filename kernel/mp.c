@@ -1,12 +1,12 @@
 #include <boot/gdt.h>
 #include <boot/smap.h>
 #include <console/printf.h>
+#include <int/idt.h>
 #include <limine.h>
 #include <mem/alloc.h>
 #include <mp/mp.h>
 #include <sch/sched.h>
 #include <spin_lock.h>
-#include <int/idt.h>
 
 struct core **core_data = NULL;
 uint64_t cr3 = 0;

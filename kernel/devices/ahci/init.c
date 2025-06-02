@@ -96,7 +96,6 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
             while (port->cmd & AHCI_CMD_CR)
                 ;
 
-            k_printf("Port %d is active\n", i);
             setup_port_slots(dev, i);
         }
     }
@@ -122,5 +121,49 @@ struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
     struct ahci_disk *d = device_setup(dev, ctrl, &disk_count);
     *d_cnt = disk_count;
     return d;
+}
 
+struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
+                                       uint8_t function,
+                                       uint32_t *out_disk_count) {
+    uint32_t abar = pci_read(bus, device, function, 0x24);
+    uint32_t abar_base = abar & ~0xF;
+
+    pci_write(bus, device, function, 0x24, 0xFFFFFFFF);
+    uint32_t size_mask = pci_read(bus, device, function, 0x24);
+    pci_write(bus, device, function, 0x24, abar);
+
+    if (size_mask == 0 || size_mask == 0xFFFFFFFF) {
+        k_printf("Invalid AHCI BAR size at %02x:%02x.%x\n", bus, device,
+                 function);
+        return NULL;
+    }
+
+    size_t abar_size = ~(size_mask & ~0xF) + 1;
+    size_t map_size = (abar_size + 0xFFF) & ~0xFFF;
+
+    void *abar_virt = vmm_map_phys(abar_base, map_size);
+    if (!abar_virt) {
+        k_printf("Failed to map AHCI BAR at %08x (size %zu)\n", abar_base,
+                 map_size);
+        return NULL;
+    }
+    struct ahci_controller *ctrl = (struct ahci_controller *) abar_virt;
+    return ahci_setup_controller(ctrl, out_disk_count);
+}
+
+void ahci_print_wrapper(struct generic_disk *d) {
+    struct ahci_disk *a = d->driver_data;
+    ahci_identify(a);
+}
+
+struct generic_disk *ahci_create_generic(struct ahci_disk *disk) {
+    struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
+    d->driver_data = disk;
+    d->sector_size = 512;
+    d->read_sector = ahci_read_sector;
+    d->write_sector = ahci_write_sector;
+    d->print = ahci_print_wrapper;
+    d->type = G_AHCI_DRIVE;
+    return d;
 }

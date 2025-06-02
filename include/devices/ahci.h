@@ -56,6 +56,9 @@
 #define AHCI_IPM_NO_INTERFACE 0x0
 #define AHCI_IPM_ACTIVE 0x1
 
+#define AHCI_CMD_READ_DMA_EXT 0x25
+#define AHCI_CMD_WRITE_DMA_EXT 0x35
+
 #define AHCI_CMD_IDENTIFY 0xEC
 #define AHCI_CMD_ST (1 << 0)  // Start
 #define AHCI_CMD_SUD (1 << 1) // Spin-Up Device
@@ -246,5 +249,19 @@ STATIC_ASSERT((sizeof(struct ahci_cmd_header) == 32),
 
 void ahci_discover(struct ahci_controller *ctrl);
 uint32_t find_free_cmd_slot(struct ahci_port *port);
-struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl, uint32_t *d_cnt);
+struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
+                                        uint32_t *d_cnt);
 void ahci_identify(struct ahci_disk *disk);
+void *ahci_prepare_command(struct ahci_full_port *port, uint32_t slot,
+                           bool write, uint64_t *out_phys);
+void ahci_setup_fis(struct ahci_cmd_table *cmd_tbl, uint8_t command,
+                    bool is_atapi);
+bool ahci_send_command(struct ahci_full_port *port, uint32_t slot);
+struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
+                                       uint8_t function,
+                                       uint32_t *out_disk_count);
+bool ahci_write_sector(struct generic_disk *disk, uint64_t lba,
+                       const uint8_t *in_buf);
+bool ahci_read_sector(struct generic_disk *disk, uint64_t lba,
+                      uint8_t *out_buf);
+struct generic_disk *ahci_create_generic(struct ahci_disk *disk);

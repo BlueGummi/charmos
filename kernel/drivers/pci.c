@@ -84,33 +84,6 @@ void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
                                          .prog_if = prog_if,
                                          .revision = revision};
 
-                if (class_code == 0x01 && subclass == 0x06 && prog_if == 0x01) {
-                    uint32_t abar = pci_read(bus, device, function, 0x24);
-                    uint32_t abar_base = abar & ~0xF;
-
-                    pci_write(bus, device, function, 0x24, 0xFFFFFFFF);
-                    uint32_t size_mask = pci_read(bus, device, function, 0x24);
-                    pci_write(bus, device, function, 0x24, abar);
-
-                    if (size_mask == 0 || size_mask == 0xFFFFFFFF) {
-                        k_printf("Invalid AHCI BAR size at %02x:%02x.%x\n", bus,
-                                 device, function);
-                        return;
-                    }
-
-                    size_t abar_size = ~(size_mask & ~0xF) + 1;
-                    size_t map_size = (abar_size + 0xFFF) & ~0xFFF;
-
-                    void *abar_virt = vmm_map_phys(abar_base, map_size);
-                    uint32_t d_cnt = 0;
-                    struct ahci_controller *ctrl =
-                        (struct ahci_controller *) abar_virt;
-                    struct ahci_disk *disks = ahci_setup_controller(ctrl, &d_cnt);
-                    for (uint32_t i = 0; i < d_cnt; i++) {
-                        ahci_identify(&disks[i]);
-                    }
-                }
-
                 if (function == 0) {
                     uint8_t header_type =
                         pci_read_byte(bus, device, function, 0x0E);

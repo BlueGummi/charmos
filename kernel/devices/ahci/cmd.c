@@ -10,7 +10,7 @@ uint32_t find_free_cmd_slot(struct ahci_port *port) {
     uint32_t slots_in_use = port->sact | port->ci;
     for (int slot = 0; slot < 32; slot++) {
         if ((slots_in_use & (1U << slot)) == 0) {
-            return slot; 
+            return slot;
         }
     }
 
@@ -47,8 +47,8 @@ void ahci_setup_fis(struct ahci_cmd_table *cmd_tbl, uint8_t command,
     struct ahci_fis_reg_h2d *fis = (struct ahci_fis_reg_h2d *) cmd_tbl->cfis;
     memset(fis, 0, sizeof(struct ahci_fis_reg_h2d));
 
-    fis->fis_type = FIS_TYPE_REG_H2D; // 0x27
-    fis->c = 1;                       // Command (not control)
+    fis->fis_type = FIS_TYPE_REG_H2D;
+    fis->c = 1;
     fis->command = command;
 
     if (is_atapi) {
