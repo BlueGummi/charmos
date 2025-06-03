@@ -1,23 +1,35 @@
 #include <sch/thread.h>
 #include <stdbool.h>
 
+struct per_core_scheduler {
+    bool active;            // Currently should be run?
+    struct thread *head;    // First task
+    struct thread *tail;    // Last task
+    struct thread *current; // One to run
+    uint64_t task_cnt;
+};
+
 struct scheduler {
     bool active;            // Currently should be run?
     bool started_first;     // Begun?
     struct thread *head;    // First task
     struct thread *tail;    // Last task
     struct thread *current; // One to run
+    uint64_t task_cnt;
 };
 
-void scheduler_init(struct scheduler *sched);
+void scheduler_init(struct scheduler *sched, uint64_t core_count);
 void scheduler_add_thread(struct scheduler *sched, struct thread *thread);
 void scheduler_rm_thread(struct scheduler *sched, struct thread *thread);
-__attribute__((noreturn)) void scheduler_start(void);
+void scheduler_rebalance(struct scheduler *sched);
+void scheduler_local_init(struct per_core_scheduler *sched, uint64_t core_id);
+__attribute__((noreturn)) void
+scheduler_start(struct per_core_scheduler *sched);
 void schedule(struct cpu_state *cpu);
 void scheduler_rm_id(struct scheduler *sched, uint64_t thread_id);
 void k_sch_main();
-extern struct thread *current_thread;
 extern struct scheduler global_sched;
+extern struct per_core_scheduler **local_schs;
 extern void timer_interrupt_handler(void);
 #define PIT_HZ 100
 #define CLI asm volatile("cli")

@@ -20,6 +20,7 @@ struct thread *thread_create(void (*entry_point)(void)) {
     new_thread->regs.ss = 0x10;
     new_thread->stack = (void *) stack_top - 0x1000;
     new_thread->entry = entry_point;
+    new_thread->curr_thread = -1; // nobody is running this
     new_thread->id = globid++;
 
     return new_thread;

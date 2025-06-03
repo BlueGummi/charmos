@@ -38,26 +38,13 @@ void wakeup() {
     asm volatile("mov %0, %%cr3" ::"r"(cr3));
     int cpu = get_core_id();
     idt_install(cpu);
-    struct core *current_core = kmalloc(sizeof(struct core));
-    current_core->id = cpu;
-    current_core->state = IDLE;
-    current_core->current_thread = NULL;
-    core_data[cpu] = *current_core;
     k_printf("processor %d is woke\n", cpu);
     spin_unlock(&wakeup_lock, ints);
+    asm("sti");
+    scheduler_start(local_schs[cpu]);
 
-    while (1) {
-        bool ints_enabled = spin_lock(&wakeup_lock);
-        if (current_core->current_thread != NULL) {
-            current_core->state = BUSY;
-            spin_unlock(&wakeup_lock, ints_enabled);
-            current_core->current_thread->entry();
-            thread_free(current_core->current_thread);
-            current_core->current_thread = NULL;
-            current_core->state = IDLE;
-        }
-        spin_unlock(&wakeup_lock, ints_enabled);
-    }
+    while (1)
+        asm("hlt");
 }
 
 void mp_wakeup_processors(struct limine_mp_response *mpr) {

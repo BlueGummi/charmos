@@ -18,8 +18,6 @@ void gdt_set_gate(int num, uint64_t base, uint32_t limit, uint8_t access,
 }
 
 void gdt_install() {
-    asm volatile("cli\n\t");
-
     gp.limit = (sizeof(struct gdt_entry) * 3) - 1;
     gp.base = (uint64_t) &gdt;
 

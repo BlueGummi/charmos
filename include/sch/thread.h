@@ -19,7 +19,9 @@ struct thread {
     struct thread *next;
     struct thread *prev;
     enum thread_state state;
+    int64_t curr_thread; // -1 if not being ran
 };
+
 struct thread *thread_create(void (*entry_point)(void));
 void thread_free(struct thread *t);
 #pragma once

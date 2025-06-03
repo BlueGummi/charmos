@@ -64,14 +64,28 @@ void k_main(void) {
     slab_init();
     idt_alloc(c_cnt);
     idt_install(0);
-    mp_inform_of_cr3(); // get their pages on our page
     test_alloc();
     uacpi_init();
     registry_setup();
     registry_print_devices();
-    scheduler_init(&global_sched);
-    scheduler_add_thread(&global_sched, thread_create(k_sch_main));
-    scheduler_start();
+    scheduler_init(&global_sched, c_cnt);
+    for (uint64_t i = 0; i < c_cnt; i++) {
+        struct per_core_scheduler *s =
+            kmalloc(sizeof(struct per_core_scheduler));
+        scheduler_local_init(s, i);
+    }
+    struct thread *t = thread_create(k_sch_main);
+    scheduler_add_thread(&global_sched, t);
+    scheduler_add_thread(&global_sched, t);
+    scheduler_add_thread(&global_sched, t);
+    scheduler_add_thread(&global_sched, t);
+    scheduler_add_thread(&global_sched, t);
+    scheduler_add_thread(&global_sched, t);
+    scheduler_add_thread(&global_sched, t);
+    scheduler_add_thread(&global_sched, t);
+    scheduler_rebalance(&global_sched);
+    asm volatile("sti");
+    scheduler_start(local_schs[0]);
     while (1) {
         asm("hlt");
     }

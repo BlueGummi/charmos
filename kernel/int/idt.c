@@ -129,7 +129,6 @@ void idt_install(uint64_t ind) {
 
     outb(PIC1_DATA, mask);
     idt_load(ind);
-    asm volatile("sti");
 }
 
 void page_fault_handler(uint64_t error_code, uint64_t fault_addr) {
