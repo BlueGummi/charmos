@@ -68,7 +68,7 @@ scheduler_start(struct per_core_scheduler *sched) {
         "push %[r15]\n\t"
 
         "push %[ss]\n\t"
-        "push %[rsp]\n\t"
+        "push %%rsp\n\t"
         "push %[rflags]\n\t"
         "push %[cs]\n\t"
         "push %[rip]\n\t"
@@ -81,7 +81,7 @@ scheduler_start(struct per_core_scheduler *sched) {
           [r10] "m"(regs->r10), [r11] "m"(regs->r11), [r12] "m"(regs->r12),
           [r13] "m"(regs->r13), [r14] "m"(regs->r14), [r15] "m"(regs->r15),
           [rip] "m"(regs->rip), [cs] "m"(regs->cs), [rflags] "m"(regs->rflags),
-          [rsp] "m"(regs->rsp), [ss] "m"(regs->ss)
+          [ss] "m"(regs->ss)
         : "memory");
 
     __builtin_unreachable();

@@ -18,14 +18,14 @@ uint64_t total_cpu = 0;
  * Return an available core # that is idle
  */
 uint64_t mp_available_core() {
-    int i = 1;
+    uint64_t i = 1;
     while (&core_data[i] != NULL) {
         if (core_data[i].state == IDLE && core_data[i].current_thread == NULL) {
             return i;
         }
         i++;
     }
-    return -1;
+    return (uint64_t)-1;
 }
 
 void wakeup() {
@@ -36,9 +36,9 @@ void wakeup() {
     while (!cr3_ready)
         ;
     asm volatile("mov %0, %%cr3" ::"r"(cr3));
-    int cpu = get_core_id();
+    uint64_t cpu = get_core_id();
     idt_install(cpu);
-    k_printf("processor %d is woke\n", cpu);
+    k_printf("processor %d initialized\n", cpu);
     spin_unlock(&wakeup_lock, ints);
     asm("sti");
     scheduler_start(local_schs[cpu]);
