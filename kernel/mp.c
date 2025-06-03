@@ -1,3 +1,4 @@
+#include <asm.h>
 #include <boot/gdt.h>
 #include <boot/smap.h>
 #include <console/printf.h>
@@ -8,20 +9,19 @@
 #include <sch/sched.h>
 #include <spin_lock.h>
 
-struct core **core_data = NULL;
+struct core *core_data = NULL;
 uint64_t cr3 = 0;
 atomic_char cr3_ready = 0;
 struct spinlock wakeup_lock = SPINLOCK_INIT;
 atomic_uint_fast64_t current_cpu = 0;
-
+uint64_t total_cpu = 0;
 /*
  * Return an available core # that is idle
  */
 uint64_t mp_available_core() {
     int i = 1;
-    while (core_data[i] != NULL) {
-        if (core_data[i]->state == IDLE &&
-            core_data[i]->current_thread == NULL) {
+    while (&core_data[i] != NULL) {
+        if (core_data[i].state == IDLE && core_data[i].current_thread == NULL) {
             return i;
         }
         i++;
@@ -30,13 +30,13 @@ uint64_t mp_available_core() {
 }
 
 void wakeup() {
-    bool ints = spin_lock(&wakeup_lock);
     enable_smap_smep_umip();
     gdt_install();
     idt_load();
     serial_init();
     while (!cr3_ready)
         ;
+    bool ints = spin_lock(&wakeup_lock);
     current_cpu++;
     asm volatile("mov %0, %%cr3" ::"r"(cr3));
     int cpu = current_cpu;
@@ -44,7 +44,8 @@ void wakeup() {
     current_core->id = cpu;
     current_core->state = IDLE;
     current_core->current_thread = NULL;
-    core_data[cpu] = current_core;
+    core_data[cpu] = *current_core;
+    k_printf("processor %d is woke\n", cpu);
     spin_unlock(&wakeup_lock, ints);
 
     while (1) {
@@ -66,4 +67,11 @@ void mp_wakeup_processors(struct limine_mp_response *mpr) {
         struct limine_mp_info *curr_cpu = mpr->cpus[i];
         curr_cpu->goto_address = wakeup;
     }
+    total_cpu = mpr->cpu_count;
+}
+
+void mp_inform_of_cr3() {
+    core_data = kmalloc(sizeof(struct core) * total_cpu);
+    asm volatile("mov %%cr3, %0" : "=r"(cr3));
+    cr3_ready = true;
 }

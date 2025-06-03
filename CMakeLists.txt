@@ -1,11 +1,17 @@
 cmake_minimum_required(VERSION 3.16)
-project(charmOS C ASM_NASM)
+project(charmOS C CXX ASM_NASM)
 
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 11)
 set(ARCH "x86_64")
 set(IMAGE_NAME "charmos-${ARCH}")
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -pipe -Wall -Wextra -Wpointer-sign -Wsign-conversion -Wenum-compare -ffreestanding -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -mno-red-zone -fno-stack-protector -fno-stack-check -fno-PIC -ffunction-sections -fdata-sections -g -m64 -mcmodel=kernel -std=gnu11 -mgeneral-regs-only -DLIMINE_API_REVISION=2 -Wno-address-of-packed-member -Wno-unused-command-line-argument -fsanitize=undefined")
+set(KERNEL_COMMON_FLAGS "-O2 -pipe -Wall -Wextra -Wpointer-sign -Wsign-conversion -Wenum-compare -ffreestanding -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -mno-red-zone -fno-stack-protector -fno-stack-check -fno-PIC -ffunction-sections -fdata-sections -g -m64 -mcmodel=kernel -mgeneral-regs-only -DLIMINE_API_REVISION=2 -Wno-address-of-packed-member -Wno-unused-command-line-argument -fsanitize=undefined")
+
+set(CMAKE_C_FLAGS "${KERNEL_COMMON_FLAGS} -std=gnu11")
+
+set(CMAKE_CXX_FLAGS "${KERNEL_COMMON_FLAGS} -fno-exceptions -fno-rtti -std=c++20")
 
 if(APPLE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -target x86_64-unknown-unknown")
@@ -53,7 +59,7 @@ set(QEMU_COMMON_FLAGS
     -no-reboot
     -s
     -monitor telnet:127.0.0.1:1234,server,nowait
-    -device qemu-xhci,id=xhci
+    -device usb-ehci,id=ehci
     -device usb-kbd,id=usbkbd
     -device usb-mouse,id=usbmouse
 

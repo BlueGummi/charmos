@@ -219,6 +219,17 @@ static inline void write_cr4(uint64_t cr4) {
     __asm__ volatile("mov %0, %%cr4" : : "r"(cr4));
 }
 
+static inline uint32_t get_core_id(void) {
+    uint32_t eax, ebx, ecx, edx;
+
+    eax = 1;
+    __asm__ volatile("cpuid"
+                     : "=b"(ebx), "=a"(eax), "=c"(ecx), "=d"(edx)
+                     : "a"(eax));
+
+    return (ebx >> 24) & 0xFF;
+}
+
 static inline bool are_interrupts_enabled() {
     unsigned long flags;
     __asm__ volatile("pushf\n\t"
