@@ -3,7 +3,7 @@
 #include <console/printf.h>
 #include <int/idt.h>
 #include <int/kb.h>
-#include <mem/bitmap_alloc.h>
+#include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <misc/dbg.h>
@@ -40,8 +40,8 @@ MAKE_HANDLER(gpf, "GPF");
 MAKE_HANDLER(ss, "STACK SEGMENT FAULT");
 MAKE_HANDLER(double_fault, "DOUBLE FAULT");
 
-struct idt_entry idt[IDT_ENTRIES];
-struct idt_ptr idtp;
+struct idt_table *idts;
+struct idt_ptr *idtps;
 
 void remap_pic() {
     uint8_t a1, a2;
@@ -65,7 +65,9 @@ void remap_pic() {
     outb(PIC2_DATA, a2);
 }
 
-void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags) {
+void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
+                  uint64_t ind) {
+    struct idt_entry *idt = idts[ind].entries;
     idt[num].base_low = (base & 0xFFFF);
     idt[num].base_mid = (base >> 16) & 0xFFFF;
     idt[num].base_high = (base >> 32) & 0xFFFFFFFF;
@@ -75,39 +77,46 @@ void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags) {
     idt[num].reserved = 0;
 }
 
-void idt_set_and_mark(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags) {
-    idt_set_gate(num, base, sel, flags);
+void idt_set_and_mark(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
+                      uint64_t ind) {
+    idt_set_gate(num, base, sel, flags, ind);
     uacpi_mark_irq_installed(num);
 }
 
-void idt_load() {
-    idtp.limit = sizeof(struct idt_entry) * IDT_ENTRIES - 1;
-    idtp.base = (uint64_t) &idt;
-    asm volatile("lidt %0" : : "m"(idtp));
+void idt_load(uint64_t ind) {
+    idtps[ind].limit = sizeof(struct idt_entry) * IDT_ENTRIES - 1;
+    idtps[ind].base = (uint64_t) &idts[ind];
+    asm volatile("lidt %0" : : "m"(idtps[ind]));
 }
 
-void idt_install() {
+void idt_alloc(uint64_t size) {
+    idts = kmalloc(sizeof(struct idt_table) * size);
+    idtps = kmalloc(sizeof(struct idt_ptr) * size);
+}
+
+void idt_install(uint64_t ind) {
     remap_pic();
 
-    idt_set_and_mark(DIV_BY_Z_ID, (uint64_t) divbyz_fault, 0x08, 0x8E);
+    idt_set_and_mark(DIV_BY_Z_ID, (uint64_t) divbyz_fault, 0x08, 0x8E, ind);
 
-    idt_set_and_mark(DEBUG_ID, (uint64_t) debug_fault, 0x08, 0x8E);
+    idt_set_and_mark(DEBUG_ID, (uint64_t) debug_fault, 0x08, 0x8E, ind);
 
-    idt_set_and_mark(BREAKPOINT_ID, (uint64_t) breakpoint_fault, 0x08, 0x8E);
+    idt_set_and_mark(BREAKPOINT_ID, (uint64_t) breakpoint_fault, 0x08, 0x8E,
+                     ind);
 
     idt_set_and_mark(DOUBLEFAULT_ID, (uint64_t) double_fault_handler_wrapper,
-                     0x08, 0x8E);
+                     0x08, 0x8E, ind);
 
-    idt_set_and_mark(SSF_ID, (uint64_t) ss_handler_wrapper, 0x08, 0x8E);
+    idt_set_and_mark(SSF_ID, (uint64_t) ss_handler_wrapper, 0x08, 0x8E, ind);
 
-    idt_set_and_mark(GPF_ID, (uint64_t) gpf_handler_wrapper, 0x08, 0x8E);
+    idt_set_and_mark(GPF_ID, (uint64_t) gpf_handler_wrapper, 0x08, 0x8E, ind);
 
     idt_set_and_mark(PAGE_FAULT_ID, (uint64_t) page_fault_handler_wrapper, 0x08,
-                     0x8E);
+                     0x8E, ind);
 
-    idt_set_and_mark(TIMER_ID, (uint64_t) context_switch, 0x08, 0x8E);
+    idt_set_and_mark(TIMER_ID, (uint64_t) context_switch, 0x08, 0x8E, ind);
 
-    idt_set_and_mark(KB_ID, (uint64_t) keyboard_handler, 0x08, 0x8E);
+    idt_set_and_mark(KB_ID, (uint64_t) keyboard_handler, 0x08, 0x8E, ind);
 
     outb(0x43, 0x36);
     uint16_t divisor = 1193180 / PIT_HZ;
@@ -119,7 +128,7 @@ void idt_install() {
     mask &= ~(1 << 1);
 
     outb(PIC1_DATA, mask);
-    idt_load();
+    idt_load(ind);
     asm volatile("sti");
 }
 

@@ -27,17 +27,22 @@ struct idt_entry {
     uint32_t reserved;
 } __attribute__((packed));
 
-extern struct idt_entry idt[IDT_ENTRIES];
+struct idt_table {
+    struct idt_entry entries[IDT_ENTRIES];
+};
+
+extern struct idt_table *idts;
 
 struct idt_ptr {
     uint16_t limit;
     uint64_t base;
 } __attribute__((packed));
 
-void idt_install();
-void idt_load();
-void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags);
-void idt_set_and_mark(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags);
+void idt_install(uint64_t ind);
+void idt_load(uint64_t ind);
+void idt_alloc(uint64_t size);
+void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags, uint64_t ind);
+void idt_set_and_mark(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags, uint64_t ind);
 
 static inline void trigger_interrupt(uint8_t code) {
     asm volatile("int %0" : : "i"(code));

@@ -50,6 +50,7 @@ struct scheduler global_sched;
 uint64_t a_rsdp = 0;
 
 void k_main(void) {
+    uint64_t c_cnt = mp_request.response->cpu_count;
     k_printf_init(framebuffer_request.response->framebuffers[0]);
     struct limine_hhdm_response *r = hhdm_request.response;
     k_printf("%s", OS_LOGO_SMALL);
@@ -57,18 +58,17 @@ void k_main(void) {
     mp_wakeup_processors(mp_request.response);
     enable_smap_smep_umip();
     gdt_install();
-    idt_install();
     init_physical_allocator(r->offset, memmap_request);
     vmm_offset_set(r->offset);
     vmm_init();
     slab_init();
+    idt_alloc(c_cnt);
+    idt_install(0);
     mp_inform_of_cr3(); // get their pages on our page
     test_alloc();
     uacpi_init();
     registry_setup();
     registry_print_devices();
-    extern void cpp_test();
-    cpp_test();
     scheduler_init(&global_sched);
     scheduler_add_thread(&global_sched, thread_create(k_sch_main));
     scheduler_start();

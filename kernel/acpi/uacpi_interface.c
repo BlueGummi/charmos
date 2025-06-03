@@ -167,7 +167,8 @@ uacpi_status uacpi_kernel_install_interrupt_handler(
     irq_table[irq].ctx = ctx;
     irq_table[irq].installed = true;
 
-    idt_set_gate(irq + 32, (uint64_t) isr_trampolines[irq], 0x08, 0x8E);
+    idt_set_gate(irq + 32, (uint64_t) isr_trampolines[irq], 0x08, 0x8E,
+                 get_core_id());
 
     if (out_irq_handle)
         *out_irq_handle = (uacpi_handle) (uintptr_t) irq;
@@ -190,7 +191,7 @@ uacpi_kernel_uninstall_interrupt_handler(uacpi_interrupt_handler handler,
     irq_table[irq].handler = NULL;
     irq_table[irq].ctx = NULL;
 
-    idt_set_gate(irq + 32, 0, 0, 0);
+    idt_set_gate(irq + 32, 0, 0, 0, get_core_id());
 
     return UACPI_STATUS_OK;
 }

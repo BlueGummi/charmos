@@ -13,7 +13,6 @@ struct core *core_data = NULL;
 uint64_t cr3 = 0;
 atomic_char cr3_ready = 0;
 struct spinlock wakeup_lock = SPINLOCK_INIT;
-atomic_uint_fast64_t current_cpu = 0;
 uint64_t total_cpu = 0;
 /*
  * Return an available core # that is idle
@@ -30,16 +29,15 @@ uint64_t mp_available_core() {
 }
 
 void wakeup() {
+    bool ints = spin_lock(&wakeup_lock);
     enable_smap_smep_umip();
     gdt_install();
-    idt_load();
     serial_init();
     while (!cr3_ready)
         ;
-    bool ints = spin_lock(&wakeup_lock);
-    current_cpu++;
     asm volatile("mov %0, %%cr3" ::"r"(cr3));
-    int cpu = current_cpu;
+    int cpu = get_core_id();
+    idt_install(cpu);
     struct core *current_core = kmalloc(sizeof(struct core));
     current_core->id = cpu;
     current_core->state = IDLE;
