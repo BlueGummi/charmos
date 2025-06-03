@@ -14,7 +14,7 @@ struct spinlock l;
 
 void k_sch_main() {
     bool lock = spin_lock(&l);
-    uint64_t id = get_core_id();
+    uint64_t id = get_sch_core_id();
     if (id == 0) {
         mp_inform_of_cr3();
     }
@@ -26,7 +26,9 @@ void k_sch_main() {
 }
 
 void schedule(struct cpu_state *cpu) {
-    struct per_core_scheduler *sched = local_schs[get_core_id()];
+    uint64_t core_id = get_sch_core_id();
+    k_printf("scheduling %lu\n", core_id);
+    struct per_core_scheduler *sched = local_schs[core_id];
     time_tick_count += 1;
     if (!sched->active) {
         return;
@@ -109,10 +111,13 @@ void scheduler_init(struct scheduler *sched, uint64_t core_count) {
 
 // todo: don't copy code so much
 static void scheduler_l_add_thread(struct per_core_scheduler *sched,
-                                   struct thread *task) {
-    if (sched == NULL || task == NULL) {
+                                   struct thread *t) {
+    if (sched == NULL || t == NULL) {
         return;
     }
+
+    struct thread *task = kmalloc(sizeof(struct thread));
+    memcpy(task, t, sizeof(struct thread));
 
     task->next = NULL;
     task->prev = NULL;

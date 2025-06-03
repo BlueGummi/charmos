@@ -25,7 +25,7 @@ uint64_t mp_available_core() {
         }
         i++;
     }
-    return (uint64_t)-1;
+    return (uint64_t) -1;
 }
 
 void wakeup() {
@@ -38,6 +38,10 @@ void wakeup() {
     asm volatile("mov %0, %%cr3" ::"r"(cr3));
     uint64_t cpu = get_core_id();
     idt_install(cpu);
+    struct core *c = kmalloc(sizeof(struct core));
+    c->id = cpu;
+    c->state = IDLE;
+    wrmsr(MSR_GS_BASE, (uint64_t) c);
     k_printf("processor %d initialized\n", cpu);
     spin_unlock(&wakeup_lock, ints);
     asm("sti");

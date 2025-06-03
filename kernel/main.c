@@ -73,16 +73,13 @@ void k_main(void) {
         struct per_core_scheduler *s =
             kmalloc(sizeof(struct per_core_scheduler));
         scheduler_local_init(s, i);
+        struct thread *t = thread_create(k_sch_main);
+        scheduler_add_thread(&global_sched, t);
     }
-    struct thread *t = thread_create(k_sch_main);
-    scheduler_add_thread(&global_sched, t);
-    scheduler_add_thread(&global_sched, t);
-    scheduler_add_thread(&global_sched, t);
-    scheduler_add_thread(&global_sched, t);
-    scheduler_add_thread(&global_sched, t);
-    scheduler_add_thread(&global_sched, t);
-    scheduler_add_thread(&global_sched, t);
-    scheduler_add_thread(&global_sched, t);
+    struct core *c = kmalloc(sizeof(struct core));
+    c->state = IDLE;
+    c->id = 0;
+    wrmsr(MSR_GS_BASE, (uint64_t) c);
     scheduler_rebalance(&global_sched);
     asm volatile("sti");
     scheduler_start(local_schs[0]);

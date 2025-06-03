@@ -1,3 +1,5 @@
+#include <console/printf.h>
+#include <mp/core.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -238,6 +240,25 @@ static inline bool are_interrupts_enabled() {
                      :
                      :);
     return (flags & (1 << 9)) != 0;
+}
+
+#define MSR_GS_BASE 0xC0000101
+
+static inline void wrmsr(uint32_t msr, uint64_t value) {
+    uint32_t lo = value & 0xFFFFFFFF;
+    uint32_t hi = value >> 32;
+    asm volatile("wrmsr" ::"c"(msr), "a"(lo), "d"(hi) : "memory");
+}
+
+static inline uint64_t rdmsr(uint32_t msr) {
+    uint64_t lo, hi;
+    asm volatile("rdmsr" : "=a"(lo), "=d"(hi) : "c"(msr));
+    return (hi << 32U) | lo;
+}
+
+static inline uint64_t get_sch_core_id() {
+    struct core *c = (struct core *) rdmsr(MSR_GS_BASE);
+    return c->id;
 }
 
 #pragma once
