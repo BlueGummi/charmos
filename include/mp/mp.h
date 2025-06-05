@@ -9,7 +9,6 @@ extern struct spinlock wakeup_lock;
 extern atomic_char cr3_ready;
 extern atomic_uint_fast64_t current_cpu;
 void wakeup();
-uint64_t mp_available_core();
 void mp_wakeup_processors(struct limine_mp_response *mpr);
-void mp_inform_of_cr3();
+void mp_inform_of_cr3(uint64_t*);
 #pragma once

@@ -95,7 +95,8 @@ void idt_alloc(uint64_t size) {
 }
 
 void idt_install(uint64_t ind) {
-    remap_pic();
+    if (!ind)
+        remap_pic();
 
     idt_set_and_mark(DIV_BY_Z_ID, (uint64_t) divbyz_fault, 0x08, 0x8E, ind);
 
@@ -118,16 +119,17 @@ void idt_install(uint64_t ind) {
 
     idt_set_and_mark(KB_ID, (uint64_t) keyboard_handler, 0x08, 0x8E, ind);
 
-    outb(0x43, 0x36);
-    uint16_t divisor = 1193180 / PIT_HZ;
-    outb(0x40, divisor & 0xFF);
-    outb(0x40, (divisor >> 8) & 0xFF);
-    uint8_t mask = inb(PIC1_DATA);
+    if (ind == 0) {
+        outb(0x43, 0x36);
+        uint16_t divisor = 1193180 / PIT_HZ;
+        outb(0x40, divisor & 0xFF);
+        outb(0x40, (divisor >> 8) & 0xFF);
+        uint8_t mask = inb(PIC1_DATA);
 
-    mask &= ~(1 << 0);
-    mask &= ~(1 << 1);
-
-    outb(PIC1_DATA, mask);
+        mask &= ~(1 << 0);
+        mask &= ~(1 << 1);
+        outb(PIC1_DATA, mask);
+    }
     idt_load(ind);
 }
 

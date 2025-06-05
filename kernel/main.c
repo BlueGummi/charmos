@@ -1,4 +1,5 @@
 #include "requests.h"
+#include <acpi/apic.h>
 #include <acpi/print.h>
 #include <acpi/uacpi_interface.h>
 #include <asm.h>
@@ -42,6 +43,7 @@
 #include <time/print.h>
 #include <uacpi/event.h>
 #include <uacpi/resources.h>
+#include <uacpi/tables.h>
 #include <uacpi/uacpi.h>
 #include <uacpi/utilities.h>
 #include <vfs/vfs.h>
@@ -69,6 +71,7 @@ void k_main(void) {
     registry_setup();
     registry_print_devices();
     scheduler_init(&global_sched, c_cnt);
+
     for (uint64_t i = 0; i < c_cnt; i++) {
         struct per_core_scheduler *s =
             kmalloc(sizeof(struct per_core_scheduler));
@@ -76,11 +79,14 @@ void k_main(void) {
         struct thread *t = thread_create(k_sch_main);
         scheduler_add_thread(&global_sched, t);
     }
+
     struct core *c = kmalloc(sizeof(struct core));
     c->state = IDLE;
     c->id = 0;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
     scheduler_rebalance(&global_sched);
+    mp_inform_of_cr3(vmm_map_phys(0xFEE00000UL, 4096));
+
     asm volatile("sti");
     scheduler_start(local_schs[0]);
     while (1) {

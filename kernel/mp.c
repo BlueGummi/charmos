@@ -1,3 +1,4 @@
+#include <acpi/lapic.h>
 #include <asm.h>
 #include <boot/gdt.h>
 #include <boot/smap.h>
@@ -9,24 +10,10 @@
 #include <sch/sched.h>
 #include <spin_lock.h>
 
-struct core *core_data = NULL;
 uint64_t cr3 = 0;
 atomic_char cr3_ready = 0;
 struct spinlock wakeup_lock = SPINLOCK_INIT;
-uint64_t total_cpu = 0;
-/*
- * Return an available core # that is idle
- */
-uint64_t mp_available_core() {
-    uint64_t i = 1;
-    while (&core_data[i] != NULL) {
-        if (core_data[i].state == IDLE && core_data[i].current_thread == NULL) {
-            return i;
-        }
-        i++;
-    }
-    return (uint64_t) -1;
-}
+uint64_t *lapic;
 
 void wakeup() {
     bool ints = spin_lock(&wakeup_lock);
@@ -37,12 +24,25 @@ void wakeup() {
         ;
     asm volatile("mov %0, %%cr3" ::"r"(cr3));
     uint64_t cpu = get_core_id();
+
+    LAPIC_REG(LAPIC_REG_SVR) = LAPIC_ENABLE | 0xFF;
+
+    LAPIC_REG(LAPIC_REG_TIMER_DIV) = 0b0011;
+
+    LAPIC_REG(LAPIC_REG_LVT_TIMER) = TIMER_VECTOR | TIMER_MODE_PERIODIC;
+
+    LAPIC_REG(LAPIC_REG_TIMER_INIT) = 1000000;
+
     idt_install(cpu);
+
     struct core *c = kmalloc(sizeof(struct core));
     c->id = cpu;
     c->state = IDLE;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
-    k_printf("processor %d initialized\n", cpu);
+
+    uint32_t lapic_id = LAPIC_REG(LAPIC_REG_ID) >> 24;
+    k_printf("core %u has LAPIC ID %u\n", cpu, lapic_id);
+
     spin_unlock(&wakeup_lock, ints);
     asm("sti");
     scheduler_start(local_schs[cpu]);
@@ -56,11 +56,10 @@ void mp_wakeup_processors(struct limine_mp_response *mpr) {
         struct limine_mp_info *curr_cpu = mpr->cpus[i];
         curr_cpu->goto_address = wakeup;
     }
-    total_cpu = mpr->cpu_count;
 }
 
-void mp_inform_of_cr3() {
-    core_data = kmalloc(sizeof(struct core) * total_cpu);
+void mp_inform_of_cr3(uint64_t *lapic_addr) {
+    lapic = lapic_addr;
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
     cr3_ready = true;
 }

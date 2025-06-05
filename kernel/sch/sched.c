@@ -1,3 +1,4 @@
+#include <acpi/lapic.h>
 #include <asm.h>
 #include <console/printf.h>
 #include <mem/alloc.h>
@@ -15,12 +16,9 @@ struct spinlock l;
 void k_sch_main() {
     bool lock = spin_lock(&l);
     uint64_t id = get_sch_core_id();
-    if (id == 0) {
-        mp_inform_of_cr3();
-    }
-    k_printf("core %d on idle!\n", id);
     spin_unlock(&l, lock);
     while (1) {
+        k_printf("core %d on idle!\n", id);
         asm volatile("hlt");
     }
 }
@@ -29,7 +27,13 @@ void schedule(struct cpu_state *cpu) {
     uint64_t core_id = get_sch_core_id();
     k_printf("scheduling %lu\n", core_id);
     struct per_core_scheduler *sched = local_schs[core_id];
+
+    if (core_id != 0) {
+        LAPIC_REG(LAPIC_REG_EOI) = 0;
+    }
+
     time_tick_count += 1;
+
     if (!sched->active) {
         return;
     }
