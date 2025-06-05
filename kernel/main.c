@@ -1,5 +1,4 @@
 #include "requests.h"
-#include <acpi/apic.h>
 #include <acpi/print.h>
 #include <acpi/uacpi_interface.h>
 #include <asm.h>

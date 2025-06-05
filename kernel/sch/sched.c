@@ -25,7 +25,6 @@ void k_sch_main() {
 
 void schedule(struct cpu_state *cpu) {
     uint64_t core_id = get_sch_core_id();
-    k_printf("scheduling %lu\n", core_id);
     struct per_core_scheduler *sched = local_schs[core_id];
 
     if (core_id != 0) {
@@ -56,39 +55,33 @@ __attribute__((noreturn)) void
 scheduler_start(struct per_core_scheduler *sched) {
     struct cpu_state *regs = &sched->current->regs;
 
-    asm volatile(
-        "push %[rax]\n\t"
-        "push %[rbx]\n\t"
-        "push %[rcx]\n\t"
-        "push %[rdx]\n\t"
-        "push %[rsi]\n\t"
-        "push %[rdi]\n\t"
-        "push %[rbp]\n\t"
-        "push %[r8]\n\t"
-        "push %[r9]\n\t"
-        "push %[r10]\n\t"
-        "push %[r11]\n\t"
-        "push %[r12]\n\t"
-        "push %[r13]\n\t"
-        "push %[r14]\n\t"
-        "push %[r15]\n\t"
+    asm volatile("push %%rax\n\t"
+                 "push %%rbx\n\t"
+                 "push %%rcx\n\t"
+                 "push %%rdx\n\t"
+                 "push %%rsi\n\t"
+                 "push %%rdi\n\t"
+                 "push %%rbp\n\t"
+                 "push %%r8\n\t"
+                 "push %%r9\n\t"
+                 "push %%r10\n\t"
+                 "push %%r11\n\t"
+                 "push %%r12\n\t"
+                 "push %%r13\n\t"
+                 "push %%r14\n\t"
+                 "push %%r15\n\t"
 
-        "push %[ss]\n\t"
-        "push %%rsp\n\t"
-        "push %[rflags]\n\t"
-        "push %[cs]\n\t"
-        "push %[rip]\n\t"
+                 "push %[ss]\n\t"
+                 "push %%rsp\n\t"
+                 "push %[rflags]\n\t"
+                 "push %[cs]\n\t"
+                 "push %[rip]\n\t"
 
-        "iretq\n\t"
-        :
-        : [rax] "m"(regs->rax), [rbx] "m"(regs->rbx), [rcx] "m"(regs->rcx),
-          [rdx] "m"(regs->rdx), [rsi] "m"(regs->rsi), [rdi] "m"(regs->rdi),
-          [rbp] "m"(regs->rbp), [r8] "m"(regs->r8), [r9] "m"(regs->r9),
-          [r10] "m"(regs->r10), [r11] "m"(regs->r11), [r12] "m"(regs->r12),
-          [r13] "m"(regs->r13), [r14] "m"(regs->r14), [r15] "m"(regs->r15),
-          [rip] "m"(regs->rip), [cs] "m"(regs->cs), [rflags] "m"(regs->rflags),
-          [ss] "m"(regs->ss)
-        : "memory");
+                 "iretq\n\t"
+                 :
+                 : [rip] "m"(regs->rip), [cs] "m"(regs->cs),
+                   [rflags] "m"(regs->rflags), [ss] "m"(regs->ss)
+                 : "memory");
 
     __builtin_unreachable();
 }
