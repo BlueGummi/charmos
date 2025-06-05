@@ -68,7 +68,6 @@ void k_main(void) {
     test_alloc();
     uacpi_init();
     registry_setup();
-    registry_print_devices();
     scheduler_init(&global_sched, c_cnt);
 
     for (uint64_t i = 0; i < c_cnt; i++) {
@@ -78,6 +77,9 @@ void k_main(void) {
         struct thread *t = thread_create(k_sch_main);
         scheduler_add_thread(&global_sched, t);
     }
+
+    struct thread *t = thread_create(registry_print_devices);
+    scheduler_add_thread(&global_sched, t);
 
     struct core *c = kmalloc(sizeof(struct core));
     c->state = IDLE;

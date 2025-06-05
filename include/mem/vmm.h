@@ -19,6 +19,11 @@
 #define PAGE_ALIGN_DOWN(x) ((x) & ~(PAGE_SIZE - 1))
 #define PAGE_ALIGN_UP(x) (((x) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1))
 
+#define UACPI_MAP_BASE 0xFFFFA00000000000
+#define UACPI_MAP_LIMIT 0xFFFFA00000100000
+#define VMM_MAP_BASE 0xFFFFA00000200000
+#define VMM_MAP_LIMIT 0xFFFFA00010000000
+
 typedef uint64_t pte_t; // Page Table Entry
 
 struct page_table {

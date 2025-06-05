@@ -6,7 +6,7 @@
 #include <string.h>
 
 struct slab_cache slab_caches[SLAB_CLASS_COUNT];
-uintptr_t slab_heap_top = 0xFFFF800000000000;
+uintptr_t slab_heap_top = 0xFFFFF00000000000;
 
 static void *slab_map_new_page() {
     uintptr_t phys = (uintptr_t) pmm_alloc_pages(1, false);
