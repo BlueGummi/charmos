@@ -16,8 +16,10 @@ extern void page_fault_handler_wrapper();
 #define MAKE_THIN_HANDLER(handler_name, message)                               \
     void __attribute__((interrupt)) handler_name##_fault(void *frame) {        \
         (void) frame;                                                          \
+        uint64_t core = get_sch_core_id();                                     \
         k_printf("\n=== " #handler_name " fault! ===\n");                      \
         k_printf("Message -> %s\n", message);                                  \
+        k_printf("Core %u faulted\n", core);                                   \
         while (1) {                                                            \
             asm volatile("hlt");                                               \
         }                                                                      \
@@ -26,8 +28,10 @@ extern void page_fault_handler_wrapper();
 #define MAKE_HANDLER(handler_name, mnemonic)                                   \
     extern void handler_name##_handler_wrapper();                              \
     void handler_name##_handler(uint64_t error_code) {                         \
+        uint64_t core = get_sch_core_id();                                     \
         k_printf("\n=== " mnemonic " fault! ===\n");                           \
         k_printf("Error code: 0x%lx\n", error_code);                           \
+        k_printf("Core %u faulted\n", core);                                   \
         while (1) {                                                            \
             asm volatile("hlt");                                               \
         }                                                                      \
@@ -42,28 +46,6 @@ MAKE_HANDLER(double_fault, "DOUBLE FAULT");
 
 struct idt_table *idts;
 struct idt_ptr *idtps;
-
-void remap_pic() {
-    uint8_t a1, a2;
-
-    a1 = inb(PIC1_DATA); // Save master PIC mask
-    a2 = inb(PIC2_DATA); // Save slave PIC mask
-
-    outb(PIC1_COMMAND, 0x11); // Start init
-    outb(PIC2_COMMAND, 0x11);
-
-    outb(PIC1_DATA, 0x20); // Master offset: 0x20 (32)
-    outb(PIC2_DATA, 0x28); // Slave offset: 0x28 (40)
-
-    outb(PIC1_DATA, 0x04); // Tell master about slave on IRQ2
-    outb(PIC2_DATA, 0x02); // Tell slave its cascade identity
-
-    outb(PIC1_DATA, 0x01); // 8086/88 mode
-    outb(PIC2_DATA, 0x01);
-
-    outb(PIC1_DATA, a1);
-    outb(PIC2_DATA, a2);
-}
 
 void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
                   uint64_t ind) {
@@ -95,8 +77,8 @@ void idt_alloc(uint64_t size) {
 }
 
 void idt_install(uint64_t ind) {
-    if (!ind)
-        remap_pic();
+    /*    if (!ind)
+            remap_pic();*/
 
     idt_set_and_mark(DIV_BY_Z_ID, (uint64_t) divbyz_fault, 0x08, 0x8E, ind);
 
@@ -119,23 +101,25 @@ void idt_install(uint64_t ind) {
 
     idt_set_and_mark(KB_ID, (uint64_t) keyboard_handler, 0x08, 0x8E, ind);
 
-    if (ind == 0) {
-        outb(0x43, 0x36);
-        uint16_t divisor = 1193180 / PIT_HZ;
-        outb(0x40, divisor & 0xFF);
-        outb(0x40, (divisor >> 8) & 0xFF);
-        uint8_t mask = inb(PIC1_DATA);
+    /*    if (ind == 0) {
+            outb(0x43, 0x36);
+            uint16_t divisor = 1193180 / PIT_HZ;
+            outb(0x40, divisor & 0xFF);
+            outb(0x40, (divisor >> 8) & 0xFF);
+            uint8_t mask = inb(PIC1_DATA);
 
-        mask &= ~(1 << 0);
-        mask &= ~(1 << 1);
-        outb(PIC1_DATA, mask);
-    }
+            mask &= ~(1 << 0);
+            mask &= ~(1 << 1);
+            outb(PIC1_DATA, mask);
+        }*/
     idt_load(ind);
 }
 
 void page_fault_handler(uint64_t error_code, uint64_t fault_addr) {
+    uint64_t core = get_sch_core_id();
     k_printf("\n=== PAGE FAULT ===\n");
     k_printf("Faulting Address (CR2): 0x%lx\n", fault_addr);
+    k_printf("Core %u faulted\n", core);
     k_printf("Error Code: 0x%lx\n", error_code);
     k_printf("  - Page not Present (P): %s\n",
              (error_code & 0x01) ? "Yes" : "No");

@@ -15,8 +15,8 @@ struct spinlock l;
 
 void k_sch_main() {
     uint64_t id = get_sch_core_id();
-    k_printf("core %d on idle!\n", id);
     while (1) {
+        k_printf("core %d on idle!\n", id);
         asm volatile("hlt");
     }
 }
@@ -25,11 +25,10 @@ void schedule(struct cpu_state *cpu) {
     uint64_t core_id = get_sch_core_id();
     struct per_core_scheduler *sched = local_schs[core_id];
 
-    if (core_id != 0) {
-        LAPIC_REG(LAPIC_REG_EOI) = 0;
-    }
+    LAPIC_REG(LAPIC_REG_EOI) = 0;
 
-    time_tick_count += 1;
+    if (core_id == 0)
+        time_tick_count += 1;
 
     if (!sched->active) {
         return;
@@ -49,43 +48,8 @@ void schedule(struct cpu_state *cpu) {
     return;
 }
 
-__attribute__((noreturn)) void
-scheduler_start(struct per_core_scheduler *sched) {
-    struct cpu_state *regs = &sched->current->regs;
-
-    asm volatile("push %%rax\n\t"
-                 "push %%rbx\n\t"
-                 "push %%rcx\n\t"
-                 "push %%rdx\n\t"
-                 "push %%rsi\n\t"
-                 "push %%rdi\n\t"
-                 "push %%rbp\n\t"
-                 "push %%r8\n\t"
-                 "push %%r9\n\t"
-                 "push %%r10\n\t"
-                 "push %%r11\n\t"
-                 "push %%r12\n\t"
-                 "push %%r13\n\t"
-                 "push %%r14\n\t"
-                 "push %%r15\n\t"
-
-                 "push %[ss]\n\t"
-                 "push %%rsp\n\t"
-                 "push %[rflags]\n\t"
-                 "push %[cs]\n\t"
-                 "push %[rip]\n\t"
-
-                 "iretq\n\t"
-                 :
-                 : [rip] "m"(regs->rip), [cs] "m"(regs->cs),
-                   [rflags] "m"(regs->rflags), [ss] "m"(regs->ss)
-                 : "memory");
-
-    __builtin_unreachable();
-}
-
 void scheduler_local_init(struct per_core_scheduler *sched, uint64_t core_id) {
-    sched->active = false;
+    sched->active = true;
     sched->head = NULL;
     sched->tail = NULL;
     sched->current = NULL;
@@ -273,4 +237,39 @@ void scheduler_rebalance(struct scheduler *sched) {
             sched->head = sched->head->next;
         }
     }
+}
+
+__attribute__((noreturn)) void
+scheduler_start(struct per_core_scheduler *sched) {
+    struct cpu_state *regs = &sched->current->regs;
+
+    asm volatile("push %%rax\n\t"
+                 "push %%rbx\n\t"
+                 "push %%rcx\n\t"
+                 "push %%rdx\n\t"
+                 "push %%rsi\n\t"
+                 "push %%rdi\n\t"
+                 "push %%rbp\n\t"
+                 "push %%r8\n\t"
+                 "push %%r9\n\t"
+                 "push %%r10\n\t"
+                 "push %%r11\n\t"
+                 "push %%r12\n\t"
+                 "push %%r13\n\t"
+                 "push %%r14\n\t"
+                 "push %%r15\n\t"
+
+                 "push %[ss]\n\t"
+                 "push %%rsp\n\t"
+                 "push %[rflags]\n\t"
+                 "push %[cs]\n\t"
+                 "push %[rip]\n\t"
+
+                 "iretq\n\t"
+                 :
+                 : [rip] "m"(regs->rip), [cs] "m"(regs->cs),
+                   [rflags] "m"(regs->rflags), [ss] "m"(regs->ss)
+                 : "memory");
+
+    __builtin_unreachable();
 }

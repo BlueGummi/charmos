@@ -62,6 +62,13 @@ void vmm_init() {
         }
     }
 
+    /*    k_printf("__stext   -> __etext   = 0x%lx -> 0x%lx\n", __stext,
+       __etext); k_printf("__sdata   -> __edata   = 0x%lx -> 0x%lx\n", __sdata,
+       __edata); k_printf("__srodata -> __erodata = 0x%lx -> 0x%lx\n",
+       __srodata, __erodata); k_printf("__sbss    -> __ebss    = 0x%lx ->
+       0x%lx\n", __sbss, __ebss); k_printf("__slimine -> __elimine = 0x%lx ->
+       0x%lx\n", __slimine_requests, __elimine_requests); */
+
     asm volatile("mov %0, %%cr3" : : "r"(kernel_pml4_phys) : "memory");
 }
 

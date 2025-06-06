@@ -13,3 +13,4 @@
 #define TIMER_VECTOR 0x20
 #define TIMER_MODE_PERIODIC (1 << 17)
 extern uint64_t *lapic;
+void lapic_init();

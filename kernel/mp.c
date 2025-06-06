@@ -15,6 +15,16 @@ atomic_char cr3_ready = 0;
 struct spinlock wakeup_lock = SPINLOCK_INIT;
 uint64_t *lapic;
 
+void lapic_init() {
+    LAPIC_REG(LAPIC_REG_SVR) = LAPIC_ENABLE | 0xFF;
+
+    LAPIC_REG(LAPIC_REG_TIMER_DIV) = 0b0011;
+
+    LAPIC_REG(LAPIC_REG_LVT_TIMER) = TIMER_VECTOR | TIMER_MODE_PERIODIC;
+
+    LAPIC_REG(LAPIC_REG_TIMER_INIT) = 1000000;
+}
+
 void wakeup() {
     bool ints = spin_lock(&wakeup_lock);
     enable_smap_smep_umip();
@@ -23,25 +33,16 @@ void wakeup() {
     while (!cr3_ready)
         ;
     asm volatile("mov %0, %%cr3" ::"r"(cr3));
-    uint64_t cpu = get_core_id();
 
-    LAPIC_REG(LAPIC_REG_SVR) = LAPIC_ENABLE | 0xFF;
-
-    LAPIC_REG(LAPIC_REG_TIMER_DIV) = 0b0011;
-
-    LAPIC_REG(LAPIC_REG_LVT_TIMER) = TIMER_VECTOR | TIMER_MODE_PERIODIC;
-
-    LAPIC_REG(LAPIC_REG_TIMER_INIT) = 1000000;
-
+    uint32_t lapic_id_raw = LAPIC_REG(LAPIC_REG_ID);
+    uint64_t cpu = (lapic_id_raw >> 24) & 0xFF;
+    lapic_init();
     idt_install(cpu);
 
     struct core *c = kmalloc(sizeof(struct core));
     c->id = cpu;
     c->state = IDLE;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
-
-    uint32_t lapic_id = LAPIC_REG(LAPIC_REG_ID) >> 24;
-    k_printf("core %u has LAPIC ID %u\n", cpu, lapic_id);
 
     spin_unlock(&wakeup_lock, ints);
     asm("sti");
@@ -58,8 +59,7 @@ void mp_wakeup_processors(struct limine_mp_response *mpr) {
     }
 }
 
-void mp_inform_of_cr3(uint64_t *lapic_addr) {
-    lapic = lapic_addr;
+void mp_inform_of_cr3() {
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
     cr3_ready = true;
 }

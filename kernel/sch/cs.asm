@@ -20,9 +20,6 @@ context_switch:
 
     mov rdi, rsp
     call schedule
-    mov dx, 0x20
-    mov ax, 0x20
-    out dx, ax
     pop r15
     pop r14
     pop r13

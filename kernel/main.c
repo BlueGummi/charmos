@@ -1,4 +1,5 @@
 #include "requests.h"
+#include <acpi/lapic.h>
 #include <acpi/print.h>
 #include <acpi/uacpi_interface.h>
 #include <asm.h>
@@ -78,15 +79,17 @@ void k_main(void) {
         scheduler_add_thread(&global_sched, t);
     }
 
-    struct thread *t = thread_create(registry_print_devices);
-    scheduler_add_thread(&global_sched, t);
+//    struct thread *t = thread_create(registry_print_devices);
+//    scheduler_add_thread(&global_sched, t);
 
     struct core *c = kmalloc(sizeof(struct core));
     c->state = IDLE;
     c->id = 0;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
     scheduler_rebalance(&global_sched);
-    mp_inform_of_cr3(vmm_map_phys(0xFEE00000UL, 4096));
+    lapic = vmm_map_phys(0xFEE00000UL, 4096);
+    lapic_init();
+    mp_inform_of_cr3();
 
     asm volatile("sti");
     scheduler_start(local_schs[0]);
