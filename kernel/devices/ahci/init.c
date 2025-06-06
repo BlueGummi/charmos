@@ -161,8 +161,8 @@ struct generic_disk *ahci_create_generic(struct ahci_disk *disk) {
     struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
     d->driver_data = disk;
     d->sector_size = 512;
-    d->read_sector = ahci_read_sector;
-    d->write_sector = ahci_write_sector;
+    d->read_sector = ahci_read_sector_wrapper;
+    d->write_sector = ahci_write_sector_wrapper;
     d->print = ahci_print_wrapper;
     d->type = G_AHCI_DRIVE;
     return d;

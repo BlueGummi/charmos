@@ -6,7 +6,7 @@
 #define LAPIC_REG_TIMER_INIT 0x380
 #define LAPIC_REG_TIMER_CUR 0x390
 #define LAPIC_REG_TIMER_DIV 0x3E0
-#define LAPIC_ENABLE  0x100
+#define LAPIC_ENABLE 0x100
 
 #define LAPIC_REG(offset)                                                      \
     (*(volatile uint32_t *) ((uintptr_t) lapic + (offset)))

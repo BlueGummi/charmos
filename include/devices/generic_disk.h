@@ -22,9 +22,9 @@ struct generic_disk {
     uint32_t sector_size;
 
     bool (*read_sector)(struct generic_disk *disk, uint64_t lba,
-                        uint8_t *buffer);
+                        uint8_t *buffer, uint64_t sector_count);
     bool (*write_sector)(struct generic_disk *disk, uint64_t lba,
-                         const uint8_t *buffer);
+                         const uint8_t *buffer, uint64_t sector_count);
     void (*print)(struct generic_disk *disk); // this one for physical disk
 
     enum errno (*mount)(struct generic_disk *disk);

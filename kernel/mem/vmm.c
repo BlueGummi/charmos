@@ -48,6 +48,13 @@ void *vmm_map_region(uintptr_t virt_base, uint64_t size, uint64_t flags) {
     return first;
 }
 
+void vmm_unmap_region(uintptr_t virt_base, uint64_t size) {
+    for (uintptr_t virt = virt_base; virt < virt_base + size;
+         virt += PAGE_SIZE) {
+        vmm_unmap_page(virt);
+    }
+}
+
 void vmm_init() {
     kernel_pml4 = (struct page_table *) pmm_alloc_page(true);
     kernel_pml4_phys = (uintptr_t) kernel_pml4 - hhdm_offset;

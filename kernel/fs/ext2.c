@@ -16,7 +16,7 @@ bool ext2_read_superblock(struct generic_disk *d, uint32_t partition_start_lba,
         partition_start_lba + (EXT2_SUPERBLOCK_OFFSET / d->sector_size);
     uint32_t superblock_offset = EXT2_SUPERBLOCK_OFFSET % d->sector_size;
 
-    if (!d->read_sector(d, superblock_lba, buffer)) {
+    if (!d->read_sector(d, superblock_lba, buffer, 1)) {
         return false;
     }
 

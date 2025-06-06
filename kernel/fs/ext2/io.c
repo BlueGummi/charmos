@@ -9,11 +9,10 @@ bool ext2_block_read(struct generic_disk *d, uint32_t lba, uint8_t *buffer,
     if (!buffer)
         return false;
 
-    for (uint32_t i = 0; i < sector_count; ++i) {
-        if (!d->read_sector(d, lba + i, buffer + (i * d->sector_size))) {
-            return false;
-        }
+    if (!d->read_sector(d, lba, buffer + (d->sector_size), sector_count)) {
+        return false;
     }
+
     return true;
 }
 
@@ -67,10 +66,8 @@ bool ext2_block_write(struct generic_disk *d, uint32_t lba,
     if (!buffer)
         return false;
 
-    for (uint32_t i = 0; i < sector_count; ++i) {
-        if (!d->write_sector(d, lba + i, buffer + (i * d->sector_size))) {
-            return false;
-        }
+    if (!d->write_sector(d, lba, buffer + (d->sector_size), sector_count)) {
+        return false;
     }
     return true;
 }

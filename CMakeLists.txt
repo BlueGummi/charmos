@@ -60,11 +60,10 @@ set(QEMU_COMMON_FLAGS
     -device usb-mouse,id=usbmouse
 
     -drive id=disk0,file=disk.img,format=raw,if=none
-    -device ahci,id=ahci
-    -device ide-hd,drive=disk0,bus=ahci.0
-    
-    #-drive id=fatdisk,file=fat32_disk.img,format=raw,if=none
-    #-device ide-hd,drive=fatdisk,bus=ide.0,unit=1
+    -device nvme,serial=deadbeef,drive=disk0,id=nvme0
+
+    -drive id=fatdisk,file=fat32_disk.img,format=raw,if=none
+    -device ide-hd,drive=fatdisk,bus=ide.0,unit=1
 
        -d trace:*ahci*
        -trace file=trace.log

@@ -25,7 +25,7 @@ const char *detect_fstr(enum fs_type type) {
 enum fs_type detect_fs(struct generic_disk *drive) {
     uint8_t *sector = kmalloc(drive->sector_size);
     enum fs_type type = FS_UNKNOWN;
-    if (!drive->read_sector(drive, 0, sector)) {
+    if (!drive->read_sector(drive, 0, sector, 1)) {
         goto end;
     }
 
@@ -51,7 +51,7 @@ enum fs_type detect_fs(struct generic_disk *drive) {
         goto end;
     }
 
-    if (!drive->read_sector(drive, 2, sector)) {
+    if (!drive->read_sector(drive, 2, sector, 1)) {
         goto end;
     }
 
@@ -69,7 +69,7 @@ enum fs_type detect_fs(struct generic_disk *drive) {
         }
     }
 
-    if (!drive->read_sector(drive, 16, sector))
+    if (!drive->read_sector(drive, 16, sector, 1))
         goto end;
 
     if (memcmp(&sector[1], "CD001", 5) == 0)

@@ -12,7 +12,7 @@ struct fat32_bpb *fat32_read_bpb(struct generic_disk *drive) {
     if (!sector)
         return NULL;
 
-    if (!drive->read_sector(drive, 0, sector)) {
+    if (!drive->read_sector(drive, 0, sector, 1)) {
         kfree(sector);
         return NULL;
     }
@@ -31,7 +31,7 @@ struct fat32_bpb *fat32_read_bpb(struct generic_disk *drive) {
         }
     }
 
-    if (fat32_lba != 0 && drive->read_sector(drive, fat32_lba, sector)) {
+    if (fat32_lba != 0 && drive->read_sector(drive, fat32_lba, sector, 1)) {
         struct fat32_bpb *bpb = (struct fat32_bpb *) sector;
 
         if (bpb->boot_signature == 0x29 &&
@@ -48,7 +48,7 @@ struct fat32_bpb *fat32_read_bpb(struct generic_disk *drive) {
     }
 
     for (uint32_t lba = 0; lba < 32; ++lba) {
-        if (!drive->read_sector(drive, lba, sector))
+        if (!drive->read_sector(drive, lba, sector, 1))
             continue;
 
         struct fat32_bpb *bpb = (struct fat32_bpb *) sector;

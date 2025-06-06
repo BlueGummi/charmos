@@ -261,7 +261,11 @@ struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
                                        uint8_t function,
                                        uint32_t *out_disk_count);
 bool ahci_write_sector(struct generic_disk *disk, uint64_t lba,
-                       const uint8_t *in_buf);
-bool ahci_read_sector(struct generic_disk *disk, uint64_t lba,
-                      uint8_t *out_buf);
+                       const uint8_t *in_buf, uint16_t cnt);
+bool ahci_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *out_buf,
+                      uint16_t cnt);
+bool ahci_read_sector_wrapper(struct generic_disk *disk, uint64_t lba,
+                              uint8_t *buf, uint64_t cnt);
+bool ahci_write_sector_wrapper(struct generic_disk *disk, uint64_t lba,
+                               const uint8_t *buf, uint64_t cnt);
 struct generic_disk *ahci_create_generic(struct ahci_disk *disk);

@@ -76,8 +76,8 @@ struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {
     struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
     d->driver_data = nvme;
     d->sector_size = 512;
-    d->read_sector = nvme_read_sector;
-    d->write_sector = nvme_write_sector;
+    d->read_sector = nvme_read_sector_wrapper;
+    d->write_sector = nvme_write_sector_wrapper;
     d->print = nvme_print_wrapper;
     d->type = G_NVME_DRIVE;
     return d;
