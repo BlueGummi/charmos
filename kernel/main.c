@@ -71,10 +71,10 @@ void k_main(void) {
     registry_setup();
     registry_print_devices();
 
-    struct generic_disk *d = registry_get_by_index(1);
-    struct ext2_sblock superblock;
-    ext2_read_superblock(d, 0, &superblock);
-    ext2_test(d, &superblock);
+  //  struct generic_disk *d = registry_get_by_index(1);
+  //  struct ext2_sblock superblock;
+  //  ext2_read_superblock(d, 0, &superblock);
+  //  ext2_test(d, &superblock);
 
     scheduler_init(&global_sched, c_cnt);
 

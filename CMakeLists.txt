@@ -48,8 +48,7 @@ add_custom_target(iso
 set(QEMU_COMMON_FLAGS
     -cdrom ${IMAGE_NAME}.iso
     -boot order=d
-    -m 2G
-    -M smm=off
+    -m 4G
     -smp cores=4
     -no-shutdown
     -no-reboot
@@ -60,15 +59,14 @@ set(QEMU_COMMON_FLAGS
     -device usb-kbd,bus=xhci.0,id=usbkbd
     -device usb-mouse,bus=xhci.0,id=usbmouse
 
-
     -drive id=disk0,file=disk.img,format=raw,if=none
-    -device nvme,serial=deadbeef,drive=disk0,id=nvme0
+    -device nvme,serial=boom,drive=disk0,id=nvme0
 
     -drive id=fatdisk,file=fat32_disk.img,format=raw,if=none
     -device ide-hd,drive=fatdisk,bus=ide.0,unit=1
 
-       -d trace:*usb*
-       -trace file=trace.log
+    -d trace:*nvme*
+    -trace file=trace.log
 )
 
 add_custom_target(run

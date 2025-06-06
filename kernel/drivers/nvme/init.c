@@ -8,20 +8,24 @@
 #include <string.h>
 
 void nvme_enable_controller(struct nvme_device *nvme) {
-    nvme->regs->cc &= ~1;
+    nvme->regs->cc.en = 0;
 
     while (nvme->regs->csts & 1) {}
 
-    uint32_t cc = 0;
-
-    cc |= 1 << 0;
+    struct nvme_cc cc = {0};
 
     uint32_t mpsmin = (nvme->cap >> 48) & 0xF;
-    cc |= (mpsmin & 0xF) << 7;
+    cc.mps = (mpsmin & 0xF);
 
-    cc |= (4 << 20); // IO queue spot stuff
+    cc.iocqes = 4; // 2 ^ 4 = 16
 
-    cc |= (6 << 16);
+    cc.iosqes = 6; // 2 ^ 6 = 64
+
+    cc.ams = 0;
+
+    cc.css = 0;
+    
+    cc.en = 1;
 
     nvme->regs->cc = cc;
 
