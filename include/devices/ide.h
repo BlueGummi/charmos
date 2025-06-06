@@ -35,6 +35,11 @@
 #define ATA_CMD_IDENTIFY_PACKET 0xA1
 #define ATA_CMD_IDENTIFY 0xEC
 
+#define ATA_PRIMARY_IO 0x1F0
+#define ATA_PRIMARY_CTRL 0x3F6
+#define ATA_SECONDARY_IO 0x170
+#define ATA_SECONDARY_CTRL 0x376
+
 struct pci_device;
 struct ide_drive {
     bool actually_exists; // it picks everything up
@@ -59,6 +64,12 @@ bool ide_read_sector(struct ide_drive *d, uint64_t lba, uint8_t *b,
                      uint8_t cnt);
 bool ide_write_sector(struct ide_drive *d, uint64_t lba, const uint8_t *b,
                       uint8_t cnt);
+
+bool ide_read_sector_wrapper(struct generic_disk *d, uint64_t lba, uint8_t *buf,
+                             uint64_t cnt);
+
+bool ide_write_sector_wrapper(struct generic_disk *d, uint64_t lba,
+                              const uint8_t *buf, uint64_t cnt);
 
 uint8_t ide_detect_drives();
 

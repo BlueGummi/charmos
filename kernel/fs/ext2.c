@@ -148,8 +148,6 @@ void ext2_test(struct generic_disk *d, struct ext2_sblock *sblock) {
         return;
     }
 
-    //    ext2_link_file(&fs, &root_inode, &i, "file");
     ext2_print_superblock(sblock);
-    //    ext2_write_file(&fs, &i, 0, (uint8_t *) data, strlen(data));
-    //    ext2_dump_file_data(&fs, &i.node, 0, strlen(data));
+
 }

@@ -69,7 +69,13 @@ void k_main(void) {
     test_alloc();
     uacpi_init();
     registry_setup();
-    registry_print_devices();
+
+    struct generic_disk *d = registry_get_by_index(
+        1); // if i did it right there should be a ext2 here
+    struct ext2_sblock superblock;
+    ext2_read_superblock(d, 0, &superblock);
+    ext2_test(d, &superblock);
+
     scheduler_init(&global_sched, c_cnt);
 
     for (uint64_t i = 0; i < c_cnt; i++) {
@@ -82,6 +88,10 @@ void k_main(void) {
 
     //    struct thread *t = thread_create(registry_print_devices);
     //    scheduler_add_thread(&global_sched, t);
+
+    while (1) {
+        asm("hlt");
+    } // no do sched for now :boom:
 
     struct core *c = kmalloc(sizeof(struct core));
     c->state = IDLE;
