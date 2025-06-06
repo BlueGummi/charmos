@@ -1,8 +1,8 @@
 #include <asm.h>
 #include <console/printf.h>
-#include <devices/ahci.h>
+#include <drivers/ahci.h>
 #include <devices/generic_disk.h>
-#include <devices/nvme.h>
+#include <drivers/nvme.h>
 #include <devices/registry.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
@@ -95,6 +95,12 @@ void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
 
                     k_printf("Found USB controller: %s at %02x:%02x.%x\n",
                              controller_type, bus, device, function);
+                    switch (prog_if) {
+                    case 0x30: //usb_init(bus, device, function);
+                    case 0x00:
+                    case 0x10:
+                    case 0x20: break;
+                    }
                 }
 
                 if (function == 0) {

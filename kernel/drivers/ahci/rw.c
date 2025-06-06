@@ -1,7 +1,7 @@
 #include <asm.h>
 #include <console/printf.h>
-#include <devices/ahci.h>
-#include <devices/ata.h>
+#include <drivers/ahci.h>
+#include <drivers/ata.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>

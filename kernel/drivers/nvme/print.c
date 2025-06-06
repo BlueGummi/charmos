@@ -1,5 +1,5 @@
 #include <console/printf.h>
-#include <devices/nvme.h>
+#include <drivers/nvme.h>
 #include <string.h>
 
 void nvme_print_identify(const struct nvme_identify_controller *ctrl) {

@@ -6,10 +6,10 @@
 #include <boot/gdt.h>
 #include <boot/smap.h>
 #include <console/printf.h>
-#include <devices/ahci.h>
+#include <drivers/ahci.h>
 #include <devices/generic_disk.h>
-#include <devices/ide.h>
-#include <devices/nvme.h>
+#include <drivers/ide.h>
+#include <drivers/nvme.h>
 #include <devices/registry.h>
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>

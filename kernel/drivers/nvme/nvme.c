@@ -1,7 +1,7 @@
 #include <asm.h>
 #include <console/printf.h>
 #include <devices/generic_disk.h>
-#include <devices/nvme.h>
+#include <drivers/nvme.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>

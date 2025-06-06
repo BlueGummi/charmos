@@ -1,5 +1,5 @@
 #include <console/printf.h>
-#include <devices/ata.h>
+#include <drivers/ata.h>
 
 static void print_string_field(uint16_t *field, int length) {
     char buf[length * 2 + 1];

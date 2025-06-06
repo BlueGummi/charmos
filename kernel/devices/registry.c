@@ -1,8 +1,8 @@
 #include <console/printf.h>
-#include <devices/ahci.h>
+#include <drivers/ahci.h>
 #include <devices/generic_disk.h>
-#include <devices/ide.h>
-#include <devices/nvme.h>
+#include <drivers/ide.h>
+#include <drivers/nvme.h>
 #include <devices/registry.h>
 #include <fs/detect.h>
 #include <mem/alloc.h>

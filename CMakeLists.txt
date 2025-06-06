@@ -55,9 +55,11 @@ set(QEMU_COMMON_FLAGS
     -no-reboot
     -s
     -monitor telnet:127.0.0.1:1234,server,nowait
-    -device usb-ehci,id=ehci
-    -device usb-kbd,id=usbkbd
-    -device usb-mouse,id=usbmouse
+
+    -device qemu-xhci,id=xhci
+    -device usb-kbd,bus=xhci.0,id=usbkbd
+    -device usb-mouse,bus=xhci.0,id=usbmouse
+
 
     -drive id=disk0,file=disk.img,format=raw,if=none
     -device nvme,serial=deadbeef,drive=disk0,id=nvme0
@@ -65,7 +67,7 @@ set(QEMU_COMMON_FLAGS
     -drive id=fatdisk,file=fat32_disk.img,format=raw,if=none
     -device ide-hd,drive=fatdisk,bus=ide.0,unit=1
 
-       -d trace:*ahci*
+       -d trace:*usb*
        -trace file=trace.log
 )
 
