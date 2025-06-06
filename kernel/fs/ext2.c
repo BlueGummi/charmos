@@ -57,7 +57,7 @@ enum errno ext2_mount(struct generic_disk *d, struct ext2_fs *fs,
     fs->inodes_count = sblock->inodes_count;
     fs->inodes_per_group = sblock->inodes_per_group;
     fs->inode_size = sblock->inode_size;
-    fs->block_size = 1024 << sblock->log_block_size;
+    fs->block_size = 1024U << sblock->log_block_size;
     fs->sectors_per_block = fs->block_size / d->sector_size;
 
     fs->num_groups =
@@ -122,7 +122,7 @@ struct k_full_inode *ext2_path_lookup(struct ext2_fs *fs,
     while (*path && *path != '/')
         path++;
 
-    size_t len = path - start;
+    uint64_t len = (uint64_t) path - (uint64_t) start;
     char next_dir[len + 1];
     memcpy(next_dir, start, len);
     next_dir[len] = '\0';
@@ -147,7 +147,4 @@ void ext2_test(struct generic_disk *d, struct ext2_sblock *sblock) {
     if (!ext2_read_inode(&fs, EXT2_ROOT_INODE, &r)) {
         return;
     }
-
-    ext2_print_superblock(sblock);
-
 }

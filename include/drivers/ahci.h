@@ -60,12 +60,12 @@
 #define AHCI_CMD_WRITE_DMA_EXT 0x35
 
 #define AHCI_CMD_IDENTIFY 0xEC
-#define AHCI_CMD_ST (1 << 0)  // Start
-#define AHCI_CMD_SUD (1 << 1) // Spin-Up Device
-#define AHCI_CMD_FRE (1 << 4) // FIS Receive Enable
-#define AHCI_CMD_FR (1 << 14) // FIS Receive Running
-#define AHCI_CMD_CR (1 << 15) // Command List Running
-#define AHCI_CMD_CLO (1 << 3) // Command List Override
+#define AHCI_CMD_ST (1U << 0)  // Start
+#define AHCI_CMD_SUD (1U << 1) // Spin-Up Device
+#define AHCI_CMD_FRE (1U << 4) // FIS Receive Enable
+#define AHCI_CMD_FR (1U << 14) // FIS Receive Running
+#define AHCI_CMD_CR (1U << 15) // Command List Running
+#define AHCI_CMD_CLO (1U << 3) // Command List Override
 
 #define AHCI_PORT_IPM_ACTIVE 1
 #define AHCI_PORT_DET_PRESENT 3

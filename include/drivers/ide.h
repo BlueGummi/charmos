@@ -18,6 +18,8 @@
 #define STATUS_DRDY 0x40
 #define STATUS_DRQ 0x08
 #define STATUS_ERR 0x01
+#define STATUS_DF 0x20
+
 #define COMMAND_READ 0x20
 #define COMMAND_WRITE 0x30
 
@@ -57,6 +59,8 @@ struct ide_drive {
     uint8_t udma_mode;
     uint8_t pio_mode;
 };
+
+#define IDE_RETRY_COUNT 3
 
 bool ide_wait_ready(struct ide_drive *d);
 

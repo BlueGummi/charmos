@@ -8,10 +8,19 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define ATA_PRIMARY_IO 0x1F0
-#define ATA_PRIMARY_CTRL 0x3F6
-#define ATA_SECONDARY_IO 0x170
-#define ATA_SECONDARY_CTRL 0x376
+static bool ide_check_error(struct ide_drive *d) {
+    uint8_t status = inb(REG_STATUS(d->io_base));
+    if (status & STATUS_ERR) {
+        uint8_t err = inb(REG_ERROR(d->io_base));
+        k_printf("[IDE] Error: STATUS=0x%02x, ERROR=0x%02x\n", status, err);
+        return true;
+    }
+    if (status & STATUS_DF) {
+        k_printf("[IDE] Device fault (DF set).\n");
+        return true;
+    }
+    return false;
+}
 
 bool ide_wait_ready(struct ide_drive *d) {
     while (inb(REG_STATUS(d->io_base)) & STATUS_BSY)
@@ -28,7 +37,7 @@ bool ide_read_sector(struct ide_drive *d, uint64_t lba, uint8_t *b,
         return false;
 
     outb(REG_DRIVE_HEAD(d->io_base),
-         0xE0 | (d->slave << 4) | ((lba >> 24) & 0x0F));
+         0xE0U | ((uint64_t) d->slave << 4) | ((lba >> 24) & 0x0F));
     outb(REG_SECTOR_COUNT(d->io_base), count);
     outb(REG_LBA_LOW(d->io_base), lba & 0xFF);
     outb(REG_LBA_MID(d->io_base), (lba >> 8) & 0xFF);
@@ -36,8 +45,10 @@ bool ide_read_sector(struct ide_drive *d, uint64_t lba, uint8_t *b,
     outb(REG_COMMAND(d->io_base), COMMAND_READ);
 
     for (uint8_t i = 0; i < count; i++) {
-        if (!ide_wait_ready(d) || !(inb(REG_STATUS(d->io_base)) & STATUS_DRQ))
-            return false;
+        if (!ide_wait_ready(d) || !(inb(REG_STATUS(d->io_base)) & STATUS_DRQ)) {
+            if (ide_check_error(d))
+                return false;
+        }
 
         insw(REG_DATA(d->io_base), b + (i * 512), 256); // 256 words = 512 bytes
     }
@@ -54,7 +65,7 @@ bool ide_write_sector(struct ide_drive *d, uint64_t lba, const uint8_t *b,
         return false;
 
     outb(REG_DRIVE_HEAD(d->io_base),
-         0xE0 | (d->slave << 4) | ((lba >> 24) & 0x0F));
+         0xE0U | ((uint64_t) d->slave << 4) | ((lba >> 24) & 0x0F));
     outb(REG_SECTOR_COUNT(d->io_base), count);
     outb(REG_LBA_LOW(d->io_base), lba & 0xFF);
     outb(REG_LBA_MID(d->io_base), (lba >> 8) & 0xFF);
@@ -62,8 +73,10 @@ bool ide_write_sector(struct ide_drive *d, uint64_t lba, const uint8_t *b,
     outb(REG_COMMAND(d->io_base), COMMAND_WRITE);
 
     for (uint8_t i = 0; i < count; i++) {
-        if (!ide_wait_ready(d) || !(inb(REG_STATUS(d->io_base)) & STATUS_DRQ))
-            return false;
+        if (!ide_wait_ready(d) || !(inb(REG_STATUS(d->io_base)) & STATUS_DRQ)) {
+            if (ide_check_error(d))
+                return false;
+        }
 
         outsw(REG_DATA(d->io_base), b + (i * 512), 256);
     }
@@ -76,8 +89,16 @@ bool ide_read_sector_wrapper(struct generic_disk *d, uint64_t lba, uint8_t *buf,
     struct ide_drive *ide = d->driver_data;
 
     while (cnt > 0) {
-        uint8_t chunk = (cnt >= 256) ? 0 : (uint8_t) cnt; // 0 means 256 sectors
-        if (!ide_read_sector(ide, lba, buf, chunk))
+        uint8_t chunk = (cnt >= 256) ? 0 : (uint8_t) cnt;
+        bool success = false;
+        for (int i = 0; i < IDE_RETRY_COUNT; i++) {
+            if (ide_read_sector(ide, lba, buf, chunk)) {
+                success = true;
+                break;
+            }
+            k_printf("[IDE] Read error at LBA %llu. Retrying...\n", lba);
+        }
+        if (!success)
             return false;
 
         uint64_t sectors = (chunk == 0) ? 256 : chunk;
@@ -95,7 +116,15 @@ bool ide_write_sector_wrapper(struct generic_disk *d, uint64_t lba,
 
     while (cnt > 0) {
         uint8_t chunk = (cnt >= 256) ? 0 : (uint8_t) cnt;
-        if (!ide_write_sector(ide, lba, buf, chunk))
+        bool success = false;
+        for (int i = 0; i < IDE_RETRY_COUNT; i++) {
+            if (ide_write_sector(ide, lba, buf, chunk)) {
+                success = true;
+                break;
+            }
+            k_printf("[IDE] Write error at LBA %llu. Retrying...\n", lba);
+        }
+        if (!success)
             return false;
 
         uint64_t sectors = (chunk == 0) ? 256 : chunk;

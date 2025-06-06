@@ -20,7 +20,8 @@ static void setup_port_slots(struct ahci_device *dev, uint32_t port_id) {
         memset(cmdtbl_virt, 0, 4096);
 
         struct ahci_cmd_header *cmd_header =
-            (port->cmd_list_base + slot * sizeof(struct ahci_cmd_header));
+            (port->cmd_list_base +
+             (uint64_t) slot * sizeof(struct ahci_cmd_header));
 
         cmd_header->ctba = (uint32_t) (cmdtbl_phys & 0xFFFFFFFF);
         cmd_header->ctbau = (uint32_t) (cmdtbl_phys >> 32);
@@ -127,7 +128,7 @@ struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
                                        uint8_t function,
                                        uint32_t *out_disk_count) {
     uint32_t abar = pci_read(bus, device, function, 0x24);
-    uint32_t abar_base = abar & ~0xF;
+    uint32_t abar_base = abar & ~0xFU;
 
     pci_write(bus, device, function, 0x24, 0xFFFFFFFF);
     uint32_t size_mask = pci_read(bus, device, function, 0x24);
@@ -139,8 +140,8 @@ struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
         return NULL;
     }
 
-    size_t abar_size = ~(size_mask & ~0xF) + 1;
-    size_t map_size = (abar_size + 0xFFF) & ~0xFFF;
+    uint64_t abar_size = ~(size_mask & ~0xFU) + 1;
+    uint64_t map_size = (abar_size + 0xFFF) & ~0xFFFU;
 
     void *abar_virt = vmm_map_phys(abar_base, map_size);
     if (!abar_virt) {

@@ -21,13 +21,13 @@ void serial_init() {
     outb(0x3F8 + 4, 0x0B);
 }
 
-static int serial_is_transmit_empty() {
+/*static int serial_is_transmit_empty() {
     return inb(0x3F8 + 5) & 0x20;
-}
+}*/
 
 static void serial_putc(char c) {
-    while (serial_is_transmit_empty() == 0)
-        ;
+    //    while (serial_is_transmit_empty() == 0)
+    //        ;
     outb(0x3F8, c);
 }
 

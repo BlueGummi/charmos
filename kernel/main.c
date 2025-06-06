@@ -6,11 +6,11 @@
 #include <boot/gdt.h>
 #include <boot/smap.h>
 #include <console/printf.h>
-#include <drivers/ahci.h>
 #include <devices/generic_disk.h>
+#include <devices/registry.h>
+#include <drivers/ahci.h>
 #include <drivers/ide.h>
 #include <drivers/nvme.h>
-#include <devices/registry.h>
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
 #include <fs/detect.h>
@@ -69,9 +69,9 @@ void k_main(void) {
     test_alloc();
     uacpi_init();
     registry_setup();
+    registry_print_devices();
 
-    struct generic_disk *d = registry_get_by_index(
-        1); // if i did it right there should be a ext2 here
+    struct generic_disk *d = registry_get_by_index(1);
     struct ext2_sblock superblock;
     ext2_read_superblock(d, 0, &superblock);
     ext2_test(d, &superblock);
