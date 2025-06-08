@@ -70,6 +70,7 @@ void k_main(void) {
     uacpi_init();
     registry_setup();
     registry_print_devices();
+    while(1)asm("hlt");
 
   //  struct generic_disk *d = registry_get_by_index(1);
   //  struct ext2_sblock superblock;

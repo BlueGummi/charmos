@@ -1,6 +1,20 @@
 #include <devices/generic_disk.h>
 #include <stdint.h>
 
+// fat32_ prefixed things are exclusively FAT32
+// fat_ prefixed things are usable in 12, 16, and 32
+// fat12_16_ prefixed things are exclusively FAT12/16
+
+#define FAT32_PARTITION_TYPE1 0x0B
+#define FAT32_PARTITION_TYPE2 0x0C
+#define FAT12_16_PARTITION_TYPE1 0x6E
+
+enum fat_fstype : uint8_t {
+    FAT_12,
+    FAT_16,
+    FAT_32,
+};
+
 enum fat_fileattr : uint8_t {
     FAT_RO = 0x01,
     FAT_HIDDEN = 0x02,
@@ -101,7 +115,17 @@ struct fat_dirent {
 } __attribute__((packed));
 
 struct fat_fs {
+    enum fat_fstype type;
     struct fat_bpb *bpb;
+
+    // below is defined differently in 12/16 and 32
+
+    uint16_t fat_size;
+    uint8_t boot_signature;
+    uint8_t drive_number;
+    uint32_t volume_id;
+    uint8_t volume_label[11];
+    uint8_t fs_type[8];
 };
 
 struct fat_bpb *fat32_read_bpb(struct generic_disk *drive);
@@ -114,4 +138,5 @@ bool fat32_read_cluster(struct generic_disk *disk, uint32_t cluster,
                         uint8_t *buffer);
 
 void fat32_list_root(struct generic_disk *disk);
+void fat_print_dirent(const struct fat_dirent *ent);
 #pragma once

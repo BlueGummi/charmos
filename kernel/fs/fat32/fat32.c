@@ -8,7 +8,7 @@
 #include <string.h>
 
 struct fat_bpb *fat32_read_bpb(struct generic_disk *drive) {
-    uint8_t *sector = kmalloc(SECTOR_SIZE);
+    uint8_t *sector = kmalloc(drive->sector_size);
 
     if (!drive->read_sector(drive, 0, sector, 1)) {
         kfree(sector);
@@ -82,6 +82,18 @@ enum errno fat32_g_mount(struct generic_disk *d) {
     struct fat_fs *fs = (struct fat_fs *) d->fs_data;
     fs->bpb = kmalloc(sizeof(struct fat_bpb));
     fs->bpb = fat32_read_bpb(d);
+    fs->boot_signature = fs->bpb->ext_32.boot_signature;
+    fs->drive_number = fs->bpb->ext_32.drive_number;
+    fs->fat_size = fs->bpb->ext_32.fat_size_32;
+    for (int i = 0; i < 8; i++)
+        fs->fs_type[i] = fs->bpb->ext_32.fs_type[i];
+
+    fs->type = FAT_32;
+    fs->volume_id = fs->bpb->ext_32.volume_id;
+
+    for (int i = 0; i < 11; i++)
+        fs->volume_label[i] = fs->bpb->ext_32.volume_label[i];
+
     return ERR_OK; // TODO: Mounting
 }
 

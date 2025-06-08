@@ -101,6 +101,7 @@ void registry_setup() {
     for (uint64_t i = 0; i < disk_count; i++) {
         struct generic_disk *disk = registry_get_by_index(i);
         detect_fs(disk);
+
         disk->mount(disk);
     }
 

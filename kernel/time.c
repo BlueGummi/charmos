@@ -6,6 +6,10 @@
 #define CMOS_ADDRESS 0x70
 #define CMOS_DATA 0x71
 
+void time_print_current() {
+    time_print_unix(time_get_unix());
+}
+
 static uint32_t is_leap(int year) {
     return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
 }
@@ -17,8 +21,8 @@ static uint32_t days_in_month(int year, int month) {
     return (month == 4 || month == 6 || month == 9 || month == 11) ? 30 : 31;
 }
 
-uint32_t datetime_to_unix(int year, int month, int day, int hour, int minute,
-                          int second) {
+static uint32_t datetime_to_unix(int year, int month, int day, int hour,
+                                 int minute, int second) {
     unsigned int timestamp = 0;
 
     for (int y = 1970; y < year; y++) {
@@ -52,38 +56,30 @@ static uint8_t bcd_to_bin(uint8_t bcd) {
     return ((bcd / 16) * 10) + (bcd & 0x0F);
 }
 
-uint32_t get_unix_time() {
-    uint8_t second, minute, hour, day, month, year, century = 20;
-
-    while (is_updating())
-        ;
-
-    second = cmos_read(0x00);
-    minute = cmos_read(0x02);
-    hour = cmos_read(0x04);
-    day = cmos_read(0x07);
-    month = cmos_read(0x08);
-    year = cmos_read(0x09);
-
-    century = cmos_read(0x32);
-
-    uint8_t status_b = cmos_read(0x0B);
-    bool bcd = !(status_b & 0x04);
-
-    if (bcd) {
-        second = bcd_to_bin(second);
-        minute = bcd_to_bin(minute);
-        hour = bcd_to_bin(hour);
-        day = bcd_to_bin(day);
-        month = bcd_to_bin(month);
-        year = bcd_to_bin(year);
-        century = bcd_to_bin(century);
+#define GET_TIME_UNIT(unit, cmos_addr)                                         \
+    uint8_t time_get_##unit() {                                                \
+        uint8_t unit = 0;                                                      \
+        while (is_updating())                                                  \
+            ;                                                                  \
+        unit = cmos_read(cmos_addr);                                           \
+        uint8_t status_b = cmos_read(0x0B);                                    \
+        bool bcd = !(status_b & 0x04);                                         \
+        if (bcd) {                                                             \
+            unit = bcd_to_bin(unit);                                           \
+        }                                                                      \
+        return unit;                                                           \
     }
 
-    int full_year = century * 100 + year;
-    return datetime_to_unix(full_year, month, day, hour, minute, second);
-}
+GET_TIME_UNIT(second, 0x00)
+GET_TIME_UNIT(minute, 0x02)
+GET_TIME_UNIT(hour, 0x04)
+GET_TIME_UNIT(day, 0x07)
+GET_TIME_UNIT(month, 0x08)
+GET_TIME_UNIT(year, 0x09)
+GET_TIME_UNIT(century, 0x32)
 
-void print_current_time() {
-    ptime(get_unix_time());
+uint32_t time_get_unix() {
+    return datetime_to_unix(time_get_century() * 100 + time_get_year(),
+                            time_get_month(), time_get_day(), time_get_hour(),
+                            time_get_minute(), time_get_second());
 }

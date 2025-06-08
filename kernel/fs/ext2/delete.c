@@ -108,7 +108,7 @@ enum errno ext2_unlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
         return ERR_FS_NO_INODE;
     }
 
-    target_inode.node.dtime = get_unix_time();
+    target_inode.node.dtime = time_get_unix();
 
     if (--target_inode.node.links_count == 0) {
         ext2_traverse_inode_blocks(fs, &target_inode.node, free_block_visitor,

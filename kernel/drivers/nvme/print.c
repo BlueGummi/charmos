@@ -23,6 +23,7 @@ void nvme_print_identify(const struct nvme_identify_controller *ctrl) {
     uint16_t major = (ver >> 16) & 0xffff;
     uint8_t minor = (ver >> 8) & 0xff;
     uint8_t tertiary = ver & 0xff;
+
     k_printf("  Version: %u.%u.%u\n", major, minor, tertiary);
 
     k_printf("  Max Data Transfer Size (MDTS): %u\n", ctrl->mdts);

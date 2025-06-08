@@ -18,7 +18,7 @@
     do {                                                                       \
         k_printf("[");                                                         \
         k_printf(ANSI_GREEN);                                                  \
-        print_current_time();                                                  \
+        time_print_current();                                                  \
         k_printf(ANSI_RESET);                                                  \
         k_printf("]");                                                         \
         k_printf(": [%sINFO%s]: ", ANSI_YELLOW, ANSI_RESET);                   \
@@ -30,7 +30,7 @@
     do {                                                                       \
         k_printf("[");                                                         \
         k_printf(ANSI_GREEN);                                                  \
-        print_current_time();                                                  \
+        time_print_current();                                                  \
         k_printf(ANSI_RESET);                                                  \
         k_printf("]");                                                         \
         k_printf(": [%sWARN%s]: ", ANSI_BRIGHT_RED, ANSI_RESET);               \

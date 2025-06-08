@@ -1,3 +1,3 @@
 #include <stdint.h>
-void ptime(uint32_t time);
+void time_print_unix(uint32_t time);
 #pragma once

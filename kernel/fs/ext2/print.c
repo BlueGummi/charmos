@@ -16,13 +16,13 @@ void ext2_print_inode(const struct k_full_inode *node) {
     k_printf("  GID: %u\n", inode.gid);
     k_printf("  Size: %u bytes\n", inode.size);
     k_printf("  Access Time: ");
-    ptime(inode.atime);
+    time_print_unix(inode.atime);
     k_printf("  Creation Time: ");
-    ptime(inode.ctime);
+    time_print_unix(inode.ctime);
     k_printf("  Modification Time: ");
-    ptime(inode.mtime);
+    time_print_unix(inode.mtime);
     k_printf("  Deletion Time: ");
-    ptime(inode.dtime);
+    time_print_unix(inode.dtime);
     k_printf("  Links Count: %u\n", inode.links_count);
     k_printf("  Blocks: %u\n", inode.blocks);
     k_printf("  Flags: 0x%08x\n", inode.flags);
@@ -110,9 +110,9 @@ void ext2_print_superblock(struct ext2_sblock *sblock) {
     k_printf("  Fragments per Group: %u\n", sblock->frags_per_group);
     k_printf("  Inodes per Group: %u\n", sblock->inodes_per_group);
     k_printf("  Mount Time: ");
-    ptime(sblock->mtime);
+    time_print_unix(sblock->mtime);
     k_printf("  Write Time: ");
-    ptime(sblock->wtime);
+    time_print_unix(sblock->wtime);
     k_printf("  Mount Count: %u\n", sblock->mnt_count);
     k_printf("  Max Mount Count: %u\n", sblock->max_mnt_count);
     k_printf("  Magic: 0x%04x\n", sblock->magic);
@@ -126,7 +126,7 @@ void ext2_print_superblock(struct ext2_sblock *sblock) {
     k_printf("  Error state: %s\n", error_recov);
     k_printf("  Minor Revision Level: %u\n", sblock->minor_rev_level);
     k_printf("  Last Check: ");
-    ptime(sblock->lastcheck);
+    time_print_unix(sblock->lastcheck);
     k_printf("  Check Interval: %u\n", sblock->checkinterval);
     char *creator = "OTHER";
     switch (sblock->creator_os) {

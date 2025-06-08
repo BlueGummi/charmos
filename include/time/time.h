@@ -1,4 +1,11 @@
 #include <stdint.h>
-void print_current_time();
-uint32_t get_unix_time();
+void time_print_current();
+uint32_t time_get_unix();
+uint8_t time_get_second();
+uint8_t time_get_minute();
+uint8_t time_get_hour();
+uint8_t time_get_day();
+uint8_t time_get_month();
+uint8_t time_get_year();
+uint8_t time_get_century();
 #pragma once

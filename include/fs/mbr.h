@@ -1,8 +1,5 @@
 #pragma once
 #include <stdint.h>
-#define SECTOR_SIZE 512
-#define FAT32_PARTITION_TYPE1 0x0B
-#define FAT32_PARTITION_TYPE2 0x0C
 
 struct mbr_partition_entry {
     uint8_t status;
@@ -18,3 +15,5 @@ struct mbr {
     struct mbr_partition_entry partitions[4];
     uint16_t signature;
 } __attribute__((packed));
+_Static_assert(sizeof(struct mbr) == 512, "");
+

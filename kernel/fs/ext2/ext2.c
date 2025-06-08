@@ -50,8 +50,8 @@ enum errno ext2_mount(struct generic_disk *d, struct ext2_fs *fs,
     if (!fs || !sblock)
         return ERR_INVAL;
 
-    sblock->mtime = get_unix_time();
-    sblock->wtime = get_unix_time();
+    sblock->mtime = time_get_unix();
+    sblock->wtime = time_get_unix();
     fs->drive = d;
     fs->sblock = sblock;
     fs->inodes_count = sblock->inodes_count;

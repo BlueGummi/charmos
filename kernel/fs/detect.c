@@ -33,14 +33,17 @@ enum fs_type detect_fs(struct generic_disk *drive) {
         type = FS_FAT12;
         goto end;
     }
+
     if (memcmp(&sector[0x36], "FAT16", 5) == 0) {
         type = FS_FAT16;
         goto end;
     }
+    
     if (memcmp(&sector[0x52], "FAT32", 5) == 0) {
         type = FS_FAT32;
         goto end;
     }
+    
     if (memcmp(&sector[3], "EXFAT   ", 8) == 0) {
         type = FS_EXFAT;
         goto end;
@@ -87,6 +90,7 @@ end:
         break;
     default: break;
     }
+    k_printf("This disk is %s\n", detect_fstr(type));
     kfree(sector);
     return type;
 }
