@@ -2,7 +2,7 @@
 #include <fs/fat32.h>
 #include <string.h>
 
-void fat32_print_bpb(const struct fat32_bpb *bpb) {
+void fat32_print_bpb(const struct fat_bpb *bpb) {
     char oem_name[9];
     memcpy(oem_name, bpb->oem_name, 8);
     oem_name[8] = '\0';
@@ -14,7 +14,7 @@ void fat32_print_bpb(const struct fat32_bpb *bpb) {
     }
 
     char volume_label[12];
-    memcpy(volume_label, bpb->volume_label, 11);
+    memcpy(volume_label, bpb->ext_32.volume_label, 11);
     volume_label[11] = '\0';
     for (int i = 10; i >= 0; i--) {
         if (volume_label[i] == ' ')
@@ -24,7 +24,7 @@ void fat32_print_bpb(const struct fat32_bpb *bpb) {
     }
 
     char fs_type[9];
-    memcpy(fs_type, bpb->fs_type, 8);
+    memcpy(fs_type, bpb->ext_32.fs_type, 8);
     fs_type[8] = '\0';
     for (int i = 7; i >= 0; i--) {
         if (fs_type[i] == ' ')
@@ -40,8 +40,8 @@ void fat32_print_bpb(const struct fat32_bpb *bpb) {
     k_printf("  Reserved Sectors: %u\n", bpb->reserved_sector_count);
     k_printf("  Number of FATs: %u\n", bpb->num_fats);
     k_printf("  Total Sectors: %u\n", bpb->total_sectors_32);
-    k_printf("  FAT Size (sectors): %u\n", bpb->fat_size_32);
-    k_printf("  Root Cluster: %u\n", bpb->root_cluster);
+    k_printf("  FAT Size (sectors): %u\n", bpb->ext_32.fat_size_32);
+    k_printf("  Root Cluster: %u\n", bpb->ext_32.root_cluster);
     k_printf("  Volume Label: %s\n", volume_label);
     k_printf("  FS Type: %s\n", fs_type);
 }
@@ -49,8 +49,10 @@ void fat32_print_bpb(const struct fat32_bpb *bpb) {
 void fat32_print_dirent(const struct fat_dirent *ent) {
     if ((uint8_t) ent->name[0] == 0xE5)
         return;
+
     if ((uint8_t) ent->name[0] == 0x00)
         return;
+
     if ((ent->attr & 0x0F) == 0x0F)
         return;
 
