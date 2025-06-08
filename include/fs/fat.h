@@ -10,6 +10,17 @@ enum fat_fileattr : uint8_t {
     FAT_ARCHIVE = 0x20,
 };
 
+static inline const char *get_fileattr_string(enum fat_fileattr f) {
+    switch (f) {
+    case FAT_RO: return "Read-Only";
+    case FAT_HIDDEN: return "Hidden";
+    case FAT_SYSTEM: return "System";
+    case FAT_VOL_ID: return "Volume ID";
+    case FAT_DIR: return "Directory";
+    case FAT_ARCHIVE: return "Archive";
+    }
+};
+
 struct fat12_16_ext_bpb {
     uint8_t drive_number;
     uint8_t reserved;
@@ -76,8 +87,8 @@ struct fat_time {
 
 struct fat_dirent {
     char name[11];
-    uint8_t attr;  // attribute flags
-    uint8_t ntres; // reserved
+    enum fat_fileattr attr; // attribute flags
+    uint8_t ntres;          // reserved
     uint8_t crttimetenth;
     struct fat_time crttime;
     struct fat_date crtdate;
@@ -96,4 +107,11 @@ struct fat_fs {
 struct fat_bpb *fat32_read_bpb(struct generic_disk *drive);
 enum errno fat32_g_mount(struct generic_disk *d);
 void fat32_g_print(struct generic_disk *d);
+uint32_t fat32_first_data_sector(const struct fat_bpb *bpb);
+uint32_t fat32_cluster_to_lba(const struct fat_bpb *bpb, uint32_t cluster);
+
+bool fat32_read_cluster(struct generic_disk *disk, uint32_t cluster,
+                        uint8_t *buffer);
+
+void fat32_list_root(struct generic_disk *disk);
 #pragma once

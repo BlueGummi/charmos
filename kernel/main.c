@@ -16,7 +16,7 @@
 #include <fs/detect.h>
 #include <fs/ext2.h>
 #include <fs/ext2_print.h>
-#include <fs/fat32.h>
+#include <fs/fat.h>
 #include <fs/fat32_print.h>
 #include <int/idt.h>
 #include <limine.h>

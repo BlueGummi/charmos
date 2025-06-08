@@ -2,7 +2,7 @@
 #include <devices/generic_disk.h>
 #include <fs/detect.h>
 #include <fs/ext2.h>
-#include <fs/fat32.h>
+#include <fs/fat.h>
 #include <mem/alloc.h>
 #include <stdint.h>
 #include <string.h>

@@ -1,7 +1,7 @@
 #include <console/printf.h>
 #include <devices/generic_disk.h>
 #include <errno.h>
-#include <fs/fat32.h>
+#include <fs/fat.h>
 #include <fs/fat32_print.h>
 #include <fs/mbr.h>
 #include <mem/alloc.h>
@@ -83,48 +83,6 @@ enum errno fat32_g_mount(struct generic_disk *d) {
     fs->bpb = kmalloc(sizeof(struct fat_bpb));
     fs->bpb = fat32_read_bpb(d);
     return ERR_OK; // TODO: Mounting
-}
-
-uint32_t fat32_first_data_sector(const struct fat_bpb *bpb) {
-    return bpb->reserved_sector_count +
-           (bpb->num_fats * bpb->ext_32.fat_size_32);
-}
-
-uint32_t fat32_cluster_to_lba(const struct fat_bpb *bpb, uint32_t cluster) {
-    return fat32_first_data_sector(bpb) +
-           (cluster - 2) * bpb->sectors_per_cluster;
-}
-
-bool fat32_read_cluster(struct generic_disk *disk, uint32_t cluster,
-                        uint8_t *buffer) {
-    struct fat_fs *fs = disk->fs_data;
-    struct fat_bpb *bpb = fs->bpb;
-
-    uint32_t lba = fat32_cluster_to_lba(bpb, cluster);
-    return disk->read_sector(disk, lba, buffer, bpb->sectors_per_cluster);
-}
-
-void fat32_list_root(struct generic_disk *disk) {
-    struct fat_fs *fs = disk->fs_data;
-    if (!fs || !fs->bpb)
-        return;
-
-    uint32_t cluster_size =
-        fs->bpb->sectors_per_cluster * fs->bpb->bytes_per_sector;
-    uint8_t *cluster_buf = kmalloc(cluster_size);
-    if (!cluster_buf)
-        return;
-
-    uint32_t cluster = fs->bpb->ext_32.root_cluster;
-
-    if (fat32_read_cluster(disk, cluster, cluster_buf)) {
-        for (uint32_t i = 0; i < cluster_size; i += sizeof(struct fat_dirent)) {
-            struct fat_dirent *entry = (struct fat_dirent *) (cluster_buf + i);
-            fat32_print_dirent(entry);
-        }
-    }
-
-    kfree(cluster_buf);
 }
 
 void fat32_g_print(struct generic_disk *d) {

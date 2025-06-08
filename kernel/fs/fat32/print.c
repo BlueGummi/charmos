@@ -1,5 +1,6 @@
+#include <mem/alloc.h>
 #include <console/printf.h>
-#include <fs/fat32.h>
+#include <fs/fat.h>
 #include <string.h>
 
 void fat32_print_bpb(const struct fat_bpb *bpb) {
@@ -68,6 +69,32 @@ void fat32_print_dirent(const struct fat_dirent *ent) {
 
     uint32_t cluster = ((uint32_t) ent->high_cluster << 16) | ent->low_cluster;
 
-    k_printf("Dirent: %-11s | Attr: 0x%02x | Cluster: %u | Size: %u\n", name,
-             ent->attr, cluster, ent->filesize);
+    k_printf("Dirent: %-11s | Attr: %-13s (0x%02x) | Cluster: %u | Size: %u\n",
+             name, get_fileattr_string(ent->attr), ent->attr, cluster,
+             ent->filesize);
 }
+
+void fat32_list_root(struct generic_disk *disk) {
+    struct fat_fs *fs = disk->fs_data;
+    if (!fs || !fs->bpb)
+        return;
+
+    uint32_t cluster_size =
+        fs->bpb->sectors_per_cluster * fs->bpb->bytes_per_sector;
+    uint8_t *cluster_buf = kmalloc(cluster_size);
+    if (!cluster_buf)
+        return;
+
+    uint32_t cluster = fs->bpb->ext_32.root_cluster;
+
+    if (fat32_read_cluster(disk, cluster, cluster_buf)) {
+        for (uint32_t i = 0; i < cluster_size; i += sizeof(struct fat_dirent)) {
+            struct fat_dirent *entry = (struct fat_dirent *) (cluster_buf + i);
+            fat32_print_dirent(entry);
+        }
+    }
+
+    kfree(cluster_buf);
+}
+
+
