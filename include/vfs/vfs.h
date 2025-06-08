@@ -31,7 +31,4 @@ struct vfs_node {
     struct spinlock lock;
 };
 
-uint64_t vfs_read(struct vfs_node *node, void *buf, size_t size, size_t offset);
-void vfs_init();
-void read_test();
 #pragma once

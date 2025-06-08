@@ -139,4 +139,6 @@ bool fat32_read_cluster(struct generic_disk *disk, uint32_t cluster,
 
 void fat32_list_root(struct generic_disk *disk);
 void fat_print_dirent(const struct fat_dirent *ent);
+struct fat_date fat_get_current_date();
+struct fat_time fat_get_current_time();
 #pragma once

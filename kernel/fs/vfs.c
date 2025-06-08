@@ -1,40 +1,39 @@
 #include <console/printf.h>
+#include <err.h>
 #include <mem/alloc.h>
 #include <stdint.h>
 #include <string.h>
 #include <vfs/ops.h>
 #include <vfs/vfs.h>
 
+// FIXME: all this is placeholder - once I finish FAT I will fix
+
 static struct vfs_node *root = NULL;
 
-static struct vnode_ops dummy_ops = {
-    .read = vfs_read,
-};
-
-uint64_t vfs_read(struct vfs_node *node, void *buf, size_t size,
-                  size_t offset) {
+enum errno vfs_read(struct vfs_node *node, void *buf, size_t size,
+                    size_t offset) {
     if (!node || !buf || node->type != VFS_FILE || offset >= node->size)
-        return 0;
+        return ERR_INVAL;
 
     char *data = (char *) node->internal_data;
     size_t remaining = node->size - offset;
     size_t to_copy = (size < remaining) ? size : remaining;
 
     memcpy(buf, data + offset, to_copy);
-    return to_copy;
+    return ERR_OK;
 }
 
-uint64_t vfs_write(struct vfs_node *node, const void *buf, size_t size,
-                   size_t offset) {
+enum errno vfs_write(struct vfs_node *node, const void *buf, size_t size,
+                     size_t offset) {
     if (!node || !buf || node->type != VFS_FILE)
-        return 0;
+        return ERR_INVAL;
 
     size_t required_size = offset + size;
 
     if (required_size > node->size) {
         void *new_data = kmalloc(required_size);
         if (!new_data)
-            return 0;
+            return ERR_FS_INTERNAL;
 
         if (node->internal_data) {
             memcpy(new_data, node->internal_data, node->size);
@@ -50,7 +49,7 @@ uint64_t vfs_write(struct vfs_node *node, const void *buf, size_t size,
     }
 
     memcpy((char *) node->internal_data + offset, buf, size);
-    return size;
+    return ERR_OK;
 }
 
 struct vfs_node *vfs_create_node(const char *name, enum vnode_type type,
@@ -68,7 +67,6 @@ struct vfs_node *vfs_create_node(const char *name, enum vnode_type type,
     node->gid = 0;
     node->size = size;
     node->inode = 0;
-    node->ops = &dummy_ops;
     node->internal_data = data;
     node->ref_count = 1;
     node->is_mountpoint = false;
@@ -88,43 +86,13 @@ void vfs_init() {
     root = vfs_create_node("/", VFS_DIRECTORY, 0, NULL);
 }
 
-int vfs_lookup(struct vfs_node *dir, const char *name,
-               struct vfs_node **result) {
+enum errno vfs_lookup(struct vfs_node *dir, const char *name,
+                      struct vfs_node **result) {
     if (!dir || !name || !result || dir->type != VFS_DIRECTORY)
-        return -1;
+        return ERR_INVAL;
 
     if (!dir->ops || !dir->ops->lookup)
-        return -2;
+        return ERR_INVAL;
 
     return dir->ops->lookup(dir, name, result);
-}
-
-struct vfs_node *vfs_resolve_path(const char *path) {
-    if (!path || path[0] != '/')
-        return NULL;
-
-    struct vfs_node *current = root;
-    char component[256];
-
-    path++;
-
-    while (*path) {
-        size_t len = 0;
-        while (*path && *path != '/') {
-            component[len++] = *path++;
-        }
-        component[len] = '\0';
-
-        if (*path == '/')
-            path++;
-
-        struct vfs_node *next = NULL;
-        if (vfs_lookup(current, component, &next) != 0) {
-            return NULL;
-        }
-
-        current = next;
-    }
-
-    return current;
 }
