@@ -8,22 +8,26 @@
 #include <string.h>
 
 void nvme_enable_controller(struct nvme_device *nvme) {
-    nvme->regs->cc &= ~1;
+
+    struct nvme_cc cc = {0};
+
+    cc.mps = 0;
+
+    cc.iocqes = 4; // 2 ^ 4 = 16
+
+    cc.iosqes = 6; // 2 ^ 6 = 64
+
+    cc.ams = 0;
+
+    cc.css = 0b110;
+
+    cc.en = 0;
+
+    nvme->regs->cc = cc;
 
     while (nvme->regs->csts & 1) {}
 
-    uint32_t cc = 0;
-
-    cc |= 1 << 0;
-
-    uint32_t mpsmin = (nvme->cap >> 48) & 0xF;
-    cc |= (mpsmin & 0xF) << 7;
-
-    cc |= (4 << 20); // IO queue spot stuff
-
-    cc |= (6 << 16);
-
-    nvme->regs->cc = cc;
+    nvme->regs->cc.en = 1;
 
     while ((nvme->regs->csts & 1) == 0) {}
 }
@@ -53,28 +57,16 @@ void nvme_alloc_admin_queues(struct nvme_device *nvme) {
     size_t acq_pages = DIV_ROUND_UP(acq_size, nvme->page_size);
 
     uint64_t asq_phys = (uint64_t) pmm_alloc_pages(asq_pages, false);
-    if (!asq_phys) {
-        return;
-    }
 
     struct nvme_command *asq_virt =
         vmm_map_phys(asq_phys, asq_pages * nvme->page_size);
-    if (!asq_virt) {
-        return;
-    }
 
     memset(asq_virt, 0, asq_pages * nvme->page_size);
 
     uint64_t acq_phys = (uint64_t) pmm_alloc_pages(acq_pages, false);
-    if (!acq_phys) {
-        return;
-    }
 
     struct nvme_completion *acq_virt =
         vmm_map_phys(acq_phys, acq_pages * nvme->page_size);
-    if (!acq_virt) {
-        return;
-    }
 
     memset(acq_virt, 0, acq_pages * nvme->page_size);
 

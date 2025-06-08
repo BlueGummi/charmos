@@ -29,13 +29,27 @@ struct nvme_completion {
     uint16_t status;
 } __attribute__((packed));
 
+struct nvme_cc {
+    uint32_t en : 1;
+    uint32_t __reserved0 : 3;
+    uint32_t css : 3;
+    uint32_t mps : 4;
+    uint32_t ams : 3;
+    uint32_t shn : 2;
+    uint32_t iosqes : 4;
+    uint32_t iocqes : 4;
+    uint32_t __reserved1 : 8;
+};
+_Static_assert(sizeof(struct nvme_cc) == sizeof(uint32_t),
+               "nvme_cc != sizeof(uint64_t)");
+
 struct nvme_regs {
     volatile uint32_t cap_lo;          // 0x00
     volatile uint32_t cap_hi;          // 0x04
     volatile uint32_t version;         // 0x08
     volatile uint32_t intms;           // 0x0C
     volatile uint32_t intmc;           // 0x10
-    volatile uint32_t cc;              // 0x14
+    volatile struct nvme_cc cc;        // 0x14
     volatile uint32_t nssr;            // 0x18
     volatile uint32_t csts;            // 0x1C
     volatile uint32_t reserved1;       // 0x20 - 0x24

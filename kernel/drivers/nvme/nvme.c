@@ -11,6 +11,8 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
                                          uint8_t func) {
 
     uint32_t original_bar0 = pci_read(bus, slot, func, 0x10);
+    uint32_t original_bar1 = pci_read(bus, slot, func, 0x14);
+
     bool is_io = original_bar0 & 1;
 
     if (is_io) {
@@ -18,18 +20,17 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     }
 
     pci_write(bus, slot, func, 0x10, 0xFFFFFFFF);
-
     uint32_t size_mask = pci_read(bus, slot, func, 0x10);
-
     pci_write(bus, slot, func, 0x10, original_bar0);
-
-    uint32_t size = ~(size_mask & ~0xF) + 1;
+    uint32_t size = ~(size_mask & ~0xFU) + 1;
 
     if (size == 0) {
         k_panic("bar0 reports zero size ?");
     }
 
-    uint32_t phys_addr = original_bar0 & ~0xF;
+    uint64_t phys_addr =
+        ((uint64_t) original_bar1 << 32) | (original_bar0 & ~0xFU);
+
     void *mmio = vmm_map_phys(phys_addr, size);
     struct nvme_regs *regs = (struct nvme_regs *) mmio;
     uint64_t cap = ((uint64_t) regs->cap_hi << 32) | regs->cap_lo;
@@ -41,7 +42,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     uint32_t dstrd = (cap >> 32) & 0xF;
 
     struct nvme_device *nvme = kmalloc(sizeof(struct nvme_device));
-    nvme->doorbell_stride = 4 << dstrd;
+    nvme->doorbell_stride = 4U << dstrd;
     nvme->page_size = page_size;
     nvme->cap = cap;
     nvme->version = version;
@@ -54,8 +55,11 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
         (volatile uint32_t *) ((uint8_t *) nvme->regs + NVME_DOORBELL_BASE +
                                nvme->doorbell_stride);
 
-    if (nvme->admin_q_depth > 64)
-        nvme->admin_q_depth = 64;
+    if (nvme->admin_q_depth > 32)
+        nvme->admin_q_depth = 32;
+
+    nvme->regs->cc.en = 0;
+
     nvme_alloc_admin_queues(nvme);
     nvme_setup_admin_queues(nvme);
     nvme_enable_controller(nvme);
