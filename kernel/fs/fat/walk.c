@@ -6,19 +6,19 @@ static bool fat32_walk_cluster(struct fat_fs *fs, uint32_t cluster,
                                fat_walk_callback callback, void *ctx) {
     uint8_t *cluster_buf = kmalloc(fs->cluster_size);
 
+    struct fat_dirent *ret = kmalloc(sizeof(struct fat_dirent));
     if (fat_read_cluster(fs, cluster, cluster_buf)) {
         for (uint32_t i = 0; i < fs->cluster_size;
              i += sizeof(struct fat_dirent)) {
             struct fat_dirent *entry = (struct fat_dirent *) (cluster_buf + i);
-            struct fat_dirent *ret = kmalloc(sizeof(struct fat_dirent));
             memcpy(ret, entry, sizeof(struct fat_dirent));
             if (callback(ret, ctx)) {
                 kfree(cluster_buf);
                 return true;
             }
-            kfree(ret);
         }
     }
+    kfree(ret);
     kfree(cluster_buf);
     return false;
 }
@@ -50,18 +50,18 @@ static bool fat12_16_walk_cluster(struct fat_fs *fs, uint32_t cluster,
         return false;
     }
 
+    struct fat_dirent *ret = kmalloc(sizeof(struct fat_dirent));
     for (uint32_t i = 0; i < bpb->root_entry_count; i++) {
         struct fat_dirent *entry =
             (struct fat_dirent *) (sector_buf + i * sizeof(struct fat_dirent));
-        struct fat_dirent *ret = kmalloc(sizeof(struct fat_dirent));
         memcpy(ret, entry, sizeof(struct fat_dirent));
         if (callback(ret, ctx)) {
             kfree(sector_buf);
             return true;
         }
-        kfree(ret);
     }
 
+    kfree(ret);
     kfree(sector_buf);
     return false;
 }
