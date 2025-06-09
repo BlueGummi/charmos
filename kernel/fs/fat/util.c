@@ -1,5 +1,6 @@
 #include <fs/fat.h>
 #include <string.h>
+#include <time/time.h>
 
 uint32_t fat_eoc(struct fat_fs *fs) {
     switch (fs->type) {
@@ -39,4 +40,18 @@ void fat_format_filename_83(const char *name, char out[11]) {
             out[8 + i] = toupper((unsigned char) dot[1 + i]);
         }
     }
+}
+
+struct fat_time fat_get_current_time() {
+    struct fat_time time = {.hour = time_get_hour(),
+                            .minute = time_get_minute(),
+                            .second = time_get_second()};
+    return time;
+}
+
+struct fat_date fat_get_current_date() {
+    struct fat_date date = {.day = time_get_day(),
+                            .month = time_get_month(),
+                            .year = time_get_year()};
+    return date;
 }

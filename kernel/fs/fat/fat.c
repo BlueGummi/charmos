@@ -6,6 +6,22 @@
 #include <mem/alloc.h>
 #include <string.h>
 
+uint32_t fat_first_data_sector(const struct fat_fs *fs) {
+    const struct fat_bpb *bpb = fs->bpb;
+
+    uint32_t root_dir_sectors =
+        ((bpb->root_entry_count * 32) + (bpb->bytes_per_sector - 1)) /
+        bpb->bytes_per_sector;
+
+    return bpb->reserved_sector_count + (bpb->num_fats * fs->fat_size) +
+           ((fs->type == FAT_12 || fs->type == FAT_16) ? root_dir_sectors : 0);
+}
+
+uint32_t fat_cluster_to_lba(const struct fat_fs *fs, uint32_t cluster) {
+    const struct fat_bpb *bpb = fs->bpb;
+    return fat_first_data_sector(fs) + (cluster - 2) * bpb->sectors_per_cluster;
+}
+
 struct fat_bpb *fat_read_bpb(struct generic_disk *drive,
                              enum fat_fstype *out_type, uint32_t *out_lba) {
     uint8_t *sector = kmalloc(drive->sector_size);
@@ -121,6 +137,28 @@ enum errno fat_g_mount(struct generic_disk *d) {
     return ERR_OK;
 }
 
+void fat_dir_init_root(struct fat_fs *fs, struct fat_dir *dir) {
+    if (fs->type == FAT_32) {
+        dir->current_cluster = fs->bpb->ext_32.root_cluster;
+        dir->current_sector = fat_cluster_to_sector(fs, dir->current_cluster);
+        dir->entries_per_sector =
+            fs->bpb->bytes_per_sector / sizeof(struct fat_dirent);
+        dir->entry_index = 0;
+        dir->is_root = true;
+    } else {
+        dir->current_sector =
+            fs->bpb->reserved_sector_count + fs->bpb->num_fats * fs->fat_size;
+        dir->root_dir_sectors =
+            (fs->bpb->root_entry_count * sizeof(struct fat_dirent)) /
+            fs->bpb->bytes_per_sector;
+        dir->entries_per_sector =
+            fs->bpb->bytes_per_sector / sizeof(struct fat_dirent);
+        dir->entry_index = 0;
+        dir->is_root = true;
+        dir->current_cluster = 0;
+    }
+}
+
 void fat_g_print(struct generic_disk *d) {
     if (!d || !d->fs_data)
         return;
@@ -134,12 +172,13 @@ void fat_g_print(struct generic_disk *d) {
     }
 
     fat_list_root(d);
-    struct fat_dirent new_file_ent;
-    bool success = fat_create_file_in_dir(d, fs->bpb->ext_32.root_cluster,
-                                          "NEWFILE.TXT", &new_file_ent);
+    struct fat_dir root = {0};
+    fat_dir_init_root(fs, &root);
+
+    bool success = fat_dir_has_entry(fs, &root, "BOOM.TXT");
     if (success) {
-        k_printf("check ur root dir :boom:\n");
+        k_printf("i found the file\n");
     } else {
-        k_printf("something screwey happen :c\n");
+        k_printf("that not right...\n");
     }
 }
