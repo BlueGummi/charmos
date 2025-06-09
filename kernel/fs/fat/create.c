@@ -13,8 +13,7 @@ static inline uint32_t fat12_16_root_dir_sectors(struct fat_fs *fs) {
            fs->bpb->bytes_per_sector;
 }
 
-static bool fat_find_free_dirent_slot(struct generic_disk *disk,
-                                      struct fat_fs *fs, uint32_t dir_cluster,
+static bool fat_find_free_dirent_slot(struct fat_fs *fs, uint32_t dir_cluster,
                                       uint8_t *dir_buf, uint32_t *out_cluster,
                                       uint32_t *out_offset,
                                       uint32_t *out_prev_cluster) {
@@ -23,7 +22,7 @@ static bool fat_find_free_dirent_slot(struct generic_disk *disk,
         uint32_t root_lba = fat12_16_root_dir_lba(fs);
         uint32_t root_secs = fat12_16_root_dir_sectors(fs);
         for (uint32_t i = 0; i < root_secs; ++i) {
-            if (!disk->read_sector(disk, root_lba + i, dir_buf, 1))
+            if (!fs->disk->read_sector(fs->disk, root_lba + i, dir_buf, 1))
                 return false;
 
             for (uint32_t offset = 0; offset < fs->bpb->bytes_per_sector;
@@ -45,7 +44,7 @@ static bool fat_find_free_dirent_slot(struct generic_disk *disk,
     *out_prev_cluster = 0;
 
     while (current_cluster != fat_eoc(fs)) {
-        if (!fat_read_cluster(disk, current_cluster, dir_buf))
+        if (!fat_read_cluster(fs, current_cluster, dir_buf))
             return false;
 
         for (uint32_t offset = 0; offset < fs->cluster_size;
@@ -65,8 +64,7 @@ static bool fat_find_free_dirent_slot(struct generic_disk *disk,
     return false;
 }
 
-static bool fat_extend_directory(struct generic_disk *disk, struct fat_fs *fs,
-                                 uint32_t prev_cluster,
+static bool fat_extend_directory(struct fat_fs *fs, uint32_t prev_cluster,
                                  uint32_t *new_cluster_out, uint8_t *dir_buf) {
     if (prev_cluster == FAT_DIR_CLUSTER_ROOT && fs->type != FAT_32) {
         // can't extend FAT12/16 root directory
@@ -78,7 +76,7 @@ static bool fat_extend_directory(struct generic_disk *disk, struct fat_fs *fs,
         return false;
 
     uint8_t *cluster_buf = kzalloc(fs->cluster_size);
-    if (!fat_write_cluster(disk, new_cluster, cluster_buf)) {
+    if (!fat_write_cluster(fs, new_cluster, cluster_buf)) {
         kfree(cluster_buf);
         return false;
     }
@@ -88,7 +86,7 @@ static bool fat_extend_directory(struct generic_disk *disk, struct fat_fs *fs,
         fat_write_fat_entry(fs, prev_cluster, new_cluster);
     fat_write_fat_entry(fs, new_cluster, fat_eoc(fs));
 
-    if (!fat_read_cluster(disk, new_cluster, dir_buf))
+    if (!fat_read_cluster(fs, new_cluster, dir_buf))
         return false;
 
     *new_cluster_out = new_cluster;
@@ -116,11 +114,9 @@ static void fat_initialize_dirent(struct fat_dirent *ent, const char *filename,
     ent->modtime = time;
 }
 
-bool fat_create_file_in_dir(struct generic_disk *disk, uint32_t dir_cluster,
+bool fat_create_file_in_dir(struct fat_fs *fs, uint32_t dir_cluster,
                             const char *filename,
                             struct fat_dirent *out_dirent) {
-
-    struct fat_fs *fs = disk->fs_data;
 
     uint32_t new_cluster = fat_alloc_cluster(fs);
     if (new_cluster == 0)
@@ -128,7 +124,7 @@ bool fat_create_file_in_dir(struct generic_disk *disk, uint32_t dir_cluster,
 
     uint8_t *cluster_buf = kzalloc(fs->cluster_size);
 
-    if (!fat_write_cluster(disk, new_cluster, cluster_buf)) {
+    if (!fat_write_cluster(fs, new_cluster, cluster_buf)) {
         kfree(cluster_buf);
         return false;
     }
@@ -138,13 +134,11 @@ bool fat_create_file_in_dir(struct generic_disk *disk, uint32_t dir_cluster,
 
     uint32_t slot_cluster = 0, slot_offset = 0, prev_cluster = 0;
 
-    bool found =
-        fat_find_free_dirent_slot(disk, fs, dir_cluster, dir_buf, &slot_cluster,
-                                  &slot_offset, &prev_cluster);
+    bool found = fat_find_free_dirent_slot(
+        fs, dir_cluster, dir_buf, &slot_cluster, &slot_offset, &prev_cluster);
 
     if (!found && fs->type == FAT_32) {
-        if (!fat_extend_directory(disk, fs, prev_cluster, &slot_cluster,
-                                  dir_buf)) {
+        if (!fat_extend_directory(fs, prev_cluster, &slot_cluster, dir_buf)) {
             kfree(dir_buf);
             return false;
         }
@@ -163,9 +157,10 @@ bool fat_create_file_in_dir(struct generic_disk *disk, uint32_t dir_cluster,
     bool success = false;
     if (dir_cluster == FAT_DIR_CLUSTER_ROOT && fs->type != FAT_32) {
         uint32_t root_lba = fat12_16_root_dir_lba(fs);
-        success = disk->write_sector(disk, root_lba + slot_cluster, dir_buf, 1);
+        success = fs->disk->write_sector(fs->disk, root_lba + slot_cluster,
+                                         dir_buf, 1);
     } else {
-        success = fat_write_cluster(disk, slot_cluster, dir_buf);
+        success = fat_write_cluster(fs, slot_cluster, dir_buf);
     }
 
     kfree(dir_buf);

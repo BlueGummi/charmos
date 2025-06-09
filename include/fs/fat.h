@@ -152,29 +152,33 @@ void fat_g_print(struct generic_disk *d);
 uint32_t fat_first_data_sector(const struct fat_fs *fs);
 uint32_t fat_cluster_to_lba(const struct fat_fs *fs, uint32_t cluster);
 
-bool fat_read_cluster(struct generic_disk *disk, uint32_t cluster,
-                      uint8_t *buffer);
-bool fat_write_cluster(struct generic_disk *disk, uint32_t cluster,
+bool fat_read_cluster(struct fat_fs *fs, uint32_t cluster, uint8_t *buffer);
+
+bool fat_write_cluster(struct fat_fs *fs, uint32_t cluster,
                        const uint8_t *buffer);
 
-void fat_list_root(struct generic_disk *disk);
+void fat_list_root(struct fat_fs *fs);
 void fat_print_dirent(const struct fat_dirent *ent);
 void fat_free_chain(struct fat_fs *fs, uint32_t start_cluster);
 uint32_t fat_alloc_cluster(struct fat_fs *fs);
-uint64_t fat_write_file(struct generic_disk *disk, uint32_t *start_cluster,
+uint64_t fat_write_file(struct fat_fs *fs, uint32_t *start_cluster,
                         const uint8_t *data, uint64_t size);
 bool fat_write_fat_entry(struct fat_fs *fs, uint32_t cluster, uint32_t value);
 uint32_t fat_read_fat_entry(struct fat_fs *fs, uint32_t cluster);
 
 void fat_format_filename_83(const char *name, char out[11]);
 
-bool fat_create_file_in_dir(struct generic_disk *disk, uint32_t dir_cluster,
+bool fat_create_file_in_dir(struct fat_fs *fs, uint32_t dir_cluster,
                             const char *filename,
                             struct fat_dirent *out_dirent);
 
 bool fat_walk_cluster(struct fat_fs *fs, uint32_t cluster, fat_walk_callback cb,
                       void *ctx);
 
+struct fat_dirent *fat_lookup(struct fat_fs *fs, uint32_t cluster,
+                              const char *f);
+
+bool fat_contains(struct fat_fs *fs, uint32_t cluster, const char *f);
 struct fat_date fat_get_current_date();
 struct fat_time fat_get_current_time();
 #pragma once

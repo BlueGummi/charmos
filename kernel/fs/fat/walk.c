@@ -1,16 +1,22 @@
 #include <fs/fat.h>
 #include <mem/alloc.h>
+#include <string.h>
 
 static bool fat32_walk_cluster(struct fat_fs *fs, uint32_t cluster,
                                fat_walk_callback callback, void *ctx) {
     uint8_t *cluster_buf = kmalloc(fs->cluster_size);
 
-    if (fat_read_cluster(fs->disk, cluster, cluster_buf)) {
+    if (fat_read_cluster(fs, cluster, cluster_buf)) {
         for (uint32_t i = 0; i < fs->cluster_size;
              i += sizeof(struct fat_dirent)) {
             struct fat_dirent *entry = (struct fat_dirent *) (cluster_buf + i);
-            if (callback(entry, ctx))
+            struct fat_dirent *ret = kmalloc(sizeof(struct fat_dirent));
+            memcpy(ret, entry, sizeof(struct fat_dirent));
+            if (callback(ret, ctx)) {
+                kfree(cluster_buf);
                 return true;
+            }
+            kfree(ret);
         }
     }
     kfree(cluster_buf);
@@ -47,14 +53,20 @@ static bool fat12_16_walk_cluster(struct fat_fs *fs, uint32_t cluster,
     for (uint32_t i = 0; i < bpb->root_entry_count; i++) {
         struct fat_dirent *entry =
             (struct fat_dirent *) (sector_buf + i * sizeof(struct fat_dirent));
-        if (callback(entry, ctx))
+        struct fat_dirent *ret = kmalloc(sizeof(struct fat_dirent));
+        memcpy(ret, entry, sizeof(struct fat_dirent));
+        if (callback(ret, ctx)) {
+            kfree(sector_buf);
             return true;
+        }
+        kfree(ret);
     }
 
     kfree(sector_buf);
     return false;
 }
 
+// If the callback returns true, the dirent passed in will be allocated
 bool fat_walk_cluster(struct fat_fs *fs, uint32_t cluster, fat_walk_callback cb,
                       void *ctx) {
     if (fs->type == FAT_32) {

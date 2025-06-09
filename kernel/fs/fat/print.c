@@ -86,8 +86,7 @@ void fat_list_dir(struct fat_fs *fs, uint32_t cluster) {
     fat_walk_cluster(fs, cluster, fat32_list_cb, NULL);
 }
 
-void fat_list_root(struct generic_disk *disk) {
-    struct fat_fs *fs = disk->fs_data;
+void fat_list_root(struct fat_fs *fs) {
     if (!fs || !fs->bpb)
         return;
 

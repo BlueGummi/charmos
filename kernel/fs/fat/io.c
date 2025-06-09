@@ -12,14 +12,14 @@
 //
 //
 
-bool fat_write_cluster(struct generic_disk *disk, uint32_t cluster,
+bool fat_write_cluster(struct fat_fs *fs, uint32_t cluster,
                        const uint8_t *buffer) {
-    struct fat_fs *fs = disk->fs_data;
     const struct fat_bpb *bpb = fs->bpb;
 
     uint32_t lba = fat_cluster_to_lba(fs, cluster);
 
-    return disk->write_sector(disk, lba, buffer, bpb->sectors_per_cluster);
+    return fs->disk->write_sector(fs->disk, lba, buffer,
+                                  bpb->sectors_per_cluster);
 }
 
 static bool fat12_write_fat_entry(struct fat_fs *fs, uint32_t, uint32_t value);
@@ -169,13 +169,12 @@ static bool fat32_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
 //
 //
 
-bool fat_read_cluster(struct generic_disk *disk, uint32_t cluster,
-                      uint8_t *buffer) {
-    struct fat_fs *fs = disk->fs_data;
+bool fat_read_cluster(struct fat_fs *fs, uint32_t cluster, uint8_t *buffer) {
     const struct fat_bpb *bpb = fs->bpb;
 
     uint32_t lba = fat_cluster_to_lba(fs, cluster);
-    return disk->read_sector(disk, lba, buffer, bpb->sectors_per_cluster);
+    return fs->disk->read_sector(fs->disk, lba, buffer,
+                                 bpb->sectors_per_cluster);
 }
 
 static uint32_t fat12_read_fat_entry(struct fat_fs *fs, uint32_t cluster);
