@@ -1,10 +1,10 @@
 #include <asm.h>
 #include <console/printf.h>
-#include <drivers/ahci.h>
-#include <drivers/usb.h>
 #include <devices/generic_disk.h>
-#include <drivers/nvme.h>
 #include <devices/registry.h>
+#include <drivers/ahci.h>
+#include <drivers/nvme.h>
+#include <drivers/usb.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
 #include <pci/pci.h>

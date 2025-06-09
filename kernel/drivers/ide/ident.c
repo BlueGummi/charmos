@@ -8,7 +8,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-
 void ide_print_info(struct generic_disk *d) {
     struct ide_drive *drive = (struct ide_drive *) d->driver_data;
     if (!drive->actually_exists)

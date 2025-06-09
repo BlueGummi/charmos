@@ -30,5 +30,4 @@ void usb_init(uint8_t bus, uint8_t slot, uint8_t func) {
 
     uint32_t phys_addr = original_bar0 & ~0xF;
     void *mmio = vmm_map_phys(phys_addr, size);
-
 }

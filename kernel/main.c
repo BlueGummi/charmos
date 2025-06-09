@@ -69,12 +69,13 @@ void k_main(void) {
     uacpi_init();
     registry_setup();
     registry_print_devices();
-    while(1)asm("hlt");
+    while (1)
+        asm("hlt");
 
-  //  struct generic_disk *d = registry_get_by_index(1);
-  //  struct ext2_sblock superblock;
-  //  ext2_read_superblock(d, 0, &superblock);
-  //  ext2_test(d, &superblock);
+    //  struct generic_disk *d = registry_get_by_index(1);
+    //  struct ext2_sblock superblock;
+    //  ext2_read_superblock(d, 0, &superblock);
+    //  ext2_test(d, &superblock);
 
     scheduler_init(&global_sched, c_cnt);
 

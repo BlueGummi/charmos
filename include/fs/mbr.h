@@ -16,4 +16,3 @@ struct mbr {
     uint16_t signature;
 } __attribute__((packed));
 _Static_assert(sizeof(struct mbr) == 512, "");
-

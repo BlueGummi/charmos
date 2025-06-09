@@ -43,7 +43,7 @@ struct fat_bpb *fat_read_bpb(struct generic_disk *drive,
         if (bpb->bytes_per_sector != 512 || bpb->num_fats == 0)
             continue;
 
-        enum fat_fstype type = FAT_UNKNOWN;
+        enum fat_fstype type = 0xFF;
 
         if (bpb->ext_32.boot_signature == 0x29 &&
             memcmp(bpb->ext_32.fs_type, "FAT32   ", 8) == 0) {
@@ -56,7 +56,7 @@ struct fat_bpb *fat_read_bpb(struct generic_disk *drive,
             type = FAT_12;
         }
 
-        if (type == FAT_UNKNOWN)
+        if (type == 0xFF)
             continue;
 
         struct fat_bpb *out_bpb = kmalloc(sizeof(struct fat_bpb));
@@ -94,20 +94,27 @@ enum errno fat_g_mount(struct generic_disk *d) {
     fs->bpb = bpb;
     fs->type = type;
     fs->volume_base_lba = lba;
-    fs->fat_size =
-        (bpb->fat_size_16 != 0) ? bpb->fat_size_16 : bpb->ext_32.fat_size_32;
-    fs->boot_signature = (type == FAT_32) ? bpb->ext_32.boot_signature
-                                          : bpb->ext_12_16.boot_signature;
-    fs->drive_number = (type == FAT_32) ? bpb->ext_32.drive_number
-                                        : bpb->ext_12_16.drive_number;
-    fs->volume_id =
-        (type == FAT_32) ? bpb->ext_32.volume_id : bpb->ext_12_16.volume_id;
+    fs->disk = d;
 
-    memcpy(fs->fs_type,
-           (type == FAT_32) ? bpb->ext_32.fs_type : bpb->ext_12_16.fs_type, 8);
-    memcpy(fs->volume_label,
-           (type == FAT_32) ? bpb->ext_32.volume_label
-                            : bpb->ext_12_16.volume_label,
+    struct fat32_ext_bpb f32_ext = bpb->ext_32;
+    struct fat12_16_ext_bpb f16_ext = bpb->ext_12_16;
+
+    bool f32 = type == FAT_32;
+
+    fs->fat_size = f32 ? f32_ext.fat_size_32 : bpb->fat_size_16;
+    fs->boot_signature = f32 ? f32_ext.boot_signature : f16_ext.boot_signature;
+    fs->drive_number = f32 ? f32_ext.drive_number : f16_ext.drive_number;
+    fs->volume_id = f32 ? f32_ext.volume_id : f16_ext.volume_id;
+
+    uint32_t total_sectors =
+        f32 ? bpb->total_sectors_32 : bpb->total_sectors_16;
+
+    uint32_t data_sectors = total_sectors - fat_first_data_sector(fs);
+    fs->total_clusters = data_sectors / bpb->sectors_per_cluster;
+
+    memcpy(fs->fs_type, f32 ? f32_ext.fs_type : f16_ext.fs_type, 8);
+
+    memcpy(fs->volume_label, f32 ? f32_ext.volume_label : f16_ext.volume_label,
            11);
 
     d->fs_data = fs;
@@ -127,4 +134,12 @@ void fat_g_print(struct generic_disk *d) {
     }
 
     fat_list_root(d);
+    struct fat_dirent new_file_ent;
+    bool success = fat_create_file_in_dir(d, fs->bpb->ext_32.root_cluster,
+                                          "NEWFILE.TXT", &new_file_ent);
+    if (success) {
+        k_printf("check ur root dir :boom:\n");
+    } else {
+        k_printf("something screwey happen :c\n");
+    }
 }

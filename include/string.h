@@ -11,4 +11,7 @@ char *strncpy(char *dest, const char *src, size_t n);
 void *memchr(const void *s, int c, size_t n);
 void *memrchr(const void *s, int c, size_t n);
 int strcmp(const char *str1, const char *str2);
+char *strchr(const char *s, int c);
+int islower(int c);
+int toupper(int c);
 #pragma once

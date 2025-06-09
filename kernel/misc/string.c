@@ -128,3 +128,22 @@ int strcmp(const char *str1, const char *str2) {
     }
     return (unsigned char) (*str1) - (unsigned char) (*str2);
 }
+
+char *strchr(const char *s, int c) {
+    do {
+        if (*s == c) {
+            return (char *) s;
+        }
+    } while (*s++);
+    return (0);
+}
+
+int islower(int c) {
+    return (unsigned) c - 'a' < 26;
+}
+
+int toupper(int c) {
+    if (islower(c))
+        return c & 0x5f;
+    return c;
+}

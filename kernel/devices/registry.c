@@ -1,9 +1,9 @@
 #include <console/printf.h>
-#include <drivers/ahci.h>
 #include <devices/generic_disk.h>
+#include <devices/registry.h>
+#include <drivers/ahci.h>
 #include <drivers/ide.h>
 #include <drivers/nvme.h>
-#include <devices/registry.h>
 #include <fs/detect.h>
 #include <mem/alloc.h>
 #include <pci/pci.h>
