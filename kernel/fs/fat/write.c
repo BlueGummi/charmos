@@ -144,34 +144,3 @@ static bool fat32_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
     kfree(buf);
     return result;
 }
-
-uint64_t fat_write_file(struct generic_disk *disk, uint32_t *start_cluster,
-                        const uint8_t *data, uint64_t size) {
-    struct fat_fs *fs = disk->fs_data;
-    const struct fat_bpb *bpb = fs->bpb;
-    uint32_t cluster_size = bpb->sectors_per_cluster * bpb->bytes_per_sector;
-
-    uint32_t prev_cluster = 0;
-    uint32_t written = 0;
-
-    while (written < size) {
-        uint32_t cluster = fat_alloc_cluster(fs);
-        if (!cluster)
-            return -1;
-
-        if (*start_cluster == 0)
-            *start_cluster = cluster;
-        else
-            fat_write_fat_entry(fs, prev_cluster, cluster);
-
-        fat_write_fat_entry(fs, cluster, fat_eoc(fs));
-
-        disk->write_sector(disk, fat_cluster_to_lba(fs, cluster),
-                           (void *) (data + written), bpb->sectors_per_cluster);
-
-        written += cluster_size;
-        prev_cluster = cluster;
-    }
-
-    return written;
-}
