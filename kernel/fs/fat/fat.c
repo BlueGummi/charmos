@@ -14,7 +14,7 @@ uint32_t fat_first_data_sector(const struct fat_fs *fs) {
         bpb->bytes_per_sector;
 
     return bpb->reserved_sector_count + (bpb->num_fats * fs->fat_size) +
-           ((fs->type == FAT_12 || fs->type == FAT_16) ? root_dir_sectors : 0);
+           ((fs->type != FAT_32) ? root_dir_sectors : 0);
 }
 
 uint32_t fat_cluster_to_lba(const struct fat_fs *fs, uint32_t cluster) {
@@ -122,6 +122,7 @@ enum errno fat_g_mount(struct generic_disk *d) {
     fs->boot_signature = f32 ? f32_ext.boot_signature : f16_ext.boot_signature;
     fs->drive_number = f32 ? f32_ext.drive_number : f16_ext.drive_number;
     fs->volume_id = f32 ? f32_ext.volume_id : f16_ext.volume_id;
+    fs->cluster_size = fs->bpb->sectors_per_cluster * fs->bpb->bytes_per_sector;
 
     uint32_t total_sectors =
         f32 ? bpb->total_sectors_32 : bpb->total_sectors_16;
@@ -146,7 +147,7 @@ void fat_g_print(struct generic_disk *d) {
 
     switch (fs->type) {
     case FAT_12:
-    case FAT_16: fat16_print_bpb(fs->bpb); break;
+    case FAT_16: fat12_16_print_bpb(fs->bpb); break;
     case FAT_32: fat32_print_bpb(fs->bpb); break;
     }
 

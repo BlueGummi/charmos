@@ -24,15 +24,9 @@ make run # run this in the build directory
 
 ### TODO:
 
-- [ ] precalculate nvme fields
-
-- [ ] reorganize filesystem generic operations
+- [ ] reorganize filesystem generic operations (vfs)
 
 - [ ] reorganize vfs to integrate with generic disks
-
-- [ ] big problem - free and unmap memory once you are done
-
-- [ ] bitfields - i forgot these existed
 
 - [ ] change disk io interface to allow for possible r/w of multiple blocks and change fs code to accomodate for this
 
@@ -41,6 +35,8 @@ make run # run this in the build directory
 - [ ] we can reserve something like IRQs 200-223 or whatever...
 
 - [ ] free functions for devices and other structs
+
+- [ ] mem alloc failure handling (do not power off the 'puter when OOM)
 
 ### "The Basics" 
 

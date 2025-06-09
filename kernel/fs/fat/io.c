@@ -4,6 +4,14 @@
 
 // TODO: errno :boom:
 
+//
+//
+//
+// ---------- WRITING CLUSTERS AND FAT ENTRIES ----------
+//
+//
+//
+
 bool fat_write_cluster(struct generic_disk *disk, uint32_t cluster,
                        const uint8_t *buffer) {
     struct fat_fs *fs = disk->fs_data;
@@ -91,6 +99,7 @@ static bool fat12_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
     return result;
 }
 
+// TODO: we can combine these with fat32 too
 static bool fat16_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
                                   uint32_t value) {
     struct generic_disk *disk = fs->disk;
@@ -152,6 +161,14 @@ static bool fat32_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
     return result;
 }
 
+//
+//
+//
+// ---------- READING CLUSTERS AND FAT ENTRIES ----------
+//
+//
+//
+
 bool fat_read_cluster(struct generic_disk *disk, uint32_t cluster,
                       uint8_t *buffer) {
     struct fat_fs *fs = disk->fs_data;
@@ -204,6 +221,8 @@ done:
         kfree(buf2);
     return result;
 }
+
+// TODO: These are kinda same-y, can combine into one function
 
 static uint32_t fat16_read_fat_entry(struct fat_fs *fs, uint32_t cluster) {
     struct generic_disk *disk = fs->disk;

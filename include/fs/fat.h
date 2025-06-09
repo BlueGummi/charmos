@@ -4,6 +4,7 @@
 // fat32_ prefixed things are exclusively FAT32
 // fat_ prefixed things are usable in 12, 16, and 32
 // fat12_16_ prefixed things are exclusively FAT12/16
+// etc...
 
 #define FAT12_PARTITION_TYPE 0x01  // FAT12, CHS addressing
 #define FAT16_PARTITION_TYPE 0x04  // FAT16, CHS addressing (less than 32MB)
@@ -117,6 +118,7 @@ struct fat_dirent {
     uint16_t low_cluster; // Low 16 bits of cluster number
     uint32_t filesize;
 } __attribute__((packed));
+_Static_assert(sizeof(struct fat_dirent) == 32, "");
 
 struct fat_fs {
     enum fat_fstype type;
@@ -125,6 +127,7 @@ struct fat_fs {
     uint32_t volume_base_lba;
     uint32_t total_clusters;
     uint32_t root_cluster;
+    uint32_t cluster_size;
 
     // below is defined differently in 12/16 and 32
     uint16_t fat_size;
@@ -135,10 +138,13 @@ struct fat_fs {
     uint8_t fs_type[8];
 };
 
-void fat16_print_bpb(const struct fat_bpb *bpb);
+typedef bool (*fat_walk_callback)(struct fat_dirent *, void *);
+
+// aside from BPB all pub funcs here should be 'fat_' - all FAT sizes
+
+void fat12_16_print_bpb(const struct fat_bpb *bpb);
 uint32_t fat_eoc(struct fat_fs *fs);
 bool fat_is_eoc(struct fat_fs *fs, uint32_t cluster);
-
 void fat32_print_bpb(const struct fat_bpb *bpb);
 struct fat_bpb *fat32_read_bpb(struct generic_disk *drive);
 enum errno fat_g_mount(struct generic_disk *d);
@@ -165,6 +171,9 @@ void fat_format_filename_83(const char *name, char out[11]);
 bool fat_create_file_in_dir(struct generic_disk *disk, uint32_t dir_cluster,
                             const char *filename,
                             struct fat_dirent *out_dirent);
+
+bool fat_walk_cluster(struct fat_fs *fs, uint32_t cluster, fat_walk_callback cb,
+                      void *ctx);
 
 struct fat_date fat_get_current_date();
 struct fat_time fat_get_current_time();
