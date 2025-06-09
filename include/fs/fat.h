@@ -11,6 +11,8 @@
 #define FAT32_PARTITION_TYPE1 0x0B // FAT32, CHS addressing
 #define FAT32_PARTITION_TYPE2 0x0C // FAT32, LBA addressing
 
+#define FAT_DIR_CLUSTER_ROOT 0xFFFFFFFF
+
 enum fat_fstype : uint8_t {
     FAT_12,
     FAT_16,
@@ -122,6 +124,7 @@ struct fat_fs {
     struct generic_disk *disk;
     uint32_t volume_base_lba;
     uint32_t total_clusters;
+    uint32_t root_cluster;
 
     // below is defined differently in 12/16 and 32
     uint16_t fat_size;

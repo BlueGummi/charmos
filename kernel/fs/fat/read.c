@@ -41,10 +41,10 @@ static uint32_t fat12_read_fat_entry(struct fat_fs *fs, uint32_t cluster) {
         buf2 = kmalloc(disk->sector_size);
         if (!disk->read_sector(disk, sector + 1, buf2, 1))
             goto done;
-        uint16_t val = (buf2[0] << 8) | buf[offset];
+        uint16_t val = buf[offset] | (buf2[0] << 8);
         result = (cluster & 1) ? (val >> 4) & 0x0FFF : val & 0x0FFF;
     } else {
-        uint16_t val = *(uint16_t *) &buf[offset];
+        uint16_t val = buf[offset] | (buf[offset + 1] << 8);
         result = (cluster & 1) ? (val >> 4) & 0x0FFF : val & 0x0FFF;
     }
 

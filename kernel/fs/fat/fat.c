@@ -117,6 +117,7 @@ enum errno fat_g_mount(struct generic_disk *d) {
 
     bool f32 = type == FAT_32;
 
+    fs->root_cluster = f32 ? f32_ext.root_cluster : FAT_DIR_CLUSTER_ROOT;
     fs->fat_size = f32 ? f32_ext.fat_size_32 : bpb->fat_size_16;
     fs->boot_signature = f32 ? f32_ext.boot_signature : f16_ext.boot_signature;
     fs->drive_number = f32 ? f32_ext.drive_number : f16_ext.drive_number;
@@ -151,8 +152,10 @@ void fat_g_print(struct generic_disk *d) {
 
     fat_list_root(d);
     struct fat_dirent new_file_ent;
-    bool success = fat_create_file_in_dir(d, fs->bpb->ext_32.root_cluster,
-                                          "BOOM.TXT", &new_file_ent);
+
+    bool success =
+        fat_create_file_in_dir(d, fs->root_cluster, "BOOM.TXT", &new_file_ent);
+
     if (success) {
         k_printf("yay\n");
     } else {

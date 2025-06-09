@@ -23,11 +23,14 @@ static void *slab_map_new_page() {
 
 static void slab_cache_init(struct slab_cache *cache, size_t obj_size) {
     cache->obj_size = obj_size + sizeof(struct slab *);
-
     size_t available = PAGE_SIZE - sizeof(struct slab);
 
-    cache->objs_per_slab = (available * 8) / (8 * cache->obj_size + 1);
+    if (cache->obj_size > available) {
+        cache->objs_per_slab = 0;
+        return;
+    }
 
+    cache->objs_per_slab = (available * 8) / (8 * cache->obj_size + 1);
     cache->slabs_free = NULL;
     cache->slabs_partial = NULL;
     cache->slabs_full = NULL;
@@ -193,7 +196,7 @@ void *kmalloc(size_t size) {
         return NULL;
 
     int idx = size_to_index(size);
-    if (idx >= 0) {
+    if (idx >= 0 && slab_caches[idx].objs_per_slab > 0) {
         return slab_alloc(&slab_caches[idx]);
     }
 

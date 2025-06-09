@@ -10,6 +10,7 @@ bool fat_write_cluster(struct generic_disk *disk, uint32_t cluster,
     const struct fat_bpb *bpb = fs->bpb;
 
     uint32_t lba = fat_cluster_to_lba(fs, cluster);
+
     return disk->write_sector(disk, lba, buffer, bpb->sectors_per_cluster);
 }
 
@@ -32,9 +33,10 @@ static bool fat12_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
     uint32_t fat_offset = cluster + (cluster / 2);
     uint32_t offset = fat_offset % fs->bpb->bytes_per_sector;
     uint32_t fat_size = fs->fat_size;
+    bool result = true;
+
     uint8_t *buf1 = kmalloc(disk->sector_size);
     uint8_t *buf2 = kmalloc(disk->sector_size);
-    bool result = true;
 
     for (uint32_t fat_index = 0; fat_index < fs->bpb->num_fats; fat_index++) {
         uint32_t base = fs->bpb->reserved_sector_count + fat_index * fat_size;
@@ -46,32 +48,37 @@ static bool fat12_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
         }
 
         if (offset == fs->bpb->bytes_per_sector - 1) {
+            // Entry crosses a sector boundary
             if (!disk->read_sector(disk, sector + 1, buf2, 1)) {
                 result = false;
                 continue;
             }
 
-            uint16_t combined = (buf2[0] << 8) | buf1[offset];
+            uint16_t combined = buf1[offset] | (buf2[0] << 8);
             if (cluster & 1)
                 combined = (combined & 0x000F) | ((value & 0x0FFF) << 4);
             else
                 combined = (combined & 0xF000) | (value & 0x0FFF);
 
-            buf1[offset] = (combined >> 8) & 0xFF;
-            buf2[0] = combined & 0xFF;
+            buf1[offset] = combined & 0xFF;
+            buf2[0] = (combined >> 8) & 0xFF;
 
             if (!disk->write_sector(disk, sector, buf1, 1) ||
                 !disk->write_sector(disk, sector + 1, buf2, 1)) {
                 result = false;
             }
         } else {
-            uint16_t *entry = (uint16_t *) &buf1[offset];
-            uint16_t old = *entry;
+            // Entry fits within a single sector
+            uint16_t old = buf1[offset] | (buf1[offset + 1] << 8);
+            uint16_t new_val;
 
             if (cluster & 1)
-                *entry = (old & 0x000F) | ((value & 0x0FFF) << 4);
+                new_val = (old & 0x000F) | ((value & 0x0FFF) << 4);
             else
-                *entry = (old & 0xF000) | (value & 0x0FFF);
+                new_val = (old & 0xF000) | (value & 0x0FFF);
+
+            buf1[offset] = new_val & 0xFF;
+            buf1[offset + 1] = (new_val >> 8) & 0xFF;
 
             if (!disk->write_sector(disk, sector, buf1, 1)) {
                 result = false;
