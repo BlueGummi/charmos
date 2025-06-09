@@ -5,14 +5,17 @@
 // fat_ prefixed things are usable in 12, 16, and 32
 // fat12_16_ prefixed things are exclusively FAT12/16
 
-#define FAT32_PARTITION_TYPE1 0x0B
-#define FAT32_PARTITION_TYPE2 0x0C
-#define FAT12_16_PARTITION_TYPE1 0x6E
+#define FAT12_PARTITION_TYPE 0x01  // FAT12, CHS addressing
+#define FAT16_PARTITION_TYPE 0x04  // FAT16, CHS addressing (less than 32MB)
+#define FAT16_PARTITION_TYPE2 0x06 // FAT16, LBA addressing (greater than 32MB)
+#define FAT32_PARTITION_TYPE1 0x0B // FAT32, CHS addressing
+#define FAT32_PARTITION_TYPE2 0x0C // FAT32, LBA addressing
 
 enum fat_fstype : uint8_t {
     FAT_12,
     FAT_16,
     FAT_32,
+    FAT_UNKNOWN,
 };
 
 enum fat_fileattr : uint8_t {
@@ -117,7 +120,7 @@ struct fat_dirent {
 struct fat_fs {
     enum fat_fstype type;
     struct fat_bpb *bpb;
-
+    uint32_t volume_base_lba;
     // below is defined differently in 12/16 and 32
 
     uint16_t fat_size;
@@ -128,16 +131,18 @@ struct fat_fs {
     uint8_t fs_type[8];
 };
 
+void fat16_print_bpb(const struct fat_bpb *bpb);
+void fat32_print_bpb(const struct fat_bpb *bpb);
 struct fat_bpb *fat32_read_bpb(struct generic_disk *drive);
-enum errno fat32_g_mount(struct generic_disk *d);
-void fat32_g_print(struct generic_disk *d);
-uint32_t fat32_first_data_sector(const struct fat_bpb *bpb);
-uint32_t fat32_cluster_to_lba(const struct fat_bpb *bpb, uint32_t cluster);
+enum errno fat_g_mount(struct generic_disk *d);
+void fat_g_print(struct generic_disk *d);
+uint32_t fat_first_data_sector(const struct fat_fs *fs);
+uint32_t fat_cluster_to_lba(const struct fat_fs *fs, uint32_t cluster);
 
-bool fat32_read_cluster(struct generic_disk *disk, uint32_t cluster,
-                        uint8_t *buffer);
+bool fat_read_cluster(struct generic_disk *disk, uint32_t cluster,
+                      uint8_t *buffer);
 
-void fat32_list_root(struct generic_disk *disk);
+void fat_list_root(struct generic_disk *disk);
 void fat_print_dirent(const struct fat_dirent *ent);
 struct fat_date fat_get_current_date();
 struct fat_time fat_get_current_time();
