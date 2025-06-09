@@ -152,7 +152,7 @@ bool fat_create_file_in_dir(struct fat_fs *fs, uint32_t dir_cluster,
     }
 
     struct fat_dirent *new_ent = (struct fat_dirent *) (dir_buf + slot_offset);
-    fat_initialize_dirent(new_ent, filename, new_cluster);
+    fat_initialize_dirent(new_ent, filename, 0); // no data in entry - no cluster 
 
     bool success = false;
     if (dir_cluster == FAT_DIR_CLUSTER_ROOT && fs->type != FAT_32) {

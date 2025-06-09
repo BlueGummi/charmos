@@ -43,6 +43,10 @@ void fat_format_filename_83(const char *name, char out[11]) {
     }
 }
 
+uint32_t fat_get_dir_cluster(struct fat_dirent *d) {
+    return ((uint32_t) d->high_cluster << 16) | d->low_cluster;
+}
+
 struct fat_time fat_get_current_time() {
     struct fat_time time = {.hour = time_get_hour(),
                             .minute = time_get_minute(),

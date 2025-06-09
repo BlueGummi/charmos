@@ -151,11 +151,11 @@ void fat_g_print(struct generic_disk *d) {
     case FAT_32: fat32_print_bpb(fs->bpb); break;
     }
 
-    fat_list_root(fs);
     struct fat_dirent new_file_ent;
 
     bool success =
         fat_create_file_in_dir(fs, fs->root_cluster, "BOOM.TXT", &new_file_ent);
+    fat_list_root(fs);
 
     if (success) {
         k_printf("yay\n");
@@ -163,9 +163,11 @@ void fat_g_print(struct generic_disk *d) {
         k_printf("that not right...\n");
     }
 
-    if (fat_contains(fs, fs->root_cluster, "BOOM.TXT")) {
-        k_printf("contains() found it\n");
-    } else {
-        k_printf("something went wrong\n");
+    struct fat_dirent *dir = fat_lookup(fs, fs->root_cluster, "MYDIR");
+    if (dir) {
+        dir = fat_lookup(fs, fat_get_dir_cluster(dir), "PLACE");
+        if (dir) {
+            fat_print_dirent(dir);
+        }
     }
 }

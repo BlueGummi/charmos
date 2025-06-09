@@ -145,6 +145,9 @@ typedef bool (*fat_walk_callback)(struct fat_dirent *, void *);
 void fat12_16_print_bpb(const struct fat_bpb *bpb);
 uint32_t fat_eoc(struct fat_fs *fs);
 bool fat_is_eoc(struct fat_fs *fs, uint32_t cluster);
+uint32_t fat_get_dir_cluster(struct fat_dirent *d);
+void fat_format_filename_83(const char *name, char out[11]);
+
 void fat32_print_bpb(const struct fat_bpb *bpb);
 struct fat_bpb *fat32_read_bpb(struct generic_disk *drive);
 enum errno fat_g_mount(struct generic_disk *d);
@@ -165,8 +168,6 @@ uint64_t fat_write_file(struct fat_fs *fs, uint32_t *start_cluster,
                         const uint8_t *data, uint64_t size);
 bool fat_write_fat_entry(struct fat_fs *fs, uint32_t cluster, uint32_t value);
 uint32_t fat_read_fat_entry(struct fat_fs *fs, uint32_t cluster);
-
-void fat_format_filename_83(const char *name, char out[11]);
 
 bool fat_create_file_in_dir(struct fat_fs *fs, uint32_t dir_cluster,
                             const char *filename,
