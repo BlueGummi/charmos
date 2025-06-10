@@ -59,11 +59,26 @@ uint64_t registry_get_disk_cnt(void) {
     return disk_count;
 }
 
+char *mkname(char *prefix, uint64_t counter) {
+    uint32_t n = 0;
+    char counter_str[25] = {0};
+    if (counter == 0)
+        counter_str[0] = '0';
+
+    do {
+        counter_str[n++] = '0' + (counter % 10);
+        counter /= 10;
+    } while (counter > 0);
+    char *cat = strcat(prefix, counter_str);
+    return cat;
+}
+
 void registry_setup() {
     struct ide_drive *drives = kmalloc(sizeof(struct ide_drive) * 4);
     struct pci_device *devices;
     uint64_t count;
     pci_scan_devices(&devices, &count);
+    uint64_t nvme_cnt = 0, ahci_cnt = 0, ide_cnt = 0;
     for (uint64_t i = 0; i < count; i++) {
         struct pci_device dev = devices[i];
         if (dev.class_code == PCI_CLASS_MASS_STORAGE &&
@@ -71,7 +86,19 @@ void registry_setup() {
             dev.prog_if == PCI_PROGIF_NVME) {
             struct nvme_device *d =
                 nvme_discover_device(dev.bus, dev.device, dev.function);
-            registry_register(nvme_create_generic(d));
+            struct generic_disk *disk = nvme_create_generic(d);
+
+            char *prefix = kzalloc(16);
+            strncpy(prefix, "nvme", 4);
+            char *name = mkname(prefix, nvme_cnt++);
+
+            char fmtname[16] = {0};
+            memcpy(fmtname, name, 15);
+            for (int j = 0; j < 15; j++) {
+                disk->name[j] = fmtname[j];
+            }
+
+            registry_register(disk);
             continue;
         }
         if (dev.class_code == 0x01 && dev.subclass == 0x06 &&
@@ -80,7 +107,18 @@ void registry_setup() {
             struct ahci_disk *disks =
                 ahci_discover_device(dev.bus, dev.device, dev.function, &d_cnt);
             for (uint32_t i = 0; i < d_cnt; i++) {
-                registry_register(ahci_create_generic(&disks[i]));
+                struct generic_disk *disk = ahci_create_generic(&disks[i]);
+                char *prefix = kzalloc(16);
+                strncpy(prefix, "ahcisata", 8);
+                char *name = mkname(prefix, ahci_cnt++);
+
+                char fmtname[16] = {0};
+                memcpy(fmtname, name, 15);
+                for (int j = 0; j < 15; j++) {
+                    disk->name[j] = fmtname[j];
+                }
+
+                registry_register(disk);
             }
             continue;
         }
@@ -93,6 +131,15 @@ void registry_setup() {
                 struct generic_disk *d = ide_create_generic(&drives[ind]);
                 if (!d)
                     continue;
+                char *prefix = kzalloc(16);
+                strncpy(prefix, "idesata", 7);
+                char *name = mkname(prefix, ide_cnt++);
+
+                char fmtname[16] = {0};
+                memcpy(fmtname, name, 15);
+                for (int j = 0; j < 15; j++) {
+                    d->name[j] = fmtname[j];
+                }
                 registry_register(d);
             }
         }
@@ -111,7 +158,7 @@ void registry_setup() {
 void registry_print_devices() {
     for (uint64_t i = 0; i < disk_count; i++) {
         struct generic_disk *disk = registry_get_by_index(i);
-        k_printf("Disk %lu is a %s. Filesystem:\n", i,
+        k_printf("Disk %lu, \"%s\" is a %s. Filesystem:\n", i, disk->name,
                  disk->type == G_IDE_DRIVE    ? "IDE DRIVE"
                  : disk->type == G_NVME_DRIVE ? "NVME DRIVE"
                                               : "AHCI DRIVE");

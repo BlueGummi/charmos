@@ -1,5 +1,7 @@
+#include <console/printf.h>
 #include <stddef.h>
 #include <stdint.h>
+
 void *memcpy(void *dest, const void *src, size_t n) {
     uint8_t *pdest = (uint8_t *) dest;
     const uint8_t *psrc = (const uint8_t *) src;
@@ -74,6 +76,7 @@ char *strcat(char *dest, const char *src) {
     }
     while ((*dest++ = *src++))
         ;
+
     return original_dest;
 }
 
