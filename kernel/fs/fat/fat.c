@@ -7,6 +7,9 @@
 #include <string.h>
 
 void fat_write_fsinfo(struct fat_fs *fs) {
+    if (fs->type != FAT_32)
+        return; // no-op
+
     uint8_t *buf = kmalloc(fs->disk->sector_size);
     if (!fs->disk->read_sector(fs->disk, fs->fsinfo_sector, buf, 1))
         return;
@@ -199,12 +202,12 @@ void fat_g_print(struct generic_disk *d) {
 
     fat_list_root(fs);
 
-    //    success = fat_create(fs, fat_get_dir_cluster(&new_file_ent), "Whimsy",
-    //    &new_file_ent,
-    //                         FAT_ARCHIVE, NULL);
+    uint32_t sillycluster = fat_get_dir_cluster(&new_file_ent);
 
-    //    success = fat_mkdir(fs, fat_get_dir_cluster(&new_file_ent), "Dbeedoo",
-    //                        &new_file_ent);
+    success = fat_create(fs, sillycluster, "Whimsy", &new_file_ent, FAT_ARCHIVE,
+                         NULL);
+
+    success = fat_mkdir(fs, sillycluster, "Dbeedoo", &new_file_ent);
 
     /* if (success) {
          k_printf("yay\n");

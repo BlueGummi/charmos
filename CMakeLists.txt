@@ -48,9 +48,7 @@ add_custom_target(iso
 set(QEMU_COMMON_FLAGS
     -cdrom ${IMAGE_NAME}.iso
     -boot d
-    -m 2G
-    -cpu host
-    -enable-kvm
+    -m 4G
     -smp cores=4
     -no-shutdown
     -no-reboot

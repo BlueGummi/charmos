@@ -133,6 +133,7 @@ bool fat_create(struct fat_fs *fs, uint32_t dir_cluster, const char *filename,
     if (fat_contains(fs, dir_cluster, filename))
         return false;
 
+
     uint8_t *dir_buf = kmalloc(fs->cluster_size);
 
     uint32_t slot_cluster = 0, slot_offset = 0, prev_cluster = 0;

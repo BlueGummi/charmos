@@ -40,13 +40,22 @@ const char *pci_class_name(uint8_t class_code, uint8_t subclass) {
 
 void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
     pci_device_count = 0;
+
     uint64_t space_to_alloc = 0;
 
     for (uint16_t bus = 0; bus < 256; ++bus) {
         for (uint8_t device = 0; device < 32; ++device) {
             for (uint8_t function = 0; function < 8; ++function) {
-                if (pci_read_word(bus, device, function, 0x00) != 0xFFFF)
-                    space_to_alloc++;
+                uint16_t vendor = pci_read_word(bus, device, function, 0x00);
+                if (vendor == 0xFFFF)
+                    continue;
+
+                space_to_alloc++;
+                uint16_t cmd = pci_read_config16(bus, device, function,
+                                                 0x04); // PCI_COMMAND offset
+                cmd |= (1 << 2);                        // PCI_COMMAND_MASTER
+                cmd |= (1 << 1);
+                pci_write_config16(bus, device, function, 0x04, cmd);
 
                 if (function == 0) {
                     uint8_t header_type =

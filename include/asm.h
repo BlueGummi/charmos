@@ -96,6 +96,39 @@ static inline void outsl(uint16_t port, const void *addr, uint32_t count) {
 //
 //
 
+static inline uint16_t pci_read_config16(uint8_t bus, uint8_t device, uint8_t function,
+                           uint8_t offset) {
+    uint32_t address = (1U << 31) // enable bit
+                       | ((uint32_t) bus << 16) | ((uint32_t) device << 11) |
+                       ((uint32_t) function << 8) |
+                       (offset & 0xFC); // aligned to 4 bytes
+    outl(PCI_CONFIG_ADDRESS, address);
+    uint32_t data = inl(PCI_CONFIG_DATA);
+
+    if (offset & 2)
+        return (uint16_t) (data >> 16);
+    else
+        return (uint16_t) (data & 0xFFFF);
+}
+
+static inline void pci_write_config16(uint8_t bus, uint8_t device, uint8_t function,
+                        uint8_t offset, uint16_t value) {
+    uint32_t address = (1U << 31) | ((uint32_t) bus << 16) |
+                       ((uint32_t) device << 11) | ((uint32_t) function << 8) |
+                       (offset & 0xFC);
+    outl(PCI_CONFIG_ADDRESS, address);
+    uint32_t old_data = inl(PCI_CONFIG_DATA);
+
+    uint32_t new_data;
+    if (offset & 2)
+        new_data = (old_data & 0x0000FFFF) | ((uint32_t) value << 16);
+    else
+        new_data = (old_data & 0xFFFF0000) | value;
+
+    outl(PCI_CONFIG_ADDRESS, address);
+    outl(PCI_CONFIG_DATA, new_data);
+}
+
 static inline uint32_t pci_config_address(uint8_t bus, uint8_t slot,
                                           uint8_t func, uint8_t offset) {
     return (uint32_t) ((1U << 31) | (bus << 16) | (slot << 11) | (func << 8) |

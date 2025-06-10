@@ -51,7 +51,12 @@ static bool fat12_16_walk_cluster(struct fat_fs *fs, uint32_t cluster,
     }
 
     struct fat_dirent *ret = kmalloc(sizeof(struct fat_dirent));
-    for (uint32_t i = 0; i < bpb->root_entry_count; i++) {
+    uint32_t entries_per_cluster =
+        is_root ? bpb->root_entry_count
+                : (sectors_to_read * bpb->bytes_per_sector) /
+                      sizeof(struct fat_dirent);
+
+    for (uint32_t i = 0; i < entries_per_cluster; i++) {
         struct fat_dirent *entry =
             (struct fat_dirent *) (sector_buf + i * sizeof(struct fat_dirent));
         memcpy(ret, entry, sizeof(struct fat_dirent));
