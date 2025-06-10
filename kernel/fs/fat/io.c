@@ -260,20 +260,17 @@ bool fat_write_dirent(struct fat_fs *fs, uint32_t dir_cluster,
                       const struct fat_dirent *dirent_to_write,
                       uint32_t entry_index) {
 
-    const struct fat_bpb *bpb = fs->bpb;
-
-    uint32_t entries_per_cluster =
-        (bpb->sectors_per_cluster * bpb->bytes_per_sector) /
-        sizeof(struct fat_dirent);
-
-    uint32_t cluster_offset = entry_index / entries_per_cluster;
-    uint32_t index_in_cluster = entry_index % entries_per_cluster;
+    uint32_t cluster_offset = entry_index / fs->entries_per_cluster;
+    uint32_t index_in_cluster = entry_index % fs->entries_per_cluster;
 
     uint32_t current_cluster = dir_cluster;
-    for (uint32_t i = 0; i < cluster_offset; i++) {
-        current_cluster = fat_read_fat_entry(fs, current_cluster);
-        if (fat_is_eoc(fs, current_cluster)) {
-            return false;
+
+    if (!(fs->type != FAT_32 && dir_cluster == FAT_DIR_CLUSTER_ROOT)) {
+        for (uint32_t i = 0; i < cluster_offset; i++) {
+            current_cluster = fat_read_fat_entry(fs, current_cluster);
+            if (fat_is_eoc(fs, current_cluster)) {
+                return false;
+            }
         }
     }
 

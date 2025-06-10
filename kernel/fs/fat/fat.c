@@ -25,7 +25,8 @@ uint32_t fat_first_data_sector(const struct fat_fs *fs) {
     const struct fat_bpb *bpb = fs->bpb;
 
     uint32_t root_dir_sectors =
-        ((bpb->root_entry_count * 32) + (bpb->bytes_per_sector - 1)) /
+        ((bpb->root_entry_count * sizeof(struct fat_dirent)) +
+         (bpb->bytes_per_sector - 1)) /
         bpb->bytes_per_sector;
 
     return bpb->reserved_sector_count + (bpb->num_fats * fs->fat_size) +
@@ -34,6 +35,12 @@ uint32_t fat_first_data_sector(const struct fat_fs *fs) {
 
 uint32_t fat_cluster_to_lba(const struct fat_fs *fs, uint32_t cluster) {
     const struct fat_bpb *bpb = fs->bpb;
+
+    if (cluster == FAT_DIR_CLUSTER_ROOT && fs->type != FAT_32) {
+        return fs->volume_base_lba + bpb->reserved_sector_count +
+               (bpb->num_fats * fs->fat_size);
+    }
+
     return fat_first_data_sector(fs) + (cluster - 2) * bpb->sectors_per_cluster;
 }
 
@@ -138,6 +145,7 @@ enum errno fat_g_mount(struct generic_disk *d) {
     fs->drive_number = f32 ? f32_ext.drive_number : f16_ext.drive_number;
     fs->volume_id = f32 ? f32_ext.volume_id : f16_ext.volume_id;
     fs->cluster_size = fs->bpb->sectors_per_cluster * fs->bpb->bytes_per_sector;
+    fs->entries_per_cluster = fs->cluster_size / sizeof(struct fat_dirent);
 
     uint32_t total_sectors =
         f32 ? bpb->total_sectors_32 : bpb->total_sectors_16;
@@ -202,14 +210,12 @@ void fat_g_print(struct generic_disk *d) {
 
     uint32_t sillycluster = fat_get_dir_cluster(&new_file_ent);
 
-    success = fat_create(fs, sillycluster, "Whimsy", &new_file_ent, FAT_ARCHIVE,
-                         NULL);
-
-    success = fat_mkdir(fs, fs->root_cluster, "Dbeedoo", &new_file_ent);
+    success = fat_create(fs, fs->root_cluster, "Whimsy", &new_file_ent,
+                         FAT_ARCHIVE, NULL);
 
     fat_list_root(fs);
 
-    success = fat_delete_file(fs, fs->root_cluster, "Dbeedoo");
+    success = fat_delete_file(fs, fs->root_cluster, "Whimsy");
 
     if (success) {
         k_printf("yay\n");

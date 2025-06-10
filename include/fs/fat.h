@@ -133,6 +133,7 @@ struct fat_fs {
     uint32_t fsinfo_sector;
     uint32_t free_clusters;
     uint32_t last_alloc_cluster;
+    uint32_t entries_per_cluster;
 
     // below is defined differently in 12/16 and 32
     uint16_t fat_size;

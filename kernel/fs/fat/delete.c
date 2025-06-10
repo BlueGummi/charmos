@@ -11,8 +11,9 @@ bool fat_delete_file(struct fat_fs *fs, uint32_t dir_cluster,
     uint32_t start_cluster = fat_get_dir_cluster(dirent);
     ((uint8_t *) dirent->name)[0] = 0xE5;
 
-    if (!fat_write_dirent(fs, dir_cluster, dirent, index))
+    if (!fat_write_dirent(fs, dir_cluster, dirent, index)) {
         return false;
+    }
 
     fat_free_chain(fs, start_cluster);
 
