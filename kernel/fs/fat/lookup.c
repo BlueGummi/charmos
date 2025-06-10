@@ -4,7 +4,7 @@
 
 struct fat_lookup_ctx {
     const char *fname;
-    struct fat_dirent *found_dir; // If this remains NULL, we never found it
+    struct fat_dirent *found_dir; // if this remains NULL, we never found it
     // no need for 'found' field
 };
 

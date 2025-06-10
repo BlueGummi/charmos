@@ -163,7 +163,7 @@ struct ahci_full_port {
     struct ahci_cmd_header **cmd_hdrs;
 };
 
-volatile struct ahci_port {
+struct ahci_port {
     uint32_t clb;       // Command List Base (lower 32 bits)
     uint32_t clbu;      // Command List Base (upper 32 bits)
     uint32_t fb;        // FIS Base (lower 32 bits)

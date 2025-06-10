@@ -21,12 +21,12 @@ struct nvme_command {
 } __attribute__((packed));
 
 struct nvme_completion {
-    uint32_t result;
-    uint32_t rsvd;
-    uint16_t sq_head;
-    uint16_t sq_id;
-    uint16_t cid;
-    uint16_t status;
+    volatile uint32_t result;
+    volatile uint32_t rsvd;
+    volatile uint16_t sq_head;
+    volatile uint16_t sq_id;
+    volatile uint16_t cid;
+    volatile uint16_t status;
 } __attribute__((packed));
 
 struct nvme_cc {
@@ -76,7 +76,7 @@ struct nvme_queue {
 };
 
 struct nvme_device {
-    struct nvme_regs *regs;
+    volatile struct nvme_regs *regs;
     uint64_t cap;
     uint32_t version;
     uint32_t doorbell_stride;

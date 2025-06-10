@@ -12,6 +12,10 @@
 #include <stdint.h>
 #include <string.h>
 
+#define HALT                                                                   \
+    while (1)                                                                  \
+        asm("hlt");
+
 #define is_aligned(value, align) (((value) & ((align) - 1)) == 0)
 
 typedef struct {
@@ -104,28 +108,33 @@ void __ubsan_handle_load_invalid_value(data_load_invalid_value_t *data,
     k_printf("UBSAN: load_invalid_value @ %s:%u:%u {value: %#lx}\n",
              data->location.filename, data->location.line,
              data->location.column, value);
+    HALT
 }
 void __ubsan_handle_nonnull_arg(data_nonnull_arg_t *data) {
     k_printf("UBSAN: handle_nonnull_arg @ %s:%u:%u {arg_index: %i}\n",
              data->location.filename, data->location.line,
              data->location.column, data->arg_index);
+    HALT
 }
 void __ubsan_handle_nullability_arg(data_nonnull_arg_t *data) {
     k_printf("UBSAN: nullability_arg @ %s:%u:%u {arg_index: %i}\n",
              data->location.filename, data->location.line,
              data->location.column, data->arg_index);
+    HALT
 }
 void __ubsan_handle_nonnull_return_v1(data_only_location_t *data
                                       [[maybe_unused]],
                                       source_location_t *location) {
     k_printf("UBSAN: nonnull_return @ %s:%u:%u\n", location->filename,
              location->line, location->column);
+    HALT
 }
 void __ubsan_handle_nullability_return_v1(data_only_location_t *data
                                           [[maybe_unused]],
                                           source_location_t *location) {
     k_printf("UBSAN: nullability_return @ %s:%u:%u\n", location->filename,
              location->line, location->column);
+    HALT
 }
 void __ubsan_handle_vla_bound_not_positive(data_location_type_t *data,
                                            uintptr_t bound) {
@@ -135,6 +144,7 @@ void __ubsan_handle_vla_bound_not_positive(data_location_type_t *data,
         data->location.filename, data->location.line, data->location.column,
         bound, info_to_bits(data->type->info), kind_to_type(data->type->kind),
         data->type->name);
+    HALT
 }
 void __ubsan_handle_add_overflow(data_location_type_t *data, uintptr_t lhs,
                                  uintptr_t rhs) {
@@ -144,6 +154,7 @@ void __ubsan_handle_add_overflow(data_location_type_t *data, uintptr_t lhs,
         data->location.filename, data->location.line, data->location.column,
         lhs, rhs, info_to_bits(data->type->info),
         kind_to_type(data->type->kind), data->type->name);
+    HALT
 }
 void __ubsan_handle_sub_overflow(data_location_type_t *data, uintptr_t lhs,
                                  uintptr_t rhs) {
@@ -153,6 +164,7 @@ void __ubsan_handle_sub_overflow(data_location_type_t *data, uintptr_t lhs,
         data->location.filename, data->location.line, data->location.column,
         lhs, rhs, info_to_bits(data->type->info),
         kind_to_type(data->type->kind), data->type->name);
+    HALT
 }
 void __ubsan_handle_mul_overflow(data_location_type_t *data, uintptr_t lhs,
                                  uintptr_t rhs) {
@@ -162,6 +174,7 @@ void __ubsan_handle_mul_overflow(data_location_type_t *data, uintptr_t lhs,
         data->location.filename, data->location.line, data->location.column,
         lhs, rhs, info_to_bits(data->type->info),
         kind_to_type(data->type->kind), data->type->name);
+    HALT
 }
 void __ubsan_handle_function_type_mismatch(void *data_raw, void *value_raw) {
     struct ubsan_function_type_mismatch_data *data =
@@ -169,6 +182,7 @@ void __ubsan_handle_function_type_mismatch(void *data_raw, void *value_raw) {
     k_printf("UBSAN: function type mismatch @ %s:%u:%u",
              data->location.filename, data->location.line,
              data->location.column);
+    HALT
 }
 void __ubsan_handle_divrem_overflow(data_location_type_t *data, uintptr_t lhs,
                                     uintptr_t rhs) {
@@ -177,6 +191,7 @@ void __ubsan_handle_divrem_overflow(data_location_type_t *data, uintptr_t lhs,
              data->location.filename, data->location.line,
              data->location.column, lhs, rhs, info_to_bits(data->type->info),
              kind_to_type(data->type->kind), data->type->name);
+    HALT
 }
 void __ubsan_handle_negate_overflow(data_location_type_t *data, uintptr_t old) {
     k_printf(
@@ -184,6 +199,7 @@ void __ubsan_handle_negate_overflow(data_location_type_t *data, uintptr_t old) {
         data->location.filename, data->location.line, data->location.column,
         old, info_to_bits(data->type->info), kind_to_type(data->type->kind),
         data->type->name);
+    HALT
 }
 void __ubsan_handle_shift_out_of_bounds(data_shift_out_of_bounds_t *data,
                                         uintptr_t lhs, uintptr_t rhs) {
@@ -195,6 +211,7 @@ void __ubsan_handle_shift_out_of_bounds(data_shift_out_of_bounds_t *data,
              kind_to_type(data->rhs_type->kind), data->rhs_type->name,
              info_to_bits(data->lhs_type->info),
              kind_to_type(data->lhs_type->kind), data->lhs_type->name);
+    HALT
 }
 void __ubsan_handle_out_of_bounds(data_out_of_bounds_t *data, uint64_t index) {
     k_printf(
@@ -205,6 +222,7 @@ void __ubsan_handle_out_of_bounds(data_out_of_bounds_t *data, uint64_t index) {
         kind_to_type(data->array_type->kind), data->array_type->name,
         info_to_bits(data->index_type->info),
         kind_to_type(data->index_type->kind), data->index_type->name);
+    HALT
 }
 
 void __ubsan_handle_type_mismatch(data_type_mismatch_t *data, void *pointer) {
@@ -221,7 +239,7 @@ void __ubsan_handle_type_mismatch(data_type_mismatch_t *data, void *pointer) {
                                       "nonnull binding to",
                                       "dynamic operation on"};
     if (strcmp(data->location.filename, "src/flanterm/backends/fb.c") == 0) {
-        return;
+        HALT return;
     }
     if (pointer == NULL) {
         k_printf(
@@ -244,6 +262,7 @@ void __ubsan_handle_type_mismatch(data_type_mismatch_t *data, void *pointer) {
             kind_strs[data->type_check_kind], (uintptr_t) pointer,
             data->type->name);
     }
+    HALT
 }
 void __ubsan_handle_type_mismatch_v1(data_type_mismatch_t *data,
                                      void *pointer) {
@@ -261,7 +280,7 @@ void __ubsan_handle_type_mismatch_v1(data_type_mismatch_t *data,
                                       "dynamic operation on"};
     data->alignment = 1UL << data->alignment;
     if (strcmp(data->location.filename, "src/flanterm/backends/fb.c") == 0) {
-        return;
+        HALT return;
     }
     if (pointer == NULL) {
         k_printf(
@@ -284,36 +303,41 @@ void __ubsan_handle_type_mismatch_v1(data_type_mismatch_t *data,
             kind_strs[data->type_check_kind], (uintptr_t) pointer,
             data->type->name);
     }
+    HALT
 }
 void __ubsan_handle_alignment_assumption(data_alignment_assumption_t *data,
                                          void *, void *, void *) {
     k_printf("UBSAN: alignment_assumption @ %s:%u:%u\n",
              data->location.filename, data->location.line,
              data->location.column);
+    HALT
 }
 void __ubsan_handle_implicit_conversion(data_implicit_conversion_t *data,
                                         void *, void *) {
     k_printf("UBSAN: implicit_conversion @ %s:%u:%u\n", data->location.filename,
              data->location.line, data->location.column);
+    HALT
 }
 void __ubsan_handle_invalid_builtin(data_invalid_builtin_t *data) {
     k_printf("UBSAN: invalid_builtin @ %s:%u:%u\n", data->location.filename,
              data->location.line, data->location.column);
+    HALT
 }
 void __ubsan_handle_pointer_overflow(data_only_location_t *data, void *,
                                      void *) {
     k_printf("UBSAN: pointer_overflow @ %s:%u:%u\n", data->location.filename,
              data->location.line, data->location.column);
+    HALT
 }
 __attribute__((noreturn)) void
 __ubsan_handle_builtin_unreachable(data_only_location_t *data) {
     k_printf("UBSAN: builtin_unreachable @ %s:%u:%u\n", data->location.filename,
              data->location.line, data->location.column);
-    panic("UBSAN");
+    HALT panic("UBSAN");
 }
 __attribute__((noreturn)) void
 __ubsan_handle_missing_return(data_only_location_t *data) {
     k_printf("UBSAN: missing_return @ %s:%u:%u\n", data->location.filename,
              data->location.line, data->location.column);
-    panic("UBSAN");
+    HALT panic("UBSAN");
 }

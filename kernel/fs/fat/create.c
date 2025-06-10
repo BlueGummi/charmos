@@ -3,6 +3,8 @@
 #include <mem/alloc.h>
 #include <string.h>
 
+// TODO: failure - ENOSPC
+
 static inline uint32_t fat12_16_root_dir_lba(struct fat_fs *fs) {
     return fs->bpb->reserved_sector_count +
            (fs->bpb->num_fats * fs->bpb->fat_size_16);
@@ -125,6 +127,8 @@ static void fat_initialize_dirent(struct fat_dirent *ent, const char *filename,
 bool fat_create(struct fat_fs *fs, uint32_t dir_cluster, const char *filename,
                 struct fat_dirent *out_dirent, enum fat_fileattr attr,
                 uint32_t *out_cluster) {
+    if (!dir_cluster)
+        return false;
 
     if (fat_contains(fs, dir_cluster, filename))
         return false;
@@ -179,7 +183,8 @@ bool fat_create(struct fat_fs *fs, uint32_t dir_cluster, const char *filename,
     return success;
 }
 
-bool fat_mkdir(struct fat_fs *fs, uint32_t parent_cluster, const char *name) {
+bool fat_mkdir(struct fat_fs *fs, uint32_t parent_cluster, const char *name,
+               struct fat_dirent *out_dirent) {
     struct fat_dirent new_dirent;
     uint32_t new_cluster = 0;
 
@@ -187,8 +192,9 @@ bool fat_mkdir(struct fat_fs *fs, uint32_t parent_cluster, const char *name) {
                     &new_cluster))
         return false;
 
+    *out_dirent = new_dirent;
+
     uint8_t *buf = kzalloc(fs->cluster_size);
-    parent_cluster = parent_cluster == fs->root_cluster ? 0 : parent_cluster;
     if (!buf)
         return false;
 
@@ -197,7 +203,10 @@ bool fat_mkdir(struct fat_fs *fs, uint32_t parent_cluster, const char *name) {
 
     struct fat_dirent *dotdot =
         (struct fat_dirent *) (buf + sizeof(struct fat_dirent));
-    fat_initialize_dirent(dotdot, "..", parent_cluster, FAT_DIR);
+
+    fat_initialize_dirent(
+        dotdot, "..", parent_cluster == fs->root_cluster ? 0 : parent_cluster,
+        FAT_DIR);
 
     bool ok = fat_write_cluster(fs, new_cluster, buf);
     kfree(buf);

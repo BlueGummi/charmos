@@ -182,7 +182,8 @@ struct fat_dirent *fat_lookup(struct fat_fs *fs, uint32_t cluster,
                               const char *f);
 
 bool fat_contains(struct fat_fs *fs, uint32_t cluster, const char *f);
-bool fat_mkdir(struct fat_fs *fs, uint32_t parent_cluster, const char *name);
+bool fat_mkdir(struct fat_fs *fs, uint32_t parent_cluster, const char *name,
+               struct fat_dirent *out_dirent);
 struct fat_date fat_get_current_date();
 struct fat_time fat_get_current_time();
 #pragma once

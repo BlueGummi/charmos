@@ -41,7 +41,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
 
     uint32_t dstrd = (cap >> 32) & 0xF;
 
-    struct nvme_device *nvme = kmalloc(sizeof(struct nvme_device));
+    struct nvme_device *nvme = kzalloc(sizeof(struct nvme_device));
     nvme->doorbell_stride = 4U << dstrd;
     nvme->page_size = page_size;
     nvme->cap = cap;
