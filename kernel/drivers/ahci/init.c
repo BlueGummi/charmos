@@ -103,8 +103,6 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
     return disks;
 }
 
-// TODO: big time reorganization
-
 struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
                                         uint32_t *d_cnt) {
     bool s64a = ctrl->cap & (1U << 31);

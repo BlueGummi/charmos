@@ -76,13 +76,11 @@ static char *mkname(char *prefix, uint64_t counter) {
 static void device_mkname(struct generic_disk *disk, const char *prefix,
                           uint64_t counter) {
     char diff_prefix[16] = {0};
-    strncpy(diff_prefix, prefix, strlen(prefix));
+    memcpy(diff_prefix, prefix, strlen(prefix));
     char *name = mkname(diff_prefix, counter);
     char fmtname[16] = {0};
     memcpy(fmtname, name, 16);
-    for (int i = 0; i < 16; i++) {
-        disk->name[i] = fmtname[i];
-    }
+    memcpy(disk->name, fmtname, 16);
 }
 
 void registry_setup() {
@@ -138,8 +136,6 @@ void registry_setup() {
 
         disk->mount(disk);
     }
-
-    // TODO: AHCI
 }
 
 void registry_print_devices() {

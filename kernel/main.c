@@ -65,7 +65,6 @@ void k_main(void) {
     slab_init();
     idt_alloc(c_cnt);
     idt_install(0);
-    test_alloc();
     uacpi_init();
     registry_setup();
     registry_print_devices();

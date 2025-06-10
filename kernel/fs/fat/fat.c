@@ -6,7 +6,7 @@
 #include <mem/alloc.h>
 #include <string.h>
 
-void fat_write_fsinfo(struct fat_fs *fs) {
+void fat_write_fsinfo(struct fat_fs *fs) { // making fsck happy
     if (fs->type != FAT_32)
         return; // no-op
 
@@ -208,14 +208,17 @@ void fat_g_print(struct generic_disk *d) {
 
     bool success = fat_mkdir(fs, fs->root_cluster, "silly", &new_file_ent);
 
-    uint32_t sillycluster = fat_get_dir_cluster(&new_file_ent);
-
     success = fat_create(fs, fs->root_cluster, "Whimsy", &new_file_ent,
                          FAT_ARCHIVE, NULL);
 
     fat_list_root(fs);
 
-    success = fat_delete_file(fs, fs->root_cluster, "Whimsy");
+    success = fat_delete(fs, fs->root_cluster, "Whimsy");
+
+    success = fat_create(fs, fs->root_cluster, "Doobert", &new_file_ent,
+                         FAT_ARCHIVE, NULL);
+
+    success = fat_rename(fs, fs->root_cluster, "Doobert", "Snoobert");
 
     if (success) {
         k_printf("yay\n");

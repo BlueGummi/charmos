@@ -1,8 +1,6 @@
 #include <asm.h>
 #include <spin_lock.h>
 
-// TODO: This terrible implementation won't work across many cores :c
-
 bool spin_lock(struct spinlock *lock) {
     bool int_enabled = are_interrupts_enabled();
     if (int_enabled) {

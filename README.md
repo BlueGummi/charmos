@@ -36,3 +36,4 @@ make run # run this in the build directory
 
 - [ ] mem alloc failure handling (do not power off the 'puter when OOM)
 
+- [ ] once filesystems are up and running, make a logging function to log to a set file

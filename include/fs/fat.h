@@ -183,7 +183,7 @@ bool fat_create(struct fat_fs *fs, uint32_t dir_cluster, const char *filename,
                 struct fat_dirent *out_dirent, enum fat_fileattr attr,
                 uint32_t *out_cluster);
 
-bool fat_delete_file(struct fat_fs *fs, uint32_t dir_cluster,
+bool fat_delete(struct fat_fs *fs, uint32_t dir_cluster,
                      const char *filename);
 
 bool fat_walk_cluster(struct fat_fs *fs, uint32_t cluster, fat_walk_callback cb,
@@ -193,8 +193,13 @@ struct fat_dirent *fat_lookup(struct fat_fs *fs, uint32_t cluster,
                               const char *f, uint32_t *out_index);
 
 bool fat_contains(struct fat_fs *fs, uint32_t cluster, const char *f);
+
 bool fat_mkdir(struct fat_fs *fs, uint32_t parent_cluster, const char *name,
                struct fat_dirent *out_dirent);
+
+bool fat_rename(struct fat_fs *fs, uint32_t dir_cluster,
+                     const char *filename, const char *new_filename);
+
 void fat_write_fsinfo(struct fat_fs *fs);
 struct fat_date fat_get_current_date();
 struct fat_time fat_get_current_time();

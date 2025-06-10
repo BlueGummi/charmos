@@ -22,6 +22,16 @@ const char *detect_fstr(enum fs_type type) {
     }
 }
 
+enum errno dummy_mount(struct generic_disk *drive) {
+    k_printf("error: filesystem \"%s\" not implemented\n",
+             detect_fstr(drive->fs_type));
+    return ERR_NOT_IMPL;
+}
+
+void dummy_print(struct generic_disk *d) {
+    dummy_mount(d);
+}
+
 enum fs_type detect_fs(struct generic_disk *drive) {
     uint8_t *sector = kmalloc(drive->sector_size);
     enum fs_type type = FS_UNKNOWN;
@@ -90,9 +100,11 @@ end:
         drive->mount = fat_g_mount;
         drive->print_fs = fat_g_print;
         break;
-    default: break;
+    default:
+        drive->mount = dummy_mount;
+        drive->print_fs = dummy_print;
+        break;
     }
-    k_printf("This disk is %s\n", detect_fstr(type));
     kfree(sector);
     return type;
 }
