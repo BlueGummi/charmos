@@ -23,7 +23,6 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
     while (true) {
         struct nvme_completion *entry = &nvme->admin_cq[nvme->admin_cq_head];
 
-        k_printf("Waiting for entry status (0x%x) to match admin_cq_phase (%u)\n", entry->status, nvme->admin_cq_phase);
         if ((entry->status & 1) == nvme->admin_cq_phase) {
             if (entry->cid == cmd->cid) {
                 uint16_t status = entry->status & 0xFFFE;
