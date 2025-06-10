@@ -6,6 +6,18 @@
 #include <mem/alloc.h>
 #include <string.h>
 
+void fat_write_fsinfo(struct fat_fs *fs) {
+    uint8_t *buf = kmalloc(fs->disk->sector_size);
+    if (!fs->disk->read_sector(fs->disk, fs->fsinfo_sector, buf, 1))
+        return;
+
+    *(uint32_t *) (buf + 0x1e8) = fs->free_clusters;
+    *(uint32_t *) (buf + 0x1ec) = fs->last_alloc_cluster;
+    kfree(buf);
+
+    fs->disk->write_sector(fs->disk, fs->fsinfo_sector, buf, 1);
+}
+
 uint32_t fat_first_data_sector(const struct fat_fs *fs) {
     const struct fat_bpb *bpb = fs->bpb;
 
@@ -131,9 +143,39 @@ enum errno fat_g_mount(struct generic_disk *d) {
     fs->total_clusters = data_sectors / bpb->sectors_per_cluster;
 
     memcpy(fs->fs_type, f32 ? f32_ext.fs_type : f16_ext.fs_type, 8);
-
     memcpy(fs->volume_label, f32 ? f32_ext.volume_label : f16_ext.volume_label,
            11);
+
+    if (f32) {
+        uint16_t fsinfo_rel_sector = f32_ext.fs_info;
+        uint8_t buf[512];
+
+        if (!d->read_sector(d, fs->volume_base_lba + fsinfo_rel_sector, buf,
+                            1)) {
+            kfree(fs);
+            return ERR_IO;
+        }
+
+        uint32_t lead_sig = *(uint32_t *) (buf + 0x00);
+        uint32_t struc_sig = *(uint32_t *) (buf + 0x1fc);
+        if (lead_sig != 0x41615252 || struc_sig != 0xAA550000) {
+            kfree(fs);
+            return ERR_FS_CORRUPT;
+        }
+
+        fs->fsinfo_sector = fsinfo_rel_sector;
+        fs->free_clusters = *(uint32_t *) (buf + 0x1e8);
+        fs->last_alloc_cluster = *(uint32_t *) (buf + 0x1ec);
+
+        if (fs->free_clusters == 0xFFFFFFFF)
+            fs->free_clusters = 0; // unknown
+        if (fs->last_alloc_cluster == 0xFFFFFFFF)
+            fs->last_alloc_cluster = 2;
+    } else {
+        fs->fsinfo_sector = 0;
+        fs->free_clusters = 0;
+        fs->last_alloc_cluster = 0;
+    }
 
     d->fs_data = fs;
     return ERR_OK;
@@ -161,15 +203,15 @@ void fat_g_print(struct generic_disk *d) {
     //    &new_file_ent,
     //                         FAT_ARCHIVE, NULL);
 
-    success = fat_mkdir(fs, fat_get_dir_cluster(&new_file_ent), "Dbeedoo",
-                        &new_file_ent);
+    //    success = fat_mkdir(fs, fat_get_dir_cluster(&new_file_ent), "Dbeedoo",
+    //                        &new_file_ent);
 
-    if (success) {
-        k_printf("yay\n");
-    } else {
-        k_printf("that not right...\n");
-    }
-
+    /* if (success) {
+         k_printf("yay\n");
+     } else {
+         k_printf("that not right...\n");
+     }
+ */
     fat_list_root(fs);
 
     struct fat_dirent *dir = fat_lookup(fs, fs->root_cluster, "MYDIR");

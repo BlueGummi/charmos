@@ -130,6 +130,9 @@ struct fat_fs {
     uint32_t total_clusters;
     uint32_t root_cluster;
     uint32_t cluster_size;
+    uint32_t fsinfo_sector;
+    uint32_t free_clusters;
+    uint32_t last_alloc_cluster;
 
     // below is defined differently in 12/16 and 32
     uint16_t fat_size;
@@ -184,6 +187,7 @@ struct fat_dirent *fat_lookup(struct fat_fs *fs, uint32_t cluster,
 bool fat_contains(struct fat_fs *fs, uint32_t cluster, const char *f);
 bool fat_mkdir(struct fat_fs *fs, uint32_t parent_cluster, const char *name,
                struct fat_dirent *out_dirent);
+void fat_write_fsinfo(struct fat_fs *fs);
 struct fat_date fat_get_current_date();
 struct fat_time fat_get_current_time();
 #pragma once

@@ -156,9 +156,11 @@ bool fat_create(struct fat_fs *fs, uint32_t dir_cluster, const char *filename,
 
     uint32_t cluster = 0;
 
-    if (attr == FAT_DIR) {
+    bool needs_cluster = (attr == FAT_DIR && strcmp(filename, ".") != 0 &&
+                          strcmp(filename, "..") != 0);
+
+    if (needs_cluster)
         cluster = fat_alloc_cluster(fs);
-    }
 
     if (out_cluster)
         *out_cluster = cluster;
