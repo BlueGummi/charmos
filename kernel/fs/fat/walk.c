@@ -2,6 +2,8 @@
 #include <mem/alloc.h>
 #include <string.h>
 
+// TODO: optimize this so I dont memcpy every iteration :boom:
+
 static bool fat32_walk_cluster(struct fat_fs *fs, uint32_t cluster,
                                fat_walk_callback callback, void *ctx) {
     uint8_t *cluster_buf = kmalloc(fs->cluster_size);
@@ -12,7 +14,7 @@ static bool fat32_walk_cluster(struct fat_fs *fs, uint32_t cluster,
              i += sizeof(struct fat_dirent)) {
             struct fat_dirent *entry = (struct fat_dirent *) (cluster_buf + i);
             memcpy(ret, entry, sizeof(struct fat_dirent));
-            if (callback(ret, ctx)) {
+            if (callback(ret, i / sizeof(struct fat_dirent), ctx)) {
                 kfree(cluster_buf);
                 return true;
             }
@@ -60,7 +62,7 @@ static bool fat12_16_walk_cluster(struct fat_fs *fs, uint32_t cluster,
         struct fat_dirent *entry =
             (struct fat_dirent *) (sector_buf + i * sizeof(struct fat_dirent));
         memcpy(ret, entry, sizeof(struct fat_dirent));
-        if (callback(ret, ctx)) {
+        if (callback(ret, i / sizeof(struct fat_dirent), ctx)) {
             kfree(sector_buf);
             return true;
         }

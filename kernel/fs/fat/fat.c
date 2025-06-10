@@ -200,28 +200,21 @@ void fat_g_print(struct generic_disk *d) {
 
     bool success = fat_mkdir(fs, fs->root_cluster, "silly", &new_file_ent);
 
-    fat_list_root(fs);
-
     uint32_t sillycluster = fat_get_dir_cluster(&new_file_ent);
 
     success = fat_create(fs, sillycluster, "Whimsy", &new_file_ent, FAT_ARCHIVE,
                          NULL);
 
-    success = fat_mkdir(fs, sillycluster, "Dbeedoo", &new_file_ent);
+    success = fat_mkdir(fs, fs->root_cluster, "Dbeedoo", &new_file_ent);
 
-    /* if (success) {
-         k_printf("yay\n");
-     } else {
-         k_printf("that not right...\n");
-     }
- */
     fat_list_root(fs);
 
-    struct fat_dirent *dir = fat_lookup(fs, fs->root_cluster, "MYDIR");
-    if (dir) {
-        dir = fat_lookup(fs, fat_get_dir_cluster(dir), "PLACE");
-        if (dir) {
-            fat_print_dirent(dir);
-        }
+    success = fat_delete_file(fs, fs->root_cluster, "Dbeedoo");
+
+    if (success) {
+        k_printf("yay\n");
+    } else {
+        k_printf("that not right...\n");
     }
+    fat_list_root(fs);
 }

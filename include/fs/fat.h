@@ -143,7 +143,7 @@ struct fat_fs {
     uint8_t fs_type[8];
 };
 
-typedef bool (*fat_walk_callback)(struct fat_dirent *, void *);
+typedef bool (*fat_walk_callback)(struct fat_dirent *, uint32_t, void *);
 
 // aside from BPB all pub funcs here should be 'fat_' - all FAT sizes
 
@@ -165,6 +165,10 @@ bool fat_read_cluster(struct fat_fs *fs, uint32_t cluster, uint8_t *buffer);
 bool fat_write_cluster(struct fat_fs *fs, uint32_t cluster,
                        const uint8_t *buffer);
 
+bool fat_write_dirent(struct fat_fs *fs, uint32_t dir_cluster,
+                      const struct fat_dirent *dirent_to_write,
+                      uint32_t entry_index);
+
 void fat_list_root(struct fat_fs *fs);
 void fat_print_dirent(const struct fat_dirent *ent);
 void fat_free_chain(struct fat_fs *fs, uint32_t start_cluster);
@@ -178,11 +182,14 @@ bool fat_create(struct fat_fs *fs, uint32_t dir_cluster, const char *filename,
                 struct fat_dirent *out_dirent, enum fat_fileattr attr,
                 uint32_t *out_cluster);
 
+bool fat_delete_file(struct fat_fs *fs, uint32_t dir_cluster,
+                     const char *filename);
+
 bool fat_walk_cluster(struct fat_fs *fs, uint32_t cluster, fat_walk_callback cb,
                       void *ctx);
 
 struct fat_dirent *fat_lookup(struct fat_fs *fs, uint32_t cluster,
-                              const char *f);
+                              const char *f, uint32_t *out_index);
 
 bool fat_contains(struct fat_fs *fs, uint32_t cluster, const char *f);
 bool fat_mkdir(struct fat_fs *fs, uint32_t parent_cluster, const char *name,

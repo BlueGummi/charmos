@@ -1,6 +1,7 @@
 #include <console/printf.h>
 #include <fs/fat.h>
 #include <mem/alloc.h>
+#include <string.h>
 
 // TODO: errno :boom:
 
@@ -253,4 +254,43 @@ static uint32_t fat32_read_fat_entry(struct fat_fs *fs, uint32_t cluster) {
 
     kfree(buf);
     return result;
+}
+
+bool fat_write_dirent(struct fat_fs *fs, uint32_t dir_cluster,
+                      const struct fat_dirent *dirent_to_write,
+                      uint32_t entry_index) {
+
+    const struct fat_bpb *bpb = fs->bpb;
+
+    uint32_t entries_per_cluster =
+        (bpb->sectors_per_cluster * bpb->bytes_per_sector) /
+        sizeof(struct fat_dirent);
+
+    uint32_t cluster_offset = entry_index / entries_per_cluster;
+    uint32_t index_in_cluster = entry_index % entries_per_cluster;
+
+    uint32_t current_cluster = dir_cluster;
+    for (uint32_t i = 0; i < cluster_offset; i++) {
+        current_cluster = fat_read_fat_entry(fs, current_cluster);
+        if (fat_is_eoc(fs, current_cluster)) {
+            return false;
+        }
+    }
+
+    uint8_t *cluster_buf = kmalloc(fs->cluster_size);
+    if (!cluster_buf)
+        return false;
+
+    if (!fat_read_cluster(fs, current_cluster, cluster_buf)) {
+        kfree(cluster_buf);
+        return false;
+    }
+
+    memcpy(cluster_buf + index_in_cluster * sizeof(struct fat_dirent),
+           dirent_to_write, sizeof(struct fat_dirent));
+
+    bool success = fat_write_cluster(fs, current_cluster, cluster_buf);
+
+    kfree(cluster_buf);
+    return success;
 }

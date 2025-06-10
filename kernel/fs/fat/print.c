@@ -76,7 +76,7 @@ void fat_print_dirent(const struct fat_dirent *ent) {
              ent->filesize);
 }
 
-bool fat32_list_cb(struct fat_dirent *d, void *ctx) {
+bool fat32_list_cb(struct fat_dirent *d, uint32_t, void *ctx) {
     (void) ctx;
     fat_print_dirent(d);
     return false;
