@@ -180,8 +180,6 @@ bool fat_create(struct fat_fs *fs, uint32_t dir_cluster, const char *filename,
 }
 
 bool fat_mkdir(struct fat_fs *fs, uint32_t parent_cluster, const char *name) {
-    parent_cluster = parent_cluster == fs->root_cluster ? 0 : parent_cluster;
-
     struct fat_dirent new_dirent;
     uint32_t new_cluster = 0;
 
@@ -190,6 +188,7 @@ bool fat_mkdir(struct fat_fs *fs, uint32_t parent_cluster, const char *name) {
         return false;
 
     uint8_t *buf = kzalloc(fs->cluster_size);
+    parent_cluster = parent_cluster == fs->root_cluster ? 0 : parent_cluster;
     if (!buf)
         return false;
 
