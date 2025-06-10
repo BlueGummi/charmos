@@ -256,9 +256,6 @@ static inline uint64_t rdmsr(uint32_t msr) {
     return (hi << 32U) | lo;
 }
 
-static inline uint64_t get_sch_core_id() {
-    struct core *c = (struct core *) rdmsr(MSR_GS_BASE);
-    return c->id;
-}
+uint64_t get_sch_core_id();
 
 #pragma once

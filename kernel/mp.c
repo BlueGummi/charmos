@@ -63,3 +63,8 @@ void mp_inform_of_cr3() {
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
     cr3_ready = true;
 }
+
+uint64_t get_sch_core_id() {
+    struct core *c = (struct core *) rdmsr(MSR_GS_BASE);
+    return c->id;
+}
