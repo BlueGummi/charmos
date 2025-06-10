@@ -153,15 +153,18 @@ void fat_g_print(struct generic_disk *d) {
 
     struct fat_dirent new_file_ent;
 
-    bool success =
-        fat_create_file_in_dir(fs, fs->root_cluster, "BOOM.TXT", &new_file_ent);
-    fat_list_root(fs);
+    bool success = fat_mkdir(fs, fs->root_cluster, "silly");
+
+    //    success = fat_create(fs, fat_get_dir_cluster(&new_file_ent), "Whimsy",
+    //                       &new_file_ent, FAT_ARCHIVE, NULL);
 
     if (success) {
         k_printf("yay\n");
     } else {
         k_printf("that not right...\n");
     }
+
+    fat_list_root(fs);
 
     struct fat_dirent *dir = fat_lookup(fs, fs->root_cluster, "MYDIR");
     if (dir) {

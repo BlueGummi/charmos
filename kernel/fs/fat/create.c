@@ -94,10 +94,18 @@ static bool fat_extend_directory(struct fat_fs *fs, uint32_t prev_cluster,
 }
 
 static void fat_initialize_dirent(struct fat_dirent *ent, const char *filename,
-                                  uint32_t cluster) {
+                                  uint32_t cluster, enum fat_fileattr attr) {
     memset(ent, 0, sizeof(struct fat_dirent));
-    fat_format_filename_83(filename, ent->name);
-    ent->attr = FAT_ARCHIVE;
+
+    if (strcmp(filename, ".") == 0) {
+        memcpy(ent->name, ".          ", 11);
+    } else if (strcmp(filename, "..") == 0) {
+        memcpy(ent->name, "..         ", 11);
+    } else {
+        fat_format_filename_83(filename, ent->name);
+    }
+
+    ent->attr = attr;
 
     ent->low_cluster = cluster & 0xFFFF;
     ent->high_cluster = cluster >> 16;
@@ -114,9 +122,12 @@ static void fat_initialize_dirent(struct fat_dirent *ent, const char *filename,
     ent->modtime = time;
 }
 
-bool fat_create_file_in_dir(struct fat_fs *fs, uint32_t dir_cluster,
-                            const char *filename,
-                            struct fat_dirent *out_dirent) {
+bool fat_create(struct fat_fs *fs, uint32_t dir_cluster, const char *filename,
+                struct fat_dirent *out_dirent, enum fat_fileattr attr,
+                uint32_t *out_cluster) {
+
+    if (fat_contains(fs, dir_cluster, filename))
+        return false;
 
     uint8_t *dir_buf = kmalloc(fs->cluster_size);
 
@@ -139,9 +150,17 @@ bool fat_create_file_in_dir(struct fat_fs *fs, uint32_t dir_cluster,
         return false;
     }
 
+    uint32_t cluster = 0;
+
+    if (attr == FAT_DIR) {
+        cluster = fat_alloc_cluster(fs);
+    }
+
+    if (out_cluster)
+        *out_cluster = cluster;
+
     struct fat_dirent *new_ent = (struct fat_dirent *) (dir_buf + slot_offset);
-    fat_initialize_dirent(new_ent, filename,
-                          0); // no data in entry - no cluster
+    fat_initialize_dirent(new_ent, filename, cluster, attr);
 
     bool success = false;
     if (dir_cluster == FAT_DIR_CLUSTER_ROOT && fs->type != FAT_32) {
@@ -158,4 +177,30 @@ bool fat_create_file_in_dir(struct fat_fs *fs, uint32_t dir_cluster,
         memcpy(out_dirent, new_ent, sizeof(struct fat_dirent));
 
     return success;
+}
+
+bool fat_mkdir(struct fat_fs *fs, uint32_t parent_cluster, const char *name) {
+    parent_cluster = parent_cluster == fs->root_cluster ? 0 : parent_cluster;
+
+    struct fat_dirent new_dirent;
+    uint32_t new_cluster = 0;
+
+    if (!fat_create(fs, parent_cluster, name, &new_dirent, FAT_DIR,
+                    &new_cluster))
+        return false;
+
+    uint8_t *buf = kzalloc(fs->cluster_size);
+    if (!buf)
+        return false;
+
+    struct fat_dirent *dot = (struct fat_dirent *) buf;
+    fat_initialize_dirent(dot, ".", new_cluster, FAT_DIR);
+
+    struct fat_dirent *dotdot =
+        (struct fat_dirent *) (buf + sizeof(struct fat_dirent));
+    fat_initialize_dirent(dotdot, "..", parent_cluster, FAT_DIR);
+
+    bool ok = fat_write_cluster(fs, new_cluster, buf);
+    kfree(buf);
+    return ok;
 }

@@ -1,6 +1,8 @@
 #include <devices/generic_disk.h>
 #include <stdint.h>
 
+// TODO: errno :boom:
+
 // fat32_ prefixed things are exclusively FAT32
 // fat_ prefixed things are usable in 12, 16, and 32
 // fat12_16_ prefixed things are exclusively FAT12/16
@@ -169,9 +171,9 @@ uint64_t fat_write_file(struct fat_fs *fs, uint32_t *start_cluster,
 bool fat_write_fat_entry(struct fat_fs *fs, uint32_t cluster, uint32_t value);
 uint32_t fat_read_fat_entry(struct fat_fs *fs, uint32_t cluster);
 
-bool fat_create_file_in_dir(struct fat_fs *fs, uint32_t dir_cluster,
-                            const char *filename,
-                            struct fat_dirent *out_dirent);
+bool fat_create(struct fat_fs *fs, uint32_t dir_cluster, const char *filename,
+                struct fat_dirent *out_dirent, enum fat_fileattr attr,
+                uint32_t *out_cluster);
 
 bool fat_walk_cluster(struct fat_fs *fs, uint32_t cluster, fat_walk_callback cb,
                       void *ctx);
@@ -180,6 +182,7 @@ struct fat_dirent *fat_lookup(struct fat_fs *fs, uint32_t cluster,
                               const char *f);
 
 bool fat_contains(struct fat_fs *fs, uint32_t cluster, const char *f);
+bool fat_mkdir(struct fat_fs *fs, uint32_t parent_cluster, const char *name);
 struct fat_date fat_get_current_date();
 struct fat_time fat_get_current_time();
 #pragma once
