@@ -1,4 +1,4 @@
-# charmos - Compact, Hobbyist And Recreational Microkernel Operating System
+# charmos - Compact, Hobbyist And Recreational Monolithic Operating System
 
 <p align="center">
 <img src="https://github.com/BlueGummi/charmos/blob/main/charmos.png" width="240">
@@ -37,3 +37,5 @@ make run # run this in the build directory
 - [ ] mem alloc failure handling (do not power off the 'puter when OOM)
 
 - [ ] once filesystems are up and running, make a logging function to log to a set file
+
+- [ ] block device sector size scans

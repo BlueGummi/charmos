@@ -9,7 +9,18 @@ enum generic_disk_type {
     G_IDE_DRIVE,
     G_NVME_DRIVE,
     G_AHCI_DRIVE,
+    G_ATAPI_DRIVE,
 };
+
+static inline const char *get_generic_disk_str(enum generic_disk_type type) {
+    switch (type) {
+    case G_IDE_DRIVE: return "IDE DRIVE";
+    case G_NVME_DRIVE: return "NVME DRIVE";
+    case G_AHCI_DRIVE: return "AHCI CONTROLLER";
+    case G_ATAPI_DRIVE: return "ATAPI DRIVE";
+    }
+    return "UNKNOWN DEVICE";
+}
 
 struct generic_disk {
     enum generic_disk_type type;

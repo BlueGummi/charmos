@@ -2,16 +2,14 @@
 #include <console/printf.h>
 #include <devices/generic_disk.h>
 #include <drivers/ahci.h>
-#include <drivers/ide.h>
+#include <drivers/ata.h>
 #include <fs/ext2.h>
 #include <mem/alloc.h>
 #include <pci/pci.h>
 #include <stdbool.h>
 #include <stdint.h>
 
-static inline void io_wait(void) {
-    outb(0x80, 0);
-}
+// TODO: Massively reorganize this directory and AHCI
 
 static void ata_select_drive(struct ide_drive *ide) {
     uint16_t base = ide->io_base;
@@ -75,7 +73,6 @@ static bool atapi_identify(struct ide_drive *ide) {
 
 bool ide_setup_drive(struct ide_drive *ide, struct pci_device *devices,
                      uint64_t count, int channel, bool is_slave) {
-    ide->sector_size = 512;
 
     for (uint64_t i = 0; i < count; i++) {
         struct pci_device *curr = &devices[i];
@@ -103,6 +100,7 @@ bool ide_setup_drive(struct ide_drive *ide, struct pci_device *devices,
 
             if (ata_identify(ide)) {
                 ide->type = IDE_TYPE_ATA;
+                ide->sector_size = 512;
                 return true;
             } else if (atapi_identify(ide)) {
                 ide->type = IDE_TYPE_ATAPI;

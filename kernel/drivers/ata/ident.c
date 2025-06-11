@@ -1,7 +1,7 @@
 #include <asm.h>
 #include <console/printf.h>
 #include <devices/generic_disk.h>
-#include <drivers/ide.h>
+#include <drivers/ata.h>
 #include <fs/ext2.h>
 #include <mem/alloc.h>
 #include <pci/pci.h>
@@ -25,8 +25,23 @@ void ide_print_info(struct generic_disk *d) {
     k_printf("  PIO Mode: %u\n", drive->pio_mode);
 }
 
+static void swap_str(char *dst, const uint16_t *src, size_t word_len) {
+    for (size_t i = 0; i < word_len; ++i) {
+        dst[2 * i] = (src[i] >> 8) & 0xFF;
+        dst[2 * i + 1] = src[i] & 0xFF;
+    }
+    dst[2 * word_len] = '\0';
+
+    for (int i = 2 * word_len - 1; i >= 0; --i) {
+        if (dst[i] == ' ' || dst[i] == '\0')
+            dst[i] = '\0';
+        else
+            break;
+    }
+}
+
 void ide_identify(struct ide_drive *drive) {
-    uint16_t buf[256];
+    uint16_t buf[256]; // TODO: kmalloc this
     uint16_t io = drive->io_base;
 
     outb(REG_DRIVE_HEAD(io), 0xA0 | (drive->slave ? 0x10 : 0x00));
@@ -46,16 +61,9 @@ void ide_identify(struct ide_drive *drive) {
 
     insw(REG_DATA(io), buf, 256);
 
-#define copy_and_swap(dst, src, len)                                           \
-    for (int i = 0; i < (len) / 2; ++i) {                                      \
-        (dst)[2 * i] = ((src)[i] >> 8) & 0xFF;                                 \
-        (dst)[2 * i + 1] = (src)[i] & 0xFF;                                    \
-    }                                                                          \
-    (dst)[len] = '\0';
-
-    copy_and_swap(drive->serial, &buf[10], 20);
-    copy_and_swap(drive->firmware, &buf[23], 8);
-    copy_and_swap(drive->model, &buf[27], 40);
+    swap_str(drive->serial, &buf[10], 10);  
+    swap_str(drive->firmware, &buf[23], 4);
+    swap_str(drive->model, &buf[27], 20);
 
     for (int i = 39; i >= 0 && drive->model[i] == ' '; i--)
         drive->model[i] = '\0';
@@ -72,8 +80,6 @@ void ide_identify(struct ide_drive *drive) {
     }
 
     drive->actually_exists = drive->total_sectors != 0;
-
-    drive->sector_size = 512;
 
     drive->supports_dma = (buf[49] & (1 << 8)) ? 1 : 0;
 

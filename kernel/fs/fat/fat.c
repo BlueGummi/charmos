@@ -159,7 +159,7 @@ enum errno fat_g_mount(struct generic_disk *d) {
 
     if (f32) {
         uint16_t fsinfo_rel_sector = f32_ext.fs_info;
-        uint8_t buf[512];
+        uint8_t *buf = kmalloc(fs->disk->sector_size);
 
         if (!d->read_sector(d, fs->volume_base_lba + fsinfo_rel_sector, buf,
                             1)) {

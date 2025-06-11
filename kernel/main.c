@@ -9,7 +9,7 @@
 #include <devices/generic_disk.h>
 #include <devices/registry.h>
 #include <drivers/ahci.h>
-#include <drivers/ide.h>
+#include <drivers/ata.h>
 #include <drivers/nvme.h>
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
@@ -60,11 +60,10 @@ void k_main(void) {
     enable_smap_smep_umip();
     gdt_install();
     init_physical_allocator(r->offset, memmap_request);
-    vmm_offset_set(r->offset);
-    vmm_init();
+    vmm_init(memmap_request.response, xa_request.response, r->offset);
     slab_init();
     idt_alloc(c_cnt);
-    //idt_install(0);
+    // idt_install(0);
     uacpi_init();
     registry_setup();
     registry_print_devices();

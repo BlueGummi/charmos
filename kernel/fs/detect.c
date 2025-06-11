@@ -1,4 +1,5 @@
 #include <console/printf.h>
+#include <fs/iso9660.h>
 #include <devices/generic_disk.h>
 #include <fs/detect.h>
 #include <fs/ext2.h>
@@ -23,13 +24,13 @@ const char *detect_fstr(enum fs_type type) {
 }
 
 enum errno dummy_mount(struct generic_disk *drive) {
-    k_printf("error: filesystem \"%s\" not implemented\n",
-             detect_fstr(drive->fs_type));
+    (void) drive;
     return ERR_NOT_IMPL;
 }
 
 void dummy_print(struct generic_disk *d) {
-    dummy_mount(d);
+    k_printf("error: filesystem \"%s\" not implemented\n",
+             detect_fstr(d->fs_type));
 }
 
 enum fs_type detect_fs(struct generic_disk *drive) {
@@ -99,6 +100,10 @@ end:
     case FS_FAT32:
         drive->mount = fat_g_mount;
         drive->print_fs = fat_g_print;
+        break;
+    case FS_ISO9660:
+        drive->mount = iso9660_mount;
+        drive->print_fs = iso9660_print;
         break;
     default:
         drive->mount = dummy_mount;

@@ -2,7 +2,7 @@
 #include <devices/generic_disk.h>
 #include <devices/registry.h>
 #include <drivers/ahci.h>
-#include <drivers/ide.h>
+#include <drivers/ata.h>
 #include <drivers/nvme.h>
 #include <fs/detect.h>
 #include <mem/alloc.h>
@@ -62,9 +62,6 @@ uint64_t registry_get_disk_cnt(void) {
 static char *mkname(char *prefix, uint64_t counter) {
     uint32_t n = 0;
     char counter_str[25] = {0};
-    if (counter == 0)
-        counter_str[0] = '0';
-
     do {
         counter_str[n++] = '0' + (counter % 10);
         counter /= 10;
@@ -88,7 +85,7 @@ void registry_setup() {
     struct pci_device *devices;
     uint64_t count;
     pci_scan_devices(&devices, &count);
-    uint64_t nvme_cnt = 0, ahci_cnt = 0, ide_cnt = 0;
+    uint64_t nvme_cnt = 0, ahci_cnt = 0, ide_cnt = 0, atapi_cnt = 0;
     for (uint64_t i = 0; i < count; i++) {
         struct pci_device dev = devices[i];
         if (dev.class_code == PCI_CLASS_MASS_STORAGE &&
@@ -109,7 +106,7 @@ void registry_setup() {
                 ahci_discover_device(dev.bus, dev.device, dev.function, &d_cnt);
             for (uint32_t i = 0; i < d_cnt; i++) {
                 struct generic_disk *disk = ahci_create_generic(&disks[i]);
-                device_mkname(disk, "ahcisata", ahci_cnt++);
+                device_mkname(disk, "sata", ahci_cnt++);
 
                 registry_register(disk);
             }
@@ -125,15 +122,15 @@ void registry_setup() {
 
                 if (drives[ind].type == IDE_TYPE_ATA) {
                     d = ide_create_generic(&drives[ind]);
+                    device_mkname(d, "ide", ide_cnt++);
                 } else if (drives[ind].type == IDE_TYPE_ATAPI) {
-                    k_printf("Found ATAPI device - no impl yet\n");
-//                    d = atapi_create_generic(&drives[ind]);
+                    d = atapi_create_generic(&drives[ind]);
+                    device_mkname(d, "atapi", atapi_cnt++);
                 }
 
                 if (!d)
                     continue;
 
-                device_mkname(d, "ide", ide_cnt++);
                 registry_register(d);
             }
         }
@@ -142,7 +139,6 @@ void registry_setup() {
     for (uint64_t i = 0; i < disk_count; i++) {
         struct generic_disk *disk = registry_get_by_index(i);
         detect_fs(disk);
-
         disk->mount(disk);
     }
 }
@@ -150,10 +146,10 @@ void registry_setup() {
 void registry_print_devices() {
     for (uint64_t i = 0; i < disk_count; i++) {
         struct generic_disk *disk = registry_get_by_index(i);
-        k_printf("Disk %lu, \"%s\" is a %s. Filesystem:\n", i, disk->name,
-                 disk->type == G_IDE_DRIVE    ? "IDE DRIVE"
-                 : disk->type == G_NVME_DRIVE ? "NVME DRIVE"
-                                              : "AHCI DRIVE");
+        k_printf("Disk %lu, \"" ANSI_GREEN "%s" ANSI_RESET
+                 "\" is a %s. Filesystem:\n",
+                 i, disk->name, get_generic_disk_str(disk->type));
+        disk->print(disk);
         disk->print_fs(disk);
     }
 }

@@ -96,8 +96,8 @@ static inline void outsl(uint16_t port, const void *addr, uint32_t count) {
 //
 //
 
-static inline uint16_t pci_read_config16(uint8_t bus, uint8_t device, uint8_t function,
-                           uint8_t offset) {
+static inline uint16_t pci_read_config16(uint8_t bus, uint8_t device,
+                                         uint8_t function, uint8_t offset) {
     uint32_t address = (1U << 31) // enable bit
                        | ((uint32_t) bus << 16) | ((uint32_t) device << 11) |
                        ((uint32_t) function << 8) |
@@ -111,8 +111,9 @@ static inline uint16_t pci_read_config16(uint8_t bus, uint8_t device, uint8_t fu
         return (uint16_t) (data & 0xFFFF);
 }
 
-static inline void pci_write_config16(uint8_t bus, uint8_t device, uint8_t function,
-                        uint8_t offset, uint16_t value) {
+static inline void pci_write_config16(uint8_t bus, uint8_t device,
+                                      uint8_t function, uint8_t offset,
+                                      uint16_t value) {
     uint32_t address = (1U << 31) | ((uint32_t) bus << 16) |
                        ((uint32_t) device << 11) | ((uint32_t) function << 8) |
                        (offset & 0xFC);
@@ -289,6 +290,9 @@ static inline uint64_t rdmsr(uint32_t msr) {
     return (hi << 32U) | lo;
 }
 
+static inline void io_wait(void) {
+    outb(0x80, 0);
+}
 uint64_t get_sch_core_id();
 
 #pragma once
