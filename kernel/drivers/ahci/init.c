@@ -46,15 +46,24 @@ static void allocate_port(struct ahci_device *dev, struct ahci_port *port,
     port->fbu = fis_phys >> 32;
     struct ahci_cmd_table **arr = kzalloc(sizeof(struct ahci_cmd_table *) * 32);
 
-    struct ahci_cmd_header **hdrr =
+    struct ahci_cmd_header **hdr =
         kzalloc(sizeof(struct ahci_cmd_header *) * 32);
 
     struct ahci_full_port p = {.port = port,
                                .fis = fis,
                                .cmd_list_base = cmdlist,
                                .cmd_tables = arr,
-                               .cmd_hdrs = hdrr};
+                               .cmd_hdrs = hdr};
     dev->regs[port_num] = p;
+}
+
+bool wait_for_clear(volatile uint32_t *reg, uint32_t bit, uint32_t timeout) {
+    while (*reg & bit) {
+        if (timeout-- == 0)
+            return false;
+        io_wait();
+    }
+    return true;
 }
 
 static struct ahci_disk *device_setup(struct ahci_device *dev,
@@ -65,8 +74,11 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
     uint32_t total_disks = 0;
 
     for (uint32_t i = 0; i < 32; i++) {
+        if (!(pi & (1U << i)))
+            continue;
+
         uint32_t ssts = ctrl->ports[i].ssts;
-        if (pi & (1U << i) && (ssts & 0x0F) == AHCI_DET_PRESENT &&
+        if ((ssts & 0x0F) == AHCI_DET_PRESENT &&
             ((ssts >> 8) & 0x0F) == AHCI_IPM_ACTIVE) {
             total_disks += 1;
         }
@@ -74,14 +86,18 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
 
     if (!total_disks)
         return NULL;
+
     *disk_count = total_disks;
 
     struct ahci_disk *disks = kzalloc(sizeof(struct ahci_disk) * total_disks);
     uint32_t disks_ind = 0;
 
     for (uint32_t i = 0; i < 32; i++) {
+        if (!(pi & (1U << i)))
+            continue;
+
         uint32_t ssts = ctrl->ports[i].ssts;
-        if (pi & (1U << i) && (ssts & 0x0F) == AHCI_DET_PRESENT &&
+        if ((ssts & 0x0F) == AHCI_DET_PRESENT &&
             ((ssts >> 8) & 0x0F) == AHCI_IPM_ACTIVE) {
             disks[disks_ind].port = i;
             disks[disks_ind].device = dev;
@@ -94,8 +110,9 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
             port->cmd |= AHCI_CMD_FRE;
             port->cmd |= AHCI_CMD_ST;
 
-            while (port->cmd & AHCI_CMD_CR)
-                ;
+            if (!wait_for_clear(&port->cmd, AHCI_CMD_CR, 1000)) {
+                continue;
+            }
 
             setup_port_slots(dev, i);
         }
@@ -148,6 +165,7 @@ struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
         return NULL;
     }
     struct ahci_controller *ctrl = (struct ahci_controller *) abar_virt;
+
     return ahci_setup_controller(ctrl, out_disk_count);
 }
 

@@ -27,6 +27,9 @@ void *ahci_prepare_command(struct ahci_full_port *port, uint32_t slot,
     if (out_phys)
         *out_phys = buffer_phys;
 
+    if (!hdr || !cmd_tbl)
+        return NULL;
+
     hdr->cfl = sizeof(struct ahci_fis_reg_h2d) / sizeof(uint32_t);
     hdr->w = write ? 1 : 0;
     hdr->p = 0;
@@ -76,6 +79,10 @@ void ahci_identify(struct ahci_disk *disk) {
 
     uint64_t buffer_phys;
     void *buffer = ahci_prepare_command(port, slot, false, &buffer_phys);
+    
+    if (!buffer)
+        return;
+
     ahci_setup_fis(port->cmd_tables[slot], AHCI_CMD_IDENTIFY, false);
 
     if (ahci_send_command(port, slot)) {

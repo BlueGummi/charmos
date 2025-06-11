@@ -101,6 +101,7 @@ void registry_setup() {
         }
         if (dev.class_code == 0x01 && dev.subclass == 0x06 &&
             dev.prog_if == 0x01) {
+            k_printf("FOUND SATA DRIVE\n");
             uint32_t d_cnt = 0;
             struct ahci_disk *disks =
                 ahci_discover_device(dev.bus, dev.device, dev.function, &d_cnt);
