@@ -121,10 +121,19 @@ void registry_setup() {
         for (int j = 0; j < 2; j++) {
             int ind = i * 2 + j;
             if (ide_setup_drive(&drives[ind], devices, count, i, j)) {
-                struct generic_disk *d = ide_create_generic(&drives[ind]);
+                struct generic_disk *d = NULL;
+
+                if (drives[ind].type == IDE_TYPE_ATA) {
+                    d = ide_create_generic(&drives[ind]);
+                } else if (drives[ind].type == IDE_TYPE_ATAPI) {
+                    k_printf("Found ATAPI device - no impl yet\n");
+//                    d = atapi_create_generic(&drives[ind]);
+                }
+
                 if (!d)
                     continue;
-                device_mkname(d, "idesata", ide_cnt++);
+
+                device_mkname(d, "ide", ide_cnt++);
                 registry_register(d);
             }
         }

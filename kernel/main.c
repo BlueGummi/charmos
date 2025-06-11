@@ -64,7 +64,7 @@ void k_main(void) {
     vmm_init();
     slab_init();
     idt_alloc(c_cnt);
-    idt_install(0);
+    //idt_install(0);
     uacpi_init();
     registry_setup();
     registry_print_devices();

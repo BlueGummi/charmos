@@ -43,12 +43,20 @@
 #define ATA_SECONDARY_CTRL 0x376
 
 struct pci_device;
+
+enum ide_type {
+    IDE_TYPE_ATA,
+    IDE_TYPE_ATAPI,
+};
+
 struct ide_drive {
     bool actually_exists; // it picks everything up
     uint32_t sector_size;
     uint16_t io_base;
     uint16_t ctrl_base;
     uint16_t slave;
+    enum ide_type type;
+    void* identify_data;
 
     char model[41];   // 40 chars + null
     char serial[21];  // 20 chars + null
@@ -78,7 +86,7 @@ bool ide_write_sector_wrapper(struct generic_disk *d, uint64_t lba,
 uint8_t ide_detect_drives();
 
 bool ide_setup_drive(struct ide_drive *ide, struct pci_device *devices,
-                     uint64_t count, int channel, int is_slave);
+                     uint64_t count, int channel, bool is_slave);
 
 struct generic_disk *ide_create_generic(struct ide_drive *ide);
 
