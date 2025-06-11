@@ -63,30 +63,38 @@ void vmm_init(struct limine_memmap_response *memmap,
                      PAGING_WRITE | PAGING_PRESENT);
     }
 
-    for (uint64_t i = 0; i < 0x100000000; i += PAGE_2MB) { // 2MiB
-        vmm_map_2mb_page(i + hhdm_offset, i, PAGING_PRESENT | PAGING_WRITE);
-    }
-
     for (uint64_t i = 0; i < memmap->entry_count; i++) {
         struct limine_memmap_entry *entry = memmap->entries[i];
-        if (entry->type != LIMINE_MEMMAP_USABLE &&
-            entry->type != LIMINE_MEMMAP_FRAMEBUFFER &&
-            entry->type != LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE &&
-            entry->type != LIMINE_MEMMAP_ACPI_RECLAIMABLE) {
-            vmm_unmap_page(entry->base);
+        if (entry->type == LIMINE_MEMMAP_BAD_MEMORY ||
+            entry->type == LIMINE_MEMMAP_RESERVED ||
+            entry->type == LIMINE_MEMMAP_ACPI_NVS) {
             continue;
         }
 
         uint64_t base = entry->base;
         uint64_t len = entry->length;
+        uint64_t end = base + len;
         uint64_t flags = PAGING_PRESENT | PAGING_WRITE;
+
         if (entry->type == LIMINE_MEMMAP_FRAMEBUFFER) {
             flags |= PAGING_WRITETHROUGH;
         }
 
-        for (uint64_t phys = base; i < base + len; i += PAGE_SIZE) {
+        uint64_t phys = base;
+        while (phys < end) {
             uint64_t virt = phys + hhdm_offset;
-            vmm_map_page(virt, phys, flags);
+
+            bool can_use_2mb = ((phys % PAGE_2MB) == 0) &&
+                               ((virt % PAGE_2MB) == 0) &&
+                               ((end - phys) >= PAGE_2MB);
+
+            if (can_use_2mb) {
+                vmm_map_2mb_page(virt, phys, flags);
+                phys += PAGE_2MB;
+            } else {
+                vmm_map_page(virt, phys, flags);
+                phys += PAGE_SIZE;
+            }
         }
     }
 
