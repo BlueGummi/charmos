@@ -1,5 +1,5 @@
 #include <console/printf.h>
-#include <err.h>
+#include <errno.h>
 #include <mem/alloc.h>
 #include <stdint.h>
 #include <string.h>
