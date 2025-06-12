@@ -9,7 +9,7 @@ bool atapi_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
     if (sector_count != 1)
         return false;
 
-    struct ide_drive *atapi = (struct ide_drive *) disk->driver_data;
+    struct ata_drive *atapi = (struct ata_drive *) disk->driver_data;
     uint16_t io = atapi->io_base;
 
     outb(REG_DRIVE_HEAD(io), atapi->slave ? 0xB0 : 0xA0);
@@ -86,11 +86,11 @@ bool atapi_read_sector_wrapper(struct generic_disk *disk, uint64_t start_lba,
 }
 
 void atapi_print_info(struct generic_disk *disk) {
-    struct ide_drive *d = disk->driver_data;
+    struct ata_drive *d = disk->driver_data;
     ata_ident_print(d->identify_data);
 }
 
-struct generic_disk *atapi_create_generic(struct ide_drive *d) {
+struct generic_disk *atapi_create_generic(struct ata_drive *d) {
     struct generic_disk *ret = kmalloc(sizeof(struct generic_disk));
     ret->driver_data = d;
     ret->sector_size = 2048;

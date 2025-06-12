@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-static bool ide_check_error(struct ide_drive *d) {
+static bool ide_check_error(struct ata_drive *d) {
     uint8_t status = inb(REG_STATUS(d->io_base));
     if (status & STATUS_ERR) {
         uint8_t err = inb(REG_ERROR(d->io_base));
@@ -22,13 +22,13 @@ static bool ide_check_error(struct ide_drive *d) {
     return false;
 }
 
-bool ide_wait_ready(struct ide_drive *d) {
+bool ide_wait_ready(struct ata_drive *d) {
     while (inb(REG_STATUS(d->io_base)) & STATUS_BSY)
         ;
     return (inb(REG_STATUS(d->io_base)) & STATUS_DRDY);
 }
 
-bool ide_read_sector(struct ide_drive *d, uint64_t lba, uint8_t *b,
+bool ide_read_sector(struct ata_drive *d, uint64_t lba, uint8_t *b,
                      uint8_t count) {
     if (count == 0)
         count = 255;
@@ -56,7 +56,7 @@ bool ide_read_sector(struct ide_drive *d, uint64_t lba, uint8_t *b,
     return true;
 }
 
-bool ide_write_sector(struct ide_drive *d, uint64_t lba, const uint8_t *b,
+bool ide_write_sector(struct ata_drive *d, uint64_t lba, const uint8_t *b,
                       uint8_t count) {
     if (count == 0)
         count = 255;
@@ -86,7 +86,7 @@ bool ide_write_sector(struct ide_drive *d, uint64_t lba, const uint8_t *b,
 
 bool ide_read_sector_wrapper(struct generic_disk *d, uint64_t lba, uint8_t *buf,
                              uint64_t cnt) {
-    struct ide_drive *ide = d->driver_data;
+    struct ata_drive *ide = d->driver_data;
 
     while (cnt > 0) {
         uint8_t chunk = (cnt >= 256) ? 0 : (uint8_t) cnt;
@@ -112,7 +112,7 @@ bool ide_read_sector_wrapper(struct generic_disk *d, uint64_t lba, uint8_t *buf,
 
 bool ide_write_sector_wrapper(struct generic_disk *d, uint64_t lba,
                               const uint8_t *buf, uint64_t cnt) {
-    struct ide_drive *ide = d->driver_data;
+    struct ata_drive *ide = d->driver_data;
 
     while (cnt > 0) {
         uint8_t chunk = (cnt >= 256) ? 0 : (uint8_t) cnt;

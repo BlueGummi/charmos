@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-struct ide_drive;
+struct ata_drive;
 struct pci_device {
     uint8_t bus;
     uint8_t device;

@@ -51,7 +51,7 @@ enum ide_type {
     IDE_TYPE_ATAPI,
 };
 
-struct ide_drive {
+struct ata_drive {
     bool actually_exists; // it picks everything up
     uint32_t sector_size;
     uint16_t io_base;
@@ -72,11 +72,11 @@ struct ide_drive {
 
 #define IDE_RETRY_COUNT 3
 
-bool ide_wait_ready(struct ide_drive *d);
+bool ide_wait_ready(struct ata_drive *d);
 
-bool ide_read_sector(struct ide_drive *d, uint64_t lba, uint8_t *b,
+bool ide_read_sector(struct ata_drive *d, uint64_t lba, uint8_t *b,
                      uint8_t cnt);
-bool ide_write_sector(struct ide_drive *d, uint64_t lba, const uint8_t *b,
+bool ide_write_sector(struct ata_drive *d, uint64_t lba, const uint8_t *b,
                       uint8_t cnt);
 
 bool ide_read_sector_wrapper(struct generic_disk *d, uint64_t lba, uint8_t *buf,
@@ -87,12 +87,12 @@ bool ide_write_sector_wrapper(struct generic_disk *d, uint64_t lba,
 
 uint8_t ide_detect_drives();
 
-bool ide_setup_drive(struct ide_drive *ide, struct pci_device *devices,
+bool ata_setup_drive(struct ata_drive *ide, struct pci_device *devices,
                      uint64_t count, int channel, bool is_slave);
 
-struct generic_disk *ide_create_generic(struct ide_drive *ide);
+struct generic_disk *ide_create_generic(struct ata_drive *ide);
 
-void ide_identify(struct ide_drive *drive);
+void ide_identify(struct ata_drive *drive);
 void ide_print_info(struct generic_disk *d);
 
 struct ata_identify {
@@ -158,4 +158,4 @@ struct ata_identify {
 } __attribute__((packed));
 
 void ata_ident_print(struct ata_identify *id);
-struct generic_disk *atapi_create_generic(struct ide_drive *d);
+struct generic_disk *atapi_create_generic(struct ata_drive *d);

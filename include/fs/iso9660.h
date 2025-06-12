@@ -16,8 +16,8 @@ struct iso9660_dir_record {
     uint8_t interleave_gap_size;
     uint16_t vol_seq_num_le;
     uint16_t vol_seq_num_be;
-    uint8_t  name_len;
-    char     name[];
+    uint8_t name_len;
+    char name[];
 } __attribute__((packed));
 
 // Primary Volume Descriptor (fixed size, 2048 bytes)
@@ -46,6 +46,13 @@ struct iso9660_pvd {
     uint32_t opt_m_path_table_loc;
     struct iso9660_dir_record root_dir_record;
 } __attribute__((packed));
+
+struct iso9660_fs {
+    struct generic_disk *disk;
+    struct iso9660_pvd *pvd;
+    uint32_t root_lba;
+    uint32_t root_size;
+};
 
 enum errno iso9660_mount(struct generic_disk *disk);
 void iso9660_print(struct generic_disk *disk);

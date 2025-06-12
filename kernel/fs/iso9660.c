@@ -76,6 +76,14 @@ void iso9660_pvd_print(const struct iso9660_pvd *pvd) {
 enum errno iso9660_mount(struct generic_disk *disk) {
     struct iso9660_pvd pvd;
     if (iso9660_parse_pvd(disk, &pvd)) {
+        struct iso9660_fs *fs = kzalloc(sizeof(struct iso9660_fs));
+        struct iso9660_pvd *new_pvd = kzalloc(sizeof(struct iso9660_pvd));
+        fs->pvd = new_pvd;
+        memcpy(fs->pvd, &pvd, sizeof(struct iso9660_pvd));
+        fs->root_lba = pvd.root_dir_record.extent_lba_le;
+        fs->root_size = pvd.root_dir_record.size_le;
+        fs->disk = disk;
+        disk->fs_data = fs;
         return ERR_OK;
     }
     return ERR_FS_INTERNAL;
@@ -83,19 +91,19 @@ enum errno iso9660_mount(struct generic_disk *disk) {
 
 void iso9660_print(struct generic_disk *disk) {
     struct iso9660_pvd pvd;
+    struct iso9660_fs *fs = disk->fs_data;
     if (!iso9660_parse_pvd(disk, &pvd)) {
         return;
     }
 
     iso9660_pvd_print(&pvd);
 
-    uint32_t root_lba = pvd.root_dir_record.extent_lba_le;
-    uint32_t root_size = pvd.root_dir_record.size_le;
     uint32_t block_size = pvd.logical_block_size_le;
-    uint32_t num_blocks = (root_size + block_size - 1) / block_size;
+    uint32_t num_blocks = (fs->root_size + block_size - 1) / block_size;
 
     uint8_t *dir_data = kmalloc(num_blocks * block_size);
-    if (!disk->read_sector(disk, root_lba, dir_data, num_blocks)) {
+
+    if (!disk->read_sector(disk, fs->root_lba, dir_data, num_blocks)) {
         k_printf("Failed to read root directory data\n");
         kfree(dir_data);
         return;
@@ -104,7 +112,7 @@ void iso9660_print(struct generic_disk *disk) {
     k_printf("--- Root Directory Contents ---\n");
 
     size_t offset = 0;
-    while (offset < root_size) {
+    while (offset < fs->root_size) {
         struct iso9660_dir_record *rec =
             (struct iso9660_dir_record *) (dir_data + offset);
 

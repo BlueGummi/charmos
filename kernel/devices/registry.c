@@ -81,7 +81,7 @@ static void device_mkname(struct generic_disk *disk, const char *prefix,
 }
 
 void registry_setup() {
-    struct ide_drive *drives = kmalloc(sizeof(struct ide_drive) * 4);
+    struct ata_drive *drives = kmalloc(sizeof(struct ata_drive) * 4);
     struct pci_device *devices;
     uint64_t count;
     pci_scan_devices(&devices, &count);
@@ -118,7 +118,7 @@ void registry_setup() {
     for (int i = 0; i < 2; i++) {
         for (int j = 0; j < 2; j++) {
             int ind = i * 2 + j;
-            if (ide_setup_drive(&drives[ind], devices, count, i, j)) {
+            if (ata_setup_drive(&drives[ind], devices, count, i, j)) {
                 struct generic_disk *d = NULL;
 
                 if (drives[ind].type == IDE_TYPE_ATA) {

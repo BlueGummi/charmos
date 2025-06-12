@@ -9,7 +9,7 @@
 #include <stdint.h>
 
 void ide_print_info(struct generic_disk *d) {
-    struct ide_drive *drive = (struct ide_drive *) d->driver_data;
+    struct ata_drive *drive = (struct ata_drive *) d->driver_data;
     if (!drive->actually_exists)
         return;
     k_printf("IDE Drive identify:\n");
@@ -40,7 +40,7 @@ static void swap_str(char *dst, const uint16_t *src, size_t word_len) {
     }
 }
 
-void ide_identify(struct ide_drive *drive) {
+void ide_identify(struct ata_drive *drive) {
     uint16_t buf[256]; // TODO: kmalloc this
     uint16_t io = drive->io_base;
 
