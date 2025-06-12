@@ -6,6 +6,17 @@
 #include <stdbool.h>
 #include <string.h>
 
+bool iso9660_read_file(struct iso9660_fs *fs, uint32_t lba, uint32_t size,
+                       void *out_buf) {
+    uint32_t num_blocks = (size + fs->block_size - 1) / fs->block_size;
+
+    if (!fs->disk->read_sector(fs->disk, lba, out_buf, num_blocks)) {
+        return false;
+    }
+
+    return true;
+}
+
 bool iso9660_parse_pvd(struct generic_disk *disk, struct iso9660_pvd *out_pvd) {
     uint8_t *buffer = kmalloc(ISO9660_SECTOR_SIZE);
 
@@ -133,4 +144,72 @@ void iso9660_print(struct generic_disk *disk) {
     iso9660_pvd_print(&pvd);
 
     iso9660_ls(fs, fs->root_lba, fs->root_size);
+}
+
+struct iso9660_dir_record *iso9660_find(struct iso9660_fs *fs,
+                                        const char *target_name, uint32_t lba,
+                                        uint32_t size) {
+    uint32_t num_blocks = (size + fs->block_size - 1) / fs->block_size;
+    uint8_t *dir_data = kmalloc(num_blocks * fs->block_size);
+    if (!fs->disk->read_sector(fs->disk, lba, dir_data, num_blocks)) {
+        kfree(dir_data);
+        return NULL;
+    }
+
+    uint64_t offset = 0;
+    while (offset < size) {
+        struct iso9660_dir_record *rec =
+            (struct iso9660_dir_record *) (dir_data + offset);
+        if (rec->length == 0) {
+            offset = ((offset / fs->block_size) + 1) * fs->block_size;
+            continue;
+        }
+
+        if (!(rec->name_len == 1 && (rec->name[0] == 0 || rec->name[0] == 1))) {
+            char name[256] = {0};
+            memcpy(name, rec->name, rec->name_len);
+            name[rec->name_len] = '\0';
+
+            if (strcmp(name, target_name) == 0) {
+                struct iso9660_dir_record *found =
+                    kmalloc(sizeof(struct iso9660_dir_record));
+                memcpy(found, rec, sizeof(struct iso9660_dir_record));
+                kfree(dir_data);
+                return found;
+            }
+        }
+
+        offset += rec->length;
+    }
+
+    kfree(dir_data);
+    return NULL;
+}
+
+void iso9660_read_and_print_file(struct iso9660_fs *fs, const char *name) {
+    struct iso9660_dir_record *rec =
+        iso9660_find(fs, name, fs->root_lba, fs->root_size);
+    if (!rec) {
+        k_printf("File '%s' not found\n", name);
+        return;
+    }
+
+    if (rec->flags & 0x02) {
+        k_printf("'%s' is a directory, not a file\n", name);
+        kfree(rec);
+        return;
+    }
+
+    void *buf = kmalloc(rec->size_le);
+    if (!iso9660_read_file(fs, rec->extent_lba_le, rec->size_le, buf)) {
+        k_printf("Failed to read file contents\n");
+        kfree(buf);
+        kfree(rec);
+        return;
+    }
+
+    k_printf("Contents of '%s':\n%.*s\n", name, rec->size_le, (char *) buf);
+
+    kfree(buf);
+    kfree(rec);
 }

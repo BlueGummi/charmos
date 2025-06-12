@@ -45,7 +45,6 @@
 #include <uacpi/tables.h>
 #include <uacpi/uacpi.h>
 #include <uacpi/utilities.h>
-#include <vfs/vfs.h>
 
 struct scheduler global_sched;
 uint64_t a_rsdp = 0;
