@@ -79,7 +79,7 @@ void ahci_identify(struct ahci_disk *disk) {
 
     uint64_t buffer_phys;
     void *buffer = ahci_prepare_command(port, slot, false, &buffer_phys);
-    
+
     if (!buffer)
         return;
 

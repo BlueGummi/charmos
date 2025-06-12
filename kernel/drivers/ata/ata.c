@@ -9,16 +9,14 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// TODO: Massively reorganize this directory and AHCI
-
-static void ata_select_drive(struct ata_drive *ata_drive) {
+void ata_select_drive(struct ata_drive *ata_drive) {
     uint16_t base = ata_drive->io_base;
 
     outb(REG_DRIVE_HEAD(base), 0xA0 | (ata_drive->slave ? 0x10 : 0x00));
     io_wait();
 }
 
-static void ata_soft_reset(struct ata_drive *ata_drive) {
+void ata_soft_reset(struct ata_drive *ata_drive) {
     uint16_t ctrl = ata_drive->ctrl_base;
 
     outb(ctrl, 0x04); // nIEN=0, SRST=1
@@ -32,7 +30,7 @@ static void ata_soft_reset(struct ata_drive *ata_drive) {
         ;
 }
 
-static bool ata_identify(struct ata_drive *ata_drive) {
+bool ata_identify(struct ata_drive *ata_drive) {
     ata_select_drive(ata_drive);
     io_wait();
 
@@ -44,30 +42,11 @@ static bool ata_identify(struct ata_drive *ata_drive) {
 
     while ((status & STATUS_BSY))
         status = inb(REG_STATUS(ata_drive->io_base));
-    if (inb(REG_LBA_MID(ata_drive->io_base)) || inb(REG_LBA_HIGH(ata_drive->io_base)))
+    if (inb(REG_LBA_MID(ata_drive->io_base)) ||
+        inb(REG_LBA_HIGH(ata_drive->io_base)))
         return false;
 
     insw(ata_drive->io_base, (uint16_t *) ata_drive->identify_data, 256);
-    return true;
-}
-
-static bool atapi_identify(struct ata_drive *ide) {
-    ata_select_drive(ide);
-    io_wait();
-
-    outb(REG_COMMAND(ide->io_base), 0xA1);
-    uint8_t status = inb(REG_STATUS(ide->io_base));
-
-    if (status == 0)
-        return false;
-
-    while ((status & STATUS_BSY))
-        status = inb(REG_STATUS(ide->io_base));
-    if (!(inb(REG_LBA_MID(ide->io_base)) == 0x14 &&
-          inb(REG_LBA_HIGH(ide->io_base)) == 0xEB))
-        return false;
-
-    insw(ide->io_base, (uint16_t *) ide->identify_data, 256);
     return true;
 }
 

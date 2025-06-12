@@ -128,7 +128,8 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
 static void slab_free(struct slab_cache *cache, struct slab *slab, void *obj) {
     obj = (uint8_t *) obj - sizeof(struct slab *);
 
-    uint64_t index = ((uintptr_t) obj - (uintptr_t) slab->mem) / cache->obj_size;
+    uint64_t index =
+        ((uintptr_t) obj - (uintptr_t) slab->mem) / cache->obj_size;
     uint64_t byte_idx = index / 8;
     uint8_t bit_mask = 1 << (index % 8);
 

@@ -63,14 +63,6 @@ void iso9660_pvd_print(const struct iso9660_pvd *pvd) {
     k_printf("M Path Table Location: 0x%08X\n", pvd->m_path_table_loc);
     k_printf("Optional M Path Table Location: 0x%08X\n",
              pvd->opt_m_path_table_loc);
-
-    k_printf("--- Root Directory Record ---\n");
-    const struct iso9660_dir_record *root = &pvd->root_dir_record;
-    k_printf("  Length: %u\n", root->length);
-    k_printf("  Extent (LBA): %u\n", root->extent_lba_le);
-    k_printf("  Data Length: %u bytes\n", root->size_le);
-    k_printf("  Flags: 0x%02X (%s)\n", root->flags,
-             (root->flags & 0x02) ? "Directory" : "File");
 }
 
 enum errno iso9660_mount(struct generic_disk *disk) {
@@ -100,30 +92,7 @@ void iso9660_ls(struct iso9660_fs *fs, uint32_t lba, uint32_t size) {
     }
 
     uint64_t offset = 0;
-}
-
-void iso9660_print(struct generic_disk *disk) {
-    struct iso9660_pvd pvd;
-    struct iso9660_fs *fs = disk->fs_data;
-    if (!iso9660_parse_pvd(disk, &pvd)) {
-        return;
-    }
-
-    iso9660_pvd_print(&pvd);
-
-    uint32_t num_blocks = (fs->root_size + fs->block_size - 1) / fs->block_size;
-
-    uint8_t *dir_data = kmalloc(num_blocks * fs->block_size);
-
-    if (!disk->read_sector(disk, fs->root_lba, dir_data, num_blocks)) {
-        kfree(dir_data);
-        return;
-    }
-
-    k_printf("--- Root Directory Contents ---\n");
-
-    uint64_t offset = 0;
-    while (offset < fs->root_size) {
+    while (offset < size) {
         struct iso9660_dir_record *rec =
             (struct iso9660_dir_record *) (dir_data + offset);
 
@@ -144,9 +113,24 @@ void iso9660_print(struct generic_disk *disk) {
         k_printf("  %s  (LBA: %u, Size: %u bytes, %s)\n", name,
                  rec->extent_lba_le, rec->size_le,
                  (rec->flags & 0x02) ? "Directory" : "File");
+        if (rec->flags & 0x02) {
+            k_printf("--Listing %s--\n", name);
+            iso9660_ls(fs, rec->extent_lba_le, rec->size_le);
+        }
 
         offset += rec->length;
     }
-
     kfree(dir_data);
+}
+
+void iso9660_print(struct generic_disk *disk) {
+    struct iso9660_pvd pvd;
+    struct iso9660_fs *fs = disk->fs_data;
+    if (!iso9660_parse_pvd(disk, &pvd)) {
+        return;
+    }
+
+    iso9660_pvd_print(&pvd);
+
+    iso9660_ls(fs, fs->root_lba, fs->root_size);
 }

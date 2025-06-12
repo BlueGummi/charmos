@@ -4,6 +4,26 @@
 
 #define ATAPI_SECTOR_SIZE 2048
 
+bool atapi_identify(struct ata_drive *ide) {
+    ata_select_drive(ide);
+    io_wait();
+
+    outb(REG_COMMAND(ide->io_base), 0xA1);
+    uint8_t status = inb(REG_STATUS(ide->io_base));
+
+    if (status == 0)
+        return false;
+
+    while ((status & STATUS_BSY))
+        status = inb(REG_STATUS(ide->io_base));
+    if (!(inb(REG_LBA_MID(ide->io_base)) == 0x14 &&
+          inb(REG_LBA_HIGH(ide->io_base)) == 0xEB))
+        return false;
+
+    insw(ide->io_base, (uint16_t *) ide->identify_data, 256);
+    return true;
+}
+
 bool atapi_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
                        uint64_t sector_count) {
     if (sector_count != 1)
@@ -70,7 +90,8 @@ bool atapi_write_sector(struct generic_disk *disk, uint64_t lba,
     (void) lba;
     (void) buffer;
     (void) sector_count;
-    return false;
+    return false; // no can write to cd
+    // TODO: newer CDs support write :boom:
 }
 
 bool atapi_read_sector_wrapper(struct generic_disk *disk, uint64_t start_lba,

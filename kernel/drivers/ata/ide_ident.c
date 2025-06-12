@@ -61,7 +61,7 @@ void ide_identify(struct ata_drive *drive) {
 
     insw(REG_DATA(io), buf, 256);
 
-    swap_str(drive->serial, &buf[10], 10);  
+    swap_str(drive->serial, &buf[10], 10);
     swap_str(drive->firmware, &buf[23], 4);
     swap_str(drive->model, &buf[27], 20);
 
