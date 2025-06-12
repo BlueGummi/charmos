@@ -13,8 +13,8 @@ bool nvme_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
                       uint16_t count) {
     struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
 
-    size_t total_bytes = count * 512;
-    size_t pages_needed = (total_bytes + 4095) / 4096;
+    uint64_t total_bytes = count * 512;
+    uint64_t pages_needed = (total_bytes + 4095) / 4096;
 
     uint64_t buffer_phys = (uint64_t) pmm_alloc_pages(pages_needed, false);
     if (!buffer_phys)
@@ -45,8 +45,8 @@ bool nvme_write_sector(struct generic_disk *disk, uint64_t lba,
                        const uint8_t *buffer, uint16_t count) {
     struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
 
-    size_t total_bytes = count * 512;
-    size_t pages_needed = (total_bytes + 4095) / 4096;
+    uint64_t total_bytes = count * 512;
+    uint64_t pages_needed = (total_bytes + 4095) / 4096;
 
     uint64_t buffer_phys = (uint64_t) pmm_alloc_pages(pages_needed, false);
     if (!buffer_phys)

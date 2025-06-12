@@ -21,9 +21,9 @@ static void *slab_map_new_page() {
     return (void *) virt;
 }
 
-static void slab_cache_init(struct slab_cache *cache, size_t obj_size) {
+static void slab_cache_init(struct slab_cache *cache, uint64_t obj_size) {
     cache->obj_size = obj_size + sizeof(struct slab *);
-    size_t available = PAGE_SIZE - sizeof(struct slab);
+    uint64_t available = PAGE_SIZE - sizeof(struct slab);
 
     if (cache->obj_size > available) {
         cache->objs_per_slab = 0;
@@ -45,7 +45,7 @@ static struct slab *slab_create(struct slab_cache *cache) {
     struct slab *slab = (struct slab *) page;
     slab->parent_cache = cache;
 
-    size_t bitmap_bytes = (cache->objs_per_slab + 7) / 8;
+    uint64_t bitmap_bytes = (cache->objs_per_slab + 7) / 8;
     slab->bitmap = (uint8_t *) ((uint8_t *) page + sizeof(struct slab));
 
     if ((cache->obj_size > 0) &&
@@ -102,8 +102,8 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
         return NULL;
     }
 
-    for (size_t i = 0; i < cache->objs_per_slab; i++) {
-        size_t byte_idx = i / 8;
+    for (uint64_t i = 0; i < cache->objs_per_slab; i++) {
+        uint64_t byte_idx = i / 8;
         uint8_t bit_mask = 1 << (i % 8);
 
         if (!(slab->bitmap[byte_idx] & bit_mask)) {
@@ -128,8 +128,8 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
 static void slab_free(struct slab_cache *cache, struct slab *slab, void *obj) {
     obj = (uint8_t *) obj - sizeof(struct slab *);
 
-    size_t index = ((uintptr_t) obj - (uintptr_t) slab->mem) / cache->obj_size;
-    size_t byte_idx = index / 8;
+    uint64_t index = ((uintptr_t) obj - (uintptr_t) slab->mem) / cache->obj_size;
+    uint64_t byte_idx = index / 8;
     uint8_t bit_mask = 1 << (index % 8);
 
     if (!(slab->bitmap[byte_idx] & bit_mask)) {
@@ -173,7 +173,7 @@ static void *slab_alloc(struct slab_cache *cache) {
     return slab_alloc_from(cache, slab);
 }
 
-static int size_to_index(size_t size) {
+static int uint64_to_index(uint64_t size) {
     if (size == 0)
         return -1;
     int shift = SLAB_MIN_SHIFT;
@@ -186,29 +186,29 @@ static int size_to_index(size_t size) {
 
 void slab_init() {
     for (int i = 0; i < SLAB_CLASS_COUNT; i++) {
-        size_t size = 1UL << (i + SLAB_MIN_SHIFT);
+        uint64_t size = 1UL << (i + SLAB_MIN_SHIFT);
         slab_cache_init(&slab_caches[i], size);
     }
 }
 
-void *kmalloc(size_t size) {
+void *kmalloc(uint64_t size) {
     if (size == 0)
         return NULL;
 
-    int idx = size_to_index(size);
+    int idx = uint64_to_index(size);
     if (idx >= 0 && slab_caches[idx].objs_per_slab > 0) {
         return slab_alloc(&slab_caches[idx]);
     }
 
-    size_t total_size = size + sizeof(struct slab_phdr);
-    size_t pages = (total_size + PAGE_SIZE - 1) / PAGE_SIZE;
+    uint64_t total_size = size + sizeof(struct slab_phdr);
+    uint64_t pages = (total_size + PAGE_SIZE - 1) / PAGE_SIZE;
 
     uintptr_t phys = (uintptr_t) pmm_alloc_pages(pages, false);
     if (!phys)
         return NULL;
 
     uintptr_t virt = slab_heap_top;
-    for (size_t i = 0; i < pages; i++) {
+    for (uint64_t i = 0; i < pages; i++) {
         vmm_map_page(virt + i * PAGE_SIZE, phys + i * PAGE_SIZE,
                      PAGING_PRESENT | PAGING_WRITE);
     }
@@ -221,7 +221,7 @@ void *kmalloc(size_t size) {
     return (void *) (hdr + 1);
 }
 
-void *kzalloc(size_t size) {
+void *kzalloc(uint64_t size) {
     void *ptr = kmalloc(size);
     if (!ptr)
         return NULL;
@@ -240,7 +240,7 @@ void kfree(void *ptr) {
 
     if (hdr->magic == MAGIC_KMALLOC_PAGE) {
         uintptr_t virt = (uintptr_t) hdr;
-        for (size_t i = 0; i < hdr->pages; i++) {
+        for (uint64_t i = 0; i < hdr->pages; i++) {
             pmm_free_pages((void *) vmm_get_phys(virt + i * PAGE_SIZE), 1,
                            false);
         }
@@ -257,7 +257,7 @@ void kfree(void *ptr) {
     slab_free(cache, slab, ptr);
 }
 
-void *krealloc(void *ptr, size_t size) {
+void *krealloc(void *ptr, uint64_t size) {
     if (!ptr)
         return NULL;
 

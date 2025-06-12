@@ -52,6 +52,7 @@ struct iso9660_fs {
     struct iso9660_pvd *pvd;
     uint32_t root_lba;
     uint32_t root_size;
+    uint32_t block_size;
 };
 
 enum errno iso9660_mount(struct generic_disk *disk);

@@ -50,11 +50,11 @@ void nvme_setup_admin_queues(struct nvme_device *nvme) {
 }
 
 void nvme_alloc_admin_queues(struct nvme_device *nvme) {
-    size_t asq_size = nvme->admin_q_depth * sizeof(struct nvme_command);
-    size_t acq_size = nvme->admin_q_depth * sizeof(struct nvme_completion);
+    uint64_t asq_size = nvme->admin_q_depth * sizeof(struct nvme_command);
+    uint64_t acq_size = nvme->admin_q_depth * sizeof(struct nvme_completion);
 
-    size_t asq_pages = DIV_ROUND_UP(asq_size, nvme->page_size);
-    size_t acq_pages = DIV_ROUND_UP(acq_size, nvme->page_size);
+    uint64_t asq_pages = DIV_ROUND_UP(asq_size, nvme->page_size);
+    uint64_t acq_pages = DIV_ROUND_UP(acq_size, nvme->page_size);
 
     uint64_t asq_phys = (uint64_t) pmm_alloc_pages(asq_pages, false);
 

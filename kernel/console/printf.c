@@ -31,13 +31,13 @@ static void serial_putc(char c) {
     outb(0x3F8, c);
 }
 
-static void serial_puts(const char *str, size_t len) {
-    for (size_t i = 0; i < len; i++) {
+static void serial_puts(const char *str, uint64_t len) {
+    for (uint64_t i = 0; i < len; i++) {
         serial_putc(str[i]);
     }
 }
 
-void double_print(struct flanterm_context *f, const char *str, size_t len) {
+void double_print(struct flanterm_context *f, const char *str, uint64_t len) {
     serial_puts(str, len);
     flanterm_write(f, str, len);
 }
@@ -242,7 +242,7 @@ static void handle_format_specifier(const char **format_ptr, va_list args) {
         case LEN_H: num = (short) va_arg(args, int); break;
         case LEN_L: num = va_arg(args, long); break;
         case LEN_LL: num = va_arg(args, long long); break;
-        case LEN_Z: num = (int64_t) va_arg(args, size_t); break;
+        case LEN_Z: num = (int64_t) va_arg(args, uint64_t); break;
         default: num = va_arg(args, int); break;
         }
         len = print_signed(buffer, num);
@@ -255,7 +255,7 @@ static void handle_format_specifier(const char **format_ptr, va_list args) {
         case LEN_H: num = (unsigned short) va_arg(args, unsigned int); break;
         case LEN_L: num = va_arg(args, unsigned long); break;
         case LEN_LL: num = va_arg(args, unsigned long long); break;
-        case LEN_Z: num = va_arg(args, size_t); break;
+        case LEN_Z: num = va_arg(args, uint64_t); break;
         default: num = va_arg(args, unsigned int); break;
         }
         len = print_unsigned(buffer, num);
@@ -268,7 +268,7 @@ static void handle_format_specifier(const char **format_ptr, va_list args) {
         case LEN_H: num = (unsigned short) va_arg(args, unsigned int); break;
         case LEN_L: num = va_arg(args, unsigned long); break;
         case LEN_LL: num = va_arg(args, unsigned long long); break;
-        case LEN_Z: num = va_arg(args, size_t); break;
+        case LEN_Z: num = va_arg(args, uint64_t); break;
         default: num = va_arg(args, unsigned int); break;
         }
         len = print_hex(buffer, num);
@@ -281,7 +281,7 @@ static void handle_format_specifier(const char **format_ptr, va_list args) {
         case LEN_H: num = (unsigned short) va_arg(args, unsigned int); break;
         case LEN_L: num = va_arg(args, unsigned long); break;
         case LEN_LL: num = va_arg(args, unsigned long long); break;
-        case LEN_Z: num = va_arg(args, size_t); break;
+        case LEN_Z: num = va_arg(args, uint64_t); break;
         default: num = va_arg(args, unsigned int); break;
         }
         len = print_hex_upper(buffer, num);
@@ -294,7 +294,7 @@ static void handle_format_specifier(const char **format_ptr, va_list args) {
         case LEN_H: num = (unsigned short) va_arg(args, unsigned int); break;
         case LEN_L: num = va_arg(args, unsigned long); break;
         case LEN_LL: num = va_arg(args, unsigned long long); break;
-        case LEN_Z: num = va_arg(args, size_t); break;
+        case LEN_Z: num = va_arg(args, uint64_t); break;
         default: num = va_arg(args, unsigned int); break;
         }
         len = print_binary(buffer, num);

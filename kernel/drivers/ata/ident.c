@@ -25,8 +25,8 @@ void ide_print_info(struct generic_disk *d) {
     k_printf("  PIO Mode: %u\n", drive->pio_mode);
 }
 
-static void swap_str(char *dst, const uint16_t *src, size_t word_len) {
-    for (size_t i = 0; i < word_len; ++i) {
+static void swap_str(char *dst, const uint16_t *src, uint64_t word_len) {
+    for (uint64_t i = 0; i < word_len; ++i) {
         dst[2 * i] = (src[i] >> 8) & 0xFF;
         dst[2 * i + 1] = src[i] & 0xFF;
     }

@@ -67,10 +67,10 @@ void debug_print_stack() {
             k_printf("  [%2d] 0x%016lx\n", i, rsp[i]);
     }
 }
-void debug_print_memory(void *addr, size_t size) {
+void debug_print_memory(void *addr, uint64_t size) {
     uint8_t *ptr = (uint8_t *) addr;
     k_printf("Memory at 0x%lx:\n", (uint64_t) addr);
-    for (size_t i = 0; i < size; i++) {
+    for (uint64_t i = 0; i < size; i++) {
         if (i % 16 == 0) {
             if (i != 0)
                 k_printf("\n");

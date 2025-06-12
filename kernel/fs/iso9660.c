@@ -34,7 +34,7 @@ bool iso9660_parse_pvd(struct generic_disk *disk, struct iso9660_pvd *out_pvd) {
     return true;
 }
 
-static void print_str(const char *label, const char *src, size_t len) {
+static void print_str(const char *label, const char *src, uint64_t len) {
     char buf[65] = {0};
     memcpy(buf, src, len);
     buf[len] = '\0';
@@ -83,10 +83,23 @@ enum errno iso9660_mount(struct generic_disk *disk) {
         fs->root_lba = pvd.root_dir_record.extent_lba_le;
         fs->root_size = pvd.root_dir_record.size_le;
         fs->disk = disk;
+        fs->block_size = pvd.logical_block_size_le;
         disk->fs_data = fs;
         return ERR_OK;
     }
     return ERR_FS_INTERNAL;
+}
+
+void iso9660_ls(struct iso9660_fs *fs, uint32_t lba, uint32_t size) {
+    uint32_t num_blocks = (size + fs->block_size - 1) / fs->block_size;
+    uint8_t *dir_data = kmalloc(num_blocks * fs->block_size);
+
+    if (!fs->disk->read_sector(fs->disk, lba, dir_data, num_blocks)) {
+        kfree(dir_data);
+        return;
+    }
+
+    uint64_t offset = 0;
 }
 
 void iso9660_print(struct generic_disk *disk) {
@@ -98,26 +111,24 @@ void iso9660_print(struct generic_disk *disk) {
 
     iso9660_pvd_print(&pvd);
 
-    uint32_t block_size = pvd.logical_block_size_le;
-    uint32_t num_blocks = (fs->root_size + block_size - 1) / block_size;
+    uint32_t num_blocks = (fs->root_size + fs->block_size - 1) / fs->block_size;
 
-    uint8_t *dir_data = kmalloc(num_blocks * block_size);
+    uint8_t *dir_data = kmalloc(num_blocks * fs->block_size);
 
     if (!disk->read_sector(disk, fs->root_lba, dir_data, num_blocks)) {
-        k_printf("Failed to read root directory data\n");
         kfree(dir_data);
         return;
     }
 
     k_printf("--- Root Directory Contents ---\n");
 
-    size_t offset = 0;
+    uint64_t offset = 0;
     while (offset < fs->root_size) {
         struct iso9660_dir_record *rec =
             (struct iso9660_dir_record *) (dir_data + offset);
 
         if (rec->length == 0) {
-            offset = ((offset / block_size) + 1) * block_size;
+            offset = ((offset / fs->block_size) + 1) * fs->block_size;
             continue;
         }
 

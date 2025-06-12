@@ -10,25 +10,25 @@
 
 static struct vfs_node *root = NULL;
 
-enum errno vfs_read(struct vfs_node *node, void *buf, size_t size,
-                    size_t offset) {
+enum errno vfs_read(struct vfs_node *node, void *buf, uint64_t size,
+                    uint64_t offset) {
     if (!node || !buf || node->type != VFS_FILE || offset >= node->size)
         return ERR_INVAL;
 
     char *data = (char *) node->internal_data;
-    size_t remaining = node->size - offset;
-    size_t to_copy = (size < remaining) ? size : remaining;
+    uint64_t remaining = node->size - offset;
+    uint64_t to_copy = (size < remaining) ? size : remaining;
 
     memcpy(buf, data + offset, to_copy);
     return ERR_OK;
 }
 
-enum errno vfs_write(struct vfs_node *node, const void *buf, size_t size,
-                     size_t offset) {
+enum errno vfs_write(struct vfs_node *node, const void *buf, uint64_t size,
+                     uint64_t offset) {
     if (!node || !buf || node->type != VFS_FILE)
         return ERR_INVAL;
 
-    size_t required_size = offset + size;
+    uint64_t required_size = offset + size;
 
     if (required_size > node->size) {
         void *new_data = kmalloc(required_size);

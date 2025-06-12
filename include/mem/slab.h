@@ -11,14 +11,14 @@ struct slab {
     struct slab *next;
     uint8_t *bitmap;
     void *mem;
-    size_t used;
+    uint64_t used;
     enum slab_state state;
     struct slab_cache *parent_cache;
 };
 
 struct slab_cache {
-    size_t obj_size;
-    size_t objs_per_slab;
+    uint64_t obj_size;
+    uint64_t objs_per_slab;
     struct slab *slabs_free;
     struct slab *slabs_partial;
     struct slab *slabs_full;
@@ -26,7 +26,7 @@ struct slab_cache {
 
 struct slab_phdr {
     uint32_t magic;
-    size_t pages;
+    uint64_t pages;
 };
 
 void slab_init();

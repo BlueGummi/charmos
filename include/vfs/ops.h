@@ -6,9 +6,9 @@ struct vnode_ops {
     enum errno (*open)(struct vfs_node *vn);
     enum errno (*close)(struct vfs_node *vn);
 
-    enum errno (*read)(struct vfs_node *vn, void *buf, size_t len,
+    enum errno (*read)(struct vfs_node *vn, void *buf, uint64_t len,
                        off_t offset);
-    enum errno (*write)(struct vfs_node *vn, const void *buf, size_t len,
+    enum errno (*write)(struct vfs_node *vn, const void *buf, uint64_t len,
                         off_t offset);
 
     enum errno (*mkdir)(struct vfs_node *vn, const char *name);
