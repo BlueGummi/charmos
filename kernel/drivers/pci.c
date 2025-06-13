@@ -51,11 +51,14 @@ void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
                     continue;
 
                 space_to_alloc++;
-                uint16_t cmd = pci_read_config16(bus, device, function,
-                                                 0x04); // PCI_COMMAND offset
-                cmd |= (1 << 2);                        // PCI_COMMAND_MASTER
-                cmd |= (1 << 1);
-                pci_write_config16(bus, device, function, 0x04, cmd);
+
+                union pci_command_reg cmd;
+                cmd.value = pci_read_config16(bus, device, function, 0x04);
+
+                cmd.bus_master = 1;
+                cmd.memory_space = 1;
+
+                pci_write_config16(bus, device, function, 0x04, cmd.value);
 
                 if (function == 0) {
                     uint8_t header_type =
