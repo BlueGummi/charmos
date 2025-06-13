@@ -2,6 +2,16 @@
 #include <devices/generic_disk.h>
 #include <stdint.h>
 
+struct iso9660_datetime {
+    uint8_t year;      // since 1900
+    uint8_t month;     // 1–12
+    uint8_t day;       // 1–31
+    uint8_t hour;      // 0–23
+    uint8_t minute;    // 0–59
+    uint8_t second;    // 0–59
+    int8_t gmt_offset; // in 15-minute intervals from GMT (-48 to +52)
+} __attribute__((packed));
+
 // Directory record (variable size, packed)
 struct iso9660_dir_record {
     uint8_t length;          // total length of this record
@@ -10,8 +20,8 @@ struct iso9660_dir_record {
     uint32_t extent_lba_be;
     uint32_t size_le; // file size in bytes (LE)
     uint32_t size_be;
-    uint8_t datetime[7]; // date/time
-    uint8_t flags;       // bit 1 = directory
+    struct iso9660_datetime datetime; // date/time
+    uint8_t flags;                    // bit 1 = directory
     uint8_t file_unit_size;
     uint8_t interleave_gap_size;
     uint16_t vol_seq_num_le;
@@ -45,6 +55,7 @@ struct iso9660_pvd {
     uint32_t m_path_table_loc;
     uint32_t opt_m_path_table_loc;
     struct iso9660_dir_record root_dir_record;
+    // couple more things - idrc about em so i'm leavin em out
 } __attribute__((packed));
 
 struct iso9660_fs {
@@ -57,6 +68,7 @@ struct iso9660_fs {
 
 enum errno iso9660_mount(struct generic_disk *disk);
 void iso9660_print(struct generic_disk *disk);
+struct iso9660_datetime iso9660_get_current_date(void);
 
 #define ISO9660_PVD_SECTOR 16
 #define ISO9660_SECTOR_SIZE 2048

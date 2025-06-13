@@ -213,3 +213,19 @@ void iso9660_read_and_print_file(struct iso9660_fs *fs, const char *name) {
     kfree(buf);
     kfree(rec);
 }
+
+struct iso9660_datetime iso9660_get_current_date(void) {
+    struct iso9660_datetime dt;
+
+    dt.year = (time_get_century() * 100 + time_get_year()) - 1900;
+    dt.month = time_get_month();
+    dt.day = time_get_day();
+    dt.hour = time_get_hour();
+    dt.minute = time_get_minute();
+    dt.second = time_get_second();
+
+    dt.gmt_offset =
+        0; // TODO: once we have better stuff up and going - alter this
+
+    return dt;
+}
