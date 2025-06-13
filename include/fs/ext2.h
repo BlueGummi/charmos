@@ -9,23 +9,67 @@ extern uint64_t PTRS_PER_BLOCK;
 #define EXT2_SIGNATURE 0xEF53
 #define EXT2_NAME_LEN 255
 #define EXT2_ROOT_INODE 2
-#define EXT2_S_IFSOCK 0xC000 // socket
-#define EXT2_S_IFLNK 0xA000  // symbolic link
-#define EXT2_S_IFREG 0x8000  // regular file
-#define EXT2_S_IFBLK 0x6000  // block device
-#define EXT2_S_IFDIR 0x4000  // directory
-#define EXT2_S_IFCHR 0x2000  // character device
-#define EXT2_S_IFIFO 0x1000  // FIFO
-#define EXT2_S_IFMT 0xF000   // mask to extract file type from i_mode
-#define EXT2_FT_UNKNOWN 0    // Unknown file type
-#define EXT2_FT_REG_FILE 1   // Regular file
-#define EXT2_FT_DIR 2        // Directory
-#define EXT2_FT_CHRDEV 3     // Character device
-#define EXT2_FT_BLKDEV 4     // Block device
-#define EXT2_FT_FIFO 5       // FIFO (named pipe)
-#define EXT2_FT_SOCK 6       // Unix domain socket
-#define EXT2_FT_SYMLINK 7    // Symbolic link
-#define EXT2_FT_MAX 8        // Number of defined file types
+#define EXT2_S_IFSOCK 0xC000     // socket
+#define EXT2_S_IFLNK 0xA000      // symbolic link
+#define EXT2_S_IFREG 0x8000      // regular file
+#define EXT2_S_IFBLK 0x6000      // block device
+#define EXT2_S_IFDIR 0x4000      // directory
+#define EXT2_S_IFCHR 0x2000      // character device
+#define EXT2_S_IFIFO 0x1000      // FIFO
+#define EXT2_S_IFMT 0xF000       // mask to extract file type from i_mode
+#define EXT2_S_PERMS 0x0FFF      // lower 12 bits: special + rwx bits
+#define EXT2_S_IRWXU 0x01C0      // owner permissions
+#define EXT2_S_IRWXG 0x0038      // group permissions
+#define EXT2_S_IRWXO 0x0007      // others permissions
+#define EXT2_S_PERMS_ONLY 0x01FF // rwx bits only
+
+#define EXT2_FT_UNKNOWN 0  // Unknown file type
+#define EXT2_FT_REG_FILE 1 // Regular file
+#define EXT2_FT_DIR 2      // Directory
+#define EXT2_FT_CHRDEV 3   // Character device
+#define EXT2_FT_BLKDEV 4   // Block device
+#define EXT2_FT_FIFO 5     // FIFO (named pipe)
+#define EXT2_FT_SOCK 6     // Unix domain socket
+#define EXT2_FT_SYMLINK 7  // Symbolic link
+#define EXT2_FT_MAX 8      // Number of defined file types
+
+// ext2 inode flags
+#define EXT2_SECRM_FL 0x00000001     // Secure deletion
+#define EXT2_UNRM_FL 0x00000002      // Undelete
+#define EXT2_COMPR_FL 0x00000004     // Compress file
+#define EXT2_SYNC_FL 0x00000008      // Synchronous updates
+#define EXT2_IMMUTABLE_FL 0x00000010 // Immutable file
+#define EXT2_APPEND_FL 0x00000020    // Writes only append
+#define EXT2_NODUMP_FL 0x00000040    // Don't include in backups
+#define EXT2_NOATIME_FL 0x00000080   // Don't update access time
+
+#define EXT2_DIRTY_FL 0x00000100    // Dirty (compress support)
+#define EXT2_COMPRBLK_FL 0x00000200 // One or more compressed clusters
+#define EXT2_NOCOMPR_FL 0x00000400  // Don't compress
+#define EXT2_ECOMPR_FL 0x00000800   // Compression error
+
+#define EXT2_BTREE_FL 0x00001000        // B-tree format directory (ext3/4)
+#define EXT2_INDEX_FL 0x00001000        // Has hash-indexed directory
+#define EXT2_IMAGIC_FL 0x00002000       // AFS directory
+#define EXT2_JOURNAL_DATA_FL 0x00004000 // Write data to journal (data=journal)
+
+#define EXT2_NOTAIL_FL 0x00008000    // File tail not merged (reiserfs)
+#define EXT2_DIRSYNC_FL 0x00010000   // Directory sync updates
+#define EXT2_TOPDIR_FL 0x00020000    // Top of directory hierarchy
+#define EXT2_HUGE_FILE_FL 0x00040000 // Set to each huge file
+#define EXT2_EXTENTS_FL 0x00080000   // Inode uses extents
+
+#define EXT2_EA_INODE_FL 0x00200000    // Inode stores extended attributes
+#define EXT2_INLINE_DATA_FL 0x10000000 // Data is stored inline in inode
+#define EXT2_PROJINHERIT_FL 0x20000000 // Project ID inheritance
+
+#define EXT2_RESERVED_FL 0x80000000 // Reserved for ext3/4
+
+// Useful masks
+#define EXT2_FL_USER_VISIBLE 0x000BDFFF // User-visible flags
+#define EXT2_FL_USER_MODIFIABLE                                                \
+    (EXT2_FL_USER_VISIBLE & ~(EXT2_SECRM_FL | EXT2_UNRM_FL))
+
 #define MIN(x, y) ((x > y) ? y : x)
 
 #define MAKE_NOP_CALLBACK                                                      \
@@ -136,7 +180,7 @@ struct ext2_inode {
     uint8_t osd2[12];
 } __attribute__((packed));
 
-struct k_full_inode {
+struct ext2_full_inode {
     struct ext2_inode node;
     uint32_t inode_num;
 };
@@ -212,26 +256,31 @@ uint32_t ext2_get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
 //
 //
 
-enum errno ext2_link_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
-                          struct k_full_inode *inode, char *name);
+enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
+                          struct ext2_full_inode *inode, char *name);
 
-enum errno ext2_unlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
+enum errno ext2_unlink_file(struct ext2_fs *fs,
+                            struct ext2_full_inode *dir_inode,
                             const char *name);
 
-enum errno ext2_create_file(struct ext2_fs *fs, struct k_full_inode *parent_dir,
+enum errno ext2_create_file(struct ext2_fs *fs,
+                            struct ext2_full_inode *parent_dir,
                             const char *name, uint16_t mode);
 
-enum errno ext2_symlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
+enum errno ext2_symlink_file(struct ext2_fs *fs,
+                             struct ext2_full_inode *dir_inode,
                              const char *name, char *target);
 
-enum errno ext2_write_file(struct ext2_fs *fs, struct k_full_inode *inode,
-                           uint32_t offset, const uint8_t *src, uint32_t size);
+enum errno ext2_write_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
+                           uint32_t offset, const uint8_t *src, uint32_t size,
+                           uint64_t *bytes_written_out);
 
-struct k_full_inode *ext2_find_file_in_dir(struct ext2_fs *fs,
-                                           struct k_full_inode *dir_inode,
-                                           const char *fname);
+struct ext2_full_inode *ext2_find_file_in_dir(struct ext2_fs *fs,
+                                              struct ext2_full_inode *dir_inode,
+                                              const char *fname);
 
-bool ext2_dir_contains_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
+bool ext2_dir_contains_file(struct ext2_fs *fs,
+                            struct ext2_full_inode *dir_inode,
                             const char *fname);
 
 //
@@ -246,7 +295,7 @@ bool ext2_free_block(struct ext2_fs *fs, uint32_t block_num);
 uint32_t ext2_alloc_inode(struct ext2_fs *fs);
 bool ext2_free_inode(struct ext2_fs *fs, uint32_t inode_num);
 
-bool ext2_walk_dir(struct ext2_fs *fs, struct k_full_inode *dir_inode,
+bool ext2_walk_dir(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
                    dir_entry_callback cb, void *ctx, bool ff_avail);
 
 void ext2_traverse_inode_blocks(struct ext2_fs *fs, struct ext2_inode *inode,

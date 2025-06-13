@@ -40,7 +40,8 @@ static bool walk_dir(struct ext2_fs *fs, uint32_t block_num,
     return modified;
 }
 
-static bool walk_direct_blocks(struct ext2_fs *fs, struct k_full_inode *inode,
+static bool walk_direct_blocks(struct ext2_fs *fs,
+                               struct ext2_full_inode *inode,
                                dir_entry_callback cb, void *ctx,
                                bool ff_avail) {
     for (uint32_t i = 0; i < 12; ++i) {
@@ -60,7 +61,7 @@ static bool walk_direct_blocks(struct ext2_fs *fs, struct k_full_inode *inode,
 
 static bool walk_indirect(struct ext2_fs *fs, uint32_t block_num, int level,
                           dir_entry_callback cb, void *ctx, bool ff_avail,
-                          struct k_full_inode *inode) {
+                          struct ext2_full_inode *inode) {
     if (block_num == 0)
         return false;
 
@@ -94,7 +95,7 @@ static bool walk_indirect(struct ext2_fs *fs, uint32_t block_num, int level,
     return false;
 }
 
-bool ext2_walk_dir(struct ext2_fs *fs, struct k_full_inode *dir_inode,
+bool ext2_walk_dir(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
                    dir_entry_callback cb, void *ctx, bool ff_avail) {
     if (!fs || !dir_inode || !cb)
         return false;

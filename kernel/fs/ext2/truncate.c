@@ -78,7 +78,7 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
     }
 }
 
-enum errno ext2_truncate_file(struct ext2_fs *fs, struct k_full_inode *inode,
+enum errno ext2_truncate_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
                               uint32_t new_size) {
     uint32_t old_block_count =
         (inode->node.size + fs->block_size - 1) / fs->block_size;

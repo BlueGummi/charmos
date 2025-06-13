@@ -4,8 +4,9 @@
 #include <mem/alloc.h>
 #include <string.h>
 
-enum errno ext2_write_file(struct ext2_fs *fs, struct k_full_inode *inode,
-                           uint32_t offset, const uint8_t *src, uint32_t size) {
+enum errno ext2_write_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
+                           uint32_t offset, const uint8_t *src, uint32_t size,
+                           uint64_t *bytes_written_out) {
     if (!fs || !inode || !src)
         return ERR_INVAL;
 
@@ -55,10 +56,109 @@ enum errno ext2_write_file(struct ext2_fs *fs, struct k_full_inode *inode,
         inode->node.size = offset + size;
     }
 
+    *bytes_written_out = bytes_written;
+
     inode->node.blocks +=
         new_block_counter * (fs->block_size / fs->drive->sector_size);
 
     return ext2_write_inode(fs, inode->inode_num, &inode->node)
                ? ERR_OK
                : ERR_FS_INTERNAL;
+}
+
+struct file_read_ctx {
+    struct ext2_fs *fs;
+    struct ext2_inode *inode;
+    uint32_t offset;
+    uint32_t length;
+    uint8_t *buffer;
+    uint32_t bytes_read;
+};
+
+static void file_read_visitor(struct ext2_fs *fs, struct ext2_inode *inode,
+                              uint32_t depth, uint32_t *block_ptr,
+                              void *user_data) {
+    (void) depth;
+    struct file_read_ctx *ctx = (struct file_read_ctx *) user_data;
+
+    if (ctx->bytes_read >= ctx->length)
+        return;
+
+    if (*block_ptr == 0)
+        return;
+
+    uint32_t block_size = fs->block_size;
+    uint8_t block_buf[block_size];
+    uint32_t lba = (*block_ptr) * fs->sectors_per_block;
+
+    if (!ext2_block_read(fs->drive, lba, block_buf, fs->sectors_per_block)) {
+        return;
+    }
+
+    uint32_t file_offset = ctx->bytes_read + ctx->offset;
+    uint32_t block_offset = file_offset % block_size;
+
+    if ((ctx->bytes_read + ctx->offset) >= inode->size)
+        return;
+
+    uint32_t remaining = ctx->length - ctx->bytes_read;
+    uint32_t in_block = block_size - block_offset;
+    uint32_t to_copy = (remaining < in_block) ? remaining : in_block;
+
+    if ((ctx->bytes_read + ctx->offset + to_copy) > inode->size)
+        to_copy = inode->size - (ctx->bytes_read + ctx->offset);
+
+    memcpy(ctx->buffer + ctx->bytes_read, block_buf + block_offset, to_copy);
+    ctx->bytes_read += to_copy;
+    ctx->offset += to_copy;
+}
+
+uint64_t ext2_read_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
+                        uint32_t offset, uint8_t *buffer, uint64_t length) {
+    if (!fs || !inode || !buffer || offset >= inode->node.size)
+        return 0;
+
+    if (offset + length > inode->node.size)
+        length = inode->node.size - offset;
+
+    struct file_read_ctx ctx = {.fs = fs,
+                                .inode = &inode->node,
+                                .offset = offset,
+                                .length = length,
+                                .buffer = buffer,
+                                .bytes_read = 0};
+
+    ext2_traverse_inode_blocks(fs, &inode->node, file_read_visitor, &ctx);
+    return ctx.bytes_read;
+}
+
+enum errno ext2_chmod(struct ext2_fs *fs, struct ext2_full_inode *node,
+                      uint16_t new_mode) {
+    if (!fs || !node)
+        return ERR_INVAL;
+
+    uint16_t ftype = node->node.mode & EXT2_S_IFMT;
+    node->node.mode = ftype | (new_mode & EXT2_S_PERMS);
+
+    if (!ext2_write_inode(fs, node->inode_num, &node->node))
+        return ERR_FS_INTERNAL;
+
+    return ERR_OK;
+}
+
+enum errno ext2_chown(struct ext2_fs *fs, struct ext2_full_inode *node,
+                      uint32_t new_uid, uint32_t new_gid) {
+    if (!fs || !node)
+        return ERR_INVAL;
+
+    if (new_uid != (uint32_t) -1)
+        node->node.uid = new_uid;
+
+    if (new_gid != (uint32_t) -1)
+        node->node.gid = new_gid;
+
+    if (!ext2_write_inode(fs, node->inode_num, &node->node))
+        return ERR_FS_INTERNAL;
+
+    return ERR_OK;
 }

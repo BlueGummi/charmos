@@ -59,7 +59,8 @@ bool unlink_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
     return false;
 }
 
-enum errno ext2_unlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
+enum errno ext2_unlink_file(struct ext2_fs *fs,
+                            struct ext2_full_inode *dir_inode,
                             const char *name) {
 
     if (!ext2_dir_contains_file(fs, dir_inode, name))
@@ -98,7 +99,7 @@ enum errno ext2_unlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
     }
     kfree(block);
 
-    struct k_full_inode target_inode;
+    struct ext2_full_inode target_inode;
     if (!ext2_read_inode(fs, ctx.inode_num, &target_inode.node))
         return ERR_FS_INTERNAL;
 

@@ -57,8 +57,8 @@ static bool link_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
     return false;
 }
 
-enum errno ext2_link_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
-                          struct k_full_inode *inode, char *name) {
+enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
+                          struct ext2_full_inode *inode, char *name) {
     struct link_ctx ctx = {
         .name = name,
         .inode = inode->inode_num,
@@ -111,7 +111,8 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
                : ERR_FS_INTERNAL;
 }
 
-enum errno ext2_symlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
+enum errno ext2_symlink_file(struct ext2_fs *fs,
+                             struct ext2_full_inode *dir_inode,
                              const char *name, char *target) {
     uint32_t inode_num = ext2_alloc_inode(fs);
     if (inode_num == 0)
@@ -140,7 +141,7 @@ enum errno ext2_symlink_file(struct ext2_fs *fs, struct k_full_inode *dir_inode,
     if (!ext2_write_inode(fs, inode_num, &new_inode))
         return ERR_FS_INTERNAL;
 
-    struct k_full_inode wrapped_inode = {
+    struct ext2_full_inode wrapped_inode = {
         .inode_num = inode_num,
         .node = new_inode,
     };

@@ -106,9 +106,9 @@ void ext2_g_print(struct generic_disk *d) {
     ext2_print_superblock(fs->sblock);
 }
 
-struct k_full_inode *ext2_path_lookup(struct ext2_fs *fs,
-                                      struct k_full_inode *node,
-                                      const char *path) {
+struct ext2_full_inode *ext2_path_lookup(struct ext2_fs *fs,
+                                         struct ext2_full_inode *node,
+                                         const char *path) {
     if (!path || !fs || !node)
         return NULL;
 
@@ -127,7 +127,7 @@ struct k_full_inode *ext2_path_lookup(struct ext2_fs *fs,
     memcpy(next_dir, start, len);
     next_dir[len] = '\0';
 
-    struct k_full_inode *next = ext2_find_file_in_dir(fs, node, next_dir);
+    struct ext2_full_inode *next = ext2_find_file_in_dir(fs, node, next_dir);
 
     if (!next) {
         k_printf("Did not find %s\n", next_dir);

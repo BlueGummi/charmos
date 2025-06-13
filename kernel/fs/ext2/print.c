@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <time/print.h>
 
-void ext2_print_inode(const struct k_full_inode *node) {
+void ext2_print_inode(const struct ext2_full_inode *node) {
     if (!node)
         return;
 
@@ -49,48 +49,6 @@ void ext2_print_inode(const struct k_full_inode *node) {
         k_printf("%02x ", inode.osd2[i]);
     }
     k_printf("\n");
-}
-
-void ext2_dump_file_data(struct ext2_fs *fs, const struct ext2_inode *inode,
-                         uint32_t start_block_index, uint32_t length) {
-    if (!fs || !inode)
-        return;
-
-    k_printf("\n==== file dump ====\n");
-
-    uint32_t bytes_remaining = length;
-    uint32_t block_size = fs->block_size;
-    uint32_t block_index = start_block_index;
-
-    while (block_index < 12 && bytes_remaining > 0) {
-        uint32_t block_num = inode->block[block_index];
-        if (block_num == 0) {
-            k_printf("block %u is not allocated\n", block_index);
-            break;
-        }
-        uint32_t lba = block_num * fs->sectors_per_block;
-        uint8_t buf[block_size];
-        if (!ext2_block_read(fs->drive, lba, buf, fs->sectors_per_block)) {
-            k_printf("failed to read block %u (LBA %u)\n", block_num, lba);
-            break;
-        }
-
-        uint32_t to_read =
-            bytes_remaining < block_size ? bytes_remaining : block_size;
-
-        for (uint32_t i = 0; i < to_read; ++i) {
-            k_printf("%c", buf[i]);
-        }
-
-        bytes_remaining -= to_read;
-        block_index++;
-    }
-
-    if (bytes_remaining > 0) {
-        k_printf("\nrequested length exceeds direct blocks available\n");
-    }
-
-    k_printf("\n== file dump end ==\n");
 }
 
 void ext2_print_superblock(struct ext2_sblock *sblock) {
