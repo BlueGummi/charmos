@@ -58,128 +58,39 @@ static bool walk_direct_blocks(struct ext2_fs *fs, struct k_full_inode *inode,
     return false;
 }
 
-static bool walk_single(struct ext2_fs *fs, dir_entry_callback cb, void *ctx,
-                        bool ff_avail, struct k_full_inode *inode) {
-    uint32_t block_num = inode->node.block[12];
-    uint32_t ptrs[PTRS_PER_BLOCK];
-    if (!ext2_block_ptr_read(fs, block_num, ptrs)) {
+static bool walk_indirect(struct ext2_fs *fs, uint32_t block_num, int level,
+                          dir_entry_callback cb, void *ctx, bool ff_avail,
+                          struct k_full_inode *inode) {
+    if (block_num == 0)
         return false;
-    }
+
+    uint32_t ptrs[PTRS_PER_BLOCK];
+    if (!ext2_block_ptr_read(fs, block_num, ptrs))
+        return false;
 
     for (uint32_t i = 0; i < PTRS_PER_BLOCK; ++i) {
         if (!ptrs[i] && ff_avail) {
             ptrs[i] = *(uint32_t *) ctx;
             inode->node.blocks += fs->block_size / fs->drive->sector_size;
             inode->node.size += fs->block_size;
+
             if (!ext2_block_ptr_write(fs, block_num, ptrs))
                 return false;
             return true;
         }
 
-        if (ptrs[i] && walk_dir(fs, ptrs[i], cb, ctx))
-            return true;
-    }
-    return false;
-}
-
-static bool walk_double(struct ext2_fs *fs, dir_entry_callback cb, void *ctx,
-                        bool ff_avail, struct k_full_inode *inode) {
-    uint32_t block_num = inode->node.block[13];
-    uint32_t level1[PTRS_PER_BLOCK];
-    if (!ext2_block_ptr_read(fs, block_num, level1))
-        return false;
-
-    for (uint32_t i = 0; i < PTRS_PER_BLOCK; ++i) {
-        if (!level1[i] && ff_avail) {
-            level1[i] = *(uint32_t *) ctx;
-            inode->node.blocks += fs->block_size / fs->drive->sector_size;
-            inode->node.size += fs->block_size;
-            if (!ext2_block_ptr_write(fs, block_num, level1))
-                return false;
-            return true;
-        }
-
-        if (!level1[i])
+        if (!ptrs[i])
             continue;
 
-        uint32_t level2[PTRS_PER_BLOCK];
-        if (!ext2_block_ptr_read(fs, level1[i], level2))
-            continue;
-
-        for (uint32_t j = 0; j < PTRS_PER_BLOCK; ++j) {
-            if (!level2[j] && ff_avail) {
-                level2[j] = *(uint32_t *) ctx;
-                inode->node.blocks += fs->block_size / fs->drive->sector_size;
-                inode->node.size += fs->block_size;
-                if (!ext2_block_ptr_write(fs, level1[i], level2))
-                    return false;
+        if (level == 1) {
+            if (walk_dir(fs, ptrs[i], cb, ctx))
                 return true;
-            }
-
-            if (level2[j] && walk_dir(fs, level2[j], cb, ctx))
+        } else {
+            if (walk_indirect(fs, ptrs[i], level - 1, cb, ctx, ff_avail, inode))
                 return true;
         }
     }
-    return false;
-}
 
-static bool walk_triple(struct ext2_fs *fs, dir_entry_callback cb, void *ctx,
-                        bool ff_avail, struct k_full_inode *inode) {
-    uint32_t block_num = inode->node.block[14];
-    uint32_t level1[PTRS_PER_BLOCK];
-    if (!ext2_block_ptr_read(fs, block_num, level1))
-        return false;
-
-    for (uint32_t i = 0; i < PTRS_PER_BLOCK; ++i) {
-        if (!level1[i] && ff_avail) {
-            level1[i] = *(uint32_t *) ctx;
-            inode->node.blocks += fs->block_size / fs->drive->sector_size;
-            inode->node.size += fs->block_size;
-            if (!ext2_block_ptr_write(fs, block_num, level1))
-                return false;
-            return true;
-        }
-
-        if (!level1[i])
-            continue;
-
-        uint32_t level2[PTRS_PER_BLOCK];
-        if (!ext2_block_ptr_read(fs, level1[i], level2))
-            continue;
-
-        for (uint32_t j = 0; j < PTRS_PER_BLOCK; ++j) {
-            if (!level2[j] && ff_avail) {
-                level2[j] = *(uint32_t *) ctx;
-                inode->node.blocks += fs->block_size / fs->drive->sector_size;
-                inode->node.size += fs->block_size;
-                if (!ext2_block_ptr_write(fs, level1[i], level2))
-                    return false;
-                return true;
-            }
-
-            if (!level2[j])
-                continue;
-
-            uint32_t level3[PTRS_PER_BLOCK];
-            if (!ext2_block_ptr_read(fs, level2[j], level3))
-                continue;
-
-            for (uint32_t k = 0; k < PTRS_PER_BLOCK; ++k) {
-                if (!level3[k] && ff_avail) {
-                    level3[k] = *(uint32_t *) ctx;
-                    inode->node.blocks +=
-                        fs->block_size / fs->drive->sector_size;
-                    inode->node.size += fs->block_size;
-                    if (!ext2_block_ptr_write(fs, level2[j], level3))
-                        return false;
-                    return true;
-                }
-
-                if (level3[k] && walk_dir(fs, level3[k], cb, ctx))
-                    return true;
-            }
-        }
-    }
     return false;
 }
 
@@ -191,16 +102,16 @@ bool ext2_walk_dir(struct ext2_fs *fs, struct k_full_inode *dir_inode,
     if (walk_direct_blocks(fs, dir_inode, cb, ctx, ff_avail))
         return true;
 
-    if (dir_inode->node.block[12] &&
-        walk_single(fs, cb, ctx, ff_avail, dir_inode))
+    if (walk_indirect(fs, dir_inode->node.block[12], 1, cb, ctx, ff_avail,
+                      dir_inode))
         return true;
 
-    if (dir_inode->node.block[13] &&
-        walk_double(fs, cb, ctx, ff_avail, dir_inode))
+    if (walk_indirect(fs, dir_inode->node.block[13], 2, cb, ctx, ff_avail,
+                      dir_inode))
         return true;
 
-    if (dir_inode->node.block[14] &&
-        walk_triple(fs, cb, ctx, ff_avail, dir_inode))
+    if (walk_indirect(fs, dir_inode->node.block[14], 3, cb, ctx, ff_avail,
+                      dir_inode))
         return true;
 
     return false;
