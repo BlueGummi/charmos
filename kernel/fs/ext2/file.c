@@ -88,18 +88,21 @@ static void file_read_visitor(struct ext2_fs *fs, struct ext2_inode *inode,
         return;
 
     uint32_t block_size = fs->block_size;
-    uint8_t block_buf[block_size];
+    uint8_t *block_buf = kmalloc(block_size);
     uint32_t lba = (*block_ptr) * fs->sectors_per_block;
 
     if (!ext2_block_read(fs->drive, lba, block_buf, fs->sectors_per_block)) {
+        kfree(block_buf);
         return;
     }
 
     uint32_t file_offset = ctx->bytes_read + ctx->offset;
     uint32_t block_offset = file_offset % block_size;
 
-    if ((ctx->bytes_read + ctx->offset) >= inode->size)
+    if ((ctx->bytes_read + ctx->offset) >= inode->size) {
+        kfree(block_buf);
         return;
+    }
 
     uint32_t remaining = ctx->length - ctx->bytes_read;
     uint32_t in_block = block_size - block_offset;
@@ -111,6 +114,7 @@ static void file_read_visitor(struct ext2_fs *fs, struct ext2_inode *inode,
     memcpy(ctx->buffer + ctx->bytes_read, block_buf + block_offset, to_copy);
     ctx->bytes_read += to_copy;
     ctx->offset += to_copy;
+    kfree(block_buf);
 }
 
 uint64_t ext2_read_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
@@ -161,4 +165,38 @@ enum errno ext2_chown(struct ext2_fs *fs, struct ext2_full_inode *node,
         return ERR_FS_INTERNAL;
 
     return ERR_OK;
+}
+
+enum errno ext2_readlink(struct ext2_fs *fs, struct ext2_full_inode *node,
+                         char *buf, uint64_t size) {
+    if (!fs || !node || !buf)
+        return ERR_INVAL;
+
+    uint64_t link_size = node->node.size;
+
+    if (link_size > size)
+        link_size = size;
+
+    // inline data stored in i_block[]
+    if (link_size <= 60) {
+        memcpy(buf, node->node.block, link_size);
+        return 0;
+    }
+
+    // target is stored in data blocks
+    uint32_t block_size = 1024 << fs->sblock->log_block_size;
+    uint32_t first_block = node->node.block[0];
+
+    if (first_block == 0)
+        return ERR_IO;
+
+    void *block = kmalloc(fs->block_size);
+
+    ext2_block_ptr_read(fs, first_block, block);
+
+    if (!block)
+        return ERR_IO;
+
+    memcpy(buf, block, link_size > block_size ? block_size : link_size);
+    return 0;
 }

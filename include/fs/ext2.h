@@ -257,7 +257,7 @@ uint32_t ext2_get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
 //
 
 enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
-                          struct ext2_full_inode *inode, char *name);
+                          struct ext2_full_inode *inode, char *name, uint8_t type);
 
 enum errno ext2_unlink_file(struct ext2_fs *fs,
                             struct ext2_full_inode *dir_inode,

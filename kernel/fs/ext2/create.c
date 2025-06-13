@@ -10,10 +10,9 @@ struct link_ctx {
     char *name;
     uint32_t inode;
     uint32_t dir_inode;
+    uint8_t type;
     bool success;
 };
-
-static bool make_symlink = false;
 
 MAKE_NOP_CALLBACK;
 
@@ -42,11 +41,7 @@ static bool link_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
         new_entry->name_len = strlen(ctx->name);
         new_entry->rec_len = original_rec_len - actual_size;
 
-        if (make_symlink) {
-            new_entry->file_type = EXT2_FT_SYMLINK;
-        } else {
-            new_entry->file_type = EXT2_FT_REG_FILE;
-        }
+        new_entry->file_type = ctx->type;
 
         memcpy(new_entry->name, ctx->name, new_entry->name_len);
         new_entry->name[new_entry->name_len] = '\0';
@@ -58,12 +53,14 @@ static bool link_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
 }
 
 enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
-                          struct ext2_full_inode *inode, char *name) {
+                          struct ext2_full_inode *inode, char *name,
+                          uint8_t type) {
     struct link_ctx ctx = {
         .name = name,
         .inode = inode->inode_num,
         .success = false,
         .dir_inode = dir_inode->inode_num,
+        .type = type,
     };
 
     if (ext2_dir_contains_file(fs, dir_inode, name))
@@ -83,15 +80,11 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
     uint8_t *block_data = kzalloc(fs->block_size);
 
     struct ext2_dir_entry *new_entry = (struct ext2_dir_entry *) block_data;
+
     new_entry->inode = inode->inode_num;
     new_entry->name_len = strlen(name);
     new_entry->rec_len = fs->block_size;
-
-    if (make_symlink) {
-        new_entry->file_type = EXT2_FT_SYMLINK;
-    } else {
-        new_entry->file_type = EXT2_FT_REG_FILE;
-    }
+    new_entry->file_type = type;
 
     memcpy(new_entry->name, name, new_entry->name_len);
 
@@ -120,7 +113,7 @@ enum errno ext2_symlink_file(struct ext2_fs *fs,
 
     struct ext2_inode new_inode = {0};
     new_inode.ctime = time_get_unix();
-    new_inode.mode = EXT2_S_IFLNK | 0777;
+    new_inode.mode = EXT2_S_IFLNK;
     new_inode.links_count = 1;
     new_inode.size = strlen(target);
     new_inode.blocks = 0;
@@ -146,9 +139,7 @@ enum errno ext2_symlink_file(struct ext2_fs *fs,
         .node = new_inode,
     };
 
-    make_symlink = true;
-    enum errno ret =
-        ext2_link_file(fs, dir_inode, &wrapped_inode, (char *) name);
-    make_symlink = false;
+    enum errno ret = ext2_link_file(fs, dir_inode, &wrapped_inode,
+                                    (char *) name, EXT2_FT_SYMLINK);
     return ret;
 }

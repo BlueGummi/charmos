@@ -82,8 +82,6 @@ enum errno ext2_mount(struct generic_disk *d, struct ext2_fs *fs,
     return ERR_OK;
 }
 
-// TODO: reorganize generic disks
-
 enum errno ext2_g_mount(struct generic_disk *d) {
     if (!d)
         return ERR_INVAL;
