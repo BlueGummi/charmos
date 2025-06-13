@@ -10,7 +10,7 @@ static bool walk_dir(struct ext2_fs *fs, uint32_t block_num,
         return false;
 
     uint32_t lba = block_num * fs->sectors_per_block;
-    if (!ext2_block_read(fs->drive, lba, dir_buf, fs->sectors_per_block)) {
+    if (!ext2_block_read(fs->partition, lba, dir_buf, fs->sectors_per_block)) {
         kfree(dir_buf);
         return false;
     }
@@ -33,7 +33,7 @@ static bool walk_dir(struct ext2_fs *fs, uint32_t block_num,
     }
 
     if (modified) {
-        ext2_block_write(fs->drive, lba, dir_buf, fs->sectors_per_block);
+        ext2_block_write(fs->partition, lba, dir_buf, fs->sectors_per_block);
     }
 
     kfree(dir_buf);

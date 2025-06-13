@@ -101,6 +101,8 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
     this_queue->sq_tail = 0;
     this_queue->cq_head = 0;
     this_queue->cq_phase = 1;
+    this_queue->sq_depth = 64; // TODO: #define these or something
+    this_queue->cq_depth = 16;
     this_queue->sq_db =
         (volatile uint32_t *) ((uint8_t *) nvme->regs + NVME_DOORBELL_BASE +
                                (2 * qid * nvme->doorbell_stride));

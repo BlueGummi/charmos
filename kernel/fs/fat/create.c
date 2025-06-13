@@ -7,7 +7,7 @@
 
 static inline uint32_t fat12_16_root_dir_lba(struct fat_fs *fs) {
     return fs->bpb->reserved_sector_count +
-           (fs->bpb->num_fats * fs->bpb->fat_size_16);
+           (fs->bpb->num_fats * fs->bpb->fat_size_16) + fs->volume_base_lba;
 }
 
 static inline uint32_t fat12_16_root_dir_sectors(struct fat_fs *fs) {

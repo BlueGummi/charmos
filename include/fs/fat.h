@@ -125,6 +125,7 @@ _Static_assert(sizeof(struct fat_dirent) == 32, "");
 struct fat_fs {
     enum fat_fstype type;
     struct fat_bpb *bpb;
+    struct generic_partition *partition;
     struct generic_disk *disk;
     uint32_t volume_base_lba;
     uint32_t total_clusters;
@@ -155,9 +156,9 @@ uint32_t fat_get_dir_cluster(struct fat_dirent *d);
 void fat_format_filename_83(const char *name, char out[11]);
 
 void fat32_print_bpb(const struct fat_bpb *bpb);
-struct fat_bpb *fat32_read_bpb(struct generic_disk *drive);
-enum errno fat_g_mount(struct generic_disk *d);
-void fat_g_print(struct generic_disk *d);
+struct fat_bpb *fat32_read_bpb(struct generic_partition *);
+enum errno fat_g_mount(struct generic_partition *);
+void fat_g_print(struct generic_partition *);
 uint32_t fat_first_data_sector(const struct fat_fs *fs);
 uint32_t fat_cluster_to_lba(const struct fat_fs *fs, uint32_t cluster);
 

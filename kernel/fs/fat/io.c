@@ -50,6 +50,7 @@ static bool fat12_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
     for (uint32_t fat_index = 0; fat_index < fs->bpb->num_fats; fat_index++) {
         uint32_t base = fs->bpb->reserved_sector_count + fat_index * fat_size;
         uint32_t sector = base + (fat_offset / fs->bpb->bytes_per_sector);
+        sector += fs->volume_base_lba;
 
         if (!disk->read_sector(disk, sector, buf1, 1)) {
             result = false;
@@ -115,6 +116,8 @@ static bool fat16_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
                           fat_index * fat_size +
                           (fat_offset / fs->bpb->bytes_per_sector);
 
+        sector += fs->volume_base_lba;
+
         if (!disk->read_sector(disk, sector, buf, 1)) {
             result = false;
             continue;
@@ -144,6 +147,8 @@ static bool fat32_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
         uint32_t sector = fs->bpb->reserved_sector_count +
                           fat_index * fat_size +
                           (fat_offset / fs->bpb->bytes_per_sector);
+
+        sector += fs->volume_base_lba;
 
         if (!disk->read_sector(disk, sector, buf, 1)) {
             result = false;
@@ -197,6 +202,9 @@ static uint32_t fat12_read_fat_entry(struct fat_fs *fs, uint32_t cluster) {
     uint32_t offset = fat_offset % fs->bpb->bytes_per_sector;
     uint32_t sector = fs->bpb->reserved_sector_count +
                       (fat_offset / fs->bpb->bytes_per_sector);
+
+    sector += fs->volume_base_lba;
+
     uint8_t *buf = kmalloc(disk->sector_size);
     uint8_t *buf2 = NULL;
     uint32_t result = 0xFFFFFFFF;
@@ -230,6 +238,9 @@ static uint32_t fat16_read_fat_entry(struct fat_fs *fs, uint32_t cluster) {
     uint32_t offset = fat_offset % fs->bpb->bytes_per_sector;
     uint32_t sector = fs->bpb->reserved_sector_count +
                       (fat_offset / fs->bpb->bytes_per_sector);
+
+    sector += fs->volume_base_lba;
+
     uint8_t *buf = kmalloc(disk->sector_size);
     uint32_t result = 0xFFFFFFFF;
 
@@ -246,6 +257,9 @@ static uint32_t fat32_read_fat_entry(struct fat_fs *fs, uint32_t cluster) {
     uint32_t offset = fat_offset % fs->bpb->bytes_per_sector;
     uint32_t sector = fs->bpb->reserved_sector_count +
                       (fat_offset / fs->bpb->bytes_per_sector);
+
+    sector += fs->volume_base_lba;
+
     uint8_t *buf = kmalloc(disk->sector_size);
     uint32_t result = 0xFFFFFFFF;
 

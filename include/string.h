@@ -1,4 +1,5 @@
 #include <stddef.h>
+#include <stdint.h>
 void *memcpy(void *dest, const void *src, uint64_t n);
 void *memset(void *s, int c, uint64_t n);
 void *memmove(void *dest, const void *src, uint64_t n);
@@ -14,4 +15,5 @@ int strcmp(const char *str1, const char *str2);
 char *strchr(const char *s, int c);
 int islower(int c);
 int toupper(int c);
+int snprintf(char *buffer, int buffer_len, const char *format, ...);
 #pragma once

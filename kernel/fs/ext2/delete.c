@@ -24,18 +24,6 @@ void free_block_visitor(struct ext2_fs *fs, struct ext2_inode *inode,
     }
 }
 
-static void ext2_dump_dir(struct ext2_dir_entry *dir) {
-    k_printf("File type is 0x%hhx\n", dir->file_type);
-    k_printf("Inode is %u\n", dir->inode);
-    k_printf("Name len is %u\n", dir->name_len);
-    k_printf("Rec len is %u\n", dir->rec_len);
-    k_printf("Name: ");
-    for (int i = 0; i < dir->name_len; i++) {
-        k_printf("%c", dir->name[i]);
-    }
-    k_printf("\n");
-}
-
 bool unlink_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
                      void *arg, uint32_t block_num, uint32_t e,
                      uint32_t entry_offset) {

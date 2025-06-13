@@ -41,28 +41,35 @@ uint32_t fat_cluster_to_lba(const struct fat_fs *fs, uint32_t cluster) {
                (bpb->num_fats * fs->fat_size);
     }
 
-    return fat_first_data_sector(fs) + (cluster - 2) * bpb->sectors_per_cluster;
+    return (fat_first_data_sector(fs) +
+            (cluster - 2) * bpb->sectors_per_cluster) +
+           fs->volume_base_lba;
 }
 
 struct fat_bpb *fat_read_bpb(struct generic_disk *drive,
-                             enum fat_fstype *out_type, uint32_t *out_lba) {
+                             enum fat_fstype *out_type, uint32_t *out_lba,
+                             uint32_t base_lba) {
     uint8_t *sector = kmalloc(drive->sector_size);
     if (!sector)
         return NULL;
 
     uint32_t fat_lba = 0;
 
-    if (drive->read_sector(drive, 0, sector, 1)) {
-        struct mbr *mbr = (struct mbr *) sector;
-        if (mbr->signature == 0xAA55) {
-            for (int i = 0; i < 4; ++i) {
-                uint8_t type = mbr->partitions[i].type;
-                if (type == FAT32_PARTITION_TYPE1 ||
-                    type == FAT32_PARTITION_TYPE2 ||
-                    type == FAT16_PARTITION_TYPE ||
-                    type == FAT12_PARTITION_TYPE) {
-                    fat_lba = mbr->partitions[i].lba_start;
-                    break;
+    if (base_lba != 0) {
+        fat_lba = base_lba;
+    } else {
+        if (drive->read_sector(drive, 0, sector, 1)) {
+            struct mbr *mbr = (struct mbr *) sector;
+            if (mbr->signature == 0xAA55) {
+                for (int i = 0; i < 4; ++i) {
+                    uint8_t type = mbr->partitions[i].type;
+                    if (type == FAT32_PARTITION_TYPE1 ||
+                        type == FAT32_PARTITION_TYPE2 ||
+                        type == FAT16_PARTITION_TYPE ||
+                        type == FAT12_PARTITION_TYPE) {
+                        fat_lba = mbr->partitions[i].lba_start;
+                        break;
+                    }
                 }
             }
         }
@@ -113,8 +120,8 @@ struct fat_bpb *fat_read_bpb(struct generic_disk *drive,
     return NULL;
 }
 
-enum errno fat_g_mount(struct generic_disk *d) {
-    if (!d)
+enum errno fat_g_mount(struct generic_partition *p) {
+    if (!p || !p->disk)
         return ERR_INVAL;
 
     struct fat_fs *fs = kmalloc(sizeof(struct fat_fs));
@@ -123,12 +130,14 @@ enum errno fat_g_mount(struct generic_disk *d) {
 
     enum fat_fstype type;
     uint32_t lba;
-    struct fat_bpb *bpb = fat_read_bpb(d, &type, &lba);
+    struct generic_disk *d = p->disk;
+    struct fat_bpb *bpb = fat_read_bpb(d, &type, &lba, p->start_lba);
     if (!bpb) {
         kfree(fs);
         return ERR_FS_INTERNAL;
     }
 
+    fs->partition = p;
     fs->bpb = bpb;
     fs->type = type;
     fs->volume_base_lba = lba;
@@ -167,6 +176,7 @@ enum errno fat_g_mount(struct generic_disk *d) {
             return ERR_IO;
         }
 
+        // TODO: #define these :boom:
         uint32_t lead_sig = *(uint32_t *) (buf + 0x00);
         uint32_t struc_sig = *(uint32_t *) (buf + 0x1fc);
         if (lead_sig != 0x41615252 || struc_sig != 0xAA550000) {
@@ -189,10 +199,11 @@ enum errno fat_g_mount(struct generic_disk *d) {
     }
 
     d->fs_data = fs;
+    p->fs_data = fs;
     return ERR_OK;
 }
 
-void fat_g_print(struct generic_disk *d) {
+void fat_g_print(struct generic_partition *d) {
     if (!d || !d->fs_data)
         return;
 

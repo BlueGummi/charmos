@@ -39,3 +39,5 @@ make run # run this in the build directory
 - [ ] once filesystems are up and running, make a logging function to log to a set file
 
 - [ ] block device sector size scans
+
+- [ ] define magic numbers!!

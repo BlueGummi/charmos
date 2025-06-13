@@ -67,10 +67,11 @@ struct nvme_queue {
     uint64_t sq_phys;           // Submission queue physical address
     uint64_t cq_phys;           // Completion queue physical address
 
-    uint16_t sq_tail; // Tail index for submission
-    uint16_t cq_head; // Head index for completion
-    uint16_t q_depth; // Queue depth (entries)
-    uint8_t cq_phase; // Phase bit for completion
+    uint16_t sq_tail;  // Tail index for submission
+    uint16_t cq_head;  // Head index for completion
+    uint16_t sq_depth; // Queue depth (entries)
+    uint16_t cq_depth; // Queue depth (entries)
+    uint8_t cq_phase;  // Phase bit for completion
     volatile uint32_t *sq_db;
     volatile uint32_t *cq_db;
 };

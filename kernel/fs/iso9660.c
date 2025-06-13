@@ -10,17 +10,22 @@ bool iso9660_read_file(struct iso9660_fs *fs, uint32_t lba, uint32_t size,
                        void *out_buf) {
     uint32_t num_blocks = (size + fs->block_size - 1) / fs->block_size;
 
-    if (!fs->disk->read_sector(fs->disk, lba, out_buf, num_blocks)) {
+    if (!fs->disk->read_sector(fs->disk, lba + fs->partition->start_lba,
+                               out_buf, num_blocks)) {
         return false;
     }
 
     return true;
 }
 
-bool iso9660_parse_pvd(struct generic_disk *disk, struct iso9660_pvd *out_pvd) {
+bool iso9660_parse_pvd(struct generic_partition *p,
+                       struct iso9660_pvd *out_pvd) {
     uint8_t *buffer = kmalloc(ISO9660_SECTOR_SIZE);
 
-    if (!disk->read_sector(disk, ISO9660_PVD_SECTOR, buffer, 1)) {
+    struct generic_disk *disk = p->disk;
+
+    if (!disk->read_sector(disk, ISO9660_PVD_SECTOR + p->start_lba, buffer,
+                           1)) {
         k_printf("Failed to read ISO9660 PVD sector\n");
         kfree(buffer);
         return false;
@@ -36,10 +41,6 @@ bool iso9660_parse_pvd(struct generic_disk *disk, struct iso9660_pvd *out_pvd) {
     }
 
     memcpy(out_pvd, pvd, sizeof(struct iso9660_pvd));
-
-    k_printf("ISO9660 Volume ID: %-32s\n", out_pvd->volume_id);
-    k_printf("Logical Block Size: %u\n", out_pvd->logical_block_size_le);
-    k_printf("Volume Space (blocks): %u\n", out_pvd->volume_space_le);
 
     kfree(buffer);
     return true;
@@ -76,9 +77,10 @@ void iso9660_pvd_print(const struct iso9660_pvd *pvd) {
              pvd->opt_m_path_table_loc);
 }
 
-enum errno iso9660_mount(struct generic_disk *disk) {
+enum errno iso9660_mount(struct generic_partition *p) {
     struct iso9660_pvd pvd;
-    if (iso9660_parse_pvd(disk, &pvd)) {
+    struct generic_disk *disk = p->disk;
+    if (iso9660_parse_pvd(p, &pvd)) {
         struct iso9660_fs *fs = kzalloc(sizeof(struct iso9660_fs));
         struct iso9660_pvd *new_pvd = kzalloc(sizeof(struct iso9660_pvd));
         fs->pvd = new_pvd;
@@ -86,8 +88,10 @@ enum errno iso9660_mount(struct generic_disk *disk) {
         fs->root_lba = pvd.root_dir_record.extent_lba_le;
         fs->root_size = pvd.root_dir_record.size_le;
         fs->disk = disk;
+        fs->partition = p;
         fs->block_size = pvd.logical_block_size_le;
         disk->fs_data = fs;
+        p->fs_data = fs;
         return ERR_OK;
     }
     return ERR_FS_INTERNAL;
@@ -97,7 +101,8 @@ void iso9660_ls(struct iso9660_fs *fs, uint32_t lba, uint32_t size) {
     uint32_t num_blocks = (size + fs->block_size - 1) / fs->block_size;
     uint8_t *dir_data = kmalloc(num_blocks * fs->block_size);
 
-    if (!fs->disk->read_sector(fs->disk, lba, dir_data, num_blocks)) {
+    if (!fs->disk->read_sector(fs->disk, lba + fs->partition->start_lba,
+                               dir_data, num_blocks)) {
         kfree(dir_data);
         return;
     }
@@ -134,7 +139,7 @@ void iso9660_ls(struct iso9660_fs *fs, uint32_t lba, uint32_t size) {
     kfree(dir_data);
 }
 
-void iso9660_print(struct generic_disk *disk) {
+void iso9660_print(struct generic_partition *disk) {
     struct iso9660_pvd pvd;
     struct iso9660_fs *fs = disk->fs_data;
     if (!iso9660_parse_pvd(disk, &pvd)) {
@@ -151,7 +156,8 @@ struct iso9660_dir_record *iso9660_find(struct iso9660_fs *fs,
                                         uint32_t size) {
     uint32_t num_blocks = (size + fs->block_size - 1) / fs->block_size;
     uint8_t *dir_data = kmalloc(num_blocks * fs->block_size);
-    if (!fs->disk->read_sector(fs->disk, lba, dir_data, num_blocks)) {
+    if (!fs->disk->read_sector(fs->disk, lba + fs->partition->start_lba,
+                               dir_data, num_blocks)) {
         kfree(dir_data);
         return NULL;
     }

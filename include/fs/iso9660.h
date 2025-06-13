@@ -59,6 +59,7 @@ struct iso9660_pvd {
 } __attribute__((packed));
 
 struct iso9660_fs {
+    struct generic_partition *partition;
     struct generic_disk *disk;
     struct iso9660_pvd *pvd;
     uint32_t root_lba;
@@ -66,8 +67,8 @@ struct iso9660_fs {
     uint32_t block_size;
 };
 
-enum errno iso9660_mount(struct generic_disk *disk);
-void iso9660_print(struct generic_disk *disk);
+enum errno iso9660_mount(struct generic_partition *);
+void iso9660_print(struct generic_partition *);
 struct iso9660_datetime iso9660_get_current_date(void);
 
 #define ISO9660_PVD_SECTOR 16

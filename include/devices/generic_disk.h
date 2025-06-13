@@ -22,6 +22,21 @@ static inline const char *get_generic_disk_str(enum generic_disk_type type) {
     return "UNKNOWN DEVICE";
 }
 
+struct generic_disk;
+
+struct generic_partition {
+    struct generic_disk *disk;
+    uint64_t start_lba;
+    uint64_t sector_count;
+    enum fs_type fs_type;
+    void *fs_data;
+    char name[16];
+    bool mounted;
+
+    enum errno (*mount)(struct generic_partition *);
+    void (*print_fs)(struct generic_partition *);
+};
+
 struct generic_disk {
     enum generic_disk_type type;
     enum fs_type fs_type;
@@ -38,8 +53,7 @@ struct generic_disk {
                          const uint8_t *buffer, uint64_t sector_count);
     void (*print)(struct generic_disk *disk); // this one for physical disk
 
-    enum errno (*mount)(struct generic_disk *disk);
-    void (*print_fs)(struct generic_disk *disk);
+    uint64_t partition_count;
+    struct generic_partition *partitions;
 };
-
 #pragma once

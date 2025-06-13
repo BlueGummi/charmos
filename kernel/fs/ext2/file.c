@@ -91,7 +91,8 @@ static void file_read_visitor(struct ext2_fs *fs, struct ext2_inode *inode,
     uint8_t *block_buf = kmalloc(block_size);
     uint32_t lba = (*block_ptr) * fs->sectors_per_block;
 
-    if (!ext2_block_read(fs->drive, lba, block_buf, fs->sectors_per_block)) {
+    if (!ext2_block_read(fs->partition, lba, block_buf,
+                         fs->sectors_per_block)) {
         kfree(block_buf);
         return;
     }

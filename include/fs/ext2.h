@@ -194,6 +194,7 @@ struct ext2_dir_entry {
 } __attribute__((packed));
 
 struct ext2_fs {
+    struct generic_partition *partition;
     struct generic_disk *drive;
     struct ext2_sblock *sblock;
     struct ext2_group_desc *group_desc;
@@ -220,25 +221,25 @@ typedef void (*ext2_block_visitor)(struct ext2_fs *fs, struct ext2_inode *inode,
 //
 //
 
-bool ext2_block_read(struct generic_disk *d, uint32_t lba, uint8_t *buffer,
+bool ext2_block_read(struct generic_partition *, uint32_t lba, uint8_t *buffer,
                      uint32_t sector_count);
 
 bool ext2_block_ptr_read(struct ext2_fs *fs, uint32_t block_num, void *buf);
 
-bool ext2_block_write(struct generic_disk *d, uint32_t lba,
+bool ext2_block_write(struct generic_partition *, uint32_t lba,
                       const uint8_t *buffer, uint32_t sector_count);
 
 bool ext2_block_ptr_write(struct ext2_fs *fs, uint32_t block_num, void *buf);
 
-bool ext2_read_superblock(struct generic_disk *d, uint32_t partition_start_lba,
+bool ext2_read_superblock(struct generic_partition *,
                           struct ext2_sblock *sblock);
 
 bool ext2_write_superblock(struct ext2_fs *fs);
 bool ext2_write_group_desc(struct ext2_fs *fs);
 
-enum errno ext2_mount(struct generic_disk *d, struct ext2_fs *fs,
+enum errno ext2_mount(struct generic_partition *, struct ext2_fs *fs,
                       struct ext2_sblock *sblock);
-enum errno ext2_g_mount(struct generic_disk *d);
+enum errno ext2_g_mount(struct generic_partition *);
 
 bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
                      struct ext2_inode *inode_out);
@@ -257,7 +258,8 @@ uint32_t ext2_get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
 //
 
 enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
-                          struct ext2_full_inode *inode, char *name, uint8_t type);
+                          struct ext2_full_inode *inode, char *name,
+                          uint8_t type);
 
 enum errno ext2_unlink_file(struct ext2_fs *fs,
                             struct ext2_full_inode *dir_inode,
@@ -301,6 +303,6 @@ bool ext2_walk_dir(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
 void ext2_traverse_inode_blocks(struct ext2_fs *fs, struct ext2_inode *inode,
                                 ext2_block_visitor visitor, void *user_data);
 
-void ext2_test(struct generic_disk *d, struct ext2_sblock *sblock);
-void ext2_g_print(struct generic_disk *d);
+void ext2_test(struct generic_partition *, struct ext2_sblock *sblock);
+void ext2_g_print(struct generic_partition *);
 #pragma once

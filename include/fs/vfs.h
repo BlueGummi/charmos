@@ -131,7 +131,7 @@ struct vfs_ops {
 
 struct vfs_mount {
     struct vfs_node *root;
-    struct generic_disk *disk;
+    struct generic_partition *partition;
     void *fs;
     char mount_point[256];
 };

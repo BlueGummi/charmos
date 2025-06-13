@@ -101,7 +101,6 @@ void registry_setup() {
         }
         if (dev.class_code == 0x01 && dev.subclass == 0x06 &&
             dev.prog_if == 0x01) {
-            k_printf("FOUND SATA DRIVE\n");
             uint32_t d_cnt = 0;
             struct ahci_disk *disks =
                 ahci_discover_device(dev.bus, dev.device, dev.function, &d_cnt);
@@ -140,7 +139,9 @@ void registry_setup() {
     for (uint64_t i = 0; i < disk_count; i++) {
         struct generic_disk *disk = registry_get_by_index(i);
         detect_fs(disk);
-        disk->mount(disk);
+        for (uint32_t j = 0; j < disk->partition_count; j++) {
+            disk->partitions[j].mount(&disk->partitions[j]);
+        }
     }
 }
 
@@ -148,9 +149,11 @@ void registry_print_devices() {
     for (uint64_t i = 0; i < disk_count; i++) {
         struct generic_disk *disk = registry_get_by_index(i);
         k_printf("Disk %lu, \"" ANSI_GREEN "%s" ANSI_RESET
-                 "\" is a %s. Filesystem:\n",
+                 "\" is a %s. Filesystem(s):\n",
                  i, disk->name, get_generic_disk_str(disk->type));
         disk->print(disk);
-        disk->print_fs(disk);
+        for (uint32_t j = 0; j < disk->partition_count; j++) {
+            disk->partitions[j].print_fs(&disk->partitions[j]);
+        }
     }
 }

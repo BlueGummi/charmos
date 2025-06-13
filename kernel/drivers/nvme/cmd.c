@@ -30,6 +30,9 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
                 nvme->admin_cq_head =
                     (nvme->admin_cq_head + 1) % nvme->admin_q_depth;
 
+                if (nvme->admin_cq_head == 0)
+                    nvme->admin_cq_phase ^= 1;
+
                 *nvme->admin_cq_db = nvme->admin_cq_head;
 
                 return status;
@@ -43,7 +46,7 @@ uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
     struct nvme_queue *this_queue = nvme->io_queues[qid];
 
     uint16_t tail = this_queue->sq_tail;
-    uint16_t next_tail = (tail + 1) % nvme->admin_q_depth;
+    uint16_t next_tail = (tail + 1) % this_queue->sq_depth;
 
     cmd->cid = tail;
     this_queue->sq[tail] = *cmd;
@@ -60,7 +63,10 @@ uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
                 uint16_t status = entry->status & 0xFFFE;
 
                 this_queue->cq_head =
-                    (this_queue->cq_head + 1) % nvme->admin_q_depth;
+                    (this_queue->cq_head + 1) % this_queue->cq_depth;
+
+                if (this_queue->cq_head == 0)
+                    this_queue->cq_phase ^= 1;
 
                 *this_queue->cq_db = this_queue->cq_head;
 

@@ -9,19 +9,21 @@
 
 uint64_t PTRS_PER_BLOCK;
 
-bool ext2_read_superblock(struct generic_disk *d, uint32_t partition_start_lba,
+bool ext2_read_superblock(struct generic_partition *p,
                           struct ext2_sblock *sblock) {
-    uint8_t buffer[d->sector_size];
-    uint32_t superblock_lba =
-        partition_start_lba + (EXT2_SUPERBLOCK_OFFSET / d->sector_size);
+    struct generic_disk *d = p->disk;
+    uint8_t *buffer = kmalloc(d->sector_size);
+    uint32_t superblock_lba = (EXT2_SUPERBLOCK_OFFSET / d->sector_size);
     uint32_t superblock_offset = EXT2_SUPERBLOCK_OFFSET % d->sector_size;
 
-    if (!d->read_sector(d, superblock_lba, buffer, 1)) {
+    if (!d->read_sector(d, superblock_lba + p->start_lba, buffer, 1)) {
+        kfree(buffer);
         return false;
     }
 
     memcpy(sblock, buffer + superblock_offset, sizeof(struct ext2_sblock));
 
+    kfree(buffer);
     return (sblock->magic == 0xEF53);
 }
 
@@ -29,7 +31,7 @@ bool ext2_write_superblock(struct ext2_fs *fs) {
     uint32_t superblock_block = 1;
     uint32_t lba = superblock_block * fs->sectors_per_block;
 
-    return ext2_block_write(fs->drive, lba, (uint8_t *) fs->sblock,
+    return ext2_block_write(fs->partition, lba, (uint8_t *) fs->sblock,
                             fs->sectors_per_block);
 }
 
@@ -41,24 +43,25 @@ bool ext2_write_group_desc(struct ext2_fs *fs) {
     uint32_t sector_size = fs->drive->sector_size;
     uint32_t sector_count = (size + (sector_size - 1)) / sector_size;
 
-    return ext2_block_write(fs->drive, lba, (uint8_t *) fs->group_desc,
+    return ext2_block_write(fs->partition, lba, (uint8_t *) fs->group_desc,
                             sector_count);
 }
 
-enum errno ext2_mount(struct generic_disk *d, struct ext2_fs *fs,
+enum errno ext2_mount(struct generic_partition *d, struct ext2_fs *fs,
                       struct ext2_sblock *sblock) {
     if (!fs || !sblock)
         return ERR_INVAL;
 
     sblock->mtime = time_get_unix();
     sblock->wtime = time_get_unix();
-    fs->drive = d;
+    fs->drive = d->disk;
+    fs->partition = d;
     fs->sblock = sblock;
     fs->inodes_count = sblock->inodes_count;
     fs->inodes_per_group = sblock->inodes_per_group;
     fs->inode_size = sblock->inode_size;
     fs->block_size = 1024U << sblock->log_block_size;
-    fs->sectors_per_block = fs->block_size / d->sector_size;
+    fs->sectors_per_block = fs->block_size / d->disk->sector_size;
 
     fs->num_groups =
         (fs->inodes_count + fs->inodes_per_group - 1) / fs->inodes_per_group;
@@ -72,7 +75,7 @@ enum errno ext2_mount(struct generic_disk *d, struct ext2_fs *fs,
     if (!fs->group_desc)
         return ERR_NO_MEM;
 
-    if (!ext2_block_read(fs->drive, gdt_block * fs->sectors_per_block,
+    if (!ext2_block_read(fs->partition, gdt_block * fs->sectors_per_block,
                          (uint8_t *) fs->group_desc,
                          gdt_blocks * fs->sectors_per_block)) {
         kfree(fs->group_desc);
@@ -82,25 +85,24 @@ enum errno ext2_mount(struct generic_disk *d, struct ext2_fs *fs,
     return ERR_OK;
 }
 
-enum errno ext2_g_mount(struct generic_disk *d) {
-    if (!d)
+enum errno ext2_g_mount(struct generic_partition *p) {
+    if (!p)
         return ERR_INVAL;
-    d->fs_data = kmalloc(sizeof(struct ext2_fs));
-    struct ext2_fs *fs = d->fs_data;
+    p->fs_data = kmalloc(sizeof(struct ext2_fs));
+    struct ext2_fs *fs = p->fs_data;
     fs->sblock = kmalloc(sizeof(struct ext2_sblock));
 
-    if (!ext2_read_superblock(d, 0,
-                              fs->sblock)) // TODO: Dynamic partition stuff
+    if (!ext2_read_superblock(p, fs->sblock))
         return ERR_FS_INTERNAL;
 
-    return ext2_mount(d, fs, fs->sblock);
+    return ext2_mount(p, fs, fs->sblock);
 }
 
-void ext2_g_print(struct generic_disk *d) {
-    if (!d)
+void ext2_g_print(struct generic_partition *p) {
+    if (!p)
         return;
 
-    struct ext2_fs *fs = d->fs_data;
+    struct ext2_fs *fs = p->fs_data;
     ext2_print_superblock(fs->sblock);
 }
 
@@ -135,9 +137,9 @@ struct ext2_full_inode *ext2_path_lookup(struct ext2_fs *fs,
     return ext2_path_lookup(fs, next, path);
 }
 
-void ext2_test(struct generic_disk *d, struct ext2_sblock *sblock) {
+void ext2_test(struct generic_partition *p, struct ext2_sblock *sblock) {
     struct ext2_fs fs;
-    if (ERR_IS_FATAL(ext2_mount(d, &fs, sblock))) {
+    if (ERR_IS_FATAL(ext2_mount(p, &fs, sblock))) {
         return;
     }
 
