@@ -7,7 +7,7 @@
 #include <time/time.h>
 
 struct link_ctx {
-    char *name;
+    const char *name;
     uint32_t inode;
     uint32_t dir_inode;
     uint8_t type;
@@ -53,7 +53,7 @@ static bool link_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
 }
 
 enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
-                          struct ext2_full_inode *inode, char *name,
+                          struct ext2_full_inode *inode, const char *name,
                           uint8_t type) {
     struct link_ctx ctx = {
         .name = name,

@@ -231,6 +231,9 @@ void fat_g_print(struct generic_partition *d) {
 
     success = fat_rename(fs, fs->root_cluster, "Doobert", "Snoobert");
 
+    success = fat_create(fs, fs->root_cluster, "Dooh", &new_file_ent,
+                         FAT_ARCHIVE, NULL);
+
     if (success) {
         k_printf("yay\n");
     } else {

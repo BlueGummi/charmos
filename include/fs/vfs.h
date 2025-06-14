@@ -30,8 +30,7 @@ enum vfs_node_flags : uint32_t {
     VFS_NODE_IN_USE      = 0x0800, // Open count > 0 (used internally)
     VFS_NODE_DIRSYNC     = 0x1000,
 };
-//clang-format on
-
+// clang-format on
 
 enum vfs_node_type : uint32_t {
     VFS_UNKNOWN = 0x0,
@@ -83,47 +82,72 @@ struct vfs_dirent {
 
 struct vfs_node;
 struct vfs_ops {
-    uint64_t (*read)(struct vfs_node *node, void *buf, uint64_t size,
-                     uint64_t offset); // read data from file, returns # bytes read
+    uint64_t (*read)(
+        struct vfs_node *node, void *buf, uint64_t size,
+        uint64_t offset); // read data from file, returns # bytes read
 
-    uint64_t (*write)(struct vfs_node *node, const void *buf, uint64_t size,
-                      uint64_t offset); // write data to file, returns # bytes written
+    uint64_t (*write)(
+        struct vfs_node *node, const void *buf, uint64_t size,
+        uint64_t offset); // write data to file, returns # bytes written
 
-    enum errno (*open)(struct vfs_node *node, int flags); // open file with flags
+    enum errno (*open)(struct vfs_node *node,
+                       int flags); // open file with flags
 
     enum errno (*close)(struct vfs_node *node); // close file
 
-    enum errno (*stat)(struct vfs_node *node, struct vfs_stat *out); // get file metadata
+    enum errno (*create)(struct vfs_node *parent, const char *name, int mode);
+
+    enum errno (*mknod)(struct vfs_node *parent, const char *name, int mode,
+                        int dev); // special devices
+
+    enum errno (*symlink)(struct vfs_node *parent, const char *target,
+                          const char *link_name);
+
+    enum errno (*mount)(struct vfs_node *mountpoint, struct vfs_node *source);
+
+    enum errno (*unmount)(struct vfs_node *mountpoint);
+
+    enum errno (*stat)(struct vfs_node *node,
+                       struct vfs_stat *out); // get file metadata
 
     enum errno (*readdir)(struct vfs_node *node, struct vfs_dirent *out,
                           uint64_t index); // read directory entry at index
 
-    enum errno (*mkdir)(struct vfs_node *parent, const char *name, int mode); // create directory
+    enum errno (*mkdir)(struct vfs_node *parent, const char *name,
+                        int mode); // create directory
 
-    enum errno (*rmdir)(struct vfs_node *parent, const char *name); // remove directory
+    enum errno (*rmdir)(struct vfs_node *parent,
+                        const char *name); // remove directory
 
-    enum errno (*unlink)(struct vfs_node *parent, const char *name); // delete file
+    enum errno (*unlink)(struct vfs_node *parent,
+                         const char *name); // delete file
 
     enum errno (*rename)(struct vfs_node *old_parent, const char *old_name,
-                         struct vfs_node *new_parent, const char *new_name); // rename/move file or directory
+                         struct vfs_node *new_parent,
+                         const char *new_name); // rename/move file or directory
 
-    enum errno (*truncate)(struct vfs_node *node, uint64_t length); // resize file to given length
+    enum errno (*truncate)(struct vfs_node *node,
+                           uint64_t length); // resize file to given length
 
-    enum errno (*readlink)(struct vfs_node *node, char *buf, uint64_t size); // read symlink target into buffer
+    enum errno (*readlink)(struct vfs_node *node, char *buf,
+                           uint64_t size); // read symlink target into buffer
 
     enum errno (*link)(struct vfs_node *parent, struct vfs_node *target,
                        const char *link_name); // create hard link to target
 
-    enum errno (*chmod)(struct vfs_node *node, int mode); // change file permissions
+    enum errno (*chmod)(struct vfs_node *node,
+                        int mode); // change file permissions
 
-    enum errno (*chown)(struct vfs_node *node, int uid, int gid); // change file ownership
+    enum errno (*chown)(struct vfs_node *node, int uid,
+                        int gid); // change file ownership
 
     enum errno (*utime)(struct vfs_node *node, uint64_t atime,
                         uint64_t mtime); // update access and modification times
 
-    void (*destroy)(struct vfs_node *node); 
+    void (*destroy)(struct vfs_node *node);
 
-    // enum errno (*ioctl)(struct vfs_node *node, uint64_t request, void *arg); // device-specific control (optional)
+    // enum errno (*ioctl)(struct vfs_node *node, uint64_t request, void *arg);
+    // // device-specific control (optional)
 
     struct vfs_node *(*finddir)(struct vfs_node *node,
                                 const char *name); // find a child node by name

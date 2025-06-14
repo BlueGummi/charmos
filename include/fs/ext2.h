@@ -258,12 +258,12 @@ uint32_t ext2_get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
 //
 
 enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
-                          struct ext2_full_inode *inode, char *name,
+                          struct ext2_full_inode *inode, const char *name,
                           uint8_t type);
 
 enum errno ext2_unlink_file(struct ext2_fs *fs,
-                            struct ext2_full_inode *dir_inode,
-                            const char *name);
+                            struct ext2_full_inode *dir_inode, const char *name,
+                            bool free_blocks);
 
 enum errno ext2_create_file(struct ext2_fs *fs,
                             struct ext2_full_inode *parent_dir,
@@ -279,7 +279,8 @@ enum errno ext2_write_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
 
 struct ext2_full_inode *ext2_find_file_in_dir(struct ext2_fs *fs,
                                               struct ext2_full_inode *dir_inode,
-                                              const char *fname);
+                                              const char *fname,
+                                              uint8_t *type_out);
 
 bool ext2_dir_contains_file(struct ext2_fs *fs,
                             struct ext2_full_inode *dir_inode,

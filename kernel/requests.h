@@ -5,6 +5,12 @@ __attribute__((used,
 __attribute__((
     used, section(".limine_requests"))) static volatile LIMINE_BASE_REVISION(2);
 
+//
+//
+// START
+//
+//
+
 __attribute__((
     used,
     section(
@@ -34,6 +40,15 @@ __attribute__((
     used, section(".limine_requests"))) static volatile struct limine_mp_request
     mp_request = {.id = LIMINE_MP_REQUEST, .revision = 2};
 
+__attribute__((used, section(".limine_requests"))) static volatile struct
+    limine_executable_cmdline_request cmdline_request = {
+        .id = LIMINE_EXECUTABLE_CMDLINE_REQUEST, .revision = 2};
+
+//
+//
+// END
+//
+//
 __attribute__((
     used,
     section(

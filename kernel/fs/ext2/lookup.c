@@ -6,6 +6,7 @@
 struct search_ctx {
     const char *target;
     struct ext2_full_inode *result;
+    uint8_t type;
 };
 
 struct contains_ctx {
@@ -25,6 +26,7 @@ static bool search_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
         ctx->target[entry->name_len] == '\0') {
         ctx->result = kmalloc(sizeof(struct ext2_inode));
         ctx->result->inode_num = e_num;
+        ctx->type = entry->file_type;
         ext2_read_inode(fs, entry->inode, &ctx->result->node);
         return true;
     }
@@ -53,10 +55,14 @@ static bool contains_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
 
 struct ext2_full_inode *ext2_find_file_in_dir(struct ext2_fs *fs,
                                               struct ext2_full_inode *dir_inode,
-                                              const char *fname) {
+                                              const char *fname,
+                                              uint8_t *type_out) {
     struct ext2_full_inode out_node = {0};
-    struct search_ctx ctx = {.target = fname, .result = &out_node};
+    struct search_ctx ctx = {.target = fname, .result = &out_node, .type = 0};
     ext2_walk_dir(fs, dir_inode, search_callback, &ctx, false);
+
+    if (type_out)
+        *type_out = ctx.type;
     return ctx.result;
 }
 
