@@ -1,4 +1,5 @@
 #include <console/printf.h>
+#include <misc/linker_symbols.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -10,9 +11,6 @@ struct elf64_sym {
     uint64_t st_value;
     uint64_t st_size;
 };
-
-extern struct elf64_sym __ssymtab[], __esymtab[];
-extern char __sstrtab[], __estrtab[];
 
 void debug_print_registers() {
     uint64_t rax, rbx, rcx, rdx, rsi, rdi, rsp, rbp, rip, rflags;
@@ -76,11 +74,14 @@ void debug_print_registers() {
 #define STT_FILE 4    // Source file name
 #define STT_COMMON 5  // Uninitialized common block
 #define STT_TLS 6     // Thread-local storage object
+
 // TODO: Move these outta here!
+
 const char *lookup_symbol(uint64_t addr, uint64_t *out_offset) {
 
     struct elf64_sym *symtab = (struct elf64_sym *) &__ssymtab;
     struct elf64_sym *symtab_end = (struct elf64_sym *) &__esymtab;
+
     const char *strtab = (char *) &__sstrtab;
 
     const char *best_name = NULL;
@@ -109,7 +110,7 @@ void debug_print_stack() {
 
     for (int i = 0; i < 64; i++) {
         uint64_t addr = rsp[i];
-        if (addr < 0xFFFF800000000000) // Filter likely invalid addresses
+        if (addr < 0xffffffff80000000) // Filter likely invalid addresses
             continue;
 
         uint64_t offset = 0;

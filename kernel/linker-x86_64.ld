@@ -28,6 +28,7 @@ SECTIONS {
     .rodata : ALIGN(4K) {
         __srodata = .;
         *(.rodata .rodata.*)
+
         . = ALIGN(4K);
         __erodata = .;
     } :rodata
@@ -35,19 +36,24 @@ SECTIONS {
     .data : ALIGN(4K) {
         __sdata = .;
         *(.data .data.*)
+
         . = ALIGN(4K);
         __edata = .;
     } :data
 
-    .symtab : {
+    .symtab : ALIGN(4K) {
         __ssymtab = .;
-        *(.symtab)
+        *(.symtab .symtab.*)
+        
+        . = ALIGN(4K);
         __esymtab = .;
     } :data
 
-    .strtab : {
+    .strtab : ALIGN(4K) {
         __sstrtab = .;
-        *(.strtab)
+        *(.strtab .strtab.*)
+        
+        . = ALIGN(4K);
         __estrtab = .;
     } :data
 
@@ -59,9 +65,7 @@ SECTIONS {
         __ebss = .;
     } :data
 
-    __kernel_virt_start = 0xffffffff80000000;
     __kernel_virt_end = ALIGN(4K);
-    __kernel_phys_start = __kernel_virt_start - 0xffffffff80000000;
 
     /DISCARD/ : {
         *(.eh_frame*)
