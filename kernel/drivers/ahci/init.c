@@ -57,8 +57,8 @@ static void allocate_port(struct ahci_device *dev, struct ahci_port *port,
     dev->regs[port_num] = p;
 }
 
-bool wait_for_clear(volatile uint32_t *reg, uint32_t bit, uint32_t timeout) {
-    while (*reg & bit) {
+bool wait_for_clear(uint32_t *reg, uint32_t bit, uint32_t timeout) {
+    while (mmio_read_32(reg) & bit) {
         if (timeout-- == 0)
             return false;
         io_wait();
@@ -69,7 +69,7 @@ bool wait_for_clear(volatile uint32_t *reg, uint32_t bit, uint32_t timeout) {
 static struct ahci_disk *device_setup(struct ahci_device *dev,
                                       struct ahci_controller *ctrl,
                                       uint32_t *disk_count) {
-    uint32_t pi = ctrl->pi;
+    uint32_t pi = mmio_read_32(&ctrl->pi);
 
     uint32_t total_disks = 0;
 
@@ -77,7 +77,7 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
         if (!(pi & (1U << i)))
             continue;
 
-        uint32_t ssts = ctrl->ports[i].ssts;
+        uint32_t ssts = mmio_read_32(&ctrl->ports[i].ssts);
         if ((ssts & 0x0F) == AHCI_DET_PRESENT &&
             ((ssts >> 8) & 0x0F) == AHCI_IPM_ACTIVE) {
             total_disks += 1;
@@ -102,13 +102,18 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
             disks[disks_ind].port = i;
             disks[disks_ind].device = dev;
             struct ahci_port *port = &ctrl->ports[i];
-            port->cmd &= ~AHCI_CMD_ST;
-            port->cmd &= ~AHCI_CMD_FRE;
+
+            uint32_t cmd = mmio_read_32(&port->cmd);
+            cmd &= ~AHCI_CMD_ST;
+            cmd &= ~AHCI_CMD_FRE;
+            mmio_write_32(&port->cmd, cmd);
 
             allocate_port(dev, port, i);
 
-            port->cmd |= AHCI_CMD_FRE;
-            port->cmd |= AHCI_CMD_ST;
+            cmd = mmio_read_32(&port->cmd);
+            cmd |= AHCI_CMD_FRE;
+            cmd |= AHCI_CMD_ST;
+            mmio_write_32(&port->cmd, cmd);
 
             if (!wait_for_clear(&port->cmd, AHCI_CMD_CR, 1000)) {
                 continue;
@@ -122,15 +127,15 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
 
 struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
                                         uint32_t *d_cnt) {
-    bool s64a = ctrl->cap & (1U << 31);
+    bool s64a = mmio_read_32(&ctrl->cap) & (1U << 31);
     if (!s64a) {
         k_printf("AHCI controller does not support 64-bit addressing\n");
         return NULL;
     }
 
-    while ((ctrl->ghc & AHCI_GHC_HR) != 0)
+    while (mmio_read_32(&ctrl->ghc) & AHCI_GHC_HR)
         ;
-    ctrl->ghc |= AHCI_GHC_AE;
+    mmio_write_32(&ctrl->ghc, mmio_read_32(&ctrl->ghc) | AHCI_GHC_AE);
 
     struct ahci_device *dev = kzalloc(sizeof(struct ahci_device));
     uint32_t disk_count = 0;

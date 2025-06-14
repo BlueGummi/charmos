@@ -23,26 +23,28 @@ void nvme_enable_controller(struct nvme_device *nvme) {
 
     cc.en = 0;
 
-    nvme->regs->cc = cc;
+    mmio_write_32(&nvme->regs->cc, *(uint32_t *) &cc);
 
-    while (nvme->regs->csts & 1) {}
+    while (mmio_read_32(&nvme->regs->csts) & 1) {}
 
-    nvme->regs->cc.en = 1;
+    cc.en = 1;
 
-    while ((nvme->regs->csts & 1) == 0) {}
+    mmio_write_32(&nvme->regs->cc, *(uint32_t *) &cc);
+
+    while ((mmio_read_32(&nvme->regs->csts) & 1) == 0) {}
 }
 
 void nvme_setup_admin_queues(struct nvme_device *nvme) {
     uint32_t q_depth_minus_1 = nvme->admin_q_depth - 1;
 
     uint32_t aqa = (q_depth_minus_1 << 16) | q_depth_minus_1;
-    nvme->regs->aqa = aqa;
+    mmio_write_32(&nvme->regs->aqa, aqa);
 
-    nvme->regs->asq_lo = (uint32_t) (nvme->admin_sq_phys & 0xFFFFFFFF);
-    nvme->regs->asq_hi = (uint32_t) (nvme->admin_sq_phys >> 32);
+    mmio_write_32(&nvme->regs->asq_lo, (nvme->admin_sq_phys & 0xFFFFFFFF));
+    mmio_write_32(&nvme->regs->asq_hi, (nvme->admin_sq_phys >> 32));
 
-    nvme->regs->acq_lo = (uint32_t) (nvme->admin_cq_phys & 0xFFFFFFFF);
-    nvme->regs->acq_hi = (uint32_t) (nvme->admin_cq_phys >> 32);
+    mmio_write_32(&nvme->regs->acq_lo, (nvme->admin_cq_phys & 0xFFFFFFFF));
+    mmio_write_32(&nvme->regs->acq_hi, (nvme->admin_cq_phys >> 32));
 
     nvme->admin_sq_tail = 0;
     nvme->admin_cq_head = 0;
@@ -76,8 +78,6 @@ void nvme_alloc_admin_queues(struct nvme_device *nvme) {
     nvme->admin_cq_phys = acq_phys;
 }
 
-#define MAX(a, b) (a > b ? a : b)
-
 void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
     if (!qid)
         k_panic("Can't allocate IO queue zero!\n");
@@ -104,11 +104,11 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
     this_queue->sq_depth = 64; // TODO: #define these or something
     this_queue->cq_depth = 16;
     this_queue->sq_db =
-        (volatile uint32_t *) ((uint8_t *) nvme->regs + NVME_DOORBELL_BASE +
-                               (2 * qid * nvme->doorbell_stride));
+        (uint32_t *) ((uint8_t *) nvme->regs + NVME_DOORBELL_BASE +
+                      (2 * qid * nvme->doorbell_stride));
     this_queue->cq_db =
-        (volatile uint32_t *) ((uint8_t *) nvme->regs + NVME_DOORBELL_BASE +
-                               ((2 * qid + 1) * nvme->doorbell_stride));
+        (uint32_t *) ((uint8_t *) nvme->regs + NVME_DOORBELL_BASE +
+                      ((2 * qid + 1) * nvme->doorbell_stride));
 
     // complete queue
     struct nvme_command cq_cmd = {0};

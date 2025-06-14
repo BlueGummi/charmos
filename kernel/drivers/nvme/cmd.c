@@ -1,3 +1,4 @@
+#include <asm.h>
 #include <console/printf.h>
 #include <devices/generic_disk.h>
 #include <drivers/nvme.h>
@@ -18,13 +19,13 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
 
     nvme->admin_sq_tail = next_tail;
 
-    *nvme->admin_sq_db = nvme->admin_sq_tail;
+    mmio_write_32(nvme->admin_sq_db, nvme->admin_sq_tail);
 
     while (true) {
         struct nvme_completion *entry = &nvme->admin_cq[nvme->admin_cq_head];
 
-        if ((entry->status & 1) == nvme->admin_cq_phase) {
-            if (entry->cid == cmd->cid) {
+        if ((mmio_read_16(&entry->status) & 1) == nvme->admin_cq_phase) {
+            if (mmio_read_16(&entry->cid) == cmd->cid) {
                 uint16_t status = entry->status & 0xFFFE;
 
                 nvme->admin_cq_head =
@@ -33,8 +34,7 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
                 if (nvme->admin_cq_head == 0)
                     nvme->admin_cq_phase ^= 1;
 
-                *nvme->admin_cq_db = nvme->admin_cq_head;
-
+                mmio_write_32(nvme->admin_cq_db, nvme->admin_cq_head);
                 return status;
             }
         }
@@ -53,13 +53,13 @@ uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
 
     this_queue->sq_tail = next_tail;
 
-    *this_queue->sq_db = this_queue->sq_tail;
+    mmio_write_32(this_queue->sq_db, this_queue->sq_tail);
 
     while (true) {
         struct nvme_completion *entry = &this_queue->cq[this_queue->cq_head];
 
-        if ((entry->status & 1) == this_queue->cq_phase) {
-            if (entry->cid == cmd->cid) {
+        if ((mmio_read_16(&entry->status) & 1) == this_queue->cq_phase) {
+            if (mmio_read_16(&entry->cid) == cmd->cid) {
                 uint16_t status = entry->status & 0xFFFE;
 
                 this_queue->cq_head =
@@ -68,7 +68,7 @@ uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
                 if (this_queue->cq_head == 0)
                     this_queue->cq_phase ^= 1;
 
-                *this_queue->cq_db = this_queue->cq_head;
+                mmio_write_32(this_queue->cq_db, this_queue->cq_head);
 
                 return status;
             }

@@ -50,15 +50,19 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme->admin_q_depth = ((nvme->cap) & 0xFFFF) + 1;
     nvme->io_queues = kmalloc(sizeof(struct nvme_queue *));
     nvme->admin_sq_db =
-        (volatile uint32_t *) ((uint8_t *) nvme->regs + NVME_DOORBELL_BASE);
+        (uint32_t *) ((uint8_t *) nvme->regs + NVME_DOORBELL_BASE);
     nvme->admin_cq_db =
-        (volatile uint32_t *) ((uint8_t *) nvme->regs + NVME_DOORBELL_BASE +
-                               nvme->doorbell_stride);
+        (uint32_t *) ((uint8_t *) nvme->regs + NVME_DOORBELL_BASE +
+                      nvme->doorbell_stride);
 
     if (nvme->admin_q_depth > 32)
         nvme->admin_q_depth = 32;
 
-    nvme->regs->cc.en = 0;
+    struct nvme_cc cc = {0};
+    cc.raw = (uint32_t) mmio_read_32(&nvme->regs->cc);
+    cc.en = 0;
+
+    mmio_write_32(&nvme->regs->cc, cc.raw);
 
     nvme_alloc_admin_queues(nvme);
     nvme_setup_admin_queues(nvme);

@@ -21,44 +21,49 @@ struct nvme_command {
 } __attribute__((packed));
 
 struct nvme_completion {
-    volatile uint32_t result;
-    volatile uint32_t rsvd;
-    volatile uint16_t sq_head;
-    volatile uint16_t sq_id;
-    volatile uint16_t cid;
-    volatile uint16_t status;
+    uint32_t result;
+    uint32_t rsvd;
+    uint16_t sq_head;
+    uint16_t sq_id;
+    uint16_t cid;
+    uint16_t status;
 } __attribute__((packed));
 
 struct nvme_cc {
-    uint32_t en : 1;
-    uint32_t __reserved0 : 3;
-    uint32_t css : 3;
-    uint32_t mps : 4;
-    uint32_t ams : 3;
-    uint32_t shn : 2;
-    uint32_t iosqes : 4;
-    uint32_t iocqes : 4;
-    uint32_t __reserved1 : 8;
-};
+    union {
+        uint32_t raw;
+        struct {
+            uint32_t en : 1;
+            uint32_t __reserved0 : 3;
+            uint32_t css : 3;
+            uint32_t mps : 4;
+            uint32_t ams : 3;
+            uint32_t shn : 2;
+            uint32_t iosqes : 4;
+            uint32_t iocqes : 4;
+            uint32_t __reserved1 : 8;
+        };
+    };
+} __attribute__((packed));
 _Static_assert(sizeof(struct nvme_cc) == sizeof(uint32_t),
                "nvme_cc != sizeof(uint64_t)");
 
 struct nvme_regs {
-    volatile uint32_t cap_lo;          // 0x00
-    volatile uint32_t cap_hi;          // 0x04
-    volatile uint32_t version;         // 0x08
-    volatile uint32_t intms;           // 0x0C
-    volatile uint32_t intmc;           // 0x10
-    volatile struct nvme_cc cc;        // 0x14
-    volatile uint32_t nssr;            // 0x18
-    volatile uint32_t csts;            // 0x1C
-    volatile uint32_t reserved1;       // 0x20 - 0x24
-    volatile uint32_t aqa;             // 0x24
-    volatile uint32_t asq_lo;          // 0x28
-    volatile uint32_t asq_hi;          // 0x2C
-    volatile uint32_t acq_lo;          // 0x30
-    volatile uint32_t acq_hi;          // 0x34
-    volatile uint32_t reserved4[1018]; // pad to 4KB total
+    uint32_t cap_lo;          // 0x00
+    uint32_t cap_hi;          // 0x04
+    uint32_t version;         // 0x08
+    uint32_t intms;           // 0x0C
+    uint32_t intmc;           // 0x10
+    struct nvme_cc cc;        // 0x14
+    uint32_t nssr;            // 0x18
+    uint32_t csts;            // 0x1C
+    uint32_t reserved1;       // 0x20 - 0x24
+    uint32_t aqa;             // 0x24
+    uint32_t asq_lo;          // 0x28
+    uint32_t asq_hi;          // 0x2C
+    uint32_t acq_lo;          // 0x30
+    uint32_t acq_hi;          // 0x34
+    uint32_t reserved4[1018]; // pad to 4KB total
 } __attribute__((aligned));
 
 struct nvme_queue {
@@ -72,18 +77,18 @@ struct nvme_queue {
     uint16_t sq_depth; // Queue depth (entries)
     uint16_t cq_depth; // Queue depth (entries)
     uint8_t cq_phase;  // Phase bit for completion
-    volatile uint32_t *sq_db;
-    volatile uint32_t *cq_db;
+    uint32_t *sq_db;
+    uint32_t *cq_db;
 };
 
 struct nvme_device {
-    volatile struct nvme_regs *regs;
+    struct nvme_regs *regs;
     uint64_t cap;
     uint32_t version;
     uint32_t doorbell_stride;
     uint32_t page_size;
-    volatile uint32_t *admin_sq_db;
-    volatile uint32_t *admin_cq_db;
+    uint32_t *admin_sq_db;
+    uint32_t *admin_cq_db;
 
     struct nvme_command *admin_sq;
     struct nvme_completion *admin_cq;

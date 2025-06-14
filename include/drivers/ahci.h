@@ -164,25 +164,25 @@ struct ahci_full_port {
 };
 
 struct ahci_port {
-    volatile uint32_t clb;       // Command List Base (lower 32 bits)
-    volatile uint32_t clbu;      // Command List Base (upper 32 bits)
-    volatile uint32_t fb;        // FIS Base (lower 32 bits)
-    volatile uint32_t fbu;       // FIS Base (upper 32 bits)
-    volatile uint32_t is;        // Interrupt Status
-    volatile uint32_t ie;        // Interrupt Enable
-    volatile uint32_t cmd;       // Command and Status
-    volatile uint32_t rsv0;      // Reserved
-    volatile uint32_t tfd;       // Task File Data
-    volatile uint32_t sig;       // Signature
-    volatile uint32_t ssts;      // SATA Status
-    volatile uint32_t sctl;      // SATA Control
-    volatile uint32_t serr;      // SATA Error
-    volatile uint32_t sact;      // SATA Active
-    volatile uint32_t ci;        // Command Issue
-    volatile uint32_t sntf;      // SATA Notification
-    volatile uint32_t fbs;       // FIS-based Switching
-    volatile uint32_t rsv1[11];  // 0x44 ~ 0x6F, Reserved
-    volatile uint32_t vendor[4]; // 0x70 ~ 0x7F, vendor specific
+    uint32_t clb;       // Command List Base (lower 32 bits)
+    uint32_t clbu;      // Command List Base (upper 32 bits)
+    uint32_t fb;        // FIS Base (lower 32 bits)
+    uint32_t fbu;       // FIS Base (upper 32 bits)
+    uint32_t is;        // Interrupt Status
+    uint32_t ie;        // Interrupt Enable
+    uint32_t cmd;       // Command and Status
+    uint32_t rsv0;      // Reserved
+    uint32_t tfd;       // Task File Data
+    uint32_t sig;       // Signature
+    uint32_t ssts;      // SATA Status
+    uint32_t sctl;      // SATA Control
+    uint32_t serr;      // SATA Error
+    uint32_t sact;      // SATA Active
+    uint32_t ci;        // Command Issue
+    uint32_t sntf;      // SATA Notification
+    uint32_t fbs;       // FIS-based Switching
+    uint32_t rsv1[11];  // 0x44 ~ 0x6F, Reserved
+    uint32_t vendor[4]; // 0x70 ~ 0x7F, vendor specific
 } __attribute__((packed));
 
 // one controller
@@ -201,17 +201,17 @@ struct ahci_disk {
 };
 
 struct ahci_controller {
-    volatile uint32_t cap;       // Host Capabilities
-    volatile uint32_t ghc;       // Global Host Control
-    volatile uint32_t is;        // Interrupt Status
-    volatile uint32_t pi;        // Ports Implemented
-    volatile uint32_t vs;        // Version
-    volatile uint32_t ccc_ctl;   // Command Completion Coalescing Control
-    volatile uint32_t ccc_ports; // CCC Ports
-    volatile uint32_t em_loc;    // Enclosure Management Location
-    volatile uint32_t em_ctl;    // Enclosure Management Control
-    volatile uint32_t cap2;      // Extended Host Capabilities
-    volatile uint32_t bohc;      // BIOS/OS Handoff Control
+    uint32_t cap;       // Host Capabilities
+    uint32_t ghc;       // Global Host Control
+    uint32_t is;        // Interrupt Status
+    uint32_t pi;        // Ports Implemented
+    uint32_t vs;        // Version
+    uint32_t ccc_ctl;   // Command Completion Coalescing Control
+    uint32_t ccc_ports; // CCC Ports
+    uint32_t em_loc;    // Enclosure Management Location
+    uint32_t em_ctl;    // Enclosure Management Control
+    uint32_t cap2;      // Extended Host Capabilities
+    uint32_t bohc;      // BIOS/OS Handoff Control
     uint8_t rsv[0xA0 - 0x2C];
     uint8_t vendor[0x100 - 0xA0];
     struct ahci_port ports[32];
@@ -233,8 +233,7 @@ struct ahci_cmd_header {
     uint16_t prdtl; // Physical region descriptor table length in entries
 
     // DW1
-    volatile uint32_t
-        prdbc; // Physical region descriptor byte count transferred
+    uint32_t prdbc; // Physical region descriptor byte count transferred
 
     // DW2, 3
     uint32_t ctba;  // Command table descriptor base address

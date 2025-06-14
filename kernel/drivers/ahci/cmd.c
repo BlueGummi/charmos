@@ -7,7 +7,8 @@
 #include <string.h>
 
 uint32_t find_free_cmd_slot(struct ahci_port *port) {
-    uint32_t slots_in_use = port->sact | port->ci;
+    uint32_t slots_in_use = mmio_read_32(&port->sact) | mmio_read_32(&port->ci);
+
     for (int slot = 0; slot < 32; slot++) {
         if ((slots_in_use & (1U << slot)) == 0) {
             return slot;
@@ -60,13 +61,16 @@ void ahci_setup_fis(struct ahci_cmd_table *cmd_tbl, uint8_t command,
 }
 
 bool ahci_send_command(struct ahci_full_port *port, uint32_t slot) {
-    port->port->is = (uint32_t) -1;
+    mmio_write_32(&port->port->is, (uint32_t) -1);
 
-    port->port->ci |= (1 << slot);
+    uint32_t ci = mmio_read_32(&port->port->ci);
+    ci |= (1 << slot);
+    mmio_write_32(&port->port->ci, ci);
 
-    while (port->port->ci & (1 << slot)) {}
+    while (mmio_read_32(&port->port->ci) & (1 << slot)) {}
 
-    if (port->port->tfd & (1 << 0) || port->port->tfd & (1 << 1)) {
+    uint32_t tfd = mmio_read_32(&port->port->tfd);
+    if (tfd & (1 << 0) || tfd & (1 << 1)) {
         return false;
     }
 

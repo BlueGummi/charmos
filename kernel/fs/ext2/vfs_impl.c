@@ -350,8 +350,6 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     f->inode_num = EXT2_ROOT_INODE;
     kfree(inode);
 
-    ext2_print_inode(f);
-
     out_node->open = false;
     out_node->name[0] = '/';
     out_node->flags = ext2_to_vfs_flags(f->node.flags);

@@ -189,35 +189,43 @@ static inline void pci_write_byte(uint8_t bus, uint8_t slot, uint8_t func,
 //
 
 static inline void mmio_write_64(void *address, uint64_t value) {
-    *(uint64_t *) address = value;
+    asm volatile("movq %0, (%1)" : : "r"(value), "r"(address) : "memory");
 }
 
 static inline void mmio_write_32(void *address, uint32_t value) {
-    *(uint32_t *) address = value;
+    asm volatile("movl %0, (%1)" : : "r"(value), "r"(address) : "memory");
 }
 
 static inline void mmio_write_16(void *address, uint16_t value) {
-    *(uint16_t *) address = value;
+    asm volatile("movw %0, (%1)" : : "r"(value), "r"(address) : "memory");
 }
 
 static inline void mmio_write_8(void *address, uint8_t value) {
-    *(uint8_t *) address = value;
+    asm volatile("movb %0, (%1)" : : "r"(value), "r"(address) : "memory");
 }
 
 static inline uint64_t mmio_read_64(void *address) {
-    return *(uint64_t *) address;
+    uint64_t value;
+    asm volatile("movq (%1), %0" : "=r"(value) : "r"(address) : "memory");
+    return value;
 }
 
 static inline uint32_t mmio_read_32(void *address) {
-    return *(uint32_t *) address;
+    uint32_t value;
+    asm volatile("movl (%1), %0" : "=r"(value) : "r"(address) : "memory");
+    return value;
 }
 
 static inline uint16_t mmio_read_16(void *address) {
-    return *(uint16_t *) address;
+    uint16_t value;
+    asm volatile("movw (%1), %0" : "=r"(value) : "r"(address) : "memory");
+    return value;
 }
 
 static inline uint8_t mmio_read_8(void *address) {
-    return *(uint8_t *) address;
+    uint8_t value;
+    asm volatile("movb (%1), %0" : "=r"(value) : "r"(address) : "memory");
+    return value;
 }
 
 //
