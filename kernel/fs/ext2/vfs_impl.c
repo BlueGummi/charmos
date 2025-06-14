@@ -13,6 +13,8 @@
 
 // TODO: open/close atomicity or whatever
 
+// TODO: check if files already exist, update times, check if file types are correct
+
 enum errno ext2_vfs_stat(struct vfs_node *v, struct vfs_stat *out);
 enum errno ext2_vfs_rename(struct vfs_node *old_parent, const char *old_name,
                            struct vfs_node *new_parent, const char *new_name);
@@ -295,50 +297,6 @@ static enum errno dir_entry_rename(struct ext2_fs *fs,
 //
 //
 //
-
-void ext2_debug_read_root_inode(struct generic_partition *p,
-                                struct ext2_sblock *sblock) {
-    if (!p || !sblock || !p->disk || !p->disk->read_sector)
-        return;
-
-    struct generic_disk *disk = p->disk;
-
-    uint32_t block_size = 1024U << sblock->log_block_size;
-    uint32_t inode_size = sblock->inode_size;
-    uint32_t sectors_per_block = block_size / disk->sector_size;
-
-    uint32_t gdt_block = (block_size == 1024) ? 2 : 1;
-    uint32_t gdt_sector = gdt_block * sectors_per_block;
-
-    struct ext2_group_desc gd;
-    if (!disk->read_sector(disk, gdt_sector, (uint8_t *) &gd, 1)) {
-        return;
-    }
-
-    uint32_t inode_table_block = gd.inode_table;
-    uint32_t root_inode_index = EXT2_ROOT_INODE - 1;
-
-    uint32_t inodes_per_block = block_size / inode_size;
-    uint32_t block_offset = root_inode_index / inodes_per_block;
-
-    uint32_t target_block = inode_table_block + block_offset;
-    uint32_t target_sector = target_block * sectors_per_block;
-
-    uint8_t *buf = kmalloc(disk->sector_size * sectors_per_block);
-    if (!buf) {
-        return;
-    }
-
-    k_printf("Reading into buffer at sector %u\n", target_sector);
-    if (!disk->read_sector(disk, target_sector, buf, 1)) {
-        kfree(buf);
-        return;
-    }
-
-    ext2_print_inode((void *) (buf - 4));
-
-    kfree(buf);
-}
 
 enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
                       struct ext2_sblock *sblock, struct vfs_node *out_node) {

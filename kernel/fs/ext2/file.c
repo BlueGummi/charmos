@@ -131,6 +131,8 @@ enum errno ext2_read_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
                                 .bytes_read = 0};
 
     ext2_traverse_inode_blocks(fs, &inode->node, file_read_visitor, &ctx);
+    inode->node.atime = time_get_unix();
+    ext2_write_inode(fs, inode->inode_num, &inode->node);
     return ERR_OK;
 }
 
