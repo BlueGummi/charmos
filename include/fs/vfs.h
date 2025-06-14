@@ -5,6 +5,8 @@
 
 // TODO: flags on file creation
 
+extern char *g_root_part;
+
 #define VFS_NAME_MAX 256 // this because of ext2
 
 #define VFS_MODE_READ 0x0001

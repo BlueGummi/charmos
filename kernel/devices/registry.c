@@ -5,6 +5,7 @@
 #include <drivers/ata.h>
 #include <drivers/nvme.h>
 #include <fs/detect.h>
+#include <fs/vfs.h>
 #include <mem/alloc.h>
 #include <pci/pci.h>
 #include <string.h>
@@ -140,6 +141,7 @@ void registry_setup() {
         struct generic_disk *disk = registry_get_by_index(i);
         detect_fs(disk);
         for (uint32_t j = 0; j < disk->partition_count; j++) {
+            k_printf("Mounting partition %s\n", disk->partitions[j].name);
             disk->partitions[j].mount(&disk->partitions[j]);
         }
     }

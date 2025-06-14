@@ -49,6 +49,7 @@
 
 struct scheduler global_sched;
 uint64_t a_rsdp = 0;
+char *g_root_part = NULL;
 
 void k_main(void) {
     uint64_t c_cnt = mp_request.response->cpu_count;
@@ -63,13 +64,13 @@ void k_main(void) {
     vmm_init(memmap_request.response, xa_request.response, r->offset);
     slab_init();
     idt_alloc(c_cnt);
+    cmdline_parse(cmdline_request.response->cmdline);
     // idt_install(0);
     uacpi_init();
     registry_setup();
     registry_print_devices();
     k_printf("command line raw request is \"%s\"\n",
              cmdline_request.response->cmdline);
-    cmdline_parse(cmdline_request.response->cmdline);
     while (1)
         asm("hlt");
 
@@ -90,10 +91,6 @@ void k_main(void) {
 
     //    struct thread *t = thread_create(registry_print_devices);
     //    scheduler_add_thread(&global_sched, t);
-
-    while (1) {
-        asm("hlt");
-    } // no do sched for now :boom:
 
     struct core *c = kmalloc(sizeof(struct core));
     c->state = IDLE;

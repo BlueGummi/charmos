@@ -1,4 +1,5 @@
 #include <console/printf.h>
+#include <fs/vfs.h>
 #include <string.h>
 
 #define MAX_VAR_LEN 128
@@ -46,7 +47,8 @@ void cmdline_parse(const char *input) {
         memcpy(val_buf, val_start, val_len);
         val_buf[val_len] = '\0';
 
-        k_printf("var: %s\n", var_buf);
-        k_printf("val: %s\n\n", val_buf);
+        if (strcmp(var_buf, "root") == 0) {
+            g_root_part = val_buf;
+        }
     }
 }
