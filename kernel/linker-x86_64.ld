@@ -39,6 +39,18 @@ SECTIONS {
         __edata = .;
     } :data
 
+    .symtab : {
+        __ssymtab = .;
+        *(.symtab)
+        __esymtab = .;
+    } :data
+
+    .strtab : {
+        __sstrtab = .;
+        *(.strtab)
+        __estrtab = .;
+    } :data
+
     .bss : ALIGN(4K) {
         __sbss = .;
         *(.bss .bss.*)

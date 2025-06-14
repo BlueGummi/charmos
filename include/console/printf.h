@@ -8,6 +8,8 @@
 #define STRINGIZE(x) STRINGIZE2(x)
 #define LINE_STRING STRINGIZE(__LINE__)
 
+void debug_print_stack();
+
 #define k_panic(fmt, ...)                                                      \
     do {                                                                       \
         k_printf("\n=========================================================" \
@@ -26,6 +28,7 @@
                  "    [" ANSI_YELLOW "MESSAGE" ANSI_RESET "] ",                \
                  __func__);                                                    \
         k_printf(fmt, ##__VA_ARGS__);                                          \
+        debug_print_stack();                                                   \
         k_printf("\n=========================================================" \
                  "================"                                            \
                  "=========="                                                  \

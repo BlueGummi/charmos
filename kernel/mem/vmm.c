@@ -55,7 +55,7 @@ void vmm_init(struct limine_memmap_response *memmap,
 
     uint64_t kernel_phys_start = xa->physical_base;
     uint64_t kernel_virt_start = xa->virtual_base;
-    uint64_t kernel_virt_end = (uint64_t) __kernel_virt_end;
+    uint64_t kernel_virt_end = (uint64_t) &__kernel_virt_end;
     uint64_t kernel_size = kernel_virt_end - kernel_virt_start;
 
     for (uint64_t i = 0; i < kernel_size; i += PAGE_SIZE) {
