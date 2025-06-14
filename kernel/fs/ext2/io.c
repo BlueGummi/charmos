@@ -79,7 +79,8 @@ bool ext2_block_write(struct generic_partition *p, uint32_t lba,
     return true;
 }
 
-bool ext2_block_ptr_write(struct ext2_fs *fs, uint32_t block_num, void *buf) {
+bool ext2_block_ptr_write(struct ext2_fs *fs, uint32_t block_num,
+                          const void *buf) {
     if (!fs || !buf)
         return false;
 

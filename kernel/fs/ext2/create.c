@@ -106,7 +106,7 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
 
 enum errno ext2_symlink_file(struct ext2_fs *fs,
                              struct ext2_full_inode *dir_inode,
-                             const char *name, char *target) {
+                             const char *name, const char *target) {
     uint32_t inode_num = ext2_alloc_inode(fs);
     if (inode_num == 0)
         return ERR_FS_NO_INODE;
@@ -142,4 +142,52 @@ enum errno ext2_symlink_file(struct ext2_fs *fs,
     enum errno ret = ext2_link_file(fs, dir_inode, &wrapped_inode,
                                     (char *) name, EXT2_FT_SYMLINK);
     return ret;
+}
+
+enum errno ext2_create_file(struct ext2_fs *fs,
+                            struct ext2_full_inode *parent_dir,
+                            const char *name, uint16_t mode) {
+    uint32_t new_inode_num = ext2_alloc_inode(fs);
+    if (new_inode_num == 0)
+        return ERR_NOSPC;
+
+    struct ext2_inode new_inode;
+    memset(&new_inode, 0, sizeof(new_inode));
+
+    new_inode.mode = mode;
+    new_inode.uid = 0;
+    new_inode.gid = 0; // TODO: these
+    new_inode.size = 0;
+    new_inode.atime = time_get_unix();
+    new_inode.ctime = new_inode.mtime = new_inode.atime;
+    new_inode.links_count = ((mode & EXT2_S_IFDIR) ? 2 : 1);
+    new_inode.blocks = 0;
+    new_inode.flags = 0;
+
+    if (!ext2_write_inode(fs, new_inode_num, &new_inode))
+        return ERR_IO;
+
+    struct ext2_full_inode temp_full_inode = {
+        .node = new_inode,
+        .inode_num = new_inode_num,
+    };
+
+    uint8_t file_type;
+    if (mode & EXT2_S_IFDIR)
+        file_type = EXT2_FT_DIR;
+    else if (mode & EXT2_S_IFREG)
+        file_type = EXT2_FT_REG_FILE;
+    else if (mode & EXT2_S_IFLNK)
+        file_type = EXT2_FT_SYMLINK;
+    else
+        file_type = EXT2_FT_UNKNOWN;
+
+    enum errno err =
+        ext2_link_file(fs, parent_dir, &temp_full_inode, name, file_type);
+    if (err != ERR_OK) {
+        ext2_free_inode(fs, new_inode_num);
+        return err;
+    }
+
+    return ERR_OK;
 }

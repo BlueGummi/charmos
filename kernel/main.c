@@ -55,7 +55,6 @@ void k_main(void) {
     struct limine_hhdm_response *r = hhdm_request.response;
     k_printf("%s", OS_LOGO_SMALL);
     a_rsdp = rsdp_request.response->address;
-    k_printf("command line request is \"%s\"\n", cmdline_request.response->cmdline);
     mp_wakeup_processors(mp_request.response);
     enable_smap_smep_umip();
     gdt_install();
@@ -67,6 +66,8 @@ void k_main(void) {
     uacpi_init();
     registry_setup();
     registry_print_devices();
+    k_printf("command line request is \"%s\"\n",
+             cmdline_request.response->cmdline);
     while (1)
         asm("hlt");
 

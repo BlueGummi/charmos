@@ -20,6 +20,7 @@ enum errno {
     ERR_NOT_IMPL = 14, // Not implemented
     ERR_NOSPC = 15,    // No space left on device
     ERR_OVERFLOW = 16, // Value too large
+    ERR_NOT_EMPTY = 17, // Directory not empty
 
     ERR_FS_NO_INODE = 100,     // Inode not found
     ERR_FS_CORRUPT = 101,      // Filesystem corruption

@@ -3,6 +3,8 @@
 #include <stdint.h>
 #pragma once
 
+// TODO: flags on file creation
+
 #define VFS_NAME_MAX 256 // this because of ext2
 
 #define VFS_MODE_READ 0x0001
@@ -11,6 +13,18 @@
 #define VFS_MODE_DIR 0x4000
 #define VFS_MODE_FILE 0x8000
 #define VFS_MODE_SYMLINK 0xA000
+#define VFS_MODE_CHARDEV 0x2000
+#define VFS_MODE_BLOCKDEV 0x6000
+#define VFS_MODE_PIPE 0x1000
+#define VFS_MODE_SOCKET 0xC000
+
+#define VFS_MODE_G_READ 0x1000
+#define VFS_MODE_G_WRITE 0x2000
+#define VFS_MODE_G_EXEC 0x4000
+
+#define VFS_MODE_O_READ 0x010000
+#define VFS_MODE_O_WRITE 0x020000
+#define VFS_MODE_O_EXEC 0x040000
 
 // clang-format off
 enum vfs_node_flags : uint32_t {
@@ -32,17 +46,6 @@ enum vfs_node_flags : uint32_t {
 };
 // clang-format on
 
-enum vfs_node_type : uint32_t {
-    VFS_UNKNOWN = 0x0,
-    VFS_FILE = 0x01,
-    VFS_DIR = 0x02,
-    VFS_SYMLINK = 0x03,
-    VFS_CHARDEV = 0x04,
-    VFS_BLOCKDEV = 0x05,
-    VFS_PIPE = 0x06,
-    VFS_SOCKET = 0x07
-};
-
 enum vfs_open_opts : uint32_t {
     VFS_OPEN_READ = 0x01,  // Open for reading
     VFS_OPEN_WRITE = 0x02, // Open for writing
@@ -61,11 +64,10 @@ enum vfs_open_opts : uint32_t {
 };
 
 struct vfs_stat {
-    enum vfs_node_type type;
+    uint16_t mode;
     uint64_t size;
 
     uint64_t inode; // inode number
-    uint32_t mode;
     uint32_t nlink; // Link count
 
     uint64_t atime;
@@ -75,30 +77,30 @@ struct vfs_stat {
 
 struct vfs_dirent {
     char name[VFS_NAME_MAX];
-    enum vfs_node_type type;
     uint64_t inode;
+    uint16_t mode;
     void *dirent_data;
 };
 
 struct vfs_node;
 struct vfs_ops {
-    uint64_t (*read)(
-        struct vfs_node *node, void *buf, uint64_t size,
-        uint64_t offset); // read data from file, returns # bytes read
+    enum errno (*read)(struct vfs_node *node, void *buf, uint64_t size,
+                       uint64_t offset); // read data from file
 
-    uint64_t (*write)(
-        struct vfs_node *node, const void *buf, uint64_t size,
-        uint64_t offset); // write data to file, returns # bytes written
+    enum errno (*write)(struct vfs_node *node, const void *buf, uint64_t size,
+                        uint64_t offset); // write data to file
 
     enum errno (*open)(struct vfs_node *node,
-                       int flags); // open file with flags
+                       uint32_t flags); // open file with flags
 
     enum errno (*close)(struct vfs_node *node); // close file
 
-    enum errno (*create)(struct vfs_node *parent, const char *name, int mode);
+    enum errno (*create)(struct vfs_node *parent, const char *name,
+                         uint16_t mode);
 
-    enum errno (*mknod)(struct vfs_node *parent, const char *name, int mode,
-                        int dev); // special devices
+    enum errno (*mknod)(struct vfs_node *parent, const char *name,
+                        uint16_t mode,
+                        uint32_t dev); // special devices
 
     enum errno (*symlink)(struct vfs_node *parent, const char *target,
                           const char *link_name);
@@ -114,7 +116,7 @@ struct vfs_ops {
                           uint64_t index); // read directory entry at index
 
     enum errno (*mkdir)(struct vfs_node *parent, const char *name,
-                        int mode); // create directory
+                        uint16_t mode); // create directory
 
     enum errno (*rmdir)(struct vfs_node *parent,
                         const char *name); // remove directory
@@ -136,13 +138,14 @@ struct vfs_ops {
                        const char *link_name); // create hard link to target
 
     enum errno (*chmod)(struct vfs_node *node,
-                        int mode); // change file permissions
+                        uint16_t mode); // change file permissions
 
-    enum errno (*chown)(struct vfs_node *node, int uid,
-                        int gid); // change file ownership
+    enum errno (*chown)(struct vfs_node *node, uint32_t uid,
+                        uint32_t gid); // change file ownership
 
-    enum errno (*utime)(struct vfs_node *node, uint64_t atime,
-                        uint64_t mtime); // update access and modification times
+    enum errno (*utime)(
+        struct vfs_node *node, uint64_t atime,
+        uint64_t mtime); // update access and modification times (unix time)
 
     void (*destroy)(struct vfs_node *node);
 
@@ -164,7 +167,7 @@ struct vfs_node {
     bool open;
     char name[256];
     uint32_t flags;
-    enum vfs_node_type type;
+    uint16_t mode;
     uint64_t size;
 
     void *fs_data;

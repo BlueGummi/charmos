@@ -23,6 +23,16 @@ extern uint64_t PTRS_PER_BLOCK;
 #define EXT2_S_IRWXO 0x0007      // others permissions
 #define EXT2_S_PERMS_ONLY 0x01FF // rwx bits only
 
+#define EXT2_S_IRUSR 0x0100
+#define EXT2_S_IWUSR 0x0080
+#define EXT2_S_IXUSR 0x0040
+#define EXT2_S_IRGRP 0x0020
+#define EXT2_S_IWGRP 0x0010
+#define EXT2_S_IXGRP 0x0008
+#define EXT2_S_IROTH 0x0004
+#define EXT2_S_IWOTH 0x0002
+#define EXT2_S_IXOTH 0x0001
+
 #define EXT2_FT_UNKNOWN 0  // Unknown file type
 #define EXT2_FT_REG_FILE 1 // Regular file
 #define EXT2_FT_DIR 2      // Directory
@@ -229,7 +239,8 @@ bool ext2_block_ptr_read(struct ext2_fs *fs, uint32_t block_num, void *buf);
 bool ext2_block_write(struct generic_partition *, uint32_t lba,
                       const uint8_t *buffer, uint32_t sector_count);
 
-bool ext2_block_ptr_write(struct ext2_fs *fs, uint32_t block_num, void *buf);
+bool ext2_block_ptr_write(struct ext2_fs *fs, uint32_t block_num,
+                          const void *buf);
 
 bool ext2_read_superblock(struct generic_partition *,
                           struct ext2_sblock *sblock);
@@ -271,11 +282,25 @@ enum errno ext2_create_file(struct ext2_fs *fs,
 
 enum errno ext2_symlink_file(struct ext2_fs *fs,
                              struct ext2_full_inode *dir_inode,
-                             const char *name, char *target);
+                             const char *name, const char *target);
 
 enum errno ext2_write_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
-                           uint32_t offset, const uint8_t *src, uint32_t size,
-                           uint64_t *bytes_written_out);
+                           uint32_t offset, const uint8_t *src, uint32_t size);
+
+enum errno ext2_read_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
+                          uint32_t offset, uint8_t *buffer, uint64_t length);
+
+enum errno ext2_truncate_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
+                              uint32_t new_size);
+
+enum errno ext2_chmod(struct ext2_fs *fs, struct ext2_full_inode *node,
+                      uint16_t new_mode);
+
+enum errno ext2_chown(struct ext2_fs *fs, struct ext2_full_inode *node,
+                      uint32_t new_uid, uint32_t new_gid);
+
+enum errno ext2_readlink(struct ext2_fs *fs, struct ext2_full_inode *node,
+                         char *buf, uint64_t size);
 
 struct ext2_full_inode *ext2_find_file_in_dir(struct ext2_fs *fs,
                                               struct ext2_full_inode *dir_inode,
@@ -285,6 +310,12 @@ struct ext2_full_inode *ext2_find_file_in_dir(struct ext2_fs *fs,
 bool ext2_dir_contains_file(struct ext2_fs *fs,
                             struct ext2_full_inode *dir_inode,
                             const char *fname);
+
+enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
+                      const char *name, uint16_t mode);
+
+enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
+                      const char *name);
 
 //
 //

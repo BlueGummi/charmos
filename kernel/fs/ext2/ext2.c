@@ -7,6 +7,8 @@
 #include <string.h>
 #include <time/time.h>
 
+// TODO: flags - maybe?
+
 uint64_t PTRS_PER_BLOCK;
 
 bool ext2_read_superblock(struct generic_partition *p,
@@ -127,7 +129,8 @@ struct ext2_full_inode *ext2_path_lookup(struct ext2_fs *fs,
     memcpy(next_dir, start, len);
     next_dir[len] = '\0';
 
-    struct ext2_full_inode *next = ext2_find_file_in_dir(fs, node, next_dir, NULL);
+    struct ext2_full_inode *next =
+        ext2_find_file_in_dir(fs, node, next_dir, NULL);
 
     if (!next) {
         k_printf("Did not find %s\n", next_dir);

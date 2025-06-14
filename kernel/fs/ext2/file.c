@@ -5,8 +5,7 @@
 #include <string.h>
 
 enum errno ext2_write_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
-                           uint32_t offset, const uint8_t *src, uint32_t size,
-                           uint64_t *bytes_written_out) {
+                           uint32_t offset, const uint8_t *src, uint32_t size) {
     if (!fs || !inode || !src)
         return ERR_INVAL;
 
@@ -55,8 +54,6 @@ enum errno ext2_write_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
     if (offset + size < inode->node.size) {
         inode->node.size = offset + size;
     }
-
-    *bytes_written_out = bytes_written;
 
     inode->node.blocks +=
         new_block_counter * (fs->block_size / fs->drive->sector_size);
@@ -118,10 +115,10 @@ static void file_read_visitor(struct ext2_fs *fs, struct ext2_inode *inode,
     kfree(block_buf);
 }
 
-uint64_t ext2_read_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
-                        uint32_t offset, uint8_t *buffer, uint64_t length) {
+enum errno ext2_read_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
+                          uint32_t offset, uint8_t *buffer, uint64_t length) {
     if (!fs || !inode || !buffer || offset >= inode->node.size)
-        return 0;
+        return ERR_INVAL;
 
     if (offset + length > inode->node.size)
         length = inode->node.size - offset;
@@ -134,7 +131,7 @@ uint64_t ext2_read_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
                                 .bytes_read = 0};
 
     ext2_traverse_inode_blocks(fs, &inode->node, file_read_visitor, &ctx);
-    return ctx.bytes_read;
+    return ERR_OK;
 }
 
 enum errno ext2_chmod(struct ext2_fs *fs, struct ext2_full_inode *node,
