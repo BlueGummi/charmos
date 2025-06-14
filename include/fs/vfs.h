@@ -1,3 +1,4 @@
+#include <devices/generic_disk.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -5,7 +6,9 @@
 
 // TODO: flags on file creation
 
+struct vfs_node;
 extern char *g_root_part;
+extern struct vfs_node *g_root_node;
 
 #define VFS_NAME_MAX 256 // this because of ext2
 
@@ -166,6 +169,7 @@ struct vfs_mount {
 };
 
 struct vfs_node {
+    enum fs_type type;
     bool open;
     char name[256];
     uint32_t flags;
@@ -177,3 +181,4 @@ struct vfs_node {
 
     struct vfs_ops *ops;
 };
+void vfs_node_print(const struct vfs_node *node);

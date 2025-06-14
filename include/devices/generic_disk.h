@@ -1,4 +1,3 @@
-#include <errno.h>
 #include <fs/detect.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -22,6 +21,16 @@ static inline const char *get_generic_disk_str(enum generic_disk_type type) {
     return "UNKNOWN DEVICE";
 }
 
+static inline const char *get_generic_disk_dev_str(enum generic_disk_type t) {
+    switch (t) {
+    case G_IDE_DRIVE: return "ata";
+    case G_NVME_DRIVE: return "nvme";
+    case G_ATAPI_DRIVE: return "cdrom";
+    case G_AHCI_DRIVE: return "sata";
+    }
+    return "unk";
+}
+
 struct generic_disk;
 
 struct generic_partition {
@@ -33,7 +42,7 @@ struct generic_partition {
     char name[16];
     bool mounted;
 
-    enum errno (*mount)(struct generic_partition *);
+    struct vfs_node *(*mount)(struct generic_partition *);
     void (*print_fs)(struct generic_partition *);
 };
 

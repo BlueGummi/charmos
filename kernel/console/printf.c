@@ -153,6 +153,29 @@ static int print_binary(char *buffer, uint64_t num) {
     return n;
 }
 
+static int print_octal(char *buffer, uint64_t num) {
+    const char *digits = "01234567";
+    int n = 0;
+
+    if (num == 0) {
+        buffer[n++] = '0';
+        return n;
+    }
+
+    while (num > 0) {
+        buffer[n++] = digits[num % 8];
+        num /= 8;
+    }
+
+    for (int i = 0; i < n / 2; i++) {
+        char tmp = buffer[i];
+        buffer[i] = buffer[n - 1 - i];
+        buffer[n - 1 - i] = tmp;
+    }
+
+    return n;
+}
+
 static void apply_padding(const char *str, int len, int width, bool left_align,
                           bool zero_pad) {
     if (len >= width) {
@@ -300,6 +323,19 @@ static void handle_format_specifier(const char **format_ptr, va_list args) {
         len = print_binary(buffer, num);
         break;
     }
+    case 'o': {
+        uint64_t num;
+        switch (len_mod) {
+        case LEN_HH: num = (unsigned char) va_arg(args, unsigned int); break;
+        case LEN_H: num = (unsigned short) va_arg(args, unsigned int); break;
+        case LEN_L: num = va_arg(args, unsigned long); break;
+        case LEN_LL: num = va_arg(args, unsigned long long); break;
+        case LEN_Z: num = va_arg(args, uint64_t); break;
+        default: num = va_arg(args, unsigned int); break;
+        }
+        len = print_octal(buffer, num);
+        break;
+    }
     case 's': {
         char *str = va_arg(args, char *);
         len = strlen(str);
@@ -332,10 +368,8 @@ static void handle_format_specifier(const char **format_ptr, va_list args) {
     *format_ptr = format;
 }
 
-void k_printf(const char *format, ...) {
+void v_k_printf(const char *format, va_list args) {
     bool ints_enabled = spin_lock(&k_printf_lock);
-    va_list args;
-    va_start(args, format);
 
     while (*format) {
         if (*format == '%') {
@@ -350,15 +384,23 @@ void k_printf(const char *format, ...) {
             format++;
         }
     }
-    va_end(args);
+
     spin_unlock(&k_printf_lock, ints_enabled);
+}
+
+void k_printf(const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    v_k_printf(format, args);
+    va_end(args);
 }
 
 void panic(const char *format, ...) {
     va_list args;
     va_start(args, format);
-    k_printf(format, args);
+    v_k_printf(format, args);
     va_end(args);
+
     while (1) {
         asm("hlt");
     }

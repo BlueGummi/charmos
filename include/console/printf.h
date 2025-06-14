@@ -4,16 +4,21 @@
 #include <misc/colors.h>
 #include <time/time.h>
 
+#define STRINGIZE2(x) #x
+#define STRINGIZE(x) STRINGIZE2(x)
+#define LINE_STRING STRINGIZE(__LINE__)
 #define k_panic(fmt, ...)                                                      \
     do {                                                                       \
-        k_printf("\n+-\033[31m!!!\033[0m[\033[91mPANIC\033[0m]\033[31m!!!"     \
-                 "\033[0m\n|\n+-> [\033[92mFROM\033[0m] \033[32m" __FILE__     \
-                 "\033[0m:\033[32m%d\033[0m\n+-> [\033[33mMESSAGE\033[0m] "    \
-                 "\033[31m",                                                   \
-                 __LINE__);                                                    \
+        k_printf(                                                              \
+            "\n+-\033[31m!!!\033[0m[\033[91mKERNEL PANIC\033[0m]\033[31m!!!"   \
+            "\033[0m\n|\n+-> [\033[92mFROM\033[0m] \033[32m" __FILE__          \
+            "\033[0m:\033[32m" LINE_STRING                                     \
+            "\033[0m\n+-> [\033[33mMESSAGE\033[0m] "                           \
+            "\033[31m");                                                       \
         panic(fmt, ##__VA_ARGS__);                                             \
         k_printf("\033[0m");                                                   \
     } while (0)
+
 #define k_info(fmt, ...)                                                       \
     do {                                                                       \
         k_printf("[");                                                         \

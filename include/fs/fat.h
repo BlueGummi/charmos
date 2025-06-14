@@ -156,8 +156,10 @@ uint32_t fat_get_dir_cluster(struct fat_dirent *d);
 void fat_format_filename_83(const char *name, char out[11]);
 
 void fat32_print_bpb(const struct fat_bpb *bpb);
+
 struct fat_bpb *fat32_read_bpb(struct generic_partition *);
-enum errno fat_g_mount(struct generic_partition *);
+struct vfs_node *fat_g_mount(struct generic_partition *p);
+
 void fat_g_print(struct generic_partition *);
 uint32_t fat_first_data_sector(const struct fat_fs *fs);
 uint32_t fat_cluster_to_lba(const struct fat_fs *fs, uint32_t cluster);

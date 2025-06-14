@@ -1,5 +1,6 @@
 #pragma once
 #include <devices/generic_disk.h>
+#include <fs/vfs.h>
 #include <stdint.h>
 
 struct iso9660_datetime {
@@ -67,7 +68,7 @@ struct iso9660_fs {
     uint32_t block_size;
 };
 
-enum errno iso9660_mount(struct generic_partition *);
+struct vfs_node *iso9660_mount(struct generic_partition *);
 void iso9660_print(struct generic_partition *);
 struct iso9660_datetime iso9660_get_current_date(void);
 

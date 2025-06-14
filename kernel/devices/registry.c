@@ -85,8 +85,10 @@ void registry_setup() {
     struct ata_drive *drives = kmalloc(sizeof(struct ata_drive) * 4);
     struct pci_device *devices;
     uint64_t count;
+
     pci_scan_devices(&devices, &count);
-    uint64_t nvme_cnt = 0, ahci_cnt = 0, ide_cnt = 0, atapi_cnt = 0;
+    uint64_t nvme_cnt = 1, ahci_cnt = 1, ide_cnt = 1, atapi_cnt = 1;
+
     for (uint64_t i = 0; i < count; i++) {
         struct pci_device dev = devices[i];
         if (dev.class_code == PCI_CLASS_MASS_STORAGE &&
@@ -123,10 +125,10 @@ void registry_setup() {
 
                 if (drives[ind].type == IDE_TYPE_ATA) {
                     d = ide_create_generic(&drives[ind]);
-                    device_mkname(d, "ide", ide_cnt++);
+                    device_mkname(d, "ata", ide_cnt++);
                 } else if (drives[ind].type == IDE_TYPE_ATAPI) {
                     d = atapi_create_generic(&drives[ind]);
-                    device_mkname(d, "atapi", atapi_cnt++);
+                    device_mkname(d, "cdrom", atapi_cnt++);
                 }
 
                 if (!d)
@@ -137,14 +139,27 @@ void registry_setup() {
         }
     }
 
+    bool found_root = false;
     for (uint64_t i = 0; i < disk_count; i++) {
         struct generic_disk *disk = registry_get_by_index(i);
         detect_fs(disk);
         for (uint32_t j = 0; j < disk->partition_count; j++) {
-            k_printf("Mounting partition %s\n", disk->partitions[j].name);
-            disk->partitions[j].mount(&disk->partitions[j]);
+            struct generic_partition *p = &disk->partitions[j];
+            if (strcmp(p->name, g_root_part) == 0) {
+                struct vfs_node *m = p->mount(p);
+                if (!m)
+                    k_panic("VFS failed to mount root '%s' - mount failure\n",
+                            g_root_part);
+                g_root_node = m;
+                vfs_node_print(g_root_node);
+                found_root = true;
+                g_root_node->ops->create(g_root_node, "ilovetwinks", 0777);
+            }
         }
     }
+    if (!found_root)
+        k_panic("VFS failed to mount root '%s' - could not find root\n",
+                g_root_part);
 }
 
 void registry_print_devices() {
@@ -155,7 +170,9 @@ void registry_print_devices() {
                  i, disk->name, get_generic_disk_str(disk->type));
         disk->print(disk);
         for (uint32_t j = 0; j < disk->partition_count; j++) {
-            disk->partitions[j].print_fs(&disk->partitions[j]);
+            struct generic_partition *p = &disk->partitions[j];
+            p->mount(p);
+            p->print_fs(p);
         }
     }
 }

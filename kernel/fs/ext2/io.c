@@ -1,3 +1,4 @@
+#include <console/printf.h>
 #include <devices/generic_disk.h>
 #include <fs/ext2.h>
 #include <mem/alloc.h>
@@ -11,8 +12,7 @@ bool ext2_block_read(struct generic_partition *p, uint32_t lba, uint8_t *buffer,
 
     struct generic_disk *d = p->disk;
 
-    if (!d->read_sector(d, lba + p->start_lba, buffer + (d->sector_size),
-                        sector_count)) {
+    if (!d->read_sector(d, lba + p->start_lba, buffer, sector_count)) {
         return false;
     }
 
@@ -61,6 +61,7 @@ bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
     }
 
     memcpy(inode_out, buf + offset_in_block, sizeof(struct ext2_inode));
+
     kfree(buf);
     return true;
 }
@@ -72,8 +73,7 @@ bool ext2_block_write(struct generic_partition *p, uint32_t lba,
 
     struct generic_disk *d = p->disk;
 
-    if (!d->write_sector(d, lba + p->start_lba, buffer + (d->sector_size),
-                         sector_count)) {
+    if (!d->write_sector(d, lba + p->start_lba, buffer, sector_count)) {
         return false;
     }
     return true;

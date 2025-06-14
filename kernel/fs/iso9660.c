@@ -77,7 +77,7 @@ void iso9660_pvd_print(const struct iso9660_pvd *pvd) {
              pvd->opt_m_path_table_loc);
 }
 
-enum errno iso9660_mount(struct generic_partition *p) {
+struct vfs_node *iso9660_mount(struct generic_partition *p) {
     struct iso9660_pvd pvd;
     struct generic_disk *disk = p->disk;
     if (iso9660_parse_pvd(p, &pvd)) {
@@ -92,9 +92,9 @@ enum errno iso9660_mount(struct generic_partition *p) {
         fs->block_size = pvd.logical_block_size_le;
         disk->fs_data = fs;
         p->fs_data = fs;
-        return ERR_OK;
+        return NULL;
     }
-    return ERR_FS_INTERNAL;
+    return NULL;
 }
 
 void iso9660_ls(struct iso9660_fs *fs, uint32_t lba, uint32_t size) {

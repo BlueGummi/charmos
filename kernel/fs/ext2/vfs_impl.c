@@ -1,7 +1,12 @@
+#include <console/printf.h>
 #include <fs/ext2.h>
+#include <fs/ext2_print.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
+#include <mem/pmm.h>
+#include <mem/vmm.h>
 #include <string.h>
+#include <time/time.h>
 
 // TODO: With all VFS impls, make sure to check these are on the same disk and
 // filesystem
@@ -290,6 +295,116 @@ static enum errno dir_entry_rename(struct ext2_fs *fs,
 //
 //
 //
+
+void ext2_debug_read_root_inode(struct generic_partition *p,
+                                struct ext2_sblock *sblock) {
+    if (!p || !sblock || !p->disk || !p->disk->read_sector)
+        return;
+
+    struct generic_disk *disk = p->disk;
+
+    uint32_t block_size = 1024U << sblock->log_block_size;
+    uint32_t inode_size = sblock->inode_size;
+    uint32_t sectors_per_block = block_size / disk->sector_size;
+
+    uint32_t gdt_block = (block_size == 1024) ? 2 : 1;
+    uint32_t gdt_sector = gdt_block * sectors_per_block;
+
+    struct ext2_group_desc gd;
+    if (!disk->read_sector(disk, gdt_sector, (uint8_t *) &gd, 1)) {
+        return;
+    }
+
+    uint32_t inode_table_block = gd.inode_table;
+    uint32_t root_inode_index = EXT2_ROOT_INODE - 1;
+
+    uint32_t inodes_per_block = block_size / inode_size;
+    uint32_t block_offset = root_inode_index / inodes_per_block;
+
+    uint32_t target_block = inode_table_block + block_offset;
+    uint32_t target_sector = target_block * sectors_per_block;
+
+    uint8_t *buf = kmalloc(disk->sector_size * sectors_per_block);
+    if (!buf) {
+        return;
+    }
+
+    k_printf("Reading into buffer at sector %u\n", target_sector);
+    if (!disk->read_sector(disk, target_sector, buf, 1)) {
+        kfree(buf);
+        return;
+    }
+
+    ext2_print_inode((void *) (buf - 4));
+
+    kfree(buf);
+}
+
+enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
+                      struct ext2_sblock *sblock, struct vfs_node *out_node) {
+    if (!fs || !sblock)
+        return ERR_INVAL;
+
+    sblock->mtime = time_get_unix();
+    sblock->wtime = time_get_unix();
+    fs->drive = p->disk;
+    fs->partition = p;
+    fs->sblock = sblock;
+    fs->inodes_count = sblock->inodes_count;
+    fs->inodes_per_group = sblock->inodes_per_group;
+    fs->inode_size = sblock->inode_size;
+    fs->block_size = 1024U << sblock->log_block_size;
+
+    fs->sectors_per_block = fs->block_size / p->disk->sector_size;
+
+    fs->num_groups =
+        (fs->inodes_count + fs->inodes_per_group - 1) / fs->inodes_per_group;
+
+    uint32_t gdt_block = (fs->block_size == 1024) ? 2 : 1;
+
+    uint32_t gdt_bytes = fs->num_groups * sizeof(struct ext2_group_desc);
+    uint32_t gdt_blocks = (gdt_bytes + fs->block_size - 1) / fs->block_size;
+
+    fs->group_desc = kmalloc(gdt_blocks * fs->block_size);
+    if (!fs->group_desc)
+        return ERR_NO_MEM;
+
+    if (!ext2_block_read(fs->partition, gdt_block * fs->sectors_per_block,
+                         (uint8_t *) fs->group_desc,
+                         gdt_blocks * fs->sectors_per_block)) {
+        kfree(fs->group_desc);
+        return ERR_IO;
+    }
+
+    struct ext2_inode *inode = kzalloc(sizeof(struct ext2_inode));
+    struct ext2_full_inode *f = kzalloc(sizeof(struct ext2_full_inode));
+    if (!ext2_read_inode(fs, EXT2_ROOT_INODE, inode)) {
+        return ERR_IO;
+    }
+
+    if (!out_node) {
+        kfree(f);
+        return ERR_OK;
+    }
+
+    memcpy(&f->node, inode, sizeof(struct ext2_inode));
+
+    f->inode_num = EXT2_ROOT_INODE;
+    kfree(inode);
+
+    ext2_print_inode(f);
+
+    out_node->open = false;
+    out_node->name[0] = '/';
+    out_node->flags = ext2_to_vfs_flags(f->node.flags);
+    out_node->mode = ext2_to_vfs_mode(f->node.mode);
+    out_node->size = f->node.size;
+    out_node->fs_data = fs;
+    out_node->fs_node_data = f;
+    out_node->type = FS_EXT2;
+    out_node->ops = &ext2_vfs_ops;
+    return ERR_OK;
+}
 
 struct vfs_node *ext2_vfs_finddir(struct vfs_node *node, const char *fname) {
     struct ext2_full_inode *full_inode = node->fs_node_data;

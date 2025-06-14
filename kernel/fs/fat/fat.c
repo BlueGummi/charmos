@@ -120,13 +120,13 @@ struct fat_bpb *fat_read_bpb(struct generic_disk *drive,
     return NULL;
 }
 
-enum errno fat_g_mount(struct generic_partition *p) {
+struct vfs_node *fat_g_mount(struct generic_partition *p) {
     if (!p || !p->disk)
-        return ERR_INVAL;
+        return NULL;
 
     struct fat_fs *fs = kmalloc(sizeof(struct fat_fs));
     if (!fs)
-        return ERR_NO_MEM;
+        return NULL;
 
     enum fat_fstype type;
     uint32_t lba;
@@ -134,7 +134,7 @@ enum errno fat_g_mount(struct generic_partition *p) {
     struct fat_bpb *bpb = fat_read_bpb(d, &type, &lba, p->start_lba);
     if (!bpb) {
         kfree(fs);
-        return ERR_FS_INTERNAL;
+        return NULL;
     }
 
     fs->partition = p;
@@ -173,7 +173,7 @@ enum errno fat_g_mount(struct generic_partition *p) {
         if (!d->read_sector(d, fs->volume_base_lba + fsinfo_rel_sector, buf,
                             1)) {
             kfree(fs);
-            return ERR_IO;
+            return NULL;
         }
 
         // TODO: #define these :boom:
@@ -181,7 +181,7 @@ enum errno fat_g_mount(struct generic_partition *p) {
         uint32_t struc_sig = *(uint32_t *) (buf + 0x1fc);
         if (lead_sig != 0x41615252 || struc_sig != 0xAA550000) {
             kfree(fs);
-            return ERR_FS_CORRUPT;
+            return NULL;
         }
 
         fs->fsinfo_sector = fsinfo_rel_sector;
@@ -200,7 +200,7 @@ enum errno fat_g_mount(struct generic_partition *p) {
 
     d->fs_data = fs;
     p->fs_data = fs;
-    return ERR_OK;
+    return NULL; // TODO: implement vfs here
 }
 
 void fat_g_print(struct generic_partition *d) {

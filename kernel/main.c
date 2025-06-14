@@ -47,9 +47,10 @@
 #include <uacpi/uacpi.h>
 #include <uacpi/utilities.h>
 
-struct scheduler global_sched;
+struct scheduler global_sched = {0};
 uint64_t a_rsdp = 0;
-char *g_root_part = NULL;
+char *g_root_part = "";
+struct vfs_node *g_root_node = NULL;
 
 void k_main(void) {
     uint64_t c_cnt = mp_request.response->cpu_count;
@@ -69,15 +70,9 @@ void k_main(void) {
     uacpi_init();
     registry_setup();
     registry_print_devices();
-    k_printf("command line raw request is \"%s\"\n",
-             cmdline_request.response->cmdline);
+
     while (1)
         asm("hlt");
-
-    //  struct generic_disk *d = registry_get_by_index(1);
-    //  struct ext2_sblock superblock;
-    //  ext2_read_superblock(d, 0, &superblock);
-    //  ext2_test(d, &superblock);
 
     scheduler_init(&global_sched, c_cnt);
 

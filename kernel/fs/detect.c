@@ -25,9 +25,9 @@ const char *detect_fstr(enum fs_type type) {
     }
 }
 
-enum errno dummy_mount(struct generic_partition *p) {
+struct vfs_node *dummy_mount(struct generic_partition *p) {
     (void) p;
-    return ERR_NOT_IMPL;
+    return NULL;
 }
 
 void dummy_print(struct generic_partition *p) {
@@ -125,7 +125,7 @@ static bool detect_gpt_partitions(struct generic_disk *disk, uint8_t *sector) {
             part->fs_type = FS_UNKNOWN;
             part->fs_data = NULL;
             part->mounted = false;
-            snprintf(part->name, sizeof(part->name), "part%d", idx);
+            snprintf(part->name, sizeof(part->name), "%sp%d", disk->name, idx);
 
             part->mount = NULL;
             part->print_fs = NULL;
@@ -244,7 +244,7 @@ enum fs_type detect_fs(struct generic_disk *disk) {
         part->fs_type = FS_UNKNOWN;
         part->fs_data = NULL;
         part->mounted = false;
-        snprintf(part->name, sizeof(part->name), "whole_disk");
+        snprintf(part->name, sizeof(part->name), "%sp1", disk->name);
         part->mount = NULL;
         part->print_fs = NULL;
     }

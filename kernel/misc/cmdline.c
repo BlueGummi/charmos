@@ -1,5 +1,6 @@
 #include <console/printf.h>
 #include <fs/vfs.h>
+#include <mem/alloc.h>
 #include <string.h>
 
 #define MAX_VAR_LEN 128
@@ -48,7 +49,9 @@ void cmdline_parse(const char *input) {
         val_buf[val_len] = '\0';
 
         if (strcmp(var_buf, "root") == 0) {
-            g_root_part = val_buf;
+            char *val = kmalloc(strlen(val_buf));
+            memcpy(val, val_buf, strlen(val_buf));
+            g_root_part = val;
         }
     }
 }
