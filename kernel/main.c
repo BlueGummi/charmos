@@ -23,6 +23,7 @@
 #include <mem/pmm.h>
 #include <mem/slab.h>
 #include <mem/vmm.h>
+#include <misc/cmdline.h>
 #include <misc/dbg.h>
 #include <misc/linker_symbols.h>
 #include <misc/logo.h>
@@ -66,8 +67,9 @@ void k_main(void) {
     uacpi_init();
     registry_setup();
     registry_print_devices();
-    k_printf("command line request is \"%s\"\n",
+    k_printf("command line raw request is \"%s\"\n",
              cmdline_request.response->cmdline);
+    cmdline_parse(cmdline_request.response->cmdline);
     while (1)
         asm("hlt");
 

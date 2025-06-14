@@ -38,7 +38,19 @@ struct vfs_node *ext2_vfs_finddir(struct vfs_node *node, const char *fname);
 enum errno ext2_vfs_mkdir(struct vfs_node *n, const char *name, uint16_t mode);
 enum errno ext2_vfs_rmdir(struct vfs_node *n, const char *name);
 
+enum errno vfs_dummy_open(struct vfs_node *a, uint32_t b) {
+    (void) a, (void) b;
+    return ERR_OK;
+}
+
+enum errno vfs_dummy_close(struct vfs_node *a) {
+    (void) a;
+    return ERR_OK;
+}
+
 static struct vfs_ops ext2_vfs_ops = {
+    .open = vfs_dummy_open,
+    .close = vfs_dummy_close,
     .stat = ext2_vfs_stat,
     .rename = ext2_vfs_rename,
     .chmod = ext2_vfs_chmod,
@@ -440,6 +452,7 @@ enum errno ext2_vfs_mkdir(struct vfs_node *n, const char *name, uint16_t mode) {
     struct ext2_full_inode *node = n->fs_node_data;
     return ext2_mkdir(fs, node, name, new_mode);
 }
+
 enum errno ext2_vfs_rmdir(struct vfs_node *n, const char *name) {
     if (!n || !name)
         return ERR_INVAL;
