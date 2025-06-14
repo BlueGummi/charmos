@@ -51,6 +51,7 @@ struct scheduler global_sched = {0};
 uint64_t a_rsdp = 0;
 char *g_root_part = "";
 struct vfs_node *g_root_node = NULL;
+struct vfs_mount *g_mount_list_head; // TODO: migrate these globals
 
 void k_main(void) {
     uint64_t c_cnt = mp_request.response->cpu_count;

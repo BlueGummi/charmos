@@ -152,9 +152,7 @@ void registry_setup() {
                             g_root_part);
                 g_root_node = m;
                 vfs_node_print(g_root_node);
-                found_root = true;
-                g_root_node->ops->create(g_root_node, "ilovetwinks", 0777);
-                g_root_node->ops->mkdir(g_root_node, "femboys333", 0777);
+                found_root = true; // TODO: Migrate this out - what is this doing here
             }
         }
     }

@@ -7,8 +7,10 @@
 // TODO: flags on file creation
 
 struct vfs_node;
+struct vfs_mount;
 extern char *g_root_part;
 extern struct vfs_node *g_root_node;
+extern struct vfs_mount *g_mount_list_head;
 
 #define VFS_NAME_MAX 256 // this because of ext2
 
@@ -166,6 +168,7 @@ struct vfs_mount {
     struct generic_partition *partition;
     void *fs;
     char mount_point[256];
+    struct vfs_mount *next;
 };
 
 struct vfs_node {

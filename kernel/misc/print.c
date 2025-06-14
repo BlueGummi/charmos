@@ -38,6 +38,6 @@ void time_print_unix(uint64_t timestamp) {
     uint32_t minute = timestamp / 60;
     uint32_t second = timestamp % 60;
 
-    k_printf("%04d-%02d-%02d %02d:%02d:%02d\n", year, month + 1, day, hour,
+    k_printf("%04d-%02d-%02d %02d:%02d:%02d", year, month + 1, day, hour,
              minute, second);
 }

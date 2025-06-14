@@ -7,16 +7,31 @@
 #define STRINGIZE2(x) #x
 #define STRINGIZE(x) STRINGIZE2(x)
 #define LINE_STRING STRINGIZE(__LINE__)
+
 #define k_panic(fmt, ...)                                                      \
     do {                                                                       \
-        k_printf(                                                              \
-            "\n+-\033[31m!!!\033[0m[\033[91mKERNEL PANIC\033[0m]\033[31m!!!"   \
-            "\033[0m\n|\n+-> [\033[92mFROM\033[0m] \033[32m" __FILE__          \
-            "\033[0m:\033[32m" LINE_STRING                                     \
-            "\033[0m\n+-> [\033[33mMESSAGE\033[0m] "                           \
-            "\033[31m");                                                       \
-        panic(fmt, ##__VA_ARGS__);                                             \
-        k_printf("\033[0m");                                                   \
+        k_printf("\n=========================================================" \
+                 "================"                                            \
+                 "=========="                                                  \
+                 "=====\n");                                                   \
+        k_printf("\n                                    [" ANSI_BG_RED         \
+                 "KERNEL PANIC" ANSI_RESET "]\n\n");                           \
+        k_printf("    [" ANSI_BRIGHT_BLUE "AT" ANSI_RESET " ");                \
+        time_print_current();                                                  \
+        k_printf("]\n");                                                       \
+        k_printf("    [" ANSI_BRIGHT_GREEN "FROM" ANSI_RESET                   \
+                 "] " ANSI_GREEN __FILE__ ANSI_RESET                           \
+                 ":" ANSI_GREEN LINE_STRING ANSI_RESET ":" ANSI_CYAN           \
+                 "%s()" ANSI_RESET "\n"                                        \
+                 "    [" ANSI_YELLOW "MESSAGE" ANSI_RESET "] ",                \
+                 __func__);                                                    \
+        k_printf(fmt, ##__VA_ARGS__);                                          \
+        k_printf("\n=========================================================" \
+                 "================"                                            \
+                 "=========="                                                  \
+                 "=====\n");                                                   \
+        while (1)                                                              \
+            asm("cli;hlt");                                                    \
     } while (0)
 
 #define k_info(fmt, ...)                                                       \
