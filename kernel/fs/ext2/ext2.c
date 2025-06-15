@@ -55,8 +55,8 @@ struct vfs_node *ext2_g_mount(struct generic_partition *p) {
     if (!p)
         return NULL;
 
-    struct ext2_fs *fs = p->fs_data;
     p->fs_data = kmalloc(sizeof(struct ext2_fs));
+    struct ext2_fs *fs = p->fs_data;
     fs->sblock = kmalloc(sizeof(struct ext2_sblock));
     struct vfs_node *n = kzalloc(sizeof(struct vfs_node));
 

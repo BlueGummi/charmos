@@ -26,6 +26,7 @@ add_subdirectory(kernel)
 
 add_custom_target(iso
     DEPENDS kernel 
+    DEPENDS ${CMAKE_SOURCE_DIR}/syms/fullsyms.c
     COMMAND rm -rf iso_root
     COMMAND mkdir -p iso_root/boot
     COMMAND cp kernel/kernel iso_root/boot/

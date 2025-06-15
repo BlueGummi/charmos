@@ -56,31 +56,33 @@ struct vfs_mount *g_mount_list_head; // TODO: migrate these globals
 
 void k_main(void) {
     uint64_t c_cnt = mp_request.response->cpu_count;
+
     k_printf_init(framebuffer_request.response->framebuffers[0]);
     struct limine_hhdm_response *r = hhdm_request.response;
     k_printf("%s", OS_LOGO_SMALL);
     a_rsdp = rsdp_request.response->address;
+
     mp_wakeup_processors(mp_request.response);
     enable_smap_smep_umip();
     gdt_install();
+
     init_physical_allocator(r->offset, memmap_request);
     vmm_init(memmap_request.response, xa_request.response, r->offset);
     slab_init();
-    hpet_init();
-    lapic = vmm_map_phys(0xFEE00000UL, 4096);
+
     idt_alloc(c_cnt);
-    cmdline_parse(cmdline_request.response->cmdline);
     idt_install(0);
+
     uacpi_init();
+    lapic = vmm_map_phys(0xFEE00000UL, 4096);
+    hpet_init();
+
+    cmdline_parse(cmdline_request.response->cmdline);
 
     registry_setup();
     registry_print_devices();
 
-    asm volatile("sti");
-
     k_printf("done\n");
-    sleep(8);
-    k_printf("one second later\n");
 
     while (1) {
         asm("hlt");

@@ -10,9 +10,9 @@
 #include <uacpi/uacpi.h>
 #include <uacpi/utilities.h>
 
-uint32_t *ioapic_regs;
 uint64_t *hpet_base;
 
+/*
 void ioapic_write(uint8_t reg, uint32_t val) {
     mmio_write_32(&ioapic_regs[0], reg); // IOREGSEL
     mmio_write_32(&ioapic_regs[4], val); // IOWIN
@@ -23,7 +23,7 @@ uint32_t ioapic_read(uint8_t reg) {
     return mmio_read_32(&ioapic_regs[4]);
 }
 
-/*static uint64_t make_redirection_entry(uint8_t vector, uint8_t dest_apic_id,
+static uint64_t make_redirection_entry(uint8_t vector, uint8_t dest_apic_id,
                                        bool masked) {
     union ioapic_redirection_entry entry = {0};
     entry.vector = vector;
@@ -89,12 +89,11 @@ void hpet_setup_periodic_interrupt_us(uint64_t microseconds_period) {
 
 void hpet_init(void) {
     struct uacpi_table hpet_table;
-    if (uacpi_table_find_by_signature("HPET", &hpet_table) != UACPI_STATUS_OK) {
-        return;
-    }
+    uacpi_table_find_by_signature("HPET", &hpet_table);
 
     struct acpi_hpet *hpet = hpet_table.ptr;
     uint64_t hpet_addr = hpet->address.address;
+    
     hpet_base = vmm_map_phys(hpet_addr, 1024);
 
     hpet_disable();

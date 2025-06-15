@@ -124,9 +124,12 @@ void page_fault_handler(uint64_t error_code, uint64_t fault_addr) {
              (error_code & 0x10) ? "Yes" : "No");
     k_printf("  - Protection Key Violation (PK): %s\n",
              (error_code & 0x20) ? "Yes" : "No");
-    if (!(error_code & 0x04))
-        while (1)
+    if (!(error_code & 0x04)) {
+        k_panic("KERNEL PAGE FAULT\n");
+        while (1) {
             asm("cli;hlt");
+        }
+    }
     /*    if (global_sched.active) {
             scheduler_rm_thread(&global_sched, global_sched.current);
         }*/
