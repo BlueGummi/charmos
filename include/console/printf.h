@@ -2,6 +2,7 @@
 #include <flanterm/flanterm.h>
 #include <limine.h>
 #include <misc/colors.h>
+#include <misc/logo.h>
 #include <time/time.h>
 
 #define STRINGIZE2(x) #x
@@ -20,6 +21,7 @@ void debug_print_stack();
         k_printf("\n" EIGHTY_EIGHT_LINES "\n");                                \
         k_printf("\n                                    [" ANSI_BG_RED         \
                  "KERNEL PANIC" ANSI_RESET "]\n\n");                           \
+        k_printf(ANSI_RED "%s\n\n" ANSI_RESET, OS_LOGO_PANIC_CENTERED);        \
         k_printf("    [" ANSI_BRIGHT_BLUE "AT" ANSI_RESET " ");                \
         time_print_current();                                                  \
         k_printf("]\n");                                                       \
