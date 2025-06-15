@@ -4,6 +4,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define AHCI_CMD_TIMEOUT_MS 5000    // Data commands (read/write)
+#define AHCI_IDENT_TIMEOUT_MS 10000 // Identify, flush cache, etc.
+#define AHCI_RESET_TIMEOUT_MS 30000 // Full controller reset or COMRESET
+
 #define AHCI_CAP 0x00       // Host Capabilities
 #define AHCI_GHC 0x04       // Global Host Control
 #define AHCI_IS 0x08        // Interrupt Status

@@ -6,6 +6,7 @@
 #include <fs/ext2.h>
 #include <mem/alloc.h>
 #include <pci/pci.h>
+#include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -26,8 +27,14 @@ void ata_soft_reset(struct ata_drive *ata_drive) {
     io_wait();
 
     uint16_t base = ata_drive->io_base;
-    while (inb(REG_STATUS(base)) & STATUS_BSY)
-        ;
+    uint64_t timeout = IDE_CMD_TIMEOUT_MS;
+
+    while (inb(REG_STATUS(base)) & STATUS_BSY) {
+        sleep_ms(1);
+        timeout--;
+        if (timeout == 0)
+            return;
+    }
 }
 
 bool ata_identify(struct ata_drive *ata_drive) {
@@ -40,8 +47,15 @@ bool ata_identify(struct ata_drive *ata_drive) {
     if (status == 0)
         return false;
 
-    while ((status & STATUS_BSY))
+    uint64_t timeout = IDE_IDENT_TIMEOUT_MS;
+    while ((status & STATUS_BSY)) {
         status = inb(REG_STATUS(ata_drive->io_base));
+        sleep_ms(1);
+        timeout--;
+        if (timeout == 0)
+            return false;
+    }
+
     if (inb(REG_LBA_MID(ata_drive->io_base)) ||
         inb(REG_LBA_HIGH(ata_drive->io_base)))
         return false;

@@ -3,6 +3,14 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define IDE_CMD_TIMEOUT_MS 5000    // Read/write sector
+#define IDE_IDENT_TIMEOUT_MS 10000 // Identify or cache flush
+#define IDE_RESET_TIMEOUT_MS 30000 // Controller reset or spin-up
+
+#define ATAPI_CMD_TIMEOUT_MS 8000     // Short packet commands
+#define ATAPI_SPINUP_TIMEOUT_MS 15000 // Spinning up disc or loading tray
+#define ATAPI_EJECT_TIMEOUT_MS 20000  // Eject/load tray or seek disc
+
 #define REG_DATA(base) (base + 0)
 #define REG_ERROR(base) (base + 1)
 #define REG_FEATURES(base) (base + 1)

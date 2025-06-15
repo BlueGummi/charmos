@@ -5,6 +5,7 @@
 #include <fs/ext2.h>
 #include <mem/alloc.h>
 #include <pci/pci.h>
+#include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -49,15 +50,26 @@ void ide_identify(struct ata_drive *drive) {
     outb(REG_COMMAND(io), ATA_CMD_IDENTIFY);
 
     uint8_t status;
-    while ((status = inb(REG_STATUS(io))) & STATUS_BSY)
-        ;
+
+    uint64_t timeout = IDE_IDENT_TIMEOUT_MS;
+    while ((status = inb(REG_STATUS(io))) & STATUS_BSY) {
+        sleep_ms(1);
+        timeout--;
+        if (timeout == 0)
+            return;
+    }
 
     if (status == 0 || (status & STATUS_ERR)) {
         return;
     }
 
-    while (!((status = inb(REG_STATUS(io))) & STATUS_DRQ))
-        ;
+    timeout = IDE_IDENT_TIMEOUT_MS;
+    while (!((status = inb(REG_STATUS(io))) & STATUS_DRQ)) {
+        sleep_ms(1);
+        timeout--;
+        if (timeout == 0)
+            return;
+    }
 
     insw(REG_DATA(io), buf, 256);
 

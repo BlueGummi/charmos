@@ -4,6 +4,7 @@
 #include <drivers/ata.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
+#include <sleep.h>
 #include <string.h>
 
 uint32_t find_free_cmd_slot(struct ahci_port *port) {
@@ -67,7 +68,13 @@ bool ahci_send_command(struct ahci_full_port *port, uint32_t slot) {
     ci |= (1 << slot);
     mmio_write_32(&port->port->ci, ci);
 
-    while (mmio_read_32(&port->port->ci) & (1 << slot)) {}
+    uint64_t timeout = AHCI_CMD_TIMEOUT_MS;
+    while (mmio_read_32(&port->port->ci) & (1 << slot)) {
+        sleep_ms(1);
+        timeout--;
+        if (timeout == 0)
+            return false;
+    }
 
     uint32_t tfd = mmio_read_32(&port->port->tfd);
     if (tfd & (1 << 0) || tfd & (1 << 1)) {

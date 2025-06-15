@@ -66,6 +66,7 @@ void k_main(void) {
     init_physical_allocator(r->offset, memmap_request);
     vmm_init(memmap_request.response, xa_request.response, r->offset);
     slab_init();
+    hpet_init();
     lapic = vmm_map_phys(0xFEE00000UL, 4096);
     idt_alloc(c_cnt);
     cmdline_parse(cmdline_request.response->cmdline);
@@ -75,7 +76,6 @@ void k_main(void) {
     registry_setup();
     registry_print_devices();
 
-    hpet_init();
     asm volatile("sti");
 
     k_printf("done\n");

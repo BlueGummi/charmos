@@ -4,6 +4,7 @@
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
+#include <sleep.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -25,13 +26,25 @@ void nvme_enable_controller(struct nvme_device *nvme) {
 
     mmio_write_32(&nvme->regs->cc, *(uint32_t *) &cc);
 
-    while (mmio_read_32(&nvme->regs->csts) & 1) {}
+    uint64_t timeout = NVME_CMD_TIMEOUT_MS;
+    while (mmio_read_32(&nvme->regs->csts) & 1) {
+        sleep_ms(1);
+        timeout--;
+        if (timeout == 0)
+            return;
+    }
 
     cc.en = 1;
 
     mmio_write_32(&nvme->regs->cc, *(uint32_t *) &cc);
 
-    while ((mmio_read_32(&nvme->regs->csts) & 1) == 0) {}
+    timeout = NVME_CMD_TIMEOUT_MS;
+    while ((mmio_read_32(&nvme->regs->csts) & 1) == 0) {
+        sleep_ms(1);
+        timeout--;
+        if (timeout == 0)
+            return;
+    }
 }
 
 void nvme_setup_admin_queues(struct nvme_device *nvme) {

@@ -24,17 +24,11 @@ make run # run this in the build directory
 
 ### TODO:
 
-- [ ] reorganize filesystem generic operations (vfs)
-
-- [ ] reorganize vfs to integrate with generic disks
-
 - [ ] disk I/O IRQ handlers to avoid blocking for unnecessary periods of time (optimization)
 
 - [ ] we can reserve something like IRQs 200-223 or whatever...
 
 - [ ] free functions for devices and other structs
-
-- [ ] mem alloc failure handling (do not power off the 'puter when OOM)
 
 - [ ] once filesystems are up and running, make a logging function to log to a set file
 

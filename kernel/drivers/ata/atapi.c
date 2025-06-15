@@ -1,6 +1,7 @@
 #include <asm.h>
 #include <drivers/ata.h>
 #include <mem/alloc.h>
+#include <sleep.h>
 
 #define ATAPI_SECTOR_SIZE 2048
 
@@ -14,8 +15,15 @@ bool atapi_identify(struct ata_drive *ide) {
     if (status == 0)
         return false;
 
-    while ((status & STATUS_BSY))
+    uint64_t timeout = ATAPI_CMD_TIMEOUT_MS;
+    while ((status & STATUS_BSY)) {
         status = inb(REG_STATUS(ide->io_base));
+        sleep_ms(1);
+        timeout--;
+        if (timeout == 0)
+            return false;
+    }
+
     if (!(inb(REG_LBA_MID(ide->io_base)) == 0x14 &&
           inb(REG_LBA_HIGH(ide->io_base)) == 0xEB))
         return false;
@@ -41,8 +49,14 @@ bool atapi_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
 
     outb(REG_COMMAND(io), ATA_CMD_PACKET);
 
-    while (inb(REG_STATUS(io)) & STATUS_BSY)
-        ;
+    uint64_t timeout = ATAPI_CMD_TIMEOUT_MS;
+    while (inb(REG_STATUS(io)) & STATUS_BSY) {
+        sleep_ms(1);
+        timeout--;
+        if (timeout == 0)
+            return false;
+    }
+
     if (!(inb(REG_STATUS(io)) & STATUS_DRQ))
         return false;
 
@@ -64,12 +78,17 @@ bool atapi_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
         outw(REG_DATA(io), word);
     }
 
+    timeout = ATAPI_CMD_TIMEOUT_MS;
     while (true) {
         uint8_t status = inb(REG_STATUS(io));
         if (status & STATUS_ERR)
             return false;
         if (status & STATUS_DRQ)
             break;
+        sleep_ms(1);
+        timeout--;
+        if (timeout == 0)
+            return false;
     }
 
     for (int i = 0; i < ATAPI_SECTOR_SIZE / 2; i++) {

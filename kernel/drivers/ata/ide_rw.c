@@ -5,6 +5,7 @@
 #include <fs/ext2.h>
 #include <mem/alloc.h>
 #include <pci/pci.h>
+#include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -23,8 +24,13 @@ static bool ide_check_error(struct ata_drive *d) {
 }
 
 bool ide_wait_ready(struct ata_drive *d) {
-    while (inb(REG_STATUS(d->io_base)) & STATUS_BSY)
-        ;
+    uint64_t timeout = IDE_CMD_TIMEOUT_MS;
+    while (inb(REG_STATUS(d->io_base)) & STATUS_BSY) {
+        sleep_ms(1);
+        timeout--;
+        if (timeout == 0)
+            return false;
+    }
     return (inb(REG_STATUS(d->io_base)) & STATUS_DRDY);
 }
 

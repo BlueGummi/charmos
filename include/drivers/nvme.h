@@ -1,6 +1,11 @@
 #pragma once
 #include <devices/generic_disk.h>
 #include <stdint.h>
+
+#define NVME_CMD_TIMEOUT_MS 2000    // Normal command timeout
+#define NVME_ADMIN_TIMEOUT_MS 5000  // Admin commands
+#define NVME_RESET_TIMEOUT_MS 30000 // Controller reset or format NVM
+
 #define DIV_ROUND_UP(x, y) (((x) + (y) - 1) / (y))
 
 struct nvme_command {

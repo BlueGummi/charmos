@@ -21,6 +21,7 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
 
     mmio_write_32(nvme->admin_sq_db, nvme->admin_sq_tail);
 
+    uint64_t timeout = NVME_ADMIN_TIMEOUT_MS;
     while (true) {
         struct nvme_completion *entry = &nvme->admin_cq[nvme->admin_cq_head];
 
@@ -38,6 +39,10 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
                 return status;
             }
         }
+        sleep_ms(1);
+        timeout--;
+        if (timeout == 0)
+            return 0xFFFF;
     }
 }
 
@@ -55,6 +60,7 @@ uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
 
     mmio_write_32(this_queue->sq_db, this_queue->sq_tail);
 
+    uint64_t timeout = NVME_CMD_TIMEOUT_MS;
     while (true) {
         struct nvme_completion *entry = &this_queue->cq[this_queue->cq_head];
 
@@ -73,6 +79,10 @@ uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
                 return status;
             }
         }
+        sleep_ms(1);
+        timeout--;
+        if (timeout == 0)
+            return 0xFFFF;
     }
 }
 
