@@ -1,3 +1,5 @@
+#include <acpi/hpet.h>
+#include <acpi/lapic.h>
 #include <acpi/uacpi_interface.h> // mark handlers as installed
 #include <asm.h>
 #include <console/printf.h>
@@ -77,8 +79,6 @@ void idt_alloc(uint64_t size) {
 }
 
 void idt_install(uint64_t ind) {
-    /*    if (!ind)
-            remap_pic();*/
 
     idt_set_and_mark(DIV_BY_Z_ID, (uint64_t) divbyz_fault, 0x08, 0x8E, ind);
 
@@ -101,25 +101,14 @@ void idt_install(uint64_t ind) {
 
     idt_set_and_mark(KB_ID, (uint64_t) keyboard_handler, 0x08, 0x8E, ind);
 
-    /*    if (ind == 0) {
-            outb(0x43, 0x36);
-            uint16_t divisor = 1193180 / PIT_HZ;
-            outb(0x40, divisor & 0xFF);
-            outb(0x40, (divisor >> 8) & 0xFF);
-            uint8_t mask = inb(PIC1_DATA);
-
-            mask &= ~(1 << 0);
-            mask &= ~(1 << 1);
-            outb(PIC1_DATA, mask);
-        }*/
     idt_load(ind);
 }
 
 void page_fault_handler(uint64_t error_code, uint64_t fault_addr) {
-    uint64_t core = get_sch_core_id();
+    //    uint64_t core = get_sch_core_id();
     k_printf("\n=== PAGE FAULT ===\n");
     k_printf("Faulting Address (CR2): 0x%lx\n", fault_addr);
-    k_printf("Core %u faulted\n", core);
+    //    k_printf("Core %u faulted\n", core);
     k_printf("Error Code: 0x%lx\n", error_code);
     k_printf("  - Page not Present (P): %s\n",
              (error_code & 0x01) ? "Yes" : "No");

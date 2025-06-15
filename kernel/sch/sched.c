@@ -8,7 +8,6 @@
 #include <stdint.h>
 #include <string.h>
 
-uint64_t time_tick_count = 0;
 struct per_core_scheduler **local_schs;
 static uint64_t c_count = 1;
 struct spinlock l;
@@ -27,8 +26,6 @@ void schedule(struct cpu_state *cpu) {
 
     LAPIC_REG(LAPIC_REG_EOI) = 0;
 
-    if (core_id == 0)
-        time_tick_count += 1;
 
     if (!sched->active) {
         return;

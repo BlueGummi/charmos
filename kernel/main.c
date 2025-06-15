@@ -1,4 +1,5 @@
 #include "requests.h"
+#include <acpi/hpet.h>
 #include <acpi/lapic.h>
 #include <acpi/print.h>
 #include <acpi/uacpi_interface.h>
@@ -65,15 +66,25 @@ void k_main(void) {
     init_physical_allocator(r->offset, memmap_request);
     vmm_init(memmap_request.response, xa_request.response, r->offset);
     slab_init();
+    lapic = vmm_map_phys(0xFEE00000UL, 4096);
     idt_alloc(c_cnt);
     cmdline_parse(cmdline_request.response->cmdline);
-    // idt_install(0);
+    idt_install(0);
     uacpi_init();
+
     registry_setup();
     registry_print_devices();
 
-    while (1)
+    hpet_init();
+    asm volatile("sti");
+
+    k_printf("done\n");
+    sleep(8);
+    k_printf("one second later\n");
+
+    while (1) {
         asm("hlt");
+    }
 
     scheduler_init(&global_sched, c_cnt);
 
@@ -93,7 +104,6 @@ void k_main(void) {
     c->id = 0;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
     scheduler_rebalance(&global_sched);
-    lapic = vmm_map_phys(0xFEE00000UL, 4096);
     lapic_init();
     mp_inform_of_cr3();
 
