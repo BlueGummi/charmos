@@ -17,6 +17,7 @@ struct tmpfs_node {
     char *data;
     uint64_t size;
 
+    char *symlink_target;
     uint16_t mode;
     uint32_t uid;
     uint32_t gid;

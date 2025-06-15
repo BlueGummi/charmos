@@ -36,3 +36,21 @@ void vfs_node_print(const struct vfs_node *node) {
     k_printf("Ops Table: 0x%llx\n", (void *) node->ops);
     k_printf("=================\n");
 }
+
+struct vfs_node *vfs_finddir(struct vfs_node *node, const char *fname) {
+    if (node->mount) {
+        node = node->mount->root;
+    }
+
+    if (!node->ops || !node->ops->finddir)
+        return NULL;
+
+    struct vfs_node *found = node->ops->finddir(node, fname);
+
+    // check for mount redirection on the found node
+    if (found && found->mount) {
+        return found->mount->root;
+    }
+
+    return found;
+}

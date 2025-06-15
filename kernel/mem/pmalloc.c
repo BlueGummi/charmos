@@ -74,7 +74,6 @@ void pmm_init(uint64_t o, struct limine_memmap_request m) {
             base += PAGE_BLOCK_SIZE(order);
         }
     }
-    k_printf("we have %llu bytes of physical memory\n", total_phys);
 }
 
 void *pmm_alloc_order(uint8_t order, bool add_offset) {

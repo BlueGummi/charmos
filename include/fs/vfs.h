@@ -181,6 +181,7 @@ struct vfs_node {
 
     void *fs_data;
     void *fs_node_data;
+    struct vfs_mount *mount;
 
     struct vfs_ops *ops;
 };

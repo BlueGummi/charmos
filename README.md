@@ -28,8 +28,6 @@ make run # run this in the build directory
 
 - [ ] we can reserve something like IRQs 200-223 or whatever...
 
-- [ ] free functions for devices and other structs
-
 - [ ] once filesystems are up and running, make a logging function to log to a set file
 
 - [ ] block device sector size scans
