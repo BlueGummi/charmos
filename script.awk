@@ -1,6 +1,6 @@
 BEGIN {
     print "#include <stdint.h>";
-    print "#include <misc/syms.h";
+    print "#include <misc/syms.h>";
 
     print "const struct sym syms[] = {";
 }
@@ -9,6 +9,6 @@ BEGIN {
 }
 END {
     print "};\n";
-    print "const size_t syms_len = sizeof(syms) / sizeof(syms[0]);";
+    print "const uint64_t syms_len = sizeof(syms) / sizeof(syms[0]);";
 }
 
