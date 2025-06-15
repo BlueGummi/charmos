@@ -87,7 +87,7 @@ void k_main(void) {
     // Filesystem init
     cmdline_parse(cmdline_request.response->cmdline);
     registry_setup();
-    //    registry_print_devices();
+    registry_print_devices();
 
     k_printf("done\n");
 
