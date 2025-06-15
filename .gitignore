@@ -1,4 +1,5 @@
 build/
+kernel/syms.c
 kernel/limine.h
 *.log
 compile_commands.json
