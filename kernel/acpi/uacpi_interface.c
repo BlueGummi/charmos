@@ -101,8 +101,7 @@ uacpi_status uacpi_kernel_io_map(uacpi_io_addr base, uacpi_size len,
     uacpi_io_handle *handle =
         (uacpi_io_handle *) kmalloc(sizeof(uacpi_io_handle));
     if (!handle) {
-        k_panic("Failed to allocate I/O handle");
-        return UACPI_STATUS_INVALID_ARGUMENT;
+        return UACPI_STATUS_INTERNAL_ERROR;
     }
 
     handle->base = base;

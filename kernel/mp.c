@@ -40,6 +40,8 @@ void wakeup() {
     idt_install(cpu);
 
     struct core *c = kmalloc(sizeof(struct core));
+    if (!c)
+        k_panic("Core %d could not allocate space for struct\n", cpu);
     c->id = cpu;
     c->state = IDLE;
     wrmsr(MSR_GS_BASE, (uint64_t) c);

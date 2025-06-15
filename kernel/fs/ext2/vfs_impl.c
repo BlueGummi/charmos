@@ -234,6 +234,8 @@ static struct vfs_node *make_vfs_node(struct ext2_fs *fs,
         return NULL;
 
     struct vfs_node *ret = kzalloc(sizeof(struct vfs_node));
+    if (!ret)
+        return NULL;
 
     if (*fname == '.')
         ret->flags |= VFS_NODE_HIDDEN;
@@ -336,6 +338,9 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
 
     struct ext2_inode *inode = kzalloc(sizeof(struct ext2_inode));
     struct ext2_full_inode *f = kzalloc(sizeof(struct ext2_full_inode));
+    if (!f || !inode)
+        return ERR_NO_MEM;
+
     if (!ext2_read_inode(fs, EXT2_ROOT_INODE, inode)) {
         return ERR_IO;
     }

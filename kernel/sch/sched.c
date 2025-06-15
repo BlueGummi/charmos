@@ -57,6 +57,9 @@ void scheduler_local_init(struct per_core_scheduler *sched, uint64_t core_id) {
 void scheduler_init(struct scheduler *sched, uint64_t core_count) {
     c_count = core_count;
     local_schs = kmalloc(sizeof(struct per_core_scheduler) * core_count);
+    if (!local_schs)
+        k_panic("Could not allocate space for local schedulers\n");
+
     sched->active = false;
     sched->started_first = false;
     sched->head = NULL;
@@ -73,6 +76,9 @@ static void scheduler_l_add_thread(struct per_core_scheduler *sched,
     }
 
     struct thread *task = kmalloc(sizeof(struct thread));
+    if (!task)
+        k_panic("Could not allocate space for task\n");
+
     memcpy(task, t, sizeof(struct thread));
 
     task->next = NULL;

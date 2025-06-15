@@ -1,16 +1,7 @@
 #include <console/printf.h>
 #include <misc/linker_symbols.h>
-#include <stddef.h>
+#include <misc/syms.h>
 #include <stdint.h>
-
-struct elf64_sym {
-    uint32_t st_name;
-    uint8_t st_info;
-    uint8_t st_other;
-    uint16_t st_shndx;
-    uint64_t st_value;
-    uint64_t st_size;
-};
 
 void debug_print_registers() {
     uint64_t rax, rbx, rcx, rdx, rsi, rdi, rsp, rbp, rip, rflags;
@@ -66,41 +57,21 @@ void debug_print_registers() {
     k_printf("   R15: 0x%lx\n", r15);
 }
 
-#define ELF64_ST_TYPE(val) ((val) & 0x0F)
-#define STT_NOTYPE 0  // Symbol type is unspecified
-#define STT_OBJECT 1  // Data object (e.g., variable)
-#define STT_FUNC 2    // Function or executable code
-#define STT_SECTION 3 // Section (rarely used directly)
-#define STT_FILE 4    // Source file name
-#define STT_COMMON 5  // Uninitialized common block
-#define STT_TLS 6     // Thread-local storage object
+const char *find_symbol(uint64_t addr, uint64_t *out_sym_addr) {
+    const char *result = NULL;
+    uint64_t best = 0;
 
-// TODO: Move these outta here!
-
-const char *lookup_symbol(uint64_t addr, uint64_t *out_offset) {
-
-    struct elf64_sym *symtab = (struct elf64_sym *) &__ssymtab;
-    struct elf64_sym *symtab_end = (struct elf64_sym *) &__esymtab;
-
-    const char *strtab = (char *) &__sstrtab;
-
-    const char *best_name = NULL;
-    uint64_t best_addr = 0;
-
-    for (struct elf64_sym *sym = symtab; sym < symtab_end; ++sym) {
-        if (ELF64_ST_TYPE(sym->st_info) != STT_FUNC)
-            continue;
-        if (addr >= sym->st_value && addr < (sym->st_value + sym->st_size)) {
-            if (sym->st_value >= best_addr) {
-                best_name = strtab + sym->st_name;
-                best_addr = sym->st_value;
-            }
+    for (size_t i = 0; i < syms_len; i++) {
+        if (syms[i].addr <= addr && syms[i].addr > best) {
+            best = syms[i].addr;
+            result = syms[i].name;
         }
     }
 
-    if (out_offset)
-        *out_offset = addr - best_addr;
-    return best_name;
+    if (out_sym_addr)
+        *out_sym_addr = best;
+
+    return result;
 }
 
 void debug_print_stack() {
@@ -110,14 +81,14 @@ void debug_print_stack() {
 
     for (int i = 0; i < 64; i++) {
         uint64_t addr = rsp[i];
-        if (addr < 0xffffffff80000000) // Filter likely invalid addresses
+        if (addr < 0xffffffff80000000)
             continue;
 
-        uint64_t offset = 0;
-        const char *sym = lookup_symbol(addr, &offset);
-
+        uint64_t sym_addr;
+        const char *sym = find_symbol(addr, &sym_addr);
         if (sym) {
-            k_printf("    [%2d] 0x%016lx <%s+0x%lx>\n", i, addr, sym, offset);
+            k_printf("    [%2d] 0x%016lx <%s+0x%lx>\n", i, addr, sym,
+                     addr - sym_addr);
         } else {
             k_printf("    [%2d] 0x%016lx <unknown>\n", i, addr);
         }

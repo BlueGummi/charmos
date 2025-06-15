@@ -112,7 +112,7 @@ struct vfs_ops {
     enum errno (*symlink)(struct vfs_node *parent, const char *target,
                           const char *link_name);
 
-    enum errno (*mount)(struct vfs_node *mountpoint, struct vfs_node *source);
+    enum errno (*mount)(struct vfs_node *mountpoint, struct vfs_node *out);
 
     enum errno (*unmount)(struct vfs_node *mountpoint);
 

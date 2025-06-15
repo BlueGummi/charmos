@@ -45,9 +45,11 @@ static void allocate_port(struct ahci_device *dev, struct ahci_port *port,
     port->fb = fis_phys & 0xFFFFFFFFUL;
     port->fbu = fis_phys >> 32;
     struct ahci_cmd_table **arr = kzalloc(sizeof(struct ahci_cmd_table *) * 32);
-
     struct ahci_cmd_header **hdr =
         kzalloc(sizeof(struct ahci_cmd_header *) * 32);
+
+    if (!arr || !hdr)
+        k_panic("Could not allocate space for AHCI commands\n");
 
     struct ahci_full_port p = {.port = port,
                                .fis = fis,
@@ -90,6 +92,9 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
     *disk_count = total_disks;
 
     struct ahci_disk *disks = kzalloc(sizeof(struct ahci_disk) * total_disks);
+    if (!disks)
+        k_panic("Could not allocate space for AHCI disks\n");
+
     uint32_t disks_ind = 0;
 
     for (uint32_t i = 0; i < 32; i++) {
@@ -181,6 +186,9 @@ void ahci_print_wrapper(struct generic_disk *d) {
 
 struct generic_disk *ahci_create_generic(struct ahci_disk *disk) {
     struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
+    if (!d)
+        k_panic("Could not allocate space for ahci device\n");
+
     d->driver_data = disk;
     d->sector_size = 512;
     d->read_sector = ahci_read_sector_wrapper;

@@ -11,6 +11,9 @@ void fat_write_fsinfo(struct fat_fs *fs) { // making fsck happy
         return; // no-op
 
     uint8_t *buf = kmalloc(fs->disk->sector_size);
+    if (!buf)
+        return;
+
     if (!fs->disk->read_sector(fs->disk, fs->fsinfo_sector, buf, 1))
         return;
 
@@ -105,6 +108,9 @@ struct fat_bpb *fat_read_bpb(struct generic_disk *drive,
             continue;
 
         struct fat_bpb *out_bpb = kmalloc(sizeof(struct fat_bpb));
+        if (!out_bpb)
+            return NULL;
+        
         if (out_bpb) {
             memcpy(out_bpb, bpb, sizeof(struct fat_bpb));
             *out_type = type;
@@ -169,6 +175,8 @@ struct vfs_node *fat_g_mount(struct generic_partition *p) {
     if (f32) {
         uint16_t fsinfo_rel_sector = f32_ext.fs_info;
         uint8_t *buf = kmalloc(fs->disk->sector_size);
+        if (!buf)
+            return NULL;
 
         if (!d->read_sector(d, fs->volume_base_lba + fsinfo_rel_sector, buf,
                             1)) {

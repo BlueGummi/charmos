@@ -237,6 +237,9 @@ enum fs_type detect_fs(struct generic_disk *disk) {
         // No partition table - create one big partition spanning the disk
         disk->partition_count = 1;
         disk->partitions = kzalloc(sizeof(struct generic_partition));
+        if (!disk->partitions)
+            return FS_UNKNOWN;
+
         struct generic_partition *part = &disk->partitions[0];
         part->disk = disk;
         part->start_lba = 0;

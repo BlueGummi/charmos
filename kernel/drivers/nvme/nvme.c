@@ -42,6 +42,9 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     uint32_t dstrd = (cap >> 32) & 0xF;
 
     struct nvme_device *nvme = kzalloc(sizeof(struct nvme_device));
+    if (!nvme)
+        k_panic("Could not allocate space for NVMe drive\n");
+
     nvme->doorbell_stride = 4U << dstrd;
     nvme->page_size = page_size;
     nvme->cap = cap;
@@ -49,6 +52,9 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme->regs = regs;
     nvme->admin_q_depth = ((nvme->cap) & 0xFFFF) + 1;
     nvme->io_queues = kmalloc(sizeof(struct nvme_queue *));
+    if (!nvme->io_queues)
+        k_panic("Could not allocate space for NVMe IO queues\n");
+
     nvme->admin_sq_db =
         (uint32_t *) ((uint8_t *) nvme->regs + NVME_DOORBELL_BASE);
     nvme->admin_cq_db =
@@ -82,6 +88,9 @@ void nvme_print_wrapper(struct generic_disk *d) {
 
 struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {
     struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
+    if (!d)
+        k_panic("Could not allocate space for NVMe device\n");
+
     d->driver_data = nvme;
     d->sector_size = 512;
     d->read_sector = nvme_read_sector_wrapper;

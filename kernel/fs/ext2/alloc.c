@@ -144,11 +144,11 @@ bool ext2_free_inode(struct ext2_fs *fs, uint32_t inode_num) {
 
     uint32_t bitmap_block = fs->group_desc[group].inode_bitmap;
     uint8_t *bitmap = kmalloc(fs->block_size);
+    if (!bitmap)
+        return false;
 
     ext2_block_read(fs->partition, bitmap_block * fs->sectors_per_block, bitmap,
                     fs->sectors_per_block);
-    if (!bitmap)
-        return false;
 
     uint32_t byte = index / 8;
     uint8_t bit = 1 << (index % 8);

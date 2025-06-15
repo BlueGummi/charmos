@@ -41,7 +41,7 @@ static void swap_str(char *dst, const uint16_t *src, uint64_t word_len) {
 }
 
 void ide_identify(struct ata_drive *drive) {
-    uint16_t buf[256]; // TODO: kmalloc this
+    uint16_t buf[256];
     uint16_t io = drive->io_base;
 
     outb(REG_DRIVE_HEAD(io), 0xA0 | (drive->slave ? 0x10 : 0x00));

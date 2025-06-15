@@ -46,6 +46,8 @@ static bool fat12_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
 
     uint8_t *buf1 = kmalloc(disk->sector_size);
     uint8_t *buf2 = kmalloc(disk->sector_size);
+    if (!buf1 || !buf2)
+        return false;
 
     for (uint32_t fat_index = 0; fat_index < fs->bpb->num_fats; fat_index++) {
         uint32_t base = fs->bpb->reserved_sector_count + fat_index * fat_size;
@@ -109,6 +111,9 @@ static bool fat16_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
     uint32_t offset = fat_offset % fs->bpb->bytes_per_sector;
     uint32_t fat_size = fs->bpb->fat_size_16;
     uint8_t *buf = kmalloc(disk->sector_size);
+    if (!buf)
+        return false;
+
     bool result = true;
 
     for (uint32_t fat_index = 0; fat_index < fs->bpb->num_fats; fat_index++) {
@@ -141,6 +146,9 @@ static bool fat32_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
     uint32_t offset = fat_offset % fs->bpb->bytes_per_sector;
     uint32_t fat_size = fs->fat_size;
     uint8_t *buf = kmalloc(disk->sector_size);
+    if (!buf)
+        return false;
+
     bool result = true;
 
     for (uint32_t fat_index = 0; fat_index < fs->bpb->num_fats; fat_index++) {
@@ -208,12 +216,17 @@ static uint32_t fat12_read_fat_entry(struct fat_fs *fs, uint32_t cluster) {
     uint8_t *buf = kmalloc(disk->sector_size);
     uint8_t *buf2 = NULL;
     uint32_t result = 0xFFFFFFFF;
+    if (!buf)
+        return result;
 
     if (!disk->read_sector(disk, sector, buf, 1))
         goto done;
 
     if (offset == fs->bpb->bytes_per_sector - 1) {
         buf2 = kmalloc(disk->sector_size);
+        if (!buf2)
+            return result;
+
         if (!disk->read_sector(disk, sector + 1, buf2, 1))
             goto done;
         uint16_t val = buf[offset] | (buf2[0] << 8);
@@ -243,6 +256,8 @@ static uint32_t fat16_read_fat_entry(struct fat_fs *fs, uint32_t cluster) {
 
     uint8_t *buf = kmalloc(disk->sector_size);
     uint32_t result = 0xFFFFFFFF;
+    if (!buf)
+        return result;
 
     if (disk->read_sector(disk, sector, buf, 1))
         result = *(uint16_t *) &buf[offset];
@@ -262,6 +277,8 @@ static uint32_t fat32_read_fat_entry(struct fat_fs *fs, uint32_t cluster) {
 
     uint8_t *buf = kmalloc(disk->sector_size);
     uint32_t result = 0xFFFFFFFF;
+    if (!buf)
+        return result;
 
     if (disk->read_sector(disk, sector, buf, 1))
         result = *(uint32_t *) &buf[offset] & 0x0FFFFFFF;

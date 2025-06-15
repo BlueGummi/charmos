@@ -61,6 +61,9 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
 
     // read dirent
     uint8_t *block = kmalloc(fs->block_size);
+    if (!block)
+        return ERR_NO_MEM;
+
     if (!ext2_block_ptr_read(fs, ctx.block_num, block)) {
         kfree(block);
         return ERR_FS_INTERNAL;

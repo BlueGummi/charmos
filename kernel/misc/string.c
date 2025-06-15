@@ -1,4 +1,5 @@
 #include <console/printf.h>
+#include <mem/alloc.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -149,6 +150,24 @@ int toupper(int c) {
     if (islower(c))
         return c & 0x5f;
     return c;
+}
+
+char *strdup(const char *str) {
+    if (!str)
+        return NULL;
+
+    size_t len = 0;
+    while (str[len] != '\0')
+        len++;
+
+    char *copy = (char *) kmalloc(len + 1);
+    if (!copy)
+        return NULL;
+
+    for (size_t i = 0; i <= len; ++i)
+        copy[i] = str[i];
+
+    return copy;
 }
 
 #include <stdarg.h>

@@ -78,6 +78,8 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
     }
 
     uint8_t *block_data = kzalloc(fs->block_size);
+    if (!block_data)
+        return ERR_NO_MEM;
 
     struct ext2_dir_entry *new_entry = (struct ext2_dir_entry *) block_data;
 

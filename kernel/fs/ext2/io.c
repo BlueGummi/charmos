@@ -102,6 +102,8 @@ bool ext2_write_inode(struct ext2_fs *fs, uint32_t inode_num,
     uint32_t block_index = offset / block_size;
 
     uint8_t *block_buf = kmalloc(block_size);
+    if (!block_buf)
+        return false;
 
     uint32_t lba = (inode_table_block + block_index) * fs->sectors_per_block;
     if (!ext2_block_read(fs->partition, lba, block_buf,

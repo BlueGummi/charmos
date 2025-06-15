@@ -16,4 +16,5 @@ char *strchr(const char *s, int c);
 int islower(int c);
 int toupper(int c);
 int snprintf(char *buffer, int buffer_len, const char *format, ...);
+char *strdup(const char *str);
 #pragma once

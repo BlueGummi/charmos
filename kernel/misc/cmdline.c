@@ -50,6 +50,9 @@ void cmdline_parse(const char *input) {
 
         if (strcmp(var_buf, "root") == 0) {
             char *val = kmalloc(strlen(val_buf));
+            if (!val)
+                k_panic("Could not allocate space for command line parsing\n");
+
             memcpy(val, val_buf, strlen(val_buf));
             g_root_part = val;
         }

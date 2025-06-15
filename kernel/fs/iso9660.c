@@ -21,6 +21,8 @@ bool iso9660_read_file(struct iso9660_fs *fs, uint32_t lba, uint32_t size,
 bool iso9660_parse_pvd(struct generic_partition *p,
                        struct iso9660_pvd *out_pvd) {
     uint8_t *buffer = kmalloc(ISO9660_SECTOR_SIZE);
+    if (!buffer)
+        return false;
 
     struct generic_disk *disk = p->disk;
 
@@ -83,6 +85,9 @@ struct vfs_node *iso9660_mount(struct generic_partition *p) {
     if (iso9660_parse_pvd(p, &pvd)) {
         struct iso9660_fs *fs = kzalloc(sizeof(struct iso9660_fs));
         struct iso9660_pvd *new_pvd = kzalloc(sizeof(struct iso9660_pvd));
+        if (!fs || !new_pvd)
+            return NULL;
+
         fs->pvd = new_pvd;
         memcpy(fs->pvd, &pvd, sizeof(struct iso9660_pvd));
         fs->root_lba = pvd.root_dir_record.extent_lba_le;
@@ -100,6 +105,8 @@ struct vfs_node *iso9660_mount(struct generic_partition *p) {
 void iso9660_ls(struct iso9660_fs *fs, uint32_t lba, uint32_t size) {
     uint32_t num_blocks = (size + fs->block_size - 1) / fs->block_size;
     uint8_t *dir_data = kmalloc(num_blocks * fs->block_size);
+    if (!dir_data)
+        return;
 
     if (!fs->disk->read_sector(fs->disk, lba + fs->partition->start_lba,
                                dir_data, num_blocks)) {
@@ -156,6 +163,9 @@ struct iso9660_dir_record *iso9660_find(struct iso9660_fs *fs,
                                         uint32_t size) {
     uint32_t num_blocks = (size + fs->block_size - 1) / fs->block_size;
     uint8_t *dir_data = kmalloc(num_blocks * fs->block_size);
+    if (!dir_data)
+        return NULL;
+
     if (!fs->disk->read_sector(fs->disk, lba + fs->partition->start_lba,
                                dir_data, num_blocks)) {
         kfree(dir_data);
@@ -179,6 +189,9 @@ struct iso9660_dir_record *iso9660_find(struct iso9660_fs *fs,
             if (strcmp(name, target_name) == 0) {
                 struct iso9660_dir_record *found =
                     kmalloc(sizeof(struct iso9660_dir_record));
+                if (!found)
+                    return NULL;
+
                 memcpy(found, rec, sizeof(struct iso9660_dir_record));
                 kfree(dir_data);
                 return found;
@@ -207,6 +220,9 @@ void iso9660_read_and_print_file(struct iso9660_fs *fs, const char *name) {
     }
 
     void *buf = kmalloc(rec->size_le);
+    if (!buf)
+        return;
+
     if (!iso9660_read_file(fs, rec->extent_lba_le, rec->size_le, buf)) {
         k_printf("Failed to read file contents\n");
         kfree(buf);

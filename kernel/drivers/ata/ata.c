@@ -73,6 +73,8 @@ bool ata_setup_drive(struct ata_drive *ide, struct pci_device *devices,
 
             ide->slave = is_slave;
             ide->identify_data = kmalloc(512);
+            if (!ide->identify_data)
+                k_panic("Could not allocate space for IDE Identify\n");
 
             ata_select_drive(ide);
             ata_soft_reset(ide);

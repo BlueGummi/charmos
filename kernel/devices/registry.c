@@ -20,6 +20,9 @@ static uint64_t disk_count = 0;
 
 void registry_register(struct generic_disk *disk) {
     struct disk_node *node = kmalloc(sizeof(struct disk_node));
+    if (!node)
+        return;
+
     node->disk = disk;
     node->next = disk_list;
     disk_list = node;
@@ -85,6 +88,8 @@ void registry_setup() {
     struct ata_drive *drives = kmalloc(sizeof(struct ata_drive) * 4);
     struct pci_device *devices;
     uint64_t count;
+    if (!drives)
+        k_panic("Could not allocate space for devices\n");
 
     pci_scan_devices(&devices, &count);
     uint64_t nvme_cnt = 1, ahci_cnt = 1, ide_cnt = 1, atapi_cnt = 1;

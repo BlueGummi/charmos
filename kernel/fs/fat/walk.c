@@ -9,6 +9,9 @@ static bool fat32_walk_cluster(struct fat_fs *fs, uint32_t cluster,
     uint8_t *cluster_buf = kmalloc(fs->cluster_size);
 
     struct fat_dirent *ret = kmalloc(sizeof(struct fat_dirent));
+    if (!cluster_buf || !ret)
+        return false;
+
     if (fat_read_cluster(fs, cluster, cluster_buf)) {
         for (uint32_t i = 0; i < fs->cluster_size;
              i += sizeof(struct fat_dirent)) {
@@ -53,6 +56,8 @@ static bool fat12_16_walk_cluster(struct fat_fs *fs, uint32_t cluster,
     }
 
     struct fat_dirent *ret = kmalloc(sizeof(struct fat_dirent));
+    if (!ret)
+        return false;
 
     uint32_t entries_per_cluster =
         is_root ? bpb->root_entry_count

@@ -22,8 +22,9 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     if (!dir)
         return ERR_IO;
 
-    uint8_t *block = kmalloc(fs->block_size);
-    memset(block, 0, fs->block_size);
+    uint8_t *block = kzalloc(fs->block_size);
+    if (!block)
+        return false;
 
     // "." entry
     struct ext2_dir_entry *dot = (struct ext2_dir_entry *) block;
@@ -70,6 +71,9 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
         return ERR_NO_ENT;
 
     uint8_t *block = kmalloc(fs->block_size);
+    if (!block)
+        return false;
+
     if (!ext2_block_ptr_read(
             fs, ext2_get_or_set_block(fs, &dir->node, 0, 0, false, NULL),
             block)) {

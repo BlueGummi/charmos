@@ -86,6 +86,9 @@ static void file_read_visitor(struct ext2_fs *fs, struct ext2_inode *inode,
 
     uint32_t block_size = fs->block_size;
     uint8_t *block_buf = kmalloc(block_size);
+    if (!block_buf)
+        return;
+
     uint32_t lba = (*block_ptr) * fs->sectors_per_block;
 
     if (!ext2_block_read(fs->partition, lba, block_buf,
@@ -191,6 +194,8 @@ enum errno ext2_readlink(struct ext2_fs *fs, struct ext2_full_inode *node,
         return ERR_IO;
 
     void *block = kmalloc(fs->block_size);
+    if (!block)
+        return ERR_NO_MEM;
 
     ext2_block_ptr_read(fs, first_block, block);
 

@@ -86,10 +86,20 @@ if [ ! -f "CMakeCache.txt" ]; then
     fi
 fi
 
-cond_print "${YELLOW}Building...${NC}"
+cond_print "${YELLOW}First initial build...${NC}"
 if [ "$make_quiet_arg" ]; then
     make iso 2>&1 >/dev/null
 else
     make iso
 fi
+
+nm "kernel/kernel" | awk "../script.awk" > "../kernel/syms.c"
+
+cond_print "${YELLOW}Build after symbol table creation...${NC}"
+if [ "$make_quiet_arg" ]; then
+    make iso 2>&1 >/dev/null
+else
+    make iso
+fi
+
 

@@ -24,7 +24,7 @@ static bool search_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
     if (entry->inode != 0 &&
         memcmp(entry->name, ctx->target, entry->name_len) == 0 &&
         ctx->target[entry->name_len] == '\0') {
-        ctx->result = kmalloc(sizeof(struct ext2_inode));
+
         ctx->result->inode_num = e_num;
         ctx->type = entry->file_type;
         ext2_read_inode(fs, entry->inode, &ctx->result->node);

@@ -76,6 +76,8 @@ void idt_load(uint64_t ind) {
 void idt_alloc(uint64_t size) {
     idts = kmalloc(sizeof(struct idt_table) * size);
     idtps = kmalloc(sizeof(struct idt_ptr) * size);
+    if (!idts || !idtps)
+        k_panic("Could not allocate space for IDT\n");
 }
 
 void idt_install(uint64_t ind) {

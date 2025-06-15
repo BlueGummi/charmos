@@ -14,6 +14,9 @@ bool ext2_read_superblock(struct generic_partition *p,
                           struct ext2_sblock *sblock) {
     struct generic_disk *d = p->disk;
     uint8_t *buffer = kmalloc(d->sector_size);
+    if (!buffer)
+        return false; // TODO: separate ERR_NO_MEM case
+
     uint32_t superblock_lba = (EXT2_SUPERBLOCK_OFFSET / d->sector_size);
     uint32_t superblock_offset = EXT2_SUPERBLOCK_OFFSET % d->sector_size;
 
@@ -52,14 +55,17 @@ struct vfs_node *ext2_g_mount(struct generic_partition *p) {
     if (!p)
         return NULL;
 
-    p->fs_data = kmalloc(sizeof(struct ext2_fs));
     struct ext2_fs *fs = p->fs_data;
+    p->fs_data = kmalloc(sizeof(struct ext2_fs));
     fs->sblock = kmalloc(sizeof(struct ext2_sblock));
+    struct vfs_node *n = kzalloc(sizeof(struct vfs_node));
+
+    if (!p->fs_data || !fs->sblock | !n)
+        return NULL;
 
     if (!ext2_read_superblock(p, fs->sblock))
         return NULL;
 
-    struct vfs_node *n = kzalloc(sizeof(struct vfs_node));
     ext2_mount(p, fs, fs->sblock, n);
     return n;
 }
