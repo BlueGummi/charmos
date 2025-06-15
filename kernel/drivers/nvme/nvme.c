@@ -36,9 +36,6 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     uint64_t cap = ((uint64_t) regs->cap_hi << 32) | regs->cap_lo;
     uint32_t version = regs->version;
 
-    uint32_t mpsmin = (cap >> 48) & 0xF;
-    uint32_t page_size = 1 << (12 + mpsmin);
-
     uint32_t dstrd = (cap >> 32) & 0xF;
 
     struct nvme_device *nvme = kzalloc(sizeof(struct nvme_device));
@@ -46,7 +43,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
         k_panic("Could not allocate space for NVMe drive\n");
 
     nvme->doorbell_stride = 4U << dstrd;
-    nvme->page_size = page_size;
+    nvme->page_size = PAGE_SIZE;
     nvme->cap = cap;
     nvme->version = version;
     nvme->regs = regs;
