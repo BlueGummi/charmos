@@ -93,7 +93,7 @@ else
     make 
 fi
 
-nm "kernel/kernel" | awk -f "../script.awk" > "../kernel/fullsyms.c"
+nm "kernel/kernel" | awk -f "../script.awk" > "../syms/fullsyms.c"
 
 cond_print "${YELLOW}Build after symbol table creation...${NC}"
 if [ "$make_quiet_arg" ]; then

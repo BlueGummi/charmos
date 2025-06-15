@@ -1,7 +1,9 @@
 BEGIN {
     print "#include <stdint.h>";
-    print "#include <misc/syms.h>";
 
+    print "#ifndef SYMS_DEFINED";
+    print "#define SYMS_DEFINED";
+    print "#include <misc/syms.h>";
     print "const struct sym syms[] = {";
 }
 / [tT] / {
@@ -10,5 +12,6 @@ BEGIN {
 END {
     print "};\n";
     print "const uint64_t syms_len = sizeof(syms) / sizeof(syms[0]);";
+    print "#endif";
 }
 

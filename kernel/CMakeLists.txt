@@ -34,9 +34,15 @@ set_target_properties(kernel_rust PROPERTIES
 add_dependencies(kernel kernel_rust_build)
 target_link_libraries(kernel kernel_rust)
 
+set(SYMS_SOURCE "${CMAKE_SOURCE_DIR}/syms/syms_dummy.c")
+if(EXISTS "${CMAKE_SOURCE_DIR}/syms/fullsyms.c")
+    set(SYMS_SOURCE "${CMAKE_SOURCE_DIR}/syms/fullsyms.c")
+endif()
+
 target_sources(
     kernel
     PRIVATE
+    ${SYMS_SOURCE}
     ${UACPI_SOURCES}
 )
 
