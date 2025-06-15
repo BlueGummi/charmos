@@ -95,3 +95,17 @@ target_include_directories(
     PRIVATE
     include
 )
+
+add_custom_command(
+    OUTPUT ${CMAKE_SOURCE_DIR}/syms/fullsyms.c
+    COMMAND nm ${CMAKE_BINARY_DIR}/kernel/kernel | awk -f 
+            ${CMAKE_SOURCE_DIR}/script.awk > 
+            ${CMAKE_SOURCE_DIR}/syms/fullsyms.c
+    DEPENDS kernel
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+add_custom_target(generate_syms ALL
+    DEPENDS ${CMAKE_SOURCE_DIR}/syms/fullsyms.c
+)
+
