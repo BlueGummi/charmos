@@ -45,6 +45,7 @@ static uint16_t tmpfs_to_vfs_mode(enum tmpfs_type mode) {
 
 static enum errno tmpfs_mount(struct vfs_node *mountpoint,
                               struct vfs_node *out) {
+    (void) mountpoint, (void) out;
     return ERR_NOT_IMPL;
 }
 
@@ -92,10 +93,12 @@ static enum errno tmpfs_write(struct vfs_node *node, const void *buf,
 }
 
 static enum errno tmpfs_open(struct vfs_node *node, uint32_t flags) {
+    (void) node, (void) flags;
     return 0; // no-op
 }
 
 static enum errno tmpfs_close(struct vfs_node *node) {
+    (void) node;
     return 0; // no-op
 }
 
@@ -145,6 +148,7 @@ static enum errno tmpfs_create(struct vfs_node *parent, const char *name,
 
 static enum errno tmpfs_mknod(struct vfs_node *parent, const char *name,
                               uint16_t mode, uint32_t dev) {
+    (void) parent, (void) name, (void) mode, (void) dev;
     return ERR_NOT_IMPL;
 }
 
@@ -160,6 +164,7 @@ static enum errno tmpfs_symlink(struct vfs_node *parent, const char *target,
 }
 
 static enum errno tmpfs_unmount(struct vfs_node *mountpoint) {
+    (void) mountpoint;
     return ERR_NOT_IMPL;
 }
 
@@ -273,6 +278,7 @@ static enum errno tmpfs_readlink(struct vfs_node *node, char *buf,
 
 static enum errno tmpfs_link(struct vfs_node *parent, struct vfs_node *target,
                              const char *link_name) {
+    (void) parent, (void) target, (void) link_name;
     // tmpfs doesn't support hard links
     return ERR_IS_DIR;
 }
@@ -285,15 +291,18 @@ static enum errno tmpfs_chmod(struct vfs_node *node, uint16_t mode) {
 
 static enum errno tmpfs_chown(struct vfs_node *node, uint32_t uid,
                               uint32_t gid) {
+    (void) node, (void) uid, (void) gid;
     return 0;
 }
 
 static enum errno tmpfs_utime(struct vfs_node *node, uint64_t atime,
                               uint64_t mtime) {
+    (void) node, (void) atime, (void) mtime;
     return 0;
 }
 
 static void tmpfs_destroy(struct vfs_node *node) {
+    (void) node;
     // TODO: cleanup
 }
 
