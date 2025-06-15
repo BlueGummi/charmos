@@ -10,12 +10,14 @@
 
 void debug_print_stack();
 
+#define ELEVEN_LINES "==========="
+#define TWENTY_TWO_LINES ELEVEN_LINES ELEVEN_LINES
+#define FORTY_FOUR_LINES TWENTY_TWO_LINES TWENTY_TWO_LINES
+#define EIGHTY_EIGHT_LINES FORTY_FOUR_LINES FORTY_FOUR_LINES
+
 #define k_panic(fmt, ...)                                                      \
     do {                                                                       \
-        k_printf("\n=========================================================" \
-                 "================"                                            \
-                 "=========="                                                  \
-                 "=====\n");                                                   \
+        k_printf("\n" EIGHTY_EIGHT_LINES "\n");                                \
         k_printf("\n                                    [" ANSI_BG_RED         \
                  "KERNEL PANIC" ANSI_RESET "]\n\n");                           \
         k_printf("    [" ANSI_BRIGHT_BLUE "AT" ANSI_RESET " ");                \
@@ -29,10 +31,7 @@ void debug_print_stack();
                  __func__);                                                    \
         k_printf(fmt, ##__VA_ARGS__);                                          \
         debug_print_stack();                                                   \
-        k_printf("\n=========================================================" \
-                 "================"                                            \
-                 "=========="                                                  \
-                 "=====\n");                                                   \
+        k_printf("\n" EIGHTY_EIGHT_LINES "\n");                                \
         while (1)                                                              \
             asm("cli;hlt");                                                    \
     } while (0)
