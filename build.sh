@@ -93,7 +93,7 @@ else
     make iso
 fi
 
-nm "kernel/kernel" | awk "../script.awk" > "../kernel/syms.c"
+nm "kernel/kernel" | awk -f "../script.awk" > "../kernel/syms.c"
 
 cond_print "${YELLOW}Build after symbol table creation...${NC}"
 if [ "$make_quiet_arg" ]; then
