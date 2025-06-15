@@ -93,12 +93,14 @@ else
     make 
 fi
 
-nm "kernel/kernel" | awk -f "../script.awk" > "../kernel/syms.c"
+nm "kernel/kernel" | awk -f "../script.awk" > "../kernel/fullsyms.c"
 
 cond_print "${YELLOW}Build after symbol table creation...${NC}"
 if [ "$make_quiet_arg" ]; then
+    cmake ..
     make iso 2>&1 >/dev/null
 else
+    cmake ..
     make iso
 fi
 
