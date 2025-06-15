@@ -27,7 +27,7 @@ void lapic_init() {
 
 void wakeup() {
     bool ints = spin_lock(&wakeup_lock);
-    enable_smap_smep_umip();
+    smap_init();
     gdt_install();
     serial_init();
     while (!cr3_ready)

@@ -55,39 +55,49 @@ struct vfs_node *g_root_node = NULL;
 struct vfs_mount *g_mount_list_head; // TODO: migrate these globals
 
 void k_main(void) {
+
+    uint64_t start = rdtsc();
     uint64_t c_cnt = mp_request.response->cpu_count;
 
+    // FB
     k_printf_init(framebuffer_request.response->framebuffers[0]);
     struct limine_hhdm_response *r = hhdm_request.response;
     k_printf("%s", OS_LOGO_SMALL);
     a_rsdp = rsdp_request.response->address;
 
+    // Early init
     mp_wakeup_processors(mp_request.response);
-    enable_smap_smep_umip();
+    smap_init();
     gdt_install();
 
-    init_physical_allocator(r->offset, memmap_request);
+    // Mem
+    pmm_init(r->offset, memmap_request);
     vmm_init(memmap_request.response, xa_request.response, r->offset);
     slab_init();
 
+    // IDT
     idt_alloc(c_cnt);
     idt_install(0);
 
+    // Early device init
     uacpi_init();
     lapic = vmm_map_phys(0xFEE00000UL, 4096);
     hpet_init();
 
+    // Filesystem init
     cmdline_parse(cmdline_request.response->cmdline);
-
     registry_setup();
-    registry_print_devices();
+    //    registry_print_devices();
 
     k_printf("done\n");
+
+    k_printf("Wow! That took %llu clock cycles!\n", rdtsc() - start);
 
     while (1) {
         asm("hlt");
     }
 
+    // Scheduler
     scheduler_init(&global_sched, c_cnt);
 
     for (uint64_t i = 0; i < c_cnt; i++) {
@@ -98,8 +108,8 @@ void k_main(void) {
         scheduler_add_thread(&global_sched, t);
     }
 
-    //    struct thread *t = thread_create(registry_print_devices);
-    //    scheduler_add_thread(&global_sched, t);
+    struct thread *t = thread_create(registry_print_devices);
+    scheduler_add_thread(&global_sched, t);
 
     struct core *c = kmalloc(sizeof(struct core));
     c->state = IDLE;

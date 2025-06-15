@@ -24,7 +24,7 @@ static bool test_bit(uint64_t index) {
 }
 
 uint64_t offset = 0;
-void init_physical_allocator(uint64_t o, struct limine_memmap_request m) {
+void pmm_init(uint64_t o, struct limine_memmap_request m) {
 
     offset = o;
     memset(bitmap, 0xFF, BITMAP_SIZE);

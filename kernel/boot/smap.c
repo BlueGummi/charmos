@@ -1,7 +1,7 @@
 #include <asm.h>
 #include <stdint.h>
 
-void enable_smap_smep_umip() {
+void smap_init() {
     uint32_t abcd[4];
 
     cpuid(0x7, 0x0, abcd);
