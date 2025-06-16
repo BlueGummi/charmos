@@ -2,22 +2,6 @@
 #include <fs/vfs.h>
 #include <mem/alloc.h>
 
-const char *fs_type_to_string(enum fs_type type) {
-    switch (type) {
-    case FS_UNKNOWN: return "UNKNOWN";
-    case FS_FAT32: return "FAT32";
-    case FS_FAT16: return "FAT16";
-    case FS_FAT12: return "FAT12";
-    case FS_EXFAT: return "exFAT";
-    case FS_EXT2: return "EXT2";
-    case FS_EXT3: return "EXT3";
-    case FS_EXT4: return "EXT4";
-    case FS_NTFS: return "NTFS";
-    case FS_ISO9660: return "ISO9660";
-    default: return "INVALID";
-    }
-}
-
 void vfs_node_print(const struct vfs_node *node) {
     if (!node) {
         k_printf("vfs_node: (null)\n");
@@ -27,7 +11,7 @@ void vfs_node_print(const struct vfs_node *node) {
     k_printf("=== VFS Node ===\n");
     k_printf("Name     : %s%s\n", node->name,
              *node->name == '/' ? " (root)" : "");
-    k_printf("Type     : %s (%d)\n", fs_type_to_string(node->type), node->type);
+    k_printf("Type     : %s (%d)\n", detect_fstr(node->fs_type), node->fs_type);
     k_printf("Open     : %s\n", node->open ? "Yes" : "No");
     k_printf("Flags    : 0x%08X\n", node->flags);
     k_printf("Mode     : 0%o\n", node->mode);

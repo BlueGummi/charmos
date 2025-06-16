@@ -21,6 +21,8 @@ const char *detect_fstr(enum fs_type type) {
     case FS_EXT4: return "EXT4";
     case FS_NTFS: return "NTFS";
     case FS_ISO9660: return "ISO9660";
+    case FS_TMPFS: return "TMPFS";
+    case FS_DEVTMPFS: return "DEVTMPFS";
     default: return "Unknown";
     }
 }

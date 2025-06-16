@@ -44,7 +44,6 @@ struct vfs_node *tmpfs_create_vfs_node(struct tmpfs_node *tnode) {
     if (!vnode)
         return NULL;
 
-    vnode->type = tmpfs_to_vfs_mode(tnode->type);
     vnode->mode = tnode->mode;
     vnode->size = tnode->size;
     strncpy(vnode->name, tnode->name, sizeof(vnode->name));
@@ -52,6 +51,7 @@ struct vfs_node *tmpfs_create_vfs_node(struct tmpfs_node *tnode) {
     vnode->fs_data = NULL; // could be fs pointer if needed
     vnode->fs_node_data = tnode;
     vnode->ops = &tmpfs_ops;
+    vnode->fs_type = FS_TMPFS;
     return vnode;
 }
 

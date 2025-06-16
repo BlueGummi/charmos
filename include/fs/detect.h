@@ -2,6 +2,8 @@
 
 struct generic_disk;
 enum fs_type {
+    FS_DEVTMPFS = -2,
+    FS_TMPFS = -1,
     FS_UNKNOWN = 0,
     FS_FAT32 = 1,
     FS_FAT16 = 2,

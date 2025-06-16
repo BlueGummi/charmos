@@ -172,7 +172,7 @@ struct vfs_mount {
 };
 
 struct vfs_node {
-    enum fs_type type;
+    enum fs_type fs_type;
     bool open;
     char name[256];
     uint32_t flags;

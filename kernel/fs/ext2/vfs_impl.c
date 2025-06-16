@@ -365,7 +365,7 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     out_node->size = f->node.size;
     out_node->fs_data = fs;
     out_node->fs_node_data = f;
-    out_node->type = FS_EXT2;
+    out_node->fs_type = FS_EXT2;
     out_node->ops = &ext2_vfs_ops;
     return ERR_OK;
 }

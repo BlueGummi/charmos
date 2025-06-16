@@ -162,6 +162,7 @@ void registry_setup() {
                 struct vfs_node *mnt = tmpfs_mkroot("tmp");
                 m->ops->mount(tmp, mnt);
                 vfs_node_print(g_root_node);
+                vfs_node_print(mnt);
                 found_root =
                     true; // TODO: Migrate this out - what is this doing here
             }
