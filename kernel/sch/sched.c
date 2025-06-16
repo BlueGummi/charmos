@@ -13,9 +13,7 @@ static uint64_t c_count = 1;
 struct spinlock l;
 
 void k_sch_main() {
-    uint64_t id = get_sch_core_id();
     while (1) {
-        k_printf("core %d on idle!\n", id);
         asm volatile("hlt");
     }
 }
@@ -25,7 +23,6 @@ void schedule(struct cpu_state *cpu) {
     struct per_core_scheduler *sched = local_schs[core_id];
 
     LAPIC_REG(LAPIC_REG_EOI) = 0;
-
 
     if (!sched->active) {
         return;

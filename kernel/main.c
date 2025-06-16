@@ -68,12 +68,12 @@ void k_main(void) {
     // Early init
     mp_wakeup_processors(mp_request.response);
     smap_init();
-    gdt_install();
 
     // Mem
     pmm_init(r->offset, memmap_request);
     vmm_init(memmap_request.response, xa_request.response, r->offset);
     slab_init();
+    gdt_install();
 
     // IDT
     idt_alloc(c_cnt);

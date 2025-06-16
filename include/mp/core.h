@@ -1,3 +1,4 @@
+#include <tss.h>
 #include <sch/thread.h>
 #include <spin_lock.h>
 #include <stdint.h>
@@ -11,6 +12,7 @@ struct core {
     uint64_t id;
     struct thread *current_thread;
     enum core_state state;
+    struct tss *tss;
 };
 
 #pragma once

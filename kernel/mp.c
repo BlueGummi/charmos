@@ -28,7 +28,6 @@ void lapic_init() {
 void wakeup() {
     bool ints = spin_lock(&wakeup_lock);
     smap_init();
-    gdt_install();
     serial_init();
     while (!cr3_ready)
         ;
@@ -37,6 +36,7 @@ void wakeup() {
     uint32_t lapic_id_raw = LAPIC_REG(LAPIC_REG_ID);
     uint64_t cpu = (lapic_id_raw >> 24) & 0xFF;
     lapic_init();
+    gdt_install();
     idt_install(cpu);
 
     struct core *c = kmalloc(sizeof(struct core));

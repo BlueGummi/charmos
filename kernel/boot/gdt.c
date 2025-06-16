@@ -1,12 +1,12 @@
 #include <boot/gdt.h>
 #include <console/printf.h>
+#include <mem/alloc.h>
 #include <stdalign.h>
 #include <stdint.h>
+#include <string.h>
 #include <tss.h>
 
 #define GDT_ENTRIES 5
-alignas(8) struct gdt_entry gdt[GDT_ENTRIES]; // 3 base + 2 entries for TSS
-struct gdt_ptr gp;
 
 void gdt_set_tss(struct gdt_entry_tss *tss_desc, uint64_t base,
                  uint32_t limit) {
@@ -21,38 +21,8 @@ void gdt_set_tss(struct gdt_entry_tss *tss_desc, uint64_t base,
     tss_desc->reserved = 0;
 }
 
-void gdt_load_local_tss(struct gdt_entry_tss *local_gdt, struct tss *core_tss) {
-    gdt_set_tss(&local_gdt[3], (uint64_t) core_tss, sizeof(struct tss) - 1);
-
-    struct gdt_ptr gp;
-    gp.limit = sizeof(struct gdt_entry) * GDT_ENTRIES - 1;
-    gp.base = (uint64_t) local_gdt;
-    asm volatile("lgdt %0" : : "m"(gp));
-
-    // TODO: Separate this out
-
-    asm volatile(".intel_syntax noprefix\n\t"
-                 "lea rax, [0x8]\n\t"
-                 "push rax\n\t"
-                 "lea rax, [rip + .that]\n\t"
-                 "push rax\n\t"
-                 "retfq\n\t"
-                 ".that:\n\t"
-                 "mov ax, 0x10\n\t"
-                 "mov ds, ax\n\t"
-                 "mov es, ax\n\t"
-                 "mov fs, ax\n\t"
-                 "mov gs, ax\n\t"
-                 "mov ss, ax\n\t"
-                 ".att_syntax prefix\n\t"
-                 :
-                 :
-                 : "rax", "ax", "memory");
-    asm volatile("ltr %w0" : : "r"(0x18));
-}
-
-void gdt_set_gate(int num, uint64_t base, uint32_t limit, uint8_t access,
-                  uint8_t gran) {
+void gdt_set_gate(struct gdt_entry *gdt, int num, uint64_t base, uint32_t limit,
+                  uint8_t access, uint8_t gran) {
     gdt[num].limit_low = (limit & 0xFFFF);
     gdt[num].base_low = (base & 0xFFFF);
     gdt[num].base_middle = (base >> 16) & 0xFF;
@@ -62,29 +32,22 @@ void gdt_set_gate(int num, uint64_t base, uint32_t limit, uint8_t access,
     gdt[num].base_high = (base >> 24) & 0xFF;
 }
 
-void gdt_install() {
-    gp.limit = (sizeof(struct gdt_entry) * 3) - 1;
-    gp.base = (uint64_t) &gdt;
-
-    // Null descriptor
-    gdt_set_gate(0, 0, 0, 0, 0);
-
-    // CS
-    gdt_set_gate(1, 0, 0xFFFFFFFF, 0x9A, 0xAF); // L bit set (0xAF)
-
-    // Data segment descriptor
-    gdt_set_gate(2, 0, 0xFFFFFFFF, 0x92, 0xCF);
-
+void gdt_load(struct gdt_entry *gdt, size_t n_entries) {
+    struct gdt_ptr gp = {
+        .limit = (sizeof(struct gdt_entry) * n_entries) - 1,
+        .base = (uint64_t) gdt,
+    };
     asm volatile("lgdt %0" : : "m"(gp));
+}
 
+void reload_segment_registers(uint16_t cs_selector, uint16_t ds_selector) {
     asm volatile(".intel_syntax noprefix\n\t"
-                 "lea rax, [0x8]\n\t"
-                 "push rax\n\t"
-                 "lea rax, [rip + .this]\n\t"
+                 "push %0\n\t"
+                 "lea rax, [rip + 1f]\n\t"
                  "push rax\n\t"
                  "retfq\n\t"
-                 ".this:\n\t"
-                 "mov ax, 0x10\n\t"
+                 "1:\n\t"
+                 "mov ax, %1\n\t"
                  "mov ds, ax\n\t"
                  "mov es, ax\n\t"
                  "mov fs, ax\n\t"
@@ -92,6 +55,65 @@ void gdt_install() {
                  "mov ss, ax\n\t"
                  ".att_syntax prefix\n\t"
                  :
-                 :
+                 : "r"((uint64_t) cs_selector), "r"(ds_selector)
                  : "rax", "ax", "memory");
+}
+
+void gdt_init(struct gdt_entry *gdt, struct tss *tss) {
+    gdt_set_gate(gdt, 0, 0, 0, 0, 0);
+
+    gdt_set_gate(gdt, 1, 0, 0xFFFFFFFF, 0x9A, 0xAF);
+
+    gdt_set_gate(gdt, 2, 0, 0xFFFFFFFF, 0x92, 0xCF);
+
+    gdt_set_tss((struct gdt_entry_tss *) &gdt[3], (uint64_t) tss,
+                sizeof(struct tss) - 1);
+
+    tss->io_map_base = sizeof(struct tss);
+
+    gdt_load(gdt, GDT_ENTRIES);
+
+    reload_segment_registers(0x08, 0x10);
+
+    asm volatile("ltr %w0" : : "r"(0x18));
+}
+
+void *kmalloc_aligned(size_t size, size_t alignment) {
+    size_t total_size = size + alignment - 1 + sizeof(void *);
+    void *raw = kmalloc(total_size);
+    if (!raw) {
+        return NULL;
+    }
+
+    uintptr_t raw_addr = (uintptr_t) raw + sizeof(void *);
+    uintptr_t aligned_addr = (raw_addr + alignment - 1) & ~(alignment - 1);
+
+    ((void **) aligned_addr)[-1] = raw;
+
+    return (void *) aligned_addr;
+}
+
+void kfree_aligned(void *ptr) {
+    if (!ptr)
+        return;
+    void *raw = ((void **) ptr)[-1];
+    extern void kfree(void *ptr);
+    kfree(raw);
+}
+
+void gdt_install(void) {
+    struct gdt_entry *gdt =
+        kmalloc_aligned(sizeof(struct gdt_entry) * GDT_ENTRIES, 8);
+    struct tss *tss = kmalloc_aligned(sizeof(struct tss), 8);
+    memset(tss, 0, sizeof(struct tss));
+
+    if (!gdt) {
+        return;
+    }
+
+    memset(gdt, 0, sizeof(struct gdt_entry) * GDT_ENTRIES);
+
+    gdt_init(gdt, tss);
+
+    return;
 }
