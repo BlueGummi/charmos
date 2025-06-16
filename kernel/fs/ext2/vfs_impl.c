@@ -252,6 +252,7 @@ static struct vfs_node *make_vfs_node(struct ext2_fs *fs,
     ret->size = node->node.size;
     ret->mode = ext2_to_vfs_mode(node->node.mode);
     ret->ops = &ext2_vfs_ops;
+    ret->fs_type = FS_EXT2;
 
     return ret;
 }

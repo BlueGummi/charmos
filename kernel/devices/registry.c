@@ -161,8 +161,13 @@ void registry_setup() {
                 struct vfs_node *tmp = m->ops->finddir(m, "tmp");
                 struct vfs_node *mnt = tmpfs_mkroot("tmp");
                 m->ops->mount(tmp, mnt);
+
+                mnt->ops->mkdir(mnt, "place", VFS_MODE_DIR);
+
+                struct vfs_node *place = mnt->ops->finddir(mnt, "place");
                 vfs_node_print(g_root_node);
                 vfs_node_print(mnt);
+                vfs_node_print(place);
                 found_root =
                     true; // TODO: Migrate this out - what is this doing here
             }

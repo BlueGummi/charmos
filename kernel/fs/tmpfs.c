@@ -1,3 +1,4 @@
+#include <console/printf.h>
 #include <fs/tmpfs.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
@@ -41,7 +42,7 @@ static enum errno tmpfs_mount(struct vfs_node *mountpoint,
 
 struct vfs_node *tmpfs_create_vfs_node(struct tmpfs_node *tnode) {
     struct vfs_node *vnode = kzalloc(sizeof(struct vfs_node));
-    if (!vnode)
+    if (!vnode || !tnode)
         return NULL;
 
     vnode->mode = tnode->mode;
@@ -102,8 +103,12 @@ static struct tmpfs_node *tmpfs_find_child(struct tmpfs_node *dir,
 
 static enum errno tmpfs_add_child(struct tmpfs_node *parent,
                                   struct tmpfs_node *child) {
-    parent->children =
-        krealloc(parent->children, sizeof(void *) * (parent->child_count + 1));
+    if (!parent->children)
+        parent->children = kmalloc(sizeof(void *) * (parent->child_count + 1));
+    else
+        parent->children = krealloc(parent->children,
+                                    sizeof(void *) * (parent->child_count + 1));
+
     parent->children[parent->child_count++] = child;
     child->parent = parent;
     return 0;
@@ -115,6 +120,7 @@ static enum errno tmpfs_create_common(struct vfs_node *parent, const char *name,
     struct tmpfs_node *pt = parent->fs_node_data;
     if (pt->type != TMPFS_DIR)
         return ERR_NOT_DIR;
+
     if (tmpfs_find_child(pt, name))
         return ERR_EXIST;
 
