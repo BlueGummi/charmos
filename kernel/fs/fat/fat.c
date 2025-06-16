@@ -110,7 +110,7 @@ struct fat_bpb *fat_read_bpb(struct generic_disk *drive,
         struct fat_bpb *out_bpb = kmalloc(sizeof(struct fat_bpb));
         if (!out_bpb)
             return NULL;
-        
+
         if (out_bpb) {
             memcpy(out_bpb, bpb, sizeof(struct fat_bpb));
             *out_type = type;
@@ -225,7 +225,7 @@ void fat_g_print(struct generic_partition *d) {
 
     struct fat_dirent new_file_ent;
 
-    bool success = fat_mkdir(fs, fs->root_cluster, "silly", &new_file_ent);
+    bool success;
 
     success = fat_create(fs, fs->root_cluster, "Whimsy", &new_file_ent,
                          FAT_ARCHIVE, NULL);
@@ -234,13 +234,16 @@ void fat_g_print(struct generic_partition *d) {
 
     success = fat_delete(fs, fs->root_cluster, "Whimsy");
 
-    success = fat_create(fs, fs->root_cluster, "Doobert", &new_file_ent,
-                         FAT_ARCHIVE, NULL);
-
-    success = fat_rename(fs, fs->root_cluster, "Doobert", "Snoobert");
-
     success = fat_create(fs, fs->root_cluster, "Dooh", &new_file_ent,
                          FAT_ARCHIVE, NULL);
+
+    uint32_t ind;
+
+    new_file_ent = *fat_lookup(fs, fs->root_cluster, "Dooh", &ind);
+
+    success = fat_write_file(fs, &new_file_ent, 0, (uint8_t *) "Doober", 6);
+
+    success = fat_write_dirent(fs, fs->root_cluster, &new_file_ent, ind);
 
     if (success) {
         k_printf("yay\n");

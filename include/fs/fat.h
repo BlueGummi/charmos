@@ -225,6 +225,12 @@ bool fat_delete(struct fat_fs *fs, uint32_t dir_cluster, const char *filename);
 bool fat_rename(struct fat_fs *fs, uint32_t dir_cluster, const char *filename,
                 const char *new_filename);
 
+bool fat_read_file(struct fat_fs *fs, struct fat_dirent *ent, uint32_t offset,
+                   uint32_t size, uint8_t *out_buf);
+
+bool fat_write_file(struct fat_fs *fs, struct fat_dirent *ent, uint32_t offset,
+                    const uint8_t *data, uint32_t size);
+
 //
 //
 // Walk iterators/directories
