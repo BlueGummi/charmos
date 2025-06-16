@@ -109,9 +109,15 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
             struct ahci_port *port = &ctrl->ports[i];
 
             uint32_t cmd = mmio_read_32(&port->cmd);
-            cmd &= ~AHCI_CMD_ST;
-            cmd &= ~AHCI_CMD_FRE;
-            mmio_write_32(&port->cmd, cmd);
+            mmio_write_32(&port->cmd, cmd & ~(AHCI_CMD_ST | AHCI_CMD_FRE));
+
+            uint64_t timeout = AHCI_CMD_TIMEOUT_MS;
+            while (mmio_read_32(&port->cmd) & (AHCI_CMD_CR | AHCI_CMD_FR)) {
+                sleep_ms(1);
+                timeout--;
+                if (timeout == 0)
+                    return NULL;
+            }
 
             allocate_port(dev, port, i);
 
@@ -119,10 +125,6 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
             cmd |= AHCI_CMD_FRE;
             cmd |= AHCI_CMD_ST;
             mmio_write_32(&port->cmd, cmd);
-
-            if (!wait_for_clear(&port->cmd, AHCI_CMD_CR, 1000)) {
-                continue;
-            }
 
             setup_port_slots(dev, i);
         }

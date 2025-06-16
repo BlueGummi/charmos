@@ -63,8 +63,12 @@ set(QEMU_COMMON_FLAGS
      -drive id=nvme0,file=disk.img,format=raw,if=none
      -device nvme,serial=boom,drive=disk0,drive=nvme0
 
+     #-drive id=fatdisk,file=fat32.img,format=raw,if=none
+     #-device ide-hd,drive=fatdisk,bus=ide.0,unit=1
      -drive id=fatdisk,file=fat32.img,format=raw,if=none
-     -device ide-hd,drive=fatdisk,bus=ide.0,unit=1
+     -device ahci,id=ahci0
+     -device ide-hd,drive=fatdisk,bus=ahci0.0
+
 
     -d trace:*hpet*
     -trace file=trace.log

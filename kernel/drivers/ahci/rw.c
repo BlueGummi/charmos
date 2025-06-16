@@ -31,13 +31,15 @@ bool ahci_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *out_buf,
     struct ahci_full_port *port = &ahci_disk->device->regs[ahci_disk->port];
 
     uint32_t slot = find_free_cmd_slot(port->port);
-    if (slot == (uint32_t) -1)
+    if (slot == (uint32_t) -1) {
         return false;
+    }
 
     uint64_t buffer_phys;
     uint8_t *buffer = ahci_prepare_command(port, slot, false, &buffer_phys);
-    if (!buffer)
+    if (!buffer) {
         return false;
+    }
 
     struct ahci_cmd_table *cmd_tbl = port->cmd_tables[slot];
 
@@ -81,8 +83,9 @@ bool ahci_read_sector_wrapper(struct generic_disk *disk, uint64_t lba,
                               uint8_t *buf, uint64_t cnt) {
     while (cnt > 0) {
         uint16_t chunk = (cnt > 65535) ? 0 : (uint16_t) cnt; // 0 means 65536
-        if (!ahci_read_sector(disk, lba, buf, chunk))
+        if (!ahci_read_sector(disk, lba, buf, chunk)) 
             return false;
+        
 
         uint64_t sectors = (chunk == 0) ? 65536 : chunk;
         lba += sectors;
