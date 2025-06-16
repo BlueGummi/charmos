@@ -176,6 +176,7 @@ struct vfs_node {
     enum fs_type fs_type;
     bool open;
     char name[256];
+    uint64_t unique_id;
     uint32_t flags;
     uint16_t mode;
     uint64_t size;

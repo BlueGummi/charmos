@@ -247,6 +247,7 @@ static struct vfs_node *make_vfs_node(struct ext2_fs *fs,
 
     ret->flags = ext2_to_vfs_flags(node->node.flags);
 
+    ret->unique_id = node->inode_num;
     ret->fs_data = fs;
     ret->fs_node_data = node;
     ret->size = node->node.size;

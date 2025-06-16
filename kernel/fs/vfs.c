@@ -59,7 +59,7 @@ void vfs_node_print(const struct vfs_node *node) {
 
 static struct vfs_mount *find_mount_for_node(struct vfs_node *node) {
     for (size_t i = 0; i < mount_table_count; i++) {
-        if (strcmp(mount_table[i]->name, node->name) == 0)
+        if (mount_table[i]->mount_point->unique_id == node->unique_id)
             return mount_table[i];
     }
     return NULL;
