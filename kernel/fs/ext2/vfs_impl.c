@@ -374,6 +374,7 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
 struct vfs_node *ext2_vfs_finddir(struct vfs_node *node, const char *fname) {
     struct ext2_full_inode *full_inode = node->fs_node_data;
 
+
     struct ext2_fs *fs = node->fs_data;
 
     struct ext2_full_inode *found =

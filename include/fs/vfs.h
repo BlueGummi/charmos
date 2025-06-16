@@ -165,6 +165,7 @@ struct vfs_ops {
 
 struct vfs_mount {
     struct vfs_node *mount_point;
+    struct vfs_mount *mount_mount;
     struct vfs_node *root;
     struct vfs_ops *ops;
     char name[256];
@@ -181,10 +182,11 @@ struct vfs_node {
 
     void *fs_data;
     void *fs_node_data;
-    struct vfs_mount *mount;
+    struct vfs_mount *child_mount;
 
     struct vfs_ops *ops;
 };
 void vfs_node_print(const struct vfs_node *node);
 enum errno vfs_mount(struct vfs_node *mountpoint, struct vfs_node *target);
 enum errno vfs_unmount(struct vfs_mount *mountpoint);
+struct vfs_node *vfs_finddir(struct vfs_node *node, const char *fname);

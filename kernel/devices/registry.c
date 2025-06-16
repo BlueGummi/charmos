@@ -152,22 +152,19 @@ void registry_setup() {
         for (uint32_t j = 0; j < disk->partition_count; j++) {
             struct generic_partition *p = &disk->partitions[j];
             if (strcmp(p->name, g_root_part) == 0) {
-                struct vfs_node *m = p->mount(p);
-                if (!m)
+                struct vfs_node *root = p->mount(p);
+                if (!root)
                     k_panic("VFS failed to mount root '%s' - mount failure\n",
                             g_root_part);
-                g_root_node = m;
-                m->ops->mkdir(m, "tmp", VFS_MODE_DIR);
-                struct vfs_node *tmp = m->ops->finddir(m, "tmp");
-                struct vfs_node *mnt = tmpfs_mkroot("tmp");
-                m->ops->mount(tmp, mnt);
-
-                mnt->ops->mkdir(mnt, "place", VFS_MODE_DIR);
-
-                struct vfs_node *place = mnt->ops->finddir(mnt, "place");
+                g_root_node = root;
+                root->ops->mkdir(root, "tmp", VFS_MODE_DIR);
+                struct vfs_node *tmp_on_ext2 = root->ops->finddir(root, "tmp");
+                struct vfs_node *tmpfs_root = tmpfs_mkroot("tmp");
+                root->ops->mount(tmp_on_ext2, tmpfs_root);
+                tmpfs_root->ops->mkdir(tmpfs_root, "place", VFS_MODE_DIR);
                 vfs_node_print(g_root_node);
-                vfs_node_print(mnt);
-                vfs_node_print(place);
+                struct vfs_node *found = vfs_finddir(g_root_node, "tmp");
+                vfs_node_print(found);
                 found_root =
                     true; // TODO: Migrate this out - what is this doing here
             }
