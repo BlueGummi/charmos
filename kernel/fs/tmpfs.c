@@ -103,11 +103,12 @@ static struct tmpfs_node *tmpfs_find_child(struct tmpfs_node *dir,
 
 static enum errno tmpfs_add_child(struct tmpfs_node *parent,
                                   struct tmpfs_node *child) {
+    uint64_t needed_size = sizeof(void *) * (parent->child_count + 1);
+
     if (!parent->children)
-        parent->children = kmalloc(sizeof(void *) * (parent->child_count + 1));
+        parent->children = kmalloc(needed_size);
     else
-        parent->children = krealloc(parent->children,
-                                    sizeof(void *) * (parent->child_count + 1));
+        parent->children = krealloc(parent->children, needed_size);
 
     parent->children[parent->child_count++] = child;
     child->parent = parent;

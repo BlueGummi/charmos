@@ -48,8 +48,7 @@ void wakeup() {
 
     spin_unlock(&wakeup_lock, ints);
     asm("sti");
-    scheduler_start(local_schs[cpu]);
-
+    k_sch_main();
     while (1)
         asm("hlt");
 }

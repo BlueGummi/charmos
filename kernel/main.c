@@ -93,10 +93,6 @@ void k_main(void) {
 
     k_printf("Wow! That took %llu clock cycles!\n", rdtsc() - start);
 
-    while (1) {
-        asm("hlt");
-    }
-
     // Scheduler
     scheduler_init(&global_sched, c_cnt);
 
@@ -108,9 +104,6 @@ void k_main(void) {
         scheduler_add_thread(&global_sched, t);
     }
 
-    struct thread *t = thread_create(registry_print_devices);
-    scheduler_add_thread(&global_sched, t);
-
     struct core *c = kmalloc(sizeof(struct core));
     c->state = IDLE;
     c->id = 0;
@@ -120,7 +113,7 @@ void k_main(void) {
     mp_inform_of_cr3();
 
     asm volatile("sti");
-    scheduler_start(local_schs[0]);
+    k_sch_main();
     while (1) {
         asm("hlt");
     }
