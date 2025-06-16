@@ -7,6 +7,8 @@
 #include <mem/vmm.h>
 #include <string.h>
 
+// TODO: Check for non 512-byte sector sizes and adjust accordingly
+
 static void ahci_set_lba_cmd(struct ahci_fis_reg_h2d *fis, uint64_t lba,
                              uint16_t sector_count) {
     fis->device = 1 << 6;
@@ -35,8 +37,7 @@ bool ahci_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *out_buf,
         return false;
     }
 
-    uint64_t buffer_phys;
-    uint8_t *buffer = ahci_prepare_command(port, slot, false, &buffer_phys);
+    uint8_t *buffer = ahci_prepare_command(port, slot, false, NULL, count * 512);
     if (!buffer) {
         return false;
     }
@@ -65,8 +66,7 @@ bool ahci_write_sector(struct generic_disk *disk, uint64_t lba,
     if (slot == (uint32_t) -1)
         return false;
 
-    uint64_t buffer_phys;
-    uint8_t *buffer = ahci_prepare_command(port, slot, true, &buffer_phys);
+    uint8_t *buffer = ahci_prepare_command(port, slot, true, NULL, count * 512);
     if (!buffer)
         return false;
 
@@ -83,9 +83,8 @@ bool ahci_read_sector_wrapper(struct generic_disk *disk, uint64_t lba,
                               uint8_t *buf, uint64_t cnt) {
     while (cnt > 0) {
         uint16_t chunk = (cnt > 65535) ? 0 : (uint16_t) cnt; // 0 means 65536
-        if (!ahci_read_sector(disk, lba, buf, chunk)) 
+        if (!ahci_read_sector(disk, lba, buf, chunk))
             return false;
-        
 
         uint64_t sectors = (chunk == 0) ? 65536 : chunk;
         lba += sectors;

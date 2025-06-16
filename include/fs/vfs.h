@@ -80,6 +80,7 @@ struct vfs_stat {
     uint64_t atime;
     uint64_t mtime;
     uint64_t ctime;
+    uint16_t present_mask;
 };
 
 struct vfs_dirent {

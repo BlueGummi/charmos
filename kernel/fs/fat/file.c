@@ -78,7 +78,6 @@ bool fat_write_file(struct fat_fs *fs, struct fat_dirent *ent, uint32_t offset,
 
     current = cluster;
     if (chain_len < needed_clusters) {
-        // Extend chain
         for (uint32_t i = chain_len; i < needed_clusters; i++) {
             uint32_t new_cluster = fat_alloc_cluster(fs);
             if (!new_cluster)

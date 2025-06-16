@@ -20,12 +20,12 @@ uint32_t find_free_cmd_slot(struct ahci_port *port) {
 }
 
 void *ahci_prepare_command(struct ahci_full_port *port, uint32_t slot,
-                           bool write, uint64_t *out_phys) {
+                           bool write, uint64_t *out_phys, uint64_t size) {
     struct ahci_cmd_header *hdr = port->cmd_hdrs[slot];
     struct ahci_cmd_table *cmd_tbl = port->cmd_tables[slot];
 
     uint64_t buffer_phys = (uint64_t) pmm_alloc_page(false);
-    void *buffer = vmm_map_phys(buffer_phys, 4096);
+    void *buffer = vmm_map_phys(buffer_phys, size);
     if (out_phys)
         *out_phys = buffer_phys;
 
@@ -98,7 +98,7 @@ void ahci_identify(struct ahci_disk *disk) {
     uint32_t slot = find_free_cmd_slot(port->port);
 
     uint64_t buffer_phys;
-    void *buffer = ahci_prepare_command(port, slot, false, &buffer_phys);
+    void *buffer = ahci_prepare_command(port, slot, false, &buffer_phys, 4096);
 
     if (!buffer)
         return;
