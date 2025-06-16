@@ -97,8 +97,7 @@ void k_main(void) {
     scheduler_init(&global_sched, c_cnt);
 
     for (uint64_t i = 0; i < c_cnt; i++) {
-        struct per_core_scheduler *s =
-            kmalloc(sizeof(struct per_core_scheduler));
+        struct scheduler *s = kmalloc(sizeof(struct scheduler));
         scheduler_local_init(s, i);
         struct thread *t = thread_create(k_sch_main);
         scheduler_add_thread(&global_sched, t);

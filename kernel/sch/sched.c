@@ -8,19 +8,21 @@
 #include <stdint.h>
 #include <string.h>
 
-struct per_core_scheduler **local_schs;
+struct scheduler **local_schs;
 static uint64_t c_count = 1;
 struct spinlock l;
 
 void k_sch_main() {
+    uint64_t core_id = get_sch_core_id();
     while (1) {
+        k_printf("Core %d running...\n", core_id);
         asm volatile("hlt");
     }
 }
 
 void schedule(struct cpu_state *cpu) {
     uint64_t core_id = get_sch_core_id();
-    struct per_core_scheduler *sched = local_schs[core_id];
+    struct scheduler *sched = local_schs[core_id];
 
     LAPIC_REG(LAPIC_REG_EOI) = 0;
 
@@ -42,7 +44,7 @@ void schedule(struct cpu_state *cpu) {
     return;
 }
 
-void scheduler_local_init(struct per_core_scheduler *sched, uint64_t core_id) {
+void scheduler_local_init(struct scheduler *sched, uint64_t core_id) {
     sched->active = true;
     sched->head = NULL;
     sched->tail = NULL;
@@ -53,12 +55,11 @@ void scheduler_local_init(struct per_core_scheduler *sched, uint64_t core_id) {
 
 void scheduler_init(struct scheduler *sched, uint64_t core_count) {
     c_count = core_count;
-    local_schs = kmalloc(sizeof(struct per_core_scheduler) * core_count);
+    local_schs = kmalloc(sizeof(struct scheduler) * core_count);
     if (!local_schs)
         k_panic("Could not allocate space for local schedulers\n");
 
     sched->active = false;
-    sched->started_first = false;
     sched->head = NULL;
     sched->tail = NULL;
     sched->current = NULL;
@@ -66,8 +67,7 @@ void scheduler_init(struct scheduler *sched, uint64_t core_count) {
 }
 
 // todo: don't copy code so much
-static void scheduler_l_add_thread(struct per_core_scheduler *sched,
-                                   struct thread *t) {
+static void scheduler_l_add_thread(struct scheduler *sched, struct thread *t) {
     if (sched == NULL || t == NULL) {
         return;
     }
@@ -100,7 +100,7 @@ static void scheduler_l_add_thread(struct per_core_scheduler *sched,
         sched->current = task;
 }
 
-static void scheduler_l_rm_thread(struct per_core_scheduler *sched,
+static void scheduler_l_rm_thread(struct scheduler *sched,
                                   struct thread *task) {
     if (sched == NULL || task == NULL || sched->head == NULL) { // Invalid
         return;
@@ -227,7 +227,7 @@ void scheduler_rebalance(struct scheduler *sched) {
     uint64_t extras = sched->task_cnt % c_count;
 
     for (uint64_t i = 0; i < c_count; i++) {
-        struct per_core_scheduler *sch = local_schs[i];
+        struct scheduler *sch = local_schs[i];
         uint64_t to_assign = tasks_per_core + (i < extras ? 1 : 0);
 
         for (uint64_t j = 0; j < to_assign; j++) {
@@ -239,8 +239,7 @@ void scheduler_rebalance(struct scheduler *sched) {
     }
 }
 
-__attribute__((noreturn)) void
-scheduler_start(struct per_core_scheduler *sched) {
+__attribute__((noreturn)) void scheduler_start(struct scheduler *sched) {
     struct cpu_state *regs = &sched->current->regs;
 
     asm volatile("push %%rax\n\t"
