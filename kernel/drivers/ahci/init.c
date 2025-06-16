@@ -140,12 +140,15 @@ struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
         return NULL;
     }
 
+    mmio_write_32(&ctrl->ghc, AHCI_GHC_HR);
+
     uint64_t timeout = AHCI_CMD_TIMEOUT_MS;
     while (mmio_read_32(&ctrl->ghc) & AHCI_GHC_HR) {
         sleep_ms(1);
-        timeout--;
-        if (timeout == 0)
+        if (--timeout == 0) {
+            k_printf("AHCI controller reset timed out\n");
             return NULL;
+        }
     }
 
     mmio_write_32(&ctrl->ghc, mmio_read_32(&ctrl->ghc) | AHCI_GHC_AE);
