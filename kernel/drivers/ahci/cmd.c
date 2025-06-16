@@ -77,6 +77,14 @@ bool ahci_send_command(struct ahci_full_port *port, uint32_t slot) {
             return false;
     }
 
+    timeout = AHCI_CMD_TIMEOUT_MS;
+    while (mmio_read_32(&port->port->tfd) & (STATUS_BSY & STATUS_DRQ) &&
+           --timeout) {
+        sleep_ms(1);
+        if (timeout == 0)
+            return false;
+    }
+
     uint32_t tfd = mmio_read_32(&port->port->tfd);
     if (tfd & (1 << 0) || tfd & (1 << 1)) {
         return false;

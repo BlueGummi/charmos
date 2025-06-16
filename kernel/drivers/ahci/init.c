@@ -59,15 +59,6 @@ static void allocate_port(struct ahci_device *dev, struct ahci_port *port,
     dev->regs[port_num] = p;
 }
 
-bool wait_for_clear(uint32_t *reg, uint32_t bit, uint32_t timeout) {
-    while (mmio_read_32(reg) & bit) {
-        if (timeout-- == 0)
-            return false;
-        io_wait();
-    }
-    return true;
-}
-
 static struct ahci_disk *device_setup(struct ahci_device *dev,
                                       struct ahci_controller *ctrl,
                                       uint32_t *disk_count) {
@@ -79,9 +70,30 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
         if (!(pi & (1U << i)))
             continue;
 
+        struct ahci_port *port = &ctrl->ports[i];
+
+        mmio_write_32(&port->cmd, mmio_read_32(&port->cmd) & ~AHCI_CMD_ST);
+        uint64_t timeout = AHCI_CMD_TIMEOUT_MS;
+        while (mmio_read_32(&port->cmd) & AHCI_CMD_CR && --timeout) {
+            sleep_ms(1);
+            if (timeout == 0)
+                return false;
+        }
+
+        mmio_write_32(&port->cmd, mmio_read_32(&port->cmd) & ~AHCI_CMD_FRE);
+
+        timeout = AHCI_CMD_TIMEOUT_MS;
+        while (mmio_read_32(&port->cmd) & AHCI_CMD_FR && --timeout) {
+            sleep_ms(1);
+            if (timeout == 0)
+                return false;
+        }
+
         uint32_t ssts = mmio_read_32(&ctrl->ports[i].ssts);
-        if ((ssts & 0x0F) == AHCI_DET_PRESENT &&
-            ((ssts >> 8) & 0x0F) == AHCI_IPM_ACTIVE) {
+        uint32_t det = ssts & 0x0F;
+        uint32_t ipm = (ssts >> 8) & 0x0F;
+
+        if (det == AHCI_DET_PRESENT && ipm == AHCI_IPM_ACTIVE) {
             total_disks += 1;
         }
     }
