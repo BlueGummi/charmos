@@ -82,13 +82,15 @@ void k_main(void) {
 
     // Early device init
     uacpi_init();
-    lapic = vmm_map_phys(0xFEE00000UL, 4096);
+    uint64_t apic_base_msr = rdmsr(IA32_APIC_BASE_MSR);
+    uintptr_t lapic_phys = apic_base_msr & IA32_APIC_BASE_MASK;
+    lapic = vmm_map_phys(lapic_phys, 4096);
     hpet_init();
 
     // Filesystem init
     cmdline_parse(cmdline_request.response->cmdline);
     registry_setup();
-//    registry_print_devices();
+    //    registry_print_devices();
 
     k_printf("done\n");
 

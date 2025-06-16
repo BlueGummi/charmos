@@ -14,3 +14,5 @@
 #define TIMER_MODE_PERIODIC (1 << 17)
 extern uint64_t *lapic;
 void lapic_init();
+#define IA32_APIC_BASE_MSR 0x1B
+#define IA32_APIC_BASE_MASK 0xFFFFF000UL
