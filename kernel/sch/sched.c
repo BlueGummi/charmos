@@ -13,9 +13,7 @@ static uint64_t c_count = 1;
 struct spinlock l;
 
 void k_sch_main() {
-    uint64_t core_id = get_sch_core_id();
     while (1) {
-        k_printf("Core %d running...\n", core_id);
         asm volatile("hlt");
     }
 }
