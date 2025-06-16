@@ -1,5 +1,6 @@
 #include <console/printf.h>
 #include <fs/vfs.h>
+#include <mem/alloc.h>
 
 const char *fs_type_to_string(enum fs_type type) {
     switch (type) {
@@ -53,4 +54,28 @@ struct vfs_node *vfs_finddir(struct vfs_node *node, const char *fname) {
     }
 
     return found;
+}
+
+enum errno vfs_mount(struct vfs_node *mountpoint, struct vfs_node *target) {
+    if (!mountpoint || !target)
+        return ERR_INVAL;
+
+    if (!(mountpoint->mode & VFS_MODE_DIR))
+        return ERR_NOT_DIR;
+
+    struct vfs_mount *mnt = kmalloc(sizeof(struct vfs_mount));
+    mnt->root = target;
+    mnt->mount_point = mountpoint;
+    mnt->ops = target->ops;
+    return ERR_OK;
+}
+
+enum errno vfs_unmount(struct vfs_mount *mountpoint) {
+    if (!mountpoint)
+        return ERR_INVAL;
+    mountpoint->mount_point->mount = NULL;
+    // TODO: free
+    mountpoint->ops = NULL;
+    kfree(mountpoint);
+    return ERR_OK;
 }

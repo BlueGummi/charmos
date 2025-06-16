@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <fs/ext2.h>
 #include <mem/alloc.h>
+#include <mem/vmm.h>
 #include <stdint.h>
 #include <string.h>
 #include <time/time.h>

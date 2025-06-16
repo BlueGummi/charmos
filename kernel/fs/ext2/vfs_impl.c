@@ -13,7 +13,8 @@
 
 // TODO: open/close atomicity or whatever
 
-// TODO: check if files already exist, update times, check if file types are correct
+// TODO: check if files already exist, update times, check if file types are
+// correct
 
 enum errno ext2_vfs_stat(struct vfs_node *v, struct vfs_stat *out);
 enum errno ext2_vfs_rename(struct vfs_node *old_parent, const char *old_name,
@@ -73,6 +74,8 @@ static struct vfs_ops ext2_vfs_ops = {
     .finddir = ext2_vfs_finddir,
     .mkdir = ext2_vfs_mkdir,
     .rmdir = ext2_vfs_rmdir,
+    .mount = vfs_mount,
+    .unmount = vfs_unmount,
 };
 
 //

@@ -5,6 +5,7 @@
 #include <drivers/ata.h>
 #include <drivers/nvme.h>
 #include <fs/detect.h>
+#include <fs/tmpfs.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
 #include <pci/pci.h>
@@ -156,8 +157,13 @@ void registry_setup() {
                     k_panic("VFS failed to mount root '%s' - mount failure\n",
                             g_root_part);
                 g_root_node = m;
+                m->ops->mkdir(m, "tmp", VFS_MODE_DIR);
+                struct vfs_node *tmp = m->ops->finddir(m, "tmp");
+                struct vfs_node *mnt = tmpfs_mkroot("tmp");
+                m->ops->mount(tmp, mnt);
                 vfs_node_print(g_root_node);
-                found_root = true; // TODO: Migrate this out - what is this doing here
+                found_root =
+                    true; // TODO: Migrate this out - what is this doing here
             }
         }
     }

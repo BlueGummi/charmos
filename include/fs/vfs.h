@@ -14,24 +14,24 @@ extern struct vfs_mount *g_mount_list_head;
 
 #define VFS_NAME_MAX 256 // this because of ext2
 
-#define VFS_MODE_READ 0x0001
-#define VFS_MODE_WRITE 0x0002
-#define VFS_MODE_EXEC 0x0004
-#define VFS_MODE_DIR 0x4000
-#define VFS_MODE_FILE 0x8000
-#define VFS_MODE_SYMLINK 0xA000
-#define VFS_MODE_CHARDEV 0x2000
-#define VFS_MODE_BLOCKDEV 0x6000
-#define VFS_MODE_PIPE 0x1000
-#define VFS_MODE_SOCKET 0xC000
+#define VFS_MODE_READ 0x0001     // Read permissions (all)
+#define VFS_MODE_WRITE 0x0002    // Write permissions (all)
+#define VFS_MODE_EXEC 0x0004     // Exec permissions (all)
+#define VFS_MODE_DIR 0x4000      // Is directory
+#define VFS_MODE_FILE 0x8000     // Is file
+#define VFS_MODE_SYMLINK 0xA000  // Is symbolic link
+#define VFS_MODE_CHARDEV 0x2000  // Is character device
+#define VFS_MODE_BLOCKDEV 0x6000 // Is block device
+#define VFS_MODE_PIPE 0x1000     // Is pipe
+#define VFS_MODE_SOCKET 0xC000   // Is socket
 
-#define VFS_MODE_G_READ 0x1000
-#define VFS_MODE_G_WRITE 0x2000
-#define VFS_MODE_G_EXEC 0x4000
+#define VFS_MODE_G_READ 0x1000  // Read permissions (group)
+#define VFS_MODE_G_WRITE 0x2000 // Write permissions (group)
+#define VFS_MODE_G_EXEC 0x4000  // Exec permissions (group)
 
-#define VFS_MODE_O_READ 0x010000
-#define VFS_MODE_O_WRITE 0x020000
-#define VFS_MODE_O_EXEC 0x040000
+#define VFS_MODE_O_READ 0x010000  // Read permissions (owner)
+#define VFS_MODE_O_WRITE 0x020000 // Write permissions (owner)
+#define VFS_MODE_O_EXEC 0x040000  // Exec permissions (owner)
 
 // clang-format off
 enum vfs_node_flags : uint32_t {
@@ -112,9 +112,9 @@ struct vfs_ops {
     enum errno (*symlink)(struct vfs_node *parent, const char *target,
                           const char *link_name);
 
-    enum errno (*mount)(struct vfs_node *mountpoint, struct vfs_node *out);
+    enum errno (*mount)(struct vfs_node *mountpoint, struct vfs_node *target);
 
-    enum errno (*unmount)(struct vfs_node *mountpoint);
+    enum errno (*unmount)(struct vfs_mount *mountpoint);
 
     enum errno (*stat)(struct vfs_node *node,
                        struct vfs_stat *out); // get file metadata
@@ -164,11 +164,11 @@ struct vfs_ops {
 };
 
 struct vfs_mount {
+    struct vfs_node *mount_point;
     struct vfs_node *root;
-    struct generic_partition *partition;
-    void *fs;
-    char mount_point[256];
-    struct vfs_mount *next;
+    struct vfs_ops *ops;
+    char name[256];
+    void *fs_data;
 };
 
 struct vfs_node {
@@ -186,3 +186,5 @@ struct vfs_node {
     struct vfs_ops *ops;
 };
 void vfs_node_print(const struct vfs_node *node);
+enum errno vfs_mount(struct vfs_node *mountpoint, struct vfs_node *target);
+enum errno vfs_unmount(struct vfs_mount *mountpoint);

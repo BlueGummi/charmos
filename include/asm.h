@@ -242,45 +242,44 @@ static inline uint8_t mmio_read_8(void *address) {
 
 static inline uint64_t rdtsc(void) {
     uint32_t lo, hi;
-    __asm__ volatile("rdtsc" : "=a"(lo), "=d"(hi));
+    asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
     return ((uint64_t) hi << 32) | lo;
 }
 
 static inline void cpuid(uint32_t eax, uint32_t ecx, uint32_t *abcd) {
-    __asm__ volatile("cpuid"
-                     : "=a"(abcd[0]), "=b"(abcd[1]), "=c"(abcd[2]),
-                       "=d"(abcd[3])
-                     : "a"(eax), "c"(ecx));
+    asm volatile("cpuid"
+                 : "=a"(abcd[0]), "=b"(abcd[1]), "=c"(abcd[2]), "=d"(abcd[3])
+                 : "a"(eax), "c"(ecx));
 }
 
 static inline uint64_t read_cr4() {
     uint64_t cr4;
-    __asm__ volatile("mov %%cr4, %0" : "=r"(cr4));
+    asm volatile("mov %%cr4, %0" : "=r"(cr4));
     return cr4;
 }
 
 static inline void write_cr4(uint64_t cr4) {
-    __asm__ volatile("mov %0, %%cr4" : : "r"(cr4));
+    asm volatile("mov %0, %%cr4" : : "r"(cr4));
 }
 
 static inline uint32_t get_core_id(void) {
     uint32_t eax, ebx, ecx, edx;
 
     eax = 1;
-    __asm__ volatile("cpuid"
-                     : "=b"(ebx), "=a"(eax), "=c"(ecx), "=d"(edx)
-                     : "a"(eax));
+    asm volatile("cpuid"
+                 : "=b"(ebx), "=a"(eax), "=c"(ecx), "=d"(edx)
+                 : "a"(eax));
 
     return (ebx >> 24) & 0xFF;
 }
 
 static inline bool are_interrupts_enabled() {
     unsigned long flags;
-    __asm__ volatile("pushf\n\t"
-                     "pop %0\n\t"
-                     : "=r"(flags)
-                     :
-                     :);
+    asm volatile("pushf\n\t"
+                 "pop %0\n\t"
+                 : "=r"(flags)
+                 :
+                 :);
     return (flags & (1 << 9)) != 0;
 }
 

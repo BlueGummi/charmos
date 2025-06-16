@@ -31,3 +31,5 @@ struct tmpfs_node {
 struct tmpfs_fs {
     struct tmpfs_node *root;
 };
+
+struct vfs_node *tmpfs_mkroot(const char *mount_point);

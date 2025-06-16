@@ -7,7 +7,7 @@ struct vfs_node *tmpfs_create_vfs_node(struct tmpfs_node *tnode);
 
 extern struct vfs_ops tmpfs_ops;
 
-struct vfs_mount *tmpfs_mkroot(const char *mount_point) {
+struct vfs_node *tmpfs_mkroot(const char *mount_point) {
     struct tmpfs_fs *fs = kzalloc(sizeof(struct tmpfs_fs));
 
     struct tmpfs_node *root = kzalloc(sizeof(struct tmpfs_node));
@@ -21,17 +21,7 @@ struct vfs_mount *tmpfs_mkroot(const char *mount_point) {
     fs->root = root;
 
     struct vfs_node *vnode = tmpfs_create_vfs_node(root);
-
-    struct vfs_mount *mnt = kzalloc(sizeof(struct vfs_mount));
-    if (!mnt)
-        return false;
-
-    mnt->root = vnode;
-    mnt->fs = fs;
-    strncpy(mnt->mount_point, mount_point, sizeof(mnt->mount_point));
-    mnt->next = NULL;
-
-    return mnt;
+    return vnode;
 }
 
 static uint16_t tmpfs_to_vfs_mode(enum tmpfs_type mode) {
@@ -163,7 +153,7 @@ static enum errno tmpfs_symlink(struct vfs_node *parent, const char *target,
     return 0;
 }
 
-static enum errno tmpfs_unmount(struct vfs_node *mountpoint) {
+static enum errno tmpfs_unmount(struct vfs_mount *mountpoint) {
     (void) mountpoint;
     return ERR_NOT_IMPL;
 }
