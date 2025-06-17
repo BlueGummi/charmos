@@ -155,12 +155,10 @@ void send_hardcoded_ping(struct e1000_device *dev) {
     struct icmp_hdr *icmp = (void *) (packet + 14 + 20);
     uint8_t *payload = packet + 14 + 20 + 8;
 
-    uint8_t src_mac[6] = {0x52, 0x54, 0x00,
-                          0x12, 0x34, 0x56}; // 52:54:00:12:34:56
-    uint8_t dest_mac[6] = {0};
-
-    ip->src_ip = htonl(0xC0A85719);
-    ip->dest_ip = htonl(0xC0A85719);
+    uint8_t src_mac[6] = {0x52, 0x54, 0x00, 0x12, 0x34, 0x56};
+    uint8_t dest_mac[6] = {0x52, 0x54, 0x00, 0x8e, 0x61, 0xf4};
+    ip->dest_ip = htonl(0xC0A87A01); // 192.168.122.1
+    ip->src_ip = htonl(0xC0A87A64);  //  192.168.122.100
 
     memcpy(eth->dest, dest_mac, 6);
     memcpy(eth->src, src_mac, 6);
