@@ -1,6 +1,5 @@
 #include <console/printf.h>
 #include <fs/ext2.h>
-#include <fs/ext2_print.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
@@ -360,7 +359,7 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     f->inode_num = EXT2_ROOT_INODE;
     kfree(inode);
 
-    out_node->open = false;
+    out_node->open_handles += 1;
     out_node->name[0] = '/';
     out_node->flags = ext2_to_vfs_flags(f->node.flags);
     out_node->mode = ext2_to_vfs_mode(f->node.mode);

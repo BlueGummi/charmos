@@ -16,7 +16,6 @@
 #include <flanterm/flanterm.h>
 #include <fs/detect.h>
 #include <fs/ext2.h>
-#include <fs/ext2_print.h>
 #include <fs/fat.h>
 #include <int/idt.h>
 #include <limine.h>

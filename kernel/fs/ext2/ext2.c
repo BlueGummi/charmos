@@ -1,6 +1,5 @@
 #include <console/printf.h>
 #include <fs/ext2.h>
-#include <fs/ext2_print.h>
 #include <mem/alloc.h>
 #include <stdint.h>
 #include <string.h>

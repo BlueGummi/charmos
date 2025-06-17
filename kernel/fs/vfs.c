@@ -47,7 +47,7 @@ void vfs_node_print(const struct vfs_node *node) {
     k_printf("Name     : %s%s\n", node->name,
              *node->name == '/' ? " (root)" : "");
     k_printf("Type     : %s (%d)\n", detect_fstr(node->fs_type), node->fs_type);
-    k_printf("Open     : %s\n", node->open ? "Yes" : "No");
+    k_printf("Open     : %s\n", node->open_handles ? "Yes" : "No");
     k_printf("Flags    : 0x%08X\n", node->flags);
     k_printf("Mode     : 0%o\n", node->mode);
     k_printf("Size     : %llu bytes\n", (unsigned long long) node->size);

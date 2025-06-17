@@ -19,20 +19,20 @@ extern uint64_t PTRS_PER_BLOCK;
 #define EXT2_S_IFIFO 0x1000      // FIFO
 #define EXT2_S_IFMT 0xF000       // mask to extract file type from i_mode
 #define EXT2_S_PERMS 0x0FFF      // lower 12 bits: special + rwx bits
-#define EXT2_S_IRWXU 0x01C0      // owner permissions
-#define EXT2_S_IRWXG 0x0038      // group permissions
-#define EXT2_S_IRWXO 0x0007      // others permissions
+#define EXT2_S_IRWXU 0x01C0      // owner permissions - ALL
+#define EXT2_S_IRWXG 0x0038      // group permissions - ALL
+#define EXT2_S_IRWXO 0x0007      // others permissions - ALL
 #define EXT2_S_PERMS_ONLY 0x01FF // rwx bits only
 
-#define EXT2_S_IRUSR 0x0100
-#define EXT2_S_IWUSR 0x0080
-#define EXT2_S_IXUSR 0x0040
-#define EXT2_S_IRGRP 0x0020
-#define EXT2_S_IWGRP 0x0010
-#define EXT2_S_IXGRP 0x0008
-#define EXT2_S_IROTH 0x0004
-#define EXT2_S_IWOTH 0x0002
-#define EXT2_S_IXOTH 0x0001
+#define EXT2_S_IRUSR 0x0100 // Owner can read
+#define EXT2_S_IWUSR 0x0080 // Owner can write
+#define EXT2_S_IXUSR 0x0040 // Owner can execute
+#define EXT2_S_IRGRP 0x0020 // Group can read
+#define EXT2_S_IWGRP 0x0010 // Group can write
+#define EXT2_S_IXGRP 0x0008 // Group can execute
+#define EXT2_S_IROTH 0x0004 // Others can read
+#define EXT2_S_IWOTH 0x0002 // Others can write
+#define EXT2_S_IXOTH 0x0001 // Others can execute
 
 #define EXT2_FT_UNKNOWN 0  // Unknown file type
 #define EXT2_FT_REG_FILE 1 // Regular file

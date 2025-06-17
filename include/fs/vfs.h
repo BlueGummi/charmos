@@ -165,26 +165,26 @@ struct vfs_ops {
 };
 
 struct vfs_mount {
-    struct vfs_node *mount_point;
-    struct vfs_mount *mount_mount;
-    struct vfs_node *root;
-    struct vfs_ops *ops;
+    struct vfs_node *mount_point;  /* vfs_node of the mountpoint */
+    struct vfs_mount *mount_mount; /* mount representing mountpoint */
+    struct vfs_node *root;         /* root of the mounted filesystem */
+    struct vfs_ops *ops;           /* filesystem operation interface */
     char name[256];
-    void *fs_data;
+    void *fs_data; /* optional filesystem driver data */
 };
 
 struct vfs_node {
-    enum fs_type fs_type;
-    bool open;
+    enum fs_type fs_type;  /* filesystem type */
+    uint64_t open_handles; /* how many things have this open */
     char name[256];
-    uint64_t unique_id;
+    uint64_t unique_id; /* exclusively unique ID - one per node */
     uint32_t flags;
     uint16_t mode;
     uint64_t size;
 
-    void *fs_data;
-    void *fs_node_data;
-    struct vfs_mount *child_mount;
+    void *fs_data;                 /* optional filesystem driver data */
+    void *fs_node_data;            /* optional filesystem driver data */
+    struct vfs_mount *child_mount; /* NULL if no child is mounted */
 
     struct vfs_ops *ops;
 };
