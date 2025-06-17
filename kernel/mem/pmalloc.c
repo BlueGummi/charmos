@@ -6,221 +6,208 @@
 #include <stdint.h>
 #include <string.h>
 
-#define PAGE_BLOCK_SIZE(order) (PAGE_SIZE << (order))
-#define PAGE_SIZE 4096U
-#define MAX_ORDER 11U
-#define MIN_ORDER 0U
-#define PAGE_ORDER_BASE 0xFFFFB00000000000ULL
-#define MAX_PAGES (0x100000000U / PAGE_SIZE)
-#define BOOT_TRACK_SIZE (64 * 1024 * 1024) // 64MB
-#define BOOT_TRACK_PAGES (BOOT_TRACK_SIZE / PAGE_SIZE)
+#define PAGE_SIZE 4096
 
-struct free_block {
-    struct free_block *next;
-};
+#define BOOT_BITMAP_SIZE ((1024 * 1024 * 128) / PAGE_SIZE)
 
-static struct free_block *free_lists[MAX_ORDER + 1];
-static uint8_t *page_order = NULL;
-static uint8_t boot_page_order[BOOT_TRACK_PAGES];
-static struct limine_memmap_response *global_memmap = NULL;
-static uint64_t total_pages;
+uint64_t bitmap_size = BOOT_BITMAP_SIZE;
+
+static uint8_t boot_bitmap[BOOT_BITMAP_SIZE];
+static uint8_t *bitmap;
+
+static void set_bit(uint64_t index) {
+    bitmap[index / 8] |= (1 << (index % 8));
+}
+
+static void clear_bit(uint64_t index) {
+    bitmap[index / 8] &= ~(1 << (index % 8));
+}
+
+static bool test_bit(uint64_t index) {
+    return (bitmap[index / 8] & (1 << (index % 8))) != 0;
+}
+
 static uint64_t offset = 0;
-
-static void push_block(uint64_t addr, uint8_t order) {
-    struct free_block *block =
-        (struct free_block *) (uintptr_t) (addr + offset);
-    block->next = free_lists[order];
-    free_lists[order] = block;
-
-    uint64_t index = addr / PAGE_SIZE;
-    if (!page_order) {
-        boot_page_order[index] = order;
-    } else {
-        page_order[index] = order;
-    }
-}
-
-void *pop_block(uint8_t order) {
-    struct free_block *block = free_lists[order];
-    if (!block)
-        return NULL;
-    free_lists[order] = block->next;
-
-    uint64_t index = ((uintptr_t) block - offset) / PAGE_SIZE;
-    page_order[index] = 0xFF;
-    return block;
-}
+static struct limine_memmap_response *memmap;
+static uint64_t total_pages = 0;
 
 void pmm_init(uint64_t o, struct limine_memmap_request m) {
-    offset = o;
-    global_memmap = m.response;
 
-    struct limine_memmap_response *memdata = m.response;
-    if (!memdata || !memdata->entries) {
-        k_panic("Invalid memory map\n");
+    offset = o;
+    bitmap = boot_bitmap;
+    memset(bitmap, 0xFF, BOOT_BITMAP_SIZE);
+
+    memmap = m.response;
+
+    if (memmap == NULL || memmap->entries == NULL) {
+        k_panic("Failed to retrieve Limine memory map\n");
         return;
     }
-
-    memset(free_lists, 0, sizeof(free_lists));
-    memset(boot_page_order, 0xFF, sizeof(boot_page_order));
 
     uint64_t total_phys = 0;
-    for (uint64_t i = 0; i < memdata->entry_count; i++) {
-        struct limine_memmap_entry *entry = memdata->entries[i];
+    for (uint64_t i = 0; i < memmap->entry_count; i++) {
+        struct limine_memmap_entry *entry = memmap->entries[i];
 
-        if (entry->type != LIMINE_MEMMAP_USABLE)
-            continue;
+        if (entry->type == LIMINE_MEMMAP_USABLE) {
+            total_phys += entry->length;
+            uint64_t start = (entry->base + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+            uint64_t end = (entry->base + entry->length) & ~(PAGE_SIZE - 1);
 
-        total_phys += entry->length;
-
-        uint64_t base = (entry->base + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-        uint64_t end = (entry->base + entry->length) & ~(PAGE_SIZE - 1);
-
-        while (base + PAGE_SIZE <= end) {
-            uint64_t size = end - base;
-            uint8_t order = MAX_ORDER;
-
-            bool sub_order = (PAGE_BLOCK_SIZE(order) > size ||
-                              (base & (PAGE_BLOCK_SIZE(order) - 1)));
-            while (order > 0 && sub_order) {
-                order--;
+            for (uint64_t addr = start; addr < end; addr += PAGE_SIZE) {
+                uint64_t index = addr / PAGE_SIZE;
+                if (index < BOOT_BITMAP_SIZE * 8) {
+                    clear_bit(index);
+                }
             }
-
-            if ((base / PAGE_SIZE) < BOOT_TRACK_PAGES)
-                push_block(base, order); // Only add to boot order region
-
-            base += PAGE_BLOCK_SIZE(order);
         }
     }
-    if (total_phys < 0x100000 * 64)
-        k_panic("I refuse to continue with less than 64MB of RAM!\n");
-
     total_pages = total_phys / PAGE_SIZE;
-    page_order = boot_page_order;
 }
 
-void pmm_dyn_init(void) {
-    uint8_t *new_page_order = (uint8_t *) kmalloc(total_pages);
-    if (!new_page_order) {
-        k_panic("Physical memory remap allocation failed\n");
-        return;
-    }
-    memset(new_page_order, 0xFF, total_pages);
+void pmm_dyn_init() {
+    uint8_t *new_bitmap = kmalloc(total_pages);
+    memcpy(new_bitmap, bitmap, BOOT_BITMAP_SIZE);
+    bitmap_size = total_pages;
+    bitmap = new_bitmap;
+    for (uint64_t i = 0; i < memmap->entry_count; i++) {
+        struct limine_memmap_entry *entry = memmap->entries[i];
 
-    for (uint64_t i = 0; i < global_memmap->entry_count; i++) {
-        struct limine_memmap_entry *entry = global_memmap->entries[i];
-        if (entry->type != LIMINE_MEMMAP_USABLE)
-            continue;
+        if (entry->type == LIMINE_MEMMAP_USABLE) {
+            uint64_t start = (entry->base + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+            uint64_t end = (entry->base + entry->length) & ~(PAGE_SIZE - 1);
 
-        uint64_t base = (entry->base + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-        uint64_t end = (entry->base + entry->length) & ~(PAGE_SIZE - 1);
-
-        while (base + PAGE_SIZE <= end) {
-            uint64_t size = end - base;
-            uint8_t order = MAX_ORDER;
-
-            bool sub_order = (PAGE_BLOCK_SIZE(order) > size ||
-                              (base & (PAGE_BLOCK_SIZE(order) - 1)));
-
-            while (order > 0 && sub_order) {
-                order--;
+            for (uint64_t addr = start; addr < end; addr += PAGE_SIZE) {
+                uint64_t index = addr / PAGE_SIZE;
+                if (index > BOOT_BITMAP_SIZE * 8) {
+                    clear_bit(index);
+                }
             }
-
-            uint64_t index = base / PAGE_SIZE;
-            if (index >= BOOT_TRACK_PAGES) { // Skip ones already tracked
-                struct free_block *block =
-                    (struct free_block *) (uintptr_t) (base + offset);
-                block->next = free_lists[order];
-                free_lists[order] = block;
-
-                new_page_order[index] = order;
-            }
-
-            base += PAGE_BLOCK_SIZE(order);
         }
     }
-
-    page_order = new_page_order;
 }
 
-void *pmm_alloc_order(uint8_t order, bool add_offset) {
-    if (order > MAX_ORDER)
-        return NULL;
+void *pmm_alloc_page(bool add_offset) {
 
-    for (uint8_t current = order; current <= MAX_ORDER; current++) {
-        void *block = pop_block(current);
-        if (!block)
-            continue;
-
-        uint64_t block_addr = (uint64_t) (uintptr_t) block - offset;
-
-        while (current > order) {
-            current--;
-            block_addr += PAGE_BLOCK_SIZE(current);
-            push_block(block_addr, current);
-            block_addr -= PAGE_BLOCK_SIZE(current);
+    for (uint64_t i = 0; i < bitmap_size * 8; i++) {
+        if (!test_bit(i)) {
+            set_bit(i);
+            void *page = (void *) ((add_offset ? offset : 0) + (i * PAGE_SIZE));
+            return page;
         }
-
-        page_order[block_addr / PAGE_SIZE] = order;
-        return (void *) (block_addr + ((add_offset) ? offset : 0));
     }
 
     return NULL;
 }
 
+void print_memory_status() {
+    uint64_t total_pages = bitmap_size * 8;
+    uint64_t free_pages = 0;
+    uint64_t allocated_pages = 0;
+
+    for (uint64_t i = 0; i < total_pages; i++) {
+        if (!test_bit(i)) {
+            free_pages++;
+        } else {
+            allocated_pages++;
+        }
+    }
+
+    k_printf("Memory Status:\n");
+    k_printf("  Total Pages: %zu\n", total_pages);
+    k_printf("  Free Pages: %zu\n", free_pages);
+    k_printf("  Allocated Pages: %zu\n", allocated_pages);
+    k_printf("  Memory Usage: %d%%\n", (allocated_pages * 100) / total_pages);
+
+    k_printf("\nMemory Segments (contiguous):\n");
+
+    uint64_t segment_start = 0;
+    int segment_state = test_bit(0);
+
+    for (uint64_t i = 1; i <= total_pages; i++) {
+        int current_state = (i < total_pages) ? test_bit(i) : -1;
+        if (current_state != segment_state) {
+
+            uintptr_t start_addr = segment_start * PAGE_SIZE;
+            uintptr_t end_addr = (i - 1) * PAGE_SIZE + PAGE_SIZE - 1;
+
+            k_printf("  %c: 0x%016lx - 0x%016lx (%zu pages)\n",
+                     segment_state ? 'A' : 'F', (unsigned long) start_addr,
+                     (unsigned long) end_addr, i - segment_start);
+
+            segment_start = i;
+            segment_state = current_state;
+        }
+    }
+
+    k_printf("\n");
+}
+
 void *pmm_alloc_pages(uint64_t count, bool add_offset) {
-    uint8_t order = MIN_ORDER;
-    while ((1ULL << order) < count)
-        order++;
-    return pmm_alloc_order(order, add_offset);
-}
 
-void *pmm_alloc_page(bool add_offset) {
-    return pmm_alloc_pages(1, add_offset);
-}
+    if (count == 0) {
+        return NULL;
+    }
 
-void pmm_free_pages(void *addr, uint64_t count, bool has_offset) {
-    if (!addr || count == 0)
-        return;
+    if (count == 1) {
+        return pmm_alloc_page(add_offset);
+    }
 
-    uintptr_t phys = (uintptr_t) addr - (has_offset ? offset : 0);
-    uint64_t page_index = phys / PAGE_SIZE;
-    uint8_t order = 0;
+    uint64_t consecutive = 0;
+    uint64_t start_index = 0;
+    bool found = false;
 
-    while ((1ULL << order) < count)
-        order++;
+    for (uint64_t i = 0; i < bitmap_size * 8; i++) {
 
-    while (order <= MAX_ORDER) {
-        uint64_t buddy_page = page_index ^ (1ULL << order);
-        uintptr_t buddy_addr = buddy_page * PAGE_SIZE;
+        if (!test_bit(i)) {
+            if (consecutive == 0) {
+                start_index = i;
+            }
+            consecutive++;
 
-        if (page_order[buddy_page] != order)
-            break;
-
-        struct free_block **prev = &free_lists[order];
-        struct free_block *curr = *prev;
-
-        bool found = false;
-        int search_limit = 1000;
-        int scanned = 0;
-        while (curr && scanned < search_limit) {
-            if ((uintptr_t) curr - offset == buddy_addr) {
-                *prev = curr->next;
+            if (consecutive == count) {
                 found = true;
                 break;
             }
-            prev = &curr->next;
-            curr = curr->next;
-            scanned++;
+        } else {
+            consecutive = 0;
         }
-
-        if (!found)
-            break;
-
-        // Merge
-        page_index &= ~(1ULL << order);
-        order++;
     }
 
-    push_block(page_index * PAGE_SIZE, order);
+    if (!found) {
+        k_printf("Couldn't allocate %zu contiguous pages\n", count);
+        return NULL;
+    }
+
+    for (uint64_t i = 0; i < count; i++) {
+        set_bit(start_index + i);
+    }
+
+    return (void *) ((add_offset ? offset : 0) + (start_index * PAGE_SIZE));
+}
+
+void pmm_free_pages(void *addr, uint64_t count, bool has_offset) {
+
+    if (addr == NULL || count == 0) {
+        return;
+    }
+
+    uint64_t start_index =
+        ((uint64_t) addr - (has_offset ? offset : 0)) / PAGE_SIZE;
+
+    if (start_index >= bitmap_size * 8 ||
+        start_index + count > bitmap_size * 8) {
+        k_printf("Invalid address range to free: 0x%zx with count %zu\n",
+                 (uint64_t) addr, count);
+        return;
+    }
+
+    for (uint64_t i = 0; i < count; i++) {
+        uint64_t index = start_index + i;
+        if (test_bit(index)) {
+            clear_bit(index);
+        } else {
+            k_printf("Page at 0x%zx was already free\n",
+                     offset + (index * PAGE_SIZE));
+        }
+    }
 }
