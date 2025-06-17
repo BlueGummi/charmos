@@ -8,9 +8,9 @@
 
 #define PAGE_SIZE 4096
 
-#define BOOT_BITMAP_SIZE ((1024 * 1024 * 128) / PAGE_SIZE)
+#define BOOT_BITMAP_SIZE ((1024 * 1024 * 128) / PAGE_SIZE / 8)
 
-uint64_t bitmap_size = BOOT_BITMAP_SIZE;
+static uint64_t bitmap_size = BOOT_BITMAP_SIZE;
 
 static uint8_t boot_bitmap[BOOT_BITMAP_SIZE];
 static uint8_t *bitmap;
@@ -65,9 +65,9 @@ void pmm_init(uint64_t o, struct limine_memmap_request m) {
 }
 
 void pmm_dyn_init() {
-    uint8_t *new_bitmap = kmalloc(total_pages);
+    uint8_t *new_bitmap = kmalloc(total_pages / 8);
     memcpy(new_bitmap, bitmap, BOOT_BITMAP_SIZE);
-    bitmap_size = total_pages;
+    bitmap_size = total_pages / 8;
     bitmap = new_bitmap;
     for (uint64_t i = 0; i < memmap->entry_count; i++) {
         struct limine_memmap_entry *entry = memmap->entries[i];
@@ -78,9 +78,8 @@ void pmm_dyn_init() {
 
             for (uint64_t addr = start; addr < end; addr += PAGE_SIZE) {
                 uint64_t index = addr / PAGE_SIZE;
-                if (index > BOOT_BITMAP_SIZE * 8) {
+                if (index >= BOOT_BITMAP_SIZE * 8 && index < total_pages)
                     clear_bit(index);
-                }
             }
         }
     }
