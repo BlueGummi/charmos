@@ -40,11 +40,14 @@ static void push_block(uint64_t addr, uint8_t order) {
     }
 }
 
-static void *pop_block(uint8_t order) {
+void *pop_block(uint8_t order) {
     struct free_block *block = free_lists[order];
     if (!block)
         return NULL;
     free_lists[order] = block->next;
+
+    uint64_t index = ((uintptr_t) block - offset) / PAGE_SIZE;
+    page_order[index] = 0xFF;
     return block;
 }
 
@@ -197,16 +200,21 @@ void pmm_free_pages(void *addr, uint64_t count, bool has_offset) {
         struct free_block **prev = &free_lists[order];
         struct free_block *curr = *prev;
 
-        while (curr) {
+        bool found = false;
+        int search_limit = 1000;
+        int scanned = 0;
+        while (curr && scanned < search_limit) {
             if ((uintptr_t) curr - offset == buddy_addr) {
                 *prev = curr->next;
+                found = true;
                 break;
             }
             prev = &curr->next;
             curr = curr->next;
+            scanned++;
         }
 
-        if (!curr)
+        if (!found)
             break;
 
         // Merge

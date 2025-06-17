@@ -70,6 +70,28 @@ void usb_init(uint8_t bus, uint8_t slot, uint8_t func) {
 
     while (mmio_read_32(&op->usbsts) & 1)
         ;
+    uintptr_t runtime_regs = (uintptr_t) mmio + cap->rtsoff;
+    struct xhci_intr_regs *intr = (void *) (runtime_regs + 0x20 * 0);
+
+    size = EVENT_RING_SIZE * sizeof(struct xhci_trb);
+
+    uint64_t event_ring_phys =
+        (uint64_t) pmm_alloc_pages(size / PAGE_SIZE, false);
+    struct xhci_trb *event_ring = vmm_map_phys(event_ring_phys, size);
+
+    memset(event_ring, 0, EVENT_RING_SIZE * sizeof(struct xhci_trb));
+
+    size = sizeof(struct erst_entry);
+    uint64_t erst_phys = (uint64_t) pmm_alloc_pages(size / PAGE_SIZE, false);
+
+    struct erst_entry *erst = vmm_map_phys(erst_phys, size);
+
+    erst->ring_segment_base = event_ring_phys;
+    erst->ring_segment_size = EVENT_RING_SIZE;
+    erst->reserved = 0;
+    mmio_write_64(&intr->erdp, event_ring_phys);
+    mmio_write_64(&intr->erstba, erst_phys);
+    mmio_write_32(&intr->erstsz, 1);
 
     k_printf("XHCI controller initialized.\n");
 }

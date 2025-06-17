@@ -110,7 +110,8 @@ void registry_setup() {
                 k_printf("Found Intel e1000 at %02x:%02x.%x (device_id=%04x)",
                          dev.bus, dev.device, dev.function, dev.device_id);
 
-                struct e1000_device *device = kmalloc(sizeof(struct e1000_device));
+                struct e1000_device *device =
+                    kmalloc(sizeof(struct e1000_device));
                 e1000_init(&dev, device);
                 break;
             }
@@ -170,6 +171,7 @@ void registry_setup() {
         detect_fs(disk);
         for (uint32_t j = 0; j < disk->partition_count; j++) {
             struct generic_partition *p = &disk->partitions[j];
+
             if (strcmp(p->name, g_root_part) == 0) {
                 struct vfs_node *root = p->mount(p);
                 if (!root)
@@ -203,6 +205,7 @@ void registry_print_devices() {
         disk->print(disk);
         for (uint32_t j = 0; j < disk->partition_count; j++) {
             struct generic_partition *p = &disk->partitions[j];
+
             if (strcmp(p->name, g_root_part) != 0)
                 p->mount(p); // Do not remount root
             p->print_fs(p);

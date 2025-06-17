@@ -58,6 +58,8 @@ set(QEMU_COMMON_FLAGS
 
     -device qemu-xhci,id=xhci
     -device usb-kbd,bus=xhci.0,id=usbkbd
+
+    -M q35
     -device usb-mouse,bus=xhci.0,id=usbmouse
 
      -drive id=nvme0,file=disk.img,format=raw,if=none

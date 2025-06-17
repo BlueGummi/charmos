@@ -70,6 +70,19 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
         if (!(pi & (1U << i)))
             continue;
 
+        uint32_t ssts = mmio_read_32(&ctrl->ports[i].ssts);
+        uint32_t det = ssts & 0x0F;
+        uint32_t ipm = (ssts >> 8) & 0x0F;
+
+        if (!(det == AHCI_DET_PRESENT && ipm == AHCI_IPM_ACTIVE)) {
+            continue;
+        }
+
+        uint32_t sig = mmio_read_32(&ctrl->ports[i].sig);
+
+        if (sig == (uint32_t) -1)
+            continue; // stupid q35 vm or something making this weird
+
         struct ahci_port *port = &ctrl->ports[i];
 
         mmio_write_32(&port->cmd, mmio_read_32(&port->cmd) & ~AHCI_CMD_ST);
@@ -89,13 +102,7 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
                 return false;
         }
 
-        uint32_t ssts = mmio_read_32(&ctrl->ports[i].ssts);
-        uint32_t det = ssts & 0x0F;
-        uint32_t ipm = (ssts >> 8) & 0x0F;
-
-        if (det == AHCI_DET_PRESENT && ipm == AHCI_IPM_ACTIVE) {
-            total_disks += 1;
-        }
+        total_disks += 1;
     }
 
     if (!total_disks)

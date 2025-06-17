@@ -53,7 +53,7 @@ static bool detect_mbr_partitions(struct generic_disk *disk, uint8_t *sector) {
         return false;
 
     disk->partition_count = count;
-    disk->partitions = kmalloc(sizeof(struct generic_partition) * count);
+    disk->partitions = kzalloc(sizeof(struct generic_partition) * count);
 
     int idx = 0;
     for (int i = 0; i < 4; i++) {
@@ -107,7 +107,7 @@ static bool detect_gpt_partitions(struct generic_disk *disk, uint8_t *sector) {
         return false;
 
     disk->partition_count = valid_count;
-    disk->partitions = kmalloc(sizeof(struct generic_partition) * valid_count);
+    disk->partitions = kzalloc(sizeof(struct generic_partition) * valid_count);
 
     int idx = 0;
     for (uint32_t i = 0; i < count; i++) {

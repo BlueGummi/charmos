@@ -41,3 +41,20 @@ struct xhci_ring {
     uint32_t enqueue_index;
     uint8_t cycle;
 };
+
+struct erst_entry {
+    uint64_t ring_segment_base;
+    uint32_t ring_segment_size;
+    uint32_t reserved;
+} __attribute__((packed));
+
+struct xhci_intr_regs {
+    uint32_t iman;   // Interrupt Management
+    uint32_t imod;   // Interrupt Moderation
+    uint32_t erstsz; // Event Ring Segment Table Size
+    uint32_t reserved;
+    uint64_t erstba; // Event Ring Segment Table Base Address
+    uint64_t erdp;   // Event Ring Dequeue Pointer
+} __attribute__((packed));
+
+#define EVENT_RING_SIZE 256
