@@ -3,6 +3,7 @@
 #include <devices/registry.h>
 #include <drivers/ahci.h>
 #include <drivers/ata.h>
+#include <drivers/e1000.h>
 #include <drivers/nvme.h>
 #include <fs/detect.h>
 #include <fs/tmpfs.h>
@@ -97,6 +98,24 @@ void registry_setup() {
 
     for (uint64_t i = 0; i < count; i++) {
         struct pci_device dev = devices[i];
+        if (dev.class_code == 0x02 && dev.subclass == 0x00 &&
+            dev.vendor_id == 0x8086) {
+            switch (dev.device_id) {
+            case 0x1000: // 82542
+            case 0x100E: // 82540EM (QEMU default)
+            case 0x1010: // 82546EB
+            case 0x1026: // 82545EM
+            case 0x10D3: // 82574L
+            case 0x10F5: // 82567LM-3
+                k_printf("Found Intel e1000 at %02x:%02x.%x (device_id=%04x)",
+                         dev.bus, dev.device, dev.function, dev.device_id);
+
+                struct e1000_device *device = kmalloc(sizeof(struct e1000_device));
+                e1000_init(&dev, device);
+                break;
+            }
+        }
+
         if (dev.class_code == PCI_CLASS_MASS_STORAGE &&
             dev.subclass == PCI_SUBCLASS_NVM &&
             dev.prog_if == PCI_PROGIF_NVME) {

@@ -33,9 +33,9 @@ static void push_block(uint64_t addr, uint8_t order) {
     free_lists[order] = block;
 
     uint64_t index = addr / PAGE_SIZE;
-    if (index < BOOT_TRACK_PAGES) {
+    if (!page_order) {
         boot_page_order[index] = order;
-    } else if (page_order) {
+    } else {
         page_order[index] = order;
     }
 }
