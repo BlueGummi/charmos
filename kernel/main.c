@@ -94,7 +94,6 @@ void k_main(void) {
 
     k_printf("done\n");
 
-    print_memory_status();
     k_printf("Wow! That took %llu clock cycles!\n", rdtsc() - start);
 
     // Scheduler
