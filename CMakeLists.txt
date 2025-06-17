@@ -65,8 +65,8 @@ set(QEMU_COMMON_FLAGS
 
      -drive id=fatdisk,file=fat32.img,format=raw,if=none
      -device nvme,serial=yay,drive=fatdisk
-     -netdev bridge,id=n1,br=virbr0
-     -device e1000,netdev=n1
+     #-netdev bridge,id=n1,br=virbr0
+     #-device e1000,netdev=n1
      #-drive id=fatdisk,file=fat12.img,format=raw,if=none
      #-device ide-hd,drive=fatdisk,bus=ide.0,unit=1
      #-drive id=fatdisk,file=fat32.img,format=raw,if=none
@@ -74,7 +74,7 @@ set(QEMU_COMMON_FLAGS
      #-device ide-hd,drive=fatdisk,bus=ahci0.0
 
 
-    -d trace:*e1000*
+    -d trace:*xhci*
     -trace file=trace.log
 )
 
