@@ -7,6 +7,8 @@
 #include <sleep.h>
 #include <string.h>
 
+#define MAX_PRDT_ENTRY_SIZE (4 * 1024 * 1024) // 4MB
+
 uint32_t find_free_cmd_slot(struct ahci_port *port) {
     uint32_t slots_in_use = mmio_read_32(&port->sact) | mmio_read_32(&port->ci);
 
@@ -24,28 +26,52 @@ void *ahci_prepare_command(struct ahci_full_port *port, uint32_t slot,
     struct ahci_cmd_header *hdr = port->cmd_hdrs[slot];
     struct ahci_cmd_table *cmd_tbl = port->cmd_tables[slot];
 
-    uint64_t buffer_phys = (uint64_t) pmm_alloc_page(false);
-    void *buffer = vmm_map_phys(buffer_phys, size);
-    if (out_phys)
-        *out_phys = buffer_phys;
-
-    if (!hdr || !cmd_tbl) {
+    if (!hdr || !cmd_tbl || size == 0)
         return NULL;
-    }
+
+    uint64_t page_count = (size + PAGE_SIZE - 1) / PAGE_SIZE;
+    uint64_t prdt_count =
+        (size + MAX_PRDT_ENTRY_SIZE - 1) / MAX_PRDT_ENTRY_SIZE;
+    if (prdt_count > 65535)
+        return NULL;
+
+    uint64_t phys_base = (uint64_t) pmm_alloc_pages(page_count, false);
+    if (!phys_base)
+        return NULL;
+
+    void *virt_base = vmm_map_phys(phys_base, page_count * PAGE_SIZE);
+    if (!virt_base)
+        return NULL;
+
+    if (out_phys)
+        *out_phys = phys_base;
 
     hdr->cfl = sizeof(struct ahci_fis_reg_h2d) / sizeof(uint32_t);
     hdr->w = write ? 1 : 0;
     hdr->p = 0;
     hdr->a = 0;
     hdr->c = 1;
+    hdr->prdtl = prdt_count;
     hdr->prdbc = 0;
 
-    cmd_tbl->prdt_entry[0].dba = (uint32_t) (buffer_phys & 0xFFFFFFFF);
-    cmd_tbl->prdt_entry[0].dbau = (uint32_t) (buffer_phys >> 32);
-    cmd_tbl->prdt_entry[0].dbc = 511;
-    cmd_tbl->prdt_entry[0].i = 1;
+    uint64_t remaining = size;
+    uint64_t offset = 0;
+    for (uint32_t i = 0; i < prdt_count; i++) {
+        uint64_t chunk =
+            (remaining > MAX_PRDT_ENTRY_SIZE) ? MAX_PRDT_ENTRY_SIZE : remaining;
 
-    return buffer;
+        uint64_t phys_addr = phys_base + offset;
+
+        cmd_tbl->prdt_entry[i].dba = (uint32_t) (phys_addr & 0xFFFFFFFF);
+        cmd_tbl->prdt_entry[i].dbau = (uint32_t) (phys_addr >> 32);
+        cmd_tbl->prdt_entry[i].dbc = (uint32_t) (chunk - 1); // size - 1
+        cmd_tbl->prdt_entry[i].i = (i == prdt_count - 1) ? 1 : 0;
+
+        offset += chunk;
+        remaining -= chunk;
+    }
+
+    return virt_base;
 }
 
 void ahci_setup_fis(struct ahci_cmd_table *cmd_tbl, uint8_t command,
