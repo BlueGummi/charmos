@@ -296,13 +296,40 @@ bool fat_write_dirent(struct fat_fs *fs, uint32_t dir_cluster,
 
     uint32_t current_cluster = dir_cluster;
 
-    if (!(fs->type != FAT_32 && dir_cluster == FAT_DIR_CLUSTER_ROOT)) {
-        for (uint32_t i = 0; i < cluster_offset; i++) {
-            current_cluster = fat_read_fat_entry(fs, current_cluster);
-            if (fat_is_eoc(fs, current_cluster)) {
-                return false;
-            }
+    if (dir_cluster == FAT_DIR_CLUSTER_ROOT) {
+        uint32_t bytes_per_sector = fs->bpb->bytes_per_sector;
+        uint32_t root_dir_size =
+            fs->bpb->root_entry_count * sizeof(struct fat_dirent);
+
+        uint32_t root_dir_sectors =
+            (root_dir_size + bytes_per_sector - 1) / bytes_per_sector;
+        uint32_t dirent_size = sizeof(struct fat_dirent);
+
+        uint32_t entry_offset_bytes = entry_index * dirent_size;
+        uint32_t sector_offset = entry_offset_bytes / bytes_per_sector;
+        uint32_t offset_in_sector = entry_offset_bytes % bytes_per_sector;
+
+        if (sector_offset >= root_dir_sectors) {
+            return false;
         }
+
+        uint32_t lba =
+            fat_cluster_to_lba(fs, FAT_DIR_CLUSTER_ROOT) + sector_offset;
+
+        uint8_t *sector_buf = kmalloc(bytes_per_sector);
+        if (!sector_buf)
+            return false;
+
+        if (!fs->disk->read_sector(fs->disk, lba, sector_buf, 1)) {
+            kfree(sector_buf);
+            return false;
+        }
+
+        memcpy(sector_buf + offset_in_sector, dirent_to_write, dirent_size);
+
+        bool success = fs->disk->write_sector(fs->disk, lba, sector_buf, 1);
+        kfree(sector_buf);
+        return success;
     }
 
     uint8_t *cluster_buf = kmalloc(fs->cluster_size);

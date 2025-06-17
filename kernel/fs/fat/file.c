@@ -62,8 +62,16 @@ bool fat_write_file(struct fat_fs *fs, struct fat_dirent *ent, uint32_t offset,
 
     uint32_t cluster_size = fs->cluster_size;
     uint32_t cluster = fat_get_dir_cluster(ent);
-    if (cluster == 0)
-        return false;
+    if (cluster == 0) {
+        cluster = fat_alloc_cluster(fs);
+        if (cluster == 0)
+            return false;
+
+        ent->high_cluster = cluster >> 16;
+        ent->low_cluster = cluster & 0xFFFF;
+
+        fat_write_fat_entry(fs, cluster, fat_eoc(fs));
+    }
 
     uint32_t end_offset = offset + size;
     uint32_t needed_clusters = (end_offset + cluster_size - 1) / cluster_size;

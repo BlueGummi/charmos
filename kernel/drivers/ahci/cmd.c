@@ -32,6 +32,7 @@ void *ahci_prepare_command(struct ahci_full_port *port, uint32_t slot,
     uint64_t page_count = (size + PAGE_SIZE - 1) / PAGE_SIZE;
     uint64_t prdt_count =
         (size + MAX_PRDT_ENTRY_SIZE - 1) / MAX_PRDT_ENTRY_SIZE;
+
     if (prdt_count > 65535)
         return NULL;
 
@@ -40,8 +41,6 @@ void *ahci_prepare_command(struct ahci_full_port *port, uint32_t slot,
         return NULL;
 
     void *virt_base = vmm_map_phys(phys_base, page_count * PAGE_SIZE);
-    if (!virt_base)
-        return NULL;
 
     if (out_phys)
         *out_phys = phys_base;

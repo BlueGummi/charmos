@@ -18,9 +18,9 @@ void fat_write_fsinfo(struct fat_fs *fs) { // making fsck happy
 
     *(uint32_t *) (buf + 0x1e8) = fs->free_clusters;
     *(uint32_t *) (buf + 0x1ec) = fs->last_alloc_cluster;
-    kfree(buf);
 
     fs->disk->write_sector(fs->disk, fs->fsinfo_sector, buf, 1);
+    kfree(buf);
 }
 
 uint32_t fat_first_data_sector(const struct fat_fs *fs) {
@@ -232,6 +232,12 @@ void fat_g_print(struct generic_partition *d) {
                          FAT_ARCHIVE, NULL);
 
     success = fat_delete(fs, fs->root_cluster, "Whimsy");
+
+    success = fat_create(fs, fs->root_cluster, "Booh", &new_file_ent,
+                         FAT_ARCHIVE, NULL);
+
+    success = fat_create(fs, fs->root_cluster, "Cooh", &new_file_ent,
+                         FAT_ARCHIVE, NULL);
 
     success = fat_create(fs, fs->root_cluster, "Dooh", &new_file_ent,
                          FAT_ARCHIVE, NULL);

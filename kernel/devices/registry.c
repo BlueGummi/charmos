@@ -184,9 +184,8 @@ void registry_print_devices() {
         disk->print(disk);
         for (uint32_t j = 0; j < disk->partition_count; j++) {
             struct generic_partition *p = &disk->partitions[j];
-            if (strcmp(p->name, g_root_part) == 0)
-                continue;
-            p->mount(p);
+            if (strcmp(p->name, g_root_part) != 0)
+                p->mount(p); // Do not remount root
             p->print_fs(p);
         }
     }
