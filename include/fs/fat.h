@@ -40,6 +40,7 @@ static inline const char *get_fileattr_string(enum fat_fileattr f) {
     case FAT_DIR: return "Directory";
     case FAT_ARCHIVE: return "Archive";
     }
+    return "Unknown";
 };
 
 struct fat12_16_ext_bpb {

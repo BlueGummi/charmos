@@ -227,16 +227,17 @@ void fat_g_print(struct generic_partition *d) {
 
     bool success;
 
+    fat_list_root(fs);
+
     success = fat_create(fs, fs->root_cluster, "Whimsy", &new_file_ent,
                          FAT_ARCHIVE, NULL);
-
-    fat_list_root(fs);
 
     success = fat_delete(fs, fs->root_cluster, "Whimsy");
 
     success = fat_create(fs, fs->root_cluster, "Dooh", &new_file_ent,
                          FAT_ARCHIVE, NULL);
 
+    fat_list_root(fs);
     uint32_t ind;
 
     new_file_ent = *fat_lookup(fs, fs->root_cluster, "Dooh", &ind);

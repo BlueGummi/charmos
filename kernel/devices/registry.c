@@ -181,10 +181,10 @@ void registry_print_devices() {
         k_printf("Disk %lu, \"" ANSI_GREEN "%s" ANSI_RESET
                  "\" is a %s. Filesystem(s):\n",
                  i, disk->name, get_generic_disk_str(disk->type));
-        // disk->print(disk);
+        disk->print(disk);
         for (uint32_t j = 0; j < disk->partition_count; j++) {
             struct generic_partition *p = &disk->partitions[j];
-            if (p->fs_type != FS_FAT12)
+            if (strcmp(p->name, g_root_part) == 0)
                 continue;
             p->mount(p);
             p->print_fs(p);

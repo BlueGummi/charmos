@@ -91,9 +91,5 @@ void fat_list_root(struct fat_fs *fs) {
     if (!fs || !fs->bpb)
         return;
 
-    if (fs->type == FAT_32) {
-        fat_list_dir(fs, fs->bpb->ext_32.root_cluster);
-    } else {
-        fat_list_dir(fs, FAT_DIR_CLUSTER_ROOT);
-    }
+    fat_list_dir(fs, fs->root_cluster);
 }

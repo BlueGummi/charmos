@@ -41,10 +41,7 @@ static bool fat12_16_walk_cluster(struct fat_fs *fs, uint32_t cluster,
     uint32_t root_dir_sectors =
         (root_dir_size + bpb->bytes_per_sector - 1) / bpb->bytes_per_sector;
 
-    uint32_t root_start_lba = fs->volume_base_lba + bpb->reserved_sector_count +
-                              (bpb->num_fats * fs->fat_size);
-
-    uint32_t lba = is_root ? root_start_lba : fat_cluster_to_lba(fs, cluster);
+    uint32_t lba = fat_cluster_to_lba(fs, cluster);
     uint32_t sectors_to_read = is_root ? root_dir_sectors : sectors_per_cluster;
 
     uint8_t *sector_buf = kmalloc(sectors_to_read * bpb->bytes_per_sector);
@@ -57,8 +54,10 @@ static bool fat12_16_walk_cluster(struct fat_fs *fs, uint32_t cluster,
     }
 
     struct fat_dirent *ret = kmalloc(sizeof(struct fat_dirent));
-    if (!ret)
+    if (!ret) {
+        kfree(sector_buf);
         return false;
+    }
 
     uint32_t entries_per_cluster =
         is_root ? bpb->root_entry_count
@@ -68,6 +67,10 @@ static bool fat12_16_walk_cluster(struct fat_fs *fs, uint32_t cluster,
     for (uint32_t i = 0; i < entries_per_cluster; i++) {
         struct fat_dirent *entry =
             (struct fat_dirent *) (sector_buf + i * sizeof(struct fat_dirent));
+
+        if (entry->name[0] == 0x00 || (uint8_t) entry->name[0] == 0xE5)
+            continue;
+
         memcpy(ret, entry, sizeof(struct fat_dirent));
         if (callback(ret, i, ctx)) {
             kfree(sector_buf);
