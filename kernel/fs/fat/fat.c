@@ -1,6 +1,5 @@
 #include <console/printf.h>
 #include <devices/generic_disk.h>
-#include <errno.h>
 #include <fs/fat.h>
 #include <fs/mbr.h>
 #include <mem/alloc.h>
@@ -39,7 +38,7 @@ uint32_t fat_first_data_sector(const struct fat_fs *fs) {
 uint32_t fat_cluster_to_lba(const struct fat_fs *fs, uint32_t cluster) {
     const struct fat_bpb *bpb = fs->bpb;
 
-    if (cluster == FAT_DIR_CLUSTER_ROOT && fs->type != FAT_32) {
+    if (cluster == FAT_DIR_CLUSTER_ROOT) {
         return fs->volume_base_lba + bpb->reserved_sector_count +
                (bpb->num_fats * fs->fat_size);
     }
@@ -240,9 +239,11 @@ void fat_g_print(struct generic_partition *d) {
     fat_list_root(fs);
     uint32_t ind;
 
-    new_file_ent = *fat_lookup(fs, fs->root_cluster, "Dooh", &ind);
+    struct fat_dirent *f = fat_lookup(fs, fs->root_cluster, "Dooh", &ind);
 
-    success = fat_write_file(fs, &new_file_ent, 0, (uint8_t *) "Doober", 6);
+    new_file_ent = f ? *f : new_file_ent;
+
+    success = fat_write_file(fs, &new_file_ent, 0, (uint8_t *) "Doober\n", 8);
 
     success = fat_write_dirent(fs, fs->root_cluster, &new_file_ent, ind);
 

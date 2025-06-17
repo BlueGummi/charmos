@@ -14,30 +14,33 @@ bool nvme_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
     struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
 
     uint64_t total_bytes = count * 512;
-    uint64_t pages_needed = (total_bytes + 4095) / 4096;
+    uint64_t pages_needed = (total_bytes + 4095) / PAGE_SIZE;
 
     uint64_t buffer_phys = (uint64_t) pmm_alloc_pages(pages_needed, false);
     if (!buffer_phys)
         return false;
 
-    void *virt = vmm_map_phys(buffer_phys, pages_needed * 4096);
-    memset(virt, 0, pages_needed * 4096);
+    void *virt = vmm_map_phys(buffer_phys, pages_needed * PAGE_SIZE);
+    memset(virt, 0, pages_needed * PAGE_SIZE);
 
     struct nvme_command cmd = {0};
     cmd.opc = NVME_OP_IO_READ;
     cmd.nsid = 1;
     cmd.prp1 = buffer_phys;
+    if (pages_needed > 1) {
+        cmd.prp2 = buffer_phys + PAGE_SIZE;
+    }
     cmd.cdw10 = lba & 0xFFFFFFFF;
     cmd.cdw11 = lba >> 32;
     cmd.cdw12 = count - 1;
 
     if (nvme_submit_io_cmd(nvme, &cmd, 1) != 0) {
-        vmm_unmap_region((uint64_t) virt, pages_needed * 4096);
+        vmm_unmap_region((uint64_t) virt, pages_needed * PAGE_SIZE);
         return false;
     }
 
     memcpy(buffer, virt, total_bytes);
-    vmm_unmap_region((uint64_t) virt, pages_needed * 4096);
+    vmm_unmap_region((uint64_t) virt, pages_needed * PAGE_SIZE);
     return true;
 }
 
@@ -46,29 +49,32 @@ bool nvme_write_sector(struct generic_disk *disk, uint64_t lba,
     struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
 
     uint64_t total_bytes = count * 512;
-    uint64_t pages_needed = (total_bytes + 4095) / 4096;
+    uint64_t pages_needed = (total_bytes + 4095) / PAGE_SIZE;
 
     uint64_t buffer_phys = (uint64_t) pmm_alloc_pages(pages_needed, false);
     if (!buffer_phys)
         return false;
 
-    void *virt = vmm_map_phys(buffer_phys, pages_needed * 4096);
+    void *virt = vmm_map_phys(buffer_phys, pages_needed * PAGE_SIZE);
     memcpy(virt, buffer, total_bytes);
 
     struct nvme_command cmd = {0};
     cmd.opc = NVME_OP_IO_WRITE;
     cmd.nsid = 1;
     cmd.prp1 = buffer_phys;
+    if (pages_needed > 1) {
+        cmd.prp2 = buffer_phys + PAGE_SIZE;
+    }
     cmd.cdw10 = lba & 0xFFFFFFFF;
     cmd.cdw11 = lba >> 32;
     cmd.cdw12 = count - 1;
 
     if (nvme_submit_io_cmd(nvme, &cmd, 1) != 0) {
-        vmm_unmap_region((uint64_t) virt, pages_needed * 4096);
+        vmm_unmap_region((uint64_t) virt, pages_needed * PAGE_SIZE);
         return false;
     }
 
-    vmm_unmap_region((uint64_t) virt, pages_needed * 4096);
+    vmm_unmap_region((uint64_t) virt, pages_needed * PAGE_SIZE);
     return true;
 }
 

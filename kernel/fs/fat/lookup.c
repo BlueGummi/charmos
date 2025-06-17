@@ -1,3 +1,4 @@
+#include <console/printf.h>
 #include <fs/fat.h>
 #include <mem/alloc.h>
 #include <string.h>
