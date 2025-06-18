@@ -155,7 +155,7 @@ struct xhci_op_regs {
     struct xhci_usbcmd usbcmd;
     uint32_t usbsts;
     uint32_t pagesize;
-    uint8_t reserved;
+    uint32_t reserved[2];
     uint32_t dnctrl;
     uint64_t crcr;
     uint32_t reserved2[4];
@@ -163,25 +163,206 @@ struct xhci_op_regs {
     uint32_t config;
 } __attribute__((packed));
 
-struct xhci_trb { // Transfer Request Block
-    uint64_t parameter;
-    uint32_t status;
+struct xhci_trb {
     union {
         struct {
-            uint32_t cycle : 1;
-            uint32_t ent : 1;
-            uint32_t isp : 1;
-            uint32_t ns : 1;
-            uint32_t chain : 1;
-            uint32_t ioc : 1;
-            uint32_t idt : 1;
-            uint32_t reserved : 2;
-            uint32_t trb_type : 6;
-            uint32_t reserved2 : 16;
+            uint64_t parameter;
+            uint32_t status;
+            uint16_t cycle : 1;
+            uint16_t ent : 1;
+            uint16_t : 8;
+            uint16_t trb_type : 6;
+            uint16_t control;
         };
-        uint32_t control;
+
+        struct {
+            uint32_t dword0;
+            uint32_t dword1;
+            uint32_t dword2;
+            uint32_t dword3;
+        } raw;
+
+        struct {
+            uint64_t data_buffer_pointer : 64;
+
+            uint32_t trb_transfer_length : 17;
+            uint32_t td_size : 5;
+            uint32_t interrupt_target : 10;
+
+            uint32_t cycle_bit : 1;
+            uint32_t evaluate_next_trb : 1;
+            uint32_t interrupt_on_short_packet : 1;
+            uint32_t no_snoop : 1;
+            uint32_t chain_bit : 1;
+            uint32_t interrupt_on_completion : 1;
+            uint32_t immediate_data : 1;
+            uint32_t : 2;
+            uint32_t block_event_interrupt : 1;
+            uint32_t trb_type : 6;
+            uint32_t : 16;
+        } normal;
+
+        struct {
+            uint32_t bmRequestType : 8;
+            uint32_t bRequest : 8;
+            uint32_t wValue : 16;
+
+            uint32_t wIndex : 16;
+            uint32_t wLength : 16;
+
+            uint32_t trb_transfer_length : 17;
+            uint32_t : 5;
+            uint32_t interrupt_target : 10;
+
+            uint32_t cycle_bit : 1;
+            uint32_t : 4;
+            uint32_t interrupt_on_completion : 1;
+            uint32_t immediate_data : 1;
+            uint32_t : 3;
+            uint32_t trb_type : 6;
+            uint32_t transfer_type : 2;
+            uint32_t : 14;
+        } setup_stage;
+
+        struct {
+            uint64_t data_buffer_pointer : 64;
+
+            uint32_t trb_transfer_length : 17;
+            uint32_t td_size : 5;
+            uint32_t interrupt_target : 10;
+
+            uint32_t cycle_bit : 1;
+            uint32_t evaluate_next_trb : 1;
+            uint32_t interrupt_on_short_packet : 1;
+            uint32_t no_snoop : 1;
+            uint32_t chain_bit : 1;
+            uint32_t interrupt_on_completion : 1;
+            uint32_t immediate_data : 1;
+            uint32_t : 3;
+            uint32_t trb_type : 6;
+            uint32_t direction : 1;
+            uint32_t : 15;
+        } data_stage;
+
+        struct {
+            uint32_t : 32;
+            uint32_t : 32;
+
+            uint32_t : 22;
+            uint32_t interrupter_target : 10;
+
+            uint32_t cycle_bit : 1;
+            uint32_t evaluate_next_trb : 1;
+            uint32_t : 2;
+            uint32_t chain_bit : 1;
+            uint32_t interrupt_on_completion : 1;
+            uint32_t : 4;
+            uint32_t trb_type : 6;
+            uint32_t direction : 1;
+            uint32_t : 15;
+        } status_stage;
+
+        struct {
+            uint64_t trb_pointer : 64;
+
+            uint32_t trb_transfer_length : 24;
+            uint32_t completion_code : 8;
+
+            uint32_t cycle_bit : 1;
+            uint32_t : 1;
+            uint32_t event_data : 1;
+            uint32_t : 7;
+            uint32_t trb_type : 6;
+            uint32_t endpoint_id : 5;
+            uint32_t : 3;
+            uint32_t slot_id : 8;
+        } transfer_event;
+
+        struct {
+            uint64_t command_trb_pointer : 64;
+            uint32_t command_completion_parameter : 24;
+            uint32_t completion_code : 8;
+            uint32_t cycle_bit : 1;
+            uint32_t : 9;
+            uint32_t trb_type : 6;
+            uint32_t vf_id : 8;
+            uint32_t slot_id : 8;
+        } command_completion_event;
+
+        struct {
+            uint32_t : 24;
+            uint32_t port_id : 8;
+            uint32_t : 32;
+            uint32_t : 24;
+            uint32_t completion_code : 8;
+            uint32_t cycle : 1;
+            uint32_t : 9;
+            uint32_t trb_type : 6;
+            uint32_t : 16;
+        } port_status_chage_event;
+
+        struct {
+            uint32_t : 32;
+            uint32_t : 32;
+            uint32_t : 32;
+            uint32_t cycle : 1;
+            uint32_t : 9;
+            uint32_t trb_type : 6;
+            uint32_t slot_type : 5;
+            uint32_t : 11;
+        } enable_slot_command;
+
+        struct {
+            uint32_t : 32;
+            uint32_t : 32;
+            uint32_t : 32;
+            uint32_t cycle : 1;
+            uint32_t : 9;
+            uint32_t trb_type : 6;
+            uint32_t : 8;
+            uint32_t slot_id : 8;
+        } disable_slot_command;
+
+        struct {
+            uint64_t input_context_pointer : 64;
+            uint32_t : 32;
+            uint32_t cycle_bit : 1;
+            uint32_t : 8;
+            uint32_t block_set_address_request : 1;
+            uint32_t trb_type : 6;
+            uint32_t : 8;
+            uint32_t slot_id : 8;
+        } address_device_command;
+
+        struct {
+            uint64_t input_context_pointer : 64;
+            uint32_t : 32;
+            uint32_t cycle_bit : 1;
+            uint32_t : 8;
+            uint32_t deconfigure : 1;
+            uint32_t trb_type : 6;
+            uint32_t : 8;
+            uint32_t slot_id : 8;
+        } configure_endpoint_command;
+
+        struct {
+            uint64_t ring_segment_ponter : 64;
+
+            uint32_t : 22;
+            uint32_t interrupter_target : 10;
+
+            uint32_t cycle_bit : 1;
+            uint32_t toggle_cycle : 1;
+            uint32_t : 2;
+            uint32_t chain_bit : 1;
+            uint32_t interrupt_on_completion : 1;
+            uint32_t : 4;
+            uint32_t trb_type : 6;
+            uint32_t : 16;
+        } link_trb;
     };
 };
+_Static_assert(sizeof(struct xhci_trb) == 0x10, "");
 
 struct xhci_ring {
     struct xhci_trb *trbs;  // Virtual mapped TRB buffer
