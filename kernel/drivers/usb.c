@@ -5,6 +5,7 @@
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <stdint.h>
+#include <string.h>
 
 // TODO: timeouts... again... :p
 
@@ -42,29 +43,80 @@ void usb_init(uint8_t bus, uint8_t slot, uint8_t func) {
         return;
     }
 
-    uint32_t cap_length = cap->cap_length;
-    uint32_t hcsparams1 = cap->hcs_params1;
-    uint32_t hccparams1 = cap->hcc_params1;
-    uint64_t db_offset = cap->dboff;
-    uint64_t runtime_offset = cap->rtsoff;
-
     uint64_t xhci_trb_phys = (uint64_t) pmm_alloc_page(false);
     struct xhci_trb *cmd_ring = vmm_map_phys(xhci_trb_phys, TRB_RING_SIZE);
-
+    memset(cmd_ring, 0, TRB_RING_SIZE);
+    cmd_ring[0].parameter = 0;
+    cmd_ring[0].status = 0;
+    cmd_ring[0].control = (TRB_TYPE_ENABLE_SLOT << 10) | 0x1;
     uint64_t xhci_dcbaa_phys = (uint64_t) pmm_alloc_page(false);
 
-    cmd_ring[TRB_RING_SIZE / sizeof(struct xhci_trb) - 1].control =
-        TRB_TYPE_LINK | (1 << 1);
+    cmd_ring[(TRB_RING_SIZE / sizeof(struct xhci_trb)) - 1].control =
+        (TRB_TYPE_LINK << 10) | (1 << 1) | 1;
 
     uint64_t crcr = xhci_trb_phys | 1;
+
+    mmio_write_64(&op->dcbaap, xhci_dcbaa_phys | 1);
+
+    k_printf("0x%llx\n", *cmd_ring);
     mmio_write_64(&op->crcr, crcr);
 
+    uint64_t erst_table_phys = (uint64_t) pmm_alloc_page(false);
+    struct xhci_erst_entry *erst_table = vmm_map_phys(erst_table_phys, 4096);
+
+    uint64_t event_ring_phys = (uint64_t) pmm_alloc_page(false);
+    struct xhci_trb *event_ring = vmm_map_phys(event_ring_phys, 4096);
+    event_ring[0].control = 1;
+    memset(event_ring, 0, 4096);
+
+    erst_table[0].ring_segment_base = event_ring_phys;
+    erst_table[0].ring_segment_size = 256;
+    erst_table[0].reserved = 0;
+
+    void *runtime_regs = (void *) mmio + cap->rtsoff;
+    uint32_t *ir_base = (uint32_t *) ((uint8_t *) runtime_regs + 0x20);
+
+    mmio_write_32(ir_base + 0x00 / 4, 1 << 1);
+    mmio_write_32(ir_base + 0x08 / 4, 1);                              // ERSTSZ
+    mmio_write_64((uint64_t *) (ir_base + 0x10 / 4), erst_table_phys); // ERSTBA
+    mmio_write_64((uint64_t *) (ir_base + 0x18 / 4), event_ring_phys | 1);
+
+    usbcmd.raw = mmio_read_32(&op->usbcmd);
+    usbcmd.interrupter_enable = 1;
+    mmio_write_32(&op->usbcmd, usbcmd.raw);
+
+    cmd_ring[TRB_RING_SIZE - 1].parameter = xhci_trb_phys;
+    cmd_ring[TRB_RING_SIZE - 1].status = 0;
+    cmd_ring[TRB_RING_SIZE - 1].control = (TRB_TYPE_LINK << 10) | 0x1;
+
+    mmio_write_64(&op->crcr, xhci_trb_phys | 0x1);
     usbcmd.raw = mmio_read_32(&op->usbcmd);
     usbcmd.run_stop = 1;
     mmio_write_32(&op->usbcmd, usbcmd.raw);
-
     while (mmio_read_32(&op->usbsts) & 1)
         ;
+
+    uint32_t *doorbell = mmio + cap->dboff;
+    mmio_write_32(&doorbell[0], 0);
+
+    uint8_t expected_cycle = 1;
+    while (true) {
+        struct xhci_trb *evt = &event_ring[0];
+
+        if ((evt->control & 1) != expected_cycle)
+            continue;
+
+        uint8_t trb_type = (evt->control >> 10) & 0x3F;
+        if (trb_type == TRB_TYPE_COMMAND_COMPLETION) {
+            uint8_t slot_id = evt->control >> 24;
+            uint8_t code = (evt->status >> 24) & 0xFF;
+            k_printf("Enable Slot complete, code=%u, slot=%u\n", code, slot_id);
+
+            mmio_write_64((uint64_t *) (ir_base + 0x18 / 4),
+                          event_ring_phys | 1);
+            break;
+        }
+    }
 
     k_printf("XHCI controller initialized.\n");
 }
