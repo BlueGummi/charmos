@@ -133,8 +133,8 @@ static void xhci_setup_command_ring(struct xhci_device *dev) {
     int last_index = TRB_RING_SIZE - 1;
     cmd_ring[last_index].parameter = cmd_ring_phys;
     cmd_ring[last_index].status = 0;
-    cmd_ring[last_index].control =
-        (TRB_TYPE_LINK << 10) | (1 << 1); // Toggle Cycle, Cycle bit = 1
+    /* Toggle Cycle, Cycle bit = 1 */
+    cmd_ring[last_index].control = (TRB_TYPE_LINK << 10) | (1 << 1);
 
     mmio_write_64(&op->crcr, cmd_ring_phys | 1);
 
