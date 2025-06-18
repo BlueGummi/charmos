@@ -126,6 +126,7 @@ static void xhci_setup_event_ring(struct xhci_device *dev) {
     ring->size = 256;
     ring->trbs = event_ring;
     ring->enqueue_index = 0;
+    ring->dequeue_index = 0;
     dev->event_ring = ring;
 }
 
@@ -143,12 +144,9 @@ static void xhci_setup_command_ring(struct xhci_device *dev) {
     /* Toggle Cycle, Cycle bit = 1 */
     cmd_ring[last_index].control = (TRB_TYPE_LINK << 10) | (1 << 1);
 
-    mmio_write_64(&op->crcr, cmd_ring_phys | 1);
-
     uint64_t dcbaa_phys = (uint64_t) pmm_alloc_page(false);
     struct xhci_dcbaa *dcbaa_virt =
         vmm_map_phys(dcbaa_phys, sizeof(struct xhci_dcbaa));
-    mmio_write_64(&op->dcbaap, dcbaa_phys | 1);
 
     struct xhci_ring *ring = kmalloc(sizeof(struct xhci_ring));
     ring->phys = cmd_ring_phys;
@@ -156,18 +154,12 @@ static void xhci_setup_command_ring(struct xhci_device *dev) {
     ring->size = TRB_RING_SIZE;
     ring->cycle = 1;
     ring->enqueue_index = 0;
+    ring->dequeue_index = 0;
 
     dev->dcbaa = dcbaa_virt;
     dev->cmd_ring = ring;
-}
-
-void xhci_cmd_enable_slot(struct xhci_device *dev) {
-    struct xhci_ring *ring = dev->cmd_ring;
-    struct xhci_trb *trb = &ring->trbs[ring->enqueue_index++];
-
-    trb->parameter = 0;
-    trb->status = 0;
-    trb->control = (TRB_TYPE_ENABLE_SLOT << 10) | ring->cycle;
+    mmio_write_64(&op->crcr, cmd_ring_phys | 1);
+    mmio_write_64(&op->dcbaap, dcbaa_phys | 1);
 }
 
 static void xhci_ring_doorbell(struct xhci_device *dev, uint64_t idx) {
@@ -175,17 +167,61 @@ static void xhci_ring_doorbell(struct xhci_device *dev, uint64_t idx) {
     mmio_write_32(&doorbell[idx], 0);
 }
 
-static void xhci_address_device(struct xhci_device *dev, uint64_t slot_id) {
-    struct xhci_device_ctx *device_ctx;
+static uint8_t xhci_enable_slot(struct xhci_device *dev) {
+    struct xhci_ring *cmd_ring = dev->cmd_ring;
+    struct xhci_ring *event_ring = dev->event_ring;
 
-    uint64_t input_ctx_phys = (uint64_t) pmm_alloc_page(false);
-    struct xhci_input_ctx *input_ctx = vmm_map_phys(input_ctx_phys, 4096);
-    memset(input_ctx, 0, 4096);
+    struct xhci_trb *trb = &cmd_ring->trbs[cmd_ring->enqueue_index];
+    memset(trb, 0, sizeof(*trb));
+    trb->parameter = 0;
+    trb->status = 0;
+    trb->control = (TRB_TYPE_ENABLE_SLOT << 10) | (cmd_ring->cycle & 1);
 
-    input_ctx->ctrl_ctx.add_flags = (1 << 0) | (1 << 1);
+    cmd_ring->enqueue_index++;
+    if (cmd_ring->enqueue_index == cmd_ring->size) {
+        cmd_ring->enqueue_index = 0;
+        cmd_ring->cycle ^= 1;
+    }
 
-    struct xhci_slot_ctx *slot = &input_ctx->slot_ctx;
-    slot->context_entries = 1;
+    xhci_ring_doorbell(dev, 0);
+
+    uint32_t dq_idx = event_ring->dequeue_index;
+    uint8_t expected_cycle = event_ring->cycle;
+
+    while (true) {
+        struct xhci_trb *evt = &event_ring->trbs[dq_idx];
+        uint32_t control = evt->control;
+        if ((control & 1) != expected_cycle) {
+            continue;
+        }
+
+        uint8_t trb_type = (control >> 10) & 0x3F;
+        if (trb_type == TRB_TYPE_COMMAND_COMPLETION) {
+            uint8_t slot_id = (control >> 24) & 0xFF;
+
+            dq_idx++;
+            if (dq_idx == event_ring->size) {
+                dq_idx = 0;
+                expected_cycle ^= 1;
+            }
+            event_ring->dequeue_index = dq_idx;
+            event_ring->cycle = expected_cycle;
+
+            uint64_t offset = dq_idx * sizeof(struct xhci_trb);
+            uint64_t erdp = event_ring->phys + offset;
+            mmio_write_64(&dev->intr_regs->erdp, erdp | 1);
+
+            return slot_id;
+        }
+
+        dq_idx++;
+        if (dq_idx == event_ring->size) {
+            dq_idx = 0;
+            expected_cycle ^= 1;
+        }
+        event_ring->dequeue_index = dq_idx;
+        event_ring->cycle = expected_cycle;
+    }
 }
 
 void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
@@ -202,64 +238,25 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
     xhci_setup_event_ring(dev);
 
     xhci_setup_command_ring(dev);
-    xhci_cmd_enable_slot(dev);
-
-    xhci_controller_enable_ints(dev);
-
     xhci_controller_start(dev);
-
-    xhci_ring_doorbell(dev, 0);
+    xhci_controller_enable_ints(dev);
 
     for (uint64_t port = 1; port <= dev->ports; port++) {
         uint32_t portsc = mmio_read_32(&dev->port_regs[port - 1].portsc);
         if (portsc & PORTSC_CCS) {
-            uint8_t speed_bits = portsc & 0xF;
-            switch (speed_bits) {
-            case 1: k_printf("lowspeed\n"); break;
-            case 2: k_printf("fullspeed\n"); break;
-            case 3: k_printf("highspeed\n"); break;
-            case 4: k_printf("superspeed\n"); break;
-            case 5: k_printf("superspeedplus\n"); break;
-            default: k_printf("unknown speed\n"); break;
+            uint8_t speed = portsc & 0xF;
+
+            uint8_t slot_id = xhci_enable_slot(dev);
+            if (slot_id == 0) {
+                k_printf("Failed to enable slot for port %lu\n", port);
+                continue;
             }
-            continue;
+
+            dev->port_info[port - 1].device_connected = true;
+            dev->port_info[port - 1].speed = speed;
+            dev->port_info[port - 1].slot_id = slot_id;
+            k_printf("Enabled slot %u\n", slot_id);
         }
-    }
-
-    uint8_t expected_cycle = 1;
-    struct xhci_ring *event_ring = dev->event_ring;
-    uint32_t dq_idx = event_ring->enqueue_index;
-    while (true) {
-        struct xhci_trb *evt = &event_ring->trbs[dq_idx];
-        uint32_t control = mmio_read_32(&evt->control);
-
-        if ((control & 1) != expected_cycle)
-            continue;
-
-        uint8_t trb_type = (control >> 10) & 0x3F;
-        if (trb_type == TRB_TYPE_COMMAND_COMPLETION) {
-            uint8_t slot_id = evt->control >> 24;
-            uint8_t code = (evt->status >> 24) & 0xFF;
-            k_printf("Enable Slot complete, code=%u, slot=%u\n", code, slot_id);
-
-            uint64_t offset = dq_idx * sizeof(struct xhci_trb);
-            uint64_t erdp = event_ring->phys + offset;
-            mmio_write_64(&dev->intr_regs->erdp, erdp | 1);
-            dq_idx++;
-            if (dq_idx == event_ring->size) {
-                dq_idx = 1;
-                expected_cycle ^= 1;
-            }
-            event_ring->enqueue_index = dq_idx;
-
-            break;
-        }
-        dq_idx++;
-        if (dq_idx == event_ring->size) {
-            dq_idx = 0;
-            expected_cycle ^= 1;
-        }
-        event_ring->enqueue_index = dq_idx;
     }
 
     k_printf("XHCI controller initialized.\n");

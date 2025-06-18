@@ -94,6 +94,18 @@
 #define PORT_SPEED_SUPER 4      // USB 3.0 SuperSpeed
 #define PORT_SPEED_SUPER_PLUS 5 // USB 3.1 Gen2 (SuperSpeed+)
 
+#define CC_SUCCESS 0x01
+#define CC_DATA_BUFFER_ERROR 0x02
+#define CC_BABBLE_DETECTED 0x03
+#define CC_USB_TRANSACTION_ERROR 0x04
+#define CC_TRB_ERROR 0x05
+#define CC_STALL_ERROR 0x06
+#define CC_RESOURCE_ERROR 0x07
+#define CC_BANDWIDTH_ERROR 0x08
+#define CC_NO_SLOTS_AVAILABLE 0x09
+#define CC_INVALID_STREAM_TYPE 0x0A
+#define CC_SLOT_NOT_ENABLED_ERROR 0x0B
+
 // 5.3: XHCI Capability Registers
 struct xhci_cap_regs {
     uint8_t cap_length;
@@ -436,6 +448,7 @@ struct xhci_ring {
     struct xhci_trb *trbs;  // Virtual mapped TRB buffer
     uint64_t phys;          // Physical address of TRB buffer
     uint32_t enqueue_index; // Next TRB to fill
+    uint32_t dequeue_index; // Point where controller sends back things
     uint8_t cycle;          // Cycle bit, toggles after ring wrap
     uint32_t size;          // Number of TRBs in ring (e.g., 256)
 };
@@ -481,6 +494,12 @@ struct xhci_slot {
     void *dev_ctx;
 };
 
+struct xhci_port_info {
+    bool device_connected;
+    uint8_t speed;
+    uint8_t slot_id;
+};
+
 struct xhci_dcbaa { // Device context base address array - check page 441
     uint64_t ptrs[256];
 } __attribute__((aligned(64)));
@@ -498,6 +517,7 @@ struct xhci_device {
     struct xhci_port_regs *port_regs;
     uint64_t ring_count;
     uint64_t ports;
+    struct xhci_port_info port_info[64];
 };
 
 void xhci_init(uint8_t bus, uint8_t slot, uint8_t func);
