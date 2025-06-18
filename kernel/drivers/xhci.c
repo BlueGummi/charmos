@@ -242,7 +242,8 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
     xhci_controller_enable_ints(dev);
 
     for (uint64_t port = 1; port <= dev->ports; port++) {
-        uint32_t portsc = mmio_read_32(&dev->port_regs[port - 1].portsc);
+        uint32_t portsc = mmio_read_32(&dev->port_regs[port - 1]);
+
         if (portsc & PORTSC_CCS) {
             uint8_t speed = portsc & 0xF;
 

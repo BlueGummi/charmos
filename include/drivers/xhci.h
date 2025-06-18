@@ -406,7 +406,6 @@ struct xhci_device_ctx {
     struct xhci_ep_ctx ep_ctx[31]; // Endpoint 1–31 (ep0 separate)
 } __attribute__((packed));
 
-// 5.4: XHCI Operational Registers
 struct xhci_op_regs {
     struct xhci_usbcmd usbcmd;
     uint32_t usbsts;
@@ -417,7 +416,7 @@ struct xhci_op_regs {
     uint32_t reserved2[4];
     uint64_t dcbaap;
     uint32_t config;
-    uint8_t reserved3[900];
+    uint32_t reserved3[241];
     struct xhci_port_regs regs[];
 } __attribute__((packed));
 
