@@ -228,8 +228,8 @@ struct xhci_device {
 
     uint64_t *dcbaa; // Virtual address of DCBAA
 
-    struct xhci_ring event_ring;
-    struct xhci_ring cmd_ring;
+    struct xhci_ring *event_ring;
+    struct xhci_ring *cmd_ring;
     struct xhci_erst_entry *erst;
     uint64_t ring_count;
 };

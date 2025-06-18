@@ -28,7 +28,10 @@ static struct xhci_device *xhci_device_create(void *mmio) {
 
     struct xhci_cap_regs *cap = mmio;
     struct xhci_op_regs *op = mmio + cap->cap_length;
+    void *runtime_regs = (void *) mmio + cap->rtsoff;
+    struct xhci_intr_regs *ir_base = (void *) ((uint8_t *) runtime_regs + 0x20);
 
+    dev->intr_regs = ir_base;
     dev->cap_regs = cap;
     dev->op_regs = op;
     return dev;
@@ -66,35 +69,31 @@ static bool xhci_controller_reset(struct xhci_device *dev) {
     return true;
 }
 
-void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
-    void *mmio = xhci_map_mmio(bus, slot, func);
-
-    struct xhci_device *dev = xhci_device_create(mmio);
-
+static bool xhci_controller_start(struct xhci_device *dev) {
     struct xhci_op_regs *op = dev->op_regs;
 
     struct xhci_usbcmd usbcmd = {.raw = mmio_read_32(&op->usbcmd)};
-    if (!xhci_controller_stop(dev))
-        k_printf("Could stop XHCI controller\n");
+    usbcmd.run_stop = 1;
+    mmio_write_32(&op->usbcmd, usbcmd.raw);
+    uint64_t timeout = XHCI_DEVICE_TIMEOUT;
 
-    if (!xhci_controller_reset(dev))
-        k_printf("Could not reset XHCI controller\n");
+    while (mmio_read_32(&op->usbsts) & 1 && timeout--) {
+        sleep_ms(1);
+        if (timeout == 0)
+            return false;
+    }
 
-    uint64_t xhci_trb_phys = (uint64_t) pmm_alloc_page(false);
-    struct xhci_trb *cmd_ring = vmm_map_phys(xhci_trb_phys, TRB_RING_SIZE);
-    memset(cmd_ring, 0, TRB_RING_SIZE);
-    cmd_ring[0].parameter = 0;
-    cmd_ring[0].status = 0;
-    cmd_ring[0].control = (TRB_TYPE_ENABLE_SLOT << 10) | 0x1;
-    uint64_t xhci_dcbaa_phys = (uint64_t) pmm_alloc_page(false);
+    return true;
+}
 
-    cmd_ring[(TRB_RING_SIZE / sizeof(struct xhci_trb)) - 1].control =
-        (TRB_TYPE_LINK << 10) | (1 << 1) | 1;
+static void xhci_controller_enable_ints(struct xhci_device *dev) {
+    struct xhci_op_regs *op = dev->op_regs;
+    struct xhci_usbcmd usbcmd = {.raw = mmio_read_32(&op->usbcmd)};
+    usbcmd.interrupter_enable = 1;
+    mmio_write_32(&op->usbcmd, usbcmd.raw);
+}
 
-    mmio_write_64(&op->dcbaap, xhci_dcbaa_phys | 1);
-
-    mmio_write_64(&op->crcr, xhci_trb_phys | 1);
-
+static void xhci_setup_event_ring(struct xhci_device *dev) {
     uint64_t erst_table_phys = (uint64_t) pmm_alloc_page(false);
     struct xhci_erst_entry *erst_table = vmm_map_phys(erst_table_phys, 4096);
 
@@ -108,37 +107,92 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
     erst_table[0].ring_segment_size = 256;
     erst_table[0].reserved = 0;
 
-    void *runtime_regs = (void *) mmio + dev->cap_regs->rtsoff;
-    struct xhci_intr_regs *ir_base = (void *) ((uint8_t *) runtime_regs + 0x20);
+    struct xhci_intr_regs *ir = dev->intr_regs;
+    mmio_write_32(&ir->iman, 1 << 1);
+    mmio_write_32(&ir->erstsz, 1);
+    mmio_write_64(&ir->erstba, erst_table_phys);
+    mmio_write_64(&ir->erdp, event_ring_phys | 1);
 
-    mmio_write_32(&ir_base->iman, 1 << 1);
-    mmio_write_32(&ir_base->erstsz, 1);
-    mmio_write_64(&ir_base->erstba, erst_table_phys);
-    mmio_write_64(&ir_base->erdp, event_ring_phys | 1);
+    struct xhci_ring *ring = kmalloc(sizeof(struct xhci_ring));
+    ring->phys = event_ring_phys;
+    ring->cycle = 1;
+    ring->size = 256;
+    ring->trbs = event_ring;
+    ring->enqueue_index = 0;
+    dev->event_ring = ring;
+}
 
-    usbcmd.raw = mmio_read_32(&op->usbcmd);
-    usbcmd.interrupter_enable = 1;
-    mmio_write_32(&op->usbcmd, usbcmd.raw);
+static void xhci_setup_command_ring(struct xhci_device *dev) {
+    struct xhci_op_regs *op = dev->op_regs;
 
-    cmd_ring[TRB_RING_SIZE - 1].parameter = xhci_trb_phys;
-    cmd_ring[TRB_RING_SIZE - 1].status = 0;
-    cmd_ring[TRB_RING_SIZE - 1].control = (TRB_TYPE_LINK << 10) | 0x1;
+    uint64_t cmd_ring_phys = (uint64_t) pmm_alloc_page(false);
+    struct xhci_trb *cmd_ring =
+        vmm_map_phys(cmd_ring_phys, sizeof(struct xhci_trb) * TRB_RING_SIZE);
+    memset(cmd_ring, 0, sizeof(struct xhci_trb) * TRB_RING_SIZE);
 
-    mmio_write_64(&op->crcr, xhci_trb_phys | 0x1);
-    usbcmd.raw = mmio_read_32(&op->usbcmd);
-    usbcmd.run_stop = 1;
-    mmio_write_32(&op->usbcmd, usbcmd.raw);
-    while (mmio_read_32(&op->usbsts) & 1)
-        ;
+    int last_index = TRB_RING_SIZE - 1;
+    cmd_ring[last_index].parameter = cmd_ring_phys;
+    cmd_ring[last_index].status = 0;
+    cmd_ring[last_index].control =
+        (TRB_TYPE_LINK << 10) | (1 << 1); // Toggle Cycle, Cycle bit = 1
 
-    uint32_t *doorbell = mmio + dev->cap_regs->dboff;
-    mmio_write_32(&doorbell[0], 0);
+    mmio_write_64(&op->crcr, cmd_ring_phys | 1);
+
+    uint64_t dcbaa_phys = (uint64_t) pmm_alloc_page(false);
+    mmio_write_64(&op->dcbaap, dcbaa_phys | 1);
+
+    struct xhci_ring *ring = kmalloc(sizeof(struct xhci_ring));
+    ring->phys = cmd_ring_phys;
+    ring->trbs = cmd_ring;
+    ring->size = TRB_RING_SIZE;
+    ring->cycle = 1;
+    ring->enqueue_index = 0;
+
+    dev->cmd_ring = ring;
+}
+
+void xhci_cmd_enable_slot(struct xhci_device *dev) {
+    struct xhci_ring *ring = dev->cmd_ring;
+    struct xhci_trb *trb = &ring->trbs[ring->enqueue_index++];
+
+    trb->parameter = 0;
+    trb->status = 0;
+    trb->control = (TRB_TYPE_ENABLE_SLOT << 10) | ring->cycle;
+}
+
+static void xhci_ring_doorbell(struct xhci_device *dev, uint64_t idx) {
+    uint32_t *doorbell = (void *) dev->cap_regs + dev->cap_regs->dboff;
+    mmio_write_32(&doorbell[idx], 0);
+}
+
+void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
+    void *mmio = xhci_map_mmio(bus, slot, func);
+
+    struct xhci_device *dev = xhci_device_create(mmio);
+
+    if (!xhci_controller_stop(dev))
+        k_printf("Could stop XHCI controller\n");
+
+    if (!xhci_controller_reset(dev))
+        k_printf("Could not reset XHCI controller\n");
+
+    xhci_setup_event_ring(dev);
+
+    xhci_setup_command_ring(dev);
+    xhci_cmd_enable_slot(dev);
+
+    xhci_controller_enable_ints(dev);
+
+    xhci_controller_start(dev);
+
+    xhci_ring_doorbell(dev, 0);
 
     uint8_t expected_cycle = 1;
+    struct xhci_trb *event_ring = dev->event_ring->trbs;
     while (true) {
         struct xhci_trb *evt = &event_ring[0];
 
-        if ((evt->control & 1) != expected_cycle)
+        if ((mmio_read_32(&evt->control) & 1) != expected_cycle)
             continue;
 
         uint8_t trb_type = (evt->control >> 10) & 0x3F;
@@ -147,8 +201,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
             uint8_t code = (evt->status >> 24) & 0xFF;
             k_printf("Enable Slot complete, code=%u, slot=%u\n", code, slot_id);
 
-            mmio_write_64((uint64_t *) (ir_base + 0x18 / 4),
-                          event_ring_phys | 1);
+            mmio_write_64(&dev->intr_regs->erdp, dev->event_ring->phys | 1);
             break;
         }
     }
