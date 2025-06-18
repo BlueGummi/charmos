@@ -63,6 +63,37 @@
 #define TRB_SET_SLOT_ID(id) (((id) & 0xFF) << 24)
 #define TRB_GET_SLOT_ID(ctrl) (((ctrl) >> 24) & 0xFF)
 
+// Bit definitions for XHCI PORTSC register
+#define PORTSC_CCS (1 << 0)           // Current Connect Status
+#define PORTSC_PED (1 << 1)           // Port Enabled/Disabled
+#define PORTSC_OCA (1 << 3)           // Over-Current Active
+#define PORTSC_RESET (1 << 4)         // Port Reset
+#define PORTSC_PLSE (1 << 5)          // Port Link State Enable
+#define PORTSC_PRES (1 << 6)          // Port Resume
+#define PORTSC_PP (1 << 9)            // Port Power
+#define PORTSC_SPEED_MASK (0xF << 10) // Bits 10–13: Port Speed
+#define PORTSC_SPEED_SHIFT 10
+
+#define PORTSC_LWS (1 << 16) // Link Write Strobe
+#define PORTSC_CSC (1 << 17) // Connect Status Change
+#define PORTSC_PEC (1 << 18) // Port Enable/Disable Change
+#define PORTSC_WRC (1 << 19) // Warm Port Reset Change
+#define PORTSC_OCC (1 << 20) // Over-current Change
+#define PORTSC_PRC (1 << 21) // Port Reset Change
+#define PORTSC_PLC (1 << 22) // Port Link State Change
+#define PORTSC_CEC (1 << 23) // Port Config Error Change
+
+#define PORTSC_IND (1 << 24)     // Port Indicator Control
+#define PORTSC_LWS_BIT (1 << 16) // Link Write Strobe
+#define PORTSC_DR (1 << 30)      // Device Removable
+#define PORTSC_WPR (1u << 31)    // Warm Port Reset
+
+#define PORT_SPEED_FULL 1       // USB 1.1 Full Speed
+#define PORT_SPEED_LOW 2        // USB 1.1 Low Speed
+#define PORT_SPEED_HIGH 3       // USB 2.0 High Speed
+#define PORT_SPEED_SUPER 4      // USB 3.0 SuperSpeed
+#define PORT_SPEED_SUPER_PLUS 5 // USB 3.1 Gen2 (SuperSpeed+)
+
 // 5.3: XHCI Capability Registers
 struct xhci_cap_regs {
     uint8_t cap_length;
@@ -76,6 +107,13 @@ struct xhci_cap_regs {
     uint32_t rtsoff;
     uint32_t hcc_params2;
 } __attribute__((packed));
+
+struct xhci_port_regs {
+    uint32_t portsc;   // Port Status and Control (offset 0x00)
+    uint32_t portpmsc; // Port Power Management Status and Control (offset 0x04)
+    uint32_t portli;   // Port Link Info (offset 0x08)
+    uint32_t portct;   // Port Configuration Timeout (offset 0x0C)
+};
 
 struct xhci_usbcmd {
     union {
@@ -166,6 +204,7 @@ _Static_assert(sizeof(struct xhci_slot_ctx) == 0x20, "");
 
 struct xhci_ep_ctx { // Refer to page 450 of the XHCI specification
 
+    /* DWORD 0 */
     uint32_t ep_state : 3; /* The current operational state of the endpoint
                             * 0 - Disabled (non-operational)
                             * 1 - Running
@@ -212,6 +251,7 @@ struct xhci_ep_ctx { // Refer to page 450 of the XHCI specification
                                        * If this is '0', then this is reserved
                                        */
 
+    /* DWORD 1 */
     uint32_t reserved2 : 1;
 
     uint32_t error_count : 2; /* Two bit down count, identifying the number
@@ -249,21 +289,25 @@ struct xhci_ep_ctx { // Refer to page 450 of the XHCI specification
                                     * receiving when configured.
                                     */
 
-    uint32_t dcs : 1; /* Dequeue cycle state - value of the xHC CCS
-                       * (Consumer Cycle State) flag for the TRB
-                       * referenced by the TR Dequeue pointer.
-                       * '0' if `max_pstreams` > '0'
-                       */
+    /* DWORD 2 */
+    union {
+        uint64_t dequeue_ptr_raw;
+        struct {
+            uint32_t dcs : 1; /* Dequeue cycle state - value of the xHC CCS
+                               * (Consumer Cycle State) flag for the TRB
+                               * referenced by the TR Dequeue pointer.
+                               * '0' if `max_pstreams` > '0'
+                               */
 
-    uint32_t reserved4 : 3;
-    uint32_t dequeue_ptr_lo : 28; /* Lower 28 bits of the dequeue pointer
-                                   * MUST be aligned to 16 BYTE BOUNDARY
-                                   */
+            uint32_t reserved4 : 3;
 
-    uint32_t dequeue_ptr_hi; /* Upper bits of the dequeue pointer
-                              * MUST be aligned to 16 BYTE BOUNDARY
-                              */
+            uint64_t dequeue_ptr : 60; /* dequeue pointer
+                                        * MUST be aligned to 16 BYTE BOUNDARY
+                                        */
+        };
+    };
 
+    /* DWORD 4 */
     uint32_t average_trb_length : 16; /* Average length of TRBs executed
                                        * by this endpoint. Must be > '0'
                                        */
@@ -339,8 +383,16 @@ _Static_assert(sizeof(struct xhci_input_ctrl_ctx) == 0x20, "");
 struct xhci_input_ctx { // Refer to page 460 of the XHCI Spec
     struct xhci_input_ctrl_ctx ctrl_ctx;
     struct xhci_slot_ctx slot_ctx;
-    struct xhci_ep_ctx ep_ctx[32];
-} __attribute__((packed, aligned(64)));
+    struct xhci_ep_ctx ep0_ctx;
+    struct xhci_ep_ctx ep_ctx[30];
+} __attribute__((packed));
+_Static_assert(sizeof(struct xhci_input_ctx) == 0x420, "");
+
+struct xhci_device_ctx {
+    struct xhci_slot_ctx slot_ctx;
+    struct xhci_ep_ctx ep0_ctx;
+    struct xhci_ep_ctx ep_ctx[31]; // Endpoint 1–31 (ep0 separate)
+} __attribute__((packed));
 
 // 5.4: XHCI Operational Registers
 struct xhci_op_regs {
@@ -353,6 +405,8 @@ struct xhci_op_regs {
     uint32_t reserved2[4];
     uint64_t dcbaap;
     uint32_t config;
+    uint8_t reserved3[900];
+    struct xhci_port_regs regs[];
 } __attribute__((packed));
 
 struct xhci_trb {
@@ -392,13 +446,29 @@ struct xhci_erst_entry {
     uint32_t reserved;
 } __attribute__((packed));
 
+struct xhci_erdp {
+    union {
+        uint64_t raw;
+        struct {
+            uint64_t desi : 3; /* Dequeue ERST Segment Index */
+            uint64_t ehb : 1;  /* Event Handler Busy */
+            uint64_t event_ring_pointer : 60;
+        };
+    };
+} __attribute__((packed));
+_Static_assert(sizeof(struct xhci_erdp) == 8, "");
+
 struct xhci_intr_regs {
     uint32_t iman;   // Interrupt Management
     uint32_t imod;   // Interrupt Moderation
     uint32_t erstsz; // Event Ring Segment Table Size
     uint32_t reserved;
     uint64_t erstba; // Event Ring Segment Table Base Address
-    uint64_t erdp;   // Event Ring Dequeue Pointer
+    union {
+        struct xhci_erdp erdp;
+        uint64_t erdp_raw;
+    };
+
 } __attribute__((packed));
 
 struct xhci_slot {
@@ -411,17 +481,23 @@ struct xhci_slot {
     void *dev_ctx;
 };
 
+struct xhci_dcbaa { // Device context base address array - check page 441
+    uint64_t ptrs[256];
+} __attribute__((aligned(64)));
+
 struct xhci_device {
     struct xhci_cap_regs *cap_regs;
     struct xhci_op_regs *op_regs;
     struct xhci_intr_regs *intr_regs; // Interrupt registers
 
-    uint64_t *dcbaa; // Virtual address of DCBAA
+    struct xhci_dcbaa *dcbaa; // Virtual address of DCBAA
 
     struct xhci_ring *event_ring;
     struct xhci_ring *cmd_ring;
     struct xhci_erst_entry *erst;
+    struct xhci_port_regs *port_regs;
     uint64_t ring_count;
+    uint64_t ports;
 };
 
 void xhci_init(uint8_t bus, uint8_t slot, uint8_t func);
