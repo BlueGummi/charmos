@@ -1,6 +1,8 @@
+#include <stdbool.h>
 #include <stdint.h>
 #pragma once
 
+#define XHCI_DEVICE_TIMEOUT 1000
 #define TRB_RING_SIZE 256
 
 // NOTE: In scatter gathers, the first TRD must NOT point to a page-aligned
@@ -209,7 +211,26 @@ struct xhci_intr_regs {
     uint64_t erdp;   // Event Ring Dequeue Pointer
 } __attribute__((packed));
 
+struct xhci_slot {
+    bool in_use;
+    uint8_t port_num;
+    struct xhci_ring ep_rings[31]; // EP 0 to 30
+    uint64_t input_ctx_phys;
+    uint64_t dev_ctx_phys;
+    void *input_ctx;
+    void *dev_ctx;
+};
+
 struct xhci_device {
-    struct xhci_ring *rings;
+    struct xhci_cap_regs *cap_regs;
+    struct xhci_op_regs *op_regs;
+    struct xhci_intr_regs *intr_regs; // Interrupt registers 
+
+    uint64_t *dcbaa; // Virtual address of DCBAA
+
+    struct xhci_ring event_ring;
+    struct xhci_ring cmd_ring;
+    struct xhci_erst_entry *erst;
     uint64_t ring_count;
 };
+void xhci_init(uint8_t bus, uint8_t slot, uint8_t func);

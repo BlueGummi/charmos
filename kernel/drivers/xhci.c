@@ -4,12 +4,13 @@
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
+#include <sleep.h>
 #include <stdint.h>
 #include <string.h>
 
 // TODO: timeouts... again... :p
 
-void usb_init(uint8_t bus, uint8_t slot, uint8_t func) {
+static void *xhci_map_mmio(uint8_t bus, uint8_t slot, uint8_t func) {
     uint32_t original_bar0 = pci_read(bus, slot, func, 0x10);
 
     pci_write(bus, slot, func, 0x10, 0xFFFFFFFF);
@@ -19,29 +20,65 @@ void usb_init(uint8_t bus, uint8_t slot, uint8_t func) {
     uint32_t size = ~(size_mask & ~0xF) + 1;
 
     uint32_t phys_addr = original_bar0 & ~0xF;
-    void *mmio = vmm_map_phys(phys_addr, size);
+    return vmm_map_phys(phys_addr, size);
+}
+
+static struct xhci_device *xhci_device_create(void *mmio) {
+    struct xhci_device *dev = kmalloc(sizeof(struct xhci_device));
 
     struct xhci_cap_regs *cap = mmio;
     struct xhci_op_regs *op = mmio + cap->cap_length;
 
-    struct xhci_usbcmd usbcmd;
-    usbcmd.raw = mmio_read_32(&op->usbcmd);
+    dev->cap_regs = cap;
+    dev->op_regs = op;
+    return dev;
+}
+
+static bool xhci_controller_stop(struct xhci_device *dev) {
+    struct xhci_op_regs *op = dev->op_regs;
+
+    struct xhci_usbcmd usbcmd = {.raw = mmio_read_32(&op->usbcmd)};
     usbcmd.run_stop = 0;
     mmio_write_32(&op->usbcmd, usbcmd.raw);
-    while ((mmio_read_32(&op->usbsts) & 1) == 0)
-        ;
+    uint64_t timeout = XHCI_DEVICE_TIMEOUT;
 
-    usbcmd.raw = mmio_read_32(&op->usbcmd);
+    while ((mmio_read_32(&op->usbsts) & 1) == 0 && timeout--) {
+        sleep_ms(1);
+        if (timeout == 0)
+            return false;
+    }
+    return true;
+}
+
+static bool xhci_controller_reset(struct xhci_device *dev) {
+    struct xhci_op_regs *op = dev->op_regs;
+
+    struct xhci_usbcmd usbcmd = {.raw = mmio_read_32(&op->usbcmd)};
     usbcmd.host_controller_reset = 1;
     mmio_write_32(&op->usbcmd, usbcmd.raw); // Reset
-    while (mmio_read_32(&op->usbcmd) & (1 << 1))
-        ;
+    uint64_t timeout = XHCI_DEVICE_TIMEOUT;
 
-    uint32_t pagesize_bits = mmio_read_32(&op->pagesize);
-    if (!(pagesize_bits & 1)) {
-        k_printf("XHCI does not support 4KiB page size!\n");
-        return;
+    while (mmio_read_32(&op->usbcmd) & (1 << 1) && timeout--) {
+        sleep_ms(1);
+        if (timeout == 0)
+            return false;
     }
+    return true;
+}
+
+void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
+    void *mmio = xhci_map_mmio(bus, slot, func);
+
+    struct xhci_device *dev = xhci_device_create(mmio);
+
+    struct xhci_op_regs *op = dev->op_regs;
+
+    struct xhci_usbcmd usbcmd = {.raw = mmio_read_32(&op->usbcmd)};
+    if (!xhci_controller_stop(dev))
+        k_printf("Could stop XHCI controller\n");
+
+    if (!xhci_controller_reset(dev))
+        k_printf("Could not reset XHCI controller\n");
 
     uint64_t xhci_trb_phys = (uint64_t) pmm_alloc_page(false);
     struct xhci_trb *cmd_ring = vmm_map_phys(xhci_trb_phys, TRB_RING_SIZE);
@@ -54,18 +91,16 @@ void usb_init(uint8_t bus, uint8_t slot, uint8_t func) {
     cmd_ring[(TRB_RING_SIZE / sizeof(struct xhci_trb)) - 1].control =
         (TRB_TYPE_LINK << 10) | (1 << 1) | 1;
 
-    uint64_t crcr = xhci_trb_phys | 1;
-
     mmio_write_64(&op->dcbaap, xhci_dcbaa_phys | 1);
 
-    k_printf("0x%llx\n", *cmd_ring);
-    mmio_write_64(&op->crcr, crcr);
+    mmio_write_64(&op->crcr, xhci_trb_phys | 1);
 
     uint64_t erst_table_phys = (uint64_t) pmm_alloc_page(false);
     struct xhci_erst_entry *erst_table = vmm_map_phys(erst_table_phys, 4096);
 
     uint64_t event_ring_phys = (uint64_t) pmm_alloc_page(false);
     struct xhci_trb *event_ring = vmm_map_phys(event_ring_phys, 4096);
+
     event_ring[0].control = 1;
     memset(event_ring, 0, 4096);
 
@@ -73,13 +108,13 @@ void usb_init(uint8_t bus, uint8_t slot, uint8_t func) {
     erst_table[0].ring_segment_size = 256;
     erst_table[0].reserved = 0;
 
-    void *runtime_regs = (void *) mmio + cap->rtsoff;
-    uint32_t *ir_base = (uint32_t *) ((uint8_t *) runtime_regs + 0x20);
+    void *runtime_regs = (void *) mmio + dev->cap_regs->rtsoff;
+    struct xhci_intr_regs *ir_base = (void *) ((uint8_t *) runtime_regs + 0x20);
 
-    mmio_write_32(ir_base + 0x00 / 4, 1 << 1);
-    mmio_write_32(ir_base + 0x08 / 4, 1);                              // ERSTSZ
-    mmio_write_64((uint64_t *) (ir_base + 0x10 / 4), erst_table_phys); // ERSTBA
-    mmio_write_64((uint64_t *) (ir_base + 0x18 / 4), event_ring_phys | 1);
+    mmio_write_32(&ir_base->iman, 1 << 1);
+    mmio_write_32(&ir_base->erstsz, 1);
+    mmio_write_64(&ir_base->erstba, erst_table_phys);
+    mmio_write_64(&ir_base->erdp, event_ring_phys | 1);
 
     usbcmd.raw = mmio_read_32(&op->usbcmd);
     usbcmd.interrupter_enable = 1;
@@ -96,7 +131,7 @@ void usb_init(uint8_t bus, uint8_t slot, uint8_t func) {
     while (mmio_read_32(&op->usbsts) & 1)
         ;
 
-    uint32_t *doorbell = mmio + cap->dboff;
+    uint32_t *doorbell = mmio + dev->cap_regs->dboff;
     mmio_write_32(&doorbell[0], 0);
 
     uint8_t expected_cycle = 1;
