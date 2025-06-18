@@ -49,11 +49,14 @@ void cmdline_parse(const char *input) {
         val_buf[val_len] = '\0';
 
         if (strcmp(var_buf, "root") == 0) {
-            char *val = kmalloc(strlen(val_buf));
+            if (g_root_part)
+                k_panic("Cannot have multiple root entries in the command line\n");
+
+            char *val = kmalloc(strlen(val_buf) + 1);
             if (!val)
                 k_panic("Could not allocate space for command line parsing\n");
 
-            memcpy(val, val_buf, strlen(val_buf));
+            memcpy(val, val_buf, strlen(val_buf) + 1);
             g_root_part = val;
         }
     }

@@ -37,3 +37,7 @@ make run # run this in the build directory
 - [ ] syscall API
 
 - [ ] define more _t typedefs like dma_t or physaddr_t and such
+
+- [ ] implement fs sanity checks
+
+- [ ] networking :boom: + networking stack :boom: :boom:
