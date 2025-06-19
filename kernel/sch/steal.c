@@ -24,7 +24,7 @@ struct scheduler *scheduler_pick_victim(struct scheduler *self) {
     uint64_t max_load = 0;
     struct scheduler *victim = NULL;
 
-    for (uint64_t i = 0; i < c_count - 1; i++) {
+    for (uint64_t i = 0; i < c_count; i++) {
         struct scheduler *potential_victim = local_schs[i];
 
         /* duh.... */
