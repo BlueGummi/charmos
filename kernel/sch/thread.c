@@ -1,16 +1,15 @@
 #include <mem/alloc.h>
 #include <sch/thread.h>
 #include <stdint.h>
-#include <string.h>
 
 uint64_t globid = 1;
 
 struct thread *thread_create(void (*entry_point)(void)) {
     struct thread *new_thread =
         (struct thread *) kzalloc(sizeof(struct thread));
-    uint64_t stack_top = (uint64_t) kmalloc(1024) + 0x1000;
-
-    memset(new_thread, 0, sizeof(struct thread)); // zero out the task
+#define STACK_SIZE 0x4000
+    void *stack = kmalloc_aligned(STACK_SIZE, 0x1000);
+    uint64_t stack_top = (uint64_t) stack + STACK_SIZE;
 
     new_thread->mlfq_level = 0;
     new_thread->time_in_level = 0;
