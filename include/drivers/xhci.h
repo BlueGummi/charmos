@@ -8,6 +8,8 @@
 // NOTE: In scatter gathers, the first TRD must NOT point to a page-aligned
 // boundary. Following TRDs must point to page-aligned boundaries.
 
+#define XHCI_EXT_CAP_ID_LEGACY_SUPPORT     1
+#define XHCI_EXT_CAP_ID_SUPPORTED_PROTOCOL 2
 // TRB Types (bits 10–15 in control word)
 #define TRB_TYPE_RESERVED 0x00
 #define TRB_TYPE_NORMAL 0x01
@@ -502,6 +504,12 @@ struct xhci_port_info {
 struct xhci_dcbaa { // Device context base address array - check page 441
     uint64_t ptrs[256];
 } __attribute__((aligned(64)));
+
+struct xhci_ext_cap {
+    uint8_t cap_id;
+    uint8_t next;
+    uint16_t cap_specific;
+};
 
 struct xhci_device {
     struct xhci_cap_regs *cap_regs;

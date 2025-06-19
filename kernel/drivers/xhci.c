@@ -232,6 +232,27 @@ static uint8_t xhci_enable_slot(struct xhci_device *dev) {
     return (xhci_wait_for_response(dev) >> 24) & 0xff;
 }
 
+bool xhci_reset_port(struct xhci_device *dev, uint32_t port_index) {
+    uint32_t *portsc = (void *) &dev->port_regs[port_index];
+
+    uint32_t val = mmio_read_32(portsc);
+    val |= (1 << 4); // Port Reset
+    mmio_write_32(portsc, val);
+
+    uint64_t timeout = 100;
+    while ((mmio_read_32(portsc) & (1 << 4)) && timeout--) {
+        sleep_ms(1);
+    }
+
+    if (mmio_read_32(portsc) & (1 << 4)) {
+        k_printf("XHCI: Port %u reset timed out.\n", port_index + 1);
+        return false;
+    }
+
+    k_printf("XHCI: Port %u reset complete.\n", port_index + 1);
+    return true;
+}
+
 void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
     void *mmio = xhci_map_mmio(bus, slot, func);
 
@@ -246,6 +267,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
     xhci_setup_event_ring(dev);
 
     xhci_setup_command_ring(dev);
+
     xhci_controller_start(dev);
     xhci_controller_enable_ints(dev);
 
@@ -255,6 +277,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
         if (portsc & PORTSC_CCS) {
             uint8_t speed = portsc & 0xF;
 
+            xhci_reset_port(dev, port);
             uint8_t slot_id = xhci_enable_slot(dev);
             if (slot_id == 0) {
                 k_printf("Failed to enable slot for port %lu\n", port);
