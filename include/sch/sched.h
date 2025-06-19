@@ -21,6 +21,7 @@ struct scheduler {
     struct thread_queue queues[MLFQ_LEVELS]; // MLFQ queues
     struct thread *current;
     uint64_t thread_count;
+    int64_t core_id;
     uint64_t load;         // Heuristically calculated load estimate
     uint64_t tick_counter; // Global tick count for periodic rebalance
     atomic_bool being_robbed;

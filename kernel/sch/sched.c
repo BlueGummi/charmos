@@ -61,6 +61,10 @@ void schedule(struct cpu_state *cpu) {
     uint64_t core_id = get_sch_core_id();
     struct scheduler *sched = local_schs[core_id];
 
+    /* make sure these are actually our core IDs */
+    if (sched->core_id == -1)
+        sched->core_id = core_id;
+
     if (!sched->active) {
         LAPIC_REG(LAPIC_REG_EOI) = 0;
         return;
@@ -113,7 +117,13 @@ void schedule(struct cpu_state *cpu) {
                 goto regular_schedule;
             }
 
-            k_printf("Core %u has picked a suitable victim\n", core_id);
+            k_printf(ANSI_GREEN "Core %u is stealing from core %u\n" ANSI_RESET,
+                     core_id, victim->core_id);
+            uint64_t val = atomic_load(&global_load);
+            k_printf(ANSI_BLUE "Core %u has a load of %u, victim has a load of "
+                               "%u, global load is %u\n" ANSI_RESET,
+                     core_id, sched->load, victim->load, val);
+
             struct thread *stolen = scheduler_steal_work(victim);
             atomic_store(&victim->being_robbed, false);
             atomic_store(&sched->stealing_work, false);
@@ -234,7 +244,9 @@ static struct scheduler *scheduler_pick_victim(struct scheduler *self) {
         bool victim_busy = atomic_load(&potential_victim->being_robbed) ||
                            atomic_load(&potential_victim->stealing_work);
 
-        if (victim_busy)
+        bool victim_is_poor = potential_victim->load <= self->load;
+
+        if (victim_busy || victim_is_poor)
             continue;
 
         if (potential_victim->load > max_load) {
@@ -316,17 +328,13 @@ void scheduler_init(uint64_t core_count) {
         k_panic("Could not allocate scheduler pointer array\n");
 
     for (uint64_t i = 0; i < core_count; i++) {
-        struct scheduler *s = kmalloc_aligned(sizeof(struct scheduler), 4096);
+        struct scheduler *s = kmalloc(sizeof(struct scheduler));
         if (!s)
             k_panic("Could not allocate scheduler %lu\n", i);
 
-        if ((uintptr_t) s % 4096 != 0) {
-            k_panic("Scheduler %lu is not page-aligned: 0x%lx\n", i,
-                    (uintptr_t) s);
-        }
-
         s->active = true;
         s->thread_count = 0;
+        s->core_id = -1;
         s->tick_counter = 0;
 
         for (int lvl = 0; lvl < MLFQ_LEVELS; lvl++) {
@@ -339,12 +347,12 @@ void scheduler_init(uint64_t core_count) {
         scheduler_add_thread(s, t, false, false);
         scheduler_add_thread(s, t0, false, false);
 
-        if (i == 0) {
-            for (int j = 0; j < 5; j++) {
-                struct thread *t1 = thread_create(k_sch_main);
-                scheduler_add_thread(s, t1, false, false);
-            }
-        }
+        /*        if (i == 0) {
+                    for (int j = 0; j < 5; j++) {
+                        struct thread *t1 = thread_create(k_sch_main);
+                        scheduler_add_thread(s, t1, false, false);
+                    }
+                }*/
 
         s->load = scheduler_compute_load(s, 700, 300);
         atomic_fetch_add(&global_load, s->load);
@@ -393,6 +401,7 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
  * called from the `schedule()` function which should not enable
  * interrupts inside of itself */
 
+/* TODO: Make this pick the busiest thread to steal from */
 static struct thread *scheduler_steal_work(struct scheduler *victim) {
     if (!victim || victim->thread_count == 0)
         return NULL;
