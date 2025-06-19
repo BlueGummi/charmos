@@ -50,7 +50,7 @@ set(QEMU_COMMON_FLAGS
     -cdrom ${IMAGE_NAME}.iso
     -boot d
     -m 4G
-    -smp cores=19
+    -smp cores=4
     -no-shutdown
     -no-reboot
     -s

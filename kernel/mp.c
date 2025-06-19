@@ -28,7 +28,7 @@ void lapic_init() {
 void wakeup() {
     bool ints = spin_lock(&wakeup_lock);
     smap_init();
-//    serial_init();
+    serial_init();
     while (!cr3_ready)
         ;
     asm volatile("mov %0, %%cr3" ::"r"(cr3));
