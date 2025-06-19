@@ -244,7 +244,8 @@ static struct scheduler *scheduler_pick_victim(struct scheduler *self) {
         bool victim_busy = atomic_load(&potential_victim->being_robbed) ||
                            atomic_load(&potential_victim->stealing_work);
 
-        bool victim_is_poor = potential_victim->load <= self->load;
+        bool victim_is_poor = (potential_victim->load * 100) <
+                              (self->load * WORK_STEAL_VICTIM_MIN_DIFF);
 
         if (victim_busy || victim_is_poor)
             continue;
@@ -347,12 +348,12 @@ void scheduler_init(uint64_t core_count) {
         scheduler_add_thread(s, t, false, false);
         scheduler_add_thread(s, t0, false, false);
 
-        /*        if (i == 0) {
-                    for (int j = 0; j < 5; j++) {
-                        struct thread *t1 = thread_create(k_sch_main);
-                        scheduler_add_thread(s, t1, false, false);
-                    }
-                }*/
+        if (i == 0) {
+            for (int j = 0; j < 5; j++) {
+                struct thread *t1 = thread_create(k_sch_main);
+                scheduler_add_thread(s, t1, false, false);
+            }
+        }
 
         s->load = scheduler_compute_load(s, 700, 300);
         atomic_fetch_add(&global_load, s->load);
