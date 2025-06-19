@@ -12,7 +12,7 @@
            */
 
 #define WORK_STEAL_VICTIM_MIN_DIFF                                             \
-    125ULL /* How much more work the victim                                    \
+    110ULL /* How much more work the victim                                    \
             * must be doing than the stealer                                   \
             * for the stealer to go through                                    \
             * with the steal.                                                  \

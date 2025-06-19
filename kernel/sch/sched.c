@@ -349,7 +349,7 @@ void scheduler_init(uint64_t core_count) {
         scheduler_add_thread(s, t0, false, false);
 
         if (i == 0) {
-            for (int j = 0; j < 5; j++) {
+            for (int j = 0; j < 50; j++) {
                 struct thread *t1 = thread_create(k_sch_main);
                 scheduler_add_thread(s, t1, false, false);
             }
