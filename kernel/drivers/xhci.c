@@ -232,6 +232,46 @@ static uint8_t xhci_enable_slot(struct xhci_device *dev) {
     return (xhci_wait_for_response(dev) >> 24) & 0xff;
 }
 
+void xhci_parse_ext_caps(struct xhci_device *dev) {
+    uint32_t hcc_params1 = mmio_read_32(&dev->cap_regs->hcc_params1);
+    uint32_t offset = (hcc_params1 >> 16) & 0xFFFF;
+
+    while (offset) {
+        void *ext_cap_addr = (uint8_t *) dev->cap_regs + offset * 4;
+        uint32_t cap_header = mmio_read_32(ext_cap_addr);
+
+        uint8_t cap_id = cap_header & 0xFF;
+        uint8_t next = (cap_header >> 8) & 0xFF;
+
+        switch (cap_id) {
+        case XHCI_EXT_CAP_ID_LEGACY_SUPPORT: {
+            void *bios_owns_addr = (uint8_t *) ext_cap_addr + 4;
+            void *os_owns_addr = (uint8_t *) ext_cap_addr + 8;
+
+            mmio_write_32(os_owns_addr, 1);
+
+            uint64_t timeout = 1000;
+            while ((mmio_read_32(bios_owns_addr) & 1) && timeout--) {
+                sleep_ms(1);
+            }
+
+            uint32_t own_data = mmio_read_32(bios_owns_addr);
+            if (own_data & 1)
+                k_printf("BIOS ownership handoff failed.\n");
+            else
+                k_printf("BIOS ownership disabled.\n");
+            goto out;
+        }
+
+        default: break;
+        }
+
+        offset = next;
+    }
+out:
+    return;
+}
+
 bool xhci_reset_port(struct xhci_device *dev, uint32_t port_index) {
     uint32_t *portsc = (void *) &dev->port_regs[port_index];
 
@@ -264,6 +304,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
     if (!xhci_controller_reset(dev))
         k_printf("Could not reset XHCI controller\n");
 
+    xhci_parse_ext_caps(dev);
     xhci_setup_event_ring(dev);
 
     xhci_setup_command_ring(dev);
