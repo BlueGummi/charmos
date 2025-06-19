@@ -12,16 +12,24 @@ static inline uint8_t ilog2(uint64_t x) {
     return r;
 }
 
-uint64_t compute_steal_threshold(uint64_t total_threads) {
-    /* Cap to avoid negative or too small thresholds */
-    if (total_threads <= 4)
+uint64_t compute_steal_threshold(uint64_t total_threads, uint64_t core_count) {
+    if (core_count == 0) {
+        k_panic("Why do you have no cores on your machine?\n");
+        return 150; // safety fallback
+    }
+
+    uint64_t threads_per_core = total_threads / core_count;
+
+    // very low thread/core ratio, be conservative
+    if (threads_per_core <= 1)
         return 150;
 
-    if (total_threads >= 512)
+    // very high ratio, allow aggressive stealing
+    if (threads_per_core >= 64)
         return 110;
 
-    uint8_t log = ilog2(total_threads);
-    return 150 - (log * 4);
+    uint8_t log = ilog2(threads_per_core);
+    return 150 - (log * 5);
 }
 
 bool scheduler_can_steal_work(struct scheduler *sched) {

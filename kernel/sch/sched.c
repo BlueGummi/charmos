@@ -15,7 +15,7 @@ struct scheduler **local_schs;
 uint64_t c_count = 1;
 /* This guy helps us figure out if the scheduler's load is
    enough of a portion of the global load to not steal work*/
-_Atomic uint64_t global_load = 0;
+atomic_uint global_load = 0;
 
 /* This is how many cores can be stealing work at once,
  * it is half the core count */
@@ -69,7 +69,7 @@ void schedule(struct cpu_state *cpu) {
 
     if (core_id == 0) {
         uint64_t val = atomic_load(&total_threads);
-        work_steal_min_diff = compute_steal_threshold(val);
+        work_steal_min_diff = compute_steal_threshold(val, c_count);
     }
 
     spin_lock(&sched->lock);
@@ -96,7 +96,7 @@ void schedule(struct cpu_state *cpu) {
         /* Re-insert the thread into its new level
          * `false, true` here says, do NOT change interrupt status,
          * and the resource is already locked */
-        scheduler_add_thread(sched, curr, false, true);
+        scheduler_add_thread(sched, curr, false, true, false);
     }
 
     struct thread *next = NULL;

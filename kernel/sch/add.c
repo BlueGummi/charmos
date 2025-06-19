@@ -4,7 +4,8 @@
 #include <stddef.h>
 
 void scheduler_add_thread(struct scheduler *sched, struct thread *task,
-                          bool change_interrupts, bool already_locked) {
+                          bool change_interrupts, bool already_locked,
+                          bool is_new_thread) {
     if (!sched || !task)
         return;
 
@@ -36,7 +37,9 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
     atomic_fetch_add(&global_load, sched->load);
     sched->thread_count++;
 
-    atomic_fetch_add(&total_threads, 1);
+    if (is_new_thread)
+        atomic_fetch_add(&total_threads, 1);
+
     if (!already_locked)
         spin_unlock(&sched->lock, change_interrupts ? ints : false);
 }

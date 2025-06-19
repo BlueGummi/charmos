@@ -34,13 +34,13 @@ void scheduler_init(uint64_t core_count) {
 
         struct thread *t = thread_create(k_sch_main);
         struct thread *t0 = thread_create(k_sch_other);
-        scheduler_add_thread(s, t, false, false);
-        scheduler_add_thread(s, t0, false, false);
+        scheduler_add_thread(s, t, false, false, true);
+        scheduler_add_thread(s, t0, false, false, true);
 
         if (i == 0) {
             for (int j = 0; j < 50; j++) {
                 struct thread *t1 = thread_create(k_sch_main);
-                scheduler_add_thread(s, t1, false, false);
+                scheduler_add_thread(s, t1, false, false, true);
             }
         }
 
