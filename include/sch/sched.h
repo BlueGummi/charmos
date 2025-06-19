@@ -11,13 +11,6 @@
            * core. This means "% of the average"                               \
            */
 
-#define WORK_STEAL_VICTIM_MIN_DIFF                                             \
-    110ULL /* How much more work the victim                                    \
-            * must be doing than the stealer                                   \
-            * for the stealer to go through                                    \
-            * with the steal.                                                  \
-            */
-
 struct thread_queue {
     struct thread *head;
     struct thread *tail;

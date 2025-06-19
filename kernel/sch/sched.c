@@ -38,6 +38,13 @@ static uint32_t max_concurrent_stealers = 0;
  * attempt any work steals. */
 static atomic_uint active_stealers = 0;
 
+/* total threads running across all cores right now */
+static atomic_uint total_threads = 0;
+
+/* How much more work the victim must be doing than the stealer
+ * for the stealer to go through with the steal. */
+static uint64_t work_steal_min_diff = 130;
+
 void k_sch_main() {
     uint64_t core_id = get_sch_core_id();
     k_printf("Core %llu is in the idle task\n", core_id);
@@ -56,6 +63,26 @@ void k_sch_other() {
     }
 }
 
+/* for work_steal_victim_min_diff */
+static inline uint8_t ilog2(uint64_t x) {
+    uint8_t r = 0;
+    while (x >>= 1)
+        r++;
+    return r;
+}
+
+uint64_t compute_steal_threshold(uint64_t total_threads) {
+    /* Cap to avoid negative or too small thresholds */
+    if (total_threads <= 4)
+        return 140;
+
+    if (total_threads >= 512)
+        return 100;
+
+    uint8_t log = ilog2(total_threads);
+    return 140 - (log * 4);
+}
+
 /* Resource locks in here do not enable interrupts */
 void schedule(struct cpu_state *cpu) {
     uint64_t core_id = get_sch_core_id();
@@ -68,6 +95,13 @@ void schedule(struct cpu_state *cpu) {
     if (!sched->active) {
         LAPIC_REG(LAPIC_REG_EOI) = 0;
         return;
+    }
+
+    /* core 0 will recompute the steal threshold */
+
+    if (core_id == 0) {
+        uint64_t val = atomic_load(&total_threads);
+        work_steal_min_diff = compute_steal_threshold(val);
     }
 
     spin_lock(&sched->lock);
@@ -244,8 +278,8 @@ static struct scheduler *scheduler_pick_victim(struct scheduler *self) {
         bool victim_busy = atomic_load(&potential_victim->being_robbed) ||
                            atomic_load(&potential_victim->stealing_work);
 
-        bool victim_is_poor = (potential_victim->load * 100) <
-                              (self->load * WORK_STEAL_VICTIM_MIN_DIFF);
+        bool victim_is_poor =
+            (potential_victim->load * 100) < (self->load * work_steal_min_diff);
 
         if (victim_busy || victim_is_poor)
             continue;
@@ -394,6 +428,7 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
     atomic_fetch_add(&global_load, sched->load);
     sched->thread_count++;
 
+    atomic_fetch_add(&total_threads, 1);
     if (!already_locked)
         spin_unlock(&sched->lock, change_interrupts ? ints : false);
 }
@@ -499,6 +534,7 @@ void scheduler_rm_thread(struct scheduler *sched, struct thread *task,
     atomic_fetch_add(&global_load, sched->load);
     sched->thread_count--;
 
+    atomic_fetch_sub(&total_threads, 1);
     if (!already_locked)
         spin_unlock(&sched->lock, change_interrupts ? ints : false);
 }
