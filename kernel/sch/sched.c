@@ -2,6 +2,8 @@
 #include <asm.h>
 #include <console/printf.h>
 #include <mem/alloc.h>
+#include <mem/pmm.h>
+#include <mem/vmm.h>
 #include <mp/mp.h>
 #include <sch/sched.h>
 #include <spin_lock.h>
@@ -175,7 +177,8 @@ uint64_t scheduler_compute_load(struct scheduler *sched, uint64_t alpha_scaled,
 void scheduler_init(uint64_t core_count) {
     c_count = core_count;
 
-    local_schs = kmalloc(sizeof(struct scheduler) * core_count);
+    local_schs = kmalloc_aligned(sizeof(struct scheduler) * core_count, 512);
+
     if (!local_schs)
         k_panic("Could not allocate space for local schedulers\n");
 
@@ -311,38 +314,4 @@ void scheduler_rm_thread(struct scheduler *sched, struct thread *task) {
     sched->load = scheduler_compute_load(sched, 700, 300);
     global_load += sched->load;
     sched->thread_count--;
-}
-
-__attribute__((noreturn)) void scheduler_start(struct scheduler *sched) {
-    struct cpu_state *regs = &sched->current->regs;
-
-    asm volatile("push %%rax\n\t"
-                 "push %%rbx\n\t"
-                 "push %%rcx\n\t"
-                 "push %%rdx\n\t"
-                 "push %%rsi\n\t"
-                 "push %%rdi\n\t"
-                 "push %%rbp\n\t"
-                 "push %%r8\n\t"
-                 "push %%r9\n\t"
-                 "push %%r10\n\t"
-                 "push %%r11\n\t"
-                 "push %%r12\n\t"
-                 "push %%r13\n\t"
-                 "push %%r14\n\t"
-                 "push %%r15\n\t"
-
-                 "push %[ss]\n\t"
-                 "push %%rsp\n\t"
-                 "push %[rflags]\n\t"
-                 "push %[cs]\n\t"
-                 "push %[rip]\n\t"
-
-                 "iretq\n\t"
-                 :
-                 : [rip] "m"(regs->rip), [cs] "m"(regs->cs),
-                   [rflags] "m"(regs->rflags), [ss] "m"(regs->ss)
-                 : "memory");
-
-    __builtin_unreachable();
 }

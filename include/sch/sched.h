@@ -22,6 +22,7 @@ struct scheduler {
     uint64_t thread_count;
     uint64_t load;         // Heuristically calculated load estimate
     uint64_t tick_counter; // Global tick count for periodic rebalance
+    uint8_t whatever;
 };
 
 void scheduler_init(uint64_t core_count);

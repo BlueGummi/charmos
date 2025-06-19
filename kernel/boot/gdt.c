@@ -78,29 +78,6 @@ void gdt_init(struct gdt_entry *gdt, struct tss *tss) {
     asm volatile("ltr %w0" : : "r"(0x18));
 }
 
-void *kmalloc_aligned(size_t size, size_t alignment) {
-    size_t total_size = size + alignment - 1 + sizeof(void *);
-    void *raw = kmalloc(total_size);
-    if (!raw) {
-        return NULL;
-    }
-
-    uintptr_t raw_addr = (uintptr_t) raw + sizeof(void *);
-    uintptr_t aligned_addr = (raw_addr + alignment - 1) & ~(alignment - 1);
-
-    ((void **) aligned_addr)[-1] = raw;
-
-    return (void *) aligned_addr;
-}
-
-void kfree_aligned(void *ptr) {
-    if (!ptr)
-        return;
-    void *raw = ((void **) ptr)[-1];
-    extern void kfree(void *ptr);
-    kfree(raw);
-}
-
 void gdt_install(void) {
     struct gdt_entry *gdt =
         kmalloc_aligned(sizeof(struct gdt_entry) * GDT_ENTRIES, 8);
