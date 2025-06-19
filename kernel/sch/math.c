@@ -15,13 +15,13 @@ static inline uint8_t ilog2(uint64_t x) {
 uint64_t compute_steal_threshold(uint64_t total_threads) {
     /* Cap to avoid negative or too small thresholds */
     if (total_threads <= 4)
-        return 140;
+        return 150;
 
     if (total_threads >= 512)
-        return 100;
+        return 110;
 
     uint8_t log = ilog2(total_threads);
-    return 140 - (log * 4);
+    return 150 - (log * 4);
 }
 
 bool scheduler_can_steal_work(struct scheduler *sched) {
