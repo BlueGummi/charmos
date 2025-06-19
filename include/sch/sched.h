@@ -33,7 +33,7 @@ void schedule(struct cpu_state *cpu);
 void k_sch_main();
 
 extern struct scheduler global_sched;
-extern struct scheduler **local_schs;
+extern struct scheduler *local_schs;
 
 #define CLI asm volatile("cli")
 #define STI asm volatile("sti")

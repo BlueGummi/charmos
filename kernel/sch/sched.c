@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <string.h>
 
-struct scheduler **local_schs;
+struct scheduler *local_schs;
 static uint64_t c_count = 1;
 
 /* This guy helps us figure out if the scheduler's load is
@@ -33,7 +33,7 @@ void k_sch_other() {
 
 void schedule(struct cpu_state *cpu) {
     uint64_t core_id = get_sch_core_id();
-    struct scheduler *sched = local_schs[core_id];
+    struct scheduler *sched = &local_schs[core_id];
 
     if (!sched->active) {
         LAPIC_REG(LAPIC_REG_EOI) = 0;
@@ -175,14 +175,12 @@ uint64_t scheduler_compute_load(struct scheduler *sched, uint64_t alpha_scaled,
 void scheduler_init(uint64_t core_count) {
     c_count = core_count;
 
-    local_schs = kmalloc(sizeof(struct scheduler *) * core_count);
+    local_schs = kmalloc(sizeof(struct scheduler) * core_count);
     if (!local_schs)
         k_panic("Could not allocate space for local schedulers\n");
 
     for (uint64_t i = 0; i < core_count; i++) {
-        struct scheduler *s = kzalloc(sizeof(struct scheduler));
-        if (!s)
-            k_panic("Could not allocate scheduler for core %lu\n", i);
+        struct scheduler *s = &local_schs[i]; // Now a direct reference
 
         s->active = true;
         s->thread_count = 0;
@@ -195,7 +193,6 @@ void scheduler_init(uint64_t core_count) {
             s->queues[lvl].tail = NULL;
         }
 
-        local_schs[i] = s;
         struct thread *t = thread_create(k_sch_main);
         struct thread *t0 = thread_create(k_sch_other);
         scheduler_add_thread(s, t);
