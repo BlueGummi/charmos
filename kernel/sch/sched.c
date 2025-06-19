@@ -12,38 +12,26 @@
 #include <string.h>
 
 struct scheduler **local_schs;
-static uint64_t c_count = 1;
-static bool scheduler_can_steal_work(struct scheduler *sched);
-static uint64_t scheduler_compute_load(struct scheduler *sched,
-                                       uint64_t alpha_scaled,
-                                       uint64_t beta_scaled);
-
-static struct scheduler *scheduler_pick_victim(struct scheduler *self);
-static struct thread *scheduler_steal_work(struct scheduler *victim);
-
-static bool try_begin_steal();
-
-static void end_steal();
-
+uint64_t c_count = 1;
 /* This guy helps us figure out if the scheduler's load is
    enough of a portion of the global load to not steal work*/
-static _Atomic uint64_t global_load = 0;
+_Atomic uint64_t global_load = 0;
 
 /* This is how many cores can be stealing work at once,
  * it is half the core count */
-static uint32_t max_concurrent_stealers = 0;
+uint32_t max_concurrent_stealers = 0;
 
 /* This is how many cores are attempting a work steal right now.
  * If this is above the maximum concurrent stealers, we will not
  * attempt any work steals. */
-static atomic_uint active_stealers = 0;
+atomic_uint active_stealers = 0;
 
 /* total threads running across all cores right now */
-static atomic_uint total_threads = 0;
+atomic_uint total_threads = 0;
 
 /* How much more work the victim must be doing than the stealer
  * for the stealer to go through with the steal. */
-static uint64_t work_steal_min_diff = 130;
+uint64_t work_steal_min_diff = 130;
 
 void k_sch_main() {
     uint64_t core_id = get_sch_core_id();
@@ -61,26 +49,6 @@ void k_sch_other() {
         k_printf("Core %llu is in the other idle task empty loop\n", core_id);
         asm volatile("hlt");
     }
-}
-
-/* for work_steal_victim_min_diff */
-static inline uint8_t ilog2(uint64_t x) {
-    uint8_t r = 0;
-    while (x >>= 1)
-        r++;
-    return r;
-}
-
-uint64_t compute_steal_threshold(uint64_t total_threads) {
-    /* Cap to avoid negative or too small thresholds */
-    if (total_threads <= 4)
-        return 140;
-
-    if (total_threads >= 512)
-        return 100;
-
-    uint8_t log = ilog2(total_threads);
-    return 140 - (log * 4);
 }
 
 /* Resource locks in here do not enable interrupts */
@@ -245,296 +213,4 @@ load_new_thread:
 
     /* do not change interrupt status */
     spin_unlock(&sched->lock, false);
-}
-
-static bool try_begin_steal() {
-    unsigned current = atomic_load(&active_stealers);
-    while (current < max_concurrent_stealers) {
-        if (atomic_compare_exchange_weak(&active_stealers, &current,
-                                         current + 1)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static void end_steal() {
-    atomic_fetch_sub(&active_stealers, 1);
-}
-
-static struct scheduler *scheduler_pick_victim(struct scheduler *self) {
-    // self->stealing_work should already be set before this is called
-    /* Ideally, we want to steal from our busiest core */
-    uint64_t max_load = 0;
-    struct scheduler *victim = NULL;
-
-    for (uint64_t i = 0; i < c_count - 1; i++) {
-        struct scheduler *potential_victim = local_schs[i];
-
-        /* duh.... */
-        if (potential_victim == self)
-            continue;
-
-        bool victim_busy = atomic_load(&potential_victim->being_robbed) ||
-                           atomic_load(&potential_victim->stealing_work);
-
-        bool victim_is_poor =
-            (potential_victim->load * 100) < (self->load * work_steal_min_diff);
-
-        if (victim_busy || victim_is_poor)
-            continue;
-
-        if (potential_victim->load > max_load) {
-            max_load = potential_victim->load;
-            victim = potential_victim;
-        }
-    }
-
-    if (victim)
-        atomic_store(&victim->being_robbed, true);
-
-    return victim;
-}
-
-static bool scheduler_can_steal_work(struct scheduler *sched) {
-    if (c_count == 0) {
-        k_panic("Why are there no cores on your machine?\n");
-    }
-
-    uint64_t val = atomic_load(&global_load);
-    uint64_t avg_core_load = val / c_count;
-
-    // steal if this core's load is less than WORK_STEAL_THRESHOLD% of average
-    uint64_t threshold_load =
-        ((avg_core_load * WORK_STEAL_THRESHOLD) / 100ULL) ?: 1;
-
-    return (sched->load < threshold_load);
-}
-
-static uint64_t scheduler_compute_load(struct scheduler *sched,
-                                       uint64_t alpha_scaled,
-                                       uint64_t beta_scaled) {
-    if (!sched)
-        return 0;
-
-    uint64_t ready_count = 0;
-    uint64_t weighted_sum = 0;
-
-    for (int level = 0; level < MLFQ_LEVELS; level++) {
-        struct thread_queue *q = &sched->queues[level];
-        if (!q->head)
-            continue;
-
-        struct thread *start = q->head;
-        struct thread *current = start;
-
-        do {
-            if (current->state == READY) {
-                ready_count++;
-                // Weight lower levels more heavily
-                weighted_sum += (MLFQ_LEVELS - level);
-            }
-            current = current->next;
-        } while (current != start);
-    }
-
-    if (ready_count == 0)
-        return 0;
-
-    // floating point math is bad so we scale it
-    uint64_t load_scaled =
-        ready_count *
-        (alpha_scaled + (beta_scaled * weighted_sum) / ready_count);
-
-    return load_scaled;
-}
-
-void scheduler_init(uint64_t core_count) {
-    c_count = core_count;
-    max_concurrent_stealers = c_count / 2;
-
-    /* I mean, if we have one core and that core wants
-     * to steal work from itself, go ahead? */
-    if (max_concurrent_stealers == 0)
-        max_concurrent_stealers = 1;
-
-    local_schs = kmalloc(sizeof(struct scheduler *) * core_count);
-    if (!local_schs)
-        k_panic("Could not allocate scheduler pointer array\n");
-
-    for (uint64_t i = 0; i < core_count; i++) {
-        struct scheduler *s = kmalloc(sizeof(struct scheduler));
-        if (!s)
-            k_panic("Could not allocate scheduler %lu\n", i);
-
-        s->active = true;
-        s->thread_count = 0;
-        s->core_id = -1;
-        s->tick_counter = 0;
-
-        for (int lvl = 0; lvl < MLFQ_LEVELS; lvl++) {
-            s->queues[lvl].head = NULL;
-            s->queues[lvl].tail = NULL;
-        }
-
-        struct thread *t = thread_create(k_sch_main);
-        struct thread *t0 = thread_create(k_sch_other);
-        scheduler_add_thread(s, t, false, false);
-        scheduler_add_thread(s, t0, false, false);
-
-        if (i == 0) {
-            for (int j = 0; j < 50; j++) {
-                struct thread *t1 = thread_create(k_sch_main);
-                scheduler_add_thread(s, t1, false, false);
-            }
-        }
-
-        s->load = scheduler_compute_load(s, 700, 300);
-        atomic_fetch_add(&global_load, s->load);
-        local_schs[i] = s;
-    }
-}
-
-void scheduler_add_thread(struct scheduler *sched, struct thread *task,
-                          bool change_interrupts, bool already_locked) {
-    if (!sched || !task)
-        return;
-
-    bool ints;
-    if (!already_locked)
-        ints = spin_lock(&sched->lock);
-
-    uint8_t level = task->mlfq_level;
-    struct thread_queue *q = &sched->queues[level];
-
-    task->next = NULL;
-    task->prev = NULL;
-
-    if (!q->head) {
-        q->head = task;
-        q->tail = task;
-        task->next = task;
-        task->prev = task;
-    } else {
-        task->prev = q->tail;
-        task->next = q->head;
-        q->tail->next = task;
-        q->head->prev = task;
-        q->tail = task;
-    }
-
-    atomic_fetch_sub(&global_load, sched->load);
-    sched->load = scheduler_compute_load(sched, 700, 300);
-    atomic_fetch_add(&global_load, sched->load);
-    sched->thread_count++;
-
-    atomic_fetch_add(&total_threads, 1);
-    if (!already_locked)
-        spin_unlock(&sched->lock, change_interrupts ? ints : false);
-}
-
-/* We do not enable interrupts here because this is only ever
- * called from the `schedule()` function which should not enable
- * interrupts inside of itself */
-
-/* TODO: Make this pick the busiest thread to steal from */
-static struct thread *scheduler_steal_work(struct scheduler *victim) {
-    if (!victim || victim->thread_count == 0)
-        return NULL;
-
-    spin_lock(&victim->lock);
-    for (int level = MLFQ_LEVELS - 1; level >= 0; level--) {
-        struct thread_queue *q = &victim->queues[level];
-
-        if (!q->head)
-            continue;
-
-        struct thread *start = q->head;
-        struct thread *current = start;
-
-        do {
-            if (current->state == READY) {
-                if (current == q->head && current == q->tail) {
-                    q->head = NULL;
-                    q->tail = NULL;
-                } else if (current == q->head) {
-                    q->head = current->next;
-                    q->head->prev = q->tail;
-                    q->tail->next = q->head;
-                } else if (current == q->tail) {
-                    q->tail = current->prev;
-                    q->tail->next = q->head;
-                    q->head->prev = q->tail;
-                } else {
-                    current->prev->next = current->next;
-                    current->next->prev = current->prev;
-                }
-
-                current->next = NULL;
-                current->prev = NULL;
-                victim->thread_count--;
-
-                /* do not re-enable interrupts!!! */
-                spin_unlock(&victim->lock, false);
-                return current;
-            }
-
-            current = current->next;
-        } while (current != start);
-    }
-
-    spin_unlock(&victim->lock, false);
-    return NULL; // Nothing to steal
-}
-
-void scheduler_rm_thread(struct scheduler *sched, struct thread *task,
-                         bool change_interrupts, bool already_locked) {
-    if (!sched || !task)
-        return;
-
-    bool ints;
-    if (!already_locked)
-        ints = spin_lock(&sched->lock);
-
-    uint8_t level = task->mlfq_level;
-    struct thread_queue *q = &sched->queues[level];
-
-    if (!q->head) {
-        if (!already_locked)
-            spin_unlock(&sched->lock, change_interrupts ? ints : false);
-
-        return;
-    }
-
-    if (q->head == q->tail && q->head == task) {
-        q->head = NULL;
-        q->tail = NULL;
-    } else if (q->head == task) {
-        q->head = q->head->next;
-        q->head->prev = q->tail;
-        q->tail->next = q->head;
-    } else if (q->tail == task) {
-        q->tail = q->tail->prev;
-        q->tail->next = q->head;
-        q->head->prev = q->tail;
-    } else {
-        struct thread *current = q->head->next;
-        while (current != q->head && current != task)
-            current = current->next;
-
-        if (current == task) {
-            current->prev->next = current->next;
-            current->next->prev = current->prev;
-        }
-    }
-
-    thread_free(task);
-    atomic_fetch_sub(&global_load, sched->load);
-    sched->load = scheduler_compute_load(sched, 700, 300);
-    atomic_fetch_add(&global_load, sched->load);
-    sched->thread_count--;
-
-    atomic_fetch_sub(&total_threads, 1);
-    if (!already_locked)
-        spin_unlock(&sched->lock, change_interrupts ? ints : false);
 }

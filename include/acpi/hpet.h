@@ -11,7 +11,6 @@ uint64_t hpet_read64(uint64_t offset);
 #define HPET_TIMER0_CONF_OFFSET 0x100
 #define HPET_TIMER0_COMPARATOR_OFFSET 0x108
 
-
 union ioapic_redirection_entry {
     uint64_t raw;
     struct {

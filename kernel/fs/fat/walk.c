@@ -67,7 +67,6 @@ static bool fat12_16_walk_cluster(struct fat_fs *fs, uint32_t cluster,
                 : (sectors_to_read * bpb->bytes_per_sector) /
                       sizeof(struct fat_dirent);
 
-
     for (uint32_t i = 0; i < entries_per_cluster; i++) {
         struct fat_dirent *entry =
             (struct fat_dirent *) (sector_buf + i * sizeof(struct fat_dirent));

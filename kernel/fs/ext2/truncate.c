@@ -77,7 +77,7 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
                 uint32_t *dind = kmalloc(fs->block_size);
                 if (!dind)
                     return;
-                
+
                 ext2_block_ptr_read(fs, tind[ind1], (uint8_t *) dind);
                 if (dind[ind2]) {
                     uint32_t *ind = kmalloc(fs->block_size);

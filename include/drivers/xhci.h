@@ -8,7 +8,7 @@
 // NOTE: In scatter gathers, the first TRD must NOT point to a page-aligned
 // boundary. Following TRDs must point to page-aligned boundaries.
 
-#define XHCI_EXT_CAP_ID_LEGACY_SUPPORT     1
+#define XHCI_EXT_CAP_ID_LEGACY_SUPPORT 1
 #define XHCI_EXT_CAP_ID_SUPPORTED_PROTOCOL 2
 // TRB Types (bits 10–15 in control word)
 #define TRB_TYPE_RESERVED 0x00

@@ -37,7 +37,8 @@ bool ahci_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *out_buf,
         return false;
     }
 
-    uint8_t *buffer = ahci_prepare_command(port, slot, false, NULL, count * 512);
+    uint8_t *buffer =
+        ahci_prepare_command(port, slot, false, NULL, count * 512);
     if (!buffer) {
         return false;
     }

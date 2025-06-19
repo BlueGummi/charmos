@@ -1,7 +1,7 @@
-#include <tss.h>
 #include <sch/thread.h>
 #include <spin_lock.h>
 #include <stdint.h>
+#include <tss.h>
 
 enum core_state {
     IDLE,

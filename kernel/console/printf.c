@@ -39,7 +39,7 @@ static void serial_puts(const char *str, uint64_t len) {
 
 void double_print(struct flanterm_context *f, const char *str, uint64_t len) {
     serial_puts(str, len);
-//    flanterm_write(f, str, len);
+    //    flanterm_write(f, str, len);
 }
 
 void k_printf_init(struct limine_framebuffer *fb) {

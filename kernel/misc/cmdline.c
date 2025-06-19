@@ -50,7 +50,8 @@ void cmdline_parse(const char *input) {
 
         if (strcmp(var_buf, "root") == 0) {
             if (strcmp(g_root_part, "") != 0)
-                k_panic("Cannot have multiple root entries in the command line\n");
+                k_panic(
+                    "Cannot have multiple root entries in the command line\n");
 
             char *val = kmalloc(strlen(val_buf) + 1);
             if (!val)

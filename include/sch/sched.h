@@ -36,9 +36,27 @@ void scheduler_rm_thread(struct scheduler *sched, struct thread *thread,
                          bool change_interrupts, bool already_locked);
 void schedule(struct cpu_state *cpu);
 void k_sch_main();
+void k_sch_other();
+
+bool scheduler_can_steal_work(struct scheduler *sched);
+uint64_t scheduler_compute_load(struct scheduler *sched, uint64_t alpha_scaled,
+                                uint64_t beta_scaled);
+uint64_t compute_steal_threshold(uint64_t total_threads);
+
+struct scheduler *scheduler_pick_victim(struct scheduler *self);
+struct thread *scheduler_steal_work(struct scheduler *victim);
+
+bool try_begin_steal();
+void end_steal();
 
 extern struct scheduler global_sched;
 extern struct scheduler **local_schs;
+extern _Atomic uint64_t global_load;
+extern uint32_t max_concurrent_stealers;
+extern atomic_uint active_stealers;
+extern atomic_uint total_threads;
+extern uint64_t work_steal_min_diff;
+extern uint64_t c_count;
 
 #define CLI asm volatile("cli")
 #define STI asm volatile("sti")
