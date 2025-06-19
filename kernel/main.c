@@ -55,7 +55,6 @@ struct vfs_mount *g_mount_list_head; // TODO: migrate these globals
 
 void k_main(void) {
 
-    uint64_t start = rdtsc();
     uint64_t c_cnt = mp_request.response->cpu_count;
 
     // FB
@@ -77,7 +76,7 @@ void k_main(void) {
 
     // IDT
     idt_alloc(c_cnt);
-//    idt_install(0);
+    idt_install(0);
 
     // Early device init
     uacpi_init();
@@ -89,32 +88,21 @@ void k_main(void) {
     // Filesystem init
     cmdline_parse(cmdline_request.response->cmdline);
     registry_setup();
-//    registry_print_devices();
+    //    registry_print_devices();
 
     k_printf("done\n");
 
-    k_printf("Wow! That took %llu clock cycles!\n", rdtsc() - start);
-
     // Scheduler
-    scheduler_init(&global_sched, c_cnt);
-
-    for (uint64_t i = 0; i < c_cnt; i++) {
-        struct scheduler *s = kmalloc(sizeof(struct scheduler));
-        scheduler_local_init(s, i);
-        struct thread *t = thread_create(k_sch_main);
-        scheduler_add_thread(&global_sched, t);
-    }
+    scheduler_init(c_cnt);
 
     struct core *c = kmalloc(sizeof(struct core));
     c->state = IDLE;
     c->id = 0;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
-    scheduler_rebalance(&global_sched);
     lapic_init();
     mp_inform_of_cr3();
 
     asm volatile("sti");
-    k_sch_main();
     while (1) {
         asm("hlt");
     }

@@ -35,20 +35,19 @@ void wakeup() {
 
     uint32_t lapic_id_raw = LAPIC_REG(LAPIC_REG_ID);
     uint64_t cpu = (lapic_id_raw >> 24) & 0xFF;
-    lapic_init();
-    gdt_install();
-    idt_install(cpu);
-
     struct core *c = kmalloc(sizeof(struct core));
     if (!c)
         k_panic("Core %d could not allocate space for struct\n", cpu);
+
+    gdt_install();
+    idt_install(cpu);
+    lapic_init();
     c->id = cpu;
     c->state = IDLE;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
 
     spin_unlock(&wakeup_lock, ints);
     asm("sti");
-    k_sch_main();
     while (1)
         asm("hlt");
 }

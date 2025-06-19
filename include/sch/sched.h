@@ -1,27 +1,39 @@
+#pragma once
 #include <sch/thread.h>
 #include <stdbool.h>
-struct scheduler {
-    bool active;            // Currently should be run?
-    struct thread *head;    // First task
-    struct thread *tail;    // Last task
-    struct thread *current; // One to run
-    uint64_t task_cnt;
+
+#define MLFQ_LEVELS 5 // Number of priority queues (0 = highest priority)
+
+#define WORK_STEAL_THRESHOLD                                                   \
+    75ULL /* How little work the core needs to be                              \
+           * doing to try to steal work from another                           \
+           * core. This means "75% of the average"                             \
+           */
+
+struct thread_queue {
+    struct thread *head;
+    struct thread *tail;
 };
 
-void scheduler_init(struct scheduler *sched, uint64_t core_count);
+struct scheduler {
+    bool active;
+    struct thread_queue queues[MLFQ_LEVELS]; // MLFQ queues
+    struct thread *current;
+    uint64_t thread_count;
+    uint64_t load;         // Heuristically calculated load estimate
+    uint64_t tick_counter; // Global tick count for periodic rebalance
+};
+
+void scheduler_init(uint64_t core_count);
 void scheduler_add_thread(struct scheduler *sched, struct thread *thread);
 void scheduler_rm_thread(struct scheduler *sched, struct thread *thread);
 void scheduler_rebalance(struct scheduler *sched);
-void scheduler_local_init(struct scheduler *sched, uint64_t core_id);
-__attribute__((noreturn)) void
-scheduler_start(struct scheduler *sched);
+__attribute__((noreturn)) void scheduler_start(struct scheduler *sched);
 void schedule(struct cpu_state *cpu);
-void scheduler_rm_id(struct scheduler *sched, uint64_t thread_id);
 void k_sch_main();
+
 extern struct scheduler global_sched;
 extern struct scheduler **local_schs;
-extern void timer_interrupt_handler(void);
-#define PIT_HZ 100
+
 #define CLI asm volatile("cli")
 #define STI asm volatile("sti")
-#pragma once

@@ -6,9 +6,15 @@ struct cpu_state {
 };
 
 enum thread_state {
-    READY,
-    RUNNING,
-    HALTED,
+    NEW,        // Thread is created but not yet scheduled
+    READY,      // Thread is ready to run but not currently running
+    RUNNING,    // Thread is currently executing
+    BLOCKED,    // Waiting on I/O, lock, or condition (e.g. sleep, mutex)
+    SLEEPING,   // Temporarily not runnable for a set time (like `sleep()`)
+    WAITING,    // Similar to BLOCKED but specifically for event/resource
+    ZOMBIE,     // Finished executing but parent hasn't reaped it yet
+    TERMINATED, // Fully done, can be cleaned up
+    HALTED,     // Thread manually suspended (like `kill -STOP`)
 };
 
 struct thread {
@@ -19,7 +25,9 @@ struct thread {
     struct thread *next;
     struct thread *prev;
     enum thread_state state;
-    int64_t curr_thread; // -1 if not being ran
+    int64_t curr_thread;    // -1 if not being ran
+    uint8_t mlfq_level;     // Current priority level
+    uint64_t time_in_level; // Ticks at this level
 };
 
 struct thread *thread_create(void (*entry_point)(void));

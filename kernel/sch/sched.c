@@ -10,10 +10,23 @@
 
 struct scheduler **local_schs;
 static uint64_t c_count = 1;
-struct spinlock l;
+
+/* This guy helps us figure out if the scheduler's load is
+   enough of a portion of the global load to not steal work*/
+static uint64_t global_load;
 
 void k_sch_main() {
+    uint64_t core_id = get_sch_core_id();
     while (1) {
+        k_printf("Core %u is in the idle task\n", core_id);
+        asm volatile("hlt");
+    }
+}
+
+void k_sch_other() {
+    uint64_t core_id = get_sch_core_id();
+    while (1) {
+        k_printf("Core %u is in the other idle task\n", core_id);
         asm volatile("hlt");
     }
 }
@@ -22,219 +35,285 @@ void schedule(struct cpu_state *cpu) {
     uint64_t core_id = get_sch_core_id();
     struct scheduler *sched = local_schs[core_id];
 
-    LAPIC_REG(LAPIC_REG_EOI) = 0;
-
     if (!sched->active) {
+        LAPIC_REG(LAPIC_REG_EOI) = 0;
         return;
     }
 
-    sched->current->state = READY;
-    if (sched->current) {
-        memcpy(&sched->current->regs, cpu, sizeof(struct cpu_state));
-        sched->current =
-            sched->current->next ? sched->current->next : sched->head;
+    struct thread *curr = sched->current;
+
+    // Move the current thread to its new place
+    if (curr && curr->state == RUNNING) {
+        memcpy(&curr->regs, cpu, sizeof(struct cpu_state));
+        curr->state = READY;
+        curr->time_in_level++;
+
+        uint8_t level = curr->mlfq_level;
+        uint64_t timeslice = 1ULL << level; // TODO: Statically calculate these
+
+        if (curr->time_in_level >= timeslice) {
+            curr->time_in_level = 0;
+
+            // Demote if not at lowest level
+            if (level < MLFQ_LEVELS - 1) {
+                curr->mlfq_level++;
+            }
+        }
+
+        // Re-insert the thread into its new level
+        scheduler_add_thread(sched, curr);
     }
 
-    if (sched->current) {
-        memcpy(cpu, &sched->current->regs, sizeof(struct cpu_state));
+    // Pick next READY thread from highest non-empty level
+    struct thread *next = NULL;
+
+    for (int lvl = 0; lvl < MLFQ_LEVELS; lvl++) {
+        struct thread_queue *q = &sched->queues[lvl];
+
+        if (!q->head)
+            continue;
+
+        struct thread *start = q->head;
+        struct thread *iter = start;
+
+        do {
+            if (iter->state == READY) {
+                next = iter;
+                break;
+            }
+            iter = iter->next;
+        } while (iter != start);
+
+        if (next) {
+            // Remove from queue
+            if (next == q->head && next == q->tail) {
+                q->head = NULL;
+                q->tail = NULL;
+            } else if (next == q->head) {
+                q->head = next->next;
+                q->head->prev = q->tail;
+                q->tail->next = q->head;
+            } else if (next == q->tail) {
+                q->tail = next->prev;
+                q->tail->next = q->head;
+                q->head->prev = q->tail;
+            } else {
+                next->prev->next = next->next;
+                next->next->prev = next->prev;
+            }
+
+            next->next = NULL;
+            next->prev = NULL;
+            break;
+        }
     }
-    sched->current->state = RUNNING;
-    return;
+
+    if (next) {
+        sched->current = next;
+        memcpy(cpu, &next->regs, sizeof(struct cpu_state));
+        next->state = RUNNING;
+    } else {
+        sched->current = NULL;
+        k_panic("No threads to run! State should not be reached!\n");
+    }
+
+    struct core *c = (void *) rdmsr(MSR_GS_BASE);
+    c->current_thread = next;
+    LAPIC_REG(LAPIC_REG_EOI) = 0;
 }
 
-void scheduler_local_init(struct scheduler *sched, uint64_t core_id) {
-    sched->active = true;
-    sched->head = NULL;
-    sched->tail = NULL;
-    sched->current = NULL;
-    sched->task_cnt = 0;
-    local_schs[core_id] = sched;
+bool scheduler_can_steal_work(struct scheduler *sched) {
+    if (c_count == 0) {
+        k_panic("Why are there no cores on your machine?\n");
+    }
+
+    uint64_t avg_core_load = global_load / c_count;
+
+    // steal if this core's load is less than 75% of average
+    uint64_t threshold_load = (avg_core_load * WORK_STEAL_THRESHOLD) / 100ULL;
+
+    return (sched->load < threshold_load);
 }
 
-void scheduler_init(struct scheduler *sched, uint64_t core_count) {
+uint64_t scheduler_compute_load(struct scheduler *sched, uint64_t alpha_scaled,
+                                uint64_t beta_scaled) {
+    if (!sched)
+        return 0;
+
+    uint64_t ready_count = 0;
+    uint64_t weighted_sum = 0;
+
+    for (int level = 0; level < MLFQ_LEVELS; level++) {
+        struct thread_queue *q = &sched->queues[level];
+        if (!q->head)
+            continue;
+
+        struct thread *start = q->head;
+        struct thread *current = start;
+
+        do {
+            if (current->state == READY) {
+                ready_count++;
+                // Weight lower levels more heavily
+                weighted_sum += (MLFQ_LEVELS - level);
+            }
+            current = current->next;
+        } while (current != start);
+    }
+
+    if (ready_count == 0)
+        return 0;
+
+    // floating point math is bad so we scale it
+    uint64_t load_scaled =
+        ready_count *
+        (alpha_scaled + (beta_scaled * weighted_sum) / ready_count);
+
+    return load_scaled;
+}
+
+void scheduler_init(uint64_t core_count) {
     c_count = core_count;
-    local_schs = kmalloc(sizeof(struct scheduler) * core_count);
+
+    local_schs = kmalloc(sizeof(struct scheduler *) * core_count);
     if (!local_schs)
         k_panic("Could not allocate space for local schedulers\n");
 
-    sched->active = false;
-    sched->head = NULL;
-    sched->tail = NULL;
-    sched->current = NULL;
-    sched->task_cnt = 0;
-}
+    for (uint64_t i = 0; i < core_count; i++) {
+        struct scheduler *s = kzalloc(sizeof(struct scheduler));
+        if (!s)
+            k_panic("Could not allocate scheduler for core %lu\n", i);
 
-// todo: don't copy code so much
-static void scheduler_l_add_thread(struct scheduler *sched, struct thread *t) {
-    if (sched == NULL || t == NULL) {
-        return;
-    }
+        s->active = true;
+        s->thread_count = 0;
+        s->load = scheduler_compute_load(s, 700, 300);
+        global_load += s->load;
+        s->tick_counter = 0;
 
-    struct thread *task = kmalloc(sizeof(struct thread));
-    if (!task)
-        k_panic("Could not allocate space for task\n");
-
-    memcpy(task, t, sizeof(struct thread));
-
-    task->next = NULL;
-    task->prev = NULL;
-
-    if (sched->head == NULL) { // Empty list
-        sched->head = task;
-        sched->tail = task;
-        task->next = task;
-        task->prev = task;
-    } else { // non-empty list
-        task->prev = sched->tail;
-        task->next = sched->head;
-
-        sched->tail->next = task;
-        sched->head->prev = task;
-
-        sched->tail = task;
-    }
-
-    if (!sched->current) // Nothing running
-        sched->current = task;
-}
-
-static void scheduler_l_rm_thread(struct scheduler *sched,
-                                  struct thread *task) {
-    if (sched == NULL || task == NULL || sched->head == NULL) { // Invalid
-        return;
-    }
-
-    if (sched->head == sched->tail && sched->head == task) { // Only task
-        sched->head = NULL;
-        sched->tail = NULL;
-        return;
-    }
-
-    if (sched->head == task) {
-        sched->head = sched->head->next;
-        sched->head->prev = sched->tail;
-        sched->tail->next = sched->head;
-    } else if (sched->tail == task) {
-        sched->tail = sched->tail->prev;
-        sched->tail->next = sched->head;
-        sched->head->prev = sched->tail;
-    } else {
-        struct thread *current = sched->head->next;
-        while (current != sched->head && current != task) {
-            current = current->next;
+        for (int lvl = 0; lvl < MLFQ_LEVELS; lvl++) {
+            s->queues[lvl].head = NULL;
+            s->queues[lvl].tail = NULL;
         }
 
-        if (current == task) {
-            current->prev->next = current->next;
-            current->next->prev = current->prev;
-        }
+        local_schs[i] = s;
+        struct thread *t = thread_create(k_sch_main);
+        struct thread *t0 = thread_create(k_sch_other);
+        scheduler_add_thread(s, t);
+        scheduler_add_thread(s, t0);
     }
 }
 
 void scheduler_add_thread(struct scheduler *sched, struct thread *task) {
-    if (sched == NULL || task == NULL) {
+    if (!sched || !task)
         return;
-    }
+
+    uint8_t level = task->mlfq_level;
+    struct thread_queue *q = &sched->queues[level];
 
     task->next = NULL;
     task->prev = NULL;
 
-    if (sched->head == NULL) { // Empty list
-        sched->head = task;
-        sched->tail = task;
+    if (!q->head) {
+        q->head = task;
+        q->tail = task;
         task->next = task;
         task->prev = task;
-    } else { // non-empty list
-        task->prev = sched->tail;
-        task->next = sched->head;
-
-        sched->tail->next = task;
-        sched->head->prev = task;
-
-        sched->tail = task;
+    } else {
+        task->prev = q->tail;
+        task->next = q->head;
+        q->tail->next = task;
+        q->head->prev = task;
+        q->tail = task;
     }
 
-    if (!sched->current) // Nothing running
-        sched->current = task;
+    global_load -= sched->load;
+    sched->load = scheduler_compute_load(sched, 700, 300);
+    global_load += sched->load;
+    sched->thread_count++;
+}
 
-    sched->task_cnt++;
+struct thread *scheduler_steal_task(struct scheduler *victim) {
+    if (!victim || victim->thread_count == 0)
+        return NULL;
+
+    for (int level = MLFQ_LEVELS - 1; level >= 0; level--) {
+        struct thread_queue *q = &victim->queues[level];
+
+        if (!q->head)
+            continue;
+
+        struct thread *start = q->head;
+        struct thread *current = start;
+
+        do {
+            if (current->state == READY) {
+                if (current == q->head && current == q->tail) {
+                    q->head = NULL;
+                    q->tail = NULL;
+                } else if (current == q->head) {
+                    q->head = current->next;
+                    q->head->prev = q->tail;
+                    q->tail->next = q->head;
+                } else if (current == q->tail) {
+                    q->tail = current->prev;
+                    q->tail->next = q->head;
+                    q->head->prev = q->tail;
+                } else {
+                    current->prev->next = current->next;
+                    current->next->prev = current->prev;
+                }
+
+                current->next = NULL;
+                current->prev = NULL;
+                victim->thread_count--;
+
+                return current;
+            }
+
+            current = current->next;
+        } while (current != start);
+    }
+
+    return NULL; // Nothing to steal
 }
 
 void scheduler_rm_thread(struct scheduler *sched, struct thread *task) {
-    if (sched == NULL || task == NULL || sched->head == NULL) { // Invalid
+    if (!sched || !task)
         return;
-    }
 
-    if (sched->head == sched->tail && sched->head == task) { // Only task
-        sched->head = NULL;
-        sched->tail = NULL;
-        sched->task_cnt--;
+    uint8_t level = task->mlfq_level;
+    struct thread_queue *q = &sched->queues[level];
+
+    if (!q->head)
         return;
-    }
 
-    if (sched->head == task) {
-        sched->head = sched->head->next;
-        sched->head->prev = sched->tail;
-        sched->tail->next = sched->head;
-    } else if (sched->tail == task) {
-        sched->tail = sched->tail->prev;
-        sched->tail->next = sched->head;
-        sched->head->prev = sched->tail;
+    if (q->head == q->tail && q->head == task) {
+        q->head = NULL;
+        q->tail = NULL;
+    } else if (q->head == task) {
+        q->head = q->head->next;
+        q->head->prev = q->tail;
+        q->tail->next = q->head;
+    } else if (q->tail == task) {
+        q->tail = q->tail->prev;
+        q->tail->next = q->head;
+        q->head->prev = q->tail;
     } else {
-        struct thread *current = sched->head->next;
-        while (current != sched->head && current != task) {
+        struct thread *current = q->head->next;
+        while (current != q->head && current != task)
             current = current->next;
-        }
 
         if (current == task) {
             current->prev->next = current->next;
             current->next->prev = current->prev;
         }
     }
-    if (task->curr_thread != -1) {
-        scheduler_l_rm_thread(local_schs[task->curr_thread], task);
-    }
+
     thread_free(task);
-    sched->task_cnt--;
-}
-
-void scheduler_rm_id(struct scheduler *sched, uint64_t task_id) {
-    CLI;
-
-    if (sched == NULL || sched->head == NULL) {
-        STI;
-        return;
-    }
-
-    struct thread *current = sched->head;
-    struct thread *start = current;
-
-    do {
-        if (current->id == task_id) {
-            scheduler_rm_thread(sched, current);
-            break;
-        }
-        current = current->next;
-    } while (current != start);
-
-    STI;
-}
-
-void scheduler_rebalance(struct scheduler *sched) {
-    uint64_t tasks_per_core = sched->task_cnt / c_count;
-    uint64_t extras = sched->task_cnt % c_count;
-
-    for (uint64_t i = 0; i < c_count; i++) {
-        struct scheduler *sch = local_schs[i];
-        uint64_t to_assign = tasks_per_core + (i < extras ? 1 : 0);
-
-        for (uint64_t j = 0; j < to_assign; j++) {
-            if (!sched->head)
-                return;
-            scheduler_l_add_thread(sch, sched->head);
-            sched->head = sched->head->next;
-        }
-    }
+    global_load -= sched->load;
+    sched->load = scheduler_compute_load(sched, 700, 300);
+    global_load += sched->load;
+    sched->thread_count--;
 }
 
 __attribute__((noreturn)) void scheduler_start(struct scheduler *sched) {
