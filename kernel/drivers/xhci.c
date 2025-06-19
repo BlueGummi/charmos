@@ -167,16 +167,15 @@ static void xhci_ring_doorbell(struct xhci_device *dev, uint64_t idx) {
     mmio_write_32(&doorbell[idx], 0);
 }
 
-static uint8_t xhci_enable_slot(struct xhci_device *dev) {
+static void xhci_send_command(struct xhci_device *dev, uint64_t parameter,
+                              uint32_t control) {
     struct xhci_ring *cmd_ring = dev->cmd_ring;
-    struct xhci_ring *event_ring = dev->event_ring;
 
     struct xhci_trb *trb = &cmd_ring->trbs[cmd_ring->enqueue_index];
-    memset(trb, 0, sizeof(*trb));
-    trb->parameter = 0;
-    trb->status = 0;
-    trb->control = (TRB_TYPE_ENABLE_SLOT << 10) | (cmd_ring->cycle & 1);
 
+    trb->parameter = parameter;
+    trb->status = 0;
+    trb->control = control;
     cmd_ring->enqueue_index++;
     if (cmd_ring->enqueue_index == cmd_ring->size) {
         cmd_ring->enqueue_index = 0;
@@ -184,7 +183,10 @@ static uint8_t xhci_enable_slot(struct xhci_device *dev) {
     }
 
     xhci_ring_doorbell(dev, 0);
+}
 
+static uint64_t xhci_wait_for_response(struct xhci_device *dev) {
+    struct xhci_ring *event_ring = dev->event_ring;
     uint32_t dq_idx = event_ring->dequeue_index;
     uint8_t expected_cycle = event_ring->cycle;
 
@@ -197,7 +199,6 @@ static uint8_t xhci_enable_slot(struct xhci_device *dev) {
 
         uint8_t trb_type = (control >> 10) & 0x3F;
         if (trb_type == TRB_TYPE_COMMAND_COMPLETION) {
-            uint8_t slot_id = (control >> 24) & 0xFF;
 
             dq_idx++;
             if (dq_idx == event_ring->size) {
@@ -211,7 +212,7 @@ static uint8_t xhci_enable_slot(struct xhci_device *dev) {
             uint64_t erdp = event_ring->phys + offset;
             mmio_write_64(&dev->intr_regs->erdp, erdp | 1);
 
-            return slot_id;
+            return control;
         }
 
         dq_idx++;
@@ -222,6 +223,13 @@ static uint8_t xhci_enable_slot(struct xhci_device *dev) {
         event_ring->dequeue_index = dq_idx;
         event_ring->cycle = expected_cycle;
     }
+}
+
+static uint8_t xhci_enable_slot(struct xhci_device *dev) {
+    xhci_send_command(
+        dev, 0, (TRB_TYPE_ENABLE_SLOT << 10) | (dev->cmd_ring->cycle & 1));
+
+    return (xhci_wait_for_response(dev) >> 24) & 0xff;
 }
 
 void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
