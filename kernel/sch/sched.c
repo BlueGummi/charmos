@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <string.h>
 
-struct scheduler *local_schs;
+struct scheduler **local_schs;
 static uint64_t c_count = 1;
 
 /* This guy helps us figure out if the scheduler's load is
@@ -19,23 +19,25 @@ static uint64_t global_load;
 
 void k_sch_main() {
     uint64_t core_id = get_sch_core_id();
+    k_printf("Core %llu is in the idle task\n", core_id);
     while (1) {
-        k_printf("Core %u is in the idle task\n", core_id);
+        k_printf("Core %llu is in the idle task empty loop\n", core_id);
         asm volatile("hlt");
     }
 }
 
 void k_sch_other() {
     uint64_t core_id = get_sch_core_id();
+    k_printf("Core %llu is in the other idle task\n", core_id);
     while (1) {
-        k_printf("Core %u is in the other idle task\n", core_id);
+        k_printf("Core %llu is in the other idle task empty loop\n", core_id);
         asm volatile("hlt");
     }
 }
 
 void schedule(struct cpu_state *cpu) {
     uint64_t core_id = get_sch_core_id();
-    struct scheduler *sched = &local_schs[core_id];
+    struct scheduler *sched = local_schs[core_id];
 
     if (!sched->active) {
         LAPIC_REG(LAPIC_REG_EOI) = 0;
@@ -177,18 +179,22 @@ uint64_t scheduler_compute_load(struct scheduler *sched, uint64_t alpha_scaled,
 void scheduler_init(uint64_t core_count) {
     c_count = core_count;
 
-    local_schs = kmalloc_aligned(sizeof(struct scheduler) * core_count, 512);
-
+    local_schs = kmalloc(sizeof(struct scheduler *) * core_count);
     if (!local_schs)
-        k_panic("Could not allocate space for local schedulers\n");
+        k_panic("Could not allocate scheduler pointer array\n");
 
     for (uint64_t i = 0; i < core_count; i++) {
-        struct scheduler *s = &local_schs[i]; // Now a direct reference
+        struct scheduler *s = kmalloc_aligned(sizeof(struct scheduler), 4096);
+        if (!s)
+            k_panic("Could not allocate scheduler %lu\n", i);
+
+        if ((uintptr_t) s % 4096 != 0) {
+            k_panic("Scheduler %lu is not page-aligned: 0x%lx\n", i,
+                    (uintptr_t) s);
+        }
 
         s->active = true;
         s->thread_count = 0;
-        s->load = scheduler_compute_load(s, 700, 300);
-        global_load += s->load;
         s->tick_counter = 0;
 
         for (int lvl = 0; lvl < MLFQ_LEVELS; lvl++) {
@@ -200,6 +206,9 @@ void scheduler_init(uint64_t core_count) {
         struct thread *t0 = thread_create(k_sch_other);
         scheduler_add_thread(s, t);
         scheduler_add_thread(s, t0);
+        s->load = scheduler_compute_load(s, 700, 300);
+        global_load += s->load;
+        local_schs[i] = s;
     }
 }
 

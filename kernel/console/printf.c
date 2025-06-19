@@ -39,7 +39,7 @@ static void serial_puts(const char *str, uint64_t len) {
 
 void double_print(struct flanterm_context *f, const char *str, uint64_t len) {
     serial_puts(str, len);
-    flanterm_write(f, str, len);
+//    flanterm_write(f, str, len);
 }
 
 void k_printf_init(struct limine_framebuffer *fb) {
@@ -369,7 +369,6 @@ static void handle_format_specifier(const char **format_ptr, va_list args) {
 }
 
 void v_k_printf(const char *format, va_list args) {
-    bool ints_enabled = spin_lock(&k_printf_lock);
 
     while (*format) {
         if (*format == '%') {
@@ -384,15 +383,15 @@ void v_k_printf(const char *format, va_list args) {
             format++;
         }
     }
-
-    spin_unlock(&k_printf_lock, ints_enabled);
 }
 
 void k_printf(const char *format, ...) {
+    spin_lock_no_cli(&k_printf_lock);
     va_list args;
     va_start(args, format);
     v_k_printf(format, args);
     va_end(args);
+    spin_unlock_no_cli(&k_printf_lock);
 }
 
 void panic(const char *format, ...) {

@@ -19,3 +19,13 @@ void spin_unlock(struct spinlock *lock, bool interrupts_changed) {
         asm volatile("sti");
     }
 }
+
+void spin_lock_no_cli(struct spinlock *lock) {
+    while (atomic_flag_test_and_set(&lock->lock)) {
+        asm volatile("pause");
+    }
+}
+
+void spin_unlock_no_cli(struct spinlock *lock) {
+    atomic_flag_clear(&lock->lock);
+}
