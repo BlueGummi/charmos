@@ -227,8 +227,9 @@ load_new_thread:
     load_thread(sched, next, cpu);
     update_core_current_thread(next);
 
+    k_printf("Core %u being scheduled\n", core_id);
+end:
     /* do not change interrupt status */
     spin_unlock_no_cli(&sched->lock);
-end:
     LAPIC_REG(LAPIC_REG_EOI) = 0;
 }
