@@ -53,31 +53,36 @@ void scheduler_update_loads(struct scheduler *sched) {
     atomic_fetch_add(&global_load, delta);
 }
 
-/* Resource locks in here do not enable interrupts */
-void schedule(struct cpu_state *cpu) {
-    uint64_t core_id = get_sch_core_id();
-    struct scheduler *sched = local_schs[core_id];
-    spin_lock_no_cli(&sched->lock);
-
-    /* make sure these are actually our core IDs */
+static inline void scheduler_verify_id(struct scheduler *sched,
+                                       uint64_t core_id) {
     if (sched->core_id == -1)
         sched->core_id = core_id;
+}
 
-    if (!sched->active) {
-        LAPIC_REG(LAPIC_REG_EOI) = 0;
-        return;
-    }
-
-    /* core 0 will recompute the steal threshold */
-
+static inline void maybe_recompute_threshold(uint64_t core_id) {
     if (core_id == 0) {
         uint64_t val = atomic_load(&total_threads);
         work_steal_min_diff = compute_steal_threshold(val, c_count);
     }
+}
 
-    struct thread *curr = sched->current;
+static inline void update_core_current_thread(struct thread *next) {
+    struct core *c = (void *) rdmsr(MSR_GS_BASE);
+    c->current_thread = next;
+}
 
-    /* re-insert the running thread to its new level */
+static inline void stop_steal(struct scheduler *sched,
+                              struct scheduler *victim) {
+    if (victim)
+        atomic_store(&victim->being_robbed, false);
+
+    atomic_store(&sched->stealing_work, false);
+    end_steal();
+}
+
+static inline void scheduler_save_thread(struct scheduler *sched,
+                                         struct thread *curr,
+                                         struct cpu_state *cpu) {
     if (curr && curr->state == RUNNING) {
         memcpy(&curr->regs, cpu, sizeof(struct cpu_state));
         curr->state = READY;
@@ -100,57 +105,9 @@ void schedule(struct cpu_state *cpu) {
          * and the resource is already locked */
         scheduler_add_thread(sched, curr, false, true, false);
     }
+}
 
-    struct thread *next = NULL;
-    bool work_stolen = false;
-
-    if (!scheduler_can_steal_work(sched))
-        goto regular_schedule;
-
-    if (!try_begin_steal())
-        goto regular_schedule;
-
-    // attempt a work steal
-
-    atomic_store(&sched->stealing_work, true);
-    struct scheduler *victim = scheduler_pick_victim(sched);
-
-    if (!victim) {
-        /* this means that every core is busy stealing work
-         * or is busy getting stolen from, and thus we cannot
-         * steal work from any victim. continuing with regular
-         * scheduling */
-        atomic_store(&sched->stealing_work, false);
-        end_steal();
-        goto regular_schedule;
-    }
-
-    k_printf(ANSI_GREEN "Core %u is stealing from core %u\n" ANSI_RESET,
-             core_id, victim->core_id);
-    /* uint64_t val = atomic_load(&global_load);
-            k_printf(ANSI_BLUE "Core %u has a load of %u, victim has a
-        load of "
-                               "%u, global load is %u\n" ANSI_RESET,
-                     core_id, sched->load, victim->load, val);*/
-
-    struct thread *stolen = scheduler_steal_work(victim);
-    atomic_store(&victim->being_robbed, false);
-    atomic_store(&sched->stealing_work, false);
-    end_steal();
-
-    if (stolen) {
-        next = stolen;
-        work_stolen = true;
-
-        goto load_new_thread;
-    }
-
-    /* work was successfully stolen */
-    if (next)
-        goto load_new_thread;
-
-regular_schedule:
-    // Pick next READY thread from highest non-empty level
+static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {
     for (int lvl = 0; lvl < MLFQ_LEVELS; lvl++) {
         struct thread_queue *q = &sched->queues[lvl];
 
@@ -161,38 +118,44 @@ regular_schedule:
         struct thread *iter = start;
 
         do {
-            if (iter->state == READY) {
-                next = iter;
+            if (iter->state == READY)
                 break;
-            }
             iter = iter->next;
         } while (iter != start);
 
-        if (next) {
-            // Remove from queue
-            if (next == q->head && next == q->tail) {
-                q->head = NULL;
-                q->tail = NULL;
-            } else if (next == q->head) {
-                q->head = next->next;
-                q->head->prev = q->tail;
-                q->tail->next = q->head;
-            } else if (next == q->tail) {
-                q->tail = next->prev;
-                q->tail->next = q->head;
-                q->head->prev = q->tail;
-            } else {
-                next->prev->next = next->next;
-                next->next->prev = next->prev;
-            }
+        if (iter->state != READY)
+            continue;
 
-            next->next = NULL;
-            next->prev = NULL;
-            break;
+        // Found the next thread
+        struct thread *next = iter;
+
+        // Remove
+        if (next == q->head && next == q->tail) {
+            q->head = NULL;
+            q->tail = NULL;
+        } else if (next == q->head) {
+            q->head = next->next;
+            q->head->prev = q->tail;
+            q->tail->next = q->head;
+        } else if (next == q->tail) {
+            q->tail = next->prev;
+            q->tail->next = q->head;
+            q->head->prev = q->tail;
+        } else {
+            next->prev->next = next->next;
+            next->next->prev = next->prev;
         }
+
+        next->next = NULL;
+        next->prev = NULL;
+        return next;
     }
 
-load_new_thread:
+    return NULL;
+}
+
+static inline void load_thread(struct scheduler *sched, struct thread *next,
+                               struct cpu_state *cpu) {
     if (next) {
         sched->current = next;
         memcpy(cpu, &next->regs, sizeof(struct cpu_state));
@@ -201,15 +164,71 @@ load_new_thread:
         sched->current = NULL;
         k_panic("No threads to run! State should not be reached!\n");
     }
+}
 
-    struct core *c = (void *) rdmsr(MSR_GS_BASE);
-    c->current_thread = next;
-    LAPIC_REG(LAPIC_REG_EOI) = 0;
+static inline void begin_steal(struct scheduler *sched) {
+    atomic_store(&sched->stealing_work, true);
+}
 
+/* Resource locks in here do not enable interrupts */
+void schedule(struct cpu_state *cpu) {
+    uint64_t core_id = get_sch_core_id();
+    struct scheduler *sched = local_schs[core_id];
+    spin_lock_no_cli(&sched->lock);
+    struct thread *curr = sched->current;
+    struct thread *next = NULL;
+
+    /* make sure these are actually our core IDs */
+    scheduler_verify_id(sched, core_id);
+
+    /* skip */
+    if (!sched->active)
+        goto end;
+
+    /* core 0 will recompute the steal threshold */
+    maybe_recompute_threshold(core_id);
+
+    /* re-insert the running thread to its new level */
+    scheduler_save_thread(sched, curr, cpu);
+
+    /* check if we can steal */
+    if (!scheduler_can_steal_work(sched))
+        goto regular_schedule;
+
+    if (!try_begin_steal())
+        goto regular_schedule;
+
+    /* attempt a steal */
+    begin_steal(sched);
+    struct scheduler *victim = scheduler_pick_victim(sched);
+
+    if (!victim) {
+        /* victim cannot be stolen from - early abort */
+        stop_steal(sched, victim);
+        goto regular_schedule;
+    }
+
+    k_printf(ANSI_GREEN "Core %u is stealing from core %u\n" ANSI_RESET,
+             core_id, victim->core_id);
+    struct thread *stolen = scheduler_steal_work(victim);
     /* done stealing work now. another core can steal from us */
-    if (work_stolen)
-        atomic_store(&sched->stealing_work, false);
+    stop_steal(sched, victim);
+
+    /* work was successfully stolen */
+    if (stolen) {
+        next = stolen;
+        goto load_new_thread;
+    }
+
+regular_schedule:
+    next = scheduler_pick_regular_thread(sched);
+
+load_new_thread:
+    load_thread(sched, next, cpu);
+    update_core_current_thread(next);
 
     /* do not change interrupt status */
     spin_unlock_no_cli(&sched->lock);
+end:
+    LAPIC_REG(LAPIC_REG_EOI) = 0;
 }

@@ -1,14 +1,18 @@
 #include <mem/alloc.h>
+#include <mem/pmm.h>
+#include <mem/vmm.h>
 #include <sch/thread.h>
 #include <stdint.h>
 
 uint64_t globid = 1;
 
+#define STACK_SIZE (4096 * 16)
+
 struct thread *thread_create(void (*entry_point)(void)) {
     struct thread *new_thread =
         (struct thread *) kzalloc(sizeof(struct thread));
-#define STACK_SIZE 0x4000
-    void *stack = kmalloc_aligned(STACK_SIZE, 0x1000);
+    uint64_t stack_phys = (uint64_t) pmm_alloc_pages(16, false);
+    void *stack = vmm_map_phys(stack_phys, 4096 * 16);
     uint64_t stack_top = (uint64_t) stack + STACK_SIZE;
 
     new_thread->mlfq_level = 0;
@@ -19,7 +23,7 @@ struct thread *thread_create(void (*entry_point)(void)) {
     new_thread->regs.rflags = 0x202;
     new_thread->regs.rsp = stack_top;
     new_thread->regs.ss = 0x10;
-    new_thread->stack = (void *) stack_top - 0x1000;
+    new_thread->stack = (void *) stack;
     new_thread->entry = entry_point;
     new_thread->curr_thread = -1; // nobody is running this
     new_thread->id = globid++;
@@ -28,6 +32,5 @@ struct thread *thread_create(void (*entry_point)(void)) {
 }
 
 void thread_free(struct thread *t) {
-    kfree(t->stack);
     kfree(t);
 }
