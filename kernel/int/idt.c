@@ -21,7 +21,7 @@ extern void page_fault_handler_wrapper();
         uint64_t core = get_sch_core_id();                                     \
         k_printf("\n=== " #handler_name " fault! ===\n");                      \
         k_printf("Message -> %s\n", message);                                  \
-        k_printf("Core %u faulted\n", core);                                   \
+        k_panic("Core %u faulted\n", core);                                    \
         while (1) {                                                            \
             asm volatile("hlt");                                               \
         }                                                                      \
@@ -33,7 +33,7 @@ extern void page_fault_handler_wrapper();
         uint64_t core = get_sch_core_id();                                     \
         k_printf("\n=== " mnemonic " fault! ===\n");                           \
         k_printf("Error code: 0x%lx\n", error_code);                           \
-        k_printf("Core %u faulted\n", core);                                   \
+        k_panic("Core %u faulted\n", core);                                    \
         while (1) {                                                            \
             asm volatile("hlt");                                               \
         }                                                                      \

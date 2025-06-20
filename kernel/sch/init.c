@@ -44,7 +44,7 @@ void scheduler_init(uint64_t core_count) {
             }
         }
 
-        s->load = scheduler_compute_load(s, 700, 300);
+        s->load = scheduler_compute_load(s, ALPHA_SCALE, BETA_SCALE);
         atomic_fetch_add(&global_load, s->load);
         local_schs[i] = s;
     }

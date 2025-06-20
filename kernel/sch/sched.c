@@ -15,7 +15,7 @@ struct scheduler **local_schs;
 uint64_t c_count = 1;
 /* This guy helps us figure out if the scheduler's load is
    enough of a portion of the global load to not steal work*/
-atomic_uint global_load = 0;
+atomic_int global_load = 0;
 
 /* This is how many cores can be stealing work at once,
  * it is half the core count */
@@ -35,7 +35,6 @@ uint64_t work_steal_min_diff = 130;
 
 void k_sch_main() {
     uint64_t core_id = get_sch_core_id();
-    k_printf("Core %llu is in the idle task\n", core_id);
     while (1) {
         k_printf("Core %llu is in the idle task empty loop\n", core_id);
         asm volatile("hlt");
@@ -44,11 +43,18 @@ void k_sch_main() {
 
 void k_sch_other() {
     uint64_t core_id = get_sch_core_id();
-    k_printf("Core %llu is in the other idle task\n", core_id);
     while (1) {
         k_printf("Core %llu is in the other idle task empty loop\n", core_id);
         asm volatile("hlt");
     }
+}
+
+void scheduler_update_loads(struct scheduler *sched) {
+    int64_t old_load = sched->load;
+    int64_t new_load = scheduler_compute_load(sched, ALPHA_SCALE, BETA_SCALE);
+    int64_t delta = new_load - old_load;
+    sched->load = new_load;
+    atomic_fetch_add(&global_load, delta);
 }
 
 /* Resource locks in here do not enable interrupts */

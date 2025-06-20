@@ -92,6 +92,7 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
                 current->next = NULL;
                 current->prev = NULL;
                 victim->thread_count--;
+                scheduler_update_loads(victim);
 
                 /* do not re-enable interrupts!!! */
                 spin_unlock(&victim->lock, false);

@@ -45,10 +45,8 @@ void scheduler_rm_thread(struct scheduler *sched, struct thread *task,
     }
 
     thread_free(task);
-    atomic_fetch_sub(&global_load, sched->load);
-    sched->load = scheduler_compute_load(sched, 700, 300);
-    atomic_fetch_add(&global_load, sched->load);
     sched->thread_count--;
+    scheduler_update_loads(sched);
 
     atomic_fetch_sub(&total_threads, 1);
     if (!already_locked)
