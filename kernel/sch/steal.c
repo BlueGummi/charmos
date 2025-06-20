@@ -21,7 +21,7 @@ void end_steal() {
 struct scheduler *scheduler_pick_victim(struct scheduler *self) {
     // self->stealing_work should already be set before this is called
     /* Ideally, we want to steal from our busiest core */
-    uint64_t max_load = 0;
+    int64_t max_load = 0;
     struct scheduler *victim = NULL;
 
     for (uint64_t i = 0; i < c_count; i++) {

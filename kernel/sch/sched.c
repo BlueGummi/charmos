@@ -31,12 +31,12 @@ atomic_uint total_threads = 0;
 
 /* How much more work the victim must be doing than the stealer
  * for the stealer to go through with the steal. */
-uint64_t work_steal_min_diff = 130;
+int64_t work_steal_min_diff = 130;
 
 void k_sch_main() {
     uint64_t core_id = get_sch_core_id();
     while (1) {
-        k_printf("Core %llu is in the idle task empty loop\n", core_id);
+     //   k_printf("Core %llu is in the idle task empty loop\n", core_id);
         asm volatile("hlt");
     }
 }
@@ -44,7 +44,7 @@ void k_sch_main() {
 void k_sch_other() {
     uint64_t core_id = get_sch_core_id();
     while (1) {
-        k_printf("Core %llu is in the other idle task empty loop\n", core_id);
+      //  k_printf("Core %llu is in the other idle task empty loop\n", core_id);
         asm volatile("hlt");
     }
 }
@@ -61,6 +61,7 @@ void scheduler_update_loads(struct scheduler *sched) {
 void schedule(struct cpu_state *cpu) {
     uint64_t core_id = get_sch_core_id();
     struct scheduler *sched = local_schs[core_id];
+    spin_lock(&sched->lock);
 
     /* make sure these are actually our core IDs */
     if (sched->core_id == -1)
@@ -78,7 +79,6 @@ void schedule(struct cpu_state *cpu) {
         work_steal_min_diff = compute_steal_threshold(val, c_count);
     }
 
-    spin_lock(&sched->lock);
     struct thread *curr = sched->current;
 
     /* re-insert the running thread to its new level */

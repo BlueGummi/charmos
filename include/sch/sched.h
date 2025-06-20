@@ -59,7 +59,7 @@ extern atomic_int global_load;
 extern uint32_t max_concurrent_stealers;
 extern atomic_uint active_stealers;
 extern atomic_uint total_threads;
-extern uint64_t work_steal_min_diff;
+extern int64_t work_steal_min_diff;
 extern uint64_t c_count;
 
 #define CLI asm volatile("cli")
