@@ -37,11 +37,11 @@ bool scheduler_can_steal_work(struct scheduler *sched) {
         k_panic("Why are there no cores on your machine?\n");
     }
 
-    uint64_t val = atomic_load(&global_load);
-    uint64_t avg_core_load = val / c_count;
+    int64_t val = atomic_load(&global_load);
+    int64_t avg_core_load = val / c_count;
 
     // steal if this core's load is less than WORK_STEAL_THRESHOLD% of average
-    uint64_t threshold_load =
+    int64_t threshold_load =
         ((avg_core_load * WORK_STEAL_THRESHOLD) / 100ULL) ?: 1;
 
     return (sched->load < threshold_load);
