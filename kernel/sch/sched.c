@@ -34,17 +34,13 @@ atomic_uint total_threads = 0;
 int64_t work_steal_min_diff = 130;
 
 void k_sch_main() {
-    uint64_t core_id = get_sch_core_id();
     while (1) {
-     //   k_printf("Core %llu is in the idle task empty loop\n", core_id);
         asm volatile("hlt");
     }
 }
 
 void k_sch_other() {
-    uint64_t core_id = get_sch_core_id();
     while (1) {
-      //  k_printf("Core %llu is in the other idle task empty loop\n", core_id);
         asm volatile("hlt");
     }
 }
@@ -61,7 +57,7 @@ void scheduler_update_loads(struct scheduler *sched) {
 void schedule(struct cpu_state *cpu) {
     uint64_t core_id = get_sch_core_id();
     struct scheduler *sched = local_schs[core_id];
-    spin_lock(&sched->lock);
+    spin_lock_no_cli(&sched->lock);
 
     /* make sure these are actually our core IDs */
     if (sched->core_id == -1)
@@ -108,48 +104,45 @@ void schedule(struct cpu_state *cpu) {
     struct thread *next = NULL;
     bool work_stolen = false;
 
+    if (!scheduler_can_steal_work(sched))
+        goto regular_schedule;
+
+    if (!try_begin_steal())
+        goto regular_schedule;
+
     // attempt a work steal
-    if (scheduler_can_steal_work(sched)) {
-        if (try_begin_steal()) {
 
-            atomic_store(&sched->stealing_work, true);
-            struct scheduler *victim = scheduler_pick_victim(sched);
+    atomic_store(&sched->stealing_work, true);
+    struct scheduler *victim = scheduler_pick_victim(sched);
 
-            if (!victim) {
-                /* this means that every core is busy stealing work
-                 * or is busy getting stolen from, and thus we cannot
-                 * steal work from any victim. continuing with regular
-                 * scheduling */
-                atomic_store(&sched->stealing_work, false);
-                end_steal();
-                goto regular_schedule;
-            }
+    if (!victim) {
+        /* this means that every core is busy stealing work
+         * or is busy getting stolen from, and thus we cannot
+         * steal work from any victim. continuing with regular
+         * scheduling */
+        atomic_store(&sched->stealing_work, false);
+        end_steal();
+        goto regular_schedule;
+    }
 
-            k_printf(ANSI_GREEN "Core %u is stealing from core %u\n" ANSI_RESET,
-                     core_id, victim->core_id);
-            uint64_t val = atomic_load(&global_load);
-            k_printf(ANSI_BLUE "Core %u has a load of %u, victim has a load of "
+    k_printf(ANSI_GREEN "Core %u is stealing from core %u\n" ANSI_RESET,
+             core_id, victim->core_id);
+    /* uint64_t val = atomic_load(&global_load);
+            k_printf(ANSI_BLUE "Core %u has a load of %u, victim has a
+        load of "
                                "%u, global load is %u\n" ANSI_RESET,
-                     core_id, sched->load, victim->load, val);
+                     core_id, sched->load, victim->load, val);*/
 
-            struct thread *stolen = scheduler_steal_work(victim);
-            atomic_store(&victim->being_robbed, false);
-            atomic_store(&sched->stealing_work, false);
-            end_steal();
+    struct thread *stolen = scheduler_steal_work(victim);
+    atomic_store(&victim->being_robbed, false);
+    atomic_store(&sched->stealing_work, false);
+    end_steal();
 
-            if (stolen) {
-                next = stolen;
-                work_stolen = true;
+    if (stolen) {
+        next = stolen;
+        work_stolen = true;
 
-                goto load_new_thread;
-
-            } else {
-                goto regular_schedule;
-            }
-        } else {
-
-            goto regular_schedule;
-        }
+        goto load_new_thread;
     }
 
     /* work was successfully stolen */
@@ -218,5 +211,5 @@ load_new_thread:
         atomic_store(&sched->stealing_work, false);
 
     /* do not change interrupt status */
-    spin_unlock(&sched->lock, false);
+    spin_unlock_no_cli(&sched->lock);
 }
