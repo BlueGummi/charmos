@@ -29,6 +29,7 @@ struct scheduler {
     atomic_bool being_robbed;
     atomic_bool stealing_work;
     struct spinlock lock;
+    uint8_t queue_bitmap;
 };
 
 void scheduler_init(uint64_t core_count);

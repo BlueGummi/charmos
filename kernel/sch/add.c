@@ -16,6 +16,8 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
     uint8_t level = task->mlfq_level;
     struct thread_queue *q = &sched->queues[level];
 
+    bool was_empty = (q->head == NULL);
+
     task->next = NULL;
     task->prev = NULL;
 
@@ -31,6 +33,9 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
         q->head->prev = task;
         q->tail = task;
     }
+
+    if (was_empty)
+        sched->queue_bitmap |= (1 << level);
 
     sched->thread_count++;
     scheduler_update_loads(sched);

@@ -108,11 +108,15 @@ static inline void scheduler_save_thread(struct scheduler *sched,
 }
 
 static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {
-    for (int lvl = 0; lvl < MLFQ_LEVELS; lvl++) {
-        struct thread_queue *q = &sched->queues[lvl];
+    uint8_t bitmap = sched->queue_bitmap;
 
+    while (bitmap) {
+        int lvl = __builtin_ctz(bitmap);
+        bitmap &= ~(1 << lvl);
+
+        struct thread_queue *q = &sched->queues[lvl];
         if (!q->head)
-            continue;
+            continue; // could be stale
 
         struct thread *start = q->head;
         struct thread *iter = start;
@@ -126,10 +130,8 @@ static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {
         if (iter->state != READY)
             continue;
 
-        // Found the next thread
         struct thread *next = iter;
 
-        // Remove
         if (next == q->head && next == q->tail) {
             q->head = NULL;
             q->tail = NULL;
@@ -145,6 +147,9 @@ static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {
             next->prev->next = next->next;
             next->next->prev = next->prev;
         }
+
+        if (q->head == NULL)
+            sched->queue_bitmap &= ~(1 << lvl);
 
         next->next = NULL;
         next->prev = NULL;
@@ -175,6 +180,7 @@ void schedule(struct cpu_state *cpu) {
     uint64_t core_id = get_sch_core_id();
     struct scheduler *sched = local_schs[core_id];
     spin_lock_no_cli(&sched->lock);
+    uint64_t tsc = rdtsc();
     struct thread *curr = sched->current;
     struct thread *next = NULL;
 
@@ -227,9 +233,9 @@ load_new_thread:
     load_thread(sched, next, cpu);
     update_core_current_thread(next);
 
-    k_printf("Core %u being scheduled\n", core_id);
 end:
     /* do not change interrupt status */
     spin_unlock_no_cli(&sched->lock);
+    k_printf("That took %llu clock cycles\n", rdtsc() - tsc);
     LAPIC_REG(LAPIC_REG_EOI) = 0;
 }

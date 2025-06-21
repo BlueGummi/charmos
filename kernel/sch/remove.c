@@ -44,6 +44,9 @@ void scheduler_rm_thread(struct scheduler *sched, struct thread *task,
         }
     }
 
+    if (q->head == NULL)
+        sched->queue_bitmap &= ~(1 << level);
+
     thread_free(task);
     sched->thread_count--;
     scheduler_update_loads(sched);

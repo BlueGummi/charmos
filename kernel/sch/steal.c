@@ -62,9 +62,13 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
         return NULL;
 
     spin_lock(&victim->lock);
-    for (int level = MLFQ_LEVELS - 1; level >= 0; level--) {
-        struct thread_queue *q = &victim->queues[level];
 
+    uint8_t mask = victim->queue_bitmap;
+    while (mask) {
+        int level = 31 - __builtin_clz((uint32_t) mask); // for 8-bit safe clz
+        mask &= ~(1 << level); // remove bit we’re handling now
+
+        struct thread_queue *q = &victim->queues[level];
         if (!q->head)
             continue;
 
@@ -89,12 +93,15 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
                     current->next->prev = current->prev;
                 }
 
+                // If empty after removal, update bitmap
+                if (q->head == NULL)
+                    victim->queue_bitmap &= ~(1 << level);
+
                 current->next = NULL;
                 current->prev = NULL;
                 victim->thread_count--;
                 scheduler_update_loads(victim);
 
-                /* do not re-enable interrupts!!! */
                 spin_unlock(&victim->lock, false);
                 return current;
             }

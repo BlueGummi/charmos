@@ -132,8 +132,10 @@ void atapi_print_info(struct generic_disk *disk) {
 
 struct generic_disk *atapi_create_generic(struct ata_drive *d) {
     struct generic_disk *ret = kmalloc(sizeof(struct generic_disk));
+
     if (!ret)
         k_panic("Could not allocate space for ATAPI device\n");
+
     ret->driver_data = d;
     ret->sector_size = 2048;
     ret->read_sector = atapi_read_sector_wrapper;
