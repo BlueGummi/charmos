@@ -80,8 +80,8 @@ void gdt_init(struct gdt_entry *gdt, struct tss *tss) {
 
 void gdt_install(void) {
     struct gdt_entry *gdt =
-        kmalloc_aligned(sizeof(struct gdt_entry) * GDT_ENTRIES, 8);
-    struct tss *tss = kmalloc_aligned(sizeof(struct tss), 8);
+        kmalloc_aligned(sizeof(struct gdt_entry) * GDT_ENTRIES, 64);
+    struct tss *tss = kmalloc_aligned(sizeof(struct tss), 64);
     memset(tss, 0, sizeof(struct tss));
 
     if (!gdt) {

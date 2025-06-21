@@ -207,7 +207,9 @@ void schedule(struct cpu_state *cpu) {
 
     k_printf(ANSI_GREEN "Core %u is stealing from core %u\n" ANSI_RESET,
              core_id, victim->core_id);
+
     struct thread *stolen = scheduler_steal_work(victim);
+    
     /* done stealing work now. another core can steal from us */
     stop_steal(sched, victim);
 
