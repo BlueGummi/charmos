@@ -17,8 +17,7 @@ uint64_t c_count = 1;
    enough of a portion of the global load to not steal work*/
 atomic_int global_load = 0;
 
-/* This is how many cores can be stealing work at once,
- * it is half the core count */
+/* This is how many cores can be stealing work at once */
 uint32_t max_concurrent_stealers = 0;
 
 /* This is how many cores are attempting a work steal right now.

@@ -29,3 +29,8 @@ void spin_lock_no_cli(struct spinlock *lock) {
 void spin_unlock_no_cli(struct spinlock *lock) {
     atomic_flag_clear(&lock->lock);
 }
+
+bool spin_trylock(struct spinlock *lock) {
+    return !atomic_flag_test_and_set(&lock->lock);
+}
+

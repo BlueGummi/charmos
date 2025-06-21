@@ -61,12 +61,14 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
     if (!victim || victim->thread_count == 0)
         return NULL;
 
-    spin_lock(&victim->lock);
+    /* do not wait in a loop */
+    if (!spin_trylock(&victim->lock))
+        return NULL;
 
     uint8_t mask = victim->queue_bitmap;
     while (mask) {
-        int level = 31 - __builtin_clz((uint32_t) mask); // for 8-bit safe clz
-        mask &= ~(1 << level); // remove bit we’re handling now
+        int level = 31 - __builtin_clz((uint32_t) mask);
+        mask &= ~(1 << level); // remove that bit from local copy
 
         struct thread_queue *q = &victim->queues[level];
         if (!q->head)
@@ -93,7 +95,7 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
                     current->next->prev = current->prev;
                 }
 
-                // If empty after removal, update bitmap
+                // clear bitmap
                 if (q->head == NULL)
                     victim->queue_bitmap &= ~(1 << level);
 
@@ -110,5 +112,5 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
     }
 
     spin_unlock(&victim->lock, false);
-    return NULL; // Nothing to steal
+    return NULL; // Nothing stealable
 }

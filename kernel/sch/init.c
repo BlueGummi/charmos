@@ -6,7 +6,7 @@
 
 void scheduler_init(uint64_t core_count) {
     c_count = core_count;
-    max_concurrent_stealers = c_count / 2;
+    max_concurrent_stealers = c_count / 4;
 
     /* I mean, if we have one core and that core wants
      * to steal work from itself, go ahead? */
