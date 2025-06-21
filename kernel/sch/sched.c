@@ -45,14 +45,6 @@ void k_sch_other() {
     }
 }
 
-void scheduler_update_loads(struct scheduler *sched) {
-    int64_t old_load = sched->load;
-    int64_t new_load = scheduler_compute_load(sched, ALPHA_SCALE, BETA_SCALE);
-    int64_t delta = new_load - old_load;
-    sched->load = new_load;
-    atomic_fetch_add(&global_load, delta);
-}
-
 static inline void scheduler_verify_id(struct scheduler *sched,
                                        uint64_t core_id) {
     if (sched->core_id == -1)

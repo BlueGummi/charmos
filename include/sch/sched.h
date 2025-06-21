@@ -10,8 +10,6 @@
            * doing to try to steal work from another                           \
            * core. This means "% of the average"                               \
            */
-#define ALPHA_SCALE 700
-#define BETA_SCALE 300
 
 struct thread_queue {
     struct thread *head;
@@ -22,9 +20,8 @@ struct scheduler {
     bool active;
     struct thread_queue queues[MLFQ_LEVELS]; // MLFQ queues
     struct thread *current;
-    uint64_t thread_count;
+    uint64_t thread_count; // Also used for load estimate
     int64_t core_id;
-    int64_t load;          // Heuristically calculated load estimate
     uint64_t tick_counter; // Global tick count for periodic rebalance
     atomic_bool being_robbed;
     atomic_bool stealing_work;
@@ -43,20 +40,16 @@ void k_sch_main();
 void k_sch_other();
 
 bool scheduler_can_steal_work(struct scheduler *sched);
-uint64_t scheduler_compute_load(struct scheduler *sched, uint64_t alpha_scaled,
-                                uint64_t beta_scaled);
-uint64_t compute_steal_threshold(uint64_t total_threads, uint64_t core_count);
+uint64_t compute_steal_threshold(uint64_t threads, uint64_t core_count);
 
 struct scheduler *scheduler_pick_victim(struct scheduler *self);
 struct thread *scheduler_steal_work(struct scheduler *victim);
-void scheduler_update_loads(struct scheduler *sched);
 
 bool try_begin_steal();
 void end_steal();
 
 extern struct scheduler global_sched;
 extern struct scheduler **local_schs;
-extern atomic_int global_load;
 extern uint32_t max_concurrent_stealers;
 extern atomic_uint active_stealers;
 extern atomic_uint total_threads;

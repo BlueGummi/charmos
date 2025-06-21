@@ -21,7 +21,7 @@ void end_steal() {
 struct scheduler *scheduler_pick_victim(struct scheduler *self) {
     // self->stealing_work should already be set before this is called
     /* Ideally, we want to steal from our busiest core */
-    int64_t max_load = 0;
+    uint64_t max_thread_count = 0;
     struct scheduler *victim = NULL;
 
     for (uint64_t i = 0; i < c_count; i++) {
@@ -34,14 +34,14 @@ struct scheduler *scheduler_pick_victim(struct scheduler *self) {
         bool victim_busy = atomic_load(&potential_victim->being_robbed) ||
                            atomic_load(&potential_victim->stealing_work);
 
-        bool victim_is_poor =
-            (potential_victim->load * 100) < (self->load * work_steal_min_diff);
+        bool victim_is_poor = (potential_victim->thread_count * 100) <
+                              (self->thread_count * work_steal_min_diff);
 
         if (victim_busy || victim_is_poor)
             continue;
 
-        if (potential_victim->load > max_load) {
-            max_load = potential_victim->load;
+        if (potential_victim->thread_count > max_thread_count) {
+            max_thread_count = potential_victim->thread_count;
             victim = potential_victim;
         }
     }
@@ -100,7 +100,6 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
                 current->next = NULL;
                 current->prev = NULL;
                 victim->thread_count--;
-                scheduler_update_loads(victim);
 
                 spin_unlock(&victim->lock, false);
                 return current;

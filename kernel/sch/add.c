@@ -38,7 +38,6 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
         sched->queue_bitmap |= (1 << level);
 
     sched->thread_count++;
-    scheduler_update_loads(sched);
 
     if (is_new_thread)
         atomic_fetch_add(&total_threads, 1);
