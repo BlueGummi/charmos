@@ -24,7 +24,7 @@ void scheduler_init(uint64_t core_count) {
 
         s->active = true;
         s->thread_count = 0;
-        s->core_id = -1;
+        s->core_id = i;
         s->tick_counter = 0;
 
         for (int lvl = 0; lvl < MLFQ_LEVELS; lvl++) {

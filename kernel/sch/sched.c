@@ -44,12 +44,6 @@ void k_sch_other() {
     }
 }
 
-static inline void scheduler_verify_id(struct scheduler *sched,
-                                       uint64_t core_id) {
-    if (sched->core_id == -1)
-        sched->core_id = core_id;
-}
-
 static inline void maybe_recompute_threshold(uint64_t core_id) {
     if (core_id == 0) {
         uint64_t val = atomic_load(&total_threads);
@@ -174,9 +168,6 @@ void schedule(struct cpu_state *cpu) {
     uint64_t tsc = rdtsc();
     struct thread *curr = sched->current;
     struct thread *next = NULL;
-
-    /* make sure these are actually our core IDs */
-    scheduler_verify_id(sched, core_id);
 
     /* skip */
     if (!sched->active)
