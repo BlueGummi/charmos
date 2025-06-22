@@ -75,6 +75,10 @@ void k_main(void) {
     slab_init();
     pmm_dyn_init();
     gdt_install();
+    struct core *c = kmalloc(sizeof(struct core));
+    c->state = IDLE;
+    c->id = 0;
+    wrmsr(MSR_GS_BASE, (uint64_t) c);
 
     // IDT
     idt_alloc(c_cnt);
@@ -115,10 +119,6 @@ void k_main(void) {
     // Scheduler
     scheduler_init(c_cnt);
 
-    struct core *c = kmalloc(sizeof(struct core));
-    c->state = IDLE;
-    c->id = 0;
-    wrmsr(MSR_GS_BASE, (uint64_t) c);
     lapic_init();
     mp_inform_of_cr3();
 

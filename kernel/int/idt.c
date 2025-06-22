@@ -14,6 +14,7 @@
 
 extern void context_switch();
 extern void page_fault_handler_wrapper();
+extern void syscall_entry();
 
 #define MAKE_THIN_HANDLER(handler_name, message)                               \
     void __attribute__((interrupt)) handler_name##_fault(void *frame) {        \
@@ -102,6 +103,8 @@ void idt_install(uint64_t ind) {
     idt_set_and_mark(TIMER_ID, (uint64_t) context_switch, 0x08, 0x8E, ind);
 
     idt_set_and_mark(KB_ID, (uint64_t) keyboard_handler, 0x08, 0x8E, ind);
+
+    idt_set_and_mark(0x80, (uint64_t) syscall_entry, 0x08, 0x8e, ind);
 
     idt_load(ind);
 }

@@ -56,8 +56,6 @@ void elf_map(uintptr_t user_pml4_phys, void *elf_data) {
         if (ph->type != PT_LOAD)
             continue;
 
-        uintptr_t virt = ph->vaddr;
-        uintptr_t offset = ph->offset;
         uint64_t filesz = ph->filesz;
         uint64_t memsz = ph->memsz;
 
@@ -69,23 +67,28 @@ void elf_map(uintptr_t user_pml4_phys, void *elf_data) {
         if (!(ph->flags & PF_X))
             flags |= PAGING_XD;
 
-        for (uint64_t off = 0; off < memsz; off += PAGE_SIZE) {
-            uintptr_t vaddr = PAGE_ALIGN_DOWN(virt + off);
-            uintptr_t phys = (uintptr_t) pmm_alloc_page(false);
-            void *phys_mapped_to_virt = vmm_map_phys(phys, 4096);
+        uintptr_t segment_base = ph->vaddr;
+        uintptr_t file_offset = ph->offset;
 
+        for (uint64_t off = 0; off < memsz; off += PAGE_SIZE) {
+            uintptr_t vaddr = PAGE_ALIGN_DOWN(segment_base + off);
+            uintptr_t phys = (uintptr_t) pmm_alloc_page(false);
             if (!phys)
                 k_panic("Failed to alloc page for user ELF\n");
 
-            if (off < filesz) {
-                uint64_t to_copy = PAGE_SIZE;
-                if (off + to_copy > filesz)
-                    to_copy = filesz - off;
+            void *phys_mapped = vmm_map_phys(phys, PAGE_SIZE);
+            memset(phys_mapped, 0, PAGE_SIZE);
 
-                memcpy(phys_mapped_to_virt, (uint8_t *) elf_data + offset + off,
-                       to_copy);
-            } else {
-                memset(phys_mapped_to_virt, 0, PAGE_SIZE);
+            uint64_t page_offset = (segment_base + off) & 0xFFF;
+            uint64_t file_off = file_offset + off;
+            uint64_t remaining = (filesz > off) ? (filesz - off) : 0;
+            uint64_t to_copy = PAGE_SIZE - page_offset;
+
+            if (remaining > 0) {
+                if (remaining < to_copy)
+                    to_copy = remaining;
+                memcpy((uint8_t *) phys_mapped + page_offset,
+                       (uint8_t *) elf_data + file_off, to_copy);
             }
 
             vmm_map_page_user(user_pml4_phys, vaddr, phys, flags);
