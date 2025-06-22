@@ -74,11 +74,17 @@ static enum errno tmpfs_write(struct vfs_node *node, const void *buf,
     struct tmpfs_node *tn = node->fs_node_data;
     if (tn->type != TMPFS_FILE)
         return ERR_IS_DIR;
+
     uint64_t new_size = offset + size;
     if (new_size > tn->size) {
-        tn->data = krealloc(tn->data, new_size);
+        if (!tn->data) {
+            tn->data = kmalloc(new_size);
+        } else {
+            tn->data = krealloc(tn->data, new_size);
+        }
         tn->size = new_size;
     }
+
     memcpy(tn->data + offset, buf, size);
     return size;
 }

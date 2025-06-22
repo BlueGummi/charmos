@@ -184,10 +184,8 @@ struct xhci_slot_ctx {
                                      * to wake up all links
                                      * in path to device*/
 
-    uint32_t root_hub_port : 8; /* Root hub port
-                                 * number used to
-                                 * access the USB
-                                 * device */
+    uint32_t root_hub_port : 8; /* Root hub port number used to
+                                 * access the USB device */
 
     uint32_t num_ports : 8; /* If this is a hub,
                              * this is set by software to
