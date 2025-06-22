@@ -18,6 +18,21 @@ uint64_t sub_offset(uint64_t a) {
     return a - hhdm_offset;
 }
 
+#define KERNEL_PML4_START_INDEX 256
+uintptr_t vmm_make_user_pml4(void) {
+    struct page_table *user_pml4 = (struct page_table *) pmm_alloc_page(true);
+    if (!user_pml4) {
+        k_panic("Failed to allocate user pml4");
+    }
+    memset(user_pml4, 0, PAGE_SIZE);
+
+    for (int i = KERNEL_PML4_START_INDEX; i < 512; i++) {
+        user_pml4->entries[i] = kernel_pml4->entries[i];
+    }
+
+    return (uintptr_t) user_pml4 - hhdm_offset;
+}
+
 void *vmm_map_region(uintptr_t virt_base, uint64_t size, uint64_t flags) {
     void *first = NULL;
 
@@ -189,6 +204,62 @@ void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
         memset(new_table, 0, PAGE_SIZE);
 
         *entry = new_table_phys | PAGING_PRESENT | PAGING_WRITE;
+    }
+    current_table =
+        (struct page_table *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+
+    entry = &current_table->entries[L1];
+    *entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
+
+    asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
+}
+
+void vmm_map_page_user(uintptr_t pml4_phys, uintptr_t virt, uintptr_t phys,
+                       uint64_t flags) {
+    if (virt == 0) {
+        k_panic("CANNOT MAP PAGE 0x0!!!\n");
+    }
+
+    uint64_t L1 = (virt >> 12) & 0x1FF;
+    uint64_t L2 = (virt >> 21) & 0x1FF;
+    uint64_t L3 = (virt >> 30) & 0x1FF;
+    uint64_t L4 = (virt >> 39) & 0x1FF;
+
+    struct page_table *current_table =
+        (struct page_table *) (pml4_phys + hhdm_offset);
+
+    pte_t *entry = &current_table->entries[L4];
+    if (!(*entry & PAGING_PRESENT)) {
+        struct page_table *new_table =
+            (struct page_table *) pmm_alloc_page(true);
+        uintptr_t new_table_phys = (uintptr_t) new_table - hhdm_offset;
+        memset(new_table, 0, PAGE_SIZE);
+        *entry = new_table_phys | PAGING_PRESENT | PAGING_WRITE |
+                 PAGING_USER_ALLOWED;
+    }
+    current_table =
+        (struct page_table *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+
+    entry = &current_table->entries[L3];
+    if (!(*entry & PAGING_PRESENT)) {
+        struct page_table *new_table =
+            (struct page_table *) pmm_alloc_page(true);
+        uintptr_t new_table_phys = (uintptr_t) new_table - hhdm_offset;
+        memset(new_table, 0, PAGE_SIZE);
+        *entry = new_table_phys | PAGING_PRESENT | PAGING_WRITE |
+                 PAGING_USER_ALLOWED;
+    }
+    current_table =
+        (struct page_table *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+
+    entry = &current_table->entries[L2];
+    if (!(*entry & PAGING_PRESENT)) {
+        struct page_table *new_table =
+            (struct page_table *) pmm_alloc_page(true);
+        uintptr_t new_table_phys = (uintptr_t) new_table - hhdm_offset;
+        memset(new_table, 0, PAGE_SIZE);
+        *entry = new_table_phys | PAGING_PRESENT | PAGING_WRITE |
+                 PAGING_USER_ALLOWED;
     }
     current_table =
         (struct page_table *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);

@@ -228,6 +228,7 @@ static enum errno ext2_to_vfs_stat(struct ext2_full_inode *node,
     out->nlink = inode->links_count;
     out->atime = inode->atime;
     out->mtime = inode->mtime;
+    out->size = inode->size;
     out->ctime = inode->ctime;
     return ERR_OK;
 }

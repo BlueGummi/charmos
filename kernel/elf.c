@@ -1,3 +1,6 @@
+#include <asm.h>
+#include <boot/gdt.h>
+#include <console/printf.h>
 #include <elf.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
@@ -7,8 +10,9 @@
 #define ELF_MAGIC 0x464C457F // "\x7FELF"
 
 #define USER_STACK_TOP 0x7FFFFFF000
+#define USER_STACK_SIZE (16 * PAGE_SIZE)
 
-uint64_t load_user_elf(void *elf_data) {
+uint64_t elf_load(const void *elf_data) {
     struct elf64_ehdr *ehdr = (struct elf64_ehdr *) elf_data;
 
     if (ehdr->ident.magic != ELF_MAGIC || ehdr->ident.class != 2) {
@@ -39,11 +43,107 @@ uint64_t load_user_elf(void *elf_data) {
         memset((void *) (ph->vaddr + ph->filesz), 0, ph->memsz - ph->filesz);
     }
 
-    for (int i = 0; i < 4; i++) {
-        uint64_t phys = (uint64_t) pmm_alloc_page(false);
-        vmm_map_page((USER_STACK_TOP - i * 0x1000), phys,
-                     PAGING_PRESENT | PAGING_USER_ALLOWED | PAGING_WRITE);
+    return ehdr->entry;
+}
+
+void elf_map(uintptr_t user_pml4_phys, void *elf_data) {
+    struct elf64_ehdr *ehdr = (struct elf64_ehdr *) elf_data;
+    struct elf64_phdr *phdrs =
+        (struct elf64_phdr *) ((uint8_t *) elf_data + ehdr->phoff);
+
+    for (int i = 0; i < ehdr->phnum; i++) {
+        struct elf64_phdr *ph = &phdrs[i];
+        if (ph->type != PT_LOAD)
+            continue;
+
+        uintptr_t virt = ph->vaddr;
+        uintptr_t offset = ph->offset;
+        uint64_t filesz = ph->filesz;
+        uint64_t memsz = ph->memsz;
+
+        uint64_t flags = PAGING_USER_ALLOWED | PAGING_PRESENT;
+
+        if (ph->flags & PF_W)
+            flags |= PAGING_WRITE;
+
+        if (!(ph->flags & PF_X))
+            flags |= PAGING_XD;
+
+        for (uint64_t off = 0; off < memsz; off += PAGE_SIZE) {
+            uintptr_t vaddr = PAGE_ALIGN_DOWN(virt + off);
+            uintptr_t phys = (uintptr_t) pmm_alloc_page(false);
+            void *phys_mapped_to_virt = vmm_map_phys(phys, 4096);
+
+            if (!phys)
+                k_panic("Failed to alloc page for user ELF\n");
+
+            if (off < filesz) {
+                uint64_t to_copy = PAGE_SIZE;
+                if (off + to_copy > filesz)
+                    to_copy = filesz - off;
+
+                memcpy(phys_mapped_to_virt, (uint8_t *) elf_data + offset + off,
+                       to_copy);
+            } else {
+                memset(phys_mapped_to_virt, 0, PAGE_SIZE);
+            }
+
+            vmm_map_page_user(user_pml4_phys, vaddr, phys, flags);
+        }
+    }
+}
+
+uintptr_t map_user_stack(uintptr_t user_pml4_phys) {
+    uintptr_t stack_bottom = USER_STACK_TOP - USER_STACK_SIZE;
+
+    for (uintptr_t v = stack_bottom; v < USER_STACK_TOP; v += PAGE_SIZE) {
+        uintptr_t phys = (uintptr_t) pmm_alloc_page(false);
+        if (!phys)
+            k_panic("Failed to alloc user stack\n");
+
+        vmm_map_page_user(user_pml4_phys, v, phys,
+                          PAGING_WRITE | PAGING_USER_ALLOWED | PAGING_PRESENT);
     }
 
-    return ehdr->entry;
+    return USER_STACK_TOP;
+}
+
+void syscall_setup(void *syscall_entry) {
+    uint64_t efer = rdmsr(0xC0000080);
+    efer |= (1 << 0);
+    wrmsr(0xC0000080, efer);
+
+    wrmsr(0xC0000082, (uint64_t) syscall_entry);
+
+    wrmsr(0xC0000084, (1 << 9));
+
+    uint64_t star = ((uint64_t) KERNEL_CS << 32) | ((uint64_t) USER_CS << 48);
+    wrmsr(0xC0000081, star);
+}
+
+__attribute__((noreturn)) void
+enter_userspace(uintptr_t entry_point, uintptr_t user_stack_top,
+                uint16_t user_cs, uint16_t user_ss, uintptr_t user_pml4_phys) {
+    asm volatile("mov %0, %%cr3" : : "r"(user_pml4_phys) : "memory");
+
+    uint64_t rflags;
+    asm volatile("pushfq; popq %0" : "=r"(rflags));
+    rflags |= (1 << 9);
+
+    k_printf("entry=0x%lx stack=0x%lx cs=0x%x ss=0x%x cr3=0x%lx\n", entry_point,
+             user_stack_top, user_cs, user_ss, user_pml4_phys);
+
+    asm volatile("cli\n"
+                 "pushq %0\n" // SS
+                 "pushq %1\n" // RSP
+                 "pushq %2\n" // RFLAGS
+                 "pushq %3\n" // CS
+                 "pushq %4\n" // RIP
+                 "iretq\n"
+                 :
+                 : "r"((uint64_t) user_ss), "r"(user_stack_top), "r"(rflags),
+                   "r"((uint64_t) user_cs), "r"(entry_point)
+                 : "memory");
+
+    __builtin_unreachable();
 }

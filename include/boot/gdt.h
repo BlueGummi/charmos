@@ -27,4 +27,17 @@ struct gdt_entry_tss {
 } __attribute__((packed));
 
 void gdt_install();
+#define KERNEL_CS 0x08
+#define KERNEL_DS 0x10
+
+#define USER_DS 0x20
+
+#define GDT_USER_CODE 0x23
+#define GDT_USER_DATA 0x2B
+
+#define USER_CS GDT_USER_CODE
+#define USER_SS GDT_USER_DATA
+
+#define GDT_KERNEL_CODE 0x08
+#define GDT_KERNEL_DATA 0x10
 #pragma once

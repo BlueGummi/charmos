@@ -65,8 +65,8 @@ set(QEMU_COMMON_FLAGS
      -drive id=nvme0,file=disk.img,format=raw,if=none
      -device nvme,serial=boom,drive=disk0,drive=nvme0
 
-     -drive id=fatdisk,file=fat32.img,format=raw,if=none
-     -device nvme,serial=yay,drive=fatdisk
+     #-drive id=fatdisk,file=fat32.img,format=raw,if=none
+     #-device nvme,serial=yay,drive=fatdisk
      #     -netdev bridge,id=n1,br=virbr0
      #     -device e1000,netdev=n1
 
