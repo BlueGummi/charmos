@@ -181,12 +181,18 @@ void registry_setup() {
                 root->ops->mkdir(root, "tmp", VFS_MODE_DIR);
                 struct vfs_node *tmp_on_ext2 = root->ops->finddir(root, "tmp");
                 struct vfs_node *tmpfs_root = tmpfs_mkroot("tmp");
+
+                struct vfs_dirent d;
+                root->ops->readdir(root, &d, 0);
+                k_printf("%s\n", d.name);
                 root->ops->mount(tmp_on_ext2, tmpfs_root);
 
                 tmpfs_root->ops->create(tmpfs_root, "place", VFS_MODE_FILE);
 
                 struct vfs_node *place =
                     tmpfs_root->ops->finddir(tmpfs_root, "place");
+
+
                 char *data = "yabadabadoo";
                 place->ops->write(place, data, 12, 0);
                 char *buf = kzalloc(20);

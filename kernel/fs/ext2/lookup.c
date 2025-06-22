@@ -14,6 +14,12 @@ struct contains_ctx {
     bool found;
 };
 
+struct readdir_ctx {
+    uint32_t entry_offset;
+    struct ext2_dir_entry *out;
+    bool found;
+};
+
 static bool search_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
                             void *ctx_ptr, uint32_t b, uint32_t e_num,
                             uint32_t c) {
@@ -53,6 +59,22 @@ static bool contains_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
     return false;
 }
 
+static bool readdir_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
+                             void *ctx_ptr, uint32_t block, uint32_t entry_num,
+                             uint32_t entry_offset) {
+    (void) fs, (void) block, (void) entry_num;
+
+    struct readdir_ctx *ctx = ctx_ptr;
+
+    if (entry_offset == ctx->entry_offset) {
+        memcpy(ctx->out, entry, sizeof(struct ext2_dir_entry));
+        ctx->found = true;
+        return true;
+    }
+
+    return false;
+}
+
 struct ext2_full_inode *ext2_find_file_in_dir(struct ext2_fs *fs,
                                               struct ext2_full_inode *dir_inode,
                                               const char *fname,
@@ -74,4 +96,16 @@ bool ext2_dir_contains_file(struct ext2_fs *fs,
     ext2_walk_dir(fs, dir_inode, contains_callback, &ctx, false);
 
     return ctx.found;
+}
+
+enum errno ext2_readdir(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
+                        struct ext2_dir_entry *out, uint32_t entry_offset) {
+    if (!fs || !dir_inode || !out)
+        return ERR_INVAL;
+
+    struct readdir_ctx ctx = {.out = out, .entry_offset = entry_offset};
+
+    ext2_walk_dir(fs, dir_inode, readdir_callback, &ctx, false);
+
+    return ctx.found ? ERR_OK : ERR_NO_ENT;
 }

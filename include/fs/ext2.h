@@ -319,6 +319,9 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
 enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
                       const char *name);
 
+enum errno ext2_readdir(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
+                        struct ext2_dir_entry *out, uint32_t entry_offset);
+
 //
 //
 //

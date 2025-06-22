@@ -44,6 +44,8 @@ enum errno ext2_vfs_symlink(struct vfs_node *parent, const char *target,
 struct vfs_node *ext2_vfs_finddir(struct vfs_node *node, const char *fname);
 enum errno ext2_vfs_mkdir(struct vfs_node *n, const char *name, uint16_t mode);
 enum errno ext2_vfs_rmdir(struct vfs_node *n, const char *name);
+enum errno ext2_vfs_readdir(struct vfs_node *n, struct vfs_dirent *out,
+                            uint64_t index);
 
 enum errno vfs_dummy_open(struct vfs_node *a, uint32_t b) {
     (void) a, (void) b;
@@ -71,6 +73,7 @@ static struct vfs_ops ext2_vfs_ops = {
     .unlink = ext2_vfs_unlink,
     .symlink = ext2_vfs_symlink,
     .finddir = ext2_vfs_finddir,
+    .readdir = ext2_vfs_readdir,
     .mkdir = ext2_vfs_mkdir,
     .rmdir = ext2_vfs_rmdir,
     .mount = vfs_mount,
@@ -257,6 +260,16 @@ static struct vfs_node *make_vfs_node(struct ext2_fs *fs,
     return ret;
 }
 
+static struct vfs_dirent *ext2_to_vfs_dirent(struct ext2_dir_entry *ext2) {
+    struct vfs_dirent *dirent = kzalloc(sizeof(struct vfs_dirent));
+
+    dirent->mode = ext2_to_vfs_mode(ext2->file_type);
+    dirent->inode = ext2->inode;
+    dirent->dirent_data = ext2;
+    memcpy(dirent->name, ext2->name, ext2->name_len);
+    return dirent;
+}
+
 struct rename_ctx {
     const char *old_name;
     const char *new_name;
@@ -372,6 +385,9 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
 }
 
 struct vfs_node *ext2_vfs_finddir(struct vfs_node *node, const char *fname) {
+    if (!node || !fname)
+        return NULL;
+
     struct ext2_full_inode *full_inode = node->fs_node_data;
 
     struct ext2_fs *fs = node->fs_data;
@@ -380,6 +396,29 @@ struct vfs_node *ext2_vfs_finddir(struct vfs_node *node, const char *fname) {
         ext2_find_file_in_dir(fs, full_inode, fname, NULL);
 
     return make_vfs_node(node->fs_data, found, fname);
+}
+
+enum errno ext2_vfs_readdir(struct vfs_node *node, struct vfs_dirent *out,
+                            uint64_t index) {
+    if (!node || !out)
+        return ERR_INVAL;
+
+    struct ext2_full_inode *full_inode = node->fs_node_data;
+
+    struct ext2_fs *fs = node->fs_data;
+
+    struct ext2_dir_entry *ext2_out = kzalloc(sizeof(struct ext2_dir_entry));
+
+    enum errno e = ext2_readdir(fs, full_inode, ext2_out, index);
+
+    if (ERR_IS_FATAL(e))
+        return e;
+
+    struct vfs_dirent *dout = ext2_to_vfs_dirent(ext2_out);
+
+    memcpy(out, dout, sizeof(struct vfs_dirent));
+
+    return e;
 }
 
 enum errno ext2_vfs_rename(struct vfs_node *old_parent, const char *old_name,

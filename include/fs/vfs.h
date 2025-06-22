@@ -77,9 +77,16 @@ struct vfs_stat {
     uint64_t inode; // inode number
     uint32_t nlink; // Link count
 
+    /* access time */
     uint64_t atime;
+
+    /* modification time */
     uint64_t mtime;
+
+    /* creation time */
     uint64_t ctime;
+
+    /* what fields here are actually real */
     uint16_t present_mask;
 };
 
