@@ -69,6 +69,7 @@ static inline void scheduler_save_thread(struct scheduler *sched,
                                          struct thread *curr,
                                          struct cpu_state *cpu) {
     if (curr && curr->state == RUNNING) {
+
         memcpy(&curr->regs, cpu, sizeof(struct cpu_state));
         curr->state = READY;
         curr->time_in_level++;
@@ -168,6 +169,7 @@ void schedule(struct cpu_state *cpu) {
     uint64_t tsc = rdtsc();
     struct thread *curr = sched->current;
     struct thread *next = NULL;
+    struct scheduler *victim = NULL;
 
     /* skip */
     if (!sched->active)
@@ -188,7 +190,7 @@ void schedule(struct cpu_state *cpu) {
 
     /* attempt a steal */
     begin_steal(sched);
-    struct scheduler *victim = scheduler_pick_victim(sched);
+    victim = scheduler_pick_victim(sched);
 
     if (!victim) {
         /* victim cannot be stolen from - early abort */
@@ -196,11 +198,8 @@ void schedule(struct cpu_state *cpu) {
         goto regular_schedule;
     }
 
-    k_printf(ANSI_GREEN "Core %u is stealing from core %u\n" ANSI_RESET,
-             core_id, victim->core_id);
-
     struct thread *stolen = scheduler_steal_work(victim);
-    
+
     /* done stealing work now. another core can steal from us */
     stop_steal(sched, victim);
 
@@ -220,6 +219,7 @@ load_new_thread:
 end:
     /* do not change interrupt status */
     spin_unlock_no_cli(&sched->lock);
-    k_printf("That took %llu clock cycles\n", rdtsc() - tsc);
+    k_printf("That took %llu clock cycles%s\n", rdtsc() - tsc,
+             victim ? ", and a thread was stolen!" : "");
     LAPIC_REG(LAPIC_REG_EOI) = 0;
 }
