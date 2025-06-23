@@ -2,12 +2,12 @@ BITS 64
 GLOBAL _start
 
 SECTION .data
-msg:    db "ring 3", 0xA, 0
+msg:    db "hello world from ring 3", 0xA, 0
 
 SECTION .text
 _start:
     mov rax, 1
-    lea rdi, [msg] 
+    lea rdi, [rel msg] 
     syscall
 
 .hang:

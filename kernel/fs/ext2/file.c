@@ -114,7 +114,6 @@ static void file_read_visitor(struct ext2_fs *fs, struct ext2_inode *inode,
 
     memcpy(ctx->buffer + ctx->bytes_read, block_buf + block_offset, to_copy);
     ctx->bytes_read += to_copy;
-    ctx->offset += to_copy;
     kfree(block_buf);
 }
 

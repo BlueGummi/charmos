@@ -80,7 +80,7 @@ void k_main(void) {
     c->id = 0;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
 
-    int 电 = 4; 
+    int 电 = 4;
     k_printf("%d\n", 电);
     // IDT
     idt_alloc(c_cnt);
@@ -107,6 +107,7 @@ void k_main(void) {
     uint8_t *buffer = kmalloc(stat.size);
 
     elf->ops->read(elf, buffer, stat.size, 0);
+
     uint64_t ent = elf_load(buffer);
 
     uint64_t user_pml4 = vmm_make_user_pml4();

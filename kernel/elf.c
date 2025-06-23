@@ -30,17 +30,12 @@ uint64_t elf_load(const void *elf_data) {
 
         uint64_t va_start = PAGE_ALIGN_DOWN(ph->vaddr);
         uint64_t va_end = PAGE_ALIGN_UP(ph->vaddr + ph->memsz);
-        uint64_t offset = ph->offset;
 
         for (uint64_t va = va_start; va < va_end; va += 0x1000) {
             uint64_t phys = (uint64_t) pmm_alloc_page(false);
             vmm_map_page(va, phys,
                          PAGING_PRESENT | PAGING_USER_ALLOWED | PAGING_WRITE);
         }
-
-        memcpy((void *) ph->vaddr, (uint8_t *) elf_data + offset, ph->filesz);
-
-        memset((void *) (ph->vaddr + ph->filesz), 0, ph->memsz - ph->filesz);
     }
 
     return ehdr->entry;
@@ -56,8 +51,10 @@ void elf_map(uintptr_t user_pml4_phys, void *elf_data) {
         if (ph->type != PT_LOAD)
             continue;
 
-        uint64_t filesz = ph->filesz;
-        uint64_t memsz = ph->memsz;
+        uintptr_t seg_vaddr_start = PAGE_ALIGN_DOWN(ph->vaddr);
+        uintptr_t seg_vaddr_end = PAGE_ALIGN_UP(ph->vaddr + ph->memsz);
+        uintptr_t file_start = ph->offset;
+        uintptr_t file_end = ph->offset + ph->filesz;
 
         uint64_t flags = PAGING_USER_ALLOWED | PAGING_PRESENT;
         if (ph->flags & PF_W)
@@ -65,11 +62,8 @@ void elf_map(uintptr_t user_pml4_phys, void *elf_data) {
         if (!(ph->flags & PF_X))
             flags |= PAGING_XD;
 
-        uintptr_t segment_base = ph->vaddr;
-        uintptr_t file_offset = ph->offset;
-
-        for (uint64_t off = 0; off < memsz; off += PAGE_SIZE) {
-            uintptr_t vaddr = PAGE_ALIGN_DOWN(segment_base + off);
+        for (uintptr_t vaddr = seg_vaddr_start; vaddr < seg_vaddr_end;
+             vaddr += PAGE_SIZE) {
 
             uintptr_t phys = (uintptr_t) pmm_alloc_page(false);
             if (!phys)
@@ -78,21 +72,26 @@ void elf_map(uintptr_t user_pml4_phys, void *elf_data) {
             void *phys_mapped = vmm_map_phys(phys, PAGE_SIZE);
             memset(phys_mapped, 0, PAGE_SIZE);
 
-            uint64_t page_offset = 0;
-            if (off == 0)
-                page_offset = segment_base & (PAGE_SIZE - 1);
+            uintptr_t offset_in_seg = vaddr - seg_vaddr_start;
+            uintptr_t file_offset_in_seg =
+                offset_in_seg + (ph->vaddr - seg_vaddr_start);
+            uintptr_t file_pos = file_start + file_offset_in_seg;
 
-            uint64_t file_page_offset = file_offset + off;
-            uint64_t bytes_remaining_in_file =
-                (filesz > off) ? (filesz - off) : 0;
-            uint64_t to_copy = PAGE_SIZE - page_offset;
-            if (bytes_remaining_in_file < to_copy)
-                to_copy = bytes_remaining_in_file;
+            uintptr_t page_offset = 0;
+            if (vaddr == seg_vaddr_start)
+                page_offset = ph->vaddr & (PAGE_SIZE - 1);
 
-            if (to_copy > 0) {
+            size_t to_copy = 0;
+            if (file_pos < file_end) {
+                size_t bytes_remaining = file_end - file_pos;
+                to_copy = PAGE_SIZE - page_offset;
+                if (bytes_remaining < to_copy)
+                    to_copy = bytes_remaining;
+
                 memcpy((uint8_t *) phys_mapped + page_offset,
-                       (uint8_t *) elf_data + file_page_offset, to_copy);
+                       (uint8_t *) elf_data + file_pos, to_copy);
             }
+
             vmm_map_page_user(user_pml4_phys, vaddr, phys, flags);
         }
     }
