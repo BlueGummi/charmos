@@ -60,10 +60,8 @@ void elf_map(uintptr_t user_pml4_phys, void *elf_data) {
         uint64_t memsz = ph->memsz;
 
         uint64_t flags = PAGING_USER_ALLOWED | PAGING_PRESENT;
-
         if (ph->flags & PF_W)
             flags |= PAGING_WRITE;
-
         if (!(ph->flags & PF_X))
             flags |= PAGING_XD;
 
@@ -72,25 +70,29 @@ void elf_map(uintptr_t user_pml4_phys, void *elf_data) {
 
         for (uint64_t off = 0; off < memsz; off += PAGE_SIZE) {
             uintptr_t vaddr = PAGE_ALIGN_DOWN(segment_base + off);
+
             uintptr_t phys = (uintptr_t) pmm_alloc_page(false);
             if (!phys)
-                k_panic("Failed to alloc page for user ELF\n");
+                k_panic("Failed to allocate page for user ELF segment\n");
 
             void *phys_mapped = vmm_map_phys(phys, PAGE_SIZE);
             memset(phys_mapped, 0, PAGE_SIZE);
 
-            uint64_t page_offset = (segment_base + off) & 0xFFF;
-            uint64_t file_off = file_offset + off;
-            uint64_t remaining = (filesz > off) ? (filesz - off) : 0;
+            uint64_t page_offset = 0;
+            if (off == 0)
+                page_offset = segment_base & (PAGE_SIZE - 1);
+
+            uint64_t file_page_offset = file_offset + off;
+            uint64_t bytes_remaining_in_file =
+                (filesz > off) ? (filesz - off) : 0;
             uint64_t to_copy = PAGE_SIZE - page_offset;
+            if (bytes_remaining_in_file < to_copy)
+                to_copy = bytes_remaining_in_file;
 
-            if (remaining > 0) {
-                if (remaining < to_copy)
-                    to_copy = remaining;
+            if (to_copy > 0) {
                 memcpy((uint8_t *) phys_mapped + page_offset,
-                       (uint8_t *) elf_data + file_off, to_copy);
+                       (uint8_t *) elf_data + file_page_offset, to_copy);
             }
-
             vmm_map_page_user(user_pml4_phys, vaddr, phys, flags);
         }
     }

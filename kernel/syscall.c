@@ -5,6 +5,8 @@
 
 void syscall_handler(uint64_t num, uint64_t arg1, uint64_t arg2, uint64_t arg3,
                      uint64_t arg4, uint64_t arg5) {
+    k_printf("num at %u, arg1 at 0x%lx\n", num, arg1);
+
     switch (num) {
     case 1:
         k_printf("userspace says: %s\n", (char*)arg1);

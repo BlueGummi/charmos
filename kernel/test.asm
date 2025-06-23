@@ -7,7 +7,7 @@ msg:    db "ring 3", 0xA, 0
 SECTION .text
 _start:
     mov rax, 1
-    lea rdi, [rel msg] 
+    lea rdi, [msg] 
     syscall
 
 .hang:

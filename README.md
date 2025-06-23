@@ -24,20 +24,16 @@ make run # run this in the build directory
 
 ### TODO:
 
-- [ ] disk I/O IRQ handlers to avoid blocking for unnecessary periods of time (optimization)
+- [ ] async io operations
 
-- [ ] we can reserve something like IRQs 200-223 or whatever...
+- [ ] ports for programs
 
-- [ ] once filesystems are up and running, make a logging function to log to a set file
+- [ ] proper userland
 
-- [ ] block device sector size scans
+- [ ] ia32 port + gub support
 
-- [ ] define magic numbers!!
+- [ ] finish up vfs and add cache
 
-- [ ] syscall API
-
-- [ ] define more _t typedefs like dma_t or physaddr_t and such
-
-- [ ] implement fs sanity checks
+- [ ] more drivers + finish xhci
 
 - [ ] networking :boom: + networking stack :boom: :boom:
