@@ -1,48 +1,53 @@
 global syscall_entry
 extern syscall_handler
-; void syscall_entry();
+
 syscall_entry:
-    push r15
-    push r14
-    push r13
-    push r12
-    push r11
-    push r10
-    push r9
-    push r8
+    push rax
+    push rbx
+    push rdx
     push rsi
     push rdi
-    push rdx
+    push r8
+    push r9
+    push r10
+    push r12
+    push r13
+    push r14
+    push r15
     push rcx
-    push rbx
-    push rax
+    push r11
 
-    ; Arguments to syscall_handler:
-    ; RAX = syscall num, RDI = arg1, RSI = arg2, RDX = arg3, R10 = arg4, R8 = arg5
+    ; rax = syscall number
+    ; rdi = arg1, rsi = arg2, rdx = arg3, r10 = arg4, r8 = arg5, r9 = arg6
 
-    mov rdi, rax        ; syscall num
-    mov rsi, rdi        ; arg1
-    mov rdx, rsi        ; arg2
-    mov rcx, rdx        ; arg3
-    mov r8, r10         ; arg4
-    mov r9, r8          ; arg5
+    mov r12, rdi
+    mov r13, rsi
+    mov r14, rdx
+    mov r15, r10
+    mov rbx, r8
+
+    mov rdi, rax   
+    mov rsi, r12
+    mov rdx, r13
+    mov r10, r14   
+    mov r8,  r15
+    mov r9,  rbx
 
     call syscall_handler
 
-    pop rax
-    pop rbx
+    pop r11
     pop rcx
-    pop rdx
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop r10
+    pop r9
+    pop r8
     pop rdi
     pop rsi
-    pop r8
-    pop r9
-    pop r10
-    pop r11
-    pop r12
-    pop r13
-    pop r14
-    pop r15
+    pop rdx
+    pop rbx
+    pop rax
 
-    sysretq
-
+    o64 sysret

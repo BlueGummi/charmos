@@ -97,14 +97,13 @@ void idt_install(uint64_t ind) {
 
     idt_set_and_mark(GPF_ID, (uint64_t) gpf_handler_wrapper, 0x08, 0x8E, ind);
 
-    idt_set_and_mark(PAGE_FAULT_ID, (uint64_t) page_fault_handler_wrapper, 0x08,
-                     0x8E, ind);
+    idt_set_and_mark(PAGE_FAULT_ID, (uint64_t) page_fault_handler_wrapper, 0x08,0x8E, ind);
 
     idt_set_and_mark(TIMER_ID, (uint64_t) context_switch, 0x08, 0x8E, ind);
 
     idt_set_and_mark(KB_ID, (uint64_t) keyboard_handler, 0x08, 0x8E, ind);
 
-    idt_set_and_mark(0x80, (uint64_t) syscall_entry, 0x08, 0x8e, ind);
+    idt_set_and_mark(0x80, (uint64_t) syscall_entry, 0x2b, 0xee, ind);
 
     idt_load(ind);
 }

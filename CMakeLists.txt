@@ -5,7 +5,7 @@ set(CMAKE_C_STANDARD 11)
 set(ARCH "x86_64")
 set(IMAGE_NAME "charmos-${ARCH}")
 
-set(KERNEL_COMMON_FLAGS "-O2 -pipe -Wall -Wextra -Wpointer-sign -Wenum-compare -ffreestanding -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -mno-red-zone -fno-stack-protector -fno-omit-frame-pointer -fno-stack-check -fno-PIC -ffunction-sections -fdata-sections  -m64 -mcmodel=kernel -mgeneral-regs-only -DLIMINE_API_REVISION=2 -Wno-address-of-packed-member -Wno-unused-command-line-argument -ggdb") 
+set(KERNEL_COMMON_FLAGS "-O2 -pipe -Wall -Wextra -Wpointer-sign -Wenum-compare -ffreestanding -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -mno-red-zone -fno-stack-protector -fno-omit-frame-pointer -fno-stack-check -fno-PIC -ffunction-sections -fdata-sections  -m64 -mcmodel=kernel -mgeneral-regs-only -DLIMINE_API_REVISION=2 -Wno-address-of-packed-member -Wno-unused-command-line-argument -ggdb -fsanitize=undefined") 
 
 set(CMAKE_C_FLAGS "${KERNEL_COMMON_FLAGS} -std=gnu11")
 
@@ -54,6 +54,7 @@ set(QEMU_COMMON_FLAGS
     -no-shutdown
     -no-reboot
     -s
+    #-S
     -monitor telnet:127.0.0.1:1234,server,nowait
 
     -device qemu-xhci,id=xhci

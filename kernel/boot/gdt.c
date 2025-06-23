@@ -62,17 +62,14 @@ void reload_segment_registers(uint16_t cs_selector, uint16_t ds_selector) {
 void gdt_init(struct gdt_entry *gdt, struct tss *tss) {
     gdt_set_gate(gdt, 0, 0, 0, 0, 0); // Null
 
-    // Kernel code & data
-    gdt_set_gate(gdt, 1, 0, 0xFFFFFFFF, 0x9A, 0xAF); // Ring 0 code
-    gdt_set_gate(gdt, 2, 0, 0xFFFFFFFF, 0x92, 0xCF); // Ring 0 data
+    gdt_set_gate(gdt, 1, 0, 0xFFFFFFFF, ACCESS_CODE_RING0, GRAN_CODE);
+    gdt_set_gate(gdt, 2, 0, 0xFFFFFFFF, ACCESS_DATA_RING0, GRAN_DATA);
+    gdt_set_gate(gdt, 5, 0, 0xFFFFFFFF, ACCESS_CODE_RING3, GRAN_CODE);
+    gdt_set_gate(gdt, 6, 0, 0xFFFFFFFF, ACCESS_DATA_RING3, GRAN_DATA);
 
     // TSS (occupies entries 3 and 4)
     gdt_set_tss((struct gdt_entry_tss *) &gdt[3], (uint64_t) tss,
                 sizeof(struct tss) - 1);
-
-    // User code & data (entries 5 and 6)
-    gdt_set_gate(gdt, 5, 0, 0xFFFFFFFF, 0xFA, 0xAF); // Ring 3 code (0xFA)
-    gdt_set_gate(gdt, 6, 0, 0xFFFFFFFF, 0xF2, 0xCF); // Ring 3 data (0xF2)
 
     tss->io_map_base = sizeof(struct tss);
 

@@ -18,6 +18,7 @@ void debug_print_stack();
 
 #define k_panic(fmt, ...)                                                      \
     do {                                                                       \
+        asm("cli");                                                            \
         k_printf("\n" EIGHTY_EIGHT_LINES "\n");                                \
         k_printf("\n                                    [" ANSI_BG_RED         \
                  "KERNEL PANIC" ANSI_RESET "]\n\n");                           \
@@ -35,7 +36,7 @@ void debug_print_stack();
         debug_print_stack();                                                   \
         k_printf("\n" EIGHTY_EIGHT_LINES "\n");                                \
         while (1)                                                              \
-            asm("cli;hlt");                                                    \
+            asm("hlt");                                                        \
     } while (0)
 
 #define k_info(fmt, ...)                                                       \

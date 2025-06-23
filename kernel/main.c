@@ -80,6 +80,8 @@ void k_main(void) {
     c->id = 0;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
 
+    int 电 = 4; 
+    k_printf("%d\n", 电);
     // IDT
     idt_alloc(c_cnt);
     idt_install(0);
@@ -96,6 +98,7 @@ void k_main(void) {
     registry_setup();
     //    registry_print_devices();
 
+    syscall_setup(syscall_entry);
     struct vfs_node *elf = g_root_node->ops->finddir(g_root_node, "user.elf");
     struct vfs_stat stat;
 
@@ -109,10 +112,6 @@ void k_main(void) {
     uint64_t user_pml4 = vmm_make_user_pml4();
     elf_map(user_pml4, buffer);
     uint64_t stack = map_user_stack(user_pml4);
-
-    syscall_setup((void *) syscall_entry);
-
-    k_printf("elf starts at 0x%lx\n", ent);
 
     enter_userspace(ent, stack, USER_CS, USER_SS, user_pml4);
 

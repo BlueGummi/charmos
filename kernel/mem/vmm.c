@@ -19,6 +19,7 @@ uint64_t sub_offset(uint64_t a) {
 }
 
 #define KERNEL_PML4_START_INDEX 256
+
 uintptr_t vmm_make_user_pml4(void) {
     struct page_table *user_pml4 = (struct page_table *) pmm_alloc_page(true);
     if (!user_pml4) {

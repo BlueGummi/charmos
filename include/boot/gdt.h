@@ -26,6 +26,14 @@ struct gdt_entry_tss {
     uint32_t reserved;
 } __attribute__((packed));
 
+#define ACCESS_CODE_RING0 0x9A  // exec/read, ring 0
+#define ACCESS_DATA_RING0 0x92  // read/write, ring 0
+#define ACCESS_CODE_RING3 0xFA  // exec/read, ring 3
+#define ACCESS_DATA_RING3 0xF2  // read/write, ring 3
+
+#define GRAN_CODE 0xAF          // G=1, D/B=0, L=1, AVL=0
+#define GRAN_DATA 0xAF          // G=1, D/B=0, L=0, AVL=0
+
 void gdt_install();
 // Kernel selectors (RPL = 0)
 #define GDT_KERNEL_CODE 0x08 // index 1
