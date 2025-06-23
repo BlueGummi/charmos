@@ -75,13 +75,12 @@ void k_main(void) {
     slab_init();
     pmm_dyn_init();
     gdt_install();
+    syscall_setup(syscall_entry);
     struct core *c = kmalloc(sizeof(struct core));
     c->state = IDLE;
     c->id = 0;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
 
-    int 电 = 4;
-    k_printf("%d\n", 电);
     // IDT
     idt_alloc(c_cnt);
     idt_install(0);
@@ -97,24 +96,6 @@ void k_main(void) {
     cmdline_parse(cmdline_request.response->cmdline);
     registry_setup();
     //    registry_print_devices();
-
-    syscall_setup(syscall_entry);
-    struct vfs_node *elf = g_root_node->ops->finddir(g_root_node, "user.elf");
-    struct vfs_stat stat;
-
-    elf->ops->stat(elf, &stat);
-
-    uint8_t *buffer = kmalloc(stat.size);
-
-    elf->ops->read(elf, buffer, stat.size, 0);
-
-    uint64_t ent = elf_load(buffer);
-
-    uint64_t user_pml4 = vmm_make_user_pml4();
-    elf_map(user_pml4, buffer);
-    uint64_t stack = map_user_stack(user_pml4);
-
-    enter_userspace(ent, stack, USER_CS, USER_SS, user_pml4);
 
     // Scheduler
     scheduler_init(c_cnt);

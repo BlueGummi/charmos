@@ -74,6 +74,7 @@ void gdt_init(struct gdt_entry *gdt, struct tss *tss) {
     tss->io_map_base = sizeof(struct tss);
 
     gdt_load(gdt, GDT_ENTRIES);
+    tss->rsp0 = (uint64_t) kmalloc_aligned(4096 * 8, 64);
 
     reload_segment_registers(GDT_KERNEL_CODE, GDT_KERNEL_DATA);
 
