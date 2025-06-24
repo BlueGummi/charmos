@@ -107,9 +107,6 @@ void registry_setup() {
             case 0x1026: // 82545EM
             case 0x10D3: // 82574L
             case 0x10F5: // 82567LM-3
-                k_printf("Found Intel e1000 at %02x:%02x.%x (device_id=%04x)",
-                         dev.bus, dev.device, dev.function, dev.device_id);
-
                 struct e1000_device *device =
                     kmalloc(sizeof(struct e1000_device));
                 e1000_init(&dev, device);
@@ -182,27 +179,8 @@ void registry_setup() {
                 struct vfs_node *tmp_on_ext2 = root->ops->finddir(root, "tmp");
                 struct vfs_node *tmpfs_root = tmpfs_mkroot("tmp");
 
-                struct vfs_dirent d;
-                root->ops->readdir(root, &d, 0);
-                k_printf("%s\n", d.name);
                 root->ops->mount(tmp_on_ext2, tmpfs_root);
 
-                tmpfs_root->ops->create(tmpfs_root, "place", VFS_MODE_FILE);
-
-                struct vfs_node *place =
-                    tmpfs_root->ops->finddir(tmpfs_root, "place");
-
-
-                char *data = "yabadabadoo";
-                place->ops->write(place, data, 12, 0);
-                char *buf = kzalloc(20);
-
-                place->ops->read(place, buf, 12, 0);
-                k_printf("%s\n", buf);
-
-                vfs_node_print(g_root_node);
-                struct vfs_node *found = vfs_finddir(g_root_node, "tmp");
-                vfs_node_print(found);
                 /* TODO: Migrate this out - what is this doing here */
                 found_root = true;
             }

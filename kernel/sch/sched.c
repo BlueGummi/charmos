@@ -219,7 +219,5 @@ load_new_thread:
 end:
     /* do not change interrupt status */
     spin_unlock_no_cli(&sched->lock);
-    k_printf("That took %llu clock cycles%s\n", rdtsc() - tsc,
-             victim ? ", and a thread was stolen!" : "");
     LAPIC_REG(LAPIC_REG_EOI) = 0;
 }

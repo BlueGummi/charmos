@@ -74,7 +74,6 @@ static void e1000_setup_rx_ring(struct e1000_device *dev) {
 
 int e1000_send_packet(struct e1000_device *dev, const void *data, size_t len) {
     if (len > E1000_MAX_TX_PACKET_SIZE) {
-        k_printf("e1000: Packet too large (%u bytes)\n", (unsigned) len);
         return -1;
     }
 
@@ -82,7 +81,6 @@ int e1000_send_packet(struct e1000_device *dev, const void *data, size_t len) {
     struct e1000_tx_desc *desc = &dev->tx_descs[next];
 
     if (!(desc->status & E1000_TXD_STAT_DD)) {
-        k_printf("e1000: TX ring full at %u\n", next);
         return -1;
     }
 
@@ -96,31 +94,6 @@ int e1000_send_packet(struct e1000_device *dev, const void *data, size_t len) {
     mmio_write_32(REG32(dev, E1000_REG_TDT), dev->tx_tail);
 
     return 0;
-}
-
-void e1000_debug_status(struct e1000_device *dev) {
-    uint32_t status = mmio_read_32(REG32(dev, E1000_REG_STATUS));
-    uint32_t tdh = mmio_read_32(REG32(dev, E1000_REG_TDH));
-    uint32_t tdt = mmio_read_32(REG32(dev, E1000_REG_TDT));
-    k_printf("e1000: STATUS=0x%x TDH=%u TDT=%u\n", status, tdh, tdt);
-}
-
-void e1000_test_transmit(struct e1000_device *dev) {
-    e1000_debug_status(dev);
-
-    uint8_t dummy_data[64] = {0xFF};
-    int res = e1000_send_packet(dev, dummy_data, sizeof(dummy_data));
-    if (res == 0)
-        k_printf("e1000: dummy packet sent\n");
-    else
-        k_printf("e1000: failed to send dummy packet\n");
-
-    sleep_ms(10);
-    e1000_debug_status(dev);
-
-    struct e1000_tx_desc *desc = &dev->tx_descs[0];
-    k_printf("e1000: TXD[0] status = 0x%x\n", desc->status);
-    e1000_debug_status(dev);
 }
 
 static inline uint16_t htons(uint16_t hostshort) {
@@ -192,6 +165,8 @@ bool e1000_init(struct pci_device *pci, struct e1000_device *dev) {
     dev->bus = pci->bus;
     dev->device = pci->device;
     dev->function = pci->function;
+    k_info("e1000", K_INFO, "Found device at %02x:%02x.%02x", pci->bus,
+           pci->device, pci->function);
 
     uint32_t bar = pci_read(dev->bus, dev->device, dev->function, PCI_BAR0);
     if (bar & 0x1)
@@ -214,12 +189,9 @@ bool e1000_init(struct pci_device *pci, struct e1000_device *dev) {
 
     e1000_reset(dev);
 
-    uint32_t status = mmio_read_32(REG32(dev, E1000_REG_STATUS));
-    k_printf("e1000: Status after reset = 0x%x\n", status);
-
     e1000_setup_tx_ring(dev);
     e1000_setup_rx_ring(dev);
-    e1000_test_transmit(dev);
     send_hardcoded_ping(dev);
+    k_info("e1000", K_INFO, "Device initialized successfully");
     return true;
 }

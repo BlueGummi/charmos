@@ -1,3 +1,4 @@
+#include <acpi/hpet.h>
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
 #include <limine.h>
@@ -39,26 +40,35 @@ void debug_print_stack();
             asm("hlt");                                                        \
     } while (0)
 
-#define k_info(fmt, ...)                                                       \
+enum k_log_level {
+    K_INFO,
+    K_WARN,
+    K_ERROR,
+};
+
+static inline const char *k_log_level_color(enum k_log_level l) {
+    switch (l) {
+    case K_INFO: return ANSI_GREEN;
+    case K_WARN: return ANSI_YELLOW;
+    case K_ERROR: return ANSI_RED;
+    default: return ANSI_RESET;
+    }
+}
+
+#define print_ms(ms)                                                           \
     do {                                                                       \
-        k_printf("[");                                                         \
-        k_printf(ANSI_GREEN);                                                  \
-        time_print_current();                                                  \
-        k_printf(ANSI_RESET);                                                  \
-        k_printf("]");                                                         \
-        k_printf(": [%sINFO%s]: ", ANSI_YELLOW, ANSI_RESET);                   \
-        k_printf(fmt, ##__VA_ARGS__);                                          \
-        k_printf("\n");                                                        \
+        int seconds = ms / 1000;                                               \
+        int milliseconds = ms % 1000;                                          \
+        k_printf("%d.%03d", seconds, milliseconds);                            \
     } while (0)
 
-#define k_warn(fmt, ...)                                                       \
+#define k_info(category, level, fmt, ...)                                      \
     do {                                                                       \
         k_printf("[");                                                         \
-        k_printf(ANSI_GREEN);                                                  \
-        time_print_current();                                                  \
+        k_printf(k_log_level_color(level));                                    \
+        k_printf("%s", category);                                              \
         k_printf(ANSI_RESET);                                                  \
-        k_printf("]");                                                         \
-        k_printf(": [%sWARN%s]: ", ANSI_BRIGHT_RED, ANSI_RESET);               \
+        k_printf("]: ");                                                       \
         k_printf(fmt, ##__VA_ARGS__);                                          \
         k_printf("\n");                                                        \
     } while (0)

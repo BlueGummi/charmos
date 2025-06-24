@@ -257,9 +257,7 @@ void xhci_parse_ext_caps(struct xhci_device *dev) {
 
             uint32_t own_data = mmio_read_32(bios_owns_addr);
             if (own_data & 1)
-                k_printf("BIOS ownership handoff failed.\n");
-            else
-                k_printf("BIOS ownership disabled.\n");
+                k_info("XHCI", K_WARN, "BIOS ownership handoff failed.\n");
             goto out;
         }
 
@@ -285,24 +283,24 @@ bool xhci_reset_port(struct xhci_device *dev, uint32_t port_index) {
     }
 
     if (mmio_read_32(portsc) & (1 << 4)) {
-        k_printf("XHCI: Port %u reset timed out.\n", port_index + 1);
+        k_info("XHCI", K_WARN, "Port %u reset timed out.\n", port_index + 1);
         return false;
     }
 
-    k_printf("XHCI: Port %u reset complete.\n", port_index + 1);
     return true;
 }
 
 void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
+    k_info("XHCI", K_INFO, "Found device at %02x:%02x.%02x", bus, slot, func);
     void *mmio = xhci_map_mmio(bus, slot, func);
 
     struct xhci_device *dev = xhci_device_create(mmio);
 
     if (!xhci_controller_stop(dev))
-        k_printf("Could stop XHCI controller\n");
+        return;
 
     if (!xhci_controller_reset(dev))
-        k_printf("Could not reset XHCI controller\n");
+        return;
 
     xhci_parse_ext_caps(dev);
     xhci_setup_event_ring(dev);
@@ -321,16 +319,16 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
             xhci_reset_port(dev, port);
             uint8_t slot_id = xhci_enable_slot(dev);
             if (slot_id == 0) {
-                k_printf("Failed to enable slot for port %lu\n", port);
+                k_info("XHCI", K_WARN, "Failed to enable slot for port %lu\n",
+                       port);
                 continue;
             }
 
             dev->port_info[port - 1].device_connected = true;
             dev->port_info[port - 1].speed = speed;
             dev->port_info[port - 1].slot_id = slot_id;
-            k_printf("Enabled slot %u\n", slot_id);
         }
     }
 
-    k_printf("XHCI controller initialized.\n");
+    k_info("XHCI", K_INFO, "Device initialized successfully");
 }

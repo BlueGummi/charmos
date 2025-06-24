@@ -33,6 +33,7 @@ unsigned char keyboard_shift_map[128] = {
     '\0', '\0', '\0', '\0', '\0'};
 
 __attribute__((interrupt)) void keyboard_handler(void *a) {
+    k_printf("Shut\n");
     (void) a;
     uint8_t status;
     do {
@@ -54,9 +55,7 @@ __attribute__((interrupt)) void keyboard_handler(void *a) {
         if (character == '\n') {
             if (memcmp(kbuffer, "shutdown", 8) == 0 ||
                 memcmp(kbuffer, "poweroff", 8) == 0) {
-                k_info("Poweroff signal received\n");
             } else if (memcmp(kbuffer, ":3", 2) == 0) {
-                k_info("silly!");
             }
             memset(kbuffer, 0, sizeof(kbuffer));
             index = 0;

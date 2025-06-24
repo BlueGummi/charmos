@@ -100,16 +100,6 @@ void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
                                          .revision = revision};
 
                 if (class_code == 0x0C && subclass == 0x03) {
-                    const char *controller_type = "Unknown";
-                    switch (prog_if) {
-                    case 0x00: controller_type = "UHCI (USB 1.1)"; break;
-                    case 0x10: controller_type = "OHCI (USB 1.1)"; break;
-                    case 0x20: controller_type = "EHCI (USB 2.0)"; break;
-                    case 0x30: controller_type = "XHCI (USB 3.0+)"; break;
-                    }
-
-                    k_printf("Found USB controller: %s at %02x:%02x.%x\n",
-                             controller_type, bus, device, function);
                     switch (prog_if) {
                     case 0x30: xhci_init(bus, device, function);
                     case 0x00:

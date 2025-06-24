@@ -3,6 +3,8 @@
 void hpet_init(void);
 void hpet_write64(uint64_t offset, uint64_t value);
 uint64_t hpet_read64(uint64_t offset);
+uint64_t hpet_timestamp_ms(void);
+uint64_t hpet_timestamp_us(void);
 
 #define HPET_GEN_CAP_ID_OFFSET 0x0
 #define HPET_GEN_CONF_OFFSET 0x10
