@@ -44,6 +44,7 @@ enum k_log_level {
     K_INFO,
     K_WARN,
     K_ERROR,
+    K_TEST,
 };
 
 static inline const char *k_log_level_color(enum k_log_level l) {
@@ -51,6 +52,7 @@ static inline const char *k_log_level_color(enum k_log_level l) {
     case K_INFO: return ANSI_GREEN;
     case K_WARN: return ANSI_YELLOW;
     case K_ERROR: return ANSI_RED;
+    case K_TEST: return ANSI_BLUE;
     default: return ANSI_RESET;
     }
 }
@@ -70,7 +72,8 @@ static inline const char *k_log_level_color(enum k_log_level l) {
         k_printf(ANSI_RESET);                                                  \
         k_printf("]: ");                                                       \
         k_printf(fmt, ##__VA_ARGS__);                                          \
-        k_printf("\n");                                                        \
+        if (level != K_TEST)                                                   \
+            k_printf("\n");                                                    \
     } while (0)
 
 void k_printf(const char *format, ...);

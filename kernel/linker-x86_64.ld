@@ -43,7 +43,7 @@ SECTIONS {
 
     .kernel_tests : { 
         __skernel_tests = .;
-        KEEP(*(SORT_BY_NAME(.kernel_tests*)))
+        KEEP(*(.kernel_tests))
         __ekernel_tests = .;
     }
 

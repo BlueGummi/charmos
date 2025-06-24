@@ -50,38 +50,51 @@
 #include <uacpi/uacpi.h>
 #include <uacpi/utilities.h>
 
-void tests_run(void) {
-    struct kernel_test *start = &__skernel_tests;
-    struct kernel_test *end   = &__ekernel_tests;
+extern struct kernel_test __skernel_tests[];
+extern struct kernel_test __ekernel_tests[];
 
-    uint64_t test_count = end - start;
-    k_info("TEST", K_INFO, "Running %llu tests...", test_count);
+void tests_run(void) {
+    struct kernel_test *start = __skernel_tests;
+    struct kernel_test *end = __ekernel_tests;
+
+    uint64_t test_count =
+        ((uint64_t) end - (uint64_t) start) / sizeof(struct kernel_test);
+    k_info("TEST", K_TEST, ANSI_CYAN "running" ANSI_RESET " %llu tests...\n",
+           test_count);
 
     for (struct kernel_test *t = start; t < end; t++) {
-        k_info("TEST", K_INFO, "Running %s", t->name);
+        k_info("TEST", K_TEST, ANSI_CYAN "running" ANSI_RESET " %s... ",
+               t->name);
         t->func();
-        k_info("TEST", K_INFO, "PASS %s", t->name);
+        if ((!t->success && t->should_fail) ||
+            (t->success && !t->should_fail)) {
+            k_printf(ANSI_GREEN "ok\n" ANSI_RESET);
+        } else {
+            k_printf(ANSI_RED "error\n" ANSI_RESET);
+            asm("cli;hlt");
+        }
     }
 
-    k_info("TEST", K_INFO, "All tests passed");
+    k_info("TEST", K_TEST, ANSI_GREEN "all ok!\n" ANSI_RESET);
 }
 
-
-REGISTER_TEST(pmm_alloc_test) {
+REGISTER_TEST(pmm_alloc_test, false) {
     void *p = pmm_alloc_page(false);
-    assert(p != NULL);
+    test_assert(p != NULL);
     pmm_free_pages(p, 1, false);
+    SET_SUCCESS(pmm_alloc_test);
 }
 
 #define ASSERT_ALIGNED(ptr, alignment)                                         \
-    assert(((uintptr_t) (ptr) & ((alignment) - 1)) == 0)
+    test_assert(((uintptr_t) (ptr) & ((alignment) - 1)) == 0)
 
 #define KMALLOC_ALIGNMENT_TEST(name, align)                                    \
-    REGISTER_TEST(kmalloc_aligned_##name##_test) {                             \
+    REGISTER_TEST(kmalloc_aligned_##name##_test, false) {                      \
         void *ptr = kmalloc_aligned(align, align);                             \
-        assert(ptr != NULL);                                                   \
+        test_assert(ptr != NULL);                                              \
         ASSERT_ALIGNED(ptr, align);                                            \
         kfree_aligned(ptr);                                                    \
+        SET_SUCCESS(kmalloc_aligned_##name##_test);                            \
     }
 
 KMALLOC_ALIGNMENT_TEST(8, 8)
