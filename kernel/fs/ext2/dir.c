@@ -54,11 +54,20 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     kfree(block);
 
     dir->node.size = fs->block_size;
+    dir->node.blocks = 2;
     dir->node.links_count = 2; // . and ..
     ext2_write_inode(fs, dir->inode_num, &dir->node);
 
     parent_dir->node.links_count++;
     ext2_write_inode(fs, parent_dir->inode_num, &parent_dir->node);
+
+    uint32_t group = (dir->inode_num - 1) / fs->sblock->inodes_per_group;
+    struct ext2_group_desc *desc = &fs->group_desc[group];
+    if (!desc)
+        return ERR_IO;
+
+    desc->used_dirs_count++;
+    ext2_write_group_desc(fs);
 
     return ERR_OK;
 }
@@ -66,8 +75,8 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
 enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
                       const char *name) {
     uint8_t type;
-    struct ext2_full_inode *dir =
-        ext2_find_file_in_dir(fs, parent_dir, name, &type);
+    struct ext2_full_inode *dir;
+    dir = ext2_find_file_in_dir(fs, parent_dir, name, &type);
     if (!dir || !(dir->node.mode & EXT2_S_IFDIR))
         return ERR_NO_ENT;
 

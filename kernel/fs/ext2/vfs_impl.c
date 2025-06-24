@@ -178,6 +178,8 @@ static uint16_t vfs_to_ext2_mode(uint16_t vfs_mode) {
         ext2_mode |= EXT2_S_IFDIR;
     else if (vfs_mode & VFS_MODE_SYMLINK)
         ext2_mode |= EXT2_S_IFLNK;
+    else if (vfs_mode & VFS_MODE_FILE)
+        ext2_mode |= EXT2_S_IFREG;
     else if (vfs_mode & VFS_MODE_CHARDEV)
         ext2_mode |= EXT2_S_IFCHR;
     else if (vfs_mode & VFS_MODE_BLOCKDEV)
