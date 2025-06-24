@@ -100,25 +100,26 @@ REGISTER_TEST(vmm_map_test, false) {
     SET_SUCCESS(vmm_map_test);
 }
 
+#define TMPFS_SETUP_NODE(root, node, name, e)                                  \
+    struct vfs_node *root = tmpfs_mkroot("tmp");                               \
+    test_assert(root != NULL);                                                 \
+    enum errno e = root->ops->create(root, name, VFS_MODE_FILE);               \
+    struct vfs_node *node = root->ops->finddir(root, name);                    \
+    test_assert(node != NULL);
+
 REGISTER_TEST(tmpfs_rw_test, false) {
-    struct vfs_node *root = tmpfs_mkroot("tmp");
+    TMPFS_SETUP_NODE(root, node, "place", e);
+    test_assert(node->size == 0);
+
     const char *lstr = large_test_string;
     uint64_t len = strlen(lstr);
-
-    char *out_buf = kzalloc(len);
-    test_assert(out_buf != NULL);
-
-    enum errno e = root->ops->create(root, "place", VFS_MODE_FILE);
-    test_assert(!ERR_IS_FATAL(e));
-
-    struct vfs_node *node = root->ops->finddir(root, "place");
-    test_assert(node != NULL);
-    test_assert(node->size == 0);
 
     e = node->ops->write(node, lstr, len, 0);
     test_assert(!ERR_IS_FATAL(e));
     test_assert(node->size == len);
 
+    char *out_buf = kzalloc(len);
+    test_assert(out_buf != NULL);
     e = node->ops->read(node, out_buf, len, 0);
     test_assert(!ERR_IS_FATAL(e));
 
@@ -126,14 +127,22 @@ REGISTER_TEST(tmpfs_rw_test, false) {
 
     e = node->ops->truncate(node, len / 2);
     test_assert(!ERR_IS_FATAL(e));
-    test_assert(node->size = len / 2);
+    test_assert(node->size == len / 2);
 
     memset(out_buf, 0, len);
     e = node->ops->read(node, out_buf, len, 0);
     test_assert(!ERR_IS_FATAL(e));
 
-    test_assert(strlen(out_buf) == len / 2);
+    e = node->ops->unlink(root, "place");
+    test_assert(!ERR_IS_FATAL(e));
 
+    e = node->ops->destroy(node);
+    test_assert(!ERR_IS_FATAL(e));
+
+    node = root->ops->finddir(root, "place");
+    test_assert(node == NULL);
+
+    test_assert(strlen(out_buf) == len / 2);
     SET_SUCCESS(tmpfs_rw_test);
 }
 

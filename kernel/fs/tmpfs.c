@@ -59,10 +59,13 @@ struct vfs_node *tmpfs_create_vfs_node(struct tmpfs_node *tnode) {
 static enum errno tmpfs_read(struct vfs_node *node, void *buf, uint64_t size,
                              uint64_t offset) {
     struct tmpfs_node *tn = node->fs_node_data;
+
     if (tn->type != TMPFS_FILE)
         return ERR_IS_DIR;
+
     if (offset >= tn->size)
         return 0;
+
     if (offset + size > tn->size)
         size = tn->size - offset;
     memcpy(buf, tn->data + offset, size);
@@ -267,15 +270,19 @@ static enum errno tmpfs_truncate(struct vfs_node *node, uint64_t length) {
     tn->data = krealloc(tn->data, length);
     if (length > tn->size)
         memset(tn->data + tn->size, 0, length - tn->size);
+
     tn->size = length;
+    node->size = length;
     return ERR_OK;
 }
 
 static enum errno tmpfs_readlink(struct vfs_node *node, char *buf,
                                  uint64_t size) {
     struct tmpfs_node *tn = node->fs_node_data;
+
     if (tn->type != TMPFS_SYMLINK)
         return ERR_IS_DIR;
+
     strncpy(buf, tn->symlink_target, size);
     return ERR_OK;
 }
@@ -305,8 +312,30 @@ static enum errno tmpfs_utime(struct vfs_node *node, uint64_t atime,
     return ERR_OK;
 }
 
-static void tmpfs_destroy(struct vfs_node *node) {
+static enum errno tmpfs_destroy(struct vfs_node *node) {
     (void) node;
+    struct tmpfs_node *n = node->fs_node_data;
+
+    if (!n)
+        return ERR_INVAL;
+
+    if (n->children)
+        kfree(n->children);
+
+    if (n->data)
+        kfree(n->data);
+
+    if (n->symlink_target)
+        kfree(n->symlink_target);
+
+    kfree(n);
+
+    n->children = NULL;
+    n->data = NULL;
+    n->symlink_target = NULL;
+    n = NULL;
+    return ERR_OK;
+
     // TODO: cleanup
 }
 

@@ -164,7 +164,7 @@ struct vfs_ops {
         struct vfs_node *node, uint64_t atime,
         uint64_t mtime); // update access and modification times (unix time)
 
-    void (*destroy)(struct vfs_node *node);
+    enum errno (*destroy)(struct vfs_node *node);
 
     // enum errno (*ioctl)(struct vfs_node *node, uint64_t request, void *arg);
     // // device-specific control (optional)
