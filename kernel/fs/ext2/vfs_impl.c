@@ -174,29 +174,23 @@ static uint16_t vfs_to_ext2_mode(uint16_t vfs_mode) {
     uint16_t ext2_mode = 0;
 
     // File type
-    if (vfs_mode & VFS_MODE_DIR)
-        ext2_mode |= EXT2_S_IFDIR;
-    else if (vfs_mode & VFS_MODE_SYMLINK)
-        ext2_mode |= EXT2_S_IFLNK;
-    else if (vfs_mode & VFS_MODE_FILE)
-        ext2_mode |= EXT2_S_IFREG;
-    else if (vfs_mode & VFS_MODE_CHARDEV)
-        ext2_mode |= EXT2_S_IFCHR;
-    else if (vfs_mode & VFS_MODE_BLOCKDEV)
-        ext2_mode |= EXT2_S_IFBLK;
-    else if (vfs_mode & VFS_MODE_PIPE)
-        ext2_mode |= EXT2_S_IFIFO;
-    else if (vfs_mode & VFS_MODE_SOCKET)
-        ext2_mode |= EXT2_S_IFSOCK;
-    else
-        ext2_mode |= EXT2_S_IFREG;
+    switch (vfs_mode & VFS_MODE_TYPE_MASK) {
+    case VFS_MODE_DIR: ext2_mode |= EXT2_S_IFDIR; break;
+    case VFS_MODE_SYMLINK: ext2_mode |= EXT2_S_IFLNK; break;
+    case VFS_MODE_CHARDEV: ext2_mode |= EXT2_S_IFCHR; break;
+    case VFS_MODE_BLOCKDEV: ext2_mode |= EXT2_S_IFBLK; break;
+    case VFS_MODE_PIPE: ext2_mode |= EXT2_S_IFIFO; break;
+    case VFS_MODE_SOCKET: ext2_mode |= EXT2_S_IFSOCK; break;
+    case VFS_MODE_FILE:
+    default: ext2_mode |= EXT2_S_IFREG; break;
+    }
 
     // Owner permissions
-    if (vfs_mode & VFS_MODE_READ)
+    if (vfs_mode & VFS_MODE_O_READ)
         ext2_mode |= EXT2_S_IRUSR;
-    if (vfs_mode & VFS_MODE_WRITE)
+    if (vfs_mode & VFS_MODE_O_WRITE)
         ext2_mode |= EXT2_S_IWUSR;
-    if (vfs_mode & VFS_MODE_EXEC)
+    if (vfs_mode & VFS_MODE_O_EXEC)
         ext2_mode |= EXT2_S_IXUSR;
 
     // Group permissions
@@ -208,11 +202,11 @@ static uint16_t vfs_to_ext2_mode(uint16_t vfs_mode) {
         ext2_mode |= EXT2_S_IXGRP;
 
     // Other permissions
-    if (vfs_mode & VFS_MODE_O_READ)
+    if (vfs_mode & VFS_MODE_READ)
         ext2_mode |= EXT2_S_IROTH;
-    if (vfs_mode & VFS_MODE_O_WRITE)
+    if (vfs_mode & VFS_MODE_WRITE)
         ext2_mode |= EXT2_S_IWOTH;
-    if (vfs_mode & VFS_MODE_O_EXEC)
+    if (vfs_mode & VFS_MODE_EXEC)
         ext2_mode |= EXT2_S_IXOTH;
 
     return ext2_mode;

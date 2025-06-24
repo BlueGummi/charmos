@@ -20,12 +20,13 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     uint8_t type;
     struct ext2_full_inode *dir =
         ext2_find_file_in_dir(fs, parent_dir, name, &type);
+
     if (!dir)
         return ERR_IO;
 
     uint8_t *block = kzalloc(fs->block_size);
     if (!block)
-        return false;
+        return ERR_NO_MEM;
 
     // "." entry
     struct ext2_dir_entry *dot = (struct ext2_dir_entry *) block;
@@ -43,31 +44,42 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     dotdot->file_type = EXT2_FT_DIR;
     strcpy(dotdot->name, "..");
 
-    bool was_allocated;
-    uint32_t new_block =
-        ext2_get_or_set_block(fs, &dir->node, 0, 0, true, &was_allocated);
+    uint32_t new_block = ext2_alloc_block(fs);
+
+    uint32_t group = (dir->inode_num - 1) / fs->sblock->inodes_per_group;
+
     if (new_block == 0) {
         kfree(block);
         return ERR_NOSPC;
     }
-    ext2_block_ptr_write(fs, new_block, block);
-    kfree(block);
 
+    dir->node.block[0] = new_block;
     dir->node.size = fs->block_size;
     dir->node.blocks = 2;
     dir->node.links_count = 2; // . and ..
-    ext2_write_inode(fs, dir->inode_num, &dir->node);
 
-    parent_dir->node.links_count++;
+    ext2_write_inode(fs, dir->inode_num, &dir->node);
     ext2_write_inode(fs, parent_dir->inode_num, &parent_dir->node);
 
-    uint32_t group = (dir->inode_num - 1) / fs->sblock->inodes_per_group;
+    ext2_block_ptr_write(fs, new_block, block);
+
+    kfree(block);
+
     struct ext2_group_desc *desc = &fs->group_desc[group];
     if (!desc)
         return ERR_IO;
 
     desc->used_dirs_count++;
+    
+    /* TODO: not sure why, but these 
+     * numbers down here are changed 
+     * and become inaccurate, 
+     * fsck complains */
+    
+    desc->free_blocks_count++;
+    fs->sblock->free_blocks_count++;
     ext2_write_group_desc(fs);
+    ext2_write_superblock(fs);
 
     return ERR_OK;
 }

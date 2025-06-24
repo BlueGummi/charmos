@@ -33,6 +33,8 @@ extern struct vfs_mount *g_mount_list_head;
 #define VFS_MODE_O_WRITE 0x020000 // Write permissions (owner)
 #define VFS_MODE_O_EXEC 0x040000  // Exec permissions (owner)
 
+#define VFS_MODE_TYPE_MASK 0xF000
+
 // clang-format off
 enum vfs_node_flags : uint32_t {
     VFS_NODE_NONE        = 0x0000, // No flags

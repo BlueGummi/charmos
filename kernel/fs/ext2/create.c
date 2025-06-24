@@ -67,6 +67,8 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
         return ERR_NO_ENT;
 
     ext2_walk_dir(fs, dir_inode, link_callback, &ctx, false);
+
+    /* did not need to allocate new block */
     if (ctx.success) {
         dir_inode->node.links_count += 1;
         return ERR_OK;
@@ -99,6 +101,7 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
         return ERR_FS_INTERNAL;
     }
 
+    /* allocated new block */
     kfree(block_data);
     dir_inode->node.links_count += 1;
     return ext2_write_inode(fs, dir_inode->inode_num, &dir_inode->node)

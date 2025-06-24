@@ -176,8 +176,8 @@ void registry_setup() {
                             g_root_part);
                 g_root_node = root;
                 
+                //root->ops->create(root, "BLAH", VFS_MODE_FILE);                
                 root->ops->mkdir(root, "tmp", VFS_MODE_DIR);
-                root->ops->create(root, "BLAH", VFS_MODE_FILE);                
                 /*struct vfs_node *tmp_on_ext2 = root->ops->finddir(root, "tmp");
                 struct vfs_node *tmpfs_root = tmpfs_mkroot("tmp");
 

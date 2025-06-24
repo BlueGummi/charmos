@@ -1,4 +1,5 @@
 #include <fs/ext2.h>
+#include <console/printf.h>
 #include <mem/alloc.h>
 #include <string.h>
 
@@ -16,6 +17,7 @@ static uint32_t ext2_get_block(struct ext2_fs *fs, uint32_t block_num,
     if (!block)
         return 0;
 
+    bool allocated_this_level = false;
     if (block_num == 0) {
         if (!allocate) {
             kfree(block);
@@ -28,6 +30,7 @@ static uint32_t ext2_get_block(struct ext2_fs *fs, uint32_t block_num,
             return 0;
         }
 
+        allocated_this_level = true;
         memset(block, 0, fs->block_size);
         ext2_block_ptr_write(fs, block_num, (uint8_t *) block);
     } else {
@@ -49,6 +52,8 @@ static uint32_t ext2_get_block(struct ext2_fs *fs, uint32_t block_num,
     if (result && block[entry_index] == 0 && allocate) {
         block[entry_index] = result;
         ext2_block_ptr_write(fs, block_num, (uint8_t *) block);
+    } else if (allocated_this_level && result == 0) {
+        ext2_free_block(fs, block_num);
     }
 
     kfree(block);
@@ -70,6 +75,7 @@ uint32_t ext2_get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
         if (inode->block[block_index] == 0 && allocate) {
             if (new_block_num == 0)
                 new_block_num = ext2_alloc_block(fs);
+
             if (new_block_num == 0)
                 return 0;
 
