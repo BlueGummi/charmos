@@ -24,9 +24,10 @@ struct kernel_test {
 #define test_assert(x)                                                         \
     do {                                                                       \
         if (!(x)) {                                                            \
-            k_printf("assert fail! %s at %s:%d\n", #x, __FILE__, __LINE__);    \
+            k_printf(" assert \"%s\" failed at %s:%d ", #x, __FILE__, __LINE__);    \
             return;                                                            \
         }                                                                      \
     } while (0)
 
 void tests_run(void);
+extern const char *large_test_string;

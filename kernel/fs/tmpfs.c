@@ -66,7 +66,7 @@ static enum errno tmpfs_read(struct vfs_node *node, void *buf, uint64_t size,
     if (offset + size > tn->size)
         size = tn->size - offset;
     memcpy(buf, tn->data + offset, size);
-    return size;
+    return ERR_OK;
 }
 
 static enum errno tmpfs_write(struct vfs_node *node, const void *buf,
@@ -83,20 +83,21 @@ static enum errno tmpfs_write(struct vfs_node *node, const void *buf,
             tn->data = krealloc(tn->data, new_size);
         }
         tn->size = new_size;
+        node->size = new_size;
     }
 
     memcpy(tn->data + offset, buf, size);
-    return size;
+    return ERR_OK;
 }
 
 static enum errno tmpfs_open(struct vfs_node *node, uint32_t flags) {
     (void) node, (void) flags;
-    return 0; // no-op
+    return ERR_NOT_IMPL; // no-op
 }
 
 static enum errno tmpfs_close(struct vfs_node *node) {
     (void) node;
-    return 0; // no-op
+    return ERR_NOT_IMPL; // no-op
 }
 
 static struct tmpfs_node *tmpfs_find_child(struct tmpfs_node *dir,
@@ -118,7 +119,7 @@ static enum errno tmpfs_add_child(struct tmpfs_node *parent,
 
     parent->children[parent->child_count++] = child;
     child->parent = parent;
-    return 0;
+    return ERR_OK;
 }
 
 static enum errno tmpfs_create_common(struct vfs_node *parent, const char *name,
@@ -139,7 +140,7 @@ static enum errno tmpfs_create_common(struct vfs_node *parent, const char *name,
     tmpfs_add_child(pt, node);
     if (out)
         *out = node;
-    return 0;
+    return ERR_OK;
 }
 
 static enum errno tmpfs_create(struct vfs_node *parent, const char *name,
@@ -163,7 +164,7 @@ static enum errno tmpfs_symlink(struct vfs_node *parent, const char *target,
     if (err != 0)
         return err;
     link->symlink_target = strdup(target);
-    return 0;
+    return ERR_OK;
 }
 
 static enum errno tmpfs_unmount(struct vfs_mount *mountpoint) {
@@ -176,7 +177,7 @@ static enum errno tmpfs_stat(struct vfs_node *node, struct vfs_stat *out) {
     out->mode = tn->mode;
     out->size = tn->size;
     // could add uid/gid/mtime/etc.
-    return 0;
+    return ERR_OK;
 }
 
 static enum errno tmpfs_readdir(struct vfs_node *node, struct vfs_dirent *out,
@@ -190,7 +191,7 @@ static enum errno tmpfs_readdir(struct vfs_node *node, struct vfs_dirent *out,
     strncpy(out->name, child->name, sizeof(out->name));
     out->inode = index;
     out->mode = tmpfs_to_vfs_mode(child->type);
-    return 0;
+    return ERR_OK;
 }
 
 static enum errno tmpfs_mkdir(struct vfs_node *parent, const char *name,
@@ -210,7 +211,7 @@ static enum errno tmpfs_rmdir(struct vfs_node *parent, const char *name) {
             kfree(c->name);
             kfree(c->children);
             kfree(c);
-            return 0;
+            return ERR_OK;
         }
     }
     return ERR_NO_ENT;
@@ -227,7 +228,7 @@ static enum errno tmpfs_unlink(struct vfs_node *parent, const char *name) {
             kfree(c->name);
             kfree(c->data);
             kfree(c);
-            return 0;
+            return ERR_OK;
         }
     }
     return ERR_NO_ENT;
@@ -256,7 +257,7 @@ static enum errno tmpfs_rename(struct vfs_node *old_parent,
     kfree(node->name);
     node->name = strdup(new_name);
     tmpfs_add_child(new_pt, node);
-    return 0;
+    return ERR_OK;
 }
 
 static enum errno tmpfs_truncate(struct vfs_node *node, uint64_t length) {
@@ -267,7 +268,7 @@ static enum errno tmpfs_truncate(struct vfs_node *node, uint64_t length) {
     if (length > tn->size)
         memset(tn->data + tn->size, 0, length - tn->size);
     tn->size = length;
-    return 0;
+    return ERR_OK;
 }
 
 static enum errno tmpfs_readlink(struct vfs_node *node, char *buf,
@@ -276,7 +277,7 @@ static enum errno tmpfs_readlink(struct vfs_node *node, char *buf,
     if (tn->type != TMPFS_SYMLINK)
         return ERR_IS_DIR;
     strncpy(buf, tn->symlink_target, size);
-    return 0;
+    return ERR_OK;
 }
 
 static enum errno tmpfs_link(struct vfs_node *parent, struct vfs_node *target,
@@ -289,19 +290,19 @@ static enum errno tmpfs_link(struct vfs_node *parent, struct vfs_node *target,
 static enum errno tmpfs_chmod(struct vfs_node *node, uint16_t mode) {
     struct tmpfs_node *tn = node->fs_node_data;
     tn->mode = mode;
-    return 0;
+    return ERR_OK;
 }
 
 static enum errno tmpfs_chown(struct vfs_node *node, uint32_t uid,
                               uint32_t gid) {
     (void) node, (void) uid, (void) gid;
-    return 0;
+    return ERR_OK;
 }
 
 static enum errno tmpfs_utime(struct vfs_node *node, uint64_t atime,
                               uint64_t mtime) {
     (void) node, (void) atime, (void) mtime;
-    return 0;
+    return ERR_OK;
 }
 
 static void tmpfs_destroy(struct vfs_node *node) {

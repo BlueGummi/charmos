@@ -250,6 +250,9 @@ struct ahci_cmd_header {
 STATIC_ASSERT((sizeof(struct ahci_cmd_header) == 32),
               "AHCI command header must be 28 bytes large!");
 
+#define ahci_info(log_level, fmt, ...)                                         \
+    k_info("AHCI", log_level, fmt, ##__VA_ARGS__)
+
 void ahci_discover(struct ahci_controller *ctrl);
 uint32_t find_free_cmd_slot(struct ahci_port *port);
 struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,

@@ -155,7 +155,7 @@ struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
                                         uint32_t *d_cnt) {
     bool s64a = mmio_read_32(&ctrl->cap) & (1U << 31);
     if (!s64a) {
-        k_printf("AHCI controller does not support 64-bit addressing\n");
+        ahci_info(K_WARN, "controller does not support 64-bit addressing\n");
         return NULL;
     }
 
@@ -165,7 +165,7 @@ struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
     while (mmio_read_32(&ctrl->ghc) & AHCI_GHC_HR) {
         sleep_ms(1);
         if (--timeout == 0) {
-            k_printf("AHCI controller reset timed out\n");
+            ahci_info(K_WARN, "controller reset timed out\n");
             return NULL;
         }
     }
@@ -176,12 +176,14 @@ struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
     uint32_t disk_count = 0;
     struct ahci_disk *d = device_setup(dev, ctrl, &disk_count);
     *d_cnt = disk_count;
+    ahci_info(K_INFO, "Device initialized successfully");
     return d;
 }
 
 struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
                                        uint8_t function,
                                        uint32_t *out_disk_count) {
+    ahci_info(K_INFO, "Found device at %02x:%02x.%x", bus, device, function);
     uint32_t abar = pci_read(bus, device, function, 0x24);
     uint32_t abar_base = abar & ~0xFU;
 
@@ -190,8 +192,7 @@ struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
     pci_write(bus, device, function, 0x24, abar);
 
     if (size_mask == 0 || size_mask == 0xFFFFFFFF) {
-        k_printf("Invalid AHCI BAR size at %02x:%02x.%x\n", bus, device,
-                 function);
+        ahci_info(K_WARN, "invalid BAR size");
         return NULL;
     }
 
@@ -200,8 +201,7 @@ struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
 
     void *abar_virt = vmm_map_phys(abar_base, map_size);
     if (!abar_virt) {
-        k_printf("Failed to map AHCI BAR at %08x (size %zu)\n", abar_base,
-                 map_size);
+        ahci_info(K_ERROR, "failed to map BAR - likely OOM error");
         return NULL;
     }
     struct ahci_controller *ctrl = (struct ahci_controller *) abar_virt;
@@ -216,8 +216,9 @@ void ahci_print_wrapper(struct generic_disk *d) {
 
 struct generic_disk *ahci_create_generic(struct ahci_disk *disk) {
     struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
-    if (!d)
-        k_panic("Could not allocate space for ahci device\n");
+    if (!d) {
+        ahci_info(K_ERROR, "could not allocate space for device");
+    }
 
     d->driver_data = disk;
     d->sector_size = 512;
