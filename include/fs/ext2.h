@@ -340,7 +340,6 @@ bool ext2_walk_dir(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
 void ext2_traverse_inode_blocks(struct ext2_fs *fs, struct ext2_inode *inode,
                                 ext2_block_visitor visitor, void *user_data);
 
-void ext2_test(struct generic_partition *, struct ext2_sblock *sblock);
 void ext2_g_print(struct generic_partition *);
 
 void ext2_print_superblock(struct ext2_sblock *sblock);

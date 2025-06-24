@@ -76,22 +76,3 @@ void ext2_g_print(struct generic_partition *p) {
     struct ext2_fs *fs = p->fs_data;
     ext2_print_superblock(fs->sblock);
 }
-
-void ext2_test(struct generic_partition *p, struct ext2_sblock *sblock) {
-    struct ext2_fs fs;
-    if (ERR_IS_FATAL(ext2_mount(p, &fs, sblock, NULL))) {
-        return;
-    }
-
-    struct ext2_inode r;
-    if (!ext2_read_inode(&fs, EXT2_ROOT_INODE, &r)) {
-        return;
-    }
-
-    //    ext2_link_file(&fs, &root_inode, &i, "file");
-    ext2_print_superblock(sblock);
-    struct ext2_full_inode f = {.node = r, .inode_num = 2};
-    ext2_print_inode(&f);
-    //    ext2_write_file(&fs, &i, 0, (uint8_t *) data, strlen(data));
-    //    ext2_dump_file_data(&fs, &i.node, 0, strlen(data));
-}

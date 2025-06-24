@@ -64,23 +64,51 @@ void tests_run(void) {
 
     uint64_t test_count =
         ((uint64_t) end - (uint64_t) start) / sizeof(struct kernel_test);
-    k_info("TEST", K_TEST, ANSI_CYAN "running" ANSI_RESET " %llu tests...\n",
-           test_count);
+    k_info("TEST", K_TEST, "running %llu tests...\n", test_count);
 
-    for (struct kernel_test *t = start; t < end; t++) {
-        k_info("TEST", K_TEST, ANSI_CYAN "running" ANSI_RESET " %s... ",
-               t->name);
+    uint64_t pass_count = 0, skip_count = 0, fail_count = 0, i = 1;
+    bool all_ok = true;
+    for (struct kernel_test *t = start; t < end; t++, i++) {
+        k_printf("[%-4d]: ", i);
+        k_printf("%s... ", t->name);
+
+        uint64_t start_ms = hpet_timestamp_ms();
+        /* supa important */
         t->func();
-        if ((!t->success && t->should_fail) ||
-            (t->success && !t->should_fail)) {
-            k_printf(ANSI_GREEN " ok\n" ANSI_RESET);
+        uint64_t end_ms = hpet_timestamp_ms();
+
+        if (t->skipped) {
+            k_printf(ANSI_GRAY " skipped  " ANSI_RESET);
+            skip_count++;
+        } else if (t->success != t->should_fail) {
+            k_printf(ANSI_GREEN " ok  " ANSI_RESET);
+            pass_count++;
         } else {
-            k_printf(ANSI_RED " error\n" ANSI_RESET);
-            asm("cli;hlt");
+            all_ok = false;
+            k_printf(ANSI_RED " error  " ANSI_RESET);
+            fail_count++;
+        }
+
+        k_printf("(%llu ms)\n", end_ms - start_ms);
+
+        if (t->message_count > 0) {
+            for (uint64_t i = 0; i < t->message_count; i++) {
+                k_printf("        +-> ");
+                k_printf(ANSI_YELLOW "%s" ANSI_RESET "\n", t->messages[i]);
+            }
+            k_printf("\n");
         }
     }
 
-    k_info("TEST", K_TEST, ANSI_GREEN "all ok!\n" ANSI_RESET);
+    char *color = all_ok ? ANSI_GREEN : ANSI_RED;
+    char *msg = all_ok ? "all ok!\n" : "some errors occurred\n";
+
+    k_info("TEST", K_TEST,
+           "%llu " ANSI_GREEN "passed" ANSI_RESET ", %llu " ANSI_RED
+           "failed" ANSI_RESET ", %llu " ANSI_GRAY "skipped\n" ANSI_RESET,
+           pass_count, fail_count, skip_count);
+
+    k_info("TEST", K_TEST, "%s%s" ANSI_RESET, color, msg);
 }
 
 REGISTER_TEST(pmm_alloc_test, false) {
@@ -88,6 +116,13 @@ REGISTER_TEST(pmm_alloc_test, false) {
     test_assert(p != NULL);
     pmm_free_pages(p, 1, false);
     SET_SUCCESS(pmm_alloc_test);
+}
+
+REGISTER_TEST(ext2_withdisk_test, false) {
+    if (g_root_node->fs_type != FS_EXT2) {
+        SET_SKIP(ext2_withdisk_test);
+        return;
+    }
 }
 
 REGISTER_TEST(vmm_map_test, false) {
