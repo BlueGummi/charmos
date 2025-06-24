@@ -41,6 +41,11 @@ SECTIONS {
         __edata = .;
     } :data
 
+    .kernel_tests : { 
+        __skernel_tests = .;
+        KEEP(*(SORT_BY_NAME(.kernel_tests*)))
+        __ekernel_tests = .;
+    }
 
     .bss : ALIGN(4K) {
         __sbss = .;

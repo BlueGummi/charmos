@@ -42,6 +42,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <syscall.h>
+#include <tests.h>
 #include <time/print.h>
 #include <uacpi/event.h>
 #include <uacpi/resources.h>
@@ -101,6 +102,7 @@ void k_main(void) {
     // Scheduler
     scheduler_init(c_cnt);
 
+    tests_run();
     lapic_init();
     mp_inform_of_cr3();
 
