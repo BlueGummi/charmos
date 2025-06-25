@@ -50,6 +50,50 @@ bool unlink_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
     return false;
 }
 
+static void unlink_adjust_neighbors(struct ext2_fs *fs, uint8_t *block,
+                                    uint32_t offset, uint32_t prev_offset) {
+    struct ext2_dir_entry *entry = (struct ext2_dir_entry *) (block + offset);
+
+    if (offset == 0) {
+        struct ext2_dir_entry *next =
+            (struct ext2_dir_entry *) ((uint8_t *) entry + entry->rec_len);
+        if ((uint8_t *) next < block + fs->block_size && next->inode != 0) {
+            next->rec_len += entry->rec_len;
+        }
+    } else {
+        struct ext2_dir_entry *prev =
+            (struct ext2_dir_entry *) (block + prev_offset);
+        prev->rec_len += entry->rec_len;
+    }
+}
+
+static void unlink_target_update(struct ext2_full_inode *target_inode,
+                                 uint32_t inode_num) {
+    target_inode->inode_num = inode_num;
+    target_inode->node.dtime = time_get_unix();
+    target_inode->node.links_count--;
+}
+
+static void unlink_free_blocks(struct ext2_fs *fs,
+                               struct ext2_full_inode *target_inode,
+                               uint32_t inode_num) {
+    ext2_traverse_inode_blocks(fs, &target_inode->node, free_block_visitor,
+                               NULL);
+    ext2_free_inode(fs, inode_num);
+}
+
+#define UNLINK_RETURN_ERR(err, type)                                           \
+    do {                                                                       \
+        err = type;                                                            \
+        goto cleanup;                                                          \
+    } while (0)
+
+#define TRY(x)                                                                 \
+    do {                                                                       \
+        if (!(x))                                                              \
+            UNLINK_RETURN_ERR(err, ERR_FS_INTERNAL);                           \
+    } while (0)
+
 enum errno ext2_unlink_file(struct ext2_fs *fs,
                             struct ext2_full_inode *dir_inode, const char *name,
                             bool free_blocks, bool decrement_links) {
@@ -65,67 +109,32 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
         return ERR_NO_MEM;
 
     enum errno err = ERR_OK;
-
-    if (!ext2_block_ptr_read(fs, ctx.block_num, block)) {
-        err = ERR_FS_INTERNAL;
-        goto cleanup;
-    }
-
-    struct ext2_dir_entry *entry =
-        (struct ext2_dir_entry *) (block + ctx.entry_offset);
-
-    if (ctx.entry_offset == 0) {
-        struct ext2_dir_entry *next =
-            (struct ext2_dir_entry *) ((uint8_t *) entry + entry->rec_len);
-        if ((uint8_t *) next < block + fs->block_size && next->inode != 0) {
-            next->rec_len += entry->rec_len;
-        }
-    } else {
-        struct ext2_dir_entry *prev =
-            (struct ext2_dir_entry *) (block + ctx.prev_offset);
-        prev->rec_len += entry->rec_len;
-    }
-
-    if (!ext2_block_ptr_write(fs, ctx.block_num, block)) {
-        err = ERR_FS_INTERNAL;
-        goto cleanup;
-    }
-
     struct ext2_full_inode target_inode;
-    if (!ext2_read_inode(fs, ctx.inode_num, &target_inode.node)) {
-        err = ERR_FS_INTERNAL;
-        goto cleanup;
-    }
 
-    if (target_inode.node.links_count == 0) {
-        err = ERR_FS_NO_INODE;
-        goto cleanup;
-    }
+    TRY(ext2_block_ptr_read(fs, ctx.block_num, block));
 
-    target_inode.inode_num = ctx.inode_num;
-    target_inode.node.dtime = time_get_unix();
-    target_inode.node.links_count--;
+    unlink_adjust_neighbors(fs, block, ctx.entry_offset, ctx.prev_offset);
 
-    if (target_inode.node.links_count == 0 && free_blocks) {
-        ext2_traverse_inode_blocks(fs, &target_inode.node, free_block_visitor,
-                                   NULL);
-        ext2_free_inode(fs, ctx.inode_num);
-    }
+    TRY(ext2_block_ptr_write(fs, ctx.block_num, block));
+    TRY(ext2_read_inode(fs, ctx.inode_num, &target_inode.node));
 
-    if (!ext2_write_inode(fs, ctx.inode_num, &target_inode.node)) {
-        err = ERR_FS_INTERNAL;
-        goto cleanup;
-    }
+    if (target_inode.node.links_count == 0)
+        UNLINK_RETURN_ERR(err, ERR_FS_NO_INODE);
+
+    unlink_target_update(&target_inode, ctx.inode_num);
+
+    if (target_inode.node.links_count == 0 && free_blocks)
+        unlink_free_blocks(fs, &target_inode, ctx.inode_num);
+
+    TRY(ext2_write_inode(fs, ctx.inode_num, &target_inode.node));
 
     if (decrement_links)
         dir_inode->node.links_count--;
 
-    if (!ext2_write_inode(fs, dir_inode->inode_num, &dir_inode->node)) {
-        err = ERR_FS_INTERNAL;
-        goto cleanup;
-    }
+    TRY(ext2_write_inode(fs, dir_inode->inode_num, &dir_inode->node));
 
 cleanup:
-    kfree(block);
+    if (block)
+        kfree(block);
     return err;
 }
