@@ -4,13 +4,36 @@
 #include <string.h>
 #include <tests.h>
 
-REGISTER_TEST(ext2_withdisk_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
-    if (g_root_node->fs_type != FS_EXT2) {
-        ADD_MESSAGE("the mounted root is not ext2");
-        SET_SKIP;
-        return;
-    }
+#define EXT2_INIT                                                              \
+    if (g_root_node->fs_type != FS_EXT2) {                                     \
+        ADD_MESSAGE("the mounted root is not ext2");                           \
+        SET_SKIP;                                                              \
+        return;                                                                \
+    }                                                                          \
     struct vfs_node *root = g_root_node;
+
+REGISTER_TEST(ext2_chmod_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    EXT2_INIT;
+
+    enum errno e = root->ops->create(root, "ext2_chmod_test", VFS_MODE_FILE);
+    TEST_ASSERT(!ERR_IS_FATAL(e));
+
+    struct vfs_node *node = root->ops->finddir(root, "ext2_chmod_test");
+    TEST_ASSERT(node != NULL);
+
+    e = root->ops->chmod(node, (uint16_t) VFS_MODE_O_EXEC);
+    TEST_ASSERT(!ERR_IS_FATAL(e));
+    TEST_ASSERT(node->mode & VFS_MODE_O_EXEC);
+
+    node = root->ops->finddir(root, "ext2_chmod_test");
+    TEST_ASSERT(node != NULL);
+    TEST_ASSERT(node->mode & VFS_MODE_O_EXEC);
+
+    SET_SUCCESS;
+}
+
+REGISTER_TEST(ext2_integration_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+    EXT2_INIT;
 
     enum errno e = root->ops->create(root, "banana", VFS_MODE_FILE);
     TEST_ASSERT(!ERR_IS_FATAL(e));

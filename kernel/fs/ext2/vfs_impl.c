@@ -145,27 +145,33 @@ static uint16_t ext2_to_vfs_mode(uint16_t ext2_mode) {
 
     // Owner permissions
     if (ext2_mode & EXT2_S_IRUSR)
-        vfs_mode |= VFS_MODE_READ;
+        vfs_mode |= VFS_MODE_O_READ;
+
     if (ext2_mode & EXT2_S_IWUSR)
-        vfs_mode |= VFS_MODE_WRITE;
+        vfs_mode |= VFS_MODE_O_WRITE;
+
     if (ext2_mode & EXT2_S_IXUSR)
-        vfs_mode |= VFS_MODE_EXEC;
+        vfs_mode |= VFS_MODE_O_EXEC;
 
     // Group permissions
     if (ext2_mode & EXT2_S_IRGRP)
         vfs_mode |= VFS_MODE_G_READ;
+
     if (ext2_mode & EXT2_S_IWGRP)
         vfs_mode |= VFS_MODE_G_WRITE;
+
     if (ext2_mode & EXT2_S_IXGRP)
         vfs_mode |= VFS_MODE_G_EXEC;
 
     // Other permissions
     if (ext2_mode & EXT2_S_IROTH)
-        vfs_mode |= VFS_MODE_O_READ;
+        vfs_mode |= VFS_MODE_R_READ;
+
     if (ext2_mode & EXT2_S_IWOTH)
-        vfs_mode |= VFS_MODE_O_WRITE;
+        vfs_mode |= VFS_MODE_R_WRITE;
+
     if (ext2_mode & EXT2_S_IXOTH)
-        vfs_mode |= VFS_MODE_O_EXEC;
+        vfs_mode |= VFS_MODE_R_EXEC;
 
     return vfs_mode;
 }
@@ -188,25 +194,31 @@ static uint16_t vfs_to_ext2_mode(uint16_t vfs_mode) {
     // Owner permissions
     if (vfs_mode & VFS_MODE_O_READ)
         ext2_mode |= EXT2_S_IRUSR;
+
     if (vfs_mode & VFS_MODE_O_WRITE)
         ext2_mode |= EXT2_S_IWUSR;
+
     if (vfs_mode & VFS_MODE_O_EXEC)
         ext2_mode |= EXT2_S_IXUSR;
 
     // Group permissions
     if (vfs_mode & VFS_MODE_G_READ)
         ext2_mode |= EXT2_S_IRGRP;
+
     if (vfs_mode & VFS_MODE_G_WRITE)
         ext2_mode |= EXT2_S_IWGRP;
+
     if (vfs_mode & VFS_MODE_G_EXEC)
         ext2_mode |= EXT2_S_IXGRP;
 
     // Other permissions
-    if (vfs_mode & VFS_MODE_READ)
+    if (vfs_mode & VFS_MODE_R_READ)
         ext2_mode |= EXT2_S_IROTH;
-    if (vfs_mode & VFS_MODE_WRITE)
+
+    if (vfs_mode & VFS_MODE_R_WRITE)
         ext2_mode |= EXT2_S_IWOTH;
-    if (vfs_mode & VFS_MODE_EXEC)
+
+    if (vfs_mode & VFS_MODE_R_EXEC)
         ext2_mode |= EXT2_S_IXOTH;
 
     return ext2_mode;
@@ -524,7 +536,7 @@ enum errno ext2_vfs_write(struct vfs_node *n, const void *buf, uint64_t size,
     struct ext2_fs *fs = n->fs_data;
     struct ext2_full_inode *node = n->fs_node_data;
     enum errno e = ext2_write_file(fs, node, offset, buf, size);
-    
+
     if (e != ERR_OK)
         return e;
 

@@ -15,26 +15,31 @@ extern struct vfs_mount *g_mount_list_head;
 #define VFS_NAME_MAX 256 // this because of ext2
 
 /* mode stuff */
-#define VFS_MODE_READ 0x0001     // Read permissions (all)
-#define VFS_MODE_WRITE 0x0002    // Write permissions (all)
-#define VFS_MODE_EXEC 0x0004     // Exec permissions (all)
-#define VFS_MODE_DIR 0x4000      // Is directory
-#define VFS_MODE_FILE 0x8000     // Is file
-#define VFS_MODE_SYMLINK 0xA000  // Is symbolic link
-#define VFS_MODE_CHARDEV 0x2000  // Is character device
-#define VFS_MODE_BLOCKDEV 0x6000 // Is block device
-#define VFS_MODE_PIPE 0x1000     // Is pipe
-#define VFS_MODE_SOCKET 0xC000   // Is socket
+#define VFS_MODE_FILE 0x8000U     // 1000 << 12
+#define VFS_MODE_DIR 0x4000U      // 0100 << 12
+#define VFS_MODE_SYMLINK 0xA000U  // 1010 << 12
+#define VFS_MODE_CHARDEV 0x2000U  // 0010 << 12
+#define VFS_MODE_BLOCKDEV 0x6000U // 0110 << 12
+#define VFS_MODE_PIPE 0x1000U     // 0001 << 12
+#define VFS_MODE_SOCKET 0xC000U   // 1100 << 12
 
-#define VFS_MODE_G_READ 0x1000  // Read permissions (group)
-#define VFS_MODE_G_WRITE 0x2000 // Write permissions (group)
-#define VFS_MODE_G_EXEC 0x4000  // Exec permissions (group)
+#define VFS_MODE_O_READ 0x0100U  // 0400 (bit 8)
+#define VFS_MODE_O_WRITE 0x0080U // 0200 (bit 7)
+#define VFS_MODE_O_EXEC 0x0040U  // 0100 (bit 6)
 
-#define VFS_MODE_O_READ 0x010000  // Read permissions (owner)
-#define VFS_MODE_O_WRITE 0x020000 // Write permissions (owner)
-#define VFS_MODE_O_EXEC 0x040000  // Exec permissions (owner)
+#define VFS_MODE_G_READ 0x0020U  // 0040 (bit 5)
+#define VFS_MODE_G_WRITE 0x0010U // 0020 (bit 4)
+#define VFS_MODE_G_EXEC 0x0008U  // 0010 (bit 3)
 
-#define VFS_MODE_TYPE_MASK 0xF000
+#define VFS_MODE_R_READ 0x0004U  // 0004 (bit 2)
+#define VFS_MODE_R_WRITE 0x0002U // 0002 (bit 1)
+#define VFS_MODE_R_EXEC 0x0001U  // 0001 (bit 0)
+
+#define VFS_MODE_READ (VFS_MODE_O_READ | VFS_MODE_G_READ | VFS_MODE_R_READ)
+#define VFS_MODE_WRITE (VFS_MODE_O_WRITE | VFS_MODE_G_WRITE | VFS_MODE_R_WRITE)
+#define VFS_MODE_EXEC (VFS_MODE_O_EXEC | VFS_MODE_G_EXEC | VFS_MODE_R_EXEC)
+
+#define VFS_MODE_TYPE_MASK 0xF000U
 
 // clang-format off
 enum vfs_node_flags : uint32_t {
