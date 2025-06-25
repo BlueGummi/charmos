@@ -36,7 +36,8 @@ bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
     uint32_t inodes_per_group = fs->sblock->inodes_per_group;
     uint32_t inode_size = fs->sblock->inode_size;
 
-    uint32_t group = (inode_idx - 1) / inodes_per_group;
+    uint32_t group = ext2_get_inode_group(fs, inode_idx);
+
     uint32_t index_in_group = (inode_idx - 1) % inodes_per_group;
 
     struct ext2_group_desc *desc = &fs->group_desc[group];
@@ -91,7 +92,7 @@ bool ext2_block_ptr_write(struct ext2_fs *fs, uint32_t block_num,
 
 bool ext2_write_inode(struct ext2_fs *fs, uint32_t inode_num,
                       const struct ext2_inode *inode) {
-    uint32_t group = (inode_num - 1) / fs->inodes_per_group;
+    uint32_t group = ext2_get_inode_group(fs, inode_num);
     uint32_t index = (inode_num - 1) % fs->inodes_per_group;
     uint32_t offset = index * fs->inode_size;
 

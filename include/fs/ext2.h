@@ -264,7 +264,17 @@ uint32_t ext2_get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
                                uint32_t block_index, uint32_t new_block_num,
                                bool allocate, bool *was_allocated);
 
+//
+//
+// Util
+//
+//
+
 bool ext2_dirent_valid(struct ext2_dir_entry *entry);
+void ext2_init_inode(struct ext2_inode *new_inode, uint16_t mode);
+uint8_t ext2_extract_ftype(uint16_t mode);
+uint32_t ext2_get_inode_group(struct ext2_fs *fs, uint32_t inode);
+uint32_t ext2_get_block_group(struct ext2_fs *fs, uint32_t block);
 
 //
 //

@@ -41,7 +41,6 @@ static bool link_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
         new_entry->inode = ctx->inode;
         new_entry->name_len = strlen(ctx->name);
         new_entry->rec_len = original_rec_len - actual_size;
-
         new_entry->file_type = ctx->type;
 
         memcpy(new_entry->name, ctx->name, new_entry->name_len);
@@ -74,9 +73,8 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
         goto done;
 
     uint32_t new_block = ext2_alloc_block(fs);
-    if (new_block == 0) {
-        return ERR_FS_NO_INODE;
-    }
+    if (new_block == 0)
+        return ERR_NOSPC;
 
     uint8_t *block_data = kzalloc(fs->block_size);
     if (!block_data)
@@ -120,18 +118,8 @@ enum errno ext2_create_file(struct ext2_fs *fs,
     if (new_inode_num == 0)
         return ERR_NOSPC;
 
-    struct ext2_inode new_inode;
-    memset(&new_inode, 0, sizeof(new_inode));
-
-    new_inode.mode = mode;
-    new_inode.uid = 0;
-    new_inode.gid = 0; // TODO: these
-    new_inode.size = 0;
-    new_inode.atime = time_get_unix();
-    new_inode.ctime = new_inode.mtime = new_inode.atime;
-    new_inode.links_count = ((mode & EXT2_S_IFDIR) ? 2 : 1);
-    new_inode.blocks = 0;
-    new_inode.flags = 0;
+    struct ext2_inode new_inode = {0};
+    ext2_init_inode(&new_inode, mode);
 
     if (!ext2_write_inode(fs, new_inode_num, &new_inode))
         return ERR_IO;
@@ -141,15 +129,7 @@ enum errno ext2_create_file(struct ext2_fs *fs,
         .inode_num = new_inode_num,
     };
 
-    uint8_t file_type;
-    if (mode & EXT2_S_IFDIR)
-        file_type = EXT2_FT_DIR;
-    else if (mode & EXT2_S_IFREG)
-        file_type = EXT2_FT_REG_FILE;
-    else if (mode & EXT2_S_IFLNK)
-        file_type = EXT2_FT_SYMLINK;
-    else
-        file_type = EXT2_FT_UNKNOWN;
+    uint8_t file_type = ext2_extract_ftype(mode);
 
     enum errno err = ext2_link_file(fs, parent_dir, &temp_full_inode, name,
                                     file_type, increment_links);

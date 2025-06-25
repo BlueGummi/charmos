@@ -15,6 +15,8 @@ enum errno ext2_symlink_file(struct ext2_fs *fs,
 
     struct ext2_inode new_inode = {0};
     new_inode.ctime = time_get_unix();
+    new_inode.mtime = time_get_unix();
+    new_inode.atime = time_get_unix();
     new_inode.mode = EXT2_S_IFLNK;
     new_inode.links_count = 1;
     new_inode.size = strlen(target);

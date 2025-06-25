@@ -1,5 +1,5 @@
-#include <fs/ext2.h>
 #include <console/printf.h>
+#include <fs/ext2.h>
 #include <mem/alloc.h>
 #include <string.h>
 
@@ -110,4 +110,38 @@ uint32_t ext2_get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
     }
 
     return (uint32_t) -1;
+}
+
+void ext2_init_inode(struct ext2_inode *new_inode, uint16_t mode) {
+    new_inode->mode = mode;
+    new_inode->uid = 0;
+    new_inode->gid = 0; // TODO: these
+    new_inode->size = 0;
+    new_inode->atime = time_get_unix();
+    new_inode->ctime = new_inode->mtime = new_inode->atime;
+    new_inode->links_count = ((mode & EXT2_S_IFDIR) ? 2 : 1);
+    new_inode->blocks = 0;
+    new_inode->flags = 0;
+}
+
+uint8_t ext2_extract_ftype(uint16_t mode) {
+    uint8_t file_type;
+    if (mode & EXT2_S_IFDIR)
+        file_type = EXT2_FT_DIR;
+    else if (mode & EXT2_S_IFREG)
+        file_type = EXT2_FT_REG_FILE;
+    else if (mode & EXT2_S_IFLNK)
+        file_type = EXT2_FT_SYMLINK;
+    else
+        file_type = EXT2_FT_UNKNOWN;
+
+    return file_type;
+}
+
+uint32_t ext2_get_block_group(struct ext2_fs *fs, uint32_t block) {
+    return (block - 1) / fs->sblock->blocks_per_group;
+}
+
+uint32_t ext2_get_inode_group(struct ext2_fs *fs, uint32_t inode) {
+    return (inode - 1) / fs->sblock->inodes_per_group;
 }
