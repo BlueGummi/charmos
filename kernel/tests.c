@@ -103,11 +103,13 @@ void tests_run(void) {
     bool all_ok = fail_count == 0;
     char *color = all_ok ? ANSI_GREEN : ANSI_RED;
     char *msg = all_ok ? "all ok!\n" : "some errors occurred\n";
+    char *fail_color = all_ok ? ANSI_GREEN : ANSI_RED;
+    char *skip_color = all_ok ? ANSI_GREEN : ANSI_GRAY;
 
     k_info("TEST", K_TEST,
-           "%llu " ANSI_GREEN "passed" ANSI_RESET ", %llu " ANSI_RED
-           "failed" ANSI_RESET ", %llu " ANSI_GRAY "skipped\n" ANSI_RESET,
-           pass_count, fail_count, skip_count);
+           "%llu " ANSI_GREEN "passed" ANSI_RESET ", %llu %sfailed" ANSI_RESET
+           ", %llu %sskipped\n" ANSI_RESET,
+           pass_count, fail_count, fail_color, skip_count, skip_color);
 
     k_info("TEST", K_TEST, "%s%s" ANSI_RESET, color, msg);
 }
