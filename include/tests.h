@@ -7,6 +7,7 @@ typedef void (*test_fn_t)(void);
 struct kernel_test {
     const char *name;
     test_fn_t func;
+    bool is_integration;
 
     /* TODO: fancy state machine with enum? */
     bool should_fail;
@@ -17,11 +18,11 @@ struct kernel_test {
     char **messages;
 } __attribute__((aligned(64)));
 
-#define REGISTER_TEST(name, should_fail)                                       \
+#define REGISTER_TEST(name, should_fail, is_integration)                       \
     static void name(void);                                                    \
     static struct kernel_test __test_##name                                    \
         __attribute__((section(".kernel_tests"), used)) = {                    \
-            #name, name, should_fail, false, false, 0, NULL};                  \
+            #name, name, is_integration, should_fail, false, false, 0, NULL};  \
     static void name(void)
 
 #define SET_SUCCESS current_test->success = true
@@ -53,3 +54,9 @@ struct kernel_test {
 
 void tests_run(void);
 extern const char *large_test_string;
+extern struct kernel_test *current_test;
+
+#define IS_INTEGRATION_TEST true
+#define IS_UNIT_TEST false
+#define SHOULD_FAIL true
+#define SHOULD_NOT_FAIL false
