@@ -21,6 +21,8 @@ struct tmpfs_node {
     uint16_t mode;
     uint32_t uid;
     uint32_t gid;
+    uint64_t mtime;
+    uint64_t atime;
 
     struct tmpfs_node *parent;
 

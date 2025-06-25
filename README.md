@@ -37,3 +37,5 @@ make run # run this in the build directory
 - [ ] more drivers + finish xhci
 
 - [ ] networking :boom: + networking stack :boom: :boom:
+
+- [ ] do not report every FS error as an internal error

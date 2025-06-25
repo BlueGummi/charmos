@@ -7,6 +7,7 @@ struct search_ctx {
     const char *target;
     struct ext2_full_inode *result;
     uint8_t type;
+    bool found;
 };
 
 struct contains_ctx {
@@ -22,18 +23,25 @@ struct readdir_ctx {
 
 static bool search_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
                             void *ctx_ptr, uint32_t b, uint32_t e_num,
-                            uint32_t c) {
-    (void) c;
+                            uint32_t offset) {
     (void) b;
     struct search_ctx *ctx = (struct search_ctx *) ctx_ptr;
 
-    if (entry->inode != 0 &&
-        memcmp(entry->name, ctx->target, entry->name_len) == 0 &&
-        ctx->target[entry->name_len] == '\0') {
+    if (entry->inode == 0 || entry->rec_len < 8 ||
+        entry->rec_len > (fs->block_size - offset) || entry->name_len == 0 ||
+        entry->name_len > EXT2_NAME_LEN)
+        return false;
 
+    if (offset + entry->rec_len > fs->block_size)
+        return false;
+
+    if (memcmp(entry->name, ctx->target, entry->name_len) == 0 &&
+        ctx->target[entry->name_len] == '\0') {
+        ctx->found = true;
         ctx->result->inode_num = e_num;
         ctx->type = entry->file_type;
         ext2_read_inode(fs, entry->inode, &ctx->result->node);
+
         return true;
     }
 
@@ -42,14 +50,20 @@ static bool search_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
 
 static bool contains_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
                               void *ctx_ptr, uint32_t b, uint32_t e,
-                              uint32_t c) {
+                              uint32_t offset) {
     struct contains_ctx *ctx = (struct contains_ctx *) ctx_ptr;
     (void) b;
     (void) e;
-    (void) fs;
-    (void) c;
-    if (entry->inode != 0 &&
-        memcmp(entry->name, ctx->target, entry->name_len) == 0 &&
+
+    if (entry->inode == 0 || entry->rec_len < 8 ||
+        entry->rec_len > (fs->block_size - offset) || entry->name_len == 0 ||
+        entry->name_len > EXT2_NAME_LEN)
+        return false;
+
+    if (offset + entry->rec_len > fs->block_size)
+        return false;
+
+    if (memcmp(entry->name, ctx->target, entry->name_len) == 0 &&
         ctx->target[entry->name_len] == '\0') {
         ctx->found = true;
         return true;
@@ -85,7 +99,13 @@ struct ext2_full_inode *ext2_find_file_in_dir(struct ext2_fs *fs,
 
     if (type_out)
         *type_out = ctx.type;
-    return ctx.result;
+
+    if (ctx.found) {
+        return ctx.result;
+    } else {
+        kfree(out_node);
+        return NULL;
+    }
 }
 
 bool ext2_dir_contains_file(struct ext2_fs *fs,

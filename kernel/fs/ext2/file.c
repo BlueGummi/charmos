@@ -9,6 +9,9 @@ enum errno ext2_write_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
     if (!fs || !inode || !src)
         return ERR_INVAL;
 
+    if (inode->node.mode & EXT2_S_IFDIR)
+        return ERR_IS_DIR;
+
     uint32_t bytes_written = 0;
     uint32_t new_block_counter = 0;
     while (bytes_written < size) {
@@ -51,7 +54,7 @@ enum errno ext2_write_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
         bytes_written += to_write;
     }
 
-    if (offset + size < inode->node.size) {
+    if (offset + size > inode->node.size) {
         inode->node.size = offset + size;
     }
 
@@ -121,6 +124,9 @@ enum errno ext2_read_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
                           uint32_t offset, uint8_t *buffer, uint64_t length) {
     if (!fs || !inode || !buffer || offset >= inode->node.size)
         return ERR_INVAL;
+
+    if (inode->node.mode & EXT2_S_IFDIR)
+        return ERR_IS_DIR;
 
     if (offset + length > inode->node.size)
         length = inode->node.size - offset;

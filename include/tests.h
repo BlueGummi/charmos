@@ -24,25 +24,25 @@ struct kernel_test {
             #name, name, should_fail, false, false, 0, NULL};                  \
     static void name(void)
 
-#define SET_SUCCESS(name) __test_##name.success = true
+#define SET_SUCCESS current_test->success = true
 
-#define SET_FAIL(name) __test_##name.success = false
+#define SET_FAIL current_test->success = false
 
-#define SET_SKIP(name) __test_##name.skipped = true
+#define SET_SKIP current_test->skipped = true
 
-#define ADD_MESSAGE(name, msg)                                                 \
+#define ADD_MESSAGE(msg)                                                       \
     do {                                                                       \
-        if (__test_##name.messages == NULL)                                    \
-            __test_##name.messages = kmalloc(sizeof(char *));                  \
+        if (current_test->messages == NULL)                                    \
+            current_test->messages = kmalloc(sizeof(char *));                  \
         else                                                                   \
-            __test_##name.messages =                                           \
-                krealloc(__test_##name.messages,                               \
-                         sizeof(char *) * __test_##name.message_count);        \
-        __test_##name.messages[__test_##name.message_count] = msg;             \
-        __test_##name.message_count++;                                         \
+            current_test->messages =                                           \
+                krealloc(current_test->messages,                               \
+                         sizeof(char *) * current_test->message_count);        \
+        current_test->messages[current_test->message_count] = msg;             \
+        current_test->message_count++;                                         \
     } while (0)
 
-#define test_assert(x)                                                         \
+#define TEST_ASSERT(x)                                                         \
     do {                                                                       \
         if (!(x)) {                                                            \
             k_printf(" assert \"%s\" failed at %s:%d ", #x, __FILE__,          \

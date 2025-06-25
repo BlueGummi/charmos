@@ -483,7 +483,12 @@ enum errno ext2_vfs_chmod(struct vfs_node *n, uint16_t mode) {
     struct ext2_fs *fs = n->fs_data;
     struct ext2_full_inode *node = n->fs_node_data;
     uint16_t new_mode = vfs_to_ext2_mode(mode);
-    return ext2_chmod(fs, node, new_mode);
+    enum errno e = ext2_chmod(fs, node, new_mode);
+    if (e != ERR_OK)
+        return e;
+
+    n->mode = mode;
+    return ERR_OK;
 }
 
 enum errno ext2_vfs_chown(struct vfs_node *n, uint32_t uid, uint32_t gid) {
@@ -492,7 +497,13 @@ enum errno ext2_vfs_chown(struct vfs_node *n, uint32_t uid, uint32_t gid) {
 
     struct ext2_fs *fs = n->fs_data;
     struct ext2_full_inode *node = n->fs_node_data;
-    return ext2_chown(fs, node, uid, gid);
+    enum errno e = ext2_chown(fs, node, uid, gid);
+    if (e != ERR_OK)
+        return e;
+
+    n->uid = uid;
+    n->gid = gid;
+    return ERR_OK;
 }
 
 enum errno ext2_vfs_read(struct vfs_node *n, void *buf, uint64_t size,
@@ -512,7 +523,13 @@ enum errno ext2_vfs_write(struct vfs_node *n, const void *buf, uint64_t size,
 
     struct ext2_fs *fs = n->fs_data;
     struct ext2_full_inode *node = n->fs_node_data;
-    return ext2_write_file(fs, node, offset, buf, size);
+    enum errno e = ext2_write_file(fs, node, offset, buf, size);
+    
+    if (e != ERR_OK)
+        return e;
+
+    n->size = node->node.size;
+    return ERR_OK;
 }
 
 enum errno ext2_vfs_utime(struct vfs_node *n, uint64_t atime, uint64_t mtime) {
@@ -527,6 +544,8 @@ enum errno ext2_vfs_utime(struct vfs_node *n, uint64_t atime, uint64_t mtime) {
     if (!ext2_write_inode(fs, node->inode_num, inode))
         return ERR_FS_INTERNAL;
 
+    n->atime = atime;
+    n->mtime = mtime;
     return ERR_OK;
 }
 

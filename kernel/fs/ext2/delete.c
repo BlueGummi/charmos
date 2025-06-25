@@ -40,6 +40,9 @@ bool unlink_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
         ctx->inode_num = entry->inode;
         ctx->block_num = block_num;
         ctx->entry_offset = entry_offset;
+        entry->inode = 0;
+        entry->name_len = 0;
+        memset(entry->name, 0, EXT2_NAME_LEN);
         return true;
     }
 
@@ -47,6 +50,7 @@ bool unlink_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
     return false;
 }
 
+/* TODO: the function works but the control flow is messy */
 enum errno ext2_unlink_file(struct ext2_fs *fs,
                             struct ext2_full_inode *dir_inode, const char *name,
                             bool free_blocks) {
@@ -55,12 +59,11 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
         return ERR_NO_ENT;
 
     struct unlink_ctx ctx = {name, false, 0, 0, 0, 0};
-
     if (!ext2_walk_dir(fs, dir_inode, unlink_callback, &ctx, false))
         return ERR_FS_INTERNAL;
 
     // read dirent
-    uint8_t *block = kmalloc(fs->block_size);
+    uint8_t *block = kzalloc(fs->block_size);
     if (!block)
         return ERR_NO_MEM;
 
@@ -71,7 +74,6 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
 
     struct ext2_dir_entry *entry =
         (struct ext2_dir_entry *) (block + ctx.entry_offset);
-    entry->inode = 0;
 
     if (ctx.entry_offset == 0) {
         struct ext2_dir_entry *next =
@@ -80,7 +82,6 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
         if ((uint8_t *) next < block + fs->block_size && next->inode != 0) {
             next->rec_len += entry->rec_len;
         }
-
     } else {
         struct ext2_dir_entry *prev =
             (struct ext2_dir_entry *) (block + ctx.prev_offset);
@@ -98,12 +99,11 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
     if (!ext2_read_inode(fs, ctx.inode_num, &target_inode.node))
         return ERR_FS_INTERNAL;
 
-    target_inode.inode_num = ctx.inode_num;
-
     if (target_inode.node.links_count == 0) {
         return ERR_FS_NO_INODE;
     }
 
+    target_inode.inode_num = ctx.inode_num;
     target_inode.node.dtime = time_get_unix();
 
     if (--target_inode.node.links_count == 0) {
@@ -118,6 +118,7 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
     if (!ext2_write_inode(fs, ctx.inode_num, &target_inode.node))
         return ERR_FS_INTERNAL;
 
+    dir_inode->node.links_count--;
     if (!ext2_write_inode(fs, dir_inode->inode_num, &dir_inode->node))
         return ERR_FS_INTERNAL;
 

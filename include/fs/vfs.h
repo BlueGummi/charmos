@@ -14,6 +14,7 @@ extern struct vfs_mount *g_mount_list_head;
 
 #define VFS_NAME_MAX 256 // this because of ext2
 
+/* mode stuff */
 #define VFS_MODE_READ 0x0001     // Read permissions (all)
 #define VFS_MODE_WRITE 0x0002    // Write permissions (all)
 #define VFS_MODE_EXEC 0x0004     // Exec permissions (all)
@@ -101,76 +102,84 @@ struct vfs_dirent {
 
 struct vfs_node;
 struct vfs_ops {
+
+    /* read data from file */
     enum errno (*read)(struct vfs_node *node, void *buf, uint64_t size,
-                       uint64_t offset); // read data from file
+                       uint64_t offset);
 
+    /* write data to file */
     enum errno (*write)(struct vfs_node *node, const void *buf, uint64_t size,
-                        uint64_t offset); // write data to file
+                        uint64_t offset);
 
-    enum errno (*open)(struct vfs_node *node,
-                       uint32_t flags); // open file with flags
+    /* open file with flags */
+    enum errno (*open)(struct vfs_node *node, uint32_t flags);
 
-    enum errno (*close)(struct vfs_node *node); // close file
+    /* close file */
+    enum errno (*close)(struct vfs_node *node);
 
+    /* create file with given name */
     enum errno (*create)(struct vfs_node *parent, const char *name,
                          uint16_t mode);
 
+    /* make node - special devices */
     enum errno (*mknod)(struct vfs_node *parent, const char *name,
-                        uint16_t mode,
-                        uint32_t dev); // special devices
+                        uint16_t mode, uint32_t dev);
 
+    /* create symbolic link */
     enum errno (*symlink)(struct vfs_node *parent, const char *target,
                           const char *link_name);
 
+    /* mount filesystem at mountpoint */
     enum errno (*mount)(struct vfs_node *mountpoint, struct vfs_node *target);
 
+    /* unmount filesystem at mountpoint */
     enum errno (*unmount)(struct vfs_mount *mountpoint);
 
-    enum errno (*stat)(struct vfs_node *node,
-                       struct vfs_stat *out); // get file metadata
+    /* get file metadata */
+    enum errno (*stat)(struct vfs_node *node, struct vfs_stat *out);
 
+    /* read directory entry at index */
     enum errno (*readdir)(struct vfs_node *node, struct vfs_dirent *out,
-                          uint64_t index); // read directory entry at index
+                          uint64_t index);
 
+    /* create directory */
     enum errno (*mkdir)(struct vfs_node *parent, const char *name,
-                        uint16_t mode); // create directory
+                        uint16_t mode);
 
-    enum errno (*rmdir)(struct vfs_node *parent,
-                        const char *name); // remove directory
+    /* remove directory */
+    enum errno (*rmdir)(struct vfs_node *parent, const char *name);
 
-    enum errno (*unlink)(struct vfs_node *parent,
-                         const char *name); // delete file
+    /* delete file */
+    enum errno (*unlink)(struct vfs_node *parent, const char *name);
 
+    /* rename/move file or directory */
     enum errno (*rename)(struct vfs_node *old_parent, const char *old_name,
-                         struct vfs_node *new_parent,
-                         const char *new_name); // rename/move file or directory
+                         struct vfs_node *new_parent, const char *new_name);
 
-    enum errno (*truncate)(struct vfs_node *node,
-                           uint64_t length); // resize file to given length
+    /* resize file to given length */
+    enum errno (*truncate)(struct vfs_node *node, uint64_t length);
 
-    enum errno (*readlink)(struct vfs_node *node, char *buf,
-                           uint64_t size); // read symlink target into buffer
+    /* read symlink into target buffer */
+    enum errno (*readlink)(struct vfs_node *node, char *buf, uint64_t size);
 
+    /* create hard link to target */
     enum errno (*link)(struct vfs_node *parent, struct vfs_node *target,
-                       const char *link_name); // create hard link to target
+                       const char *link_name);
 
-    enum errno (*chmod)(struct vfs_node *node,
-                        uint16_t mode); // change file permissions
+    /* change file permissions */
+    enum errno (*chmod)(struct vfs_node *node, uint16_t mode);
 
-    enum errno (*chown)(struct vfs_node *node, uint32_t uid,
-                        uint32_t gid); // change file ownership
+    /* change file ownership */
+    enum errno (*chown)(struct vfs_node *node, uint32_t uid, uint32_t gid);
 
-    enum errno (*utime)(
-        struct vfs_node *node, uint64_t atime,
-        uint64_t mtime); // update access and modification times (unix time)
+    /* update access times, unix time */
+    enum errno (*utime)(struct vfs_node *node, uint64_t atime, uint64_t mtime);
 
+    /* deallocate node */
     enum errno (*destroy)(struct vfs_node *node);
 
-    // enum errno (*ioctl)(struct vfs_node *node, uint64_t request, void *arg);
-    // // device-specific control (optional)
-
-    struct vfs_node *(*finddir)(struct vfs_node *node,
-                                const char *name); // find a child node by name
+    /* find node by name */
+    struct vfs_node *(*finddir)(struct vfs_node *node, const char *name);
 };
 
 struct vfs_mount {
@@ -190,6 +199,10 @@ struct vfs_node {
     uint32_t flags;
     uint16_t mode;
     uint64_t size;
+    uint32_t uid;
+    uint32_t gid;
+    uint64_t mtime;
+    uint64_t atime;
 
     void *fs_data;                 /* optional filesystem driver data */
     void *fs_node_data;            /* optional filesystem driver data */
