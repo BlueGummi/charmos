@@ -37,6 +37,7 @@ static bool link_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
 
         struct ext2_dir_entry *new_entry =
             (struct ext2_dir_entry *) (entry_base + actual_size);
+
         new_entry->inode = ctx->inode;
         new_entry->name_len = strlen(ctx->name);
         new_entry->rec_len = original_rec_len - actual_size;
@@ -54,7 +55,7 @@ static bool link_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
 
 enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
                           struct ext2_full_inode *inode, const char *name,
-                          uint8_t type) {
+                          uint8_t type, bool increment_links) {
     struct link_ctx ctx = {
         .name = name,
         .inode = inode->inode_num,
@@ -69,10 +70,8 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
     ext2_walk_dir(fs, dir_inode, link_callback, &ctx, false);
 
     /* did not need to allocate new block */
-    if (ctx.success) {
-        dir_inode->node.links_count += 1;
-        return ERR_OK;
-    }
+    if (ctx.success)
+        goto done;
 
     uint32_t new_block = ext2_alloc_block(fs);
     if (new_block == 0) {
@@ -103,7 +102,11 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
 
     /* allocated new block */
     kfree(block_data);
-    dir_inode->node.links_count += 1;
+
+done:
+    if (increment_links)
+        dir_inode->node.links_count += 1;
+
     return ext2_write_inode(fs, dir_inode->inode_num, &dir_inode->node)
                ? ERR_OK
                : ERR_FS_INTERNAL;
@@ -111,7 +114,8 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
 
 enum errno ext2_create_file(struct ext2_fs *fs,
                             struct ext2_full_inode *parent_dir,
-                            const char *name, uint16_t mode) {
+                            const char *name, uint16_t mode,
+                            bool increment_links) {
     uint32_t new_inode_num = ext2_alloc_inode(fs);
     if (new_inode_num == 0)
         return ERR_NOSPC;
@@ -147,8 +151,9 @@ enum errno ext2_create_file(struct ext2_fs *fs,
     else
         file_type = EXT2_FT_UNKNOWN;
 
-    enum errno err =
-        ext2_link_file(fs, parent_dir, &temp_full_inode, name, file_type);
+    enum errno err = ext2_link_file(fs, parent_dir, &temp_full_inode, name,
+                                    file_type, increment_links);
+
     if (err != ERR_OK) {
         ext2_free_inode(fs, new_inode_num);
         return err;

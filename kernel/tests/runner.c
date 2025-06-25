@@ -70,10 +70,16 @@ void tests_run(void) {
             integration_test_count++;
     }
 
-    k_info("TEST", K_TEST, "running %llu unit tests...\n", unit_test_count);
+    k_info("TEST", K_TEST,
+           "running %llu " ANSI_CYAN "unit" ANSI_RESET " tests...\n",
+           unit_test_count);
+
     run(true, start, end);
-    k_info("TEST", K_TEST, "running %llu integration tests...\n",
+
+    k_info("TEST", K_TEST,
+           "running %llu " ANSI_MAGENTA "integration" ANSI_RESET " tests...\n",
            integration_test_count);
+
     run(false, start, end);
 
     bool all_ok = fail_count == 0;

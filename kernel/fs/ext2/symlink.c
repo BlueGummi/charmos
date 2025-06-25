@@ -42,7 +42,7 @@ enum errno ext2_symlink_file(struct ext2_fs *fs,
     };
 
     enum errno ret = ext2_link_file(fs, dir_inode, &wrapped_inode,
-                                    (char *) name, EXT2_FT_SYMLINK);
+                                    (char *) name, EXT2_FT_SYMLINK, false);
     return ret;
 }
 

@@ -52,7 +52,7 @@ bool unlink_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
 
 enum errno ext2_unlink_file(struct ext2_fs *fs,
                             struct ext2_full_inode *dir_inode, const char *name,
-                            bool free_blocks) {
+                            bool free_blocks, bool decrement_links) {
     if (!ext2_dir_contains_file(fs, dir_inode, name))
         return ERR_NO_ENT;
 
@@ -117,7 +117,9 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
         goto cleanup;
     }
 
-    dir_inode->node.links_count--;
+    if (decrement_links)
+        dir_inode->node.links_count--;
+
     if (!ext2_write_inode(fs, dir_inode->inode_num, &dir_inode->node)) {
         err = ERR_FS_INTERNAL;
         goto cleanup;

@@ -453,9 +453,9 @@ enum errno ext2_vfs_rename(struct vfs_node *old_parent, const char *old_name,
     if (!this_inode)
         return ERR_NO_ENT;
 
-    ext2_unlink_file(fs, old_node, old_name, false);
+    ext2_unlink_file(fs, old_node, old_name, false, false);
 
-    return ext2_link_file(fs, new_node, this_inode, new_name, ftype);
+    return ext2_link_file(fs, new_node, this_inode, new_name, ftype, true);
 }
 
 enum errno ext2_vfs_stat(struct vfs_node *v, struct vfs_stat *out) {
@@ -476,7 +476,7 @@ enum errno ext2_vfs_link(struct vfs_node *parent, struct vfs_node *target,
     struct ext2_full_inode *child = target->fs_node_data;
     struct ext2_fs *fs = parent->fs_data;
 
-    return ext2_link_file(fs, dir, child, name, vfs_to_ext2_mode(target->mode));
+    return ext2_link_file(fs, dir, child, name, vfs_to_ext2_mode(target->mode), true);
 }
 
 enum errno ext2_vfs_symlink(struct vfs_node *parent, const char *target,
@@ -588,7 +588,7 @@ enum errno ext2_vfs_unlink(struct vfs_node *n, const char *name) {
 
     struct ext2_fs *fs = n->fs_data;
     struct ext2_full_inode *node = n->fs_node_data;
-    return ext2_unlink_file(fs, node, name, true);
+    return ext2_unlink_file(fs, node, name, true, false);
 }
 
 enum errno ext2_vfs_create(struct vfs_node *n, const char *name,
@@ -599,7 +599,7 @@ enum errno ext2_vfs_create(struct vfs_node *n, const char *name,
     uint16_t new_mode = vfs_to_ext2_mode(mode);
     struct ext2_fs *fs = n->fs_data;
     struct ext2_full_inode *node = n->fs_node_data;
-    return ext2_create_file(fs, node, name, new_mode);
+    return ext2_create_file(fs, node, name, new_mode, false);
 }
 
 enum errno ext2_vfs_mkdir(struct vfs_node *n, const char *name, uint16_t mode) {

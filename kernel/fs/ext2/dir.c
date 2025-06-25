@@ -13,7 +13,7 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
         mode |= EXT2_S_IFDIR;
     }
 
-    enum errno err = ext2_create_file(fs, parent_dir, name, mode);
+    enum errno err = ext2_create_file(fs, parent_dir, name, mode, true);
     if (err != ERR_OK)
         return err;
 
@@ -70,12 +70,12 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
         return ERR_IO;
 
     desc->used_dirs_count++;
-    
-    /* TODO: not sure why, but these 
-     * numbers down here are changed 
-     * and become inaccurate, 
+
+    /* TODO: not sure why, but these
+     * numbers down here are changed
+     * and become inaccurate,
      * fsck complains */
-    
+
     desc->free_blocks_count++;
     fs->sblock->free_blocks_count++;
     ext2_write_group_desc(fs);
@@ -124,7 +124,7 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     if (!empty)
         return ERR_NOT_EMPTY;
 
-    enum errno err = ext2_unlink_file(fs, parent_dir, name, true);
+    enum errno err = ext2_unlink_file(fs, parent_dir, name, true, true);
     if (err != ERR_OK)
         return err;
 

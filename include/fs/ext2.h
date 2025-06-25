@@ -272,15 +272,16 @@ uint32_t ext2_get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
 
 enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
                           struct ext2_full_inode *inode, const char *name,
-                          uint8_t type);
+                          uint8_t type, bool increment_links);
 
 enum errno ext2_unlink_file(struct ext2_fs *fs,
                             struct ext2_full_inode *dir_inode, const char *name,
-                            bool free_blocks);
+                            bool free_blocks, bool decrement_links);
 
 enum errno ext2_create_file(struct ext2_fs *fs,
                             struct ext2_full_inode *parent_dir,
-                            const char *name, uint16_t mode);
+                            const char *name, uint16_t mode,
+                            bool increment_links);
 
 enum errno ext2_symlink_file(struct ext2_fs *fs,
                              struct ext2_full_inode *dir_inode,
