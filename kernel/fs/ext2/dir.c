@@ -7,6 +7,14 @@
 #include <string.h>
 #include <time/time.h>
 
+bool ext2_dirent_valid(struct ext2_dir_entry *entry) {
+    if (entry->inode == 0 || entry->rec_len < 8 || entry->name_len == 0 ||
+        entry->name_len > EXT2_NAME_LEN)
+        return false;
+
+    return true;
+}
+
 enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
                       const char *name, uint16_t mode) {
     if (!(mode & EXT2_S_IFDIR)) {

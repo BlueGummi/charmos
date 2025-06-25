@@ -58,9 +58,6 @@ void tests_run(void) {
     struct kernel_test *start = __skernel_tests;
     struct kernel_test *end = __ekernel_tests;
 
-    uint64_t test_count =
-        ((uint64_t) end - (uint64_t) start) / sizeof(struct kernel_test);
-    k_info("TEST", K_TEST, "running %llu tests...\n", test_count);
     uint64_t unit_test_count = 0;
     uint64_t integration_test_count = 0;
     for (struct kernel_test *t = start; t < end; t++) {
@@ -84,7 +81,7 @@ void tests_run(void) {
 
     bool all_ok = fail_count == 0;
     char *color = all_ok ? ANSI_GREEN : ANSI_RED;
-    char *msg = all_ok ? "all ok!\n" : "some errors occurred\n";
+    char *msg = all_ok ? "all tests pass 🎉!\n" : "some errors occurred\n";
     char *fail_color = all_ok ? ANSI_GREEN : ANSI_RED;
     char *skip_color = all_ok ? ANSI_GREEN : ANSI_GRAY;
 

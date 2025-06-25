@@ -12,6 +12,45 @@
     }                                                                          \
     struct vfs_node *root = g_root_node;
 
+REGISTER_TEST(ext2_stat_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    EXT2_INIT;
+
+    enum errno e = root->ops->create(root, "ext2_stat_test", VFS_MODE_FILE);
+    TEST_ASSERT(!ERR_IS_FATAL(e));
+
+    struct vfs_node *node = root->ops->finddir(root, "ext2_stat_test");
+    TEST_ASSERT(node != NULL);
+
+    struct vfs_stat empty_stat = {0};
+    struct vfs_stat stat_out = {0};
+    node->ops->stat(node, &stat_out);
+
+    /* this should return something */
+    TEST_ASSERT(memcmp(&stat_out, &empty_stat, sizeof(struct vfs_stat)) != 0);
+
+    SET_SUCCESS;
+}
+
+REGISTER_TEST(ext2_rename_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    EXT2_INIT;
+    enum errno e = root->ops->create(root, "ext2_rename_test", VFS_MODE_FILE);
+    TEST_ASSERT(!ERR_IS_FATAL(e));
+
+    struct vfs_node *node = root->ops->finddir(root, "ext2_rename_test");
+    TEST_ASSERT(node != NULL);
+
+    e = node->ops->rename(root, "ext2_rename_test", root, "ext2_rename_test2");
+    TEST_ASSERT(!ERR_IS_FATAL(e));
+
+    node = root->ops->finddir(root, "ext2_rename_test");
+    TEST_ASSERT(node == NULL);
+
+    node = root->ops->finddir(root, "ext2_rename_test2");
+    TEST_ASSERT(node != NULL);
+
+    SET_SUCCESS;
+}
+
 REGISTER_TEST(ext2_chmod_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     EXT2_INIT;
 
@@ -55,10 +94,11 @@ REGISTER_TEST(ext2_symlink_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 REGISTER_TEST(ext2_integration_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     EXT2_INIT;
 
-    enum errno e = root->ops->create(root, "banana", VFS_MODE_FILE);
+    enum errno e =
+        root->ops->create(root, "ext2_integration_test", VFS_MODE_FILE);
     TEST_ASSERT(!ERR_IS_FATAL(e));
 
-    struct vfs_node *node = root->ops->finddir(root, "banana");
+    struct vfs_node *node = root->ops->finddir(root, "ext2_integration_test");
     TEST_ASSERT(node != NULL);
 
     const char *lstr = large_test_string;
@@ -83,10 +123,10 @@ REGISTER_TEST(ext2_integration_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     TEST_ASSERT(!ERR_IS_FATAL(e));
     TEST_ASSERT(strlen(out_buf) == len / 2);
 
-    e = node->ops->unlink(root, "banana");
+    e = node->ops->unlink(root, "ext2_integration_test");
     TEST_ASSERT(!ERR_IS_FATAL(e));
 
-    node = root->ops->finddir(root, "banana");
+    node = root->ops->finddir(root, "ext2_integration_test");
     TEST_ASSERT(node == NULL);
 
     SET_SUCCESS;

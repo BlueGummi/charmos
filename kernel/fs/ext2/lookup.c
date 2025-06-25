@@ -27,9 +27,7 @@ static bool search_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
     (void) b;
     struct search_ctx *ctx = (struct search_ctx *) ctx_ptr;
 
-    if (entry->inode == 0 || entry->rec_len < 8 ||
-        entry->rec_len > (fs->block_size - offset) || entry->name_len == 0 ||
-        entry->name_len > EXT2_NAME_LEN)
+    if (!ext2_dirent_valid(entry))
         return false;
 
     if (offset + entry->rec_len > fs->block_size)
@@ -55,9 +53,7 @@ static bool contains_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
     (void) b;
     (void) e;
 
-    if (entry->inode == 0 || entry->rec_len < 8 ||
-        entry->rec_len > (fs->block_size - offset) || entry->name_len == 0 ||
-        entry->name_len > EXT2_NAME_LEN)
+    if (!ext2_dirent_valid(entry))
         return false;
 
     if (offset + entry->rec_len > fs->block_size)
@@ -79,6 +75,9 @@ static bool readdir_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
     (void) fs, (void) block, (void) entry_num;
 
     struct readdir_ctx *ctx = ctx_ptr;
+
+    if (!ext2_dirent_valid(entry))
+        return false;
 
     if (entry_offset == ctx->entry_offset) {
         memcpy(ctx->out, entry, sizeof(struct ext2_dir_entry));

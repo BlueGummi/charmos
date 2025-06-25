@@ -191,7 +191,7 @@ struct vfs_mount {
     struct vfs_node *mount_point;  /* vfs_node of the mountpoint */
     struct vfs_mount *mount_mount; /* mount representing mountpoint */
     struct vfs_node *root;         /* root of the mounted filesystem */
-    struct vfs_ops *ops;           /* filesystem operation interface */
+    const struct vfs_ops *ops;           /* filesystem operation interface */
     char name[256];
     void *fs_data; /* optional filesystem driver data */
 };
@@ -213,7 +213,7 @@ struct vfs_node {
     void *fs_node_data;            /* optional filesystem driver data */
     struct vfs_mount *child_mount; /* NULL if no child is mounted */
 
-    struct vfs_ops *ops;
+    const struct vfs_ops *ops;
 };
 void vfs_node_print(const struct vfs_node *node);
 enum errno vfs_mount(struct vfs_node *mountpoint, struct vfs_node *target);

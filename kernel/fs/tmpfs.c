@@ -6,8 +6,6 @@
 
 struct vfs_node *tmpfs_create_vfs_node(struct tmpfs_node *tnode);
 
-extern struct vfs_ops tmpfs_ops;
-
 struct vfs_node *tmpfs_mkroot(const char *mount_point) {
     struct tmpfs_fs *fs = kzalloc(sizeof(struct tmpfs_fs));
 
@@ -38,22 +36,6 @@ static enum errno tmpfs_mount(struct vfs_node *mountpoint,
                               struct vfs_node *out) {
     (void) mountpoint, (void) out;
     return ERR_NOT_IMPL;
-}
-
-struct vfs_node *tmpfs_create_vfs_node(struct tmpfs_node *tnode) {
-    struct vfs_node *vnode = kzalloc(sizeof(struct vfs_node));
-    if (!vnode || !tnode)
-        return NULL;
-
-    vnode->mode = tnode->mode;
-    vnode->size = tnode->size;
-    strncpy(vnode->name, tnode->name, sizeof(vnode->name));
-
-    vnode->fs_data = NULL; // could be fs pointer if needed
-    vnode->fs_node_data = tnode;
-    vnode->ops = &tmpfs_ops;
-    vnode->fs_type = FS_TMPFS;
-    return vnode;
 }
 
 static enum errno tmpfs_read(struct vfs_node *node, void *buf, uint64_t size,
@@ -168,7 +150,7 @@ static enum errno tmpfs_symlink(struct vfs_node *parent, const char *target,
 
     if (err != ERR_OK)
         return err;
-    
+
     link->symlink_target = strdup(target);
     return ERR_OK;
 }
@@ -363,26 +345,42 @@ static struct vfs_node *tmpfs_finddir(struct vfs_node *node, const char *name) {
     return child ? tmpfs_create_vfs_node(child) : NULL;
 }
 
-struct vfs_ops tmpfs_ops = {.read = tmpfs_read,
-                            .write = tmpfs_write,
-                            .open = tmpfs_open,
-                            .close = tmpfs_close,
-                            .create = tmpfs_create,
-                            .mknod = tmpfs_mknod,
-                            .symlink = tmpfs_symlink,
-                            .mount = tmpfs_mount,
-                            .unmount = tmpfs_unmount,
-                            .stat = tmpfs_stat,
-                            .readdir = tmpfs_readdir,
-                            .mkdir = tmpfs_mkdir,
-                            .rmdir = tmpfs_rmdir,
-                            .unlink = tmpfs_unlink,
-                            .rename = tmpfs_rename,
-                            .truncate = tmpfs_truncate,
-                            .readlink = tmpfs_readlink,
-                            .link = tmpfs_link,
-                            .chmod = tmpfs_chmod,
-                            .chown = tmpfs_chown,
-                            .utime = tmpfs_utime,
-                            .destroy = tmpfs_destroy,
-                            .finddir = tmpfs_finddir};
+static const struct vfs_ops tmpfs_ops = {.read = tmpfs_read,
+                                         .write = tmpfs_write,
+                                         .open = tmpfs_open,
+                                         .close = tmpfs_close,
+                                         .create = tmpfs_create,
+                                         .mknod = tmpfs_mknod,
+                                         .symlink = tmpfs_symlink,
+                                         .mount = tmpfs_mount,
+                                         .unmount = tmpfs_unmount,
+                                         .stat = tmpfs_stat,
+                                         .readdir = tmpfs_readdir,
+                                         .mkdir = tmpfs_mkdir,
+                                         .rmdir = tmpfs_rmdir,
+                                         .unlink = tmpfs_unlink,
+                                         .rename = tmpfs_rename,
+                                         .truncate = tmpfs_truncate,
+                                         .readlink = tmpfs_readlink,
+                                         .link = tmpfs_link,
+                                         .chmod = tmpfs_chmod,
+                                         .chown = tmpfs_chown,
+                                         .utime = tmpfs_utime,
+                                         .destroy = tmpfs_destroy,
+                                         .finddir = tmpfs_finddir};
+
+struct vfs_node *tmpfs_create_vfs_node(struct tmpfs_node *tnode) {
+    struct vfs_node *vnode = kzalloc(sizeof(struct vfs_node));
+    if (!vnode || !tnode)
+        return NULL;
+
+    vnode->mode = tnode->mode;
+    vnode->size = tnode->size;
+    strncpy(vnode->name, tnode->name, sizeof(vnode->name));
+
+    vnode->fs_data = NULL; // could be fs pointer if needed
+    vnode->fs_node_data = tnode;
+    vnode->ops = &tmpfs_ops;
+    vnode->fs_type = FS_TMPFS;
+    return vnode;
+}

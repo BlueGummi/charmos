@@ -58,7 +58,7 @@ enum errno vfs_dummy_close(struct vfs_node *a) {
     return ERR_OK;
 }
 
-static struct vfs_ops ext2_vfs_ops = {
+static const struct vfs_ops ext2_vfs_ops = {
     .open = vfs_dummy_open,
     .close = vfs_dummy_close,
     .stat = ext2_vfs_stat,
@@ -240,6 +240,8 @@ static enum errno ext2_to_vfs_stat(struct ext2_full_inode *node,
     out->mtime = inode->mtime;
     out->size = inode->size;
     out->ctime = inode->ctime;
+    out->present_mask = 0xffff;
+
     return ERR_OK;
 }
 
@@ -294,10 +296,15 @@ static bool dir_entry_rename_callback(struct ext2_fs *fs,
     (void) c, (void) fs, (void) b, (void) e_num;
     struct rename_ctx *ctx = (struct rename_ctx *) ctx_ptr;
 
+    if (!ext2_dirent_valid(entry))
+        return false;
+    
     if (entry->inode != 0 &&
         memcmp(entry->name, ctx->old_name, entry->name_len) == 0 &&
         ctx->old_name[entry->name_len] == '\0') {
+
         memcpy(entry->name, ctx->new_name, strlen(ctx->new_name));
+        entry->name_len = strlen(ctx->new_name);
         ctx->success = true;
         return true;
     }

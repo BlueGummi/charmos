@@ -264,6 +264,8 @@ uint32_t ext2_get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
                                uint32_t block_index, uint32_t new_block_num,
                                bool allocate, bool *was_allocated);
 
+bool ext2_dirent_valid(struct ext2_dir_entry *entry);
+
 //
 //
 // Higher level stuff
