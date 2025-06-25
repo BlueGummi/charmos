@@ -40,6 +40,7 @@ enum errno ext2_vfs_unlink(struct vfs_node *n, const char *name);
 
 enum errno ext2_vfs_symlink(struct vfs_node *parent, const char *target,
                             const char *link_name);
+enum errno ext2_vfs_readlink(struct vfs_node *n, char *out_buf, uint64_t size);
 
 struct vfs_node *ext2_vfs_finddir(struct vfs_node *node, const char *fname);
 enum errno ext2_vfs_mkdir(struct vfs_node *n, const char *name, uint16_t mode);
@@ -72,6 +73,7 @@ static struct vfs_ops ext2_vfs_ops = {
     .create = ext2_vfs_create,
     .unlink = ext2_vfs_unlink,
     .symlink = ext2_vfs_symlink,
+    .readlink = ext2_vfs_readlink,
     .finddir = ext2_vfs_finddir,
     .readdir = ext2_vfs_readdir,
     .mkdir = ext2_vfs_mkdir,
@@ -486,6 +488,16 @@ enum errno ext2_vfs_symlink(struct vfs_node *parent, const char *target,
     struct ext2_fs *fs = parent->fs_data;
 
     return ext2_symlink_file(fs, dir, link_name, target);
+}
+
+enum errno ext2_vfs_readlink(struct vfs_node *n, char *out_buf, uint64_t size) {
+    if (!n || !out_buf || !size)
+        return ERR_INVAL;
+
+    struct ext2_full_inode *node = n->fs_node_data;
+    struct ext2_fs *fs = n->fs_data;
+
+    return ext2_readlink(fs, node, out_buf, size);
 }
 
 enum errno ext2_vfs_chmod(struct vfs_node *n, uint16_t mode) {

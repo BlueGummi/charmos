@@ -109,46 +109,6 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
                : ERR_FS_INTERNAL;
 }
 
-enum errno ext2_symlink_file(struct ext2_fs *fs,
-                             struct ext2_full_inode *dir_inode,
-                             const char *name, const char *target) {
-    uint32_t inode_num = ext2_alloc_inode(fs);
-    if (inode_num == 0)
-        return ERR_FS_NO_INODE;
-
-    struct ext2_inode new_inode = {0};
-    new_inode.ctime = time_get_unix();
-    new_inode.mode = EXT2_S_IFLNK;
-    new_inode.links_count = 1;
-    new_inode.size = strlen(target);
-    new_inode.blocks = 0;
-
-    if (strlen(target) <= sizeof(new_inode.block)) {
-        memcpy(new_inode.block, target, strlen(target));
-        new_inode.block[strlen(target)] = '\0';
-    } else {
-        uint32_t block = ext2_alloc_block(fs);
-        if (block == 0)
-            return ERR_FS_NO_INODE;
-
-        ext2_block_ptr_write(fs, block, target);
-        new_inode.block[0] = block;
-        new_inode.blocks = fs->block_size / fs->drive->sector_size;
-    }
-
-    if (!ext2_write_inode(fs, inode_num, &new_inode))
-        return ERR_FS_INTERNAL;
-
-    struct ext2_full_inode wrapped_inode = {
-        .inode_num = inode_num,
-        .node = new_inode,
-    };
-
-    enum errno ret = ext2_link_file(fs, dir_inode, &wrapped_inode,
-                                    (char *) name, EXT2_FT_SYMLINK);
-    return ret;
-}
-
 enum errno ext2_create_file(struct ext2_fs *fs,
                             struct ext2_full_inode *parent_dir,
                             const char *name, uint16_t mode) {

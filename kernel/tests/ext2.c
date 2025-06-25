@@ -32,6 +32,26 @@ REGISTER_TEST(ext2_chmod_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS;
 }
 
+REGISTER_TEST(ext2_symlink_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    EXT2_INIT;
+
+    enum errno e = root->ops->symlink(root, "/tmp", "ext2_symlink_test");
+    TEST_ASSERT(!ERR_IS_FATAL(e));
+
+    struct vfs_node *node = root->ops->finddir(root, "ext2_symlink_test");
+    TEST_ASSERT(node != NULL);
+
+    char *buf = kzalloc(5);
+    TEST_ASSERT(buf != NULL);
+
+    e = node->ops->readlink(node, buf, 4);
+    TEST_ASSERT(!ERR_IS_FATAL(e));
+
+    TEST_ASSERT(strcmp(buf, "/tmp") == 0);
+
+    SET_SUCCESS;
+}
+
 REGISTER_TEST(ext2_integration_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     EXT2_INIT;
 
