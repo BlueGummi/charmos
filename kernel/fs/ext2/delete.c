@@ -50,11 +50,9 @@ bool unlink_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
     return false;
 }
 
-/* TODO: the function works but the control flow is messy */
 enum errno ext2_unlink_file(struct ext2_fs *fs,
                             struct ext2_full_inode *dir_inode, const char *name,
                             bool free_blocks) {
-
     if (!ext2_dir_contains_file(fs, dir_inode, name))
         return ERR_NO_ENT;
 
@@ -62,14 +60,15 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
     if (!ext2_walk_dir(fs, dir_inode, unlink_callback, &ctx, false))
         return ERR_FS_INTERNAL;
 
-    // read dirent
     uint8_t *block = kzalloc(fs->block_size);
     if (!block)
         return ERR_NO_MEM;
 
+    enum errno err = ERR_OK;
+
     if (!ext2_block_ptr_read(fs, ctx.block_num, block)) {
-        kfree(block);
-        return ERR_FS_INTERNAL;
+        err = ERR_FS_INTERNAL;
+        goto cleanup;
     }
 
     struct ext2_dir_entry *entry =
@@ -78,7 +77,6 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
     if (ctx.entry_offset == 0) {
         struct ext2_dir_entry *next =
             (struct ext2_dir_entry *) ((uint8_t *) entry + entry->rec_len);
-
         if ((uint8_t *) next < block + fs->block_size && next->inode != 0) {
             next->rec_len += entry->rec_len;
         }
@@ -89,38 +87,43 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
     }
 
     if (!ext2_block_ptr_write(fs, ctx.block_num, block)) {
-        kfree(block);
-        return ERR_FS_INTERNAL;
+        err = ERR_FS_INTERNAL;
+        goto cleanup;
     }
-    kfree(block);
 
     struct ext2_full_inode target_inode;
-
-    if (!ext2_read_inode(fs, ctx.inode_num, &target_inode.node))
-        return ERR_FS_INTERNAL;
+    if (!ext2_read_inode(fs, ctx.inode_num, &target_inode.node)) {
+        err = ERR_FS_INTERNAL;
+        goto cleanup;
+    }
 
     if (target_inode.node.links_count == 0) {
-        return ERR_FS_NO_INODE;
+        err = ERR_FS_NO_INODE;
+        goto cleanup;
     }
 
     target_inode.inode_num = ctx.inode_num;
     target_inode.node.dtime = time_get_unix();
+    target_inode.node.links_count--;
 
-    if (--target_inode.node.links_count == 0) {
-        if (free_blocks) {
-            ext2_traverse_inode_blocks(fs, &target_inode.node,
-                                       free_block_visitor, NULL);
-            ext2_free_inode(fs, ctx.inode_num);
-        }
-        // else, just unlink but keep blocks allocated (for moves)
+    if (target_inode.node.links_count == 0 && free_blocks) {
+        ext2_traverse_inode_blocks(fs, &target_inode.node, free_block_visitor,
+                                   NULL);
+        ext2_free_inode(fs, ctx.inode_num);
     }
 
-    if (!ext2_write_inode(fs, ctx.inode_num, &target_inode.node))
-        return ERR_FS_INTERNAL;
+    if (!ext2_write_inode(fs, ctx.inode_num, &target_inode.node)) {
+        err = ERR_FS_INTERNAL;
+        goto cleanup;
+    }
 
     dir_inode->node.links_count--;
-    if (!ext2_write_inode(fs, dir_inode->inode_num, &dir_inode->node))
-        return ERR_FS_INTERNAL;
+    if (!ext2_write_inode(fs, dir_inode->inode_num, &dir_inode->node)) {
+        err = ERR_FS_INTERNAL;
+        goto cleanup;
+    }
 
-    return ERR_OK;
+cleanup:
+    kfree(block);
+    return err;
 }
