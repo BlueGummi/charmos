@@ -1,6 +1,7 @@
 #include <mutex.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
+#include <string.h>
 
 void thread_queue_init(struct thread_queue *q) {
     q->head = NULL;
@@ -36,42 +37,48 @@ struct thread *thread_queue_pop_front(struct thread_queue *q) {
 void mutex_init(struct mutex *m) {
     m->owner = NULL;
     thread_queue_init(&m->waiters);
+    memcpy(&m->lock, 0, sizeof(struct spinlock));
 }
 
 void mutex_lock(struct mutex *m) {
     struct thread *curr = scheduler_get_curr_thread();
 
-    // take ownership if unlocked
+    bool interrupts = spin_lock(&m->lock);
+
     if (m->owner == NULL) {
         m->owner = curr;
+        spin_unlock(&m->lock, interrupts);
         return;
     }
 
-    // already locked
-    while (m->owner != NULL) {
-        thread_queue_push_back(&m->waiters, curr);
-        curr->state = BLOCKED;
-        scheduler_yield();
-    }
+    thread_queue_push_back(&m->waiters, curr);
+    curr->state = BLOCKED;
 
-    // we now own the mutex
-    m->owner = curr;
+    spin_unlock(&m->lock, interrupts);
+    scheduler_yield();
+
+    mutex_lock(m);
 }
 
 void mutex_unlock(struct mutex *m) {
     struct thread *curr = scheduler_get_curr_thread();
 
+    bool interrupts = spin_lock(&m->lock);
+
     if (m->owner != curr) {
-        k_panic("mutex owner was not the current thread upon unlock");
+        spin_unlock(&m->lock, interrupts);
+        k_panic("mutex unlock by non-owner thread");
         return;
     }
 
     m->owner = NULL;
 
-    // wake up the next waiting thread, if any
     struct thread *next = thread_queue_pop_front(&m->waiters);
     if (next != NULL) {
+        m->owner = next;
         next->state = READY;
         scheduler_enqueue(next);
     }
+
+    spin_unlock(&m->lock, interrupts);
 }
