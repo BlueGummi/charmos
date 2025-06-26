@@ -17,7 +17,7 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
                                 uint32_t block_index) {
     uint32_t bpi = blocks_per_indirection(fs);
 
-    struct fs_cache_entry *ent;
+    struct block_cache_entry *ent;
 
     if (block_index < EXT2_NDIR_BLOCKS) {
         inode->block[block_index] = 0;

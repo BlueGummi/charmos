@@ -62,6 +62,7 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
         .dir_inode = dir_inode->inode_num,
         .type = type,
     };
+    struct generic_disk *d = fs->drive;
 
     if (ext2_dir_contains_file(fs, dir_inode, name))
         return ERR_NO_ENT;
@@ -76,7 +77,10 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
     if (new_block == 0)
         return ERR_NOSPC;
 
-    struct fs_cache_entry *ent = ext2_bcache_ent_create(fs, new_block, false);
+    uint32_t lba = ext2_block_to_lba(fs, new_block);
+    struct block_cache_entry *ent;
+    ent =
+        bcache_create_ent(d, lba, fs->block_size, fs->sectors_per_block, false);
     if (!ent)
         return ERR_IO;
 
@@ -90,10 +94,10 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
 
     memcpy(new_entry->name, name, new_entry->name_len);
 
-    bool status = ext2_bcache_insert(fs, new_block, ent);
+    bool status = bcache_insert(d, lba, ent);
     if (!status) {
-        ext2_bcache_evict(fs);
-        ext2_bcache_insert(fs, new_block, ent);
+        bcache_evict(d);
+        bcache_insert(d, lba, ent);
     }
 
     if (ext2_block_write(fs, ent)) {

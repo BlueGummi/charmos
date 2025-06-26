@@ -93,6 +93,8 @@ struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {
     d->read_sector = nvme_read_sector_wrapper;
     d->write_sector = nvme_write_sector_wrapper;
     d->print = nvme_print_wrapper;
+    d->cache = kmalloc(sizeof(struct block_cache));
+    block_cache_init(d->cache, DEFAULT_BLOCK_CACHE_SIZE);
     d->type = G_NVME_DRIVE;
     return d;
 }

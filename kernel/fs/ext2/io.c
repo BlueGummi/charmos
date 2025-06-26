@@ -5,53 +5,53 @@
 #include <stdint.h>
 #include <string.h>
 
+uint32_t ext2_block_to_lba(struct ext2_fs *fs, uint32_t block_num) {
+    if (!fs)
+        return -1;
+
+    struct generic_partition *p = fs->partition;
+
+    uint32_t base_lba = block_num * fs->sectors_per_block;
+    uint32_t lba = base_lba + p->start_lba;
+    return lba;
+}
+
 /* these should now return block cache entries */
-struct fs_cache_entry *ext2_block_read(struct ext2_fs *fs, uint32_t block_num) {
+struct block_cache_entry *ext2_block_read(struct ext2_fs *fs,
+                                          uint32_t block_num) {
     if (!fs)
         return NULL;
 
-    struct fs_cache_entry *ret = ext2_bcache_get(fs, block_num);
+    struct generic_disk *d = fs->drive;
 
-    if (ret)
-        return ret;
+    uint32_t lba = ext2_block_to_lba(fs, block_num);
+    uint32_t spb = fs->sectors_per_block;
 
-    ret = ext2_bcache_ent_create(fs, block_num, false);
-
-    bool status = ext2_bcache_insert(fs, block_num, ret);
-
-    /* insertion does not call eviction */
-    if (!status) {
-        ext2_bcache_evict(fs);
-        ext2_bcache_insert(fs, block_num, ret);
-    }
-
-    return ret;
+    return bcache_get(d, lba, fs->block_size, spb, false);
 }
 
-bool ext2_block_write(struct ext2_fs *fs, struct fs_cache_entry *ent) {
+bool ext2_block_write(struct ext2_fs *fs, struct block_cache_entry *ent) {
     if (!fs || !ent)
         return false;
 
     if (!ent->buffer)
         return false;
 
-    struct generic_partition *p = fs->partition;
     struct generic_disk *d = fs->drive;
 
-    uint32_t block_num = ent->number;
-    uint32_t base_lba = block_num * fs->sectors_per_block;
-    uint32_t lba = base_lba + p->start_lba;
-    uint32_t spb = fs->sectors_per_block;
     const uint8_t *buf = (const uint8_t *) ent->buffer;
 
+    uint32_t spb = fs->sectors_per_block;
+    
     /* this updates access times */
-    ext2_bcache_get(fs, block_num);
+    bcache_get(d, ent->lba, fs->block_size, spb, false);
 
-    return d->write_sector(d, lba, buf, spb);
+    return d->write_sector(d, ent->lba, buf, fs->sectors_per_block);
 }
 
-struct fs_cache_entry *ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
-                                       struct ext2_inode *inode_out) {
+struct block_cache_entry *ext2_inode_read(struct ext2_fs *fs,
+                                          uint32_t inode_idx,
+                                          struct ext2_inode *inode_out) {
     if (!fs || !inode_out || inode_idx == 0)
         return false;
 
@@ -74,7 +74,7 @@ struct fs_cache_entry *ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
     if (inode_idx == 0 || inode_idx > fs->sblock->inodes_count)
         return false;
 
-    struct fs_cache_entry *ent = ext2_block_read(fs, inode_block_num);
+    struct block_cache_entry *ent = ext2_block_read(fs, inode_block_num);
     if (!ent)
         return NULL;
 
@@ -98,7 +98,7 @@ bool ext2_inode_write(struct ext2_fs *fs, uint32_t inode_num,
     uint32_t block_index = offset / block_size;
 
     uint32_t inode_block_num = (inode_table_block + block_index);
-    struct fs_cache_entry *ent = ext2_block_read(fs, inode_block_num);
+    struct block_cache_entry *ent = ext2_block_read(fs, inode_block_num);
     if (!ent)
         return false;
 

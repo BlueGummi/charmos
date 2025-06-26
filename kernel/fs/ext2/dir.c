@@ -8,8 +8,7 @@
 #include <time/time.h>
 
 bool ext2_dirent_valid(struct ext2_dir_entry *entry) {
-    if (entry->inode == 0 || entry->rec_len < 8 || entry->name_len == 0 ||
-        entry->name_len > EXT2_NAME_LEN)
+    if (entry->inode == 0 || entry->rec_len < 8 || entry->name_len == 0)
         return false;
 
     return true;
@@ -59,7 +58,12 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     if (new_block == 0)
         return ERR_NOSPC;
 
-    struct fs_cache_entry *ent = ext2_bcache_ent_create(fs, new_block, false);
+    uint32_t lba = ext2_block_to_lba(fs, new_block);
+
+    struct block_cache_entry *ent;
+    ent = bcache_create_ent(fs->drive, lba, fs->block_size,
+                            fs->sectors_per_block, false);
+
     if (!ent)
         return ERR_IO;
 
@@ -100,7 +104,7 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
 
     uint32_t tmp = ext2_get_or_set_block(fs, &dir->node, 0, 0, false, NULL);
 
-    struct fs_cache_entry *ent = ext2_block_read(fs, tmp);
+    struct block_cache_entry *ent = ext2_block_read(fs, tmp);
 
     if (!ent)
         return ERR_IO;

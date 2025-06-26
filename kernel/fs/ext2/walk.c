@@ -6,7 +6,7 @@
 static bool walk_dir(struct ext2_fs *fs, uint32_t block_num,
                      dir_entry_callback callback, void *ctx) {
 
-    struct fs_cache_entry *ent = ext2_block_read(fs, block_num);
+    struct block_cache_entry *ent = ext2_block_read(fs, block_num);
     if (!ent)
         return false;
 
@@ -60,7 +60,7 @@ static bool walk_indirect(struct ext2_fs *fs, uint32_t block_num, int level,
     if (block_num == 0)
         return false;
 
-    struct fs_cache_entry *ent = ext2_block_read(fs, block_num);
+    struct block_cache_entry *ent = ext2_block_read(fs, block_num);
     if (!ent)
         return false;
 
@@ -121,7 +121,7 @@ static void traverse_indirect(struct ext2_fs *fs, struct ext2_inode *inode,
     if (depth <= 0 || block_num == 0)
         return;
 
-    struct fs_cache_entry *ent = ext2_block_read(fs, block_num);
+    struct block_cache_entry *ent = ext2_block_read(fs, block_num);
     if (!ent)
         return;
 

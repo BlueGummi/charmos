@@ -350,9 +350,6 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     fs->inode_size = sblock->inode_size;
     fs->block_size = 1024U << sblock->log_block_size;
 
-    fs->block_cache = kzalloc(sizeof(struct fs_cache));
-    fs_cache_init(fs->block_cache, EXT2_CACHE_BLOCKS);
-
     fs->sectors_per_block = fs->block_size / p->disk->sector_size;
 
     fs->num_groups =
@@ -363,8 +360,11 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
 
     fs->sblock_cache_ent = ext2_block_read(fs, superblock_block);
 
-    struct fs_cache_entry *gdt_ent =
-        ext2_bcache_ent_create(fs, gdt_block, true);
+    struct block_cache_entry *gdt_ent;
+
+    uint32_t lba = ext2_block_to_lba(fs, gdt_block);
+    gdt_ent = bcache_create_ent(fs->drive, lba, fs->block_size,
+                                fs->sectors_per_block, true);
 
     if (!gdt_ent)
         return ERR_IO;
