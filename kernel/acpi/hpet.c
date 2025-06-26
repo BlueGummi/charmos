@@ -107,11 +107,10 @@ static inline uint32_t hpet_get_fs_per_tick(void) {
 
 uint64_t hpet_timestamp_us(void) {
     uint64_t ticks = hpet_read64(HPET_MAIN_COUNTER_OFFSET);
-    uint64_t fs_total = ticks * (uint64_t)hpet_get_fs_per_tick();
+    uint64_t fs_total = ticks * (uint64_t) hpet_get_fs_per_tick();
     return fs_total / 1000000000ULL; // 1 us = 1e9 fs
 }
 
 uint64_t hpet_timestamp_ms(void) {
     return hpet_timestamp_us() / 1000;
 }
-

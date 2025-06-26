@@ -32,9 +32,9 @@ static uint32_t ext2_get_block(struct ext2_fs *fs, uint32_t block_num,
 
         allocated_this_level = true;
         memset(block, 0, fs->block_size);
-        ext2_block_ptr_write(fs, block_num, (uint8_t *) block);
+        ext2_block_write(fs, block_num, (uint8_t *) block);
     } else {
-        ext2_block_ptr_read(fs, block_num, (uint8_t *) block);
+        ext2_block_read(fs, block_num, (uint8_t *) block);
     }
 
     uint32_t index = block_index;
@@ -51,7 +51,7 @@ static uint32_t ext2_get_block(struct ext2_fs *fs, uint32_t block_num,
 
     if (result && block[entry_index] == 0 && allocate) {
         block[entry_index] = result;
-        ext2_block_ptr_write(fs, block_num, (uint8_t *) block);
+        ext2_block_write(fs, block_num, (uint8_t *) block);
     } else if (allocated_this_level && result == 0) {
         ext2_free_block(fs, block_num);
     }

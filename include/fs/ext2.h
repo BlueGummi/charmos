@@ -238,10 +238,9 @@ typedef void (*ext2_block_visitor)(struct ext2_fs *fs, struct ext2_inode *inode,
 //
 //
 
-bool ext2_block_ptr_read(struct ext2_fs *fs, uint32_t block_num, void *buf);
+bool ext2_block_read(struct ext2_fs *fs, uint32_t block_num, void *buf);
 
-bool ext2_block_ptr_write(struct ext2_fs *fs, uint32_t block_num,
-                          const void *buf);
+bool ext2_block_write(struct ext2_fs *fs, uint32_t block_num, const void *buf);
 
 bool ext2_read_superblock(struct generic_partition *,
                           struct ext2_sblock *sblock);

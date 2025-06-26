@@ -30,7 +30,7 @@ enum errno ext2_symlink_file(struct ext2_fs *fs,
         if (block == 0)
             return ERR_FS_NO_INODE;
 
-        ext2_block_ptr_write(fs, block, target);
+        ext2_block_write(fs, block, target);
         new_inode.block[0] = block;
         new_inode.blocks = fs->block_size / fs->drive->sector_size;
     }
@@ -75,7 +75,7 @@ enum errno ext2_readlink(struct ext2_fs *fs, struct ext2_full_inode *node,
     if (!block)
         return ERR_NO_MEM;
 
-    ext2_block_ptr_read(fs, first_block, block);
+    ext2_block_read(fs, first_block, block);
 
     if (!block)
         return ERR_IO;

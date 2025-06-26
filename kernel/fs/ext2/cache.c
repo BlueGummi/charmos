@@ -18,5 +18,3 @@ bool ext2_bcache_insert(struct ext2_fs *fs, uint64_t block_num,
                         struct fs_cache_entry *ent) {
     return fs_cache_insert(fs->block_cache, block_num, ent);
 }
-
-

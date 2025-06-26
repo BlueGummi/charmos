@@ -111,11 +111,11 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
     enum errno err = ERR_OK;
     struct ext2_full_inode target_inode;
 
-    TRY(ext2_block_ptr_read(fs, ctx.block_num, block));
+    TRY(ext2_block_read(fs, ctx.block_num, block));
 
     unlink_adjust_neighbors(fs, block, ctx.entry_offset, ctx.prev_offset);
 
-    TRY(ext2_block_ptr_write(fs, ctx.block_num, block));
+    TRY(ext2_block_write(fs, ctx.block_num, block));
     TRY(ext2_inode_read(fs, ctx.inode_num, &target_inode.node));
 
     if (target_inode.node.links_count == 0)

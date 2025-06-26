@@ -45,9 +45,9 @@ enum errno ext2_write_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
         if (!block_buf)
             return ERR_NO_MEM;
 
-        ext2_block_ptr_read(fs, block_num, block_buf);
+        ext2_block_read(fs, block_num, block_buf);
         memcpy(block_buf + block_offset, src + bytes_written, to_write);
-        ext2_block_ptr_write(fs, block_num, block_buf);
+        ext2_block_write(fs, block_num, block_buf);
 
         kfree(block_buf);
 
@@ -92,7 +92,7 @@ static void file_read_visitor(struct ext2_fs *fs, struct ext2_inode *inode,
     if (!block_buf)
         return;
 
-    if (!ext2_block_ptr_read(fs, *block_ptr, block_buf)) {
+    if (!ext2_block_read(fs, *block_ptr, block_buf)) {
         kfree(block_buf);
         return;
     }

@@ -33,14 +33,13 @@ bool ext2_read_superblock(struct generic_partition *p,
 bool ext2_write_superblock(struct ext2_fs *fs) {
     uint32_t superblock_block = 1;
 
-    return ext2_block_ptr_write(fs, superblock_block, (uint8_t *) fs->sblock);
+    return ext2_block_write(fs, superblock_block, (uint8_t *) fs->sblock);
 }
 
 bool ext2_write_group_desc(struct ext2_fs *fs) {
     uint32_t group_desc_block = (fs->block_size == 1024) ? 2 : 1;
 
-    return ext2_block_ptr_write(fs, group_desc_block,
-                                (uint8_t *) fs->group_desc);
+    return ext2_block_write(fs, group_desc_block, (uint8_t *) fs->group_desc);
 }
 
 struct vfs_node *ext2_g_mount(struct generic_partition *p) {

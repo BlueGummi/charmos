@@ -367,7 +367,7 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     if (!fs->group_desc)
         return ERR_NO_MEM;
 
-    if (!ext2_block_ptr_read(fs, gdt_block, (uint8_t *) fs->group_desc)) {
+    if (!ext2_block_read(fs, gdt_block, (uint8_t *) fs->group_desc)) {
         kfree(fs->group_desc);
         return ERR_IO;
     }

@@ -33,7 +33,7 @@ void lapic_timer_disable() {
 
 void lapic_timer_enable() {
     uint32_t lvt = LAPIC_REG(LAPIC_REG_LVT_TIMER);
-    lvt &= ~LAPIC_LVT_MASK;  
+    lvt &= ~LAPIC_LVT_MASK;
     LAPIC_REG(LAPIC_REG_LVT_TIMER) = lvt;
 }
 

@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <string.h>
 
-bool ext2_block_ptr_read(struct ext2_fs *fs, uint32_t block_num, void *buf) {
+bool ext2_block_read(struct ext2_fs *fs, uint32_t block_num, void *buf) {
     if (!fs || !buf)
         return false;
 
@@ -44,7 +44,7 @@ bool ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
     if (!buf || inode_idx == 0 || inode_idx > fs->sblock->inodes_count)
         return false;
 
-    if (!ext2_block_ptr_read(fs, inode_block_num, buf)) {
+    if (!ext2_block_read(fs, inode_block_num, buf)) {
         kfree(buf);
         return false;
     }
@@ -55,8 +55,7 @@ bool ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
     return true;
 }
 
-bool ext2_block_ptr_write(struct ext2_fs *fs, uint32_t block_num,
-                          const void *buf) {
+bool ext2_block_write(struct ext2_fs *fs, uint32_t block_num, const void *buf) {
     if (!fs || !buf)
         return false;
 
@@ -86,14 +85,14 @@ bool ext2_inode_write(struct ext2_fs *fs, uint32_t inode_num,
 
     uint32_t inode_block_num = (inode_table_block + block_index);
 
-    if (!ext2_block_ptr_read(fs, inode_block_num, block_buf)) {
+    if (!ext2_block_read(fs, inode_block_num, block_buf)) {
         kfree(block_buf);
         return false;
     }
 
     memcpy(block_buf + block_offset, inode, fs->inode_size);
 
-    bool status = ext2_block_ptr_write(fs, inode_block_num, block_buf);
+    bool status = ext2_block_write(fs, inode_block_num, block_buf);
     kfree(block_buf);
     return status;
 }

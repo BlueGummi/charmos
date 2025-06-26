@@ -9,7 +9,7 @@ static bool walk_dir(struct ext2_fs *fs, uint32_t block_num,
     if (!dir_buf)
         return false;
 
-    if (!ext2_block_ptr_read(fs, block_num, dir_buf)) {
+    if (!ext2_block_read(fs, block_num, dir_buf)) {
         kfree(dir_buf);
         return false;
     }
@@ -32,7 +32,7 @@ static bool walk_dir(struct ext2_fs *fs, uint32_t block_num,
     }
 
     if (modified) {
-        ext2_block_ptr_write(fs, block_num, dir_buf);
+        ext2_block_write(fs, block_num, dir_buf);
     }
 
     kfree(dir_buf);
@@ -65,7 +65,7 @@ static bool walk_indirect(struct ext2_fs *fs, uint32_t block_num, int level,
         return false;
 
     uint32_t ptrs[PTRS_PER_BLOCK];
-    if (!ext2_block_ptr_read(fs, block_num, ptrs))
+    if (!ext2_block_read(fs, block_num, ptrs))
         return false;
 
     for (uint32_t i = 0; i < PTRS_PER_BLOCK; ++i) {
@@ -74,7 +74,7 @@ static bool walk_indirect(struct ext2_fs *fs, uint32_t block_num, int level,
             inode->node.blocks += fs->block_size / fs->drive->sector_size;
             inode->node.size += fs->block_size;
 
-            if (!ext2_block_ptr_write(fs, block_num, ptrs))
+            if (!ext2_block_write(fs, block_num, ptrs))
                 return false;
             return true;
         }
@@ -127,7 +127,7 @@ static void traverse_indirect(struct ext2_fs *fs, struct ext2_inode *inode,
     if (!block)
         return;
 
-    ext2_block_ptr_read(fs, block_num, (uint8_t *) block);
+    ext2_block_read(fs, block_num, (uint8_t *) block);
 
     for (uint32_t i = 0; i < fs->block_size / sizeof(uint32_t); i++) {
         if (block[i] || depth == 1) {
@@ -140,7 +140,7 @@ static void traverse_indirect(struct ext2_fs *fs, struct ext2_inode *inode,
         }
     }
 
-    ext2_block_ptr_write(fs, block_num, (uint8_t *) block);
+    ext2_block_write(fs, block_num, (uint8_t *) block);
     kfree(block);
 }
 

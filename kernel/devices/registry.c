@@ -175,11 +175,11 @@ void registry_setup() {
                     k_panic("VFS failed to mount root '%s' - mount failure\n",
                             g_root_part);
                 g_root_node = root;
-                
-                //root->ops->create(root, "BLAH", VFS_MODE_FILE);                
+
+                // root->ops->create(root, "BLAH", VFS_MODE_FILE);
                 root->ops->mkdir(root, "tmp", VFS_MODE_DIR);
-                /*struct vfs_node *tmp_on_ext2 = root->ops->finddir(root, "tmp");
-                struct vfs_node *tmpfs_root = tmpfs_mkroot("tmp");
+                /*struct vfs_node *tmp_on_ext2 = root->ops->finddir(root,
+                "tmp"); struct vfs_node *tmpfs_root = tmpfs_mkroot("tmp");
 
                 root->ops->mount(tmp_on_ext2, tmpfs_root);
                 */
