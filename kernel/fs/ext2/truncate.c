@@ -17,19 +17,20 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
                                 uint32_t block_index) {
     uint32_t bpi = blocks_per_indirection(fs);
 
+    struct fs_cache_entry *ent;
+
     if (block_index < EXT2_NDIR_BLOCKS) {
         inode->block[block_index] = 0;
 
     } else if (block_index < EXT2_NDIR_BLOCKS + bpi) {
         if (inode->block[EXT2_IND_BLOCK]) {
-            uint32_t *ind = kmalloc(fs->block_size);
-            if (!ind)
+            ent = ext2_block_read(fs, inode->block[EXT2_IND_BLOCK]);
+            if (!ent)
                 return;
 
-            ext2_block_read(fs, inode->block[EXT2_IND_BLOCK], (uint8_t *) ind);
+            uint32_t *ind = (uint32_t *) ent->buffer;
             ind[block_index - EXT2_NDIR_BLOCKS] = 0;
-            ext2_block_write(fs, inode->block[EXT2_IND_BLOCK], (uint8_t *) ind);
-            kfree(ind);
+            ext2_block_write(fs, ent);
         }
 
     } else if (block_index < EXT2_NDIR_BLOCKS + bpi + bpi * bpi) {
@@ -38,23 +39,22 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
         uint32_t ind2 = dbl_index % bpi;
 
         if (inode->block[EXT2_DIND_BLOCK]) {
-            uint32_t *dind = kmalloc(fs->block_size);
-            if (!dind)
+
+            ent = ext2_block_read(fs, inode->block[EXT2_DIND_BLOCK]);
+            if (!ent)
                 return;
 
-            ext2_block_read(fs, inode->block[EXT2_DIND_BLOCK],
-                            (uint8_t *) dind);
+            uint32_t *dind = (uint32_t *) ent->buffer;
+
             if (dind[ind1]) {
-                uint32_t *ind = kmalloc(fs->block_size);
-                if (!ind)
+                ent = ext2_block_read(fs, dind[ind1]);
+                if (!ent)
                     return;
 
-                ext2_block_read(fs, dind[ind1], (uint8_t *) ind);
+                uint32_t *ind = (uint32_t *) ent->buffer;
                 ind[ind2] = 0;
-                ext2_block_write(fs, dind[ind1], (uint8_t *) ind);
-                kfree(ind);
+                ext2_block_write(fs, ent);
             }
-            kfree(dind);
         }
 
     } else {
@@ -65,31 +65,27 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
         uint32_t ind3 = rem % bpi;
 
         if (inode->block[EXT2_TIND_BLOCK]) {
-            uint32_t *tind = kmalloc(fs->block_size);
-            if (!tind)
+
+            ent = ext2_block_read(fs, inode->block[EXT2_TIND_BLOCK]);
+            if (!ent)
                 return;
 
-            ext2_block_read(fs, inode->block[EXT2_TIND_BLOCK],
-                            (uint8_t *) tind);
+            uint32_t *tind = (uint32_t *) ent->buffer;
+
             if (tind[ind1]) {
-                uint32_t *dind = kmalloc(fs->block_size);
-                if (!dind)
+                ent = ext2_block_read(fs, tind[ind1]);
+                if (!ent)
                     return;
 
-                ext2_block_read(fs, tind[ind1], (uint8_t *) dind);
-                if (dind[ind2]) {
-                    uint32_t *ind = kmalloc(fs->block_size);
-                    if (!ind)
-                        return;
+                uint32_t *dind = (uint32_t *) ent->buffer;
 
-                    ext2_block_read(fs, dind[ind2], (uint8_t *) ind);
+                if (dind[ind2]) {
+                    ent = ext2_block_read(fs, dind[ind2]);
+                    uint32_t *ind = (uint32_t *) ent->buffer;
                     ind[ind3] = 0;
-                    ext2_block_write(fs, dind[ind2], (uint8_t *) ind);
-                    kfree(ind);
+                    ext2_block_write(fs, ent);
                 }
-                kfree(dind);
             }
-            kfree(tind);
         }
     }
 }

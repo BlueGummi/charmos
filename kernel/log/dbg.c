@@ -79,7 +79,7 @@ void debug_print_stack() {
 
     __asm__ volatile("mov %%rsp, %0" : "=r"(rsp));
 
-    for (int i = 0; i < 64; i++) {
+    for (int i = 0; i < 256; i++) {
         uint64_t addr = rsp[i];
         if (addr < 0xffffffff80000000)
             continue;

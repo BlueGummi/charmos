@@ -76,10 +76,11 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
     if (new_block == 0)
         return ERR_NOSPC;
 
-    uint8_t *block_data = kzalloc(fs->block_size);
-    if (!block_data)
-        return ERR_NO_MEM;
+    struct fs_cache_entry *ent = ext2_bcache_ent_create(fs, new_block, false);
+    if (!ent)
+        return ERR_IO;
 
+    uint8_t *block_data = ent->buffer;
     struct ext2_dir_entry *new_entry = (struct ext2_dir_entry *) block_data;
 
     new_entry->inode = inode->inode_num;
@@ -89,7 +90,13 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
 
     memcpy(new_entry->name, name, new_entry->name_len);
 
-    if (ext2_block_write(fs, new_block, (uint32_t *) block_data)) {
+    bool status = ext2_bcache_insert(fs, new_block, ent);
+    if (!status) {
+        ext2_bcache_evict(fs);
+        ext2_bcache_insert(fs, new_block, ent);
+    }
+
+    if (ext2_block_write(fs, ent)) {
         if (!ext2_walk_dir(fs, dir_inode, nop_callback, &new_block, true)) {
             ext2_free_block(fs, new_block);
             return ERR_FS_INTERNAL;
@@ -97,9 +104,6 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
     } else {
         return ERR_FS_INTERNAL;
     }
-
-    /* allocated new block */
-    kfree(block_data);
 
 done:
     if (increment_links)

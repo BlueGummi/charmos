@@ -342,7 +342,6 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
 
     sblock->mtime = time_get_unix();
     sblock->wtime = time_get_unix();
-    struct generic_disk *disk = p->disk;
     fs->drive = p->disk;
     fs->partition = p;
     fs->sblock = sblock;
@@ -352,25 +351,30 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     fs->block_size = 1024U << sblock->log_block_size;
 
     fs->block_cache = kzalloc(sizeof(struct fs_cache));
-    fs->inode_cache = kzalloc(sizeof(struct fs_cache));
     fs_cache_init(fs->block_cache, EXT2_CACHE_BLOCKS);
-    fs_cache_init(fs->inode_cache, EXT2_CACHE_INODES);
 
     fs->sectors_per_block = fs->block_size / p->disk->sector_size;
 
     fs->num_groups =
         (fs->inodes_count + fs->inodes_per_group - 1) / fs->inodes_per_group;
 
+    uint32_t superblock_block = 1024 / fs->block_size;
     uint32_t gdt_block = (fs->block_size == 1024) ? 2 : 1;
 
-    fs->group_desc = kmalloc(fs->block_size);
-    if (!fs->group_desc)
-        return ERR_NO_MEM;
+    fs->sblock_cache_ent = ext2_block_read(fs, superblock_block);
 
-    if (!ext2_block_read(fs, gdt_block, (uint8_t *) fs->group_desc)) {
-        kfree(fs->group_desc);
+    struct fs_cache_entry *gdt_ent =
+        ext2_bcache_ent_create(fs, gdt_block, true);
+
+    if (!gdt_ent)
         return ERR_IO;
-    }
+
+    fs->group_desc = (struct ext2_group_desc *) gdt_ent->buffer;
+    gdt_ent = ext2_block_read(fs, gdt_block);
+    fs->gdesc_cache_ent = gdt_ent;
+
+    if (!gdt_ent)
+        return ERR_IO;
 
     struct ext2_inode *inode = kzalloc(sizeof(struct ext2_inode));
     struct ext2_full_inode *f = kzalloc(sizeof(struct ext2_full_inode));

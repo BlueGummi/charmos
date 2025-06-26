@@ -6,7 +6,6 @@
 
 extern uint64_t PTRS_PER_BLOCK;
 #define EXT2_CACHE_BLOCKS 2048
-#define EXT2_CACHE_INODES 1024
 
 #define EXT2_NBLOCKS 15
 #define EXT2_SUPERBLOCK_OFFSET 1024
@@ -214,7 +213,8 @@ struct ext2_fs {
     struct ext2_sblock *sblock;
     struct ext2_group_desc *group_desc;
     struct fs_cache *block_cache;
-    struct fs_cache *inode_cache;
+    struct fs_cache_entry *sblock_cache_ent;
+    struct fs_cache_entry *gdesc_cache_ent;
     uint32_t num_groups;
     uint32_t inodes_count;
     uint32_t inodes_per_group;
@@ -238,9 +238,9 @@ typedef void (*ext2_block_visitor)(struct ext2_fs *fs, struct ext2_inode *inode,
 //
 //
 
-bool ext2_block_read(struct ext2_fs *fs, uint32_t block_num, void *buf);
+struct fs_cache_entry *ext2_block_read(struct ext2_fs *fs, uint32_t block_num);
 
-bool ext2_block_write(struct ext2_fs *fs, uint32_t block_num, const void *buf);
+bool ext2_block_write(struct ext2_fs *fs, struct fs_cache_entry *ent);
 
 bool ext2_read_superblock(struct generic_partition *,
                           struct ext2_sblock *sblock);
@@ -253,8 +253,8 @@ enum errno ext2_mount(struct generic_partition *, struct ext2_fs *fs,
 
 struct vfs_node *ext2_g_mount(struct generic_partition *);
 
-bool ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
-                     struct ext2_inode *inode_out);
+struct fs_cache_entry *ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
+                                       struct ext2_inode *inode_out);
 
 bool ext2_inode_write(struct ext2_fs *fs, uint32_t inode_num,
                       const struct ext2_inode *inode);
@@ -268,12 +268,13 @@ uint32_t ext2_get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
 //
 //
 
-struct fs_cache_entry *ext2_icache_get(struct ext2_fs *fs, uint64_t inode_num);
 struct fs_cache_entry *ext2_bcache_get(struct ext2_fs *fs, uint64_t block_num);
-bool ext2_icache_insert(struct ext2_fs *fs, uint64_t inode_num,
-                        struct fs_cache_entry *ent);
 bool ext2_bcache_insert(struct ext2_fs *fs, uint64_t block_num,
                         struct fs_cache_entry *ent);
+bool ext2_bcache_evict(struct ext2_fs *fs);
+
+struct fs_cache_entry *
+ext2_bcache_ent_create(struct ext2_fs *fs, uint64_t block_num, bool no_evict);
 
 //
 //

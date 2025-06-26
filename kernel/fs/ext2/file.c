@@ -41,15 +41,14 @@ enum errno ext2_write_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
         if (to_write > size - bytes_written)
             to_write = size - bytes_written;
 
-        uint8_t *block_buf = kmalloc(fs->block_size);
-        if (!block_buf)
-            return ERR_NO_MEM;
+        struct fs_cache_entry *ent = ext2_block_read(fs, block_num);
+        if (!ent)
+            return ERR_IO;
 
-        ext2_block_read(fs, block_num, block_buf);
+        uint8_t *block_buf = ent->buffer;
+
         memcpy(block_buf + block_offset, src + bytes_written, to_write);
-        ext2_block_write(fs, block_num, block_buf);
-
-        kfree(block_buf);
+        ext2_block_write(fs, ent);
 
         bytes_written += to_write;
     }
@@ -88,20 +87,16 @@ static void file_read_visitor(struct ext2_fs *fs, struct ext2_inode *inode,
         return;
 
     uint32_t block_size = fs->block_size;
-    uint8_t *block_buf = kmalloc(block_size);
-    if (!block_buf)
+    struct fs_cache_entry *ent = ext2_block_read(fs, *block_ptr);
+    if (!ent)
         return;
 
-    if (!ext2_block_read(fs, *block_ptr, block_buf)) {
-        kfree(block_buf);
-        return;
-    }
+    uint8_t *block_buf = ent->buffer;
 
     uint32_t file_offset = ctx->bytes_read + ctx->offset;
     uint32_t block_offset = file_offset % block_size;
 
     if ((ctx->bytes_read + ctx->offset) >= inode->size) {
-        kfree(block_buf);
         return;
     }
 
@@ -114,7 +109,6 @@ static void file_read_visitor(struct ext2_fs *fs, struct ext2_inode *inode,
 
     memcpy(ctx->buffer + ctx->bytes_read, block_buf + block_offset, to_copy);
     ctx->bytes_read += to_copy;
-    kfree(block_buf);
 }
 
 enum errno ext2_read_file(struct ext2_fs *fs, struct ext2_full_inode *inode,

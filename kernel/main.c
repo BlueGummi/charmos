@@ -84,7 +84,7 @@ void k_main(void) {
 
     // IDT
     idt_alloc(c_cnt);
-    idt_install(0);
+    //    idt_install(0);
 
     // Early device init
     uacpi_init();

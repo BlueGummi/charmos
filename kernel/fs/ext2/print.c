@@ -1,7 +1,6 @@
 #include <console/printf.h>
 #include <devices/generic_disk.h>
 #include <fs/ext2.h>
-#include <stdint.h>
 #include <time/print.h>
 
 void ext2_print_inode(const struct ext2_full_inode *node) {

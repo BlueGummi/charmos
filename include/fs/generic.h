@@ -1,9 +1,13 @@
 #include <mutex.h>
+#include <spin_lock.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
+
 #pragma once
 #define MAX_CACHE_ENTRIES 1024
 
+/* must be allocated with malloc */
 struct fs_cache_entry {
     /* allocated upon new reads */
     uint8_t *buffer;
@@ -27,11 +31,11 @@ struct fs_cache_wrapper {
 
 struct fs_cache {
     struct fs_cache_wrapper *entries;
+    atomic_uint_fast64_t ticks;
     uint64_t capacity;
     uint64_t count;
+    struct spinlock lock;
 };
-
-#define FS_CACHE_INIT {0}
 
 static inline uint64_t fs_cache_hash(uint64_t x, uint64_t capacity) {
     x ^= x >> 30;
@@ -50,3 +54,12 @@ bool fs_cache_remove(struct fs_cache *cache, uint64_t key);
 void fs_cache_destroy(struct fs_cache *cache);
 void fs_cache_ent_unlock(struct fs_cache_entry *ent);
 void fs_cache_ent_lock(struct fs_cache_entry *ent);
+bool fs_cache_evict(struct fs_cache *cache);
+
+static inline void fs_cache_increment_ticks(struct fs_cache *cache) {
+    atomic_fetch_add(&cache->ticks, 1);
+}
+
+static inline uint64_t fs_cache_get_ticks(struct fs_cache *cache) {
+    return atomic_load(&cache->ticks);
+}

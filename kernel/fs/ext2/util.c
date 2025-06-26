@@ -13,28 +13,25 @@ static uint32_t ext2_get_block(struct ext2_fs *fs, uint32_t block_num,
     }
 
     uint32_t pointers_per_block = fs->block_size / sizeof(uint32_t);
-    uint32_t *block = kmalloc(fs->block_size);
-    if (!block)
-        return 0;
 
     bool allocated_this_level = false;
+    struct fs_cache_entry *ent = ext2_block_read(fs, block_num);
+    uint32_t *block = (uint32_t *) ent->buffer;
+
     if (block_num == 0) {
         if (!allocate) {
-            kfree(block);
             return 0;
         }
 
         block_num = ext2_alloc_block(fs);
         if (block_num == 0) {
-            kfree(block);
             return 0;
         }
 
         allocated_this_level = true;
+
         memset(block, 0, fs->block_size);
-        ext2_block_write(fs, block_num, (uint8_t *) block);
-    } else {
-        ext2_block_read(fs, block_num, (uint8_t *) block);
+        ext2_block_write(fs, ent);
     }
 
     uint32_t index = block_index;
@@ -51,12 +48,11 @@ static uint32_t ext2_get_block(struct ext2_fs *fs, uint32_t block_num,
 
     if (result && block[entry_index] == 0 && allocate) {
         block[entry_index] = result;
-        ext2_block_write(fs, block_num, (uint8_t *) block);
+        ext2_block_write(fs, ent);
     } else if (allocated_this_level && result == 0) {
         ext2_free_block(fs, block_num);
     }
 
-    kfree(block);
     return result;
 }
 
