@@ -68,23 +68,26 @@ void mutex_lock(struct mutex *m) {
 void mutex_unlock(struct mutex *m) {
     struct thread *curr = scheduler_get_curr_thread();
 
-    bool interrupts = spin_lock(&m->lock);
+    spin_lock(&m->lock);
 
     if (m->owner != curr) {
-        spin_unlock(&m->lock, interrupts);
         k_panic("mutex unlock by non-owner thread");
-        return;
     }
 
-    k_printf("core %u unlocked the mutex\n", get_sch_core_id());
     m->owner = NULL;
 
+    k_printf("core %u unlocked the mutex\n", get_sch_core_id());
     struct thread *next = thread_queue_pop_front(&m->waiters);
     if (next != NULL) {
+        int64_t next_core = next->curr_core;
+        k_printf(
+            "core %u says: a waiter which was last ran on core %u is ready\n",
+            get_sch_core_id(), next_core);
         next->state = READY;
-        k_printf("another thread has been marked as ready\n");
-        scheduler_enqueue(next);
+        scheduler_add_thread(local_schs[next_core], next, false, false, false);
+    } else {
+        k_printf("core %u says: no more waiters\n", get_sch_core_id());
     }
 
-    spin_unlock(&m->lock, interrupts);
+    spin_unlock(&m->lock, true);
 }

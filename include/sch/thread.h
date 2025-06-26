@@ -26,7 +26,7 @@ struct thread {
     struct thread *next;
     struct thread *prev;
     enum thread_state state;
-    int64_t curr_thread;    // -1 if not being ran
+    int64_t curr_core;    // -1 if not being ran
     uint8_t mlfq_level;     // Current priority level
     uint64_t time_in_level; // Ticks at this level
 };

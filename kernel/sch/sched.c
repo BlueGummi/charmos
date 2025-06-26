@@ -49,9 +49,14 @@ void k_sch_idle() {
 struct mutex k_mutex_test_mutex = {0};
 void k_mutex_test() {
     mutex_init(&k_mutex_test_mutex);
+    asm("cli");
     mutex_lock(&k_mutex_test_mutex);
-    for (uint64_t i = 0; i < 50; i++) {}
+    for (uint64_t i = 0; i < 50; i++) {
+        asm volatile("");
+    }
     mutex_unlock(&k_mutex_test_mutex);
+    asm("sti");
+
     while (1) {
         asm volatile("hlt");
     }
@@ -86,27 +91,23 @@ static inline void stop_steal(struct scheduler *sched,
 static void scheduler_save_thread(struct scheduler *sched, struct thread *curr,
                                   struct cpu_state *cpu) {
     if (curr && curr->state == RUNNING) {
-
         memcpy(&curr->regs, cpu, sizeof(struct cpu_state));
-        curr->state = READY;
-        curr->time_in_level++;
 
+        curr->curr_core = -1;
+        curr->time_in_level++;
         uint8_t level = curr->mlfq_level;
-        uint64_t timeslice = 1ULL << level; // TODO: Statically calculate these
+        uint64_t timeslice = 1ULL << level;
 
         if (curr->time_in_level >= timeslice) {
             curr->time_in_level = 0;
-
-            // Demote if not at lowest level
-            if (level < MLFQ_LEVELS - 1) {
+            if (level < MLFQ_LEVELS - 1)
                 curr->mlfq_level++;
-            }
         }
 
-        /* Re-insert the thread into its new level
-         * `false, true` here says, do NOT change interrupt status,
-         * and the resource is already locked */
-        scheduler_add_thread(sched, curr, false, true, false);
+        if (curr->state == RUNNING) {
+            curr->state = READY;
+            scheduler_add_thread(sched, curr, false, true, false);
+        }
     }
 }
 
@@ -168,6 +169,7 @@ static void load_thread(struct scheduler *sched, struct thread *next,
         sched->current = next;
         memcpy(cpu, &next->regs, sizeof(struct cpu_state));
         next->state = RUNNING;
+        next->curr_core = get_sch_core_id();
     } else {
         sched->current = NULL;
     }
@@ -181,7 +183,7 @@ void scheduler_yield() {
     asm volatile("int $0x20");
 }
 
-void sch_enable_timeslice() {
+void scheduler_enable_timeslice() {
     lapic_timer_enable();
 }
 
@@ -262,11 +264,13 @@ load_new_thread:
     update_core_current_thread(next);
 
     if (!next) {
+        k_printf("scheduler disabled timeslices\n");
         disable_timeslice();
         goto end;
     }
 
     if (all_threads_unrunnable(sched) && next->state == IDLE_THREAD) {
+        k_printf("scheduler disabled timeslices\n");
         disable_timeslice();
     }
 
