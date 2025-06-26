@@ -238,13 +238,7 @@ typedef void (*ext2_block_visitor)(struct ext2_fs *fs, struct ext2_inode *inode,
 //
 //
 
-bool ext2_block_read(struct generic_partition *, uint32_t lba, uint8_t *buffer,
-                     uint32_t sector_count);
-
 bool ext2_block_ptr_read(struct ext2_fs *fs, uint32_t block_num, void *buf);
-
-bool ext2_block_write(struct generic_partition *, uint32_t lba,
-                      const uint8_t *buffer, uint32_t sector_count);
 
 bool ext2_block_ptr_write(struct ext2_fs *fs, uint32_t block_num,
                           const void *buf);
@@ -260,15 +254,27 @@ enum errno ext2_mount(struct generic_partition *, struct ext2_fs *fs,
 
 struct vfs_node *ext2_g_mount(struct generic_partition *);
 
-bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
+bool ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
                      struct ext2_inode *inode_out);
 
-bool ext2_write_inode(struct ext2_fs *fs, uint32_t inode_num,
+bool ext2_inode_write(struct ext2_fs *fs, uint32_t inode_num,
                       const struct ext2_inode *inode);
 
 uint32_t ext2_get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
                                uint32_t block_index, uint32_t new_block_num,
                                bool allocate, bool *was_allocated);
+//
+//
+// FS cache operations
+//
+//
+
+struct fs_cache_entry *ext2_icache_get(struct ext2_fs *fs, uint64_t inode_num);
+struct fs_cache_entry *ext2_bcache_get(struct ext2_fs *fs, uint64_t block_num);
+bool ext2_icache_insert(struct ext2_fs *fs, uint64_t inode_num,
+                        struct fs_cache_entry *ent);
+bool ext2_bcache_insert(struct ext2_fs *fs, uint64_t block_num,
+                        struct fs_cache_entry *ent);
 
 //
 //

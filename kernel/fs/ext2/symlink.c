@@ -35,7 +35,7 @@ enum errno ext2_symlink_file(struct ext2_fs *fs,
         new_inode.blocks = fs->block_size / fs->drive->sector_size;
     }
 
-    if (!ext2_write_inode(fs, inode_num, &new_inode))
+    if (!ext2_inode_write(fs, inode_num, &new_inode))
         return ERR_FS_INTERNAL;
 
     struct ext2_full_inode wrapped_inode = {

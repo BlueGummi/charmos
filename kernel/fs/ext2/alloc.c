@@ -162,7 +162,7 @@ bool ext2_free_inode(struct ext2_fs *fs, uint32_t inode_num) {
     ext2_write_superblock(fs);
 
     struct ext2_inode empty = {0};
-    ext2_write_inode(fs, inode_num + 1, &empty);
+    ext2_inode_write(fs, inode_num + 1, &empty);
 
     return true;
 }

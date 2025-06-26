@@ -48,7 +48,7 @@ static bool walk_direct_blocks(struct ext2_fs *fs,
             inode->node.block[i] = *(uint32_t *) ctx;
             inode->node.blocks += fs->block_size / fs->drive->sector_size;
             inode->node.size += fs->block_size;
-            ext2_write_inode(fs, inode->node.block[i], &inode->node);
+            ext2_inode_write(fs, inode->node.block[i], &inode->node);
             return true;
         }
 

@@ -342,6 +342,7 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
 
     sblock->mtime = time_get_unix();
     sblock->wtime = time_get_unix();
+    struct generic_disk *disk = p->disk;
     fs->drive = p->disk;
     fs->partition = p;
     fs->sblock = sblock;
@@ -362,16 +363,11 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
 
     uint32_t gdt_block = (fs->block_size == 1024) ? 2 : 1;
 
-    uint32_t gdt_bytes = fs->num_groups * sizeof(struct ext2_group_desc);
-    uint32_t gdt_blocks = (gdt_bytes + fs->block_size - 1) / fs->block_size;
-
-    fs->group_desc = kmalloc(gdt_blocks * fs->block_size);
+    fs->group_desc = kmalloc(fs->block_size);
     if (!fs->group_desc)
         return ERR_NO_MEM;
 
-    if (!ext2_block_read(fs->partition, gdt_block * fs->sectors_per_block,
-                         (uint8_t *) fs->group_desc,
-                         gdt_blocks * fs->sectors_per_block)) {
+    if (!ext2_block_ptr_read(fs, gdt_block, (uint8_t *) fs->group_desc)) {
         kfree(fs->group_desc);
         return ERR_IO;
     }
@@ -381,7 +377,7 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     if (!f || !inode)
         return ERR_NO_MEM;
 
-    if (!ext2_read_inode(fs, EXT2_ROOT_INODE, inode)) {
+    if (!ext2_inode_read(fs, EXT2_ROOT_INODE, inode)) {
         return ERR_IO;
     }
 
@@ -578,7 +574,7 @@ enum errno ext2_vfs_utime(struct vfs_node *n, uint64_t atime, uint64_t mtime) {
     struct ext2_inode *inode = &node->node;
     inode->atime = atime;
     inode->mtime = mtime;
-    if (!ext2_write_inode(fs, node->inode_num, inode))
+    if (!ext2_inode_write(fs, node->inode_num, inode))
         return ERR_FS_INTERNAL;
 
     n->atime = atime;

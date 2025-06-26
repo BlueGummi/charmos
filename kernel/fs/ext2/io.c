@@ -5,30 +5,20 @@
 #include <stdint.h>
 #include <string.h>
 
-bool ext2_block_read(struct generic_partition *p, uint32_t lba, uint8_t *buffer,
-                     uint32_t sector_count) {
-    if (!buffer)
-        return false;
-
-    struct generic_disk *d = p->disk;
-
-    if (!d->read_sector(d, lba + p->start_lba, buffer, sector_count)) {
-        return false;
-    }
-
-    return true;
-}
-
 bool ext2_block_ptr_read(struct ext2_fs *fs, uint32_t block_num, void *buf) {
     if (!fs || !buf)
         return false;
 
     uint32_t lba = block_num * fs->sectors_per_block;
-    return ext2_block_read(fs->partition, lba, (uint8_t *) buf,
-                           fs->sectors_per_block);
+
+    struct generic_partition *p = fs->partition;
+    struct generic_disk *d = fs->drive;
+
+    return d->read_sector(d, lba + p->start_lba, (uint8_t *) buf,
+                          fs->sectors_per_block);
 }
 
-bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
+bool ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
                      struct ext2_inode *inode_out) {
     if (!fs || !inode_out || inode_idx == 0)
         return false;
@@ -48,15 +38,13 @@ bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
     uint32_t offset_in_block = offset_bytes % fs->block_size;
 
     uint32_t inode_block_num = inode_table_block + block_offset;
-    uint32_t inode_lba = inode_block_num * fs->sectors_per_block;
 
     uint8_t *buf = kmalloc(fs->block_size);
 
     if (!buf || inode_idx == 0 || inode_idx > fs->sblock->inodes_count)
         return false;
 
-    if (!ext2_block_read(fs->partition, inode_lba, buf,
-                         fs->sectors_per_block)) {
+    if (!ext2_block_ptr_read(fs, inode_block_num, buf)) {
         kfree(buf);
         return false;
     }
@@ -67,30 +55,20 @@ bool ext2_read_inode(struct ext2_fs *fs, uint32_t inode_idx,
     return true;
 }
 
-bool ext2_block_write(struct generic_partition *p, uint32_t lba,
-                      const uint8_t *buffer, uint32_t sector_count) {
-    if (!buffer)
-        return false;
-
-    struct generic_disk *d = p->disk;
-
-    if (!d->write_sector(d, lba + p->start_lba, buffer, sector_count)) {
-        return false;
-    }
-    return true;
-}
-
 bool ext2_block_ptr_write(struct ext2_fs *fs, uint32_t block_num,
                           const void *buf) {
     if (!fs || !buf)
         return false;
 
     uint32_t lba = block_num * fs->sectors_per_block;
-    return ext2_block_write(fs->partition, lba, (const uint8_t *) buf,
-                            fs->sectors_per_block);
+    struct generic_partition *p = fs->partition;
+    struct generic_disk *d = fs->drive;
+
+    return d->write_sector(d, lba + p->start_lba, (const uint8_t *) buf,
+                           fs->sectors_per_block);
 }
 
-bool ext2_write_inode(struct ext2_fs *fs, uint32_t inode_num,
+bool ext2_inode_write(struct ext2_fs *fs, uint32_t inode_num,
                       const struct ext2_inode *inode) {
     uint32_t group = ext2_get_inode_group(fs, inode_num);
     uint32_t index = (inode_num - 1) % fs->inodes_per_group;
@@ -106,17 +84,16 @@ bool ext2_write_inode(struct ext2_fs *fs, uint32_t inode_num,
     if (!block_buf)
         return false;
 
-    uint32_t lba = (inode_table_block + block_index) * fs->sectors_per_block;
-    if (!ext2_block_read(fs->partition, lba, block_buf,
-                         fs->sectors_per_block)) {
+    uint32_t inode_block_num = (inode_table_block + block_index);
+
+    if (!ext2_block_ptr_read(fs, inode_block_num, block_buf)) {
         kfree(block_buf);
         return false;
     }
 
     memcpy(block_buf + block_offset, inode, fs->inode_size);
 
-    bool status =
-        ext2_block_write(fs->partition, lba, block_buf, fs->sectors_per_block);
+    bool status = ext2_block_ptr_write(fs, inode_block_num, block_buf);
     kfree(block_buf);
     return status;
 }

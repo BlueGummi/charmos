@@ -105,7 +105,7 @@ done:
     if (increment_links)
         dir_inode->node.links_count += 1;
 
-    return ext2_write_inode(fs, dir_inode->inode_num, &dir_inode->node)
+    return ext2_inode_write(fs, dir_inode->inode_num, &dir_inode->node)
                ? ERR_OK
                : ERR_FS_INTERNAL;
 }
@@ -121,7 +121,7 @@ enum errno ext2_create_file(struct ext2_fs *fs,
     struct ext2_inode new_inode = {0};
     ext2_init_inode(&new_inode, mode);
 
-    if (!ext2_write_inode(fs, new_inode_num, &new_inode))
+    if (!ext2_inode_write(fs, new_inode_num, &new_inode))
         return ERR_IO;
 
     struct ext2_full_inode temp_full_inode = {

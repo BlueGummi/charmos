@@ -116,7 +116,7 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
     unlink_adjust_neighbors(fs, block, ctx.entry_offset, ctx.prev_offset);
 
     TRY(ext2_block_ptr_write(fs, ctx.block_num, block));
-    TRY(ext2_read_inode(fs, ctx.inode_num, &target_inode.node));
+    TRY(ext2_inode_read(fs, ctx.inode_num, &target_inode.node));
 
     if (target_inode.node.links_count == 0)
         UNLINK_RETURN_ERR(err, ERR_FS_NO_INODE);
@@ -126,12 +126,12 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
     if (target_inode.node.links_count == 0 && free_blocks)
         unlink_free_blocks(fs, &target_inode, ctx.inode_num);
 
-    TRY(ext2_write_inode(fs, ctx.inode_num, &target_inode.node));
+    TRY(ext2_inode_write(fs, ctx.inode_num, &target_inode.node));
 
     if (decrement_links)
         dir_inode->node.links_count--;
 
-    TRY(ext2_write_inode(fs, dir_inode->inode_num, &dir_inode->node));
+    TRY(ext2_inode_write(fs, dir_inode->inode_num, &dir_inode->node));
 
 cleanup:
     if (block)

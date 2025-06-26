@@ -48,4 +48,6 @@ bool fs_cache_insert(struct fs_cache *cache, uint64_t key,
 struct fs_cache_entry *fs_cache_get(struct fs_cache *cache, uint64_t key);
 bool fs_cache_remove(struct fs_cache *cache, uint64_t key);
 void fs_cache_destroy(struct fs_cache *cache);
+void fs_cache_ent_unlock(struct fs_cache_entry *ent);
+void fs_cache_ent_lock(struct fs_cache_entry *ent);
 

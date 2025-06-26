@@ -70,3 +70,11 @@ void fs_cache_destroy(struct fs_cache *cache) {
     cache->capacity = 0;
     cache->count = 0;
 }
+
+void fs_cache_ent_lock(struct fs_cache_entry *ent) {
+    return mutex_lock(&ent->lock);
+}
+
+void fs_cache_ent_unlock(struct fs_cache_entry *ent) {
+    return mutex_unlock(&ent->lock);
+}

@@ -65,8 +65,8 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
 
     ext2_init_dot_ents(fs, block, parent_dir, dir);
     ext2_init_dir(fs, dir, new_block);
-    ext2_write_inode(fs, dir->inode_num, &dir->node);
-    ext2_write_inode(fs, parent_dir->inode_num, &parent_dir->node);
+    ext2_inode_write(fs, dir->inode_num, &dir->node);
+    ext2_inode_write(fs, parent_dir->inode_num, &parent_dir->node);
     ext2_block_ptr_write(fs, new_block, block);
 
     kfree(block);
@@ -133,7 +133,7 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
         return err;
 
     parent_dir->node.links_count--;
-    ext2_write_inode(fs, parent_dir->inode_num, &parent_dir->node);
+    ext2_inode_write(fs, parent_dir->inode_num, &parent_dir->node);
 
     return ERR_OK;
 }

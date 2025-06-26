@@ -61,7 +61,7 @@ enum errno ext2_write_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
     inode->node.blocks +=
         new_block_counter * (fs->block_size / fs->drive->sector_size);
 
-    return ext2_write_inode(fs, inode->inode_num, &inode->node)
+    return ext2_inode_write(fs, inode->inode_num, &inode->node)
                ? ERR_OK
                : ERR_FS_INTERNAL;
 }
@@ -137,7 +137,7 @@ enum errno ext2_read_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
 
     ext2_traverse_inode_blocks(fs, &inode->node, file_read_visitor, &ctx);
     inode->node.atime = time_get_unix();
-    ext2_write_inode(fs, inode->inode_num, &inode->node);
+    ext2_inode_write(fs, inode->inode_num, &inode->node);
     return ERR_OK;
 }
 
@@ -149,7 +149,7 @@ enum errno ext2_chmod(struct ext2_fs *fs, struct ext2_full_inode *node,
     uint16_t ftype = node->node.mode & EXT2_S_IFMT;
     node->node.mode = ftype | (new_mode & EXT2_S_PERMS);
 
-    if (!ext2_write_inode(fs, node->inode_num, &node->node))
+    if (!ext2_inode_write(fs, node->inode_num, &node->node))
         return ERR_FS_INTERNAL;
 
     return ERR_OK;
@@ -166,7 +166,7 @@ enum errno ext2_chown(struct ext2_fs *fs, struct ext2_full_inode *node,
     if (new_gid != (uint32_t) -1)
         node->node.gid = new_gid;
 
-    if (!ext2_write_inode(fs, node->inode_num, &node->node))
+    if (!ext2_inode_write(fs, node->inode_num, &node->node))
         return ERR_FS_INTERNAL;
 
     return ERR_OK;

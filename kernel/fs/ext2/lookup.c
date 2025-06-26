@@ -38,7 +38,7 @@ static bool search_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
         ctx->found = true;
         ctx->result->inode_num = e_num;
         ctx->type = entry->file_type;
-        ext2_read_inode(fs, entry->inode, &ctx->result->node);
+        ext2_inode_read(fs, entry->inode, &ctx->result->node);
 
         return true;
     }
