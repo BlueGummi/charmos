@@ -92,10 +92,7 @@ static void file_read_visitor(struct ext2_fs *fs, struct ext2_inode *inode,
     if (!block_buf)
         return;
 
-    uint32_t lba = (*block_ptr) * fs->sectors_per_block;
-
-    if (!ext2_block_read(fs->partition, lba, block_buf,
-                         fs->sectors_per_block)) {
+    if (!ext2_block_ptr_read(fs, *block_ptr, block_buf)) {
         kfree(block_buf);
         return;
     }

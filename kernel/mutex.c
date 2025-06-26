@@ -52,10 +52,8 @@ void mutex_lock(struct mutex *m) {
         if (m->owner == NULL) {
             m->owner = curr;
             spin_unlock(&m->lock, false);
-            k_printf("core %u acquired the mutex\n", get_sch_core_id());
             return;
         }
-        k_printf("core %u was deferred\n", get_sch_core_id());
 
         thread_queue_push_back(&m->waiters, curr);
         curr->state = BLOCKED;
@@ -76,17 +74,11 @@ void mutex_unlock(struct mutex *m) {
 
     m->owner = NULL;
 
-    k_printf("core %u unlocked the mutex\n", get_sch_core_id());
     struct thread *next = thread_queue_pop_front(&m->waiters);
     if (next != NULL) {
         int64_t next_core = next->curr_core;
-        k_printf(
-            "core %u says: a waiter which was last ran on core %u is ready\n",
-            get_sch_core_id(), next_core);
         next->state = READY;
         scheduler_add_thread(local_schs[next_core], next, false, false, false);
-    } else {
-        k_printf("core %u says: no more waiters\n", get_sch_core_id());
     }
 
     spin_unlock(&m->lock, true);

@@ -32,22 +32,15 @@ bool ext2_read_superblock(struct generic_partition *p,
 
 bool ext2_write_superblock(struct ext2_fs *fs) {
     uint32_t superblock_block = 1;
-    uint32_t lba = superblock_block * fs->sectors_per_block;
 
-    return ext2_block_write(fs->partition, lba, (uint8_t *) fs->sblock,
-                            fs->sectors_per_block);
+    return ext2_block_ptr_write(fs, superblock_block, (uint8_t *) fs->sblock);
 }
 
 bool ext2_write_group_desc(struct ext2_fs *fs) {
     uint32_t group_desc_block = (fs->block_size == 1024) ? 2 : 1;
-    uint32_t lba = group_desc_block * fs->sectors_per_block;
 
-    uint32_t size = fs->num_groups * sizeof(struct ext2_group_desc);
-    uint32_t sector_size = fs->drive->sector_size;
-    uint32_t sector_count = (size + (sector_size - 1)) / sector_size;
-
-    return ext2_block_write(fs->partition, lba, (uint8_t *) fs->group_desc,
-                            sector_count);
+    return ext2_block_ptr_write(fs, group_desc_block,
+                                (uint8_t *) fs->group_desc);
 }
 
 struct vfs_node *ext2_g_mount(struct generic_partition *p) {

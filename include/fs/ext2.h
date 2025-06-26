@@ -1,9 +1,13 @@
 #include <devices/generic_disk.h>
 #include <errno.h>
+#include <fs/generic.h>
 #include <fs/vfs.h>
 #include <stdint.h>
 
 extern uint64_t PTRS_PER_BLOCK;
+#define EXT2_CACHE_BLOCKS 2048
+#define EXT2_CACHE_INODES 1024
+
 #define EXT2_NBLOCKS 15
 #define EXT2_SUPERBLOCK_OFFSET 1024
 #define EXT2_SIGNATURE_OFFSET 0x38
@@ -209,6 +213,8 @@ struct ext2_fs {
     struct generic_disk *drive;
     struct ext2_sblock *sblock;
     struct ext2_group_desc *group_desc;
+    struct fs_cache *block_cache;
+    struct fs_cache *inode_cache;
     uint32_t num_groups;
     uint32_t inodes_count;
     uint32_t inodes_per_group;

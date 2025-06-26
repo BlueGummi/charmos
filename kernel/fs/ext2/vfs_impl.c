@@ -298,7 +298,7 @@ static bool dir_entry_rename_callback(struct ext2_fs *fs,
 
     if (!ext2_dirent_valid(entry))
         return false;
-    
+
     if (entry->inode != 0 &&
         memcmp(entry->name, ctx->old_name, entry->name_len) == 0 &&
         ctx->old_name[entry->name_len] == '\0') {
@@ -349,6 +349,11 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     fs->inodes_per_group = sblock->inodes_per_group;
     fs->inode_size = sblock->inode_size;
     fs->block_size = 1024U << sblock->log_block_size;
+
+    fs->block_cache = kzalloc(sizeof(struct fs_cache));
+    fs->inode_cache = kzalloc(sizeof(struct fs_cache));
+    fs_cache_init(fs->block_cache, EXT2_CACHE_BLOCKS);
+    fs_cache_init(fs->inode_cache, EXT2_CACHE_INODES);
 
     fs->sectors_per_block = fs->block_size / p->disk->sector_size;
 
@@ -483,7 +488,8 @@ enum errno ext2_vfs_link(struct vfs_node *parent, struct vfs_node *target,
     struct ext2_full_inode *child = target->fs_node_data;
     struct ext2_fs *fs = parent->fs_data;
 
-    return ext2_link_file(fs, dir, child, name, vfs_to_ext2_mode(target->mode), true);
+    return ext2_link_file(fs, dir, child, name, vfs_to_ext2_mode(target->mode),
+                          true);
 }
 
 enum errno ext2_vfs_symlink(struct vfs_node *parent, const char *target,

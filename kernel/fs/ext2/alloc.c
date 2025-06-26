@@ -25,17 +25,16 @@ static uint32_t alloc_from_bitmap(struct ext2_fs *fs, uint32_t bitmap_block,
     if (!bitmap)
         return -1;
 
-    uint32_t lba = bitmap_block * fs->sectors_per_block;
     uint32_t byte_pos, bit_pos;
 
-    if (!ext2_block_read(fs->partition, lba, bitmap, fs->sectors_per_block))
+    if (!ext2_block_ptr_read(fs, bitmap_block, bitmap))
         goto err;
 
     if (!find_free_bit(bitmap, fs->block_size, &byte_pos, &bit_pos))
         goto err;
 
     bitmap[byte_pos] |= (1 << bit_pos);
-    if (!ext2_block_write(fs->partition, lba, bitmap, fs->sectors_per_block))
+    if (!ext2_block_ptr_write(fs, bitmap_block, bitmap))
         goto err;
 
     update_counts(fs, group);
@@ -88,8 +87,7 @@ bool ext2_free_block(struct ext2_fs *fs, uint32_t block_num) {
     if (!bitmap)
         return false;
 
-    ext2_block_read(fs->partition, bitmap_block * fs->sectors_per_block, bitmap,
-                    fs->sectors_per_block);
+    ext2_block_ptr_read(fs, bitmap_block, bitmap);
 
     uint32_t byte = index / 8;
     uint8_t bit = 1 << (index % 8);
@@ -99,15 +97,13 @@ bool ext2_free_block(struct ext2_fs *fs, uint32_t block_num) {
     }
 
     bitmap[byte] &= ~bit;
-    ext2_block_write(fs->partition, bitmap_block * fs->sectors_per_block,
-                     bitmap, fs->sectors_per_block);
+    ext2_block_ptr_write(fs, bitmap_block, bitmap);
 
     kfree(bitmap);
 
     uint8_t *zero_buf = kzalloc(fs->block_size);
     if (zero_buf) {
-        ext2_block_write(fs->partition, block_num * fs->sectors_per_block,
-                         zero_buf, fs->sectors_per_block);
+        ext2_block_ptr_write(fs, block_num, zero_buf);
         kfree(zero_buf);
     }
 
@@ -147,8 +143,7 @@ bool ext2_free_inode(struct ext2_fs *fs, uint32_t inode_num) {
     if (!bitmap)
         return false;
 
-    ext2_block_read(fs->partition, bitmap_block * fs->sectors_per_block, bitmap,
-                    fs->sectors_per_block);
+    ext2_block_ptr_read(fs, bitmap_block, bitmap);
 
     uint32_t byte = index / 8;
     uint8_t bit = 1 << (index % 8);
@@ -158,8 +153,7 @@ bool ext2_free_inode(struct ext2_fs *fs, uint32_t inode_num) {
     }
 
     bitmap[byte] &= ~bit;
-    ext2_block_write(fs->partition, bitmap_block * fs->sectors_per_block,
-                     bitmap, fs->sectors_per_block);
+    ext2_block_ptr_write(fs, bitmap_block, bitmap);
     kfree(bitmap);
 
     fs->group_desc[group].free_inodes_count++;
