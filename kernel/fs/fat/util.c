@@ -25,7 +25,7 @@ void fat_format_filename_83(const char *name, char out[11]) {
     memset(out, ' ', 11);
 
     const char *dot = strchr(name, '.');
-    int base_len = dot ? (dot - name) : strlen(name);
+    int base_len = dot ? (dot - name) : (long int) strlen(name);
     if (base_len > 8)
         base_len = 8;
 

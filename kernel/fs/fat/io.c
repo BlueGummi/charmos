@@ -40,7 +40,7 @@ static bool fat12_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
                                   uint32_t value) {
     struct generic_disk *disk = fs->disk;
     uint32_t fat_offset = cluster + (cluster / 2);
-    uint32_t offset = fat_offset % fs->bpb->bytes_per_sector;
+    uint16_t offset = fat_offset % fs->bpb->bytes_per_sector;
     uint32_t fat_size = fs->fat_size;
     bool result = true;
 
@@ -207,7 +207,7 @@ uint32_t fat_read_fat_entry(struct fat_fs *fs, uint32_t cluster) {
 static uint32_t fat12_read_fat_entry(struct fat_fs *fs, uint32_t cluster) {
     struct generic_disk *disk = fs->disk;
     uint32_t fat_offset = cluster + (cluster / 2);
-    uint32_t offset = fat_offset % fs->bpb->bytes_per_sector;
+    uint16_t offset = fat_offset % fs->bpb->bytes_per_sector;
     uint32_t sector = fs->bpb->reserved_sector_count +
                       (fat_offset / fs->bpb->bytes_per_sector);
 
@@ -216,6 +216,7 @@ static uint32_t fat12_read_fat_entry(struct fat_fs *fs, uint32_t cluster) {
     uint8_t *buf = kmalloc(disk->sector_size);
     uint8_t *buf2 = NULL;
     uint32_t result = 0xFFFFFFFF;
+    
     if (!buf)
         return result;
 
@@ -291,7 +292,6 @@ bool fat_write_dirent(struct fat_fs *fs, uint32_t dir_cluster,
                       const struct fat_dirent *dirent_to_write,
                       uint32_t entry_index) {
 
-    uint32_t cluster_offset = entry_index / fs->entries_per_cluster;
     uint32_t index_in_cluster = entry_index % fs->entries_per_cluster;
 
     uint32_t current_cluster = dir_cluster;
