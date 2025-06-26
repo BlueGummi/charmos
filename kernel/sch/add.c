@@ -50,11 +50,15 @@ void scheduler_enqueue(struct thread *t) {
     struct scheduler *s = local_schs[0];
     uint64_t min_load = UINT64_MAX;
 
+    uint64_t c = 0;
     for (uint64_t i = 0; i < c_count; i++) {
         if (local_schs[i]->thread_count < min_load) {
             min_load = local_schs[i]->thread_count;
             s = local_schs[i];
+            c = i;
         }
     }
+    k_printf("adding to the scheduling queue\n");
     scheduler_add_thread(s, t, false, false, true);
+    k_printf("added to core %u\n", c);
 }

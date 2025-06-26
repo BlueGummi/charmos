@@ -2,11 +2,16 @@
 #include <asm.h>
 #include <stdatomic.h>
 #include <stdbool.h>
+#include <string.h>
 
 #define SPINLOCK_INIT {0}
 struct spinlock {
     atomic_flag lock;
 };
+
+static inline void spinlock_init(struct spinlock *lock) {
+    memset(lock, 0, sizeof(struct spinlock));
+}
 
 static inline bool spin_lock(struct spinlock *lock) {
     bool int_enabled = are_interrupts_enabled();

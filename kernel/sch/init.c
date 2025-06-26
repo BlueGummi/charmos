@@ -34,16 +34,10 @@ void scheduler_init(uint64_t core_count) {
 
         struct thread *t = thread_create(k_sch_main);
         struct thread *t0 = thread_create(k_sch_idle);
+        struct thread *t1 = thread_create(k_mutex_test);
         scheduler_add_thread(s, t, false, false, true);
         scheduler_add_thread(s, t0, false, false, true);
-
-        if (i == 0) {
-            for (int j = 0; j < 500; j++) {
-                struct thread *t1 = thread_create(k_sch_main);
-                scheduler_add_thread(s, t1, false, false, true);
-            }
-        }
-
+        scheduler_add_thread(s, t1, false, false, true);
         local_schs[i] = s;
     }
 }

@@ -5,6 +5,7 @@
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <mp/mp.h>
+#include <mutex.h>
 #include <sch/sched.h>
 #include <spin_lock.h>
 #include <stdatomic.h>
@@ -35,12 +36,22 @@ int64_t work_steal_min_diff = 130;
 void k_sch_main() {
     while (1) {
         asm volatile("hlt");
-        scheduler_get_curr_thread()->state = IDLE_THREAD;
     }
 }
 
 void k_sch_idle() {
     scheduler_get_curr_thread()->state = IDLE_THREAD;
+    while (1) {
+        asm volatile("hlt");
+    }
+}
+
+struct mutex k_mutex_test_mutex = {0};
+void k_mutex_test() {
+    mutex_init(&k_mutex_test_mutex);
+    mutex_lock(&k_mutex_test_mutex);
+    for (uint64_t i = 0; i < 50; i++) {}
+    mutex_unlock(&k_mutex_test_mutex);
     while (1) {
         asm volatile("hlt");
     }
@@ -249,7 +260,7 @@ regular_schedule:
 load_new_thread:
     load_thread(sched, next, cpu);
     update_core_current_thread(next);
-    
+
     if (!next) {
         disable_timeslice();
         goto end;

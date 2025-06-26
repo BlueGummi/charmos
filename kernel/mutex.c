@@ -1,7 +1,6 @@
 #include <mutex.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
-#include <string.h>
 
 void thread_queue_init(struct thread_queue *q) {
     q->head = NULL;
@@ -35,29 +34,35 @@ struct thread *thread_queue_pop_front(struct thread_queue *q) {
 }
 
 void mutex_init(struct mutex *m) {
+    if (m->initialized)
+        return;
+
     m->owner = NULL;
     thread_queue_init(&m->waiters);
-    memcpy(&m->lock, 0, sizeof(struct spinlock));
+    spinlock_init(&m->lock);
+    m->initialized = true;
 }
 
 void mutex_lock(struct mutex *m) {
     struct thread *curr = scheduler_get_curr_thread();
 
-    bool interrupts = spin_lock(&m->lock);
+    while (true) {
+        spin_lock(&m->lock);
 
-    if (m->owner == NULL) {
-        m->owner = curr;
-        spin_unlock(&m->lock, interrupts);
-        return;
+        if (m->owner == NULL) {
+            m->owner = curr;
+            spin_unlock(&m->lock, false);
+            k_printf("core %u acquired the mutex\n", get_sch_core_id());
+            return;
+        }
+        k_printf("core %u was deferred\n", get_sch_core_id());
+
+        thread_queue_push_back(&m->waiters, curr);
+        curr->state = BLOCKED;
+
+        spin_unlock(&m->lock, false);
+        scheduler_yield();
     }
-
-    thread_queue_push_back(&m->waiters, curr);
-    curr->state = BLOCKED;
-
-    spin_unlock(&m->lock, interrupts);
-    scheduler_yield();
-
-    mutex_lock(m);
 }
 
 void mutex_unlock(struct mutex *m) {
@@ -71,12 +76,13 @@ void mutex_unlock(struct mutex *m) {
         return;
     }
 
+    k_printf("core %u unlocked the mutex\n", get_sch_core_id());
     m->owner = NULL;
 
     struct thread *next = thread_queue_pop_front(&m->waiters);
     if (next != NULL) {
-        m->owner = next;
         next->state = READY;
+        k_printf("another thread has been marked as ready\n");
         scheduler_enqueue(next);
     }
 
