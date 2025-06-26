@@ -344,7 +344,6 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     sblock->wtime = time_get_unix();
     fs->drive = p->disk;
     fs->partition = p;
-    fs->sblock = sblock;
     fs->inodes_count = sblock->inodes_count;
     fs->inodes_per_group = sblock->inodes_per_group;
     fs->inode_size = sblock->inode_size;
@@ -358,8 +357,6 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     uint32_t superblock_block = 1024 / fs->block_size;
     uint32_t gdt_block = (fs->block_size == 1024) ? 2 : 1;
 
-    fs->sblock_cache_ent = ext2_block_read(fs, superblock_block);
-
     struct block_cache_entry *gdt_ent;
 
     uint32_t lba = ext2_block_to_lba(fs, gdt_block);
@@ -369,6 +366,8 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     if (!gdt_ent)
         return ERR_IO;
 
+    fs->sblock_cache_ent = ext2_block_read(fs, superblock_block);
+    fs->sblock = (struct ext2_sblock *) fs->sblock_cache_ent->buffer;
     fs->group_desc = (struct ext2_group_desc *) gdt_ent->buffer;
     gdt_ent = ext2_block_read(fs, gdt_block);
     fs->gdesc_cache_ent = gdt_ent;
