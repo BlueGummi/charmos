@@ -89,7 +89,6 @@ bool ext2_free_block(struct ext2_fs *fs, uint32_t block_num) {
     uint32_t byte = index / 8;
     uint8_t bit = 1 << (index % 8);
     if (!(bitmap[byte] & bit)) {
-        k_printf("Block %u already free\n", block_num);
         return false;
     }
 
