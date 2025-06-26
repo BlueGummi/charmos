@@ -45,3 +45,16 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
     if (!already_locked)
         spin_unlock(&sched->lock, change_interrupts ? ints : false);
 }
+
+void scheduler_enqueue(struct thread *t) {
+    struct scheduler *s = local_schs[0];
+    uint64_t min_load = UINT64_MAX;
+
+    for (uint64_t i = 0; i < c_count; i++) {
+        if (local_schs[i]->thread_count < min_load) {
+            min_load = local_schs[i]->thread_count;
+            s = local_schs[i];
+        }
+    }
+    scheduler_add_thread(s, t, false, false, true);
+}

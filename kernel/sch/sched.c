@@ -35,13 +35,20 @@ int64_t work_steal_min_diff = 130;
 void k_sch_main() {
     while (1) {
         asm volatile("hlt");
+        scheduler_get_curr_thread()->state = IDLE_THREAD;
     }
 }
 
-void k_sch_other() {
+void k_sch_idle() {
+    scheduler_get_curr_thread()->state = IDLE_THREAD;
     while (1) {
         asm volatile("hlt");
     }
+}
+
+struct thread *scheduler_get_curr_thread() {
+    struct core *c = (void *) rdmsr(MSR_GS_BASE);
+    return c->current_thread;
 }
 
 static inline void maybe_recompute_threshold(uint64_t core_id) {
@@ -65,9 +72,8 @@ static inline void stop_steal(struct scheduler *sched,
     end_steal();
 }
 
-static inline void scheduler_save_thread(struct scheduler *sched,
-                                         struct thread *curr,
-                                         struct cpu_state *cpu) {
+static void scheduler_save_thread(struct scheduler *sched, struct thread *curr,
+                                  struct cpu_state *cpu) {
     if (curr && curr->state == RUNNING) {
 
         memcpy(&curr->regs, cpu, sizeof(struct cpu_state));
@@ -108,7 +114,7 @@ static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {
         struct thread *iter = start;
 
         do {
-            if (iter->state == READY)
+            if (iter->state == READY || iter->state == IDLE_THREAD)
                 break;
             iter = iter->next;
         } while (iter != start);
@@ -145,20 +151,49 @@ static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {
     return NULL;
 }
 
-static inline void load_thread(struct scheduler *sched, struct thread *next,
-                               struct cpu_state *cpu) {
+static void load_thread(struct scheduler *sched, struct thread *next,
+                        struct cpu_state *cpu) {
     if (next) {
         sched->current = next;
         memcpy(cpu, &next->regs, sizeof(struct cpu_state));
         next->state = RUNNING;
     } else {
         sched->current = NULL;
-        k_panic("No threads to run! State should not be reached!\n");
     }
+}
+
+static inline void disable_timeslice() {
+    lapic_timer_disable();
+}
+
+void scheduler_yield() {
+    asm volatile("int $0x20");
+}
+
+void sch_enable_timeslice() {
+    lapic_timer_enable();
 }
 
 static inline void begin_steal(struct scheduler *sched) {
     atomic_store(&sched->stealing_work, true);
+}
+
+static bool all_threads_unrunnable(struct scheduler *sched) {
+    for (uint64_t lvl = 0; lvl < MLFQ_LEVELS; lvl++) {
+        struct thread_queue *q = &sched->queues[lvl];
+        if (!q->head)
+            continue;
+
+        struct thread *start = q->head;
+        struct thread *iter = start;
+
+        do {
+            if (iter->state == READY)
+                return false;
+            iter = iter->next;
+        } while (iter != start);
+    }
+    return true;
 }
 
 /* Resource locks in here do not enable interrupts */
@@ -166,7 +201,6 @@ void schedule(struct cpu_state *cpu) {
     uint64_t core_id = get_sch_core_id();
     struct scheduler *sched = local_schs[core_id];
     spin_lock_no_cli(&sched->lock);
-    uint64_t tsc = rdtsc();
     struct thread *curr = sched->current;
     struct thread *next = NULL;
     struct scheduler *victim = NULL;
@@ -215,6 +249,15 @@ regular_schedule:
 load_new_thread:
     load_thread(sched, next, cpu);
     update_core_current_thread(next);
+    
+    if (!next) {
+        disable_timeslice();
+        goto end;
+    }
+
+    if (all_threads_unrunnable(sched) && next->state == IDLE_THREAD) {
+        disable_timeslice();
+    }
 
 end:
     /* do not change interrupt status */

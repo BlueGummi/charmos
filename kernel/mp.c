@@ -25,6 +25,18 @@ void lapic_init() {
     LAPIC_REG(LAPIC_REG_TIMER_INIT) = 10000000;
 }
 
+void lapic_timer_disable() {
+    uint32_t lvt = LAPIC_REG(LAPIC_REG_LVT_TIMER);
+    lvt |= LAPIC_LVT_MASK;
+    LAPIC_REG(LAPIC_REG_LVT_TIMER) = lvt;
+}
+
+void lapic_timer_enable() {
+    uint32_t lvt = LAPIC_REG(LAPIC_REG_LVT_TIMER);
+    lvt &= ~LAPIC_LVT_MASK;  
+    LAPIC_REG(LAPIC_REG_LVT_TIMER) = lvt;
+}
+
 void wakeup() {
     bool ints = spin_lock(&wakeup_lock);
     smap_init();

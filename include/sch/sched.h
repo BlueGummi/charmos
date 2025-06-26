@@ -11,11 +11,6 @@
            * core. This means "% of the average"                               \
            */
 
-struct thread_queue {
-    struct thread *head;
-    struct thread *tail;
-};
-
 struct scheduler {
     bool active;
     struct thread_queue queues[MLFQ_LEVELS]; // MLFQ queues
@@ -37,13 +32,17 @@ void scheduler_rm_thread(struct scheduler *sched, struct thread *thread,
                          bool change_interrupts, bool already_locked);
 void schedule(struct cpu_state *cpu);
 void k_sch_main();
-void k_sch_other();
+void k_sch_idle();
+void scheduler_enable_timeslice();
+void scheduler_yield();
+void scheduler_enqueue(struct thread *t);
 
 bool scheduler_can_steal_work(struct scheduler *sched);
 uint64_t compute_steal_threshold(uint64_t threads, uint64_t core_count);
 
 struct scheduler *scheduler_pick_victim(struct scheduler *self);
 struct thread *scheduler_steal_work(struct scheduler *victim);
+struct thread *scheduler_get_curr_thread();
 
 bool try_begin_steal();
 void end_steal();

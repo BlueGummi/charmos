@@ -46,8 +46,4 @@ void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
 void idt_set_and_mark(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
                       uint64_t ind);
 
-static inline void trigger_interrupt(uint8_t code) {
-    asm volatile("int %0" : : "i"(code));
-}
-
 #pragma once

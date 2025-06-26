@@ -6,6 +6,7 @@
 #define LAPIC_REG_TIMER_INIT 0x380
 #define LAPIC_REG_TIMER_CUR 0x390
 #define LAPIC_REG_TIMER_DIV 0x3E0
+#define LAPIC_LVT_MASK (1 << 16)
 #define LAPIC_ENABLE 0x100
 
 #define LAPIC_REG(offset)                                                      \
@@ -14,5 +15,7 @@
 #define TIMER_MODE_PERIODIC (1 << 17)
 extern uint64_t *lapic;
 void lapic_init();
+void lapic_timer_disable();
+void lapic_timer_enable();
 #define IA32_APIC_BASE_MSR 0x1B
 #define IA32_APIC_BASE_MASK 0xFFFFF000UL

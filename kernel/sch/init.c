@@ -33,7 +33,7 @@ void scheduler_init(uint64_t core_count) {
         }
 
         struct thread *t = thread_create(k_sch_main);
-        struct thread *t0 = thread_create(k_sch_other);
+        struct thread *t0 = thread_create(k_sch_idle);
         scheduler_add_thread(s, t, false, false, true);
         scheduler_add_thread(s, t0, false, false, true);
 
