@@ -1,6 +1,6 @@
 #include <devices/generic_disk.h>
 #include <errno.h>
-#include <fs/generic.h>
+#include <fs/bcache.h>
 #include <fs/vfs.h>
 #include <stdint.h>
 

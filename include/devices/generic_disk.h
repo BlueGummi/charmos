@@ -1,5 +1,5 @@
 #include <fs/detect.h>
-#include <fs/generic.h>
+#include <fs/bcache.h>
 #include <stdbool.h>
 #include <stdint.h>
 
