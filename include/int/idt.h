@@ -43,7 +43,8 @@ void idt_load(uint64_t ind);
 void idt_alloc(uint64_t size);
 void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
                   uint64_t ind);
-void idt_set_and_mark(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
-                      uint64_t ind);
 
+int idt_install_handler(uint8_t flags, void (*handler)(void), uint64_t core);
+int idt_alloc_entry(void);
+void idt_free_entry(int entry);
 #pragma once

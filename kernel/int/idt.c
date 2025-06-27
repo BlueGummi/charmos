@@ -15,9 +15,12 @@
 extern void context_switch();
 extern void page_fault_handler_wrapper();
 extern void syscall_entry();
+#define MAX_IDT_ENTRIES 256
+
+static bool idt_entry_used[MAX_IDT_ENTRIES];
 
 #define MAKE_THIN_HANDLER(handler_name, message)                               \
-    void __attribute__((interrupt)) handler_name##_fault(void *frame) {        \
+    void handler_name##_fault(void *frame) {                                   \
         (void) frame;                                                          \
         uint64_t core = get_sch_core_id();                                     \
         k_printf("\n=== " #handler_name " fault! ===\n");                      \
@@ -60,12 +63,16 @@ void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
     idt[num].ist = 0;
     idt[num].flags = flags;
     idt[num].reserved = 0;
+    idt_entry_used[num] = true;
 }
 
-void idt_set_and_mark(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
-                      uint64_t ind) {
-    idt_set_gate(num, base, sel, flags, ind);
-    uacpi_mark_irq_installed(num);
+int idt_install_handler(uint8_t flags, void (*handler)(void), uint64_t core) {
+    int entry = idt_alloc_entry();
+    if (entry == -1)
+        return -1;
+
+    idt_set_gate(entry, (uint64_t) handler, 0x08, flags, core);
+    return entry;
 }
 
 void idt_load(uint64_t ind) {
@@ -81,30 +88,46 @@ void idt_alloc(uint64_t size) {
         k_panic("Could not allocate space for IDT\n");
 }
 
+int idt_alloc_entry(void) {
+    for (int i = 32; i < MAX_IDT_ENTRIES; i++) { // skip first 32: exceptions
+        if (!idt_entry_used[i]) {
+            idt_entry_used[i] = true;
+            return i;
+        }
+    }
+    return -1; // none available
+}
+
+void idt_free_entry(int entry) {
+    if (entry < 32 || entry >= MAX_IDT_ENTRIES)
+        return;
+
+    idt_entry_used[entry] = false;
+}
+
 void idt_install(uint64_t ind) {
 
-    idt_set_and_mark(DIV_BY_Z_ID, (uint64_t) divbyz_fault, 0x08, 0x8E, ind);
+    idt_set_gate(DIV_BY_Z_ID, (uint64_t) divbyz_fault, 0x08, 0x8E, ind);
 
-    idt_set_and_mark(DEBUG_ID, (uint64_t) debug_fault, 0x08, 0x8E, ind);
+    idt_set_gate(DEBUG_ID, (uint64_t) debug_fault, 0x08, 0x8E, ind);
 
-    idt_set_and_mark(BREAKPOINT_ID, (uint64_t) breakpoint_fault, 0x08, 0x8E,
-                     ind);
+    idt_set_gate(BREAKPOINT_ID, (uint64_t) breakpoint_fault, 0x08, 0x8E, ind);
 
-    idt_set_and_mark(DOUBLEFAULT_ID, (uint64_t) double_fault_handler_wrapper,
-                     0x08, 0x8E, ind);
+    idt_set_gate(DOUBLEFAULT_ID, (uint64_t) double_fault_handler_wrapper, 0x08,
+                 0x8E, ind);
 
-    idt_set_and_mark(SSF_ID, (uint64_t) ss_handler_wrapper, 0x08, 0x8E, ind);
+    idt_set_gate(SSF_ID, (uint64_t) ss_handler_wrapper, 0x08, 0x8E, ind);
 
-    idt_set_and_mark(GPF_ID, (uint64_t) gpf_handler_wrapper, 0x08, 0x8E, ind);
+    idt_set_gate(GPF_ID, (uint64_t) gpf_handler_wrapper, 0x08, 0x8E, ind);
 
-    idt_set_and_mark(PAGE_FAULT_ID, (uint64_t) page_fault_handler_wrapper, 0x08,
-                     0x8E, ind);
+    idt_set_gate(PAGE_FAULT_ID, (uint64_t) page_fault_handler_wrapper, 0x08,
+                 0x8E, ind);
 
-    idt_set_and_mark(TIMER_ID, (uint64_t) context_switch, 0x08, 0x8E, ind);
+    idt_set_gate(TIMER_ID, (uint64_t) context_switch, 0x08, 0x8E, ind);
 
-    idt_set_and_mark(KB_ID, (uint64_t) keyboard_handler, 0x08, 0x8E, ind);
+    idt_set_gate(KB_ID, (uint64_t) keyboard_handler, 0x08, 0x8E, ind);
 
-    idt_set_and_mark(0x80, (uint64_t) syscall_entry, 0x2b, 0xee, ind);
+    idt_set_gate(0x80, (uint64_t) syscall_entry, 0x2b, 0xee, ind);
 
     idt_load(ind);
 }

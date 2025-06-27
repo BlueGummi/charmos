@@ -3,6 +3,7 @@
 #include <asm.h>
 #include <console/printf.h>
 #include <int/idt.h>
+#include <int/irq.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/slab.h>
@@ -30,28 +31,10 @@ void uacpi_print_devs() {
                                    UACPI_NULL, UACPI_OBJECT_DEVICE_BIT,
                                    UACPI_MAX_DEPTH_ANY, UACPI_NULL);
 }
-static irq_entry_t irq_table[IDT_ENTRIES];
 
 extern uint64_t a_rsdp;
 
 extern uint64_t tsc_freq;
-
-#define DEFINE_IRQ_HANDLER(n)                                                  \
-    __attribute__((interrupt)) void irq##n##_entry(void *);                    \
-    __attribute__((interrupt)) void irq##n##_entry(void *) {                   \
-        if (irq_table[n].installed) {                                          \
-            irq_table[n].handler(irq_table[n].ctx);                            \
-        }                                                                      \
-    }
-#include "irq_handlers.h"
-
-void irq_common_handler(uint8_t irq_num) {
-
-    if (irq_num >= MAX_IRQ || !irq_table[irq_num].installed)
-        return;
-
-    irq_table[irq_num].handler(irq_table[irq_num].ctx);
-}
 
 uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
 
@@ -141,33 +124,18 @@ void uacpi_kernel_sleep(uacpi_u64 msec) {
         uacpi_kernel_stall(100);
 }
 
-void (*isr_trampolines[])(void *) = {
-#define X(n) [n] = irq##n##_entry,
-#include "irq_list.h"
-#undef X
-};
-
-void uacpi_mark_irq_installed(
-    uint8_t irq) { // this is used in idt.c to avoid overwriting
-    irq_table[irq].installed = true;
-}
-
 uacpi_status uacpi_kernel_install_interrupt_handler(
     uacpi_u32 irq, uacpi_interrupt_handler handler, uacpi_handle ctx,
     uacpi_handle *out_irq_handle) {
 
-    if (irq >= IDT_ENTRIES)
+    if (irq >= IRQ_MAX)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    if (irq_table[irq].installed)
+    if (irq_is_installed(irq))
         return UACPI_STATUS_ALREADY_EXISTS;
 
-    irq_table[irq].handler = handler;
-    irq_table[irq].ctx = ctx;
-    irq_table[irq].installed = true;
-
-    idt_set_gate(irq + 32, (uint64_t) isr_trampolines[irq], 0x08, 0x8E,
-                 get_core_id());
+    if (irq_install(irq, (void *) handler, ctx) < 0)
+        return UACPI_STATUS_INTERNAL_ERROR;
 
     if (out_irq_handle)
         *out_irq_handle = (uacpi_handle) (uintptr_t) irq;
@@ -178,19 +146,17 @@ uacpi_status uacpi_kernel_install_interrupt_handler(
 uacpi_status
 uacpi_kernel_uninstall_interrupt_handler(uacpi_interrupt_handler handler,
                                          uacpi_handle irq_handle) {
-
     uint32_t irq = (uint32_t) (uintptr_t) irq_handle;
-    if (irq >= IDT_ENTRIES || !irq_table[irq].installed)
-        return UACPI_STATUS_NOT_FOUND;
+    (void) handler;
 
-    if (irq_table[irq].handler != handler)
+    if (irq >= IRQ_MAX)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    irq_table[irq].installed = false;
-    irq_table[irq].handler = NULL;
-    irq_table[irq].ctx = NULL;
+    if (!irq_is_installed(irq))
+        return UACPI_STATUS_NOT_FOUND;
 
-    idt_set_gate(irq + 32, 0, 0, 0, get_core_id());
+    if (irq_free(irq) < 0)
+        return UACPI_STATUS_INVALID_ARGUMENT;
 
     return UACPI_STATUS_OK;
 }
