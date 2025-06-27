@@ -37,11 +37,7 @@ bool ahci_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *out_buf,
         return false;
     }
 
-    uint8_t *buffer =
-        ahci_prepare_command(port, slot, false, NULL, count * 512);
-    if (!buffer) {
-        return false;
-    }
+    ahci_prepare_command(port, slot, false, out_buf, count * 512);
 
     struct ahci_cmd_table *cmd_tbl = port->cmd_tables[slot];
 
@@ -49,8 +45,6 @@ bool ahci_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *out_buf,
     ahci_set_lba_cmd((struct ahci_fis_reg_h2d *) cmd_tbl->cfis, lba, count);
 
     bool ok = ahci_send_command(port, slot);
-    if (ok)
-        memcpy(out_buf, buffer, count * 512);
 
     return ok;
 }
@@ -67,11 +61,7 @@ bool ahci_write_sector(struct generic_disk *disk, uint64_t lba,
     if (slot == (uint32_t) -1)
         return false;
 
-    uint8_t *buffer = ahci_prepare_command(port, slot, true, NULL, count * 512);
-    if (!buffer)
-        return false;
-
-    memcpy(buffer, in_buf, count * 512);
+    ahci_prepare_command(port, slot, true, (uint8_t *) in_buf, count * 512);
 
     struct ahci_cmd_table *cmd_tbl = port->cmd_tables[slot];
     ahci_setup_fis(cmd_tbl, AHCI_CMD_WRITE_DMA_EXT, false);

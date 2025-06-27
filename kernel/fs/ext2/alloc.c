@@ -95,11 +95,6 @@ bool ext2_free_block(struct ext2_fs *fs, uint32_t block_num) {
     bitmap[byte] &= ~bit;
     ext2_block_write(fs, ent);
 
-    uint8_t *zero_buf = kzalloc(fs->block_size);
-    if (zero_buf) {
-        ext2_block_write(fs, ent);
-    }
-
     fs->group_desc[group].free_blocks_count++;
     fs->sblock->free_blocks_count++;
 

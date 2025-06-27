@@ -7,7 +7,6 @@
 #include <mem/vmm.h>
 #include <sleep.h>
 #include <stdint.h>
-#include <string.h>
 
 bool nvme_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
                       uint16_t count) {
@@ -16,12 +15,9 @@ bool nvme_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
     uint64_t total_bytes = count * 512;
     uint64_t pages_needed = (total_bytes + 4095) / PAGE_SIZE;
 
-    uint64_t buffer_phys = (uint64_t) pmm_alloc_pages(pages_needed, false);
+    uint64_t buffer_phys = (uint64_t) vmm_get_phys((uint64_t) buffer);
     if (!buffer_phys)
         return false;
-
-    void *virt = vmm_map_phys(buffer_phys, pages_needed * PAGE_SIZE);
-    memset(virt, 0, pages_needed * PAGE_SIZE);
 
     struct nvme_command cmd = {0};
     cmd.opc = NVME_OP_IO_READ;
@@ -35,12 +31,9 @@ bool nvme_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
     cmd.cdw12 = count - 1;
 
     if (nvme_submit_io_cmd(nvme, &cmd, 1) != 0) {
-        vmm_unmap_region((uint64_t) virt, pages_needed * PAGE_SIZE);
         return false;
     }
 
-    memcpy(buffer, virt, total_bytes);
-    vmm_unmap_region((uint64_t) virt, pages_needed * PAGE_SIZE);
     return true;
 }
 
@@ -51,12 +44,9 @@ bool nvme_write_sector(struct generic_disk *disk, uint64_t lba,
     uint64_t total_bytes = count * 512;
     uint64_t pages_needed = (total_bytes + 4095) / PAGE_SIZE;
 
-    uint64_t buffer_phys = (uint64_t) pmm_alloc_pages(pages_needed, false);
+    uint64_t buffer_phys = (uint64_t) vmm_get_phys((uint64_t) buffer);
     if (!buffer_phys)
         return false;
-
-    void *virt = vmm_map_phys(buffer_phys, pages_needed * PAGE_SIZE);
-    memcpy(virt, buffer, total_bytes);
 
     struct nvme_command cmd = {0};
     cmd.opc = NVME_OP_IO_WRITE;
@@ -70,11 +60,9 @@ bool nvme_write_sector(struct generic_disk *disk, uint64_t lba,
     cmd.cdw12 = count - 1;
 
     if (nvme_submit_io_cmd(nvme, &cmd, 1) != 0) {
-        vmm_unmap_region((uint64_t) virt, pages_needed * PAGE_SIZE);
         return false;
     }
 
-    vmm_unmap_region((uint64_t) virt, pages_needed * PAGE_SIZE);
     return true;
 }
 

@@ -86,7 +86,7 @@ bool block_cache_remove(struct block_cache *cache, uint64_t key) {
             entry->value = NULL;
             cache->count--;
 
-            kfree(entry->value->buffer);
+            kfree_aligned(entry->value->buffer);
             kfree(entry->value);
             spin_unlock(&cache->lock, ints);
             return true;
@@ -177,7 +177,7 @@ struct block_cache_entry *bcache_create_ent(struct generic_disk *disk,
                                             uint64_t lba, uint64_t block_size,
                                             uint64_t sectors_per_block,
                                             bool no_evict) {
-    uint8_t *buf = kmalloc(block_size);
+    uint8_t *buf = kmalloc_aligned(block_size, PAGE_SIZE);
 
     if (!disk->read_sector(disk, lba, buf, sectors_per_block))
         return NULL;

@@ -2,6 +2,7 @@
 #include <console/printf.h>
 #include <drivers/ahci.h>
 #include <drivers/ata.h>
+#include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <sleep.h>
@@ -21,29 +22,19 @@ uint32_t find_free_cmd_slot(struct ahci_port *port) {
     return -1;
 }
 
-void *ahci_prepare_command(struct ahci_full_port *port, uint32_t slot,
-                           bool write, uint64_t *out_phys, uint64_t size) {
+void ahci_prepare_command(struct ahci_full_port *port, uint32_t slot,
+                          bool write, uint8_t *buf, uint64_t size) {
     struct ahci_cmd_header *hdr = port->cmd_hdrs[slot];
     struct ahci_cmd_table *cmd_tbl = port->cmd_tables[slot];
 
     if (!hdr || !cmd_tbl || size == 0)
-        return NULL;
+        return;
 
-    uint64_t page_count = (size + PAGE_SIZE - 1) / PAGE_SIZE;
     uint64_t prdt_count =
         (size + MAX_PRDT_ENTRY_SIZE - 1) / MAX_PRDT_ENTRY_SIZE;
 
     if (prdt_count > 65535)
-        return NULL;
-
-    uint64_t phys_base = (uint64_t) pmm_alloc_pages(page_count, false);
-    if (!phys_base)
-        return NULL;
-
-    void *virt_base = vmm_map_phys(phys_base, page_count * PAGE_SIZE);
-
-    if (out_phys)
-        *out_phys = phys_base;
+        return;
 
     hdr->cfl = sizeof(struct ahci_fis_reg_h2d) / sizeof(uint32_t);
     hdr->w = write ? 1 : 0;
@@ -55,6 +46,7 @@ void *ahci_prepare_command(struct ahci_full_port *port, uint32_t slot,
 
     uint64_t remaining = size;
     uint64_t offset = 0;
+    uint64_t phys_base = vmm_get_phys((uint64_t) buf);
     for (uint32_t i = 0; i < prdt_count; i++) {
         uint64_t chunk =
             (remaining > MAX_PRDT_ENTRY_SIZE) ? MAX_PRDT_ENTRY_SIZE : remaining;
@@ -69,8 +61,6 @@ void *ahci_prepare_command(struct ahci_full_port *port, uint32_t slot,
         offset += chunk;
         remaining -= chunk;
     }
-
-    return virt_base;
 }
 
 void ahci_setup_fis(struct ahci_cmd_table *cmd_tbl, uint8_t command,
@@ -122,8 +112,11 @@ void ahci_identify(struct ahci_disk *disk) {
     struct ahci_full_port *port = &disk->device->regs[disk->port];
     uint32_t slot = find_free_cmd_slot(port->port);
 
-    uint64_t buffer_phys;
-    void *buffer = ahci_prepare_command(port, slot, false, &buffer_phys, 4096);
+    uint8_t *buffer = kmalloc_aligned(4096, 4096);
+    if (!buffer)
+        return;
+
+    ahci_prepare_command(port, slot, false, buffer, 4096);
 
     if (!buffer)
         return;
@@ -136,4 +129,5 @@ void ahci_identify(struct ahci_disk *disk) {
     } else {
         k_printf("AHCI IDENTIFY failed\n");
     }
+    kfree_aligned(buffer);
 }

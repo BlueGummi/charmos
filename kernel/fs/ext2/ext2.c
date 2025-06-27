@@ -12,7 +12,7 @@ uint64_t PTRS_PER_BLOCK;
 bool ext2_read_superblock(struct generic_partition *p,
                           struct ext2_sblock *sblock) {
     struct generic_disk *d = p->disk;
-    uint8_t *buffer = kmalloc(d->sector_size);
+    uint8_t *buffer = kmalloc_aligned(d->sector_size, PAGE_SIZE);
     if (!buffer)
         return false; // TODO: separate ERR_NO_MEM case
 
@@ -26,7 +26,7 @@ bool ext2_read_superblock(struct generic_partition *p,
 
     memcpy(sblock, buffer + superblock_offset, sizeof(struct ext2_sblock));
 
-    kfree(buffer);
+    kfree_aligned(buffer);
     return (sblock->magic == 0xEF53);
 }
 
@@ -42,9 +42,9 @@ struct vfs_node *ext2_g_mount(struct generic_partition *p) {
     if (!p)
         return NULL;
 
-    p->fs_data = kmalloc(sizeof(struct ext2_fs));
+    p->fs_data = kmalloc_aligned(sizeof(struct ext2_fs), PAGE_SIZE);
     struct ext2_fs *fs = p->fs_data;
-    fs->sblock = kmalloc(sizeof(struct ext2_sblock));
+    fs->sblock = kmalloc_aligned(sizeof(struct ext2_sblock), PAGE_SIZE);
     struct vfs_node *n = kzalloc(sizeof(struct vfs_node));
 
     if (!p->fs_data || !fs->sblock | !n)

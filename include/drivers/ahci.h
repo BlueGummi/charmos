@@ -258,8 +258,8 @@ uint32_t find_free_cmd_slot(struct ahci_port *port);
 struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
                                         uint32_t *d_cnt);
 void ahci_identify(struct ahci_disk *disk);
-void *ahci_prepare_command(struct ahci_full_port *port, uint32_t slot,
-                           bool write, uint64_t *out_phys, uint64_t size);
+void ahci_prepare_command(struct ahci_full_port *port, uint32_t slot,
+                          bool write, uint8_t *buf, uint64_t size);
 void ahci_setup_fis(struct ahci_cmd_table *cmd_tbl, uint8_t command,
                     bool is_atapi);
 bool ahci_send_command(struct ahci_full_port *port, uint32_t slot);
