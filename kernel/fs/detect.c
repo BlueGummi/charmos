@@ -68,7 +68,7 @@ static bool detect_mbr_partitions(struct generic_disk *disk, uint8_t *sector) {
         part->fs_type = FS_UNKNOWN;
         part->fs_data = NULL;
         part->mounted = false;
-        snprintf(part->name, sizeof(part->name), "part%d", idx);
+        snprintf(part->name, sizeof(part->name), "%sp%d", disk->name, idx);
 
         part->mount = NULL;
         part->print_fs = NULL;
@@ -218,6 +218,7 @@ enum fs_type detect_fs(struct generic_disk *disk) {
     uint8_t *sector = kmalloc(disk->sector_size);
     if (!sector)
         return FS_UNKNOWN;
+    k_printf("attempting to detect %s's filesystem(s)\n", disk->name);
 
     if (!disk->read_sector(disk, 0, sector, 1)) {
         kfree(sector);

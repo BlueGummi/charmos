@@ -191,10 +191,11 @@ struct ahci_port {
 
 // one controller
 struct ahci_device {
-    uint8_t type;                   // Device type
-    uint32_t signature;             // Device signature
-    uint32_t sectors;               // Total sectors (for disks)
-    uint16_t sector_size;           // Sector size in bytes
+    uint8_t type;         // Device type
+    uint32_t signature;   // Device signature
+    uint32_t sectors;     // Total sectors (for disks)
+    uint16_t sector_size; // Sector size in bytes
+    struct ahci_controller *ctrl;
     struct ahci_full_port regs[32]; // Pointer to port registers
 };
 
@@ -218,7 +219,6 @@ struct ahci_controller {
     uint32_t bohc;      // BIOS/OS Handoff Control
     uint8_t rsv[0xA0 - 0x2C];
     uint8_t vendor[0x100 - 0xA0];
-    struct ahci_port ports[32];
 };
 
 struct ahci_cmd_header {
@@ -278,3 +278,9 @@ bool ahci_write_sector_wrapper(struct generic_disk *disk, uint64_t lba,
                                const uint8_t *buf, uint64_t cnt);
 
 struct generic_disk *ahci_create_generic(struct ahci_disk *disk);
+
+#define AHCI_PORT_OFFSET(n) (0x100 + (n) * 0x80)
+
+static inline struct ahci_port *ahci_get_port(struct ahci_device *dev, int n) {
+    return (struct ahci_port *) ((uintptr_t) dev->ctrl + AHCI_PORT_OFFSET(n));
+}

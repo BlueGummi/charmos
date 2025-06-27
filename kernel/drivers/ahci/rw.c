@@ -5,7 +5,6 @@
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <string.h>
 
 // TODO: Check for non 512-byte sector sizes and adjust accordingly
 

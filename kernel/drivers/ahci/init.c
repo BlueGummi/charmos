@@ -12,6 +12,16 @@
 // TODO: Hand this off to IDE if the GHC bit 31 is OFF
 // It won't be AHCI - Sometimes we are in IDE emul mode
 
+/* TODO: file is very messy. clean this up you goober >:C */
+
+static bool wait_until_clear(uint32_t *reg, uint32_t mask) {
+    uint64_t timeout_ms = AHCI_CMD_TIMEOUT_MS;
+    while ((mmio_read_32(reg) & mask) && timeout_ms--) {
+        sleep_ms(1);
+    }
+    return (mmio_read_32(reg) & mask) == 0;
+}
+
 static void setup_port_slots(struct ahci_device *dev, uint32_t port_id) {
     struct ahci_full_port *port = &dev->regs[port_id];
     for (int slot = 0; slot < 32; slot++) {
@@ -66,43 +76,44 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
 
     uint32_t total_disks = 0;
 
+    // Only check ports that are implemented
     for (uint32_t i = 0; i < 32; i++) {
         if (!(pi & (1U << i)))
             continue;
 
-        uint32_t ssts = mmio_read_32(&ctrl->ports[i].ssts);
+        struct ahci_port *port = ahci_get_port(dev, i);
+
+        mmio_write_32(&port->cmd, mmio_read_32(&port->cmd) & ~AHCI_CMD_ST);
+        wait_until_clear(&port->cmd, AHCI_CMD_CR);
+
+        mmio_write_32(&port->cmd, mmio_read_32(&port->cmd) & ~AHCI_CMD_FRE);
+        wait_until_clear(&port->cmd, AHCI_CMD_FR);
+
+        mmio_write_32(&port->is, 0xFFFFFFFF);
+
+        uint32_t cmd = mmio_read_32(&port->cmd);
+        cmd |= AHCI_CMD_FRE | AHCI_CMD_ST;
+        mmio_write_32(&port->cmd, cmd);
+
+        uint32_t ssts = mmio_read_32(&port->ssts);
         uint32_t det = ssts & 0x0F;
         uint32_t ipm = (ssts >> 8) & 0x0F;
+        if (!(det == AHCI_DET_PRESENT && ipm == AHCI_IPM_ACTIVE))
+            continue;
 
-        if (!(det == AHCI_DET_PRESENT && ipm == AHCI_IPM_ACTIVE)) {
+        uint32_t sig = mmio_read_32(&port->sig);
+        ahci_info(K_INFO, "Controller port %u has signature 0x%lx", i, sig);
+
+        if (sig == 0xFFFFFFFF)
+            continue;
+
+        if (port->sig != 0x00000101) {
+            ahci_info(K_WARN, "Controller port %u is not an HDD, skipping...",
+                      i, sig);
             continue;
         }
 
-        uint32_t sig = mmio_read_32(&ctrl->ports[i].sig);
-
-        if (sig == (uint32_t) -1)
-            continue; // stupid q35 vm or something making this weird
-
-        struct ahci_port *port = &ctrl->ports[i];
-
-        mmio_write_32(&port->cmd, mmio_read_32(&port->cmd) & ~AHCI_CMD_ST);
-        uint64_t timeout = AHCI_CMD_TIMEOUT_MS;
-        while (mmio_read_32(&port->cmd) & AHCI_CMD_CR && --timeout) {
-            sleep_ms(1);
-            if (timeout == 0)
-                return false;
-        }
-
-        mmio_write_32(&port->cmd, mmio_read_32(&port->cmd) & ~AHCI_CMD_FRE);
-
-        timeout = AHCI_CMD_TIMEOUT_MS;
-        while (mmio_read_32(&port->cmd) & AHCI_CMD_FR && --timeout) {
-            sleep_ms(1);
-            if (timeout == 0)
-                return false;
-        }
-
-        total_disks += 1;
+        total_disks++;
     }
 
     if (!total_disks)
@@ -120,12 +131,13 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
         if (!(pi & (1U << i)))
             continue;
 
-        uint32_t ssts = ctrl->ports[i].ssts;
+        struct ahci_port *port = ahci_get_port(dev, i);
+        uint32_t ssts = mmio_read_32(&port->ssts);
+
         if ((ssts & 0x0F) == AHCI_DET_PRESENT &&
             ((ssts >> 8) & 0x0F) == AHCI_IPM_ACTIVE) {
             disks[disks_ind].port = i;
             disks[disks_ind].device = dev;
-            struct ahci_port *port = &ctrl->ports[i];
 
             uint32_t cmd = mmio_read_32(&port->cmd);
             mmio_write_32(&port->cmd, cmd & ~(AHCI_CMD_ST | AHCI_CMD_FRE));
@@ -146,6 +158,7 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
             mmio_write_32(&port->cmd, cmd);
 
             setup_port_slots(dev, i);
+            ahci_info(K_INFO, "Port %u slots set up", i);
         }
     }
     return disks;
@@ -173,10 +186,12 @@ struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
     mmio_write_32(&ctrl->ghc, mmio_read_32(&ctrl->ghc) | AHCI_GHC_AE);
 
     struct ahci_device *dev = kzalloc(sizeof(struct ahci_device));
+    dev->ctrl = ctrl;
     uint32_t disk_count = 0;
     struct ahci_disk *d = device_setup(dev, ctrl, &disk_count);
     *d_cnt = disk_count;
-    ahci_info(K_INFO, "Device initialized successfully");
+    ahci_info(K_INFO, "Device initialized successfully, %u port(s) present",
+              disk_count);
     return d;
 }
 
@@ -216,9 +231,8 @@ void ahci_print_wrapper(struct generic_disk *d) {
 
 struct generic_disk *ahci_create_generic(struct ahci_disk *disk) {
     struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
-    if (!d) {
+    if (!d)
         ahci_info(K_ERROR, "could not allocate space for device");
-    }
 
     d->driver_data = disk;
     d->sector_size = 512;

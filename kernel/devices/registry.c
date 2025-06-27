@@ -130,10 +130,11 @@ void registry_setup() {
             uint32_t d_cnt = 0;
             struct ahci_disk *disks =
                 ahci_discover_device(dev.bus, dev.device, dev.function, &d_cnt);
+
             for (uint32_t i = 0; i < d_cnt; i++) {
                 struct generic_disk *disk = ahci_create_generic(&disks[i]);
+                k_info("DEVICE", K_INFO, "Registering \"sata%u\"\n", ahci_cnt);
                 device_mkname(disk, "sata", ahci_cnt++);
-
                 registry_register(disk);
             }
             continue;
@@ -176,15 +177,8 @@ void registry_setup() {
                             g_root_part);
                 g_root_node = root;
 
-                // root->ops->create(root, "BLAH", VFS_MODE_FILE);
                 root->ops->mkdir(root, "tmp", VFS_MODE_DIR);
-                /*struct vfs_node *tmp_on_ext2 = root->ops->finddir(root,
-                "tmp"); struct vfs_node *tmpfs_root = tmpfs_mkroot("tmp");
 
-                root->ops->mount(tmp_on_ext2, tmpfs_root);
-                */
-
-                /* TODO: Migrate this out - what is this doing here */
                 found_root = true;
             }
         }
