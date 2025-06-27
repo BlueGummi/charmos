@@ -4,6 +4,16 @@
 #include <mem/alloc.h>
 #include <stdatomic.h>
 
+#define ALIGN_DOWN(x, align) ((x) & ~((align) - 1))
+
+static uint8_t *get_lba_offset_buffer(struct block_cache_entry *ent,
+                                      uint64_t lba, uint64_t spb,
+                                      uint64_t block_size) {
+    uint64_t offset_lba = lba - ent->lba;
+    uint64_t offset_bytes = (block_size / spb) * offset_lba;
+    return ent->buffer + offset_bytes;
+}
+
 /* sleeping locks aren't necessary here because there isn't
  * going to be a long wait for cache accesses - hopefullly
  */
@@ -146,22 +156,20 @@ void block_cache_ent_unlock(struct block_cache_entry *ent) {
 struct block_cache_entry *bcache_get(struct generic_disk *disk, uint64_t lba,
                                      uint64_t block_size, uint64_t spb,
                                      bool no_evict) {
-    struct block_cache_entry *ret = block_cache_get(disk->cache, lba);
+    uint64_t base_lba = ALIGN_DOWN(lba, spb);
+    struct block_cache_entry *ent = block_cache_get(disk->cache, base_lba);
 
-    if (ret) {
-        return ret;
+    if (ent) {
+        struct block_cache_entry *shallow =
+            kzalloc(sizeof(struct block_cache_entry));
+        *shallow = *ent;
+        shallow->buffer = get_lba_offset_buffer(ent, lba, spb, block_size);
+        shallow->lba = lba;
+        return shallow;
     }
 
-    ret = bcache_create_ent(disk, lba, block_size, spb, no_evict);
-
-    bool status = bcache_insert(disk, lba, ret);
-
-    /* insertion does not call eviction */
-    if (!status) {
-        bcache_evict(disk);
-        bcache_insert(disk, lba, ret);
-    }
-    return ret;
+    ent = bcache_create_ent(disk, lba, block_size, spb, no_evict);
+    return ent;
 }
 
 bool bcache_insert(struct generic_disk *disk, uint64_t lba,
@@ -177,16 +185,39 @@ struct block_cache_entry *bcache_create_ent(struct generic_disk *disk,
                                             uint64_t lba, uint64_t block_size,
                                             uint64_t sectors_per_block,
                                             bool no_evict) {
-    uint8_t *buf = kmalloc_aligned(block_size, PAGE_SIZE);
+    uint64_t base_lba = ALIGN_DOWN(lba, sectors_per_block);
 
-    if (!disk->read_sector(disk, lba, buf, sectors_per_block))
+    // check if it already exists
+    struct block_cache_entry *existing = block_cache_get(disk->cache, base_lba);
+    if (existing) {
+        struct block_cache_entry *shallow =
+            kzalloc(sizeof(struct block_cache_entry));
+        *shallow = *existing;
+        shallow->buffer =
+            get_lba_offset_buffer(existing, lba, sectors_per_block, block_size);
+        shallow->lba = lba;
+        return shallow;
+    }
+
+    uint8_t *buf = kmalloc_aligned(block_size, PAGE_SIZE);
+    if (!disk->read_sector(disk, base_lba, buf, sectors_per_block)) {
+        kfree_aligned(buf);
         return NULL;
+    }
 
     struct block_cache_entry *ent = kzalloc(sizeof(struct block_cache_entry));
     ent->buffer = buf;
-    ent->lba = lba;
+    ent->lba = base_lba;
     ent->size = block_size;
     ent->no_evict = no_evict;
-    bcache_insert(disk, lba, ent);
-    return ent;
+
+    bcache_insert(disk, base_lba, ent);
+
+    struct block_cache_entry *shallow =
+        kzalloc(sizeof(struct block_cache_entry));
+    *shallow = *ent;
+    shallow->buffer =
+        get_lba_offset_buffer(ent, lba, sectors_per_block, block_size);
+    shallow->lba = lba;
+    return shallow;
 }
