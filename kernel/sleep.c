@@ -32,3 +32,13 @@ void sleep_us(uint64_t us) {
 void sleep(uint64_t seconds) {
     sleep_hpet_fs(seconds * 1000000000000000ULL); // 1 s = 1e15 femtoseconds
 }
+
+bool mmio_wait(uint32_t *reg, uint32_t mask, uint64_t timeout) {
+    uint64_t timeout_us = timeout * 1000;
+    while ((mmio_read_32(reg) & mask) && timeout_us--) {
+        if (timeout_us == 0)
+            return false;
+        sleep_us(10);
+    }
+    return (mmio_read_32(reg) & mask) == 0;
+}

@@ -14,14 +14,6 @@
 
 /* TODO: file is very messy. clean this up you goober >:C */
 
-static bool wait_until_clear(uint32_t *reg, uint32_t mask) {
-    uint64_t timeout_ms = AHCI_CMD_TIMEOUT_MS;
-    while ((mmio_read_32(reg) & mask) && timeout_ms--) {
-        sleep_ms(1);
-    }
-    return (mmio_read_32(reg) & mask) == 0;
-}
-
 static void setup_port_slots(struct ahci_device *dev, uint32_t port_id) {
     struct ahci_full_port *port = &dev->regs[port_id];
     for (int slot = 0; slot < 32; slot++) {
@@ -84,10 +76,10 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
         struct ahci_port *port = ahci_get_port(dev, i);
 
         mmio_write_32(&port->cmd, mmio_read_32(&port->cmd) & ~AHCI_CMD_ST);
-        wait_until_clear(&port->cmd, AHCI_CMD_CR);
+        mmio_wait(&port->cmd, AHCI_CMD_CR, AHCI_CMD_TIMEOUT_MS);
 
         mmio_write_32(&port->cmd, mmio_read_32(&port->cmd) & ~AHCI_CMD_FRE);
-        wait_until_clear(&port->cmd, AHCI_CMD_FR);
+        mmio_wait(&port->cmd, AHCI_CMD_FR, AHCI_CMD_TIMEOUT_MS);
 
         mmio_write_32(&port->is, 0xFFFFFFFF);
 
@@ -142,13 +134,8 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
             uint32_t cmd = mmio_read_32(&port->cmd);
             mmio_write_32(&port->cmd, cmd & ~(AHCI_CMD_ST | AHCI_CMD_FRE));
 
-            uint64_t timeout = AHCI_CMD_TIMEOUT_MS;
-            while (mmio_read_32(&port->cmd) & (AHCI_CMD_CR | AHCI_CMD_FR)) {
-                sleep_ms(1);
-                timeout--;
-                if (timeout == 0)
-                    return NULL;
-            }
+            mmio_wait(&port->cmd, AHCI_CMD_CR | AHCI_CMD_FR,
+                      AHCI_CMD_TIMEOUT_MS);
 
             allocate_port(dev, port, i);
 
@@ -174,14 +161,7 @@ struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
 
     mmio_write_32(&ctrl->ghc, AHCI_GHC_HR);
 
-    uint64_t timeout = AHCI_CMD_TIMEOUT_MS;
-    while (mmio_read_32(&ctrl->ghc) & AHCI_GHC_HR) {
-        sleep_ms(1);
-        if (--timeout == 0) {
-            ahci_info(K_WARN, "controller reset timed out\n");
-            return NULL;
-        }
-    }
+    mmio_wait(&ctrl->ghc, AHCI_GHC_HR, AHCI_CMD_TIMEOUT_MS);
 
     mmio_write_32(&ctrl->ghc, mmio_read_32(&ctrl->ghc) | AHCI_GHC_AE);
 

@@ -51,9 +51,9 @@ void ide_identify(struct ata_drive *drive) {
 
     uint8_t status;
 
-    uint64_t timeout = IDE_IDENT_TIMEOUT_MS;
+    uint64_t timeout = IDE_IDENT_TIMEOUT_MS * 1000;
     while ((status = inb(REG_STATUS(io))) & STATUS_BSY) {
-        sleep_ms(1);
+        sleep_us(10);
         timeout--;
         if (timeout == 0)
             return;
@@ -63,9 +63,9 @@ void ide_identify(struct ata_drive *drive) {
         return;
     }
 
-    timeout = IDE_IDENT_TIMEOUT_MS;
+    timeout = IDE_IDENT_TIMEOUT_MS * 1000;
     while (!((status = inb(REG_STATUS(io))) & STATUS_DRQ)) {
-        sleep_ms(1);
+        sleep_us(10);
         timeout--;
         if (timeout == 0)
             return;

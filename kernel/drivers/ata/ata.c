@@ -27,10 +27,10 @@ void ata_soft_reset(struct ata_drive *ata_drive) {
     io_wait();
 
     uint16_t base = ata_drive->io_base;
-    uint64_t timeout = IDE_CMD_TIMEOUT_MS;
+    uint64_t timeout = IDE_CMD_TIMEOUT_MS * 1000;
 
     while (inb(REG_STATUS(base)) & STATUS_BSY) {
-        sleep_ms(1);
+        sleep_us(10);
         timeout--;
         if (timeout == 0)
             return;
@@ -47,10 +47,10 @@ bool ata_identify(struct ata_drive *ata_drive) {
     if (status == 0)
         return false;
 
-    uint64_t timeout = IDE_IDENT_TIMEOUT_MS;
+    uint64_t timeout = IDE_IDENT_TIMEOUT_MS * 1000;
     while ((status & STATUS_BSY)) {
         status = inb(REG_STATUS(ata_drive->io_base));
-        sleep_ms(1);
+        sleep_us(1);
         timeout--;
         if (timeout == 0)
             return false;

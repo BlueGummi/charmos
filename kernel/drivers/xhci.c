@@ -46,10 +46,9 @@ static bool xhci_controller_stop(struct xhci_device *dev) {
     struct xhci_usbcmd usbcmd = {.raw = mmio_read_32(&op->usbcmd)};
     usbcmd.run_stop = 0;
     mmio_write_32(&op->usbcmd, usbcmd.raw);
-    uint64_t timeout = XHCI_DEVICE_TIMEOUT;
-
+    uint64_t timeout = XHCI_DEVICE_TIMEOUT * 1000;
     while ((mmio_read_32(&op->usbsts) & 1) == 0 && timeout--) {
-        sleep_ms(1);
+        sleep_us(10);
         if (timeout == 0)
             return false;
     }
@@ -62,10 +61,10 @@ static bool xhci_controller_reset(struct xhci_device *dev) {
     struct xhci_usbcmd usbcmd = {.raw = mmio_read_32(&op->usbcmd)};
     usbcmd.host_controller_reset = 1;
     mmio_write_32(&op->usbcmd, usbcmd.raw); // Reset
-    uint64_t timeout = XHCI_DEVICE_TIMEOUT;
+    uint64_t timeout = XHCI_DEVICE_TIMEOUT * 1000;
 
     while (mmio_read_32(&op->usbcmd) & (1 << 1) && timeout--) {
-        sleep_ms(1);
+        sleep_us(10);
         if (timeout == 0)
             return false;
     }
@@ -78,10 +77,9 @@ static bool xhci_controller_start(struct xhci_device *dev) {
     struct xhci_usbcmd usbcmd = {.raw = mmio_read_32(&op->usbcmd)};
     usbcmd.run_stop = 1;
     mmio_write_32(&op->usbcmd, usbcmd.raw);
-    uint64_t timeout = XHCI_DEVICE_TIMEOUT;
-
+    uint64_t timeout = XHCI_DEVICE_TIMEOUT * 1000;
     while (mmio_read_32(&op->usbsts) & 1 && timeout--) {
-        sleep_ms(1);
+        sleep_us(10);
         if (timeout == 0)
             return false;
     }
@@ -250,9 +248,9 @@ void xhci_parse_ext_caps(struct xhci_device *dev) {
 
             mmio_write_32(os_owns_addr, 1);
 
-            uint64_t timeout = 1000;
+            uint64_t timeout = 1000 * 1000;
             while ((mmio_read_32(bios_owns_addr) & 1) && timeout--) {
-                sleep_ms(1);
+                sleep_us(1);
             }
 
             uint32_t own_data = mmio_read_32(bios_owns_addr);
@@ -277,9 +275,9 @@ bool xhci_reset_port(struct xhci_device *dev, uint32_t port_index) {
     val |= (1 << 4); // Port Reset
     mmio_write_32(portsc, val);
 
-    uint64_t timeout = 100;
+    uint64_t timeout = 100 * 1000;
     while ((mmio_read_32(portsc) & (1 << 4)) && timeout--) {
-        sleep_ms(1);
+        sleep_us(1);
     }
 
     if (mmio_read_32(portsc) & (1 << 4)) {

@@ -15,10 +15,10 @@ bool atapi_identify(struct ata_drive *ide) {
     if (status == 0)
         return false;
 
-    uint64_t timeout = ATAPI_CMD_TIMEOUT_MS;
+    uint64_t timeout = ATAPI_CMD_TIMEOUT_MS * 1000;
     while ((status & STATUS_BSY)) {
         status = inb(REG_STATUS(ide->io_base));
-        sleep_ms(1);
+        sleep_us(10);
         timeout--;
         if (timeout == 0)
             return false;
@@ -49,9 +49,9 @@ bool atapi_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
 
     outb(REG_COMMAND(io), ATA_CMD_PACKET);
 
-    uint64_t timeout = ATAPI_CMD_TIMEOUT_MS;
+    uint64_t timeout = ATAPI_CMD_TIMEOUT_MS * 1000;
     while (inb(REG_STATUS(io)) & STATUS_BSY) {
-        sleep_ms(1);
+        sleep_us(10);
         timeout--;
         if (timeout == 0)
             return false;
@@ -78,14 +78,14 @@ bool atapi_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
         outw(REG_DATA(io), word);
     }
 
-    timeout = ATAPI_CMD_TIMEOUT_MS;
+    timeout = ATAPI_CMD_TIMEOUT_MS * 1000;
     while (true) {
         uint8_t status = inb(REG_STATUS(io));
         if (status & STATUS_ERR)
             return false;
         if (status & STATUS_DRQ)
             break;
-        sleep_ms(1);
+        sleep_us(10);
         timeout--;
         if (timeout == 0)
             return false;

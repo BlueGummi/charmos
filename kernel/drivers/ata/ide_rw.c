@@ -24,9 +24,9 @@ static bool ide_check_error(struct ata_drive *d) {
 }
 
 bool ide_wait_ready(struct ata_drive *d) {
-    uint64_t timeout = IDE_CMD_TIMEOUT_MS;
+    uint64_t timeout = IDE_CMD_TIMEOUT_MS * 1000;
     while (inb(REG_STATUS(d->io_base)) & STATUS_BSY) {
-        sleep_ms(1);
+        sleep_us(10);
         timeout--;
         if (timeout == 0)
             return false;

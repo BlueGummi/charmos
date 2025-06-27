@@ -26,21 +26,17 @@ void nvme_enable_controller(struct nvme_device *nvme) {
 
     mmio_write_32(&nvme->regs->cc, *(uint32_t *) &cc);
 
-    uint64_t timeout = NVME_CMD_TIMEOUT_MS;
-    while (mmio_read_32(&nvme->regs->csts) & 1) {
-        sleep_ms(1);
-        timeout--;
-        if (timeout == 0)
-            return;
-    }
+    /* TODO: probably move these out into a custom wait fn */
+
+    mmio_wait(&nvme->regs->csts, 1, NVME_CMD_TIMEOUT_MS);
 
     cc.en = 1;
 
     mmio_write_32(&nvme->regs->cc, *(uint32_t *) &cc);
 
-    timeout = NVME_CMD_TIMEOUT_MS;
+    uint64_t timeout = NVME_CMD_TIMEOUT_MS * 1000;
     while ((mmio_read_32(&nvme->regs->csts) & 1) == 0) {
-        sleep_ms(1);
+        sleep_us(10);
         timeout--;
         if (timeout == 0)
             return;
