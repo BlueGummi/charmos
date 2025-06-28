@@ -300,6 +300,13 @@ static inline uint64_t rdmsr(uint32_t msr) {
 static inline void io_wait(void) {
     outb(0x80, 0);
 }
-uint64_t get_sch_core_id();
+
+static inline uint64_t get_sch_core_id() {
+    uint64_t id;
+    asm volatile("movq %%gs:%c1, %0"
+                 : "=r"(id)
+                 : "i"(offsetof(struct core, id)));
+    return id;
+}
 
 #pragma once
