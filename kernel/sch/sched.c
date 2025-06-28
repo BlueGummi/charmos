@@ -51,10 +51,12 @@ void k_mutex_test() {
     mutex_init(&k_mutex_test_mutex);
     asm("cli");
     mutex_lock(&k_mutex_test_mutex);
+    k_printf("core %u locked the mutex\n", get_core_id());
     for (uint64_t i = 0; i < 50; i++) {
         asm volatile("");
     }
     mutex_unlock(&k_mutex_test_mutex);
+    k_printf("core %u unlocked the mutex\n", get_core_id());
     asm("sti");
 
     while (1) {

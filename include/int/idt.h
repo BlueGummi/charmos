@@ -2,10 +2,6 @@
 
 #define IDT_ENTRIES 256
 #define MAX_IRQ 224
-#define PIC1_COMMAND 0x20
-#define PIC1_DATA 0x21
-#define PIC2_COMMAND 0xA0
-#define PIC2_DATA 0xA1
 
 #define DIV_BY_Z_ID 0x0
 #define DEBUG_ID 0x1

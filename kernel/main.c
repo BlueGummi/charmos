@@ -92,9 +92,6 @@ void k_main(void) {
     uint64_t apic_base_msr = rdmsr(IA32_APIC_BASE_MSR);
     uintptr_t lapic_phys = apic_base_msr & IA32_APIC_BASE_MASK;
     lapic = vmm_map_phys(lapic_phys, 4096);
-    
-    uint32_t lapic_svr = *(uint32_t*)(lapic + 0xF0);
-    mmio_write_32(lapic, lapic_svr & 0x100);
 
     hpet_init();
     ioapic_init();
@@ -109,13 +106,13 @@ void k_main(void) {
     // Scheduler
     scheduler_init(c_cnt);
 
-    asm("sti");
     tests_run();
     lapic_init();
     mp_inform_of_cr3();
 
     k_info("MAIN", K_INFO, "Boot OK");
-    asm("sti");
+    asm volatile("sti");
+    scheduler_yield();
     while (1) {
         asm("hlt");
     }
