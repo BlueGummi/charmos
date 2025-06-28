@@ -1,6 +1,7 @@
 #include <mutex.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
+#include <sleep.h>
 
 void thread_queue_init(struct thread_queue *q) {
     q->head = NULL;
@@ -43,23 +44,61 @@ void mutex_init(struct mutex *m) {
     m->initialized = true;
 }
 
+#define MAX_SPIN_ATTEMPTS 50
+#define SPIN_DELAY_US 50
+
+static bool try_acquire_mutex(struct mutex *m, struct thread *curr) {
+    spin_lock(&m->lock);
+    if (m->owner == NULL) {
+        m->owner = curr;
+        spin_unlock(&m->lock, false);
+        return true;
+    }
+    spin_unlock(&m->lock, false);
+    return false;
+}
+
+static bool should_spin_on_mutex(struct mutex *m) {
+    spin_lock(&m->lock);
+    struct thread *owner = m->owner;
+    bool active = (owner != NULL && owner->state == RUNNING);
+    spin_unlock(&m->lock, false);
+    return active;
+}
+
+static bool spin_wait_mutex(struct mutex *m, struct thread *curr) {
+    for (int i = 0; i < MAX_SPIN_ATTEMPTS; i++) {
+        if (try_acquire_mutex(m, curr)) {
+            return true;
+        }
+        sleep_us(SPIN_DELAY_US);
+    }
+    return false;
+}
+
+static void block_on_mutex(struct mutex *m, struct thread *curr) {
+    spin_lock(&m->lock);
+    thread_queue_push_back(&m->waiters, curr);
+    curr->state = BLOCKED;
+    spin_unlock(&m->lock, false);
+    scheduler_yield();
+}
+
 void mutex_lock(struct mutex *m) {
     struct thread *curr = scheduler_get_curr_thread();
 
     while (true) {
-        spin_lock(&m->lock);
-
-        if (m->owner == NULL) {
-            m->owner = curr;
-            spin_unlock(&m->lock, false);
+        if (try_acquire_mutex(m, curr)) {
             return;
         }
 
-        thread_queue_push_back(&m->waiters, curr);
-        curr->state = BLOCKED;
+        if (should_spin_on_mutex(m)) {
+            if (spin_wait_mutex(m, curr)) {
+                return; 
+            }
+        }
 
-        spin_unlock(&m->lock, false);
-        scheduler_yield();
+        block_on_mutex(m, curr);
     }
 }
 
