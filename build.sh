@@ -61,8 +61,6 @@ if [ ! -d "limine" ]; then
     git clone https://github.com/limine-bootloader/limine --branch=v9.x-binary --depth=1 $cli_quiet_arg
 fi
 
-./kernel/get-deps
-
 if [ ! -d "build" ]; then
     mkdir -p build
 fi
