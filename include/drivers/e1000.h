@@ -1,4 +1,4 @@
-#include <pci/pci.h>
+#include <drivers/pci.h>
 #include <stdbool.h>
 #include <stdint.h>
 #pragma once

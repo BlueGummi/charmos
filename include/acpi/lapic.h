@@ -8,7 +8,7 @@
 #define LAPIC_REG_TIMER_DIV 0x3E0
 #define LAPIC_LVT_MASK (1 << 16)
 #define LAPIC_ENABLE 0x100
-
+#define LAPIC_SPURIOUS_REGISTER 0xF0
 #define LAPIC_REG(offset)                                                      \
     (*(volatile uint32_t *) ((uintptr_t) lapic + (offset)))
 #define TIMER_VECTOR 0x20
@@ -19,3 +19,4 @@ void lapic_timer_disable();
 void lapic_timer_enable();
 #define IA32_APIC_BASE_MSR 0x1B
 #define IA32_APIC_BASE_MASK 0xFFFFF000UL
+#define IA32_APIC_BASE_ENABLE (1 << 11)

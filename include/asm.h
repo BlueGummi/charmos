@@ -162,10 +162,10 @@ static inline void pci_write(uint8_t bus, uint8_t slot, uint8_t func,
 
 static inline void pci_write_word(uint8_t bus, uint8_t slot, uint8_t func,
                                   uint8_t offset, uint16_t value) {
-    uint32_t tmp = pci_read(bus, slot, func, offset & 0xFC);
+    uint32_t tmp = pci_read(bus, slot, func, offset & 0xFCU);
     uint32_t shift = (offset & 2) * 8;
-    tmp = (tmp & ~(0xFFFF << shift)) | ((uint32_t) value << shift);
-    pci_write(bus, slot, func, offset & 0xFC, tmp);
+    tmp = (tmp & ~(0xFFFFU << shift)) | ((uint32_t) value << shift);
+    pci_write(bus, slot, func, offset & 0xFCU, tmp);
 }
 
 static inline void pci_write_byte(uint8_t bus, uint8_t slot, uint8_t func,

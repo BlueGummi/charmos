@@ -4,7 +4,7 @@
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <pci/pci.h>
+#include <drivers/pci.h>
 #include <sleep.h>
 #include <stddef.h>
 #include <stdint.h>

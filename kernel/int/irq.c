@@ -3,15 +3,7 @@
 #include <int/idt.h>
 #include <int/irq.h>
 
-static struct irq_entry irq_table[IRQ_MAX];
-
-void irq_init(void) {
-    for (int i = 0; i < IRQ_MAX; ++i) {
-        irq_table[i].installed = false;
-        irq_table[i].handler = NULL;
-        irq_table[i].ctx = NULL;
-    }
-}
+static struct irq_entry irq_table[IRQ_MAX] = {0};
 
 int irq_install(uint8_t irq, irq_handler_t handler, void *ctx) {
     if (irq_table[irq].installed)

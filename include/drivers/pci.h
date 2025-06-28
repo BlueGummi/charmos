@@ -33,10 +33,28 @@ union pci_command_reg {
     };
 };
 
+struct pci_msix_table_entry {
+    uint32_t msg_addr_low;
+    uint32_t msg_addr_high;
+    uint32_t msg_data;
+    uint32_t vector_ctrl; // Bit 0 = Mask
+};
+
+struct pci_msix_cap {
+    uint8_t cap_id;            // 0x0
+    uint8_t next_ptr;          // 0x1
+    uint16_t msg_ctl;          // 0x2
+    uint32_t table_offset_bir; // 0x4
+    uint32_t pba_offset_bir;   // 0x8
+};
+
+
 const char *pci_class_name(uint8_t class_code, uint8_t subclass);
 
 void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out);
 uint32_t pci_read_bar(uint8_t bus, uint8_t device, uint8_t function,
                       uint8_t bar_index);
 
+#define PCI_CAP_PTR 0x34
+#define PCI_CAP_ID_MSIX 0x11
 #pragma once

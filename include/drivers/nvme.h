@@ -54,21 +54,21 @@ _Static_assert(sizeof(struct nvme_cc) == sizeof(uint32_t),
                "nvme_cc != sizeof(uint64_t)");
 
 struct nvme_regs {
-    uint32_t cap_lo;          // 0x00
-    uint32_t cap_hi;          // 0x04
-    uint32_t version;         // 0x08
-    uint32_t intms;           // 0x0C
-    uint32_t intmc;           // 0x10
-    struct nvme_cc cc;        // 0x14
-    uint32_t nssr;            // 0x18
-    uint32_t csts;            // 0x1C
-    uint32_t reserved1;       // 0x20 - 0x24
-    uint32_t aqa;             // 0x24
-    uint32_t asq_lo;          // 0x28
-    uint32_t asq_hi;          // 0x2C
-    uint32_t acq_lo;          // 0x30
-    uint32_t acq_hi;          // 0x34
-    uint32_t reserved4[1018]; // pad to 4KB total
+    uint32_t cap_lo;
+    uint32_t cap_hi;
+    uint32_t version;
+    uint32_t intms;
+    uint32_t intmc;
+    struct nvme_cc cc;
+    uint32_t nssr;
+    uint32_t csts;
+    uint32_t reserved1;
+    uint32_t aqa;
+    uint32_t asq_lo;
+    uint32_t asq_hi;
+    uint32_t acq_lo;
+    uint32_t acq_hi;
+    uint32_t reserved4[1018];
 } __attribute__((aligned));
 
 struct nvme_queue {

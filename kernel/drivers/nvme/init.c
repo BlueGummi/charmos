@@ -1,6 +1,10 @@
+#include <acpi/ioapic.h>
 #include <asm.h>
 #include <console/printf.h>
 #include <drivers/nvme.h>
+#include <drivers/pci.h>
+#include <int/idt.h>
+#include <int/irq.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
@@ -8,6 +12,7 @@
 #include <stdint.h>
 #include <string.h>
 
+/* we poll in setup */
 void nvme_enable_controller(struct nvme_device *nvme) {
 
     struct nvme_cc cc = {0};
@@ -87,6 +92,10 @@ void nvme_alloc_admin_queues(struct nvme_device *nvme) {
     nvme->admin_cq_phys = acq_phys;
 }
 
+void functest() {
+    k_printf("nvme device responded\n");
+}
+
 void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
     if (!qid)
         k_panic("Can't allocate IO queue zero!\n");
@@ -125,9 +134,11 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
     cq_cmd.prp1 = cq_phys;
 
     cq_cmd.cdw10 = (15) << 16 | 1;
-    cq_cmd.cdw11 = 1;
+    cq_cmd.cdw11 = 4 << 16 | 0b11;
+
+    idt_set_gate(0x24, (uint64_t) functest, 0x08, 0x8E, 0);
     if (nvme_submit_admin_cmd(nvme, &cq_cmd) != 0) {
-        k_printf("nvme: failed to create IO Completion Queue\n");
+        k_info("NVMe", K_ERROR, "failed to create IOCQ - code 0x%x", cq_cmd);
         return;
     }
 
@@ -137,10 +148,10 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
     sq_cmd.prp1 = sq_phys;
 
     sq_cmd.cdw10 = (63) << 16 | 1;
-    sq_cmd.cdw11 = 1 << 16 | 1;
+    sq_cmd.cdw11 = qid << 16 | 1;
 
     if (nvme_submit_admin_cmd(nvme, &sq_cmd) != 0) {
-        k_printf("nvme: failed to create IO Submission Queue\n");
+        k_info("NVMe", K_ERROR, "failed to create IOSQ - code 0x%x", sq_cmd);
         return;
     }
 }

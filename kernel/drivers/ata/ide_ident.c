@@ -4,7 +4,7 @@
 #include <drivers/ata.h>
 #include <fs/ext2.h>
 #include <mem/alloc.h>
-#include <pci/pci.h>
+#include <drivers/pci.h>
 #include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>

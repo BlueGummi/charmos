@@ -7,7 +7,7 @@
 #include <drivers/xhci.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
-#include <pci/pci.h>
+#include <drivers/pci.h>
 
 static struct pci_device *pci_devices = NULL;
 static uint64_t pci_device_count;

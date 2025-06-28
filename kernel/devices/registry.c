@@ -9,7 +9,7 @@
 #include <fs/tmpfs.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
-#include <pci/pci.h>
+#include <drivers/pci.h>
 #include <string.h>
 
 struct disk_node {

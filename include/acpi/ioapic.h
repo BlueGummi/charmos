@@ -7,3 +7,4 @@ struct ioapic_info {
 };
 
 void ioapic_init(void);
+void ioapic_set_redirection_entry(int irq, uint64_t entry);

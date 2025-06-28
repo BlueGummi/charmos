@@ -13,6 +13,7 @@
 #include <drivers/ahci.h>
 #include <drivers/ata.h>
 #include <drivers/nvme.h>
+#include <drivers/pci.h>
 #include <elf.h>
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
@@ -31,7 +32,6 @@
 #include <misc/logo.h>
 #include <mp/core.h>
 #include <mp/mp.h>
-#include <pci/pci.h>
 #include <pit.h>
 #include <rust.h>
 #include <sch/sched.h>
@@ -92,8 +92,13 @@ void k_main(void) {
     uint64_t apic_base_msr = rdmsr(IA32_APIC_BASE_MSR);
     uintptr_t lapic_phys = apic_base_msr & IA32_APIC_BASE_MASK;
     lapic = vmm_map_phys(lapic_phys, 4096);
+    uint64_t apic_base = rdmsr(IA32_APIC_BASE_MSR);
+    apic_base |= IA32_APIC_BASE_ENABLE;
+    wrmsr(IA32_APIC_BASE_MSR, apic_base);
+    LAPIC_REG(LAPIC_SPURIOUS_REGISTER) = 0x1ff;
     hpet_init();
     ioapic_init();
+    asm volatile("sti");
     k_info("MAIN", K_INFO, "Early boot OK");
 
     // Filesystem init
