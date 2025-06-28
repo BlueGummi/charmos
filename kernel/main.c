@@ -1,5 +1,6 @@
 #include "requests.h"
 #include <acpi/hpet.h>
+#include <acpi/ioapic.h>
 #include <acpi/lapic.h>
 #include <acpi/print.h>
 #include <acpi/uacpi_interface.h>
@@ -92,6 +93,7 @@ void k_main(void) {
     uintptr_t lapic_phys = apic_base_msr & IA32_APIC_BASE_MASK;
     lapic = vmm_map_phys(lapic_phys, 4096);
     hpet_init();
+    ioapic_init();
     k_info("MAIN", K_INFO, "Early boot OK");
 
     // Filesystem init

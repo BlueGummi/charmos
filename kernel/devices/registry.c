@@ -120,6 +120,7 @@ void registry_setup() {
             struct nvme_device *d =
                 nvme_discover_device(dev.bus, dev.device, dev.function);
             struct generic_disk *disk = nvme_create_generic(d);
+            k_info("DEVICE", K_INFO, "Registering \"nvme%u\"", nvme_cnt);
             device_mkname(disk, "nvme", nvme_cnt++);
 
             registry_register(disk);
@@ -133,7 +134,7 @@ void registry_setup() {
 
             for (uint32_t i = 0; i < d_cnt; i++) {
                 struct generic_disk *disk = ahci_create_generic(&disks[i]);
-                k_info("DEVICE", K_INFO, "Registering \"sata%u\"\n", ahci_cnt);
+                k_info("DEVICE", K_INFO, "Registering \"sata%u\"", ahci_cnt);
                 device_mkname(disk, "sata", ahci_cnt++);
                 registry_register(disk);
             }
@@ -149,9 +150,12 @@ void registry_setup() {
 
                 if (drives[ind].type == IDE_TYPE_ATA) {
                     d = ide_create_generic(&drives[ind]);
+                    k_info("DEVICE", K_INFO, "Registering \"ata%u\"", ide_cnt);
                     device_mkname(d, "ata", ide_cnt++);
                 } else if (drives[ind].type == IDE_TYPE_ATAPI) {
                     d = atapi_create_generic(&drives[ind]);
+                    k_info("DEVICE", K_INFO, "Registering \"cdrom%u\"",
+                           atapi_cnt);
                     device_mkname(d, "cdrom", atapi_cnt++);
                 }
 

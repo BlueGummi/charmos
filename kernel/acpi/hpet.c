@@ -12,34 +12,6 @@
 
 uint64_t *hpet_base;
 
-/*
-void ioapic_write(uint8_t reg, uint32_t val) {
-    mmio_write_32(&ioapic_regs[0], reg); // IOREGSEL
-    mmio_write_32(&ioapic_regs[4], val); // IOWIN
-}
-
-uint32_t ioapic_read(uint8_t reg) {
-    mmio_write_32(&ioapic_regs[0], reg);
-    return mmio_read_32(&ioapic_regs[4]);
-}
-
-static uint64_t make_redirection_entry(uint8_t vector, uint8_t dest_apic_id,
-                                       bool masked) {
-    union ioapic_redirection_entry entry = {0};
-    entry.vector = vector;
-    entry.delivery_mode = 0; // Fixed delivery
-    entry.dest_mode = 0;     // Physical mode
-    entry.polarity = 0;      // Active high
-    entry.trigger_mode = 0;  // Edge triggered
-    entry.mask = masked ? 1 : 0;
-    entry.dest_apic_id = dest_apic_id;
-    return entry.raw;
-}
-
-void ioapic_set_redirection_entry(int irq, uint64_t entry) {
-    ioapic_write(0x10 + irq * 2, (uint32_t) (entry & 0xFFFFFFFF));
-    ioapic_write(0x10 + irq * 2 + 1, (uint32_t) (entry >> 32));
-}*/
 
 void hpet_write64(uint64_t offset, uint64_t value) {
     mmio_write_64((void *) ((uintptr_t) hpet_base + offset), value);
@@ -89,7 +61,9 @@ void hpet_setup_periodic_interrupt_us(uint64_t microseconds_period) {
 
 void hpet_init(void) {
     struct uacpi_table hpet_table;
-    uacpi_table_find_by_signature("HPET", &hpet_table);
+    if (uacpi_table_find_by_signature("HPET", &hpet_table) != UACPI_STATUS_OK) {
+        k_info("HPET", K_ERROR, "Did not find HPET ACPI entry");
+    }
 
     struct acpi_hpet *hpet = hpet_table.ptr;
     uint64_t hpet_addr = hpet->address.address;
@@ -99,6 +73,7 @@ void hpet_init(void) {
     hpet_disable();
     hpet_write64(HPET_MAIN_COUNTER_OFFSET, 0);
     hpet_enable();
+    k_info("HPET", K_INFO, "HPET initialized");
 }
 
 static inline uint32_t hpet_get_fs_per_tick(void) {
