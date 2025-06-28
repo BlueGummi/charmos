@@ -386,12 +386,12 @@ void v_k_printf(const char *format, va_list args) {
 }
 
 void k_printf(const char *format, ...) {
-    spin_lock(&k_printf_lock);
+    spin_lock_no_cli(&k_printf_lock);
     va_list args;
     va_start(args, format);
     v_k_printf(format, args);
     va_end(args);
-    spin_unlock(&k_printf_lock, false);
+    spin_unlock_no_cli(&k_printf_lock);
 }
 
 void panic(const char *format, ...) {

@@ -1,3 +1,4 @@
+#include <asm.h>
 #include <console/printf.h>
 #include <tests.h>
 

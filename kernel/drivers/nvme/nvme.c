@@ -1,5 +1,5 @@
-#include <asm.h>
 #include <acpi/lapic.h>
+#include <asm.h>
 #include <console/printf.h>
 #include <devices/generic_disk.h>
 #include <drivers/nvme.h>
@@ -9,48 +9,48 @@
 #include <mem/vmm.h>
 #include <stdint.h>
 
-void nvme_msix_enable_vector(uint8_t bus, uint8_t slot, uint8_t func,
-                            uint32_t original_bar0, uint32_t original_bar1,
-                            uint8_t msix_cap_offset,
-                            uint32_t vector_index, uint32_t irq_vector) {
+static void nvme_msix_enable_vector(uint8_t bus, uint8_t slot, uint8_t func,
+                                    uint8_t msix_cap_offset,
+                                    uint32_t vector_index) {
     uint32_t table_offset_bir = pci_read(bus, slot, func, msix_cap_offset + 4);
+    uint32_t original_bar0 = pci_read(bus, slot, func, 0x10);
+    uint32_t original_bar1 = pci_read(bus, slot, func, 0x14);
 
     uint8_t bir = table_offset_bir & 0x7;
     uint32_t table_offset = table_offset_bir & ~0x7;
 
     uint64_t bar_addr = 0;
     if (bir == 0) {
-        bar_addr = ((uint64_t)original_bar1 << 32) | (original_bar0 & ~0xFU);
+        bar_addr = ((uint64_t) original_bar1 << 32) | (original_bar0 & ~0xFU);
     } else if (bir == 1) {
         k_printf("nvme_msix_enable_vector: Unsupported BIR");
     }
 
     size_t map_size = (vector_index + 1) * sizeof(struct pci_msix_table_entry);
     if (map_size < 4096) {
-        map_size = 4096; 
+        map_size = 4096;
     }
     void *msix_table = vmm_map_phys(bar_addr + table_offset, map_size);
 
-    uintptr_t entry_addr = (uintptr_t)msix_table + vector_index * sizeof(struct pci_msix_table_entry);
+    struct pci_msix_table_entry *entry_addr =
+        (void *) msix_table +
+        vector_index * sizeof(struct pci_msix_table_entry);
 
-    uint64_t apic_base_addr = rdmsr(IA32_APIC_BASE_MSR);
-    mmio_write_32((void*)(entry_addr + offsetof(struct pci_msix_table_entry, msg_addr_low)), apic_base_addr);
-    mmio_write_32((void*)(entry_addr + offsetof(struct pci_msix_table_entry, msg_addr_high)), 0);
+    uint64_t msg_addr = 0xFEE00000 | (get_sch_core_id() << 12);
 
-    mmio_write_32((void*)(entry_addr + offsetof(struct pci_msix_table_entry, msg_data)), irq_vector);
+    mmio_write_32(&entry_addr->msg_addr_low, msg_addr);
+    mmio_write_32(&entry_addr->msg_addr_high, 0);
+    mmio_write_32(&entry_addr->msg_data, vector_index);
 
-    uint32_t vector_ctrl = mmio_read_32((void*)(entry_addr + offsetof(struct pci_msix_table_entry, vector_ctrl)));
-    vector_ctrl &= ~0x1;  
-    mmio_write_32((void*)(entry_addr + offsetof(struct pci_msix_table_entry, vector_ctrl)), vector_ctrl);
+    uint32_t vector_ctrl = mmio_read_32(&entry_addr->vector_ctrl);
+    vector_ctrl &= ~0x1;
+    mmio_write_32(&entry_addr->vector_ctrl, vector_ctrl);
 
-    k_info("NVMe", K_INFO, "Enabled MSI-X vector %u with IRQ vector %u", vector_index, irq_vector);
+    k_info("NVMe", K_INFO, "Enabled MSI-X vector %u", vector_index);
 }
-
 
 void nvme_enable_msix(uint8_t bus, uint8_t slot, uint8_t func) {
     uint8_t cap_ptr = pci_read_byte(bus, slot, func, PCI_CAP_PTR);
-    uint32_t original_bar0 = pci_read(bus, slot, func, 0x10);
-    uint32_t original_bar1 = pci_read(bus, slot, func, 0x14);
 
     while (cap_ptr != 0) {
         uint8_t cap_id = pci_read_byte(bus, slot, func, cap_ptr);
@@ -63,10 +63,10 @@ void nvme_enable_msix(uint8_t bus, uint8_t slot, uint8_t func) {
             pci_write_word(bus, slot, func, cap_ptr + 2, msg_ctl);
 
             uint16_t verify = pci_read_word(bus, slot, func, cap_ptr + 2);
+
             if ((verify & (1 << 15)) && !(verify & (1 << 14))) {
                 k_info("NVMe", K_INFO, "MSI-X enabled");
-                nvme_msix_enable_vector(bus, slot, func, original_bar0, original_bar1,
-                                       cap_ptr, 4, 0x24);
+                nvme_msix_enable_vector(bus, slot, func, cap_ptr, 0x24);
             } else {
                 k_info("NVMe", K_ERROR, "Failed to enable MSI-X");
             }

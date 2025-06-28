@@ -9,6 +9,7 @@
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <misc/dbg.h>
+#include <int/irq.h>
 #include <sch/sched.h>
 #include <stdint.h>
 
@@ -64,6 +65,7 @@ void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
     idt[num].flags = flags;
     idt[num].reserved = 0;
     idt_entry_used[num] = true;
+    irq_set_installed(num, true);
 }
 
 int idt_install_handler(uint8_t flags, void (*handler)(void), uint64_t core) {

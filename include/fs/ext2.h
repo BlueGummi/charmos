@@ -60,9 +60,6 @@ extern uint64_t PTRS_PER_BLOCK;
 #define EXT2_COMPRBLK_FL 0x00000200 // One or more compressed clusters
 #define EXT2_NOCOMPR_FL 0x00000400  // Don't compress
 #define EXT2_ECOMPR_FL 0x00000800   // Compression error
-
-#define EXT2_BTREE_FL 0x00001000        // B-tree format directory (ext3/4)
-#define EXT2_INDEX_FL 0x00001000        // Has hash-indexed directory
 #define EXT2_IMAGIC_FL 0x00002000       // AFS directory
 #define EXT2_JOURNAL_DATA_FL 0x00004000 // Write data to journal (data=journal)
 
