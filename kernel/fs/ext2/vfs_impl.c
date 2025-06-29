@@ -335,6 +335,7 @@ static enum errno dir_entry_rename(struct ext2_fs *fs,
 //
 //
 
+/* no locking necessary in mounting, duh */
 enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
                       struct ext2_sblock *sblock, struct vfs_node *out_node) {
     if (!fs || !sblock)
@@ -360,8 +361,10 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     struct block_cache_entry *gdt_ent;
 
     uint32_t lba = ext2_block_to_lba(fs, gdt_block);
-    gdt_ent = bcache_create_ent(fs->drive, lba, fs->block_size,
-                                fs->sectors_per_block, true);
+
+    uint32_t bs = fs->block_size;
+    uint32_t spb = fs->sectors_per_block;
+    gdt_ent = bcache_create_ent(fs->drive, lba, bs, spb, true);
 
     if (!gdt_ent)
         return ERR_IO;

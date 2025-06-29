@@ -16,7 +16,7 @@ uint32_t ext2_block_to_lba(struct ext2_fs *fs, uint32_t block_num) {
     return lba;
 }
 
-/* these should now return block cache entries */
+/* not our job to lock it */
 struct block_cache_entry *ext2_block_read(struct ext2_fs *fs,
                                           uint32_t block_num) {
     if (!fs)
@@ -38,15 +38,15 @@ bool ext2_block_write(struct ext2_fs *fs, struct block_cache_entry *ent) {
         return false;
 
     struct generic_disk *d = fs->drive;
-
+    uint32_t spb = fs->sectors_per_block;
     const uint8_t *buf = (const uint8_t *) ent->buffer;
 
-    uint32_t spb = fs->sectors_per_block;
-    
-    /* this updates access times */
-    bcache_get(d, ent->lba, fs->block_size, spb, false);
+    bcache_ent_lock(ent);
+    bcache_get(d, ent->lba, fs->block_size, spb, false); /* updates atimes */
+    bool ret = d->write_sector(d, ent->lba, buf, spb);
+    bcache_ent_unlock(ent);
 
-    return d->write_sector(d, ent->lba, buf, fs->sectors_per_block);
+    return ret;
 }
 
 struct block_cache_entry *ext2_inode_read(struct ext2_fs *fs,
@@ -80,7 +80,9 @@ struct block_cache_entry *ext2_inode_read(struct ext2_fs *fs,
 
     uint8_t *buf = ent->buffer;
 
+    bcache_ent_lock(ent);
     memcpy(inode_out, buf + offset_in_block, sizeof(struct ext2_inode));
+    bcache_ent_unlock(ent);
 
     return ent;
 }
@@ -104,7 +106,9 @@ bool ext2_inode_write(struct ext2_fs *fs, uint32_t inode_num,
 
     uint8_t *block_buf = ent->buffer;
 
+    bcache_ent_lock(ent);
     memcpy(block_buf + block_offset, inode, fs->inode_size);
+    bcache_ent_unlock(ent);
 
     bool status = ext2_block_write(fs, ent);
     return status;

@@ -94,7 +94,7 @@ void nvme_alloc_admin_queues(struct nvme_device *nvme) {
 
 __attribute__((interrupt))
 void functest(struct interrupt_frame *frame) {
-    k_info("NVMe", K_INFO, "NVMe device interrupt caught!\n");
+    k_info("NVMe", K_INFO, "NVMe device interrupt caught!");
 }
 
 

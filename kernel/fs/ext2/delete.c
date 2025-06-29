@@ -92,14 +92,18 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
     if (!ext2_walk_dir(fs, dir_inode, unlink_callback, &ctx, false))
         return ERR_FS_INTERNAL;
 
-    struct ext2_full_inode target_inode;
+    struct ext2_full_inode target_inode = {0};
 
     struct block_cache_entry *ent = ext2_block_read(fs, ctx.block_num);
     if (!ent)
         return ERR_IO;
 
+    bcache_ent_lock(ent);
+
     uint8_t *block = ent->buffer;
     unlink_adjust_neighbors(fs, block, ctx.entry_offset, ctx.prev_offset);
+
+    bcache_ent_unlock(ent);
 
     if (!ext2_block_write(fs, ent))
         return ERR_IO;

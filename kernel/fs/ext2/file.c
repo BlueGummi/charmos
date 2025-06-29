@@ -45,9 +45,11 @@ enum errno ext2_write_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
         if (!ent)
             return ERR_IO;
 
+        bcache_ent_lock(ent);
         uint8_t *block_buf = ent->buffer;
-
         memcpy(block_buf + block_offset, src + bytes_written, to_write);
+        bcache_ent_unlock(ent);
+
         ext2_block_write(fs, ent);
 
         bytes_written += to_write;
@@ -91,6 +93,7 @@ static void file_read_visitor(struct ext2_fs *fs, struct ext2_inode *inode,
     if (!ent)
         return;
 
+    bcache_ent_lock(ent);
     uint8_t *block_buf = ent->buffer;
 
     uint32_t file_offset = ctx->bytes_read + ctx->offset;
@@ -109,6 +112,7 @@ static void file_read_visitor(struct ext2_fs *fs, struct ext2_inode *inode,
 
     memcpy(ctx->buffer + ctx->bytes_read, block_buf + block_offset, to_copy);
     ctx->bytes_read += to_copy;
+    bcache_ent_unlock(ent);
 }
 
 enum errno ext2_read_file(struct ext2_fs *fs, struct ext2_full_inode *inode,

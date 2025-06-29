@@ -30,14 +30,20 @@ enum errno ext2_symlink_file(struct ext2_fs *fs,
         if (block == 0)
             return ERR_FS_NO_INODE;
 
+        /* TODO: same flow is copied in create.c */
         uint32_t lba = ext2_block_to_lba(fs, block);
+        uint32_t bs = fs->block_size;
+        uint32_t spb = fs->sectors_per_block;
+
         struct block_cache_entry *ent;
-        ent = bcache_create_ent(fs->drive, lba, fs->block_size,
-                                fs->sectors_per_block, false);
+        ent = bcache_create_ent(fs->drive, lba, bs, spb, false);
         if (!ent)
             return ERR_IO;
 
+        bcache_ent_lock(ent);
         memcpy(ent->buffer, target, strlen(target) + 1);
+        bcache_ent_unlock(ent);
+
         ext2_block_write(fs, ent);
 
         new_inode.block[0] = block;
@@ -67,28 +73,32 @@ enum errno ext2_readlink(struct ext2_fs *fs, struct ext2_full_inode *node,
     if (link_size > size)
         link_size = size;
 
-    // inline data stored in i_block[]
+    /* inline data stored in i_block[] */
     if (link_size <= 60) {
         memcpy(buf, node->node.block, link_size);
         return 0;
     }
 
-    // target is stored in data blocks
+    /* target is stored in data blocks */
     uint32_t block_size = 1024 << fs->sblock->log_block_size;
     uint32_t first_block = node->node.block[0];
 
     if (first_block == 0)
         return ERR_IO;
 
+    /* no lock - RO */
     struct block_cache_entry *ent = ext2_block_read(fs, first_block);
     if (!ent)
         return ERR_IO;
 
+    bcache_ent_lock(ent);
     uint8_t *block = ent->buffer;
 
     if (!block)
         return ERR_IO;
 
     memcpy(buf, block, link_size > block_size ? block_size : link_size);
+    bcache_ent_unlock(ent);
+
     return 0;
 }

@@ -143,6 +143,6 @@ struct generic_disk *atapi_create_generic(struct ata_drive *d) {
     ret->print = atapi_print_info;
     ret->type = G_ATAPI_DRIVE;
     ret->cache = kmalloc(sizeof(struct block_cache));
-    block_cache_init(ret->cache, DEFAULT_BLOCK_CACHE_SIZE);
+    bcache_init(ret->cache, DEFAULT_BLOCK_CACHE_SIZE);
     return ret;
 }

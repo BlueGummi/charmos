@@ -36,6 +36,7 @@ struct block_cache {
     atomic_uint_fast64_t ticks;
     uint64_t capacity;
     uint64_t count;
+    uint64_t spb;
     struct spinlock lock;
 };
 
@@ -48,22 +49,15 @@ static inline uint64_t block_cache_hash(uint64_t x, uint64_t capacity) {
     return x % capacity;
 }
 
-void block_cache_init(struct block_cache *cache, uint64_t capacity);
-bool block_cache_insert(struct block_cache *cache, uint64_t key,
-                        struct block_cache_entry *value);
-struct block_cache_entry *block_cache_get(struct block_cache *cache,
-                                          uint64_t key);
-bool block_cache_remove(struct block_cache *cache, uint64_t key);
-void block_cache_destroy(struct block_cache *cache);
-void block_cache_ent_unlock(struct block_cache_entry *ent);
-void block_cache_ent_lock(struct block_cache_entry *ent);
-bool block_cache_evict(struct block_cache *cache);
+void bcache_init(struct block_cache *cache, uint64_t capacity);
+void bcache_ent_unlock(struct block_cache_entry *ent);
+void bcache_ent_lock(struct block_cache_entry *ent);
 struct block_cache_entry *bcache_get(struct generic_disk *disk, uint64_t lba,
                                      uint64_t block_size, uint64_t spb, bool);
 
 bool bcache_insert(struct generic_disk *disk, uint64_t lba,
                    struct block_cache_entry *ent);
-bool bcache_evict(struct generic_disk *disk);
+bool bcache_evict(struct generic_disk *disk, uint64_t spb);
 
 struct block_cache_entry *bcache_create_ent(struct generic_disk *disk,
                                             uint64_t lba, uint64_t block_size,

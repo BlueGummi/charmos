@@ -126,6 +126,6 @@ struct generic_disk *ide_create_generic(struct ata_drive *ide) {
     d->write_sector = ide_write_sector_wrapper;
     d->print = ide_print_info;
     d->cache = kmalloc(sizeof(struct block_cache));
-    block_cache_init(d->cache, DEFAULT_BLOCK_CACHE_SIZE);
+    bcache_init(d->cache, DEFAULT_BLOCK_CACHE_SIZE);
     return d;
 }

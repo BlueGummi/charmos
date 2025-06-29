@@ -49,8 +49,8 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     if (err != ERR_OK)
         return err;
 
-    struct ext2_full_inode *dir =
-        ext2_find_file_in_dir(fs, parent_dir, name, NULL);
+    struct ext2_full_inode *dir;
+    dir = ext2_find_file_in_dir(fs, parent_dir, name, NULL);
     if (!dir)
         return ERR_IO;
 
@@ -59,17 +59,21 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
         return ERR_NOSPC;
 
     uint32_t lba = ext2_block_to_lba(fs, new_block);
+    uint32_t bs = fs->block_size;
+    uint32_t spb = fs->sectors_per_block;
 
     struct block_cache_entry *ent;
-    ent = bcache_create_ent(fs->drive, lba, fs->block_size,
-                            fs->sectors_per_block, false);
+    ent = bcache_create_ent(fs->drive, lba, bs, spb, false);
 
     if (!ent)
         return ERR_IO;
 
     uint8_t *block = ent->buffer;
 
+    bcache_ent_lock(ent);
     ext2_init_dot_ents(fs, block, parent_dir, dir);
+    bcache_ent_unlock(ent);
+
     ext2_init_dir(fs, dir, new_block);
 
     ext2_inode_write(fs, dir->inode_num, &dir->node);

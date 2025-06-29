@@ -78,9 +78,14 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
         return ERR_NOSPC;
 
     uint32_t lba = ext2_block_to_lba(fs, new_block);
+    uint32_t bs = fs->block_size;
+    uint32_t spb = fs->sectors_per_block;
+
     struct block_cache_entry *ent;
-    ent =
-        bcache_create_ent(d, lba, fs->block_size, fs->sectors_per_block, false);
+
+    /* no locking here because this is a new entry that
+     * no one besides us should have access to right now */
+    ent = bcache_create_ent(d, lba, bs, spb, false);
     if (!ent)
         return ERR_IO;
 
@@ -96,7 +101,7 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
 
     bool status = bcache_insert(d, lba, ent);
     if (!status) {
-        bcache_evict(d);
+        bcache_evict(d, fs->sectors_per_block);
         bcache_insert(d, lba, ent);
     }
 

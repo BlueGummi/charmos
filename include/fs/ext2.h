@@ -193,6 +193,7 @@ struct ext2_inode {
 struct ext2_full_inode {
     struct ext2_inode node;
     uint32_t inode_num;
+    struct spinlock lock;
 };
 
 struct ext2_dir_entry {
@@ -272,6 +273,7 @@ void ext2_init_inode(struct ext2_inode *new_inode, uint16_t mode);
 uint8_t ext2_extract_ftype(uint16_t mode);
 uint32_t ext2_get_inode_group(struct ext2_fs *fs, uint32_t inode);
 uint32_t ext2_get_block_group(struct ext2_fs *fs, uint32_t block);
+void ext2_inode_unlock(struct ext2_full_inode *node);
 
 //
 //
