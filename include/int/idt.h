@@ -12,6 +12,7 @@
 #define GPF_ID 0xD
 #define PAGE_FAULT_ID 0xE
 #define TIMER_ID 0x20
+#define SCHEDULER_ID 0x20
 #define KB_ID 0x21
 
 struct idt_entry {

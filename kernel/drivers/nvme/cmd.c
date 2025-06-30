@@ -28,8 +28,11 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
             dev->io_statuses[qid][cid] = status;
             t->state = READY;
 
-            scheduler_add_thread(local_schs[t->curr_core], t, false, false,
-                                 true);
+            /* boost */
+            t->mlfq_level = 0;
+            uint64_t c = t->curr_core;
+            scheduler_add_thread(local_schs[c], t, false, false, true);
+            lapic_send_ipi(c, SCHEDULER_ID);
         }
 
         queue->cq_head = (queue->cq_head + 1) % queue->cq_depth;
@@ -41,6 +44,7 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
 }
 
 void nvme_isr_handler(void *ctx, uint8_t vector, void *rsp) {
+    (void) vector, (void) rsp;
     struct nvme_device *dev = ctx;
     /* TODO: many IO queues */
     nvme_process_completions(dev, 1);

@@ -166,18 +166,18 @@ void idt_free_entry(int entry) {
 
 void idt_install(uint64_t ind) {
 
-    set(DIV_BY_Z_ID, (uint64_t) divbyz_fault, 0x08, 0x8E, ind);
+    idt_set_gate(DIV_BY_Z_ID, (uint64_t) divbyz_fault, 0x08, 0x8E, ind);
 
-    set(DEBUG_ID, (uint64_t) debug_fault, 0x08, 0x8E, ind);
+    idt_set_gate(DEBUG_ID, (uint64_t) debug_fault, 0x08, 0x8E, ind);
 
-    set(BREAKPOINT_ID, (uint64_t) breakpoint_fault, 0x08, 0x8E, ind);
+    idt_set_gate(BREAKPOINT_ID, (uint64_t) breakpoint_fault, 0x08, 0x8E, ind);
 
-    set(SSF_ID, (uint64_t) ss_handler_wrapper, 0x08, 0x8E, ind);
+    idt_set_gate(SSF_ID, (uint64_t) ss_handler, 0x08, 0x8E, ind);
 
     /*
-    set(GPF_ID, (uint64_t) gpf_handler_wrapper, 0x08, 0x8E, ind);
-    set(DBF_ID, (uint64_t) double_fault_handler_wrapper, 0x08, 0x8E, ind);
-    set(PAGE_FAULT_ID, (uint64_t) page_fault_handler_wrapper, 0x08, 0x8E, ind);
+    idt_set_gate(GPF_ID, (uint64_t) gpf_handler, 0x08, 0x8E, ind);
+    idt_set_gate(DBF_ID, (uint64_t) double_fault_handler, 0x08, 0x8E, ind);
+    idt_set_gate(PAGE_FAULT_ID, (uint64_t) page_fault_handler, 0x08, 0x8E, ind);
     */
 
     idt_set_gate(TIMER_ID, (uint64_t) isr_timer_routine, 0x08, 0x8E, ind);
