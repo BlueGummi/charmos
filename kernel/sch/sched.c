@@ -1,6 +1,7 @@
 #include <acpi/lapic.h>
 #include <asm.h>
 #include <console/printf.h>
+#include <devices/registry.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
@@ -12,6 +13,7 @@
 #include <stdatomic.h>
 #include <stdint.h>
 #include <string.h>
+#include <tests.h>
 
 struct scheduler **local_schs;
 uint64_t c_count = 1;
@@ -35,39 +37,31 @@ atomic_uint total_threads = 0;
 int64_t work_steal_min_diff = 130;
 
 void k_sch_main() {
+    scheduler_get_curr_thread()->flags = NO_STEAL;
+    k_info("MAIN", K_INFO, "Device setup");
+    registry_setup();
+    tests_run();
+    k_info("MAIN", K_INFO, "Boot OK");
     while (1) {
         asm volatile("hlt");
     }
 }
 
 void k_sch_idle() {
-    scheduler_get_curr_thread()->state = IDLE_THREAD;
     while (1) {
         asm volatile("hlt");
     }
 }
 
-struct mutex k_mutex_test_mutex = {0};
-void k_mutex_test() {
-    mutex_init(&k_mutex_test_mutex);
-    asm("cli");
-    mutex_lock(&k_mutex_test_mutex);
-    k_printf("core %u locked the mutex\n", get_core_id());
-    for (uint64_t i = 0; i < 50; i++) {
-        sleep_ms(5);
-    }
-    mutex_unlock(&k_mutex_test_mutex);
-    k_printf("core %u unlocked the mutex\n", get_core_id());
-    asm("sti");
-
-    while (1) {
-        asm volatile("hlt");
-    }
-}
-
+/* TODO: no rdmsr */
 struct thread *scheduler_get_curr_thread() {
     struct core *c = (void *) rdmsr(MSR_GS_BASE);
     return c->current_thread;
+}
+
+static inline void update_core_current_thread(struct thread *next) {
+    struct core *c = (void *) rdmsr(MSR_GS_BASE);
+    c->current_thread = next;
 }
 
 static inline void maybe_recompute_threshold(uint64_t core_id) {
@@ -75,11 +69,6 @@ static inline void maybe_recompute_threshold(uint64_t core_id) {
         uint64_t val = atomic_load(&total_threads);
         work_steal_min_diff = compute_steal_threshold(val, c_count);
     }
-}
-
-static inline void update_core_current_thread(struct thread *next) {
-    struct core *c = (void *) rdmsr(MSR_GS_BASE);
-    c->current_thread = next;
 }
 
 static inline void stop_steal(struct scheduler *sched,
@@ -179,6 +168,8 @@ static void load_thread(struct scheduler *sched, struct thread *next,
 }
 
 static inline void disable_timeslice() {
+    uint64_t core_id = get_sch_core_id();
+    k_printf("Core %u disabled the timeslice\n", core_id);
     lapic_timer_disable();
 }
 
@@ -264,18 +255,16 @@ regular_schedule:
 
 load_new_thread:
     load_thread(sched, next, cpu);
+
     update_core_current_thread(next);
 
     if (!next) {
-        k_printf("scheduler disabled timeslices\n");
         disable_timeslice();
         goto end;
     }
 
-    if (all_threads_unrunnable(sched) && next->state == IDLE_THREAD) {
-        k_printf("scheduler disabled timeslices\n");
+    if (all_threads_unrunnable(sched) && next->state == IDLE_THREAD)
         disable_timeslice();
-    }
 
 end:
     /* do not change interrupt status */

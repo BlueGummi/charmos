@@ -7,7 +7,7 @@
 #define DIV_BY_Z_ID 0x0
 #define DEBUG_ID 0x1
 #define BREAKPOINT_ID 0x3
-#define DOUBLEFAULT_ID 0x8
+#define DBF_ID 0x8
 #define SSF_ID 0xC
 #define GPF_ID 0xD
 #define PAGE_FAULT_ID 0xE

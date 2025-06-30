@@ -18,7 +18,7 @@ void scheduler_init(uint64_t core_count) {
         k_panic("Could not allocate scheduler pointer array\n");
 
     for (uint64_t i = 0; i < core_count; i++) {
-        struct scheduler *s = kmalloc(sizeof(struct scheduler));
+        struct scheduler *s = kzalloc(sizeof(struct scheduler));
         if (!s)
             k_panic("Could not allocate scheduler %lu\n", i);
 
@@ -32,12 +32,16 @@ void scheduler_init(uint64_t core_count) {
             s->queues[lvl].tail = NULL;
         }
 
-        struct thread *t = thread_create(k_sch_main);
         struct thread *t0 = thread_create(k_sch_idle);
-        struct thread *t1 = thread_create(k_mutex_test);
-        scheduler_add_thread(s, t, false, false, true);
         scheduler_add_thread(s, t0, false, false, true);
-        scheduler_add_thread(s, t1, false, false, true);
+        t0 = thread_create(k_sch_idle);
+        scheduler_add_thread(s, t0, false, false, true);
+
+        if (!i) {
+            struct thread *t = thread_create(k_sch_main);
+            scheduler_add_thread(s, t, false, false, true);
+        }
+
         local_schs[i] = s;
     }
 }

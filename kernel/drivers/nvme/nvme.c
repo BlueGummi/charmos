@@ -146,8 +146,17 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme_alloc_admin_queues(nvme);
     nvme_setup_admin_queues(nvme);
     nvme_enable_controller(nvme);
-    nvme_alloc_io_queues(nvme, 1); // TODO: many IO queues
+    nvme_alloc_io_queues(nvme, 1);
     nvme_identify_controller(nvme);
+    // TODO: many IO queues
+    nvme->io_waiters = kzalloc(sizeof(struct thread *) * 2);
+    nvme->io_statuses = kmalloc(sizeof(uint16_t *) * 2);
+
+    uint64_t dep = nvme->io_queues[1]->sq_depth;
+    nvme->io_waiters[1] =
+        kzalloc(sizeof(struct thread *) * nvme->io_queues[1]->sq_depth);
+    nvme->io_statuses[1] = kzalloc(sizeof(uint16_t) * dep);
+
     return nvme;
 }
 

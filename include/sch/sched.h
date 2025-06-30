@@ -33,7 +33,6 @@ void scheduler_rm_thread(struct scheduler *sched, struct thread *thread,
 void schedule(struct cpu_state *cpu);
 void k_sch_main();
 void k_sch_idle();
-void k_mutex_test();
 void scheduler_enable_timeslice();
 void scheduler_yield();
 void scheduler_enqueue(struct thread *t);

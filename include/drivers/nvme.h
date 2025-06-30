@@ -1,5 +1,6 @@
 #pragma once
 #include <devices/generic_disk.h>
+#include <sch/thread.h>
 #include <stdint.h>
 
 #define NVME_CMD_TIMEOUT_MS 2000    // Normal command timeout
@@ -84,6 +85,7 @@ struct nvme_queue {
     uint8_t cq_phase;  // Phase bit for completion
     uint32_t *sq_db;
     uint32_t *cq_db;
+    struct thread **waiters;
 };
 
 struct nvme_device {
@@ -106,7 +108,8 @@ struct nvme_device {
     uint8_t admin_cq_phase;
 
     struct nvme_queue **io_queues;
-
+    struct thread ***io_waiters;
+    uint16_t **io_statuses;
     uint8_t isr_index;
 };
 

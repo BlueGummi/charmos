@@ -17,7 +17,8 @@ extern void context_switch();
 extern void page_fault_handler_wrapper();
 extern void syscall_entry();
 #define MAX_IDT_ENTRIES 256
-static bool idt_entry_used[MAX_IDT_ENTRIES];
+static bool **idt_entry_used = NULL;
+struct isr_entry **isr_table = NULL;
 
 #include "isr_stubs.h"
 #include "isr_vectors_array.h"
@@ -53,11 +54,10 @@ MAKE_HANDLER(gpf, "GPF");
 MAKE_HANDLER(ss, "STACK SEGMENT FAULT");
 MAKE_HANDLER(double_fault, "DOUBLE FAULT");
 
-struct isr_entry isr_table[MAX_IDT_ENTRIES];
-
 void isr_common_entry(uint8_t vector) {
-    if (isr_table[vector].handler) {
-        isr_table[vector].handler(isr_table[vector].ctx, vector);
+    uint8_t c = get_sch_core_id();
+    if (isr_table[c][vector].handler) {
+        isr_table[c][vector].handler(isr_table[c][vector].ctx, vector);
     } else {
         k_printf("Unhandled ISR vector: %u\n", vector);
         while (1)
@@ -68,8 +68,9 @@ void isr_common_entry(uint8_t vector) {
 }
 
 void isr_register(uint8_t vector, isr_handler_t handler, void *ctx) {
-    isr_table[vector].handler = handler;
-    isr_table[vector].ctx = ctx;
+    uint8_t c = get_sch_core_id();
+    isr_table[c][vector].handler = handler;
+    isr_table[c][vector].ctx = ctx;
     irq_set_installed(vector, true);
 }
 
@@ -80,7 +81,7 @@ void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
                   uint64_t ind) {
     struct idt_entry *idt = idts[ind].entries;
 
-    isr_table[num].handler = (void *) base;
+    isr_table[ind][num].handler = (void *) base;
     base = (uint64_t) isr_vectors[num];
 
     idt[num].base_low = (base & 0xFFFF);
@@ -91,7 +92,7 @@ void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
     idt[num].flags = flags;
     idt[num].reserved = 0;
 
-    idt_entry_used[num] = true;
+    idt_entry_used[ind][num] = true;
     irq_set_installed(num, true);
 }
 
@@ -107,7 +108,7 @@ static void set(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
     idt[num].flags = flags;
     idt[num].reserved = 0;
 
-    idt_entry_used[num] = true;
+    idt_entry_used[ind][num] = true;
     irq_set_installed(num, true);
 }
 
@@ -129,14 +130,23 @@ void idt_load(uint64_t ind) {
 void idt_alloc(uint64_t size) {
     idts = kmalloc(sizeof(struct idt_table) * size);
     idtps = kmalloc(sizeof(struct idt_ptr) * size);
+    idt_entry_used = kmalloc(sizeof(bool *) * size);
+    isr_table = kmalloc(sizeof(struct isr_entry *) * size);
+
+    for (uint64_t i = 0; i < size; i++) {
+        idt_entry_used[i] = kzalloc(sizeof(bool) * IDT_ENTRIES);
+        isr_table[i] = kzalloc(sizeof(struct isr_entry) * IDT_ENTRIES);
+    }
+
     if (!idts || !idtps)
         k_panic("Could not allocate space for IDT\n");
 }
 
 int idt_alloc_entry(void) {
+    uint8_t c = get_sch_core_id();
     for (int i = 32; i < MAX_IDT_ENTRIES; i++) { // skip first 32: exceptions
-        if (!idt_entry_used[i]) {
-            idt_entry_used[i] = true;
+        if (!idt_entry_used[c][i]) {
+            idt_entry_used[c][i] = true;
             return i;
         }
     }
@@ -158,14 +168,14 @@ void idt_install(uint64_t ind) {
 
     set(BREAKPOINT_ID, (uint64_t) breakpoint_fault, 0x08, 0x8E, ind);
 
-    set(DOUBLEFAULT_ID, (uint64_t) double_fault_handler_wrapper, 0x08, 0x8E,
-        ind);
 
     set(SSF_ID, (uint64_t) ss_handler_wrapper, 0x08, 0x8E, ind);
 
+    /*
     set(GPF_ID, (uint64_t) gpf_handler_wrapper, 0x08, 0x8E, ind);
-
+    set(DBF_ID, (uint64_t) double_fault_handler_wrapper, 0x08, 0x8E, ind);
     set(PAGE_FAULT_ID, (uint64_t) page_fault_handler_wrapper, 0x08, 0x8E, ind);
+    */
 
     set(TIMER_ID, (uint64_t) context_switch, 0x08, 0x8E, ind);
 

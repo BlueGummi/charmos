@@ -3,19 +3,81 @@
 #include <console/printf.h>
 #include <devices/generic_disk.h>
 #include <drivers/nvme.h>
-#include <mem/alloc.h>
 #include <int/idt.h>
+#include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <sleep.h>
 #include <stdint.h>
 #include <string.h>
 
+void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
+    struct nvme_queue *queue = dev->io_queues[qid];
+
+    while (true) {
+        struct nvme_completion *entry = &queue->cq[queue->cq_head];
+
+        if ((entry->status & 1) != queue->cq_phase)
+            break;
+
+        uint16_t cid = entry->cid;
+        uint16_t status = entry->status & 0xFFFE;
+
+        struct thread *t = dev->io_waiters[qid][cid];
+        if (t) {
+            dev->io_statuses[qid][cid] = status;
+            t->state = READY;
+
+            scheduler_add_thread(local_schs[t->curr_core], t, false, false,
+                                 true);
+        }
+
+        queue->cq_head = (queue->cq_head + 1) % queue->cq_depth;
+        if (queue->cq_head == 0)
+            queue->cq_phase ^= 1;
+
+        mmio_write_32(queue->cq_db, queue->cq_head);
+    }
+}
+
 void nvme_isr_handler(void *ctx, uint8_t vector) {
-    k_info("NVMe", K_INFO, "Caught device interrupt from vector %u", vector);
+    struct nvme_device *dev = ctx;
+    /* TODO: many IO queues */
+    nvme_process_completions(dev, 1);
     LAPIC_REG(LAPIC_REG_EOI) = 0;
 }
 
+uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
+                            uint32_t qid) {
+    struct nvme_queue *this_queue = nvme->io_queues[qid];
+
+    uint16_t tail = this_queue->sq_tail;
+    uint16_t next_tail = (tail + 1) % this_queue->sq_depth;
+
+    cmd->cid = tail;
+    this_queue->sq[tail] = *cmd;
+
+    struct thread *curr = scheduler_get_curr_thread();
+
+    nvme->io_statuses[qid][tail] = 0xFFFF; // In-flight
+
+    this_queue->sq_tail = next_tail;
+    mmio_write_32(this_queue->sq_db, this_queue->sq_tail);
+
+    curr->state = BLOCKED;
+
+    /* TODO: this is a really cursed hack */
+    nvme->io_waiters[qid][tail] = curr;
+
+    SAVE_CPU_STATE(&curr->regs);
+    curr->regs.rip = (uint64_t) &&here;
+    scheduler_yield();
+
+here:
+    // when we resume, read the status set by ISR
+    nvme->io_waiters[qid][tail] = NULL;
+    return nvme->io_statuses[qid][tail];
+}
 
 uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
                                struct nvme_command *cmd) {
@@ -54,6 +116,7 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
     }
 }
 
+/*
 uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
                             uint32_t qid) {
     struct nvme_queue *this_queue = nvme->io_queues[qid];
@@ -92,7 +155,7 @@ uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
         if (timeout == 0)
             return 0xFFFF;
     }
-}
+}*/
 
 uint8_t *nvme_identify_controller(struct nvme_device *nvme) {
     uint64_t buffer_phys = (uint64_t) pmm_alloc_page(false);

@@ -22,7 +22,7 @@ void lapic_init() {
 
     LAPIC_REG(LAPIC_REG_LVT_TIMER) = TIMER_VECTOR | TIMER_MODE_PERIODIC;
 
-    LAPIC_REG(LAPIC_REG_TIMER_INIT) = 10000000;
+    LAPIC_REG(LAPIC_REG_TIMER_INIT) = 100000;
 }
 
 void lapic_timer_disable() {

@@ -14,7 +14,7 @@
 
 #define HALT                                                                   \
     while (1)                                                                  \
-        asm("hlt");
+        asm("cli;hlt");
 
 #define is_aligned(value, align) (((value) & ((align) - 1)) == 0)
 

@@ -80,6 +80,7 @@ void k_main(void) {
     syscall_setup(syscall_entry);
     struct core *c = kmalloc(sizeof(struct core));
     c->state = IDLE;
+    c->current_thread = kzalloc(sizeof(struct thread));
     c->id = 0;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
 
@@ -89,28 +90,21 @@ void k_main(void) {
 
     // Early device init
     uacpi_init();
-    uint64_t apic_base_msr = rdmsr(IA32_APIC_BASE_MSR);
-    uintptr_t lapic_phys = apic_base_msr & IA32_APIC_BASE_MASK;
+    uintptr_t lapic_phys = rdmsr(IA32_APIC_BASE_MSR) & IA32_APIC_BASE_MASK;
     lapic = vmm_map_phys(lapic_phys, 4096);
 
     hpet_init();
     ioapic_init();
     k_info("MAIN", K_INFO, "Early boot OK");
 
-    // Filesystem init
-    cmdline_parse(cmdline_request.response->cmdline);
-    registry_setup();
-
-    //    registry_print_devices();
-
     // Scheduler
     scheduler_init(c_cnt);
 
-    tests_run();
+    // Filesystem init
+    cmdline_parse(cmdline_request.response->cmdline);
     lapic_init();
     mp_inform_of_cr3();
 
-    k_info("MAIN", K_INFO, "Boot OK");
     asm volatile("sti");
     while (1) {
         asm("hlt");
