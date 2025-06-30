@@ -14,7 +14,7 @@ permissions:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-rolling
+    runs-on: ubuntu-latest
 
     steps:
       - name: Check out code
@@ -36,6 +36,26 @@ jobs:
 
       - name: Get xorriso
         run: sudo apt install xorriso -y
+
+      - name: Install dependencies for building binutils
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential texinfo wget
+
+      - name: Download and build latest binutils
+        run: |
+          BINUTILS_VERSION=2.41
+          wget https://ftp.gnu.org/gnu/binutils/binutils-$BINUTILS_VERSION.tar.gz
+          tar xf binutils-$BINUTILS_VERSION.tar.gz
+          mkdir binutils-build
+          cd binutils-build
+          ../binutils-$BINUTILS_VERSION/configure --prefix=$HOME/binutils
+          make -j$(nproc)
+          make install
+          echo "$HOME/binutils/bin" >> $GITHUB_PATH
+
+      - name: Verify installed `as`
+        run: as --version
 
       - name: Compile 
         run:  ./build.sh
