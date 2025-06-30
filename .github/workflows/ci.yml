@@ -15,27 +15,20 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
 
     steps:
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm base-devel rustup nasm xorriso cmake git
+          rustup default nightly
+          rustup target add x86_64-unknown-none
+
       - name: Check out code
         uses: actions/checkout@v2
 
+      - name: Compile
+        run: ./build.sh
 
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          override: true
-          components: rustfmt, clippy
-
-      - name: Install x86_64-unknown-none target
-        run: rustup target add x86_64-unknown-none
-
-      - name: Get nasm
-        run: sudo apt install nasm -y
-
-      - name: Get xorriso
-        run: sudo apt install xorriso -y
-
-      - name: Compile 
-        run:  ./build.sh
