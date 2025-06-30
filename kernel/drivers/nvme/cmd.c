@@ -66,14 +66,9 @@ uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
 
     curr->state = BLOCKED;
 
-    /* TODO: this is a really cursed hack */
     nvme->io_waiters[qid][tail] = curr;
-
-    SAVE_CPU_STATE(&curr->regs);
-    curr->regs.rip = (uint64_t) &&here;
     scheduler_yield();
 
-here:
     // when we resume, read the status set by ISR
     nvme->io_waiters[qid][tail] = NULL;
     return nvme->io_statuses[qid][tail];

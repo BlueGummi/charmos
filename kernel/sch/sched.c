@@ -82,8 +82,11 @@ static inline void stop_steal(struct scheduler *sched,
 
 static void scheduler_save_thread(struct scheduler *sched, struct thread *curr,
                                   struct cpu_state *cpu) {
-    if (curr && curr->state == RUNNING) {
+    if (curr) {
         memcpy(&curr->regs, cpu, sizeof(struct cpu_state));
+        
+        if (curr->state != RUNNING)
+            return;
 
         curr->curr_core = -1;
         curr->time_in_level++;

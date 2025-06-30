@@ -41,32 +41,6 @@ struct thread_queue {
     struct thread *tail;
 };
 
-#define SAVE_CPU_STATE(cpu_state_ptr)                                          \
-    asm volatile("mov %%r15, 0x00(%0)\n\t"                                     \
-                 "mov %%r14, 0x08(%0)\n\t"                                     \
-                 "mov %%r13, 0x10(%0)\n\t"                                     \
-                 "mov %%r12, 0x18(%0)\n\t"                                     \
-                 "mov %%r11, 0x20(%0)\n\t"                                     \
-                 "mov %%r10, 0x28(%0)\n\t"                                     \
-                 "mov %%r9,  0x30(%0)\n\t"                                     \
-                 "mov %%r8,  0x38(%0)\n\t"                                     \
-                 "mov %%rsi, 0x40(%0)\n\t"                                     \
-                 "mov %%rdi, 0x48(%0)\n\t"                                     \
-                 "mov %%rbp, 0x50(%0)\n\t"                                     \
-                 "mov %%rdx, 0x58(%0)\n\t"                                     \
-                 "mov %%rcx, 0x60(%0)\n\t"                                     \
-                 "mov %%rbx, 0x68(%0)\n\t"                                     \
-                 "mov %%rax, 0x70(%0)\n\t"                                     \
-                 "lea (%%rip), %%rax\n\t"                                      \
-                 "mov %%rax, 0x78(%0)\n\t"                                     \
-                 "pushfq\n\t"                                                  \
-                 "popq %%rax\n\t"                                              \
-                 "mov %%rax, 0x88(%0)\n\t"                                     \
-                 "mov %%rsp, 0x90(%0)\n\t"                                     \
-                 :                                                             \
-                 : "r"(cpu_state_ptr)                                          \
-                 : "memory", "rax")
-
 struct thread *thread_create(void (*entry_point)(void));
 void thread_free(struct thread *t);
 #pragma once
