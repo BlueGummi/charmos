@@ -99,11 +99,11 @@ void ahci_identify(struct ahci_disk *disk) {
     struct ahci_full_port *port = &disk->device->regs[disk->port];
     uint32_t slot = find_free_cmd_slot(port->port);
 
-    uint8_t *buffer = kmalloc_aligned(4096, 4096);
+    uint8_t *buffer = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
     if (!buffer)
         return;
 
-    ahci_prepare_command(port, slot, false, buffer, 4096);
+    ahci_prepare_command(port, slot, false, buffer, PAGE_SIZE);
 
     if (!buffer)
         return;

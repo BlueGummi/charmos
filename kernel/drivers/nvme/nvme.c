@@ -28,8 +28,8 @@ static void nvme_msix_enable_vector(uint8_t bus, uint8_t slot, uint8_t func,
     }
 
     size_t map_size = (vector_index + 1) * sizeof(struct pci_msix_table_entry);
-    if (map_size < 4096) {
-        map_size = 4096;
+    if (map_size < PAGE_SIZE) {
+        map_size = PAGE_SIZE;
     }
     void *msix_table = vmm_map_phys(bar_addr + table_offset, map_size);
 

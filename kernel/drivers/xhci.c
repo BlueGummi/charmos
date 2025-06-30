@@ -96,13 +96,14 @@ static void xhci_controller_enable_ints(struct xhci_device *dev) {
 
 static void xhci_setup_event_ring(struct xhci_device *dev) {
     uint64_t erst_table_phys = (uint64_t) pmm_alloc_page(false);
-    struct xhci_erst_entry *erst_table = vmm_map_phys(erst_table_phys, 4096);
+    struct xhci_erst_entry *erst_table =
+        vmm_map_phys(erst_table_phys, PAGE_SIZE);
 
     uint64_t event_ring_phys = (uint64_t) pmm_alloc_page(false);
-    struct xhci_trb *event_ring = vmm_map_phys(event_ring_phys, 4096);
+    struct xhci_trb *event_ring = vmm_map_phys(event_ring_phys, PAGE_SIZE);
 
     event_ring[0].control = 1;
-    memset(event_ring, 0, 4096);
+    memset(event_ring, 0, PAGE_SIZE);
 
     erst_table[0].ring_segment_base = event_ring_phys;
     erst_table[0].ring_segment_size = 256;

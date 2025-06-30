@@ -18,8 +18,8 @@ static void setup_port_slots(struct ahci_device *dev, uint32_t port_id) {
     struct ahci_full_port *port = &dev->regs[port_id];
     for (int slot = 0; slot < 32; slot++) {
         uint64_t cmdtbl_phys = (uint64_t) pmm_alloc_page(false);
-        void *cmdtbl_virt = vmm_map_phys(cmdtbl_phys, 4096);
-        memset(cmdtbl_virt, 0, 4096);
+        void *cmdtbl_virt = vmm_map_phys(cmdtbl_phys, PAGE_SIZE);
+        memset(cmdtbl_virt, 0, PAGE_SIZE);
 
         struct ahci_cmd_header *cmd_header =
             (port->cmd_list_base +
@@ -37,10 +37,10 @@ static void allocate_port(struct ahci_device *dev, struct ahci_port *port,
                           uint32_t port_num) {
     uint64_t cmdlist_phys = (uint64_t) pmm_alloc_page(false);
     uint64_t fis_phys = (uint64_t) pmm_alloc_page(false);
-    void *cmdlist = vmm_map_phys(cmdlist_phys, 4096);
-    void *fis = vmm_map_phys(fis_phys, 4096);
-    memset(cmdlist, 0, 4096);
-    memset(fis, 0, 4096);
+    void *cmdlist = vmm_map_phys(cmdlist_phys, PAGE_SIZE);
+    void *fis = vmm_map_phys(fis_phys, PAGE_SIZE);
+    memset(cmdlist, 0, PAGE_SIZE);
+    memset(fis, 0, PAGE_SIZE);
 
     port->clb = cmdlist_phys & 0xFFFFFFFFUL;
     port->clbu = cmdlist_phys >> 32;

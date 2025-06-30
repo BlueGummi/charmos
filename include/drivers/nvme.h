@@ -1,5 +1,6 @@
 #pragma once
 #include <devices/generic_disk.h>
+#include <mem/vmm.h>
 #include <sch/thread.h>
 #include <stdint.h>
 
@@ -114,7 +115,7 @@ struct nvme_device {
 };
 
 struct nvme_identify {
-    uint8_t data[4096];
+    uint8_t data[PAGE_SIZE];
 };
 
 struct nvme_identify_namespace {

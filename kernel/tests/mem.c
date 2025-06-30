@@ -13,9 +13,9 @@ REGISTER_TEST(pmm_alloc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 REGISTER_TEST(vmm_map_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     uint64_t p = (uint64_t) pmm_alloc_page(false);
     TEST_ASSERT(p != 0);
-    void *ptr = vmm_map_phys(p, 4096);
+    void *ptr = vmm_map_phys(p, PAGE_SIZE);
     TEST_ASSERT(ptr != NULL);
-    vmm_unmap_virt(ptr, 4096);
+    vmm_unmap_virt(ptr, PAGE_SIZE);
     TEST_ASSERT(vmm_get_phys((uint64_t) ptr) == (uint64_t) -1);
     SET_SUCCESS;
 }
@@ -44,4 +44,4 @@ KMALLOC_ALIGNMENT_TEST(32, 32)
 KMALLOC_ALIGNMENT_TEST(64, 64)
 KMALLOC_ALIGNMENT_TEST(128, 128)
 KMALLOC_ALIGNMENT_TEST(256, 256)
-KMALLOC_ALIGNMENT_TEST(4096, 4096)
+KMALLOC_ALIGNMENT_TEST(PAGE_SIZE, PAGE_SIZE)

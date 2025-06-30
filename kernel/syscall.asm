@@ -29,7 +29,7 @@ syscall_entry:
     mov rdi, rax   
     mov rsi, r12
     mov rdx, r13
-    mov r10, r14   
+    mov rcx, r14   
     mov r8,  r15
     mov r9,  rbx
 

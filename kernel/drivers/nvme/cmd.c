@@ -155,9 +155,9 @@ uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
 uint8_t *nvme_identify_controller(struct nvme_device *nvme) {
     uint64_t buffer_phys = (uint64_t) pmm_alloc_page(false);
 
-    void *buffer = vmm_map_phys(buffer_phys, 4096);
+    void *buffer = vmm_map_phys(buffer_phys, PAGE_SIZE);
 
-    memset(buffer, 0, 4096);
+    memset(buffer, 0, PAGE_SIZE);
 
     struct nvme_command cmd = {0};
     cmd.opc = NVME_OP_ADMIN_IDENT; // IDENTIFY opcode
@@ -180,9 +180,9 @@ uint8_t *nvme_identify_controller(struct nvme_device *nvme) {
 uint8_t *nvme_identify_namespace(struct nvme_device *nvme, uint32_t nsid) {
     uint64_t buffer_phys = (uint64_t) pmm_alloc_page(false);
 
-    void *buffer = vmm_map_phys(buffer_phys, 4096);
+    void *buffer = vmm_map_phys(buffer_phys, PAGE_SIZE);
 
-    memset(buffer, 0, 4096);
+    memset(buffer, 0, PAGE_SIZE);
 
     struct nvme_command cmd = {0};
     cmd.opc = NVME_OP_ADMIN_IDENT; // IDENTIFY opcode

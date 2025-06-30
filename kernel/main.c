@@ -91,7 +91,7 @@ void k_main(void) {
     // Early device init
     uacpi_init();
     uintptr_t lapic_phys = rdmsr(IA32_APIC_BASE_MSR) & IA32_APIC_BASE_MASK;
-    lapic = vmm_map_phys(lapic_phys, 4096);
+    lapic = vmm_map_phys(lapic_phys, PAGE_SIZE);
 
     hpet_init();
     ioapic_init();
