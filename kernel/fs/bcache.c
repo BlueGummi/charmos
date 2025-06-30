@@ -6,45 +6,45 @@
 
 #define ALIGN_DOWN(x, align) ((x) & ~((align) - 1))
 
-static uint8_t *get_lba_offset_buffer(struct block_cache_entry *ent,
+static uint8_t *get_lba_offset_buffer(struct bcache_entry *ent,
                                       uint64_t lba, uint64_t spb,
                                       uint64_t block_size) {
     uint64_t offset_lba = lba - ent->lba;
     uint64_t offset_bytes = (block_size / spb) * offset_lba;
     return ent->buffer + offset_bytes;
 }
-static bool remove(struct block_cache *cache, uint64_t key, uint64_t spb);
-static bool insert(struct block_cache *cache, uint64_t key,
-                   struct block_cache_entry *value);
-static struct block_cache_entry *get(struct block_cache *cache, uint64_t key);
+static bool remove(struct bcache *cache, uint64_t key, uint64_t spb);
+static bool insert(struct bcache *cache, uint64_t key,
+                   struct bcache_entry *value);
+static struct bcache_entry *get(struct bcache *cache, uint64_t key);
 
 /* sleeping locks aren't necessary here because there isn't
  * going to be a long wait for cache accesses - hopefullly
  */
 
-void bcache_init(struct block_cache *cache, uint64_t capacity) {
+void bcache_init(struct bcache *cache, uint64_t capacity) {
     cache->capacity = capacity;
     cache->count = 0;
-    cache->entries = kzalloc(sizeof(struct block_cache_wrapper) * capacity);
+    cache->entries = kzalloc(sizeof(struct bcache_wrapper) * capacity);
 }
 
 /* eviction must be explicitly and separately called */
-static bool insert(struct block_cache *cache, uint64_t key,
-                   struct block_cache_entry *value) {
+static bool insert(struct bcache *cache, uint64_t key,
+                   struct bcache_entry *value) {
 
     bool ints = spin_lock(&cache->lock);
 
-    uint64_t index = block_cache_hash(key, cache->capacity);
-    block_cache_increment_ticks(cache);
+    uint64_t index = bcache_hash(key, cache->capacity);
+    bcache_increment_ticks(cache);
 
     for (uint64_t i = 0; i < cache->capacity; i++) {
         uint64_t try = (index + i) % cache->capacity;
-        struct block_cache_wrapper *entry = &cache->entries[try];
+        struct bcache_wrapper *entry = &cache->entries[try];
 
         if (!entry->occupied || entry->key == key) {
             entry->key = key;
             entry->value = value;
-            entry->value->access_time = block_cache_get_ticks(cache);
+            entry->value->access_time = bcache_get_ticks(cache);
             entry->occupied = true;
             cache->count++;
             spin_unlock(&cache->lock, ints);
@@ -56,14 +56,14 @@ static bool insert(struct block_cache *cache, uint64_t key,
     return false; // full
 }
 
-static struct block_cache_entry *get(struct block_cache *cache, uint64_t key) {
+static struct bcache_entry *get(struct bcache *cache, uint64_t key) {
     bool ints = spin_lock(&cache->lock);
 
-    uint64_t index = block_cache_hash(key, cache->capacity);
+    uint64_t index = bcache_hash(key, cache->capacity);
 
     for (uint64_t i = 0; i < cache->capacity; i++) {
         uint64_t try = (index + i) % cache->capacity;
-        struct block_cache_wrapper *entry = &cache->entries[try];
+        struct bcache_wrapper *entry = &cache->entries[try];
 
         if (!entry->occupied) {
             spin_unlock(&cache->lock, ints);
@@ -71,7 +71,7 @@ static struct block_cache_entry *get(struct block_cache *cache, uint64_t key) {
         }
 
         if (entry->key == key) {
-            entry->value->access_time = block_cache_get_ticks(cache);
+            entry->value->access_time = bcache_get_ticks(cache);
             spin_unlock(&cache->lock, ints);
             return entry->value;
         }
@@ -81,17 +81,17 @@ static struct block_cache_entry *get(struct block_cache *cache, uint64_t key) {
     return NULL;
 }
 
-static bool can_remove_lba_group(struct block_cache *cache, uint64_t base_lba,
+static bool can_remove_lba_group(struct bcache *cache, uint64_t base_lba,
                                  uint64_t spb) {
     /* caller must already hold the lock */
     for (uint64_t i = 0; i < spb; i++) {
         uint64_t key = base_lba + i;
-        uint64_t index = block_cache_hash(key, cache->capacity);
+        uint64_t index = bcache_hash(key, cache->capacity);
         bool found = false;
 
         for (uint64_t j = 0; j < cache->capacity; j++) {
             uint64_t try = (index + j) % cache->capacity;
-            struct block_cache_wrapper *entry = &cache->entries[try];
+            struct bcache_wrapper *entry = &cache->entries[try];
 
             if (!entry->occupied)
                 break;
@@ -113,13 +113,13 @@ static bool can_remove_lba_group(struct block_cache *cache, uint64_t base_lba,
     return true;
 }
 
-static bool remove(struct block_cache *cache, uint64_t key, uint64_t spb) {
+static bool remove(struct bcache *cache, uint64_t key, uint64_t spb) {
     bool ints = spin_lock(&cache->lock);
-    uint64_t index = block_cache_hash(key, cache->capacity);
+    uint64_t index = bcache_hash(key, cache->capacity);
 
     for (uint64_t i = 0; i < cache->capacity; i++) {
         uint64_t try = (index + i) % cache->capacity;
-        struct block_cache_wrapper *entry = &cache->entries[try];
+        struct bcache_wrapper *entry = &cache->entries[try];
 
         if (!entry->occupied) {
             spin_unlock(&cache->lock, ints);
@@ -127,7 +127,7 @@ static bool remove(struct block_cache *cache, uint64_t key, uint64_t spb) {
         }
 
         if (entry->key == key) {
-            struct block_cache_entry *val = entry->value;
+            struct bcache_entry *val = entry->value;
             entry->occupied = false;
             entry->value = NULL;
             cache->count--;
@@ -154,14 +154,14 @@ static bool remove(struct block_cache *cache, uint64_t key, uint64_t spb) {
     return false;
 }
 
-static bool evict(struct block_cache *cache, uint64_t spb) {
+static bool evict(struct bcache *cache, uint64_t spb) {
     bool ints = spin_lock(&cache->lock);
 
     /* find oldest accessed cache entry */
     uint64_t oldest = UINT64_MAX;
     uint64_t target = 0;
     for (uint64_t i = 0; i < cache->capacity; i++) {
-        struct block_cache_wrapper *entry = &cache->entries[i];
+        struct bcache_wrapper *entry = &cache->entries[i];
 
         if (!entry->occupied || !entry->value)
             continue;
@@ -185,30 +185,30 @@ static bool evict(struct block_cache *cache, uint64_t spb) {
 }
 
 /* TODO: free all entries */
-void bcache_destroy(struct block_cache *cache) {
+void bcache_destroy(struct bcache *cache) {
     kfree(cache->entries);
     cache->entries = NULL;
     cache->capacity = 0;
     cache->count = 0;
 }
 
-void bcache_ent_lock(struct block_cache_entry *ent) {
+void bcache_ent_lock(struct bcache_entry *ent) {
     return mutex_lock(&ent->lock);
 }
 
-void bcache_ent_unlock(struct block_cache_entry *ent) {
+void bcache_ent_unlock(struct bcache_entry *ent) {
     return mutex_unlock(&ent->lock);
 }
 
-struct block_cache_entry *bcache_get(struct generic_disk *disk, uint64_t lba,
+struct bcache_entry *bcache_get(struct generic_disk *disk, uint64_t lba,
                                      uint64_t block_size, uint64_t spb,
                                      bool no_evict) {
     uint64_t base_lba = ALIGN_DOWN(lba, spb);
-    struct block_cache_entry *ent = get(disk->cache, base_lba);
+    struct bcache_entry *ent = get(disk->cache, base_lba);
 
     if (ent) {
-        struct block_cache_entry *shallow =
-            kzalloc(sizeof(struct block_cache_entry));
+        struct bcache_entry *shallow =
+            kzalloc(sizeof(struct bcache_entry));
         *shallow = *ent;
         shallow->buffer = get_lba_offset_buffer(ent, lba, spb, block_size);
         shallow->lba = lba;
@@ -220,7 +220,7 @@ struct block_cache_entry *bcache_get(struct generic_disk *disk, uint64_t lba,
 }
 
 bool bcache_insert(struct generic_disk *disk, uint64_t lba,
-                   struct block_cache_entry *ent) {
+                   struct bcache_entry *ent) {
     return insert(disk->cache, lba, ent);
 }
 
@@ -228,17 +228,17 @@ bool bcache_evict(struct generic_disk *disk, uint64_t spb) {
     return evict(disk->cache, spb);
 }
 
-struct block_cache_entry *bcache_create_ent(struct generic_disk *disk,
+struct bcache_entry *bcache_create_ent(struct generic_disk *disk,
                                             uint64_t lba, uint64_t block_size,
                                             uint64_t sectors_per_block,
                                             bool no_evict) {
     uint64_t base_lba = ALIGN_DOWN(lba, sectors_per_block);
 
     // check if it already exists
-    struct block_cache_entry *existing = get(disk->cache, base_lba);
+    struct bcache_entry *existing = get(disk->cache, base_lba);
     if (existing) {
-        struct block_cache_entry *shallow =
-            kzalloc(sizeof(struct block_cache_entry));
+        struct bcache_entry *shallow =
+            kzalloc(sizeof(struct bcache_entry));
         *shallow = *existing;
         shallow->buffer =
             get_lba_offset_buffer(existing, lba, sectors_per_block, block_size);
@@ -252,7 +252,7 @@ struct block_cache_entry *bcache_create_ent(struct generic_disk *disk,
         return NULL;
     }
 
-    struct block_cache_entry *ent = kzalloc(sizeof(struct block_cache_entry));
+    struct bcache_entry *ent = kzalloc(sizeof(struct bcache_entry));
     ent->buffer = buf;
     ent->lba = base_lba;
     ent->size = block_size;
@@ -260,8 +260,8 @@ struct block_cache_entry *bcache_create_ent(struct generic_disk *disk,
 
     bcache_insert(disk, base_lba, ent);
 
-    struct block_cache_entry *shallow =
-        kzalloc(sizeof(struct block_cache_entry));
+    struct bcache_entry *shallow =
+        kzalloc(sizeof(struct bcache_entry));
     *shallow = *ent;
     shallow->buffer =
         get_lba_offset_buffer(ent, lba, sectors_per_block, block_size);

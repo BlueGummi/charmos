@@ -94,7 +94,7 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
 
     struct ext2_full_inode target_inode = {0};
 
-    struct block_cache_entry *ent = ext2_block_read(fs, ctx.block_num);
+    struct bcache_entry *ent = ext2_block_read(fs, ctx.block_num);
     if (!ent)
         return ERR_IO;
 

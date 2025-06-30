@@ -64,7 +64,7 @@ struct generic_disk {
     void (*print)(struct generic_disk *disk); // this one for physical disk
 
     uint64_t partition_count;
-    struct block_cache *cache;
+    struct bcache *cache;
     struct generic_partition *partitions;
 };
 #pragma once

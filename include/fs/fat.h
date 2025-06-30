@@ -1,4 +1,5 @@
 #include <devices/generic_disk.h>
+#include <fs/bcache.h>
 #include <stdint.h>
 
 // TODO: errno :boom:

@@ -31,7 +31,7 @@ bool ext2_read_superblock(struct generic_partition *p,
 }
 
 bool ext2_write_superblock(struct ext2_fs *fs) {
-    return ext2_block_write(fs, fs->sblock_cache_ent);
+    return ext2_block_write(fs, fs->sbcache_ent);
 }
 
 bool ext2_write_group_desc(struct ext2_fs *fs) {

@@ -15,7 +15,7 @@ static uint32_t ext2_get_block(struct ext2_fs *fs, uint32_t block_num,
     uint32_t pointers_per_block = fs->block_size / sizeof(uint32_t);
 
     bool allocated_this_level = false;
-    struct block_cache_entry *ent = ext2_block_read(fs, block_num);
+    struct bcache_entry *ent = ext2_block_read(fs, block_num);
 
     if (block_num == 0) {
         if (!allocate) {

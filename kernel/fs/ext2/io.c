@@ -17,7 +17,7 @@ uint32_t ext2_block_to_lba(struct ext2_fs *fs, uint32_t block_num) {
 }
 
 /* not our job to lock it */
-struct block_cache_entry *ext2_block_read(struct ext2_fs *fs,
+struct bcache_entry *ext2_block_read(struct ext2_fs *fs,
                                           uint32_t block_num) {
     if (!fs)
         return NULL;
@@ -30,7 +30,7 @@ struct block_cache_entry *ext2_block_read(struct ext2_fs *fs,
     return bcache_get(d, lba, fs->block_size, spb, false);
 }
 
-bool ext2_block_write(struct ext2_fs *fs, struct block_cache_entry *ent) {
+bool ext2_block_write(struct ext2_fs *fs, struct bcache_entry *ent) {
     if (!fs || !ent)
         return false;
 
@@ -49,7 +49,7 @@ bool ext2_block_write(struct ext2_fs *fs, struct block_cache_entry *ent) {
     return ret;
 }
 
-struct block_cache_entry *ext2_inode_read(struct ext2_fs *fs,
+struct bcache_entry *ext2_inode_read(struct ext2_fs *fs,
                                           uint32_t inode_idx,
                                           struct ext2_inode *inode_out) {
     if (!fs || !inode_out || inode_idx == 0)
@@ -74,7 +74,7 @@ struct block_cache_entry *ext2_inode_read(struct ext2_fs *fs,
     if (inode_idx == 0 || inode_idx > fs->sblock->inodes_count)
         return false;
 
-    struct block_cache_entry *ent = ext2_block_read(fs, inode_block_num);
+    struct bcache_entry *ent = ext2_block_read(fs, inode_block_num);
     if (!ent)
         return NULL;
 
@@ -100,7 +100,7 @@ bool ext2_inode_write(struct ext2_fs *fs, uint32_t inode_num,
     uint32_t block_index = offset / block_size;
 
     uint32_t inode_block_num = (inode_table_block + block_index);
-    struct block_cache_entry *ent = ext2_block_read(fs, inode_block_num);
+    struct bcache_entry *ent = ext2_block_read(fs, inode_block_num);
     if (!ent)
         return false;
 

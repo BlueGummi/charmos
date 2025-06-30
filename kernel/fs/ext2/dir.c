@@ -62,7 +62,7 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     uint32_t bs = fs->block_size;
     uint32_t spb = fs->sectors_per_block;
 
-    struct block_cache_entry *ent;
+    struct bcache_entry *ent;
     ent = bcache_create_ent(fs->drive, lba, bs, spb, false);
 
     if (!ent)
@@ -108,7 +108,7 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
 
     uint32_t tmp = ext2_get_or_set_block(fs, &dir->node, 0, 0, false, NULL);
 
-    struct block_cache_entry *ent = ext2_block_read(fs, tmp);
+    struct bcache_entry *ent = ext2_block_read(fs, tmp);
 
     if (!ent)
         return ERR_IO;

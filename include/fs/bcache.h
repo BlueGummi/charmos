@@ -10,7 +10,7 @@
 struct generic_disk;
 
 /* must be allocated with malloc */
-struct block_cache_entry {
+struct bcache_entry {
     /* allocated upon new reads */
     uint8_t *buffer;
     uint64_t size;
@@ -25,14 +25,14 @@ struct block_cache_entry {
     bool no_evict;
 };
 
-struct block_cache_wrapper {
+struct bcache_wrapper {
     uint64_t key;                    // block number
-    struct block_cache_entry *value; // pointer to cache entry
+    struct bcache_entry *value; // pointer to cache entry
     bool occupied;
 };
 
-struct block_cache {
-    struct block_cache_wrapper *entries;
+struct bcache {
+    struct bcache_wrapper *entries;
     atomic_uint_fast64_t ticks;
     uint64_t capacity;
     uint64_t count;
@@ -40,7 +40,7 @@ struct block_cache {
     struct spinlock lock;
 };
 
-static inline uint64_t block_cache_hash(uint64_t x, uint64_t capacity) {
+static inline uint64_t bcache_hash(uint64_t x, uint64_t capacity) {
     x ^= x >> 30;
     x *= 0xbf58476d1ce4e5b9ULL;
     x ^= x >> 27;
@@ -49,25 +49,25 @@ static inline uint64_t block_cache_hash(uint64_t x, uint64_t capacity) {
     return x % capacity;
 }
 
-void bcache_init(struct block_cache *cache, uint64_t capacity);
-void bcache_ent_unlock(struct block_cache_entry *ent);
-void bcache_ent_lock(struct block_cache_entry *ent);
-struct block_cache_entry *bcache_get(struct generic_disk *disk, uint64_t lba,
+void bcache_init(struct bcache *cache, uint64_t capacity);
+void bcache_ent_unlock(struct bcache_entry *ent);
+void bcache_ent_lock(struct bcache_entry *ent);
+struct bcache_entry *bcache_get(struct generic_disk *disk, uint64_t lba,
                                      uint64_t block_size, uint64_t spb, bool);
 
 bool bcache_insert(struct generic_disk *disk, uint64_t lba,
-                   struct block_cache_entry *ent);
+                   struct bcache_entry *ent);
 bool bcache_evict(struct generic_disk *disk, uint64_t spb);
 
-struct block_cache_entry *bcache_create_ent(struct generic_disk *disk,
+struct bcache_entry *bcache_create_ent(struct generic_disk *disk,
                                             uint64_t lba, uint64_t block_size,
                                             uint64_t sectors_per_block,
                                             bool no_evict);
 
-static inline void block_cache_increment_ticks(struct block_cache *cache) {
+static inline void bcache_increment_ticks(struct bcache *cache) {
     atomic_fetch_add(&cache->ticks, 1);
 }
 
-static inline uint64_t block_cache_get_ticks(struct block_cache *cache) {
+static inline uint64_t bcache_get_ticks(struct bcache *cache) {
     return atomic_load(&cache->ticks);
 }

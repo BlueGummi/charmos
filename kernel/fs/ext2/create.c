@@ -81,7 +81,7 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
     uint32_t bs = fs->block_size;
     uint32_t spb = fs->sectors_per_block;
 
-    struct block_cache_entry *ent;
+    struct bcache_entry *ent;
 
     /* no locking here because this is a new entry that
      * no one besides us should have access to right now */

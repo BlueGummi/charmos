@@ -41,7 +41,7 @@ enum errno ext2_write_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
         if (to_write > size - bytes_written)
             to_write = size - bytes_written;
 
-        struct block_cache_entry *ent = ext2_block_read(fs, block_num);
+        struct bcache_entry *ent = ext2_block_read(fs, block_num);
         if (!ent)
             return ERR_IO;
 
@@ -89,7 +89,7 @@ static void file_read_visitor(struct ext2_fs *fs, struct ext2_inode *inode,
         return;
 
     uint32_t block_size = fs->block_size;
-    struct block_cache_entry *ent = ext2_block_read(fs, *block_ptr);
+    struct bcache_entry *ent = ext2_block_read(fs, *block_ptr);
     if (!ent)
         return;
 

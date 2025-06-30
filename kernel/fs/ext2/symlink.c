@@ -35,7 +35,7 @@ enum errno ext2_symlink_file(struct ext2_fs *fs,
         uint32_t bs = fs->block_size;
         uint32_t spb = fs->sectors_per_block;
 
-        struct block_cache_entry *ent;
+        struct bcache_entry *ent;
         ent = bcache_create_ent(fs->drive, lba, bs, spb, false);
         if (!ent)
             return ERR_IO;
@@ -87,7 +87,7 @@ enum errno ext2_readlink(struct ext2_fs *fs, struct ext2_full_inode *node,
         return ERR_IO;
 
     /* no lock - RO */
-    struct block_cache_entry *ent = ext2_block_read(fs, first_block);
+    struct bcache_entry *ent = ext2_block_read(fs, first_block);
     if (!ent)
         return ERR_IO;
 
