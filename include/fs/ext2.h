@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <fs/bcache.h>
 #include <fs/vfs.h>
+#include <spin_lock.h>
 #include <stdint.h>
 
 extern uint64_t PTRS_PER_BLOCK;
@@ -56,10 +57,10 @@ extern uint64_t PTRS_PER_BLOCK;
 #define EXT2_NODUMP_FL 0x00000040    // Don't include in backups
 #define EXT2_NOATIME_FL 0x00000080   // Don't update access time
 
-#define EXT2_DIRTY_FL 0x00000100    // Dirty (compress support)
-#define EXT2_COMPRBLK_FL 0x00000200 // One or more compressed clusters
-#define EXT2_NOCOMPR_FL 0x00000400  // Don't compress
-#define EXT2_ECOMPR_FL 0x00000800   // Compression error
+#define EXT2_DIRTY_FL 0x00000100        // Dirty (compress support)
+#define EXT2_COMPRBLK_FL 0x00000200     // One or more compressed clusters
+#define EXT2_NOCOMPR_FL 0x00000400      // Don't compress
+#define EXT2_ECOMPR_FL 0x00000800       // Compression error
 #define EXT2_IMAGIC_FL 0x00002000       // AFS directory
 #define EXT2_JOURNAL_DATA_FL 0x00004000 // Write data to journal (data=journal)
 
@@ -217,6 +218,9 @@ struct ext2_fs {
     uint32_t block_size;
     uint32_t sectors_per_block;
     uint16_t inode_size;
+
+    /* lock the fs struct */
+    struct spinlock lock;
 };
 
 typedef bool (*dir_entry_callback)(struct ext2_fs *fs,
@@ -234,8 +238,7 @@ typedef void (*ext2_block_visitor)(struct ext2_fs *fs, struct ext2_inode *inode,
 //
 //
 
-struct bcache_entry *ext2_block_read(struct ext2_fs *fs,
-                                          uint32_t block_num);
+struct bcache_entry *ext2_block_read(struct ext2_fs *fs, uint32_t block_num);
 
 bool ext2_block_write(struct ext2_fs *fs, struct bcache_entry *ent);
 
@@ -250,9 +253,8 @@ enum errno ext2_mount(struct generic_partition *, struct ext2_fs *fs,
 
 struct vfs_node *ext2_g_mount(struct generic_partition *);
 
-struct bcache_entry *ext2_inode_read(struct ext2_fs *fs,
-                                          uint32_t inode_idx,
-                                          struct ext2_inode *inode_out);
+struct bcache_entry *ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
+                                     struct ext2_inode *inode_out);
 
 bool ext2_inode_write(struct ext2_fs *fs, uint32_t inode_num,
                       const struct ext2_inode *inode);
@@ -270,10 +272,15 @@ uint32_t ext2_get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
 uint32_t ext2_block_to_lba(struct ext2_fs *fs, uint32_t block_num);
 bool ext2_dirent_valid(struct ext2_dir_entry *entry);
 void ext2_init_inode(struct ext2_inode *new_inode, uint16_t mode);
+
+void ext2_init_dirent(struct ext2_fs *fs, struct ext2_dir_entry *new_entry,
+                      uint32_t inode_num, const char *name, uint8_t type);
+
 uint8_t ext2_extract_ftype(uint16_t mode);
 uint32_t ext2_get_inode_group(struct ext2_fs *fs, uint32_t inode);
 uint32_t ext2_get_block_group(struct ext2_fs *fs, uint32_t block);
-void ext2_inode_unlock(struct ext2_full_inode *node);
+bool ext2_fs_lock(struct ext2_fs *fs);
+void ext2_fs_unlock(struct ext2_fs *fs, bool i);
 
 //
 //
@@ -361,5 +368,4 @@ void ext2_print_inode(const struct ext2_full_inode *node);
 void ext2_dump_file_data(struct ext2_fs *fs, const struct ext2_inode *inode,
                          uint32_t start_block_index, uint32_t length);
 
-#pragma once
 #pragma once

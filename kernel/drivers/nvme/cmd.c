@@ -40,7 +40,7 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
     }
 }
 
-void nvme_isr_handler(void *ctx, uint8_t vector) {
+void nvme_isr_handler(void *ctx, uint8_t vector, void *rsp) {
     struct nvme_device *dev = ctx;
     /* TODO: many IO queues */
     nvme_process_completions(dev, 1);
@@ -110,47 +110,6 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
             return 0xFFFF;
     }
 }
-
-/*
-uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
-                            uint32_t qid) {
-    struct nvme_queue *this_queue = nvme->io_queues[qid];
-
-    uint16_t tail = this_queue->sq_tail;
-    uint16_t next_tail = (tail + 1) % this_queue->sq_depth;
-
-    cmd->cid = tail;
-    this_queue->sq[tail] = *cmd;
-
-    this_queue->sq_tail = next_tail;
-
-    mmio_write_32(this_queue->sq_db, this_queue->sq_tail);
-
-    uint64_t timeout = NVME_CMD_TIMEOUT_MS * 1000;
-    while (true) {
-        struct nvme_completion *entry = &this_queue->cq[this_queue->cq_head];
-
-        if ((mmio_read_16(&entry->status) & 1) == this_queue->cq_phase) {
-            if (mmio_read_16(&entry->cid) == cmd->cid) {
-                uint16_t status = entry->status & 0xFFFE;
-
-                this_queue->cq_head =
-                    (this_queue->cq_head + 1) % this_queue->cq_depth;
-
-                if (this_queue->cq_head == 0)
-                    this_queue->cq_phase ^= 1;
-
-                mmio_write_32(this_queue->cq_db, this_queue->cq_head);
-
-                return status;
-            }
-        }
-        sleep_us(10);
-        timeout--;
-        if (timeout == 0)
-            return 0xFFFF;
-    }
-}*/
 
 uint8_t *nvme_identify_controller(struct nvme_device *nvme) {
     uint64_t buffer_phys = (uint64_t) pmm_alloc_page(false);

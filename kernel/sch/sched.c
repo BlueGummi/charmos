@@ -210,7 +210,9 @@ static bool all_threads_unrunnable(struct scheduler *sched) {
 void schedule(struct cpu_state *cpu) {
     uint64_t core_id = get_sch_core_id();
     struct scheduler *sched = local_schs[core_id];
+
     spin_lock_no_cli(&sched->lock);
+    
     struct thread *curr = sched->current;
     struct thread *next = NULL;
     struct scheduler *victim = NULL;

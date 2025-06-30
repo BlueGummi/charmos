@@ -35,7 +35,7 @@ struct idt_ptr {
     uint64_t base;
 } __attribute__((packed));
 
-typedef void (*isr_handler_t)(void *ctx, uint8_t vector);
+typedef void (*isr_handler_t)(void *ctx, uint8_t vector, void *rsp);
 
 struct isr_entry {
     isr_handler_t handler;

@@ -21,6 +21,7 @@ isr_vector_%1:
     push rax
 
     mov rdi, %1
+    mov rsi, rsp
     call isr_common_entry
 
     pop rax

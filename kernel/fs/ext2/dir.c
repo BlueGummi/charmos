@@ -78,7 +78,6 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
 
     ext2_inode_write(fs, dir->inode_num, &dir->node);
     ext2_inode_write(fs, parent_dir->inode_num, &parent_dir->node);
-
     ext2_block_write(fs, ent);
 
     uint32_t group = ext2_get_inode_group(fs, dir->inode_num);
@@ -90,8 +89,11 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
 
     /* TODO: not sure why, but these numbers down here are changed
      * and become inaccurate, fsck complains */
+    bool i = ext2_fs_lock(fs);
     desc->free_blocks_count++;
     fs->sblock->free_blocks_count++;
+    ext2_fs_unlock(fs, i);
+
     ext2_write_group_desc(fs);
     ext2_write_superblock(fs);
 

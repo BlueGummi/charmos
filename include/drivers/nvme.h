@@ -228,4 +228,4 @@ bool nvme_read_sector_wrapper(struct generic_disk *disk, uint64_t lba,
 
 bool nvme_write_sector_wrapper(struct generic_disk *disk, uint64_t lba,
                                const uint8_t *buf, uint64_t cnt);
-void nvme_isr_handler(void *ctx, uint8_t vector);
+void nvme_isr_handler(void *ctx, uint8_t vector, void *rsp);

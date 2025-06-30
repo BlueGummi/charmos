@@ -54,10 +54,10 @@ MAKE_HANDLER(gpf, "GPF");
 MAKE_HANDLER(ss, "STACK SEGMENT FAULT");
 MAKE_HANDLER(double_fault, "DOUBLE FAULT");
 
-void isr_common_entry(uint8_t vector) {
+void isr_common_entry(uint8_t vector, void *rsp) {
     uint8_t c = get_sch_core_id();
     if (isr_table[c][vector].handler) {
-        isr_table[c][vector].handler(isr_table[c][vector].ctx, vector);
+        isr_table[c][vector].handler(isr_table[c][vector].ctx, vector, rsp);
     } else {
         k_printf("Unhandled ISR vector: %u\n", vector);
         while (1)

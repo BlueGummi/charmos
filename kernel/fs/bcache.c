@@ -6,9 +6,8 @@
 
 #define ALIGN_DOWN(x, align) ((x) & ~((align) - 1))
 
-static uint8_t *get_lba_offset_buffer(struct bcache_entry *ent,
-                                      uint64_t lba, uint64_t spb,
-                                      uint64_t block_size) {
+static uint8_t *get_lba_offset_buffer(struct bcache_entry *ent, uint64_t lba,
+                                      uint64_t spb, uint64_t block_size) {
     uint64_t offset_lba = lba - ent->lba;
     uint64_t offset_bytes = (block_size / spb) * offset_lba;
     return ent->buffer + offset_bytes;
@@ -201,14 +200,13 @@ void bcache_ent_unlock(struct bcache_entry *ent) {
 }
 
 struct bcache_entry *bcache_get(struct generic_disk *disk, uint64_t lba,
-                                     uint64_t block_size, uint64_t spb,
-                                     bool no_evict) {
+                                uint64_t block_size, uint64_t spb,
+                                bool no_evict) {
     uint64_t base_lba = ALIGN_DOWN(lba, spb);
     struct bcache_entry *ent = get(disk->cache, base_lba);
 
     if (ent) {
-        struct bcache_entry *shallow =
-            kzalloc(sizeof(struct bcache_entry));
+        struct bcache_entry *shallow = kzalloc(sizeof(struct bcache_entry));
         *shallow = *ent;
         shallow->buffer = get_lba_offset_buffer(ent, lba, spb, block_size);
         shallow->lba = lba;
@@ -220,25 +218,29 @@ struct bcache_entry *bcache_get(struct generic_disk *disk, uint64_t lba,
 }
 
 bool bcache_insert(struct generic_disk *disk, uint64_t lba,
-                   struct bcache_entry *ent) {
-    return insert(disk->cache, lba, ent);
+                   struct bcache_entry *ent, uint64_t spb) {
+    if (insert(disk->cache, lba, ent)) {
+        return true;
+    } else {
+        evict(disk->cache, spb);
+        return insert(disk->cache, lba, ent);
+    }
 }
 
 bool bcache_evict(struct generic_disk *disk, uint64_t spb) {
     return evict(disk->cache, spb);
 }
 
-struct bcache_entry *bcache_create_ent(struct generic_disk *disk,
-                                            uint64_t lba, uint64_t block_size,
-                                            uint64_t sectors_per_block,
-                                            bool no_evict) {
+struct bcache_entry *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
+                                       uint64_t block_size,
+                                       uint64_t sectors_per_block,
+                                       bool no_evict) {
     uint64_t base_lba = ALIGN_DOWN(lba, sectors_per_block);
 
     // check if it already exists
     struct bcache_entry *existing = get(disk->cache, base_lba);
     if (existing) {
-        struct bcache_entry *shallow =
-            kzalloc(sizeof(struct bcache_entry));
+        struct bcache_entry *shallow = kzalloc(sizeof(struct bcache_entry));
         *shallow = *existing;
         shallow->buffer =
             get_lba_offset_buffer(existing, lba, sectors_per_block, block_size);
@@ -258,10 +260,9 @@ struct bcache_entry *bcache_create_ent(struct generic_disk *disk,
     ent->size = block_size;
     ent->no_evict = no_evict;
 
-    bcache_insert(disk, base_lba, ent);
+    bcache_insert(disk, base_lba, ent, sectors_per_block);
 
-    struct bcache_entry *shallow =
-        kzalloc(sizeof(struct bcache_entry));
+    struct bcache_entry *shallow = kzalloc(sizeof(struct bcache_entry));
     *shallow = *ent;
     shallow->buffer =
         get_lba_offset_buffer(ent, lba, sectors_per_block, block_size);

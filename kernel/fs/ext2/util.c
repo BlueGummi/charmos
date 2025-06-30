@@ -134,6 +134,15 @@ void ext2_init_inode(struct ext2_inode *new_inode, uint16_t mode) {
     new_inode->flags = 0;
 }
 
+void ext2_init_dirent(struct ext2_fs *fs, struct ext2_dir_entry *new_entry,
+                      uint32_t inode_num, const char *name, uint8_t type) {
+    new_entry->inode = inode_num;
+    new_entry->name_len = strlen(name);
+    new_entry->rec_len = fs->block_size;
+    new_entry->file_type = type;
+    memcpy(new_entry->name, name, new_entry->name_len);
+}
+
 uint8_t ext2_extract_ftype(uint16_t mode) {
     uint8_t file_type;
     if (mode & EXT2_S_IFDIR)
@@ -154,4 +163,12 @@ uint32_t ext2_get_block_group(struct ext2_fs *fs, uint32_t block) {
 
 uint32_t ext2_get_inode_group(struct ext2_fs *fs, uint32_t inode) {
     return (inode - 1) / fs->sblock->inodes_per_group;
+}
+
+bool ext2_fs_lock(struct ext2_fs *fs) {
+    return spin_lock(&fs->lock);
+}
+
+void ext2_fs_unlock(struct ext2_fs *fs, bool b) {
+    spin_unlock(&fs->lock, b);
 }

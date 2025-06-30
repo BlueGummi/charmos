@@ -102,9 +102,8 @@ static bool detect_gpt_partitions(struct generic_disk *disk, uint8_t *sector) {
         if (!disk->read_sector(disk, lba, sector, 1))
             break;
 
-        struct gpt_partition_entry *entry =
-            (struct gpt_partition_entry *) (sector +
-                                            (i % entries_per_sector) * size);
+        struct gpt_partition_entry *entry;
+        entry = (void *) (sector + (i % entries_per_sector) * size);
 
         if (entry->first_lba && entry->last_lba)
             valid_count++;

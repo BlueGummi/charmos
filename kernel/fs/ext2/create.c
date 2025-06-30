@@ -14,6 +14,13 @@ struct link_ctx {
     bool success;
 };
 
+#define MKCTX(name, num, dirnum, type)                                         \
+    {.name = name,                                                             \
+     .inode = num,                                                             \
+     .success = false,                                                         \
+     .dir_inode = dirnum,                                                      \
+     .type = type}
+
 MAKE_NOP_CALLBACK;
 
 static bool link_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
@@ -52,22 +59,15 @@ static bool link_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
     return false;
 }
 
-enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
+enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir,
                           struct ext2_full_inode *inode, const char *name,
                           uint8_t type, bool increment_links) {
-    struct link_ctx ctx = {
-        .name = name,
-        .inode = inode->inode_num,
-        .success = false,
-        .dir_inode = dir_inode->inode_num,
-        .type = type,
-    };
-    struct generic_disk *d = fs->drive;
+    if (ext2_dir_contains_file(fs, dir, name))
+        return ERR_EXIST;
 
-    if (ext2_dir_contains_file(fs, dir_inode, name))
-        return ERR_NO_ENT;
+    struct link_ctx ctx = MKCTX(name, inode->inode_num, dir->inode_num, type);
 
-    ext2_walk_dir(fs, dir_inode, link_callback, &ctx, false);
+    ext2_walk_dir(fs, dir, link_callback, &ctx, false);
 
     /* did not need to allocate new block */
     if (ctx.success)
@@ -77,56 +77,41 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
     if (new_block == 0)
         return ERR_NOSPC;
 
+    struct bcache_entry *ent;
     uint32_t lba = ext2_block_to_lba(fs, new_block);
-    uint32_t bs = fs->block_size;
     uint32_t spb = fs->sectors_per_block;
 
-    struct bcache_entry *ent;
-
-    /* no locking here because this is a new entry that
-     * no one besides us should have access to right now */
-    ent = bcache_create_ent(d, lba, bs, spb, false);
+    /* this inserts the entry into the block cache */
+    ent = bcache_create_ent(fs->drive, lba, fs->block_size, spb, false);
     if (!ent)
         return ERR_IO;
 
-    uint8_t *block_data = ent->buffer;
-    struct ext2_dir_entry *new_entry = (struct ext2_dir_entry *) block_data;
+    /* no locking here because this is a new entry that
+     * no one besides us should have access to right now */
+    struct ext2_dir_entry *new_entry = (void *) ent->buffer;
 
-    new_entry->inode = inode->inode_num;
-    new_entry->name_len = strlen(name);
-    new_entry->rec_len = fs->block_size;
-    new_entry->file_type = type;
+    ext2_init_dirent(fs, new_entry, inode->inode_num, name, type);
 
-    memcpy(new_entry->name, name, new_entry->name_len);
+    if (!ext2_block_write(fs, ent))
+        return ERR_IO;
 
-    bool status = bcache_insert(d, lba, ent);
-    if (!status) {
-        bcache_evict(d, fs->sectors_per_block);
-        bcache_insert(d, lba, ent);
-    }
-
-    if (ext2_block_write(fs, ent)) {
-        if (!ext2_walk_dir(fs, dir_inode, nop_callback, &new_block, true)) {
-            ext2_free_block(fs, new_block);
-            return ERR_FS_INTERNAL;
-        }
-    } else {
-        return ERR_FS_INTERNAL;
+    /* this sets the first available block to our new block */
+    if (!ext2_walk_dir(fs, dir, nop_callback, &new_block, true)) {
+        ext2_free_block(fs, new_block);
+        return ERR_IO;
     }
 
 done:
     if (increment_links)
-        dir_inode->node.links_count += 1;
+        dir->node.links_count += 1;
 
-    return ext2_inode_write(fs, dir_inode->inode_num, &dir_inode->node)
-               ? ERR_OK
-               : ERR_FS_INTERNAL;
+    bool status = ext2_inode_write(fs, dir->inode_num, &dir->node);
+    return status ? ERR_OK : ERR_FS_INTERNAL;
 }
 
 enum errno ext2_create_file(struct ext2_fs *fs,
                             struct ext2_full_inode *parent_dir,
-                            const char *name, uint16_t mode,
-                            bool increment_links) {
+                            const char *name, uint16_t mode, bool increment) {
     uint32_t new_inode_num = ext2_alloc_inode(fs);
     if (new_inode_num == 0)
         return ERR_NOSPC;
@@ -137,15 +122,14 @@ enum errno ext2_create_file(struct ext2_fs *fs,
     if (!ext2_inode_write(fs, new_inode_num, &new_inode))
         return ERR_IO;
 
-    struct ext2_full_inode temp_full_inode = {
+    struct ext2_full_inode tmp = {
         .node = new_inode,
         .inode_num = new_inode_num,
     };
 
-    uint8_t file_type = ext2_extract_ftype(mode);
+    uint8_t ft = ext2_extract_ftype(mode);
 
-    enum errno err = ext2_link_file(fs, parent_dir, &temp_full_inode, name,
-                                    file_type, increment_links);
+    enum errno err = ext2_link_file(fs, parent_dir, &tmp, name, ft, increment);
 
     if (err != ERR_OK) {
         ext2_free_inode(fs, new_inode_num);
