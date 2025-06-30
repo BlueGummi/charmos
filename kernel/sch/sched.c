@@ -49,7 +49,7 @@ void k_sch_main() {
 
 void k_sch_idle() {
     while (1) {
-        asm volatile("hlt");
+        scheduler_yield();
     }
 }
 
