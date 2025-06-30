@@ -4,12 +4,12 @@
 #include <asm.h>
 #include <console/printf.h>
 #include <int/idt.h>
+#include <int/irq.h>
 #include <int/kb.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <misc/dbg.h>
-#include <int/irq.h>
 #include <sch/sched.h>
 #include <stdint.h>
 
@@ -17,8 +17,10 @@ extern void context_switch();
 extern void page_fault_handler_wrapper();
 extern void syscall_entry();
 #define MAX_IDT_ENTRIES 256
-
 static bool idt_entry_used[MAX_IDT_ENTRIES];
+
+#include "isr_stubs.h"
+#include "isr_vectors_array.h"
 
 #define MAKE_THIN_HANDLER(handler_name, message)                               \
     void handler_name##_fault(void *frame) {                                   \
@@ -51,12 +53,36 @@ MAKE_HANDLER(gpf, "GPF");
 MAKE_HANDLER(ss, "STACK SEGMENT FAULT");
 MAKE_HANDLER(double_fault, "DOUBLE FAULT");
 
+struct isr_entry isr_table[MAX_IDT_ENTRIES];
+
+void isr_common_entry(uint8_t vector) {
+    if (isr_table[vector].handler) {
+        isr_table[vector].handler(isr_table[vector].ctx, vector);
+    } else {
+        k_printf("Unhandled ISR vector: %u\n", vector);
+        while (1)
+            asm volatile("hlt");
+    }
+
+    LAPIC_REG(LAPIC_REG_EOI) = 0;
+}
+
+void isr_register(uint8_t vector, isr_handler_t handler, void *ctx) {
+    isr_table[vector].handler = handler;
+    isr_table[vector].ctx = ctx;
+    irq_set_installed(vector, true);
+}
+
 struct idt_table *idts;
 struct idt_ptr *idtps;
 
 void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
                   uint64_t ind) {
     struct idt_entry *idt = idts[ind].entries;
+
+    isr_table[num].handler = (void *) base;
+    base = (uint64_t) isr_vectors[num];
+
     idt[num].base_low = (base & 0xFFFF);
     idt[num].base_mid = (base >> 16) & 0xFFFF;
     idt[num].base_high = (base >> 32) & 0xFFFFFFFF;
@@ -64,6 +90,23 @@ void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
     idt[num].ist = 0;
     idt[num].flags = flags;
     idt[num].reserved = 0;
+
+    idt_entry_used[num] = true;
+    irq_set_installed(num, true);
+}
+
+static void set(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
+                uint64_t ind) {
+    struct idt_entry *idt = idts[ind].entries;
+
+    idt[num].base_low = (base & 0xFFFF);
+    idt[num].base_mid = (base >> 16) & 0xFFFF;
+    idt[num].base_high = (base >> 32) & 0xFFFFFFFF;
+    idt[num].selector = sel;
+    idt[num].ist = 0;
+    idt[num].flags = flags;
+    idt[num].reserved = 0;
+
     idt_entry_used[num] = true;
     irq_set_installed(num, true);
 }
@@ -109,27 +152,26 @@ void idt_free_entry(int entry) {
 
 void idt_install(uint64_t ind) {
 
-    idt_set_gate(DIV_BY_Z_ID, (uint64_t) divbyz_fault, 0x08, 0x8E, ind);
+    set(DIV_BY_Z_ID, (uint64_t) divbyz_fault, 0x08, 0x8E, ind);
 
-    idt_set_gate(DEBUG_ID, (uint64_t) debug_fault, 0x08, 0x8E, ind);
+    set(DEBUG_ID, (uint64_t) debug_fault, 0x08, 0x8E, ind);
 
-    idt_set_gate(BREAKPOINT_ID, (uint64_t) breakpoint_fault, 0x08, 0x8E, ind);
+    set(BREAKPOINT_ID, (uint64_t) breakpoint_fault, 0x08, 0x8E, ind);
 
-    idt_set_gate(DOUBLEFAULT_ID, (uint64_t) double_fault_handler_wrapper, 0x08,
-                 0x8E, ind);
+    set(DOUBLEFAULT_ID, (uint64_t) double_fault_handler_wrapper, 0x08, 0x8E,
+        ind);
 
-    idt_set_gate(SSF_ID, (uint64_t) ss_handler_wrapper, 0x08, 0x8E, ind);
+    set(SSF_ID, (uint64_t) ss_handler_wrapper, 0x08, 0x8E, ind);
 
-    idt_set_gate(GPF_ID, (uint64_t) gpf_handler_wrapper, 0x08, 0x8E, ind);
+    set(GPF_ID, (uint64_t) gpf_handler_wrapper, 0x08, 0x8E, ind);
 
-    idt_set_gate(PAGE_FAULT_ID, (uint64_t) page_fault_handler_wrapper, 0x08,
-                 0x8E, ind);
+    set(PAGE_FAULT_ID, (uint64_t) page_fault_handler_wrapper, 0x08, 0x8E, ind);
 
-    idt_set_gate(TIMER_ID, (uint64_t) context_switch, 0x08, 0x8E, ind);
+    set(TIMER_ID, (uint64_t) context_switch, 0x08, 0x8E, ind);
 
-    idt_set_gate(KB_ID, (uint64_t) keyboard_handler, 0x08, 0x8E, ind);
+    set(KB_ID, (uint64_t) keyboard_handler, 0x08, 0x8E, ind);
 
-    idt_set_gate(0x80, (uint64_t) syscall_entry, 0x2b, 0xee, ind);
+    set(0x80, (uint64_t) syscall_entry, 0x2b, 0xee, ind);
 
     idt_load(ind);
 }

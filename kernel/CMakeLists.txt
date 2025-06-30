@@ -1,14 +1,18 @@
 cmake_minimum_required(VERSION 3.16)
-project(charmOS-kernel C ASM_NASM)
+project(charmOS-kernel C ASM_NASM ASM-ATT)
 set(CARGO_TARGET x86_64-unknown-none)
 set(CMAKE_C_STANDARD 11)
-
-enable_language(ASM_NASM)
 
 file(GLOB_RECURSE C_SOURCES *.c)
 file(GLOB_RECURSE ASM_SOURCES *.S)
 file(GLOB_RECURSE NASM_SOURCES *.asm)
 file(GLOB_RECURSE RS_SOURCES *.rs)
+
+enable_language(ASM_NASM)
+enable_language(ASM-ATT)
+
+set_source_files_properties(${NASM_SOURCES} PROPERTIES LANGUAGE ASM_NASM)
+set_source_files_properties(${ASM_SOURCES} PROPERTIES LANGUAGE ASM-ATT)
 
 include_directories(. freestnd-c-hdrs)
 include(uACPI/uacpi.cmake)

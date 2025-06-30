@@ -106,6 +106,8 @@ struct nvme_device {
     uint8_t admin_cq_phase;
 
     struct nvme_queue **io_queues;
+
+    uint8_t isr_index;
 };
 
 struct nvme_identify {
@@ -222,3 +224,4 @@ bool nvme_read_sector_wrapper(struct generic_disk *disk, uint64_t lba,
 
 bool nvme_write_sector_wrapper(struct generic_disk *disk, uint64_t lba,
                                const uint8_t *buf, uint64_t cnt);
+void nvme_isr_handler(void *ctx, uint8_t vector);

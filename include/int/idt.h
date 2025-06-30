@@ -1,4 +1,5 @@
 #include <stdint.h>
+#pragma once
 
 #define IDT_ENTRIES 256
 #define MAX_IRQ 224
@@ -34,6 +35,13 @@ struct idt_ptr {
     uint64_t base;
 } __attribute__((packed));
 
+typedef void (*isr_handler_t)(void *ctx, uint8_t vector);
+
+struct isr_entry {
+    isr_handler_t handler;
+    void *ctx;
+};
+
 void idt_install(uint64_t ind);
 void idt_load(uint64_t ind);
 void idt_alloc(uint64_t size);
@@ -43,4 +51,4 @@ void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
 int idt_install_handler(uint8_t flags, void (*handler)(void), uint64_t core);
 int idt_alloc_entry(void);
 void idt_free_entry(int entry);
-#pragma once
+void isr_register(uint8_t vector, isr_handler_t handler, void *ctx);

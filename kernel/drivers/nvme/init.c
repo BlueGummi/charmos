@@ -92,11 +92,6 @@ void nvme_alloc_admin_queues(struct nvme_device *nvme) {
     nvme->admin_cq_phys = acq_phys;
 }
 
-__attribute__((interrupt)) void functest(struct interrupt_frame *frame) {
-    k_info("NVMe", K_INFO, "NVMe device interrupt caught!");
-    LAPIC_REG(LAPIC_REG_EOI) = 0;
-}
-
 void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
     if (!qid)
         k_panic("Can't allocate IO queue zero!\n");
@@ -135,9 +130,9 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
     cq_cmd.prp1 = cq_phys;
 
     cq_cmd.cdw10 = (15) << 16 | 1;
-    cq_cmd.cdw11 = 0x24 << 16 | 0b11;
+    cq_cmd.cdw11 = nvme->isr_index << 16 | 0b11;
 
-    idt_set_gate(0x24, (uint64_t) functest, 0x08, 0x8E, 0);
+    idt_set_gate(nvme->isr_index, (uint64_t) nvme_isr_handler, 0x08, 0x8E, 0);
     if (nvme_submit_admin_cmd(nvme, &cq_cmd) != 0) {
         k_info("NVMe", K_ERROR, "failed to create IOCQ - code 0x%x", cq_cmd);
         return;
@@ -155,4 +150,5 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
         k_info("NVMe", K_ERROR, "failed to create IOSQ - code 0x%x", sq_cmd);
         return;
     }
+    k_info("NVMe", K_INFO, "NVMe Queues created - ISR %u", nvme->isr_index);
 }

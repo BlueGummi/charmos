@@ -1,13 +1,21 @@
+#include <acpi/lapic.h>
 #include <asm.h>
 #include <console/printf.h>
 #include <devices/generic_disk.h>
 #include <drivers/nvme.h>
 #include <mem/alloc.h>
+#include <int/idt.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <sleep.h>
 #include <stdint.h>
 #include <string.h>
+
+void nvme_isr_handler(void *ctx, uint8_t vector) {
+    k_info("NVMe", K_INFO, "Caught device interrupt from vector %u", vector);
+    LAPIC_REG(LAPIC_REG_EOI) = 0;
+}
+
 
 uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
                                struct nvme_command *cmd) {

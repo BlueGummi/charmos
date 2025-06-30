@@ -4,6 +4,7 @@
 #include <devices/generic_disk.h>
 #include <drivers/nvme.h>
 #include <drivers/pci.h>
+#include <int/idt.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
@@ -49,7 +50,7 @@ static void nvme_msix_enable_vector(uint8_t bus, uint8_t slot, uint8_t func,
     k_info("NVMe", K_INFO, "Enabled MSI-X vector %u", vector_index);
 }
 
-void nvme_enable_msix(uint8_t bus, uint8_t slot, uint8_t func) {
+void nvme_enable_msix(uint8_t bus, uint8_t slot, uint8_t func, uint8_t isr) {
     uint8_t cap_ptr = pci_read_byte(bus, slot, func, PCI_CAP_PTR);
 
     while (cap_ptr != 0) {
@@ -66,7 +67,7 @@ void nvme_enable_msix(uint8_t bus, uint8_t slot, uint8_t func) {
 
             if ((verify & (1 << 15)) && !(verify & (1 << 14))) {
                 k_info("NVMe", K_INFO, "MSI-X enabled");
-                nvme_msix_enable_vector(bus, slot, func, cap_ptr, 0x24);
+                nvme_msix_enable_vector(bus, slot, func, cap_ptr, isr);
             } else {
                 k_info("NVMe", K_ERROR, "Failed to enable MSI-X");
             }
@@ -103,8 +104,9 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
 
     void *mmio = vmm_map_phys(phys_addr, size);
 
-    nvme_enable_msix(bus, slot, func);
-    
+    uint8_t nvme_isr = idt_alloc_entry();
+    nvme_enable_msix(bus, slot, func, nvme_isr);
+
     struct nvme_regs *regs = (struct nvme_regs *) mmio;
     uint64_t cap = ((uint64_t) regs->cap_hi << 32) | regs->cap_lo;
     uint32_t version = regs->version;
@@ -120,6 +122,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme->cap = cap;
     nvme->version = version;
     nvme->regs = regs;
+    nvme->isr_index = nvme_isr;
     nvme->admin_q_depth = ((nvme->cap) & 0xFFFF) + 1;
     nvme->io_queues = kmalloc(sizeof(struct nvme_queue *));
     if (!nvme->io_queues)
