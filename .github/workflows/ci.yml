@@ -19,15 +19,15 @@ jobs:
       image: archlinux:latest
 
     steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      
       - name: Install dependencies
         run: |
           pacman -Syu --noconfirm
           pacman -S --noconfirm base-devel rustup nasm xorriso cmake git
           rustup default nightly
           rustup target add x86_64-unknown-none
-
-      - name: Check out code
-        uses: actions/checkout@v2
 
       - name: Compile
         run: ./build.sh
