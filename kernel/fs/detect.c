@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <string.h>
 
+/* there is no point in using the bcache for these operations */
 const char *detect_fstr(enum fs_type type) {
     switch (type) {
     case FS_FAT12: return "FAT12";
@@ -37,6 +38,21 @@ void dummy_print(struct generic_partition *p) {
              detect_fstr(p->disk->fs_type));
 }
 
+static void make_partition(struct generic_partition *part,
+                           struct generic_disk *disk, uint64_t start_lba,
+                           uint64_t sector_count, uint8_t idx) {
+    part->disk = disk;
+    part->start_lba = start_lba;
+    part->sector_count = sector_count;
+    part->fs_type = FS_UNKNOWN;
+    part->fs_data = NULL;
+    part->mounted = false;
+    snprintf(part->name, sizeof(part->name), "%sp%d", disk->name, idx);
+
+    part->mount = NULL;
+    part->print_fs = NULL;
+}
+
 static bool detect_mbr_partitions(struct generic_disk *disk, uint8_t *sector) {
     struct mbr *mbr = (struct mbr *) sector;
 
@@ -62,16 +78,7 @@ static bool detect_mbr_partitions(struct generic_disk *disk, uint8_t *sector) {
             continue;
 
         struct generic_partition *part = &disk->partitions[idx++];
-        part->disk = disk;
-        part->start_lba = p->lba_start;
-        part->sector_count = p->sector_count;
-        part->fs_type = FS_UNKNOWN;
-        part->fs_data = NULL;
-        part->mounted = false;
-        snprintf(part->name, sizeof(part->name), "%sp%d", disk->name, idx);
-
-        part->mount = NULL;
-        part->print_fs = NULL;
+        make_partition(part, disk, p->lba_start, p->sector_count, idx);
     }
     return true;
 }
@@ -115,22 +122,13 @@ static bool detect_gpt_partitions(struct generic_disk *disk, uint8_t *sector) {
         if (!disk->read_sector(disk, lba, sector, 1))
             break;
 
-        struct gpt_partition_entry *entry =
-            (struct gpt_partition_entry *) (sector +
-                                            (i % entries_per_sector) * size);
+        struct gpt_partition_entry *entry;
+        entry = (void *) (sector + (i % entries_per_sector) * size);
 
         if (entry->first_lba && entry->last_lba) {
             struct generic_partition *part = &disk->partitions[idx++];
-            part->disk = disk;
-            part->start_lba = entry->first_lba;
-            part->sector_count = entry->last_lba - entry->first_lba + 1;
-            part->fs_type = FS_UNKNOWN;
-            part->fs_data = NULL;
-            part->mounted = false;
-            snprintf(part->name, sizeof(part->name), "%sp%d", disk->name, idx);
-
-            part->mount = NULL;
-            part->print_fs = NULL;
+            uint64_t sector_count = entry->last_lba - entry->first_lba + 1;
+            make_partition(part, disk, entry->first_lba, sector_count, idx);
         }
     }
     return true;
@@ -153,21 +151,13 @@ static enum fs_type detect_partition_fs(struct generic_disk *disk,
     if (memcmp(&sector[3], "NTFS    ", 8) == 0)
         return FS_NTFS;
 
-    // Try ext/iso detection inside partition
-    // Ext superblock is at offset 1024 bytes = sector 2 if sector_size=512, so
-    // sector 2 relative to partition start
+    /* Try ext/iso detection inside partition
+     * Ext superblock is at offset 1024 bytes = sector 2 if sector_size=512, so
+     * sector 2 relative to partition start */
     if (disk->read_sector(disk, part->start_lba + 2, sector, 1)) {
         uint16_t magic = *(uint16_t *) &sector[56];
         if (magic == 0xEF53) {
-            uint32_t features = *(uint32_t *) &sector[96];
-            uint32_t ro_compat = *(uint32_t *) &sector[104];
-
-            if (ro_compat & (1 << 0))
-                return FS_EXT4;
-            else if (features & (1 << 6))
-                return FS_EXT3;
-            else
-                return FS_EXT2;
+            return FS_EXT2;
         }
     }
 
@@ -176,8 +166,6 @@ static enum fs_type detect_partition_fs(struct generic_disk *disk,
             return FS_ISO9660;
     }
 
-    // If we read this signature, it is a non-partitioned CD001 disk - maybe
-    // QEMU VM thing? idk a bit of a hack. FIXME.
     if (disk->read_sector(disk, 16, sector, 1)) {
         if (memcmp(&sector[1], "CD001", 5) == 0) {
             part->start_lba = 0;
@@ -189,11 +177,9 @@ static enum fs_type detect_partition_fs(struct generic_disk *disk,
     return FS_UNKNOWN;
 }
 
-static void assign_partition_fs_ops(struct generic_partition *part) {
+static void assign_fs_ops(struct generic_partition *part) {
     switch (part->fs_type) {
     case FS_EXT2:
-    case FS_EXT3:
-    case FS_EXT4:
         part->mount = ext2_g_mount;
         part->print_fs = ext2_g_print;
         break;
@@ -207,6 +193,8 @@ static void assign_partition_fs_ops(struct generic_partition *part) {
         part->mount = iso9660_mount;
         part->print_fs = iso9660_print;
         break;
+    case FS_EXT3:
+    case FS_EXT4:
     default:
         part->mount = dummy_mount;
         part->print_fs = dummy_print;
@@ -215,7 +203,7 @@ static void assign_partition_fs_ops(struct generic_partition *part) {
 }
 
 enum fs_type detect_fs(struct generic_disk *disk) {
-    uint8_t *sector = kmalloc(disk->sector_size);
+    uint8_t *sector = kmalloc_aligned(disk->sector_size, PAGE_SIZE);
     if (!sector)
         return FS_UNKNOWN;
     k_info("FS", K_INFO, "attempting to detect %s's filesystem(s)", disk->name);
@@ -237,32 +225,26 @@ enum fs_type detect_fs(struct generic_disk *disk) {
     }
 
     if (!found_partitions) {
-        // No partition table - create one big partition spanning the disk
+        /* No partition table - create one big partition spanning the disk */
         disk->partition_count = 1;
         disk->partitions = kzalloc(sizeof(struct generic_partition));
         if (!disk->partitions)
             return FS_UNKNOWN;
 
         struct generic_partition *part = &disk->partitions[0];
-        part->disk = disk;
-        part->start_lba = 0;
-        part->sector_count = disk->total_sectors;
-        part->fs_type = FS_UNKNOWN;
-        part->fs_data = NULL;
-        part->mounted = false;
-        snprintf(part->name, sizeof(part->name), "%sp1", disk->name);
-        part->mount = NULL;
-        part->print_fs = NULL;
+        make_partition(part, disk, 0, disk->total_sectors, 1);
     }
 
     for (uint64_t i = 0; i < disk->partition_count; i++) {
         struct generic_partition *part = &disk->partitions[i];
         part->disk = disk;
         part->fs_type = detect_partition_fs(disk, part, sector);
-        assign_partition_fs_ops(part);
+        assign_fs_ops(part);
+        k_info("FS", K_INFO, "%s has a(n) %s filesystem", part->name,
+               detect_fstr(part->fs_type));
     }
 
-    kfree(sector);
+    kfree_aligned(sector);
 
     return disk->partition_count > 0 ? disk->partitions[0].fs_type : FS_UNKNOWN;
 }
