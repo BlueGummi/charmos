@@ -274,5 +274,4 @@ load_new_thread:
 end:
     /* do not change interrupt status */
     spin_unlock_no_cli(&sched->lock);
-    LAPIC_REG(LAPIC_REG_EOI) = 0;
 }

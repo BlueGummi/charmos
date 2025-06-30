@@ -16,25 +16,26 @@ struct spinlock wakeup_lock = SPINLOCK_INIT;
 uint64_t *lapic;
 
 void lapic_init() {
-    LAPIC_REG(LAPIC_REG_SVR) = LAPIC_ENABLE | 0xFF;
+    LAPIC_SEND(LAPIC_REG(LAPIC_REG_SVR), LAPIC_ENABLE | 0xFF);
 
-    LAPIC_REG(LAPIC_REG_TIMER_DIV) = 0b0011;
+    LAPIC_SEND(LAPIC_REG(LAPIC_REG_TIMER_DIV), 0b0011);
 
-    LAPIC_REG(LAPIC_REG_LVT_TIMER) = TIMER_VECTOR | TIMER_MODE_PERIODIC;
+    LAPIC_SEND(LAPIC_REG(LAPIC_REG_LVT_TIMER),
+               TIMER_VECTOR | TIMER_MODE_PERIODIC);
 
-    LAPIC_REG(LAPIC_REG_TIMER_INIT) = 100000;
+    LAPIC_SEND(LAPIC_REG(LAPIC_REG_TIMER_INIT), 100000);
 }
 
 void lapic_timer_disable() {
-    uint32_t lvt = LAPIC_REG(LAPIC_REG_LVT_TIMER);
+    uint32_t lvt = LAPIC_READ(LAPIC_REG(LAPIC_REG_LVT_TIMER));
     lvt |= LAPIC_LVT_MASK;
-    LAPIC_REG(LAPIC_REG_LVT_TIMER) = lvt;
+    LAPIC_SEND(LAPIC_REG(LAPIC_REG_LVT_TIMER), lvt);
 }
 
 void lapic_timer_enable() {
-    uint32_t lvt = LAPIC_REG(LAPIC_REG_LVT_TIMER);
+    uint32_t lvt = LAPIC_READ(LAPIC_REG(LAPIC_REG_LVT_TIMER));
     lvt &= ~LAPIC_LVT_MASK;
-    LAPIC_REG(LAPIC_REG_LVT_TIMER) = lvt;
+    LAPIC_SEND(LAPIC_REG(LAPIC_REG_LVT_TIMER), lvt);
 }
 
 void wakeup() {
@@ -45,7 +46,7 @@ void wakeup() {
         ;
     asm volatile("mov %0, %%cr3" ::"r"(cr3));
 
-    uint32_t lapic_id_raw = LAPIC_REG(LAPIC_REG_ID);
+    uint32_t lapic_id_raw = LAPIC_READ(LAPIC_REG(LAPIC_REG_ID));
     uint64_t cpu = (lapic_id_raw >> 24) & 0xFF;
     struct core *c = kmalloc(sizeof(struct core));
     if (!c)

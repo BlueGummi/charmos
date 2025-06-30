@@ -52,3 +52,4 @@ int idt_install_handler(uint8_t flags, void (*handler)(void), uint64_t core);
 int idt_alloc_entry(void);
 void idt_free_entry(int entry);
 void isr_register(uint8_t vector, isr_handler_t handler, void *ctx);
+void lapic_send_ipi(uint8_t apic_id, uint8_t vector);

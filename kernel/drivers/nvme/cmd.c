@@ -44,7 +44,7 @@ void nvme_isr_handler(void *ctx, uint8_t vector, void *rsp) {
     struct nvme_device *dev = ctx;
     /* TODO: many IO queues */
     nvme_process_completions(dev, 1);
-    LAPIC_REG(LAPIC_REG_EOI) = 0;
+    LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
 }
 
 uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,

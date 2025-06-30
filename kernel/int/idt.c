@@ -63,8 +63,12 @@ void isr_common_entry(uint8_t vector, void *rsp) {
         while (1)
             asm volatile("hlt");
     }
+}
 
-    LAPIC_REG(LAPIC_REG_EOI) = 0;
+void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {
+    (void) ctx, (void) vector;
+    schedule(rsp);
+    LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
 }
 
 void isr_register(uint8_t vector, isr_handler_t handler, void *ctx) {
@@ -168,7 +172,6 @@ void idt_install(uint64_t ind) {
 
     set(BREAKPOINT_ID, (uint64_t) breakpoint_fault, 0x08, 0x8E, ind);
 
-
     set(SSF_ID, (uint64_t) ss_handler_wrapper, 0x08, 0x8E, ind);
 
     /*
@@ -177,13 +180,23 @@ void idt_install(uint64_t ind) {
     set(PAGE_FAULT_ID, (uint64_t) page_fault_handler_wrapper, 0x08, 0x8E, ind);
     */
 
-    set(TIMER_ID, (uint64_t) context_switch, 0x08, 0x8E, ind);
+    idt_set_gate(TIMER_ID, (uint64_t) isr_timer_routine, 0x08, 0x8E, ind);
 
     set(KB_ID, (uint64_t) keyboard_handler, 0x08, 0x8E, ind);
 
     set(0x80, (uint64_t) syscall_entry, 0x2b, 0xee, ind);
 
     idt_load(ind);
+}
+
+void lapic_send_ipi(uint8_t apic_id, uint8_t vector) {
+    LAPIC_SEND(LAPIC_REG(LAPIC_ICR_HIGH), apic_id << LAPIC_DEST_SHIFT);
+    LAPIC_SEND(LAPIC_REG(LAPIC_ICR_LOW), vector | LAPIC_DELIVERY_FIXED |
+                                             LAPIC_LEVEL_ASSERT |
+                                             LAPIC_DEST_PHYSICAL);
+
+    while (LAPIC_READ(LAPIC_REG(LAPIC_ICR_LOW)) & (1 << 12))
+        ;
 }
 
 void page_fault_handler(uint64_t error_code, uint64_t fault_addr) {
