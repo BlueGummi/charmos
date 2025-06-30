@@ -1,4 +1,4 @@
-#include <acpi/ioapic.h>
+#include <acpi/lapic.h>
 #include <asm.h>
 #include <console/printf.h>
 #include <drivers/nvme.h>
@@ -92,11 +92,10 @@ void nvme_alloc_admin_queues(struct nvme_device *nvme) {
     nvme->admin_cq_phys = acq_phys;
 }
 
-__attribute__((interrupt))
-void functest(struct interrupt_frame *frame) {
+__attribute__((interrupt)) void functest(struct interrupt_frame *frame) {
     k_info("NVMe", K_INFO, "NVMe device interrupt caught!");
+    LAPIC_REG(LAPIC_REG_EOI) = 0;
 }
-
 
 void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
     if (!qid)

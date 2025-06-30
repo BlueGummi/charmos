@@ -99,7 +99,6 @@ void k_main(void) {
 
     // Filesystem init
     cmdline_parse(cmdline_request.response->cmdline);
-    asm volatile("sti");
     registry_setup();
 
     //    registry_print_devices();
@@ -112,7 +111,7 @@ void k_main(void) {
     mp_inform_of_cr3();
 
     k_info("MAIN", K_INFO, "Boot OK");
-    scheduler_yield();
+    asm volatile("sti");
     while (1) {
         asm("hlt");
     }
