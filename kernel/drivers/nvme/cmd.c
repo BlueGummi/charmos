@@ -30,8 +30,11 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
 
             /* boost */
             t->mlfq_level = 0;
+            t->time_in_level = 0;
             uint64_t c = t->curr_core;
             scheduler_add_thread(local_schs[c], t, false, false, true);
+
+            /* immediately run */
             lapic_send_ipi(c, SCHEDULER_ID);
         }
 
@@ -78,6 +81,7 @@ uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
     return nvme->io_statuses[qid][tail];
 }
 
+/* this doesnt do interrupt driven IO since it is done once */
 uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
                                struct nvme_command *cmd) {
     uint16_t tail = nvme->admin_sq_tail;
@@ -132,7 +136,7 @@ uint8_t *nvme_identify_controller(struct nvme_device *nvme) {
     uint16_t status = nvme_submit_admin_cmd(nvme, &cmd);
 
     if (status) {
-        k_printf("IDENTIFY failed! Status: 0x%04X\n", status);
+        nvme_info(K_ERROR, "IDENTIFY failed! Status: 0x%04X\n", status);
         return NULL;
     }
 
@@ -157,7 +161,7 @@ uint8_t *nvme_identify_namespace(struct nvme_device *nvme, uint32_t nsid) {
     uint16_t status = nvme_submit_admin_cmd(nvme, &cmd);
 
     if (status) {
-        k_printf("IDENTIFY namespace failed! Status: 0x%04X\n", status);
+        nvme_info(K_ERROR, "IDENTIFY namespace failed! Status: 0x%04X\n", status);
         return NULL;
     }
 

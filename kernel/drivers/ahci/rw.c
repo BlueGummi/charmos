@@ -43,7 +43,7 @@ bool ahci_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *out_buf,
     ahci_setup_fis(cmd_tbl, AHCI_CMD_READ_DMA_EXT, false);
     ahci_set_lba_cmd((struct ahci_fis_reg_h2d *) cmd_tbl->cfis, lba, count);
 
-    bool ok = ahci_send_command(port, slot);
+    bool ok = ahci_send_command(ahci_disk, port, slot);
 
     return ok;
 }
@@ -66,7 +66,7 @@ bool ahci_write_sector(struct generic_disk *disk, uint64_t lba,
     ahci_setup_fis(cmd_tbl, AHCI_CMD_WRITE_DMA_EXT, false);
     ahci_set_lba_cmd((struct ahci_fis_reg_h2d *) cmd_tbl->cfis, lba, count);
 
-    return ahci_send_command(port, slot);
+    return ahci_send_command(ahci_disk, port, slot);
 }
 
 bool ahci_read_sector_wrapper(struct generic_disk *disk, uint64_t lba,

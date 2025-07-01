@@ -14,17 +14,17 @@ bool ext2_dirent_valid(struct ext2_dir_entry *entry) {
     return true;
 }
 
-static void ext2_init_dir(struct ext2_fs *fs, struct ext2_full_inode *dir,
-                          uint32_t new_block) {
+static void init_dir(struct ext2_fs *fs, struct ext2_full_inode *dir,
+                     uint32_t new_block) {
     dir->node.block[0] = new_block;
     dir->node.size = fs->block_size;
     dir->node.blocks = 2;
     dir->node.links_count = 2;
 }
 
-static void ext2_init_dot_ents(struct ext2_fs *fs, uint8_t *block,
-                               struct ext2_full_inode *parent_dir,
-                               struct ext2_full_inode *dir) {
+static void init_dot_ents(struct ext2_fs *fs, uint8_t *block,
+                          struct ext2_full_inode *parent_dir,
+                          struct ext2_full_inode *dir) {
     struct ext2_dir_entry *dot = (struct ext2_dir_entry *) block;
     dot->inode = dir->inode_num;
     dot->rec_len = 12;
@@ -71,10 +71,10 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     uint8_t *block = ent->buffer;
 
     bcache_ent_lock(ent);
-    ext2_init_dot_ents(fs, block, parent_dir, dir);
+    init_dot_ents(fs, block, parent_dir, dir);
     bcache_ent_unlock(ent);
 
-    ext2_init_dir(fs, dir, new_block);
+    init_dir(fs, dir, new_block);
 
     ext2_inode_write(fs, dir->inode_num, &dir->node);
     ext2_inode_write(fs, parent_dir->inode_num, &parent_dir->node);
@@ -115,13 +115,15 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     if (!ent)
         return ERR_IO;
 
+    bcache_ent_lock(ent);
     uint8_t *block = ent->buffer;
 
     bool empty = true;
     uint32_t offset = 0;
+
     while (offset < dir->node.size) {
-        struct ext2_dir_entry *entry =
-            (struct ext2_dir_entry *) (block + offset);
+        struct ext2_dir_entry *entry;
+        entry = (struct ext2_dir_entry *) (block + offset);
         if (entry->name_len == 1 && entry->name[0] == '.') {
             // skip
         } else if (entry->name_len == 2 && entry->name[0] == '.' &&
@@ -134,6 +136,7 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
         offset += entry->rec_len;
     }
 
+    bcache_ent_unlock(ent);
     if (!empty)
         return ERR_NOT_EMPTY;
 

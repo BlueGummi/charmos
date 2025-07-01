@@ -2,6 +2,7 @@
 #include <devices/generic_disk.h>
 #include <mem/vmm.h>
 #include <sch/thread.h>
+#include <spin_lock.h>
 #include <stdint.h>
 
 #define NVME_CMD_TIMEOUT_MS 2000    // Normal command timeout
@@ -87,6 +88,7 @@ struct nvme_queue {
     uint32_t *sq_db;
     uint32_t *cq_db;
     struct thread **waiters;
+    struct spinlock lock;
 };
 
 struct nvme_device {
@@ -183,6 +185,7 @@ struct nvme_identify_controller {
 #define PCI_CLASS_MASS_STORAGE 0x01
 #define PCI_SUBCLASS_NVM 0x08
 #define PCI_PROGIF_NVME 0x02
+#define nvme_info(lvl, fmt, ...) k_info("NVMe", lvl, fmt, ##__VA_ARGS__)
 
 #define NVME_DOORBELL_BASE 0x1000
 

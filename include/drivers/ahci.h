@@ -1,6 +1,7 @@
 #pragma once
 #include <devices/generic_disk.h>
 #include <s_assert.h>
+#include <sch/thread.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -22,6 +23,8 @@
 
 #define AHCI_PORT_BASE 0x100 // Base offset for port registers
 #define AHCI_PORT_SIZE 0x80  // Size of each port register set
+
+#define AHCI_MAX_PORTS 32
 
 #define AHCI_PORT_CLB 0x00  // Command List Base Address
 #define AHCI_PORT_CLBU 0x04 // Command List Base Address Upper
@@ -196,6 +199,12 @@ struct ahci_device {
     uint32_t sectors;     // Total sectors (for disks)
     uint16_t sector_size; // Sector size in bytes
     struct ahci_controller *ctrl;
+    uint64_t port_count;
+    struct thread
+        *io_waiters[AHCI_MAX_PORTS][32];      // Thread waiting per port/slot
+    uint16_t io_statuses[AHCI_MAX_PORTS][32]; // Status per port/slot
+
+    uint8_t irq_num;
     struct ahci_full_port regs[32]; // Pointer to port registers
 };
 
@@ -262,7 +271,7 @@ void ahci_prepare_command(struct ahci_full_port *port, uint32_t slot,
                           bool write, uint8_t *buf, uint64_t size);
 void ahci_setup_fis(struct ahci_cmd_table *cmd_tbl, uint8_t command,
                     bool is_atapi);
-bool ahci_send_command(struct ahci_full_port *port, uint32_t slot);
+bool ahci_send_command(struct ahci_disk *disk, struct ahci_full_port *port, uint32_t slot);
 struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
                                        uint8_t function,
                                        uint32_t *out_disk_count);
@@ -278,6 +287,7 @@ bool ahci_write_sector_wrapper(struct generic_disk *disk, uint64_t lba,
                                const uint8_t *buf, uint64_t cnt);
 
 struct generic_disk *ahci_create_generic(struct ahci_disk *disk);
+void ahci_isr_handler(void *ctx, uint8_t vector, void *rsp);
 
 #define AHCI_PORT_OFFSET(n) (0x100 + (n) * 0x80)
 

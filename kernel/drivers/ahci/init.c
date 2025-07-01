@@ -1,7 +1,10 @@
+#include <acpi/ioapic.h>
 #include <asm.h>
 #include <console/printf.h>
 #include <drivers/ahci.h>
 #include <drivers/ata.h>
+#include <drivers/pci.h>
+#include <int/idt.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
@@ -16,14 +19,13 @@
 
 static void setup_port_slots(struct ahci_device *dev, uint32_t port_id) {
     struct ahci_full_port *port = &dev->regs[port_id];
-    for (int slot = 0; slot < 32; slot++) {
+    for (uint64_t slot = 0; slot < 32; slot++) {
         uint64_t cmdtbl_phys = (uint64_t) pmm_alloc_page(false);
         void *cmdtbl_virt = vmm_map_phys(cmdtbl_phys, PAGE_SIZE);
         memset(cmdtbl_virt, 0, PAGE_SIZE);
 
         struct ahci_cmd_header *cmd_header =
-            (port->cmd_list_base +
-             (uint64_t) slot * sizeof(struct ahci_cmd_header));
+            (port->cmd_list_base + slot * sizeof(struct ahci_cmd_header));
 
         cmd_header->ctba = (uint32_t) (cmdtbl_phys & 0xFFFFFFFF);
         cmd_header->ctbau = (uint32_t) (cmdtbl_phys >> 32);
@@ -66,9 +68,9 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
                                       uint32_t *disk_count) {
     uint32_t pi = mmio_read_32(&ctrl->pi);
 
+    mmio_write_32(&dev->ctrl->ghc, 1 << 1);
     uint32_t total_disks = 0;
 
-    // Only check ports that are implemented
     for (uint32_t i = 0; i < 32; i++) {
         if (!(pi & (1U << i)))
             continue;
@@ -80,8 +82,6 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
 
         mmio_write_32(&port->cmd, mmio_read_32(&port->cmd) & ~AHCI_CMD_FRE);
         mmio_wait(&port->cmd, AHCI_CMD_FR, AHCI_CMD_TIMEOUT_MS);
-
-        mmio_write_32(&port->is, 0xFFFFFFFF);
 
         uint32_t cmd = mmio_read_32(&port->cmd);
         cmd |= AHCI_CMD_FRE | AHCI_CMD_ST;
@@ -105,6 +105,7 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
             continue;
         }
 
+        dev->port_count++;
         total_disks++;
     }
 
@@ -132,6 +133,8 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
             disks[disks_ind].device = dev;
 
             uint32_t cmd = mmio_read_32(&port->cmd);
+            mmio_write_32(&port->is, 0xFFFFFFFF);
+            mmio_write_32(&port->ie, 0xFFFFFFFF);
             mmio_write_32(&port->cmd, cmd & ~(AHCI_CMD_ST | AHCI_CMD_FRE));
 
             mmio_wait(&port->cmd, AHCI_CMD_CR | AHCI_CMD_FR,
@@ -167,11 +170,14 @@ struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
 
     struct ahci_device *dev = kzalloc(sizeof(struct ahci_device));
     dev->ctrl = ctrl;
+    dev->irq_num = idt_alloc_entry();
+
     uint32_t disk_count = 0;
     struct ahci_disk *d = device_setup(dev, ctrl, &disk_count);
     *d_cnt = disk_count;
     ahci_info(K_INFO, "Device initialized successfully, %u port(s) present",
               disk_count);
+
     return d;
 }
 
@@ -199,9 +205,20 @@ struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
         ahci_info(K_ERROR, "failed to map BAR - likely OOM error");
         return NULL;
     }
+    uint8_t irq_line = pci_read(bus, device, function, 0x3C);
+
+    ahci_info(K_INFO, "AHCI device uses IRQ %u ", irq_line);
+
     struct ahci_controller *ctrl = (struct ahci_controller *) abar_virt;
 
-    return ahci_setup_controller(ctrl, out_disk_count);
+    struct ahci_disk *disk = ahci_setup_controller(ctrl, out_disk_count);
+    if (!disk)
+        return NULL;
+
+    isr_register(disk->device->irq_num, ahci_isr_handler, disk->device);
+
+    ioapic_route_irq(irq_line, disk->device->irq_num, get_sch_core_id(), false);
+    return disk;
 }
 
 void ahci_print_wrapper(struct generic_disk *d) {

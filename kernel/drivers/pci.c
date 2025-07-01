@@ -4,10 +4,10 @@
 #include <devices/registry.h>
 #include <drivers/ahci.h>
 #include <drivers/nvme.h>
+#include <drivers/pci.h>
 #include <drivers/xhci.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
-#include <drivers/pci.h>
 
 static struct pci_device *pci_devices = NULL;
 static uint64_t pci_device_count;
@@ -126,4 +126,75 @@ uint32_t pci_read_bar(uint8_t bus, uint8_t device, uint8_t function,
                       uint8_t bar_index) {
     uint8_t offset = 0x10 + (bar_index * 4);
     return pci_read(bus, device, function, offset);
+}
+
+static void pci_msix_enable_vector(uint8_t bus, uint8_t slot, uint8_t func,
+                                   uint8_t msix_cap_offset,
+                                   uint32_t vector_index) {
+    uint32_t table_offset_bir = pci_read(bus, slot, func, msix_cap_offset + 4);
+
+    uint8_t bir = table_offset_bir & 0x7;
+    uint32_t table_offset = table_offset_bir & ~0x7;
+
+    uint32_t bar_low = pci_read(bus, slot, func, 0x10 + 4 * bir);
+    uint32_t bar_high = pci_read(bus, slot, func, 0x10 + 4 * bir + 4);
+
+    uint64_t bar_addr = 0;
+
+    if (bir == 0) {
+        bar_addr = ((uint64_t) bar_high << 32) | (bar_low & ~0xFU);
+    } else if (bir == 1) {
+        k_info("PCI", K_ERROR, "unsupported BIR");
+    }
+
+    uint64_t map_size =
+        (vector_index + 1) * sizeof(struct pci_msix_table_entry);
+    if (map_size < PAGE_SIZE) {
+        map_size = PAGE_SIZE;
+    }
+    void *msix_table = vmm_map_phys(bar_addr + table_offset, map_size);
+
+    struct pci_msix_table_entry *entry_addr =
+        (void *) msix_table +
+        vector_index * sizeof(struct pci_msix_table_entry);
+
+    uint64_t msg_addr = 0xFEE00000 | (get_sch_core_id() << 12);
+
+    mmio_write_32(&entry_addr->msg_addr_low, msg_addr);
+    mmio_write_32(&entry_addr->msg_addr_high, 0);
+    mmio_write_32(&entry_addr->msg_data, vector_index);
+
+    uint32_t vector_ctrl = mmio_read_32(&entry_addr->vector_ctrl);
+    vector_ctrl &= ~0x1;
+    mmio_write_32(&entry_addr->vector_ctrl, vector_ctrl);
+
+    k_info("PCI", K_INFO, "Enabled MSI-X vector %u", vector_index);
+}
+
+void pci_enable_msix(uint8_t bus, uint8_t slot, uint8_t func, uint8_t isr) {
+    uint8_t cap_ptr = pci_read_byte(bus, slot, func, PCI_CAP_PTR);
+
+    while (cap_ptr != 0) {
+        uint8_t cap_id = pci_read_byte(bus, slot, func, cap_ptr);
+        if (cap_id == PCI_CAP_ID_MSIX) {
+            uint16_t msg_ctl = pci_read_word(bus, slot, func, cap_ptr + 2);
+
+            msg_ctl |= (1 << 15);
+            msg_ctl &= ~(1 << 14);
+
+            pci_write_word(bus, slot, func, cap_ptr + 2, msg_ctl);
+
+            uint16_t verify = pci_read_word(bus, slot, func, cap_ptr + 2);
+
+            if ((verify & (1 << 15)) && !(verify & (1 << 14))) {
+                k_info("PCI", K_INFO, "MSI-X enabled");
+                pci_msix_enable_vector(bus, slot, func, cap_ptr, isr);
+            } else {
+                k_info("PCI", K_ERROR, "Failed to enable MSI-X");
+            }
+            return;
+        }
+        cap_ptr = pci_read_byte(bus, slot, func, cap_ptr + 1);
+    }
+    k_info("PCI", K_ERROR, "MSI-X capability not found");
 }

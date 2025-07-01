@@ -1,7 +1,9 @@
+#include <acpi/lapic.h>
 #include <asm.h>
 #include <console/printf.h>
 #include <drivers/ahci.h>
 #include <drivers/ata.h>
+#include <int/idt.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
@@ -9,6 +11,43 @@
 #include <string.h>
 
 #define MAX_PRDT_ENTRY_SIZE (4 * 1024 * 1024) // 4MB
+
+void ahci_process_completions(struct ahci_device *dev, uint32_t port) {
+    struct ahci_port *p = dev->regs[port].port;
+    uint32_t completed = ~(p->ci | p->sact) & 0xFFFFFFFF;
+
+    for (uint64_t slot = 0; slot < 32; slot++) {
+        if (completed & (1ULL << slot)) {
+            struct thread *t = dev->io_waiters[port][slot];
+            if (t) {
+                dev->io_statuses[port][slot] = 0;
+                t->state = READY;
+                t->mlfq_level = 0;
+                t->time_in_level = 0;
+                uint64_t core = t->curr_core;
+                scheduler_add_thread(local_schs[core], t, false, false, true);
+                lapic_send_ipi(core, SCHEDULER_ID);
+            }
+        }
+    }
+
+    p->is = p->is;
+}
+
+void ahci_isr_handler(void *ctx, uint8_t vector, void *rsp) {
+    struct ahci_device *dev = ctx;
+    for (uint32_t port = 0; port < AHCI_MAX_PORTS; port++) {
+        if (!dev->regs[port].port)
+            continue;
+
+        if (dev->regs[port].port->is & dev->regs[port].port->ie) {
+            ahci_process_completions(dev, port);
+            dev->regs[port].port->is =
+                dev->regs[port].port->is; // Clear interrupt
+        }
+    }
+    LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
+}
 
 uint32_t find_free_cmd_slot(struct ahci_port *port) {
     uint32_t slots_in_use = mmio_read_32(&port->sact) | mmio_read_32(&port->ci);
@@ -77,15 +116,24 @@ void ahci_setup_fis(struct ahci_cmd_table *cmd_tbl, uint8_t command,
     }
 }
 
-bool ahci_send_command(struct ahci_full_port *port, uint32_t slot) {
-    mmio_write_32(&port->port->is, (uint32_t) -1);
+bool ahci_send_command(struct ahci_disk *disk, struct ahci_full_port *port,
+                       uint32_t slot) {
+    struct thread *curr = scheduler_get_curr_thread();
+    struct ahci_device *dev = disk->device;
+
+    mmio_write_32(&port->port->is, 0xFFFFFFFF);
 
     uint32_t ci = mmio_read_32(&port->port->ci);
     ci |= (1 << slot);
     mmio_write_32(&port->port->ci, ci);
 
-    mmio_wait(&port->port->ci, 1 << slot, AHCI_CMD_TIMEOUT_MS);
-    mmio_wait(&port->port->tfd, STATUS_BSY & STATUS_DRQ, AHCI_CMD_TIMEOUT_MS);
+    curr->state = BLOCKED;
+    dev->io_waiters[disk->port][slot] = curr;
+    dev->io_statuses[disk->port][slot] = 0xFFFF; // In-flight
+
+    scheduler_yield();
+
+    dev->io_waiters[disk->port][slot] = NULL;
 
     uint32_t tfd = mmio_read_32(&port->port->tfd);
     if (tfd & (1 << 0) || tfd & (1 << 1)) {
@@ -110,7 +158,7 @@ void ahci_identify(struct ahci_disk *disk) {
 
     ahci_setup_fis(port->cmd_tables[slot], AHCI_CMD_IDENTIFY, false);
 
-    if (ahci_send_command(port, slot)) {
+    if (ahci_send_command(disk, port, slot)) {
         struct ata_identify *ident = (struct ata_identify *) buffer;
         ata_ident_print(ident);
     } else {

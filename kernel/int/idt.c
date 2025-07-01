@@ -75,6 +75,8 @@ void isr_register(uint8_t vector, isr_handler_t handler, void *ctx) {
     uint8_t c = get_sch_core_id();
     isr_table[c][vector].handler = handler;
     isr_table[c][vector].ctx = ctx;
+
+    idt_set_gate(vector, (uint64_t)handler, 0x08, 0x8e, c);
     irq_set_installed(vector, true);
 }
 

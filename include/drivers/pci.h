@@ -54,6 +54,7 @@ const char *pci_class_name(uint8_t class_code, uint8_t subclass);
 void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out);
 uint32_t pci_read_bar(uint8_t bus, uint8_t device, uint8_t function,
                       uint8_t bar_index);
+void pci_enable_msix(uint8_t bus, uint8_t slot, uint8_t func, uint8_t isr);
 
 #define PCI_CAP_PTR 0x34
 #define PCI_CAP_ID_MSIX 0x11
