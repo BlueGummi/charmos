@@ -278,11 +278,10 @@ struct ahci_request {
 
     void (*on_complete)(struct ahci_request *);
     void *user_data;
-    struct thread_queue wait_queue;
 };
 
 void ahci_discover(struct ahci_controller *ctrl);
-uint32_t find_free_cmd_slot(struct ahci_port *port);
+uint32_t ahci_find_slot(struct ahci_port *port);
 struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
                                         uint32_t *d_cnt);
 void ahci_identify(struct ahci_disk *disk);
@@ -315,6 +314,9 @@ bool ahci_read_sector_wrapper(struct generic_disk *disk, uint64_t lba,
 
 bool ahci_write_sector_wrapper(struct generic_disk *disk, uint64_t lba,
                                const uint8_t *buf, uint64_t cnt);
+
+bool ahci_submit_bio_request(struct generic_disk *disk,
+                             struct bio_request *bio);
 
 struct generic_disk *ahci_create_generic(struct ahci_disk *disk);
 void ahci_isr_handler(void *ctx, uint8_t vector, void *rsp);

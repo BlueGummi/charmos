@@ -235,6 +235,7 @@ struct generic_disk *ahci_create_generic(struct ahci_disk *disk) {
     d->sector_size = 512;
     d->read_sector = ahci_read_sector_wrapper;
     d->write_sector = ahci_write_sector_wrapper;
+    d->submit_bio_async = ahci_submit_bio_request;
     d->print = ahci_print_wrapper;
     d->cache = kmalloc(sizeof(struct bcache));
     bcache_init(d->cache, DEFAULT_BLOCK_CACHE_SIZE);

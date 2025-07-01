@@ -15,8 +15,8 @@
 
 void ahci_process_completions(struct ahci_device *dev, uint32_t port) {
     struct ahci_port *p = dev->regs[port].port;
-    uint32_t completed =
-        ~(mmio_read_32(&p->ci) | mmio_read_32(&p->sact)) & 0xFFFFFFFF;
+    uint32_t completed;
+    completed = ~(mmio_read_32(&p->ci) | mmio_read_32(&p->sact)) & 0xFFFFFFFF;
 
     for (uint32_t slot = 0; slot < 32; slot++) {
         if (completed & (1ULL << slot)) {
@@ -75,7 +75,7 @@ void ahci_send_command(struct ahci_disk *disk, struct ahci_full_port *port,
     mmio_write_32(&port->port->ci, ci);
 }
 
-uint32_t find_free_cmd_slot(struct ahci_port *port) {
+uint32_t ahci_find_slot(struct ahci_port *port) {
     uint32_t slots_in_use = mmio_read_32(&port->sact) | mmio_read_32(&port->ci);
 
     for (int slot = 0; slot < 32; slot++) {
@@ -144,7 +144,7 @@ void ahci_setup_fis(struct ahci_cmd_table *cmd_tbl, uint8_t command,
 
 void ahci_identify(struct ahci_disk *disk) {
     struct ahci_full_port *port = &disk->device->regs[disk->port];
-    uint32_t slot = find_free_cmd_slot(port->port);
+    uint32_t slot = ahci_find_slot(port->port);
 
     uint8_t *buffer = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
     if (!buffer)
@@ -184,16 +184,16 @@ bool ahci_submit_bio_request(struct generic_disk *disk,
     if (!ahci_req)
         return false;
 
+    struct ahci_full_port *p = &ahci_disk->device->regs[ahci_disk->port];
+
     ahci_req->port = ahci_disk->port;
-    ahci_req->slot = -1;
+    ahci_req->slot = ahci_find_slot(p->port);
     ahci_req->lba = bio->lba;
     ahci_req->buffer = bio->buffer;
     ahci_req->sector_count = bio->sector_count;
     ahci_req->size = bio->size;
     ahci_req->write = bio->write;
     ahci_req->done = false;
-    ahci_req->status = -1;
-    ahci_req->wait_queue = (struct thread_queue) {0};
 
     ahci_req->on_complete = ahci_on_bio_complete;
     ahci_req->user_data = bio;
