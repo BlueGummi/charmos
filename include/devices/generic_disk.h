@@ -1,5 +1,7 @@
-#include <fs/detect.h>
 #include <fs/bcache.h>
+#include <fs/detect.h>
+#include <sch/sched.h>
+#include <sch/thread.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -61,10 +63,20 @@ struct generic_disk {
                         uint8_t *buffer, uint64_t sector_count);
     bool (*write_sector)(struct generic_disk *disk, uint64_t lba,
                          const uint8_t *buffer, uint64_t sector_count);
+
+    /*    bool (*read_sector_async)(struct generic_disk *, uint64_t lba,
+                                  uint8_t *buffer, uint64_t count,
+                                  struct bio_request *);
+
+        bool (*write_sector_async)(struct generic_disk *, uint64_t lba,
+                                   const uint8_t *buffer, uint64_t count,
+                                   struct bio_request *);*/
+
     void (*print)(struct generic_disk *disk); // this one for physical disk
 
     uint64_t partition_count;
     struct bcache *cache;
     struct generic_partition *partitions;
 };
+
 #pragma once

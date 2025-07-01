@@ -3,37 +3,6 @@
 #include <sch/thread.h>
 #include <sleep.h>
 
-void thread_queue_init(struct thread_queue *q) {
-    q->head = NULL;
-    q->tail = NULL;
-}
-
-void thread_queue_push_back(struct thread_queue *q, struct thread *t) {
-    t->next = NULL;
-
-    if (q->tail) {
-        q->tail->next = t;
-    } else {
-        q->head = t;
-    }
-
-    q->tail = t;
-}
-
-struct thread *thread_queue_pop_front(struct thread_queue *q) {
-    struct thread *t = q->head;
-
-    if (t) {
-        q->head = t->next;
-        if (q->head == NULL) {
-            q->tail = NULL;
-        }
-        t->next = NULL;
-    }
-
-    return t;
-}
-
 void mutex_init(struct mutex *m) {
     if (m->initialized)
         return;

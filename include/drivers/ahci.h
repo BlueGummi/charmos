@@ -200,9 +200,11 @@ struct ahci_device {
     uint16_t sector_size; // Sector size in bytes
     struct ahci_controller *ctrl;
     uint64_t port_count;
-    struct thread
-        *io_waiters[AHCI_MAX_PORTS][32];      // Thread waiting per port/slot
-    uint16_t io_statuses[AHCI_MAX_PORTS][32]; // Status per port/slot
+    
+    struct thread *io_waiters[AHCI_MAX_PORTS][32];
+    uint16_t io_statuses[AHCI_MAX_PORTS][32];
+
+    struct ahci_request *io_requests[AHCI_MAX_PORTS][32];
 
     uint8_t irq_num;
     struct ahci_full_port regs[32]; // Pointer to port registers
@@ -262,6 +264,23 @@ STATIC_ASSERT((sizeof(struct ahci_cmd_header) == 32),
 #define ahci_info(log_level, fmt, ...)                                         \
     k_info("AHCI", log_level, fmt, ##__VA_ARGS__)
 
+struct ahci_request {
+    uint32_t port;
+    uint32_t slot;
+    uint64_t lba;
+    void *buffer;
+    uint64_t size;
+    uint64_t sector_count;
+    bool write;
+
+    volatile bool done;
+    int status;
+
+    void (*on_complete)(struct ahci_request *);
+    void *user_data;
+    struct thread_queue wait_queue;
+};
+
 void ahci_discover(struct ahci_controller *ctrl);
 uint32_t find_free_cmd_slot(struct ahci_port *port);
 struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
@@ -271,7 +290,10 @@ void ahci_prepare_command(struct ahci_full_port *port, uint32_t slot,
                           bool write, uint8_t *buf, uint64_t size);
 void ahci_setup_fis(struct ahci_cmd_table *cmd_tbl, uint8_t command,
                     bool is_atapi);
-bool ahci_send_command(struct ahci_disk *disk, struct ahci_full_port *port, uint32_t slot);
+
+void ahci_send_command(struct ahci_disk *disk, struct ahci_full_port *port,
+                       struct ahci_request *req);
+
 struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
                                        uint8_t function,
                                        uint32_t *out_disk_count);
