@@ -49,6 +49,26 @@ struct generic_partition {
     void (*print_fs)(struct generic_partition *);
 };
 
+struct bio_request {
+    struct generic_disk *disk; // disk to operate on
+    uint64_t lba;              // starting LBA
+    void *buffer;              // data buffer
+    uint64_t size;             // in bytes
+    uint64_t sector_count;     // derived from size
+    bool write;                // true = write, false = read
+
+    volatile bool done;
+    int status;
+
+    void (*on_complete)(struct bio_request *); // optional
+    void *user_data;
+
+    struct thread_queue wait_queue;
+
+    // driver-private data
+    void *driver_private;
+};
+
 struct generic_disk {
     enum generic_disk_type type;
     enum fs_type fs_type;
@@ -64,13 +84,8 @@ struct generic_disk {
     bool (*write_sector)(struct generic_disk *disk, uint64_t lba,
                          const uint8_t *buffer, uint64_t sector_count);
 
-    /*    bool (*read_sector_async)(struct generic_disk *, uint64_t lba,
-                                  uint8_t *buffer, uint64_t count,
-                                  struct bio_request *);
-
-        bool (*write_sector_async)(struct generic_disk *, uint64_t lba,
-                                   const uint8_t *buffer, uint64_t count,
-                                   struct bio_request *);*/
+    bool (*submit_bio_async)(struct generic_disk *disk,
+                             struct bio_request *bio);
 
     void (*print)(struct generic_disk *disk); // this one for physical disk
 

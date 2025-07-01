@@ -27,6 +27,7 @@ void ahci_process_completions(struct ahci_device *dev, uint32_t port) {
                 if (req->on_complete)
                     req->on_complete(req);
 
+                /* if there are waiters - this ignores if not */
                 scheduler_wake_up(&req->wait_queue);
                 dev->io_requests[port][slot] = NULL;
             }
@@ -152,4 +153,47 @@ void ahci_identify(struct ahci_disk *disk) {
     struct ata_identify *ident = (struct ata_identify *) buffer;
     ata_ident_print(ident);
     kfree_aligned(buffer);
+}
+
+static void ahci_on_bio_complete(struct ahci_request *req) {
+    struct bio_request *bio = (struct bio_request *) req->user_data;
+
+    bio->done = true;
+    bio->status = req->status;
+    scheduler_wake_up(&bio->wait_queue);
+
+    if (bio->on_complete)
+        bio->on_complete(bio);
+
+    kfree(req);
+}
+
+bool ahci_submit_bio_request(struct generic_disk *disk,
+                             struct bio_request *bio) {
+    struct ahci_disk *ahci_disk = (struct ahci_disk *) disk->driver_data;
+    struct ahci_request *ahci_req = kmalloc(sizeof(struct ahci_request));
+    if (!ahci_req)
+        return false;
+
+    ahci_req->port = ahci_disk->port;
+    ahci_req->slot = -1;
+    ahci_req->lba = bio->lba;
+    ahci_req->buffer = bio->buffer;
+    ahci_req->sector_count = bio->sector_count;
+    ahci_req->size = bio->size;
+    ahci_req->write = bio->write;
+    ahci_req->done = false;
+    ahci_req->status = -1;
+    ahci_req->wait_queue = (struct thread_queue) {0};
+
+    ahci_req->on_complete = ahci_on_bio_complete;
+    ahci_req->user_data = bio;
+
+    if (bio->write) {
+        return ahci_write_sector_async(disk, bio->lba, bio->buffer,
+                                       bio->sector_count, ahci_req);
+    } else {
+        return ahci_read_sector_async(disk, bio->lba, bio->buffer,
+                                      bio->sector_count, ahci_req);
+    }
 }
