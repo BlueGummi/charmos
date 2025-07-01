@@ -74,6 +74,21 @@ struct nvme_regs {
     uint32_t reserved4[1018];
 } __attribute__((aligned));
 
+struct nvme_request {
+    uint32_t qid;
+    uint64_t lba;
+    void *buffer;
+    uint64_t size;
+    uint64_t sector_count;
+    bool write;
+
+    volatile bool done;
+    int status;
+
+    void (*on_complete)(struct nvme_request *);
+    void *user_data;
+};
+
 struct nvme_queue {
     struct nvme_command *sq;    // Submission queue (virtual)
     struct nvme_completion *cq; // Completion queue (virtual)
@@ -87,6 +102,7 @@ struct nvme_queue {
     uint8_t cq_phase;  // Phase bit for completion
     uint32_t *sq_db;
     uint32_t *cq_db;
+
     struct thread **waiters;
     struct spinlock lock;
 };
@@ -110,6 +126,7 @@ struct nvme_device {
     uint16_t admin_q_depth;
     uint8_t admin_cq_phase;
 
+    struct nvme_request **io_requests;
     struct nvme_queue **io_queues;
     struct thread ***io_waiters;
     uint16_t **io_statuses;
@@ -207,8 +224,8 @@ struct nvme_identify_controller {
 uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
                                struct nvme_command *cmd);
 
-uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
-                            uint32_t qid);
+void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
+                        uint32_t qid);
 
 uint8_t *nvme_identify_controller(struct nvme_device *nvme);
 uint8_t *nvme_identify_namespace(struct nvme_device *nvme, uint32_t nsid);

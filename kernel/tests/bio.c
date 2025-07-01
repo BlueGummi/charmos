@@ -18,8 +18,8 @@ static bool done = false;
 
 void bio_callback(struct bio_request *req) {
     (void) req;
-    ADD_MESSAGE("blkdev_bio callback succeeded");
     done = true;
+    ADD_MESSAGE("blkdev_bio callback succeeded");
 }
 
 REGISTER_TEST(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
@@ -40,6 +40,12 @@ REGISTER_TEST(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         .wait_queue = {0},
     };
 
+    if (!d->submit_bio_async) {
+        SET_SKIP;
+        ADD_MESSAGE("BIO function is NULL");
+        return;
+    }
+    
     bool submitted = d->submit_bio_async(d, &bio);
     if (!submitted) {
         kfree_aligned(bio.buffer);

@@ -32,9 +32,7 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
             t->mlfq_level = 0;
             t->time_in_level = 0;
             uint64_t c = t->curr_core;
-            scheduler_add_thread(local_schs[c], t, false, false, true);
-
-            /* immediately run */
+            scheduler_put_back(t);
             lapic_send_ipi(c, SCHEDULER_ID);
         }
 
@@ -54,8 +52,8 @@ void nvme_isr_handler(void *ctx, uint8_t vector, void *rsp) {
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
 }
 
-uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
-                            uint32_t qid) {
+void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
+                        uint32_t qid) {
     struct nvme_queue *this_queue = nvme->io_queues[qid];
 
     uint16_t tail = this_queue->sq_tail;
@@ -64,21 +62,10 @@ uint16_t nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
     cmd->cid = tail;
     this_queue->sq[tail] = *cmd;
 
-    struct thread *curr = scheduler_get_curr_thread();
-
     nvme->io_statuses[qid][tail] = 0xFFFF; // In-flight
 
     this_queue->sq_tail = next_tail;
     mmio_write_32(this_queue->sq_db, this_queue->sq_tail);
-
-    curr->state = BLOCKED;
-
-    nvme->io_waiters[qid][tail] = curr;
-    scheduler_yield();
-
-    // when we resume, read the status set by ISR
-    nvme->io_waiters[qid][tail] = NULL;
-    return nvme->io_statuses[qid][tail];
 }
 
 /* this doesnt do interrupt driven IO since it is done once */
@@ -161,7 +148,8 @@ uint8_t *nvme_identify_namespace(struct nvme_device *nvme, uint32_t nsid) {
     uint16_t status = nvme_submit_admin_cmd(nvme, &cmd);
 
     if (status) {
-        nvme_info(K_ERROR, "IDENTIFY namespace failed! Status: 0x%04X\n", status);
+        nvme_info(K_ERROR, "IDENTIFY namespace failed! Status: 0x%04X\n",
+                  status);
         return NULL;
     }
 

@@ -167,6 +167,7 @@ void registry_setup() {
         }
     }
 
+    k_info("VFS", K_INFO, "attempting to find and mount root");
     bool found_root = false;
     for (uint64_t i = 0; i < disk_count; i++) {
         struct generic_disk *disk = registry_get_by_index(i);

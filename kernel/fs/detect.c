@@ -208,7 +208,7 @@ enum fs_type detect_fs(struct generic_disk *disk) {
     k_info("FS", K_INFO, "attempting to detect %s's filesystem(s)", disk->name);
 
     if (!disk->read_sector(disk, 0, sector, 1)) {
-        kfree(sector);
+        kfree_aligned(sector);
         return FS_UNKNOWN;
     }
 
