@@ -20,7 +20,6 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
 
-
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -31,31 +30,8 @@ jobs:
       - name: Install x86_64-unknown-none target
         run: rustup target add x86_64-unknown-none
 
-      - name: Get nasm
-        run: sudo apt install nasm -y
-
-      - name: Get xorriso
-        run: sudo apt install xorriso -y
-
-      - name: Install dependencies for building binutils
-        run: |
-          sudo apt update
-          sudo apt install -y build-essential texinfo wget
-
-      - name: Download and build latest binutils
-        run: |
-          BINUTILS_VERSION=2.41
-          wget https://ftp.gnu.org/gnu/binutils/binutils-$BINUTILS_VERSION.tar.gz
-          tar xf binutils-$BINUTILS_VERSION.tar.gz
-          mkdir binutils-build
-          cd binutils-build
-          ../binutils-$BINUTILS_VERSION/configure --prefix=$HOME/binutils
-          make -j$(nproc)
-          make install
-          echo "$HOME/binutils/bin" >> $GITHUB_PATH
-
-      - name: Verify installed `as`
-        run: as --version
+      - name: Dependencies
+        run: sudo apt install xorriso nasm -y
 
       - name: Compile 
         run:  ./build.sh

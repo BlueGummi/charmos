@@ -49,7 +49,7 @@ void k_sch_main() {
 
 void k_sch_idle() {
     while (1) {
-        scheduler_yield();
+        asm volatile("hlt");
     }
 }
 
@@ -84,7 +84,7 @@ static void scheduler_save_thread(struct scheduler *sched, struct thread *curr,
                                   struct cpu_state *cpu) {
     if (curr) {
         memcpy(&curr->regs, cpu, sizeof(struct cpu_state));
-        
+
         if (curr->state != RUNNING)
             return;
 
@@ -212,7 +212,7 @@ void schedule(struct cpu_state *cpu) {
     struct scheduler *sched = local_schs[core_id];
 
     spin_lock_no_cli(&sched->lock);
-    
+
     struct thread *curr = sched->current;
     struct thread *next = NULL;
     struct scheduler *victim = NULL;
