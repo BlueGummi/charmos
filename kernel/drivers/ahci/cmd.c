@@ -43,7 +43,7 @@ void ahci_process_completions(struct ahci_device *dev, uint32_t port) {
         }
     }
 
-    p->is = p->is;
+    mmio_write_32(&p->is, p->is);
 }
 
 void ahci_isr_handler(void *ctx, uint8_t vector, void *rsp) {

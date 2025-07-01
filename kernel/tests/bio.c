@@ -18,6 +18,7 @@ static bool done = false;
 
 void bio_callback(struct bio_request *req) {
     (void) req;
+    ADD_MESSAGE("blkdev_bio callback succeeded");
     done = true;
 }
 
