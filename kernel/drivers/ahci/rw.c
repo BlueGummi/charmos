@@ -29,10 +29,7 @@ bool ahci_read_sector_async(struct generic_disk *disk, uint64_t lba,
     struct ahci_disk *ahci_disk = (struct ahci_disk *) disk->driver_data;
     struct ahci_full_port *port = &ahci_disk->device->regs[ahci_disk->port];
 
-    uint32_t slot = find_free_cmd_slot(port->port);
-    if (slot == (uint32_t) -1)
-        return false;
-
+    uint32_t slot = req->slot;
     ahci_prepare_command(port, slot, false, buf, count * 512);
 
     struct ahci_cmd_table *cmd_tbl = port->cmd_tables[slot];
@@ -48,6 +45,7 @@ bool ahci_read_sector_async(struct generic_disk *disk, uint64_t lba,
         .write = false,
         .done = false,
         .status = -1,
+        .on_complete = NULL,
         .wait_queue = {0},
     };
 
@@ -58,10 +56,21 @@ bool ahci_read_sector_async(struct generic_disk *disk, uint64_t lba,
 bool ahci_read_sector_blocking(struct generic_disk *disk, uint64_t lba,
                                uint8_t *buf, uint16_t count) {
     struct ahci_request req;
+    struct ahci_disk *ahci_disk = (struct ahci_disk *) disk->driver_data;
+    struct ahci_device *dev = ahci_disk->device;
+
+    struct thread *curr = scheduler_get_curr_thread();
+    curr->state = BLOCKED;
+    dev->io_waiters[ahci_disk->port][req.slot] = curr;
+    req.slot =
+        find_free_cmd_slot(ahci_disk->device->regs[ahci_disk->port].port);
+
     if (!ahci_read_sector_async(disk, lba, buf, count, &req))
         return false;
 
-    thread_queue_wait_on(&req.wait_queue);
+    scheduler_yield();
+
+    dev->io_waiters[ahci_disk->port][req.slot] = NULL;
     return req.status == 0;
 }
 
@@ -74,10 +83,7 @@ bool ahci_write_sector_async(struct generic_disk *disk, uint64_t lba,
     struct ahci_disk *ahci_disk = (struct ahci_disk *) disk->driver_data;
     struct ahci_full_port *port = &ahci_disk->device->regs[ahci_disk->port];
 
-    uint32_t slot = find_free_cmd_slot(port->port);
-    if (slot == (uint32_t) -1)
-        return false;
-
+    uint32_t slot = req->slot;
     ahci_prepare_command(port, slot, true, (uint8_t *) in_buf, count * 512);
 
     struct ahci_cmd_table *cmd_tbl = port->cmd_tables[slot];
@@ -93,6 +99,7 @@ bool ahci_write_sector_async(struct generic_disk *disk, uint64_t lba,
         .write = false,
         .done = false,
         .status = -1,
+        .on_complete = NULL,
         .wait_queue = {0},
     };
 
@@ -103,10 +110,21 @@ bool ahci_write_sector_async(struct generic_disk *disk, uint64_t lba,
 bool ahci_write_sector_blocking(struct generic_disk *disk, uint64_t lba,
                                 const uint8_t *buf, uint16_t count) {
     struct ahci_request req;
+    struct ahci_disk *ahci_disk = (struct ahci_disk *) disk->driver_data;
+    struct ahci_device *dev = ahci_disk->device;
+    req.slot =
+        find_free_cmd_slot(ahci_disk->device->regs[ahci_disk->port].port);
+
+    struct thread *curr = scheduler_get_curr_thread();
+    curr->state = BLOCKED;
+    dev->io_waiters[ahci_disk->port][req.slot] = curr;
+
     if (!ahci_write_sector_async(disk, lba, buf, count, &req))
         return false;
 
-    thread_queue_wait_on(&req.wait_queue);
+    scheduler_yield();
+
+    dev->io_waiters[ahci_disk->port][req.slot] = NULL;
     return req.status == 0;
 }
 

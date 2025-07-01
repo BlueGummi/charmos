@@ -15,7 +15,8 @@
 
 void ahci_process_completions(struct ahci_device *dev, uint32_t port) {
     struct ahci_port *p = dev->regs[port].port;
-    uint32_t completed = ~(p->ci | p->sact) & 0xFFFFFFFF;
+    uint32_t completed =
+        ~(mmio_read_32(&p->ci) | mmio_read_32(&p->sact)) & 0xFFFFFFFF;
 
     for (uint32_t slot = 0; slot < 32; slot++) {
         if (completed & (1ULL << slot)) {
@@ -28,7 +29,15 @@ void ahci_process_completions(struct ahci_device *dev, uint32_t port) {
                     req->on_complete(req);
 
                 /* if there are waiters - this ignores if not */
-                scheduler_wake_up(&req->wait_queue);
+                if (dev->io_waiters[port][slot]) {
+                    struct thread *t = dev->io_waiters[port][slot];
+                    t->state = READY;
+                    t->mlfq_level = 0;
+                    t->time_in_level = 0;
+                    scheduler_put_back(t);
+                    lapic_send_ipi(t->curr_core, SCHEDULER_ID);
+                }
+
                 dev->io_requests[port][slot] = NULL;
             }
         }
@@ -45,9 +54,10 @@ void ahci_isr_handler(void *ctx, uint8_t vector, void *rsp) {
         if (!dev->regs[port].port)
             continue;
 
-        if (dev->regs[port].port->is & dev->regs[port].port->ie) {
+        struct ahci_port *p = dev->regs[port].port;
+        if (mmio_read_32(&p->is) & mmio_read_32(&p->ie)) {
             ahci_process_completions(dev, port);
-            dev->regs[port].port->is = dev->regs[port].port->is;
+            mmio_write_32(&p->is, p->is);
         }
     }
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
@@ -160,7 +170,6 @@ static void ahci_on_bio_complete(struct ahci_request *req) {
 
     bio->done = true;
     bio->status = req->status;
-    scheduler_wake_up(&bio->wait_queue);
 
     if (bio->on_complete)
         bio->on_complete(bio);
