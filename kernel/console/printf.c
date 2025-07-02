@@ -4,9 +4,13 @@
 #include <limine.h>
 #include <spin_lock.h>
 #include <stdarg.h>
-#include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdbool.h>
+
+#include "console/printf.h"
+
+struct flanterm_context;
 
 struct spinlock k_printf_lock = SPINLOCK_INIT;
 struct flanterm_context *ft_ctx;

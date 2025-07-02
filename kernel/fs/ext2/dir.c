@@ -1,11 +1,10 @@
-#include <console/printf.h>
 #include <errno.h>
 #include <fs/ext2.h>
-#include <mem/alloc.h>
-#include <mem/vmm.h>
 #include <stdint.h>
 #include <string.h>
-#include <time/time.h>
+#include <stdbool.h>
+
+#include "fs/bcache.h"
 
 bool ext2_dirent_valid(struct ext2_dir_entry *entry) {
     if (entry->inode == 0 || entry->rec_len < 8 || entry->name_len == 0)

@@ -1,5 +1,6 @@
 #include <mem/alloc.h>
 #include <string.h>
+#include <stdint.h>
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 

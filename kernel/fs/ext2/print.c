@@ -1,5 +1,4 @@
 #include <console/printf.h>
-#include <devices/generic_disk.h>
 #include <fs/ext2.h>
 #include <time/print.h>
 

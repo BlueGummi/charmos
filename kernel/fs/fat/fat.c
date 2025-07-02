@@ -4,6 +4,8 @@
 #include <fs/mbr.h>
 #include <mem/alloc.h>
 #include <string.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 void fat_write_fsinfo(struct fat_fs *fs) { // making fsck happy
     if (fs->type != FAT_32)

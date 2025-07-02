@@ -2,6 +2,12 @@
 #include <drivers/ata.h>
 #include <mem/alloc.h>
 #include <sleep.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "console/printf.h"
+#include "devices/generic_disk.h"
+#include "fs/bcache.h"
 
 #define ATAPI_SECTOR_SIZE 2048
 

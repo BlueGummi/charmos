@@ -1,8 +1,8 @@
 #include <console/printf.h>
-#include <mem/alloc.h>
 #include <sch/sched.h>
-#include <spin_lock.h>
 #include <stdatomic.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 /* for work_steal_victim_min_diff */
 static inline uint8_t ilog2(uint64_t x) {

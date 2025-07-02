@@ -2,6 +2,10 @@
 #include <spin_lock.h>
 #include <stdatomic.h>
 #include <stddef.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "sch/thread.h"
 
 void scheduler_rm_thread(struct scheduler *sched, struct thread *task,
                          bool change_interrupts, bool already_locked) {

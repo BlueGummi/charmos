@@ -1,10 +1,12 @@
 #include <console/printf.h>
 #include <devices/generic_disk.h>
-#include <errno.h>
 #include <fs/iso9660.h>
 #include <mem/alloc.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdint.h>
+
+#include "time/time.h"
 
 bool iso9660_read_file(struct iso9660_fs *fs, uint32_t lba, uint32_t size,
                        void *out_buf) {

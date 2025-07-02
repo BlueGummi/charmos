@@ -1,6 +1,7 @@
 #include <console/printf.h>
 #include <drivers/nvme.h>
 #include <string.h>
+#include <stdint.h>
 
 void nvme_print_identify(const struct nvme_identify_controller *ctrl) {
     char sn[21] = {0};

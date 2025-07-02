@@ -1,7 +1,9 @@
-#include <console/printf.h>
 #include <fs/ext2.h>
-#include <mem/alloc.h>
 #include <stdint.h>
+#include <stdbool.h>
+
+#include "devices/generic_disk.h"
+#include "fs/bcache.h"
 
 static bool walk_dir(struct ext2_fs *fs, uint32_t block_num,
                      dir_entry_callback callback, void *ctx) {

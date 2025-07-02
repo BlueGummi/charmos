@@ -1,8 +1,11 @@
 #include <console/printf.h>
 #include <mem/alloc.h>
 #include <sch/sched.h>
-#include <spin_lock.h>
-#include <stdatomic.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include "sch/thread.h"
 
 void scheduler_init(uint64_t core_count) {
     c_count = core_count;

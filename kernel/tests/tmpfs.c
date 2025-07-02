@@ -3,6 +3,9 @@
 #include <mem/alloc.h>
 #include <tests.h>
 
+#include "errno.h"
+#include "string.h"
+
 #define TMPFS_SETUP_NODE(root, node, name, e)                                  \
     struct vfs_node *root = tmpfs_mkroot("tmp");                               \
     TEST_ASSERT(root != NULL);                                                 \

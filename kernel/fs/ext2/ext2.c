@@ -1,9 +1,11 @@
-#include <console/printf.h>
 #include <fs/ext2.h>
 #include <mem/alloc.h>
 #include <stdint.h>
 #include <string.h>
-#include <time/time.h>
+#include <stdbool.h>
+
+#include "devices/generic_disk.h"
+#include "fs/vfs.h"
 
 // TODO: flags - maybe?
 

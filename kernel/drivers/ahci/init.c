@@ -1,14 +1,14 @@
 #include <asm.h>
 #include <console/printf.h>
 #include <drivers/ahci.h>
-#include <drivers/ata.h>
 #include <int/idt.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <s_assert.h>
 #include <sleep.h>
 #include <string.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 // TODO: Hand this off to IDE if the GHC bit 31 is OFF
 // It won't be AHCI - Sometimes we are in IDE emul mode

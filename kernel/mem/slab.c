@@ -5,6 +5,8 @@
 #include <misc/magic_numbers.h>
 #include <spin_lock.h>
 #include <string.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 struct slab_cache slab_caches[SLAB_CLASS_COUNT];
 uintptr_t slab_heap_top = 0xFFFFF00000000000;

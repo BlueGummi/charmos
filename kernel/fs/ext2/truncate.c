@@ -1,7 +1,11 @@
-#include <console/printf.h>
 #include <errno.h>
 #include <fs/ext2.h>
-#include <mem/alloc.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include "devices/generic_disk.h"
+#include "fs/bcache.h"
 
 #define EXT2_NDIR_BLOCKS 12
 #define EXT2_IND_BLOCK EXT2_NDIR_BLOCKS

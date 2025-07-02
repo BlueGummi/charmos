@@ -1,12 +1,13 @@
-#include <asm.h>
-#include <console/printf.h>
 #include <devices/generic_disk.h>
 #include <drivers/nvme.h>
 #include <mem/alloc.h>
-#include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <sleep.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+
+#include "sch/sched.h"
+#include "sch/thread.h"
 
 bool nvme_read_sector_async(struct generic_disk *disk, uint64_t lba,
                             uint8_t *buffer, uint16_t count,

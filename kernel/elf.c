@@ -1,11 +1,11 @@
 #include <asm.h>
-#include <boot/gdt.h>
 #include <console/printf.h>
 #include <elf.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdbool.h>
 
 #define ELF_MAGIC 0x464C457F // "\x7FELF"
 

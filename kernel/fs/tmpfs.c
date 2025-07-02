@@ -1,8 +1,12 @@
-#include <console/printf.h>
 #include <fs/tmpfs.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
 #include <string.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "errno.h"
+#include "fs/detect.h"
 
 struct vfs_node *tmpfs_create_vfs_node(struct tmpfs_node *tnode);
 

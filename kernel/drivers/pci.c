@@ -1,13 +1,11 @@
 #include <asm.h>
 #include <console/printf.h>
-#include <devices/generic_disk.h>
-#include <devices/registry.h>
-#include <drivers/ahci.h>
-#include <drivers/nvme.h>
 #include <drivers/pci.h>
 #include <drivers/xhci.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
+#include <stddef.h>
+#include <stdint.h>
 
 static struct pci_device *pci_devices = NULL;
 static uint64_t pci_device_count;

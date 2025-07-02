@@ -2,12 +2,12 @@
 #include <console/printf.h>
 #include <devices/generic_disk.h>
 #include <drivers/ata.h>
-#include <fs/ext2.h>
 #include <mem/alloc.h>
-#include <drivers/pci.h>
 #include <sleep.h>
-#include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
+
+#include "fs/bcache.h"
 
 void ide_print_info(struct generic_disk *d) {
     struct ata_drive *drive = (struct ata_drive *) d->driver_data;

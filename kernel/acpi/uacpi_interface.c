@@ -4,17 +4,21 @@
 #include <console/printf.h>
 #include <int/idt.h>
 #include <mem/alloc.h>
-#include <mem/pmm.h>
-#include <mem/slab.h>
 #include <mem/vmm.h>
 #include <pit.h>
 #include <spin_lock.h>
 #include <stdint.h>
-#include <uacpi/event.h>
-#include <uacpi/internal/types.h>
 #include <uacpi/platform/arch_helpers.h>
 #include <uacpi/status.h>
 #include <uacpi/uacpi.h>
+#include <stdbool.h>
+
+#include "uacpi/internal/types.h"
+#include "uacpi/kernel_api.h"
+#include "uacpi/log.h"
+#include "uacpi/namespace.h"
+#include "uacpi/platform/types.h"
+#include "uacpi/types.h"
 
 uint64_t tsc_freq = 0;
 

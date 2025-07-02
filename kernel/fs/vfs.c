@@ -2,6 +2,10 @@
 #include <fs/vfs.h>
 #include <mem/alloc.h>
 #include <string.h>
+#include <stdint.h>
+
+#include "errno.h"
+#include "fs/detect.h"
 
 static struct vfs_mount **mount_table = NULL;
 static uint64_t mount_table_count = 0;

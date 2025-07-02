@@ -1,7 +1,8 @@
-#include <console/printf.h>
 #include <fs/fat.h>
 #include <mem/alloc.h>
 #include <string.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 // TODO: errno
 

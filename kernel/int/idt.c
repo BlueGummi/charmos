@@ -1,16 +1,13 @@
-#include <acpi/hpet.h>
 #include <acpi/lapic.h>
-#include <acpi/uacpi_interface.h> // mark handlers as installed
 #include <asm.h>
 #include <console/printf.h>
 #include <int/idt.h>
 #include <int/kb.h>
 #include <mem/alloc.h>
-#include <mem/pmm.h>
-#include <mem/vmm.h>
-#include <misc/dbg.h>
 #include <sch/sched.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
 
 extern void context_switch();
 extern void page_fault_handler_wrapper();

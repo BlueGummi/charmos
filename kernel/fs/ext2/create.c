@@ -1,10 +1,10 @@
-#include <console/printf.h>
 #include <errno.h>
 #include <fs/ext2.h>
-#include <mem/alloc.h>
 #include <stdint.h>
 #include <string.h>
-#include <time/time.h>
+#include <stdbool.h>
+
+#include "fs/bcache.h"
 
 struct link_ctx {
     const char *name;

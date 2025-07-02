@@ -1,15 +1,17 @@
 #include <acpi/lapic.h>
 #include <asm.h>
-#include <console/printf.h>
 #include <drivers/ahci.h>
 #include <drivers/ata.h>
 #include <int/idt.h>
 #include <mem/alloc.h>
-#include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <sch/sched.h>
-#include <sleep.h>
 #include <string.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "devices/generic_disk.h"
+#include "sch/thread.h"
 
 #define MAX_PRDT_ENTRY_SIZE (4 * 1024 * 1024) // 4MB
 

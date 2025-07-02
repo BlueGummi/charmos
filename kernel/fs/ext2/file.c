@@ -1,8 +1,12 @@
-#include <console/printf.h>
 #include <errno.h>
 #include <fs/ext2.h>
-#include <mem/alloc.h>
 #include <string.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "devices/generic_disk.h"
+#include "fs/bcache.h"
+#include "time/time.h"
 
 enum errno ext2_write_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
                            uint32_t offset, const uint8_t *src, uint32_t size) {

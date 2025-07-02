@@ -1,8 +1,11 @@
-#include <console/printf.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
 #include <string.h>
 #include <tests.h>
+#include <stdint.h>
+
+#include "errno.h"
+#include "fs/detect.h"
 
 #define EXT2_INIT                                                              \
     if (g_root_node->fs_type != FS_EXT2) {                                     \

@@ -1,25 +1,12 @@
-#include "requests.h"
 #include <acpi/hpet.h>
 #include <acpi/ioapic.h>
 #include <acpi/lapic.h>
-#include <acpi/print.h>
 #include <acpi/uacpi_interface.h>
 #include <asm.h>
 #include <boot/gdt.h>
 #include <boot/smap.h>
 #include <console/printf.h>
-#include <devices/generic_disk.h>
-#include <devices/registry.h>
-#include <drivers/ahci.h>
-#include <drivers/ata.h>
-#include <drivers/nvme.h>
-#include <drivers/pci.h>
 #include <elf.h>
-#include <flanterm/backends/fb.h>
-#include <flanterm/flanterm.h>
-#include <fs/detect.h>
-#include <fs/ext2.h>
-#include <fs/fat.h>
 #include <int/idt.h>
 #include <limine.h>
 #include <mem/alloc.h>
@@ -27,29 +14,17 @@
 #include <mem/slab.h>
 #include <mem/vmm.h>
 #include <misc/cmdline.h>
-#include <misc/dbg.h>
-#include <misc/linker_symbols.h>
 #include <misc/logo.h>
 #include <mp/core.h>
 #include <mp/mp.h>
-#include <pit.h>
-#include <rust.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
-#include <sleep.h>
-#include <spin_lock.h>
-#include <stdalign.h>
-#include <stdatomic.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <syscall.h>
-#include <tests.h>
-#include <time/print.h>
-#include <uacpi/event.h>
-#include <uacpi/resources.h>
-#include <uacpi/tables.h>
-#include <uacpi/uacpi.h>
-#include <uacpi/utilities.h>
+#include <stddef.h>
+
+#include "requests.h"
+#include "fs/vfs.h"
 
 struct scheduler global_sched = {0};
 uint64_t a_rsdp = 0;

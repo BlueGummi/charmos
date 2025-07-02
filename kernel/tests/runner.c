@@ -1,6 +1,11 @@
-#include <asm.h>
 #include <console/printf.h>
 #include <tests.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include "acpi/hpet.h"
+#include "misc/colors.h"
 
 extern struct kernel_test __skernel_tests[];
 extern struct kernel_test __ekernel_tests[];

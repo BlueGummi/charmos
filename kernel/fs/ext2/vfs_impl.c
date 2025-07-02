@@ -1,11 +1,15 @@
-#include <console/printf.h>
 #include <fs/ext2.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
-#include <mem/pmm.h>
-#include <mem/vmm.h>
 #include <string.h>
 #include <time/time.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "devices/generic_disk.h"
+#include "errno.h"
+#include "fs/bcache.h"
+#include "fs/detect.h"
 
 // TODO: With all VFS impls, make sure to check these are on the same disk and
 // filesystem

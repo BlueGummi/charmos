@@ -1,7 +1,7 @@
 #include <console/printf.h>
-#include <misc/linker_symbols.h>
 #include <misc/syms.h>
 #include <stdint.h>
+#include <stddef.h>
 
 void debug_print_registers() {
     uint64_t rax, rbx, rcx, rdx, rsi, rdi, rsp, rbp, rip, rflags;

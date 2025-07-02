@@ -1,7 +1,10 @@
-#include <console/printf.h>
 #include <fs/ext2.h>
 #include <mem/alloc.h>
 #include <string.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "errno.h"
 
 struct search_ctx {
     const char *target;

@@ -1,10 +1,11 @@
-#include <asm.h>
-#include <console/printf.h>
 #include <drivers/ahci.h>
-#include <drivers/ata.h>
-#include <mem/alloc.h>
-#include <mem/pmm.h>
-#include <mem/vmm.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include "devices/generic_disk.h"
+#include "sch/sched.h"
+#include "sch/thread.h"
 
 // TODO: Check for non 512-byte sector sizes and adjust accordingly
 

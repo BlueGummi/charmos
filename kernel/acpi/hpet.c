@@ -1,14 +1,11 @@
 #include <acpi/hpet.h>
 #include <asm.h>
 #include <console/printf.h>
-#include <mem/alloc.h>
-#include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <uacpi/event.h>
-#include <uacpi/resources.h>
 #include <uacpi/tables.h>
-#include <uacpi/uacpi.h>
-#include <uacpi/utilities.h>
+
+#include "uacpi/acpi.h"
+#include "uacpi/status.h"
 
 uint64_t *hpet_base;
 

@@ -2,9 +2,6 @@
 #include <console/printf.h>
 #include <devices/generic_disk.h>
 #include <drivers/ata.h>
-#include <drivers/pci.h>
-#include <fs/ext2.h>
-#include <mem/alloc.h>
 #include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>

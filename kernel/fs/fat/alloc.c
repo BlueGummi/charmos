@@ -1,5 +1,5 @@
-#include <console/printf.h>
 #include <fs/fat.h>
+#include <stdint.h>
 
 uint32_t fat_alloc_cluster(struct fat_fs *fs) {
     uint32_t total_clusters = fs->total_clusters;

@@ -1,8 +1,10 @@
-#include <console/printf.h>
 #include <crypto/chacha20.h>
 #include <crypto/entropy_pool.h>
-#include <mem/alloc.h>
 #include <string.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "spin_lock.h"
 
 static uint8_t chacha_key[32] = {0};
 static uint8_t chacha_nonce[12] = {0};

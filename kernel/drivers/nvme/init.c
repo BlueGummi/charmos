@@ -1,8 +1,6 @@
-#include <acpi/lapic.h>
 #include <asm.h>
 #include <console/printf.h>
 #include <drivers/nvme.h>
-#include <drivers/pci.h>
 #include <int/idt.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
@@ -10,6 +8,7 @@
 #include <sleep.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdbool.h>
 
 /* we poll in setup */
 void nvme_enable_controller(struct nvme_device *nvme) {

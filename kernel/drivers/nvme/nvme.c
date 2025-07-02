@@ -1,4 +1,3 @@
-#include <acpi/lapic.h>
 #include <asm.h>
 #include <console/printf.h>
 #include <devices/generic_disk.h>
@@ -6,9 +5,12 @@
 #include <drivers/pci.h>
 #include <int/idt.h>
 #include <mem/alloc.h>
-#include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <stdint.h>
+#include <stdbool.h>
+
+#include "fs/bcache.h"
+#include "sch/sched.h"
 
 struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
                                          uint8_t func) {

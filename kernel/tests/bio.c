@@ -1,10 +1,14 @@
-#include <console/printf.h>
 #include <devices/generic_disk.h>
 #include <fs/ext2.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
 #include <sleep.h>
 #include <tests.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include "fs/detect.h"
 
 #define EXT2_INIT                                                              \
     if (g_root_node->fs_type != FS_EXT2) {                                     \

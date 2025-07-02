@@ -2,6 +2,10 @@
 #include <spin_lock.h>
 #include <stdatomic.h>
 #include <stddef.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "sch/thread.h"
 
 bool try_begin_steal() {
     unsigned current = atomic_load(&active_stealers);

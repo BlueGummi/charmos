@@ -1,7 +1,8 @@
-#include <console/printf.h>
 #include <fs/fat.h>
 #include <string.h>
 #include <time/time.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 uint32_t fat_eoc(struct fat_fs *fs) {
     switch (fs->type) {

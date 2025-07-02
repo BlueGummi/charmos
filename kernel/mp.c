@@ -7,8 +7,12 @@
 #include <limine.h>
 #include <mem/alloc.h>
 #include <mp/mp.h>
-#include <sch/sched.h>
 #include <spin_lock.h>
+#include <stdatomic.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "mp/core.h"
 
 uint64_t cr3 = 0;
 atomic_char cr3_ready = 0;

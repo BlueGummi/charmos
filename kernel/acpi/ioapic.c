@@ -3,11 +3,11 @@
 #include <console/printf.h>
 #include <mem/vmm.h>
 #include <stdint.h>
-#include <uacpi/event.h>
-#include <uacpi/resources.h>
 #include <uacpi/tables.h>
-#include <uacpi/uacpi.h>
-#include <uacpi/utilities.h>
+
+#include "acpi/hpet.h"
+#include "uacpi/acpi.h"
+#include "uacpi/status.h"
 
 static struct ioapic_info ioapic;
 

@@ -3,6 +3,12 @@
 #include <console/printf.h>
 #include <mem/alloc.h>
 #include <uacpi/kernel_api.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "uacpi/platform/types.h"
+#include "uacpi/status.h"
+#include "uacpi/types.h"
 
 uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
                                           uacpi_handle *out_handle) {

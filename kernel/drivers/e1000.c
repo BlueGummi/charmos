@@ -6,9 +6,9 @@
 #include <mem/vmm.h>
 #include <drivers/pci.h>
 #include <sleep.h>
-#include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdbool.h>
 
 #define E1000_MAX_TX_PACKET_SIZE 1518
 #define REG32(dev, offset) (&(dev->regs[(offset) / 4U]))

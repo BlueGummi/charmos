@@ -1,13 +1,16 @@
 #include <acpi/ioapic.h>
 #include <drivers/ahci.h>
-#include <drivers/ata.h>
-#include <drivers/pci.h>
 #include <int/idt.h>
 #include <mem/alloc.h>
-#include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <s_assert.h>
-#include <sleep.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include "asm.h"
+#include "console/printf.h"
+#include "devices/generic_disk.h"
+#include "fs/bcache.h"
 
 struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
                                        uint8_t function,

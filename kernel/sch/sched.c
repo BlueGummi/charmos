@@ -2,18 +2,16 @@
 #include <asm.h>
 #include <console/printf.h>
 #include <devices/registry.h>
-#include <mem/alloc.h>
-#include <mem/pmm.h>
-#include <mem/vmm.h>
-#include <mp/mp.h>
-#include <mutex.h>
 #include <sch/sched.h>
-#include <sleep.h>
 #include <spin_lock.h>
 #include <stdatomic.h>
 #include <stdint.h>
 #include <string.h>
 #include <tests.h>
+#include <stdbool.h>
+
+#include "mp/core.h"
+#include "sch/thread.h"
 
 struct scheduler **local_schs;
 uint64_t c_count = 1;

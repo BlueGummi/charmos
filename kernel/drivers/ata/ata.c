@@ -1,9 +1,7 @@
 #include <asm.h>
 #include <console/printf.h>
-#include <devices/generic_disk.h>
 #include <drivers/ahci.h>
 #include <drivers/ata.h>
-#include <fs/ext2.h>
 #include <mem/alloc.h>
 #include <drivers/pci.h>
 #include <sleep.h>

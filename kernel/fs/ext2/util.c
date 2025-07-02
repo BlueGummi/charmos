@@ -1,7 +1,11 @@
-#include <console/printf.h>
 #include <fs/ext2.h>
-#include <mem/alloc.h>
 #include <string.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "fs/bcache.h"
+#include "spin_lock.h"
+#include "time/time.h"
 
 static uint32_t ext2_get_block(struct ext2_fs *fs, uint32_t block_num,
                                uint32_t depth, uint32_t block_index,

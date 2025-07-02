@@ -1,7 +1,5 @@
 #include <boot/gdt.h>
-#include <console/printf.h>
 #include <mem/alloc.h>
-#include <stdalign.h>
 #include <stdint.h>
 #include <string.h>
 #include <tss.h>
