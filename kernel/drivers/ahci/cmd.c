@@ -6,9 +6,9 @@
 #include <mem/alloc.h>
 #include <mem/vmm.h>
 #include <sch/sched.h>
-#include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "devices/generic_disk.h"
 #include "sch/thread.h"

@@ -19,12 +19,12 @@
 #include <mp/mp.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <syscall.h>
-#include <stddef.h>
 
-#include "requests.h"
 #include "fs/vfs.h"
+#include "requests.h"
 
 struct scheduler global_sched = {0};
 uint64_t a_rsdp = 0;

@@ -1,10 +1,10 @@
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <tests.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <tests.h>
 
 REGISTER_TEST(pmm_alloc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     void *p = pmm_alloc_page(false);

@@ -1,7 +1,7 @@
 #include <console/printf.h>
 #include <fs/ext2.h>
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "fs/bcache.h"
 
@@ -98,7 +98,7 @@ bool ext2_free_block(struct ext2_fs *fs, uint32_t block_num) {
     bcache_ent_lock(ent);
     uint32_t byte = index / 8;
     uint8_t bit = 1 << (index % 8);
-    
+
     /* already free */
     if (!(bitmap[byte] & bit)) {
         bcache_ent_unlock(ent);

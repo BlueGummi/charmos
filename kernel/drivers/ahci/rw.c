@@ -55,7 +55,7 @@ bool ahci_read_sector_blocking(struct generic_disk *disk, uint64_t lba,
     struct ahci_disk *ahci_disk = (struct ahci_disk *) disk->driver_data;
     struct ahci_device *dev = ahci_disk->device;
     req.slot = ahci_find_slot(ahci_disk->device->regs[ahci_disk->port].port);
-    
+
     /* refer to write_sector as to why we do this */
     req.trigger_completion = true;
 
@@ -106,7 +106,7 @@ bool ahci_write_sector_blocking(struct generic_disk *disk, uint64_t lba,
     struct ahci_disk *ahci_disk = (struct ahci_disk *) disk->driver_data;
     struct ahci_device *dev = ahci_disk->device;
     req.slot = ahci_find_slot(ahci_disk->device->regs[ahci_disk->port].port);
-    
+
     /* this is here because there are completion
      * events that the blocking r/w need in order to
      * properly wake up threads and such */

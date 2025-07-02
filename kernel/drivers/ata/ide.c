@@ -4,8 +4,8 @@
 #include <drivers/ata.h>
 #include <mem/alloc.h>
 #include <sleep.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "fs/bcache.h"
 

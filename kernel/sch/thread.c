@@ -2,9 +2,9 @@
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <sch/thread.h>
-#include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 uint64_t globid = 1;
 

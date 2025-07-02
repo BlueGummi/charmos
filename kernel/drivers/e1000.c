@@ -1,14 +1,14 @@
 #include <asm.h>
 #include <console/printf.h>
 #include <drivers/e1000.h>
+#include <drivers/pci.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <drivers/pci.h>
 #include <sleep.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <stdbool.h>
 
 #define E1000_MAX_TX_PACKET_SIZE 1518
 #define REG32(dev, offset) (&(dev->regs[(offset) / 4U]))

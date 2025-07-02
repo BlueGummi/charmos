@@ -1,5 +1,5 @@
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 void sleep(uint64_t seconds);
 void sleep_us(uint64_t us);
 void sleep_ms(uint64_t msec);

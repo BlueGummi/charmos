@@ -6,9 +6,9 @@
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <sleep.h>
-#include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 // TODO: Hand this off to IDE if the GHC bit 31 is OFF
 // It won't be AHCI - Sometimes we are in IDE emul mode

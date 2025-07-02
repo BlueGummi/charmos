@@ -9,7 +9,6 @@
 
 uint64_t *hpet_base;
 
-
 void hpet_write64(uint64_t offset, uint64_t value) {
     mmio_write_64((void *) ((uintptr_t) hpet_base + offset), value);
 }

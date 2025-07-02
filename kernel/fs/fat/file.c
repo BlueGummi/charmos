@@ -1,8 +1,8 @@
 #include <fs/fat.h>
 #include <mem/alloc.h>
-#include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 bool fat_read_file(struct fat_fs *fs, struct fat_dirent *ent, uint32_t offset,
                    uint32_t size, uint8_t *out_buf) {

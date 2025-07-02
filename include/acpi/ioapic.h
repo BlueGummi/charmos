@@ -1,6 +1,6 @@
 #pragma once
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 struct ioapic_info {
     uint8_t id;
     uint32_t gsi_base;

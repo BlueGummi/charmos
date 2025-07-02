@@ -1,8 +1,8 @@
 #include <crypto/chacha20.h>
 #include <crypto/entropy_pool.h>
-#include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "spin_lock.h"
 

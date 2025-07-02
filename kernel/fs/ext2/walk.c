@@ -1,6 +1,6 @@
 #include <fs/ext2.h>
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "devices/generic_disk.h"
 #include "fs/bcache.h"

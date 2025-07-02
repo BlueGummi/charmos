@@ -68,7 +68,7 @@ void mutex_lock(struct mutex *m) {
 
         if (should_spin_on_mutex(m)) {
             if (spin_wait_mutex(m, curr)) {
-                return; 
+                return;
             }
         }
 

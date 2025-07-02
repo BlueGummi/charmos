@@ -1,8 +1,8 @@
 #include <console/printf.h>
-#include <tests.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <tests.h>
 
 #include "acpi/hpet.h"
 #include "misc/colors.h"

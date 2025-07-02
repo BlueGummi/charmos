@@ -1,8 +1,8 @@
 #include <errno.h>
 #include <fs/ext2.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <stdbool.h>
 
 #include "fs/bcache.h"
 

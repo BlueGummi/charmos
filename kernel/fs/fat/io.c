@@ -1,8 +1,8 @@
 #include <fs/fat.h>
 #include <mem/alloc.h>
-#include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "devices/generic_disk.h"
 
@@ -219,7 +219,7 @@ static uint32_t fat12_read_fat_entry(struct fat_fs *fs, uint32_t cluster) {
     uint8_t *buf = kmalloc(disk->sector_size);
     uint8_t *buf2 = NULL;
     uint32_t result = 0xFFFFFFFF;
-    
+
     if (!buf)
         return result;
 

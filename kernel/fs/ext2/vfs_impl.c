@@ -1,10 +1,10 @@
 #include <fs/ext2.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
-#include <string.h>
-#include <time/time.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
+#include <time/time.h>
 
 #include "devices/generic_disk.h"
 #include "errno.h"

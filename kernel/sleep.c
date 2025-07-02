@@ -1,8 +1,8 @@
 #include <acpi/hpet.h>
 #include <asm.h>
 #include <sleep.h>
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 extern uint64_t *hpet_base;
 

@@ -8,9 +8,9 @@
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <sleep.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <stdbool.h>
 
 #include "sch/sched.h"
 #include "sch/thread.h"

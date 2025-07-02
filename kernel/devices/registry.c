@@ -5,13 +5,13 @@
 #include <drivers/ata.h>
 #include <drivers/e1000.h>
 #include <drivers/nvme.h>
+#include <drivers/pci.h>
 #include <fs/detect.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
-#include <drivers/pci.h>
-#include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "misc/colors.h"
 

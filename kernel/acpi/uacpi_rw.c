@@ -2,9 +2,9 @@
 #include <asm.h>
 #include <console/printf.h>
 #include <mem/alloc.h>
-#include <uacpi/kernel_api.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <uacpi/kernel_api.h>
 
 #include "uacpi/platform/types.h"
 #include "uacpi/status.h"

@@ -7,11 +7,11 @@
 #include <mem/vmm.h>
 #include <pit.h>
 #include <spin_lock.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <uacpi/platform/arch_helpers.h>
 #include <uacpi/status.h>
 #include <uacpi/uacpi.h>
-#include <stdbool.h>
 
 #include "uacpi/internal/types.h"
 #include "uacpi/kernel_api.h"

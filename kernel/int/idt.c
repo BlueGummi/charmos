@@ -5,9 +5,9 @@
 #include <int/kb.h>
 #include <mem/alloc.h>
 #include <sch/sched.h>
-#include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 extern void context_switch();
 extern void page_fault_handler_wrapper();

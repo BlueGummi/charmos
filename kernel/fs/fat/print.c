@@ -1,8 +1,8 @@
 #include <console/printf.h>
 #include <fs/fat.h>
-#include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #define create_str(new_str, orig_str, orig_str_size)                           \
     char new_str[orig_str_size + 1] = {0};                                     \

@@ -1,8 +1,8 @@
 #include <fs/ext2.h>
 #include <mem/alloc.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <stdbool.h>
 
 #include "devices/generic_disk.h"
 #include "fs/vfs.h"

@@ -1,8 +1,8 @@
 #include <sch/sched.h>
 #include <spin_lock.h>
 #include <stdatomic.h>
-#include <stddef.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "sch/thread.h"

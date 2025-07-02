@@ -1,7 +1,7 @@
 #include <fs/ext2.h>
-#include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "fs/bcache.h"
 #include "spin_lock.h"

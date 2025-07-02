@@ -7,9 +7,9 @@
 #include <fs/iso9660.h>
 #include <fs/mbr.h>
 #include <mem/alloc.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <stdbool.h>
 
 /* there is no point in using the bcache for these operations */
 const char *detect_fstr(enum fs_type type) {

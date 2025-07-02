@@ -3,9 +3,9 @@
 #include <elf.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <stdbool.h>
 
 #define ELF_MAGIC 0x464C457F // "\x7FELF"
 

@@ -1,8 +1,8 @@
 #include <fs/vfs.h>
 #include <mem/alloc.h>
+#include <stdint.h>
 #include <string.h>
 #include <tests.h>
-#include <stdint.h>
 
 #include "errno.h"
 #include "fs/detect.h"

@@ -48,14 +48,14 @@ struct pci_msix_cap {
     uint32_t pba_offset_bir;   // 0x8
 };
 
-
 const char *pci_class_name(uint8_t class_code, uint8_t subclass);
 
 void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out);
 uint32_t pci_read_bar(uint8_t bus, uint8_t device, uint8_t function,
                       uint8_t bar_index);
 void pci_enable_msix(uint8_t bus, uint8_t slot, uint8_t func);
-void pci_enable_msix_on_core(uint8_t bus, uint8_t slot, uint8_t func, uint8_t vector, uint8_t core);
+void pci_enable_msix_on_core(uint8_t bus, uint8_t slot, uint8_t func,
+                             uint8_t vector, uint8_t core);
 
 #define PCI_CAP_PTR 0x34
 #define PCI_CAP_ID_MSIX 0x11

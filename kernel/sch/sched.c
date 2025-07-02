@@ -5,10 +5,10 @@
 #include <sch/sched.h>
 #include <spin_lock.h>
 #include <stdatomic.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 #include <tests.h>
-#include <stdbool.h>
 
 #include "mp/core.h"
 #include "sch/thread.h"

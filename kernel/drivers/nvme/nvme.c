@@ -6,8 +6,8 @@
 #include <int/idt.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "fs/bcache.h"
 #include "sch/sched.h"

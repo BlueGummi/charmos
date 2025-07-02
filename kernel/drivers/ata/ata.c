@@ -2,8 +2,8 @@
 #include <console/printf.h>
 #include <drivers/ahci.h>
 #include <drivers/ata.h>
-#include <mem/alloc.h>
 #include <drivers/pci.h>
+#include <mem/alloc.h>
 #include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>

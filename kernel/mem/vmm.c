@@ -4,9 +4,9 @@
 #include <mem/vmm.h>
 #include <misc/linker_symbols.h>
 #include <spin_lock.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <stdbool.h>
 
 struct spinlock vmm_lock = SPINLOCK_INIT;
 struct page_table *kernel_pml4 = NULL;
