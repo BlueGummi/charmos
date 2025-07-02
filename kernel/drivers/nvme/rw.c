@@ -8,10 +8,6 @@
 #include <sleep.h>
 #include <stdint.h>
 
-/* I should have a mapping of
- * core numbers to their
- * respective queue numbers - array */
-
 bool nvme_read_sector_async(struct generic_disk *disk, uint64_t lba,
                             uint8_t *buffer, uint16_t count,
                             struct nvme_request *req) {
