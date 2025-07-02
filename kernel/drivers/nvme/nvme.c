@@ -36,9 +36,6 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
 
     void *mmio = vmm_map_phys(phys_addr, size);
 
-    uint8_t nvme_isr = idt_alloc_entry();
-    pci_enable_msix(bus, slot, func, nvme_isr);
-
     struct nvme_regs *regs = (struct nvme_regs *) mmio;
     uint64_t cap = ((uint64_t) regs->cap_hi << 32) | regs->cap_lo;
     uint32_t version = regs->version;
@@ -55,7 +52,6 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
 
     nvme->version = version;
     nvme->regs = regs;
-    nvme->isr_index = nvme_isr;
     nvme->admin_q_depth = ((nvme->cap) & 0xFFFF) + 1;
     nvme->io_queues = kmalloc(sizeof(struct nvme_queue *));
     if (!nvme->io_queues)
@@ -81,21 +77,37 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme_alloc_admin_queues(nvme);
     nvme_setup_admin_queues(nvme);
     nvme_enable_controller(nvme);
-    nvme_set_num_queues(nvme, core_count, core_count);
-    nvme_alloc_io_queues(nvme, 1);
+    uint32_t actual = nvme_set_num_queues(nvme, core_count, core_count);
+    uint32_t total_sq = actual & 0xffff;
+    uint32_t total_cq = actual >> 16;
+    nvme_info(K_INFO, "Controller supports %u SQs and %u CQs", total_sq,
+              total_cq);
 
-    // TODO: many IO queues
-    nvme->io_waiters = kzalloc(sizeof(struct thread *) * 2);
-    nvme->io_statuses = kzalloc(sizeof(uint16_t *) * 2);
-    nvme->io_requests = kzalloc(sizeof(struct nvme_request *) * 2);
+    nvme_set_num_queues(nvme, total_sq, total_cq);
 
-    uint64_t dep = nvme->io_queues[1]->sq_depth;
-    nvme->io_waiters[1] =
-        kzalloc(sizeof(struct thread *) * nvme->io_queues[1]->sq_depth);
-    nvme->io_statuses[1] = kzalloc(sizeof(uint16_t) * dep);
+    uint32_t sqs_to_make = core_count > total_sq ? total_sq : core_count;
 
-    /* 64 SQEs */
-    nvme->io_requests[1] = kzalloc(sizeof(struct nvme_request) * 64);
+    nvme->isr_index = kzalloc(sizeof(uint8_t) * sqs_to_make);
+    nvme->io_waiters = kzalloc(sizeof(struct thread *) * sqs_to_make);
+    nvme->io_statuses = kzalloc(sizeof(uint16_t *) * sqs_to_make);
+    nvme->io_requests = kzalloc(sizeof(struct nvme_request *) * sqs_to_make);
+    nvme->io_queues = kzalloc(sizeof(struct nvme_queue *) * sqs_to_make);
+    nvme->queues_made = sqs_to_make;
+
+    pci_enable_msix(bus, slot, func);
+    for (uint32_t i = 1; i <= sqs_to_make; i++) {
+        uint8_t nvme_isr = idt_alloc_entry_on_core(i - 1);
+        pci_enable_msix_on_core(bus, slot, func, nvme_isr, i - 1);
+        nvme->isr_index[i] = nvme_isr;
+
+        nvme_alloc_io_queues(nvme, i);
+
+        uint64_t dep = nvme->io_queues[i]->sq_depth;
+        nvme->io_waiters[i] =
+            kzalloc(sizeof(struct thread *) * nvme->io_queues[i]->sq_depth);
+        nvme->io_statuses[i] = kzalloc(sizeof(uint16_t) * dep);
+        nvme->io_requests[i] = kzalloc(sizeof(struct nvme_request) * 64);
+    }
 
     return nvme;
 }

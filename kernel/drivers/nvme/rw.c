@@ -8,16 +8,15 @@
 #include <sleep.h>
 #include <stdint.h>
 
-/* TODO: many IO queues */
-
-/* I should have a mapping of 
- * core numbers to their 
+/* I should have a mapping of
+ * core numbers to their
  * respective queue numbers - array */
 
 bool nvme_read_sector_async(struct generic_disk *disk, uint64_t lba,
                             uint8_t *buffer, uint16_t count,
                             struct nvme_request *req) {
     struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
+    uint16_t qid = THIS_QID;
 
     uint64_t total_bytes = count * 512;
     uint64_t pages_needed = (total_bytes + PAGE_SIZE - 1) / PAGE_SIZE;
@@ -46,7 +45,7 @@ bool nvme_read_sector_async(struct generic_disk *disk, uint64_t lba,
     req->done = false;
     req->status = -1;
 
-    nvme_submit_io_cmd(nvme, &cmd, 1, req);
+    nvme_submit_io_cmd(nvme, &cmd, qid, req);
 
     return true;
 }
@@ -55,6 +54,7 @@ bool nvme_write_sector_async(struct generic_disk *disk, uint64_t lba,
                              const uint8_t *buffer, uint16_t count,
                              struct nvme_request *req) {
     struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
+    uint16_t qid = THIS_QID;
 
     uint64_t total_bytes = count * 512;
     uint64_t pages_needed = (total_bytes + PAGE_SIZE - 1) / PAGE_SIZE;
@@ -83,7 +83,7 @@ bool nvme_write_sector_async(struct generic_disk *disk, uint64_t lba,
     req->done = false;
     req->status = -1;
 
-    nvme_submit_io_cmd(nvme, &cmd, 1, req);
+    nvme_submit_io_cmd(nvme, &cmd, qid, req);
 
     return true;
 }
@@ -91,7 +91,8 @@ bool nvme_write_sector_async(struct generic_disk *disk, uint64_t lba,
 bool nvme_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
                       uint16_t count) {
     struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
-    struct nvme_queue *this_queue = nvme->io_queues[1];
+    uint16_t qid = THIS_QID;
+    struct nvme_queue *this_queue = nvme->io_queues[qid];
     uint16_t tail = this_queue->sq_tail;
 
     struct nvme_request req = {0};
@@ -100,17 +101,18 @@ bool nvme_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
     struct thread *curr = scheduler_get_curr_thread();
     curr->state = BLOCKED;
 
-    nvme->io_waiters[1][tail] = curr;
+    nvme->io_waiters[qid][tail] = curr;
     scheduler_yield();
 
-    nvme->io_waiters[1][tail] = NULL;
-    return !(nvme->io_statuses[1][tail]);
+    nvme->io_waiters[qid][tail] = NULL;
+    return !(nvme->io_statuses[qid][tail]);
 }
 
 bool nvme_write_sector(struct generic_disk *disk, uint64_t lba,
                        const uint8_t *buffer, uint16_t count) {
     struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
-    struct nvme_queue *this_queue = nvme->io_queues[1];
+    uint16_t qid = THIS_QID;
+    struct nvme_queue *this_queue = nvme->io_queues[qid];
     uint16_t tail = this_queue->sq_tail;
 
     struct nvme_request req = {0};
@@ -119,11 +121,11 @@ bool nvme_write_sector(struct generic_disk *disk, uint64_t lba,
     struct thread *curr = scheduler_get_curr_thread();
     curr->state = BLOCKED;
 
-    nvme->io_waiters[1][tail] = curr;
+    nvme->io_waiters[qid][tail] = curr;
     scheduler_yield();
 
-    nvme->io_waiters[1][tail] = NULL;
-    return !(nvme->io_statuses[1][tail]);
+    nvme->io_waiters[qid][tail] = NULL;
+    return !(nvme->io_statuses[qid][tail]);
 }
 
 bool nvme_read_sector_wrapper(struct generic_disk *disk, uint64_t lba,

@@ -122,15 +122,35 @@ void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
     *count_out = pci_device_count;
 }
 
+uint8_t pci_find_capability(uint8_t bus, uint8_t slot, uint8_t func,
+                            uint8_t cap_id) {
+    uint8_t cap_ptr = pci_read_byte(bus, slot, func, PCI_CAP_PTR);
+
+    while (cap_ptr != 0 && cap_ptr != 0xFF) {
+        uint8_t current_id = pci_read_byte(bus, slot, func, cap_ptr);
+        if (current_id == cap_id) {
+            return cap_ptr;
+        }
+        cap_ptr = pci_read_byte(bus, slot, func, cap_ptr + 1);
+    }
+
+    return 0;
+}
+
 uint32_t pci_read_bar(uint8_t bus, uint8_t device, uint8_t function,
                       uint8_t bar_index) {
     uint8_t offset = 0x10 + (bar_index * 4);
     return pci_read(bus, device, function, offset);
 }
 
-static void pci_msix_enable_vector(uint8_t bus, uint8_t slot, uint8_t func,
-                                   uint8_t msix_cap_offset,
-                                   uint32_t vector_index, uint8_t apic_id) {
+void pci_enable_msix_on_core(uint8_t bus, uint8_t slot, uint8_t func,
+                             uint8_t vector_index, uint8_t apic_id) {
+    uint8_t msix_cap_offset =
+        pci_find_capability(bus, slot, func, PCI_CAP_ID_MSIX);
+    if (msix_cap_offset == 0) {
+        k_info("PCI", K_ERROR, "MSI-X capability not found");
+        return;
+    }
     uint32_t table_offset_bir = pci_read(bus, slot, func, msix_cap_offset + 4);
 
     uint8_t bir = table_offset_bir & 0x7;
@@ -167,12 +187,9 @@ static void pci_msix_enable_vector(uint8_t bus, uint8_t slot, uint8_t func,
     uint32_t vector_ctrl = mmio_read_32(&entry_addr->vector_ctrl);
     vector_ctrl &= ~0x1;
     mmio_write_32(&entry_addr->vector_ctrl, vector_ctrl);
-
-    k_info("PCI", K_INFO, "Enabled MSI-X vector %u for core %u", vector_index,
-           apic_id);
 }
 
-void pci_enable_msix(uint8_t bus, uint8_t slot, uint8_t func, uint8_t isr) {
+void pci_enable_msix(uint8_t bus, uint8_t slot, uint8_t func) {
     uint8_t cap_ptr = pci_read_byte(bus, slot, func, PCI_CAP_PTR);
 
     while (cap_ptr != 0) {
@@ -189,7 +206,6 @@ void pci_enable_msix(uint8_t bus, uint8_t slot, uint8_t func, uint8_t isr) {
 
             if ((verify & (1 << 15)) && !(verify & (1 << 14))) {
                 k_info("PCI", K_INFO, "MSI-X enabled");
-                pci_msix_enable_vector(bus, slot, func, cap_ptr, isr, 0);
             } else {
                 k_info("PCI", K_ERROR, "Failed to enable MSI-X");
             }

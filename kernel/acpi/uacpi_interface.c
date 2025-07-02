@@ -3,7 +3,6 @@
 #include <asm.h>
 #include <console/printf.h>
 #include <int/idt.h>
-#include <int/irq.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/slab.h>
@@ -127,15 +126,15 @@ void uacpi_kernel_sleep(uacpi_u64 msec) {
 uacpi_status uacpi_kernel_install_interrupt_handler(
     uacpi_u32 irq, uacpi_interrupt_handler handler, uacpi_handle ctx,
     uacpi_handle *out_irq_handle) {
+    irq += 32;
 
-    if (irq >= IRQ_MAX)
+    if (irq >= 256)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    if (irq_is_installed(irq))
+    if (idt_is_installed(irq))
         return UACPI_STATUS_ALREADY_EXISTS;
 
-    if (irq_install(irq, (void *) handler, ctx) < 0)
-        return UACPI_STATUS_INTERNAL_ERROR;
+    isr_register(irq, (void *) handler, ctx, get_sch_core_id());
 
     if (out_irq_handle)
         *out_irq_handle = (uacpi_handle) (uintptr_t) irq;
@@ -147,17 +146,17 @@ uacpi_status
 uacpi_kernel_uninstall_interrupt_handler(uacpi_interrupt_handler handler,
                                          uacpi_handle irq_handle) {
     uint32_t irq = (uint32_t) (uintptr_t) irq_handle;
+    irq += 32;
+
     (void) handler;
 
-    if (irq >= IRQ_MAX)
+    if (irq >= 256)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    if (!irq_is_installed(irq))
+    if (!idt_is_installed(irq))
         return UACPI_STATUS_NOT_FOUND;
 
-    if (irq_free(irq) < 0)
-        return UACPI_STATUS_INVALID_ARGUMENT;
-
+    idt_free_entry(irq);
     return UACPI_STATUS_OK;
 }
 

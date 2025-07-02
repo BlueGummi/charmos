@@ -57,7 +57,9 @@ void nvme_isr_handler(void *ctx, uint8_t vector, void *rsp) {
     (void) vector, (void) rsp;
     struct nvme_device *dev = ctx;
     /* TODO: many IO queues */
-    nvme_process_completions(dev, 1);
+    for (uint32_t i = 1; i <= dev->queues_made; i++) {
+        nvme_process_completions(dev, i);
+    }
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
 }
 
@@ -78,7 +80,6 @@ void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
     mmio_write_32(this_queue->sq_db, this_queue->sq_tail);
 }
 
-/* this doesnt do interrupt driven IO since it is done once */
 uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
                                struct nvme_command *cmd, uint32_t *dw0_out) {
     uint16_t tail = nvme->admin_sq_tail;
@@ -140,8 +141,7 @@ bool nvme_submit_bio_request(struct generic_disk *disk,
     req->done = false;
     req->lba = bio->lba;
 
-    /* TODO: many IO queues */
-    req->qid = 1;
+    req->qid = THIS_QID;
     req->sector_count = bio->sector_count;
     req->size = bio->size;
     req->write = bio->write;
@@ -203,11 +203,6 @@ uint32_t nvme_set_num_queues(struct nvme_device *nvme, uint16_t desired_sq,
 
     uint16_t actual_sq = (cdw0 & 0xFFFF) + 1;
     uint16_t actual_cq = ((cdw0 >> 16) & 0xFFFF) + 1;
-
-    nvme_info(
-        K_INFO,
-        "Controller supports %u submission queues and %u completion queues",
-        actual_sq, actual_cq);
 
     return (actual_cq << 16) | actual_sq;
 }

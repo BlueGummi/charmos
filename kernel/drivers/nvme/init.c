@@ -4,7 +4,6 @@
 #include <drivers/nvme.h>
 #include <drivers/pci.h>
 #include <int/idt.h>
-#include <int/irq.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
@@ -122,18 +121,22 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
         (uint32_t *) ((uint8_t *) nvme->regs + NVME_DOORBELL_BASE +
                       ((2 * qid + 1) * nvme->doorbell_stride));
 
+    uint8_t this_isr = nvme->isr_index[qid];
+
     // complete queue
     struct nvme_command cq_cmd = {0};
     cq_cmd.opc = NVME_OP_ADMIN_CREATE_IOCQ;
     cq_cmd.prp1 = cq_phys;
 
-    cq_cmd.cdw10 = (15) << 16 | 1;
-    cq_cmd.cdw11 = nvme->isr_index << 16 | 0b11;
+    cq_cmd.cdw10 = (15) << 16 | qid;
+    cq_cmd.cdw11 = this_isr << 16 | 0b11;
 
-    isr_register(nvme->isr_index, nvme_isr_handler, nvme, 0);
+    isr_register(this_isr, nvme_isr_handler, nvme, qid - 1);
+
 
     if (nvme_submit_admin_cmd(nvme, &cq_cmd, NULL) != 0) {
-        nvme_info(K_ERROR, "failed to create IOCQ - code 0x%x", cq_cmd);
+        nvme_info(K_ERROR, "failed to create IOCQ %u, code 0x%x, ISR %u", qid,
+                  cq_cmd.opc, this_isr);
         return;
     }
 
@@ -142,12 +145,13 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
     sq_cmd.opc = NVME_OP_ADMIN_CREATE_IOSQ;
     sq_cmd.prp1 = sq_phys;
 
-    sq_cmd.cdw10 = (63) << 16 | 1;
+    sq_cmd.cdw10 = (63) << 16 | qid;
     sq_cmd.cdw11 = qid << 16 | 1;
 
     if (nvme_submit_admin_cmd(nvme, &sq_cmd, NULL) != 0) {
-        nvme_info(K_ERROR, "failed to create IOSQ - code 0x%x", sq_cmd);
+        nvme_info(K_ERROR, "failed to create IOSQ %u, code 0x%x, ISR %u", qid,
+                  sq_cmd.opc, this_isr);
         return;
     }
-    nvme_info(K_INFO, "NVMe Queues created - ISR %u", nvme->isr_index);
+    nvme_info(K_INFO, "NVMe QID %u created - ISR %u", qid, this_isr);
 }

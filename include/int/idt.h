@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdint.h>
 #pragma once
 
@@ -50,6 +51,9 @@ void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
                   uint64_t ind);
 
 int idt_alloc_entry(void);
+int idt_alloc_entry_on_core(uint64_t core);
 void idt_free_entry(int entry);
-void isr_register(uint8_t vector, isr_handler_t handler, void *ctx, uint64_t core);
+bool idt_is_installed(int entry);
+void isr_register(uint8_t vector, isr_handler_t handler, void *ctx,
+                  uint64_t core);
 void lapic_send_ipi(uint8_t apic_id, uint8_t vector);

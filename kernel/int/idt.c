@@ -4,7 +4,6 @@
 #include <asm.h>
 #include <console/printf.h>
 #include <int/idt.h>
-#include <int/irq.h>
 #include <int/kb.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
@@ -71,12 +70,12 @@ void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
 }
 
-void isr_register(uint8_t vector, isr_handler_t handler, void *ctx, uint64_t c) {
+void isr_register(uint8_t vector, isr_handler_t handler, void *ctx,
+                  uint64_t c) {
     isr_table[c][vector].handler = handler;
     isr_table[c][vector].ctx = ctx;
 
-    idt_set_gate(vector, (uint64_t)handler, 0x08, 0x8e, c);
-    irq_set_installed(vector, true);
+    idt_set_gate(vector, (uint64_t) handler, 0x08, 0x8e, c);
 }
 
 struct idt_table *idts;
@@ -98,7 +97,6 @@ void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
     idt[num].reserved = 0;
 
     idt_entry_used[ind][num] = true;
-    irq_set_installed(num, true);
 }
 
 static void set(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
@@ -114,7 +112,6 @@ static void set(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
     idt[num].reserved = 0;
 
     idt_entry_used[ind][num] = true;
-    irq_set_installed(num, true);
 }
 
 int idt_install_handler(uint8_t flags, void (*handler)(void), uint64_t core) {
@@ -147,8 +144,7 @@ void idt_alloc(uint64_t size) {
         k_panic("Could not allocate space for IDT\n");
 }
 
-int idt_alloc_entry(void) {
-    uint8_t c = get_sch_core_id();
+int idt_alloc_entry_on_core(uint64_t c) {
     for (int i = 32; i < MAX_IDT_ENTRIES; i++) { // skip first 32: exceptions
         if (!idt_entry_used[c][i]) {
             idt_entry_used[c][i] = true;
@@ -156,6 +152,14 @@ int idt_alloc_entry(void) {
         }
     }
     return -1; // none available
+}
+
+int idt_alloc_entry(void) {
+    return idt_alloc_entry_on_core(get_sch_core_id());
+}
+
+bool idt_is_installed(int entry) {
+    return idt_entry_used[entry];
 }
 
 void idt_free_entry(int entry) {
