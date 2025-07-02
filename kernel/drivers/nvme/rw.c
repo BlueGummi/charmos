@@ -18,7 +18,7 @@ bool nvme_read_sector_async(struct generic_disk *disk, uint64_t lba,
     struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
     uint16_t qid = THIS_QID;
 
-    uint64_t total_bytes = count * 512;
+    uint64_t total_bytes = count * disk->sector_size;
     uint64_t pages_needed = (total_bytes + PAGE_SIZE - 1) / PAGE_SIZE;
 
     uint64_t buffer_phys = (uint64_t) vmm_get_phys((uint64_t) buffer);
@@ -56,7 +56,7 @@ bool nvme_write_sector_async(struct generic_disk *disk, uint64_t lba,
     struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
     uint16_t qid = THIS_QID;
 
-    uint64_t total_bytes = count * 512;
+    uint64_t total_bytes = count * disk->sector_size;
     uint64_t pages_needed = (total_bytes + PAGE_SIZE - 1) / PAGE_SIZE;
 
     uint64_t buffer_phys = (uint64_t) vmm_get_phys((uint64_t) buffer);
@@ -136,7 +136,7 @@ bool nvme_read_sector_wrapper(struct generic_disk *disk, uint64_t lba,
             return false;
 
         lba += chunk;
-        buf += chunk * 512;
+        buf += chunk * disk->sector_size;
         cnt -= chunk;
     }
     return true;
@@ -150,7 +150,7 @@ bool nvme_write_sector_wrapper(struct generic_disk *disk, uint64_t lba,
             return false;
 
         lba += chunk;
-        buf += chunk * 512;
+        buf += chunk * disk->sector_size;
         cnt -= chunk;
     }
     return true;
@@ -179,7 +179,7 @@ bool nvme_write_sector_async_wrapper(struct generic_disk *disk, uint64_t lba,
             return false;
 
         lba += chunk;
-        buf += chunk * 512;
+        buf += chunk * disk->sector_size;
     }
 
     return true;
@@ -208,7 +208,7 @@ bool nvme_read_sector_async_wrapper(struct generic_disk *disk, uint64_t lba,
             return false;
 
         lba += chunk;
-        buf += chunk * 512;
+        buf += chunk * disk->sector_size;
     }
 
     return true;

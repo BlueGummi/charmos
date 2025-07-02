@@ -135,23 +135,63 @@ struct nvme_device {
     uint16_t **io_statuses;
     uint8_t *isr_index;
     uint32_t queues_made;
+
+    uint32_t sector_size;
 };
 
 struct nvme_identify {
     uint8_t data[PAGE_SIZE];
 };
 
+struct nvme_lbaf {
+    uint16_t ms;    // Metadata size
+    uint8_t lbads;  // LBA data size (log2 of sector size)
+    uint8_t rp : 2; // Relative performance
+    uint8_t reserved : 6;
+} __attribute__((packed));
+
 struct nvme_identify_namespace {
-    uint64_t nsze; // Namespace Size (number of logical blocks)
-    uint64_t ncap; // Namespace Capacity (number of logical blocks)
-    uint64_t nuse; // Namespace Utilization (number of logical blocks)
-    uint8_t flbas; // Formatted LBA Size (lower 4 bits = LBA format index)
-    uint8_t rsvd1[3];
-    uint8_t nmic;   // Metadata Indicator Capabilities
-    uint8_t rescap; // Reservation Capabilities
-    uint8_t rsvd2[88];
-    // more but lazy :p
-};
+    uint64_t nsze;  // Namespace Size
+    uint64_t ncap;  // Namespace Capacity
+    uint64_t nuse;  // Namespace Utilization
+    uint8_t nsfeat; // Namespace Features
+    uint8_t nlbaf;  // Number of LBA formats
+    uint8_t flbas;  // Formatted LBA Size
+    uint8_t mc;     // Metadata Capabilities
+    uint8_t dpc;    // End-to-end Data Protection Capabilities
+    uint8_t dps;    // End-to-end Data Protection Type Settings
+    uint8_t nmic; // Namespace Multipath I/O and Namespace Sharing Capabilities
+    uint8_t rescap;     // Reservation Capabilities
+    uint8_t fpi;        // Format Progress Indicator
+    uint8_t dlfeat;     // Deallocate Logical Block Features
+    uint16_t nawun;     // Namespace Atomic Write Unit Normal
+    uint16_t nawupf;    // Namespace Atomic Write Unit Power Fail
+    uint16_t nacwu;     // Namespace Atomic Compare & Write Unit
+    uint16_t nabsn;     // Namespace Atomic Boundary Size Normal
+    uint16_t nabo;      // Namespace Atomic Boundary Offset
+    uint16_t nabspf;    // Namespace Atomic Boundary Size Power Fail
+    uint16_t noiob;     // Namespace Optimal IO Boundary
+    uint64_t nvmcap[2]; // Namespace NVM Capacity
+    uint16_t npwg;
+    uint16_t npwa;
+    uint16_t npdg;
+    uint16_t npda;
+    uint16_t nows;
+    uint16_t mssrl;
+    uint32_t mcl;
+    uint8_t msrc;
+    uint8_t reserved0[11];
+    uint32_t adagrpid;
+    uint8_t reserved1[3];
+    uint8_t nsattr;
+    uint16_t nvmsetid;
+    uint16_t endgid;
+    uint64_t nguid[2];
+    uint64_t eui64;
+    struct nvme_lbaf lbaf[64]; // LBA format descriptions
+    uint8_t vendor_specific[3712];
+} __attribute__((packed));
+_Static_assert(sizeof(struct nvme_identify_namespace) == 0x1000, "");
 
 struct nvme_identify_controller {
     uint16_t vid;    // PCI Vendor ID

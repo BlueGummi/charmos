@@ -231,5 +231,12 @@ uint8_t *nvme_identify_namespace(struct nvme_device *nvme, uint32_t nsid) {
         return NULL;
     }
 
+    struct nvme_identify_namespace *ns = (void *) buffer;
+    uint8_t flbas_index = ns->flbas & 0xF; // lower 4 bits = selected format
+    uint8_t lbads = ns->lbaf[flbas_index].lbads;
+    uint32_t sector_size = 1U << lbads;
+    nvme_info(K_INFO, "Device sector size is %u bytes", sector_size);
+
+    nvme->sector_size = sector_size;
     return (uint8_t *) buffer;
 }

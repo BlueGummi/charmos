@@ -150,14 +150,15 @@ static enum fs_type detect_partition_fs(struct generic_disk *disk,
     if (memcmp(&sector[3], "NTFS    ", 8) == 0)
         return FS_NTFS;
 
-    /* Try ext/iso detection inside partition
-     * Ext superblock is at offset 1024 bytes = sector 2 if sector_size=512, so
-     * sector 2 relative to partition start */
-    if (disk->read_sector(disk, part->start_lba + 2, sector, 1)) {
-        uint16_t magic = *(uint16_t *) &sector[56];
-        if (magic == 0xEF53) {
+    uint64_t ext_sb_offset = 1024;
+    uint64_t ext_sector_offset =
+        part->start_lba + (ext_sb_offset / disk->sector_size);
+    uint64_t ext_offset_within_sector = ext_sb_offset % disk->sector_size;
+
+    if (disk->read_sector(disk, ext_sector_offset, sector, 1)) {
+        uint16_t magic = *(uint16_t *) (sector + ext_offset_within_sector + 56);
+        if (magic == 0xEF53)
             return FS_EXT2;
-        }
     }
 
     if (disk->read_sector(disk, part->start_lba + 16, sector, 1)) {

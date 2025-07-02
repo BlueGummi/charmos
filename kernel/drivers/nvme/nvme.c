@@ -77,6 +77,8 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme_alloc_admin_queues(nvme);
     nvme_setup_admin_queues(nvme);
     nvme_enable_controller(nvme);
+    nvme_identify_namespace(nvme, 1);
+
     uint32_t actual = nvme_set_num_queues(nvme, core_count, core_count);
     uint32_t total_sq = actual & 0xffff;
     uint32_t total_cq = actual >> 16;
@@ -129,7 +131,7 @@ struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {
         k_panic("Could not allocate space for NVMe device\n");
 
     d->driver_data = nvme;
-    d->sector_size = 512;
+    d->sector_size = nvme->sector_size;
     d->read_sector = nvme_read_sector_wrapper;
     d->write_sector = nvme_write_sector_wrapper;
     d->submit_bio_async = nvme_submit_bio_request;
