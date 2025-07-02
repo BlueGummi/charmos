@@ -128,8 +128,8 @@ bool ext2_walk_dir(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
     return false;
 }
 
-static void readahead_indirect_entries(struct ext2_fs *fs, uint32_t *entries,
-                                       uint32_t count, uint32_t start_index) {
+static void readahead_blocks(struct ext2_fs *fs, uint32_t *entries,
+                             uint32_t count, uint32_t start_index) {
     for (uint32_t j = 1; j <= 2 && (start_index + j) < count; j++) {
         uint32_t next = entries[start_index + j];
         if (next)
@@ -150,6 +150,7 @@ static void traverse_indirect(struct ext2_fs *fs, struct ext2_inode *inode,
 
     bcache_ent_lock(ent);
     uint32_t *block = (uint32_t *) ent->buffer;
+    uint32_t size = sizeof(uint32_t);
 
     for (uint32_t i = 0; i < fs->block_size / sizeof(uint32_t); i++) {
         if (block[i] || depth == 1) {
@@ -158,8 +159,7 @@ static void traverse_indirect(struct ext2_fs *fs, struct ext2_inode *inode,
 
         if (depth > 1 && block[i]) {
             if (readahead)
-                readahead_indirect_entries(
-                    fs, block, fs->block_size / sizeof(uint32_t), i);
+                readahead_blocks(fs, block, fs->block_size / size, i);
 
             traverse_indirect(fs, inode, block[i], depth - 1, visitor,
                               user_data, readahead);
