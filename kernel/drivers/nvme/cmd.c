@@ -56,7 +56,9 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
 void nvme_isr_handler(void *ctx, uint8_t vector, void *rsp) {
     (void) vector, (void) rsp;
     struct nvme_device *dev = ctx;
-    nvme_process_completions(dev, THIS_QID);
+    for (uint32_t i = 1; i <= dev->queues_made; i++) {
+        nvme_process_completions(dev, i);
+    }
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
 }
 

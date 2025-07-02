@@ -271,35 +271,61 @@ void vmm_map_page_user(uintptr_t pml4_phys, uintptr_t virt, uintptr_t phys,
     asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
 }
 
-void vmm_unmap_page(uintptr_t virt) {
+static bool vmm_is_table_empty(struct page_table *table) {
+    for (int i = 0; i < 512; i++) {
+        if (table->entries[i] & PAGING_PRESENT)
+            return false;
+    }
+    return true;
+}
 
+void vmm_unmap_page(uintptr_t virt) {
     uint64_t L1 = (virt >> 12) & 0x1FF;
     uint64_t L2 = (virt >> 21) & 0x1FF;
     uint64_t L3 = (virt >> 30) & 0x1FF;
     uint64_t L4 = (virt >> 39) & 0x1FF;
 
-    struct page_table *current_table = kernel_pml4;
-    pte_t *entry = &current_table->entries[L4];
-    if (!(*entry & PAGING_PRESENT))
+    struct page_table *l4_table = kernel_pml4;
+    pte_t *l4e = &l4_table->entries[L4];
+    if (!(*l4e & PAGING_PRESENT))
         return;
-    current_table =
-        (struct page_table *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+    struct page_table *l3_table =
+        (struct page_table *) ((*l4e & PAGING_PHYS_MASK) + hhdm_offset);
 
-    entry = &current_table->entries[L3];
-    if (!(*entry & PAGING_PRESENT))
+    pte_t *l3e = &l3_table->entries[L3];
+    if (!(*l3e & PAGING_PRESENT))
         return;
-    current_table =
-        (struct page_table *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+    struct page_table *l2_table =
+        (struct page_table *) ((*l3e & PAGING_PHYS_MASK) + hhdm_offset);
 
-    entry = &current_table->entries[L2];
-    if (!(*entry & PAGING_PRESENT))
+    pte_t *l2e = &l2_table->entries[L2];
+    if (!(*l2e & PAGING_PRESENT))
         return;
-    current_table =
-        (struct page_table *) ((*entry & PAGING_PHYS_MASK) + hhdm_offset);
+    struct page_table *l1_table =
+        (struct page_table *) ((*l2e & PAGING_PHYS_MASK) + hhdm_offset);
 
-    entry = &current_table->entries[L1];
-    *entry &= ~PAGING_PRESENT;
+    pte_t *l1e = &l1_table->entries[L1];
+    *l1e &= ~PAGING_PRESENT;
     asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
+
+    // walk back up and free empty tables
+    if (vmm_is_table_empty(l1_table)) {
+        uintptr_t l1_phys = ((uintptr_t) l1_table - hhdm_offset);
+        *l2e = 0;
+        pmm_free_pages((void *) l1_phys, 1, false);
+    }
+
+    if (vmm_is_table_empty(l2_table)) {
+        uintptr_t l2_phys = ((uintptr_t) l2_table - hhdm_offset);
+        *l3e = 0;
+        pmm_free_pages((void *) l2_phys, 1, false);
+    }
+
+    if (vmm_is_table_empty(l3_table)) {
+        uintptr_t l3_phys = ((uintptr_t) l3_table - hhdm_offset);
+        *l4e = 0;
+        pmm_free_pages((void *) l3_phys, 1, false);
+    }
 }
 
 uintptr_t vmm_get_phys(uintptr_t virt) {
