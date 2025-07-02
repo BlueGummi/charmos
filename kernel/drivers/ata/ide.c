@@ -106,3 +106,20 @@ void ide_identify(struct ata_drive *drive) {
 
     drive->pio_mode = buf[64] & 0x03;
 }
+
+struct generic_disk *ide_create_generic(struct ata_drive *ide) {
+    ide_identify(ide);
+    if (!ide->actually_exists)
+        return NULL;
+
+    struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
+    d->type = G_IDE_DRIVE;
+    d->driver_data = ide;
+    d->sector_size = ide->sector_size;
+    d->read_sector = ide_read_sector_wrapper;
+    d->write_sector = ide_write_sector_wrapper;
+    d->print = ide_print_info;
+    d->cache = kmalloc(sizeof(struct bcache));
+    bcache_init(d->cache, DEFAULT_BLOCK_CACHE_SIZE);
+    return d;
+}
