@@ -24,7 +24,13 @@ make run # run this in the build directory
 
 ### TODO:
 
-- [ ] async io operations
+- [x] blkdev bcache
+
+- [ ] bcache async io prefetch
+
+- [x] mlfq smp work stealing scheduler
+
+- [x] async blkdev io operations
 
 - [ ] ports for programs
 
@@ -32,10 +38,9 @@ make run # run this in the build directory
 
 - [ ] ia32 port + gub support
 
-- [ ] finish up vfs and add cache
+- [ ] finish up vfs and add page cache
 
 - [ ] more drivers + finish xhci
 
 - [ ] networking :boom: + networking stack :boom: :boom:
 
-- [ ] do not report every FS error as an internal error

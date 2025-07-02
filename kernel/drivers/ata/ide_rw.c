@@ -2,9 +2,9 @@
 #include <console/printf.h>
 #include <devices/generic_disk.h>
 #include <drivers/ata.h>
+#include <drivers/pci.h>
 #include <fs/ext2.h>
 #include <mem/alloc.h>
-#include <drivers/pci.h>
 #include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -102,7 +102,7 @@ bool ide_read_sector_wrapper(struct generic_disk *d, uint64_t lba, uint8_t *buf,
                 success = true;
                 break;
             }
-            k_printf("[IDE] Read error at LBA %llu. Retrying...\n", lba);
+            k_info("IDE", K_WARN, "read error at LBA %u. Retrying...\n", lba);
         }
         if (!success)
             return false;
@@ -128,7 +128,7 @@ bool ide_write_sector_wrapper(struct generic_disk *d, uint64_t lba,
                 success = true;
                 break;
             }
-            k_printf("[IDE] Write error at LBA %llu. Retrying...\n", lba);
+            k_info("IDE", K_WARN, "write error at LBA %u. Retrying...\n", lba);
         }
         if (!success)
             return false;
