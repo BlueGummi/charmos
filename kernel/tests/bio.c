@@ -27,43 +27,38 @@ REGISTER_TEST(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct ext2_fs *fs = root->fs_data;
     struct generic_disk *d = fs->drive;
 
-    struct bio_request bio = {
-        .lba = 0,
-        .buffer = kmalloc_aligned(512, 4096),
-        .size = 512,
-        .sector_count = 1,
-        .write = false,
-        .done = false,
-        .status = -1,
-        .on_complete = bio_callback,
-        .user_data = NULL,
-        .wait_queue = {0},
-    };
+    for (int i = 0; i < 10; i++) {
+        struct bio_request bio = {
+            .lba = 0,
+            .buffer = kmalloc_aligned(512, 4096),
+            .size = 512,
+            .sector_count = 1,
+            .write = false,
+            .done = false,
+            .status = -1,
+            .on_complete = bio_callback,
+            .user_data = NULL,
+            .wait_queue = {0},
+        };
 
-    if (!d->submit_bio_async) {
-        SET_SKIP;
-        ADD_MESSAGE("BIO function is NULL");
-        return;
-    }
-    
-    bool submitted = d->submit_bio_async(d, &bio);
-    if (!submitted) {
-        kfree_aligned(bio.buffer);
-        SET_FAIL;
-        return;
-    }
-
-    uint64_t timeout = 100 * 1000;
-    while (!done && timeout--) {
-        sleep_us(10);
-        if (timeout == 0) {
-            SET_FAIL;
+        if (!d->submit_bio_async) {
+            SET_SKIP;
+            ADD_MESSAGE("BIO function is NULL");
+            return;
         }
+
+        bool submitted = d->submit_bio_async(d, &bio);
+        if (!submitted) {
+            kfree_aligned(bio.buffer);
+            SET_FAIL;
+            return;
+        }
+
+        sleep_ms(1);
+
+        TEST_ASSERT(bio.status == 0);
+        TEST_ASSERT(done == true);
+        kfree_aligned(bio.buffer);
     }
-
-    TEST_ASSERT(bio.status == 0);
-    TEST_ASSERT(done == true);
-
-    kfree_aligned(bio.buffer);
     SET_SUCCESS;
 }

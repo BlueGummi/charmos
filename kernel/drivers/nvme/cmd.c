@@ -43,6 +43,7 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
             if (req->on_complete)
                 req->on_complete(req);
         }
+        dev->io_requests[qid][cid] = NULL;
 
         queue->cq_head = (queue->cq_head + 1) % queue->cq_depth;
         if (queue->cq_head == 0)
