@@ -158,6 +158,10 @@ int idt_alloc_entry(void) {
     return idt_alloc_entry_on_core(get_sch_core_id());
 }
 
+void idt_set_alloc(int entry, uint64_t c, bool used) {
+    idt_entry_used[c][entry] = used;
+}
+
 bool idt_is_installed(int entry) {
     return idt_entry_used[entry];
 }
@@ -166,7 +170,7 @@ void idt_free_entry(int entry) {
     if (entry < 32 || entry >= MAX_IDT_ENTRIES)
         return;
 
-    idt_entry_used[entry] = false;
+    idt_entry_used[get_sch_core_id()][entry] = false;
 }
 
 void idt_install(uint64_t ind) {

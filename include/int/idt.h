@@ -50,6 +50,7 @@ void idt_alloc(uint64_t size);
 void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
                   uint64_t ind);
 
+void idt_set_alloc(int entry, uint64_t c, bool used);
 int idt_alloc_entry(void);
 int idt_alloc_entry_on_core(uint64_t core);
 void idt_free_entry(int entry);
