@@ -133,7 +133,6 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
 
     isr_register(this_isr, nvme_isr_handler, nvme, qid - 1);
 
-
     if (nvme_submit_admin_cmd(nvme, &cq_cmd, NULL) != 0) {
         nvme_info(K_ERROR, "failed to create IOCQ %u, code 0x%x, ISR %u", qid,
                   cq_cmd.opc, this_isr);
