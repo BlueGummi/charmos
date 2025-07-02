@@ -59,6 +59,19 @@ enum ide_type {
     IDE_TYPE_ATAPI,
 };
 
+struct ide_request {
+    uint64_t lba;
+    void *buffer;
+    uint64_t size;
+    uint64_t sector_count;
+    bool write;
+    volatile bool done;
+    int status;
+
+    void (*on_complete)(struct ide_request *);
+    void *user_data;
+};
+
 struct ata_drive {
     bool actually_exists; // it picks everything up
     uint32_t sector_size;

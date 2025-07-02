@@ -155,3 +155,33 @@ bool nvme_write_sector_wrapper(struct generic_disk *disk, uint64_t lba,
     }
     return true;
 }
+
+bool nvme_write_sector_async_wrapper(struct generic_disk *disk, uint64_t lba,
+                                     const uint8_t *buf, uint64_t cnt,
+                                     struct nvme_request *req) {
+    while (cnt > 0) {
+        uint16_t chunk = (cnt > 65535) ? 65535 : (uint16_t) cnt;
+        if (!nvme_write_sector_async(disk, lba, buf, chunk, req))
+            return false;
+
+        lba += chunk;
+        buf += chunk * 512;
+        cnt -= chunk;
+    }
+    return true;
+}
+
+bool nvme_read_sector_async_wrapper(struct generic_disk *disk, uint64_t lba,
+                                    uint8_t *buf, uint64_t cnt,
+                                    struct nvme_request *req) {
+    while (cnt > 0) {
+        uint16_t chunk = (cnt > 65535) ? 65535 : (uint16_t) cnt;
+        if (!nvme_read_sector_async(disk, lba, buf, chunk, req))
+            return false;
+
+        lba += chunk;
+        buf += chunk * 512;
+        cnt -= chunk;
+    }
+    return true;
+}

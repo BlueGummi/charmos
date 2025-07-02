@@ -63,8 +63,6 @@ struct bio_request {
     void (*on_complete)(struct bio_request *); // optional
     void *user_data;
 
-    struct thread_queue wait_queue;
-
     // driver-private data
     void *driver_private;
 };
