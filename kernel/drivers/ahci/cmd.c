@@ -202,10 +202,10 @@ bool ahci_submit_bio_request(struct generic_disk *disk,
     ahci_req->user_data = bio;
 
     if (bio->write) {
-        return ahci_write_sector_async(disk, bio->lba, bio->buffer,
-                                       bio->sector_count, ahci_req);
+        return ahci_write_sector_async_wrapper(disk, bio->lba, bio->buffer,
+                                               bio->sector_count, ahci_req);
     } else {
-        return ahci_read_sector_async(disk, bio->lba, bio->buffer,
-                                      bio->sector_count, ahci_req);
+        return ahci_read_sector_async_wrapper(disk, bio->lba, bio->buffer,
+                                              bio->sector_count, ahci_req);
     }
 }

@@ -312,8 +312,16 @@ bool ahci_read_sector_async(struct generic_disk *disk, uint64_t lba,
 bool ahci_read_sector_wrapper(struct generic_disk *disk, uint64_t lba,
                               uint8_t *buf, uint64_t cnt);
 
+bool ahci_read_sector_async_wrapper(struct generic_disk *disk, uint64_t lba,
+                                    uint8_t *buf, uint64_t cnt,
+                                    struct ahci_request *req);
+
 bool ahci_write_sector_wrapper(struct generic_disk *disk, uint64_t lba,
                                const uint8_t *buf, uint64_t cnt);
+
+bool ahci_write_sector_async_wrapper(struct generic_disk *disk, uint64_t lba,
+                                     const uint8_t *buf, uint64_t cnt,
+                                     struct ahci_request *req);
 
 bool ahci_submit_bio_request(struct generic_disk *disk,
                              struct bio_request *bio);

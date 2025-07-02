@@ -145,3 +145,35 @@ bool ahci_write_sector_wrapper(struct generic_disk *disk, uint64_t lba,
     }
     return true;
 }
+
+bool ahci_write_sector_async_wrapper(struct generic_disk *disk, uint64_t lba,
+                                     const uint8_t *buf, uint64_t cnt,
+                                     struct ahci_request *req) {
+    while (cnt > 0) {
+        uint16_t chunk = (cnt > 65535) ? 0 : (uint16_t) cnt;
+        if (!ahci_write_sector_async(disk, lba, buf, chunk, req))
+            return false;
+
+        uint64_t sectors = (chunk == 0) ? 65536 : chunk;
+        lba += sectors;
+        buf += sectors * 512;
+        cnt -= sectors;
+    }
+    return true;
+}
+
+bool ahci_read_sector_async_wrapper(struct generic_disk *disk, uint64_t lba,
+                                    uint8_t *buf, uint64_t cnt,
+                                    struct ahci_request *req) {
+    while (cnt > 0) {
+        uint16_t chunk = (cnt > 65535) ? 0 : (uint16_t) cnt;
+        if (!ahci_read_sector_async(disk, lba, buf, chunk, req))
+            return false;
+
+        uint64_t sectors = (chunk == 0) ? 65536 : chunk;
+        lba += sectors;
+        buf += sectors * 512;
+        cnt -= sectors;
+    }
+    return true;
+}
