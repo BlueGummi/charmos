@@ -52,6 +52,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme->doorbell_stride = 4U << dstrd;
     nvme->page_size = PAGE_SIZE;
     nvme->cap = cap;
+
     nvme->version = version;
     nvme->regs = regs;
     nvme->isr_index = nvme_isr;
@@ -75,11 +76,14 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
 
     mmio_write_32(&nvme->regs->cc, cc.raw);
 
+    uint64_t core_count = scheduler_get_core_count();
+
     nvme_alloc_admin_queues(nvme);
     nvme_setup_admin_queues(nvme);
     nvme_enable_controller(nvme);
+    nvme_set_num_queues(nvme, core_count, core_count);
     nvme_alloc_io_queues(nvme, 1);
-    nvme_identify_controller(nvme);
+
     // TODO: many IO queues
     nvme->io_waiters = kzalloc(sizeof(struct thread *) * 2);
     nvme->io_statuses = kzalloc(sizeof(uint16_t *) * 2);

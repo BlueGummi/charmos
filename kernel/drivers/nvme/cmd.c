@@ -80,7 +80,7 @@ void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
 
 /* this doesnt do interrupt driven IO since it is done once */
 uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
-                               struct nvme_command *cmd) {
+                               struct nvme_command *cmd, uint32_t *dw0_out) {
     uint16_t tail = nvme->admin_sq_tail;
     uint16_t next_tail = (tail + 1) % nvme->admin_q_depth;
 
@@ -106,6 +106,8 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
                     nvme->admin_cq_phase ^= 1;
 
                 mmio_write_32(nvme->admin_cq_db, nvme->admin_cq_head);
+                if (dw0_out)
+                    *dw0_out = entry->result;
                 return status;
             }
         }
@@ -170,7 +172,7 @@ uint8_t *nvme_identify_controller(struct nvme_device *nvme) {
     cmd.prp1 = buffer_phys;
     cmd.cdw10 = 1; // identify controller
 
-    uint16_t status = nvme_submit_admin_cmd(nvme, &cmd);
+    uint16_t status = nvme_submit_admin_cmd(nvme, &cmd, NULL);
 
     if (status) {
         nvme_info(K_ERROR, "IDENTIFY failed! Status: 0x%04X\n", status);
@@ -179,6 +181,35 @@ uint8_t *nvme_identify_controller(struct nvme_device *nvme) {
 
     uint8_t *data = (uint8_t *) buffer;
     return data;
+}
+
+uint32_t nvme_set_num_queues(struct nvme_device *nvme, uint16_t desired_sq,
+                             uint16_t desired_cq) {
+    struct nvme_command cmd = {0};
+    cmd.opc = NVME_OP_ADMIN_SET_FEATS;
+    cmd.cdw10 = 0x07;
+    cmd.cdw11 =
+        ((uint32_t) (desired_cq - 1) << 16) | ((desired_sq - 1) & 0xFFFF);
+
+    uint32_t cdw0;
+    uint16_t status = nvme_submit_admin_cmd(nvme, &cmd, &cdw0);
+
+    if (status) {
+        nvme_info(K_ERROR,
+                  "SET FEATURES (Number of Queues) failed! Status: 0x%04X",
+                  status);
+        return 0;
+    }
+
+    uint16_t actual_sq = (cdw0 & 0xFFFF) + 1;
+    uint16_t actual_cq = ((cdw0 >> 16) & 0xFFFF) + 1;
+
+    nvme_info(
+        K_INFO,
+        "Controller supports %u submission queues and %u completion queues",
+        actual_sq, actual_cq);
+
+    return (actual_cq << 16) | actual_sq;
 }
 
 uint8_t *nvme_identify_namespace(struct nvme_device *nvme, uint32_t nsid) {
@@ -195,11 +226,10 @@ uint8_t *nvme_identify_namespace(struct nvme_device *nvme, uint32_t nsid) {
     cmd.prp1 = buffer_phys;
     cmd.cdw10 = 0; // Identify Namespace (CNS=0)
 
-    uint16_t status = nvme_submit_admin_cmd(nvme, &cmd);
+    uint16_t status = nvme_submit_admin_cmd(nvme, &cmd, NULL);
 
     if (status) {
-        nvme_info(K_ERROR, "IDENTIFY namespace failed! Status: 0x%04X\n",
-                  status);
+        nvme_info(K_ERROR, "IDENTIFY namespace failed! Status: 0x%04X", status);
         return NULL;
     }
 

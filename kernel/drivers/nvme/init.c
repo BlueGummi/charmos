@@ -132,7 +132,7 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
 
     isr_register(nvme->isr_index, nvme_isr_handler, nvme, 0);
 
-    if (nvme_submit_admin_cmd(nvme, &cq_cmd) != 0) {
+    if (nvme_submit_admin_cmd(nvme, &cq_cmd, NULL) != 0) {
         nvme_info(K_ERROR, "failed to create IOCQ - code 0x%x", cq_cmd);
         return;
     }
@@ -145,7 +145,7 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
     sq_cmd.cdw10 = (63) << 16 | 1;
     sq_cmd.cdw11 = qid << 16 | 1;
 
-    if (nvme_submit_admin_cmd(nvme, &sq_cmd) != 0) {
+    if (nvme_submit_admin_cmd(nvme, &sq_cmd, NULL) != 0) {
         nvme_info(K_ERROR, "failed to create IOSQ - code 0x%x", sq_cmd);
         return;
     }
