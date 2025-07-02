@@ -23,6 +23,7 @@ enum errno ext2_write_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
         bool allocate = (size - bytes_written > 0);
         uint32_t block_num = ext2_get_or_set_block(
             fs, &inode->node, block_index, 0, allocate, &new_block);
+
         if (new_block) {
             new_block_counter += 1;
         }
@@ -133,7 +134,7 @@ enum errno ext2_read_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
                                 .buffer = buffer,
                                 .bytes_read = 0};
 
-    ext2_traverse_inode_blocks(fs, &inode->node, file_read_visitor, &ctx);
+    ext2_traverse_inode_blocks(fs, &inode->node, file_read_visitor, &ctx, true);
     inode->node.atime = time_get_unix();
     ext2_inode_write(fs, inode->inode_num, &inode->node);
     return ERR_OK;

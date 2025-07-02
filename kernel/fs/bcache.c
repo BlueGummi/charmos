@@ -5,6 +5,7 @@
 #include <stdatomic.h>
 
 #define ALIGN_DOWN(x, align) ((x) & ~((align) - 1))
+#define ALIGN_UP(x, align) (((x) + ((align) - 1)) & ~((align) - 1))
 
 static uint8_t *get_lba_offset_buffer(struct bcache_entry *ent, uint64_t lba,
                                       uint64_t spb, uint64_t block_size) {
@@ -12,10 +13,17 @@ static uint8_t *get_lba_offset_buffer(struct bcache_entry *ent, uint64_t lba,
     uint64_t offset_bytes = (block_size / spb) * offset_lba;
     return ent->buffer + offset_bytes;
 }
+
 static bool remove(struct bcache *cache, uint64_t key, uint64_t spb);
+
 static bool insert(struct bcache *cache, uint64_t key,
                    struct bcache_entry *value);
+
 static struct bcache_entry *get(struct bcache *cache, uint64_t key);
+
+/* prefetch is asynchronous */
+static void prefetch(struct generic_disk *disk, struct bcache *cache,
+                     uint64_t lba, uint64_t block_size, uint64_t spb);
 
 /* sleeping locks aren't necessary here because there isn't
  * going to be a long wait for cache accesses - hopefullly
@@ -153,6 +161,58 @@ static bool remove(struct bcache *cache, uint64_t key, uint64_t spb) {
     return false;
 }
 
+struct bcache_pf_data {
+    struct bcache_entry *new_entry;
+    struct bcache *cache;
+};
+
+static void prefetch_callback(struct bio_request *bio) {
+    struct bcache_pf_data *data = bio->user_data;
+    struct bcache_entry *ent = data->new_entry;
+    struct bcache *cache = data->cache;
+    ent->buffer = bio->buffer;
+    ent->lba = bio->lba;
+    ent->dirty = false;
+    ent->no_evict = false;
+    ent->size = bio->size;
+    insert(cache, bio->lba, ent);
+    kfree(data);
+}
+
+static void prefetch(struct generic_disk *disk, struct bcache *cache,
+                     uint64_t lba, uint64_t block_size, uint64_t spb) {
+
+    uint64_t base_lba = ALIGN_DOWN(lba, spb);
+
+    /* no need to re-prefetch existing LBA */
+    if (get(cache, base_lba))
+        return;
+
+    struct bio_request *req = kmalloc(sizeof(struct bio_request));
+    struct bcache_pf_data *pf = kmalloc(sizeof(struct bcache_pf_data));
+    pf->cache = cache;
+    pf->new_entry = kmalloc(sizeof(struct bcache_entry));
+
+    req->buffer = kmalloc_aligned(block_size, PAGE_SIZE);
+    req->disk = disk;
+    req->lba = base_lba;
+    req->done = false;
+    req->sector_count = spb;
+    req->status = -1;
+    req->write = false;
+    req->user_data = pf;
+    req->on_complete = prefetch_callback;
+
+    disk->submit_bio_async(disk, req);
+}
+
+void bcache_prefetch_async(struct generic_disk *disk, uint64_t lba,
+                           uint64_t block_size, uint64_t spb) {
+    uint64_t aligned = ALIGN_DOWN(lba, spb);
+
+    prefetch(disk, disk->cache, aligned, block_size, spb);
+}
+
 static bool evict(struct bcache *cache, uint64_t spb) {
     bool ints = spin_lock(&cache->lock);
 
@@ -189,14 +249,6 @@ void bcache_destroy(struct bcache *cache) {
     cache->entries = NULL;
     cache->capacity = 0;
     cache->count = 0;
-}
-
-void bcache_ent_lock(struct bcache_entry *ent) {
-    return mutex_lock(&ent->lock);
-}
-
-void bcache_ent_unlock(struct bcache_entry *ent) {
-    return mutex_unlock(&ent->lock);
 }
 
 struct bcache_entry *bcache_get(struct generic_disk *disk, uint64_t lba,
@@ -268,4 +320,12 @@ struct bcache_entry *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
         get_lba_offset_buffer(ent, lba, sectors_per_block, block_size);
     shallow->lba = lba;
     return shallow;
+}
+
+void bcache_ent_lock(struct bcache_entry *ent) {
+    return mutex_lock(&ent->lock);
+}
+
+void bcache_ent_unlock(struct bcache_entry *ent) {
+    return mutex_unlock(&ent->lock);
 }

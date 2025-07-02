@@ -26,7 +26,7 @@ struct bcache_entry {
 };
 
 struct bcache_wrapper {
-    uint64_t key;                    // block number
+    uint64_t key;               // block number
     struct bcache_entry *value; // pointer to cache entry
     bool occupied;
 };
@@ -52,17 +52,22 @@ static inline uint64_t bcache_hash(uint64_t x, uint64_t capacity) {
 void bcache_init(struct bcache *cache, uint64_t capacity);
 void bcache_ent_unlock(struct bcache_entry *ent);
 void bcache_ent_lock(struct bcache_entry *ent);
+
 struct bcache_entry *bcache_get(struct generic_disk *disk, uint64_t lba,
-                                     uint64_t block_size, uint64_t spb, bool);
+                                uint64_t block_size, uint64_t spb, bool);
 
 bool bcache_insert(struct generic_disk *disk, uint64_t lba,
                    struct bcache_entry *ent, uint64_t spb);
+
 bool bcache_evict(struct generic_disk *disk, uint64_t spb);
 
-struct bcache_entry *bcache_create_ent(struct generic_disk *disk,
-                                            uint64_t lba, uint64_t block_size,
-                                            uint64_t sectors_per_block,
-                                            bool no_evict);
+void bcache_prefetch_async(struct generic_disk *disk, uint64_t lba,
+                           uint64_t block_size, uint64_t spb);
+
+struct bcache_entry *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
+                                       uint64_t block_size,
+                                       uint64_t sectors_per_block,
+                                       bool no_evict);
 
 static inline void bcache_increment_ticks(struct bcache *cache) {
     atomic_fetch_add(&cache->ticks, 1);

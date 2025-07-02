@@ -78,7 +78,7 @@ static void unlink_free_blocks(struct ext2_fs *fs,
                                struct ext2_full_inode *target_inode,
                                uint32_t inode_num) {
     ext2_traverse_inode_blocks(fs, &target_inode->node, free_block_visitor,
-                               NULL);
+                               NULL, false);
     ext2_free_inode(fs, inode_num);
 }
 

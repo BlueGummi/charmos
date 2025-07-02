@@ -128,9 +128,19 @@ bool ext2_walk_dir(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
     return false;
 }
 
+static void readahead_indirect_entries(struct ext2_fs *fs, uint32_t *entries,
+                                       uint32_t count, uint32_t start_index) {
+    for (uint32_t j = 1; j <= 2 && (start_index + j) < count; j++) {
+        uint32_t next = entries[start_index + j];
+        if (next)
+            ext2_prefetch_block(fs, next);
+    }
+}
+
 static void traverse_indirect(struct ext2_fs *fs, struct ext2_inode *inode,
                               uint32_t block_num, int depth,
-                              ext2_block_visitor visitor, void *user_data) {
+                              ext2_block_visitor visitor, void *user_data,
+                              bool readahead) {
     if (depth <= 0 || block_num == 0)
         return;
 
@@ -147,8 +157,12 @@ static void traverse_indirect(struct ext2_fs *fs, struct ext2_inode *inode,
         }
 
         if (depth > 1 && block[i]) {
+            if (readahead)
+                readahead_indirect_entries(
+                    fs, block, fs->block_size / sizeof(uint32_t), i);
+
             traverse_indirect(fs, inode, block[i], depth - 1, visitor,
-                              user_data);
+                              user_data, readahead);
         }
     }
 
@@ -157,17 +171,24 @@ static void traverse_indirect(struct ext2_fs *fs, struct ext2_inode *inode,
 }
 
 void ext2_traverse_inode_blocks(struct ext2_fs *fs, struct ext2_inode *inode,
-                                ext2_block_visitor visitor, void *user_data) {
+                                ext2_block_visitor visitor, void *user_data,
+                                bool readahead) {
     for (int i = 0; i < 12; i++) {
+        if (readahead)
+            ext2_prefetch_block(fs, inode->block[i]);
+
         visitor(fs, inode, 0, &inode->block[i], user_data);
     }
 
     if (inode->block[12])
-        traverse_indirect(fs, inode, inode->block[12], 1, visitor, user_data);
+        traverse_indirect(fs, inode, inode->block[12], 1, visitor, user_data,
+                          readahead);
 
     if (inode->block[13])
-        traverse_indirect(fs, inode, inode->block[13], 2, visitor, user_data);
+        traverse_indirect(fs, inode, inode->block[13], 2, visitor, user_data,
+                          readahead);
 
     if (inode->block[14])
-        traverse_indirect(fs, inode, inode->block[14], 3, visitor, user_data);
+        traverse_indirect(fs, inode, inode->block[14], 3, visitor, user_data,
+                          readahead);
 }

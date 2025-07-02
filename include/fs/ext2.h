@@ -282,6 +282,8 @@ uint32_t ext2_get_block_group(struct ext2_fs *fs, uint32_t block);
 bool ext2_fs_lock(struct ext2_fs *fs);
 void ext2_fs_unlock(struct ext2_fs *fs, bool i);
 
+void ext2_prefetch_block(struct ext2_fs *fs, uint32_t block);
+
 //
 //
 // Higher level stuff
@@ -357,7 +359,8 @@ bool ext2_walk_dir(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
                    dir_entry_callback cb, void *ctx, bool ff_avail);
 
 void ext2_traverse_inode_blocks(struct ext2_fs *fs, struct ext2_inode *inode,
-                                ext2_block_visitor visitor, void *user_data);
+                                ext2_block_visitor visitor, void *user_data,
+                                bool readahead);
 
 void ext2_g_print(struct generic_partition *);
 
