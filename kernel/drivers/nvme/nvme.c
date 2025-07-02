@@ -109,7 +109,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
         nvme->io_waiters[i] =
             kzalloc(sizeof(struct thread *) * nvme->io_queues[i]->sq_depth);
         nvme->io_statuses[i] = kzalloc(sizeof(uint16_t) * dep);
-        nvme->io_requests[i] = kzalloc(sizeof(struct nvme_request) * 64);
+        nvme->io_requests[i] = kzalloc(sizeof(struct nvme_request *) * 64);
     }
 
     return nvme;

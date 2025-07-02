@@ -26,13 +26,14 @@ REGISTER_TEST(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     EXT2_INIT;
     struct ext2_fs *fs = root->fs_data;
     struct generic_disk *d = fs->drive;
+    uint64_t run_times = 1;
 
-    for (int i = 0; i < 10; i++) {
+    for (uint64_t i = 0; i < run_times; i++) {
         struct bio_request bio = {
             .lba = 0,
             .buffer = kmalloc_aligned(512, 4096),
             .size = 512,
-            .sector_count = 1,
+            .sector_count = 512 * 512,
             .write = false,
             .done = false,
             .status = -1,
@@ -53,11 +54,12 @@ REGISTER_TEST(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
             return;
         }
 
-        sleep_ms(1);
+        sleep_ms(3);
 
         TEST_ASSERT(bio.status == 0);
-        TEST_ASSERT(done == true);
         kfree_aligned(bio.buffer);
     }
+    TEST_ASSERT(done == true);
+    TEST_ASSERT(current_test->message_count == run_times);
     SET_SUCCESS;
 }

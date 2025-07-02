@@ -21,13 +21,13 @@ void serial_init() {
     outb(0x3F8 + 4, 0x0B);
 }
 
-/*static int serial_is_transmit_empty() {
+static int serial_is_transmit_empty() {
     return inb(0x3F8 + 5) & 0x20;
-}*/
+}
 
 static void serial_putc(char c) {
-    //    while (serial_is_transmit_empty() == 0)
-    //        ;
+    while (serial_is_transmit_empty() == 0)
+        ;
     outb(0x3F8, c);
 }
 
@@ -386,12 +386,12 @@ void v_k_printf(const char *format, va_list args) {
 }
 
 void k_printf(const char *format, ...) {
-    spin_lock_no_cli(&k_printf_lock);
+    bool i = spin_lock(&k_printf_lock);
     va_list args;
     va_start(args, format);
     v_k_printf(format, args);
     va_end(args);
-    spin_unlock_no_cli(&k_printf_lock);
+    spin_unlock(&k_printf_lock, i);
 }
 
 void panic(const char *format, ...) {

@@ -17,11 +17,11 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
     while (true) {
         struct nvme_completion *entry = &queue->cq[queue->cq_head];
 
-        if ((entry->status & 1) != queue->cq_phase)
+        if ((mmio_read_32(&entry->status) & 1) != queue->cq_phase)
             break;
 
-        uint16_t cid = entry->cid;
-        uint16_t status = entry->status & 0xFFFE;
+        uint16_t cid = mmio_read_32(&entry->cid);
+        uint16_t status = mmio_read_32(&entry->status) & 0xFFFE;
 
         struct thread *t = dev->io_waiters[qid][cid];
         if (t) {
@@ -36,24 +36,26 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
             lapic_send_ipi(c, SCHEDULER_ID);
         }
 
+        struct nvme_request *req = dev->io_requests[qid][cid];
+
+        if (!req)
+            goto skip;
+
+        if (--req->remaining_parts == 0) {
+            req->done = true;
+            req->status = 0;
+            if (req->on_complete)
+                req->on_complete(req);
+
+            dev->io_requests[qid][cid] = NULL;
+        }
+
+    skip:
         queue->cq_head = (queue->cq_head + 1) % queue->cq_depth;
         if (queue->cq_head == 0)
             queue->cq_phase ^= 1;
 
         mmio_write_32(queue->cq_db, queue->cq_head);
-
-        struct nvme_request *req = dev->io_requests[qid][cid];
-
-        if (!req)
-            continue;
-
-        if (req->trigger_completion) {
-            req->done = true;
-            req->status = 0;
-            if (req->on_complete)
-                req->on_complete(req);
-            dev->io_requests[qid][cid] = NULL;
-        }
     }
 }
 
@@ -147,7 +149,6 @@ bool nvme_submit_bio_request(struct generic_disk *disk,
     req->size = bio->size;
     req->write = bio->write;
     req->user_data = bio;
-    req->trigger_completion = false;
 
     req->on_complete = nvme_on_bio_complete;
 

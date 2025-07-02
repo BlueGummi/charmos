@@ -3,6 +3,7 @@
 #include <mem/vmm.h>
 #include <sch/thread.h>
 #include <spin_lock.h>
+#include <stdatomic.h>
 #include <stdint.h>
 
 #define NVME_CMD_TIMEOUT_MS 2000    // Normal command timeout
@@ -83,11 +84,9 @@ struct nvme_request {
     uint64_t sector_count;
     bool write;
 
-    /* do this on the last r/w */
-    bool trigger_completion;
-
     volatile bool done;
     int status;
+    volatile int remaining_parts;
 
     void (*on_complete)(struct nvme_request *);
     void *user_data;
