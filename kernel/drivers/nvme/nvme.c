@@ -89,7 +89,9 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme->io_waiters[1] =
         kzalloc(sizeof(struct thread *) * nvme->io_queues[1]->sq_depth);
     nvme->io_statuses[1] = kzalloc(sizeof(uint16_t) * dep);
-    nvme->io_requests[1] = kzalloc(sizeof(struct nvme_request));
+
+    /* 64 SQEs */
+    nvme->io_requests[1] = kzalloc(sizeof(struct nvme_request) * 64);
 
     return nvme;
 }
@@ -111,7 +113,7 @@ struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {
     d->sector_size = 512;
     d->read_sector = nvme_read_sector_wrapper;
     d->write_sector = nvme_write_sector_wrapper;
-    d->submit_bio_async = NULL;
+    d->submit_bio_async = nvme_submit_bio_request;
     d->print = nvme_print_wrapper;
     d->cache = kmalloc(sizeof(struct bcache));
     bcache_init(d->cache, DEFAULT_BLOCK_CACHE_SIZE);

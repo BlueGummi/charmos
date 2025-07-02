@@ -126,8 +126,8 @@ struct nvme_device {
     uint16_t admin_q_depth;
     uint8_t admin_cq_phase;
 
-    struct nvme_request **io_requests;
     struct nvme_queue **io_queues;
+    struct nvme_request ***io_requests;
     struct thread ***io_waiters;
     uint16_t **io_statuses;
     uint8_t isr_index;
@@ -225,7 +225,7 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
                                struct nvme_command *cmd);
 
 void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
-                        uint32_t qid);
+                        uint32_t qid, struct nvme_request *req);
 
 uint8_t *nvme_identify_controller(struct nvme_device *nvme);
 uint8_t *nvme_identify_namespace(struct nvme_device *nvme, uint32_t nsid);
@@ -238,8 +238,18 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
 struct generic_disk *nvme_create_generic(struct nvme_device *nvme);
 void nvme_print_identify(const struct nvme_identify_controller *ctrl);
 void nvme_print_namespace(const struct nvme_identify_namespace *ns);
+
+bool nvme_read_sector_async(struct generic_disk *disk, uint64_t lba,
+                            uint8_t *buffer, uint16_t count,
+                            struct nvme_request *req);
+
 bool nvme_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
                       uint16_t cnt);
+
+bool nvme_write_sector_async(struct generic_disk *disk, uint64_t lba,
+                             const uint8_t *buffer, uint16_t count,
+                             struct nvme_request *req);
+
 bool nvme_write_sector(struct generic_disk *disk, uint64_t lba,
                        const uint8_t *buffer, uint16_t cnt);
 
@@ -249,3 +259,6 @@ bool nvme_read_sector_wrapper(struct generic_disk *disk, uint64_t lba,
 bool nvme_write_sector_wrapper(struct generic_disk *disk, uint64_t lba,
                                const uint8_t *buf, uint64_t cnt);
 void nvme_isr_handler(void *ctx, uint8_t vector, void *rsp);
+
+bool nvme_submit_bio_request(struct generic_disk *disk,
+                             struct bio_request *bio);

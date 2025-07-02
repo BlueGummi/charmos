@@ -36,6 +36,14 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
             lapic_send_ipi(c, SCHEDULER_ID);
         }
 
+        struct nvme_request *req = dev->io_requests[qid][cid];
+        if (req) {
+            req->done = true;
+            req->status = 0;
+            if (req->on_complete)
+                req->on_complete(req);
+        }
+
         queue->cq_head = (queue->cq_head + 1) % queue->cq_depth;
         if (queue->cq_head == 0)
             queue->cq_phase ^= 1;
@@ -53,7 +61,7 @@ void nvme_isr_handler(void *ctx, uint8_t vector, void *rsp) {
 }
 
 void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
-                        uint32_t qid) {
+                        uint32_t qid, struct nvme_request *req) {
     struct nvme_queue *this_queue = nvme->io_queues[qid];
 
     uint16_t tail = this_queue->sq_tail;
@@ -62,6 +70,7 @@ void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
     cmd->cid = tail;
     this_queue->sq[tail] = *cmd;
 
+    nvme->io_requests[qid][tail] = req;
     nvme->io_statuses[qid][tail] = 0xFFFF; // In-flight
 
     this_queue->sq_tail = next_tail;
@@ -103,6 +112,46 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
         timeout--;
         if (timeout == 0)
             return 0xFFFF;
+    }
+}
+
+static void nvme_on_bio_complete(struct nvme_request *req) {
+    struct bio_request *bio = (struct bio_request *) req->user_data;
+
+    bio->done = true;
+    bio->status = req->status;
+
+    if (bio->on_complete)
+        bio->on_complete(bio);
+
+    kfree(req);
+}
+
+bool nvme_submit_bio_request(struct generic_disk *disk,
+                             struct bio_request *bio) {
+    struct nvme_request *req = kmalloc(sizeof(struct nvme_request));
+    if (!req)
+        return false;
+
+    req->buffer = bio->buffer;
+    req->done = false;
+    req->lba = bio->lba;
+
+    /* TODO: many IO queues */
+    req->qid = 1;
+    req->sector_count = bio->sector_count;
+    req->size = bio->size;
+    req->write = bio->write;
+    req->user_data = bio;
+
+    req->on_complete = nvme_on_bio_complete;
+
+    if (bio->write) {
+        return nvme_write_sector_async(disk, bio->lba, bio->buffer,
+                                       bio->sector_count, req);
+    } else {
+        return nvme_read_sector_async(disk, bio->lba, bio->buffer,
+                                      bio->sector_count, req);
     }
 }
 

@@ -9,12 +9,18 @@
 #include <stdint.h>
 
 /* TODO: many IO queues */
+
+/* I should have a mapping of 
+ * core numbers to their 
+ * respective queue numbers - array */
+
 bool nvme_read_sector_async(struct generic_disk *disk, uint64_t lba,
-                            uint8_t *buffer, uint16_t count) {
+                            uint8_t *buffer, uint16_t count,
+                            struct nvme_request *req) {
     struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
 
     uint64_t total_bytes = count * 512;
-    uint64_t pages_needed = (total_bytes + 4095) / PAGE_SIZE;
+    uint64_t pages_needed = (total_bytes + PAGE_SIZE - 1) / PAGE_SIZE;
 
     uint64_t buffer_phys = (uint64_t) vmm_get_phys((uint64_t) buffer);
     if (!buffer_phys)
@@ -33,17 +39,25 @@ bool nvme_read_sector_async(struct generic_disk *disk, uint64_t lba,
     cmd.cdw11 = lba >> 32;
     cmd.cdw12 = count - 1;
 
-    nvme_submit_io_cmd(nvme, &cmd, 1);
+    req->lba = lba;
+    req->buffer = buffer;
+    req->sector_count = count;
+    req->write = false;
+    req->done = false;
+    req->status = -1;
+
+    nvme_submit_io_cmd(nvme, &cmd, 1, req);
 
     return true;
 }
 
 bool nvme_write_sector_async(struct generic_disk *disk, uint64_t lba,
-                             const uint8_t *buffer, uint16_t count) {
+                             const uint8_t *buffer, uint16_t count,
+                             struct nvme_request *req) {
     struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
 
     uint64_t total_bytes = count * 512;
-    uint64_t pages_needed = (total_bytes + 4095) / PAGE_SIZE;
+    uint64_t pages_needed = (total_bytes + PAGE_SIZE - 1) / PAGE_SIZE;
 
     uint64_t buffer_phys = (uint64_t) vmm_get_phys((uint64_t) buffer);
     if (!buffer_phys)
@@ -62,7 +76,14 @@ bool nvme_write_sector_async(struct generic_disk *disk, uint64_t lba,
     cmd.cdw11 = lba >> 32;
     cmd.cdw12 = count - 1;
 
-    nvme_submit_io_cmd(nvme, &cmd, 1);
+    req->lba = lba;
+    req->buffer = (uint8_t *) buffer;
+    req->sector_count = count;
+    req->write = true;
+    req->done = false;
+    req->status = -1;
+
+    nvme_submit_io_cmd(nvme, &cmd, 1, req);
 
     return true;
 }
@@ -73,8 +94,9 @@ bool nvme_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
     struct nvme_queue *this_queue = nvme->io_queues[1];
     uint16_t tail = this_queue->sq_tail;
 
-    nvme_read_sector_async(disk, lba, buffer, count);
-    
+    struct nvme_request req = {0};
+    nvme_read_sector_async(disk, lba, buffer, count, &req);
+
     struct thread *curr = scheduler_get_curr_thread();
     curr->state = BLOCKED;
 
@@ -91,7 +113,8 @@ bool nvme_write_sector(struct generic_disk *disk, uint64_t lba,
     struct nvme_queue *this_queue = nvme->io_queues[1];
     uint16_t tail = this_queue->sq_tail;
 
-    nvme_write_sector_async(disk, lba, buffer, count);
+    struct nvme_request req = {0};
+    nvme_write_sector_async(disk, lba, buffer, count, &req);
 
     struct thread *curr = scheduler_get_curr_thread();
     curr->state = BLOCKED;

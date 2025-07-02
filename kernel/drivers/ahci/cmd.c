@@ -19,28 +19,31 @@ void ahci_process_completions(struct ahci_device *dev, uint32_t port) {
     completed = ~(mmio_read_32(&p->ci) | mmio_read_32(&p->sact)) & 0xFFFFFFFF;
 
     for (uint32_t slot = 0; slot < 32; slot++) {
-        if (completed & (1ULL << slot)) {
-            struct ahci_request *req = dev->io_requests[port][slot];
-            if (req) {
-                req->done = true;
-                req->status = 0;
+        if (!(completed & (1ULL << slot)))
+            continue;
 
-                if (req->on_complete)
-                    req->on_complete(req);
+        struct ahci_request *req = dev->io_requests[port][slot];
 
-                /* if there are waiters - this ignores if not */
-                if (dev->io_waiters[port][slot]) {
-                    struct thread *t = dev->io_waiters[port][slot];
-                    t->state = READY;
-                    t->mlfq_level = 0;
-                    t->time_in_level = 0;
-                    scheduler_put_back(t);
-                    lapic_send_ipi(t->curr_core, SCHEDULER_ID);
-                }
+        if (!req)
+            continue;
 
-                dev->io_requests[port][slot] = NULL;
-            }
+        req->done = true;
+        req->status = 0;
+
+        if (req->on_complete)
+            req->on_complete(req);
+
+        /* if there are waiters - this ignores if not */
+        if (dev->io_waiters[port][slot]) {
+            struct thread *t = dev->io_waiters[port][slot];
+            t->state = READY;
+            t->mlfq_level = 0;
+            t->time_in_level = 0;
+            scheduler_put_back(t);
+            lapic_send_ipi(t->curr_core, SCHEDULER_ID);
         }
+
+        dev->io_requests[port][slot] = NULL;
     }
 
     mmio_write_32(&p->is, p->is);
