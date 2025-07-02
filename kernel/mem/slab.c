@@ -3,6 +3,7 @@
 #include <mem/slab.h>
 #include <mem/vmm.h>
 #include <misc/magic_numbers.h>
+#include <spin_lock.h>
 #include <string.h>
 
 struct slab_cache slab_caches[SLAB_CLASS_COUNT];
@@ -192,12 +193,14 @@ void slab_init() {
     }
 }
 
+static struct spinlock kmalloc_lock = SPINLOCK_INIT;
 void *kmalloc(uint64_t size) {
     if (size == 0)
         return NULL;
-
+    bool i = spin_lock(&kmalloc_lock);
     int idx = uint64_to_index(size);
     if (idx >= 0 && slab_caches[idx].objs_per_slab > 0) {
+        spin_unlock(&kmalloc_lock, i);
         return slab_alloc(&slab_caches[idx]);
     }
 
@@ -207,8 +210,10 @@ void *kmalloc(uint64_t size) {
     uintptr_t virt = slab_heap_top;
     for (uint64_t i = 0; i < pages; i++) {
         uintptr_t phys = (uintptr_t) pmm_alloc_pages(1, false);
-        if (!phys)
+        if (!phys) {
+            spin_unlock(&kmalloc_lock, i);
             return NULL;
+        }
         vmm_map_page(virt + i * PAGE_SIZE, phys, PAGING_PRESENT | PAGING_WRITE);
     }
 
@@ -217,6 +222,7 @@ void *kmalloc(uint64_t size) {
     hdr->pages = pages;
 
     slab_heap_top += pages * PAGE_SIZE;
+    spin_unlock(&kmalloc_lock, i);
     return (void *) (hdr + 1);
 }
 
@@ -230,10 +236,12 @@ void *kzalloc(uint64_t size) {
     return ptr;
 }
 
+static struct spinlock kfree_lock = SPINLOCK_INIT;
 void kfree(void *ptr) {
     if (!ptr)
         return;
 
+    bool i = spin_lock(&kfree_lock);
     struct slab_phdr *hdr =
         (struct slab_phdr *) ((uint8_t *) ptr - sizeof(struct slab_phdr));
 
@@ -243,17 +251,20 @@ void kfree(void *ptr) {
             pmm_free_pages((void *) vmm_get_phys(virt + i * PAGE_SIZE), 1,
                            false);
         }
+        spin_unlock(&kfree_lock, i);
         return;
     }
 
     void *raw_obj = (uint8_t *) ptr - sizeof(struct slab *);
     struct slab *slab = *((struct slab **) raw_obj);
     if (!slab) {
+        spin_unlock(&kfree_lock, i);
         return;
     }
 
     struct slab_cache *cache = slab->parent_cache;
     slab_free(cache, slab, ptr);
+    spin_unlock(&kfree_lock, i);
 }
 
 void *krealloc(void *ptr, uint64_t size) {
