@@ -83,6 +83,9 @@ struct nvme_request {
     uint64_t sector_count;
     bool write;
 
+    /* do this on the last r/w */
+    bool trigger_completion;
+
     volatile bool done;
     int status;
 

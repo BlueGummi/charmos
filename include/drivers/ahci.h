@@ -272,6 +272,7 @@ struct ahci_request {
     uint64_t size;
     uint64_t sector_count;
     bool write;
+    bool trigger_completion;
 
     volatile bool done;
     int status;

@@ -54,6 +54,9 @@ bool ahci_read_sector_blocking(struct generic_disk *disk, uint64_t lba,
     struct ahci_disk *ahci_disk = (struct ahci_disk *) disk->driver_data;
     struct ahci_device *dev = ahci_disk->device;
     req.slot = ahci_find_slot(ahci_disk->device->regs[ahci_disk->port].port);
+    
+    /* refer to write_sector as to why we do this */
+    req.trigger_completion = true;
 
     struct thread *curr = scheduler_get_curr_thread();
     curr->state = BLOCKED;
@@ -102,6 +105,12 @@ bool ahci_write_sector_blocking(struct generic_disk *disk, uint64_t lba,
     struct ahci_disk *ahci_disk = (struct ahci_disk *) disk->driver_data;
     struct ahci_device *dev = ahci_disk->device;
     req.slot = ahci_find_slot(ahci_disk->device->regs[ahci_disk->port].port);
+    
+    /* this is here because there are completion
+     * events that the blocking r/w need in order to
+     * properly wake up threads and such */
+
+    req.trigger_completion = true;
 
     struct thread *curr = scheduler_get_curr_thread();
     curr->state = BLOCKED;
@@ -120,10 +129,11 @@ bool ahci_read_sector_wrapper(struct generic_disk *disk, uint64_t lba,
                               uint8_t *buf, uint64_t cnt) {
     while (cnt > 0) {
         uint16_t chunk = (cnt > 65535) ? 0 : (uint16_t) cnt; // 0 means 65536
+        uint64_t sectors = (chunk == 0) ? 65536 : chunk;
+
         if (!ahci_read_sector_blocking(disk, lba, buf, chunk))
             return false;
 
-        uint64_t sectors = (chunk == 0) ? 65536 : chunk;
         lba += sectors;
         buf += sectors * 512;
         cnt -= sectors;
@@ -135,10 +145,11 @@ bool ahci_write_sector_wrapper(struct generic_disk *disk, uint64_t lba,
                                const uint8_t *buf, uint64_t cnt) {
     while (cnt > 0) {
         uint16_t chunk = (cnt > 65535) ? 0 : (uint16_t) cnt;
+        uint64_t sectors = (chunk == 0) ? 65536 : chunk;
+
         if (!ahci_write_sector_blocking(disk, lba, buf, chunk))
             return false;
 
-        uint64_t sectors = (chunk == 0) ? 65536 : chunk;
         lba += sectors;
         buf += sectors * 512;
         cnt -= sectors;
@@ -151,10 +162,13 @@ bool ahci_write_sector_async_wrapper(struct generic_disk *disk, uint64_t lba,
                                      struct ahci_request *req) {
     while (cnt > 0) {
         uint16_t chunk = (cnt > 65535) ? 0 : (uint16_t) cnt;
+        uint64_t sectors = (chunk == 0) ? 65536 : chunk;
+
+        req->trigger_completion = (cnt == sectors);
+
         if (!ahci_write_sector_async(disk, lba, buf, chunk, req))
             return false;
 
-        uint64_t sectors = (chunk == 0) ? 65536 : chunk;
         lba += sectors;
         buf += sectors * 512;
         cnt -= sectors;
@@ -167,10 +181,13 @@ bool ahci_read_sector_async_wrapper(struct generic_disk *disk, uint64_t lba,
                                     struct ahci_request *req) {
     while (cnt > 0) {
         uint16_t chunk = (cnt > 65535) ? 0 : (uint16_t) cnt;
+        uint64_t sectors = (chunk == 0) ? 65536 : chunk;
+
+        req->trigger_completion = (cnt == sectors);
+
         if (!ahci_read_sector_async(disk, lba, buf, chunk, req))
             return false;
 
-        uint64_t sectors = (chunk == 0) ? 65536 : chunk;
         lba += sectors;
         buf += sectors * 512;
         cnt -= sectors;

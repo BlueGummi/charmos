@@ -27,11 +27,13 @@ void ahci_process_completions(struct ahci_device *dev, uint32_t port) {
         if (!req)
             continue;
 
-        req->done = true;
-        req->status = 0;
+        if (req->trigger_completion) {
+            req->done = true;
+            req->status = 0;
 
-        if (req->on_complete)
-            req->on_complete(req);
+            if (req->on_complete)
+                req->on_complete(req);
+        }
 
         /* if there are waiters - this ignores if not */
         if (dev->io_waiters[port][slot]) {
