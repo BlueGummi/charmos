@@ -5,6 +5,7 @@
 #include <int/idt.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
+#include <mutex.h>
 #include <pit.h>
 #include <spin_lock.h>
 #include <stdbool.h>
@@ -175,6 +176,24 @@ void uacpi_kernel_free_spinlock(uacpi_handle a) {
     kfree(a);
 }
 
+uacpi_handle uacpi_kernel_create_mutex(void) {
+    struct mutex *m = kzalloc(sizeof(struct mutex));
+    return m;
+}
+
+void uacpi_kernel_free_mutex(uacpi_handle a) {
+    kfree(a);
+}
+
+uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle m, uacpi_u16 b) {
+    (void) b;
+    mutex_lock(m);
+    return UACPI_STATUS_OK;
+}
+
+void uacpi_kernel_release_mutex(uacpi_handle m) {
+    mutex_unlock(m);
+}
 uacpi_cpu_flags uacpi_kernel_lock_spinlock(uacpi_handle a) {
 
     bool flag = spin_lock((struct spinlock *) a);
@@ -210,14 +229,6 @@ uacpi_status uacpi_kernel_wait_for_work_completion(void) {
     return UACPI_STATUS_OK;
 }
 
-uacpi_handle uacpi_kernel_create_mutex(void) {
-
-    return kzalloc(8);
-}
-void uacpi_kernel_free_mutex(uacpi_handle a) {
-
-    kfree(a);
-}
 uacpi_handle uacpi_kernel_create_event(void) {
 
     return kzalloc(8);
@@ -226,10 +237,6 @@ void uacpi_kernel_free_event(uacpi_handle a) {
 
     kfree(a);
 }
-uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle, uacpi_u16) {
-    return UACPI_STATUS_OK;
-}
-void uacpi_kernel_release_mutex(uacpi_handle) {}
 
 uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle, uacpi_u16) {
     return false;

@@ -215,6 +215,7 @@ struct vfs_node {
 
     const struct vfs_ops *ops;
 };
+
 void vfs_node_print(const struct vfs_node *node);
 enum errno vfs_mount(struct vfs_node *mountpoint, struct vfs_node *target);
 enum errno vfs_unmount(struct vfs_mount *mountpoint);
