@@ -56,6 +56,9 @@ void bcache_ent_lock(struct bcache_entry *ent);
 struct bcache_entry *bcache_get(struct generic_disk *disk, uint64_t lba,
                                 uint64_t block_size, uint64_t spb, bool);
 
+bool bcache_write(struct generic_disk *disk, struct bcache_entry *ent,
+                  uint64_t spb);
+
 bool bcache_insert(struct generic_disk *disk, uint64_t lba,
                    struct bcache_entry *ent, uint64_t spb);
 

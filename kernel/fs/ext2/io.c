@@ -17,8 +17,7 @@ uint32_t ext2_block_to_lba(struct ext2_fs *fs, uint32_t block_num) {
 }
 
 /* not our job to lock it */
-struct bcache_entry *ext2_block_read(struct ext2_fs *fs,
-                                          uint32_t block_num) {
+struct bcache_entry *ext2_block_read(struct ext2_fs *fs, uint32_t block_num) {
     if (!fs)
         return NULL;
 
@@ -39,19 +38,17 @@ bool ext2_block_write(struct ext2_fs *fs, struct bcache_entry *ent) {
 
     struct generic_disk *d = fs->drive;
     uint32_t spb = fs->sectors_per_block;
-    const uint8_t *buf = (const uint8_t *) ent->buffer;
 
     bcache_ent_lock(ent);
     bcache_get(d, ent->lba, fs->block_size, spb, false); /* updates atimes */
-    bool ret = d->write_sector(d, ent->lba, buf, spb);
+    bool ret = bcache_write(d, ent, spb);
     bcache_ent_unlock(ent);
 
     return ret;
 }
 
-struct bcache_entry *ext2_inode_read(struct ext2_fs *fs,
-                                          uint32_t inode_idx,
-                                          struct ext2_inode *inode_out) {
+struct bcache_entry *ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
+                                     struct ext2_inode *inode_out) {
     if (!fs || !inode_out || inode_idx == 0)
         return false;
 

@@ -20,6 +20,8 @@ static bool insert(struct bcache *cache, uint64_t key,
                    struct bcache_entry *value);
 
 static struct bcache_entry *get(struct bcache *cache, uint64_t key);
+static bool write(struct generic_disk *d, struct bcache *cache,
+                  struct bcache_entry *ent, uint64_t spb);
 
 /* prefetch is asynchronous */
 static void prefetch(struct generic_disk *disk, struct bcache *cache,
@@ -184,7 +186,7 @@ static void prefetch(struct generic_disk *disk, struct bcache *cache,
 
     uint64_t base_lba = ALIGN_DOWN(lba, spb);
 
-    /* no need to re-prefetch existing LBA */
+    /* no need to re-fetch existing entry */
     if (get(cache, base_lba))
         return;
 
@@ -243,6 +245,15 @@ static bool evict(struct bcache *cache, uint64_t spb) {
     return false;
 }
 
+/* TODO: writeback */
+static bool write(struct generic_disk *d, struct bcache *cache,
+                  struct bcache_entry *ent, uint64_t spb) {
+    bool ints = spin_lock(&cache->lock);
+    bool ret = d->write_sector(d, ent->lba, ent->buffer, spb);
+    spin_unlock(&cache->lock, ints);
+    return ret;
+}
+
 /* TODO: free all entries */
 void bcache_destroy(struct bcache *cache) {
     kfree(cache->entries);
@@ -281,6 +292,11 @@ bool bcache_insert(struct generic_disk *disk, uint64_t lba,
 
 bool bcache_evict(struct generic_disk *disk, uint64_t spb) {
     return evict(disk->cache, spb);
+}
+
+bool bcache_write(struct generic_disk *disk, struct bcache_entry *ent,
+                  uint64_t spb) {
+    return write(disk, disk->cache, ent, spb);
 }
 
 struct bcache_entry *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
