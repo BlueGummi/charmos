@@ -44,6 +44,7 @@ uint64_t compute_steal_threshold(uint64_t threads, uint64_t core_count);
 struct scheduler *scheduler_pick_victim(struct scheduler *self);
 struct thread *scheduler_steal_work(struct scheduler *victim);
 struct thread *scheduler_get_curr_thread();
+uint64_t scheduler_get_core_count();
 
 bool try_begin_steal();
 void end_steal();

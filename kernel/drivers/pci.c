@@ -130,7 +130,7 @@ uint32_t pci_read_bar(uint8_t bus, uint8_t device, uint8_t function,
 
 static void pci_msix_enable_vector(uint8_t bus, uint8_t slot, uint8_t func,
                                    uint8_t msix_cap_offset,
-                                   uint32_t vector_index) {
+                                   uint32_t vector_index, uint8_t apic_id) {
     uint32_t table_offset_bir = pci_read(bus, slot, func, msix_cap_offset + 4);
 
     uint8_t bir = table_offset_bir & 0x7;
@@ -158,7 +158,7 @@ static void pci_msix_enable_vector(uint8_t bus, uint8_t slot, uint8_t func,
         (void *) msix_table +
         vector_index * sizeof(struct pci_msix_table_entry);
 
-    uint64_t msg_addr = 0xFEE00000 | (get_sch_core_id() << 12);
+    uint64_t msg_addr = 0xFEE00000 | (apic_id << 12);
 
     mmio_write_32(&entry_addr->msg_addr_low, msg_addr);
     mmio_write_32(&entry_addr->msg_addr_high, 0);
@@ -168,7 +168,8 @@ static void pci_msix_enable_vector(uint8_t bus, uint8_t slot, uint8_t func,
     vector_ctrl &= ~0x1;
     mmio_write_32(&entry_addr->vector_ctrl, vector_ctrl);
 
-    k_info("PCI", K_INFO, "Enabled MSI-X vector %u", vector_index);
+    k_info("PCI", K_INFO, "Enabled MSI-X vector %u for core %u", vector_index,
+           apic_id);
 }
 
 void pci_enable_msix(uint8_t bus, uint8_t slot, uint8_t func, uint8_t isr) {
@@ -188,7 +189,7 @@ void pci_enable_msix(uint8_t bus, uint8_t slot, uint8_t func, uint8_t isr) {
 
             if ((verify & (1 << 15)) && !(verify & (1 << 14))) {
                 k_info("PCI", K_INFO, "MSI-X enabled");
-                pci_msix_enable_vector(bus, slot, func, cap_ptr, isr);
+                pci_msix_enable_vector(bus, slot, func, cap_ptr, isr, 0);
             } else {
                 k_info("PCI", K_ERROR, "Failed to enable MSI-X");
             }

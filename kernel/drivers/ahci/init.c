@@ -215,7 +215,7 @@ struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
     if (!disk)
         return NULL;
 
-    isr_register(disk->device->irq_num, ahci_isr_handler, disk->device);
+    isr_register(disk->device->irq_num, ahci_isr_handler, disk->device, 0);
 
     ioapic_route_irq(irq_line, disk->device->irq_num, get_sch_core_id(), false);
     return disk;

@@ -130,7 +130,7 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
     cq_cmd.cdw10 = (15) << 16 | 1;
     cq_cmd.cdw11 = nvme->isr_index << 16 | 0b11;
 
-    isr_register(nvme->isr_index, nvme_isr_handler, nvme);
+    isr_register(nvme->isr_index, nvme_isr_handler, nvme, 0);
 
     if (nvme_submit_admin_cmd(nvme, &cq_cmd) != 0) {
         nvme_info(K_ERROR, "failed to create IOCQ - code 0x%x", cq_cmd);

@@ -71,8 +71,7 @@ void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
 }
 
-void isr_register(uint8_t vector, isr_handler_t handler, void *ctx) {
-    uint8_t c = get_sch_core_id();
+void isr_register(uint8_t vector, isr_handler_t handler, void *ctx, uint64_t c) {
     isr_table[c][vector].handler = handler;
     isr_table[c][vector].ctx = ctx;
 
