@@ -155,7 +155,7 @@ char *strdup(const char *str) {
     if (!str)
         return NULL;
 
-    size_t len = 0;
+    uint64_t len = 0;
     while (str[len] != '\0')
         len++;
 
@@ -163,7 +163,7 @@ char *strdup(const char *str) {
     if (!copy)
         return NULL;
 
-    for (size_t i = 0; i <= len; ++i)
+    for (uint64_t i = 0; i <= len; ++i)
         copy[i] = str[i];
 
     return copy;

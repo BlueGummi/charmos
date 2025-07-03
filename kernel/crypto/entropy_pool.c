@@ -34,8 +34,8 @@ void entropy_pool_add(struct entropy_pool *pool, const uint8_t *data,
     spin_unlock(&pool->lock, ints);
 }
 
-size_t entropy_pool_extract(struct entropy_pool *pool, uint8_t *out,
-                            size_t len) {
+uint64_t entropy_pool_extract(struct entropy_pool *pool, uint8_t *out,
+                            uint64_t len) {
     uint8_t seed[32];
 
     bool ints = spin_lock(&pool->lock);
@@ -60,14 +60,14 @@ size_t entropy_pool_extract(struct entropy_pool *pool, uint8_t *out,
     return len;
 }
 
-size_t entropy_pool_bits(struct entropy_pool *pool) {
+uint64_t entropy_pool_bits(struct entropy_pool *pool) {
     bool ints = spin_lock(&pool->lock);
-    size_t bits = pool->entropy_bits;
+    uint64_t bits = pool->entropy_bits;
     spin_unlock(&pool->lock, ints);
     return bits;
 }
 
-void entropy_pool_decrease(struct entropy_pool *pool, size_t bits) {
+void entropy_pool_decrease(struct entropy_pool *pool, uint64_t bits) {
     bool ints = spin_lock(&pool->lock);
     if (pool->entropy_bits > bits)
         pool->entropy_bits -= bits;
@@ -77,7 +77,7 @@ void entropy_pool_decrease(struct entropy_pool *pool, size_t bits) {
 }
 
 void entropy_pool_seed(struct entropy_pool *pool) {
-    size_t bits = entropy_pool_bits(pool);
+    uint64_t bits = entropy_pool_bits(pool);
     if (bits < 256) {
         // Wait for more entropy
         return;

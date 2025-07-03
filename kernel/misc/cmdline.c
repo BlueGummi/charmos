@@ -36,13 +36,13 @@ void cmdline_parse(const char *input) {
             input++;
         const char *val_end = input;
 
-        size_t var_len = var_end - var_start;
+        uint64_t var_len = var_end - var_start;
         if (var_len >= MAX_VAR_LEN)
             var_len = MAX_VAR_LEN - 1;
         memcpy(var_buf, var_start, var_len);
         var_buf[var_len] = '\0';
 
-        size_t val_len = val_end - val_start;
+        uint64_t val_len = val_end - val_start;
         if (val_len >= MAX_VAL_LEN)
             val_len = MAX_VAL_LEN - 1;
         memcpy(val_buf, val_start, val_len);

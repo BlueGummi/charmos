@@ -77,18 +77,18 @@ static void chacha20_block(uint8_t output[64], const uint32_t input[16]) {
 // Encrypt or decrypt (it's symmetric)
 void chacha20_encrypt(const uint8_t key[32], const uint8_t nonce[12],
                       uint32_t counter, const uint8_t *in, uint8_t *out,
-                      size_t len) {
+                      uint64_t len) {
     uint32_t state[16];
     uint8_t keystream[64];
-    size_t offset = 0;
+    uint64_t offset = 0;
 
     while (len > 0) {
         chacha20_init_state(state, key, nonce, counter);
         chacha20_block(keystream, state);
         counter++;
 
-        size_t block_len = len > 64 ? 64 : len;
-        for (size_t i = 0; i < block_len; i++) {
+        uint64_t block_len = len > 64 ? 64 : len;
+        for (uint64_t i = 0; i < block_len; i++) {
             out[offset + i] = in[offset + i] ^ keystream[i];
         }
 

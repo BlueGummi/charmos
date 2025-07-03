@@ -13,7 +13,7 @@ static uint64_t mount_table_capacity = 0;
 
 static void mount_table_add(struct vfs_mount *mnt) {
     if (mount_table_count == mount_table_capacity) {
-        size_t new_capacity =
+        uint64_t new_capacity =
             (mount_table_capacity == 0) ? 4 : mount_table_capacity * 2;
 
         struct vfs_mount **new_table;
@@ -33,7 +33,7 @@ static void mount_table_add(struct vfs_mount *mnt) {
 }
 
 static void mount_table_remove(struct vfs_mount *mnt) {
-    for (size_t i = 0; i < mount_table_count; i++) {
+    for (uint64_t i = 0; i < mount_table_count; i++) {
         if (mount_table[i] == mnt) {
             mount_table[i] = mount_table[--mount_table_count];
             return;
@@ -62,7 +62,7 @@ void vfs_node_print(const struct vfs_node *node) {
 }
 
 static struct vfs_mount *find_mount_for_node(struct vfs_node *node) {
-    for (size_t i = 0; i < mount_table_count; i++) {
+    for (uint64_t i = 0; i < mount_table_count; i++) {
         if (mount_table[i]->mount_point->unique_id == node->unique_id)
             return mount_table[i];
     }
@@ -127,7 +127,7 @@ enum errno vfs_unmount(struct vfs_mount *mnt) {
 }
 
 void vfs_clear_mounts(void) {
-    for (size_t i = 0; i < mount_table_count; i++) {
+    for (uint64_t i = 0; i < mount_table_count; i++) {
         kfree(mount_table[i]);
     }
     kfree(mount_table);

@@ -91,7 +91,7 @@ static enum errno tmpfs_close(struct vfs_node *node) {
 
 static struct tmpfs_node *tmpfs_find_child(struct tmpfs_node *dir,
                                            const char *name) {
-    for (size_t i = 0; i < dir->child_count; ++i)
+    for (uint64_t i = 0; i < dir->child_count; ++i)
         if (strcmp(dir->children[i]->name, name) == 0)
             return dir->children[i];
     return NULL;
@@ -195,7 +195,7 @@ static enum errno tmpfs_mkdir(struct vfs_node *parent, const char *name,
 
 static enum errno tmpfs_rmdir(struct vfs_node *parent, const char *name) {
     struct tmpfs_node *pt = parent->fs_node_data;
-    for (size_t i = 0; i < pt->child_count; ++i) {
+    for (uint64_t i = 0; i < pt->child_count; ++i) {
         struct tmpfs_node *c = pt->children[i];
         if (strcmp(c->name, name) == 0 && c->type == TMPFS_DIR) {
             // remove
@@ -213,7 +213,7 @@ static enum errno tmpfs_rmdir(struct vfs_node *parent, const char *name) {
 
 static enum errno tmpfs_unlink(struct vfs_node *parent, const char *name) {
     struct tmpfs_node *pt = parent->fs_node_data;
-    for (size_t i = 0; i < pt->child_count; ++i) {
+    for (uint64_t i = 0; i < pt->child_count; ++i) {
         struct tmpfs_node *c = pt->children[i];
         if (strcmp(c->name, name) == 0 && c->type != TMPFS_DIR) {
             memmove(&pt->children[i], &pt->children[i + 1],
@@ -239,7 +239,7 @@ static enum errno tmpfs_rename(struct vfs_node *old_parent,
         return ERR_NO_ENT;
 
     // Remove from old parent
-    for (size_t i = 0; i < old_pt->child_count; ++i) {
+    for (uint64_t i = 0; i < old_pt->child_count; ++i) {
         if (old_pt->children[i] == node) {
             memmove(&old_pt->children[i], &old_pt->children[i + 1],
                     (old_pt->child_count - i - 1) * sizeof(void *));

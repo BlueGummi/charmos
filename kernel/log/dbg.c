@@ -61,7 +61,7 @@ const char *find_symbol(uint64_t addr, uint64_t *out_sym_addr) {
     const char *result = NULL;
     uint64_t best = 0;
 
-    for (size_t i = 0; i < syms_len; i++) {
+    for (uint64_t i = 0; i < syms_len; i++) {
         if (syms[i].addr <= addr && syms[i].addr > best) {
             best = syms[i].addr;
             result = syms[i].name;

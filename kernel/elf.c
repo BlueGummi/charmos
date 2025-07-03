@@ -81,9 +81,9 @@ void elf_map(uintptr_t user_pml4_phys, void *elf_data) {
             if (vaddr == seg_vaddr_start)
                 page_offset = ph->vaddr & (PAGE_SIZE - 1);
 
-            size_t to_copy = 0;
+            uint64_t to_copy = 0;
             if (file_pos < file_end) {
-                size_t bytes_remaining = file_end - file_pos;
+                uint64_t bytes_remaining = file_end - file_pos;
                 to_copy = PAGE_SIZE - page_offset;
                 if (bytes_remaining < to_copy)
                     to_copy = bytes_remaining;

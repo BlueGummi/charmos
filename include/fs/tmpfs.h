@@ -27,7 +27,7 @@ struct tmpfs_node {
     struct tmpfs_node *parent;
 
     struct tmpfs_node **children;
-    size_t child_count;
+    uint64_t child_count;
 };
 
 struct tmpfs_fs {
