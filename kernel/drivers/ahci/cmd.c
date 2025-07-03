@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "devices/generic_disk.h"
+#include "fs/generic.h"
 #include "sch/thread.h"
 
 #define MAX_PRDT_ENTRY_SIZE (4 * 1024 * 1024) // 4MB

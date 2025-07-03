@@ -1,6 +1,6 @@
 #include <asm.h>
 #include <console/printf.h>
-#include <devices/generic_disk.h>
+#include <fs/generic.h>
 #include <drivers/ata.h>
 #include <mem/alloc.h>
 #include <sleep.h>

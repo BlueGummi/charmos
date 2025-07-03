@@ -1,4 +1,4 @@
-#include <devices/generic_disk.h>
+#include <fs/generic.h>
 #include <fs/ext2.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>

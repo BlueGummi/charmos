@@ -1,6 +1,6 @@
 #include <console/printf.h>
-#include <devices/generic_disk.h>
-#include <devices/registry.h>
+#include <fs/generic.h>
+#include <registry.h>
 #include <drivers/ahci.h>
 #include <drivers/ata.h>
 #include <drivers/e1000.h>

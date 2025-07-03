@@ -9,7 +9,7 @@
 
 #include "asm.h"
 #include "console/printf.h"
-#include "devices/generic_disk.h"
+#include "fs/generic.h"
 #include "fs/bcache.h"
 
 struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,

@@ -2,7 +2,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "devices/generic_disk.h"
+#include "fs/generic.h"
 #include "fs/bcache.h"
 
 static bool walk_dir(struct ext2_fs *fs, uint32_t block_num,

@@ -1,5 +1,5 @@
 #pragma once
-#include <devices/generic_disk.h>
+#include <fs/generic.h>
 #include <stdbool.h>
 #include <stdint.h>
 

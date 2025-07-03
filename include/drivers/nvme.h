@@ -1,5 +1,5 @@
 #pragma once
-#include <devices/generic_disk.h>
+#include <fs/generic.h>
 #include <mem/vmm.h>
 #include <sch/thread.h>
 #include <spin_lock.h>

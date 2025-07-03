@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "devices/generic_disk.h"
+#include "fs/generic.h"
 #include "fs/bcache.h"
 
 #define EXT2_NDIR_BLOCKS 12

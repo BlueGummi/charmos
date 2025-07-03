@@ -1,7 +1,7 @@
 #include <acpi/lapic.h>
 #include <asm.h>
 #include <console/printf.h>
-#include <devices/registry.h>
+#include <registry.h>
 #include <sch/sched.h>
 #include <spin_lock.h>
 #include <stdatomic.h>

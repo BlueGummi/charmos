@@ -1,7 +1,7 @@
 #include <acpi/lapic.h>
 #include <asm.h>
 #include <console/printf.h>
-#include <devices/generic_disk.h>
+#include <fs/generic.h>
 #include <drivers/nvme.h>
 #include <int/idt.h>
 #include <mem/alloc.h>

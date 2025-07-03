@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "devices/generic_disk.h"
+#include "fs/generic.h"
 #include "sch/sched.h"
 #include "sch/thread.h"
 

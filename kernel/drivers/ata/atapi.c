@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 #include "console/printf.h"
-#include "devices/generic_disk.h"
+#include "fs/generic.h"
 #include "fs/bcache.h"
 
 #define ATAPI_SECTOR_SIZE 2048

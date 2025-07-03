@@ -1,4 +1,4 @@
-#include <devices/generic_disk.h>
+#include <fs/generic.h>
 #include <errno.h>
 #include <fs/bcache.h>
 #include <fs/vfs.h>

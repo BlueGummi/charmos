@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "devices/generic_disk.h"
+#include "fs/generic.h"
 
 // TODO: optimize this so I dont memcpy every iteration :boom:
 

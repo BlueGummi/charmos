@@ -1,5 +1,5 @@
 #include <console/printf.h>
-#include <devices/generic_disk.h>
+#include <fs/generic.h>
 #include <fs/detect.h>
 #include <fs/ext2.h>
 #include <fs/fat.h>

@@ -5,7 +5,7 @@
 #include <string.h>
 #include <time/time.h>
 
-#include "devices/generic_disk.h"
+#include "fs/generic.h"
 #include "fs/bcache.h"
 
 enum errno ext2_symlink_file(struct ext2_fs *fs,

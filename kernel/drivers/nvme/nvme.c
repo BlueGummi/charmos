@@ -1,6 +1,6 @@
 #include <asm.h>
 #include <console/printf.h>
-#include <devices/generic_disk.h>
+#include <fs/generic.h>
 #include <drivers/nvme.h>
 #include <drivers/pci.h>
 #include <int/idt.h>
