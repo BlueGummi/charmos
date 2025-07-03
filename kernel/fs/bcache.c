@@ -182,6 +182,7 @@ static void prefetch_callback(struct bio_request *bio) {
     ent->size = bio->size;
     insert(cache, bio->lba, ent);
     kfree(data);
+    kfree(bio);
 }
 
 static void prefetch(struct generic_disk *disk, struct bcache *cache,
