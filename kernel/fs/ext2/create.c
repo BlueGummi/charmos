@@ -78,11 +78,9 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir,
         return ERR_NOSPC;
 
     struct bcache_entry *ent;
-    uint32_t lba = ext2_block_to_lba(fs, new_block);
-    uint32_t spb = fs->sectors_per_block;
 
     /* this inserts the entry into the block cache */
-    ent = bcache_create_ent(fs->drive, lba, fs->block_size, spb, false);
+    ent = ext2_create_bcache_ent(fs, new_block);
     if (!ent)
         return ERR_IO;
 

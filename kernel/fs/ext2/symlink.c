@@ -32,13 +32,8 @@ enum errno ext2_symlink_file(struct ext2_fs *fs,
         if (block == 0)
             return ERR_FS_NO_INODE;
 
-        /* TODO: same flow is copied in create.c */
-        uint32_t lba = ext2_block_to_lba(fs, block);
-        uint32_t bs = fs->block_size;
-        uint32_t spb = fs->sectors_per_block;
-
         struct bcache_entry *ent;
-        ent = bcache_create_ent(fs->drive, lba, bs, spb, false);
+        ent = ext2_create_bcache_ent(fs, block);
         if (!ent)
             return ERR_IO;
 

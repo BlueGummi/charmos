@@ -282,6 +282,8 @@ uint32_t ext2_get_block_group(struct ext2_fs *fs, uint32_t block);
 bool ext2_fs_lock(struct ext2_fs *fs);
 void ext2_fs_unlock(struct ext2_fs *fs, bool i);
 void ext2_prefetch_block(struct ext2_fs *fs, uint32_t block);
+struct bcache_entry *ext2_create_bcache_ent(struct ext2_fs *fs,
+                                            uint32_t block);
 
 //
 //

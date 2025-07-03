@@ -182,3 +182,9 @@ void ext2_prefetch_block(struct ext2_fs *fs, uint32_t block) {
     bcache_prefetch_async(fs->drive, lba, fs->block_size,
                           fs->sectors_per_block);
 }
+
+struct bcache_entry *ext2_create_bcache_ent(struct ext2_fs *fs,
+                                            uint32_t block) {
+    return bcache_create_ent(fs->drive, ext2_block_to_lba(fs, block),
+                             fs->block_size, fs->sectors_per_block, false);
+}
