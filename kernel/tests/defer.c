@@ -1,5 +1,6 @@
 #include <mem/alloc.h>
 #include <sch/defer.h>
+#include <sch/sched.h>
 #include <sleep.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -10,6 +11,7 @@ static bool defer_worked = false;
 
 static void defer_func(void *boo) {
     (void) boo;
+    k_printf("Core %u\n", get_sch_core_id());
     ADD_MESSAGE("Defer complete");
     defer_worked = true;
 }

@@ -59,10 +59,9 @@ void defer_enqueue(defer_func_t func, void *arg, uint64_t delay_ms) {
 }
 
 void defer_init(void) {
-    uint64_t core_num = scheduler_get_core_count();
-    for (uint64_t i = 0; i < core_num; i++) {
-        idt_set_alloc(HPET_IRQ_VECTOR, i, true);
-        isr_register(HPET_IRQ_VECTOR, hpet_irq_handler, NULL, i);
-        ioapic_route_irq(HPET_IRQ_LINE, HPET_IRQ_VECTOR, i, false);
-    }
+    uint8_t vector = idt_alloc_entry_on_core(0);
+
+    idt_set_alloc(vector, 0, true);
+    isr_register(vector, hpet_irq_handler, NULL, 0);
+    ioapic_route_irq(HPET_IRQ_LINE, vector, 0, false);
 }
