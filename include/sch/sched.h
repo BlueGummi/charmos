@@ -43,7 +43,6 @@ uint64_t compute_steal_threshold(uint64_t threads, uint64_t core_count);
 
 struct scheduler *scheduler_pick_victim(struct scheduler *self);
 struct thread *scheduler_steal_work(struct scheduler *victim);
-struct thread *scheduler_get_curr_thread();
 uint64_t scheduler_get_core_count();
 
 bool try_begin_steal();
@@ -56,6 +55,12 @@ extern atomic_uint active_stealers;
 extern atomic_uint total_threads;
 extern int64_t work_steal_min_diff;
 extern uint64_t c_count;
+
+/* TODO: no rdmsr */
+static inline struct thread *scheduler_get_curr_thread() {
+    struct core *c = (void *) rdmsr(MSR_GS_BASE);
+    return c->current_thread;
+}
 
 #define CLI asm volatile("cli")
 #define STI asm volatile("sti")

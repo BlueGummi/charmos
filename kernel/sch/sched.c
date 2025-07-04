@@ -55,12 +55,6 @@ uint64_t scheduler_get_core_count() {
     return c_count;
 }
 
-/* TODO: no rdmsr */
-struct thread *scheduler_get_curr_thread() {
-    struct core *c = (void *) rdmsr(MSR_GS_BASE);
-    return c->current_thread;
-}
-
 static inline void update_core_current_thread(struct thread *next) {
     struct core *c = (void *) rdmsr(MSR_GS_BASE);
     c->current_thread = next;
