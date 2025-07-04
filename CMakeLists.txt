@@ -74,9 +74,9 @@ set(QEMU_COMMON_FLAGS
      #-drive id=fatdisk,file=fat12.img,format=raw,if=none
      #-device ide-hd,drive=fatdisk,bus=ide.0,unit=1
      
-     #-drive id=fatdisk,file=disk.img,format=raw,if=none
-     #-device ahci,id=ahci0
-     #-device ide-hd,drive=fatdisk,bus=ahci0.3
+     -drive id=fatdisk,file=disk.img,format=raw,if=none
+     -device ahci,id=ahci0
+     -device ide-hd,drive=fatdisk,bus=ahci0.3
 
 
     -d trace:*nvme*

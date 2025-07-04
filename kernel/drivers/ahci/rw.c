@@ -54,6 +54,7 @@ bool ahci_read_sector_blocking(struct generic_disk *disk, uint64_t lba,
     struct ahci_request req = {0};
     struct ahci_disk *ahci_disk = (struct ahci_disk *) disk->driver_data;
     struct ahci_device *dev = ahci_disk->device;
+    bool i = spin_lock(&dev->lock);
     req.slot = ahci_find_slot(ahci_disk->device->regs[ahci_disk->port].port);
 
     /* refer to write_sector as to why we do this */
@@ -63,9 +64,12 @@ bool ahci_read_sector_blocking(struct generic_disk *disk, uint64_t lba,
     curr->state = BLOCKED;
     dev->io_waiters[ahci_disk->port][req.slot] = curr;
 
-    if (!ahci_read_sector_async(disk, lba, buf, count, &req))
+    if (!ahci_read_sector_async(disk, lba, buf, count, &req)) {
+        spin_unlock(&dev->lock, i);
         return false;
+    }
 
+    spin_unlock(&dev->lock, i);
     scheduler_yield();
 
     dev->io_waiters[ahci_disk->port][req.slot] = NULL;
@@ -105,6 +109,7 @@ bool ahci_write_sector_blocking(struct generic_disk *disk, uint64_t lba,
     struct ahci_request req = {0};
     struct ahci_disk *ahci_disk = (struct ahci_disk *) disk->driver_data;
     struct ahci_device *dev = ahci_disk->device;
+    bool i = spin_lock(&dev->lock);
     req.slot = ahci_find_slot(ahci_disk->device->regs[ahci_disk->port].port);
 
     /* this is here because there are completion
@@ -117,9 +122,12 @@ bool ahci_write_sector_blocking(struct generic_disk *disk, uint64_t lba,
     curr->state = BLOCKED;
     dev->io_waiters[ahci_disk->port][req.slot] = curr;
 
-    if (!ahci_write_sector_async(disk, lba, buf, count, &req))
+    if (!ahci_write_sector_async(disk, lba, buf, count, &req)) {
+        spin_unlock(&dev->lock, i);
         return false;
+    }
 
+    spin_unlock(&dev->lock, i);
     scheduler_yield();
 
     dev->io_waiters[ahci_disk->port][req.slot] = NULL;

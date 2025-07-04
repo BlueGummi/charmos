@@ -207,6 +207,7 @@ struct ahci_device {
     struct ahci_request *io_requests[AHCI_MAX_PORTS][32];
 
     uint8_t irq_num;
+    struct spinlock lock;
     struct ahci_full_port regs[32]; // Pointer to port registers
 };
 
