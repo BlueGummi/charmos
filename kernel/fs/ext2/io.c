@@ -4,8 +4,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "fs/bcache.h"
-
 uint32_t ext2_block_to_lba(struct ext2_fs *fs, uint32_t block_num) {
     if (!fs)
         return -1;

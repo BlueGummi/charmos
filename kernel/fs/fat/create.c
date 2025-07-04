@@ -4,8 +4,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "fs/generic.h"
-
 // TODO: failure - ENOSPC
 
 static inline uint32_t fat12_16_root_dir_lba(struct fat_fs *fs) {

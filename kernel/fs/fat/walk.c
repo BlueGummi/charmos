@@ -4,8 +4,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "fs/generic.h"
-
 // TODO: optimize this so I dont memcpy every iteration :boom:
 
 static bool fat32_walk_cluster(struct fat_fs *fs, uint32_t cluster,

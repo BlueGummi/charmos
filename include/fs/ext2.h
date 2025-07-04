@@ -1,6 +1,6 @@
 #include <block/generic.h>
 #include <errno.h>
-#include <fs/bcache.h>
+#include <block/bcache.h>
 #include <fs/vfs.h>
 #include <spin_lock.h>
 #include <stdint.h>

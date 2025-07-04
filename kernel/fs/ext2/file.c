@@ -4,10 +4,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "fs/generic.h"
-#include "fs/bcache.h"
-#include "time/time.h"
-
 enum errno ext2_write_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
                            uint32_t offset, const uint8_t *src, uint32_t size) {
     if (!fs || !inode || !src)

@@ -4,9 +4,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "fs/generic.h"
-#include "fs/vfs.h"
-
 // TODO: flags - maybe?
 
 uint64_t PTRS_PER_BLOCK;

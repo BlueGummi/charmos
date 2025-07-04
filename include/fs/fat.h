@@ -1,5 +1,5 @@
 #include <block/generic.h>
-#include <fs/bcache.h>
+#include <block/bcache.h>
 #include <stdint.h>
 
 // TODO: errno :boom:

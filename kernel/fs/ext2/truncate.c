@@ -4,9 +4,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "fs/generic.h"
-#include "fs/bcache.h"
-
 #define EXT2_NDIR_BLOCKS 12
 #define EXT2_IND_BLOCK EXT2_NDIR_BLOCKS
 #define EXT2_DIND_BLOCK (EXT2_IND_BLOCK + 1)

@@ -1,5 +1,5 @@
 #include <block/generic.h>
-#include <fs/bcache.h>
+#include <block/bcache.h>
 #include <mem/alloc.h>
 #include <stdbool.h>
 #include <stddef.h>

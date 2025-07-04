@@ -6,11 +6,6 @@
 #include <string.h>
 #include <time/time.h>
 
-#include "fs/generic.h"
-#include "errno.h"
-#include "fs/bcache.h"
-#include "fs/detect.h"
-
 // TODO: With all VFS impls, make sure to check these are on the same disk and
 // filesystem
 

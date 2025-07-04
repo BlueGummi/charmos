@@ -3,10 +3,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "fs/bcache.h"
-#include "spin_lock.h"
-#include "time/time.h"
-
 static uint32_t ext2_get_block(struct ext2_fs *fs, uint32_t block_num,
                                uint32_t depth, uint32_t block_index,
                                uint32_t new_block_num, bool allocate,

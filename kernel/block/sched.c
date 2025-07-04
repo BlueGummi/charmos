@@ -1,6 +1,7 @@
-#include <console/printf.h>
 #include <block/generic.h>
+#include <console/printf.h>
 #include <mem/alloc.h>
+#include <sch/defer.h>
 #include <spin_lock.h>
 #include <stdint.h>
 #include <string.h>
@@ -39,6 +40,16 @@ static inline bool submit_if_skip_sched(struct bio_scheduler *sched,
         return true;
     }
     return false;
+}
+
+static bool sched_is_empty(struct bio_scheduler *sched) {
+    for (uint32_t i = 0; i < BIO_SCHED_MAX; i++) {
+        if (!sched->queues[i].head)
+            continue;
+        else
+            return false;
+    }
+    return true;
 }
 
 static inline bool should_early_dispatch(struct bio_scheduler *sched) {
@@ -352,7 +363,7 @@ static void try_rq_reorder(struct bio_scheduler *sched) {
     disk->ops->reorder(disk);
 }
 
-void bio_sched_tick(void *ctx) {
+static void bio_sched_tick(void *ctx) {
     struct bio_scheduler *sched = ctx;
 
     bool i = spin_lock(&sched->lock);
@@ -361,8 +372,8 @@ void bio_sched_tick(void *ctx) {
     try_rq_reorder(sched);
     try_early_dispatch(sched);
 
-    if (!bio_sched_is_empty(sched)) {
-        defer_after_ms(bio_sched_tick, sched, BIO_SCHED_TICK_MS);
+    if (!sched_is_empty(sched)) {
+        defer_enqueue(bio_sched_tick, sched, BIO_SCHED_TICK_MS);
     } else {
         sched->defer_pending = false;
     }

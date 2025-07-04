@@ -1,5 +1,5 @@
 #pragma once
-#include <fs/bcache.h>
+#include <block/bcache.h>
 #include <block/bio.h>
 #include <fs/detect.h>
 #include <sch/sched.h>
@@ -28,6 +28,9 @@
 /* max amount of requests in a queue to boost a starved request */
 #define BIO_SCHED_BOOST_MAX_OCCUPANCE 8
 
+/* time between checks of the queue */
+#define BIO_SCHED_TICK_MS 100
+
 struct bio_rqueue {
     struct bio_request *head;
     struct bio_request *tail;
@@ -39,6 +42,7 @@ struct bio_scheduler {
     struct spinlock lock;
     uint64_t total_requests;
     struct bio_rqueue queues[BIO_SCHED_LEVELS];
+    bool defer_pending;
 };
 
 struct bio_scheduler_ops {

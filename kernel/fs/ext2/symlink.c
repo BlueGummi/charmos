@@ -5,9 +5,6 @@
 #include <string.h>
 #include <time/time.h>
 
-#include "fs/generic.h"
-#include "fs/bcache.h"
-
 enum errno ext2_symlink_file(struct ext2_fs *fs,
                              struct ext2_full_inode *dir_inode,
                              const char *name, const char *target) {
