@@ -242,6 +242,14 @@ struct nvme_identify_controller {
     // TODO: there is more but me lazy and dont need it
 } __attribute__((packed));
 
+#define NVME_PRP_INITIAL_CAPACITY 16
+#define NVME_PRP_GROWTH_FACTOR 2
+struct nvme_bio_data {
+    uint64_t *prps;
+    uint64_t prp_count;    // current number of PRPs
+    uint64_t prp_capacity; // allocated capacity
+};
+
 #define NVME_COMPLETION_PHASE(cpl) ((cpl)->status & 0x1)
 #define NVME_COMPLETION_STATUS(cpl) (((cpl)->status >> 1) & 0x7FFF)
 #define PCI_CLASS_MASS_STORAGE 0x01

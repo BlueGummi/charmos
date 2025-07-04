@@ -50,6 +50,12 @@ struct bio_request {
      * enough waiting around */
     uint64_t enqueue_time;
 
-    // driver-private data
+    /* boosts are accelerated if it
+     * boosts often */
+    uint8_t boost_count;
+
     void *driver_private;
+
+    /* secondary private stuff for coalescing - i am lazy */
+    void *driver_private2;
 };

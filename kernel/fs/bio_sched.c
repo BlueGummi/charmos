@@ -45,14 +45,35 @@ static inline bool should_early_dispatch(struct bio_scheduler *sched) {
     return sched->total_requests > sched->disk->ops->dispatch_threshold;
 }
 
-static inline bool should_boost(struct bio_request *req) {
+static bool should_boost(struct bio_request *req) {
     uint64_t curr_timestamp = time_get_ms();
-    uint64_t max_wait = req->disk->ops->max_wait_time[req->priority];
-    return curr_timestamp > (req->enqueue_time + max_wait);
+
+    struct bio_scheduler_ops *ops = req->disk->ops;
+    uint64_t base_wait = ops->max_wait_time[req->priority];
+
+    // reduce wait time threshold by 2^boost_count, with a max shift cap
+    uint64_t shift = req->boost_count > BIO_SCHED_BOOST_SHIFT_LIMIT
+                         ? BIO_SCHED_BOOST_SHIFT_LIMIT
+                         : req->boost_count;
+
+    uint64_t adjusted_wait = base_wait >> shift;
+    if (adjusted_wait < BIO_SCHED_MIN_WAIT_MS)
+        adjusted_wait = BIO_SCHED_MIN_WAIT_MS;
+
+    return curr_timestamp > (req->enqueue_time + adjusted_wait);
+}
+
+static inline uint64_t get_boost_depth(struct bio_request *req) {
+    if (req->boost_count >= 3)
+        return 2;
+    else if (req->boost_count >= 1)
+        return 1;
+    return 0;
 }
 
 static inline uint64_t get_boosted_prio(struct bio_request *req) {
-    uint64_t prio = req->priority + BIO_SCHED_STARVATION_BOOST;
+    uint64_t step = get_boost_depth(req);
+    uint64_t prio = req->priority + BIO_SCHED_STARVATION_BOOST + step;
     return prio > BIO_SCHED_MAX ? BIO_SCHED_MAX : prio;
 }
 
@@ -96,6 +117,7 @@ static void boost_prio(struct bio_scheduler *sched, struct bio_request *req) {
     /* remove from current queue */
     dequeue(sched, req);
     req->priority = new_prio;
+    req->boost_count++;
 
     /* re-insert to new level */
     enqueue(sched, req);
@@ -259,6 +281,7 @@ void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req) {
     uint32_t coalesces = BIO_SCHED_MAX_COALESCES;
     bool i = spin_lock(&sched->lock);
 
+    set_request_timestamp(req);
     enqueue(sched, req);
     while (try_coalesce(sched) && coalesces--)
         ;
