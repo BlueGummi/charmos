@@ -66,5 +66,6 @@ void scheduler_enqueue(struct thread *t) {
 void scheduler_put_back(struct thread *t) {
     if (t->curr_core == -1)
         return;
+
     scheduler_add_thread(local_schs[t->curr_core], t, false, false, true);
 }

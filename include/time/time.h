@@ -8,4 +8,6 @@ uint8_t time_get_day();
 uint8_t time_get_month();
 uint8_t time_get_year();
 uint8_t time_get_century();
+uint64_t time_get_ms(void);
+uint64_t time_get_us(void);
 #pragma once

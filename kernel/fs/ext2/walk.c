@@ -176,7 +176,7 @@ void ext2_traverse_inode_blocks(struct ext2_fs *fs, struct ext2_inode *inode,
                                 ext2_block_visitor visitor, void *user_data,
                                 bool readahead) {
     for (int i = 0; i < 12; i++) {
-        if (readahead)
+        if (readahead && inode->block[i])
             ext2_prefetch_block(fs, inode->block[i]);
 
         visitor(fs, inode, 0, &inode->block[i], user_data);

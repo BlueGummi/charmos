@@ -12,6 +12,7 @@
 extern void context_switch();
 extern void page_fault_handler_wrapper();
 extern void syscall_entry();
+void page_fault_handler(uint64_t error_code, uint64_t fault_addr);
 #define MAX_IDT_ENTRIES 256
 static bool **idt_entry_used = NULL;
 struct isr_entry **isr_table = NULL;
@@ -180,11 +181,9 @@ void idt_install(uint64_t ind) {
 
     idt_set_gate(SSF_ID, (uint64_t) ss_handler, 0x08, 0x8E, ind);
 
-    /*
     idt_set_gate(GPF_ID, (uint64_t) gpf_handler, 0x08, 0x8E, ind);
     idt_set_gate(DBF_ID, (uint64_t) double_fault_handler, 0x08, 0x8E, ind);
     idt_set_gate(PAGE_FAULT_ID, (uint64_t) page_fault_handler, 0x08, 0x8E, ind);
-    */
 
     idt_set_gate(TIMER_ID, (uint64_t) isr_timer_routine, 0x08, 0x8E, ind);
 
@@ -200,9 +199,6 @@ void lapic_send_ipi(uint8_t apic_id, uint8_t vector) {
     LAPIC_SEND(LAPIC_REG(LAPIC_ICR_LOW), vector | LAPIC_DELIVERY_FIXED |
                                              LAPIC_LEVEL_ASSERT |
                                              LAPIC_DEST_PHYSICAL);
-
-    while (LAPIC_READ(LAPIC_REG(LAPIC_ICR_LOW)) & (1 << 12))
-        ;
 }
 
 void page_fault_handler(uint64_t error_code, uint64_t fault_addr) {

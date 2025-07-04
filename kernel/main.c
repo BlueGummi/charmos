@@ -80,7 +80,7 @@ void k_main(void) {
     lapic_init();
     mp_inform_of_cr3();
 
-    asm volatile("sti");
+    scheduler_yield();
     while (1) {
         asm("hlt");
     }

@@ -102,3 +102,15 @@ struct generic_disk {
     uint64_t partition_count;
     struct generic_partition *partitions;
 };
+
+static inline bool disk_skip_coalesce(struct generic_disk *disk) {
+    return disk->flags & DISK_FLAG_NO_COALESCE;
+}
+
+static inline bool disk_skip_sched(struct generic_disk *disk) {
+    return disk->flags & DISK_FLAG_NO_SCHED;
+}
+
+static inline bool disk_skip_reorder(struct generic_disk *disk) {
+    return disk->flags & DISK_FLAG_NO_REORDER;
+}

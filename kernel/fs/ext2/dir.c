@@ -57,8 +57,7 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     if (new_block == 0)
         return ERR_NOSPC;
 
-    struct bcache_entry *ent;
-    ent = ext2_create_bcache_ent(fs, new_block);
+    struct bcache_entry *ent = ext2_create_bcache_ent(fs, new_block);
 
     if (!ent)
         return ERR_IO;

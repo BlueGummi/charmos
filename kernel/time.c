@@ -1,3 +1,4 @@
+#include <acpi/hpet.h>
 #include <asm.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -84,4 +85,12 @@ uint32_t time_get_unix() {
     return datetime_to_unix(time_get_century() * 100 + time_get_year(),
                             time_get_month(), time_get_day(), time_get_hour(),
                             time_get_minute(), time_get_second());
+}
+
+uint64_t time_get_ms(void) {
+    return hpet_timestamp_ms();
+}
+
+uint64_t time_get_us(void) {
+    return hpet_timestamp_us();
 }

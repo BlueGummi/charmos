@@ -47,6 +47,7 @@ void k_sch_main() {
 
 void k_sch_idle() {
     while (1) {
+        scheduler_yield();
         asm volatile("hlt");
     }
 }
@@ -167,8 +168,6 @@ static void load_thread(struct scheduler *sched, struct thread *next,
 }
 
 static inline void disable_timeslice() {
-    uint64_t core_id = get_sch_core_id();
-    k_printf("Core %u disabled the timeslice\n", core_id);
     lapic_timer_disable();
 }
 

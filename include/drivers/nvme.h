@@ -137,6 +137,7 @@ struct nvme_device {
     uint32_t queues_made;
 
     uint32_t sector_size;
+    struct spinlock lock;
 };
 
 struct nvme_identify {

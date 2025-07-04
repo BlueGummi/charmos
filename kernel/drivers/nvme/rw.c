@@ -88,6 +88,8 @@ bool nvme_write_sector_async(struct generic_disk *disk, uint64_t lba,
 bool nvme_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
                       uint16_t count) {
     struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
+
+    bool i = spin_lock(&nvme->lock);
     uint16_t qid = THIS_QID;
     struct nvme_queue *this_queue = nvme->io_queues[qid];
     uint16_t tail = this_queue->sq_tail;
@@ -99,6 +101,7 @@ bool nvme_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
     curr->state = BLOCKED;
 
     nvme->io_waiters[qid][tail] = curr;
+    spin_unlock(&nvme->lock, i);
     scheduler_yield();
 
     nvme->io_waiters[qid][tail] = NULL;
@@ -108,6 +111,8 @@ bool nvme_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
 bool nvme_write_sector(struct generic_disk *disk, uint64_t lba,
                        const uint8_t *buffer, uint16_t count) {
     struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
+    
+    bool i = spin_lock(&nvme->lock);
     uint16_t qid = THIS_QID;
     struct nvme_queue *this_queue = nvme->io_queues[qid];
     uint16_t tail = this_queue->sq_tail;
@@ -119,6 +124,7 @@ bool nvme_write_sector(struct generic_disk *disk, uint64_t lba,
     curr->state = BLOCKED;
 
     nvme->io_waiters[qid][tail] = curr;
+    spin_unlock(&nvme->lock, i);
     scheduler_yield();
 
     nvme->io_waiters[qid][tail] = NULL;

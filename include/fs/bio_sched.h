@@ -11,9 +11,13 @@
 
 /* how many queue levels the bio_scheduler has */
 #define BIO_SCHED_LEVELS 5
+#define BIO_SCHED_MAX (BIO_SCHED_LEVELS - 1)
 
 /* boosts can only boost priority by this amount */
 #define BIO_SCHED_STARVATION_BOOST 3
+
+/* how many times we can coalesce in a single enqueue() */
+#define BIO_SCHED_MAX_COALESCES 4
 
 struct bio_rqueue {
     struct bio_request *head;
@@ -28,8 +32,9 @@ struct bio_scheduler {
 };
 
 struct bio_scheduler_ops {
-    bool (*should_coalesce)(struct generic_disk *dev, struct bio_request *a,
-                            struct bio_request *b);
+    bool (*should_coalesce)(struct generic_disk *dev,
+                            const struct bio_request *a,
+                            const struct bio_request *b);
 
     void (*do_coalesce)(struct generic_disk *dev, struct bio_request *into,
                         struct bio_request *from);
@@ -57,4 +62,3 @@ void bio_sched_dispatch_all(struct generic_disk *disk);
 struct bio_scheduler *bio_sched_create(struct generic_disk *disk,
                                        struct bio_scheduler_ops *ops);
 
-extern atomic_uint_fast64_t bio_sched_ticks;
