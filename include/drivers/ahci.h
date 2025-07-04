@@ -1,5 +1,5 @@
 #pragma once
-#include <fs/generic.h>
+#include <block/generic.h>
 #include <s_assert.h>
 #include <sch/thread.h>
 #include <stdbool.h>

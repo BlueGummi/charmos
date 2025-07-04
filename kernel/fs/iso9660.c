@@ -1,5 +1,5 @@
 #include <console/printf.h>
-#include <fs/generic.h>
+#include <block/generic.h>
 #include <fs/iso9660.h>
 #include <mem/alloc.h>
 #include <stdbool.h>

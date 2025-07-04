@@ -2,7 +2,7 @@
 #include <asm.h>
 #include <console/printf.h>
 #include <drivers/nvme.h>
-#include <fs/generic.h>
+#include <block/generic.h>
 #include <int/idt.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>

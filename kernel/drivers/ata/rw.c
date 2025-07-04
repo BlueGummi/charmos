@@ -1,6 +1,6 @@
 #include <asm.h>
 #include <console/printf.h>
-#include <fs/generic.h>
+#include <block/generic.h>
 #include <drivers/ata.h>
 #include <sleep.h>
 #include <stdbool.h>

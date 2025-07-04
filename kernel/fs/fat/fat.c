@@ -1,5 +1,5 @@
 #include <console/printf.h>
-#include <fs/generic.h>
+#include <block/generic.h>
 #include <fs/fat.h>
 #include <fs/mbr.h>
 #include <mem/alloc.h>

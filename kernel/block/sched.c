@@ -1,5 +1,5 @@
 #include <console/printf.h>
-#include <fs/generic.h>
+#include <block/generic.h>
 #include <mem/alloc.h>
 #include <spin_lock.h>
 #include <stdint.h>
@@ -350,6 +350,24 @@ static void try_rq_reorder(struct bio_scheduler *sched) {
         return;
 
     disk->ops->reorder(disk);
+}
+
+void bio_sched_tick(void *ctx) {
+    struct bio_scheduler *sched = ctx;
+
+    bool i = spin_lock(&sched->lock);
+
+    boost_starved_requests(sched);
+    try_rq_reorder(sched);
+    try_early_dispatch(sched);
+
+    if (!bio_sched_is_empty(sched)) {
+        defer_after_ms(bio_sched_tick, sched, BIO_SCHED_TICK_MS);
+    } else {
+        sched->defer_pending = false;
+    }
+
+    spin_unlock(&sched->lock, i);
 }
 
 void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req) {

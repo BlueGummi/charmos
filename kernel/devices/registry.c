@@ -1,5 +1,5 @@
 #include <console/printf.h>
-#include <fs/generic.h>
+#include <block/generic.h>
 #include <registry.h>
 #include <drivers/ahci.h>
 #include <drivers/ata.h>

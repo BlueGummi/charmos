@@ -1,4 +1,4 @@
-#include <fs/generic.h>
+#include <block/generic.h>
 #include <fs/bcache.h>
 #include <stdint.h>
 

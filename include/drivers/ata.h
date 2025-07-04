@@ -1,5 +1,5 @@
 #pragma once
-#include <fs/generic.h>
+#include <block/generic.h>
 #include <stdbool.h>
 #include <stdint.h>
 

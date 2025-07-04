@@ -1,5 +1,5 @@
 #include <drivers/nvme.h>
-#include <fs/generic.h>
+#include <block/generic.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
 #include <stdbool.h>
