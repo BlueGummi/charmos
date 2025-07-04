@@ -23,6 +23,12 @@ static inline void set_request_timestamp(struct bio_request *req) {
     req->enqueue_time = time_get_ms();
 }
 
+static inline void set_coalesced(struct bio_request *into,
+                                 struct bio_request *from) {
+    into->is_aggregate = true;
+    from->skip = true;
+}
+
 static inline bool submit_if_urgent(struct bio_scheduler *sched,
                                     struct bio_request *req) {
     if (req->priority == BIO_RQ_URGENT) {
@@ -53,6 +59,20 @@ static inline bool should_early_dispatch(struct bio_scheduler *sched) {
     return sched->total_requests > sched->disk->ops->dispatch_threshold;
 }
 
+static inline uint64_t get_boost_depth(struct bio_request *req) {
+    if (req->boost_count >= 3)
+        return 2;
+    else if (req->boost_count >= 1)
+        return 1;
+    return 0;
+}
+
+static inline uint64_t get_boosted_prio(struct bio_request *req) {
+    uint64_t step = get_boost_depth(req);
+    uint64_t prio = req->priority + BIO_SCHED_STARVATION_BOOST + step;
+    return prio > BIO_SCHED_MAX ? BIO_SCHED_MAX : prio;
+}
+
 static bool should_boost(struct bio_request *req) {
     uint64_t curr_timestamp = time_get_ms();
 
@@ -71,24 +91,22 @@ static bool should_boost(struct bio_request *req) {
     return curr_timestamp > (req->enqueue_time + adjusted_wait);
 }
 
-static inline uint64_t get_boost_depth(struct bio_request *req) {
-    if (req->boost_count >= 3)
-        return 2;
-    else if (req->boost_count >= 1)
-        return 1;
-    return 0;
-}
+static void boost_prio(struct bio_scheduler *sched, struct bio_request *req) {
+    enum bio_request_priority new_prio = get_boosted_prio(req);
 
-static inline void set_coalesced(struct bio_request *into,
-                                 struct bio_request *from) {
-    into->is_aggregate = true;
-    from->skip = true;
-}
+    if (req->priority == new_prio)
+        return;
 
-static inline uint64_t get_boosted_prio(struct bio_request *req) {
-    uint64_t step = get_boost_depth(req);
-    uint64_t prio = req->priority + BIO_SCHED_STARVATION_BOOST + step;
-    return prio > BIO_SCHED_MAX ? BIO_SCHED_MAX : prio;
+    if (sched->queues[new_prio].request_count > BIO_SCHED_BOOST_MAX_OCCUPANCE)
+        return;
+
+    /* remove from current queue */
+    dequeue(sched, req);
+    req->priority = new_prio;
+    req->boost_count++;
+
+    /* re-insert to new level */
+    enqueue(sched, req);
 }
 
 static inline bool try_boost(struct bio_scheduler *sched,
@@ -103,22 +121,31 @@ static inline bool try_boost(struct bio_scheduler *sched,
 /* this will be called with the lock already acquired */
 static bool boost_starved_requests(struct bio_scheduler *sched) {
     bool boosted_any = false;
+
     for (uint64_t i = 0; i < BIO_SCHED_LEVELS; i++) {
         struct bio_rqueue *queue = &sched->queues[i];
         struct bio_request *iter = queue->head;
-        /* skip */
         if (!iter)
             continue;
 
         struct bio_request *start = iter;
         do {
             struct bio_request *next = iter->next;
-            if (try_boost(sched, iter))
-                boosted_any = true;
+
+            if (!iter->skip)
+                try_boost(sched, iter);
+
+            /* weird hack */
+            if (iter->priority != i)
+                goto next_level;
 
             iter = next;
         } while (iter && iter != start);
+
+    next_level:
+        continue;
     }
+
     return boosted_any;
 }
 
@@ -142,24 +169,6 @@ static bool try_dispatch_queue_head(struct bio_scheduler *sched,
         return true;
     }
     return false;
-}
-
-static void boost_prio(struct bio_scheduler *sched, struct bio_request *req) {
-    enum bio_request_priority new_prio = get_boosted_prio(req);
-
-    if (req->priority == new_prio)
-        return;
-
-    if (sched->queues[new_prio].request_count > BIO_SCHED_BOOST_MAX_OCCUPANCE)
-        return;
-
-    /* remove from current queue */
-    dequeue(sched, req);
-    req->priority = new_prio;
-    req->boost_count++;
-
-    /* re-insert to new level */
-    enqueue(sched, req);
 }
 
 /* TODO: generic list - this is identical to the thread scheduler */
@@ -276,6 +285,7 @@ static bool check_higher_queue(struct bio_scheduler *sched,
                 dequeue(sched, candidate);
                 enqueue(sched, candidate);
             }
+
             return true;
         }
         iter = hc_next;

@@ -13,6 +13,7 @@ uint64_t hpet_timestamp_us(void);
 #define HPET_MAIN_COUNTER_OFFSET 0xF0
 #define HPET_TIMER0_CONF_OFFSET 0x100
 #define HPET_TIMER0_COMPARATOR_OFFSET 0x108
+#define HPET_IRQ_LINE 2
 
 union hpet_timer_config {
     uint64_t raw;

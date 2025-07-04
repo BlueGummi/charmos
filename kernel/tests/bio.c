@@ -97,8 +97,26 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
         .user_data = NULL,
         .priority = BIO_RQ_MEDIUM,
     };
+
+    struct bio_request bio2 = {
+        .lba = 50,
+        .disk = d,
+        .buffer = kmalloc_aligned(512, 4096),
+        .size = 512,
+        .sector_count = 512 * 512,
+        .write = false,
+        .done = false,
+        .status = -1,
+        .on_complete = bio_sch_callback,
+        .user_data = NULL,
+        .priority = BIO_RQ_LOW,
+    };
+
     bio_sched_enqueue(d, &bio);
-    sleep_ms(50);
-    TEST_ASSERT(current_test->message_count == 1);
+    bio_sched_enqueue(d, &bio2);
+
+    sleep_ms(100);
+    
+    TEST_ASSERT(current_test->message_count == 2);
     SET_SUCCESS;
 }

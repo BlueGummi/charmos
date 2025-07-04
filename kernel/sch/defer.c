@@ -10,8 +10,7 @@
 
 static deferred_event_t *defer_queue = NULL;
 static struct spinlock defer_lock = {0};
-#define HPET_IRQ_VECTOR 0xF2
-#define HPET_IRQ_LINE 2
+static uint64_t hpet_next_fire_time = UINT64_MAX;
 
 static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
     (void) irq;
@@ -30,8 +29,12 @@ static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
     }
 
     if (defer_queue) {
+        hpet_next_fire_time = defer_queue->timestamp_ms;
         hpet_program_oneshot(defer_queue->timestamp_ms);
+    } else {
+        hpet_next_fire_time = UINT64_MAX;
     }
+
     spin_unlock(&defer_lock, i);
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
 }
@@ -47,7 +50,11 @@ void defer_enqueue(defer_func_t func, void *arg, uint64_t delay_ms) {
     if (!defer_queue || ev->timestamp_ms < defer_queue->timestamp_ms) {
         ev->next = defer_queue;
         defer_queue = ev;
-        hpet_program_oneshot(ev->timestamp_ms);
+
+        if (ev->timestamp_ms < hpet_next_fire_time) {
+            hpet_next_fire_time = ev->timestamp_ms;
+            hpet_program_oneshot(ev->timestamp_ms);
+        }
     } else {
         deferred_event_t *curr = defer_queue;
         while (curr->next && curr->next->timestamp_ms < ev->timestamp_ms)
@@ -55,6 +62,7 @@ void defer_enqueue(defer_func_t func, void *arg, uint64_t delay_ms) {
         ev->next = curr->next;
         curr->next = ev;
     }
+
     spin_unlock(&defer_lock, i);
 }
 
