@@ -28,6 +28,8 @@ make run # run this in the build directory
 
 - [x] bcache async io prefetch/readahead
 
+- [ ] async blkdev io request scheduler
+
 - [x] mlfq smp work stealing scheduler
 
 - [x] async blkdev io operations

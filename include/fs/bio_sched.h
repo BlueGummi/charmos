@@ -25,9 +25,13 @@
 /* max of 2^4 threshold reduction */
 #define BIO_SCHED_BOOST_SHIFT_LIMIT 4
 
+/* max amount of requests in a queue to boost a starved request */
+#define BIO_SCHED_BOOST_MAX_OCCUPANCE 8
+
 struct bio_rqueue {
     struct bio_request *head;
     struct bio_request *tail;
+    uint64_t request_count;
 };
 
 struct bio_scheduler {
@@ -45,11 +49,7 @@ struct bio_scheduler_ops {
     void (*do_coalesce)(struct generic_disk *dev, struct bio_request *into,
                         struct bio_request *from);
 
-    void (*dispatch_partial)(struct generic_disk *dev,
-                             enum bio_request_priority min_prio);
-
-    void (*dispatch_all)(struct generic_disk *dev);
-
+    void (*dispatch_queue)(struct generic_disk *dev, struct bio_rqueue *q);
     void (*reorder)(struct generic_disk *dev);
 
     uint32_t max_wait_time[BIO_SCHED_LEVELS];

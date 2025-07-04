@@ -138,6 +138,7 @@ struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {
     d->write_sector = nvme_write_sector_wrapper;
     d->submit_bio_async = nvme_submit_bio_request;
     d->print = nvme_print_wrapper;
+    d->flags = DISK_FLAG_NO_REORDER;
     d->cache = kmalloc(sizeof(struct bcache));
     bcache_init(d->cache, DEFAULT_BLOCK_CACHE_SIZE);
     d->type = G_NVME_DRIVE;

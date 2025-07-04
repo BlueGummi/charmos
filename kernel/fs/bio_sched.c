@@ -71,6 +71,12 @@ static inline uint64_t get_boost_depth(struct bio_request *req) {
     return 0;
 }
 
+static inline void set_coalesced(struct bio_request *into,
+                                 struct bio_request *from) {
+    into->is_aggregate = true;
+    from->skip = true;
+}
+
 static inline uint64_t get_boosted_prio(struct bio_request *req) {
     uint64_t step = get_boost_depth(req);
     uint64_t prio = req->priority + BIO_SCHED_STARVATION_BOOST + step;
@@ -84,6 +90,29 @@ static inline bool try_boost(struct bio_scheduler *sched,
         return true;
     }
     return false;
+}
+
+/* this will be called with the lock already acquired */
+static bool boost_starved_requests(struct bio_scheduler *sched) {
+    bool boosted_any = false;
+    for (uint64_t i = 0; i < BIO_SCHED_LEVELS; i++) {
+        struct bio_rqueue *queue = &sched->queues[i];
+        struct bio_request *iter = queue->head;
+        /* skip */
+        if (!iter)
+            continue;
+
+        struct bio_request *start = iter;
+
+        do {
+            struct bio_request *next = iter->next;
+            if (try_boost(sched, iter))
+                boosted_any = true;
+
+            iter = next;
+        } while (iter && iter != start);
+    }
+    return boosted_any;
 }
 
 static inline void try_early_dispatch(struct bio_scheduler *sched) {
@@ -114,6 +143,9 @@ static void boost_prio(struct bio_scheduler *sched, struct bio_request *req) {
     if (req->priority == new_prio)
         return;
 
+    if (sched->queues[new_prio].request_count > BIO_SCHED_BOOST_MAX_OCCUPANCE)
+        return;
+
     /* remove from current queue */
     dequeue(sched, req);
     req->priority = new_prio;
@@ -121,21 +153,6 @@ static void boost_prio(struct bio_scheduler *sched, struct bio_request *req) {
 
     /* re-insert to new level */
     enqueue(sched, req);
-}
-
-static bool try_coalesce(struct bio_scheduler *sched) {
-    struct generic_disk *disk = sched->disk;
-    if (disk_skip_coalesce(disk))
-        return false;
-
-    bool coalesced_any = false;
-
-    for (int prio = 0; prio < BIO_SCHED_LEVELS; prio++) {
-        if (coalesce_priority_queue(disk, &sched->queues[prio]))
-            coalesced_any = true;
-    }
-
-    return coalesced_any;
 }
 
 /* TODO: generic list - this is identical to the thread scheduler */
@@ -146,7 +163,7 @@ static void enqueue(struct bio_scheduler *sched, struct bio_request *req) {
     if (submit_if_urgent(sched, req))
         return;
 
-    req->enqueue_time = time_get_ms();
+    set_request_timestamp(req);
     enum bio_request_priority prio = req->priority;
     struct bio_rqueue *q = &sched->queues[prio];
     req->next = NULL;
@@ -165,6 +182,7 @@ static void enqueue(struct bio_scheduler *sched, struct bio_request *req) {
         q->tail = req;
     }
 
+    q->request_count++;
     sched->total_requests++;
 }
 
@@ -198,6 +216,8 @@ static void dequeue(struct bio_scheduler *sched, struct bio_request *req) {
             current->next->prev = current->prev;
         }
     }
+
+    q->request_count--;
     sched->total_requests--;
 }
 
@@ -217,13 +237,70 @@ static bool try_merge_candidates(struct generic_disk *disk,
 
         if (ops->should_coalesce(disk, iter, candidate)) {
             ops->do_coalesce(disk, iter, candidate);
-            candidate->skip = true;
-            iter->is_aggregate = true;
+
+            set_coalesced(iter, candidate);
             merged = true;
         }
         candidate = next_candidate;
     }
     return merged;
+}
+
+static bool check_higher_queue(struct bio_scheduler *sched,
+                               struct bio_rqueue *higher,
+                               struct bio_request *candidate) {
+    struct generic_disk *disk = sched->disk;
+    struct bio_request *iter = higher->head;
+    struct bio_request *hc_start = iter;
+
+    do {
+        struct bio_request *hc_next = iter->next;
+        if (iter->skip) {
+            iter = hc_next;
+            continue;
+        }
+
+        if (disk->ops->should_coalesce(disk, iter, candidate)) {
+            disk->ops->do_coalesce(disk, iter, candidate);
+            set_coalesced(iter, candidate);
+
+            if (candidate->priority < iter->priority) {
+                candidate->priority = iter->priority;
+                dequeue(sched, candidate);
+                enqueue(sched, candidate);
+            }
+            return true;
+        }
+        iter = hc_next;
+    } while (iter && iter != hc_start);
+    return false;
+}
+
+static bool coalesce_adjacent_queues(struct generic_disk *disk,
+                                     struct bio_rqueue *lower,
+                                     struct bio_rqueue *higher) {
+    if (!lower->head || !higher->head)
+        return false;
+
+    struct bio_scheduler *sched = disk->scheduler;
+    struct bio_request *candidate = lower->head;
+    struct bio_request *start = candidate;
+    bool coalesced = false;
+
+    do {
+        struct bio_request *next = candidate->next;
+        if (candidate->skip) {
+            candidate = next;
+            continue;
+        }
+
+        if (check_higher_queue(sched, higher, candidate))
+            coalesced = true;
+
+        candidate = next;
+    } while (candidate && candidate != start);
+
+    return coalesced;
 }
 
 static bool coalesce_priority_queue(struct generic_disk *disk,
@@ -245,27 +322,34 @@ static bool coalesce_priority_queue(struct generic_disk *disk,
     return coalesced;
 }
 
-/* this will be called with the lock already acquired */
-static bool boost_starved_requests(struct bio_scheduler *sched) {
-    bool boosted_any = false;
-    for (uint64_t i = 0; i < BIO_SCHED_LEVELS; i++) {
-        struct bio_rqueue *queue = &sched->queues[i];
-        struct bio_request *iter = queue->head;
-        /* skip */
-        if (!iter)
-            continue;
+static bool try_coalesce(struct bio_scheduler *sched) {
+    struct generic_disk *disk = sched->disk;
+    if (disk_skip_coalesce(disk))
+        return false;
 
-        struct bio_request *start = iter;
+    bool coalesced_any = false;
 
-        do {
-            struct bio_request *next = iter->next;
-            if (try_boost(sched, iter))
-                boosted_any = true;
-
-            iter = next;
-        } while (iter && iter != start);
+    for (int prio = 0; prio < BIO_SCHED_LEVELS; prio++) {
+        if (coalesce_priority_queue(disk, &sched->queues[prio]))
+            coalesced_any = true;
     }
-    return boosted_any;
+
+    /* cross-prio coalescing */
+    for (int prio = 0; prio < BIO_SCHED_LEVELS - 1; prio++) {
+        if (coalesce_adjacent_queues(disk, &sched->queues[prio],
+                                     &sched->queues[prio + 1]))
+            coalesced_any = true;
+    }
+
+    return coalesced_any;
+}
+
+static void try_rq_reorder(struct bio_scheduler *sched) {
+    struct generic_disk *disk = sched->disk;
+    if (disk_skip_reorder(disk))
+        return;
+
+    disk->ops->reorder(disk);
 }
 
 void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req) {
@@ -281,13 +365,14 @@ void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req) {
     uint32_t coalesces = BIO_SCHED_MAX_COALESCES;
     bool i = spin_lock(&sched->lock);
 
-    set_request_timestamp(req);
     enqueue(sched, req);
     while (try_coalesce(sched) && coalesces--)
         ;
 
     try_early_dispatch(sched);
     boost_starved_requests(sched);
+    try_rq_reorder(sched);
+
     spin_unlock(&sched->lock, i);
 }
 
