@@ -58,7 +58,8 @@ struct bio_scheduler_ops {
 
 void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req);
 
-void bio_sched_dequeue(struct generic_disk *disk, struct bio_request *req);
+void bio_sched_dequeue(struct generic_disk *disk, struct bio_request *req,
+                       bool already_locked);
 
 void bio_sched_dispatch_partial(struct generic_disk *disk,
                                 enum bio_request_priority prio);

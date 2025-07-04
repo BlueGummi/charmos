@@ -248,6 +248,7 @@ struct nvme_bio_data {
     uint64_t *prps;
     uint64_t prp_count;    // current number of PRPs
     uint64_t prp_capacity; // allocated capacity
+    struct bio_request *coalescee;
 };
 
 #define NVME_COMPLETION_PHASE(cpl) ((cpl)->status & 0x1)
@@ -325,3 +326,14 @@ void nvme_isr_handler(void *ctx, uint8_t vector, void *rsp);
 
 bool nvme_submit_bio_request(struct generic_disk *disk,
                              struct bio_request *bio);
+
+bool nvme_should_coalesce(struct generic_disk *disk,
+                          const struct bio_request *a,
+                          const struct bio_request *b);
+
+void nvme_do_coalesce(struct generic_disk *disk, struct bio_request *into,
+                      struct bio_request *from);
+
+void nvme_reorder(struct generic_disk *disk);
+
+void nvme_dispatch_queue(struct generic_disk *disk, struct bio_rqueue *q);

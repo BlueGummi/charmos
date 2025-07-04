@@ -9,6 +9,7 @@
 
 uint64_t *hpet_base;
 
+
 void hpet_write64(uint64_t offset, uint64_t value) {
     mmio_write_64((void *) ((uintptr_t) hpet_base + offset), value);
 }
@@ -84,4 +85,20 @@ uint64_t hpet_timestamp_us(void) {
 
 uint64_t hpet_timestamp_ms(void) {
     return hpet_timestamp_us() / 1000;
+}
+
+void hpet_program_oneshot(uint64_t future_ms) {
+    uint64_t now = hpet_timestamp_ms();
+    uint64_t delta_us = (future_ms > now) ? (future_ms - now) * 1000 : 1000;
+
+    uint64_t current_counter = hpet_read64(HPET_MAIN_COUNTER_OFFSET);
+    uint64_t freq = hpet_get_fs_per_tick();
+
+    uint64_t ticks = current_counter + ((delta_us * freq) / 1000000ULL);
+
+    hpet_write64(HPET_TIMER0_COMPARATOR_OFFSET, ticks);
+
+    uint64_t conf = hpet_read64(HPET_TIMER0_CONF_OFFSET);
+    conf &= ~(1 << 3);
+    hpet_write64(HPET_TIMER0_CONF_OFFSET, conf);
 }

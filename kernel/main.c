@@ -17,6 +17,7 @@
 #include <misc/logo.h>
 #include <mp/core.h>
 #include <mp/mp.h>
+#include <sch/defer.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
 #include <stddef.h>
@@ -74,6 +75,7 @@ void k_main(void) {
 
     // Scheduler
     scheduler_init(c_cnt);
+    defer_init();
 
     // Filesystem init
     cmdline_parse(cmdline_request.response->cmdline);

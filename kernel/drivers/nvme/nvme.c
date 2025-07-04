@@ -1,8 +1,8 @@
 #include <asm.h>
 #include <console/printf.h>
-#include <fs/generic.h>
 #include <drivers/nvme.h>
 #include <drivers/pci.h>
+#include <fs/generic.h>
 #include <int/idt.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
@@ -127,6 +127,22 @@ void nvme_print_wrapper(struct generic_disk *d) {
     nvme_print_identify((struct nvme_identify_controller *) i);
 }
 
+static struct bio_scheduler_ops nvme_bio_sched_ops = {
+    .should_coalesce = nvme_should_coalesce,
+    .reorder = nvme_reorder,
+    .do_coalesce = nvme_do_coalesce,
+    .max_wait_time =
+        {
+            [BIO_RQ_BACKGROUND] = 20,
+            [BIO_RQ_LOW] = 15,
+            [BIO_RQ_MEDIUM] = 10,
+            [BIO_RQ_HIGH] = 4,
+            [BIO_RQ_URGENT] = 0,
+        },
+    .dispatch_threshold = 8,
+    .dispatch_queue = nvme_dispatch_queue,
+};
+
 struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {
     struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
     if (!d)
@@ -140,6 +156,8 @@ struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {
     d->print = nvme_print_wrapper;
     d->flags = DISK_FLAG_NO_REORDER;
     d->cache = kmalloc(sizeof(struct bcache));
+    d->scheduler = bio_sched_create(d, &nvme_bio_sched_ops);
+
     bcache_init(d->cache, DEFAULT_BLOCK_CACHE_SIZE);
     d->type = G_NVME_DRIVE;
     return d;

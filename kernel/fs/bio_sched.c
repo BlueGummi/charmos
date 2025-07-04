@@ -376,11 +376,17 @@ void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req) {
     spin_unlock(&sched->lock, i);
 }
 
-void bio_sched_dequeue(struct generic_disk *disk, struct bio_request *req) {
+void bio_sched_dequeue(struct generic_disk *disk, struct bio_request *req,
+                       bool already_locked) {
     struct bio_scheduler *sched = disk->scheduler;
-    bool i = spin_lock(&sched->lock);
+    bool i = false;
+    if (!already_locked)
+        i = spin_lock(&sched->lock);
+
     dequeue(sched, req);
-    spin_unlock(&sched->lock, i);
+
+    if (!already_locked)
+        spin_unlock(&sched->lock, i);
 }
 
 struct bio_scheduler *bio_sched_create(struct generic_disk *disk,
@@ -390,4 +396,12 @@ struct bio_scheduler *bio_sched_create(struct generic_disk *disk,
     disk->ops = ops;
     disk->scheduler = sched;
     return sched;
+}
+
+void bio_sched_dispatch_partial(struct generic_disk *d,
+                                enum bio_request_priority p) {
+    /* no one in urgent queue */
+    for (uint32_t i = BIO_SCHED_MAX - 1; i > p; i--) {
+        d->ops->dispatch_queue(d, &d->scheduler->queues[i]);
+    }
 }

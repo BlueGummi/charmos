@@ -24,11 +24,14 @@ struct bio_request {
     /* can get boosted during coalesce */
     enum bio_request_priority priority;
     struct generic_disk *disk;
-    uint64_t lba;          // starting LBA
-    void *buffer;          // data buffer
+    uint64_t lba; // starting LBA
+    void *buffer; // data buffer
+
+    /* intrusive fields - may be changed by scheduler */
     uint64_t size;         // in bytes
     uint64_t sector_count; // derived from size
-    bool write;            // true = write, false = read
+
+    bool write; // true = write, false = read
 
     volatile bool done;
     int32_t status;
@@ -45,6 +48,7 @@ struct bio_request {
     /* used by dispatcher - do not submit */
     bool skip;
     bool is_aggregate;
+    struct bio_request *next_coalesced;
 
     /* priority boosted to URGENT after
      * enough waiting around */
