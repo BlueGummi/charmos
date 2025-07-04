@@ -405,3 +405,9 @@ void bio_sched_dispatch_partial(struct generic_disk *d,
         d->ops->dispatch_queue(d, &d->scheduler->queues[i]);
     }
 }
+
+void bio_sched_dispatch_all(struct generic_disk *d) {
+    for (uint32_t i = BIO_SCHED_MAX - 1; i > 0; i--) {
+        d->ops->dispatch_queue(d, &d->scheduler->queues[i]);
+    }
+}
