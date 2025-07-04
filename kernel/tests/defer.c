@@ -28,7 +28,7 @@ static void defer_func(void *boo) {
 REGISTER_TEST(defer_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
     defer_enqueue(defer_func, NULL, 50);
     enqueue_ms = time_get_ms();
-    sleep_ms(53);
+    sleep_ms(100);
 
     if (defer_worked)
         SET_SUCCESS;

@@ -43,12 +43,9 @@ static inline bool submit_if_skip_sched(struct bio_scheduler *sched,
 }
 
 static bool sched_is_empty(struct bio_scheduler *sched) {
-    for (uint32_t i = 0; i < BIO_SCHED_MAX; i++) {
-        if (!sched->queues[i].head)
-            continue;
-        else
+    for (uint32_t i = 0; i < BIO_SCHED_LEVELS; i++)
+        if (sched->queues[i].head)
             return false;
-    }
     return true;
 }
 
@@ -114,7 +111,6 @@ static bool boost_starved_requests(struct bio_scheduler *sched) {
             continue;
 
         struct bio_request *start = iter;
-
         do {
             struct bio_request *next = iter->next;
             if (try_boost(sched, iter))
@@ -401,6 +397,10 @@ void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req) {
     try_early_dispatch(sched);
     boost_starved_requests(sched);
     try_rq_reorder(sched);
+    if (!sched->defer_pending) {
+        sched->defer_pending = true;
+        defer_enqueue(bio_sched_tick, sched, BIO_SCHED_TICK_MS);
+    }
 
     spin_unlock(&sched->lock, i);
 }
