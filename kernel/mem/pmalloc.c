@@ -88,8 +88,17 @@ void pmm_dyn_init() {
 
 void *pmm_alloc_page(bool add_offset) {
 
+    for (uint64_t i = last_allocated_index; i < bitmap_size * 8; i++) {
+        if (!test_bit(i)) {
+            set_bit(i);
+            void *page = (void *) ((add_offset ? offset : 0) + (i * PAGE_SIZE));
+            return page;
+        }
+    }
+
     for (uint64_t i = 0; i < bitmap_size * 8; i++) {
         if (!test_bit(i)) {
+            last_allocated_index = i;
             set_bit(i);
             void *page = (void *) ((add_offset ? offset : 0) + (i * PAGE_SIZE));
             return page;
@@ -157,7 +166,6 @@ void *pmm_alloc_pages(uint64_t count, bool add_offset) {
     bool found = false;
 
     for (uint64_t i = last_allocated_index; i < bitmap_size * 8; i++) {
-
         if (!test_bit(i)) {
             if (consecutive == 0) {
                 start_index = i;
@@ -175,7 +183,6 @@ void *pmm_alloc_pages(uint64_t count, bool add_offset) {
 
     if (!found) {
         for (uint64_t i = 0; i < bitmap_size * 8; i++) {
-
             if (!test_bit(i)) {
                 if (consecutive == 0) {
                     start_index = i;

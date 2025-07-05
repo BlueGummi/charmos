@@ -33,23 +33,29 @@ static void bio_sched_tick(void *ctx) {
     spin_unlock(&sched->lock, i);
 }
 
+static bool try_early_submit(struct bio_scheduler *sched,
+                             struct bio_request *req) {
+    /* disk does not support/need IO scheduling */
+    if (submit_if_skip_sched(sched, req))
+        return true;
+
+    if (submit_if_urgent(sched, req))
+        return true;
+
+    return false;
+}
+
 void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req) {
     struct bio_scheduler *sched = disk->scheduler;
 
-    /* disk does not support/need IO scheduling */
-    if (submit_if_skip_sched(sched, req))
+    if (try_early_submit(sched, req))
         return;
 
-    if (submit_if_urgent(sched, req))
-        return;
-
-    uint32_t coalesces = BIO_SCHED_MAX_COALESCES;
     bool i = spin_lock(&sched->lock);
 
     bio_sched_enqueue_internal(sched, req);
 
-    while (bio_sched_try_coalesce(sched) && coalesces--)
-        ;
+    bio_sched_try_coalesce(sched);
 
     bio_sched_try_early_dispatch(sched);
     bio_sched_boost_starved(sched);

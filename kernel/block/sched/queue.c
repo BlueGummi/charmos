@@ -35,6 +35,7 @@ void bio_sched_enqueue_internal(struct bio_scheduler *sched,
         q->tail = req;
     }
 
+    q->dirty = true;
     q->request_count++;
     sched->total_requests++;
 }
@@ -68,6 +69,7 @@ void bio_sched_dequeue_internal(struct bio_scheduler *sched,
         }
     }
 
+    q->dirty = true;
     q->request_count--;
     sched->total_requests--;
 }

@@ -24,29 +24,19 @@ bool nvme_should_coalesce(struct generic_disk *disk,
     return true;
 }
 
+static inline uint64_t prp_count_for(uint64_t size) {
+    return (size + PAGE_SIZE - 1) / PAGE_SIZE;
+}
+
 static void add_prp_segment(struct nvme_bio_data *prp_data, const void *buffer,
                             uint64_t size) {
     uint8_t *vaddr = (uint8_t *) buffer;
     uint64_t offset = 0;
 
     while (offset < size) {
-        if (prp_data->prp_count >= prp_data->prp_capacity) {
-            uint64_t new_capacity =
-                prp_data->prp_capacity == 0
-                    ? NVME_PRP_INITIAL_CAPACITY
-                    : prp_data->prp_capacity * NVME_PRP_GROWTH_FACTOR;
-
-            uint64_t *new_prps =
-                krealloc(prp_data->prps, new_capacity * sizeof(uint64_t));
-
-            prp_data->prps = new_prps;
-            prp_data->prp_capacity = new_capacity;
-        }
-
         void *page_vaddr = vaddr + offset;
         uint64_t phys = vmm_get_phys((uint64_t) page_vaddr);
         prp_data->prps[prp_data->prp_count++] = phys;
-
         offset += PAGE_SIZE;
     }
 }
@@ -55,24 +45,29 @@ void nvme_do_coalesce(struct generic_disk *disk, struct bio_request *into,
                       struct bio_request *from) {
     (void) disk;
 
-    if (!into->driver_private2) {
-        struct nvme_bio_data *dd = kzalloc(sizeof(struct nvme_bio_data));
+    struct nvme_bio_data *dd = into->driver_private2;
 
-        /* TODO: figure out how much space to actually allocate */
-        dd->prps = kzalloc(PAGE_SIZE);
+    if (!dd) {
+        dd = kzalloc(sizeof(struct nvme_bio_data));
         into->driver_private2 = dd;
+
+        uint64_t prp_needed =
+            prp_count_for(into->size) + prp_count_for(from->size);
+        dd->prps = kmalloc(prp_needed * sizeof(uint64_t));
+        dd->prp_capacity = prp_needed;
+        dd->prp_count = 0;
+
         add_prp_segment(dd, into->buffer, into->size);
     }
 
-    struct nvme_bio_data *dd = into->driver_private2;
-    dd->coalescee = from;
-    into->next_coalesced = from;
     add_prp_segment(dd, from->buffer, from->size);
 
     into->sector_count += from->sector_count;
     into->size += from->size;
-    from->skip = true;
     into->is_aggregate = true;
+    into->next_coalesced = from;
+    from->skip = true;
+
     bio_sched_dequeue(disk, from, true);
 }
 

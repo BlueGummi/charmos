@@ -80,6 +80,9 @@ static bool coalesce_adjacent_queues(struct generic_disk *disk,
     if (!lower->head || !higher->head)
         return false;
 
+    if (!lower->dirty || !higher->dirty)
+        return false;
+
     struct bio_scheduler *sched = disk->scheduler;
     struct bio_request *candidate = lower->head;
     struct bio_request *start = candidate;
@@ -98,12 +101,17 @@ static bool coalesce_adjacent_queues(struct generic_disk *disk,
         candidate = next;
     } while (candidate && candidate != start);
 
+    lower->dirty = false;
+    higher->dirty = false;
     return coalesced;
 }
 
 static bool coalesce_priority_queue(struct generic_disk *disk,
                                     struct bio_rqueue *queue) {
     if (!queue->head)
+        return false;
+
+    if (!queue->dirty)
         return false;
 
     struct bio_request *start = queue->head;
@@ -119,6 +127,9 @@ static bool coalesce_priority_queue(struct generic_disk *disk,
 
         iter = next;
     } while (iter && iter != start);
+
+    queue->dirty = false;
+
     return coalesced;
 }
 

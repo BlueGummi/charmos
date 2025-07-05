@@ -32,10 +32,16 @@
 /* time between checks of the queue */
 #define BIO_SCHED_TICK_MS 20
 
+/* max to scan before bail */
+#define BIO_SCHED_COALESCE_SCAN_LIMIT 8
+
 struct bio_rqueue {
     struct bio_request *head;
     struct bio_request *tail;
     uint64_t request_count;
+
+    /* coalescing */
+    bool dirty;
 };
 
 struct bio_scheduler {
