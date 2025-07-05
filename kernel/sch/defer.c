@@ -59,6 +59,7 @@ void defer_enqueue(defer_func_t func, void *arg, uint64_t delay_ms) {
         deferred_event_t *curr = defer_queue;
         while (curr->next && curr->next->timestamp_ms < ev->timestamp_ms)
             curr = curr->next;
+
         ev->next = curr->next;
         curr->next = ev;
     }

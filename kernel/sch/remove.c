@@ -58,3 +58,10 @@ void scheduler_rm_thread(struct scheduler *sched, struct thread *task,
     if (!already_locked)
         spin_unlock(&sched->lock, change_interrupts ? ints : false);
 }
+
+void scheduler_take_out(struct thread *t) {
+    if (t->curr_core == -1)
+        return;
+
+    scheduler_rm_thread(local_schs[t->curr_core], t, false, false);
+}
