@@ -55,11 +55,13 @@ void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req) {
 
     bio_sched_enqueue_internal(sched, req);
 
-    bio_sched_try_coalesce(sched);
-
     bio_sched_try_early_dispatch(sched);
     bio_sched_boost_starved(sched);
+
+    bio_sched_try_coalesce(sched);
+
     try_rq_reorder(sched);
+
     if (!sched->defer_pending) {
         sched->defer_pending = true;
         defer_enqueue(bio_sched_tick, sched, BIO_SCHED_TICK_MS);

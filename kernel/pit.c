@@ -19,7 +19,7 @@ static void pit_wait_until_zero() {
         uint16_t count = pit_read_count();
         if (count <= 1)
             break;
-        __asm__ volatile("pause");
+        asm volatile("pause");
     }
 }
 

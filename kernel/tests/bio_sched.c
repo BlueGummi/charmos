@@ -80,8 +80,13 @@ REGISTER_TEST(bio_sched_coalesce_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
         .user_data = (void *) BIO_RQ_MEDIUM,
     };
 
+    char *name = kmalloc(100);
+    uint64_t t = time_get_us();
     bio_sched_enqueue(d, &bio);
     bio_sched_enqueue(d, &bio2);
+    snprintf(name, 100, "enqueues took %d us", time_get_us() - t);
+    ADD_MESSAGE(name);
+
     bio_sched_dispatch_all(d);
     sleep_ms(2);
     TEST_ASSERT(cb1d && cb2d);

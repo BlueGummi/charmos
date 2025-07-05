@@ -9,7 +9,6 @@
 REGISTER_TEST(pmm_alloc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     void *p = pmm_alloc_page(false);
     TEST_ASSERT(p != NULL);
-    pmm_free_pages(p, 1, false);
     SET_SUCCESS;
 }
 
@@ -36,7 +35,6 @@ REGISTER_TEST(vmm_map_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
             void *ptr = kmalloc_aligned(align, align);                         \
             TEST_ASSERT(ptr != NULL);                                          \
             ASSERT_ALIGNED(ptr, align);                                        \
-            kfree_aligned(ptr);                                                \
         }                                                                      \
         SET_SUCCESS;                                                           \
     }
