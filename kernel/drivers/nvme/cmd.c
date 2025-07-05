@@ -127,58 +127,6 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
     }
 }
 
-static void nvme_on_bio_complete(struct nvme_request *req) {
-    struct bio_request *bio = (struct bio_request *) req->user_data;
-
-    bio->done = true;
-    bio->status = req->status;
-
-    if (bio->driver_private2) {
-        struct bio_request *coalesced = bio->next_coalesced;
-        while (coalesced) {
-            coalesced->done = true;
-            coalesced->status = req->status;
-
-            if (coalesced->on_complete)
-                coalesced->on_complete(coalesced);
-
-            coalesced = coalesced->next_coalesced;
-        }
-    }
-
-    if (bio->on_complete)
-        bio->on_complete(bio);
-
-    kfree(req);
-}
-
-bool nvme_submit_bio_request(struct generic_disk *disk,
-                             struct bio_request *bio) {
-    struct nvme_request *req = kmalloc(sizeof(struct nvme_request));
-    if (!req)
-        return false;
-
-    req->buffer = bio->buffer;
-    req->done = false;
-    req->lba = bio->lba;
-
-    req->qid = THIS_QID;
-    req->sector_count = bio->sector_count;
-    req->size = bio->size;
-    req->write = bio->write;
-    req->user_data = bio;
-
-    req->on_complete = nvme_on_bio_complete;
-
-    if (bio->write) {
-        return nvme_write_sector_async_wrapper(disk, bio->lba, bio->buffer,
-                                               bio->sector_count, req);
-    } else {
-        return nvme_read_sector_async_wrapper(disk, bio->lba, bio->buffer,
-                                              bio->sector_count, req);
-    }
-}
-
 uint8_t *nvme_identify_controller(struct nvme_device *nvme) {
     uint64_t buffer_phys = (uint64_t) pmm_alloc_page(false);
 
