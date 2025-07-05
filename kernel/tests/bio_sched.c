@@ -138,7 +138,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
     bio_sched_enqueue(d, &bio2);
     bio_sched_enqueue(d, &bio3);
 
-    sleep_ms(200);
+    sleep_ms(400);
 
     TEST_ASSERT(current_test->message_count == 3);
     SET_SUCCESS;

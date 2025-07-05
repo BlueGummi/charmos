@@ -133,10 +133,7 @@ static bool boost_starved_requests(struct bio_scheduler *sched) {
         do {
             struct bio_request *next = iter->next;
 
-            if (!iter->skip)
-                try_boost(sched, iter);
-
-            if (iter->priority != i)
+            if (!iter->skip && try_boost(sched, iter))
                 goto next_level;
 
             iter = next;
@@ -401,6 +398,7 @@ void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req) {
     bool i = spin_lock(&sched->lock);
 
     enqueue(sched, req);
+
     while (try_coalesce(sched) && coalesces--)
         ;
 
