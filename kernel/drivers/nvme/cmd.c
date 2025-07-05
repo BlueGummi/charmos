@@ -133,9 +133,7 @@ static void nvme_on_bio_complete(struct nvme_request *req) {
     bio->status = req->status;
 
     if (bio->driver_private2) {
-        struct nvme_bio_data *data = bio->driver_private2;
-
-        struct bio_request *coalesced = data->coalescee;
+        struct bio_request *coalesced = bio->next_coalesced;
         while (coalesced) {
             coalesced->done = true;
             coalesced->status = req->status;

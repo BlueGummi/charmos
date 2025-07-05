@@ -56,6 +56,9 @@ void nvme_do_coalesce(struct generic_disk *disk, struct bio_request *into,
 
     if (!into->driver_private2) {
         struct nvme_bio_data *dd = kzalloc(sizeof(struct nvme_bio_data));
+
+        /* TODO: figure out how much space to actually allocate */
+        dd->prps = kzalloc(PAGE_SIZE);
         into->driver_private2 = dd;
         add_prp_segment(dd, into->buffer, into->size);
     }
