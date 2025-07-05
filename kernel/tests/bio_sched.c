@@ -1,4 +1,5 @@
 #include <block/generic.h>
+#include <block/sched.h>
 #include <fs/ext2.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>

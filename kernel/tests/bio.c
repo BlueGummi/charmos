@@ -1,3 +1,4 @@
+#include <block/bio.h>
 #include <block/generic.h>
 #include <fs/ext2.h>
 #include <fs/vfs.h>
@@ -36,7 +37,7 @@ REGISTER_TEST(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         struct bio_request bio = {
             .lba = 0,
             .buffer = kmalloc_aligned(512 * 512, 4096),
-            .size = 512 * 512, 
+            .size = 512 * 512,
             .sector_count = 512,
             .write = false,
             .done = false,

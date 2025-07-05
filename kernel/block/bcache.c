@@ -1,5 +1,6 @@
-#include <block/generic.h>
 #include <block/bcache.h>
+#include <block/generic.h>
+#include <block/sched.h>
 #include <mem/alloc.h>
 #include <stdbool.h>
 #include <stddef.h>

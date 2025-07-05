@@ -1,3 +1,4 @@
+#include <block/bio.h>
 #include <block/generic.h>
 #include <drivers/nvme.h>
 #include <mem/alloc.h>
@@ -21,7 +22,7 @@ static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
         data->prps[i] = vmm_get_phys(vaddr);
         vaddr += PAGE_SIZE;
     }
-    
+
     data->prp_count = num_pages;
 
     return true;

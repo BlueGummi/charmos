@@ -1,6 +1,7 @@
 #pragma once
 #include <block/bcache.h>
 #include <block/bio.h>
+#include <block/generic.h>
 #include <fs/detect.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
@@ -65,10 +66,50 @@ void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req);
 void bio_sched_dequeue(struct generic_disk *disk, struct bio_request *req,
                        bool already_locked);
 
+void bio_sched_enqueue_internal(struct bio_scheduler *sched,
+                                struct bio_request *req);
+void bio_sched_dequeue_internal(struct bio_scheduler *sched,
+                                struct bio_request *req);
+
 void bio_sched_dispatch_partial(struct generic_disk *disk,
                                 enum bio_request_priority prio);
 
 void bio_sched_dispatch_all(struct generic_disk *disk);
 
+void bio_sched_try_early_dispatch(struct bio_scheduler *sched);
+
+bool bio_sched_try_coalesce(struct bio_scheduler *sched);
+bool bio_sched_boost_starved(struct bio_scheduler *sched);
+
 struct bio_scheduler *bio_sched_create(struct generic_disk *disk,
                                        struct bio_scheduler_ops *ops);
+
+static inline void set_request_timestamp(struct bio_request *req) {
+    req->enqueue_time = time_get_ms();
+}
+
+static inline bool submit_if_urgent(struct bio_scheduler *sched,
+                                    struct bio_request *req) {
+    if (req->priority == BIO_RQ_URGENT) {
+        /* VIP request - skip the queue ! */
+        sched->disk->submit_bio_async(sched->disk, req);
+        return true;
+    }
+    return false;
+}
+
+static inline bool sched_is_empty(struct bio_scheduler *sched) {
+    for (uint32_t i = 0; i < BIO_SCHED_LEVELS; i++)
+        if (sched->queues[i].head)
+            return false;
+    return true;
+}
+
+static inline bool submit_if_skip_sched(struct bio_scheduler *sched,
+                                        struct bio_request *req) {
+    if (disk_skip_sched(sched->disk)) {
+        sched->disk->submit_bio_async(sched->disk, req);
+        return true;
+    }
+    return false;
+}

@@ -1,5 +1,6 @@
 #include <acpi/lapic.h>
 #include <asm.h>
+#include <block/bio.h>
 #include <block/generic.h>
 #include <drivers/ahci.h>
 #include <drivers/ata.h>

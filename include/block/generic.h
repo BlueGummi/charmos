@@ -1,6 +1,5 @@
 #pragma once
 #include <block/bcache.h>
-#include <block/sched.h>
 #include <fs/detect.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
@@ -10,6 +9,7 @@
 #include <stdint.h>
 
 struct generic_disk;
+struct bio_request;
 
 enum generic_disk_type {
     G_IDE_DRIVE,
