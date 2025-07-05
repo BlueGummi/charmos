@@ -14,6 +14,7 @@ static uint64_t bitmap_size = BOOT_BITMAP_SIZE;
 
 static uint8_t boot_bitmap[BOOT_BITMAP_SIZE];
 static uint8_t *bitmap;
+static uint64_t last_allocated_index = 0;
 
 static void set_bit(uint64_t index) {
     bitmap[index / 8] |= (1 << (index % 8));
@@ -155,7 +156,7 @@ void *pmm_alloc_pages(uint64_t count, bool add_offset) {
     uint64_t start_index = 0;
     bool found = false;
 
-    for (uint64_t i = 0; i < bitmap_size * 8; i++) {
+    for (uint64_t i = last_allocated_index; i < bitmap_size * 8; i++) {
 
         if (!test_bit(i)) {
             if (consecutive == 0) {
@@ -173,10 +174,30 @@ void *pmm_alloc_pages(uint64_t count, bool add_offset) {
     }
 
     if (!found) {
+        for (uint64_t i = 0; i < bitmap_size * 8; i++) {
+
+            if (!test_bit(i)) {
+                if (consecutive == 0) {
+                    start_index = i;
+                }
+                consecutive++;
+
+                if (consecutive == count) {
+                    found = true;
+                    break;
+                }
+            } else {
+                consecutive = 0;
+            }
+        }
+    }
+
+    if (!found) {
         k_printf("Couldn't allocate %zu contiguous pages\n", count);
         return NULL;
     }
 
+    last_allocated_index = start_index;
     for (uint64_t i = 0; i < count; i++) {
         set_bit(start_index + i);
     }

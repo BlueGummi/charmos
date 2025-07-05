@@ -29,7 +29,7 @@
 #define BIO_SCHED_BOOST_MAX_OCCUPANCE 8
 
 /* time between checks of the queue */
-#define BIO_SCHED_TICK_MS 10
+#define BIO_SCHED_TICK_MS 20
 
 struct bio_rqueue {
     struct bio_request *head;

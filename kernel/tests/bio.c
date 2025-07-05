@@ -19,6 +19,7 @@
     struct vfs_node *root = g_root_node;
 
 static bool done = false;
+static bool done2 = false;
 static uint64_t sch_start_ms = 0, sch_end_ms = 0;
 
 static void bio_callback(struct bio_request *req) {
@@ -29,7 +30,8 @@ static void bio_callback(struct bio_request *req) {
 
 static void bio_sch_callback(struct bio_request *req) {
     (void) req;
-    done = true;
+
+    done2 = true;
     sch_end_ms = time_get_ms();
     char *msg = kmalloc(100);
     snprintf(msg, 100, "bio_sch_callback succeeded in %d ms",
@@ -116,7 +118,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
     bio_sched_enqueue(d, &bio2);
 
     sleep_ms(100);
-    
+
     TEST_ASSERT(current_test->message_count == 2);
     SET_SUCCESS;
 }
