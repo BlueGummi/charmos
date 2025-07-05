@@ -1,5 +1,5 @@
-#include <drivers/nvme.h>
 #include <block/generic.h>
+#include <drivers/nvme.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
 #include <stdbool.h>
@@ -9,10 +9,28 @@
 #include "sch/sched.h"
 #include "sch/thread.h"
 
+static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
+                               size_t size) {
+    size_t offset = (uintptr_t) buffer & (PAGE_SIZE - 1);
+    size_t num_pages = (offset + size + PAGE_SIZE - 1) / PAGE_SIZE;
+
+    data->prps = kmalloc(sizeof(struct nvme_bio_data) * num_pages);
+    uintptr_t vaddr = (uintptr_t) buffer & ~(PAGE_SIZE - 1);
+
+    for (size_t i = 0; i < num_pages; ++i) {
+        data->prps[i] = vmm_get_phys(vaddr);
+        vaddr += PAGE_SIZE;
+    }
+    
+    data->prp_count = num_pages;
+
+    return true;
+}
+
 static void nvme_setup_prps(struct nvme_command *cmd,
                             struct nvme_bio_data *data,
                             const void *fallback_buffer, size_t size) {
-    if (!data || data->prp_count == 0) {
+    if (data->prp_count == 0) {
         uint64_t buffer_phys = vmm_get_phys((uint64_t) fallback_buffer);
         cmd->prp1 = buffer_phys;
         if (size > PAGE_SIZE)
@@ -37,15 +55,24 @@ bool nvme_read_sector_async(struct generic_disk *disk, uint64_t lba,
     struct nvme_device *nvme = disk->driver_data;
     uint16_t qid = THIS_QID;
 
+    struct bio_request *bio = req->user_data;
+
+    struct nvme_bio_data *data = kzalloc(sizeof(struct nvme_bio_data));
+
+    if (!nvme_bio_fill_prps(data, buffer, count * disk->sector_size)) {
+        kfree(data);
+        return false;
+    }
+
+    if (bio)
+        bio->driver_private2 = data;
+
     struct nvme_command cmd = {0};
     cmd.opc = NVME_OP_IO_READ;
     cmd.nsid = 1;
     cmd.cdw10 = lba & 0xFFFFFFFF;
     cmd.cdw11 = lba >> 32;
     cmd.cdw12 = count - 1;
-
-    struct bio_request *bio = req->user_data;
-    struct nvme_bio_data *data = bio ? bio->driver_private2 : NULL;
 
     nvme_setup_prps(&cmd, data, buffer, count * disk->sector_size);
 
@@ -66,15 +93,24 @@ bool nvme_write_sector_async(struct generic_disk *disk, uint64_t lba,
     struct nvme_device *nvme = disk->driver_data;
     uint16_t qid = THIS_QID;
 
+    struct bio_request *bio = req->user_data;
+
+    struct nvme_bio_data *data = kzalloc(sizeof(struct nvme_bio_data));
+
+    if (!nvme_bio_fill_prps(data, buffer, count * disk->sector_size)) {
+        kfree(data);
+        return false;
+    }
+
+    if (bio)
+        bio->driver_private2 = data;
+
     struct nvme_command cmd = {0};
     cmd.opc = NVME_OP_IO_WRITE;
     cmd.nsid = 1;
     cmd.cdw10 = lba & 0xFFFFFFFF;
     cmd.cdw11 = lba >> 32;
     cmd.cdw12 = count - 1;
-
-    struct bio_request *bio = req->user_data;
-    struct nvme_bio_data *data = bio ? bio->driver_private2 : NULL;
 
     nvme_setup_prps(&cmd, data, buffer, count * disk->sector_size);
 
@@ -137,8 +173,11 @@ bool nvme_write_sector(struct generic_disk *disk, uint64_t lba,
 
 bool nvme_read_sector_wrapper(struct generic_disk *disk, uint64_t lba,
                               uint8_t *buf, uint64_t cnt) {
+
+    struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
+    uint16_t max_sectors = nvme->max_transfer_size / disk->sector_size;
     while (cnt > 0) {
-        uint16_t chunk = (cnt > 65535) ? 65535 : (uint16_t) cnt;
+        uint16_t chunk = (cnt > max_sectors) ? max_sectors : (uint16_t) cnt;
         if (!nvme_read_sector(disk, lba, buf, chunk))
             return false;
 
@@ -151,8 +190,11 @@ bool nvme_read_sector_wrapper(struct generic_disk *disk, uint64_t lba,
 
 bool nvme_write_sector_wrapper(struct generic_disk *disk, uint64_t lba,
                                const uint8_t *buf, uint64_t cnt) {
+
+    struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
+    uint16_t max_sectors = nvme->max_transfer_size / disk->sector_size;
     while (cnt > 0) {
-        uint16_t chunk = (cnt > 65535) ? 65535 : (uint16_t) cnt;
+        uint16_t chunk = (cnt > max_sectors) ? max_sectors : (uint16_t) cnt;
         if (!nvme_write_sector(disk, lba, buf, chunk))
             return false;
 
@@ -166,12 +208,14 @@ bool nvme_write_sector_wrapper(struct generic_disk *disk, uint64_t lba,
 bool nvme_write_sector_async_wrapper(struct generic_disk *disk, uint64_t lba,
                                      const uint8_t *buf, uint64_t cnt,
                                      struct nvme_request *req) {
+    struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
+    uint16_t max_sectors = nvme->max_transfer_size / disk->sector_size;
     uint16_t chunk;
 
     int part_count = 0;
     uint64_t tmp_cnt = cnt;
     while (tmp_cnt > 0) {
-        chunk = (tmp_cnt > 65535) ? 65535 : (uint16_t) tmp_cnt;
+        chunk = (tmp_cnt > max_sectors) ? max_sectors : (uint16_t) tmp_cnt;
         tmp_cnt -= chunk;
         part_count++;
     }
@@ -179,7 +223,7 @@ bool nvme_write_sector_async_wrapper(struct generic_disk *disk, uint64_t lba,
     req->remaining_parts = part_count;
 
     while (cnt > 0) {
-        chunk = (cnt > 65535) ? 65535 : (uint16_t) cnt;
+        chunk = (cnt > max_sectors) ? max_sectors : (uint16_t) cnt;
         cnt -= chunk;
 
         if (!nvme_write_sector_async(disk, lba, buf, chunk, req))
@@ -195,12 +239,14 @@ bool nvme_write_sector_async_wrapper(struct generic_disk *disk, uint64_t lba,
 bool nvme_read_sector_async_wrapper(struct generic_disk *disk, uint64_t lba,
                                     uint8_t *buf, uint64_t cnt,
                                     struct nvme_request *req) {
+    struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
+    uint16_t max_sectors = nvme->max_transfer_size / disk->sector_size;
     uint16_t chunk;
 
     int part_count = 0;
     uint64_t tmp_cnt = cnt;
     while (tmp_cnt > 0) {
-        chunk = (tmp_cnt > 65535) ? 65535 : (uint16_t) tmp_cnt;
+        chunk = (tmp_cnt > max_sectors) ? max_sectors : (uint16_t) tmp_cnt;
         tmp_cnt -= chunk;
         part_count++;
     }
@@ -208,7 +254,7 @@ bool nvme_read_sector_async_wrapper(struct generic_disk *disk, uint64_t lba,
     req->remaining_parts = part_count;
 
     while (cnt > 0) {
-        chunk = (cnt > 65535) ? 65535 : (uint16_t) cnt;
+        chunk = (cnt > max_sectors) ? max_sectors : (uint16_t) cnt;
         cnt -= chunk;
 
         if (!nvme_read_sector_async(disk, lba, buf, chunk, req))

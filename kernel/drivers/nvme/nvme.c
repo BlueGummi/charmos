@@ -79,6 +79,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme_setup_admin_queues(nvme);
     nvme_enable_controller(nvme);
     nvme_identify_namespace(nvme, 1);
+    struct nvme_identify_controller *c = (void *) nvme_identify_controller(nvme);
 
     uint32_t actual = nvme_set_num_queues(nvme, core_count, core_count);
     uint32_t total_sq = actual & 0xffff;
@@ -90,6 +91,8 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
 
     uint32_t sqs_to_make = core_count > total_sq ? total_sq : core_count;
 
+    nvme->max_transfer_size = (1 << c->mdts) * PAGE_SIZE;
+    nvme_info(K_INFO, "Controller max transfer size is %u bytes", nvme->max_transfer_size);
     nvme->isr_index = kzalloc(sizeof(uint8_t) * sqs_to_make);
     nvme->io_waiters = kzalloc(sizeof(struct thread *) * sqs_to_make);
     nvme->io_statuses = kzalloc(sizeof(uint16_t *) * sqs_to_make);

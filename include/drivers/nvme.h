@@ -138,6 +138,7 @@ struct nvme_device {
 
     uint32_t sector_size;
     struct spinlock lock;
+    uint64_t max_transfer_size;
 };
 
 struct nvme_identify {
