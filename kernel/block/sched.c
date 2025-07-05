@@ -64,6 +64,7 @@ static inline uint64_t get_boost_depth(struct bio_request *req) {
         return 2;
     else if (req->boost_count >= 1)
         return 1;
+
     return 0;
 }
 
@@ -135,7 +136,6 @@ static bool boost_starved_requests(struct bio_scheduler *sched) {
             if (!iter->skip)
                 try_boost(sched, iter);
 
-            /* weird hack */
             if (iter->priority != i)
                 goto next_level;
 
