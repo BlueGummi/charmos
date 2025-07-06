@@ -17,7 +17,7 @@ enum bio_request_priority {
     BIO_RQ_URGENT = 4,
 };
 
-/* everything without the / const / comment next to it
+/* everything WITHOUT the / const / comment next to it
  * can be changed by the scheduler during optimizations */
 struct bio_request {
     /* REQUIRED to be set by sender */
@@ -72,9 +72,9 @@ struct bio_request {
 struct bio_request *bio_create_write(struct generic_disk *d, uint64_t lba,
                                      uint64_t sectors, uint64_t size,
                                      void (*cb)(struct bio_request *),
-                                     void *user);
+                                     void *user, void *buf);
 
 struct bio_request *bio_create_read(struct generic_disk *d, uint64_t lba,
                                     uint64_t sectors, uint64_t size,
                                     void (*cb)(struct bio_request *),
-                                    void *user);
+                                    void *user, void *buf);

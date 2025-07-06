@@ -9,7 +9,7 @@ static struct bio_request *create(struct generic_disk *d, uint64_t lba,
                                   uint64_t sec, uint64_t size,
                                   enum bio_request_priority p,
                                   void (*cb)(struct bio_request *), bool write,
-                                  void *user) {
+                                  void *user, void *buffer) {
 
     struct bio_request *req = kzalloc(sizeof(struct bio_request));
     req->disk = d;
@@ -18,7 +18,7 @@ static struct bio_request *create(struct generic_disk *d, uint64_t lba,
     req->sector_count = sec;
     req->priority = p;
     req->on_complete = cb;
-    req->buffer = kmalloc_aligned(size, PAGE_SIZE);
+    req->buffer = buffer ? buffer : kmalloc_aligned(size, PAGE_SIZE);
     req->write = write;
     req->user_data = user;
     req->status = -1;
@@ -29,15 +29,15 @@ static struct bio_request *create(struct generic_disk *d, uint64_t lba,
 struct bio_request *bio_create_read(struct generic_disk *d, uint64_t lba,
                                     uint64_t sectors, uint64_t size,
                                     void (*cb)(struct bio_request *),
-                                    void *user) {
-    return create(d, lba, sectors, size, BIO_RQ_MEDIUM, cb, false, user);
+                                    void *user, void *buffer) {
+    return create(d, lba, sectors, size, BIO_RQ_MEDIUM, cb, false, user, buffer);
 }
 
 struct bio_request *bio_create_write(struct generic_disk *d, uint64_t lba,
                                      uint64_t sectors, uint64_t size,
                                      void (*cb)(struct bio_request *),
-                                     void *user) {
-    return create(d, lba, sectors, size, BIO_RQ_MEDIUM, cb, true, user);
+                                     void *user, void *buffer) {
+    return create(d, lba, sectors, size, BIO_RQ_MEDIUM, cb, true, user, buffer);
 }
 
 void bio_request_free(struct bio_request *req) {

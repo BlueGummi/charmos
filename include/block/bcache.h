@@ -15,6 +15,9 @@ struct generic_disk;
 struct bcache_entry {
     /* allocated upon new reads */
     uint8_t *buffer;
+
+    /* aligned LBA buffer */
+    uint8_t *base_buffer;
     uint64_t size;
 
     /* logical block address */
@@ -25,6 +28,9 @@ struct bcache_entry {
     struct mutex lock;
     bool dirty;
     bool no_evict;
+
+    /* associated outgoing request */
+    struct bio_request *request;
 };
 
 struct bcache_wrapper {
@@ -38,10 +44,8 @@ struct bcache {
     struct bcache_wrapper *entries;
     atomic_uint_fast64_t ticks;
     uint64_t capacity;
-    uint64_t dirty_ents;
     uint64_t count;
     uint64_t spb;
-    uint64_t max_dirty_ents;
     struct spinlock lock;
 };
 

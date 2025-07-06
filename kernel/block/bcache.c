@@ -10,9 +10,14 @@
 #define ALIGN_UP(x, align) (((x) + ((align) - 1)) & ~((align) - 1))
 
 static uint8_t *get_lba_offset_buffer(struct bcache_entry *ent, uint64_t lba,
-                                      uint64_t spb, uint64_t block_size) {
+                                      uint64_t spb, uint64_t block_size,
+                                      uint8_t **out_base) {
     uint64_t offset_lba = lba - ent->lba;
     uint64_t offset_bytes = (block_size / spb) * offset_lba;
+
+    if (out_base)
+        *out_base = ent->buffer;
+
     return ent->buffer + offset_bytes;
 }
 
@@ -28,17 +33,6 @@ static bool write(struct generic_disk *d, struct bcache *cache,
 /* prefetch is asynchronous */
 static void prefetch(struct generic_disk *disk, struct bcache *cache,
                      uint64_t lba, uint64_t block_size, uint64_t spb);
-
-/* sleeping locks aren't necessary here because there isn't
- * going to be a long wait for cache accesses - hopefullly
- */
-
-void bcache_init(struct bcache *cache, uint64_t capacity) {
-    spinlock_init(&cache->lock);
-    cache->capacity = capacity;
-    cache->count = 0;
-    cache->entries = kzalloc(sizeof(struct bcache_wrapper) * capacity);
-}
 
 /* eviction must be explicitly and separately called */
 static bool insert(struct bcache *cache, uint64_t key,
@@ -186,8 +180,9 @@ static void prefetch(struct generic_disk *disk, struct bcache *cache,
         return;
 
     struct bcache_pf_data *pf = kmalloc(sizeof(struct bcache_pf_data));
-    struct bio_request *req =
-        bio_create_read(disk, base_lba, spb, block_size, prefetch_callback, pf);
+
+    struct bio_request *req = bio_create_read(disk, base_lba, spb, block_size,
+                                              prefetch_callback, pf, NULL);
 
     pf->cache = cache;
     pf->new_entry = kmalloc(sizeof(struct bcache_entry));
@@ -200,11 +195,6 @@ static void prefetch(struct generic_disk *disk, struct bcache *cache,
     ent->buffer = req->buffer;
 
     disk->submit_bio_async(disk, req);
-}
-
-void bcache_prefetch_async(struct generic_disk *disk, uint64_t lba,
-                           uint64_t block_size, uint64_t spb) {
-    prefetch(disk, disk->cache, ALIGN_DOWN(lba, spb), block_size, spb);
 }
 
 static bool evict(struct bcache *cache, uint64_t spb) {
@@ -246,6 +236,31 @@ static bool write(struct generic_disk *d, struct bcache *cache,
     return ret;
 }
 
+static void write_enqueue_cb(struct bio_request *req) {
+    struct bcache_entry *ent = req->user_data;
+    ent->dirty = false;
+    ent->request = NULL;
+    kfree(req);
+}
+
+static void write_queue(struct generic_disk *d, struct bcache *cache,
+                        struct bcache_entry *ent, uint64_t spb,
+                        enum bio_request_priority prio) {
+
+    bool ints = spin_lock(&cache->lock);
+    ent->dirty = true;
+
+    struct bio_request *req;
+    req = bio_create_write(d, ent->lba, ent->size, spb, write_enqueue_cb, ent,
+                           ent->base_buffer);
+
+    req->priority = prio;
+    ent->request = req;
+    bio_sched_enqueue(d, req);
+
+    spin_unlock(&cache->lock, ints);
+}
+
 /* TODO: free all entries */
 void bcache_destroy(struct bcache *cache) {
     kfree(cache->entries);
@@ -263,7 +278,11 @@ struct bcache_entry *bcache_get(struct generic_disk *disk, uint64_t lba,
     if (ent) {
         struct bcache_entry *shallow = kzalloc(sizeof(struct bcache_entry));
         *shallow = *ent;
-        shallow->buffer = get_lba_offset_buffer(ent, lba, spb, block_size);
+        uint8_t *base_buffer;
+        shallow->buffer =
+            get_lba_offset_buffer(ent, lba, spb, block_size, &base_buffer);
+
+        shallow->base_buffer = base_buffer;
         shallow->lba = lba;
         return shallow;
     }
@@ -291,6 +310,11 @@ bool bcache_writethrough(struct generic_disk *disk, struct bcache_entry *ent,
     return write(disk, disk->cache, ent, spb);
 }
 
+void bcache_write_queue(struct generic_disk *disk, struct bcache_entry *ent,
+                        uint64_t spb, enum bio_request_priority prio) {
+    write_queue(disk, disk->cache, ent, spb, prio);
+}
+
 struct bcache_entry *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
                                        uint64_t block_size,
                                        uint64_t sectors_per_block,
@@ -303,8 +327,10 @@ struct bcache_entry *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
     if (existing) {
         struct bcache_entry *shallow = kzalloc(sizeof(struct bcache_entry));
         *shallow = *existing;
-        shallow->buffer =
-            get_lba_offset_buffer(existing, lba, sectors_per_block, block_size);
+        uint8_t *base_buffer;
+        shallow->buffer = get_lba_offset_buffer(
+            existing, lba, sectors_per_block, block_size, &base_buffer);
+        shallow->base_buffer = base_buffer;
         shallow->lba = lba;
         return shallow;
     }
@@ -324,10 +350,14 @@ struct bcache_entry *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
     bcache_insert(disk, base_lba, ent, sectors_per_block);
 
     struct bcache_entry *shallow = kzalloc(sizeof(struct bcache_entry));
+    uint8_t *out_buf;
+
     *shallow = *ent;
-    shallow->buffer =
-        get_lba_offset_buffer(ent, lba, sectors_per_block, block_size);
+    shallow->buffer = get_lba_offset_buffer(ent, lba, sectors_per_block,
+                                            block_size, &out_buf);
     shallow->lba = lba;
+    shallow->base_buffer = out_buf;
+
     return shallow;
 }
 
@@ -337,4 +367,16 @@ void bcache_ent_lock(struct bcache_entry *ent) {
 
 void bcache_ent_unlock(struct bcache_entry *ent) {
     return mutex_unlock(&ent->lock);
+}
+
+void bcache_prefetch_async(struct generic_disk *disk, uint64_t lba,
+                           uint64_t block_size, uint64_t spb) {
+    prefetch(disk, disk->cache, ALIGN_DOWN(lba, spb), block_size, spb);
+}
+
+void bcache_init(struct bcache *cache, uint64_t capacity) {
+    spinlock_init(&cache->lock);
+    cache->capacity = capacity;
+    cache->count = 0;
+    cache->entries = kzalloc(sizeof(struct bcache_wrapper) * capacity);
 }

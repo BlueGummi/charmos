@@ -101,8 +101,18 @@ static void nvme_on_bio_complete(struct nvme_request *req) {
             if (coalesced->on_complete)
                 coalesced->on_complete(coalesced);
 
+            if (coalesced->driver_private2) {
+                struct nvme_bio_data *dd = coalesced->driver_private2;
+                kfree(dd->prps);
+                kfree(coalesced->driver_private2);
+            }
+
             coalesced = coalesced->next_coalesced;
         }
+
+        struct nvme_bio_data *dd = bio->driver_private2;
+        kfree(dd->prps);
+        kfree(bio->driver_private2);
     }
 
     if (bio->on_complete)
