@@ -34,7 +34,7 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
             ind[block_index - EXT2_NDIR_BLOCKS] = 0;
             bcache_ent_unlock(ent);
 
-            ext2_block_write(fs, ent);
+            ext2_block_write(fs, ent, EXT2_PRIO_INODE);
         }
     } else if (block_index < EXT2_NDIR_BLOCKS + bpi + bpi * bpi) {
         uint32_t dbl_index = block_index - EXT2_NDIR_BLOCKS - bpi;
@@ -59,7 +59,7 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
                 ind[ind2] = 0;
                 bcache_ent_unlock(ent);
 
-                ext2_block_write(fs, ent);
+                ext2_block_write(fs, ent, EXT2_PRIO_INODE);
             }
             bcache_ent_unlock(i2);
         }
@@ -82,8 +82,10 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
 
             if (tind[ind1]) {
                 i2 = ext2_block_read(fs, tind[ind1]);
-                if (!i2)
+                if (!i2) {
+                    bcache_ent_unlock(i3);
                     return;
+                }
 
                 bcache_ent_lock(i2);
                 uint32_t *dind = (uint32_t *) i2->buffer;
@@ -96,7 +98,7 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
                     ind[ind3] = 0;
                     bcache_ent_unlock(ent);
 
-                    ext2_block_write(fs, ent);
+                    ext2_block_write(fs, ent, EXT2_PRIO_INODE);
                 }
                 bcache_ent_unlock(i2);
             }

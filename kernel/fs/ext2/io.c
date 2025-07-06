@@ -28,7 +28,8 @@ struct bcache_entry *ext2_block_read(struct ext2_fs *fs, uint32_t block_num) {
     return bcache_get(d, lba, fs->block_size, spb, false);
 }
 
-bool ext2_block_write(struct ext2_fs *fs, struct bcache_entry *ent) {
+bool ext2_block_write(struct ext2_fs *fs, struct bcache_entry *ent,
+                      enum bio_request_priority prio) {
     if (!fs || !ent)
         return false;
 
@@ -40,10 +41,10 @@ bool ext2_block_write(struct ext2_fs *fs, struct bcache_entry *ent) {
 
     bcache_ent_lock(ent);
     bcache_get(d, ent->lba, fs->block_size, spb, false); /* updates atimes */
-    bool ret = bcache_writethrough(d, ent, spb);
+    bcache_write_queue(d, ent, spb, prio);
     bcache_ent_unlock(ent);
 
-    return ret;
+    return true;
 }
 
 struct bcache_entry *ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
@@ -106,6 +107,6 @@ bool ext2_inode_write(struct ext2_fs *fs, uint32_t inode_num,
     memcpy(block_buf + block_offset, inode, fs->inode_size);
     bcache_ent_unlock(ent);
 
-    bool status = ext2_block_write(fs, ent);
+    bool status = ext2_block_write(fs, ent, EXT2_PRIO_INODE);
     return status;
 }

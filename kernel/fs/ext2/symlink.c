@@ -38,7 +38,7 @@ enum errno ext2_symlink_file(struct ext2_fs *fs,
         memcpy(ent->buffer, target, strlen(target) + 1);
         bcache_ent_unlock(ent);
 
-        ext2_block_write(fs, ent);
+        ext2_block_write(fs, ent, EXT2_PRIO_DIRENT);
 
         new_inode.block[0] = block;
         new_inode.blocks = fs->block_size / fs->drive->sector_size;

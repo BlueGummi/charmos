@@ -30,11 +30,11 @@ bool ext2_read_superblock(struct generic_partition *p,
 }
 
 bool ext2_write_superblock(struct ext2_fs *fs) {
-    return ext2_block_write(fs, fs->sbcache_ent);
+    return ext2_block_write(fs, fs->sbcache_ent, EXT2_PRIO_SBLOCK);
 }
 
 bool ext2_write_group_desc(struct ext2_fs *fs) {
-    return ext2_block_write(fs, fs->gdesc_cache_ent);
+    return ext2_block_write(fs, fs->gdesc_cache_ent, EXT2_PRIO_SBLOCK);
 }
 
 struct vfs_node *ext2_g_mount(struct generic_partition *p) {

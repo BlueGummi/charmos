@@ -10,13 +10,9 @@
 #define ALIGN_UP(x, align) (((x) + ((align) - 1)) & ~((align) - 1))
 
 static uint8_t *get_lba_offset_buffer(struct bcache_entry *ent, uint64_t lba,
-                                      uint64_t spb, uint64_t block_size,
-                                      uint8_t **out_base) {
+                                      uint64_t spb, uint64_t block_size) {
     uint64_t offset_lba = lba - ent->lba;
     uint64_t offset_bytes = (block_size / spb) * offset_lba;
-
-    if (out_base)
-        *out_base = ent->buffer;
 
     return ent->buffer + offset_bytes;
 }
@@ -250,9 +246,8 @@ static void write_queue(struct generic_disk *d, struct bcache *cache,
     bool ints = spin_lock(&cache->lock);
     ent->dirty = true;
 
-    struct bio_request *req;
-    req = bio_create_write(d, ent->lba, ent->size, spb, write_enqueue_cb, ent,
-                           ent->base_buffer);
+    struct bio_request *req = bio_create_write(
+        d, ent->lba, spb, ent->size, write_enqueue_cb, ent, ent->buffer);
 
     req->priority = prio;
     ent->request = req;
@@ -278,11 +273,8 @@ struct bcache_entry *bcache_get(struct generic_disk *disk, uint64_t lba,
     if (ent) {
         struct bcache_entry *shallow = kzalloc(sizeof(struct bcache_entry));
         *shallow = *ent;
-        uint8_t *base_buffer;
-        shallow->buffer =
-            get_lba_offset_buffer(ent, lba, spb, block_size, &base_buffer);
+        shallow->buffer = get_lba_offset_buffer(ent, lba, spb, block_size);
 
-        shallow->base_buffer = base_buffer;
         shallow->lba = lba;
         return shallow;
     }
@@ -327,10 +319,8 @@ struct bcache_entry *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
     if (existing) {
         struct bcache_entry *shallow = kzalloc(sizeof(struct bcache_entry));
         *shallow = *existing;
-        uint8_t *base_buffer;
-        shallow->buffer = get_lba_offset_buffer(
-            existing, lba, sectors_per_block, block_size, &base_buffer);
-        shallow->base_buffer = base_buffer;
+        shallow->buffer =
+            get_lba_offset_buffer(existing, lba, sectors_per_block, block_size);
         shallow->lba = lba;
         return shallow;
     }
@@ -350,13 +340,11 @@ struct bcache_entry *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
     bcache_insert(disk, base_lba, ent, sectors_per_block);
 
     struct bcache_entry *shallow = kzalloc(sizeof(struct bcache_entry));
-    uint8_t *out_buf;
 
     *shallow = *ent;
-    shallow->buffer = get_lba_offset_buffer(ent, lba, sectors_per_block,
-                                            block_size, &out_buf);
+    shallow->buffer =
+        get_lba_offset_buffer(ent, lba, sectors_per_block, block_size);
     shallow->lba = lba;
-    shallow->base_buffer = out_buf;
 
     return shallow;
 }

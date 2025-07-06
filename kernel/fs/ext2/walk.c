@@ -32,7 +32,7 @@ static bool walk_dir(struct ext2_fs *fs, uint32_t block_num,
     bcache_ent_unlock(ent);
 
     if (modified)
-        ext2_block_write(fs, ent);
+        ext2_block_write(fs, ent, EXT2_PRIO_DIRENT);
 
     return modified;
 }
@@ -78,7 +78,7 @@ static bool walk_indirect(struct ext2_fs *fs, uint32_t block_num, int level,
             inode->node.size += fs->block_size;
 
             bcache_ent_unlock(ent);
-            if (!ext2_block_write(fs, ent))
+            if (!ext2_block_write(fs, ent, EXT2_PRIO_DIRENT))
                 return false;
             return true;
         }
@@ -166,7 +166,7 @@ static void traverse_indirect(struct ext2_fs *fs, struct ext2_inode *inode,
     }
 
     bcache_ent_unlock(ent);
-    ext2_block_write(fs, ent);
+    ext2_block_write(fs, ent, EXT2_PRIO_DIRENT);
 }
 
 void ext2_traverse_inode_blocks(struct ext2_fs *fs, struct ext2_inode *inode,

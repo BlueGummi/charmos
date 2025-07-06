@@ -16,8 +16,6 @@ struct bcache_entry {
     /* allocated upon new reads */
     uint8_t *buffer;
 
-    /* aligned LBA buffer */
-    uint8_t *base_buffer;
     uint64_t size;
 
     /* logical block address */

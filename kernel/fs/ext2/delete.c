@@ -105,7 +105,7 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
 
     bcache_ent_unlock(ent);
 
-    if (!ext2_block_write(fs, ent))
+    if (!ext2_block_write(fs, ent, EXT2_PRIO_DIRENT))
         return ERR_IO;
 
     if (!ext2_inode_read(fs, ctx.inode_num, &target_inode.node))

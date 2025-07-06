@@ -1,11 +1,10 @@
+#include <block/sched.h>
+#include <fs/ext2.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
 #include <stdint.h>
 #include <string.h>
 #include <tests.h>
-
-#include "errno.h"
-#include "fs/detect.h"
 
 #define EXT2_INIT                                                              \
     if (g_root_node->fs_type != FS_EXT2) {                                     \
@@ -131,6 +130,11 @@ REGISTER_TEST(ext2_integration_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 
     node = root->ops->finddir(root, "ext2_integration_test");
     TEST_ASSERT(node == NULL);
+
+    struct ext2_fs *fs = root->fs_data;
+    struct generic_disk *d = fs->drive;
+
+    bio_sched_dispatch_all(d);
 
     SET_SUCCESS;
 }

@@ -13,13 +13,6 @@ struct link_ctx {
     bool success;
 };
 
-#define MKCTX(name, num, dirnum, type)                                         \
-    {.name = name,                                                             \
-     .inode = num,                                                             \
-     .success = false,                                                         \
-     .dir_inode = dirnum,                                                      \
-     .type = type}
-
 MAKE_NOP_CALLBACK;
 
 static bool link_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
@@ -64,7 +57,7 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir,
     if (ext2_dir_contains_file(fs, dir, name))
         return ERR_EXIST;
 
-    struct link_ctx ctx = MKCTX(name, inode->inode_num, dir->inode_num, type);
+    struct link_ctx ctx = {name, inode->inode_num, dir->inode_num, type, false};
 
     ext2_walk_dir(fs, dir, link_callback, &ctx, false);
 
@@ -89,7 +82,7 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir,
 
     ext2_init_dirent(fs, new_entry, inode->inode_num, name, type);
 
-    if (!ext2_block_write(fs, ent))
+    if (!ext2_block_write(fs, ent, EXT2_PRIO_DIRENT))
         return ERR_IO;
 
     /* this sets the first available block to our new block */

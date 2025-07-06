@@ -51,7 +51,7 @@ enum errno ext2_write_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
         memcpy(block_buf + block_offset, src + bytes_written, to_write);
         bcache_ent_unlock(ent);
 
-        ext2_block_write(fs, ent);
+        ext2_block_write(fs, ent, EXT2_PRIO_DATA);
 
         bytes_written += to_write;
     }

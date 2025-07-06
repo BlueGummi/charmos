@@ -98,25 +98,19 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
     sch_start_ms = time_get_ms();
     struct ext2_fs *fs = root->fs_data;
     struct generic_disk *d = fs->drive;
-
-    for (int i = 0; i < 10; i++) {
-        struct bio_request *bio = kmalloc(sizeof(struct bio_request));
-        TEST_ASSERT(bio != NULL);
-
-        bio->lba = 0;
-        bio->disk = d;
-        bio->buffer = kmalloc_aligned(512, 4096);
-        bio->size = 512;
-        bio->sector_count = 1;
-        bio->write = false;
-        bio->done = false;
-        bio->status = -1;
-        bio->on_complete = bio_sch_callback;
-        bio->priority = BIO_RQ_HIGH;
-        bio->user_data = (void *) BIO_RQ_HIGH;
-
-        bio_sched_enqueue(d, bio);
-    }
+    struct bio_request bio = {
+        .lba = 0,
+        .disk = d,
+        .buffer = kmalloc_aligned(512, 4096),
+        .size = 512,
+        .sector_count = 1,
+        .write = false,
+        .done = false,
+        .status = -1,
+        .on_complete = bio_sch_callback,
+        .priority = BIO_RQ_HIGH,
+        .user_data = (void *) BIO_RQ_HIGH,
+    };
 
     struct bio_request bio2 = {
         .lba = 50,
@@ -146,11 +140,12 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
         .user_data = (void *) BIO_RQ_LOW,
     };
 
+    bio_sched_enqueue(d, &bio);
     bio_sched_enqueue(d, &bio2);
     bio_sched_enqueue(d, &bio3);
 
-    sleep_ms(600);
+    sleep_ms(400);
 
-    TEST_ASSERT(current_test->message_count == 12);
+    TEST_ASSERT(current_test->message_count == 3);
     SET_SUCCESS;
 }

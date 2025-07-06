@@ -70,7 +70,7 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
 
     ext2_inode_write(fs, dir->inode_num, &dir->node);
     ext2_inode_write(fs, parent_dir->inode_num, &parent_dir->node);
-    ext2_block_write(fs, ent);
+    ext2_block_write(fs, ent, EXT2_PRIO_DIRENT);
 
     uint32_t group = ext2_get_inode_group(fs, dir->inode_num);
     struct ext2_group_desc *desc = &fs->group_desc[group];

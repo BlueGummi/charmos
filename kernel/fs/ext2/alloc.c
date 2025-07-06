@@ -39,7 +39,7 @@ static uint32_t alloc_from_bitmap(struct ext2_fs *fs, uint32_t bitmap_block,
     bitmap[byte_pos] |= (1 << bit_pos);
     bcache_ent_unlock(ent);
 
-    if (!ext2_block_write(fs, ent))
+    if (!ext2_block_write(fs, ent, EXT2_PRIO_BITMAPS))
         return -1;
 
     update_counts(fs, group);
@@ -106,7 +106,7 @@ bool ext2_free_block(struct ext2_fs *fs, uint32_t block_num) {
 
     bitmap[byte] &= ~bit;
     bcache_ent_unlock(ent);
-    ext2_block_write(fs, ent);
+    ext2_block_write(fs, ent, EXT2_PRIO_BITMAPS);
 
     fs->group_desc[group].free_blocks_count++;
     fs->sblock->free_blocks_count++;
@@ -157,7 +157,7 @@ bool ext2_free_inode(struct ext2_fs *fs, uint32_t inode_num) {
 
     bitmap[byte] &= ~bit;
     bcache_ent_unlock(ent);
-    ext2_block_write(fs, ent);
+    ext2_block_write(fs, ent, EXT2_PRIO_BITMAPS);
 
     fs->group_desc[group].free_inodes_count++;
     fs->sblock->free_inodes_count++;
