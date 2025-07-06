@@ -15,9 +15,10 @@ static inline bool should_early_dispatch(struct bio_scheduler *sched) {
 
 static bool try_dispatch_queue_head(struct bio_scheduler *sched,
                                     struct bio_rqueue *q) {
-    if (q->head) {
-        bio_sched_dequeue_internal(sched, q->head);
-        sched->disk->submit_bio_async(sched->disk, q->head);
+    struct bio_request *head = q->head;
+    if (head) {
+        bio_sched_dequeue_internal(sched, head);
+        sched->disk->submit_bio_async(sched->disk, head);
         return true;
     }
     return false;

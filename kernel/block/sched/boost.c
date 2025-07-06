@@ -8,7 +8,7 @@
 #include <time/time.h>
 
 /* enqueuing skips enqueuing if the req is URGENT */
-static void boost_prio(struct bio_scheduler *sched, struct bio_request *req);
+static bool boost_prio(struct bio_scheduler *sched, struct bio_request *req);
 
 static inline uint64_t get_boost_depth(struct bio_request *req) {
     if (req->boost_count >= 3)
@@ -43,14 +43,14 @@ static bool should_boost(struct bio_request *req) {
     return curr_timestamp > (req->enqueue_time + adjusted_wait);
 }
 
-static void boost_prio(struct bio_scheduler *sched, struct bio_request *req) {
+static bool boost_prio(struct bio_scheduler *sched, struct bio_request *req) {
     enum bio_request_priority new_prio = get_boosted_prio(req);
 
     if (req->priority == new_prio)
-        return;
+        return false;
 
     if (sched->queues[new_prio].request_count > BIO_SCHED_BOOST_MAX_OCCUPANCE)
-        return;
+        return false;
 
     /* remove from current queue */
     bio_sched_dequeue_internal(sched, req);
@@ -59,13 +59,13 @@ static void boost_prio(struct bio_scheduler *sched, struct bio_request *req) {
 
     /* re-insert to new level */
     bio_sched_enqueue_internal(sched, req);
+    return true;
 }
 
 static inline bool try_boost(struct bio_scheduler *sched,
                              struct bio_request *req) {
     if (should_boost(req)) {
-        boost_prio(sched, req);
-        return true;
+        return boost_prio(sched, req);
     }
     return false;
 }

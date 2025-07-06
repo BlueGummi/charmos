@@ -78,6 +78,7 @@ void nvme_dispatch_queue(struct generic_disk *disk, struct bio_rqueue *q) {
             k_panic("'skip' request found during dispatch");
 
         bio_sched_dequeue(disk, req, true);
+
         nvme_submit_bio_request(disk, req);
     }
 }

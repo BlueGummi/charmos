@@ -1,11 +1,17 @@
+#include <block/bcache.h>
 #include <block/generic.h>
 #include <errno.h>
-#include <block/bcache.h>
 #include <fs/vfs.h>
 #include <spin_lock.h>
 #include <stdint.h>
 
 extern uint64_t PTRS_PER_BLOCK;
+
+#define EXT2_PRIO_DIRENT BIO_RQ_MEDIUM
+#define EXT2_PRIO_INODE BIO_RQ_MEDIUM
+#define EXT2_PRIO_DATA BIO_RQ_HIGH
+#define EXT2_PRIO_BITMAPS BIO_RQ_BACKGROUND
+#define EXT2_PRIO_SBLOCK BIO_RQ_LOW
 
 #define EXT2_NBLOCKS 15
 #define EXT2_SUPERBLOCK_OFFSET 1024
@@ -282,8 +288,7 @@ uint32_t ext2_get_block_group(struct ext2_fs *fs, uint32_t block);
 bool ext2_fs_lock(struct ext2_fs *fs);
 void ext2_fs_unlock(struct ext2_fs *fs, bool i);
 void ext2_prefetch_block(struct ext2_fs *fs, uint32_t block);
-struct bcache_entry *ext2_create_bcache_ent(struct ext2_fs *fs,
-                                            uint32_t block);
+struct bcache_entry *ext2_create_bcache_ent(struct ext2_fs *fs, uint32_t block);
 
 //
 //
