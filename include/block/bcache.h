@@ -1,3 +1,4 @@
+#include <block/bio.h>
 #include <mutex.h>
 #include <spin_lock.h>
 #include <stdatomic.h>
@@ -6,6 +7,7 @@
 
 #pragma once
 #define DEFAULT_BLOCK_CACHE_SIZE 2048
+#define DEFAULT_MAX_DIRTY_ENTS 64
 
 struct generic_disk;
 
@@ -31,12 +33,15 @@ struct bcache_wrapper {
     bool occupied;
 };
 
+/* TODO: bitmap to mark present entries */
 struct bcache {
     struct bcache_wrapper *entries;
     atomic_uint_fast64_t ticks;
     uint64_t capacity;
+    uint64_t dirty_ents;
     uint64_t count;
     uint64_t spb;
+    uint64_t max_dirty_ents;
     struct spinlock lock;
 };
 
@@ -56,8 +61,10 @@ void bcache_ent_lock(struct bcache_entry *ent);
 struct bcache_entry *bcache_get(struct generic_disk *disk, uint64_t lba,
                                 uint64_t block_size, uint64_t spb, bool);
 
-bool bcache_write(struct generic_disk *disk, struct bcache_entry *ent,
-                  uint64_t spb);
+bool bcache_writethrough(struct generic_disk *disk, struct bcache_entry *ent, uint64_t spb);
+
+void bcache_write_queue(struct generic_disk *disk, struct bcache_entry *ent, uint64_t spb,
+                        enum bio_request_priority prio);
 
 bool bcache_insert(struct generic_disk *disk, uint64_t lba,
                    struct bcache_entry *ent, uint64_t spb);

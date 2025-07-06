@@ -1,5 +1,4 @@
 #pragma once
-#include <block/bcache.h>
 #include <fs/detect.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
@@ -18,34 +17,42 @@ enum bio_request_priority {
     BIO_RQ_URGENT = 4,
 };
 
+/* everything without the / const / comment next to it
+ * can be changed by the scheduler during optimizations */
 struct bio_request {
-    /* public interface fields */
+    /* REQUIRED to be set by sender */
 
-    /* can get boosted during coalesce */
+    /* starting priority - can get boosted */
     enum bio_request_priority priority;
-    struct generic_disk *disk;
-    uint64_t lba; // starting LBA
-    void *buffer; // data buffer
+    /* const */ struct generic_disk *disk;
 
-    /* intrusive fields - may be changed by scheduler */
-    uint64_t size;         // in bytes
-    uint64_t sector_count; // derived from size
+    /* starting logical block address */
+    /* const */ uint64_t lba;
 
-    bool write; // true = write, false = read
+    /* page aligned buffer */
+    /* const */ void *buffer;
 
+    /* buffer size in bytes  */
+    uint64_t size;
+
+    /* sectors to read/write */
+    uint64_t sector_count;
+
+    /* const */ bool write;
+
+    /* OPTIONALLY set by sender */
+    void (*on_complete)(struct bio_request *);
+    /* const */ void *user_data;
+
+    /* set upon completion */
     volatile bool done;
     int32_t status;
 
-    void (*on_complete)(struct bio_request *); // optional
-    void *user_data;
-
-    /* internally used in scheduler */
+    /* everything below this is internally used in scheduler */
     struct bio_request *next;
     struct bio_request *prev;
 
-    /* coalescing flags */
-
-    /* used by dispatcher - do not submit */
+    /* coalescing */
     bool skip;
     bool is_aggregate;
     struct bio_request *next_coalesced;
@@ -59,7 +66,15 @@ struct bio_request {
     uint8_t boost_count;
 
     void *driver_private;
-
-    /* secondary private stuff for coalescing - i am lazy */
     void *driver_private2;
 };
+
+struct bio_request *bio_create_write(struct generic_disk *d, uint64_t lba,
+                                     uint64_t sectors, uint64_t size,
+                                     void (*cb)(struct bio_request *),
+                                     void *user);
+
+struct bio_request *bio_create_read(struct generic_disk *d, uint64_t lba,
+                                    uint64_t sectors, uint64_t size,
+                                    void (*cb)(struct bio_request *),
+                                    void *user);

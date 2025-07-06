@@ -2,6 +2,7 @@
 #include <asm.h>
 #include <block/bio.h>
 #include <block/generic.h>
+#include <block/sched.h>
 #include <console/printf.h>
 #include <drivers/nvme.h>
 #include <int/idt.h>
@@ -12,9 +13,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-
-#include "sch/sched.h"
-#include "sch/thread.h"
 
 void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
     struct nvme_queue *queue = dev->io_queues[qid];

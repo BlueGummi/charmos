@@ -40,7 +40,7 @@ bool ext2_block_write(struct ext2_fs *fs, struct bcache_entry *ent) {
 
     bcache_ent_lock(ent);
     bcache_get(d, ent->lba, fs->block_size, spb, false); /* updates atimes */
-    bool ret = bcache_write(d, ent, spb);
+    bool ret = bcache_writethrough(d, ent, spb);
     bcache_ent_unlock(ent);
 
     return ret;

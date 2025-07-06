@@ -67,7 +67,7 @@ struct generic_disk *ahci_create_generic(struct ahci_disk *disk) {
     d->write_sector = ahci_write_sector_wrapper;
     d->submit_bio_async = ahci_submit_bio_request;
     d->print = ahci_print_wrapper;
-    d->cache = kmalloc(sizeof(struct bcache));
+    d->cache = kzalloc(sizeof(struct bcache));
     bcache_init(d->cache, DEFAULT_BLOCK_CACHE_SIZE);
     d->type = G_AHCI_DRIVE;
     return d;

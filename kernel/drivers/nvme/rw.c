@@ -1,14 +1,12 @@
 #include <block/bio.h>
 #include <block/generic.h>
+#include <block/sched.h>
 #include <drivers/nvme.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-
-#include "sch/sched.h"
-#include "sch/thread.h"
 
 static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
                                size_t size) {
