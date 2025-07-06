@@ -9,7 +9,6 @@
 
 uint64_t *hpet_base;
 
-
 void hpet_write64(uint64_t offset, uint64_t value) {
     mmio_write_64((void *) ((uintptr_t) hpet_base + offset), value);
 }
@@ -65,7 +64,7 @@ void hpet_init(void) {
     struct acpi_hpet *hpet = hpet_table.ptr;
     uint64_t hpet_addr = hpet->address.address;
 
-    hpet_base = vmm_map_phys(hpet_addr, 1024);
+    hpet_base = vmm_map_phys(hpet_addr, 1024, PAGING_UNCACHABLE);
 
     hpet_disable();
     hpet_write64(HPET_MAIN_COUNTER_OFFSET, 0);

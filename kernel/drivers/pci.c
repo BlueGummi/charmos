@@ -170,7 +170,8 @@ void pci_enable_msix_on_core(uint8_t bus, uint8_t slot, uint8_t func,
     if (map_size < PAGE_SIZE) {
         map_size = PAGE_SIZE;
     }
-    void *msix_table = vmm_map_phys(bar_addr + table_offset, map_size);
+    void *msix_table =
+        vmm_map_phys(bar_addr + table_offset, map_size, PAGING_UNCACHABLE);
 
     struct pci_msix_table_entry *entry_addr =
         (void *) msix_table +

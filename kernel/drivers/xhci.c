@@ -21,7 +21,7 @@ static void *xhci_map_mmio(uint8_t bus, uint8_t slot, uint8_t func) {
     uint32_t size = ~(size_mask & ~0xF) + 1;
 
     uint32_t phys_addr = original_bar0 & ~0xF;
-    return vmm_map_phys(phys_addr, size);
+    return vmm_map_phys(phys_addr, size, PAGING_UNCACHABLE);
 }
 
 static struct xhci_device *xhci_device_create(void *mmio) {
@@ -98,10 +98,11 @@ static void xhci_controller_enable_ints(struct xhci_device *dev) {
 static void xhci_setup_event_ring(struct xhci_device *dev) {
     uint64_t erst_table_phys = (uint64_t) pmm_alloc_page(false);
     struct xhci_erst_entry *erst_table =
-        vmm_map_phys(erst_table_phys, PAGE_SIZE);
+        vmm_map_phys(erst_table_phys, PAGE_SIZE, PAGING_UNCACHABLE);
 
     uint64_t event_ring_phys = (uint64_t) pmm_alloc_page(false);
-    struct xhci_trb *event_ring = vmm_map_phys(event_ring_phys, PAGE_SIZE);
+    struct xhci_trb *event_ring =
+        vmm_map_phys(event_ring_phys, PAGE_SIZE, PAGING_UNCACHABLE);
 
     event_ring[0].control = 1;
     memset(event_ring, 0, PAGE_SIZE);
@@ -135,7 +136,8 @@ static void xhci_setup_command_ring(struct xhci_device *dev) {
 
     uint64_t cmd_ring_phys = (uint64_t) pmm_alloc_page(false);
     struct xhci_trb *cmd_ring =
-        vmm_map_phys(cmd_ring_phys, sizeof(struct xhci_trb) * TRB_RING_SIZE);
+        vmm_map_phys(cmd_ring_phys, sizeof(struct xhci_trb) * TRB_RING_SIZE,
+                     PAGING_UNCACHABLE);
     memset(cmd_ring, 0, sizeof(struct xhci_trb) * TRB_RING_SIZE);
 
     int last_index = TRB_RING_SIZE - 1;
@@ -146,7 +148,7 @@ static void xhci_setup_command_ring(struct xhci_device *dev) {
 
     uint64_t dcbaa_phys = (uint64_t) pmm_alloc_page(false);
     struct xhci_dcbaa *dcbaa_virt =
-        vmm_map_phys(dcbaa_phys, sizeof(struct xhci_dcbaa));
+        vmm_map_phys(dcbaa_phys, sizeof(struct xhci_dcbaa), PAGING_UNCACHABLE);
 
     struct xhci_ring *ring = kmalloc(sizeof(struct xhci_ring));
     ring->phys = cmd_ring_phys;

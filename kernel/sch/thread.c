@@ -14,7 +14,7 @@ struct thread *thread_create(void (*entry_point)(void)) {
     struct thread *new_thread =
         (struct thread *) kzalloc(sizeof(struct thread));
     uint64_t stack_phys = (uint64_t) pmm_alloc_pages(16, false);
-    void *stack = vmm_map_phys(stack_phys, PAGE_SIZE * 16);
+    void *stack = vmm_map_phys(stack_phys, PAGE_SIZE * 16, 0);
     uint64_t stack_top = (uint64_t) stack + STACK_SIZE;
 
     new_thread->mlfq_level = 0;

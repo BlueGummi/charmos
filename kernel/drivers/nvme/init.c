@@ -71,14 +71,14 @@ void nvme_alloc_admin_queues(struct nvme_device *nvme) {
     uint64_t asq_phys = (uint64_t) pmm_alloc_pages(asq_pages, false);
 
     struct nvme_command *asq_virt =
-        vmm_map_phys(asq_phys, asq_pages * nvme->page_size);
+        vmm_map_phys(asq_phys, asq_pages * nvme->page_size, PAGING_UNCACHABLE);
 
     memset(asq_virt, 0, asq_pages * nvme->page_size);
 
     uint64_t acq_phys = (uint64_t) pmm_alloc_pages(acq_pages, false);
 
     struct nvme_completion *acq_virt =
-        vmm_map_phys(acq_phys, acq_pages * nvme->page_size);
+        vmm_map_phys(acq_phys, acq_pages * nvme->page_size, PAGING_UNCACHABLE);
 
     memset(acq_virt, 0, acq_pages * nvme->page_size);
 
@@ -99,11 +99,13 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
     uint64_t cq_pages = 2;
 
     uint64_t sq_phys = (uint64_t) pmm_alloc_pages(sq_pages, false);
-    this_queue->sq = vmm_map_phys(sq_phys, sq_pages * nvme->page_size);
+    this_queue->sq =
+        vmm_map_phys(sq_phys, sq_pages * nvme->page_size, PAGING_UNCACHABLE);
     memset(this_queue->sq, 0, sq_pages * nvme->page_size);
 
     uint64_t cq_phys = (uint64_t) pmm_alloc_pages(cq_pages, false);
-    this_queue->cq = vmm_map_phys(cq_phys, cq_pages * nvme->page_size);
+    this_queue->cq =
+        vmm_map_phys(cq_phys, cq_pages * nvme->page_size, PAGING_UNCACHABLE);
     memset(this_queue->cq, 0, cq_pages * nvme->page_size);
 
     this_queue->sq_phys = sq_phys;

@@ -5,7 +5,6 @@
 #include <stdint.h>
 #include <uacpi/tables.h>
 
-#include "acpi/hpet.h"
 #include "uacpi/acpi.h"
 #include "uacpi/status.h"
 
@@ -79,7 +78,7 @@ void ioapic_init(void) {
 
             ioapic.id = ioapic_entry->id;
             ioapic.gsi_base = ioapic_entry->gsi_base;
-            ioapic.mmio_base = vmm_map_phys(ioapic_entry->address, 0x20);
+            ioapic.mmio_base = vmm_map_phys(ioapic_entry->address, 0x20, PAGING_UNCACHABLE);
 
             k_info("I/O APIC", K_INFO, "ID: %u, GSI Base: %u, MMIO: 0x%lx",
                    ioapic.id, ioapic.gsi_base, ioapic.mmio_base);

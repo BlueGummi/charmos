@@ -14,7 +14,6 @@
 #include <uacpi/status.h>
 #include <uacpi/uacpi.h>
 
-#include "uacpi/internal/types.h"
 #include "uacpi/kernel_api.h"
 #include "uacpi/log.h"
 #include "uacpi/namespace.h"
@@ -53,7 +52,7 @@ uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
 extern uintptr_t vmm_map_top;
 
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
-    return vmm_map_phys(addr, len);
+    return vmm_map_phys(addr, len, PAGING_UNCACHABLE);
 }
 
 void uacpi_kernel_unmap(void *addr, uacpi_size len) {

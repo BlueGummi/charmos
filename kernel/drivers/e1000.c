@@ -21,7 +21,7 @@ static void e1000_reset(struct e1000_device *dev) {
 static void e1000_setup_tx_ring(struct e1000_device *dev) {
     uint64_t space = sizeof(struct e1000_tx_desc) * E1000_NUM_TX_DESC;
     dev->tx_descs_phys = (uintptr_t) pmm_alloc_pages(space / PAGE_SIZE, false);
-    dev->tx_descs = vmm_map_phys(dev->tx_descs_phys, space);
+    dev->tx_descs = vmm_map_phys(dev->tx_descs_phys, space, PAGING_UNCACHABLE);
     memset(dev->tx_descs, 0, space);
 
     for (int i = 0; i < E1000_NUM_TX_DESC; ++i) {
@@ -49,7 +49,7 @@ static void e1000_setup_tx_ring(struct e1000_device *dev) {
 static void e1000_setup_rx_ring(struct e1000_device *dev) {
     uint64_t space = sizeof(struct e1000_rx_desc) * E1000_NUM_RX_DESC;
     dev->rx_descs_phys = (uintptr_t) pmm_alloc_pages(space / PAGE_SIZE, false);
-    dev->rx_descs = vmm_map_phys(dev->rx_descs_phys, space);
+    dev->rx_descs = vmm_map_phys(dev->rx_descs_phys, space, PAGING_UNCACHABLE);
     memset(dev->rx_descs, 0, space);
 
     for (int i = 0; i < E1000_NUM_RX_DESC; ++i) {
@@ -72,7 +72,8 @@ static void e1000_setup_rx_ring(struct e1000_device *dev) {
                   E1000_RCTL_EN | E1000_RCTL_BAM | E1000_RCTL_SECRC);
 }
 
-int e1000_send_packet(struct e1000_device *dev, const void *data, uint64_t len) {
+int e1000_send_packet(struct e1000_device *dev, const void *data,
+                      uint64_t len) {
     if (len > E1000_MAX_TX_PACKET_SIZE) {
         return -1;
     }
@@ -183,7 +184,7 @@ bool e1000_init(struct pci_device *pci, struct e1000_device *dev) {
     if (mmio_size == 0 || mmio_size > (1 << 24))
         return false;
 
-    dev->regs = vmm_map_phys(phys_addr, mmio_size);
+    dev->regs = vmm_map_phys(phys_addr, mmio_size, PAGING_UNCACHABLE);
     if (!dev->regs)
         return false;
 

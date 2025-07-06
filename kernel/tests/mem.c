@@ -15,7 +15,7 @@ REGISTER_TEST(pmm_alloc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 REGISTER_TEST(vmm_map_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     uint64_t p = (uint64_t) pmm_alloc_page(false);
     TEST_ASSERT(p != 0);
-    void *ptr = vmm_map_phys(p, PAGE_SIZE);
+    void *ptr = vmm_map_phys(p, PAGE_SIZE, 0);
     TEST_ASSERT(ptr != NULL);
     vmm_unmap_virt(ptr, PAGE_SIZE);
     TEST_ASSERT(vmm_get_phys((uint64_t) ptr) == (uint64_t) -1);

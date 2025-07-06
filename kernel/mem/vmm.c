@@ -362,7 +362,7 @@ uintptr_t vmm_get_phys(uintptr_t virt) {
     return (*entry & PAGING_PHYS_MASK) + (virt & 0xFFF);
 }
 
-void *vmm_map_phys(uint64_t addr, uint64_t len) {
+void *vmm_map_phys(uint64_t addr, uint64_t len, uint64_t flags) {
 
     uintptr_t phys_start = PAGE_ALIGN_DOWN(addr);
     uintptr_t offset = addr - phys_start;
@@ -379,7 +379,7 @@ void *vmm_map_phys(uint64_t addr, uint64_t len) {
 
     for (uint64_t i = 0; i < total_pages; i++) {
         vmm_map_page(virt_start + i * PAGE_SIZE, phys_start + i * PAGE_SIZE,
-                     PAGING_PRESENT | PAGING_WRITE);
+                     PAGING_PRESENT | PAGING_WRITE | flags);
     }
 
     return (void *) (virt_start + offset);

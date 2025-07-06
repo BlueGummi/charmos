@@ -69,7 +69,7 @@ void elf_map(uintptr_t user_pml4_phys, void *elf_data) {
             if (!phys)
                 k_panic("Failed to allocate page for user ELF segment\n");
 
-            void *phys_mapped = vmm_map_phys(phys, PAGE_SIZE);
+            void *phys_mapped = vmm_map_phys(phys, PAGE_SIZE, 0);
             memset(phys_mapped, 0, PAGE_SIZE);
 
             uintptr_t offset_in_seg = vaddr - seg_vaddr_start;
