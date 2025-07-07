@@ -46,10 +46,12 @@ static bool should_boost(struct bio_request *req) {
 static bool boost_prio(struct bio_scheduler *sched, struct bio_request *req) {
     enum bio_request_priority new_prio = get_boosted_prio(req);
 
+    struct bio_scheduler_ops *ops = sched->disk->ops;
+
     if (req->priority == new_prio)
         return false;
 
-    if (sched->queues[new_prio].request_count > BIO_SCHED_BOOST_MAX_OCCUPANCE)
+    if (sched->queues[new_prio].request_count > ops->boost_occupance_limit)
         return false;
 
     /* remove from current queue */
