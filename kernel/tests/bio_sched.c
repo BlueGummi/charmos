@@ -35,6 +35,7 @@ static void bio_sch_callback(struct bio_request *req) {
     total_complete_time[q_lvl] += time;
     req->user_data = NULL;
     runs++;
+    TEST_ASSERT(req->status == BIO_STATUS_OK);
 }
 
 static void bio_sch_callback1(struct bio_request *req) {

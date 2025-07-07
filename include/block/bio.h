@@ -17,6 +17,13 @@ enum bio_request_priority {
     BIO_RQ_URGENT = 4,
 };
 
+enum bio_request_status : int32_t {
+    BIO_STATUS_INFLIGHT = -1,
+    BIO_STATUS_INVAL_ARG = -2,
+    BIO_STATUS_INVAL_INTERNAL = -3,
+    BIO_STATUS_OK = 0,
+};
+
 /* everything WITHOUT the / const / comment next to it
  * can be changed by the scheduler during optimizations */
 struct bio_request {
@@ -46,7 +53,10 @@ struct bio_request {
 
     /* set upon completion */
     volatile bool done;
-    int32_t status;
+    enum bio_request_status status;
+
+    void *driver_private;
+    void *driver_private2;
 
     /* everything below this is internally used in scheduler */
     struct bio_request *next;
@@ -64,9 +74,6 @@ struct bio_request {
     /* boosts are accelerated if it
      * boosts often */
     uint8_t boost_count;
-
-    void *driver_private;
-    void *driver_private2;
 };
 
 struct bio_request *bio_create_write(struct generic_disk *d, uint64_t lba,

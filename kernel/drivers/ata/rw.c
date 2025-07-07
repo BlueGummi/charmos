@@ -1,23 +1,81 @@
 #include <asm.h>
-#include <console/printf.h>
 #include <block/generic.h>
+#include <console/printf.h>
 #include <drivers/ata.h>
+#include <mem/alloc.h>
 #include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
 
-static bool ide_check_error(struct ata_drive *d) {
-    uint8_t status = inb(REG_STATUS(d->io_base));
-    if (status & STATUS_ERR) {
-        uint8_t err = inb(REG_ERROR(d->io_base));
-        k_printf("[IDE] Error: STATUS=0x%02x, ERROR=0x%02x\n", status, err);
-        return true;
+void ide_start_next(struct ide_channel *chan) {
+    struct ide_request *req = chan->head;
+    struct ata_drive *d = chan->current_drive;
+
+    chan->busy = true;
+
+    outb(REG_DRIVE_HEAD(d->io_base),
+         0xE0U | (d->slave << 4) | ((req->lba >> 24) & 0x0F));
+    outb(REG_SECTOR_COUNT(d->io_base), req->sector_count);
+    outb(REG_LBA_LOW(d->io_base), req->lba & 0xFF);
+    outb(REG_LBA_MID(d->io_base), (req->lba >> 8) & 0xFF);
+    outb(REG_LBA_HIGH(d->io_base), (req->lba >> 16) & 0xFF);
+    outb(REG_COMMAND(d->io_base), req->write ? COMMAND_WRITE : COMMAND_READ);
+}
+
+static void enqueue_ide_request(struct ide_channel *chan,
+                                struct ide_request *req) {
+    req->next = NULL;
+
+    if (!chan->head) {
+        chan->head = req;
+        chan->tail = req;
+    } else {
+        chan->tail->next = req;
+        chan->tail = req;
     }
-    if (status & STATUS_DF) {
-        k_printf("[IDE] Device fault (DF set).\n");
-        return true;
+}
+
+static void submit_async(struct ata_drive *d, struct ide_request *req) {
+    enqueue_ide_request(&d->channel, req);
+    if (!d->channel.busy)
+        ide_start_next(&d->channel);
+}
+
+static void ide_irq_handler(struct ide_channel *chan) {
+    struct ide_request *req = chan->head;
+    struct ata_drive *d = chan->current_drive;
+
+    if (!req)
+        return;
+
+    uint8_t *buf = req->bio->buffer + (req->current_sector * 512);
+    if (req->write) {
+        outsw(REG_DATA(d->io_base), buf, 256);
+    } else {
+        insw(REG_DATA(d->io_base), buf, 256);
     }
-    return false;
+
+    req->current_sector++;
+
+    if (req->current_sector >= req->sector_count) {
+        req->done = true;
+
+        /* TODO: Read status */
+        req->status = 0;
+
+        if (req->waiter)
+            scheduler_wake(req->waiter);
+        else if (req->on_complete)
+            req->on_complete(req);
+
+        chan->head = req->next;
+        kfree(req);
+
+        if (chan->head)
+            ide_start_next(chan);
+        else
+            chan->busy = false;
+    }
 }
 
 bool ide_wait_ready(struct ata_drive *d) {
@@ -33,57 +91,12 @@ bool ide_wait_ready(struct ata_drive *d) {
 
 bool ide_read_sector(struct ata_drive *d, uint64_t lba, uint8_t *b,
                      uint8_t count) {
-    if (count == 0)
-        count = 255;
-
-    if (!ide_wait_ready(d))
-        return false;
-
-    outb(REG_DRIVE_HEAD(d->io_base),
-         0xE0U | ((uint64_t) d->slave << 4) | ((lba >> 24) & 0x0F));
-    outb(REG_SECTOR_COUNT(d->io_base), count);
-    outb(REG_LBA_LOW(d->io_base), lba & 0xFF);
-    outb(REG_LBA_MID(d->io_base), (lba >> 8) & 0xFF);
-    outb(REG_LBA_HIGH(d->io_base), (lba >> 16) & 0xFF);
-    outb(REG_COMMAND(d->io_base), COMMAND_READ);
-
-    for (uint8_t i = 0; i < count; i++) {
-        if (!ide_wait_ready(d) || !(inb(REG_STATUS(d->io_base)) & STATUS_DRQ)) {
-            if (ide_check_error(d))
-                return false;
-        }
-
-        insw(REG_DATA(d->io_base), b + (i * 512), 256); // 256 words = 512 bytes
-    }
 
     return true;
 }
 
 bool ide_write_sector(struct ata_drive *d, uint64_t lba, const uint8_t *b,
                       uint8_t count) {
-    if (count == 0)
-        count = 255;
-
-    if (!ide_wait_ready(d))
-        return false;
-
-    outb(REG_DRIVE_HEAD(d->io_base),
-         0xE0U | ((uint64_t) d->slave << 4) | ((lba >> 24) & 0x0F));
-    outb(REG_SECTOR_COUNT(d->io_base), count);
-    outb(REG_LBA_LOW(d->io_base), lba & 0xFF);
-    outb(REG_LBA_MID(d->io_base), (lba >> 8) & 0xFF);
-    outb(REG_LBA_HIGH(d->io_base), (lba >> 16) & 0xFF);
-    outb(REG_COMMAND(d->io_base), COMMAND_WRITE);
-
-    for (uint8_t i = 0; i < count; i++) {
-        if (!ide_wait_ready(d) || !(inb(REG_STATUS(d->io_base)) & STATUS_DRQ)) {
-            if (ide_check_error(d))
-                return false;
-        }
-
-        outsw(REG_DATA(d->io_base), b + (i * 512), 256);
-    }
-
     return true;
 }
 

@@ -98,7 +98,7 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
         if (sig == 0xFFFFFFFF)
             continue;
 
-        if (port->sig != 0x00000101) {
+        if (sig != 0x00000101) {
             ahci_info(K_WARN, "Controller port %u is not an HDD, skipping...",
                       i, sig);
             continue;
@@ -128,6 +128,11 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
 
         if ((ssts & 0x0F) == AHCI_DET_PRESENT &&
             ((ssts >> 8) & 0x0F) == AHCI_IPM_ACTIVE) {
+            uint32_t sig = mmio_read_32(&port->sig);
+
+            if (sig != 0x00000101)
+                continue;
+            
             disks[disks_ind].port = i;
             disks[disks_ind].device = dev;
 
@@ -174,7 +179,8 @@ struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
     uint32_t disk_count = 0;
     struct ahci_disk *d = device_setup(dev, ctrl, &disk_count);
     *d_cnt = disk_count;
-    ahci_info(K_INFO, "Device initialized successfully, %u port(s) present",
+    ahci_info(K_INFO,
+              "Device initialized successfully, %u usable port(s) present",
               disk_count);
 
     return d;

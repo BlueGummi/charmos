@@ -71,13 +71,15 @@ bool ata_setup_drive(struct ata_drive *ide, struct pci_device *devices,
         if (curr->class_code == 1 && curr->subclass == 1) {
             uint32_t bar = pci_read_bar(curr->bus, curr->device, curr->function,
                                         channel * 2);
+
             uint32_t ctrl_bar = pci_read_bar(curr->bus, curr->device,
                                              curr->function, channel * 2 + 1);
-
             ide->io_base = (bar & 1) ? (bar & 0xFFFFFFFC)
                                      : ((channel == 0) ? ATA_PRIMARY_IO
                                                        : ATA_SECONDARY_IO);
 
+            ide->irq = pci_read_config8(curr->bus, curr->device, curr->function,
+                                        PCI_INTERRUPT_LINE);
             ide->ctrl_base =
                 (ctrl_bar & 1)
                     ? (ctrl_bar & 0xFFFFFFFC)

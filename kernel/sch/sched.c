@@ -1,6 +1,7 @@
 #include <acpi/lapic.h>
 #include <asm.h>
 #include <console/printf.h>
+#include <int/idt.h>
 #include <registry.h>
 #include <sch/sched.h>
 #include <spin_lock.h>
@@ -268,4 +269,15 @@ load_new_thread:
 end:
     /* do not change interrupt status */
     spin_unlock_no_cli(&sched->lock);
+}
+
+void scheduler_wake(struct thread *t) {
+    t->state = READY;
+
+    /* boost */
+    t->mlfq_level = 0;
+    t->time_in_level = 0;
+    uint64_t c = t->curr_core;
+    scheduler_put_back(t);
+    lapic_send_ipi(c, SCHEDULER_ID);
 }

@@ -5,6 +5,7 @@
 
 #define PCI_CONFIG_ADDRESS 0xCF8
 #define PCI_CONFIG_DATA 0xCFC
+#define PCI_INTERRUPT_LINE 0x3C
 
 //
 //
@@ -109,6 +110,19 @@ static inline uint16_t pci_read_config16(uint8_t bus, uint8_t device,
         return (uint16_t) (data >> 16);
     else
         return (uint16_t) (data & 0xFFFF);
+}
+
+static inline uint8_t pci_read_config8(uint8_t bus, uint8_t device,
+                                       uint8_t function, uint8_t offset) {
+    uint32_t address = (1U << 31)
+                       | ((uint32_t) bus << 16)
+                       | ((uint32_t) device << 11)
+                       | ((uint32_t) function << 8)
+                       | (offset & 0xFC); // 4-byte aligned
+    outl(PCI_CONFIG_ADDRESS, address);
+    uint32_t data = inl(PCI_CONFIG_DATA);
+
+    return (uint8_t)((data >> ((offset & 3) * 8)) & 0xFF);
 }
 
 static inline void pci_write_config16(uint8_t bus, uint8_t device,

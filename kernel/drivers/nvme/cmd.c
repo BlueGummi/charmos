@@ -14,6 +14,15 @@
 #include <stdint.h>
 #include <string.h>
 
+static enum bio_request_status nvme_to_bio_status(uint16_t status) {
+    if (status == NVME_STATUS_CONFLICTING_ATTRIBUTES) {
+        return BIO_STATUS_INVAL_ARG;
+    } else if (status == NVME_STATUS_INVALID_PROT_INFO) {
+        return BIO_STATUS_INVAL_INTERNAL;
+    }
+    return BIO_STATUS_OK;
+}
+
 void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
     struct nvme_queue *queue = dev->io_queues[qid];
 
@@ -25,19 +34,11 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
 
         uint16_t cid = mmio_read_32(&entry->cid);
         uint16_t status = mmio_read_32(&entry->status) & 0xFFFE;
+        dev->io_statuses[qid][cid] = status;
 
         struct thread *t = dev->io_waiters[qid][cid];
-        if (t) {
-            dev->io_statuses[qid][cid] = status;
-            t->state = READY;
-
-            /* boost */
-            t->mlfq_level = 0;
-            t->time_in_level = 0;
-            uint64_t c = t->curr_core;
-            scheduler_put_back(t);
-            lapic_send_ipi(c, SCHEDULER_ID);
-        }
+        if (t)
+            scheduler_wake(t);
 
         struct nvme_request *req = dev->io_requests[qid][cid];
 
@@ -46,7 +47,7 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
 
         if (--req->remaining_parts == 0) {
             req->done = true;
-            req->status = 0;
+            req->status = nvme_to_bio_status(status);
             if (req->on_complete)
                 req->on_complete(req);
 

@@ -64,12 +64,25 @@ struct ide_request {
     void *buffer;
     uint64_t size;
     uint64_t sector_count;
+    uint8_t current_sector;
+
     bool write;
     volatile bool done;
     int status;
 
     void (*on_complete)(struct ide_request *);
     void *user_data;
+    struct bio_request *bio;
+    struct thread *waiter;
+    struct ide_request *next;
+};
+
+struct ide_channel {
+    struct ide_request *head;
+    struct ide_request *tail;
+
+    bool busy;
+    struct ata_drive *current_drive;
 };
 
 struct ata_drive {
@@ -89,6 +102,8 @@ struct ata_drive {
     uint8_t supports_dma;
     uint8_t udma_mode;
     uint8_t pio_mode;
+    uint8_t irq;
+    struct ide_channel channel;
 };
 
 #define IDE_RETRY_COUNT 3

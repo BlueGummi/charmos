@@ -111,6 +111,8 @@ struct generic_disk *ide_create_generic(struct ata_drive *ide) {
     if (!ide->actually_exists)
         return NULL;
 
+    k_info("IDE", K_INFO, "IDE drive IRQ on line %u", ide->irq);
+
     struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
     d->type = G_IDE_DRIVE;
     d->driver_data = ide;

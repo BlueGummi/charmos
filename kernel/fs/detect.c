@@ -88,6 +88,7 @@ static bool detect_gpt_partitions(struct generic_disk *disk, uint8_t *sector) {
     if (!disk->read_sector(disk, 1, sector, 1))
         return false;
 
+
     struct gpt_header *gpt = (struct gpt_header *) sector;
     if (gpt->signature != 0x5452415020494645ULL)
         return false;

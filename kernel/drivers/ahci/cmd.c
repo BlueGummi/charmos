@@ -37,15 +37,9 @@ void ahci_process_completions(struct ahci_device *dev, uint32_t port) {
                 req->on_complete(req);
         }
 
-        /* if there are waiters - this ignores if not */
-        if (dev->io_waiters[port][slot]) {
-            struct thread *t = dev->io_waiters[port][slot];
-            t->state = READY;
-            t->mlfq_level = 0;
-            t->time_in_level = 0;
-            scheduler_put_back(t);
-            lapic_send_ipi(t->curr_core, SCHEDULER_ID);
-        }
+        struct thread *t = dev->io_waiters[port][slot];
+        if (t)
+            scheduler_wake(t);
 
         dev->io_requests[port][slot] = NULL;
     }

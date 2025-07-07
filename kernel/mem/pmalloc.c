@@ -90,6 +90,7 @@ void *pmm_alloc_page(bool add_offset) {
 
     for (uint64_t i = last_allocated_index; i < bitmap_size * 8; i++) {
         if (!test_bit(i)) {
+            last_allocated_index = i;
             set_bit(i);
             void *page = (void *) ((add_offset ? offset : 0) + (i * PAGE_SIZE));
             return page;

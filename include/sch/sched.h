@@ -37,6 +37,7 @@ void scheduler_enable_timeslice();
 void scheduler_yield();
 void scheduler_enqueue(struct thread *t);
 void scheduler_put_back(struct thread *t);
+void scheduler_wake(struct thread *t);
 void scheduler_take_out(struct thread *t);
 
 bool scheduler_can_steal_work(struct scheduler *sched);

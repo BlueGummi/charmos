@@ -1,5 +1,6 @@
 #pragma once
 #include <block/generic.h>
+#include <block/sched.h>
 #include <mem/vmm.h>
 #include <sch/thread.h>
 #include <spin_lock.h>
@@ -275,6 +276,9 @@ struct nvme_bio_data {
 
 #define NVME_OP_IO_READ 0x02
 #define NVME_OP_IO_WRITE 0x01
+
+#define NVME_STATUS_CONFLICTING_ATTRIBUTES 0x80
+#define NVME_STATUS_INVALID_PROT_INFO 0x81
 
 uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
                                struct nvme_command *cmd, uint32_t *);
