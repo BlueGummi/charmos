@@ -36,16 +36,27 @@ void bio_sched_try_early_dispatch(struct bio_scheduler *sched) {
         do_early_dispatch(sched);
 }
 
+static void dispatch_queue(struct generic_disk *disk, struct bio_rqueue *q) {
+    while (q->head) {
+        struct bio_request *req = q->head;
+        if (req->skip)
+            k_panic("'skip' request found during dispatch");
+
+        bio_sched_dequeue(disk, req, true);
+        disk->submit_bio_async(disk, req);
+    }
+}
+
 void bio_sched_dispatch_partial(struct generic_disk *d,
                                 enum bio_request_priority p) {
     /* no one in urgent queue */
     for (uint32_t i = BIO_SCHED_MAX - 1; i > p; i--) {
-        d->ops->dispatch_queue(d, &d->scheduler->queues[i]);
+        dispatch_queue(d, &d->scheduler->queues[i]);
     }
 }
 
 void bio_sched_dispatch_all(struct generic_disk *d) {
     for (uint32_t i = BIO_SCHED_MAX - 1; i > 0; i--) {
-        d->ops->dispatch_queue(d, &d->scheduler->queues[i]);
+        dispatch_queue(d, &d->scheduler->queues[i]);
     }
 }

@@ -134,9 +134,9 @@ void nvme_print_wrapper(struct generic_disk *d) {
 }
 
 static struct bio_scheduler_ops nvme_bio_sched_ops = {
-    .should_coalesce = nvme_should_coalesce,
-    .reorder = nvme_reorder,
-    .do_coalesce = nvme_do_coalesce,
+    .should_coalesce = noop_should_coalesce,
+    .reorder = noop_reorder,
+    .do_coalesce = noop_do_coalesce,
     .max_wait_time =
         {
             [BIO_RQ_BACKGROUND] = 20,
@@ -146,7 +146,6 @@ static struct bio_scheduler_ops nvme_bio_sched_ops = {
             [BIO_RQ_URGENT] = 0,
         },
     .dispatch_threshold = 128,
-    .dispatch_queue = nvme_dispatch_queue,
     .boost_occupance_limit =
         {
             [BIO_RQ_BACKGROUND] = 64,

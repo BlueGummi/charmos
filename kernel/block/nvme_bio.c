@@ -1,47 +1,11 @@
 #include <asm.h>
-#include <block/generic.h>
 #include <block/sched.h>
-#include <console/printf.h>
 #include <drivers/nvme.h>
-#include <drivers/pci.h>
-#include <int/idt.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
 
-bool nvme_should_coalesce(struct generic_disk *disk,
-                          const struct bio_request *a,
-                          const struct bio_request *b) {
-    (void) disk, (void) a, (void) b;
-    return false;
-}
-
-void nvme_do_coalesce(struct generic_disk *disk, struct bio_request *into,
-                      struct bio_request *from) {
-    (void) disk, (void) into, (void) from;
-}
-
-void nvme_dispatch_queue(struct generic_disk *disk, struct bio_rqueue *q) {
-    while (q->head) {
-        struct bio_request *req = q->head;
-        if (req->skip)
-            k_panic("'skip' request found during dispatch");
-
-        bio_sched_dequeue(disk, req, true);
-
-        nvme_submit_bio_request(disk, req);
-    }
-}
-
-void nvme_reorder(struct generic_disk *disk) {
-    (void) disk;
-}
-
-static void nvme_on_bio_complete(struct nvme_request *req) {
-    struct bio_request *bio = (struct bio_request *) req->user_data;
-
-    bio->done = true;
-    bio->status = req->status;
-
+static void handle_coalesces(struct nvme_request *req,
+                             struct bio_request *bio) {
     if (bio->driver_private2) {
         struct bio_request *coalesced = bio->next_coalesced;
         while (coalesced) {
@@ -64,6 +28,21 @@ static void nvme_on_bio_complete(struct nvme_request *req) {
         kfree(dd->prps);
         kfree(bio->driver_private2);
     }
+}
+
+static void nvme_on_bio_complete(struct nvme_request *req) {
+    struct bio_request *bio = (struct bio_request *) req->user_data;
+
+    bio->done = true;
+
+    /* the NVMe status is already converted to a
+     * bio status before we get here */
+    bio->status = req->status;
+
+    /* TODO: I have realized that coalescing is useless,
+     * this still needs to be here to clean up PRPs though,
+     * rename this */
+    handle_coalesces(req, bio);
 
     if (bio->on_complete)
         bio->on_complete(bio);

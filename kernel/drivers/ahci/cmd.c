@@ -26,10 +26,7 @@ void ahci_process_completions(struct ahci_device *dev, uint32_t port) {
 
         struct ahci_request *req = dev->io_requests[port][slot];
 
-        if (!req)
-            continue;
-
-        if (req->trigger_completion) {
+        if (req && req->trigger_completion) {
             req->done = true;
             req->status = 0;
 
@@ -71,15 +68,15 @@ void ahci_send_command(struct ahci_disk *disk, struct ahci_full_port *port,
     mmio_write_32(&port->port->is, 0xFFFFFFFF);
     disk->device->io_requests[disk->port][slot] = req;
 
-    uint32_t ci = mmio_read_32(&port->port->ci);
-    ci |= (1 << slot);
-    mmio_write_32(&port->port->ci, ci);
+    uint32_t command_issue = mmio_read_32(&port->port->ci);
+    command_issue |= (1 << slot);
+    mmio_write_32(&port->port->ci, command_issue);
 }
 
 uint32_t ahci_find_slot(struct ahci_port *port) {
     uint32_t slots_in_use = mmio_read_32(&port->sact) | mmio_read_32(&port->ci);
 
-    for (int slot = 0; slot < 32; slot++) {
+    for (int slot = 0; slot < AHCI_MAX_SLOTS; slot++) {
         if ((slots_in_use & (1U << slot)) == 0) {
             return slot;
         }
@@ -162,8 +159,18 @@ void ahci_identify(struct ahci_disk *disk) {
     struct ahci_request req = {
         .slot = slot, .port = disk->port, .buffer = buffer};
     ahci_send_command(disk, port, &req);
-    struct ata_identify *ident = (struct ata_identify *) buffer;
-    ata_ident_print(ident);
+
+    uint32_t logical_sector_size = 512;
+
+    if (buffer[106] & (1 << 14)) {
+        uint32_t low = buffer[117];
+        uint32_t high = buffer[118];
+        logical_sector_size = ((uint32_t) high << 16) | low;
+    }
+    disk->sector_size = logical_sector_size;
+
+    ahci_info(K_INFO, "Sector size is %u bytes", disk->sector_size);
+
     kfree_aligned(buffer);
 }
 

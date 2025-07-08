@@ -6,8 +6,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// TODO: Check for non 512-byte sector sizes and adjust accordingly
-
 static void ahci_set_lba_cmd(struct ahci_fis_reg_h2d *fis, uint64_t lba,
                              uint16_t sector_count) {
     fis->device = 1 << 6;
@@ -34,7 +32,7 @@ static bool rw_async(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
     struct ahci_full_port *port = &ahci_disk->device->regs[ahci_disk->port];
 
     uint32_t slot = req->slot;
-    ahci_prepare_command(port, slot, false, buf, count * 512);
+    ahci_prepare_command(port, slot, false, buf, count * disk->sector_size);
 
     struct ahci_cmd_table *tbl = port->cmd_tables[slot];
     uint8_t cmd = write ? AHCI_CMD_WRITE_DMA_EXT : AHCI_CMD_READ_DMA_EXT;
@@ -88,7 +86,7 @@ static bool rw_sync_wrapper(struct generic_disk *disk, uint64_t lba,
             return false;
 
         lba += sectors;
-        buf += sectors * 512;
+        buf += sectors * disk->sector_size;
         cnt -= sectors;
     }
     return true;
@@ -107,7 +105,7 @@ static bool rw_async_wrapper(struct generic_disk *disk, uint64_t lba,
             return false;
 
         lba += sectors;
-        buf += sectors * 512;
+        buf += sectors * disk->sector_size;
         cnt -= sectors;
     }
     return true;
