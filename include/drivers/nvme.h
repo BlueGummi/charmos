@@ -308,11 +308,11 @@ bool nvme_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
                       uint16_t cnt);
 
 bool nvme_write_sector_async(struct generic_disk *disk, uint64_t lba,
-                             const uint8_t *buffer, uint16_t count,
+                             uint8_t *buffer, uint16_t count,
                              struct nvme_request *req);
 
-bool nvme_write_sector(struct generic_disk *disk, uint64_t lba,
-                       const uint8_t *buffer, uint16_t cnt);
+bool nvme_write_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
+                       uint16_t cnt);
 
 bool nvme_read_sector_wrapper(struct generic_disk *disk, uint64_t lba,
                               uint8_t *buf, uint64_t cnt);
@@ -327,6 +327,7 @@ bool nvme_write_sector_async_wrapper(struct generic_disk *disk, uint64_t lba,
 
 bool nvme_write_sector_wrapper(struct generic_disk *disk, uint64_t lba,
                                const uint8_t *buf, uint64_t cnt);
+
 void nvme_isr_handler(void *ctx, uint8_t vector, void *rsp);
 
 bool nvme_submit_bio_request(struct generic_disk *disk,
