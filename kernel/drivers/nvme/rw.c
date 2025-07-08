@@ -13,9 +13,9 @@ typedef bool (*async_fn)(struct generic_disk *, uint64_t, uint8_t *, uint16_t,
                          struct nvme_request *);
 
 static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
-                               size_t size) {
-    size_t offset = (uintptr_t) buffer & (PAGE_SIZE - 1);
-    size_t num_pages = (offset + size + PAGE_SIZE - 1) / PAGE_SIZE;
+                               uint64_t size) {
+    uint64_t offset = (uintptr_t) buffer & (PAGE_SIZE - 1);
+    uint64_t num_pages = (offset + size + PAGE_SIZE - 1) / PAGE_SIZE;
 
     data->prps = kmalloc(sizeof(struct nvme_bio_data) * num_pages);
     uintptr_t vaddr = (uintptr_t) buffer & ~(PAGE_SIZE - 1);
@@ -32,7 +32,7 @@ static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
 
 static void nvme_setup_prps(struct nvme_command *cmd,
                             struct nvme_bio_data *data,
-                            const void *fallback_buffer, size_t size) {
+                            const void *fallback_buffer, uint64_t size) {
     if (data->prp_count == 0) {
         uint64_t buffer_phys = vmm_get_phys((uint64_t) fallback_buffer);
         cmd->prp1 = buffer_phys;

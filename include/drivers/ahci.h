@@ -302,7 +302,7 @@ struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
 bool ahci_write_sector(struct generic_disk *disk, uint64_t lba,
                        const uint8_t *in_buf, uint16_t cnt);
 bool ahci_write_sector_async(struct generic_disk *disk, uint64_t lba,
-                             const uint8_t *in_buf, uint16_t count,
+                             uint8_t *in_buf, uint16_t count,
                              struct ahci_request *req);
 
 bool ahci_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *out_buf,

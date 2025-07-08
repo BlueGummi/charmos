@@ -62,7 +62,7 @@ struct bio_scheduler_ops {
 
     uint32_t max_wait_time[BIO_SCHED_LEVELS];
     uint32_t dispatch_threshold;
-    uint64_t boost_occupance_limit;
+    uint64_t boost_occupance_limit[BIO_SCHED_LEVELS];
 };
 
 void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req);

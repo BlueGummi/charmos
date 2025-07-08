@@ -147,7 +147,14 @@ static struct bio_scheduler_ops nvme_bio_sched_ops = {
         },
     .dispatch_threshold = 128,
     .dispatch_queue = nvme_dispatch_queue,
-    .boost_occupance_limit = 48,
+    .boost_occupance_limit =
+        {
+            [BIO_RQ_BACKGROUND] = 64,
+            [BIO_RQ_LOW] = 56,
+            [BIO_RQ_MEDIUM] = 48,
+            [BIO_RQ_HIGH] = 40,
+            [BIO_RQ_URGENT] = 32,
+        },
 };
 
 struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {

@@ -51,7 +51,7 @@ static bool boost_prio(struct bio_scheduler *sched, struct bio_request *req) {
     if (req->priority == new_prio)
         return false;
 
-    if (sched->queues[new_prio].request_count > ops->boost_occupance_limit)
+    if (sched->queues[new_prio].request_count > ops->boost_occupance_limit[new_prio])
         return false;
 
     /* remove from current queue */
