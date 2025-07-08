@@ -1,3 +1,4 @@
+#include <acpi/lapic.h>
 #include <asm.h>
 #include <block/generic.h>
 #include <console/printf.h>
@@ -7,7 +8,73 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-void ide_start_next(struct ide_channel *chan) {
+static void ide_start_next(struct ide_channel *chan);
+
+static enum bio_request_status translate_status(uint8_t status, uint8_t error) {
+    if ((status & STATUS_ERR) == 0) {
+        return BIO_STATUS_OK;
+    }
+
+    if (error & 0x04)
+        return BIO_STATUS_ABRT;
+    if (error & 0x40)
+        return BIO_STATUS_UNCORRECTABLE;
+    if (error & 0x10 || error & 0x01 || error & 0x02)
+        return BIO_STATUS_ID_NOT_FOUND;
+    if (error & 0x08 || error & 0x20)
+        return BIO_STATUS_MEDIA_CHANGE;
+    if (error & 0x80)
+        return BIO_STATUS_BAD_SECTOR;
+
+    return BIO_STATUS_UNKNOWN_ERR;
+}
+
+void ide_irq_handler(void *ctx, uint8_t irq_num, void *rsp) {
+    (void) irq_num, (void) rsp;
+
+    struct ide_channel *chan = ctx;
+    struct ide_request *req = chan->head;
+    struct ata_drive *d = chan->current_drive;
+
+    uint8_t status = inb(REG_STATUS(d->io_base));
+    uint8_t error = inb(REG_ERROR(d->io_base));
+
+    if (!req)
+        goto out;
+
+    uint8_t *buf = req->buffer + (req->current_sector * 512);
+    if (req->write) {
+        outsw(REG_DATA(d->io_base), buf, 256);
+    } else {
+        insw(REG_DATA(d->io_base), buf, 256);
+    }
+
+    req->current_sector++;
+
+    if (req->current_sector >= req->sector_count) {
+        req->done = true;
+
+        /* TODO: Read status */
+        req->status = translate_status(status, error);
+
+        if (req->waiter)
+            scheduler_wake(req->waiter);
+        else if (req->on_complete)
+            req->on_complete(req);
+
+        chan->head = req->next;
+        kfree(req);
+
+        if (chan->head)
+            ide_start_next(chan);
+        else
+            chan->busy = false;
+    }
+out:
+    LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
+}
+
+static void ide_start_next(struct ide_channel *chan) {
     struct ide_request *req = chan->head;
     struct ata_drive *d = chan->current_drive;
 
@@ -41,43 +108,6 @@ static void submit_async(struct ata_drive *d, struct ide_request *req) {
         ide_start_next(&d->channel);
 }
 
-static void ide_irq_handler(struct ide_channel *chan) {
-    struct ide_request *req = chan->head;
-    struct ata_drive *d = chan->current_drive;
-
-    if (!req)
-        return;
-
-    uint8_t *buf = req->bio->buffer + (req->current_sector * 512);
-    if (req->write) {
-        outsw(REG_DATA(d->io_base), buf, 256);
-    } else {
-        insw(REG_DATA(d->io_base), buf, 256);
-    }
-
-    req->current_sector++;
-
-    if (req->current_sector >= req->sector_count) {
-        req->done = true;
-
-        /* TODO: Read status */
-        req->status = 0;
-
-        if (req->waiter)
-            scheduler_wake(req->waiter);
-        else if (req->on_complete)
-            req->on_complete(req);
-
-        chan->head = req->next;
-        kfree(req);
-
-        if (chan->head)
-            ide_start_next(chan);
-        else
-            chan->busy = false;
-    }
-}
-
 bool ide_wait_ready(struct ata_drive *d) {
     uint64_t timeout = IDE_CMD_TIMEOUT_MS * 1000;
     while (inb(REG_STATUS(d->io_base)) & STATUS_BSY) {
@@ -89,15 +119,45 @@ bool ide_wait_ready(struct ata_drive *d) {
     return (inb(REG_STATUS(d->io_base)) & STATUS_DRDY);
 }
 
+static struct ide_request *request_init(uint64_t lba, uint8_t *buffer,
+                                        uint8_t count, bool write) {
+    struct ide_request *req = kzalloc(sizeof(struct ide_request));
+    req->lba = lba;
+    req->buffer = buffer;
+    req->sector_count = count;
+    req->status = BIO_STATUS_INFLIGHT;
+    req->write = write;
+    return req;
+}
+
+static inline void submit_and_wait(struct ata_drive *d,
+                                   struct ide_request *req) {
+    bool i = spin_lock(&req->lock);
+    submit_async(d, req);
+    struct thread *t = scheduler_get_curr_thread();
+    t->state = BLOCKED;
+    req->waiter = t;
+    spin_unlock(&req->lock, i);
+}
+
 bool ide_read_sector(struct ata_drive *d, uint64_t lba, uint8_t *b,
                      uint8_t count) {
+    struct ide_request *req = request_init(lba, b, count, false);
 
-    return true;
+    submit_and_wait(d, req);
+    scheduler_yield();
+
+    return !req->status;
 }
 
 bool ide_write_sector(struct ata_drive *d, uint64_t lba, const uint8_t *b,
                       uint8_t count) {
-    return true;
+    struct ide_request *req = request_init(lba, (uint8_t *) b, count, true);
+
+    submit_and_wait(d, req);
+    scheduler_yield();
+
+    return !req->status;
 }
 
 bool ide_read_sector_wrapper(struct generic_disk *d, uint64_t lba, uint8_t *buf,

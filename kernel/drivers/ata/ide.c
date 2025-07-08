@@ -1,8 +1,10 @@
+#include <acpi/ioapic.h>
 #include <asm.h>
 #include <block/bcache.h>
 #include <block/generic.h>
 #include <console/printf.h>
 #include <drivers/ata.h>
+#include <int/idt.h>
 #include <mem/alloc.h>
 #include <sleep.h>
 #include <stddef.h>
@@ -112,6 +114,10 @@ struct generic_disk *ide_create_generic(struct ata_drive *ide) {
         return NULL;
 
     k_info("IDE", K_INFO, "IDE drive IRQ on line %u", ide->irq);
+    uint8_t irq = idt_alloc_entry();
+    ioapic_route_irq(ide->irq, irq, 0, false);
+    isr_register(irq, ide_irq_handler, &ide->channel, 0);
+    ide->channel.current_drive = ide;
 
     struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
     d->type = G_IDE_DRIVE;

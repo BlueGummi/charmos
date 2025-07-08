@@ -18,10 +18,19 @@ enum bio_request_priority {
 };
 
 enum bio_request_status : int32_t {
+    BIO_STATUS_OK = 0,
     BIO_STATUS_INFLIGHT = -1,
     BIO_STATUS_INVAL_ARG = -2,
     BIO_STATUS_INVAL_INTERNAL = -3,
-    BIO_STATUS_OK = 0,
+    BIO_STATUS_TIMEOUT = -4,
+    BIO_STATUS_DEVICE_FAULT = -5,
+    BIO_STATUS_UNCORRECTABLE = -6,
+    BIO_STATUS_ABRT = -7,
+    BIO_STATUS_MEDIA_CHANGE = -8,
+    BIO_STATUS_ID_NOT_FOUND = -9,
+    BIO_STATUS_BAD_SECTOR = -10,
+    BIO_STATUS_WRITE_PROTECT = -11,
+    BIO_STATUS_UNKNOWN_ERR = -12
 };
 
 /* everything WITHOUT the / const / comment next to it

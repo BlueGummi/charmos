@@ -58,7 +58,7 @@ void pci_init_devices(struct pci_device *devices, uint64_t count) {
     struct pci_driver *start = __skernel_pci_devices;
     struct pci_driver *end = __ekernel_pci_devices;
 
-    k_info("PCI", K_INFO, "There are %u PCI drivers", end - start - 1);
+    k_info("PCI", K_INFO, "There are %u PCI drivers", end - start);
 
     for (uint64_t i = 0; i < count; i++) {
         struct pci_device *dev = &devices[i];
