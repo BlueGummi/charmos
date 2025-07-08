@@ -47,6 +47,12 @@ SECTIONS {
         __ekernel_tests = .;
     }
 
+    .kernel_pci_devices : { 
+        __skernel_pci_devices = .;
+        KEEP(*(.kernel_pci_devices))
+        __ekernel_pci_devices = .;
+    }
+
     .bss : ALIGN(4K) {
         __sbss = .;
         *(.bss .bss.*)

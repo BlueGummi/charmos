@@ -1,3 +1,4 @@
+#include <asm.h>
 #include <stdint.h>
 
 struct ata_drive;
@@ -14,6 +15,27 @@ struct pci_device {
     uint8_t prog_if;
     uint8_t revision;
 };
+
+struct pci_driver {
+    char *name;
+    uint8_t class_code;
+    uint8_t subclass;
+    uint8_t prog_if;
+    uint16_t vendor_id;
+    void (*initialize)(uint8_t, uint8_t, uint8_t, struct pci_device *);
+} __attribute__((aligned(64)));
+
+extern struct pci_driver __skernel_pci_devices[];
+extern struct pci_driver __ekernel_pci_devices[];
+
+#define REGISTER_PCI_DEV(n, cc, sc, pi, vi, init)                              \
+    static struct pci_driver pci_device_##n __attribute__((                    \
+        section(".kernel_pci_devices"), used)) = {.name = #n,                  \
+                                                  .class_code = cc,            \
+                                                  .subclass = sc,              \
+                                                  .prog_if = pi,               \
+                                                  .vendor_id = vi,             \
+                                                  .initialize = init};
 
 union pci_command_reg {
     uint16_t value;
@@ -48,6 +70,104 @@ struct pci_msix_cap {
     uint32_t pba_offset_bir;   // 0x8
 };
 
+#define PCI_CAP_PTR 0x34
+#define PCI_CAP_ID_MSIX 0x11
+#define PCI_CONFIG_ADDRESS 0xCF8
+#define PCI_CONFIG_DATA 0xCFC
+#define PCI_INTERRUPT_LINE 0x3C
+#define PCI_PROG_IF 0x09
+
+static inline uint16_t pci_read_config16(uint8_t bus, uint8_t device,
+                                         uint8_t function, uint8_t offset) {
+    uint32_t address = (1U << 31) // enable bit
+                       | ((uint32_t) bus << 16) | ((uint32_t) device << 11) |
+                       ((uint32_t) function << 8) |
+                       (offset & 0xFC); // aligned to 4 bytes
+    outl(PCI_CONFIG_ADDRESS, address);
+    uint32_t data = inl(PCI_CONFIG_DATA);
+
+    if (offset & 2)
+        return (uint16_t) (data >> 16);
+    else
+        return (uint16_t) (data & 0xFFFF);
+}
+
+static inline uint8_t pci_read_config8(uint8_t bus, uint8_t device,
+                                       uint8_t function, uint8_t offset) {
+    uint32_t address = (1U << 31) | ((uint32_t) bus << 16) |
+                       ((uint32_t) device << 11) | ((uint32_t) function << 8) |
+                       (offset & 0xFC); // 4-byte aligned
+    outl(PCI_CONFIG_ADDRESS, address);
+    uint32_t data = inl(PCI_CONFIG_DATA);
+
+    return (uint8_t) ((data >> ((offset & 3) * 8)) & 0xFF);
+}
+
+static inline void pci_write_config16(uint8_t bus, uint8_t device,
+                                      uint8_t function, uint8_t offset,
+                                      uint16_t value) {
+    uint32_t address = (1U << 31) | ((uint32_t) bus << 16) |
+                       ((uint32_t) device << 11) | ((uint32_t) function << 8) |
+                       (offset & 0xFC);
+    outl(PCI_CONFIG_ADDRESS, address);
+    uint32_t old_data = inl(PCI_CONFIG_DATA);
+
+    uint32_t new_data;
+    if (offset & 2)
+        new_data = (old_data & 0x0000FFFF) | ((uint32_t) value << 16);
+    else
+        new_data = (old_data & 0xFFFF0000) | value;
+
+    outl(PCI_CONFIG_ADDRESS, address);
+    outl(PCI_CONFIG_DATA, new_data);
+}
+
+static inline uint32_t pci_config_address(uint8_t bus, uint8_t slot,
+                                          uint8_t func, uint8_t offset) {
+    return (uint32_t) ((1U << 31) | (bus << 16) | (slot << 11) | (func << 8) |
+                       (offset & 0xFC));
+}
+
+static inline uint32_t pci_read(uint8_t bus, uint8_t slot, uint8_t func,
+                                uint8_t offset) {
+    outl(PCI_CONFIG_ADDRESS, pci_config_address(bus, slot, func, offset));
+    return inl(PCI_CONFIG_DATA);
+}
+
+static inline uint16_t pci_read_word(uint8_t bus, uint8_t slot, uint8_t func,
+                                     uint8_t offset) {
+    uint32_t value = pci_read(bus, slot, func, offset & 0xFC);
+    return (value >> ((offset & 2) * 8)) & 0xFFFF;
+}
+
+static inline uint8_t pci_read_byte(uint8_t bus, uint8_t slot, uint8_t func,
+                                    uint8_t offset) {
+    uint32_t value = pci_read(bus, slot, func, offset & 0xFC);
+    return (value >> ((offset & 3) * 8)) & 0xFF;
+}
+
+static inline void pci_write(uint8_t bus, uint8_t slot, uint8_t func,
+                             uint8_t offset, uint32_t value) {
+    outl(PCI_CONFIG_ADDRESS, pci_config_address(bus, slot, func, offset));
+    outl(PCI_CONFIG_DATA, value);
+}
+
+static inline void pci_write_word(uint8_t bus, uint8_t slot, uint8_t func,
+                                  uint8_t offset, uint16_t value) {
+    uint32_t tmp = pci_read(bus, slot, func, offset & 0xFCU);
+    uint32_t shift = (offset & 2) * 8;
+    tmp = (tmp & ~(0xFFFFU << shift)) | ((uint32_t) value << shift);
+    pci_write(bus, slot, func, offset & 0xFCU, tmp);
+}
+
+static inline void pci_write_byte(uint8_t bus, uint8_t slot, uint8_t func,
+                                  uint8_t offset, uint8_t value) {
+    uint32_t tmp = pci_read(bus, slot, func, offset & 0xFC);
+    uint32_t shift = (offset & 3) * 8;
+    tmp = (tmp & ~(0xFF << shift)) | ((uint32_t) value << shift);
+    pci_write(bus, slot, func, offset & 0xFC, tmp);
+}
+
 const char *pci_class_name(uint8_t class_code, uint8_t subclass);
 
 void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out);
@@ -56,7 +176,5 @@ uint32_t pci_read_bar(uint8_t bus, uint8_t device, uint8_t function,
 void pci_enable_msix(uint8_t bus, uint8_t slot, uint8_t func);
 void pci_enable_msix_on_core(uint8_t bus, uint8_t slot, uint8_t func,
                              uint8_t vector, uint8_t core);
-
-#define PCI_CAP_PTR 0x34
-#define PCI_CAP_ID_MSIX 0x11
+void pci_init_devices(struct pci_device *devices, uint64_t count);
 #pragma once

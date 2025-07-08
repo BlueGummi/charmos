@@ -8,6 +8,7 @@
 #include <int/idt.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
+#include <registry.h>
 #include <sch/sched.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -168,3 +169,19 @@ struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {
     d->type = G_NVME_DRIVE;
     return d;
 }
+
+static uint64_t nvme_cnt = 1;
+
+static void nvme_pci_init(uint8_t bus, uint8_t device, uint8_t function,
+                          struct pci_device *dev) {
+    (void) dev;
+
+    struct nvme_device *d = nvme_discover_device(bus, device, function);
+    struct generic_disk *disk = nvme_create_generic(d);
+    registry_mkname(disk, "nvme", nvme_cnt++);
+    registry_register(disk);
+    k_print_register(disk->name);
+}
+
+REGISTER_PCI_DEV(nvme, PCI_CLASS_MASS_STORAGE, PCI_SUBCLASS_NVM,
+                 PCI_PROGIF_NVME, 0xFFFF, nvme_pci_init);

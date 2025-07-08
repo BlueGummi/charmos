@@ -197,4 +197,5 @@ void ata_ident_print(struct ata_identify *id);
 void ata_select_drive(struct ata_drive *ata_drive);
 void ata_soft_reset(struct ata_drive *ata_drive);
 bool atapi_identify(struct ata_drive *ide);
+void ata_init(struct pci_device *devices, uint64_t count);
 struct generic_disk *atapi_create_generic(struct ata_drive *d);

@@ -1,6 +1,7 @@
 #include <acpi/uacpi_interface.h>
 #include <asm.h>
 #include <console/printf.h>
+#include <drivers/pci.h>
 #include <mem/alloc.h>
 #include <stdbool.h>
 #include <stdint.h>

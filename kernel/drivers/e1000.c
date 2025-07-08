@@ -196,3 +196,16 @@ bool e1000_init(struct pci_device *pci, struct e1000_device *dev) {
     k_info("e1000", K_INFO, "Device initialized successfully");
     return true;
 }
+
+static void e1000_pci_init(uint8_t bus, uint8_t d, uint8_t func,
+                           struct pci_device *db) {
+    uint16_t did = db->device_id;
+    if (did == 0x1000 || did == 0x100E || did == 0x1010 || did == 0x1026 ||
+        did == 0x10D3 || did == 0x10F5) {
+        struct pci_device dev = {.bus = bus, .device = d, .function = func};
+        struct e1000_device *device = kmalloc(sizeof(struct e1000_device));
+        e1000_init(&dev, device);
+    }
+}
+
+REGISTER_PCI_DEV(e1000, 2, 0, 0xff, 0x8086, e1000_pci_init);

@@ -1,6 +1,5 @@
-#include <console/printf.h>
 #include <block/generic.h>
-#include <registry.h>
+#include <console/printf.h>
 #include <drivers/ahci.h>
 #include <drivers/ata.h>
 #include <drivers/e1000.h>
@@ -9,6 +8,7 @@
 #include <fs/detect.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
+#include <registry.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -89,88 +89,23 @@ static void device_mkname(struct generic_disk *disk, const char *prefix,
     memcpy(disk->name, fmtname, 16);
 }
 
+void registry_mkname(struct generic_disk *disk, const char *prefix,
+                     uint64_t counter) {
+    device_mkname(disk, prefix, counter);
+}
+
 void registry_setup() {
-    struct ata_drive *drives = kmalloc(sizeof(struct ata_drive) * 4);
     struct pci_device *devices;
     uint64_t count;
-    if (!drives)
-        k_panic("Could not allocate space for devices\n");
 
     pci_scan_devices(&devices, &count);
-    uint64_t nvme_cnt = 1, ahci_cnt = 1, ide_cnt = 1, atapi_cnt = 1;
+    k_info("PCI", K_INFO, "Found %u devices", count);
+    
+    pci_init_devices(devices, count);
+    ata_init(devices, count);
 
-    for (uint64_t i = 0; i < count; i++) {
-        struct pci_device dev = devices[i];
-        if (dev.class_code == 0x02 && dev.subclass == 0x00 &&
-            dev.vendor_id == 0x8086) {
-            switch (dev.device_id) {
-            case 0x1000: // 82542
-            case 0x100E: // 82540EM (QEMU default)
-            case 0x1010: // 82546EB
-            case 0x1026: // 82545EM
-            case 0x10D3: // 82574L
-            case 0x10F5: // 82567LM-3
-                struct e1000_device *device =
-                    kmalloc(sizeof(struct e1000_device));
-                e1000_init(&dev, device);
-                break;
-            }
-        }
-
-        if (dev.class_code == PCI_CLASS_MASS_STORAGE &&
-            dev.subclass == PCI_SUBCLASS_NVM &&
-            dev.prog_if == PCI_PROGIF_NVME) {
-            struct nvme_device *d =
-                nvme_discover_device(dev.bus, dev.device, dev.function);
-            struct generic_disk *disk = nvme_create_generic(d);
-            k_info("DEVICE", K_INFO, "Registering \"nvme%u\"", nvme_cnt);
-            device_mkname(disk, "nvme", nvme_cnt++);
-
-            registry_register(disk);
-            continue;
-        }
-        if (dev.class_code == 0x01 && dev.subclass == 0x06 &&
-            dev.prog_if == 0x01) {
-            uint32_t d_cnt = 0;
-            struct ahci_disk *disks =
-                ahci_discover_device(dev.bus, dev.device, dev.function, &d_cnt);
-
-            for (uint32_t i = 0; i < d_cnt; i++) {
-                struct generic_disk *disk = ahci_create_generic(&disks[i]);
-                k_info("DEVICE", K_INFO, "Registering \"sata%u\"", ahci_cnt);
-                device_mkname(disk, "sata", ahci_cnt++);
-                registry_register(disk);
-            }
-            continue;
-        }
-    }
-
-    for (int i = 0; i < 2; i++) {
-        for (int j = 0; j < 2; j++) {
-            int ind = i * 2 + j;
-            if (ata_setup_drive(&drives[ind], devices, count, i, j)) {
-                struct generic_disk *d = NULL;
-
-                if (drives[ind].type == IDE_TYPE_ATA) {
-                    d = ide_create_generic(&drives[ind]);
-                    k_info("DEVICE", K_INFO, "Registering \"ata%u\"", ide_cnt);
-                    device_mkname(d, "ata", ide_cnt++);
-                } else if (drives[ind].type == IDE_TYPE_ATAPI) {
-                    d = atapi_create_generic(&drives[ind]);
-                    k_info("DEVICE", K_INFO, "Registering \"cdrom%u\"",
-                           atapi_cnt);
-                    device_mkname(d, "cdrom", atapi_cnt++);
-                }
-
-                if (!d)
-                    continue;
-
-                registry_register(d);
-            }
-        }
-    }
-
-    k_info("VFS", K_INFO, "attempting to find and mount root '%s'", g_root_part);
+    k_info("VFS", K_INFO, "Attempting to find and mount root '%s'",
+           g_root_part);
     bool found_root = false;
     for (uint64_t i = 0; i < disk_count; i++) {
         struct generic_disk *disk = registry_get_by_index(i);

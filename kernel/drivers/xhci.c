@@ -1,5 +1,6 @@
 #include <asm.h>
 #include <console/printf.h>
+#include <drivers/pci.h>
 #include <drivers/xhci.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
@@ -8,8 +9,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-
-// TODO: timeouts... again... :p
 
 static void *xhci_map_mmio(uint8_t bus, uint8_t slot, uint8_t func) {
     uint32_t original_bar0 = pci_read(bus, slot, func, 0x10);
@@ -334,3 +333,12 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
 
     k_info("XHCI", K_INFO, "Device initialized successfully");
 }
+static void xhci_pci_init(uint8_t bus, uint8_t slot, uint8_t func,
+                          struct pci_device *dev) {
+    switch (dev->prog_if) {
+    case 0x30: xhci_init(bus, slot, func);
+    default: break;
+    }
+}
+
+REGISTER_PCI_DEV(xhci, 0x0C, 0x03, 0x030, 0xFFFF, xhci_pci_init)

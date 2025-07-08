@@ -1,16 +1,18 @@
 #include <acpi/ioapic.h>
 #include <drivers/ahci.h>
+#include <drivers/pci.h>
 #include <int/idt.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
+#include <registry.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 #include "asm.h"
-#include "console/printf.h"
-#include "block/generic.h"
 #include "block/bcache.h"
+#include "block/generic.h"
+#include "console/printf.h"
 
 struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
                                        uint8_t function,
@@ -72,3 +74,20 @@ struct generic_disk *ahci_create_generic(struct ahci_disk *disk) {
     d->type = G_AHCI_DRIVE;
     return d;
 }
+
+static uint64_t ahci_cnt = 1;
+
+static void ahci_pci_init(uint8_t bus, uint8_t slot, uint8_t func,
+                          struct pci_device *dev) {
+    (void) dev;
+    uint32_t d_cnt = 0;
+    struct ahci_disk *disks = ahci_discover_device(bus, slot, func, &d_cnt);
+    for (uint32_t i = 0; i < d_cnt; i++) {
+        struct generic_disk *disk = ahci_create_generic(&disks[i]);
+        registry_mkname(disk, "sata", ahci_cnt++);
+        registry_register(disk);
+        k_print_register(disk->name);
+    }
+}
+
+REGISTER_PCI_DEV(ahci, 1, 6, 1, 0xFFFF, ahci_pci_init)

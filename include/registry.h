@@ -9,3 +9,7 @@ struct generic_disk *registry_get_by_index(uint64_t index);
 uint64_t registry_get_disk_cnt(void);
 void registry_setup();
 void registry_print_devices();
+void registry_mkname(struct generic_disk *disk, const char *prefix,
+                     uint64_t counter);
+#define k_print_register(name)                                                 \
+    k_info("DEVICE", K_INFO, "Registering " ANSI_GREEN "%s" ANSI_RESET, name)

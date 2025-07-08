@@ -4,6 +4,7 @@
 #include <drivers/ata.h>
 #include <drivers/pci.h>
 #include <mem/alloc.h>
+#include <registry.h>
 #include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -78,8 +79,19 @@ bool ata_setup_drive(struct ata_drive *ide, struct pci_device *devices,
                                      : ((channel == 0) ? ATA_PRIMARY_IO
                                                        : ATA_SECONDARY_IO);
 
-            ide->irq = pci_read_config8(curr->bus, curr->device, curr->function,
-                                        PCI_INTERRUPT_LINE);
+            uint8_t prog_if = pci_read_config8(curr->bus, curr->device,
+                                               curr->function, PCI_PROG_IF);
+            bool primary_native = (prog_if & 0x01);
+            bool secondary_native = (prog_if & 0x04);
+            if ((channel == 0 && !primary_native) ||
+                (channel == 1 && !secondary_native)) {
+                ide->irq = (channel == 0) ? 14 : 15;
+            } else {
+                // Native PCI mode
+                ide->irq = pci_read_config8(curr->bus, curr->device,
+                                            curr->function, PCI_INTERRUPT_LINE);
+            }
+
             ide->ctrl_base =
                 (ctrl_bar & 1)
                     ? (ctrl_bar & 0xFFFFFFFC)
@@ -111,4 +123,34 @@ bool ata_setup_drive(struct ata_drive *ide, struct pci_device *devices,
     ide->ctrl_base = 0;
     ide->slave = 0;
     return false;
+}
+
+static uint64_t ide_cnt = 1, atapi_cnt = 1;
+
+void ata_init(struct pci_device *devices, uint64_t count) {
+    struct ata_drive *drives = kmalloc(sizeof(struct ata_drive) * 4);
+    if (!drives)
+        k_panic("Could not allocate space for devices\n");
+    for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 2; j++) {
+            int ind = i * 2 + j;
+            if (ata_setup_drive(&drives[ind], devices, count, i, j)) {
+                struct generic_disk *d = NULL;
+
+                if (drives[ind].type == IDE_TYPE_ATA) {
+                    d = ide_create_generic(&drives[ind]);
+                    registry_mkname(d, "ata", ide_cnt++);
+                } else if (drives[ind].type == IDE_TYPE_ATAPI) {
+                    d = atapi_create_generic(&drives[ind]);
+                    registry_mkname(d, "cdrom", atapi_cnt++);
+                }
+
+                if (!d)
+                    continue;
+
+                k_print_register(d->name);
+                registry_register(d);
+            }
+        }
+    }
 }

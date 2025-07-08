@@ -71,6 +71,7 @@ set(QEMU_COMMON_FLAGS
      #-netdev bridge,id=n1,br=virbr0
      #-device e1000,netdev=n1
 
+     -device piix3-ide,id=ide
      -drive id=fatdisk,file=fat.img,format=raw,if=none
      -device ide-hd,drive=fatdisk,bus=ide.0
      

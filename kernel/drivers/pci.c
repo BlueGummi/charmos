@@ -36,6 +36,36 @@ const char *pci_class_name(uint8_t class_code, uint8_t subclass) {
     return "Unknown Device";
 }
 
+static void init_device(struct pci_device *dev) {
+    struct pci_driver *start = __skernel_pci_devices;
+    struct pci_driver *end = __ekernel_pci_devices;
+
+    for (struct pci_driver *d = start; d < end; d++) {
+        bool class, subclass, prog_if, vendor;
+
+        class = dev->class_code == d->class_code;
+        subclass = dev->subclass == d->subclass;
+        prog_if = dev->prog_if == d->prog_if;
+        vendor = d->vendor_id == 0xFFFF ? true : dev->vendor_id == d->vendor_id;
+
+        if (class && subclass && prog_if && vendor) {
+            d->initialize(dev->bus, dev->device, dev->function, dev);
+        }
+    }
+}
+
+void pci_init_devices(struct pci_device *devices, uint64_t count) {
+    struct pci_driver *start = __skernel_pci_devices;
+    struct pci_driver *end = __ekernel_pci_devices;
+
+    k_info("PCI", K_INFO, "There are %u PCI drivers", end - start - 1);
+
+    for (uint64_t i = 0; i < count; i++) {
+        struct pci_device *dev = &devices[i];
+        init_device(dev);
+    }
+}
+
 void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
     pci_device_count = 0;
 
@@ -96,15 +126,6 @@ void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
                                          .subclass = subclass,
                                          .prog_if = prog_if,
                                          .revision = revision};
-
-                if (class_code == 0x0C && subclass == 0x03) {
-                    switch (prog_if) {
-                    case 0x30: xhci_init(bus, device, function);
-                    case 0x00:
-                    case 0x10:
-                    case 0x20: break;
-                    }
-                }
 
                 if (function == 0) {
                     uint8_t header_type =
