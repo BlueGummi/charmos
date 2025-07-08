@@ -1,5 +1,6 @@
 #pragma once
 #include <block/generic.h>
+#include <block/sched.h>
 #include <s_assert.h>
 #include <sch/thread.h>
 #include <stdbool.h>
@@ -25,6 +26,7 @@
 #define AHCI_PORT_SIZE 0x80  // Size of each port register set
 
 #define AHCI_MAX_PORTS 32
+#define AHCI_MAX_SLOTS 32
 
 #define AHCI_PORT_CLB 0x00  // Command List Base Address
 #define AHCI_PORT_CLBU 0x04 // Command List Base Address Upper
@@ -215,6 +217,7 @@ struct ahci_device {
 struct ahci_disk {
     struct ahci_device *device;
     uint32_t port;
+    uint16_t sector_size; // Sector size in bytes
 };
 
 struct ahci_controller {
@@ -327,6 +330,15 @@ bool ahci_write_sector_async_wrapper(struct generic_disk *disk, uint64_t lba,
 
 bool ahci_submit_bio_request(struct generic_disk *disk,
                              struct bio_request *bio);
+
+void ahci_do_coalesce(struct generic_disk *disk, struct bio_request *into,
+                      struct bio_request *from);
+
+bool ahci_should_coalesce(struct generic_disk *disk,
+                          const struct bio_request *a,
+                          const struct bio_request *b);
+
+void ahci_reorder(struct generic_disk *disk);
 
 struct generic_disk *ahci_create_generic(struct ahci_disk *disk);
 void ahci_isr_handler(void *ctx, uint8_t vector, void *rsp);

@@ -341,5 +341,3 @@ void nvme_do_coalesce(struct generic_disk *disk, struct bio_request *into,
                       struct bio_request *from);
 
 void nvme_reorder(struct generic_disk *disk);
-
-void nvme_dispatch_queue(struct generic_disk *disk, struct bio_rqueue *q);

@@ -70,6 +70,13 @@ struct pci_msix_cap {
     uint32_t pba_offset_bir;   // 0x8
 };
 
+#define PCI_BAR0 0x10
+#define PCI_BAR1 0x14
+#define PCI_BAR2 0x18
+#define PCI_BAR3 0x1C
+#define PCI_BAR4 0x20
+#define PCI_BAR5 0x24
+
 #define PCI_CAP_PTR 0x34
 #define PCI_CAP_ID_MSIX 0x11
 #define PCI_CONFIG_ADDRESS 0xCF8

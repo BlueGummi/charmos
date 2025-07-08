@@ -57,13 +57,21 @@ struct bio_scheduler_ops {
     void (*do_coalesce)(struct generic_disk *dev, struct bio_request *into,
                         struct bio_request *from);
 
-    void (*dispatch_queue)(struct generic_disk *dev, struct bio_rqueue *q);
     void (*reorder)(struct generic_disk *dev);
 
     uint32_t max_wait_time[BIO_SCHED_LEVELS];
     uint32_t dispatch_threshold;
     uint64_t boost_occupance_limit[BIO_SCHED_LEVELS];
 };
+
+bool noop_should_coalesce(struct generic_disk *disk,
+                          const struct bio_request *a,
+                          const struct bio_request *b);
+
+void noop_do_coalesce(struct generic_disk *disk, struct bio_request *into,
+                      struct bio_request *from);
+
+void noop_reorder(struct generic_disk *disk);
 
 void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req);
 
