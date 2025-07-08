@@ -161,7 +161,7 @@ struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {
     d->write_sector = nvme_write_sector_wrapper;
     d->submit_bio_async = nvme_submit_bio_request;
     d->print = nvme_print_wrapper;
-    d->flags = DISK_FLAG_NO_REORDER /*| DISK_FLAG_NO_COALESCE */;
+    d->flags = DISK_FLAG_NO_REORDER | DISK_FLAG_NO_COALESCE;
     d->cache = kzalloc(sizeof(struct bcache));
     d->scheduler = bio_sched_create(d, &nvme_bio_sched_ops);
 

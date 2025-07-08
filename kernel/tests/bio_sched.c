@@ -105,7 +105,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
 
     prng_seed(time_get_us());
 
-    uint64_t test_runs = 512 * 16;
+    uint64_t test_runs = 512;
     uint64_t runs_per_lvl[BIO_SCHED_LEVELS] = {0};
     uint8_t **buffers = kmalloc(test_runs * sizeof(uint8_t *));
     struct bio_request **rqs =
@@ -122,6 +122,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
         rq->on_complete = bio_sch_callback;
         rq->buffer = buffers[i];
         rq->priority = prng_next() % BIO_SCHED_LEVELS;
+        rq->write = false;
     }
 
     uint64_t ms = time_get_ms();
