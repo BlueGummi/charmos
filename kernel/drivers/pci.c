@@ -45,7 +45,7 @@ static void init_device(struct pci_device *dev) {
 
         class = dev->class_code == d->class_code;
         subclass = dev->subclass == d->subclass;
-        prog_if = dev->prog_if == d->prog_if;
+        prog_if = d->prog_if == 0xFF ? true : dev->prog_if == d->prog_if;
         vendor = d->vendor_id == 0xFFFF ? true : dev->vendor_id == d->vendor_id;
 
         if (class && subclass && prog_if && vendor) {
