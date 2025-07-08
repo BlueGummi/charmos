@@ -1,5 +1,5 @@
-#include <console/printf.h>
 #include <block/generic.h>
+#include <console/printf.h>
 #include <fs/detect.h>
 #include <fs/ext2.h>
 #include <fs/fat.h>
@@ -87,7 +87,6 @@ static bool detect_mbr_partitions(struct generic_disk *disk, uint8_t *sector) {
 static bool detect_gpt_partitions(struct generic_disk *disk, uint8_t *sector) {
     if (!disk->read_sector(disk, 1, sector, 1))
         return false;
-
 
     struct gpt_header *gpt = (struct gpt_header *) sector;
     if (gpt->signature != 0x5452415020494645ULL)
@@ -211,6 +210,8 @@ enum fs_type detect_fs(struct generic_disk *disk) {
     k_info("FS", K_INFO, "attempting to detect %s's filesystem(s)", disk->name);
 
     if (!disk->read_sector(disk, 0, sector, 1)) {
+        k_info("FS", K_WARN, "%s has an unknown filesystem - read failed",
+               disk->name);
         kfree_aligned(sector);
         return FS_UNKNOWN;
     }

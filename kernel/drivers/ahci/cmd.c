@@ -15,13 +15,18 @@
 
 #define MAX_PRDT_ENTRY_SIZE (4 * 1024 * 1024) // 4MB
 
+/* TODO: horrible code - bit-op spam */
 void ahci_process_completions(struct ahci_device *dev, uint32_t port) {
-    struct ahci_port *p = dev->regs[port].port;
-    uint32_t completed;
-    completed = ~(mmio_read_32(&p->ci) | mmio_read_32(&p->sact)) & 0xFFFFFFFF;
+    struct ahci_full_port *fp = &dev->regs[port];
+    struct ahci_port *p = fp->port;
 
-    for (uint32_t slot = 0; slot < 32; slot++) {
-        if (!(completed & (1ULL << slot)))
+    uint32_t ci = mmio_read_32(&p->ci);
+    uint32_t sact = mmio_read_32(&p->sact);
+    uint32_t completed = ~(ci | sact);
+
+    for (uint32_t slot = 0; slot < AHCI_MAX_SLOTS; slot++) {
+        uint32_t mask = 1U << slot;
+        if (!(completed & mask))
             continue;
 
         struct ahci_request *req = dev->io_requests[port][slot];
@@ -32,6 +37,7 @@ void ahci_process_completions(struct ahci_device *dev, uint32_t port) {
 
             if (req->on_complete)
                 req->on_complete(req);
+            fp->slot_bitmap &= ~(1U << slot);
         }
 
         struct thread *t = dev->io_waiters[port][slot];
@@ -52,12 +58,9 @@ void ahci_isr_handler(void *ctx, uint8_t vector, void *rsp) {
         if (!dev->regs[port].port)
             continue;
 
-        struct ahci_port *p = dev->regs[port].port;
-        if (mmio_read_32(&p->is) & mmio_read_32(&p->ie)) {
-            ahci_process_completions(dev, port);
-            mmio_write_32(&p->is, p->is);
-        }
+        ahci_process_completions(dev, port);
     }
+
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
 }
 
@@ -69,15 +72,18 @@ void ahci_send_command(struct ahci_disk *disk, struct ahci_full_port *port,
     disk->device->io_requests[disk->port][slot] = req;
 
     uint32_t command_issue = mmio_read_32(&port->port->ci);
-    command_issue |= (1 << slot);
+    command_issue |= (1U << slot);
     mmio_write_32(&port->port->ci, command_issue);
 }
 
-uint32_t ahci_find_slot(struct ahci_port *port) {
-    uint32_t slots_in_use = mmio_read_32(&port->sact) | mmio_read_32(&port->ci);
+uint32_t ahci_find_slot(struct ahci_full_port *p) {
+
+    uint32_t slots_in_use = p->slot_bitmap;
 
     for (int slot = 0; slot < AHCI_MAX_SLOTS; slot++) {
-        if ((slots_in_use & (1U << slot)) == 0) {
+        uint32_t mask = 1U << slot;
+        if (!(slots_in_use & mask)) {
+            p->slot_bitmap |= mask;
             return slot;
         }
     }
@@ -143,7 +149,7 @@ void ahci_setup_fis(struct ahci_cmd_table *cmd_tbl, uint8_t command,
 
 void ahci_identify(struct ahci_disk *disk) {
     struct ahci_full_port *port = &disk->device->regs[disk->port];
-    uint32_t slot = ahci_find_slot(port->port);
+    uint32_t slot = ahci_find_slot(port);
 
     uint8_t *buffer = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
     if (!buffer)
@@ -162,11 +168,12 @@ void ahci_identify(struct ahci_disk *disk) {
 
     uint32_t logical_sector_size = 512;
 
-    if (buffer[106] & (1 << 14)) {
+    /*if (buffer[106] & (1 << 14)) {
         uint32_t low = buffer[117];
         uint32_t high = buffer[118];
         logical_sector_size = ((uint32_t) high << 16) | low;
-    }
+    }*/
+
     disk->sector_size = logical_sector_size;
 
     ahci_info(K_INFO, "Sector size is %u bytes", disk->sector_size);
@@ -189,14 +196,14 @@ static void ahci_on_bio_complete(struct ahci_request *req) {
 bool ahci_submit_bio_request(struct generic_disk *disk,
                              struct bio_request *bio) {
     struct ahci_disk *ahci_disk = (struct ahci_disk *) disk->driver_data;
-    struct ahci_request *ahci_req = kmalloc(sizeof(struct ahci_request));
+    struct ahci_request *ahci_req = kzalloc(sizeof(struct ahci_request));
     if (!ahci_req)
         return false;
 
     struct ahci_full_port *p = &ahci_disk->device->regs[ahci_disk->port];
 
     ahci_req->port = ahci_disk->port;
-    ahci_req->slot = ahci_find_slot(p->port);
+    ahci_req->slot = ahci_find_slot(p);
     ahci_req->lba = bio->lba;
     ahci_req->buffer = bio->buffer;
     ahci_req->sector_count = bio->sector_count;

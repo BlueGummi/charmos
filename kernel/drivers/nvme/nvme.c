@@ -157,7 +157,7 @@ static struct bio_scheduler_ops nvme_bio_sched_ops = {
 };
 
 struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {
-    struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
+    struct generic_disk *d = kzalloc(sizeof(struct generic_disk));
     if (!d)
         k_panic("Could not allocate space for NVMe device\n");
 

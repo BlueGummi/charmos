@@ -32,11 +32,13 @@ static bool rw_async(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
     struct ahci_full_port *port = &ahci_disk->device->regs[ahci_disk->port];
 
     uint32_t slot = req->slot;
-    ahci_prepare_command(port, slot, false, buf, count * disk->sector_size);
+    ahci_prepare_command(port, slot, write, buf, count * disk->sector_size);
 
     struct ahci_cmd_table *tbl = port->cmd_tables[slot];
     uint8_t cmd = write ? AHCI_CMD_WRITE_DMA_EXT : AHCI_CMD_READ_DMA_EXT;
-    ahci_setup_fis(tbl, cmd, false);
+    bool is_atapi = false;
+
+    ahci_setup_fis(tbl, cmd, is_atapi);
 
     ahci_set_lba_cmd((struct ahci_fis_reg_h2d *) tbl->cfis, lba, count);
 
@@ -57,8 +59,13 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
     struct ahci_request req = {0};
     struct ahci_disk *ahci_disk = (struct ahci_disk *) disk->driver_data;
     struct ahci_device *dev = ahci_disk->device;
+    struct ahci_full_port *port = &dev->regs[ahci_disk->port];
+
     bool i = spin_lock(&dev->lock);
-    req.slot = ahci_find_slot(ahci_disk->device->regs[ahci_disk->port].port);
+    req.slot = ahci_find_slot(port);
+
+    /* tells ISR handler to mark status properly */
+    req.trigger_completion = true;
 
     struct thread *curr = scheduler_get_curr_thread();
     curr->state = BLOCKED;
@@ -120,7 +127,7 @@ bool ahci_read_sector_async(struct generic_disk *disk, uint64_t lba,
 bool ahci_write_sector_async(struct generic_disk *disk, uint64_t lba,
                              uint8_t *in_buf, uint16_t count,
                              struct ahci_request *req) {
-    return rw_async(disk, lba, (uint8_t *) in_buf, count, req, true);
+    return rw_async(disk, lba, in_buf, count, req, true);
 }
 
 bool ahci_read_sector_blocking(struct generic_disk *disk, uint64_t lba,

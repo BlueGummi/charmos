@@ -23,7 +23,7 @@ static bool done2 = false;
 static bool cb1d = false, cb2d = false;
 static uint64_t avg_complete_time[BIO_SCHED_LEVELS] = {0};
 static uint64_t total_complete_time[BIO_SCHED_LEVELS] = {0};
-static uint64_t runs = 0;
+static atomic_uint runs = 0;
 
 static void bio_sch_callback(struct bio_request *req) {
     (void) req;
@@ -34,7 +34,7 @@ static void bio_sch_callback(struct bio_request *req) {
     uint64_t time = time_get_ms() - q_ms;
     total_complete_time[q_lvl] += time;
     req->user_data = NULL;
-    runs++;
+    atomic_fetch_add(&runs, 1);
     TEST_ASSERT(req->status == BIO_STATUS_OK);
 }
 
@@ -134,6 +134,11 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
     }
     ms = time_get_ms() - ms;
 
+    char *msg = kmalloc(100);
+    snprintf(msg, 100, "Total time spent is %d ms", ms);
+    ADD_MESSAGE(msg);
+    sleep_ms(2000);
+
     for (uint64_t i = 0; i < BIO_SCHED_LEVELS; i++) {
         avg_complete_time[i] = total_complete_time[i] / runs_per_lvl[i];
         char *msg = kzalloc(100);
@@ -142,11 +147,9 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
         ADD_MESSAGE(msg);
     }
 
-    char *msg = kmalloc(100);
-    snprintf(msg, 100, "Total time spent is %d ms", ms);
-    ADD_MESSAGE(msg);
-    sleep_ms(2000);
-
+    char *m2 = kmalloc(100);
+    snprintf(m2, 100, "Runs is %d, test_runs is %d", runs, test_runs);
+    ADD_MESSAGE(m2);
     TEST_ASSERT(runs == test_runs);
 
     SET_SUCCESS;

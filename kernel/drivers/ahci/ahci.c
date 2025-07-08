@@ -9,11 +9,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "asm.h"
-#include "block/bcache.h"
-#include "block/generic.h"
-#include "console/printf.h"
-
 struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
                                        uint8_t function,
                                        uint32_t *out_disk_count) {
@@ -83,11 +78,13 @@ static struct bio_scheduler_ops ahci_sata_ssd_ops = {
 };
 
 struct generic_disk *ahci_create_generic(struct ahci_disk *disk) {
-    struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
+    struct generic_disk *d = kzalloc(sizeof(struct generic_disk));
     if (!d)
         ahci_info(K_ERROR, "could not allocate space for device");
 
     ahci_identify(disk);
+
+    d->flags = DISK_FLAG_NO_COALESCE | DISK_FLAG_NO_REORDER;
     d->driver_data = disk;
     d->sector_size = disk->sector_size;
     d->read_sector = ahci_read_sector_wrapper;
@@ -95,8 +92,7 @@ struct generic_disk *ahci_create_generic(struct ahci_disk *disk) {
     d->submit_bio_async = ahci_submit_bio_request;
     d->print = ahci_print_wrapper;
     d->cache = kzalloc(sizeof(struct bcache));
-    d->scheduler = kzalloc(sizeof(struct bio_scheduler));
-    bio_sched_create(d, &ahci_sata_ssd_ops);
+    d->scheduler = bio_sched_create(d, &ahci_sata_ssd_ops);
     bcache_init(d->cache, DEFAULT_BLOCK_CACHE_SIZE);
     d->type = G_AHCI_DRIVE;
     return d;

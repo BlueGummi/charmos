@@ -170,6 +170,7 @@ struct ahci_full_port {
     void *fis;
     struct ahci_cmd_table **cmd_tables;
     struct ahci_cmd_header **cmd_hdrs;
+    volatile uint32_t slot_bitmap;
 };
 
 struct ahci_port {
@@ -286,7 +287,7 @@ struct ahci_request {
 };
 
 void ahci_discover(struct ahci_controller *ctrl);
-uint32_t ahci_find_slot(struct ahci_port *port);
+uint32_t ahci_find_slot(struct ahci_full_port *port);
 struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
                                         uint32_t *d_cnt);
 void ahci_identify(struct ahci_disk *disk);
