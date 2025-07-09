@@ -2,6 +2,7 @@
 #include <asm.h>
 #include <block/bcache.h>
 #include <block/generic.h>
+#include <block/sched.h>
 #include <console/printf.h>
 #include <drivers/ata.h>
 #include <int/idt.h>
@@ -108,6 +109,32 @@ void ide_identify(struct ata_drive *drive) {
     drive->pio_mode = buf[64] & 0x03;
 }
 
+static struct bio_scheduler_ops ide_bio_ops = {
+    .should_coalesce = noop_should_coalesce,
+    .reorder = ide_reorder,
+    .do_coalesce = noop_do_coalesce,
+
+    .max_wait_time =
+        {
+            [BIO_RQ_BACKGROUND] = 100,
+            [BIO_RQ_LOW] = 75,
+            [BIO_RQ_MEDIUM] = 50,
+            [BIO_RQ_HIGH] = 25,
+            [BIO_RQ_URGENT] = 0,
+        },
+
+    .dispatch_threshold = 1,
+
+    .boost_occupance_limit =
+        {
+            [BIO_RQ_BACKGROUND] = 1,
+            [BIO_RQ_LOW] = 1,
+            [BIO_RQ_MEDIUM] = 1,
+            [BIO_RQ_HIGH] = 1,
+            [BIO_RQ_URGENT] = 0,
+        },
+};
+
 struct generic_disk *ide_create_generic(struct ata_drive *ide) {
     ide_identify(ide);
     if (!ide->actually_exists)
@@ -125,8 +152,13 @@ struct generic_disk *ide_create_generic(struct ata_drive *ide) {
     d->sector_size = ide->sector_size;
     d->read_sector = ide_read_sector_wrapper;
     d->write_sector = ide_write_sector_wrapper;
+    d->submit_bio_async = ide_submit_bio_async;
+
     d->print = ide_print_info;
-    d->cache = kmalloc(sizeof(struct bcache));
+    d->cache = kzalloc(sizeof(struct bcache));
+    d->flags = DISK_FLAG_NO_COALESCE;
+    d->scheduler = bio_sched_create(d, &ide_bio_ops);
+
     bcache_init(d->cache, DEFAULT_BLOCK_CACHE_SIZE);
     return d;
 }

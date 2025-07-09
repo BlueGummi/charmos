@@ -214,4 +214,12 @@ static inline uint64_t get_sch_core_id() {
     return id;
 }
 
+static inline void clear_interrupts(void) {
+    asm volatile("cli");
+}
+
+static inline void restore_interrupts(void) {
+    asm volatile("sti");
+}
+
 #pragma once

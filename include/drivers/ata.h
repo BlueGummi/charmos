@@ -83,6 +83,7 @@ struct ide_channel {
     struct ide_request *tail;
 
     bool busy;
+    struct spinlock lock;
     struct ata_drive *current_drive;
 };
 
@@ -110,11 +111,6 @@ struct ata_drive {
 #define IDE_RETRY_COUNT 3
 
 bool ide_wait_ready(struct ata_drive *d);
-
-bool ide_read_sector(struct ata_drive *d, uint64_t lba, uint8_t *b,
-                     uint8_t cnt);
-bool ide_write_sector(struct ata_drive *d, uint64_t lba, const uint8_t *b,
-                      uint8_t cnt);
 
 bool ide_read_sector_wrapper(struct generic_disk *d, uint64_t lba, uint8_t *buf,
                              uint64_t cnt);
@@ -200,4 +196,6 @@ void ata_soft_reset(struct ata_drive *ata_drive);
 bool atapi_identify(struct ata_drive *ide);
 void ata_init(struct pci_device *devices, uint64_t count);
 void ide_irq_handler(void *ctx, uint8_t irq_num, void *rsp);
+void ide_reorder(struct generic_disk *disk);
+bool ide_submit_bio_async(struct generic_disk *d, struct bio_request *b);
 struct generic_disk *atapi_create_generic(struct ata_drive *d);

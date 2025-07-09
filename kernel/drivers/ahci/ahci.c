@@ -40,8 +40,10 @@ struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
     struct ahci_controller *ctrl = (struct ahci_controller *) abar_virt;
 
     struct ahci_disk *disk = ahci_setup_controller(ctrl, out_disk_count);
-    if (!disk)
+    if (!disk) {
+        ahci_info(K_WARN, "AHCI device unsupported");
         return NULL;
+    }
 
     uint64_t core = get_sch_core_id();
     isr_register(disk->device->irq_num, ahci_isr_handler, disk->device, core);
@@ -60,20 +62,20 @@ static struct bio_scheduler_ops ahci_sata_ssd_ops = {
     .do_coalesce = noop_do_coalesce,
     .max_wait_time =
         {
-            [BIO_RQ_BACKGROUND] = 35,
+            [BIO_RQ_BACKGROUND] = 30,
             [BIO_RQ_LOW] = 20,
             [BIO_RQ_MEDIUM] = 15,
             [BIO_RQ_HIGH] = 10,
             [BIO_RQ_URGENT] = 0,
         },
-    .dispatch_threshold = 64,
+    .dispatch_threshold = 48,
     .boost_occupance_limit =
         {
-            [BIO_RQ_BACKGROUND] = 48,
-            [BIO_RQ_LOW] = 40,
-            [BIO_RQ_MEDIUM] = 32,
-            [BIO_RQ_HIGH] = 24,
-            [BIO_RQ_URGENT] = 16,
+            [BIO_RQ_BACKGROUND] = 40,
+            [BIO_RQ_LOW] = 32,
+            [BIO_RQ_MEDIUM] = 24,
+            [BIO_RQ_HIGH] = 16,
+            [BIO_RQ_URGENT] = 8,
         },
 };
 

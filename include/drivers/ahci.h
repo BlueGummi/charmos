@@ -171,6 +171,7 @@ struct ahci_full_port {
     struct ahci_cmd_table **cmd_tables;
     struct ahci_cmd_header **cmd_hdrs;
     volatile uint32_t slot_bitmap;
+    struct spinlock bitmap_lock;
 };
 
 struct ahci_port {

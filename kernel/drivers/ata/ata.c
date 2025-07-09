@@ -83,11 +83,11 @@ bool ata_setup_drive(struct ata_drive *ide, struct pci_device *devices,
                                                curr->function, PCI_PROG_IF);
             bool primary_native = (prog_if & 0x01);
             bool secondary_native = (prog_if & 0x04);
+
             if ((channel == 0 && !primary_native) ||
                 (channel == 1 && !secondary_native)) {
                 ide->irq = (channel == 0) ? 14 : 15;
             } else {
-                // Native PCI mode
                 ide->irq = pci_read_config8(curr->bus, curr->device,
                                             curr->function, PCI_INTERRUPT_LINE);
             }
@@ -128,9 +128,10 @@ bool ata_setup_drive(struct ata_drive *ide, struct pci_device *devices,
 static uint64_t ide_cnt = 1, atapi_cnt = 1;
 
 void ata_init(struct pci_device *devices, uint64_t count) {
-    struct ata_drive *drives = kmalloc(sizeof(struct ata_drive) * 4);
+    struct ata_drive *drives = kzalloc(sizeof(struct ata_drive) * 4);
     if (!drives)
         k_panic("Could not allocate space for devices\n");
+
     for (int i = 0; i < 2; i++) {
         for (int j = 0; j < 2; j++) {
             int ind = i * 2 + j;

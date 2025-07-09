@@ -42,7 +42,13 @@ void ide_irq_handler(void *ctx, uint8_t irq_num, void *rsp) {
     if (!req)
         goto out;
 
-    uint8_t *buf = req->buffer + (req->current_sector * 512);
+    if (status & STATUS_ERR) {
+        req->status = translate_status(status, error);
+        req->done = true;
+        goto complete;
+    }
+
+    uint8_t *buf = req->buffer + req->current_sector * 512;
     if (req->write) {
         outsw(REG_DATA(d->io_base), buf, 256);
     } else {
@@ -51,25 +57,30 @@ void ide_irq_handler(void *ctx, uint8_t irq_num, void *rsp) {
 
     req->current_sector++;
 
-    if (req->current_sector >= req->sector_count) {
-        req->done = true;
+    if (req->current_sector < req->sector_count)
+        goto out;
 
-        /* TODO: Read status */
-        req->status = translate_status(status, error);
+    req->status = translate_status(status, error);
+    req->done = true;
 
-        if (req->waiter)
-            scheduler_wake(req->waiter);
-        else if (req->on_complete)
-            req->on_complete(req);
-
-        chan->head = req->next;
-        kfree(req);
-
-        if (chan->head)
-            ide_start_next(chan);
-        else
-            chan->busy = false;
+complete:
+    if (req->waiter) {
+        scheduler_wake(req->waiter);
+    } else if (req->on_complete) {
+        req->on_complete(req);
     }
+
+    bool i = spin_lock(&chan->lock);
+    chan->head = req->next;
+
+    if (chan->head) {
+        ide_start_next(chan);
+    } else {
+        chan->busy = false;
+    }
+
+    spin_unlock(&chan->lock, i);
+
 out:
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
 }
@@ -91,8 +102,7 @@ static void ide_start_next(struct ide_channel *chan) {
 
 static void enqueue_ide_request(struct ide_channel *chan,
                                 struct ide_request *req) {
-    req->next = NULL;
-
+    bool i = spin_lock(&chan->lock);
     if (!chan->head) {
         chan->head = req;
         chan->tail = req;
@@ -100,23 +110,14 @@ static void enqueue_ide_request(struct ide_channel *chan,
         chan->tail->next = req;
         chan->tail = req;
     }
+    spin_unlock(&chan->lock, i);
 }
 
 static void submit_async(struct ata_drive *d, struct ide_request *req) {
     enqueue_ide_request(&d->channel, req);
-    if (!d->channel.busy)
+    if (!d->channel.busy) {
         ide_start_next(&d->channel);
-}
-
-bool ide_wait_ready(struct ata_drive *d) {
-    uint64_t timeout = IDE_CMD_TIMEOUT_MS * 1000;
-    while (inb(REG_STATUS(d->io_base)) & STATUS_BSY) {
-        sleep_us(10);
-        timeout--;
-        if (timeout == 0)
-            return false;
     }
-    return (inb(REG_STATUS(d->io_base)) & STATUS_DRDY);
 }
 
 static struct ide_request *request_init(uint64_t lba, uint8_t *buffer,
@@ -130,84 +131,86 @@ static struct ide_request *request_init(uint64_t lba, uint8_t *buffer,
     return req;
 }
 
+static void ide_bio_on_complete(struct ide_request *req) {
+    struct bio_request *bio = req->user_data;
+    bio->done = true;
+    bio->status = req->status;
+
+    if (bio->on_complete)
+        bio->on_complete(bio);
+
+    kfree(req);
+}
+
+bool ide_submit_bio_async(struct generic_disk *d, struct bio_request *b) {
+    struct ata_drive *disk = d->driver_data;
+    struct ide_request *req =
+        request_init(b->lba, b->buffer, b->sector_count, b->write);
+    req->size = b->size;
+    req->user_data = b;
+    req->on_complete = ide_bio_on_complete;
+    submit_async(disk, req);
+    return true;
+}
+
 static inline void submit_and_wait(struct ata_drive *d,
                                    struct ide_request *req) {
     bool i = spin_lock(&req->lock);
-    submit_async(d, req);
     struct thread *t = scheduler_get_curr_thread();
     t->state = BLOCKED;
     req->waiter = t;
+    submit_async(d, req);
     spin_unlock(&req->lock, i);
+}
+
+static bool rw_sync(struct ata_drive *d, uint64_t lba, uint8_t *b, uint8_t cnt,
+                    bool write) {
+    struct ide_request *req = request_init(lba, b, cnt, write);
+
+    submit_and_wait(d, req);
+    scheduler_yield();
+
+    bool ret = !req->status;
+
+    kfree(req);
+    return ret;
+}
+
+typedef bool (*sync_fn)(struct ata_drive *, uint64_t, uint8_t *, uint8_t);
+
+static bool rw_sync_wrapper(struct generic_disk *d, uint64_t lba, uint8_t *buf,
+                            uint64_t cnt, sync_fn function) {
+    struct ata_drive *ide = d->driver_data;
+
+    while (cnt > 0) {
+        uint8_t chunk = (cnt >= 256) ? 0 : (uint8_t) cnt;
+        function(ide, lba, buf, chunk);
+
+        uint64_t sectors = (chunk == 0) ? 256 : chunk;
+        lba += sectors;
+        buf += sectors * 512;
+        cnt -= sectors;
+    }
+
+    return true;
 }
 
 bool ide_read_sector(struct ata_drive *d, uint64_t lba, uint8_t *b,
                      uint8_t count) {
-    struct ide_request *req = request_init(lba, b, count, false);
-
-    submit_and_wait(d, req);
-    scheduler_yield();
-
-    return !req->status;
+    return rw_sync(d, lba, b, count, false);
 }
 
-bool ide_write_sector(struct ata_drive *d, uint64_t lba, const uint8_t *b,
+bool ide_write_sector(struct ata_drive *d, uint64_t lba, uint8_t *b,
                       uint8_t count) {
-    struct ide_request *req = request_init(lba, (uint8_t *) b, count, true);
-
-    submit_and_wait(d, req);
-    scheduler_yield();
-
-    return !req->status;
+    return rw_sync(d, lba, b, count, true);
 }
 
 bool ide_read_sector_wrapper(struct generic_disk *d, uint64_t lba, uint8_t *buf,
                              uint64_t cnt) {
-    struct ata_drive *ide = d->driver_data;
-
-    while (cnt > 0) {
-        uint8_t chunk = (cnt >= 256) ? 0 : (uint8_t) cnt;
-        bool success = false;
-        for (int i = 0; i < IDE_RETRY_COUNT; i++) {
-            if (ide_read_sector(ide, lba, buf, chunk)) {
-                success = true;
-                break;
-            }
-            k_info("IDE", K_WARN, "read error at LBA %u. Retrying...\n", lba);
-        }
-        if (!success)
-            return false;
-
-        uint64_t sectors = (chunk == 0) ? 256 : chunk;
-        lba += sectors;
-        buf += sectors * 512;
-        cnt -= sectors;
-    }
-
-    return true;
+    return rw_sync_wrapper(d, lba, buf, cnt, ide_read_sector);
 }
 
 bool ide_write_sector_wrapper(struct generic_disk *d, uint64_t lba,
                               const uint8_t *buf, uint64_t cnt) {
-    struct ata_drive *ide = d->driver_data;
-
-    while (cnt > 0) {
-        uint8_t chunk = (cnt >= 256) ? 0 : (uint8_t) cnt;
-        bool success = false;
-        for (int i = 0; i < IDE_RETRY_COUNT; i++) {
-            if (ide_write_sector(ide, lba, buf, chunk)) {
-                success = true;
-                break;
-            }
-            k_info("IDE", K_WARN, "write error at LBA %u. Retrying...\n", lba);
-        }
-        if (!success)
-            return false;
-
-        uint64_t sectors = (chunk == 0) ? 256 : chunk;
-        lba += sectors;
-        buf += sectors * 512;
-        cnt -= sectors;
-    }
-
-    return true;
+    return rw_sync_wrapper(d, lba, (uint8_t *) buf, cnt, ide_write_sector);
 }

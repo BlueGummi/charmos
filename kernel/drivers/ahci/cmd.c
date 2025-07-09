@@ -37,7 +37,9 @@ void ahci_process_completions(struct ahci_device *dev, uint32_t port) {
 
             if (req->on_complete)
                 req->on_complete(req);
+            bool i = spin_lock(&fp->bitmap_lock);
             fp->slot_bitmap &= ~(1U << slot);
+            spin_unlock(&fp->bitmap_lock, i);
         }
 
         struct thread *t = dev->io_waiters[port][slot];
@@ -78,21 +80,27 @@ void ahci_send_command(struct ahci_disk *disk, struct ahci_full_port *port,
 
 uint32_t ahci_find_slot(struct ahci_full_port *p) {
 
+    bool i = spin_lock(&p->bitmap_lock);
     uint32_t slots_in_use = p->slot_bitmap;
 
     for (int slot = 0; slot < AHCI_MAX_SLOTS; slot++) {
         uint32_t mask = 1U << slot;
         if (!(slots_in_use & mask)) {
             p->slot_bitmap |= mask;
+            spin_unlock(&p->bitmap_lock, i);
             return slot;
         }
     }
 
+    spin_unlock(&p->bitmap_lock, i);
     return -1;
 }
 
+/* TODO: BUG here when there are too many concurrent requests
+ * eating up all the available slots */
 void ahci_prepare_command(struct ahci_full_port *port, uint32_t slot,
                           bool write, uint8_t *buf, uint64_t size) {
+
     struct ahci_cmd_header *hdr = port->cmd_hdrs[slot];
     struct ahci_cmd_table *cmd_tbl = port->cmd_tables[slot];
 
