@@ -133,6 +133,7 @@ static struct bio_scheduler_ops ide_bio_ops = {
             [BIO_RQ_HIGH] = 1,
             [BIO_RQ_URGENT] = 0,
         },
+    .min_wait_ms = 2,
 };
 
 struct generic_disk *ide_create_generic(struct ata_drive *ide) {

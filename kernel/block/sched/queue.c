@@ -16,7 +16,7 @@ void bio_sched_enqueue_internal(struct bio_scheduler *sched,
     if (submit_if_urgent(sched, req))
         return;
 
-    set_request_timestamp(req);
+    update_request_timestamp(req);
     enum bio_request_priority prio = req->priority;
     struct bio_rqueue *q = &sched->queues[prio];
     req->next = NULL;

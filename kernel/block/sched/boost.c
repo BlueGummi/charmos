@@ -7,9 +7,6 @@
 #include <stdint.h>
 #include <time/time.h>
 
-/* enqueuing skips enqueuing if the req is URGENT */
-static bool boost_prio(struct bio_scheduler *sched, struct bio_request *req);
-
 static inline uint64_t get_boost_depth(struct bio_request *req) {
     if (req->boost_count >= 3)
         return 2;
@@ -31,19 +28,21 @@ static bool should_boost(struct bio_request *req) {
     struct bio_scheduler_ops *ops = req->disk->ops;
     uint64_t base_wait = ops->max_wait_time[req->priority];
 
-    // reduce wait time threshold by 2^boost_count, with a max shift cap
+    /* reduce wait time threshold by 2^boost_count, with a max shift cap */
     uint64_t shift = req->boost_count > BIO_SCHED_BOOST_SHIFT_LIMIT
                          ? BIO_SCHED_BOOST_SHIFT_LIMIT
                          : req->boost_count;
 
     uint64_t adjusted_wait = base_wait >> shift;
-    if (adjusted_wait < BIO_SCHED_MIN_WAIT_MS)
-        adjusted_wait = BIO_SCHED_MIN_WAIT_MS;
+
+    if (adjusted_wait < ops->min_wait_ms)
+        adjusted_wait = ops->min_wait_ms;
 
     return curr_timestamp > (req->enqueue_time + adjusted_wait);
 }
 
-static bool boost_prio(struct bio_scheduler *sched, struct bio_request *req) {
+static bool do_boost_prio(struct bio_scheduler *sched,
+                          struct bio_request *req) {
     enum bio_request_priority new_prio = get_boosted_prio(req);
 
     struct bio_scheduler_ops *ops = sched->disk->ops;
@@ -51,10 +50,16 @@ static bool boost_prio(struct bio_scheduler *sched, struct bio_request *req) {
     if (req->priority == new_prio)
         return false;
 
-    if (sched->queues[new_prio].request_count > ops->boost_occupance_limit[new_prio])
-        return false;
+    uint64_t target_request_count = sched->queues[new_prio].request_count;
+    uint64_t target_occupance_limit = ops->boost_occupance_limit[new_prio];
 
-    /* remove from current queue */
+    /* update the timestamp so we don't try to
+     * boost this request again for a while */
+    if (target_request_count > target_occupance_limit) {
+        update_request_timestamp(req);
+        return false;
+    }
+
     bio_sched_dequeue_internal(sched, req);
     req->priority = new_prio;
     req->boost_count++;
@@ -66,9 +71,9 @@ static bool boost_prio(struct bio_scheduler *sched, struct bio_request *req) {
 
 static inline bool try_boost(struct bio_scheduler *sched,
                              struct bio_request *req) {
-    if (should_boost(req)) {
-        return boost_prio(sched, req);
-    }
+    if (should_boost(req))
+        return do_boost_prio(sched, req);
+
     return false;
 }
 
