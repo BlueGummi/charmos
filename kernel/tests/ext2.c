@@ -14,6 +14,13 @@
     }                                                                          \
     struct vfs_node *root = g_root_node;
 
+static void flush() {
+    struct ext2_fs *fs = g_root_node->fs_data;
+    struct generic_disk *d = fs->drive;
+
+    bio_sched_dispatch_all(d);
+}
+
 REGISTER_TEST(ext2_stat_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     EXT2_INIT;
 
@@ -30,6 +37,7 @@ REGISTER_TEST(ext2_stat_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     /* this should return something */
     TEST_ASSERT(memcmp(&stat_out, &empty_stat, sizeof(struct vfs_stat)) != 0);
 
+    flush();
     SET_SUCCESS;
 }
 
@@ -50,6 +58,7 @@ REGISTER_TEST(ext2_rename_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     node = root->ops->finddir(root, "ext2_rename_test2");
     TEST_ASSERT(node != NULL);
 
+    flush();
     SET_SUCCESS;
 }
 
@@ -70,6 +79,7 @@ REGISTER_TEST(ext2_chmod_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(node != NULL);
     TEST_ASSERT(node->mode & VFS_MODE_O_EXEC);
 
+    flush();
     SET_SUCCESS;
 }
 
@@ -90,6 +100,7 @@ REGISTER_TEST(ext2_symlink_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     TEST_ASSERT(strcmp(buf, "/tmp") == 0);
 
+    flush();
     SET_SUCCESS;
 }
 
@@ -105,6 +116,7 @@ REGISTER_TEST(ext2_dir_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     e = root->ops->rmdir(root, "ext2_dir_test");
     TEST_ASSERT(!ERR_IS_FATAL(e));
 
+    flush();
     SET_SUCCESS;
 }
 
@@ -146,10 +158,7 @@ REGISTER_TEST(ext2_integration_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     node = root->ops->finddir(root, "ext2_integration_test");
     TEST_ASSERT(node == NULL);
 
-    struct ext2_fs *fs = root->fs_data;
-    struct generic_disk *d = fs->drive;
-
-    bio_sched_dispatch_all(d);
+    flush();
 
     SET_SUCCESS;
 }
