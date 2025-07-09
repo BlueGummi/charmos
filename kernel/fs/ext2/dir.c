@@ -72,11 +72,6 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     ext2_inode_write(fs, parent_dir->inode_num, &parent_dir->node);
     ext2_block_write(fs, ent, EXT2_PRIO_DIRENT);
 
-    uint32_t group = ext2_get_inode_group(fs, dir->inode_num);
-    struct ext2_group_desc *desc = &fs->group_desc[group];
-    if (!desc)
-        return ERR_IO;
-
     return ERR_OK;
 }
 
@@ -85,8 +80,11 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     uint8_t type;
     struct ext2_full_inode *dir;
     dir = ext2_find_file_in_dir(fs, parent_dir, name, &type);
-    if (!dir || !(dir->node.mode & EXT2_S_IFDIR))
+    if (!dir)
         return ERR_NO_ENT;
+
+    if (!(dir->node.mode & EXT2_S_IFDIR))
+        return ERR_NOT_DIR;
 
     uint32_t b_idx = 0;
     uint32_t b_num = 0;
@@ -124,10 +122,14 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     if (!empty)
         return ERR_NOT_EMPTY;
 
-    enum errno err = ext2_unlink_file(fs, parent_dir, name, true, true);
+    bool free_blocks = true;
+    bool decrement_links = true;
+
+    enum errno err =
+        ext2_unlink_file(fs, parent_dir, name, free_blocks, decrement_links);
+
     if (err != ERR_OK)
         return err;
-
 
     if (dir->node.blocks) {
         uint32_t block = dir->node.block[0];
@@ -140,7 +142,7 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
 
     uint32_t group = ext2_get_inode_group(fs, dir->inode_num);
     struct ext2_group_desc *desc = &fs->group_desc[group];
-    
+
     bool i = ext2_fs_lock(fs);
     desc->used_dirs_count--;
     parent_dir->node.links_count--;

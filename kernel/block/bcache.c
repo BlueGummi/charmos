@@ -20,7 +20,7 @@ static uint8_t *get_lba_offset_buffer(struct bcache_entry *ent, uint64_t lba,
 static bool remove(struct bcache *cache, uint64_t key, uint64_t spb);
 
 static bool insert(struct bcache *cache, uint64_t key,
-                   struct bcache_entry *value);
+                   struct bcache_entry *value, bool already_locked);
 
 static struct bcache_entry *get(struct bcache *cache, uint64_t key);
 static bool write(struct generic_disk *d, struct bcache *cache,
@@ -32,9 +32,12 @@ static void prefetch(struct generic_disk *disk, struct bcache *cache,
 
 /* eviction must be explicitly and separately called */
 static bool insert(struct bcache *cache, uint64_t key,
-                   struct bcache_entry *value) {
+                   struct bcache_entry *value, bool already_locked) {
 
-    bool ints = spin_lock(&cache->lock);
+    bool ints = false;
+
+    if (!already_locked)
+        ints = spin_lock(&cache->lock);
 
     uint64_t index = bcache_hash(key, cache->capacity);
     bcache_increment_ticks(cache);
@@ -49,12 +52,15 @@ static bool insert(struct bcache *cache, uint64_t key,
             entry->value->access_time = bcache_get_ticks(cache);
             entry->occupied = true;
             cache->count++;
-            spin_unlock(&cache->lock, ints);
+
+            if (!already_locked)
+                spin_unlock(&cache->lock, ints);
             return true;
         }
     }
 
-    spin_unlock(&cache->lock, ints);
+    if (!already_locked)
+        spin_unlock(&cache->lock, ints);
     return false; // full
 }
 
@@ -162,7 +168,7 @@ struct bcache_pf_data {
 
 static void prefetch_callback(struct bio_request *bio) {
     struct bcache_pf_data *data = bio->user_data;
-    insert(data->cache, bio->lba, data->new_entry);
+    insert(data->cache, bio->lba, data->new_entry, false);
     kfree(data);
     kfree(bio);
 }
@@ -285,11 +291,11 @@ struct bcache_entry *bcache_get(struct generic_disk *disk, uint64_t lba,
 
 bool bcache_insert(struct generic_disk *disk, uint64_t lba,
                    struct bcache_entry *ent, uint64_t spb) {
-    if (insert(disk->cache, lba, ent)) {
+    if (insert(disk->cache, lba, ent, false)) {
         return true;
     } else {
         evict(disk->cache, spb);
-        return insert(disk->cache, lba, ent);
+        return insert(disk->cache, lba, ent, false);
     }
 }
 
@@ -315,6 +321,7 @@ struct bcache_entry *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
     uint64_t base_lba = ALIGN_DOWN(lba, sectors_per_block);
 
     struct bcache_entry *existing = get(disk->cache, base_lba);
+    bool i = spin_lock(&disk->cache->lock);
 
     if (existing) {
         struct bcache_entry *shallow = kzalloc(sizeof(struct bcache_entry));
@@ -322,12 +329,14 @@ struct bcache_entry *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
         shallow->buffer =
             get_lba_offset_buffer(existing, lba, sectors_per_block, block_size);
         shallow->lba = lba;
+        spin_unlock(&disk->cache->lock, i);
         return shallow;
     }
 
     uint8_t *buf = kmalloc_aligned(block_size, PAGE_SIZE);
     if (!disk->read_sector(disk, base_lba, buf, sectors_per_block)) {
         kfree_aligned(buf);
+        spin_unlock(&disk->cache->lock, i);
         return NULL;
     }
 
@@ -337,7 +346,10 @@ struct bcache_entry *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
     ent->size = block_size;
     ent->no_evict = no_evict;
 
-    bcache_insert(disk, base_lba, ent, sectors_per_block);
+    if (!insert(disk->cache, lba, ent, true)) {
+        evict(disk->cache, sectors_per_block);
+        insert(disk->cache, lba, ent, true);
+    }
 
     struct bcache_entry *shallow = kzalloc(sizeof(struct bcache_entry));
 
@@ -346,6 +358,7 @@ struct bcache_entry *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
         get_lba_offset_buffer(ent, lba, sectors_per_block, block_size);
     shallow->lba = lba;
 
+    spin_unlock(&disk->cache->lock, i);
     return shallow;
 }
 
