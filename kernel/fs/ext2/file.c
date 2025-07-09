@@ -63,9 +63,8 @@ enum errno ext2_write_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
     inode->node.blocks +=
         new_block_counter * (fs->block_size / fs->drive->sector_size);
 
-    return ext2_inode_write(fs, inode->inode_num, &inode->node)
-               ? ERR_OK
-               : ERR_FS_INTERNAL;
+    bool status = ext2_inode_write(fs, inode->inode_num, &inode->node);
+    return status ? ERR_OK : ERR_IO;
 }
 
 struct file_read_ctx {

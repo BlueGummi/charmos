@@ -53,12 +53,15 @@ static uint32_t ext2_get_block(struct ext2_fs *fs, uint32_t block_num,
     result = ext2_get_block(fs, bnum, depth - 1, entry_offset, new_block_num,
                             allocate, was_allocated);
 
-    /* no I will not make locking any more fine grained */
     bcache_ent_lock(ent);
 
     if (result && block[entry_index] == 0 && allocate) {
         block[entry_index] = result;
+        bcache_ent_unlock(ent);
+
         ext2_block_write(fs, ent, EXT2_PRIO_DIRENT);
+
+        bcache_ent_lock(ent);
     } else if (allocated_this_level && result == 0) {
         ext2_free_block(fs, block_num);
     }

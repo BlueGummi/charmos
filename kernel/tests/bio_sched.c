@@ -138,6 +138,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
     snprintf(msg, 100, "Total time spent is %d ms", ms);
     ADD_MESSAGE(msg);
     sleep_ms(2000);
+    bio_sched_dispatch_all(d);
 
     for (uint64_t i = 0; i < BIO_SCHED_LEVELS; i++) {
         avg_complete_time[i] = total_complete_time[i] / runs_per_lvl[i];

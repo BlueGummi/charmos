@@ -93,6 +93,21 @@ REGISTER_TEST(ext2_symlink_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS;
 }
 
+REGISTER_TEST(ext2_dir_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    EXT2_INIT;
+
+    enum errno e = root->ops->mkdir(root, "ext2_dir_test", VFS_MODE_DIR);
+    TEST_ASSERT(!ERR_IS_FATAL(e));
+
+    struct vfs_node *node = root->ops->finddir(root, "ext2_dir_test");
+    TEST_ASSERT(node != NULL);
+
+    e = root->ops->rmdir(root, "ext2_dir_test");
+    TEST_ASSERT(!ERR_IS_FATAL(e));
+
+    SET_SUCCESS;
+}
+
 REGISTER_TEST(ext2_integration_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     EXT2_INIT;
 

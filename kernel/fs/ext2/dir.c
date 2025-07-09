@@ -77,18 +77,6 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     if (!desc)
         return ERR_IO;
 
-    desc->used_dirs_count++;
-
-    /* TODO: not sure why, but these numbers down here are changed
-     * and become inaccurate, fsck complains */
-    bool i = ext2_fs_lock(fs);
-    desc->free_blocks_count++;
-    fs->sblock->free_blocks_count++;
-    ext2_fs_unlock(fs, i);
-
-    ext2_write_group_desc(fs);
-    ext2_write_superblock(fs);
-
     return ERR_OK;
 }
 
@@ -100,7 +88,11 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     if (!dir || !(dir->node.mode & EXT2_S_IFDIR))
         return ERR_NO_ENT;
 
-    uint32_t tmp = ext2_get_or_set_block(fs, &dir->node, 0, 0, false, NULL);
+    uint32_t b_idx = 0;
+    uint32_t b_num = 0;
+
+    uint32_t tmp =
+        ext2_get_or_set_block(fs, &dir->node, b_idx, b_num, false, NULL);
 
     struct bcache_entry *ent = ext2_block_read(fs, tmp);
 
@@ -136,7 +128,27 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     if (err != ERR_OK)
         return err;
 
+
+    if (dir->node.blocks) {
+        uint32_t block = dir->node.block[0];
+        if (block)
+            ext2_free_block(fs, block);
+        dir->node.block[0] = 0;
+        dir->node.blocks = 0;
+        dir->node.size = 0;
+    }
+
+    uint32_t group = ext2_get_inode_group(fs, dir->inode_num);
+    struct ext2_group_desc *desc = &fs->group_desc[group];
+    
+    bool i = ext2_fs_lock(fs);
+    desc->used_dirs_count--;
     parent_dir->node.links_count--;
+    ext2_fs_unlock(fs, i);
+
+    ext2_free_inode(fs, dir->inode_num);
+
+    ext2_inode_write(fs, dir->inode_num, &dir->node);
     ext2_inode_write(fs, parent_dir->inode_num, &parent_dir->node);
 
     return ERR_OK;
