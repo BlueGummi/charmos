@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-static void ide_start_next(struct ide_channel *chan);
+static void ide_start_next(struct ide_channel *chan, bool locked);
 
 static enum bio_request_status translate_status(uint8_t status, uint8_t error) {
     if ((status & STATUS_ERR) == 0) {
@@ -33,6 +33,8 @@ void ide_irq_handler(void *ctx, uint8_t irq_num, void *rsp) {
     (void) irq_num, (void) rsp;
 
     struct ide_channel *chan = ctx;
+    bool i = spin_lock(&chan->lock);
+
     struct ide_request *req = chan->head;
     struct ata_drive *d = chan->current_drive;
 
@@ -57,8 +59,9 @@ void ide_irq_handler(void *ctx, uint8_t irq_num, void *rsp) {
 
     req->current_sector++;
 
-    if (req->current_sector < req->sector_count)
+    if (req->current_sector < req->sector_count) {
         goto out;
+    }
 
     req->status = translate_status(status, error);
     req->done = true;
@@ -70,24 +73,26 @@ complete:
         req->on_complete(req);
     }
 
-    bool i = spin_lock(&chan->lock);
-    chan->head = req->next;
+    chan->head = chan->head->next;
 
     if (chan->head) {
-        ide_start_next(chan);
+        ide_start_next(chan, true);
     } else {
         chan->busy = false;
     }
 
-    spin_unlock(&chan->lock, i);
-
 out:
+    spin_unlock(&chan->lock, i);
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
 }
 
-static void ide_start_next(struct ide_channel *chan) {
+static void ide_start_next(struct ide_channel *chan, bool locked) {
     struct ide_request *req = chan->head;
     struct ata_drive *d = chan->current_drive;
+
+    bool i = false;
+    if (!locked)
+        i = spin_lock(&chan->lock);
 
     chan->busy = true;
 
@@ -98,26 +103,49 @@ static void ide_start_next(struct ide_channel *chan) {
     outb(REG_LBA_MID(d->io_base), (req->lba >> 8) & 0xFF);
     outb(REG_LBA_HIGH(d->io_base), (req->lba >> 16) & 0xFF);
     outb(REG_COMMAND(d->io_base), req->write ? COMMAND_WRITE : COMMAND_READ);
+
+    if (req->write) {
+        uint8_t status;
+        do {
+            status = inb(REG_STATUS(d->io_base));
+        } while ((status & STATUS_DRQ) == 0);
+
+        uint8_t *buf = req->buffer;
+        outsw(REG_DATA(d->io_base), buf, 256);
+        req->current_sector = 1;
+    }
+
+    if (!locked)
+        spin_unlock(&chan->lock, i);
 }
 
 static void enqueue_ide_request(struct ide_channel *chan,
-                                struct ide_request *req) {
-    bool i = spin_lock(&chan->lock);
+                                struct ide_request *req, bool locked) {
+
+    bool i = false;
+    if (!locked)
+        i = spin_lock(&chan->lock);
+
     if (!chan->head) {
         chan->head = req;
         chan->tail = req;
     } else {
+        req->next = NULL;
         chan->tail->next = req;
         chan->tail = req;
     }
-    spin_unlock(&chan->lock, i);
+
+    if (!locked)
+        spin_unlock(&chan->lock, i);
 }
 
 static void submit_async(struct ata_drive *d, struct ide_request *req) {
-    enqueue_ide_request(&d->channel, req);
+    bool i = spin_lock(&d->channel.lock);
+    enqueue_ide_request(&d->channel, req, true);
     if (!d->channel.busy) {
-        ide_start_next(&d->channel);
+        ide_start_next(&d->channel, true);
     }
+    spin_unlock(&d->channel.lock, i);
 }
 
 static struct ide_request *request_init(uint64_t lba, uint8_t *buffer,
@@ -125,9 +153,11 @@ static struct ide_request *request_init(uint64_t lba, uint8_t *buffer,
     struct ide_request *req = kzalloc(sizeof(struct ide_request));
     req->lba = lba;
     req->buffer = buffer;
-    req->sector_count = count;
+    req->sector_count = (count == 0) ? 256 : count;
     req->status = BIO_STATUS_INFLIGHT;
     req->write = write;
+    req->next = NULL;
+
     return req;
 }
 
@@ -149,6 +179,7 @@ bool ide_submit_bio_async(struct generic_disk *d, struct bio_request *b) {
     req->size = b->size;
     req->user_data = b;
     req->on_complete = ide_bio_on_complete;
+
     submit_async(disk, req);
     return true;
 }

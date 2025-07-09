@@ -100,7 +100,7 @@ void registry_setup() {
 
     pci_scan_devices(&devices, &count);
     k_info("PCI", K_INFO, "Found %u devices", count);
-    
+
     pci_init_devices(devices, count);
     ata_init(devices, count);
 
@@ -119,16 +119,17 @@ void registry_setup() {
                     k_panic("VFS failed to mount root '%s' - mount failure\n",
                             g_root_part);
                 g_root_node = root;
-
-                root->ops->mkdir(root, "tmp", VFS_MODE_DIR);
-
                 found_root = true;
             }
         }
     }
+
     if (!found_root)
         k_panic("VFS failed to mount root '%s' - could not find root\n",
                 g_root_part);
+
+    k_info("VFS", K_INFO, "Root '%s' mounted - is a(n) %s filesystem",
+           g_root_part, detect_fstr(g_root_node->fs_type));
 }
 
 void registry_print_devices() {

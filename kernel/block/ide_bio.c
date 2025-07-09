@@ -48,4 +48,5 @@ void ide_reorder(struct generic_disk *disk) {
         kfree(array);
         q->dirty = false;
     }
+
 }

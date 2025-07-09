@@ -73,6 +73,7 @@ struct ide_request {
 
     void (*on_complete)(struct ide_request *);
     void *user_data;
+
     struct thread *waiter;
     struct ide_request *next;
     struct spinlock lock;

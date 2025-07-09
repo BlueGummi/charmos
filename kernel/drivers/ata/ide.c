@@ -44,7 +44,7 @@ static void swap_str(char *dst, const uint16_t *src, uint64_t word_len) {
 }
 
 void ide_identify(struct ata_drive *drive) {
-    uint16_t buf[256];
+    uint16_t *buf = kmalloc(256 * sizeof(uint16_t));
     uint16_t io = drive->io_base;
 
     outb(REG_DRIVE_HEAD(io), 0xA0 | (drive->slave ? 0x10 : 0x00));
@@ -58,11 +58,11 @@ void ide_identify(struct ata_drive *drive) {
         sleep_us(10);
         timeout--;
         if (timeout == 0)
-            return;
+            goto out;
     }
 
     if (status == 0 || (status & STATUS_ERR)) {
-        return;
+        goto out;
     }
 
     timeout = IDE_IDENT_TIMEOUT_MS * 1000;
@@ -70,7 +70,7 @@ void ide_identify(struct ata_drive *drive) {
         sleep_us(10);
         timeout--;
         if (timeout == 0)
-            return;
+            goto out;
     }
 
     insw(REG_DATA(io), buf, 256);
@@ -107,6 +107,8 @@ void ide_identify(struct ata_drive *drive) {
     }
 
     drive->pio_mode = buf[64] & 0x03;
+out:
+    kfree(buf);
 }
 
 static struct bio_scheduler_ops ide_bio_ops = {
@@ -142,14 +144,15 @@ struct generic_disk *ide_create_generic(struct ata_drive *ide) {
     if (!ide->actually_exists)
         return NULL;
 
-    k_info("IDE", K_INFO, "IDE drive IRQ on line %u", ide->irq);
     uint8_t irq = idt_alloc_entry();
+    k_info("IDE", K_INFO, "IDE drive IRQ on line %u, allocated entry %u",
+           ide->irq, irq);
+
     ioapic_route_irq(ide->irq, irq, 0, false);
     isr_register(irq, ide_irq_handler, &ide->channel, 0);
     ide->channel.current_drive = ide;
 
     struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
-    d->type = G_IDE_DRIVE;
     d->driver_data = ide;
     d->sector_size = ide->sector_size;
     d->read_sector = ide_read_sector_wrapper;
@@ -157,10 +160,13 @@ struct generic_disk *ide_create_generic(struct ata_drive *ide) {
     d->submit_bio_async = ide_submit_bio_async;
 
     d->print = ide_print_info;
-    d->cache = kzalloc(sizeof(struct bcache));
     d->flags = DISK_FLAG_NO_COALESCE;
+
+    d->cache = kzalloc(sizeof(struct bcache));
     d->scheduler = bio_sched_create(d, &ide_bio_ops);
 
     bcache_init(d->cache, DEFAULT_BLOCK_CACHE_SIZE);
+
+    d->type = G_IDE_DRIVE;
     return d;
 }
