@@ -45,7 +45,6 @@ struct bio_request {
     /* starting logical block address */
     /* const */ uint64_t lba;
 
-    /* page aligned buffer */
     /* const */ void *buffer;
 
     /* buffer size in bytes  */

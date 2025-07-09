@@ -111,9 +111,6 @@
 /* max of 2^4 threshold reduction */
 #define BIO_SCHED_BOOST_SHIFT_LIMIT 4
 
-/* time between checks of the queue */
-#define BIO_SCHED_TICK_MS 20
-
 /* max to scan before bail */
 #define BIO_SCHED_COALESCE_SCAN_LIMIT 8
 

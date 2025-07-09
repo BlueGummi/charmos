@@ -155,6 +155,7 @@ static struct bio_scheduler_ops nvme_bio_sched_ops = {
             [BIO_RQ_URGENT] = 32,
         },
     .min_wait_ms = 1,
+    .tick_ms = 20,
 };
 
 struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {

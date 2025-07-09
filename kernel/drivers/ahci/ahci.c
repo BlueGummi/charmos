@@ -78,6 +78,7 @@ static struct bio_scheduler_ops ahci_sata_ssd_ops = {
             [BIO_RQ_URGENT] = 8,
         },
     .min_wait_ms = 2,
+    .tick_ms = 25,
 };
 
 struct generic_disk *ahci_create_generic(struct ahci_disk *disk) {
