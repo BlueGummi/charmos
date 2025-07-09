@@ -3,7 +3,7 @@ import sys
 import shutil
 import re
 
-def move_file_and_update_references(old_path, new_path):
+def move_and_update(old_path, new_path):
     new_dir = os.path.dirname(new_path)
     if new_dir and not os.path.exists(new_dir):
         os.makedirs(new_dir)
@@ -16,7 +16,7 @@ def move_file_and_update_references(old_path, new_path):
 
     base_dir = os.path.abspath(os.path.join(os.getcwd(), ".."))
 
-    pattern = re.compile(r'<([^>]+)>')
+    pattern = re.compile(r'[<"]([^">]+)[>"]')
 
     for root, dirs, files in os.walk(base_dir):
         for file in files:
@@ -55,5 +55,5 @@ if __name__ == "__main__":
 
     old_path_input = sys.argv[1]
     new_path_input = sys.argv[2]
-    move_file_and_update_references(old_path_input, new_path_input)
+    move_and_update(old_path_input, new_path_input)
 
