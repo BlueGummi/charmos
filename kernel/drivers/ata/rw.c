@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 static void ide_start_next(struct ide_channel *chan, bool locked);
+typedef bool (*sync_fn)(struct ata_drive *, uint64_t, uint8_t *, uint8_t);
 
 static enum bio_request_status translate_status(uint8_t status, uint8_t error) {
     if ((status & STATUS_ERR) == 0) {
@@ -36,18 +37,19 @@ void ide_irq_handler(void *ctx, uint8_t irq_num, void *rsp) {
     bool i = spin_lock(&chan->lock);
 
     struct ide_request *req = chan->head;
+
+    if (!req)
+        goto out;
+
     struct ata_drive *d = chan->current_drive;
 
     uint8_t status = inb(REG_STATUS(d->io_base));
     uint8_t error = inb(REG_ERROR(d->io_base));
 
-    if (!req)
-        goto out;
-
     if (status & STATUS_ERR) {
         req->status = translate_status(status, error);
         req->done = true;
-        goto complete;
+        goto next_request;
     }
 
     uint8_t *buf = req->buffer + req->current_sector * 512;
@@ -63,15 +65,21 @@ void ide_irq_handler(void *ctx, uint8_t irq_num, void *rsp) {
         goto out;
     }
 
-    req->status = translate_status(status, error);
-    req->done = true;
+    if (--req->remaining_parts == 0) {
+        req->status = translate_status(status, error);
+        req->done = true;
+        if (req->on_complete)
+            req->on_complete(req);
+    } else {
+        goto out;
+    }
 
-complete:
     if (req->waiter) {
         scheduler_wake(req->waiter);
-    } else if (req->on_complete) {
-        req->on_complete(req);
+        req->waiter = NULL;
     }
+
+next_request:
 
     chan->head = chan->head->next;
 
@@ -84,6 +92,17 @@ complete:
 out:
     spin_unlock(&chan->lock, i);
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
+}
+
+static void ide_on_complete(struct ide_request *req) {
+    struct bio_request *bio = req->user_data;
+    bio->done = true;
+    bio->status = req->status;
+
+    if (bio->on_complete)
+        bio->on_complete(bio);
+
+    kfree(req);
 }
 
 static void ide_start_next(struct ide_channel *chan, bool locked) {
@@ -119,8 +138,8 @@ static void ide_start_next(struct ide_channel *chan, bool locked) {
         spin_unlock(&chan->lock, i);
 }
 
-static void enqueue_ide_request(struct ide_channel *chan,
-                                struct ide_request *req, bool locked) {
+static void enqueue_request(struct ide_channel *chan, struct ide_request *req,
+                            bool locked) {
 
     bool i = false;
     if (!locked)
@@ -141,47 +160,11 @@ static void enqueue_ide_request(struct ide_channel *chan,
 
 static void submit_async(struct ata_drive *d, struct ide_request *req) {
     bool i = spin_lock(&d->channel.lock);
-    enqueue_ide_request(&d->channel, req, true);
+    enqueue_request(&d->channel, req, true);
     if (!d->channel.busy) {
         ide_start_next(&d->channel, true);
     }
     spin_unlock(&d->channel.lock, i);
-}
-
-static struct ide_request *request_init(uint64_t lba, uint8_t *buffer,
-                                        uint8_t count, bool write) {
-    struct ide_request *req = kzalloc(sizeof(struct ide_request));
-    req->lba = lba;
-    req->buffer = buffer;
-    req->sector_count = (count == 0) ? 256 : count;
-    req->status = BIO_STATUS_INFLIGHT;
-    req->write = write;
-    req->next = NULL;
-
-    return req;
-}
-
-static void ide_bio_on_complete(struct ide_request *req) {
-    struct bio_request *bio = req->user_data;
-    bio->done = true;
-    bio->status = req->status;
-
-    if (bio->on_complete)
-        bio->on_complete(bio);
-
-    kfree(req);
-}
-
-bool ide_submit_bio_async(struct generic_disk *d, struct bio_request *b) {
-    struct ata_drive *disk = d->driver_data;
-    struct ide_request *req =
-        request_init(b->lba, b->buffer, b->sector_count, b->write);
-    req->size = b->size;
-    req->user_data = b;
-    req->on_complete = ide_bio_on_complete;
-
-    submit_async(disk, req);
-    return true;
 }
 
 static inline void submit_and_wait(struct ata_drive *d,
@@ -194,9 +177,60 @@ static inline void submit_and_wait(struct ata_drive *d,
     spin_unlock(&req->lock, i);
 }
 
+static struct ide_request *request_init(uint64_t lba, uint8_t *buffer,
+                                        uint8_t count, bool write,
+                                        uint64_t remaining_parts) {
+    struct ide_request *req = kzalloc(sizeof(struct ide_request));
+    req->lba = lba;
+    req->remaining_parts = remaining_parts;
+    req->buffer = buffer;
+    req->sector_count = (count == 0) ? 256 : count;
+    req->status = BIO_STATUS_INFLIGHT;
+    req->write = write;
+    req->next = NULL;
+
+    return req;
+}
+
+bool ide_submit_bio_async(struct generic_disk *disk, struct bio_request *bio) {
+    struct ata_drive *ide = disk->driver_data;
+    uint64_t lba = bio->lba;
+    uint8_t *buf = bio->buffer;
+    uint64_t cnt = bio->sector_count;
+
+    int parts = 0;
+    uint64_t tmp = cnt;
+    while (tmp > 0) {
+        tmp -= (tmp >= 256) ? 256 : tmp;
+        parts++;
+    }
+
+    k_printf("Starting...\n");
+    while (cnt > 0) {
+        k_printf("Sending...\n");
+        uint8_t chunk = (cnt >= 256) ? 0 : (uint8_t) cnt;
+        struct ide_request *req =
+            request_init(lba, buf, chunk, bio->write, parts);
+
+        req->size = (chunk == 0 ? 256 : chunk) * 512;
+        req->user_data = bio;
+        req->on_complete = ide_on_complete;
+
+        submit_async(ide, req);
+
+        uint64_t sectors = (chunk == 0) ? 256 : chunk;
+        lba += sectors;
+        buf += sectors * 512;
+        cnt -= sectors;
+    }
+    k_printf("Done\n");
+
+    return true;
+}
+
 static bool rw_sync(struct ata_drive *d, uint64_t lba, uint8_t *b, uint8_t cnt,
                     bool write) {
-    struct ide_request *req = request_init(lba, b, cnt, write);
+    struct ide_request *req = request_init(lba, b, cnt, write, 1);
 
     submit_and_wait(d, req);
     scheduler_yield();
@@ -206,8 +240,6 @@ static bool rw_sync(struct ata_drive *d, uint64_t lba, uint8_t *b, uint8_t cnt,
     kfree(req);
     return ret;
 }
-
-typedef bool (*sync_fn)(struct ata_drive *, uint64_t, uint8_t *, uint8_t);
 
 static bool rw_sync_wrapper(struct generic_disk *d, uint64_t lba, uint8_t *buf,
                             uint64_t cnt, sync_fn function) {

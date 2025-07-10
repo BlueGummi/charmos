@@ -125,18 +125,18 @@ static struct bio_scheduler_ops ide_bio_ops = {
             [BIO_RQ_URGENT] = 0,
         },
 
-    .dispatch_threshold = 1,
+    .dispatch_threshold = 64,
 
     .boost_occupance_limit =
         {
-            [BIO_RQ_BACKGROUND] = 1,
-            [BIO_RQ_LOW] = 1,
-            [BIO_RQ_MEDIUM] = 1,
-            [BIO_RQ_HIGH] = 1,
+            [BIO_RQ_BACKGROUND] = 32,
+            [BIO_RQ_LOW] = 24,
+            [BIO_RQ_MEDIUM] = 16,
+            [BIO_RQ_HIGH] = 8,
             [BIO_RQ_URGENT] = 0,
         },
     .min_wait_ms = 2,
-    .tick_ms = 40,
+    .tick_ms = 35,
 };
 
 struct generic_disk *ide_create_generic(struct ata_drive *ide) {
@@ -160,7 +160,7 @@ struct generic_disk *ide_create_generic(struct ata_drive *ide) {
     d->submit_bio_async = ide_submit_bio_async;
 
     d->print = ide_print_info;
-    d->flags = DISK_FLAG_NO_COALESCE;
+    d->flags = DISK_FLAG_NO_COALESCE | DISK_FLAG_NO_REORDER;
 
     d->cache = kzalloc(sizeof(struct bcache));
     d->scheduler = bio_sched_create(d, &ide_bio_ops);

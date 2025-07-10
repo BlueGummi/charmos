@@ -37,8 +37,10 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
         dev->io_statuses[qid][cid] = status;
 
         struct thread *t = dev->io_waiters[qid][cid];
-        if (t)
+        if (t) {
             scheduler_wake(t);
+            dev->io_waiters[qid][cid] = NULL;
+        }
 
         struct nvme_request *req = dev->io_requests[qid][cid];
 

@@ -234,14 +234,33 @@ static bool write(struct generic_disk *d, struct bcache *cache,
                   struct bcache_entry *ent, uint64_t spb) {
     bool ints = spin_lock(&cache->lock);
     bool ret = d->write_sector(d, ent->lba, ent->buffer, spb);
+    uint64_t aligned = ALIGN_DOWN(ent->lba, spb);
+    if (aligned != ent->lba)
+        kfree(ent);
+
     spin_unlock(&cache->lock, ints);
     return ret;
 }
 
+struct write_queue_data {
+    struct bcache_entry *ent;
+    uint64_t spb;
+};
+
 static void write_enqueue_cb(struct bio_request *req) {
-    struct bcache_entry *ent = req->user_data;
+    struct write_queue_data *qd = req->user_data;
+
+    struct bcache_entry *ent = qd->ent;
+    uint64_t spb = qd->spb;
+
     ent->dirty = false;
     ent->request = NULL;
+
+    uint64_t aligned = ALIGN_DOWN(ent->lba, spb);
+    if (aligned != ent->lba)
+        kfree(ent);
+
+    kfree(qd);
     kfree(req);
 }
 
@@ -251,9 +270,12 @@ static void write_queue(struct generic_disk *d, struct bcache *cache,
 
     bool ints = spin_lock(&cache->lock);
     ent->dirty = true;
+    struct write_queue_data *qd = kmalloc(sizeof(struct write_queue_data));
+    qd->ent = ent;
+    qd->spb = spb;
 
     struct bio_request *req = bio_create_write(
-        d, ent->lba, spb, ent->size, write_enqueue_cb, ent, ent->buffer);
+        d, ent->lba, spb, ent->size, write_enqueue_cb, qd, ent->buffer);
 
     req->priority = prio;
     ent->request = req;

@@ -80,6 +80,7 @@ void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
 
                 space_to_alloc++;
 
+                /* TODO: Do not blindly enable all PCI devices */
                 union pci_command_reg cmd;
                 cmd.value = pci_read_config16(bus, device, function, 0x04);
 
@@ -126,6 +127,10 @@ void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
                                          .subclass = subclass,
                                          .prog_if = prog_if,
                                          .revision = revision};
+
+                k_info("PCI", K_INFO, "Found device '%s' at %02x:%02x.%x",
+                       pci_class_name(class_code, subclass), bus, device,
+                       function);
 
                 if (function == 0) {
                     uint8_t header_type =
