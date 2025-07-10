@@ -65,7 +65,7 @@ struct ide_request {
     void *buffer;
     uint64_t size;
     uint64_t sector_count;
-    uint8_t current_sector;
+    uint16_t current_sector;
 
     bool write;
     volatile bool done;
@@ -74,7 +74,7 @@ struct ide_request {
     void (*on_complete)(struct ide_request *);
     void *user_data;
 
-    uint64_t remaining_parts;
+    bool trigger_completion;
     struct thread *waiter;
     struct ide_request *next;
     struct spinlock lock;
@@ -111,8 +111,6 @@ struct ata_drive {
 };
 
 #define IDE_RETRY_COUNT 3
-
-bool ide_wait_ready(struct ata_drive *d);
 
 bool ide_read_sector_wrapper(struct generic_disk *d, uint64_t lba, uint8_t *buf,
                              uint64_t cnt);

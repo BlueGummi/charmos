@@ -65,18 +65,16 @@ void ide_irq_handler(void *ctx, uint8_t irq_num, void *rsp) {
         goto out;
     }
 
-    if (--req->remaining_parts == 0) {
+    if (req->trigger_completion) {
         req->status = translate_status(status, error);
         req->done = true;
+
         if (req->on_complete)
             req->on_complete(req);
-    } else {
-        goto out;
     }
 
     if (req->waiter) {
         scheduler_wake(req->waiter);
-        req->waiter = NULL;
     }
 
 next_request:
@@ -105,6 +103,11 @@ static void ide_on_complete(struct ide_request *req) {
     kfree(req);
 }
 
+static void ide_wait_ready(struct ata_drive *d) {
+    while (inb(REG_STATUS(d->io_base)) & STATUS_BSY)
+        ;
+}
+
 static void ide_start_next(struct ide_channel *chan, bool locked) {
     struct ide_request *req = chan->head;
     struct ata_drive *d = chan->current_drive;
@@ -115,6 +118,7 @@ static void ide_start_next(struct ide_channel *chan, bool locked) {
 
     chan->busy = true;
 
+    ide_wait_ready(d);
     outb(REG_DRIVE_HEAD(d->io_base),
          0xE0U | (d->slave << 4) | ((req->lba >> 24) & 0x0F));
     outb(REG_SECTOR_COUNT(d->io_base), req->sector_count);
@@ -178,16 +182,16 @@ static inline void submit_and_wait(struct ata_drive *d,
 }
 
 static struct ide_request *request_init(uint64_t lba, uint8_t *buffer,
-                                        uint8_t count, bool write,
-                                        uint64_t remaining_parts) {
+                                        uint8_t count, bool write) {
     struct ide_request *req = kzalloc(sizeof(struct ide_request));
     req->lba = lba;
-    req->remaining_parts = remaining_parts;
     req->buffer = buffer;
     req->sector_count = (count == 0) ? 256 : count;
     req->status = BIO_STATUS_INFLIGHT;
     req->write = write;
     req->next = NULL;
+    req->user_data = NULL;
+    req->trigger_completion = true;
 
     return req;
 }
@@ -198,39 +202,31 @@ bool ide_submit_bio_async(struct generic_disk *disk, struct bio_request *bio) {
     uint8_t *buf = bio->buffer;
     uint64_t cnt = bio->sector_count;
 
-    int parts = 0;
-    uint64_t tmp = cnt;
-    while (tmp > 0) {
-        tmp -= (tmp >= 256) ? 256 : tmp;
-        parts++;
-    }
-
-    k_printf("Starting...\n");
+    bio->status = BIO_STATUS_INFLIGHT;
     while (cnt > 0) {
-        k_printf("Sending...\n");
         uint8_t chunk = (cnt >= 256) ? 0 : (uint8_t) cnt;
-        struct ide_request *req =
-            request_init(lba, buf, chunk, bio->write, parts);
+        uint64_t sectors = (chunk == 0) ? 256 : chunk;
 
-        req->size = (chunk == 0 ? 256 : chunk) * 512;
+        struct ide_request *req = request_init(lba, buf, chunk, bio->write);
+        req->size = sectors * 512;
         req->user_data = bio;
         req->on_complete = ide_on_complete;
 
+        req->trigger_completion = (cnt == sectors);
+
         submit_async(ide, req);
 
-        uint64_t sectors = (chunk == 0) ? 256 : chunk;
         lba += sectors;
         buf += sectors * 512;
         cnt -= sectors;
     }
-    k_printf("Done\n");
 
     return true;
 }
 
 static bool rw_sync(struct ata_drive *d, uint64_t lba, uint8_t *b, uint8_t cnt,
                     bool write) {
-    struct ide_request *req = request_init(lba, b, cnt, write, 1);
+    struct ide_request *req = request_init(lba, b, cnt, write);
 
     submit_and_wait(d, req);
     scheduler_yield();

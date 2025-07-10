@@ -118,25 +118,25 @@ static struct bio_scheduler_ops ide_bio_ops = {
 
     .max_wait_time =
         {
-            [BIO_RQ_BACKGROUND] = 100,
-            [BIO_RQ_LOW] = 75,
-            [BIO_RQ_MEDIUM] = 50,
-            [BIO_RQ_HIGH] = 25,
+            [BIO_RQ_BACKGROUND] = 35,
+            [BIO_RQ_LOW] = 25,
+            [BIO_RQ_MEDIUM] = 10,
+            [BIO_RQ_HIGH] = 4,
             [BIO_RQ_URGENT] = 0,
         },
 
-    .dispatch_threshold = 64,
+    .dispatch_threshold = 96,
 
     .boost_occupance_limit =
         {
-            [BIO_RQ_BACKGROUND] = 32,
-            [BIO_RQ_LOW] = 24,
-            [BIO_RQ_MEDIUM] = 16,
-            [BIO_RQ_HIGH] = 8,
-            [BIO_RQ_URGENT] = 0,
+            [BIO_RQ_BACKGROUND] = 64,
+            [BIO_RQ_LOW] = 56,
+            [BIO_RQ_MEDIUM] = 48,
+            [BIO_RQ_HIGH] = 40,
+            [BIO_RQ_URGENT] = 32,
         },
-    .min_wait_ms = 2,
-    .tick_ms = 35,
+    .min_wait_ms = 1,
+    .tick_ms = 25,
 };
 
 struct generic_disk *ide_create_generic(struct ata_drive *ide) {
