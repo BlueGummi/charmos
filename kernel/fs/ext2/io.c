@@ -40,9 +40,9 @@ bool ext2_block_write(struct ext2_fs *fs, struct bcache_entry *ent,
     struct generic_disk *d = fs->drive;
     uint32_t spb = fs->sectors_per_block;
 
-    bcache_ent_lock(ent);
+    bool i = bcache_ent_lock(ent);
     bcache_write_queue(d, ent, spb, prio);
-    bcache_ent_unlock(ent);
+    bcache_ent_unlock(ent, i);
 
     return true;
 }
@@ -75,10 +75,9 @@ struct bcache_entry *ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
     uint8_t *buf = ext2_block_read(fs, inode_block_num, &ent);
     if (!buf)
         return NULL;
-
-    bcache_ent_lock(ent);
+    bool i = bcache_ent_lock(ent);
     memcpy(inode_out, buf + offset_in_block, sizeof(struct ext2_inode));
-    bcache_ent_unlock(ent);
+    bcache_ent_unlock(ent, i);
 
     return ent;
 }
@@ -100,10 +99,9 @@ bool ext2_inode_write(struct ext2_fs *fs, uint32_t inode_num,
     uint8_t *block_buf = ext2_block_read(fs, inode_block_num, &ent);
     if (!block_buf)
         return false;
-
-    bcache_ent_lock(ent);
+    bool i = bcache_ent_lock(ent);
     memcpy(block_buf + block_offset, inode, fs->inode_size);
-    bcache_ent_unlock(ent);
+    bcache_ent_unlock(ent, i);
 
     bool status = ext2_block_write(fs, ent, EXT2_PRIO_INODE);
     return status;

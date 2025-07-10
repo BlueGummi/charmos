@@ -366,12 +366,12 @@ void *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
     return ent->buffer + offset;
 }
 
-void bcache_ent_lock(struct bcache_entry *ent) {
-    return mutex_lock(&ent->lock);
+bool bcache_ent_lock(struct bcache_entry *ent) {
+    return spin_lock(&ent->lock);
 }
 
-void bcache_ent_unlock(struct bcache_entry *ent) {
-    return mutex_unlock(&ent->lock);
+void bcache_ent_unlock(struct bcache_entry *ent, bool i) {
+    return spin_unlock(&ent->lock, i);
 }
 
 void bcache_prefetch_async(struct generic_disk *disk, uint64_t lba,

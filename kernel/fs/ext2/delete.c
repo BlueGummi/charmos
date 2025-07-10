@@ -99,11 +99,11 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
     if (!block)
         return ERR_IO;
 
-    bcache_ent_lock(ent);
+    bool i = bcache_ent_lock(ent);
 
     unlink_adjust_neighbors(fs, block, ctx.entry_offset, ctx.prev_offset);
 
-    bcache_ent_unlock(ent);
+    bcache_ent_unlock(ent, i);
 
     if (!ext2_block_write(fs, ent, EXT2_PRIO_DIRENT))
         return ERR_IO;

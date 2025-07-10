@@ -61,9 +61,9 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     if (!block)
         return ERR_IO;
 
-    bcache_ent_lock(ent);
+    bool i = bcache_ent_lock(ent);
     init_dot_ents(fs, block, parent_dir, dir);
-    bcache_ent_unlock(ent);
+    bcache_ent_unlock(ent, i);
 
     init_dir(fs, dir, new_block);
 
@@ -97,7 +97,7 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     if (!ent)
         return ERR_IO;
 
-    bcache_ent_lock(ent);
+    bool i = bcache_ent_lock(ent);
 
     bool empty = true;
     uint32_t offset = 0;
@@ -117,7 +117,7 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
         offset += entry->rec_len;
     }
 
-    bcache_ent_unlock(ent);
+    bcache_ent_unlock(ent, i);
     if (!empty)
         return ERR_NOT_EMPTY;
 
@@ -142,7 +142,7 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     uint32_t group = ext2_get_inode_group(fs, dir->inode_num);
     struct ext2_group_desc *desc = &fs->group_desc[group];
 
-    bool i = ext2_fs_lock(fs);
+    i = ext2_fs_lock(fs);
     desc->used_dirs_count--;
     parent_dir->node.links_count--;
     ext2_fs_unlock(fs, i);

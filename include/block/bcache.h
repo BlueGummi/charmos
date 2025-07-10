@@ -23,7 +23,7 @@ struct bcache_entry {
 
     /* used with a counter - not a real 'timestamp' */
     uint64_t access_time;
-    struct mutex lock;
+    struct spinlock lock;
     bool dirty;
     bool no_evict;
 
@@ -57,8 +57,8 @@ static inline uint64_t bcache_hash(uint64_t x, uint64_t capacity) {
 }
 
 void bcache_init(struct bcache *cache, uint64_t capacity);
-void bcache_ent_unlock(struct bcache_entry *ent);
-void bcache_ent_lock(struct bcache_entry *ent);
+void bcache_ent_unlock(struct bcache_entry *ent, bool interrupts);
+bool bcache_ent_lock(struct bcache_entry *ent);
 
 void *bcache_get(struct generic_disk *disk, uint64_t lba, uint64_t block_size,
                  uint64_t spb, bool no_evict, struct bcache_entry **out_entry);
