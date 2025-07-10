@@ -235,46 +235,27 @@ static bool write(struct generic_disk *d, struct bcache *cache,
     return ret;
 }
 
-struct write_queue_data {
-    struct bcache_entry *ent;
-    uint64_t spb;
-};
-
 static void write_enqueue_cb(struct bio_request *req) {
-    struct write_queue_data *qd = req->user_data;
-
-    struct bcache_entry *ent = qd->ent;
-    uint64_t spb = qd->spb;
+    struct bcache_entry *ent = req->user_data;
 
     ent->dirty = false;
     ent->request = NULL;
 
-    uint64_t aligned = ALIGN_DOWN(ent->lba, spb);
-    if (aligned != ent->lba)
-        kfree(ent);
-
-    kfree(qd);
     kfree(req);
 }
 
-static void write_queue(struct generic_disk *d, struct bcache *cache,
-                        struct bcache_entry *ent, uint64_t spb,
-                        enum bio_request_priority prio) {
+static void write_queue(struct generic_disk *d, struct bcache_entry *ent,
+                        uint64_t spb, enum bio_request_priority prio) {
 
-    bool ints = spin_lock(&cache->lock);
     ent->dirty = true;
-    struct write_queue_data *qd = kmalloc(sizeof(struct write_queue_data));
-    qd->ent = ent;
-    qd->spb = spb;
 
     struct bio_request *req = bio_create_write(
-        d, ent->lba, spb, ent->size, write_enqueue_cb, qd, ent->buffer);
+        d, ent->lba, spb, ent->size, write_enqueue_cb, ent, ent->buffer);
 
     req->priority = prio;
     ent->request = req;
-    bio_sched_enqueue(d, req);
 
-    spin_unlock(&cache->lock, ints);
+    bio_sched_enqueue(d, req);
 }
 
 /* TODO: free all entries */
@@ -326,7 +307,7 @@ bool bcache_writethrough(struct generic_disk *disk, struct bcache_entry *ent,
 
 void bcache_write_queue(struct generic_disk *disk, struct bcache_entry *ent,
                         uint64_t spb, enum bio_request_priority prio) {
-    write_queue(disk, disk->cache, ent, spb, prio);
+    write_queue(disk, ent, spb, prio);
 }
 
 void *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
@@ -366,12 +347,12 @@ void *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
     return ent->buffer + offset;
 }
 
-bool bcache_ent_lock(struct bcache_entry *ent) {
-    return spin_lock(&ent->lock);
+void bcache_ent_lock(struct bcache_entry *ent) {
+    return spin_lock_no_cli(&ent->lock);
 }
 
-void bcache_ent_unlock(struct bcache_entry *ent, bool i) {
-    return spin_unlock(&ent->lock, i);
+void bcache_ent_unlock(struct bcache_entry *ent) {
+    return spin_unlock_no_cli(&ent->lock);
 }
 
 void bcache_prefetch_async(struct generic_disk *disk, uint64_t lba,

@@ -31,9 +31,9 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
             if (!ind)
                 return;
 
-            bool i = bcache_ent_lock(ent);
+            bcache_ent_lock(ent);
             ind[block_index - EXT2_NDIR_BLOCKS] = 0;
-            bcache_ent_unlock(ent, i);
+            bcache_ent_unlock(ent);
 
             ext2_block_write(fs, ent, EXT2_PRIO_INODE);
         }
@@ -48,7 +48,7 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
             if (!dind)
                 return;
 
-            bool i = bcache_ent_lock(i2);
+            bcache_ent_lock(i2);
 
             if (dind[ind1]) {
                 uint32_t *ind =
@@ -58,11 +58,11 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
 
                 bcache_ent_lock(ent);
                 ind[ind2] = 0;
-                bcache_ent_unlock(ent, i);
+                bcache_ent_unlock(ent);
 
                 ext2_block_write(fs, ent, EXT2_PRIO_INODE);
             }
-            bcache_ent_unlock(i2, i);
+            bcache_ent_unlock(i2);
         }
 
     } else {
@@ -78,13 +78,13 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
                 fs, inode->block[EXT2_TIND_BLOCK], &i3);
             if (!tind)
                 return;
-            bool i = bcache_ent_lock(i3);
+            bcache_ent_lock(i3);
 
             if (tind[ind1]) {
                 uint32_t *dind =
                     (uint32_t *) ext2_block_read(fs, tind[ind1], &i2);
                 if (!dind) {
-                    bcache_ent_unlock(i3, i);
+                    bcache_ent_unlock(i3);
                     return;
                 }
 
@@ -96,13 +96,13 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
 
                     bcache_ent_lock(ent);
                     ind[ind3] = 0;
-                    bcache_ent_unlock(ent, i);
+                    bcache_ent_unlock(ent);
 
                     ext2_block_write(fs, ent, EXT2_PRIO_INODE);
                 }
-                bcache_ent_unlock(i2, i);
+                bcache_ent_unlock(i2);
             }
-            bcache_ent_unlock(i3, i);
+            bcache_ent_unlock(i3);
         }
     }
 }

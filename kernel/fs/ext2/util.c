@@ -33,7 +33,7 @@ static uint32_t ext2_get_block(struct ext2_fs *fs, uint32_t block_num,
         block = (uint32_t *) ext2_block_read(fs, block_num, &ent);
     }
 
-    bool i = bcache_ent_lock(ent);
+    bcache_ent_lock(ent);
 
     if (allocated_this_level) {
         memset(block, 0, fs->block_size);
@@ -47,16 +47,16 @@ static uint32_t ext2_get_block(struct ext2_fs *fs, uint32_t block_num,
     uint32_t entry_index = index / divisor;
     uint32_t entry_offset = index % divisor;
     uint32_t bnum = block[entry_index];
-    bcache_ent_unlock(ent, i);
+    bcache_ent_unlock(ent);
 
     uint32_t result;
     result = ext2_get_block(fs, bnum, depth - 1, entry_offset, new_block_num,
                             allocate, was_allocated);
-    i = bcache_ent_lock(ent);
+    bcache_ent_lock(ent);
 
     if (result && block[entry_index] == 0 && allocate) {
         block[entry_index] = result;
-        bcache_ent_unlock(ent, i);
+        bcache_ent_unlock(ent);
 
         ext2_block_write(fs, ent, EXT2_PRIO_DIRENT);
 
@@ -65,7 +65,7 @@ static uint32_t ext2_get_block(struct ext2_fs *fs, uint32_t block_num,
         ext2_free_block(fs, block_num);
     }
 
-    bcache_ent_unlock(ent, i);
+    bcache_ent_unlock(ent);
 
     return result;
 }
