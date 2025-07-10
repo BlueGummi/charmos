@@ -9,6 +9,7 @@
 #include <mem/vmm.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
+#include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -78,22 +79,28 @@ void ahci_send_command(struct ahci_disk *disk, struct ahci_full_port *port,
     mmio_write_32(&port->port->ci, command_issue);
 }
 
-uint32_t ahci_find_slot(struct ahci_full_port *p) {
-
-    bool i = spin_lock(&p->bitmap_lock);
+static uint32_t try_find_slot(struct ahci_full_port *p) {
     uint32_t slots_in_use = p->slot_bitmap;
-
     for (int slot = 0; slot < AHCI_MAX_SLOTS; slot++) {
         uint32_t mask = 1U << slot;
         if (!(slots_in_use & mask)) {
             p->slot_bitmap |= mask;
-            spin_unlock(&p->bitmap_lock, i);
             return slot;
         }
     }
+    return (uint32_t) -1;
+}
+
+uint32_t ahci_find_slot(struct ahci_full_port *p) {
+
+    bool i = spin_lock(&p->bitmap_lock);
+
+    uint32_t slot = try_find_slot(p);
+    while (slot == (uint32_t) -1)
+        slot = try_find_slot(p);
 
     spin_unlock(&p->bitmap_lock, i);
-    return -1;
+    return slot;
 }
 
 /* TODO: BUG here when there are too many concurrent requests
