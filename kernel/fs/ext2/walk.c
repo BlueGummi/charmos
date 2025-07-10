@@ -5,12 +5,12 @@
 static bool walk_dir(struct ext2_fs *fs, uint32_t block_num,
                      dir_entry_callback callback, void *ctx) {
 
-    struct bcache_entry *ent = ext2_block_read(fs, block_num);
-    if (!ent)
+    struct bcache_entry *ent;
+    uint8_t *dir_buf = ext2_block_read(fs, block_num, &ent);
+    if (!dir_buf)
         return false;
 
     bcache_ent_lock(ent);
-    uint8_t *dir_buf = ent->buffer;
 
     uint32_t offset = 0;
     bool modified = false;
@@ -62,12 +62,12 @@ static bool walk_indirect(struct ext2_fs *fs, uint32_t block_num, int level,
     if (block_num == 0)
         return false;
 
-    struct bcache_entry *ent = ext2_block_read(fs, block_num);
-    if (!ent)
+    struct bcache_entry *ent;
+    uint32_t *ptrs = (uint32_t *) ext2_block_read(fs, block_num, &ent);
+    if (!ptrs)
         return false;
 
     bcache_ent_lock(ent);
-    uint32_t *ptrs = (uint32_t *) ent->buffer;
 
     for (uint32_t i = 0; i < PTRS_PER_BLOCK; ++i) {
         if (!ptrs[i] && ff_avail) {
@@ -143,12 +143,12 @@ static void traverse_indirect(struct ext2_fs *fs, struct ext2_inode *inode,
     if (depth <= 0 || block_num == 0)
         return;
 
-    struct bcache_entry *ent = ext2_block_read(fs, block_num);
-    if (!ent)
+    struct bcache_entry *ent;
+    uint32_t *block = (uint32_t *) ext2_block_read(fs, block_num, &ent);
+    if (!block)
         return;
 
     bcache_ent_lock(ent);
-    uint32_t *block = (uint32_t *) ent->buffer;
     uint32_t size = sizeof(uint32_t);
 
     for (uint32_t i = 0; i < fs->block_size / sizeof(uint32_t); i++) {

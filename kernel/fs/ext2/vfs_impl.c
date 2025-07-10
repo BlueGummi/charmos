@@ -363,16 +363,16 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
 
     uint32_t bs = fs->block_size;
     uint32_t spb = fs->sectors_per_block;
-    gdt_ent = bcache_create_ent(fs->drive, lba, bs, spb, true);
+    fs->group_desc =
+        (void *) bcache_create_ent(fs->drive, lba, bs, spb, true, &gdt_ent);
 
-    if (!gdt_ent)
+    if (!fs->group_desc)
         return ERR_IO;
 
-    fs->sbcache_ent = ext2_block_read(fs, superblock_block);
-    fs->sblock = (struct ext2_sblock *) fs->sbcache_ent->buffer;
-    fs->group_desc = (struct ext2_group_desc *) gdt_ent->buffer;
-    gdt_ent = ext2_block_read(fs, gdt_block);
-    fs->gdesc_cache_ent = gdt_ent;
+    fs->sblock =
+        (void *) ext2_block_read(fs, superblock_block, &fs->sbcache_ent);
+    ext2_block_read(fs, gdt_block, &fs->gdesc_cache_ent);
+
 
     if (!gdt_ent)
         return ERR_IO;

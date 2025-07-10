@@ -94,13 +94,13 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
 
     struct ext2_full_inode target_inode = {0};
 
-    struct bcache_entry *ent = ext2_block_read(fs, ctx.block_num);
-    if (!ent)
+    struct bcache_entry *ent;
+    uint8_t *block = ext2_block_read(fs, ctx.block_num, &ent);
+    if (!block)
         return ERR_IO;
 
     bcache_ent_lock(ent);
 
-    uint8_t *block = ent->buffer;
     unlink_adjust_neighbors(fs, block, ctx.entry_offset, ctx.prev_offset);
 
     bcache_ent_unlock(ent);

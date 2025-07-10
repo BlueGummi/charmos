@@ -60,13 +60,14 @@ void bcache_init(struct bcache *cache, uint64_t capacity);
 void bcache_ent_unlock(struct bcache_entry *ent);
 void bcache_ent_lock(struct bcache_entry *ent);
 
-struct bcache_entry *bcache_get(struct generic_disk *disk, uint64_t lba,
-                                uint64_t block_size, uint64_t spb, bool);
+void *bcache_get(struct generic_disk *disk, uint64_t lba, uint64_t block_size,
+                 uint64_t spb, bool no_evict, struct bcache_entry **out_entry);
 
-bool bcache_writethrough(struct generic_disk *disk, struct bcache_entry *ent, uint64_t spb);
+bool bcache_writethrough(struct generic_disk *disk, struct bcache_entry *ent,
+                         uint64_t spb);
 
-void bcache_write_queue(struct generic_disk *disk, struct bcache_entry *ent, uint64_t spb,
-                        enum bio_request_priority prio);
+void bcache_write_queue(struct generic_disk *disk, struct bcache_entry *ent,
+                        uint64_t spb, enum bio_request_priority prio);
 
 bool bcache_insert(struct generic_disk *disk, uint64_t lba,
                    struct bcache_entry *ent, uint64_t spb);
@@ -76,10 +77,9 @@ bool bcache_evict(struct generic_disk *disk, uint64_t spb);
 void bcache_prefetch_async(struct generic_disk *disk, uint64_t lba,
                            uint64_t block_size, uint64_t spb);
 
-struct bcache_entry *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
-                                       uint64_t block_size,
-                                       uint64_t sectors_per_block,
-                                       bool no_evict);
+void *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
+                        uint64_t block_size, uint64_t sectors_per_block,
+                        bool no_evict, struct bcache_entry **out_entry);
 
 static inline void bcache_increment_ticks(struct bcache *cache) {
     atomic_fetch_add(&cache->ticks, 1);

@@ -24,11 +24,10 @@ static uint32_t alloc_from_bitmap(struct ext2_fs *fs, uint32_t bitmap_block,
                                                         uint32_t)) {
     uint32_t byte_pos, bit_pos;
 
-    struct bcache_entry *ent = ext2_block_read(fs, bitmap_block);
-    if (!ent)
+    struct bcache_entry *ent;
+    uint8_t *bitmap = ext2_block_read(fs, bitmap_block, &ent);
+    if (!bitmap)
         return -1;
-
-    uint8_t *bitmap = ent->buffer;
 
     bcache_ent_lock(ent);
     if (!find_free_bit(bitmap, fs->block_size, &byte_pos, &bit_pos)) {
@@ -88,11 +87,10 @@ bool ext2_free_block(struct ext2_fs *fs, uint32_t block_num) {
 
     uint32_t bitmap_block = fs->group_desc[group].block_bitmap;
 
-    struct bcache_entry *ent = ext2_block_read(fs, bitmap_block);
-    if (!ent)
+    struct bcache_entry *ent;
+    uint8_t *bitmap = ext2_block_read(fs, bitmap_block, &ent);
+    if (!bitmap)
         return false;
-
-    uint8_t *bitmap = ent->buffer;
 
     bcache_ent_lock(ent);
     uint32_t byte = index / 8;
@@ -141,12 +139,12 @@ bool ext2_free_inode(struct ext2_fs *fs, uint32_t inode_num) {
 
     uint32_t bitmap_block = fs->group_desc[group].inode_bitmap;
 
-    struct bcache_entry *ent = ext2_block_read(fs, bitmap_block);
-    if (!ent)
+    struct bcache_entry *ent;
+    uint8_t *bitmap = ext2_block_read(fs, bitmap_block, &ent);
+    if (!bitmap)
         return false;
 
     bcache_ent_lock(ent);
-    uint8_t *bitmap = ent->buffer;
 
     uint32_t byte = index / 8;
     uint8_t bit = 1 << (index % 8);

@@ -72,13 +72,13 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir,
     struct bcache_entry *ent;
 
     /* this inserts the entry into the block cache */
-    ent = ext2_create_bcache_ent(fs, new_block);
-    if (!ent)
+    struct ext2_dir_entry *new_entry =
+        (void *) ext2_create_bcache_ent(fs, new_block, &ent);
+    if (!new_entry)
         return ERR_IO;
 
     /* no locking here because this is a new entry that
      * no one besides us should have access to right now */
-    struct ext2_dir_entry *new_entry = (void *) ent->buffer;
 
     ext2_init_dirent(fs, new_entry, inode->inode_num, name, type);
 

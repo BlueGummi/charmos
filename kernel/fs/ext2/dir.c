@@ -55,12 +55,11 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     if (new_block == 0)
         return ERR_NOSPC;
 
-    struct bcache_entry *ent = ext2_create_bcache_ent(fs, new_block);
+    struct bcache_entry *ent;
+    uint8_t *block = ext2_create_bcache_ent(fs, new_block, &ent);
 
-    if (!ent)
+    if (!block)
         return ERR_IO;
-
-    uint8_t *block = ent->buffer;
 
     bcache_ent_lock(ent);
     init_dot_ents(fs, block, parent_dir, dir);
@@ -92,13 +91,13 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     uint32_t tmp =
         ext2_get_or_set_block(fs, &dir->node, b_idx, b_num, false, NULL);
 
-    struct bcache_entry *ent = ext2_block_read(fs, tmp);
+    struct bcache_entry *ent;
+    uint8_t *block = ext2_block_read(fs, tmp, &ent);
 
     if (!ent)
         return ERR_IO;
 
     bcache_ent_lock(ent);
-    uint8_t *block = ent->buffer;
 
     bool empty = true;
     uint32_t offset = 0;

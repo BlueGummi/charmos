@@ -15,7 +15,8 @@ static uint32_t ext2_get_block(struct ext2_fs *fs, uint32_t block_num,
     uint32_t pointers_per_block = fs->block_size / sizeof(uint32_t);
 
     bool allocated_this_level = false;
-    struct bcache_entry *ent = ext2_block_read(fs, block_num);
+    struct bcache_entry *ent;
+    uint32_t *block = (uint32_t *) ext2_block_read(fs, block_num, &ent);
 
     if (block_num == 0) {
         if (!allocate) {
@@ -29,11 +30,10 @@ static uint32_t ext2_get_block(struct ext2_fs *fs, uint32_t block_num,
 
         allocated_this_level = true;
 
-        ent = ext2_block_read(fs, block_num);
+        block = (uint32_t *) ext2_block_read(fs, block_num, &ent);
     }
 
     bcache_ent_lock(ent);
-    uint32_t *block = (uint32_t *) ent->buffer;
 
     if (allocated_this_level) {
         memset(block, 0, fs->block_size);
@@ -180,8 +180,8 @@ void ext2_prefetch_block(struct ext2_fs *fs, uint32_t block) {
                           fs->sectors_per_block);
 }
 
-struct bcache_entry *ext2_create_bcache_ent(struct ext2_fs *fs,
-                                            uint32_t block) {
+uint8_t *ext2_create_bcache_ent(struct ext2_fs *fs, uint32_t block,
+                                struct bcache_entry **out) {
     return bcache_create_ent(fs->drive, ext2_block_to_lba(fs, block),
-                             fs->block_size, fs->sectors_per_block, false);
+                             fs->block_size, fs->sectors_per_block, false, out);
 }

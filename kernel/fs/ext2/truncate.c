@@ -25,12 +25,13 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
         inode->block[block_index] = 0;
     } else if (block_index < EXT2_NDIR_BLOCKS + bpi) {
         if (inode->block[EXT2_IND_BLOCK]) {
-            ent = ext2_block_read(fs, inode->block[EXT2_IND_BLOCK]);
-            if (!ent)
+            uint32_t *ind = (uint32_t *) ext2_block_read(
+                fs, inode->block[EXT2_IND_BLOCK], &ent);
+
+            if (!ind)
                 return;
 
             bcache_ent_lock(ent);
-            uint32_t *ind = (uint32_t *) ent->buffer;
             ind[block_index - EXT2_NDIR_BLOCKS] = 0;
             bcache_ent_unlock(ent);
 
@@ -42,20 +43,20 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
         uint32_t ind2 = dbl_index % bpi;
 
         if (inode->block[EXT2_DIND_BLOCK]) {
-            i2 = ext2_block_read(fs, inode->block[EXT2_DIND_BLOCK]);
-            if (!i2)
+            uint32_t *dind = (uint32_t *) ext2_block_read(
+                fs, inode->block[EXT2_DIND_BLOCK], &i2);
+            if (!dind)
                 return;
 
             bcache_ent_lock(i2);
-            uint32_t *dind = (uint32_t *) i2->buffer;
 
             if (dind[ind1]) {
-                ent = ext2_block_read(fs, dind[ind1]);
-                if (!ent)
+                uint32_t *ind =
+                    (uint32_t *) ext2_block_read(fs, dind[ind1], &ent);
+                if (!ind)
                     return;
 
                 bcache_ent_lock(ent);
-                uint32_t *ind = (uint32_t *) ent->buffer;
                 ind[ind2] = 0;
                 bcache_ent_unlock(ent);
 
@@ -73,28 +74,28 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
 
         if (inode->block[EXT2_TIND_BLOCK]) {
 
-            i3 = ext2_block_read(fs, inode->block[EXT2_TIND_BLOCK]);
-            if (!i3)
+            uint32_t *tind = (uint32_t *) ext2_block_read(
+                fs, inode->block[EXT2_TIND_BLOCK], &i3);
+            if (!tind)
                 return;
 
             bcache_ent_lock(i3);
-            uint32_t *tind = (uint32_t *) i3->buffer;
 
             if (tind[ind1]) {
-                i2 = ext2_block_read(fs, tind[ind1]);
-                if (!i2) {
+                uint32_t *dind =
+                    (uint32_t *) ext2_block_read(fs, tind[ind1], &i2);
+                if (!dind) {
                     bcache_ent_unlock(i3);
                     return;
                 }
 
                 bcache_ent_lock(i2);
-                uint32_t *dind = (uint32_t *) i2->buffer;
 
                 if (dind[ind2]) {
-                    ent = ext2_block_read(fs, dind[ind2]);
+                    uint32_t *ind =
+                        (uint32_t *) ext2_block_read(fs, dind[ind2], &ent);
 
                     bcache_ent_lock(ent);
-                    uint32_t *ind = (uint32_t *) ent->buffer;
                     ind[ind3] = 0;
                     bcache_ent_unlock(ent);
 

@@ -16,7 +16,8 @@ uint32_t ext2_block_to_lba(struct ext2_fs *fs, uint32_t block_num) {
 }
 
 /* not our job to lock it */
-struct bcache_entry *ext2_block_read(struct ext2_fs *fs, uint32_t block_num) {
+uint8_t *ext2_block_read(struct ext2_fs *fs, uint32_t block_num,
+                         struct bcache_entry **out) {
     if (!fs)
         return NULL;
 
@@ -25,7 +26,7 @@ struct bcache_entry *ext2_block_read(struct ext2_fs *fs, uint32_t block_num) {
     uint32_t lba = ext2_block_to_lba(fs, block_num);
     uint32_t spb = fs->sectors_per_block;
 
-    return bcache_get(d, lba, fs->block_size, spb, false);
+    return bcache_get(d, lba, fs->block_size, spb, false, out);
 }
 
 bool ext2_block_write(struct ext2_fs *fs, struct bcache_entry *ent,
@@ -40,7 +41,6 @@ bool ext2_block_write(struct ext2_fs *fs, struct bcache_entry *ent,
     uint32_t spb = fs->sectors_per_block;
 
     bcache_ent_lock(ent);
-    bcache_get(d, ent->lba, fs->block_size, spb, false); /* updates atimes */
     bcache_write_queue(d, ent, spb, prio);
     bcache_ent_unlock(ent);
 
@@ -71,11 +71,10 @@ struct bcache_entry *ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
     if (inode_idx == 0 || inode_idx > fs->sblock->inodes_count)
         return false;
 
-    struct bcache_entry *ent = ext2_block_read(fs, inode_block_num);
-    if (!ent)
+    struct bcache_entry *ent;
+    uint8_t *buf = ext2_block_read(fs, inode_block_num, &ent);
+    if (!buf)
         return NULL;
-
-    uint8_t *buf = ent->buffer;
 
     bcache_ent_lock(ent);
     memcpy(inode_out, buf + offset_in_block, sizeof(struct ext2_inode));
@@ -97,11 +96,10 @@ bool ext2_inode_write(struct ext2_fs *fs, uint32_t inode_num,
     uint32_t block_index = offset / block_size;
 
     uint32_t inode_block_num = (inode_table_block + block_index);
-    struct bcache_entry *ent = ext2_block_read(fs, inode_block_num);
-    if (!ent)
+    struct bcache_entry *ent;
+    uint8_t *block_buf = ext2_block_read(fs, inode_block_num, &ent);
+    if (!block_buf)
         return false;
-
-    uint8_t *block_buf = ent->buffer;
 
     bcache_ent_lock(ent);
     memcpy(block_buf + block_offset, inode, fs->inode_size);

@@ -30,12 +30,12 @@ enum errno ext2_symlink_file(struct ext2_fs *fs,
             return ERR_FS_NO_INODE;
 
         struct bcache_entry *ent;
-        ent = ext2_create_bcache_ent(fs, block);
-        if (!ent)
+        uint8_t *buffer = ext2_create_bcache_ent(fs, block, &ent);
+        if (!buffer)
             return ERR_IO;
 
         bcache_ent_lock(ent);
-        memcpy(ent->buffer, target, strlen(target) + 1);
+        memcpy(buffer, target, strlen(target) + 1);
         bcache_ent_unlock(ent);
 
         ext2_block_write(fs, ent, EXT2_PRIO_DIRENT);
@@ -80,13 +80,12 @@ enum errno ext2_readlink(struct ext2_fs *fs, struct ext2_full_inode *node,
     if (first_block == 0)
         return ERR_IO;
 
-    /* no lock - RO */
-    struct bcache_entry *ent = ext2_block_read(fs, first_block);
-    if (!ent)
+    struct bcache_entry *ent;
+    uint8_t *block = ext2_block_read(fs, first_block, &ent);
+    if (!block)
         return ERR_IO;
 
     bcache_ent_lock(ent);
-    uint8_t *block = ent->buffer;
 
     if (!block)
         return ERR_IO;
