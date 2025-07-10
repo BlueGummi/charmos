@@ -357,7 +357,8 @@ struct bcache_entry *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
     }
 
     uint8_t *buf = kmalloc_aligned(block_size, PAGE_SIZE);
-    if (!disk->read_sector(disk, base_lba, buf, sectors_per_block)) {
+    if (!disk->read_sector(disk, base_lba, buf,
+                           PAGE_SIZE / disk->sector_size)) {
         kfree_aligned(buf);
         spin_unlock(&disk->cache->lock, i);
         return NULL;
