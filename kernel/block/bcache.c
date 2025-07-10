@@ -233,6 +233,7 @@ static bool evict(struct bcache *cache, uint64_t spb) {
 static bool write(struct generic_disk *d, struct bcache *cache,
                   struct bcache_entry *ent, uint64_t spb) {
     bool ints = spin_lock(&cache->lock);
+
     bool ret = d->write_sector(d, ent->lba, ent->buffer, spb);
     uint64_t aligned = ALIGN_DOWN(ent->lba, spb);
     if (aligned != ent->lba)
