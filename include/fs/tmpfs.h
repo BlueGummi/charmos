@@ -2,7 +2,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <string.h>
 
 enum tmpfs_type {
     TMPFS_FILE,
@@ -14,8 +13,10 @@ enum tmpfs_type {
 struct tmpfs_node {
     enum tmpfs_type type;
     char *name;
-    char *data;
-    uint64_t size;
+
+    void **pages;        // array of page pointers
+    uint64_t num_pages;  // number of allocated pages
+    uint64_t size;       // total file size
 
     char *symlink_target;
     uint16_t mode;
@@ -33,5 +34,9 @@ struct tmpfs_node {
 struct tmpfs_fs {
     struct tmpfs_node *root;
 };
+
+#define TMPFS_PAGE_SIZE 4096
+#define TMPFS_PAGE_SHIFT 12
+#define TMPFS_PAGE_MASK  (TMPFS_PAGE_SIZE - 1)
 
 struct vfs_node *tmpfs_mkroot(const char *mount_point);

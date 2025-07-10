@@ -5,9 +5,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "errno.h"
-#include "fs/detect.h"
-
 struct vfs_node *tmpfs_create_vfs_node(struct tmpfs_node *tnode);
 
 struct vfs_node *tmpfs_mkroot(const char *mount_point) {
@@ -54,7 +51,26 @@ static enum errno tmpfs_read(struct vfs_node *node, void *buf, uint64_t size,
 
     if (offset + size > tn->size)
         size = tn->size - offset;
-    memcpy(buf, tn->data + offset, size);
+
+    uint8_t *out = buf;
+    while (size > 0) {
+        uint64_t page_idx = offset >> TMPFS_PAGE_SHIFT;
+        uint64_t page_offset = offset & TMPFS_PAGE_MASK;
+        uint64_t to_copy = TMPFS_PAGE_SIZE - page_offset;
+        if (to_copy > size)
+            to_copy = size;
+
+        if (page_idx >= tn->num_pages || !tn->pages[page_idx]) {
+            memset(out, 0, to_copy);
+        } else {
+            memcpy(out, (uint8_t *) tn->pages[page_idx] + page_offset, to_copy);
+        }
+
+        offset += to_copy;
+        out += to_copy;
+        size -= to_copy;
+    }
+
     return ERR_OK;
 }
 
@@ -64,18 +80,46 @@ static enum errno tmpfs_write(struct vfs_node *node, const void *buf,
     if (tn->type != TMPFS_FILE)
         return ERR_IS_DIR;
 
-    uint64_t new_size = offset + size;
-    if (new_size > tn->size) {
-        if (!tn->data) {
-            tn->data = kmalloc(new_size);
-        } else {
-            tn->data = krealloc(tn->data, new_size);
-        }
-        tn->size = new_size;
-        node->size = new_size;
+    uint64_t end = offset + size;
+    uint64_t required_pages = (end + TMPFS_PAGE_SIZE - 1) >> TMPFS_PAGE_SHIFT;
+
+    if (required_pages > tn->num_pages) {
+        void **new_pages = krealloc(tn->pages, required_pages * sizeof(void *));
+        if (!new_pages)
+            return ERR_NO_MEM;
+        memset(new_pages + tn->num_pages, 0,
+               (required_pages - tn->num_pages) * sizeof(void *));
+        tn->pages = new_pages;
+        tn->num_pages = required_pages;
     }
 
-    memcpy(tn->data + offset, buf, size);
+    const uint8_t *in = buf;
+    while (size > 0) {
+        uint64_t page_idx = offset >> TMPFS_PAGE_SHIFT;
+        uint64_t page_offset = offset & TMPFS_PAGE_MASK;
+        uint64_t to_copy = TMPFS_PAGE_SIZE - page_offset;
+        if (to_copy > size)
+            to_copy = size;
+
+        if (!tn->pages[page_idx]) {
+            tn->pages[page_idx] = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+            if (!tn->pages[page_idx])
+                return ERR_NO_MEM;
+            memset(tn->pages[page_idx], 0, TMPFS_PAGE_SIZE);
+        }
+
+        memcpy((uint8_t *) tn->pages[page_idx] + page_offset, in, to_copy);
+
+        offset += to_copy;
+        in += to_copy;
+        size -= to_copy;
+    }
+
+    if (end > tn->size) {
+        tn->size = end;
+        node->size = end;
+    }
+
     return ERR_OK;
 }
 
@@ -101,17 +145,13 @@ static enum errno tmpfs_add_child(struct tmpfs_node *parent,
                                   struct tmpfs_node *child) {
     uint64_t needed_size = sizeof(void *) * (parent->child_count + 1);
 
-    if (!parent->children)
-        parent->children = kmalloc(needed_size);
-    else
-        parent->children = krealloc(parent->children, needed_size);
+    parent->children = krealloc(parent->children, needed_size);
 
     parent->children[parent->child_count++] = child;
     child->parent = parent;
     return ERR_OK;
 }
 
-/* TODO: leaks */
 static enum errno tmpfs_create_common(struct vfs_node *parent, const char *name,
                                       uint16_t mode, enum tmpfs_type type,
                                       struct tmpfs_node **out) {
@@ -126,6 +166,12 @@ static enum errno tmpfs_create_common(struct vfs_node *parent, const char *name,
     node->type = type;
     node->name = strdup(name);
     node->mode = mode;
+
+    if (type == TMPFS_FILE) {
+        node->pages = NULL;
+        node->num_pages = 0;
+        node->size = 0;
+    }
 
     tmpfs_add_child(pt, node);
     if (out)
@@ -211,6 +257,16 @@ static enum errno tmpfs_rmdir(struct vfs_node *parent, const char *name) {
     return ERR_NO_ENT;
 }
 
+static void tmpfs_free_node(struct tmpfs_node *tn) {
+    for (uint64_t i = 0; i < tn->num_pages; ++i) {
+        if (tn->pages[i]) {
+            kfree_aligned(tn->pages[i]);
+            tn->pages[i] = NULL;
+        }
+    }
+    kfree(tn->pages);
+}
+
 static enum errno tmpfs_unlink(struct vfs_node *parent, const char *name) {
     struct tmpfs_node *pt = parent->fs_node_data;
     for (uint64_t i = 0; i < pt->child_count; ++i) {
@@ -220,7 +276,7 @@ static enum errno tmpfs_unlink(struct vfs_node *parent, const char *name) {
                     (pt->child_count - i - 1) * sizeof(void *));
             pt->child_count--;
             kfree(c->name);
-            kfree(c->data);
+            tmpfs_free_node(c);
             kfree(c);
             return ERR_OK;
         }
@@ -238,7 +294,6 @@ static enum errno tmpfs_rename(struct vfs_node *old_parent,
     if (!node)
         return ERR_NO_ENT;
 
-    // Remove from old parent
     for (uint64_t i = 0; i < old_pt->child_count; ++i) {
         if (old_pt->children[i] == node) {
             memmove(&old_pt->children[i], &old_pt->children[i + 1],
@@ -258,9 +313,52 @@ static enum errno tmpfs_truncate(struct vfs_node *node, uint64_t length) {
     struct tmpfs_node *tn = node->fs_node_data;
     if (tn->type != TMPFS_FILE)
         return ERR_IS_DIR;
-    tn->data = krealloc(tn->data, length);
-    if (length > tn->size)
-        memset(tn->data + tn->size, 0, length - tn->size);
+
+    uint64_t old_size = tn->size;
+    uint64_t new_pages = (length + TMPFS_PAGE_SIZE - 1) >> TMPFS_PAGE_SHIFT;
+
+    if (new_pages < tn->num_pages) {
+        for (uint64_t i = new_pages; i < tn->num_pages; ++i) {
+            if (tn->pages[i]) {
+                kfree_aligned(tn->pages[i]);
+                tn->pages[i] = NULL;
+            }
+        }
+    }
+
+    if (new_pages != tn->num_pages) {
+        void **new_array = krealloc(tn->pages, new_pages * sizeof(void *));
+        if (!new_array && new_pages > 0)
+            return ERR_NO_MEM;
+
+        if (new_pages > tn->num_pages)
+            memset(new_array + tn->num_pages, 0,
+                   (new_pages - tn->num_pages) * sizeof(void *));
+
+        tn->pages = new_array;
+        tn->num_pages = new_pages;
+    }
+
+    if (length > old_size) {
+        uint64_t last_page_idx = old_size >> TMPFS_PAGE_SHIFT;
+        uint64_t last_offset = old_size & TMPFS_PAGE_MASK;
+
+        if (last_page_idx < new_pages) {
+            if (!tn->pages[last_page_idx]) {
+                tn->pages[last_page_idx] = kmalloc(TMPFS_PAGE_SIZE);
+                if (!tn->pages[last_page_idx])
+                    return ERR_NO_MEM;
+                memset(tn->pages[last_page_idx], 0, TMPFS_PAGE_SIZE);
+            }
+
+            uint64_t to_zero = TMPFS_PAGE_SIZE - last_offset;
+            if (length - old_size < to_zero)
+                to_zero = length - old_size;
+
+            memset((uint8_t *) tn->pages[last_page_idx] + last_offset, 0,
+                   to_zero);
+        }
+    }
 
     tn->size = length;
     node->size = length;
@@ -322,8 +420,7 @@ static enum errno tmpfs_destroy(struct vfs_node *node) {
     if (n->children)
         kfree(n->children);
 
-    if (n->data)
-        kfree(n->data);
+    tmpfs_free_node(n);
 
     if (n->symlink_target)
         kfree(n->symlink_target);
@@ -331,12 +428,9 @@ static enum errno tmpfs_destroy(struct vfs_node *node) {
     kfree(n);
 
     n->children = NULL;
-    n->data = NULL;
     n->symlink_target = NULL;
     n = NULL;
     return ERR_OK;
-
-    // TODO: cleanup
 }
 
 static struct vfs_node *tmpfs_finddir(struct vfs_node *node, const char *name) {

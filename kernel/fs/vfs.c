@@ -17,11 +17,7 @@ static void mount_table_add(struct vfs_mount *mnt) {
             (mount_table_capacity == 0) ? 4 : mount_table_capacity * 2;
 
         struct vfs_mount **new_table;
-        if (!mount_table)
-            new_table = kmalloc(new_capacity * sizeof(*mount_table));
-        else
-            new_table =
-                krealloc(mount_table, new_capacity * sizeof(*mount_table));
+        new_table = krealloc(mount_table, new_capacity * sizeof(*mount_table));
 
         if (!new_table)
             return;

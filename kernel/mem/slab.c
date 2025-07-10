@@ -271,7 +271,7 @@ void kfree(void *ptr) {
 
 void *krealloc(void *ptr, uint64_t size) {
     if (!ptr)
-        return NULL;
+        return kmalloc(size);
 
     void *new_ptr = kmalloc(size);
 
