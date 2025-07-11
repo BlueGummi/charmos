@@ -80,26 +80,27 @@ void ahci_send_command(struct ahci_disk *disk, struct ahci_full_port *port,
 }
 
 static uint32_t try_find_slot(struct ahci_full_port *p) {
+    bool i = spin_lock(&p->bitmap_lock);
     uint32_t slots_in_use = p->slot_bitmap;
     for (int slot = 0; slot < AHCI_MAX_SLOTS; slot++) {
         uint32_t mask = 1U << slot;
         if (!(slots_in_use & mask)) {
             p->slot_bitmap |= mask;
+            spin_unlock(&p->bitmap_lock, i);
             return slot;
         }
     }
+    spin_unlock(&p->bitmap_lock, i);
     return (uint32_t) -1;
 }
 
 uint32_t ahci_find_slot(struct ahci_full_port *p) {
 
-    bool i = spin_lock(&p->bitmap_lock);
-
     uint32_t slot = try_find_slot(p);
+
     while (slot == (uint32_t) -1)
         slot = try_find_slot(p);
 
-    spin_unlock(&p->bitmap_lock, i);
     return slot;
 }
 

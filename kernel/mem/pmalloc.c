@@ -109,49 +109,6 @@ void *pmm_alloc_page(bool add_offset) {
     return NULL;
 }
 
-void print_memory_status() {
-    uint64_t total_pages = bitmap_size * 8;
-    uint64_t free_pages = 0;
-    uint64_t allocated_pages = 0;
-
-    for (uint64_t i = 0; i < total_pages; i++) {
-        if (!test_bit(i)) {
-            free_pages++;
-        } else {
-            allocated_pages++;
-        }
-    }
-
-    k_printf("Memory Status:\n");
-    k_printf("  Total Pages: %zu\n", total_pages);
-    k_printf("  Free Pages: %zu\n", free_pages);
-    k_printf("  Allocated Pages: %zu\n", allocated_pages);
-    k_printf("  Memory Usage: %d%%\n", (allocated_pages * 100) / total_pages);
-
-    k_printf("\nMemory Segments (contiguous):\n");
-
-    uint64_t segment_start = 0;
-    int segment_state = test_bit(0);
-
-    for (uint64_t i = 1; i <= total_pages; i++) {
-        int current_state = (i < total_pages) ? test_bit(i) : -1;
-        if (current_state != segment_state) {
-
-            uintptr_t start_addr = segment_start * PAGE_SIZE;
-            uintptr_t end_addr = (i - 1) * PAGE_SIZE + PAGE_SIZE - 1;
-
-            k_printf("  %c: 0x%016lx - 0x%016lx (%zu pages)\n",
-                     segment_state ? 'A' : 'F', (unsigned long) start_addr,
-                     (unsigned long) end_addr, i - segment_start);
-
-            segment_start = i;
-            segment_state = current_state;
-        }
-    }
-
-    k_printf("\n");
-}
-
 void *pmm_alloc_pages(uint64_t count, bool add_offset) {
 
     if (count == 0) {

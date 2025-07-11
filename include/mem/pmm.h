@@ -6,6 +6,5 @@ void pmm_init(uint64_t o, struct limine_memmap_request m);
 void *pmm_alloc_page(bool offset);
 void *pmm_alloc_pages(uint64_t count, bool add_offset);
 void pmm_free_pages(void *addr, uint64_t count, bool has_offset);
-void print_memory_status();
 void pmm_dyn_init(void);
 #pragma once

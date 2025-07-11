@@ -8,11 +8,11 @@
 #include <stdint.h>
 #include <string.h>
 
-struct spinlock vmm_lock = SPINLOCK_INIT;
-struct page_table *kernel_pml4 = NULL;
-uintptr_t kernel_pml4_phys = 0;
+static struct spinlock vmm_lock = SPINLOCK_INIT;
+static struct page_table *kernel_pml4 = NULL;
+static uintptr_t kernel_pml4_phys = 0;
 static uint64_t hhdm_offset = 0;
-uintptr_t vmm_map_top = VMM_MAP_BASE;
+static uintptr_t vmm_map_top = VMM_MAP_BASE;
 #define ENTRY_PRESENT(entry) (entry & PAGING_PRESENT)
 
 uint64_t sub_offset(uint64_t a) {
@@ -33,34 +33,6 @@ uintptr_t vmm_make_user_pml4(void) {
     }
 
     return (uintptr_t) user_pml4 - hhdm_offset;
-}
-
-void *vmm_map_region(uintptr_t virt_base, uint64_t size, uint64_t flags) {
-    void *first = NULL;
-
-    for (uintptr_t virt = virt_base; virt < virt_base + size;
-         virt += PAGE_SIZE) {
-
-        uintptr_t phys = (uintptr_t) pmm_alloc_page(false);
-        if (virt == virt_base) {
-            first = (void *) phys;
-        }
-        if (phys == (uintptr_t) -1) {
-            k_panic("Error: Out of memory mapping region\n");
-            return NULL;
-        }
-
-        vmm_map_page(virt, phys, flags);
-    }
-
-    return first;
-}
-
-void vmm_unmap_region(uintptr_t virt_base, uint64_t size) {
-    for (uintptr_t virt = virt_base; virt < virt_base + size;
-         virt += PAGE_SIZE) {
-        vmm_unmap_page(virt);
-    }
 }
 
 void vmm_init(struct limine_memmap_response *memmap,
@@ -130,7 +102,7 @@ void vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
         k_panic(
             "vmm_map_2mb_page: addresses must be 2MiB aligned and non-zero\n");
     }
-
+    bool interrupts = spin_lock(&vmm_lock);
     uint64_t L2 = (virt >> 21) & 0x1FF;
 
     struct page_table *current_table = kernel_pml4;
@@ -149,6 +121,7 @@ void vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
         (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT | PAGING_2MB_page;
 
     asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
+    spin_unlock(&vmm_lock, interrupts);
 }
 
 void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
@@ -156,6 +129,7 @@ void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
         k_panic("CANNOT MAP PAGE 0x0!!!\n");
     }
 
+    bool interrupts = spin_lock(&vmm_lock);
     struct page_table *current_table = kernel_pml4;
 
     for (uint64_t i = 0; i < 3; i++) {
@@ -173,6 +147,7 @@ void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     *entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
 
     asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
+    spin_unlock(&vmm_lock, interrupts);
 }
 
 void vmm_map_page_user(uintptr_t pml4_phys, uintptr_t virt, uintptr_t phys,
@@ -213,13 +188,17 @@ void vmm_unmap_page(uintptr_t virt) {
     struct page_table *tables[4];
     pte_t *entries[4];
 
+    bool interrupts = spin_lock(&vmm_lock);
+
     tables[0] = kernel_pml4;
     for (uint64_t level = 0; level < 3; level++) {
         uint64_t index = (virt >> (39 - level * 9)) & 0x1FF;
         entries[level] = &tables[level]->entries[index];
 
-        if (!(*entries[level] & PAGING_PRESENT))
+        if (!(*entries[level] & PAGING_PRESENT)) {
+            spin_unlock(&vmm_lock, interrupts);
             return;
+        }
 
         tables[level + 1] =
             (struct page_table *) ((*entries[level] & PAGING_PHYS_MASK) +
@@ -240,6 +219,7 @@ void vmm_unmap_page(uintptr_t virt) {
             break;
         }
     }
+    spin_unlock(&vmm_lock, interrupts);
 }
 
 uintptr_t vmm_get_phys(uintptr_t virt) {

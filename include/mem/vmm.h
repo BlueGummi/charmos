@@ -39,8 +39,6 @@ void vmm_init(struct limine_memmap_response *memmap,
               struct limine_executable_address_response *xa, uint64_t offset);
 void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags);
 void vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags);
-void *vmm_map_region(uintptr_t virt_base, uint64_t size, uint64_t flags);
-void vmm_unmap_region(uintptr_t virt_base, uint64_t size);
 void vmm_unmap_page(uintptr_t virt);
 uintptr_t vmm_get_phys(uintptr_t virt);
 void *vmm_map_phys(uint64_t addr, uint64_t len, uint64_t flags);
@@ -48,5 +46,4 @@ void vmm_unmap_virt(void *addr, uint64_t len);
 uintptr_t vmm_make_user_pml4(void);
 void vmm_map_page_user(uintptr_t pml4_phys, uintptr_t virt, uintptr_t phys,
                        uint64_t flags);
-extern struct page_table *kernel_pml4;
 #pragma once
