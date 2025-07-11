@@ -15,6 +15,7 @@
 #define TIMER_ID 0x20
 #define SCHEDULER_ID TIMER_ID
 #define KB_ID 0x21
+#define TLB_SHOOTDOWN_ID 0x22
 
 struct idt_entry {
     uint16_t base_low;

@@ -59,6 +59,7 @@ void k_main(void) {
     c->current_thread = kzalloc(sizeof(struct thread));
     c->id = 0;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
+    global_cores = kmalloc(sizeof(struct core*) * c_cnt);
 
     // IDT
     idt_alloc(c_cnt);
@@ -76,6 +77,7 @@ void k_main(void) {
     // Scheduler
     scheduler_init(c_cnt);
     defer_init();
+    k_info("MAIN", K_INFO, "Scheduler init OK");
 
     // Filesystem init
     cmdline_parse(cmdline_request.response->cmdline);

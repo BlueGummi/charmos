@@ -222,4 +222,12 @@ static inline void restore_interrupts(void) {
     asm volatile("sti");
 }
 
+static inline void invlpg(uint64_t virt) {
+    asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
+}
+
+static inline void cpu_relax(void) {
+    asm volatile("pause");
+}
+
 #pragma once

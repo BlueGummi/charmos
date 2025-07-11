@@ -4,6 +4,8 @@
 #include <int/idt.h>
 #include <int/kb.h>
 #include <mem/alloc.h>
+#include <mp/core.h>
+#include <mp/mp.h>
 #include <sch/sched.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -171,6 +173,15 @@ void idt_free_entry(int entry) {
     idt_entry_used[get_sch_core_id()][entry] = false;
 }
 
+static void tlb_shootdown(void *ctx, uint8_t irq, void *rsp) {
+    (void) ctx, (void) irq, (void) rsp;
+    struct core *core = global_cores[get_sch_core_id()];
+    uintptr_t addr =
+        atomic_load_explicit(&core->tlb_shootdown_page, memory_order_acquire);
+    invlpg(addr);
+    atomic_store_explicit(&core->tlb_shootdown_page, 0, memory_order_release);
+}
+
 void idt_install(uint64_t ind) {
 
     idt_set_gate(DIV_BY_Z_ID, (uint64_t) divbyz_fault, 0x08, 0x8E, ind);
@@ -191,6 +202,7 @@ void idt_install(uint64_t ind) {
 
     set(0x80, (uint64_t) syscall_entry, 0x2b, 0xee, ind);
 
+    isr_register(TLB_SHOOTDOWN_ID, tlb_shootdown, NULL, ind);
     idt_load(ind);
 }
 

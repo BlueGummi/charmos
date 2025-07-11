@@ -1,25 +1,28 @@
+#include <acpi/lapic.h>
 #include <console/printf.h>
+#include <int/idt.h>
 #include <limine.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <misc/linker_symbols.h>
+#include <mp/mp.h>
+#include <sch/sched.h>
 #include <spin_lock.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#define KERNEL_PML4_START_INDEX 256
+#define ENTRY_PRESENT(entry) (entry & PAGING_PRESENT)
 
 static struct spinlock vmm_lock = SPINLOCK_INIT;
 static struct page_table *kernel_pml4 = NULL;
 static uintptr_t kernel_pml4_phys = 0;
 static uint64_t hhdm_offset = 0;
 static uintptr_t vmm_map_top = VMM_MAP_BASE;
-#define ENTRY_PRESENT(entry) (entry & PAGING_PRESENT)
 
 uint64_t sub_offset(uint64_t a) {
     return a - hhdm_offset;
 }
-
-#define KERNEL_PML4_START_INDEX 256
 
 uintptr_t vmm_make_user_pml4(void) {
     struct page_table *user_pml4 = (struct page_table *) pmm_alloc_page(true);
@@ -33,6 +36,26 @@ uintptr_t vmm_make_user_pml4(void) {
     }
 
     return (uintptr_t) user_pml4 - hhdm_offset;
+}
+
+static void do_tlb_shootdown(uint64_t addr) {
+    if (!mp_ready)
+        return;
+
+    uint64_t this_core = get_sch_core_id();
+    uint64_t cores = scheduler_get_core_count();
+    for (uint64_t i = 0; i < cores; i++) {
+        if (i == this_core)
+            continue;
+
+        struct core *target = global_cores[i];
+        atomic_store_explicit(&target->tlb_shootdown_page, addr,
+                              memory_order_release);
+        lapic_send_ipi(i, TLB_SHOOTDOWN_ID);
+        while (atomic_load_explicit(&target->tlb_shootdown_page,
+                                    memory_order_acquire) != 0)
+            cpu_relax();
+    }
 }
 
 void vmm_init(struct limine_memmap_response *memmap,
@@ -120,7 +143,8 @@ void vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     *entry =
         (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT | PAGING_2MB_page;
 
-    asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
+    invlpg(virt);
+    do_tlb_shootdown(virt);
     spin_unlock(&vmm_lock, interrupts);
 }
 
@@ -146,7 +170,8 @@ void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     pte_t *entry = &current_table->entries[L1];
     *entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
 
-    asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
+    invlpg(virt);
+    do_tlb_shootdown(virt);
     spin_unlock(&vmm_lock, interrupts);
 }
 
@@ -173,7 +198,7 @@ void vmm_map_page_user(uintptr_t pml4_phys, uintptr_t virt, uintptr_t phys,
     pte_t *entry = &current_table->entries[L1];
     *entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
 
-    asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
+    invlpg(virt);
 }
 
 static inline bool vmm_is_table_empty(struct page_table *table) {
@@ -209,7 +234,8 @@ void vmm_unmap_page(uintptr_t virt) {
     entries[3] = &tables[3]->entries[L1];
 
     *entries[3] &= ~PAGING_PRESENT;
-    asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
+    invlpg(virt);
+    do_tlb_shootdown(virt);
     for (uint64_t level = 3; level > 0; level--) {
         if (vmm_is_table_empty(tables[level])) {
             uintptr_t phys = (uintptr_t) tables[level] - hhdm_offset;
