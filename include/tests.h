@@ -1,5 +1,6 @@
 #pragma once
 #include <console/printf.h>
+#include <errno.h>
 #include <stdbool.h>
 
 typedef void (*test_fn_t)(void);
@@ -51,6 +52,8 @@ struct kernel_test {
             return;                                                            \
         }                                                                      \
     } while (0)
+
+#define FAIL_IF_FATAL(op) TEST_ASSERT(!ERR_IS_FATAL(op))
 
 void tests_run(void);
 extern const char *large_test_string;

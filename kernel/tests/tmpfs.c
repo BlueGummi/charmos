@@ -9,11 +9,10 @@
 #define TMPFS_SETUP_NODE(root, node, name, e)                                  \
     struct vfs_node *root = tmpfs_mkroot("tmp");                               \
     TEST_ASSERT(root != NULL);                                                 \
-    enum errno e = root->ops->create(root, name, VFS_MODE_FILE);               \
+    FAIL_IF_FATAL(root->ops->create(root, name, VFS_MODE_FILE));               \
     struct vfs_dirent ent;                                                     \
     struct vfs_node *node;                                                     \
-    e = root->ops->finddir(root, name, &ent);                                  \
-    TEST_ASSERT(!ERR_IS_FATAL(e));                                             \
+    FAIL_IF_FATAL(root->ops->finddir(root, name, &ent));                       \
     node = ent.node;                                                           \
     TEST_ASSERT(node != NULL);
 
@@ -24,32 +23,27 @@ REGISTER_TEST(tmpfs_rw_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     const char *lstr = large_test_string;
     uint64_t len = strlen(lstr);
 
-    e = node->ops->write(node, lstr, len, 0);
-    TEST_ASSERT(!ERR_IS_FATAL(e));
+    FAIL_IF_FATAL(node->ops->write(node, lstr, len, 0));
+
     TEST_ASSERT(node->size == len);
 
     char *out_buf = kzalloc(len);
     TEST_ASSERT(out_buf != NULL);
-    e = node->ops->read(node, out_buf, len, 0);
-    TEST_ASSERT(!ERR_IS_FATAL(e));
+
+    FAIL_IF_FATAL(node->ops->read(node, out_buf, len, 0));
 
     TEST_ASSERT(memcmp(out_buf, lstr, len) == 0);
 
-    e = node->ops->truncate(node, len / 2);
-    TEST_ASSERT(!ERR_IS_FATAL(e));
+    FAIL_IF_FATAL(node->ops->truncate(node, len / 2));
     TEST_ASSERT(node->size == len / 2);
 
     memset(out_buf, 0, len);
-    e = node->ops->read(node, out_buf, len, 0);
-    TEST_ASSERT(!ERR_IS_FATAL(e));
 
-    e = node->ops->unlink(root, "place");
-    TEST_ASSERT(!ERR_IS_FATAL(e));
+    FAIL_IF_FATAL(node->ops->read(node, out_buf, len, 0));
+    FAIL_IF_FATAL(node->ops->unlink(root, "place"));
+    FAIL_IF_FATAL(node->ops->destroy(node));
 
-    e = node->ops->destroy(node);
-    TEST_ASSERT(!ERR_IS_FATAL(e));
-
-    e = root->ops->finddir(root, "place", &ent);
+    enum errno e = root->ops->finddir(root, "place", &ent);
     TEST_ASSERT(e == ERR_NO_ENT);
 
     TEST_ASSERT(strlen(out_buf) == len / 2);
@@ -64,25 +58,23 @@ REGISTER_TEST(tmpfs_dir_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     char *out_buf = kzalloc(len);
     TEST_ASSERT(out_buf != NULL);
 
-    enum errno e = root->ops->mkdir(root, "place", VFS_MODE_DIR);
-    TEST_ASSERT(!ERR_IS_FATAL(e));
+    FAIL_IF_FATAL(root->ops->mkdir(root, "place", VFS_MODE_DIR));
 
     struct vfs_dirent ent;
     struct vfs_node *dir;
-    e = root->ops->finddir(root, "place", &ent);
-    TEST_ASSERT(!ERR_IS_FATAL(e));
+
+    FAIL_IF_FATAL(root->ops->finddir(root, "place", &ent));
 
     dir = ent.node;
     TEST_ASSERT(dir != NULL);
 
-    e = dir->ops->write(dir, lstr, len, 0);
+    enum errno e = dir->ops->write(dir, lstr, len, 0);
     TEST_ASSERT(e == ERR_IS_DIR);
 
     e = dir->ops->read(dir, out_buf, len, 0);
     TEST_ASSERT(e == ERR_IS_DIR);
 
-    e = dir->ops->rmdir(root, "place");
-    TEST_ASSERT(!ERR_IS_FATAL(e));
+    FAIL_IF_FATAL(dir->ops->rmdir(root, "place"));
 
     e = root->ops->finddir(root, "place", &ent);
     TEST_ASSERT(e == ERR_NO_ENT);
@@ -93,31 +85,24 @@ REGISTER_TEST(tmpfs_dir_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 REGISTER_TEST(tmpfs_general_tests, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     TMPFS_SETUP_NODE(root, node, "place", e);
 
-    e = node->ops->chmod(node, VFS_MODE_EXEC);
-    TEST_ASSERT(!ERR_IS_FATAL(e));
+    FAIL_IF_FATAL(node->ops->chmod(node, VFS_MODE_EXEC));
 
     TEST_ASSERT(node->mode == VFS_MODE_EXEC);
 
-    e = node->ops->chown(node, 42, 37);
-    TEST_ASSERT(!ERR_IS_FATAL(e));
+    FAIL_IF_FATAL(node->ops->chown(node, 42, 37));
 
     TEST_ASSERT(node->uid == 42 && node->gid == 37);
 
-    e = root->ops->mkdir(root, "bingbong", VFS_MODE_DIR);
-    TEST_ASSERT(!ERR_IS_FATAL(e));
-
-    e = root->ops->finddir(root, "bingbong", &ent);
-    TEST_ASSERT(!ERR_IS_FATAL(e));
+    FAIL_IF_FATAL(root->ops->mkdir(root, "bingbong", VFS_MODE_DIR));
+    FAIL_IF_FATAL(root->ops->finddir(root, "bingbong", &ent));
 
     node = ent.node;
     TEST_ASSERT(node != NULL);
 
-    e = node->ops->symlink(node, "/tmp", "bang");
-    TEST_ASSERT(!ERR_IS_FATAL(e));
+    FAIL_IF_FATAL(node->ops->symlink(node, "/tmp", "bang"));
 
     struct vfs_node *bang;
-    e = node->ops->finddir(node, "bang", &ent);
-    TEST_ASSERT(!ERR_IS_FATAL(e));
+    FAIL_IF_FATAL(node->ops->finddir(node, "bang", &ent));
 
     bang = ent.node;
     TEST_ASSERT(bang != NULL);
@@ -125,8 +110,7 @@ REGISTER_TEST(tmpfs_general_tests, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     char *buf = kzalloc(10);
     TEST_ASSERT(bang != NULL);
 
-    e = bang->ops->readlink(bang, buf, 10);
-    TEST_ASSERT(!ERR_IS_FATAL(e));
+    FAIL_IF_FATAL(bang->ops->readlink(bang, buf, 10));
 
     TEST_ASSERT(strcmp(buf, "/tmp") == 0);
 
