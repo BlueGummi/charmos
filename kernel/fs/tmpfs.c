@@ -33,9 +33,9 @@ static uint16_t tmpfs_to_vfs_mode(enum tmpfs_type mode) {
     return -1;
 }
 
-static enum errno tmpfs_mount(struct vfs_node *mountpoint,
-                              struct vfs_node *out) {
-    (void) mountpoint, (void) out;
+static enum errno tmpfs_mount(struct vfs_node *mountpoint, struct vfs_node *out,
+                              const char *name) {
+    (void) mountpoint, (void) out, (void) name;
     return ERR_NOT_IMPL;
 }
 
@@ -229,7 +229,6 @@ static enum errno tmpfs_readdir(struct vfs_node *node, struct vfs_dirent *out,
 
     struct tmpfs_node *child = tn->children[index];
     strncpy(out->name, child->name, sizeof(out->name));
-    out->inode = index;
     out->mode = tmpfs_to_vfs_mode(child->type);
     return ERR_OK;
 }
@@ -433,14 +432,27 @@ static enum errno tmpfs_destroy(struct vfs_node *node) {
     return ERR_OK;
 }
 
-static struct vfs_node *tmpfs_finddir(struct vfs_node *node, const char *name) {
+static enum errno tmpfs_finddir(struct vfs_node *node, const char *name,
+                                struct vfs_dirent *out) {
     struct tmpfs_node *tn = node->fs_node_data;
 
     if (tn->type != TMPFS_DIR)
-        return NULL;
+        return ERR_NOT_DIR;
 
     struct tmpfs_node *child = tmpfs_find_child(tn, name);
-    return child ? tmpfs_create_vfs_node(child) : NULL;
+    if (!child)
+        return ERR_NO_ENT;
+
+    struct vfs_node *n = tmpfs_create_vfs_node(child);
+    struct vfs_dirent ent;
+    ent.node = n;
+    memcpy(ent.name, name, strlen(name));
+    ent.mode = n->mode;
+    ent.dirent_data = tn;
+
+    memcpy(out, &ent, sizeof(struct vfs_dirent));
+
+    return ERR_OK;
 }
 
 static const struct vfs_ops tmpfs_ops = {.read = tmpfs_read,
@@ -474,7 +486,6 @@ struct vfs_node *tmpfs_create_vfs_node(struct tmpfs_node *tnode) {
 
     vnode->mode = tnode->mode;
     vnode->size = tnode->size;
-    strncpy(vnode->name, tnode->name, sizeof(vnode->name));
 
     vnode->fs_data = NULL; // could be fs pointer if needed
     vnode->fs_node_data = tnode;

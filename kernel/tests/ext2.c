@@ -27,7 +27,13 @@ REGISTER_TEST(ext2_stat_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     enum errno e = root->ops->create(root, "ext2_stat_test", VFS_MODE_FILE);
     TEST_ASSERT(!ERR_IS_FATAL(e));
 
-    struct vfs_node *node = root->ops->finddir(root, "ext2_stat_test");
+    struct vfs_node *node;
+    struct vfs_dirent out;
+
+    e = root->ops->finddir(root, "ext2_stat_test", &out);
+    TEST_ASSERT(!ERR_IS_FATAL(e));
+
+    node = out.node;
     TEST_ASSERT(node != NULL);
 
     struct vfs_stat empty_stat = {0};
@@ -46,16 +52,24 @@ REGISTER_TEST(ext2_rename_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     enum errno e = root->ops->create(root, "ext2_rename_test", VFS_MODE_FILE);
     TEST_ASSERT(!ERR_IS_FATAL(e));
 
-    struct vfs_node *node = root->ops->finddir(root, "ext2_rename_test");
+    struct vfs_dirent out;
+    struct vfs_node *node;
+    e = root->ops->finddir(root, "ext2_rename_test", &out);
+    TEST_ASSERT(!ERR_IS_FATAL(e));
+
+    node = out.node;
     TEST_ASSERT(node != NULL);
 
     e = node->ops->rename(root, "ext2_rename_test", root, "ext2_rename_test2");
     TEST_ASSERT(!ERR_IS_FATAL(e));
 
-    node = root->ops->finddir(root, "ext2_rename_test");
-    TEST_ASSERT(node == NULL);
+    e = root->ops->finddir(root, "ext2_rename_test", &out);
+    TEST_ASSERT(e == ERR_NO_ENT);
 
-    node = root->ops->finddir(root, "ext2_rename_test2");
+    e = root->ops->finddir(root, "ext2_rename_test2", &out);
+    TEST_ASSERT(!ERR_IS_FATAL(e));
+
+    node = out.node;
     TEST_ASSERT(node != NULL);
 
     flush();
@@ -68,14 +82,23 @@ REGISTER_TEST(ext2_chmod_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     enum errno e = root->ops->create(root, "ext2_chmod_test", VFS_MODE_FILE);
     TEST_ASSERT(!ERR_IS_FATAL(e));
 
-    struct vfs_node *node = root->ops->finddir(root, "ext2_chmod_test");
+    struct vfs_node *node;
+    struct vfs_dirent ent;
+
+    e = root->ops->finddir(root, "ext2_chmod_test", &ent);
+    TEST_ASSERT(!ERR_IS_FATAL(e));
+
+    node = ent.node;
     TEST_ASSERT(node != NULL);
 
     e = root->ops->chmod(node, (uint16_t) VFS_MODE_O_EXEC);
     TEST_ASSERT(!ERR_IS_FATAL(e));
     TEST_ASSERT(node->mode & VFS_MODE_O_EXEC);
 
-    node = root->ops->finddir(root, "ext2_chmod_test");
+    e = root->ops->finddir(root, "ext2_chmod_test", &ent);
+    TEST_ASSERT(!ERR_IS_FATAL(e));
+
+    node = ent.node;
     TEST_ASSERT(node != NULL);
     TEST_ASSERT(node->mode & VFS_MODE_O_EXEC);
 
@@ -89,7 +112,12 @@ REGISTER_TEST(ext2_symlink_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     enum errno e = root->ops->symlink(root, "/tmp", "ext2_symlink_test");
     TEST_ASSERT(!ERR_IS_FATAL(e));
 
-    struct vfs_node *node = root->ops->finddir(root, "ext2_symlink_test");
+    struct vfs_dirent ent;
+    struct vfs_node *node;
+    e = root->ops->finddir(root, "ext2_symlink_test", &ent);
+    TEST_ASSERT(!ERR_IS_FATAL(e));
+
+    node = ent.node;
     TEST_ASSERT(node != NULL);
 
     char *buf = kzalloc(5);
@@ -110,7 +138,13 @@ REGISTER_TEST(ext2_dir_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     enum errno e = root->ops->mkdir(root, "ext2_dir_test", VFS_MODE_DIR);
     TEST_ASSERT(!ERR_IS_FATAL(e));
 
-    struct vfs_node *node = root->ops->finddir(root, "ext2_dir_test");
+    struct vfs_dirent ent;
+    struct vfs_node *node;
+
+    e = root->ops->finddir(root, "ext2_dir_test", &ent);
+    TEST_ASSERT(!ERR_IS_FATAL(e));
+
+    node = ent.node;
     TEST_ASSERT(node != NULL);
 
     e = root->ops->rmdir(root, "ext2_dir_test");
@@ -127,7 +161,12 @@ REGISTER_TEST(ext2_integration_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
         root->ops->create(root, "ext2_integration_test", VFS_MODE_FILE);
     TEST_ASSERT(!ERR_IS_FATAL(e));
 
-    struct vfs_node *node = root->ops->finddir(root, "ext2_integration_test");
+    struct vfs_dirent ent;
+    struct vfs_node *node;
+    e = root->ops->finddir(root, "ext2_integration_test", &ent);
+    TEST_ASSERT(!ERR_IS_FATAL(e));
+
+    node = ent.node;
     TEST_ASSERT(node != NULL);
 
     const char *lstr = large_test_string;
@@ -155,8 +194,8 @@ REGISTER_TEST(ext2_integration_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     e = node->ops->unlink(root, "ext2_integration_test");
     TEST_ASSERT(!ERR_IS_FATAL(e));
 
-    node = root->ops->finddir(root, "ext2_integration_test");
-    TEST_ASSERT(node == NULL);
+    e = root->ops->finddir(root, "ext2_integration_test", &ent);
+    TEST_ASSERT(e == ERR_NO_ENT);
 
     flush();
 

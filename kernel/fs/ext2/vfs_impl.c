@@ -41,7 +41,8 @@ enum errno ext2_vfs_symlink(struct vfs_node *parent, const char *target,
                             const char *link_name);
 enum errno ext2_vfs_readlink(struct vfs_node *n, char *out_buf, uint64_t size);
 
-struct vfs_node *ext2_vfs_finddir(struct vfs_node *node, const char *fname);
+enum errno ext2_vfs_finddir(struct vfs_node *node, const char *fname,
+                            struct vfs_dirent *out);
 enum errno ext2_vfs_mkdir(struct vfs_node *n, const char *name, uint16_t mode);
 enum errno ext2_vfs_rmdir(struct vfs_node *n, const char *name);
 enum errno ext2_vfs_readdir(struct vfs_node *n, struct vfs_dirent *out,
@@ -257,8 +258,6 @@ static struct vfs_node *make_vfs_node(struct ext2_fs *fs,
     if (*fname == '.')
         ret->flags |= VFS_NODE_HIDDEN;
 
-    memcpy(ret->name, fname, strlen(fname));
-
     ret->flags = ext2_to_vfs_flags(node->node.flags);
 
     ret->unique_id = node->inode_num;
@@ -276,7 +275,6 @@ static struct vfs_dirent *ext2_to_vfs_dirent(struct ext2_dir_entry *ext2) {
     struct vfs_dirent *dirent = kzalloc(sizeof(struct vfs_dirent));
 
     dirent->mode = ext2_to_vfs_mode(ext2->file_type);
-    dirent->inode = ext2->inode;
     dirent->dirent_data = ext2;
     memcpy(dirent->name, ext2->name, ext2->name_len);
     return dirent;
@@ -373,7 +371,6 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
         (void *) ext2_block_read(fs, superblock_block, &fs->sbcache_ent);
     ext2_block_read(fs, gdt_block, &fs->gdesc_cache_ent);
 
-
     if (!gdt_ent)
         return ERR_IO;
 
@@ -397,7 +394,6 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     kfree(inode);
 
     out_node->open_handles += 1;
-    out_node->name[0] = '/';
     out_node->flags = ext2_to_vfs_flags(f->node.flags);
     out_node->mode = ext2_to_vfs_mode(f->node.mode);
     out_node->size = f->node.size;
@@ -408,9 +404,10 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     return ERR_OK;
 }
 
-struct vfs_node *ext2_vfs_finddir(struct vfs_node *node, const char *fname) {
-    if (!node || !fname)
-        return NULL;
+enum errno ext2_vfs_finddir(struct vfs_node *node, const char *fname,
+                            struct vfs_dirent *out) {
+    if (!node || !fname || !out)
+        return ERR_INVAL;
 
     struct ext2_full_inode *full_inode = node->fs_node_data;
 
@@ -419,7 +416,20 @@ struct vfs_node *ext2_vfs_finddir(struct vfs_node *node, const char *fname) {
     struct ext2_full_inode *found =
         ext2_find_file_in_dir(fs, full_inode, fname, NULL);
 
-    return make_vfs_node(node->fs_data, found, fname);
+    if (!found)
+        return ERR_NO_ENT;
+
+    struct vfs_node *n = make_vfs_node(fs, found, fname);
+
+    struct vfs_dirent ent;
+    ent.mode = n->mode;
+    ent.node = n;
+    ent.dirent_data = fs;
+   
+    memcpy(&ent.name, fname, strlen(fname));
+    memcpy(out, &ent, sizeof(struct vfs_dirent));
+
+    return ERR_OK;
 }
 
 enum errno ext2_vfs_readdir(struct vfs_node *node, struct vfs_dirent *out,

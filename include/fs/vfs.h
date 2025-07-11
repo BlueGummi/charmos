@@ -100,8 +100,8 @@ struct vfs_stat {
 
 struct vfs_dirent {
     char name[VFS_NAME_MAX];
-    uint64_t inode;
     uint16_t mode;
+    struct vfs_node *node;
     void *dirent_data;
 };
 
@@ -135,7 +135,8 @@ struct vfs_ops {
                           const char *link_name);
 
     /* mount filesystem at mountpoint */
-    enum errno (*mount)(struct vfs_node *mountpoint, struct vfs_node *target);
+    enum errno (*mount)(struct vfs_node *mountpoint, struct vfs_node *target,
+                        const char *name);
 
     /* unmount filesystem at mountpoint */
     enum errno (*unmount)(struct vfs_mount *mountpoint);
@@ -184,7 +185,8 @@ struct vfs_ops {
     enum errno (*destroy)(struct vfs_node *node);
 
     /* find node by name */
-    struct vfs_node *(*finddir)(struct vfs_node *node, const char *name);
+    enum errno (*finddir)(struct vfs_node *node, const char *name,
+                          struct vfs_dirent *out);
 };
 
 struct vfs_mount {
@@ -199,8 +201,7 @@ struct vfs_mount {
 struct vfs_node {
     enum fs_type fs_type;  /* filesystem type */
     uint64_t open_handles; /* how many things have this open */
-    char name[256];
-    uint64_t unique_id; /* exclusively unique ID - one per node */
+    uint64_t unique_id;    /* exclusively unique ID - one per node */
     uint32_t flags;
     uint16_t mode;
     uint64_t size;
@@ -217,6 +218,7 @@ struct vfs_node {
 };
 
 void vfs_node_print(const struct vfs_node *node);
-enum errno vfs_mount(struct vfs_node *mountpoint, struct vfs_node *target);
+enum errno vfs_mount(struct vfs_node *mountpoint, struct vfs_node *target,
+                     const char *name);
 enum errno vfs_unmount(struct vfs_mount *mountpoint);
 struct vfs_node *vfs_finddir(struct vfs_node *node, const char *fname);

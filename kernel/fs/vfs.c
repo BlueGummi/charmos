@@ -44,8 +44,6 @@ void vfs_node_print(const struct vfs_node *node) {
     }
 
     k_printf("=== VFS Node ===\n");
-    k_printf("Name     : %s%s\n", node->name,
-             *node->name == '/' ? " (root)" : "");
     k_printf("Type     : %s (%d)\n", detect_fstr(node->fs_type), node->fs_type);
     k_printf("Open     : %s\n", node->open_handles ? "Yes" : "No");
     k_printf("Flags    : 0x%08X\n", node->flags);
@@ -76,7 +74,11 @@ struct vfs_node *vfs_finddir(struct vfs_node *node, const char *fname) {
     if (!node->ops || !node->ops->finddir)
         return NULL;
 
-    struct vfs_node *found = node->ops->finddir(node, fname);
+    struct vfs_dirent ent = {0};
+
+    node->ops->finddir(node, fname, &ent);
+
+    struct vfs_node *found = ent.node;
 
     mnt = find_mount_for_node(found);
     if (mnt)
@@ -85,7 +87,8 @@ struct vfs_node *vfs_finddir(struct vfs_node *node, const char *fname) {
     return found;
 }
 
-enum errno vfs_mount(struct vfs_node *mountpoint, struct vfs_node *target) {
+enum errno vfs_mount(struct vfs_node *mountpoint, struct vfs_node *target,
+                     const char *name) {
     if (!mountpoint || !target)
         return ERR_INVAL;
 
@@ -99,7 +102,7 @@ enum errno vfs_mount(struct vfs_node *mountpoint, struct vfs_node *target) {
     if (!mnt)
         return ERR_NO_MEM;
 
-    memcpy(mnt->name, mountpoint->name, sizeof(mnt->name));
+    memcpy(mnt->name, name, sizeof(mnt->name));
     mnt->root = target;
     mnt->mount_point = mountpoint;
     mnt->ops = target->ops;
