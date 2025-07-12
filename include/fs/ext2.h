@@ -200,7 +200,7 @@ struct ext2_inode {
 struct ext2_full_inode {
     struct ext2_inode node;
     uint32_t inode_num;
-    struct spinlock lock;
+    struct bcache_entry *ent;
 };
 
 struct ext2_dir_entry {
@@ -287,10 +287,18 @@ void ext2_init_dirent(struct ext2_fs *fs, struct ext2_dir_entry *new_entry,
 uint8_t ext2_extract_ftype(uint16_t mode);
 uint32_t ext2_get_inode_group(struct ext2_fs *fs, uint32_t inode);
 uint32_t ext2_get_block_group(struct ext2_fs *fs, uint32_t block);
+
+void ext2_inode_lock(struct ext2_full_inode *ino);
+void ext2_inode_unlock(struct ext2_full_inode *ino);
 bool ext2_fs_lock(struct ext2_fs *fs);
 void ext2_fs_unlock(struct ext2_fs *fs, bool i);
+
+bool ext2_walk_dir(struct ext2_fs *fs, struct ext2_full_inode *dir,
+                   dir_entry_callback cb, void *ctx);
+
 void ext2_prefetch_block(struct ext2_fs *fs, uint32_t block);
-uint8_t *ext2_create_bcache_ent(struct ext2_fs *fs, uint32_t block, struct bcache_entry **out);
+uint8_t *ext2_create_bcache_ent(struct ext2_fs *fs, uint32_t block,
+                                struct bcache_entry **out);
 
 //
 //
@@ -363,8 +371,8 @@ bool ext2_free_block(struct ext2_fs *fs, uint32_t block_num);
 uint32_t ext2_alloc_inode(struct ext2_fs *fs);
 bool ext2_free_inode(struct ext2_fs *fs, uint32_t inode_num);
 
-bool ext2_walk_dir(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
-                   dir_entry_callback cb, void *ctx, bool ff_avail);
+bool ext2_find_first_available(struct ext2_fs *fs, struct ext2_full_inode *dir,
+                               uint32_t *new_block);
 
 void ext2_traverse_inode_blocks(struct ext2_fs *fs, struct ext2_inode *inode,
                                 ext2_block_visitor visitor, void *user_data,

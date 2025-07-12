@@ -104,8 +104,8 @@ static bool walk_indirect(struct ext2_fs *fs, uint32_t block_num, int level,
     return false;
 }
 
-bool ext2_walk_dir(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
-                   dir_entry_callback cb, void *ctx, bool ff_avail) {
+static bool do_walk_dir(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
+                        dir_entry_callback cb, void *ctx, bool ff_avail) {
     if (!fs || !dir_inode || !cb)
         return false;
 
@@ -190,4 +190,16 @@ void ext2_traverse_inode_blocks(struct ext2_fs *fs, struct ext2_inode *inode,
     if (inode->block[14])
         traverse_indirect(fs, inode, inode->block[14], 3, visitor, user_data,
                           readahead);
+}
+
+bool ext2_walk_dir(struct ext2_fs *fs, struct ext2_full_inode *dir,
+                   dir_entry_callback cb, void *ctx) {
+    return do_walk_dir(fs, dir, cb, ctx, false);
+}
+
+MAKE_NOP_CALLBACK;
+
+bool ext2_find_first_available(struct ext2_fs *fs, struct ext2_full_inode *dir,
+                               uint32_t *new_block) {
+    return do_walk_dir(fs, dir, nop_callback, new_block, true);
 }

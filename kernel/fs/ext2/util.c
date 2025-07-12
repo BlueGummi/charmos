@@ -179,6 +179,14 @@ void ext2_prefetch_block(struct ext2_fs *fs, uint32_t block) {
                           fs->sectors_per_block);
 }
 
+void ext2_inode_lock(struct ext2_full_inode *ino) {
+    bcache_ent_lock(ino->ent);
+}
+
+void ext2_inode_unlock(struct ext2_full_inode *ino) {
+    bcache_ent_unlock(ino->ent);
+}
+
 uint8_t *ext2_create_bcache_ent(struct ext2_fs *fs, uint32_t block,
                                 struct bcache_entry **out) {
     return bcache_create_ent(fs->drive, ext2_block_to_lba(fs, block),

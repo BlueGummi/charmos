@@ -89,7 +89,7 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
         return ERR_NO_ENT;
 
     struct unlink_ctx ctx = {name, false, 0, 0, 0, 0};
-    if (!ext2_walk_dir(fs, dir_inode, unlink_callback, &ctx, false))
+    if (!ext2_walk_dir(fs, dir_inode, unlink_callback, &ctx))
         return ERR_FS_INTERNAL;
 
     struct ext2_full_inode target_inode = {0};
@@ -99,7 +99,7 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
     if (!block)
         return ERR_IO;
 
-     bcache_ent_lock(ent);
+    bcache_ent_lock(ent);
 
     unlink_adjust_neighbors(fs, block, ctx.entry_offset, ctx.prev_offset);
 

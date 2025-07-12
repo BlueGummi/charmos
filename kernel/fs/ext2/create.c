@@ -13,8 +13,6 @@ struct link_ctx {
     bool success;
 };
 
-MAKE_NOP_CALLBACK;
-
 static bool link_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
                           void *ctx_ptr, uint32_t block_num, uint32_t e,
                           uint32_t o) {
@@ -59,7 +57,7 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir,
 
     struct link_ctx ctx = {name, inode->inode_num, dir->inode_num, type, false};
 
-    ext2_walk_dir(fs, dir, link_callback, &ctx, false);
+    ext2_walk_dir(fs, dir, link_callback, &ctx);
 
     /* did not need to allocate new block */
     if (ctx.success)
@@ -86,7 +84,7 @@ enum errno ext2_link_file(struct ext2_fs *fs, struct ext2_full_inode *dir,
         return ERR_IO;
 
     /* this sets the first available block to our new block */
-    if (!ext2_walk_dir(fs, dir, nop_callback, &new_block, true)) {
+    if (!ext2_find_first_available(fs, dir, &new_block)) {
         ext2_free_block(fs, new_block);
         return ERR_IO;
     }

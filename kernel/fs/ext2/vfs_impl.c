@@ -318,7 +318,7 @@ static enum errno dir_entry_rename(struct ext2_fs *fs,
     struct rename_ctx ctx = {
         .old_name = old, .new_name = new, .success = false};
 
-    if (!ext2_walk_dir(fs, node, dir_entry_rename_callback, &ctx, false))
+    if (!ext2_walk_dir(fs, node, dir_entry_rename_callback, &ctx))
         return ERR_FS_INTERNAL;
 
     return ERR_OK;

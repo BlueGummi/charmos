@@ -97,7 +97,7 @@ struct ext2_full_inode *ext2_find_file_in_dir(struct ext2_fs *fs,
                                               uint8_t *type_out) {
     struct ext2_full_inode *out_node = kzalloc(sizeof(struct ext2_full_inode));
     struct search_ctx ctx = {.target = fname, .result = out_node, .type = 0};
-    ext2_walk_dir(fs, dir_inode, search_callback, &ctx, false);
+    ext2_walk_dir(fs, dir_inode, search_callback, &ctx);
 
     if (type_out)
         *type_out = ctx.type;
@@ -115,7 +115,7 @@ bool ext2_dir_contains_file(struct ext2_fs *fs,
                             const char *fname) {
     struct contains_ctx ctx = {.target = fname, .found = false};
 
-    ext2_walk_dir(fs, dir_inode, contains_callback, &ctx, false);
+    ext2_walk_dir(fs, dir_inode, contains_callback, &ctx);
 
     return ctx.found;
 }
@@ -127,7 +127,7 @@ enum errno ext2_readdir(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
 
     struct readdir_ctx ctx = {.out = out, .entry_offset = entry_offset};
 
-    ext2_walk_dir(fs, dir_inode, readdir_callback, &ctx, false);
+    ext2_walk_dir(fs, dir_inode, readdir_callback, &ctx);
 
     return ctx.found ? ERR_OK : ERR_NO_ENT;
 }
