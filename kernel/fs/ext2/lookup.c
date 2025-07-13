@@ -48,9 +48,11 @@ static bool search_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
         uint32_t ino = entry->inode;
         struct bcache_entry *ent;
 
-        /* read `acquire()'s the node so we have to release it */
+        /* read `acquire()'s the node, we have to unlock but not dec refcount */
+
         memcpy(out, ext2_inode_read(fs, ino, &ent), sizeof(struct ext2_inode));
-        bcache_ent_release(ent);
+        bcache_ent_unlock(ent);
+        ctx->result->ent = ent;
 
         return true;
     }

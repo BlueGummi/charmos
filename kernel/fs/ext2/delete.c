@@ -114,6 +114,7 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
     unlink_target_update(target_inode);
     bcache_ent_release(ent);
 
+    /* This will re-acquire our locks */
     if (target_inode->links_count == 0 && free_blocks)
         unlink_free_blocks(fs, target_inode, ctx.inode_num);
 

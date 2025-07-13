@@ -52,25 +52,32 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
         return ERR_IO;
 
     uint32_t new_block = ext2_alloc_block(fs);
-    if (new_block == 0)
+    if (new_block == 0) {
+        ext2_dealloc_inode(dir);
         return ERR_NOSPC;
+    }
 
     struct bcache_entry *ent;
     uint8_t *block = ext2_create_bcache_ent(fs, new_block, &ent);
 
-    if (!block)
+    if (!block) {
+        ext2_dealloc_inode(dir);
         return ERR_IO;
+    }
 
     bcache_ent_acquire(ent);
     init_dot_ents(fs, block, parent_dir, dir);
     bcache_ent_release(ent);
 
+    ext2_inode_lock(dir);
     init_dir(fs, dir, new_block);
+    ext2_inode_unlock(dir);
 
     ext2_inode_write(fs, dir->inode_num, &dir->node);
     ext2_inode_write(fs, parent_dir->inode_num, &parent_dir->node);
     ext2_block_write(fs, ent, EXT2_PRIO_DIRENT);
 
+    ext2_dealloc_inode(dir);
     return ERR_OK;
 }
 
@@ -82,8 +89,10 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     if (!dir)
         return ERR_NO_ENT;
 
-    if (!(dir->node.mode & EXT2_S_IFDIR))
+    if (!(dir->node.mode & EXT2_S_IFDIR)) {
+        ext2_dealloc_inode(dir);
         return ERR_NOT_DIR;
+    }
 
     uint32_t b_idx = 0;
     uint32_t b_num = 0;
@@ -94,9 +103,12 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     struct bcache_entry *ent;
     uint8_t *block = ext2_block_read(fs, tmp, &ent);
 
-    if (!ent)
+    if (!ent) {
+        ext2_dealloc_inode(dir);
         return ERR_IO;
+    }
 
+    ext2_inode_lock(dir);
     bcache_ent_acquire(ent);
 
     bool empty = true;
@@ -118,8 +130,12 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     }
 
     bcache_ent_release(ent);
-    if (!empty)
+    ext2_inode_unlock(dir);
+
+    if (!empty) {
+        ext2_dealloc_inode(dir);
         return ERR_NOT_EMPTY;
+    }
 
     bool free_blocks = true;
     bool decrement_links = true;
@@ -127,8 +143,10 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     enum errno err =
         ext2_unlink_file(fs, parent_dir, name, free_blocks, decrement_links);
 
-    if (err != ERR_OK)
+    if (err != ERR_OK) {
+        ext2_dealloc_inode(dir);
         return err;
+    }
 
     if (dir->node.blocks) {
         uint32_t block = dir->node.block[0];
@@ -152,5 +170,6 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     ext2_inode_write(fs, dir->inode_num, &dir->node);
     ext2_inode_write(fs, parent_dir->inode_num, &parent_dir->node);
 
+    ext2_dealloc_inode(dir);
     return ERR_OK;
 }

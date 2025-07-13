@@ -2,6 +2,7 @@
 #include <block/generic.h>
 #include <errno.h>
 #include <fs/vfs.h>
+#include <mem/alloc.h>
 #include <spin_lock.h>
 #include <stdint.h>
 
@@ -200,7 +201,7 @@ struct ext2_inode {
 struct ext2_full_inode {
     struct ext2_inode node;
     uint32_t inode_num;
-    struct mutex lock;
+    struct bcache_entry *ent;
 };
 
 struct ext2_dir_entry {
@@ -285,20 +286,52 @@ void ext2_init_dirent(struct ext2_fs *fs, struct ext2_dir_entry *new_entry,
                       uint32_t inode_num, const char *name, uint8_t type);
 
 uint8_t ext2_extract_ftype(uint16_t mode);
-uint32_t ext2_get_inode_group(struct ext2_fs *fs, uint32_t inode);
-uint32_t ext2_get_block_group(struct ext2_fs *fs, uint32_t block);
-
-void ext2_inode_lock(struct ext2_full_inode *ino);
-void ext2_inode_unlock(struct ext2_full_inode *ino);
-bool ext2_fs_lock(struct ext2_fs *fs);
-void ext2_fs_unlock(struct ext2_fs *fs, bool i);
 
 bool ext2_walk_dir(struct ext2_fs *fs, struct ext2_full_inode *dir,
                    dir_entry_callback cb, void *ctx);
 
-void ext2_prefetch_block(struct ext2_fs *fs, uint32_t block);
-uint8_t *ext2_create_bcache_ent(struct ext2_fs *fs, uint32_t block,
-                                struct bcache_entry **out);
+static inline void ext2_dealloc_inode(struct ext2_full_inode *ino) {
+    kfree(ino);
+}
+
+static inline uint32_t ext2_get_block_group(struct ext2_fs *fs,
+                                            uint32_t block) {
+    return (block - 1) / fs->sblock->blocks_per_group;
+}
+
+static inline uint32_t ext2_get_inode_group(struct ext2_fs *fs,
+                                            uint32_t inode) {
+    return (inode - 1) / fs->sblock->inodes_per_group;
+}
+
+static inline bool ext2_fs_lock(struct ext2_fs *fs) {
+    return spin_lock(&fs->lock);
+}
+
+static inline void ext2_fs_unlock(struct ext2_fs *fs, bool b) {
+    spin_unlock(&fs->lock, b);
+}
+
+static inline void ext2_prefetch_block(struct ext2_fs *fs, uint32_t block) {
+    uint32_t lba = ext2_block_to_lba(fs, block);
+    bcache_prefetch_async(fs->drive, lba, fs->block_size,
+                          fs->sectors_per_block);
+}
+
+static inline void ext2_inode_lock(struct ext2_full_inode *ino) {
+    bcache_ent_lock(ino->ent);
+}
+
+static inline void ext2_inode_unlock(struct ext2_full_inode *ino) {
+    bcache_ent_unlock(ino->ent);
+}
+
+static inline uint8_t *ext2_create_bcache_ent(struct ext2_fs *fs,
+                                              uint32_t block,
+                                              struct bcache_entry **out) {
+    return bcache_create_ent(fs->drive, ext2_block_to_lba(fs, block),
+                             fs->block_size, fs->sectors_per_block, false, out);
+}
 
 //
 //

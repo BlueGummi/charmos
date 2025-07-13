@@ -38,9 +38,8 @@ void ahci_process_completions(struct ahci_device *dev, uint32_t port) {
 
             if (req->on_complete)
                 req->on_complete(req);
-            bool i = spin_lock(&fp->bitmap_lock);
-            fp->slot_bitmap &= ~(1U << slot);
-            spin_unlock(&fp->bitmap_lock, i);
+            atomic_store(&fp->slot_bitmap,
+                         atomic_load(&fp->slot_bitmap) & ~mask);
         }
 
         struct thread *t = dev->io_waiters[port][slot];
@@ -80,18 +79,21 @@ void ahci_send_command(struct ahci_disk *disk, struct ahci_full_port *port,
 }
 
 static uint32_t try_find_slot(struct ahci_full_port *p) {
-    bool i = spin_lock(&p->bitmap_lock);
-    uint32_t slots_in_use = p->slot_bitmap;
-    for (int slot = 0; slot < AHCI_MAX_SLOTS; slot++) {
-        uint32_t mask = 1U << slot;
-        if (!(slots_in_use & mask)) {
-            p->slot_bitmap |= mask;
-            spin_unlock(&p->bitmap_lock, i);
-            return slot;
+    for (;;) {
+        uint32_t old = atomic_load(&p->slot_bitmap);
+        for (int slot = 0; slot < AHCI_MAX_SLOTS; slot++) {
+            uint32_t mask = 1U << slot;
+            if (!(old & mask)) {
+                uint32_t new_bitmap = old | mask;
+                if (atomic_compare_exchange_weak(&p->slot_bitmap, &old,
+                                                 new_bitmap)) {
+                    return slot;
+                }
+                break; // someone changed bitmap, retry outer loop
+            }
         }
+        return (uint32_t) -1; // no free slot found
     }
-    spin_unlock(&p->bitmap_lock, i);
-    return (uint32_t) -1;
 }
 
 uint32_t ahci_find_slot(struct ahci_full_port *p) {
