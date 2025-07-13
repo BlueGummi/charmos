@@ -41,16 +41,15 @@ bool ext2_block_write(struct ext2_fs *fs, struct bcache_entry *ent,
     return true;
 }
 
-struct bcache_entry *ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
-                                     struct ext2_inode *inode_out) {
-    if (!fs || !inode_out || inode_idx == 0)
-        return false;
+struct ext2_inode *ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
+                                   struct bcache_entry **out_ent) {
+    if (!fs || inode_idx == 0 || inode_idx > fs->sblock->inodes_count)
+        return NULL;
 
     uint32_t inodes_per_group = fs->sblock->inodes_per_group;
     uint32_t inode_size = fs->sblock->inode_size;
 
     uint32_t group = ext2_get_inode_group(fs, inode_idx);
-
     uint32_t index_in_group = (inode_idx - 1) % inodes_per_group;
 
     struct ext2_group_desc *desc = &fs->group_desc[group];
@@ -62,19 +61,18 @@ struct bcache_entry *ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
 
     uint32_t inode_block_num = inode_table_block + block_offset;
 
-    if (inode_idx == 0 || inode_idx > fs->sblock->inodes_count)
-        return false;
-
     struct bcache_entry *ent;
     uint8_t *buf = ext2_block_read(fs, inode_block_num, &ent);
     if (!buf)
         return NULL;
 
-    bcache_ent_lock(ent);
-    memcpy(inode_out, buf + offset_in_block, sizeof(struct ext2_inode));
-    bcache_ent_unlock(ent);
+    bcache_ent_acquire(ent);
+    if (out_ent)
+        *out_ent = ent;
 
-    return ent;
+    struct ext2_inode *inode_ptr =
+        (struct ext2_inode *) (buf + offset_in_block);
+    return inode_ptr;
 }
 
 bool ext2_inode_write(struct ext2_fs *fs, uint32_t inode_num,
@@ -95,9 +93,9 @@ bool ext2_inode_write(struct ext2_fs *fs, uint32_t inode_num,
     if (!block_buf)
         return false;
 
-    bcache_ent_lock(ent);
+    bcache_ent_acquire(ent);
     memcpy(block_buf + block_offset, inode, fs->inode_size);
-    bcache_ent_unlock(ent);
+    bcache_ent_release(ent);
 
     bool status = ext2_block_write(fs, ent, EXT2_PRIO_INODE);
     return status;

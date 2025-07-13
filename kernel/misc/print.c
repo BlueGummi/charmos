@@ -1,7 +1,7 @@
 #include <console/printf.h>
 #include <stdint.h>
 
-void time_print_unix(uint64_t timestamp) {
+void time_print_unix(uint32_t timestamp) {
     uint32_t days_in_month[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
     uint32_t year = 1970;

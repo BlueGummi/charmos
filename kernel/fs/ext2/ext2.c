@@ -60,6 +60,4 @@ void ext2_g_print(struct generic_partition *p) {
     if (!p)
         return;
 
-    struct ext2_fs *fs = p->fs_data;
-    ext2_print_superblock(fs->sblock);
 }

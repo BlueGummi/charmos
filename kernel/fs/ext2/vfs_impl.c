@@ -379,12 +379,16 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     if (!f || !inode)
         return ERR_NO_MEM;
 
-    if (!ext2_inode_read(fs, EXT2_ROOT_INODE, inode)) {
+    struct bcache_entry *root_ent;
+
+    ext2_inode_read(fs, EXT2_ROOT_INODE, &root_ent);
+
+    if (!root_ent)
         return ERR_IO;
-    }
 
     if (!out_node) {
         kfree(f);
+        bcache_ent_release(root_ent);
         return ERR_OK;
     }
 
@@ -401,6 +405,7 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     out_node->fs_node_data = f;
     out_node->fs_type = FS_EXT2;
     out_node->ops = &ext2_vfs_ops;
+    bcache_ent_release(root_ent);
     return ERR_OK;
 }
 
@@ -425,7 +430,7 @@ enum errno ext2_vfs_finddir(struct vfs_node *node, const char *fname,
     ent.mode = n->mode;
     ent.node = n;
     ent.dirent_data = fs;
-   
+
     memcpy(&ent.name, fname, strlen(fname));
     memcpy(out, &ent, sizeof(struct vfs_dirent));
 

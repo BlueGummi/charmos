@@ -34,9 +34,9 @@ enum errno ext2_symlink_file(struct ext2_fs *fs,
         if (!buffer)
             return ERR_IO;
 
-        bcache_ent_lock(ent);
+        bcache_ent_acquire(ent);
         memcpy(buffer, target, strlen(target) + 1);
-        bcache_ent_unlock(ent);
+        bcache_ent_release(ent);
 
         ext2_block_write(fs, ent, EXT2_PRIO_DIRENT);
 
@@ -85,13 +85,13 @@ enum errno ext2_readlink(struct ext2_fs *fs, struct ext2_full_inode *node,
     if (!block)
         return ERR_IO;
 
-    bcache_ent_lock(ent);
+    bcache_ent_acquire(ent);
 
     if (!block)
         return ERR_IO;
 
     memcpy(buf, block, link_size > block_size ? block_size : link_size);
-    bcache_ent_unlock(ent);
+    bcache_ent_release(ent);
 
     return 0;
 }

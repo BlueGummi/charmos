@@ -22,21 +22,21 @@ void mutex_init(struct mutex *m) {
 #define SPIN_DELAY_US 50
 
 static bool try_acquire_mutex(struct mutex *m, struct thread *curr) {
-    spin_lock(&m->lock);
+    bool i = spin_lock(&m->lock);
     if (m->owner == NULL) {
         m->owner = curr;
-        spin_unlock(&m->lock, false);
+        spin_unlock(&m->lock, i);
         return true;
     }
-    spin_unlock(&m->lock, false);
+    spin_unlock(&m->lock, i);
     return false;
 }
 
 static bool should_spin_on_mutex(struct mutex *m) {
-    spin_lock(&m->lock);
+    bool i = spin_lock(&m->lock);
     struct thread *owner = m->owner;
     bool active = (owner != NULL && owner->state == RUNNING);
-    spin_unlock(&m->lock, false);
+    spin_unlock(&m->lock, i);
     return active;
 }
 
@@ -51,10 +51,10 @@ static bool spin_wait_mutex(struct mutex *m, struct thread *curr) {
 }
 
 static void block_on_mutex(struct mutex *m, struct thread *curr) {
-    spin_lock(&m->lock);
+    bool i = spin_lock(&m->lock);
     thread_queue_push_back(&m->waiters, curr);
     curr->state = BLOCKED;
-    spin_unlock(&m->lock, false);
+    spin_unlock(&m->lock, i);
     scheduler_yield();
 }
 
@@ -79,7 +79,7 @@ void mutex_lock(struct mutex *m) {
 void mutex_unlock(struct mutex *m) {
     struct thread *curr = scheduler_get_curr_thread();
 
-    spin_lock(&m->lock);
+    bool i = spin_lock(&m->lock);
 
     if (m->owner != curr) {
         k_panic("mutex unlock by non-owner thread");
@@ -94,5 +94,5 @@ void mutex_unlock(struct mutex *m) {
         scheduler_add_thread(local_schs[next_core], next, false, false, false);
     }
 
-    spin_unlock(&m->lock, true);
+    spin_unlock(&m->lock, i);
 }

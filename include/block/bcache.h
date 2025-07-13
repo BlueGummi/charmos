@@ -1,9 +1,11 @@
 #include <block/bio.h>
 #include <mutex.h>
+#include <refcount.h>
 #include <spin_lock.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <types.h>
 
 #pragma once
 #define DEFAULT_BLOCK_CACHE_SIZE 2048
@@ -23,12 +25,14 @@ struct bcache_entry {
 
     /* used with a counter - not a real 'timestamp' */
     uint64_t access_time;
-    struct spinlock lock;
+    struct mutex lock;
     bool dirty;
     bool no_evict;
 
     /* associated outgoing request */
     struct bio_request *request;
+
+    refcount_t refcount;
 };
 
 struct bcache_wrapper {
@@ -57,8 +61,6 @@ static inline uint64_t bcache_hash(uint64_t x, uint64_t capacity) {
 }
 
 void bcache_init(struct bcache *cache, uint64_t capacity);
-void bcache_ent_unlock(struct bcache_entry *ent);
-void bcache_ent_lock(struct bcache_entry *ent);
 
 void *bcache_get(struct generic_disk *disk, uint64_t lba, uint64_t block_size,
                  uint64_t spb, bool no_evict, struct bcache_entry **out_entry);
@@ -87,4 +89,30 @@ static inline void bcache_increment_ticks(struct bcache *cache) {
 
 static inline uint64_t bcache_get_ticks(struct bcache *cache) {
     return atomic_load(&cache->ticks);
+}
+
+static inline void bcache_ent_lock(struct bcache_entry *ent) {
+    mutex_lock(&ent->lock);
+}
+
+static inline void bcache_ent_unlock(struct bcache_entry *ent) {
+    mutex_unlock(&ent->lock);
+}
+
+static inline void bcache_ent_pin(struct bcache_entry *ent) {
+    refcount_inc(&ent->refcount);
+}
+
+static inline void bcache_ent_unpin(struct bcache_entry *ent) {
+    refcount_dec(&ent->refcount);
+}
+
+static inline void bcache_ent_acquire(struct bcache_entry *ent) {
+    refcount_inc(&ent->refcount);
+    bcache_ent_lock(ent);
+}
+
+static inline void bcache_ent_release(struct bcache_entry *ent) {
+    refcount_dec(&ent->refcount);
+    bcache_ent_unlock(ent);
 }

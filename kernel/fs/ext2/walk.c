@@ -10,7 +10,7 @@ static bool walk_dir(struct ext2_fs *fs, uint32_t block_num,
     if (!dir_buf)
         return false;
 
-    bcache_ent_lock(ent);
+    bcache_ent_acquire(ent);
 
     uint32_t offset = 0;
     bool modified = false;
@@ -29,7 +29,7 @@ static bool walk_dir(struct ext2_fs *fs, uint32_t block_num,
         offset += entry->rec_len;
     }
 
-    bcache_ent_unlock(ent);
+    bcache_ent_release(ent);
 
     if (modified)
         ext2_block_write(fs, ent, EXT2_PRIO_DIRENT);
@@ -67,7 +67,7 @@ static bool walk_indirect(struct ext2_fs *fs, uint32_t block_num, int level,
     if (!ptrs)
         return false;
 
-    bcache_ent_lock(ent);
+    bcache_ent_acquire(ent);
 
     for (uint32_t i = 0; i < PTRS_PER_BLOCK; ++i) {
         if (!ptrs[i] && ff_avail) {
@@ -77,7 +77,7 @@ static bool walk_indirect(struct ext2_fs *fs, uint32_t block_num, int level,
             inode->node.blocks += fs->block_size / fs->drive->sector_size;
             inode->node.size += fs->block_size;
 
-            bcache_ent_unlock(ent);
+            bcache_ent_release(ent);
             if (!ext2_block_write(fs, ent, EXT2_PRIO_DIRENT))
                 return false;
             return true;
@@ -88,19 +88,19 @@ static bool walk_indirect(struct ext2_fs *fs, uint32_t block_num, int level,
 
         if (level == 1) {
             if (walk_dir(fs, ptrs[i], cb, ctx)) {
-                bcache_ent_unlock(ent);
+                bcache_ent_release(ent);
                 return true;
             }
         } else {
             if (walk_indirect(fs, ptrs[i], level - 1, cb, ctx, ff_avail,
                               inode)) {
-                bcache_ent_unlock(ent);
+                bcache_ent_release(ent);
                 return true;
             }
         }
     }
 
-    bcache_ent_unlock(ent);
+    bcache_ent_release(ent);
     return false;
 }
 
@@ -148,7 +148,7 @@ static void traverse_indirect(struct ext2_fs *fs, struct ext2_inode *inode,
     if (!block)
         return;
 
-    bcache_ent_lock(ent);
+    bcache_ent_acquire(ent);
     uint32_t size = sizeof(uint32_t);
 
     for (uint32_t i = 0; i < fs->block_size / sizeof(uint32_t); i++) {
@@ -165,7 +165,7 @@ static void traverse_indirect(struct ext2_fs *fs, struct ext2_inode *inode,
         }
     }
 
-    bcache_ent_unlock(ent);
+    bcache_ent_release(ent);
     ext2_block_write(fs, ent, EXT2_PRIO_DIRENT);
 }
 

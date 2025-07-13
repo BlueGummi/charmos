@@ -22,8 +22,10 @@ struct readdir_ctx {
     uint32_t entry_offset;
     struct ext2_dir_entry *out;
     bool found;
+    uint32_t count;
 };
 
+/* TODO: Figure out how to return errors here in the case of a failed read */
 static bool search_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
                             void *ctx_ptr, uint32_t b, uint32_t e_num,
                             uint32_t offset) {
@@ -41,7 +43,14 @@ static bool search_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
         ctx->found = true;
         ctx->result->inode_num = e_num;
         ctx->type = entry->file_type;
-        ext2_inode_read(fs, entry->inode, &ctx->result->node);
+
+        struct ext2_inode *out = &ctx->result->node;
+        uint32_t ino = entry->inode;
+        struct bcache_entry *ent;
+
+        /* read `acquire()'s the node so we have to release it */
+        memcpy(out, ext2_inode_read(fs, ino, &ent), sizeof(struct ext2_inode));
+        bcache_ent_release(ent);
 
         return true;
     }
@@ -75,19 +84,20 @@ static bool contains_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
 static bool readdir_callback(struct ext2_fs *fs, struct ext2_dir_entry *entry,
                              void *ctx_ptr, uint32_t block, uint32_t entry_num,
                              uint32_t entry_offset) {
-    (void) fs, (void) block, (void) entry_num;
+    (void) fs, (void) block, (void) entry_num, (void) entry_offset;
 
     struct readdir_ctx *ctx = ctx_ptr;
 
     if (!ext2_dirent_valid(entry))
         return false;
 
-    if (entry_offset == ctx->entry_offset) {
+    if (ctx->count == ctx->entry_offset) {
         memcpy(ctx->out, entry, sizeof(struct ext2_dir_entry));
         ctx->found = true;
         return true;
     }
 
+    ctx->count++;
     return false;
 }
 
@@ -125,7 +135,8 @@ enum errno ext2_readdir(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
     if (!fs || !dir_inode || !out)
         return ERR_INVAL;
 
-    struct readdir_ctx ctx = {.out = out, .entry_offset = entry_offset};
+    struct readdir_ctx ctx = {
+        .out = out, .entry_offset = entry_offset, .count = 0};
 
     ext2_walk_dir(fs, dir_inode, readdir_callback, &ctx);
 

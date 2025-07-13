@@ -179,7 +179,7 @@ static void prefetch(struct generic_disk *disk, struct bcache *cache,
                                               prefetch_callback, pf, NULL);
 
     pf->cache = cache;
-    pf->new_entry = kmalloc(sizeof(struct bcache_entry));
+    pf->new_entry = kzalloc(sizeof(struct bcache_entry));
     struct bcache_entry *ent = pf->new_entry;
 
     ent->lba = lba;
@@ -203,7 +203,7 @@ static bool evict(struct bcache *cache, uint64_t spb) {
         if (!entry->occupied || !entry->value)
             continue;
 
-        if (entry->value->no_evict)
+        if (entry->value->no_evict || atomic_load(&entry->value->refcount) > 0)
             continue;
 
         if (entry->value->access_time < oldest) {
@@ -240,6 +240,7 @@ static void write_enqueue_cb(struct bio_request *req) {
 
     ent->dirty = false;
     ent->request = NULL;
+    bcache_ent_unpin(ent);
 
     kfree(req);
 }
@@ -255,6 +256,7 @@ static void write_queue(struct generic_disk *d, struct bcache_entry *ent,
     req->priority = prio;
     ent->request = req;
 
+    bcache_ent_pin(ent);
     bio_sched_enqueue(d, req);
 }
 
@@ -345,14 +347,6 @@ void *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
 
     uint64_t offset = (lba - base_lba) * disk->sector_size;
     return ent->buffer + offset;
-}
-
-void bcache_ent_lock(struct bcache_entry *ent) {
-    return spin_lock_no_cli(&ent->lock);
-}
-
-void bcache_ent_unlock(struct bcache_entry *ent) {
-    return spin_unlock_no_cli(&ent->lock);
 }
 
 void bcache_prefetch_async(struct generic_disk *disk, uint64_t lba,

@@ -61,9 +61,9 @@ enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     if (!block)
         return ERR_IO;
 
-    bcache_ent_lock(ent);
+    bcache_ent_acquire(ent);
     init_dot_ents(fs, block, parent_dir, dir);
-    bcache_ent_unlock(ent);
+    bcache_ent_release(ent);
 
     init_dir(fs, dir, new_block);
 
@@ -97,7 +97,7 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     if (!ent)
         return ERR_IO;
 
-    bcache_ent_lock(ent);
+    bcache_ent_acquire(ent);
 
     bool empty = true;
     uint32_t offset = 0;
@@ -117,7 +117,7 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
         offset += entry->rec_len;
     }
 
-    bcache_ent_unlock(ent);
+    bcache_ent_release(ent);
     if (!empty)
         return ERR_NOT_EMPTY;
 

@@ -200,7 +200,7 @@ struct ext2_inode {
 struct ext2_full_inode {
     struct ext2_inode node;
     uint32_t inode_num;
-    struct bcache_entry *ent;
+    struct mutex lock;
 };
 
 struct ext2_dir_entry {
@@ -261,8 +261,8 @@ enum errno ext2_mount(struct generic_partition *, struct ext2_fs *fs,
 
 struct vfs_node *ext2_g_mount(struct generic_partition *);
 
-struct bcache_entry *ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
-                                     struct ext2_inode *inode_out);
+struct ext2_inode *ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
+                                   struct bcache_entry **out_ent);
 
 bool ext2_inode_write(struct ext2_fs *fs, uint32_t inode_num,
                       const struct ext2_inode *inode);
@@ -379,10 +379,6 @@ void ext2_traverse_inode_blocks(struct ext2_fs *fs, struct ext2_inode *inode,
                                 bool readahead);
 
 void ext2_g_print(struct generic_partition *);
-
-void ext2_print_superblock(struct ext2_sblock *sblock);
-
-void ext2_print_inode(const struct ext2_full_inode *node);
 
 void ext2_dump_file_data(struct ext2_fs *fs, const struct ext2_inode *inode,
                          uint32_t start_block_index, uint32_t length);

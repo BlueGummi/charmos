@@ -67,18 +67,16 @@ static void unlink_adjust_neighbors(struct ext2_fs *fs, uint8_t *block,
     }
 }
 
-static void unlink_target_update(struct ext2_full_inode *target_inode,
-                                 uint32_t inode_num) {
-    target_inode->inode_num = inode_num;
-    target_inode->node.dtime = time_get_unix();
-    target_inode->node.links_count--;
+static void unlink_target_update(struct ext2_inode *target_inode) {
+    target_inode->dtime = time_get_unix();
+    target_inode->links_count--;
 }
 
 static void unlink_free_blocks(struct ext2_fs *fs,
-                               struct ext2_full_inode *target_inode,
+                               struct ext2_inode *target_inode,
                                uint32_t inode_num) {
-    ext2_traverse_inode_blocks(fs, &target_inode->node, free_block_visitor,
-                               NULL, false);
+    ext2_traverse_inode_blocks(fs, target_inode, free_block_visitor, NULL,
+                               false);
     ext2_free_inode(fs, inode_num);
 }
 
@@ -92,34 +90,34 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
     if (!ext2_walk_dir(fs, dir_inode, unlink_callback, &ctx))
         return ERR_FS_INTERNAL;
 
-    struct ext2_full_inode target_inode = {0};
-
     struct bcache_entry *ent;
     uint8_t *block = ext2_block_read(fs, ctx.block_num, &ent);
     if (!block)
         return ERR_IO;
 
-    bcache_ent_lock(ent);
-
+    bcache_ent_acquire(ent);
     unlink_adjust_neighbors(fs, block, ctx.entry_offset, ctx.prev_offset);
-
-    bcache_ent_unlock(ent);
+    bcache_ent_release(ent);
 
     if (!ext2_block_write(fs, ent, EXT2_PRIO_DIRENT))
         return ERR_IO;
 
-    if (!ext2_inode_read(fs, ctx.inode_num, &target_inode.node))
+    struct ext2_inode *target_inode = NULL;
+    target_inode = ext2_inode_read(fs, ctx.inode_num, &ent);
+
+    if (!ent || !target_inode)
         return ERR_IO;
 
-    if (target_inode.node.links_count == 0)
+    if (target_inode->links_count == 0)
         return ERR_FS_NO_INODE;
 
-    unlink_target_update(&target_inode, ctx.inode_num);
+    unlink_target_update(target_inode);
+    bcache_ent_release(ent);
 
-    if (target_inode.node.links_count == 0 && free_blocks)
-        unlink_free_blocks(fs, &target_inode, ctx.inode_num);
+    if (target_inode->links_count == 0 && free_blocks)
+        unlink_free_blocks(fs, target_inode, ctx.inode_num);
 
-    if (!ext2_inode_write(fs, ctx.inode_num, &target_inode.node))
+    if (!ext2_inode_write(fs, ctx.inode_num, target_inode))
         return ERR_IO;
 
     if (decrement_links)
