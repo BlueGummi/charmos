@@ -13,8 +13,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "misc/colors.h"
-
 struct disk_node {
     struct generic_disk *disk;
     struct disk_node *next;
@@ -130,21 +128,4 @@ void registry_setup() {
 
     k_info("VFS", K_INFO, "Root '%s' mounted - is a(n) %s filesystem",
            g_root_part, detect_fstr(g_root_node->fs_type));
-}
-
-void registry_print_devices() {
-    for (uint64_t i = 0; i < disk_count; i++) {
-        struct generic_disk *disk = registry_get_by_index(i);
-        k_printf("Disk %lu, \"" ANSI_GREEN "%s" ANSI_RESET
-                 "\" is a %s. Filesystem(s):\n",
-                 i, disk->name, get_generic_disk_str(disk->type));
-        disk->print(disk);
-        for (uint32_t j = 0; j < disk->partition_count; j++) {
-            struct generic_partition *p = &disk->partitions[j];
-
-            if (strcmp(p->name, g_root_part) != 0)
-                p->mount(p); // Do not remount root
-            p->print_fs(p);
-        }
-    }
 }

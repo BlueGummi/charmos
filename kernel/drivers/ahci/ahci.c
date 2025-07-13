@@ -94,7 +94,6 @@ struct generic_disk *ahci_create_generic(struct ahci_disk *disk) {
     d->read_sector = ahci_read_sector_wrapper;
     d->write_sector = ahci_write_sector_wrapper;
     d->submit_bio_async = ahci_submit_bio_request;
-    d->print = ahci_print_wrapper;
     d->cache = kzalloc(sizeof(struct bcache));
     d->scheduler = bio_sched_create(d, &ahci_sata_ssd_ops);
     bcache_init(d->cache, DEFAULT_BLOCK_CACHE_SIZE);

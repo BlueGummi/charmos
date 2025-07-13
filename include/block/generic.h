@@ -48,7 +48,6 @@ struct generic_partition {
     bool mounted;
 
     struct vfs_node *(*mount)(struct generic_partition *);
-    void (*print_fs)(struct generic_partition *);
 };
 
 enum disk_flags {
@@ -93,8 +92,6 @@ struct generic_disk {
     /* immediate asynchronous submission */
     bool (*submit_bio_async)(struct generic_disk *disk,
                              struct bio_request *bio);
-
-    void (*print)(struct generic_disk *disk); // this one for physical disk
 
     struct bio_scheduler_ops *ops;
     struct bio_scheduler *scheduler;

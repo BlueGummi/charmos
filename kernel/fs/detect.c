@@ -51,7 +51,6 @@ static void make_partition(struct generic_partition *part,
     snprintf(part->name, sizeof(part->name), "%sp%d", disk->name, idx);
 
     part->mount = NULL;
-    part->print_fs = NULL;
 }
 
 static bool detect_mbr_partitions(struct generic_disk *disk, uint8_t *sector) {
@@ -180,26 +179,14 @@ static enum fs_type detect_partition_fs(struct generic_disk *disk,
 
 static void assign_fs_ops(struct generic_partition *part) {
     switch (part->fs_type) {
-    case FS_EXT2:
-        part->mount = ext2_g_mount;
-        part->print_fs = ext2_g_print;
-        break;
+    case FS_EXT2: part->mount = ext2_g_mount; break;
     case FS_FAT12:
     case FS_FAT16:
-    case FS_FAT32:
-        part->mount = fat_g_mount;
-        part->print_fs = fat_g_print;
-        break;
-    case FS_ISO9660:
-        part->mount = iso9660_mount;
-        part->print_fs = iso9660_print;
-        break;
+    case FS_FAT32: part->mount = fat_g_mount; break;
+    case FS_ISO9660: part->mount = iso9660_mount; break;
     case FS_EXT3:
     case FS_EXT4:
-    default:
-        part->mount = dummy_mount;
-        part->print_fs = dummy_print;
-        break;
+    default: part->mount = dummy_mount; break;
     }
 }
 

@@ -67,14 +67,14 @@ static void unlink_adjust_neighbors(struct ext2_fs *fs, uint8_t *block,
     }
 }
 
-static void unlink_target_update(struct ext2_inode *target_inode) {
+static inline void unlink_target_update(struct ext2_inode *target_inode) {
     target_inode->dtime = time_get_unix();
     target_inode->links_count--;
 }
 
-static void unlink_free_blocks(struct ext2_fs *fs,
-                               struct ext2_inode *target_inode,
-                               uint32_t inode_num) {
+static inline void unlink_free_blocks(struct ext2_fs *fs,
+                                      struct ext2_inode *target_inode,
+                                      uint32_t inode_num) {
     ext2_traverse_inode_blocks(fs, target_inode, free_block_visitor, NULL,
                                false);
     ext2_free_inode(fs, inode_num);

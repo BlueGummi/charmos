@@ -159,7 +159,6 @@ struct generic_disk *ide_create_generic(struct ata_drive *ide) {
     d->write_sector = ide_write_sector_wrapper;
     d->submit_bio_async = ide_submit_bio_async;
 
-    d->print = ide_print_info;
     d->flags = DISK_FLAG_NO_COALESCE | DISK_FLAG_NO_REORDER;
 
     d->cache = kzalloc(sizeof(struct bcache));

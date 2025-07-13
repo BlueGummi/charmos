@@ -1,8 +1,8 @@
 #include <asm.h>
-#include <console/printf.h>
-#include <drivers/ata.h>
 #include <block/bcache.h>
 #include <block/generic.h>
+#include <console/printf.h>
+#include <drivers/ata.h>
 #include <mem/alloc.h>
 #include <sleep.h>
 #include <stdbool.h>
@@ -145,7 +145,6 @@ struct generic_disk *atapi_create_generic(struct ata_drive *d) {
     ret->sector_size = 2048;
     ret->read_sector = atapi_read_sector_wrapper;
     ret->write_sector = atapi_write_sector;
-    ret->print = atapi_print_info;
     ret->type = G_ATAPI_DRIVE;
     ret->cache = kmalloc(sizeof(struct bcache));
     bcache_init(ret->cache, DEFAULT_BLOCK_CACHE_SIZE);
