@@ -273,7 +273,7 @@ void *krealloc(void *ptr, uint64_t size) {
     if (!ptr)
         return kmalloc(size);
 
-    void *new_ptr = kmalloc(size);
+    void *new_ptr = kzalloc(size);
 
     if (!new_ptr)
         return NULL;

@@ -89,7 +89,7 @@ static uint32_t try_find_slot(struct ahci_full_port *p) {
                                                  new_bitmap)) {
                     return slot;
                 }
-                break; // someone changed bitmap, retry outer loop
+                break;
             }
         }
         return (uint32_t) -1; // no free slot found

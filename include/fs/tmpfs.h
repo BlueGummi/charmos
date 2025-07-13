@@ -14,9 +14,9 @@ struct tmpfs_node {
     enum tmpfs_type type;
     char *name;
 
-    void **pages;        // array of page pointers
-    uint64_t num_pages;  // number of allocated pages
-    uint64_t size;       // total file size
+    void **pages;       // array of page pointers
+    uint64_t num_pages; // number of allocated pages
+    uint64_t size;      // total file size
 
     char *symlink_target;
     uint16_t mode;
@@ -37,6 +37,6 @@ struct tmpfs_fs {
 
 #define TMPFS_PAGE_SIZE 4096
 #define TMPFS_PAGE_SHIFT 12
-#define TMPFS_PAGE_MASK  (TMPFS_PAGE_SIZE - 1)
+#define TMPFS_PAGE_MASK (TMPFS_PAGE_SIZE - 1)
 
 struct vfs_node *tmpfs_mkroot(const char *mount_point);

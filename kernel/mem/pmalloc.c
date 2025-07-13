@@ -1,5 +1,6 @@
 #include <console/printf.h>
 #include <mem/alloc.h>
+#include <mem/pmm.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -17,15 +18,22 @@ static uint8_t *bitmap;
 static uint64_t last_allocated_index = 0;
 
 static void set_bit(uint64_t index) {
-    bitmap[index / 8] |= (1 << (index % 8));
+    uint64_t byte = index / 8;
+    uint8_t mask = 1 << (index % 8);
+    __atomic_fetch_or(&bitmap[byte], mask, __ATOMIC_SEQ_CST);
 }
 
 static void clear_bit(uint64_t index) {
-    bitmap[index / 8] &= ~(1 << (index % 8));
+    uint64_t byte = index / 8;
+    uint8_t mask = ~(1 << (index % 8));
+    __atomic_fetch_and(&bitmap[byte], mask, __ATOMIC_SEQ_CST);
 }
 
 static bool test_bit(uint64_t index) {
-    return (bitmap[index / 8] & (1 << (index % 8))) != 0;
+    uint64_t byte = index / 8;
+    uint8_t value;
+    __atomic_load(&bitmap[byte], &value, __ATOMIC_SEQ_CST);
+    return (value & (1 << (index % 8))) != 0;
 }
 
 static uint64_t offset = 0;
@@ -87,36 +95,13 @@ void pmm_dyn_init() {
 }
 
 void *pmm_alloc_page(bool add_offset) {
-
-    for (uint64_t i = last_allocated_index; i < bitmap_size * 8; i++) {
-        if (!test_bit(i)) {
-            last_allocated_index = i;
-            set_bit(i);
-            void *page = (void *) ((add_offset ? offset : 0) + (i * PAGE_SIZE));
-            return page;
-        }
-    }
-
-    for (uint64_t i = 0; i < bitmap_size * 8; i++) {
-        if (!test_bit(i)) {
-            last_allocated_index = i;
-            set_bit(i);
-            void *page = (void *) ((add_offset ? offset : 0) + (i * PAGE_SIZE));
-            return page;
-        }
-    }
-
-    return NULL;
+    return pmm_alloc_pages(1, add_offset);
 }
 
 void *pmm_alloc_pages(uint64_t count, bool add_offset) {
 
     if (count == 0) {
         return NULL;
-    }
-
-    if (count == 1) {
-        return pmm_alloc_page(add_offset);
     }
 
     uint64_t consecutive = 0;

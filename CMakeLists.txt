@@ -5,7 +5,7 @@ set(CMAKE_C_STANDARD 11)
 set(ARCH "x86_64")
 set(IMAGE_NAME "charmos-${ARCH}")
 
-set(KERNEL_COMMON_FLAGS "-O2 -pipe -Wall -Wextra -Wpointer-sign -Wenum-compare -ffreestanding -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -mno-red-zone -fno-stack-protector -fno-omit-frame-pointer -fno-stack-check -fno-PIC -ffunction-sections -fdata-sections  -m64 -mcmodel=kernel -mgeneral-regs-only -DLIMINE_API_REVISION=2 -Wno-address-of-packed-member -Wno-unused-command-line-argument -ggdb") 
+set(KERNEL_COMMON_FLAGS "-O2 -pipe -Wall -Wextra -Wpointer-sign -Wenum-compare -ffreestanding -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -mno-red-zone -fno-stack-protector -fno-omit-frame-pointer -fno-stack-check -fno-PIC -ffunction-sections -fdata-sections  -m64 -mcmodel=kernel -mgeneral-regs-only -DLIMINE_API_REVISION=2 -Wno-address-of-packed-member -Wno-unused-command-line-argument -ggdb -fsanitize=undefined") 
 
 set(CMAKE_C_FLAGS "${KERNEL_COMMON_FLAGS} -std=gnu11")
 
@@ -63,8 +63,8 @@ set(QEMU_COMMON_FLAGS
     -M q35
     -device usb-mouse,bus=xhci.0,id=usbmouse
 
-    #-drive id=nvme0,file=disk.img,format=raw,if=none
-    #-device nvme,serial=boom,drive=disk0,drive=nvme0#,num_queues=4
+     -drive id=nvme0,file=disk.img,format=raw,if=none
+     -device nvme,serial=boom,drive=disk0,drive=nvme0#,num_queues=4
 
      #-drive id=fatdisk,file=fat32.img,format=raw,if=none
      #-device nvme,serial=yay,drive=fatdisk
@@ -75,9 +75,9 @@ set(QEMU_COMMON_FLAGS
      #-drive id=fatdisk,file=disk.img,format=raw,if=none
      #-device ide-hd,drive=fatdisk,bus=ide.0
      
-     -drive id=fatdisk,file=disk.img,format=raw,if=none
-     -device ahci,id=ahci0
-     -device ide-hd,drive=fatdisk,bus=ahci0.3
+     #-drive id=fatdisk,file=disk.img,format=raw,if=none
+     #-device ahci,id=ahci0
+     #-device ide-hd,drive=fatdisk,bus=ahci0.3
 
 
      #-d trace:*ahci*

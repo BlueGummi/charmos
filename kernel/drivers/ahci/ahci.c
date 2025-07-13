@@ -68,7 +68,7 @@ static struct bio_scheduler_ops ahci_sata_ssd_ops = {
             [BIO_RQ_HIGH] = 10,
             [BIO_RQ_URGENT] = 0,
         },
-    .dispatch_threshold = 96,
+    .dispatch_threshold = 48,
     .boost_occupance_limit =
         {
             [BIO_RQ_BACKGROUND] = 80,
