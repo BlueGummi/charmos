@@ -57,7 +57,8 @@ REGISTER_TEST(bio_sched_coalesce_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
     struct ext2_fs *fs = root->fs_data;
     struct generic_disk *d = fs->drive;
 
-    struct bio_request bio = {
+    struct bio_request *bio = kmalloc(sizeof(*bio));
+    *bio = (struct bio_request) {
         .lba = 0,
         .disk = d,
         .buffer = kmalloc_aligned(512, 4096),
@@ -71,7 +72,8 @@ REGISTER_TEST(bio_sched_coalesce_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
         .user_data = (void *) BIO_RQ_MEDIUM,
     };
 
-    struct bio_request bio2 = {
+    struct bio_request *bio2 = kmalloc(sizeof(*bio2));
+    *bio2 = (struct bio_request) {
         .lba = 1,
         .disk = d,
         .buffer = kmalloc_aligned(512, 4096),
@@ -87,13 +89,13 @@ REGISTER_TEST(bio_sched_coalesce_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
 
     char *name = kmalloc(100);
     uint64_t t = time_get_us();
-    bio_sched_enqueue(d, &bio);
-    bio_sched_enqueue(d, &bio2);
+    bio_sched_enqueue(d, bio);
+    bio_sched_enqueue(d, bio2);
     snprintf(name, 100, "enqueues took %d us", time_get_us() - t);
     ADD_MESSAGE(name);
 
     bio_sched_dispatch_all(d);
-    sleep_ms(2);
+    sleep_ms(20);
     TEST_ASSERT(cb1d && cb2d);
     SET_SUCCESS;
 }

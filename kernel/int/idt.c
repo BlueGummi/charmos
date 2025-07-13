@@ -192,9 +192,9 @@ void idt_install(uint64_t ind) {
 
     idt_set_gate(SSF_ID, (uint64_t) ss_handler, 0x08, 0x8E, ind);
 
-    idt_set_gate(GPF_ID, (uint64_t) gpf_handler, 0x08, 0x8E, ind);
+    /*idt_set_gate(GPF_ID, (uint64_t) gpf_handler, 0x08, 0x8E, ind);
     idt_set_gate(DBF_ID, (uint64_t) double_fault_handler, 0x08, 0x8E, ind);
-    idt_set_gate(PAGE_FAULT_ID, (uint64_t) page_fault_handler, 0x08, 0x8E, ind);
+    idt_set_gate(PAGE_FAULT_ID, (uint64_t) page_fault_handler, 0x08, 0x8E, ind);*/
 
     idt_set_gate(TIMER_ID, (uint64_t) isr_timer_routine, 0x08, 0x8E, ind);
 
