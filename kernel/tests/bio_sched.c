@@ -95,15 +95,13 @@ REGISTER_TEST(bio_sched_coalesce_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
     ADD_MESSAGE(name);
 
     bio_sched_dispatch_all(d);
-    sleep_ms(20);
+    sleep_ms(200);
     TEST_ASSERT(cb1d && cb2d);
     SET_SUCCESS;
 }
 
 REGISTER_TEST(bio_sched_delay_enqueue_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
     EXT2_INIT;
-    SET_SKIP;
-    return;
     struct ext2_fs *fs = root->fs_data;
     struct generic_disk *d = fs->drive;
 
@@ -141,6 +139,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
     char *msg = kmalloc(100);
     snprintf(msg, 100, "Total time spent enqueuing is %d ms", ms);
     ADD_MESSAGE(msg);
+    bio_sched_dispatch_all(d);
     sleep_ms(400);
 
     for (uint64_t i = 0; i < BIO_SCHED_LEVELS; i++) {

@@ -114,12 +114,18 @@
 /* max to scan before bail */
 #define BIO_SCHED_COALESCE_SCAN_LIMIT 8
 
+#define BIO_SCHED_BOOST_SCAN_LIMIT 32
+
+#define BIO_SCHED_MAX_BOOST_SCAN 1024
+
 /* max coalesces in one enqueue() */
 #define BIO_SCHED_MAX_COALESCES 4
 
 struct bio_rqueue {
     struct bio_request *head;
     struct bio_request *tail;
+    struct bio_request *last_boosted;
+
     uint64_t request_count;
 
     /* coalescing */
