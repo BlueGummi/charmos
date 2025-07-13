@@ -108,8 +108,10 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
     if (!ent || !target_inode)
         return ERR_IO;
 
-    if (target_inode->links_count == 0)
+    if (target_inode->links_count == 0) {
+        bcache_ent_release(ent);
         return ERR_FS_NO_INODE;
+    }
 
     unlink_target_update(target_inode);
     bcache_ent_release(ent);
