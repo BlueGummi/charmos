@@ -238,12 +238,11 @@ void *kzalloc(uint64_t size) {
     return ptr;
 }
 
-static struct spinlock kfree_lock = SPINLOCK_INIT;
 void kfree(void *ptr) {
     if (!ptr)
         return;
 
-    bool i = spin_lock(&kfree_lock);
+    bool i = spin_lock(&kmalloc_lock);
     struct slab_phdr *hdr =
         (struct slab_phdr *) ((uint8_t *) ptr - sizeof(struct slab_phdr));
 
@@ -253,20 +252,20 @@ void kfree(void *ptr) {
             pmm_free_pages((void *) vmm_get_phys(virt + i * PAGE_SIZE), 1,
                            false);
         }
-        spin_unlock(&kfree_lock, i);
+        spin_unlock(&kmalloc_lock, i);
         return;
     }
 
     void *raw_obj = (uint8_t *) ptr - sizeof(struct slab *);
     struct slab *slab = *((struct slab **) raw_obj);
     if (!slab) {
-        spin_unlock(&kfree_lock, i);
+        spin_unlock(&kmalloc_lock, i);
         return;
     }
 
     struct slab_cache *cache = slab->parent_cache;
     slab_free(cache, slab, ptr);
-    spin_unlock(&kfree_lock, i);
+    spin_unlock(&kmalloc_lock, i);
 }
 
 void *krealloc(void *ptr, uint64_t size) {
