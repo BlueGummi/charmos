@@ -86,6 +86,8 @@ REGISTER_TEST(bio_sched_coalesce_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
         .priority = BIO_RQ_MEDIUM,
         .user_data = (void *) BIO_RQ_MEDIUM,
     };
+    bio->on_complete = bio_sch_callback1;
+    bio2->on_complete = bio_sch_callback2;
 
     char *name = kmalloc(100);
     uint64_t t = time_get_us();

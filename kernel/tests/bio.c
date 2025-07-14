@@ -34,7 +34,8 @@ REGISTER_TEST(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     uint64_t run_times = 1;
 
     for (uint64_t i = 0; i < run_times; i++) {
-        struct bio_request bio = {
+        struct bio_request *bio = kmalloc(sizeof(struct bio_request));
+        *bio = (struct bio_request) {
             .lba = 0,
             .buffer = kmalloc_aligned(512 * 512, 4096),
             .size = 512 * 512,
@@ -52,17 +53,17 @@ REGISTER_TEST(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
             return;
         }
 
-        bool submitted = d->submit_bio_async(d, &bio);
+        bool submitted = d->submit_bio_async(d, bio);
         if (!submitted) {
-            kfree_aligned(bio.buffer);
+            kfree_aligned(bio->buffer);
             SET_FAIL;
             return;
         }
 
         sleep_ms(500);
 
-        TEST_ASSERT(bio.status == 0);
-        kfree_aligned(bio.buffer);
+        TEST_ASSERT(bio->status == 0);
+        kfree_aligned(bio->buffer);
     }
     TEST_ASSERT(done == true);
     TEST_ASSERT(current_test->message_count == run_times);

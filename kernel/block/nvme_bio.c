@@ -44,6 +44,12 @@ static void nvme_on_bio_complete(struct nvme_request *req) {
      * rename this */
     handle_coalesces(req, bio);
 
+    /* TODO: HACK used here to avoid jumping to invalid code */
+    if ((uint64_t) bio->on_complete < 0xffffffff80000000) {
+        kfree(req);
+        return;
+    }
+
     if (bio->on_complete)
         bio->on_complete(bio);
 
@@ -52,7 +58,7 @@ static void nvme_on_bio_complete(struct nvme_request *req) {
 
 bool nvme_submit_bio_request(struct generic_disk *disk,
                              struct bio_request *bio) {
-    struct nvme_request *req = kmalloc(sizeof(struct nvme_request));
+    struct nvme_request *req = kzalloc(sizeof(struct nvme_request));
     if (!req)
         return false;
 

@@ -188,7 +188,7 @@ static void prefetch(struct generic_disk *disk, struct bcache *cache,
     ent->no_evict = false;
     ent->buffer = req->buffer;
 
-    disk->submit_bio_async(disk, req);
+    bio_sched_enqueue(disk, req);
 }
 
 static bool evict(struct bcache *cache, uint64_t spb) {
