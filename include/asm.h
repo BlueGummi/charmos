@@ -231,3 +231,33 @@ static inline void cpu_relax(void) {
 }
 
 #pragma once
+
+#define compiler_barrier() __asm__ __volatile__("" ::: "memory")
+
+#if defined(__x86_64__) || defined(__i386__)
+
+#define memory_barrier() __asm__ __volatile__("mfence" ::: "memory")
+#define memory_barrier_acquire()                                               \
+    compiler_barrier() // loads are never reordered after loads
+#define memory_barrier_release()                                               \
+    compiler_barrier() // stores before stores guaranteed
+
+#elif defined(__aarch64__)
+
+#define memory_barrier() __asm__ __volatile__("dsb sy" ::: "memory")
+#define memory_barrier_acquire() __asm__ __volatile__("dmb ishld" ::: "memory")
+#define memory_barrier_release() __asm__ __volatile__("dmb ishst" ::: "memory")
+
+#elif defined(__riscv)
+
+#define memory_barrier() __asm__ __volatile__("fence iorw, iorw" ::: "memory")
+#define memory_barrier_acquire()                                               \
+    __asm__ __volatile__("fence ir, ir" ::: "memory")
+#define memory_barrier_release()                                               \
+    __asm__ __volatile__("fence ow, ow" ::: "memory")
+
+#else
+#error "Unsupported architecture for memory barriers"
+#endif
+
+#pragma once
