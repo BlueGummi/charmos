@@ -104,15 +104,15 @@ static inline void bcache_ent_pin(struct bcache_entry *ent) {
 }
 
 static inline void bcache_ent_unpin(struct bcache_entry *ent) {
-    refcount_dec(&ent->refcount);
+    refcount_dec_and_test(&ent->refcount);
 }
 
 static inline void bcache_ent_acquire(struct bcache_entry *ent) {
-    refcount_inc(&ent->refcount);
+    bcache_ent_pin(ent);
     bcache_ent_lock(ent);
 }
 
 static inline void bcache_ent_release(struct bcache_entry *ent) {
-    refcount_dec(&ent->refcount);
+    bcache_ent_unpin(ent);
     bcache_ent_unlock(ent);
 }

@@ -155,7 +155,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
     char *m2 = kmalloc(100);
     snprintf(m2, 100, "Runs is %d, test_runs is %d", runs, test_runs);
     ADD_MESSAGE(m2);
-    TEST_ASSERT(runs == test_runs);
+    TEST_ASSERT(atomic_load(&runs) == test_runs);
 
     SET_SUCCESS;
 }
