@@ -153,11 +153,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
         ADD_MESSAGE(msg);
     }
 
-    struct bio_scheduler *s = d->scheduler;
     sleep_ms(2000);
-    k_printf("q's are 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx\n", s->queues[0].head,
-             s->queues[1].head, s->queues[2].head, s->queues[3].head,
-             s->queues[4].head);
 
     char *m2 = kmalloc(100);
     snprintf(m2, 100, "Runs is %d, test_runs is %d", runs, test_runs);
