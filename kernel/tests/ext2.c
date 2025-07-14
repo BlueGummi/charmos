@@ -18,6 +18,9 @@ static void flush() {
     struct ext2_fs *fs = g_root_node->fs_data;
     struct generic_disk *d = fs->drive;
 
+    if (d == (void*)0x20)
+        k_panic("Yo...\n");
+
     bio_sched_dispatch_all(d);
 }
 

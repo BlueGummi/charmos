@@ -88,6 +88,6 @@ struct bio_scheduler *bio_sched_create(struct generic_disk *disk,
     struct bio_scheduler *sched = kzalloc(sizeof(struct bio_scheduler));
     sched->disk = disk;
     disk->ops = ops;
-    disk->scheduler = sched;
+
     return sched;
 }
