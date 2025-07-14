@@ -86,6 +86,7 @@ REGISTER_TEST(bio_sched_coalesce_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
         .priority = BIO_RQ_MEDIUM,
         .user_data = (void *) BIO_RQ_MEDIUM,
     };
+
     bio->on_complete = bio_sch_callback1;
     bio2->on_complete = bio_sch_callback2;
 
@@ -98,6 +99,7 @@ REGISTER_TEST(bio_sched_coalesce_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
 
     bio_sched_dispatch_all(d);
     sleep_ms(200);
+
     TEST_ASSERT(cb1d && cb2d);
     SET_SUCCESS;
 }
@@ -142,7 +144,6 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
     snprintf(msg, 100, "Total time spent enqueuing is %d ms", ms);
     ADD_MESSAGE(msg);
     bio_sched_dispatch_all(d);
-    sleep_ms(400);
 
     for (uint64_t i = 0; i < BIO_SCHED_LEVELS; i++) {
         avg_complete_time[i] = total_complete_time[i] / runs_per_lvl[i];
@@ -152,10 +153,16 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
         ADD_MESSAGE(msg);
     }
 
+    struct bio_scheduler *s = d->scheduler;
+    sleep_ms(2000);
+    k_printf("q's are 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx\n", s->queues[0].head,
+             s->queues[1].head, s->queues[2].head, s->queues[3].head,
+             s->queues[4].head);
+
     char *m2 = kmalloc(100);
     snprintf(m2, 100, "Runs is %d, test_runs is %d", runs, test_runs);
     ADD_MESSAGE(m2);
-    TEST_ASSERT(atomic_load(&runs) == test_runs);
+    TEST_ASSERT(runs == test_runs);
 
     SET_SUCCESS;
 }

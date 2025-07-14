@@ -81,38 +81,32 @@ static inline bool try_boost(struct bio_scheduler *sched,
 bool bio_sched_boost_starved(struct bio_scheduler *sched) {
     bool boosted_any = false;
 
-    uint64_t checks_left = sched->total_requests / BIO_SCHED_BOOST_SCAN_LIMIT;
-
-    if (checks_left > BIO_SCHED_MAX_BOOST_SCAN)
-        checks_left = BIO_SCHED_MAX_BOOST_SCAN;
-
-    for (uint64_t i = 0; i < BIO_SCHED_LEVELS; i++) {
+    for (int64_t i = BIO_RQ_HIGH; i >= 0; i--) {
         struct bio_rqueue *queue = &sched->queues[i];
-        struct bio_request *iter = queue->last_boosted ?: queue->head;
+        struct bio_request *iter = queue->head;
 
         if (!iter)
             continue;
 
+        uint64_t checks_left = queue->request_count;
+
+        if (checks_left > BIO_SCHED_MAX_BOOST_SCAN)
+            checks_left = BIO_SCHED_MAX_BOOST_SCAN;
+
         struct bio_request *start = iter;
         do {
-            struct bio_request *next = iter->next;
-            checks_left--;
-            if (checks_left == 0)
-                goto out;
-
-            if (!iter->skip && try_boost(sched, iter)) {
-                queue->last_boosted = iter;
+            if (!iter->skip && try_boost(sched, iter))
                 goto next_level;
-            }
 
-            iter = next;
+            if (--checks_left == 0)
+                goto next_level;
 
+            iter = iter->next;
         } while (iter && iter != start);
 
     next_level:
         continue;
     }
 
-out:
     return boosted_any;
 }

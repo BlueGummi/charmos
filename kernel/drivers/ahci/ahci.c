@@ -62,19 +62,19 @@ static struct bio_scheduler_ops ahci_sata_ssd_ops = {
     .do_coalesce = noop_do_coalesce,
     .max_wait_time =
         {
-            [BIO_RQ_BACKGROUND] = 50,
+            [BIO_RQ_BACKGROUND] = 30,
             [BIO_RQ_LOW] = 20,
             [BIO_RQ_MEDIUM] = 15,
             [BIO_RQ_HIGH] = 10,
             [BIO_RQ_URGENT] = 0,
         },
-    .dispatch_threshold = 48,
+    .dispatch_threshold = 96,
     .boost_occupance_limit =
         {
-            [BIO_RQ_BACKGROUND] = 80,
-            [BIO_RQ_LOW] = 60,
-            [BIO_RQ_MEDIUM] = 50,
-            [BIO_RQ_HIGH] = 40,
+            [BIO_RQ_BACKGROUND] = 50,
+            [BIO_RQ_LOW] = 40,
+            [BIO_RQ_MEDIUM] = 30,
+            [BIO_RQ_HIGH] = 20,
             [BIO_RQ_URGENT] = 8,
         },
     .min_wait_ms = 2,
