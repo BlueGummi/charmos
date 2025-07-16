@@ -1,6 +1,7 @@
 #pragma once
 #include <console/printf.h>
 #include <errno.h>
+#include <mem/alloc.h>
 #include <stdbool.h>
 
 typedef void (*test_fn_t)(void);

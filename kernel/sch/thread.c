@@ -1,6 +1,8 @@
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
+#include <sch/reaper.h>
+#include <sch/sched.h>
 #include <sch/thread.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -10,17 +12,21 @@ uint64_t globid = 1;
 
 #define STACK_SIZE (PAGE_SIZE * 16)
 
-static void thread_exit(void) {
-    k_printf("Thread has exited!\n");
-    while (1)
-        asm("hlt");
+static void thread_exit() {
+    disable_interrupts();
+    struct thread *self = scheduler_get_curr_thread();
+
+    self->state = ZOMBIE;
+    reaper_enqueue(self);
+    enable_interrupts();
+
+    scheduler_yield();
 }
 
 struct thread *thread_create(void (*entry_point)(void)) {
     struct thread *new_thread =
         (struct thread *) kzalloc(sizeof(struct thread));
-    uint64_t stack_phys = (uint64_t) pmm_alloc_pages(16, false);
-    void *stack = vmm_map_phys(stack_phys, PAGE_SIZE * 16, 0);
+    void *stack = kmalloc_aligned(STACK_SIZE, PAGE_SIZE);
     uint64_t stack_top = (uint64_t) stack + STACK_SIZE;
     uint64_t *sp = (uint64_t *) stack_top;
 
@@ -40,6 +46,9 @@ struct thread *thread_create(void (*entry_point)(void)) {
 }
 
 void thread_free(struct thread *t) {
+    t->prev = NULL;
+    t->next = NULL;
+    kfree_aligned(t->stack);
     kfree(t);
 }
 

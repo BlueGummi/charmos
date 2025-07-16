@@ -4,6 +4,10 @@
 
 static struct thread_reaper reaper = {0};
 static struct thread *reaper_thread = NULL;
+static void wake_reaper(void *arg) {
+    (void) arg;
+    scheduler_wake(reaper_thread);
+}
 
 void reaper_enqueue(struct thread *t) {
     bool i = spin_lock(&reaper.lock);
@@ -19,12 +23,10 @@ void reaper_enqueue(struct thread *t) {
         reaper.queue.tail = t;
     }
 
-    spin_unlock(&reaper.lock, i);
-}
+    if (reaper_thread->state == SLEEPING)
+        wake_reaper(NULL);
 
-static void wake_reaper(void *arg) {
-    (void) arg;
-    scheduler_wake(reaper_thread);
+    spin_unlock(&reaper.lock, i);
 }
 
 void reaper_init(void) {
@@ -46,12 +48,11 @@ void reaper_thread_main() {
 
             /* bye bye */
             t->state = TERMINATED;
-            t->prev = NULL;
-            t->next = NULL;
 
             struct thread *next = t->next;
             thread_free(t);
             t = next;
+            reaper.reaped_threads++;
         }
 
         disable_interrupts();
@@ -64,4 +65,8 @@ void reaper_thread_main() {
 
         scheduler_yield();
     }
+}
+
+uint64_t reaper_get_reaped_thread_count(void) {
+    return reaper.reaped_threads;
 }
