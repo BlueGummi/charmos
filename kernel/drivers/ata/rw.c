@@ -4,6 +4,7 @@
 #include <console/printf.h>
 #include <drivers/ata.h>
 #include <mem/alloc.h>
+#include <misc/sll.h>
 #include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -157,14 +158,7 @@ static void enqueue_request(struct ide_channel *chan, struct ide_request *req,
     if (!locked)
         i = spin_lock(&chan->lock);
 
-    if (!chan->head) {
-        chan->head = req;
-        chan->tail = req;
-    } else {
-        req->next = NULL;
-        chan->tail->next = req;
-        chan->tail = req;
-    }
+    sll_add(chan, req);
 
     if (!locked)
         spin_unlock(&chan->lock, i);
