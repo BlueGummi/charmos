@@ -30,9 +30,7 @@ void reaper_enqueue(struct thread *t) {
 }
 
 void reaper_init(void) {
-    struct thread *t = thread_create(reaper_thread_main);
-    scheduler_enqueue(t);
-    reaper_thread = t;
+    reaper_thread = thread_spawn(reaper_thread_main);
 }
 
 void reaper_thread_main() {

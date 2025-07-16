@@ -54,5 +54,12 @@ void thread_queue_push_back(struct thread_queue *q, struct thread *t);
 struct thread *thread_queue_pop_front(struct thread_queue *q);
 void thread_queue_clear(struct thread_queue *q);
 void thread_queue_remove(struct thread_queue *q, struct thread *t);
+void scheduler_enqueue(struct thread *t);
+
+static inline struct thread *thread_spawn(void (*entry)(void)) {
+    struct thread *t = thread_create(entry);
+    scheduler_enqueue(t);
+    return t;
+}
 
 #pragma once

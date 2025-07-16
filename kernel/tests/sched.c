@@ -13,8 +13,7 @@ static void testfn(void) {
 
 REGISTER_TEST(sched_reaper_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     uint64_t reaped_threads_at_start = reaper_get_reaped_thread_count();
-    struct thread *t = thread_create(testfn);
-    scheduler_enqueue(t);
+    thread_spawn(testfn);
     enable_interrupts();
 
     while (!ran)
