@@ -30,15 +30,17 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *thread,
                           bool is_new_thread);
 void scheduler_rm_thread(struct scheduler *sched, struct thread *thread,
                          bool change_interrupts, bool already_locked);
-void schedule(struct cpu_state *cpu);
-void k_sch_main();
-void k_sch_idle();
+void schedule(void);
+void k_sch_main(void);
+void k_sch_idle(void);
 void scheduler_enable_timeslice();
 void scheduler_yield();
 void scheduler_enqueue(struct thread *t);
 void scheduler_put_back(struct thread *t);
 void scheduler_wake(struct thread *t);
 void scheduler_take_out(struct thread *t);
+void switch_context(struct context *old, struct context *new);
+void load_context(struct context *new);
 
 bool scheduler_can_steal_work(struct scheduler *sched);
 uint64_t compute_steal_threshold(uint64_t threads, uint64_t core_count);

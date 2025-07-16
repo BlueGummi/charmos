@@ -32,6 +32,7 @@ REGISTER_TEST(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct ext2_fs *fs = root->fs_data;
     struct generic_disk *d = fs->drive;
     uint64_t run_times = 1;
+    enable_interrupts();
 
     for (uint64_t i = 0; i < run_times; i++) {
         struct bio_request *bio = kmalloc(sizeof(struct bio_request));

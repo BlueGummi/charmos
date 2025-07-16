@@ -73,7 +73,8 @@ void wakeup() {
         scheduler_get_core_count())
         mp_ready = true;
 
-    asm("sti");
+    restore_interrupts();
+    scheduler_yield();
     while (1)
         asm("hlt");
 }

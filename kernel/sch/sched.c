@@ -8,7 +8,6 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <string.h>
 #include <tests.h>
 
 #include "mp/core.h"
@@ -48,6 +47,7 @@ void k_sch_main() {
 
 void k_sch_idle() {
     while (1) {
+        restore_interrupts();
         asm volatile("hlt");
     }
 }
@@ -77,14 +77,9 @@ static inline void stop_steal(struct scheduler *sched,
     end_steal();
 }
 
-static void scheduler_save_thread(struct scheduler *sched, struct thread *curr,
-                                  struct cpu_state *cpu) {
-    if (curr) {
-        memcpy(&curr->regs, cpu, sizeof(struct cpu_state));
-
-        if (curr->state != RUNNING)
-            return;
-
+static void scheduler_save_thread(struct scheduler *sched,
+                                  struct thread *curr) {
+    if (curr && curr->state == RUNNING) {
         curr->curr_core = -1;
         curr->time_in_level++;
         uint8_t level = curr->mlfq_level;
@@ -155,11 +150,9 @@ static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {
     return NULL;
 }
 
-static void load_thread(struct scheduler *sched, struct thread *next,
-                        struct cpu_state *cpu) {
+static void load_thread(struct scheduler *sched, struct thread *next) {
     if (next) {
         sched->current = next;
-        memcpy(cpu, &next->regs, sizeof(struct cpu_state));
         next->state = RUNNING;
         next->curr_core = get_sch_core_id();
     } else {
@@ -172,7 +165,10 @@ static inline void disable_timeslice() {
 }
 
 void scheduler_yield() {
-    asm volatile("int $0x20");
+    bool were_enabled = are_interrupts_enabled();
+    schedule();
+    if (were_enabled)
+        enable_interrupts();
 }
 
 void scheduler_enable_timeslice() {
@@ -202,7 +198,7 @@ static bool all_threads_unrunnable(struct scheduler *sched) {
 }
 
 /* Resource locks in here do not enable interrupts */
-void schedule(struct cpu_state *cpu) {
+void schedule(void) {
     uint64_t core_id = get_sch_core_id();
     struct scheduler *sched = local_schs[core_id];
 
@@ -211,6 +207,7 @@ void schedule(struct cpu_state *cpu) {
     struct thread *curr = sched->current;
     struct thread *next = NULL;
     struct scheduler *victim = NULL;
+    struct thread *prev = sched->current;
 
     /* skip */
     if (!sched->active)
@@ -220,7 +217,7 @@ void schedule(struct cpu_state *cpu) {
     maybe_recompute_threshold(core_id);
 
     /* re-insert the running thread to its new level */
-    scheduler_save_thread(sched, curr, cpu);
+    scheduler_save_thread(sched, curr);
 
     /* check if we can steal */
     if (!scheduler_can_steal_work(sched))
@@ -254,7 +251,7 @@ regular_schedule:
     next = scheduler_pick_regular_thread(sched);
 
 load_new_thread:
-    load_thread(sched, next, cpu);
+    load_thread(sched, next);
 
     update_core_current_thread(next);
 
@@ -269,6 +266,11 @@ load_new_thread:
 end:
     /* do not change interrupt status */
     spin_unlock_no_cli(&sched->lock);
+
+    if (prev)
+        switch_context(&prev->regs, &next->regs);
+    else
+        load_context(&next->regs);
 }
 
 void scheduler_wake(struct thread *t) {

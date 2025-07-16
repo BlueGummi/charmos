@@ -65,9 +65,9 @@ void isr_common_entry(uint8_t vector, void *rsp) {
 }
 
 void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {
-    (void) ctx, (void) vector;
-    schedule(rsp);
+    (void) ctx, (void) vector, (void) rsp;
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
+    schedule();
 }
 
 void isr_register(uint8_t vector, isr_handler_t handler, void *ctx,
@@ -194,7 +194,8 @@ void idt_install(uint64_t ind) {
 
     /*idt_set_gate(GPF_ID, (uint64_t) gpf_handler, 0x08, 0x8E, ind);
     idt_set_gate(DBF_ID, (uint64_t) double_fault_handler, 0x08, 0x8E, ind);
-    idt_set_gate(PAGE_FAULT_ID, (uint64_t) page_fault_handler, 0x08, 0x8E, ind);*/
+    idt_set_gate(PAGE_FAULT_ID, (uint64_t) page_fault_handler, 0x08, 0x8E,
+    ind);*/
 
     idt_set_gate(TIMER_ID, (uint64_t) isr_timer_routine, 0x08, 0x8E, ind);
 

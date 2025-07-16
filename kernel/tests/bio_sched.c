@@ -109,6 +109,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
     struct ext2_fs *fs = root->fs_data;
     struct generic_disk *d = fs->drive;
 
+    enable_interrupts();
     prng_seed(time_get_us());
 
     uint64_t test_runs = 512;

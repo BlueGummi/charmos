@@ -222,6 +222,14 @@ static inline void restore_interrupts(void) {
     asm volatile("sti");
 }
 
+static inline void enable_interrupts(void) {
+    asm volatile("sti");
+}
+
+static inline void disable_interrupts(void) {
+    asm volatile("cli");
+}
+
 static inline void invlpg(uint64_t virt) {
     asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
 }
