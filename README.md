@@ -34,6 +34,12 @@ make run # run this in the build directory
 
 - [x] async blkdev io operations
 
+- [ ] devtmpfs 
+
+- [ ] port neural network to kernel and use in scheduling
+
+- [ ] remove existing scheduling logic and use neural network scheduler 
+
 - [ ] ports for programs
 
 - [ ] proper userland
