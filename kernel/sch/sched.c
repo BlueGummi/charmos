@@ -56,6 +56,16 @@ uint64_t scheduler_get_core_count() {
     return c_count;
 }
 
+void scheduler_wake(struct thread *t) {
+    t->state = READY;
+
+    /* boost */
+    t->mlfq_level = 0;
+    t->time_in_level = 0;
+    uint64_t c = t->curr_core;
+    scheduler_put_back(t);
+    lapic_send_ipi(c, SCHEDULER_ID);
+}
 static inline void update_core_current_thread(struct thread *next) {
     struct core *c = (void *) rdmsr(MSR_GS_BASE);
     c->current_thread = next;
@@ -93,7 +103,10 @@ static void scheduler_save_thread(struct scheduler *sched,
 
         if (curr->state == RUNNING) {
             curr->state = READY;
-            scheduler_add_thread(sched, curr, false, true, false);
+            bool change_interrupts = false;
+            bool locked = true;
+            bool new = false;
+            scheduler_add_thread(sched, curr, change_interrupts, locked, new);
         }
     }
 }
@@ -203,44 +216,33 @@ void schedule(void) {
 
     bool interrupts = spin_lock(&sched->lock);
 
+    struct thread *prev = sched->current;
     struct thread *curr = sched->current;
     struct thread *next = NULL;
-    struct scheduler *victim = NULL;
-    struct thread *prev = sched->current;
 
-    /* skip */
     if (!sched->active)
         goto end;
 
-    /* core 0 will recompute the steal threshold */
     maybe_recompute_threshold(core_id);
-
-    /* re-insert the running thread to its new level */
     scheduler_save_thread(sched, curr);
 
-    /* check if we can steal */
     if (!scheduler_can_steal_work(sched))
         goto regular_schedule;
 
     if (!try_begin_steal())
         goto regular_schedule;
 
-    /* attempt a steal */
     begin_steal(sched);
-    victim = scheduler_pick_victim(sched);
+    struct scheduler *victim = scheduler_pick_victim(sched);
 
     if (!victim) {
-        /* victim cannot be stolen from - early abort */
         stop_steal(sched, victim);
         goto regular_schedule;
     }
 
     struct thread *stolen = scheduler_steal_work(victim);
-
-    /* done stealing work now. another core can steal from us */
     stop_steal(sched, victim);
 
-    /* work was successfully stolen */
     if (stolen) {
         next = stolen;
         goto load_new_thread;
@@ -263,22 +265,10 @@ load_new_thread:
         disable_timeslice();
 
 end:
-    /* do not change interrupt status */
     spin_unlock(&sched->lock, interrupts);
 
     if (prev)
         switch_context(&prev->regs, &next->regs);
     else
         load_context(&next->regs);
-}
-
-void scheduler_wake(struct thread *t) {
-    t->state = READY;
-
-    /* boost */
-    t->mlfq_level = 0;
-    t->time_in_level = 0;
-    uint64_t c = t->curr_core;
-    scheduler_put_back(t);
-    lapic_send_ipi(c, SCHEDULER_ID);
 }

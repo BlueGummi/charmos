@@ -41,10 +41,10 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
     if (was_empty)
         sched->queue_bitmap |= (1 << level);
 
-    sched->thread_count++;
-
-    if (is_new_thread)
+    if (is_new_thread) {
+        sched->thread_count++;
         atomic_fetch_add(&total_threads, 1);
+    }
 
     if (!already_locked)
         spin_unlock(&sched->lock, change_interrupts ? ints : false);
