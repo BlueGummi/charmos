@@ -1,6 +1,8 @@
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
+#include <misc/dll.h>
+#include <misc/queue.h>
 #include <sch/reaper.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
@@ -58,60 +60,17 @@ void thread_queue_init(struct thread_queue *q) {
 }
 
 void thread_queue_push_back(struct thread_queue *q, struct thread *t) {
-    t->next = NULL;
-
-    if (q->tail) {
-        q->tail->next = t;
-    } else {
-        q->head = t;
-    }
-
-    q->tail = t;
+    queue_push_back(q, t);
 }
 
 struct thread *thread_queue_pop_front(struct thread_queue *q) {
-    struct thread *t = q->head;
-
-    if (t) {
-        q->head = t->next;
-        if (q->head == NULL) {
-            q->tail = NULL;
-        }
-        t->next = NULL;
-    }
-
+    queue_pop_front(q, t);
     return t;
-}
-
-void thread_queue_remove(struct thread_queue *q, struct thread *t) {
-    if (!q || !t || !q->head)
-        return;
-
-    if (t->next == t) {
-        q->head = NULL;
-    } else {
-        t->prev->next = t->next;
-        t->next->prev = t->prev;
-
-        if (q->head == t)
-            q->head = t->next;
-    }
-
-    t->next = t->prev = NULL;
 }
 
 void thread_queue_clear(struct thread_queue *q) {
     if (!q || !q->head)
         return;
 
-    struct thread *start = q->head;
-    struct thread *iter = start;
-
-    do {
-        struct thread *next = iter->next;
-        iter->next = iter->prev = NULL;
-        iter = next;
-    } while (iter != start);
-
-    q->head = NULL;
+    dll_clear(q);
 }
