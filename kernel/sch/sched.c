@@ -197,12 +197,11 @@ static bool all_threads_unrunnable(struct scheduler *sched) {
     return true;
 }
 
-/* Resource locks in here do not enable interrupts */
 void schedule(void) {
     uint64_t core_id = get_sch_core_id();
     struct scheduler *sched = local_schs[core_id];
 
-    spin_lock_no_cli(&sched->lock);
+    bool interrupts = spin_lock(&sched->lock);
 
     struct thread *curr = sched->current;
     struct thread *next = NULL;
@@ -265,7 +264,7 @@ load_new_thread:
 
 end:
     /* do not change interrupt status */
-    spin_unlock_no_cli(&sched->lock);
+    spin_unlock(&sched->lock, interrupts);
 
     if (prev)
         switch_context(&prev->regs, &next->regs);
