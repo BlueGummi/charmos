@@ -66,6 +66,7 @@ void scheduler_wake(struct thread *t) {
     scheduler_put_back(t);
     lapic_send_ipi(c, SCHEDULER_ID);
 }
+
 static inline void update_core_current_thread(struct thread *next) {
     struct core *c = (void *) rdmsr(MSR_GS_BASE);
     c->current_thread = next;
