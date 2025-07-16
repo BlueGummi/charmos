@@ -1,3 +1,4 @@
+#include <misc/dll.h>
 #include <sch/sched.h>
 #include <spin_lock.h>
 #include <stdatomic.h>
@@ -26,27 +27,7 @@ void scheduler_rm_thread(struct scheduler *sched, struct thread *task,
         return;
     }
 
-    if (q->head == q->tail && q->head == task) {
-        q->head = NULL;
-        q->tail = NULL;
-    } else if (q->head == task) {
-        q->head = q->head->next;
-        q->head->prev = q->tail;
-        q->tail->next = q->head;
-    } else if (q->tail == task) {
-        q->tail = q->tail->prev;
-        q->tail->next = q->head;
-        q->head->prev = q->tail;
-    } else {
-        struct thread *current = q->head->next;
-        while (current != q->head && current != task)
-            current = current->next;
-
-        if (current == task) {
-            current->prev->next = current->next;
-            current->next->prev = current->prev;
-        }
-    }
+    dll_remove(q, task);
 
     if (q->head == NULL)
         sched->queue_bitmap &= ~(1 << level);

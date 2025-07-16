@@ -1,3 +1,4 @@
+#include <misc/dll.h>
 #include <sch/sched.h>
 #include <spin_lock.h>
 #include <stdatomic.h>
@@ -21,22 +22,7 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
     struct thread_queue *q = &sched->queues[level];
 
     bool was_empty = (q->head == NULL);
-
-    task->next = NULL;
-    task->prev = NULL;
-
-    if (!q->head) {
-        q->head = task;
-        q->tail = task;
-        task->next = task;
-        task->prev = task;
-    } else {
-        task->prev = q->tail;
-        task->next = q->head;
-        q->tail->next = task;
-        q->head->prev = task;
-        q->tail = task;
-    }
+    dll_add(q, task);
 
     if (was_empty)
         sched->queue_bitmap |= (1 << level);
