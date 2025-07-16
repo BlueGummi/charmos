@@ -71,6 +71,9 @@ bool bcache_writethrough(struct generic_disk *disk, struct bcache_entry *ent,
 void bcache_write_queue(struct generic_disk *disk, struct bcache_entry *ent,
                         uint64_t spb, enum bio_request_priority prio);
 
+void bcache_stat(struct generic_disk *disk, uint64_t *total_dirty_out,
+                 uint64_t *total_present_out);
+
 bool bcache_insert(struct generic_disk *disk, uint64_t lba,
                    struct bcache_entry *ent, uint64_t spb);
 

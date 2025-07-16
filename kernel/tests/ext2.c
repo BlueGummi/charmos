@@ -2,6 +2,7 @@
 #include <fs/ext2.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
+#include <sleep.h>
 #include <stdint.h>
 #include <string.h>
 #include <tests.h>
@@ -14,14 +15,34 @@
     }                                                                          \
     struct vfs_node *root = g_root_node;
 
+/*
+static void check_bcache(void) {
+    struct ext2_fs *fs = g_root_node->fs_data;
+    struct generic_disk *d = fs->drive;
+
+    uint64_t bcache_total_dirty = 42;
+    uint64_t bcache_total_present = 37;
+
+    bcache_stat(d, &bcache_total_dirty, &bcache_total_present);
+
+    char *msg = kmalloc(100);
+    snprintf(msg, 100, "Block cache has %d dirty entries and %d total entries",
+             bcache_total_dirty, bcache_total_present);
+
+    ADD_MESSAGE(msg);
+
+    TEST_ASSERT(bcache_total_dirty == 0);
+}*/
+
 static void flush() {
     struct ext2_fs *fs = g_root_node->fs_data;
     struct generic_disk *d = fs->drive;
 
-    if (d == (void*)0x20)
-        k_panic("Yo...\n");
-
     bio_sched_dispatch_all(d);
+
+    /*
+    sleep_ms(500);
+    check_bcache();*/
 }
 
 REGISTER_TEST(ext2_stat_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {

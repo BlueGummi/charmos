@@ -221,6 +221,34 @@ static bool evict(struct bcache *cache, uint64_t spb) {
     return false;
 }
 
+static void stat(struct bcache *cache, uint64_t *total_dirty_out,
+                 uint64_t *total_present_out) {
+    bool ints = spin_lock(&cache->lock);
+
+    uint64_t total_dirty = 0;
+    uint64_t total_present = 0;
+    for (uint64_t i = 0; i < cache->capacity; i++) {
+        struct bcache_wrapper *entry = &cache->entries[i];
+
+        if (!entry->occupied || !entry->value)
+            continue;
+
+        total_present++;
+
+        if (entry->value->dirty) {
+            total_dirty++;
+        }
+    }
+
+    if (total_dirty_out)
+        *total_dirty_out = total_dirty;
+
+    if (total_present_out)
+        *total_present_out = total_present;
+
+    spin_unlock(&cache->lock, ints);
+}
+
 /* TODO: writeback */
 static bool write(struct generic_disk *d, struct bcache *cache,
                   struct bcache_entry *ent, uint64_t spb) {
@@ -255,6 +283,8 @@ static void write_queue(struct generic_disk *d, struct bcache_entry *ent,
 
     req->priority = prio;
     ent->request = req;
+
+
 
     bcache_ent_pin(ent);
     bio_sched_enqueue(d, req);
@@ -310,6 +340,11 @@ bool bcache_writethrough(struct generic_disk *disk, struct bcache_entry *ent,
 void bcache_write_queue(struct generic_disk *disk, struct bcache_entry *ent,
                         uint64_t spb, enum bio_request_priority prio) {
     write_queue(disk, ent, spb, prio);
+}
+
+void bcache_stat(struct generic_disk *disk, uint64_t *total_dirty_out,
+                 uint64_t *total_present_out) {
+    stat(disk->cache, total_dirty_out, total_present_out);
 }
 
 void *bcache_create_ent(struct generic_disk *disk, uint64_t lba,

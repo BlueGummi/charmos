@@ -8,7 +8,7 @@
 #include <spin_lock.h>
 #include <time/time.h>
 
-static deferred_event_t *defer_queue = NULL;
+static struct deferred_event *defer_queue = NULL;
 static struct spinlock defer_lock = {0};
 static uint64_t hpet_next_fire_time = UINT64_MAX;
 
@@ -19,7 +19,7 @@ static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
 
     bool i = spin_lock(&defer_lock);
     while (defer_queue && defer_queue->timestamp_ms <= now) {
-        deferred_event_t *ev = defer_queue;
+        struct deferred_event *ev = defer_queue;
         defer_queue = ev->next;
 
         spin_unlock(&defer_lock, i);
@@ -41,7 +41,7 @@ static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
 
 void defer_enqueue(defer_func_t func, void *arg, uint64_t delay_ms) {
     uint64_t now = time_get_ms();
-    deferred_event_t *ev = kmalloc(sizeof(deferred_event_t));
+    struct deferred_event *ev = kmalloc(sizeof(struct deferred_event));
     ev->timestamp_ms = now + delay_ms;
     ev->callback = func;
     ev->arg = arg;
@@ -56,7 +56,7 @@ void defer_enqueue(defer_func_t func, void *arg, uint64_t delay_ms) {
             hpet_program_oneshot(ev->timestamp_ms);
         }
     } else {
-        deferred_event_t *curr = defer_queue;
+        struct deferred_event *curr = defer_queue;
         while (curr->next && curr->next->timestamp_ms < ev->timestamp_ms)
             curr = curr->next;
 
