@@ -15,5 +15,7 @@ struct event_pool {
     struct condvar queue_cv;
 };
 
-void event_pool_add(defer_func_t func, void *arg);
 void event_pool_init(uint64_t num_threads);
+
+/* can only fail from allocation fail */
+bool event_pool_add(defer_func_t func, void *arg);

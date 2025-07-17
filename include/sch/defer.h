@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdint.h>
 #pragma once
 
@@ -11,4 +12,6 @@ struct deferred_event {
 };
 
 void defer_init(void);
-void defer_enqueue(defer_func_t func, void *arg, uint64_t delay_ms);
+
+/* can only fail from allocation fail */
+bool defer_enqueue(defer_func_t func, void *arg, uint64_t delay_ms);

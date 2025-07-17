@@ -1,4 +1,5 @@
 #include <block/bio.h>
+#include <errno.h>
 #include <mutex.h>
 #include <refcount.h>
 #include <spin_lock.h>
@@ -79,8 +80,8 @@ bool bcache_insert(struct generic_disk *disk, uint64_t lba,
 
 bool bcache_evict(struct generic_disk *disk, uint64_t spb);
 
-void bcache_prefetch_async(struct generic_disk *disk, uint64_t lba,
-                           uint64_t block_size, uint64_t spb);
+enum errno bcache_prefetch_async(struct generic_disk *disk, uint64_t lba,
+                                 uint64_t block_size, uint64_t spb);
 
 void *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
                         uint64_t block_size, uint64_t sectors_per_block,

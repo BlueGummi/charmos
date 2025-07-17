@@ -1,3 +1,4 @@
+#include <compiler.h>
 #include <mem/alloc.h>
 #include <misc/sll.h>
 #include <sch/event_pool.h>
@@ -24,8 +25,11 @@ static void worker_main(void) {
     }
 }
 
-void event_pool_add(defer_func_t func, void *arg) {
+bool event_pool_add(defer_func_t func, void *arg) {
     struct worker_task *task = kmalloc(sizeof(*task));
+    if (unlikely(!task))
+        return false;
+
     task->func = func;
     task->arg = arg;
     task->next = NULL;
@@ -37,6 +41,7 @@ void event_pool_add(defer_func_t func, void *arg) {
 
     condvar_signal(&pool.queue_cv);
     spin_unlock(&pool.lock, interrupts);
+    return true;
 }
 
 void event_pool_init(uint64_t num_threads) {

@@ -1,3 +1,4 @@
+#include <compiler.h>
 #include <fs/ext2.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
@@ -273,6 +274,8 @@ static struct vfs_node *make_vfs_node(struct ext2_fs *fs,
 
 static struct vfs_dirent *ext2_to_vfs_dirent(struct ext2_dir_entry *ext2) {
     struct vfs_dirent *dirent = kzalloc(sizeof(struct vfs_dirent));
+    if (!dirent)
+        return NULL;
 
     dirent->mode = ext2_to_vfs_mode(ext2->file_type);
     dirent->dirent_data = ext2;
@@ -447,6 +450,8 @@ enum errno ext2_vfs_readdir(struct vfs_node *node, struct vfs_dirent *out,
     struct ext2_fs *fs = node->fs_data;
 
     struct ext2_dir_entry *ext2_out = kzalloc(sizeof(struct ext2_dir_entry));
+    if (unlikely(!ext2_out))
+        return ERR_NO_MEM;
 
     enum errno e = ext2_readdir(fs, full_inode, ext2_out, index);
 

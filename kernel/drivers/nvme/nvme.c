@@ -2,6 +2,7 @@
 #include <block/bcache.h>
 #include <block/generic.h>
 #include <block/sched.h>
+#include <compiler.h>
 #include <console/printf.h>
 #include <drivers/nvme.h>
 #include <drivers/pci.h>
@@ -102,6 +103,10 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme->io_statuses = kzalloc(sizeof(uint16_t *) * sqs_to_make);
     nvme->io_requests = kzalloc(sizeof(struct nvme_request *) * sqs_to_make);
     nvme->io_queues = kzalloc(sizeof(struct nvme_queue *) * sqs_to_make);
+    if (unlikely(!nvme->isr_index || !nvme->io_waiters || !nvme->io_statuses ||
+                 !nvme->io_requests || !nvme->io_queues))
+        k_panic("Could not allocate space for NVMe structures");
+
     nvme->queues_made = sqs_to_make;
 
     pci_enable_msix(bus, slot, func);
@@ -120,6 +125,9 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
             kzalloc(sizeof(struct thread *) * nvme->io_queues[i]->sq_depth);
         nvme->io_statuses[i] = kzalloc(sizeof(uint16_t) * dep);
         nvme->io_requests[i] = kzalloc(sizeof(struct nvme_request *) * 64);
+        if (unlikely(!nvme->io_waiters[i] || !nvme->io_statuses[i] ||
+                     !nvme->io_requests[i]))
+            k_panic("Could not allocate space for NVMe structures");
     }
 
     return nvme;
@@ -170,6 +178,9 @@ struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {
     d->submit_bio_async = nvme_submit_bio_request;
     d->flags = DISK_FLAG_NO_REORDER | DISK_FLAG_NO_COALESCE;
     d->cache = kzalloc(sizeof(struct bcache));
+    if (unlikely(!d->cache))
+        k_panic("Could not allocate space for NVMe block cache\n");
+
     d->scheduler = bio_sched_create(d, &nvme_bio_sched_ops);
 
     bcache_init(d->cache, DEFAULT_BLOCK_CACHE_SIZE);

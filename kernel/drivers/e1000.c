@@ -1,4 +1,5 @@
 #include <asm.h>
+#include <compiler.h>
 #include <console/printf.h>
 #include <drivers/e1000.h>
 #include <drivers/pci.h>
@@ -26,6 +27,9 @@ static void e1000_setup_tx_ring(struct e1000_device *dev) {
 
     for (int i = 0; i < E1000_NUM_TX_DESC; ++i) {
         dev->tx_buffers[i] = kmalloc(2048);
+        if (!dev->tx_buffers[i])
+            k_panic("e1000 ring setup allocation failed!\n");
+
         dev->tx_descs[i].addr = vmm_get_phys((uintptr_t) dev->tx_buffers[i]);
         dev->tx_descs[i].status = E1000_TXD_STAT_DD;
     }
@@ -54,6 +58,9 @@ static void e1000_setup_rx_ring(struct e1000_device *dev) {
 
     for (int i = 0; i < E1000_NUM_RX_DESC; ++i) {
         dev->rx_buffers[i] = kmalloc(E1000_RX_BUF_SIZE);
+        if (!dev->rx_buffers[i])
+            k_panic("e1000 ring allocation failed\n");
+
         dev->rx_descs[i].addr = vmm_get_phys((uintptr_t) dev->rx_buffers[i]);
         dev->rx_descs[i].status = 0;
     }
@@ -204,6 +211,9 @@ static void e1000_pci_init(uint8_t bus, uint8_t d, uint8_t func,
         did == 0x10D3 || did == 0x10F5) {
         struct pci_device dev = {.bus = bus, .device = d, .function = func};
         struct e1000_device *device = kmalloc(sizeof(struct e1000_device));
+        if (unlikely(!device))
+            k_panic("e1000 device allocation failed!\n");
+
         e1000_init(&dev, device);
     }
 }

@@ -132,7 +132,7 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
 
             if (sig != 0x00000101)
                 continue;
-            
+
             disks[disks_ind].port = i;
             disks[disks_ind].device = dev;
 
@@ -173,6 +173,9 @@ struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
     mmio_write_32(&ctrl->ghc, mmio_read_32(&ctrl->ghc) | AHCI_GHC_AE);
 
     struct ahci_device *dev = kzalloc(sizeof(struct ahci_device));
+    if (!dev)
+        k_panic("Could not allocate space for AHCI device setup\n");
+
     dev->ctrl = ctrl;
     dev->irq_num = idt_alloc_entry();
 

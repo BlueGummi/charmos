@@ -2,16 +2,19 @@
 #include <console/printf.h>
 #include <errno.h>
 #include <mem/alloc.h>
+#include <mem/pmm.h>
 #include <stdbool.h>
 
 typedef void (*test_fn_t)(void);
+
+/* TODO: Turn the macros into things that look like functions,
+ * so rather than SET_SUCCESS, it would be SET_SUCCESS() */
 
 struct kernel_test {
     const char *name;
     test_fn_t func;
     bool is_integration;
 
-    /* TODO: fancy state machine with enum? */
     bool should_fail;
     bool success;
     bool skipped;
@@ -55,6 +58,13 @@ struct kernel_test {
     } while (0)
 
 #define FAIL_IF_FATAL(op) TEST_ASSERT(!ERR_IS_FATAL(op))
+
+#define ABORT_IF_RAM_LOW()                                                     \
+    if (pmm_get_usable_ram() < 1024 * 1024 * 8) {                              \
+        ADD_MESSAGE("RAM too low for test to continue!\n");                    \
+        SET_SKIP;                                                              \
+        return;                                                                \
+    }
 
 void tests_run(void);
 extern const char *large_test_string;

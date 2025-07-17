@@ -12,6 +12,9 @@ static struct bio_request *create(struct generic_disk *d, uint64_t lba,
                                   void *user, void *buffer) {
 
     struct bio_request *req = kzalloc(sizeof(struct bio_request));
+    if (!req)
+        return NULL;
+
     req->disk = d;
     req->lba = lba;
     req->size = size;
@@ -19,6 +22,11 @@ static struct bio_request *create(struct generic_disk *d, uint64_t lba,
     req->priority = p;
     req->on_complete = cb;
     req->buffer = buffer ? buffer : kmalloc_aligned(size, PAGE_SIZE);
+    if (!req->buffer) {
+        kfree(req);
+        return NULL;
+    }
+
     req->write = write;
     req->user_data = user;
     req->status = -1;

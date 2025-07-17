@@ -95,6 +95,9 @@ struct generic_disk *ahci_create_generic(struct ahci_disk *disk) {
     d->write_sector = ahci_write_sector_wrapper;
     d->submit_bio_async = ahci_submit_bio_request;
     d->cache = kzalloc(sizeof(struct bcache));
+    if (!d->cache)
+        k_panic("Could not allocate space for AHCI device block cache\n");
+
     d->scheduler = bio_sched_create(d, &ahci_sata_ssd_ops);
     bcache_init(d->cache, DEFAULT_BLOCK_CACHE_SIZE);
     d->type = G_AHCI_DRIVE;

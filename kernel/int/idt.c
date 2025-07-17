@@ -1,5 +1,6 @@
 #include <acpi/lapic.h>
 #include <asm.h>
+#include <compiler.h>
 #include <console/printf.h>
 #include <int/idt.h>
 #include <int/kb.h>
@@ -134,14 +135,15 @@ void idt_alloc(uint64_t size) {
     idtps = kmalloc(sizeof(struct idt_ptr) * size);
     idt_entry_used = kmalloc(sizeof(bool *) * size);
     isr_table = kmalloc(sizeof(struct isr_entry *) * size);
+    if (unlikely(!idts || !idtps || !idt_entry_used || !isr_table))
+        k_panic("Could not allocate space for interrupt tables\n");
 
     for (uint64_t i = 0; i < size; i++) {
         idt_entry_used[i] = kzalloc(sizeof(bool) * IDT_ENTRIES);
         isr_table[i] = kzalloc(sizeof(struct isr_entry) * IDT_ENTRIES);
+        if (unlikely(!idt_entry_used[i] || !isr_table[i]))
+            k_panic("Could not allocate space for interrupt tables\n");
     }
-
-    if (!idts || !idtps)
-        k_panic("Could not allocate space for IDT\n");
 }
 
 int idt_alloc_entry_on_core(uint64_t c) {

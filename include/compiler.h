@@ -23,8 +23,8 @@
 #define __hidden __attribute__((visibility("hidden")))
 #define __export __attribute__((visibility("default")))
 
-#define __likely(x) __builtin_expect(!!(x), 1)
-#define __unlikely(x) __builtin_expect(!!(x), 0)
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
 
 #define __deprecated __attribute__((deprecated))
 #define __deprecated_msg(msg) __attribute__((deprecated(msg)))

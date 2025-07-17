@@ -186,6 +186,9 @@ static inline void submit_and_wait(struct ata_drive *d,
 static struct ide_request *request_init(uint64_t lba, uint8_t *buffer,
                                         uint8_t count, bool write) {
     struct ide_request *req = kzalloc(sizeof(struct ide_request));
+    if (!req)
+        return NULL;
+
     req->lba = lba;
     req->buffer = buffer;
     req->sector_count = (count == 0) ? 256 : count;

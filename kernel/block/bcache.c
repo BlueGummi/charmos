@@ -6,6 +6,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* TODO: File is getting big, split into multiple */
+
+/* TODO: use linked list in hashmap collisions */
+
 #define ALIGN_DOWN(x, align) ((x) & ~((align) - 1))
 #define ALIGN_UP(x, align) (((x) + ((align) - 1)) & ~((align) - 1))
 
@@ -19,8 +23,8 @@ static bool write(struct generic_disk *d, struct bcache *cache,
                   struct bcache_entry *ent, uint64_t spb);
 
 /* prefetch is asynchronous */
-static void prefetch(struct generic_disk *disk, struct bcache *cache,
-                     uint64_t lba, uint64_t block_size, uint64_t spb);
+static enum errno prefetch(struct generic_disk *disk, struct bcache *cache,
+                           uint64_t lba, uint64_t block_size, uint64_t spb);
 
 /* eviction must be explicitly and separately called */
 static bool insert(struct bcache *cache, uint64_t key,
@@ -165,21 +169,26 @@ static void prefetch_callback(struct bio_request *bio) {
     kfree(bio);
 }
 
-static void prefetch(struct generic_disk *disk, struct bcache *cache,
-                     uint64_t lba, uint64_t block_size, uint64_t spb) {
+static enum errno prefetch(struct generic_disk *disk, struct bcache *cache,
+                           uint64_t lba, uint64_t block_size, uint64_t spb) {
     uint64_t base_lba = ALIGN_DOWN(lba, spb);
 
     /* no need to re-fetch existing entry */
     if (get(cache, base_lba))
-        return;
+        return ERR_EXIST;
 
     struct bcache_pf_data *pf = kmalloc(sizeof(struct bcache_pf_data));
+    if (!pf)
+        return ERR_NO_MEM;
 
     struct bio_request *req = bio_create_read(disk, base_lba, spb, block_size,
                                               prefetch_callback, pf, NULL);
 
     pf->cache = cache;
     pf->new_entry = kzalloc(sizeof(struct bcache_entry));
+    if (!pf->new_entry)
+        return ERR_NO_MEM;
+
     struct bcache_entry *ent = pf->new_entry;
 
     ent->lba = lba;
@@ -189,6 +198,7 @@ static void prefetch(struct generic_disk *disk, struct bcache *cache,
     ent->buffer = req->buffer;
 
     bio_sched_enqueue(disk, req);
+    return ERR_OK;
 }
 
 static bool evict(struct bcache *cache, uint64_t spb) {
@@ -284,8 +294,6 @@ static void write_queue(struct generic_disk *d, struct bcache_entry *ent,
     req->priority = prio;
     ent->request = req;
 
-
-
     bcache_ent_pin(ent);
     bio_sched_enqueue(d, req);
 }
@@ -347,6 +355,7 @@ void bcache_stat(struct generic_disk *disk, uint64_t *total_dirty_out,
     stat(disk->cache, total_dirty_out, total_present_out);
 }
 
+/* TODO: error code here */
 void *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
                         uint64_t block_size, uint64_t sectors_per_block,
                         bool no_evict, struct bcache_entry **out_entry) {
@@ -357,6 +366,9 @@ void *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
 
     if (!ent) {
         uint8_t *buf = kmalloc_aligned(block_size, PAGE_SIZE);
+        if (!buf)
+            return NULL;
+
         if (!disk->read_sector(disk, base_lba, buf, sectors_per_block)) {
             kfree_aligned(buf);
             spin_unlock(&disk->cache->lock, i);
@@ -365,6 +377,9 @@ void *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
         }
 
         ent = kzalloc(sizeof(struct bcache_entry));
+        if (!ent)
+            return NULL;
+
         ent->buffer = buf;
         ent->lba = base_lba;
         ent->size = block_size;
@@ -384,9 +399,9 @@ void *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
     return ent->buffer + offset;
 }
 
-void bcache_prefetch_async(struct generic_disk *disk, uint64_t lba,
-                           uint64_t block_size, uint64_t spb) {
-    prefetch(disk, disk->cache, ALIGN_DOWN(lba, spb), block_size, spb);
+enum errno bcache_prefetch_async(struct generic_disk *disk, uint64_t lba,
+                                 uint64_t block_size, uint64_t spb) {
+    return prefetch(disk, disk->cache, ALIGN_DOWN(lba, spb), block_size, spb);
 }
 
 void bcache_init(struct bcache *cache, uint64_t capacity) {
@@ -394,4 +409,6 @@ void bcache_init(struct bcache *cache, uint64_t capacity) {
     cache->capacity = capacity;
     cache->count = 0;
     cache->entries = kzalloc(sizeof(struct bcache_wrapper) * capacity);
+    if (!cache->entries)
+        k_panic("Block cache initialization allocation failed\n");
 }

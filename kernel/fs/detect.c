@@ -1,4 +1,5 @@
 #include <block/generic.h>
+#include <compiler.h>
 #include <console/printf.h>
 #include <fs/detect.h>
 #include <fs/ext2.h>
@@ -53,11 +54,13 @@ static void make_partition(struct generic_partition *part,
     part->mount = NULL;
 }
 
-static bool detect_mbr_partitions(struct generic_disk *disk, uint8_t *sector) {
+static enum errno detect_mbr_partitions(struct generic_disk *disk,
+                                        uint8_t *sector) {
     struct mbr *mbr = (struct mbr *) sector;
 
+    /* no idea what to return here */
     if (mbr->signature != 0xAA55)
-        return false;
+        return ERR_FS_CORRUPT;
 
     int count = 0;
     for (int i = 0; i < 4; i++) {
@@ -66,10 +69,12 @@ static bool detect_mbr_partitions(struct generic_disk *disk, uint8_t *sector) {
     }
 
     if (count == 0)
-        return false;
+        return ERR_FS_CORRUPT;
 
     disk->partition_count = count;
     disk->partitions = kzalloc(sizeof(struct generic_partition) * count);
+    if (unlikely(!disk->partitions))
+        return ERR_NO_MEM;
 
     int idx = 0;
     for (int i = 0; i < 4; i++) {
@@ -80,7 +85,7 @@ static bool detect_mbr_partitions(struct generic_disk *disk, uint8_t *sector) {
         struct generic_partition *part = &disk->partitions[idx++];
         make_partition(part, disk, p->lba_start, p->sector_count, idx);
     }
-    return true;
+    return ERR_OK;
 }
 
 static bool detect_gpt_partitions(struct generic_disk *disk, uint8_t *sector) {

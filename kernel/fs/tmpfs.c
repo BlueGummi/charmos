@@ -1,3 +1,4 @@
+#include <compiler.h>
 #include <fs/tmpfs.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
@@ -163,6 +164,9 @@ static enum errno tmpfs_create_common(struct vfs_node *parent, const char *name,
         return ERR_EXIST;
 
     struct tmpfs_node *node = kzalloc(sizeof(*node));
+    if (unlikely(!node))
+        return ERR_NO_MEM;
+
     node->type = type;
     node->name = strdup(name);
     node->mode = mode;

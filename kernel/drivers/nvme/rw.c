@@ -18,6 +18,9 @@ static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
     uint64_t num_pages = (offset + size + PAGE_SIZE - 1) / PAGE_SIZE;
 
     data->prps = kmalloc(sizeof(struct nvme_bio_data) * num_pages);
+    if (!data->prps)
+        return false;
+
     uintptr_t vaddr = (uintptr_t) buffer & ~(PAGE_SIZE - 1);
 
     for (size_t i = 0; i < num_pages; ++i) {
@@ -62,6 +65,8 @@ static bool rw_send_command(struct generic_disk *disk, uint64_t lba,
     struct bio_request *bio = req->user_data;
 
     struct nvme_bio_data *data = kzalloc(sizeof(struct nvme_bio_data));
+    if (!data)
+        return false;
 
     if (!nvme_bio_fill_prps(data, buffer, count * disk->sector_size)) {
         kfree(data);

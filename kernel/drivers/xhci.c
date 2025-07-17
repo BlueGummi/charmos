@@ -1,4 +1,5 @@
 #include <asm.h>
+#include <compiler.h>
 #include <console/printf.h>
 #include <drivers/pci.h>
 #include <drivers/xhci.h>
@@ -25,6 +26,8 @@ static void *xhci_map_mmio(uint8_t bus, uint8_t slot, uint8_t func) {
 
 static struct xhci_device *xhci_device_create(void *mmio) {
     struct xhci_device *dev = kmalloc(sizeof(struct xhci_device));
+    if (unlikely(!dev))
+        k_panic("Could not allocate space for XHCI device");
 
     struct xhci_cap_regs *cap = mmio;
     struct xhci_op_regs *op = mmio + cap->cap_length;
@@ -121,6 +124,9 @@ static void xhci_setup_event_ring(struct xhci_device *dev) {
     mmio_write_64(&ir->erdp, erdp.raw);
 
     struct xhci_ring *ring = kmalloc(sizeof(struct xhci_ring));
+    if (unlikely(!ring))
+        k_panic("Could not allocate space for XHCI ring\n");
+
     ring->phys = event_ring_phys;
     ring->cycle = 1;
     ring->size = 256;
@@ -150,6 +156,9 @@ static void xhci_setup_command_ring(struct xhci_device *dev) {
         vmm_map_phys(dcbaa_phys, sizeof(struct xhci_dcbaa), PAGING_UNCACHABLE);
 
     struct xhci_ring *ring = kmalloc(sizeof(struct xhci_ring));
+    if (unlikely(!ring))
+        k_panic("Could not allocate space for XHCI ring\n");
+
     ring->phys = cmd_ring_phys;
     ring->trbs = cmd_ring;
     ring->size = TRB_RING_SIZE;

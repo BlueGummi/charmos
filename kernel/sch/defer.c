@@ -39,9 +39,12 @@ static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
 }
 
-void defer_enqueue(defer_func_t func, void *arg, uint64_t delay_ms) {
+bool defer_enqueue(defer_func_t func, void *arg, uint64_t delay_ms) {
     uint64_t now = time_get_ms();
     struct deferred_event *ev = kmalloc(sizeof(struct deferred_event));
+    if (!ev)
+        return false;
+
     ev->timestamp_ms = now + delay_ms;
     ev->callback = func;
     ev->arg = arg;
@@ -65,6 +68,7 @@ void defer_enqueue(defer_func_t func, void *arg, uint64_t delay_ms) {
     }
 
     spin_unlock(&defer_lock, i);
+    return true;
 }
 
 void defer_init(void) {

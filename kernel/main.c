@@ -1,3 +1,4 @@
+#include <compiler.h>
 #include <acpi/hpet.h>
 #include <acpi/ioapic.h>
 #include <acpi/lapic.h>
@@ -55,11 +56,19 @@ void k_main(void) {
     gdt_install();
     syscall_setup(syscall_entry);
     struct core *c = kmalloc(sizeof(struct core));
+    if (!c)
+        k_panic("Could not allocate space for core structure on BSP");
+
     c->state = IDLE;
     c->current_thread = kzalloc(sizeof(struct thread));
+    if (unlikely(!c->current_thread))
+        k_panic("Could not allocate space for BSP's current thread");
+
     c->id = 0;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
-    global_cores = kmalloc(sizeof(struct core*) * c_cnt);
+    global_cores = kmalloc(sizeof(struct core *) * c_cnt);
+    if (unlikely(!global_cores))
+        k_panic("Could not allocate space for global core structures");
 
     // IDT
     idt_alloc(c_cnt);

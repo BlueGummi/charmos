@@ -7,12 +7,16 @@
 #include <tests.h>
 
 REGISTER_TEST(pmm_alloc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    ABORT_IF_RAM_LOW();
+
     void *p = pmm_alloc_page(false);
     TEST_ASSERT(p != NULL);
     SET_SUCCESS;
 }
 
 REGISTER_TEST(vmm_map_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    ABORT_IF_RAM_LOW();
+
     uint64_t p = (uint64_t) pmm_alloc_page(false);
     TEST_ASSERT(p != 0);
     void *ptr = vmm_map_phys(p, PAGE_SIZE, 0);
@@ -31,6 +35,7 @@ REGISTER_TEST(vmm_map_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
 #define KMALLOC_ALIGNMENT_TEST(name, align)                                    \
     REGISTER_TEST(kmalloc_aligned_##name##_test, false, false) {               \
+        ABORT_IF_RAM_LOW();                                                    \
         for (uint64_t i = 0; i < ALIGNED_ALLOC_TIMES; i++) {                   \
             void *ptr = kmalloc_aligned(align, align);                         \
             TEST_ASSERT(ptr != NULL);                                          \

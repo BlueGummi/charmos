@@ -1,4 +1,5 @@
 #include <boot/gdt.h>
+#include <console/printf.h>
 #include <mem/alloc.h>
 #include <stdint.h>
 #include <string.h>
@@ -73,6 +74,8 @@ void gdt_init(struct gdt_entry *gdt, struct tss *tss) {
 
     gdt_load(gdt, GDT_ENTRIES);
     tss->rsp0 = (uint64_t) kmalloc_aligned(PAGE_SIZE * 8, 64);
+    if (!tss->rsp0)
+        k_panic("GDT TSS RSP0 stack allocation failed!\n");
 
     reload_segment_registers(GDT_KERNEL_CODE, GDT_KERNEL_DATA);
 

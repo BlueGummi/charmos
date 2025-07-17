@@ -1,4 +1,5 @@
 #include <asm.h>
+#include <compiler.h>
 #include <console/printf.h>
 #include <drivers/nvme.h>
 #include <int/idt.h>
@@ -93,6 +94,9 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
         k_panic("Can't allocate IO queue zero!\n");
 
     nvme->io_queues[qid] = kmalloc(sizeof(struct nvme_queue));
+    if (unlikely(!nvme->io_queues[qid]))
+        k_panic("NVMe IO queue allocation failed!\n");
+
     struct nvme_queue *this_queue = nvme->io_queues[qid];
 
     uint64_t sq_pages = 2;

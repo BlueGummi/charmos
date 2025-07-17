@@ -3,6 +3,7 @@
 #include <block/bcache.h>
 #include <block/generic.h>
 #include <block/sched.h>
+#include <compiler.h>
 #include <console/printf.h>
 #include <drivers/ata.h>
 #include <int/idt.h>
@@ -15,17 +16,6 @@ void ide_print_info(struct generic_disk *d) {
     struct ata_drive *drive = (struct ata_drive *) d->driver_data;
     if (!drive->actually_exists)
         return;
-    k_printf("IDE Drive identify:\n");
-    k_printf("  IDE Drive Model: %s\n", drive->model);
-    k_printf("  Serial: %s\n", drive->serial);
-    k_printf("  Firmware: %s\n", drive->firmware);
-    k_printf("  Sectors: %llu\n", drive->total_sectors);
-    k_printf("  Size: %llu MB\n",
-             (drive->total_sectors * drive->sector_size) / (1024 * 1024));
-    k_printf("  LBA48: %s\n", drive->supports_lba48 ? "Yes" : "No");
-    k_printf("  DMA: %s\n", drive->supports_dma ? "Yes" : "No");
-    k_printf("  UDMA Mode: %u\n", drive->udma_mode);
-    k_printf("  PIO Mode: %u\n", drive->pio_mode);
 }
 
 static void swap_str(char *dst, const uint16_t *src, uint64_t word_len) {
@@ -45,6 +35,9 @@ static void swap_str(char *dst, const uint16_t *src, uint64_t word_len) {
 
 void ide_identify(struct ata_drive *drive) {
     uint16_t *buf = kmalloc(256 * sizeof(uint16_t));
+    if (unlikely(!buf))
+        k_panic("IDE identify buffer allocation failed\n");
+
     uint16_t io = drive->io_base;
 
     outb(REG_DRIVE_HEAD(io), 0xA0 | (drive->slave ? 0x10 : 0x00));
@@ -153,6 +146,9 @@ struct generic_disk *ide_create_generic(struct ata_drive *ide) {
     ide->channel.current_drive = ide;
 
     struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
+    if (unlikely(!d))
+        k_panic("IDE drive allocation failed!\n");
+
     d->driver_data = ide;
     d->sector_size = ide->sector_size;
     d->read_sector = ide_read_sector_wrapper;
@@ -162,6 +158,9 @@ struct generic_disk *ide_create_generic(struct ata_drive *ide) {
     d->flags = DISK_FLAG_NO_COALESCE | DISK_FLAG_NO_REORDER;
 
     d->cache = kzalloc(sizeof(struct bcache));
+    if (!d->cache)
+        k_panic("Could not allocate space for IDE drive block cache\n");
+
     d->scheduler = bio_sched_create(d, &ide_bio_ops);
 
     bcache_init(d->cache, DEFAULT_BLOCK_CACHE_SIZE);

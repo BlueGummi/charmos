@@ -199,6 +199,7 @@ static struct spinlock kmalloc_lock = SPINLOCK_INIT;
 void *kmalloc(uint64_t size) {
     if (size == 0)
         return NULL;
+
     bool i = spin_lock(&kmalloc_lock);
     int idx = uint64_to_index(size);
     if (idx >= 0 && slab_caches[idx].objs_per_slab > 0) {

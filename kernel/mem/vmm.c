@@ -62,6 +62,9 @@ void vmm_init(struct limine_memmap_response *memmap,
               struct limine_executable_address_response *xa, uint64_t offset) {
     hhdm_offset = offset;
     kernel_pml4 = (struct page_table *) pmm_alloc_page(true);
+    if (!kernel_pml4)
+        k_panic("Could not allocate space for kernel PML4\n");
+
     kernel_pml4_phys = (uintptr_t) kernel_pml4 - hhdm_offset;
     memset(kernel_pml4, 0, PAGE_SIZE);
 
@@ -115,6 +118,9 @@ void vmm_init(struct limine_memmap_response *memmap,
 
 static void pte_init(pte_t *entry, uint64_t flags) {
     struct page_table *new_table = (struct page_table *) pmm_alloc_page(true);
+    if (!new_table)
+        k_panic("Could not allocate space for page table entry!\n");
+
     uintptr_t new_table_phys = (uintptr_t) new_table - hhdm_offset;
     memset(new_table, 0, PAGE_SIZE);
     *entry = new_table_phys | PAGING_PRESENT | PAGING_WRITE | flags;

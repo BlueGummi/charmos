@@ -1,6 +1,7 @@
 #include <acpi/print.h>
 #include <acpi/uacpi_interface.h>
 #include <asm.h>
+#include <compiler.h>
 #include <console/printf.h>
 #include <int/idt.h>
 #include <mem/alloc.h>
@@ -22,11 +23,16 @@
 
 uint64_t tsc_freq = 0;
 
+#define panic_if_error(x)                                                      \
+    if (uacpi_unlikely_error(x))                                               \
+        k_panic("uACPI initialization failed!\n");
+
 void uacpi_init() {
     tsc_freq = measure_tsc_freq_pit();
-    uacpi_initialize(0);
-    uacpi_namespace_load();
-    uacpi_namespace_initialize();
+
+    panic_if_error(uacpi_initialize(0));
+    panic_if_error(uacpi_namespace_load());
+    panic_if_error(uacpi_namespace_initialize());
 }
 
 void uacpi_print_devs() {
@@ -135,9 +141,6 @@ uacpi_status uacpi_kernel_install_interrupt_handler(
     if (irq >= 256)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    if (idt_is_installed(irq))
-        return UACPI_STATUS_ALREADY_EXISTS;
-
     isr_register(irq, (void *) handler, ctx, get_sch_core_id());
 
     if (out_irq_handle)
@@ -219,7 +222,6 @@ uacpi_thread_id uacpi_kernel_get_thread_id(void) {
 
 uacpi_status uacpi_kernel_schedule_work(uacpi_work_type, uacpi_work_handler,
                                         uacpi_handle) {
-
     return UACPI_STATUS_OK;
 }
 

@@ -73,6 +73,10 @@ void pmm_init(uint64_t o, struct limine_memmap_request m) {
     total_pages = total_phys / PAGE_SIZE;
 }
 
+uint64_t pmm_get_usable_ram(void) {
+    return total_pages * PAGE_SIZE;
+}
+
 void pmm_dyn_init() {
     uint64_t size = total_pages / 8;
     uint8_t *new_bitmap = kmalloc(size);
@@ -147,10 +151,9 @@ void *pmm_alloc_pages(uint64_t count, bool add_offset) {
         }
     }
 
-    if (!found) {
-        k_printf("Couldn't allocate %zu contiguous pages\n", count);
+    /* fail */
+    if (!found)
         return NULL;
-    }
 
     last_allocated_index = start_index;
     for (uint64_t i = 0; i < count; i++) {

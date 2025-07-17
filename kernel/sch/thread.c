@@ -1,3 +1,4 @@
+#include <compiler.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
@@ -31,6 +32,10 @@ struct thread *thread_create(void (*entry_point)(void)) {
     struct thread *new_thread =
         (struct thread *) kzalloc(sizeof(struct thread));
     void *stack = kmalloc_aligned(STACK_SIZE, PAGE_SIZE);
+
+    if (unlikely(!new_thread || !stack))
+        return NULL;
+
     uint64_t stack_top = (uint64_t) stack + STACK_SIZE;
     uint64_t *sp = (uint64_t *) stack_top;
 

@@ -147,6 +147,9 @@ struct generic_disk *atapi_create_generic(struct ata_drive *d) {
     ret->write_sector = atapi_write_sector;
     ret->type = G_ATAPI_DRIVE;
     ret->cache = kmalloc(sizeof(struct bcache));
+    if (!ret->cache)
+        k_panic("Could not allocate space for ATAPI device block cache\n");
+
     bcache_init(ret->cache, DEFAULT_BLOCK_CACHE_SIZE);
     return ret;
 }
