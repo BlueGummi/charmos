@@ -1,5 +1,6 @@
 #include <console/printf.h>
 #include <mem/alloc.h>
+#include <sch/event_pool.h>
 #include <sch/reaper.h>
 #include <sch/sched.h>
 #include <stdbool.h>
@@ -47,4 +48,5 @@ void scheduler_init(uint64_t core_count) {
         local_schs[i] = s;
     }
     reaper_init();
+    event_pool_init(core_count);
 }

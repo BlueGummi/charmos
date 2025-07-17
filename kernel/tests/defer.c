@@ -5,7 +5,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <string.h>
 #include <tests.h>
 
 static bool defer_worked = false;
@@ -25,7 +24,7 @@ static void defer_func(void *boo) {
     defer_worked = true;
 }
 
-REGISTER_TEST(defer_test, IS_UNIT_TEST, SHOULD_NOT_FAIL) {
+REGISTER_TEST(defer_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     defer_enqueue(defer_func, NULL, 50);
     enqueue_ms = time_get_ms();
     sleep_ms(100);

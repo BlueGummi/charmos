@@ -3,6 +3,8 @@
 #include <mem/vmm.h>
 #include <misc/dll.h>
 #include <misc/queue.h>
+#include <sch/condvar.h>
+#include <sch/defer.h>
 #include <sch/reaper.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
@@ -73,4 +75,27 @@ void thread_queue_clear(struct thread_queue *q) {
         return;
 
     dll_clear(q);
+}
+
+void thread_block_on(struct thread_queue *q) {
+    /* We're assuming interrupts were already off here.
+     * If not, the caller must re-enable them *after* yielding. */
+
+    struct thread *current = scheduler_get_curr_thread();
+    current->state = BLOCKED;
+    thread_queue_push_back(q, current);
+}
+
+static void wake_thread(void *a) {
+    struct thread *t = a;
+    scheduler_wake(t);
+}
+
+void thread_sleep_for_ms(uint64_t ms) {
+    disable_interrupts();
+    struct thread *curr = scheduler_get_curr_thread();
+    curr->state = SLEEPING;
+    defer_enqueue(wake_thread, curr, ms);
+    enable_interrupts();
+    scheduler_yield();
 }

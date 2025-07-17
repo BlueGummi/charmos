@@ -180,6 +180,8 @@ static inline void disable_timeslice() {
 
 void scheduler_yield() {
     bool were_enabled = are_interrupts_enabled();
+
+    disable_interrupts();
     schedule();
     if (were_enabled)
         enable_interrupts();

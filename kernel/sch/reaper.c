@@ -53,15 +53,7 @@ void reaper_thread_main() {
             reaper.reaped_threads++;
         }
 
-        disable_interrupts();
-        reaper_thread->state = SLEEPING;
-
-        void *arg = NULL;
-        uint64_t check_ms = 1000;
-        defer_enqueue(wake_reaper, arg, check_ms);
-        enable_interrupts();
-
-        scheduler_yield();
+        thread_sleep_for_ms(1000);
     }
 }
 
