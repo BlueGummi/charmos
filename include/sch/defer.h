@@ -2,11 +2,11 @@
 #include <stdint.h>
 #pragma once
 
-typedef void (*defer_func_t)(void *arg);
+typedef void (*dpc_t)(void *arg);
 
 struct deferred_event {
     uint64_t timestamp_ms;
-    defer_func_t callback;
+    dpc_t callback;
     void *arg;
     struct deferred_event *next;
 };
@@ -14,4 +14,4 @@ struct deferred_event {
 void defer_init(void);
 
 /* can only fail from allocation fail */
-bool defer_enqueue(defer_func_t func, void *arg, uint64_t delay_ms);
+bool defer_enqueue(dpc_t func, void *arg, uint64_t delay_ms);

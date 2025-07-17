@@ -3,7 +3,7 @@
 #include <sch/condvar.h>
 
 struct worker_task {
-    defer_func_t func;
+    dpc_t func;
     void *arg;
     struct worker_task *next;
 };
@@ -18,4 +18,4 @@ struct event_pool {
 void event_pool_init(uint64_t num_threads);
 
 /* can only fail from allocation fail */
-bool event_pool_add(defer_func_t func, void *arg);
+bool event_pool_add(dpc_t func, void *arg);

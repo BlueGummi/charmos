@@ -25,7 +25,7 @@ static void worker_main(void) {
     }
 }
 
-bool event_pool_add(defer_func_t func, void *arg) {
+bool event_pool_add(dpc_t func, void *arg) {
     struct worker_task *task = kmalloc(sizeof(*task));
     if (unlikely(!task))
         return false;
