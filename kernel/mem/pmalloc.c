@@ -74,8 +74,13 @@ void pmm_init(uint64_t o, struct limine_memmap_request m) {
 }
 
 void pmm_dyn_init() {
-    uint8_t *new_bitmap = kmalloc(total_pages / 8);
-    memcpy(new_bitmap, bitmap, BOOT_BITMAP_SIZE);
+    uint64_t size = total_pages / 8;
+    uint8_t *new_bitmap = kmalloc(size);
+    if (!new_bitmap)
+        k_panic("Could not allocate space for physical memory allocator\n");
+
+    uint64_t to_copy = BOOT_BITMAP_SIZE > size ? size : BOOT_BITMAP_SIZE;
+    memcpy(new_bitmap, bitmap, to_copy);
     bitmap_size = total_pages / 8;
     bitmap = new_bitmap;
     for (uint64_t i = 0; i < memmap->entry_count; i++) {
