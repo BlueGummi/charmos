@@ -14,42 +14,49 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-uint64_t cr3 = 0;
-atomic_char cr3_ready = 0;
-struct spinlock wakeup_lock = SPINLOCK_INIT;
-uint64_t *lapic;
+static uint64_t cr3 = 0;
+static atomic_char cr3_ready = 0;
+static struct spinlock wakeup_lock = SPINLOCK_INIT;
 struct core **global_cores = NULL;
 bool mp_ready = false;
 static atomic_uint cores_awake = 0;
+
+static void setup_cpu(uint64_t cpu) {
+    struct core *c = kmalloc(sizeof(struct core));
+    if (!c)
+        k_panic("Core %d could not allocate space for struct\n", cpu);
+    c->id = cpu;
+    c->state = IDLE;
+    wrmsr(MSR_GS_BASE, (uint64_t) c);
+    global_cores[cpu] = c;
+}
+
+static inline void set_core_awake(void) {
+    atomic_fetch_add_explicit(&cores_awake, 1, memory_order_release);
+    if (atomic_load_explicit(&cores_awake, memory_order_acquire) ==
+        scheduler_get_core_count())
+        mp_ready = true;
+}
 
 void wakeup() {
     bool ints = spin_lock(&wakeup_lock);
     smap_init();
     serial_init();
+
     while (!cr3_ready)
         cpu_relax();
+
     asm volatile("mov %0, %%cr3" ::"r"(cr3));
 
-    uint32_t lapic_id_raw = LAPIC_READ(LAPIC_REG(LAPIC_REG_ID));
-    uint64_t cpu = (lapic_id_raw >> 24) & 0xFF;
-    struct core *c = kmalloc(sizeof(struct core));
-    if (!c)
-        k_panic("Core %d could not allocate space for struct\n", cpu);
+    uint64_t cpu = lapic_get_id();
 
     gdt_install();
     idt_install(cpu);
-    lapic_init();
-    c->id = cpu;
-    c->state = IDLE;
-    wrmsr(MSR_GS_BASE, (uint64_t) c);
-    global_cores[cpu] = c;
+    lapic_timer_init();
 
+    setup_cpu(cpu);
     spin_unlock(&wakeup_lock, ints);
-    atomic_fetch_add_explicit(&cores_awake, 1, memory_order_release);
-
-    if (atomic_load_explicit(&cores_awake, memory_order_acquire) ==
-        scheduler_get_core_count())
-        mp_ready = true;
+    set_core_awake();
 
     restore_interrupts();
     scheduler_yield();
@@ -84,4 +91,6 @@ void mp_setup_bsp(uint64_t core_count) {
     global_cores = kmalloc(sizeof(struct core *) * core_count);
     if (unlikely(!global_cores))
         k_panic("Could not allocate space for global core structures");
+
+    global_cores[0] = c;
 }

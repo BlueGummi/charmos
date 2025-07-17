@@ -1,4 +1,3 @@
-#include <compiler.h>
 #include <acpi/hpet.h>
 #include <acpi/ioapic.h>
 #include <acpi/lapic.h>
@@ -6,6 +5,7 @@
 #include <asm.h>
 #include <boot/gdt.h>
 #include <boot/smap.h>
+#include <compiler.h>
 #include <console/printf.h>
 #include <elf.h>
 #include <int/idt.h>
@@ -63,7 +63,7 @@ void k_main(void) {
 
     // Early device init
     uacpi_init();
-    lapic_map();
+    lapic_init();
 
     hpet_init();
     ioapic_init();
@@ -76,7 +76,7 @@ void k_main(void) {
 
     // Filesystem init
     cmdline_parse(cmdline_request.response->cmdline);
-    lapic_init();
+    lapic_timer_init();
     mp_complete_init();
 
     restore_interrupts();

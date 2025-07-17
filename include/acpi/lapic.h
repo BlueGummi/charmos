@@ -37,7 +37,8 @@
 #define TIMER_MODE_PERIODIC (1 << 17)
 extern uint64_t *lapic;
 void lapic_init();
-void lapic_map(void);
+void lapic_timer_init(void);
+uint64_t lapic_get_id(void);
 void lapic_timer_disable();
 void lapic_timer_enable();
 void lapic_send_ipi(uint8_t apic_id, uint8_t vector);
