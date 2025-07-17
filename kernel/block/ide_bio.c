@@ -24,7 +24,7 @@ static void partial_reorder(struct bio_rqueue *q, uint64_t last_lba) {
 
     int scanned = 0;
     while (cur && scanned < MAX_REORDER_SCAN) {
-        uint64_t distance = abs64((int64_t)(cur->lba - last_lba));
+        uint64_t distance = abs64((int64_t) (cur->lba - last_lba));
         if (distance < best_distance) {
             best_distance = distance;
             best = cur;

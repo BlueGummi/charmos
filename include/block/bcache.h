@@ -1,11 +1,11 @@
 #include <block/bio.h>
 #include <errno.h>
-#include <mutex.h>
 #include <refcount.h>
-#include <spin_lock.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <sync/mutex.h>
+#include <sync/spin_lock.h>
 #include <types.h>
 
 #pragma once

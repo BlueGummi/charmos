@@ -1,12 +1,12 @@
-#include <mutex.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
 #include <sleep.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <sync/mutex.h>
 
 #include "console/printf.h"
-#include "spin_lock.h"
+#include <sync/spin_lock.h>
 
 void mutex_init(struct mutex *m) {
     if (m->initialized)

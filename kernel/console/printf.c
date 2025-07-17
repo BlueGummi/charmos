@@ -2,11 +2,11 @@
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
 #include <limine.h>
-#include <spin_lock.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <sync/spin_lock.h>
 
 #include "console/printf.h"
 
@@ -31,8 +31,8 @@ static int serial_is_transmit_empty() {
 }*/
 
 static void serial_putc(char c) {
-/*    while (serial_is_transmit_empty() == 0)
-        ;*/
+    /*    while (serial_is_transmit_empty() == 0)
+            ;*/
     outb(0x3F8, c);
 }
 

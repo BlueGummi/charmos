@@ -38,7 +38,8 @@ struct bio_request *bio_create_read(struct generic_disk *d, uint64_t lba,
                                     uint64_t sectors, uint64_t size,
                                     void (*cb)(struct bio_request *),
                                     void *user, void *buffer) {
-    return create(d, lba, sectors, size, BIO_RQ_MEDIUM, cb, false, user, buffer);
+    return create(d, lba, sectors, size, BIO_RQ_MEDIUM, cb, false, user,
+                  buffer);
 }
 
 struct bio_request *bio_create_write(struct generic_disk *d, uint64_t lba,

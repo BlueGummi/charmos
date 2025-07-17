@@ -1,9 +1,9 @@
 #include <sch/sched.h>
-#include <spin_lock.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <sync/spin_lock.h>
 
 #include "sch/thread.h"
 

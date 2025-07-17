@@ -1,7 +1,7 @@
 #include <sch/sched.h>
 #include <sch/thread.h>
-#include <spin_lock.h>
 #include <stdbool.h>
+#include <sync/spin_lock.h>
 
 struct mutex {
     struct thread *owner;

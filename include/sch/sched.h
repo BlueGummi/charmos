@@ -1,7 +1,7 @@
 #pragma once
 #include <sch/thread.h>
-#include <spin_lock.h>
 #include <stdbool.h>
+#include <sync/spin_lock.h>
 
 #define MLFQ_LEVELS 5 // Number of priority queues (0 = highest priority)
 

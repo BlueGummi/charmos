@@ -1,6 +1,6 @@
 #include <sch/defer.h>
-#include <spin_lock.h>
-#include <sch/condvar.h>
+#include <sync/condvar.h>
+#include <sync/spin_lock.h>
 
 struct worker_task {
     dpc_t func;

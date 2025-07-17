@@ -1,5 +1,5 @@
-#include <sch/condvar.h>
 #include <sch/sched.h>
+#include <sync/condvar.h>
 
 void condvar_init(struct condvar *cv) {
     thread_queue_init(&cv->waiters);

@@ -3,10 +3,10 @@
 #include <fs/detect.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
-#include <spin_lock.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <sync/spin_lock.h>
 
 struct generic_disk;
 struct bio_request;

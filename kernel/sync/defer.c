@@ -5,7 +5,7 @@
 #include <mem/alloc.h>
 #include <sch/defer.h>
 #include <sch/sched.h>
-#include <spin_lock.h>
+#include <sync/spin_lock.h>
 #include <time/time.h>
 
 static struct deferred_event *defer_queue = NULL;

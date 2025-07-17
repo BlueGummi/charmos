@@ -1,9 +1,9 @@
 #include <boot/gdt.h>
+#include <boot/tss.h>
 #include <console/printf.h>
 #include <mem/alloc.h>
 #include <stdint.h>
 #include <string.h>
-#include <tss.h>
 
 #define GDT_ENTRIES 7
 

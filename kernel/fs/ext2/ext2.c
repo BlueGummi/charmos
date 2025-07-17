@@ -59,5 +59,4 @@ struct vfs_node *ext2_g_mount(struct generic_partition *p) {
 void ext2_g_print(struct generic_partition *p) {
     if (!p)
         return;
-
 }

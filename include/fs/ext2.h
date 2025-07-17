@@ -3,8 +3,8 @@
 #include <errno.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
-#include <spin_lock.h>
 #include <stdint.h>
+#include <sync/spin_lock.h>
 
 extern uint64_t PTRS_PER_BLOCK;
 

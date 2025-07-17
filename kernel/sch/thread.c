@@ -4,7 +4,6 @@
 #include <mem/vmm.h>
 #include <misc/dll.h>
 #include <misc/queue.h>
-#include <sch/condvar.h>
 #include <sch/defer.h>
 #include <sch/reaper.h>
 #include <sch/sched.h>
@@ -12,6 +11,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <sync/condvar.h>
 
 uint64_t globid = 1;
 

@@ -4,10 +4,10 @@
 #include <int/idt.h>
 #include <registry.h>
 #include <sch/sched.h>
-#include <spin_lock.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <sync/spin_lock.h>
 #include <tests.h>
 
 #include "mp/core.h"

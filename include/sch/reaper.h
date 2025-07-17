@@ -1,6 +1,6 @@
 #pragma once
 #include <sch/thread.h>
-#include <spin_lock.h>
+#include <sync/spin_lock.h>
 
 struct thread_reaper {
     struct thread_queue queue;

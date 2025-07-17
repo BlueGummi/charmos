@@ -170,8 +170,7 @@ struct ahci_full_port {
     void *fis;
     struct ahci_cmd_table **cmd_tables;
     struct ahci_cmd_header **cmd_hdrs;
- 
-    
+
     volatile atomic_uint slot_bitmap;
 };
 

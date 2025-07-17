@@ -4,8 +4,8 @@
 #include <mem/alloc.h>
 #include <misc/dll.h>
 #include <sch/defer.h>
-#include <spin_lock.h>
 #include <stdint.h>
+#include <sync/spin_lock.h>
 #include <time/time.h>
 
 /* enqueuing skips enqueuing if the req is URGENT */

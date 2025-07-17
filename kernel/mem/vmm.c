@@ -7,10 +7,10 @@
 #include <misc/linker_symbols.h>
 #include <mp/mp.h>
 #include <sch/sched.h>
-#include <spin_lock.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <sync/spin_lock.h>
 #define KERNEL_PML4_START_INDEX 256
 #define ENTRY_PRESENT(entry) (entry & PAGING_PRESENT)
 

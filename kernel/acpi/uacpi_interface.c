@@ -6,11 +6,11 @@
 #include <int/idt.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
-#include <mutex.h>
 #include <pit.h>
-#include <spin_lock.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <sync/mutex.h>
+#include <sync/spin_lock.h>
 #include <uacpi/event.h>
 #include <uacpi/platform/arch_helpers.h>
 #include <uacpi/status.h>

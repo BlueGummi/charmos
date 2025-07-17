@@ -1,7 +1,7 @@
+#include <boot/tss.h>
 #include <sch/thread.h>
 #include <stdatomic.h>
 #include <stdint.h>
-#include <tss.h>
 
 enum core_state {
     IDLE,

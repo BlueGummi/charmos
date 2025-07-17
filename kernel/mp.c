@@ -9,10 +9,10 @@
 #include <mem/alloc.h>
 #include <mp/mp.h>
 #include <sch/sched.h>
-#include <spin_lock.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <sync/spin_lock.h>
 
 static uint64_t cr3 = 0;
 static atomic_char cr3_ready = 0;

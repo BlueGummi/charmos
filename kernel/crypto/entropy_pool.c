@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "spin_lock.h"
+#include <sync/spin_lock.h>
 
 static uint8_t chacha_key[32] = {0};
 static uint8_t chacha_nonce[12] = {0};
@@ -35,7 +35,7 @@ void entropy_pool_add(struct entropy_pool *pool, const uint8_t *data,
 }
 
 uint64_t entropy_pool_extract(struct entropy_pool *pool, uint8_t *out,
-                            uint64_t len) {
+                              uint64_t len) {
     uint8_t seed[32];
 
     bool ints = spin_lock(&pool->lock);

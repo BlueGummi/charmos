@@ -1,5 +1,7 @@
 #pragma once
 
+#define __randomize_layout __attribute__((randomize_layout))
+
 #define __always_inline inline __attribute__((always_inline))
 
 #define __noinline __attribute__((noinline))

@@ -3,10 +3,10 @@
 #include <mem/slab.h>
 #include <mem/vmm.h>
 #include <misc/magic_numbers.h>
-#include <spin_lock.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <sync/spin_lock.h>
 
 struct slab_cache slab_caches[SLAB_CLASS_COUNT];
 uintptr_t slab_heap_top = 0xFFFFF00000000000;
