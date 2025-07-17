@@ -2,6 +2,7 @@
 #include <asm.h>
 #include <boot/gdt.h>
 #include <boot/smap.h>
+#include <compiler.h>
 #include <console/printf.h>
 #include <int/idt.h>
 #include <limine.h>
@@ -20,29 +21,6 @@ uint64_t *lapic;
 struct core **global_cores = NULL;
 bool mp_ready = false;
 static atomic_uint cores_awake = 0;
-
-void lapic_init() {
-    LAPIC_SEND(LAPIC_REG(LAPIC_REG_SVR), LAPIC_ENABLE | 0xFF);
-
-    LAPIC_SEND(LAPIC_REG(LAPIC_REG_TIMER_DIV), 0b0011);
-
-    LAPIC_SEND(LAPIC_REG(LAPIC_REG_LVT_TIMER),
-               TIMER_VECTOR | TIMER_MODE_PERIODIC);
-
-    LAPIC_SEND(LAPIC_REG(LAPIC_REG_TIMER_INIT), 100000);
-}
-
-void lapic_timer_disable() {
-    uint32_t lvt = LAPIC_READ(LAPIC_REG(LAPIC_REG_LVT_TIMER));
-    lvt |= LAPIC_LVT_MASK;
-    LAPIC_SEND(LAPIC_REG(LAPIC_REG_LVT_TIMER), lvt);
-}
-
-void lapic_timer_enable() {
-    uint32_t lvt = LAPIC_READ(LAPIC_REG(LAPIC_REG_LVT_TIMER));
-    lvt &= ~LAPIC_LVT_MASK;
-    LAPIC_SEND(LAPIC_REG(LAPIC_REG_LVT_TIMER), lvt);
-}
 
 void wakeup() {
     bool ints = spin_lock(&wakeup_lock);
@@ -89,4 +67,21 @@ void mp_wakeup_processors(struct limine_mp_response *mpr) {
 void mp_inform_of_cr3() {
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
     cr3_ready = true;
+}
+
+void mp_setup_bsp(uint64_t core_count) {
+    struct core *c = kmalloc(sizeof(struct core));
+    if (!c)
+        k_panic("Could not allocate space for core structure on BSP");
+
+    c->state = IDLE;
+    c->current_thread = kzalloc(sizeof(struct thread));
+    if (unlikely(!c->current_thread))
+        k_panic("Could not allocate space for BSP's current thread");
+
+    c->id = 0;
+    wrmsr(MSR_GS_BASE, (uint64_t) c);
+    global_cores = kmalloc(sizeof(struct core *) * core_count);
+    if (unlikely(!global_cores))
+        k_panic("Could not allocate space for global core structures");
 }

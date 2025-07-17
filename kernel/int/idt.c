@@ -209,13 +209,6 @@ void idt_install(uint64_t ind) {
     idt_load(ind);
 }
 
-void lapic_send_ipi(uint8_t apic_id, uint8_t vector) {
-    LAPIC_SEND(LAPIC_REG(LAPIC_ICR_HIGH), apic_id << LAPIC_DEST_SHIFT);
-    LAPIC_SEND(LAPIC_REG(LAPIC_ICR_LOW), vector | LAPIC_DELIVERY_FIXED |
-                                             LAPIC_LEVEL_ASSERT |
-                                             LAPIC_DEST_PHYSICAL);
-}
-
 void page_fault_handler(uint64_t error_code, uint64_t fault_addr) {
     //    uint64_t core = get_sch_core_id();
     k_printf("\n=== PAGE FAULT ===\n");

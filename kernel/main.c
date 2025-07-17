@@ -35,7 +35,6 @@ struct vfs_node *g_root_node = NULL;
 struct vfs_mount *g_mount_list_head; // TODO: migrate these globals
 
 void k_main(void) {
-
     uint64_t c_cnt = mp_request.response->cpu_count;
 
     // FB
@@ -54,21 +53,9 @@ void k_main(void) {
     slab_init();
     pmm_dyn_init();
     gdt_install();
+
     syscall_setup(syscall_entry);
-    struct core *c = kmalloc(sizeof(struct core));
-    if (!c)
-        k_panic("Could not allocate space for core structure on BSP");
-
-    c->state = IDLE;
-    c->current_thread = kzalloc(sizeof(struct thread));
-    if (unlikely(!c->current_thread))
-        k_panic("Could not allocate space for BSP's current thread");
-
-    c->id = 0;
-    wrmsr(MSR_GS_BASE, (uint64_t) c);
-    global_cores = kmalloc(sizeof(struct core *) * c_cnt);
-    if (unlikely(!global_cores))
-        k_panic("Could not allocate space for global core structures");
+    mp_setup_bsp(c_cnt);
 
     // IDT
     idt_alloc(c_cnt);
@@ -76,8 +63,7 @@ void k_main(void) {
 
     // Early device init
     uacpi_init();
-    uintptr_t lapic_phys = rdmsr(IA32_APIC_BASE_MSR) & IA32_APIC_BASE_MASK;
-    lapic = vmm_map_phys(lapic_phys, PAGE_SIZE, PAGING_UNCACHABLE);
+    lapic_map();
 
     hpet_init();
     ioapic_init();
