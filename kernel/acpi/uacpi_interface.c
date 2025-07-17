@@ -11,6 +11,7 @@
 #include <spin_lock.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <uacpi/event.h>
 #include <uacpi/platform/arch_helpers.h>
 #include <uacpi/status.h>
 #include <uacpi/uacpi.h>
@@ -33,6 +34,7 @@ void uacpi_init() {
     panic_if_error(uacpi_initialize(0));
     panic_if_error(uacpi_namespace_load());
     panic_if_error(uacpi_namespace_initialize());
+    panic_if_error(uacpi_finalize_gpe_initialization());
 }
 
 void uacpi_print_devs() {
