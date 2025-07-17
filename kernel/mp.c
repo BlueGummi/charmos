@@ -64,7 +64,7 @@ void mp_wakeup_processors(struct limine_mp_response *mpr) {
     }
 }
 
-void mp_inform_of_cr3() {
+void mp_complete_init() {
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
     cr3_ready = true;
 }

@@ -12,7 +12,7 @@ extern bool mp_ready;
 extern atomic_uint_fast64_t current_cpu;
 void wakeup();
 void mp_wakeup_processors(struct limine_mp_response *mpr);
-void mp_inform_of_cr3();
+void mp_complete_init();
 void mp_setup_bsp(uint64_t core_count);
 extern struct core **global_cores;
 #pragma once

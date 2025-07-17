@@ -77,7 +77,7 @@ void k_main(void) {
     // Filesystem init
     cmdline_parse(cmdline_request.response->cmdline);
     lapic_init();
-    mp_inform_of_cr3();
+    mp_complete_init();
 
     restore_interrupts();
     scheduler_yield();
