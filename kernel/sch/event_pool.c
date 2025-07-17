@@ -1,4 +1,5 @@
 #include <mem/alloc.h>
+#include <misc/sll.h>
 #include <sch/event_pool.h>
 
 static struct event_pool pool = {0};
@@ -30,12 +31,9 @@ void event_pool_add(defer_func_t func, void *arg) {
     task->next = NULL;
 
     bool interrupts = spin_lock(&pool.lock);
-    if (pool.tail) {
-        pool.tail->next = task;
-        pool.tail = task;
-    } else {
-        pool.head = pool.tail = task;
-    }
+
+    struct event_pool *p = &pool;
+    sll_add(p, task);
 
     condvar_signal(&pool.queue_cv);
     spin_unlock(&pool.lock, interrupts);
