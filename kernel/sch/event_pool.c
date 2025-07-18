@@ -47,20 +47,6 @@ static inline struct worker_task pool_dequeue(struct event_pool *pool) {
     return task;
 }
 
-static struct event_pool *get_most_loaded_pool(void) {
-    uint64_t max_load = 0;
-    struct event_pool *most_loaded = NULL;
-    int64_t core_num = get_this_core_id();
-
-    for (int64_t i = 0; i < num_pools; i++) {
-        if (pools[i]->num_tasks > max_load && i != core_num) {
-            max_load = pools[i]->num_tasks;
-            most_loaded = pools[i];
-        }
-    }
-    return most_loaded;
-}
-
 static void worker_main(void) {
     while (1) {
         struct event_pool *pool = get_event_pool_local();
@@ -113,22 +99,29 @@ bool event_pool_add_local(dpc_t func, void *arg) {
     return add(pool, func, arg);
 }
 
+static void spawn_on_core(uint64_t core, uint64_t threads) {
+    for (uint64_t i = 0; i < threads; i++) {
+        struct thread *t = thread_spawn_on_core(worker_main, core);
+        if (!t)
+            k_panic("Failed to spawn worker thread on core %u\n", core);
+
+        t->flags = NO_STEAL;
+    }
+}
+
 void event_pool_init(uint64_t num_threads) {
-    num_pools = num_threads;
+    num_pools = scheduler_get_core_count();
     pools = kzalloc(sizeof(struct event_pool *) * num_pools);
 
     if (!pools)
         k_panic("Failed to allocate space for event pools!\n");
 
-    for (uint64_t i = 0; i < num_threads; ++i) {
+    for (int64_t i = 0; i < num_pools; ++i) {
         pools[i] = kzalloc(sizeof(struct event_pool));
         if (!pools[i])
             k_panic("Failed to allocate space for event pool %u!\n", i);
 
-        uint64_t core_count = scheduler_get_core_count();
-        struct thread *t = thread_spawn_on_core(worker_main, i % core_count);
-
-        /* We don't want these migrated across cores */
-        t->flags = NO_STEAL;
+        uint64_t core_id = i;
+        spawn_on_core(core_id, num_threads);
     }
 }

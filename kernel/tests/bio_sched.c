@@ -120,9 +120,13 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
     struct bio_request **rqs =
         kmalloc(test_runs * sizeof(struct bio_request *));
 
+    TEST_ASSERT(buffers && rqs);
+
     for (uint64_t i = 0; i < test_runs; i++) {
         buffers[i] = kmalloc_aligned(512, PAGE_SIZE);
         rqs[i] = kzalloc(sizeof(struct bio_request));
+        TEST_ASSERT(buffers[i] && rqs[i]);
+
         struct bio_request *rq = rqs[i];
         rq->disk = d;
         rq->lba = (i * 2) % 512;
@@ -144,6 +148,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
     ms = time_get_ms() - ms;
 
     char *msg = kmalloc(100);
+    TEST_ASSERT(msg);
     snprintf(msg, 100, "Total time spent enqueuing is %d ms", ms);
     ADD_MESSAGE(msg);
     bio_sched_dispatch_all(d);
@@ -151,6 +156,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
     for (uint64_t i = 0; i < BIO_SCHED_LEVELS; i++) {
         avg_complete_time[i] = total_complete_time[i] / runs_per_lvl[i];
         char *msg = kzalloc(100);
+        TEST_ASSERT(msg);
         snprintf(msg, 100, "Average completion time of level %d is %d ms", i,
                  avg_complete_time[i]);
         ADD_MESSAGE(msg);
@@ -159,6 +165,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
     sleep_ms(2000);
 
     char *m2 = kmalloc(100);
+    TEST_ASSERT(m2);
     snprintf(m2, 100, "Runs is %d, test_runs is %d", runs, test_runs);
     ADD_MESSAGE(m2);
     TEST_ASSERT(runs == test_runs);

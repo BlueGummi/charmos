@@ -4,6 +4,8 @@
 #include <sync/condvar.h>
 #include <sync/spin_lock.h>
 #pragma once
+
+/* Must be a power of two for modulo optimization */
 #define EVENT_POOL_CAPACITY 512
 
 typedef void (*dpc_t)(void *arg);
@@ -14,8 +16,6 @@ struct deferred_event {
     void *arg;
     struct deferred_event *next;
 };
-
-/* Must be a power of two for modulo optimization */
 
 struct worker_task {
     dpc_t func;
@@ -37,8 +37,7 @@ void defer_init(void);
 
 /* can only fail from allocation fail */
 bool defer_enqueue(dpc_t func, void *arg, uint64_t delay_ms);
-
-void event_pool_init(uint64_t num_threads);
+void event_pool_init(uint64_t threads_per_core);
 
 /* these can only fail from allocation fail */
 bool event_pool_add(dpc_t func, void *arg);

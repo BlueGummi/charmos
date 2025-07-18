@@ -49,7 +49,7 @@ add_custom_target(iso
 set(QEMU_COMMON_FLAGS
     -cdrom ${IMAGE_NAME}.iso
     -boot d
-    -m 20M
+    -m 4G
     -smp cores=4
     -no-shutdown
     -no-reboot
