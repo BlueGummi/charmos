@@ -206,7 +206,7 @@ static inline void io_wait(void) {
     outb(0x80, 0);
 }
 
-static inline uint64_t get_sch_core_id() {
+static inline uint64_t get_this_core_id() {
     uint64_t id;
     asm volatile("movq %%gs:%c1, %0"
                  : "=r"(id)

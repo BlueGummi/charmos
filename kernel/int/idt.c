@@ -26,7 +26,7 @@ struct isr_entry **isr_table = NULL;
 #define MAKE_THIN_HANDLER(handler_name, message)                               \
     void handler_name##_fault(void *frame) {                                   \
         (void) frame;                                                          \
-        uint64_t core = get_sch_core_id();                                     \
+        uint64_t core = get_this_core_id();                                     \
         k_printf("\n=== " #handler_name " fault! ===\n");                      \
         k_printf("Message -> %s\n", message);                                  \
         k_panic("Core %u faulted\n", core);                                    \
@@ -38,7 +38,7 @@ struct isr_entry **isr_table = NULL;
 #define MAKE_HANDLER(handler_name, mnemonic)                                   \
     extern void handler_name##_handler_wrapper();                              \
     void handler_name##_handler(uint64_t error_code) {                         \
-        uint64_t core = get_sch_core_id();                                     \
+        uint64_t core = get_this_core_id();                                     \
         k_printf("\n=== " mnemonic " fault! ===\n");                           \
         k_printf("Error code: 0x%lx\n", error_code);                           \
         k_panic("Core %u faulted\n", core);                                    \
@@ -55,7 +55,7 @@ MAKE_HANDLER(ss, "STACK SEGMENT FAULT");
 MAKE_HANDLER(double_fault, "DOUBLE FAULT");
 
 void isr_common_entry(uint8_t vector, void *rsp) {
-    uint8_t c = get_sch_core_id();
+    uint8_t c = get_this_core_id();
     if (isr_table[c][vector].handler) {
         isr_table[c][vector].handler(isr_table[c][vector].ctx, vector, rsp);
     } else {
@@ -157,7 +157,7 @@ int idt_alloc_entry_on_core(uint64_t c) {
 }
 
 int idt_alloc_entry(void) {
-    return idt_alloc_entry_on_core(get_sch_core_id());
+    return idt_alloc_entry_on_core(get_this_core_id());
 }
 
 void idt_set_alloc(int entry, uint64_t c, bool used) {
@@ -172,12 +172,12 @@ void idt_free_entry(int entry) {
     if (entry < 32 || entry >= MAX_IDT_ENTRIES)
         return;
 
-    idt_entry_used[get_sch_core_id()][entry] = false;
+    idt_entry_used[get_this_core_id()][entry] = false;
 }
 
 static void tlb_shootdown(void *ctx, uint8_t irq, void *rsp) {
     (void) ctx, (void) irq, (void) rsp;
-    struct core *core = global_cores[get_sch_core_id()];
+    struct core *core = global_cores[get_this_core_id()];
     uintptr_t addr =
         atomic_load_explicit(&core->tlb_shootdown_page, memory_order_acquire);
     invlpg(addr);
@@ -210,7 +210,7 @@ void idt_install(uint64_t ind) {
 }
 
 void page_fault_handler(uint64_t error_code, uint64_t fault_addr) {
-    //    uint64_t core = get_sch_core_id();
+    //    uint64_t core = get_this_core_id();
     k_printf("\n=== PAGE FAULT ===\n");
     k_printf("Faulting Address (CR2): 0x%lx\n", fault_addr);
     //    k_printf("Core %u faulted\n", core);

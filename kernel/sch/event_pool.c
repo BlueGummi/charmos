@@ -10,7 +10,7 @@ static struct event_pool **pools = NULL;
 static int64_t num_pools = 0;
 
 static struct event_pool *get_event_pool_local(void) {
-    uint64_t core_id = get_sch_core_id();
+    uint64_t core_id = get_this_core_id();
     return pools[core_id];
 }
 
@@ -38,7 +38,7 @@ static struct event_pool *get_least_loaded_pool(void) {
 }
 
 static struct event_pool *get_least_loaded_remote_pool(void) {
-    return get_least_loaded_pool_except_core(get_sch_core_id());
+    return get_least_loaded_pool_except_core(get_this_core_id());
 }
 
 static void worker_main(void) {

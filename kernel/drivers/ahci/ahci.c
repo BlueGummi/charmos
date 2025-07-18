@@ -45,7 +45,7 @@ struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
         return NULL;
     }
 
-    uint64_t core = get_sch_core_id();
+    uint64_t core = get_this_core_id();
     isr_register(disk->device->irq_num, ahci_isr_handler, disk->device, core);
     ioapic_route_irq(irq_line, disk->device->irq_num, core, false);
     return disk;

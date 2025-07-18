@@ -12,7 +12,7 @@
 #define NVME_RESET_TIMEOUT_MS 30000 // Controller reset or format NVM
 
 #define DIV_ROUND_UP(x, y) (((x) + (y) - 1) / (y))
-#define THIS_QID (get_sch_core_id() + 1)
+#define THIS_QID (get_this_core_id() + 1)
 
 struct nvme_command {
     uint8_t opc;

@@ -42,7 +42,7 @@ static void do_tlb_shootdown(uint64_t addr) {
     if (!mp_ready)
         return;
 
-    uint64_t this_core = get_sch_core_id();
+    uint64_t this_core = get_this_core_id();
     uint64_t cores = scheduler_get_core_count();
     for (uint64_t i = 0; i < cores; i++) {
         if (i == this_core)

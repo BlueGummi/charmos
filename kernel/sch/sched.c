@@ -168,7 +168,7 @@ static void load_thread(struct scheduler *sched, struct thread *next) {
     if (next) {
         sched->current = next;
         next->state = RUNNING;
-        next->curr_core = get_sch_core_id();
+        next->curr_core = get_this_core_id();
     } else {
         sched->current = NULL;
     }
@@ -214,7 +214,7 @@ static bool all_threads_unrunnable(struct scheduler *sched) {
 }
 
 void schedule(void) {
-    uint64_t core_id = get_sch_core_id();
+    uint64_t core_id = get_this_core_id();
     struct scheduler *sched = local_schs[core_id];
 
     bool interrupts = spin_lock(&sched->lock);
