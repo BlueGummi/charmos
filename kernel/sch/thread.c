@@ -15,8 +15,6 @@
 
 uint64_t globid = 1;
 
-#define STACK_SIZE (PAGE_SIZE * 16)
-
 static void thread_exit() {
     disable_interrupts();
     struct thread *self = scheduler_get_curr_thread();

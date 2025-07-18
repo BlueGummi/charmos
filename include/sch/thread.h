@@ -1,5 +1,7 @@
 #include <stdint.h>
+#include <mem/alloc.h>
 #pragma once
+#define STACK_SIZE (PAGE_SIZE * 4)
 
 struct context {
     uint64_t rbx;
