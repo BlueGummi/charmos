@@ -1,3 +1,4 @@
+#pragma once
 #include <sch/thread.h>
 #include <sync/spin_lock.h>
 

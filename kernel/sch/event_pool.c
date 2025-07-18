@@ -1,7 +1,7 @@
 #include <compiler.h>
 #include <mem/alloc.h>
 #include <misc/sll.h>
-#include <sch/event_pool.h>
+#include <sch/defer.h>
 
 static struct event_pool pool = {0};
 

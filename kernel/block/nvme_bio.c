@@ -3,6 +3,7 @@
 #include <drivers/nvme.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
+#include <sch/defer.h>
 
 static void handle_coalesces(struct nvme_request *req,
                              struct bio_request *bio) {
@@ -17,16 +18,16 @@ static void handle_coalesces(struct nvme_request *req,
 
             if (coalesced->driver_private2) {
                 struct nvme_bio_data *dd = coalesced->driver_private2;
-                kfree(dd->prps);
-                kfree(coalesced->driver_private2);
+                defer_free(dd->prps);
+                defer_free(coalesced->driver_private2);
             }
 
             coalesced = coalesced->next_coalesced;
         }
 
         struct nvme_bio_data *dd = bio->driver_private2;
-        kfree(dd->prps);
-        kfree(bio->driver_private2);
+        defer_free(dd->prps);
+        defer_free(bio->driver_private2);
     }
 }
 
@@ -44,16 +45,16 @@ static void nvme_on_bio_complete(struct nvme_request *req) {
      * rename this */
     handle_coalesces(req, bio);
 
-    /* TODO: HACK used here to avoid jumping to invalid code */
+    /* used here to avoid jumping to invalid code */
     if ((uint64_t) bio->on_complete < 0xffffffff80000000) {
-        kfree(req);
+        defer_free(req);
         return;
     }
 
     if (bio->on_complete)
         bio->on_complete(bio);
 
-    kfree(req);
+    defer_free(req);
 }
 
 bool nvme_submit_bio_request(struct generic_disk *disk,

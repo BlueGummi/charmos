@@ -1,4 +1,5 @@
 #include <stdint.h>
+#pragma once
 
 #define LAPIC_ICR_LOW 0x300
 #define LAPIC_ICR_HIGH 0x310

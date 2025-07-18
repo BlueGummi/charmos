@@ -7,6 +7,7 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
+#pragma once
 
 typedef atomic_uint refcount_t;
 

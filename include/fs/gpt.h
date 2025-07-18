@@ -1,4 +1,5 @@
 #include <stdint.h>
+#pragma once
 
 struct gpt_header {
     uint64_t signature;

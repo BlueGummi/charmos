@@ -1,7 +1,6 @@
 #pragma once
 #include <block/generic.h>
 #include <block/sched.h>
-#include <s_assert.h>
 #include <sch/thread.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -264,8 +263,8 @@ struct ahci_cmd_header {
     uint32_t rsv1[4]; // Reserved
 } __attribute__((packed));
 
-STATIC_ASSERT((sizeof(struct ahci_cmd_header) == 32),
-              "AHCI command header must be 28 bytes large!");
+_Static_assert((sizeof(struct ahci_cmd_header) == 32),
+               "AHCI command header must be 28 bytes large!");
 
 #define ahci_info(log_level, fmt, ...)                                         \
     k_info("AHCI", log_level, fmt, ##__VA_ARGS__)

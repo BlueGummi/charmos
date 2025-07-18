@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <stdint.h>
+#pragma once
 
 enum devtmpfs_node_type {
     DEVTMPFS_DIR,

@@ -1,4 +1,5 @@
 #include <stdint.h>
+#pragma once
 
 struct elf64_ident {
     uint32_t magic;

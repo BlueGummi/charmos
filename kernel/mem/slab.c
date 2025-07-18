@@ -250,8 +250,8 @@ void kfree(void *ptr) {
     if (hdr->magic == MAGIC_KMALLOC_PAGE) {
         uintptr_t virt = (uintptr_t) hdr;
         for (uint64_t i = 0; i < hdr->pages; i++) {
-            pmm_free_pages((void *) vmm_get_phys(virt + i * PAGE_SIZE), 1,
-                           false);
+            void *phys = (void *) vmm_get_phys(virt + i * PAGE_SIZE);
+            pmm_free_pages(phys, 1, false);
         }
         spin_unlock(&kmalloc_lock, i);
         return;
