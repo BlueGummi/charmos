@@ -14,17 +14,21 @@ struct deferred_event {
     struct deferred_event *next;
 };
 
+/* Must be a power of two for modulo optimization */
+#define EVENT_POOL_CAPACITY 512
+
 struct worker_task {
     dpc_t func;
     void *arg;
-    struct worker_task *next;
 };
 
 struct event_pool {
-    struct worker_task *head;
-    struct worker_task *tail;
     struct spinlock lock;
     struct condvar queue_cv;
+
+    struct worker_task tasks[EVENT_POOL_CAPACITY];
+    uint64_t head; // producer index
+    uint64_t tail; // consumer index
 };
 
 void defer_init(void);
