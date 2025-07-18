@@ -52,9 +52,6 @@ struct scheduler *scheduler_pick_victim(struct scheduler *self);
 struct thread *scheduler_steal_work(struct scheduler *victim);
 uint64_t scheduler_get_core_count();
 
-bool try_begin_steal();
-void end_steal();
-
 extern struct scheduler **local_schs;
 extern uint32_t max_concurrent_stealers;
 extern atomic_uint active_stealers;

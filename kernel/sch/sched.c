@@ -79,6 +79,21 @@ static inline void maybe_recompute_threshold(uint64_t core_id) {
     }
 }
 
+static bool try_begin_steal() {
+    unsigned current = atomic_load(&active_stealers);
+    while (current < max_concurrent_stealers) {
+        if (atomic_compare_exchange_weak(&active_stealers, &current,
+                                         current + 1)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static inline void end_steal() {
+    atomic_fetch_sub(&active_stealers, 1);
+}
+
 static inline void stop_steal(struct scheduler *sched,
                               struct scheduler *victim) {
     if (victim)

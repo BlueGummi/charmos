@@ -9,7 +9,7 @@
 static struct event_pool **pools = NULL;
 static int64_t num_pools = 0;
 
-static struct event_pool *get_event_pool_local(void) {
+static inline struct event_pool *get_event_pool_local(void) {
     uint64_t core_id = get_this_core_id();
     return pools[core_id];
 }
@@ -17,9 +17,8 @@ static struct event_pool *get_event_pool_local(void) {
 static struct event_pool *get_least_loaded_pool_except_core(int64_t core_num) {
     uint64_t minimum_load = UINT64_MAX;
 
-    /* nothing - this just means that it won't avoid any core */
     if (core_num == -1)
-        ;
+        /* don't avoid any core */;
 
     /* There will always be a 'core 0 thread' */
     struct event_pool *least_loaded = pools[0];
@@ -33,12 +32,33 @@ static struct event_pool *get_least_loaded_pool_except_core(int64_t core_num) {
     return least_loaded;
 }
 
-static struct event_pool *get_least_loaded_pool(void) {
+static inline struct event_pool *get_least_loaded_pool(void) {
     return get_least_loaded_pool_except_core(-1);
 }
 
-static struct event_pool *get_least_loaded_remote_pool(void) {
+static inline struct event_pool *get_least_loaded_remote_pool(void) {
     return get_least_loaded_pool_except_core(get_this_core_id());
+}
+
+static inline struct worker_task pool_dequeue(struct event_pool *pool) {
+    struct worker_task task = pool->tasks[pool->tail % EVENT_POOL_CAPACITY];
+    pool->tail++;
+    pool->num_tasks--;
+    return task;
+}
+
+static struct event_pool *get_most_loaded_pool(void) {
+    uint64_t max_load = 0;
+    struct event_pool *most_loaded = NULL;
+    int64_t core_num = get_this_core_id();
+
+    for (int64_t i = 0; i < num_pools; i++) {
+        if (pools[i]->num_tasks > max_load && i != core_num) {
+            max_load = pools[i]->num_tasks;
+            most_loaded = pools[i];
+        }
+    }
+    return most_loaded;
 }
 
 static void worker_main(void) {
@@ -49,10 +69,7 @@ static void worker_main(void) {
         while (pool->head == pool->tail)
             condvar_wait(&pool->queue_cv, &pool->lock);
 
-        struct worker_task task = pool->tasks[pool->tail % EVENT_POOL_CAPACITY];
-        pool->tail++;
-        pool->num_tasks--;
-
+        struct worker_task task = pool_dequeue(pool);
         spin_unlock(&pool->lock, interrupts);
 
         task.func(task.arg);

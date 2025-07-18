@@ -7,21 +7,6 @@
 
 #include "sch/thread.h"
 
-bool try_begin_steal() {
-    unsigned current = atomic_load(&active_stealers);
-    while (current < max_concurrent_stealers) {
-        if (atomic_compare_exchange_weak(&active_stealers, &current,
-                                         current + 1)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-void end_steal() {
-    atomic_fetch_sub(&active_stealers, 1);
-}
-
 struct scheduler *scheduler_pick_victim(struct scheduler *self) {
     // self->stealing_work should already be set before this is called
     /* Ideally, we want to steal from our busiest core */
