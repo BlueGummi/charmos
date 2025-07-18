@@ -49,6 +49,12 @@ void scheduler_enqueue(struct thread *t) {
     scheduler_add_thread(s, t, false, false, true);
 }
 
+/* TODO: Make scheduler_add_thread an internal function so I don't need to
+ * pass in the 'false false true' here and all over the place */
+void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id) {
+    scheduler_add_thread(local_schs[core_id], t, false, false, true);
+}
+
 void scheduler_put_back(struct thread *t) {
     if (t->curr_core == -1)
         return;

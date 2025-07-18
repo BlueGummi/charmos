@@ -25,6 +25,8 @@ struct scheduler {
 };
 
 void scheduler_init(uint64_t core_count);
+
+/* TODO: Use these internally, no need to worry about the bool parameters */
 void scheduler_add_thread(struct scheduler *sched, struct thread *thread,
                           bool change_interrupts, bool already_locked,
                           bool is_new_thread);
@@ -36,6 +38,7 @@ void k_sch_idle(void);
 void scheduler_enable_timeslice();
 void scheduler_yield();
 void scheduler_enqueue(struct thread *t);
+void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id);
 void scheduler_put_back(struct thread *t);
 void scheduler_wake(struct thread *t);
 void scheduler_take_out(struct thread *t);
@@ -52,7 +55,6 @@ uint64_t scheduler_get_core_count();
 bool try_begin_steal();
 void end_steal();
 
-extern struct scheduler global_sched;
 extern struct scheduler **local_schs;
 extern uint32_t max_concurrent_stealers;
 extern atomic_uint active_stealers;
@@ -66,5 +68,15 @@ static inline struct thread *scheduler_get_curr_thread() {
     return c->current_thread;
 }
 
-#define CLI asm volatile("cli")
-#define STI asm volatile("sti")
+static inline struct thread *thread_spawn(void (*entry)(void)) {
+    struct thread *t = thread_create(entry);
+    scheduler_enqueue(t);
+    return t;
+}
+
+static inline struct thread *thread_spawn_on_core(void (*entry)(void),
+                                                  uint64_t core_id) {
+    struct thread *t = thread_create(entry);
+    scheduler_enqueue_on_core(t, core_id);
+    return t;
+}

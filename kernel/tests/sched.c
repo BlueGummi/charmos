@@ -34,7 +34,7 @@ static void event_pool_fn(void *arg) {
 }
 
 REGISTER_TEST(event_pool_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    event_pool_add(event_pool_fn, NULL);
+    event_pool_add_remote(event_pool_fn, NULL);
     sleep_ms(50);
     TEST_ASSERT(atomic_load(&event_pool_ran));
 

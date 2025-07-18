@@ -4,6 +4,7 @@
 #include <sync/condvar.h>
 #include <sync/spin_lock.h>
 #pragma once
+#define EVENT_POOL_CAPACITY 512
 
 typedef void (*dpc_t)(void *arg);
 
@@ -15,7 +16,6 @@ struct deferred_event {
 };
 
 /* Must be a power of two for modulo optimization */
-#define EVENT_POOL_CAPACITY 512
 
 struct worker_task {
     dpc_t func;
@@ -29,6 +29,8 @@ struct event_pool {
     struct worker_task tasks[EVENT_POOL_CAPACITY];
     uint64_t head; // producer index
     uint64_t tail; // consumer index
+
+    uint64_t num_tasks;
 };
 
 void defer_init(void);
@@ -38,9 +40,11 @@ bool defer_enqueue(dpc_t func, void *arg, uint64_t delay_ms);
 
 void event_pool_init(uint64_t num_threads);
 
-/* can only fail from allocation fail */
+/* these can only fail from allocation fail */
 bool event_pool_add(dpc_t func, void *arg);
+bool event_pool_add_remote(dpc_t func, void *arg);
+bool event_pool_add_local(dpc_t func, void *arg);
 
 static inline void defer_free(void *ptr) {
-    event_pool_add(kfree, ptr);
+    event_pool_add_remote(kfree, ptr);
 }

@@ -1,4 +1,5 @@
 #include <stdint.h>
+#pragma once
 
 struct context {
     uint64_t rbx;
@@ -55,13 +56,4 @@ void thread_block_on(struct thread_queue *q);
 struct thread *thread_queue_pop_front(struct thread_queue *q);
 void thread_queue_clear(struct thread_queue *q);
 void thread_queue_remove(struct thread_queue *q, struct thread *t);
-void scheduler_enqueue(struct thread *t);
 void thread_sleep_for_ms(uint64_t ms);
-
-static inline struct thread *thread_spawn(void (*entry)(void)) {
-    struct thread *t = thread_create(entry);
-    scheduler_enqueue(t);
-    return t;
-}
-
-#pragma once
