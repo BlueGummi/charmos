@@ -7,15 +7,10 @@ struct condvar {
 };
 
 static inline void condvar_wait(struct condvar *cv, struct spinlock *lock) {
-    bool interrupts = are_interrupts_enabled();
-
-    disable_interrupts();
     thread_block_on(&cv->waiters);
 
-    spin_unlock_no_cli(lock);
-
-    if (interrupts)
-        enable_interrupts();
+    bool change_interrupts = false;
+    spin_unlock(lock, change_interrupts);
 
     scheduler_yield();
 

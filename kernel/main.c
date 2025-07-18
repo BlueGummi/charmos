@@ -8,6 +8,7 @@
 #include <compiler.h>
 #include <console/printf.h>
 #include <elf.h>
+#include <fs/vfs.h>
 #include <int/idt.h>
 #include <limine.h>
 #include <mem/alloc.h>
@@ -18,6 +19,7 @@
 #include <misc/logo.h>
 #include <mp/core.h>
 #include <mp/mp.h>
+#include <requests.h>
 #include <sch/defer.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
@@ -25,14 +27,13 @@
 #include <stdint.h>
 #include <syscall.h>
 
-#include "fs/vfs.h"
-#include "requests.h"
-
 struct scheduler global_sched = {0};
 uint64_t a_rsdp = 0;
 char *g_root_part = "";
 struct vfs_node *g_root_node = NULL;
 struct vfs_mount *g_mount_list_head; // TODO: migrate these globals
+
+#define BEHAVIOR /* avoids undefined behavior */
 
 void k_main(void) {
     uint64_t c_cnt = mp_request.response->cpu_count;

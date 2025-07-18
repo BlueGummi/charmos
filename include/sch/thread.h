@@ -1,5 +1,6 @@
-#include <stdint.h>
 #include <mem/alloc.h>
+#include <stddef.h>
+#include <stdint.h>
 #pragma once
 #define STACK_SIZE (PAGE_SIZE * 4)
 
@@ -51,6 +52,8 @@ struct thread_queue {
 };
 
 struct thread *thread_create(void (*entry_point)(void));
+struct thread *thread_create_custom_stack(void (*entry_point)(void),
+                                          size_t stack_size);
 void thread_free(struct thread *t);
 void thread_queue_init(struct thread_queue *q);
 void thread_queue_push_back(struct thread_queue *q, struct thread *t);

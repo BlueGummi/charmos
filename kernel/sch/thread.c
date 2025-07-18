@@ -26,15 +26,15 @@ static void thread_exit() {
     scheduler_yield();
 }
 
-struct thread *thread_create(void (*entry_point)(void)) {
+static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     struct thread *new_thread =
         (struct thread *) kzalloc(sizeof(struct thread));
-    void *stack = kmalloc_aligned(STACK_SIZE, PAGE_SIZE);
+    void *stack = kmalloc_aligned(stack_size, PAGE_SIZE);
 
     if (unlikely(!new_thread || !stack))
         return NULL;
 
-    uint64_t stack_top = (uint64_t) stack + STACK_SIZE;
+    uint64_t stack_top = (uint64_t) stack + stack_size;
     uint64_t *sp = (uint64_t *) stack_top;
 
     *--sp = (uint64_t) thread_exit;
@@ -50,6 +50,15 @@ struct thread *thread_create(void (*entry_point)(void)) {
     new_thread->id = globid++;
 
     return new_thread;
+}
+
+struct thread *thread_create(void (*entry_point)(void)) {
+    return create(entry_point, STACK_SIZE);
+}
+
+struct thread *thread_create_custom_stack(void (*entry_point)(void),
+                                          size_t stack_size) {
+    return create(entry_point, stack_size);
 }
 
 void thread_free(struct thread *t) {
@@ -81,12 +90,16 @@ void thread_queue_clear(struct thread_queue *q) {
 }
 
 void thread_block_on(struct thread_queue *q) {
-    /* We're assuming interrupts were already off here.
-     * If not, the caller must re-enable them *after* yielding. */
+    bool interrupts = are_interrupts_enabled();
+
+    disable_interrupts();
 
     struct thread *current = scheduler_get_curr_thread();
     current->state = BLOCKED;
     thread_queue_push_back(q, current);
+
+    if (interrupts)
+        enable_interrupts();
 }
 
 static void wake_thread(void *a) {
