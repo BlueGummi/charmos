@@ -28,6 +28,14 @@ union hpet_timer_config {
         uint64_t periodic_capable : 1; // read-only
         uint64_t size_capable : 1;     // read-only, 1 = 64-bit capable
         uint64_t value_set : 1;
-        /* Other fields - I don't need them so I exclude them */
+        uint64_t reserved1 : 1;
+        uint64_t timer_32bit : 1;
+        uint64_t ioapic_route : 5;
+        uint64_t fsb_int_enable : 1;
+        uint64_t fsb_int_delivery : 1;
+        uint64_t reserved2:16;
+        uint64_t route_cap:32;
     };
-};
+}__attribute__((packed));
+
+_Static_assert(sizeof(union hpet_timer_config) == 8, "");

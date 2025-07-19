@@ -49,9 +49,10 @@ void hpet_setup_periodic_interrupt_us(uint64_t microseconds_period) {
     uint64_t ticks = hpet_us_to_ticks(microseconds_period);
 
     hpet_disable();
-    hpet_write64(HPET_MAIN_COUNTER_OFFSET, 0);
 
-    union hpet_timer_config timer_cfg = {0};
+    hpet_write64(HPET_MAIN_COUNTER_OFFSET, 0);
+    union hpet_timer_config timer_cfg;
+    timer_cfg.raw = hpet_read64(HPET_TIMER0_CONF_OFFSET);
     timer_cfg.interrupt_enable = 1;
     timer_cfg.interrupt_type = 1;
     timer_cfg.type = 1; // periodic
@@ -73,6 +74,8 @@ void hpet_program_oneshot(uint64_t future_ms) {
     union hpet_timer_config conf;
     conf.raw = hpet_read64(HPET_TIMER0_CONF_OFFSET);
     conf.type = 0;
+
+    /* TODO: dynamic, per core */
     conf.interrupt_type = 1;
     conf.interrupt_enable = 1;
     hpet_write64(HPET_TIMER0_CONF_OFFSET, conf.raw);
@@ -91,7 +94,7 @@ void hpet_init(void) {
     struct acpi_hpet *hpet = hpet_table.ptr;
     uint64_t hpet_addr = hpet->address.address;
 
-    hpet_base = vmm_map_phys(hpet_addr, 1024, PAGING_UNCACHABLE);
+    hpet_base = vmm_map_phys(hpet_addr, PAGE_SIZE, PAGING_UNCACHABLE);
 
     hpet_disable();
     hpet_write64(HPET_MAIN_COUNTER_OFFSET, 0);

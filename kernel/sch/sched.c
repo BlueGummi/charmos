@@ -43,8 +43,6 @@ void k_sch_main() {
     tests_run();
     k_info("MAIN", K_INFO, "Boot OK");
     while (1) {
-        hpet_disable();
-        k_printf("y u bother me\n");
         asm volatile("hlt");
     }
 }

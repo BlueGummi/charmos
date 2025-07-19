@@ -13,8 +13,7 @@ static struct spinlock defer_lock = {0};
 static uint64_t hpet_next_fire_time = UINT64_MAX;
 
 static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
-    (void) irq;
-    (void) ctx, (void) rsp;
+    (void) irq, (void) ctx, (void) rsp;
     uint64_t now = hpet_timestamp_ms();
 
     bool i = spin_lock(&defer_lock);

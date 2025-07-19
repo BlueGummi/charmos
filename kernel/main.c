@@ -68,6 +68,7 @@ void k_main(void) {
 
     hpet_init();
     ioapic_init();
+
     k_info("MAIN", K_INFO, "Early boot OK");
 
     // Scheduler
