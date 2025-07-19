@@ -107,9 +107,9 @@ static __always_inline void stop_steal(struct scheduler *sched,
     end_steal();
 }
 
-/* TODO: Very bad IDLE_THREAD weirdness */
 static __always_inline void scheduler_save_thread(struct scheduler *sched,
                                                   struct thread *curr) {
+    maybe_recompute_threshold(get_this_core_id());
     if (curr && curr->state == RUNNING) {
         curr->curr_core = -1;
         curr->time_in_level++;
@@ -186,6 +186,10 @@ static __always_inline void disable_timeslice() {
     }
 }
 
+static __always_inline void enable_timeslice() {
+    scheduler_enable_timeslice();
+}
+
 static __always_inline struct thread *
 load_idle_thread(struct scheduler *sched) {
     disable_timeslice();
@@ -196,7 +200,6 @@ void scheduler_yield() {
     bool were_enabled = are_interrupts_enabled();
     disable_interrupts();
 
-    scheduler_enable_timeslice();
     schedule();
 
     if (were_enabled)
@@ -213,60 +216,55 @@ static __always_inline void begin_steal(struct scheduler *sched) {
     atomic_store(&sched->stealing_work, true);
 }
 
-void schedule(void) {
-    uint64_t core_id = get_this_core_id();
-
-    struct scheduler *sched = local_schs[core_id];
-
-    bool interrupts = spin_lock(&sched->lock);
-
-    struct thread *prev = sched->current;
-    struct thread *curr = sched->current;
-    struct thread *next = NULL;
-
-    maybe_recompute_threshold(core_id);
-    scheduler_save_thread(sched, curr);
-
+static __always_inline struct thread *try_do_steal(struct scheduler *sched) {
     if (!scheduler_can_steal_work(sched))
-        goto regular_schedule;
+        return NULL;
 
     if (!try_begin_steal())
-        goto regular_schedule;
+        return NULL;
 
     begin_steal(sched);
     struct scheduler *victim = scheduler_pick_victim(sched);
 
     if (!victim) {
         stop_steal(sched, victim);
-        goto regular_schedule;
+        return NULL;
     }
 
     struct thread *stolen = scheduler_steal_work(victim);
     stop_steal(sched, victim);
 
-    if (stolen) {
-        next = stolen;
-        goto load_new_thread;
-    }
+    return stolen;
+}
 
-regular_schedule:
-    next = scheduler_pick_regular_thread(sched);
+void schedule(void) {
+    struct scheduler *sched = get_this_core_sched();
 
-load_new_thread:
-    load_thread(sched, next);
+    bool interrupts = spin_lock(&sched->lock);
+
+    struct thread *curr = sched->current;
+    struct thread *next = NULL;
+    scheduler_save_thread(sched, curr);
+
+    struct thread *stolen = try_do_steal(sched);
+
+    next = stolen ? stolen : scheduler_pick_regular_thread(sched);
 
     if (!next) {
         next = load_idle_thread(sched);
-    } else if (next == prev) {
-        disable_timeslice();
+    } else {
+        if (curr == next)
+            disable_timeslice();
+        else
+            enable_timeslice();
     }
 
+    load_thread(sched, next);
     update_core_current_thread(next);
-
     spin_unlock(&sched->lock, interrupts);
 
-    if (prev && next)
-        switch_context(&prev->regs, &next->regs);
+    if (curr && next)
+        switch_context(&curr->regs, &next->regs);
     else if (next)
         load_context(&next->regs);
 }

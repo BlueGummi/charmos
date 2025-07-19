@@ -79,3 +79,7 @@ static inline struct thread *thread_spawn_on_core(void (*entry)(void),
     scheduler_enqueue_on_core(t, core_id);
     return t;
 }
+
+static inline struct scheduler *get_this_core_sched(void) {
+    return local_schs[get_this_core_id()];
+}
