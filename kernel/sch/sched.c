@@ -186,6 +186,10 @@ static __always_inline void disable_timeslice() {
     }
 }
 
+static __always_inline void enable_timeslice() {
+    scheduler_enable_timeslice();
+}
+
 static __always_inline struct thread *
 load_idle_thread(struct scheduler *sched) {
     disable_timeslice();
@@ -196,7 +200,6 @@ void scheduler_yield() {
     bool were_enabled = are_interrupts_enabled();
     disable_interrupts();
 
-    scheduler_enable_timeslice();
     schedule();
 
     if (were_enabled)
@@ -255,14 +258,14 @@ regular_schedule:
 load_new_thread:
     load_thread(sched, next);
 
-    if (!next) {
+    if (!next)
         next = load_idle_thread(sched);
-    } else if (next == prev) {
+    else if (next == prev)
         disable_timeslice();
-    }
+    else
+        enable_timeslice();
 
     update_core_current_thread(next);
-
     spin_unlock(&sched->lock, interrupts);
 
     if (prev && next)
