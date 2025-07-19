@@ -29,6 +29,7 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     struct thread *new_thread =
         (struct thread *) kzalloc(sizeof(struct thread));
     void *stack = kmalloc_aligned(stack_size, PAGE_SIZE);
+    memset(stack, 0, stack_size);
 
     if (unlikely(!new_thread || !stack))
         return NULL;

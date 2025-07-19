@@ -1,6 +1,4 @@
 #include <limine.h>
-#include <mp/core.h>
-#include <sch/thread.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>

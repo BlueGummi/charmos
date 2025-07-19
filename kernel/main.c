@@ -82,6 +82,7 @@ void k_main(void) {
 
     restore_interrupts();
     scheduler_yield();
+
     while (1) {
         asm("hlt");
     }

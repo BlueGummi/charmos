@@ -49,11 +49,12 @@ add_custom_target(iso
 set(QEMU_COMMON_FLAGS
     -cdrom ${IMAGE_NAME}.iso
     -boot d
-    -m 4G
-    -smp cores=4
+    -m 1G
+    -smp cores=2
     -no-shutdown
     -no-reboot
     -s
+    -enable-kvm
     #-S
     -monitor telnet:127.0.0.1:1234,server,nowait
 
@@ -80,7 +81,7 @@ set(QEMU_COMMON_FLAGS
      #-device ide-hd,drive=fatdisk,bus=ahci0.3
 
 
-     #-d trace:*ahci*
+    #-d trace:*hpet*
     -trace file=trace.log
 )
 

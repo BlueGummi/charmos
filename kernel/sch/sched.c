@@ -35,6 +35,7 @@ atomic_uint total_threads = 0;
 /* How much more work the victim must be doing than the stealer
  * for the stealer to go through with the steal. */
 int64_t work_steal_min_diff = 130;
+
 void k_sch_main() {
     scheduler_get_curr_thread()->flags = NO_STEAL;
     k_info("MAIN", K_INFO, "Device setup");
@@ -42,6 +43,7 @@ void k_sch_main() {
     tests_run();
     k_info("MAIN", K_INFO, "Boot OK");
     while (1) {
+        hpet_disable();
         k_printf("y u bother me\n");
         asm volatile("hlt");
     }

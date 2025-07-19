@@ -18,6 +18,7 @@ static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
     uint64_t now = hpet_timestamp_ms();
 
     bool i = spin_lock(&defer_lock);
+
     while (defer_queue && defer_queue->timestamp_ms <= now) {
         struct deferred_event *ev = defer_queue;
         defer_queue = ev->next;
@@ -36,6 +37,8 @@ static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
     }
 
     spin_unlock(&defer_lock, i);
+
+    hpet_clear_interrupt_status();
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
 }
 

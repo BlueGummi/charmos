@@ -4,6 +4,7 @@
 #include <drivers/nvme.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
+#include <sch/defer.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -69,7 +70,7 @@ static bool rw_send_command(struct generic_disk *disk, uint64_t lba,
         return false;
 
     if (!nvme_bio_fill_prps(data, buffer, count * disk->sector_size)) {
-        kfree(data);
+        defer_free(data);
         return false;
     }
 

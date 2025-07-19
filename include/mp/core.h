@@ -1,6 +1,5 @@
 #pragma once
 #include <boot/tss.h>
-#include <sch/thread.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
