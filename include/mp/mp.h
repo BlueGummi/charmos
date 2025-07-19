@@ -11,5 +11,4 @@ void mp_wakeup_processors(struct limine_mp_response *mpr);
 void mp_complete_init();
 void mp_setup_bsp(uint64_t core_count);
 extern bool mp_ready;
-extern struct core **global_cores;
 #pragma once

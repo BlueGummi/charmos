@@ -1,3 +1,4 @@
+#pragma once
 #include <console/printf.h>
 #include <mp/core.h>
 #include <stdbool.h>
@@ -206,14 +207,6 @@ static inline void io_wait(void) {
     outb(0x80, 0);
 }
 
-static inline uint64_t get_this_core_id() {
-    uint64_t id;
-    asm volatile("movq %%gs:%c1, %0"
-                 : "=r"(id)
-                 : "i"(offsetof(struct core, id)));
-    return id;
-}
-
 static inline void clear_interrupts(void) {
     asm volatile("cli");
 }
@@ -237,8 +230,6 @@ static inline void invlpg(uint64_t virt) {
 static inline void cpu_relax(void) {
     asm volatile("pause");
 }
-
-#pragma once
 
 #define compiler_barrier() __asm__ __volatile__("" ::: "memory")
 
@@ -267,5 +258,3 @@ static inline void cpu_relax(void) {
 #else
 #error "Unsupported architecture for memory barriers"
 #endif
-
-#pragma once

@@ -18,7 +18,6 @@ uint64_t globid = 1;
 static void thread_exit() {
     disable_interrupts();
     struct thread *self = scheduler_get_curr_thread();
-
     self->state = ZOMBIE;
     reaper_enqueue(self);
     enable_interrupts();

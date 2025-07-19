@@ -108,6 +108,8 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
               IS_INTEGRATION_TEST) {
     EXT2_INIT;
     ABORT_IF_RAM_LOW();
+
+
     struct ext2_fs *fs = root->fs_data;
     struct generic_disk *d = fs->drive;
 

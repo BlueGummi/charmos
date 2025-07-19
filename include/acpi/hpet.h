@@ -6,6 +6,7 @@ uint64_t hpet_read64(uint64_t offset);
 void hpet_program_oneshot(uint64_t future_ms);
 uint64_t hpet_timestamp_ms(void);
 uint64_t hpet_timestamp_us(void);
+void hpet_interrupt_disable(void);
 
 #define HPET_GEN_CAP_ID_OFFSET 0x0
 #define HPET_GEN_CONF_OFFSET 0x10

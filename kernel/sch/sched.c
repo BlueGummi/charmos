@@ -1,7 +1,9 @@
 #include <acpi/lapic.h>
 #include <asm.h>
+#include <compiler.h>
 #include <console/printf.h>
 #include <int/idt.h>
+#include <mp/mp.h>
 #include <registry.h>
 #include <sch/sched.h>
 #include <stdatomic.h>
@@ -33,7 +35,6 @@ atomic_uint total_threads = 0;
 /* How much more work the victim must be doing than the stealer
  * for the stealer to go through with the steal. */
 int64_t work_steal_min_diff = 130;
-
 void k_sch_main() {
     scheduler_get_curr_thread()->flags = NO_STEAL;
     k_info("MAIN", K_INFO, "Device setup");
@@ -41,13 +42,16 @@ void k_sch_main() {
     tests_run();
     k_info("MAIN", K_INFO, "Boot OK");
     while (1) {
+        k_printf("y u bother me\n");
         asm volatile("hlt");
     }
 }
 
 void k_sch_idle() {
     while (1) {
-        restore_interrupts();
+        scheduler_get_curr_thread()->flags = NO_STEAL;
+        scheduler_get_curr_thread()->state = SLEEPING;
+        enable_interrupts();
         asm volatile("hlt");
     }
 }
@@ -67,19 +71,19 @@ void scheduler_wake(struct thread *t) {
     lapic_send_ipi(c, SCHEDULER_ID);
 }
 
-static inline void update_core_current_thread(struct thread *next) {
-    struct core *c = (void *) rdmsr(MSR_GS_BASE);
+static __always_inline void update_core_current_thread(struct thread *next) {
+    struct core *c = global_cores[get_this_core_id()];
     c->current_thread = next;
 }
 
-static inline void maybe_recompute_threshold(uint64_t core_id) {
+static __always_inline void maybe_recompute_threshold(uint64_t core_id) {
     if (core_id == 0) {
         uint64_t val = atomic_load(&total_threads);
         work_steal_min_diff = compute_steal_threshold(val, c_count);
     }
 }
 
-static bool try_begin_steal() {
+static __always_inline bool try_begin_steal() {
     unsigned current = atomic_load(&active_stealers);
     while (current < max_concurrent_stealers) {
         if (atomic_compare_exchange_weak(&active_stealers, &current,
@@ -90,12 +94,12 @@ static bool try_begin_steal() {
     return false;
 }
 
-static inline void end_steal() {
+static __always_inline void end_steal() {
     atomic_fetch_sub(&active_stealers, 1);
 }
 
-static inline void stop_steal(struct scheduler *sched,
-                              struct scheduler *victim) {
+static __always_inline void stop_steal(struct scheduler *sched,
+                                       struct scheduler *victim) {
     if (victim)
         atomic_store(&victim->being_robbed, false);
 
@@ -103,8 +107,9 @@ static inline void stop_steal(struct scheduler *sched,
     end_steal();
 }
 
-static void scheduler_save_thread(struct scheduler *sched,
-                                  struct thread *curr) {
+/* TODO: Very bad IDLE_THREAD weirdness */
+static __always_inline void scheduler_save_thread(struct scheduler *sched,
+                                                  struct thread *curr) {
     if (curr && curr->state == RUNNING) {
         curr->curr_core = -1;
         curr->time_in_level++;
@@ -117,17 +122,16 @@ static void scheduler_save_thread(struct scheduler *sched,
                 curr->mlfq_level++;
         }
 
-        if (curr->state == RUNNING) {
-            curr->state = READY;
-            bool change_interrupts = false;
-            bool locked = true;
-            bool new = false;
-            scheduler_add_thread(sched, curr, change_interrupts, locked, new);
-        }
+        curr->state = READY;
+        bool change_interrupts = false;
+        bool locked = true;
+        bool new = false;
+        scheduler_add_thread(sched, curr, change_interrupts, locked, new);
     }
 }
 
-static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {
+static __always_inline struct thread *
+scheduler_pick_regular_thread(struct scheduler *sched) {
     uint8_t bitmap = sched->queue_bitmap;
 
     while (bitmap) {
@@ -135,22 +139,8 @@ static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {
         bitmap &= ~(1 << lvl);
 
         struct thread_queue *q = &sched->queues[lvl];
-        if (!q->head)
-            continue; // could be stale
 
-        struct thread *start = q->head;
-        struct thread *iter = start;
-
-        do {
-            if (iter->state == READY || iter->state == IDLE_THREAD)
-                break;
-            iter = iter->next;
-        } while (iter != start);
-
-        if (iter->state != READY)
-            continue;
-
-        struct thread *next = iter;
+        struct thread *next = q->head;
 
         if (next == q->head && next == q->tail) {
             q->head = NULL;
@@ -179,7 +169,8 @@ static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {
     return NULL;
 }
 
-static void load_thread(struct scheduler *sched, struct thread *next) {
+static __always_inline void load_thread(struct scheduler *sched,
+                                        struct thread *next) {
     if (next) {
         sched->current = next;
         next->state = RUNNING;
@@ -189,47 +180,42 @@ static void load_thread(struct scheduler *sched, struct thread *next) {
     }
 }
 
-static inline void disable_timeslice() {
-    lapic_timer_disable();
+static __always_inline void disable_timeslice() {
+    if (lapic_timer_is_enabled()) {
+        lapic_timer_disable();
+    }
+}
+
+static __always_inline struct thread *
+load_idle_thread(struct scheduler *sched) {
+    disable_timeslice();
+    return sched->idle_thread;
 }
 
 void scheduler_yield() {
     bool were_enabled = are_interrupts_enabled();
-
     disable_interrupts();
+
+    scheduler_enable_timeslice();
     schedule();
+
     if (were_enabled)
         enable_interrupts();
 }
 
 void scheduler_enable_timeslice() {
-    lapic_timer_enable();
-}
-
-static inline void begin_steal(struct scheduler *sched) {
-    atomic_store(&sched->stealing_work, true);
-}
-
-static bool all_threads_unrunnable(struct scheduler *sched) {
-    for (uint64_t lvl = 0; lvl < MLFQ_LEVELS; lvl++) {
-        struct thread_queue *q = &sched->queues[lvl];
-        if (!q->head)
-            continue;
-
-        struct thread *start = q->head;
-        struct thread *iter = start;
-
-        do {
-            if (iter->state == READY)
-                return false;
-            iter = iter->next;
-        } while (iter != start);
+    if (!lapic_timer_is_enabled()) {
+        lapic_timer_enable();
     }
-    return true;
+}
+
+static __always_inline void begin_steal(struct scheduler *sched) {
+    atomic_store(&sched->stealing_work, true);
 }
 
 void schedule(void) {
     uint64_t core_id = get_this_core_id();
+
     struct scheduler *sched = local_schs[core_id];
 
     bool interrupts = spin_lock(&sched->lock);
@@ -237,9 +223,6 @@ void schedule(void) {
     struct thread *prev = sched->current;
     struct thread *curr = sched->current;
     struct thread *next = NULL;
-
-    if (!sched->active)
-        goto end;
 
     maybe_recompute_threshold(core_id);
     scheduler_save_thread(sched, curr);
@@ -272,21 +255,18 @@ regular_schedule:
 load_new_thread:
     load_thread(sched, next);
 
-    update_core_current_thread(next);
-
     if (!next) {
+        next = load_idle_thread(sched);
+    } else if (next == prev) {
         disable_timeslice();
-        goto end;
     }
 
-    if (all_threads_unrunnable(sched) && next->state == IDLE_THREAD)
-        disable_timeslice();
+    update_core_current_thread(next);
 
-end:
     spin_unlock(&sched->lock, interrupts);
 
-    if (prev)
+    if (prev && next)
         switch_context(&prev->regs, &next->regs);
-    else
+    else if (next)
         load_context(&next->regs);
 }

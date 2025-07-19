@@ -1,3 +1,5 @@
+#include <acpi/lapic.h>
+#include <int/idt.h>
 #include <misc/dll.h>
 #include <sch/sched.h>
 #include <stdatomic.h>
@@ -39,20 +41,24 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
 void scheduler_enqueue(struct thread *t) {
     struct scheduler *s = local_schs[0];
     uint64_t min_load = UINT64_MAX;
+    uint64_t min_core = 0;
 
     for (uint64_t i = 0; i < c_count; i++) {
         if (local_schs[i]->thread_count < min_load) {
             min_load = local_schs[i]->thread_count;
             s = local_schs[i];
+            min_core = i;
         }
     }
     scheduler_add_thread(s, t, false, false, true);
+    lapic_send_ipi(min_core, SCHEDULER_ID);
 }
 
 /* TODO: Make scheduler_add_thread an internal function so I don't need to
  * pass in the 'false false true' here and all over the place */
 void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id) {
     scheduler_add_thread(local_schs[core_id], t, false, false, true);
+    lapic_send_ipi(core_id, SCHEDULER_ID);
 }
 
 void scheduler_put_back(struct thread *t) {

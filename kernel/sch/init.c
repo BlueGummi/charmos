@@ -36,9 +36,7 @@ void scheduler_init(uint64_t core_count) {
         }
 
         struct thread *t0 = thread_create(k_sch_idle);
-        scheduler_add_thread(s, t0, false, false, true);
-        t0 = thread_create(k_sch_idle);
-        scheduler_add_thread(s, t0, false, false, true);
+        s->idle_thread = t0;
 
         if (!i) {
             struct thread *t = thread_create(k_sch_main);
@@ -48,5 +46,5 @@ void scheduler_init(uint64_t core_count) {
         local_schs[i] = s;
     }
     reaper_init();
-    event_pool_init(core_count);
+    event_pool_init();
 }

@@ -5,7 +5,6 @@
 #include <sync/condvar.h>
 #include <sync/spin_lock.h>
 
-/* TODO: Many threads per core */
 static struct event_pool **pools = NULL;
 static int64_t num_pools = 0;
 
@@ -47,7 +46,7 @@ static inline struct worker_task pool_dequeue(struct event_pool *pool) {
     return task;
 }
 
-static void worker_main(void) {
+void worker_main(void) {
     while (1) {
         struct event_pool *pool = get_event_pool_local();
         bool interrupts = spin_lock(&pool->lock);
@@ -100,16 +99,13 @@ bool event_pool_add_local(dpc_t func, void *arg) {
 }
 
 static void spawn_on_core(uint64_t core, uint64_t threads) {
-    for (uint64_t i = 0; i < threads; i++) {
-        struct thread *t = thread_spawn_on_core(worker_main, core);
-        if (!t)
-            k_panic("Failed to spawn worker thread on core %u\n", core);
-
-        t->flags = NO_STEAL;
-    }
+    for (uint64_t i = 0; i < threads; i++)
+        worker_spawn_on_core(core);
 }
 
-void event_pool_init(uint64_t num_threads) {
+void event_pool_init(void) {
+    uint64_t num_threads = 1;
+
     num_pools = scheduler_get_core_count();
     pools = kzalloc(sizeof(struct event_pool *) * num_pools);
 

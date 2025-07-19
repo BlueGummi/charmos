@@ -15,7 +15,7 @@
 extern void context_switch();
 extern void page_fault_handler_wrapper();
 extern void syscall_entry();
-void page_fault_handler(uint64_t error_code, uint64_t fault_addr);
+void page_fault_handler(void *context, uint8_t vector, void *rsp);
 #define MAX_IDT_ENTRIES 256
 static bool **idt_entry_used = NULL;
 struct isr_entry **isr_table = NULL;
@@ -26,7 +26,7 @@ struct isr_entry **isr_table = NULL;
 #define MAKE_THIN_HANDLER(handler_name, message)                               \
     void handler_name##_fault(void *frame) {                                   \
         (void) frame;                                                          \
-        uint64_t core = get_this_core_id();                                     \
+        uint64_t core = get_this_core_id();                                    \
         k_printf("\n=== " #handler_name " fault! ===\n");                      \
         k_printf("Message -> %s\n", message);                                  \
         k_panic("Core %u faulted\n", core);                                    \
@@ -38,7 +38,7 @@ struct isr_entry **isr_table = NULL;
 #define MAKE_HANDLER(handler_name, mnemonic)                                   \
     extern void handler_name##_handler_wrapper();                              \
     void handler_name##_handler(uint64_t error_code) {                         \
-        uint64_t core = get_this_core_id();                                     \
+        uint64_t core = get_this_core_id();                                    \
         k_printf("\n=== " mnemonic " fault! ===\n");                           \
         k_printf("Error code: 0x%lx\n", error_code);                           \
         k_panic("Core %u faulted\n", core);                                    \
@@ -55,7 +55,9 @@ MAKE_HANDLER(ss, "STACK SEGMENT FAULT");
 MAKE_HANDLER(double_fault, "DOUBLE FAULT");
 
 void isr_common_entry(uint8_t vector, void *rsp) {
+    mark_self_in_interrupt();
     uint8_t c = get_this_core_id();
+
     if (isr_table[c][vector].handler) {
         isr_table[c][vector].handler(isr_table[c][vector].ctx, vector, rsp);
     } else {
@@ -63,11 +65,18 @@ void isr_common_entry(uint8_t vector, void *rsp) {
         while (1)
             asm volatile("hlt");
     }
+
+    unmark_self_in_interrupt();
 }
 
 void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {
     (void) ctx, (void) vector, (void) rsp;
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
+    lapic_timer_enable();
+
+    /* Doing this as the `schedule()` will go to another thread */
+    unmark_self_in_interrupt();
+
     schedule();
 }
 
@@ -194,10 +203,9 @@ void idt_install(uint64_t ind) {
 
     idt_set_gate(SSF_ID, (uint64_t) ss_handler, 0x08, 0x8E, ind);
 
-    /*idt_set_gate(GPF_ID, (uint64_t) gpf_handler, 0x08, 0x8E, ind);
+    idt_set_gate(GPF_ID, (uint64_t) gpf_handler, 0x08, 0x8E, ind);
     idt_set_gate(DBF_ID, (uint64_t) double_fault_handler, 0x08, 0x8E, ind);
-    idt_set_gate(PAGE_FAULT_ID, (uint64_t) page_fault_handler, 0x08, 0x8E,
-    ind);*/
+    idt_set_gate(PAGE_FAULT_ID, (uint64_t) page_fault_handler, 0x08, 0x8E, ind);
 
     idt_set_gate(TIMER_ID, (uint64_t) isr_timer_routine, 0x08, 0x8E, ind);
 
@@ -209,11 +217,19 @@ void idt_install(uint64_t ind) {
     idt_load(ind);
 }
 
-void page_fault_handler(uint64_t error_code, uint64_t fault_addr) {
-    //    uint64_t core = get_this_core_id();
+static struct spinlock pf_lock = SPINLOCK_INIT;
+void page_fault_handler(void *context, uint8_t vector, void *rsp) {
+    (void) context, (void) vector;
+
+    uint64_t *stack = (uint64_t *) rsp;
+    uint64_t error_code = stack[15];
+    uint64_t fault_addr;
+
+    asm volatile("mov %%cr2, %0" : "=r"(fault_addr));
+
+    spin_lock_no_cli(&pf_lock);
     k_printf("\n=== PAGE FAULT ===\n");
     k_printf("Faulting Address (CR2): 0x%lx\n", fault_addr);
-    //    k_printf("Core %u faulted\n", core);
     k_printf("Error Code: 0x%lx\n", error_code);
     k_printf("  - Page not Present (P): %s\n",
              (error_code & 0x01) ? "Yes" : "No");
@@ -227,12 +243,15 @@ void page_fault_handler(uint64_t error_code, uint64_t fault_addr) {
              (error_code & 0x10) ? "Yes" : "No");
     k_printf("  - Protection Key Violation (PK): %s\n",
              (error_code & 0x20) ? "Yes" : "No");
+
     if (!(error_code & 0x04)) {
-        k_panic("KERNEL PAGE FAULT\n");
+        spin_unlock_no_cli(&pf_lock);
+        k_panic("KERNEL PAGE FAULT ON CORE %llu\n", get_this_core_id());
         while (1) {
             asm("cli;hlt");
         }
     }
+    spin_unlock_no_cli(&pf_lock);
     /*    if (global_sched.active) {
             scheduler_rm_thread(&global_sched, global_sched.current);
         }*/

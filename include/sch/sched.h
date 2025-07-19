@@ -21,6 +21,7 @@ struct scheduler {
     atomic_bool being_robbed;
     atomic_bool stealing_work;
     struct spinlock lock;
+    struct thread *idle_thread;
     uint8_t queue_bitmap;
 };
 

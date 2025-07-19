@@ -24,7 +24,7 @@ static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
 
         spin_unlock(&defer_lock, i);
         ev->callback(ev->arg);
-        kfree(ev);
+        defer_free(ev);
         i = spin_lock(&defer_lock);
     }
 
@@ -41,7 +41,7 @@ static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
 
 bool defer_enqueue(dpc_t func, void *arg, uint64_t delay_ms) {
     uint64_t now = time_get_ms();
-    struct deferred_event *ev = kmalloc(sizeof(struct deferred_event));
+    struct deferred_event *ev = kzalloc(sizeof(struct deferred_event));
     if (!ev)
         return false;
 
@@ -76,5 +76,6 @@ void defer_init(void) {
 
     idt_set_alloc(vector, 0, true);
     isr_register(vector, hpet_irq_handler, NULL, 0);
+    k_info("DEFER", K_INFO, "Allocated IRQ %u for defer interrupts", vector);
     ioapic_route_irq(HPET_IRQ_LINE, vector, 0, false);
 }

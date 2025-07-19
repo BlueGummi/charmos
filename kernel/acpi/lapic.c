@@ -2,7 +2,7 @@
 #include <asm.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
-uint64_t *lapic;
+uint32_t *lapic;
 
 void lapic_init(void) {
     uintptr_t lapic_phys = rdmsr(IA32_APIC_BASE_MSR) & IA32_APIC_BASE_MASK;
@@ -30,6 +30,11 @@ void lapic_timer_enable() {
     uint32_t lvt = LAPIC_READ(LAPIC_REG(LAPIC_REG_LVT_TIMER));
     lvt &= ~LAPIC_LVT_MASK;
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_LVT_TIMER), lvt);
+}
+
+bool lapic_timer_is_enabled() {
+    uint32_t lvt = LAPIC_READ(LAPIC_REG(LAPIC_REG_LVT_TIMER));
+    return !(lvt & (1 << 16));
 }
 
 void lapic_send_ipi(uint8_t apic_id, uint8_t vector) {

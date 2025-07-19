@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdint.h>
 #pragma once
 
@@ -36,11 +37,12 @@
 
 #define TIMER_VECTOR 0x20
 #define TIMER_MODE_PERIODIC (1 << 17)
-extern uint64_t *lapic;
+extern uint32_t *lapic;
 void lapic_init();
 void lapic_timer_init(void);
 uint64_t lapic_get_id(void);
 void lapic_timer_disable();
+bool lapic_timer_is_enabled();
 void lapic_timer_enable();
 void lapic_send_ipi(uint8_t apic_id, uint8_t vector);
 #define IA32_APIC_BASE_MSR 0x1B

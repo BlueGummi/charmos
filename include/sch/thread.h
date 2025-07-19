@@ -16,16 +16,15 @@ struct context {
 };
 
 enum thread_state {
-    NEW,         // Thread is created but not yet scheduled
-    READY,       // Thread is ready to run but not currently running
-    RUNNING,     // Thread is currently executing
-    BLOCKED,     // Waiting on I/O, lock, or condition (e.g. sleep, mutex)
-    SLEEPING,    // Temporarily not runnable for a set time (like `sleep()`)
-    WAITING,     // Similar to BLOCKED but specifically for event/resource
-    ZOMBIE,      // Finished executing but parent hasn't reaped it yet
-    TERMINATED,  // Fully done, can be cleaned up
-    HALTED,      // Thread manually suspended (like `kill -STOP`)
-    IDLE_THREAD, // Kernel idle thread
+    NEW,        // Thread is created but not yet scheduled
+    READY,      // Thread is ready to run but not currently running
+    RUNNING,    // Thread is currently executing
+    BLOCKED,    // Waiting on I/O, lock, or condition (e.g. sleep, mutex)
+    SLEEPING,   // Temporarily not runnable for a set time (like `sleep()`)
+    WAITING,    // Similar to BLOCKED but specifically for event/resource
+    ZOMBIE,     // Finished executing but parent hasn't reaped it yet
+    TERMINATED, // Fully done, can be cleaned up
+    HALTED,     // Thread manually suspended (like `kill -STOP`)
 };
 
 enum thread_flags {
@@ -62,3 +61,11 @@ struct thread *thread_queue_pop_front(struct thread_queue *q);
 void thread_queue_clear(struct thread_queue *q);
 void thread_queue_remove(struct thread_queue *q, struct thread *t);
 void thread_sleep_for_ms(uint64_t ms);
+
+/* TODO: HACK putting these here due to header recursion */
+
+static inline void thread_set_state(struct thread *t, enum thread_state state) {
+    asm volatile("cli");
+    t->state = state;
+    asm volatile("sti");
+}
