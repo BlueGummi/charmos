@@ -1,6 +1,4 @@
 #pragma once
-#include <console/printf.h>
-#include <mp/core.h>
 #include <stdbool.h>
 #include <stdint.h>
 

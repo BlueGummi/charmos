@@ -6,10 +6,6 @@
 
 extern uint64_t *hpet_base;
 
-static inline uint32_t hpet_get_fs_per_tick(void) {
-    return hpet_read64(HPET_GEN_CAP_ID_OFFSET) >> 32;
-}
-
 static void sleep_hpet_fs(uint64_t femtoseconds) {
     uint32_t fs_per_tick = hpet_get_fs_per_tick();
     uint64_t ticks_to_wait = femtoseconds / fs_per_tick;

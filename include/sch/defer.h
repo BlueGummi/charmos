@@ -1,3 +1,4 @@
+#include <console/printf.h>
 #include <mem/alloc.h>
 #include <stdbool.h>
 #include <stdint.h>

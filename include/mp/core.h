@@ -2,6 +2,7 @@
 #include <boot/tss.h>
 #include <stdatomic.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 enum core_state {

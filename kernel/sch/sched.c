@@ -48,9 +48,9 @@ void k_sch_main() {
 }
 
 void k_sch_idle() {
+    scheduler_get_curr_thread()->flags = NO_STEAL;
+    scheduler_get_curr_thread()->state = SLEEPING;
     while (1) {
-        scheduler_get_curr_thread()->flags = NO_STEAL;
-        scheduler_get_curr_thread()->state = SLEEPING;
         enable_interrupts();
         asm volatile("hlt");
     }

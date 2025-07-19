@@ -1,8 +1,7 @@
+#include <asm.h>
 #include <stdint.h>
 #pragma once
 void hpet_init(void);
-void hpet_write64(uint64_t offset, uint64_t value);
-uint64_t hpet_read64(uint64_t offset);
 void hpet_program_oneshot(uint64_t future_ms);
 uint64_t hpet_timestamp_ms(void);
 uint64_t hpet_timestamp_us(void);
@@ -33,9 +32,22 @@ union hpet_timer_config {
         uint64_t ioapic_route : 5;
         uint64_t fsb_int_enable : 1;
         uint64_t fsb_int_delivery : 1;
-        uint64_t reserved2:16;
-        uint64_t route_cap:32;
+        uint64_t reserved2 : 16;
+        uint64_t route_cap : 32;
     };
-}__attribute__((packed));
+} __attribute__((packed));
 
 _Static_assert(sizeof(union hpet_timer_config) == 8, "");
+
+extern uint64_t *hpet_base;
+static inline void hpet_write64(uint64_t offset, uint64_t value) {
+    mmio_write_64((void *) ((uintptr_t) hpet_base + offset), value);
+}
+
+static inline uint64_t hpet_read64(uint64_t offset) {
+    return mmio_read_64((void *) ((uintptr_t) hpet_base + offset));
+}
+
+static inline uint32_t hpet_get_fs_per_tick(void) {
+    return hpet_read64(HPET_GEN_CAP_ID_OFFSET) >> 32;
+}
