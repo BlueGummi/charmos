@@ -85,8 +85,6 @@ enum errno ext2_readlink(struct ext2_fs *fs, struct ext2_full_inode *node,
     if (!block)
         return ERR_IO;
 
-    bcache_ent_acquire(ent);
-
     if (!block)
         return ERR_IO;
 

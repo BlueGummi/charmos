@@ -63,8 +63,6 @@ void thread_queue_clear(struct thread_queue *q);
 void thread_queue_remove(struct thread_queue *q, struct thread *t);
 void thread_sleep_for_ms(uint64_t ms);
 
-/* TODO: HACK putting these here due to header recursion */
-
 static inline void thread_set_state(struct thread *t, enum thread_state state) {
     bool i = are_interrupts_enabled();
     disable_interrupts();

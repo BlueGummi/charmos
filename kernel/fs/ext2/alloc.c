@@ -29,7 +29,6 @@ static uint32_t alloc_from_bitmap(struct ext2_fs *fs, uint32_t bitmap_block,
     if (!bitmap)
         return -1;
 
-    bcache_ent_acquire(ent);
     if (!find_free_bit(bitmap, fs->block_size, &byte_pos, &bit_pos)) {
         bcache_ent_release(ent);
         return -1;
@@ -92,7 +91,6 @@ bool ext2_free_block(struct ext2_fs *fs, uint32_t block_num) {
     if (!bitmap)
         return false;
 
-    bcache_ent_acquire(ent);
     uint32_t byte = index / 8;
     uint8_t bit = 1 << (index % 8);
 
@@ -143,8 +141,6 @@ bool ext2_free_inode(struct ext2_fs *fs, uint32_t inode_num) {
     uint8_t *bitmap = ext2_block_read(fs, bitmap_block, &ent);
     if (!bitmap)
         return false;
-
-    bcache_ent_acquire(ent);
 
     uint32_t byte = index / 8;
     uint8_t bit = 1 << (index % 8);

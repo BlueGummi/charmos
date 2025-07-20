@@ -4,6 +4,7 @@
 #include <mem/slab.h>
 #include <mem/vmm.h>
 #include <misc/magic_numbers.h>
+#include <mp/core.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -189,8 +190,8 @@ static void *slab_alloc(struct slab_cache *cache) {
             return obj;
         }
     }
-    spin_unlock(&cache->lock, interrupts);
 
+    spin_unlock(&cache->lock, interrupts);
     struct slab *slab = slab_create(cache);
     if (!slab)
         return NULL;
@@ -214,7 +215,7 @@ static int uint64_to_index(uint64_t size) {
     return (shift > SLAB_MAX_SHIFT) ? -1 : shift - SLAB_MIN_SHIFT;
 }
 
-void slab_init(uint64_t num_cores) {
+void slab_init() {
     for (int i = 0; i < SLAB_CLASS_COUNT; i++) {
         uint64_t size = 1UL << (i + SLAB_MIN_SHIFT);
         slab_cache_init(&slab_caches[i], size);
@@ -222,8 +223,9 @@ void slab_init(uint64_t num_cores) {
 
     for (int i = 0; i < SLAB_CLASS_COUNT; i++) {
         struct slab_cache *cache = &slab_caches[i];
-        cache->percore_caches = kzalloc(sizeof(struct slab *) * num_cores);
-        for (uint64_t j = 0; j < num_cores; j++) {
+        cache->percore_caches =
+            kzalloc(sizeof(struct slab *) * global.core_count);
+        for (uint64_t j = 0; j < global.core_count; j++) {
             cache->percore_caches[j] = kzalloc(sizeof(struct slab));
         }
     }
@@ -323,8 +325,7 @@ void *kmalloc_aligned(uint64_t size, uint64_t align) {
         return NULL;
 
     uintptr_t aligned = (raw + sizeof(uintptr_t) + align - 1) & ~(align - 1);
-    ((uintptr_t *) aligned)[-1] =
-        raw; // Store original ptr before aligned block
+    ((uintptr_t *) aligned)[-1] = raw;
 
     return (void *) aligned;
 }

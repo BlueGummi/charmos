@@ -12,12 +12,12 @@
 
 #include "fs/detect.h"
 #define EXT2_INIT                                                              \
-    if (g_root_node->fs_type != FS_EXT2) {                                     \
+    if (global.root_node->fs_type != FS_EXT2) {                                \
         ADD_MESSAGE("the mounted root is not ext2");                           \
         SET_SKIP;                                                              \
         return;                                                                \
     }                                                                          \
-    struct vfs_node *root = g_root_node;
+    struct vfs_node *root = global.root_node;
 
 static bool done2 = false;
 static bool cb1d = false, cb2d = false;
@@ -108,7 +108,6 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
               IS_INTEGRATION_TEST) {
     EXT2_INIT;
     ABORT_IF_RAM_LOW();
-
 
     struct ext2_fs *fs = root->fs_data;
     struct generic_disk *d = fs->drive;

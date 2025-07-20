@@ -8,12 +8,12 @@
 #include <tests.h>
 
 #define EXT2_INIT                                                              \
-    if (g_root_node->fs_type != FS_EXT2) {                                     \
+    if (global.root_node->fs_type != FS_EXT2) {                                \
         ADD_MESSAGE("the mounted root is not ext2");                           \
         SET_SKIP;                                                              \
         return;                                                                \
     }                                                                          \
-    struct vfs_node *root = g_root_node;
+    struct vfs_node *root = global.root_node;
 
 /*
 static void check_bcache(void) {
@@ -35,7 +35,7 @@ static void check_bcache(void) {
 }*/
 
 static void flush() {
-    struct ext2_fs *fs = g_root_node->fs_data;
+    struct ext2_fs *fs = global.root_node->fs_data;
     struct generic_disk *d = fs->drive;
 
     bio_sched_dispatch_all(d);

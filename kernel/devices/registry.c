@@ -1,4 +1,5 @@
 #include <block/generic.h>
+#include <charmos.h>
 #include <console/printf.h>
 #include <drivers/ahci.h>
 #include <drivers/ata.h>
@@ -103,7 +104,7 @@ void registry_setup() {
     ata_init(devices, count);
 
     k_info("VFS", K_INFO, "Attempting to find and mount root '%s'",
-           g_root_part);
+           global.root_partition);
     bool found_root = false;
     for (uint64_t i = 0; i < disk_count; i++) {
         struct generic_disk *disk = registry_get_by_index(i);
@@ -111,12 +112,12 @@ void registry_setup() {
         for (uint32_t j = 0; j < disk->partition_count; j++) {
             struct generic_partition *p = &disk->partitions[j];
 
-            if (strcmp(p->name, g_root_part) == 0) {
+            if (strcmp(p->name, global.root_partition) == 0) {
                 struct vfs_node *root = p->mount(p);
                 if (!root)
                     k_panic("VFS failed to mount root '%s' - mount failure\n",
-                            g_root_part);
-                g_root_node = root;
+                            global.root_partition);
+                global.root_node = root;
                 found_root = true;
             }
         }
@@ -124,8 +125,8 @@ void registry_setup() {
 
     if (!found_root)
         k_panic("VFS failed to mount root '%s' - could not find root\n",
-                g_root_part);
+                global.root_partition);
 
     k_info("VFS", K_INFO, "Root '%s' mounted - is a(n) %s filesystem",
-           g_root_part, detect_fstr(g_root_node->fs_type));
+           global.root_partition, detect_fstr(global.root_node->fs_type));
 }

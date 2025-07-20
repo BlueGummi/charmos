@@ -49,13 +49,13 @@ static inline struct worker_task pool_dequeue(struct event_pool *pool) {
 void worker_main(void) {
     while (1) {
         struct event_pool *pool = get_event_pool_local();
-        bool interrupts = spin_lock(&pool->lock);
+        spin_lock(&pool->lock);
 
         while (pool->head == pool->tail)
             condvar_wait(&pool->queue_cv, &pool->lock);
 
         struct worker_task task = pool_dequeue(pool);
-        spin_unlock(&pool->lock, interrupts);
+        spin_unlock(&pool->lock, true);
 
         task.func(task.arg);
     }
@@ -106,7 +106,7 @@ static void spawn_on_core(uint64_t core, uint64_t threads) {
 void event_pool_init(void) {
     uint64_t num_threads = 1;
 
-    num_pools = scheduler_get_core_count();
+    num_pools = global.core_count;
     pools = kzalloc(sizeof(struct event_pool *) * num_pools);
 
     if (!pools)

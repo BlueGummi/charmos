@@ -28,7 +28,7 @@ struct slab_cache {
     struct slab *slabs_free;
     struct slab *slabs_partial;
     struct slab *slabs_full;
-    struct slab **percore_caches;
+    struct slab_cache_percore **percore_caches;
 
     struct spinlock lock;
 };
@@ -38,7 +38,7 @@ struct slab_phdr {
     uint64_t pages;
 };
 
-void slab_init(uint64_t num_cores);
+void slab_init();
 extern struct slab_cache slab_caches[SLAB_CLASS_COUNT];
 extern uintptr_t slab_heap_top;
 

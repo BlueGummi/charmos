@@ -15,7 +15,6 @@ uint32_t ext2_block_to_lba(struct ext2_fs *fs, uint32_t block_num) {
     return lba;
 }
 
-/* not our job to lock it */
 uint8_t *ext2_block_read(struct ext2_fs *fs, uint32_t block_num,
                          struct bcache_entry **out) {
     if (!fs)
@@ -26,7 +25,10 @@ uint8_t *ext2_block_read(struct ext2_fs *fs, uint32_t block_num,
     uint32_t lba = ext2_block_to_lba(fs, block_num);
     uint32_t spb = fs->sectors_per_block;
 
-    return bcache_get(d, lba, fs->block_size, spb, false, out);
+    uint8_t *buf = bcache_get(d, lba, fs->block_size, spb, false, out);
+
+    bcache_ent_acquire(*out);
+    return buf;
 }
 
 bool ext2_block_write(struct ext2_fs *fs, struct bcache_entry *ent,
@@ -43,8 +45,9 @@ bool ext2_block_write(struct ext2_fs *fs, struct bcache_entry *ent,
 
 struct ext2_inode *ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
                                    struct bcache_entry **out_ent) {
-    if (!fs || inode_idx == 0 || inode_idx > fs->sblock->inodes_count)
+    if (!fs || inode_idx == 0 || inode_idx > fs->inodes_count) {
         return NULL;
+    }
 
     uint32_t inodes_per_group = fs->sblock->inodes_per_group;
     uint32_t inode_size = fs->sblock->inode_size;
@@ -66,7 +69,6 @@ struct ext2_inode *ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
     if (!buf)
         return NULL;
 
-    bcache_ent_acquire(ent);
     if (out_ent)
         *out_ent = ent;
 
@@ -93,7 +95,6 @@ bool ext2_inode_write(struct ext2_fs *fs, uint32_t inode_num,
     if (!block_buf)
         return false;
 
-    bcache_ent_acquire(ent);
     memcpy(block_buf + block_offset, inode, fs->inode_size);
     bcache_ent_release(ent);
 

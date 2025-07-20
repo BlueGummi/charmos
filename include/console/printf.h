@@ -12,6 +12,10 @@
 
 void debug_print_stack();
 
+static inline void qemu_exit(int code) {
+    outb(0xf4, ((code << 1) | 1) & 0xFF);
+}
+
 #define ELEVEN_LINES "==========="
 #define TWENTY_TWO_LINES ELEVEN_LINES ELEVEN_LINES
 #define FORTY_FOUR_LINES TWENTY_TWO_LINES TWENTY_TWO_LINES
@@ -36,6 +40,7 @@ void debug_print_stack();
         k_printf(fmt, ##__VA_ARGS__);                                          \
         debug_print_stack();                                                   \
         k_printf("\n" EIGHTY_EIGHT_LINES "\n");                                \
+        qemu_exit(1);                                                          \
         while (1)                                                              \
             asm("hlt");                                                        \
     } while (0)

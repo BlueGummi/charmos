@@ -358,32 +358,18 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     uint32_t superblock_block = 1024 / fs->block_size;
     uint32_t gdt_block = (fs->block_size == 1024) ? 2 : 1;
 
-    struct bcache_entry *gdt_ent;
-
-    uint32_t lba = ext2_block_to_lba(fs, gdt_block);
-
-    uint32_t bs = fs->block_size;
-    uint32_t spb = fs->sectors_per_block;
-    fs->group_desc =
-        (void *) bcache_create_ent(fs->drive, lba, bs, spb, true, &gdt_ent);
-
-    if (!fs->group_desc)
-        return ERR_IO;
-
     fs->sblock =
         (void *) ext2_block_read(fs, superblock_block, &fs->sbcache_ent);
-    ext2_block_read(fs, gdt_block, &fs->gdesc_cache_ent);
 
-    if (!gdt_ent)
-        return ERR_IO;
+    fs->group_desc =
+        (void *) ext2_block_read(fs, gdt_block, &fs->gdesc_cache_ent);
 
     struct ext2_inode *inode = kzalloc(sizeof(struct ext2_inode));
     struct ext2_full_inode *f = kzalloc(sizeof(struct ext2_full_inode));
     if (!f || !inode)
         return ERR_NO_MEM;
 
-    struct bcache_entry *root_ent;
-
+    struct bcache_entry *root_ent = NULL;
     ext2_inode_read(fs, EXT2_ROOT_INODE, &root_ent);
 
     if (!root_ent)
@@ -408,6 +394,9 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     out_node->fs_node_data = f;
     out_node->fs_type = FS_EXT2;
     out_node->ops = &ext2_vfs_ops;
+
+    bcache_ent_release(fs->gdesc_cache_ent);
+    bcache_ent_release(fs->sbcache_ent);
     bcache_ent_release(root_ent);
     return ERR_OK;
 }

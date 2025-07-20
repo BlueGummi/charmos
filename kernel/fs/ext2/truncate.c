@@ -31,7 +31,6 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
             if (!ind)
                 return;
 
-            bcache_ent_acquire(ent);
             ind[block_index - EXT2_NDIR_BLOCKS] = 0;
             bcache_ent_release(ent);
 
@@ -48,15 +47,12 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
             if (!dind)
                 return;
 
-            bcache_ent_acquire(i2);
-
             if (dind[ind1]) {
                 uint32_t *ind =
                     (uint32_t *) ext2_block_read(fs, dind[ind1], &ent);
                 if (!ind)
                     return;
 
-                bcache_ent_acquire(ent);
                 ind[ind2] = 0;
                 bcache_ent_release(ent);
 
@@ -78,7 +74,6 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
                 fs, inode->block[EXT2_TIND_BLOCK], &i3);
             if (!tind)
                 return;
-            bcache_ent_acquire(i3);
 
             if (tind[ind1]) {
                 uint32_t *dind =
@@ -88,13 +83,10 @@ static void clear_block_pointer(struct ext2_fs *fs, struct ext2_inode *inode,
                     return;
                 }
 
-                bcache_ent_acquire(i2);
-
                 if (dind[ind2]) {
                     uint32_t *ind =
                         (uint32_t *) ext2_block_read(fs, dind[ind2], &ent);
 
-                    bcache_ent_acquire(ent);
                     ind[ind3] = 0;
                     bcache_ent_release(ent);
 

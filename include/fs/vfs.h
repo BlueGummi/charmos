@@ -1,5 +1,5 @@
-#include <block/generic.h>
 #include <errno.h>
+#include <fs/detect.h>
 #include <stdbool.h>
 #include <stdint.h>
 #pragma once
@@ -8,9 +8,6 @@
 
 struct vfs_node;
 struct vfs_mount;
-extern char *g_root_part;
-extern struct vfs_node *g_root_node;
-extern struct vfs_mount *g_mount_list_head;
 
 #define VFS_NAME_MAX 256 // this because of ext2
 

@@ -11,10 +11,11 @@ uint64_t PTRS_PER_BLOCK;
 bool ext2_read_superblock(struct generic_partition *p,
                           struct ext2_sblock *sblock) {
     struct generic_disk *d = p->disk;
-    uint8_t *buffer = kmalloc_aligned(d->sector_size, PAGE_SIZE);
+    uint8_t *buffer = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
     if (!buffer)
         return false; // TODO: separate ERR_NO_MEM case
 
+    memset(buffer, 0, PAGE_SIZE);
     uint32_t superblock_lba = (EXT2_SUPERBLOCK_OFFSET / d->sector_size);
     uint32_t superblock_offset = EXT2_SUPERBLOCK_OFFSET % d->sector_size;
 
@@ -24,6 +25,14 @@ bool ext2_read_superblock(struct generic_partition *p,
     }
 
     memcpy(sblock, buffer + superblock_offset, sizeof(struct ext2_sblock));
+
+    uint8_t *b = (uint8_t *) sblock;
+    for (uint64_t i = 0; i < sizeof(struct ext2_sblock); i++) {
+        k_printf("%02x ", b[i]);
+        if ((i + 1) % 32 == 0)
+            k_printf("\n");
+    }
+    k_printf("\n");
 
     kfree_aligned(buffer);
     return (sblock->magic == 0xEF53);
@@ -41,9 +50,12 @@ struct vfs_node *ext2_g_mount(struct generic_partition *p) {
     if (!p)
         return NULL;
 
-    p->fs_data = kmalloc_aligned(sizeof(struct ext2_fs), PAGE_SIZE);
+    p->fs_data = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
     struct ext2_fs *fs = p->fs_data;
-    fs->sblock = kmalloc_aligned(sizeof(struct ext2_sblock), PAGE_SIZE);
+    fs->sblock = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+
+    memset(fs->sblock, 0, PAGE_SIZE);
+
     struct vfs_node *n = kzalloc(sizeof(struct vfs_node));
 
     if (!p->fs_data || !fs->sblock | !n)

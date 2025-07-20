@@ -95,7 +95,6 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
     if (!block)
         return ERR_IO;
 
-    bcache_ent_acquire(ent);
     unlink_adjust_neighbors(fs, block, ctx.entry_offset, ctx.prev_offset);
     bcache_ent_release(ent);
 

@@ -109,7 +109,6 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     }
 
     ext2_inode_lock(dir);
-    bcache_ent_acquire(ent);
 
     bool empty = true;
     uint32_t offset = 0;

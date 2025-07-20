@@ -5,6 +5,8 @@
 #include <asm.h>
 #include <boot/gdt.h>
 #include <boot/smap.h>
+#include <boot/stage.h>
+#include <charmos.h>
 #include <compiler.h>
 #include <console/printf.h>
 #include <elf.h>
@@ -23,20 +25,16 @@
 #include <sch/defer.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
-#include <stddef.h>
 #include <stdint.h>
 #include <syscall.h>
 
-struct scheduler global_sched = {0};
-uint64_t a_rsdp = 0;
-char *g_root_part = "";
-struct vfs_node *g_root_node = NULL;
-struct vfs_mount *g_mount_list_head; // TODO: migrate these globals
+struct charmos_globals global = {0};
+uint64_t a_rsdp;
 
 #define BEHAVIOR /* avoids undefined behavior */
 
 void k_main(void) {
-    uint64_t c_cnt = mp_request.response->cpu_count;
+    global.core_count = mp_request.response->cpu_count;
 
     // FB
     k_printf_init(framebuffer_request.response->framebuffers[0]);
@@ -47,19 +45,22 @@ void k_main(void) {
     // Early init
     mp_wakeup_processors(mp_request.response);
     smap_init();
+    global.current_bootstage = BOOTSTAGE_EARLY_MP;
 
     // Mem
     pmm_init(r->offset, memmap_request);
     vmm_init(memmap_request.response, xa_request.response, r->offset);
-    slab_init(c_cnt);
+    slab_init();
     pmm_dyn_init();
+
+    global.current_bootstage = BOOTSTAGE_EARLY_ALLOCATORS;
     gdt_install();
 
     syscall_setup(syscall_entry);
-    mp_setup_bsp(c_cnt);
+    mp_setup_bsp();
 
     // IDT
-    idt_alloc(c_cnt);
+    idt_alloc();
     idt_install(0);
 
     // Early device init
@@ -69,11 +70,13 @@ void k_main(void) {
     hpet_init();
     ioapic_init();
 
-    k_info("MAIN", K_INFO, "Early boot OK");
+    global.current_bootstage = BOOTSTAGE_EARLY_DEVICES;
+    k_info("MAIN", K_INFO, "Early boot OK - %llu cores", global.core_count);
 
     // Scheduler
-    scheduler_init(c_cnt);
+    scheduler_init();
     defer_init();
+    global.current_bootstage = BOOTSTAGE_MID_SCHEDULER;
     k_info("MAIN", K_INFO, "Scheduler init OK");
 
     // Filesystem init

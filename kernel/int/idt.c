@@ -138,7 +138,8 @@ void idt_load(uint64_t ind) {
     asm volatile("lidt %0" : : "m"(idtps[ind]));
 }
 
-void idt_alloc(uint64_t size) {
+void idt_alloc() {
+    uint64_t size = global.core_count;
     idts = kmalloc(sizeof(struct idt_table) * size);
     idtps = kmalloc(sizeof(struct idt_ptr) * size);
     idt_entry_used = kmalloc(sizeof(bool *) * size);
@@ -185,11 +186,12 @@ void idt_free_entry(int entry) {
 
 static void tlb_shootdown(void *ctx, uint8_t irq, void *rsp) {
     (void) ctx, (void) irq, (void) rsp;
-    struct core *core = global_cores[get_this_core_id()];
+    struct core *core = global.cores[get_this_core_id()];
     uintptr_t addr =
         atomic_load_explicit(&core->tlb_shootdown_page, memory_order_acquire);
     invlpg(addr);
     atomic_store_explicit(&core->tlb_shootdown_page, 0, memory_order_release);
+    LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
 }
 
 void idt_install(uint64_t ind) {

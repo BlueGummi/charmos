@@ -76,7 +76,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
 
     mmio_write_32(&nvme->regs->cc, cc.raw);
 
-    uint64_t core_count = scheduler_get_core_count();
+    uint64_t core_count = global.core_count;
 
     nvme_alloc_admin_queues(nvme);
     nvme_setup_admin_queues(nvme);

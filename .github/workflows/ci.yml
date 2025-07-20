@@ -31,7 +31,29 @@ jobs:
         run: rustup target add x86_64-unknown-none
 
       - name: Dependencies
-        run: sudo apt install xorriso nasm -y
+        run: sudo apt update -y && sudo apt install xorriso nasm qemu-system -y 
 
       - name: Compile 
         run:  ./build.sh
+
+      - name: Run tests
+        run: |
+          cd build
+          dd if=/dev/zero of=disk.img bs=10M count=1
+          mkfs.ext2 disk.img
+
+          set +e
+          export TERM=dumb
+          make tests | tee qemu.log
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "[INFO]: make tests exited with $EXIT_CODE"
+
+          if grep -q "all tests pass" qemu.log; then
+            echo "[PASS] Tests passed!"
+            exit 0
+          else
+            echo "[FAIL] Test failure or panic detected:"
+            tail -n 40 qemu.log
+            exit 1
+          fi
+

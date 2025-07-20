@@ -10,8 +10,6 @@ static bool walk_dir(struct ext2_fs *fs, uint32_t block_num,
     if (!dir_buf)
         return false;
 
-    bcache_ent_acquire(ent);
-
     uint32_t offset = 0;
     bool modified = false;
 
@@ -66,8 +64,6 @@ static bool walk_indirect(struct ext2_fs *fs, uint32_t block_num, int level,
     uint32_t *ptrs = (uint32_t *) ext2_block_read(fs, block_num, &ent);
     if (!ptrs)
         return false;
-
-    bcache_ent_acquire(ent);
 
     for (uint32_t i = 0; i < PTRS_PER_BLOCK; ++i) {
         if (!ptrs[i] && ff_avail) {
@@ -148,7 +144,6 @@ static void traverse_indirect(struct ext2_fs *fs, struct ext2_inode *inode,
     if (!block)
         return;
 
-    bcache_ent_acquire(ent);
     uint32_t size = sizeof(uint32_t);
 
     for (uint32_t i = 0; i < fs->block_size / sizeof(uint32_t); i++) {

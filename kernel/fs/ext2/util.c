@@ -33,8 +33,6 @@ static uint32_t ext2_get_block(struct ext2_fs *fs, uint32_t block_num,
         block = (uint32_t *) ext2_block_read(fs, block_num, &ent);
     }
 
-    bcache_ent_acquire(ent);
-
     if (allocated_this_level) {
         memset(block, 0, fs->block_size);
     }

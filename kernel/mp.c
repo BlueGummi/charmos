@@ -17,8 +17,6 @@
 static uint64_t cr3 = 0;
 static atomic_char cr3_ready = 0;
 static struct spinlock wakeup_lock = SPINLOCK_INIT;
-struct core **global_cores = NULL;
-bool mp_ready = false;
 static atomic_uint cores_awake = 0;
 
 static void setup_cpu(uint64_t cpu) {
@@ -28,14 +26,15 @@ static void setup_cpu(uint64_t cpu) {
     c->id = cpu;
     c->state = IDLE;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
-    global_cores[cpu] = c;
+    global.cores[cpu] = c;
 }
 
 static inline void set_core_awake(void) {
     atomic_fetch_add_explicit(&cores_awake, 1, memory_order_release);
     if (atomic_load_explicit(&cores_awake, memory_order_acquire) ==
-        scheduler_get_core_count())
-        mp_ready = true;
+        (global.core_count - 1)) {
+        global.current_bootstage = BOOTSTAGE_MID_MP;
+    }
 }
 
 void wakeup() {
@@ -55,8 +54,8 @@ void wakeup() {
     lapic_timer_init();
 
     setup_cpu(cpu);
-    spin_unlock(&wakeup_lock, ints);
     set_core_awake();
+    spin_unlock(&wakeup_lock, ints);
 
     restore_interrupts();
     scheduler_yield();
@@ -74,9 +73,14 @@ void mp_wakeup_processors(struct limine_mp_response *mpr) {
 void mp_complete_init() {
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
     cr3_ready = true;
+
+    /* I know, I know, mmio is used here to force the read */
+    while (mmio_read_8((uint8_t *) &global.current_bootstage) !=
+           BOOTSTAGE_MID_MP)
+        ;
 }
 
-void mp_setup_bsp(uint64_t core_count) {
+void mp_setup_bsp() {
     struct core *c = kmalloc(sizeof(struct core));
     if (!c)
         k_panic("Could not allocate space for core structure on BSP");
@@ -88,9 +92,10 @@ void mp_setup_bsp(uint64_t core_count) {
 
     c->id = 0;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
-    global_cores = kmalloc(sizeof(struct core *) * core_count);
-    if (unlikely(!global_cores))
+    global.cores = kmalloc(sizeof(struct core *) * global.core_count);
+
+    if (unlikely(!global.cores))
         k_panic("Could not allocate space for global core structures");
 
-    global_cores[0] = c;
+    global.cores[0] = c;
 }

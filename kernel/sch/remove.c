@@ -44,5 +44,5 @@ void scheduler_take_out(struct thread *t) {
     if (t->curr_core == -1)
         return;
 
-    scheduler_rm_thread(local_schs[t->curr_core], t, false, false);
+    scheduler_rm_thread(global.schedulers[t->curr_core], t, false, false);
 }

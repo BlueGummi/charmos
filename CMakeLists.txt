@@ -51,8 +51,7 @@ set(QEMU_COMMON_FLAGS
     -boot d
     -m 4G
     -smp cores=4
-    -no-shutdown
-    -no-reboot
+
     -s
     #-S
     -monitor telnet:127.0.0.1:1234,server,nowait
@@ -65,6 +64,7 @@ set(QEMU_COMMON_FLAGS
 
      -drive id=nvme0,file=disk.img,format=raw,if=none
      -device nvme,serial=boom,drive=disk0,drive=nvme0#,num_queues=4
+    -device isa-debug-exit,iobase=0xf4,iosize=0x04
 
     #-drive id=fatdisk,file=fat32.img,format=raw,if=none
     # -device nvme,serial=yay,drive=fatdisk
@@ -89,12 +89,23 @@ add_custom_target(run
     COMMAND clear
     COMMAND qemu-system-${ARCH} ${QEMU_COMMON_FLAGS}
          -serial stdio
+         -no-shutdown
+         -no-reboot
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
 add_custom_target(headless
     DEPENDS iso
     COMMAND clear
+    COMMAND qemu-system-${ARCH} ${QEMU_COMMON_FLAGS}
+        -nographic
+        -no-shutdown
+        -no-reboot
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
+add_custom_target(tests
+    DEPENDS iso
     COMMAND qemu-system-${ARCH} ${QEMU_COMMON_FLAGS}
         -nographic
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}

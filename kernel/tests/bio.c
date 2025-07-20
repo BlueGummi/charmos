@@ -1,5 +1,6 @@
 #include <block/bio.h>
 #include <block/generic.h>
+#include <charmos.h>
 #include <fs/ext2.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
@@ -12,12 +13,12 @@
 #include "fs/detect.h"
 
 #define EXT2_INIT                                                              \
-    if (g_root_node->fs_type != FS_EXT2) {                                     \
+    if (global.root_node->fs_type != FS_EXT2) {                                \
         ADD_MESSAGE("the mounted root is not ext2");                           \
         SET_SKIP;                                                              \
         return;                                                                \
     }                                                                          \
-    struct vfs_node *root = g_root_node;
+    struct vfs_node *root = global.root_node;
 
 static bool done = false;
 

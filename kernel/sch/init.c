@@ -7,20 +7,19 @@
 #include <stddef.h>
 #include <stdint.h>
 
-void scheduler_init(uint64_t core_count) {
-    c_count = core_count;
-    max_concurrent_stealers = c_count / 4;
+void scheduler_init(void) {
+    max_concurrent_stealers = global.core_count / 4;
 
     /* I mean, if we have one core and that core wants
      * to steal work from itself, go ahead? */
     if (max_concurrent_stealers == 0)
         max_concurrent_stealers = 1;
 
-    local_schs = kmalloc(sizeof(struct scheduler *) * core_count);
-    if (!local_schs)
+    global.schedulers = kmalloc(sizeof(struct scheduler *) * global.core_count);
+    if (!global.schedulers)
         k_panic("Could not allocate scheduler pointer array\n");
 
-    for (uint64_t i = 0; i < core_count; i++) {
+    for (uint64_t i = 0; i < global.core_count; i++) {
         struct scheduler *s = kzalloc(sizeof(struct scheduler));
         if (!s)
             k_panic("Could not allocate scheduler %lu\n", i);
@@ -36,6 +35,8 @@ void scheduler_init(uint64_t core_count) {
         }
 
         struct thread *t0 = thread_create(k_sch_idle);
+        t0->flags = NO_STEAL;
+        t0->state = SLEEPING;
         s->idle_thread = t0;
 
         if (!i) {
@@ -43,7 +44,7 @@ void scheduler_init(uint64_t core_count) {
             scheduler_add_thread(s, t, false, false, true);
         }
 
-        local_schs[i] = s;
+        global.schedulers[i] = s;
     }
     reaper_init();
     event_pool_init();

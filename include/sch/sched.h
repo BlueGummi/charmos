@@ -1,4 +1,5 @@
 #pragma once
+#include <charmos.h>
 #include <mp/core.h>
 #include <sch/thread.h>
 #include <stdbool.h>
@@ -26,7 +27,7 @@ struct scheduler {
     uint8_t queue_bitmap;
 };
 
-void scheduler_init(uint64_t core_count);
+void scheduler_init();
 
 /* TODO: Use these internally, no need to worry about the bool parameters */
 void scheduler_add_thread(struct scheduler *sched, struct thread *thread,
@@ -52,14 +53,11 @@ uint64_t compute_steal_threshold(uint64_t threads, uint64_t core_count);
 
 struct scheduler *scheduler_pick_victim(struct scheduler *self);
 struct thread *scheduler_steal_work(struct scheduler *victim);
-uint64_t scheduler_get_core_count();
 
-extern struct scheduler **local_schs;
 extern uint32_t max_concurrent_stealers;
 extern atomic_uint active_stealers;
 extern atomic_uint total_threads;
 extern int64_t work_steal_min_diff;
-extern uint64_t c_count;
 
 /* TODO: no rdmsr */
 static inline struct thread *scheduler_get_curr_thread() {
@@ -81,5 +79,5 @@ static inline struct thread *thread_spawn_on_core(void (*entry)(void),
 }
 
 static inline struct scheduler *get_this_core_sched(void) {
-    return local_schs[get_this_core_id()];
+    return global.schedulers[get_this_core_id()];
 }

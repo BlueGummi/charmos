@@ -1,5 +1,9 @@
 #pragma once
+#include <boot/stage.h>
 #include <boot/tss.h>
+#include <charmos.h>
+#include <compiler.h>
+#include <console/printf.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -18,7 +22,6 @@ struct core {
     volatile atomic_uintptr_t tlb_shootdown_page;
     bool in_interrupt;
 };
-extern struct core **global_cores;
 
 static inline uint64_t get_this_core_id() {
     uint64_t id;
@@ -29,9 +32,9 @@ static inline uint64_t get_this_core_id() {
 }
 
 static inline void mark_self_in_interrupt(void) {
-    global_cores[get_this_core_id()]->in_interrupt = true;
+    global.cores[get_this_core_id()]->in_interrupt = true;
 }
 
 static inline void unmark_self_in_interrupt(void) {
-    global_cores[get_this_core_id()]->in_interrupt = false;
+    global.cores[get_this_core_id()]->in_interrupt = false;
 }

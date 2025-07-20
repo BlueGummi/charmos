@@ -39,19 +39,20 @@ uintptr_t vmm_make_user_pml4(void) {
 }
 
 static void do_tlb_shootdown(uint64_t addr) {
-    if (!mp_ready)
+    if (global.current_bootstage < BOOTSTAGE_MID_MP)
         return;
 
     uint64_t this_core = get_this_core_id();
-    uint64_t cores = scheduler_get_core_count();
+    uint64_t cores = global.core_count;
     for (uint64_t i = 0; i < cores; i++) {
         if (i == this_core)
             continue;
 
-        struct core *target = global_cores[i];
+        struct core *target = global.cores[i];
         atomic_store_explicit(&target->tlb_shootdown_page, addr,
                               memory_order_release);
         lapic_send_ipi(i, TLB_SHOOTDOWN_ID);
+
         while (atomic_load_explicit(&target->tlb_shootdown_page,
                                     memory_order_acquire) != 0)
             cpu_relax();

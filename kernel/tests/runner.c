@@ -1,4 +1,5 @@
 #include <console/printf.h>
+#include <sleep.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -100,4 +101,7 @@ void tests_run(void) {
 
     k_info("TEST", K_TEST, "%s%s" ANSI_RESET " (%llu ms)\n", color, msg,
            total_time);
+
+    sleep(3);
+    all_ok ? qemu_exit(0) : qemu_exit(1);
 }

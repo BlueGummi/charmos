@@ -1,3 +1,4 @@
+#include <charmos.h>
 #include <console/printf.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
@@ -49,7 +50,7 @@ void cmdline_parse(const char *input) {
         val_buf[val_len] = '\0';
 
         if (strcmp(var_buf, "root") == 0) {
-            if (strcmp(g_root_part, "") != 0)
+            if (global.root_partition)
                 k_panic(
                     "Cannot have multiple root entries in the command line\n");
 
@@ -58,7 +59,7 @@ void cmdline_parse(const char *input) {
                 k_panic("Could not allocate space for command line parsing\n");
 
             memcpy(val, val_buf, strlen(val_buf) + 1);
-            g_root_part = val;
+            global.root_partition = val;
         }
     }
 }

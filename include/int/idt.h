@@ -47,7 +47,7 @@ struct isr_entry {
 
 void idt_install(uint64_t ind);
 void idt_load(uint64_t ind);
-void idt_alloc(uint64_t size);
+void idt_alloc();
 void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
                   uint64_t ind);
 

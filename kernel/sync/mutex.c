@@ -2,7 +2,6 @@
 #include <sch/thread.h>
 #include <sleep.h>
 #include <stddef.h>
-#include <stdint.h>
 #include <sync/mutex.h>
 
 #include "console/printf.h"
@@ -88,11 +87,8 @@ void mutex_unlock(struct mutex *m) {
     m->owner = NULL;
 
     struct thread *next = thread_queue_pop_front(&m->waiters);
-    if (next != NULL) {
-        int64_t next_core = next->curr_core;
-        next->state = READY;
-        scheduler_add_thread(local_schs[next_core], next, false, false, false);
-    }
+    if (next != NULL)
+        scheduler_wake(next);
 
     spin_unlock(&m->lock, i);
 }

@@ -1,5 +1,6 @@
 #include <acpi/lapic.h>
 #include <asm.h>
+#include <boot/stage.h>
 #include <compiler.h>
 #include <console/printf.h>
 #include <int/idt.h>
@@ -40,24 +41,21 @@ void k_sch_main() {
     scheduler_get_curr_thread()->flags = NO_STEAL;
     k_info("MAIN", K_INFO, "Device setup");
     registry_setup();
+    global.current_bootstage = BOOTSTAGE_LATE_DEVICES;
     tests_run();
     k_info("MAIN", K_INFO, "Boot OK");
+    global.current_bootstage = BOOTSTAGE_COMPLETE;
+
     while (1) {
         asm volatile("hlt");
     }
 }
 
 void k_sch_idle() {
-    scheduler_get_curr_thread()->flags = NO_STEAL;
-    scheduler_get_curr_thread()->state = SLEEPING;
     while (1) {
         enable_interrupts();
         asm volatile("hlt");
     }
-}
-
-uint64_t scheduler_get_core_count() {
-    return c_count;
 }
 
 void scheduler_wake(struct thread *t) {
@@ -72,7 +70,7 @@ void scheduler_wake(struct thread *t) {
 }
 
 static __always_inline void update_core_current_thread(struct thread *next) {
-    struct core *c = global_cores[get_this_core_id()];
+    struct core *c = global.cores[get_this_core_id()];
     c->current_thread = next;
 }
 

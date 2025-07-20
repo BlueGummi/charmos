@@ -1,11 +1,7 @@
 #pragma once
-#include <fs/detect.h>
-#include <sch/sched.h>
-#include <sch/thread.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <sync/spin_lock.h>
 
 /* urgent requests bypass the bio_scheduler,
  * they get submitted immediately */
