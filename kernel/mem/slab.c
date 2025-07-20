@@ -1,4 +1,5 @@
 #include <console/printf.h>
+#include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/slab.h>
 #include <mem/vmm.h>
@@ -13,9 +14,8 @@ uintptr_t slab_heap_top = 0xFFFFF00000000000;
 
 static void *slab_map_new_page() {
     uintptr_t phys = (uintptr_t) pmm_alloc_pages(1, false);
-    if (!phys) {
+    if (!phys)
         return NULL;
-    }
 
     uintptr_t virt = slab_heap_top;
     slab_heap_top += PAGE_SIZE;
@@ -37,28 +37,31 @@ static void slab_cache_init(struct slab_cache *cache, uint64_t obj_size) {
     cache->slabs_free = NULL;
     cache->slabs_partial = NULL;
     cache->slabs_full = NULL;
+    spinlock_init(&cache->lock);
 }
 
 static struct slab *slab_create(struct slab_cache *cache) {
     void *page = slab_map_new_page();
-    if (!page) {
+    if (!page)
         return NULL;
-    }
 
     struct slab *slab = (struct slab *) page;
     slab->parent_cache = cache;
 
     uint64_t bitmap_bytes = (cache->objs_per_slab + 7) / 8;
-    slab->bitmap = (uint8_t *) ((uint8_t *) page + sizeof(struct slab));
+    uint8_t *ptr = ((uint8_t *) page + sizeof(struct slab));
+
+    slab->bitmap = (atomic_uint_fast8_t *) ptr;
 
     if ((cache->obj_size > 0) &&
         ((cache->obj_size & (cache->obj_size - 1)) == 0))
         k_panic("PANIC\n");
+
     uintptr_t mem_ptr = (uintptr_t) (slab->bitmap + bitmap_bytes);
     mem_ptr = (mem_ptr + cache->obj_size - 1) & ~(cache->obj_size - 1);
     slab->mem = (void *) mem_ptr;
 
-    slab->used = 0;
+    atomic_store(&slab->used, 0);
     slab->state = SLAB_FREE;
     slab->next = NULL;
 
@@ -67,9 +70,9 @@ static struct slab *slab_create(struct slab_cache *cache) {
 }
 
 static void slab_list_remove(struct slab **list, struct slab *slab) {
-    while (*list && *list != slab) {
+    while (*list && *list != slab)
         list = &(*list)->next;
-    }
+
     if (*list == slab) {
         *list = slab->next;
         slab->next = NULL;
@@ -82,7 +85,12 @@ static void slab_list_add(struct slab **list, struct slab *slab) {
 }
 
 static void slab_move_slab(struct slab_cache *cache, struct slab *slab,
-                           int new_state) {
+                           int new_state, bool lock_held) {
+    bool interrupts = false;
+
+    if (!lock_held)
+        interrupts = spin_lock(&cache->lock);
+
     switch (slab->state) {
     case SLAB_FREE: slab_list_remove(&cache->slabs_free, slab); break;
     case SLAB_PARTIAL: slab_list_remove(&cache->slabs_partial, slab); break;
@@ -98,25 +106,30 @@ static void slab_move_slab(struct slab_cache *cache, struct slab *slab,
     case SLAB_FULL: slab_list_add(&cache->slabs_full, slab); break;
     default: k_panic("Unknown new slab state %d\n", new_state);
     }
+
+    if (!lock_held)
+        spin_unlock(&cache->lock, interrupts);
 }
 
-static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
-    if (slab->state == SLAB_FULL) {
+static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab,
+                             bool lock_held) {
+    if (slab->state == SLAB_FULL)
         return NULL;
-    }
 
     for (uint64_t i = 0; i < cache->objs_per_slab; i++) {
         uint64_t byte_idx = i / 8;
         uint8_t bit_mask = 1 << (i % 8);
 
-        if (!(slab->bitmap[byte_idx] & bit_mask)) {
-            slab->bitmap[byte_idx] |= bit_mask;
-            slab->used++;
+        uint8_t old = atomic_fetch_or(&slab->bitmap[byte_idx], bit_mask);
 
-            if (slab->used == cache->objs_per_slab) {
-                slab_move_slab(cache, slab, SLAB_FULL);
-            } else if (slab->used == 1) {
-                slab_move_slab(cache, slab, SLAB_PARTIAL);
+        if (!(old & bit_mask)) {
+            slab->bitmap[byte_idx] |= bit_mask;
+            atomic_fetch_add(&slab->used, 1);
+
+            if (atomic_load(&slab->used) == cache->objs_per_slab) {
+                slab_move_slab(cache, slab, SLAB_FULL, lock_held);
+            } else if (atomic_load(&slab->used) == 1) {
+                slab_move_slab(cache, slab, SLAB_PARTIAL, lock_held);
             }
 
             uint8_t *obj = (uint8_t *) slab->mem + i * cache->obj_size;
@@ -136,45 +149,58 @@ static void slab_free(struct slab_cache *cache, struct slab *slab, void *obj) {
     uint64_t byte_idx = index / 8;
     uint8_t bit_mask = 1 << (index % 8);
 
-    if (!(slab->bitmap[byte_idx] & bit_mask)) {
-        return;
+    uint8_t old = atomic_fetch_and(&slab->bitmap[byte_idx], ~bit_mask);
+    if (!(old & bit_mask)) {
+        return; // bit was not set
     }
 
-    slab->bitmap[byte_idx] &= ~bit_mask;
-    slab->used--;
+    uint64_t new_used = atomic_fetch_sub(&slab->used, 1) - 1;
 
-    if (slab->used == 0) {
-        slab_move_slab(cache, slab, SLAB_FREE);
+    bool lock_held = false;
+    if (new_used == 0) {
+        slab_move_slab(cache, slab, SLAB_FREE, lock_held);
     } else if (slab->state == SLAB_FULL) {
-        slab_move_slab(cache, slab, SLAB_PARTIAL);
+        slab_move_slab(cache, slab, SLAB_PARTIAL, lock_held);
     }
 }
 
 static void *slab_alloc(struct slab_cache *cache) {
+    bool interrupts = spin_lock(&cache->lock);
+    bool lock_held = true;
+
     for (struct slab *slab = cache->slabs_partial; slab; slab = slab->next) {
-        if (slab->state == SLAB_FULL) {
+        if (slab->state == SLAB_FULL)
             continue;
-        }
-        void *obj = slab_alloc_from(cache, slab);
-        if (obj)
+
+        void *obj = slab_alloc_from(cache, slab, lock_held);
+        if (obj) {
+            spin_unlock(&cache->lock, interrupts);
             return obj;
+        }
     }
 
     for (struct slab *slab = cache->slabs_free; slab; slab = slab->next) {
-        if (slab->state == SLAB_FULL) {
+        if (slab->state == SLAB_FULL)
             continue;
-        }
-        void *obj = slab_alloc_from(cache, slab);
-        if (obj)
+
+        void *obj = slab_alloc_from(cache, slab, lock_held);
+        if (obj) {
+            spin_unlock(&cache->lock, interrupts);
             return obj;
+        }
     }
+    spin_unlock(&cache->lock, interrupts);
 
     struct slab *slab = slab_create(cache);
     if (!slab)
         return NULL;
 
+    interrupts = spin_lock(&cache->lock);
     slab_list_add(&cache->slabs_free, slab);
-    return slab_alloc_from(cache, slab);
+    spin_unlock(&cache->lock, interrupts);
+
+    lock_held = false;
+    return slab_alloc_from(cache, slab, lock_held);
 }
 
 static int uint64_to_index(uint64_t size) {
@@ -188,10 +214,18 @@ static int uint64_to_index(uint64_t size) {
     return (shift > SLAB_MAX_SHIFT) ? -1 : shift - SLAB_MIN_SHIFT;
 }
 
-void slab_init() {
+void slab_init(uint64_t num_cores) {
     for (int i = 0; i < SLAB_CLASS_COUNT; i++) {
         uint64_t size = 1UL << (i + SLAB_MIN_SHIFT);
         slab_cache_init(&slab_caches[i], size);
+    }
+
+    for (int i = 0; i < SLAB_CLASS_COUNT; i++) {
+        struct slab_cache *cache = &slab_caches[i];
+        cache->percore_caches = kzalloc(sizeof(struct slab *) * num_cores);
+        for (uint64_t j = 0; j < num_cores; j++) {
+            cache->percore_caches[j] = kzalloc(sizeof(struct slab));
+        }
     }
 }
 

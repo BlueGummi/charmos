@@ -1,5 +1,6 @@
-#include <stddef.h>
+#include <stdatomic.h>
 #include <stdint.h>
+#include <sync/spin_lock.h>
 
 #define SLAB_MIN_SHIFT 4
 #define SLAB_MAX_SHIFT 12
@@ -9,11 +10,16 @@ enum slab_state { SLAB_FREE, SLAB_PARTIAL, SLAB_FULL };
 
 struct slab {
     struct slab *next;
-    uint8_t *bitmap;
+    atomic_uint_fast8_t *bitmap;
     void *mem;
-    uint64_t used;
+    atomic_uint_fast64_t used;
     enum slab_state state;
     struct slab_cache *parent_cache;
+};
+
+struct slab_cache_percore {
+    struct slab *current_partial;
+    struct slab *current_free;
 };
 
 struct slab_cache {
@@ -22,6 +28,9 @@ struct slab_cache {
     struct slab *slabs_free;
     struct slab *slabs_partial;
     struct slab *slabs_full;
+    struct slab **percore_caches;
+
+    struct spinlock lock;
 };
 
 struct slab_phdr {
@@ -29,7 +38,7 @@ struct slab_phdr {
     uint64_t pages;
 };
 
-void slab_init();
+void slab_init(uint64_t num_cores);
 extern struct slab_cache slab_caches[SLAB_CLASS_COUNT];
 extern uintptr_t slab_heap_top;
 

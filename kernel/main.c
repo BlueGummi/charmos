@@ -51,7 +51,7 @@ void k_main(void) {
     // Mem
     pmm_init(r->offset, memmap_request);
     vmm_init(memmap_request.response, xa_request.response, r->offset);
-    slab_init();
+    slab_init(c_cnt);
     pmm_dyn_init();
     gdt_install();
 
