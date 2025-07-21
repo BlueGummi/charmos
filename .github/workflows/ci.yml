@@ -48,6 +48,7 @@ jobs:
           EXIT_CODE=${PIPESTATUS[0]}
           echo "[INFO]: make tests exited with $EXIT_CODE"
 
+          e2fsck disk.img
           if grep -q "all tests pass" qemu.log; then
             echo "[PASS] Tests passed!"
             exit 0
@@ -57,5 +58,4 @@ jobs:
             exit 1
           fi
 
-          fsck.ext2 disk.img
 
