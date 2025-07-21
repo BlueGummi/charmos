@@ -5,6 +5,7 @@
 #include <int/idt.h>
 #include <int/kb.h>
 #include <mem/alloc.h>
+#include <mem/vmm.h>
 #include <mp/core.h>
 #include <mp/mp.h>
 #include <sch/sched.h>
@@ -182,16 +183,6 @@ void idt_free_entry(int entry) {
         return;
 
     idt_entry_used[get_this_core_id()][entry] = false;
-}
-
-static void tlb_shootdown(void *ctx, uint8_t irq, void *rsp) {
-    (void) ctx, (void) irq, (void) rsp;
-    struct core *core = global.cores[get_this_core_id()];
-    uintptr_t addr =
-        atomic_load_explicit(&core->tlb_shootdown_page, memory_order_acquire);
-    invlpg(addr);
-    atomic_store_explicit(&core->tlb_shootdown_page, 0, memory_order_release);
-    LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
 }
 
 void idt_install(uint64_t ind) {

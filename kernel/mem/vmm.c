@@ -38,25 +38,53 @@ uintptr_t vmm_make_user_pml4(void) {
     return (uintptr_t) user_pml4 - hhdm_offset;
 }
 
-static void do_tlb_shootdown(uint64_t addr) {
+void tlb_shootdown(void *ctx, uint8_t irq, void *rsp) {
+    (void) ctx, (void) irq, (void) rsp;
+
+    struct core *core = global.cores[get_this_core_id()];
+    uint64_t req_gen =
+        atomic_load_explicit(&core->tlb_req_gen, memory_order_acquire);
+
+    uintptr_t page =
+        atomic_load_explicit(&core->tlb_page, memory_order_acquire);
+    if (page)
+        invlpg(page);
+
+    atomic_store_explicit(&core->tlb_page, 0, memory_order_release);
+    atomic_store_explicit(&core->tlb_ack_gen, req_gen, memory_order_release);
+
+    LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
+}
+
+static void do_tlb_shootdown(uintptr_t addr) {
     if (global.current_bootstage < BOOTSTAGE_MID_MP)
         return;
 
+    uint64_t gen = atomic_fetch_add(&global.next_tlb_gen, 1);
     uint64_t this_core = get_this_core_id();
     uint64_t cores = global.core_count;
+
     for (uint64_t i = 0; i < cores; i++) {
         if (i == this_core)
             continue;
 
         struct core *target = global.cores[i];
-        atomic_store_explicit(&target->tlb_shootdown_page, addr,
-                              memory_order_release);
+        atomic_store_explicit(&target->tlb_page, addr, memory_order_release);
+        atomic_store_explicit(&target->tlb_req_gen, gen, memory_order_release);
         lapic_send_ipi(i, TLB_SHOOTDOWN_ID);
-
-        while (atomic_load_explicit(&target->tlb_shootdown_page,
-                                    memory_order_acquire) != 0)
-            cpu_relax();
     }
+
+
+    /*
+    for (uint64_t i = 0; i < cores; i++) {
+        if (i == this_core)
+            continue;
+
+        struct core *target = global.cores[i];
+        while (atomic_load_explicit(&target->tlb_ack_gen,
+                                    memory_order_acquire) < gen)
+            cpu_relax();
+    }*/
 }
 
 void vmm_init(struct limine_memmap_response *memmap,

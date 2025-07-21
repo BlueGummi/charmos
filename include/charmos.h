@@ -1,5 +1,6 @@
 #include <boot/stage.h>
 #include <fs/vfs.h>
+#include <stdatomic.h>
 #pragma once
 
 struct charmos_globals {
@@ -10,6 +11,7 @@ struct charmos_globals {
     uint64_t core_count;
     struct scheduler **schedulers;
     struct core **cores;
+    atomic_uint_fast64_t next_tlb_gen;
 };
 
 extern struct charmos_globals global;

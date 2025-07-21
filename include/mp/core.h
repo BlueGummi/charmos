@@ -19,7 +19,9 @@ struct core {
     struct thread *current_thread;
     enum core_state state;
     struct tss *tss;
-    volatile atomic_uintptr_t tlb_shootdown_page;
+    atomic_uintptr_t tlb_page;        // page to invalidate (or 0 = none)
+    atomic_uint_fast64_t tlb_req_gen; // generation to process
+    atomic_uint_fast64_t tlb_ack_gen; // last processed
     bool in_interrupt;
 };
 
