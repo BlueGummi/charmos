@@ -1,10 +1,12 @@
 #pragma once
 #include <sch/thread.h>
 #include <sync/spin_lock.h>
+#include <sync/condvar.h>
 
 struct thread_reaper {
     struct thread_queue queue;
     struct spinlock lock;
+    struct condvar cv;
     uint64_t reaped_threads;
 };
 

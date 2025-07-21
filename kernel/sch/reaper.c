@@ -19,10 +19,10 @@ void reaper_enqueue(struct thread *t) {
         reaper.queue.tail = t;
     }
 
-    if (atomic_load(&reaper_thread->state) == THREAD_STATE_SLEEPING) {
-        scheduler_wake(reaper_thread);
-    }
+    /*k_printf("Woke reaper, its core is %llu and its state is %s\n",
+             reaper_thread->curr_core, thread_state_str(reaper_thread->state));*/
 
+    condvar_signal(&reaper.cv);
     spin_unlock(&reaper.lock, i);
 }
 
@@ -30,36 +30,31 @@ void reaper_init(void) {
     reaper_thread = thread_spawn(reaper_thread_main);
 }
 
+uint64_t reaper_get_reaped_thread_count(void) {
+    return reaper.reaped_threads;
+}
+
 void reaper_thread_main() {
     while (1) {
         bool i = spin_lock(&reaper.lock);
+
+        while (!reaper.queue.head) {
+            condvar_wait(&reaper.cv, &reaper.lock);
+        }
 
         struct thread *t = reaper.queue.head;
         reaper.queue.head = reaper.queue.tail = NULL;
 
         spin_unlock(&reaper.lock, i);
 
-        bool reaped_something = false;
         while (t) {
-            /* bye bye */
             atomic_store(&t->state, THREAD_STATE_TERMINATED);
-
             struct thread *next = t->next;
             thread_free(t);
             t = next;
             reaper.reaped_threads++;
-            reaped_something = true;
         }
 
-        if (reaped_something) {
-            thread_sleep_for_ms(100);
-        } else {
-            thread_set_state(reaper_thread, THREAD_STATE_SLEEPING);
-            scheduler_yield();
-        }
+        thread_sleep_for_ms(100);
     }
-}
-
-uint64_t reaper_get_reaped_thread_count(void) {
-    return reaper.reaped_threads;
 }

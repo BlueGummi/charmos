@@ -28,6 +28,19 @@ enum thread_state : uint8_t {
     THREAD_STATE_HALTED,     /* Thread manually suspended */
 };
 
+static inline const char *thread_state_str(const enum thread_state state) {
+    switch (state) {
+    case THREAD_STATE_NEW: return "NEW";
+    case THREAD_STATE_READY: return "READY";
+    case THREAD_STATE_RUNNING: return "RUNNING";
+    case THREAD_STATE_BLOCKED: return "BLOCKED";
+    case THREAD_STATE_SLEEPING: return "SLEEPING";
+    case THREAD_STATE_ZOMBIE: return "ZOMBIE";
+    case THREAD_STATE_TERMINATED: return "TERMINATED";
+    case THREAD_STATE_HALTED: return "HALTED";
+    }
+}
+
 enum thread_flags : uint8_t {
     THREAD_FLAGS_NO_STEAL, /* Do not migrate between cores */
 };

@@ -229,6 +229,10 @@ static inline void cpu_relax(void) {
     asm volatile("pause");
 }
 
+static inline int clz(uint8_t a) {
+    return __builtin_clz(a);
+}
+
 #define compiler_barrier() __asm__ __volatile__("" ::: "memory")
 
 #if defined(__x86_64__) || defined(__i386__)

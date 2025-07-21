@@ -47,6 +47,7 @@ void k_sch_main() {
 }
 
 void k_sch_idle() {
+    enable_interrupts();
     while (1) {
         enable_interrupts();
         asm volatile("hlt");
@@ -135,7 +136,7 @@ static inline void requeue_current_thread_if_runnable(struct scheduler *sched,
 }
 
 static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {
-    uint8_t bitmap = sched->queue_bitmap;
+    uint8_t bitmap = atomic_load(&sched->queue_bitmap);
 
     while (bitmap) {
         int lvl = __builtin_ctz(bitmap);
@@ -180,7 +181,7 @@ static inline struct thread *load_idle_thread(struct scheduler *sched) {
 }
 
 static inline void change_timeslice(struct thread *curr, struct thread *next) {
-    if (curr == next || next->prio == THREAD_PRIO_RT)
+    if (curr == next/* || next->prio == THREAD_PRIO_RT */)
         disable_timeslice();
     else
         enable_timeslice();
