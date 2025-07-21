@@ -81,6 +81,17 @@ void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {
     schedule();
 }
 
+void panic_isr(void *ctx, uint8_t vector, void *rsp) {
+    (void) ctx, (void) vector, (void) rsp;
+    if (global.panic_in_progress) {
+        disable_interrupts();
+        k_printf("    [CPU %u] Halting due to system panic\n",
+                 get_this_core_id());
+        while (1)
+            asm volatile("hlt");
+    }
+}
+
 void isr_register(uint8_t vector, isr_handler_t handler, void *ctx,
                   uint64_t c) {
     isr_table[c][vector].handler = handler;
@@ -206,6 +217,7 @@ void idt_install(uint64_t ind) {
 
     set(0x80, (uint64_t) syscall_entry, 0x2b, 0xee, ind);
 
+    isr_register(PANIC_ID, panic_isr, NULL, ind);
     isr_register(TLB_SHOOTDOWN_ID, tlb_shootdown, NULL, ind);
     idt_load(ind);
 }

@@ -12,6 +12,8 @@ struct charmos_globals {
     struct scheduler **schedulers;
     struct core **cores;
     atomic_uint_fast64_t next_tlb_gen;
+
+    volatile bool panic_in_progress;
 };
 
 extern struct charmos_globals global;

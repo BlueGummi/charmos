@@ -45,6 +45,7 @@ void lapic_timer_disable();
 bool lapic_timer_is_enabled();
 void lapic_timer_enable();
 void lapic_send_ipi(uint8_t apic_id, uint8_t vector);
+void broadcast_nmi_except(uint64_t exclude_core);
 #define IA32_APIC_BASE_MSR 0x1B
 #define IA32_APIC_BASE_MASK 0xFFFFF000UL
 #define IA32_APIC_BASE_ENABLE (1 << 11)

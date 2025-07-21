@@ -1,5 +1,7 @@
 #include <acpi/lapic.h>
 #include <asm.h>
+#include <charmos.h>
+#include <int/idt.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
 uint32_t *lapic;
@@ -42,6 +44,15 @@ void lapic_send_ipi(uint8_t apic_id, uint8_t vector) {
     LAPIC_SEND(LAPIC_REG(LAPIC_ICR_LOW), vector | LAPIC_DELIVERY_FIXED |
                                              LAPIC_LEVEL_ASSERT |
                                              LAPIC_DEST_PHYSICAL);
+}
+
+void broadcast_nmi_except(uint64_t exclude_core) {
+    for (uint64_t i = 0; i < global.core_count; i++) {
+        if (i == exclude_core)
+            continue;
+
+        lapic_send_ipi(i, PANIC_ID);
+    }
 }
 
 uint64_t lapic_get_id(void) {

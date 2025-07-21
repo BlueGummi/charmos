@@ -4,6 +4,11 @@ project(charmOS C ASM_NASM)
 set(CMAKE_C_STANDARD 11)
 set(ARCH "x86_64")
 set(IMAGE_NAME "charmos-${ARCH}")
+option(ENABLE_TESTS "Enable test-related code" ON)
+
+if(ENABLE_TESTS)
+    add_compile_definitions(TESTS=true)
+endif()
 
 set(KERNEL_COMMON_FLAGS "-O2 -pipe -Wall -Wextra -Wpointer-sign -Wenum-compare -ffreestanding -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -mno-red-zone -fno-stack-protector -fno-omit-frame-pointer -fno-stack-check -fno-PIC -ffunction-sections -fdata-sections  -m64 -mcmodel=kernel -mgeneral-regs-only -DLIMINE_API_REVISION=2 -Wno-address-of-packed-member -Wno-unused-command-line-argument -ggdb") 
 
@@ -45,7 +50,6 @@ add_custom_target(iso
     COMMAND ../limine/limine bios-install ${IMAGE_NAME}.iso 2>&1 >/dev/null
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
-
 set(QEMU_COMMON_FLAGS
     -cdrom ${IMAGE_NAME}.iso
     -boot d
@@ -83,6 +87,7 @@ set(QEMU_COMMON_FLAGS
     -d trace:*serial*
     -trace file=trace.log
 )
+
 
 add_custom_target(run
     DEPENDS iso

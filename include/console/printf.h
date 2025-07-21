@@ -1,4 +1,5 @@
 #include <acpi/hpet.h>
+#include <charmos.h>
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>
 #include <limine.h>
@@ -11,10 +12,17 @@
 #define LINE_STRING STRINGIZE(__LINE__)
 
 void debug_print_stack();
+extern void panic_entry();
 
 static inline void qemu_exit(int code) {
     outb(0xf4, ((code << 1) | 1) & 0xFF);
 }
+
+struct panic_regs {
+    uint64_t rsp;
+    uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
+    uint64_t rsi, rdi, rbp, rdx, rcx, rbx, rax;
+};
 
 #define ELEVEN_LINES "==========="
 #define TWENTY_TWO_LINES ELEVEN_LINES ELEVEN_LINES
@@ -23,12 +31,14 @@ static inline void qemu_exit(int code) {
 
 #define k_panic(fmt, ...)                                                      \
     do {                                                                       \
+        global.panic_in_progress = true;                                       \
         asm("cli");                                                            \
         k_printf("\n" EIGHTY_EIGHT_LINES "\n");                                \
         k_printf("\n                                    [" ANSI_BG_RED         \
                  "KERNEL PANIC" ANSI_RESET "]\n\n");                           \
         k_printf(ANSI_RED "%s\n\n" ANSI_RESET, OS_LOGO_PANIC_CENTERED);        \
-        k_printf("    [" ANSI_BRIGHT_BLUE "AT" ANSI_RESET " ");                \
+        panic_entry();                                                         \
+        k_printf("\n    [" ANSI_BRIGHT_BLUE "AT" ANSI_RESET " ");              \
         time_print_current();                                                  \
         k_printf("]\n");                                                       \
         k_printf("    [" ANSI_BRIGHT_GREEN "FROM" ANSI_RESET                   \
