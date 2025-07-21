@@ -19,7 +19,7 @@ void reaper_enqueue(struct thread *t) {
         reaper.queue.tail = t;
     }
 
-    if (reaper_thread->state == SLEEPING)
+    if (reaper_thread->state == THREAD_STATE_SLEEPING)
         scheduler_wake(reaper_thread);
 
     spin_unlock(&reaper.lock, i);
@@ -42,7 +42,7 @@ void reaper_thread_main() {
         while (t) {
 
             /* bye bye */
-            t->state = TERMINATED;
+            t->state = THREAD_STATE_TERMINATED;
 
             struct thread *next = t->next;
             thread_free(t);
@@ -54,7 +54,7 @@ void reaper_thread_main() {
         if (reaped_something) {
             thread_sleep_for_ms(1000);
         } else {
-            thread_set_state(reaper_thread, SLEEPING);
+            thread_set_state(reaper_thread, THREAD_STATE_SLEEPING);
             scheduler_yield();
         }
     }

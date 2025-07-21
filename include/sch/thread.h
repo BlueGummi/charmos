@@ -17,20 +17,35 @@ struct context {
 };
 
 enum thread_state {
-    NEW,        // Thread is created but not yet scheduled
-    READY,      // Thread is ready to run but not currently running
-    RUNNING,    // Thread is currently executing
-    BLOCKED,    // Waiting on I/O, lock, or condition (e.g. sleep, mutex)
-    SLEEPING,   // Temporarily not runnable for a set time (like `sleep()`)
-    WAITING,    // Similar to BLOCKED but specifically for event/resource
-    ZOMBIE,     // Finished executing but parent hasn't reaped it yet
-    TERMINATED, // Fully done, can be cleaned up
-    HALTED,     // Thread manually suspended (like `kill -STOP`)
+    THREAD_STATE_NEW,     /* Thread is created but not yet scheduled */
+    THREAD_STATE_READY,   /* Thread is ready to run but not currently running */
+    THREAD_STATE_RUNNING, /* Thread is currently executing */
+    THREAD_STATE_BLOCKED, /* Waiting on I/O, lock, or condition */
+    THREAD_STATE_SLEEPING, /* Temporarily not runnable */
+    THREAD_STATE_ZOMBIE, /* Finished executing but hasn't been reaped it yet */
+    THREAD_STATE_TERMINATED, /* Fully done, can be cleaned up */
+    THREAD_STATE_HALTED,     /* Thread manually suspended */
 };
 
 enum thread_flags {
-    NO_STEAL,
+    THREAD_FLAGS_NO_STEAL, /* Do not migrate between cores */
 };
+
+enum thread_priority {
+    THREAD_PRIO_RT = 0,         /* realtime thread */
+    THREAD_PRIO_HIGH = 1,       /* high priority timesharing thread */
+    THREAD_PRIO_MID = 2,        /* medium priority timesharing thread */
+    THREAD_PRIO_LOW = 3,        /* low priority timesharing thread */
+    THREAD_PRIO_BACKGROUND = 4, /* background thread */
+};
+
+#define THREAD_PRIO_CLASS(prio)                                                \
+    ((prio == THREAD_PRIO_RT)                                                  \
+         ? 0                                                                   \
+         : ((prio >= THREAD_PRIO_HIGH && prio <= THREAD_PRIO_LOW) ? 1 : 2))
+
+#define THREAD_PRIO_MAX_BOOST(prio)                                            \
+    (THREAD_PRIO_CLASS(prio) == 2 ? 4 : THREAD_PRIO_CLASS(prio))
 
 struct thread {
     uint64_t id;
@@ -41,9 +56,9 @@ struct thread {
     struct thread *prev;
     enum thread_state state;
     enum thread_flags flags;
-    int64_t curr_core;      // -1 if not being ran
-    uint8_t mlfq_level;     // Current priority level
-    uint64_t time_in_level; // Ticks at this level
+    int64_t curr_core;         /* -1 if not being ran */
+    enum thread_priority prio; /* priority level right now */
+    uint64_t time_in_level;    /* ticks at this level */
 };
 
 struct thread_queue {

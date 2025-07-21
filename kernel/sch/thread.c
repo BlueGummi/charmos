@@ -18,7 +18,7 @@ uint64_t globid = 1;
 static void thread_exit() {
     disable_interrupts();
     struct thread *self = scheduler_get_curr_thread();
-    self->state = ZOMBIE;
+    self->state = THREAD_STATE_ZOMBIE;
     reaper_enqueue(self);
     enable_interrupts();
 
@@ -40,9 +40,9 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     *--sp = (uint64_t) thread_exit;
 
     new_thread->regs.rsp = (uint64_t) sp;
-    new_thread->mlfq_level = 0;
+    new_thread->prio = THREAD_PRIO_MID;
     new_thread->time_in_level = 0;
-    new_thread->state = READY;
+    new_thread->state = THREAD_STATE_READY;
     new_thread->regs.rip = (uint64_t) entry_point;
     new_thread->stack = (void *) stack;
     new_thread->entry = entry_point;
@@ -95,7 +95,7 @@ void thread_block_on(struct thread_queue *q) {
     disable_interrupts();
 
     struct thread *current = scheduler_get_curr_thread();
-    current->state = BLOCKED;
+    current->state = THREAD_STATE_BLOCKED;
     thread_queue_push_back(q, current);
 
     if (interrupts)
@@ -110,7 +110,7 @@ static void wake_thread(void *a) {
 void thread_sleep_for_ms(uint64_t ms) {
     disable_interrupts();
     struct thread *curr = scheduler_get_curr_thread();
-    curr->state = SLEEPING;
+    curr->state = THREAD_STATE_SLEEPING;
     defer_enqueue(wake_thread, curr, ms);
     enable_interrupts();
     scheduler_yield();

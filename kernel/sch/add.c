@@ -20,14 +20,14 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
     if (!already_locked)
         ints = spin_lock(&sched->lock);
 
-    uint8_t level = task->mlfq_level;
-    struct thread_queue *q = &sched->queues[level];
+    enum thread_priority prio = task->prio;
+    struct thread_queue *q = &sched->queues[prio];
 
     bool was_empty = (q->head == NULL);
     dll_add(q, task);
 
     if (was_empty)
-        sched->queue_bitmap |= (1 << level);
+        sched->queue_bitmap |= (1 << prio);
 
     if (is_new_thread) {
         sched->thread_count++;

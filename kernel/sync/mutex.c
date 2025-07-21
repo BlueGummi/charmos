@@ -34,7 +34,7 @@ static bool try_acquire_mutex(struct mutex *m, struct thread *curr) {
 static bool should_spin_on_mutex(struct mutex *m) {
     bool i = spin_lock(&m->lock);
     struct thread *owner = m->owner;
-    bool active = (owner != NULL && owner->state == RUNNING);
+    bool active = (owner != NULL && owner->state == THREAD_STATE_RUNNING);
     spin_unlock(&m->lock, i);
     return active;
 }
@@ -52,7 +52,7 @@ static bool spin_wait_mutex(struct mutex *m, struct thread *curr) {
 static void block_on_mutex(struct mutex *m, struct thread *curr) {
     bool i = spin_lock(&m->lock);
     thread_queue_push_back(&m->waiters, curr);
-    curr->state = BLOCKED;
+    curr->state = THREAD_STATE_BLOCKED;
     spin_unlock(&m->lock, i);
     scheduler_yield();
 }

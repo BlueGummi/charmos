@@ -16,8 +16,9 @@ static inline struct event_pool *get_event_pool_local(void) {
 static struct event_pool *get_least_loaded_pool_except_core(int64_t core_num) {
     uint64_t minimum_load = UINT64_MAX;
 
-    if (core_num == -1)
-        /* don't avoid any core */;
+    if (core_num == -1) {
+        /* don't avoid any core */
+    }
 
     /* There will always be a 'core 0 thread' */
     struct event_pool *least_loaded = pools[0];

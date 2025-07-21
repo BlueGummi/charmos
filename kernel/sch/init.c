@@ -35,8 +35,8 @@ void scheduler_init(void) {
         }
 
         struct thread *t0 = thread_create(k_sch_idle);
-        t0->flags = NO_STEAL;
-        t0->state = SLEEPING;
+        t0->flags = THREAD_FLAGS_NO_STEAL;
+        t0->state = THREAD_STATE_SLEEPING;
         s->idle_thread = t0;
 
         if (!i) {

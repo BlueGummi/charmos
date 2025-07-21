@@ -67,10 +67,10 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
         struct thread *current = start;
 
         do {
-            if (current->flags == NO_STEAL)
+            if (current->flags == THREAD_FLAGS_NO_STEAL)
                 continue;
             /* do not steal each other's idle threads */
-            if (current->state == READY) {
+            if (current->state == THREAD_STATE_READY) {
                 if (current == q->head && current == q->tail) {
                     q->head = NULL;
                     q->tail = NULL;

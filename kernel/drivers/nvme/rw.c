@@ -111,7 +111,7 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
     function(disk, lba, buffer, count, &req);
 
     struct thread *curr = scheduler_get_curr_thread();
-    curr->state = BLOCKED;
+    thread_set_state(curr, THREAD_STATE_BLOCKED);
 
     nvme->io_waiters[qid][tail] = curr;
     spin_unlock(&nvme->lock, i);

@@ -66,7 +66,7 @@ static inline void worker_spawn_on_core(uint64_t core) {
     if (!t)
         k_panic("Failed to spawn worker thread on core %u\n", core);
 
-    t->flags = NO_STEAL;
+    t->flags = THREAD_FLAGS_NO_STEAL;
 }
 
 static inline void defer_free(void *ptr) {

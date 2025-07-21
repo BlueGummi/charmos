@@ -38,7 +38,7 @@ atomic_uint total_threads = 0;
 int64_t work_steal_min_diff = 130;
 
 void k_sch_main() {
-    scheduler_get_curr_thread()->flags = NO_STEAL;
+    scheduler_get_curr_thread()->flags = THREAD_FLAGS_NO_STEAL;
     k_info("MAIN", K_INFO, "Device setup");
     registry_setup();
     global.current_bootstage = BOOTSTAGE_LATE_DEVICES;
@@ -59,10 +59,10 @@ void k_sch_idle() {
 }
 
 void scheduler_wake(struct thread *t) {
-    t->state = READY;
+    t->state = THREAD_STATE_READY;
 
     /* boost */
-    t->mlfq_level = 0;
+    t->prio = THREAD_PRIO_MAX_BOOST(t->prio);
     t->time_in_level = 0;
     uint64_t c = t->curr_core;
     scheduler_put_back(t);
@@ -108,19 +108,19 @@ static __always_inline void stop_steal(struct scheduler *sched,
 static __always_inline void scheduler_save_thread(struct scheduler *sched,
                                                   struct thread *curr) {
     maybe_recompute_threshold(get_this_core_id());
-    if (curr && curr->state == RUNNING) {
+    if (curr && curr->state == THREAD_STATE_RUNNING) {
         curr->curr_core = -1;
         curr->time_in_level++;
-        uint8_t level = curr->mlfq_level;
+        enum thread_priority level = curr->prio;
         uint64_t timeslice = 1ULL << level;
 
         if (curr->time_in_level >= timeslice) {
             curr->time_in_level = 0;
-            if (level < MLFQ_LEVELS - 1)
-                curr->mlfq_level++;
+            if (level < MLFQ_LEVELS - 1 && level != THREAD_PRIO_RT)
+                curr->prio++;
         }
 
-        curr->state = READY;
+        curr->state = THREAD_STATE_RUNNING;
         bool change_interrupts = false;
         bool locked = true;
         bool new = false;
@@ -171,7 +171,7 @@ static __always_inline void load_thread(struct scheduler *sched,
                                         struct thread *next) {
     if (next) {
         sched->current = next;
-        next->state = RUNNING;
+        next->state = THREAD_STATE_RUNNING;
         next->curr_core = get_this_core_id();
     } else {
         sched->current = NULL;

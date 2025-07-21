@@ -24,7 +24,6 @@ static void setup_cpu(uint64_t cpu) {
     if (!c)
         k_panic("Core %d could not allocate space for struct\n", cpu);
     c->id = cpu;
-    c->state = IDLE;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
     global.cores[cpu] = c;
 }
@@ -85,7 +84,6 @@ void mp_setup_bsp() {
     if (!c)
         k_panic("Could not allocate space for core structure on BSP");
 
-    c->state = IDLE;
     c->current_thread = kzalloc(sizeof(struct thread));
     if (unlikely(!c->current_thread))
         k_panic("Could not allocate space for BSP's current thread");

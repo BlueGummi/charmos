@@ -68,7 +68,7 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
     req.trigger_completion = true;
 
     struct thread *curr = scheduler_get_curr_thread();
-    curr->state = BLOCKED;
+    thread_set_state(curr, THREAD_STATE_BLOCKED);
     dev->io_waiters[ahci_disk->port][req.slot] = curr;
 
     if (!function(disk, lba, buf, count, &req)) {

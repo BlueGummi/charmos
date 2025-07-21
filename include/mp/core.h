@@ -9,15 +9,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-enum core_state {
-    IDLE,
-    BUSY,
-};
-
 struct core {
     uint64_t id;
     struct thread *current_thread;
-    enum core_state state;
     struct tss *tss;
     atomic_uintptr_t tlb_page;        // page to invalidate (or 0 = none)
     atomic_uint_fast64_t tlb_req_gen; // generation to process

@@ -3,7 +3,6 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdint.h>
 #include <sync/spin_lock.h>
 
 #include "sch/thread.h"
@@ -17,8 +16,8 @@ void scheduler_rm_thread(struct scheduler *sched, struct thread *task,
     if (!already_locked)
         ints = spin_lock(&sched->lock);
 
-    uint8_t level = task->mlfq_level;
-    struct thread_queue *q = &sched->queues[level];
+    enum thread_priority prio = task->prio;
+    struct thread_queue *q = &sched->queues[prio];
 
     if (!q->head) {
         if (!already_locked)
@@ -30,7 +29,7 @@ void scheduler_rm_thread(struct scheduler *sched, struct thread *task,
     dll_remove(q, task);
 
     if (q->head == NULL)
-        sched->queue_bitmap &= ~(1 << level);
+        sched->queue_bitmap &= ~(1 << prio);
 
     thread_free(task);
     sched->thread_count--;

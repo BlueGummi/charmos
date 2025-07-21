@@ -177,7 +177,7 @@ static inline void submit_and_wait(struct ata_drive *d,
                                    struct ide_request *req) {
     bool i = spin_lock(&req->lock);
     struct thread *t = scheduler_get_curr_thread();
-    t->state = BLOCKED;
+    thread_set_state(t, THREAD_STATE_BLOCKED);
     req->waiter = t;
     submit_async(d, req);
     spin_unlock(&req->lock, i);
