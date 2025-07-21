@@ -39,6 +39,7 @@ void schedule(void);
 void k_sch_main(void);
 void k_sch_idle(void);
 void scheduler_enable_timeslice();
+void scheduler_disable_timeslice();
 void scheduler_yield();
 void scheduler_enqueue(struct thread *t);
 void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id);
@@ -49,7 +50,8 @@ void switch_context(struct context *old, struct context *new);
 void load_context(struct context *new);
 
 bool scheduler_can_steal_work(struct scheduler *sched);
-uint64_t compute_steal_threshold(uint64_t threads, uint64_t core_count);
+uint64_t scheduler_compute_steal_threshold(uint64_t threads);
+struct thread *scheduler_try_do_steal(struct scheduler *sched);
 
 struct scheduler *scheduler_pick_victim(struct scheduler *self);
 struct thread *scheduler_steal_work(struct scheduler *victim);
@@ -81,3 +83,5 @@ static inline struct thread *thread_spawn_on_core(void (*entry)(void),
 static inline struct scheduler *get_this_core_sched(void) {
     return global.schedulers[get_this_core_id()];
 }
+
+#define TICKS_FOR_PRIO(level) (1ULL << level)

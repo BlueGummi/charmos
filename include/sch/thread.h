@@ -16,7 +16,7 @@ struct context {
     uint64_t rip;
 };
 
-enum thread_state {
+enum thread_state : uint8_t {
     THREAD_STATE_NEW,     /* Thread is created but not yet scheduled */
     THREAD_STATE_READY,   /* Thread is ready to run but not currently running */
     THREAD_STATE_RUNNING, /* Thread is currently executing */
@@ -27,11 +27,11 @@ enum thread_state {
     THREAD_STATE_HALTED,     /* Thread manually suspended */
 };
 
-enum thread_flags {
+enum thread_flags : uint8_t {
     THREAD_FLAGS_NO_STEAL, /* Do not migrate between cores */
 };
 
-enum thread_priority {
+enum thread_priority : uint8_t {
     THREAD_PRIO_RT = 0,         /* realtime thread */
     THREAD_PRIO_HIGH = 1,       /* high priority timesharing thread */
     THREAD_PRIO_MID = 2,        /* medium priority timesharing thread */
@@ -39,13 +39,26 @@ enum thread_priority {
     THREAD_PRIO_BACKGROUND = 4, /* background thread */
 };
 
+enum thread_prio_class : uint8_t {
+    THREAD_PRIO_CLASS_RT = 0,
+    THREAD_PRIO_CLASS_TS = 1,
+    THREAD_PRIO_CLASS_BG = 2,
+};
+
 #define THREAD_PRIO_CLASS(prio)                                                \
     ((prio == THREAD_PRIO_RT)                                                  \
-         ? 0                                                                   \
-         : ((prio >= THREAD_PRIO_HIGH && prio <= THREAD_PRIO_LOW) ? 1 : 2))
+         ? THREAD_PRIO_CLASS_RT                                                \
+         : ((prio >= THREAD_PRIO_HIGH && prio <= THREAD_PRIO_LOW)              \
+                ? THREAD_PRIO_CLASS_TS                                         \
+                : THREAD_PRIO_CLASS_BG))
 
 #define THREAD_PRIO_MAX_BOOST(prio)                                            \
-    (THREAD_PRIO_CLASS(prio) == 2 ? 4 : THREAD_PRIO_CLASS(prio))
+    (enum thread_priority)(THREAD_PRIO_CLASS(prio) == THREAD_PRIO_CLASS_BG     \
+                               ? THREAD_PRIO_BACKGROUND                        \
+                               : THREAD_PRIO_CLASS(prio))
+
+#define THREAD_PRIO_IS_TIMESHARING(prio)                                       \
+    (THREAD_PRIO_CLASS(prio) == THREAD_PRIO_CLASS_TS)
 
 struct thread {
     uint64_t id;

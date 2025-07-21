@@ -12,13 +12,13 @@ static inline uint8_t ilog2(uint64_t x) {
     return r;
 }
 
-uint64_t compute_steal_threshold(uint64_t threads, uint64_t core_count) {
-    if (core_count == 0) {
+uint64_t scheduler_compute_steal_threshold(uint64_t threads) {
+    if (global.core_count == 0) {
         k_panic("Why do you have no cores on your machine?\n");
         return 150; // safety fallback
     }
 
-    uint64_t threads_per_core = threads / core_count;
+    uint64_t threads_per_core = threads / global.core_count;
 
     // very low thread/core ratio, be conservative
     if (threads_per_core <= 1)

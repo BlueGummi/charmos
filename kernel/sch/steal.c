@@ -106,3 +106,52 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
     spin_unlock(&victim->lock, false);
     return NULL; // Nothing stealable
 }
+
+static inline void begin_steal(struct scheduler *sched) {
+    atomic_store(&sched->stealing_work, true);
+}
+
+static inline bool try_begin_steal() {
+    unsigned current = atomic_load(&active_stealers);
+    while (current < max_concurrent_stealers) {
+        if (atomic_compare_exchange_weak(&active_stealers, &current,
+                                         current + 1)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static inline void end_steal() {
+    atomic_fetch_sub(&active_stealers, 1);
+}
+
+static inline void stop_steal(struct scheduler *sched,
+                              struct scheduler *victim) {
+    if (victim)
+        atomic_store(&victim->being_robbed, false);
+
+    atomic_store(&sched->stealing_work, false);
+    end_steal();
+}
+
+struct thread *scheduler_try_do_steal(struct scheduler *sched) {
+    if (!scheduler_can_steal_work(sched))
+        return NULL;
+
+    if (!try_begin_steal())
+        return NULL;
+
+    begin_steal(sched);
+    struct scheduler *victim = scheduler_pick_victim(sched);
+
+    if (!victim) {
+        stop_steal(sched, victim);
+        return NULL;
+    }
+
+    struct thread *stolen = scheduler_steal_work(victim);
+    stop_steal(sched, victim);
+
+    return stolen;
+}
