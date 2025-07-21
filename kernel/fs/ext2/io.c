@@ -49,8 +49,8 @@ struct ext2_inode *ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
         return NULL;
     }
 
-    uint32_t inodes_per_group = fs->sblock->inodes_per_group;
-    uint32_t inode_size = fs->sblock->inode_size;
+    uint32_t inodes_per_group = fs->inodes_per_group;
+    uint32_t inode_size = fs->inode_size;
 
     uint32_t group = ext2_get_inode_group(fs, inode_idx);
     uint32_t index_in_group = (inode_idx - 1) % inodes_per_group;

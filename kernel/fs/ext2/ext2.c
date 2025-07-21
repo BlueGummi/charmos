@@ -20,19 +20,11 @@ bool ext2_read_superblock(struct generic_partition *p,
     uint32_t superblock_offset = EXT2_SUPERBLOCK_OFFSET % d->sector_size;
 
     if (!d->read_sector(d, superblock_lba + p->start_lba, buffer, 1)) {
-        kfree(buffer);
+        kfree_aligned(buffer);
         return false;
     }
 
     memcpy(sblock, buffer + superblock_offset, sizeof(struct ext2_sblock));
-
-    uint8_t *b = (uint8_t *) sblock;
-    for (uint64_t i = 0; i < sizeof(struct ext2_sblock); i++) {
-        k_printf("%02x ", b[i]);
-        if ((i + 1) % 32 == 0)
-            k_printf("\n");
-    }
-    k_printf("\n");
 
     kfree_aligned(buffer);
     return (sblock->magic == 0xEF53);

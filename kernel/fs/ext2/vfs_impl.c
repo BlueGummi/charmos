@@ -349,6 +349,7 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     fs->inodes_per_group = sblock->inodes_per_group;
     fs->inode_size = sblock->inode_size;
     fs->block_size = 1024U << sblock->log_block_size;
+    fs->blocks_per_group = sblock->blocks_per_group;
 
     fs->sectors_per_block = fs->block_size / p->disk->sector_size;
 
@@ -370,6 +371,7 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
         return ERR_NO_MEM;
 
     struct bcache_entry *root_ent = NULL;
+
     ext2_inode_read(fs, EXT2_ROOT_INODE, &root_ent);
 
     if (!root_ent)

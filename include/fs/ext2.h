@@ -222,6 +222,7 @@ struct ext2_fs {
     uint32_t num_groups;
     uint32_t inodes_count;
     uint32_t inodes_per_group;
+    uint32_t blocks_per_group;
     uint32_t block_size;
     uint32_t sectors_per_block;
     uint16_t inode_size;
@@ -301,7 +302,7 @@ static inline uint32_t ext2_get_block_group(struct ext2_fs *fs,
 
 static inline uint32_t ext2_get_inode_group(struct ext2_fs *fs,
                                             uint32_t inode) {
-    return (inode - 1) / fs->sblock->inodes_per_group;
+    return (inode - 1) / fs->inodes_per_group;
 }
 
 static inline bool ext2_fs_lock(struct ext2_fs *fs) {
