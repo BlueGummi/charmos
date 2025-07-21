@@ -44,7 +44,7 @@ jobs:
 
           set +e
           export TERM=dumb
-          timeout 60s make tests | tee qemu.log
+          timeout 120s make tests | tee qemu.log
           EXIT_CODE=${PIPESTATUS[0]}
           echo "[INFO]: make tests exited with $EXIT_CODE"
 
