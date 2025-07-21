@@ -77,6 +77,7 @@ void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {
     /* Doing this as the `schedule()` will go to another thread */
     unmark_self_in_interrupt();
 
+    lapic_timer_enable();
     schedule();
 }
 
