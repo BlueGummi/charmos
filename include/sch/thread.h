@@ -3,6 +3,7 @@
 #include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <sync/spin_lock.h>
 #pragma once
 #define STACK_SIZE (PAGE_SIZE * 4)
 
@@ -46,46 +47,61 @@ enum thread_flags : uint8_t {
 };
 
 enum thread_priority : uint8_t {
-    THREAD_PRIO_RT = 0,         /* realtime thread */
-    THREAD_PRIO_HIGH = 1,       /* high priority timesharing thread */
-    THREAD_PRIO_MID = 2,        /* medium priority timesharing thread */
-    THREAD_PRIO_LOW = 3,        /* low priority timesharing thread */
-    THREAD_PRIO_BACKGROUND = 4, /* background thread */
+    THREAD_PRIO_RT = 0,         /* Realtime thread */
+    THREAD_PRIO_HIGH = 1,       /* High priority timesharing thread */
+    THREAD_PRIO_MID = 2,        /* Medium priority timesharing thread */
+    THREAD_PRIO_LOW = 3,        /* Low priority timesharing thread */
+    THREAD_PRIO_BACKGROUND = 4, /* Background thread */
 };
 
 enum thread_prio_class : uint8_t {
-    THREAD_PRIO_CLASS_RT = 0,
-    THREAD_PRIO_CLASS_TS = 1,
-    THREAD_PRIO_CLASS_BG = 2,
+    THREAD_PRIO_CLASS_RT = 0, /* Realtime class */
+    THREAD_PRIO_CLASS_TS = 1, /* Timesharing class */
+    THREAD_PRIO_CLASS_BG = 2, /* Background class */
 };
 
-#define THREAD_PRIO_CLASS(prio)                                                \
-    ((prio == THREAD_PRIO_RT)                                                  \
-         ? THREAD_PRIO_CLASS_RT                                                \
-         : ((prio >= THREAD_PRIO_HIGH && prio <= THREAD_PRIO_LOW)              \
-                ? THREAD_PRIO_CLASS_TS                                         \
-                : THREAD_PRIO_CLASS_BG))
+enum wake_reason {
+    WAKE_REASON_NONE = 0,    /* No reason specified */
+    WAKE_REASON_SIGNAL = 1,  /* Signal from something */
+    WAKE_REASON_TIMEOUT = 2, /* Timeout */
+};
+
+static inline enum thread_prio_class prio_class_of(enum thread_priority prio) {
+    switch (prio) {
+    case THREAD_PRIO_RT: return THREAD_PRIO_CLASS_RT;
+    case THREAD_PRIO_HIGH:
+    case THREAD_PRIO_MID: /* fallthrough */
+    case THREAD_PRIO_LOW: return THREAD_PRIO_CLASS_TS;
+    case THREAD_PRIO_BACKGROUND: return THREAD_PRIO_CLASS_BG;
+    }
+}
 
 #define THREAD_PRIO_MAX_BOOST(prio)                                            \
-    (enum thread_priority)(THREAD_PRIO_CLASS(prio) == THREAD_PRIO_CLASS_BG     \
+    (enum thread_priority)(prio_class_of(prio) == THREAD_PRIO_CLASS_BG         \
                                ? THREAD_PRIO_BACKGROUND                        \
-                               : THREAD_PRIO_CLASS(prio))
+                               : prio_class_of(prio))
 
 #define THREAD_PRIO_IS_TIMESHARING(prio)                                       \
-    (THREAD_PRIO_CLASS(prio) == THREAD_PRIO_CLASS_TS)
+    (prio_class_of(prio) == THREAD_PRIO_CLASS_TS)
 
 struct thread {
     uint64_t id;
     void (*entry)(void);
     void *stack;
+
     struct context regs;
     struct thread *next;
     struct thread *prev;
+
     _Atomic enum thread_state state;
-    enum thread_flags flags;
-    int64_t curr_core;         /* -1 if not being ran */
     enum thread_priority prio; /* priority level right now */
-    uint64_t time_in_level;    /* ticks at this level */
+    enum thread_flags flags;
+    volatile enum wake_reason wake_reason;
+
+    int64_t curr_core;      /* -1 if not being ran */
+    uint64_t time_in_level; /* ticks at this level */
+
+    struct worker_thread *worker; /* NULL if this is not a worker */
 };
 
 struct thread_queue {
@@ -102,8 +118,9 @@ void thread_queue_push_back(struct thread_queue *q, struct thread *t);
 void thread_block_on(struct thread_queue *q);
 struct thread *thread_queue_pop_front(struct thread_queue *q);
 void thread_queue_clear(struct thread_queue *q);
-void thread_queue_remove(struct thread_queue *q, struct thread *t);
+bool thread_queue_remove(struct thread_queue *q, struct thread *t);
 void thread_sleep_for_ms(uint64_t ms);
+void thread_exit(void);
 
 static inline void thread_set_state(struct thread *t, enum thread_state state) {
     bool i = are_interrupts_enabled();

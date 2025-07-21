@@ -28,14 +28,14 @@ REGISTER_TEST(sched_reaper_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 }
 
 static atomic_bool event_pool_ran = false;
-static void event_pool_fn(void *arg) {
+static void event_pool_fn(void *arg, void *) {
     (void) arg;
     atomic_store(&event_pool_ran, true);
     ADD_MESSAGE("event pool ran");
 }
 
 REGISTER_TEST(event_pool_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    event_pool_add_remote(event_pool_fn, NULL);
+    event_pool_add_remote(event_pool_fn, NULL, NULL);
     sleep_ms(50);
     TEST_ASSERT(atomic_load(&event_pool_ran));
 

@@ -34,3 +34,7 @@ static inline void mark_self_in_interrupt(void) {
 static inline void unmark_self_in_interrupt(void) {
     global.cores[get_this_core_id()]->in_interrupt = false;
 }
+
+static inline bool in_interrupt(void) {
+    return global.cores[get_this_core_id()]->in_interrupt;
+}

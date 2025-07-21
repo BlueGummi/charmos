@@ -16,3 +16,26 @@
         q->head = thing;                                                       \
     }                                                                          \
     q->tail = thing;
+
+#define queue_remove(q, t)                                                     \
+    typeof(q->head) prev = NULL;                                               \
+    typeof(q->head) curr = q->head;                                            \
+                                                                               \
+    while (curr) {                                                             \
+        if (curr == t) {                                                       \
+            if (prev) {                                                        \
+                prev->next = curr->next;                                       \
+            } else {                                                           \
+                q->head = curr->next;                                          \
+            }                                                                  \
+                                                                               \
+            if (q->tail == curr) {                                             \
+                q->tail = prev;                                                \
+            }                                                                  \
+            return true;                                                       \
+        }                                                                      \
+                                                                               \
+        prev = curr;                                                           \
+        curr = curr->next;                                                     \
+    }                                                                          \
+    return false;

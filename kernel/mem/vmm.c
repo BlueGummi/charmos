@@ -57,6 +57,7 @@ void tlb_shootdown(void *ctx, uint8_t irq, void *rsp) {
 }
 
 static void do_tlb_shootdown(uintptr_t addr) {
+    return;
     if (global.current_bootstage < BOOTSTAGE_MID_MP)
         return;
 

@@ -15,7 +15,7 @@
 
 uint64_t globid = 1;
 
-static void thread_exit() {
+void thread_exit() {
     disable_interrupts();
     struct thread *self = scheduler_get_curr_thread();
     atomic_store(&self->state, THREAD_STATE_ZOMBIE);
@@ -77,6 +77,10 @@ void thread_queue_push_back(struct thread_queue *q, struct thread *t) {
     queue_push_back(q, t);
 }
 
+bool thread_queue_remove(struct thread_queue *q, struct thread *t) {
+    queue_remove(q, t);
+}
+
 struct thread *thread_queue_pop_front(struct thread_queue *q) {
     queue_pop_front(q, t);
     return t;
@@ -102,7 +106,7 @@ void thread_block_on(struct thread_queue *q) {
         enable_interrupts();
 }
 
-static void wake_thread(void *a) {
+static void wake_thread(void *a, void *) {
     struct thread *t = a;
     scheduler_wake(t);
 }
@@ -111,7 +115,7 @@ void thread_sleep_for_ms(uint64_t ms) {
     disable_interrupts();
     struct thread *curr = scheduler_get_curr_thread();
     atomic_store(&curr->state, THREAD_STATE_SLEEPING);
-    defer_enqueue(wake_thread, curr, ms);
+    defer_enqueue(wake_thread, curr, NULL, ms);
     enable_interrupts();
     scheduler_yield();
 }

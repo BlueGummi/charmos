@@ -6,30 +6,9 @@ struct condvar {
     struct thread_queue waiters;
 };
 
-static inline void condvar_wait(struct condvar *cv, struct spinlock *lock) {
-    thread_block_on(&cv->waiters);
-
-    bool change_interrupts = false;
-    spin_unlock(lock, change_interrupts);
-
-    scheduler_yield();
-
-    spin_lock(lock);
-}
-
-static inline void condvar_init(struct condvar *cv) {
-    thread_queue_init(&cv->waiters);
-}
-
-static inline void condvar_signal(struct condvar *cv) {
-    struct thread *t = thread_queue_pop_front(&cv->waiters);
-    if (t)
-        scheduler_wake(t);
-}
-
-static inline void condvar_broadcast(struct condvar *cv) {
-    struct thread *t;
-    while ((t = thread_queue_pop_front(&cv->waiters)) != NULL) {
-        scheduler_wake(t);
-    }
-}
+bool condvar_wait(struct condvar *cv, struct spinlock *lock);
+void condvar_init(struct condvar *cv);
+void condvar_signal(struct condvar *cv);
+void condvar_broadcast(struct condvar *cv);
+bool condvar_wait_timeout(struct condvar *cv, struct spinlock *lock,
+                          time_t timeout_ms);

@@ -181,7 +181,7 @@ static inline struct thread *load_idle_thread(struct scheduler *sched) {
 }
 
 static inline void change_timeslice(struct thread *curr, struct thread *next) {
-    if (curr == next/* || next->prio == THREAD_PRIO_RT */)
+    if (curr == next /* || next->prio == THREAD_PRIO_RT */)
         disable_timeslice();
     else
         enable_timeslice();
