@@ -67,9 +67,9 @@ uint32_t ext2_alloc_block(struct ext2_fs *fs) {
         return -1;
 
     for (uint32_t group = 0; group < fs->num_groups; ++group) {
-        uint32_t block_num = alloc_from_bitmap(
-            fs, fs->group_desc[group].block_bitmap,
-            fs->sblock->blocks_per_group, group, update_block_counts);
+        uint32_t block_num =
+            alloc_from_bitmap(fs, fs->group_desc[group].block_bitmap,
+                              fs->blocks_per_group, group, update_block_counts);
         if (block_num != (uint32_t) -1) {
             return block_num;
         }
@@ -81,8 +81,8 @@ bool ext2_free_block(struct ext2_fs *fs, uint32_t block_num) {
     if (!fs || block_num == 0)
         return false;
 
-    uint32_t group = block_num / fs->sblock->blocks_per_group;
-    uint32_t index = block_num % fs->sblock->blocks_per_group;
+    uint32_t group = block_num / fs->blocks_per_group;
+    uint32_t index = block_num % fs->blocks_per_group;
 
     uint32_t bitmap_block = fs->group_desc[group].block_bitmap;
 

@@ -74,7 +74,6 @@ enum errno ext2_readlink(struct ext2_fs *fs, struct ext2_full_inode *node,
     }
 
     /* target is stored in data blocks */
-    uint32_t block_size = 1024 << fs->sblock->log_block_size;
     uint32_t first_block = node->node.block[0];
 
     if (first_block == 0)
@@ -88,7 +87,7 @@ enum errno ext2_readlink(struct ext2_fs *fs, struct ext2_full_inode *node,
     if (!block)
         return ERR_IO;
 
-    memcpy(buf, block, link_size > block_size ? block_size : link_size);
+    memcpy(buf, block, link_size > fs->block_size ? fs->block_size : link_size);
     bcache_ent_release(ent);
 
     return 0;
