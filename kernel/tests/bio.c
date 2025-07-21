@@ -62,7 +62,7 @@ REGISTER_TEST(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
             return;
         }
 
-        sleep_ms(500);
+        sleep_ms(100);
 
         TEST_ASSERT(bio->status == 0);
         kfree_aligned(bio->buffer);

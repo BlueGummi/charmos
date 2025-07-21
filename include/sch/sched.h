@@ -63,8 +63,7 @@ extern int64_t work_steal_min_diff;
 
 /* TODO: no rdmsr */
 static inline struct thread *scheduler_get_curr_thread() {
-    struct core *c = (void *) rdmsr(MSR_GS_BASE);
-    return c->current_thread;
+    return global.cores[get_this_core_id()]->current_thread;
 }
 
 static inline struct thread *thread_spawn(void (*entry)(void)) {

@@ -105,15 +105,15 @@ static bool should_spawn_worker(struct event_pool *pool) {
 
 static bool spawn_worker(struct event_pool *pool) {
     bool i = spin_lock(&pool->lock);
+    struct worker_thread *w = &pool->threads[get_available_worker_idx(pool)];
+    w->inactivity_check_period = get_inactivity_timeout(pool);
     struct thread *t = thread_spawn_on_core(worker_main, pool->core);
+
     if (!t) {
         atomic_store(&pool->currently_spawning, false);
         spin_unlock(&pool->lock, i);
         return false;
     }
-
-    struct worker_thread *w = &pool->threads[get_available_worker_idx(pool)];
-    w->inactivity_check_period = get_inactivity_timeout(pool);
 
     link_thread_and_worker(w, t);
     update_pool_after_spawn(pool);
@@ -158,6 +158,10 @@ static inline struct event_pool *get_least_loaded_remote_pool(void) {
 }
 
 static inline struct worker_thread *get_this_worker_thread(void) {
+    /* Spin - We may not have this yet but we are about to get it */
+    while (!scheduler_get_curr_thread()->worker)
+        ;
+
     return scheduler_get_curr_thread()->worker;
 }
 
@@ -192,7 +196,7 @@ static bool worker_wait(struct event_pool *pool, struct worker_thread *worker) {
     return signal;
 }
 
-static inline bool worker_should_exit(struct worker_thread *worker,
+static inline bool worker_should_exit(const struct worker_thread *worker,
                                       time_t start_idle, bool idle,
                                       bool signal) {
     const time_t timeout = worker->inactivity_check_period;
@@ -203,8 +207,11 @@ static inline bool worker_should_exit(struct worker_thread *worker,
     return false;
 }
 
-static inline void set_idle(struct worker_thread *worker, time_t *start_idle,
-                            bool *idle) {
+static inline void set_idle(const struct worker_thread *worker,
+                            time_t *start_idle, bool *idle) {
+    if (!worker)
+        k_panic("Worker is NULL\n");
+
     if (!worker->is_permanent && !(*idle)) {
         *start_idle = time_get_ms();
         *idle = true;
@@ -257,17 +264,20 @@ void worker_main(void) {
     struct worker_thread *worker = get_this_worker_thread();
     struct event_pool *pool = get_event_pool_local();
 
+    bool interrupts = true;
     while (1) {
         bool idle = false;
         time_t start_idle = 0;
 
-        bool interrupts = spin_lock(&pool->lock);
+        interrupts = spin_lock(&pool->lock);
 
         if (idle_loop_should_exit(pool, worker, &idle, &start_idle))
-            worker_exit(pool, worker, interrupts);
+            break;
 
         do_work_from_pool(pool, worker, &idle, interrupts);
     }
+
+    worker_exit(pool, worker, interrupts);
 }
 
 //
