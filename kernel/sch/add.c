@@ -50,6 +50,7 @@ void scheduler_enqueue(struct thread *t) {
             min_core = i;
         }
     }
+
     scheduler_add_thread(s, t, false, false, true);
     lapic_send_ipi(min_core, SCHEDULER_ID);
 }
@@ -63,7 +64,7 @@ void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id) {
 
 void scheduler_put_back(struct thread *t) {
     if (t->curr_core == -1)
-        return;
+        k_panic("Tried to put_back a thread in the ready queues\n");
 
     struct scheduler *sch = global.schedulers[t->curr_core];
     scheduler_add_thread(sch, t, false, false, false);

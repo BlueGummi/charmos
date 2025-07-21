@@ -18,10 +18,6 @@
 
 struct scheduler **local_schs;
 
-/* This guy helps us figure out if the scheduler's load is
-   enough of a portion of the global load to not steal work*/
-atomic_int global_load = 0;
-
 /* This is how many cores can be stealing work at once */
 uint32_t max_concurrent_stealers = 0;
 
@@ -38,7 +34,6 @@ atomic_uint total_threads = 0;
 int64_t work_steal_min_diff = 130;
 
 void k_sch_main() {
-    scheduler_get_curr_thread()->flags = THREAD_FLAGS_NO_STEAL;
     k_info("MAIN", K_INFO, "Device setup");
     registry_setup();
     global.current_bootstage = BOOTSTAGE_LATE_DEVICES;
@@ -59,13 +54,13 @@ void k_sch_idle() {
 }
 
 void scheduler_wake(struct thread *t) {
-    t->state = THREAD_STATE_READY;
-
+    atomic_store(&t->state, THREAD_STATE_READY);
     /* boost */
     t->prio = THREAD_PRIO_MAX_BOOST(t->prio);
     t->time_in_level = 0;
     uint64_t c = t->curr_core;
     scheduler_put_back(t);
+
     lapic_send_ipi(c, SCHEDULER_ID);
 }
 
@@ -110,7 +105,7 @@ static inline void do_thread_prio_decay(struct thread *thread) {
 }
 
 static inline void update_thread_before_save(struct thread *thread) {
-    thread->state = THREAD_STATE_READY;
+    atomic_store(&thread->state, THREAD_STATE_READY);
     thread->curr_core = -1;
     thread->time_in_level++;
 
@@ -132,9 +127,10 @@ static inline void do_save_thread(struct scheduler *sched,
     do_re_enqueue_thread(sched, curr);
 }
 
-static inline void save_thread(struct scheduler *sched, struct thread *curr) {
+static inline void requeue_current_thread_if_runnable(struct scheduler *sched,
+                                                      struct thread *curr) {
     maybe_recompute_threshold(get_this_core_id());
-    if (curr && curr->state == THREAD_STATE_RUNNING)
+    if (curr && atomic_load(&curr->state) == THREAD_STATE_RUNNING)
         do_save_thread(sched, curr);
 }
 
@@ -171,7 +167,7 @@ static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {
 static void load_thread(struct scheduler *sched, struct thread *next) {
     if (next) {
         sched->current = next;
-        next->state = THREAD_STATE_RUNNING;
+        atomic_store(&next->state, THREAD_STATE_RUNNING);
         next->curr_core = get_this_core_id();
     } else {
         sched->current = NULL;
@@ -184,20 +180,10 @@ static inline struct thread *load_idle_thread(struct scheduler *sched) {
 }
 
 static inline void change_timeslice(struct thread *curr, struct thread *next) {
-    if (curr == next)
+    if (curr == next || next->prio == THREAD_PRIO_RT)
         disable_timeslice();
     else
         enable_timeslice();
-}
-
-void scheduler_yield() {
-    bool were_enabled = are_interrupts_enabled();
-    disable_interrupts();
-
-    schedule();
-
-    if (were_enabled)
-        enable_interrupts();
 }
 
 void schedule(void) {
@@ -207,7 +193,7 @@ void schedule(void) {
 
     struct thread *curr = sched->current;
     struct thread *next = NULL;
-    save_thread(sched, curr);
+    requeue_current_thread_if_runnable(sched, curr);
 
     struct thread *stolen = scheduler_try_do_steal(sched);
 
@@ -228,4 +214,14 @@ void schedule(void) {
         switch_context(&curr->regs, &next->regs);
     else
         load_context(&next->regs);
+}
+
+void scheduler_yield() {
+    bool were_enabled = are_interrupts_enabled();
+    disable_interrupts();
+
+    schedule();
+
+    if (were_enabled)
+        enable_interrupts();
 }

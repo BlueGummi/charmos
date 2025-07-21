@@ -5,7 +5,7 @@
 #include <sleep.h>
 #include <tests.h>
 
-static atomic_bool ran = false;
+static volatile atomic_bool ran = false;
 
 static void testfn(void) {
     atomic_store(&ran, true);

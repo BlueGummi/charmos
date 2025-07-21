@@ -1,5 +1,6 @@
 #include <asm.h>
 #include <mem/alloc.h>
+#include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>
 #pragma once
@@ -67,7 +68,7 @@ struct thread {
     struct context regs;
     struct thread *next;
     struct thread *prev;
-    enum thread_state state;
+    _Atomic enum thread_state state;
     enum thread_flags flags;
     int64_t curr_core;         /* -1 if not being ran */
     enum thread_priority prio; /* priority level right now */
@@ -94,7 +95,7 @@ void thread_sleep_for_ms(uint64_t ms);
 static inline void thread_set_state(struct thread *t, enum thread_state state) {
     bool i = are_interrupts_enabled();
     disable_interrupts();
-    t->state = state;
+    atomic_store(&t->state, state);
     if (i)
         enable_interrupts();
 }

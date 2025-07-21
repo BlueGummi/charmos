@@ -74,8 +74,6 @@ static void do_tlb_shootdown(uintptr_t addr) {
         lapic_send_ipi(i, TLB_SHOOTDOWN_ID);
     }
 
-
-    /*
     for (uint64_t i = 0; i < cores; i++) {
         if (i == this_core)
             continue;
@@ -84,7 +82,7 @@ static void do_tlb_shootdown(uintptr_t addr) {
         while (atomic_load_explicit(&target->tlb_ack_gen,
                                     memory_order_acquire) < gen)
             cpu_relax();
-    }*/
+    }
 }
 
 void vmm_init(struct limine_memmap_response *memmap,

@@ -18,7 +18,7 @@ uint64_t globid = 1;
 static void thread_exit() {
     disable_interrupts();
     struct thread *self = scheduler_get_curr_thread();
-    self->state = THREAD_STATE_ZOMBIE;
+    atomic_store(&self->state, THREAD_STATE_ZOMBIE);
     reaper_enqueue(self);
     enable_interrupts();
 
@@ -95,7 +95,7 @@ void thread_block_on(struct thread_queue *q) {
     disable_interrupts();
 
     struct thread *current = scheduler_get_curr_thread();
-    current->state = THREAD_STATE_BLOCKED;
+    atomic_store(&current->state, THREAD_STATE_BLOCKED);
     thread_queue_push_back(q, current);
 
     if (interrupts)
@@ -110,7 +110,7 @@ static void wake_thread(void *a) {
 void thread_sleep_for_ms(uint64_t ms) {
     disable_interrupts();
     struct thread *curr = scheduler_get_curr_thread();
-    curr->state = THREAD_STATE_SLEEPING;
+    atomic_store(&curr->state, THREAD_STATE_SLEEPING);
     defer_enqueue(wake_thread, curr, ms);
     enable_interrupts();
     scheduler_yield();

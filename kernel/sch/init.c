@@ -41,6 +41,7 @@ void scheduler_init(void) {
 
         if (!i) {
             struct thread *t = thread_create(k_sch_main);
+            t->flags = THREAD_FLAGS_NO_STEAL;
             scheduler_add_thread(s, t, false, false, true);
         }
 
