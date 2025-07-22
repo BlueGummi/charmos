@@ -57,6 +57,7 @@ void k_sch_idle() {
 void scheduler_wake(struct thread *t) {
     atomic_store(&t->state, THREAD_STATE_READY);
     /* boost */
+
     t->prio = THREAD_PRIO_MAX_BOOST(t->prio);
     t->time_in_level = 0;
     uint64_t c = t->curr_core;
@@ -103,6 +104,9 @@ static inline void do_thread_prio_decay(struct thread *thread) {
     thread->time_in_level = 0;
     if (THREAD_PRIO_IS_TIMESHARING(thread->prio))
         thread->prio = ts_new_prio(thread->prio);
+
+    if (thread->prio == THREAD_PRIO_URGENT)
+        thread->prio = THREAD_PRIO_HIGH;
 }
 
 static inline void update_thread_before_save(struct thread *thread) {
@@ -180,11 +184,17 @@ static inline struct thread *load_idle_thread(struct scheduler *sched) {
     return sched->idle_thread;
 }
 
-static inline void change_timeslice(struct thread *curr, struct thread *next) {
-    if (curr == next || next->prio == THREAD_PRIO_RT)
+static inline void change_timeslice(struct scheduler *sched,
+                                    struct thread *next) {
+    if (sched->thread_count == 1) {
         disable_timeslice();
-    else
+        return;
+    }
+
+    if (THREAD_PRIO_IS_TIMESHARING(next->prio))
         enable_timeslice();
+    else
+        disable_timeslice();
 }
 
 void schedule(void) {
@@ -203,7 +213,7 @@ void schedule(void) {
     if (!next) {
         next = load_idle_thread(sched);
     } else {
-        change_timeslice(curr, next);
+        change_timeslice(sched, next);
     }
 
     load_thread(sched, next);

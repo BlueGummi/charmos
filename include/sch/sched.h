@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <sync/spin_lock.h>
 
-#define MLFQ_LEVELS 5 // Number of priority queues (0 = highest priority)
+#define MLFQ_LEVELS 6
 
 #define WORK_STEAL_THRESHOLD                                                   \
     75ULL /* How little work the core needs to be                              \

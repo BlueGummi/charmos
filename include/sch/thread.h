@@ -19,7 +19,6 @@ struct context {
 };
 
 enum thread_state : uint8_t {
-    THREAD_STATE_NEW,     /* Thread is created but not yet scheduled */
     THREAD_STATE_READY,   /* Thread is ready to run but not currently running */
     THREAD_STATE_RUNNING, /* Thread is currently executing */
     THREAD_STATE_BLOCKED, /* Waiting on I/O, lock, or condition */
@@ -31,7 +30,6 @@ enum thread_state : uint8_t {
 
 static inline const char *thread_state_str(const enum thread_state state) {
     switch (state) {
-    case THREAD_STATE_NEW: return "NEW";
     case THREAD_STATE_READY: return "READY";
     case THREAD_STATE_RUNNING: return "RUNNING";
     case THREAD_STATE_BLOCKED: return "BLOCKED";
@@ -47,11 +45,12 @@ enum thread_flags : uint8_t {
 };
 
 enum thread_priority : uint8_t {
-    THREAD_PRIO_RT = 0,         /* Realtime thread */
-    THREAD_PRIO_HIGH = 1,       /* High priority timesharing thread */
-    THREAD_PRIO_MID = 2,        /* Medium priority timesharing thread */
-    THREAD_PRIO_LOW = 3,        /* Low priority timesharing thread */
-    THREAD_PRIO_BACKGROUND = 4, /* Background thread */
+    THREAD_PRIO_URGENT = 0,     /* Urgent thread - ran before RT */
+    THREAD_PRIO_RT = 1,         /* Realtime thread */
+    THREAD_PRIO_HIGH = 2,       /* High priority timesharing thread */
+    THREAD_PRIO_MID = 3,        /* Medium priority timesharing thread */
+    THREAD_PRIO_LOW = 4,        /* Low priority timesharing thread */
+    THREAD_PRIO_BACKGROUND = 5, /* Background thread */
 };
 
 enum thread_prio_class : uint8_t {
@@ -68,6 +67,7 @@ enum wake_reason {
 
 static inline enum thread_prio_class prio_class_of(enum thread_priority prio) {
     switch (prio) {
+    case THREAD_PRIO_URGENT: /* fallthrough */
     case THREAD_PRIO_RT: return THREAD_PRIO_CLASS_RT;
     case THREAD_PRIO_HIGH:
     case THREAD_PRIO_MID: /* fallthrough */

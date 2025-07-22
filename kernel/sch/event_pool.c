@@ -118,8 +118,6 @@ static bool spawn_worker(struct event_pool *pool) {
     link_thread_and_worker(w, t);
     update_pool_after_spawn(pool);
 
-    k_printf("Worker thread spawned on pool %llu, timeout is %llu\n",
-             pool->core, w->inactivity_check_period);
     atomic_store(&pool->currently_spawning, false);
     spin_unlock(&pool->lock, i);
     return true;
@@ -255,8 +253,6 @@ static void worker_exit(struct event_pool *pool, struct worker_thread *worker,
     worker->present = false;
     pool->num_workers--;
     spin_unlock(&pool->lock, interrupts);
-    k_printf("Worker thread %llu is exiting...\n",
-             scheduler_get_curr_thread()->id);
     thread_exit();
 }
 

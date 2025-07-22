@@ -16,6 +16,7 @@ REGISTER_TEST(sched_reaper_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     uint64_t reaped_threads_at_start = reaper_get_reaped_thread_count();
     thread_spawn(testfn);
     enable_interrupts();
+
     scheduler_yield();
 
     while (!atomic_load(&ran))

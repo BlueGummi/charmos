@@ -63,7 +63,7 @@ void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id) {
 }
 
 void scheduler_put_back(struct thread *t) {
-    if (t->curr_core == -1 && t->state != THREAD_STATE_NEW)
+    if (t->curr_core == -1)
         k_panic("Tried to put_back a thread in the ready queues\n");
 
     struct scheduler *sch = global.schedulers[t->curr_core];

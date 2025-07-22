@@ -42,7 +42,7 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->regs.rsp = (uint64_t) sp;
     new_thread->prio = THREAD_PRIO_MID;
     new_thread->time_in_level = 0;
-    new_thread->state = THREAD_STATE_NEW;
+    new_thread->state = THREAD_STATE_READY;
     new_thread->regs.rip = (uint64_t) entry_point;
     new_thread->stack = (void *) stack;
     new_thread->entry = entry_point;

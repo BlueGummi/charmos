@@ -19,9 +19,6 @@ void reaper_enqueue(struct thread *t) {
         reaper.queue.tail = t;
     }
 
-    /*k_printf("Woke reaper, its core is %llu and its state is %s\n",
-             reaper_thread->curr_core, thread_state_str(reaper_thread->state));*/
-
     condvar_signal(&reaper.cv);
     spin_unlock(&reaper.lock, i);
 }
