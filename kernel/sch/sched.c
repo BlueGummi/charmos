@@ -55,11 +55,11 @@ void k_sch_idle() {
     }
 }
 
-void scheduler_wake(struct thread *t) {
+void scheduler_wake(struct thread *t, enum thread_priority new_prio) {
     atomic_store(&t->state, THREAD_STATE_READY);
     /* boost */
 
-    t->prio = THREAD_PRIO_MAX_BOOST(t->prio);
+    t->prio = new_prio;
     t->time_in_level = 0;
     uint64_t c = t->curr_core;
     scheduler_put_back(t);

@@ -108,7 +108,7 @@ void thread_block_on(struct thread_queue *q) {
 
 static void wake_thread(void *a, void *) {
     struct thread *t = a;
-    scheduler_wake(t);
+    scheduler_wake(t, THREAD_PRIO_MAX_BOOST(t->prio));
 }
 
 void thread_sleep_for_ms(uint64_t ms) {

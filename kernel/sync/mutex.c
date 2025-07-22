@@ -78,7 +78,7 @@ void mutex_unlock(struct mutex *m) {
 
     struct thread *next = thread_queue_pop_front(&m->waiters);
     if (next != NULL)
-        scheduler_wake(next);
+        scheduler_wake(next, THREAD_PRIO_MAX_BOOST(next->prio));
 
     spin_unlock(&m->lock, i);
 }

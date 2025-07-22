@@ -44,7 +44,7 @@ void scheduler_yield();
 void scheduler_enqueue(struct thread *t);
 void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id);
 void scheduler_put_back(struct thread *t);
-void scheduler_wake(struct thread *t);
+void scheduler_wake(struct thread *t, enum thread_priority prio);
 void scheduler_take_out(struct thread *t);
 void switch_context(struct context *old, struct context *new);
 void load_context(struct context *new);
