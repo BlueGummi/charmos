@@ -10,34 +10,41 @@ static inline void refcount_init(refcount_t *rc, unsigned int val) {
 }
 
 static inline bool refcount_inc(refcount_t *rc) {
-    unsigned int old = atomic_load(rc);
     for (;;) {
-        /* can't increment */
+        unsigned int old = atomic_load(rc);
         if (old == 0 || old == UINT_MAX)
             return false;
 
-        /* `old` is updated if the exchange fails */
-        if (atomic_compare_exchange_weak(rc, &old, old + 1))
+        unsigned int expected = old;
+        if (atomic_compare_exchange_weak(rc, &expected, old + 1))
             return true;
     }
 }
 
 static inline bool refcount_inc_not_zero(refcount_t *rc) {
-    unsigned int old = atomic_load(rc);
-    while (old != 0) {
-        if (atomic_compare_exchange_weak(rc, &old, old + 1))
-            return true;
-    }
-    return false;
-}
-
-static inline bool refcount_dec_and_test(refcount_t *rc) {
-    unsigned int old = atomic_load(rc);
     for (;;) {
+        unsigned int old = atomic_load(rc);
         if (old == 0)
             return false;
 
-        if (atomic_compare_exchange_weak(rc, &old, old - 1))
-            return old == 1;
+        unsigned int expected = old;
+        if (atomic_compare_exchange_weak(rc, &expected, old + 1))
+            return true;
+
+        old = expected;
+    }
+}
+
+static inline bool refcount_dec_and_test(refcount_t *rc) {
+    for (;;) {
+        unsigned int old = atomic_load(rc);
+        if (old == 0)
+            return false;
+
+        unsigned int expected = old;
+        if (atomic_compare_exchange_weak(rc, &expected, old - 1))
+            return (old - 1) == 0;
+
+        old = expected;
     }
 }
