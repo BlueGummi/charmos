@@ -24,13 +24,11 @@ enum errno ext2_write_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
         uint32_t block_num = ext2_get_or_set_block(
             fs, &inode->node, block_index, 0, allocate, &new_block);
 
-        if (new_block) {
+        if (new_block)
             new_block_counter += 1;
-        }
 
-        if (block_num == 0 && allocate) {
+        if (block_num == 0 && allocate)
             return ERR_FS_NO_INODE;
-        }
 
         if (block_num == 0) {
             bytes_written +=

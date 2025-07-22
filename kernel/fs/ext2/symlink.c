@@ -84,9 +84,6 @@ enum errno ext2_readlink(struct ext2_fs *fs, struct ext2_full_inode *node,
     if (!block)
         return ERR_IO;
 
-    if (!block)
-        return ERR_IO;
-
     memcpy(buf, block, link_size > fs->block_size ? fs->block_size : link_size);
     bcache_ent_release(ent);
 

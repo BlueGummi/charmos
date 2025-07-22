@@ -1,15 +1,9 @@
+#pragma once
 #include <console/printf.h>
-#include <stdatomic.h>
-#include <stdbool.h>
-#include <types.h>
-
 #include <limits.h>
 #include <stdatomic.h>
 #include <stdbool.h>
-#include <stdint.h>
-#pragma once
-
-typedef atomic_uint refcount_t;
+#include <types.h>
 
 static inline void refcount_init(refcount_t *rc, unsigned int val) {
     atomic_store(rc, val);
@@ -18,12 +12,13 @@ static inline void refcount_init(refcount_t *rc, unsigned int val) {
 static inline bool refcount_inc(refcount_t *rc) {
     unsigned int old = atomic_load(rc);
     for (;;) {
+        /* can't increment */
         if (old == 0 || old == UINT_MAX)
-            return false; // can't increment
+            return false;
 
+        /* `old` is updated if the exchange fails */
         if (atomic_compare_exchange_weak(rc, &old, old + 1))
             return true;
-        // `old` is updated by the intrinsic if the exchange fails
     }
 }
 
@@ -40,7 +35,7 @@ static inline bool refcount_dec_and_test(refcount_t *rc) {
     unsigned int old = atomic_load(rc);
     for (;;) {
         if (old == 0)
-            return false; // underflow prevented
+            return false;
 
         if (atomic_compare_exchange_weak(rc, &old, old - 1))
             return old == 1;

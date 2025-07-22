@@ -42,6 +42,7 @@ void k_sch_main() {
     global.current_bootstage = BOOTSTAGE_COMPLETE;
 
     while (1) {
+        k_printf("Yawn....\n");
         asm volatile("hlt");
     }
 }
