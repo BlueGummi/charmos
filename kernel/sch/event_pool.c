@@ -15,8 +15,9 @@ static inline struct event_pool *get_event_pool_local(void) {
     return pools[core_id];
 }
 
-static inline struct thread *worker_spawn_on_core(uint64_t core) {
-    struct thread *t = thread_spawn_on_core(worker_main, core);
+static inline struct thread *worker_spawn_on_core() {
+    uint64_t stack_size = PAGE_SIZE;
+    struct thread *t = thread_create_custom_stack(worker_main, stack_size);
     if (!t)
         return NULL;
 
@@ -49,28 +50,30 @@ static struct event_pool *get_least_loaded_pool_except_core(int64_t core_num) {
 //
 //
 
+// clang-format off
+_Static_assert(MAX_INTERACTIVITY_CHECK_PERIOD / 4 > MIN_INTERACTIVITY_CHECK_PERIOD, "");
+// clang-format on
+
 static inline time_t get_inactivity_timeout(struct event_pool *pool) {
     uint32_t num_workers = atomic_load(&pool->num_workers);
 
-    if (num_workers <= 2)
-        return SECONDS_TO_MS(6);
+    if (num_workers <= (MAX_WORKERS / 8))
+        return MAX_INTERACTIVITY_CHECK_PERIOD;
 
-    if (num_workers <= 4)
-        return SECONDS_TO_MS(3);
+    if (num_workers <= (MAX_WORKERS / 4))
+        return MAX_INTERACTIVITY_CHECK_PERIOD / 2;
 
-    if (num_workers <= 8)
-        return SECONDS_TO_MS(1);
+    if (num_workers <= (MAX_WORKERS / 2))
+        return MAX_INTERACTIVITY_CHECK_PERIOD / 4;
 
-    return SECONDS_TO_MS(3);
+    return MIN_INTERACTIVITY_CHECK_PERIOD;
 }
 
 static inline uint64_t get_available_worker_idx(struct event_pool *pool) {
     /* start at 1 since index 0 is the permanent one */
-    for (uint64_t i = 1; i < MAX_WORKERS; i++) {
-        if (pool->threads[i].present == false) {
+    for (uint64_t i = 1; i < MAX_WORKERS; i++)
+        if (pool->threads[i].present == false)
             return i;
-        }
-    }
 
     k_panic("No space to spawn this worker! State should be unreachable!\n");
 }
@@ -98,7 +101,7 @@ static bool should_spawn_worker(struct event_pool *pool) {
 
     bool can_spawn = time_get_ms() - pool->last_spawn_attempt > SPAWN_DELAY;
 
-    bool currently_not_spawning = !atomic_load(&pool->currently_spawning);
+    bool currently_not_spawning = !pool->currently_spawning;
 
     return should_spawn && can_spawn && currently_not_spawning;
 }
@@ -107,18 +110,19 @@ static bool spawn_worker(struct event_pool *pool) {
     bool i = spin_lock(&pool->lock);
     struct worker_thread *w = &pool->threads[get_available_worker_idx(pool)];
     w->inactivity_check_period = get_inactivity_timeout(pool);
-    struct thread *t = thread_spawn_on_core(worker_main, pool->core);
+    struct thread *t = worker_spawn_on_core();
 
     if (!t) {
-        atomic_store(&pool->currently_spawning, false);
+        pool->currently_spawning = false;
         spin_unlock(&pool->lock, i);
         return false;
     }
 
     link_thread_and_worker(w, t);
-    update_pool_after_spawn(pool);
+    scheduler_enqueue_on_core(t, pool->core);
 
-    atomic_store(&pool->currently_spawning, false);
+    update_pool_after_spawn(pool);
+    pool->currently_spawning = false;
     spin_unlock(&pool->lock, i);
     return true;
 }
@@ -130,7 +134,7 @@ static void spawn_worker_dpc(void *arg1, void *unused) {
 }
 
 static bool do_spawn_worker(struct event_pool *pool, bool interrupts) {
-    atomic_store(&pool->currently_spawning, true);
+    pool->currently_spawning = true;
     spin_unlock(&pool->lock, interrupts);
 
     if (!in_interrupt()) {
@@ -156,10 +160,6 @@ static inline struct event_pool *get_least_loaded_remote_pool(void) {
 }
 
 static inline struct worker_thread *get_this_worker_thread(void) {
-    /* Spin - We may not have this yet but we are about to get it */
-    while (!scheduler_get_curr_thread()->worker)
-        ;
-
     return scheduler_get_curr_thread()->worker;
 }
 
@@ -251,7 +251,7 @@ static void worker_exit(struct event_pool *pool, struct worker_thread *worker,
                         bool interrupts) {
     worker->should_exit = true;
     worker->present = false;
-    pool->num_workers--;
+    atomic_fetch_sub(&pool->num_workers, 1);
     spin_unlock(&pool->lock, interrupts);
     thread_exit();
 }
@@ -300,7 +300,7 @@ static bool add(struct event_pool *pool, dpc_t func, void *arg, void *arg2) {
     pool->head = next_head;
     atomic_fetch_add(&pool->num_tasks, 1);
 
-    if (try_spawn_worker(pool, interrupts)) {}
+    try_spawn_worker(pool, interrupts);
 
     spin_unlock(&pool->lock, interrupts);
     condvar_signal(&pool->queue_cv);
@@ -311,7 +311,7 @@ static void spawn_permanent_thread_on_core(uint64_t core) {
     struct event_pool *pool = pools[core];
     pool->core = core;
 
-    struct thread *thread = worker_spawn_on_core(core);
+    struct thread *thread = worker_spawn_on_core();
     if (!thread) {
         k_panic("Failed to spawn permanent worker thread on core %llu\n", core);
     }
@@ -320,6 +320,7 @@ static void spawn_permanent_thread_on_core(uint64_t core) {
     worker->is_permanent = true;
     worker->inactivity_check_period = MINUTES_TO_MS(5);
     link_thread_and_worker(worker, thread);
+    scheduler_enqueue_on_core(thread, core);
     update_pool_after_spawn(pool);
 }
 

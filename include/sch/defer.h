@@ -12,6 +12,8 @@
 #define EVENT_POOL_CAPACITY 512
 #define MAX_WORKERS 16
 #define SPAWN_DELAY 25 /* 25ms delay between worker thread spawns */
+#define MIN_INTERACTIVITY_CHECK_PERIOD SECONDS_TO_MS(2)
+#define MAX_INTERACTIVITY_CHECK_PERIOD SECONDS_TO_MS(10)
 
 typedef void (*dpc_t)(void *arg, void *arg2);
 
@@ -39,6 +41,21 @@ struct worker_thread {
     bool present;
 };
 
+#ifdef TESTS
+struct event_pool_stats {
+    uint64_t total_tasks_added;     /* Total # of tasks submitted to the pool */
+    uint64_t total_tasks_executed;  /* Number of tasks successfully executed */
+    uint64_t total_workers_spawned; /* Total worker threads spawned */
+    uint64_t total_worker_exits;    /* Total workers that exited */
+    uint64_t max_queue_length;      /* Max observed length of the task queue */
+    uint64_t current_queue_length;  /* Current length of the queue */
+    uint64_t total_spawn_attempts;  /* # times spawn_worker was attempted */
+    uint64_t total_spawn_failures;  /* Number of times spawn_worker failed */
+    uint64_t num_idle_workers;      /* Snapshot of current idle workers */
+    uint64_t num_active_workers;    /* Snapshot of current active workers */
+};
+#endif
+
 struct event_pool {
     struct spinlock lock;
     struct condvar queue_cv;
@@ -57,7 +74,10 @@ struct event_pool {
     time_t last_spawn_attempt;
     uint64_t core;
 
-    atomic_bool currently_spawning;
+    bool currently_spawning;
+#ifdef TESTS
+    struct event_pool_stats stats;
+#endif
 };
 
 void defer_init(void);

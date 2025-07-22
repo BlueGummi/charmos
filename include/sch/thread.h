@@ -101,7 +101,7 @@ struct thread {
     int64_t curr_core;      /* -1 if not being ran */
     uint64_t time_in_level; /* ticks at this level */
 
-    volatile struct worker_thread *worker; /* NULL if this is not a worker */
+    struct worker_thread *worker; /* NULL if this is not a worker */
 };
 
 struct thread_queue {

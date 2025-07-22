@@ -103,7 +103,7 @@ void tests_run(void) {
            total_time);
 
 #ifdef TESTS
-    sleep(30);
-    all_ok ? qemu_exit(0) : qemu_exit(1);
+//    sleep(30);
+//    all_ok ? qemu_exit(0) : qemu_exit(1);
 #endif
 }
