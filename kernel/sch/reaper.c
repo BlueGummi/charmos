@@ -44,14 +44,21 @@ void reaper_thread_main() {
 
         spin_unlock(&reaper.lock, i);
 
+        bool reaped_something = false;
         while (t) {
             atomic_store(&t->state, THREAD_STATE_TERMINATED);
             struct thread *next = t->next;
             thread_free(t);
+            reaped_something = true;
             t = next;
             reaper.reaped_threads++;
         }
 
-        thread_sleep_for_ms(100);
+        if (reaped_something) {
+            thread_sleep_for_ms(100);
+        } else {
+            thread_set_state(reaper_thread, THREAD_STATE_SLEEPING);
+            scheduler_yield();
+        }
     }
 }

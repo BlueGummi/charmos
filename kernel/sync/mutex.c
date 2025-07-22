@@ -7,16 +7,6 @@
 #include "console/printf.h"
 #include <sync/spin_lock.h>
 
-void mutex_init(struct mutex *m) {
-    if (m->initialized)
-        return;
-
-    m->owner = NULL;
-    thread_queue_init(&m->waiters);
-    spinlock_init(&m->lock);
-    m->initialized = true;
-}
-
 #define MAX_SPIN_ATTEMPTS 50
 #define SPIN_DELAY_US 50
 
