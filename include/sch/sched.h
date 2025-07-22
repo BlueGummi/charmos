@@ -83,4 +83,4 @@ static inline struct scheduler *get_this_core_sched(void) {
     return global.schedulers[get_this_core_id()];
 }
 
-#define TICKS_FOR_PRIO(level) (1ULL << level)
+#define TICKS_FOR_PRIO(level) (level == THREAD_PRIO_LOW ? 64 : 1ULL << level)

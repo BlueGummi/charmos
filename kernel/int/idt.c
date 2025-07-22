@@ -16,17 +16,16 @@
 extern void context_switch();
 extern void page_fault_handler_wrapper();
 extern void syscall_entry();
-void page_fault_handler(void *context, uint8_t vector, void *rsp);
 #define MAX_IDT_ENTRIES 256
 static bool **idt_entry_used = NULL;
-struct isr_entry **isr_table = NULL;
+static struct isr_entry **isr_table = NULL;
 
 #include "isr_stubs.h"
 #include "isr_vectors_array.h"
 
-#define MAKE_THIN_HANDLER(handler_name, message)                               \
-    void handler_name##_fault(void *frame) {                                   \
-        (void) frame;                                                          \
+#define MAKE_HANDLER(handler_name, message)                                    \
+    void handler_name##_handler(void *ctx, uint8_t vector, void *rsp) {        \
+        (void) ctx, (void) vector, (void) rsp;                                 \
         uint64_t core = get_this_core_id();                                    \
         k_printf("\n=== " #handler_name " fault! ===\n");                      \
         k_printf("Message -> %s\n", message);                                  \
@@ -36,21 +35,9 @@ struct isr_entry **isr_table = NULL;
         }                                                                      \
     }
 
-#define MAKE_HANDLER(handler_name, mnemonic)                                   \
-    extern void handler_name##_handler_wrapper();                              \
-    void handler_name##_handler(uint64_t error_code) {                         \
-        uint64_t core = get_this_core_id();                                    \
-        k_printf("\n=== " mnemonic " fault! ===\n");                           \
-        k_printf("Error code: 0x%lx\n", error_code);                           \
-        k_panic("Core %u faulted\n", core);                                    \
-        while (1) {                                                            \
-            asm volatile("hlt");                                               \
-        }                                                                      \
-    }
-
-MAKE_THIN_HANDLER(divbyz, "Division by zero");
-MAKE_THIN_HANDLER(debug, "Debug signal");
-MAKE_THIN_HANDLER(breakpoint, "Breakpoint");
+MAKE_HANDLER(divbyz, "Division by zero");
+MAKE_HANDLER(debug, "Debug signal");
+MAKE_HANDLER(breakpoint, "Breakpoint");
 MAKE_HANDLER(gpf, "GPF");
 MAKE_HANDLER(ss, "STACK SEGMENT FAULT");
 MAKE_HANDLER(double_fault, "DOUBLE FAULT");
@@ -197,33 +184,8 @@ void idt_free_entry(int entry) {
     idt_entry_used[get_this_core_id()][entry] = false;
 }
 
-void idt_install(uint64_t ind) {
-
-    idt_set_gate(DIV_BY_Z_ID, (uint64_t) divbyz_fault, 0x08, 0x8E, ind);
-
-    idt_set_gate(DEBUG_ID, (uint64_t) debug_fault, 0x08, 0x8E, ind);
-
-    idt_set_gate(BREAKPOINT_ID, (uint64_t) breakpoint_fault, 0x08, 0x8E, ind);
-
-    idt_set_gate(SSF_ID, (uint64_t) ss_handler, 0x08, 0x8E, ind);
-
-    idt_set_gate(GPF_ID, (uint64_t) gpf_handler, 0x08, 0x8E, ind);
-    idt_set_gate(DBF_ID, (uint64_t) double_fault_handler, 0x08, 0x8E, ind);
-    idt_set_gate(PAGE_FAULT_ID, (uint64_t) page_fault_handler, 0x08, 0x8E, ind);
-
-    idt_set_gate(TIMER_ID, (uint64_t) isr_timer_routine, 0x08, 0x8E, ind);
-
-    set(KB_ID, (uint64_t) keyboard_handler, 0x08, 0x8E, ind);
-
-    set(0x80, (uint64_t) syscall_entry, 0x2b, 0xee, ind);
-
-    isr_register(PANIC_ID, panic_isr, NULL, ind);
-    isr_register(TLB_SHOOTDOWN_ID, tlb_shootdown, NULL, ind);
-    idt_load(ind);
-}
-
 static struct spinlock pf_lock = SPINLOCK_INIT;
-void page_fault_handler(void *context, uint8_t vector, void *rsp) {
+static void page_fault_handler(void *context, uint8_t vector, void *rsp) {
     (void) context, (void) vector;
 
     uint64_t *stack = (uint64_t *) rsp;
@@ -260,4 +222,22 @@ void page_fault_handler(void *context, uint8_t vector, void *rsp) {
     /*    if (global_sched.active) {
             scheduler_rm_thread(&global_sched, global_sched.current);
         }*/
+}
+
+void idt_install(uint64_t ind) {
+
+    isr_register(DIV_BY_Z_ID, divbyz_handler, NULL, ind);
+    isr_register(DEBUG_ID, debug_handler, NULL, ind);
+    isr_register(BREAKPOINT_ID, breakpoint_handler, NULL, ind);
+    isr_register(SSF_ID, ss_handler, NULL, ind);
+    isr_register(GPF_ID, gpf_handler, NULL, ind);
+    isr_register(DBF_ID, double_fault_handler, NULL, ind);
+    isr_register(PAGE_FAULT_ID, page_fault_handler, NULL, ind);
+    isr_register(TIMER_ID, isr_timer_routine, NULL, ind);
+
+    set(0x80, (uint64_t) syscall_entry, 0x2b, 0xee, ind);
+
+    isr_register(PANIC_ID, panic_isr, NULL, ind);
+    isr_register(TLB_SHOOTDOWN_ID, tlb_shootdown, NULL, ind);
+    idt_load(ind);
 }
