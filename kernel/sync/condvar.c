@@ -21,30 +21,30 @@ void condvar_init(struct condvar *cv) {
     thread_queue_init(&cv->waiters);
 }
 
+static inline void set_wake_reason_and_wake(struct thread *t,
+                                            enum wake_reason reason) {
+    t->wake_reason = reason;
+    scheduler_wake(t, THREAD_PRIO_MAX_BOOST(t->perceived_prio));
+}
+
 void condvar_signal(struct condvar *cv) {
     struct thread *t = thread_queue_pop_front(&cv->waiters);
-    if (t) {
-        t->wake_reason = WAKE_REASON_SIGNAL;
-        scheduler_wake(t, THREAD_PRIO_MAX_BOOST(t->prio));
-    }
+    if (t)
+        set_wake_reason_and_wake(t, WAKE_REASON_SIGNAL);
 }
 
 void condvar_broadcast(struct condvar *cv) {
     struct thread *t;
-    while ((t = thread_queue_pop_front(&cv->waiters)) != NULL) {
-        t->wake_reason = WAKE_REASON_SIGNAL;
-        scheduler_wake(t, THREAD_PRIO_MAX_BOOST(t->prio));
-    }
+    while ((t = thread_queue_pop_front(&cv->waiters)) != NULL)
+        set_wake_reason_and_wake(t, WAKE_REASON_SIGNAL);
 }
 
 static void condvar_timeout_wakeup(void *arg, void *arg2) {
     struct thread *t = arg;
     struct condvar *cv = arg2;
 
-    if (thread_queue_remove(&cv->waiters, t)) {
-        t->wake_reason = WAKE_REASON_TIMEOUT;
-        scheduler_wake(t, THREAD_PRIO_MAX_BOOST(t->prio));
-    }
+    if (thread_queue_remove(&cv->waiters, t))
+        set_wake_reason_and_wake(t, WAKE_REASON_TIMEOUT);
 }
 
 bool condvar_wait_timeout(struct condvar *cv, struct spinlock *lock,

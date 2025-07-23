@@ -11,8 +11,7 @@
 #include "sch/thread.h"
 
 void scheduler_add_thread(struct scheduler *sched, struct thread *task,
-                          bool change_interrupts, bool already_locked,
-                          bool is_new_thread) {
+                          bool already_locked) {
     if (!sched || !task)
         return;
 
@@ -20,7 +19,7 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
     if (!already_locked)
         ints = spin_lock(&sched->lock);
 
-    enum thread_priority prio = task->prio;
+    enum thread_priority prio = task->perceived_prio;
     struct thread_queue *q = &sched->queues[prio];
 
     bool was_empty = (q->head == NULL);
@@ -29,13 +28,15 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
     if (was_empty)
         sched->queue_bitmap |= (1 << prio);
 
-    if (is_new_thread) {
-        sched->thread_count++;
-        atomic_fetch_add(&total_threads, 1);
-    }
+    sched->thread_count++;
+    atomic_fetch_add(&total_threads, 1);
 
     if (!already_locked)
-        spin_unlock(&sched->lock, change_interrupts ? ints : false);
+        spin_unlock(&sched->lock, ints);
+}
+
+static inline void put_on_scheduler(struct scheduler *s, struct thread *t) {
+    scheduler_add_thread(s, t, false);
 }
 
 void scheduler_enqueue(struct thread *t) {
@@ -51,21 +52,28 @@ void scheduler_enqueue(struct thread *t) {
         }
     }
 
-    scheduler_add_thread(s, t, false, false, true);
+    put_on_scheduler(s, t);
     lapic_send_ipi(min_core, SCHEDULER_ID);
 }
 
 /* TODO: Make scheduler_add_thread an internal function so I don't need to
  * pass in the 'false false true' here and all over the place */
 void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id) {
-    scheduler_add_thread(global.schedulers[core_id], t, false, false, true);
+    put_on_scheduler(global.schedulers[core_id], t);
     lapic_send_ipi(core_id, SCHEDULER_ID);
 }
 
-void scheduler_put_back(struct thread *t) {
+void scheduler_wake(struct thread *t, enum thread_priority new_prio) {
+    atomic_store(&t->state, THREAD_STATE_READY);
+    /* boost */
+
+    t->perceived_prio = new_prio;
+    t->time_in_level = 0;
+    uint64_t c = t->curr_core;
     if (t->curr_core == -1)
         k_panic("Tried to put_back a thread in the ready queues\n");
 
     struct scheduler *sch = global.schedulers[t->curr_core];
-    scheduler_add_thread(sch, t, false, false, false);
+    put_on_scheduler(sch, t);
+    lapic_send_ipi(c, SCHEDULER_ID);
 }

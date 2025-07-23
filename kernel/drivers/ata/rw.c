@@ -255,6 +255,9 @@ static bool rw_sync_wrapper(struct generic_disk *d, uint64_t lba, uint8_t *buf,
         cnt -= sectors;
     }
 
+    /* We have to yield to decay our priority and run something else
+     * since the interrupt sets our prio to URGENT */
+    scheduler_yield();
     return true;
 }
 

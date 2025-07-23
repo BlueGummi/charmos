@@ -93,7 +93,9 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
 
                 current->next = NULL;
                 current->prev = NULL;
+
                 victim->thread_count--;
+                atomic_fetch_sub(&total_threads, 1);
 
                 spin_unlock(&victim->lock, false);
                 return current;

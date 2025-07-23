@@ -25,6 +25,7 @@ void scheduler_init(void) {
             k_panic("Could not allocate scheduler %lu\n", i);
 
         s->active = true;
+
         s->thread_count = 0;
         s->core_id = i;
         s->tick_counter = 0;
@@ -36,13 +37,13 @@ void scheduler_init(void) {
 
         struct thread *t0 = thread_create(k_sch_idle);
         t0->flags = THREAD_FLAGS_NO_STEAL;
-        t0->state = THREAD_STATE_SLEEPING;
+        t0->state = THREAD_STATE_IDLE_THREAD;
         s->idle_thread = t0;
 
         if (!i) {
             struct thread *t = thread_create(k_sch_main);
             t->flags = THREAD_FLAGS_NO_STEAL;
-            scheduler_add_thread(s, t, false, false, true);
+            scheduler_add_thread(s, t, false);
         }
 
         global.schedulers[i] = s;

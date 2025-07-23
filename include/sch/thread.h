@@ -19,6 +19,7 @@ struct context {
 };
 
 enum thread_state : uint8_t {
+    THREAD_STATE_IDLE_THREAD, /* Specifically the idle thread */
     THREAD_STATE_READY,   /* Thread is ready to run but not currently running */
     THREAD_STATE_RUNNING, /* Thread is currently executing */
     THREAD_STATE_BLOCKED, /* Waiting on I/O, lock, or condition */
@@ -30,6 +31,7 @@ enum thread_state : uint8_t {
 
 static inline const char *thread_state_str(const enum thread_state state) {
     switch (state) {
+    case THREAD_STATE_IDLE_THREAD: return "IDLE THREAD";
     case THREAD_STATE_READY: return "READY";
     case THREAD_STATE_RUNNING: return "RUNNING";
     case THREAD_STATE_BLOCKED: return "BLOCKED";
@@ -53,10 +55,11 @@ enum thread_priority : uint8_t {
     THREAD_PRIO_BACKGROUND = 5, /* Background thread */
 };
 
+/* Numbers here must match the highest boostable thread priority */
 enum thread_prio_class : uint8_t {
-    THREAD_PRIO_CLASS_RT = 0, /* Realtime class */
-    THREAD_PRIO_CLASS_TS = 1, /* Timesharing class */
-    THREAD_PRIO_CLASS_BG = 2, /* Background class */
+    THREAD_PRIO_CLASS_RT = 1, /* Realtime class */
+    THREAD_PRIO_CLASS_TS = 2, /* Timesharing class */
+    THREAD_PRIO_CLASS_BG = 3, /* Background class */
 };
 
 enum wake_reason {
@@ -74,6 +77,7 @@ static inline enum thread_prio_class prio_class_of(enum thread_priority prio) {
     case THREAD_PRIO_LOW: return THREAD_PRIO_CLASS_TS;
     case THREAD_PRIO_BACKGROUND: return THREAD_PRIO_CLASS_BG;
     }
+    return THREAD_PRIO_CLASS_TS;
 }
 
 #define THREAD_PRIO_MAX_BOOST(prio)                                            \
@@ -94,7 +98,8 @@ struct thread {
     struct thread *prev;
 
     _Atomic enum thread_state state;
-    enum thread_priority prio; /* priority level right now */
+    enum thread_priority perceived_prio; /* priority level right now */
+    enum thread_priority base_prio; /* priority level at creation time */
     enum thread_flags flags;
     volatile enum wake_reason wake_reason;
 

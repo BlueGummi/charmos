@@ -20,6 +20,7 @@ void thread_exit() {
     struct thread *self = scheduler_get_curr_thread();
     atomic_store(&self->state, THREAD_STATE_ZOMBIE);
     reaper_enqueue(self);
+
     enable_interrupts();
 
     scheduler_yield();
@@ -40,7 +41,8 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     *--sp = (uint64_t) thread_exit;
 
     new_thread->regs.rsp = (uint64_t) sp;
-    new_thread->prio = THREAD_PRIO_MID;
+    new_thread->base_prio = THREAD_PRIO_MID;
+    new_thread->perceived_prio = THREAD_PRIO_MID;
     new_thread->time_in_level = 0;
     new_thread->state = THREAD_STATE_READY;
     new_thread->regs.rip = (uint64_t) entry_point;
@@ -106,9 +108,10 @@ void thread_block_on(struct thread_queue *q) {
         enable_interrupts();
 }
 
-static void wake_thread(void *a, void *) {
+static void wake_thread(void *a, void *unused) {
+    (void) unused;
     struct thread *t = a;
-    scheduler_wake(t, THREAD_PRIO_MAX_BOOST(t->prio));
+    scheduler_wake(t, THREAD_PRIO_MAX_BOOST(t->perceived_prio));
 }
 
 void thread_sleep_for_ms(uint64_t ms) {

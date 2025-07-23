@@ -29,12 +29,11 @@ struct scheduler {
 
 void scheduler_init();
 
-/* TODO: Use these internally, no need to worry about the bool parameters */
 void scheduler_add_thread(struct scheduler *sched, struct thread *thread,
-                          bool change_interrupts, bool already_locked,
-                          bool is_new_thread);
+                          bool already_locked);
+
 void scheduler_rm_thread(struct scheduler *sched, struct thread *thread,
-                         bool change_interrupts, bool already_locked);
+                         bool already_locked);
 void schedule(void);
 void k_sch_main(void);
 void k_sch_idle(void);
@@ -43,7 +42,6 @@ void scheduler_disable_timeslice();
 void scheduler_yield();
 void scheduler_enqueue(struct thread *t);
 void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id);
-void scheduler_put_back(struct thread *t);
 void scheduler_wake(struct thread *t, enum thread_priority prio);
 void scheduler_take_out(struct thread *t);
 void switch_context(struct context *old, struct context *new);

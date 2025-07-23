@@ -8,7 +8,7 @@
 #include "sch/thread.h"
 
 void scheduler_rm_thread(struct scheduler *sched, struct thread *task,
-                         bool change_interrupts, bool already_locked) {
+                         bool already_locked) {
     if (!sched || !task)
         return;
 
@@ -16,12 +16,12 @@ void scheduler_rm_thread(struct scheduler *sched, struct thread *task,
     if (!already_locked)
         ints = spin_lock(&sched->lock);
 
-    enum thread_priority prio = task->prio;
+    enum thread_priority prio = task->perceived_prio;
     struct thread_queue *q = &sched->queues[prio];
 
     if (!q->head) {
         if (!already_locked)
-            spin_unlock(&sched->lock, change_interrupts ? ints : false);
+            spin_unlock(&sched->lock, ints);
 
         return;
     }
@@ -33,15 +33,15 @@ void scheduler_rm_thread(struct scheduler *sched, struct thread *task,
 
     thread_free(task);
     sched->thread_count--;
-
     atomic_fetch_sub(&total_threads, 1);
+
     if (!already_locked)
-        spin_unlock(&sched->lock, change_interrupts ? ints : false);
+        spin_unlock(&sched->lock, ints);
 }
 
 void scheduler_take_out(struct thread *t) {
     if (t->curr_core == -1)
         return;
 
-    scheduler_rm_thread(global.schedulers[t->curr_core], t, false, false);
+    scheduler_rm_thread(global.schedulers[t->curr_core], t, false);
 }

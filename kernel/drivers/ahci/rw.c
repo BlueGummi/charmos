@@ -96,6 +96,9 @@ static bool rw_sync_wrapper(struct generic_disk *disk, uint64_t lba,
         buf += sectors * disk->sector_size;
         cnt -= sectors;
     }
+
+    /* Yield decays the priority since the wake up will make us URGENT */
+    scheduler_yield();
     return true;
 }
 

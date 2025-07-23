@@ -134,6 +134,10 @@ static bool rw_wrapper(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
         buf += chunk * disk->sector_size;
         cnt -= chunk;
     }
+
+    /* Our priority is boosted to URGENT upon wakeup from the device interrupt.
+     * We must *immediately* yield to decay this priority to `base_prio` */
+    scheduler_yield();
     return true;
 }
 

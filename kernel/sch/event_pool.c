@@ -179,7 +179,7 @@ static bool worker_wait(struct event_pool *pool, struct worker_thread *worker) {
 
     pool->idle_workers++;
 
-    if (worker->timeout_ran) {
+    if (worker->timeout_ran && !worker->is_permanent) {
         signal = condvar_wait_timeout(&pool->queue_cv, &pool->lock, timeout);
         worker->timeout_ran = false;
     } else {
