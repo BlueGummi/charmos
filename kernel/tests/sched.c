@@ -29,8 +29,8 @@ REGISTER_TEST(sched_reaper_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 }
 
 static atomic_bool event_pool_ran = false;
-static void event_pool_fn(void *arg, void *) {
-    (void) arg;
+static void event_pool_fn(void *arg, void *unused) {
+    (void) arg, (void) unused;
     atomic_store(&event_pool_ran, true);
     ADD_MESSAGE("event pool ran");
 }
@@ -39,6 +39,48 @@ REGISTER_TEST(event_pool_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     event_pool_add_remote(event_pool_fn, NULL, NULL);
     sleep_ms(50);
     TEST_ASSERT(atomic_load(&event_pool_ran));
+
+    SET_SUCCESS;
+}
+
+static atomic_bool rt_thread_fail = false;
+static struct thread *rt = NULL;
+
+static void rt_thread(void) {
+    uint64_t spins = 10;
+    struct thread *me = scheduler_get_curr_thread();
+    if (me != rt) {
+        goto fail;
+    }
+
+    uint64_t start_time = me->time_in_level;
+    for (uint64_t i = 0; i < spins; i++) {
+
+        /* This sleep function just
+         * busy wait-polls the timer */
+        sleep_ms(1);
+
+        /* This is changed if preemption occurred */
+        if (me->time_in_level != start_time)
+            goto fail;
+    }
+
+    return;
+
+fail:
+    atomic_store(&rt_thread_fail, true);
+    return;
+}
+
+REGISTER_TEST(rt_thread_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    struct thread *thread = thread_create(rt_thread);
+    rt = thread;
+    thread->base_prio = THREAD_PRIO_RT;
+    thread->perceived_prio = THREAD_PRIO_RT;
+
+    scheduler_enqueue(thread);
+    scheduler_yield();
+    TEST_ASSERT(!atomic_load(&rt_thread_fail));
 
     SET_SUCCESS;
 }
