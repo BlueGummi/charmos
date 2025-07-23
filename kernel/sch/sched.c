@@ -80,7 +80,7 @@ static inline void maybe_recompute_steal_threshold(uint64_t core_id) {
 }
 
 /* Higher number == lower priority */
-static inline enum thread_priority ts_new_prio(enum thread_priority curr) {
+static inline enum thread_priority get_decayed_prio(enum thread_priority curr) {
     return curr == THREAD_PRIO_LOW ? THREAD_PRIO_HIGH : curr + 1;
 }
 
@@ -94,7 +94,7 @@ static inline void do_thread_prio_decay(struct thread *thread) {
 
     /* Timesharing threads decay and then get re-boosted to THREAD_PRIO_HIGH */
     if (THREAD_PRIO_IS_TIMESHARING(thread->perceived_prio))
-        thread->perceived_prio = ts_new_prio(thread->perceived_prio);
+        thread->perceived_prio = get_decayed_prio(thread->perceived_prio);
 
     /* Reset the priority to the base priority. URGENT is only set from
      * explicit boosts for device interrupts, and we must reset it here. */
@@ -179,27 +179,32 @@ static void load_thread(struct scheduler *sched, struct thread *next) {
     next->curr_core = get_this_core_id();
 
     /* Do not mark the idle thread as RUNNING because this causes
-     * it to enter the runqueues, which is Very Bad™! */
+     * it to enter the runqueues, which is Very Bad™ (it gets enqueued,
+     * and becomes treated like a regular thread)! */
 
     if (atomic_load(&next->state) != THREAD_STATE_IDLE_THREAD)
         atomic_store(&next->state, THREAD_STATE_RUNNING);
 
-    /* We are running this now */
     update_core_current_thread(next);
 }
 
 static inline struct thread *load_idle_thread(struct scheduler *sched) {
-    /* Idle thread has no need to have a timeslice anyways
+    /* Idle thread has no need to have a timeslice
      * No preemption will be occurring since nothing else runs */
     disable_timeslice();
     return sched->idle_thread;
+}
+
+static inline bool only_one_thread_runnable(struct scheduler *sched,
+                                            struct thread *next) {
+    return sched->thread_count == 0 || sched->current == next;
 }
 
 static inline void change_timeslice(struct scheduler *sched,
                                     struct thread *next) {
 
     /* Only one thread is running - no timeslice needed */
-    if (sched->thread_count == 0 || sched->current == next) {
+    if (only_one_thread_runnable(sched, next)) {
         disable_timeslice();
         return;
     }
@@ -230,7 +235,7 @@ void schedule(void) {
     next = stolen ? stolen : scheduler_pick_regular_thread(sched);
 
     if (!next) {
-        /* Still nothing found? Load the idle thread */
+        /* Nothing available via steal or in our queues? */
         next = load_idle_thread(sched);
     } else {
 
