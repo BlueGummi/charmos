@@ -36,7 +36,7 @@ void reaper_thread_main() {
         bool i = spin_lock(&reaper.lock);
 
         while (!reaper.queue.head) {
-            condvar_wait(&reaper.cv, &reaper.lock);
+            condvar_wait(&reaper.cv, &reaper.lock, i);
         }
 
         struct thread *t = reaper.queue.head;

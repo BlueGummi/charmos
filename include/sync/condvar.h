@@ -6,9 +6,12 @@ struct condvar {
     struct thread_queue waiters;
 };
 
-bool condvar_wait(struct condvar *cv, struct spinlock *lock);
+bool condvar_wait(struct condvar *cv, struct spinlock *lock,
+                  bool change_interrupts);
+
 void condvar_init(struct condvar *cv);
 void condvar_signal(struct condvar *cv);
 void condvar_broadcast(struct condvar *cv);
+
 bool condvar_wait_timeout(struct condvar *cv, struct spinlock *lock,
-                          time_t timeout_ms);
+                          time_t timeout_ms, bool change_interrupts);

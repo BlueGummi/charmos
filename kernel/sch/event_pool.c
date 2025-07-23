@@ -173,17 +173,19 @@ static inline bool signaled_by_timeout(bool signaled) {
     return !signaled;
 }
 
-static bool worker_wait(struct event_pool *pool, struct worker_thread *worker) {
+static bool worker_wait(struct event_pool *pool, struct worker_thread *worker,
+                        bool interrupts) {
     const time_t timeout = worker->inactivity_check_period;
     bool signal = true;
 
     pool->idle_workers++;
 
     if (worker->timeout_ran && !worker->is_permanent) {
-        signal = condvar_wait_timeout(&pool->queue_cv, &pool->lock, timeout);
+        signal = condvar_wait_timeout(&pool->queue_cv, &pool->lock, timeout,
+                                      interrupts);
         worker->timeout_ran = false;
     } else {
-        signal = condvar_wait(&pool->queue_cv, &pool->lock);
+        signal = condvar_wait(&pool->queue_cv, &pool->lock, interrupts);
     }
 
     pool->idle_workers--;
@@ -218,10 +220,10 @@ static inline void set_idle(const struct worker_thread *worker,
 
 static bool idle_loop_should_exit(struct event_pool *pool,
                                   struct worker_thread *worker, bool *idle,
-                                  time_t *start_idle) {
+                                  time_t *start_idle, bool interrupts) {
     while (pool->head == pool->tail) {
         set_idle(worker, start_idle, idle);
-        bool signal = worker_wait(pool, worker);
+        bool signal = worker_wait(pool, worker, interrupts);
 
         if (worker_should_exit(worker, *start_idle, *idle, signal))
             return true;
@@ -267,7 +269,7 @@ void worker_main(void) {
 
         interrupts = spin_lock(&pool->lock);
 
-        if (idle_loop_should_exit(pool, worker, &idle, &start_idle))
+        if (idle_loop_should_exit(pool, worker, &idle, &start_idle, interrupts))
             break;
 
         do_work_from_pool(pool, worker, &idle, interrupts);

@@ -112,7 +112,6 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
     struct ext2_fs *fs = root->fs_data;
     struct generic_disk *d = fs->drive;
 
-    enable_interrupts();
     prng_seed(time_get_us());
 
     uint64_t test_runs = 512;
@@ -139,6 +138,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
         rq->write = false;
     }
 
+    enable_interrupts();
     uint64_t ms = time_get_ms();
     for (uint64_t i = 0; i < test_runs; i++) {
         struct bio_request *rq = rqs[i];

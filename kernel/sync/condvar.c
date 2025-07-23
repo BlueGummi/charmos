@@ -1,17 +1,16 @@
 #include <sch/defer.h>
 #include <sync/condvar.h>
 
-bool condvar_wait(struct condvar *cv, struct spinlock *lock) {
+bool condvar_wait(struct condvar *cv, struct spinlock *lock,
+                  bool change_interrupts) {
     struct thread *curr = scheduler_get_curr_thread();
     curr->wake_reason = WAKE_REASON_NONE;
 
     thread_block_on(&cv->waiters);
 
-    bool change_interrupts = false;
     spin_unlock(lock, change_interrupts);
 
     scheduler_yield();
-
     spin_lock(lock);
 
     return curr->wake_reason != WAKE_REASON_TIMEOUT;
@@ -48,12 +47,12 @@ static void condvar_timeout_wakeup(void *arg, void *arg2) {
 }
 
 bool condvar_wait_timeout(struct condvar *cv, struct spinlock *lock,
-                          time_t timeout_ms) {
+                          time_t timeout_ms, bool change_interrupts) {
     struct thread *curr = scheduler_get_curr_thread();
     curr->wake_reason = WAKE_REASON_NONE;
 
     defer_enqueue(condvar_timeout_wakeup, curr, cv, timeout_ms);
-    condvar_wait(cv, lock);
+    condvar_wait(cv, lock, change_interrupts);
 
     return curr->wake_reason != WAKE_REASON_TIMEOUT;
 }
