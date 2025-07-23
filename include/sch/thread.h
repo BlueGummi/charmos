@@ -19,6 +19,7 @@ struct context {
 };
 
 enum thread_state : uint8_t {
+    THREAD_STATE_NEW,         /* New thread */
     THREAD_STATE_IDLE_THREAD, /* Specifically the idle thread */
     THREAD_STATE_READY,   /* Thread is ready to run but not currently running */
     THREAD_STATE_RUNNING, /* Thread is currently executing */
@@ -31,6 +32,7 @@ enum thread_state : uint8_t {
 
 static inline const char *thread_state_str(const enum thread_state state) {
     switch (state) {
+    case THREAD_STATE_NEW: return "NEW";
     case THREAD_STATE_IDLE_THREAD: return "IDLE THREAD";
     case THREAD_STATE_READY: return "READY";
     case THREAD_STATE_RUNNING: return "RUNNING";

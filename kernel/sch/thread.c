@@ -26,6 +26,14 @@ void thread_exit() {
     scheduler_yield();
 }
 
+void thread_entry_wrapper(void) {
+    void (*entry)(void);
+    asm("mov %%r12, %0" : "=r"(entry));
+    enable_interrupts();
+    entry();
+    thread_exit();
+}
+
 static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     struct thread *new_thread =
         (struct thread *) kzalloc(sizeof(struct thread));
@@ -36,16 +44,14 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
         return NULL;
 
     uint64_t stack_top = (uint64_t) stack + stack_size;
-    uint64_t *sp = (uint64_t *) stack_top;
 
-    *--sp = (uint64_t) thread_exit;
-
-    new_thread->regs.rsp = (uint64_t) sp;
+    new_thread->regs.rsp = (uint64_t) stack_top;
     new_thread->base_prio = THREAD_PRIO_MID;
     new_thread->perceived_prio = THREAD_PRIO_MID;
     new_thread->time_in_level = 0;
-    new_thread->state = THREAD_STATE_READY;
-    new_thread->regs.rip = (uint64_t) entry_point;
+    new_thread->state = THREAD_STATE_NEW;
+    new_thread->regs.r12 = (uint64_t) entry_point;
+    new_thread->regs.rip = (uint64_t) thread_entry_wrapper;
     new_thread->stack = (void *) stack;
     new_thread->entry = entry_point;
     new_thread->curr_core = -1; // nobody is running this

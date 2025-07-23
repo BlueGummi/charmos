@@ -47,7 +47,7 @@ static atomic_bool rt_thread_fail = false;
 static struct thread *rt = NULL;
 
 static void rt_thread(void) {
-    uint64_t spins = 10;
+    uint64_t spins = 100;
     struct thread *me = scheduler_get_curr_thread();
     if (me != rt) {
         goto fail;
@@ -55,7 +55,6 @@ static void rt_thread(void) {
 
     uint64_t start_time = me->time_in_level;
     for (uint64_t i = 0; i < spins; i++) {
-
         /* This sleep function just
          * busy wait-polls the timer */
         sleep_ms(1);
@@ -81,6 +80,45 @@ REGISTER_TEST(rt_thread_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     scheduler_enqueue(thread);
     scheduler_yield();
     TEST_ASSERT(!atomic_load(&rt_thread_fail));
+
+    SET_SUCCESS;
+}
+
+static atomic_bool ts_thread_fail = false;
+static struct thread *ts = NULL;
+static void ts_thread(void) {
+    uint64_t spins = 10;
+    struct thread *me = scheduler_get_curr_thread();
+    if (me != ts) {
+        goto fail;
+    }
+
+    uint64_t start_time = me->time_in_level;
+    enum thread_priority start_prio = me->perceived_prio;
+
+    for (uint64_t i = 0; i < spins; i++)
+        asm volatile("hlt");
+
+    /* Time in level never changed, and priority level never changed */
+    if (me->time_in_level == start_time && start_prio == me->perceived_prio)
+        goto fail;
+
+    return;
+
+fail:
+    atomic_store(&ts_thread_fail, true);
+    return;
+}
+
+REGISTER_TEST(ts_thread_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+
+    disable_interrupts();
+    ts = thread_spawn(ts_thread);
+    enable_interrupts();
+
+    scheduler_yield();
+
+    TEST_ASSERT(!atomic_load(&ts_thread_fail));
 
     SET_SUCCESS;
 }

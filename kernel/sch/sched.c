@@ -195,16 +195,11 @@ static inline struct thread *load_idle_thread(struct scheduler *sched) {
     return sched->idle_thread;
 }
 
-static inline bool only_one_thread_runnable(struct scheduler *sched,
-                                            struct thread *next) {
-    return sched->thread_count == 0 || sched->current == next;
-}
-
 static inline void change_timeslice(struct scheduler *sched,
                                     struct thread *next) {
 
     /* Only one thread is running - no timeslice needed */
-    if (only_one_thread_runnable(sched, next)) {
+    if (sched->thread_count == 0) {
         disable_timeslice();
         return;
     }
@@ -238,7 +233,6 @@ void schedule(void) {
         /* Nothing available via steal or in our queues? */
         next = load_idle_thread(sched);
     } else {
-
         /* Depending on what was loaded, we may or may not
          * need to adjust the timeslice. RT threads do not
          * have timeslices, so the timeslice needs to be
@@ -261,10 +255,12 @@ void schedule(void) {
 
 void scheduler_yield() {
     bool were_enabled = are_interrupts_enabled();
-    disable_interrupts();
 
+    disable_interrupts();
     schedule();
 
     if (were_enabled)
         enable_interrupts();
+    else
+        disable_interrupts();
 }
