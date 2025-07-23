@@ -32,8 +32,8 @@ void scheduler_rm_thread(struct scheduler *sched, struct thread *task,
         sched->queue_bitmap &= ~(1 << prio);
 
     thread_free(task);
-    sched->thread_count--;
-    atomic_fetch_sub(&scheduler_data.total_threads, 1);
+
+    scheduler_decrement_thread_count(sched);
 
     if (!already_locked)
         spin_unlock(&sched->lock, ints);

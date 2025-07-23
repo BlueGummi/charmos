@@ -22,14 +22,7 @@ For things not specified here, such as multi-line comments, simply use the same 
 
 ### Create comments to rationalize and reason, not to explain
 
-Comments should exist to explain **why** something exists, not **how** it functions. Avoid writing comments in the following style, or similar styles:
-```c
-/* @param: some parameter
-* desc: some description
-* @return: some return value
-*/
-```
-This greatly sacrifices space, and provides minimal information. The signature of a function should give all this information.
+Comments should exist to explain **why** something exists or needs to exist. It can be helpful to leave a comment about how something functions sometimes, but do not be overly enthusiastic about leaving comments on every last little thing, as this causes creates unnecessary noise.
 
 Comments in places such as enum members and struct members are encouraged, as many IDEs will generate documentation on the fly from these comments.
     
@@ -44,7 +37,7 @@ e.g., under `kernel/fs/ext2`, the code for reading/writing blocks and inodes are
 
 ```bash
 include/
-└── ext2.h              # header           - group
+└── ext2.h             # header           - group
 kernel/
 └── fs/                # higher dir       - group
     ├── ext2/          # dir              - group
@@ -90,23 +83,21 @@ For further small details, such as brace conventions, refer to the `.clang-forma
 
 ### Keep it short, sweet, and straightforward
 
-Ideally, no single file should exceed 600 lines of code. If there is more than 600loc in a file, it is time to consider refactoring or regrouping.
+Ideally, no single file should exceed 2000 lines of code. If there are more than 2000loc in a file, it is time to consider refactoring or regrouping.
 
 Functions with more convoluted control flow should be limited to less lines of code, whereas functions with very straightforward control flow can span more lines of code, such as a function to search the blocks of a node in a filesystem.
 
 ### Keep the `struct/enum`, but allow anonymous aliases
 
-Unless the library being used prefers anonymous `typedef`s for structs and enums, use explicit struct/enum definitions. This is because `typedef`s will be used for aliases, such as `pte_t`, and it minimizes the confusion of a variable's type
+Unless the library being used prefers anonymous `typedef`s for structs an,d enums, use explicit struct/enum definitions. This is because `typedef`s will be used for aliases, such as `pte_t`, and it minimizes the confusion of a variable's type
 
 ### `goto` is good, but don't overuse it
 
 For functions with a common exit point upon an error or similar behavior, using a `goto` to reach the statements they will all execute instead of copy-pasting code can increase readability and reduce verbosity.
 
-Avoid going "backwards" with `goto`s, as this can introduce strange and unexpected consequences.
-
 ### Macros are best in moderation
 
-Macros should be used for to define constants and in declaring repeated functions such as in the case of interrupt handlers. But, do not use macros to change the syntax of the language or create macros that will only be used one time.
+Macros should be used for to define constants and in declaring repeated functions such as in the case of interrupt handlers. But, do not use macros to change the syntax of the language.
 
 ### Inline functions
 
@@ -116,28 +107,7 @@ As a rule of thumb, an inline function should not have complex control flow and 
 
 ### Inline assembly
 
-For large (>15 line) segments of assembly, it is preferred to create a separate `.S` or `.asm` file. Both ATT and Intel syntaxes are acceptable. It is preferred to use ATT assembly for inline assembly (or for when functionality only provided by ATT assembly is necessary), and Intel assembly for separate files, as it is often viewed as more readable and is typically seen as easier to write.
-
-`nasm` and `gas` are both required dependencies, so there is no limitation from the available assemblers.
-
-### Assertions
-
-Assertions are helpful in guarding against specific conditions, but, it is preferred to reduce their usage once a function is complete and no longer being actively worked on, as they can reduce readability, and if a proper error handling system exists, can be unnecessary.
-
-### Threads and concurrency
-
-For functions that may be accessed by many threads at once, use a global `struct spin_lock` for that function, and place a lock and unlock around atomic blocks of code. Avoid simply locking the entire function (unless it is necessary), as this can entirely remove the benefit of multithreading.
-
-If interrupts are disabled before setting a lock, do not enable them at the unlock. But, if interrupts are enabled before setting a lock, disable them and re-enable them at the unlock.
-
-```c
-bool interrupts_were_enabled = interrupts_are_enabled();
-disable_interrupts();
-acquire_lock();
-// critical section
-release_lock();
-if (interrupts_were_enabled) enable_interrupts();
-```
+For large (> 15 line) segments of assembly, it is preferred to create a separate `.S` or `.asm` file. Both ATT and Intel syntaxes are acceptable. It is preferred to use ATT assembly for inline assembly (or for when functionality only provided by ATT assembly is necessary), and Intel assembly for separate files, as it is often viewed as more readable and is typically seen as easier to write.
 
 ### Errors should not be too "extra"
 
@@ -155,9 +125,11 @@ The build script should be complete and simple. It is wasteful to spend time on 
 
 ## Testing
 
-It is highly preferred to write tests in `#ifdef` blocks that will only compile if the tests are enabled at compilation. Specific notes on tests, (e.g. flags to pass to QEMU, external disks that should be formatted in a specific way) should be commented around the test portions.
+It is highly preferred to write tests in `#ifdef TESTS` blocks that will only compile if the tests are enabled at compilation. Specific notes on tests, (e.g. flags to pass to QEMU, external disks that should be formatted in a specific way) should be commented around the test portions.
 
 Tests should seek to check edge cases more than general scenarios, as these will more often than not be the source of bugs and errors.
+
+Refer to `include/tests.h` to see how tests are done, and check `kernel/tests` to see examples of tests
 
 ## Contributing
 
@@ -165,19 +137,13 @@ Commit messages should provide a brief overview of the change made. Avoid changi
 
 For specific commit message styles, it isn't strictly enforced to use one or the other, as long as the message itself sufficiently provides information regarding the commit.
 
-The commonly used style of `{type}({scope}): {subject}` is helpful, but it is not prohibited to write commit messages in other styles.
+The commonly used style of `[scope]: {subject}` is helpful, but it is not prohibited to write commit messages in other styles.
 
 ## Miscellaneous
 
 ### Integer sizes
 
-In cases where the size of an integer matters, it is better to use the `stdint.h` type, as it is easier to read and understand. However, if a short-lived integer is being used, it is acceptable to use the standard `int` type or other default C types.
-
-Some examples of this are in loops where the limit is a 32-bit integer or smaller, or in array indexing.
-
-### Magic numbers
-
-Put them in `include/misc/magic_numbers.h` to avoid collisions. Prefix them with `MAGIC_`.
+In cases where the size of an integer matters, it is better to use the `stdint.h` type, as it is easier to read and understand. However, if a short-lived integer is being used, such as in a loop counter, it is acceptable to use the standard `int` type or other default C types.
 
 ### Citing sources
 

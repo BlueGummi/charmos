@@ -28,8 +28,7 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
     if (was_empty)
         sched->queue_bitmap |= (1 << prio);
 
-    sched->thread_count++;
-    atomic_fetch_add(&scheduler_data.total_threads, 1);
+    scheduler_increment_thread_count(sched);
 
     if (!already_locked)
         spin_unlock(&sched->lock, ints);

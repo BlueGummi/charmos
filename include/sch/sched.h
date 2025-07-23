@@ -50,7 +50,7 @@ void switch_context(struct context *old, struct context *new);
 void load_context(struct context *new);
 
 bool scheduler_can_steal_work(struct scheduler *sched);
-uint64_t scheduler_compute_steal_threshold(uint64_t threads);
+uint64_t scheduler_compute_steal_threshold();
 struct thread *scheduler_try_do_steal(struct scheduler *sched);
 
 struct scheduler *scheduler_pick_victim(struct scheduler *self);
@@ -60,7 +60,7 @@ struct scheduler_data {
     uint32_t max_concurrent_stealers;
     atomic_uint active_stealers;
     atomic_uint total_threads;
-    int64_t work_steal_min_diff;
+    int64_t steal_min_diff;
 };
 
 extern struct scheduler_data scheduler_data;
@@ -85,6 +85,16 @@ static inline struct thread *thread_spawn_on_core(void (*entry)(void),
 
 static inline struct scheduler *get_this_core_sched(void) {
     return global.schedulers[get_this_core_id()];
+}
+
+static inline void scheduler_decrement_thread_count(struct scheduler *sched) {
+    sched->thread_count--;
+    atomic_fetch_sub(&scheduler_data.total_threads, 1);
+}
+
+static inline void scheduler_increment_thread_count(struct scheduler *sched) {
+    sched->thread_count++;
+    atomic_fetch_add(&scheduler_data.total_threads, 1);
 }
 
 #define TICKS_FOR_PRIO(level) (level == THREAD_PRIO_LOW ? 64 : 1ULL << level)

@@ -85,8 +85,10 @@ static inline enum thread_prio_class prio_class_of(enum thread_priority prio) {
                                ? THREAD_PRIO_BACKGROUND                        \
                                : prio_class_of(prio))
 
+/* Background threads share timeslices */
 #define THREAD_PRIO_IS_TIMESHARING(prio)                                       \
-    (prio_class_of(prio) == THREAD_PRIO_CLASS_TS)
+    (prio_class_of(prio) == THREAD_PRIO_CLASS_TS ||                            \
+     prio_class_of(prio) == THREAD_PRIO_CLASS_BG)
 
 struct thread {
     uint64_t id;
@@ -99,7 +101,7 @@ struct thread {
 
     _Atomic enum thread_state state;
     enum thread_priority perceived_prio; /* priority level right now */
-    enum thread_priority base_prio; /* priority level at creation time */
+    enum thread_priority base_prio;      /* priority level at creation time */
     enum thread_flags flags;
     volatile enum wake_reason wake_reason;
 

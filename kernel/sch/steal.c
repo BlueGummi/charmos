@@ -5,10 +5,8 @@
 #include <stdint.h>
 #include <sync/spin_lock.h>
 
-#include "sch/thread.h"
-
+/* self->stealing_work should already be set before this is called */
 struct scheduler *scheduler_pick_victim(struct scheduler *self) {
-    // self->stealing_work should already be set before this is called
     /* Ideally, we want to steal from our busiest core */
     uint64_t max_thread_count = 0;
     struct scheduler *victim = NULL;
@@ -23,8 +21,8 @@ struct scheduler *scheduler_pick_victim(struct scheduler *self) {
         bool victim_busy = atomic_load(&potential_victim->being_robbed) ||
                            atomic_load(&potential_victim->stealing_work);
 
-        bool victim_scaled = potential_victim->thread_count * 100;
-        bool scaled = self->thread_count * scheduler_data.work_steal_min_diff;
+        uint64_t victim_scaled = potential_victim->thread_count * 100;
+        uint64_t scaled = self->thread_count * scheduler_data.steal_min_diff;
         bool victim_is_poor = victim_scaled < scaled;
 
         if (victim_busy || victim_is_poor)
@@ -55,10 +53,10 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
     if (!spin_trylock(&victim->lock))
         return NULL;
 
-    uint8_t mask = victim->queue_bitmap;
+    uint8_t mask = atomic_load(&victim->queue_bitmap);
     while (mask) {
         int level = 31 - __builtin_clz((uint32_t) mask);
-        mask &= ~(1 << level); // remove that bit from local copy
+        mask &= ~(1 << level); /* remove that bit from local copy */
 
         struct thread_queue *q = &victim->queues[level];
         if (!q->head)
@@ -69,39 +67,40 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
 
         do {
             if (current->flags == THREAD_FLAGS_NO_STEAL)
-                continue;
+                goto check_next;
 
-            if (atomic_load(&current->state) == THREAD_STATE_READY) {
-                if (current == q->head && current == q->tail) {
-                    q->head = NULL;
-                    q->tail = NULL;
-                } else if (current == q->head) {
-                    q->head = current->next;
-                    q->head->prev = q->tail;
-                    q->tail->next = q->head;
-                } else if (current == q->tail) {
-                    q->tail = current->prev;
-                    q->tail->next = q->head;
-                    q->head->prev = q->tail;
-                } else {
-                    current->prev->next = current->next;
-                    current->next->prev = current->prev;
-                }
+            if (atomic_load(&current->state) != THREAD_STATE_READY)
+                goto check_next;
 
-                // clear bitmap
-                if (q->head == NULL)
-                    victim->queue_bitmap &= ~(1 << level);
-
-                current->next = NULL;
-                current->prev = NULL;
-
-                victim->thread_count--;
-                atomic_fetch_sub(&scheduler_data.total_threads, 1);
-
-                spin_unlock(&victim->lock, false);
-                return current;
+            if (current == q->head && current == q->tail) {
+                q->head = NULL;
+                q->tail = NULL;
+            } else if (current == q->head) {
+                q->head = current->next;
+                q->head->prev = q->tail;
+                q->tail->next = q->head;
+            } else if (current == q->tail) {
+                q->tail = current->prev;
+                q->tail->next = q->head;
+                q->head->prev = q->tail;
+            } else {
+                current->prev->next = current->next;
+                current->next->prev = current->prev;
             }
 
+            // clear bitmap
+            if (q->head == NULL)
+                victim->queue_bitmap &= ~(1 << level);
+
+            current->next = NULL;
+            current->prev = NULL;
+
+            scheduler_decrement_thread_count(victim);
+
+            spin_unlock(&victim->lock, false);
+            return current;
+
+        check_next:
             current = current->next;
         } while (current != start);
     }
