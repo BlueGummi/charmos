@@ -312,15 +312,10 @@ void *bcache_get(struct generic_disk *disk, uint64_t lba, uint64_t block_size,
                  uint64_t spb, bool no_evict, struct bcache_entry **out_entry) {
     uint64_t base_lba = ALIGN_DOWN(lba, spb);
     struct bcache_entry *ent = get(disk->cache, base_lba);
-    bool i = spin_lock(&disk->cache->lock);
 
-    if (!ent) {
-        spin_unlock(&disk->cache->lock, i);
+    if (!ent)
         return bcache_create_ent(disk, lba, block_size, spb, no_evict,
                                  out_entry);
-    }
-
-    spin_unlock(&disk->cache->lock, i);
 
     *out_entry = ent;
 

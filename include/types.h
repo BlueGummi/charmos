@@ -1,7 +1,7 @@
 #pragma once
 #include <stdatomic.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 typedef size_t time_t;
 typedef uint32_t inode_t;

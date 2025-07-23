@@ -26,6 +26,8 @@ uint8_t *ext2_block_read(struct ext2_fs *fs, uint32_t block_num,
     uint32_t spb = fs->sectors_per_block;
 
     uint8_t *buf = bcache_get(d, lba, fs->block_size, spb, false, out);
+    if (!buf)
+        return NULL;
 
     bcache_ent_acquire(*out);
     return buf;
