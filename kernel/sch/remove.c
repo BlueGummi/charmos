@@ -33,7 +33,7 @@ void scheduler_rm_thread(struct scheduler *sched, struct thread *task,
 
     thread_free(task);
     sched->thread_count--;
-    atomic_fetch_sub(&total_threads, 1);
+    atomic_fetch_sub(&scheduler_data.total_threads, 1);
 
     if (!already_locked)
         spin_unlock(&sched->lock, ints);

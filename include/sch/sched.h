@@ -13,6 +13,8 @@
            * core. This means "% of the average"                               \
            */
 
+#define SCHEDULER_DEFAULT_WORK_STEAL_MIN_DIFF 130
+
 struct scheduler {
     bool active;
     struct thread_queue queues[MLFQ_LEVELS]; // MLFQ queues
@@ -54,10 +56,14 @@ struct thread *scheduler_try_do_steal(struct scheduler *sched);
 struct scheduler *scheduler_pick_victim(struct scheduler *self);
 struct thread *scheduler_steal_work(struct scheduler *victim);
 
-extern uint32_t max_concurrent_stealers;
-extern atomic_uint active_stealers;
-extern atomic_uint total_threads;
-extern int64_t work_steal_min_diff;
+struct scheduler_data {
+    uint32_t max_concurrent_stealers;
+    atomic_uint active_stealers;
+    atomic_uint total_threads;
+    int64_t work_steal_min_diff;
+};
+
+extern struct scheduler_data scheduler_data;
 
 /* TODO: no rdmsr */
 static inline struct thread *scheduler_get_curr_thread() {

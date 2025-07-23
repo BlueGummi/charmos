@@ -17,22 +17,22 @@
 #include "mp/core.h"
 #include "sch/thread.h"
 
-struct scheduler **local_schs;
+struct scheduler_data scheduler_data = {
+    /* This is how many cores can be stealing work at once */
+    .max_concurrent_stealers = 0,
 
-/* This is how many cores can be stealing work at once */
-uint32_t max_concurrent_stealers = 0;
+    /* This is how many cores are attempting a work steal right now.
+     * If this is above the maximum concurrent stealers, we will not
+     * attempt any work steals. */
+    .active_stealers = 0,
 
-/* This is how many cores are attempting a work steal right now.
- * If this is above the maximum concurrent stealers, we will not
- * attempt any work steals. */
-atomic_uint active_stealers = 0;
+    /* total threads in runqueues of all cores */
+    .total_threads = 0,
 
-/* total threads running across all cores right now */
-atomic_uint total_threads = 0;
-
-/* How much more work the victim must be doing than the stealer
- * for the stealer to go through with the steal. */
-int64_t work_steal_min_diff = 130;
+    /* How much more work the victim must be doing than the stealer
+     * for the stealer to go through with the steal. */
+    .work_steal_min_diff = SCHEDULER_DEFAULT_WORK_STEAL_MIN_DIFF,
+};
 
 void k_sch_main() {
     k_info("MAIN", K_INFO, "Device setup");
@@ -46,7 +46,7 @@ void k_sch_main() {
         k_printf("We have %llu thread(s) in our runqueues, there are %llu "
                  "total thread(s) in runqueues\n",
                  get_this_core_sched()->thread_count,
-                 atomic_load(&total_threads));
+                 atomic_load(&scheduler_data.total_threads));
         asm volatile("hlt");
     }
 }
@@ -83,8 +83,9 @@ static inline void update_core_current_thread(struct thread *next) {
 
 static inline void maybe_recompute_threshold(uint64_t core_id) {
     if (core_id == 0) {
-        uint64_t val = atomic_load(&total_threads);
-        work_steal_min_diff = scheduler_compute_steal_threshold(val);
+        uint64_t val = atomic_load(&scheduler_data.total_threads);
+        scheduler_data.work_steal_min_diff =
+            scheduler_compute_steal_threshold(val);
     }
 }
 
@@ -97,7 +98,8 @@ static inline void do_thread_prio_decay(struct thread *thread) {
     if (THREAD_PRIO_IS_TIMESHARING(thread->perceived_prio))
         thread->perceived_prio = ts_new_prio(thread->perceived_prio);
 
-    /* Reset the priority to the base */
+    /* Reset the priority to the base. URGENT is only set from
+     * explicit boosts for device interrupts. */
     if (thread->perceived_prio == THREAD_PRIO_URGENT)
         thread->perceived_prio = thread->base_prio;
 }
@@ -157,7 +159,7 @@ static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {
         next->prev = NULL;
 
         sched->thread_count--;
-        atomic_fetch_sub(&total_threads, 1);
+        atomic_fetch_sub(&scheduler_data.total_threads, 1);
 
         return next;
     }

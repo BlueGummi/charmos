@@ -8,12 +8,12 @@
 #include <stdint.h>
 
 void scheduler_init(void) {
-    max_concurrent_stealers = global.core_count / 4;
+    scheduler_data.max_concurrent_stealers = global.core_count / 4;
 
     /* I mean, if we have one core and that core wants
      * to steal work from itself, go ahead? */
-    if (max_concurrent_stealers == 0)
-        max_concurrent_stealers = 1;
+    if (scheduler_data.max_concurrent_stealers == 0)
+        scheduler_data.max_concurrent_stealers = 1;
 
     global.schedulers = kmalloc(sizeof(struct scheduler *) * global.core_count);
     if (!global.schedulers)

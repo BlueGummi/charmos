@@ -37,7 +37,7 @@ bool scheduler_can_steal_work(struct scheduler *sched) {
         k_panic("Why are there no cores on your machine?\n");
     }
 
-    int64_t val = atomic_load(&total_threads);
+    int64_t val = atomic_load(&scheduler_data.total_threads);
     int64_t avg_core_threads = val / global.core_count;
 
     // steal if this core's load is less than WORK_STEAL_THRESHOLD% of average

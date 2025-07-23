@@ -23,8 +23,9 @@ struct scheduler *scheduler_pick_victim(struct scheduler *self) {
         bool victim_busy = atomic_load(&potential_victim->being_robbed) ||
                            atomic_load(&potential_victim->stealing_work);
 
-        bool victim_is_poor = (potential_victim->thread_count * 100) <
-                              (self->thread_count * work_steal_min_diff);
+        bool victim_scaled = potential_victim->thread_count * 100;
+        bool scaled = self->thread_count * scheduler_data.work_steal_min_diff;
+        bool victim_is_poor = victim_scaled < scaled;
 
         if (victim_busy || victim_is_poor)
             continue;
@@ -95,7 +96,7 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
                 current->prev = NULL;
 
                 victim->thread_count--;
-                atomic_fetch_sub(&total_threads, 1);
+                atomic_fetch_sub(&scheduler_data.total_threads, 1);
 
                 spin_unlock(&victim->lock, false);
                 return current;
@@ -114,10 +115,10 @@ static inline void begin_steal(struct scheduler *sched) {
 }
 
 static inline bool try_begin_steal() {
-    unsigned current = atomic_load(&active_stealers);
-    while (current < max_concurrent_stealers) {
-        if (atomic_compare_exchange_weak(&active_stealers, &current,
-                                         current + 1)) {
+    unsigned current = atomic_load(&scheduler_data.active_stealers);
+    while (current < scheduler_data.max_concurrent_stealers) {
+        if (atomic_compare_exchange_weak(&scheduler_data.active_stealers,
+                                         &current, current + 1)) {
             return true;
         }
     }
@@ -125,7 +126,7 @@ static inline bool try_begin_steal() {
 }
 
 static inline void end_steal() {
-    atomic_fetch_sub(&active_stealers, 1);
+    atomic_fetch_sub(&scheduler_data.active_stealers, 1);
 }
 
 static inline void stop_steal(struct scheduler *sched,
