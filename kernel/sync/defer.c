@@ -80,8 +80,9 @@ void defer_init(void) {
         uint8_t vector = idt_alloc_entry();
 
         isr_register(vector, hpet_irq_handler, NULL);
-        ioapic_route_irq(i + HPET_IRQ_BASE, vector, i, false);
-        hpet_setup_timer(i, i + HPET_IRQ_BASE, false, true);
+        ioapic_route_irq(i + 3, vector, i, false);
+        
+        hpet_setup_timer(i, i + 3, false, true);
 
         k_info("DEFER", K_INFO,
                "Timer %llu routed to IRQ %u (vector %u on core %u)", i,

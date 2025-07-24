@@ -48,6 +48,7 @@ void hpet_setup_periodic_interrupt_us(uint64_t microseconds_period) {
 
 void hpet_program_oneshot(uint64_t future_ms) {
     hpet_disable();
+
     union hpet_timer_config conf;
     conf.raw = hpet_read64(HPET_TIMER_CONF_OFFSET(HPET_CURRENT));
     conf.type = 0;

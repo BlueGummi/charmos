@@ -3,7 +3,6 @@
 #include <console/printf.h>
 #include <mem/alloc.h>
 #include <sch/defer.h>
-#include <stdint.h>
 #include <sync/spin_lock.h>
 #include <time/time.h>
 
@@ -15,7 +14,8 @@ static void try_rq_reorder(struct bio_scheduler *sched) {
     disk->ops->reorder(disk);
 }
 
-static void bio_sched_tick(void *ctx, void *) {
+static void bio_sched_tick(void *ctx, void *unused) {
+    (void) unused;
     struct bio_scheduler *sched = ctx;
 
     bool i = spin_lock(&sched->lock);
