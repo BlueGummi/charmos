@@ -26,6 +26,7 @@ enum idle_thread_state {
 struct idle_thread_data {
     enum idle_thread_state state;
 
+    bool woken_from_timer;
     bool did_work_recently;
     uint64_t last_entry_ms;
     uint64_t last_exit_ms;

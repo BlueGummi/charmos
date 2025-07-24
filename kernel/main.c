@@ -1,3 +1,4 @@
+#include <acpi/cst.h>
 #include <acpi/hpet.h>
 #include <acpi/ioapic.h>
 #include <acpi/lapic.h>
@@ -70,6 +71,7 @@ void k_main(void) {
 
     hpet_init();
     ioapic_init();
+    acpi_find_cst();
 
     global.current_bootstage = BOOTSTAGE_EARLY_DEVICES;
     k_info("MAIN", K_INFO, "Early boot OK - %llu cores", global.core_count);
