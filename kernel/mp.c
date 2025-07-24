@@ -72,6 +72,8 @@ void mp_wakeup_processors(struct limine_mp_response *mpr) {
 void mp_complete_init() {
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
     cr3_ready = true;
+    if (global.core_count == 1)
+        return;
 
     /* I know, I know, mmio is used here to force the read */
     while (mmio_read_8((uint8_t *) &global.current_bootstage) !=
