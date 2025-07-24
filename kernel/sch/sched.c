@@ -244,11 +244,12 @@ void schedule(void) {
 
     spin_unlock(&sched->lock, interrupts);
 
-    if (curr && next) {
+    if (curr && curr->state != THREAD_STATE_IDLE_THREAD) {
         switch_context(&curr->regs, &next->regs);
     } else {
         /* Only `load_context` here since nothing was running,
-         * typically only used in the very first yield */
+         * typically only used in the very first yield or when
+         * exiting the idle thread */
         load_context(&next->regs);
     }
 }
