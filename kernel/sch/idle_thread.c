@@ -1,5 +1,6 @@
 #include <asm.h>
 #include <assert.h>
+#include <block/sched.h>
 #include <int/idt.h>
 #include <sch/defer.h>
 #include <sch/sched.h>
@@ -32,26 +33,28 @@ static inline void setup_idle_timer(struct idle_thread_data *idle, time_t ms) {
  * failed to bring us out of the idle thread last time*/
 static inline void reset_idle_thread_stage(struct idle_thread_data *idle) {
     idle->state = IDLE_THREAD_FAST_HLT;
+    scheduler_yield();
 }
 
 static inline void progress_idle_thread_stage(struct idle_thread_data *idle) {
     /* We should not be progressing if we are at the last stage */
     assert(idle->state < IDLE_THREAD_DEEP_SLEEP);
+    restore_interrupts();
     idle->state++;
 }
 
 static void do_idle_fast_hlt(struct idle_thread_data *idle) {
     setup_idle_timer(idle, IDLE_THREAD_CHECK_MS);
 
-    enable_interrupts();
+    idle->woken_from_timer = false;
     wait_for_interrupt();
 
     /* If the very next interrupt is from the timer
      * that we set, then we progress to the next
      * idle thread stage. Otherwise, something else
      * (device driver, scheduler, etc.) has woken us */
-    if (idle->woken_from_timer == true) {
 
+    if (idle->woken_from_timer) {
         /* Progress to next stage */
         progress_idle_thread_stage(idle);
     } else {
@@ -67,15 +70,13 @@ static void do_idle_fast_hlt(struct idle_thread_data *idle) {
 static void do_idle_work_steal(struct idle_thread_data *idle,
                                struct scheduler *sched) {
 
-    /* There is no need to lock `sched` here, because
-     * the lock is only useful if preemption is happening
-     * or if other cores are stealing from us. If we are in the idle
-     * thread, neither of these things are happening */
+    spin_lock(&sched->lock);
     struct thread *stolen = scheduler_try_do_steal(sched);
+    spin_unlock(&sched->lock, true);
+
     if (stolen) {
         /* We got work, so let's reset the stage and yield */
         reset_idle_thread_stage(idle);
-        scheduler_yield();
     } else {
 
         /* No work stolen, progress. */
@@ -88,7 +89,18 @@ static void do_idle_event_scan(struct idle_thread_data *idle) {
      * to do this full event scan, and it is likely not
      * very beneficial since this is high-cost, low-return */
 
+    /* TODO: As we add more things to this kernel, remember to update
+     * idle thread with functionality to flush their caches and such */
     progress_idle_thread_stage(idle);
+}
+
+/* TODO: Make this use C-states once we get that worked out */
+static void do_idle_deep_sleep(struct idle_thread_data *data) {
+    (void) data;
+    while (true) {
+        enable_interrupts();
+        wait_for_interrupt();
+    }
 }
 
 static void do_idle_loop(struct idle_thread_data *idle,
@@ -97,13 +109,13 @@ static void do_idle_loop(struct idle_thread_data *idle,
     case IDLE_THREAD_FAST_HLT: do_idle_fast_hlt(idle); break;
     case IDLE_THREAD_WORK_STEAL: do_idle_work_steal(idle, sched); break;
     case IDLE_THREAD_EVENT_SCAN: do_idle_event_scan(idle); break;
-   // case IDLE_THREAD_DEEP_SLEEP: do_idle_deep_sleep(idle); break;
+    case IDLE_THREAD_DEEP_SLEEP: do_idle_deep_sleep(idle); break;
     }
 }
 
 void scheduler_idle_main(void) {
     while(1)asm("sti;hlt");
-
+    
     struct idle_thread_data *idle = get_this_core_idle_thread();
     idle->woken_from_timer = false;
     idle->last_entry_ms = time_get_ms();
@@ -111,8 +123,6 @@ void scheduler_idle_main(void) {
 
     struct scheduler *sched = get_this_core_sched();
     scheduler_disable_timeslice();
-    enable_interrupts();
-
     while (true) {
         do_idle_loop(idle, sched);
     }

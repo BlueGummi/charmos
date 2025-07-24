@@ -8,35 +8,56 @@
 #include <sync/spin_lock.h>
 #include <time/time.h>
 
-static struct deferred_event *defer_queue = NULL;
-static struct spinlock defer_lock = {0};
-static uint64_t hpet_next_fire_time = UINT64_MAX;
+static struct deferred_event **defer_queues = NULL;
+static struct spinlock *defer_locks = NULL;
+static uint64_t *hpet_next_fire_times = NULL;
+
+static inline uint64_t this_timer(void) {
+    return HPET_CURRENT;
+}
+
+static inline struct spinlock *this_lock(void) {
+    return &defer_locks[this_timer()];
+}
+
+static inline struct deferred_event *this_defer_queue(void) {
+    return defer_queues[this_timer()];
+}
 
 static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
     (void) irq, (void) ctx, (void) rsp;
+
     uint64_t now = hpet_timestamp_ms();
 
-    bool i = spin_lock(&defer_lock);
+    struct spinlock *lock = this_lock();
+    bool i = spin_lock(lock);
+
+    struct deferred_event *defer_queue = this_defer_queue();
+
+    uint64_t timer = this_timer();
 
     while (defer_queue && defer_queue->timestamp_ms <= now) {
         struct deferred_event *ev = defer_queue;
         defer_queue = ev->next;
+        defer_queues[timer] = defer_queue;
 
-        spin_unlock(&defer_lock, i);
-        ev->callback(ev->arg, ev->arg2);
+        spin_unlock(lock, i);
+
+        if (ev->callback)
+            ev->callback(ev->arg, ev->arg2);
 
         defer_free(ev);
-        i = spin_lock(&defer_lock);
+        i = spin_lock(lock);
     }
 
     if (defer_queue) {
-        hpet_next_fire_time = defer_queue->timestamp_ms;
+        hpet_next_fire_times[timer] = defer_queue->timestamp_ms;
         hpet_program_oneshot(defer_queue->timestamp_ms);
     } else {
-        hpet_next_fire_time = UINT64_MAX;
+        hpet_next_fire_times[timer] = UINT64_MAX;
     }
 
-    spin_unlock(&defer_lock, i);
+    spin_unlock(lock, i);
 
     hpet_clear_interrupt_status();
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
@@ -53,17 +74,21 @@ bool defer_enqueue(dpc_t func, void *arg, void *arg2, uint64_t delay_ms) {
     ev->arg = arg;
     ev->arg2 = arg2;
 
-    bool i = spin_lock(&defer_lock);
-    if (!defer_queue || ev->timestamp_ms < defer_queue->timestamp_ms) {
-        ev->next = defer_queue;
-        defer_queue = ev;
+    struct spinlock *lock = this_lock();
+    bool i = spin_lock(lock);
 
-        if (ev->timestamp_ms < hpet_next_fire_time) {
-            hpet_next_fire_time = ev->timestamp_ms;
+    uint64_t t = this_timer();
+
+    if (!defer_queues[t] || ev->timestamp_ms < defer_queues[t]->timestamp_ms) {
+        ev->next = defer_queues[t];
+        defer_queues[t] = ev;
+
+        if (ev->timestamp_ms < hpet_next_fire_times[t]) {
+            hpet_next_fire_times[t] = ev->timestamp_ms;
             hpet_program_oneshot(ev->timestamp_ms);
         }
     } else {
-        struct deferred_event *curr = defer_queue;
+        struct deferred_event *curr = defer_queues[t];
         while (curr->next && curr->next->timestamp_ms < ev->timestamp_ms)
             curr = curr->next;
 
@@ -71,17 +96,26 @@ bool defer_enqueue(dpc_t func, void *arg, void *arg2, uint64_t delay_ms) {
         curr->next = ev;
     }
 
-    spin_unlock(&defer_lock, i);
+    spin_unlock(lock, i);
     return true;
 }
 
 void defer_init(void) {
+    defer_queues = kzalloc(sizeof(struct deferred_event *) * hpet_timer_count);
+    defer_locks = kzalloc(sizeof(struct spinlock) * hpet_timer_count);
+    hpet_next_fire_times = kzalloc(sizeof(uint64_t) * hpet_timer_count);
+
+    if (!defer_queues || !defer_locks || !hpet_next_fire_times)
+        k_panic("Defer queue allocation failed!\n");
+
     for (uint64_t i = 0; i < hpet_timer_count; i++) {
+        hpet_next_fire_times[i] = UINT64_MAX;
+
         uint8_t vector = idt_alloc_entry();
 
         isr_register(vector, hpet_irq_handler, NULL);
         ioapic_route_irq(i + 3, vector, i, false);
-        
+
         hpet_setup_timer(i, i + 3, false, true);
 
         k_info("DEFER", K_INFO,

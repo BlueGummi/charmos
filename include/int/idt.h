@@ -14,7 +14,6 @@
 #define IRQ_PAGE_FAULT 0xE
 #define IRQ_TIMER 0x20
 #define IRQ_SCHEDULER IRQ_TIMER
-#define IRQ_KB 0x21
 #define IRQ_TLB_SHOOTDOWN 0x22
 #define IRQ_PANIC 0x23
 #define IRQ_NOP 0x24 /* This is here so cores can bother each other */

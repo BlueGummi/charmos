@@ -29,7 +29,9 @@ uint64_t tsc_freq = 0;
     if (uacpi_unlikely_error(x))                                               \
         k_panic("uACPI initialization failed!\n");
 
-void uacpi_init() {
+static uint64_t our_rsdp = 0;
+void uacpi_init(uint64_t rsdp) {
+    our_rsdp = rsdp;
     tsc_freq = measure_tsc_freq_pit();
 
     panic_if_error(uacpi_initialize(0));
@@ -44,17 +46,13 @@ void uacpi_print_devs() {
                                    UACPI_MAX_DEPTH_ANY, UACPI_NULL);
 }
 
-extern uint64_t a_rsdp;
-
-extern uint64_t tsc_freq;
-
 uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
 
-    if (a_rsdp == 0) {
+    if (our_rsdp == 0) {
         k_printf("no rsdp set\n");
         return UACPI_STATUS_INTERNAL_ERROR;
     }
-    *out_rsdp_address = a_rsdp;
+    *out_rsdp_address = our_rsdp;
     return UACPI_STATUS_OK;
 }
 

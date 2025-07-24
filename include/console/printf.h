@@ -5,6 +5,7 @@
 #include <limine.h>
 #include <misc/colors.h>
 #include <misc/logo.h>
+#include <sync/spin_lock.h>
 #include <time/time.h>
 
 #define STRINGIZE2(x) #x
@@ -28,11 +29,13 @@ struct panic_regs {
 #define TWENTY_TWO_LINES ELEVEN_LINES ELEVEN_LINES
 #define FORTY_FOUR_LINES TWENTY_TWO_LINES TWENTY_TWO_LINES
 #define EIGHTY_EIGHT_LINES FORTY_FOUR_LINES FORTY_FOUR_LINES
+extern struct spinlock panic_lock;
 
 #define k_panic(fmt, ...)                                                      \
     do {                                                                       \
         global.panic_in_progress = true;                                       \
         disable_interrupts();                                                  \
+        spin_lock(&panic_lock);                                                \
         k_printf("\n" EIGHTY_EIGHT_LINES "\n");                                \
         k_printf("\n                                    [" ANSI_BG_RED         \
                  "KERNEL PANIC" ANSI_RESET "]\n\n");                           \
@@ -50,6 +53,7 @@ struct panic_regs {
         k_printf(fmt, ##__VA_ARGS__);                                          \
         debug_print_stack();                                                   \
         k_printf("\n" EIGHTY_EIGHT_LINES "\n");                                \
+        spin_unlock(&panic_lock, false);                                       \
         qemu_exit(1);                                                          \
         while (1)                                                              \
             wait_for_interrupt();                                              \

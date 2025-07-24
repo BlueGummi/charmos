@@ -14,6 +14,8 @@ struct charmos_globals {
     atomic_uint_fast64_t next_tlb_gen;
 
     volatile bool panic_in_progress;
+
+    struct generic_disk *root_node_disk;
 };
 
 extern struct charmos_globals global;

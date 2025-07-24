@@ -56,6 +56,7 @@ set(QEMU_COMMON_FLAGS
     -m 4G
     -smp cores=4
 
+    -acpitable ssdt6.dat
     -s
     #-S
     -monitor telnet:127.0.0.1:1234,server,nowait

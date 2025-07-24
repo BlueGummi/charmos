@@ -32,6 +32,7 @@ static inline uint64_t hpet_us_to_ticks(uint64_t us) {
 
 void hpet_setup_periodic_interrupt_us(uint64_t microseconds_period) {
     hpet_disable();
+    
     uint64_t ticks = hpet_us_to_ticks(microseconds_period);
 
     hpet_write64(HPET_MAIN_COUNTER_OFFSET, HPET_CURRENT);

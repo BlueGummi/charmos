@@ -32,7 +32,7 @@
 #include <tests.h>
 
 struct charmos_globals global = {0};
-uint64_t a_rsdp;
+struct spinlock panic_lock = SPINLOCK_INIT;
 
 #define BEHAVIOR /* avoids undefined behavior */
 
@@ -43,7 +43,6 @@ void k_main(void) {
     k_printf_init(framebuffer_request.response->framebuffers[0]);
     struct limine_hhdm_response *r = hhdm_request.response;
     k_printf("%s", OS_LOGO_SMALL);
-    a_rsdp = rsdp_request.response->address;
 
     // Early init
     mp_wakeup_processors(mp_request.response);
@@ -66,7 +65,7 @@ void k_main(void) {
     idt_init();
 
     // Early device init
-    uacpi_init();
+    uacpi_init(rsdp_request.response->address);
     lapic_init();
 
     hpet_init();

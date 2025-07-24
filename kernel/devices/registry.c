@@ -118,6 +118,7 @@ void registry_setup() {
                     k_panic("VFS failed to mount root '%s' - mount failure\n",
                             global.root_partition);
                 global.root_node = root;
+                global.root_node_disk = disk;
                 found_root = true;
             }
         }
