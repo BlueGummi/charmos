@@ -229,6 +229,10 @@ static inline void cpu_relax(void) {
     asm volatile("pause");
 }
 
+static inline void wait_for_interrupt(void) {
+    asm volatile("hlt");
+}
+
 static inline int clz(uint8_t a) {
     return __builtin_clz(a);
 }

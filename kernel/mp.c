@@ -49,7 +49,7 @@ void wakeup() {
     uint64_t cpu = lapic_get_id();
 
     gdt_install();
-    idt_install(cpu);
+    idt_load();
     lapic_timer_init();
 
     setup_cpu(cpu);
@@ -59,7 +59,7 @@ void wakeup() {
     restore_interrupts();
     scheduler_yield();
     while (1)
-        asm("hlt");
+        wait_for_interrupt();
 }
 
 void mp_wakeup_processors(struct limine_mp_response *mpr) {

@@ -34,11 +34,11 @@ make run # run this in the build directory
 
 - [x] async blkdev io operations
 
+- [ ] lots of acpi things to do stuff
+
 - [ ] devtmpfs 
 
-- [ ] port neural network to kernel and use in scheduling
-
-- [ ] remove existing scheduling logic and use neural network scheduler 
+- [ ] proper system of using ifdefs to log info, track info, do profiling, etc.
 
 - [ ] ports for programs
 

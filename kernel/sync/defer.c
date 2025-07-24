@@ -75,10 +75,10 @@ bool defer_enqueue(dpc_t func, void *arg, void *arg2, uint64_t delay_ms) {
 }
 
 void defer_init(void) {
-    uint8_t vector = idt_alloc_entry_on_core(0);
+    uint8_t vector = idt_alloc_entry();
 
-    idt_set_alloc(vector, 0, true);
-    isr_register(vector, hpet_irq_handler, NULL, 0);
+    idt_set_alloc(vector, true);
+    isr_register(vector, hpet_irq_handler, NULL);
     k_info("DEFER", K_INFO, "Allocated IRQ %u for defer interrupts", vector);
     ioapic_route_irq(HPET_IRQ_LINE, vector, 0, false);
 }

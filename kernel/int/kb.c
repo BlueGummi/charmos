@@ -62,7 +62,8 @@ __attribute__((interrupt)) void keyboard_handler(void *a) {
         } else {
             if (character == '1') {
                 debug_print_registers();
-                asm volatile("cli;hlt");
+                disable_interrupts();
+                wait_for_interrupt();
             }
             kbuffer[index++] = character;
         }

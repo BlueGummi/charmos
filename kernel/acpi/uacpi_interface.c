@@ -144,7 +144,7 @@ uacpi_status uacpi_kernel_install_interrupt_handler(
     if (irq >= 256)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    isr_register(irq, (void *) handler, ctx, get_this_core_id());
+    isr_register(irq, (void *) handler, ctx);
 
     if (out_irq_handle)
         *out_irq_handle = (uacpi_handle) (uintptr_t) irq;

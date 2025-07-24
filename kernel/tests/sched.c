@@ -97,7 +97,7 @@ static void ts_thread(void) {
     enum thread_priority start_prio = me->perceived_prio;
 
     for (uint64_t i = 0; i < spins; i++)
-        asm volatile("hlt");
+        wait_for_interrupt();
 
     /* Time in level never changed, and priority level never changed */
     if (me->time_in_level == start_time && start_prio == me->perceived_prio)

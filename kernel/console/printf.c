@@ -406,6 +406,7 @@ void panic(const char *format, ...) {
     va_end(args);
 
     while (1) {
-        asm("cli;hlt");
+        disable_interrupts();
+        wait_for_interrupt();
     }
 }

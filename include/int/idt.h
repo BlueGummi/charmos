@@ -32,8 +32,6 @@ struct idt_table {
     struct idt_entry entries[IDT_ENTRIES];
 };
 
-extern struct idt_table *idts;
-
 struct idt_ptr {
     uint16_t limit;
     uint64_t base;
@@ -46,17 +44,13 @@ struct isr_entry {
     void *ctx;
 };
 
-void idt_install(uint64_t ind);
-void idt_load(uint64_t ind);
-void idt_alloc();
-void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
-                  uint64_t ind);
+void idt_init();
+void idt_load();
+void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags);
 
-void idt_set_alloc(int entry, uint64_t c, bool used);
+void idt_set_alloc(int entry, bool used);
 int idt_alloc_entry(void);
-int idt_alloc_entry_on_core(uint64_t core);
 void idt_free_entry(int entry);
 bool idt_is_installed(int entry);
-void isr_register(uint8_t vector, isr_handler_t handler, void *ctx,
-                  uint64_t core);
+void isr_register(uint8_t vector, isr_handler_t handler, void *ctx);
 void lapic_send_ipi(uint8_t apic_id, uint8_t vector);

@@ -14,6 +14,22 @@
            */
 
 #define SCHEDULER_DEFAULT_WORK_STEAL_MIN_DIFF 130
+#define IDLE_THREAD_CHECK_MS 100
+
+enum idle_thread_state {
+    IDLE_THREAD_FAST_HLT = 0,   /* Quick fast idle halt loop */
+    IDLE_THREAD_WORK_STEAL = 1, /* Attempt to do a thread steal */
+    IDLE_THREAD_EVENT_SCAN = 2, /* Scan for stealable events */
+    IDLE_THREAD_DEEP_SLEEP = 3, /* Enter deep sleep state */
+};
+
+struct idle_thread_data {
+    enum idle_thread_state state;
+
+    bool did_work_recently;
+    uint64_t last_entry_ms;
+    uint64_t last_exit_ms;
+};
 
 struct scheduler {
     bool active;
@@ -26,6 +42,7 @@ struct scheduler {
     atomic_bool stealing_work;
     struct spinlock lock;
     struct thread *idle_thread;
+    struct idle_thread_data idle_thread_data;
     atomic_uint_fast8_t queue_bitmap;
 };
 
@@ -38,7 +55,7 @@ void scheduler_rm_thread(struct scheduler *sched, struct thread *thread,
                          bool already_locked);
 void schedule(void);
 void k_sch_main(void);
-void k_sch_idle(void);
+void scheduler_idle_main(void);
 void scheduler_enable_timeslice();
 void scheduler_disable_timeslice();
 void scheduler_yield();
@@ -85,6 +102,10 @@ static inline struct thread *thread_spawn_on_core(void (*entry)(void),
 
 static inline struct scheduler *get_this_core_sched(void) {
     return global.schedulers[get_this_core_id()];
+}
+
+static inline struct idle_thread_data *get_this_core_idle_thread(void) {
+    return &get_this_core_sched()->idle_thread_data;
 }
 
 static inline void scheduler_decrement_thread_count(struct scheduler *sched) {

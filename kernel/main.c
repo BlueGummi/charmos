@@ -21,12 +21,14 @@
 #include <misc/logo.h>
 #include <mp/core.h>
 #include <mp/mp.h>
+#include <registry.h>
 #include <requests.h>
 #include <sch/defer.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
 #include <stdint.h>
 #include <syscall.h>
+#include <tests.h>
 
 struct charmos_globals global = {0};
 uint64_t a_rsdp;
@@ -60,8 +62,7 @@ void k_main(void) {
     mp_setup_bsp();
 
     // IDT
-    idt_alloc();
-    idt_install(0);
+    idt_init();
 
     // Early device init
     uacpi_init();
@@ -88,6 +89,19 @@ void k_main(void) {
     scheduler_yield();
 
     while (1) {
-        asm("hlt");
+        wait_for_interrupt();
+    }
+}
+
+void k_sch_main() {
+    k_info("MAIN", K_INFO, "Device setup");
+    registry_setup();
+    global.current_bootstage = BOOTSTAGE_LATE_DEVICES;
+    tests_run();
+    k_info("MAIN", K_INFO, "Boot OK");
+    global.current_bootstage = BOOTSTAGE_COMPLETE;
+
+    while (1) {
+        wait_for_interrupt();
     }
 }

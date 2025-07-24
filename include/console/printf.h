@@ -32,7 +32,7 @@ struct panic_regs {
 #define k_panic(fmt, ...)                                                      \
     do {                                                                       \
         global.panic_in_progress = true;                                       \
-        asm("cli");                                                            \
+        disable_interrupts();                                                  \
         k_printf("\n" EIGHTY_EIGHT_LINES "\n");                                \
         k_printf("\n                                    [" ANSI_BG_RED         \
                  "KERNEL PANIC" ANSI_RESET "]\n\n");                           \
@@ -52,7 +52,7 @@ struct panic_regs {
         k_printf("\n" EIGHTY_EIGHT_LINES "\n");                                \
         qemu_exit(1);                                                          \
         while (1)                                                              \
-            asm("hlt");                                                        \
+            wait_for_interrupt();                                              \
     } while (0)
 
 enum k_log_level {

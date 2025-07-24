@@ -110,10 +110,9 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme->queues_made = sqs_to_make;
 
     pci_enable_msix(bus, slot, func);
-    uint8_t nvme_base_isr = idt_alloc_entry_on_core(0);
     for (uint32_t i = 1; i <= sqs_to_make; i++) {
-        uint8_t nvme_isr = nvme_base_isr + i - 1;
-        idt_set_alloc(nvme_isr, i - 1, true);
+        uint8_t nvme_isr = idt_alloc_entry();
+        idt_set_alloc(nvme_isr, true);
 
         pci_enable_msix_on_core(bus, slot, func, nvme_isr, i - 1);
         nvme->isr_index[i] = nvme_isr;

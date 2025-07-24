@@ -31,26 +31,6 @@ struct scheduler_data scheduler_data = {
     .steal_min_diff = SCHEDULER_DEFAULT_WORK_STEAL_MIN_DIFF,
 };
 
-void k_sch_main() {
-    k_info("MAIN", K_INFO, "Device setup");
-    registry_setup();
-    global.current_bootstage = BOOTSTAGE_LATE_DEVICES;
-    tests_run();
-    k_info("MAIN", K_INFO, "Boot OK");
-    global.current_bootstage = BOOTSTAGE_COMPLETE;
-
-    while (1) {
-        asm volatile("hlt");
-    }
-}
-
-void k_sch_idle() {
-    while (1) {
-        enable_interrupts();
-        asm volatile("hlt");
-    }
-}
-
 static inline void disable_timeslice() {
     if (lapic_timer_is_enabled())
         lapic_timer_disable();
@@ -125,6 +105,12 @@ static inline void do_save_thread(struct scheduler *sched,
     do_re_enqueue_thread(sched, curr);
 }
 
+static inline void update_idle_thread(void) {
+    struct idle_thread_data *data = get_this_core_idle_thread();
+    data->did_work_recently = true;
+    data->last_exit_ms = time_get_ms();
+}
+
 static inline void requeue_current_thread_if_runnable(struct scheduler *sched,
                                                       struct thread *curr) {
 
@@ -132,8 +118,11 @@ static inline void requeue_current_thread_if_runnable(struct scheduler *sched,
     maybe_recompute_steal_threshold(get_this_core_id());
 
     /* Only save a running thread that exists */
-    if (curr && atomic_load(&curr->state) == THREAD_STATE_RUNNING)
+    if (curr && atomic_load(&curr->state) == THREAD_STATE_RUNNING) {
         do_save_thread(sched, curr);
+    } else if (curr && atomic_load(&curr->state) == THREAD_STATE_IDLE_THREAD) {
+        update_idle_thread();
+    }
 }
 
 static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {

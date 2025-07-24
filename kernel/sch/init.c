@@ -35,10 +35,10 @@ void scheduler_init(void) {
             s->queues[lvl].tail = NULL;
         }
 
-        struct thread *t0 = thread_create(k_sch_idle);
-        t0->flags = THREAD_FLAGS_NO_STEAL;
-        t0->state = THREAD_STATE_IDLE_THREAD;
-        s->idle_thread = t0;
+        struct thread *idle_thread = thread_create(scheduler_idle_main);
+        idle_thread->flags = THREAD_FLAGS_NO_STEAL;
+        idle_thread->state = THREAD_STATE_IDLE_THREAD;
+        s->idle_thread = idle_thread;
 
         if (!i) {
             struct thread *t = thread_create(k_sch_main);

@@ -17,8 +17,8 @@ extern void context_switch();
 extern void page_fault_handler_wrapper();
 extern void syscall_entry();
 #define MAX_IDT_ENTRIES 256
-static bool **idt_entry_used = NULL;
-static struct isr_entry **isr_table = NULL;
+static bool idt_entry_used[MAX_IDT_ENTRIES] = {0};
+static struct isr_entry isr_table[MAX_IDT_ENTRIES] = {0};
 
 #include "isr_stubs.h"
 #include "isr_vectors_array.h"
@@ -31,7 +31,7 @@ static struct isr_entry **isr_table = NULL;
         k_printf("Message -> %s\n", message);                                  \
         k_panic("Core %u faulted\n", core);                                    \
         while (1) {                                                            \
-            asm volatile("hlt");                                               \
+            wait_for_interrupt();                                              \
         }                                                                      \
     }
 
@@ -44,14 +44,13 @@ MAKE_HANDLER(double_fault, "DOUBLE FAULT");
 
 void isr_common_entry(uint8_t vector, void *rsp) {
     mark_self_in_interrupt();
-    uint8_t c = get_this_core_id();
 
-    if (isr_table[c][vector].handler) {
-        isr_table[c][vector].handler(isr_table[c][vector].ctx, vector, rsp);
+    if (isr_table[vector].handler) {
+        isr_table[vector].handler(isr_table[vector].ctx, vector, rsp);
     } else {
         k_printf("Unhandled ISR vector: %u\n", vector);
         while (1)
-            asm volatile("hlt");
+            wait_for_interrupt();
     }
 
     unmark_self_in_interrupt();
@@ -75,26 +74,24 @@ void panic_isr(void *ctx, uint8_t vector, void *rsp) {
         k_printf("    [CPU %u] Halting due to system panic\n",
                  get_this_core_id());
         while (1)
-            asm volatile("hlt");
+            wait_for_interrupt();
     }
 }
 
-void isr_register(uint8_t vector, isr_handler_t handler, void *ctx,
-                  uint64_t c) {
-    isr_table[c][vector].handler = handler;
-    isr_table[c][vector].ctx = ctx;
+void isr_register(uint8_t vector, isr_handler_t handler, void *ctx) {
+    isr_table[vector].handler = handler;
+    isr_table[vector].ctx = ctx;
 
-    idt_set_gate(vector, (uint64_t) handler, 0x08, 0x8e, c);
+    idt_set_gate(vector, (uint64_t) handler, 0x08, 0x8e);
 }
 
-struct idt_table *idts;
-struct idt_ptr *idtps;
+static struct idt_table idts = {0};
+static struct idt_ptr idtps = {0};
 
-void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
-                  uint64_t ind) {
-    struct idt_entry *idt = idts[ind].entries;
+void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags) {
+    struct idt_entry *idt = idts.entries;
 
-    isr_table[ind][num].handler = (void *) base;
+    isr_table[num].handler = (void *) base;
     base = (uint64_t) isr_vectors[num];
 
     idt[num].base_low = (base & 0xFFFF);
@@ -105,12 +102,11 @@ void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
     idt[num].flags = flags;
     idt[num].reserved = 0;
 
-    idt_entry_used[ind][num] = true;
+    idt_entry_used[num] = true;
 }
 
-static void set(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
-                uint64_t ind) {
-    struct idt_entry *idt = idts[ind].entries;
+static void set(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags) {
+    struct idt_entry *idt = idts.entries;
 
     idt[num].base_low = (base & 0xFFFF);
     idt[num].base_mid = (base >> 16) & 0xFFFF;
@@ -120,57 +116,36 @@ static void set(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags,
     idt[num].flags = flags;
     idt[num].reserved = 0;
 
-    idt_entry_used[ind][num] = true;
+    idt_entry_used[num] = true;
 }
 
-int idt_install_handler(uint8_t flags, void (*handler)(void), uint64_t core) {
+int idt_install_handler(uint8_t flags, void (*handler)(void)) {
     int entry = idt_alloc_entry();
     if (entry == -1)
         return -1;
 
-    idt_set_gate(entry, (uint64_t) handler, 0x08, flags, core);
+    idt_set_gate(entry, (uint64_t) handler, 0x08, flags);
     return entry;
 }
 
-void idt_load(uint64_t ind) {
-    idtps[ind].limit = sizeof(struct idt_entry) * IDT_ENTRIES - 1;
-    idtps[ind].base = (uint64_t) &idts[ind];
-    asm volatile("lidt %0" : : "m"(idtps[ind]));
+void idt_load(void) {
+    idtps.limit = sizeof(struct idt_entry) * IDT_ENTRIES - 1;
+    idtps.base = (uint64_t) &idts;
+    asm volatile("lidt %0" : : "m"(idtps));
 }
 
-void idt_alloc() {
-    uint64_t size = global.core_count;
-    idts = kmalloc(sizeof(struct idt_table) * size);
-    idtps = kmalloc(sizeof(struct idt_ptr) * size);
-    idt_entry_used = kmalloc(sizeof(bool *) * size);
-    isr_table = kmalloc(sizeof(struct isr_entry *) * size);
-    if (unlikely(!idts || !idtps || !idt_entry_used || !isr_table))
-        k_panic("Could not allocate space for interrupt tables\n");
-
-    for (uint64_t i = 0; i < size; i++) {
-        idt_entry_used[i] = kzalloc(sizeof(bool) * IDT_ENTRIES);
-        isr_table[i] = kzalloc(sizeof(struct isr_entry) * IDT_ENTRIES);
-        if (unlikely(!idt_entry_used[i] || !isr_table[i]))
-            k_panic("Could not allocate space for interrupt tables\n");
-    }
-}
-
-int idt_alloc_entry_on_core(uint64_t c) {
+int idt_alloc_entry() {
     for (int i = 32; i < MAX_IDT_ENTRIES; i++) { // skip first 32: exceptions
-        if (!idt_entry_used[c][i]) {
-            idt_entry_used[c][i] = true;
+        if (!idt_entry_used[i]) {
+            idt_entry_used[i] = true;
             return i;
         }
     }
     return -1; // none available
 }
 
-int idt_alloc_entry(void) {
-    return idt_alloc_entry_on_core(get_this_core_id());
-}
-
-void idt_set_alloc(int entry, uint64_t c, bool used) {
-    idt_entry_used[c][entry] = used;
+void idt_set_alloc(int entry, bool used) {
+    idt_entry_used[entry] = used;
 }
 
 bool idt_is_installed(int entry) {
@@ -181,7 +156,7 @@ void idt_free_entry(int entry) {
     if (entry < 32 || entry >= MAX_IDT_ENTRIES)
         return;
 
-    idt_entry_used[get_this_core_id()][entry] = false;
+    idt_entry_used[entry] = false;
 }
 
 static struct spinlock pf_lock = SPINLOCK_INIT;
@@ -215,7 +190,8 @@ static void page_fault_handler(void *context, uint8_t vector, void *rsp) {
         spin_unlock_no_cli(&pf_lock);
         k_panic("KERNEL PAGE FAULT ON CORE %llu\n", get_this_core_id());
         while (1) {
-            asm("cli;hlt");
+            disable_interrupts();
+            wait_for_interrupt();
         }
     }
     spin_unlock_no_cli(&pf_lock);
@@ -224,20 +200,21 @@ static void page_fault_handler(void *context, uint8_t vector, void *rsp) {
         }*/
 }
 
-void idt_install(uint64_t ind) {
+void idt_init() {
 
-    isr_register(DIV_BY_Z_ID, divbyz_handler, NULL, ind);
-    isr_register(DEBUG_ID, debug_handler, NULL, ind);
-    isr_register(BREAKPOINT_ID, breakpoint_handler, NULL, ind);
-    isr_register(SSF_ID, ss_handler, NULL, ind);
-    isr_register(GPF_ID, gpf_handler, NULL, ind);
-    isr_register(DBF_ID, double_fault_handler, NULL, ind);
-    isr_register(PAGE_FAULT_ID, page_fault_handler, NULL, ind);
-    isr_register(TIMER_ID, isr_timer_routine, NULL, ind);
+    isr_register(DIV_BY_Z_ID, divbyz_handler, NULL);
+    isr_register(DEBUG_ID, debug_handler, NULL);
+    isr_register(BREAKPOINT_ID, breakpoint_handler, NULL);
+    /*
+    isr_register(SSF_ID, ss_handler, NULL);
+    isr_register(GPF_ID, gpf_handler, NULL);
+    isr_register(DBF_ID, double_fault_handler, NULL);
+    isr_register(PAGE_FAULT_ID, page_fault_handler, NULL);*/
+    isr_register(TIMER_ID, isr_timer_routine, NULL);
 
-    set(0x80, (uint64_t) syscall_entry, 0x2b, 0xee, ind);
+    set(0x80, (uint64_t) syscall_entry, 0x2b, 0xee);
 
-    isr_register(PANIC_ID, panic_isr, NULL, ind);
-    isr_register(TLB_SHOOTDOWN_ID, tlb_shootdown, NULL, ind);
-    idt_load(ind);
+    isr_register(PANIC_ID, panic_isr, NULL);
+    isr_register(TLB_SHOOTDOWN_ID, tlb_shootdown, NULL);
+    idt_load();
 }
