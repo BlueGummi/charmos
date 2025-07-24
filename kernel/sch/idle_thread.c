@@ -25,7 +25,9 @@ static void do_idle_loop(struct idle_thread_data *idle,
 }
 
 void scheduler_idle_main(void) {
-    while(1){enable_interrupts();wait_for_interrupt();}
+    while (1) {
+        asm("sti;hlt");
+    }
 
     struct idle_thread_data *idle = get_this_core_idle_thread();
     idle->last_entry_ms = time_get_ms();

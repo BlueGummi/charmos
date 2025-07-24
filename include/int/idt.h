@@ -5,18 +5,19 @@
 #define IDT_ENTRIES 256
 #define MAX_IRQ 224
 
-#define DIV_BY_Z_ID 0x0
-#define DEBUG_ID 0x1
-#define BREAKPOINT_ID 0x3
-#define DBF_ID 0x8
-#define SSF_ID 0xC
-#define GPF_ID 0xD
-#define PAGE_FAULT_ID 0xE
-#define TIMER_ID 0x20
-#define SCHEDULER_ID TIMER_ID
-#define KB_ID 0x21
-#define TLB_SHOOTDOWN_ID 0x22
-#define PANIC_ID 0x23
+#define IRQ_DIV_BY_Z 0x0
+#define IRQ_DEBUG 0x1
+#define IRQ_BREAKPOINT 0x3
+#define IRQ_DBF 0x8
+#define IRQ_SSF 0xC
+#define IRQ_GPF 0xD
+#define IRQ_PAGE_FAULT 0xE
+#define IRQ_TIMER 0x20
+#define IRQ_SCHEDULER IRQ_TIMER
+#define IRQ_KB 0x21
+#define IRQ_TLB_SHOOTDOWN 0x22
+#define IRQ_PANIC 0x23
+#define IRQ_NOP 0x24 /* This is here so cores can bother each other */
 
 struct idt_entry {
     uint16_t base_low;

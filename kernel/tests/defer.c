@@ -12,8 +12,8 @@ static uint64_t enqueue_ms;
 static uint64_t finish_ms;
 char msg[100] = {0};
 
-static void defer_func(void *boo, void *) {
-    (void) boo;
+static void defer_func(void *boo, void *unused) {
+    (void) boo, (void) unused;
     finish_ms = time_get_ms();
 
     snprintf(msg, 100, "Start ms was %d, end ms was %d, took %d ms", enqueue_ms,
@@ -25,7 +25,8 @@ static void defer_func(void *boo, void *) {
 }
 
 REGISTER_TEST(defer_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    defer_enqueue(defer_func, NULL, NULL, 50);
+    enable_interrupts();
+    defer_enqueue(defer_func, NULL, NULL, 5);
     enqueue_ms = time_get_ms();
     sleep_ms(100);
 

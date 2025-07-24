@@ -1,4 +1,4 @@
-#include <acpi/hpet.h>
+#include <asm.h>
 #include <charmos.h>
 #include <flanterm/backends/fb.h>
 #include <flanterm/flanterm.h>

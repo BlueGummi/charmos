@@ -32,7 +32,7 @@ struct idle_thread_data {
 };
 
 struct scheduler {
-    bool active;
+    bool timeslice_enabled;
     struct thread_queue queues[MLFQ_LEVELS]; // MLFQ queues
     struct thread *current;
     uint64_t thread_count; // Also used for load estimate

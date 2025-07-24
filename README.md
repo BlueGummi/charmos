@@ -32,6 +32,8 @@ make run # run this in the build directory
 
 - [x] mlfq smp work stealing scheduler
 
+- [ ] timer api abstraction
+
 - [x] async blkdev io operations
 
 - [ ] lots of acpi things to do stuff

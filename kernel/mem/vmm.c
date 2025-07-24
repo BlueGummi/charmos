@@ -72,7 +72,7 @@ static void do_tlb_shootdown(uintptr_t addr) {
         struct core *target = global.cores[i];
         atomic_store_explicit(&target->tlb_page, addr, memory_order_release);
         atomic_store_explicit(&target->tlb_req_gen, gen, memory_order_release);
-        lapic_send_ipi(i, TLB_SHOOTDOWN_ID);
+        lapic_send_ipi(i, IRQ_TLB_SHOOTDOWN);
     }
 
     for (uint64_t i = 0; i < cores; i++) {

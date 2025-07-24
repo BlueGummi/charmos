@@ -4,6 +4,7 @@
 #include <int/idt.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
+#include <sleep.h>
 uint32_t *lapic;
 
 void lapic_init(void) {
@@ -11,15 +12,30 @@ void lapic_init(void) {
     lapic = vmm_map_phys(lapic_phys, PAGE_SIZE, PAGING_UNCACHABLE);
 }
 
-void lapic_timer_init() {
-    LAPIC_SEND(LAPIC_REG(LAPIC_REG_SVR), LAPIC_ENABLE | 0xFF);
+static uint32_t lapic_calibrated_freq = 0;
 
+void lapic_timer_init() {
+    uint32_t calibration_sleep_ms = 2;
+    uint32_t timeslice_ms = 15;
+
+    LAPIC_SEND(LAPIC_REG(LAPIC_REG_SVR), LAPIC_ENABLE | 0xFF);
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_TIMER_DIV), 0b0011);
+    LAPIC_SEND(LAPIC_REG(LAPIC_REG_LVT_TIMER), TIMER_VECTOR | LAPIC_LVT_MASK);
+    LAPIC_SEND(LAPIC_REG(LAPIC_REG_TIMER_INIT), 0xFFFFFFFF);
+
+    sleep_ms(calibration_sleep_ms);
+
+    uint32_t curr = LAPIC_READ(LAPIC_REG(LAPIC_REG_TIMER_CUR));
+    uint32_t elapsed = 0xFFFFFFFF - curr;
+
+    lapic_calibrated_freq = elapsed * (1000 / calibration_sleep_ms);
+
+    uint32_t timeslice_ticks = (lapic_calibrated_freq * timeslice_ms) / 1000;
 
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_LVT_TIMER),
                TIMER_VECTOR | TIMER_MODE_PERIODIC);
 
-    LAPIC_SEND(LAPIC_REG(LAPIC_REG_TIMER_INIT), 100000);
+    LAPIC_SEND(LAPIC_REG(LAPIC_REG_TIMER_INIT), timeslice_ticks);
 }
 
 void lapic_timer_disable() {
@@ -51,7 +67,7 @@ void broadcast_nmi_except(uint64_t exclude_core) {
         if (i == exclude_core)
             continue;
 
-        lapic_send_ipi(i, PANIC_ID);
+        lapic_send_ipi(i, IRQ_PANIC);
     }
 }
 

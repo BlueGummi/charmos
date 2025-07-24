@@ -24,7 +24,7 @@ void scheduler_init(void) {
         if (!s)
             k_panic("Could not allocate scheduler %lu\n", i);
 
-        s->active = true;
+        s->timeslice_enabled = false;
 
         s->thread_count = 0;
         s->core_id = i;

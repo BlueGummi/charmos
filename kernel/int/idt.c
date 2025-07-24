@@ -63,8 +63,12 @@ void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {
     /* Doing this as the `schedule()` will go to another thread */
     unmark_self_in_interrupt();
 
-    lapic_timer_enable();
     schedule();
+}
+
+/* Literally a no-op. Used to break out of "wait for interrupt" loops */
+static void nop_handler(void *ctx, uint8_t vector, void *rsp) {
+    (void) ctx, (void) vector, (void) rsp;
 }
 
 void panic_isr(void *ctx, uint8_t vector, void *rsp) {
@@ -202,19 +206,20 @@ static void page_fault_handler(void *context, uint8_t vector, void *rsp) {
 
 void idt_init() {
 
-    isr_register(DIV_BY_Z_ID, divbyz_handler, NULL);
-    isr_register(DEBUG_ID, debug_handler, NULL);
-    isr_register(BREAKPOINT_ID, breakpoint_handler, NULL);
-    /*
-    isr_register(SSF_ID, ss_handler, NULL);
-    isr_register(GPF_ID, gpf_handler, NULL);
-    isr_register(DBF_ID, double_fault_handler, NULL);
-    isr_register(PAGE_FAULT_ID, page_fault_handler, NULL);*/
-    isr_register(TIMER_ID, isr_timer_routine, NULL);
+    isr_register(IRQ_DIV_BY_Z, divbyz_handler, NULL);
+    isr_register(IRQ_DEBUG, debug_handler, NULL);
+    isr_register(IRQ_BREAKPOINT, breakpoint_handler, NULL);
+
+    isr_register(IRQ_SSF, ss_handler, NULL);
+    isr_register(IRQ_GPF, gpf_handler, NULL);
+    isr_register(IRQ_DBF, double_fault_handler, NULL);
+    isr_register(IRQ_PAGE_FAULT, page_fault_handler, NULL);
+    isr_register(IRQ_TIMER, isr_timer_routine, NULL);
+
+    isr_register(IRQ_PANIC, panic_isr, NULL);
+    isr_register(IRQ_TLB_SHOOTDOWN, tlb_shootdown, NULL);
+    isr_register(IRQ_NOP, nop_handler, NULL);
 
     set(0x80, (uint64_t) syscall_entry, 0x2b, 0xee);
-
-    isr_register(PANIC_ID, panic_isr, NULL);
-    isr_register(TLB_SHOOTDOWN_ID, tlb_shootdown, NULL);
     idt_load();
 }

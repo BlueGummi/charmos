@@ -32,13 +32,19 @@ struct scheduler_data scheduler_data = {
 };
 
 static inline void disable_timeslice() {
-    if (lapic_timer_is_enabled())
+    struct scheduler *self = get_this_core_sched();
+    if (self->timeslice_enabled) {
         lapic_timer_disable();
+        self->timeslice_enabled = false;
+    }
 }
 
 static inline void enable_timeslice() {
-    if (!lapic_timer_is_enabled())
+    struct scheduler *self = get_this_core_sched();
+    if (!self->timeslice_enabled) {
         lapic_timer_enable();
+        self->timeslice_enabled = true;
+    }
 }
 
 void scheduler_enable_timeslice() {

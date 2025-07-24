@@ -152,7 +152,7 @@ static struct bio_scheduler_ops nvme_bio_sched_ops = {
             [BIO_RQ_HIGH] = 4,
             [BIO_RQ_URGENT] = 0,
         },
-    .dispatch_threshold = 128,
+    .dispatch_threshold = 96,
     .boost_occupance_limit =
         {
             [BIO_RQ_BACKGROUND] = 64,

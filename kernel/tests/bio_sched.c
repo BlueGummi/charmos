@@ -108,6 +108,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
               IS_INTEGRATION_TEST) {
     EXT2_INIT;
     ABORT_IF_RAM_LOW();
+    enable_interrupts();
 
     struct ext2_fs *fs = root->fs_data;
     struct generic_disk *d = fs->drive;
@@ -138,7 +139,6 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
         rq->write = false;
     }
 
-    enable_interrupts();
     uint64_t ms = time_get_ms();
     for (uint64_t i = 0; i < test_runs; i++) {
         struct bio_request *rq = rqs[i];
@@ -167,9 +167,9 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
 
     char *m2 = kmalloc(100);
     TEST_ASSERT(m2);
-    snprintf(m2, 100, "Runs is %d, test_runs is %d", runs, test_runs);
+    snprintf(m2, 100, "Runs is %d, test_runs is %d", atomic_load(&runs), test_runs);
     ADD_MESSAGE(m2);
-    TEST_ASSERT(runs == test_runs);
+    TEST_ASSERT(atomic_load(&runs) == test_runs);
 
     SET_SUCCESS;
 }

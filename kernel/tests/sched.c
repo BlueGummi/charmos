@@ -50,6 +50,7 @@ static void rt_thread(void) {
     uint64_t spins = 100;
     struct thread *me = scheduler_get_curr_thread();
     if (me != rt) {
+        k_printf("Different thread\n");
         goto fail;
     }
 
@@ -60,8 +61,9 @@ static void rt_thread(void) {
         sleep_ms(1);
 
         /* This is changed if preemption occurred */
-        if (me->time_in_level != start_time)
+        if (me->time_in_level != start_time) {
             goto fail;
+        }
     }
 
     return;
@@ -74,10 +76,10 @@ fail:
 REGISTER_TEST(rt_thread_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct thread *thread = thread_create(rt_thread);
     rt = thread;
-    thread->base_prio = THREAD_PRIO_RT;
-    thread->perceived_prio = THREAD_PRIO_RT;
+    thread->base_prio = THREAD_PRIO_URGENT;
+    thread->perceived_prio = THREAD_PRIO_URGENT;
 
-    scheduler_enqueue(thread);
+    scheduler_enqueue_on_core(thread, get_this_core_id());
     scheduler_yield();
     TEST_ASSERT(!atomic_load(&rt_thread_fail));
 

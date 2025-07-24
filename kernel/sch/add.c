@@ -52,14 +52,14 @@ void scheduler_enqueue(struct thread *t) {
     }
 
     put_on_scheduler(s, t);
-    lapic_send_ipi(min_core, SCHEDULER_ID);
+    lapic_send_ipi(min_core, IRQ_SCHEDULER);
 }
 
 /* TODO: Make scheduler_add_thread an internal function so I don't need to
  * pass in the 'false false true' here and all over the place */
 void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id) {
     put_on_scheduler(global.schedulers[core_id], t);
-    lapic_send_ipi(core_id, SCHEDULER_ID);
+    lapic_send_ipi(core_id, IRQ_SCHEDULER);
 }
 
 void scheduler_wake(struct thread *t, enum thread_priority new_prio) {
@@ -74,5 +74,5 @@ void scheduler_wake(struct thread *t, enum thread_priority new_prio) {
 
     struct scheduler *sch = global.schedulers[t->curr_core];
     put_on_scheduler(sch, t);
-    lapic_send_ipi(c, SCHEDULER_ID);
+    lapic_send_ipi(c, IRQ_SCHEDULER);
 }

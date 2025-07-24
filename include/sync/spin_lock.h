@@ -14,11 +14,12 @@ static inline void spinlock_init(struct spinlock *lock) {
 }
 
 static inline bool spin_lock(struct spinlock *lock) {
+    bool int_enabled = are_interrupts_enabled();
+    clear_interrupts();
+    
     while (atomic_flag_test_and_set(&lock->lock))
         cpu_relax();
 
-    bool int_enabled = are_interrupts_enabled();
-    clear_interrupts();
     return int_enabled;
 }
 

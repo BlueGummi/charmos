@@ -38,6 +38,7 @@ static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
 
     spin_unlock(&defer_lock, i);
 
+    hpet_clear_interrupt_status();
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
 }
 
@@ -75,10 +76,15 @@ bool defer_enqueue(dpc_t func, void *arg, void *arg2, uint64_t delay_ms) {
 }
 
 void defer_init(void) {
-    uint8_t vector = idt_alloc_entry();
+    for (uint64_t i = 0; i < hpet_timer_count; i++) {
+        uint8_t vector = idt_alloc_entry();
 
-    idt_set_alloc(vector, true);
-    isr_register(vector, hpet_irq_handler, NULL);
-    k_info("DEFER", K_INFO, "Allocated IRQ %u for defer interrupts", vector);
-    ioapic_route_irq(HPET_IRQ_LINE, vector, 0, false);
+        isr_register(vector, hpet_irq_handler, NULL);
+        ioapic_route_irq(i + HPET_IRQ_BASE, vector, i, false);
+        hpet_setup_timer(i, i + HPET_IRQ_BASE, false, true);
+
+        k_info("DEFER", K_INFO,
+               "Timer %llu routed to IRQ %u (vector %u on core %u)", i,
+               i + HPET_IRQ_BASE, vector, i);
+    }
 }

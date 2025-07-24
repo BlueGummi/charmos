@@ -56,7 +56,7 @@ void wakeup() {
     set_core_awake();
     spin_unlock(&wakeup_lock, ints);
 
-    restore_interrupts();
+    enable_interrupts();
     scheduler_yield();
     while (1)
         wait_for_interrupt();
