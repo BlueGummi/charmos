@@ -12,7 +12,7 @@ static inline void refcount_init(refcount_t *rc, unsigned int val) {
 static inline bool refcount_inc(refcount_t *rc) {
     for (;;) {
         unsigned int old = atomic_load(rc);
-        if (old == 0 || old == UINT_MAX)
+        if (old == UINT_MAX)
             return false;
 
         unsigned int expected = old;
