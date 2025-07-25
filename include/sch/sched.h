@@ -14,21 +14,18 @@
            */
 
 #define SCHEDULER_DEFAULT_WORK_STEAL_MIN_DIFF 130
-#define IDLE_THREAD_CHECK_MS 100
 
 enum idle_thread_state {
-    IDLE_THREAD_FAST_HLT = 0,   /* Quick fast idle halt loop */
-    IDLE_THREAD_WORK_STEAL = 1, /* Attempt to do a thread steal */
-    IDLE_THREAD_EVENT_SCAN = 2, /* Scan for stealable events */
-    IDLE_THREAD_DEEP_SLEEP = 3, /* Enter deep sleep state */
+    IDLE_THREAD_WORK_STEAL = 0, /* Attempt to do a thread steal */
+    IDLE_THREAD_SLEEP = 1, /* Enter sleep state */
 };
 
 struct idle_thread_data {
-    enum idle_thread_state state;
+    _Atomic enum idle_thread_state state;
 
-    bool woken_from_timer;
-    bool did_work_recently;
-    uint64_t last_entry_ms;
+    atomic_bool woken_from_timer;
+    atomic_bool did_work_recently;
+    atomic_uint_fast64_t last_entry_ms;
     uint64_t last_exit_ms;
 };
 

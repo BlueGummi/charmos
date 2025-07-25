@@ -4,6 +4,7 @@
 #include <int/idt.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
+#include <mp/core.h>
 #include <sleep.h>
 uint32_t *lapic;
 

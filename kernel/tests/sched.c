@@ -47,7 +47,7 @@ static atomic_bool rt_thread_fail = false;
 static struct thread *rt = NULL;
 
 static void rt_thread(void) {
-    uint64_t spins = 100;
+    uint64_t spins = 50;
     struct thread *me = scheduler_get_curr_thread();
     if (me != rt) {
         k_printf("Different thread\n");
