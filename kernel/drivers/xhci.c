@@ -469,6 +469,46 @@ bool xhci_send_control_transfer(struct xhci_device *dev, uint8_t slot_id,
     return xhci_wait_for_transfer_event(dev, slot_id);
 }
 
+bool usb_get_string_descriptor(struct xhci_device *dev, uint8_t port,
+                               uint8_t string_idx, char *out, size_t max_len) {
+    if (!string_idx)
+        return false;
+
+    struct xhci_ring *ep0_ring = dev->port_info[port - 1].ep0_ring;
+    uint8_t slot_id = dev->port_info[port - 1].slot_id;
+
+    uint64_t desc_phys = (uint64_t) pmm_alloc_page(false);
+    uint8_t *desc = vmm_map_phys(desc_phys, 4096, 0);
+    memset(desc, 0, 4096);
+
+    struct usb_setup_packet setup = {
+        .bitmap_request_type = 0x80,
+        .request = USB_RQ_CODE_GET_DESCRIPTOR,
+        .value = (USB_DESC_TYPE_STRING << 8) | string_idx,
+        .index = 0,
+        .length = 255,
+    };
+
+    if (!xhci_send_control_transfer(dev, slot_id, ep0_ring, &setup, desc))
+        return false;
+
+    uint8_t bLength = desc[0];
+    if (bLength < 2 || bLength > 255)
+        return false;
+
+    size_t out_idx = 0;
+    for (size_t i = 2; i < bLength && out_idx < (max_len - 1); i += 2) {
+        if (desc[i + 1] == 0) {
+            out[out_idx++] = desc[i];
+        } else {
+            out[out_idx++] = '?';
+        }
+    }
+    out[out_idx] = '\0';
+
+    return true;
+}
+
 void usb_get_device_descriptor(struct xhci_device *dev, uint8_t port) {
     struct xhci_ring *ep0_ring = dev->port_info[port - 1].ep0_ring;
     uint8_t slot_id = dev->port_info[port - 1].slot_id;
@@ -502,6 +542,17 @@ void usb_get_device_descriptor(struct xhci_device *dev, uint8_t port) {
     k_printf("  idVendor: %04x\n", ddesc->vendor_id);
     k_printf("  idProduct: %04x\n", ddesc->product_id);
     k_printf("  bNumConfigurations: %u\n", ddesc->num_configs);
+
+    char manufacturer[128] = {0};
+    char product[128] = {0};
+
+    usb_get_string_descriptor(dev, port, ddesc->manufacturer, manufacturer,
+                              sizeof(manufacturer));
+    usb_get_string_descriptor(dev, port, ddesc->product, product,
+                              sizeof(product));
+
+    k_printf("  Manufacturer: %s\n", manufacturer);
+    k_printf("  Product: %s\n", product);
 }
 
 void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
