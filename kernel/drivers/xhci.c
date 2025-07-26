@@ -1,3 +1,4 @@
+#include <drivers/usb.h>
 #include <asm.h>
 #include <compiler.h>
 #include <console/printf.h>
@@ -253,31 +254,30 @@ void xhci_parse_ext_caps(struct xhci_device *dev) {
         uint8_t cap_id = cap_header & 0xFF;
         uint8_t next = (cap_header >> 8) & 0xFF;
 
-        switch (cap_id) {
-        case XHCI_EXT_CAP_ID_LEGACY_SUPPORT: {
-            void *bios_owns_addr = (uint8_t *) ext_cap_addr + 4;
-            void *os_owns_addr = (uint8_t *) ext_cap_addr + 8;
-
-            mmio_write_32(os_owns_addr, 1);
-
-            uint64_t timeout = 1000 * 1000;
-            while ((mmio_read_32(bios_owns_addr) & 1) && timeout--) {
-                sleep_us(1);
-            }
-
-            uint32_t own_data = mmio_read_32(bios_owns_addr);
-            if (own_data & 1)
-                k_info("XHCI", K_WARN, "BIOS ownership handoff failed.\n");
-            goto out;
+        if (cap_id != XHCI_EXT_CAP_ID_LEGACY_SUPPORT) {
+            offset = next;
+            continue;
         }
 
-        default: break;
+        void *bios_owns_addr = (uint8_t *) ext_cap_addr + 4;
+        void *os_owns_addr = (uint8_t *) ext_cap_addr + 8;
+
+        mmio_write_32(os_owns_addr, 1);
+
+        uint64_t timeout = 1000 * 1000;
+        while ((mmio_read_32(bios_owns_addr) & 1) && timeout--) {
+            sleep_us(1);
         }
 
-        offset = next;
+        uint32_t own_data = mmio_read_32(bios_owns_addr);
+        if (own_data & 1) {
+            xhci_warn("BIOS ownership handoff failed");
+        } else {
+            xhci_info("BIOS ownership handoff completed");
+        }
+
+        break;
     }
-out:
-    return;
 }
 
 bool xhci_reset_port(struct xhci_device *dev, uint32_t port_index) {
@@ -293,15 +293,69 @@ bool xhci_reset_port(struct xhci_device *dev, uint32_t port_index) {
     }
 
     if (mmio_read_32(portsc) & (1 << 4)) {
-        k_info("XHCI", K_WARN, "Port %u reset timed out.\n", port_index + 1);
+        xhci_warn("Port %u reset timed out", port_index + 1);
         return false;
     }
 
     return true;
 }
+bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
+                         uint8_t speed, uint8_t port) {
+    uint64_t input_ctx_phys = (uint64_t) pmm_alloc_page(false);
+    struct xhci_input_ctx *input_ctx =
+        vmm_map_phys(input_ctx_phys, PAGE_SIZE, PAGING_UNCACHABLE);
+    memset(input_ctx, 0, PAGE_SIZE);
+
+    input_ctx->ctrl_ctx.add_flags = (1 << 0) | (1 << 1); // slot + ep0
+    input_ctx->ctrl_ctx.drop_flags = 0;
+
+    struct xhci_slot_ctx *slot = &input_ctx->slot_ctx;
+    slot->route_string = 0;
+    slot->speed = speed;
+    slot->context_entries = 1;
+    slot->root_hub_port = port;
+    slot->mtt = 0;
+    slot->hub = 0;
+    slot->num_ports = 0;
+
+    uint64_t ep0_ring_phys = (uint64_t) pmm_alloc_page(false);
+    struct xhci_trb *ep0_ring =
+        vmm_map_phys(ep0_ring_phys, PAGE_SIZE, PAGING_UNCACHABLE);
+    memset(ep0_ring, 0, PAGE_SIZE);
+    ep0_ring[TRB_RING_SIZE - 1].parameter = ep0_ring_phys;
+    ep0_ring[TRB_RING_SIZE - 1].control = (TRB_TYPE_LINK << 10) | (1 << 1);
+
+    struct xhci_ep_ctx *ep0 = &input_ctx->ep0_ctx;
+    ep0->ep_type = 4; /* Control */
+    ep0->max_packet_size =
+        (speed == PORT_SPEED_LOW || speed == PORT_SPEED_FULL) ? 8 : 64;
+    ep0->max_burst_size = 0;
+    ep0->interval = 0;
+    ep0->dcs = 1;
+    ep0->dequeue_ptr_raw = ep0_ring_phys;
+
+    uint64_t dev_ctx_phys = (uint64_t) pmm_alloc_page(false);
+    struct xhci_device_ctx *dev_ctx =
+        vmm_map_phys(dev_ctx_phys, PAGE_SIZE, PAGING_UNCACHABLE);
+    memset(dev_ctx, 0, PAGE_SIZE);
+
+    ctrl->dcbaa->ptrs[slot_id] = dev_ctx_phys;
+
+    xhci_send_command(ctrl, input_ctx_phys,
+                      (TRB_TYPE_ADDRESS_DEVICE << 10) |
+                          (ctrl->cmd_ring->cycle & 1) | (slot_id << 24));
+
+    if (!(xhci_wait_for_response(ctrl) & (1 << 0))) {
+        xhci_warn("Address device failed for slot %u, port %u", slot_id, port);
+        return false;
+    }
+
+    xhci_info("Address device completed for slot %u, port %u", slot_id, port);
+    return true;
+}
 
 void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
-    k_info("XHCI", K_INFO, "Found device at %02x:%02x.%02x", bus, slot, func);
+    xhci_info("Found device at %02x:%02x.%02x", bus, slot, func);
     void *mmio = xhci_map_mmio(bus, slot, func);
 
     struct xhci_device *dev = xhci_device_create(mmio);
@@ -329,18 +383,18 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
             xhci_reset_port(dev, port);
             uint8_t slot_id = xhci_enable_slot(dev);
             if (slot_id == 0) {
-                k_info("XHCI", K_WARN, "Failed to enable slot for port %lu\n",
-                       port);
+                xhci_warn("Failed to enable slot for port %lu\n", port);
                 continue;
             }
 
             dev->port_info[port - 1].device_connected = true;
             dev->port_info[port - 1].speed = speed;
             dev->port_info[port - 1].slot_id = slot_id;
+            xhci_address_device(dev, slot_id, speed, port);
         }
     }
 
-    k_info("XHCI", K_INFO, "Device initialized successfully");
+    xhci_info("Device initialized successfully");
 }
 static void xhci_pci_init(uint8_t bus, uint8_t slot, uint8_t func,
                           struct pci_device *dev) {

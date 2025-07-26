@@ -526,3 +526,6 @@ struct xhci_device {
 };
 
 void xhci_init(uint8_t bus, uint8_t slot, uint8_t func);
+#define xhci_info(string, ...) k_info("XHCI", K_INFO, string, ##__VA_ARGS__)
+#define xhci_warn(string, ...) k_info("XHCI", K_WARN, string, ##__VA_ARGS__)
+#define xhci_error(string, ...) k_info("XHCI", K_ERROR, string, ##__VA_ARGS__)

@@ -84,7 +84,7 @@ set(QEMU_COMMON_FLAGS
      #-device ide-hd,drive=fatdisk,bus=ahci0.3
 
 
-    -d trace:*serial*
+    -d trace:*xhci*
     -trace file=trace.log
 )
 
