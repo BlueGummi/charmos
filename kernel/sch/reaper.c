@@ -48,10 +48,10 @@ void reaper_thread_main() {
         while (t) {
             atomic_store(&t->state, THREAD_STATE_TERMINATED);
             struct thread *next = t->next;
+            reaper.reaped_threads++;
             thread_free(t);
             reaped_something = true;
             t = next;
-            reaper.reaped_threads++;
         }
 
         if (reaped_something) {

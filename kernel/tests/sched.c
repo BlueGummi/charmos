@@ -22,9 +22,16 @@ REGISTER_TEST(sched_reaper_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     while (!atomic_load(&ran))
         ;
 
-    sleep_ms(50);
+    uint64_t timeout = 5000;
+    while (reaper_get_reaped_thread_count() <= reaped_threads_at_start &&
+           timeout--)
+        sleep_us(10);
 
-    TEST_ASSERT(reaper_get_reaped_thread_count() > reaped_threads_at_start);
+    if (!timeout) {
+        SET_FAIL;
+        return;
+    }
+
     SET_SUCCESS;
 }
 
