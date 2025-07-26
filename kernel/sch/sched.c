@@ -156,7 +156,7 @@ static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {
 
     /* No more threads at this queue level */
     if (q->head == NULL)
-        sched->queue_bitmap &= ~(1 << lvl);
+        atomic_fetch_and(&sched->queue_bitmap, ~(1 << lvl));
 
     next->next = NULL;
     next->prev = NULL;
