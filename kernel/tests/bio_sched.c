@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include <tests.h>
 
 #include "fs/detect.h"
@@ -167,7 +168,8 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
 
     char *m2 = kmalloc(100);
     TEST_ASSERT(m2);
-    snprintf(m2, 100, "Runs is %d, test_runs is %d", atomic_load(&runs), test_runs);
+    snprintf(m2, 100, "Runs is %d, test_runs is %d", atomic_load(&runs),
+             test_runs);
     ADD_MESSAGE(m2);
     TEST_ASSERT(atomic_load(&runs) == test_runs);
 
