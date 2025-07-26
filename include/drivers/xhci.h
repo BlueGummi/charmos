@@ -527,6 +527,25 @@ struct xhci_device {
 };
 
 void xhci_init(uint8_t bus, uint8_t slot, uint8_t func);
+void *xhci_map_mmio(uint8_t bus, uint8_t slot, uint8_t func);
+struct xhci_device *xhci_device_create(void *mmio);
+bool xhci_controller_stop(struct xhci_device *dev);
+bool xhci_controller_reset(struct xhci_device *dev);
+bool xhci_controller_start(struct xhci_device *dev);
+void xhci_controller_enable_ints(struct xhci_device *dev);
+void xhci_setup_event_ring(struct xhci_device *dev);
+void xhci_setup_command_ring(struct xhci_device *dev);
+void xhci_ring_doorbell(struct xhci_device *dev, uint32_t slot_id,
+                        uint32_t ep_id);
+void xhci_send_command(struct xhci_device *dev, uint64_t parameter,
+                       uint32_t control);
+uint64_t xhci_wait_for_response(struct xhci_device *dev);
+bool xhci_wait_for_transfer_event(struct xhci_device *dev, uint8_t slot_id);
+uint8_t xhci_enable_slot(struct xhci_device *dev);
+void xhci_parse_ext_caps(struct xhci_device *dev);
+bool xhci_reset_port(struct xhci_device *dev, uint32_t port_index);
+
+
 #define xhci_info(string, ...) k_info("XHCI", K_INFO, string, ##__VA_ARGS__)
 #define xhci_warn(string, ...) k_info("XHCI", K_WARN, string, ##__VA_ARGS__)
 #define xhci_error(string, ...) k_info("XHCI", K_ERROR, string, ##__VA_ARGS__)

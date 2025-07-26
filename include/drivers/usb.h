@@ -1,5 +1,6 @@
 #pragma once
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 /* All page numbers are for the USB 2.0 Specification */
@@ -197,8 +198,48 @@ struct usb_endpoint {
     void *hc_data;
 };
 
+struct usb_controller;
+
+enum usb_transfer_type {
+    USB_TRANSFER_CONTROL,
+    USB_TRANSFER_BULK,
+    USB_TRANSFER_INTERRUPT,
+};
+
+struct usb_packet {
+    enum usb_transfer_type type;
+
+    struct usb_setup_packet *setup;
+    void *data;
+    size_t length;
+    bool direction_in;
+
+    void (*completion_cb)(void *ctx, bool success);
+    void *context;
+};
+
+struct usb_controller_ops {
+    bool (*submit_control_transfer)(struct usb_controller *ctrl, uint8_t port,
+                                    struct usb_packet *pkt);
+    bool (*submit_bulk_transfer)(struct usb_controller *ctrl, uint8_t port,
+                                 struct usb_packet *pkt);
+    bool (*submit_interrupt_transfer)(struct usb_controller *ctrl, uint8_t port,
+                                      struct usb_packet *pkt);
+
+    bool (*reset_port)(struct usb_controller *ctrl, uint8_t port);
+    bool (*get_device_descriptor)(struct usb_controller *ctrl, uint8_t port,
+                                  struct usb_device_descriptor *out);
+
+    bool (*get_string_descriptor)(struct usb_controller *ctrl, uint8_t port,
+                                  uint8_t string_index, char *buf, size_t len);
+
+    void (*ring_doorbell)(struct usb_controller *ctrl, uint8_t slot,
+                          uint8_t ep);
+};
+
 struct usb_controller { /* Generic USB controller */
     enum usb_controller_type type;
+    struct usb_controller_ops ops;
     void *data;
 };
 
