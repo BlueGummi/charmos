@@ -497,6 +497,7 @@ struct xhci_port_info {
     bool device_connected;
     uint8_t speed;
     uint8_t slot_id;
+    struct xhci_ring *ep0_ring;
 };
 
 struct xhci_dcbaa { // Device context base address array - check page 441

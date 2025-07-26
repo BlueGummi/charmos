@@ -34,6 +34,8 @@ make run # run this in the build directory
 
 - [ ] timer api abstraction
 
+- [ ] clean up all drivers. less bitfields, more #defines
+
 - [x] async blkdev io operations
 
 - [ ] lots of acpi things to do stuff

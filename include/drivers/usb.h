@@ -4,6 +4,16 @@
 
 /* All page numbers are for the USB 2.0 Specification */
 
+/* Page 279 - Descriptor types */
+#define USB_DESC_TYPE_DEVICE 1
+#define USB_DESC_TYPE_CONFIG 2
+#define USB_DESC_TYPE_STRING 3
+#define USB_DESC_TYPE_INTERFACE 4
+#define USB_DESC_TYPE_ENDPOINT 5
+#define USB_DESC_TYPE_DEV_QUALIFIER 6
+#define USB_DESC_TYPE_OTHER_SPEED_CONFIG 7
+#define USB_DESC_TYPE_INTERFACE_POWER 8
+
 /* Request bitmap field definitions */
 #define USB_REQUEST_TRANS_HTD 0
 #define USB_REQUEST_TRANS_DTH 1
@@ -195,7 +205,7 @@ struct usb_controller { /* Generic USB controller */
 struct usb_device {
     uint8_t address;
     uint8_t speed;
-    uint8_t port;            // Port number on the root hub
+    uint8_t port;            /* Port number on the root hub */
     uint8_t slot_id;         /* Used for xHCI */
     uint8_t max_packet_size; /* For endpoint 0 */
 

@@ -1,8 +1,8 @@
-#include <drivers/usb.h>
 #include <asm.h>
 #include <compiler.h>
 #include <console/printf.h>
 #include <drivers/pci.h>
+#include <drivers/usb.h>
 #include <drivers/xhci.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <string.h>
 
+/* TODO: Make custom definitions for each TRB type */
 static void *xhci_map_mmio(uint8_t bus, uint8_t slot, uint8_t func) {
     uint32_t original_bar0 = pci_read(bus, slot, func, 0x10);
 
@@ -142,8 +143,7 @@ static void xhci_setup_command_ring(struct xhci_device *dev) {
 
     uint64_t cmd_ring_phys = (uint64_t) pmm_alloc_page(false);
     struct xhci_trb *cmd_ring =
-        vmm_map_phys(cmd_ring_phys, sizeof(struct xhci_trb) * TRB_RING_SIZE,
-                     PAGING_UNCACHABLE);
+        vmm_map_phys(cmd_ring_phys, sizeof(struct xhci_trb) * TRB_RING_SIZE, 0);
     memset(cmd_ring, 0, sizeof(struct xhci_trb) * TRB_RING_SIZE);
 
     int last_index = TRB_RING_SIZE - 1;
@@ -173,9 +173,10 @@ static void xhci_setup_command_ring(struct xhci_device *dev) {
     mmio_write_64(&op->dcbaap, dcbaa_phys | 1);
 }
 
-static void xhci_ring_doorbell(struct xhci_device *dev, uint64_t idx) {
+static void xhci_ring_doorbell(struct xhci_device *dev, uint32_t slot_id,
+                               uint32_t ep_id) {
     uint32_t *doorbell = (void *) dev->cap_regs + dev->cap_regs->dboff;
-    mmio_write_32(&doorbell[idx], 0);
+    mmio_write_32(&doorbell[slot_id], ep_id);
 }
 
 static void xhci_send_command(struct xhci_device *dev, uint64_t parameter,
@@ -193,7 +194,7 @@ static void xhci_send_command(struct xhci_device *dev, uint64_t parameter,
         cmd_ring->cycle ^= 1;
     }
 
-    xhci_ring_doorbell(dev, 0);
+    xhci_ring_doorbell(dev, 0, 0);
 }
 
 static uint64_t xhci_wait_for_response(struct xhci_device *dev) {
@@ -203,7 +204,7 @@ static uint64_t xhci_wait_for_response(struct xhci_device *dev) {
 
     while (true) {
         struct xhci_trb *evt = &event_ring->trbs[dq_idx];
-        uint32_t control = evt->control;
+        uint32_t control = mmio_read_32(&evt->control);
         if ((control & 1) != expected_cycle) {
             continue;
         }
@@ -224,6 +225,58 @@ static uint64_t xhci_wait_for_response(struct xhci_device *dev) {
             mmio_write_64(&dev->intr_regs->erdp, erdp | 1);
 
             return control;
+        }
+
+        dq_idx++;
+        if (dq_idx == event_ring->size) {
+            dq_idx = 0;
+            expected_cycle ^= 1;
+        }
+        event_ring->dequeue_index = dq_idx;
+        event_ring->cycle = expected_cycle;
+    }
+}
+
+static bool xhci_wait_for_transfer_event(struct xhci_device *dev,
+                                         uint8_t slot_id) {
+    struct xhci_ring *event_ring = dev->event_ring;
+    uint32_t dq_idx = event_ring->dequeue_index;
+    uint8_t expected_cycle = event_ring->cycle;
+
+    while (true) {
+        struct xhci_trb *evt = &event_ring->trbs[dq_idx];
+        uint32_t control = mmio_read_32(&evt->control);
+        if ((control & 1) != expected_cycle) {
+            continue;
+        }
+
+        uint8_t trb_type = (control >> 10) & 0x3F;
+        if (trb_type == TRB_TYPE_TRANSFER_EVENT) {
+            uint8_t completion_code = (evt->status >> 24) & 0xFF;
+            uint8_t evt_slot_id = (control >> 24) & 0xFF;
+
+            if (evt_slot_id != slot_id) {
+                dq_idx++;
+                if (dq_idx == event_ring->size) {
+                    dq_idx = 0;
+                    expected_cycle ^= 1;
+                }
+                continue;
+            }
+
+            dq_idx++;
+            if (dq_idx == event_ring->size) {
+                dq_idx = 0;
+                expected_cycle ^= 1;
+            }
+            event_ring->dequeue_index = dq_idx;
+            event_ring->cycle = expected_cycle;
+
+            uint64_t offset = dq_idx * sizeof(struct xhci_trb);
+            uint64_t erdp = event_ring->phys + offset;
+            mmio_write_64(&dev->intr_regs->erdp, erdp | 1);
+
+            return (completion_code == 1);
         }
 
         dq_idx++;
@@ -299,6 +352,7 @@ bool xhci_reset_port(struct xhci_device *dev, uint32_t port_index) {
 
     return true;
 }
+
 bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
                          uint8_t speed, uint8_t port) {
     uint64_t input_ctx_phys = (uint64_t) pmm_alloc_page(false);
@@ -325,14 +379,26 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
     ep0_ring[TRB_RING_SIZE - 1].parameter = ep0_ring_phys;
     ep0_ring[TRB_RING_SIZE - 1].control = (TRB_TYPE_LINK << 10) | (1 << 1);
 
+    struct xhci_ring *ring = kmalloc(sizeof(struct xhci_ring));
+    if (unlikely(!ring))
+        k_panic("Could not allocate space for ep0 ring");
+
+    ring->phys = ep0_ring_phys;
+    ring->trbs = ep0_ring;
+    ring->size = TRB_RING_SIZE;
+    ring->cycle = 1;
+    ring->enqueue_index = 0;
+    ring->dequeue_index = 0;
+
+    ctrl->port_info[port - 1].ep0_ring = ring;
+
     struct xhci_ep_ctx *ep0 = &input_ctx->ep0_ctx;
     ep0->ep_type = 4; /* Control */
     ep0->max_packet_size =
         (speed == PORT_SPEED_LOW || speed == PORT_SPEED_FULL) ? 8 : 64;
     ep0->max_burst_size = 0;
     ep0->interval = 0;
-    ep0->dcs = 1;
-    ep0->dequeue_ptr_raw = ep0_ring_phys;
+    ep0->dequeue_ptr_raw = ep0_ring_phys | 1;
 
     uint64_t dev_ctx_phys = (uint64_t) pmm_alloc_page(false);
     struct xhci_device_ctx *dev_ctx =
@@ -352,6 +418,90 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
 
     xhci_info("Address device completed for slot %u, port %u", slot_id, port);
     return true;
+}
+
+bool xhci_send_control_transfer(struct xhci_device *dev, uint8_t slot_id,
+                                struct xhci_ring *ep0_ring,
+                                struct usb_setup_packet *setup, void *buffer) {
+    uint64_t buffer_phys = (uint64_t) vmm_get_phys((uintptr_t) buffer);
+
+    int idx = ep0_ring->enqueue_index;
+
+    struct xhci_trb *setup_trb = &ep0_ring->trbs[idx++];
+    setup_trb->parameter = (uint64_t) setup->bitmap_request_type;
+    setup_trb->parameter |= (uint64_t) setup->request << 8ULL;
+    setup_trb->parameter |= (uint64_t) setup->value << 16ULL;
+    setup_trb->parameter |= (uint64_t) setup->index << 32ULL;
+    setup_trb->parameter |= (uint64_t) setup->length << 48ULL;
+
+    /* Transfer length */
+    setup_trb->status = 8;
+
+    setup_trb->idt = 1;
+    setup_trb->trb_type = TRB_TYPE_SETUP_STAGE;
+    setup_trb->cycle = ep0_ring->cycle & 1;
+
+    /* OUT */
+    setup_trb->control |= (2 << 16);
+
+    // Data Stage
+    struct xhci_trb *data_trb = &ep0_ring->trbs[idx++];
+    data_trb->parameter = buffer_phys;
+    data_trb->status = setup->length;
+
+    data_trb->trb_type = TRB_TYPE_DATA_STAGE;
+    data_trb->cycle = ep0_ring->cycle & 1;
+
+    /* IN */
+    data_trb->control |= (3 << 16);
+
+    // Status Stage
+    struct xhci_trb *status_trb = &ep0_ring->trbs[idx++];
+    status_trb->parameter = 0;
+    status_trb->status = 0;
+    status_trb->trb_type = TRB_TYPE_STATUS_STAGE;
+    status_trb->cycle = ep0_ring->cycle & 1;
+    status_trb->control |= (1 << 5); // IOC
+
+    ep0_ring->enqueue_index = idx;
+    xhci_ring_doorbell(dev, slot_id, 1);
+
+    return xhci_wait_for_transfer_event(dev, slot_id);
+}
+
+void usb_get_device_descriptor(struct xhci_device *dev, uint8_t port) {
+    struct xhci_ring *ep0_ring = dev->port_info[port - 1].ep0_ring;
+    uint8_t slot_id = dev->port_info[port - 1].slot_id;
+
+    uint64_t desc_phys = (uint64_t) pmm_alloc_page(false);
+    uint8_t *desc = vmm_map_phys(desc_phys, 4096, 0);
+    memset(desc, 0, 4096);
+
+    struct usb_setup_packet setup = {
+        .bitmap_request_type = 0x80, // Device-to-host | Standard | Device
+        .request = USB_RQ_CODE_GET_DESCRIPTOR,
+        .value = (USB_DESC_TYPE_DEVICE << 8),
+        .index = 0,
+        .length = 30,
+    };
+
+    bool ok = xhci_send_control_transfer(dev, slot_id, ep0_ring, &setup, desc);
+
+    if (!ok) {
+        xhci_warn("Failed to get device descriptor on port %u", port);
+        return;
+    }
+
+    struct usb_device_descriptor *ddesc = (void *) desc;
+
+    k_printf("Port %u: USB Device Descriptor:\n", port);
+    k_printf("  bLength: %u\n", ddesc->length);
+    k_printf("  bDescriptorType: %u\n", ddesc->type);
+    k_printf("  bcdUSB: %04x\n", ddesc->usb_num_bcd);
+    k_printf("  bDeviceClass: %u\n", ddesc->class);
+    k_printf("  idVendor: %04x\n", ddesc->vendor_id);
+    k_printf("  idProduct: %04x\n", ddesc->product_id);
+    k_printf("  bNumConfigurations: %u\n", ddesc->num_configs);
 }
 
 void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
@@ -391,6 +541,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
             dev->port_info[port - 1].speed = speed;
             dev->port_info[port - 1].slot_id = slot_id;
             xhci_address_device(dev, slot_id, speed, port);
+            usb_get_device_descriptor(dev, port);
         }
     }
 
