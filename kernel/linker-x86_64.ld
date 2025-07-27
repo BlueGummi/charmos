@@ -52,6 +52,12 @@ SECTIONS {
         KEEP(*(.kernel_pci_devices))
         __ekernel_pci_devices = .;
     }
+    
+    .kernel_usb_drivers : { 
+        __skernel_usb_drivers = .;
+        KEEP(*(.kernel_usb_drivers))
+        __ekernel_usb_drivers = .;
+    }
 
     .bss : ALIGN(4K) {
         __sbss = .;

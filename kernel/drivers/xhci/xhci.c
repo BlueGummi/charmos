@@ -143,7 +143,6 @@ static struct usb_controller_ops xhci_ctrl_ops = {
     .submit_bulk_transfer = NULL,
     .submit_interrupt_transfer = NULL,
     .reset_port = NULL,
-    .ring_doorbell = NULL,
 };
 
 void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
@@ -199,12 +198,8 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
             usb->configured = false;
             usb->host = ctrl;
 
-            if (!dev->num_devices) {
-                dev->devices = kmalloc(sizeof(struct usb_device *));
-            } else {
-                dev->devices =
-                    krealloc(dev->devices, dev->num_devices * sizeof(void *));
-            }
+            size_t size = (dev->num_devices + 1) * sizeof(void *);
+            dev->devices = krealloc(dev->devices, size);
             dev->devices[dev->num_devices++] = usb;
         }
     }
@@ -217,6 +212,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
 
     xhci_info("Device initialized successfully");
 }
+
 static void xhci_pci_init(uint8_t bus, uint8_t slot, uint8_t func,
                           struct pci_device *dev) {
     switch (dev->prog_if) {

@@ -261,6 +261,10 @@ struct usb_endpoint {
     bool in; /* true - in, false - out */
     uint8_t *transfer_buffer;
     uint16_t transfer_len;
+    uint16_t max_packet_size;
+    uint8_t address;
+    uint8_t attributes;
+    uint8_t interval;
 
     void *hc_data;
 };
@@ -304,9 +308,6 @@ struct usb_controller_ops {
                                       struct usb_packet *pkt);
 
     bool (*reset_port)(struct usb_controller *ctrl, uint8_t port);
-
-    void (*ring_doorbell)(struct usb_controller *ctrl, uint8_t slot,
-                          uint8_t ep);
 };
 
 struct usb_controller { /* Generic USB controller */
@@ -314,6 +315,29 @@ struct usb_controller { /* Generic USB controller */
     struct usb_controller_ops ops;
     void *driver_data;
 };
+
+struct usb_device;
+struct usb_driver {
+    const char *name;
+    uint8_t class_code;
+    uint8_t subclass;
+    uint8_t protocol;
+
+    bool (*probe)(struct usb_device *dev);      /* Attach and set up */
+    void (*disconnect)(struct usb_device *dev); /* Clean up and unplug */
+} __attribute__((aligned(64)));
+extern struct usb_driver __skernel_usb_drivers[];
+extern struct usb_driver __ekernel_usb_drivers[];
+
+#define REGISTER_USB_DRIVER(n, cc, sc, proto, probe_fn, disconnect_fn)         \
+    static struct usb_driver usb_driver_##n                                    \
+        __attribute__((section(".kernel_usb_drivers"), used)) = {              \
+            .name = #n,                                                        \
+            .class_code = cc,                                                  \
+            .subclass = sc,                                                    \
+            .protocol = proto,                                                 \
+            .probe = probe_fn,                                                 \
+            .disconnect = disconnect_fn};
 
 struct usb_device {
     uint8_t address;
@@ -325,12 +349,17 @@ struct usb_device {
     struct usb_device_descriptor *descriptor;
     struct usb_config_descriptor config;
 
-    struct usb_endpoint *endpoints; /* List of endpoints */
+    struct usb_endpoint **endpoints; /* List of endpoints */
     uint8_t num_endpoints;
 
     struct usb_controller *host;
 
+    struct usb_interface_descriptor **interfaces; /* List of interfaces */
+    uint8_t num_interfaces;
+
     struct usb_driver *driver; /* Attached driver */
+
+    void *driver_private;
 
     bool configured;
 };

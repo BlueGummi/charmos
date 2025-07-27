@@ -4,12 +4,18 @@
 #include <mem/vmm.h>
 #include <string.h>
 
-static uint8_t get_desc_bitmap(void) {
+static inline uint8_t construct_rq_bitmap(uint8_t transfer, uint8_t type,
+                                          uint8_t recip) {
     uint8_t bitmap = 0;
-    bitmap |= USB_REQUEST_TRANS_DTH << USB_REQUEST_TRANSFER_SHIFT;
-    bitmap |= USB_REQUEST_TYPE_STANDARD << USB_REQUEST_TYPE_SHIFT;
-    bitmap |= USB_REQUEST_RECIPIENT_DEVICE;
+    bitmap |= transfer << USB_REQUEST_TRANSFER_SHIFT;
+    bitmap |= type << USB_REQUEST_TYPE_SHIFT;
+    bitmap |= recip;
     return bitmap;
+}
+
+static uint8_t get_desc_bitmap(void) {
+    return construct_rq_bitmap(USB_REQUEST_TRANS_DTH, USB_REQUEST_TYPE_STANDARD,
+                               USB_REQUEST_RECIPIENT_DEVICE);
 }
 
 bool usb_get_string_descriptor(struct usb_device *dev, uint8_t string_idx,
@@ -42,6 +48,7 @@ bool usb_get_string_descriptor(struct usb_device *dev, uint8_t string_idx,
     }
     out[out_idx] = '\0';
 
+    kfree_aligned(desc);
     return true;
 }
 
@@ -83,6 +90,81 @@ void usb_get_device_descriptor(struct usb_device *dev) {
     k_printf("  NumConfigurations: %u\n", ddesc->num_configs);
 }
 
+static void match_interfaces(struct usb_driver *driver,
+                             struct usb_device *dev) {
+    for (uint8_t i = 0; i < dev->num_interfaces; i++) {
+        struct usb_interface_descriptor *in = dev->interfaces[i];
+        bool class, subclass, proto;
+        class = driver->class_code == 0xFF || driver->class_code == in->class;
+        subclass = driver->subclass == 0xFF || driver->subclass == in->subclass;
+        proto = driver->protocol == 0xFF || driver->protocol == in->protocol;
+
+        bool everything_matches = class && subclass && proto;
+        if (everything_matches) {
+            if (driver->probe && driver->probe(dev)) {
+                dev->driver = driver;
+                return;
+            }
+        }
+    }
+}
+
+void usb_try_bind_driver(struct usb_device *dev) {
+    struct usb_driver *start = __skernel_usb_drivers;
+    struct usb_driver *end = __ekernel_usb_drivers;
+
+    for (struct usb_driver *d = start; d < end; d++)
+        match_interfaces(d, dev);
+}
+
+void usb_register_dev_interface(struct usb_device *dev,
+                                struct usb_interface_descriptor *interface) {
+    struct usb_interface_descriptor *new_int =
+        kmalloc(sizeof(struct usb_interface_descriptor));
+    memcpy(new_int, interface, sizeof(struct usb_interface_descriptor));
+
+    size_t size = (dev->num_interfaces + 1) * sizeof(void *);
+
+    dev->interfaces = krealloc(dev->interfaces, size);
+    dev->interfaces[dev->num_interfaces++] = new_int;
+}
+
+void usb_register_dev_ep(struct usb_device *dev,
+                         struct usb_endpoint_descriptor *endpoint) {
+    struct usb_endpoint_descriptor *new_ep =
+        kmalloc(sizeof(struct usb_endpoint_descriptor));
+    memcpy(new_ep, endpoint, sizeof(struct usb_endpoint_descriptor));
+
+    struct usb_endpoint *ep = kzalloc(sizeof(struct usb_endpoint));
+    ep->address = USB_ENDPOINT_ATTR_TRANS_TYPE(endpoint->attributes);
+    ep->address = endpoint->address;
+    ep->max_packet_size = endpoint->max_packet_size;
+    ep->interval = endpoint->interval;
+    ep->in = USB_ENDPOINT_ADDR_EP_DIRECTION(endpoint->address);
+
+    size_t size = (dev->num_endpoints + 1) * sizeof(void *);
+    dev->endpoints = krealloc(dev->endpoints, size);
+    dev->endpoints[dev->num_endpoints++] = ep;
+}
+
+static void setup_config_descriptor(struct usb_device *dev, uint8_t *ptr,
+                                    uint8_t *end) {
+    while (ptr < end) {
+        uint8_t len = ptr[0];
+        uint8_t dtype = ptr[1];
+
+        if (dtype == USB_DESC_TYPE_INTERFACE) {
+            struct usb_interface_descriptor *iface = (void *) ptr;
+            usb_register_dev_interface(dev, iface);
+        } else if (dtype == USB_DESC_TYPE_ENDPOINT) {
+            struct usb_endpoint_descriptor *epd = (void *) ptr;
+            usb_register_dev_ep(dev, epd);
+        }
+
+        ptr += len;
+    }
+}
+
 void usb_get_config_descriptor(struct usb_device *dev) {
     uint8_t *desc = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
 
@@ -98,6 +180,7 @@ void usb_get_config_descriptor(struct usb_device *dev) {
     uint8_t port = dev->port;
     if (!ctrl->ops.submit_control_transfer(ctrl, port, &setup, desc)) {
         usb_warn("Failed to get config descriptor on port %u", port);
+        kfree_aligned(desc);
         return;
     }
 
@@ -114,32 +197,18 @@ void usb_get_config_descriptor(struct usb_device *dev) {
 
     if (!ctrl->ops.submit_control_transfer(ctrl, port, &setup, desc)) {
         usb_warn("Failed to get full config descriptor on port %u", port);
+        kfree_aligned(desc);
         return;
     }
 
     uint8_t *ptr = desc;
     uint8_t *end = desc + total_len;
 
-    while (ptr < end) {
-        uint8_t len = ptr[0];
-        uint8_t dtype = ptr[1];
+    setup_config_descriptor(dev, ptr, end);
 
-        if (dtype == USB_DESC_TYPE_INTERFACE) {
-            struct usb_interface_descriptor *iface = (void *) ptr;
-            if (iface->class == USB_CLASS_HID && iface->subclass == 0x01 &&
-                iface->protocol == 0x01) {
-                k_printf("Found keyboard interface at %u\n",
-                         iface->interface_number);
-            }
-        }
-
-        ptr += len;
-    }
-
-    uint8_t bitmap = 0;
-    bitmap |= USB_REQUEST_TRANS_HTD << USB_REQUEST_TRANSFER_SHIFT;
-    bitmap |= USB_REQUEST_TYPE_STANDARD << USB_REQUEST_TYPE_SHIFT;
-    bitmap |= USB_REQUEST_RECIPIENT_DEVICE;
+    uint8_t bitmap =
+        construct_rq_bitmap(USB_REQUEST_TRANS_HTD, USB_REQUEST_TYPE_STANDARD,
+                            USB_REQUEST_RECIPIENT_DEVICE);
 
     struct usb_setup_packet set_cfg = {
         .bitmap_request_type = bitmap,
@@ -151,6 +220,10 @@ void usb_get_config_descriptor(struct usb_device *dev) {
 
     if (!ctrl->ops.submit_control_transfer(ctrl, port, &set_cfg, NULL)) {
         usb_warn("Failed to set configuration on port %u\n", port);
+        kfree_aligned(desc);
         return;
     }
+
+    usb_try_bind_driver(dev);
+    kfree_aligned(desc);
 }
