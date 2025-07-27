@@ -4,7 +4,6 @@
 #include <drivers/usb.h>
 #include <drivers/xhci.h>
 #include <mem/alloc.h>
-#include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <sleep.h>
 #include <stdbool.h>

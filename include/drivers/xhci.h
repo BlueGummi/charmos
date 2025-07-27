@@ -5,6 +5,15 @@
 #define XHCI_DEVICE_TIMEOUT 1000
 #define TRB_RING_SIZE 256
 
+#define XHCI_ENDPOINT_TYPE_INVAL 0
+#define XHCI_ENDPOINT_TYPE_ISOCH_OUT 1
+#define XHCI_ENDPOINT_TYPE_BULK_OUT 2
+#define XHCI_ENDPOINT_TYPE_INTERRUPT_OUT 3
+#define XHCI_ENDPOINT_TYPE_CONTROL_BI 4
+#define XHCI_ENDPOINT_TYPE_ISOCH_IN 5
+#define XHCI_ENDPOINT_TYPE_BULK_IN 6
+#define XHCI_ENDPOINT_TYPE_INTERRUPT_IN 7
+
 // NOTE: In scatter gathers, the first TRD must NOT point to a page-aligned
 // boundary. Following TRDs must point to page-aligned boundaries.
 
@@ -49,7 +58,7 @@
 #define TRB_TYPE_DEVICE_NOTIFICATION 0x26
 #define TRB_TYPE_MFINDEX_WRAP 0x27
 
-// Control field helpers ('control' is the 32-bit TRB control word)
+// Control field helpers
 #define TRB_GET_TYPE(ctrl) (((ctrl) >> 10) & 0x3F)
 #define TRB_SET_TYPE(val) (((val) & 0x3F) << 10)
 
@@ -483,21 +492,12 @@ struct xhci_intr_regs {
 
 } __attribute__((packed));
 
-struct xhci_slot {
-    bool in_use;
-    uint8_t port_num;
-    struct xhci_ring ep_rings[31]; // EP 0 to 30
-    uint64_t input_ctx_phys;
-    uint64_t dev_ctx_phys;
-    struct xhci_input_ctx *input_ctx;
-    void *dev_ctx;
-};
-
 struct xhci_port_info {
     bool device_connected;
     uint8_t speed;
     uint8_t slot_id;
     struct xhci_ring *ep0_ring;
+    struct xhci_ring *ep_rings[31]; // EP 0 to 30
 };
 
 struct xhci_dcbaa { // Device context base address array - check page 441
@@ -521,7 +521,6 @@ struct xhci_device {
     struct xhci_ring *cmd_ring;
     struct xhci_erst_entry *erst;
     struct xhci_port_regs *port_regs;
-    uint64_t ring_count;
     uint64_t ports;
     struct xhci_port_info port_info[64];
 
@@ -540,6 +539,14 @@ void xhci_setup_event_ring(struct xhci_device *dev);
 void xhci_setup_command_ring(struct xhci_device *dev);
 void xhci_ring_doorbell(struct xhci_device *dev, uint32_t slot_id,
                         uint32_t ep_id);
+
+/* I don't want to cause even longer compile times
+ * by including the ever-growing USB header in here */
+struct usb_controller;
+struct usb_packet;
+bool xhci_submit_interrupt_transfer(struct usb_controller *ctrl, uint8_t port,
+                                    struct usb_packet *pkt);
+
 void xhci_send_command(struct xhci_device *dev, uint64_t parameter,
                        uint32_t control);
 uint64_t xhci_wait_for_response(struct xhci_device *dev);

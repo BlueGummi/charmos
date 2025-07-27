@@ -117,8 +117,9 @@ void usb_try_bind_driver(struct usb_device *dev) {
         match_interfaces(d, dev);
 }
 
-void usb_register_dev_interface(struct usb_device *dev,
-                                struct usb_interface_descriptor *interface) {
+static void
+usb_register_dev_interface(struct usb_device *dev,
+                           struct usb_interface_descriptor *interface) {
     struct usb_interface_descriptor *new_int =
         kmalloc(sizeof(struct usb_interface_descriptor));
     memcpy(new_int, interface, sizeof(struct usb_interface_descriptor));
@@ -129,17 +130,20 @@ void usb_register_dev_interface(struct usb_device *dev,
     dev->interfaces[dev->num_interfaces++] = new_int;
 }
 
-void usb_register_dev_ep(struct usb_device *dev,
-                         struct usb_endpoint_descriptor *endpoint) {
+static void usb_register_dev_ep(struct usb_device *dev,
+                                struct usb_endpoint_descriptor *endpoint) {
     struct usb_endpoint_descriptor *new_ep =
         kmalloc(sizeof(struct usb_endpoint_descriptor));
     memcpy(new_ep, endpoint, sizeof(struct usb_endpoint_descriptor));
 
     struct usb_endpoint *ep = kzalloc(sizeof(struct usb_endpoint));
-    ep->address = USB_ENDPOINT_ATTR_TRANS_TYPE(endpoint->attributes);
+
+    ep->type = USB_ENDPOINT_ATTR_TRANS_TYPE(endpoint->attributes);
+    ep->number = USB_ENDPOINT_ADDR_EP_NUM(endpoint->address);
     ep->address = endpoint->address;
     ep->max_packet_size = endpoint->max_packet_size;
     ep->interval = endpoint->interval;
+
     ep->in = USB_ENDPOINT_ADDR_EP_DIRECTION(endpoint->address);
 
     size_t size = (dev->num_endpoints + 1) * sizeof(void *);
@@ -224,6 +228,5 @@ void usb_get_config_descriptor(struct usb_device *dev) {
         return;
     }
 
-    usb_try_bind_driver(dev);
     kfree_aligned(desc);
 }

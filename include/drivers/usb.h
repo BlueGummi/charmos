@@ -49,7 +49,7 @@
 /* Endpoint address bitmap definitions */
 #define USB_ENDPOINT_ADDR_EP_DIRECTION_OUT 0
 #define USB_ENDPOINT_ADDR_EP_DIRECTION_IN 1
-#define USB_ENDPOINT_ADDR_EP_NUM(byte) (byte & 7)
+#define USB_ENDPOINT_ADDR_EP_NUM(byte) (byte & 0xF)
 #define USB_ENDPOINT_ADDR_EP_DIRECTION(byte) ((byte >> 7) & 1)
 
 /* Endpoint attribute bitmap definitions */
@@ -302,12 +302,18 @@ struct usb_packet {
 struct usb_controller_ops {
     bool (*submit_control_transfer)(struct usb_controller *ctrl, uint8_t port,
                                     struct usb_setup_packet *pkt, void *buf);
+
     bool (*submit_bulk_transfer)(struct usb_controller *ctrl, uint8_t port,
                                  struct usb_packet *pkt);
+
     bool (*submit_interrupt_transfer)(struct usb_controller *ctrl, uint8_t port,
                                       struct usb_packet *pkt);
 
     bool (*reset_port)(struct usb_controller *ctrl, uint8_t port);
+
+    bool (*setup_interrupt_endpoint)(
+        struct usb_controller *ctrl, uint8_t port, struct usb_endpoint *ep,
+        void (*callback)(void *ctx, uint8_t *data, size_t len), void *ctx);
 };
 
 struct usb_controller { /* Generic USB controller */
@@ -368,6 +374,7 @@ bool usb_get_string_descriptor(struct usb_device *dev, uint8_t string_idx,
                                char *out, size_t max_len);
 void usb_get_device_descriptor(struct usb_device *dev);
 void usb_get_config_descriptor(struct usb_device *dev);
+void usb_try_bind_driver(struct usb_device *dev);
 
 #define usb_info(string, ...) k_info("USB", K_INFO, string, ##__VA_ARGS__)
 #define usb_warn(string, ...) k_info("USB", K_WARN, string, ##__VA_ARGS__)
