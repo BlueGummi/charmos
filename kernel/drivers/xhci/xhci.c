@@ -128,82 +128,23 @@ bool xhci_send_control_transfer(struct xhci_device *dev, uint8_t slot_id,
     return xhci_wait_for_transfer_event(dev, slot_id);
 }
 
-bool usb_get_string_descriptor(struct xhci_device *dev, uint8_t port,
-                               uint8_t string_idx, char *out, size_t max_len) {
-    if (!string_idx)
-        return false;
+static bool xhci_control_transfer(struct usb_controller *ctrl, uint8_t port,
+                                  struct usb_setup_packet *setup,
+                                  void *buffer) {
+    struct xhci_device *xhci = ctrl->driver_data;
+    struct xhci_ring *ep0_ring = xhci->port_info[port - 1].ep0_ring;
+    uint8_t slot_id = xhci->port_info[port - 1].slot_id;
 
-    struct xhci_ring *ep0_ring = dev->port_info[port - 1].ep0_ring;
-    uint8_t slot_id = dev->port_info[port - 1].slot_id;
-
-    uint64_t desc_phys = (uint64_t) pmm_alloc_page(false);
-    uint8_t *desc = vmm_map_phys(desc_phys, 4096, 0);
-    memset(desc, 0, 4096);
-
-    struct usb_setup_packet setup = {
-        .bitmap_request_type = 0x80,
-        .request = USB_RQ_CODE_GET_DESCRIPTOR,
-        .value = (USB_DESC_TYPE_STRING << 8) | string_idx,
-        .index = 0,
-        .length = 255,
-    };
-
-    if (!xhci_send_control_transfer(dev, slot_id, ep0_ring, &setup, desc))
-        return false;
-
-    uint8_t bLength = desc[0];
-    if (bLength < 2 || bLength > 255)
-        return false;
-
-    size_t out_idx = 0;
-    for (size_t i = 2; i < bLength && out_idx < (max_len - 1); i += 2) {
-        if (desc[i + 1] == 0) {
-            out[out_idx++] = desc[i];
-        } else {
-            out[out_idx++] = '?';
-        }
-    }
-    out[out_idx] = '\0';
-
-    return true;
+    return xhci_send_control_transfer(xhci, slot_id, ep0_ring, setup, buffer);
 }
 
-void usb_get_device_descriptor(struct xhci_device *dev, uint8_t port) {
-    struct xhci_ring *ep0_ring = dev->port_info[port - 1].ep0_ring;
-    uint8_t slot_id = dev->port_info[port - 1].slot_id;
-
-    uint64_t desc_phys = (uint64_t) pmm_alloc_page(false);
-    uint8_t *desc = vmm_map_phys(desc_phys, 4096, 0);
-    memset(desc, 0, 4096);
-
-    struct usb_setup_packet setup = {
-        .bitmap_request_type = 0x80, // Device-to-host | Standard | Device
-        .request = USB_RQ_CODE_GET_DESCRIPTOR,
-        .value = (USB_DESC_TYPE_DEVICE << 8),
-        .index = 0,
-        .length = 30,
-    };
-
-    bool ok = xhci_send_control_transfer(dev, slot_id, ep0_ring, &setup, desc);
-
-    if (!ok) {
-        xhci_warn("Failed to get device descriptor on port %u", port);
-        return;
-    }
-
-    struct usb_device_descriptor *ddesc = (void *) desc;
-
-    char manufacturer[128] = {0};
-    char product[128] = {0};
-
-    usb_get_string_descriptor(dev, port, ddesc->manufacturer, manufacturer,
-                              sizeof(manufacturer));
-    usb_get_string_descriptor(dev, port, ddesc->product, product,
-                              sizeof(product));
-
-    k_printf("  Manufacturer: %s\n", manufacturer);
-    k_printf("  Product: %s\n", product);
-}
+static struct usb_controller_ops xhci_ctrl_ops = {
+    .submit_control_transfer = xhci_control_transfer,
+    .submit_bulk_transfer = NULL,
+    .submit_interrupt_transfer = NULL,
+    .reset_port = NULL,
+    .ring_doorbell = NULL,
+};
 
 void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
     xhci_info("Found device at %02x:%02x.%02x", bus, slot, func);
@@ -225,6 +166,11 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
     xhci_controller_start(dev);
     xhci_controller_enable_ints(dev);
 
+    struct usb_controller *ctrl = kmalloc(sizeof(struct usb_controller));
+    ctrl->driver_data = dev;
+    ctrl->type = USB_CONTROLLER_XHCI;
+    ctrl->ops = xhci_ctrl_ops;
+
     for (uint64_t port = 1; port <= dev->ports; port++) {
         uint32_t portsc = mmio_read_32(&dev->port_regs[port - 1]);
 
@@ -242,8 +188,31 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
             dev->port_info[port - 1].speed = speed;
             dev->port_info[port - 1].slot_id = slot_id;
             xhci_address_device(dev, slot_id, speed, port);
-            usb_get_device_descriptor(dev, port);
+            struct usb_device *usb = kzalloc(sizeof(struct usb_device));
+            /* Panic since this is boot-time only */
+            if (!usb)
+                k_panic("No space for the USB device\n");
+
+            usb->speed = speed;
+            usb->slot_id = slot_id;
+            usb->port = port;
+            usb->configured = false;
+            usb->host = ctrl;
+
+            if (!dev->num_devices) {
+                dev->devices = kmalloc(sizeof(struct usb_device *));
+            } else {
+                dev->devices =
+                    krealloc(dev->devices, dev->num_devices * sizeof(void *));
+            }
+            dev->devices[dev->num_devices++] = usb;
         }
+    }
+
+    for (uint64_t i = 0; i < dev->num_devices; i++) {
+        struct usb_device *usb = dev->devices[i];
+        usb_get_device_descriptor(usb);
+        usb_get_config_descriptor(usb);
     }
 
     xhci_info("Device initialized successfully");

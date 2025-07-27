@@ -53,10 +53,8 @@ void xhci_setup_event_ring(struct xhci_device *dev) {
 void xhci_setup_command_ring(struct xhci_device *dev) {
     struct xhci_op_regs *op = dev->op_regs;
 
-    uint64_t cmd_ring_phys = (uint64_t) pmm_alloc_page(false);
-    struct xhci_trb *cmd_ring =
-        vmm_map_phys(cmd_ring_phys, sizeof(struct xhci_trb) * TRB_RING_SIZE, 0);
-    memset(cmd_ring, 0, sizeof(struct xhci_trb) * TRB_RING_SIZE);
+    struct xhci_trb *cmd_ring = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    uintptr_t cmd_ring_phys = vmm_get_phys((uintptr_t) cmd_ring);
 
     int last_index = TRB_RING_SIZE - 1;
     cmd_ring[last_index].parameter = cmd_ring_phys;

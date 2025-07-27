@@ -15,6 +15,8 @@
 #define USB_DESC_TYPE_OTHER_SPEED_CONFIG 7
 #define USB_DESC_TYPE_INTERFACE_POWER 8
 
+#define USB_DESC_TYPE_SHIFT 8
+
 /* Request bitmap field definitions */
 #define USB_REQUEST_TRANS_HTD 0
 #define USB_REQUEST_TRANS_DTH 1
@@ -27,6 +29,14 @@
 #define USB_REQUEST_RECIPIENT_INTERFACE 1
 #define USB_REQUEST_RECIPIENT_ENDPOINT 2
 #define USB_REQUEST_RECIPIENT_OTHER 3
+
+#define USB_REQUEST_TRANSFER_SHIFT 7
+#define USB_REQUEST_TRANSFER_MASK 1
+
+#define USB_REQUEST_TYPE_SHIFT 5
+#define USB_REQUEST_TYPE_MASK 3
+
+#define USB_REQUEST_RECIPIENT_MASK 0x1F
 
 #define USB_REQUEST_TRANSFER(byte) ((byte >> 7) & 1)
 #define USB_REQUEST_TYPE(byte) ((byte >> 5) & 3)
@@ -73,6 +83,46 @@
 
 #define USB_ENDPOINT_INTERVAL_TO_INTEGER_HIGH_SPEED(num) (2 << (num - 2))
 
+/* Subclass codes are not defined in a centralized place. Add them as needed */
+#define USB_CLASS_AUDIO 0x1
+/* Audio subclasses go here */
+
+#define USB_CLASS_COMMS 0x2
+/* Comms subclasses go here */
+
+#define USB_CLASS_HID 0x3
+
+#define USB_SUBCLASS_HID_NONE 0x0
+#define USB_SUBCLASS_HID_BOOT_INTERFACE 0x1
+/* 2 - 225 reserved for HID */
+
+#define USB_PROTOCOL_HID_NONE 0x0
+#define USB_PROTOCOL_HID_KEYBOARD 0x1
+#define USB_PROTOCOL_HID_MOUSE 0x2
+/* 3 - 225 reserved */
+
+#define USB_CLASS_PHYSICAL 0x5
+#define USB_CLASS_IMAGE 0x6
+#define USB_CLASS_PRINTER 0x7
+#define USB_CLASS_MASS_STORAGE 0x8
+#define USB_CLASS_HUB 0x9
+#define USB_CLASS_DATA 0xA
+#define USB_CLASS_SMART_CARD 0xB
+#define USB_CLASS_CONTENT_SECURITY 0xD
+#define USB_CLASS_VIDEO 0xE
+#define USB_CLASS_PERSONAL_HEALTHCARE 0xF
+#define USB_CLASS_AUDIO_VIDEO 0x10
+#define USB_CLASS_BILLBOARD 0x11
+#define USB_CLASS_USB_TYPE_C 0x12
+#define USB_CLASS_BULK_DISPLAY 0x13
+#define USB_CLASS_MCTP_OVER_USB 0x14
+#define USB_CLASS_I3C_DEVICE 0x3C
+#define USB_CLASS_DIAGNOSTIC_DEVICE 0xDC
+#define USB_CLASS_WIRELESS 0xE0
+#define USB_CLASS_MISC 0xEF
+#define USB_CLASS_APPLICATION_SPECIFIC 0xFE
+#define USB_CLASS_VENDOR_SPECIFIC 0xFF
+
 /* Request codes */
 enum usb_rq_code : uint8_t {
     USB_RQ_CODE_GET_STATUS = 0,    /* Page 282 */
@@ -91,6 +141,23 @@ enum usb_rq_code : uint8_t {
 
     USB_RQ_CODE_SYNCH_FRAME = 12, /* Page 288 */
 };
+
+static inline const char *usb_rq_code_str(const enum usb_rq_code code) {
+    switch (code) {
+    case USB_RQ_CODE_GET_STATUS: return "GET_STATUS";
+    case USB_RQ_CODE_CLEAR_FEATURE: return "CLEAR_FEATURE";
+    case USB_RQ_CODE_SET_FEATURE: return "SET_FEATURE";
+    case USB_RQ_CODE_SET_ADDR: return "SET_ADDR";
+    case USB_RQ_CODE_GET_DESCRIPTOR: return "GET_DESCRIPTOR";
+    case USB_RQ_CODE_SET_DESCRIPTOR: return "SET_DESCRIPTOR";
+    case USB_RQ_CODE_GET_CONFIG: return "GET_CONFIG";
+    case USB_RQ_CODE_SET_CONFIG: return "SET_CONFIG";
+    case USB_RQ_CODE_GET_INTERFACE: return "GET_INTERFACE";
+    case USB_RQ_CODE_SET_INTERFACE: return "SET_INTERFACE";
+    case USB_RQ_CODE_SYNCH_FRAME: return "SYNCH_FRAME";
+    default: return "UNKNOWN_CODE";
+    }
+}
 
 enum usb_controller_type {
     USB_CONTROLLER_UHCI,
@@ -206,6 +273,16 @@ enum usb_transfer_type {
     USB_TRANSFER_INTERRUPT,
 };
 
+static inline const char *
+usb_transfer_type_str(const enum usb_transfer_type type) {
+    switch (type) {
+    case USB_TRANSFER_CONTROL: return "USB TRANSFER CONTROL";
+    case USB_TRANSFER_BULK: return "USB TRANSFER BULK";
+    case USB_TRANSFER_INTERRUPT: return "USB TRANSFER INTERRUPT";
+    default: return "UNKNOWN";
+    }
+}
+
 struct usb_packet {
     enum usb_transfer_type type;
 
@@ -220,18 +297,13 @@ struct usb_packet {
 
 struct usb_controller_ops {
     bool (*submit_control_transfer)(struct usb_controller *ctrl, uint8_t port,
-                                    struct usb_packet *pkt);
+                                    struct usb_setup_packet *pkt, void *buf);
     bool (*submit_bulk_transfer)(struct usb_controller *ctrl, uint8_t port,
                                  struct usb_packet *pkt);
     bool (*submit_interrupt_transfer)(struct usb_controller *ctrl, uint8_t port,
                                       struct usb_packet *pkt);
 
     bool (*reset_port)(struct usb_controller *ctrl, uint8_t port);
-    bool (*get_device_descriptor)(struct usb_controller *ctrl, uint8_t port,
-                                  struct usb_device_descriptor *out);
-
-    bool (*get_string_descriptor)(struct usb_controller *ctrl, uint8_t port,
-                                  uint8_t string_index, char *buf, size_t len);
 
     void (*ring_doorbell)(struct usb_controller *ctrl, uint8_t slot,
                           uint8_t ep);
@@ -240,7 +312,7 @@ struct usb_controller_ops {
 struct usb_controller { /* Generic USB controller */
     enum usb_controller_type type;
     struct usb_controller_ops ops;
-    void *data;
+    void *driver_data;
 };
 
 struct usb_device {
@@ -251,14 +323,23 @@ struct usb_device {
     uint8_t max_packet_size; /* For endpoint 0 */
 
     struct usb_device_descriptor *descriptor;
-    struct usb_config_descriptor *config;
+    struct usb_config_descriptor config;
 
     struct usb_endpoint *endpoints; /* List of endpoints */
     uint8_t num_endpoints;
 
-    struct usb_controller host;
+    struct usb_controller *host;
 
     struct usb_driver *driver; /* Attached driver */
 
     bool configured;
 };
+
+bool usb_get_string_descriptor(struct usb_device *dev, uint8_t string_idx,
+                               char *out, size_t max_len);
+void usb_get_device_descriptor(struct usb_device *dev);
+void usb_get_config_descriptor(struct usb_device *dev);
+
+#define usb_info(string, ...) k_info("USB", K_INFO, string, ##__VA_ARGS__)
+#define usb_warn(string, ...) k_info("USB", K_WARN, string, ##__VA_ARGS__)
+#define usb_error(string, ...) k_info("USB", K_ERROR, string, ##__VA_ARGS__)

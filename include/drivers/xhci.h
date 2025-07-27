@@ -524,6 +524,9 @@ struct xhci_device {
     uint64_t ring_count;
     uint64_t ports;
     struct xhci_port_info port_info[64];
+
+    uint64_t num_devices;
+    struct usb_device **devices;
 };
 
 void xhci_init(uint8_t bus, uint8_t slot, uint8_t func);
@@ -544,7 +547,6 @@ bool xhci_wait_for_transfer_event(struct xhci_device *dev, uint8_t slot_id);
 uint8_t xhci_enable_slot(struct xhci_device *dev);
 void xhci_parse_ext_caps(struct xhci_device *dev);
 bool xhci_reset_port(struct xhci_device *dev, uint32_t port_index);
-
 
 #define xhci_info(string, ...) k_info("XHCI", K_INFO, string, ##__VA_ARGS__)
 #define xhci_warn(string, ...) k_info("XHCI", K_WARN, string, ##__VA_ARGS__)
