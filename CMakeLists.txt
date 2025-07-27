@@ -61,7 +61,7 @@ set(QEMU_COMMON_FLAGS
     -monitor telnet:127.0.0.1:1234,server,nowait
 
     -device qemu-xhci,id=xhci
-    -device usb-kbd,bus=xhci.0,id=usbkbd
+    -device usb-kbd,bus=xhci.0
 
     -M q35
     -device usb-mouse,bus=xhci.0,id=usbmouse

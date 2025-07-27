@@ -206,6 +206,8 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
 
         struct xhci_ep_ctx *ep_ctx = &input_ctx->ep_ctx[ep_index];
         ep_ctx->ep_type = usb_to_xhci_ep_type(ep->in, ep->type);
+
+        ep_ctx->max_esit_payload_lo = ep->max_packet_size;
         ep_ctx->max_packet_size = ep->max_packet_size;
         ep_ctx->interval = ep->interval;
         ep_ctx->max_burst_size = 0;
@@ -245,7 +247,7 @@ static bool xhci_control_transfer(struct usb_controller *ctrl, uint8_t port,
 static struct usb_controller_ops xhci_ctrl_ops = {
     .submit_control_transfer = xhci_control_transfer,
     .submit_bulk_transfer = NULL,
-    .submit_interrupt_transfer = NULL,
+    .submit_interrupt_transfer = xhci_submit_interrupt_transfer,
     .reset_port = NULL,
 };
 
@@ -316,6 +318,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
         if (!usb_set_configuration(usb))
             continue;
         xhci_configure_device_endpoints(dev, usb);
+
         usb_try_bind_driver(usb);
     }
 
