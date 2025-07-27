@@ -38,8 +38,10 @@ static inline bool refcount_inc_not_zero(refcount_t *rc) {
 static inline bool refcount_dec_and_test(refcount_t *rc) {
     for (;;) {
         unsigned int old = atomic_load(rc);
-        if (old == 0)
+        if (old == 0) {
+            k_panic("%s(): Possible UAF!\n", __func__);
             return false;
+        }
 
         unsigned int expected = old;
         if (atomic_compare_exchange_weak(rc, &expected, old - 1))

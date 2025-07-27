@@ -348,9 +348,9 @@ extern struct usb_driver __ekernel_usb_drivers[];
 struct usb_device {
     uint8_t address;
     uint8_t speed;
-    uint8_t port;            /* Port number on the root hub */
-    uint8_t slot_id;         /* Used for xHCI */
-    uint8_t max_packet_size; /* For endpoint 0 */
+    uint8_t port;    /* Port number on the root hub */
+    uint8_t slot_id; /* Used for xHCI */
+    uint8_t max_packet_size;
 
     struct usb_device_descriptor *descriptor;
     struct usb_config_descriptor config;
@@ -373,7 +373,9 @@ struct usb_device {
 bool usb_get_string_descriptor(struct usb_device *dev, uint8_t string_idx,
                                char *out, size_t max_len);
 void usb_get_device_descriptor(struct usb_device *dev);
-void usb_get_config_descriptor(struct usb_device *dev);
+bool usb_parse_config_descriptor(struct usb_device *dev);
+bool usb_set_configuration(struct usb_device *dev);
+
 void usb_try_bind_driver(struct usb_device *dev);
 
 #define usb_info(string, ...) k_info("USB", K_INFO, string, ##__VA_ARGS__)

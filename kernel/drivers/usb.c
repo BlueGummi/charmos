@@ -169,7 +169,7 @@ static void setup_config_descriptor(struct usb_device *dev, uint8_t *ptr,
     }
 }
 
-void usb_get_config_descriptor(struct usb_device *dev) {
+bool usb_parse_config_descriptor(struct usb_device *dev) {
     uint8_t *desc = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
 
     struct usb_setup_packet setup = {
@@ -182,19 +182,15 @@ void usb_get_config_descriptor(struct usb_device *dev) {
 
     struct usb_controller *ctrl = dev->host;
     uint8_t port = dev->port;
+
     if (!ctrl->ops.submit_control_transfer(ctrl, port, &setup, desc)) {
-        usb_warn("Failed to get config descriptor on port %u", port);
+        usb_warn("Failed to get config descriptor header on port %u", port);
         kfree_aligned(desc);
-        return;
+        return false;
     }
 
     struct usb_config_descriptor *cdesc = (void *) desc;
-
     memcpy(&dev->config, cdesc, sizeof(struct usb_config_descriptor));
-
-    char conf[128] = {0};
-    usb_get_string_descriptor(dev, cdesc->configuration, conf, sizeof(conf));
-    k_printf("CONFIG is %s\n", conf);
 
     uint16_t total_len = cdesc->total_length;
     setup.length = total_len;
@@ -202,13 +198,21 @@ void usb_get_config_descriptor(struct usb_device *dev) {
     if (!ctrl->ops.submit_control_transfer(ctrl, port, &setup, desc)) {
         usb_warn("Failed to get full config descriptor on port %u", port);
         kfree_aligned(desc);
-        return;
+        return false;
     }
 
-    uint8_t *ptr = desc;
-    uint8_t *end = desc + total_len;
+    char conf[128] = {0};
+    usb_get_string_descriptor(dev, cdesc->configuration, conf, sizeof(conf));
+    k_printf("CONFIG is %s\n", conf);
 
-    setup_config_descriptor(dev, ptr, end);
+    setup_config_descriptor(dev, desc, desc + total_len);
+    kfree_aligned(desc);
+    return true;
+}
+
+bool usb_set_configuration(struct usb_device *dev) {
+    struct usb_controller *ctrl = dev->host;
+    uint8_t port = dev->port;
 
     uint8_t bitmap =
         construct_rq_bitmap(USB_REQUEST_TRANS_HTD, USB_REQUEST_TYPE_STANDARD,
@@ -217,16 +221,15 @@ void usb_get_config_descriptor(struct usb_device *dev) {
     struct usb_setup_packet set_cfg = {
         .bitmap_request_type = bitmap,
         .request = USB_RQ_CODE_SET_CONFIG,
-        .value = cdesc->configuration_value,
+        .value = dev->config.configuration_value,
         .index = 0,
         .length = 0,
     };
 
     if (!ctrl->ops.submit_control_transfer(ctrl, port, &set_cfg, NULL)) {
         usb_warn("Failed to set configuration on port %u\n", port);
-        kfree_aligned(desc);
-        return;
+        return false;
     }
 
-    kfree_aligned(desc);
+    return true;
 }

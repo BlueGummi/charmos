@@ -11,6 +11,10 @@
 #include <stdint.h>
 #include <string.h>
 
+static inline uint8_t get_ep_index(struct usb_endpoint *ep) {
+    return (ep->number * 2) + (ep->in ? 1 : 0);
+}
+
 static inline uint8_t usb_to_xhci_ep_type(bool in, uint8_t type) {
     if (in) {
         switch (type) {
@@ -28,22 +32,20 @@ static inline uint8_t usb_to_xhci_ep_type(bool in, uint8_t type) {
 
         default: xhci_error("Invalid type detected: %u\n", type); return 0;
         }
-    } else {
-        switch (type) {
-        case USB_ENDPOINT_ATTR_TRANS_TYPE_BULK:
-            return XHCI_ENDPOINT_TYPE_BULK_OUT;
+    }
+    switch (type) {
+    case USB_ENDPOINT_ATTR_TRANS_TYPE_BULK: return XHCI_ENDPOINT_TYPE_BULK_OUT;
 
-        case USB_ENDPOINT_ATTR_TRANS_TYPE_CONTROL:
-            return XHCI_ENDPOINT_TYPE_CONTROL_BI;
+    case USB_ENDPOINT_ATTR_TRANS_TYPE_CONTROL:
+        return XHCI_ENDPOINT_TYPE_CONTROL_BI;
 
-        case USB_ENDPOINT_ATTR_TRANS_TYPE_INTERRUPT:
-            return XHCI_ENDPOINT_TYPE_INTERRUPT_OUT;
+    case USB_ENDPOINT_ATTR_TRANS_TYPE_INTERRUPT:
+        return XHCI_ENDPOINT_TYPE_INTERRUPT_OUT;
 
-        case USB_ENDPOINT_ATTR_TRANS_TYPE_ISOCHRONOUS:
-            return XHCI_ENDPOINT_TYPE_ISOCH_OUT;
+    case USB_ENDPOINT_ATTR_TRANS_TYPE_ISOCHRONOUS:
+        return XHCI_ENDPOINT_TYPE_ISOCH_OUT;
 
-        default: xhci_error("Invalid type detected: %u\n", type); return 0;
-        }
+    default: xhci_error("Invalid type detected: %u\n", type); return 0;
     }
 }
 
@@ -84,7 +86,7 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
     ctrl->port_info[port - 1].ep0_ring = ring;
 
     struct xhci_ep_ctx *ep0 = &input_ctx->ep0_ctx;
-    ep0->ep_type = 4; /* Control */
+    ep0->ep_type = XHCI_ENDPOINT_TYPE_CONTROL_BI;
     ep0->max_packet_size =
         (speed == PORT_SPEED_LOW || speed == PORT_SPEED_FULL) ? 8 : 64;
     ep0->max_burst_size = 0;
@@ -161,69 +163,73 @@ bool xhci_send_control_transfer(struct xhci_device *dev, uint8_t slot_id,
     return xhci_wait_for_transfer_event(dev, slot_id);
 }
 
-static void xhci_configure_device_endpoints(struct xhci_device *xhci,
-                                            struct usb_device *dev) {
-    uint8_t slot_id = dev->slot_id;
-    uint8_t port = dev->port;
+static struct xhci_ring *allocate_endpoint_ring(void) {
+    struct xhci_trb *trbs = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    if (!trbs)
+        return NULL;
 
+    uintptr_t ring_phys = vmm_get_phys((uintptr_t) trbs);
+
+    trbs[TRB_RING_SIZE - 1].parameter = ring_phys;
+    trbs[TRB_RING_SIZE - 1].control = (TRB_TYPE_LINK << 10) | (1 << 1);
+
+    struct xhci_ring *ring = kmalloc(sizeof(struct xhci_ring));
+    if (!ring) {
+        kfree_aligned(trbs);
+        return NULL;
+    }
+
+    ring->phys = ring_phys;
+    ring->trbs = trbs;
+    ring->size = TRB_RING_SIZE;
+    ring->cycle = 1;
+    ring->enqueue_index = 0;
+    ring->dequeue_index = 0;
+
+    return ring;
+}
+
+bool xhci_configure_device_endpoints(struct xhci_device *xhci,
+                                     struct usb_device *usb) {
     struct xhci_input_ctx *input_ctx = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
     uintptr_t input_ctx_phys = vmm_get_phys((uintptr_t) input_ctx);
 
-    input_ctx->ctrl_ctx.add_flags = 0;
-    input_ctx->ctrl_ctx.drop_flags = 0;
+    input_ctx->ctrl_ctx.add_flags = (1 << 0);
 
-    uint8_t max_ep_id = 0;
+    uint8_t max_ep_index = 0;
 
-    for (size_t i = 0; i < dev->num_endpoints; i++) {
-        struct usb_endpoint *ep = dev->endpoints[i];
+    for (size_t i = 0; i < usb->num_endpoints; i++) {
+        struct usb_endpoint *ep = usb->endpoints[i];
+        uint8_t ep_index = get_ep_index(ep);
+        max_ep_index = (ep_index > max_ep_index) ? ep_index : max_ep_index;
+        input_ctx->ctrl_ctx.add_flags |= (1 << ep_index);
 
-        uint8_t ep_num = ep->number;
-
-        bool is_in = ep->in;
-        uint8_t ep_id = (ep_num << 1) | (is_in ? 1 : 0);
-
-        if (ep_id > max_ep_id)
-            max_ep_id = ep_id;
-
-        struct xhci_trb *trbs = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
-        uintptr_t ring_phys = vmm_get_phys((uintptr_t) trbs);
-
-        trbs[TRB_RING_SIZE - 1].parameter = ring_phys;
-
-        /* Cycle bit zero at this point */
-        trbs[TRB_RING_SIZE - 1].control = (TRB_TYPE_LINK << 10);
-
-        struct xhci_ring *ring = kzalloc(sizeof(struct xhci_ring));
-        ring->phys = ring_phys;
-        ring->trbs = trbs;
-        ring->size = TRB_RING_SIZE;
-        ring->cycle = 1;
-
-        xhci->port_info[port - 1].ep_rings[ep_id] = ring;
-        ep->hc_data = ring;
-
-        struct xhci_ep_ctx *ep_ctx = &input_ctx->ep_ctx[ep_id];
+        struct xhci_ep_ctx *ep_ctx = &input_ctx->ep_ctx[ep_index];
         ep_ctx->ep_type = usb_to_xhci_ep_type(ep->in, ep->type);
         ep_ctx->max_packet_size = ep->max_packet_size;
-        ep_ctx->dequeue_ptr_raw = ring_phys | 1;
         ep_ctx->interval = ep->interval;
+        ep_ctx->max_burst_size = 0;
 
-        input_ctx->ctrl_ctx.add_flags |= (1 << ep_id);
+        struct xhci_ring *ring = allocate_endpoint_ring();
+        ep_ctx->dequeue_ptr_raw = ring->phys | 1;
+
+        xhci->port_info[usb->port - 1].ep_rings[ep_index] = ring;
     }
 
-    struct xhci_slot_ctx *slot_ctx = &input_ctx->slot_ctx;
-    slot_ctx->context_entries = max_ep_id + 1;
+    input_ctx->slot_ctx.context_entries = max_ep_index;
 
-    uint32_t control = 0;
-    control |= TRB_SET_TYPE(TRB_TYPE_CONFIGURE_ENDPOINT);
+    uint32_t control = TRB_SET_TYPE(TRB_TYPE_CONFIGURE_ENDPOINT);
     control |= xhci->cmd_ring->cycle & 1;
-    control |= slot_id << 24;
+    control |= usb->slot_id << 24;
 
     xhci_send_command(xhci, input_ctx_phys, control);
 
-    if (!(xhci_wait_for_response(xhci) & 1)) {
-        xhci_warn("Failed to configure endpoints for slot %u\n", slot_id);
+    if (!(xhci_wait_for_response(xhci) & (1 << 0))) {
+        xhci_warn("Failed to configure endpoints for slot %u\n", usb->slot_id);
+        return false;
     }
+
+    return true;
 }
 
 static bool xhci_control_transfer(struct usb_controller *ctrl, uint8_t port,
@@ -305,8 +311,11 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
     for (uint64_t i = 0; i < dev->num_devices; i++) {
         struct usb_device *usb = dev->devices[i];
         usb_get_device_descriptor(usb);
-        usb_get_config_descriptor(usb);
-        /* FIXME xhci_configure_device_endpoints(dev, usb); */
+        if (!usb_parse_config_descriptor(usb))
+            continue;
+        if (!usb_set_configuration(usb))
+            continue;
+        xhci_configure_device_endpoints(dev, usb);
         usb_try_bind_driver(usb);
     }
 
