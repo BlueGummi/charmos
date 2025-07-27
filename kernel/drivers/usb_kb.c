@@ -56,13 +56,13 @@ void parse_keyboard_report(const uint8_t *report) {
 
 void setup_keyboard_polling(struct usb_device *dev, struct usb_endpoint *ep) {
     struct usb_packet pkt = {
-        .data = kzalloc(8),
+        .data = kzalloc_aligned(8, PAGE_SIZE),
         .length = 8,
     };
 
     while (true) {
         bool success = dev->host->ops.submit_interrupt_transfer(
-            dev->host, dev->port, &pkt);
+            dev->host, dev->port, &pkt, ep);
 
         if (success) {
             parse_keyboard_report(pkt.data);
@@ -78,7 +78,7 @@ bool usb_keyboard_probe(struct usb_device *dev) {
 
         bool is_interrupt = ep->type == USB_ENDPOINT_ATTR_TRANS_TYPE_INTERRUPT;
         if ((ep->address & 0x80) && is_interrupt) {
-            //  setup_keyboard_polling(dev, ep);
+//            setup_keyboard_polling(dev, ep);
             k_info("usbkbd", K_INFO, "USB keyboard initialized");
             return true;
         }

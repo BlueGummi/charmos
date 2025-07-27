@@ -496,8 +496,7 @@ struct xhci_port_info {
     bool device_connected;
     uint8_t speed;
     uint8_t slot_id;
-    struct xhci_ring *ep0_ring;
-    struct xhci_ring *ep_rings[31]; // EP 0 to 30
+    struct xhci_ring *ep_rings[32];
 };
 
 struct xhci_dcbaa { // Device context base address array - check page 441
@@ -544,8 +543,10 @@ void xhci_ring_doorbell(struct xhci_device *dev, uint32_t slot_id,
  * by including the ever-growing USB header in here */
 struct usb_controller;
 struct usb_packet;
+struct usb_endpoint;
+
 bool xhci_submit_interrupt_transfer(struct usb_controller *ctrl, uint8_t port,
-                                    struct usb_packet *pkt);
+                                    struct usb_packet *pkt, struct usb_endpoint *ep);
 
 void xhci_send_command(struct xhci_device *dev, uint64_t parameter,
                        uint32_t control);

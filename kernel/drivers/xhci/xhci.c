@@ -11,10 +11,6 @@
 #include <stdint.h>
 #include <string.h>
 
-static inline uint8_t get_ep_index(struct usb_endpoint *ep) {
-    return (ep->number * 2) + (ep->in ? 1 : 0);
-}
-
 static inline uint8_t usb_to_xhci_ep_type(bool in, uint8_t type) {
     if (in) {
         switch (type) {
@@ -83,7 +79,7 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
     ring->enqueue_index = 0;
     ring->dequeue_index = 0;
 
-    ctrl->port_info[port - 1].ep0_ring = ring;
+    ctrl->port_info[port - 1].ep_rings[0] = ring;
 
     struct xhci_ep_ctx *ep0 = &input_ctx->ep0_ctx;
     ep0->ep_type = XHCI_ENDPOINT_TYPE_CONTROL_BI;
@@ -138,7 +134,7 @@ bool xhci_send_control_transfer(struct xhci_device *dev, uint8_t slot_id,
     /* OUT */
     setup_trb->control |= (2 << 16);
 
-    // Data Stage
+    /* Data Stage */
     struct xhci_trb *data_trb = &ep0_ring->trbs[idx++];
     data_trb->parameter = buffer_phys;
     data_trb->status = setup->length;
@@ -149,7 +145,7 @@ bool xhci_send_control_transfer(struct xhci_device *dev, uint8_t slot_id,
     /* IN */
     data_trb->control |= (3 << 16);
 
-    // Status Stage
+    /* Status Stage */
     struct xhci_trb *status_trb = &ep0_ring->trbs[idx++];
     status_trb->parameter = 0;
     status_trb->status = 0;
@@ -205,20 +201,22 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
         input_ctx->ctrl_ctx.add_flags |= (1 << ep_index);
 
         struct xhci_ep_ctx *ep_ctx = &input_ctx->ep_ctx[ep_index];
+
         ep_ctx->ep_type = usb_to_xhci_ep_type(ep->in, ep->type);
 
-        ep_ctx->max_esit_payload_lo = ep->max_packet_size;
         ep_ctx->max_packet_size = ep->max_packet_size;
         ep_ctx->interval = ep->interval;
         ep_ctx->max_burst_size = 0;
 
         struct xhci_ring *ring = allocate_endpoint_ring();
+
         ep_ctx->dequeue_ptr_raw = ring->phys | 1;
+        ep_ctx->dcs = 1;
 
         xhci->port_info[usb->port - 1].ep_rings[ep_index] = ring;
     }
 
-    input_ctx->slot_ctx.context_entries = max_ep_index;
+    input_ctx->slot_ctx.context_entries = max_ep_index + 1;
 
     uint32_t control = TRB_SET_TYPE(TRB_TYPE_CONFIGURE_ENDPOINT);
     control |= xhci->cmd_ring->cycle & 1;
@@ -238,7 +236,7 @@ static bool xhci_control_transfer(struct usb_controller *ctrl, uint8_t port,
                                   struct usb_setup_packet *setup,
                                   void *buffer) {
     struct xhci_device *xhci = ctrl->driver_data;
-    struct xhci_ring *ep0_ring = xhci->port_info[port - 1].ep0_ring;
+    struct xhci_ring *ep0_ring = xhci->port_info[port - 1].ep_rings[0];
     uint8_t slot_id = xhci->port_info[port - 1].slot_id;
 
     return xhci_send_control_transfer(xhci, slot_id, ep0_ring, setup, buffer);
@@ -247,7 +245,7 @@ static bool xhci_control_transfer(struct usb_controller *ctrl, uint8_t port,
 static struct usb_controller_ops xhci_ctrl_ops = {
     .submit_control_transfer = xhci_control_transfer,
     .submit_bulk_transfer = NULL,
-    .submit_interrupt_transfer = xhci_submit_interrupt_transfer,
+    .submit_interrupt_transfer = NULL /*xhci_submit_interrupt_transfer*/,
     .reset_port = NULL,
 };
 

@@ -299,6 +299,7 @@ struct usb_packet {
     void *context;
 };
 
+struct usb_device;
 struct usb_controller_ops {
     bool (*submit_control_transfer)(struct usb_controller *ctrl, uint8_t port,
                                     struct usb_setup_packet *pkt, void *buf);
@@ -307,7 +308,8 @@ struct usb_controller_ops {
                                  struct usb_packet *pkt);
 
     bool (*submit_interrupt_transfer)(struct usb_controller *ctrl, uint8_t port,
-                                      struct usb_packet *pkt);
+                                      struct usb_packet *pkt,
+                                      struct usb_endpoint *ep);
 
     bool (*reset_port)(struct usb_controller *ctrl, uint8_t port);
 
@@ -322,7 +324,6 @@ struct usb_controller { /* Generic USB controller */
     void *driver_data;
 };
 
-struct usb_device;
 struct usb_driver {
     const char *name;
     uint8_t class_code;
@@ -377,6 +378,10 @@ bool usb_parse_config_descriptor(struct usb_device *dev);
 bool usb_set_configuration(struct usb_device *dev);
 
 void usb_try_bind_driver(struct usb_device *dev);
+
+static inline uint8_t get_ep_index(struct usb_endpoint *ep) {
+    return (ep->number * 2) + (ep->in ? 1 : 0);
+}
 
 #define usb_info(string, ...) k_info("USB", K_INFO, string, ##__VA_ARGS__)
 #define usb_warn(string, ...) k_info("USB", K_WARN, string, ##__VA_ARGS__)

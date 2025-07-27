@@ -137,51 +137,6 @@ static uint64_t wait_for_transfer_event(struct xhci_device *dev,
     }
 }
 
-void xhci_ring_enqueue(struct xhci_ring *ring, struct xhci_trb *src) {
-    uint32_t idx = ring->enqueue_index;
-
-    if (idx == ring->size - 1) {
-        panic("Attempted to enqueue into LINK TRB slot");
-    }
-
-    struct xhci_trb *dst = &ring->trbs[idx];
-    *dst = *src;
-    dst->cycle = ring->cycle;
-
-    ring->enqueue_index++;
-
-    if (ring->enqueue_index == ring->size - 1) {
-        // wrap and toggle cycle after hitting LINK TRB slot
-        ring->enqueue_index = 0;
-        ring->cycle ^= 1;
-    }
-}
-
-
-bool xhci_submit_interrupt_transfer(struct usb_controller *ctrl, uint8_t port,
-                                    struct usb_packet *pkt) {
-    struct xhci_device *dev = ctrl->driver_data;
-    uint8_t slot_id = dev->port_info[port - 1].slot_id;
-
-    /* TODO - do not hardcode this as 3 */
-    struct xhci_ring *ring = dev->port_info[port - 1].ep_rings[3];
-
-    uint64_t phys = vmm_get_phys((uintptr_t) pkt->data);
-
-    struct xhci_trb __attribute__((aligned(16))) trb = {0};
-    trb.parameter = phys;
-    trb.status = pkt->length;
-
-    trb.ioc = 1;
-    trb.cycle = ring->cycle;
-    trb.trb_type = TRB_TYPE_NORMAL;
-
-    xhci_ring_enqueue(ring, &trb);
-    xhci_ring_doorbell(dev, slot_id, 3);
-
-    return xhci_generic_wait(dev, slot_id, wait_for_transfer_event);
-}
-
 uint64_t xhci_wait_for_response(struct xhci_device *dev) {
     return xhci_generic_wait(dev, 0, wait_for_response);
 }
