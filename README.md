@@ -32,6 +32,8 @@ make run # run this in the build directory
 
 - [x] mlfq smp work stealing scheduler
 
+- [ ] complete usb devices, xhci, ehci, uhci, ohci
+
 - [ ] timer api abstraction
 
 - [ ] clean up all drivers. less bitfields, more #defines
@@ -50,9 +52,7 @@ make run # run this in the build directory
 
 - [ ] ia32 port + gub support
 
-- [ ] finish up vfs and add page cache
-
-- [ ] more drivers + finish xhci
+- [ ] finish up vfs and add page cache - dual cache model, metadata in private block cache, file data in page cache
 
 - [ ] networking :boom: + networking stack :boom: :boom:
 
