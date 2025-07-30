@@ -30,7 +30,7 @@ struct idle_thread_data {
 };
 
 struct scheduler {
-    bool timeslice_enabled;
+    atomic_bool timeslice_enabled;
 
     struct thread_queue urgent_threads;
 
