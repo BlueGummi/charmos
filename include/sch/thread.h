@@ -1,13 +1,17 @@
 #include <asm.h>
 #include <mem/alloc.h>
+#include <misc/rbt.h>
 #include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <sync/spin_lock.h>
+#include <time/time.h>
+#include <types.h>
 #pragma once
 #define STACK_SIZE (PAGE_SIZE * 4)
+#define THREAD_EVENT_RINGBUFFER_CAPACITY (32)
 
-struct context {
+struct cpu_context {
     uint64_t rbx;
     uint64_t rbp;
     uint64_t r12;
@@ -45,7 +49,7 @@ static inline const char *thread_state_str(const enum thread_state state) {
 }
 
 enum thread_flags : uint8_t {
-    THREAD_FLAGS_NO_STEAL, /* Do not migrate between cores */
+    THREAD_FLAGS_NO_STEAL = 1, /* Do not migrate between cores */
 };
 
 enum thread_priority : uint8_t {
@@ -64,6 +68,32 @@ enum thread_prio_class : uint8_t {
     THREAD_PRIO_CLASS_BG = 3, /* Background class */
 };
 
+enum thread_wake_reason : uint8_t {
+    THREAD_WAKE_REASON_IO = 1,
+    THREAD_WAKE_REASON_MANUAL = 2,
+    THREAD_WAKE_REASON_TIMEOUT = 3,
+    THREAD_WAKE_REASON_UNKNOWN = 4,
+};
+
+enum thread_block_reason : uint8_t {
+    THREAD_BLOCK_REASON_IO = 5,
+    THREAD_BLOCK_REASON_MANUAL = 6,
+    THREAD_BLOCK_REASON_UNKNOWN = 7,
+};
+
+/* TODO: not sure if I should merge this with block reasons or not */
+enum thread_sleep_reason : uint8_t {
+    THREAD_SLEEP_REASON_MANUAL = 8,
+    THREAD_SLEEP_REASON_UNKNOWN = 9,
+
+};
+
+struct thread_event_reason {
+    uint8_t reason;
+    time_t timestamp;
+};
+
+/* Used in condvars, totally separate from thread_wake_reason */
 enum wake_reason {
     WAKE_REASON_NONE = 0,    /* No reason specified */
     WAKE_REASON_SIGNAL = 1,  /* Signal from something */
@@ -92,12 +122,24 @@ static inline enum thread_prio_class prio_class_of(enum thread_priority prio) {
     (prio_class_of(prio) == THREAD_PRIO_CLASS_TS ||                            \
      prio_class_of(prio) == THREAD_PRIO_CLASS_BG)
 
+#define MAKE_THREAD_RINGBUFFER(name)                                           \
+    struct thread_event_reason name[THREAD_EVENT_RINGBUFFER_CAPACITY];         \
+    size_t name##_head;
+
+struct thread_activity_data {
+    MAKE_THREAD_RINGBUFFER(wake_reasons);
+    MAKE_THREAD_RINGBUFFER(block_reasons);
+    MAKE_THREAD_RINGBUFFER(sleep_reasons);
+};
+
 struct thread {
     uint64_t id;
     void (*entry)(void);
     void *stack;
 
-    struct context regs;
+    struct cpu_context regs;
+
+    struct rbt_node tree_node;
     struct thread *next;
     struct thread *prev;
 
@@ -106,6 +148,8 @@ struct thread {
     enum thread_priority base_prio;      /* priority level at creation time */
     enum thread_flags flags;
     volatile enum wake_reason wake_reason;
+
+    struct thread_activity_data activity_data;
 
     int64_t curr_core;      /* -1 if not being ran */
     uint64_t time_in_level; /* ticks at this level */
@@ -137,4 +181,28 @@ static inline void thread_set_state(struct thread *t, enum thread_state state) {
     atomic_store(&t->state, state);
     if (i)
         enable_interrupts();
+}
+
+static inline void thread_add_event_reason(struct thread_event_reason *ring,
+                                           size_t *head, uint8_t reason) {
+    size_t next_head = *head + 1;
+    ring[*head % THREAD_EVENT_RINGBUFFER_CAPACITY].reason = reason;
+    ring[*head % THREAD_EVENT_RINGBUFFER_CAPACITY].timestamp = time_get_ms();
+
+    *head = next_head;
+}
+
+static inline void thread_add_wake_reason(struct thread *t, uint8_t reason) {
+    struct thread_activity_data *d = &t->activity_data;
+    thread_add_event_reason(d->wake_reasons, &d->wake_reasons_head, reason);
+}
+
+static inline void thread_add_block_reason(struct thread *t, uint8_t reason) {
+    struct thread_activity_data *d = &t->activity_data;
+    thread_add_event_reason(d->block_reasons, &d->block_reasons_head, reason);
+}
+
+static inline void thread_add_sleep_reason(struct thread *t, uint8_t reason) {
+    struct thread_activity_data *d = &t->activity_data;
+    thread_add_event_reason(d->sleep_reasons, &d->sleep_reasons_head, reason);
 }

@@ -61,8 +61,8 @@ void scheduler_enqueue(struct thread *t);
 void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id);
 void scheduler_wake(struct thread *t, enum thread_priority prio);
 void scheduler_take_out(struct thread *t);
-void switch_context(struct context *old, struct context *new);
-void load_context(struct context *new);
+void switch_context(struct cpu_context *old, struct cpu_context *new);
+void load_context(struct cpu_context *new);
 
 bool scheduler_can_steal_work(struct scheduler *sched);
 uint64_t scheduler_compute_steal_threshold();
