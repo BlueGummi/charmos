@@ -17,7 +17,7 @@
 
 enum idle_thread_state {
     IDLE_THREAD_WORK_STEAL = 0, /* Attempt to do a thread steal */
-    IDLE_THREAD_SLEEP = 1, /* Enter sleep state */
+    IDLE_THREAD_SLEEP = 1,      /* Enter sleep state */
 };
 
 struct idle_thread_data {
@@ -31,7 +31,14 @@ struct idle_thread_data {
 
 struct scheduler {
     bool timeslice_enabled;
-    struct thread_queue queues[MLFQ_LEVELS]; // MLFQ queues
+
+    struct thread_queue urgent_threads;
+
+    struct thread_queue ts_threads;
+
+    struct thread_queue rt_threads;
+    struct thread_queue bg_threads;
+
     struct thread *current;
     uint64_t thread_count; // Also used for load estimate
     int64_t core_id;
@@ -114,6 +121,19 @@ static inline void scheduler_decrement_thread_count(struct scheduler *sched) {
 static inline void scheduler_increment_thread_count(struct scheduler *sched) {
     sched->thread_count++;
     atomic_fetch_add(&scheduler_data.total_threads, 1);
+}
+
+static inline struct thread_queue *
+scheduler_get_this_thread_queue(struct scheduler *sched,
+                                enum thread_priority prio) {
+    switch (prio) {
+    case THREAD_PRIO_URGENT: return &sched->urgent_threads;
+    case THREAD_PRIO_RT: return &sched->rt_threads;
+    case THREAD_PRIO_HIGH:
+    case THREAD_PRIO_MID:
+    case THREAD_PRIO_LOW: return &sched->ts_threads;
+    case THREAD_PRIO_BACKGROUND: return &sched->bg_threads;
+    }
 }
 
 #define TICKS_FOR_PRIO(level) (level == THREAD_PRIO_LOW ? 64 : 1ULL << level)

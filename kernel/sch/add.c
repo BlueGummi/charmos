@@ -20,7 +20,7 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
         ints = spin_lock(&sched->lock);
 
     enum thread_priority prio = task->perceived_prio;
-    struct thread_queue *q = &sched->queues[prio];
+    struct thread_queue *q = scheduler_get_this_thread_queue(sched, prio);
 
     bool was_empty = (q->head == NULL);
     dll_add(q, task);

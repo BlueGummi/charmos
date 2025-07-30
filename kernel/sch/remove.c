@@ -17,7 +17,7 @@ void scheduler_rm_thread(struct scheduler *sched, struct thread *task,
         ints = spin_lock(&sched->lock);
 
     enum thread_priority prio = task->perceived_prio;
-    struct thread_queue *q = &sched->queues[prio];
+    struct thread_queue *q = scheduler_get_this_thread_queue(sched, prio);
 
     if (!q->head) {
         if (!already_locked)

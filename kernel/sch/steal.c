@@ -58,7 +58,7 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
         int level = 31 - __builtin_clz((uint32_t) mask);
         mask &= ~(1 << level); /* remove that bit from local copy */
 
-        struct thread_queue *q = &victim->queues[level];
+        struct thread_queue *q = scheduler_get_this_thread_queue(victim, level);
         if (!q->head)
             continue;
 

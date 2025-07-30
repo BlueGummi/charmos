@@ -141,7 +141,7 @@ static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {
     int lvl = __builtin_ctz(bitmap);
     bitmap &= ~(1 << lvl);
 
-    struct thread_queue *q = &sched->queues[lvl];
+    struct thread_queue *q = scheduler_get_this_thread_queue(sched, lvl);
     struct thread *next = q->head;
 
     /* Dequeue */

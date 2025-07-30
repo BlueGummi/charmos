@@ -30,11 +30,6 @@ void scheduler_init(void) {
         s->core_id = i;
         s->tick_counter = 0;
 
-        for (int lvl = 0; lvl < MLFQ_LEVELS; lvl++) {
-            s->queues[lvl].head = NULL;
-            s->queues[lvl].tail = NULL;
-        }
-
         struct thread *idle_thread = thread_create(scheduler_idle_main);
         idle_thread->flags = THREAD_FLAGS_NO_STEAL;
         idle_thread->state = THREAD_STATE_IDLE_THREAD;
