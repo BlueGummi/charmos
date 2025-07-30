@@ -34,6 +34,7 @@ struct scheduler {
 
     struct thread_queue urgent_threads;
 
+    struct rbt thread_rbt;
     struct thread_queue ts_threads;
 
     struct thread_queue rt_threads;
@@ -42,7 +43,6 @@ struct scheduler {
     struct thread *current;
     uint64_t thread_count; // Also used for load estimate
     int64_t core_id;
-    uint64_t tick_counter; // Global tick count for periodic rebalance
     atomic_bool being_robbed;
     atomic_bool stealing_work;
     struct spinlock lock;
@@ -66,7 +66,8 @@ void scheduler_disable_timeslice();
 void scheduler_yield();
 void scheduler_enqueue(struct thread *t);
 void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id);
-void scheduler_wake(struct thread *t, enum thread_priority prio);
+void scheduler_wake(struct thread *t, enum thread_priority prio,
+                    enum thread_wake_reason reason);
 void scheduler_take_out(struct thread *t);
 void switch_context(struct cpu_context *old, struct cpu_context *new);
 void load_context(struct cpu_context *new);
@@ -134,6 +135,7 @@ scheduler_get_this_thread_queue(struct scheduler *sched,
     case THREAD_PRIO_LOW: return &sched->ts_threads;
     case THREAD_PRIO_BACKGROUND: return &sched->bg_threads;
     }
+    k_panic("unreachable!\n");
 }
 
 #define TICKS_FOR_PRIO(level) (level == THREAD_PRIO_LOW ? 64 : 1ULL << level)

@@ -118,7 +118,8 @@ void thread_block_on(struct thread_queue *q) {
 static void wake_thread(void *a, void *unused) {
     (void) unused;
     struct thread *t = a;
-    scheduler_wake(t, THREAD_PRIO_MAX_BOOST(t->perceived_prio));
+    scheduler_wake(t, THREAD_PRIO_MAX_BOOST(t->perceived_prio),
+                   THREAD_WAKE_REASON_TIMEOUT);
 }
 
 void thread_sleep_for_ms(uint64_t ms) {

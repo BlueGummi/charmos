@@ -28,7 +28,6 @@ void scheduler_init(void) {
 
         s->thread_count = 0;
         s->core_id = i;
-        s->tick_counter = 0;
 
         struct thread *idle_thread = thread_create(scheduler_idle_main);
         idle_thread->flags = THREAD_FLAGS_NO_STEAL;

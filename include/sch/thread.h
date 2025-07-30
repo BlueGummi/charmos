@@ -136,6 +136,7 @@ struct thread {
     uint64_t id;
     void (*entry)(void);
     void *stack;
+    struct spinlock lock;
 
     struct cpu_context regs;
 
@@ -175,34 +176,71 @@ bool thread_queue_remove(struct thread_queue *q, struct thread *t);
 void thread_sleep_for_ms(uint64_t ms);
 void thread_exit(void);
 
-static inline void thread_set_state(struct thread *t, enum thread_state state) {
-    bool i = are_interrupts_enabled();
-    disable_interrupts();
-    atomic_store(&t->state, state);
-    if (i)
-        enable_interrupts();
-}
+static inline void thread_add_event_reason(
+    struct thread *t,
+    struct thread_event_reason ring[THREAD_EVENT_RINGBUFFER_CAPACITY],
+    size_t *head, uint8_t reason, bool already_locked) {
 
-static inline void thread_add_event_reason(struct thread_event_reason *ring,
-                                           size_t *head, uint8_t reason) {
+    bool interrupts = false;
+    if (!already_locked)
+        interrupts = spin_lock(&t->lock);
+
     size_t next_head = *head + 1;
     ring[*head % THREAD_EVENT_RINGBUFFER_CAPACITY].reason = reason;
     ring[*head % THREAD_EVENT_RINGBUFFER_CAPACITY].timestamp = time_get_ms();
 
     *head = next_head;
+
+    if (!already_locked)
+        spin_unlock(&t->lock, interrupts);
 }
 
-static inline void thread_add_wake_reason(struct thread *t, uint8_t reason) {
+static inline void thread_add_wake_reason(struct thread *t, uint8_t reason,
+                                          bool already_locked) {
     struct thread_activity_data *d = &t->activity_data;
-    thread_add_event_reason(d->wake_reasons, &d->wake_reasons_head, reason);
+    thread_add_event_reason(t, d->wake_reasons, &d->wake_reasons_head, reason,
+                            already_locked);
 }
 
-static inline void thread_add_block_reason(struct thread *t, uint8_t reason) {
+static inline void thread_add_block_reason(struct thread *t, uint8_t reason,
+                                           bool already_locked) {
     struct thread_activity_data *d = &t->activity_data;
-    thread_add_event_reason(d->block_reasons, &d->block_reasons_head, reason);
+    thread_add_event_reason(t, d->block_reasons, &d->block_reasons_head, reason,
+                            already_locked);
 }
 
-static inline void thread_add_sleep_reason(struct thread *t, uint8_t reason) {
+static inline void thread_add_sleep_reason(struct thread *t, uint8_t reason,
+                                           bool already_locked) {
     struct thread_activity_data *d = &t->activity_data;
-    thread_add_event_reason(d->sleep_reasons, &d->sleep_reasons_head, reason);
+    thread_add_event_reason(t, d->sleep_reasons, &d->sleep_reasons_head, reason,
+                            already_locked);
+}
+
+static inline void set_state_internal(struct thread *t,
+                                      enum thread_state state) {
+    atomic_store(&t->state, state);
+}
+
+static inline void thread_block(struct thread *t,
+                                enum thread_block_reason reason) {
+    bool i = spin_lock(&t->lock);
+    set_state_internal(t, THREAD_STATE_BLOCKED);
+    thread_add_block_reason(t, reason, true);
+    spin_unlock(&t->lock, i);
+}
+
+static inline void thread_sleep(struct thread *t,
+                                enum thread_sleep_reason reason) {
+    bool i = spin_lock(&t->lock);
+    set_state_internal(t, THREAD_STATE_SLEEPING);
+    thread_add_sleep_reason(t, reason, true);
+    spin_unlock(&t->lock, i);
+}
+
+static inline void thread_wake(struct thread *t,
+                               enum thread_wake_reason reason) {
+    bool i = spin_lock(&t->lock);
+    set_state_internal(t, THREAD_STATE_READY);
+    thread_add_wake_reason(t, reason, true);
+    spin_unlock(&t->lock, i);
 }

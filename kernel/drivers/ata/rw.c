@@ -83,7 +83,7 @@ void ide_irq_handler(void *ctx, uint8_t irq_num, void *rsp) {
     }
 
     if (req->waiter)
-        scheduler_wake(req->waiter, THREAD_PRIO_URGENT);
+        scheduler_wake(req->waiter, THREAD_PRIO_URGENT, THREAD_WAKE_REASON_IO);
 
 next_request:
 
@@ -176,7 +176,7 @@ static inline void submit_and_wait(struct ata_drive *d,
                                    struct ide_request *req) {
     bool i = spin_lock(&req->lock);
     struct thread *t = scheduler_get_curr_thread();
-    thread_set_state(t, THREAD_STATE_BLOCKED);
+    thread_block(t, THREAD_BLOCK_REASON_IO);
     req->waiter = t;
     submit_async(d, req);
     spin_unlock(&req->lock, i);

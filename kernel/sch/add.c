@@ -62,17 +62,19 @@ void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id) {
     lapic_send_ipi(core_id, IRQ_SCHEDULER);
 }
 
-void scheduler_wake(struct thread *t, enum thread_priority new_prio) {
-    atomic_store(&t->state, THREAD_STATE_READY);
-    /* boost */
-
+void scheduler_wake(struct thread *t, enum thread_priority new_prio,
+                    enum thread_wake_reason reason) {
     t->perceived_prio = new_prio;
     t->time_in_level = 0;
-    uint64_t c = t->curr_core;
-    if (t->curr_core == -1)
+
+    thread_wake(t, reason);
+    /* boost */
+
+    int64_t c = t->curr_core;
+    if (c == -1)
         k_panic("Tried to put_back a thread in the ready queues\n");
 
-    struct scheduler *sch = global.schedulers[t->curr_core];
+    struct scheduler *sch = global.schedulers[c];
     put_on_scheduler(sch, t);
     lapic_send_ipi(c, IRQ_SCHEDULER);
 }

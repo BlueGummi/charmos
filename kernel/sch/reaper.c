@@ -57,7 +57,7 @@ void reaper_thread_main() {
         if (reaped_something) {
             thread_sleep_for_ms(100);
         } else {
-            thread_set_state(reaper_thread, THREAD_STATE_SLEEPING);
+            thread_sleep(t, THREAD_SLEEP_REASON_MANUAL);
             scheduler_yield();
         }
     }
