@@ -35,6 +35,11 @@ static inline void put_on_scheduler(struct scheduler *s, struct thread *t) {
     scheduler_add_thread(s, t, false);
 }
 
+static void do_wake_other_core(struct scheduler *target, uint64_t core_num) {
+    if (!target->timeslice_enabled)
+        lapic_send_ipi(core_num, IRQ_SCHEDULER);
+}
+
 void scheduler_enqueue(struct thread *t) {
     struct scheduler *s = global.schedulers[0];
     uint64_t min_load = UINT64_MAX;
@@ -49,14 +54,14 @@ void scheduler_enqueue(struct thread *t) {
     }
 
     put_on_scheduler(s, t);
-    lapic_send_ipi(min_core, IRQ_SCHEDULER);
+    do_wake_other_core(s, min_core);
 }
 
 /* TODO: Make scheduler_add_thread an internal function so I don't need to
  * pass in the 'false false true' here and all over the place */
 void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id) {
     put_on_scheduler(global.schedulers[core_id], t);
-    lapic_send_ipi(core_id, IRQ_SCHEDULER);
+    do_wake_other_core(global.schedulers[core_id], core_id);
 }
 
 void scheduler_wake(struct thread *t, enum thread_priority new_prio,
@@ -73,5 +78,5 @@ void scheduler_wake(struct thread *t, enum thread_priority new_prio,
 
     struct scheduler *sch = global.schedulers[c];
     put_on_scheduler(sch, t);
-    lapic_send_ipi(c, IRQ_SCHEDULER);
+    do_wake_other_core(sch, c);
 }

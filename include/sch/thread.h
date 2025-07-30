@@ -114,11 +114,17 @@ static inline const char *thread_event_reason_str(const uint8_t reason) {
     }
 }
 
+struct thread_event_association {
+    uint8_t reason;
+    uint64_t cycle; /* Cycle for the associated reason */
+};
+
 #define THREAD_ASSOCIATED_REASON_NONE 0xFF
 struct thread_event_reason {
     uint8_t reason;
-    uint8_t associated_reason;
+    struct thread_event_association associated_reason;
     time_t timestamp;
+    uint64_t cycle;
 };
 
 /* Used in condvars, totally separate from thread_wake_reason */
@@ -235,16 +241,30 @@ void thread_add_wake_reason(struct thread *t, uint8_t reason,
                             bool already_locked);
 
 static inline struct thread_event_reason *
+wake_reason_associated_reason(struct thread_activity_data *data,
+                              struct thread_event_reason *wake) {
+    if (thread_wake_is_from_block(wake->reason)) {
+        return &data->block_reasons[wake->associated_reason.reason %
+                                    THREAD_EVENT_RINGBUFFER_CAPACITY];
+    } else if (thread_wake_is_from_sleep(wake->reason)) {
+        return &data->sleep_reasons[wake->associated_reason.reason %
+                                    THREAD_EVENT_RINGBUFFER_CAPACITY];
+    }
+    return NULL;
+}
+
+static inline bool
+thread_event_reason_is_valid(struct thread_activity_data *data,
+                             struct thread_event_reason *reason) {
+    struct thread_event_reason *assoc =
+        wake_reason_associated_reason(data, reason);
+    return assoc->cycle == reason->associated_reason.cycle;
+}
+
+static inline struct thread_event_reason *
 most_recent(struct thread_event_reason *reasons, size_t head) {
     size_t past_head = head - 1;
     return &reasons[past_head % THREAD_EVENT_RINGBUFFER_CAPACITY];
-}
-
-static inline void link_wake_reason(struct thread_event_reason *target_reason,
-                                    struct thread_event_reason *this_reason,
-                                    size_t target_link, size_t this_link) {
-    target_reason->associated_reason = this_link;
-    this_reason->associated_reason = target_link;
 }
 
 static inline void thread_add_block_reason(struct thread *t, uint8_t reason,

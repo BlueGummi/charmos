@@ -6,9 +6,10 @@ static void log_event(const char *name, struct thread_event_reason *r, size_t i,
     if (!r->timestamp)
         return;
 
-    k_printf("    %s reason %llu: %s at time %llu %s-> linked to %llu\n", name,
-             i, thread_event_reason_str(r->reason), r->timestamp,
-             i == head ? "<-- head " : "", r->associated_reason);
+    k_printf(
+        "    %s reason %llu: %s at time %llu %s-> linked to %llu, cycle %llu\n",
+        name, i, thread_event_reason_str(r->reason), r->timestamp,
+        i == head ? "<-- head " : "", r->associated_reason, r->cycle);
 }
 
 void thread_log_event_reasons(struct thread *t) {
@@ -32,13 +33,13 @@ void thread_log_event_reasons(struct thread *t) {
 
         log_event("Wake", &data->wake_reasons[i], i, data->wake_reasons_head);
 
-        if (wr->associated_reason == THREAD_ASSOCIATED_REASON_NONE)
+        if (wr->associated_reason.reason == THREAD_ASSOCIATED_REASON_NONE)
             continue;
 
         struct thread_event_reason *r =
             thread_wake_is_from_block(wr->reason)
-                ? &data->block_reasons[wr->associated_reason]
-                : &data->sleep_reasons[wr->associated_reason];
+                ? &data->block_reasons[wr->associated_reason.reason]
+                : &data->sleep_reasons[wr->associated_reason.reason];
 
         k_printf("      The time from this event reason to its associated "
                  "reason is %lld milliseconds\n\n",
@@ -71,6 +72,9 @@ thread_add_event_reason(struct thread *t, struct thread_event_reason *ring,
     struct thread_event_reason *this_reason =
         &ring[*head % THREAD_EVENT_RINGBUFFER_CAPACITY];
 
+    if (this_reason->timestamp != 0)
+        this_reason->cycle++;
+
     this_reason->reason = reason;
     this_reason->timestamp = time_get_ms();
 
@@ -80,6 +84,19 @@ thread_add_event_reason(struct thread *t, struct thread_event_reason *ring,
         spin_unlock(&t->lock, interrupts);
 
     return this_reason;
+}
+
+static inline void link_wake_reason(struct thread_event_reason *target_reason,
+                                    struct thread_event_reason *this_reason,
+                                    size_t target_link, size_t this_link) {
+    struct thread_event_association *target = &target_reason->associated_reason;
+    struct thread_event_association *asso = &this_reason->associated_reason;
+
+    target->reason = this_link % THREAD_EVENT_RINGBUFFER_CAPACITY;
+    asso->reason = target_link % THREAD_EVENT_RINGBUFFER_CAPACITY;
+
+    target->cycle = this_reason->cycle;
+    asso->cycle = target_reason->cycle;
 }
 
 void thread_add_wake_reason(struct thread *t, uint8_t reason,
@@ -99,7 +116,7 @@ void thread_add_wake_reason(struct thread *t, uint8_t reason,
         past_head = d->sleep_reasons_head - 1;
         past = most_recent(d->sleep_reasons, d->sleep_reasons_head);
     } else {
-        curr->associated_reason = THREAD_ASSOCIATED_REASON_NONE;
+        curr->associated_reason.reason = THREAD_ASSOCIATED_REASON_NONE;
     }
 
     if (past)
@@ -132,17 +149,6 @@ static void advance_to_next_bucket(struct thread_activity_stats *stats,
     size_t new_bucket = stats->current_bucket + steps;
     stats->current_bucket = new_bucket % THREAD_ACTIVITY_BUCKET_COUNT;
     stats->last_update_ms = now - (now % THREAD_ACTIVITY_BUCKET_DURATION);
-}
-
-static struct thread_event_reason *find_pair(struct thread_activity_data *data,
-                                             struct thread_event_reason *wake) {
-    if (thread_wake_is_from_block(wake->reason)) {
-        return &data->block_reasons[wake->associated_reason];
-    } else if (thread_wake_is_from_sleep(wake->reason)) {
-        return &data->sleep_reasons[wake->associated_reason];
-    } else {
-        return NULL; /* Unknown/unpaired events are skipped */
-    }
 }
 
 static void update_bucket_data(struct thread_event_reason *wake,
@@ -207,11 +213,14 @@ void thread_update_activity_stats(struct thread *t) {
         size_t idx = i % THREAD_EVENT_RINGBUFFER_CAPACITY;
         struct thread_event_reason *wake = &data->wake_reasons[idx];
 
-        if (wake->associated_reason == THREAD_ASSOCIATED_REASON_NONE)
+        if (wake->associated_reason.reason == THREAD_ASSOCIATED_REASON_NONE)
             continue;
 
-        struct thread_event_reason *start_evt = find_pair(data, wake);
-        if (!start_evt)
+        struct thread_event_reason *start_evt =
+            wake_reason_associated_reason(data, wake);
+
+        bool start_evt_is_valid = thread_event_reason_is_valid(data, wake);
+        if (!start_evt || !start_evt_is_valid)
             continue;
 
         time_t start = start_evt->timestamp;
