@@ -83,7 +83,8 @@ void ide_irq_handler(void *ctx, uint8_t irq_num, void *rsp) {
     }
 
     if (req->waiter)
-        scheduler_wake(req->waiter, THREAD_PRIO_URGENT, THREAD_WAKE_REASON_IO);
+        scheduler_wake(req->waiter, THREAD_PRIO_URGENT,
+                       THREAD_WAKE_REASON_BLOCKING_IO);
 
 next_request:
 

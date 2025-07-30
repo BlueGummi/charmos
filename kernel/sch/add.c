@@ -12,9 +12,6 @@
 
 void scheduler_add_thread(struct scheduler *sched, struct thread *task,
                           bool already_locked) {
-    if (!sched || !task)
-        return;
-
     bool ints = false;
     if (!already_locked)
         ints = spin_lock(&sched->lock);

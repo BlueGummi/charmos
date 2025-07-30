@@ -210,7 +210,6 @@ static inline void change_timeslice(struct scheduler *sched,
 
 void schedule(void) {
     struct scheduler *sched = get_this_core_sched();
-
     bool interrupts = spin_lock(&sched->lock);
 
     struct thread *curr = sched->current;

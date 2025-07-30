@@ -1,6 +1,4 @@
-#include <compiler.h>
 #include <mem/alloc.h>
-#include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <misc/dll.h>
 #include <misc/queue.h>
@@ -10,9 +8,7 @@
 #include <sch/thread.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdint.h>
 #include <string.h>
-#include <sync/condvar.h>
 
 uint64_t globid = 1;
 
@@ -108,7 +104,8 @@ void thread_block_on(struct thread_queue *q) {
     disable_interrupts();
 
     struct thread *current = scheduler_get_curr_thread();
-    atomic_store(&current->state, THREAD_STATE_BLOCKED);
+
+    thread_block(current, THREAD_BLOCK_REASON_MANUAL);
     thread_queue_push_back(q, current);
 
     if (interrupts)
@@ -119,13 +116,14 @@ static void wake_thread(void *a, void *unused) {
     (void) unused;
     struct thread *t = a;
     scheduler_wake(t, THREAD_PRIO_MAX_BOOST(t->perceived_prio),
-                   THREAD_WAKE_REASON_TIMEOUT);
+                   THREAD_WAKE_REASON_SLEEP_TIMEOUT);
 }
 
 void thread_sleep_for_ms(uint64_t ms) {
     disable_interrupts();
     struct thread *curr = scheduler_get_curr_thread();
-    atomic_store(&curr->state, THREAD_STATE_SLEEPING);
+
+    thread_sleep(curr, THREAD_SLEEP_REASON_MANUAL);
     defer_enqueue(wake_thread, curr, NULL, ms);
     enable_interrupts();
     scheduler_yield();

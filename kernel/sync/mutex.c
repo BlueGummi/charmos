@@ -42,7 +42,7 @@ static bool spin_wait_mutex(struct mutex *m, struct thread *curr) {
 static void block_on_mutex(struct mutex *m, struct thread *curr) {
     bool i = spin_lock(&m->lock);
     thread_queue_push_back(&m->waiters, curr);
-    curr->state = THREAD_STATE_BLOCKED;
+    thread_block(curr, THREAD_BLOCK_REASON_MANUAL);
     spin_unlock(&m->lock, i);
     scheduler_yield();
 }
@@ -79,7 +79,7 @@ void mutex_unlock(struct mutex *m) {
     struct thread *next = thread_queue_pop_front(&m->waiters);
     if (next != NULL)
         scheduler_wake(next, THREAD_PRIO_MAX_BOOST(next->perceived_prio),
-                       THREAD_WAKE_REASON_MANUAL);
+                       THREAD_WAKE_REASON_BLOCKING_MANUAL);
 
     spin_unlock(&m->lock, i);
 }

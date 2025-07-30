@@ -23,8 +23,11 @@ void condvar_init(struct condvar *cv) {
 static inline void set_wake_reason_and_wake(struct thread *t,
                                             enum wake_reason reason) {
     t->wake_reason = reason;
-    scheduler_wake(t, THREAD_PRIO_MAX_BOOST(t->perceived_prio),
-                   THREAD_WAKE_REASON_MANUAL);
+    enum thread_wake_reason r = reason == WAKE_REASON_TIMEOUT
+                                    ? THREAD_WAKE_REASON_SLEEP_TIMEOUT
+                                    : THREAD_WAKE_REASON_SLEEP_MANUAL;
+
+    scheduler_wake(t, THREAD_PRIO_MAX_BOOST(t->perceived_prio), r);
 }
 
 void condvar_signal(struct condvar *cv) {

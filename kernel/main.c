@@ -102,6 +102,7 @@ void k_sch_main() {
     k_info("MAIN", K_INFO, "Boot OK");
     global.current_bootstage = BOOTSTAGE_COMPLETE;
 
+    thread_log_event_reasons(scheduler_get_curr_thread());
     while (1) {
         wait_for_interrupt();
     }
