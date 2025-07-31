@@ -33,10 +33,6 @@ static void do_idle_work_steal(struct idle_thread_data *idle,
 /* TODO: Make this use C-states once we get that worked out */
 static void do_idle_deep_sleep(struct idle_thread_data *data) {
     (void) data;
-    while (true) {
-        enable_interrupts();
-        wait_for_interrupt();
-    }
 }
 
 static void do_idle_loop(struct idle_thread_data *idle,
@@ -52,6 +48,10 @@ void scheduler_idle_main(void) {
     atomic_store(&idle->woken_from_timer, false);
     atomic_store(&idle->last_entry_ms, time_get_ms());
     atomic_store(&idle->state, IDLE_THREAD_WORK_STEAL);
+    while (true) {
+        enable_interrupts();
+        wait_for_interrupt();
+    }
 
     struct scheduler *sched = get_this_core_sched();
     while (true) {

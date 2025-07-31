@@ -9,7 +9,6 @@
 #include <types.h>
 #pragma once
 #define STACK_SIZE (PAGE_SIZE * 4)
-#define THREAD_EVENT_RINGBUFFER_CAPACITY (32)
 
 struct cpu_context {
     uint64_t rbx;
@@ -156,8 +155,15 @@ static inline enum thread_prio_class prio_class_of(enum thread_priority prio) {
     (prio_class_of(prio) == THREAD_PRIO_CLASS_TS ||                            \
      prio_class_of(prio) == THREAD_PRIO_CLASS_BG)
 
-#define THREAD_ACTIVITY_BUCKET_COUNT 10
+#define THREAD_ACTIVITY_BUCKET_COUNT 16
 #define THREAD_ACTIVITY_BUCKET_DURATION 1000 /* 1 second per bucket */
+#define THREAD_EVENT_RINGBUFFER_CAPACITY 16
+#define THREAD_RUNTIME_NUM_BUCKETS 16
+
+struct thread_runtime_bucket {
+    uint64_t run_time_ms;
+    uint64_t wall_clock_sec;
+};
 
 struct thread_activity_bucket {
     uint32_t block_count;
@@ -185,6 +191,10 @@ struct thread_activity_data {
     MAKE_THREAD_RINGBUFFER(sleep_reasons);
 };
 
+struct thread_runtime_buckets {
+    struct thread_runtime_bucket buckets[THREAD_RUNTIME_NUM_BUCKETS];
+};
+
 struct thread {
     uint64_t id;
     void (*entry)(void);
@@ -206,8 +216,11 @@ struct thread {
     /* For condvar */
     volatile enum wake_reason wake_reason;
 
-    struct thread_activity_data activity_data;
-    struct thread_activity_stats activity_stats;
+    uint64_t run_start_time; /* When did we start running */
+
+    struct thread_runtime_buckets *runtime_buckets;
+    struct thread_activity_data *activity_data;
+    struct thread_activity_stats *activity_stats;
 
     int64_t curr_core;      /* -1 if not being ran */
     uint64_t time_in_level; /* ticks at this level */
@@ -239,6 +252,7 @@ thread_add_event_reason(struct thread *t, struct thread_event_reason *ring,
                         size_t *head, uint8_t reason, bool already_locked);
 void thread_add_wake_reason(struct thread *t, uint8_t reason,
                             bool already_locked);
+void thread_update_runtime_buckets(struct thread *thread);
 
 static inline struct thread_event_reason *
 wake_reason_associated_reason(struct thread_activity_data *data,
@@ -269,14 +283,14 @@ most_recent(struct thread_event_reason *reasons, size_t head) {
 
 static inline void thread_add_block_reason(struct thread *t, uint8_t reason,
                                            bool already_locked) {
-    struct thread_activity_data *d = &t->activity_data;
+    struct thread_activity_data *d = t->activity_data;
     thread_add_event_reason(t, d->block_reasons, &d->block_reasons_head, reason,
                             already_locked);
 }
 
 static inline void thread_add_sleep_reason(struct thread *t, uint8_t reason,
                                            bool already_locked) {
-    struct thread_activity_data *d = &t->activity_data;
+    struct thread_activity_data *d = t->activity_data;
     thread_add_event_reason(t, d->sleep_reasons, &d->sleep_reasons_head, reason,
                             already_locked);
 }
@@ -286,26 +300,33 @@ static inline void set_state_internal(struct thread *t,
     atomic_store(&t->state, state);
 }
 
-static inline void thread_block(struct thread *t,
-                                enum thread_block_reason reason) {
+static inline void
+set_state_and_update_reason(struct thread *t, uint8_t reason,
+                            enum thread_state state,
+                            void (*callback)(struct thread *, uint8_t, bool)) {
+    set_state_internal(t, state);
+    callback(t, reason, true);
+    if (state != THREAD_STATE_READY)
+        thread_update_runtime_buckets(t);
+}
+
+static inline void thread_block(struct thread *t, enum thread_block_reason r) {
     bool i = spin_lock(&t->lock);
-    set_state_internal(t, THREAD_STATE_BLOCKED);
-    thread_add_block_reason(t, reason, true);
+    set_state_and_update_reason(t, r, THREAD_STATE_BLOCKED,
+                                thread_add_block_reason);
     spin_unlock(&t->lock, i);
 }
 
-static inline void thread_sleep(struct thread *t,
-                                enum thread_sleep_reason reason) {
+static inline void thread_sleep(struct thread *t, enum thread_sleep_reason r) {
     bool i = spin_lock(&t->lock);
-    set_state_internal(t, THREAD_STATE_SLEEPING);
-    thread_add_sleep_reason(t, reason, true);
+    set_state_and_update_reason(t, r, THREAD_STATE_SLEEPING,
+                                thread_add_sleep_reason);
     spin_unlock(&t->lock, i);
 }
 
-static inline void thread_wake(struct thread *t,
-                               enum thread_wake_reason reason) {
+static inline void thread_wake(struct thread *t, enum thread_wake_reason r) {
     bool i = spin_lock(&t->lock);
-    set_state_internal(t, THREAD_STATE_READY);
-    thread_add_wake_reason(t, reason, true);
+    set_state_and_update_reason(t, r, THREAD_STATE_READY,
+                                thread_add_wake_reason);
     spin_unlock(&t->lock, i);
 }

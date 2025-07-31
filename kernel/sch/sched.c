@@ -92,6 +92,7 @@ static inline void update_thread_before_save(struct thread *thread) {
     atomic_store(&thread->state, THREAD_STATE_READY);
     thread->curr_core = -1;
     thread->time_in_level++;
+    thread_update_runtime_buckets(thread);
 
     /* Decay the priority depending on what the thread class is */
     if (thread->time_in_level >= TICKS_FOR_PRIO(thread->perceived_prio))
@@ -172,6 +173,7 @@ static void load_thread(struct scheduler *sched, struct thread *next) {
         return;
 
     next->curr_core = get_this_core_id();
+    next->run_start_time = time_get_ms();
 
     /* Do not mark the idle thread as RUNNING because this causes
      * it to enter the runqueues, which is Very Bad™ (it gets enqueued,

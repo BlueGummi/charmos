@@ -53,6 +53,10 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->entry = entry_point;
     new_thread->curr_core = -1; // nobody is running this
     new_thread->id = globid++;
+    new_thread->activity_data = kzalloc(sizeof(struct thread_activity_data));
+    new_thread->activity_stats = kzalloc(sizeof(struct thread_activity_stats));
+    new_thread->runtime_buckets =
+        kzalloc(sizeof(struct thread_runtime_buckets));
 
     return new_thread;
 }
@@ -70,6 +74,9 @@ void thread_free(struct thread *t) {
     t->prev = NULL;
     t->next = NULL;
     kfree_aligned(t->stack);
+    kfree(t->runtime_buckets);
+    kfree(t->activity_data);
+    kfree(t->activity_stats);
     kfree(t);
 }
 

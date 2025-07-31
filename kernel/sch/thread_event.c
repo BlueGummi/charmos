@@ -13,7 +13,7 @@ static void log_event(const char *name, struct thread_event_reason *r, size_t i,
 }
 
 void thread_log_event_reasons(struct thread *t) {
-    struct thread_activity_data *data = &t->activity_data;
+    struct thread_activity_data *data = t->activity_data;
     k_printf("Thread %llu event reason logs:\n", t->id);
     k_printf("  Block reasons (head %llu):\n", data->block_reasons_head);
     for (size_t i = 0; i < THREAD_EVENT_RINGBUFFER_CAPACITY; i++)
@@ -46,16 +46,18 @@ void thread_log_event_reasons(struct thread *t) {
                  wr->timestamp - r->timestamp);
     }
 
-    struct thread_activity_stats *stats = &t->activity_stats;
+    struct thread_activity_stats *stats = t->activity_stats;
     for (size_t i = 0; i < THREAD_ACTIVITY_BUCKET_COUNT; i++) {
         struct thread_activity_bucket *b = &stats->buckets[i];
+        struct thread_runtime_bucket *bk = &t->runtime_buckets->buckets[i];
+
         k_printf(
             "Bucket %llu shows: block_count %llu, sleep_count %llu, "
             "wake_count %llu, "
             "block_duration %llu, sleep_duration %llu, wake duration %llu\n",
             i, b->block_count, b->sleep_count, b->wake_count, b->block_duration,
             b->sleep_duration,
-            (1000 - (b->sleep_duration + b->block_duration)));
+            (bk->run_time_ms - (b->sleep_duration + b->block_duration)));
     }
 }
 
@@ -101,7 +103,7 @@ static inline void link_wake_reason(struct thread_event_reason *target_reason,
 
 void thread_add_wake_reason(struct thread *t, uint8_t reason,
                             bool already_locked) {
-    struct thread_activity_data *d = &t->activity_data;
+    struct thread_activity_data *d = t->activity_data;
     struct thread_event_reason *curr = thread_add_event_reason(
         t, d->wake_reasons, &d->wake_reasons_head, reason, already_locked);
 
@@ -193,8 +195,8 @@ static void update_bucket(struct thread_activity_stats *stats,
 }
 
 void thread_update_activity_stats(struct thread *t) {
-    struct thread_activity_stats *stats = &t->activity_stats;
-    struct thread_activity_data *data = &t->activity_data;
+    struct thread_activity_stats *stats = t->activity_stats;
+    struct thread_activity_data *data = t->activity_data;
 
     time_t now = time_get_ms();
 
@@ -235,4 +237,32 @@ void thread_update_activity_stats(struct thread *t) {
     }
 
     stats->last_wake_index = wake_head;
+}
+
+void thread_update_runtime_buckets(struct thread *thread) {
+    uint64_t now = time_get_ms();
+
+    /* Which seconds does this delta span? */
+    uint64_t start_sec = thread->run_start_time / 1000;
+    uint64_t end_sec = now / 1000;
+
+    for (uint64_t sec = start_sec; sec <= end_sec; ++sec) {
+        uint64_t bucket_index = sec % THREAD_RUNTIME_NUM_BUCKETS;
+
+        struct thread_runtime_buckets *bs = thread->runtime_buckets;
+        struct thread_runtime_bucket *bucket = &bs->buckets[bucket_index];
+
+        /* Reset it if it's for a different second */
+        if (bucket->wall_clock_sec != sec) {
+            bucket->wall_clock_sec = sec;
+            bucket->run_time_ms = 0;
+        }
+
+        /* How much of delta belongs to this second? */
+        uint64_t slice_start =
+            (sec == start_sec) ? thread->run_start_time : sec * 1000;
+        uint64_t slice_end = (sec == end_sec) ? now : (sec + 1) * 1000;
+
+        bucket->run_time_ms += slice_end - slice_start;
+    }
 }
