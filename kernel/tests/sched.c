@@ -131,3 +131,30 @@ REGISTER_TEST(ts_thread_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     SET_SUCCESS;
 }
+
+static atomic_uint ran_count = 0;
+static void sched_spawn_entry(void) {
+    atomic_fetch_add(&ran_count, 1);
+}
+
+REGISTER_TEST(sched_spawn_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    uint64_t reaped_threads_at_start = reaper_get_reaped_thread_count();
+    disable_interrupts();
+    uint32_t run_times = 500;
+
+    for (uint32_t i = 0; i < run_times; i++)
+        thread_spawn(sched_spawn_entry);
+
+    enable_interrupts();
+
+    while (run_times != ran_count)
+        scheduler_yield();
+
+    TEST_ASSERT(run_times == ran_count);
+
+    while (reaper_get_reaped_thread_count() !=
+           reaped_threads_at_start + run_times)
+        sleep_us(10);
+
+    SET_SUCCESS;
+}

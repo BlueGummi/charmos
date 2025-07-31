@@ -197,9 +197,7 @@ struct thread_runtime_buckets {
 
 struct thread {
     uint64_t id;
-    void (*entry)(void);
     void *stack;
-    struct spinlock lock;
 
     struct cpu_context regs;
 
@@ -248,10 +246,9 @@ void thread_log_event_reasons(struct thread *t);
 void thread_exit(void);
 void thread_update_activity_stats(struct thread *t);
 struct thread_event_reason *
-thread_add_event_reason(struct thread *t, struct thread_event_reason *ring,
-                        size_t *head, uint8_t reason, bool already_locked);
-void thread_add_wake_reason(struct thread *t, uint8_t reason,
-                            bool already_locked);
+thread_add_event_reason(struct thread_event_reason *ring, size_t *head,
+                        uint8_t reason);
+void thread_add_wake_reason(struct thread *t, uint8_t reason);
 void thread_update_runtime_buckets(struct thread *thread);
 
 static inline struct thread_event_reason *
@@ -281,18 +278,14 @@ most_recent(struct thread_event_reason *reasons, size_t head) {
     return &reasons[past_head % THREAD_EVENT_RINGBUFFER_CAPACITY];
 }
 
-static inline void thread_add_block_reason(struct thread *t, uint8_t reason,
-                                           bool already_locked) {
+static inline void thread_add_block_reason(struct thread *t, uint8_t reason) {
     struct thread_activity_data *d = t->activity_data;
-    thread_add_event_reason(t, d->block_reasons, &d->block_reasons_head, reason,
-                            already_locked);
+    thread_add_event_reason(d->block_reasons, &d->block_reasons_head, reason);
 }
 
-static inline void thread_add_sleep_reason(struct thread *t, uint8_t reason,
-                                           bool already_locked) {
+static inline void thread_add_sleep_reason(struct thread *t, uint8_t reason) {
     struct thread_activity_data *d = t->activity_data;
-    thread_add_event_reason(t, d->sleep_reasons, &d->sleep_reasons_head, reason,
-                            already_locked);
+    thread_add_event_reason(d->sleep_reasons, &d->sleep_reasons_head, reason);
 }
 
 static inline void set_state_internal(struct thread *t,
@@ -300,33 +293,27 @@ static inline void set_state_internal(struct thread *t,
     atomic_store(&t->state, state);
 }
 
-static inline void
-set_state_and_update_reason(struct thread *t, uint8_t reason,
-                            enum thread_state state,
-                            void (*callback)(struct thread *, uint8_t, bool)) {
+static inline void set_state_and_update_reason(struct thread *t, uint8_t reason,
+                                               enum thread_state state,
+                                               void (*callback)(struct thread *,
+                                                                uint8_t)) {
     set_state_internal(t, state);
-    callback(t, reason, true);
+    callback(t, reason);
     if (state != THREAD_STATE_READY)
         thread_update_runtime_buckets(t);
 }
 
 static inline void thread_block(struct thread *t, enum thread_block_reason r) {
-    bool i = spin_lock(&t->lock);
     set_state_and_update_reason(t, r, THREAD_STATE_BLOCKED,
                                 thread_add_block_reason);
-    spin_unlock(&t->lock, i);
 }
 
 static inline void thread_sleep(struct thread *t, enum thread_sleep_reason r) {
-    bool i = spin_lock(&t->lock);
     set_state_and_update_reason(t, r, THREAD_STATE_SLEEPING,
                                 thread_add_sleep_reason);
-    spin_unlock(&t->lock, i);
 }
 
 static inline void thread_wake(struct thread *t, enum thread_wake_reason r) {
-    bool i = spin_lock(&t->lock);
     set_state_and_update_reason(t, r, THREAD_STATE_READY,
                                 thread_add_wake_reason);
-    spin_unlock(&t->lock, i);
 }

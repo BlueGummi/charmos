@@ -40,11 +40,12 @@ struct bcache_wrapper {
     uint64_t key;               // block number
     struct bcache_entry *value; // pointer to cache entry
     bool occupied;
+    struct bcache_wrapper *next;
 };
 
 /* TODO: bitmap to mark present entries */
 struct bcache {
-    struct bcache_wrapper *entries;
+    struct bcache_wrapper **entries;
     atomic_uint_fast64_t ticks;
     uint64_t capacity;
     uint64_t count;

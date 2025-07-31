@@ -36,8 +36,7 @@ static inline void put_on_scheduler(struct scheduler *s, struct thread *t) {
 }
 
 static void do_wake_other_core(struct scheduler *target, uint64_t core_num) {
-    if (!atomic_load(&target->timeslice_enabled))
-        lapic_send_ipi(core_num, IRQ_SCHEDULER);
+    lapic_send_ipi(core_num, IRQ_SCHEDULER);
 }
 
 void scheduler_enqueue(struct thread *t) {

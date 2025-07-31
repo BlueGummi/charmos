@@ -62,12 +62,8 @@ void thread_log_event_reasons(struct thread *t) {
 }
 
 struct thread_event_reason *
-thread_add_event_reason(struct thread *t, struct thread_event_reason *ring,
-                        size_t *head, uint8_t reason, bool already_locked) {
-
-    bool interrupts = false;
-    if (!already_locked)
-        interrupts = spin_lock(&t->lock);
+thread_add_event_reason(struct thread_event_reason *ring, size_t *head,
+                        uint8_t reason) {
 
     size_t next_head = *head + 1;
 
@@ -81,9 +77,6 @@ thread_add_event_reason(struct thread *t, struct thread_event_reason *ring,
     this_reason->timestamp = time_get_ms();
 
     *head = next_head;
-
-    if (!already_locked)
-        spin_unlock(&t->lock, interrupts);
 
     return this_reason;
 }
@@ -101,11 +94,10 @@ static inline void link_wake_reason(struct thread_event_reason *target_reason,
     asso->cycle = target_reason->cycle;
 }
 
-void thread_add_wake_reason(struct thread *t, uint8_t reason,
-                            bool already_locked) {
+void thread_add_wake_reason(struct thread *t, uint8_t reason) {
     struct thread_activity_data *d = t->activity_data;
-    struct thread_event_reason *curr = thread_add_event_reason(
-        t, d->wake_reasons, &d->wake_reasons_head, reason, already_locked);
+    struct thread_event_reason *curr =
+        thread_add_event_reason(d->wake_reasons, &d->wake_reasons_head, reason);
 
     size_t this_past_head = d->wake_reasons_head - 1;
     struct thread_event_reason *past = NULL;

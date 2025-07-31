@@ -50,7 +50,6 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->regs.r12 = (uint64_t) entry_point;
     new_thread->regs.rip = (uint64_t) thread_entry_wrapper;
     new_thread->stack = (void *) stack;
-    new_thread->entry = entry_point;
     new_thread->curr_core = -1; // nobody is running this
     new_thread->id = globid++;
     new_thread->activity_data = kzalloc(sizeof(struct thread_activity_data));

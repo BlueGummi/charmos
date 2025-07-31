@@ -30,56 +30,58 @@ static enum errno prefetch(struct generic_disk *disk, struct bcache *cache,
 /* eviction must be explicitly and separately called */
 static bool insert(struct bcache *cache, uint64_t key,
                    struct bcache_entry *value, bool already_locked) {
-
     bool ints = false;
-
     if (!already_locked)
         ints = spin_lock(&cache->lock);
 
     uint64_t index = bcache_hash(key, cache->capacity);
-    bcache_increment_ticks(cache);
+    struct bcache_wrapper *head = cache->entries[index];
 
-    for (uint64_t i = 0; i < cache->capacity; i++) {
-        uint64_t try = (index + i) % cache->capacity;
-        struct bcache_wrapper *entry = &cache->entries[try];
-
-        if (!entry->occupied || entry->key == key) {
-            entry->key = key;
-            entry->value = value;
-            entry->value->access_time = bcache_get_ticks(cache);
-            entry->occupied = true;
-            cache->count++;
-
+    /* Key already exists */
+    for (struct bcache_wrapper *node = head; node; node = node->next) {
+        if (node->key == key) {
+            node->value = value;
+            node->value->access_time = bcache_get_ticks(cache);
             if (!already_locked)
                 spin_unlock(&cache->lock, ints);
             return true;
         }
     }
 
+    /* New head */
+    struct bcache_wrapper *new_node = kmalloc(sizeof(struct bcache_wrapper));
+    if (!new_node) {
+        if (!already_locked)
+            spin_unlock(&cache->lock, ints);
+        return false;
+    }
+
+    new_node->key = key;
+    new_node->value = value;
+    new_node->value->access_time = bcache_get_ticks(cache);
+    new_node->next = head;
+
+    cache->entries[index] = new_node;
+    cache->count++;
+
     if (!already_locked)
         spin_unlock(&cache->lock, ints);
-    return false; // full
+    return true;
 }
 
 static struct bcache_entry *get(struct bcache *cache, uint64_t key) {
     bool ints = spin_lock(&cache->lock);
 
     uint64_t index = bcache_hash(key, cache->capacity);
+    struct bcache_wrapper *node = cache->entries[index];
 
-    for (uint64_t i = 0; i < cache->capacity; i++) {
-        uint64_t try = (index + i) % cache->capacity;
-        struct bcache_wrapper *entry = &cache->entries[try];
-
-        if (!entry->occupied) {
+    while (node) {
+        if (node->key == key) {
+            node->value->access_time = bcache_get_ticks(cache);
             spin_unlock(&cache->lock, ints);
-            return NULL; // not found
+            return node->value;
         }
-
-        if (entry->key == key) {
-            entry->value->access_time = bcache_get_ticks(cache);
-            spin_unlock(&cache->lock, ints);
-            return entry->value;
-        }
+        node = node->next;
     }
 
     spin_unlock(&cache->lock, ints);
@@ -89,30 +91,25 @@ static struct bcache_entry *get(struct bcache *cache, uint64_t key) {
 static bool can_remove_lba_group(struct bcache *cache, uint64_t base_lba,
                                  uint64_t spb) {
     /* caller must already hold the lock */
+
     for (uint64_t i = 0; i < spb; i++) {
         uint64_t key = base_lba + i;
         uint64_t index = bcache_hash(key, cache->capacity);
+        struct bcache_wrapper *node = cache->entries[index];
         bool found = false;
 
-        for (uint64_t j = 0; j < cache->capacity; j++) {
-            uint64_t try = (index + j) % cache->capacity;
-            struct bcache_wrapper *entry = &cache->entries[try];
-
-            if (!entry->occupied)
-                break;
-
-            if (entry->key == key) {
-                if (i == 0) {
-                    found = true; // base_lba should be found
-                } else {
-                    return false; // another lba in the group is still cached
-                }
+        while (node) {
+            if (node->key == key) {
+                found = true;
                 break;
             }
+            node = node->next;
         }
 
         if (i == 0 && !found)
-            return false; // base_lba must exist
+            return false; /* base_lba must exist */
+        else if (i > 0 && found)
+            return false; /* another lba in the group is still cached */
     }
 
     return true;
@@ -122,20 +119,19 @@ static bool remove(struct bcache *cache, uint64_t key, uint64_t spb) {
     bool ints = spin_lock(&cache->lock);
     uint64_t index = bcache_hash(key, cache->capacity);
 
-    for (uint64_t i = 0; i < cache->capacity; i++) {
-        uint64_t try = (index + i) % cache->capacity;
-        struct bcache_wrapper *entry = &cache->entries[try];
+    struct bcache_wrapper *prev = NULL;
+    struct bcache_wrapper *node = cache->entries[index];
 
-        if (!entry->occupied) {
-            spin_unlock(&cache->lock, ints);
-            return false;
-        }
+    while (node) {
+        if (node->key == key) {
+            if (prev)
+                prev->next = node->next;
+            else
+                cache->entries[index] = node->next;
 
-        if (entry->key == key) {
-            struct bcache_entry *val = entry->value;
-            entry->occupied = false;
-            entry->value = NULL;
+            struct bcache_entry *val = node->value;
             cache->count--;
+            kfree(node);
 
             bool should_free = false;
             if (val && key == val->lba && !val->no_evict) {
@@ -152,6 +148,9 @@ static bool remove(struct bcache *cache, uint64_t key, uint64_t spb) {
             spin_unlock(&cache->lock, ints);
             return true;
         }
+
+        prev = node;
+        node = node->next;
     }
 
     spin_unlock(&cache->lock, ints);
@@ -206,30 +205,36 @@ static enum errno prefetch(struct generic_disk *disk, struct bcache *cache,
 static bool evict(struct bcache *cache, uint64_t spb) {
     bool ints = spin_lock(&cache->lock);
 
-    /* find oldest accessed cache entry */
     uint64_t oldest = UINT64_MAX;
-    uint64_t target = 0;
+    uint64_t target_key = 0;
+    bool found = false;
+
     for (uint64_t i = 0; i < cache->capacity; i++) {
-        struct bcache_wrapper *entry = &cache->entries[i];
+        struct bcache_wrapper *node = cache->entries[i];
+        while (node) {
+            struct bcache_entry *entry = node->value;
 
-        if (!entry->occupied || !entry->value)
-            continue;
+            if (!entry || entry->no_evict ||
+                atomic_load(&entry->refcount) > 0) {
+                node = node->next;
+                continue;
+            }
 
-        if (entry->value->no_evict || atomic_load(&entry->value->refcount) > 0)
-            continue;
+            if (entry->access_time < oldest) {
+                oldest = entry->access_time;
+                target_key = node->key;
+                found = true;
+            }
 
-        if (entry->value->access_time < oldest) {
-            oldest = entry->value->access_time;
-            target = entry->key;
+            node = node->next;
         }
     }
 
-    if (target) {
-        spin_unlock(&cache->lock, ints);
-        return remove(cache, target, spb);
-    }
-
     spin_unlock(&cache->lock, ints);
+
+    if (found)
+        return remove(cache, target_key, spb);
+
     return false;
 }
 
@@ -239,16 +244,16 @@ static void stat(struct bcache *cache, uint64_t *total_dirty_out,
 
     uint64_t total_dirty = 0;
     uint64_t total_present = 0;
+
     for (uint64_t i = 0; i < cache->capacity; i++) {
-        struct bcache_wrapper *entry = &cache->entries[i];
-
-        if (!entry->occupied || !entry->value)
-            continue;
-
-        total_present++;
-
-        if (entry->value->dirty) {
-            total_dirty++;
+        struct bcache_wrapper *node = cache->entries[i];
+        while (node) {
+            if (node->value) {
+                total_present++;
+                if (node->value->dirty)
+                    total_dirty++;
+            }
+            node = node->next;
         }
     }
 
@@ -300,8 +305,20 @@ static void write_queue(struct generic_disk *d, struct bcache_entry *ent,
     bio_sched_enqueue(d, req);
 }
 
-/* TODO: free all entries */
 void bcache_destroy(struct bcache *cache) {
+    for (uint64_t i = 0; i < cache->capacity; i++) {
+        struct bcache_wrapper *node = cache->entries[i];
+        while (node) {
+            struct bcache_wrapper *next = node->next;
+            if (node->value) {
+                kfree_aligned(node->value->buffer);
+                kfree(node->value);
+            }
+            kfree(node);
+            node = next;
+        }
+    }
+
     kfree(cache->entries);
     cache->entries = NULL;
     cache->capacity = 0;
@@ -405,7 +422,7 @@ void bcache_init(struct bcache *cache, uint64_t capacity) {
     spinlock_init(&cache->lock);
     cache->capacity = capacity;
     cache->count = 0;
-    cache->entries = kzalloc(sizeof(struct bcache_wrapper) * capacity);
+    cache->entries = kzalloc(sizeof(struct bcache_wrapper *) * capacity);
     if (!cache->entries)
         k_panic("Block cache initialization allocation failed\n");
 }
