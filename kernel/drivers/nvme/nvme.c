@@ -99,12 +99,9 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme_info(K_INFO, "Controller max transfer size is %u bytes",
               nvme->max_transfer_size);
     nvme->isr_index = kzalloc(sizeof(uint8_t) * sqs_to_make);
-    nvme->io_waiters = kzalloc(sizeof(struct thread *) * sqs_to_make);
-    nvme->io_statuses = kzalloc(sizeof(uint16_t *) * sqs_to_make);
     nvme->io_requests = kzalloc(sizeof(struct nvme_request *) * sqs_to_make);
     nvme->io_queues = kzalloc(sizeof(struct nvme_queue *) * sqs_to_make);
-    if (unlikely(!nvme->isr_index || !nvme->io_waiters || !nvme->io_statuses ||
-                 !nvme->io_requests || !nvme->io_queues))
+    if (unlikely(!nvme->isr_index || !nvme->io_requests || !nvme->io_queues))
         k_panic("Could not allocate space for NVMe structures");
 
     nvme->queues_made = sqs_to_make;
@@ -119,13 +116,8 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
 
         nvme_alloc_io_queues(nvme, i);
 
-        uint64_t dep = nvme->io_queues[i]->sq_depth;
-        nvme->io_waiters[i] =
-            kzalloc(sizeof(struct thread *) * nvme->io_queues[i]->sq_depth);
-        nvme->io_statuses[i] = kzalloc(sizeof(uint16_t) * dep);
         nvme->io_requests[i] = kzalloc(sizeof(struct nvme_request *) * 64);
-        if (unlikely(!nvme->io_waiters[i] || !nvme->io_statuses[i] ||
-                     !nvme->io_requests[i]))
+        if (unlikely(!nvme->io_requests[i]))
             k_panic("Could not allocate space for NVMe structures");
     }
 

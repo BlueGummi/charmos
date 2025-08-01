@@ -103,9 +103,6 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
     struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
 
     bool i = spin_lock(&nvme->lock);
-    uint16_t qid = THIS_QID;
-    struct nvme_queue *this_queue = nvme->io_queues[qid];
-    uint16_t tail = this_queue->sq_tail;
 
     struct nvme_request req = {0};
     function(disk, lba, buffer, count, &req);
@@ -113,12 +110,11 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
     struct thread *curr = scheduler_get_curr_thread();
     thread_block(curr, THREAD_BLOCK_REASON_IO);
 
-    nvme->io_waiters[qid][tail] = curr;
+    req.waiter = curr;
     spin_unlock(&nvme->lock, i);
     scheduler_yield();
 
-    nvme->io_waiters[qid][tail] = NULL;
-    return !(nvme->io_statuses[qid][tail]);
+    return !req.status;
 }
 
 static bool rw_wrapper(struct generic_disk *disk, uint64_t lba, uint8_t *buf,

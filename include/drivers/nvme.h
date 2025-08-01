@@ -86,11 +86,14 @@ struct nvme_request {
     bool write;
 
     volatile bool done;
-    int status;
+    volatile uint16_t status;
     volatile int remaining_parts;
 
     void (*on_complete)(struct nvme_request *);
     void *user_data;
+    struct thread *waiter;
+
+    struct nvme_request *next;
 };
 
 struct nvme_queue {
@@ -130,10 +133,13 @@ struct nvme_device {
     uint16_t admin_q_depth;
     uint8_t admin_cq_phase;
 
+    /* Array of pointers to queues */
     struct nvme_queue **io_queues;
+
+    /* 2D array of pointers to io requests
+     * in queues and queue entries */
     struct nvme_request ***io_requests;
-    struct thread ***io_waiters;
-    uint16_t **io_statuses;
+
     uint8_t *isr_index;
     uint32_t queues_made;
 

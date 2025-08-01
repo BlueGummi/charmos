@@ -34,19 +34,18 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
 
         uint16_t cid = mmio_read_32(&entry->cid);
         uint16_t status = mmio_read_32(&entry->status) & 0xFFFE;
-        dev->io_statuses[qid][cid] = status;
 
-        struct thread *t = dev->io_waiters[qid][cid];
+        struct nvme_request *req = dev->io_requests[qid][cid];
+        if (!req)
+            goto skip;
+
+        req->status = status;
+
+        struct thread *t = req->waiter;
         if (t) {
             scheduler_wake(t, THREAD_PRIO_URGENT,
                            THREAD_WAKE_REASON_BLOCKING_IO);
-            dev->io_waiters[qid][cid] = NULL;
         }
-
-        struct nvme_request *req = dev->io_requests[qid][cid];
-
-        if (!req)
-            goto skip;
 
         if (--req->remaining_parts == 0) {
             req->done = true;
@@ -84,7 +83,7 @@ void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
     this_queue->sq[tail] = *cmd;
 
     nvme->io_requests[qid][tail] = req;
-    nvme->io_statuses[qid][tail] = 0xFFFF; // In-flight
+    req->status = 0xFFFF; /* In flight */
 
     this_queue->sq_tail = next_tail;
     mmio_write_32(this_queue->sq_db, this_queue->sq_tail);
