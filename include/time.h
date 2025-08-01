@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
-#include <types.h>
+#include <types/types.h>
+void time_print_unix(uint32_t timestamp);
 void time_print_current();
 uint32_t time_get_unix();
 uint8_t time_get_second();

@@ -1,7 +1,7 @@
 #pragma once
 #include <stdbool.h>
 #include <stdint.h>
-#include <uacpi/internal/types.h>
+#include <uacpi/types.h>
 
 typedef struct { // typedefing it because of consistency with uacpi naming
     uint8_t bus, slot, func;

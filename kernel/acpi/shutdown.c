@@ -3,9 +3,9 @@
 #include <uacpi/event.h>
 #include <uacpi/sleep.h>
 
-#include "uacpi/platform/types.h"
+#include <types/types.h>
 #include "uacpi/status.h"
-#include "uacpi/types.h"
+#include <types/types.h>
 
 int system_shutdown(void) {
     uacpi_status ret = uacpi_prepare_for_sleep_state(UACPI_SLEEP_STATE_S5);

@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <time/time.h>
+#include <time.h>
 
 enum errno ext2_symlink_file(struct ext2_fs *fs,
                              struct ext2_full_inode *dir_inode,

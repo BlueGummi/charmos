@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <sync/condvar.h>
 #include <sync/spin_lock.h>
-#include <types.h>
+#include <types/types.h>
 #pragma once
 
 /* Must be a power of two for modulo optimization */

@@ -5,8 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <sync/spin_lock.h>
-#include <time/time.h>
-#include <types.h>
+#include <time.h>
+#include <types/types.h>
 #pragma once
 #define STACK_SIZE (PAGE_SIZE * 4)
 

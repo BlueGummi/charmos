@@ -6,7 +6,7 @@
 #include <sch/defer.h>
 #include <sch/sched.h>
 #include <sync/spin_lock.h>
-#include <time/time.h>
+#include <time.h>
 
 static struct deferred_event **defer_queues = NULL;
 static struct spinlock *defer_locks = NULL;

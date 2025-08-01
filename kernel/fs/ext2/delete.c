@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <time/time.h>
+#include <time.h>
 
 struct unlink_ctx {
     const char *name;

@@ -15,13 +15,12 @@
 #include <uacpi/event.h>
 #include <uacpi/platform/arch_helpers.h>
 #include <uacpi/status.h>
+#include <uacpi/types.h>
 #include <uacpi/uacpi.h>
 
 #include "uacpi/kernel_api.h"
 #include "uacpi/log.h"
 #include "uacpi/namespace.h"
-#include "uacpi/platform/types.h"
-#include "uacpi/types.h"
 
 uint64_t tsc_freq = 0;
 

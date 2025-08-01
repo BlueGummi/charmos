@@ -5,7 +5,7 @@
 #include <uacpi/namespace.h>
 #include <uacpi/status.h>
 #include <uacpi/tables.h>
-#include <uacpi/types.h>
+#include <types/types.h>
 #include <uacpi/uacpi.h>
 
 static uacpi_iteration_decision

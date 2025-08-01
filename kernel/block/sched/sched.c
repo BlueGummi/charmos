@@ -4,7 +4,7 @@
 #include <mem/alloc.h>
 #include <sch/defer.h>
 #include <sync/spin_lock.h>
-#include <time/time.h>
+#include <time.h>
 
 static void try_rq_reorder(struct bio_scheduler *sched) {
     struct generic_disk *disk = sched->disk;

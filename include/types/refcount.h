@@ -3,7 +3,7 @@
 #include <limits.h>
 #include <stdatomic.h>
 #include <stdbool.h>
-#include <types.h>
+#include <types/types.h>
 
 static inline void refcount_init(refcount_t *rc, unsigned int val) {
     atomic_store(rc, val);

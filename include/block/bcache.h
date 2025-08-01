@@ -1,12 +1,12 @@
 #include <block/bio.h>
 #include <errno.h>
-#include <refcount.h>
+#include <types/refcount.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <sync/mutex.h>
 #include <sync/spin_lock.h>
-#include <types.h>
+#include <types/types.h>
 
 #pragma once
 #define DEFAULT_BLOCK_CACHE_SIZE 2048

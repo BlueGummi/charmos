@@ -1,3 +1,4 @@
+#include <uacpi/types.h>
 #include <acpi/uacpi_interface.h>
 #include <asm.h>
 #include <console/printf.h>
@@ -7,9 +8,7 @@
 #include <stdint.h>
 #include <uacpi/kernel_api.h>
 
-#include "uacpi/platform/types.h"
 #include "uacpi/status.h"
-#include "uacpi/types.h"
 
 uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
                                           uacpi_handle *out_handle) {
