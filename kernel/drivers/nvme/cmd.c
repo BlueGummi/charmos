@@ -23,8 +23,15 @@ static enum bio_request_status nvme_to_bio_status(uint16_t status) {
     return BIO_STATUS_OK;
 }
 
+static inline void wake_waiter(struct nvme_request *req) {
+    struct thread *t = req->waiter;
+    if (t)
+        scheduler_wake_from_io_block(t);
+}
+
 void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
     struct nvme_queue *queue = dev->io_queues[qid];
+    queue->outstanding--;
 
     while (true) {
         struct nvme_completion *entry = &queue->cq[queue->cq_head];
@@ -40,11 +47,13 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
             goto skip;
 
         req->status = status;
+        wake_waiter(req);
 
-        struct thread *t = req->waiter;
-        if (t) {
-            scheduler_wake(t, THREAD_PRIO_URGENT,
-                           THREAD_WAKE_REASON_BLOCKING_IO);
+        struct nvme_waiting_requests *waiters = &dev->waiting_requests;
+        if (waiters->head) {
+            struct nvme_request *next = waiters->head;
+            waiters->head = waiters->head->next;
+            nvme_send_nvme_req(dev->generic_disk, next);
         }
 
         if (--req->remaining_parts == 0) {
@@ -80,6 +89,9 @@ void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
     uint16_t next_tail = (tail + 1) % this_queue->sq_depth;
 
     cmd->cid = tail;
+
+    this_queue->outstanding++;
+
     this_queue->sq[tail] = *cmd;
 
     nvme->io_requests[qid][tail] = req;

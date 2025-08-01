@@ -76,10 +76,8 @@ bool nvme_submit_bio_request(struct generic_disk *disk,
     req->on_complete = nvme_on_bio_complete;
 
     if (bio->write) {
-        return nvme_write_sector_async_wrapper(disk, bio->lba, bio->buffer,
-                                               bio->sector_count, req);
+        return nvme_write_sector_async_wrapper(disk, req);
     } else {
-        return nvme_read_sector_async_wrapper(disk, bio->lba, bio->buffer,
-                                              bio->sector_count, req);
+        return nvme_read_sector_async_wrapper(disk, req);
     }
 }

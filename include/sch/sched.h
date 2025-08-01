@@ -138,4 +138,8 @@ scheduler_get_this_thread_queue(struct scheduler *sched,
     k_panic("unreachable!\n");
 }
 
+static inline void scheduler_wake_from_io_block(struct thread *t) {
+    scheduler_wake(t, THREAD_PRIO_URGENT, THREAD_WAKE_REASON_BLOCKING_IO);
+}
+
 #define TICKS_FOR_PRIO(level) (level == THREAD_PRIO_LOW ? 64 : 1ULL << level)

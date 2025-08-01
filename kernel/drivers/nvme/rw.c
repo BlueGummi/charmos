@@ -4,14 +4,19 @@
 #include <drivers/nvme.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
+#include <misc/sll.h>
 #include <sch/defer.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 typedef bool (*sync_fn)(struct generic_disk *, uint64_t, uint8_t *, uint16_t);
-typedef bool (*async_fn)(struct generic_disk *, uint64_t, uint8_t *, uint16_t,
-                         struct nvme_request *);
+typedef bool (*async_fn)(struct generic_disk *, struct nvme_request *);
+
+static void enqueue_request(struct nvme_device *dev, struct nvme_request *req) {
+    struct nvme_waiting_requests *q = &dev->waiting_requests;
+    sll_add(q, req);
+}
 
 static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
                                uint64_t size) {
@@ -56,14 +61,24 @@ static void nvme_setup_prps(struct nvme_command *cmd,
     }
 }
 
-static bool rw_send_command(struct generic_disk *disk, uint64_t lba,
-                            uint8_t *buffer, uint16_t count,
-                            struct nvme_request *req, uint8_t opc) {
+static bool rw_send_command(struct generic_disk *disk, struct nvme_request *req,
+                            uint8_t opc) {
 
     struct nvme_device *nvme = disk->driver_data;
     uint16_t qid = THIS_QID;
+    uint64_t lba = req->lba;
+    uint64_t count = req->sector_count;
+    void *buffer = req->buffer;
 
     struct bio_request *bio = req->user_data;
+    struct nvme_queue *q = nvme->io_queues[qid];
+
+    if (q->outstanding >= q->sq_depth) {
+        enqueue_request(nvme, req);
+
+        /* No room */
+        return true;
+    }
 
     struct nvme_bio_data *data = kzalloc(sizeof(struct nvme_bio_data));
     if (!data)
@@ -105,7 +120,11 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
     bool i = spin_lock(&nvme->lock);
 
     struct nvme_request req = {0};
-    function(disk, lba, buffer, count, &req);
+    req.lba = lba;
+    req.buffer = buffer;
+    req.sector_count = count;
+
+    function(disk, &req);
 
     struct thread *curr = scheduler_get_curr_thread();
     thread_block(curr, THREAD_BLOCK_REASON_IO);
@@ -137,12 +156,13 @@ static bool rw_wrapper(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
     return true;
 }
 
-static bool rw_async_wrapper(struct generic_disk *disk, uint64_t lba,
-                             uint8_t *buf, uint64_t cnt,
+static bool rw_async_wrapper(struct generic_disk *disk,
                              struct nvme_request *req, async_fn function) {
     struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
     uint16_t max_sectors = nvme->max_transfer_size / disk->sector_size;
     uint16_t chunk;
+
+    uint64_t cnt = req->sector_count;
 
     int part_count = 0;
     uint64_t tmp_cnt = cnt;
@@ -158,11 +178,8 @@ static bool rw_async_wrapper(struct generic_disk *disk, uint64_t lba,
         chunk = (cnt > max_sectors) ? max_sectors : (uint16_t) cnt;
         cnt -= chunk;
 
-        if (!function(disk, lba, buf, chunk, req))
+        if (!function(disk, req))
             return false;
-
-        lba += chunk;
-        buf += chunk * disk->sector_size;
     }
 
     return true;
@@ -188,26 +205,26 @@ bool nvme_write_sector_wrapper(struct generic_disk *disk, uint64_t lba,
     return rw_wrapper(disk, lba, (uint8_t *) buf, cnt, nvme_write_sector);
 }
 
-bool nvme_read_sector_async(struct generic_disk *disk, uint64_t lba,
-                            uint8_t *buffer, uint16_t count,
+bool nvme_read_sector_async(struct generic_disk *disk,
                             struct nvme_request *req) {
-    return rw_send_command(disk, lba, buffer, count, req, NVME_OP_IO_READ);
+    return rw_send_command(disk, req, NVME_OP_IO_READ);
 }
 
-bool nvme_write_sector_async(struct generic_disk *disk, uint64_t lba,
-                             uint8_t *buffer, uint16_t count,
+bool nvme_write_sector_async(struct generic_disk *disk,
                              struct nvme_request *req) {
-    return rw_send_command(disk, lba, buffer, count, req, NVME_OP_IO_WRITE);
-}
-bool nvme_write_sector_async_wrapper(struct generic_disk *disk, uint64_t lba,
-                                     const uint8_t *buf, uint64_t cnt,
-                                     struct nvme_request *req) {
-    return rw_async_wrapper(disk, lba, (uint8_t *) buf, cnt, req,
-                            nvme_write_sector_async);
+    return rw_send_command(disk, req, NVME_OP_IO_WRITE);
 }
 
-bool nvme_read_sector_async_wrapper(struct generic_disk *disk, uint64_t lba,
-                                    uint8_t *buf, uint64_t cnt,
+bool nvme_write_sector_async_wrapper(struct generic_disk *disk,
+                                     struct nvme_request *req) {
+    return rw_async_wrapper(disk, req, nvme_write_sector_async);
+}
+
+bool nvme_read_sector_async_wrapper(struct generic_disk *disk,
                                     struct nvme_request *req) {
-    return rw_async_wrapper(disk, lba, buf, cnt, req, nvme_read_sector_async);
+    return rw_async_wrapper(disk, req, nvme_read_sector_async);
+}
+
+bool nvme_send_nvme_req(struct generic_disk *d, struct nvme_request *r) {
+    return rw_send_command(d, r, r->write ? NVME_OP_IO_WRITE : NVME_OP_IO_READ);
 }

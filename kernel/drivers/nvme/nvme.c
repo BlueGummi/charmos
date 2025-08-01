@@ -57,7 +57,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme->version = version;
     nvme->regs = regs;
     nvme->admin_q_depth = ((nvme->cap) & 0xFFFF) + 1;
-    nvme->io_queues = kmalloc(sizeof(struct nvme_queue *));
+    nvme->io_queues = kzalloc(sizeof(struct nvme_queue *));
     if (!nvme->io_queues)
         k_panic("Could not allocate space for NVMe IO queues\n");
 
@@ -176,6 +176,7 @@ struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {
 
     bcache_init(d->cache, DEFAULT_BLOCK_CACHE_SIZE);
     d->type = G_NVME_DRIVE;
+    nvme->generic_disk = d;
     return d;
 }
 
