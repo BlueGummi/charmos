@@ -1,5 +1,6 @@
 #include <acpi/lapic.h>
 #include <asm.h>
+#include <assert.h>
 #include <block/bio.h>
 #include <block/generic.h>
 #include <block/sched.h>
@@ -43,18 +44,10 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
         uint16_t status = mmio_read_32(&entry->status) & 0xFFFE;
 
         struct nvme_request *req = dev->io_requests[qid][cid];
-        if (!req)
-            goto skip;
+        assert(req);
 
         req->status = status;
         wake_waiter(req);
-
-        struct nvme_waiting_requests *waiters = &dev->waiting_requests;
-        if (waiters->head) {
-            struct nvme_request *next = waiters->head;
-            waiters->head = waiters->head->next;
-            nvme_send_nvme_req(dev->generic_disk, next);
-        }
 
         if (--req->remaining_parts == 0) {
             req->done = true;
@@ -65,12 +58,18 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
             dev->io_requests[qid][cid] = NULL;
         }
 
-    skip:
         queue->cq_head = (queue->cq_head + 1) % queue->cq_depth;
         if (queue->cq_head == 0)
             queue->cq_phase ^= 1;
 
         mmio_write_32(queue->cq_db, queue->cq_head);
+    }
+
+    struct nvme_waiting_requests *waiters = &dev->waiting_requests;
+    if (waiters->head) {
+        struct nvme_request *next = waiters->head;
+        waiters->head = waiters->head->next;
+        nvme_send_nvme_req(dev->generic_disk, next);
     }
 }
 

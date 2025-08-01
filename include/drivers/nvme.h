@@ -110,12 +110,11 @@ struct nvme_queue {
     uint32_t *sq_db;
     uint32_t *cq_db;
 
-    struct spinlock lock;
-
     uint16_t outstanding;
 };
 
 struct nvme_waiting_requests {
+    struct spinlock lock;
     struct nvme_request *head;
     struct nvme_request *tail;
 };
@@ -151,7 +150,6 @@ struct nvme_device {
     uint32_t queues_made;
 
     uint32_t sector_size;
-    struct spinlock lock;
     uint64_t max_transfer_size;
     struct generic_disk *generic_disk;
 };

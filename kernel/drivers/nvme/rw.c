@@ -23,7 +23,7 @@ static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
     uint64_t offset = (uintptr_t) buffer & (PAGE_SIZE - 1);
     uint64_t num_pages = (offset + size + PAGE_SIZE - 1) / PAGE_SIZE;
 
-    data->prps = kmalloc(sizeof(struct nvme_bio_data) * num_pages);
+    data->prps = kmalloc(sizeof(uint64_t) * num_pages);
     if (!data->prps)
         return false;
 
@@ -63,7 +63,6 @@ static void nvme_setup_prps(struct nvme_command *cmd,
 
 static bool rw_send_command(struct generic_disk *disk, struct nvme_request *req,
                             uint8_t opc) {
-
     struct nvme_device *nvme = disk->driver_data;
     uint16_t qid = THIS_QID;
     uint64_t lba = req->lba;
@@ -114,23 +113,16 @@ static bool rw_send_command(struct generic_disk *disk, struct nvme_request *req,
 
 static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
                     uint16_t count, async_fn function) {
-
-    struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
-
-    bool i = spin_lock(&nvme->lock);
-
     struct nvme_request req = {0};
     req.lba = lba;
     req.buffer = buffer;
     req.sector_count = count;
-
-    function(disk, &req);
-
     struct thread *curr = scheduler_get_curr_thread();
     thread_block(curr, THREAD_BLOCK_REASON_IO);
 
     req.waiter = curr;
-    spin_unlock(&nvme->lock, i);
+    function(disk, &req);
+
     scheduler_yield();
 
     return !req.status;
@@ -150,8 +142,6 @@ static bool rw_wrapper(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
         cnt -= chunk;
     }
 
-    /* Our priority is boosted to URGENT upon wakeup from the device interrupt.
-     * We must *immediately* yield to decay this priority to `base_prio` */
     scheduler_yield();
     return true;
 }

@@ -1,4 +1,5 @@
 #include <asm.h>
+#include <assert.h>
 #include <block/sched.h>
 #include <drivers/nvme.h>
 #include <mem/alloc.h>
@@ -44,12 +45,6 @@ static void nvme_on_bio_complete(struct nvme_request *req) {
      * this still needs to be here to clean up PRPs though,
      * rename this */
     handle_coalesces(req, bio);
-
-    /* used here to avoid jumping to invalid code */
-    if ((uint64_t) bio->on_complete < 0xffffffff80000000) {
-        defer_free(req);
-        return;
-    }
 
     if (bio->on_complete)
         bio->on_complete(bio);
