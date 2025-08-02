@@ -154,7 +154,7 @@ REGISTER_TEST(sched_spawn_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     while (reaper_get_reaped_thread_count() !=
            reaped_threads_at_start + run_times)
-        sleep_us(10);
+        sleep_ms(1);
 
     SET_SUCCESS;
 }

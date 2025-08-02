@@ -21,18 +21,19 @@ static void rcu_reader_thread(void) {
     uint64_t end = time_get_ms() + RCU_TEST_DURATION_MS;
 
     while (time_get_ms() < end) {
-        struct rcu_test_data *p = shared_ptr;
-        if (!p)
-            continue;
+        rcu_read_lock();
 
-        int v = p->value;
-        if (v != 42 && v != 43) {
-            atomic_store(&rcu_test_failed, true);
-            ADD_MESSAGE("RCU reader saw invalid value");
-            k_printf("%d\n", v);
+        struct rcu_test_data *p = shared_ptr;
+        if (p) {
+            int v = p->value;
+            if (v != 42 && v != 43) {
+                atomic_store(&rcu_test_failed, true);
+                ADD_MESSAGE("RCU reader saw invalid value");
+                k_printf("%d\n", v);
+            }
         }
 
-        rcu_mark_quiescent();
+        rcu_read_unlock();
     }
 
     atomic_fetch_add(&rcu_reads_done, 1);

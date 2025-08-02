@@ -13,3 +13,5 @@ void rcu_mark_quiescent(void);
 void rcu_synchronize(void);
 void rcu_defer(void (*func)(void *), void *arg);
 void rcu_maintenance_tick(void);
+void rcu_read_lock(void);
+void rcu_read_unlock(void);

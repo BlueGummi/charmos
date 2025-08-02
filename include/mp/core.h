@@ -19,6 +19,7 @@ struct core {
     bool in_interrupt;
 
     uint64_t rcu_seen_gen;
+    uint32_t rcu_nesting;
     bool rcu_quiescent;
 };
 

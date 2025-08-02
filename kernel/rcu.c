@@ -64,3 +64,24 @@ void rcu_maintenance_tick(void) {
 
     rcu_synchronize();
 }
+
+void rcu_read_lock(void) {
+    struct core *c = get_current_core();
+    if (!c)
+        return;
+
+    if (c->rcu_nesting++ == 0) {
+        c->rcu_quiescent = false;
+    }
+}
+
+void rcu_read_unlock(void) {
+    struct core *c = get_current_core();
+    if (!c || c->rcu_nesting == 0)
+        return;
+
+    if (--c->rcu_nesting == 0) {
+        c->rcu_quiescent = true;
+        c->rcu_seen_gen = atomic_load(&rcu_global_gen);
+    }
+}
