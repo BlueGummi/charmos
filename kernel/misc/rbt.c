@@ -18,6 +18,22 @@ struct rbt_node *rbt_find_min(struct rbt_node *node) {
     return node;
 }
 
+struct rbt_node *rbt_min(struct rbt *tree) {
+    return rbt_find_min(tree->root);
+}
+
+struct rbt_node *rbt_next(struct rbt_node *node) {
+    if (node->right)
+        return rbt_find_min(node->right);
+
+    struct rbt_node *parent = node->parent;
+    while (parent && node == parent->right) {
+        node = parent;
+        parent = parent->parent;
+    }
+    return parent;
+}
+
 static void rb_transplant(struct rbt *tree, struct rbt_node *u,
                           struct rbt_node *v) {
     if (u->parent == NULL)
@@ -226,7 +242,7 @@ void rb_delete(struct rbt *tree, struct rbt_node *z) {
     }
 }
 
-struct rbt_node *rbt_search(struct rbt_node *root, int data) {
+struct rbt_node *rbt_search(struct rbt_node *root, uint64_t data) {
     while (root && root->data != data) {
         if (data < root->data)
             root = root->left;
@@ -236,7 +252,7 @@ struct rbt_node *rbt_search(struct rbt_node *root, int data) {
     return root;
 }
 
-void rbt_remove(struct rbt *tree, int data) {
+void rbt_remove(struct rbt *tree, uint64_t data) {
     struct rbt_node *node = rbt_search(tree->root, data);
     if (node)
         rb_delete(tree, node);

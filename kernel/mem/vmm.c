@@ -281,21 +281,37 @@ void vmm_unmap_page(uintptr_t virt) {
 }
 
 uintptr_t vmm_get_phys(uintptr_t virt) {
-
     struct page_table *current_table = kernel_pml4;
-    for (uint64_t i = 0; i < 3; i++) {
-        uint64_t level = virt >> (39 - (i * 9)) & 0x1FF;
+
+    for (uint64_t i = 0; i < 2; i++) {
+        uint64_t level = (virt >> (39 - i * 9)) & 0x1FF;
         pte_t *entry = &current_table->entries[level];
+
         if (!ENTRY_PRESENT(*entry))
-            return -1;
+            return (uintptr_t) -1;
 
         current_table = (struct page_table *) ((*entry & PAGING_PHYS_MASK) +
                                                global.hhdm_offset);
     }
 
+    uint64_t L2 = (virt >> 21) & 0x1FF;
+    pte_t *entry = &current_table->entries[L2];
+
+    if (!ENTRY_PRESENT(*entry))
+        return (uintptr_t) -1;
+
+    if (*entry & PAGING_2MB_page) {
+        uintptr_t phys_base = *entry & PAGING_2MB_PHYS_MASK;
+        uintptr_t offset = virt & (PAGE_2MB - 1);
+        return phys_base + offset;
+    }
+
+    current_table = (struct page_table *) ((*entry & PAGING_PHYS_MASK) +
+                                           global.hhdm_offset);
     uint64_t L1 = (virt >> 12) & 0x1FF;
-    pte_t *entry = &current_table->entries[L1];
-    if (!(ENTRY_PRESENT(*entry)))
+    entry = &current_table->entries[L1];
+
+    if (!ENTRY_PRESENT(*entry))
         return (uintptr_t) -1;
 
     return (*entry & PAGING_PHYS_MASK) + (virt & 0xFFF);

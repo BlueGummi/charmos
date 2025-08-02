@@ -9,6 +9,7 @@
 #define PAGING_PHYS_MASK (0x00FFFFFFF000UL)
 #define PAGING_PAGE_SIZE (1UL << 7)
 #define PAGING_UNCACHABLE (1UL << 4)
+#define PAGING_NO_FLAGS (0)
 #define PAGING_WRITETHROUGH (1UL << 3)
 #define PAGING_2MB_page (1ULL << 7)
 #define PAGE_SIZE 4096
@@ -18,6 +19,7 @@
 #define PT_KERNEL_RX (PAGING_PRESENT)
 #define PT_KERNEL_RW (PAGING_PRESENT | PAGING_WRITE | PAGING_XD)
 
+#define PAGING_2MB_PHYS_MASK (~((uintptr_t) PAGE_2MB - 1))
 #define PAGE_ALIGN_DOWN(x) ((x) & ~(PAGE_SIZE - 1))
 #define PAGE_ALIGN_UP(x) (((x) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1))
 
