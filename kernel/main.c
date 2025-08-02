@@ -38,6 +38,7 @@ struct spinlock panic_lock = SPINLOCK_INIT;
 
 void k_main(void) {
     global.core_count = mp_request.response->cpu_count;
+    global.hhdm_offset = hhdm_request.response->offset;
 
     // FB
     k_printf_init(framebuffer_request.response->framebuffers[0]);
@@ -50,8 +51,8 @@ void k_main(void) {
     global.current_bootstage = BOOTSTAGE_EARLY_MP;
 
     // Mem
-    pmm_init(r->offset, memmap_request);
-    vmm_init(memmap_request.response, xa_request.response, r->offset);
+    pmm_init(memmap_request);
+    vmm_init(memmap_request.response, xa_request.response);
     slab_init();
     pmm_dyn_init();
 

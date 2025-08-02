@@ -15,6 +15,7 @@ struct charmos_globals {
 
     volatile bool panic_in_progress;
 
+    uint64_t hhdm_offset;
     struct generic_disk *root_node_disk;
 };
 

@@ -1,5 +1,6 @@
 #include <console/printf.h>
 #include <mem/alloc.h>
+#include <mem/bitmap.h>
 #include <mem/pmm.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -11,38 +12,13 @@
 
 #define BOOT_BITMAP_SIZE ((1024 * 1024 * 128) / PAGE_SIZE / 8)
 
-static uint64_t bitmap_size = BOOT_BITMAP_SIZE;
-
 static uint8_t boot_bitmap[BOOT_BITMAP_SIZE];
-static uint8_t *bitmap;
-static uint64_t last_allocated_index = 0;
+static bool buddy_active = false;
 
-static void set_bit(uint64_t index) {
-    uint64_t byte = index / 8;
-    uint8_t mask = 1 << (index % 8);
-    __atomic_fetch_or(&bitmap[byte], mask, __ATOMIC_SEQ_CST);
-}
-
-static void clear_bit(uint64_t index) {
-    uint64_t byte = index / 8;
-    uint8_t mask = ~(1 << (index % 8));
-    __atomic_fetch_and(&bitmap[byte], mask, __ATOMIC_SEQ_CST);
-}
-
-static bool test_bit(uint64_t index) {
-    uint64_t byte = index / 8;
-    uint8_t value;
-    __atomic_load(&bitmap[byte], &value, __ATOMIC_SEQ_CST);
-    return (value & (1 << (index % 8))) != 0;
-}
-
-static uint64_t offset = 0;
 static struct limine_memmap_response *memmap;
 static uint64_t total_pages = 0;
 
-void pmm_init(uint64_t o, struct limine_memmap_request m) {
-
-    offset = o;
+void pmm_init(struct limine_memmap_request m) {
     bitmap = boot_bitmap;
     memset(bitmap, 0xFF, BOOT_BITMAP_SIZE);
 
@@ -104,88 +80,22 @@ void pmm_dyn_init() {
 }
 
 void *pmm_alloc_page(bool add_offset) {
-    return pmm_alloc_pages(1, add_offset);
+    if (!buddy_active)
+        return bitmap_alloc_page(add_offset);
+
+    k_panic("No buddy allocator yet\n");
 }
 
 void *pmm_alloc_pages(uint64_t count, bool add_offset) {
+    if (!buddy_active)
+        return bitmap_alloc_pages(count, add_offset);
 
-    if (count == 0) {
-        return NULL;
-    }
-
-    uint64_t consecutive = 0;
-    uint64_t start_index = 0;
-    bool found = false;
-
-    for (uint64_t i = last_allocated_index; i < bitmap_size * 8; i++) {
-        if (!test_bit(i)) {
-            if (consecutive == 0) {
-                start_index = i;
-            }
-            consecutive++;
-
-            if (consecutive == count) {
-                found = true;
-                break;
-            }
-        } else {
-            consecutive = 0;
-        }
-    }
-
-    if (!found) {
-        for (uint64_t i = 0; i < bitmap_size * 8; i++) {
-            if (!test_bit(i)) {
-                if (consecutive == 0) {
-                    start_index = i;
-                }
-                consecutive++;
-
-                if (consecutive == count) {
-                    found = true;
-                    break;
-                }
-            } else {
-                consecutive = 0;
-            }
-        }
-    }
-
-    /* fail */
-    if (!found)
-        return NULL;
-
-    last_allocated_index = start_index;
-    for (uint64_t i = 0; i < count; i++) {
-        set_bit(start_index + i);
-    }
-
-    return (void *) ((add_offset ? offset : 0) + (start_index * PAGE_SIZE));
+    k_panic("No buddy allocator yet\n");
 }
 
 void pmm_free_pages(void *addr, uint64_t count, bool has_offset) {
+    if (!buddy_active)
+        return bitmap_free_pages(addr, count, has_offset);
 
-    if (addr == NULL || count == 0) {
-        return;
-    }
-
-    uint64_t start_index =
-        ((uint64_t) addr - (has_offset ? offset : 0)) / PAGE_SIZE;
-
-    if (start_index >= bitmap_size * 8 ||
-        start_index + count > bitmap_size * 8) {
-        k_printf("Invalid address range to free: 0x%zx with count %zu\n",
-                 (uint64_t) addr, count);
-        return;
-    }
-
-    for (uint64_t i = 0; i < count; i++) {
-        uint64_t index = start_index + i;
-        if (test_bit(index)) {
-            clear_bit(index);
-        } else {
-            k_printf("Page at 0x%zx was already free\n",
-                     offset + (index * PAGE_SIZE));
-        }
-    }
+    k_panic("No buddy allocator yet\n");
 }

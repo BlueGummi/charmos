@@ -36,7 +36,7 @@ uint64_t sub_offset(uint64_t a);
 unsigned long get_cr3(void);
 void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags);
 void vmm_init(struct limine_memmap_response *memmap,
-              struct limine_executable_address_response *xa, uint64_t offset);
+              struct limine_executable_address_response *xa);
 void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags);
 void vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags);
 void vmm_unmap_page(uintptr_t virt);
