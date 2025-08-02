@@ -8,6 +8,7 @@ struct buddy_page {
     uint64_t order;
     struct buddy_page *next;
     struct free_area *free_area;
+    bool is_free;
 };
 
 struct free_area {

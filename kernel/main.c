@@ -42,7 +42,6 @@ void k_main(void) {
 
     // FB
     k_printf_init(framebuffer_request.response->framebuffers[0]);
-    struct limine_hhdm_response *r = hhdm_request.response;
     k_printf("%s", OS_LOGO_SMALL);
 
     // Early init
