@@ -17,6 +17,9 @@ struct core {
     atomic_uint_fast64_t tlb_req_gen; // generation to process
     atomic_uint_fast64_t tlb_ack_gen; // last processed
     bool in_interrupt;
+
+    uint64_t rcu_seen_gen;
+    bool rcu_quiescent;
 };
 
 static inline uint64_t get_this_core_id() {
@@ -25,6 +28,10 @@ static inline uint64_t get_this_core_id() {
                  : "=r"(id)
                  : "i"(offsetof(struct core, id)));
     return id;
+}
+
+static inline struct core *get_current_core(void) {
+    return global.cores[get_this_core_id()];
 }
 
 static inline void mark_self_in_interrupt(void) {

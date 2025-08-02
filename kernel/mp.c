@@ -20,7 +20,7 @@ static struct spinlock wakeup_lock = SPINLOCK_INIT;
 static atomic_uint cores_awake = 0;
 
 static void setup_cpu(uint64_t cpu) {
-    struct core *c = kmalloc(sizeof(struct core));
+    struct core *c = kzalloc(sizeof(struct core));
     if (!c)
         k_panic("Core %d could not allocate space for struct\n", cpu);
     c->id = cpu;

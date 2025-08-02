@@ -351,6 +351,8 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     fs->block_size = 1024U << sblock->log_block_size;
     fs->blocks_per_group = sblock->blocks_per_group;
 
+    spinlock_init(&fs->lock);
+
     fs->sectors_per_block = fs->block_size / p->disk->sector_size;
 
     fs->num_groups =

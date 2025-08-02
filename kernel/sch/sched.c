@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <sync/spin_lock.h>
 #include <tests.h>
+#include <types/rcu.h>
 
 struct scheduler_data scheduler_data = {
     /* This is how many cores can be stealing work at once */
@@ -118,10 +119,10 @@ static inline void update_idle_thread(void) {
     data->last_exit_ms = time_get_ms();
 }
 
-static inline void requeue_current_thread_if_runnable(struct scheduler *sched,
-                                                      struct thread *curr) {
-
-    /* Core 0 will recompute the steal threshold */
+static inline void save_current_thread(struct scheduler *sched,
+                                       struct thread *curr) {
+    /* TODO: No, don't rely on core 0. Allow any core to
+     * recompute this since we have tickless mode */
     maybe_recompute_steal_threshold(get_this_core_id());
 
     /* Only save a running thread that exists */
@@ -210,6 +211,18 @@ static inline void change_timeslice(struct scheduler *sched,
     }
 }
 
+static inline void context_switch(struct thread *curr, struct thread *next) {
+    rcu_mark_quiescent();
+    if (curr && curr->state != THREAD_STATE_IDLE_THREAD) {
+        switch_context(&curr->regs, &next->regs);
+    } else {
+        /* Only `load_context` here since nothing was running,
+         * typically only used in the very first yield or when
+         * exiting the idle thread */
+        load_context(&next->regs);
+    }
+}
+
 void schedule(void) {
     struct scheduler *sched = get_this_core_sched();
     bool interrupts = spin_lock(&sched->lock);
@@ -217,7 +230,7 @@ void schedule(void) {
     struct thread *curr = sched->current;
     struct thread *next = NULL;
 
-    requeue_current_thread_if_runnable(sched, curr);
+    save_current_thread(sched, curr);
 
     /* Checks if we can steal, finds a victim, and tries to steal.
      * NULL is returned if any step was unsuccessful */
@@ -237,17 +250,9 @@ void schedule(void) {
     }
 
     load_thread(sched, next);
-
     spin_unlock(&sched->lock, interrupts);
 
-    if (curr && curr->state != THREAD_STATE_IDLE_THREAD) {
-        switch_context(&curr->regs, &next->regs);
-    } else {
-        /* Only `load_context` here since nothing was running,
-         * typically only used in the very first yield or when
-         * exiting the idle thread */
-        load_context(&next->regs);
-    }
+    context_switch(curr, next);
 }
 
 void scheduler_yield() {
