@@ -1,4 +1,5 @@
 #include <misc/list.h>
+#include <misc/minheap.h>
 #include <misc/rbt.h>
 #include <stdatomic.h>
 #include <stdint.h>
@@ -6,7 +7,7 @@
 #include <types/types.h>
 
 #define HUGEPAGE_HEAP_BASE 0xFFFFE00000000000ULL
-#define HUGEPAGE_HEAP_END   0xFFFFEFFFFFFFFFFFULL
+#define HUGEPAGE_HEAP_END 0xFFFFEFFFFFFFFFFFULL
 #define HUGEPAGE_SIZE (2 * 1024 * 1024) /* 2 MB */
 #define HUGEPAGE_DELETION_TIMEOUT_NONE ((time_t) -1)
 #define HUGEPAGE_U8_BITMAP_SIZE (64)
@@ -37,7 +38,8 @@ struct hugepage {
     atomic_bool being_deleted; /* Being cleaned up - do not use */
 
     struct rbt_node tree_node;
-    struct list_head list_node;
+    struct list_head gc_list_node;
+    struct minheap_node minheap_node;
 };
 
 struct hugepage_core_list {
@@ -45,7 +47,7 @@ struct hugepage_core_list {
                            * list to potentially free a page - rare,
                            * usually not contended */
 
-    struct list_head hugepages_list;
+    struct minheap *hugepage_minheap;
     core_t core_num;
 };
 

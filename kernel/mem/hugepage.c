@@ -28,7 +28,7 @@ static inline void hugepage_deletion_init(struct hugepage *hp) {
 
 static inline void hugepage_structures_init(struct hugepage *hp,
                                             vaddr_t vaddr_base) {
-    INIT_LIST_HEAD(&hp->list_node);
+    INIT_LIST_HEAD(&hp->gc_list_node);
     rbt_init_node(&hp->tree_node);
 
     /* Sort by vaddr */
@@ -59,7 +59,7 @@ static inline bool hugepage_trylock(struct hugepage *hp) {
 
 static void init_hugepage_list(struct hugepage_core_list *list,
                                core_t core_num) {
-    INIT_LIST_HEAD(&list->hugepages_list);
+    list->hugepage_minheap = minheap_create();
     list->core_num = core_num;
 }
 
@@ -75,7 +75,7 @@ static void hugepage_page_init(struct hugepage *hp, vaddr_t vaddr_base,
 
 static inline void hugepage_insert_in_core_list(struct hugepage_core_list *list,
                                                 struct hugepage *hp) {
-    list_add(&hp->list_node, &list->hugepages_list);
+    minheap_insert(list->hugepage_minheap, &hp->minheap_node, hp->virt_base);
 }
 
 static inline void hugepage_insert_in_global_tree(struct hugepage_tree *tree,
@@ -84,7 +84,7 @@ static inline void hugepage_insert_in_global_tree(struct hugepage_tree *tree,
 }
 
 static inline void hugepage_insert(struct hugepage *hp) {
-    struct hugepage_core_list *hcl = &full_tree.core_lists[hcl->core_num];
+    struct hugepage_core_list *hcl = &full_tree.core_lists[hp->owner_core];
     hugepage_insert_in_core_list(hcl, hp);
     hugepage_insert_in_global_tree(&full_tree, hp);
 }

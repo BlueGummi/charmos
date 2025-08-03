@@ -2,8 +2,6 @@
 #include <misc/minheap.h>
 #include <string.h>
 
-#define INITIAL_CAPACITY 64
-
 static void minheap_swap(struct minheap *heap, uint32_t a, uint32_t b) {
     struct minheap_node *tmp = heap->nodes[a];
     heap->nodes[a] = heap->nodes[b];
@@ -48,9 +46,9 @@ static void minheap_sift_down(struct minheap *heap, uint32_t idx) {
 
 struct minheap *minheap_create(void) {
     struct minheap *heap = kmalloc(sizeof(struct minheap));
-    heap->capacity = INITIAL_CAPACITY;
+    heap->capacity = MINHEAP_INIT_CAP;
     heap->size = 0;
-    heap->nodes = kmalloc(sizeof(struct minheap_node *) * heap->capacity);
+    heap->nodes = kzalloc(sizeof(struct minheap_node *) * heap->capacity);
     return heap;
 }
 
