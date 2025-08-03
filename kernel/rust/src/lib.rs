@@ -19,9 +19,8 @@ pub struct BitmapAllocator;
 
 unsafe impl GlobalAlloc for BitmapAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        let size = layout.size().max(layout.align());
-        let pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
-        unsafe { kmalloc(pages) }
+        let size = layout.size();
+        unsafe { kmalloc(size) }
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, _: Layout) {
