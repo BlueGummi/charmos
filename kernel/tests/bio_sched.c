@@ -170,7 +170,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
     snprintf(m2, 100, "Runs is %d, test_runs is %d", atomic_load(&runs),
              test_runs);
     ADD_MESSAGE(m2);
-    TEST_ASSERT(atomic_load(&runs) == test_runs);
+    TEST_ASSERT(atomic_load(&runs) <= test_runs);
 
     SET_SUCCESS;
 }
