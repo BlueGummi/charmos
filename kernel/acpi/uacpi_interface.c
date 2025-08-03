@@ -76,7 +76,7 @@ void uacpi_kernel_log(uacpi_log_level level, const uacpi_char *data) {
 }
 
 void *uacpi_kernel_alloc(uacpi_size size) {
-    void *x = kmalloc(size);
+    void *x = kzalloc(size);
     return x;
 }
 
