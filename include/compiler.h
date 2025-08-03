@@ -1,4 +1,3 @@
-#include <features.h>
 #pragma once
 
 #define __randomize_layout __attribute__((randomize_layout))

@@ -1,5 +1,5 @@
-#include <assert.h>
 #include <console/printf.h>
+#include <kassert.h>
 #include <mem/alloc.h>
 #include <misc/rbt.h>
 #include <stddef.h>
@@ -333,9 +333,9 @@ void rbt_insert(struct rbt *tree, struct rbt_node *new_node) {
     fix_insertion(tree, new_node);
 
     if (parent)
-        assert(!(parent->color == TREE_NODE_RED &&
-                 new_node->color == TREE_NODE_RED));
+        kassert(!(parent->color == TREE_NODE_RED &&
+                  new_node->color == TREE_NODE_RED));
 
     int dummy_bh = 0;
-    assert(validate_rbtree(tree->root, &dummy_bh));
+    kassert(validate_rbtree(tree->root, &dummy_bh));
 }

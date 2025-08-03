@@ -1,7 +1,7 @@
 #include <asm.h>
-#include <assert.h>
 #include <block/sched.h>
 #include <int/idt.h>
+#include <kassert.h>
 #include <sch/defer.h>
 #include <sch/sched.h>
 
@@ -12,7 +12,7 @@ static inline void reset_idle_thread_stage(struct idle_thread_data *idle) {
 
 static inline void progress_idle_thread_stage(struct idle_thread_data *idle) {
     /* We should not be progressing if we are at the last stage */
-    assert(idle->state < IDLE_THREAD_SLEEP);
+    kassert(idle->state < IDLE_THREAD_SLEEP);
     atomic_fetch_add(&idle->state, 1);
 }
 

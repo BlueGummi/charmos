@@ -1,12 +1,12 @@
 #include <acpi/lapic.h>
 #include <asm.h>
-#include <assert.h>
 #include <block/bio.h>
 #include <block/generic.h>
 #include <block/sched.h>
 #include <console/printf.h>
 #include <drivers/nvme.h>
 #include <int/idt.h>
+#include <kassert.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
@@ -44,7 +44,7 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
         uint16_t status = mmio_read_32(&entry->status) & 0xFFFE;
 
         struct nvme_request *req = dev->io_requests[qid][cid];
-        assert(req);
+        kassert(req);
 
         req->status = status;
         wake_waiter(req);

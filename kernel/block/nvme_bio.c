@@ -1,5 +1,5 @@
 #include <asm.h>
-#include <assert.h>
+#include <kassert.h>
 #include <block/sched.h>
 #include <drivers/nvme.h>
 #include <mem/alloc.h>
