@@ -41,6 +41,7 @@ void vmm_init(struct limine_memmap_response *memmap,
               struct limine_executable_address_response *xa);
 void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags);
 void vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags);
+void vmm_unmap_2mb_page(uintptr_t virt);
 void vmm_unmap_page(uintptr_t virt);
 uintptr_t vmm_get_phys(uintptr_t virt);
 void *vmm_map_phys(uint64_t addr, uint64_t len, uint64_t flags);

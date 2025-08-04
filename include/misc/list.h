@@ -46,6 +46,15 @@ static inline int list_empty(const struct list_head *head) {
     return head->next == head;
 }
 
+static inline struct list_head *list_pop_front(struct list_head *head) {
+    if (list_empty(head))
+        return NULL;
+
+    struct list_head *entry = head->next;
+    list_del(entry);
+    return entry;
+}
+
 #define list_entry(ptr, type, member)                                          \
     ((type *) ((char *) (ptr) - (offsetof(type, member))))
 

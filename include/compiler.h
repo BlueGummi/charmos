@@ -1,7 +1,5 @@
 #pragma once
 
-#define __randomize_layout __attribute__((randomize_layout))
-
 #define __noinline __attribute__((noinline))
 
 #define __noreturn __attribute__((noreturn))
@@ -20,7 +18,7 @@
 
 #define __section(x) __attribute__((section(x)))
 
-#define __hidden __attribute__((visibility("hidden")))
+#define __hidden __attribute__((visibility("hidden")))`
 #define __export __attribute__((visibility("default")))
 
 #define likely(x) __builtin_expect(!!(x), 1)
@@ -50,3 +48,7 @@
 #else
 #define __restrict
 #endif
+
+#define smp_mb() atomic_thread_fence(memory_order_seq_cst)
+#define smp_rmb() atomic_thread_fence(memory_order_acquire)
+#define smp_wmb() atomic_thread_fence(memory_order_release)

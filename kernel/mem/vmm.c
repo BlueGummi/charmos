@@ -142,6 +142,14 @@ void vmm_init(struct limine_memmap_response *memmap,
     asm volatile("mov %0, %%cr3" : : "r"(kernel_pml4_phys) : "memory");
 }
 
+static inline bool vmm_is_table_empty(struct page_table *table) {
+    for (int i = 0; i < 512; i++) {
+        if (table->entries[i] & PAGING_PRESENT)
+            return false;
+    }
+    return true;
+}
+
 static void pte_init(pte_t *entry, uint64_t flags) {
     struct page_table *new_table = (struct page_table *) pmm_alloc_page(true);
     if (!new_table)
@@ -177,6 +185,51 @@ void vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
 
     invlpg(virt);
     do_tlb_shootdown(virt);
+    spin_unlock(&vmm_lock, interrupts);
+}
+
+void vmm_unmap_2mb_page(uintptr_t virt) {
+    if ((virt & (PAGE_2MB - 1)) != 0) {
+        k_panic("vmm_unmap_2mb_page: virtual address not 2MiB aligned!\n");
+    }
+
+    struct page_table *tables[3];
+    pte_t *entries[3];
+
+    bool interrupts = spin_lock(&vmm_lock);
+    tables[0] = kernel_pml4;
+
+    for (uint64_t level = 0; level < 2; level++) {
+        uint64_t index = (virt >> (39 - level * 9)) & 0x1FF;
+        entries[level] = &tables[level]->entries[index];
+
+        if (!ENTRY_PRESENT(*entries[level])) {
+            spin_unlock(&vmm_lock, interrupts);
+            return;
+        }
+
+        tables[level + 1] =
+            (struct page_table *) ((*entries[level] & PAGING_PHYS_MASK) +
+                                   global.hhdm_offset);
+    }
+
+    uint64_t L2 = (virt >> 21) & 0x1FF;
+    entries[2] = &tables[2]->entries[L2];
+
+    *entries[2] &= ~PAGING_PRESENT;
+    invlpg(virt);
+    do_tlb_shootdown(virt);
+
+    for (uint64_t level = 2; level > 0; level--) {
+        if (vmm_is_table_empty(tables[level])) {
+            uintptr_t phys = (uintptr_t) tables[level] - global.hhdm_offset;
+            *entries[level - 1] = 0;
+            pmm_free_pages((void *) phys, 1, false);
+        } else {
+            break;
+        }
+    }
+
     spin_unlock(&vmm_lock, interrupts);
 }
 
@@ -231,14 +284,6 @@ void vmm_map_page_user(uintptr_t pml4_phys, uintptr_t virt, uintptr_t phys,
     *entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
 
     invlpg(virt);
-}
-
-static inline bool vmm_is_table_empty(struct page_table *table) {
-    for (int i = 0; i < 512; i++) {
-        if (table->entries[i] & PAGING_PRESENT)
-            return false;
-    }
-    return true;
 }
 
 void vmm_unmap_page(uintptr_t virt) {

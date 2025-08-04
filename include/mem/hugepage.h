@@ -14,6 +14,36 @@
 #define HUGEPAGE_ALIGN(addr) ((addr + HUGEPAGE_SIZE - 1) & ~(HUGEPAGE_SIZE - 1))
 #define HUGEPAGE_SIZE_IN_4KB_PAGES (512)
 
+/* We scale this timeout based on the # of pages in the GC list.
+ *
+ * If there are `HUGEPAGE_GC_LIST_MAX_HUGEPAGES` - 1, the timeout is
+ * equal to `HUGEPAGE_GC_LIST_TIMEOUT_PER_PAGE`.
+ *
+ * If there are `HUGEPAGE_GC_LIST_MAX_HUGEPAGES` or more,
+ * the timeout is 0, and the hugepage is immediately deleted.
+ *
+ * The formula is
+ *
+ * timeout = (max_hugepages - current_hugepages) * timeout_per_hugepage
+ *
+ */
+#define HUGEPAGE_GC_LIST_TIMEOUT_PER_PAGE 500 /* 500 ms */
+
+/* 32MB of hugepages - adjustable
+ *
+ * TODO: adjust this based on total system RAM */
+#define HUGEPAGE_GC_LIST_MAX_HUGEPAGES 16
+
+#define HUGEPAGE_OPTIMAL_MAX_TIMEOUT 32000 /* 32 seconds */
+
+#if ((HUGEPAGE_GC_LIST_TIMEOUT_PER_PAGE * HUGEPAGE_GC_LIST_MAX_HUGEPAGES) >    \
+     HUGEPAGE_OPTIMAL_MAX_TIMEOUT)
+
+#warn                                                                          \
+    "HUGEPAGE_GC_LIST_TIMEOUT_PER_PAGE or HUGEPAGE_GC_LIST_MAX_HUGEPAGES may be set to a suboptimal value"
+
+#endif
+
 enum hugepage_state {
     HUGEPAGE_STATE_USED,
     HUGEPAGE_STATE_PARTIAL,
@@ -30,6 +60,10 @@ struct hugepage {
     uint8_t bitmap[HUGEPAGE_U8_BITMAP_SIZE]; /* One bit per 4KB page */
 
     uint32_t pages_used;
+    uint32_t last_allocated_idx; /* For one page allocations - gives us an
+                                  * O(1) allocation time in the fastpath
+                                  * without creating much fragmentation */
+
     enum hugepage_state state;
 
     core_t owner_core;
@@ -53,25 +87,25 @@ struct hugepage_core_list {
 };
 
 struct hugepage_tree {
+    struct spinlock lock;
     struct rbt root_node;
     core_t core_count;
     struct hugepage_core_list *core_lists;
 };
 
 struct hugepage_gc_list {
+    struct spinlock lock;
     struct list_head hugepages_list;
+    uint32_t pages_in_list;
 };
 
-static enum hugepage_state hugepage_state_of(struct hugepage *hp) {
-    /* All empty? */
-    if (hp->pages_used == 0)
-        return HUGEPAGE_STATE_FREE;
+static inline bool hugepage_gc_list_lock(struct hugepage_gc_list *gcl) {
+    return spin_lock(&gcl->lock);
+}
 
-    /* All full? */
-    if (hp->pages_used == HUGEPAGE_SIZE_IN_4KB_PAGES)
-        return HUGEPAGE_STATE_USED;
-
-    return HUGEPAGE_STATE_PARTIAL;
+static inline void hugepage_gc_list_unlock(struct hugepage_gc_list *gcl,
+                                           bool iflag) {
+    spin_unlock(&gcl->lock, iflag);
 }
 
 static inline bool hugepage_list_lock(struct hugepage_core_list *hcl) {
@@ -96,4 +130,22 @@ static inline bool hugepage_trylock(struct hugepage *hp) {
     return spin_trylock(&hp->lock);
 }
 
+static inline bool hugepage_tree_lock(struct hugepage_tree *hpt) {
+    return spin_lock(&hpt->lock);
+}
+
+static inline void hugepage_tree_unlock(struct hugepage_tree *hpt, bool iflag) {
+    spin_unlock(&hpt->lock, iflag);
+}
+
+/* You cannot unmark the 'being_deleted' since that is a UAF */
+static inline void hugepage_mark_being_deleted(struct hugepage *hp) {
+    atomic_store(&hp->being_deleted, true);
+}
+
+static inline bool hugepage_is_being_deleted(struct hugepage *hp) {
+    return atomic_load(&hp->being_deleted);
+}
+
 void hugepage_alloc_init(void);
+void hugepage_print(struct hugepage *hp);

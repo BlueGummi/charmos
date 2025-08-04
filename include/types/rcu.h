@@ -1,4 +1,5 @@
 #pragma once
+#include <compiler.h>
 #include <stdatomic.h>
 #include <stdint.h>
 
@@ -15,3 +16,17 @@ void rcu_defer(void (*func)(void *), void *arg);
 void rcu_maintenance_tick(void);
 void rcu_read_lock(void);
 void rcu_read_unlock(void);
+
+#define rcu_assign_pointer(p, v)                                               \
+    ({                                                                         \
+        smp_wmb();                                                             \
+        (p) = (v);                                                             \
+    })
+
+/* safely dereference under RCU read lock */
+#define rcu_dereference(p)                                                     \
+    ({                                                                         \
+        typeof(p) _________p = (p);                                            \
+        smp_rmb();                                                             \
+        _________p;                                                            \
+    })

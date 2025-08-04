@@ -1,3 +1,4 @@
+#include <console/panic.h>
 #include <mem/alloc.h>
 #include <misc/minheap.h>
 #include <string.h>
@@ -74,8 +75,10 @@ void minheap_insert(struct minheap *heap, struct minheap_node *node,
 
 void minheap_remove(struct minheap *heap, struct minheap_node *node) {
     uint32_t idx = node->index;
-    if (idx >= heap->size)
+    if (idx >= heap->size) {
+        k_panic("Minheap node index '%u' exceeds minheap capacity!", idx);
         return;
+    }
 
     heap->size--;
     if (idx != heap->size) {
@@ -84,10 +87,8 @@ void minheap_remove(struct minheap *heap, struct minheap_node *node) {
         minheap_sift_down(heap, idx);
         minheap_sift_up(heap, idx);
     }
-}
 
-struct minheap_node *minheap_peek(struct minheap *heap) {
-    return heap->size == 0 ? NULL : heap->nodes[0];
+    node->index = MINHEAP_INDEX_INVALID;
 }
 
 struct minheap_node *minheap_pop(struct minheap *heap) {
@@ -102,9 +103,6 @@ struct minheap_node *minheap_pop(struct minheap *heap) {
         minheap_sift_down(heap, 0);
     }
 
+    top->index = MINHEAP_INDEX_INVALID;
     return top;
-}
-
-uint32_t minheap_size(struct minheap *heap) {
-    return heap->size;
 }

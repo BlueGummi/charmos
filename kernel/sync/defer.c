@@ -46,7 +46,7 @@ static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
         if (ev->callback)
             ev->callback(ev->arg, ev->arg2);
 
-        defer_free(ev);
+        kfree(ev);
         i = spin_lock(lock);
     }
 
