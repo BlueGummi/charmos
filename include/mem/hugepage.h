@@ -28,7 +28,8 @@ struct hugepage {
                         * without traversing page tables */
     vaddr_t virt_base;
     uint8_t bitmap[HUGEPAGE_U8_BITMAP_SIZE]; /* One bit per 4KB page */
-    refcount_t refcount;
+
+    uint32_t pages_used;
     enum hugepage_state state;
 
     core_t owner_core;
@@ -62,25 +63,37 @@ struct hugepage_gc_list {
 };
 
 static enum hugepage_state hugepage_state_of(struct hugepage *hp) {
-    int found_empty = 0;
-    int found_full = 0;
-
-    for (uint64_t i = 0; i < HUGEPAGE_U8_BITMAP_SIZE; i++) {
-        uint8_t this_part = hp->bitmap[i];
-        if (this_part == UINT8_MAX)
-            found_full++;
-        else if (this_part == 0)
-            found_empty++;
-    }
-
     /* All empty? */
-    if (found_empty == HUGEPAGE_U8_BITMAP_SIZE)
+    if (hp->pages_used == 0)
         return HUGEPAGE_STATE_FREE;
 
     /* All full? */
-    if (found_full == HUGEPAGE_U8_BITMAP_SIZE)
+    if (hp->pages_used == HUGEPAGE_SIZE_IN_4KB_PAGES)
         return HUGEPAGE_STATE_USED;
 
     return HUGEPAGE_STATE_PARTIAL;
 }
+
+static inline bool hugepage_list_lock(struct hugepage_core_list *hcl) {
+    return spin_lock(&hcl->lock);
+}
+
+/* We never trylock the hugepage_list so there is no need to write that lol */
+static inline void hugepage_list_unlock(struct hugepage_core_list *hcl,
+                                        bool iflag) {
+    spin_unlock(&hcl->lock, iflag);
+}
+
+static inline bool hugepage_lock(struct hugepage *hp) {
+    return spin_lock(&hp->lock);
+}
+
+static inline void hugepage_unlock(struct hugepage *hp, bool iflag) {
+    spin_unlock(&hp->lock, iflag);
+}
+
+static inline bool hugepage_trylock(struct hugepage *hp) {
+    return spin_trylock(&hp->lock);
+}
+
 void hugepage_alloc_init(void);

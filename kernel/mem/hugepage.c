@@ -8,26 +8,81 @@
 
 static struct hugepage_tree full_tree = {0};
 
+/* TODO: This shouldn't be here. Move it to
+ * a different file. I (past me by the time
+ * you read this) am lazy and this is used
+ * nowhere else though, so I'm keeping it here.
+ * Go move it. */
+static uint8_t popcount_uint8(uint8_t n) {
+    uint8_t c = 0;
+    for (; n; ++c)
+        n &= n - 1;
+    return c;
+}
+
+void hugepage_print(struct hugepage *hp) {
+    bool iflag = hugepage_lock(hp);
+    k_printf("struct hugepage {\n");
+    k_printf("       .phys_base = 0x%lx\n", hp->phys_base);
+    k_printf("       .virt_base = 0x%lx\n", hp->virt_base);
+    k_printf("       .pages_used = %u\n", hp->pages_used);
+    k_printf("       .owner_core = %u\n", hp->owner_core);
+    if (hp->for_deletion) {
+        k_printf("       .deletion_timeout = %u\n", hp->deletion_timeout);
+        k_printf("       .being_deleted = %d\n", hp->being_deleted);
+    }
+    k_printf("}\n");
+    hugepage_unlock(hp, iflag);
+}
+
+/* We check hugepage allocation counts, bitmaps,
+ * states, and their pointers */
+static bool hugepage_is_valid(struct hugepage *hp) {
+    bool iflag = hugepage_lock(hp);
+
+    uint32_t pused = 0;
+
+    for (int i = 0; i < HUGEPAGE_U8_BITMAP_SIZE; i++) {
+        uint8_t bm_part = hp->bitmap[i];
+        pused += popcount_uint8(bm_part);
+    }
+
+    if (pused != hp->pages_used) {
+        hugepage_unlock(hp, iflag);
+        return false;
+    }
+
+    /* These two must match, _state_of will calculate it
+     * independently from what hp->state is */
+    bool state_valid = hugepage_state_of(hp) == hp->state;
+
+    if (!state_valid) {
+        hugepage_unlock(hp, iflag);
+        return false;
+    }
+
+    return true;
+}
+
 /* Everything free */
-static inline void hugepage_bitmap_zero(struct hugepage *hp) {
+static inline void bitmap_zero(struct hugepage *hp) {
     memset(hp->bitmap, 0, HUGEPAGE_U8_BITMAP_SIZE);
 }
 
-static inline void hugepage_addrs_init(struct hugepage *hp, vaddr_t vaddr_base,
-                                       vaddr_t physaddr_base) {
+static inline void addrs_init(struct hugepage *hp, vaddr_t vaddr_base,
+                              vaddr_t physaddr_base) {
     hp->phys_base = physaddr_base;
     hp->virt_base = vaddr_base;
 }
 
 /* No deletion happening */
-static inline void hugepage_deletion_init(struct hugepage *hp) {
+static inline void deletion_init(struct hugepage *hp) {
     hp->deletion_timeout = HUGEPAGE_DELETION_TIMEOUT_NONE;
     hp->for_deletion = false;
     hp->being_deleted = false;
 }
 
-static inline void hugepage_structures_init(struct hugepage *hp,
-                                            vaddr_t vaddr_base) {
+static inline void structures_init(struct hugepage *hp, vaddr_t vaddr_base) {
     INIT_LIST_HEAD(&hp->gc_list_node);
     rbt_init_node(&hp->tree_node);
 
@@ -35,26 +90,14 @@ static inline void hugepage_structures_init(struct hugepage *hp,
     hp->tree_node.data = vaddr_base;
 }
 
-static inline void hugepage_state_init(struct hugepage *hp, core_t owner) {
+static inline void state_init(struct hugepage *hp, core_t owner) {
     hp->owner_core = owner;
     hp->state = HUGEPAGE_STATE_FREE;
-    refcount_init(&hp->refcount, 0);
+    hp->pages_used = 0;
 }
 
-static inline void hugepage_lock_init(struct hugepage *hp) {
+static inline void lock_init(struct hugepage *hp) {
     spinlock_init(&hp->lock);
-}
-
-static inline void hugepage_lock(struct hugepage *hp) {
-    spin_lock(&hp->lock);
-}
-
-static inline void hugepage_unlock(struct hugepage *hp, bool iflag) {
-    spin_unlock(&hp->lock, iflag);
-}
-
-static inline bool hugepage_trylock(struct hugepage *hp) {
-    return spin_trylock(&hp->lock);
 }
 
 static void init_hugepage_list(struct hugepage_core_list *list,
@@ -63,33 +106,35 @@ static void init_hugepage_list(struct hugepage_core_list *list,
     list->core_num = core_num;
 }
 
-static void hugepage_page_init(struct hugepage *hp, vaddr_t vaddr_base,
-                               paddr_t phys_base, core_t owner) {
-    hugepage_lock_init(hp);
-    hugepage_bitmap_zero(hp);
-    hugepage_deletion_init(hp);
-    hugepage_addrs_init(hp, vaddr_base, phys_base);
-    hugepage_structures_init(hp, vaddr_base);
-    hugepage_state_init(hp, owner);
+static void page_init(struct hugepage *hp, vaddr_t vaddr_base,
+                      paddr_t phys_base, core_t owner) {
+    lock_init(hp);
+    bitmap_zero(hp);
+    deletion_init(hp);
+    addrs_init(hp, vaddr_base, phys_base);
+    structures_init(hp, vaddr_base);
+    state_init(hp, owner);
 }
 
-static inline void hugepage_insert_in_core_list(struct hugepage_core_list *list,
-                                                struct hugepage *hp) {
+static inline void insert_in_core_list(struct hugepage_core_list *list,
+                                       struct hugepage *hp) {
+    bool iflag = hugepage_list_lock(list);
     minheap_insert(list->hugepage_minheap, &hp->minheap_node, hp->virt_base);
+    hugepage_list_unlock(list, iflag);
 }
 
-static inline void hugepage_insert_in_global_tree(struct hugepage_tree *tree,
-                                                  struct hugepage *hp) {
+static inline void insert_in_global_tree(struct hugepage_tree *tree,
+                                         struct hugepage *hp) {
     rbt_insert(&tree->root_node, &hp->tree_node);
 }
 
-static inline void hugepage_insert(struct hugepage *hp) {
+static inline void insert(struct hugepage *hp) {
     struct hugepage_core_list *hcl = &full_tree.core_lists[hp->owner_core];
-    hugepage_insert_in_core_list(hcl, hp);
-    hugepage_insert_in_global_tree(&full_tree, hp);
+    insert_in_core_list(hcl, hp);
+    insert_in_global_tree(&full_tree, hp);
 }
 
-static vaddr_t hugepage_find_free_vaddr(struct hugepage_tree *tree) {
+static vaddr_t find_free_vaddr(struct hugepage_tree *tree) {
     vaddr_t last_end = HUGEPAGE_HEAP_BASE;
 
     struct rbt_node *node = rbt_min(&tree->root_node);
@@ -98,9 +143,8 @@ static vaddr_t hugepage_find_free_vaddr(struct hugepage_tree *tree) {
 
         last_end = HUGEPAGE_ALIGN(last_end);
 
-        if (last_end + HUGEPAGE_SIZE <= hp->virt_base) {
+        if (last_end + HUGEPAGE_SIZE <= hp->virt_base)
             return last_end;
-        }
 
         last_end = hp->virt_base + HUGEPAGE_SIZE;
         node = rbt_next(node);
@@ -109,27 +153,27 @@ static vaddr_t hugepage_find_free_vaddr(struct hugepage_tree *tree) {
     return HUGEPAGE_ALIGN(last_end);
 }
 
-static inline paddr_t hugepage_alloc_2mb(void) {
+static inline paddr_t alloc_2mb(void) {
     return (paddr_t) pmm_alloc_pages(HUGEPAGE_SIZE_IN_4KB_PAGES, false);
 }
 
-static inline void hugepage_map_pages(vaddr_t virt_base, paddr_t phys_base) {
+static inline void map_pages(vaddr_t virt_base, paddr_t phys_base) {
     vmm_map_2mb_page(virt_base, phys_base, PAGING_NO_FLAGS);
 }
 
-static struct hugepage *hugepage_alloc(core_t owner) {
+static struct hugepage *alloc_new_hugepage(core_t owner) {
     struct hugepage *hp = kzalloc(sizeof(struct hugepage));
     if (!hp)
         return NULL;
 
-    vaddr_t virt_base = hugepage_find_free_vaddr(&full_tree);
-    paddr_t phys_base = hugepage_alloc_2mb();
+    vaddr_t virt_base = find_free_vaddr(&full_tree);
+    paddr_t phys_base = alloc_2mb();
     if (!phys_base)
         return NULL;
 
-    hugepage_map_pages(virt_base, phys_base);
-    hugepage_page_init(hp, virt_base, phys_base, owner);
-    hugepage_insert(hp);
+    map_pages(virt_base, phys_base);
+    page_init(hp, virt_base, phys_base, owner);
+    insert(hp);
 
     return hp;
 }

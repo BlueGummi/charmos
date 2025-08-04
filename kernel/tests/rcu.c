@@ -37,9 +37,10 @@ static void rcu_reader_thread(void) {
     }
 
     atomic_fetch_add(&rcu_reads_done, 1);
+    k_printf("Reader thread complete\n");
 }
 
-static atomic_bool rcu_deferred_freed = false;
+static atomic_bool volatile rcu_deferred_freed = false;
 
 static void rcu_free_fn(void *ptr) {
     kfree(ptr);
@@ -48,7 +49,7 @@ static void rcu_free_fn(void *ptr) {
 }
 
 static void rcu_writer_thread(void) {
-    sleep_ms(10);
+    sleep_ms(30);
 
     struct rcu_test_data *old = shared_ptr;
 
@@ -58,6 +59,7 @@ static void rcu_writer_thread(void) {
 
     rcu_synchronize();
     rcu_defer(rcu_free_fn, old);
+    k_printf("Writer thread complete\n");
 }
 
 REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
@@ -66,10 +68,10 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     initial->value = 42;
     shared_ptr = initial;
 
-    for (uint64_t i = 0; i < NUM_RCU_READERS; i++) {
+    for (uint64_t i = 0; i < NUM_RCU_READERS; i++)
         thread_spawn(rcu_reader_thread);
-    }
 
+    k_printf("Readers spawned\n");
     thread_spawn(rcu_writer_thread);
 
     while (atomic_load(&rcu_reads_done) < NUM_RCU_READERS)
