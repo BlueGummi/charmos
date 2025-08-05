@@ -30,13 +30,14 @@ enum hugepage_flags : uint8_t {
 };
 
 enum hugepage_hint : uint8_t {
-    HUGEPAGE_HINT_NONE,
-    HUGEPAGE_HINT_EXPECT_SMALL_ALLOCS,
-    HUGEPAGE_HINT_EXPECT_LARGE_ALLOCS,
-    HUGEPAGE_HINT_EXPECT_BULK_FREE,
-    HUGEPAGE_HINT_PREFER_INDEPENDENT,
-    HUGEPAGE_HINT_ALLOW_REBALANCE,
+    HUGEPAGE_HINT_NONE = 0,
+    HUGEPAGE_HINT_EXPECT_SMALL_ALLOCS = 1,
+    HUGEPAGE_HINT_EXPECT_LARGE_ALLOCS = 2,
+    HUGEPAGE_HINT_EXPECT_BULK_FREE = 3,
+    HUGEPAGE_HINT_PREFER_INDEPENDENT = 4,
+    HUGEPAGE_HINT_ALLOW_REBALANCE = 5,
 };
+#define HUGEPAGE_HINT_COUNT_INTERNAL 6
 
 struct hugepage {
     struct spinlock lock;
@@ -222,6 +223,7 @@ void hugepage_free_hugepage(struct hugepage *hp);
 void *hugepage_alloc_from_hugepage(struct hugepage *hp, size_t cnt);
 void hugepage_free_from_hugepage(struct hugepage *hp, void *ptr,
                                  size_t page_count);
+void hugepage_issue_hint(enum hugepage_hint hint, uint32_t arg);
 
 #define hugepage_sanity_assert(hp) kassert(hugepage_is_valid(hp))
 #define hugepage_deletion_sanity_assert(hp)                                    \

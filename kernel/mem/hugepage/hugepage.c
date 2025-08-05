@@ -73,6 +73,7 @@ void hugepage_delete(struct hugepage *hp) {
     kfree(hp);
 }
 
+/* Only used inside of this allocator */
 void hugepage_delete_and_unlink(struct hugepage *hp) {
     bool iflag = hugepage_gc_list_lock(&hugepage_gc_list);
 
