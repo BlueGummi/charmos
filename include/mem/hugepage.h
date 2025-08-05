@@ -67,6 +67,7 @@ struct hugepage {
     enum hugepage_state state;
 
     core_t owner_core;
+    atomic_bool gc_timer_pending;
 
     time_t deletion_timeout;
     bool for_deletion;         /* In deletion list */
@@ -96,7 +97,7 @@ struct hugepage_tree {
 struct hugepage_gc_list {
     struct spinlock lock;
     struct list_head hugepages_list;
-    uint32_t pages_in_list;
+    atomic_uint pages_in_list;
 };
 
 static inline bool hugepage_gc_list_lock(struct hugepage_gc_list *gcl) {
@@ -147,5 +148,53 @@ static inline bool hugepage_is_being_deleted(struct hugepage *hp) {
     return atomic_load(&hp->being_deleted);
 }
 
+static inline uint8_t popcount_uint8(uint8_t n) {
+    uint8_t c = 0;
+    for (; n; ++c)
+        n &= n - 1;
+    return c;
+}
+
+bool hugepage_is_valid(struct hugepage *hp);
+bool hugepage_safe_for_deletion(struct hugepage *hp);
+
 void hugepage_alloc_init(void);
 void hugepage_print(struct hugepage *hp);
+void hugepage_enqueue_for_gc(struct hugepage *hp);
+struct hugepage *hugepage_get_from_gc_list(void);
+void hugepage_tree_insert(struct hugepage_tree *tree, struct hugepage *hp);
+
+void hugepage_core_list_insert(struct hugepage_core_list *list,
+                               struct hugepage *hp);
+
+struct hugepage *hugepage_core_list_peek(struct hugepage_core_list *hcl);
+struct hugepage *hugepage_core_list_pop(struct hugepage_core_list *hcl);
+
+void hugepage_core_list_remove_hugepage(struct hugepage_core_list *hcl,
+                                        struct hugepage *hp);
+
+void hugepage_tree_remove(struct hugepage_tree *tree, struct hugepage *hp);
+void hugepage_init(struct hugepage *hp, vaddr_t vaddr_base, paddr_t phys_base,
+                   core_t owner);
+void hugepage_delete(struct hugepage *hp);
+
+void hugepage_gc_add(struct hugepage *hp);
+void hugepage_gc_remove(struct hugepage *hp);
+
+#define hugepage_sanity_assert(hp) kassert(hugepage_is_valid(hp))
+#define hugepage_deletion_sanity_assert(hp)                                    \
+    kassert(hugepage_safe_for_deletion(hp))
+
+#define hugepage_from_gc_list_node(node)                                       \
+    container_of(node, struct hugepage, gc_list_node)
+
+#define hugepage_from_minheap_node(node)                                       \
+    container_of(node, struct hugepage, minheap_node)
+
+extern struct hugepage_tree *hugepage_full_tree;
+extern struct hugepage_gc_list hugepage_gc_list;
+
+static inline struct hugepage_core_list *
+hugepage_get_core_list(struct hugepage *hp) {
+    return &hugepage_full_tree->core_lists[hp->owner_core];
+}
