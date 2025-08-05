@@ -27,7 +27,7 @@ void hugepage_print(struct hugepage *hp) {
 bool hugepage_is_valid(struct hugepage *hp) {
     bool iflag = hugepage_lock(hp);
 
-    uint32_t pused = 0;
+    uint64_t pused = 0;
 
     for (int i = 0; i < HUGEPAGE_U64_BITMAP_SIZE; i++) {
         uint64_t bm_part = hp->bitmap[i];

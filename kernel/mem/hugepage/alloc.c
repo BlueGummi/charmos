@@ -21,20 +21,20 @@ static inline size_t u64_idx_for_idx(size_t idx) {
 
 static inline void set_bit(struct hugepage *hp, size_t index) {
     size_t u64_idx = u64_idx_for_idx(index);
-    uint64_t mask = 1 << (index % 64);
+    uint64_t mask = 1ULL << (index % 64);
     hp->bitmap[u64_idx] |= mask;
 }
 
 static inline void clear_bit(struct hugepage *hp, size_t index) {
     size_t u64_idx = u64_idx_for_idx(index);
-    uint64_t mask = ~(1 << (index % 64));
+    uint64_t mask = ~(1ULL << (index % 64));
     hp->bitmap[u64_idx] &= mask;
 }
 
 static inline bool test_bit(struct hugepage *hp, size_t index) {
     size_t u64_idx = u64_idx_for_idx(index);
     uint64_t value = hp->bitmap[u64_idx];
-    return (value & (1 << (index % 64))) != 0;
+    return (value & (1ULL << (index % 64))) != 0;
 }
 
 static size_t find_free_range(struct hugepage *hp, size_t page_count) {
@@ -146,6 +146,7 @@ static inline void reinsert_hugepage(struct hugepage *hp) {
         hugepage_core_list_insert(hcl, hp);
 }
 
+#include <asm.h>
 static inline void *alloc_and_adjust(struct hugepage *hp, size_t pages) {
     kassert(pages > 0);
     if (hugepage_num_pages_free(hp) < pages)
@@ -153,7 +154,9 @@ static inline void *alloc_and_adjust(struct hugepage *hp, size_t pages) {
 
     hugepage_sanity_assert(hp);
     hugepage_remove_from_list_safe(hp);
+
     void *ret = hugepage_alloc_from_hugepage(hp, pages);
+
     reinsert_hugepage(hp);
     return ret;
 }

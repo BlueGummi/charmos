@@ -170,13 +170,16 @@ static inline bool hugepage_is_marked_for_deletion(struct hugepage *hp) {
     return atomic_load(&hp->for_deletion);
 }
 
-static inline uint8_t popcount_uint64(uint64_t n) {
-    uint64_t c = 0;
-    for (; n; ++c)
-        n &= n - 1;
-    return c;
+static inline uint64_t popcount_uint64(uint64_t n) {
+    uint64_t count = 0;
+    while (n > 0) {
+        if (n & 1) {
+            count++;
+        }
+        n >>= 1;
+    }
+    return count;
 }
-
 bool hugepage_is_valid(struct hugepage *hp);
 bool hugepage_safe_for_deletion(struct hugepage *hp);
 
