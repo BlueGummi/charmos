@@ -4,6 +4,10 @@
 #define MINHEAP_INIT_CAP 64
 #define MINHEAP_INDEX_INVALID ((uint32_t) -1)
 
+#define minheap_for_each(heap, node_ptr)                                       \
+    for (uint32_t __i = 0;                                                     \
+         (node_ptr = ((heap)->nodes[__i]), __i < (heap)->size); __i++)
+
 struct minheap_node {
     uint64_t key;
     uint32_t index;

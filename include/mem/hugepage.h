@@ -1,6 +1,8 @@
+#include <mem/vaddr_alloc.h>
 #include <misc/list.h>
 #include <misc/minheap.h>
 #include <misc/rbt.h>
+#include <mp/core.h>
 #include <stdatomic.h>
 #include <stdint.h>
 #include <sync/spin_lock.h>
@@ -10,7 +12,7 @@
 #define HUGEPAGE_HEAP_END 0xFFFFEFFFFFFFFFFFULL
 #define HUGEPAGE_SIZE (2 * 1024 * 1024) /* 2 MB */
 #define HUGEPAGE_DELETION_TIMEOUT_NONE ((time_t) -1)
-#define HUGEPAGE_U8_BITMAP_SIZE (64)
+#define HUGEPAGE_U64_BITMAP_SIZE (8)
 #define HUGEPAGE_ALIGN(addr) ((addr + HUGEPAGE_SIZE - 1) & ~(HUGEPAGE_SIZE - 1))
 #define HUGEPAGE_SIZE_IN_4KB_PAGES (512)
 
@@ -19,10 +21,21 @@
  * TODO: adjust this based on total system RAM */
 #define HUGEPAGE_GC_LIST_MAX_HUGEPAGES 16
 
-enum hugepage_state {
-    HUGEPAGE_STATE_USED,
-    HUGEPAGE_STATE_PARTIAL,
-    HUGEPAGE_STATE_FREE,
+enum hugepage_flags : uint8_t {
+    HUGEPAGE_FLAG_PINNED = 1 << 0,
+    HUGEPAGE_FLAG_RECYCLED = 1 << 1,
+    HUGEPAGE_FLAG_LOCAL_ONLY = 1 << 2,
+    HUGEPAGE_FLAG_ARENA = 1 << 3,
+    HUGEPAGE_FLAG_UNTRACKED = 1 << 4,
+};
+
+enum hugepage_hint : uint8_t {
+    HUGEPAGE_HINT_NONE,
+    HUGEPAGE_HINT_EXPECT_SMALL_ALLOCS,
+    HUGEPAGE_HINT_EXPECT_LARGE_ALLOCS,
+    HUGEPAGE_HINT_EXPECT_BULK_FREE,
+    HUGEPAGE_HINT_PREFER_INDEPENDENT,
+    HUGEPAGE_HINT_ALLOW_REBALANCE,
 };
 
 struct hugepage {
@@ -31,14 +44,13 @@ struct hugepage {
                         * buddy allocator to free it
                         * without traversing page tables */
     vaddr_t virt_base;
-    uint8_t bitmap[HUGEPAGE_U8_BITMAP_SIZE]; /* One bit per 4KB page */
 
     uint32_t pages_used;
     uint32_t last_allocated_idx; /* For one page allocations - gives us an
                                   * O(1) allocation time in the fastpath
                                   * without creating much fragmentation */
 
-    enum hugepage_state state;
+    enum hugepage_flags flags;
 
     core_t owner_core;
 
@@ -48,6 +60,13 @@ struct hugepage {
     struct rbt_node tree_node;
     struct list_head gc_list_node;
     struct minheap_node minheap_node;
+
+    uint64_t bitmap[HUGEPAGE_U64_BITMAP_SIZE]; /* One bit per 4KB page */
+};
+
+struct hugepage_arena {
+    struct spinlock lock;
+    struct minheap *hugepages;
 };
 
 struct hugepage_core_list {
@@ -61,9 +80,10 @@ struct hugepage_core_list {
 
 struct hugepage_tree {
     struct spinlock lock;
-    struct rbt root_node;
+    struct rbt *root_node;
     core_t core_count;
     struct hugepage_core_list *core_lists;
+    struct vas_space *address_space;
 };
 
 struct hugepage_gc_list {
@@ -71,6 +91,28 @@ struct hugepage_gc_list {
     struct list_head hugepages_list;
     atomic_uint pages_in_list;
 };
+
+#define hugepage_from_gc_list_node(node)                                       \
+    container_of(node, struct hugepage, gc_list_node)
+
+#define hugepage_from_minheap_node(node)                                       \
+    container_of(node, struct hugepage, minheap_node)
+
+static inline void hugepage_gc_list_dec_count(struct hugepage_gc_list *hgcl) {
+    atomic_fetch_sub(&hgcl->pages_in_list, 1);
+}
+
+static inline void hugepage_gc_list_inc_count(struct hugepage_gc_list *hgcl) {
+    atomic_fetch_add(&hgcl->pages_in_list, 1);
+}
+
+static inline bool hugepage_still_in_core_list(struct hugepage *hp) {
+    return hp->minheap_node.index != MINHEAP_INDEX_INVALID;
+}
+
+static inline size_t hugepage_num_pages_free(struct hugepage *hp) {
+    return HUGEPAGE_SIZE_IN_4KB_PAGES - hp->pages_used;
+}
 
 static inline bool hugepage_lock(struct hugepage *hp) {
     return spin_lock(&hp->lock);
@@ -115,8 +157,20 @@ static inline bool hugepage_is_being_deleted(struct hugepage *hp) {
     return atomic_load(&hp->being_deleted);
 }
 
-static inline uint8_t popcount_uint8(uint8_t n) {
-    uint8_t c = 0;
+static inline void hugepage_mark_for_deletion(struct hugepage *hp) {
+    atomic_store(&hp->for_deletion, true);
+}
+
+static inline void hugepage_unmark_for_deletion(struct hugepage *hp) {
+    atomic_store(&hp->for_deletion, false);
+}
+
+static inline bool hugepage_is_marked_for_deletion(struct hugepage *hp) {
+    return atomic_load(&hp->for_deletion);
+}
+
+static inline uint8_t popcount_uint64(uint64_t n) {
+    uint64_t c = 0;
     for (; n; ++c)
         n &= n - 1;
     return c;
@@ -173,16 +227,27 @@ void hugepage_free_from_hugepage(struct hugepage *hp, void *ptr,
 #define hugepage_deletion_sanity_assert(hp)                                    \
     kassert(hugepage_safe_for_deletion(hp))
 
-#define hugepage_from_gc_list_node(node)                                       \
-    container_of(node, struct hugepage, gc_list_node)
-
-#define hugepage_from_minheap_node(node)                                       \
-    container_of(node, struct hugepage, minheap_node)
-
 extern struct hugepage_tree *hugepage_full_tree;
 extern struct hugepage_gc_list hugepage_gc_list;
 
 static inline struct hugepage_core_list *
 hugepage_get_core_list(struct hugepage *hp) {
     return &hugepage_full_tree->core_lists[hp->owner_core];
+}
+
+static inline struct hugepage_core_list *hugepage_this_core_list(void) {
+    return &hugepage_full_tree->core_lists[get_this_core_id()];
+}
+
+static inline void hugepage_remove_from_core_list(struct hugepage *hp) {
+    struct hugepage_core_list *hcl = hugepage_get_core_list(hp);
+    hugepage_core_list_remove_hugepage(hcl, hp);
+}
+
+static inline bool hugepage_remove_from_list_safe(struct hugepage *hp) {
+    if (hugepage_still_in_core_list(hp)) {
+        hugepage_remove_from_core_list(hp);
+        return true;
+    }
+    return false;
 }

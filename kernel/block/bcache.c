@@ -2,6 +2,7 @@
 #include <block/generic.h>
 #include <block/sched.h>
 #include <mem/alloc.h>
+#include <misc/align.h>
 #include <sch/defer.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -10,9 +11,6 @@
 /* TODO: File is getting big, split into multiple */
 
 /* TODO: use linked list in hashmap collisions */
-
-#define ALIGN_DOWN(x, align) ((x) & ~((align) - 1))
-#define ALIGN_UP(x, align) (((x) + ((align) - 1)) & ~((align) - 1))
 
 static bool remove(struct bcache *cache, uint64_t key, uint64_t spb);
 

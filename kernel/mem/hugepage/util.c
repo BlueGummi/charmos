@@ -7,18 +7,6 @@
 #include <sch/defer.h>
 #include <types/refcount.h>
 
-static enum hugepage_state hugepage_state_of(struct hugepage *hp) {
-    /* All empty? */
-    if (hp->pages_used == 0)
-        return HUGEPAGE_STATE_FREE;
-
-    /* All full? */
-    if (hp->pages_used == HUGEPAGE_SIZE_IN_4KB_PAGES)
-        return HUGEPAGE_STATE_USED;
-
-    return HUGEPAGE_STATE_PARTIAL;
-}
-
 void hugepage_print(struct hugepage *hp) {
     bool iflag = hugepage_lock(hp);
     k_printf("struct hugepage {\n");
@@ -41,9 +29,9 @@ bool hugepage_is_valid(struct hugepage *hp) {
 
     uint32_t pused = 0;
 
-    for (int i = 0; i < HUGEPAGE_U8_BITMAP_SIZE; i++) {
-        uint8_t bm_part = hp->bitmap[i];
-        pused += popcount_uint8(bm_part);
+    for (int i = 0; i < HUGEPAGE_U64_BITMAP_SIZE; i++) {
+        uint64_t bm_part = hp->bitmap[i];
+        pused += popcount_uint64(bm_part);
     }
 
     if (pused != hp->pages_used) {
@@ -53,12 +41,6 @@ bool hugepage_is_valid(struct hugepage *hp) {
 
     /* These two must match, hugepage_state_of will calculate it
      * independently from what hp->state is */
-    bool state_valid = hugepage_state_of(hp) == hp->state;
-
-    if (!state_valid) {
-        hugepage_unlock(hp, iflag);
-        return false;
-    }
 
     return true;
 }

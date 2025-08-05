@@ -2,13 +2,13 @@
 
 void hugepage_tree_insert(struct hugepage_tree *tree, struct hugepage *hp) {
     bool iflag = hugepage_tree_lock(tree);
-    rbt_insert(&tree->root_node, &hp->tree_node);
+    rbt_insert(tree->root_node, &hp->tree_node);
     hugepage_tree_unlock(tree, iflag);
 }
 
 void hugepage_tree_remove(struct hugepage_tree *tree, struct hugepage *hp) {
     bool iflag = hugepage_tree_lock(tree);
-    rbt_remove(&tree->root_node, hp->virt_base);
+    rbt_remove(tree->root_node, hp->virt_base);
     hugepage_tree_unlock(tree, iflag);
 }
 
