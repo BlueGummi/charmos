@@ -4,8 +4,6 @@
 #include <mem/hugepage.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <sch/defer.h>
-#include <types/refcount.h>
 
 struct hugepage_tree *hugepage_full_tree = NULL;
 struct hugepage_gc_list hugepage_gc_list = {0};
@@ -43,7 +41,7 @@ static inline void hugepage_insert(struct hugepage *hp) {
     hugepage_tree_insert(hugepage_full_tree, hp);
 }
 
-static struct hugepage *create_new_hugepage(core_t owner) {
+struct hugepage *hugepage_create(core_t owner) {
     struct hugepage *hp = kzalloc(sizeof(struct hugepage));
     if (!hp)
         return NULL;
@@ -61,19 +59,26 @@ static struct hugepage *create_new_hugepage(core_t owner) {
     return hp;
 }
 
+static void hugepage_free_internal(struct hugepage *hp) {
+    kassert(hp->pages_used == 0);
+    vmm_unmap_2mb_page(hp->virt_base);
+    pmm_free_pages((void *) hp->phys_base, HUGEPAGE_SIZE_IN_4KB_PAGES, false);
+    kfree(hp);
+}
+
 void hugepage_delete(struct hugepage *hp) {
+    bool iflag = hugepage_gc_list_lock(&hugepage_gc_list);
     atomic_store(&hp->gc_timer_pending, false);
 
-    /* If for_deletion is true, it must be in the list */
-    if (hugepage_trylock(hp) && hp->for_deletion) {
-        hugepage_gc_remove(hp);
+    if (atomic_load(&hp->for_deletion)) {
         hugepage_mark_being_deleted(hp);
-        kassert(hp->pages_used == 0);
-        vmm_unmap_2mb_page(hp->virt_base);
-        pmm_free_pages((void *) hp->phys_base, HUGEPAGE_SIZE_IN_4KB_PAGES,
-                       false);
-        kfree(hp);
+        hugepage_gc_remove_internal(hp);
+        atomic_fetch_sub(&hugepage_gc_list.pages_in_list, 1);
+        atomic_store(&hp->for_deletion, false);
     }
+
+    hugepage_gc_list_unlock(&hugepage_gc_list, iflag);
+    hugepage_free_internal(hp);
 }
 
 static inline void init_hugepage_list(struct hugepage_core_list *list,

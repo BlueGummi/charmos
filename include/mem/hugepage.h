@@ -52,7 +52,6 @@ enum hugepage_state {
 
 struct hugepage {
     struct spinlock lock;
-
     paddr_t phys_base; /* Just so we can quickly call the
                         * buddy allocator to free it
                         * without traversing page tables */
@@ -70,7 +69,7 @@ struct hugepage {
     atomic_bool gc_timer_pending;
 
     time_t deletion_timeout;
-    bool for_deletion;         /* In deletion list */
+    atomic_bool for_deletion;  /* In deletion list */
     atomic_bool being_deleted; /* Being cleaned up - do not use */
 
     struct rbt_node tree_node;
@@ -100,6 +99,14 @@ struct hugepage_gc_list {
     atomic_uint pages_in_list;
 };
 
+static inline bool hugepage_lock(struct hugepage *hp) {
+    return spin_lock(&hp->lock);
+}
+
+static inline void hugepage_unlock(struct hugepage *hp, bool iflag) {
+    spin_unlock(&hp->lock, iflag);
+}
+
 static inline bool hugepage_gc_list_lock(struct hugepage_gc_list *gcl) {
     return spin_lock(&gcl->lock);
 }
@@ -113,22 +120,9 @@ static inline bool hugepage_list_lock(struct hugepage_core_list *hcl) {
     return spin_lock(&hcl->lock);
 }
 
-/* We never trylock the hugepage_list so there is no need to write that lol */
 static inline void hugepage_list_unlock(struct hugepage_core_list *hcl,
                                         bool iflag) {
     spin_unlock(&hcl->lock, iflag);
-}
-
-static inline bool hugepage_lock(struct hugepage *hp) {
-    return spin_lock(&hp->lock);
-}
-
-static inline void hugepage_unlock(struct hugepage *hp, bool iflag) {
-    spin_unlock(&hp->lock, iflag);
-}
-
-static inline bool hugepage_trylock(struct hugepage *hp) {
-    return spin_trylock(&hp->lock);
 }
 
 static inline bool hugepage_tree_lock(struct hugepage_tree *hpt) {
@@ -158,28 +152,30 @@ static inline uint8_t popcount_uint8(uint8_t n) {
 bool hugepage_is_valid(struct hugepage *hp);
 bool hugepage_safe_for_deletion(struct hugepage *hp);
 
-void hugepage_alloc_init(void);
 void hugepage_print(struct hugepage *hp);
 void hugepage_enqueue_for_gc(struct hugepage *hp);
 struct hugepage *hugepage_get_from_gc_list(void);
-void hugepage_tree_insert(struct hugepage_tree *tree, struct hugepage *hp);
 
 void hugepage_core_list_insert(struct hugepage_core_list *list,
                                struct hugepage *hp);
-
 struct hugepage *hugepage_core_list_peek(struct hugepage_core_list *hcl);
 struct hugepage *hugepage_core_list_pop(struct hugepage_core_list *hcl);
 
 void hugepage_core_list_remove_hugepage(struct hugepage_core_list *hcl,
                                         struct hugepage *hp);
 
+void hugepage_tree_insert(struct hugepage_tree *tree, struct hugepage *hp);
 void hugepage_tree_remove(struct hugepage_tree *tree, struct hugepage *hp);
+
 void hugepage_init(struct hugepage *hp, vaddr_t vaddr_base, paddr_t phys_base,
                    core_t owner);
 void hugepage_delete(struct hugepage *hp);
 
 void hugepage_gc_add(struct hugepage *hp);
 void hugepage_gc_remove(struct hugepage *hp);
+void hugepage_gc_remove_internal(struct hugepage *hp);
+
+void hugepage_alloc_init(void);
 
 #define hugepage_sanity_assert(hp) kassert(hugepage_is_valid(hp))
 #define hugepage_deletion_sanity_assert(hp)                                    \

@@ -1,11 +1,4 @@
-#include <charmos.h>
-#include <kassert.h>
-#include <mem/alloc.h>
 #include <mem/hugepage.h>
-#include <mem/pmm.h>
-#include <mem/vmm.h>
-#include <sch/defer.h>
-#include <types/refcount.h>
 
 void hugepage_tree_insert(struct hugepage_tree *tree, struct hugepage *hp) {
     bool iflag = hugepage_tree_lock(tree);

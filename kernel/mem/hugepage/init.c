@@ -1,12 +1,7 @@
 #include <charmos.h>
 #include <kassert.h>
-#include <mem/alloc.h>
 #include <mem/hugepage.h>
-#include <mem/pmm.h>
-#include <mem/vmm.h>
-#include <sch/defer.h>
 #include <string.h>
-#include <types/refcount.h>
 
 /*
  *
