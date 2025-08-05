@@ -4,6 +4,7 @@
 #include <mem/hugepage.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
+#include <mp/core.h>
 
 struct hugepage_tree *hugepage_full_tree = NULL;
 struct hugepage_gc_list hugepage_gc_list = {0};
@@ -27,8 +28,11 @@ static vaddr_t find_free_vaddr(struct hugepage_tree *tree) {
     return HUGEPAGE_ALIGN(last_end);
 }
 
+#define IS_ALIGNED(ptr, align) (((uintptr_t) (ptr) & ((align) - 1)) == 0)
 static inline paddr_t alloc_2mb_phys(void) {
-    return (paddr_t) pmm_alloc_pages(HUGEPAGE_SIZE_IN_4KB_PAGES, false);
+    paddr_t ret = (paddr_t) pmm_alloc_pages(HUGEPAGE_SIZE_IN_4KB_PAGES, false);
+    kassert(IS_ALIGNED(ret, HUGEPAGE_SIZE));
+    return ret;
 }
 
 static inline void map_pages(vaddr_t virt_base, paddr_t phys_base) {
@@ -41,7 +45,8 @@ static inline void hugepage_insert(struct hugepage *hp) {
     hugepage_tree_insert(hugepage_full_tree, hp);
 }
 
-struct hugepage *hugepage_create(core_t owner) {
+/* Create a hugepage but don't put it anywhere */
+static struct hugepage *create(core_t owner) {
     struct hugepage *hp = kzalloc(sizeof(struct hugepage));
     if (!hp)
         return NULL;
@@ -53,10 +58,22 @@ struct hugepage *hugepage_create(core_t owner) {
 
     map_pages(virt_base, phys_base);
     hugepage_init(hp, virt_base, phys_base, owner);
-    hugepage_insert(hp);
     hugepage_sanity_assert(hp);
 
     return hp;
+}
+
+struct hugepage *hugepage_create(core_t owner) {
+    struct hugepage *hp = create(owner);
+    if (!hp)
+        return NULL;
+
+    hugepage_insert(hp);
+    return hp;
+}
+
+struct hugepage *hugepage_alloc_hugepage(void) {
+    return create(get_this_core_id());
 }
 
 static void hugepage_free_internal(struct hugepage *hp) {

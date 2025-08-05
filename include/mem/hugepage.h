@@ -177,6 +177,26 @@ void hugepage_gc_remove_internal(struct hugepage *hp);
 
 void hugepage_alloc_init(void);
 
+void *hugepage_alloc_pages(size_t page_count);
+void hugepage_free_pages(void *ptr, size_t page_count);
+
+
+void *hugepage_realloc_pages(void *ptr, size_t new_cnt);
+/* Below is explicit hugepage management, sometimes some things may need this */
+
+/* Allocates a fresh new hugepage or pulls one
+ * from the garbage collection list that is not
+ * tracked in any internal data structures */
+struct hugepage *hugepage_alloc_hugepage(void);
+
+/* Frees the hugepage, panicking if the data is not sane, e.g.
+ * pages_used is 0 but the bitmap says otherwise */
+void hugepage_free_hugepage(struct hugepage *hp);
+
+void *hugepage_alloc_from_hugepage(struct hugepage *hp, size_t cnt);
+void hugepage_free_from_hugepage(struct hugepage *hp, void *ptr,
+                                 size_t page_count);
+
 #define hugepage_sanity_assert(hp) kassert(hugepage_is_valid(hp))
 #define hugepage_deletion_sanity_assert(hp)                                    \
     kassert(hugepage_safe_for_deletion(hp))

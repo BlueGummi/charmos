@@ -1,3 +1,4 @@
+#include <mem/hugepage.h>
 #include <acpi/cst.h>
 #include <acpi/hpet.h>
 #include <acpi/ioapic.h>
@@ -54,6 +55,7 @@ void k_main(void) {
     vmm_init(memmap_request.response, xa_request.response);
     slab_init();
     pmm_dyn_init();
+    hugepage_alloc_init();
 
     global.current_bootstage = BOOTSTAGE_EARLY_ALLOCATORS;
     gdt_install();
