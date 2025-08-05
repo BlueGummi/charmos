@@ -69,6 +69,11 @@ static void do_add_entry(struct limine_memmap_entry *entry) {
         uint64_t order = MIN(order_base_2(region_size), MAX_ORDER - 1);
         uint64_t block_size = 1ULL << order;
 
+        while ((region_start & (block_size - 1)) != 0 && order > 0) {
+            order--;
+            block_size = 1ULL << order;
+        }
+
         if (region_start + block_size > total_pages)
             break;
 

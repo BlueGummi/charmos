@@ -39,6 +39,7 @@ bool hugepage_is_valid(struct hugepage *hp) {
         return false;
     }
 
+    hugepage_unlock(hp, iflag);
     return true;
 }
 

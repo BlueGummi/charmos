@@ -151,6 +151,7 @@ static inline void *alloc_and_adjust(struct hugepage *hp, size_t pages) {
     if (hugepage_num_pages_free(hp) < pages)
         return NULL;
 
+    hugepage_sanity_assert(hp);
     hugepage_remove_from_list_safe(hp);
     void *ret = hugepage_alloc_from_hugepage(hp, pages);
     reinsert_hugepage(hp);

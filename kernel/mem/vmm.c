@@ -162,8 +162,9 @@ static void pte_init(pte_t *entry, uint64_t flags) {
 
 void vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     if (virt == 0 || (virt & 0x1FFFFF) || (phys & 0x1FFFFF)) {
-        k_panic(
-            "vmm_map_2mb_page: addresses must be 2MiB aligned and non-zero\n");
+        k_panic("vmm_map_2mb_page: addresses must be 2MiB aligned and "
+                "non-zero, virt is 0x%lx, phys is 0x%lx\n",
+                virt, phys);
     }
     bool interrupts = spin_lock(&vmm_lock);
     uint64_t L2 = (virt >> 21) & 0x1FF;

@@ -260,8 +260,8 @@ static inline bool hugepage_remove_from_list_safe(struct hugepage *hp) {
 }
 
 static inline size_t hugepage_hps_needed_for(size_t page_count) {
-    size_t usable_pages_per_hp = HUGEPAGE_SIZE_IN_4KB_PAGES - 1;
-    return (page_count + usable_pages_per_hp - 1) / usable_pages_per_hp;
+    return (page_count + HUGEPAGE_SIZE_IN_4KB_PAGES - 1) /
+           HUGEPAGE_SIZE_IN_4KB_PAGES;
 }
 
 static inline bool hugepage_is_full(struct hugepage *hp) {

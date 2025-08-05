@@ -152,6 +152,7 @@ static inline void init_hugepage_list(struct hugepage_core_list *list,
  * to fill it in on demand */
 void hugepage_alloc_init(void) {
     uint64_t core_count = global.core_count;
+    INIT_LIST_HEAD(&hugepage_gc_list.hugepages_list);
 
     hugepage_full_tree = kzalloc(sizeof(struct hugepage_tree));
     hugepage_full_tree->core_count = core_count;

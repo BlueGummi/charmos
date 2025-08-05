@@ -12,7 +12,7 @@ struct rbt *rbt_create(void) {
 }
 
 struct rbt_node *rbt_find_min(struct rbt_node *node) {
-    while (node->left != NULL)
+    while (node && node->left != NULL)
         node = node->left;
 
     return node;
