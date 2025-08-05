@@ -20,6 +20,7 @@ void reaper_enqueue(struct thread *t) {
     }
 
     condvar_signal(&reaper.cv);
+
     spin_unlock(&reaper.lock, i);
 }
 

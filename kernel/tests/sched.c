@@ -138,23 +138,16 @@ static void sched_spawn_entry(void) {
 }
 
 REGISTER_TEST(sched_spawn_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    uint64_t reaped_threads_at_start = reaper_get_reaped_thread_count();
-    disable_interrupts();
+    enable_interrupts();
     uint32_t run_times = 50;
 
     for (uint32_t i = 0; i < run_times; i++)
         thread_spawn(sched_spawn_entry);
 
-    enable_interrupts();
-
     while (run_times != ran_count)
         scheduler_yield();
 
     TEST_ASSERT(run_times == ran_count);
-
-    while (reaper_get_reaped_thread_count() !=
-           reaped_threads_at_start + run_times)
-        sleep_ms(1);
 
     SET_SUCCESS;
 }

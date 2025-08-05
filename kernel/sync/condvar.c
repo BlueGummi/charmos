@@ -1,16 +1,21 @@
 #include <sch/defer.h>
 #include <sync/condvar.h>
 
+static void do_block_on_queue(struct thread *curr, struct thread_queue *q) {
+    atomic_store(&curr->state, THREAD_STATE_BLOCKED);
+
+    thread_queue_push_back(q, curr);
+
+    scheduler_yield();
+}
+
 bool condvar_wait(struct condvar *cv, struct spinlock *lock,
                   bool change_interrupts) {
     struct thread *curr = scheduler_get_curr_thread();
     curr->wake_reason = WAKE_REASON_NONE;
 
-    thread_block_on(&cv->waiters);
-
     spin_unlock(lock, change_interrupts);
-
-    scheduler_yield();
+    do_block_on_queue(curr, &cv->waiters);
     spin_lock(lock);
 
     return curr->wake_reason != WAKE_REASON_TIMEOUT;

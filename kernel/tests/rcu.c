@@ -18,6 +18,7 @@ static atomic_bool rcu_test_failed = false;
 static atomic_uint rcu_reads_done = 0;
 
 static void rcu_reader_thread(void) {
+    disable_interrupts();
     uint64_t end = time_get_ms() + RCU_TEST_DURATION_MS;
 
     while (time_get_ms() < end) {
@@ -38,6 +39,7 @@ static void rcu_reader_thread(void) {
 
     atomic_fetch_add(&rcu_reads_done, 1);
     k_printf("Reader thread complete\n");
+    enable_interrupts();
 }
 
 static atomic_bool volatile rcu_deferred_freed = false;
