@@ -2,13 +2,6 @@
 #include <mem/hugepage.h>
 #include <sch/defer.h>
 
-/* The first few hugepages have a longer GC list
- * timeout, whereas the last few have shorter ones */
-time_t hugepage_gc_deletion_timeout(void) {
-    return (HUGEPAGE_GC_LIST_MAX_HUGEPAGES - hugepage_gc_list.pages_in_list) *
-           HUGEPAGE_GC_LIST_TIMEOUT_PER_PAGE;
-}
-
 void hugepage_gc_add(struct hugepage *hp) {
     bool iflag = hugepage_gc_list_lock(&hugepage_gc_list);
 
@@ -47,7 +40,6 @@ struct hugepage *hugepage_get_from_gc_list(void) {
         if (!atomic_load(&hp->being_deleted)) {
             atomic_fetch_sub(&hugepage_gc_list.pages_in_list, 1);
             atomic_store(&hp->for_deletion, false);
-            hp->deletion_timeout = HUGEPAGE_DELETION_TIMEOUT_NONE;
             break;
         }
 
@@ -59,7 +51,6 @@ struct hugepage *hugepage_get_from_gc_list(void) {
 }
 
 static inline void hugepage_mark_for_deletion(struct hugepage *hp) {
-    hp->deletion_timeout = hugepage_gc_deletion_timeout();
     hp->for_deletion = true;
 }
 
@@ -73,22 +64,11 @@ static inline void hugepage_remove_from_core_list(struct hugepage *hp) {
 }
 
 static inline bool hugepage_try_instant_delete(struct hugepage *hp) {
-    if (hp->deletion_timeout == 0) {
+    if (hugepage_gc_list.pages_in_list > HUGEPAGE_GC_LIST_MAX_HUGEPAGES) {
         hugepage_delete(hp);
         return true;
     }
     return false;
-}
-
-static void hugepage_delete_dpc(void *arg1, void *arg2) {
-    (void) arg2;
-    struct hugepage *hp = arg1;
-    hugepage_delete(hp);
-}
-
-static inline void hugepage_enqueue_timer_dpc(struct hugepage *hp) {
-    if (atomic_exchange(&hp->gc_timer_pending, true) == false)
-        defer_enqueue(hugepage_delete_dpc, hp, NULL, hp->deletion_timeout);
 }
 
 void hugepage_enqueue_for_gc(struct hugepage *hp) {
@@ -105,5 +85,4 @@ void hugepage_enqueue_for_gc(struct hugepage *hp) {
 
     /* Only enqueue if this has a timeout */
     hugepage_gc_add(hp);
-    hugepage_enqueue_timer_dpc(hp);
 }

@@ -20,10 +20,8 @@ static inline void bitmap_init(struct hugepage *hp) {
 
 /* No deletion happening */
 static inline void deletion_init(struct hugepage *hp) {
-    hp->deletion_timeout = HUGEPAGE_DELETION_TIMEOUT_NONE;
     hp->for_deletion = false;
     hp->being_deleted = false;
-    hp->gc_timer_pending = false;
 }
 
 static inline void addrs_init(struct hugepage *hp, vaddr_t vaddr_base,

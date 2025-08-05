@@ -85,7 +85,6 @@ static void hugepage_free_internal(struct hugepage *hp) {
 
 void hugepage_delete(struct hugepage *hp) {
     bool iflag = hugepage_gc_list_lock(&hugepage_gc_list);
-    atomic_store(&hp->gc_timer_pending, false);
 
     if (atomic_load(&hp->for_deletion)) {
         hugepage_mark_being_deleted(hp);

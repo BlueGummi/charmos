@@ -14,35 +14,10 @@
 #define HUGEPAGE_ALIGN(addr) ((addr + HUGEPAGE_SIZE - 1) & ~(HUGEPAGE_SIZE - 1))
 #define HUGEPAGE_SIZE_IN_4KB_PAGES (512)
 
-/* We scale this timeout based on the # of pages in the GC list.
- *
- * If there are `HUGEPAGE_GC_LIST_MAX_HUGEPAGES` - 1, the timeout is
- * equal to `HUGEPAGE_GC_LIST_TIMEOUT_PER_PAGE`.
- *
- * If there are `HUGEPAGE_GC_LIST_MAX_HUGEPAGES` or more,
- * the timeout is 0, and the hugepage is immediately deleted.
- *
- * The formula is
- *
- * timeout = (max_hugepages - current_hugepages) * timeout_per_hugepage
- *
- */
-#define HUGEPAGE_GC_LIST_TIMEOUT_PER_PAGE 500 /* 500 ms */
-
 /* 32MB of hugepages - adjustable
  *
  * TODO: adjust this based on total system RAM */
 #define HUGEPAGE_GC_LIST_MAX_HUGEPAGES 16
-
-#define HUGEPAGE_OPTIMAL_MAX_TIMEOUT 32000 /* 32 seconds */
-
-#if ((HUGEPAGE_GC_LIST_TIMEOUT_PER_PAGE * HUGEPAGE_GC_LIST_MAX_HUGEPAGES) >    \
-     HUGEPAGE_OPTIMAL_MAX_TIMEOUT)
-
-#warn                                                                          \
-    "HUGEPAGE_GC_LIST_TIMEOUT_PER_PAGE or HUGEPAGE_GC_LIST_MAX_HUGEPAGES may be set to a suboptimal value"
-
-#endif
 
 enum hugepage_state {
     HUGEPAGE_STATE_USED,
@@ -66,9 +41,7 @@ struct hugepage {
     enum hugepage_state state;
 
     core_t owner_core;
-    atomic_bool gc_timer_pending;
 
-    time_t deletion_timeout;
     atomic_bool for_deletion;  /* In deletion list */
     atomic_bool being_deleted; /* Being cleaned up - do not use */
 
@@ -179,7 +152,6 @@ void hugepage_alloc_init(void);
 
 void *hugepage_alloc_pages(size_t page_count);
 void hugepage_free_pages(void *ptr, size_t page_count);
-
 
 void *hugepage_realloc_pages(void *ptr, size_t new_cnt);
 /* Below is explicit hugepage management, sometimes some things may need this */

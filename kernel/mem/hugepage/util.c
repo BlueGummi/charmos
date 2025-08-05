@@ -27,7 +27,6 @@ void hugepage_print(struct hugepage *hp) {
     k_printf("       .pages_used = %u\n", hp->pages_used);
     k_printf("       .owner_core = %u\n", hp->owner_core);
     if (hp->for_deletion) {
-        k_printf("       .deletion_timeout = %u\n", hp->deletion_timeout);
         k_printf("       .being_deleted = %d\n", hp->being_deleted);
     }
     k_printf("}\n");
