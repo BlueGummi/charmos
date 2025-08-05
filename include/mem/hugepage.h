@@ -195,9 +195,12 @@ void hugepage_core_list_remove_hugepage(struct hugepage_core_list *hcl,
 void hugepage_tree_insert(struct hugepage_tree *tree, struct hugepage *hp);
 void hugepage_tree_remove(struct hugepage_tree *tree, struct hugepage *hp);
 
+void hugepage_insert_internal(struct hugepage *hp);
+
 void hugepage_init(struct hugepage *hp, vaddr_t vaddr_base, paddr_t phys_base,
                    core_t owner);
 void hugepage_delete(struct hugepage *hp);
+struct hugepage *hugepage_create_internal(core_t owner);
 
 void hugepage_gc_add(struct hugepage *hp);
 void hugepage_gc_remove(struct hugepage *hp);
@@ -224,6 +227,8 @@ void *hugepage_alloc_from_hugepage(struct hugepage *hp, size_t cnt);
 void hugepage_free_from_hugepage(struct hugepage *hp, void *ptr,
                                  size_t page_count);
 void hugepage_issue_hint(enum hugepage_hint hint, uint32_t arg);
+bool hugepage_create_contiguous(core_t owner, size_t hugepage_count,
+                                struct hugepage **hp_out);
 
 #define hugepage_sanity_assert(hp) kassert(hugepage_is_valid(hp))
 #define hugepage_deletion_sanity_assert(hp)                                    \
@@ -252,4 +257,14 @@ static inline bool hugepage_remove_from_list_safe(struct hugepage *hp) {
         return true;
     }
     return false;
+}
+
+static inline size_t hugepage_hps_needed_for(size_t page_count) {
+    size_t usable_pages_per_hp = HUGEPAGE_SIZE_IN_4KB_PAGES - 1;
+    return (page_count + usable_pages_per_hp - 1) / usable_pages_per_hp;
+}
+
+static inline bool hugepage_is_full(struct hugepage *hp) {
+    /* All used up */
+    return hp->pages_used == HUGEPAGE_SIZE_IN_4KB_PAGES;
 }

@@ -21,20 +21,20 @@ static inline size_t u64_idx_for_idx(size_t idx) {
 
 static inline void set_bit(struct hugepage *hp, size_t index) {
     size_t u64_idx = u64_idx_for_idx(index);
-    uint8_t mask = 1 << (index % 8);
+    uint64_t mask = 1 << (index % 64);
     hp->bitmap[u64_idx] |= mask;
 }
 
 static inline void clear_bit(struct hugepage *hp, size_t index) {
     size_t u64_idx = u64_idx_for_idx(index);
-    uint8_t mask = ~(1 << (index % 8));
+    uint64_t mask = ~(1 << (index % 64));
     hp->bitmap[u64_idx] &= mask;
 }
 
 static inline bool test_bit(struct hugepage *hp, size_t index) {
     size_t u64_idx = u64_idx_for_idx(index);
-    uint8_t value = hp->bitmap[u64_idx];
-    return (value & (1 << (index % 8))) != 0;
+    uint64_t value = hp->bitmap[u64_idx];
+    return (value & (1 << (index % 64))) != 0;
 }
 
 static size_t find_free_range(struct hugepage *hp, size_t page_count) {
@@ -74,9 +74,17 @@ static void *do_fastpath_alloc(struct hugepage *hp, bool iflag) {
     return NULL;
 }
 
+static inline bool alloc_requires_multiple_hugepages(size_t page_count) {
+    return hugepage_hps_needed_for(page_count) > 1;
+}
+
 /* This is not supposed to remove from the per-core
  * minheap if the hugepage is full */
 void *hugepage_alloc_from_hugepage(struct hugepage *hp, size_t page_count) {
+    /* Impossible */
+    if (unlikely(alloc_requires_multiple_hugepages(page_count)))
+        return NULL;
+
     bool iflag = hugepage_lock(hp);
 
     if (page_count == 1)
@@ -135,18 +143,13 @@ static void *try_alloc_from_hugepage(struct hugepage *hp,
     return hugepage_alloc_from_hugepage(hp, pages_requested);
 }
 
-static inline bool allocation_requires_multiple_hugepages(size_t page_count) {
-    return page_count > HUGEPAGE_SIZE_IN_4KB_PAGES;
+static inline bool hugepage_is_not_full(struct hugepage *hp) {
+    return !hugepage_is_full(hp);
 }
 
-static inline bool hugepage_is_full(struct hugepage *hp) {
-    /* All used up */
-    return hp->pages_used == HUGEPAGE_SIZE_IN_4KB_PAGES;
-}
-
-static void adjust_hugepage_after_allocation(struct hugepage *hp) {
+static inline void adjust_hugepage_after_allocation(struct hugepage *hp) {
     /* No change needed */
-    if (!likely(hugepage_is_full(hp)))
+    if (likely(hugepage_is_not_full(hp)))
         return;
 
     /* Stop tracking it here */
@@ -155,7 +158,7 @@ static void adjust_hugepage_after_allocation(struct hugepage *hp) {
 
 static void *alloc_search_core_list(struct hugepage_core_list *hcl,
                                     size_t page_count) {
-    if (unlikely(allocation_requires_multiple_hugepages(page_count)))
+    if (unlikely(alloc_requires_multiple_hugepages(page_count)))
         return NULL;
 
     struct minheap_node *mhn;
@@ -172,6 +175,63 @@ static void *alloc_search_core_list(struct hugepage_core_list *hcl,
     return NULL;
 }
 
+static struct hugepage **create_hp_arr(size_t needed) {
+    core_t owner = get_this_core_id();
+    struct hugepage **hp_arr = kmalloc(sizeof(struct hugepage *) * needed);
+    if (!hugepage_create_contiguous(owner, needed, hp_arr)) {
+        kfree(hp_arr);
+        return NULL;
+    }
+    return hp_arr;
+}
+
+static inline void *alloc_from_hp_and_adjust(struct hugepage *hp,
+                                             size_t pages) {
+    kassert(pages > 0); /* Should not be reachable */
+    void *ret = hugepage_alloc_from_hugepage(hp, pages);
+    adjust_hugepage_after_allocation(hp);
+    return ret;
+}
+
+static void *alloc_from_multiple_hugepages(size_t page_count) {
+    size_t needed = hugepage_hps_needed_for(page_count);
+    struct hugepage **hp_arr = create_hp_arr(needed);
+    if (!hp_arr)
+        return NULL;
+
+    for (size_t i = 0; i < needed; i++) {
+        size_t chunk = page_count > HUGEPAGE_SIZE_IN_4KB_PAGES
+                           ? HUGEPAGE_SIZE_IN_4KB_PAGES
+                           : page_count;
+
+        struct hugepage *hp = hp_arr[i];
+        alloc_from_hp_and_adjust(hp, chunk);
+
+        page_count -= chunk;
+    }
+
+    vaddr_t base = hp_arr[0]->virt_base;
+    kfree(hp_arr);
+    return (void *) base;
+}
+
+static inline void *try_alloc_from_gc_list(struct hugepage_core_list *hcl,
+                                           size_t page_count) {
+    struct hugepage *recycled = hugepage_get_from_gc_list();
+    if (!recycled)
+        return NULL;
+
+    recycled->owner_core = hcl->core_num;
+    hugepage_insert_internal(recycled);
+    return alloc_from_hp_and_adjust(recycled, page_count);
+}
+
+static void *alloc_from_new_hugepage(struct hugepage_core_list *hcl,
+                                     size_t page_count) {
+    struct hugepage *new = hugepage_create_internal(hcl->core_num);
+    return alloc_from_hp_and_adjust(new, page_count);
+}
+
 void *hugepage_alloc_pages(size_t page_count) {
     struct hugepage_core_list *hcl = hugepage_this_core_list();
 
@@ -180,8 +240,12 @@ void *hugepage_alloc_pages(size_t page_count) {
     if (ptr)
         return ptr;
 
-    /* If the requested pages can fit in one hugepage,
-     * we go and search the garbage collection list.
-     * If not, we absolutely must allocate new hugepages
-     * to guarantee contiguity */
+    if (unlikely(alloc_requires_multiple_hugepages(page_count)))
+        return alloc_from_multiple_hugepages(page_count);
+
+    ptr = try_alloc_from_gc_list(hcl, page_count);
+    if (ptr)
+        return ptr;
+
+    return alloc_from_new_hugepage(hcl, page_count);
 }

@@ -1,3 +1,4 @@
+#include <kassert.h>
 #include <mem/hugepage.h>
 
 void hugepage_tree_insert(struct hugepage_tree *tree, struct hugepage *hp) {
@@ -21,6 +22,7 @@ void hugepage_tree_remove(struct hugepage_tree *tree, struct hugepage *hp) {
 void hugepage_core_list_insert(struct hugepage_core_list *list,
                                struct hugepage *hp) {
     bool iflag = hugepage_list_lock(list);
+    kassert(hp->owner_core == list->core_num);
     minheap_insert(list->hugepage_minheap, &hp->minheap_node, hp->virt_base);
     hugepage_list_unlock(list, iflag);
 }
@@ -51,6 +53,7 @@ struct hugepage *hugepage_core_list_pop(struct hugepage_core_list *hcl) {
 void hugepage_core_list_remove_hugepage(struct hugepage_core_list *hcl,
                                         struct hugepage *hp) {
     bool iflag = hugepage_list_lock(hcl);
+    kassert(hp->owner_core == hcl->core_num);
     minheap_remove(hcl->hugepage_minheap, &hp->minheap_node);
     hugepage_list_unlock(hcl, iflag);
 }

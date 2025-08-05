@@ -19,6 +19,8 @@ static void (*hugepage_hint_table[HUGEPAGE_HINT_COUNT_INTERNAL])(uint32_t) = {
     [HUGEPAGE_HINT_PREFER_INDEPENDENT] = hugepage_hint_nop,
 };
 
+/* TODO: Enqueue hints as a DPC to move them out of the way
+ * and execute them asynchronously */
 void hugepage_issue_hint(enum hugepage_hint hint, uint32_t arg) {
     hugepage_hint_table[hint](arg);
 }

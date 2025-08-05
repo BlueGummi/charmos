@@ -39,9 +39,6 @@ bool hugepage_is_valid(struct hugepage *hp) {
         return false;
     }
 
-    /* These two must match, hugepage_state_of will calculate it
-     * independently from what hp->state is */
-
     return true;
 }
 
@@ -50,7 +47,7 @@ bool hugepage_safe_for_deletion(struct hugepage *hp) {
         return false;
 
     bool nothing_allocated = hp->pages_used == 0;
-    bool mh_node_clear = hp->minheap_node.index == MINHEAP_INDEX_INVALID;
+    bool mh_node_clear = !hugepage_still_in_core_list(hp);
 
     return nothing_allocated && mh_node_clear;
 }

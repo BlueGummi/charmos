@@ -10,6 +10,7 @@ struct hugepage_tree *hugepage_full_tree = NULL;
 struct hugepage_gc_list hugepage_gc_list = {0};
 
 #define IS_ALIGNED(ptr, align) (((uintptr_t) (ptr) & ((align) - 1)) == 0)
+
 static inline paddr_t alloc_2mb_phys(void) {
     paddr_t ret = (paddr_t) pmm_alloc_pages(HUGEPAGE_SIZE_IN_4KB_PAGES, false);
     kassert(IS_ALIGNED(ret, HUGEPAGE_SIZE));
@@ -20,17 +21,19 @@ static inline void map_pages(vaddr_t virt_base, paddr_t phys_base) {
     vmm_map_2mb_page(virt_base, phys_base, PAGING_NO_FLAGS);
 }
 
-static inline void hugepage_insert(struct hugepage *hp) {
+void hugepage_insert_internal(struct hugepage *hp) {
     struct hugepage_core_list *hcl = hugepage_get_core_list(hp);
-    hugepage_core_list_insert(hcl, hp);
+    if (!hugepage_is_full(hp))
+        hugepage_core_list_insert(hcl, hp);
+
     hugepage_tree_insert(hugepage_full_tree, hp);
 }
 
-static vaddr_t find_free_vaddr(struct hugepage_tree *hpft) {
+static inline vaddr_t find_free_vaddr(struct hugepage_tree *hpft) {
     return vas_alloc(hpft->address_space, HUGEPAGE_SIZE, HUGEPAGE_SIZE);
 }
 
-static void free_vaddr(struct hugepage_tree *hpft, vaddr_t addr) {
+static inline void free_vaddr(struct hugepage_tree *hpft, vaddr_t addr) {
     vas_free(hpft->address_space, addr);
 }
 
@@ -40,11 +43,13 @@ static struct hugepage *create(core_t owner) {
     if (!hp)
         return NULL;
 
-    vaddr_t virt_base = find_free_vaddr(hugepage_full_tree);
     paddr_t phys_base = alloc_2mb_phys();
-    if (!phys_base)
+    if (!phys_base) {
+        kfree(hp);
         return NULL;
+    }
 
+    vaddr_t virt_base = find_free_vaddr(hugepage_full_tree);
     map_pages(virt_base, phys_base);
     hugepage_init(hp, virt_base, phys_base, owner);
     hugepage_sanity_assert(hp);
@@ -52,12 +57,60 @@ static struct hugepage *create(core_t owner) {
     return hp;
 }
 
-struct hugepage *hugepage_create(core_t owner) {
+static vaddr_t alloc_addrs_for_contiguous_hugepages(size_t hugepage_count) {
+    kassert(hugepage_count != 0);
+    return vas_alloc(hugepage_full_tree->address_space,
+                     HUGEPAGE_SIZE * hugepage_count, HUGEPAGE_SIZE);
+}
+
+struct hugepage *hugepage_create_with_vaddr(core_t owner, vaddr_t vaddr) {
+    struct hugepage *hp = kzalloc(sizeof(struct hugepage));
+    if (!hp)
+        return NULL;
+
+    paddr_t phys_base = alloc_2mb_phys();
+    if (!phys_base) {
+        kfree(hp);
+        return NULL;
+    }
+
+    map_pages(vaddr, phys_base);
+    hugepage_init(hp, vaddr, phys_base, owner);
+    hugepage_sanity_assert(hp);
+
+    return hp;
+}
+
+static void free_existing(struct hugepage **hp_arr, size_t up_to) {
+    for (size_t i = 0; i < up_to; i++)
+        hugepage_delete(hp_arr[i]);
+}
+
+bool hugepage_create_contiguous(core_t owner, size_t hugepage_count,
+                                struct hugepage **hp_out) {
+    vaddr_t vbase = alloc_addrs_for_contiguous_hugepages(hugepage_count);
+    vaddr_t vtop = vbase + (hugepage_count * HUGEPAGE_SIZE);
+
+    size_t hp_out_idx = 0;
+    for (vaddr_t i = vbase; i < vtop; i += HUGEPAGE_SIZE) {
+        struct hugepage *hp = hugepage_create_with_vaddr(owner, i);
+        if (!hp) {
+            free_existing(hp_out, i);
+            return false;
+        }
+
+        hp_out[hp_out_idx++] = hp;
+        hugepage_insert_internal(hp);
+    }
+    return true;
+}
+
+struct hugepage *hugepage_create_internal(core_t owner) {
     struct hugepage *hp = create(owner);
     if (!hp)
         return NULL;
 
-    hugepage_insert(hp);
+    hugepage_insert_internal(hp);
     return hp;
 }
 
@@ -94,6 +147,9 @@ static inline void init_hugepage_list(struct hugepage_core_list *list,
     list->core_num = core_num;
 }
 
+/* TODO: Give each core one hugepage
+ * to begin with so they don't need
+ * to fill it in on demand */
 void hugepage_alloc_init(void) {
     uint64_t core_count = global.core_count;
 
