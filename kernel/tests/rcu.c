@@ -46,6 +46,7 @@ static atomic_bool volatile rcu_deferred_freed = false;
 
 static void rcu_free_fn(void *ptr) {
     kfree(ptr);
+    k_printf("RCU free success\n");
 
     atomic_store(&rcu_deferred_freed, true);
 }
@@ -74,6 +75,8 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         thread_spawn(rcu_reader_thread);
 
     k_printf("Readers spawned\n");
+
+    sleep_ms(50);
     thread_spawn(rcu_writer_thread);
 
     while (atomic_load(&rcu_reads_done) < NUM_RCU_READERS)

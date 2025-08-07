@@ -255,17 +255,31 @@ static void buddy_free_pages(void *addr, uint64_t count, bool has_offset) {
 void *pmm_alloc_page(bool add_offset) {
     return pmm_alloc_pages(1, add_offset);
 }
-
+static struct spinlock pmalloc_lock = SPINLOCK_INIT;
 void *pmm_alloc_pages(uint64_t count, bool add_offset) {
-    if (!buddy_active)
-        return bitmap_alloc_pages(count, add_offset);
-    return buddy_alloc_pages(count, add_offset);
+    bool iflag = spin_lock(&pmalloc_lock);
+
+    if (!buddy_active) {
+        void *p = bitmap_alloc_pages(count, add_offset);
+        spin_unlock(&pmalloc_lock, iflag);
+        return p;
+    }
+
+    void *p = buddy_alloc_pages(count, add_offset);
+    spin_unlock(&pmalloc_lock, iflag);
+    return p;
 }
 
 void pmm_free_pages(void *addr, uint64_t count, bool has_offset) {
-    if (!buddy_active)
-        return bitmap_free_pages(addr, count, has_offset);
+    bool iflag = spin_lock(&pmalloc_lock);
+    if (!buddy_active) {
+        bitmap_free_pages(addr, count, has_offset);
+        spin_unlock(&pmalloc_lock, iflag);
+        return;
+    }
+
     buddy_free_pages(addr, count, has_offset);
+    spin_unlock(&pmalloc_lock, iflag);
 }
 
 uint64_t pmm_get_usable_ram(void) {

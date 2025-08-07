@@ -181,8 +181,7 @@ void vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     }
 
     pte_t *entry = &current_table->entries[L2];
-    *entry =
-        (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT | PAGING_2MB_page;
+    *entry = phys | flags | PAGING_PRESENT | PAGING_2MB_page;
 
     invlpg(virt);
     do_tlb_shootdown(virt);
@@ -190,9 +189,9 @@ void vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
 }
 
 void vmm_unmap_2mb_page(uintptr_t virt) {
-    if ((virt & (PAGE_2MB - 1)) != 0) {
+    if ((virt & (PAGE_2MB - 1)) != 0) 
         k_panic("vmm_unmap_2mb_page: virtual address not 2MiB aligned!\n");
-    }
+    
 
     struct page_table *tables[3];
     pte_t *entries[3];

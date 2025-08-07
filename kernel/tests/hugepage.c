@@ -20,6 +20,7 @@ REGISTER_TEST(hugepage_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         uint64_t end = rdtsc();
         clock_cycles[i] = end - start;
     }
+    hugepage_print_all();
 
     uint64_t total = 0;
     for (uint64_t i = 0; i < HUGEPAGE_SINGLE_PAGE_ALLOC_TEST_TIMES; i++)
@@ -33,5 +34,24 @@ REGISTER_TEST(hugepage_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ADD_MESSAGE(message);
     ptr = hugepage_alloc_pages(1024);
     TEST_ASSERT(ptr);
+
+    hugepage_print_all();
+    hugepage_free_pages(ptr, 1024);
+    hugepage_print_all();
+
+    ptr = hugepage_alloc_pages(512);
+    uint64_t tsc = rdtsc();
+    hugepage_lookup(ptr);
+    uint64_t firsttsc = rdtsc() - tsc;
+    tsc = rdtsc();
+    hugepage_lookup(ptr);
+    uint64_t secondtsc = rdtsc() - tsc;
+
+    char *msg2 = kzalloc(100);
+    snprintf(msg2, 100,
+             "The first hugepage lookup took %d cc, the second one took %d cc",
+             firsttsc, secondtsc);
+    ADD_MESSAGE(msg2);
+
     SET_SUCCESS;
 }

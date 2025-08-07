@@ -1,4 +1,5 @@
 #include <compiler.h>
+#include <mem/hugepage.h>
 #include <console/printf.h>
 #include <fs/tmpfs.h>
 #include <fs/vfs.h>
@@ -104,7 +105,7 @@ static enum errno tmpfs_write(struct vfs_node *node, const void *buf,
             to_copy = size;
 
         if (!tn->pages[page_idx]) {
-            tn->pages[page_idx] = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+            tn->pages[page_idx] = hugepage_alloc_page();
             if (!tn->pages[page_idx])
                 return ERR_NO_MEM;
             memset(tn->pages[page_idx], 0, TMPFS_PAGE_SIZE);
@@ -264,7 +265,7 @@ static enum errno tmpfs_rmdir(struct vfs_node *parent, const char *name) {
 static void tmpfs_free_node(struct tmpfs_node *tn) {
     for (uint64_t i = 0; i < tn->num_pages; ++i) {
         if (tn->pages[i]) {
-            kfree_aligned(tn->pages[i]);
+            hugepage_free_page(tn->pages[i]);
             tn->pages[i] = NULL;
         }
     }
@@ -324,7 +325,7 @@ static enum errno tmpfs_truncate(struct vfs_node *node, uint64_t length) {
     if (new_pages < tn->num_pages) {
         for (uint64_t i = new_pages; i < tn->num_pages; ++i) {
             if (tn->pages[i]) {
-                kfree_aligned(tn->pages[i]);
+                hugepage_free_page(tn->pages[i]);
                 tn->pages[i] = NULL;
             }
         }
@@ -349,7 +350,7 @@ static enum errno tmpfs_truncate(struct vfs_node *node, uint64_t length) {
 
         if (last_page_idx < new_pages) {
             if (!tn->pages[last_page_idx]) {
-                tn->pages[last_page_idx] = kmalloc(TMPFS_PAGE_SIZE);
+                tn->pages[last_page_idx] = hugepage_alloc_page();
                 if (!tn->pages[last_page_idx])
                     return ERR_NO_MEM;
                 memset(tn->pages[last_page_idx], 0, TMPFS_PAGE_SIZE);

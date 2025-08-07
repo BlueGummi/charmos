@@ -20,7 +20,7 @@ static inline paddr_t alloc_2mb_phys(void) {
 }
 
 static inline void map_pages(vaddr_t virt_base, paddr_t phys_base) {
-    vmm_map_2mb_page(virt_base, phys_base, PAGING_NO_FLAGS);
+    vmm_map_2mb_page(virt_base, phys_base, PAGING_WRITE);
 }
 
 void hugepage_insert_internal(struct hugepage *hp) {

@@ -215,6 +215,7 @@ void hugepage_tb_remove(struct hugepage_tb *htb, struct hugepage *hp);
 /* Hints */
 void hugepage_hint(enum hugepage_hint hint, uint64_t arg,
                    hugepage_hint_callback cb);
+void hugepage_print_all(void);
 
 #define hugepage_sanity_assert(hp) kassert(hugepage_is_valid(hp))
 #define hugepage_deletion_sanity_assert(hp)                                    \
