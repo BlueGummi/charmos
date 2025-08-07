@@ -3,11 +3,7 @@
 #include <mem/hugepage.h>
 #include <string.h>
 
-/*
- *
- * Hugepage init/delete
- *
- */
+#include "internal.h"
 
 static inline void lock_init(struct hugepage *hp) {
     spinlock_init(&hp->lock);

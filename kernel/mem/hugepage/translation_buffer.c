@@ -2,6 +2,8 @@
 #include <mem/alloc.h>
 #include <mem/hugepage.h>
 
+#include "internal.h"
+
 static inline bool tb_entry_on_cooldown(struct hugepage_tb *htb,
                                         struct hugepage_tb_entry *e) {
     return e->valid && (htb->gen_counter - e->gen) < HTB_COOLDOWN_TICKS;

@@ -5,6 +5,8 @@
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 
+#include "internal.h"
+
 static size_t find_free_range(struct hugepage *hp, size_t page_count) {
     size_t max = HUGEPAGE_SIZE_IN_4KB_PAGES - page_count;
 

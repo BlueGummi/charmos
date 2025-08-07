@@ -6,6 +6,8 @@
 #include <mem/vmm.h>
 #include <mp/core.h>
 
+#include "internal.h"
+
 struct hugepage_tree *hugepage_full_tree = NULL;
 struct hugepage_gc_list hugepage_gc_list = {0};
 

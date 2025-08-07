@@ -1,6 +1,8 @@
 #include <kassert.h>
 #include <mem/hugepage.h>
 
+#include "internal.h"
+
 void hugepage_tree_insert(struct hugepage_tree *tree, struct hugepage *hp) {
     bool iflag = hugepage_tree_lock(tree);
     rbt_insert(tree->root_node, &hp->tree_node);

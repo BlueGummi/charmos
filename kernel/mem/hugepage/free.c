@@ -5,6 +5,8 @@
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 
+#include "internal.h"
+
 /* This will not garbage collect the
  * hugepage if it becomes fully empty */
 void hugepage_free_from_hugepage(struct hugepage *hp, void *ptr,

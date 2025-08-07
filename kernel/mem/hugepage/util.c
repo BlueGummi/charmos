@@ -7,6 +7,8 @@
 #include <sch/defer.h>
 #include <types/refcount.h>
 
+#include "internal.h"
+
 void hugepage_print(struct hugepage *hp) {
     bool iflag = hugepage_lock(hp);
     k_printf("struct hugepage {\n");

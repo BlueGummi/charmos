@@ -2,6 +2,8 @@
 #include <mem/alloc.h>
 #include <mem/hugepage.h>
 
+#include "internal.h"
+
 static void hugepage_hint_nop(uint64_t unused) {
     (void) unused;
 }

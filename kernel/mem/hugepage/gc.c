@@ -2,6 +2,8 @@
 #include <mem/hugepage.h>
 #include <sch/defer.h>
 
+#include "internal.h"
+
 void hugepage_gc_add(struct hugepage *hp) {
     bool iflag = hugepage_gc_list_lock(&hugepage_gc_list);
 
