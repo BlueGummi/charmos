@@ -1,4 +1,7 @@
+#include <kassert.h>
 #include <mem/vaddr_alloc.h>
+#include <mem/vmm.h>
+#include <misc/align.h>
 #include <misc/list.h>
 #include <misc/minheap.h>
 #include <misc/rbt.h>
@@ -13,7 +16,7 @@
 #define HUGEPAGE_SIZE (2 * 1024 * 1024) /* 2 MB */
 #define HUGEPAGE_DELETION_TIMEOUT_NONE ((time_t) -1)
 #define HUGEPAGE_U64_BITMAP_SIZE (8)
-#define HUGEPAGE_ALIGN(addr) ((addr + HUGEPAGE_SIZE - 1) & ~(HUGEPAGE_SIZE - 1))
+#define HUGEPAGE_ALIGN(addr) ALIGN_DOWN(addr, HUGEPAGE_SIZE)
 #define HUGEPAGE_SIZE_IN_4KB_PAGES (512)
 
 /* 32MB of hugepages - adjustable
@@ -29,15 +32,47 @@ enum hugepage_flags : uint8_t {
     HUGEPAGE_FLAG_UNTRACKED = 1 << 4,
 };
 
+typedef void (*hugepage_hint_callback)(bool success, uint64_t data);
 enum hugepage_hint : uint8_t {
     HUGEPAGE_HINT_NONE = 0,
     HUGEPAGE_HINT_EXPECT_SMALL_ALLOCS = 1,
     HUGEPAGE_HINT_EXPECT_LARGE_ALLOCS = 2,
     HUGEPAGE_HINT_EXPECT_BULK_FREE = 3,
     HUGEPAGE_HINT_PREFER_INDEPENDENT = 4,
-    HUGEPAGE_HINT_ALLOW_REBALANCE = 5,
+    HUGEPAGE_HINT_ADD_HTB_ENTRY = 5,
+    HUGEPAGE_HINT_ALLOW_REBALANCE = 6,
 };
-#define HUGEPAGE_HINT_COUNT_INTERNAL 6
+
+/* To be used in arenas for different
+ * allocation techniques */
+enum hugepage_allocation_type : uint8_t {
+    HUGEPAGE_ALLOCATION_TYPE_BITMAP = 0,
+    HUGEPAGE_ALLOCATION_TYPE_BUDDY = 1,
+    HUGEPAGE_ALLOCATION_TYPE_SLAB = 2,
+    HUGEPAGE_ALLOCATION_TYPE_DEFAULT = HUGEPAGE_ALLOCATION_TYPE_BITMAP,
+};
+
+#define HUGEPAGE_HINT_COUNT_INTERNAL 7
+#define HTB_TAG_MASK 0xFFFFFFFFFFFFF000ULL
+#define HTB_COOLDOWN_TICKS 10
+#define HTB_MAX_ENTRIES 128
+
+struct hugepage_tb_entry {
+    vaddr_t tag;
+    struct hugepage *hp;
+    bool valid;
+    uint8_t gen;
+    struct spinlock lock;
+};
+
+/* We want to prevent these from taking up over a page */
+_Static_assert(sizeof(struct hugepage_tb_entry) * HTB_MAX_ENTRIES < 4096, "");
+
+struct hugepage_tb {
+    uint64_t gen_counter;
+    size_t entry_count;
+    struct hugepage_tb_entry *entries;
+};
 
 struct hugepage {
     struct spinlock lock;
@@ -52,6 +87,7 @@ struct hugepage {
                                   * without creating much fragmentation */
 
     enum hugepage_flags flags;
+    enum hugepage_allocation_type alloc_type;
 
     core_t owner_core;
 
@@ -82,9 +118,9 @@ struct hugepage_core_list {
 struct hugepage_tree {
     struct spinlock lock;
     struct rbt *root_node;
-    core_t core_count;
     struct hugepage_core_list *core_lists;
     struct vas_space *address_space;
+    struct hugepage_tb *htb;
 };
 
 struct hugepage_gc_list {
@@ -92,6 +128,9 @@ struct hugepage_gc_list {
     struct list_head hugepages_list;
     atomic_uint pages_in_list;
 };
+
+#define hugepage_from_tree_node(node)                                          \
+    container_of(node, struct hugepage, tree_node)
 
 #define hugepage_from_gc_list_node(node)                                       \
     container_of(node, struct hugepage, gc_list_node)
@@ -149,6 +188,15 @@ static inline void hugepage_tree_unlock(struct hugepage_tree *hpt, bool iflag) {
     spin_unlock(&hpt->lock, iflag);
 }
 
+static inline bool hugepage_tb_entry_lock(struct hugepage_tb_entry *htbe) {
+    return spin_lock(&htbe->lock);
+}
+
+static inline void hugepage_tb_entry_unlock(struct hugepage_tb_entry *htbe,
+                                            bool iflag) {
+    spin_unlock(&htbe->lock, iflag);
+}
+
 /* You cannot unmark the 'being_deleted' since that is a UAF */
 static inline void hugepage_mark_being_deleted(struct hugepage *hp) {
     atomic_store(&hp->being_deleted, true);
@@ -180,42 +228,64 @@ static inline uint64_t popcount_uint64(uint64_t n) {
     }
     return count;
 }
+
 bool hugepage_is_valid(struct hugepage *hp);
 bool hugepage_safe_for_deletion(struct hugepage *hp);
 
 void hugepage_print(struct hugepage *hp);
-void hugepage_enqueue_for_gc(struct hugepage *hp);
+
 struct hugepage *hugepage_get_from_gc_list(void);
 
+/* Core list operations for per-core minheaps */
 void hugepage_core_list_insert(struct hugepage_core_list *list,
                                struct hugepage *hp);
+
+void hugepage_return_to_list_internal(struct hugepage *hp);
+
 struct hugepage *hugepage_core_list_peek(struct hugepage_core_list *hcl);
 struct hugepage *hugepage_core_list_pop(struct hugepage_core_list *hcl);
-
 void hugepage_core_list_remove_hugepage(struct hugepage_core_list *hcl,
                                         struct hugepage *hp);
 
+/* Global rbt operations on the hugepage tree */
 void hugepage_tree_insert(struct hugepage_tree *tree, struct hugepage *hp);
 void hugepage_tree_remove(struct hugepage_tree *tree, struct hugepage *hp);
 
+/* Internal allocator-private insertion into trees and stuff */
 void hugepage_insert_internal(struct hugepage *hp);
 
 void hugepage_init(struct hugepage *hp, vaddr_t vaddr_base, paddr_t phys_base,
                    core_t owner);
+
 void hugepage_delete(struct hugepage *hp);
+
+/* Internal initialization + creation */
 struct hugepage *hugepage_create_internal(core_t owner);
 
+/* Contiguous hugepages for multi-hugepage allocations */
+bool hugepage_create_contiguous(core_t owner, size_t hugepage_count,
+                                struct hugepage **hp_out);
+
 void hugepage_gc_add(struct hugepage *hp);
+void hugepage_gc_enqueue(struct hugepage *hp);
 void hugepage_gc_remove(struct hugepage *hp);
 void hugepage_gc_remove_internal(struct hugepage *hp);
 
+/* The actual initialization for the whole allocator */
 void hugepage_alloc_init(void);
 
+/* Allocate from global hugepage allocator */
 void *hugepage_alloc_pages(size_t page_count);
+static inline void *hugepage_alloc_page(void) {
+    return hugepage_alloc_pages(1);
+}
+
 void hugepage_free_pages(void *ptr, size_t page_count);
+static inline void hugepage_free_page(void *ptr) {
+    hugepage_free_pages(ptr, 1);
+}
 
 void *hugepage_realloc_pages(void *ptr, size_t new_cnt);
-/* Below is explicit hugepage management, sometimes some things may need this */
 
 /* Allocates a fresh new hugepage or pulls one
  * from the garbage collection list that is not
@@ -225,13 +295,26 @@ struct hugepage *hugepage_alloc_hugepage(void);
 /* Frees the hugepage, panicking if the data is not sane, e.g.
  * pages_used is 0 but the bitmap says otherwise */
 void hugepage_free_hugepage(struct hugepage *hp);
+struct hugepage *hugepage_lookup(void *ptr);
 
+/* Uses the simple bitmaps for now */
 void *hugepage_alloc_from_hugepage(struct hugepage *hp, size_t cnt);
 void hugepage_free_from_hugepage(struct hugepage *hp, void *ptr,
                                  size_t page_count);
-void hugepage_issue_hint(enum hugepage_hint hint, uint32_t arg);
-bool hugepage_create_contiguous(core_t owner, size_t hugepage_count,
-                                struct hugepage **hp_out);
+
+/* Hugepage translation buffer */
+struct hugepage_tb *hugepage_tb_init(size_t size);
+struct hugepage *hugepage_tb_lookup(struct hugepage_tb *htb, vaddr_t addr);
+bool hugepage_tb_ent_exists(struct hugepage_tb *htb, vaddr_t addr);
+
+/* Returns if it was successful or if there is still a cooldown,
+ * done to prevent thrashing of the htb */
+bool hugepage_tb_insert(struct hugepage_tb *htb, struct hugepage *hp);
+void hugepage_tb_remove(struct hugepage_tb *htb, struct hugepage *hp);
+
+/* Hints */
+void hugepage_hint(enum hugepage_hint hint, uint64_t arg,
+                   hugepage_hint_callback cb);
 
 #define hugepage_sanity_assert(hp) kassert(hugepage_is_valid(hp))
 #define hugepage_deletion_sanity_assert(hp)                                    \
@@ -267,7 +350,55 @@ static inline size_t hugepage_hps_needed_for(size_t page_count) {
            HUGEPAGE_SIZE_IN_4KB_PAGES;
 }
 
+static inline size_t hugepage_chunk_for(size_t page_count) {
+    return page_count > HUGEPAGE_SIZE_IN_4KB_PAGES ? HUGEPAGE_SIZE_IN_4KB_PAGES
+                                                   : page_count;
+}
+
 static inline bool hugepage_is_full(struct hugepage *hp) {
     /* All used up */
     return hp->pages_used == HUGEPAGE_SIZE_IN_4KB_PAGES;
+}
+
+static inline bool hugepage_is_empty(struct hugepage *hp) {
+    return hp->pages_used == 0;
+}
+
+static inline size_t hugepage_tb_hash(vaddr_t addr, struct hugepage_tb *tb) {
+    addr >>= 21; /* Remove 2MB alignment bits */
+    addr ^= addr >> 5;
+    addr ^= addr >> 11;
+    return addr % tb->entry_count;
+}
+
+/* Just to prevent OOB */
+#define assert_u64_idx_idx_sanity(u64_idx)                                     \
+    kassert(u64_idx < HUGEPAGE_U64_BITMAP_SIZE)
+
+static inline void *hugepage_idx_to_addr(struct hugepage *hp, size_t idx) {
+    return (void *) (hp->virt_base + idx * PAGE_SIZE);
+}
+
+static inline size_t u64_idx_for_idx(size_t idx) {
+    size_t u64_idx = idx / 64;
+    assert_u64_idx_idx_sanity(u64_idx);
+    return u64_idx;
+}
+
+static inline void set_bit(struct hugepage *hp, size_t index) {
+    size_t u64_idx = u64_idx_for_idx(index);
+    uint64_t mask = 1ULL << (index % 64);
+    hp->bitmap[u64_idx] |= mask;
+}
+
+static inline void clear_bit(struct hugepage *hp, size_t index) {
+    size_t u64_idx = u64_idx_for_idx(index);
+    uint64_t mask = ~(1ULL << (index % 64));
+    hp->bitmap[u64_idx] &= mask;
+}
+
+static inline bool test_bit(struct hugepage *hp, size_t index) {
+    size_t u64_idx = u64_idx_for_idx(index);
+    uint64_t value = hp->bitmap[u64_idx];
+    return (value & (1ULL << (index % 64))) != 0;
 }

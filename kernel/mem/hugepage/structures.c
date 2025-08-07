@@ -27,6 +27,15 @@ void hugepage_core_list_insert(struct hugepage_core_list *list,
     hugepage_list_unlock(list, iflag);
 }
 
+void hugepage_return_to_list_internal(struct hugepage *hp) {
+    /* Nothing to be done */
+    if (hugepage_still_in_core_list(hp))
+        return;
+
+    struct hugepage_core_list *hcl = hugepage_get_core_list(hp);
+    hugepage_core_list_insert(hcl, hp);
+}
+
 typedef struct minheap_node *(minheap_fn) (struct minheap *);
 static struct hugepage *core_list_do_op(struct hugepage_core_list *hcl,
                                         minheap_fn op) {

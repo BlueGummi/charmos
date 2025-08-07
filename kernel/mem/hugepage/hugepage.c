@@ -57,7 +57,8 @@ static struct hugepage *create(core_t owner) {
     return hp;
 }
 
-static vaddr_t alloc_addrs_for_contiguous_hugepages(size_t hugepage_count) {
+static inline vaddr_t
+alloc_addrs_for_contiguous_hugepages(size_t hugepage_count) {
     kassert(hugepage_count != 0);
     return vas_alloc(hugepage_full_tree->address_space,
                      HUGEPAGE_SIZE * hugepage_count, HUGEPAGE_SIZE);
@@ -138,6 +139,7 @@ void hugepage_delete_and_unlink(struct hugepage *hp) {
     }
 
     hugepage_gc_list_unlock(&hugepage_gc_list, iflag);
+    hugepage_tb_remove(hugepage_full_tree->htb, hp);
     hugepage_delete(hp);
 }
 
@@ -155,17 +157,25 @@ void hugepage_alloc_init(void) {
     INIT_LIST_HEAD(&hugepage_gc_list.hugepages_list);
 
     hugepage_full_tree = kzalloc(sizeof(struct hugepage_tree));
-    hugepage_full_tree->core_count = core_count;
+    if (!hugepage_full_tree)
+        k_panic("Hugepage allocator could not be allocated\n");
+
     hugepage_full_tree->core_lists =
         kzalloc(sizeof(struct hugepage_core_list) * core_count);
 
     hugepage_full_tree->address_space =
         vas_space_init(HUGEPAGE_HEAP_BASE, HUGEPAGE_HEAP_END);
+
     hugepage_full_tree->root_node = rbt_create();
+    hugepage_full_tree->htb = hugepage_tb_init(HTB_MAX_ENTRIES);
+
+    if (unlikely(!hugepage_full_tree->core_lists ||
+                 !hugepage_full_tree->address_space ||
+                 !hugepage_full_tree->root_node || !hugepage_full_tree->htb))
+        k_panic("Hugepage allocator could not be allocated\n");
 
     spinlock_init(&hugepage_full_tree->lock);
-
-    for (uint64_t i = 0; i < hugepage_full_tree->core_count; i++) {
+    for (uint64_t i = 0; i < core_count; i++) {
         struct hugepage_core_list *hcl = &hugepage_full_tree->core_lists[i];
         init_hugepage_list(hcl, i);
     }

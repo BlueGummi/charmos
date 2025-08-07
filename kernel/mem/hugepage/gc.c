@@ -58,7 +58,8 @@ static inline bool hugepage_try_instant_delete(struct hugepage *hp) {
     return false;
 }
 
-void hugepage_enqueue_for_gc(struct hugepage *hp) {
+void hugepage_gc_enqueue(struct hugepage *hp) {
+    hugepage_tb_remove(hugepage_full_tree->htb, hp);
     hugepage_remove_from_list_safe(hp);
     hugepage_tree_remove(hugepage_full_tree, hp);
 
