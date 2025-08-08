@@ -32,7 +32,7 @@ static inline uint64_t hpet_us_to_ticks(uint64_t us) {
 
 void hpet_setup_periodic_interrupt_us(uint64_t microseconds_period) {
     hpet_disable();
-    
+
     uint64_t ticks = hpet_us_to_ticks(microseconds_period);
 
     hpet_write64(HPET_MAIN_COUNTER_OFFSET, HPET_CURRENT);
@@ -48,13 +48,13 @@ void hpet_setup_periodic_interrupt_us(uint64_t microseconds_period) {
 }
 
 void hpet_program_oneshot(uint64_t future_ms) {
-    hpet_disable();
 
     union hpet_timer_config conf;
     conf.raw = hpet_read64(HPET_TIMER_CONF_OFFSET(HPET_CURRENT));
     conf.type = 0;
     conf.interrupt_type = 0;
     conf.interrupt_enable = 1;
+    hpet_disable();
     hpet_write64(HPET_TIMER_CONF_OFFSET(HPET_CURRENT), conf.raw);
 
     uint64_t now = hpet_timestamp_ms();

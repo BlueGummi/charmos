@@ -63,10 +63,8 @@ void wakeup() {
 }
 
 void mp_wakeup_processors(struct limine_mp_response *mpr) {
-    for (uint64_t i = 0; i < mpr->cpu_count; i++) {
-        struct limine_mp_info *curr_cpu = mpr->cpus[i];
-        curr_cpu->goto_address = wakeup;
-    }
+    for (uint64_t i = 0; i < mpr->cpu_count; i++)
+        mpr->cpus[i]->goto_address = wakeup;
 }
 
 void mp_complete_init() {

@@ -18,7 +18,6 @@ static atomic_bool rcu_test_failed = false;
 static atomic_uint rcu_reads_done = 0;
 
 static void rcu_reader_thread(void) {
-    disable_interrupts();
     uint64_t end = time_get_ms() + RCU_TEST_DURATION_MS;
 
     while (time_get_ms() < end) {
@@ -38,16 +37,13 @@ static void rcu_reader_thread(void) {
     }
 
     atomic_fetch_add(&rcu_reads_done, 1);
-    k_printf("Reader thread complete\n");
-    enable_interrupts();
 }
 
 static atomic_bool volatile rcu_deferred_freed = false;
 
 static void rcu_free_fn(void *ptr) {
+    k_printf("RCU defer free\n");
     kfree(ptr);
-    k_printf("RCU free success\n");
-
     atomic_store(&rcu_deferred_freed, true);
 }
 
@@ -62,11 +58,9 @@ static void rcu_writer_thread(void) {
 
     rcu_synchronize();
     rcu_defer(rcu_free_fn, old);
-    k_printf("Writer thread complete\n");
 }
 
 REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    enable_interrupts();
     struct rcu_test_data *initial = kmalloc(sizeof(*initial));
     initial->value = 42;
     shared_ptr = initial;
@@ -74,7 +68,8 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     for (uint64_t i = 0; i < NUM_RCU_READERS; i++)
         thread_spawn(rcu_reader_thread);
 
-    k_printf("Readers spawned\n");
+    k_printf("Readers spawned - we are core %llu\n", get_this_core_id());
+    enable_interrupts();
 
     sleep_ms(50);
     thread_spawn(rcu_writer_thread);
@@ -82,12 +77,16 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     while (atomic_load(&rcu_reads_done) < NUM_RCU_READERS)
         scheduler_yield();
 
+    enable_interrupts();
     for (int i = 0; i < 100 && !atomic_load(&rcu_deferred_freed); i++)
         sleep_ms(1);
 
     TEST_ASSERT(!atomic_load(&rcu_test_failed));
+
+    k_printf("Waiting on defer free\n");
+    enable_interrupts();
     while (!atomic_load(&rcu_deferred_freed))
-        ;
+        scheduler_yield();
 
     SET_SUCCESS;
 }

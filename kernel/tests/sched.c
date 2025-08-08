@@ -3,6 +3,7 @@
 #include <sch/sched.h>
 #include <sch/thread.h>
 #include <sleep.h>
+#include <string.h>
 #include <tests.h>
 
 static volatile atomic_bool ran = false;
@@ -43,8 +44,17 @@ static void event_pool_fn(void *arg, void *unused) {
 }
 
 REGISTER_TEST(event_pool_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    uint64_t tsc = rdtsc();
     event_pool_add_remote(event_pool_fn, NULL, NULL);
+    uint64_t total = rdtsc() - tsc;
     sleep_ms(50);
+    while (!atomic_load(&event_pool_ran))
+        cpu_relax();
+
+    char *msg = kzalloc(100);
+    TEST_ASSERT(msg);
+    snprintf(msg, 100, "Took %d clock cycles to add to event pool", total);
+    ADD_MESSAGE(msg);
     TEST_ASSERT(atomic_load(&event_pool_ran));
 
     SET_SUCCESS;

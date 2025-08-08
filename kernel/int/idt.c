@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <types/rcu.h>
 
 extern void context_switch();
 extern void page_fault_handler_wrapper();
@@ -53,6 +54,7 @@ void isr_common_entry(uint8_t vector, void *rsp) {
             wait_for_interrupt();
     }
 
+    rcu_mark_quiescent();
     unmark_self_in_interrupt();
 }
 

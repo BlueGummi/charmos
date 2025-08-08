@@ -53,12 +53,34 @@ struct minheap *minheap_create(void) {
     return heap;
 }
 
+void minheap_expand(struct minheap *heap, uint32_t new_size) {
+    if (new_size <= heap->capacity)
+        return;
+
+    struct minheap_node **new_nodes =
+        kmalloc(sizeof(struct minheap_node *) * new_size);
+
+    if (!new_nodes)
+        return;
+
+    memcpy(new_nodes, heap->nodes,
+           sizeof(struct minheap_node *) * heap->capacity);
+
+    kfree(heap->nodes);
+    heap->nodes = new_nodes;
+    heap->capacity = new_size;
+}
+
 void minheap_insert(struct minheap *heap, struct minheap_node *node,
                     uint64_t key) {
     if (heap->size >= heap->capacity) {
         uint32_t new_cap = heap->capacity * 2;
         struct minheap_node **new_nodes =
             kmalloc(sizeof(struct minheap_node *) * new_cap);
+
+        if (!new_nodes)
+            return;
+
         memcpy(new_nodes, heap->nodes,
                sizeof(struct minheap_node *) * heap->capacity);
         kfree(heap->nodes);

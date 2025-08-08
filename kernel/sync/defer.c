@@ -6,7 +6,6 @@
 #include <sch/defer.h>
 #include <sch/sched.h>
 #include <sync/spin_lock.h>
-#include <time.h>
 
 static struct deferred_event **defer_queues = NULL;
 static struct spinlock *defer_locks = NULL;
@@ -27,8 +26,6 @@ static inline struct deferred_event *this_defer_queue(void) {
 static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
     (void) irq, (void) ctx, (void) rsp;
 
-    uint64_t now = hpet_timestamp_ms();
-
     struct spinlock *lock = this_lock();
     bool i = spin_lock(lock);
 
@@ -36,6 +33,7 @@ static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
 
     uint64_t timer = this_timer();
 
+    uint64_t now = hpet_timestamp_ms();
     while (defer_queue && defer_queue->timestamp_ms <= now) {
         struct deferred_event *ev = defer_queue;
         defer_queue = ev->next;
@@ -64,11 +62,11 @@ static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
 }
 
 bool defer_enqueue(dpc_t func, void *arg, void *arg2, uint64_t delay_ms) {
-    uint64_t now = hpet_timestamp_ms();
     struct deferred_event *ev = kzalloc(sizeof(struct deferred_event));
     if (!ev)
         return false;
 
+    uint64_t now = hpet_timestamp_ms();
     ev->timestamp_ms = now + delay_ms;
     ev->callback = func;
     ev->arg = arg;

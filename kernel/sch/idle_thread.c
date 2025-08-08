@@ -4,6 +4,7 @@
 #include <kassert.h>
 #include <sch/defer.h>
 #include <sch/sched.h>
+#include <types/rcu.h>
 
 static inline void reset_idle_thread_stage(struct idle_thread_data *idle) {
     atomic_store(&idle->state, IDLE_THREAD_WORK_STEAL);
@@ -49,6 +50,7 @@ void scheduler_idle_main(void) {
     atomic_store(&idle->last_entry_ms, time_get_ms());
     atomic_store(&idle->state, IDLE_THREAD_WORK_STEAL);
     while (true) {
+        rcu_mark_quiescent();
         enable_interrupts();
         wait_for_interrupt();
     }

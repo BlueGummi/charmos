@@ -31,26 +31,17 @@ void rcu_synchronize(void) {
         if (all_seen)
             break;
 
-        cpu_relax();
+        scheduler_yield();
     }
 }
 
-static void rcu_defer_wrapper(void *arg1, void *arg2) {
-    (void) arg2;
-    struct rcu_defer_op *op = arg1;
-    op->func(op->arg);
-    kfree(op);
+static void rcu_defer_wrapper(void *argument, void *fn) {
+    void (*f)(void *) = fn;
+    f(argument);
 }
 
 void rcu_defer(void (*func)(void *), void *arg) {
-    struct rcu_defer_op *op = kmalloc(sizeof(*op));
-    if (!op)
-        return;
-
-    op->func = func;
-    op->arg = arg;
-
-    defer_enqueue(rcu_defer_wrapper, op, NULL, RCU_GRACE_DELAY_MS);
+    defer_enqueue(rcu_defer_wrapper, arg, (void *) func, RCU_GRACE_DELAY_MS);
 }
 
 void rcu_maintenance_tick(void) {
@@ -77,8 +68,10 @@ void rcu_read_lock(void) {
 
 void rcu_read_unlock(void) {
     struct core *c = get_current_core();
-    if (!c || c->rcu_nesting == 0)
+    if (!c || c->rcu_nesting == 0) {
+        k_panic("RCU bug\n");
         return;
+    }
 
     if (--c->rcu_nesting == 0) {
         c->rcu_quiescent = true;
