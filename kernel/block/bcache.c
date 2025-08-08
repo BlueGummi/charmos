@@ -2,6 +2,7 @@
 #include <block/generic.h>
 #include <block/sched.h>
 #include <mem/alloc.h>
+#include <mem/hugepage.h>
 #include <misc/align.h>
 #include <sch/defer.h>
 #include <stdbool.h>
@@ -139,7 +140,7 @@ static bool remove(struct bcache *cache, uint64_t key, uint64_t spb) {
             }
 
             if (should_free) {
-                kfree_aligned(val->buffer);
+                hugepage_free_page(val->buffer);
                 kfree(val);
             }
 
@@ -309,7 +310,7 @@ void bcache_destroy(struct bcache *cache) {
         while (node) {
             struct bcache_wrapper *next = node->next;
             if (node->value) {
-                kfree_aligned(node->value->buffer);
+                hugepage_free_page(node->value->buffer);
                 kfree(node->value);
             }
             kfree(node);
@@ -377,12 +378,12 @@ void *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
     bool i = spin_lock(&disk->cache->lock);
 
     if (!ent) {
-        uint8_t *buf = kmalloc_aligned(block_size, PAGE_SIZE);
+        uint8_t *buf = hugepage_alloc_page();
         if (!buf)
             return NULL;
 
         if (!disk->read_sector(disk, base_lba, buf, sectors_per_block)) {
-            kfree_aligned(buf);
+            hugepage_free_page(buf);
             spin_unlock(&disk->cache->lock, i);
             *out_entry = NULL;
             return NULL;

@@ -198,6 +198,7 @@ struct thread_runtime_buckets {
 struct thread {
     uint64_t id;
     void *stack;
+    size_t stack_size;
 
     struct cpu_context regs;
 

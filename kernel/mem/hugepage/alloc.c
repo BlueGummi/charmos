@@ -77,25 +77,26 @@ static inline bool hugepage_is_not_full(struct hugepage *hp) {
     return !hugepage_is_full(hp);
 }
 
-static inline void reinsert_hugepage(struct hugepage *hp) {
+static inline void reinsert_hugepage(struct hugepage *hp, bool locked) {
     struct hugepage_core_list *hcl = hugepage_get_core_list(hp);
 
     /* Re-insert if it is not full to balance the minheap */
     if (likely(hugepage_is_not_full(hp)))
-        hugepage_core_list_insert(hcl, hp);
+        hugepage_core_list_insert(hcl, hp, locked);
 }
 
-static inline void *alloc_and_adjust(struct hugepage *hp, size_t pages) {
+static inline void *alloc_and_adjust(struct hugepage *hp, size_t pages,
+                                     bool minheap_locked) {
     kassert(pages > 0);
     if (hugepage_num_pages_free(hp) < pages)
         return NULL;
 
     hugepage_sanity_assert(hp);
-    hugepage_remove_from_list_safe(hp);
+    hugepage_remove_from_core_list_safe(hp, minheap_locked);
 
     void *ret = hugepage_alloc_from_hugepage(hp, pages);
 
-    reinsert_hugepage(hp);
+    reinsert_hugepage(hp, minheap_locked);
     return ret;
 }
 
@@ -105,13 +106,17 @@ static void *alloc_search_core_list(struct hugepage_core_list *hcl,
         return NULL;
 
     struct minheap_node *mhn;
+    bool iflag = hugepage_list_lock(hcl);
     minheap_for_each(hcl->hugepage_minheap, mhn) {
         struct hugepage *hp = hugepage_from_minheap_node(mhn);
-        void *p = alloc_and_adjust(hp, page_count);
-        if (p)
+        void *p = alloc_and_adjust(hp, page_count, true);
+        if (p) {
+            hugepage_list_unlock(hcl, iflag);
             return p;
+        }
     }
 
+    hugepage_list_unlock(hcl, iflag);
     /* No space in minheap */
     return NULL;
 }
@@ -136,7 +141,7 @@ static void *alloc_from_multiple_hugepages(size_t page_count) {
         size_t chunk = hugepage_chunk_for(page_count);
 
         struct hugepage *hp = hp_arr[i];
-        alloc_and_adjust(hp, chunk);
+        alloc_and_adjust(hp, chunk, false);
 
         page_count -= chunk;
     }
@@ -154,13 +159,13 @@ static inline void *try_alloc_from_gc_list(struct hugepage_core_list *hcl,
 
     recycled->owner_core = hcl->core_num;
     hugepage_insert_internal(recycled);
-    return alloc_and_adjust(recycled, page_count);
+    return alloc_and_adjust(recycled, page_count, false);
 }
 
 static void *alloc_from_new_hugepage(struct hugepage_core_list *hcl,
                                      size_t page_count) {
     struct hugepage *new = hugepage_create_internal(hcl->core_num);
-    return alloc_and_adjust(new, page_count);
+    return alloc_and_adjust(new, page_count, false);
 }
 
 /* TODO: Fallback to stealing hugepages from other cores */

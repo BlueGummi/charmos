@@ -1,6 +1,12 @@
 #include <kassert.h>
 #include <mem/hugepage.h>
 #include <mem/vmm.h>
+#include <string.h>
+
+/* Everything free, so we zero it */
+static inline void hugepage_zero_bitmap(struct hugepage *hp) {
+    memset(hp->bitmap, 0, HUGEPAGE_U64_BITMAP_SIZE * 8);
+}
 
 static inline void hugepage_gc_list_dec_count(struct hugepage_gc_list *hgcl) {
     atomic_fetch_sub(&hgcl->pages_in_list, 1);
@@ -16,14 +22,6 @@ static inline bool hugepage_still_in_core_list(struct hugepage *hp) {
 
 static inline size_t hugepage_num_pages_free(struct hugepage *hp) {
     return HUGEPAGE_SIZE_IN_4KB_PAGES - hp->pages_used;
-}
-
-static inline bool hugepage_lock(struct hugepage *hp) {
-    return spin_lock(&hp->lock);
-}
-
-static inline void hugepage_unlock(struct hugepage *hp, bool iflag) {
-    spin_unlock(&hp->lock, iflag);
 }
 
 static inline bool hugepage_gc_list_lock(struct hugepage_gc_list *gcl) {
@@ -99,17 +97,22 @@ hugepage_get_core_list(struct hugepage *hp) {
 }
 
 static inline struct hugepage_core_list *hugepage_this_core_list(void) {
+    if (global.current_bootstage < BOOTSTAGE_MID_MP)
+        return &hugepage_full_tree->core_lists[0];
+
     return &hugepage_full_tree->core_lists[get_this_core_id()];
 }
 
-static inline void hugepage_remove_from_core_list(struct hugepage *hp) {
+static inline void hugepage_remove_from_core_list(struct hugepage *hp,
+                                                  bool locked) {
     struct hugepage_core_list *hcl = hugepage_get_core_list(hp);
-    hugepage_core_list_remove_hugepage(hcl, hp);
+    hugepage_core_list_remove_hugepage(hcl, hp, locked);
 }
 
-static inline bool hugepage_remove_from_list_safe(struct hugepage *hp) {
+static inline bool hugepage_remove_from_core_list_safe(struct hugepage *hp,
+                                                       bool locked) {
     if (hugepage_still_in_core_list(hp)) {
-        hugepage_remove_from_core_list(hp);
+        hugepage_remove_from_core_list(hp, locked);
         return true;
     }
     return false;
@@ -150,20 +153,20 @@ static inline void *hugepage_idx_to_addr(struct hugepage *hp, size_t idx) {
 }
 
 static inline size_t u64_idx_for_idx(size_t idx) {
-    size_t u64_idx = idx / 64;
+    size_t u64_idx = idx / 64ULL;
     assert_u64_idx_idx_sanity(u64_idx);
     return u64_idx;
 }
 
 static inline void set_bit(struct hugepage *hp, size_t index) {
     size_t u64_idx = u64_idx_for_idx(index);
-    uint64_t mask = 1ULL << (index % 64);
+    uint64_t mask = 1ULL << (index % 64ULL);
     hp->bitmap[u64_idx] |= mask;
 }
 
 static inline void clear_bit(struct hugepage *hp, size_t index) {
     size_t u64_idx = u64_idx_for_idx(index);
-    uint64_t mask = ~(1ULL << (index % 64));
+    uint64_t mask = ~(1ULL << (index % 64ULL));
     hp->bitmap[u64_idx] &= mask;
 }
 

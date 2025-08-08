@@ -11,6 +11,8 @@
  * hugepage if it becomes fully empty */
 void hugepage_free_from_hugepage(struct hugepage *hp, void *ptr,
                                  size_t page_count) {
+    bool iflag = hugepage_lock(hp);
+
     kassert(page_count > 0);
     vaddr_t addr = (vaddr_t) ptr;
     kassert(addr >= hp->virt_base);
@@ -20,12 +22,12 @@ void hugepage_free_from_hugepage(struct hugepage *hp, void *ptr,
     size_t index = offset / PAGE_SIZE;
     kassert(index + page_count <= HUGEPAGE_SIZE_IN_4KB_PAGES);
 
-    bool iflag = hugepage_lock(hp);
-
     /* Sanity check: all bits must be set */
     for (size_t i = 0; i < page_count; i++)
         if (!test_bit(hp, index + i))
-            k_panic("double free or corrupt ptr");
+            k_panic("double free or corrupt ptr 0x%lx with page count %u at "
+                    "index %u",
+                    ptr, page_count, i);
 
     for (size_t i = 0; i < page_count; i++)
         clear_bit(hp, index + i);
@@ -40,7 +42,7 @@ void hugepage_free_from_hugepage(struct hugepage *hp, void *ptr,
 /* Alter the bitmap and possibly put a hugepage back into the minheap
  * from the tree, or enqueue for deletion if everything is free */
 static void free_and_adjust(struct hugepage *hp, void *ptr, size_t page_count) {
-    hugepage_remove_from_list_safe(hp);
+    hugepage_remove_from_core_list_safe(hp, false);
     hugepage_free_from_hugepage(hp, ptr, page_count);
 
     /* Put this up for garbage collection */
@@ -48,19 +50,23 @@ static void free_and_adjust(struct hugepage *hp, void *ptr, size_t page_count) {
         return hugepage_gc_enqueue(hp);
 
     /* Or just re-insert it */
-    hugepage_core_list_insert(hugepage_get_core_list(hp), hp);
+    hugepage_core_list_insert(hugepage_get_core_list(hp), hp, false);
 }
 
 static struct hugepage *search_core_list(struct hugepage_core_list *hcl,
                                          vaddr_t vaddr) {
     struct minheap_node *mhn = NULL;
 
+    bool iflag = hugepage_list_lock(hcl);
     minheap_for_each(hcl->hugepage_minheap, mhn) {
         struct hugepage *hp = hugepage_from_minheap_node(mhn);
-        if (hp->virt_base == vaddr)
+        if (hp->virt_base == vaddr) {
+            hugepage_list_unlock(hcl, iflag);
             return hp;
+        }
     }
 
+    hugepage_list_unlock(hcl, iflag);
     return NULL;
 }
 
@@ -79,30 +85,32 @@ static struct hugepage *search_global_tree(struct hugepage_tree *tree,
     return hp;
 }
 
-static struct hugepage *search_for_hugepage(vaddr_t vaddr,
-                                            bool *found_in_tb_out) {
-    kassert(HUGEPAGE_ALIGN(vaddr) == vaddr);
-    struct hugepage *found = hugepage_tb_lookup(hugepage_full_tree->htb, vaddr);
-    if (found) {
-        *found_in_tb_out = true;
-        return found;
-    }
+static inline void tb_insert_safe(struct hugepage_tb *tb, struct hugepage *hp) {
+    if (tb && hp)
+        hugepage_tb_insert(tb, hp);
+}
 
-    struct hugepage_core_list *hcl = hugepage_this_core_list();
-    found = search_core_list(hcl, vaddr);
+static struct hugepage *search_for_hugepage(vaddr_t vaddr) {
+    kassert(HUGEPAGE_ALIGN(vaddr) == vaddr);
+    struct hugepage *found = NULL;
+    found = hugepage_tb_lookup(hugepage_full_tree->htb, vaddr);
     if (found)
         return found;
 
-    return search_global_tree(hugepage_full_tree, vaddr);
+    found = search_core_list(hugepage_this_core_list(), vaddr);
+    if (found)
+        goto out;
+
+    found = search_global_tree(hugepage_full_tree, vaddr);
+
+out:
+    tb_insert_safe(hugepage_full_tree->htb, found);
+    return found;
 }
 
 struct hugepage *hugepage_lookup(void *ptr) {
     vaddr_t vaddr = HUGEPAGE_ALIGN((vaddr_t) ptr);
-    bool found_in_tb = false;
-    struct hugepage *hp = search_for_hugepage(vaddr, &found_in_tb);
-    if (!found_in_tb)
-        hugepage_tb_insert(hugepage_full_tree->htb, hp);
-
+    struct hugepage *hp = search_for_hugepage(vaddr);
     return hp;
 }
 
@@ -113,8 +121,7 @@ static inline bool free_requires_multiple_hugepages(size_t page_count) {
 static size_t free_from_chunk(vaddr_t base, size_t page_count, size_t index) {
     size_t chunk = hugepage_chunk_for(page_count);
     vaddr_t vaddr = base + index * HUGEPAGE_SIZE;
-    bool found_in_tb = false;
-    struct hugepage *hp = search_for_hugepage(vaddr, &found_in_tb);
+    struct hugepage *hp = search_for_hugepage(vaddr);
     if (!hp)
         k_panic("Likely double free\n");
 
@@ -136,14 +143,10 @@ void hugepage_free_pages(void *ptr, size_t page_count) {
     if (free_requires_multiple_hugepages(page_count))
         return free_from_multiple_hugepages(vaddr_aligned, page_count);
 
-    bool found_in_tb = false;
-    struct hugepage *hp = search_for_hugepage(vaddr_aligned, &found_in_tb);
+    struct hugepage *hp = search_for_hugepage(vaddr_aligned);
 
     if (!hp)
         k_panic("Likely double free\n");
-
-    if (!found_in_tb)
-        hugepage_tb_insert(hugepage_full_tree->htb, hp);
 
     free_and_adjust(hp, ptr, page_count);
 }

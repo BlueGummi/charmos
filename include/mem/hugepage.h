@@ -21,11 +21,11 @@
 #define HUGEPAGE_GC_LIST_MAX_HUGEPAGES 16
 
 enum hugepage_flags : uint8_t {
-    HUGEPAGE_FLAG_PINNED = 1 << 0,
-    HUGEPAGE_FLAG_RECYCLED = 1 << 1,
-    HUGEPAGE_FLAG_LOCAL_ONLY = 1 << 2,
-    HUGEPAGE_FLAG_ARENA = 1 << 3,
-    HUGEPAGE_FLAG_UNTRACKED = 1 << 4,
+    HUGEPAGE_FLAG_NONE = 0,
+    HUGEPAGE_FLAG_PINNED = 1 << 0,    /* Pinned to the core */
+    HUGEPAGE_FLAG_RECYCLED = 1 << 1,  /* Recycled from arena */
+    HUGEPAGE_FLAG_ARENA = 1 << 2,     /* From arena */
+    HUGEPAGE_FLAG_UNTRACKED = 1 << 3, /* Not in an arena or the allocator */
 };
 
 typedef void (*hugepage_hint_callback)(bool success, uint64_t data);
@@ -37,15 +37,6 @@ enum hugepage_hint : uint8_t {
     HUGEPAGE_HINT_PREFER_INDEPENDENT = 4,
     HUGEPAGE_HINT_ADD_HTB_ENTRY = 5,
     HUGEPAGE_HINT_ALLOW_REBALANCE = 6,
-};
-
-/* To be used in arenas for different
- * allocation techniques */
-enum hugepage_allocation_type : uint8_t {
-    HUGEPAGE_ALLOCATION_TYPE_BITMAP = 0,
-    HUGEPAGE_ALLOCATION_TYPE_BUDDY = 1,
-    HUGEPAGE_ALLOCATION_TYPE_SLAB = 2,
-    HUGEPAGE_ALLOCATION_TYPE_DEFAULT = HUGEPAGE_ALLOCATION_TYPE_BITMAP,
 };
 
 #define HUGEPAGE_HINT_COUNT_INTERNAL 7
@@ -83,7 +74,7 @@ struct hugepage {
                                   * without creating much fragmentation */
 
     enum hugepage_flags flags;
-    enum hugepage_allocation_type alloc_type;
+    uint8_t allocation_type; /* Only used with arena pages */
 
     core_t owner_core;
 
@@ -95,6 +86,9 @@ struct hugepage {
     struct minheap_node minheap_node;
 
     uint64_t bitmap[HUGEPAGE_U64_BITMAP_SIZE]; /* One bit per 4KB page */
+
+    /* For whatever needs it */
+    void *private;
 };
 
 struct hugepage_core_list {
@@ -129,29 +123,29 @@ struct hugepage_gc_list {
 #define hugepage_from_minheap_node(node)                                       \
     container_of(node, struct hugepage, minheap_node)
 
+/* Sanity checks */
 bool hugepage_is_valid(struct hugepage *hp);
 bool hugepage_safe_for_deletion(struct hugepage *hp);
 
 void hugepage_print(struct hugepage *hp);
 
-struct hugepage *hugepage_get_from_gc_list(void);
-
 /* Core list operations for per-core minheaps */
 void hugepage_core_list_insert(struct hugepage_core_list *list,
-                               struct hugepage *hp);
+                               struct hugepage *hp, bool locked);
 
+/* Put the hugepage back on its core list */
 void hugepage_return_to_list_internal(struct hugepage *hp);
 
 struct hugepage *hugepage_core_list_peek(struct hugepage_core_list *hcl);
 struct hugepage *hugepage_core_list_pop(struct hugepage_core_list *hcl);
 void hugepage_core_list_remove_hugepage(struct hugepage_core_list *hcl,
-                                        struct hugepage *hp);
+                                        struct hugepage *hp, bool locked);
 
 /* Global rbt operations on the hugepage tree */
 void hugepage_tree_insert(struct hugepage_tree *tree, struct hugepage *hp);
 void hugepage_tree_remove(struct hugepage_tree *tree, struct hugepage *hp);
 
-/* Internal allocator-private insertion into trees and stuff */
+/* Internal allocator-private insertion into trees */
 void hugepage_insert_internal(struct hugepage *hp);
 
 void hugepage_init(struct hugepage *hp, vaddr_t vaddr_base, paddr_t phys_base,
@@ -166,10 +160,12 @@ struct hugepage *hugepage_create_internal(core_t owner);
 bool hugepage_create_contiguous(core_t owner, size_t hugepage_count,
                                 struct hugepage **hp_out);
 
+/* GC list */
 void hugepage_gc_add(struct hugepage *hp);
 void hugepage_gc_enqueue(struct hugepage *hp);
 void hugepage_gc_remove(struct hugepage *hp);
 void hugepage_gc_remove_internal(struct hugepage *hp);
+struct hugepage *hugepage_get_from_gc_list(void);
 
 /* The actual initialization for the whole allocator */
 void hugepage_alloc_init(void);
@@ -192,12 +188,16 @@ void *hugepage_realloc_pages(void *ptr, size_t new_cnt);
  * tracked in any internal data structures */
 struct hugepage *hugepage_alloc_hugepage(void);
 
+/* Same as `alloc_hugepage` but this guarantees that the
+ * gc list is not checked, and a new hugepage is allocated */
+struct hugepage *hugepage_create_new_hugepage(void);
+
 /* Frees the hugepage, panicking if the data is not sane, e.g.
  * pages_used is 0 but the bitmap says otherwise */
 void hugepage_free_hugepage(struct hugepage *hp);
 struct hugepage *hugepage_lookup(void *ptr);
 
-/* Uses the simple bitmaps for now */
+/* Uses the bitmap */
 void *hugepage_alloc_from_hugepage(struct hugepage *hp, size_t cnt);
 void hugepage_free_from_hugepage(struct hugepage *hp, void *ptr,
                                  size_t page_count);
@@ -216,10 +216,19 @@ void hugepage_tb_remove(struct hugepage_tb *htb, struct hugepage *hp);
 void hugepage_hint(enum hugepage_hint hint, uint64_t arg,
                    hugepage_hint_callback cb);
 void hugepage_print_all(void);
+void hugepage_bit_set(struct hugepage *hp, size_t idx);
 
 #define hugepage_sanity_assert(hp) kassert(hugepage_is_valid(hp))
 #define hugepage_deletion_sanity_assert(hp)                                    \
     kassert(hugepage_safe_for_deletion(hp))
+
+static inline bool hugepage_lock(struct hugepage *hp) {
+    return spin_lock(&hp->lock);
+}
+
+static inline void hugepage_unlock(struct hugepage *hp, bool iflag) {
+    spin_unlock(&hp->lock, iflag);
+}
 
 extern struct hugepage_tree *hugepage_full_tree;
 extern struct hugepage_gc_list hugepage_gc_list;

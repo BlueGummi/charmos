@@ -13,9 +13,9 @@ void hugepage_gc_add(struct hugepage *hp) {
     hugepage_gc_list_unlock(&hugepage_gc_list, iflag);
 }
 
+/* No locks are taken here */
 void hugepage_gc_remove_internal(struct hugepage *hp) {
     list_del(&hp->gc_list_node);
-
     hugepage_gc_list_dec_count(&hugepage_gc_list);
 }
 
@@ -25,6 +25,18 @@ void hugepage_gc_remove(struct hugepage *hp) {
     hugepage_gc_remove_internal(hp);
 
     hugepage_gc_list_unlock(&hugepage_gc_list, iflag);
+}
+
+static void hugepage_reset(struct hugepage *hp) {
+    hugepage_unmark_for_deletion(hp);
+    hp->allocation_type = 0;
+    hp->being_deleted = false;
+
+    hugepage_zero_bitmap(hp);
+
+    hp->for_deletion = false;
+    hp->last_allocated_idx = 0;
+    hp->pages_used = 0;
 }
 
 /* This is used when creating a new hugepage.
@@ -41,7 +53,7 @@ struct hugepage *hugepage_get_from_gc_list(void) {
         hp = hugepage_from_gc_list_node(nd);
 
         if (!hugepage_is_being_deleted(hp)) {
-            hugepage_unmark_for_deletion(hp);
+            hugepage_reset(hp);
             break;
         }
 
@@ -54,23 +66,28 @@ struct hugepage *hugepage_get_from_gc_list(void) {
 
 static inline bool hugepage_try_instant_delete(struct hugepage *hp) {
     if (hugepage_gc_list.pages_in_list > HUGEPAGE_GC_LIST_MAX_HUGEPAGES) {
+        /* We do not use `delete_and_unlink` because this hugepage
+         * will already not exist in any data structures to track it.
+         * `delete_and_unlink` would be used to delete hps **in** the
+         * gc_list for whatever reason they need to be deleted */
         hugepage_delete(hp);
         return true;
     }
     return false;
 }
 
-void hugepage_gc_enqueue(struct hugepage *hp) {
+static inline void hugepage_untrack(struct hugepage *hp) {
     hugepage_tb_remove(hugepage_full_tree->htb, hp);
-    hugepage_remove_from_list_safe(hp);
+    hugepage_remove_from_core_list_safe(hp, false);
     hugepage_tree_remove(hugepage_full_tree, hp);
+}
 
+void hugepage_gc_enqueue(struct hugepage *hp) {
+    hugepage_untrack(hp);
     hugepage_deletion_sanity_assert(hp);
-
     hugepage_mark_for_deletion(hp);
     if (hugepage_try_instant_delete(hp))
         return;
 
-    /* Only enqueue if this has a timeout */
     hugepage_gc_add(hp);
 }

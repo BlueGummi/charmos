@@ -22,11 +22,17 @@ void hugepage_tree_remove(struct hugepage_tree *tree, struct hugepage *hp) {
  */
 
 void hugepage_core_list_insert(struct hugepage_core_list *list,
-                               struct hugepage *hp) {
-    bool iflag = hugepage_list_lock(list);
+                               struct hugepage *hp, bool locked) {
+    bool iflag;
+
+    if (!locked)
+        iflag = hugepage_list_lock(list);
+
     kassert(hp->owner_core == list->core_num);
     minheap_insert(list->hugepage_minheap, &hp->minheap_node, hp->virt_base);
-    hugepage_list_unlock(list, iflag);
+
+    if (!locked)
+        hugepage_list_unlock(list, iflag);
 }
 
 void hugepage_return_to_list_internal(struct hugepage *hp) {
@@ -35,7 +41,7 @@ void hugepage_return_to_list_internal(struct hugepage *hp) {
         return;
 
     struct hugepage_core_list *hcl = hugepage_get_core_list(hp);
-    hugepage_core_list_insert(hcl, hp);
+    hugepage_core_list_insert(hcl, hp, false);
 }
 
 typedef struct minheap_node *(minheap_fn) (struct minheap *);
@@ -62,9 +68,14 @@ struct hugepage *hugepage_core_list_pop(struct hugepage_core_list *hcl) {
 }
 
 void hugepage_core_list_remove_hugepage(struct hugepage_core_list *hcl,
-                                        struct hugepage *hp) {
-    bool iflag = hugepage_list_lock(hcl);
+                                        struct hugepage *hp, bool locked) {
+    bool iflag = false;
+    if (!locked)
+        iflag = hugepage_list_lock(hcl);
+
     kassert(hp->owner_core == hcl->core_num);
     minheap_remove(hcl->hugepage_minheap, &hp->minheap_node);
-    hugepage_list_unlock(hcl, iflag);
+
+    if (!locked)
+        hugepage_list_unlock(hcl, iflag);
 }

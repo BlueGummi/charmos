@@ -26,7 +26,7 @@ static inline void map_pages(vaddr_t virt_base, paddr_t phys_base) {
 void hugepage_insert_internal(struct hugepage *hp) {
     struct hugepage_core_list *hcl = hugepage_get_core_list(hp);
     if (!hugepage_is_full(hp))
-        hugepage_core_list_insert(hcl, hp);
+        hugepage_core_list_insert(hcl, hp, false);
 
     hugepage_tree_insert(hugepage_full_tree, hp);
 }
@@ -51,6 +51,7 @@ static struct hugepage *create(core_t owner) {
         return NULL;
     }
 
+    hp->flags = HUGEPAGE_FLAG_UNTRACKED;
     vaddr_t virt_base = find_free_vaddr(hugepage_full_tree);
     map_pages(virt_base, phys_base);
     hugepage_init(hp, virt_base, phys_base, owner);
@@ -97,6 +98,7 @@ bool hugepage_create_contiguous(core_t owner, size_t hugepage_count,
     size_t hp_out_idx = 0;
     for (vaddr_t i = vbase; i < vtop; i += HUGEPAGE_SIZE) {
         struct hugepage *hp = hugepage_create_with_vaddr(owner, i);
+        hp->flags = HUGEPAGE_FLAG_NONE;
         if (!hp) {
             free_existing(hp_out, i);
             return false;
@@ -113,11 +115,24 @@ struct hugepage *hugepage_create_internal(core_t owner) {
     if (!hp)
         return NULL;
 
+    hp->flags = HUGEPAGE_FLAG_NONE;
     hugepage_insert_internal(hp);
     return hp;
 }
 
 struct hugepage *hugepage_alloc_hugepage(void) {
+    core_t core = get_this_core_id();
+    struct hugepage *recycled = hugepage_get_from_gc_list();
+
+    if (recycled) {
+        recycled->owner_core = core;
+        return recycled;
+    }
+
+    return create(core);
+}
+
+struct hugepage *hugepage_create_new_hugepage(void) {
     return create(get_this_core_id());
 }
 
@@ -143,6 +158,10 @@ void hugepage_delete_and_unlink(struct hugepage *hp) {
     hugepage_gc_list_unlock(&hugepage_gc_list, iflag);
     hugepage_tb_remove(hugepage_full_tree->htb, hp);
     hugepage_delete(hp);
+}
+
+void hugepage_bit_set(struct hugepage *hp, size_t idx) {
+    set_bit(hp, idx);
 }
 
 static inline void init_hugepage_list(struct hugepage_core_list *list,

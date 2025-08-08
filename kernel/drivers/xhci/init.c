@@ -4,6 +4,7 @@
 #include <drivers/usb.h>
 #include <drivers/xhci.h>
 #include <mem/alloc.h>
+#include <mem/hugepage.h>
 #include <mem/vmm.h>
 #include <sleep.h>
 #include <stdbool.h>
@@ -11,10 +12,10 @@
 #include <string.h>
 
 void xhci_setup_event_ring(struct xhci_device *dev) {
-    struct xhci_erst_entry *erst_table = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    struct xhci_erst_entry *erst_table = hugepage_alloc_page();
     uintptr_t erst_table_phys = vmm_get_phys((uintptr_t) erst_table);
 
-    struct xhci_trb *event_ring = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    struct xhci_trb *event_ring = hugepage_alloc_page();
     uintptr_t event_ring_phys = vmm_get_phys((uintptr_t) event_ring);
 
     event_ring[0].control = 1;
@@ -50,7 +51,7 @@ void xhci_setup_event_ring(struct xhci_device *dev) {
 void xhci_setup_command_ring(struct xhci_device *dev) {
     struct xhci_op_regs *op = dev->op_regs;
 
-    struct xhci_trb *cmd_ring = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    struct xhci_trb *cmd_ring = hugepage_alloc_page();
     uintptr_t cmd_ring_phys = vmm_get_phys((uintptr_t) cmd_ring);
 
     int last_index = TRB_RING_SIZE - 1;
@@ -59,7 +60,7 @@ void xhci_setup_command_ring(struct xhci_device *dev) {
     /* Toggle Cycle, Cycle bit = 1 */
     cmd_ring[last_index].control = (TRB_TYPE_LINK << 10) | (1 << 1);
 
-    struct xhci_dcbaa *dcbaa_virt = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    struct xhci_dcbaa *dcbaa_virt = hugepage_alloc_page();
     uintptr_t dcbaa_phys = vmm_get_phys((uintptr_t) dcbaa_virt);
 
     struct xhci_ring *ring = kmalloc(sizeof(struct xhci_ring));

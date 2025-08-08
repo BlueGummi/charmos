@@ -320,6 +320,7 @@ void *krealloc(void *ptr, uint64_t size) {
 }
 
 void *kmalloc_aligned(uint64_t size, uint64_t align) {
+
     uintptr_t raw = (uintptr_t) kmalloc(size + align - 1 + sizeof(uintptr_t));
     if (!raw)
         return NULL;

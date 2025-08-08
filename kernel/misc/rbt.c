@@ -182,7 +182,7 @@ static int validate_rbtree(struct rbt_node *node, int *black_height) {
     if (node->color == TREE_NODE_RED) {
         if ((node->left && node->left->color == TREE_NODE_RED) ||
             (node->right && node->right->color == TREE_NODE_RED)) {
-            k_printf("Red-Red violation at node %d\n", node->data);
+            k_printf("Red-Red violation at node 0x%lx\n", node->data);
             return 0;
         }
     }
@@ -196,7 +196,7 @@ static int validate_rbtree(struct rbt_node *node, int *black_height) {
         return 0;
 
     if (left_black_height != right_black_height) {
-        k_printf("Black-height violation at node %d (left height=%d, right "
+        k_printf("Black-height violation at node 0x%lx (left height=%d, right "
                  "height=%d)\n",
                  node->data, left_black_height, right_black_height);
         return 0;

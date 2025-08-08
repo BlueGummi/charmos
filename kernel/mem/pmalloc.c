@@ -255,6 +255,7 @@ static void buddy_free_pages(void *addr, uint64_t count, bool has_offset) {
 void *pmm_alloc_page(bool add_offset) {
     return pmm_alloc_pages(1, add_offset);
 }
+
 static struct spinlock pmalloc_lock = SPINLOCK_INIT;
 void *pmm_alloc_pages(uint64_t count, bool add_offset) {
     bool iflag = spin_lock(&pmalloc_lock);

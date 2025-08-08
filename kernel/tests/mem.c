@@ -1,4 +1,5 @@
 #include <mem/alloc.h>
+#include <mem/hugepage.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <stdbool.h>
@@ -50,4 +51,13 @@ KMALLOC_ALIGNMENT_TEST(32, 32)
 KMALLOC_ALIGNMENT_TEST(64, 64)
 KMALLOC_ALIGNMENT_TEST(128, 128)
 KMALLOC_ALIGNMENT_TEST(256, 256)
-KMALLOC_ALIGNMENT_TEST(PAGE_SIZE, PAGE_SIZE)
+
+REGISTER_TEST(kmalloc_aligned_4096_test, false, false) {
+    ABORT_IF_RAM_LOW();
+    for (uint64_t i = 0; i < ALIGNED_ALLOC_TIMES; i++) {
+        void *ptr = hugepage_alloc_page();
+        TEST_ASSERT(ptr != NULL);
+        ASSERT_ALIGNED(ptr, 4096);
+    }
+    SET_SUCCESS;
+}

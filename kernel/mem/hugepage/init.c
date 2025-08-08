@@ -1,17 +1,11 @@
 #include <charmos.h>
 #include <kassert.h>
 #include <mem/hugepage.h>
-#include <string.h>
 
 #include "internal.h"
 
 static inline void lock_init(struct hugepage *hp) {
     spinlock_init(&hp->lock);
-}
-
-/* Everything free, so we zero it */
-static inline void bitmap_init(struct hugepage *hp) {
-    memset(hp->bitmap, 0, HUGEPAGE_U64_BITMAP_SIZE * 8);
 }
 
 /* No deletion happening */
@@ -28,10 +22,9 @@ static inline void addrs_init(struct hugepage *hp, vaddr_t vaddr_base,
 
 static inline void structures_init(struct hugepage *hp, vaddr_t vaddr_base) {
     INIT_LIST_HEAD(&hp->gc_list_node);
-    rbt_init_node(&hp->tree_node);
-
     /* Sort by vaddr */
     hp->tree_node.data = vaddr_base;
+    rbt_init_node(&hp->tree_node);
 }
 
 static inline void state_init(struct hugepage *hp, core_t owner) {
@@ -42,7 +35,7 @@ static inline void state_init(struct hugepage *hp, core_t owner) {
 void hugepage_init(struct hugepage *hp, vaddr_t vaddr_base, paddr_t phys_base,
                    core_t owner) {
     lock_init(hp);
-    bitmap_init(hp);
+    hugepage_zero_bitmap(hp);
     deletion_init(hp);
     addrs_init(hp, vaddr_base, phys_base);
     structures_init(hp, vaddr_base);
