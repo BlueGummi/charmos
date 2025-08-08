@@ -92,18 +92,19 @@ static void free_existing(struct hugepage **hp_arr, size_t up_to) {
 
 bool hugepage_create_contiguous(core_t owner, size_t hugepage_count,
                                 struct hugepage **hp_out) {
+    kassert(hp_out);
     vaddr_t vbase = alloc_addrs_for_contiguous_hugepages(hugepage_count);
     vaddr_t vtop = vbase + (hugepage_count * HUGEPAGE_SIZE);
 
     size_t hp_out_idx = 0;
     for (vaddr_t i = vbase; i < vtop; i += HUGEPAGE_SIZE) {
         struct hugepage *hp = hugepage_create_with_vaddr(owner, i);
-        hp->flags = HUGEPAGE_FLAG_NONE;
         if (!hp) {
-            free_existing(hp_out, i);
+            free_existing(hp_out, hp_out_idx);
             return false;
         }
 
+        hp->flags = HUGEPAGE_FLAG_NONE;
         hp_out[hp_out_idx++] = hp;
         hugepage_insert_internal(hp);
     }

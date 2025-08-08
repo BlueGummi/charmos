@@ -25,9 +25,9 @@ void hugepage_free_from_hugepage(struct hugepage *hp, void *ptr,
     /* Sanity check: all bits must be set */
     for (size_t i = 0; i < page_count; i++)
         if (!test_bit(hp, index + i))
-            k_panic("double free or corrupt ptr 0x%lx with page count %u at "
-                    "index %u",
-                    ptr, page_count, i);
+            k_panic("double free or corrupt ptr 0x%lx with page count %u\n"
+                    "index %u, checking bit %llu",
+                    ptr, page_count, i, index + i);
 
     for (size_t i = 0; i < page_count; i++)
         clear_bit(hp, index + i);

@@ -123,12 +123,48 @@ static void *alloc_search_core_list(struct hugepage_core_list *hcl,
 
 static struct hugepage **create_hp_arr(size_t needed) {
     core_t owner = get_this_core_id();
-    struct hugepage **hp_arr = kmalloc(sizeof(struct hugepage *) * needed);
+    struct hugepage **hp_arr = kzalloc(sizeof(struct hugepage *) * needed);
+    if (!hp_arr)
+        return NULL;
+
     if (!hugepage_create_contiguous(owner, needed, hp_arr)) {
         kfree(hp_arr);
         return NULL;
     }
+
     return hp_arr;
+}
+
+static inline void *
+alloc_from_hugepage_at_base_and_adjust(struct hugepage *hp, size_t pages,
+                                       bool minheap_locked) {
+    kassert(pages > 0);
+
+    if (hugepage_num_pages_free(hp) < pages)
+        return NULL;
+
+    hugepage_sanity_assert(hp);
+    hugepage_remove_from_core_list_safe(hp, minheap_locked);
+
+    bool iflag = hugepage_lock(hp);
+
+    /* sanity: ensure first 'pages' bits are free */
+    for (size_t i = 0; i < pages; i++) {
+        if (test_bit(hp, i)) {
+            hugepage_unlock(hp, iflag);
+            reinsert_hugepage(hp, minheap_locked);
+            return NULL;
+        }
+    }
+
+    for (size_t i = 0; i < pages; i++)
+        set_bit(hp, i);
+
+    hp->pages_used += pages;
+    hugepage_unlock(hp, iflag);
+
+    reinsert_hugepage(hp, minheap_locked);
+    return hugepage_idx_to_addr(hp, 0);
 }
 
 static void *alloc_from_multiple_hugepages(size_t page_count) {
@@ -137,18 +173,26 @@ static void *alloc_from_multiple_hugepages(size_t page_count) {
     if (!hp_arr)
         return NULL;
 
+    void *first_ptr = NULL;
+
     for (size_t i = 0; i < needed; i++) {
         size_t chunk = hugepage_chunk_for(page_count);
-
         struct hugepage *hp = hp_arr[i];
-        alloc_and_adjust(hp, chunk, false);
+
+        void *p = alloc_from_hugepage_at_base_and_adjust(hp, chunk, false);
+        if (!p) {
+            kfree(hp_arr);
+            return NULL;
+        }
+
+        if (i == 0)
+            first_ptr = p;
 
         page_count -= chunk;
     }
 
-    vaddr_t base = hp_arr[0]->virt_base;
     kfree(hp_arr);
-    return (void *) base;
+    return first_ptr;
 }
 
 static inline void *try_alloc_from_gc_list(struct hugepage_core_list *hcl,

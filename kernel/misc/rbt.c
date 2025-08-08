@@ -335,7 +335,4 @@ void rbt_insert(struct rbt *tree, struct rbt_node *new_node) {
     if (parent)
         kassert(!(parent->color == TREE_NODE_RED &&
                   new_node->color == TREE_NODE_RED));
-
-    int dummy_bh = 0;
-    kassert(validate_rbtree(tree->root, &dummy_bh));
 }

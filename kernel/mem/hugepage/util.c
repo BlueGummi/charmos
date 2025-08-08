@@ -26,21 +26,26 @@ void hugepage_print(struct hugepage *hp) {
 
 void hugepage_print_all(void) {
     k_printf("hugepage core lists:\n");
+
     for (size_t i = 0; i < global.core_count; i++) {
         struct hugepage_core_list *hcl = &hugepage_full_tree->core_lists[i];
+        bool iflag = hugepage_list_lock(hcl);
         struct minheap_node *mhn;
         minheap_for_each(hcl->hugepage_minheap, mhn) {
             struct hugepage *hp = hugepage_from_minheap_node(mhn);
             hugepage_print(hp);
         }
+        hugepage_list_unlock(hcl, iflag);
     }
     k_printf("hugepage gc list:\n");
+    bool iflag = hugepage_gc_list_lock(&hugepage_gc_list);
     struct list_head *gclh = &hugepage_gc_list.hugepages_list;
     struct list_head *pos;
     list_for_each(pos, gclh) {
         struct hugepage *hp = hugepage_from_gc_list_node(pos);
         hugepage_print(hp);
     }
+    hugepage_gc_list_unlock(&hugepage_gc_list, iflag);
 }
 
 /* We check hugepage allocation counts, bitmaps,

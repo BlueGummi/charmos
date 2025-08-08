@@ -100,7 +100,7 @@ static enum errno tmpfs_write(struct vfs_node *node, const void *buf,
     while (size > 0) {
         uint64_t page_idx = offset >> TMPFS_PAGE_SHIFT;
         uint64_t page_offset = offset & TMPFS_PAGE_MASK;
-        uint64_t to_copy = TMPFS_PAGE_SIZE - page_offset;
+        uint64_t to_copy = PAGE_SIZE - page_offset;
         if (to_copy > size)
             to_copy = size;
 
@@ -108,7 +108,7 @@ static enum errno tmpfs_write(struct vfs_node *node, const void *buf,
             tn->pages[page_idx] = hugepage_alloc_page();
             if (!tn->pages[page_idx])
                 return ERR_NO_MEM;
-            memset(tn->pages[page_idx], 0, TMPFS_PAGE_SIZE);
+            memset(tn->pages[page_idx], 0, PAGE_SIZE);
         }
 
         memcpy((uint8_t *) tn->pages[page_idx] + page_offset, in, to_copy);

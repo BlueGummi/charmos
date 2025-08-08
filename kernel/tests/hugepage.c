@@ -20,7 +20,6 @@ REGISTER_TEST(hugepage_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         uint64_t end = rdtsc();
         clock_cycles[i] = end - start;
     }
-    hugepage_print_all();
 
     uint64_t total = 0;
     for (uint64_t i = 0; i < HUGEPAGE_SINGLE_PAGE_ALLOC_TEST_TIMES; i++)
@@ -32,12 +31,15 @@ REGISTER_TEST(hugepage_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
              "alloc is %d",
              total / HUGEPAGE_SINGLE_PAGE_ALLOC_TEST_TIMES);
     ADD_MESSAGE(message);
+
     ptr = hugepage_alloc_pages(1024);
+
+    /*    for (size_t i = 0; i < 512; i++)
+            hugepage_alloc_pages(512); */
+
     TEST_ASSERT(ptr);
 
-    hugepage_print_all();
     hugepage_free_pages(ptr, 1024);
-    hugepage_print_all();
 
     ptr = hugepage_alloc_pages(512);
     uint64_t tsc = rdtsc();
