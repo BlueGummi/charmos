@@ -16,7 +16,7 @@ REGISTER_TEST(hugepage_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     for (uint64_t i = 0; i < HUGEPAGE_SINGLE_PAGE_ALLOC_TEST_TIMES; i++) {
         uint64_t start = rdtsc();
-        hugepage_alloc_pages(1);
+        void *p = hugepage_alloc_pages(4);
         uint64_t end = rdtsc();
         clock_cycles[i] = end - start;
     }
@@ -33,9 +33,6 @@ REGISTER_TEST(hugepage_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ADD_MESSAGE(message);
 
     ptr = hugepage_alloc_pages(1024);
-
-    /*    for (size_t i = 0; i < 512; i++)
-            hugepage_alloc_pages(512); */
 
     TEST_ASSERT(ptr);
 

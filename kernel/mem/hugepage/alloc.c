@@ -107,6 +107,7 @@ static void *alloc_search_core_list(struct hugepage_core_list *hcl,
 
     struct minheap_node *mhn;
     bool iflag = hugepage_list_lock(hcl);
+
     minheap_for_each(hcl->hugepage_minheap, mhn) {
         struct hugepage *hp = hugepage_from_minheap_node(mhn);
         void *p = alloc_and_adjust(hp, page_count, true);

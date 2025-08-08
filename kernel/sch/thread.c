@@ -1,4 +1,5 @@
 #include <mem/alloc.h>
+#include <mem/hugepage.h>
 #include <mem/vmm.h>
 #include <misc/dll.h>
 #include <misc/queue.h>
@@ -34,7 +35,7 @@ void thread_entry_wrapper(void) {
 static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     struct thread *new_thread =
         (struct thread *) kzalloc(sizeof(struct thread));
-    void *stack = kmalloc_aligned(stack_size, PAGE_SIZE);
+    void *stack = hugepage_alloc_pages(stack_size / PAGE_SIZE);
     memset(stack, 0, stack_size);
 
     if (unlikely(!new_thread || !stack))
@@ -42,6 +43,7 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
 
     uint64_t stack_top = (uint64_t) stack + stack_size;
 
+    new_thread->stack_size = stack_size;
     new_thread->regs.rsp = (uint64_t) stack_top;
     new_thread->base_prio = THREAD_PRIO_MID;
     new_thread->perceived_prio = THREAD_PRIO_MID;
@@ -72,7 +74,8 @@ struct thread *thread_create_custom_stack(void (*entry_point)(void),
 void thread_free(struct thread *t) {
     t->prev = NULL;
     t->next = NULL;
-    kfree_aligned(t->stack);
+
+    hugepage_free_pages(t->stack, t->stack_size / PAGE_SIZE);
     kfree(t->runtime_buckets);
     kfree(t->activity_data);
     kfree(t->activity_stats);
