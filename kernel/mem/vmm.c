@@ -56,7 +56,6 @@ void tlb_shootdown(void *ctx, uint8_t irq, void *rsp) {
 }
 
 static void do_tlb_shootdown(uintptr_t addr) {
-    return;
     if (global.current_bootstage < BOOTSTAGE_MID_MP)
         return;
 
@@ -183,15 +182,12 @@ void vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     pte_t *entry = &current_table->entries[L2];
     *entry = phys | flags | PAGING_PRESENT | PAGING_2MB_page;
 
-    invlpg(virt);
-    do_tlb_shootdown(virt);
     spin_unlock(&vmm_lock, interrupts);
 }
 
 void vmm_unmap_2mb_page(uintptr_t virt) {
-    if ((virt & (PAGE_2MB - 1)) != 0) 
+    if ((virt & (PAGE_2MB - 1)) != 0)
         k_panic("vmm_unmap_2mb_page: virtual address not 2MiB aligned!\n");
-    
 
     struct page_table *tables[3];
     pte_t *entries[3];
@@ -255,8 +251,6 @@ void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     pte_t *entry = &current_table->entries[L1];
     *entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
 
-    invlpg(virt);
-    do_tlb_shootdown(virt);
     spin_unlock(&vmm_lock, interrupts);
 }
 
@@ -282,8 +276,6 @@ void vmm_map_page_user(uintptr_t pml4_phys, uintptr_t virt, uintptr_t phys,
     uint64_t L1 = (virt >> 12) & 0x1FF;
     pte_t *entry = &current_table->entries[L1];
     *entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
-
-    invlpg(virt);
 }
 
 void vmm_unmap_page(uintptr_t virt) {
