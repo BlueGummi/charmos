@@ -3,7 +3,7 @@
 #include <sync/spin_lock.h>
 
 #define SLAB_MIN_SHIFT 4
-#define SLAB_MAX_SHIFT 12
+#define SLAB_MAX_SHIFT 18
 #define SLAB_CLASS_COUNT (SLAB_MAX_SHIFT - SLAB_MIN_SHIFT + 1)
 
 enum slab_state { SLAB_FREE, SLAB_PARTIAL, SLAB_FULL };

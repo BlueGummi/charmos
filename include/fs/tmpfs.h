@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <sync/mutex.h>
 
 enum tmpfs_type {
     TMPFS_FILE,
@@ -29,6 +30,7 @@ struct tmpfs_node {
 
     struct tmpfs_node **children;
     uint64_t child_count;
+    struct mutex lock;
 };
 
 struct tmpfs_fs {

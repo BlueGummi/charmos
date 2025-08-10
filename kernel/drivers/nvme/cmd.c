@@ -10,6 +10,7 @@
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
+#include <sch/defer.h>
 #include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -30,6 +31,26 @@ static inline void wake_waiter(struct nvme_request *req) {
         scheduler_wake_from_io_block(t);
 }
 
+static void nvme_dpc(void *rvoid, void *dvoid) {
+    struct nvme_device *dev = dvoid;
+    struct nvme_request *req = rvoid;
+    wake_waiter(req);
+
+    if (--req->remaining_parts == 0) {
+        req->done = true;
+        req->status = nvme_to_bio_status(req->status);
+        if (req->on_complete)
+            req->on_complete(req);
+    }
+
+    struct nvme_waiting_requests *waiters = &dev->waiting_requests;
+    if (waiters->head) {
+        struct nvme_request *next = waiters->head;
+        waiters->head = waiters->head->next;
+        nvme_send_nvme_req(dev->generic_disk, next);
+    }
+}
+
 void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
     struct nvme_queue *queue = dev->io_queues[qid];
     queue->outstanding--;
@@ -44,32 +65,16 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
         uint16_t status = mmio_read_32(&entry->status) & 0xFFFE;
 
         struct nvme_request *req = dev->io_requests[qid][cid];
-        kassert(req);
 
         req->status = status;
-        wake_waiter(req);
-
-        if (--req->remaining_parts == 0) {
-            req->done = true;
-            req->status = nvme_to_bio_status(status);
-            if (req->on_complete)
-                req->on_complete(req);
-
-            dev->io_requests[qid][cid] = NULL;
-        }
+        event_pool_add_fast(nvme_dpc, req, dev);
+        dev->io_requests[qid][cid] = NULL;
 
         queue->cq_head = (queue->cq_head + 1) % queue->cq_depth;
         if (queue->cq_head == 0)
             queue->cq_phase ^= 1;
 
         mmio_write_32(queue->cq_db, queue->cq_head);
-    }
-
-    struct nvme_waiting_requests *waiters = &dev->waiting_requests;
-    if (waiters->head) {
-        struct nvme_request *next = waiters->head;
-        waiters->head = waiters->head->next;
-        nvme_send_nvme_req(dev->generic_disk, next);
     }
 }
 

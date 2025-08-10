@@ -44,6 +44,14 @@ static struct event_pool *get_least_loaded_pool_except_core(int64_t core_num) {
     return least_loaded;
 }
 
+static inline bool event_pool_lock(struct event_pool *p) {
+    return spin_lock(&p->lock);
+}
+
+static inline void event_pool_unlock(struct event_pool *p, bool iflag) {
+    spin_unlock(&p->lock, iflag);
+}
+
 //
 //
 // On demand worker thread spawning
@@ -92,6 +100,10 @@ static inline void update_pool_after_spawn(struct event_pool *pool) {
 }
 
 static bool should_spawn_worker(struct event_pool *pool) {
+    bool can_spawn = time_get_ms() - pool->last_spawn_attempt > SPAWN_DELAY;
+    if (!can_spawn)
+        return false;
+
     bool no_idle_workers = pool->idle_workers == 0;
     bool still_work_to_do = (pool->head - pool->tail) > 0;
 
@@ -99,22 +111,20 @@ static bool should_spawn_worker(struct event_pool *pool) {
     bool not_exceeded_limit = atomic_load(&pool->num_workers) < MAX_WORKERS;
     bool should_spawn = not_exceeded_limit && not_enough_workers;
 
-    bool can_spawn = time_get_ms() - pool->last_spawn_attempt > SPAWN_DELAY;
-
     bool currently_not_spawning = !pool->currently_spawning;
 
-    return should_spawn && can_spawn && currently_not_spawning;
+    return should_spawn && currently_not_spawning;
 }
 
 static bool spawn_worker(struct event_pool *pool) {
-    bool i = spin_lock(&pool->lock);
+    bool i = event_pool_lock(pool);
     struct worker_thread *w = &pool->threads[get_available_worker_idx(pool)];
     w->inactivity_check_period = get_inactivity_timeout(pool);
     struct thread *t = worker_spawn_on_core();
 
     if (!t) {
         pool->currently_spawning = false;
-        spin_unlock(&pool->lock, i);
+        event_pool_unlock(pool, i);
         return false;
     }
 
@@ -123,7 +133,7 @@ static bool spawn_worker(struct event_pool *pool) {
 
     update_pool_after_spawn(pool);
     pool->currently_spawning = false;
-    spin_unlock(&pool->lock, i);
+    event_pool_unlock(pool, i);
     return true;
 }
 
@@ -135,7 +145,7 @@ static void spawn_worker_dpc(void *arg1, void *unused) {
 
 static bool do_spawn_worker(struct event_pool *pool, bool interrupts) {
     pool->currently_spawning = true;
-    spin_unlock(&pool->lock, interrupts);
+    event_pool_unlock(pool, interrupts);
 
     if (!in_interrupt()) {
         return spawn_worker(pool);
@@ -209,9 +219,6 @@ static inline bool worker_should_exit(const struct worker_thread *worker,
 
 static inline void set_idle(const struct worker_thread *worker,
                             time_t *start_idle, bool *idle) {
-    if (!worker)
-        k_panic("Worker is NULL\n");
-
     if (!worker->is_permanent && !(*idle)) {
         *start_idle = time_get_ms();
         *idle = true;
@@ -236,7 +243,7 @@ static inline struct worker_task pool_dequeue(struct event_pool *pool,
     struct worker_task task = pool->tasks[pool->tail % EVENT_POOL_CAPACITY];
     pool->tail++;
     atomic_fetch_sub(&pool->num_tasks, 1);
-    spin_unlock(&pool->lock, interrupts);
+    event_pool_unlock(pool, interrupts);
     return task;
 }
 
@@ -254,7 +261,7 @@ static void worker_exit(struct event_pool *pool, struct worker_thread *worker,
     worker->should_exit = true;
     worker->present = false;
     atomic_fetch_sub(&pool->num_workers, 1);
-    spin_unlock(&pool->lock, interrupts);
+    event_pool_unlock(pool, interrupts);
     thread_exit();
 }
 
@@ -267,7 +274,7 @@ void worker_main(void) {
         bool idle = false;
         time_t start_idle = 0;
 
-        interrupts = spin_lock(&pool->lock);
+        interrupts = event_pool_lock(pool);
 
         if (idle_loop_should_exit(pool, worker, &idle, &start_idle, interrupts))
             break;
@@ -285,14 +292,14 @@ void worker_main(void) {
 //
 
 static bool add(struct event_pool *pool, dpc_t func, void *arg, void *arg2) {
-    bool interrupts = spin_lock(&pool->lock);
+    bool interrupts = event_pool_lock(pool);
 
     uint64_t next_head = pool->head + 1;
     if ((next_head - pool->tail) > EVENT_POOL_CAPACITY) {
 
         /* panic for now - just so we know this went wrong */
         k_panic("Event pool OVERFLOW!\n");
-        spin_unlock(&pool->lock, interrupts);
+        event_pool_unlock(pool, interrupts);
         return false;
     }
 
@@ -304,7 +311,7 @@ static bool add(struct event_pool *pool, dpc_t func, void *arg, void *arg2) {
 
     try_spawn_worker(pool, interrupts);
 
-    spin_unlock(&pool->lock, interrupts);
+    event_pool_unlock(pool, interrupts);
     condvar_signal(&pool->queue_cv);
     return true;
 }
@@ -355,5 +362,11 @@ bool event_pool_add_remote(dpc_t func, void *arg, void *arg2) {
 
 bool event_pool_add_local(dpc_t func, void *arg, void *arg2) {
     struct event_pool *pool = get_event_pool_local();
+    return add(pool, func, arg, arg2);
+}
+
+bool event_pool_add_fast(dpc_t func, void *arg, void *arg2) {
+    struct event_pool *pool =
+        pools[(get_this_core_id() + 1) % global.core_count];
     return add(pool, func, arg, arg2);
 }

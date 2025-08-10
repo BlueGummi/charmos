@@ -86,10 +86,11 @@ void defer_init(void);
 bool defer_enqueue(dpc_t func, void *arg, void *arg2, uint64_t delay_ms);
 void event_pool_init();
 
-/* these can only fail from allocation fail */
 bool event_pool_add(dpc_t func, void *arg, void *arg2);
 bool event_pool_add_remote(dpc_t func, void *arg, void *arg2);
 bool event_pool_add_local(dpc_t func, void *arg, void *arg2);
+bool event_pool_add_fast(dpc_t func, void *arg, void *arg2);
+
 void worker_main(void);
 
 static void kfree_deferrable(void *ptr, void *) {

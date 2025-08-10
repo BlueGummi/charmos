@@ -1,7 +1,7 @@
 #include <asm.h>
-#include <kassert.h>
 #include <block/sched.h>
 #include <drivers/nvme.h>
+#include <kassert.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
 #include <sch/defer.h>
@@ -19,16 +19,16 @@ static void handle_coalesces(struct nvme_request *req,
 
             if (coalesced->driver_private2) {
                 struct nvme_bio_data *dd = coalesced->driver_private2;
-                defer_free(dd->prps);
-                defer_free(coalesced->driver_private2);
+                kfree(dd->prps);
+                kfree(coalesced->driver_private2);
             }
 
             coalesced = coalesced->next_coalesced;
         }
 
         struct nvme_bio_data *dd = bio->driver_private2;
-        defer_free(dd->prps);
-        defer_free(bio->driver_private2);
+        kfree(dd->prps);
+        kfree(bio->driver_private2);
     }
 }
 
@@ -49,7 +49,7 @@ static void nvme_on_bio_complete(struct nvme_request *req) {
     if (bio->on_complete)
         bio->on_complete(bio);
 
-    defer_free(req);
+    kfree(req);
 }
 
 bool nvme_submit_bio_request(struct generic_disk *disk,

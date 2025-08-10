@@ -1,12 +1,20 @@
 #include <compiler.h>
-#include <mem/hugepage.h>
 #include <console/printf.h>
 #include <fs/tmpfs.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
+#include <mem/hugepage.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+
+static inline void tmpfs_node_lock(struct tmpfs_node *tn) {
+    mutex_lock(&tn->lock);
+}
+
+static inline void tmpfs_node_unlock(struct tmpfs_node *tn) {
+    mutex_unlock(&tn->lock);
+}
 
 struct vfs_node *tmpfs_create_vfs_node(struct tmpfs_node *tnode);
 
@@ -57,9 +65,9 @@ static enum errno tmpfs_read(struct vfs_node *node, void *buf, uint64_t size,
 
     uint8_t *out = buf;
     while (size > 0) {
-        uint64_t page_idx = offset >> TMPFS_PAGE_SHIFT;
+        uint64_t page_idx = offset / PAGE_SIZE;
         uint64_t page_offset = offset & TMPFS_PAGE_MASK;
-        uint64_t to_copy = TMPFS_PAGE_SIZE - page_offset;
+        uint64_t to_copy = PAGE_SIZE - page_offset;
         if (to_copy > size)
             to_copy = size;
 
@@ -77,15 +85,8 @@ static enum errno tmpfs_read(struct vfs_node *node, void *buf, uint64_t size,
     return ERR_OK;
 }
 
-static enum errno tmpfs_write(struct vfs_node *node, const void *buf,
-                              uint64_t size, uint64_t offset) {
-    struct tmpfs_node *tn = node->fs_node_data;
-    if (tn->type != TMPFS_FILE)
-        return ERR_IS_DIR;
-
-    uint64_t end = offset + size;
-    uint64_t required_pages = (end + TMPFS_PAGE_SIZE - 1) >> TMPFS_PAGE_SHIFT;
-
+static enum errno realloc_page_array(struct tmpfs_node *tn,
+                                     size_t required_pages) {
     if (required_pages > tn->num_pages) {
         void **new_pages = krealloc(tn->pages, required_pages * sizeof(void *));
         if (!new_pages)
@@ -95,10 +96,25 @@ static enum errno tmpfs_write(struct vfs_node *node, const void *buf,
         tn->pages = new_pages;
         tn->num_pages = required_pages;
     }
+    return ERR_OK;
+}
+
+static enum errno tmpfs_write(struct vfs_node *node, const void *buf,
+                              uint64_t size, uint64_t offset) {
+    struct tmpfs_node *tn = node->fs_node_data;
+    if (tn->type != TMPFS_FILE)
+        return ERR_IS_DIR;
+
+    uint64_t end = offset + size;
+    size_t required_pages = (end + PAGE_SIZE - 1) / PAGE_SIZE;
+
+    enum errno e = realloc_page_array(tn, required_pages);
+    if (e != ERR_OK)
+        return e;
 
     const uint8_t *in = buf;
     while (size > 0) {
-        uint64_t page_idx = offset >> TMPFS_PAGE_SHIFT;
+        uint64_t page_idx = offset / PAGE_SIZE;
         uint64_t page_offset = offset & TMPFS_PAGE_MASK;
         uint64_t to_copy = PAGE_SIZE - page_offset;
         if (to_copy > size)
@@ -320,7 +336,7 @@ static enum errno tmpfs_truncate(struct vfs_node *node, uint64_t length) {
         return ERR_IS_DIR;
 
     uint64_t old_size = tn->size;
-    uint64_t new_pages = (length + TMPFS_PAGE_SIZE - 1) >> TMPFS_PAGE_SHIFT;
+    uint64_t new_pages = (length + PAGE_SIZE - 1) / PAGE_SIZE;
 
     if (new_pages < tn->num_pages) {
         for (uint64_t i = new_pages; i < tn->num_pages; ++i) {
@@ -345,7 +361,7 @@ static enum errno tmpfs_truncate(struct vfs_node *node, uint64_t length) {
     }
 
     if (length > old_size) {
-        uint64_t last_page_idx = old_size >> TMPFS_PAGE_SHIFT;
+        uint64_t last_page_idx = old_size / PAGE_SIZE;
         uint64_t last_offset = old_size & TMPFS_PAGE_MASK;
 
         if (last_page_idx < new_pages) {
@@ -353,10 +369,10 @@ static enum errno tmpfs_truncate(struct vfs_node *node, uint64_t length) {
                 tn->pages[last_page_idx] = hugepage_alloc_page();
                 if (!tn->pages[last_page_idx])
                     return ERR_NO_MEM;
-                memset(tn->pages[last_page_idx], 0, TMPFS_PAGE_SIZE);
+                memset(tn->pages[last_page_idx], 0, PAGE_SIZE);
             }
 
-            uint64_t to_zero = TMPFS_PAGE_SIZE - last_offset;
+            uint64_t to_zero = PAGE_SIZE - last_offset;
             if (length - old_size < to_zero)
                 to_zero = length - old_size;
 

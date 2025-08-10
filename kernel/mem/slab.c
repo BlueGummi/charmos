@@ -220,15 +220,6 @@ void slab_init() {
         uint64_t size = 1UL << (i + SLAB_MIN_SHIFT);
         slab_cache_init(&slab_caches[i], size);
     }
-
-    for (int i = 0; i < SLAB_CLASS_COUNT; i++) {
-        struct slab_cache *cache = &slab_caches[i];
-        cache->percore_caches =
-            kzalloc(sizeof(struct slab *) * global.core_count);
-        for (uint64_t j = 0; j < global.core_count; j++) {
-            cache->percore_caches[j] = kzalloc(sizeof(struct slab));
-        }
-    }
 }
 
 static struct spinlock kmalloc_lock = SPINLOCK_INIT;

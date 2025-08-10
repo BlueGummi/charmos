@@ -45,7 +45,7 @@ static void event_pool_fn(void *arg, void *unused) {
 
 REGISTER_TEST(event_pool_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     uint64_t tsc = rdtsc();
-    event_pool_add_remote(event_pool_fn, NULL, NULL);
+    event_pool_add_fast(event_pool_fn, NULL, NULL);
     uint64_t total = rdtsc() - tsc;
     sleep_ms(50);
     while (!atomic_load(&event_pool_ran))

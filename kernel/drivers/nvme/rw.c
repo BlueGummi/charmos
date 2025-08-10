@@ -84,7 +84,7 @@ static bool rw_send_command(struct generic_disk *disk, struct nvme_request *req,
         return false;
 
     if (!nvme_bio_fill_prps(data, buffer, count * disk->sector_size)) {
-        defer_free(data);
+        kfree(data);
         return false;
     }
 

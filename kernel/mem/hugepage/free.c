@@ -123,7 +123,7 @@ static size_t free_from_chunk(vaddr_t base, size_t page_count, size_t index) {
     vaddr_t vaddr = base + index * HUGEPAGE_SIZE;
     struct hugepage *hp = search_for_hugepage(vaddr);
     if (!hp)
-        k_panic("Likely double free\n");
+        k_panic("Likely double free of base addr 0x%lx\n", base);
 
     void *vp = (void *) vaddr;
     free_and_adjust(hp, vp, chunk);
@@ -146,7 +146,7 @@ void hugepage_free_pages(void *ptr, size_t page_count) {
     struct hugepage *hp = search_for_hugepage(vaddr_aligned);
 
     if (!hp)
-        k_panic("Likely double free\n");
+        k_panic("Likely double free of addr 0x%lx\n", ptr);
 
     free_and_adjust(hp, ptr, page_count);
 }
