@@ -17,11 +17,6 @@
     TEST_ASSERT(node != NULL);
 
 REGISTER_TEST(tmpfs_rw_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
-    ADD_MESSAGE("This function is not threadsafe yet and thus cannot be "
-                "properly tested");
-    SET_SKIP;
-    return;
-
     TMPFS_SETUP_NODE(root, node, "place", e);
     TEST_ASSERT(node->size == 0);
 
