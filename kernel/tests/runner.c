@@ -75,6 +75,7 @@ void tests_run(void) {
         else
             integration_test_count++;
     }
+    uint64_t total_test_count = unit_test_count + integration_test_count;
 
     k_info("TEST", K_TEST,
            "running %llu " ANSI_CYAN "unit" ANSI_RESET " tests...\n",
@@ -95,9 +96,11 @@ void tests_run(void) {
     char *skip_color = all_ok ? ANSI_GREEN : ANSI_GRAY;
 
     k_info("TEST", K_TEST,
-           "%llu " ANSI_GREEN "passed" ANSI_RESET ", %llu %sfailed" ANSI_RESET
+           "%llu " ANSI_CYAN "total" ANSI_RESET " tests, %llu " ANSI_GREEN
+           "passed" ANSI_RESET ", %llu %sfailed" ANSI_RESET
            ", %llu %sskipped\n" ANSI_RESET,
-           pass_count, fail_count, fail_color, skip_count, skip_color);
+           total_test_count, pass_count, fail_count, fail_color, skip_count,
+           skip_color);
 
     k_info("TEST", K_TEST, "%s%s" ANSI_RESET " (%llu ms)\n", color, msg,
            total_time);
