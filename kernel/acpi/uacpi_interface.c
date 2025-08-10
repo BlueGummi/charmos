@@ -5,6 +5,7 @@
 #include <console/printf.h>
 #include <int/idt.h>
 #include <mem/alloc.h>
+#include <mem/hugepage.h>
 #include <mem/vmm.h>
 #include <mp/core.h>
 #include <pit.h>
@@ -58,7 +59,8 @@ uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
 extern uintptr_t vmm_map_top;
 
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
-    return vmm_map_phys(addr, len, PAGING_UNCACHABLE);
+    void *ret = vmm_map_phys(addr, len, PAGING_UNCACHABLE);
+    return ret;
 }
 
 void uacpi_kernel_unmap(void *addr, uacpi_size len) {
@@ -76,12 +78,16 @@ void uacpi_kernel_log(uacpi_log_level level, const uacpi_char *data) {
 }
 
 void *uacpi_kernel_alloc(uacpi_size size) {
-    void *x = kzalloc(size);
-    return x;
+    size_t pages = (size / PAGE_SIZE) + 1;
+    return hugepage_alloc_pages(pages);
 }
 
-void uacpi_kernel_free(void *mem) {
-    kfree(mem);
+void uacpi_kernel_free(void *mem, uacpi_size size) {
+    if (!mem)
+        return;
+
+    size_t pages = (size / PAGE_SIZE) + 1;
+    hugepage_free_pages(mem, pages);
 }
 
 uacpi_status uacpi_kernel_io_map(uacpi_io_addr base, uacpi_size len,

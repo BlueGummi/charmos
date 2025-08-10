@@ -47,7 +47,7 @@ void uacpi_kernel_pci_device_close(uacpi_handle handle) {
         return;
     }
     dev->is_open = false;
-    uacpi_kernel_free(dev);
+    kfree(dev);
 }
 
 uacpi_status uacpi_kernel_pci_read8(uacpi_handle device, uacpi_size offset,

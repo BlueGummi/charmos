@@ -8,6 +8,7 @@
 #include <fs/iso9660.h>
 #include <fs/mbr.h>
 #include <mem/alloc.h>
+#include <mem/hugepage.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -196,7 +197,7 @@ static void assign_fs_ops(struct generic_partition *part) {
 }
 
 enum fs_type detect_fs(struct generic_disk *disk) {
-    uint8_t *sector = kmalloc_aligned(disk->sector_size, PAGE_SIZE);
+    uint8_t *sector = hugepage_alloc_page();
     if (!sector)
         return FS_UNKNOWN;
     k_info("FS", K_INFO, "attempting to detect %s's filesystem(s)", disk->name);
@@ -204,7 +205,7 @@ enum fs_type detect_fs(struct generic_disk *disk) {
     if (!disk->read_sector(disk, 0, sector, 1)) {
         k_info("FS", K_WARN, "%s has an unknown filesystem - read failed",
                disk->name);
-        kfree_aligned(sector);
+        hugepage_free_page(sector);
         return FS_UNKNOWN;
     }
 
@@ -239,7 +240,7 @@ enum fs_type detect_fs(struct generic_disk *disk) {
                detect_fstr(part->fs_type));
     }
 
-    kfree_aligned(sector);
+    hugepage_free_page(sector);
 
     return disk->partition_count > 0 ? disk->partitions[0].fs_type : FS_UNKNOWN;
 }

@@ -1,5 +1,6 @@
 #include <drivers/usb.h>
 #include <mem/alloc.h>
+#include <mem/hugepage.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <string.h>
@@ -25,7 +26,7 @@ bool usb_get_string_descriptor(struct usb_device *dev, uint8_t string_idx,
 
     struct usb_controller *ctrl = dev->host;
     uint8_t port = dev->port;
-    uint8_t *desc = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    uint8_t *desc = hugepage_alloc_page();
 
     struct usb_setup_packet setup = {
         .bitmap_request_type = get_desc_bitmap(),
@@ -48,12 +49,12 @@ bool usb_get_string_descriptor(struct usb_device *dev, uint8_t string_idx,
     }
     out[out_idx] = '\0';
 
-    kfree_aligned(desc);
+    hugepage_free_page(desc);
     return true;
 }
 
 void usb_get_device_descriptor(struct usb_device *dev) {
-    uint8_t *desc = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    uint8_t *desc = hugepage_alloc_page();
 
     struct usb_setup_packet setup = {
         .bitmap_request_type = get_desc_bitmap(),
@@ -170,7 +171,7 @@ static void setup_config_descriptor(struct usb_device *dev, uint8_t *ptr,
 }
 
 bool usb_parse_config_descriptor(struct usb_device *dev) {
-    uint8_t *desc = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    uint8_t *desc = hugepage_alloc_page();
 
     struct usb_setup_packet setup = {
         .bitmap_request_type = get_desc_bitmap(),
@@ -185,7 +186,7 @@ bool usb_parse_config_descriptor(struct usb_device *dev) {
 
     if (!ctrl->ops.submit_control_transfer(ctrl, port, &setup, desc)) {
         usb_warn("Failed to get config descriptor header on port %u", port);
-        kfree_aligned(desc);
+        hugepage_free_page(desc);
         return false;
     }
 
@@ -197,7 +198,7 @@ bool usb_parse_config_descriptor(struct usb_device *dev) {
 
     if (!ctrl->ops.submit_control_transfer(ctrl, port, &setup, desc)) {
         usb_warn("Failed to get full config descriptor on port %u", port);
-        kfree_aligned(desc);
+        hugepage_free_page(desc);
         return false;
     }
 
@@ -206,7 +207,7 @@ bool usb_parse_config_descriptor(struct usb_device *dev) {
     k_printf("CONFIG is %s\n", conf);
 
     setup_config_descriptor(dev, desc, desc + total_len);
-    kfree_aligned(desc);
+    hugepage_free_page(desc);
     return true;
 }
 

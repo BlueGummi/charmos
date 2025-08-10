@@ -236,10 +236,10 @@ void *kmalloc(uint64_t size) {
     if (size == 0)
         return NULL;
 
-    bool i = spin_lock(&kmalloc_lock);
+    bool iflag = spin_lock(&kmalloc_lock);
     int idx = uint64_to_index(size);
     if (idx >= 0 && slab_caches[idx].objs_per_slab > 0) {
-        spin_unlock(&kmalloc_lock, i);
+        spin_unlock(&kmalloc_lock, iflag);
         return slab_alloc(&slab_caches[idx]);
     }
 
@@ -248,7 +248,7 @@ void *kmalloc(uint64_t size) {
 
     uintptr_t virt = slab_heap_top;
     for (uint64_t i = 0; i < pages; i++) {
-        uintptr_t phys = (uintptr_t) pmm_alloc_pages(1, false);
+        uintptr_t phys = (uintptr_t) pmm_alloc_page(false);
         if (!phys) {
             spin_unlock(&kmalloc_lock, i);
             return NULL;
@@ -261,7 +261,7 @@ void *kmalloc(uint64_t size) {
     hdr->pages = pages;
 
     slab_heap_top += pages * PAGE_SIZE;
-    spin_unlock(&kmalloc_lock, i);
+    spin_unlock(&kmalloc_lock, iflag);
     return (void *) (hdr + 1);
 }
 
@@ -279,30 +279,32 @@ void kfree(void *ptr) {
     if (!ptr)
         return;
 
-    bool i = spin_lock(&kmalloc_lock);
+    bool iflag = spin_lock(&kmalloc_lock);
     struct slab_phdr *hdr =
         (struct slab_phdr *) ((uint8_t *) ptr - sizeof(struct slab_phdr));
 
     if (hdr->magic == MAGIC_KMALLOC_PAGE) {
         uintptr_t virt = (uintptr_t) hdr;
         for (uint64_t i = 0; i < hdr->pages; i++) {
-            void *phys = (void *) vmm_get_phys(virt + i * PAGE_SIZE);
+            uintptr_t vaddr = virt + i * PAGE_SIZE;
+            void *phys = (void *) vmm_get_phys(vaddr);
+            vmm_unmap_page(vaddr);
             pmm_free_pages(phys, 1, false);
         }
-        spin_unlock(&kmalloc_lock, i);
+        spin_unlock(&kmalloc_lock, iflag);
         return;
     }
 
     void *raw_obj = (uint8_t *) ptr - sizeof(struct slab *);
     struct slab *slab = *((struct slab **) raw_obj);
     if (!slab) {
-        spin_unlock(&kmalloc_lock, i);
+        spin_unlock(&kmalloc_lock, iflag);
         return;
     }
 
     struct slab_cache *cache = slab->parent_cache;
     slab_free(cache, slab, ptr);
-    spin_unlock(&kmalloc_lock, i);
+    spin_unlock(&kmalloc_lock, iflag);
 }
 
 void *krealloc(void *ptr, uint64_t size) {
