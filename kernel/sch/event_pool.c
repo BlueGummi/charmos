@@ -253,7 +253,10 @@ static void do_work_from_pool(struct event_pool *pool,
     struct worker_task task = pool_dequeue(pool, interrupts);
     worker->last_active = time_get_ms();
     *idle = false;
+
+    enum irql old = irql_raise(IRQL_DISPATCH_LEVEL);
     task.func(task.arg, task.arg2);
+    irql_lower(old);
 }
 
 static void worker_exit(struct event_pool *pool, struct worker_thread *worker,

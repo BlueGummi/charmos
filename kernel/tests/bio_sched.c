@@ -20,7 +20,6 @@
     }                                                                          \
     struct vfs_node *root = global.root_node;
 
-static bool bs_done = false;
 static bool done2 = false;
 static bool cb1d = false, cb2d = false;
 static uint64_t avg_complete_time[BIO_SCHED_LEVELS] = {0};
@@ -29,8 +28,6 @@ static atomic_uint runs = 0;
 
 static void bio_sch_callback(struct bio_request *req) {
     (void) req;
-    if (bs_done)
-        k_printf("BIO sched callback came in after test completed\n");
 
     done2 = true;
     uint64_t q_ms = (uint64_t) req->user_data >> 12;
@@ -175,6 +172,5 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
     ADD_MESSAGE(m2);
     TEST_ASSERT(atomic_load(&runs) <= test_runs);
 
-    bs_done = true;
     SET_SUCCESS;
 }

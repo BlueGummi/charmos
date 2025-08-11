@@ -56,6 +56,8 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->id = globid++;
     new_thread->activity_data = kzalloc(sizeof(struct thread_activity_data));
     new_thread->activity_stats = kzalloc(sizeof(struct thread_activity_stats));
+    INIT_LIST_HEAD(&new_thread->apc_head[0]);
+    INIT_LIST_HEAD(&new_thread->apc_head[1]);
     new_thread->runtime_buckets =
         kzalloc(sizeof(struct thread_runtime_buckets));
 
@@ -152,4 +154,14 @@ void thread_sleep_for_ms(uint64_t ms) {
     defer_enqueue(wake_thread, curr, NULL, ms);
     enable_interrupts();
     scheduler_yield();
+}
+
+void thread_wake_manual(struct thread *t) {
+    enum thread_state s = thread_get_state(t);
+    enum thread_priority p = t->perceived_prio;
+
+    if (s == THREAD_STATE_BLOCKED)
+        scheduler_wake(t, p, THREAD_WAKE_REASON_BLOCKING_MANUAL);
+    else if (s == THREAD_STATE_SLEEPING)
+        scheduler_wake(t, p, THREAD_WAKE_REASON_SLEEP_MANUAL);
 }

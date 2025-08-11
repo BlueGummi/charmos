@@ -4,6 +4,7 @@
 #include <charmos.h>
 #include <compiler.h>
 #include <console/printf.h>
+#include <sch/irql.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -21,6 +22,7 @@ struct core {
     uint64_t rcu_seen_gen;
     uint32_t rcu_nesting;
     bool rcu_quiescent;
+    enum irql current_irql;
 };
 
 static inline uint64_t get_this_core_id() {
@@ -36,13 +38,21 @@ static inline struct core *get_current_core(void) {
 }
 
 static inline void mark_self_in_interrupt(void) {
-    global.cores[get_this_core_id()]->in_interrupt = true;
+    get_current_core()->in_interrupt = true;
 }
 
 static inline void unmark_self_in_interrupt(void) {
-    global.cores[get_this_core_id()]->in_interrupt = false;
+    get_current_core()->in_interrupt = false;
 }
 
 static inline bool in_interrupt(void) {
-    return global.cores[get_this_core_id()]->in_interrupt;
+    return get_current_core()->in_interrupt;
+}
+
+static inline enum irql get_irql(void) {
+    return get_current_core()->current_irql;
+}
+
+static inline bool in_thread_context(void) {
+    return in_interrupt();
 }

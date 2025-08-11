@@ -1,4 +1,3 @@
-#include <mem/hugepage.h>
 #include <acpi/cst.h>
 #include <acpi/hpet.h>
 #include <acpi/ioapic.h>
@@ -16,6 +15,7 @@
 #include <int/idt.h>
 #include <limine.h>
 #include <mem/alloc.h>
+#include <mem/hugepage.h>
 #include <mem/pmm.h>
 #include <mem/slab.h>
 #include <mem/vmm.h>

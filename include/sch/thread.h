@@ -1,5 +1,6 @@
 #include <asm.h>
 #include <mem/alloc.h>
+#include <misc/list.h>
 #include <misc/rbt.h>
 #include <stdatomic.h>
 #include <stddef.h>
@@ -195,6 +196,7 @@ struct thread_runtime_buckets {
     struct thread_runtime_bucket buckets[THREAD_RUNTIME_NUM_BUCKETS];
 };
 
+#define APC_TYPE_COUNT 2
 struct thread {
     uint64_t id;
     void *stack;
@@ -225,7 +227,26 @@ struct thread {
     uint64_t time_in_level; /* ticks at this level */
 
     struct worker_thread *worker; /* NULL if this is not a worker */
+
+    struct spinlock apc_lock;
+
+    /* APC queues */
+    struct list_head apc_head[APC_TYPE_COUNT];
+
+    /* any APC pending */
+    atomic_uintptr_t apc_pending_mask; /* bitmask of APC_TYPE_* pending */
+
+    /* APC disable counts */
+    int special_apc_disable;
+    int kernel_apc_disable;
+
+    /* if thread is in an alertable wait, this is true */
+    bool alertable_wait;
 };
+
+/* We do this because this exists in apc.h and there are
+ * Fun, Great Header Conflicts that I don't want to deal with */
+#undef APC_TYPE_COUNT
 
 struct thread_queue {
     struct thread *head;
@@ -240,17 +261,21 @@ void thread_free(struct thread *t);
 void thread_queue_init(struct thread_queue *q);
 void thread_queue_push_back(struct thread_queue *q, struct thread *t);
 void thread_block_on(struct thread_queue *q);
+
 struct thread *thread_queue_pop_front(struct thread_queue *q);
 void thread_queue_clear(struct thread_queue *q);
 bool thread_queue_remove(struct thread_queue *q, struct thread *t);
 void thread_sleep_for_ms(uint64_t ms);
 void thread_log_event_reasons(struct thread *t);
 void thread_exit(void);
+
 void thread_update_activity_stats(struct thread *t);
+
 struct thread_event_reason *
 thread_add_event_reason(struct thread_event_reason *ring, size_t *head,
                         uint8_t reason);
 void thread_add_wake_reason(struct thread *t, uint8_t reason);
+void thread_wake_manual(struct thread *t);
 void thread_update_runtime_buckets(struct thread *thread);
 
 static inline struct thread_event_reason *
@@ -288,6 +313,10 @@ static inline void thread_add_block_reason(struct thread *t, uint8_t reason) {
 static inline void thread_add_sleep_reason(struct thread *t, uint8_t reason) {
     struct thread_activity_data *d = t->activity_data;
     thread_add_event_reason(d->sleep_reasons, &d->sleep_reasons_head, reason);
+}
+
+static inline enum thread_state thread_get_state(struct thread *t) {
+    return atomic_load(&t->state);
 }
 
 static inline void set_state_internal(struct thread *t,

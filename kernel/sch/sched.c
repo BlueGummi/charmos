@@ -6,6 +6,7 @@
 #include <int/idt.h>
 #include <mp/mp.h>
 #include <registry.h>
+#include <sch/apc.h>
 #include <sch/sched.h>
 #include <sleep.h>
 #include <stdatomic.h>
@@ -168,10 +169,17 @@ static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {
     return next;
 }
 
+static inline void maybe_exec_apcs(struct thread *t) {
+    if (thread_has_apcs(t) && safe_to_exec_apcs())
+        thread_exec_apcs(t);
+}
+
 static void load_thread(struct scheduler *sched, struct thread *next) {
     sched->current = next;
     if (!next)
         return;
+
+    maybe_exec_apcs(next);
 
     next->curr_core = get_this_core_id();
     next->run_start_time = time_get_ms();
@@ -195,6 +203,12 @@ static inline struct thread *load_idle_thread(struct scheduler *sched) {
 
 static inline void change_timeslice(struct scheduler *sched,
                                     struct thread *next) {
+    /* Only one thread is running - no timeslice needed */
+    if (sched->thread_count == 0) {
+        disable_timeslice();
+        return;
+    }
+
     if (THREAD_PRIO_IS_TIMESHARING(next->perceived_prio)) {
         /* Timesharing threads need timeslices */
         enable_timeslice();
@@ -252,7 +266,12 @@ void scheduler_yield() {
     bool were_enabled = are_interrupts_enabled();
 
     disable_interrupts();
+
+    enum irql old = irql_raise(IRQL_DISPATCH_LEVEL);
     schedule();
+    irql_lower(old);
+
+    thread_check_and_deliver_apcs(scheduler_get_curr_thread());
 
     if (were_enabled)
         enable_interrupts();

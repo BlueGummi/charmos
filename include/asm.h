@@ -144,6 +144,10 @@ static inline uint8_t mmio_read_8(void *address) {
 //
 //
 
+static inline void write_cr8(uint64_t cr8) {
+    asm volatile("mov %0, %%cr8" ::"r"(cr8));
+}
+
 static inline uint64_t rdtsc(void) {
     uint32_t lo, hi;
     asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
@@ -256,10 +260,8 @@ static inline int clz(uint8_t a) {
 #elif defined(__riscv)
 
 #define memory_barrier() asm volatile("fence iorw, iorw" ::: "memory")
-#define memory_barrier_acquire()                                               \
-    asm volatile("fence ir, ir" ::: "memory")
-#define memory_barrier_release()                                               \
-    asm volatile("fence ow, ow" ::: "memory")
+#define memory_barrier_acquire() asm volatile("fence ir, ir" ::: "memory")
+#define memory_barrier_release() asm volatile("fence ow, ow" ::: "memory")
 
 #else
 #error "Unsupported architecture for memory barriers"
