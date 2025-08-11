@@ -87,16 +87,30 @@ void thread_queue_init(struct thread_queue *q) {
     q->tail = NULL;
 }
 
+static inline bool queue_lock(struct thread_queue *q) {
+    return spin_lock(&q->lock);
+}
+
+static inline void queue_unlock(struct thread_queue *q, bool iflag) {
+    spin_unlock(&q->lock, iflag);
+}
+
 void thread_queue_push_back(struct thread_queue *q, struct thread *t) {
+    bool iflag = queue_lock(q);
     queue_push_back(q, t);
+    queue_unlock(q, iflag);
 }
 
 bool thread_queue_remove(struct thread_queue *q, struct thread *t) {
+    bool iflag = queue_lock(q);
     queue_remove(q, t);
+    queue_unlock(q, iflag);
 }
 
 struct thread *thread_queue_pop_front(struct thread_queue *q) {
+    bool iflag = queue_lock(q);
     queue_pop_front(q, t);
+    queue_unlock(q, iflag);
     return t;
 }
 
@@ -104,7 +118,9 @@ void thread_queue_clear(struct thread_queue *q) {
     if (!q || !q->head)
         return;
 
+    bool iflag = queue_lock(q);
     dll_clear(q);
+    queue_unlock(q, iflag);
 }
 
 void thread_block_on(struct thread_queue *q) {

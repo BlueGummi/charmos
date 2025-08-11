@@ -230,6 +230,7 @@ struct thread {
 struct thread_queue {
     struct thread *head;
     struct thread *tail;
+    struct spinlock lock;
 };
 
 struct thread *thread_create(void (*entry_point)(void));
