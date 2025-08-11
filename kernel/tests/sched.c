@@ -37,25 +37,37 @@ REGISTER_TEST(sched_reaper_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 }
 
 static atomic_bool event_pool_ran = false;
+static atomic_uint event_pool_times = 0;
 static void event_pool_fn(void *arg, void *unused) {
     (void) arg, (void) unused;
     atomic_store(&event_pool_ran, true);
-    ADD_MESSAGE("event pool ran");
+    atomic_fetch_add(&event_pool_times, 1);
 }
 
 REGISTER_TEST(event_pool_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     uint64_t tsc = rdtsc();
-    event_pool_add_fast(event_pool_fn, NULL, NULL);
+    uint64_t times = 512;
+
+    for (uint64_t i = 0; i < times; i++)
+        event_pool_add_fast(event_pool_fn, NULL, NULL);
+
     uint64_t total = rdtsc() - tsc;
     sleep_ms(50);
+
     while (!atomic_load(&event_pool_ran))
         cpu_relax();
 
     char *msg = kzalloc(100);
     TEST_ASSERT(msg);
-    snprintf(msg, 100, "Took %d clock cycles to add to event pool", total);
+    snprintf(msg, 100, "Took %d clock cycles to add to event pool %d times",
+             total, times);
     ADD_MESSAGE(msg);
     TEST_ASSERT(atomic_load(&event_pool_ran));
+    msg = kzalloc(100);
+    snprintf(msg, 100,
+             "Event pool ran %d times, tests should've had it run %d times",
+             event_pool_times, times);
+    ADD_MESSAGE(msg);
 
     SET_SUCCESS;
 }

@@ -195,13 +195,6 @@ static inline struct thread *load_idle_thread(struct scheduler *sched) {
 
 static inline void change_timeslice(struct scheduler *sched,
                                     struct thread *next) {
-
-    /* Only one thread is running - no timeslice needed */
-    if (sched->thread_count == 0) {
-        disable_timeslice();
-        return;
-    }
-
     if (THREAD_PRIO_IS_TIMESHARING(next->perceived_prio)) {
         /* Timesharing threads need timeslices */
         enable_timeslice();

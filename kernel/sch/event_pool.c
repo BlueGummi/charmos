@@ -150,7 +150,7 @@ static bool do_spawn_worker(struct event_pool *pool, bool interrupts) {
     if (!in_interrupt()) {
         return spawn_worker(pool);
     } else {
-        return event_pool_add_remote(spawn_worker_dpc, pool, NULL);
+        return event_pool_add_fast(spawn_worker_dpc, pool, NULL);
     }
 }
 
