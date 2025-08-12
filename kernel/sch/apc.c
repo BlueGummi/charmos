@@ -157,6 +157,7 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
 
     add_apc_to_thread(t, a, type);
 
+    thread_release(t, iflag);
     /* Let's go and execute em */
     if (thread_is_curr_thread(t)) {
         thread_check_and_deliver_apcs(t);
@@ -165,8 +166,6 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
         /* Not us, go wake up the other guy */
         wake_if_waiting(t);
     }
-
-    thread_release(t, iflag);
 }
 
 static inline void apc_unlink(struct apc *apc) {
