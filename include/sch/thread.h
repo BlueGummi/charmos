@@ -265,6 +265,7 @@ struct thread {
     thread_prio_t prio32_base;   /* Base computed at creation */
     int32_t dynamic_delta;       /* Signed delta applied to base */
     thread_prio_t cached_prio32; /* Last effective priority used */
+    uint64_t weight_fp;
 
     /* Class changes */
     uint64_t last_class_change_ms;

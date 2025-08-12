@@ -3,6 +3,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define rbt_for_each(pos, root)                                                \
+    for (pos = rb_first(root); pos != NULL; pos = rbt_next(pos))
+
 #define rbt_entry(ptr, type, member) container_of(ptr, type, member)
 #define rbt_parent(n) ((n)->parent)
 #define RBTREE_COMPARE(a, b) ((a)->key - (b)->key)
@@ -24,6 +27,15 @@ struct rbt {
 static inline void rbt_init_node(struct rbt_node *n) {
     n->color = TREE_NODE_BLACK;
     n->left = n->right = n->parent = NULL;
+}
+
+static inline struct rbt_node *rb_first(const struct rbt *root) {
+    struct rbt_node *node = root->root;
+    if (!node)
+        return NULL;
+    while (node->left)
+        node = node->left;
+    return node;
 }
 
 struct rbt *rbt_create(void);

@@ -10,14 +10,19 @@
 #include <sync/spin_lock.h>
 #include <tests.h>
 
+static void thread_update_effective_priority(struct thread *t);
+
 static enum thread_activity_class
 classify_activity(struct thread_activity_metrics m) {
     if (m.run_ratio > 80 && m.block_ratio < 10)
         return THREAD_ACTIVITY_CLASS_CPU_BOUND;
+
     if (m.block_ratio > 40 && m.wake_freq > 2)
         return THREAD_ACTIVITY_CLASS_IO_BOUND;
+
     if (m.wake_freq > 5)
         return THREAD_ACTIVITY_CLASS_INTERACTIVE;
+
     if (m.sleep_ratio > 50)
         return THREAD_ACTIVITY_CLASS_SLEEPY;
     return THREAD_ACTIVITY_CLASS_UNKNOWN;
@@ -87,14 +92,19 @@ void thread_calculate_activity_data(struct thread *t) {
 #define THREAD_HYSTERESIS_MS 250 /* don't change class more often than this */
 #define THREAD_PROV_BOOST_MS 50  /* provisional boost expiration */
 
-#define LIM(min, max)                                                          \
-    bucket_min = min;                                                          \
-    bucket_max = max;                                                          \
+#define LIM(__min, __max)                                                      \
+    min = __min;                                                               \
+    max = __max;                                                               \
     break;
 
-thread_prio_t thread_base_prio32_from_base(enum thread_priority base,
-                                           int nice) {
-    uint32_t bucket_min, bucket_max;
+#define CLAMP(__var, __min, __max)                                             \
+    if (__var > __max)                                                         \
+        __var = __max;                                                         \
+    if (__var < __min)                                                         \
+        __var = __min;
+
+static uint64_t prio_base_and_ceil_from_base(enum thread_priority base) {
+    uint32_t min, max;
     switch (base) {
     /* These two thread prios do not have any prio_t */
     case THREAD_PRIO_URGENT: return 0;
@@ -105,14 +115,24 @@ thread_prio_t thread_base_prio32_from_base(enum thread_priority base,
     case THREAD_PRIO_LOW:
     default: LIM(THREAD_PRIO_LOW_BASE, THREAD_PRIO_LOW_CEIL);
     }
+    return (uint64_t) max << 32ULL | min;
+}
+
+#define DERIVE_BASE_AND_CEIL(__prio, __min, __max)                             \
+    uint64_t __ceil_full = prio_base_and_ceil_from_base(__prio);               \
+    __min = __ceil_full & 0xFFFFFFFF;                                          \
+    __max = __ceil_full >> 32ULL;
+
+thread_prio_t thread_base_prio32_from_base(enum thread_priority base,
+                                           int nice) {
+    uint32_t bucket_min, bucket_max;
+    DERIVE_BASE_AND_CEIL(base, bucket_min, bucket_max);
 
     int32_t nice_offset = (nice /* -20 .. +19 */ + 20);
     uint64_t span = (uint64_t) bucket_max - bucket_min;
     uint64_t pos = (span * (uint64_t) nice_offset) / 39ULL;
     return (thread_prio_t) (bucket_min + pos);
 }
-
-#undef LIM
 
 #define Q16_ONE (1u << 16)
 static uint32_t compute_activity_score_q16(struct thread_activity_metrics *m) {
@@ -156,9 +176,26 @@ static inline int32_t jitter_for_thread(void) {
     return j;
 }
 
-#define SET_MUL(multiplier)                                                    \
-    class_mul = multiplier;                                                    \
+#define SET_MUL(__multiplier)                                                  \
+    class_mul = __multiplier;                                                  \
     break;
+
+static int get_class_multiplier(enum thread_activity_class class) {
+    int class_mul;
+    switch (class) {
+    case THREAD_ACTIVITY_CLASS_INTERACTIVE: SET_MUL(THREAD_MUL_INTERACTIVE);
+    case THREAD_ACTIVITY_CLASS_IO_BOUND: SET_MUL(THREAD_MUL_IO_BOUND);
+    case THREAD_ACTIVITY_CLASS_CPU_BOUND: SET_MUL(THREAD_MUL_CPU_BOUND);
+    case THREAD_ACTIVITY_CLASS_SLEEPY:
+    default: SET_MUL(0); /* Unclassified thread or sleepy thread */
+    }
+    return class_mul;
+}
+
+static inline void clamp_thread_delta(struct thread *t) {
+    CLAMP(t->dynamic_delta, -(int32_t) THREAD_DELTA_MAX,
+          (int32_t) THREAD_DELTA_MAX);
+}
 
 void thread_apply_wake_boost(struct thread *t, uint64_t now_ms) {
     /* Do nothing */
@@ -171,14 +208,7 @@ void thread_apply_wake_boost(struct thread *t, uint64_t now_ms) {
 
     uint32_t score_q16 = compute_activity_score_q16(&t->activity_metrics);
 
-    int class_mul;
-    switch (t->activity_class) {
-    case THREAD_ACTIVITY_CLASS_INTERACTIVE: SET_MUL(THREAD_MUL_INTERACTIVE);
-    case THREAD_ACTIVITY_CLASS_IO_BOUND: SET_MUL(THREAD_MUL_IO_BOUND);
-    case THREAD_ACTIVITY_CLASS_CPU_BOUND: SET_MUL(THREAD_MUL_CPU_BOUND);
-    case THREAD_ACTIVITY_CLASS_SLEEPY:
-    default: SET_MUL(0); /* Unclassified thread or sleepy thread */
-    }
+    int class_mul = get_class_multiplier(t->activity_class);
 
     /* Raw units */
     uint32_t raw_units = (((uint64_t) score_q16 * (uint64_t) class_mul) >> 16);
@@ -191,12 +221,10 @@ void thread_apply_wake_boost(struct thread *t, uint64_t now_ms) {
     delta_change += j;
 
     t->dynamic_delta += delta_change;
-    if (t->dynamic_delta > (int32_t) THREAD_DELTA_MAX)
-        t->dynamic_delta = (int32_t) THREAD_DELTA_MAX;
-    if (t->dynamic_delta < -(int32_t) THREAD_DELTA_MAX)
-        t->dynamic_delta = -(int32_t) THREAD_DELTA_MAX;
+    clamp_thread_delta(t);
 
     t->last_class_change_ms = now_ms;
+    thread_update_effective_priority(t);
 }
 
 void thread_apply_cpu_penalty(struct thread *t) {
@@ -206,30 +234,22 @@ void thread_apply_cpu_penalty(struct thread *t) {
     if (t->activity_class == THREAD_ACTIVITY_CLASS_CPU_BOUND) {
         /* Small penalty */
         t->dynamic_delta -= THREAD_PENALTY_CPU_RUN;
-        if (t->dynamic_delta < -(int32_t) THREAD_DELTA_MAX)
-            t->dynamic_delta = -(int32_t) THREAD_DELTA_MAX;
+        clamp_thread_delta(t);
     }
-}
 
-#define LIM(base, ceil)                                                        \
-    min = base;                                                                \
-    max = ceil;                                                                \
-    break;
+    thread_update_effective_priority(t);
+}
 
 static void thread_update_effective_priority(struct thread *t) {
     thread_prio_t eff = t->prio32_base + t->dynamic_delta;
 
     /* Clamp to bucket range */
     uint32_t min, max;
-    switch (t->base_prio) {
-    case THREAD_PRIO_HIGH: LIM(THREAD_PRIO_HIGH_BASE, THREAD_PRIO_HIGH_CEIL);
-    case THREAD_PRIO_MID: LIM(THREAD_PRIO_MID_BASE, THREAD_PRIO_MID_CEIL);
-    case THREAD_PRIO_LOW: LIM(THREAD_PRIO_LOW_BASE, THREAD_PRIO_LOW_CEIL);
-    default: min = max = eff; break;
-    }
+    DERIVE_BASE_AND_CEIL(t->base_prio, min, max);
 
     if (eff < min)
         eff = min;
+
     if (eff > max)
         eff = max;
 
@@ -237,4 +257,73 @@ static void thread_update_effective_priority(struct thread *t) {
     t->priority_in_level = eff;
 }
 
-#undef LIM
+#define MIN_PERIOD_MS 20  /* don’t go too short — avoids high timer churn */
+#define MAX_PERIOD_MS 300 /* don’t go too long — keeps latency sane */
+#define BASE_PERIOD_MS 50 /* baseline for small loads */
+
+static uint64_t sched_compute_period(struct scheduler *s) {
+    uint64_t load = s->thread_count;
+    uint64_t period = BASE_PERIOD_MS + (load * 2); /* Linear growth */
+    CLAMP(period, MIN_PERIOD_MS, MAX_PERIOD_MS);
+
+    return period;
+}
+
+#define MIN_SLICE_MS 2  /* smallest slice granularity */
+#define MAX_SLICE_MS 20 /* cap slice length to avoid hogs */
+#define thread_from_rbt_node(node) rbt_entry(node, struct thread, tree_node)
+
+static void scheduler_allocate_slices(struct scheduler *s, uint64_t now_ms) {
+    s->period_ms = sched_compute_period(s);
+    s->period_start_ms = now_ms;
+
+    uint64_t total_weight = 0;
+    struct rbt_node *node;
+    rbt_for_each(node, &s->thread_rbt) {
+        struct thread *t = thread_from_rbt_node(node);
+        total_weight += t->weight_fp;
+    }
+
+    if (total_weight == 0)
+        total_weight = 1;
+
+    s->total_weight_fp = total_weight;
+
+    rbt_for_each(node, &s->thread_rbt) {
+        struct thread *t = thread_from_rbt_node(node);
+
+        uint64_t budget_ms = (s->period_ms * t->weight_fp) / total_weight;
+        if (budget_ms < MIN_SLICE_MS)
+            budget_ms = MIN_SLICE_MS;
+
+        uint64_t slice_ms = MIN_SLICE_MS;
+
+        if (budget_ms > MAX_SLICE_MS) {
+            slice_ms = MAX_SLICE_MS;
+        } else if (budget_ms > MIN_SLICE_MS) {
+            slice_ms = budget_ms;
+        }
+
+        t->timeslice_duration_ms = slice_ms;
+        t->timeslices_remaining = (budget_ms + slice_ms - 1) / slice_ms;
+        t->completed_period = s->current_period - 1;
+    }
+}
+
+static void scheduler_update_thread_weights(struct scheduler *s) {
+    struct rbt_node *node;
+    rbt_for_each(node, &s->thread_rbt) {
+        struct thread *t = rbt_entry(node, struct thread, tree_node);
+
+        thread_update_effective_priority(t);
+        t->weight_fp = (uint64_t) (t->priority_in_level) << 16;
+    }
+}
+
+void sched_period_start(struct scheduler *s, uint64_t now_ms) {
+    s->current_period++;
+
+    scheduler_update_thread_weights(s);
+
+    scheduler_allocate_slices(s, now_ms);
+}

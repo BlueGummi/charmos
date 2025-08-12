@@ -41,7 +41,13 @@ struct scheduler {
     struct thread_queue bg_threads;
 
     struct thread *current;
-    uint64_t thread_count; // Also used for load estimate
+    uint64_t thread_count;
+    uint64_t current_period;
+    uint64_t period_ms;
+    uint64_t period_start_ms;
+    uint64_t total_weight_fp;
+    uint64_t last_timeslice_ms;
+
     int64_t core_id;
     atomic_bool being_robbed;
     atomic_bool stealing_work;
