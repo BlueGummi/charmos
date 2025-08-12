@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <sync/spin_lock.h>
 #include <time.h>
+#include <types/refcount.h>
 #include <types/types.h>
 #pragma once
 #define STACK_SIZE (PAGE_SIZE * 4)
@@ -228,7 +229,8 @@ struct thread {
 
     struct worker_thread *worker; /* NULL if this is not a worker */
 
-    struct spinlock apc_lock;
+    struct spinlock lock;
+    refcount_t refcount;
 
     /* APC queues */
     struct list_head apc_head[APC_TYPE_COUNT];
@@ -277,6 +279,30 @@ thread_add_event_reason(struct thread_event_reason *ring, size_t *head,
 void thread_add_wake_reason(struct thread *t, uint8_t reason);
 void thread_wake_manual(struct thread *t);
 void thread_update_runtime_buckets(struct thread *thread);
+
+static inline bool thread_get(struct thread *t) {
+    return refcount_inc_not_zero(&t->refcount);
+}
+
+static inline void thread_put(struct thread *t) {
+    if (refcount_dec_and_test(&t->refcount)) {
+        if (atomic_load(&t->state) != THREAD_STATE_TERMINATED) {
+            k_panic("final ref dropped while thread not terminated\n");
+        }
+        thread_free(t);
+    }
+}
+
+static inline bool thread_acquire(struct thread *t) {
+    if (!refcount_inc_not_zero(&t->refcount))
+        k_panic("UAF");
+    return spin_lock(&t->lock);
+}
+
+static inline void thread_release(struct thread *t, bool iflag) {
+    spin_unlock(&t->lock, iflag);
+    thread_put(t);
+}
 
 static inline struct thread_event_reason *
 wake_reason_associated_reason(struct thread_activity_data *data,

@@ -50,7 +50,7 @@ void reaper_thread_main() {
             atomic_store(&t->state, THREAD_STATE_TERMINATED);
             struct thread *next = t->next;
             reaper.reaped_threads++;
-            thread_free(t);
+            thread_put(t);
             reaped_something = true;
             t = next;
         }

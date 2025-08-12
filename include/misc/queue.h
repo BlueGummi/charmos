@@ -17,7 +17,7 @@
     }                                                                          \
     q->tail = thing;
 
-#define queue_remove(q, t)                                                     \
+#define queue_remove(q, t, val)                                                \
     typeof(q->head) prev = NULL;                                               \
     typeof(q->head) curr = q->head;                                            \
                                                                                \
@@ -32,10 +32,10 @@
             if (q->tail == curr) {                                             \
                 q->tail = prev;                                                \
             }                                                                  \
-            return true;                                                       \
+            val = true;                                                        \
+            break;                                                             \
         }                                                                      \
                                                                                \
         prev = curr;                                                           \
         curr = curr->next;                                                     \
-    }                                                                          \
-    return false;
+    }

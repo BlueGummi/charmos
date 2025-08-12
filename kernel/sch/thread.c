@@ -55,6 +55,7 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->stack = (void *) stack;
     new_thread->curr_core = -1; // nobody is running this
     new_thread->id = globid++;
+    new_thread->refcount = 1;
     new_thread->activity_data = kzalloc(sizeof(struct thread_activity_data));
     new_thread->activity_stats = kzalloc(sizeof(struct thread_activity_stats));
     INIT_LIST_HEAD(&new_thread->apc_head[0]);
@@ -106,8 +107,10 @@ void thread_queue_push_back(struct thread_queue *q, struct thread *t) {
 
 bool thread_queue_remove(struct thread_queue *q, struct thread *t) {
     bool iflag = queue_lock(q);
-    queue_remove(q, t);
+    bool val = false;
+    queue_remove(q, t, val);
     queue_unlock(q, iflag);
+    return val;
 }
 
 struct thread *thread_queue_pop_front(struct thread_queue *q) {

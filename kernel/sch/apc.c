@@ -50,14 +50,6 @@ static inline bool thread_can_exec_kernel_apcs(struct thread *t) {
            (atomic_load(&t->apc_pending_mask) & apc_type_bit(APC_TYPE_KERNEL));
 }
 
-static inline bool thread_lock_apc_lock(struct thread *t) {
-    return spin_lock(&t->apc_lock);
-}
-
-static inline void thread_unlock_apc_lock(struct thread *t, bool iflag) {
-    spin_unlock(&t->apc_lock, iflag);
-}
-
 static inline bool thread_is_dying(struct thread *t) {
     enum thread_state s = thread_get_state(t);
     return s == THREAD_STATE_TERMINATED || s == THREAD_STATE_ZOMBIE;
@@ -82,17 +74,17 @@ static void deliver_apc_type(struct thread *t, enum apc_type type) {
     struct apc *apc;
 
     while (true) {
-        bool iflag = thread_lock_apc_lock(t);
+        bool iflag = thread_acquire(t);
 
         if (apc_list_empty(t, type)) {
             apc_list_unset_bitmask(t, type);
-            thread_unlock_apc_lock(t, iflag);
+            thread_release(t, iflag);
             return;
         }
 
         apc = list_first_entry(&t->apc_head[type], struct apc, node);
         apc_list_del(apc);
-        thread_unlock_apc_lock(t, iflag);
+        thread_release(t, iflag);
 
         apc->enqueued = false;
         if (!apc_is_cancelled(apc))
@@ -161,7 +153,7 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
 
     thread_apc_sanity_check(t);
 
-    bool iflag = thread_lock_apc_lock(t);
+    bool iflag = thread_acquire(t);
 
     add_apc_to_thread(t, a, type);
 
@@ -174,7 +166,7 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
         wake_if_waiting(t);
     }
 
-    thread_unlock_apc_lock(t, iflag);
+    thread_release(t, iflag);
 }
 
 static inline void apc_unlink(struct apc *apc) {
@@ -210,7 +202,7 @@ bool apc_cancel(struct apc *a) {
 
     struct thread *t = a->owner;
     bool removed = false;
-    bool iflag = thread_lock_apc_lock(t);
+    bool iflag = thread_acquire(t);
 
     apc_set_cancelled(a);
 
@@ -223,7 +215,7 @@ bool apc_cancel(struct apc *a) {
         }
     }
 
-    thread_unlock_apc_lock(t, iflag);
+    thread_release(t, iflag);
     return removed;
 }
 
