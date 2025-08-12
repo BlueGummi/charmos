@@ -3,12 +3,23 @@
 #include <sch/sched.h>
 #include <sch/thread.h>
 
+#define apc_from_list_node(n) container_of(n, struct apc, node)
+
 static inline size_t apc_type_bit(enum apc_type t) {
     return (size_t) 1ULL << (size_t) t;
 }
 
 static inline bool apc_list_empty(struct thread *t, enum apc_type type) {
     return list_empty(&t->apc_head[type]);
+}
+
+static inline void apc_list_del(struct apc *a) {
+    list_del(&a->node);
+}
+
+static inline void apc_add_tail(struct thread *t, struct apc *a,
+                                enum apc_type type) {
+    list_add_tail(&a->node, &t->apc_head[type]);
 }
 
 static inline void apc_list_unset_bitmask(struct thread *t,
@@ -26,10 +37,6 @@ static inline void apc_unset_cancelled(struct apc *a) {
 
 static inline bool apc_is_cancelled(struct apc *a) {
     return atomic_load(&a->cancelled);
-}
-
-static inline bool apc_is_not_cancelled(struct apc *a) {
-    return !apc_is_cancelled(a);
 }
 
 static inline bool thread_can_exec_special_apcs(struct thread *t) {
@@ -79,7 +86,7 @@ static void wake_if_waiting(struct thread *t) {
 
 static inline void exec_apc(struct apc *a) {
     enum irql old = irql_raise(IRQL_APC_LEVEL);
-    a->func(a->arg1, a->arg2);
+    a->func(a, a->arg1, a->arg2);
     a->enqueued = false;
     irql_lower(old);
 }
@@ -97,11 +104,11 @@ static void deliver_apc_type(struct thread *t, enum apc_type type) {
         }
 
         apc = list_first_entry(&t->apc_head[type], struct apc, node);
-        list_del(&apc->node);
+        apc_list_del(apc);
         thread_unlock_apc_lock(t, iflag);
 
         apc->enqueued = false;
-        if (apc_is_not_cancelled(apc))
+        if (!apc_is_cancelled(apc))
             exec_apc(apc);
     }
 }
@@ -128,7 +135,7 @@ static inline void add_apc_to_thread(struct thread *t, struct apc *a,
                                      enum apc_type type) {
     a->owner = t;
     apc_unset_cancelled(a);
-    list_add_tail(&a->node, &t->apc_head[type]);
+    apc_add_tail(t, a, type);
     a->enqueued = true;
     atomic_fetch_or(&t->apc_pending_mask, apc_type_bit(type));
 }
@@ -168,7 +175,7 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
 }
 
 static inline void apc_unlink(struct apc *apc) {
-    list_del(&apc->node);
+    apc_list_del(apc);
     apc->enqueued = false;
     apc->owner = NULL;
 }
@@ -178,7 +185,7 @@ static bool try_cancel_from_list(struct thread *t, struct apc *a,
     struct list_head *pos, *n;
 
     list_for_each_safe(pos, n, &t->apc_head[type]) {
-        struct apc *apc = list_entry(pos, struct apc, node);
+        struct apc *apc = apc_from_list_node(pos);
         if (apc == a) {
             apc_unlink(apc);
             return true;

@@ -11,7 +11,8 @@ struct thread;
 
 enum apc_type { APC_TYPE_SPECIAL_KERNEL, APC_TYPE_KERNEL, APC_TYPE_COUNT };
 
-typedef void (*apc_func_t)(void *arg1, void *arg2);
+struct apc;
+typedef void (*apc_func_t)(struct apc *apc, void *arg1, void *arg2);
 
 struct apc {
     apc_func_t func;
