@@ -12,6 +12,29 @@
 #pragma once
 #define STACK_SIZE (PAGE_SIZE * 4)
 
+/* Thread priority magic numbers */
+
+/* 4 billion threads all running
+ * at once is probably an upper
+ * limit we won't hit
+ *
+ * - famous last words */
+typedef uint32_t thread_prio_t;
+#define THREAD_PRIO_MAX UINT32_MAX
+#define THREAD_PRIO_MIN UINT32_MIN
+
+#define THREAD_PRIO_HIGHEST_BASE 0xC0000000
+#define THREAD_PRIO_HIGHEST_CEIL 0xFFFFFFFF
+
+#define THREAD_PRIO_HIGH_BASE 0x80000000
+#define THREAD_PRIO_HIGH_CEIL 0xBFFFFFFF
+
+#define THREAD_PRIO_MID_BASE 0x40000000
+#define THREAD_PRIO_MID_CEIL 0x7FFFFFFF
+
+#define THREAD_PRIO_LOW_BASE 0x0
+#define THREAD_PRIO_LOW_CEIL 0x3FFFFFFF
+
 struct cpu_context {
     uint64_t rbx;
     uint64_t rbp;
@@ -221,21 +244,43 @@ struct thread_activity_data {
 
 #define APC_TYPE_COUNT 2
 struct thread {
+    /* Thread contexts */
     uint64_t id;
     void *stack;
     size_t stack_size;
 
     struct cpu_context regs;
 
+    /* Nodes */
     struct rbt_node tree_node;
     struct thread *next;
     struct thread *prev;
 
+    /* State */
     _Atomic enum thread_state state;
 
+    /* Priorities */
+    thread_prio_t priority_in_level;
+    thread_prio_t prio32_base;
+    int32_t dynamic_delta;       /* Signed delta applied to base */
+    thread_prio_t cached_prio32; /* Last effective priority used */
+    enum thread_prio_class priority_class;
+
+    /* Class changes */
+    uint64_t last_class_change_ms;
+    uint64_t provisional_boost_until_ms;
+    uint64_t weight_fp;
+    uint64_t completed_period;
+
+    uint64_t timeslice_duration_ms;
+    uint64_t timeslices_remaining;
+
+    /* Legacy stuff - will be migrated out */
     enum thread_activity_class activity_class;
     enum thread_priority perceived_prio; /* priority level right now */
     enum thread_priority base_prio;      /* priority level at creation time */
+    uint64_t time_in_level;              /* ticks at this level */
+
     enum thread_flags flags;
 
     /* For condvar */
@@ -243,15 +288,16 @@ struct thread {
 
     uint64_t run_start_time; /* When did we start running */
 
+    /* Activity data */
     struct thread_activity_data *activity_data;
     struct thread_activity_stats *activity_stats;
     struct thread_activity_metrics activity_metrics;
 
-    int64_t curr_core;      /* -1 if not being ran */
-    uint64_t time_in_level; /* ticks at this level */
+    int64_t curr_core; /* -1 if not being ran */
 
     struct worker_thread *worker; /* NULL if this is not a worker */
 
+    /* Lock + rc */
     struct spinlock lock;
     refcount_t refcount;
 
@@ -375,3 +421,12 @@ static inline void thread_wake(struct thread *t, enum thread_wake_reason r) {
     set_state_and_update_reason(t, r, THREAD_STATE_READY,
                                 thread_add_wake_reason);
 }
+
+#define FIXED_SHIFT 12
+static inline uint64_t thread_compute_weight(struct thread *t) {
+    thread_prio_t priority = t->priority_in_level;
+
+    /* weight = 1 + (priority / 2^20) in fixed point */
+    return (1 << FIXED_SHIFT) + ((uint64_t) priority >> (20 - FIXED_SHIFT));
+}
+#undef FIXED_SHIFT

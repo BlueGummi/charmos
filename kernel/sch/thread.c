@@ -50,6 +50,7 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->perceived_prio = THREAD_PRIO_MID;
     new_thread->time_in_level = 0;
     new_thread->state = THREAD_STATE_NEW;
+    new_thread->priority_in_level = 500;
     new_thread->regs.r12 = (uint64_t) entry_point;
     new_thread->regs.rip = (uint64_t) thread_entry_wrapper;
     new_thread->stack = (void *) stack;
