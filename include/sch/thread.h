@@ -23,6 +23,7 @@ typedef uint32_t thread_prio_t;
 #define THREAD_PRIO_MAX UINT32_MAX
 #define THREAD_PRIO_MIN UINT32_MIN
 
+/* This range is only used for boosts */
 #define THREAD_PRIO_HIGHEST_BASE 0xC0000000
 #define THREAD_PRIO_HIGHEST_CEIL 0xFFFFFFFF
 
@@ -261,24 +262,25 @@ struct thread {
 
     /* Priorities */
     thread_prio_t priority_in_level;
-    thread_prio_t prio32_base;
+    thread_prio_t prio32_base;   /* Base computed at creation */
     int32_t dynamic_delta;       /* Signed delta applied to base */
     thread_prio_t cached_prio32; /* Last effective priority used */
-    enum thread_prio_class priority_class;
 
     /* Class changes */
     uint64_t last_class_change_ms;
-    uint64_t provisional_boost_until_ms;
-    uint64_t weight_fp;
-    uint64_t completed_period;
 
+    /* Timeslice info and periods */
+    uint64_t completed_period;
     uint64_t timeslice_duration_ms;
     uint64_t timeslices_remaining;
 
-    /* Legacy stuff - will be migrated out */
+    /* Used to derive/impact the priorty_in_level */
+    enum thread_prio_class priority_class;
     enum thread_activity_class activity_class;
+    enum thread_priority base_prio; /* priority level at creation time */
+
+    /* Legacy stuff - will be migrated out */
     enum thread_priority perceived_prio; /* priority level right now */
-    enum thread_priority base_prio;      /* priority level at creation time */
     uint64_t time_in_level;              /* ticks at this level */
 
     enum thread_flags flags;
@@ -343,6 +345,7 @@ void thread_exit(void);
 void thread_update_activity_stats(struct thread *t, uint64_t time);
 void thread_classify_activity(struct thread *t);
 void thread_update_runtime_buckets(struct thread *thread, uint64_t time);
+thread_prio_t thread_base_prio32_from_base(enum thread_priority base, int nice);
 
 void thread_add_wake_reason(struct thread *t, uint8_t reason);
 void thread_wake_manual(struct thread *t);

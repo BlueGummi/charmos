@@ -10,6 +10,7 @@
 #include <charmos.h>
 #include <compiler.h>
 #include <console/printf.h>
+#include <crypto/prng.h>
 #include <elf.h>
 #include <fs/vfs.h>
 #include <int/idt.h>
@@ -80,6 +81,9 @@ void k_main(void) {
     // Scheduler
     scheduler_init();
     defer_init();
+
+    /* TODO: Move this prng_seed call out of this place */
+    prng_seed(time_get_us());
     global.current_bootstage = BOOTSTAGE_MID_SCHEDULER;
     k_info("MAIN", K_INFO, "Scheduler init OK");
 

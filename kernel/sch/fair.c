@@ -1,5 +1,6 @@
 #include <asm.h>
 #include <boot/stage.h>
+#include <crypto/prng.h>
 #include <int/idt.h>
 #include <mp/mp.h>
 #include <registry.h>
@@ -66,14 +67,6 @@ void thread_calculate_activity_data(struct thread *t) {
     t->activity_metrics = mtcs;
 }
 
-static const int class_weight_adjust[] = {
-    [THREAD_ACTIVITY_CLASS_CPU_BOUND] = -100,   /* Lower priority a bit */
-    [THREAD_ACTIVITY_CLASS_IO_BOUND] = +50,     /* Small boost */
-    [THREAD_ACTIVITY_CLASS_INTERACTIVE] = +200, /* Bigger boost */
-    [THREAD_ACTIVITY_CLASS_SLEEPY] = 0,         /* Neutral */
-    [THREAD_ACTIVITY_CLASS_UNKNOWN] = 0,
-};
-
 #define THREAD_DELTA_UNIT 0x00010000u /*/ 2^16 small increment */
 
 #define THREAD_BOOST_WAKE_SMALL                                                \
@@ -93,3 +86,155 @@ static const int class_weight_adjust[] = {
                                this */
 #define THREAD_HYSTERESIS_MS 250 /* don't change class more often than this */
 #define THREAD_PROV_BOOST_MS 50  /* provisional boost expiration */
+
+#define LIM(min, max)                                                          \
+    bucket_min = min;                                                          \
+    bucket_max = max;                                                          \
+    break;
+
+thread_prio_t thread_base_prio32_from_base(enum thread_priority base,
+                                           int nice) {
+    uint32_t bucket_min, bucket_max;
+    switch (base) {
+    /* These two thread prios do not have any prio_t */
+    case THREAD_PRIO_URGENT: return 0;
+    case THREAD_PRIO_RT: return 0;
+
+    case THREAD_PRIO_HIGH: LIM(THREAD_PRIO_HIGH_BASE, THREAD_PRIO_HIGH_CEIL);
+    case THREAD_PRIO_MID: LIM(THREAD_PRIO_MID_BASE, THREAD_PRIO_MID_CEIL);
+    case THREAD_PRIO_LOW:
+    default: LIM(THREAD_PRIO_LOW_BASE, THREAD_PRIO_LOW_CEIL);
+    }
+
+    int32_t nice_offset = (nice /* -20 .. +19 */ + 20);
+    uint64_t span = (uint64_t) bucket_max - bucket_min;
+    uint64_t pos = (span * (uint64_t) nice_offset) / 39ULL;
+    return (thread_prio_t) (bucket_min + pos);
+}
+
+#undef LIM
+
+#define Q16_ONE (1u << 16)
+static uint32_t compute_activity_score_q16(struct thread_activity_metrics *m) {
+    /* m->run_ratio, block_ratio, sleep_ratio are 0..100 */
+    /* m->wake_freq = wakes/sec (0..inf, but we clamp) */
+
+    /* Normalize wake frequency to avoid 💥 numbers */
+    uint32_t wake_norm = m->wake_freq > 20 ? 100 : (m->wake_freq * 5);
+
+    /* Prefer high wake_norm and small block_ratio */
+    /* interactive_pct = wake_norm * (100 - block_ratio) / 100 */
+    uint32_t interactive_pct = (wake_norm * (100u - m->block_ratio)) / 100u;
+
+    /* CPU Bound reduces interactivity
+     * strong run_ratio -> reduce */
+    uint32_t cpu_factor = (100u - (uint32_t) m->run_ratio);
+
+    /* score_pct = interactive_pct * (100 - run_ratio) / 100 */
+    uint32_t score_pct = (interactive_pct * cpu_factor) / 100u;
+
+    /* Add a bit of bias to give small signals some weight */
+    uint32_t bias = score_pct / 8; /* 12.5% of score is bias */
+    uint32_t final_pct = score_pct + bias;
+    if (final_pct > 100)
+        final_pct = 100;
+
+    /* Turn it to Q16 */
+    return (final_pct * Q16_ONE) / 100u;
+}
+
+/* How many delta units per Q16 score? */
+#define THREAD_MUL_INTERACTIVE 24 /* Big boost */
+#define THREAD_MUL_IO_BOUND 10    /* Small boost */
+#define THREAD_MUL_CPU_BOUND 0    /* No boost */
+#define THREAD_MUL_SLEEPY 0       /* No boost */
+
+static inline int32_t jitter_for_thread(void) {
+    uint32_t v = prng_next();
+    uint32_t jit = THREAD_REINSERT_THRESHOLD >> 2;
+    int32_t j = (int32_t) (v % (2 * jit + 1)) - (int32_t) jit;
+    return j;
+}
+
+#define SET_MUL(multiplier)                                                    \
+    class_mul = multiplier;                                                    \
+    break;
+
+void thread_apply_wake_boost(struct thread *t, uint64_t now_ms) {
+    /* Do nothing */
+    if (t->priority_class == THREAD_PRIO_CLASS_RT)
+        return;
+
+    /* Rate limit to prevent rapid bouncing */
+    if (now_ms - t->last_class_change_ms < THREAD_HYSTERESIS_MS)
+        return;
+
+    uint32_t score_q16 = compute_activity_score_q16(&t->activity_metrics);
+
+    int class_mul;
+    switch (t->activity_class) {
+    case THREAD_ACTIVITY_CLASS_INTERACTIVE: SET_MUL(THREAD_MUL_INTERACTIVE);
+    case THREAD_ACTIVITY_CLASS_IO_BOUND: SET_MUL(THREAD_MUL_IO_BOUND);
+    case THREAD_ACTIVITY_CLASS_CPU_BOUND: SET_MUL(THREAD_MUL_CPU_BOUND);
+    case THREAD_ACTIVITY_CLASS_SLEEPY:
+    default: SET_MUL(0); /* Unclassified thread or sleepy thread */
+    }
+
+    /* Raw units */
+    uint32_t raw_units = (((uint64_t) score_q16 * (uint64_t) class_mul) >> 16);
+
+    /* Delta change to apply */
+    int32_t delta_change = (int32_t) raw_units * (int32_t) THREAD_DELTA_UNIT;
+
+    /* Small jitter to prevent massive overlaps */
+    int32_t j = jitter_for_thread();
+    delta_change += j;
+
+    t->dynamic_delta += delta_change;
+    if (t->dynamic_delta > (int32_t) THREAD_DELTA_MAX)
+        t->dynamic_delta = (int32_t) THREAD_DELTA_MAX;
+    if (t->dynamic_delta < -(int32_t) THREAD_DELTA_MAX)
+        t->dynamic_delta = -(int32_t) THREAD_DELTA_MAX;
+
+    t->last_class_change_ms = now_ms;
+}
+
+void thread_apply_cpu_penalty(struct thread *t) {
+    thread_calculate_activity_data(t); /* Give it another update */
+
+    /* Apply the penalty */
+    if (t->activity_class == THREAD_ACTIVITY_CLASS_CPU_BOUND) {
+        /* Small penalty */
+        t->dynamic_delta -= THREAD_PENALTY_CPU_RUN;
+        if (t->dynamic_delta < -(int32_t) THREAD_DELTA_MAX)
+            t->dynamic_delta = -(int32_t) THREAD_DELTA_MAX;
+    }
+}
+
+#define LIM(base, ceil)                                                        \
+    min = base;                                                                \
+    max = ceil;                                                                \
+    break;
+
+static void thread_update_effective_priority(struct thread *t) {
+    thread_prio_t eff = t->prio32_base + t->dynamic_delta;
+
+    /* Clamp to bucket range */
+    uint32_t min, max;
+    switch (t->base_prio) {
+    case THREAD_PRIO_HIGH: LIM(THREAD_PRIO_HIGH_BASE, THREAD_PRIO_HIGH_CEIL);
+    case THREAD_PRIO_MID: LIM(THREAD_PRIO_MID_BASE, THREAD_PRIO_MID_CEIL);
+    case THREAD_PRIO_LOW: LIM(THREAD_PRIO_LOW_BASE, THREAD_PRIO_LOW_CEIL);
+    default: min = max = eff; break;
+    }
+
+    if (eff < min)
+        eff = min;
+    if (eff > max)
+        eff = max;
+
+    t->cached_prio32 = eff;
+    t->priority_in_level = eff;
+}
+
+#undef LIM
