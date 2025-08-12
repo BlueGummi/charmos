@@ -233,6 +233,7 @@ struct thread {
 
     _Atomic enum thread_state state;
 
+    enum thread_activity_class activity_class;
     enum thread_priority perceived_prio; /* priority level right now */
     enum thread_priority base_prio;      /* priority level at creation time */
     enum thread_flags flags;
@@ -294,8 +295,7 @@ void thread_log_event_reasons(struct thread *t);
 void thread_exit(void);
 
 void thread_update_activity_stats(struct thread *t, uint64_t time);
-enum thread_activity_class
-thread_classify_activity(struct thread_activity_metrics m);
+void thread_classify_activity(struct thread *t);
 void thread_update_runtime_buckets(struct thread *thread, uint64_t time);
 
 void thread_add_wake_reason(struct thread *t, uint8_t reason);

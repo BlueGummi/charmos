@@ -9,7 +9,8 @@
 #include <sync/spin_lock.h>
 #include <tests.h>
 
-enum thread_activity_class thread_classify_activity(struct thread_activity_metrics m) {
+static enum thread_activity_class
+classify_activity(struct thread_activity_metrics m) {
     if (m.run_ratio > 80 && m.block_ratio < 10)
         return THREAD_ACTIVITY_CLASS_CPU_BOUND;
     if (m.block_ratio > 40 && m.wake_freq > 2)
@@ -19,6 +20,10 @@ enum thread_activity_class thread_classify_activity(struct thread_activity_metri
     if (m.sleep_ratio > 50)
         return THREAD_ACTIVITY_CLASS_SLEEPY;
     return THREAD_ACTIVITY_CLASS_UNKNOWN;
+}
+
+void thread_classify_activity(struct thread *t) {
+    t->activity_class = classify_activity(t->activity_metrics);
 }
 
 static struct thread_activity_metrics calc_activity_metrics(struct thread *t) {
