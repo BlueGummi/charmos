@@ -54,5 +54,5 @@ static inline enum irql get_irql(void) {
 }
 
 static inline bool in_thread_context(void) {
-    return in_interrupt();
+    return !in_interrupt();
 }

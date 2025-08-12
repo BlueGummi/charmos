@@ -250,4 +250,8 @@ void apc_init(struct apc *a, apc_func_t fn, void *arg1, void *arg2) {
     a->func = fn;
     a->arg1 = arg1;
     a->arg2 = arg2;
+    INIT_LIST_HEAD(&a->node);
+    a->cancelled = false;
+    a->owner = NULL;
+    a->enqueued = false;
 }

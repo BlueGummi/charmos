@@ -28,6 +28,7 @@ void thread_entry_wrapper(void) {
     void (*entry)(void);
     asm("mov %%r12, %0" : "=r"(entry));
     enable_interrupts();
+    irql_lower(IRQL_PASSIVE_LEVEL);
     entry();
     thread_exit();
 }
