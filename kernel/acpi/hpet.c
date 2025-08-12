@@ -155,7 +155,7 @@ uint64_t hpet_timestamp_us(void) {
     uint64_t fs_total = ticks * hpet_fs_per_tick;
     atomic_store(&hpet_cached_time_us,
                  fs_total / 1000000000ULL); // 1 us = 1e9 fs
-    hpet_cached_time_ms = hpet_cached_time_us * 1000;
+    hpet_cached_time_ms = hpet_cached_time_us / 1000;
     return hpet_cached_time_us;
 }
 

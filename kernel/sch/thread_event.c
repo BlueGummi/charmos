@@ -12,10 +12,9 @@ void thread_log_event_reasons(struct thread *t) {
         k_printf(
             "Bucket %llu shows: block_count %llu, sleep_count %llu, "
             "wake_count %llu, "
-            "block_duration %llu, sleep_duration %llu, wake duration %llu\n",
+            "block_duration %llu, sleep_duration %llu, run duration %llu\n",
             i, b->block_count, b->sleep_count, b->wake_count, b->block_duration,
-            b->sleep_duration,
-            (bk->run_time_ms - (b->sleep_duration + b->block_duration)));
+            b->sleep_duration, bk->run_time_ms);
     }
     k_printf("Thread activity metrics show block ratio %llu, sleep ratio %llu, "
              "run ratio %llu, wake freq %llu\n",
