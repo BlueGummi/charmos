@@ -160,7 +160,32 @@ static inline enum thread_prio_class prio_class_of(enum thread_priority prio) {
 #define THREAD_ACTIVITY_BUCKET_COUNT 16
 #define THREAD_ACTIVITY_BUCKET_DURATION 1000 /* 1 second per bucket */
 #define THREAD_EVENT_RINGBUFFER_CAPACITY 16
-#define THREAD_RUNTIME_NUM_BUCKETS 16
+
+enum thread_activity_class {
+    THREAD_ACTIVITY_CLASS_CPU_BOUND,
+    THREAD_ACTIVITY_CLASS_IO_BOUND,
+    THREAD_ACTIVITY_CLASS_INTERACTIVE,
+    THREAD_ACTIVITY_CLASS_SLEEPY,
+    THREAD_ACTIVITY_CLASS_UNKNOWN
+};
+
+static inline const char *
+thread_activity_class_str(enum thread_activity_class c) {
+    switch (c) {
+    case THREAD_ACTIVITY_CLASS_CPU_BOUND: return "CPU BOUND";
+    case THREAD_ACTIVITY_CLASS_IO_BOUND: return "IO BOUND";
+    case THREAD_ACTIVITY_CLASS_INTERACTIVE: return "INTERACTIVE";
+    case THREAD_ACTIVITY_CLASS_SLEEPY: return "SLEEPY";
+    case THREAD_ACTIVITY_CLASS_UNKNOWN: return "UNKNOWN";
+    }
+}
+
+struct thread_activity_metrics {
+    uint64_t run_ratio;
+    uint64_t block_ratio;
+    uint64_t sleep_ratio;
+    uint64_t wake_freq;
+};
 
 struct thread_runtime_bucket {
     uint64_t run_time_ms;
@@ -177,6 +202,7 @@ struct thread_activity_bucket {
 };
 
 struct thread_activity_stats {
+    struct thread_runtime_bucket rt_buckets[THREAD_EVENT_RINGBUFFER_CAPACITY];
     struct thread_activity_bucket buckets[THREAD_ACTIVITY_BUCKET_COUNT];
     time_t last_update_ms;
     size_t last_wake_index;
@@ -191,10 +217,6 @@ struct thread_activity_data {
     MAKE_THREAD_RINGBUFFER(wake_reasons);
     MAKE_THREAD_RINGBUFFER(block_reasons);
     MAKE_THREAD_RINGBUFFER(sleep_reasons);
-};
-
-struct thread_runtime_buckets {
-    struct thread_runtime_bucket buckets[THREAD_RUNTIME_NUM_BUCKETS];
 };
 
 #define APC_TYPE_COUNT 2
@@ -220,9 +242,9 @@ struct thread {
 
     uint64_t run_start_time; /* When did we start running */
 
-    struct thread_runtime_buckets *runtime_buckets;
     struct thread_activity_data *activity_data;
     struct thread_activity_stats *activity_stats;
+    struct thread_activity_metrics activity_metrics;
 
     int64_t curr_core;      /* -1 if not being ran */
     uint64_t time_in_level; /* ticks at this level */
@@ -271,14 +293,18 @@ void thread_sleep_for_ms(uint64_t ms);
 void thread_log_event_reasons(struct thread *t);
 void thread_exit(void);
 
-void thread_update_activity_stats(struct thread *t);
+void thread_update_activity_stats(struct thread *t, uint64_t time);
+enum thread_activity_class
+thread_classify_activity(struct thread_activity_metrics m);
+void thread_update_runtime_buckets(struct thread *thread, uint64_t time);
+
+void thread_add_wake_reason(struct thread *t, uint8_t reason);
+void thread_wake_manual(struct thread *t);
+void thread_calculate_activity_data(struct thread *t);
 
 struct thread_event_reason *
 thread_add_event_reason(struct thread_event_reason *ring, size_t *head,
-                        uint8_t reason);
-void thread_add_wake_reason(struct thread *t, uint8_t reason);
-void thread_wake_manual(struct thread *t);
-void thread_update_runtime_buckets(struct thread *thread);
+                        uint8_t reason, uint64_t time);
 
 static inline bool thread_get(struct thread *t) {
     return refcount_inc_not_zero(&t->refcount);
@@ -304,41 +330,16 @@ static inline void thread_release(struct thread *t, bool iflag) {
     thread_put(t);
 }
 
-static inline struct thread_event_reason *
-wake_reason_associated_reason(struct thread_activity_data *data,
-                              struct thread_event_reason *wake) {
-    if (thread_wake_is_from_block(wake->reason)) {
-        return &data->block_reasons[wake->associated_reason.reason %
-                                    THREAD_EVENT_RINGBUFFER_CAPACITY];
-    } else if (thread_wake_is_from_sleep(wake->reason)) {
-        return &data->sleep_reasons[wake->associated_reason.reason %
-                                    THREAD_EVENT_RINGBUFFER_CAPACITY];
-    }
-    return NULL;
-}
-
-static inline bool
-thread_event_reason_is_valid(struct thread_activity_data *data,
-                             struct thread_event_reason *reason) {
-    struct thread_event_reason *assoc =
-        wake_reason_associated_reason(data, reason);
-    return assoc->cycle == reason->associated_reason.cycle;
-}
-
-static inline struct thread_event_reason *
-most_recent(struct thread_event_reason *reasons, size_t head) {
-    size_t past_head = head - 1;
-    return &reasons[past_head % THREAD_EVENT_RINGBUFFER_CAPACITY];
-}
-
 static inline void thread_add_block_reason(struct thread *t, uint8_t reason) {
     struct thread_activity_data *d = t->activity_data;
-    thread_add_event_reason(d->block_reasons, &d->block_reasons_head, reason);
+    thread_add_event_reason(d->block_reasons, &d->block_reasons_head, reason,
+                            time_get_ms());
 }
 
 static inline void thread_add_sleep_reason(struct thread *t, uint8_t reason) {
     struct thread_activity_data *d = t->activity_data;
-    thread_add_event_reason(d->sleep_reasons, &d->sleep_reasons_head, reason);
+    thread_add_event_reason(d->sleep_reasons, &d->sleep_reasons_head, reason,
+                            time_get_ms());
 }
 
 static inline enum thread_state thread_get_state(struct thread *t) {
@@ -357,7 +358,7 @@ static inline void set_state_and_update_reason(struct thread *t, uint8_t reason,
     set_state_internal(t, state);
     callback(t, reason);
     if (state != THREAD_STATE_READY)
-        thread_update_runtime_buckets(t);
+        thread_update_runtime_buckets(t, time_get_ms());
 }
 
 static inline void thread_block(struct thread *t, enum thread_block_reason r) {

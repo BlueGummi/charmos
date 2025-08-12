@@ -9,6 +9,9 @@
 
 uint64_t *hpet_base;
 uint64_t hpet_timer_count;
+uint64_t hpet_fs_per_tick;
+atomic_uint_fast64_t hpet_cached_time_us = 0;
+atomic_uint_fast64_t hpet_cached_time_ms = 0;
 
 void hpet_enable(void) {
     uint64_t conf = hpet_read64(HPET_GEN_CONF_OFFSET);
@@ -27,7 +30,7 @@ void hpet_clear_interrupt_status(void) {
 }
 
 static inline uint64_t hpet_us_to_ticks(uint64_t us) {
-    return (us * 1000000000ULL) / hpet_get_fs_per_tick();
+    return (us * 1000000000ULL) / hpet_fs_per_tick;
 }
 
 void hpet_setup_periodic_interrupt_us(uint64_t microseconds_period) {
@@ -137,17 +140,23 @@ void hpet_init(void) {
     union hpet_timer_general_capabilities cap = {0};
     cap.raw = hpet_read64(HPET_GEN_CAP_ID_OFFSET);
     hpet_timer_count = cap.num_timers;
+    hpet_fs_per_tick = hpet_read64(HPET_GEN_CAP_ID_OFFSET) >> 32;
 
     pit_disable();
     hpet_enable();
+    hpet_timestamp_us();
 
     k_info("HPET", K_INFO, "HPET initialized - %llu timers", hpet_timer_count);
 }
 
 uint64_t hpet_timestamp_us(void) {
     uint64_t ticks = hpet_read64(HPET_MAIN_COUNTER_OFFSET);
-    uint64_t fs_total = ticks * (uint64_t) hpet_get_fs_per_tick();
-    return fs_total / 1000000000ULL; // 1 us = 1e9 fs
+
+    uint64_t fs_total = ticks * hpet_fs_per_tick;
+    atomic_store(&hpet_cached_time_us,
+                 fs_total / 1000000000ULL); // 1 us = 1e9 fs
+    hpet_cached_time_ms = hpet_cached_time_us * 1000;
+    return hpet_cached_time_us;
 }
 
 uint64_t hpet_timestamp_ms(void) {

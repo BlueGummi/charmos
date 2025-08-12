@@ -55,6 +55,7 @@ set(QEMU_COMMON_FLAGS
     -boot d
     -m 4G
     -smp cores=4
+    -enable-kvm
 
     -s
     #-S

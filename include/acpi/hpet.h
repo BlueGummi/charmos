@@ -6,6 +6,18 @@ void hpet_init(void);
 void hpet_program_oneshot(uint64_t future_ms);
 uint64_t hpet_timestamp_ms(void);
 uint64_t hpet_timestamp_us(void);
+
+extern atomic_uint_fast64_t hpet_cached_time_us;
+extern atomic_uint_fast64_t hpet_cached_time_ms;
+
+static inline uint64_t hpet_timestamp_us_fast(void) {
+    return hpet_cached_time_us;
+}
+
+static inline uint64_t hpet_timestamp_ms_fast(void) {
+    return hpet_cached_time_ms;
+}
+
 void hpet_disable(void);
 void hpet_enable(void);
 void hpet_clear_interrupt_status(void);
@@ -19,6 +31,7 @@ void hpet_setup_timer(uint8_t timer_index, uint8_t irq_line, bool periodic,
 #define HPET_MAIN_COUNTER_OFFSET 0xF0
 extern uint64_t *hpet_base;
 extern uint64_t hpet_timer_count;
+extern uint64_t hpet_fs_per_tick;
 
 #define HPET_TIMER_CONF_OFFSET(num) (0x100 + (num * 0x20))
 #define HPET_TIMER_COMPARATOR_OFFSET(num) (HPET_TIMER_CONF_OFFSET(num) + 0x8)
@@ -68,8 +81,4 @@ static inline void hpet_write64(uint64_t offset, uint64_t value) {
 
 static inline uint64_t hpet_read64(uint64_t offset) {
     return mmio_read_64((void *) ((uintptr_t) hpet_base + offset));
-}
-
-static inline uint32_t hpet_get_fs_per_tick(void) {
-    return hpet_read64(HPET_GEN_CAP_ID_OFFSET) >> 32;
 }

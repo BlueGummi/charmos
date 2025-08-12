@@ -1,55 +1,13 @@
 #include <sch/sched.h>
 #include <sch/thread.h>
 
-static void log_event(const char *name, struct thread_event_reason *r, size_t i,
-                      size_t head) {
-    if (!r->timestamp)
-        return;
-
-    k_printf(
-        "    %s reason %llu: %s at time %llu %s-> linked to %llu, cycle %llu\n",
-        name, i, thread_event_reason_str(r->reason), r->timestamp,
-        i == head ? "<-- head " : "", r->associated_reason, r->cycle);
-}
-
 void thread_log_event_reasons(struct thread *t) {
-    struct thread_activity_data *data = t->activity_data;
     k_printf("Thread %llu event reason logs:\n", t->id);
-    k_printf("  Block reasons (head %llu):\n", data->block_reasons_head);
-    for (size_t i = 0; i < THREAD_EVENT_RINGBUFFER_CAPACITY; i++)
-        log_event("Block", &data->block_reasons[i], i,
-                  data->block_reasons_head);
-
-    k_printf("  Sleep reasons (head %llu):\n", data->sleep_reasons_head);
-    for (size_t i = 0; i < THREAD_EVENT_RINGBUFFER_CAPACITY; i++)
-        log_event("Sleep", &data->sleep_reasons[i], i,
-                  data->sleep_reasons_head);
-
-    k_printf("  Wake reasons (head %llu):\n", data->wake_reasons_head);
-    for (size_t i = 0; i < THREAD_EVENT_RINGBUFFER_CAPACITY; i++) {
-        struct thread_event_reason *wr = &data->wake_reasons[i];
-        if (!wr->timestamp)
-            continue;
-
-        log_event("Wake", &data->wake_reasons[i], i, data->wake_reasons_head);
-
-        if (wr->associated_reason.reason == THREAD_ASSOCIATED_REASON_NONE)
-            continue;
-
-        struct thread_event_reason *r =
-            thread_wake_is_from_block(wr->reason)
-                ? &data->block_reasons[wr->associated_reason.reason]
-                : &data->sleep_reasons[wr->associated_reason.reason];
-
-        k_printf("      The time from this event reason to its associated "
-                 "reason is %lld milliseconds\n\n",
-                 wr->timestamp - r->timestamp);
-    }
 
     struct thread_activity_stats *stats = t->activity_stats;
     for (size_t i = 0; i < THREAD_ACTIVITY_BUCKET_COUNT; i++) {
         struct thread_activity_bucket *b = &stats->buckets[i];
-        struct thread_runtime_bucket *bk = &t->runtime_buckets->buckets[i];
+        struct thread_runtime_bucket *bk = &t->activity_stats->rt_buckets[i];
 
         k_printf(
             "Bucket %llu shows: block_count %llu, sleep_count %llu, "
@@ -59,11 +17,44 @@ void thread_log_event_reasons(struct thread *t) {
             b->sleep_duration,
             (bk->run_time_ms - (b->sleep_duration + b->block_duration)));
     }
+    k_printf("Thread activity metrics show block ratio %llu, sleep ratio %llu, "
+             "run ratio %llu, wake freq %llu\n",
+             t->activity_metrics.block_ratio, t->activity_metrics.sleep_ratio,
+             t->activity_metrics.run_ratio, t->activity_metrics.wake_freq);
+    k_printf("Thread activity class is %s\n",
+             thread_activity_class_str(
+                 thread_classify_activity(t->activity_metrics)));
+}
+
+static struct thread_event_reason *
+most_recent(struct thread_event_reason *reasons, size_t head) {
+    size_t past_head = head - 1;
+    return &reasons[past_head % THREAD_EVENT_RINGBUFFER_CAPACITY];
+}
+
+static struct thread_event_reason *
+wake_reason_associated_reason(struct thread_activity_data *data,
+                              struct thread_event_reason *wake) {
+    if (thread_wake_is_from_block(wake->reason)) {
+        return &data->block_reasons[wake->associated_reason.reason %
+                                    THREAD_EVENT_RINGBUFFER_CAPACITY];
+    } else if (thread_wake_is_from_sleep(wake->reason)) {
+        return &data->sleep_reasons[wake->associated_reason.reason %
+                                    THREAD_EVENT_RINGBUFFER_CAPACITY];
+    }
+    return NULL;
+}
+
+static bool thread_event_reason_is_valid(struct thread_activity_data *data,
+                                         struct thread_event_reason *reason) {
+    struct thread_event_reason *assoc =
+        wake_reason_associated_reason(data, reason);
+    return assoc->cycle == reason->associated_reason.cycle;
 }
 
 struct thread_event_reason *
 thread_add_event_reason(struct thread_event_reason *ring, size_t *head,
-                        uint8_t reason) {
+                        uint8_t reason, uint64_t time) {
 
     size_t next_head = *head + 1;
 
@@ -74,7 +65,7 @@ thread_add_event_reason(struct thread_event_reason *ring, size_t *head,
         this_reason->cycle++;
 
     this_reason->reason = reason;
-    this_reason->timestamp = time_get_ms();
+    this_reason->timestamp = time;
 
     *head = next_head;
 
@@ -96,8 +87,8 @@ static inline void link_wake_reason(struct thread_event_reason *target_reason,
 
 void thread_add_wake_reason(struct thread *t, uint8_t reason) {
     struct thread_activity_data *d = t->activity_data;
-    struct thread_event_reason *curr =
-        thread_add_event_reason(d->wake_reasons, &d->wake_reasons_head, reason);
+    struct thread_event_reason *curr = thread_add_event_reason(
+        d->wake_reasons, &d->wake_reasons_head, reason, time_get_ms());
 
     size_t this_past_head = d->wake_reasons_head - 1;
     struct thread_event_reason *past = NULL;
@@ -116,7 +107,7 @@ void thread_add_wake_reason(struct thread *t, uint8_t reason) {
     if (past)
         link_wake_reason(past, curr, past_head, this_past_head);
 
-    thread_update_activity_stats(t);
+    thread_update_activity_stats(t, time_get_ms());
 }
 
 static inline size_t get_bucket_index(time_t timestamp_ms) {
@@ -186,11 +177,11 @@ static void update_bucket(struct thread_activity_stats *stats,
     }
 }
 
-void thread_update_activity_stats(struct thread *t) {
+void thread_update_activity_stats(struct thread *t, uint64_t time) {
     struct thread_activity_stats *stats = t->activity_stats;
     struct thread_activity_data *data = t->activity_data;
 
-    time_t now = time_get_ms();
+    time_t now = time;
 
     /* Advance to next bucket if a new time window has happened */
     time_t elapsed = now - stats->last_update_ms;
@@ -221,7 +212,7 @@ void thread_update_activity_stats(struct thread *t) {
         time_t end = wake->timestamp;
 
         if (start > end) {
-            k_printf("Potential corrupted timestamp\n");
+            k_panic("Potential corrupted timestamp\n");
             continue;
         }
 
@@ -231,18 +222,18 @@ void thread_update_activity_stats(struct thread *t) {
     stats->last_wake_index = wake_head;
 }
 
-void thread_update_runtime_buckets(struct thread *thread) {
-    uint64_t now = time_get_ms();
+void thread_update_runtime_buckets(struct thread *thread, uint64_t time) {
+    uint64_t now = time;
 
     /* Which seconds does this delta span? */
     uint64_t start_sec = thread->run_start_time / 1000;
     uint64_t end_sec = now / 1000;
 
     for (uint64_t sec = start_sec; sec <= end_sec; ++sec) {
-        uint64_t bucket_index = sec % THREAD_RUNTIME_NUM_BUCKETS;
+        uint64_t bucket_index = sec % THREAD_EVENT_RINGBUFFER_CAPACITY;
 
-        struct thread_runtime_buckets *bs = thread->runtime_buckets;
-        struct thread_runtime_bucket *bucket = &bs->buckets[bucket_index];
+        struct thread_runtime_bucket *bucket =
+            &thread->activity_stats->rt_buckets[bucket_index];
 
         /* Reset it if it's for a different second */
         if (bucket->wall_clock_sec != sec) {

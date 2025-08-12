@@ -62,11 +62,6 @@ static inline void update_core_current_thread(struct thread *next) {
     c->current_thread = next;
 }
 
-static inline void maybe_recompute_steal_threshold(uint64_t core_id) {
-    if (core_id == 0)
-        scheduler_data.steal_min_diff = scheduler_compute_steal_threshold();
-}
-
 /* Higher number == lower priority */
 static inline enum thread_priority get_decayed_prio(enum thread_priority curr) {
     return curr == THREAD_PRIO_LOW ? THREAD_PRIO_HIGH : curr + 1;
@@ -90,11 +85,12 @@ static inline void do_thread_prio_decay(struct thread *thread) {
         thread->perceived_prio = thread->base_prio;
 }
 
-static inline void update_thread_before_save(struct thread *thread) {
+static inline void update_thread_before_save(struct thread *thread,
+                                             uint64_t time) {
     atomic_store(&thread->state, THREAD_STATE_READY);
     thread->curr_core = -1;
     thread->time_in_level++;
-    thread_update_runtime_buckets(thread);
+    thread_update_runtime_buckets(thread, time);
 
     /* Decay the priority depending on what the thread class is */
     if (thread->time_in_level >= TICKS_FOR_PRIO(thread->perceived_prio))
@@ -108,29 +104,27 @@ static inline void do_re_enqueue_thread(struct scheduler *sched,
     scheduler_add_thread(sched, thread, locked);
 }
 
-static inline void do_save_thread(struct scheduler *sched,
-                                  struct thread *curr) {
-    update_thread_before_save(curr);
+static inline void do_save_thread(struct scheduler *sched, struct thread *curr,
+                                  uint64_t time) {
+    update_thread_before_save(curr, time);
     do_re_enqueue_thread(sched, curr);
 }
 
-static inline void update_idle_thread(void) {
+static inline void update_idle_thread(uint64_t time) {
     struct idle_thread_data *data = get_this_core_idle_thread();
     data->did_work_recently = true;
-    data->last_exit_ms = time_get_ms();
+    data->last_exit_ms = time;
 }
 
 static inline void save_current_thread(struct scheduler *sched,
-                                       struct thread *curr) {
-    /* TODO: No, don't rely on core 0. Allow any core to
-     * recompute this since we have tickless mode */
-    maybe_recompute_steal_threshold(get_this_core_id());
+                                       struct thread *curr, uint64_t time) {
+    scheduler_data.steal_min_diff = scheduler_compute_steal_threshold();
 
     /* Only save a running thread that exists */
     if (curr && atomic_load(&curr->state) == THREAD_STATE_RUNNING) {
-        do_save_thread(sched, curr);
+        do_save_thread(sched, curr, time);
     } else if (curr && atomic_load(&curr->state) == THREAD_STATE_IDLE_THREAD) {
-        update_idle_thread();
+        update_idle_thread(time);
     }
 }
 
@@ -169,13 +163,15 @@ static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {
     return next;
 }
 
-static void load_thread(struct scheduler *sched, struct thread *next) {
+static void load_thread(struct scheduler *sched, struct thread *next,
+                        uint64_t time) {
     sched->current = next;
     if (!next)
         return;
 
     next->curr_core = get_this_core_id();
-    next->run_start_time = time_get_ms();
+    next->run_start_time = time;
+    thread_calculate_activity_data(next);
 
     /* Do not mark the idle thread as RUNNING because this causes
      * it to enter the runqueues, which is Very Bad™ (it gets enqueued,
@@ -194,8 +190,7 @@ static inline struct thread *load_idle_thread(struct scheduler *sched) {
     return sched->idle_thread;
 }
 
-static inline void change_timeslice(struct scheduler *sched,
-                                    struct thread *next) {
+static void change_timeslice(struct scheduler *sched, struct thread *next) {
     /* Only one thread is running - no timeslice needed */
     if (sched->thread_count == 0) {
         disable_timeslice();
@@ -227,10 +222,11 @@ void schedule(void) {
     struct scheduler *sched = get_this_core_sched();
     bool interrupts = spin_lock(&sched->lock);
 
+    uint64_t time = time_get_ms_fast();
     struct thread *curr = sched->current;
     struct thread *next = NULL;
 
-    save_current_thread(sched, curr);
+    save_current_thread(sched, curr, time);
 
     /* Checks if we can steal, finds a victim, and tries to steal.
      * NULL is returned if any step was unsuccessful */
@@ -249,7 +245,7 @@ void schedule(void) {
         change_timeslice(sched, next);
     }
 
-    load_thread(sched, next);
+    load_thread(sched, next, time);
     spin_unlock(&sched->lock, interrupts);
 
     context_switch(curr, next);

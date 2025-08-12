@@ -132,3 +132,11 @@ uint64_t time_get_ms(void) {
 uint64_t time_get_us(void) {
     return hpet_timestamp_us();
 }
+
+uint64_t time_get_ms_fast(void) {
+    return hpet_timestamp_ms_fast();
+}
+
+uint64_t time_get_us_fast(void) {
+    return hpet_timestamp_us_fast();
+}

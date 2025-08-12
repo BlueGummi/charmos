@@ -60,8 +60,6 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->activity_stats = kzalloc(sizeof(struct thread_activity_stats));
     INIT_LIST_HEAD(&new_thread->apc_head[0]);
     INIT_LIST_HEAD(&new_thread->apc_head[1]);
-    new_thread->runtime_buckets =
-        kzalloc(sizeof(struct thread_runtime_buckets));
 
     return new_thread;
 }
@@ -80,7 +78,6 @@ void thread_free(struct thread *t) {
     t->next = NULL;
 
     hugepage_free_pages(t->stack, t->stack_size / PAGE_SIZE);
-    kfree(t->runtime_buckets);
     kfree(t->activity_data);
     kfree(t->activity_stats);
     kfree(t);
