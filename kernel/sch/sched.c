@@ -169,17 +169,10 @@ static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {
     return next;
 }
 
-static inline void maybe_exec_apcs(struct thread *t) {
-    if (thread_has_apcs(t) && safe_to_exec_apcs())
-        thread_exec_apcs(t);
-}
-
 static void load_thread(struct scheduler *sched, struct thread *next) {
     sched->current = next;
     if (!next)
         return;
-
-    maybe_exec_apcs(next);
 
     next->curr_core = get_this_core_id();
     next->run_start_time = time_get_ms();
@@ -277,4 +270,8 @@ void scheduler_yield() {
         enable_interrupts();
     else
         disable_interrupts();
+}
+
+void scheduler_force_resched(struct scheduler *sched) {
+    lapic_send_ipi(sched->core_id, IRQ_SCHEDULER);
 }

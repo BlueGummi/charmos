@@ -66,9 +66,11 @@ void scheduler_disable_timeslice();
 void scheduler_yield();
 void scheduler_enqueue(struct thread *t);
 void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id);
+void scheduler_force_resched(struct scheduler *sched);
 void scheduler_wake(struct thread *t, enum thread_priority prio,
                     enum thread_wake_reason reason);
 void scheduler_take_out(struct thread *t);
+
 void switch_context(struct cpu_context *old, struct cpu_context *new);
 void load_context(struct cpu_context *new);
 

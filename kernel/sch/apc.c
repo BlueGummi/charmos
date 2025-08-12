@@ -63,25 +63,12 @@ static inline bool thread_is_dying(struct thread *t) {
     return s == THREAD_STATE_TERMINATED || s == THREAD_STATE_ZOMBIE;
 }
 
-static inline bool thread_is_active(struct thread *t) {
-    enum thread_state s = thread_get_state(t);
-    return s == THREAD_STATE_READY || s == THREAD_STATE_RUNNING;
-}
-
 static void thread_apc_sanity_check(struct thread *t) {
     if (unlikely(thread_get_state(t) == THREAD_STATE_IDLE_THREAD))
         k_panic("Attempted to put an APC on the idle thread");
 
     if (unlikely(thread_is_dying(t)))
         k_panic("Attempted to put an APC on a dying thread");
-}
-
-static void wake_if_waiting(struct thread *t) {
-    if (thread_is_active(t))
-        return;
-
-    thread_apc_sanity_check(t);
-    thread_wake_manual(t);
 }
 
 static inline void exec_apc(struct apc *a) {
@@ -144,14 +131,27 @@ static inline bool thread_is_curr_thread(struct thread *t) {
     return t == scheduler_get_curr_thread();
 }
 
-static void try_exec_apcs(struct thread *t, enum apc_type type) {
-    if (safe_to_exec_apcs()) {
-        /* run only if not disabled */
-        if (type == APC_TYPE_SPECIAL_KERNEL && t->special_apc_disable == 0)
-            thread_check_and_deliver_apcs(t);
-        else if (type == APC_TYPE_KERNEL && t->kernel_apc_disable == 0)
-            thread_check_and_deliver_apcs(t);
-    }
+static inline bool thread_is_active(struct thread *t) {
+    enum thread_state s = thread_get_state(t);
+    return s == THREAD_STATE_READY || s == THREAD_STATE_RUNNING;
+}
+
+/* Poke the target core if there is no preemption on it
+ * because we need the thread to reschedule to run its APC */
+static inline void maybe_force_reschedule(struct thread *t) {
+    struct scheduler *target = global.schedulers[t->curr_core];
+    struct core *core = global.cores[t->curr_core];
+    if (!target->timeslice_enabled && core->current_irql == IRQL_PASSIVE_LEVEL)
+        scheduler_force_resched(target);
+}
+
+static void wake_if_waiting(struct thread *t) {
+    if (thread_is_active(t))
+        return maybe_force_reschedule(t);
+
+    /* Get it running again */
+    thread_apc_sanity_check(t);
+    thread_wake_manual(t);
 }
 
 void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
@@ -165,9 +165,12 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
 
     add_apc_to_thread(t, a, type);
 
+    /* Let's go and execute em */
     if (thread_is_curr_thread(t)) {
-        try_exec_apcs(t, type);
+        thread_check_and_deliver_apcs(t);
     } else {
+
+        /* Not us, go wake up the other guy */
         wake_if_waiting(t);
     }
 
