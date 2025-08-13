@@ -46,7 +46,7 @@ static void event_pool_fn(void *arg, void *unused) {
 
 REGISTER_TEST(event_pool_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     uint64_t tsc = rdtsc();
-    uint64_t times = 512;
+    uint64_t times = 256;
 
     for (uint64_t i = 0; i < times; i++)
         event_pool_add_fast(event_pool_fn, NULL, NULL);

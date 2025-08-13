@@ -176,11 +176,7 @@ static inline void stop_steal(struct scheduler *sched,
     end_steal();
 }
 
-/* TODO: I have temporarily disabled stealing whilst migrating
-* over to the new scheduler, future me, re-enable it. */
 struct thread *scheduler_try_do_steal(struct scheduler *sched) {
-    return NULL;
-
     if (!scheduler_can_steal_work(sched))
         return NULL;
 
