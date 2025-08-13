@@ -104,8 +104,9 @@ static struct thread_activity_metrics calc_activity_metrics(struct thread *t) {
         struct thread_activity_bucket *b = &t->activity_stats->buckets[i];
         struct thread_runtime_bucket *rtb = &t->activity_stats->rt_buckets[i];
 
-        uint64_t brun =
-            rtb->run_time_ms - b->block_duration - b->sleep_duration;
+        int64_t brun = rtb->run_time_ms - b->block_duration - b->sleep_duration;
+        if (brun < 0)
+            brun = 0;
 
         total_duration += THREAD_ACTIVITY_BUCKET_DURATION;
         total_block += b->block_duration;
