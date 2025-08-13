@@ -57,6 +57,10 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->curr_core = -1; // nobody is running this
     new_thread->id = globid++;
     new_thread->refcount = 1;
+    new_thread->prio32_base = thread_base_prio32_from_base(THREAD_PRIO_MID, 0);
+    new_thread->dynamic_delta = 0;
+    new_thread->activity_class = THREAD_ACTIVITY_CLASS_UNKNOWN;
+    thread_update_effective_priority(new_thread);
     new_thread->activity_data = kzalloc(sizeof(struct thread_activity_data));
     new_thread->activity_stats = kzalloc(sizeof(struct thread_activity_stats));
     INIT_LIST_HEAD(&new_thread->apc_head[0]);

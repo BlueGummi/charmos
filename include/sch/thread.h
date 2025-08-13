@@ -347,6 +347,9 @@ void thread_update_activity_stats(struct thread *t, uint64_t time);
 void thread_classify_activity(struct thread *t);
 void thread_update_runtime_buckets(struct thread *thread, uint64_t time);
 thread_prio_t thread_base_prio32_from_base(enum thread_priority base, int nice);
+void thread_apply_wake_boost(struct thread *t, uint64_t now_ms);
+void thread_update_effective_priority(struct thread *t);
+void thread_apply_cpu_penalty(struct thread *t);
 
 void thread_add_wake_reason(struct thread *t, uint8_t reason);
 void thread_wake_manual(struct thread *t);

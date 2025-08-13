@@ -35,6 +35,7 @@ struct scheduler {
     struct thread_queue urgent_threads;
 
     struct rbt thread_rbt;
+    struct rbt completed_rbt;
     struct thread_queue ts_threads;
 
     struct thread_queue rt_threads;
@@ -76,6 +77,7 @@ void scheduler_force_resched(struct scheduler *sched);
 void scheduler_wake(struct thread *t, enum thread_priority prio,
                     enum thread_wake_reason reason);
 void scheduler_take_out(struct thread *t);
+void scheduler_period_start(struct scheduler *s, uint64_t now_ms);
 
 void switch_context(struct cpu_context *old, struct cpu_context *new);
 void load_context(struct cpu_context *new);

@@ -10,8 +10,6 @@
 #include <sync/spin_lock.h>
 #include <tests.h>
 
-static void thread_update_effective_priority(struct thread *t);
-
 static enum thread_activity_class
 classify_activity(struct thread_activity_metrics m) {
     if (m.run_ratio > 80 && m.block_ratio < 10)
@@ -240,7 +238,7 @@ void thread_apply_cpu_penalty(struct thread *t) {
     thread_update_effective_priority(t);
 }
 
-static void thread_update_effective_priority(struct thread *t) {
+void thread_update_effective_priority(struct thread *t) {
     thread_prio_t eff = t->prio32_base + t->dynamic_delta;
 
     /* Clamp to bucket range */
@@ -255,6 +253,8 @@ static void thread_update_effective_priority(struct thread *t) {
 
     t->cached_prio32 = eff;
     t->priority_in_level = eff;
+    t->tree_node.data = eff;
+    t->weight_fp = (uint64_t) (t->priority_in_level) << 16;
 }
 
 #define MIN_PERIOD_MS 20  /* don’t go too short — avoids high timer churn */
@@ -316,11 +316,10 @@ static void scheduler_update_thread_weights(struct scheduler *s) {
         struct thread *t = rbt_entry(node, struct thread, tree_node);
 
         thread_update_effective_priority(t);
-        t->weight_fp = (uint64_t) (t->priority_in_level) << 16;
     }
 }
 
-void sched_period_start(struct scheduler *s, uint64_t now_ms) {
+void scheduler_period_start(struct scheduler *s, uint64_t now_ms) {
     s->current_period++;
 
     scheduler_update_thread_weights(s);

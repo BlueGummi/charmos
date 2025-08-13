@@ -67,6 +67,7 @@ void scheduler_wake(struct thread *t, enum thread_priority new_prio,
     t->time_in_level = 0;
 
     thread_wake(t, reason);
+    thread_apply_wake_boost(t, time_get_ms());
     /* boost */
 
     int64_t c = t->curr_core;
@@ -76,4 +77,43 @@ void scheduler_wake(struct thread *t, enum thread_priority new_prio,
     struct scheduler *sch = global.schedulers[c];
     put_on_scheduler(sch, t);
     do_wake_other_core(sch);
+}
+
+void scheduler_rm_thread(struct scheduler *sched, struct thread *task,
+                         bool already_locked) {
+    if (!sched || !task)
+        return;
+
+    bool ints = false;
+    if (!already_locked)
+        ints = spin_lock(&sched->lock);
+
+    enum thread_priority prio = task->perceived_prio;
+    struct thread_queue *q = scheduler_get_this_thread_queue(sched, prio);
+
+    if (!q->head) {
+        if (!already_locked)
+            spin_unlock(&sched->lock, ints);
+
+        return;
+    }
+
+    dll_remove(q, task);
+
+    if (q->head == NULL)
+        sched->queue_bitmap &= ~(1 << prio);
+
+    thread_free(task);
+
+    scheduler_decrement_thread_count(sched);
+
+    if (!already_locked)
+        spin_unlock(&sched->lock, ints);
+}
+
+void scheduler_take_out(struct thread *t) {
+    if (t->curr_core == -1)
+        return;
+
+    scheduler_rm_thread(global.schedulers[t->curr_core], t, false);
 }
