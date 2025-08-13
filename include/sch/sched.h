@@ -30,32 +30,44 @@ struct idle_thread_data {
 };
 
 struct scheduler {
+    /* Current timeslice data */
     atomic_bool timeslice_enabled;
+    uint64_t timeslice_duration;
 
+    /* Structures */
     struct thread_queue urgent_threads;
 
     struct rbt thread_rbt;
     struct rbt completed_rbt;
-    struct thread_queue ts_threads;
 
     struct thread_queue rt_threads;
     struct thread_queue bg_threads;
 
+    atomic_uint_fast8_t queue_bitmap;
+
     struct thread *current;
+
     uint64_t thread_count;
+
+    /* Period information */
+    bool period_enabled;
     uint64_t current_period;
+
     uint64_t period_ms;
     uint64_t period_start_ms;
     uint64_t total_weight_fp;
-    uint64_t last_timeslice_ms;
 
     int64_t core_id;
+
+    /* Work steal/migration */
     atomic_bool being_robbed;
     atomic_bool stealing_work;
+
     struct spinlock lock;
+
+    /* Idle thread data */
     struct thread *idle_thread;
     struct idle_thread_data idle_thread_data;
-    atomic_uint_fast8_t queue_bitmap;
 };
 
 void scheduler_init();
@@ -74,8 +86,7 @@ void scheduler_yield();
 void scheduler_enqueue(struct thread *t);
 void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id);
 void scheduler_force_resched(struct scheduler *sched);
-void scheduler_wake(struct thread *t, enum thread_priority prio,
-                    enum thread_wake_reason reason);
+void scheduler_wake(struct thread *t, enum thread_wake_reason reason);
 void scheduler_take_out(struct thread *t);
 void scheduler_period_start(struct scheduler *s, uint64_t now_ms);
 
@@ -93,7 +104,7 @@ struct scheduler_data {
     uint32_t max_concurrent_stealers;
     atomic_uint active_stealers;
     atomic_uint total_threads;
-    int64_t steal_min_diff;
+    atomic_int_fast64_t steal_min_diff;
 };
 
 extern struct scheduler_data scheduler_data;
@@ -140,16 +151,16 @@ scheduler_get_this_thread_queue(struct scheduler *sched,
     switch (prio) {
     case THREAD_PRIO_URGENT: return &sched->urgent_threads;
     case THREAD_PRIO_RT: return &sched->rt_threads;
-    case THREAD_PRIO_HIGH:
-    case THREAD_PRIO_MID:
-    case THREAD_PRIO_LOW: return &sched->ts_threads;
+    case THREAD_PRIO_HIGH: /* These priorities use the red */
+    case THREAD_PRIO_MID:  /* black tree for scheduling */
+    case THREAD_PRIO_LOW: return NULL;
     case THREAD_PRIO_BACKGROUND: return &sched->bg_threads;
     }
     k_panic("unreachable!\n");
 }
 
 static inline void scheduler_wake_from_io_block(struct thread *t) {
-    scheduler_wake(t, THREAD_PRIO_URGENT, THREAD_WAKE_REASON_BLOCKING_IO);
+    scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_IO);
 }
 
 #define TICKS_FOR_PRIO(level) (level == THREAD_PRIO_LOW ? 64 : 1ULL << level)

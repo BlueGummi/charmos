@@ -1,5 +1,6 @@
 #include <acpi/lapic.h>
 #include <int/idt.h>
+#include <kassert.h>
 #include <misc/dll.h>
 #include <sch/sched.h>
 #include <stdatomic.h>
@@ -8,24 +9,36 @@
 #include <stdint.h>
 #include <sync/spin_lock.h>
 
-#include "sch/thread.h"
+#include "internal.h"
 
 void scheduler_add_thread(struct scheduler *sched, struct thread *task,
                           bool already_locked) {
+    kassert(task->state != THREAD_STATE_IDLE_THREAD);
+
     bool ints = false;
     if (!already_locked)
         ints = spin_lock(&sched->lock);
 
-    enum thread_priority prio = task->perceived_prio;
-    struct thread_queue *q = scheduler_get_this_thread_queue(sched, prio);
+    enum thread_priority prio = task->base_prio;
 
-    bool was_empty = (q->head == NULL);
-    dll_add(q, task);
+    /* Put it on the tree since this is timesharing */
+    if (prio_class_of(prio) == THREAD_PRIO_CLASS_TS) {
+        /* This will be a new thread this period */
+        task->completed_period = sched->current_period - 1;
+        enqueue_to_tree(sched, task);
+    } else {
+        struct thread_queue *q = scheduler_get_this_thread_queue(sched, prio);
+        dll_add(q, task);
+    }
 
-    if (was_empty)
-        sched->queue_bitmap |= (1 << prio);
+    sched->queue_bitmap |= (1 << prio);
 
     scheduler_increment_thread_count(sched);
+
+    if (!sched->period_enabled && sched->thread_count > 1) {
+        sched->period_enabled = true;
+        scheduler_period_start(sched, time_get_ms());
+    }
 
     if (!already_locked)
         spin_unlock(&sched->lock, ints);
@@ -61,11 +74,7 @@ void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id) {
     do_wake_other_core(global.schedulers[core_id]);
 }
 
-void scheduler_wake(struct thread *t, enum thread_priority new_prio,
-                    enum thread_wake_reason reason) {
-    t->perceived_prio = new_prio;
-    t->time_in_level = 0;
-
+void scheduler_wake(struct thread *t, enum thread_wake_reason reason) {
     thread_wake(t, reason);
     thread_apply_wake_boost(t);
     /* boost */
@@ -77,43 +86,4 @@ void scheduler_wake(struct thread *t, enum thread_priority new_prio,
     struct scheduler *sch = global.schedulers[c];
     put_on_scheduler(sch, t);
     do_wake_other_core(sch);
-}
-
-void scheduler_rm_thread(struct scheduler *sched, struct thread *task,
-                         bool already_locked) {
-    if (!sched || !task)
-        return;
-
-    bool ints = false;
-    if (!already_locked)
-        ints = spin_lock(&sched->lock);
-
-    enum thread_priority prio = task->perceived_prio;
-    struct thread_queue *q = scheduler_get_this_thread_queue(sched, prio);
-
-    if (!q->head) {
-        if (!already_locked)
-            spin_unlock(&sched->lock, ints);
-
-        return;
-    }
-
-    dll_remove(q, task);
-
-    if (q->head == NULL)
-        sched->queue_bitmap &= ~(1 << prio);
-
-    thread_free(task);
-
-    scheduler_decrement_thread_count(sched);
-
-    if (!already_locked)
-        spin_unlock(&sched->lock, ints);
-}
-
-void scheduler_take_out(struct thread *t) {
-    if (t->curr_core == -1)
-        return;
-
-    scheduler_rm_thread(global.schedulers[t->curr_core], t, false);
 }

@@ -24,7 +24,14 @@ void scheduler_init(void) {
         if (!s)
             k_panic("Could not allocate scheduler %lu\n", i);
 
+        s->thread_rbt.root = NULL;
+        s->completed_rbt.root = NULL;
         s->timeslice_enabled = false;
+        s->current_period = 1; /* Start at period 1 to avoid
+                                * starting at 0 because
+                                * that would lead to threads
+                                * being mistakenly identified
+                                * as completed */
 
         s->thread_count = 0;
         s->core_id = i;

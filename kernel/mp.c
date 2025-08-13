@@ -50,9 +50,9 @@ void wakeup() {
 
     gdt_install();
     idt_load();
-    lapic_timer_init();
 
     setup_cpu(cpu);
+    lapic_timer_init(cpu);
     set_core_awake();
     spin_unlock(&wakeup_lock, ints);
 

@@ -1,20 +1,13 @@
 #include <acpi/lapic.h>
-#include <asm.h>
-#include <boot/stage.h>
-#include <compiler.h>
-#include <console/printf.h>
 #include <int/idt.h>
 #include <mp/mp.h>
-#include <registry.h>
 #include <sch/apc.h>
 #include <sch/sched.h>
-#include <sleep.h>
-#include <stdatomic.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <sync/spin_lock.h>
-#include <tests.h>
 #include <types/rcu.h>
+
+#include "internal.h"
+
+/* We will perform scheduler period operations on thread load */
 
 struct scheduler_data scheduler_data = {
     /* This is how many cores can be stealing work at once */
@@ -33,6 +26,7 @@ struct scheduler_data scheduler_data = {
     .steal_min_diff = SCHEDULER_DEFAULT_WORK_STEAL_MIN_DIFF,
 };
 
+/* Timeslice stuff */
 static inline void disable_timeslice() {
     struct scheduler *self = get_this_core_sched();
     if (atomic_load(&self->timeslice_enabled)) {
@@ -49,6 +43,23 @@ static inline void enable_timeslice() {
     }
 }
 
+static inline void change_timeslice_duration(uint64_t new_duration) {
+    struct scheduler *self = get_this_core_sched();
+
+    /* No need to unnecessarily write to MMIO */
+    if (self->timeslice_duration == new_duration &&
+        atomic_load(&self->timeslice_enabled))
+        return;
+
+    self->timeslice_duration = new_duration;
+    lapic_timer_set_ms(new_duration);
+    enable_timeslice();
+}
+
+void scheduler_change_timeslice_duration(uint64_t new_duration) {
+    change_timeslice_duration(new_duration);
+}
+
 void scheduler_enable_timeslice() {
     enable_timeslice();
 }
@@ -62,52 +73,49 @@ static inline void update_core_current_thread(struct thread *next) {
     c->current_thread = next;
 }
 
-/* Higher number == lower priority */
-static inline enum thread_priority get_decayed_prio(enum thread_priority curr) {
-    return curr == THREAD_PRIO_LOW ? THREAD_PRIO_HIGH : curr + 1;
-}
-
-static inline void do_thread_prio_decay(struct thread *thread) {
-    /* Nothing happens - RT threads do not decay */
-    if (thread->perceived_prio == THREAD_PRIO_RT)
+static inline void decay_thread_timeslice(struct scheduler *sched,
+                                          struct thread *thread) {
+    /* If there is no period enabled right now,
+     * the thread should not decay timeslices,
+     * and we'll just keep it in the ready-queue */
+    if (!sched->period_enabled)
         return;
 
-    /* Reset the time for the new priority */
-    thread->time_in_level = 0;
+    /* We do not decay non-timesharing thread timeslices */
+    if (prio_class_of(thread->base_prio) != THREAD_PRIO_CLASS_TS)
+        return;
 
-    /* Timesharing threads decay and then get re-boosted to THREAD_PRIO_HIGH */
-    if (THREAD_PRIO_IS_TIMESHARING(thread->perceived_prio))
-        thread->perceived_prio = get_decayed_prio(thread->perceived_prio);
+    if (thread->timeslices_remaining == 0)
+        k_panic("Bug: Thread with no timeslices remaining was saved "
+                "to the run queues");
 
-    /* Reset the priority to the base priority. URGENT is only set from
-     * explicit boosts for device interrupts, and we must reset it here. */
-    if (thread->perceived_prio == THREAD_PRIO_URGENT)
-        thread->perceived_prio = thread->base_prio;
+    thread->timeslices_remaining--;
+
+    /* We are done for this period */
+    if (thread->timeslices_remaining == 0)
+        thread->completed_period = sched->current_period;
 }
 
-static inline void update_thread_before_save(struct thread *thread,
+static inline void update_thread_before_save(struct scheduler *sched,
+                                             struct thread *thread,
                                              uint64_t time) {
     atomic_store(&thread->state, THREAD_STATE_READY);
     thread->curr_core = -1;
-    thread->time_in_level++;
     thread_update_runtime_buckets(thread, time);
-
-    /* Decay the priority depending on what the thread class is */
-    if (thread->time_in_level >= TICKS_FOR_PRIO(thread->perceived_prio))
-        do_thread_prio_decay(thread);
+    decay_thread_timeslice(sched, thread);
 }
 
 static inline void do_re_enqueue_thread(struct scheduler *sched,
                                         struct thread *thread) {
     /* Scheduler is locked - called from `schedule()` */
-    bool locked = true;
-    scheduler_add_thread(sched, thread, locked);
-}
-
-static inline void do_save_thread(struct scheduler *sched, struct thread *curr,
-                                  uint64_t time) {
-    update_thread_before_save(curr, time);
-    do_re_enqueue_thread(sched, curr);
+    if (thread->timeslices_remaining == 0) {
+        sched->queue_bitmap |= (1 << thread->base_prio);
+        retire_thread(sched, thread);
+        scheduler_increment_thread_count(sched);
+    } else {
+        bool locked = true;
+        scheduler_add_thread(sched, thread, locked);
+    }
 }
 
 static inline void update_idle_thread(uint64_t time) {
@@ -116,29 +124,32 @@ static inline void update_idle_thread(uint64_t time) {
     data->last_exit_ms = time;
 }
 
-static inline void save_current_thread(struct scheduler *sched,
-                                       struct thread *curr, uint64_t time) {
-    scheduler_data.steal_min_diff = scheduler_compute_steal_threshold();
+static inline void update_min_steal_diff(void) {
+    atomic_store(&scheduler_data.steal_min_diff,
+                 scheduler_compute_steal_threshold());
+}
+
+static inline void save_thread(struct scheduler *sched, struct thread *curr,
+                               uint64_t time) {
+    update_min_steal_diff();
 
     /* Only save a running thread that exists */
     if (curr && atomic_load(&curr->state) == THREAD_STATE_RUNNING) {
-        do_save_thread(sched, curr, time);
+        update_thread_before_save(sched, curr, time);
+        do_re_enqueue_thread(sched, curr);
     } else if (curr && atomic_load(&curr->state) == THREAD_STATE_IDLE_THREAD) {
         update_idle_thread(time);
     }
 }
 
-static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {
-    uint8_t bitmap = atomic_load(&sched->queue_bitmap);
+static inline enum thread_priority
+available_prio_level_from_bitmap(uint8_t bitmap) {
+    return __builtin_ctz(bitmap);
+}
 
-    /* Nothing in queues */
-    if (!bitmap)
-        return NULL;
-
-    int lvl = __builtin_ctz(bitmap);
-    bitmap &= ~(1 << lvl);
-
-    struct thread_queue *q = scheduler_get_this_thread_queue(sched, lvl);
+static struct thread *pick_from_special_queues(struct scheduler *sched,
+                                               enum thread_priority prio) {
+    struct thread_queue *q = scheduler_get_this_thread_queue(sched, prio);
     struct thread *next = q->head;
 
     /* Dequeue */
@@ -153,10 +164,48 @@ static struct thread *scheduler_pick_regular_thread(struct scheduler *sched) {
 
     /* No more threads at this queue level */
     if (q->head == NULL)
-        atomic_fetch_and(&sched->queue_bitmap, ~(1 << lvl));
+        atomic_fetch_and(&sched->queue_bitmap, ~(1 << prio));
 
     next->next = NULL;
     next->prev = NULL;
+    return next;
+}
+
+static struct thread *pick_from_regular_queues(struct scheduler *sched,
+                                               uint64_t now_ms,
+                                               enum thread_priority prio) {
+    struct thread *next = find_highest_prio(sched, prio);
+    if (next)
+        return next;
+
+    /* Here, we have been unable to find
+     * a thread in the ready queues,
+     * so we shall start a new period and swap
+     * the pointers and find the
+     * thread again */
+    swap_queues(sched);
+    scheduler_period_start(sched, now_ms);
+    return find_highest_prio(sched, prio);
+}
+
+static struct thread *pick_thread(struct scheduler *sched, uint64_t now_ms) {
+    uint8_t bitmap = atomic_load(&sched->queue_bitmap);
+
+    /* Nothing in queues */
+    if (!bitmap) {
+        return NULL;
+    }
+
+    struct thread *next = NULL;
+
+    enum thread_priority prio = available_prio_level_from_bitmap(bitmap);
+    enum thread_prio_class pclass = prio_class_of(prio);
+
+    if (pclass != THREAD_PRIO_CLASS_TS) {
+        next = pick_from_special_queues(sched, prio);
+    } else {
+        next = pick_from_regular_queues(sched, now_ms, prio);
+    }
 
     scheduler_decrement_thread_count(sched);
 
@@ -187,6 +236,7 @@ static void load_thread(struct scheduler *sched, struct thread *next,
 static inline struct thread *load_idle_thread(struct scheduler *sched) {
     /* Idle thread has no need to have a timeslice
      * No preemption will be occurring since nothing else runs */
+    disable_period(sched);
     disable_timeslice();
     return sched->idle_thread;
 }
@@ -194,13 +244,18 @@ static inline struct thread *load_idle_thread(struct scheduler *sched) {
 static void change_timeslice(struct scheduler *sched, struct thread *next) {
     /* Only one thread is running - no timeslice needed */
     if (sched->thread_count == 0) {
+        /* Disable the scheduling period because
+         * there is no need for period
+         * tracking when we have
+         * one thread running */
+        disable_period(sched);
         disable_timeslice();
         return;
     }
 
-    if (THREAD_PRIO_IS_TIMESHARING(next->perceived_prio)) {
+    if (THREAD_PRIO_IS_TIMESHARING(next->base_prio)) {
         /* Timesharing threads need timeslices */
-        enable_timeslice();
+        change_timeslice_duration(next->timeslice_duration_ms);
     } else {
         /* RT threads do not share time*/
         disable_timeslice();
@@ -209,6 +264,7 @@ static void change_timeslice(struct scheduler *sched, struct thread *next) {
 
 static inline void context_switch(struct thread *curr, struct thread *next) {
     rcu_mark_quiescent();
+
     if (curr && curr->state != THREAD_STATE_IDLE_THREAD) {
         switch_context(&curr->regs, &next->regs);
     } else {
@@ -221,19 +277,19 @@ static inline void context_switch(struct thread *curr, struct thread *next) {
 
 void schedule(void) {
     struct scheduler *sched = get_this_core_sched();
-    bool interrupts = spin_lock(&sched->lock);
+    scheduler_lock(sched);
 
     uint64_t time = time_get_ms_fast();
     struct thread *curr = sched->current;
     struct thread *next = NULL;
 
-    save_current_thread(sched, curr, time);
+    save_thread(sched, curr, time);
 
     /* Checks if we can steal, finds a victim, and tries to steal.
      * NULL is returned if any step was unsuccessful */
     struct thread *stolen = scheduler_try_do_steal(sched);
 
-    next = stolen ? stolen : scheduler_pick_regular_thread(sched);
+    next = stolen ? stolen : pick_thread(sched, time);
 
     if (!next) {
         /* Nothing available via steal or in our queues? */
@@ -247,7 +303,7 @@ void schedule(void) {
     }
 
     load_thread(sched, next, time);
-    spin_unlock(&sched->lock, interrupts);
+    scheduler_unlock(sched);
 
     context_switch(curr, next);
 }
@@ -270,5 +326,6 @@ void scheduler_yield() {
 }
 
 void scheduler_force_resched(struct scheduler *sched) {
-    lapic_send_ipi(sched->core_id, IRQ_SCHEDULER);
+    if (!atomic_load(&sched->timeslice_enabled))
+        lapic_send_ipi(sched->core_id, IRQ_SCHEDULER);
 }

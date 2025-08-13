@@ -83,16 +83,12 @@ static void rt_thread(void) {
         goto fail;
     }
 
-    uint64_t start_time = me->time_in_level;
     for (uint64_t i = 0; i < spins; i++) {
         /* This sleep function just
          * busy wait-polls the timer */
         sleep_ms(1);
 
         /* This is changed if preemption occurred */
-        if (me->time_in_level != start_time) {
-            goto fail;
-        }
     }
 
     return;
@@ -106,7 +102,6 @@ REGISTER_TEST(rt_thread_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct thread *thread = thread_create(rt_thread);
     rt = thread;
     thread->base_prio = THREAD_PRIO_URGENT;
-    thread->perceived_prio = THREAD_PRIO_URGENT;
 
     scheduler_enqueue_on_core(thread, get_this_core_id());
     scheduler_yield();
@@ -124,14 +119,13 @@ static void ts_thread(void) {
         goto fail;
     }
 
-    uint64_t start_time = me->time_in_level;
-    enum thread_priority start_prio = me->perceived_prio;
+    thread_prio_t start_prio = me->priority_in_level;
 
     for (uint64_t i = 0; i < spins; i++)
         wait_for_interrupt();
 
     /* Time in level never changed, and priority level never changed */
-    if (me->time_in_level == start_time && start_prio == me->perceived_prio)
+    if (start_prio == me->priority_in_level)
         goto fail;
 
     return;

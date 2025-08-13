@@ -6,6 +6,8 @@
 #include <sync/spin_lock.h>
 
 /* self->stealing_work should already be set before this is called */
+/* TODO: Rate limit me so I don't do a full scan of all cores due to that being
+ * expensive */
 struct scheduler *scheduler_pick_victim(struct scheduler *self) {
     /* Ideally, we want to steal from our busiest core */
     uint64_t max_thread_count = 0;
@@ -40,11 +42,75 @@ struct scheduler *scheduler_pick_victim(struct scheduler *self) {
     return victim;
 }
 
+static struct thread *steal_from_ts_threads(struct scheduler *victim,
+                                            int level) {
+    struct rbt_node *node;
+    rbt_for_each_reverse(node, &victim->thread_rbt) {
+        struct thread *target = thread_from_rbt_node(node);
+        if (target->flags & THREAD_FLAGS_NO_STEAL)
+            continue;
+
+        rb_delete(&victim->thread_rbt, node);
+        if (victim->thread_rbt.root == NULL)
+            victim->queue_bitmap &= ~(1 << level);
+
+        return target;
+    }
+
+    return NULL;
+}
+
+static struct thread *steal_from_special_threads(struct scheduler *victim,
+                                                 struct thread_queue *q,
+                                                 int level) {
+    struct thread *start = q->head;
+    struct thread *current = start;
+
+    do {
+        if (current->flags == THREAD_FLAGS_NO_STEAL)
+            goto check_next;
+
+        if (atomic_load(&current->state) != THREAD_STATE_READY)
+            goto check_next;
+
+        if (current == q->head && current == q->tail) {
+            q->head = NULL;
+            q->tail = NULL;
+        } else if (current == q->head) {
+            q->head = current->next;
+            q->head->prev = q->tail;
+            q->tail->next = q->head;
+        } else if (current == q->tail) {
+            q->tail = current->prev;
+            q->tail->next = q->head;
+            q->head->prev = q->tail;
+        } else {
+            current->prev->next = current->next;
+            current->next->prev = current->prev;
+        }
+
+        // clear bitmap
+        if (q->head == NULL)
+            victim->queue_bitmap &= ~(1 << level);
+
+        current->next = NULL;
+        current->prev = NULL;
+
+        scheduler_decrement_thread_count(victim);
+
+        return current;
+
+    check_next:
+        current = current->next;
+    } while (current != start);
+    return NULL;
+}
+
 /* We do not enable interrupts here because this is only ever
  * called from the `schedule()` function which should not enable
- * interrupts inside of itself */
-
-/* TODO: Make this pick the busiest thread to steal from */
+ * interrupts inside of itself
+ *
+ * TODO: Make this pick the busiest thread to steal from */
 struct thread *scheduler_steal_work(struct scheduler *victim) {
     if (!victim || victim->thread_count == 0)
         return NULL;
@@ -53,60 +119,33 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
     if (!spin_trylock(&victim->lock))
         return NULL;
 
+    struct thread *stolen = NULL;
     uint8_t mask = atomic_load(&victim->queue_bitmap);
     while (mask) {
         int level = 31 - __builtin_clz((uint32_t) mask);
         mask &= ~(1 << level); /* remove that bit from local copy */
+        enum thread_prio_class pclass = prio_class_of(level);
 
-        struct thread_queue *q = scheduler_get_this_thread_queue(victim, level);
-        if (!q->head)
-            continue;
+        if (pclass == THREAD_PRIO_CLASS_TS) {
+            stolen = steal_from_ts_threads(victim, level);
+            if (stolen)
+                break;
 
-        struct thread *start = q->head;
-        struct thread *current = start;
+        } else {
+            struct thread_queue *q =
+                scheduler_get_this_thread_queue(victim, level);
 
-        do {
-            if (current->flags == THREAD_FLAGS_NO_STEAL)
-                goto check_next;
+            if (!q->head)
+                continue;
 
-            if (atomic_load(&current->state) != THREAD_STATE_READY)
-                goto check_next;
-
-            if (current == q->head && current == q->tail) {
-                q->head = NULL;
-                q->tail = NULL;
-            } else if (current == q->head) {
-                q->head = current->next;
-                q->head->prev = q->tail;
-                q->tail->next = q->head;
-            } else if (current == q->tail) {
-                q->tail = current->prev;
-                q->tail->next = q->head;
-                q->head->prev = q->tail;
-            } else {
-                current->prev->next = current->next;
-                current->next->prev = current->prev;
-            }
-
-            // clear bitmap
-            if (q->head == NULL)
-                victim->queue_bitmap &= ~(1 << level);
-
-            current->next = NULL;
-            current->prev = NULL;
-
-            scheduler_decrement_thread_count(victim);
-
-            spin_unlock(&victim->lock, false);
-            return current;
-
-        check_next:
-            current = current->next;
-        } while (current != start);
+            stolen = steal_from_special_threads(victim, q, level);
+            if (stolen)
+                break;
+        }
     }
 
     spin_unlock(&victim->lock, false);
-    return NULL; // Nothing stealable
+    return stolen;
 }
 
 static inline void begin_steal(struct scheduler *sched) {
@@ -137,7 +176,11 @@ static inline void stop_steal(struct scheduler *sched,
     end_steal();
 }
 
+/* TODO: I have temporarily disabled stealing whilst migrating
+* over to the new scheduler, future me, re-enable it. */
 struct thread *scheduler_try_do_steal(struct scheduler *sched) {
+    return NULL;
+
     if (!scheduler_can_steal_work(sched))
         return NULL;
 

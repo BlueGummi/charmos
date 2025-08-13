@@ -40,14 +40,13 @@ static uint64_t prio_base_and_ceil_from_base(enum thread_priority base);
 #define THREAD_MUL_SLEEPY 0       /* No boost */
 
 /* Scheduling periods */
-#define MIN_PERIOD_MS 20  /* don’t go too short — avoids high timer churn */
-#define MAX_PERIOD_MS 300 /* don’t go too long — keeps latency sane */
+#define MIN_PERIOD_MS 20  /* don’t go too short */
+#define MAX_PERIOD_MS 300 /* don’t go too long */
 #define BASE_PERIOD_MS 50 /* baseline for small loads */
 
 /* Timeslices */
 #define MIN_SLICE_MS 2  /* smallest slice granularity */
 #define MAX_SLICE_MS 20 /* cap slice length to avoid hogs */
-#define thread_from_rbt_node(node) rbt_entry(node, struct thread, tree_node)
 
 #define LIM(__min, __max)                                                      \
     min = __min;                                                               \
@@ -216,7 +215,7 @@ static inline void clamp_thread_delta(struct thread *t) {
 
 void thread_apply_wake_boost(struct thread *t) {
     /* Do nothing */
-    if (t->priority_class == THREAD_PRIO_CLASS_RT)
+    if (prio_class_of(t->base_prio))
         return;
 
     uint32_t score_q16 = compute_activity_score_q16(&t->activity_metrics);
@@ -258,12 +257,7 @@ void thread_update_effective_priority(struct thread *t) {
     /* Clamp to bucket range */
     uint32_t min, max;
     DERIVE_BASE_AND_CEIL(t->base_prio, min, max);
-
-    if (eff < min)
-        eff = min;
-
-    if (eff > max)
-        eff = max;
+    CLAMP(eff, min, max);
 
     t->cached_prio32 = eff;
     t->priority_in_level = eff;
@@ -271,7 +265,7 @@ void thread_update_effective_priority(struct thread *t) {
     t->weight_fp = (uint64_t) (t->priority_in_level) << 16;
 }
 
-static uint64_t sched_compute_period(struct scheduler *s) {
+static uint64_t compute_period(struct scheduler *s) {
     uint64_t load = s->thread_count;
     uint64_t period = BASE_PERIOD_MS + (load * 2); /* Linear growth */
     CLAMP(period, MIN_PERIOD_MS, MAX_PERIOD_MS);
@@ -279,8 +273,8 @@ static uint64_t sched_compute_period(struct scheduler *s) {
     return period;
 }
 
-static void scheduler_allocate_slices(struct scheduler *s, uint64_t now_ms) {
-    s->period_ms = sched_compute_period(s);
+static void allocate_slices(struct scheduler *s, uint64_t now_ms) {
+    s->period_ms = compute_period(s);
     s->period_start_ms = now_ms;
 
     uint64_t total_weight = 0;
@@ -330,5 +324,7 @@ void scheduler_period_start(struct scheduler *s, uint64_t now_ms) {
 
     scheduler_update_thread_weights(s);
 
-    scheduler_allocate_slices(s, now_ms);
+    allocate_slices(s, now_ms);
+
+    s->period_enabled = true;
 }

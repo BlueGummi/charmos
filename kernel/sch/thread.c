@@ -47,8 +47,6 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->stack_size = stack_size;
     new_thread->regs.rsp = (uint64_t) stack_top;
     new_thread->base_prio = THREAD_PRIO_MID;
-    new_thread->perceived_prio = THREAD_PRIO_MID;
-    new_thread->time_in_level = 0;
     new_thread->state = THREAD_STATE_NEW;
     new_thread->priority_in_level = 500;
     new_thread->regs.r12 = (uint64_t) entry_point;
@@ -57,6 +55,8 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->curr_core = -1; // nobody is running this
     new_thread->id = globid++;
     new_thread->refcount = 1;
+    new_thread->timeslices_remaining = 1;
+
     new_thread->prio32_base = thread_base_prio32_from_base(THREAD_PRIO_MID, 0);
     new_thread->dynamic_delta = 0;
     new_thread->activity_class = THREAD_ACTIVITY_CLASS_UNKNOWN;
@@ -148,8 +148,7 @@ void thread_block_on(struct thread_queue *q) {
 static void wake_thread(void *a, void *unused) {
     (void) unused;
     struct thread *t = a;
-    scheduler_wake(t, THREAD_PRIO_MAX_BOOST(t->perceived_prio),
-                   THREAD_WAKE_REASON_SLEEP_TIMEOUT);
+    scheduler_wake(t, THREAD_WAKE_REASON_SLEEP_TIMEOUT);
 }
 
 void thread_sleep_for_ms(uint64_t ms) {
@@ -164,10 +163,9 @@ void thread_sleep_for_ms(uint64_t ms) {
 
 void thread_wake_manual(struct thread *t) {
     enum thread_state s = thread_get_state(t);
-    enum thread_priority p = t->perceived_prio;
 
     if (s == THREAD_STATE_BLOCKED)
-        scheduler_wake(t, p, THREAD_WAKE_REASON_BLOCKING_MANUAL);
+        scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_MANUAL);
     else if (s == THREAD_STATE_SLEEPING)
-        scheduler_wake(t, p, THREAD_WAKE_REASON_SLEEP_MANUAL);
+        scheduler_wake(t, THREAD_WAKE_REASON_SLEEP_MANUAL);
 }

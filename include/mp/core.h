@@ -19,6 +19,7 @@ struct core {
     atomic_uint_fast64_t tlb_ack_gen; // last processed
     bool in_interrupt;
 
+    uint32_t lapic_freq;
     uint64_t rcu_seen_gen;
     uint32_t rcu_nesting;
     bool rcu_quiescent;

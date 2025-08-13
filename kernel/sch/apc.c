@@ -162,7 +162,6 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
     if (thread_is_curr_thread(t)) {
         thread_check_and_deliver_apcs(t);
     } else {
-
         /* Not us, go wake up the other guy */
         wake_if_waiting(t);
     }

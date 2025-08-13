@@ -13,9 +13,7 @@ void lapic_init(void) {
     lapic = vmm_map_phys(lapic_phys, PAGE_SIZE, PAGING_UNCACHABLE);
 }
 
-static uint32_t lapic_calibrated_freq = 0;
-
-void lapic_timer_init() {
+void lapic_timer_init(uint64_t core_id) {
     uint32_t calibration_sleep_ms = 2;
     uint32_t timeslice_ms = 15;
 
@@ -29,14 +27,21 @@ void lapic_timer_init() {
     uint32_t curr = LAPIC_READ(LAPIC_REG(LAPIC_REG_TIMER_CUR));
     uint32_t elapsed = 0xFFFFFFFF - curr;
 
-    lapic_calibrated_freq = elapsed * (1000 / calibration_sleep_ms);
+    uint64_t lapic_calibrated_freq = elapsed * (1000 / calibration_sleep_ms);
 
     uint32_t timeslice_ticks = (lapic_calibrated_freq * timeslice_ms) / 1000;
 
+    global.cores[core_id]->lapic_freq = lapic_calibrated_freq;
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_LVT_TIMER),
                TIMER_VECTOR | TIMER_MODE_PERIODIC);
 
     LAPIC_SEND(LAPIC_REG(LAPIC_REG_TIMER_INIT), timeslice_ticks);
+}
+
+void lapic_timer_set_ms(uint32_t ms) {
+    uint32_t ticks = (get_current_core()->lapic_freq * ms) / 1000;
+
+    LAPIC_SEND(LAPIC_REG(LAPIC_REG_TIMER_INIT), ticks);
 }
 
 void lapic_timer_disable() {

@@ -18,6 +18,17 @@ struct rbt_node *rbt_find_min(struct rbt_node *node) {
     return node;
 }
 
+struct rbt_node *rbt_find_max(struct rbt_node *node) {
+    while (node && node->right != NULL)
+        node = node->right;
+
+    return node;
+}
+
+struct rbt_node *rbt_max(struct rbt *tree) {
+    return rbt_find_max(tree->root);
+}
+
 struct rbt_node *rbt_min(struct rbt *tree) {
     return rbt_find_min(tree->root);
 }

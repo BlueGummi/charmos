@@ -171,6 +171,8 @@ static inline enum thread_prio_class prio_class_of(enum thread_priority prio) {
     return THREAD_PRIO_CLASS_TS;
 }
 
+#define thread_from_rbt_node(node) rbt_entry(node, struct thread, tree_node)
+
 #define THREAD_PRIO_MAX_BOOST(prio)                                            \
     (enum thread_priority)(prio_class_of(prio) == THREAD_PRIO_CLASS_BG         \
                                ? THREAD_PRIO_BACKGROUND                        \
@@ -276,13 +278,8 @@ struct thread {
     uint64_t timeslices_remaining;
 
     /* Used to derive/impact the priorty_in_level */
-    enum thread_prio_class priority_class;
     enum thread_activity_class activity_class;
     enum thread_priority base_prio; /* priority level at creation time */
-
-    /* Legacy stuff - will be migrated out */
-    enum thread_priority perceived_prio; /* priority level right now */
-    uint64_t time_in_level;              /* ticks at this level */
 
     enum thread_flags flags;
 

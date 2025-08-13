@@ -40,11 +40,12 @@
 #define TIMER_MODE_PERIODIC (1 << 17)
 extern uint32_t *lapic;
 void lapic_init();
-void lapic_timer_init(void);
+void lapic_timer_init(uint64_t core_id);
 uint64_t lapic_get_id(void);
 void lapic_timer_disable();
 bool lapic_timer_is_enabled();
 void lapic_timer_enable();
+void lapic_timer_set_ms(uint32_t ms);
 void lapic_send_ipi(uint8_t apic_id, uint8_t vector);
 void broadcast_nmi_except(uint64_t exclude_core);
 #define IA32_APIC_BASE_MSR 0x1B

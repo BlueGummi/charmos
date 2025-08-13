@@ -89,7 +89,7 @@ void k_main(void) {
 
     // Filesystem init
     cmdline_parse(cmdline_request.response->cmdline);
-    lapic_timer_init();
+    lapic_timer_init(0);
     mp_complete_init();
 
     restore_interrupts();
