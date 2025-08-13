@@ -25,7 +25,7 @@ vaddr_t vas_alloc(struct vas_space *vas, size_t size, size_t align) {
         struct vas_range *vr = rbt_entry(node, struct vas_range, node);
 
         if (prev_end + size <= vr->start) {
-            struct vas_range *new_range = kmalloc(sizeof(*new_range));
+            struct vas_range *new_range = kzalloc(sizeof(*new_range));
             new_range->start = prev_end;
             new_range->length = size;
             new_range->node.data = new_range->start;
@@ -39,7 +39,7 @@ vaddr_t vas_alloc(struct vas_space *vas, size_t size, size_t align) {
     }
 
     if (prev_end + size <= vas->limit) {
-        struct vas_range *new_range = kmalloc(sizeof(*new_range));
+        struct vas_range *new_range = kzalloc(sizeof(*new_range));
         new_range->start = prev_end;
         new_range->length = size;
         new_range->node.data = new_range->start;

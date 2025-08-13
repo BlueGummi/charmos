@@ -10,6 +10,14 @@
 #include <string.h>
 #include <sync/spin_lock.h>
 
+#ifndef SLAB_OBJ_ALIGN
+#define SLAB_OBJ_ALIGN 16u
+#endif
+
+static inline uint64_t round_up_pow2(uint64_t x, uint64_t a) {
+    return (x + (a - 1)) & ~(a - 1);
+}
+
 struct slab_cache slab_caches[SLAB_CLASS_COUNT];
 uintptr_t slab_heap_top = 0xFFFFF00000000000;
 
@@ -26,15 +34,24 @@ static void *slab_map_new_page() {
 }
 
 static void slab_cache_init(struct slab_cache *cache, uint64_t obj_size) {
-    cache->obj_size = obj_size + sizeof(struct slab *);
+    const uint64_t header = sizeof(struct slab *);
+
+    cache->obj_size = header + obj_size; // stride, not necessarily power-of-two
     uint64_t available = PAGE_SIZE - sizeof(struct slab);
 
     if (cache->obj_size > available) {
         cache->objs_per_slab = 0;
+        cache->slabs_free = NULL;
+        cache->slabs_partial = NULL;
+        cache->slabs_full = NULL;
+        spinlock_init(&cache->lock);
         return;
     }
 
     cache->objs_per_slab = (available * 8) / (8 * cache->obj_size + 1);
+    if (cache->objs_per_slab == 0)
+        cache->objs_per_slab = 1;
+
     cache->slabs_free = NULL;
     cache->slabs_partial = NULL;
     cache->slabs_full = NULL;
@@ -49,24 +66,38 @@ static struct slab *slab_create(struct slab_cache *cache) {
     struct slab *slab = (struct slab *) page;
     slab->parent_cache = cache;
 
-    uint64_t bitmap_bytes = (cache->objs_per_slab + 7) / 8;
-    uint8_t *ptr = ((uint8_t *) page + sizeof(struct slab));
+    if (cache->objs_per_slab == 0) {
+        vmm_unmap_page((uintptr_t) page);
+        return NULL;
+    }
 
-    slab->bitmap = (atomic_uint_fast8_t *) ptr;
+    for (;;) {
+        uint64_t n = cache->objs_per_slab;
+        uint64_t bitmap_bytes = (n + 7) / 8;
+        uint8_t *ptr = ((uint8_t *) page + sizeof(struct slab));
 
-    if ((cache->obj_size > 0) &&
-        ((cache->obj_size & (cache->obj_size - 1)) == 0))
-        k_panic("PANIC\n");
+        slab->bitmap = (atomic_uint_fast8_t *) ptr;
 
-    uintptr_t mem_ptr = (uintptr_t) (slab->bitmap + bitmap_bytes);
-    mem_ptr = (mem_ptr + cache->obj_size - 1) & ~(cache->obj_size - 1);
-    slab->mem = (void *) mem_ptr;
+        uintptr_t mem_ptr = (uintptr_t) (slab->bitmap) + bitmap_bytes;
+        mem_ptr = round_up_pow2(mem_ptr, SLAB_OBJ_ALIGN);
+
+        uintptr_t end = mem_ptr + n * cache->obj_size;
+        if (end - (uintptr_t) page <= PAGE_SIZE) {
+            slab->mem = (void *) mem_ptr;
+            break;
+        }
+        if (--cache->objs_per_slab == 0) {
+            vmm_unmap_page((uintptr_t) page);
+            return NULL;
+        }
+    }
 
     atomic_store(&slab->used, 0);
     slab->state = SLAB_FREE;
     slab->next = NULL;
 
-    memset(slab->bitmap, 0, bitmap_bytes);
+    uint64_t bitmap_bytes = (cache->objs_per_slab + 7) / 8;
+    memset((void *) slab->bitmap, 0, bitmap_bytes);
     return slab;
 }
 
@@ -119,22 +150,21 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab,
 
     for (uint64_t i = 0; i < cache->objs_per_slab; i++) {
         uint64_t byte_idx = i / 8;
-        uint8_t bit_mask = 1 << (i % 8);
+        uint8_t bit_mask = (uint8_t) (1u << (i % 8));
 
         uint8_t old = atomic_fetch_or(&slab->bitmap[byte_idx], bit_mask);
 
         if (!(old & bit_mask)) {
-            slab->bitmap[byte_idx] |= bit_mask;
-            atomic_fetch_add(&slab->used, 1);
+            uint64_t used = atomic_fetch_add(&slab->used, 1) + 1;
 
-            if (atomic_load(&slab->used) == cache->objs_per_slab) {
+            if (used == cache->objs_per_slab) {
                 slab_move_slab(cache, slab, SLAB_FULL, lock_held);
-            } else if (atomic_load(&slab->used) == 1) {
+            } else if (used == 1) {
                 slab_move_slab(cache, slab, SLAB_PARTIAL, lock_held);
             }
 
             uint8_t *obj = (uint8_t *) slab->mem + i * cache->obj_size;
-            *((struct slab **) obj) = slab;
+            *((struct slab **) obj) = slab; // hidden header for kfree
             return obj + sizeof(struct slab *);
         }
     }
@@ -148,11 +178,12 @@ static void slab_free(struct slab_cache *cache, struct slab *slab, void *obj) {
     uint64_t index =
         ((uintptr_t) obj - (uintptr_t) slab->mem) / cache->obj_size;
     uint64_t byte_idx = index / 8;
-    uint8_t bit_mask = 1 << (index % 8);
+    uint8_t bit_mask = (uint8_t) (1u << (index % 8));
 
-    uint8_t old = atomic_fetch_and(&slab->bitmap[byte_idx], ~bit_mask);
+    uint8_t old =
+        atomic_fetch_and(&slab->bitmap[byte_idx], (uint8_t) ~bit_mask);
     if (!(old & bit_mask)) {
-        return; // bit was not set
+        return;
     }
 
     uint64_t new_used = atomic_fetch_sub(&slab->used, 1) - 1;
@@ -223,6 +254,26 @@ void slab_init() {
 }
 
 static struct spinlock kmalloc_lock = SPINLOCK_INIT;
+
+static inline uint64_t kmalloc_usable_size(void *ptr) {
+    if (!ptr)
+        return 0;
+
+    struct slab_phdr *hdr =
+        (struct slab_phdr *) ((uint8_t *) ptr - sizeof(struct slab_phdr));
+
+    if (hdr->magic == MAGIC_KMALLOC_PAGE) {
+        return hdr->pages * PAGE_SIZE - sizeof(struct slab_phdr);
+    }
+
+    void *raw_obj = (uint8_t *) ptr - sizeof(struct slab *);
+    struct slab *slab = *((struct slab **) raw_obj);
+    if (!slab)
+        return 0;
+    struct slab_cache *cache = slab->parent_cache;
+    return cache->obj_size - sizeof(struct slab *);
+}
+
 void *kmalloc(uint64_t size) {
     if (size == 0)
         return NULL;
@@ -241,7 +292,7 @@ void *kmalloc(uint64_t size) {
     for (uint64_t i = 0; i < pages; i++) {
         uintptr_t phys = (uintptr_t) pmm_alloc_page(false);
         if (!phys) {
-            spin_unlock(&kmalloc_lock, i);
+            spin_unlock(&kmalloc_lock, iflag);
             return NULL;
         }
         vmm_map_page(virt + i * PAGE_SIZE, phys, PAGING_PRESENT | PAGING_WRITE);
@@ -302,12 +353,19 @@ void *krealloc(void *ptr, uint64_t size) {
     if (!ptr)
         return kmalloc(size);
 
-    void *new_ptr = kzalloc(size);
+    if (size == 0) {
+        kfree(ptr);
+        return NULL;
+    }
+
+    uint64_t old = kmalloc_usable_size(ptr);
+    void *new_ptr = kmalloc(size);
 
     if (!new_ptr)
         return NULL;
 
-    memcpy(new_ptr, ptr, size);
+    uint64_t to_copy = (old < size) ? old : size;
+    memcpy(new_ptr, ptr, to_copy);
     kfree(ptr);
     return new_ptr;
 }

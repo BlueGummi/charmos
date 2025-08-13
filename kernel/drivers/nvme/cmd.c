@@ -32,7 +32,7 @@ static inline void wake_waiter(struct nvme_request *req) {
 }
 
 static void nvme_dpc(void *rvoid, void *dvoid) {
-    (void) dvoid;
+    struct nvme_device *dev = dvoid;
     struct nvme_request *req = rvoid;
     wake_waiter(req);
 
@@ -41,6 +41,13 @@ static void nvme_dpc(void *rvoid, void *dvoid) {
         req->status = nvme_to_bio_status(req->status);
         if (req->on_complete)
             req->on_complete(req);
+    }
+
+    struct nvme_waiting_requests *waiters = &dev->waiting_requests;
+    if (waiters->head) {
+        struct nvme_request *next = waiters->head;
+        waiters->head = waiters->head->next;
+        nvme_send_nvme_req(dev->generic_disk, next);
     }
 }
 
@@ -68,13 +75,6 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
             queue->cq_phase ^= 1;
 
         mmio_write_32(queue->cq_db, queue->cq_head);
-    }
-
-    struct nvme_waiting_requests *waiters = &dev->waiting_requests;
-    if (waiters->head) {
-        struct nvme_request *next = waiters->head;
-        waiters->head = waiters->head->next;
-        nvme_send_nvme_req(dev->generic_disk, next);
     }
 }
 

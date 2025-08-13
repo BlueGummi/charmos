@@ -179,6 +179,7 @@ void hugepage_alloc_init(void) {
     INIT_LIST_HEAD(&hugepage_gc_list.hugepages_list);
 
     hugepage_full_tree = kzalloc(sizeof(struct hugepage_tree));
+    spinlock_init(&hugepage_full_tree->lock);
     if (!hugepage_full_tree)
         k_panic("Hugepage allocator could not be allocated\n");
 
@@ -196,7 +197,6 @@ void hugepage_alloc_init(void) {
                  !hugepage_full_tree->root_node || !hugepage_full_tree->htb))
         k_panic("Hugepage allocator could not be allocated\n");
 
-    spinlock_init(&hugepage_full_tree->lock);
     for (uint64_t i = 0; i < core_count; i++) {
         struct hugepage_core_list *hcl = &hugepage_full_tree->core_lists[i];
         init_hugepage_list(hcl, i);
