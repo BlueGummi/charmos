@@ -20,16 +20,6 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
 
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          override: true
-          components: rustfmt, clippy
-
-      - name: Install x86_64-unknown-none target
-        run: rustup target add x86_64-unknown-none
-
       - name: Dependencies
         run: sudo apt update -y && sudo apt install xorriso nasm qemu-system -y 
 
