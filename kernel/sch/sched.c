@@ -172,7 +172,7 @@ static void load_thread(struct scheduler *sched, struct thread *next,
     next->curr_core = get_this_core_id();
     next->run_start_time = time;
     thread_calculate_activity_data(next);
-    thread_classify_activity(next);
+    thread_classify_activity(next, time);
 
     /* Do not mark the idle thread as RUNNING because this causes
      * it to enter the runqueues, which is Very Bad™ (it gets enqueued,

@@ -88,8 +88,13 @@ classify_activity(struct thread_activity_metrics m) {
     return THREAD_ACTIVITY_CLASS_CPU_BOUND;
 }
 
-void thread_classify_activity(struct thread *t) {
+void thread_classify_activity(struct thread *t, uint64_t now_ms) {
+    /* Rate limit to prevent rapid bouncing */
+    if (now_ms - t->last_class_change_ms < THREAD_HYSTERESIS_MS)
+        return;
+
     t->activity_class = classify_activity(t->activity_metrics);
+    t->last_class_change_ms = now_ms;
 }
 
 static struct thread_activity_metrics calc_activity_metrics(struct thread *t) {
@@ -209,13 +214,9 @@ static inline void clamp_thread_delta(struct thread *t) {
           (int32_t) THREAD_DELTA_MAX);
 }
 
-void thread_apply_wake_boost(struct thread *t, uint64_t now_ms) {
+void thread_apply_wake_boost(struct thread *t) {
     /* Do nothing */
     if (t->priority_class == THREAD_PRIO_CLASS_RT)
-        return;
-
-    /* Rate limit to prevent rapid bouncing */
-    if (now_ms - t->last_class_change_ms < THREAD_HYSTERESIS_MS)
         return;
 
     uint32_t score_q16 = compute_activity_score_q16(&t->activity_metrics);
@@ -235,7 +236,6 @@ void thread_apply_wake_boost(struct thread *t, uint64_t now_ms) {
     t->dynamic_delta += delta_change;
     clamp_thread_delta(t);
 
-    t->last_class_change_ms = now_ms;
     thread_update_effective_priority(t);
 }
 

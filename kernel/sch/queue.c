@@ -67,7 +67,7 @@ void scheduler_wake(struct thread *t, enum thread_priority new_prio,
     t->time_in_level = 0;
 
     thread_wake(t, reason);
-    thread_apply_wake_boost(t, time_get_ms());
+    thread_apply_wake_boost(t);
     /* boost */
 
     int64_t c = t->curr_core;
