@@ -19,7 +19,7 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
     if (!already_locked)
         ints = spin_lock(&sched->lock);
 
-    enum thread_priority prio = task->base_prio;
+    enum thread_priority prio = task->perceived_priority;
 
     /* Put it on the tree since this is timesharing */
     if (prio_class_of(prio) == THREAD_PRIO_CLASS_TS) {
@@ -74,11 +74,13 @@ void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id) {
     do_wake_other_core(global.schedulers[core_id]);
 }
 
-void scheduler_wake(struct thread *t, enum thread_wake_reason reason) {
+void scheduler_wake(struct thread *t, enum thread_wake_reason reason,
+                    enum thread_priority prio) {
     thread_wake(t, reason);
     thread_apply_wake_boost(t);
-    /* boost */
+    t->perceived_priority = prio;
 
+    /* boost */
     int64_t c = t->curr_core;
     if (c == -1)
         k_panic("Tried to put_back a thread in the ready queues\n");

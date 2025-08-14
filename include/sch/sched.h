@@ -86,8 +86,10 @@ void scheduler_yield();
 void scheduler_enqueue(struct thread *t);
 void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id);
 void scheduler_force_resched(struct scheduler *sched);
-void scheduler_wake(struct thread *t, enum thread_wake_reason reason);
-void scheduler_take_out(struct thread *t);
+
+void scheduler_wake(struct thread *t, enum thread_wake_reason reason,
+                    enum thread_priority prio);
+
 void scheduler_period_start(struct scheduler *s, uint64_t now_ms);
 
 void switch_context(struct cpu_context *old, struct cpu_context *new);
@@ -160,7 +162,7 @@ scheduler_get_this_thread_queue(struct scheduler *sched,
 }
 
 static inline void scheduler_wake_from_io_block(struct thread *t) {
-    scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_IO);
+    scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_IO, THREAD_PRIO_URGENT);
 }
 
 #define TICKS_FOR_PRIO(level) (level == THREAD_PRIO_LOW ? 64 : 1ULL << level)

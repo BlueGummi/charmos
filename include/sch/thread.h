@@ -173,15 +173,9 @@ static inline enum thread_prio_class prio_class_of(enum thread_priority prio) {
 
 #define thread_from_rbt_node(node) rbt_entry(node, struct thread, tree_node)
 
-#define THREAD_PRIO_MAX_BOOST(prio)                                            \
-    (enum thread_priority)(prio_class_of(prio) == THREAD_PRIO_CLASS_BG         \
-                               ? THREAD_PRIO_BACKGROUND                        \
-                               : prio_class_of(prio))
-
 /* Background threads share timeslices */
 #define THREAD_PRIO_IS_TIMESHARING(prio)                                       \
-    (prio_class_of(prio) == THREAD_PRIO_CLASS_TS ||                            \
-     prio_class_of(prio) == THREAD_PRIO_CLASS_BG)
+    (prio_class_of(prio) == THREAD_PRIO_CLASS_TS)
 
 #define THREAD_ACTIVITY_BUCKET_COUNT 16
 #define THREAD_ACTIVITY_BUCKET_DURATION 1000 /* 1 second per bucket */
@@ -263,7 +257,7 @@ struct thread {
     _Atomic enum thread_state state;
 
     /* Priorities */
-    thread_prio_t priority_in_level;
+    thread_prio_t priority_score;
     thread_prio_t prio32_base;   /* Base computed at creation */
     int32_t dynamic_delta;       /* Signed delta applied to base */
     thread_prio_t cached_prio32; /* Last effective priority used */
@@ -279,7 +273,8 @@ struct thread {
 
     /* Used to derive/impact the priorty_in_level */
     enum thread_activity_class activity_class;
-    enum thread_priority base_prio; /* priority level at creation time */
+    enum thread_priority base_priority; /* priority level at creation time */
+    enum thread_priority perceived_priority;
 
     enum thread_flags flags;
 
@@ -428,7 +423,7 @@ static inline void thread_wake(struct thread *t, enum thread_wake_reason r) {
 
 #define FIXED_SHIFT 12
 static inline uint64_t thread_compute_weight(struct thread *t) {
-    thread_prio_t priority = t->priority_in_level;
+    thread_prio_t priority = t->priority_score;
 
     /* weight = 1 + (priority / 2^20) in fixed point */
     return (1 << FIXED_SHIFT) + ((uint64_t) priority >> (20 - FIXED_SHIFT));

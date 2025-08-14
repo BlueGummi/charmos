@@ -82,7 +82,7 @@ static inline void decay_thread_timeslice(struct scheduler *sched,
         return;
 
     /* We do not decay non-timesharing thread timeslices */
-    if (prio_class_of(thread->base_prio) != THREAD_PRIO_CLASS_TS)
+    if (!THREAD_PRIO_IS_TIMESHARING(thread->perceived_priority))
         return;
 
     if (thread->timeslices_remaining == 0)
@@ -108,11 +108,17 @@ static inline void update_thread_before_save(struct scheduler *sched,
 static inline void do_re_enqueue_thread(struct scheduler *sched,
                                         struct thread *thread) {
     /* Scheduler is locked - called from `schedule()` */
-    if (thread->timeslices_remaining == 0) {
-        sched->queue_bitmap |= (1 << thread->base_prio);
+    if (THREAD_PRIO_IS_TIMESHARING(thread->perceived_priority) &&
+        thread->timeslices_remaining == 0) {
+        sched->queue_bitmap |= (1 << thread->perceived_priority);
         retire_thread(sched, thread);
         scheduler_increment_thread_count(sched);
     } else {
+
+        /* Thread just finished an URGENT boost */
+        if (thread->perceived_priority == THREAD_PRIO_URGENT)
+            thread->perceived_priority = thread->base_priority;
+
         bool locked = true;
         scheduler_add_thread(sched, thread, locked);
     }
@@ -253,7 +259,7 @@ static void change_timeslice(struct scheduler *sched, struct thread *next) {
         return;
     }
 
-    if (THREAD_PRIO_IS_TIMESHARING(next->base_prio)) {
+    if (THREAD_PRIO_IS_TIMESHARING(next->perceived_priority)) {
         /* Timesharing threads need timeslices */
         change_timeslice_duration(next->timeslice_duration_ms);
     } else {

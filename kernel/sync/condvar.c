@@ -32,7 +32,7 @@ static inline void set_wake_reason_and_wake(struct thread *t,
                                     ? THREAD_WAKE_REASON_SLEEP_TIMEOUT
                                     : THREAD_WAKE_REASON_SLEEP_MANUAL;
 
-    scheduler_wake(t, r);
+    scheduler_wake(t, r, t->perceived_priority);
 }
 
 void condvar_signal(struct condvar *cv) {

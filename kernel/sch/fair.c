@@ -215,7 +215,7 @@ static inline void clamp_thread_delta(struct thread *t) {
 
 void thread_apply_wake_boost(struct thread *t) {
     /* Do nothing */
-    if (prio_class_of(t->base_prio) == THREAD_PRIO_CLASS_RT)
+    if (prio_class_of(t->perceived_priority) == THREAD_PRIO_CLASS_RT)
         return;
 
     uint32_t score_q16 = compute_activity_score_q16(&t->activity_metrics);
@@ -256,13 +256,13 @@ void thread_update_effective_priority(struct thread *t) {
 
     /* Clamp to bucket range */
     uint32_t min, max;
-    DERIVE_BASE_AND_CEIL(t->base_prio, min, max);
+    DERIVE_BASE_AND_CEIL(t->perceived_priority, min, max);
     CLAMP(eff, min, max);
 
     t->cached_prio32 = eff;
-    t->priority_in_level = eff;
+    t->priority_score = eff;
     t->tree_node.data = eff;
-    t->weight_fp = (uint64_t) (t->priority_in_level) << 16;
+    t->weight_fp = (uint64_t) (t->priority_score) << 16;
 }
 
 static uint64_t compute_period(struct scheduler *s) {

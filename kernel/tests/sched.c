@@ -101,7 +101,8 @@ fail:
 REGISTER_TEST(rt_thread_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct thread *thread = thread_create(rt_thread);
     rt = thread;
-    thread->base_prio = THREAD_PRIO_URGENT;
+    thread->base_priority = THREAD_PRIO_URGENT;
+    thread->perceived_priority = THREAD_PRIO_URGENT;
 
     scheduler_enqueue_on_core(thread, get_this_core_id());
     scheduler_yield();
@@ -113,19 +114,19 @@ REGISTER_TEST(rt_thread_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 static atomic_bool ts_thread_fail = false;
 static struct thread *ts = NULL;
 static void ts_thread(void) {
-    uint64_t spins = 10;
+    uint64_t spins = 100;
     struct thread *me = scheduler_get_curr_thread();
     if (me != ts) {
         goto fail;
     }
 
-    thread_prio_t start_prio = me->priority_in_level;
+    thread_prio_t start_prio = me->priority_score;
 
     for (uint64_t i = 0; i < spins; i++)
         wait_for_interrupt();
 
     /* Time in level never changed, and priority level never changed */
-    if (start_prio == me->priority_in_level)
+    if (start_prio == me->priority_score)
         goto fail;
 
     return;
