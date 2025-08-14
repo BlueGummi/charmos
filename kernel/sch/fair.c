@@ -215,7 +215,7 @@ static inline void clamp_thread_delta(struct thread *t) {
 
 void thread_apply_wake_boost(struct thread *t) {
     /* Do nothing */
-    if (prio_class_of(t->base_prio))
+    if (prio_class_of(t->base_prio) == THREAD_PRIO_CLASS_RT)
         return;
 
     uint32_t score_q16 = compute_activity_score_q16(&t->activity_metrics);

@@ -1,5 +1,6 @@
 #include <boot/stage.h>
 #include <fs/vfs.h>
+#include <misc/list.h>
 #include <stdatomic.h>
 #pragma once
 
@@ -17,6 +18,11 @@ struct charmos_globals {
 
     uint64_t hhdm_offset;
     struct generic_disk *root_node_disk;
+
+    /* Conditional compilation globals go down here */
+#ifdef PROFILING_ENABLED
+    struct list_head profiling_list_head;
+#endif
 };
 
 extern struct charmos_globals global;

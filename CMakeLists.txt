@@ -4,10 +4,39 @@ project(charmOS C ASM_NASM)
 set(CMAKE_C_STANDARD 11)
 set(ARCH "x86_64")
 set(IMAGE_NAME "charmos-${ARCH}")
-option(ENABLE_TESTS "Enable test-related code" ON)
+option(ENABLE_TESTS "Enable tests" ON)
 
-if(ENABLE_TESTS)
-    add_compile_definitions(TESTS=true)
+set(PROFILING_FLAGS
+    PROFILING_SCHED
+    PROFILING_VFS
+)
+
+option(PROFILING_ALL "Enable all profiling" OFF)
+
+foreach(flag ${PROFILING_FLAGS})
+    option(${flag} "Enable ${flag}" OFF)
+endforeach()
+
+if(PROFILING_ALL)
+    foreach(flag ${PROFILING_FLAGS})
+        set(${flag} ON CACHE BOOL "" FORCE)
+    endforeach()
+endif()
+
+set(PROFILING_ENABLED OFF)
+foreach(flag ${PROFILING_FLAGS})
+    if(${flag})
+        set(PROFILING_ENABLED ON)
+        add_compile_definitions(${flag})
+    endif()
+endforeach()
+
+if(PROFILING_ALL)
+    add_compile_definitions(PROFILING_ALL)
+endif()
+
+if(PROFILING_ENABLED)
+    add_compile_definitions(PROFILING_ENABLED)
 endif()
 
 set(KERNEL_COMMON_FLAGS "-O2 -pipe -Wall -Wextra -Wpointer-sign -Wenum-compare -ffreestanding -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -mno-red-zone -fno-stack-protector -fno-omit-frame-pointer -fno-stack-check -fno-PIC -ffunction-sections -fdata-sections  -m64 -mcmodel=kernel -mgeneral-regs-only -DLIMINE_API_REVISION=2 -Wno-address-of-packed-member -Wno-unused-command-line-argument -ggdb -DUACPI_SIZED_FREES=true") 

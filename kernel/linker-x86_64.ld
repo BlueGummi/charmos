@@ -58,6 +58,12 @@ SECTIONS {
         KEEP(*(.kernel_usb_drivers))
         __ekernel_usb_drivers = .;
     }
+    
+    .kernel_profiling_data : { 
+        __skernel_profiling_data = .;
+        KEEP(*(.kernel_profiling_data))
+        __ekernel_profiling_data = .;
+    }
 
     .bss : ALIGN(4K) {
         __sbss = .;

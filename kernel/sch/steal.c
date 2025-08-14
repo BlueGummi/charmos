@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <sync/spin_lock.h>
 
+#include "sched_profiling.h"
+
 /* self->stealing_work should already be set before this is called */
 /* TODO: Rate limit me so I don't do a full scan of all cores due to that being
  * expensive */
@@ -193,6 +195,9 @@ struct thread *scheduler_try_do_steal(struct scheduler *sched) {
 
     struct thread *stolen = scheduler_steal_work(victim);
     stop_steal(sched, victim);
+
+    if (stolen)
+        sched_profiling_record_steal();
 
     return stolen;
 }

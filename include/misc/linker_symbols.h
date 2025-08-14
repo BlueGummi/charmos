@@ -1,6 +1,8 @@
 #pragma once
 #include <stdint.h>
 
+/* TODO: Migrate these out probably */
+
 extern uint64_t __stext, __etext;
 extern uint64_t __srodata, __erodata;
 extern uint64_t __sdata, __edata;

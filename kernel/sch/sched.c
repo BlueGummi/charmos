@@ -276,7 +276,6 @@ static inline void context_switch(struct thread *curr, struct thread *next) {
 }
 
 void schedule(void) {
-    uint64_t tsc = rdtsc();
     struct scheduler *sched = get_this_core_sched();
     scheduler_lock(sched);
 
