@@ -112,7 +112,7 @@ static struct thread_activity_metrics calc_activity_metrics(struct thread *t) {
         if (brun < 0)
             brun = 0;
 
-        total_duration += THREAD_ACTIVITY_BUCKET_DURATION;
+        total_duration += rtb->run_time_ms;
         total_block += b->block_duration;
         total_sleep += b->sleep_duration;
         total_run += brun;
