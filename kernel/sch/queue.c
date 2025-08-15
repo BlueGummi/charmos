@@ -19,10 +19,10 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
     if (!already_locked)
         ints = spin_lock(&sched->lock);
 
-    enum thread_priority prio = task->perceived_priority;
+    enum thread_prio_class prio = task->perceived_priority;
 
     /* Put it on the tree since this is timesharing */
-    if (prio_class_of(prio) == THREAD_PRIO_CLASS_TS) {
+    if (prio_type_of(prio) == THREAD_PRIO_TYPE_TS) {
         /* This will be a new thread this period */
         task->completed_period = sched->current_period - 1;
         enqueue_to_tree(sched, task);
@@ -75,7 +75,7 @@ void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id) {
 }
 
 void scheduler_wake(struct thread *t, enum thread_wake_reason reason,
-                    enum thread_priority prio) {
+                    enum thread_prio_class prio) {
     thread_wake(t, reason);
     thread_apply_wake_boost(t);
     t->perceived_priority = prio;

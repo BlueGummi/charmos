@@ -19,7 +19,7 @@ static inline void swap_queues(struct scheduler *sched) {
 }
 
 static inline struct thread *find_highest_prio(struct scheduler *sched,
-                                               enum thread_priority prio) {
+                                               enum thread_prio_class prio) {
     struct rbt_node *node = rbt_max(&sched->thread_rbt);
     if (!node)
         return NULL;

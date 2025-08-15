@@ -101,8 +101,8 @@ fail:
 REGISTER_TEST(rt_thread_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct thread *thread = thread_create(rt_thread);
     rt = thread;
-    thread->base_priority = THREAD_PRIO_URGENT;
-    thread->perceived_priority = THREAD_PRIO_URGENT;
+    thread->base_priority = THREAD_PRIO_CLASS_URGENT;
+    thread->perceived_priority = THREAD_PRIO_CLASS_URGENT;
 
     scheduler_enqueue_on_core(thread, get_this_core_id());
     scheduler_yield();

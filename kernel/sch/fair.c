@@ -10,7 +10,7 @@
 #include <sync/spin_lock.h>
 #include <tests.h>
 
-static uint64_t prio_base_and_ceil_from_base(enum thread_priority base);
+static uint64_t prio_base_and_ceil_from_base(enum thread_prio_class base);
 
 #define THREAD_DELTA_UNIT 0x00010000u /* 2^16 small increment */
 #define Q16_ONE (1u << 16)
@@ -135,22 +135,24 @@ void thread_calculate_activity_data(struct thread *t) {
     t->activity_metrics = mtcs;
 }
 
-static uint64_t prio_base_and_ceil_from_base(enum thread_priority base) {
+// clang-format off
+static uint64_t prio_base_and_ceil_from_base(enum thread_prio_class base) {
     uint32_t min, max;
     switch (base) {
     /* These two thread prios do not have any prio_t */
-    case THREAD_PRIO_URGENT: return 0;
-    case THREAD_PRIO_RT: return 0;
+    case THREAD_PRIO_CLASS_URGENT: return 0;
+    case THREAD_PRIO_CLASS_RT: return 0;
 
-    case THREAD_PRIO_HIGH: LIM(THREAD_PRIO_HIGH_BASE, THREAD_PRIO_HIGH_CEIL);
-    case THREAD_PRIO_MID: LIM(THREAD_PRIO_MID_BASE, THREAD_PRIO_MID_CEIL);
-    case THREAD_PRIO_LOW:
+    case THREAD_PRIO_CLASS_HIGH: LIM(THREAD_PRIO_HIGH_BASE, THREAD_PRIO_HIGH_CEIL);
+    case THREAD_PRIO_CLASS_MID: LIM(THREAD_PRIO_MID_BASE, THREAD_PRIO_MID_CEIL);
+    case THREAD_PRIO_CLASS_LOW:
     default: LIM(THREAD_PRIO_LOW_BASE, THREAD_PRIO_LOW_CEIL);
     }
     return (uint64_t) max << 32ULL | min;
 }
+// clang-format on
 
-thread_prio_t thread_base_prio32_from_base(enum thread_priority base,
+thread_prio_t thread_base_prio32_from_base(enum thread_prio_class base,
                                            int nice) {
     uint32_t bucket_min, bucket_max;
     DERIVE_BASE_AND_CEIL(base, bucket_min, bucket_max);
@@ -215,7 +217,7 @@ static inline void clamp_thread_delta(struct thread *t) {
 
 void thread_apply_wake_boost(struct thread *t) {
     /* Do nothing */
-    if (prio_class_of(t->perceived_priority) == THREAD_PRIO_CLASS_RT)
+    if (prio_type_of(t->perceived_priority) == THREAD_PRIO_TYPE_RT)
         return;
 
     uint32_t score_q16 = compute_activity_score_q16(&t->activity_metrics);

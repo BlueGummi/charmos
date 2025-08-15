@@ -116,7 +116,7 @@ static inline void do_re_enqueue_thread(struct scheduler *sched,
     } else {
 
         /* Thread just finished an URGENT boost */
-        if (thread->perceived_priority == THREAD_PRIO_URGENT)
+        if (thread->perceived_priority == THREAD_PRIO_CLASS_URGENT)
             thread->perceived_priority = thread->base_priority;
 
         bool locked = true;
@@ -148,13 +148,13 @@ static inline void save_thread(struct scheduler *sched, struct thread *curr,
     }
 }
 
-static inline enum thread_priority
+static inline enum thread_prio_class
 available_prio_level_from_bitmap(uint8_t bitmap) {
     return __builtin_ctz(bitmap);
 }
 
 static struct thread *pick_from_special_queues(struct scheduler *sched,
-                                               enum thread_priority prio) {
+                                               enum thread_prio_class prio) {
     struct thread_queue *q = scheduler_get_this_thread_queue(sched, prio);
     struct thread *next = q->head;
 
@@ -179,7 +179,7 @@ static struct thread *pick_from_special_queues(struct scheduler *sched,
 
 static struct thread *pick_from_regular_queues(struct scheduler *sched,
                                                uint64_t now_ms,
-                                               enum thread_priority prio) {
+                                               enum thread_prio_class prio) {
     struct thread *next = find_highest_prio(sched, prio);
     if (next)
         return next;
@@ -204,10 +204,10 @@ static struct thread *pick_thread(struct scheduler *sched, uint64_t now_ms) {
 
     struct thread *next = NULL;
 
-    enum thread_priority prio = available_prio_level_from_bitmap(bitmap);
-    enum thread_prio_class pclass = prio_class_of(prio);
+    enum thread_prio_class prio = available_prio_level_from_bitmap(bitmap);
+    enum thread_prio_type ptype = prio_type_of(prio);
 
-    if (pclass != THREAD_PRIO_CLASS_TS) {
+    if (ptype != THREAD_PRIO_TYPE_TS) {
         next = pick_from_special_queues(sched, prio);
     } else {
         next = pick_from_regular_queues(sched, now_ms, prio);

@@ -88,7 +88,7 @@ void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id);
 void scheduler_force_resched(struct scheduler *sched);
 
 void scheduler_wake(struct thread *t, enum thread_wake_reason reason,
-                    enum thread_priority prio);
+                    enum thread_prio_class prio);
 
 void scheduler_period_start(struct scheduler *s, uint64_t now_ms);
 
@@ -149,20 +149,20 @@ static inline void scheduler_increment_thread_count(struct scheduler *sched) {
 
 static inline struct thread_queue *
 scheduler_get_this_thread_queue(struct scheduler *sched,
-                                enum thread_priority prio) {
+                                enum thread_prio_class prio) {
     switch (prio) {
-    case THREAD_PRIO_URGENT: return &sched->urgent_threads;
-    case THREAD_PRIO_RT: return &sched->rt_threads;
-    case THREAD_PRIO_HIGH: /* These priorities use the red */
-    case THREAD_PRIO_MID:  /* black tree for scheduling */
-    case THREAD_PRIO_LOW: return NULL;
-    case THREAD_PRIO_BACKGROUND: return &sched->bg_threads;
+    case THREAD_PRIO_CLASS_URGENT: return &sched->urgent_threads;
+    case THREAD_PRIO_CLASS_RT: return &sched->rt_threads;
+    case THREAD_PRIO_CLASS_HIGH: /* These priorities use the red */
+    case THREAD_PRIO_CLASS_MID:  /* black tree for scheduling */
+    case THREAD_PRIO_CLASS_LOW: return NULL;
+    case THREAD_PRIO_CLASS_BACKGROUND: return &sched->bg_threads;
     }
     k_panic("unreachable!\n");
 }
 
 static inline void scheduler_wake_from_io_block(struct thread *t) {
-    scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_IO, THREAD_PRIO_URGENT);
+    scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_IO, THREAD_PRIO_CLASS_URGENT);
 }
 
 #define TICKS_FOR_PRIO(level) (level == THREAD_PRIO_LOW ? 64 : 1ULL << level)
