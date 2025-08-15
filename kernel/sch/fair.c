@@ -331,7 +331,9 @@ static void scheduler_update_thread_weights(struct scheduler *s) {
     rbt_for_each(node, &s->thread_rbt) {
         struct thread *t = rbt_entry(node, struct thread, tree_node);
 
-        thread_update_effective_priority(t);
+        /* This will recalculate activity data
+         * and update the effective priority */
+        thread_apply_cpu_penalty(t);
     }
 }
 
