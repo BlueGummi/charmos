@@ -165,8 +165,8 @@ static void prefetch_callback(struct bio_request *bio) {
     struct bcache_pf_data *data = bio->user_data;
     insert(data->cache, bio->lba, data->new_entry, false);
 
-    defer_free(data);
-    defer_free(bio);
+    kfree(data);
+    kfree(bio);
 }
 
 static enum errno prefetch(struct generic_disk *disk, struct bcache *cache,
@@ -286,7 +286,7 @@ static void write_enqueue_cb(struct bio_request *req) {
     ent->request = NULL;
     bcache_ent_unpin(ent);
 
-    defer_free(req);
+    kfree(req);
 }
 
 static void write_queue(struct generic_disk *d, struct bcache_entry *ent,
