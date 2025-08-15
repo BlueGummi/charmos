@@ -12,37 +12,45 @@
 
 static uint64_t prio_base_and_ceil_from_base(enum thread_prio_class base);
 
-#define THREAD_DELTA_UNIT 0x00010000u /* 2^16 small increment */
+#define THREAD_DELTA_UNIT (1ULL << 17)
 #define Q16_ONE (1u << 16)
 
 #define THREAD_BOOST_WAKE_SMALL                                                \
-    (4 * THREAD_DELTA_UNIT) /* provisional boost for wake */
+    (4ULL * THREAD_DELTA_UNIT) /* provisional boost for wake */
 
 #define THREAD_BOOST_WAKE_LARGE                                                \
-    (12 * THREAD_DELTA_UNIT) /* stronger boost if very interactive */
+    (12ULL * THREAD_DELTA_UNIT) /* stronger boost if very interactive */
 
 #define THREAD_PENALTY_CPU_RUN                                                 \
-    (3 * THREAD_DELTA_UNIT) /* penalize heavy CPU usage per run period */
+    (3ULL * THREAD_DELTA_UNIT) /* penalize heavy CPU usage per run period */
+
+#define THREAD_DELTA_MAX_UNITS 0x200
+
+#define THREAD_DELTA_MAX_U64                                                   \
+    (THREAD_DELTA_UNIT * (uint64_t) THREAD_DELTA_MAX_UNITS)
 
 #define THREAD_DELTA_MAX                                                       \
-    (0x1000 * THREAD_DELTA_UNIT) /* clamp delta magnitude */
+    ((THREAD_DELTA_MAX_U64 > (uint64_t) INT32_MAX)                             \
+         ? INT32_MAX                                                           \
+         : (int32_t) THREAD_DELTA_MAX_U64)
 
 #define THREAD_REINSERT_THRESHOLD                                              \
-    (8 * THREAD_DELTA_UNIT) /* only reinsert if effective priority changes >=  \
-                               this */
-#define THREAD_HYSTERESIS_MS 250 /* don't change class more often than this */
-#define THREAD_PROV_BOOST_MS 50  /* provisional boost expiration */
+    (8ULL * THREAD_DELTA_UNIT) /* only reinsert if effective priority changes  \
+                               >= this */
+#define THREAD_HYSTERESIS_MS                                                   \
+    250ULL                         /* don't change class more often than this */
+#define THREAD_PROV_BOOST_MS 50ULL /* provisional boost expiration */
 
 /* How many delta units per Q16 score? */
-#define THREAD_MUL_INTERACTIVE 24 /* Big boost */
-#define THREAD_MUL_IO_BOUND 10    /* Small boost */
-#define THREAD_MUL_CPU_BOUND 0    /* No boost */
-#define THREAD_MUL_SLEEPY 0       /* No boost */
+#define THREAD_MUL_INTERACTIVE 5ULL /* Big boost */
+#define THREAD_MUL_IO_BOUND 3ULL    /* Small boost */
+#define THREAD_MUL_CPU_BOUND 1ULL   /* No boost */
+#define THREAD_MUL_SLEEPY 1ULL      /* No boost */
 
 /* Scheduling periods */
-#define MIN_PERIOD_MS 20  /* don’t go too short */
-#define MAX_PERIOD_MS 300 /* don’t go too long */
-#define BASE_PERIOD_MS 50 /* baseline for small loads */
+#define MIN_PERIOD_MS 20ULL  /* don’t go too short */
+#define MAX_PERIOD_MS 300ULL /* don’t go too long */
+#define BASE_PERIOD_MS 50ULL /* baseline for small loads */
 
 /* Timeslices */
 #define MIN_SLICE_MS 2  /* smallest slice granularity */
@@ -167,7 +175,7 @@ static uint32_t compute_activity_score_q16(struct thread_activity_metrics *m) {
     /* m->run_ratio, block_ratio, sleep_ratio are 0..100 */
     /* m->wake_freq = wakes/sec (0..inf, but we clamp) */
 
-    /* Normalize wake frequency to avoid 💥 numbers */
+    /* Normalize wake frequency */
     uint32_t wake_norm = m->wake_freq > 20 ? 100 : (m->wake_freq * 5);
 
     /* Prefer high wake_norm and small block_ratio */
@@ -211,32 +219,38 @@ static int get_class_multiplier(enum thread_activity_class class) {
 }
 
 static inline void clamp_thread_delta(struct thread *t) {
-    CLAMP(t->dynamic_delta, -(int32_t) THREAD_DELTA_MAX,
-          (int32_t) THREAD_DELTA_MAX);
+    const int32_t max = THREAD_DELTA_MAX;
+    if (t->dynamic_delta > max)
+        t->dynamic_delta = max;
+
+    if (t->dynamic_delta < -max)
+        t->dynamic_delta = -max;
 }
 
 void thread_apply_wake_boost(struct thread *t) {
-    /* Do nothing */
     if (prio_type_of(t->perceived_priority) == THREAD_PRIO_TYPE_RT)
         return;
 
-    uint32_t score_q16 = compute_activity_score_q16(&t->activity_metrics);
+    uint64_t score_q16 = compute_activity_score_q16(&t->activity_metrics);
+    uint64_t class_mul = get_class_multiplier(t->activity_class);
 
-    int class_mul = get_class_multiplier(t->activity_class);
+    uint64_t raw_units = score_q16 * class_mul;
 
-    /* Raw units */
-    uint32_t raw_units = (((uint64_t) score_q16 * (uint64_t) class_mul) >> 16);
+    int64_t delta_change64 = ((int64_t) raw_units * THREAD_DELTA_UNIT) >> 16;
 
-    /* Delta change to apply */
-    int32_t delta_change = (int32_t) raw_units * (int32_t) THREAD_DELTA_UNIT;
+    delta_change64 += jitter_for_thread();
 
-    /* Small jitter to prevent massive overlaps */
-    int32_t j = jitter_for_thread();
-    delta_change += j;
+    int64_t new_delta = (int64_t) t->dynamic_delta + delta_change64;
 
-    t->dynamic_delta += delta_change;
-    clamp_thread_delta(t);
+    if (new_delta > THREAD_DELTA_MAX)
+        new_delta = THREAD_DELTA_MAX;
+    else if (new_delta < -THREAD_DELTA_MAX)
+        new_delta = -THREAD_DELTA_MAX;
 
+    t->dynamic_delta = (int32_t) new_delta;
+    t->cached_prio32 = t->prio32_base + t->dynamic_delta;
+
+    // clamp effective priority to bucket range
     thread_update_effective_priority(t);
 }
 
