@@ -172,9 +172,13 @@ static inline enum thread_prio_type prio_type_of(enum thread_prio_class prio) {
 
 #define thread_from_rbt_node(node) rbt_entry(node, struct thread, tree_node)
 
-/* Background threads share timeslices */
 #define THREAD_PRIO_IS_TIMESHARING(prio)                                       \
     (prio_type_of(prio) == THREAD_PRIO_TYPE_TS)
+
+/* Background threads share timeslices */
+#define THREAD_PRIO_HAS_TIMESLICE(prio)                                        \
+    (prio_type_of(prio) == THREAD_PRIO_TYPE_TS ||                              \
+     prio_type_of(prio) == THREAD_PRIO_TYPE_BG)
 
 #define THREAD_ACTIVITY_BUCKET_COUNT 16
 #define THREAD_ACTIVITY_BUCKET_DURATION 1000 /* 1 second per bucket */

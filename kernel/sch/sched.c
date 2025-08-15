@@ -259,7 +259,7 @@ static void change_timeslice(struct scheduler *sched, struct thread *next) {
         return;
     }
 
-    if (THREAD_PRIO_IS_TIMESHARING(next->perceived_priority)) {
+    if (THREAD_PRIO_HAS_TIMESLICE(next->perceived_priority)) {
         /* Timesharing threads need timeslices */
         change_timeslice_duration(next->timeslice_duration_ms);
     } else {
