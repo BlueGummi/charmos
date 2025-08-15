@@ -10,7 +10,8 @@
 #include <sync/spin_lock.h>
 #include <tests.h>
 
-static uint64_t prio_base_and_ceil_from_base(enum thread_prio_class base);
+static void derive_timeshare_prio_range(enum thread_activity_class cls,
+                                        uint32_t *min, uint32_t *max);
 
 #define THREAD_DELTA_UNIT (1ULL << 17)
 #define Q16_ONE (1u << 16)
@@ -70,11 +71,6 @@ static uint64_t prio_base_and_ceil_from_base(enum thread_prio_class base);
         __var = __max;                                                         \
     if (__var < __min)                                                         \
         __var = __min;
-
-#define DERIVE_BASE_AND_CEIL(__prio, __min, __max)                             \
-    uint64_t __ceil_full = prio_base_and_ceil_from_base(__prio);               \
-    __min = __ceil_full & 0xFFFFFFFF;                                          \
-    __max = __ceil_full >> 32ULL;
 
 static enum thread_activity_class
 classify_activity(struct thread_activity_metrics m) {
@@ -143,32 +139,30 @@ void thread_calculate_activity_data(struct thread *t) {
     t->activity_metrics = mtcs;
 }
 
-// clang-format off
-static uint64_t prio_base_and_ceil_from_base(enum thread_prio_class base) {
-    uint32_t min, max;
-    switch (base) {
-    /* These two thread prios do not have any prio_t */
-    case THREAD_PRIO_CLASS_URGENT: return 0;
-    case THREAD_PRIO_CLASS_RT: return 0;
+static void derive_timeshare_prio_range(enum thread_activity_class cls,
+                                        uint32_t *min, uint32_t *max) {
+    switch (cls) {
+    case THREAD_ACTIVITY_CLASS_INTERACTIVE:
+        *min = THREAD_PRIO_TS_INTERACTIVE_MIN;
+        *max = THREAD_PRIO_TS_INTERACTIVE_MAX;
+        break;
 
-    case THREAD_PRIO_CLASS_HIGH: LIM(THREAD_PRIO_HIGH_BASE, THREAD_PRIO_HIGH_CEIL);
-    case THREAD_PRIO_CLASS_MID: LIM(THREAD_PRIO_MID_BASE, THREAD_PRIO_MID_CEIL);
-    case THREAD_PRIO_CLASS_LOW:
-    default: LIM(THREAD_PRIO_LOW_BASE, THREAD_PRIO_LOW_CEIL);
+    case THREAD_ACTIVITY_CLASS_IO_BOUND:
+        *min = THREAD_PRIO_TS_IO_BOUND_MIN;
+        *max = THREAD_PRIO_TS_IO_BOUND_MAX;
+        break;
+
+    case THREAD_ACTIVITY_CLASS_CPU_BOUND:
+        *min = THREAD_PRIO_TS_CPU_BOUND_MIN;
+        *max = THREAD_PRIO_TS_CPU_BOUND_MAX;
+        break;
+
+    case THREAD_ACTIVITY_CLASS_SLEEPY:
+    default:
+        *min = THREAD_PRIO_TS_SLEEPY_MIN;
+        *max = THREAD_PRIO_TS_SLEEPY_MAX;
+        break;
     }
-    return (uint64_t) max << 32ULL | min;
-}
-// clang-format on
-
-thread_prio_t thread_base_prio32_from_base(enum thread_prio_class base,
-                                           int nice) {
-    uint32_t bucket_min, bucket_max;
-    DERIVE_BASE_AND_CEIL(base, bucket_min, bucket_max);
-
-    int32_t nice_offset = (nice /* -20 .. +19 */ + 20);
-    uint64_t span = (uint64_t) bucket_max - bucket_min;
-    uint64_t pos = (span * (uint64_t) nice_offset) / 39ULL;
-    return (thread_prio_t) (bucket_min + pos);
 }
 
 static uint32_t compute_activity_score_q16(struct thread_activity_metrics *m) {
@@ -248,7 +242,6 @@ void thread_apply_wake_boost(struct thread *t) {
         new_delta = -THREAD_DELTA_MAX;
 
     t->dynamic_delta = (int32_t) new_delta;
-    t->cached_prio32 = t->prio32_base + t->dynamic_delta;
 
     // clamp effective priority to bucket range
     thread_update_effective_priority(t);
@@ -268,17 +261,16 @@ void thread_apply_cpu_penalty(struct thread *t) {
 }
 
 void thread_update_effective_priority(struct thread *t) {
-    thread_prio_t eff = t->prio32_base + t->dynamic_delta;
-
-    /* Clamp to bucket range */
     uint32_t min, max;
-    DERIVE_BASE_AND_CEIL(t->perceived_priority, min, max);
+    derive_timeshare_prio_range(t->activity_class, &min, &max);
+
+    int64_t eff = ((int64_t) min + (int64_t) max) / 2 + t->dynamic_delta;
+
     CLAMP(eff, min, max);
 
-    t->cached_prio32 = eff;
-    t->priority_score = eff;
-    t->tree_node.data = eff;
-    t->weight_fp = (uint64_t) (t->priority_score) << 16;
+    t->priority_score = (thread_prio_t) eff;
+    t->tree_node.data = t->priority_score;
+    t->weight_fp = (uint64_t) t->priority_score << 16;
 }
 
 static uint64_t compute_period(struct scheduler *s) {

@@ -46,8 +46,8 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
 
     new_thread->stack_size = stack_size;
     new_thread->regs.rsp = (uint64_t) stack_top;
-    new_thread->base_priority = THREAD_PRIO_CLASS_MID;
-    new_thread->perceived_priority = THREAD_PRIO_CLASS_MID;
+    new_thread->base_priority = THREAD_PRIO_CLASS_TIMESHARE;
+    new_thread->perceived_priority = THREAD_PRIO_CLASS_TIMESHARE;
     new_thread->state = THREAD_STATE_NEW;
     new_thread->regs.r12 = (uint64_t) entry_point;
     new_thread->regs.rip = (uint64_t) thread_entry_wrapper;
@@ -56,9 +56,6 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->id = globid++;
     new_thread->refcount = 1;
     new_thread->timeslices_remaining = 1;
-
-    new_thread->prio32_base =
-        thread_base_prio32_from_base(THREAD_PRIO_CLASS_MID, 0);
 
     new_thread->dynamic_delta = 0;
     new_thread->activity_class = THREAD_ACTIVITY_CLASS_UNKNOWN;

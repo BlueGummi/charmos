@@ -153,9 +153,7 @@ scheduler_get_this_thread_queue(struct scheduler *sched,
     switch (prio) {
     case THREAD_PRIO_CLASS_URGENT: return &sched->urgent_threads;
     case THREAD_PRIO_CLASS_RT: return &sched->rt_threads;
-    case THREAD_PRIO_CLASS_HIGH: /* These priorities use the red */
-    case THREAD_PRIO_CLASS_MID:  /* black tree for scheduling */
-    case THREAD_PRIO_CLASS_LOW: return NULL;
+    case THREAD_PRIO_CLASS_TIMESHARE: return NULL; /* Use the tree */
     case THREAD_PRIO_CLASS_BACKGROUND: return &sched->bg_threads;
     }
     k_panic("unreachable!\n");

@@ -23,18 +23,19 @@ typedef uint32_t thread_prio_t;
 #define THREAD_PRIO_MAX UINT32_MAX
 #define THREAD_PRIO_MIN UINT32_MIN
 
-/* This range is only used for boosts */
-#define THREAD_PRIO_HIGHEST_BASE 0xC0000000
-#define THREAD_PRIO_HIGHEST_CEIL 0xFFFFFFFF
+#define THREAD_PRIO_TS_INTERACTIVE_MIN 0xC0000000u
+#define THREAD_PRIO_TS_INTERACTIVE_MAX 0xDFFFFFFFu
 
-#define THREAD_PRIO_HIGH_BASE 0x80000000
-#define THREAD_PRIO_HIGH_CEIL 0xBFFFFFFF
+#define THREAD_PRIO_TS_IO_BOUND_MIN 0xA0000000u
+#define THREAD_PRIO_TS_IO_BOUND_MAX 0xBFFFFFFFu
 
-#define THREAD_PRIO_MID_BASE 0x40000000
-#define THREAD_PRIO_MID_CEIL 0x7FFFFFFF
+#define THREAD_PRIO_TS_CPU_BOUND_MIN 0x80000000u
+#define THREAD_PRIO_TS_CPU_BOUND_MAX 0x9FFFFFFFu
 
-#define THREAD_PRIO_LOW_BASE 0x0
-#define THREAD_PRIO_LOW_CEIL 0x3FFFFFFF
+#define THREAD_PRIO_TS_SLEEPY_MIN 0x60000000u
+#define THREAD_PRIO_TS_SLEEPY_MAX 0x7FFFFFFFu
+
+#define THREAD_PRIO_APPROX_MIDDLE 0x90000000u
 
 struct cpu_context {
     uint64_t rbx;
@@ -80,10 +81,8 @@ enum thread_flags : uint8_t {
 enum thread_prio_class : uint8_t {
     THREAD_PRIO_CLASS_URGENT = 0,     /* Urgent thread - ran before RT */
     THREAD_PRIO_CLASS_RT = 1,         /* Realtime thread */
-    THREAD_PRIO_CLASS_HIGH = 2,       /* High priority timesharing thread */
-    THREAD_PRIO_CLASS_MID = 3,        /* Medium priority timesharing thread */
-    THREAD_PRIO_CLASS_LOW = 4,        /* Low priority timesharing thread */
-    THREAD_PRIO_CLASS_BACKGROUND = 5, /* Background thread */
+    THREAD_PRIO_CLASS_TIMESHARE = 2,  /* Timesharing thread */
+    THREAD_PRIO_CLASS_BACKGROUND = 3, /* Background thread */
 };
 
 enum thread_prio_type : uint8_t {
@@ -162,9 +161,7 @@ static inline enum thread_prio_type prio_type_of(enum thread_prio_class prio) {
     switch (prio) {
     case THREAD_PRIO_CLASS_URGENT: /* fallthrough */
     case THREAD_PRIO_CLASS_RT: return THREAD_PRIO_TYPE_RT;
-    case THREAD_PRIO_CLASS_HIGH:
-    case THREAD_PRIO_CLASS_MID: /* fallthrough */
-    case THREAD_PRIO_CLASS_LOW: return THREAD_PRIO_TYPE_TS;
+    case THREAD_PRIO_CLASS_TIMESHARE: return THREAD_PRIO_TYPE_TS;
     case THREAD_PRIO_CLASS_BACKGROUND: return THREAD_PRIO_TYPE_BG;
     }
     return THREAD_PRIO_TYPE_TS;
@@ -261,9 +258,7 @@ struct thread {
 
     /* Priorities */
     thread_prio_t priority_score;
-    thread_prio_t prio32_base;   /* Base computed at creation */
-    int32_t dynamic_delta;       /* Signed delta applied to base */
-    thread_prio_t cached_prio32; /* Last effective priority used */
+    int32_t dynamic_delta; /* Signed delta applied to base */
     uint64_t weight_fp;
 
     /* Class changes */
@@ -342,8 +337,6 @@ void thread_exit(void);
 void thread_update_activity_stats(struct thread *t, uint64_t time);
 void thread_classify_activity(struct thread *t, uint64_t now_ms);
 void thread_update_runtime_buckets(struct thread *thread, uint64_t time);
-thread_prio_t thread_base_prio32_from_base(enum thread_prio_class base,
-                                           int nice);
 void thread_apply_wake_boost(struct thread *t);
 void thread_update_effective_priority(struct thread *t);
 void thread_apply_cpu_penalty(struct thread *t);
