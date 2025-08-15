@@ -80,8 +80,8 @@ void scheduler_rm_thread(struct scheduler *sched, struct thread *thread,
 void schedule(void);
 void k_sch_main(void);
 void scheduler_idle_main(void);
-void scheduler_enable_timeslice();
-void scheduler_disable_timeslice();
+void scheduler_preempt_enable();
+void scheduler_preempt_disable();
 void scheduler_yield();
 void scheduler_enqueue(struct thread *t);
 void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id);

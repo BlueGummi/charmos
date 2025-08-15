@@ -87,8 +87,6 @@ static void rt_thread(void) {
         /* This sleep function just
          * busy wait-polls the timer */
         sleep_ms(1);
-
-        /* This is changed if preemption occurred */
     }
 
     return;

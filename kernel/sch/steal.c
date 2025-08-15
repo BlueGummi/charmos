@@ -53,9 +53,11 @@ static struct thread *steal_from_ts_threads(struct scheduler *victim,
             continue;
 
         rb_delete(&victim->thread_rbt, node);
-        if (victim->thread_rbt.root == NULL)
+        if (victim->thread_rbt.root == NULL &&
+            victim->completed_rbt.root == NULL)
             victim->queue_bitmap &= ~(1 << level);
 
+        scheduler_decrement_thread_count(victim);
         return target;
     }
 
@@ -65,14 +67,17 @@ static struct thread *steal_from_ts_threads(struct scheduler *victim,
 static struct thread *steal_from_special_threads(struct scheduler *victim,
                                                  struct thread_queue *q,
                                                  int level) {
+    if (!q->head)
+        return NULL;
+
     struct thread *start = q->head;
     struct thread *current = start;
 
     do {
-        if (current->flags == THREAD_FLAGS_NO_STEAL)
+        if (current->flags & THREAD_FLAGS_NO_STEAL)
             goto check_next;
 
-        if (atomic_load(&current->state) != THREAD_STATE_READY)
+        if (thread_get_state(current) != THREAD_STATE_READY)
             goto check_next;
 
         if (current == q->head && current == q->tail) {
@@ -99,7 +104,6 @@ static struct thread *steal_from_special_threads(struct scheduler *victim,
         current->prev = NULL;
 
         scheduler_decrement_thread_count(victim);
-
         return current;
 
     check_next:
@@ -136,9 +140,6 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
         } else {
             struct thread_queue *q =
                 scheduler_get_this_thread_queue(victim, level);
-
-            if (!q->head)
-                continue;
 
             stolen = steal_from_special_threads(victim, q, level);
             if (stolen)

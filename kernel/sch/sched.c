@@ -26,8 +26,7 @@ struct scheduler_data scheduler_data = {
     .steal_min_diff = SCHEDULER_DEFAULT_WORK_STEAL_MIN_DIFF,
 };
 
-/* Timeslice stuff */
-static inline void disable_timeslice() {
+static inline void preempt_disable() {
     struct scheduler *self = get_this_core_sched();
     if (atomic_load(&self->timeslice_enabled)) {
         lapic_timer_disable();
@@ -35,7 +34,7 @@ static inline void disable_timeslice() {
     }
 }
 
-static inline void enable_timeslice() {
+static inline void preempt_enable() {
     struct scheduler *self = get_this_core_sched();
     if (!atomic_load(&self->timeslice_enabled)) {
         lapic_timer_enable();
@@ -53,19 +52,19 @@ static inline void change_timeslice_duration(uint64_t new_duration) {
 
     self->timeslice_duration = new_duration;
     lapic_timer_set_ms(new_duration);
-    enable_timeslice();
+    preempt_enable();
 }
 
 void scheduler_change_timeslice_duration(uint64_t new_duration) {
     change_timeslice_duration(new_duration);
 }
 
-void scheduler_enable_timeslice() {
-    enable_timeslice();
+void scheduler_preempt_enable() {
+    preempt_enable();
 }
 
-void scheduler_disable_timeslice() {
-    disable_timeslice();
+void scheduler_preempt_disable() {
+    preempt_disable();
 }
 
 static inline void update_core_current_thread(struct thread *next) {
@@ -107,6 +106,11 @@ static inline void update_thread_before_save(struct scheduler *sched,
 
 static inline void do_re_enqueue_thread(struct scheduler *sched,
                                         struct thread *thread) {
+
+    /* Thread just finished an URGENT boost */
+    if (thread->perceived_priority == THREAD_PRIO_CLASS_URGENT)
+        thread->perceived_priority = thread->base_priority;
+
     /* Scheduler is locked - called from `schedule()` */
     if (THREAD_PRIO_IS_TIMESHARING(thread->perceived_priority) &&
         thread->timeslices_remaining == 0) {
@@ -114,11 +118,6 @@ static inline void do_re_enqueue_thread(struct scheduler *sched,
         retire_thread(sched, thread);
         scheduler_increment_thread_count(sched);
     } else {
-
-        /* Thread just finished an URGENT boost */
-        if (thread->perceived_priority == THREAD_PRIO_CLASS_URGENT)
-            thread->perceived_priority = thread->base_priority;
-
         bool locked = true;
         scheduler_add_thread(sched, thread, locked);
     }
@@ -140,10 +139,10 @@ static inline void save_thread(struct scheduler *sched, struct thread *curr,
     update_min_steal_diff();
 
     /* Only save a running thread that exists */
-    if (curr && atomic_load(&curr->state) == THREAD_STATE_RUNNING) {
+    if (curr && thread_get_state(curr) == THREAD_STATE_RUNNING) {
         update_thread_before_save(sched, curr, time);
         do_re_enqueue_thread(sched, curr);
-    } else if (curr && atomic_load(&curr->state) == THREAD_STATE_IDLE_THREAD) {
+    } else if (curr && thread_get_state(curr) == THREAD_STATE_IDLE_THREAD) {
         update_idle_thread(time);
     }
 }
@@ -196,11 +195,9 @@ static struct thread *pick_from_regular_queues(struct scheduler *sched,
 
 static struct thread *pick_thread(struct scheduler *sched, uint64_t now_ms) {
     uint8_t bitmap = atomic_load(&sched->queue_bitmap);
-
     /* Nothing in queues */
-    if (!bitmap) {
+    if (!bitmap)
         return NULL;
-    }
 
     struct thread *next = NULL;
 
@@ -214,7 +211,6 @@ static struct thread *pick_thread(struct scheduler *sched, uint64_t now_ms) {
     }
 
     scheduler_decrement_thread_count(sched);
-
     return next;
 }
 
@@ -243,7 +239,7 @@ static inline struct thread *load_idle_thread(struct scheduler *sched) {
     /* Idle thread has no need to have a timeslice
      * No preemption will be occurring since nothing else runs */
     disable_period(sched);
-    disable_timeslice();
+    preempt_disable();
     return sched->idle_thread;
 }
 
@@ -255,7 +251,7 @@ static void change_timeslice(struct scheduler *sched, struct thread *next) {
          * tracking when we have
          * one thread running */
         disable_period(sched);
-        disable_timeslice();
+        preempt_disable();
         return;
     }
 
@@ -264,7 +260,7 @@ static void change_timeslice(struct scheduler *sched, struct thread *next) {
         change_timeslice_duration(next->timeslice_duration_ms);
     } else {
         /* RT threads do not share time*/
-        disable_timeslice();
+        preempt_disable();
     }
 }
 
