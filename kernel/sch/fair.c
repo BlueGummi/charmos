@@ -12,9 +12,9 @@
 
 static void derive_timeshare_prio_range(enum thread_activity_class cls,
                                         uint32_t *min, uint32_t *max);
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#define THREAD_DELTA_UNIT (1ULL << 17)
-#define Q16_ONE (1u << 16)
+#define THREAD_DELTA_UNIT (1ULL << 16)
 
 #define THREAD_BOOST_WAKE_SMALL                                                \
     (4ULL * THREAD_DELTA_UNIT) /* provisional boost for wake */
@@ -38,11 +38,10 @@ static void derive_timeshare_prio_range(enum thread_activity_class cls,
 #define THREAD_REINSERT_THRESHOLD                                              \
     (8ULL * THREAD_DELTA_UNIT) /* only reinsert if effective priority changes  \
                                >= this */
-#define THREAD_HYSTERESIS_MS                                                   \
-    250ULL                         /* don't change class more often than this */
+
+#define THREAD_HYSTERESIS_MS 250ULL
 #define THREAD_PROV_BOOST_MS 50ULL /* provisional boost expiration */
 
-/* How many delta units per Q16 score? */
 #define THREAD_MUL_INTERACTIVE 5ULL /* Big boost */
 #define THREAD_MUL_IO_BOUND 3ULL    /* Small boost */
 #define THREAD_MUL_CPU_BOUND 1ULL   /* No boost */
@@ -57,10 +56,10 @@ static void derive_timeshare_prio_range(enum thread_activity_class cls,
 #define MIN_SLICE_MS 2  /* smallest slice granularity */
 #define MAX_SLICE_MS 20 /* cap slice length to avoid hogs */
 
-#define LIM(__min, __max)                                                      \
-    min = __min;                                                               \
-    max = __max;                                                               \
-    break;
+#define WAKE_FREQ_MAX 20
+#define WAKE_FREQ_SCALE 5
+#define BIAS_SCALE_NUM 1
+#define BIAS_SCALE_DEN 8
 
 #define SET_MUL(__multiplier)                                                  \
     class_mul = __multiplier;                                                  \
@@ -165,32 +164,23 @@ static void derive_timeshare_prio_range(enum thread_activity_class cls,
     }
 }
 
-static uint32_t compute_activity_score_q16(struct thread_activity_metrics *m) {
-    /* m->run_ratio, block_ratio, sleep_ratio are 0..100 */
-    /* m->wake_freq = wakes/sec (0..inf, but we clamp) */
+static uint32_t compute_activity_score_pct(struct thread_activity_metrics *m) {
+    uint32_t wake_norm = m->wake_freq > WAKE_FREQ_MAX ? 100 : m->wake_freq * 5;
 
-    /* Normalize wake frequency */
-    uint32_t wake_norm = m->wake_freq > 20 ? 100 : (m->wake_freq * 5);
-
-    /* Prefer high wake_norm and small block_ratio */
-    /* interactive_pct = wake_norm * (100 - block_ratio) / 100 */
     uint32_t interactive_pct = (wake_norm * (100u - m->block_ratio)) / 100u;
 
-    /* CPU Bound reduces interactivity
-     * strong run_ratio -> reduce */
-    uint32_t cpu_factor = (100u - (uint32_t) m->run_ratio);
+    uint32_t cpu_factor = 100u - m->run_ratio;
 
-    /* score_pct = interactive_pct * (100 - run_ratio) / 100 */
     uint32_t score_pct = (interactive_pct * cpu_factor) / 100u;
 
-    /* Add a bit of bias to give small signals some weight */
-    uint32_t bias = score_pct / 8; /* 12.5% of score is bias */
+    uint32_t bias = score_pct / 8;
+
     uint32_t final_pct = score_pct + bias;
+
     if (final_pct > 100)
         final_pct = 100;
 
-    /* Turn it to Q16 */
-    return (final_pct * Q16_ONE) / 100u;
+    return final_pct;
 }
 
 static inline int32_t jitter_for_thread(void) {
@@ -225,26 +215,34 @@ void thread_apply_wake_boost(struct thread *t) {
     if (prio_type_of(t->perceived_priority) == THREAD_PRIO_TYPE_RT)
         return;
 
-    uint64_t score_q16 = compute_activity_score_q16(&t->activity_metrics);
-    uint64_t class_mul = get_class_multiplier(t->activity_class);
+    uint32_t score_pct = compute_activity_score_pct(&t->activity_metrics);
+    int32_t mul = get_class_multiplier(t->activity_class);
 
-    uint64_t raw_units = score_q16 * class_mul;
-
-    int64_t delta_change64 = ((int64_t) raw_units * THREAD_DELTA_UNIT) >> 16;
+    int64_t delta_change64 = score_pct * THREAD_DELTA_UNIT * mul / 100;
 
     delta_change64 += jitter_for_thread();
 
     int64_t new_delta = (int64_t) t->dynamic_delta + delta_change64;
-
-    if (new_delta > THREAD_DELTA_MAX)
-        new_delta = THREAD_DELTA_MAX;
-    else if (new_delta < -THREAD_DELTA_MAX)
-        new_delta = -THREAD_DELTA_MAX;
+    CLAMP(new_delta, -THREAD_DELTA_MAX, THREAD_DELTA_MAX);
 
     t->dynamic_delta = (int32_t) new_delta;
 
-    // clamp effective priority to bucket range
     thread_update_effective_priority(t);
+}
+
+static int32_t compute_cpu_penalty(struct thread *t, int32_t base_penalty) {
+    struct thread_activity_metrics *m = &t->activity_metrics;
+    uint32_t run_scale = m->run_ratio;
+    uint32_t wake_scale = m->wake_freq * 2;
+    if (wake_scale > 100)
+        wake_scale = 100;
+
+    int32_t penalty = base_penalty * run_scale / 100;
+    penalty -= base_penalty * wake_scale / 200;
+    if (penalty < 1)
+        penalty = 1;
+
+    return penalty;
 }
 
 void thread_apply_cpu_penalty(struct thread *t) {
@@ -253,11 +251,29 @@ void thread_apply_cpu_penalty(struct thread *t) {
     /* Apply the penalty */
     if (t->activity_class == THREAD_ACTIVITY_CLASS_CPU_BOUND) {
         /* Small penalty */
-        t->dynamic_delta -= THREAD_PENALTY_CPU_RUN;
+        int32_t penalty = compute_cpu_penalty(t, THREAD_PENALTY_CPU_RUN);
+        int64_t scaled_delta = penalty * t->weight / MAX(t->weight, 1ULL);
+        t->dynamic_delta -= scaled_delta;
         clamp_thread_delta(t);
     }
 
     thread_update_effective_priority(t);
+}
+
+static int64_t base_weight_of(struct thread *t) {
+    struct thread_activity_metrics *m = &t->activity_metrics;
+
+    int64_t w = 10240;
+
+    w += m->wake_freq * 100;
+    w += (100 - m->run_ratio) * 50;
+
+    w += t->dynamic_delta / 100000;
+
+    if (w < 1)
+        w = 1;
+
+    return w;
 }
 
 void thread_update_effective_priority(struct thread *t) {
@@ -265,19 +281,17 @@ void thread_update_effective_priority(struct thread *t) {
     derive_timeshare_prio_range(t->activity_class, &min, &max);
 
     int64_t eff = ((int64_t) min + (int64_t) max) / 2 + t->dynamic_delta;
-
     CLAMP(eff, min, max);
 
     t->priority_score = (thread_prio_t) eff;
     t->tree_node.data = t->priority_score;
-    t->weight_fp = (uint64_t) t->priority_score << 16;
+    t->weight = base_weight_of(t);
 }
 
 static uint64_t compute_period(struct scheduler *s) {
     uint64_t load = s->thread_count;
     uint64_t period = BASE_PERIOD_MS + (load * 2); /* Linear growth */
     CLAMP(period, MIN_PERIOD_MS, MAX_PERIOD_MS);
-
     return period;
 }
 
@@ -289,7 +303,7 @@ static void allocate_slices(struct scheduler *s, uint64_t now_ms) {
     struct rbt_node *node;
     rbt_for_each(node, &s->thread_rbt) {
         struct thread *t = thread_from_rbt_node(node);
-        total_weight += t->weight_fp;
+        total_weight += t->weight;
     }
 
     if (total_weight == 0)
@@ -300,7 +314,7 @@ static void allocate_slices(struct scheduler *s, uint64_t now_ms) {
     rbt_for_each(node, &s->thread_rbt) {
         struct thread *t = thread_from_rbt_node(node);
 
-        uint64_t budget_ms = (s->period_ms * t->weight_fp) / total_weight;
+        uint64_t budget_ms = (s->period_ms * t->weight) / total_weight;
         if (budget_ms < MIN_SLICE_MS)
             budget_ms = MIN_SLICE_MS;
 

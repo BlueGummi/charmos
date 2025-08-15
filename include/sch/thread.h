@@ -259,7 +259,7 @@ struct thread {
     /* Priorities */
     thread_prio_t priority_score;
     int32_t dynamic_delta; /* Signed delta applied to base */
-    uint64_t weight_fp;
+    uint64_t weight;
 
     /* Class changes */
     uint64_t last_class_change_ms;

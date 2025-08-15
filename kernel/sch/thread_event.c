@@ -22,9 +22,9 @@ void thread_log_event_reasons(struct thread *t) {
              t->activity_metrics.run_ratio, t->activity_metrics.wake_freq);
     k_printf("Thread activity class is %s\n",
              thread_activity_class_str(t->activity_class));
-    k_printf("Priority is %u, dynamic_delta is %d\nweight_fp is %u, "
+    k_printf("Priority is %u, dynamic_delta is %d\nweight is %u, "
              "last_class_change_ms is %u\n",
-             t->priority_score, t->dynamic_delta, t->weight_fp,
+             t->priority_score, t->dynamic_delta, t->weight,
              t->last_class_change_ms);
 }
 
