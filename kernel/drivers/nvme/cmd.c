@@ -37,6 +37,8 @@ static void nvme_dpc(void *rvoid, void *dvoid) {
     wake_waiter(req);
 
     if (--req->remaining_parts == 0) {
+        kfree(req->bio_data->prps);
+        kfree(req->bio_data);
         req->done = true;
         req->status = nvme_to_bio_status(req->status);
         if (req->on_complete)

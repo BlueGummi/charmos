@@ -77,6 +77,13 @@ struct nvme_regs {
     uint32_t reserved4[1018];
 } __attribute__((aligned));
 
+struct nvme_bio_data {
+    uint64_t *prps;
+    uint64_t prp_count;    // current number of PRPs
+    uint64_t prp_capacity; // allocated capacity
+    struct bio_request *coalescee;
+};
+
 struct nvme_request {
     uint32_t qid;
     uint64_t lba;
@@ -90,8 +97,10 @@ struct nvme_request {
     volatile int remaining_parts;
 
     void (*on_complete)(struct nvme_request *);
-    void *user_data;
+    struct nvme_bio_data *bio_data;
     struct thread *waiter;
+
+    void *user_data;
 
     struct nvme_request *next;
 };
@@ -255,15 +264,6 @@ struct nvme_identify_controller {
     uint8_t cqes; // Completion Queue Entry Size
     // TODO: there is more but me lazy and dont need it
 } __attribute__((packed));
-
-#define NVME_PRP_INITIAL_CAPACITY 16
-#define NVME_PRP_GROWTH_FACTOR 2
-struct nvme_bio_data {
-    uint64_t *prps;
-    uint64_t prp_count;    // current number of PRPs
-    uint64_t prp_capacity; // allocated capacity
-    struct bio_request *coalescee;
-};
 
 #define NVME_COMPLETION_PHASE(cpl) ((cpl)->status & 0x1)
 #define NVME_COMPLETION_STATUS(cpl) (((cpl)->status >> 1) & 0x7FFF)

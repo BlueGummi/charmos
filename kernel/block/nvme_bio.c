@@ -6,31 +6,6 @@
 #include <mem/vmm.h>
 #include <sch/defer.h>
 
-static void handle_coalesces(struct nvme_request *req,
-                             struct bio_request *bio) {
-    if (bio->driver_private2) {
-        struct bio_request *coalesced = bio->next_coalesced;
-        while (coalesced) {
-            coalesced->done = true;
-            coalesced->status = req->status;
-
-            if (coalesced->on_complete)
-                coalesced->on_complete(coalesced);
-
-            if (coalesced->driver_private2) {
-                struct nvme_bio_data *dd = coalesced->driver_private2;
-                kfree(dd->prps);
-                kfree(coalesced->driver_private2);
-            }
-
-            coalesced = coalesced->next_coalesced;
-        }
-
-        struct nvme_bio_data *dd = bio->driver_private2;
-        kfree(dd->prps);
-        kfree(bio->driver_private2);
-    }
-}
 
 static void nvme_on_bio_complete(struct nvme_request *req) {
     struct bio_request *bio = (struct bio_request *) req->user_data;
@@ -40,11 +15,6 @@ static void nvme_on_bio_complete(struct nvme_request *req) {
     /* the NVMe status is already converted to a
      * bio status before we get here */
     bio->status = req->status;
-
-    /* TODO: I have realized that coalescing is useless,
-     * this still needs to be here to clean up PRPs though,
-     * rename this */
-    handle_coalesces(req, bio);
 
     if (bio->on_complete)
         bio->on_complete(bio);

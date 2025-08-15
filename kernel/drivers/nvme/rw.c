@@ -69,7 +69,6 @@ static bool rw_send_command(struct generic_disk *disk, struct nvme_request *req,
     uint64_t count = req->sector_count;
     void *buffer = req->buffer;
 
-    struct bio_request *bio = req->user_data;
     struct nvme_queue *q = nvme->io_queues[qid];
 
     if (q->outstanding >= q->sq_depth) {
@@ -88,8 +87,7 @@ static bool rw_send_command(struct generic_disk *disk, struct nvme_request *req,
         return false;
     }
 
-    if (bio)
-        bio->driver_private2 = data;
+    req->bio_data = data;
 
     struct nvme_command cmd = {0};
     cmd.opc = opc;
