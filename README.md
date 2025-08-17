@@ -30,17 +30,17 @@ make run # run this in the build directory
 
 - [x] async blkdev io request scheduler
 
-- [x] mlfq smp work stealing scheduler
+- [ ] fix rcu
+
+- [ ] figure out how to represent processor topology (NUMA, SMT)
 
 - [ ] complete usb devices, xhci, ehci, uhci, ohci
-
-- [ ] timer api abstraction
 
 - [ ] clean up all drivers. less bitfields, more #defines
 
 - [x] async blkdev io operations
 
-- [ ] lots of acpi things to do stuff
+- [ ] lots of acpi things to do stuff - C states
 
 - [ ] devtmpfs 
 
