@@ -2,6 +2,7 @@
 #include <mem/alloc.h>
 #include <misc/list.h>
 #include <misc/rbt.h>
+#include <sch/apc.h>
 #include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -239,7 +240,6 @@ struct thread_activity_data {
     MAKE_THREAD_RINGBUFFER(sleep_reasons);
 };
 
-#define APC_TYPE_COUNT 2
 struct thread {
     /* Thread contexts */
     uint64_t id;
@@ -295,7 +295,7 @@ struct thread {
     struct spinlock lock;
     refcount_t refcount;
 
-    /* APC queues */
+    /* Standard APC queues */
     struct list_head apc_head[APC_TYPE_COUNT];
 
     /* any APC pending */
@@ -305,13 +305,21 @@ struct thread {
     int special_apc_disable;
     int kernel_apc_disable;
 
-    /* if thread is in an alertable wait, this is true */
-    bool alertable_wait;
+    /* These APCs execute when `recent_event` matches the APC_EVENT_type
+     * of an `on_event_apc`. For example, if a thread is migrated across
+     * cores, there might be an APC to record the migration, or change
+     * other internal structures to account for this event.
+     *
+     * It is suboptimal to hardcode such functions, and thus, a dynamic
+     * `on_event_apcs` is chosen to perform these tasks.
+     *
+     * There can only be one APC for each APC_EVENT_type, and thus,
+     * this simple array is chosen rather than a set of list_heads.
+     *
+     * Hooray, I love saving 24 bytes! Also everything in here
+     * MUST be allocated with `kmalloc`. Memory leaks are kinda bad */
+    struct apc *on_event_apcs[APC_EVENT_COUNT];
 };
-
-/* We do this because this exists in apc.h and there are
- * Fun, Great Header Conflicts that I don't want to deal with */
-#undef APC_TYPE_COUNT
 
 struct thread_queue {
     struct thread *head;

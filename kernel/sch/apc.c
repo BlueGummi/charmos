@@ -1,9 +1,14 @@
+#include <kassert.h>
 #include <mp/core.h>
 #include <sch/apc.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
 
 #define apc_from_list_node(n) container_of(n, struct apc, node)
+
+static inline bool thread_has_apcs(struct thread *t) {
+    return t->apc_pending_mask != 0;
+}
 
 static inline size_t apc_type_bit(enum apc_type t) {
     return (size_t) 1ULL << (size_t) t;
@@ -63,10 +68,9 @@ static void thread_apc_sanity_check(struct thread *t) {
         k_panic("Attempted to put an APC on a dying thread");
 }
 
-static inline void exec_apc(struct apc *a) {
+static void exec_apc(struct apc *a) {
     enum irql old = irql_raise(IRQL_APC_LEVEL);
     a->func(a, a->arg1, a->arg2);
-    a->enqueued = false;
     irql_lower(old);
 }
 
@@ -84,34 +88,17 @@ static void deliver_apc_type(struct thread *t, enum apc_type type) {
 
         apc = list_first_entry(&t->apc_head[type], struct apc, node);
         apc_list_del(apc);
+        apc->enqueued = false;
+
         thread_release(t, iflag);
 
-        apc->enqueued = false;
         if (!apc_is_cancelled(apc))
             exec_apc(apc);
     }
 }
 
-void thread_exec_apcs(struct thread *t) {
-    if (thread_can_exec_special_apcs(t))
-        deliver_apc_type(t, APC_TYPE_SPECIAL_KERNEL);
-
-    if (thread_can_exec_kernel_apcs(t))
-        deliver_apc_type(t, APC_TYPE_KERNEL);
-}
-
-void thread_check_and_deliver_apcs(struct thread *t) {
-    if (!thread_has_apcs(t))
-        return;
-
-    if (!safe_to_exec_apcs())
-        return;
-
-    thread_exec_apcs(t);
-}
-
-static inline void add_apc_to_thread(struct thread *t, struct apc *a,
-                                     enum apc_type type) {
+static void add_apc_to_thread(struct thread *t, struct apc *a,
+                              enum apc_type type) {
     a->owner = t;
     apc_unset_cancelled(a);
     apc_add_tail(t, a, type);
@@ -130,7 +117,7 @@ static inline bool thread_is_active(struct thread *t) {
 
 /* Poke the target core if there is no preemption on it
  * because we need the thread to reschedule to run its APC */
-static inline void maybe_force_reschedule(struct thread *t) {
+static void maybe_force_reschedule(struct thread *t) {
     struct scheduler *target = global.schedulers[t->curr_core];
     struct core *core = global.cores[t->curr_core];
     if (!target->timeslice_enabled && core->current_irql == IRQL_PASSIVE_LEVEL)
@@ -148,7 +135,7 @@ static void wake_if_waiting(struct thread *t) {
 
 void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
     /* avoid double-enqueue */
-    if (!t || !a || a->enqueued)
+    if (a->enqueued)
         return;
 
     thread_apc_sanity_check(t);
@@ -165,6 +152,26 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
         /* Not us, go wake up the other guy */
         wake_if_waiting(t);
     }
+}
+
+void apc_enqueue_event_apc(struct thread *t, struct apc *a,
+                           enum apc_event evt) {
+    kassert(evt != APC_EVENT_NONE);
+    kassert(!a->enqueued && !a->owner); /* Panic - this might be accidentally
+                                         * placed on multiple threads */
+
+    /* Only one of each type please */
+    kassert(t->on_event_apcs[evt] == NULL);
+
+    thread_apc_sanity_check(t);
+
+    bool iflag = thread_acquire(t);
+
+    t->on_event_apcs[evt] = a;
+    a->enqueued = true;
+    a->owner = t;
+
+    thread_release(t, iflag);
 }
 
 static inline void apc_unlink(struct apc *apc) {
@@ -221,6 +228,39 @@ void apc_enqueue_on_curr(struct apc *a, enum apc_type type) {
     apc_enqueue(scheduler_get_curr_thread(), a, type);
 }
 
+struct apc *apc_create(void) {
+    return kmalloc(sizeof(struct apc));
+}
+
+void apc_init(struct apc *a, apc_func_t fn, void *arg1, void *arg2) {
+    a->func = fn;
+    a->arg1 = arg1;
+    a->arg2 = arg2;
+    INIT_LIST_HEAD(&a->node);
+    a->cancelled = false;
+    a->owner = NULL;
+    a->enqueued = false;
+}
+
+void thread_free_event_apcs(struct thread *t) {
+    for (int i = 0; i < APC_EVENT_COUNT; i++) {
+        struct apc *this = t->on_event_apcs[i];
+        if (this)
+            kfree(this);
+    }
+}
+
+void thread_exec_event_apc(struct thread *t, enum apc_event event) {
+    if (event == APC_EVENT_NONE)
+        return;
+
+    struct apc *ea = t->on_event_apcs[event];
+    if (!ea) /* No APC for this event */
+        return;
+
+    exec_apc(ea);
+}
+
 void thread_disable_special_apcs(struct thread *t) {
     t->special_apc_disable++;
 }
@@ -239,12 +279,20 @@ void thread_enable_kernel_apcs(struct thread *t) {
         thread_check_and_deliver_apcs(t);
 }
 
-void apc_init(struct apc *a, apc_func_t fn, void *arg1, void *arg2) {
-    a->func = fn;
-    a->arg1 = arg1;
-    a->arg2 = arg2;
-    INIT_LIST_HEAD(&a->node);
-    a->cancelled = false;
-    a->owner = NULL;
-    a->enqueued = false;
+void thread_exec_apcs(struct thread *t) {
+    if (thread_can_exec_special_apcs(t))
+        deliver_apc_type(t, APC_TYPE_SPECIAL_KERNEL);
+
+    if (thread_can_exec_kernel_apcs(t))
+        deliver_apc_type(t, APC_TYPE_KERNEL);
+}
+
+void thread_check_and_deliver_apcs(struct thread *t) {
+    if (!thread_has_apcs(t))
+        return;
+
+    if (!safe_to_exec_apcs())
+        return;
+
+    thread_exec_apcs(t);
 }

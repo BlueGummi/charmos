@@ -37,11 +37,11 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     struct thread *new_thread =
         (struct thread *) kzalloc(sizeof(struct thread));
     void *stack = hugepage_alloc_pages(stack_size / PAGE_SIZE);
-    memset(stack, 0, stack_size);
 
     if (unlikely(!new_thread || !stack))
         return NULL;
 
+    memset(stack, 0, stack_size);
     uint64_t stack_top = (uint64_t) stack + stack_size;
 
     new_thread->stack_size = stack_size;
@@ -56,7 +56,6 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->id = globid++;
     new_thread->refcount = 1;
     new_thread->timeslices_remaining = 1;
-
     new_thread->dynamic_delta = 0;
     new_thread->activity_class = THREAD_ACTIVITY_CLASS_UNKNOWN;
     thread_update_effective_priority(new_thread);
@@ -84,6 +83,7 @@ void thread_free(struct thread *t) {
     hugepage_free_pages(t->stack, t->stack_size / PAGE_SIZE);
     kfree(t->activity_data);
     kfree(t->activity_stats);
+    thread_free_event_apcs(t);
     kfree(t);
 }
 
