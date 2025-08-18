@@ -12,3 +12,4 @@ typedef atomic_uint refcount_t;
 typedef uintptr_t paddr_t;
 typedef uintptr_t vaddr_t;
 typedef uint64_t core_t; /* CPU Core number */
+typedef uint64_t cpumask_t;
