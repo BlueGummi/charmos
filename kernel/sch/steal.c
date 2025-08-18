@@ -199,7 +199,7 @@ struct thread *scheduler_try_do_steal(struct scheduler *sched) {
 
     if (stolen) {
         sched_profiling_record_steal();
-        thread_exec_event_apc(stolen, APC_EVENT_THREAD_MIGRATE);
+        thread_set_recent_apc_event(stolen, APC_EVENT_THREAD_MIGRATE);
     }
 
     return stolen;

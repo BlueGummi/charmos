@@ -56,6 +56,7 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->id = globid++;
     new_thread->refcount = 1;
     new_thread->timeslices_remaining = 1;
+    new_thread->recent_event = APC_EVENT_NONE;
     new_thread->dynamic_delta = 0;
     new_thread->activity_class = THREAD_ACTIVITY_CLASS_UNKNOWN;
     thread_update_effective_priority(new_thread);

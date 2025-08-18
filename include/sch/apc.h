@@ -38,8 +38,9 @@ void apc_enqueue_event_apc(struct thread *t, struct apc *a, enum apc_event evt);
 void apc_enqueue_on_curr(struct apc *a, enum apc_type type);
 bool apc_cancel(struct apc *a);
 
+void thread_set_recent_apc_event(struct thread *t, enum apc_event event);
 void thread_exec_apcs(struct thread *t);
-void thread_exec_event_apc(struct thread *t, enum apc_event event);
+void thread_exec_event_apcs(struct thread *t);
 void thread_check_and_deliver_apcs(struct thread *t);
 
 void thread_enable_special_apcs(struct thread *t);

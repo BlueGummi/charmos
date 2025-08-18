@@ -305,6 +305,10 @@ struct thread {
     int special_apc_disable;
     int kernel_apc_disable;
 
+    /* The most recent APC event, set to APC_EVENT_NONE if no event
+     * on a thread has happened */
+    enum apc_event recent_event;
+
     /* These APCs execute when `recent_event` matches the APC_EVENT_type
      * of an `on_event_apc`. For example, if a thread is migrated across
      * cores, there might be an APC to record the migration, or change

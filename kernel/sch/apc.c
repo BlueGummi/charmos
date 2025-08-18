@@ -250,7 +250,13 @@ void thread_free_event_apcs(struct thread *t) {
     }
 }
 
-void thread_exec_event_apc(struct thread *t, enum apc_event event) {
+void thread_set_recent_apc_event(struct thread *t, enum apc_event event) {
+    t->recent_event = event;
+}
+
+void thread_exec_event_apcs(struct thread *t) {
+    enum apc_event event = t->recent_event;
+
     if (event == APC_EVENT_NONE)
         return;
 
@@ -259,6 +265,8 @@ void thread_exec_event_apc(struct thread *t, enum apc_event event) {
         return;
 
     exec_apc(ea);
+
+    t->recent_event = APC_EVENT_NONE;
 }
 
 void thread_disable_special_apcs(struct thread *t) {
@@ -285,6 +293,8 @@ void thread_exec_apcs(struct thread *t) {
 
     if (thread_can_exec_kernel_apcs(t))
         deliver_apc_type(t, APC_TYPE_KERNEL);
+
+    thread_exec_event_apcs(t);
 }
 
 void thread_check_and_deliver_apcs(struct thread *t) {
