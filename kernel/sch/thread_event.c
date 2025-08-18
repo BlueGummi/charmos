@@ -140,13 +140,19 @@ static void advance_to_next_bucket(struct thread_activity_stats *stats,
 
 static void update_bucket_data(struct thread_event_reason *wake,
                                struct thread_activity_bucket *bucket,
-                               uint64_t overlap) {
-    bucket->wake_count++;
+                               uint64_t overlap, bool count_event) {
+    if (count_event) {
+        bucket->wake_count++;
+        if (thread_wake_is_from_block(wake->reason)) {
+            bucket->block_count++;
+        } else if (thread_wake_is_from_sleep(wake->reason)) {
+            bucket->sleep_count++;
+        }
+    }
+
     if (thread_wake_is_from_block(wake->reason)) {
-        bucket->block_count++;
         bucket->block_duration += overlap;
     } else if (thread_wake_is_from_sleep(wake->reason)) {
-        bucket->sleep_count++;
         bucket->sleep_duration += overlap;
     }
 }
@@ -160,20 +166,20 @@ static inline uint64_t find_overlap(time_t effective_start,
 static void update_bucket(struct thread_activity_stats *stats,
                           struct thread_event_reason *wake, time_t start,
                           time_t end) {
-    /* What buckets does this fall into? */
     time_t bucket_start = start - (start % THREAD_ACTIVITY_BUCKET_DURATION);
+
     while (bucket_start < end) {
         time_t bucket_end = bucket_start + THREAD_ACTIVITY_BUCKET_DURATION;
         size_t bucket_index = get_bucket_index(bucket_start);
 
-        /* Find out overlap */
         time_t effective_start = start > bucket_start ? start : bucket_start;
         time_t effective_end = end < bucket_end ? end : bucket_end;
-
         uint64_t overlap = find_overlap(effective_start, effective_end);
 
         struct thread_activity_bucket *bucket = &stats->buckets[bucket_index];
-        update_bucket_data(wake, bucket, overlap);
+
+        bool first_bucket = bucket == &stats->buckets[stats->current_bucket];
+        update_bucket_data(wake, bucket, overlap, first_bucket);
 
         bucket_start += THREAD_ACTIVITY_BUCKET_DURATION;
     }

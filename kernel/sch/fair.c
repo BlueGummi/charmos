@@ -111,22 +111,23 @@ static struct thread_activity_metrics calc_activity_metrics(struct thread *t) {
         struct thread_activity_bucket *b = &t->activity_stats->buckets[i];
         struct thread_runtime_bucket *rtb = &t->activity_stats->rt_buckets[i];
 
-        int64_t brun = rtb->run_time_ms - b->block_duration - b->sleep_duration;
-        if (brun < 0)
-            brun = 0;
+        uint64_t run_time = rtb->run_time_ms;
+        uint64_t block_time = b->block_duration;
+        uint64_t sleep_time = b->sleep_duration;
 
-        total_duration += rtb->run_time_ms;
-        total_block += b->block_duration;
-        total_sleep += b->sleep_duration;
-        total_run += brun;
+        total_run += run_time;
+        total_block += block_time;
+        total_sleep += sleep_time;
         total_wake_count += b->wake_count;
     }
 
-    if (total_duration > 0) {
-        m.run_ratio = (total_run * 100) / total_duration;
-        m.block_ratio = (total_block * 100) / total_duration;
-        m.sleep_ratio = (total_sleep * 100) / total_duration;
-    }
+    total_duration = total_run + total_block + total_sleep;
+    if (total_duration == 0)
+        total_duration = 1;
+
+    m.run_ratio = (total_run * 100) / total_duration;
+    m.block_ratio = (total_block * 100) / total_duration;
+    m.sleep_ratio = (total_sleep * 100) / total_duration;
 
     m.wake_freq = total_wake_count / THREAD_ACTIVITY_BUCKET_COUNT;
 
