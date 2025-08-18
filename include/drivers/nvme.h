@@ -120,6 +120,8 @@ struct nvme_queue {
     uint32_t *cq_db;
 
     uint16_t outstanding;
+
+    struct spinlock lock;
 };
 
 struct nvme_waiting_requests {

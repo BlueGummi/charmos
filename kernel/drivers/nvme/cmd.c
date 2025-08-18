@@ -16,6 +16,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "internal.h"
+
 static enum bio_request_status nvme_to_bio_status(uint16_t status) {
     if (status == NVME_STATUS_CONFLICTING_ATTRIBUTES) {
         return BIO_STATUS_INVAL_ARG;
@@ -57,6 +59,8 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
     struct nvme_queue *queue = dev->io_queues[qid];
     queue->outstanding--;
 
+    bool iflag = nvme_queue_lock(queue);
+
     while (true) {
         struct nvme_completion *entry = &queue->cq[queue->cq_head];
 
@@ -78,6 +82,8 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
 
         mmio_write_32(queue->cq_db, queue->cq_head);
     }
+
+    nvme_queue_unlock(queue, iflag);
 }
 
 void nvme_isr_handler(void *ctx, uint8_t vector, void *rsp) {
@@ -91,6 +97,8 @@ void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
                         uint32_t qid, struct nvme_request *req) {
     struct nvme_queue *this_queue = nvme->io_queues[qid];
 
+    bool iflag = nvme_queue_lock(this_queue);
+
     uint16_t tail = this_queue->sq_tail;
     uint16_t next_tail = (tail + 1) % this_queue->sq_depth;
 
@@ -101,10 +109,12 @@ void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
     this_queue->sq[tail] = *cmd;
 
     nvme->io_requests[qid][tail] = req;
-    req->status = 0xFFFF; /* In flight */
+    req->status = BIO_STATUS_INFLIGHT; /* In flight */
 
     this_queue->sq_tail = next_tail;
     mmio_write_32(this_queue->sq_db, this_queue->sq_tail);
+
+    nvme_queue_unlock(this_queue, iflag);
 }
 
 uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,

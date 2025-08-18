@@ -10,12 +10,18 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "internal.h"
+
 typedef bool (*sync_fn)(struct generic_disk *, uint64_t, uint8_t *, uint16_t);
 typedef bool (*async_fn)(struct generic_disk *, struct nvme_request *);
 
 static void enqueue_request(struct nvme_device *dev, struct nvme_request *req) {
     struct nvme_waiting_requests *q = &dev->waiting_requests;
+    bool iflag = spin_lock(&q->lock);
+
     sll_add(q, req);
+
+    spin_unlock(&q->lock, iflag);
 }
 
 static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
@@ -106,6 +112,7 @@ static bool rw_send_command(struct generic_disk *disk, struct nvme_request *req,
     req->status = -1;
 
     nvme_submit_io_cmd(nvme, &cmd, qid, req);
+
     return true;
 }
 
@@ -121,6 +128,7 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
     req.waiter = curr;
     function(disk, &req);
 
+    /* Go run something else now */
     scheduler_yield();
 
     return !req.status;
@@ -140,6 +148,7 @@ static bool rw_wrapper(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
         cnt -= chunk;
     }
 
+    /* Reset priority after boost */
     scheduler_yield();
     return true;
 }
