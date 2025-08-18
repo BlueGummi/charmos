@@ -54,9 +54,21 @@ static bool thread_event_reason_is_valid(struct thread_activity_data *data,
     return assoc->cycle == reason->associated_reason.cycle;
 }
 
+static bool is_block(uint8_t reason) {
+    return reason == THREAD_BLOCK_REASON_IO ||
+           reason == THREAD_BLOCK_REASON_MANUAL ||
+           reason == THREAD_BLOCK_REASON_UNKNOWN;
+}
+
+static bool is_sleep(uint8_t reason) {
+    return reason == THREAD_SLEEP_REASON_MANUAL ||
+           reason == THREAD_SLEEP_REASON_UNKNOWN;
+}
+
 struct thread_event_reason *
 thread_add_event_reason(struct thread_event_reason *ring, size_t *head,
-                        uint8_t reason, uint64_t time) {
+                        uint8_t reason, uint64_t time,
+                        struct thread_activity_stats *stats) {
 
     size_t next_head = *head + 1;
 
@@ -70,6 +82,17 @@ thread_add_event_reason(struct thread_event_reason *ring, size_t *head,
     this_reason->timestamp = time;
 
     *head = next_head;
+
+    if (is_block(reason) || is_sleep(reason)) {
+        size_t bucket_idx = stats->current_bucket;
+        struct thread_activity_bucket *bucket = &stats->buckets[bucket_idx];
+
+        if (is_block(reason)) {
+            bucket->block_count++;
+        } else if (is_sleep(reason)) {
+            bucket->sleep_count++;
+        }
+    }
 
     return this_reason;
 }
@@ -89,8 +112,9 @@ static inline void link_wake_reason(struct thread_event_reason *target_reason,
 
 void thread_add_wake_reason(struct thread *t, uint8_t reason) {
     struct thread_activity_data *d = t->activity_data;
-    struct thread_event_reason *curr = thread_add_event_reason(
-        d->wake_reasons, &d->wake_reasons_head, reason, time_get_ms());
+    struct thread_event_reason *curr =
+        thread_add_event_reason(d->wake_reasons, &d->wake_reasons_head, reason,
+                                time_get_ms(), t->activity_stats);
 
     size_t this_past_head = d->wake_reasons_head - 1;
     struct thread_event_reason *past = NULL;
@@ -141,14 +165,8 @@ static void advance_to_next_bucket(struct thread_activity_stats *stats,
 static void update_bucket_data(struct thread_event_reason *wake,
                                struct thread_activity_bucket *bucket,
                                uint64_t overlap, bool count_event) {
-    if (count_event) {
+    if (count_event)
         bucket->wake_count++;
-        if (thread_wake_is_from_block(wake->reason)) {
-            bucket->block_count++;
-        } else if (thread_wake_is_from_sleep(wake->reason)) {
-            bucket->sleep_count++;
-        }
-    }
 
     if (thread_wake_is_from_block(wake->reason)) {
         bucket->block_duration += overlap;

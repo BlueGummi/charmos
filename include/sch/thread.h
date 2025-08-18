@@ -359,7 +359,8 @@ void thread_calculate_activity_data(struct thread *t);
 
 struct thread_event_reason *
 thread_add_event_reason(struct thread_event_reason *ring, size_t *head,
-                        uint8_t reason, uint64_t time);
+                        uint8_t reason, uint64_t time,
+                        struct thread_activity_stats *stats);
 
 static inline bool thread_get(struct thread *t) {
     return refcount_inc_not_zero(&t->refcount);
@@ -388,13 +389,13 @@ static inline void thread_release(struct thread *t, bool iflag) {
 static inline void thread_add_block_reason(struct thread *t, uint8_t reason) {
     struct thread_activity_data *d = t->activity_data;
     thread_add_event_reason(d->block_reasons, &d->block_reasons_head, reason,
-                            time_get_ms());
+                            time_get_ms(), t->activity_stats);
 }
 
 static inline void thread_add_sleep_reason(struct thread *t, uint8_t reason) {
     struct thread_activity_data *d = t->activity_data;
     thread_add_event_reason(d->sleep_reasons, &d->sleep_reasons_head, reason,
-                            time_get_ms());
+                            time_get_ms(), t->activity_stats);
 }
 
 static inline enum thread_state thread_get_state(struct thread *t) {
