@@ -1,3 +1,4 @@
+#include <acpi/acpi.h>
 #include <acpi/cst.h>
 #include <acpi/hpet.h>
 #include <acpi/ioapic.h>
@@ -42,55 +43,50 @@ void k_main(void) {
     global.core_count = mp_request.response->cpu_count;
     global.hhdm_offset = hhdm_request.response->offset;
 
-    // FB
+    /* Framebuffer */
     k_printf_init(framebuffer_request.response->framebuffers[0]);
     k_printf("%s", OS_LOGO_SMALL);
 
-    // Early init
+    /* Early */
     mp_wakeup_processors(mp_request.response);
     smap_init();
     global.current_bootstage = BOOTSTAGE_EARLY_MP;
 
-    // Mem
+    /* Allocators */
     pmm_init(memmap_request);
     vmm_init(memmap_request.response, xa_request.response);
     slab_init();
     pmm_dyn_init();
     hugepage_alloc_init();
-
     global.current_bootstage = BOOTSTAGE_EARLY_ALLOCATORS;
-    gdt_install();
 
+    gdt_install();
     syscall_setup(syscall_entry);
     mp_setup_bsp();
 
-    // IDT
+    /* Early devices */
     idt_init();
-
-    // Early device init
     uacpi_init(rsdp_request.response->address);
     lapic_init();
-
     hpet_init();
     ioapic_init();
     acpi_find_cst();
-
     global.current_bootstage = BOOTSTAGE_EARLY_DEVICES;
     k_info("MAIN", K_INFO, "Early boot OK - %llu cores", global.core_count);
 
-    // Scheduler
+    /* Scheduler */
     scheduler_init();
     defer_init();
-
-    /* TODO: Move this prng_seed call out of this place */
     prng_seed(time_get_us());
     global.current_bootstage = BOOTSTAGE_MID_SCHEDULER;
     k_info("MAIN", K_INFO, "Scheduler init OK");
 
-    // Filesystem init
+    /* Command line + MP complete */
     cmdline_parse(cmdline_request.response->cmdline);
     lapic_timer_init(0);
     mp_complete_init();
+    srat_init();
+    topology_init();
 
     restore_interrupts();
     scheduler_yield();

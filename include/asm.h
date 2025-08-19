@@ -154,6 +154,13 @@ static inline uint64_t rdtsc(void) {
     return ((uint64_t) hi << 32) | lo;
 }
 
+static inline void cpuid_count(uint32_t leaf, uint32_t subleaf, uint32_t *eax,
+                               uint32_t *ebx, uint32_t *ecx, uint32_t *edx) {
+    asm volatile("cpuid"
+                 : "=a"(*eax), "=b"(*ebx), "=c"(*ecx), "=d"(*edx)
+                 : "a"(leaf), "c"(subleaf));
+}
+
 static inline void cpuid(uint32_t eax, uint32_t ecx, uint32_t *abcd) {
     asm volatile("cpuid"
                  : "=a"(abcd[0]), "=b"(abcd[1]), "=c"(abcd[2]), "=d"(abcd[3])

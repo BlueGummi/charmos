@@ -24,6 +24,11 @@ struct core {
     uint32_t rcu_nesting;
     bool rcu_quiescent;
     enum irql current_irql;
+
+    uint64_t numa_node;
+    uint32_t package_id;
+    uint32_t smt_mask;
+    uint32_t smt_id;
 };
 
 static inline uint64_t get_this_core_id() {

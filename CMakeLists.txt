@@ -83,7 +83,15 @@ set(QEMU_COMMON_FLAGS
     -cdrom ${IMAGE_NAME}.iso
     -boot d
     -m 4G
-    -smp cores=4
+    -smp cores=8 
+    -object memory-backend-ram,size=1G,id=mem0 
+    -object memory-backend-ram,size=1G,id=mem1 
+    -object memory-backend-ram,size=1G,id=mem2 
+    -object memory-backend-ram,size=1G,id=mem3 
+    -numa node,cpus=0-1,nodeid=0,memdev=mem0 
+    -numa node,cpus=2-3,nodeid=1,memdev=mem1 
+    -numa node,cpus=4-5,nodeid=2,memdev=mem2 
+    -numa node,cpus=6-7,nodeid=3,memdev=mem3
 
     -s
     #-S
@@ -95,9 +103,11 @@ set(QEMU_COMMON_FLAGS
     -M q35
     -device usb-mouse,bus=xhci.0,id=usbmouse
 
-     -drive id=nvme0,file=disk.img,format=raw,if=none
-     -device nvme,serial=boom,drive=disk0,drive=nvme0#,num_queues=4
+    -drive id=nvme0,file=disk.img,format=raw,if=none
+    -device nvme,serial=boom,drive=disk0,drive=nvme0#,num_queues=4
     -device isa-debug-exit,iobase=0xf4,iosize=0x04
+    
+
 
     #-drive id=fatdisk,file=fat32.img,format=raw,if=none
     # -device nvme,serial=yay,drive=fatdisk
