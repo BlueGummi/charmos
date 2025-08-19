@@ -21,25 +21,24 @@ const char *find_symbol(uint64_t addr, uint64_t *out_sym_addr) {
 }
 
 void debug_print_stack() {
-    uint64_t *rsp;
-    uint64_t rbp;
-
+    uint64_t *rbp;
     asm volatile("mov %%rbp, %0" : "=r"(rbp));
-    asm volatile("mov %%rsp, %0" : "=r"(rsp));
 
-    for (uint64_t i = 0; i < rbp; i++) {
-        uint64_t addr = rsp[i];
-        if (addr < 0xffffffff80000000)
-            continue;
-
-        uint64_t sym_addr;
-        const char *sym = find_symbol(addr, &sym_addr);
-        if (sym) {
-            k_printf("    [%2d] 0x%016lx <%s+0x%lx>\n", i, addr, sym,
-                     addr - sym_addr);
-        } else {
-            k_printf("    [%2d] 0x%016lx <unknown>\n", i, addr);
+    int frame = 0;
+    while (rbp) {
+        uint64_t ret_addr = rbp[1];
+        if (ret_addr >= 0xffffffff80000000) {
+            uint64_t sym_addr;
+            const char *sym = find_symbol(ret_addr, &sym_addr);
+            if (sym) {
+                k_printf("    [%d] 0x%016lx <%s+0x%lx>\n", frame, ret_addr, sym,
+                         ret_addr - sym_addr);
+            } else {
+                k_printf("    [%d] 0x%016lx <unknown>\n", frame, ret_addr);
+            }
         }
+        rbp = (uint64_t *) rbp[0];
+        frame++;
     }
 }
 
