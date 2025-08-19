@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <sync/spin_lock.h>
 
+#include "internal.h"
 #include "sched_profiling.h"
 
 /* self->stealing_work should already be set before this is called */
@@ -44,6 +45,11 @@ struct scheduler *scheduler_pick_victim(struct scheduler *self) {
     return victim;
 }
 
+static inline bool
+scheduler_has_no_timesharing_threads(struct scheduler *sched) {
+    return sched->thread_rbt.root == NULL && sched->completed_rbt.root == NULL;
+}
+
 static struct thread *steal_from_ts_threads(struct scheduler *victim,
                                             int level) {
     struct rbt_node *node;
@@ -53,9 +59,9 @@ static struct thread *steal_from_ts_threads(struct scheduler *victim,
             continue;
 
         rb_delete(&victim->thread_rbt, node);
-        if (victim->thread_rbt.root == NULL &&
-            victim->completed_rbt.root == NULL)
-            victim->queue_bitmap &= ~(1 << level);
+
+        if (scheduler_has_no_timesharing_threads(victim))
+            scheduler_clear_queue_bitmap(victim, level);
 
         scheduler_decrement_thread_count(victim);
         return target;
@@ -96,9 +102,8 @@ static struct thread *steal_from_special_threads(struct scheduler *victim,
             current->next->prev = current->prev;
         }
 
-        // clear bitmap
         if (q->head == NULL)
-            victim->queue_bitmap &= ~(1 << level);
+            scheduler_clear_queue_bitmap(victim, level);
 
         current->next = NULL;
         current->prev = NULL;

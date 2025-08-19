@@ -50,3 +50,17 @@ static inline void disable_period(struct scheduler *sched) {
     sched->period_ms = 0;
     sched->period_start_ms = 0;
 }
+
+static inline void scheduler_set_queue_bitmap(struct scheduler *sched,
+                                              uint8_t prio) {
+    atomic_fetch_or(&sched->queue_bitmap, 1 << prio);
+}
+
+static inline void scheduler_clear_queue_bitmap(struct scheduler *sched,
+                                                uint8_t prio) {
+    atomic_fetch_and(&sched->queue_bitmap, ~(1 << prio));
+}
+
+static inline uint8_t scheduler_get_bitmap(struct scheduler *sched) {
+    return atomic_load(&sched->queue_bitmap);
+}

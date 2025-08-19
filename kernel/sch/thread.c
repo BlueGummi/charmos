@@ -11,7 +11,8 @@
 #include <stddef.h>
 #include <string.h>
 
-uint64_t globid = 1;
+/* lol */
+static uint64_t globid = 1;
 
 void thread_exit() {
     disable_interrupts();
@@ -57,7 +58,6 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->refcount = 1;
     new_thread->timeslices_remaining = 1;
     new_thread->recent_event = APC_EVENT_NONE;
-    new_thread->dynamic_delta = 0;
     new_thread->activity_class = THREAD_ACTIVITY_CLASS_UNKNOWN;
     thread_update_effective_priority(new_thread);
     new_thread->activity_data = kzalloc(sizeof(struct thread_activity_data));

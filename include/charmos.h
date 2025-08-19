@@ -5,19 +5,24 @@
 #pragma once
 
 struct charmos_globals {
+    volatile bool panic_in_progress;
+    volatile enum bootstage current_bootstage;
+
     char *root_partition;
+
+    /* TODO: no more list */
     struct vfs_mount *mount_list_head;
     struct vfs_node *root_node;
-    volatile enum bootstage current_bootstage;
+    struct generic_disk *root_node_disk;
+
+    struct topology *cpu_topology;
     uint64_t core_count;
     struct scheduler **schedulers;
     struct core **cores;
-    atomic_uint_fast64_t next_tlb_gen;
-
-    volatile bool panic_in_progress;
-
     uint64_t hhdm_offset;
-    struct generic_disk *root_node_disk;
+
+    /* TODO: no more of this */
+    atomic_uint_fast64_t next_tlb_gen;
 
     /* Conditional compilation globals go down here */
 #ifdef PROFILING_ENABLED

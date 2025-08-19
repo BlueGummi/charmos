@@ -98,7 +98,7 @@ static inline void decay_thread_timeslice(struct scheduler *sched,
 static inline void update_thread_before_save(struct scheduler *sched,
                                              struct thread *thread,
                                              uint64_t time) {
-    atomic_store(&thread->state, THREAD_STATE_READY);
+    thread_set_state(thread, THREAD_STATE_READY);
     thread->curr_core = -1;
     thread_update_runtime_buckets(thread, time);
     decay_thread_timeslice(sched, thread);
@@ -114,7 +114,7 @@ static inline void do_re_enqueue_thread(struct scheduler *sched,
     /* Scheduler is locked - called from `schedule()` */
     if (THREAD_PRIO_IS_TIMESHARING(thread->perceived_priority) &&
         thread->timeslices_remaining == 0) {
-        sched->queue_bitmap |= (1 << thread->perceived_priority);
+        scheduler_set_queue_bitmap(sched, thread->perceived_priority);
         retire_thread(sched, thread);
         scheduler_increment_thread_count(sched);
     } else {
@@ -169,7 +169,7 @@ static struct thread *pick_from_special_queues(struct scheduler *sched,
 
     /* No more threads at this queue level */
     if (q->head == NULL)
-        atomic_fetch_and(&sched->queue_bitmap, ~(1 << prio));
+        scheduler_clear_queue_bitmap(sched, prio);
 
     next->next = NULL;
     next->prev = NULL;
@@ -194,7 +194,7 @@ static struct thread *pick_from_regular_queues(struct scheduler *sched,
 }
 
 static struct thread *pick_thread(struct scheduler *sched, uint64_t now_ms) {
-    uint8_t bitmap = atomic_load(&sched->queue_bitmap);
+    uint8_t bitmap = scheduler_get_bitmap(sched);
     /* Nothing in queues */
     if (!bitmap)
         return NULL;
@@ -229,8 +229,8 @@ static void load_thread(struct scheduler *sched, struct thread *next,
      * it to enter the runqueues, which is Very Bad™ (it gets enqueued,
      * and becomes treated like a regular thread)! */
 
-    if (atomic_load(&next->state) != THREAD_STATE_IDLE_THREAD)
-        atomic_store(&next->state, THREAD_STATE_RUNNING);
+    if (thread_get_state(next) != THREAD_STATE_IDLE_THREAD)
+        thread_set_state(next, THREAD_STATE_RUNNING);
 
     update_core_current_thread(next);
 }

@@ -407,6 +407,10 @@ static inline enum thread_state thread_get_state(struct thread *t) {
     return atomic_load(&t->state);
 }
 
+static inline void thread_set_state(struct thread *t, enum thread_state state) {
+    atomic_store(&t->state, state);
+}
+
 static inline void set_state_internal(struct thread *t,
                                       enum thread_state state) {
     atomic_store(&t->state, state);
