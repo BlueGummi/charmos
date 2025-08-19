@@ -178,9 +178,11 @@ static inline enum thread_prio_type prio_type_of(enum thread_prio_class prio) {
     (prio_type_of(prio) == THREAD_PRIO_TYPE_TS ||                              \
      prio_type_of(prio) == THREAD_PRIO_TYPE_BG)
 
-#define THREAD_ACTIVITY_BUCKET_COUNT 16
+#define THREAD_ACTIVITY_BUCKET_COUNT 8
 #define THREAD_ACTIVITY_BUCKET_DURATION 1000 /* 1 second per bucket */
-#define THREAD_EVENT_RINGBUFFER_CAPACITY 16
+#define THREAD_EVENT_RINGBUFFER_CAPACITY THREAD_ACTIVITY_BUCKET_COUNT
+#define TOTAL_BUCKET_DURATION                                                  \
+    (THREAD_ACTIVITY_BUCKET_COUNT * THREAD_ACTIVITY_BUCKET_DURATION)
 
 enum thread_activity_class {
     THREAD_ACTIVITY_CLASS_CPU_BOUND,
@@ -214,6 +216,8 @@ struct thread_runtime_bucket {
 };
 
 struct thread_activity_bucket {
+    uint64_t cycle;
+
     uint32_t block_count;
     uint32_t sleep_count;
     uint32_t wake_count;
@@ -227,6 +231,7 @@ struct thread_activity_stats {
     struct thread_activity_bucket buckets[THREAD_ACTIVITY_BUCKET_COUNT];
     time_t last_update_ms;
     size_t last_wake_index;
+    uint64_t current_cycle;
     size_t current_bucket; /* idx of bucket representing 'now' */
 };
 

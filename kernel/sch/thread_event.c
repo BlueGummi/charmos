@@ -1,5 +1,6 @@
 #include <sch/sched.h>
 #include <sch/thread.h>
+#include <string.h>
 
 void thread_log_event_reasons(struct thread *t) {
     k_printf("Thread %llu event reason logs:\n", t->id);
@@ -65,36 +66,105 @@ static bool is_sleep(uint8_t reason) {
            reason == THREAD_SLEEP_REASON_UNKNOWN;
 }
 
+static size_t get_bucket_index(time_t timestamp_ms) {
+    return (timestamp_ms / THREAD_ACTIVITY_BUCKET_DURATION) %
+           THREAD_ACTIVITY_BUCKET_COUNT;
+}
+
+static void clear_bucket(struct thread_activity_bucket *b) {
+    b->block_count = 0;
+    b->sleep_count = 0;
+    b->wake_count = 0;
+    b->block_duration = 0;
+    b->sleep_duration = 0;
+}
+
+static void clear_bucket_set_cycle(struct thread_activity_bucket *b,
+                                   uint64_t cycle) {
+    clear_bucket(b);
+    b->cycle = cycle;
+}
+
+static void advance_to_next_bucket(struct thread_activity_stats *stats,
+                                   size_t steps, time_t now) {
+    for (size_t i = 1; i <= steps && i <= THREAD_ACTIVITY_BUCKET_COUNT; ++i) {
+        size_t next_bucket = stats->current_bucket + i;
+        size_t index = next_bucket % THREAD_ACTIVITY_BUCKET_COUNT;
+
+        struct thread_activity_bucket *b = &stats->buckets[index];
+
+        if (b->cycle != stats->current_cycle)
+            clear_bucket_set_cycle(b, stats->current_cycle);
+    }
+
+    size_t new_bucket = stats->current_bucket + steps;
+    stats->current_bucket = new_bucket % THREAD_ACTIVITY_BUCKET_COUNT;
+
+    if (new_bucket > stats->current_bucket)
+        stats->current_cycle++;
+
+    stats->last_update_ms = now - (now % THREAD_ACTIVITY_BUCKET_DURATION);
+}
+
+static void advance_buckets_to_time(struct thread_activity_stats *stats,
+                                    time_t ts) {
+    if (ts <= stats->last_update_ms)
+        return;
+
+    time_t elapsed = ts - stats->last_update_ms;
+
+    if (elapsed >= TOTAL_BUCKET_DURATION) {
+        /* Jumped past everything, reset it */
+        stats->current_cycle++;
+        stats->current_bucket = get_bucket_index(ts);
+
+        for (size_t i = 0; i < THREAD_ACTIVITY_BUCKET_COUNT; i++)
+            clear_bucket_set_cycle(&stats->buckets[i], stats->current_cycle);
+
+        stats->last_update_ms = ts - (ts % THREAD_ACTIVITY_BUCKET_DURATION);
+        return;
+    }
+
+    size_t steps = elapsed / THREAD_ACTIVITY_BUCKET_DURATION;
+    if (steps)
+        advance_to_next_bucket(stats, steps, ts);
+}
+
+static void clear_event_slot(struct thread_event_reason *slot) {
+    slot->associated_reason.reason = THREAD_ASSOCIATED_REASON_NONE;
+    slot->associated_reason.cycle = 0;
+    slot->reason = 0;
+    slot->timestamp = 0;
+}
+
 struct thread_event_reason *
 thread_add_event_reason(struct thread_event_reason *ring, size_t *head,
                         uint8_t reason, uint64_t time,
                         struct thread_activity_stats *stats) {
 
-    size_t next_head = *head + 1;
-
-    struct thread_event_reason *this_reason =
+    struct thread_event_reason *slot =
         &ring[*head % THREAD_EVENT_RINGBUFFER_CAPACITY];
 
-    if (this_reason->timestamp != 0)
-        this_reason->cycle++;
+    if (slot->timestamp != 0)
+        slot->cycle++;
 
-    this_reason->reason = reason;
-    this_reason->timestamp = time;
+    clear_event_slot(slot);
 
-    *head = next_head;
+    slot->reason = reason;
+    slot->timestamp = time;
+    *head = *head + 1;
 
     if (is_block(reason) || is_sleep(reason)) {
-        size_t bucket_idx = stats->current_bucket;
-        struct thread_activity_bucket *bucket = &stats->buckets[bucket_idx];
-
-        if (is_block(reason)) {
-            bucket->block_count++;
-        } else if (is_sleep(reason)) {
-            bucket->sleep_count++;
-        }
+        advance_buckets_to_time(stats, time);
+        size_t i = get_bucket_index(time);
+        struct thread_activity_bucket *b = &stats->buckets[i];
+        if (is_block(reason))
+            b->block_count++;
+        else
+            b->sleep_count++;
     }
 
-    return this_reason;
+    return slot;
 }
 
 static inline void link_wake_reason(struct thread_event_reason *target_reason,
@@ -110,63 +180,11 @@ static inline void link_wake_reason(struct thread_event_reason *target_reason,
     asso->cycle = target_reason->cycle;
 }
 
-void thread_add_wake_reason(struct thread *t, uint8_t reason) {
-    struct thread_activity_data *d = t->activity_data;
-    struct thread_event_reason *curr =
-        thread_add_event_reason(d->wake_reasons, &d->wake_reasons_head, reason,
-                                time_get_ms(), t->activity_stats);
-
-    size_t this_past_head = d->wake_reasons_head - 1;
-    struct thread_event_reason *past = NULL;
-    size_t past_head = 0;
-
-    if (thread_wake_is_from_block(reason)) {
-        past_head = d->block_reasons_head - 1;
-        past = most_recent(d->block_reasons, d->block_reasons_head);
-    } else if (thread_wake_is_from_sleep(reason)) {
-        past_head = d->sleep_reasons_head - 1;
-        past = most_recent(d->sleep_reasons, d->sleep_reasons_head);
-    } else {
-        curr->associated_reason.reason = THREAD_ASSOCIATED_REASON_NONE;
-    }
-
-    if (past)
-        link_wake_reason(past, curr, past_head, this_past_head);
-
-    thread_update_activity_stats(t, time_get_ms());
-}
-
-static inline size_t get_bucket_index(time_t timestamp_ms) {
-    return (timestamp_ms / THREAD_ACTIVITY_BUCKET_DURATION) %
-           THREAD_ACTIVITY_BUCKET_COUNT;
-}
-
-static inline void clear_bucket(struct thread_activity_bucket *b) {
-    b->block_count = 0;
-    b->sleep_count = 0;
-    b->wake_count = 0;
-    b->block_duration = 0;
-    b->sleep_duration = 0;
-}
-
-static void advance_to_next_bucket(struct thread_activity_stats *stats,
-                                   size_t steps, time_t now) {
-
-    for (size_t i = 1; i <= steps && i <= THREAD_ACTIVITY_BUCKET_COUNT; ++i) {
-        size_t next_bucket = stats->current_bucket + i;
-        size_t index = next_bucket % THREAD_ACTIVITY_BUCKET_COUNT;
-        clear_bucket(&stats->buckets[index]);
-    }
-    size_t new_bucket = stats->current_bucket + steps;
-    stats->current_bucket = new_bucket % THREAD_ACTIVITY_BUCKET_COUNT;
-    stats->last_update_ms = now - (now % THREAD_ACTIVITY_BUCKET_DURATION);
-}
-
 static void update_bucket_data(struct thread_event_reason *wake,
                                struct thread_activity_bucket *bucket,
-                               uint64_t overlap, bool count_event) {
-    if (count_event)
-        bucket->wake_count++;
+                               uint64_t overlap, uint32_t current_cycle) {
+    if (bucket->cycle != current_cycle)
+        clear_bucket_set_cycle(bucket, current_cycle);
 
     if (thread_wake_is_from_block(wake->reason)) {
         bucket->block_duration += overlap;
@@ -185,8 +203,12 @@ static void update_bucket(struct thread_activity_stats *stats,
                           struct thread_event_reason *wake, time_t start,
                           time_t end) {
     time_t bucket_start = start - (start % THREAD_ACTIVITY_BUCKET_DURATION);
+    uint32_t current_cycle = stats->current_cycle;
 
-    while (bucket_start < end) {
+    size_t max_buckets = THREAD_ACTIVITY_BUCKET_COUNT;
+    size_t buckets_updated = 0;
+
+    while (bucket_start < end && buckets_updated < max_buckets) {
         time_t bucket_end = bucket_start + THREAD_ACTIVITY_BUCKET_DURATION;
         size_t bucket_index = get_bucket_index(bucket_start);
 
@@ -196,10 +218,10 @@ static void update_bucket(struct thread_activity_stats *stats,
 
         struct thread_activity_bucket *bucket = &stats->buckets[bucket_index];
 
-        bool first_bucket = bucket == &stats->buckets[stats->current_bucket];
-        update_bucket_data(wake, bucket, overlap, first_bucket);
+        update_bucket_data(wake, bucket, overlap, current_cycle);
 
         bucket_start += THREAD_ACTIVITY_BUCKET_DURATION;
+        buckets_updated++;
     }
 }
 
@@ -246,6 +268,37 @@ void thread_update_activity_stats(struct thread *t, uint64_t time) {
     }
 
     stats->last_wake_index = wake_head;
+}
+
+void thread_add_wake_reason(struct thread *t, uint8_t reason) {
+    struct thread_activity_data *d = t->activity_data;
+    time_t now = time_get_ms();
+
+    struct thread_event_reason *curr = thread_add_event_reason(
+        d->wake_reasons, &d->wake_reasons_head, reason, now, t->activity_stats);
+
+    advance_buckets_to_time(t->activity_stats, now);
+    size_t wbi = get_bucket_index(now);
+    t->activity_stats->buckets[wbi].wake_count++;
+
+    size_t this_past_head = d->wake_reasons_head - 1;
+    struct thread_event_reason *past = NULL;
+    size_t past_head = 0;
+
+    if (thread_wake_is_from_block(reason)) {
+        past_head = d->block_reasons_head - 1;
+        past = most_recent(d->block_reasons, d->block_reasons_head);
+    } else if (thread_wake_is_from_sleep(reason)) {
+        past_head = d->sleep_reasons_head - 1;
+        past = most_recent(d->sleep_reasons, d->sleep_reasons_head);
+    } else {
+        curr->associated_reason.reason = THREAD_ASSOCIATED_REASON_NONE;
+    }
+
+    if (past)
+        link_wake_reason(past, curr, past_head, this_past_head);
+
+    thread_update_activity_stats(t, now);
 }
 
 void thread_update_runtime_buckets(struct thread *thread, uint64_t time) {
