@@ -84,10 +84,11 @@ void k_main(void) {
     /* Command line + MP complete */
     cmdline_parse(cmdline_request.response->cmdline);
     lapic_timer_init(0);
+
     mp_complete_init();
     srat_init();
     topology_init();
-
+    
     restore_interrupts();
     scheduler_yield();
 

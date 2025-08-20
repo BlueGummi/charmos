@@ -41,12 +41,13 @@ static void init_smt_info(struct core *c) {
     }
 
     apic_id = c->id;
+    c->package_id = c->id >> core_width;
     c->smt_mask = (1 << smt_width) - 1;
     c->smt_id = apic_id & c->smt_mask;
     c->core_id = (apic_id >> smt_width) & ((1 << (core_width - smt_width)) - 1);
 }
 
-static void setup_cpu(uint64_t cpu) {
+static struct core *setup_cpu(uint64_t cpu) {
     struct core *c = kzalloc(sizeof(struct core));
     if (!c)
         k_panic("Core %d could not allocate space for struct\n", cpu);
@@ -54,6 +55,7 @@ static void setup_cpu(uint64_t cpu) {
     init_smt_info(c);
     wrmsr(MSR_GS_BASE, (uint64_t) c);
     global.cores[cpu] = c;
+    return c;
 }
 
 static inline void set_core_awake(void) {
@@ -97,7 +99,7 @@ void mp_wakeup_processors(struct limine_mp_response *mpr) {
 
 void mp_complete_init() {
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
-    cr3_ready = true;
+    atomic_store(&cr3_ready, 1);
     if (global.core_count == 1)
         return;
 
@@ -131,31 +133,39 @@ static struct topology_node *core_nodes;
 static struct topology_node *numa_nodes;
 static struct topology_node machine_node;
 
+#define BOLD_STR(__str) ANSI_BOLD __str ANSI_RESET
+
 static void cpu_mask_print(const struct cpu_mask *m) {
     if (!m->uses_large) {
-        k_printf("0x%llx", (unsigned long long) m->small);
+        k_printf(BOLD_STR("0x%llx"), (uint64_t) m->small);
     } else {
         size_t nwords = (m->nbits + 63) / 64;
         for (size_t i = 0; i < nwords; i++)
-            k_printf("%016llx", (unsigned long long) m->large[nwords - 1 - i]);
+            k_printf(BOLD_STR("%016llx"), (uint64_t) m->large[nwords - 1 - i]);
     }
 }
+
+#define TOPO_MAKE_STR(__color, __str) (__color __str ANSI_RESET)
+
+static const char *topo_node_str[TL_MAX] = {
+    [TL_SMT] = TOPO_MAKE_STR(ANSI_MAGENTA, "SMT"),
+    [TL_CORE] = TOPO_MAKE_STR(ANSI_BLUE, "CORE"),
+    [TL_LLC] = TOPO_MAKE_STR(ANSI_CYAN, "LLC"),
+    [TL_PACKAGE] = TOPO_MAKE_STR(ANSI_GREEN, "PACKAGE"),
+    [TL_NUMA] = TOPO_MAKE_STR(ANSI_YELLOW, "NUMA NODE"),
+    [TL_MACHINE] = TOPO_MAKE_STR(ANSI_RED, "MACHINE"),
+};
 
 static void print_topology_node(struct topology_node *node, int depth) {
     for (int i = 0; i < depth; i++)
         k_printf("  ");
 
-    const char *level_str = (node->level == TL_SMT)       ? "SMT"
-                            : (node->level == TL_CORE)    ? "CORE"
-                            : (node->level == TL_LLC)     ? "LLC"
-                            : (node->level == TL_PACKAGE) ? "PKG"
-                            : (node->level == TL_NUMA)    ? "NUMA"
-                            : (node->level == TL_MACHINE) ? "MACH"
-                                                          : "???";
+    const char *level_str = topo_node_str[node->level];
 
-    k_printf("[%s] id=%d parent=%d cpus=", level_str, node->id, node->parent);
+    k_printf("[%s] ID = " ANSI_BOLD "%d" ANSI_RESET ", CPUs = ", level_str,
+             node->id);
     cpu_mask_print(&node->cpus);
-    k_printf(" nr_children=%d\n", node->nr_children);
+    k_printf("\n");
 
     if (node->level == TL_MACHINE) {
         for (int n = 0; n < global.cpu_topology.count[TL_NUMA]; n++)
@@ -224,6 +234,7 @@ void cpu_mask_or(struct cpu_mask *dst, const struct cpu_mask *a,
 }
 
 void topology_dump(void) {
+    k_info("TOPOLOGY", K_INFO, "Processor topology:");
     print_topology_node(&machine_node, 0);
 }
 

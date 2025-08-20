@@ -31,9 +31,6 @@ void srat_init(void) {
                     (uint64_t) cpu->proximity_domain_high[1] << 16 |
                     (uint64_t) cpu->proximity_domain_high[2] << 24;
 
-                k_info("SRAT", K_INFO, "CPU APIC ID %u -> NUMA node %u",
-                       cpu->id, prox_domain);
-
                 struct core *c = global.cores[cpu->id];
                 if (c) {
                     c->numa_node = prox_domain;
