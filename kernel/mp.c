@@ -20,6 +20,33 @@ static atomic_char cr3_ready = 0;
 static struct spinlock wakeup_lock = SPINLOCK_INIT;
 static atomic_uint cores_awake = 0;
 
+static void detect_llc(struct topo_cache_info *llc) {
+    uint32_t eax, ebx, ecx, edx;
+    for (uint32_t idx = 0;; idx++) {
+
+        cpuid_count(4, idx, &eax, &ebx, &ecx, &edx);
+
+        uint32_t cache_type = eax & 0x1F;
+        if (cache_type == 0)
+            break;
+
+        uint32_t cache_level = (eax >> 5) & 0x7;
+        if (cache_level != 3)
+            continue;
+
+        llc->level = cache_level;
+        llc->type = cache_type;
+        llc->line_size = (ebx & 0xFFF) + 1;
+        llc->cores_sharing = ((eax >> 14) & 0xFFF) + 1;
+
+        uint32_t sets = ecx + 1;
+        uint32_t ways = ((ebx >> 22) & 0x3FF) + 1;
+        llc->size_kb = (ways * sets * llc->line_size) / 1024;
+
+        break;
+    }
+}
+
 static void init_smt_info(struct core *c) {
     uint32_t eax, ebx, ecx, edx;
 
@@ -53,6 +80,8 @@ static struct core *setup_cpu(uint64_t cpu) {
         k_panic("Core %d could not allocate space for struct\n", cpu);
     c->id = cpu;
     init_smt_info(c);
+    detect_llc(&c->llc);
+
     wrmsr(MSR_GS_BASE, (uint64_t) c);
     global.cores[cpu] = c;
     return c;
@@ -127,12 +156,14 @@ void mp_setup_bsp() {
 
     global.cores[0] = c;
     init_smt_info(c);
+    detect_llc(&c->llc);
 }
 
 static struct topology_node *smt_nodes;
 static struct topology_node *core_nodes;
 static struct topology_node *numa_nodes;
 static struct topology_node *package_nodes;
+static struct topology_node *llc_nodes;
 static struct topology_node machine_node;
 
 #define BOLD_STR(__str) ANSI_BOLD __str ANSI_RESET
@@ -167,7 +198,6 @@ static void print_topology_node(struct topology_node *node, int depth) {
     k_printf("[%s] ID = " ANSI_BOLD "%d" ANSI_RESET ", CPUs = ", level_str,
              node->id);
     cpu_mask_print(&node->cpus);
-
     k_printf("\n");
 
     switch (node->level) {
@@ -178,17 +208,22 @@ static void print_topology_node(struct topology_node *node, int depth) {
         break;
 
     case TL_PACKAGE:
+        for (int i = 0; i < global.cpu_topology.count[TL_LLC]; i++)
+            if (llc_nodes[i].parent == node->id)
+                print_topology_node(&llc_nodes[i], depth + 1);
+        break;
+
+    case TL_LLC:
         for (int i = 0; i < global.cpu_topology.count[TL_NUMA]; i++)
             if (numa_nodes[i].parent == node->id)
                 print_topology_node(&numa_nodes[i], depth + 1);
-
         break;
 
     case TL_NUMA:
-
         for (int i = 0; i < global.cpu_topology.count[TL_CORE]; i++)
 
             if (core_nodes[i].parent == node->id)
+
                 print_topology_node(&core_nodes[i], depth + 1);
         break;
 
@@ -254,6 +289,46 @@ void topology_dump(void) {
     print_topology_node(&machine_node, 0);
 }
 
+static size_t build_smt_nodes(size_t n_cpus) {
+    smt_nodes = kzalloc(n_cpus * sizeof(struct topology_node));
+
+    for (size_t i = 0; i < n_cpus; i++) {
+        struct core *c = global.cores[i];
+
+        struct topology_node *node = &smt_nodes[i];
+
+        size_t core_index = 0;
+        for (size_t j = 0; j < global.core_count; j++) {
+            if (core_nodes[j].core->core_id == c->core_id &&
+                core_nodes[j].core->package_id == c->package_id) {
+                core_index = j;
+                break;
+            }
+        }
+
+        node->level = TL_SMT;
+        node->id = i;
+        node->parent = core_index;
+        node->core = c;
+        node->first_child = -1;
+
+        node->nr_children = 0;
+
+        cpu_mask_init(&node->cpus, n_cpus);
+        cpu_mask_set(&node->cpus, i);
+        cpu_mask_init(&node->idle, n_cpus);
+        cpu_mask_set(&node->idle, i);
+
+        struct topology_node *parent_core = &core_nodes[core_index];
+        if (parent_core->first_child == -1)
+            parent_core->first_child = i;
+
+        parent_core->nr_children++;
+    }
+
+    return n_cpus;
+}
+
 static size_t build_core_nodes(size_t n_cpus) {
     size_t core_count = 0;
     core_nodes = kzalloc(n_cpus * sizeof(struct topology_node));
@@ -265,14 +340,12 @@ static size_t build_core_nodes(size_t n_cpus) {
         for (size_t j = 0; j < core_count; j++) {
             if (core_nodes[j].core->core_id == c->core_id &&
                 core_nodes[j].core->package_id == c->package_id) {
-
                 exists = true;
                 break;
             }
         }
 
         if (exists)
-
             continue;
 
         struct topology_node *node = &core_nodes[core_count];
@@ -299,53 +372,40 @@ static size_t build_core_nodes(size_t n_cpus) {
     return core_count;
 }
 
-static size_t build_smt_nodes(size_t n_cpus) {
-    smt_nodes = kzalloc(n_cpus * sizeof(struct topology_node));
-
-    for (size_t i = 0; i < n_cpus; i++) {
-        struct core *c = global.cores[i];
-
-        struct topology_node *node = &smt_nodes[i];
-
-        size_t core_index = 0;
-        for (size_t j = 0; j < global.core_count; j++) {
-            if (core_nodes[j].core->core_id == c->core_id &&
-                core_nodes[j].core->package_id == c->package_id) {
-                core_index = j;
-
-                break;
-            }
-        }
-
-        node->level = TL_SMT;
-        node->id = i;
-        node->parent = core_index;
-        node->core = c;
-        node->first_child = -1;
-
-        node->nr_children = 0;
-
-        cpu_mask_init(&node->cpus, n_cpus);
-        cpu_mask_set(&node->cpus, i);
-        cpu_mask_init(&node->idle, n_cpus);
-        cpu_mask_set(&node->idle, i);
-
-        struct topology_node *parent_core = &core_nodes[core_index];
-        if (parent_core->first_child == -1) {
-            parent_core->first_child = i;
-        }
-        parent_core->nr_children++;
+static bool cpu_mask_intersects(const struct cpu_mask *a,
+                                const struct cpu_mask *b) {
+    if (!a->uses_large && !b->uses_large) {
+        return (a->small & b->small) != 0;
     }
 
-    return n_cpus;
+    size_t nwords = ((a->nbits > b->nbits ? a->nbits : b->nbits) + 63) / 64;
+    for (size_t i = 0; i < nwords; i++) {
+        uint64_t wa = 0, wb = 0;
+
+        if (a->uses_large) {
+            if (i < (a->nbits + 63) / 64)
+                wa = a->large[i];
+        } else if (i == 0) {
+            wa = a->small;
+        }
+        if (b->uses_large) {
+            if (i < (b->nbits + 63) / 64)
+                wb = b->large[i];
+        } else if (i == 0) {
+            wb = b->small;
+        }
+
+        if ((wa & wb) != 0)
+            return true;
+    }
+    return false;
 }
 
-static size_t build_numa_nodes(size_t n_cores) {
+static size_t build_numa_nodes(size_t n_cores, size_t n_llc) {
     size_t max_numa = 0;
     for (size_t i = 0; i < n_cores; i++) {
-        if (core_nodes[i].core->numa_node > max_numa) {
+        if (core_nodes[i].core->numa_node > max_numa)
             max_numa = core_nodes[i].core->numa_node;
-        }
     }
 
     size_t n_numa_nodes = max_numa + 1;
@@ -355,7 +415,7 @@ static size_t build_numa_nodes(size_t n_cores) {
         struct topology_node *numa = &numa_nodes[i];
         numa->level = TL_NUMA;
         numa->id = i;
-        numa->parent = 0;
+        numa->parent = -1;
         numa->first_child = -1;
         numa->nr_children = 0;
         numa->core = NULL;
@@ -368,19 +428,132 @@ static size_t build_numa_nodes(size_t n_cores) {
         uint32_t numa_id = c->numa_node;
         struct topology_node *numa = &numa_nodes[numa_id];
 
-        uint32_t pkg_id = c->package_id;
+        core_nodes[i].parent = numa_id;
 
-        numa->parent = pkg_id;
+        if (numa->first_child == -1)
+            numa->first_child = i;
 
         numa->nr_children++;
         cpu_mask_or(&numa->cpus, &numa->cpus, &core_nodes[i].cpus);
         cpu_mask_or(&numa->idle, &numa->idle, &core_nodes[i].idle);
     }
 
+    for (size_t i = 0; i < n_numa_nodes; i++) {
+        struct topology_node *numa = &numa_nodes[i];
+        if (numa->first_child == -1)
+            continue;
+
+        for (size_t j = 0; j < n_llc; j++) {
+            struct topology_node *llc = &llc_nodes[j];
+
+            if (cpu_mask_intersects(&llc->cpus, &numa->cpus)) {
+                numa->parent = llc->id;
+                numa->data.cache = llc->data.cache;
+
+                if (llc->first_child == -1)
+                    llc->first_child = i;
+
+                llc->nr_children++;
+                break;
+            }
+        }
+    }
+
     return n_numa_nodes;
 }
 
-static size_t build_package_nodes(size_t n_cores) {
+static size_t build_llc_nodes(size_t n_cores) {
+    llc_nodes = kzalloc(n_cores * sizeof(struct topology_node));
+    size_t llc_count = 0;
+
+    for (size_t i = 0; i < n_cores; i++) {
+        struct core *c = core_nodes[i].core;
+        uint32_t pkg_id = c->package_id;
+
+        if (c->llc.level == 0 || c->llc.type == 0)
+            continue;
+
+        bool exists = false;
+        for (size_t j = 0; j < llc_count; j++) {
+            struct topo_cache_info *existing = llc_nodes[j].data.cache;
+
+            if (existing->level == c->llc.level &&
+                existing->type == c->llc.type &&
+                existing->size_kb == c->llc.size_kb &&
+                llc_nodes[j].parent == pkg_id) {
+
+                exists = true;
+                cpu_mask_or(&llc_nodes[j].cpus, &llc_nodes[j].cpus,
+
+                            &core_nodes[i].cpus);
+                cpu_mask_or(&llc_nodes[j].idle, &llc_nodes[j].idle,
+                            &core_nodes[i].idle);
+                break;
+            }
+        }
+
+        if (exists)
+            continue;
+
+        struct topology_node *node = &llc_nodes[llc_count];
+        node->level = TL_LLC;
+        node->id = llc_count;
+        node->parent = pkg_id;
+        node->core = NULL;
+        node->data.cache = &c->llc;
+
+        node->first_child = -1;
+        node->nr_children = 0;
+
+        cpu_mask_init(&node->cpus, global.core_count);
+        cpu_mask_or(&node->cpus, &node->cpus, &core_nodes[i].cpus);
+
+        cpu_mask_init(&node->idle, global.core_count);
+        cpu_mask_or(&node->idle, &node->idle, &core_nodes[i].idle);
+
+        llc_count++;
+    }
+
+    /* no LLC info present, mirror packages */
+    if (llc_count == 0) {
+        uint32_t max_pkg_id = 0;
+        for (size_t i = 0; i < n_cores; i++)
+            if (core_nodes[i].core->package_id > max_pkg_id)
+                max_pkg_id = core_nodes[i].core->package_id;
+
+        size_t n_packages = max_pkg_id + 1;
+
+        for (size_t p = 0; p < n_packages; p++) {
+            struct topology_node *node = &llc_nodes[llc_count];
+            node->level = TL_LLC;
+            node->id = llc_count;
+            node->parent = p;
+            node->core = NULL;
+            node->data.cache = NULL;
+
+            node->first_child = -1;
+            node->nr_children = 0;
+
+            cpu_mask_init(&node->cpus, global.core_count);
+            cpu_mask_init(&node->idle, global.core_count);
+
+            for (size_t i = 0; i < n_cores; i++) {
+
+                if (core_nodes[i].core->package_id == p) {
+                    cpu_mask_or(&node->cpus, &node->cpus, &core_nodes[i].cpus);
+                    cpu_mask_or(&node->idle, &node->idle, &core_nodes[i].idle);
+                }
+            }
+
+            llc_count++;
+        }
+    }
+
+    return llc_count;
+}
+
+static size_t build_package_nodes(size_t n_cores, size_t n_llc) {
+
     uint32_t max_pkg_id = 0;
 
     for (size_t i = 0; i < n_cores; i++)
@@ -388,51 +561,34 @@ static size_t build_package_nodes(size_t n_cores) {
             max_pkg_id = core_nodes[i].core->package_id;
 
     size_t n_packages = max_pkg_id + 1;
-
     package_nodes = kzalloc(n_packages * sizeof(struct topology_node));
 
     for (size_t i = 0; i < n_packages; i++) {
         struct topology_node *pkg = &package_nodes[i];
         pkg->level = TL_PACKAGE;
         pkg->id = i;
-        pkg->parent = -1;
+        pkg->parent = 0;
         pkg->first_child = -1;
         pkg->nr_children = 0;
-
+        pkg->core = NULL;
         cpu_mask_init(&pkg->cpus, global.core_count);
         cpu_mask_init(&pkg->idle, global.core_count);
     }
 
-    for (size_t i = 0; i < n_cores; i++) {
-        struct topology_node *core = &core_nodes[i];
+    for (size_t j = 0; j < n_llc; j++) {
+        struct topology_node *llc = &llc_nodes[j];
+        uint32_t pkg_id = llc->parent;
+        if (pkg_id >= n_packages)
+            continue;
 
-        uint32_t pkg_id = core->core->package_id;
         struct topology_node *pkg = &package_nodes[pkg_id];
 
-        core->parent = pkg_id;
         if (pkg->first_child == -1)
-            pkg->first_child = i;
+            pkg->first_child = j;
+
         pkg->nr_children++;
-
-        cpu_mask_or(&pkg->cpus, &pkg->cpus, &core->cpus);
-        cpu_mask_or(&pkg->idle, &pkg->idle, &core->idle);
-    }
-
-    for (size_t i = 0; i < n_packages; i++) {
-        struct topology_node *pkg = &package_nodes[i];
-
-        size_t core_idx = pkg->first_child;
-        size_t numa_id = core_nodes[core_idx].core->numa_node;
-        pkg->parent = 0; /* MACHINE is parent */
-
-        struct topology_node *numa = &numa_nodes[numa_id];
-        if (numa->first_child == -1)
-
-            numa->first_child = i;
-        numa->nr_children++;
-
-        cpu_mask_or(&numa->cpus, &numa->cpus, &pkg->cpus);
-        cpu_mask_or(&numa->idle, &numa->idle, &pkg->idle);
+        cpu_mask_or(&pkg->cpus, &pkg->cpus, &llc->cpus);
+        cpu_mask_or(&pkg->idle, &pkg->idle, &llc->idle);
     }
 
     return n_packages;
@@ -442,7 +598,7 @@ static void build_machine_node(size_t n_packages) {
     machine_node.level = TL_MACHINE;
     machine_node.id = 0;
     machine_node.parent = -1;
-    machine_node.first_child = 0;
+    machine_node.first_child = -1;
     machine_node.nr_children = n_packages;
     machine_node.core = NULL;
 
@@ -450,10 +606,13 @@ static void build_machine_node(size_t n_packages) {
     cpu_mask_init(&machine_node.idle, global.core_count);
 
     for (size_t i = 0; i < n_packages; i++) {
-        cpu_mask_or(&machine_node.cpus, &machine_node.cpus,
-                    &numa_nodes[i].cpus);
-        cpu_mask_or(&machine_node.idle, &machine_node.idle,
-                    &numa_nodes[i].idle);
+        struct topology_node *pkg = &package_nodes[i];
+
+        if (machine_node.first_child == -1)
+            machine_node.first_child = i;
+
+        cpu_mask_or(&machine_node.cpus, &machine_node.cpus, &pkg->cpus);
+        cpu_mask_or(&machine_node.idle, &machine_node.idle, &pkg->idle);
     }
 }
 
@@ -462,8 +621,9 @@ void topology_init(void) {
 
     size_t n_cores = build_core_nodes(n_cpus);
     size_t n_smt = build_smt_nodes(n_cpus);
-    size_t n_numa = build_numa_nodes(n_cores);
-    size_t n_packages = build_package_nodes(n_cores);
+    size_t n_llc = build_llc_nodes(n_cores);
+    size_t n_numa = build_numa_nodes(n_cores, n_llc);
+    size_t n_packages = build_package_nodes(n_cores, n_llc);
 
     build_machine_node(n_packages);
 
@@ -473,6 +633,8 @@ void topology_init(void) {
     global.cpu_topology.count[TL_CORE] = n_cores;
     global.cpu_topology.level[TL_NUMA] = numa_nodes;
     global.cpu_topology.count[TL_NUMA] = n_numa;
+    global.cpu_topology.level[TL_LLC] = llc_nodes;
+    global.cpu_topology.count[TL_LLC] = n_llc;
     global.cpu_topology.level[TL_PACKAGE] = package_nodes;
     global.cpu_topology.count[TL_PACKAGE] = n_packages;
     global.cpu_topology.level[TL_MACHINE] = &machine_node;

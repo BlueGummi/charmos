@@ -8,8 +8,8 @@ enum topology_level {
     TL_SMT,
     TL_CORE,
     TL_LLC,
-    TL_PACKAGE,
     TL_NUMA,
+    TL_PACKAGE,
     TL_MACHINE,
     TL_MAX
 };
@@ -26,11 +26,9 @@ struct cpu_mask {
 struct topo_cache_info {
     uint8_t level; /* 1, 2, 3 */
     uint8_t type;  /* Data, unified, instruction */
-    uint32_t size_bytes;
+    uint32_t size_kb;
     uint32_t line_size;
-    uint32_t sets;
-    uint32_t ways;
-    struct cpu_mask cpus; /* Who shares this */
+    uint32_t cores_sharing; /* Who shares this */
 };
 
 struct topo_package_info {
