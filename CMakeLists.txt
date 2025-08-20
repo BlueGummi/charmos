@@ -83,15 +83,12 @@ set(QEMU_COMMON_FLAGS
     -cdrom ${IMAGE_NAME}.iso
     -boot d
     -m 4G
-    -smp cores=4,threads=2
-    -object memory-backend-ram,size=1G,id=mem0 
-    -object memory-backend-ram,size=1G,id=mem1 
-    -object memory-backend-ram,size=1G,id=mem2 
-    -object memory-backend-ram,size=1G,id=mem3 
-    -numa node,cpus=0-1,nodeid=0,memdev=mem0 
-    -numa node,cpus=2-3,nodeid=1,memdev=mem1 
-    -numa node,cpus=4-5,nodeid=2,memdev=mem2 
-    -numa node,cpus=6-7,nodeid=3,memdev=mem3
+    -smp sockets=2,cores=2,threads=2
+    -object memory-backend-ram,size=2G,id=mem0
+    -object memory-backend-ram,size=2G,id=mem1
+    -numa node,cpus=0-3,nodeid=0,memdev=mem0
+    -numa node,cpus=4-7,nodeid=1,memdev=mem1
+
 
     -s
     #-S
