@@ -14,15 +14,24 @@ enum topology_level {
     TL_MAX
 };
 
+struct cpu_mask {
+    bool uses_large;
+    union {
+        uint64_t small;
+        uint64_t *large;
+    };
+    size_t nbits;
+};
+
 struct topology_node {
     enum topology_level level;
-    int32_t id;          /* Index in this node */
-    int32_t parent;      /* Parent node index, -1 for root */
+    uint64_t id;          /* Index in this node */
+    uint64_t parent;      /* Parent node index, -1 for root */
     int32_t first_child; /* Index in child array */
     int32_t nr_children;
 
-    cpumask_t cpus; /* CPUs in the node */
-    cpumask_t idle; /* Mask of idle CPUs */
+    struct cpu_mask cpus;
+    struct cpu_mask idle;
 
     struct core *core; /* Pointer to this node's `core` struct */
 };

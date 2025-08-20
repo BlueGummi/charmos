@@ -2,21 +2,17 @@
 #include <stdint.h>
 
 void smap_init() {
-    uint32_t abcd[4];
+    uint32_t a, b, c, d;
 
-    cpuid(0x7, 0x0, abcd);
-    if (!(abcd[1] & (1 << 20))) {
-        // SMAP not supported
+    cpuid(0x7, 0x0, &a, &b, &c, &d);
+    if (!(b & (1 << 20)))
         return;
-    }
-    if (!(abcd[1] & (1 << 7))) {
-        // SMEP not supported
+
+    if (!(b & (1 << 7)))
         return;
-    }
-    if (!(abcd[2] & (1 << 2))) {
-        // UMIP not supported
+
+    if (!(c & (1 << 2)))
         return;
-    }
 
     uint64_t cr4 = read_cr4();
 

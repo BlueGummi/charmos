@@ -12,6 +12,7 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 #include <sync/spin_lock.h>
 
 static uint64_t cr3 = 0;
@@ -20,35 +21,37 @@ static struct spinlock wakeup_lock = SPINLOCK_INIT;
 static atomic_uint cores_awake = 0;
 
 static void init_smt_info(struct core *c) {
-
     uint32_t eax, ebx, ecx, edx;
-    uint32_t apic_id = c->id;
+
     uint32_t smt_width = 0;
-    uint32_t smt_mask = 0;
+    uint32_t core_width = 0;
+    uint32_t apic_id;
 
     for (uint32_t level = 0;; level++) {
         cpuid_count(0xB, level, &eax, &ebx, &ecx, &edx);
         uint32_t level_type = (ecx >> 8) & 0xFF;
         if (level_type == 0)
             break;
-        if (level_type != 1)
-            continue;
 
-        smt_width = ebx & 0xFF;
-        smt_mask = (1 << smt_width) - 1;
-
-        c->smt_mask = smt_mask;
-        c->smt_id = apic_id & smt_mask;
-        break;
+        if (level_type == 1) {
+            smt_width = eax & 0x1F;
+        } else if (level_type == 2) {
+            core_width = eax & 0x1F;
+        }
     }
+
+    apic_id = c->id;
+    c->smt_mask = (1 << smt_width) - 1;
+    c->smt_id = apic_id & c->smt_mask;
+    c->core_id = (apic_id >> smt_width) & ((1 << (core_width - smt_width)) - 1);
 }
 
 static void setup_cpu(uint64_t cpu) {
     struct core *c = kzalloc(sizeof(struct core));
     if (!c)
         k_panic("Core %d could not allocate space for struct\n", cpu);
-    init_smt_info(c);
     c->id = cpu;
+    init_smt_info(c);
     wrmsr(MSR_GS_BASE, (uint64_t) c);
     global.cores[cpu] = c;
 }
@@ -128,37 +131,95 @@ static struct topology_node *core_nodes;
 static struct topology_node *numa_nodes;
 static struct topology_node machine_node;
 
+static void cpu_mask_print(const struct cpu_mask *m) {
+    if (!m->uses_large) {
+        k_printf("0x%llx", (unsigned long long) m->small);
+    } else {
+        size_t nwords = (m->nbits + 63) / 64;
+        for (size_t i = 0; i < nwords; i++)
+            k_printf("%016llx", (unsigned long long) m->large[nwords - 1 - i]);
+    }
+}
+
 static void print_topology_node(struct topology_node *node, int depth) {
     for (int i = 0; i < depth; i++)
         k_printf("  ");
 
-    k_printf("[%s] id=%d parent=%d cpus=0x%llx nr_children=%d\n",
-             (node->level == TL_SMT)       ? "SMT"
-             : (node->level == TL_CORE)    ? "CORE"
-             : (node->level == TL_LLC)     ? "LLC"
-             : (node->level == TL_PACKAGE) ? "PKG"
-             : (node->level == TL_NUMA)    ? "NUMA"
-             : (node->level == TL_MACHINE) ? "MACH"
-                                           : "???",
-             node->id, node->parent, (unsigned long long) node->cpus,
-             node->nr_children);
+    const char *level_str = (node->level == TL_SMT)       ? "SMT"
+                            : (node->level == TL_CORE)    ? "CORE"
+                            : (node->level == TL_LLC)     ? "LLC"
+                            : (node->level == TL_PACKAGE) ? "PKG"
+                            : (node->level == TL_NUMA)    ? "NUMA"
+                            : (node->level == TL_MACHINE) ? "MACH"
+                                                          : "???";
+
+    k_printf("[%s] id=%d parent=%d cpus=", level_str, node->id, node->parent);
+    cpu_mask_print(&node->cpus);
+    k_printf(" nr_children=%d\n", node->nr_children);
 
     if (node->level == TL_MACHINE) {
         for (int n = 0; n < global.cpu_topology.count[TL_NUMA]; n++)
             print_topology_node(&global.cpu_topology.level[TL_NUMA][n],
                                 depth + 1);
-    } else if (node->level == TL_NUMA) {
 
+    } else if (node->level == TL_NUMA) {
         for (int i = 0; i < global.cpu_topology.count[TL_CORE]; i++) {
             if (core_nodes[i].parent == node->id)
                 print_topology_node(&core_nodes[i], depth + 1);
         }
+
     } else if (node->level == TL_CORE) {
         for (int i = 0; i < global.cpu_topology.count[TL_SMT]; i++) {
-            if (smt_nodes[i].parent == core_nodes[i].id)
-
+            if (smt_nodes[i].parent == node->id) // <-- compare to THIS core
                 print_topology_node(&smt_nodes[i], depth + 1);
         }
+    }
+}
+
+static void cpu_mask_init(struct cpu_mask *m, size_t nbits) {
+    m->nbits = nbits;
+    if (nbits <= 64) {
+        m->uses_large = false;
+        m->small = 0;
+    } else {
+        m->uses_large = true;
+        size_t nwords = (nbits + 63) / 64;
+        m->large = kzalloc(sizeof(uint64_t) * nwords);
+    }
+}
+
+void cpu_mask_set(struct cpu_mask *m, size_t cpu) {
+    if (!m->uses_large) {
+        m->small |= (1ULL << cpu);
+    } else {
+        m->large[cpu / 64] |= (1ULL << (cpu % 64));
+    }
+}
+
+void cpu_mask_clear(struct cpu_mask *m, size_t cpu) {
+    if (!m->uses_large) {
+        m->small &= ~(1ULL << cpu);
+    } else {
+        m->large[cpu / 64] &= ~(1ULL << (cpu % 64));
+    }
+}
+
+bool cpu_mask_test(const struct cpu_mask *m, size_t cpu) {
+    if (!m->uses_large) {
+        return (m->small >> cpu) & 1ULL;
+    } else {
+        return (m->large[cpu / 64] >> (cpu % 64)) & 1ULL;
+    }
+}
+
+void cpu_mask_or(struct cpu_mask *dst, const struct cpu_mask *a,
+                 const struct cpu_mask *b) {
+    if (!dst->uses_large) {
+        dst->small = a->small | b->small;
+    } else {
+        size_t nwords = (dst->nbits + 63) / 64;
+        for (size_t i = 0; i < nwords; i++)
+            dst->large[i] = a->large[i] | b->large[i];
     }
 }
 
@@ -166,103 +227,165 @@ void topology_dump(void) {
     print_topology_node(&machine_node, 0);
 }
 
-void topology_init(void) {
-    uint64_t n_cpus = global.core_count;
+static size_t build_core_nodes(size_t n_cpus) {
+    size_t core_count = 0;
+    core_nodes = kzalloc(n_cpus * sizeof(struct topology_node));
 
-    smt_nodes = kzalloc(sizeof(struct topology_node) * n_cpus);
-    core_nodes = kzalloc(sizeof(struct topology_node) * n_cpus);
+    uint32_t *core_id_to_index = kzalloc(n_cpus * sizeof(uint32_t));
+    memset(core_id_to_index, 0xFF, n_cpus * sizeof(uint32_t));
 
-    for (uint64_t i = 0; i < n_cpus; i++) {
+    for (size_t i = 0; i < n_cpus; i++) {
         struct core *c = global.cores[i];
+        uint32_t core_id = c->core_id;
 
-        smt_nodes[i].level = TL_SMT;
-        smt_nodes[i].id = c->id;
+        if (core_id_to_index[core_id] == 0xFFFFFFFF) {
+            struct topology_node *node = &core_nodes[core_count];
+            node->level = TL_CORE;
+            node->id = core_id;
+            node->first_child = -1;
+            node->nr_children = 0;
+            node->core = c;
 
-        smt_nodes[i].parent = i;
-        smt_nodes[i].first_child = -1;
-        smt_nodes[i].nr_children = 0;
-        smt_nodes[i].cpus = 1ULL << c->id;
-        smt_nodes[i].idle = smt_nodes[i].cpus;
-        smt_nodes[i].core = c;
+            cpu_mask_init(&node->cpus, n_cpus);
+            cpu_mask_init(&node->idle, n_cpus);
 
-        core_nodes[i].level = TL_CORE;
-        core_nodes[i].id = i;
-        core_nodes[i].parent = 0;
-        core_nodes[i].first_child = i;
-        core_nodes[i].nr_children = 1;
-        core_nodes[i].cpus = smt_nodes[i].cpus;
-        core_nodes[i].idle = core_nodes[i].cpus;
-        core_nodes[i].core = c;
+            for (size_t j = 0; j < n_cpus; j++) {
+                if (global.cores[j]->core_id == core_id) {
+                    cpu_mask_set(&node->cpus, j);
+                }
+            }
+
+            core_id_to_index[core_id] = core_count;
+            core_count++;
+        }
     }
 
+    kfree(core_id_to_index);
+    return core_count;
+}
+
+static size_t build_smt_nodes(size_t n_cpus) {
+    smt_nodes = kzalloc(n_cpus * sizeof(struct topology_node));
+
+    uint32_t *core_id_to_index = kzalloc(n_cpus * sizeof(uint32_t));
+    memset(core_id_to_index, 0xFF, n_cpus * sizeof(uint32_t));
+
+    for (size_t i = 0; i < n_cpus; i++) {
+        for (size_t j = 0; j < n_cpus; j++) {
+            if (core_nodes[j].id == global.cores[i]->core_id) {
+                core_id_to_index[global.cores[i]->core_id] = j;
+                break;
+            }
+        }
+    }
+
+    for (size_t i = 0; i < n_cpus; i++) {
+        struct core *c = global.cores[i];
+        struct topology_node *node = &smt_nodes[i];
+
+        uint32_t core_index = core_id_to_index[c->core_id];
+
+        node->level = TL_SMT;
+        node->id = i;
+        node->parent = core_index;
+        node->core = c;
+        node->first_child = -1;
+        node->nr_children = 0;
+
+        cpu_mask_init(&node->cpus, n_cpus);
+        cpu_mask_set(&node->cpus, i);
+        cpu_mask_init(&node->idle, n_cpus);
+        cpu_mask_set(&node->idle, i);
+
+        struct topology_node *parent_core = &core_nodes[core_index];
+        if (parent_core->first_child == -1) {
+            parent_core->first_child = i;
+        }
+        parent_core->nr_children++;
+    }
+
+    kfree(core_id_to_index);
+    return n_cpus;
+}
+
+static size_t build_numa_nodes(size_t n_cores) {
+    size_t max_numa = 0;
+    for (size_t i = 0; i < n_cores; i++) {
+        if (core_nodes[i].core->numa_node > max_numa) {
+            max_numa = core_nodes[i].core->numa_node;
+        }
+    }
+
+    size_t n_numa_nodes = max_numa + 1;
+    numa_nodes = kzalloc(n_numa_nodes * sizeof(struct topology_node));
+
+    for (size_t i = 0; i < n_numa_nodes; i++) {
+        struct topology_node *numa = &numa_nodes[i];
+        numa->level = TL_NUMA;
+        numa->id = i;
+        numa->parent = 0;
+        numa->first_child = -1;
+        numa->nr_children = 0;
+        numa->core = NULL;
+        cpu_mask_init(&numa->cpus, global.core_count);
+        cpu_mask_init(&numa->idle, global.core_count);
+    }
+
+    for (size_t i = 0; i < n_cores; i++) {
+        struct core *c = core_nodes[i].core;
+        uint32_t numa_id = c->numa_node;
+        struct topology_node *numa = &numa_nodes[numa_id];
+
+        core_nodes[i].parent = numa_id;
+        if (numa->first_child == -1) {
+            numa->first_child = i;
+        }
+        numa->nr_children++;
+        cpu_mask_or(&numa->cpus, &numa->cpus, &core_nodes[i].cpus);
+        cpu_mask_or(&numa->idle, &numa->idle, &core_nodes[i].idle);
+    }
+
+    return n_numa_nodes;
+}
+
+static void build_machine_node(size_t n_numa_nodes) {
     machine_node.level = TL_MACHINE;
     machine_node.id = 0;
     machine_node.parent = -1;
     machine_node.first_child = 0;
-    machine_node.nr_children = n_cpus;
-    machine_node.cpus = 0;
-
-    for (uint64_t i = 0; i < n_cpus; i++)
-        machine_node.cpus |= core_nodes[i].cpus;
-    machine_node.idle = machine_node.cpus;
-
+    machine_node.nr_children = n_numa_nodes;
     machine_node.core = NULL;
 
+    cpu_mask_init(&machine_node.cpus, global.core_count);
+    cpu_mask_init(&machine_node.idle, global.core_count);
+
+    for (size_t i = 0; i < n_numa_nodes; i++) {
+        numa_nodes[i].parent = 0;
+        cpu_mask_or(&machine_node.cpus, &machine_node.cpus,
+                    &numa_nodes[i].cpus);
+        cpu_mask_or(&machine_node.idle, &machine_node.idle,
+                    &numa_nodes[i].idle);
+    }
+}
+
+void topology_init(void) {
+    size_t n_cpus = global.core_count;
+
+    size_t n_cores = build_core_nodes(n_cpus);
+    size_t n_smt = build_smt_nodes(n_cpus);
+    size_t n_numa = build_numa_nodes(n_cores);
+    build_machine_node(n_numa);
+
     global.cpu_topology.level[TL_SMT] = smt_nodes;
-
-    global.cpu_topology.count[TL_SMT] = n_cpus;
-
+    global.cpu_topology.count[TL_SMT] = n_smt;
     global.cpu_topology.level[TL_CORE] = core_nodes;
-    global.cpu_topology.count[TL_CORE] = n_cpus;
-
+    global.cpu_topology.count[TL_CORE] = n_cores;
+    global.cpu_topology.level[TL_NUMA] = numa_nodes;
+    global.cpu_topology.count[TL_NUMA] = n_numa;
     global.cpu_topology.level[TL_PACKAGE] = &machine_node;
     global.cpu_topology.count[TL_PACKAGE] = 1;
-
     global.cpu_topology.level[TL_MACHINE] = &machine_node;
     global.cpu_topology.count[TL_MACHINE] = 1;
 
-    size_t max_numa_id = 0;
-    for (uint64_t i = 0; i < n_cpus; i++)
-        if (global.cores[i]->numa_node > max_numa_id)
-            max_numa_id = global.cores[i]->numa_node;
-
-    size_t n_numa_nodes = max_numa_id + 1;
-    numa_nodes = kzalloc(sizeof(struct topology_node) * n_numa_nodes);
-
-    for (size_t n = 0; n < n_numa_nodes; n++) {
-        numa_nodes[n].level = TL_NUMA;
-        numa_nodes[n].id = n;
-        numa_nodes[n].parent = 0;
-        numa_nodes[n].first_child = -1;
-        numa_nodes[n].nr_children = 0;
-        numa_nodes[n].cpus = 0;
-        numa_nodes[n].idle = 0;
-        numa_nodes[n].core = NULL;
-    }
-
-    for (uint64_t i = 0; i < n_cpus; i++) {
-
-        struct core *c = global.cores[i];
-        struct topology_node *numa = &numa_nodes[c->numa_node];
-
-        if (numa->first_child == -1)
-            numa->first_child = c->id;
-
-        numa->nr_children++;
-        numa->cpus |= 1ULL << c->id;
-        numa->idle |= 1ULL << c->id;
-
-        core_nodes[i].parent = numa->id;
-    }
-
-    machine_node.first_child = 0;
-    machine_node.nr_children = n_numa_nodes;
-
-    machine_node.cpus = 0;
-    for (size_t n = 0; n < n_numa_nodes; n++)
-        machine_node.cpus |= numa_nodes[n].cpus;
-
-    global.cpu_topology.level[TL_NUMA] = numa_nodes;
-    global.cpu_topology.count[TL_NUMA] = n_numa_nodes;
     topology_dump();
 }

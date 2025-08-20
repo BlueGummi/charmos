@@ -29,6 +29,7 @@ struct core {
     uint32_t package_id;
     uint32_t smt_mask;
     uint32_t smt_id;
+    uint32_t core_id;
 };
 
 static inline uint64_t get_this_core_id() {
