@@ -89,6 +89,7 @@ set(QEMU_COMMON_FLAGS
     -numa node,cpus=0-3,nodeid=0,memdev=mem0
     -numa node,cpus=4-7,nodeid=1,memdev=mem1
 
+
     -s
     #-S
     -monitor telnet:127.0.0.1:1234,server,nowait

@@ -273,14 +273,13 @@ bool cpu_mask_test(const struct cpu_mask *m, size_t cpu) {
     }
 }
 
-void cpu_mask_or(struct cpu_mask *dst, const struct cpu_mask *a,
-                 const struct cpu_mask *b) {
+void cpu_mask_or(struct cpu_mask *dst, const struct cpu_mask *b) {
     if (!dst->uses_large) {
-        dst->small = a->small | b->small;
+        dst->small = dst->small | b->small;
     } else {
         size_t nwords = (dst->nbits + 63) / 64;
         for (size_t i = 0; i < nwords; i++)
-            dst->large[i] = a->large[i] | b->large[i];
+            dst->large[i] = dst->large[i] | b->large[i];
     }
 }
 
@@ -434,8 +433,8 @@ static size_t build_numa_nodes(size_t n_cores, size_t n_llc) {
             numa->first_child = i;
 
         numa->nr_children++;
-        cpu_mask_or(&numa->cpus, &numa->cpus, &core_nodes[i].cpus);
-        cpu_mask_or(&numa->idle, &numa->idle, &core_nodes[i].idle);
+        cpu_mask_or(&numa->cpus, &core_nodes[i].cpus);
+        cpu_mask_or(&numa->idle, &core_nodes[i].idle);
     }
 
     for (size_t i = 0; i < n_numa_nodes; i++) {
@@ -481,13 +480,9 @@ static size_t build_llc_nodes(size_t n_cores) {
                 existing->type == c->llc.type &&
                 existing->size_kb == c->llc.size_kb &&
                 llc_nodes[j].parent == pkg_id) {
-
                 exists = true;
-                cpu_mask_or(&llc_nodes[j].cpus, &llc_nodes[j].cpus,
-
-                            &core_nodes[i].cpus);
-                cpu_mask_or(&llc_nodes[j].idle, &llc_nodes[j].idle,
-                            &core_nodes[i].idle);
+                cpu_mask_or(&llc_nodes[j].cpus, &core_nodes[i].cpus);
+                cpu_mask_or(&llc_nodes[j].idle, &core_nodes[i].idle);
                 break;
             }
         }
@@ -506,10 +501,10 @@ static size_t build_llc_nodes(size_t n_cores) {
         node->nr_children = 0;
 
         cpu_mask_init(&node->cpus, global.core_count);
-        cpu_mask_or(&node->cpus, &node->cpus, &core_nodes[i].cpus);
+        cpu_mask_or(&node->cpus, &core_nodes[i].cpus);
 
         cpu_mask_init(&node->idle, global.core_count);
-        cpu_mask_or(&node->idle, &node->idle, &core_nodes[i].idle);
+        cpu_mask_or(&node->idle, &core_nodes[i].idle);
 
         llc_count++;
     }
@@ -540,8 +535,8 @@ static size_t build_llc_nodes(size_t n_cores) {
             for (size_t i = 0; i < n_cores; i++) {
 
                 if (core_nodes[i].core->package_id == p) {
-                    cpu_mask_or(&node->cpus, &node->cpus, &core_nodes[i].cpus);
-                    cpu_mask_or(&node->idle, &node->idle, &core_nodes[i].idle);
+                    cpu_mask_or(&node->cpus, &core_nodes[i].cpus);
+                    cpu_mask_or(&node->idle, &core_nodes[i].idle);
                 }
             }
 
@@ -587,8 +582,8 @@ static size_t build_package_nodes(size_t n_cores, size_t n_llc) {
             pkg->first_child = j;
 
         pkg->nr_children++;
-        cpu_mask_or(&pkg->cpus, &pkg->cpus, &llc->cpus);
-        cpu_mask_or(&pkg->idle, &pkg->idle, &llc->idle);
+        cpu_mask_or(&pkg->cpus, &llc->cpus);
+        cpu_mask_or(&pkg->idle, &llc->idle);
     }
 
     return n_packages;
@@ -611,8 +606,8 @@ static void build_machine_node(size_t n_packages) {
         if (machine_node.first_child == -1)
             machine_node.first_child = i;
 
-        cpu_mask_or(&machine_node.cpus, &machine_node.cpus, &pkg->cpus);
-        cpu_mask_or(&machine_node.idle, &machine_node.idle, &pkg->idle);
+        cpu_mask_or(&machine_node.cpus, &pkg->cpus);
+        cpu_mask_or(&machine_node.idle, &pkg->idle);
     }
 }
 
