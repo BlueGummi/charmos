@@ -170,7 +170,7 @@ static void print_topology_node(struct topology_node *node, int depth) {
 
     } else if (node->level == TL_CORE) {
         for (int i = 0; i < global.cpu_topology.count[TL_SMT]; i++) {
-            if (smt_nodes[i].parent == node->id) // <-- compare to THIS core
+            if (smt_nodes[i].parent == node->id)
                 print_topology_node(&smt_nodes[i], depth + 1);
         }
     }

@@ -104,7 +104,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     if (unlikely(!nvme->isr_index || !nvme->io_requests || !nvme->io_queues))
         k_panic("Could not allocate space for NVMe structures");
 
-    nvme->queues_made = sqs_to_make;
+    nvme->queue_count = sqs_to_make;
 
     pci_enable_msix(bus, slot, func);
     for (uint32_t i = 1; i <= sqs_to_make; i++) {

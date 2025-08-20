@@ -70,7 +70,7 @@ static void nvme_setup_prps(struct nvme_command *cmd,
 static bool rw_send_command(struct generic_disk *disk, struct nvme_request *req,
                             uint8_t opc) {
     struct nvme_device *nvme = disk->driver_data;
-    uint16_t qid = THIS_QID;
+    uint16_t qid = THIS_QID(nvme);
     uint64_t lba = req->lba;
     uint64_t count = req->sector_count;
     void *buffer = req->buffer;

@@ -6,7 +6,6 @@
 #include <mem/vmm.h>
 #include <sch/defer.h>
 
-
 static void nvme_on_bio_complete(struct nvme_request *req) {
     struct bio_request *bio = (struct bio_request *) req->user_data;
 
@@ -32,7 +31,8 @@ bool nvme_submit_bio_request(struct generic_disk *disk,
     req->done = false;
     req->lba = bio->lba;
 
-    req->qid = THIS_QID;
+    struct nvme_device *dev = disk->driver_data;
+    req->qid = THIS_QID(dev);
     req->sector_count = bio->sector_count;
     req->size = bio->size;
     req->write = bio->write;
