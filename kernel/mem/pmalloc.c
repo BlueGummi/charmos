@@ -207,7 +207,7 @@ void pmm_dyn_init() {
     buddy_active = true;
 }
 
-static void *buddy_alloc_pages(uint64_t count, bool add_offset) {
+static paddr_t buddy_alloc_pages(uint64_t count) {
     if (count == 0)
         k_panic("Tried to allocate zero pages\n");
 
@@ -218,7 +218,7 @@ static void *buddy_alloc_pages(uint64_t count, bool add_offset) {
     }
 
     if (order >= MAX_ORDER) {
-        return NULL;
+        return 0x0;
     }
 
     uint64_t current_order = order;
@@ -226,14 +226,14 @@ static void *buddy_alloc_pages(uint64_t count, bool add_offset) {
         current_order++;
 
     if (current_order >= MAX_ORDER) {
-        return NULL;
+        return 0x0;
     }
 
     while (current_order > order) {
         struct buddy_page *page =
             remove_from_free_area(&free_area[current_order]);
         if (!page) {
-            return NULL;
+            return 0x0;
         }
 
         uint64_t new_order = current_order - 1;
@@ -254,19 +254,17 @@ static void *buddy_alloc_pages(uint64_t count, bool add_offset) {
 
     struct buddy_page *page = remove_from_free_area(&free_area[order]);
     if (!page) {
-        return NULL;
+        return 0x0;
     }
 
-    return (void *) ((page->pfn * PAGE_SIZE) +
-                     (add_offset ? global.hhdm_offset : 0));
+    return (paddr_t) (page->pfn * PAGE_SIZE);
 }
 
-static void buddy_free_pages(void *addr, uint64_t count, bool has_offset) {
+static void buddy_free_pages(paddr_t addr, uint64_t count) {
     if (!addr || count == 0)
         return;
 
-    uint64_t pfn =
-        ((uintptr_t) addr - (has_offset ? global.hhdm_offset : 0)) / PAGE_SIZE;
+    uint64_t pfn = (uintptr_t) addr / PAGE_SIZE;
     if (pfn >= total_pages)
         return;
 
@@ -310,34 +308,34 @@ static void buddy_free_pages(void *addr, uint64_t count, bool has_offset) {
     add_to_free_area(page, &free_area[order]);
 }
 
-void *pmm_alloc_page(bool add_offset) {
-    return pmm_alloc_pages(1, add_offset);
+paddr_t pmm_alloc_page() {
+    return pmm_alloc_pages(1);
 }
 
 static struct spinlock pmalloc_lock = SPINLOCK_INIT;
-void *pmm_alloc_pages(uint64_t count, bool add_offset) {
+paddr_t pmm_alloc_pages(uint64_t count) {
     bool iflag = spin_lock(&pmalloc_lock);
 
     if (!buddy_active) {
-        void *p = bitmap_alloc_pages(count, add_offset);
+        paddr_t p = bitmap_alloc_pages(count);
         spin_unlock(&pmalloc_lock, iflag);
         return p;
     }
 
-    void *p = buddy_alloc_pages(count, add_offset);
+    paddr_t p = buddy_alloc_pages(count);
     spin_unlock(&pmalloc_lock, iflag);
     return p;
 }
 
-void pmm_free_pages(void *addr, uint64_t count, bool has_offset) {
+void pmm_free_pages(paddr_t addr, uint64_t count) {
     bool iflag = spin_lock(&pmalloc_lock);
     if (!buddy_active) {
-        bitmap_free_pages(addr, count, has_offset);
+        bitmap_free_pages(addr, count);
         spin_unlock(&pmalloc_lock, iflag);
         return;
     }
 
-    buddy_free_pages(addr, count, has_offset);
+    buddy_free_pages(addr, count);
     spin_unlock(&pmalloc_lock, iflag);
 }
 

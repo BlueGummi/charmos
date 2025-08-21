@@ -22,7 +22,7 @@ struct slab_cache slab_caches[SLAB_CLASS_COUNT];
 uintptr_t slab_heap_top = 0xFFFFF00000000000;
 
 static void *slab_map_new_page() {
-    uintptr_t phys = (uintptr_t) pmm_alloc_pages(1, false);
+    uintptr_t phys = pmm_alloc_page();
     if (!phys)
         return NULL;
 
@@ -290,7 +290,7 @@ void *kmalloc(uint64_t size) {
 
     uintptr_t virt = slab_heap_top;
     for (uint64_t i = 0; i < pages; i++) {
-        uintptr_t phys = (uintptr_t) pmm_alloc_page(false);
+        uintptr_t phys = pmm_alloc_page();
         if (!phys) {
             spin_unlock(&kmalloc_lock, iflag);
             return NULL;
@@ -329,9 +329,9 @@ void kfree(void *ptr) {
         uintptr_t virt = (uintptr_t) hdr;
         for (uint64_t i = 0; i < hdr->pages; i++) {
             uintptr_t vaddr = virt + i * PAGE_SIZE;
-            void *phys = (void *) vmm_get_phys(vaddr);
+            paddr_t phys = (paddr_t) vmm_get_phys(vaddr);
             vmm_unmap_page(vaddr);
-            pmm_free_pages(phys, 1, false);
+            pmm_free_pages(phys, 1);
         }
         spin_unlock(&kmalloc_lock, iflag);
         return;

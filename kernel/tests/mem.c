@@ -10,15 +10,15 @@
 REGISTER_TEST(pmm_alloc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
-    void *p = pmm_alloc_page(false);
-    TEST_ASSERT(p != NULL);
+    paddr_t p = pmm_alloc_page();
+    TEST_ASSERT(p);
     SET_SUCCESS;
 }
 
 REGISTER_TEST(vmm_map_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
-    uint64_t p = (uint64_t) pmm_alloc_page(false);
+    uint64_t p = pmm_alloc_page();
     TEST_ASSERT(p != 0);
     void *ptr = vmm_map_phys(p, PAGE_SIZE, 0);
     TEST_ASSERT(ptr != NULL);

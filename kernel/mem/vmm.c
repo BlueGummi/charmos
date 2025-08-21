@@ -23,8 +23,12 @@ uint64_t sub_offset(uint64_t a) {
     return a - global.hhdm_offset;
 }
 
+static inline struct page_table *alloc_pt(void) {
+    return (struct page_table *) (pmm_alloc_page() + global.hhdm_offset);
+}
+
 uintptr_t vmm_make_user_pml4(void) {
-    struct page_table *user_pml4 = (struct page_table *) pmm_alloc_page(true);
+    struct page_table *user_pml4 = alloc_pt();
     if (!user_pml4) {
         k_panic("Failed to allocate user pml4");
     }
@@ -86,7 +90,7 @@ static void do_tlb_shootdown(uintptr_t addr) {
 
 void vmm_init(struct limine_memmap_response *memmap,
               struct limine_executable_address_response *xa) {
-    kernel_pml4 = (struct page_table *) pmm_alloc_page(true);
+    kernel_pml4 = alloc_pt();
     if (!kernel_pml4)
         k_panic("Could not allocate space for kernel PML4\n");
 
@@ -150,7 +154,7 @@ static inline bool vmm_is_table_empty(struct page_table *table) {
 }
 
 static void pte_init(pte_t *entry, uint64_t flags) {
-    struct page_table *new_table = (struct page_table *) pmm_alloc_page(true);
+    struct page_table *new_table = alloc_pt();
     if (!new_table)
         k_panic("Could not allocate space for page table entry!\n");
 
@@ -218,9 +222,9 @@ void vmm_unmap_2mb_page(uintptr_t virt) {
 
     for (uint64_t level = 2; level > 0; level--) {
         if (vmm_is_table_empty(tables[level])) {
-            uintptr_t phys = (uintptr_t) tables[level] - global.hhdm_offset;
+            paddr_t phys = (uintptr_t) tables[level] - global.hhdm_offset;
             *entries[level - 1] = 0;
-            pmm_free_pages((void *) phys, 1, false);
+            pmm_free_pages(phys, 1);
         } else {
             break;
         }
@@ -309,7 +313,7 @@ void vmm_unmap_page(uintptr_t virt) {
         if (vmm_is_table_empty(tables[level])) {
             uintptr_t phys = (uintptr_t) tables[level] - global.hhdm_offset;
             *entries[level - 1] = 0;
-            pmm_free_pages((void *) phys, 1, false);
+            pmm_free_pages(phys, 1);
         } else {
             break;
         }

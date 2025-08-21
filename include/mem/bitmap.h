@@ -1,12 +1,13 @@
 #include <stdbool.h>
 #include <stdint.h>
+#include <types/types.h>
 
 extern uint8_t *bitmap;
 extern uint64_t bitmap_size;
 
-void *bitmap_alloc_page(bool add_offset);
-void *bitmap_alloc_pages(uint64_t count, bool add_offset);
-void bitmap_free_pages(void *addr, uint64_t count, bool has_offset);
+paddr_t bitmap_alloc_page();
+paddr_t bitmap_alloc_pages(uint64_t count);
+void bitmap_free_pages(paddr_t addr, uint64_t count);
 
 static inline void set_bit(uint64_t index) {
     uint64_t byte = index / 8;

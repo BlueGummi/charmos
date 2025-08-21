@@ -14,7 +14,7 @@ struct hugepage_gc_list hugepage_gc_list = {0};
 #define IS_ALIGNED(ptr, align) (((uintptr_t) (ptr) & ((align) - 1)) == 0)
 
 static inline paddr_t alloc_2mb_phys(void) {
-    paddr_t ret = (paddr_t) pmm_alloc_pages(HUGEPAGE_SIZE_IN_4KB_PAGES, false);
+    paddr_t ret = pmm_alloc_pages(HUGEPAGE_SIZE_IN_4KB_PAGES);
     kassert(IS_ALIGNED(ret, HUGEPAGE_SIZE));
     return ret;
 }
@@ -141,7 +141,7 @@ void hugepage_delete(struct hugepage *hp) {
     kassert(hp->pages_used == 0);
     free_vaddr(hugepage_full_tree, hp->virt_base);
     vmm_unmap_2mb_page(hp->virt_base);
-    pmm_free_pages((void *) hp->phys_base, HUGEPAGE_SIZE_IN_4KB_PAGES, false);
+    pmm_free_pages(hp->phys_base, HUGEPAGE_SIZE_IN_4KB_PAGES);
     kfree(hp);
 }
 

@@ -12,11 +12,11 @@ uint64_t bitmap_size = BOOT_BITMAP_SIZE;
 uint8_t *bitmap;
 static uint64_t last_allocated_index = 0;
 
-void *bitmap_alloc_page(bool add_offset) {
-    return pmm_alloc_pages(1, add_offset);
+paddr_t bitmap_alloc_page() {
+    return bitmap_alloc_pages(1);
 }
 
-void *bitmap_alloc_pages(uint64_t count, bool add_offset) {
+paddr_t bitmap_alloc_pages(uint64_t count) {
     if (count == 0) {
         k_panic("Zero pages requested\n");
     }
@@ -61,24 +61,22 @@ void *bitmap_alloc_pages(uint64_t count, bool add_offset) {
 
     /* fail */
     if (!found)
-        return NULL;
+        return 0x0;
 
     last_allocated_index = start_index;
     for (uint64_t i = 0; i < count; i++) {
         set_bit(start_index + i);
     }
 
-    return (void *) ((add_offset ? global.hhdm_offset : 0) +
-                     (start_index * PAGE_SIZE));
+    return (vaddr_t) (start_index * PAGE_SIZE);
 }
 
-void bitmap_free_pages(void *addr, uint64_t count, bool has_offset) {
-    if (addr == NULL || count == 0) {
+void bitmap_free_pages(paddr_t addr, uint64_t count) {
+    if (addr == 0 || count == 0) {
         k_panic("Possible UAF\n");
     }
 
-    uint64_t start_index =
-        ((uint64_t) addr - (has_offset ? global.hhdm_offset : 0)) / PAGE_SIZE;
+    uint64_t start_index = (uint64_t) addr / PAGE_SIZE;
 
     if (start_index >= bitmap_size * 8 ||
         start_index + count > bitmap_size * 8) {
