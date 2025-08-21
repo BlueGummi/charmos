@@ -101,49 +101,47 @@ static void cpu_mask_init(struct cpu_mask *m, size_t nbits) {
 
 void cpu_mask_set(struct cpu_mask *m, size_t cpu) {
     if (!m->uses_large) {
-        m->small |= (1ULL << cpu);
+        atomic_fetch_or(&m->small, 1ULL << cpu);
     } else {
-        m->large[cpu / 64] |= (1ULL << (cpu % 64));
+
+        atomic_fetch_or(&m->large[cpu / 64], 1ULL << (cpu % 64));
     }
 }
 
 void cpu_mask_clear(struct cpu_mask *m, size_t cpu) {
     if (!m->uses_large) {
-        m->small &= ~(1ULL << cpu);
+        atomic_fetch_and(&m->small, ~(1ULL << cpu));
     } else {
-        m->large[cpu / 64] &= ~(1ULL << (cpu % 64));
+        atomic_fetch_and(&m->large[cpu / 64], ~(1ULL << (cpu % 64)));
     }
 }
 
 bool cpu_mask_test(const struct cpu_mask *m, size_t cpu) {
     if (!m->uses_large) {
-        return (m->small >> cpu) & 1ULL;
+        return (atomic_load(&m->small) >> cpu) & 1ULL;
     } else {
-        return (m->large[cpu / 64] >> (cpu % 64)) & 1ULL;
+        return (atomic_load(&m->large[cpu / 64]) >> (cpu % 64)) & 1ULL;
     }
 }
 
 void cpu_mask_or(struct cpu_mask *dst, const struct cpu_mask *b) {
     if (!dst->uses_large) {
-        dst->small = dst->small | b->small;
+        atomic_fetch_or(&dst->small, atomic_load(&b->small));
     } else {
         size_t nwords = (dst->nbits + 63) / 64;
         for (size_t i = 0; i < nwords; i++)
-            dst->large[i] = dst->large[i] | b->large[i];
+            atomic_fetch_or(&dst->large[i], atomic_load(&b->large[i]));
     }
 }
 
 static bool cpu_mask_empty(const struct cpu_mask *mask) {
-    if (!mask->uses_large) {
-        return mask->small == 0;
-    }
+    if (!mask->uses_large)
+        return atomic_load(&mask->small) == 0;
 
     size_t nwords = (mask->nbits + 63) / 64;
-    for (size_t i = 0; i < nwords; i++) {
-
-        if (mask->large[i] != 0)
+    for (size_t i = 0; i < nwords; i++)
+        if (atomic_load(&mask->large[i]) != 0)
             return false;
-    }
 
     return true;
 }

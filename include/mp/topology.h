@@ -17,8 +17,8 @@ enum topology_level {
 struct cpu_mask {
     bool uses_large;
     union {
-        uint64_t small;
-        uint64_t *large;
+        atomic_uint_fast64_t small;
+        atomic_uint_fast64_t *large;
     };
     size_t nbits;
 };
