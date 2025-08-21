@@ -88,6 +88,7 @@ void k_main(void) {
 
     mp_complete_init();
     srat_init();
+    slit_init();
     topology_init();
 
     restore_interrupts();

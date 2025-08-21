@@ -82,13 +82,29 @@ add_custom_target(iso
 set(QEMU_COMMON_FLAGS
     -cdrom ${IMAGE_NAME}.iso
     -boot d
-    -m 4G
-    -smp sockets=2,cores=2,threads=2
+    -m 8G
+    -smp sockets=2,cores=4,threads=1
     -object memory-backend-ram,size=2G,id=mem0
     -object memory-backend-ram,size=2G,id=mem1
-    -numa node,cpus=0-3,nodeid=0,memdev=mem0
-    -numa node,cpus=4-7,nodeid=1,memdev=mem1
+    -object memory-backend-ram,size=2G,id=mem2
+    -object memory-backend-ram,size=2G,id=mem3
 
+    -numa node,cpus=0-1,nodeid=0,memdev=mem0
+    -numa node,cpus=2-3,nodeid=1,memdev=mem1
+    -numa node,cpus=4-5,nodeid=2,memdev=mem2
+    -numa node,cpus=6-7,nodeid=3,memdev=mem3
+    -numa dist,src=0,dst=1,val=15
+    -numa dist,src=1,dst=0,val=15
+    -numa dist,src=0,dst=2,val=20
+    -numa dist,src=2,dst=0,val=20
+    -numa dist,src=0,dst=3,val=30
+    -numa dist,src=3,dst=0,val=30
+    -numa dist,src=1,dst=2,val=25
+    -numa dist,src=2,dst=1,val=25
+    -numa dist,src=1,dst=3,val=35
+    -numa dist,src=3,dst=1,val=35
+    -numa dist,src=2,dst=3,val=15
+    -numa dist,src=3,dst=2,val=15
 
     -s
     #-S

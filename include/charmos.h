@@ -1,5 +1,6 @@
 #include <boot/stage.h>
 #include <fs/vfs.h>
+#include <mem/numa.h>
 #include <misc/list.h>
 #include <mp/topology.h>
 #include <stdatomic.h>
@@ -17,6 +18,8 @@ struct charmos_globals {
     struct generic_disk *root_node_disk;
 
     struct topology topology;
+    size_t numa_node_count;
+    struct numa_node *numa_nodes;
     uint64_t core_count;
     struct scheduler **schedulers;
     struct core **cores;
