@@ -32,6 +32,7 @@ struct core {
     uint32_t smt_id;
     uint32_t core_id;
 
+    struct topology_node *topo_node;
     struct topo_cache_info llc;
 };
 
@@ -49,10 +50,12 @@ static inline struct core *get_current_core(void) {
 
 static inline void mark_self_idle(void) {
     get_current_core()->idle = true;
+    topo_mark_core_idle(get_this_core_id(), true);
 }
 
 static inline void unmark_self_idle(void) {
     get_current_core()->idle = false;
+    topo_mark_core_idle(get_this_core_id(), false);
 }
 
 static inline void mark_self_in_interrupt(void) {

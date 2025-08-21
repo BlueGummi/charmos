@@ -38,8 +38,9 @@ struct topo_package_info {
 
 struct topology_node {
     enum topology_level level;
-    uint64_t id;         /* Index in this node */
-    uint64_t parent;     /* Parent node index, -1 for root */
+    uint64_t id;     /* Index in this node */
+    uint64_t parent; /* Parent node index, -1 for root */
+    struct topology_node *parent_node;
     int32_t first_child; /* Index in child array */
     int32_t nr_children;
 
@@ -59,3 +60,6 @@ struct topology {
     struct topology_node *level[TL_MAX];
     uint16_t count[TL_MAX];
 };
+
+void topo_mark_core_idle(size_t cpu_id, bool idle);
+struct core *topo_find_idle_core(struct core *local_core);

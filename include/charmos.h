@@ -16,7 +16,7 @@ struct charmos_globals {
     struct vfs_node *root_node;
     struct generic_disk *root_node_disk;
 
-    struct topology cpu_topology;
+    struct topology topology;
     uint64_t core_count;
     struct scheduler **schedulers;
     struct core **cores;
