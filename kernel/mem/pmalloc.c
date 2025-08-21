@@ -150,7 +150,49 @@ void pmm_init(struct limine_memmap_request m) {
 }
 
 void pmm_dyn_init() {
-    buddy_page_array = kzalloc(sizeof(struct buddy_page) * total_pages);
+    size_t pages_needed =
+        (sizeof(struct buddy_page) * total_pages + PAGE_SIZE - 1) / PAGE_SIZE;
+    bool found = false;
+
+    for (uint64_t i = 0; i < memmap->entry_count && !found; i++) {
+        struct limine_memmap_entry *entry = memmap->entries[i];
+        if (entry->type != LIMINE_MEMMAP_USABLE)
+            continue;
+
+        uint64_t start = ALIGN_UP(entry->base, PAGE_SIZE);
+        uint64_t end = ALIGN_DOWN(entry->base + entry->length, PAGE_SIZE);
+
+        uint64_t run_start = 0;
+
+        uint64_t run_len = 0;
+
+        for (uint64_t addr = start; addr < end; addr += PAGE_SIZE) {
+            uint64_t pfn = addr / PAGE_SIZE;
+
+            if (!test_bit(pfn)) {
+                if (run_len == 0)
+                    run_start = addr;
+                run_len++;
+
+                if (run_len >= pages_needed) {
+                    buddy_page_array =
+                        (void *) (run_start + global.hhdm_offset);
+
+                    for (uint64_t j = 0; j < pages_needed; j++)
+                        set_bit((run_start / PAGE_SIZE) + j);
+
+                    entry->base = run_start + pages_needed * PAGE_SIZE;
+                    entry->length = (end - entry->base);
+
+                    found = true;
+                    break;
+                }
+            } else {
+                run_len = 0;
+            }
+        }
+    }
+
     if (!buddy_page_array)
         k_panic("Failed to allocate buddy metadata");
 
