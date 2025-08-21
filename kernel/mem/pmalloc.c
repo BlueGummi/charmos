@@ -3,6 +3,7 @@
 #include <mem/bitmap.h>
 #include <mem/buddy.h>
 #include <mem/pmm.h>
+#include <misc/align.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -19,11 +20,37 @@ static struct buddy_page *buddy_page_array = NULL;
 static struct limine_memmap_response *memmap;
 static uint64_t total_pages = 0;
 
-static bool is_block_free_in_bitmap(uint64_t pfn, uint64_t order) {
+static bool pfn_usable_from_memmap(uint64_t pfn) {
+    uint64_t addr = pfn * PAGE_SIZE;
+
+    for (uint64_t i = 0; i < memmap->entry_count; i++) {
+        struct limine_memmap_entry *entry = memmap->entries[i];
+        if (entry->type != LIMINE_MEMMAP_USABLE)
+            continue;
+
+        uint64_t start = ALIGN_DOWN(entry->base, PAGE_SIZE);
+
+        uint64_t end = ALIGN_UP(entry->base + entry->length, PAGE_SIZE);
+
+        if (addr >= start && addr < end)
+
+            return true;
+    }
+    return false;
+}
+
+static bool is_block_free(uint64_t pfn, uint64_t order) {
     uint64_t pages = 1ULL << order;
+
     for (uint64_t i = 0; i < pages; i++) {
-        if (test_bit(pfn + i)) {
-            return false;
+        uint64_t cur_pfn = pfn + i;
+
+        if (cur_pfn < BOOT_BITMAP_SIZE * 8) {
+            if (test_bit(cur_pfn))
+                return false;
+        } else {
+            if (!pfn_usable_from_memmap(cur_pfn))
+                return false;
         }
     }
     return true;
@@ -77,7 +104,7 @@ static void do_add_entry(struct limine_memmap_entry *entry) {
         if (region_start + block_size > total_pages)
             break;
 
-        if (is_block_free_in_bitmap(region_start, order)) {
+        if (is_block_free(region_start, order)) {
             struct buddy_page *page = &buddy_page_array[region_start];
             memset(page, 0, sizeof(*page));
             page->pfn = region_start;
@@ -108,8 +135,8 @@ void pmm_init(struct limine_memmap_request m) {
 
         if (entry->type == LIMINE_MEMMAP_USABLE) {
             total_phys += entry->length;
-            uint64_t start = (entry->base + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-            uint64_t end = (entry->base + entry->length) & ~(PAGE_SIZE - 1);
+            uint64_t start = ALIGN_DOWN(entry->base, PAGE_SIZE);
+            uint64_t end = ALIGN_UP(entry->base + entry->length, PAGE_SIZE);
 
             for (uint64_t addr = start; addr < end; addr += PAGE_SIZE) {
                 uint64_t index = addr / PAGE_SIZE;
@@ -123,15 +150,6 @@ void pmm_init(struct limine_memmap_request m) {
 }
 
 void pmm_dyn_init() {
-    uint64_t size = total_pages / 8;
-    uint8_t *new_bitmap = kmalloc(size);
-    if (!new_bitmap)
-        k_panic("Failed to allocate dynamic bitmap");
-
-    memcpy(new_bitmap, bitmap, MIN(BOOT_BITMAP_SIZE, size));
-    bitmap_size = size;
-    bitmap = new_bitmap;
-
     buddy_page_array = kzalloc(sizeof(struct buddy_page) * total_pages);
     if (!buddy_page_array)
         k_panic("Failed to allocate buddy metadata");
@@ -141,10 +159,8 @@ void pmm_dyn_init() {
         free_area[i].nr_free = 0;
     }
 
-    for (uint64_t i = 0; i < memmap->entry_count; i++) {
-        struct limine_memmap_entry *entry = memmap->entries[i];
-        do_add_entry(entry);
-    }
+    for (uint64_t i = 0; i < memmap->entry_count; i++)
+        do_add_entry(memmap->entries[i]);
 
     buddy_active = true;
 }
