@@ -97,7 +97,7 @@ next_request:
 
 out:
     spin_unlock(&chan->lock, i);
-    LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
+    lapic_write(LAPIC_REG_EOI, 0);
 }
 
 static void ide_on_complete(struct ide_request *req) {

@@ -67,6 +67,7 @@ void k_main(void) {
     /* Early devices */
     idt_init();
     uacpi_init(rsdp_request.response->address);
+    x2apic_init();
     lapic_init();
     hpet_init();
     ioapic_init();
@@ -88,7 +89,7 @@ void k_main(void) {
     mp_complete_init();
     srat_init();
     topology_init();
-    
+
     restore_interrupts();
     scheduler_yield();
 

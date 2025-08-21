@@ -52,7 +52,7 @@ void tlb_shootdown(void *ctx, uint8_t irq, void *rsp) {
     atomic_store_explicit(&core->tlb_page, 0, memory_order_release);
     atomic_store_explicit(&core->tlb_ack_gen, req_gen, memory_order_release);
 
-    LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
+    lapic_write(LAPIC_REG_EOI, 0);
 }
 
 static void do_tlb_shootdown(uintptr_t addr) {
@@ -70,7 +70,7 @@ static void do_tlb_shootdown(uintptr_t addr) {
         struct core *target = global.cores[i];
         atomic_store_explicit(&target->tlb_page, addr, memory_order_release);
         atomic_store_explicit(&target->tlb_req_gen, gen, memory_order_release);
-        lapic_send_ipi(i, IRQ_TLB_SHOOTDOWN);
+        ipi_send(i, IRQ_TLB_SHOOTDOWN);
     }
 
     for (uint64_t i = 0; i < cores; i++) {

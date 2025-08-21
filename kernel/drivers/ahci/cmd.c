@@ -63,7 +63,7 @@ void ahci_isr_handler(void *ctx, uint8_t vector, void *rsp) {
         ahci_process_completions(dev, port);
     }
 
-    LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
+    lapic_write(LAPIC_REG_EOI, 0);
 }
 
 void ahci_send_command(struct ahci_disk *disk, struct ahci_full_port *port,

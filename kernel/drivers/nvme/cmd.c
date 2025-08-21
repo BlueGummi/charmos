@@ -90,7 +90,7 @@ void nvme_isr_handler(void *ctx, uint8_t vector, void *rsp) {
     (void) vector, (void) rsp;
     struct nvme_device *dev = ctx;
     nvme_process_completions(dev, THIS_QID(dev));
-    LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
+    lapic_write(LAPIC_REG_EOI, 0);
 }
 
 void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,

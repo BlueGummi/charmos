@@ -63,7 +63,7 @@ void isr_common_entry(uint8_t vector, void *rsp) {
 
 void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {
     (void) ctx, (void) vector, (void) rsp;
-    LAPIC_SEND(LAPIC_REG(LAPIC_REG_EOI), 0);
+    lapic_write(LAPIC_REG_EOI, 0);
 
     /* Doing this as the `schedule()` will go to another thread */
     unmark_self_in_interrupt();

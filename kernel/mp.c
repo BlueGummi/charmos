@@ -105,7 +105,9 @@ void wakeup() {
 
     asm volatile("mov %0, %%cr3" ::"r"(cr3));
 
-    uint64_t cpu = lapic_get_id();
+    x2apic_init();
+
+    uint64_t cpu = cpu_get_this_id();
 
     gdt_install();
     idt_load();

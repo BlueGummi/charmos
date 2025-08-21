@@ -329,5 +329,5 @@ void scheduler_yield() {
 
 void scheduler_force_resched(struct scheduler *sched) {
     if (!atomic_load(&sched->timeslice_enabled))
-        lapic_send_ipi(sched->core_id, IRQ_SCHEDULER);
+        ipi_send(sched->core_id, IRQ_SCHEDULER);
 }
