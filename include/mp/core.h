@@ -23,6 +23,7 @@ struct core {
     uint64_t rcu_seen_gen;
     uint32_t rcu_nesting;
     bool rcu_quiescent;
+    bool idle; /* Flag */
     enum irql current_irql;
 
     uint64_t numa_node;
@@ -44,6 +45,14 @@ static inline uint64_t get_this_core_id() {
 
 static inline struct core *get_current_core(void) {
     return global.cores[get_this_core_id()];
+}
+
+static inline void mark_self_idle(void) {
+    get_current_core()->idle = true;
+}
+
+static inline void unmark_self_idle(void) {
+    get_current_core()->idle = false;
 }
 
 static inline void mark_self_in_interrupt(void) {
