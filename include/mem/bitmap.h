@@ -1,7 +1,11 @@
+#include <mem/vmm.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <types/types.h>
 
+#define BOOT_BITMAP_SIZE ((1024 * 1024 * 128) / PAGE_SIZE / 8)
+
+extern uint8_t boot_bitmap[BOOT_BITMAP_SIZE];
 extern uint8_t *bitmap;
 extern uint64_t bitmap_size;
 

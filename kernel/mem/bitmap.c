@@ -5,8 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define BOOT_BITMAP_SIZE ((1024 * 1024 * 128) / PAGE_SIZE / 8)
-
+uint8_t boot_bitmap[BOOT_BITMAP_SIZE] = {[0 ...(BOOT_BITMAP_SIZE - 1)] = 0xFF};
 uint64_t bitmap_size = BOOT_BITMAP_SIZE;
 
 uint8_t *bitmap;
@@ -17,9 +16,8 @@ paddr_t bitmap_alloc_page() {
 }
 
 paddr_t bitmap_alloc_pages(uint64_t count) {
-    if (count == 0) {
+    if (count == 0)
         k_panic("Zero pages requested\n");
-    }
 
     uint64_t consecutive = 0;
     uint64_t start_index = 0;
@@ -27,9 +25,9 @@ paddr_t bitmap_alloc_pages(uint64_t count) {
 
     for (uint64_t i = last_allocated_index; i < bitmap_size * 8; i++) {
         if (!test_bit(i)) {
-            if (consecutive == 0) {
+            if (consecutive == 0)
                 start_index = i;
-            }
+
             consecutive++;
 
             if (consecutive == count) {
@@ -44,9 +42,9 @@ paddr_t bitmap_alloc_pages(uint64_t count) {
     if (!found) {
         for (uint64_t i = 0; i < bitmap_size * 8; i++) {
             if (!test_bit(i)) {
-                if (consecutive == 0) {
+                if (consecutive == 0)
                     start_index = i;
-                }
+
                 consecutive++;
 
                 if (consecutive == count) {

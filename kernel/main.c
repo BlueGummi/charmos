@@ -53,10 +53,10 @@ void k_main(void) {
     global.current_bootstage = BOOTSTAGE_EARLY_MP;
 
     /* Allocators */
-    pmm_init(memmap_request);
+    pmm_early_init(memmap_request);
 
     vmm_init(memmap_request.response, xa_request.response);
-    pmm_dyn_init();
+    pmm_mid_init();
 
     slab_init();
     hugepage_alloc_init();

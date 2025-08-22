@@ -25,6 +25,9 @@ struct charmos_globals {
     struct core **cores;
     uint64_t hhdm_offset;
 
+    bool buddy_active;
+    uint64_t total_pages;
+
     /* TODO: no more of this */
     atomic_uint_fast64_t next_tlb_gen;
 
