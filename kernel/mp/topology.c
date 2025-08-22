@@ -288,7 +288,7 @@ static size_t build_numa_nodes(size_t n_cores, size_t n_llc) {
 
         /* Initialized if there is actually
          * NUMA present (these nodes are not fake) */
-        if (global.numa_nodes) {
+        if (global.numa_node_count > 1) {
             numa->data.numa = &global.numa_nodes[i];
             global.numa_nodes[i].topo = numa;
         }

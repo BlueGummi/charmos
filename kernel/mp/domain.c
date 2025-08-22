@@ -99,7 +99,7 @@ void core_domain_dump(void) {
  * NUMA nodes. If not, we just group cores into
  * groups of 4 and construct domains from them. */
 void core_domain_init(void) {
-    if (global.numa_nodes) {
+    if (global.numa_node_count > 1) {
         construct_domains_from_numa_nodes();
     } else {
         construct_domains_from_cores();
