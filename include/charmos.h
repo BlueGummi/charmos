@@ -1,10 +1,10 @@
+#pragma once
 #include <boot/stage.h>
 #include <fs/vfs.h>
 #include <mem/numa.h>
 #include <misc/list.h>
 #include <mp/topology.h>
 #include <stdatomic.h>
-#pragma once
 
 struct charmos_globals {
     volatile bool panic_in_progress;
@@ -23,6 +23,9 @@ struct charmos_globals {
     uint64_t core_count;
     struct scheduler **schedulers;
     struct core **cores;
+
+    uint64_t domain_count;
+    struct core_domain **core_domains;
     uint64_t hhdm_offset;
 
     bool buddy_active;

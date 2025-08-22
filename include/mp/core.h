@@ -3,7 +3,6 @@
 #include <boot/tss.h>
 #include <charmos.h>
 #include <compiler.h>
-#include <console/printf.h>
 #include <sch/irql.h>
 #include <stdatomic.h>
 #include <stdbool.h>

@@ -24,6 +24,7 @@
 #include <misc/cmdline.h>
 #include <misc/logo.h>
 #include <mp/core.h>
+#include <mp/domain.h>
 #include <mp/mp.h>
 #include <registry.h>
 #include <requests.h>
@@ -92,6 +93,7 @@ void k_main(void) {
     srat_init();
     slit_init();
     topology_init();
+    core_domain_init();
 
     restore_interrupts();
     scheduler_yield();

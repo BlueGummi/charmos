@@ -1,5 +1,6 @@
 #include <acpi/hpet.h>
 #include <asm.h>
+#include <console/printf.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <time.h>

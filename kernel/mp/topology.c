@@ -1,5 +1,5 @@
-#include <acpi/lapic.h>
 #include <asm.h>
+#include <console/printf.h>
 #include <int/idt.h>
 #include <limine.h>
 #include <mem/alloc.h>
@@ -71,9 +71,7 @@ static void print_topology_node(struct topology_node *node, int depth) {
 
     case TL_NUMA:
         for (int i = 0; i < global.topology.count[TL_CORE]; i++)
-
             if (core_nodes[i].parent == node->id)
-
                 print_topology_node(&core_nodes[i], depth + 1);
         break;
 
@@ -287,6 +285,14 @@ static size_t build_numa_nodes(size_t n_cores, size_t n_llc) {
         numa->first_child = -1;
         numa->nr_children = 0;
         numa->core = NULL;
+
+        /* Initialized if there is actually
+         * NUMA present (these nodes are not fake) */
+        if (global.numa_nodes) {
+            numa->data.numa = &global.numa_nodes[i];
+            global.numa_nodes[i].topo = numa;
+        }
+
         cpu_mask_init(&numa->cpus, global.core_count);
         cpu_mask_init(&numa->idle, global.core_count);
     }
@@ -510,6 +516,40 @@ void topology_init(void) {
     global.topology.count[TL_MACHINE] = 1;
 
     topology_dump();
+}
+
+struct core **topo_get_smts_under_numa(struct topology_node *numa,
+                                       size_t *count) {
+    size_t total = 0;
+    struct core **smts = NULL;
+    if (!numa || numa->level != TL_NUMA)
+        goto out;
+
+    for (int32_t i = 0; i < numa->nr_children; i++) {
+        struct topology_node *core_node = &core_nodes[numa->first_child + i];
+        total += core_node->nr_children;
+    }
+
+    if (total == 0)
+        goto out;
+
+    smts = kmalloc(sizeof(struct core *) * total);
+    if (!smts)
+        k_panic("Could not allocate array for NUMA SMTs\n");
+
+    size_t idx = 0;
+    for (int32_t i = 0; i < numa->nr_children; i++) {
+        struct topology_node *core_node = &core_nodes[numa->first_child + i];
+        for (int32_t j = 0; j < core_node->nr_children; j++) {
+            struct topology_node *smt_node =
+                &smt_nodes[core_node->first_child + j];
+            smts[idx++] = smt_node->core;
+        }
+    }
+
+out:
+    *count = total;
+    return smts;
 }
 
 void topo_mark_core_idle(size_t cpu_id, bool idle) {

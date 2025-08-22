@@ -83,7 +83,7 @@ set(QEMU_COMMON_FLAGS
     -cdrom ${IMAGE_NAME}.iso
     -boot d
     -m 8G
-    -smp sockets=2,cores=4,threads=1
+    -smp sockets=2,cores=2,threads=2
     -object memory-backend-ram,size=2G,id=mem0
     -object memory-backend-ram,size=2G,id=mem1
     -object memory-backend-ram,size=2G,id=mem2

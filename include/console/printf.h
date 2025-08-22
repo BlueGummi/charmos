@@ -1,3 +1,4 @@
+#pragma once
 #include <asm.h>
 #include <charmos.h>
 #include <flanterm/backends/fb.h>

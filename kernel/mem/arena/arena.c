@@ -1,3 +1,4 @@
+#include <console/panic.h>
 #include <mem/alloc.h>
 #include <mem/arena.h>
 #include <mem/hugepage.h>

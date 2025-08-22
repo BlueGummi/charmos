@@ -50,7 +50,7 @@ struct topology_node {
     struct core *core; /* Pointer to this node's `core` struct */
 
     union {
-        struct topo_numa_region *numa;
+        struct numa_node *numa;
         struct topo_cache_info *cache;
         struct topo_package_info *package;
     } data;
@@ -63,3 +63,5 @@ struct topology {
 
 void topo_mark_core_idle(size_t cpu_id, bool idle);
 struct core *topo_find_idle_core(struct core *local_core);
+struct core **topo_get_smts_under_numa(struct topology_node *numa,
+                                       size_t *count);

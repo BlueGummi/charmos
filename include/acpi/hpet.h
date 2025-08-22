@@ -1,5 +1,5 @@
 #include <asm.h>
-#include <mp/core.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #pragma once
 void hpet_init(void);
