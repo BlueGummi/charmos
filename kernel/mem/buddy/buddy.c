@@ -26,7 +26,6 @@ static bool pfn_usable_from_memmap(uint64_t pfn) {
         uint64_t end = ALIGN_UP(entry->base + entry->length, PAGE_SIZE);
 
         if (addr >= start && addr < end)
-
             return true;
     }
     return false;
@@ -72,7 +71,9 @@ static struct buddy_page *remove_from_free_area(struct free_area *area) {
     return page;
 }
 
-void buddy_add_entry(struct limine_memmap_entry *entry) {
+void buddy_add_entry(struct buddy_page *page_array,
+                     struct limine_memmap_entry *entry,
+                     struct free_area *farea) {
     if (entry->type != LIMINE_MEMMAP_USABLE)
         return;
 
@@ -98,15 +99,34 @@ void buddy_add_entry(struct limine_memmap_entry *entry) {
             break;
 
         if (is_block_free(region_start, order)) {
-            struct buddy_page *page = &buddy_page_array[region_start];
+            struct buddy_page *page = &page_array[region_start];
             memset(page, 0, sizeof(*page));
             page->pfn = region_start;
             page->order = order;
-            add_to_free_area(page, &buddy_free_area[order]);
+            add_to_free_area(page, &farea[order]);
         }
 
         region_start += block_size;
         region_size -= block_size;
+    }
+}
+
+void buddy_reserve_range(uint64_t pfn, uint64_t pages) {
+    for (uint64_t i = 0; i < pages; i++) {
+        struct buddy_page *page = &buddy_page_array[pfn + i];
+        if (page->is_free) {
+            struct free_area *area = page->free_area;
+            struct buddy_page **prev = &area->next;
+            while (*prev && *prev != page)
+                prev = &(*prev)->next;
+
+            if (*prev == page) {
+                *prev = page->next;
+                area->nr_free--;
+            }
+
+            page->is_free = false;
+        }
     }
 }
 

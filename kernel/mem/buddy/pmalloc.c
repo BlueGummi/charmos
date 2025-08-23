@@ -94,7 +94,7 @@ void pmm_mid_init() {
     }
 
     for (uint64_t i = 0; i < memmap->entry_count; i++)
-        buddy_add_entry(memmap->entries[i]);
+        buddy_add_entry(buddy_page_array, memmap->entries[i], buddy_free_area);
 
     global.buddy_active = true;
 }
