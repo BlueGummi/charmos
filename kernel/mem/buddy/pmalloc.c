@@ -39,11 +39,7 @@ void pmm_early_init(struct limine_memmap_request m) {
     global.total_pages = total_phys / PAGE_SIZE;
 }
 
-void pmm_mid_init() {
-    size_t pages_needed =
-        (sizeof(struct buddy_page) * global.total_pages + PAGE_SIZE - 1) /
-        PAGE_SIZE;
-
+static void mid_init_buddy(size_t pages_needed) {
     bool found = false;
 
     for (uint64_t i = 0; i < memmap->entry_count && !found; i++) {
@@ -53,9 +49,7 @@ void pmm_mid_init() {
 
         uint64_t start = ALIGN_UP(entry->base, PAGE_SIZE);
         uint64_t end = ALIGN_DOWN(entry->base + entry->length, PAGE_SIZE);
-
         uint64_t run_start = 0;
-
         uint64_t run_len = 0;
 
         for (uint64_t addr = start; addr < end; addr += PAGE_SIZE) {
@@ -84,7 +78,14 @@ void pmm_mid_init() {
             }
         }
     }
+}
 
+void pmm_mid_init() {
+    size_t pages_needed =
+        (sizeof(struct buddy_page) * global.total_pages + PAGE_SIZE - 1) /
+        PAGE_SIZE;
+
+    mid_init_buddy(pages_needed);
     if (!buddy_page_array)
         k_panic("Failed to allocate buddy metadata");
 
@@ -97,6 +98,57 @@ void pmm_mid_init() {
         buddy_add_entry(buddy_page_array, memmap->entries[i], buddy_free_area);
 
     global.buddy_active = true;
+}
+
+static void late_init_from_numa(size_t domain_count) {
+    for (size_t i = 0; i < domain_count; i++) {
+        struct numa_node *node = &global.numa_nodes[i % global.numa_node_count];
+
+        domain_buddies[i].start = node->mem_base;
+        domain_buddies[i].end = node->mem_base + node->mem_size;
+
+        domain_buddies[i].length = node->mem_size;
+
+        /* Slice of buddy array corresponding to this range */
+        size_t page_offset = node->mem_base / PAGE_SIZE;
+        domain_buddies[i].buddy = &buddy_page_array[page_offset];
+    }
+}
+
+/* No NUMA, just split evenly */
+static void late_init_non_numa(size_t domain_count) {
+    size_t pages_per_domain = global.total_pages / domain_count;
+    size_t remainder_pages = global.total_pages % domain_count;
+
+    uintptr_t base = 0;
+    size_t page_cursor = 0;
+
+    for (size_t i = 0; i < domain_count; i++) {
+        size_t this_pages = pages_per_domain;
+        if (i == domain_count - 1)
+            this_pages += remainder_pages;
+
+        domain_buddies[i].start = base;
+
+        domain_buddies[i].end = base + this_pages / PAGE_SIZE;
+        domain_buddies[i].length = this_pages / PAGE_SIZE;
+
+        domain_buddies[i].buddy = &buddy_page_array[page_cursor];
+
+        page_cursor += this_pages;
+        base += this_pages / PAGE_SIZE;
+    }
+}
+
+void pmm_late_init(void) {
+    size_t domain_count = global.domain_count;
+    domain_buddies = kmalloc(sizeof(struct domain_buddy) * domain_count);
+
+    if (global.numa_node_count > 1) {
+        late_init_from_numa(domain_count);
+    } else {
+        late_init_non_numa(domain_count);
+    }
 }
 
 paddr_t pmm_alloc_page() {

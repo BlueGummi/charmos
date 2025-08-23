@@ -94,6 +94,7 @@ void k_main(void) {
     slit_init();
     topology_init();
     core_domain_init();
+    pmm_late_init();
 
     restore_interrupts();
     scheduler_yield();

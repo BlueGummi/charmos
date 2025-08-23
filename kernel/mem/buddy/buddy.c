@@ -12,6 +12,7 @@
 
 struct free_area buddy_free_area[MAX_ORDER] = {0};
 struct buddy_page *buddy_page_array = NULL;
+struct domain_buddy *domain_buddies;
 
 static bool pfn_usable_from_memmap(uint64_t pfn) {
     uint64_t addr = pfn * PAGE_SIZE;

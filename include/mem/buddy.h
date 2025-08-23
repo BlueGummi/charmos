@@ -19,8 +19,16 @@ struct free_area {
     uint64_t nr_free;
 };
 
+struct domain_buddy {
+    struct buddy_page *buddy;
+    paddr_t start; /* physical start address */
+    paddr_t end;   /* physical end address */
+    size_t length; /* total bytes */
+};
+
 extern struct free_area buddy_free_area[MAX_ORDER];
 extern struct buddy_page *buddy_page_array;
+extern struct domain_buddy *domain_buddies;
 
 static inline bool buddy_is_pfn_free(uint64_t pfn) {
     if (pfn >= global.total_pages)
