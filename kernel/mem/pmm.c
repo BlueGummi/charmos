@@ -147,6 +147,12 @@ static void late_init_non_numa(size_t domain_count) {
     }
 }
 
+/* We construct the buddies here, then
+ * we hand it off to domain_buddies_init.
+ *
+ * This is just to avoid a bunch of NUMA
+ * logic sitting around in the domain_buddies_init */
+
 void pmm_late_init(void) {
     size_t domain_count = global.domain_count;
     domain_buddies = kmalloc(sizeof(struct domain_buddy) * domain_count);

@@ -1,7 +1,11 @@
 #include <charmos.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <sync/spin_lock.h>
 #include <types/types.h>
+
+#define DOMAIN_ARENA_SIZE 64
+#define DOMAIN_FREE_QUEUE_SIZE 64
 
 #define MIN(x, y) ((x) > (y) ? (y) : (x))
 #define MAX_ORDER 20
@@ -20,12 +24,32 @@ struct free_area {
     uint64_t nr_free;
 };
 
+struct domain_arena {
+    struct buddy_page **pages;
+    size_t head;
+    size_t tail;
+    size_t capacity;
+    struct spinlock lock;
+};
+
+struct domain_free_queue {
+    paddr_t *queue;
+    size_t head;
+    size_t tail;
+    size_t capacity;
+    struct spinlock lock;
+};
+
 struct domain_buddy {
     struct buddy_page *buddy;
     struct free_area *free_area;
+    struct domain_arena *arena;
+    struct domain_free_queue *free_queue;
     paddr_t start; /* physical start address */
     paddr_t end;   /* physical end address */
     size_t length; /* total bytes */
+    size_t pages_used;
+    size_t total_pages;
 };
 
 extern struct free_area buddy_free_area[MAX_ORDER];
