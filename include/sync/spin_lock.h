@@ -55,3 +55,12 @@ static inline bool spin_trylock(struct spinlock *lock) {
     return atomic_compare_exchange_strong_explicit(
         &lock->state, &expected, 1, memory_order_acquire, memory_order_relaxed);
 }
+
+#define SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(type, member)                 \
+    static inline bool type##_lock(struct type *obj) {                         \
+        return spin_lock(&obj->member);                                        \
+    }                                                                          \
+                                                                               \
+    static inline void type##_unlock(struct type *obj, bool iflag) {           \
+        spin_unlock(&obj->member, iflag);                                      \
+    }

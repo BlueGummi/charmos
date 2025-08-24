@@ -57,16 +57,16 @@ static struct hugepage *search_core_list(struct hugepage_core_list *hcl,
                                          vaddr_t vaddr) {
     struct minheap_node *mhn = NULL;
 
-    bool iflag = hugepage_list_lock(hcl);
+    bool iflag = hugepage_core_list_lock(hcl);
     minheap_for_each(hcl->hugepage_minheap, mhn) {
         struct hugepage *hp = hugepage_from_minheap_node(mhn);
         if (hp->virt_base == vaddr) {
-            hugepage_list_unlock(hcl, iflag);
+            hugepage_core_list_unlock(hcl, iflag);
             return hp;
         }
     }
 
-    hugepage_list_unlock(hcl, iflag);
+    hugepage_core_list_unlock(hcl, iflag);
     return NULL;
 }
 

@@ -15,3 +15,7 @@ static inline struct domain_buddy *domain_for_addr(paddr_t addr) {
     k_panic("Likely invalid free address 0x%lx", addr);
     return NULL;
 }
+
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(domain_buddy, lock);
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(domain_free_queue, lock);
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(domain_arena, lock);

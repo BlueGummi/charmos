@@ -106,18 +106,18 @@ static void *alloc_search_core_list(struct hugepage_core_list *hcl,
         return NULL;
 
     struct minheap_node *mhn;
-    bool iflag = hugepage_list_lock(hcl);
+    bool iflag = hugepage_core_list_lock(hcl);
 
     minheap_for_each(hcl->hugepage_minheap, mhn) {
         struct hugepage *hp = hugepage_from_minheap_node(mhn);
         void *p = alloc_and_adjust(hp, page_count, true);
         if (p) {
-            hugepage_list_unlock(hcl, iflag);
+            hugepage_core_list_unlock(hcl, iflag);
             return p;
         }
     }
 
-    hugepage_list_unlock(hcl, iflag);
+    hugepage_core_list_unlock(hcl, iflag);
     /* No space in minheap */
     return NULL;
 }

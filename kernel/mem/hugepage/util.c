@@ -29,13 +29,13 @@ void hugepage_print_all(void) {
 
     for (size_t i = 0; i < global.core_count; i++) {
         struct hugepage_core_list *hcl = &hugepage_full_tree->core_lists[i];
-        bool iflag = hugepage_list_lock(hcl);
+        bool iflag = hugepage_core_list_lock(hcl);
         struct minheap_node *mhn;
         minheap_for_each(hcl->hugepage_minheap, mhn) {
             struct hugepage *hp = hugepage_from_minheap_node(mhn);
             hugepage_print(hp);
         }
-        hugepage_list_unlock(hcl, iflag);
+        hugepage_core_list_unlock(hcl, iflag);
     }
     k_printf("hugepage gc list:\n");
     bool iflag = hugepage_gc_list_lock(&hugepage_gc_list);

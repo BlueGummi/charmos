@@ -24,40 +24,10 @@ static inline size_t hugepage_num_pages_free(struct hugepage *hp) {
     return HUGEPAGE_SIZE_IN_4KB_PAGES - hp->pages_used;
 }
 
-static inline bool hugepage_gc_list_lock(struct hugepage_gc_list *gcl) {
-    return spin_lock(&gcl->lock);
-}
-
-static inline void hugepage_gc_list_unlock(struct hugepage_gc_list *gcl,
-                                           bool iflag) {
-    spin_unlock(&gcl->lock, iflag);
-}
-
-static inline bool hugepage_list_lock(struct hugepage_core_list *hcl) {
-    return spin_lock(&hcl->lock);
-}
-
-static inline void hugepage_list_unlock(struct hugepage_core_list *hcl,
-                                        bool iflag) {
-    spin_unlock(&hcl->lock, iflag);
-}
-
-static inline bool hugepage_tree_lock(struct hugepage_tree *hpt) {
-    return spin_lock(&hpt->lock);
-}
-
-static inline void hugepage_tree_unlock(struct hugepage_tree *hpt, bool iflag) {
-    spin_unlock(&hpt->lock, iflag);
-}
-
-static inline bool hugepage_tb_entry_lock(struct hugepage_tb_entry *htbe) {
-    return spin_lock(&htbe->lock);
-}
-
-static inline void hugepage_tb_entry_unlock(struct hugepage_tb_entry *htbe,
-                                            bool iflag) {
-    spin_unlock(&htbe->lock, iflag);
-}
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(hugepage_gc_list, lock)
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(hugepage_core_list, lock)
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(hugepage_tree, lock)
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(hugepage_tb_entry, lock)
 
 /* You cannot unmark the 'being_deleted' since that is a UAF */
 static inline void hugepage_mark_being_deleted(struct hugepage *hp) {

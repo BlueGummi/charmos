@@ -54,6 +54,7 @@ struct domain_buddy {
     size_t length; /* total bytes */
     size_t pages_used;
     size_t total_pages;
+    struct spinlock lock;
 };
 
 extern struct free_area buddy_free_area[MAX_ORDER];
