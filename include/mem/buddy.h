@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <types/types.h>
 
+#define MIN(x, y) ((x) > (y) ? (y) : (x))
 #define MAX_ORDER 20
 #pragma once
 
@@ -37,8 +38,10 @@ static inline bool buddy_is_pfn_free(uint64_t pfn) {
     return buddy_page_array[pfn].is_free;
 }
 
-paddr_t buddy_alloc_pages(uint64_t count);
-void buddy_free_pages(paddr_t addr, uint64_t count);
+void buddy_add_to_free_area(struct buddy_page *page, struct free_area *area);
+struct buddy_page *buddy_remove_from_free_area(struct free_area *area);
+paddr_t buddy_alloc_pages_global(uint64_t count);
+void buddy_free_pages_global(paddr_t addr, uint64_t count);
 struct limine_memmap_entry;
 void buddy_add_entry(struct buddy_page *page_array,
                      struct limine_memmap_entry *entry,

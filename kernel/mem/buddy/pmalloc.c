@@ -9,6 +9,11 @@
 #include <string.h>
 
 struct limine_memmap_response *memmap;
+typedef paddr_t (*alloc_fn)(size_t pages);
+typedef void (*free_fn)(paddr_t addr, size_t pages);
+
+static alloc_fn current_alloc_fn = bitmap_alloc_pages;
+static free_fn current_free_fn = bitmap_free_pages;
 
 void pmm_early_init(struct limine_memmap_request m) {
     bitmap = boot_bitmap;
@@ -98,6 +103,8 @@ void pmm_mid_init() {
         buddy_add_entry(buddy_page_array, memmap->entries[i], buddy_free_area);
 
     global.buddy_active = true;
+    current_alloc_fn = buddy_alloc_pages_global;
+    current_free_fn = buddy_free_pages_global;
 }
 
 static void late_init_from_numa(size_t domain_count) {
@@ -162,27 +169,14 @@ void pmm_free_page(paddr_t addr) {
 static struct spinlock pmalloc_lock = SPINLOCK_INIT;
 paddr_t pmm_alloc_pages(uint64_t count) {
     bool iflag = spin_lock(&pmalloc_lock);
-
-    if (!global.buddy_active) {
-        paddr_t p = bitmap_alloc_pages(count);
-        spin_unlock(&pmalloc_lock, iflag);
-        return p;
-    }
-
-    paddr_t p = buddy_alloc_pages(count);
+    paddr_t p = current_alloc_fn(count);
     spin_unlock(&pmalloc_lock, iflag);
     return p;
 }
 
 void pmm_free_pages(paddr_t addr, uint64_t count) {
     bool iflag = spin_lock(&pmalloc_lock);
-    if (!global.buddy_active) {
-        bitmap_free_pages(addr, count);
-        spin_unlock(&pmalloc_lock, iflag);
-        return;
-    }
-
-    buddy_free_pages(addr, count);
+    current_free_fn(addr, count);
     spin_unlock(&pmalloc_lock, iflag);
 }
 
