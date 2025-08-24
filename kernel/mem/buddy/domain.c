@@ -102,7 +102,8 @@ static void domain_structs_init(struct domain_buddy *dom, size_t arena_capacity,
     if (!dom->free_queue)
         k_panic("Failed to allocate domain free queue\n");
 
-    dom->free_queue->queue = kzalloc(sizeof(paddr_t) * fq_capacity);
+    size_t fq_size = sizeof(*dom->free_queue->queue) * fq_capacity;
+    dom->free_queue->queue = kzalloc(fq_size);
     if (!dom->free_queue->queue)
         k_panic("Failed to allocate domain free queue array\n");
 

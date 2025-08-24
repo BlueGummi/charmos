@@ -33,7 +33,11 @@ struct domain_arena {
 };
 
 struct domain_free_queue {
-    paddr_t *queue;
+    struct {
+        paddr_t addr;
+        size_t pages;
+    } *queue;
+
     size_t head;
     size_t tail;
     size_t capacity;
@@ -78,3 +82,9 @@ void buddy_free_pages(paddr_t addr, size_t count, struct buddy_page *page_array,
                       struct free_area *free_area);
 
 void domain_buddies_init(void);
+bool domain_free_queue_enqueue(struct domain_free_queue *fq, paddr_t addr,
+                               size_t pages);
+bool domain_free_queue_dequeue(struct domain_free_queue *fq, paddr_t *addr_out,
+                               size_t *pages_out);
+bool domain_arena_push(struct domain_arena *arena, struct buddy_page *page);
+struct buddy_page *domain_arena_pop(struct domain_arena *arena);
