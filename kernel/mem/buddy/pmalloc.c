@@ -155,6 +155,10 @@ paddr_t pmm_alloc_page() {
     return pmm_alloc_pages(1);
 }
 
+void pmm_free_page(paddr_t addr) {
+    pmm_free_pages(addr, 1);
+}
+
 static struct spinlock pmalloc_lock = SPINLOCK_INIT;
 paddr_t pmm_alloc_pages(uint64_t count) {
     bool iflag = spin_lock(&pmalloc_lock);

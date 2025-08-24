@@ -29,7 +29,12 @@ static void *slab_map_new_page() {
     uintptr_t virt = slab_heap_top;
     slab_heap_top += PAGE_SIZE;
 
-    vmm_map_page(virt, phys, PAGING_PRESENT | PAGING_WRITE);
+    enum errno e = vmm_map_page(virt, phys, PAGING_PRESENT | PAGING_WRITE);
+    if (e < 0) {
+        pmm_free_pages(phys, 1);
+        return NULL;
+    }
+
     return (void *) virt;
 }
 
@@ -289,13 +294,29 @@ void *kmalloc(uint64_t size) {
     uint64_t pages = (total_size + PAGE_SIZE - 1) / PAGE_SIZE;
 
     uintptr_t virt = slab_heap_top;
+    uintptr_t phys_pages[pages];
+    uint64_t allocated = 0;
+
     for (uint64_t i = 0; i < pages; i++) {
         uintptr_t phys = pmm_alloc_page();
         if (!phys) {
+            for (uint64_t j = 0; j < allocated; j++)
+                pmm_free_page(phys_pages[j]);
             spin_unlock(&kmalloc_lock, iflag);
             return NULL;
         }
-        vmm_map_page(virt + i * PAGE_SIZE, phys, PAGING_PRESENT | PAGING_WRITE);
+
+        enum errno e = vmm_map_page(virt + i * PAGE_SIZE, phys,
+                                    PAGING_PRESENT | PAGING_WRITE);
+        if (e < 0) {
+            pmm_free_page(phys);
+            for (uint64_t j = 0; j < allocated; j++)
+                pmm_free_page(phys_pages[j]);
+            spin_unlock(&kmalloc_lock, iflag);
+            return NULL;
+        }
+
+        phys_pages[allocated++] = phys;
     }
 
     struct slab_phdr *hdr = (struct slab_phdr *) virt;
@@ -331,7 +352,7 @@ void kfree(void *ptr) {
             uintptr_t vaddr = virt + i * PAGE_SIZE;
             paddr_t phys = (paddr_t) vmm_get_phys(vaddr);
             vmm_unmap_page(vaddr);
-            pmm_free_pages(phys, 1);
+            pmm_free_page(phys);
         }
         spin_unlock(&kmalloc_lock, iflag);
         return;

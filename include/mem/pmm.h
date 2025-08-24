@@ -7,6 +7,7 @@ extern struct limine_memmap_response *memmap;
 paddr_t pmm_alloc_page();
 paddr_t pmm_alloc_pages(uint64_t count);
 void pmm_free_pages(paddr_t addr, uint64_t count);
+void pmm_free_page(paddr_t addr);
 
 void pmm_early_init(struct limine_memmap_request m);
 void pmm_mid_init(void);

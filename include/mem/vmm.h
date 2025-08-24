@@ -36,11 +36,10 @@ struct page_table {
 
 uint64_t sub_offset(uint64_t a);
 unsigned long get_cr3(void);
-void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags);
 void vmm_init(struct limine_memmap_response *memmap,
               struct limine_executable_address_response *xa);
-void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags);
-void vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags);
+enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags);
+enum errno vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags);
 void vmm_unmap_2mb_page(uintptr_t virt);
 void vmm_unmap_page(uintptr_t virt);
 uintptr_t vmm_get_phys(uintptr_t virt);

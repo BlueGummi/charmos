@@ -24,7 +24,12 @@ uint64_t sub_offset(uint64_t a) {
 }
 
 static inline struct page_table *alloc_pt(void) {
-    return (struct page_table *) (pmm_alloc_page() + global.hhdm_offset);
+    struct page_table *ret = (void *) (pmm_alloc_page() + global.hhdm_offset);
+    if (!ret)
+        return NULL;
+
+    memset(ret, 0, PAGE_SIZE);
+    return ret;
 }
 
 uintptr_t vmm_make_user_pml4(void) {
@@ -102,9 +107,13 @@ void vmm_init(struct limine_memmap_response *memmap,
     uint64_t kernel_virt_end = (uint64_t) &__kernel_virt_end;
     uint64_t kernel_size = kernel_virt_end - kernel_virt_start;
 
+    enum errno e;
+
     for (uint64_t i = 0; i < kernel_size; i += PAGE_SIZE) {
-        vmm_map_page(kernel_virt_start + i, kernel_phys_start + i,
-                     PAGING_WRITE | PAGING_PRESENT);
+        e = vmm_map_page(kernel_virt_start + i, kernel_phys_start + i,
+                         PAGING_WRITE | PAGING_PRESENT);
+        if (e < 0)
+            k_panic("Error %s whilst mapping kernel\n", errno_to_str(e));
     }
 
     for (uint64_t i = 0; i < memmap->entry_count; i++) {
@@ -133,12 +142,14 @@ void vmm_init(struct limine_memmap_response *memmap,
                                ((end - phys) >= PAGE_2MB);
 
             if (can_use_2mb) {
-                vmm_map_2mb_page(virt, phys, flags);
+                e = vmm_map_2mb_page(virt, phys, flags);
                 phys += PAGE_2MB;
             } else {
-                vmm_map_page(virt, phys, flags);
+                e = vmm_map_page(virt, phys, flags);
                 phys += PAGE_SIZE;
             }
+            if (e < 0)
+                k_panic("Error %s whilst mapping kernel\n", errno_to_str(e));
         }
     }
 
@@ -153,40 +164,49 @@ static inline bool vmm_is_table_empty(struct page_table *table) {
     return true;
 }
 
-static void pte_init(pte_t *entry, uint64_t flags) {
+static enum errno pte_init(pte_t *entry, uint64_t flags) {
     struct page_table *new_table = alloc_pt();
     if (!new_table)
-        k_panic("Could not allocate space for page table entry!\n");
+        return ERR_NO_MEM;
 
     uintptr_t new_table_phys = (uintptr_t) new_table - global.hhdm_offset;
     memset(new_table, 0, PAGE_SIZE);
     *entry = new_table_phys | PAGING_PRESENT | PAGING_WRITE | flags;
+    return ERR_OK;
 }
 
-void vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
+enum errno vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     if (virt == 0 || (virt & 0x1FFFFF) || (phys & 0x1FFFFF)) {
         k_panic("vmm_map_2mb_page: addresses must be 2MiB aligned and "
-                "non-zero, virt is 0x%lx, phys is 0x%lx\n",
+                "non-zero, virt=0x%lx phys=0x%lx\n",
                 virt, phys);
     }
+
     bool interrupts = spin_lock(&vmm_lock);
     uint64_t L2 = (virt >> 21) & 0x1FF;
 
     struct page_table *current_table = kernel_pml4;
     for (uint64_t i = 0; i < 2; i++) {
-        uint64_t level = virt >> (39 - (i * 9)) & 0x1FF;
+        uint64_t level = (virt >> (39 - (i * 9))) & 0x1FF;
         pte_t *entry = &current_table->entries[level];
-        if (!ENTRY_PRESENT(*entry))
-            pte_init(entry, 0);
 
+        if (!ENTRY_PRESENT(*entry)) {
+            enum errno ret = pte_init(entry, 0);
+            if (ret < 0) {
+                spin_unlock(&vmm_lock, interrupts);
+                return ret;
+            }
+        }
         current_table = (struct page_table *) ((*entry & PAGING_PHYS_MASK) +
                                                global.hhdm_offset);
     }
 
     pte_t *entry = &current_table->entries[L2];
-    *entry = phys | flags | PAGING_PRESENT | PAGING_2MB_page;
+    *entry =
+        (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT | PAGING_2MB_page;
 
     spin_unlock(&vmm_lock, interrupts);
+    return 0;
 }
 
 void vmm_unmap_2mb_page(uintptr_t virt) {
@@ -233,7 +253,7 @@ void vmm_unmap_2mb_page(uintptr_t virt) {
     spin_unlock(&vmm_lock, interrupts);
 }
 
-void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
+enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     if (virt == 0) {
         k_panic("CANNOT MAP PAGE 0x0!!!\n");
     }
@@ -242,11 +262,16 @@ void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     struct page_table *current_table = kernel_pml4;
 
     for (uint64_t i = 0; i < 3; i++) {
-        uint64_t level = virt >> (39 - (i * 9)) & 0x1FF;
+        uint64_t level = (virt >> (39 - (i * 9))) & 0x1FF;
         pte_t *entry = &current_table->entries[level];
-        if (!ENTRY_PRESENT(*entry))
-            pte_init(entry, 0);
 
+        if (!ENTRY_PRESENT(*entry)) {
+            enum errno ret = pte_init(entry, 0);
+            if (ret < 0) {
+                spin_unlock(&vmm_lock, interrupts);
+                return ret;
+            }
+        }
         current_table = (struct page_table *) ((*entry & PAGING_PHYS_MASK) +
                                                global.hhdm_offset);
     }
@@ -256,6 +281,7 @@ void vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     *entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
 
     spin_unlock(&vmm_lock, interrupts);
+    return 0;
 }
 
 void vmm_map_page_user(uintptr_t pml4_phys, uintptr_t virt, uintptr_t phys,
