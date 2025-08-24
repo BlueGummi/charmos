@@ -156,6 +156,8 @@ void pmm_late_init(void) {
     } else {
         late_init_non_numa(domain_count);
     }
+
+    domain_buddies_init();
 }
 
 paddr_t pmm_alloc_page() {

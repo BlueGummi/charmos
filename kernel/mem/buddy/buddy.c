@@ -12,8 +12,8 @@ struct free_area buddy_free_area[MAX_ORDER] = {0};
 struct buddy_page *buddy_page_array = NULL;
 struct domain_buddy *domain_buddies;
 
-static paddr_t alloc_pages(struct free_area *free_area,
-                           struct buddy_page *page_array, size_t count) {
+paddr_t buddy_alloc_pages(struct free_area *free_area,
+                          struct buddy_page *page_array, size_t count) {
     if (count == 0)
         k_panic("Tried to allocate zero pages\n");
 
@@ -63,12 +63,11 @@ static paddr_t alloc_pages(struct free_area *free_area,
 }
 
 paddr_t buddy_alloc_pages_global(size_t count) {
-    return alloc_pages(buddy_free_area, buddy_page_array, count);
+    return buddy_alloc_pages(buddy_free_area, buddy_page_array, count);
 }
 
-static void free_pages(paddr_t addr, size_t count,
-                       struct buddy_page *page_array,
-                       struct free_area *free_area) {
+void buddy_free_pages(paddr_t addr, size_t count, struct buddy_page *page_array,
+                      struct free_area *free_area) {
     if (!addr || count == 0)
         return;
 
@@ -117,5 +116,5 @@ static void free_pages(paddr_t addr, size_t count,
 }
 
 void buddy_free_pages_global(paddr_t addr, uint64_t count) {
-    free_pages(addr, count, buddy_page_array, buddy_free_area);
+    buddy_free_pages(addr, count, buddy_page_array, buddy_free_area);
 }

@@ -22,6 +22,7 @@ struct free_area {
 
 struct domain_buddy {
     struct buddy_page *buddy;
+    struct free_area *free_area;
     paddr_t start; /* physical start address */
     paddr_t end;   /* physical end address */
     size_t length; /* total bytes */
@@ -47,3 +48,9 @@ void buddy_add_entry(struct buddy_page *page_array,
                      struct limine_memmap_entry *entry,
                      struct free_area *farea);
 void buddy_reserve_range(uint64_t pfn, uint64_t pages);
+paddr_t buddy_alloc_pages(struct free_area *free_area,
+                          struct buddy_page *page_array, size_t count);
+void buddy_free_pages(paddr_t addr, size_t count, struct buddy_page *page_array,
+                      struct free_area *free_area);
+
+void domain_buddies_init(void);
