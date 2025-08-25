@@ -44,16 +44,29 @@ struct domain_free_queue {
     struct spinlock lock;
 };
 
+struct domain_zonelist_entry {
+    struct domain_buddy *domain;
+    uint8_t distance;
+    size_t free_pages;
+};
+
+struct domain_zonelist {
+    struct domain_zonelist_entry *entries;
+    size_t count;
+};
+
 struct domain_buddy {
+    struct domain_zonelist zonelist;
     struct buddy_page *buddy;
     struct free_area *free_area;
-    struct domain_arena *arena;
+    struct domain_arena **arenas; /* One per core */
+    size_t core_count;            /* # cores on this domain */
     struct domain_free_queue *free_queue;
     paddr_t start; /* physical start address */
     paddr_t end;   /* physical end address */
     size_t length; /* total bytes */
-    size_t pages_used;
-    size_t total_pages;
+    atomic_size_t pages_used;
+    atomic_size_t total_pages;
     struct spinlock lock;
 };
 

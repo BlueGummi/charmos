@@ -1,6 +1,48 @@
+#pragma once
+#define PAGE_SIZE 4096
+#include <stdbool.h>
 #include <stdint.h>
 
-#define PAGE_SIZE 4096
+#define ALLOC_LOCALITY_SHIFT 8
+#define ALLOC_LOCALITY_MASK 0x7
+#define ALLOC_LOCALITY(flags)                                                  \
+    (((flags) >> ALLOC_LOCALITY_SHIFT) & ALLOC_LOCALITY_MASK)
+
+enum alloc_flags : uint16_t {
+    /* Cache alignment */
+    ALLOC_FLAG_PREFER_CACHE_ALIGNED = (1 << 0),
+    ALLOC_FLAG_NO_CACHE_ALIGN = (1 << 1),
+
+    /* Pageable */
+    ALLOC_FLAG_PAGEABLE = (1 << 4),
+    ALLOC_FLAG_NONPAGEABLE = (1 << 5),
+
+    /* Movable */
+    ALLOC_FLAG_MOVABLE = (1 << 6),
+    ALLOC_FLAG_NONMOVABLE = (1 << 7),
+};
+
+enum alloc_class {
+    ALLOC_CLASS_DEFAULT = 0,
+    ALLOC_CLASS_NONMOVABLE,
+    ALLOC_CLASS_INTERLEAVED,
+    ALLOC_CLASS_HIGH_BANDWIDTH,
+};
+
+static inline bool alloc_flags_valid(uint16_t flags) {
+    if ((flags & ALLOC_FLAG_PAGEABLE) && (flags & ALLOC_FLAG_NONPAGEABLE))
+        return false;
+
+    if ((flags & ALLOC_FLAG_MOVABLE) && (flags & ALLOC_FLAG_NONMOVABLE))
+        return false;
+
+    if ((flags & ALLOC_FLAG_PREFER_CACHE_ALIGNED) &&
+        (flags & ALLOC_FLAG_NO_CACHE_ALIGN))
+        return false;
+
+    return true;
+}
+
 void *kmalloc(uint64_t size);
 void *krealloc(void *ptr, uint64_t size);
 void *kzalloc(uint64_t size);

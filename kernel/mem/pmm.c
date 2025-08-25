@@ -4,6 +4,7 @@
 #include <mem/buddy.h>
 #include <mem/pmm.h>
 #include <misc/align.h>
+#include <mp/domain.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -111,9 +112,11 @@ static void late_init_from_numa(size_t domain_count) {
     for (size_t i = 0; i < domain_count; i++) {
         struct numa_node *node = &global.numa_nodes[i % global.numa_node_count];
 
+        struct core_domain *cd = global.core_domains[i];
+
         domain_buddies[i].start = node->mem_base;
         domain_buddies[i].end = node->mem_base + node->mem_size;
-
+        domain_buddies[i].core_count = cd->num_cores;
         domain_buddies[i].length = node->mem_size;
 
         /* Slice of buddy array corresponding to this range */
@@ -135,7 +138,9 @@ static void late_init_non_numa(size_t domain_count) {
         if (i == domain_count - 1)
             this_pages += remainder_pages;
 
+        struct core_domain *cd = global.core_domains[i];
         domain_buddies[i].start = base;
+        domain_buddies[i].core_count = cd->num_cores;
 
         domain_buddies[i].end = base + this_pages / PAGE_SIZE;
         domain_buddies[i].length = this_pages / PAGE_SIZE;
