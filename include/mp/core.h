@@ -33,6 +33,9 @@ struct core {
 
     struct topology_node *topo_node;
     struct topo_cache_info llc;
+    struct domain_buddy *domain_buddy;
+    struct domain_arena *domain_arena;
+    size_t rr_current_domain;
 };
 
 static inline uint64_t get_this_core_id() {

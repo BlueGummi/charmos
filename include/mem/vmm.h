@@ -23,6 +23,9 @@
 #define PAGE_ALIGN_DOWN(x) ((x) & ~(PAGE_SIZE - 1))
 #define PAGE_ALIGN_UP(x) (((x) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1))
 
+#define PAGE_TO_PFN(addr) (addr / PAGE_SIZE)
+#define PFN_TO_PAGE(pfn) (pfn * PAGE_SIZE)
+
 #define UACPI_MAP_BASE 0xFFFFA00000000000
 #define UACPI_MAP_LIMIT 0xFFFFA00000100000
 #define VMM_MAP_BASE 0xFFFFA00000200000

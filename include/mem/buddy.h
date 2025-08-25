@@ -93,7 +93,7 @@ void buddy_reserve_range(uint64_t pfn, uint64_t pages);
 paddr_t buddy_alloc_pages(struct free_area *free_area,
                           struct buddy_page *page_array, size_t count);
 void buddy_free_pages(paddr_t addr, size_t count, struct buddy_page *page_array,
-                      struct free_area *free_area);
+                      struct free_area *free_area, size_t total_pages);
 
 void domain_buddies_init(void);
 bool domain_free_queue_enqueue(struct domain_free_queue *fq, paddr_t addr,

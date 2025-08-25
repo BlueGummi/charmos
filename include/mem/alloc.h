@@ -4,9 +4,14 @@
 #include <stdint.h>
 
 #define ALLOC_LOCALITY_SHIFT 8
+#define ALLOC_LOCALITY_MAX 7
+#define ALLOC_LOCALITY_MIN 0
 #define ALLOC_LOCALITY_MASK 0x7
-#define ALLOC_LOCALITY(flags)                                                  \
+#define ALLOC_LOCALITY_FROM_FLAGS(flags)                                       \
     (((flags) >> ALLOC_LOCALITY_SHIFT) & ALLOC_LOCALITY_MASK)
+
+#define ALLOC_LOCALITY_TO_FLAGS(locality)                                      \
+    (((locality) & ALLOC_LOCALITY_MASK) << ALLOC_LOCALITY_SHIFT)
 
 enum alloc_flags : uint16_t {
     /* Cache alignment */

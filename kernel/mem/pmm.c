@@ -108,6 +108,13 @@ void pmm_mid_init() {
     current_free_fn = buddy_free_pages_global;
 }
 
+static void link_domain_cores_to_buddy(struct core_domain *cd,
+                                       struct domain_buddy *bd) {
+    for (size_t i = 0; i < cd->num_cores; i++) {
+        cd->cores[i]->domain_buddy = bd;
+    }
+}
+
 static void late_init_from_numa(size_t domain_count) {
     for (size_t i = 0; i < domain_count; i++) {
         struct numa_node *node = &global.numa_nodes[i % global.numa_node_count];
@@ -118,6 +125,7 @@ static void late_init_from_numa(size_t domain_count) {
         domain_buddies[i].end = node->mem_base + node->mem_size;
         domain_buddies[i].core_count = cd->num_cores;
         domain_buddies[i].length = node->mem_size;
+        link_domain_cores_to_buddy(cd, &domain_buddies[i]);
 
         /* Slice of buddy array corresponding to this range */
         size_t page_offset = node->mem_base / PAGE_SIZE;
@@ -140,12 +148,12 @@ static void late_init_non_numa(size_t domain_count) {
 
         struct core_domain *cd = global.core_domains[i];
         domain_buddies[i].start = base;
-        domain_buddies[i].core_count = cd->num_cores;
-
         domain_buddies[i].end = base + this_pages / PAGE_SIZE;
+        domain_buddies[i].core_count = cd->num_cores;
         domain_buddies[i].length = this_pages / PAGE_SIZE;
 
         domain_buddies[i].buddy = &buddy_page_array[page_cursor];
+        link_domain_cores_to_buddy(cd, &domain_buddies[i]);
 
         page_cursor += this_pages;
         base += this_pages / PAGE_SIZE;
@@ -157,7 +165,6 @@ static void late_init_non_numa(size_t domain_count) {
  *
  * This is just to avoid a bunch of NUMA
  * logic sitting around in the domain_buddies_init */
-
 void pmm_late_init(void) {
     size_t domain_count = global.domain_count;
     domain_buddies = kmalloc(sizeof(struct domain_buddy) * domain_count);

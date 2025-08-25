@@ -3,157 +3,130 @@
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <misc/align.h>
-#include <misc/sort.h>
-#include <string.h>
+#include <mp/domain.h>
 
-static int compare_zonelist_entries(const void *a, const void *b) {
-    const struct domain_zonelist_entry *da = a;
-    const struct domain_zonelist_entry *db = b;
+#include "internal.h"
 
-    if (da->distance != db->distance)
-        return da->distance - db->distance;
-
-    if (da->free_pages != db->free_pages)
-        return (db->free_pages > da->free_pages) ? -1 : 1;
-
-    return 0;
+static paddr_t domain_alloc_interleaved(size_t pages) {
+    return 0x0; /* TODO */
 }
 
-static void domain_build_zonelist(struct domain_buddy *dom) {
-    dom->zonelist.count = global.domain_count;
-    dom->zonelist.entries =
-        kmalloc(sizeof(struct domain_zonelist_entry) * global.domain_count);
+static paddr_t try_retrieve_from_arena(size_t pages) {
+    if (pages > 1) /* Can't do it, arenas only cache single-pages */
+        return 0x0;
 
-    for (size_t i = 0; i < global.domain_count; i++) {
-        dom->zonelist.entries[i].domain = &domain_buddies[i];
-        dom->zonelist.entries[i].distance =
-            global.numa_nodes[dom - domain_buddies].distance[i];
-        dom->zonelist.entries[i].free_pages =
-            domain_buddies[i].total_pages - domain_buddies[i].pages_used;
-    }
+    struct domain_arena *this_arena = domain_arena_on_this_core();
+    struct buddy_page *bp = domain_arena_pop(this_arena);
+    if (bp)
+        return PFN_TO_PAGE(bp->pfn);
 
-    qsort(dom->zonelist.entries, dom->zonelist.count,
-          sizeof(struct domain_zonelist_entry), compare_zonelist_entries);
+    /* Nothing */
+    return 0x0;
 }
 
-static inline int order_base_2(uint64_t x) {
-    if (x == 0)
-        return -1;
-    return 63 - __builtin_clzll(x);
+static paddr_t domain_alloc_from_buddy_internal(struct domain_buddy *this,
+                                                size_t pages) {
+    paddr_t ret = buddy_alloc_pages(this->free_area, this->buddy, pages);
+    atomic_fetch_add(&this->pages_used, pages);
+    return ret;
 }
 
-static void domain_buddy_track_pages(struct domain_buddy *dom) {
-    size_t total_pages = dom->length / PAGE_SIZE;
-    size_t used_pages = 0;
-
-    for (size_t i = 0; i < total_pages; i++) {
-        if (!dom->buddy[i].is_free)
-            used_pages++;
-    }
-
-    dom->total_pages = total_pages;
-    dom->pages_used = used_pages;
+static paddr_t alloc_from_this_buddy(size_t pages) {
+    struct domain_buddy *this = domain_buddy_on_this_core();
+    bool iflag = domain_buddy_lock(this);
+    paddr_t ret = domain_alloc_from_buddy_internal(this, pages);
+    domain_buddy_unlock(this, iflag);
+    return ret;
 }
 
-void domain_buddies_print(void) {
-    for (size_t i = 0; i < global.domain_count; i++) {
-        struct domain_buddy *dom = &domain_buddies[i];
-        k_printf("Domain %zu: start=0x%lx, end=0x%lx, total_pages=%zu, "
-                 "pages_used=%zu\n",
-                 i, (void *) dom->start, (void *) dom->end, dom->total_pages,
-                 dom->pages_used);
-    }
-}
+static paddr_t zonelist_alloc_fallback(struct domain_zonelist *zl,
+                                       struct domain_buddy *best,
+                                       size_t max_scan, size_t pages) {
+    /* Walk other buddies in zonelist */
+    for (size_t i = 0; i < max_scan; i++) {
+        struct domain_zonelist_entry *entry = &zl->entries[i];
+        struct domain_buddy *candidate = entry->domain;
 
-static void domain_buddy_init(struct domain_buddy *dom) {
-    size_t total_pages = dom->length / PAGE_SIZE;
-
-    for (int i = 0; i < MAX_ORDER; i++) {
-        dom->free_area[i].next = NULL;
-        dom->free_area[i].nr_free = 0;
-    }
-
-    size_t page_start = dom->start / PAGE_SIZE;
-    size_t page_end = page_start + total_pages;
-
-    size_t region_start = page_start;
-    size_t region_size = total_pages;
-
-    while (region_size > 0) {
-        if (!buddy_is_pfn_free(region_start)) {
-            region_start++;
-            region_size--;
+        if (candidate == best)
             continue;
-        }
 
-        int order = MIN(order_base_2(region_size), MAX_ORDER - 1);
-        size_t block_size = 1ULL << order;
+        bool iflag = domain_buddy_lock(candidate);
+        paddr_t ret = domain_alloc_from_buddy_internal(candidate, pages);
+        domain_buddy_unlock(candidate, iflag);
 
-        while ((region_start & (block_size - 1)) != 0 && order > 0) {
-            order--;
-            block_size = 1ULL << order;
-        }
-
-        if (region_start + block_size > page_end)
-            block_size = page_end - region_start;
-
-        struct buddy_page *page = &dom->buddy[region_start - page_start];
-        memset(page, 0, sizeof(*page));
-        page->pfn = region_start;
-        page->order = order;
-        page->is_free = true;
-
-        buddy_add_to_free_area(page, &dom->free_area[order]);
-
-        region_start += block_size;
-        region_size -= block_size;
+        if (ret)
+            return ret;
     }
+
+    return 0x0;
 }
 
-static void domain_structs_init(struct domain_buddy *dom, size_t arena_capacity,
-                                size_t fq_capacity) {
-    dom->free_area = kzalloc(sizeof(struct free_area) * MAX_ORDER);
-    if (!dom->free_area)
-        k_panic("Failed to allocate domain free area\n");
-
-    dom->arenas = kzalloc(sizeof(struct domain_arena *) * dom->core_count);
-    if (!dom->arenas)
-        k_panic("Failed to allocate domain arena\n");
-
-    for (size_t i = 0; i < dom->core_count; i++) {
-        dom->arenas[i] = kzalloc(sizeof(struct domain_arena));
-        struct domain_arena *this = dom->arenas[i];
-        this->pages = kzalloc(sizeof(struct buddy_page *) * arena_capacity);
-        if (!this->pages)
-            k_panic("Failed to allocate domain arena pages");
-
-        this->head = 0;
-        this->tail = 0;
-        this->capacity = arena_capacity;
-        spinlock_init(&this->lock);
-    }
-
-    dom->free_queue = kzalloc(sizeof(struct domain_free_queue));
-    if (!dom->free_queue)
-        k_panic("Failed to allocate domain free queue\n");
-
-    size_t fq_size = sizeof(*dom->free_queue->queue) * fq_capacity;
-    dom->free_queue->queue = kzalloc(fq_size);
-    if (!dom->free_queue->queue)
-        k_panic("Failed to allocate domain free queue array\n");
-
-    dom->free_queue->head = 0;
-    dom->free_queue->tail = 0;
-    dom->free_queue->capacity = fq_capacity;
-    spinlock_init(&dom->free_queue->lock);
+static inline size_t derive_max_scan_from_zonelist(struct domain_zonelist *zl,
+                                                   uint16_t locality_degree) {
+    size_t max_scan = ((locality_degree + 1) * zl->count / ALLOC_LOCALITY_MAX);
+    if (max_scan > zl->count)
+        max_scan = zl->count;
+    return max_scan;
 }
 
-void domain_buddies_init(void) {
-    for (size_t i = 0; i < global.domain_count; i++) {
-        struct domain_buddy *dbd = &domain_buddies[i];
-        domain_structs_init(dbd, DOMAIN_ARENA_SIZE, DOMAIN_FREE_QUEUE_SIZE);
-        domain_buddy_init(dbd);
-        domain_buddy_track_pages(dbd);
-        domain_build_zonelist(dbd);
+static paddr_t do_alloc_with_locality(size_t pages, uint16_t locality_degree) {
+    struct domain_buddy *local = domain_buddy_on_this_core();
+    struct domain_zonelist *zl = &local->zonelist;
+
+    size_t max_scan = derive_max_scan_from_zonelist(zl, locality_degree);
+
+    /* Just pick the best domain */
+    struct domain_buddy *best = NULL;
+
+    int best_distance = INT32_MAX;
+    size_t best_free_pages = 0;
+
+    for (size_t i = 0; i < max_scan; i++) {
+        struct domain_zonelist_entry *entry = &zl->entries[i];
+        struct domain_buddy *candidate = entry->domain;
+
+        size_t free_pages = candidate->total_pages - candidate->pages_used;
+        if (free_pages < pages)
+            continue;
+
+        int score = entry->distance - (int) free_pages;
+        if (!best || score < (best_distance - (int) best_free_pages)) {
+            best = candidate;
+            best_distance = entry->distance;
+            best_free_pages = free_pages;
+        }
     }
+
+    if (!best)
+        return 0;
+
+    /* Try best first */
+    bool iflag = domain_buddy_lock(best);
+    paddr_t ret = domain_alloc_from_buddy_internal(best, pages);
+    domain_buddy_unlock(best, iflag);
+    if (ret)
+        return ret;
+
+    return zonelist_alloc_fallback(zl, best, max_scan, pages);
+}
+
+paddr_t domain_alloc(size_t pages, enum alloc_class class,
+                     enum alloc_flags flags) {
+    /* We only care about INTERLEAVED at the buddy allocator level */
+    if (class == ALLOC_CLASS_INTERLEAVED)
+        return domain_alloc_interleaved(pages);
+
+    /* Fastpath: Get it from our local arena */
+    paddr_t ret = try_retrieve_from_arena(pages);
+    if (ret)
+        return ret;
+
+    /* We don't care about any other flags in the domain buddy allocator */
+    uint16_t locality_degree = ALLOC_LOCALITY_FROM_FLAGS(flags);
+
+    /* No other options. Allocate from this buddy. */
+    if (locality_degree == ALLOC_LOCALITY_MAX)
+        return alloc_from_this_buddy(pages);
+
+    return do_alloc_with_locality(pages, locality_degree);
 }
