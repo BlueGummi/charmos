@@ -56,6 +56,10 @@ static inline bool spin_trylock(struct spinlock *lock) {
         &lock->state, &expected, 1, memory_order_acquire, memory_order_relaxed);
 }
 
+/* Keep these static inline so you only "pay for what you need" (e.g. if you
+ * never call trylock() you don't pay the cost of having that dead function
+ * in the object file/binary) */
+
 #define SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(type, member)                 \
     static inline bool type##_lock(struct type *obj) {                         \
         return spin_lock(&obj->member);                                        \
@@ -63,4 +67,8 @@ static inline bool spin_trylock(struct spinlock *lock) {
                                                                                \
     static inline void type##_unlock(struct type *obj, bool iflag) {           \
         spin_unlock(&obj->member, iflag);                                      \
+    }                                                                          \
+                                                                               \
+    static inline bool type##_trylock(struct type *obj) {                      \
+        return spin_trylock(&obj->member);                                     \
     }

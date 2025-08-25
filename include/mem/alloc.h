@@ -13,10 +13,16 @@
 #define ALLOC_LOCALITY_TO_FLAGS(locality)                                      \
     (((locality) & ALLOC_LOCALITY_MASK) << ALLOC_LOCALITY_SHIFT)
 
+#define ALLOC_FLAG_SET(flags, mask) (flags & mask)
+
 enum alloc_flags : uint16_t {
     /* Cache alignment */
     ALLOC_FLAG_PREFER_CACHE_ALIGNED = (1 << 0),
     ALLOC_FLAG_NO_CACHE_ALIGN = (1 << 1),
+
+    /* Flexible locality */
+    ALLOC_FLAG_FLEXIBILE_LOCALITY = (1 << 2),
+    ALLOC_FLAG_STRICT_LOCALITY = (1 << 3),
 
     /* Pageable */
     ALLOC_FLAG_PAGEABLE = (1 << 4),
@@ -35,6 +41,10 @@ enum alloc_class {
 };
 
 static inline bool alloc_flags_valid(uint16_t flags) {
+    if ((flags & ALLOC_FLAG_FLEXIBILE_LOCALITY) &&
+        (flags & ALLOC_FLAG_STRICT_LOCALITY))
+        return false;
+
     if ((flags & ALLOC_FLAG_PAGEABLE) && (flags & ALLOC_FLAG_NONPAGEABLE))
         return false;
 

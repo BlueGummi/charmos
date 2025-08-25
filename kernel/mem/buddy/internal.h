@@ -5,7 +5,7 @@
 #include <misc/align.h>
 #include <mp/core.h>
 
-static inline struct domain_buddy *domain_for_addr(paddr_t addr) {
+static inline struct domain_buddy *domain_buddy_for_addr(paddr_t addr) {
     for (size_t i = 0; i < global.domain_count; i++) {
         struct domain_buddy *d = &domain_buddies[i];
         if (addr >= d->start && addr < d->end)
@@ -25,7 +25,7 @@ static inline struct domain_arena *domain_arena_on_this_core(void) {
     return get_current_core()->domain_arena;
 }
 
-static inline struct domain_free_queue *domain_freequeue_on_this_core(void) {
+static inline struct domain_free_queue *domain_free_queue_on_this_core(void) {
     return get_current_core()->domain_buddy->free_queue;
 }
 
@@ -66,6 +66,14 @@ static inline void domain_stat_mark_interleaved(struct domain_buddy *d) {
 static inline void domain_stat_failed_alloc(struct domain_buddy *d) {
     atomic_fetch_add_explicit(&d->stats.failed_alloc_count, 1,
                               memory_order_relaxed);
+}
+
+static inline bool is_free_in_progress(struct domain_free_queue *fq) {
+    return atomic_load_explicit(&fq->free_in_progress, memory_order_relaxed);
+}
+
+static inline void mark_free_in_progress(struct domain_free_queue *fq, bool s) {
+    atomic_store_explicit(&fq->free_in_progress, s, memory_order_relaxed);
 }
 
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(domain_buddy, lock);

@@ -29,6 +29,7 @@ struct domain_arena {
     size_t head;
     size_t tail;
     size_t capacity;
+    atomic_size_t num_pages;
     struct spinlock lock;
 };
 
@@ -41,6 +42,16 @@ struct domain_free_queue {
     size_t head;
     size_t tail;
     size_t capacity;
+    atomic_size_t num_elements;
+    atomic_bool free_in_progress; /* Simple flag to indicate that
+                                   * a free is in progress to prevent
+                                   * overly aggressive freeing. Enqueue/dequeue
+                                   * is still allowed since that uses
+                                   * the spinlock, but this just prevents
+                                   * aggressive concurrent access to the free
+                                   * queue so I don't free aggressively (not a
+                                   * 'race condition', just suboptimal) */
+
     struct spinlock lock;
 };
 
@@ -102,10 +113,9 @@ void buddy_add_entry(struct buddy_page *page_array,
                      struct limine_memmap_entry *entry,
                      struct free_area *farea);
 void buddy_reserve_range(uint64_t pfn, uint64_t pages);
-paddr_t buddy_alloc_pages(struct free_area *free_area,
-                          struct buddy_page *page_array, size_t count);
-void buddy_free_pages(paddr_t addr, size_t count, struct buddy_page *page_array,
-                      struct free_area *free_area, size_t total_pages);
+paddr_t buddy_alloc_pages(struct free_area *free_area, size_t count);
+void buddy_free_pages(paddr_t addr, size_t count, struct free_area *free_area,
+                      size_t total_pages);
 
 void domain_buddies_init(void);
 bool domain_free_queue_enqueue(struct domain_free_queue *fq, paddr_t addr,

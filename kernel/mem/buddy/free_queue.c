@@ -20,6 +20,9 @@ bool domain_free_queue_enqueue(struct domain_free_queue *fq, paddr_t addr,
         success = true;
     }
 
+    if (success)
+        atomic_fetch_add_explicit(&fq->num_elements, 1, memory_order_relaxed);
+
     domain_free_queue_unlock(fq, iflag);
     return success;
 }
@@ -35,6 +38,9 @@ bool domain_free_queue_dequeue(struct domain_free_queue *fq, paddr_t *addr_out,
         fq->head = (fq->head + 1) % fq->capacity;
         success = true;
     }
+
+    if (success)
+        atomic_fetch_sub_explicit(&fq->num_elements, 1, memory_order_relaxed);
 
     domain_free_queue_unlock(fq, iflag);
     return success;

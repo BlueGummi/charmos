@@ -12,8 +12,7 @@ struct free_area buddy_free_area[MAX_ORDER] = {0};
 struct buddy_page *buddy_page_array = NULL;
 struct domain_buddy *domain_buddies;
 
-paddr_t buddy_alloc_pages(struct free_area *free_area,
-                          struct buddy_page *page_array, size_t count) {
+paddr_t buddy_alloc_pages(struct free_area *free_area, size_t count) {
     if (count == 0)
         k_panic("Tried to allocate zero pages\n");
 
@@ -42,7 +41,7 @@ paddr_t buddy_alloc_pages(struct free_area *free_area,
         uint64_t new_order = current_order - 1;
         uint64_t buddy_pfn = page->pfn + (1ULL << new_order);
 
-        struct buddy_page *buddy = &page_array[buddy_pfn];
+        struct buddy_page *buddy = &buddy_page_array[buddy_pfn];
         memset(buddy, 0, sizeof(*buddy));
 
         page->order = new_order;
@@ -63,11 +62,11 @@ paddr_t buddy_alloc_pages(struct free_area *free_area,
 }
 
 paddr_t buddy_alloc_pages_global(size_t count) {
-    return buddy_alloc_pages(buddy_free_area, buddy_page_array, count);
+    return buddy_alloc_pages(buddy_free_area, count);
 }
 
-void buddy_free_pages(paddr_t addr, size_t count, struct buddy_page *page_array,
-                      struct free_area *free_area, size_t total_pages) {
+void buddy_free_pages(paddr_t addr, size_t count, struct free_area *free_area,
+                      size_t total_pages) {
     if (!addr || count == 0)
         return;
 
@@ -81,7 +80,7 @@ void buddy_free_pages(paddr_t addr, size_t count, struct buddy_page *page_array,
         size <<= 1;
     }
 
-    struct buddy_page *page = &page_array[pfn];
+    struct buddy_page *page = &buddy_page_array[pfn];
     memset(page, 0, sizeof(*page));
     page->pfn = pfn;
     page->order = order;
@@ -92,7 +91,7 @@ void buddy_free_pages(paddr_t addr, size_t count, struct buddy_page *page_array,
         if (buddy_pfn >= total_pages)
             break;
 
-        struct buddy_page *buddy = &page_array[buddy_pfn];
+        struct buddy_page *buddy = &buddy_page_array[buddy_pfn];
         if (!buddy->is_free || buddy->order != order)
             break;
 
@@ -106,7 +105,7 @@ void buddy_free_pages(paddr_t addr, size_t count, struct buddy_page *page_array,
         }
 
         pfn = (pfn < buddy_pfn) ? pfn : buddy_pfn;
-        page = &page_array[pfn];
+        page = &buddy_page_array[pfn];
         memset(page, 0, sizeof(*page));
         page->pfn = pfn;
         page->order = ++order;
@@ -116,6 +115,5 @@ void buddy_free_pages(paddr_t addr, size_t count, struct buddy_page *page_array,
 }
 
 void buddy_free_pages_global(paddr_t addr, uint64_t count) {
-    buddy_free_pages(addr, count, buddy_page_array, buddy_free_area,
-                     global.total_pages);
+    buddy_free_pages(addr, count, buddy_free_area, global.total_pages);
 }

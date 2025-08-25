@@ -1,3 +1,4 @@
+#include <kassert.h>
 #include <mem/alloc.h>
 #include <mem/buddy.h>
 #include <mem/pmm.h>
@@ -6,12 +7,14 @@
 #include <mp/domain.h>
 
 #include "internal.h"
+#define DISTANCE_WEIGHT 1000 /* distance is heavily weighted */
+#define FREE_PAGES_WEIGHT 1  /* free pages count less */
 
 static paddr_t alloc_from_buddy_internal(struct domain_buddy *this,
                                          size_t pages) {
     bool iflag = domain_buddy_lock(this);
 
-    paddr_t ret = buddy_alloc_pages(this->free_area, this->buddy, pages);
+    paddr_t ret = buddy_alloc_pages(this->free_area, pages);
     if (ret)
         domain_stat_alloc(this, /*remote*/ false, /*interleaved*/ false);
 
@@ -163,14 +166,14 @@ static inline size_t derive_max_scan_from_zonelist(struct domain_zonelist *zl,
     return max_scan;
 }
 
-#define DISTANCE_WEIGHT 1000 /* distance is heavily weighted */
-#define FREE_PAGES_WEIGHT 1  /* free pages count less */
-
-static paddr_t alloc_with_locality(size_t pages, uint16_t locality_degree) {
+static paddr_t alloc_with_locality(size_t pages, bool flexible_locality,
+                                   uint16_t locality_degree) {
     struct domain_buddy *local = domain_buddy_on_this_core();
     struct domain_zonelist *zl = &local->zonelist;
 
     size_t max_scan = derive_max_scan_from_zonelist(zl, locality_degree);
+    if (flexible_locality)
+        max_scan = zl->count;
 
     /* Just pick the best domain */
     struct domain_buddy *best = NULL;
@@ -185,8 +188,11 @@ static paddr_t alloc_with_locality(size_t pages, uint16_t locality_degree) {
         if (free_pages < pages)
             continue;
 
-        int score = (entry->distance * DISTANCE_WEIGHT) -
-                    ((int) free_pages * FREE_PAGES_WEIGHT);
+        int dist_weight =
+            flexible_locality ? DISTANCE_WEIGHT / 4 : DISTANCE_WEIGHT;
+
+        int score =
+            (entry->distance * dist_weight) - (free_pages * FREE_PAGES_WEIGHT);
 
         if (!best || score < best_score) {
             best = candidate;
@@ -202,13 +208,16 @@ static paddr_t alloc_with_locality(size_t pages, uint16_t locality_degree) {
     if (ret)
         return ret;
 
-    ret = zonelist_alloc_fallback(zl, local, best, max_scan, pages);
+    if (flexible_locality)
+        ret = zonelist_alloc_fallback(zl, local, best, max_scan, pages);
 
     return ret;
 }
 
-paddr_t domain_alloc_internal(size_t pages, enum alloc_class class,
-                              enum alloc_flags flags) {
+paddr_t domain_alloc(size_t pages, enum alloc_class class,
+                     enum alloc_flags flags) {
+    kassert(pages != 0);
+
     /* We only care about INTERLEAVED at the buddy allocator level */
     if (class == ALLOC_CLASS_INTERLEAVED)
         return alloc_interleaved(pages);
@@ -220,10 +229,13 @@ paddr_t domain_alloc_internal(size_t pages, enum alloc_class class,
 
     /* We don't care about any other flags in the domain buddy allocator */
     uint16_t locality_degree = ALLOC_LOCALITY_FROM_FLAGS(flags);
+    bool flexible_locality =
+        ALLOC_FLAG_SET(flags, ALLOC_FLAG_FLEXIBILE_LOCALITY) ||
+        global.numa_node_count == 1;
 
     /* No other options. Allocate from this buddy. */
     if (locality_degree == ALLOC_LOCALITY_MAX)
         return alloc_from_this_buddy(pages);
 
-    return alloc_with_locality(pages, locality_degree);
+    return alloc_with_locality(pages, flexible_locality, locality_degree);
 }
