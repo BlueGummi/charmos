@@ -82,8 +82,6 @@ static inline void free_from_buddy_internal(struct domain_buddy *target,
     bool iflag = domain_buddy_lock(target);
     buddy_free_pages(address, page_count, target->free_area,
                      target->total_pages);
-    atomic_fetch_sub_explicit(&target->pages_used, page_count,
-                              memory_order_relaxed);
     domain_stat_free(target);
     domain_buddy_unlock(target, iflag);
 }
