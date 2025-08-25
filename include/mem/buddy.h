@@ -55,7 +55,19 @@ struct domain_zonelist {
     size_t count;
 };
 
+struct domain_buddy_stats {
+    atomic_size_t alloc_count;
+    atomic_size_t free_count;
+    atomic_size_t remote_alloc_count;
+    atomic_size_t remote_free_count;
+    atomic_size_t failed_alloc_count;
+
+    atomic_size_t interleaved_alloc_count;
+    atomic_size_t interleaved_free_count;
+};
+
 struct domain_buddy {
+    struct domain_buddy_stats stats;
     struct domain_zonelist zonelist;
     struct buddy_page *buddy;
     struct free_area *free_area;
@@ -102,3 +114,8 @@ bool domain_free_queue_dequeue(struct domain_free_queue *fq, paddr_t *addr_out,
                                size_t *pages_out);
 bool domain_arena_push(struct domain_arena *arena, struct buddy_page *page);
 struct buddy_page *domain_arena_pop(struct domain_arena *arena);
+
+#define domain_for_each_arena(domain, arena_ptr)                               \
+    for (uint32_t __i = 0;                                                     \
+         (arena_ptr = ((domain)->arenas[__i]), __i < (domain)->core_count);    \
+         __i++)

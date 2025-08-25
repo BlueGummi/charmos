@@ -158,11 +158,35 @@ static void domain_structs_init(struct domain_buddy *dom, size_t arena_capacity,
     spinlock_init(&dom->free_queue->lock);
 }
 
+#define ARENA_SCALE_PERMILLE 10    /* 1% of domain pages per-core arena */
+#define FREEQUEUE_SCALE_PERMILLE 5 /* 0.5% of total pages for freequeues */
+
+#define MAX_ARENA_PAGES 4096      /* absolute cap per-core arena */
+#define MAX_FREEQUEUE_PAGES 16384 /* absolute cap per-domain freequeue */
+
+static size_t compute_arena_max(size_t domain_total_pages) {
+    size_t scaled = (domain_total_pages * ARENA_SCALE_PERMILLE) / 1000;
+    if (scaled > MAX_ARENA_PAGES)
+        return MAX_ARENA_PAGES;
+
+    return scaled;
+}
+
+static size_t compute_freequeue_max(size_t system_total_pages) {
+    size_t scaled = (system_total_pages * FREEQUEUE_SCALE_PERMILLE) / 1000;
+    if (scaled > MAX_FREEQUEUE_PAGES)
+        return MAX_FREEQUEUE_PAGES;
+
+    return scaled;
+}
+
 void domain_buddies_init(void) {
+    size_t freequeue_size = compute_freequeue_max(global.total_pages);
     for (size_t i = 0; i < global.domain_count; i++) {
         struct core_domain *d = global.core_domains[i];
         struct domain_buddy *dbd = &domain_buddies[i];
-        domain_structs_init(dbd, DOMAIN_ARENA_SIZE, DOMAIN_FREE_QUEUE_SIZE, d);
+        size_t arena_size = compute_arena_max(dbd->end - dbd->start);
+        domain_structs_init(dbd, arena_size, freequeue_size, d);
         domain_buddy_init(dbd);
         domain_buddy_track_pages(dbd);
         domain_build_zonelist(dbd);
