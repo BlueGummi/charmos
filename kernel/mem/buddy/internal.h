@@ -5,6 +5,10 @@
 #include <misc/align.h>
 #include <mp/core.h>
 
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(domain_buddy, lock);
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(domain_free_queue, lock);
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(domain_arena, lock);
+
 static inline struct domain_buddy *domain_buddy_for_addr(paddr_t addr) {
     for (size_t i = 0; i < global.domain_count; i++) {
         struct domain_buddy *d = &domain_buddies[i];
@@ -46,16 +50,8 @@ static inline void domain_stat_alloc(struct domain_buddy *d, bool remote,
                                   memory_order_relaxed);
 }
 
-static inline void domain_stat_free(struct domain_buddy *d, bool remote,
-                                    bool interleaved) {
+static inline void domain_stat_free(struct domain_buddy *d) {
     atomic_fetch_add_explicit(&d->stats.free_count, 1, memory_order_relaxed);
-
-    if (remote)
-        atomic_fetch_add_explicit(&d->stats.remote_free_count, 1,
-                                  memory_order_relaxed);
-    if (interleaved)
-        atomic_fetch_add_explicit(&d->stats.interleaved_free_count, 1,
-                                  memory_order_relaxed);
 }
 
 static inline void domain_stat_mark_interleaved(struct domain_buddy *d) {
@@ -76,6 +72,18 @@ static inline void mark_free_in_progress(struct domain_free_queue *fq, bool s) {
     atomic_store_explicit(&fq->free_in_progress, s, memory_order_relaxed);
 }
 
-SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(domain_buddy, lock);
-SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(domain_free_queue, lock);
-SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(domain_arena, lock);
+static inline struct buddy_page *buddy_page_for_addr(paddr_t address) {
+    return &buddy_page_array[PAGE_TO_PFN(address)];
+}
+
+static inline void free_from_buddy_internal(struct domain_buddy *target,
+                                            paddr_t address,
+                                            size_t page_count) {
+    bool iflag = domain_buddy_lock(target);
+    buddy_free_pages(address, page_count, target->free_area,
+                     target->total_pages);
+    atomic_fetch_sub_explicit(&target->pages_used, page_count,
+                              memory_order_relaxed);
+    domain_stat_free(target);
+    domain_buddy_unlock(target, iflag);
+}

@@ -8,20 +8,6 @@
 
 #include "internal.h"
 
-static inline struct buddy_page *buddy_page_for_addr(paddr_t address) {
-    return &buddy_page_array[PAGE_TO_PFN(address)];
-}
-
-static void free_from_buddy_internal(struct domain_buddy *target,
-                                     paddr_t address, size_t page_count) {
-    bool iflag = domain_buddy_lock(target);
-
-    buddy_free_pages(address, page_count, target->free_area,
-                     target->total_pages);
-
-    domain_buddy_unlock(target, iflag);
-}
-
 static bool try_push_page_onto_arena(struct domain_arena *arena,
                                      paddr_t address) {
     struct buddy_page *buddy = buddy_page_for_addr(address);

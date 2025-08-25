@@ -10,14 +10,54 @@
 #define DISTANCE_WEIGHT 1000 /* distance is heavily weighted */
 #define FREE_PAGES_WEIGHT 1  /* free pages count less */
 
+static inline bool domain_free_queue_available(struct domain_free_queue *fq,
+                                               struct domain_buddy *domain) {
+    return fq->num_elements > domain->core_count;
+}
+
+static inline size_t domain_freequeue_flush_quota(struct domain_free_queue *fq,
+                                                  struct domain_buddy *domain) {
+    size_t quota = fq->num_elements / domain->core_count;
+    if (quota == 0)
+        quota = 1;
+
+    return quota;
+}
+
+static void flush_freequeue_into_local_arena(struct domain_buddy *domain,
+                                             struct domain_free_queue *fq,
+                                             size_t quota) {
+    struct domain_arena *local_arena = domain_arena_on_this_core();
+
+    for (size_t i = 0; i < quota; i++) {
+        paddr_t addr = 0;
+        size_t page_count = 0;
+
+        if (!domain_free_queue_dequeue(fq, &addr, &page_count))
+            break; /* queue drained */
+
+        if (page_count > 1) {
+            free_from_buddy_internal(domain, addr, page_count);
+            continue;
+        }
+
+        struct buddy_page *bp = buddy_page_for_addr(addr);
+
+        if (!domain_arena_push(local_arena, bp)) {
+            /* arena is full, fall back */
+            free_from_buddy_internal(domain, addr, page_count);
+        }
+    }
+}
+
 static paddr_t alloc_from_buddy_internal(struct domain_buddy *this,
                                          size_t pages) {
     bool iflag = domain_buddy_lock(this);
 
     paddr_t ret = buddy_alloc_pages(this->free_area, pages);
+
     if (ret)
         domain_stat_alloc(this, /*remote*/ false, /*interleaved*/ false);
-
     else
         domain_stat_failed_alloc(this);
 
@@ -64,6 +104,25 @@ static paddr_t alloc_from_remote_domain(struct domain_buddy *remote,
     return ret;
 }
 
+static paddr_t try_alloc_from_free_queue(struct domain_free_queue *fq,
+                                         struct domain_buddy *this,
+                                         struct domain_arena *this_arena) {
+    if (domain_free_queue_available(fq, this)) {
+        size_t quota = domain_freequeue_flush_quota(fq, this);
+
+        flush_freequeue_into_local_arena(this, fq, quota);
+
+        /* retry after flush */
+        struct buddy_page *bp = domain_arena_pop(this_arena);
+        if (bp) {
+            domain_stat_alloc(this, /*remote*/ false, /*interleaved*/ false);
+            return PFN_TO_PAGE(bp->pfn);
+        }
+    }
+
+    return 0x0;
+}
+
 static paddr_t try_alloc_from_local_arena(size_t pages) {
     if (pages > 1) /* Can't do it, arenas only cache single-pages */
         return 0x0;
@@ -78,9 +137,13 @@ static paddr_t try_alloc_from_local_arena(size_t pages) {
     }
 
     struct domain_buddy *this = domain_buddy_on_this_core();
-    paddr_t ret = try_alloc_from_all_arenas(this, pages, /*remote*/ false);
+    struct domain_free_queue *fq = domain_free_queue_on_this_core();
 
-    return ret;
+    paddr_t ret = try_alloc_from_free_queue(fq, this, this_arena);
+    if (ret)
+        return ret;
+
+    return try_alloc_from_all_arenas(this, pages, /*remote*/ false);
 }
 
 static inline paddr_t do_alloc_interleaved_local(struct domain_buddy *local,

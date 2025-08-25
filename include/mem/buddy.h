@@ -70,11 +70,8 @@ struct domain_buddy_stats {
     atomic_size_t alloc_count;
     atomic_size_t free_count;
     atomic_size_t remote_alloc_count;
-    atomic_size_t remote_free_count;
     atomic_size_t failed_alloc_count;
-
     atomic_size_t interleaved_alloc_count;
-    atomic_size_t interleaved_free_count;
 };
 
 struct domain_buddy {
