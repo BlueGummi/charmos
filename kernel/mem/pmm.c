@@ -63,6 +63,32 @@ void pmm_early_init(struct limine_memmap_request m) {
     global.total_pages = total_phys / PAGE_SIZE;
 }
 
+static inline void *fast_memset(void *dst, int c, size_t n) {
+    unsigned char *d = dst;
+
+    if (__builtin_constant_p(c) && c == 0) {
+        size_t qwords = n / 8;
+        size_t bytes = n % 8;
+
+        if (qwords) {
+            asm volatile("rep stosq"
+                         : "+D"(d), "+c"(qwords)
+                         : "a"(0ULL)
+                         : "memory");
+        }
+
+        while (bytes--)
+            *d++ = 0;
+
+        return dst;
+    }
+
+    while (n--)
+        *d++ = (unsigned char) c;
+
+    return dst;
+}
+
 static void mid_init_buddy(size_t pages_needed) {
     bool found = false;
 
@@ -77,7 +103,7 @@ static void mid_init_buddy(size_t pages_needed) {
 
         if (run_len >= pages_needed) {
             buddy_page_array = (void *) (start + global.hhdm_offset);
-            memset(buddy_page_array, 0, pages_needed * PAGE_SIZE);
+            fast_memset(buddy_page_array, 0, pages_needed * PAGE_SIZE);
 
             for (uint64_t j = 0; j < pages_needed; j++)
                 set_bit((start / PAGE_SIZE) + j);
