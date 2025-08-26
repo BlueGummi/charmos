@@ -204,6 +204,10 @@ enum errno vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     }
 
     pte_t *entry = &current_table->entries[L2];
+    if (ENTRY_PRESENT(*entry)) {
+        invlpg(virt);
+        do_tlb_shootdown(virt);
+    }
     *entry =
         (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT | PAGING_2MB_page;
 
@@ -280,6 +284,11 @@ enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
 
     uint64_t L1 = (virt >> 12) & 0x1FF;
     pte_t *entry = &current_table->entries[L1];
+    if (ENTRY_PRESENT(*entry)) {
+        invlpg(virt);
+        do_tlb_shootdown(virt);
+    }
+
     *entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
 
     spin_unlock(&vmm_lock, interrupts);
