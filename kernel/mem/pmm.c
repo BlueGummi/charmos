@@ -10,7 +10,9 @@
 #include <string.h>
 
 struct limine_memmap_response *memmap;
-typedef paddr_t (*alloc_fn)(size_t pages);
+typedef paddr_t (*alloc_fn)(size_t pages, enum alloc_class class,
+                            enum alloc_flags f);
+
 typedef void (*free_fn)(paddr_t addr, size_t pages);
 
 static alloc_fn current_alloc_fn = bitmap_alloc_pages;
@@ -42,6 +44,22 @@ void pmm_early_init(struct limine_memmap_request m) {
             }
         }
     }
+
+    uint64_t last_usable_pfn = 0;
+
+    for (uint64_t i = 0; i < memmap->entry_count; i++) {
+        struct limine_memmap_entry *entry = memmap->entries[i];
+        if (entry->type != LIMINE_MEMMAP_USABLE)
+            continue;
+
+        uint64_t end =
+            ALIGN_UP(entry->base + entry->length, PAGE_SIZE) / PAGE_SIZE;
+
+        if (end > last_usable_pfn)
+            last_usable_pfn = end;
+    }
+
+    global.last_pfn = last_usable_pfn;
     global.total_pages = total_phys / PAGE_SIZE;
 }
 
@@ -55,45 +73,33 @@ static void mid_init_buddy(size_t pages_needed) {
 
         uint64_t start = ALIGN_UP(entry->base, PAGE_SIZE);
         uint64_t end = ALIGN_DOWN(entry->base + entry->length, PAGE_SIZE);
-        uint64_t run_start = 0;
-        uint64_t run_len = 0;
+        uint64_t run_len = end > start ? (end - start) / PAGE_SIZE : 0;
 
-        for (uint64_t addr = start; addr < end; addr += PAGE_SIZE) {
-            uint64_t pfn = addr / PAGE_SIZE;
+        if (run_len >= pages_needed) {
+            buddy_page_array = (void *) (start + global.hhdm_offset);
+            memset(buddy_page_array, 0, pages_needed * PAGE_SIZE);
 
-            if (!test_bit(pfn)) {
-                if (run_len == 0)
-                    run_start = addr;
-                run_len++;
+            for (uint64_t j = 0; j < pages_needed; j++)
+                set_bit((start / PAGE_SIZE) + j);
 
-                if (run_len >= pages_needed) {
-                    buddy_page_array =
-                        (void *) (run_start + global.hhdm_offset);
+            entry->base = start + pages_needed * PAGE_SIZE;
+            entry->length = end - entry->base;
 
-                    for (uint64_t j = 0; j < pages_needed; j++)
-                        set_bit((run_start / PAGE_SIZE) + j);
-
-                    entry->base = run_start + pages_needed * PAGE_SIZE;
-                    entry->length = (end - entry->base);
-
-                    found = true;
-                    break;
-                }
-            } else {
-                run_len = 0;
-            }
+            found = true;
+            break;
         }
     }
+
+    if (!buddy_page_array)
+        k_panic("Failed to allocate buddy metadata");
 }
 
 void pmm_mid_init() {
     size_t pages_needed =
-        (sizeof(struct buddy_page) * global.total_pages + PAGE_SIZE - 1) /
+        (sizeof(struct buddy_page) * global.last_pfn + PAGE_SIZE - 1) /
         PAGE_SIZE;
 
     mid_init_buddy(pages_needed);
-    if (!buddy_page_array)
-        k_panic("Failed to allocate buddy metadata");
 
     for (int i = 0; i < MAX_ORDER; i++) {
         buddy_free_area[i].next = NULL;
@@ -106,6 +112,16 @@ void pmm_mid_init() {
     global.buddy_active = true;
     current_alloc_fn = buddy_alloc_pages_global;
     current_free_fn = buddy_free_pages_global;
+    for (uint64_t i = 0; i < memmap->entry_count; i++) {
+        struct limine_memmap_entry *e = memmap->entries[i];
+        uint64_t start = ALIGN_UP(e->base, PAGE_SIZE) / PAGE_SIZE;
+        uint64_t end = ALIGN_DOWN(e->base + e->length, PAGE_SIZE) / PAGE_SIZE;
+
+        if (e->type == LIMINE_MEMMAP_USABLE) {
+            for (uint64_t p = start; p < end; p++)
+                buddy_page_array[p].phys_usable = 1;
+        }
+    }
 }
 
 static void link_domain_cores_to_buddy(struct core_domain *cd,
@@ -115,31 +131,34 @@ static void link_domain_cores_to_buddy(struct core_domain *cd,
     }
 }
 
+static inline uint64_t pages_to_bytes(size_t pages) {
+    return (uint64_t) pages * PAGE_SIZE;
+}
+
 static void late_init_from_numa(size_t domain_count) {
     for (size_t i = 0; i < domain_count; i++) {
         struct numa_node *node = &global.numa_nodes[i % global.numa_node_count];
-
         struct core_domain *cd = global.core_domains[i];
 
-        domain_buddies[i].start = node->mem_base;
-        domain_buddies[i].end = node->mem_base + node->mem_size;
+        domain_buddies[i].start = node->mem_base;                /* bytes */
+        domain_buddies[i].end = node->mem_base + node->mem_size; /* bytes */
+        domain_buddies[i].length = node->mem_size;               /* bytes */
         domain_buddies[i].core_count = cd->num_cores;
-        domain_buddies[i].length = node->mem_size;
         link_domain_cores_to_buddy(cd, &domain_buddies[i]);
 
-        /* Slice of buddy array corresponding to this range */
-        size_t page_offset = node->mem_base / PAGE_SIZE;
+        /* Slice of global buddy_page_array corresponding to this PFN range */
+        size_t page_offset = node->mem_base / PAGE_SIZE; /* PFN index */
         domain_buddies[i].buddy = &buddy_page_array[page_offset];
     }
 }
 
-/* No NUMA, just split evenly */
+/* No NUMA: split last_pfn evenly across domains.
+ * Keep dom->start/dom->end in bytes to match NUMA path. */
 static void late_init_non_numa(size_t domain_count) {
-    size_t pages_per_domain = global.total_pages / domain_count;
-    size_t remainder_pages = global.total_pages % domain_count;
+    size_t pages_per_domain = global.last_pfn / domain_count;
+    size_t remainder_pages = global.last_pfn % domain_count;
 
-    uintptr_t base = 0;
-    size_t page_cursor = 0;
+    size_t page_cursor = 0; /* PFN cursor (pages) */
 
     for (size_t i = 0; i < domain_count; i++) {
         size_t this_pages = pages_per_domain;
@@ -147,16 +166,22 @@ static void late_init_non_numa(size_t domain_count) {
             this_pages += remainder_pages;
 
         struct core_domain *cd = global.core_domains[i];
-        domain_buddies[i].start = base;
-        domain_buddies[i].end = base + this_pages / PAGE_SIZE;
+
+        uint64_t domain_start_bytes = pages_to_bytes(page_cursor); /* bytes */
+
+        uint64_t domain_length_bytes = pages_to_bytes(this_pages); /* bytes */
+
+        domain_buddies[i].start = domain_start_bytes; /* bytes */
+        domain_buddies[i].end =
+            domain_start_bytes + domain_length_bytes;   /* bytes */
+        domain_buddies[i].length = domain_length_bytes; /* bytes */
         domain_buddies[i].core_count = cd->num_cores;
-        domain_buddies[i].length = this_pages / PAGE_SIZE;
 
         domain_buddies[i].buddy = &buddy_page_array[page_cursor];
+
         link_domain_cores_to_buddy(cd, &domain_buddies[i]);
 
         page_cursor += this_pages;
-        base += this_pages / PAGE_SIZE;
     }
 }
 
@@ -167,7 +192,7 @@ static void late_init_non_numa(size_t domain_count) {
  * logic sitting around in the domain_buddies_init */
 void pmm_late_init(void) {
     size_t domain_count = global.domain_count;
-    domain_buddies = kmalloc(sizeof(struct domain_buddy) * domain_count);
+    domain_buddies = kzalloc(sizeof(struct domain_buddy) * domain_count);
 
     if (global.numa_node_count > 1) {
         late_init_from_numa(domain_count);
@@ -176,28 +201,26 @@ void pmm_late_init(void) {
     }
 
     domain_buddies_init();
+    current_alloc_fn = domain_alloc;
+    current_free_fn = domain_free;
 }
 
-paddr_t pmm_alloc_page() {
-    return pmm_alloc_pages(1);
+paddr_t pmm_alloc_page(enum alloc_class c, enum alloc_flags f) {
+    return pmm_alloc_pages(1, c, f);
 }
 
 void pmm_free_page(paddr_t addr) {
     pmm_free_pages(addr, 1);
 }
 
-static struct spinlock pmalloc_lock = SPINLOCK_INIT;
-paddr_t pmm_alloc_pages(uint64_t count) {
-    bool iflag = spin_lock(&pmalloc_lock);
-    paddr_t p = current_alloc_fn(count);
-    spin_unlock(&pmalloc_lock, iflag);
-    return p;
+paddr_t pmm_alloc_pages(uint64_t count, enum alloc_class c,
+                        enum alloc_flags f) {
+    paddr_t ret = current_alloc_fn(count, c, f);
+    return ret;
 }
 
 void pmm_free_pages(paddr_t addr, uint64_t count) {
-    bool iflag = spin_lock(&pmalloc_lock);
     current_free_fn(addr, count);
-    spin_unlock(&pmalloc_lock, iflag);
 }
 
 uint64_t pmm_get_usable_ram(void) {

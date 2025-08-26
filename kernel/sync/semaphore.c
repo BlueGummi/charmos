@@ -2,6 +2,12 @@
 #include <sync/semaphore.h>
 #include <sync/spin_lock.h>
 
+#define get_count(sem) atomic_load(&sem->count)
+#define set_count(sem, val) atomic_store(&sem->count, val)
+#define inc_count(sem) atomic_fetch_add(&sem->count, 1)
+#define dec_count(sem) atomic_fetch_sub(&sem->count, 1)
+#define add_count(sem, val) atomic_fetch_add(&sem->count, val)
+
 void semaphore_init(struct semaphore *s, int value) {
     s->count = value;
     spinlock_init(&s->lock);
@@ -11,35 +17,33 @@ void semaphore_init(struct semaphore *s, int value) {
 void semaphore_wait(struct semaphore *s) {
     bool iflag = semaphore_lock(s);
 
-    while (s->count == 0) {
+    while (s->count == 0)
         condvar_wait(&s->cv, &s->lock, false);
-    }
 
-    s->count--;
-
+    dec_count(s);
     semaphore_unlock(s, iflag);
 }
 
 bool semaphore_timedwait(struct semaphore *s, time_t timeout_ms) {
     bool iflag = semaphore_lock(s);
 
-    while (s->count == 0) {
+    while (get_count(s) == 0) {
         if (!condvar_wait_timeout(&s->cv, &s->lock, timeout_ms, false)) {
-            spin_unlock(&s->lock, iflag);
+            semaphore_unlock(s, iflag);
             return false;
         }
     }
 
-    s->count--;
-
+    dec_count(s);
     semaphore_unlock(s, iflag);
+
     return true;
 }
 
 void semaphore_post(struct semaphore *s) {
     bool iflag = semaphore_lock(s);
 
-    s->count++;
+    inc_count(s);
     condvar_signal(&s->cv);
 
     semaphore_unlock(s, iflag);
@@ -48,7 +52,7 @@ void semaphore_post(struct semaphore *s) {
 void semaphore_postn(struct semaphore *s, int n) {
     bool iflag = semaphore_lock(s);
 
-    s->count += n;
+    add_count(s, n);
     for (int i = 0; i < n; i++)
         condvar_signal(&s->cv);
 

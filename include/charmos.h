@@ -30,6 +30,7 @@ struct charmos_globals {
 
     bool buddy_active;
     uint64_t total_pages;
+    uintptr_t last_pfn;
 
     /* TODO: no more of this */
     atomic_uint_fast64_t next_tlb_gen;

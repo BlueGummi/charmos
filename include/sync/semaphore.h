@@ -4,7 +4,7 @@
 #include <sync/spin_lock.h>
 
 struct semaphore {
-    int count;
+    atomic_int count;
 
     struct spinlock lock;
     struct condvar cv;

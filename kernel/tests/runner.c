@@ -67,6 +67,10 @@ void tests_run(void) {
     struct kernel_test *start = __skernel_tests;
     struct kernel_test *end = __ekernel_tests;
 
+    bool all_ok = true;
+    char *msg = all_ok ? "all tests pass 🎉!" : "some errors occurred";
+    char *color = all_ok ? ANSI_GREEN : ANSI_RED;
+
     uint64_t unit_test_count = 0;
     uint64_t integration_test_count = 0;
     for (struct kernel_test *t = start; t < end; t++) {
@@ -89,9 +93,9 @@ void tests_run(void) {
 
     run(false, start, end);
 
-    bool all_ok = fail_count == 0;
-    char *color = all_ok ? ANSI_GREEN : ANSI_RED;
-    char *msg = all_ok ? "all tests pass 🎉!" : "some errors occurred";
+    all_ok = fail_count == 0;
+    color = all_ok ? ANSI_GREEN : ANSI_RED;
+    msg = all_ok ? "all tests pass 🎉!" : "some errors occurred";
     char *fail_color = all_ok ? ANSI_GREEN : ANSI_RED;
     char *skip_color = all_ok ? ANSI_GREEN : ANSI_GRAY;
 
@@ -102,6 +106,7 @@ void tests_run(void) {
            total_test_count, pass_count, fail_count, fail_color, skip_count,
            skip_color);
 
+end:
     k_info("TEST", K_TEST, "%s%s" ANSI_RESET " (%llu ms)\n", color, msg,
            total_time);
 

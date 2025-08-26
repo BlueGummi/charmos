@@ -1,8 +1,3 @@
-#include <kassert.h>
-#include <mem/alloc.h>
-#include <mem/buddy.h>
-#include <mem/pmm.h>
-#include <mem/vmm.h>
 #include <misc/align.h>
 #include <mp/domain.h>
 
@@ -102,17 +97,19 @@ static struct domain_arena *find_non_full_arena(struct domain_buddy *domain,
 
 static size_t compute_min_elements_to_free(struct domain_buddy *domain,
                                            struct domain_free_queue *queue) {
+
     size_t total_slots_available = 0;
     struct domain_arena *curr;
 
     domain_for_each_arena(domain, curr) {
-        size_t slots_available = curr->capacity - curr->num_pages;
-        total_slots_available += slots_available;
+        total_slots_available += curr->capacity - curr->num_pages;
     }
 
-    /* Simple formula: Try to fill the current arenas or just drain the queue */
-    return total_slots_available > queue->num_elements ? queue->num_elements
-                                                       : total_slots_available;
+    size_t target = queue->num_elements / 2;
+    if (target > total_slots_available)
+        target = total_slots_available;
+
+    return target > 0 ? target : 1;
 }
 
 static void flush_free_queue_internal(struct domain_buddy *domain,
@@ -166,7 +163,7 @@ static void flush_free_queue_internal(struct domain_buddy *domain,
  * For frees of more than one page, we don't bother with
  * the arenas, and we just flush to the main buddy.
  */
-static void flush_free_queue(struct domain_buddy *domain,
+void domain_flush_free_queue(struct domain_buddy *domain,
                              struct domain_free_queue *queue) {
     if (is_free_in_progress(queue))
         return;
@@ -191,5 +188,22 @@ void domain_free(paddr_t address, size_t page_count) {
         free_from_remote_domain_buddy(target, address, page_count);
     }
 
-    flush_free_queue(local, free_queue);
+    domain_enqueue_flush_worker(&local->worker);
+    domain_flush_free_queue(local, free_queue);
+}
+
+void domain_flush_thread() {
+    struct domain_flush_worker *worker = &domain_buddy_on_this_core()->worker;
+    while (!worker->stop) {
+        semaphore_wait(&worker->sema);
+        struct domain_free_queue *fq = worker->domain->free_queue;
+        domain_flush_free_queue(worker->domain, fq);
+        atomic_store(&worker->enqueued, false);
+    }
+}
+
+void domain_enqueue_flush_worker(struct domain_flush_worker *worker) {
+    bool already = atomic_exchange(&worker->enqueued, true);
+    if (!already)
+        semaphore_post(&worker->sema);
 }

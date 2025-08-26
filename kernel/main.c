@@ -76,7 +76,9 @@ void k_main(void) {
     ioapic_init();
     acpi_find_cst();
     global.current_bootstage = BOOTSTAGE_EARLY_DEVICES;
-    k_info("MAIN", K_INFO, "Early boot OK - %llu cores", global.core_count);
+    k_info("MAIN", K_INFO,
+           "Early boot OK - %llu cores - total usable pages is 0x%llx",
+           global.core_count, global.total_pages);
 
     /* Scheduler */
     scheduler_init();

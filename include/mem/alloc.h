@@ -14,6 +14,7 @@
     (((locality) & ALLOC_LOCALITY_MASK) << ALLOC_LOCALITY_SHIFT)
 
 #define ALLOC_FLAG_SET(flags, mask) (flags & mask)
+#define ALLOC_FLAGS_NONE 0
 
 enum alloc_flags : uint16_t {
     /* Cache alignment */

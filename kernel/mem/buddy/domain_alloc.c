@@ -1,9 +1,6 @@
 #include <kassert.h>
-#include <mem/alloc.h>
-#include <mem/buddy.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <misc/align.h>
 #include <mp/domain.h>
 
 #include "internal.h"

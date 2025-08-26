@@ -24,7 +24,9 @@ uint64_t sub_offset(uint64_t a) {
 }
 
 static inline struct page_table *alloc_pt(void) {
-    struct page_table *ret = (void *) (pmm_alloc_page() + global.hhdm_offset);
+    struct page_table *ret =
+        (void *) (pmm_alloc_page(ALLOC_CLASS_DEFAULT, ALLOC_FLAGS_NONE) +
+                  global.hhdm_offset);
     if (!ret)
         return NULL;
 

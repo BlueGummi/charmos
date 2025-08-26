@@ -22,19 +22,24 @@ paddr_t buddy_alloc_pages(struct free_area *free_area, size_t count) {
         size <<= 1;
     }
 
-    if (order >= MAX_ORDER)
+    if (order >= MAX_ORDER) {
+        k_panic("Attempted to allocate too many pages (outside max order)\n");
         return 0x0;
+    }
 
     uint64_t current_order = order;
     while (current_order < MAX_ORDER && free_area[current_order].nr_free == 0)
         current_order++;
 
-    if (current_order >= MAX_ORDER)
+    if (current_order >= MAX_ORDER) {
+        k_panic("Attempted to allocate too many pages (outside max order)\n");
         return 0x0;
+    }
 
     while (current_order > order) {
         struct buddy_page *page =
             buddy_remove_from_free_area(&free_area[current_order]);
+
         if (!page)
             return 0x0;
 
@@ -59,10 +64,6 @@ paddr_t buddy_alloc_pages(struct free_area *free_area, size_t count) {
         return 0x0;
 
     return PFN_TO_PAGE(page->pfn);
-}
-
-paddr_t buddy_alloc_pages_global(size_t count) {
-    return buddy_alloc_pages(buddy_free_area, count);
 }
 
 void buddy_free_pages(paddr_t addr, size_t count, struct free_area *free_area,
@@ -114,6 +115,18 @@ void buddy_free_pages(paddr_t addr, size_t count, struct free_area *free_area,
     buddy_add_to_free_area(page, &free_area[order]);
 }
 
+static struct spinlock buddy_lock = SPINLOCK_INIT;
 void buddy_free_pages_global(paddr_t addr, uint64_t count) {
-    buddy_free_pages(addr, count, buddy_free_area, global.total_pages);
+    bool iflag = spin_lock(&buddy_lock);
+    buddy_free_pages(addr, count, buddy_free_area, global.last_pfn);
+    spin_unlock(&buddy_lock, iflag);
+}
+
+paddr_t buddy_alloc_pages_global(size_t count, enum alloc_class c,
+                                 enum alloc_flags f) {
+    (void) c, (void) f;
+    bool iflag = spin_lock(&buddy_lock);
+    paddr_t ret = buddy_alloc_pages(buddy_free_area, count);
+    spin_unlock(&buddy_lock, iflag);
+    return ret;
 }

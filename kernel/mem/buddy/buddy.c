@@ -31,7 +31,6 @@ static bool is_block_free(uint64_t pfn, uint64_t order) {
 
     for (uint64_t i = 0; i < pages; i++) {
         uint64_t cur_pfn = pfn + i;
-
         if (cur_pfn < BOOT_BITMAP_SIZE * 8) {
             if (test_bit(cur_pfn))
                 return false;
@@ -40,6 +39,7 @@ static bool is_block_free(uint64_t pfn, uint64_t order) {
                 return false;
         }
     }
+
     return true;
 }
 
@@ -72,9 +72,8 @@ void buddy_add_entry(struct buddy_page *page_array,
     if (entry->type != LIMINE_MEMMAP_USABLE)
         return;
 
-    uint64_t start = (entry->base + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-    uint64_t end = (entry->base + entry->length) & ~(PAGE_SIZE - 1);
-
+    uint64_t start = ALIGN_UP(entry->base, PAGE_SIZE);
+    uint64_t end = ALIGN_DOWN(entry->base + entry->length, PAGE_SIZE);
     if (start >= end)
         return;
 
@@ -82,22 +81,25 @@ void buddy_add_entry(struct buddy_page *page_array,
     uint64_t region_size = (end - start) / PAGE_SIZE;
 
     while (region_size > 0) {
-        uint64_t order = MIN(order_base_2(region_size), MAX_ORDER - 1);
-        uint64_t block_size = 1ULL << order;
+        int order = MIN(order_base_2(region_size), MAX_ORDER - 1);
+        size_t block_size = 1ULL << order;
 
         while ((region_start & (block_size - 1)) != 0 && order > 0) {
             order--;
             block_size = 1ULL << order;
         }
 
-        if (region_start + block_size > global.total_pages)
-            break;
+        if (block_size > region_size)
+            block_size = region_size;
 
         if (is_block_free(region_start, order)) {
             struct buddy_page *page = &page_array[region_start];
             memset(page, 0, sizeof(*page));
+
             page->pfn = region_start;
             page->order = order;
+            page->is_free = true;
+
             buddy_add_to_free_area(page, &farea[order]);
         }
 
