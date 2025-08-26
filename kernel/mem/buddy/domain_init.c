@@ -67,7 +67,7 @@ static void remove_block_from_global(size_t start_pfn, int order) {
     struct buddy_page *page = buddy_free_area[order].next;
 
     while (page) {
-        if (page->pfn == start_pfn) {
+        if (pfn_for_buddy_page(page) == start_pfn) {
             *prev = page->next;
             buddy_free_area[order].nr_free--;
             page->next = NULL;
@@ -81,7 +81,6 @@ static void remove_block_from_global(size_t start_pfn, int order) {
 static void buddy_add_block_to_global(size_t start_pfn, int order) {
     struct buddy_page *page = get_buddy_page_for_pfn(start_pfn);
     memset(page, 0, sizeof(*page));
-    page->pfn = start_pfn;
     page->order = order;
     page->is_free = true;
 
@@ -106,7 +105,6 @@ static void domain_buddy_split_for_domain(struct domain_buddy *dom,
         size_t idx = start_pfn - dom->start / PAGE_SIZE;
         struct buddy_page *page = &dom->buddy[idx];
         memset(page, 0, sizeof(*page));
-        page->pfn = start_pfn;
         page->order = order;
         page->is_free = true;
         buddy_add_to_free_area(page, &dom->free_area[order]);
@@ -157,7 +155,7 @@ static void domain_buddy_init(struct domain_buddy *dom) {
 
         while (page) {
             struct buddy_page *next_page = page->next;
-            size_t block_start = page->pfn;
+            size_t block_start = pfn_for_buddy_page(page);
             size_t block_end = block_start + (1ULL << page->order);
 
             if (block_end <= dom_start || block_start >= dom_end) {
@@ -165,8 +163,8 @@ static void domain_buddy_init(struct domain_buddy *dom) {
                 continue;
             }
 
-            domain_buddy_split_for_domain(dom, page->pfn, page->order,
-                                          dom_start, dom_end);
+            domain_buddy_split_for_domain(dom, pfn_for_buddy_page(page),
+                                          page->order, dom_start, dom_end);
 
             page = next_page;
         }

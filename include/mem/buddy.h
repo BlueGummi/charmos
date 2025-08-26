@@ -14,7 +14,6 @@
 #pragma once
 
 struct buddy_page {
-    uint64_t pfn;
     struct buddy_page *next;
     uint8_t phys_usable : 1;
     uint8_t is_free : 1;
@@ -125,6 +124,10 @@ static inline struct buddy_page *get_buddy_page_for_pfn(uint64_t pfn) {
         return NULL;
 
     return &buddy_page_array[pfn];
+}
+
+static inline uint64_t pfn_for_buddy_page(struct buddy_page *bp) {
+    return (uint64_t) (bp - buddy_page_array);
 }
 
 static inline bool pfn_phys_usable(uint64_t pfn) {

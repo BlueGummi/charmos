@@ -77,7 +77,7 @@ static paddr_t try_alloc_from_all_arenas(struct domain_buddy *owner,
             struct domain_buddy *local = domain_buddy_on_this_core();
             atomic_fetch_add(&local->pages_used, 1);
             domain_stat_alloc(local, /*remote*/ remote, /*interleaved*/ false);
-            return PFN_TO_PAGE(bp->pfn);
+            return PFN_TO_PAGE(pfn_for_buddy_page(bp));
         }
     }
 
@@ -115,7 +115,7 @@ static paddr_t try_alloc_from_free_queue(struct domain_free_queue *fq,
         if (bp) {
             atomic_fetch_add(&this->pages_used, 1);
             domain_stat_alloc(this, /*remote*/ false, /*interleaved*/ false);
-            return PFN_TO_PAGE(bp->pfn);
+            return PFN_TO_PAGE(pfn_for_buddy_page(bp));
         }
     }
 
@@ -133,7 +133,7 @@ static paddr_t try_alloc_from_local_arena(size_t pages) {
         struct domain_buddy *local = domain_buddy_on_this_core();
         atomic_fetch_add(&local->pages_used, 1);
         domain_stat_alloc(local, /*remote*/ false, /*interleaved*/ false);
-        return PFN_TO_PAGE(bp->pfn);
+        return PFN_TO_PAGE(pfn_for_buddy_page(bp));
     }
 
     struct domain_buddy *this = domain_buddy_on_this_core();

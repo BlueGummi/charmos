@@ -95,7 +95,6 @@ void buddy_add_entry(struct buddy_page *page_array,
             struct buddy_page *page = &page_array[region_start];
             memset(page, 0, sizeof(*page));
 
-            page->pfn = region_start;
             page->order = order;
             page->is_free = true;
 

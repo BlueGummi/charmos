@@ -44,13 +44,12 @@ paddr_t buddy_alloc_pages(struct free_area *free_area, size_t count) {
             return 0x0;
 
         uint64_t new_order = current_order - 1;
-        uint64_t buddy_pfn = page->pfn + (1ULL << new_order);
+        uint64_t buddy_pfn = pfn_for_buddy_page(page) + (1ULL << new_order);
 
         struct buddy_page *buddy = &buddy_page_array[buddy_pfn];
         memset(buddy, 0, sizeof(*buddy));
 
         page->order = new_order;
-        buddy->pfn = buddy_pfn;
         buddy->order = new_order;
 
         buddy_add_to_free_area(page, &free_area[new_order]);
@@ -63,7 +62,7 @@ paddr_t buddy_alloc_pages(struct free_area *free_area, size_t count) {
     if (!page)
         return 0x0;
 
-    return PFN_TO_PAGE(page->pfn);
+    return PFN_TO_PAGE(pfn_for_buddy_page(page));
 }
 
 void buddy_free_pages(paddr_t addr, size_t count, struct free_area *free_area,
@@ -83,7 +82,6 @@ void buddy_free_pages(paddr_t addr, size_t count, struct free_area *free_area,
 
     struct buddy_page *page = &buddy_page_array[pfn];
     memset(page, 0, sizeof(*page));
-    page->pfn = pfn;
     page->order = order;
 
     while (order < MAX_ORDER - 1) {
@@ -108,7 +106,6 @@ void buddy_free_pages(paddr_t addr, size_t count, struct free_area *free_area,
         pfn = (pfn < buddy_pfn) ? pfn : buddy_pfn;
         page = &buddy_page_array[pfn];
         memset(page, 0, sizeof(*page));
-        page->pfn = pfn;
         page->order = ++order;
     }
 
