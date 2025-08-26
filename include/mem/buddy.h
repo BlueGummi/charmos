@@ -16,7 +16,6 @@
 struct buddy_page {
     uint64_t pfn;
     struct buddy_page *next;
-    struct free_area *free_area;
     uint8_t phys_usable : 1;
     uint8_t is_free : 1;
     uint8_t order : 6;

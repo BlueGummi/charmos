@@ -48,7 +48,6 @@ static inline int order_base_2(uint64_t x) {
 }
 
 void buddy_add_to_free_area(struct buddy_page *page, struct free_area *area) {
-    page->free_area = area;
     page->next = area->next;
     area->next = page;
     area->nr_free++;
@@ -105,24 +104,5 @@ void buddy_add_entry(struct buddy_page *page_array,
 
         region_start += block_size;
         region_size -= block_size;
-    }
-}
-
-void buddy_reserve_range(uint64_t pfn, uint64_t pages) {
-    for (uint64_t i = 0; i < pages; i++) {
-        struct buddy_page *page = &buddy_page_array[pfn + i];
-        if (page->is_free) {
-            struct free_area *area = page->free_area;
-            struct buddy_page **prev = &area->next;
-            while (*prev && *prev != page)
-                prev = &(*prev)->next;
-
-            if (*prev == page) {
-                *prev = page->next;
-                area->nr_free--;
-            }
-
-            page->is_free = false;
-        }
     }
 }
