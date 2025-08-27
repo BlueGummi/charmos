@@ -7,7 +7,7 @@
 #include <sch/sched.h>
 #include <stdatomic.h>
 #include <stdint.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 #include <tests.h>
 
 static void derive_timeshare_prio_range(enum thread_activity_class cls,

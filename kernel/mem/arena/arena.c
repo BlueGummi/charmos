@@ -9,7 +9,7 @@ struct hugepage *arena_lookup(struct arena *a, vaddr_t addr) {
     kassert(HUGEPAGE_ALIGN(addr) == addr);
     struct hugepage *hp = NULL;
 
-    bool iflag = arena_lock(a);
+    enum irql irql = arena_lock(a);
     /* Fastest path */
     if (arena_has_private_htb(a)) {
         hp = hugepage_tb_lookup(a->tb, addr);
@@ -31,7 +31,7 @@ struct hugepage *arena_lookup(struct arena *a, vaddr_t addr) {
         hugepage_tb_insert(a->tb, hp);
 
 out:
-    arena_unlock(a, iflag);
+    arena_unlock(a, irql);
     return hp;
 }
 

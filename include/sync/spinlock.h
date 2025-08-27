@@ -32,12 +32,12 @@ static inline void spin_unlock_raw(struct spinlock *lock) {
 }
 
 static inline void spin_unlock(struct spinlock *lock, enum irql old) {
-    atomic_store_explicit(&lock->state, 0, memory_order_release);
+    atomic_exchange_explicit(&lock->state, 0, memory_order_release);
     irql_lower(old);
 }
 
 static inline enum irql spin_lock(struct spinlock *lock) {
-    if (in_interrupt())
+    if (global.current_bootstage >= BOOTSTAGE_MID_MP && in_interrupt())
         k_panic("Attempted to take non-ISR safe spinlock from an ISR!\n");
 
     spin_lock_raw(lock);
@@ -62,6 +62,10 @@ static inline bool spin_trylock(struct spinlock *lock) {
 #define SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(type, member)                 \
     static inline enum irql type##_lock(struct type *obj) {                    \
         return spin_lock(&obj->member);                                        \
+    }                                                                          \
+                                                                               \
+    static inline enum irql type##_lock_irq_disable(struct type *obj) {        \
+        return spin_lock_irq_disable(&obj->member);                            \
     }                                                                          \
                                                                                \
     static inline void type##_unlock(struct type *obj, enum irql irql) {       \

@@ -36,14 +36,6 @@ static inline bool thread_exhausted_period(struct scheduler *sched,
     return thread->completed_period == sched->current_period;
 }
 
-static inline bool scheduler_lock(struct scheduler *sched) {
-    return spin_lock(&sched->lock);
-}
-
-static inline void scheduler_unlock(struct scheduler *sched) {
-    return spin_unlock(&sched->lock, false);
-}
-
 /* Don't touch `current_period` here */
 static inline void disable_period(struct scheduler *sched) {
     sched->period_enabled = false;
@@ -64,3 +56,5 @@ static inline void scheduler_clear_queue_bitmap(struct scheduler *sched,
 static inline uint8_t scheduler_get_bitmap(struct scheduler *sched) {
     return atomic_load(&sched->queue_bitmap);
 }
+
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(scheduler, lock);

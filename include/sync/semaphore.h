@@ -1,7 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include <sync/condvar.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 
 struct semaphore {
     atomic_int count;

@@ -69,7 +69,7 @@ static bool insert(struct bcache *cache, uint64_t key,
 }
 
 static struct bcache_entry *get(struct bcache *cache, uint64_t key) {
-    bool ints = spin_lock(&cache->lock);
+    enum irql irql = spin_lock(&cache->lock);
 
     uint64_t index = bcache_hash(key, cache->capacity);
     struct bcache_wrapper *node = cache->entries[index];
@@ -77,13 +77,13 @@ static struct bcache_entry *get(struct bcache *cache, uint64_t key) {
     while (node) {
         if (node->key == key) {
             node->value->access_time = bcache_get_ticks(cache);
-            spin_unlock(&cache->lock, ints);
+            spin_unlock(&cache->lock, irql);
             return node->value;
         }
         node = node->next;
     }
 
-    spin_unlock(&cache->lock, ints);
+    spin_unlock(&cache->lock, irql);
     return NULL;
 }
 
@@ -115,7 +115,7 @@ static bool can_remove_lba_group(struct bcache *cache, uint64_t base_lba,
 }
 
 static bool remove(struct bcache *cache, uint64_t key, uint64_t spb) {
-    bool ints = spin_lock(&cache->lock);
+    enum irql irql = spin_lock(&cache->lock);
     uint64_t index = bcache_hash(key, cache->capacity);
 
     struct bcache_wrapper *prev = NULL;
@@ -144,7 +144,7 @@ static bool remove(struct bcache *cache, uint64_t key, uint64_t spb) {
                 kfree(val);
             }
 
-            spin_unlock(&cache->lock, ints);
+            spin_unlock(&cache->lock, irql);
             return true;
         }
 
@@ -152,7 +152,7 @@ static bool remove(struct bcache *cache, uint64_t key, uint64_t spb) {
         node = node->next;
     }
 
-    spin_unlock(&cache->lock, ints);
+    spin_unlock(&cache->lock, irql);
     return false;
 }
 
@@ -202,7 +202,7 @@ static enum errno prefetch(struct generic_disk *disk, struct bcache *cache,
 }
 
 static bool evict(struct bcache *cache, uint64_t spb) {
-    bool ints = spin_lock(&cache->lock);
+    enum irql irql = spin_lock(&cache->lock);
 
     uint64_t oldest = UINT64_MAX;
     uint64_t target_key = 0;
@@ -229,7 +229,7 @@ static bool evict(struct bcache *cache, uint64_t spb) {
         }
     }
 
-    spin_unlock(&cache->lock, ints);
+    spin_unlock(&cache->lock, irql);
 
     if (found)
         return remove(cache, target_key, spb);
@@ -239,7 +239,7 @@ static bool evict(struct bcache *cache, uint64_t spb) {
 
 static void stat(struct bcache *cache, uint64_t *total_dirty_out,
                  uint64_t *total_present_out) {
-    bool ints = spin_lock(&cache->lock);
+    enum irql irql = spin_lock(&cache->lock);
 
     uint64_t total_dirty = 0;
     uint64_t total_present = 0;
@@ -262,20 +262,20 @@ static void stat(struct bcache *cache, uint64_t *total_dirty_out,
     if (total_present_out)
         *total_present_out = total_present;
 
-    spin_unlock(&cache->lock, ints);
+    spin_unlock(&cache->lock, irql);
 }
 
 /* TODO: writeback */
 static bool write(struct generic_disk *d, struct bcache *cache,
                   struct bcache_entry *ent, uint64_t spb) {
-    bool ints = spin_lock(&cache->lock);
+    enum irql irql = spin_lock(&cache->lock);
 
     bool ret = d->write_sector(d, ent->lba, ent->buffer, spb);
     uint64_t aligned = ALIGN_DOWN(ent->lba, spb);
     if (aligned != ent->lba)
         kfree(ent);
 
-    spin_unlock(&cache->lock, ints);
+    spin_unlock(&cache->lock, irql);
     return ret;
 }
 
@@ -375,7 +375,7 @@ void *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
     uint64_t base_lba = ALIGN_DOWN(lba, sectors_per_block);
 
     struct bcache_entry *ent = get(disk->cache, base_lba);
-    bool i = spin_lock(&disk->cache->lock);
+    enum irql irql = spin_lock(&disk->cache->lock);
 
     if (!ent) {
         uint8_t *buf = hugepage_alloc_page();
@@ -384,7 +384,7 @@ void *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
 
         if (!disk->read_sector(disk, base_lba, buf, sectors_per_block)) {
             hugepage_free_page(buf);
-            spin_unlock(&disk->cache->lock, i);
+            spin_unlock(&disk->cache->lock, irql);
             *out_entry = NULL;
             return NULL;
         }
@@ -404,7 +404,7 @@ void *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
         }
     }
 
-    spin_unlock(&disk->cache->lock, i);
+    spin_unlock(&disk->cache->lock, irql);
 
     *out_entry = ent;
 

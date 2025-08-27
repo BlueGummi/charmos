@@ -2,7 +2,7 @@
 #include <block/generic.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 
 #define IDE_CMD_TIMEOUT_MS 5000    // Read/write sector
 #define IDE_IDENT_TIMEOUT_MS 10000 // Identify or cache flush

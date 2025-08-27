@@ -1,21 +1,17 @@
 #include <sch/defer.h>
 #include <sync/condvar.h>
 
-static void do_block_on_queue(struct thread *curr, struct thread_queue *q) {
-    atomic_store(&curr->state, THREAD_STATE_BLOCKED);
-
-    thread_queue_push_back(q, curr);
-
+static void do_block_on_queue(struct thread_queue *q) {
+    thread_block_on(q);
     scheduler_yield();
 }
 
-bool condvar_wait(struct condvar *cv, struct spinlock *lock,
-                  bool change_interrupts) {
+bool condvar_wait(struct condvar *cv, struct spinlock *lock, enum irql irql) {
     struct thread *curr = scheduler_get_curr_thread();
     curr->wake_reason = WAKE_REASON_NONE;
 
-    spin_unlock(lock, change_interrupts);
-    do_block_on_queue(curr, &cv->waiters);
+    spin_unlock(lock, irql);
+    do_block_on_queue(&cv->waiters);
     spin_lock(lock);
 
     return curr->wake_reason != WAKE_REASON_TIMEOUT;
@@ -56,12 +52,12 @@ static void condvar_timeout_wakeup(void *arg, void *arg2) {
 }
 
 bool condvar_wait_timeout(struct condvar *cv, struct spinlock *lock,
-                          time_t timeout_ms, bool change_interrupts) {
+                          time_t timeout_ms, enum irql irql) {
     struct thread *curr = scheduler_get_curr_thread();
     curr->wake_reason = WAKE_REASON_NONE;
 
     defer_enqueue(condvar_timeout_wakeup, curr, cv, timeout_ms);
-    condvar_wait(cv, lock, change_interrupts);
+    condvar_wait(cv, lock, irql);
 
     return curr->wake_reason != WAKE_REASON_TIMEOUT;
 }

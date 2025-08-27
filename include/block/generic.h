@@ -6,7 +6,7 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 
 struct generic_disk;
 struct bio_request;

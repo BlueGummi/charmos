@@ -15,13 +15,15 @@
 typedef bool (*sync_fn)(struct generic_disk *, uint64_t, uint8_t *, uint16_t);
 typedef bool (*async_fn)(struct generic_disk *, struct nvme_request *);
 
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(nvme_waiting_requests, lock);
+
 static void enqueue_request(struct nvme_device *dev, struct nvme_request *req) {
     struct nvme_waiting_requests *q = &dev->waiting_requests;
-    bool iflag = spin_lock(&q->lock);
+    enum irql irql = nvme_waiting_requests_lock_irq_disable(q);
 
     sll_add(q, req);
 
-    spin_unlock(&q->lock, iflag);
+    nvme_waiting_requests_unlock(q, irql);
 }
 
 static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
@@ -122,11 +124,14 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
     req.lba = lba;
     req.buffer = buffer;
     req.sector_count = count;
-    struct thread *curr = scheduler_get_curr_thread();
-    thread_block(curr, THREAD_BLOCK_REASON_IO);
 
+    struct thread *curr = scheduler_get_curr_thread();
+
+    preempt_disable();
+    thread_block(curr, THREAD_BLOCK_REASON_IO);
     req.waiter = curr;
     function(disk, &req);
+    preempt_enable();
 
     /* Go run something else now */
     scheduler_yield();

@@ -12,7 +12,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <sync/mutex.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 #include <uacpi/event.h>
 #include <uacpi/platform/arch_helpers.h>
 #include <uacpi/status.h>
@@ -200,8 +200,7 @@ void uacpi_kernel_release_mutex(uacpi_handle m) {
 }
 uacpi_cpu_flags uacpi_kernel_lock_spinlock(uacpi_handle a) {
 
-    bool flag = spin_lock((struct spinlock *) a);
-    return flag;
+    return spin_lock((struct spinlock *) a);
 }
 
 void uacpi_kernel_unlock_spinlock(uacpi_handle a, uacpi_cpu_flags b) {

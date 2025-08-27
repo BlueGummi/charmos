@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 
 static uint8_t chacha_key[32] = {0};
 static uint8_t chacha_nonce[12] = {0};
@@ -20,7 +20,7 @@ void entropy_pool_init(struct entropy_pool *pool) {
 
 void entropy_pool_add(struct entropy_pool *pool, const uint8_t *data,
                       uint64_t len, uint64_t entropy_bits) {
-    bool ints = spin_lock(&pool->lock);
+    enum irql irql = spin_lock(&pool->lock);
 
     for (uint64_t i = 0; i < len; i++) {
         pool->buffer[pool->write_pos] ^= data[i];
@@ -31,18 +31,18 @@ void entropy_pool_add(struct entropy_pool *pool, const uint8_t *data,
     if (pool->entropy_bits > ENTROPY_MAX_BITS)
         pool->entropy_bits = ENTROPY_MAX_BITS;
 
-    spin_unlock(&pool->lock, ints);
+    spin_unlock(&pool->lock, irql);
 }
 
 uint64_t entropy_pool_extract(struct entropy_pool *pool, uint8_t *out,
                               uint64_t len) {
     uint8_t seed[32];
 
-    bool ints = spin_lock(&pool->lock);
+    enum irql irql = spin_lock(&pool->lock);
 
     // Refuse to output if there's insufficient entropy
     if (pool->entropy_bits < len * 8) {
-        spin_unlock(&pool->lock, ints);
+        spin_unlock(&pool->lock, irql);
         return 0;
     }
 
@@ -54,26 +54,26 @@ uint64_t entropy_pool_extract(struct entropy_pool *pool, uint8_t *out,
     else
         pool->entropy_bits = 0;
 
-    spin_unlock(&pool->lock, ints);
+    spin_unlock(&pool->lock, irql);
 
     chacha20_encrypt(seed, chacha_nonce, 0, (uint8_t[64]) {0}, out, len);
     return len;
 }
 
 uint64_t entropy_pool_bits(struct entropy_pool *pool) {
-    bool ints = spin_lock(&pool->lock);
+    enum irql irql = spin_lock(&pool->lock);
     uint64_t bits = pool->entropy_bits;
-    spin_unlock(&pool->lock, ints);
+    spin_unlock(&pool->lock, irql);
     return bits;
 }
 
 void entropy_pool_decrease(struct entropy_pool *pool, uint64_t bits) {
-    bool ints = spin_lock(&pool->lock);
+    enum irql irql = spin_lock(&pool->lock);
     if (pool->entropy_bits > bits)
         pool->entropy_bits -= bits;
     else
         pool->entropy_bits = 0;
-    spin_unlock(&pool->lock, ints);
+    spin_unlock(&pool->lock, irql);
 }
 
 void entropy_pool_seed(struct entropy_pool *pool) {

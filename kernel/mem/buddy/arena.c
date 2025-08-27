@@ -9,7 +9,7 @@
 
 bool domain_arena_push(struct domain_arena *arena, struct buddy_page *page) {
     bool success = false;
-    bool iflag = domain_arena_lock(arena);
+    enum irql irql = domain_arena_lock(arena);
 
     size_t next = (arena->tail + 1) % arena->capacity;
     if (next != arena->head) {
@@ -21,13 +21,13 @@ bool domain_arena_push(struct domain_arena *arena, struct buddy_page *page) {
     if (success)
         atomic_fetch_add_explicit(&arena->num_pages, 1, memory_order_relaxed);
 
-    domain_arena_unlock(arena, iflag);
+    domain_arena_unlock(arena, irql);
     return success;
 }
 
 struct buddy_page *domain_arena_pop(struct domain_arena *arena) {
     struct buddy_page *page = NULL;
-    bool iflag = domain_arena_lock(arena);
+    enum irql irql = domain_arena_lock(arena);
 
     if (arena->head != arena->tail) {
         page = arena->pages[arena->head];
@@ -37,6 +37,6 @@ struct buddy_page *domain_arena_pop(struct domain_arena *arena) {
     if (page)
         atomic_fetch_sub_explicit(&arena->num_pages, 1, memory_order_relaxed);
 
-    domain_arena_unlock(arena, iflag);
+    domain_arena_unlock(arena, irql);
     return page;
 }

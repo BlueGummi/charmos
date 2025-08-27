@@ -11,7 +11,7 @@
  * hugepage if it becomes fully empty */
 void hugepage_free_from_hugepage(struct hugepage *hp, void *ptr,
                                  size_t page_count) {
-    bool iflag = hugepage_lock(hp);
+    enum irql irql = hugepage_lock(hp);
 
     kassert(page_count > 0);
     vaddr_t addr = (vaddr_t) ptr;
@@ -35,7 +35,7 @@ void hugepage_free_from_hugepage(struct hugepage *hp, void *ptr,
     kassert(hp->pages_used >= page_count);
     hp->pages_used -= page_count;
 
-    hugepage_unlock(hp, iflag);
+    hugepage_unlock(hp, irql);
     hugepage_sanity_assert(hp);
 }
 
@@ -57,31 +57,31 @@ static struct hugepage *search_core_list(struct hugepage_core_list *hcl,
                                          vaddr_t vaddr) {
     struct minheap_node *mhn = NULL;
 
-    bool iflag = hugepage_core_list_lock(hcl);
+    enum irql irql = hugepage_core_list_lock(hcl);
     minheap_for_each(hcl->hugepage_minheap, mhn) {
         struct hugepage *hp = hugepage_from_minheap_node(mhn);
         if (hp->virt_base == vaddr) {
-            hugepage_core_list_unlock(hcl, iflag);
+            hugepage_core_list_unlock(hcl, irql);
             return hp;
         }
     }
 
-    hugepage_core_list_unlock(hcl, iflag);
+    hugepage_core_list_unlock(hcl, irql);
     return NULL;
 }
 
 static struct hugepage *search_global_tree(struct hugepage_tree *tree,
                                            vaddr_t vaddr) {
-    bool iflag = hugepage_tree_lock(tree);
+    enum irql irql = hugepage_tree_lock(tree);
 
     struct rbt_node *n = rbt_search(tree->root_node->root, vaddr);
     if (!n) {
-        hugepage_tree_unlock(tree, iflag);
+        hugepage_tree_unlock(tree, irql);
         return NULL;
     }
 
     struct hugepage *hp = hugepage_from_tree_node(n);
-    hugepage_tree_unlock(tree, iflag);
+    hugepage_tree_unlock(tree, irql);
     return hp;
 }
 

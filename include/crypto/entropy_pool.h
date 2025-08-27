@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 #pragma once
 #define ENTROPY_POOL_SIZE 64 // 512 bits
 #define ENTROPY_MAX_BITS (ENTROPY_POOL_SIZE * 8)

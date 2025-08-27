@@ -1,6 +1,6 @@
 #include <sch/thread.h>
 #include <stdbool.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 #pragma once
 
 struct mutex {

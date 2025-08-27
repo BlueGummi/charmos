@@ -59,14 +59,6 @@ void scheduler_change_timeslice_duration(uint64_t new_duration) {
     change_timeslice_duration(new_duration);
 }
 
-void scheduler_tick_enable() {
-    tick_enable();
-}
-
-void scheduler_tick_disable() {
-    tick_disable();
-}
-
 static inline void update_core_current_thread(struct thread *next) {
     struct core *c = global.cores[get_this_core_id()];
     c->current_thread = next;
@@ -279,7 +271,7 @@ static inline void context_switch(struct thread *curr, struct thread *next) {
 
 void schedule(void) {
     struct scheduler *sched = get_this_core_sched();
-    scheduler_lock(sched);
+    enum irql irql = scheduler_lock(sched);
 
     uint64_t time = time_get_ms_fast();
     struct thread *curr = sched->current;
@@ -305,7 +297,7 @@ void schedule(void) {
     }
 
     load_thread(sched, next, time);
-    scheduler_unlock(sched);
+    scheduler_unlock(sched, irql);
 
     context_switch(curr, next);
 }
@@ -314,11 +306,7 @@ void scheduler_yield() {
     bool were_enabled = are_interrupts_enabled();
 
     disable_interrupts();
-
-    enum irql old = irql_raise(IRQL_DISPATCH_LEVEL);
     schedule();
-    irql_lower(old);
-
     thread_check_and_deliver_apcs(scheduler_get_curr_thread());
 
     if (were_enabled)
@@ -328,6 +316,5 @@ void scheduler_yield() {
 }
 
 void scheduler_force_resched(struct scheduler *sched) {
-    if (!atomic_load(&sched->tick_enabled))
-        ipi_send(sched->core_id, IRQ_SCHEDULER);
+    ipi_send(sched->core_id, IRQ_SCHEDULER);
 }

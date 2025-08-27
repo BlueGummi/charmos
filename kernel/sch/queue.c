@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 
 #include "internal.h"
 
@@ -15,9 +15,9 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
                           bool already_locked) {
     kassert(task->state != THREAD_STATE_IDLE_THREAD);
 
-    bool ints = false;
+    enum irql irql = IRQL_PASSIVE_LEVEL;
     if (!already_locked)
-        ints = spin_lock(&sched->lock);
+        irql = scheduler_lock_irq_disable(sched);
 
     enum thread_prio_class prio = task->perceived_priority;
 
@@ -41,7 +41,7 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
     }
 
     if (!already_locked)
-        spin_unlock(&sched->lock, ints);
+        scheduler_unlock(sched, irql);
 }
 
 static inline void put_on_scheduler(struct scheduler *s, struct thread *t) {
@@ -87,5 +87,6 @@ void scheduler_wake(struct thread *t, enum thread_wake_reason reason,
 
     struct scheduler *sch = global.schedulers[c];
     put_on_scheduler(sch, t);
+
     do_wake_other_core(sch);
 }

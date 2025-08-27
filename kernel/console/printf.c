@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 
 #include "console/printf.h"
 
@@ -391,12 +391,16 @@ void v_k_printf(const char *format, va_list args) {
 }
 
 void k_printf(const char *format, ...) {
-    bool i = spin_lock(&k_printf_lock);
+    bool i = are_interrupts_enabled();
+    disable_interrupts();
+    spin_lock_raw(&k_printf_lock);
     va_list args;
     va_start(args, format);
     v_k_printf(format, args);
     va_end(args);
-    spin_unlock(&k_printf_lock, i);
+    spin_unlock_raw(&k_printf_lock);
+    if (i)
+        enable_interrupts();
 }
 
 void panic(const char *format, ...) {

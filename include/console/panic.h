@@ -28,13 +28,13 @@ struct panic_regs {
 #define TWENTY_TWO_LINES ELEVEN_LINES ELEVEN_LINES
 #define FORTY_FOUR_LINES TWENTY_TWO_LINES TWENTY_TWO_LINES
 #define EIGHTY_EIGHT_LINES FORTY_FOUR_LINES FORTY_FOUR_LINES
-extern struct spinlock panic_lock;
 
 #define k_panic(fmt, ...)                                                      \
     do {                                                                       \
-        global.panic_in_progress = true;                                       \
         disable_interrupts();                                                  \
-        spin_lock(&panic_lock);                                                \
+        while (global.panic_in_progress)                                       \
+            ;                                                                  \
+        global.panic_in_progress = true;                                       \
         k_printf("\n" EIGHTY_EIGHT_LINES "\n");                                \
         k_printf("\n                                    [" ANSI_BG_RED         \
                  "KERNEL PANIC" ANSI_RESET "]\n\n");                           \
@@ -52,8 +52,7 @@ extern struct spinlock panic_lock;
         k_printf(fmt, ##__VA_ARGS__);                                          \
         debug_print_stack();                                                   \
         k_printf("\n" EIGHTY_EIGHT_LINES "\n");                                \
-        spin_unlock(&panic_lock, false);                                       \
-        qemu_exit(1);                                                          \
+        global.panic_in_progress = false;                                      \
         while (1)                                                              \
             wait_for_interrupt();                                              \
     } while (0)

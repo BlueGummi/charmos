@@ -53,14 +53,14 @@ void *hugepage_alloc_from_hugepage(struct hugepage *hp, size_t page_count) {
     if (unlikely(alloc_requires_multiple_hugepages(page_count)))
         return NULL;
 
-    bool iflag = hugepage_lock(hp);
+    enum irql irql = hugepage_lock(hp);
 
     if (page_count == 1)
-        return do_fastpath_alloc(hp, iflag);
+        return do_fastpath_alloc(hp, irql);
 
     size_t idx = find_free_range(hp, page_count);
     if (idx == (size_t) -1) {
-        hugepage_unlock(hp, iflag);
+        hugepage_unlock(hp, irql);
         return NULL;
     }
 
@@ -68,7 +68,7 @@ void *hugepage_alloc_from_hugepage(struct hugepage *hp, size_t page_count) {
         set_bit(hp, idx + i);
 
     hp->pages_used += page_count;
-    hugepage_unlock(hp, iflag);
+    hugepage_unlock(hp, irql);
 
     return hugepage_idx_to_addr(hp, idx);
 }
@@ -106,18 +106,18 @@ static void *alloc_search_core_list(struct hugepage_core_list *hcl,
         return NULL;
 
     struct minheap_node *mhn;
-    bool iflag = hugepage_core_list_lock(hcl);
+    enum irql irql = hugepage_core_list_lock(hcl);
 
     minheap_for_each(hcl->hugepage_minheap, mhn) {
         struct hugepage *hp = hugepage_from_minheap_node(mhn);
         void *p = alloc_and_adjust(hp, page_count, true);
         if (p) {
-            hugepage_core_list_unlock(hcl, iflag);
+            hugepage_core_list_unlock(hcl, irql);
             return p;
         }
     }
 
-    hugepage_core_list_unlock(hcl, iflag);
+    hugepage_core_list_unlock(hcl, irql);
     /* No space in minheap */
     return NULL;
 }
@@ -147,12 +147,12 @@ alloc_from_hugepage_at_base_and_adjust(struct hugepage *hp, size_t pages,
     hugepage_sanity_assert(hp);
     hugepage_remove_from_core_list_safe(hp, minheap_locked);
 
-    bool iflag = hugepage_lock(hp);
+    enum irql irql = hugepage_lock(hp);
 
     /* sanity: ensure first 'pages' bits are free */
     for (size_t i = 0; i < pages; i++) {
         if (test_bit(hp, i)) {
-            hugepage_unlock(hp, iflag);
+            hugepage_unlock(hp, irql);
             reinsert_hugepage(hp, minheap_locked);
             return NULL;
         }
@@ -162,7 +162,7 @@ alloc_from_hugepage_at_base_and_adjust(struct hugepage *hp, size_t pages,
         set_bit(hp, i);
 
     hp->pages_used += pages;
-    hugepage_unlock(hp, iflag);
+    hugepage_unlock(hp, irql);
 
     reinsert_hugepage(hp, minheap_locked);
     return hugepage_idx_to_addr(hp, 0);

@@ -5,7 +5,7 @@
 #include <mem/alloc.h>
 #include <sch/defer.h>
 #include <sch/sched.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 
 static struct deferred_event **defer_queues = NULL;
 static struct spinlock *defer_locks = NULL;
@@ -27,7 +27,7 @@ static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
     (void) irq, (void) ctx, (void) rsp;
 
     struct spinlock *lock = this_lock();
-    bool i = spin_lock(lock);
+    enum irql irql = spin_lock_irq_disable(lock);
 
     struct deferred_event *defer_queue = this_defer_queue();
 
@@ -39,13 +39,13 @@ static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
         defer_queue = ev->next;
         defer_queues[timer] = defer_queue;
 
-        spin_unlock(lock, i);
+        spin_unlock(lock, irql);
 
         if (ev->callback)
             ev->callback(ev->arg, ev->arg2);
 
         kfree(ev);
-        i = spin_lock(lock);
+        irql = spin_lock_irq_disable(lock);
     }
 
     if (defer_queue) {
@@ -55,7 +55,7 @@ static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
         hpet_next_fire_times[timer] = UINT64_MAX;
     }
 
-    spin_unlock(lock, i);
+    spin_unlock(lock, irql);
 
     hpet_clear_interrupt_status();
     lapic_write(LAPIC_REG_EOI, 0);
@@ -73,7 +73,7 @@ bool defer_enqueue(dpc_t func, void *arg, void *arg2, uint64_t delay_ms) {
     ev->arg2 = arg2;
 
     struct spinlock *lock = this_lock();
-    bool i = spin_lock(lock);
+    enum irql irql = spin_lock_irq_disable(lock);
 
     uint64_t t = this_timer();
 
@@ -94,7 +94,7 @@ bool defer_enqueue(dpc_t func, void *arg, void *arg2, uint64_t delay_ms) {
         curr->next = ev;
     }
 
-    spin_unlock(lock, i);
+    spin_unlock(lock, irql);
     return true;
 }
 

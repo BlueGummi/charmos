@@ -35,7 +35,7 @@ void ide_irq_handler(void *ctx, uint8_t irq_num, void *rsp) {
     (void) irq_num, (void) rsp;
 
     struct ide_channel *chan = ctx;
-    bool i = spin_lock(&chan->lock);
+    enum irql irql = spin_lock_irq_disable(&chan->lock);
 
     struct ide_request *req = chan->head;
 
@@ -96,7 +96,7 @@ next_request:
     }
 
 out:
-    spin_unlock(&chan->lock, i);
+    spin_unlock(&chan->lock, irql);
     lapic_write(LAPIC_REG_EOI, 0);
 }
 
@@ -164,22 +164,22 @@ static void enqueue_request(struct ide_channel *chan, struct ide_request *req,
 }
 
 static void submit_async(struct ata_drive *d, struct ide_request *req) {
-    bool i = spin_lock(&d->channel.lock);
+    enum irql irql = spin_lock(&d->channel.lock);
     enqueue_request(&d->channel, req, true);
     if (!d->channel.busy) {
         ide_start_next(&d->channel, true);
     }
-    spin_unlock(&d->channel.lock, i);
+    spin_unlock(&d->channel.lock, irql);
 }
 
 static inline void submit_and_wait(struct ata_drive *d,
                                    struct ide_request *req) {
-    bool i = spin_lock(&req->lock);
+    enum irql irql = spin_lock(&req->lock);
     struct thread *t = scheduler_get_curr_thread();
     thread_block(t, THREAD_BLOCK_REASON_IO);
     req->waiter = t;
     submit_async(d, req);
-    spin_unlock(&req->lock, i);
+    spin_unlock(&req->lock, irql);
 }
 
 static struct ide_request *request_init(uint64_t lba, uint8_t *buffer,

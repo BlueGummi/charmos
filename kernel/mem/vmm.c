@@ -10,7 +10,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 #define KERNEL_PML4_START_INDEX 256
 #define ENTRY_PRESENT(entry) (entry & PAGING_PRESENT)
 
@@ -184,7 +184,7 @@ enum errno vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
                 virt, phys);
     }
 
-    bool interrupts = spin_lock(&vmm_lock);
+    enum irql irql = spin_lock(&vmm_lock);
     uint64_t L2 = (virt >> 21) & 0x1FF;
 
     struct page_table *current_table = kernel_pml4;
@@ -195,7 +195,7 @@ enum errno vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
         if (!ENTRY_PRESENT(*entry)) {
             enum errno ret = pte_init(entry, 0);
             if (ret < 0) {
-                spin_unlock(&vmm_lock, interrupts);
+                spin_unlock(&vmm_lock, irql);
                 return ret;
             }
         }
@@ -211,7 +211,7 @@ enum errno vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     *entry =
         (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT | PAGING_2MB_page;
 
-    spin_unlock(&vmm_lock, interrupts);
+    spin_unlock(&vmm_lock, irql);
     return 0;
 }
 
@@ -222,7 +222,7 @@ void vmm_unmap_2mb_page(uintptr_t virt) {
     struct page_table *tables[3];
     pte_t *entries[3];
 
-    bool interrupts = spin_lock(&vmm_lock);
+    enum irql irql = spin_lock(&vmm_lock);
     tables[0] = kernel_pml4;
 
     for (uint64_t level = 0; level < 2; level++) {
@@ -230,7 +230,7 @@ void vmm_unmap_2mb_page(uintptr_t virt) {
         entries[level] = &tables[level]->entries[index];
 
         if (!ENTRY_PRESENT(*entries[level])) {
-            spin_unlock(&vmm_lock, interrupts);
+            spin_unlock(&vmm_lock, irql);
             return;
         }
 
@@ -256,7 +256,7 @@ void vmm_unmap_2mb_page(uintptr_t virt) {
         }
     }
 
-    spin_unlock(&vmm_lock, interrupts);
+    spin_unlock(&vmm_lock, irql);
 }
 
 enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
@@ -264,7 +264,7 @@ enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
         k_panic("CANNOT MAP PAGE 0x0!!!\n");
     }
 
-    bool interrupts = spin_lock(&vmm_lock);
+    enum irql irql = spin_lock(&vmm_lock);
     struct page_table *current_table = kernel_pml4;
 
     for (uint64_t i = 0; i < 3; i++) {
@@ -274,7 +274,7 @@ enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
         if (!ENTRY_PRESENT(*entry)) {
             enum errno ret = pte_init(entry, 0);
             if (ret < 0) {
-                spin_unlock(&vmm_lock, interrupts);
+                spin_unlock(&vmm_lock, irql);
                 return ret;
             }
         }
@@ -291,7 +291,7 @@ enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
 
     *entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
 
-    spin_unlock(&vmm_lock, interrupts);
+    spin_unlock(&vmm_lock, irql);
     return 0;
 }
 
@@ -323,7 +323,7 @@ void vmm_unmap_page(uintptr_t virt) {
     struct page_table *tables[4];
     pte_t *entries[4];
 
-    bool interrupts = spin_lock(&vmm_lock);
+    enum irql irql = spin_lock(&vmm_lock);
 
     tables[0] = kernel_pml4;
     for (uint64_t level = 0; level < 3; level++) {
@@ -331,7 +331,7 @@ void vmm_unmap_page(uintptr_t virt) {
         entries[level] = &tables[level]->entries[index];
 
         if (!(*entries[level] & PAGING_PRESENT)) {
-            spin_unlock(&vmm_lock, interrupts);
+            spin_unlock(&vmm_lock, irql);
             return;
         }
 
@@ -355,7 +355,7 @@ void vmm_unmap_page(uintptr_t virt) {
             break;
         }
     }
-    spin_unlock(&vmm_lock, interrupts);
+    spin_unlock(&vmm_lock, irql);
 }
 
 uintptr_t vmm_get_phys(uintptr_t virt) {

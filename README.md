@@ -30,9 +30,13 @@ make run # run this in the build directory
 
 - [x] async blkdev io request scheduler
 
+- [ ] fix header file stuff. move big public functions to `include/` and then keep literally everything else in `_internal.h` files that live next to the `.c` files
+
 - [ ] fix rcu
 
-- [ ] figure out how to represent processor topology (NUMA, SMT)
+- [x] figure out how to represent processor topology (NUMA, SMT)
+
+- [x] numa buddy allocator
 
 - [ ] complete usb devices, xhci, ehci, uhci, ohci
 

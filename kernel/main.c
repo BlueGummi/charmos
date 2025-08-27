@@ -37,7 +37,6 @@
 #include <tests.h>
 
 struct charmos_globals global = {0};
-struct spinlock panic_lock = SPINLOCK_INIT;
 
 #define BEHAVIOR /* avoids undefined behavior */
 

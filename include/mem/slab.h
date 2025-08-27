@@ -1,6 +1,6 @@
 #include <stdatomic.h>
 #include <stdint.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 
 #define SLAB_MIN_SHIFT 4
 #define SLAB_MAX_SHIFT 18
@@ -29,8 +29,6 @@ struct slab_cache {
     struct slab *slabs_partial;
     struct slab *slabs_full;
     struct slab_cache_percore **percore_caches;
-
-    struct spinlock lock;
 };
 
 struct slab_phdr {

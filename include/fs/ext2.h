@@ -4,7 +4,7 @@
 #include <fs/vfs.h>
 #include <mem/alloc.h>
 #include <stdint.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 
 extern uint64_t PTRS_PER_BLOCK;
 

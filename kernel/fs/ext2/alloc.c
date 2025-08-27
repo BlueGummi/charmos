@@ -46,10 +46,10 @@ static uint32_t alloc_from_bitmap(struct ext2_fs *fs, uint32_t bitmap_block,
 
 static void update_block_counts(struct ext2_fs *fs, uint32_t group) {
 
-    bool i = ext2_fs_lock(fs);
+    enum irql irql = ext2_fs_lock(fs);
     fs->group_desc[group].free_blocks_count--;
     fs->sblock->free_blocks_count--;
-    ext2_fs_unlock(fs, i);
+    ext2_fs_unlock(fs, irql);
 
     ext2_write_group_desc(fs);
     ext2_write_superblock(fs);

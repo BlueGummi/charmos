@@ -5,7 +5,7 @@
 #include <sch/thread.h>
 #include <stdatomic.h>
 #include <stdint.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 
 #define NVME_CMD_TIMEOUT_MS 2000    // Normal command timeout
 #define NVME_ADMIN_TIMEOUT_MS 5000  // Admin commands

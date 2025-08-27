@@ -64,17 +64,15 @@ void isr_common_entry(uint8_t vector, void *rsp) {
 
 void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {
     (void) ctx, (void) vector, (void) rsp;
-    if (!preemption_disabled()) {
+    /*if (!preemption_disabled()) { */
         lapic_write(LAPIC_REG_EOI, 0);
 
         /* Doing this as the `schedule()` will go to another thread */
         unmark_self_in_interrupt();
-
         schedule();
-    } else {
+    /*} else {
         lapic_write(LAPIC_REG_EOI, 0);
-        set_needs_resched();
-    }
+    }*/
 }
 
 /* Literally a no-op. Used to break out of "wait for interrupt" loops */

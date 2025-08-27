@@ -17,7 +17,7 @@ struct vas_space *vas_space_init(vaddr_t base, vaddr_t limit) {
 }
 
 vaddr_t vas_alloc(struct vas_space *vas, size_t size, size_t align) {
-    bool iflag = vas_space_lock(vas);
+    enum irql irql = vas_space_lock(vas);
     vaddr_t prev_end = ALIGN_UP(vas->base, align);
 
     struct rbt_node *node = rbt_min(vas->tree);
@@ -30,7 +30,7 @@ vaddr_t vas_alloc(struct vas_space *vas, size_t size, size_t align) {
             new_range->length = size;
             new_range->node.data = new_range->start;
             rbt_insert(vas->tree, &new_range->node);
-            vas_space_unlock(vas, iflag);
+            vas_space_unlock(vas, irql);
             return prev_end;
         }
 
@@ -44,16 +44,16 @@ vaddr_t vas_alloc(struct vas_space *vas, size_t size, size_t align) {
         new_range->length = size;
         new_range->node.data = new_range->start;
         rbt_insert(vas->tree, &new_range->node);
-        vas_space_unlock(vas, iflag);
+        vas_space_unlock(vas, irql);
         return prev_end;
     }
 
-    vas_space_unlock(vas, iflag);
+    vas_space_unlock(vas, irql);
     return 0;
 }
 
 void vas_free(struct vas_space *vas, vaddr_t addr) {
-    bool iflag = vas_space_lock(vas);
+    enum irql irql = vas_space_lock(vas);
 
     struct rbt_node *node = vas->tree->root;
     while (node) {
@@ -66,12 +66,12 @@ void vas_free(struct vas_space *vas, vaddr_t addr) {
         } else {
             rbt_remove(vas->tree, vr->node.data);
             kfree(vr);
-            vas_space_unlock(vas, iflag);
+            vas_space_unlock(vas, irql);
             return;
         }
     }
 
-    vas_space_unlock(vas, iflag);
+    vas_space_unlock(vas, irql);
     bool invalid_free_happened = true;
     kassert(invalid_free_happened == true);
 }

@@ -61,7 +61,7 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
     struct ahci_device *dev = ahci_disk->device;
     struct ahci_full_port *port = &dev->regs[ahci_disk->port];
 
-    bool i = spin_lock(&dev->lock);
+    enum irql irql = spin_lock(&dev->lock);
     req.slot = ahci_find_slot(port);
 
     /* tells ISR handler to mark status properly */
@@ -72,11 +72,11 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
     dev->io_waiters[ahci_disk->port][req.slot] = curr;
 
     if (!function(disk, lba, buf, count, &req)) {
-        spin_unlock(&dev->lock, i);
+        spin_unlock(&dev->lock, irql);
         return false;
     }
 
-    spin_unlock(&dev->lock, i);
+    spin_unlock(&dev->lock, irql);
     scheduler_yield();
 
     dev->io_waiters[ahci_disk->port][req.slot] = NULL;

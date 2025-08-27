@@ -4,7 +4,7 @@
 #include <mem/alloc.h>
 #include <sch/defer.h>
 #include <stdint.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 #include <time.h>
 
 static bool coalesce_priority_queue(struct generic_disk *disk,

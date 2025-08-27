@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <sync/semaphore.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 #include <types/types.h>
 
 #define DOMAIN_ARENA_SIZE 64

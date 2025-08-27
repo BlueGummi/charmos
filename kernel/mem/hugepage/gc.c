@@ -5,12 +5,12 @@
 #include "internal.h"
 
 void hugepage_gc_add(struct hugepage *hp) {
-    bool iflag = hugepage_gc_list_lock(&hugepage_gc_list);
+    enum irql irql = hugepage_gc_list_lock(&hugepage_gc_list);
 
     list_add(&hp->gc_list_node, &hugepage_gc_list.hugepages_list);
     hugepage_gc_list_inc_count(&hugepage_gc_list);
 
-    hugepage_gc_list_unlock(&hugepage_gc_list, iflag);
+    hugepage_gc_list_unlock(&hugepage_gc_list, irql);
 }
 
 /* No locks are taken here */
@@ -20,11 +20,11 @@ void hugepage_gc_remove_internal(struct hugepage *hp) {
 }
 
 void hugepage_gc_remove(struct hugepage *hp) {
-    bool iflag = hugepage_gc_list_lock(&hugepage_gc_list);
+    enum irql irql = hugepage_gc_list_lock(&hugepage_gc_list);
 
     hugepage_gc_remove_internal(hp);
 
-    hugepage_gc_list_unlock(&hugepage_gc_list, iflag);
+    hugepage_gc_list_unlock(&hugepage_gc_list, irql);
 }
 
 static void hugepage_reset(struct hugepage *hp) {
@@ -43,7 +43,7 @@ static void hugepage_reset(struct hugepage *hp) {
  * We can check if the gc list has anything
  * and just take that hugepage */
 struct hugepage *hugepage_get_from_gc_list(void) {
-    bool iflag = hugepage_gc_list_lock(&hugepage_gc_list);
+    enum irql irql = hugepage_gc_list_lock(&hugepage_gc_list);
 
     struct list_head *nd = NULL;
     struct hugepage *hp = NULL;
@@ -60,7 +60,7 @@ struct hugepage *hugepage_get_from_gc_list(void) {
         hp = NULL;
     }
 
-    hugepage_gc_list_unlock(&hugepage_gc_list, iflag);
+    hugepage_gc_list_unlock(&hugepage_gc_list, irql);
     return hp;
 }
 

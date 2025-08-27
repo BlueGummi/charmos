@@ -114,16 +114,16 @@ void buddy_free_pages(paddr_t addr, size_t count, struct free_area *free_area,
 
 static struct spinlock buddy_lock = SPINLOCK_INIT;
 void buddy_free_pages_global(paddr_t addr, uint64_t count) {
-    bool iflag = spin_lock(&buddy_lock);
+    enum irql irql = spin_lock(&buddy_lock);
     buddy_free_pages(addr, count, buddy_free_area, global.last_pfn);
-    spin_unlock(&buddy_lock, iflag);
+    spin_unlock(&buddy_lock, irql);
 }
 
 paddr_t buddy_alloc_pages_global(size_t count, enum alloc_class c,
                                  enum alloc_flags f) {
     (void) c, (void) f;
-    bool iflag = spin_lock(&buddy_lock);
+    enum irql irql = spin_lock(&buddy_lock);
     paddr_t ret = buddy_alloc_pages(buddy_free_area, count);
-    spin_unlock(&buddy_lock, iflag);
+    spin_unlock(&buddy_lock, irql);
     return ret;
 }

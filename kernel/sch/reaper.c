@@ -6,7 +6,7 @@ static struct thread_reaper reaper = {0};
 static struct thread *reaper_thread = NULL;
 
 void reaper_enqueue(struct thread *t) {
-    bool i = spin_lock(&reaper.lock);
+    enum irql irql = spin_lock_irq_disable(&reaper.lock);
 
     t->next = NULL;
     t->prev = NULL;
@@ -21,7 +21,7 @@ void reaper_enqueue(struct thread *t) {
 
     condvar_signal(&reaper.cv);
 
-    spin_unlock(&reaper.lock, i);
+    spin_unlock(&reaper.lock, irql);
 }
 
 void reaper_init(void) {
@@ -34,16 +34,16 @@ uint64_t reaper_get_reaped_thread_count(void) {
 
 void reaper_thread_main() {
     while (1) {
-        bool i = spin_lock(&reaper.lock);
+        enum irql irql = spin_lock(&reaper.lock);
 
         while (!reaper.queue.head) {
-            condvar_wait(&reaper.cv, &reaper.lock, i);
+            condvar_wait(&reaper.cv, &reaper.lock, irql);
         }
 
         struct thread *t = reaper.queue.head;
         reaper.queue.head = reaper.queue.tail = NULL;
 
-        spin_unlock(&reaper.lock, i);
+        spin_unlock(&reaper.lock, irql);
 
         bool reaped_something = false;
         while (t) {

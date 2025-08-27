@@ -3,7 +3,7 @@
 #include <mem/alloc.h>
 #include <mp/domain.h>
 #include <stdbool.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 
 static void init_global_domain(uint64_t domain_count) {
     global.domain_count = domain_count;

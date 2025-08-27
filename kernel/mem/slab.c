@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 
 #ifndef SLAB_OBJ_ALIGN
 #define SLAB_OBJ_ALIGN 16u
@@ -49,7 +49,6 @@ static void slab_cache_init(struct slab_cache *cache, uint64_t obj_size) {
         cache->slabs_free = NULL;
         cache->slabs_partial = NULL;
         cache->slabs_full = NULL;
-        spinlock_init(&cache->lock);
         return;
     }
 
@@ -60,7 +59,6 @@ static void slab_cache_init(struct slab_cache *cache, uint64_t obj_size) {
     cache->slabs_free = NULL;
     cache->slabs_partial = NULL;
     cache->slabs_full = NULL;
-    spinlock_init(&cache->lock);
 }
 
 static struct slab *slab_create(struct slab_cache *cache) {
@@ -125,11 +123,7 @@ static void slab_list_add(struct slab **list, struct slab *slab) {
 }
 
 static void slab_move_slab(struct slab_cache *cache, struct slab *slab,
-                           int new_state, bool lock_held) {
-    bool interrupts = false;
-
-    if (!lock_held)
-        interrupts = spin_lock(&cache->lock);
+                           int new_state) {
 
     switch (slab->state) {
     case SLAB_FREE: slab_list_remove(&cache->slabs_free, slab); break;
@@ -146,13 +140,9 @@ static void slab_move_slab(struct slab_cache *cache, struct slab *slab,
     case SLAB_FULL: slab_list_add(&cache->slabs_full, slab); break;
     default: k_panic("Unknown new slab state %d\n", new_state);
     }
-
-    if (!lock_held)
-        spin_unlock(&cache->lock, interrupts);
 }
 
-static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab,
-                             bool lock_held) {
+static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
     if (slab->state == SLAB_FULL)
         return NULL;
 
@@ -166,13 +156,13 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab,
             uint64_t used = atomic_fetch_add(&slab->used, 1) + 1;
 
             if (used == cache->objs_per_slab) {
-                slab_move_slab(cache, slab, SLAB_FULL, lock_held);
+                slab_move_slab(cache, slab, SLAB_FULL);
             } else if (used == 1) {
-                slab_move_slab(cache, slab, SLAB_PARTIAL, lock_held);
+                slab_move_slab(cache, slab, SLAB_PARTIAL);
             }
 
             uint8_t *obj = (uint8_t *) slab->mem + i * cache->obj_size;
-            *((struct slab **) obj) = slab; // hidden header for kfree
+            *((struct slab **) obj) = slab;
             return obj + sizeof(struct slab *);
         }
     }
@@ -196,25 +186,21 @@ static void slab_free(struct slab_cache *cache, struct slab *slab, void *obj) {
 
     uint64_t new_used = atomic_fetch_sub(&slab->used, 1) - 1;
 
-    bool lock_held = false;
     if (new_used == 0) {
-        slab_move_slab(cache, slab, SLAB_FREE, lock_held);
+        slab_move_slab(cache, slab, SLAB_FREE);
     } else if (slab->state == SLAB_FULL) {
-        slab_move_slab(cache, slab, SLAB_PARTIAL, lock_held);
+        slab_move_slab(cache, slab, SLAB_PARTIAL);
     }
 }
 
 static void *slab_alloc(struct slab_cache *cache) {
-    bool interrupts = spin_lock(&cache->lock);
-    bool lock_held = true;
 
     for (struct slab *slab = cache->slabs_partial; slab; slab = slab->next) {
         if (slab->state == SLAB_FULL)
             continue;
 
-        void *obj = slab_alloc_from(cache, slab, lock_held);
+        void *obj = slab_alloc_from(cache, slab);
         if (obj) {
-            spin_unlock(&cache->lock, interrupts);
             return obj;
         }
     }
@@ -223,24 +209,19 @@ static void *slab_alloc(struct slab_cache *cache) {
         if (slab->state == SLAB_FULL)
             continue;
 
-        void *obj = slab_alloc_from(cache, slab, lock_held);
+        void *obj = slab_alloc_from(cache, slab);
         if (obj) {
-            spin_unlock(&cache->lock, interrupts);
             return obj;
         }
     }
 
-    spin_unlock(&cache->lock, interrupts);
     struct slab *slab = slab_create(cache);
     if (!slab)
         return NULL;
 
-    interrupts = spin_lock(&cache->lock);
     slab_list_add(&cache->slabs_free, slab);
-    spin_unlock(&cache->lock, interrupts);
 
-    lock_held = false;
-    return slab_alloc_from(cache, slab, lock_held);
+    return slab_alloc_from(cache, slab);
 }
 
 static int uint64_to_index(uint64_t size) {
@@ -286,10 +267,11 @@ void *kmalloc(uint64_t size) {
     if (size == 0)
         return NULL;
 
-    bool iflag = spin_lock(&kmalloc_lock);
+    enum irql irql = spin_lock_irq_disable(&kmalloc_lock);
+
     int idx = uint64_to_index(size);
     if (idx >= 0 && slab_caches[idx].objs_per_slab > 0) {
-        spin_unlock(&kmalloc_lock, iflag);
+        spin_unlock(&kmalloc_lock, irql);
         return slab_alloc(&slab_caches[idx]);
     }
 
@@ -305,7 +287,7 @@ void *kmalloc(uint64_t size) {
         if (!phys) {
             for (uint64_t j = 0; j < allocated; j++)
                 pmm_free_page(phys_pages[j]);
-            spin_unlock(&kmalloc_lock, iflag);
+            spin_unlock(&kmalloc_lock, irql);
             return NULL;
         }
 
@@ -315,7 +297,7 @@ void *kmalloc(uint64_t size) {
             pmm_free_page(phys);
             for (uint64_t j = 0; j < allocated; j++)
                 pmm_free_page(phys_pages[j]);
-            spin_unlock(&kmalloc_lock, iflag);
+            spin_unlock(&kmalloc_lock, irql);
             return NULL;
         }
 
@@ -327,7 +309,7 @@ void *kmalloc(uint64_t size) {
     hdr->pages = pages;
 
     slab_heap_top += pages * PAGE_SIZE;
-    spin_unlock(&kmalloc_lock, iflag);
+    spin_unlock(&kmalloc_lock, irql);
     return (void *) (hdr + 1);
 }
 
@@ -345,7 +327,7 @@ void kfree(void *ptr) {
     if (!ptr)
         return;
 
-    bool iflag = spin_lock(&kmalloc_lock);
+    enum irql irql = spin_lock_irq_disable(&kmalloc_lock);
 
     struct slab_phdr *hdr_candidate =
         (struct slab_phdr *) ((uint8_t *) ptr - sizeof(struct slab_phdr));
@@ -360,7 +342,7 @@ void kfree(void *ptr) {
                 vmm_unmap_page(vaddr);
                 pmm_free_page(phys);
             }
-            spin_unlock(&kmalloc_lock, iflag);
+            spin_unlock(&kmalloc_lock, irql);
             return;
         }
     }
@@ -368,14 +350,14 @@ void kfree(void *ptr) {
     void *raw_obj = (uint8_t *) ptr - sizeof(struct slab *);
     struct slab *slab = *((struct slab **) raw_obj);
     if (!slab) {
-        spin_unlock(&kmalloc_lock, iflag);
+        spin_unlock(&kmalloc_lock, irql);
         return;
     }
 
     struct slab_cache *cache = slab->parent_cache;
     slab_free(cache, slab, ptr);
 
-    spin_unlock(&kmalloc_lock, iflag);
+    spin_unlock(&kmalloc_lock, irql);
 }
 
 void *krealloc(void *ptr, uint64_t size) {

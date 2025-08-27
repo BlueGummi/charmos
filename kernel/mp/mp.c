@@ -6,7 +6,7 @@
 #include <mem/alloc.h>
 #include <mp/mp.h>
 #include <sch/sched.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 
 static uint64_t cr3 = 0;
 static atomic_char cr3_ready = 0;
@@ -89,7 +89,7 @@ static inline void set_core_awake(void) {
 }
 
 void wakeup() {
-    bool ints = spin_lock(&wakeup_lock);
+    enum irql irql = spin_lock(&wakeup_lock);
     smap_init();
     serial_init();
 
@@ -108,7 +108,7 @@ void wakeup() {
     setup_cpu(cpu);
     lapic_timer_init(cpu);
     set_core_awake();
-    spin_unlock(&wakeup_lock, ints);
+    spin_unlock(&wakeup_lock, irql);
 
     enable_interrupts();
     scheduler_yield();

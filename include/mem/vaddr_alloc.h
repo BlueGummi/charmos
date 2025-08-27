@@ -2,7 +2,7 @@
 #include <misc/rbt.h>
 #include <stdatomic.h>
 #include <stdint.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 #include <types/types.h>
 
 struct vas_range {

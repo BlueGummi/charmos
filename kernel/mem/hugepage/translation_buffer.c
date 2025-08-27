@@ -35,14 +35,14 @@ void hugepage_tb_remove(struct hugepage_tb *htb, struct hugepage *hp) {
     if (!e->valid)
         return;
 
-    bool iflag = hugepage_tb_entry_lock(e);
+    enum irql irql = hugepage_tb_entry_lock(e);
 
     e->valid = false;
     e->hp = NULL;
     e->tag = 0x0;
     e->gen = 0;
 
-    hugepage_tb_entry_unlock(e, iflag);
+    hugepage_tb_entry_unlock(e, irql);
 }
 
 bool hugepage_tb_insert(struct hugepage_tb *htb, struct hugepage *hp) {
@@ -50,12 +50,12 @@ bool hugepage_tb_insert(struct hugepage_tb *htb, struct hugepage *hp) {
     size_t idx = hugepage_tb_hash(addr, htb);
     struct hugepage_tb_entry *e = &htb->entries[idx];
 
-    bool i = hugepage_tb_entry_lock(e);
+    enum irql irql = hugepage_tb_entry_lock(e);
 
     /* Cooldown avoids thrashing, and there's no
      * need to re-insert the same hugepage */
     if (tb_entry_on_cooldown(htb, e) || e->hp == hp) {
-        hugepage_tb_entry_unlock(e, i);
+        hugepage_tb_entry_unlock(e, irql);
         return false;
     }
 
@@ -63,7 +63,7 @@ bool hugepage_tb_insert(struct hugepage_tb *htb, struct hugepage *hp) {
     e->hp = hp;
     e->valid = true;
     e->gen = htb->gen_counter++;
-    hugepage_tb_entry_unlock(e, i);
+    hugepage_tb_entry_unlock(e, irql);
     return true;
 }
 

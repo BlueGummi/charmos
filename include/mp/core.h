@@ -3,6 +3,7 @@
 #include <boot/tss.h>
 #include <charmos.h>
 #include <compiler.h>
+#include <console/panic.h>
 #include <sch/irql.h>
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -38,7 +39,6 @@ struct core {
     size_t rr_current_domain;
 
     atomic_uint preempt_disable_depth;
-    atomic_bool needs_resched;
 };
 
 static inline uint64_t get_this_core_id() {
@@ -87,22 +87,41 @@ static inline bool preemption_disabled(void) {
     return atomic_load(&get_current_core()->preempt_disable_depth) > 0;
 }
 
+/*
+ *
+ * FIXME: Bugs happening here, replace the old == 0 and UINT32_MAX with
+ * checks to fix these weird bugs that are happening!
+ *
+ */
 static inline uint32_t preempt_disable(void) {
-    return atomic_fetch_add(&get_current_core()->preempt_disable_depth, 1);
+    struct core *cpu = get_current_core();
+    uint32_t old, new;
+
+    do {
+        old = atomic_load(&cpu->preempt_disable_depth);
+        if (old == UINT32_MAX)
+            return 0;
+
+        new = old + 1;
+
+    } while (
+        !atomic_compare_exchange_weak(&cpu->preempt_disable_depth, &old, new));
+
+    return new;
 }
 
 static inline uint32_t preempt_enable(void) {
-    return atomic_fetch_sub(&get_current_core()->preempt_disable_depth, 1);
-}
+    struct core *cpu = get_current_core();
+    uint32_t old, new;
 
-static inline void set_needs_resched(void) {
-    atomic_store(&get_current_core()->needs_resched, true);
-}
+    do {
+        old = atomic_load(&cpu->preempt_disable_depth);
+        if (old == 0)
+            return 0;
 
-static inline void unset_needs_resched(void) {
-    atomic_store(&get_current_core()->needs_resched, false);
-}
+        new = old - 1;
+    } while (
+        !atomic_compare_exchange_weak(&cpu->preempt_disable_depth, &old, new));
 
-static inline bool needs_resched(void) {
-    return atomic_load(&get_current_core()->needs_resched);
+    return new;
 }

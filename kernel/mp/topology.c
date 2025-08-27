@@ -7,7 +7,7 @@
 #include <mp/mp.h>
 #include <mp/topology.h>
 #include <stdatomic.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 
 static struct topology_node *smt_nodes;
 static struct topology_node *core_nodes;

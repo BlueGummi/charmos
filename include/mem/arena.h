@@ -4,7 +4,7 @@
 #include <misc/minheap.h>
 #include <stdatomic.h>
 #include <stdint.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 #include <types/types.h>
 
 #define ARENA_HTB_SIZE 16

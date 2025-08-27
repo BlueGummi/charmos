@@ -6,7 +6,7 @@
 #include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 #include <time.h>
 #include <types/refcount.h>
 #include <types/types.h>

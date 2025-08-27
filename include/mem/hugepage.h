@@ -5,7 +5,7 @@
 #include <misc/minheap.h>
 #include <misc/rbt.h>
 #include <mp/core.h>
-#include <sync/spin_lock.h>
+#include <sync/spinlock.h>
 
 #define HUGEPAGE_HEAP_BASE 0xFFFFE00000000000ULL
 #define HUGEPAGE_HEAP_END 0xFFFFEFFFFFFFFFFFULL

@@ -159,10 +159,10 @@ enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
     uint32_t group = ext2_get_inode_group(fs, dir->inode_num);
     struct ext2_group_desc *desc = &fs->group_desc[group];
 
-    bool i = ext2_fs_lock(fs);
+    enum irql irql = ext2_fs_lock(fs);
     desc->used_dirs_count--;
     parent_dir->node.links_count--;
-    ext2_fs_unlock(fs, i);
+    ext2_fs_unlock(fs, irql);
 
     ext2_free_inode(fs, dir->inode_num);
 

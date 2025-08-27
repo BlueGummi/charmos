@@ -3,8 +3,7 @@
 #include <console/printf.h>
 #include <mem/alloc.h>
 #include <sch/defer.h>
-#include <sync/spin_lock.h>
-#include <time.h>
+#include <sync/spinlock.h>
 
 static void try_rq_reorder(struct bio_scheduler *sched) {
     struct generic_disk *disk = sched->disk;
@@ -18,7 +17,7 @@ static void bio_sched_tick(void *ctx, void *unused) {
     (void) unused;
     struct bio_scheduler *sched = ctx;
 
-    bool i = spin_lock(&sched->lock);
+    enum irql irql = spin_lock_irq_disable(&sched->lock);
 
     bio_sched_boost_starved(sched);
     try_rq_reorder(sched);
@@ -30,7 +29,7 @@ static void bio_sched_tick(void *ctx, void *unused) {
         sched->defer_pending = false;
     }
 
-    spin_unlock(&sched->lock, i);
+    spin_unlock(&sched->lock, irql);
 }
 
 static bool try_early_submit(struct bio_scheduler *sched,
@@ -51,7 +50,7 @@ void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req) {
     if (try_early_submit(sched, req))
         return;
 
-    bool i = spin_lock(&sched->lock);
+    enum irql irql = spin_lock_irq_disable(&sched->lock);
 
     bio_sched_enqueue_internal(sched, req);
 
@@ -67,7 +66,7 @@ void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req) {
         defer_enqueue(bio_sched_tick, sched, NULL, disk->ops->tick_ms);
     }
 
-    spin_unlock(&sched->lock, i);
+    spin_unlock(&sched->lock, irql);
 }
 
 void bio_sched_dequeue(struct generic_disk *disk, struct bio_request *req,
@@ -75,7 +74,7 @@ void bio_sched_dequeue(struct generic_disk *disk, struct bio_request *req,
     struct bio_scheduler *sched = disk->scheduler;
     bool i = false;
     if (!already_locked)
-        i = spin_lock(&sched->lock);
+        i = spin_lock_irq_disable(&sched->lock);
 
     bio_sched_dequeue_internal(sched, req);
 
