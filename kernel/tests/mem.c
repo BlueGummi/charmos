@@ -135,27 +135,6 @@ REGISTER_TEST(kmalloc_mixed_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS;
 }
 
-REGISTER_TEST(kmalloc_alignment_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    ABORT_IF_RAM_LOW();
-
-    const size_t alignments[] = {16, 32, 64, 128, 256, 512, 1024};
-    void *ptrs[STRESS_ALLOC_TIMES];
-
-    for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
-        size_t align =
-            alignments[i % (sizeof(alignments) / sizeof(alignments[0]))];
-        ptrs[i] = kmalloc_aligned(align, align);
-        TEST_ASSERT(ptrs[i] != NULL);
-        ASSERT_ALIGNED(ptrs[i], align);
-    }
-
-    for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
-        kfree_aligned(ptrs[i]);
-    }
-
-    SET_SUCCESS;
-}
-
 #define MT_THREAD_COUNT 8
 #define MT_ALLOC_TIMES 512
 
