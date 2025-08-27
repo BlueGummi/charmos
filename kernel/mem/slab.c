@@ -71,31 +71,33 @@ static struct slab *slab_create(struct slab_cache *cache) {
     struct slab *slab = (struct slab *) page;
     slab->parent_cache = cache;
 
-    if (cache->objs_per_slab == 0) {
+    uint64_t max_objs = (PAGE_SIZE - sizeof(struct slab)) / cache->obj_size;
+    if (max_objs == 0) {
         vmm_unmap_page((uintptr_t) page);
         return NULL;
     }
 
-    for (;;) {
-        uint64_t n = cache->objs_per_slab;
+    uint64_t n;
+    uintptr_t mem_ptr;
+
+    for (n = max_objs; n > 0; n--) {
         uint64_t bitmap_bytes = (n + 7) / 8;
-        uint8_t *ptr = ((uint8_t *) page + sizeof(struct slab));
-
-        slab->bitmap = (atomic_uint_fast8_t *) ptr;
-
-        uintptr_t mem_ptr = (uintptr_t) (slab->bitmap) + bitmap_bytes;
+        mem_ptr = (uintptr_t) page + sizeof(struct slab) + bitmap_bytes;
         mem_ptr = round_up_pow2(mem_ptr, SLAB_OBJ_ALIGN);
-
         uintptr_t end = mem_ptr + n * cache->obj_size;
-        if (end - (uintptr_t) page <= PAGE_SIZE) {
-            slab->mem = (void *) mem_ptr;
+        if (end <= (uintptr_t) page + PAGE_SIZE)
             break;
-        }
-        if (--cache->objs_per_slab == 0) {
-            vmm_unmap_page((uintptr_t) page);
-            return NULL;
-        }
     }
+
+    if (n == 0) {
+        vmm_unmap_page((uintptr_t) page);
+        return NULL;
+    }
+
+    cache->objs_per_slab = n;
+    slab->bitmap =
+        (atomic_uint_fast8_t *) ((uint8_t *) page + sizeof(struct slab));
+    slab->mem = (void *) mem_ptr;
 
     atomic_store(&slab->used, 0);
     slab->state = SLAB_FREE;
@@ -103,6 +105,7 @@ static struct slab *slab_create(struct slab_cache *cache) {
 
     uint64_t bitmap_bytes = (cache->objs_per_slab + 7) / 8;
     memset((void *) slab->bitmap, 0, bitmap_bytes);
+
     return slab;
 }
 
@@ -343,19 +346,23 @@ void kfree(void *ptr) {
         return;
 
     bool iflag = spin_lock(&kmalloc_lock);
-    struct slab_phdr *hdr =
+
+    struct slab_phdr *hdr_candidate =
         (struct slab_phdr *) ((uint8_t *) ptr - sizeof(struct slab_phdr));
 
-    if (hdr->magic == MAGIC_KMALLOC_PAGE) {
-        uintptr_t virt = (uintptr_t) hdr;
-        for (uint64_t i = 0; i < hdr->pages; i++) {
-            uintptr_t vaddr = virt + i * PAGE_SIZE;
-            paddr_t phys = (paddr_t) vmm_get_phys(vaddr);
-            vmm_unmap_page(vaddr);
-            pmm_free_page(phys);
+    if (vmm_get_phys((uintptr_t) hdr_candidate) != (paddr_t) -1) {
+        if (hdr_candidate->magic == MAGIC_KMALLOC_PAGE) {
+            uintptr_t virt = (uintptr_t) hdr_candidate;
+            uint64_t pages = hdr_candidate->pages;
+            for (uint64_t i = 0; i < pages; i++) {
+                uintptr_t vaddr = virt + i * PAGE_SIZE;
+                paddr_t phys = (paddr_t) vmm_get_phys(vaddr);
+                vmm_unmap_page(vaddr);
+                pmm_free_page(phys);
+            }
+            spin_unlock(&kmalloc_lock, iflag);
+            return;
         }
-        spin_unlock(&kmalloc_lock, iflag);
-        return;
     }
 
     void *raw_obj = (uint8_t *) ptr - sizeof(struct slab *);
@@ -367,6 +374,7 @@ void kfree(void *ptr) {
 
     struct slab_cache *cache = slab->parent_cache;
     slab_free(cache, slab, ptr);
+
     spin_unlock(&kmalloc_lock, iflag);
 }
 

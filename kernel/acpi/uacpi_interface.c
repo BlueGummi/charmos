@@ -78,16 +78,12 @@ void uacpi_kernel_log(uacpi_log_level level, const uacpi_char *data) {
 }
 
 void *uacpi_kernel_alloc(uacpi_size size) {
-    size_t pages = (size / PAGE_SIZE) + 1;
-    return hugepage_alloc_pages(pages);
+    void *ret = kmalloc(size);
+    return ret;
 }
 
 void uacpi_kernel_free(void *mem, uacpi_size size) {
-    if (!mem)
-        return;
-
-    size_t pages = (size / PAGE_SIZE) + 1;
-    hugepage_free_pages(mem, pages);
+    kfree(mem);
 }
 
 uacpi_status uacpi_kernel_io_map(uacpi_io_addr base, uacpi_size len,
