@@ -294,7 +294,7 @@ paddr_t domain_alloc(size_t pages, enum alloc_class class,
     uint16_t locality_degree = ALLOC_LOCALITY_FROM_FLAGS(flags);
     bool flexible_locality =
         ALLOC_FLAG_SET(flags, ALLOC_FLAG_FLEXIBILE_LOCALITY) ||
-        global.numa_node_count == 1;
+        locality_degree == ALLOC_LOCALITY_MIN || global.numa_node_count == 1;
 
     /* No other options. Allocate from this buddy. */
     if (locality_degree == ALLOC_LOCALITY_MAX)

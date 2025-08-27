@@ -182,6 +182,9 @@ void domain_free(paddr_t address, size_t page_count) {
     struct domain_free_queue *free_queue = domain_free_queue_on_this_core();
 
     atomic_fetch_sub(&target->pages_used, page_count);
+
+    domain_stat_free(target);
+
     if (local == target) {
         free_from_local_domain_buddy(target, address, page_count);
     } else {
