@@ -16,16 +16,6 @@
 void debug_print_stack();
 extern void panic_entry();
 
-static inline void qemu_exit(int code) {
-    outb(0xf4, ((code << 1) | 1) & 0xFF);
-}
-
-struct panic_regs {
-    uint64_t rsp;
-    uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
-    uint64_t rsi, rdi, rbp, rdx, rcx, rbx, rax;
-};
-
 #define ELEVEN_LINES "==========="
 #define TWENTY_TWO_LINES ELEVEN_LINES ELEVEN_LINES
 #define FORTY_FOUR_LINES TWENTY_TWO_LINES TWENTY_TWO_LINES

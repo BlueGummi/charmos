@@ -2,6 +2,7 @@
 #include <mem/alloc.h>
 #include <misc/minheap.h>
 #include <string.h>
+#include <sync/spin_lock.h>
 
 static void minheap_swap(struct minheap *heap, uint32_t a, uint32_t b) {
     struct minheap_node *tmp = heap->nodes[a];

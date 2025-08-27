@@ -26,7 +26,7 @@ void scheduler_init(void) {
 
         s->thread_rbt.root = NULL;
         s->completed_rbt.root = NULL;
-        s->timeslice_enabled = false;
+        s->tick_enabled = false;
         s->current_period = 1; /* Start at period 1 to avoid
                                 * starting at 0 because
                                 * that would lead to threads

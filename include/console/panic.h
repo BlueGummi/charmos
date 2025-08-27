@@ -4,7 +4,6 @@
 #include <limine.h>
 #include <misc/colors.h>
 #include <misc/logo.h>
-#include <sync/spin_lock.h>
 #include <time.h>
 
 #define STRINGIZE2(x) #x

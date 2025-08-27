@@ -36,6 +36,9 @@ struct core {
     struct domain_buddy *domain_buddy;
     struct domain_arena *domain_arena;
     size_t rr_current_domain;
+
+    atomic_uint preempt_disable_depth;
+    atomic_bool needs_resched;
 };
 
 static inline uint64_t get_this_core_id() {
@@ -78,4 +81,28 @@ static inline enum irql get_irql(void) {
 
 static inline bool in_thread_context(void) {
     return !in_interrupt();
+}
+
+static inline bool preemption_disabled(void) {
+    return atomic_load(&get_current_core()->preempt_disable_depth) > 0;
+}
+
+static inline uint32_t preempt_disable(void) {
+    return atomic_fetch_add(&get_current_core()->preempt_disable_depth, 1);
+}
+
+static inline uint32_t preempt_enable(void) {
+    return atomic_fetch_sub(&get_current_core()->preempt_disable_depth, 1);
+}
+
+static inline void set_needs_resched(void) {
+    atomic_store(&get_current_core()->needs_resched, true);
+}
+
+static inline void unset_needs_resched(void) {
+    atomic_store(&get_current_core()->needs_resched, false);
+}
+
+static inline bool needs_resched(void) {
+    return atomic_load(&get_current_core()->needs_resched);
 }

@@ -26,19 +26,19 @@ struct scheduler_data scheduler_data = {
     .steal_min_diff = SCHEDULER_DEFAULT_WORK_STEAL_MIN_DIFF,
 };
 
-static inline void preempt_disable() {
+static inline void tick_disable() {
     struct scheduler *self = get_this_core_sched();
-    if (atomic_load(&self->timeslice_enabled)) {
+    if (atomic_load(&self->tick_enabled)) {
         lapic_timer_disable();
-        atomic_store(&self->timeslice_enabled, false);
+        atomic_store(&self->tick_enabled, false);
     }
 }
 
-static inline void preempt_enable() {
+static inline void tick_enable() {
     struct scheduler *self = get_this_core_sched();
-    if (!atomic_load(&self->timeslice_enabled)) {
+    if (!atomic_load(&self->tick_enabled)) {
         lapic_timer_enable();
-        atomic_store(&self->timeslice_enabled, true);
+        atomic_store(&self->tick_enabled, true);
     }
 }
 
@@ -47,24 +47,24 @@ static inline void change_timeslice_duration(uint64_t new_duration) {
 
     /* No need to unnecessarily write to MMIO */
     if (self->timeslice_duration == new_duration &&
-        atomic_load(&self->timeslice_enabled))
+        atomic_load(&self->tick_enabled))
         return;
 
     self->timeslice_duration = new_duration;
     lapic_timer_set_ms(new_duration);
-    preempt_enable();
+    tick_enable();
 }
 
 void scheduler_change_timeslice_duration(uint64_t new_duration) {
     change_timeslice_duration(new_duration);
 }
 
-void scheduler_preempt_enable() {
-    preempt_enable();
+void scheduler_tick_enable() {
+    tick_enable();
 }
 
-void scheduler_preempt_disable() {
-    preempt_disable();
+void scheduler_tick_disable() {
+    tick_disable();
 }
 
 static inline void update_core_current_thread(struct thread *next) {
@@ -239,7 +239,7 @@ static inline struct thread *load_idle_thread(struct scheduler *sched) {
     /* Idle thread has no need to have a timeslice
      * No preemption will be occurring since nothing else runs */
     disable_period(sched);
-    preempt_disable();
+    tick_disable();
     return sched->idle_thread;
 }
 
@@ -251,7 +251,7 @@ static void change_timeslice(struct scheduler *sched, struct thread *next) {
          * tracking when we have
          * one thread running */
         disable_period(sched);
-        preempt_disable();
+        tick_disable();
         return;
     }
 
@@ -260,7 +260,7 @@ static void change_timeslice(struct scheduler *sched, struct thread *next) {
         change_timeslice_duration(next->timeslice_duration_ms);
     } else {
         /* RT threads do not share time*/
-        preempt_disable();
+        tick_disable();
     }
 }
 
@@ -328,6 +328,6 @@ void scheduler_yield() {
 }
 
 void scheduler_force_resched(struct scheduler *sched) {
-    if (!atomic_load(&sched->timeslice_enabled))
+    if (!atomic_load(&sched->tick_enabled))
         ipi_send(sched->core_id, IRQ_SCHEDULER);
 }

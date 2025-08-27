@@ -120,7 +120,7 @@ static inline bool thread_is_active(struct thread *t) {
 static void maybe_force_reschedule(struct thread *t) {
     struct scheduler *target = global.schedulers[t->curr_core];
     struct core *core = global.cores[t->curr_core];
-    if (!target->timeslice_enabled && core->current_irql == IRQL_PASSIVE_LEVEL)
+    if (!target->tick_enabled && core->current_irql == IRQL_PASSIVE_LEVEL)
         scheduler_force_resched(target);
 }
 
@@ -298,10 +298,7 @@ void thread_exec_apcs(struct thread *t) {
 }
 
 void thread_check_and_deliver_apcs(struct thread *t) {
-    if (!thread_has_apcs(t))
-        return;
-
-    if (!safe_to_exec_apcs())
+    if (!t || !thread_has_apcs(t) || !safe_to_exec_apcs())
         return;
 
     thread_exec_apcs(t);

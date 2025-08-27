@@ -31,7 +31,7 @@ struct idle_thread_data {
 
 struct scheduler {
     /* Current timeslice data */
-    atomic_bool timeslice_enabled;
+    atomic_bool tick_enabled;
     uint64_t timeslice_duration;
 
     /* Structures */

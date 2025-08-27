@@ -64,12 +64,17 @@ void isr_common_entry(uint8_t vector, void *rsp) {
 
 void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {
     (void) ctx, (void) vector, (void) rsp;
-    lapic_write(LAPIC_REG_EOI, 0);
+    if (!preemption_disabled()) {
+        lapic_write(LAPIC_REG_EOI, 0);
 
-    /* Doing this as the `schedule()` will go to another thread */
-    unmark_self_in_interrupt();
+        /* Doing this as the `schedule()` will go to another thread */
+        unmark_self_in_interrupt();
 
-    schedule();
+        schedule();
+    } else {
+        lapic_write(LAPIC_REG_EOI, 0);
+        set_needs_resched();
+    }
 }
 
 /* Literally a no-op. Used to break out of "wait for interrupt" loops */
@@ -179,7 +184,7 @@ static void page_fault_handler(void *context, uint8_t vector, void *rsp) {
 
     asm volatile("mov %%cr2, %0" : "=r"(fault_addr));
 
-    spin_lock_no_cli(&pf_lock);
+    spin_lock_raw(&pf_lock);
     k_printf("\n=== PAGE FAULT ===\n");
     k_printf("Faulting Address (CR2): 0x%lx\n", fault_addr);
     k_printf("Error Code: 0x%lx\n", error_code);
@@ -197,14 +202,14 @@ static void page_fault_handler(void *context, uint8_t vector, void *rsp) {
              (error_code & 0x20) ? "Yes" : "No");
 
     if (!(error_code & 0x04)) {
-        spin_unlock_no_cli(&pf_lock);
+        spin_unlock_raw(&pf_lock);
         k_panic("KERNEL PAGE FAULT ON CORE %llu\n", get_this_core_id());
         while (1) {
             disable_interrupts();
             wait_for_interrupt();
         }
     }
-    spin_unlock_no_cli(&pf_lock);
+    spin_unlock_raw(&pf_lock);
     /*    if (global_sched.active) {
             scheduler_rm_thread(&global_sched, global_sched.current);
         }*/
