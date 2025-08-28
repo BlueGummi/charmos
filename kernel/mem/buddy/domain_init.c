@@ -203,6 +203,7 @@ static void domain_structs_init(struct domain_buddy *dom, size_t arena_capacity,
         dom->cores = core_domain->cores;
         spinlock_init(&this->lock);
 
+        core_domain->cores[i]->domain_buddy = dom;
         core_domain->cores[i]->domain_arena = this;
     }
 

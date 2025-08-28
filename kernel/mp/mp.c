@@ -90,6 +90,7 @@ static inline void set_core_awake(void) {
 
 void wakeup() {
     enum irql irql = spin_lock(&wakeup_lock);
+    disable_interrupts();
     smap_init();
     serial_init();
 

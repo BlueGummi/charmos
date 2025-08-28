@@ -4,7 +4,7 @@
 
 extern bool bug_here;
 enum irql irql_raise(enum irql new_level) {
-    if (global.current_bootstage < BOOTSTAGE_MID_MP)
+    if (global.current_bootstage < BOOTSTAGE_LATE_DEVICES)
         return IRQL_PASSIVE_LEVEL;
 
     struct core *cpu = get_current_core();
@@ -24,7 +24,7 @@ enum irql irql_raise(enum irql new_level) {
 }
 
 void irql_lower(enum irql new_level) {
-    if (global.current_bootstage < BOOTSTAGE_MID_MP)
+    if (global.current_bootstage < BOOTSTAGE_LATE_DEVICES)
         return;
 
     struct core *cpu = get_current_core();

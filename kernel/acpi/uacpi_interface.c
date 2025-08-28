@@ -82,7 +82,7 @@ void *uacpi_kernel_alloc(uacpi_size size) {
     return ret;
 }
 
-void uacpi_kernel_free(void *mem, uacpi_size size) {
+void uacpi_kernel_free(void *mem) {
     kfree(mem);
 }
 

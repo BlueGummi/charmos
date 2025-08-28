@@ -10,6 +10,8 @@ enum slab_state { SLAB_FREE, SLAB_PARTIAL, SLAB_FULL };
 
 struct slab {
     struct slab *next;
+    struct slab *prev;
+
     atomic_uint_fast8_t *bitmap;
     void *mem;
     atomic_uint_fast64_t used;

@@ -34,11 +34,10 @@ uint64_t reaper_get_reaped_thread_count(void) {
 
 void reaper_thread_main() {
     while (1) {
-        enum irql irql = spin_lock(&reaper.lock);
+        enum irql irql = spin_lock_irq_disable(&reaper.lock);
 
-        while (!reaper.queue.head) {
+        while (!reaper.queue.head)
             condvar_wait(&reaper.cv, &reaper.lock, irql);
-        }
 
         struct thread *t = reaper.queue.head;
         reaper.queue.head = reaper.queue.tail = NULL;

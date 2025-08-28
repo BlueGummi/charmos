@@ -44,6 +44,8 @@ void k_main(void) {
     global.core_count = mp_request.response->cpu_count;
     global.hhdm_offset = hhdm_request.response->offset;
 
+    disable_interrupts();
+
     /* Framebuffer */
     k_printf_init(framebuffer_request.response->framebuffers[0]);
     k_printf("%s", OS_LOGO_SMALL);
@@ -108,8 +110,8 @@ void k_main(void) {
 
 void k_sch_main() {
     k_info("MAIN", K_INFO, "Device setup");
-    registry_setup();
     global.current_bootstage = BOOTSTAGE_LATE_DEVICES;
+    registry_setup();
     tests_run();
     k_info("MAIN", K_INFO, "Boot OK");
     global.current_bootstage = BOOTSTAGE_COMPLETE;

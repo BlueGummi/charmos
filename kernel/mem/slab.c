@@ -108,17 +108,24 @@ static struct slab *slab_create(struct slab_cache *cache) {
 }
 
 static void slab_list_remove(struct slab **list, struct slab *slab) {
-    while (*list && *list != slab)
-        list = &(*list)->next;
-
-    if (*list == slab) {
+    if (slab->prev)
+        slab->prev->next = slab->next;
+    else
         *list = slab->next;
-        slab->next = NULL;
-    }
+
+    if (slab->next)
+        slab->next->prev = slab->prev;
+
+    slab->next = slab->prev = NULL;
 }
 
 static void slab_list_add(struct slab **list, struct slab *slab) {
     slab->next = *list;
+
+    if (*list)
+        (*list)->prev = slab;
+
+    slab->prev = NULL;
     *list = slab;
 }
 
@@ -194,15 +201,13 @@ static void slab_free(struct slab_cache *cache, struct slab *slab, void *obj) {
 }
 
 static void *slab_alloc(struct slab_cache *cache) {
-
     for (struct slab *slab = cache->slabs_partial; slab; slab = slab->next) {
         if (slab->state == SLAB_FULL)
             continue;
 
         void *obj = slab_alloc_from(cache, slab);
-        if (obj) {
+        if (obj)
             return obj;
-        }
     }
 
     for (struct slab *slab = cache->slabs_free; slab; slab = slab->next) {
@@ -210,9 +215,8 @@ static void *slab_alloc(struct slab_cache *cache) {
             continue;
 
         void *obj = slab_alloc_from(cache, slab);
-        if (obj) {
+        if (obj)
             return obj;
-        }
     }
 
     struct slab *slab = slab_create(cache);
@@ -332,19 +336,17 @@ void kfree(void *ptr) {
     struct slab_phdr *hdr_candidate =
         (struct slab_phdr *) ((uint8_t *) ptr - sizeof(struct slab_phdr));
 
-    if (vmm_get_phys((uintptr_t) hdr_candidate) != (paddr_t) -1) {
-        if (hdr_candidate->magic == MAGIC_KMALLOC_PAGE) {
-            uintptr_t virt = (uintptr_t) hdr_candidate;
-            uint64_t pages = hdr_candidate->pages;
-            for (uint64_t i = 0; i < pages; i++) {
-                uintptr_t vaddr = virt + i * PAGE_SIZE;
-                paddr_t phys = (paddr_t) vmm_get_phys(vaddr);
-                vmm_unmap_page(vaddr);
-                pmm_free_page(phys);
-            }
-            spin_unlock(&kmalloc_lock, irql);
-            return;
+    if (hdr_candidate->magic == MAGIC_KMALLOC_PAGE) {
+        uintptr_t virt = (uintptr_t) hdr_candidate;
+        uint64_t pages = hdr_candidate->pages;
+        for (uint64_t i = 0; i < pages; i++) {
+            uintptr_t vaddr = virt + i * PAGE_SIZE;
+            paddr_t phys = (paddr_t) vmm_get_phys(vaddr);
+            vmm_unmap_page(vaddr);
+            pmm_free_page(phys);
         }
+        spin_unlock(&kmalloc_lock, irql);
+        return;
     }
 
     void *raw_obj = (uint8_t *) ptr - sizeof(struct slab *);
