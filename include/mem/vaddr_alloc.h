@@ -21,11 +21,4 @@ struct vas_space {
 struct vas_space *vas_space_init(vaddr_t base, vaddr_t limit);
 void vas_free(struct vas_space *vas, vaddr_t addr);
 vaddr_t vas_alloc(struct vas_space *vas, size_t size, size_t align);
-
-static inline bool vas_space_lock(struct vas_space *vs) {
-    return spin_lock(&vs->lock);
-}
-
-static inline void vas_space_unlock(struct vas_space *vs, bool iflag) {
-    spin_unlock(&vs->lock, iflag);
-}
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(vas_space, lock);

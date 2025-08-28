@@ -10,9 +10,9 @@
 #include <string.h>
 #include <sync/spinlock.h>
 
-#ifndef SLAB_OBJ_ALIGN
+#include "slab_internal.h"
+
 #define SLAB_OBJ_ALIGN 16u
-#endif
 
 static inline uint64_t round_up_pow2(uint64_t x, uint64_t a) {
     return (x + (a - 1)) & ~(a - 1);

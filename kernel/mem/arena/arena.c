@@ -4,6 +4,7 @@
 #include <mem/hugepage.h>
 
 #include "internal.h"
+#include "mem/hugepage/internal.h"
 
 struct hugepage *arena_lookup(struct arena *a, vaddr_t addr) {
     kassert(HUGEPAGE_ALIGN(addr) == addr);

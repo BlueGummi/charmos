@@ -3,6 +3,7 @@
 #include <mem/vmm.h>
 #include <mp/domain.h>
 
+#include "mem/buddy/internal.h"
 #include "internal.h"
 #define DISTANCE_WEIGHT 1000 /* distance is heavily weighted */
 #define FREE_PAGES_WEIGHT 1  /* free pages count less */

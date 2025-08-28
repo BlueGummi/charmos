@@ -18,6 +18,7 @@
 #include <limine.h>
 #include <mem/alloc.h>
 #include <mem/buddy.h>
+#include <mem/domain.h>
 #include <mem/hugepage.h>
 #include <mem/pmm.h>
 #include <mem/slab.h>
@@ -120,16 +121,7 @@ void k_sch_main() {
 
     thread_log_event_reasons(scheduler_get_curr_thread());
 
-    for (size_t i = 0; i < global.domain_count; i++) {
-        struct domain_buddy *dom = &domain_buddies[i];
-        struct domain_buddy_stats *stat = &dom->stats;
-        k_printf("Domain %u stats: %u allocs, %u failed, %u interleaved, %u "
-                 "remote, %u frees, %u pages used, %u total pages\n",
-                 i, stat->alloc_count, stat->failed_alloc_count,
-                 stat->interleaved_alloc_count, stat->remote_alloc_count,
-                 stat->free_count, dom->pages_used, dom->total_pages);
-    }
-
+    domain_dump();
     while (1) {
         wait_for_interrupt();
     }

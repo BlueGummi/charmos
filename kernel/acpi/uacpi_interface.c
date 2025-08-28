@@ -9,6 +9,7 @@
 #include <mem/vmm.h>
 #include <mp/core.h>
 #include <pit.h>
+#include <sch/sched.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <sync/mutex.h>
@@ -206,8 +207,9 @@ uacpi_cpu_flags uacpi_kernel_lock_spinlock(uacpi_handle a) {
 void uacpi_kernel_unlock_spinlock(uacpi_handle a, uacpi_cpu_flags b) {
     spin_unlock((struct spinlock *) a, b);
 }
+
 uacpi_thread_id uacpi_kernel_get_thread_id(void) {
-    return (uacpi_thread_id) 0;
+    return scheduler_get_curr_thread();
 }
 
 //

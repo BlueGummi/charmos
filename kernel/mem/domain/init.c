@@ -1,5 +1,6 @@
 #include <mem/alloc.h>
 #include <mem/buddy.h>
+#include <mem/domain.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <misc/align.h>
@@ -7,6 +8,9 @@
 #include <mp/domain.h>
 #include <sch/thread.h>
 #include <string.h>
+
+#include "internal.h"
+#include "mem/buddy/internal.h"
 
 static int compare_zonelist_entries(const void *a, const void *b) {
     const struct domain_zonelist_entry *da = a;
@@ -256,9 +260,78 @@ static void domain_init_worker(struct domain_buddy *domain) {
     worker->perceived_priority = THREAD_PRIO_CLASS_BACKGROUND;
 }
 
+static void link_domain_cores_to_buddy(struct core_domain *cd,
+                                       struct domain_buddy *bd) {
+    for (size_t i = 0; i < cd->num_cores; i++) {
+        cd->cores[i]->domain_buddy = bd;
+    }
+}
+
+static inline uint64_t pages_to_bytes(size_t pages) {
+    return (uint64_t) pages * PAGE_SIZE;
+}
+
+static void late_init_from_numa(size_t domain_count) {
+    for (size_t i = 0; i < domain_count; i++) {
+        struct numa_node *node = &global.numa_nodes[i % global.numa_node_count];
+        struct core_domain *cd = global.core_domains[i];
+
+        domain_buddies[i].start = node->mem_base;                /* bytes */
+        domain_buddies[i].end = node->mem_base + node->mem_size; /* bytes */
+        domain_buddies[i].length = node->mem_size;               /* bytes */
+        domain_buddies[i].core_count = cd->num_cores;
+        link_domain_cores_to_buddy(cd, &domain_buddies[i]);
+
+        /* Slice of global buddy_page_array corresponding to this PFN range */
+        size_t page_offset = node->mem_base / PAGE_SIZE; /* PFN index */
+        domain_buddies[i].buddy = &buddy_page_array[page_offset];
+    }
+}
+
+/* No NUMA: split last_pfn evenly across domains.
+ * Keep dom->start/dom->end in bytes to match NUMA path. */
+static void late_init_non_numa(size_t domain_count) {
+    size_t pages_per_domain = global.last_pfn / domain_count;
+    size_t remainder_pages = global.last_pfn % domain_count;
+
+    size_t page_cursor = 0; /* PFN cursor (pages) */
+
+    for (size_t i = 0; i < domain_count; i++) {
+        size_t this_pages = pages_per_domain;
+        if (i == domain_count - 1)
+            this_pages += remainder_pages;
+
+        struct core_domain *cd = global.core_domains[i];
+
+        uint64_t domain_start_bytes = pages_to_bytes(page_cursor); /* bytes */
+
+        uint64_t domain_length_bytes = pages_to_bytes(this_pages); /* bytes */
+
+        domain_buddies[i].start = domain_start_bytes; /* bytes */
+        domain_buddies[i].end =
+            domain_start_bytes + domain_length_bytes;   /* bytes */
+        domain_buddies[i].length = domain_length_bytes; /* bytes */
+        domain_buddies[i].core_count = cd->num_cores;
+
+        domain_buddies[i].buddy = &buddy_page_array[page_cursor];
+
+        link_domain_cores_to_buddy(cd, &domain_buddies[i]);
+
+        page_cursor += this_pages;
+    }
+}
+
 void domain_buddies_init(void) {
-    size_t freequeue_size = compute_freequeue_max(global.total_pages);
     size_t domain_count = global.domain_count;
+    domain_buddies = kzalloc(sizeof(struct domain_buddy) * domain_count);
+
+    if (global.numa_node_count > 1) {
+        late_init_from_numa(domain_count);
+    } else {
+        late_init_non_numa(domain_count);
+    }
+
+    size_t freequeue_size = compute_freequeue_max(global.total_pages);
 
     for (size_t i = 0; i < domain_count; i++) {
         struct core_domain *d = global.core_domains[i];
@@ -276,4 +349,16 @@ void domain_buddies_init(void) {
     }
 
     domain_buddies_print();
+}
+
+void domain_dump(void) {
+    for (size_t i = 0; i < global.domain_count; i++) {
+        struct domain_buddy *dom = &domain_buddies[i];
+        struct domain_buddy_stats *stat = &dom->stats;
+        k_printf("Domain %u stats: %u allocs, %u failed, %u interleaved, %u "
+                 "remote, %u frees, %u pages used, %u total pages\n",
+                 i, stat->alloc_count, stat->failed_alloc_count,
+                 stat->interleaved_alloc_count, stat->remote_alloc_count,
+                 stat->free_count, dom->pages_used, dom->total_pages);
+    }
 }

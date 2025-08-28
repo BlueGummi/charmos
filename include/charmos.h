@@ -28,7 +28,6 @@ struct charmos_globals {
     struct core_domain **core_domains;
     uint64_t hhdm_offset;
 
-    bool buddy_active;
     uint64_t total_pages;
     uintptr_t last_pfn;
 

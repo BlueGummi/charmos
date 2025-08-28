@@ -3,6 +3,111 @@
 #include <mem/vmm.h>
 #include <string.h>
 
+#define HTB_TAG_MASK 0xFFFFFFFFFFFFF000ULL
+#define HTB_COOLDOWN_TICKS 10
+#define HTB_MAX_ENTRIES 128
+
+struct hugepage_tb_entry {
+    vaddr_t tag;
+    struct hugepage *hp;
+    bool valid;
+    uint8_t gen;
+    struct spinlock lock;
+};
+
+/* We want to prevent these from taking up over a page */
+_Static_assert(sizeof(struct hugepage_tb_entry) * HTB_MAX_ENTRIES < 4096, "");
+
+struct hugepage_tb {
+    uint64_t gen_counter;
+    size_t entry_count;
+    struct hugepage_tb_entry *entries;
+};
+
+struct hugepage_core_list {
+    struct spinlock lock; /* For when another core modifies this core's
+                           * list to potentially free a page - rare,
+                           * usually not contended */
+
+    struct minheap *hugepage_minheap;
+    core_t core_num;
+};
+
+struct hugepage_tree {
+    struct spinlock lock;
+    struct rbt *root_node;
+    struct hugepage_core_list *core_lists;
+    struct vas_space *address_space;
+    struct hugepage_tb *htb;
+};
+
+struct hugepage_gc_list {
+    struct spinlock lock;
+    struct list_head hugepages_list;
+    atomic_uint pages_in_list;
+};
+
+#define hugepage_from_tree_node(node)                                          \
+    container_of(node, struct hugepage, tree_node)
+
+#define hugepage_from_gc_list_node(node)                                       \
+    container_of(node, struct hugepage, gc_list_node)
+
+#define hugepage_from_minheap_node(node)                                       \
+    container_of(node, struct hugepage, minheap_node)
+
+#define hugepage_sanity_assert(hp) kassert(hugepage_is_valid(hp))
+#define hugepage_deletion_sanity_assert(hp)                                    \
+    kassert(hugepage_safe_for_deletion(hp))
+
+/* Sanity checks */
+bool hugepage_is_valid(struct hugepage *hp);
+bool hugepage_safe_for_deletion(struct hugepage *hp);
+
+/* GC list */
+void hugepage_gc_add(struct hugepage *hp);
+void hugepage_gc_enqueue(struct hugepage *hp);
+void hugepage_gc_remove(struct hugepage *hp);
+void hugepage_gc_remove_internal(struct hugepage *hp);
+struct hugepage *hugepage_get_from_gc_list(void);
+
+void hugepage_print(struct hugepage *hp);
+
+/* Core list operations for per-core minheaps */
+void hugepage_core_list_insert(struct hugepage_core_list *list,
+                               struct hugepage *hp, bool locked);
+
+/* Put the hugepage back on its core list */
+void hugepage_return_to_list_internal(struct hugepage *hp);
+
+struct hugepage *hugepage_core_list_peek(struct hugepage_core_list *hcl);
+struct hugepage *hugepage_core_list_pop(struct hugepage_core_list *hcl);
+void hugepage_core_list_remove_hugepage(struct hugepage_core_list *hcl,
+                                        struct hugepage *hp, bool locked);
+
+/* Global rbt operations on the hugepage tree */
+void hugepage_tree_insert(struct hugepage_tree *tree, struct hugepage *hp);
+void hugepage_tree_remove(struct hugepage_tree *tree, struct hugepage *hp);
+
+/* Internal allocator-private insertion into trees */
+void hugepage_insert_internal(struct hugepage *hp);
+
+void hugepage_init(struct hugepage *hp, vaddr_t vaddr_base, paddr_t phys_base,
+                   core_t owner);
+
+void hugepage_delete(struct hugepage *hp);
+
+/* Internal initialization + creation */
+struct hugepage *hugepage_create_internal(core_t owner);
+
+/* Contiguous hugepages for multi-hugepage allocations */
+bool hugepage_create_contiguous(core_t owner, size_t hugepage_count,
+                                struct hugepage **hp_out);
+
+void hugepage_print_all(void);
+void hugepage_bit_set(struct hugepage *hp, size_t idx);
+extern struct hugepage_tree *hugepage_full_tree;
+extern struct hugepage_gc_list hugepage_gc_list;
 /* Everything free, so we zero it */
 static inline void hugepage_zero_bitmap(struct hugepage *hp) {
     memset(hp->bitmap, 0, HUGEPAGE_U64_BITMAP_SIZE * 8);
