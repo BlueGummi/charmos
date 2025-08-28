@@ -110,7 +110,7 @@ static bool should_spawn_worker(struct event_pool *pool) {
 }
 
 static bool spawn_worker(struct event_pool *pool) {
-    enum irql irql = event_pool_lock(pool);
+    enum irql irql = event_pool_lock_irq_disable(pool);
     struct worker_thread *w = &pool->threads[get_available_worker_idx(pool)];
     w->inactivity_check_period = get_inactivity_timeout(pool);
     struct thread *t = worker_spawn_on_core();
@@ -136,9 +136,8 @@ static void spawn_worker_dpc(void *arg1, void *unused) {
     spawn_worker(pool);
 }
 
-static bool do_spawn_worker(struct event_pool *pool, enum irql irql) {
+static bool do_spawn_worker(struct event_pool *pool) {
     pool->currently_spawning = true;
-    event_pool_unlock(pool, irql);
 
     if (!in_interrupt()) {
         return spawn_worker(pool);
@@ -147,9 +146,9 @@ static bool do_spawn_worker(struct event_pool *pool, enum irql irql) {
     }
 }
 
-static inline bool try_spawn_worker(struct event_pool *pool, enum irql irql) {
+static inline bool try_spawn_worker(struct event_pool *pool) {
     if (should_spawn_worker(pool))
-        return do_spawn_worker(pool, irql);
+        return do_spawn_worker(pool);
 
     return false;
 }
@@ -176,76 +175,72 @@ static inline bool signaled_by_timeout(bool signaled) {
     return !signaled;
 }
 
-static bool worker_wait(struct event_pool *pool, struct worker_thread *worker,
+static bool worker_wait(struct event_pool *pool, struct worker_thread *w,
                         enum irql irql) {
-    const time_t timeout = worker->inactivity_check_period;
-    bool signal = true;
-
+    bool signal;
     pool->idle_workers++;
 
-    if (worker->timeout_ran && !worker->is_permanent) {
-        signal =
-            condvar_wait_timeout(&pool->queue_cv, &pool->lock, timeout, irql);
-        worker->timeout_ran = false;
+    if (w->timeout_ran && !w->is_permanent) {
+        signal = condvar_wait_timeout(&pool->queue_cv, &pool->lock,
+                                      w->inactivity_check_period, irql);
+        w->timeout_ran = false;
+
     } else {
         signal = condvar_wait(&pool->queue_cv, &pool->lock, irql);
     }
 
     pool->idle_workers--;
 
-    if (signaled_by_timeout(signal))
-        worker->timeout_ran = true;
+    if (signaled_by_timeout(signal)) {
+        w->timeout_ran = true;
+        if (!w->idle) {
+            w->idle = true;
+            w->start_idle = time_get_ms();
+        }
+    }
 
     return signal;
 }
 
 static inline bool worker_should_exit(const struct worker_thread *worker,
-                                      time_t start_idle, bool idle,
                                       bool signal) {
     const time_t timeout = worker->inactivity_check_period;
-    if (!worker->is_permanent && idle && signaled_by_timeout(signal))
-        if (time_get_ms() - start_idle >= timeout)
+    if (!worker->is_permanent && worker->idle && signaled_by_timeout(signal))
+        if (time_get_ms() - worker->start_idle >= timeout)
             return true;
 
     return false;
 }
 
-static inline void set_idle(const struct worker_thread *worker,
-                            time_t *start_idle, bool *idle) {
-    if (!worker->is_permanent && !(*idle)) {
-        *start_idle = time_get_ms();
-        *idle = true;
-    }
-}
+static bool dequeue_task(struct event_pool *pool, struct worker_task *out) {
 
-static bool idle_loop_should_exit(struct event_pool *pool,
-                                  struct worker_thread *worker, bool *idle,
-                                  time_t *start_idle, enum irql irql) {
-    while (pool->head == pool->tail) {
-        set_idle(worker, start_idle, idle);
-        bool signal = worker_wait(pool, worker, irql);
+    uint64_t tail, head;
 
-        if (worker_should_exit(worker, *start_idle, *idle, signal))
-            return true;
-    }
-    return false;
-}
+    do {
+        tail = atomic_load_explicit(&pool->tail, memory_order_relaxed);
+        head = atomic_load_explicit(&pool->head, memory_order_acquire);
 
-static inline struct worker_task pool_dequeue(struct event_pool *pool,
-                                              enum irql irql) {
-    struct worker_task task = pool->tasks[pool->tail % EVENT_POOL_CAPACITY];
-    pool->tail++;
-    atomic_fetch_sub(&pool->num_tasks, 1);
-    event_pool_unlock(pool, irql);
-    return task;
+        if (tail == head)
+            return false;
+
+    } while (!atomic_compare_exchange_weak_explicit(
+        &pool->tail, &tail, tail + 1, memory_order_acq_rel,
+        memory_order_relaxed));
+
+    *out = pool->tasks[tail % EVENT_POOL_CAPACITY];
+
+    atomic_fetch_sub_explicit(&pool->num_tasks, 1, memory_order_release);
+    return true;
 }
 
 static void do_work_from_pool(struct event_pool *pool,
-                              struct worker_thread *worker, bool *idle,
-                              enum irql irql) {
-    struct worker_task task = pool_dequeue(pool, irql);
+                              struct worker_thread *worker) {
+    struct worker_task task;
+    if (!dequeue_task(pool, &task))
+        return;
+
     worker->last_active = time_get_ms();
-    *idle = false;
+    worker->idle = false;
 
     enum irql old = irql_raise(IRQL_DISPATCH_LEVEL);
     task.func(task.arg, task.arg2);
@@ -262,23 +257,35 @@ static void worker_exit(struct event_pool *pool, struct worker_thread *worker,
 }
 
 void worker_main(void) {
-    struct worker_thread *worker = get_this_worker_thread();
+    struct worker_thread *w = get_this_worker_thread();
     struct event_pool *pool = get_event_pool_local();
 
-    enum irql irql = IRQL_PASSIVE_LEVEL;
     while (1) {
-        bool idle = false;
-        time_t start_idle = 0;
+        struct worker_task task;
 
-        irql = event_pool_lock(pool);
+        if (dequeue_task(pool, &task)) {
+            w->last_active = time_get_ms();
+            w->idle = false;
 
-        if (idle_loop_should_exit(pool, worker, &idle, &start_idle, irql))
-            break;
+            enum irql old = irql_raise(IRQL_DISPATCH_LEVEL);
 
-        do_work_from_pool(pool, worker, &idle, irql);
+            task.func(task.arg, task.arg2);
+
+            irql_lower(old);
+            continue;
+        }
+
+        enum irql irql = event_pool_lock_irq_disable(pool);
+        while (atomic_load_explicit(&pool->head, memory_order_acquire) ==
+               atomic_load_explicit(&pool->tail, memory_order_relaxed)) {
+
+            bool signaled = worker_wait(pool, w, irql);
+
+            if (worker_should_exit(w, signaled))
+                worker_exit(pool, w, irql);
+        }
+        event_pool_unlock(pool, irql);
     }
-
-    worker_exit(pool, worker, irql);
 }
 
 //
@@ -287,28 +294,33 @@ void worker_main(void) {
 //
 //
 
-static bool add(struct event_pool *pool, dpc_t func, void *arg, void *arg2) {
-    enum irql irql = event_pool_lock_irq_disable(pool);
+static bool enqueue_task(struct event_pool *pool, dpc_t func, void *arg,
+                         void *arg2) {
+    uint64_t head, tail;
 
-    uint64_t next_head = pool->head + 1;
-    if ((next_head - pool->tail) > EVENT_POOL_CAPACITY) {
+    do {
+        head = atomic_load_explicit(&pool->head, memory_order_relaxed);
+        tail = atomic_load_explicit(&pool->tail, memory_order_acquire);
 
-        /* panic for now - just so we know this went wrong */
-        k_panic("Event pool OVERFLOW!\n");
-        event_pool_unlock(pool, irql);
-        return false;
-    }
+        if (head - tail >= EVENT_POOL_CAPACITY)
+            k_panic("Event pool OVERFLOW\n"); /* I will eventually figure out
+                                               * a way to handle these */
 
-    pool->tasks[pool->head % EVENT_POOL_CAPACITY].func = func;
-    pool->tasks[pool->head % EVENT_POOL_CAPACITY].arg = arg;
-    pool->tasks[pool->head % EVENT_POOL_CAPACITY].arg2 = arg2;
-    pool->head = next_head;
-    atomic_fetch_add(&pool->num_tasks, 1);
+    } while (!atomic_compare_exchange_weak_explicit(
+        &pool->head, &head, head + 1, memory_order_acq_rel,
+        memory_order_relaxed));
 
-    try_spawn_worker(pool, irql);
+    pool->tasks[head % EVENT_POOL_CAPACITY] = (struct worker_task) {
+        .func = func,
+        .arg = arg,
+        .arg2 = arg2,
+    };
 
-    event_pool_unlock(pool, irql);
+    atomic_fetch_add_explicit(&pool->num_tasks, 1, memory_order_release);
+
+    try_spawn_worker(pool);
     condvar_signal(&pool->queue_cv);
+
     return true;
 }
 
@@ -341,6 +353,7 @@ void event_pool_init(void) {
         if (!pools[i])
             k_panic("Failed to allocate space for event pool %u!\n", i);
 
+        spinlock_init(&pools[i]->lock);
         uint64_t core_id = i;
         spawn_permanent_thread_on_core(core_id);
     }
@@ -348,21 +361,21 @@ void event_pool_init(void) {
 
 bool event_pool_add(dpc_t func, void *arg, void *arg2) {
     struct event_pool *pool = get_least_loaded_pool();
-    return add(pool, func, arg, arg2);
+    return enqueue_task(pool, func, arg, arg2);
 }
 
 bool event_pool_add_remote(dpc_t func, void *arg, void *arg2) {
     struct event_pool *pool = get_least_loaded_remote_pool();
-    return add(pool, func, arg, arg2);
+    return enqueue_task(pool, func, arg, arg2);
 }
 
 bool event_pool_add_local(dpc_t func, void *arg, void *arg2) {
     struct event_pool *pool = get_event_pool_local();
-    return add(pool, func, arg, arg2);
+    return enqueue_task(pool, func, arg, arg2);
 }
 
 bool event_pool_add_fast(dpc_t func, void *arg, void *arg2) {
     struct event_pool *pool =
         pools[(get_this_core_id() + 1) % global.core_count];
-    return add(pool, func, arg, arg2);
+    return enqueue_task(pool, func, arg, arg2);
 }

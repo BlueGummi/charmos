@@ -39,6 +39,8 @@ struct worker_thread {
     bool should_exit;
     bool is_permanent;
     bool present;
+    bool idle;
+    time_t start_idle;
 };
 
 #ifdef TESTS
@@ -62,8 +64,8 @@ struct event_pool {
 
     struct worker_task tasks[EVENT_POOL_CAPACITY];
     struct worker_thread threads[MAX_WORKERS];
-    uint64_t head; // producer index
-    uint64_t tail; // consumer index
+    atomic_uint_fast64_t head;
+    atomic_uint_fast64_t tail;
 
     atomic_uint num_tasks;
 
@@ -92,11 +94,3 @@ bool event_pool_add_local(dpc_t func, void *arg, void *arg2);
 bool event_pool_add_fast(dpc_t func, void *arg, void *arg2);
 
 void worker_main(void);
-
-static void kfree_deferrable(void *ptr, void *) {
-    kfree(ptr);
-}
-
-static inline void defer_free(void *ptr) {
-    event_pool_add_remote(kfree_deferrable, ptr, NULL);
-}
