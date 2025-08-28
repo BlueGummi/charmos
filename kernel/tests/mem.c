@@ -62,7 +62,6 @@ REGISTER_TEST(kmalloc_aligned_4096_test, false, false) {
     SET_SUCCESS;
 }
 
-/*
 #define STRESS_ALLOC_TIMES 2048
 
 REGISTER_TEST(pmm_stress_alloc_free_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
@@ -231,5 +230,3 @@ REGISTER_TEST(pmm_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     SET_SUCCESS;
 }
-
-*/

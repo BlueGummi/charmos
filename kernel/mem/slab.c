@@ -100,6 +100,7 @@ static struct slab *slab_create(struct slab_cache *cache) {
     atomic_store(&slab->used, 0);
     slab->state = SLAB_FREE;
     slab->next = NULL;
+    slab->prev = NULL;
 
     uint64_t bitmap_bytes = (cache->objs_per_slab + 7) / 8;
     memset((void *) slab->bitmap, 0, bitmap_bytes);
@@ -275,8 +276,9 @@ void *kmalloc(uint64_t size) {
 
     int idx = uint64_to_index(size);
     if (idx >= 0 && slab_caches[idx].objs_per_slab > 0) {
+        void *ret = slab_alloc(&slab_caches[idx]);
         spin_unlock(&kmalloc_lock, irql);
-        return slab_alloc(&slab_caches[idx]);
+        return ret;
     }
 
     uint64_t total_size = size + sizeof(struct slab_phdr);
