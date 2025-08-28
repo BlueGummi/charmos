@@ -2,6 +2,7 @@
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/slab.h>
+#include <mem/vaddr_alloc.h>
 #include <mem/vmm.h>
 #include <misc/magic_numbers.h>
 #include <mp/core.h>
@@ -12,26 +13,32 @@
 
 #include "slab_internal.h"
 
+#define SLAB_HEAP_START 0xFFFFF00000000000ULL
+#define SLAB_HEAP_END 0xFFFFF10000000000ULL
 #define SLAB_OBJ_ALIGN 16u
 
 static inline uint64_t round_up_pow2(uint64_t x, uint64_t a) {
     return (x + (a - 1)) & ~(a - 1);
 }
 
-struct slab_cache slab_caches[SLAB_CLASS_COUNT];
-uintptr_t slab_heap_top = 0xFFFFF00000000000;
+static struct vas_space *slab_vas = NULL;
+static struct slab_cache slab_caches[SLAB_CLASS_COUNT];
 
 static void *slab_map_new_page() {
     uintptr_t phys = pmm_alloc_page(ALLOC_CLASS_DEFAULT, ALLOC_FLAGS_NONE);
     if (!phys)
         return NULL;
 
-    uintptr_t virt = slab_heap_top;
-    slab_heap_top += PAGE_SIZE;
+    uintptr_t virt = vas_alloc(slab_vas, PAGE_SIZE, PAGE_SIZE);
+
+    if (!virt) {
+        pmm_free_page(phys);
+        return NULL;
+    }
 
     enum errno e = vmm_map_page(virt, phys, PAGING_PRESENT | PAGING_WRITE);
     if (e < 0) {
-        pmm_free_pages(phys, 1);
+        pmm_free_page(phys);
         return NULL;
     }
 
@@ -41,7 +48,7 @@ static void *slab_map_new_page() {
 static void slab_cache_init(struct slab_cache *cache, uint64_t obj_size) {
     const uint64_t header = sizeof(struct slab *);
 
-    cache->obj_size = header + obj_size; // stride, not necessarily power-of-two
+    cache->obj_size = header + obj_size;
     uint64_t available = PAGE_SIZE - sizeof(struct slab);
 
     if (cache->obj_size > available) {
@@ -241,6 +248,10 @@ static int uint64_to_index(uint64_t size) {
 }
 
 void slab_init() {
+    slab_vas = vas_space_bootstrap(SLAB_HEAP_START, SLAB_HEAP_END);
+    if (!slab_vas)
+        k_panic("Could not initialize slab VAS\n");
+
     for (int i = 0; i < SLAB_CLASS_COUNT; i++) {
         uint64_t size = 1UL << (i + SLAB_MIN_SHIFT);
         slab_cache_init(&slab_caches[i], size);
@@ -284,7 +295,7 @@ void *kmalloc(uint64_t size) {
     uint64_t total_size = size + sizeof(struct slab_phdr);
     uint64_t pages = (total_size + PAGE_SIZE - 1) / PAGE_SIZE;
 
-    uintptr_t virt = slab_heap_top;
+    uintptr_t virt = vas_alloc(slab_vas, pages * PAGE_SIZE, PAGE_SIZE);
     uintptr_t phys_pages[pages];
     uint64_t allocated = 0;
 
@@ -314,7 +325,6 @@ void *kmalloc(uint64_t size) {
     hdr->magic = MAGIC_KMALLOC_PAGE;
     hdr->pages = pages;
 
-    slab_heap_top += pages * PAGE_SIZE;
     spin_unlock(&kmalloc_lock, irql);
     return (void *) (hdr + 1);
 }
@@ -347,6 +357,8 @@ void kfree(void *ptr) {
             vmm_unmap_page(vaddr);
             pmm_free_page(phys);
         }
+
+        vas_free(slab_vas, virt);
         spin_unlock(&kmalloc_lock, irql);
         return;
     }

@@ -23,7 +23,7 @@ void hugepage_tree_remove(struct hugepage_tree *tree, struct hugepage *hp) {
 
 void hugepage_core_list_insert(struct hugepage_core_list *list,
                                struct hugepage *hp, bool locked) {
-    bool irql;
+    enum irql irql;
 
     if (!locked)
         irql = hugepage_core_list_lock(list);
@@ -69,7 +69,7 @@ struct hugepage *hugepage_core_list_pop(struct hugepage_core_list *hcl) {
 
 void hugepage_core_list_remove_hugepage(struct hugepage_core_list *hcl,
                                         struct hugepage *hp, bool locked) {
-    bool irql = false;
+    enum irql irql = IRQL_PASSIVE_LEVEL;
     if (!locked)
         irql = hugepage_core_list_lock(hcl);
 

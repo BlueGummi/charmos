@@ -137,7 +137,7 @@ fail:
 REGISTER_TEST(ts_thread_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     disable_interrupts();
-    ts = thread_spawn(ts_thread);
+    ts = thread_spawn_on_core(ts_thread, 0); /* We are 0 */
     enable_interrupts();
 
     scheduler_yield();
