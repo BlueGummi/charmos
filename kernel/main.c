@@ -32,6 +32,7 @@
 #include <sch/defer.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
+#include <sch/tid.h>
 #include <stdint.h>
 #include <syscall.h>
 #include <tests.h>
@@ -83,6 +84,7 @@ void k_main(void) {
            global.core_count, global.total_pages);
 
     /* Scheduler */
+    thread_init_thread_ids();
     scheduler_init();
     defer_init();
     prng_seed(time_get_us());

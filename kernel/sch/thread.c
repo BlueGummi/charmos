@@ -7,12 +7,17 @@
 #include <sch/reaper.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
+#include <sch/tid.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
 
 /* lol */
-static uint64_t globid = 1;
+static struct tid_space *thread_tid_space = NULL;
+
+void thread_init_thread_ids(void) {
+    thread_tid_space = tid_space_init(UINT64_MAX);
+}
 
 void thread_exit() {
     disable_interrupts();
@@ -54,7 +59,7 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->regs.rip = (uint64_t) thread_entry_wrapper;
     new_thread->stack = (void *) stack;
     new_thread->curr_core = -1; // nobody is running this
-    new_thread->id = globid++;
+    new_thread->id = tid_alloc(thread_tid_space);
     new_thread->refcount = 1;
     new_thread->timeslices_remaining = 1;
     new_thread->recent_event = APC_EVENT_NONE;
@@ -81,6 +86,7 @@ void thread_free(struct thread *t) {
     t->prev = NULL;
     t->next = NULL;
 
+    tid_free(thread_tid_space, t->id);
     hugepage_free_pages(t->stack, t->stack_size / PAGE_SIZE);
     kfree(t->activity_data);
     kfree(t->activity_stats);
