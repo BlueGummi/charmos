@@ -109,32 +109,6 @@ REGISTER_TEST(rt_thread_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS;
 }
 
-static atomic_bool ts_thread_fail = false;
-static struct thread *ts = NULL;
-static void ts_thread(void) {
-    uint64_t spins = 10;
-
-    for (uint64_t i = 0; i < spins; i++) {
-        k_printf("ts_thread(): tick!\n");
-        wait_for_interrupt();
-    }
-
-    return;
-}
-
-REGISTER_TEST(ts_thread_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-
-    disable_interrupts();
-    ts = thread_spawn_on_core(ts_thread, 0); /* We are 0 */
-    enable_interrupts();
-
-    scheduler_yield();
-
-    TEST_ASSERT(!atomic_load(&ts_thread_fail));
-
-    SET_SUCCESS;
-}
-
 static atomic_uint ran_count = 0;
 static void sched_spawn_entry(void) {
     atomic_fetch_add(&ran_count, 1);

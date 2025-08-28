@@ -213,38 +213,32 @@ static inline bool worker_should_exit(const struct worker_thread *worker,
 }
 
 static bool dequeue_task(struct event_pool *pool, struct worker_task *out) {
+    uint64_t pos;
+    struct slot *s;
 
-    uint64_t tail, head;
+    while (1) {
+        pos = atomic_load_explicit(&pool->tail, memory_order_relaxed);
+        s = &pool->tasks[pos % EVENT_POOL_CAPACITY];
+        uint64_t seq = atomic_load_explicit(&s->seq, memory_order_acquire);
+        int64_t diff = (int64_t) seq - (int64_t) (pos + 1);
 
-    do {
-        tail = atomic_load_explicit(&pool->tail, memory_order_relaxed);
-        head = atomic_load_explicit(&pool->head, memory_order_acquire);
+        if (diff == 0) {
+            if (atomic_compare_exchange_weak_explicit(
+                    &pool->tail, &pos, pos + 1, memory_order_acq_rel,
+                    memory_order_relaxed)) {
 
-        if (tail == head)
+                *out = s->task;
+                atomic_store_explicit(&s->seq, pos + EVENT_POOL_CAPACITY,
+                                      memory_order_release);
+                return true;
+            }
+
+            continue;
+        } else if (diff < 0) {
             return false;
-
-    } while (!atomic_compare_exchange_weak_explicit(
-        &pool->tail, &tail, tail + 1, memory_order_acq_rel,
-        memory_order_relaxed));
-
-    *out = pool->tasks[tail % EVENT_POOL_CAPACITY];
-
-    atomic_fetch_sub_explicit(&pool->num_tasks, 1, memory_order_release);
-    return true;
-}
-
-static void do_work_from_pool(struct event_pool *pool,
-                              struct worker_thread *worker) {
-    struct worker_task task;
-    if (!dequeue_task(pool, &task))
-        return;
-
-    worker->last_active = time_get_ms();
-    worker->idle = false;
-
-    enum irql old = irql_raise(IRQL_DISPATCH_LEVEL);
-    task.func(task.arg, task.arg2);
-    irql_lower(old);
+        }
+        cpu_relax();
+    }
 }
 
 static void worker_exit(struct event_pool *pool, struct worker_thread *worker,
@@ -296,32 +290,36 @@ void worker_main(void) {
 
 static bool enqueue_task(struct event_pool *pool, dpc_t func, void *arg,
                          void *arg2) {
-    uint64_t head, tail;
+    uint64_t pos;
+    struct slot *s;
 
-    do {
-        head = atomic_load_explicit(&pool->head, memory_order_relaxed);
-        tail = atomic_load_explicit(&pool->tail, memory_order_acquire);
+    while (1) {
 
-        if (head - tail >= EVENT_POOL_CAPACITY)
-            k_panic("Event pool OVERFLOW\n"); /* I will eventually figure out
-                                               * a way to handle these */
+        pos = atomic_load_explicit(&pool->head, memory_order_relaxed);
+        s = &pool->tasks[pos % EVENT_POOL_CAPACITY];
+        uint64_t seq = atomic_load_explicit(&s->seq, memory_order_acquire);
+        int64_t diff = (int64_t) seq - (int64_t) pos;
 
-    } while (!atomic_compare_exchange_weak_explicit(
-        &pool->head, &head, head + 1, memory_order_acq_rel,
-        memory_order_relaxed));
+        if (diff == 0) {
+            if (atomic_compare_exchange_weak_explicit(
+                    &pool->head, &pos, pos + 1, memory_order_acq_rel,
+                    memory_order_relaxed)) {
 
-    pool->tasks[head % EVENT_POOL_CAPACITY] = (struct worker_task) {
-        .func = func,
-        .arg = arg,
-        .arg2 = arg2,
-    };
+                s->task = (struct worker_task) {
+                    .func = func, .arg = arg, .arg2 = arg2};
 
-    atomic_fetch_add_explicit(&pool->num_tasks, 1, memory_order_release);
-
-    try_spawn_worker(pool);
-    condvar_signal(&pool->queue_cv);
-
-    return true;
+                atomic_store_explicit(&s->seq, pos + 1, memory_order_release);
+                condvar_signal(&pool->queue_cv);
+                try_spawn_worker(pool);
+                return true;
+            }
+            continue;
+        } else if (diff < 0) {
+            k_panic("Event pool overflow\n");
+            return false;
+        }
+        cpu_relax();
+    }
 }
 
 static void spawn_permanent_thread_on_core(uint64_t core) {
@@ -349,11 +347,17 @@ void event_pool_init(void) {
         k_panic("Failed to allocate space for event pools!\n");
 
     for (int64_t i = 0; i < num_pools; ++i) {
+
         pools[i] = kzalloc(sizeof(struct event_pool));
         if (!pools[i])
-            k_panic("Failed to allocate space for event pool %u!\n", i);
+            k_panic("Failed to allocate space for event pool %ld!\n", i);
 
         spinlock_init(&pools[i]->lock);
+
+        for (uint64_t j = 0; j < EVENT_POOL_CAPACITY; ++j)
+            atomic_store_explicit(&pools[i]->tasks[j].seq, j,
+                                  memory_order_relaxed);
+
         uint64_t core_id = i;
         spawn_permanent_thread_on_core(core_id);
     }

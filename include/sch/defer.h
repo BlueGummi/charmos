@@ -31,6 +31,11 @@ struct worker_task {
     void *arg2;
 };
 
+struct slot {
+    atomic_uint_fast64_t seq;
+    struct worker_task task;
+};
+
 struct worker_thread {
     struct thread *thread;
     time_t last_active;
@@ -62,7 +67,7 @@ struct event_pool {
     struct spinlock lock;
     struct condvar queue_cv;
 
-    struct worker_task tasks[EVENT_POOL_CAPACITY];
+    struct slot tasks[EVENT_POOL_CAPACITY];
     struct worker_thread threads[MAX_WORKERS];
     atomic_uint_fast64_t head;
     atomic_uint_fast64_t tail;
