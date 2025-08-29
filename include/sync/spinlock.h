@@ -40,13 +40,15 @@ static inline enum irql spin_lock(struct spinlock *lock) {
     if (global.current_bootstage >= BOOTSTAGE_MID_MP && in_interrupt())
         k_panic("Attempted to take non-ISR safe spinlock from an ISR!\n");
 
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     spin_lock_raw(lock);
-    return irql_raise(IRQL_DISPATCH_LEVEL);
+    return irql;
 }
 
 static inline enum irql spin_lock_irq_disable(struct spinlock *lock) {
+    enum irql irql = irql_raise(IRQL_HIGH_LEVEL);
     spin_lock_raw(lock);
-    return irql_raise(IRQL_HIGH_LEVEL);
+    return irql;
 }
 
 static inline bool spin_trylock(struct spinlock *lock) {
