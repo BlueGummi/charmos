@@ -2,8 +2,12 @@
 #include <sync/condvar.h>
 
 static void do_block_on_queue(struct thread_queue *q) {
+    bool i = are_interrupts_enabled();
+    disable_interrupts();
     thread_block_on(q);
     scheduler_yield();
+    if (i)
+        enable_interrupts();
 }
 
 bool condvar_wait(struct condvar *cv, struct spinlock *lock, enum irql irql) {

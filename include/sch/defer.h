@@ -72,7 +72,9 @@ struct event_pool {
     atomic_uint_fast64_t head;
     atomic_uint_fast64_t tail;
 
+    atomic_bool spawn_pending;
     atomic_uint num_tasks;
+    atomic_uint_fast64_t worker_bitmap;
 
     atomic_uint num_workers;
     atomic_uint idle_workers;
@@ -81,7 +83,7 @@ struct event_pool {
     time_t last_spawn_attempt;
     uint64_t core;
 
-    bool currently_spawning;
+    atomic_flag spawner_flag;
 #ifdef TESTS
     struct event_pool_stats stats;
 #endif
