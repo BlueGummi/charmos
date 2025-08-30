@@ -18,7 +18,7 @@ static void expand_minheap_dpc(void *list, void *size) {
 
 static void hugepage_hint_bulk_free(uint64_t increased_size) {
     struct hugepage_core_list *hcl = hugepage_this_core_list();
-    event_pool_add_remote(expand_minheap_dpc, hcl, (void *) increased_size);
+    workqueue_add_remote(expand_minheap_dpc, hcl, (void *) increased_size);
 }
 
 static void hugepage_hint_htb(uint64_t addr) {

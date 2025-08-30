@@ -50,5 +50,5 @@ void scheduler_init(void) {
         global.schedulers[i] = s;
     }
     reaper_init();
-    event_pool_init();
+    workqueue_init();
 }

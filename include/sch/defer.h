@@ -49,7 +49,7 @@ struct worker_thread {
 };
 
 #ifdef TESTS
-struct event_pool_stats {
+struct workqueue_stats {
     uint64_t total_tasks_added;     /* Total # of tasks submitted to the pool */
     uint64_t total_tasks_executed;  /* Number of tasks successfully executed */
     uint64_t total_workers_spawned; /* Total worker threads spawned */
@@ -63,7 +63,7 @@ struct event_pool_stats {
 };
 #endif
 
-struct event_pool {
+struct workqueue {
     struct spinlock lock;
     struct condvar queue_cv;
 
@@ -85,7 +85,7 @@ struct event_pool {
 
     atomic_flag spawner_flag;
 #ifdef TESTS
-    struct event_pool_stats stats;
+    struct workqueue_stats stats;
 #endif
 };
 
@@ -93,11 +93,11 @@ void defer_init(void);
 
 /* can only fail from allocation fail */
 bool defer_enqueue(dpc_t func, void *arg, void *arg2, uint64_t delay_ms);
-void event_pool_init();
+void workqueue_init();
 
-bool event_pool_add(dpc_t func, void *arg, void *arg2);
-bool event_pool_add_remote(dpc_t func, void *arg, void *arg2);
-bool event_pool_add_local(dpc_t func, void *arg, void *arg2);
-bool event_pool_add_fast(dpc_t func, void *arg, void *arg2);
+bool workqueue_add(dpc_t func, void *arg, void *arg2);
+bool workqueue_add_remote(dpc_t func, void *arg, void *arg2);
+bool workqueue_add_local(dpc_t func, void *arg, void *arg2);
+bool workqueue_add_fast(dpc_t func, void *arg, void *arg2);
 
 void worker_main(void);

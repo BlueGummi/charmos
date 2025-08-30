@@ -5,13 +5,13 @@
 #include <sync/condvar.h>
 #include <sync/spinlock.h>
 
-SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(event_pool, lock);
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(workqueue, lock);
 /* Array of pointers to pools */
-static struct event_pool **pools = NULL;
+static struct workqueue **pools = NULL;
 static int64_t num_pools = 0;
 
 /* Basic get functions */
-static inline struct event_pool *get_event_pool_local(void) {
+static inline struct workqueue *get_workqueue_local(void) {
     uint64_t core_id = get_this_core_id();
     return pools[core_id];
 }
@@ -26,7 +26,7 @@ static inline struct thread *worker_create() {
     return t;
 }
 
-static struct event_pool *get_least_loaded_pool_except_core(int64_t core_num) {
+static struct workqueue *get_least_loaded_pool_except_core(int64_t core_num) {
     uint64_t minimum_load = UINT64_MAX;
 
     if (core_num == -1) {
@@ -34,7 +34,7 @@ static struct event_pool *get_least_loaded_pool_except_core(int64_t core_num) {
     }
 
     /* There will always be a 'core 0 thread' */
-    struct event_pool *least_loaded = pools[0];
+    struct workqueue *least_loaded = pools[0];
     for (int64_t i = 0; i < num_pools; i++) {
         if (atomic_load(&pools[i]->num_tasks) < minimum_load && i != core_num) {
             minimum_load = atomic_load(&pools[i]->num_tasks);
@@ -55,7 +55,7 @@ static struct event_pool *get_least_loaded_pool_except_core(int64_t core_num) {
 _Static_assert(MAX_INTERACTIVITY_CHECK_PERIOD / 4 > MIN_INTERACTIVITY_CHECK_PERIOD, "");
 // clang-format on
 
-static inline time_t get_inactivity_timeout(struct event_pool *pool) {
+static inline time_t get_inactivity_timeout(struct workqueue *pool) {
     uint32_t num_workers = atomic_load(&pool->num_workers);
 
     if (num_workers <= (MAX_WORKERS / 8))
@@ -70,7 +70,7 @@ static inline time_t get_inactivity_timeout(struct event_pool *pool) {
     return MIN_INTERACTIVITY_CHECK_PERIOD;
 }
 
-static int reserve_slot(struct event_pool *pool) {
+static int reserve_slot(struct workqueue *pool) {
     for (uint64_t i = 1; i < MAX_WORKERS; ++i) {
         uint64_t bit = 1ull << i;
         uint64_t old =
@@ -90,7 +90,7 @@ static int reserve_slot(struct event_pool *pool) {
     return -1;
 }
 
-static void unreserve_slot(struct event_pool *pool, int idx) {
+static void unreserve_slot(struct workqueue *pool, int idx) {
     uint64_t bit = ~(1ull << idx);
     atomic_fetch_and_explicit(&pool->worker_bitmap, bit, memory_order_acq_rel);
 }
@@ -103,21 +103,21 @@ static inline void link_thread_and_worker(struct worker_thread *worker,
     thread->worker = worker;
 }
 
-static inline void update_pool_after_spawn(struct event_pool *pool) {
+static inline void update_pool_after_spawn(struct workqueue *pool) {
     atomic_fetch_add(&pool->num_workers, 1);
     pool->last_spawn_attempt = time_get_ms();
 }
 
-static bool claim_spawner(struct event_pool *p) {
+static bool claim_spawner(struct workqueue *p) {
     return atomic_flag_test_and_set_explicit(&p->spawner_flag,
                                              memory_order_acq_rel) == 0;
 }
 
-static void release_spawner(struct event_pool *p) {
+static void release_spawner(struct workqueue *p) {
     atomic_flag_clear_explicit(&p->spawner_flag, memory_order_release);
 }
 
-static bool spawn_worker(struct event_pool *pool) {
+static bool spawn_worker(struct workqueue *pool) {
     if (!claim_spawner(pool))
         return false;
 
@@ -153,7 +153,7 @@ static bool spawn_worker(struct event_pool *pool) {
     return true;
 }
 
-static bool should_spawn_worker(struct event_pool *pool) {
+static bool should_spawn_worker(struct workqueue *pool) {
     time_t now = time_get_ms();
     if (now - pool->last_spawn_attempt <= SPAWN_DELAY)
         return false;
@@ -167,7 +167,7 @@ static bool should_spawn_worker(struct event_pool *pool) {
     return no_idle && work_pending && under_limit && not_spawning;
 }
 
-static bool try_spawn_worker(struct event_pool *pool) {
+static bool try_spawn_worker(struct workqueue *pool) {
     if (!should_spawn_worker(pool))
         return false;
 
@@ -179,11 +179,11 @@ static bool try_spawn_worker(struct event_pool *pool) {
     return spawn_worker(pool);
 }
 
-static inline struct event_pool *get_least_loaded_pool(void) {
+static inline struct workqueue *get_least_loaded_pool(void) {
     return get_least_loaded_pool_except_core(-1);
 }
 
-static inline struct event_pool *get_least_loaded_remote_pool(void) {
+static inline struct workqueue *get_least_loaded_remote_pool(void) {
     return get_least_loaded_pool_except_core(get_this_core_id());
 }
 
@@ -201,7 +201,7 @@ static inline bool signaled_by_timeout(bool signaled) {
     return !signaled;
 }
 
-static bool worker_wait(struct event_pool *pool, struct worker_thread *w,
+static bool worker_wait(struct workqueue *pool, struct worker_thread *w,
                         enum irql irql) {
     bool signal;
     pool->idle_workers++;
@@ -238,7 +238,7 @@ static inline bool worker_should_exit(const struct worker_thread *worker,
     return false;
 }
 
-static bool dequeue_task(struct event_pool *pool, struct worker_task *out) {
+static bool dequeue_task(struct workqueue *pool, struct worker_task *out) {
     uint64_t pos;
     struct slot *s;
 
@@ -267,7 +267,7 @@ static bool dequeue_task(struct event_pool *pool, struct worker_task *out) {
     }
 }
 
-static void worker_exit(struct event_pool *pool, struct worker_thread *worker,
+static void worker_exit(struct workqueue *pool, struct worker_thread *worker,
 
                         enum irql irql) {
     worker->present = false;
@@ -281,14 +281,14 @@ static void worker_exit(struct event_pool *pool, struct worker_thread *worker,
 
     atomic_fetch_sub(&pool->num_workers, 1);
 
-    event_pool_unlock(pool, irql);
+    workqueue_unlock(pool, irql);
 
     thread_exit();
 }
 
 void worker_main(void) {
     struct worker_thread *w = get_this_worker_thread();
-    struct event_pool *pool = get_event_pool_local();
+    struct workqueue *pool = get_workqueue_local();
 
     while (1) {
 
@@ -303,7 +303,7 @@ void worker_main(void) {
             continue;
         }
 
-        enum irql irql = event_pool_lock_irq_disable(pool);
+        enum irql irql = workqueue_lock_irq_disable(pool);
 
         while (atomic_load(&pool->head) == atomic_load(&pool->tail)) {
             if (atomic_load(&pool->spawn_pending)) {
@@ -317,7 +317,7 @@ void worker_main(void) {
                 worker_exit(pool, w, irql);
         }
 
-        event_pool_unlock(pool, irql);
+        workqueue_unlock(pool, irql);
     }
 }
 
@@ -327,7 +327,7 @@ void worker_main(void) {
 //
 //
 
-static bool enqueue_task(struct event_pool *pool, dpc_t func, void *arg,
+static bool enqueue_task(struct workqueue *pool, dpc_t func, void *arg,
                          void *arg2) {
     uint64_t pos;
     struct slot *s;
@@ -362,7 +362,7 @@ static bool enqueue_task(struct event_pool *pool, dpc_t func, void *arg,
 }
 
 static void spawn_permanent_thread_on_core(uint64_t core) {
-    struct event_pool *pool = pools[core];
+    struct workqueue *pool = pools[core];
     pool->core = core;
 
     struct thread *thread = worker_create();
@@ -378,16 +378,16 @@ static void spawn_permanent_thread_on_core(uint64_t core) {
     update_pool_after_spawn(pool);
 }
 
-void event_pool_init(void) {
+void workqueue_init(void) {
     num_pools = global.core_count;
-    pools = kzalloc(sizeof(struct event_pool *) * num_pools);
+    pools = kzalloc(sizeof(struct workqueue *) * num_pools);
 
     if (!pools)
         k_panic("Failed to allocate space for event pools!\n");
 
     for (int64_t i = 0; i < num_pools; ++i) {
 
-        pools[i] = kzalloc(sizeof(struct event_pool));
+        pools[i] = kzalloc(sizeof(struct workqueue));
         if (!pools[i])
             k_panic("Failed to allocate space for event pool %ld!\n", i);
 
@@ -402,23 +402,23 @@ void event_pool_init(void) {
     }
 }
 
-bool event_pool_add(dpc_t func, void *arg, void *arg2) {
-    struct event_pool *pool = get_least_loaded_pool();
+bool workqueue_add(dpc_t func, void *arg, void *arg2) {
+    struct workqueue *pool = get_least_loaded_pool();
     return enqueue_task(pool, func, arg, arg2);
 }
 
-bool event_pool_add_remote(dpc_t func, void *arg, void *arg2) {
-    struct event_pool *pool = get_least_loaded_remote_pool();
+bool workqueue_add_remote(dpc_t func, void *arg, void *arg2) {
+    struct workqueue *pool = get_least_loaded_remote_pool();
     return enqueue_task(pool, func, arg, arg2);
 }
 
-bool event_pool_add_local(dpc_t func, void *arg, void *arg2) {
-    struct event_pool *pool = get_event_pool_local();
+bool workqueue_add_local(dpc_t func, void *arg, void *arg2) {
+    struct workqueue *pool = get_workqueue_local();
     return enqueue_task(pool, func, arg, arg2);
 }
 
-bool event_pool_add_fast(dpc_t func, void *arg, void *arg2) {
-    struct event_pool *pool =
+bool workqueue_add_fast(dpc_t func, void *arg, void *arg2) {
+    struct workqueue *pool =
         pools[(get_this_core_id() + 1) % global.core_count];
     return enqueue_task(pool, func, arg, arg2);
 }

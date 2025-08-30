@@ -74,7 +74,7 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
         struct nvme_request *req = dev->io_requests[qid][cid];
 
         req->status = status;
-        event_pool_add_fast(nvme_dpc, req, dev);
+        workqueue_add_fast(nvme_dpc, req, dev);
         dev->io_requests[qid][cid] = NULL;
 
         queue->cq_head = (queue->cq_head + 1) % queue->cq_depth;
