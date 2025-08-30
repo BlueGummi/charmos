@@ -9,7 +9,7 @@
 #pragma once
 
 /* Must be a power of two for modulo optimization */
-#define EVENT_POOL_CAPACITY 512
+#define WORKQUEUE_CAPACITY 512
 #define MAX_WORKERS 16
 #define SPAWN_DELAY 25 /* 25ms delay between worker thread spawns */
 #define MIN_INTERACTIVITY_CHECK_PERIOD SECONDS_TO_MS(2)
@@ -50,8 +50,8 @@ struct worker_thread {
 
 #ifdef TESTS
 struct workqueue_stats {
-    uint64_t total_tasks_added;     /* Total # of tasks submitted to the pool */
-    uint64_t total_tasks_executed;  /* Number of tasks successfully executed */
+    uint64_t total_tasks_added;    /* Total # of tasks submitted to the queue */
+    uint64_t total_tasks_executed; /* Number of tasks successfully executed */
     uint64_t total_workers_spawned; /* Total worker threads spawned */
     uint64_t total_worker_exits;    /* Total workers that exited */
     uint64_t max_queue_length;      /* Max observed length of the task queue */
@@ -63,11 +63,12 @@ struct workqueue_stats {
 };
 #endif
 
+_Static_assert(MAX_WORKERS < 64, ""); /* Won't fit in our bitmap */
 struct workqueue {
     struct spinlock lock;
     struct condvar queue_cv;
 
-    struct slot tasks[EVENT_POOL_CAPACITY];
+    struct slot tasks[WORKQUEUE_CAPACITY];
     struct worker_thread threads[MAX_WORKERS];
     atomic_uint_fast64_t head;
     atomic_uint_fast64_t tail;
