@@ -1,6 +1,4 @@
 #include <asm.h>
-#include <flanterm/backends/fb.h>
-#include <flanterm/flanterm.h>
 #include <limine.h>
 #include <stdarg.h>
 #include <stdbool.h>

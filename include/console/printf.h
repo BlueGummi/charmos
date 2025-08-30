@@ -1,8 +1,8 @@
 #pragma once
 #include <asm.h>
 #include <charmos.h>
-#include <flanterm/backends/fb.h>
-#include <flanterm/flanterm.h>
+#include <flanterm/src/flanterm.h>
+#include <flanterm/src/flanterm_backends/fb.h>
 #include <limine.h>
 #include <misc/colors.h>
 #include <misc/logo.h>
