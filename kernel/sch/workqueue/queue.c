@@ -6,7 +6,7 @@ bool workqueue_dequeue_task(struct workqueue *queue, struct worker_task *out) {
 
     while (1) {
         pos = atomic_load_explicit(&queue->tail, memory_order_relaxed);
-        s = &queue->tasks[pos % WORKQUEUE_CAPACITY];
+        s = &queue->tasks[pos % queue->capacity];
         uint64_t seq = atomic_load_explicit(&s->seq, memory_order_acquire);
         int64_t diff = (int64_t) seq - (int64_t) (pos + 1);
 
@@ -16,7 +16,7 @@ bool workqueue_dequeue_task(struct workqueue *queue, struct worker_task *out) {
                     memory_order_relaxed)) {
 
                 *out = s->task;
-                atomic_store_explicit(&s->seq, pos + WORKQUEUE_CAPACITY,
+                atomic_store_explicit(&s->seq, pos + queue->capacity,
                                       memory_order_release);
                 return true;
             }
@@ -35,9 +35,8 @@ bool workqueue_enqueue_task(struct workqueue *queue, dpc_t func, void *arg,
     struct slot *s;
 
     while (1) {
-
         pos = atomic_load_explicit(&queue->head, memory_order_relaxed);
-        s = &queue->tasks[pos % WORKQUEUE_CAPACITY];
+        s = &queue->tasks[pos % queue->capacity];
         uint64_t seq = atomic_load_explicit(&s->seq, memory_order_acquire);
         int64_t diff = (int64_t) seq - (int64_t) pos;
 

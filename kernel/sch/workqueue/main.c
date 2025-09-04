@@ -49,7 +49,7 @@ static void worker_exit(struct workqueue *queue, struct worker_thread *worker,
 
     worker->thread = NULL;
 
-    int slot_idx = (int) (worker - &queue->threads[0]);
+    int slot_idx = (int) (worker - &queue->workers[0]);
     workqueue_unreserve_slot(queue, slot_idx);
 
     atomic_fetch_sub(&queue->num_workers, 1);

@@ -1,4 +1,4 @@
-#include <console/printf.h>
+#pragma once
 #include <mem/alloc.h>
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -6,14 +6,15 @@
 #include <sync/condvar.h>
 #include <sync/spinlock.h>
 #include <types/types.h>
-#pragma once
+
+/* TODO: Make the values below scale */
 
 /* Must be a power of two for modulo optimization */
-#define WORKQUEUE_CAPACITY 512
-#define MAX_WORKERS 16
-#define SPAWN_DELAY 25 /* 25ms delay between worker thread spawns */
-#define MIN_INTERACTIVITY_CHECK_PERIOD SECONDS_TO_MS(2)
-#define MAX_INTERACTIVITY_CHECK_PERIOD SECONDS_TO_MS(10)
+#define DEFAULT_WORKQUEUE_CAPACITY 512
+#define DEFAULT_MAX_WORKERS 16
+#define DEFAULT_SPAWN_DELAY 150 /* 150ms delay between worker thread spawns */
+#define DEFAULT_MIN_INTERACTIVITY_CHECK_PERIOD SECONDS_TO_MS(2)
+#define DEFAULT_MAX_INTERACTIVITY_CHECK_PERIOD SECONDS_TO_MS(10)
 
 typedef void (*dpc_t)(void *arg, void *arg2);
 
@@ -63,13 +64,16 @@ struct workqueue_stats {
 };
 #endif
 
-_Static_assert(MAX_WORKERS < 64, ""); /* Won't fit in our bitmap */
+_Static_assert(DEFAULT_MAX_WORKERS < 64, ""); /* Won't fit in our bitmap */
 struct workqueue {
     struct spinlock lock;
     struct condvar queue_cv;
 
-    struct slot tasks[WORKQUEUE_CAPACITY];
-    struct worker_thread threads[MAX_WORKERS];
+    struct slot *tasks;
+    struct worker_thread *workers;
+    size_t max_workers;
+    size_t capacity;
+
     atomic_uint_fast64_t head;
     atomic_uint_fast64_t tail;
 
@@ -81,13 +85,30 @@ struct workqueue {
     atomic_uint idle_workers;
     atomic_uint total_spawned;
 
+    time_t spawn_delay;
     time_t last_spawn_attempt;
+
+    struct {
+        uint64_t min;
+        uint64_t max;
+    } interactivity_check_period;
+
     uint64_t core;
 
     atomic_flag spawner_flag;
 #ifdef TESTS
     struct workqueue_stats stats;
 #endif
+};
+
+/* Positive values are success with a message,
+ * zero is success with nothing special.
+ *
+ * Negative values are errors */
+enum workqueue_error : int32_t {
+    WORKQUEUE_ERROR_NEED_NEW_THREAD = 4,
+    WORKQUEUE_ERROR_OK = 0,
+    WORKQUEUE_ERROR_FULL = -1,
 };
 
 void defer_init(void);

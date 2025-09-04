@@ -11,7 +11,7 @@ static void spawn_permanent_thread_on_core(uint64_t core) {
         k_panic("Failed to spawn permanent worker thread on core %llu\n", core);
     }
 
-    struct worker_thread *worker = &queue->threads[0];
+    struct worker_thread *worker = &queue->workers[0];
     worker->is_permanent = true;
     worker->inactivity_check_period = MINUTES_TO_MS(5);
     workqueue_link_thread_and_worker(worker, thread);
@@ -33,8 +33,23 @@ void workqueue_init(void) {
             k_panic("Failed to allocate space for workqueue %ld!\n", i);
 
         spinlock_init(&workqueues[i]->lock);
+        workqueues[i]->capacity = DEFAULT_WORKQUEUE_CAPACITY;
+        workqueues[i]->max_workers = DEFAULT_MAX_WORKERS;
+        workqueues[i]->spawn_delay = DEFAULT_SPAWN_DELAY;
 
-        for (uint64_t j = 0; j < WORKQUEUE_CAPACITY; ++j)
+        workqueues[i]->interactivity_check_period.min =
+            DEFAULT_MIN_INTERACTIVITY_CHECK_PERIOD;
+
+        workqueues[i]->interactivity_check_period.max =
+            DEFAULT_MAX_INTERACTIVITY_CHECK_PERIOD;
+
+        workqueues[i]->tasks =
+            kzalloc(sizeof(struct slot) * workqueues[i]->capacity);
+
+        workqueues[i]->workers =
+            kzalloc(sizeof(struct worker_thread) * workqueues[i]->max_workers);
+
+        for (uint64_t j = 0; j < DEFAULT_WORKQUEUE_CAPACITY; ++j)
             atomic_store_explicit(&workqueues[i]->tasks[j].seq, j,
                                   memory_order_relaxed);
 

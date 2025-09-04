@@ -1,26 +1,28 @@
 #include "internal.h"
 
-// clang-format off
-_Static_assert(MAX_INTERACTIVITY_CHECK_PERIOD / 4 > MIN_INTERACTIVITY_CHECK_PERIOD, "");
-// clang-format on
+_Static_assert(DEFAULT_MAX_INTERACTIVITY_CHECK_PERIOD / 4 >
+                   DEFAULT_MIN_INTERACTIVITY_CHECK_PERIOD,
+               "");
 
-static inline time_t get_inactivity_timeout(struct workqueue *queue) {
+static time_t get_inactivity_timeout(struct workqueue *queue) {
     uint32_t num_workers = atomic_load(&queue->num_workers);
+    size_t min = queue->interactivity_check_period.min;
+    size_t max = queue->interactivity_check_period.max;
 
-    if (num_workers <= (MAX_WORKERS / 8))
-        return MAX_INTERACTIVITY_CHECK_PERIOD;
+    if (num_workers <= (queue->max_workers / 8))
+        return max;
 
-    if (num_workers <= (MAX_WORKERS / 4))
-        return MAX_INTERACTIVITY_CHECK_PERIOD / 2;
+    if (num_workers <= (queue->max_workers / 4))
+        return max / 2;
 
-    if (num_workers <= (MAX_WORKERS / 2))
-        return MAX_INTERACTIVITY_CHECK_PERIOD / 4;
+    if (num_workers <= (queue->max_workers / 2))
+        return max / 4;
 
-    return MIN_INTERACTIVITY_CHECK_PERIOD;
+    return min;
 }
 
 int workqueue_reserve_slot(struct workqueue *queue) {
-    for (uint64_t i = 1; i < MAX_WORKERS; ++i) {
+    for (uint64_t i = 1; i < queue->max_workers; ++i) {
         uint64_t bit = 1ull << i;
         uint64_t old =
             atomic_load_explicit(&queue->worker_bitmap, memory_order_relaxed);
@@ -76,7 +78,7 @@ bool workqueue_spawn_worker(struct workqueue *queue) {
         return false;
     }
 
-    struct worker_thread *w = &queue->threads[slot];
+    struct worker_thread *w = &queue->workers[slot];
     w->inactivity_check_period = get_inactivity_timeout(queue);
 
     struct thread *t = worker_create();
@@ -93,7 +95,9 @@ bool workqueue_spawn_worker(struct workqueue *queue) {
 
     atomic_fetch_add(&queue->num_workers, 1);
     atomic_fetch_add(&queue->total_spawned, 1);
-    queue->last_spawn_attempt = time_get_ms();
+    queue->last_spawn_attempt = time_get_ms(); /* This is a slowpath so we
+                                                * can safely run this
+                                                * more costly MMIO op */
 
     scheduler_enqueue_on_core(t, queue->core);
 
@@ -103,14 +107,14 @@ bool workqueue_spawn_worker(struct workqueue *queue) {
 }
 
 static bool should_spawn_worker(struct workqueue *queue) {
-    time_t now = time_get_ms();
-    if (now - queue->last_spawn_attempt <= SPAWN_DELAY)
+    time_t now = time_get_ms_fast();
+    if (now - queue->last_spawn_attempt <= queue->spawn_delay)
         return false;
 
     bool no_idle = atomic_load(&queue->idle_workers) == 0;
     bool work_pending = atomic_load(&queue->head) != atomic_load(&queue->tail);
 
-    bool under_limit = atomic_load(&queue->num_workers) < MAX_WORKERS;
+    bool under_limit = atomic_load(&queue->num_workers) < queue->max_workers;
     bool not_spawning = !atomic_flag_test_and_set(&queue->spawner_flag);
 
     return no_idle && work_pending && under_limit && not_spawning;
