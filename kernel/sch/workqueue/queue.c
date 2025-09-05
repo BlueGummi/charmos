@@ -25,7 +25,6 @@ bool workqueue_dequeue_task(struct workqueue *queue, struct worker_task *out) {
         } else if (diff < 0) {
             return false;
         }
-        cpu_relax();
     }
 }
 
@@ -58,6 +57,5 @@ bool workqueue_enqueue_task(struct workqueue *queue, dpc_t func, void *arg,
             k_panic("Event queue overflow\n");
             return false;
         }
-        cpu_relax();
     }
 }

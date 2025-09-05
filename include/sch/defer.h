@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <sync/condvar.h>
 #include <sync/spinlock.h>
+#include <types/refcount.h>
 #include <types/types.h>
 
 /* TODO: Make the values below scale */
@@ -49,6 +50,7 @@ struct worker_thread {
     time_t start_idle;
 };
 
+/* TODO: Get in profiling.h and put these under there */
 #ifdef TESTS
 struct workqueue_stats {
     uint64_t total_tasks_added;    /* Total # of tasks submitted to the queue */
@@ -69,20 +71,20 @@ struct workqueue {
     struct spinlock lock;
     struct condvar queue_cv;
 
-    struct slot *tasks;
-    struct worker_thread *workers;
+    struct slot *tasks;            /* Ringbuffer of ``capacity`` tasks */
+    struct worker_thread *workers; /* Array of ``max_workers`` workers */
     size_t max_workers;
     size_t capacity;
 
     atomic_uint_fast64_t head;
     atomic_uint_fast64_t tail;
 
-    atomic_bool spawn_pending;
-    atomic_uint num_tasks;
-    atomic_uint_fast64_t worker_bitmap;
+    atomic_bool spawn_pending; /* Some enqueue wants us to spawn a worker */
+    atomic_uint num_tasks;     /* How many tasks do we have in the ringbuf */
+    atomic_uint_fast64_t worker_bitmap; /* Bitmap of used/available workers */
 
-    atomic_uint num_workers;
-    atomic_uint idle_workers;
+    atomic_uint num_workers; /* Current # workers */
+    atomic_uint idle_workers; /* # idle */
     atomic_uint total_spawned;
 
     time_t spawn_delay;
@@ -99,6 +101,8 @@ struct workqueue {
 #ifdef TESTS
     struct workqueue_stats stats;
 #endif
+
+    refcount_t refcount;
 };
 
 /* Positive values are success with a message,
@@ -110,6 +114,15 @@ enum workqueue_error : int32_t {
     WORKQUEUE_ERROR_OK = 0,
     WORKQUEUE_ERROR_FULL = -1,
 };
+
+static inline bool workqueue_get(struct workqueue *queue) {
+    return refcount_inc(&queue->refcount);
+}
+
+static inline void workqueue_put(struct workqueue *queue) {
+    if (refcount_dec_and_test(&queue->refcount))
+        return; /* TODO: free */
+}
 
 void defer_init(void);
 
