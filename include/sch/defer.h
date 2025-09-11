@@ -1,5 +1,6 @@
 #pragma once
 #include <mem/alloc.h>
+#include <misc/list.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -19,6 +20,7 @@
 
 typedef void (*dpc_t)(void *arg, void *arg2);
 
+/* TODO: Merge this with standard workqueue infra */
 struct deferred_event {
     uint64_t timestamp_ms;
     dpc_t callback;
@@ -27,10 +29,17 @@ struct deferred_event {
     struct deferred_event *next;
 };
 
+struct work_args {
+    void *arg1;
+    void *arg2;
+};
+#define WORK_ARGS(a, b) ((struct work_args) {.arg1 = a, .arg2 = b})
+
 struct worker_task {
     dpc_t func;
     void *arg;
     void *arg2;
+    struct list_head list_node;
 };
 
 struct slot {
@@ -48,6 +57,12 @@ struct worker_thread {
     bool present;
     bool idle;
     time_t start_idle;
+};
+
+struct work_list {
+    struct list_head list; /* List of individual works */
+    struct spinlock lock;  /* Lock for the list */
+    uint64_t work_list_id; /* ID for the list */
 };
 
 /* TODO: Get in profiling.h and put these under there */
@@ -83,7 +98,7 @@ struct workqueue {
     atomic_uint num_tasks;     /* How many tasks do we have in the ringbuf */
     atomic_uint_fast64_t worker_bitmap; /* Bitmap of used/available workers */
 
-    atomic_uint num_workers; /* Current # workers */
+    atomic_uint num_workers;  /* Current # workers */
     atomic_uint idle_workers; /* # idle */
     atomic_uint total_spawned;
 
@@ -127,12 +142,12 @@ static inline void workqueue_put(struct workqueue *queue) {
 void defer_init(void);
 
 /* can only fail from allocation fail */
-bool defer_enqueue(dpc_t func, void *arg, void *arg2, uint64_t delay_ms);
+bool defer_enqueue(dpc_t func, struct work_args args, uint64_t delay_ms);
 void workqueue_init();
 
-bool workqueue_add(dpc_t func, void *arg, void *arg2);
-bool workqueue_add_remote(dpc_t func, void *arg, void *arg2);
-bool workqueue_add_local(dpc_t func, void *arg, void *arg2);
-bool workqueue_add_fast(dpc_t func, void *arg, void *arg2);
+bool workqueue_add(dpc_t func, struct work_args args);
+bool workqueue_add_remote(dpc_t func, struct work_args args);
+bool workqueue_add_local(dpc_t func, struct work_args args);
+bool workqueue_add_fast(dpc_t func, struct work_args args);
 
 void worker_main(void);

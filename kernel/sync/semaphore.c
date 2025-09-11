@@ -44,6 +44,7 @@ void semaphore_post(struct semaphore *s) {
     enum irql irql = semaphore_lock(s);
 
     inc_count(s);
+
     condvar_signal(&s->cv);
 
     semaphore_unlock(s, irql);

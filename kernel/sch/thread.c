@@ -156,7 +156,7 @@ void thread_sleep_for_ms(uint64_t ms) {
     struct thread *curr = scheduler_get_curr_thread();
 
     thread_sleep(curr, THREAD_SLEEP_REASON_MANUAL);
-    defer_enqueue(wake_thread, curr, NULL, ms);
+    defer_enqueue(wake_thread, WORK_ARGS(curr, NULL), ms);
     enable_interrupts();
     scheduler_yield();
 }

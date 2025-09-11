@@ -24,7 +24,8 @@ static void bio_sched_tick(void *ctx, void *unused) {
     bio_sched_try_early_dispatch(sched);
 
     if (!sched_is_empty(sched)) {
-        defer_enqueue(bio_sched_tick, sched, NULL, sched->disk->ops->tick_ms);
+        defer_enqueue(bio_sched_tick, WORK_ARGS(sched, NULL),
+                      sched->disk->ops->tick_ms);
     } else {
         sched->defer_pending = false;
     }
@@ -63,7 +64,8 @@ void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req) {
 
     if (!sched->defer_pending) {
         sched->defer_pending = true;
-        defer_enqueue(bio_sched_tick, sched, NULL, disk->ops->tick_ms);
+        defer_enqueue(bio_sched_tick, WORK_ARGS(sched, NULL),
+                      disk->ops->tick_ms);
     }
 
     spin_unlock(&sched->lock, irql);

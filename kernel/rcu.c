@@ -41,7 +41,7 @@ static void rcu_defer_wrapper(void *argument, void *fn) {
 }
 
 void rcu_defer(void (*func)(void *), void *arg) {
-    defer_enqueue(rcu_defer_wrapper, arg, (void *) func, RCU_GRACE_DELAY_MS);
+    defer_enqueue(rcu_defer_wrapper, WORK_ARGS(arg, (void *) func), RCU_GRACE_DELAY_MS);
 }
 
 void rcu_maintenance_tick(void) {

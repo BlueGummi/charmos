@@ -255,9 +255,12 @@ static void domain_init_worker(struct domain_buddy *domain) {
     semaphore_init(&domain->worker.sema, 0);
     domain->worker.thread = thread_create(domain_flush_thread);
     struct thread *worker = domain->worker.thread;
-    worker->curr_core = domain->cores[0]->id;
+    uint64_t id = domain->cores[0]->id;
+
+    worker->curr_core = id;
     worker->base_priority = THREAD_PRIO_CLASS_BACKGROUND;
     worker->perceived_priority = THREAD_PRIO_CLASS_BACKGROUND;
+    scheduler_enqueue_on_core(worker, id);
 }
 
 static void link_domain_cores_to_buddy(struct core_domain *cd,

@@ -35,10 +35,11 @@ static inline void set_wake_reason_and_wake(struct thread *t,
     scheduler_wake(t, r, t->perceived_priority);
 }
 
-void condvar_signal(struct condvar *cv) {
+struct thread *condvar_signal(struct condvar *cv) {
     struct thread *t = thread_queue_pop_front(&cv->waiters);
     if (t)
         set_wake_reason_and_wake(t, WAKE_REASON_SIGNAL);
+    return t;
 }
 
 void condvar_broadcast(struct condvar *cv) {
@@ -60,7 +61,7 @@ bool condvar_wait_timeout(struct condvar *cv, struct spinlock *lock,
     struct thread *curr = scheduler_get_curr_thread();
     curr->wake_reason = WAKE_REASON_NONE;
 
-    defer_enqueue(condvar_timeout_wakeup, curr, cv, timeout_ms);
+    defer_enqueue(condvar_timeout_wakeup, WORK_ARGS(curr, cv), timeout_ms);
     condvar_wait(cv, lock, irql);
 
     return curr->wake_reason != WAKE_REASON_TIMEOUT;

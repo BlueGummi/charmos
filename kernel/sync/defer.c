@@ -61,7 +61,7 @@ static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
     lapic_write(LAPIC_REG_EOI, 0);
 }
 
-bool defer_enqueue(dpc_t func, void *arg, void *arg2, uint64_t delay_ms) {
+bool defer_enqueue(dpc_t func, struct work_args args, uint64_t delay_ms) {
     struct deferred_event *ev = kzalloc(sizeof(struct deferred_event));
     if (!ev)
         return false;
@@ -69,8 +69,8 @@ bool defer_enqueue(dpc_t func, void *arg, void *arg2, uint64_t delay_ms) {
     uint64_t now = hpet_timestamp_ms();
     ev->timestamp_ms = now + delay_ms;
     ev->callback = func;
-    ev->arg = arg;
-    ev->arg2 = arg2;
+    ev->arg = args.arg1;
+    ev->arg2 = args.arg2;
 
     struct spinlock *lock = this_lock();
     enum irql irql = spin_lock_irq_disable(lock);

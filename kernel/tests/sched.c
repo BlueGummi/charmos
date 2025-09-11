@@ -49,7 +49,7 @@ REGISTER_TEST(workqueue_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     uint64_t times = 256;
 
     for (uint64_t i = 0; i < times; i++)
-        workqueue_add_fast(workqueue_fn, NULL, NULL);
+        workqueue_add_fast(workqueue_fn, WORK_ARGS(NULL, NULL));
 
     uint64_t total = rdtsc() - tsc;
     sleep_ms(50);
