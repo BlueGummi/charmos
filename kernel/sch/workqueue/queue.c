@@ -2,12 +2,12 @@
 
 bool workqueue_dequeue_task(struct workqueue *queue, struct worker_task *out) {
     uint64_t pos;
-    struct slot *s;
+    struct worker_task *t;
 
     while (1) {
         pos = atomic_load_explicit(&queue->tail, memory_order_relaxed);
-        s = &queue->tasks[pos % queue->capacity];
-        uint64_t seq = atomic_load_explicit(&s->seq, memory_order_acquire);
+        t = &queue->tasks[pos % queue->capacity];
+        uint64_t seq = atomic_load_explicit(&t->seq, memory_order_acquire);
         int64_t diff = (int64_t) seq - (int64_t) (pos + 1);
 
         if (diff == 0) {
@@ -15,8 +15,8 @@ bool workqueue_dequeue_task(struct workqueue *queue, struct worker_task *out) {
                     &queue->tail, &pos, pos + 1, memory_order_acq_rel,
                     memory_order_relaxed)) {
 
-                *out = s->task;
-                atomic_store_explicit(&s->seq, pos + queue->capacity,
+                *out = *t;
+                atomic_store_explicit(&t->seq, pos + queue->capacity,
                                       memory_order_release);
                 return true;
             }
@@ -31,12 +31,12 @@ bool workqueue_dequeue_task(struct workqueue *queue, struct worker_task *out) {
 bool workqueue_enqueue_task(struct workqueue *queue, dpc_t func, void *arg,
                             void *arg2) {
     uint64_t pos;
-    struct slot *s;
+    struct worker_task *t;
 
     while (1) {
         pos = atomic_load_explicit(&queue->head, memory_order_relaxed);
-        s = &queue->tasks[pos % queue->capacity];
-        uint64_t seq = atomic_load_explicit(&s->seq, memory_order_acquire);
+        t = &queue->tasks[pos % queue->capacity];
+        uint64_t seq = atomic_load_explicit(&t->seq, memory_order_acquire);
         int64_t diff = (int64_t) seq - (int64_t) pos;
 
         if (diff == 0) {
@@ -44,10 +44,11 @@ bool workqueue_enqueue_task(struct workqueue *queue, dpc_t func, void *arg,
                     &queue->head, &pos, pos + 1, memory_order_acq_rel,
                     memory_order_relaxed)) {
 
-                s->task = (struct worker_task) {
-                    .func = func, .arg = arg, .arg2 = arg2};
+                t->func = func;
+                t->arg = arg;
+                t->arg2 = arg2;
 
-                atomic_store_explicit(&s->seq, pos + 1, memory_order_release);
+                atomic_store_explicit(&t->seq, pos + 1, memory_order_release);
                 condvar_signal(&queue->queue_cv);
                 workqueue_try_spawn_worker(queue);
                 return true;

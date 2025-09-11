@@ -44,7 +44,7 @@ void workqueue_init(void) {
             DEFAULT_MAX_INTERACTIVITY_CHECK_PERIOD;
 
         workqueues[i]->tasks =
-            kzalloc(sizeof(struct slot) * workqueues[i]->capacity);
+            kzalloc(sizeof(struct worker_task) * workqueues[i]->capacity);
 
         workqueues[i]->workers =
             kzalloc(sizeof(struct worker_thread) * workqueues[i]->max_workers);

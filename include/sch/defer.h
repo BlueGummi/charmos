@@ -40,11 +40,8 @@ struct worker_task {
     void *arg;
     void *arg2;
     struct list_head list_node;
-};
-
-struct slot {
+    atomic_bool cancelled;
     atomic_uint_fast64_t seq;
-    struct worker_task task;
 };
 
 struct worker_thread {
@@ -86,7 +83,7 @@ struct workqueue {
     struct spinlock lock;
     struct condvar queue_cv;
 
-    struct slot *tasks;            /* Ringbuffer of ``capacity`` tasks */
+    struct worker_task *tasks;     /* Ringbuffer of ``capacity`` tasks */
     struct worker_thread *workers; /* Array of ``max_workers`` workers */
     size_t max_workers;
     size_t capacity;
@@ -145,6 +142,7 @@ void defer_init(void);
 bool defer_enqueue(dpc_t func, struct work_args args, uint64_t delay_ms);
 void workqueue_init();
 
+struct worker_task *work_create(dpc_t func, struct work_args args);
 bool workqueue_add(dpc_t func, struct work_args args);
 bool workqueue_add_remote(dpc_t func, struct work_args args);
 bool workqueue_add_local(dpc_t func, struct work_args args);
