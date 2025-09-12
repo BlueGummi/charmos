@@ -68,6 +68,20 @@ static void release_spawner(struct workqueue *p) {
     atomic_flag_clear_explicit(&p->spawner_flag, memory_order_release);
 }
 
+static void worker_complete_init(struct workqueue *queue,
+                                 struct worker_thread *w, struct thread *t) {
+    w->thread = t;
+    w->present = true;
+    w->timeout_ran = true;
+    t->worker = w;
+
+    atomic_fetch_add(&queue->num_workers, 1);
+    atomic_fetch_add(&queue->total_spawned, 1);
+    queue->last_spawn_attempt = time_get_ms(); /* This is a slowpath so we
+                                                * can safely run this
+                                                * more costly MMIO op */
+}
+
 bool workqueue_spawn_worker(struct workqueue *queue) {
     if (!claim_spawner(queue))
         return false;
@@ -81,23 +95,14 @@ bool workqueue_spawn_worker(struct workqueue *queue) {
     struct worker_thread *w = &queue->workers[slot];
     w->inactivity_check_period = get_inactivity_timeout(queue);
 
-    struct thread *t = worker_create();
+    struct thread *t = worker_create_unmigratable();
     if (!t) {
         workqueue_unreserve_slot(queue, slot);
         release_spawner(queue);
         return false;
     }
 
-    w->thread = t;
-    w->present = true;
-    w->timeout_ran = true;
-    t->worker = w;
-
-    atomic_fetch_add(&queue->num_workers, 1);
-    atomic_fetch_add(&queue->total_spawned, 1);
-    queue->last_spawn_attempt = time_get_ms(); /* This is a slowpath so we
-                                                * can safely run this
-                                                * more costly MMIO op */
+    worker_complete_init(queue, w, t);
 
     scheduler_enqueue_on_core(t, queue->core);
 
@@ -112,7 +117,7 @@ static bool should_spawn_worker(struct workqueue *queue) {
         return false;
 
     bool no_idle = atomic_load(&queue->idle_workers) == 0;
-    bool work_pending = atomic_load(&queue->head) != atomic_load(&queue->tail);
+    bool work_pending = !workqueue_empty(queue);
 
     bool under_limit = atomic_load(&queue->num_workers) < queue->max_workers;
     bool not_spawning = !atomic_flag_test_and_set(&queue->spawner_flag);
@@ -125,7 +130,7 @@ bool workqueue_try_spawn_worker(struct workqueue *queue) {
         return false;
 
     if (in_interrupt()) {
-        atomic_store(&queue->spawn_pending, true);
+        workqueue_set_needs_spawn(queue, true);
         return true;
     }
 

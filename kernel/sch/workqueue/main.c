@@ -70,17 +70,15 @@ void worker_main(void) {
             w->last_active = time_get_ms();
             w->idle = false;
 
-            enum irql old = irql_raise(IRQL_DISPATCH_LEVEL);
-            task.func(task.arg, task.arg2);
-            irql_lower(old);
+            work_execute(&task);
             continue;
         }
 
         enum irql irql = workqueue_lock_irq_disable(queue);
 
-        while (atomic_load(&queue->head) == atomic_load(&queue->tail)) {
-            if (atomic_load(&queue->spawn_pending)) {
-                atomic_store(&queue->spawn_pending, false);
+        while (workqueue_empty(queue)) {
+            if (workqueue_needs_spawn(queue)) {
+                workqueue_set_needs_spawn(queue, false);
                 workqueue_spawn_worker(queue);
             }
 

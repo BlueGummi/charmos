@@ -6,7 +6,7 @@ static void spawn_permanent_thread_on_core(uint64_t core) {
     struct workqueue *queue = workqueues[core];
     queue->core = core;
 
-    struct thread *thread = worker_create();
+    struct thread *thread = worker_create_unmigratable();
     if (!thread) {
         k_panic("Failed to spawn permanent worker thread on core %llu\n", core);
     }

@@ -10,7 +10,7 @@ static inline struct workqueue *workqueue_local(void) {
     return workqueues[core_id];
 }
 
-static inline struct thread *worker_create() {
+static inline struct thread *worker_create_unmigratable() {
     uint64_t stack_size = PAGE_SIZE;
     struct thread *t = thread_create_custom_stack(worker_main, stack_size);
     if (!t)
@@ -22,6 +22,19 @@ static inline struct thread *worker_create() {
 
 static inline struct worker_thread *get_this_worker_thread(void) {
     return scheduler_get_curr_thread()->worker;
+}
+
+static inline bool workqueue_empty(struct workqueue *queue) {
+    return atomic_load(&queue->head) == atomic_load(&queue->tail);
+}
+
+static inline void workqueue_set_needs_spawn(struct workqueue *queue,
+                                             bool needs) {
+    atomic_store(&queue->spawn_pending, needs);
+}
+
+static inline bool workqueue_needs_spawn(struct workqueue *queue) {
+    return atomic_load(&queue->spawn_pending);
 }
 
 bool workqueue_try_spawn_worker(struct workqueue *queue);

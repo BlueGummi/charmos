@@ -31,3 +31,9 @@ bool workqueue_add_fast(dpc_t func, struct work_args args) {
         workqueues[(get_this_core_id() + 1) % global.core_count];
     return workqueue_enqueue_task(queue, func, args.arg1, args.arg2);
 }
+
+void work_execute(struct worker_task *task) {
+    enum irql old = irql_raise(IRQL_DISPATCH_LEVEL);
+    task->func(task->arg, task->arg2);
+    irql_lower(old);
+}

@@ -57,7 +57,9 @@ struct worker_thread {
 };
 
 struct work_list {
-    struct list_head list; /* List of individual works */
+    struct list_head list;          /* List of individual works */
+    struct list_head worklist_node; /* Node for list of worklists in a queue */
+    uint64_t creation_time;
     struct spinlock lock;  /* Lock for the list */
     uint64_t work_list_id; /* ID for the list */
 };
@@ -147,5 +149,8 @@ bool workqueue_add(dpc_t func, struct work_args args);
 bool workqueue_add_remote(dpc_t func, struct work_args args);
 bool workqueue_add_local(dpc_t func, struct work_args args);
 bool workqueue_add_fast(dpc_t func, struct work_args args);
+
+void work_execute(struct worker_task *task);
+struct work_list *work_list_create(void);
 
 void worker_main(void);
