@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-typedef size_t time_t;
+typedef uint64_t time_t;
 typedef uint32_t inode_t;
 typedef uint16_t mode_t;
 typedef uint32_t gid_t;

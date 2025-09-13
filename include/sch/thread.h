@@ -294,7 +294,7 @@ struct thread {
 
     int64_t curr_core; /* -1 if not being ran */
 
-    struct worker_thread *worker; /* NULL if this is not a worker */
+    struct worker *worker; /* NULL if this is not a worker */
 
     /* Lock + rc */
     struct spinlock lock;

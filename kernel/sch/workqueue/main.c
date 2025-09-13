@@ -4,7 +4,7 @@ static inline bool signaled_by_timeout(bool signaled) {
     return !signaled;
 }
 
-static bool worker_wait(struct workqueue *queue, struct worker_thread *w,
+static bool worker_wait(struct workqueue *queue, struct worker *w,
                         enum irql irql) {
     bool signal;
     queue->idle_workers++;
@@ -31,7 +31,7 @@ static bool worker_wait(struct workqueue *queue, struct worker_thread *w,
     return signal;
 }
 
-static inline bool worker_should_exit(const struct worker_thread *worker,
+static inline bool worker_should_exit(const struct worker *worker,
                                       bool signal) {
     const time_t timeout = worker->inactivity_check_period;
     if (!worker->is_permanent && worker->idle && signaled_by_timeout(signal))
@@ -41,7 +41,7 @@ static inline bool worker_should_exit(const struct worker_thread *worker,
     return false;
 }
 
-static void worker_exit(struct workqueue *queue, struct worker_thread *worker,
+static void worker_exit(struct workqueue *queue, struct worker *worker,
                         enum irql irql) {
     worker->present = false;
     worker->idle = false;
@@ -60,12 +60,12 @@ static void worker_exit(struct workqueue *queue, struct worker_thread *worker,
 }
 
 void worker_main(void) {
-    struct worker_thread *w = get_this_worker_thread();
+    struct worker *w = get_this_worker_thread();
     struct workqueue *queue = workqueue_local();
 
     while (1) {
 
-        struct worker_task task;
+        struct work task;
         if (workqueue_dequeue_task(queue, &task)) {
             w->last_active = time_get_ms();
             w->idle = false;

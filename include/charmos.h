@@ -34,6 +34,8 @@ struct charmos_globals {
     /* TODO: no more of this */
     atomic_uint_fast64_t next_tlb_gen;
 
+    struct workqueue **workqueues;
+
     /* Conditional compilation globals go down here */
 #ifdef PROFILING_ENABLED
     struct list_head profiling_list_head;

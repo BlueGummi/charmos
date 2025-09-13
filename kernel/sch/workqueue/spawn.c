@@ -6,23 +6,23 @@ _Static_assert(DEFAULT_MAX_INTERACTIVITY_CHECK_PERIOD / 4 >
 
 static time_t get_inactivity_timeout(struct workqueue *queue) {
     uint32_t num_workers = atomic_load(&queue->num_workers);
-    size_t min = queue->interactivity_check_period.min;
-    size_t max = queue->interactivity_check_period.max;
+    size_t min = queue->attrs.inactive_check_period.min;
+    size_t max = queue->attrs.inactive_check_period.max;
 
-    if (num_workers <= (queue->max_workers / 8))
+    if (num_workers <= (queue->attrs.max_workers / 8))
         return max;
 
-    if (num_workers <= (queue->max_workers / 4))
+    if (num_workers <= (queue->attrs.max_workers / 4))
         return max / 2;
 
-    if (num_workers <= (queue->max_workers / 2))
+    if (num_workers <= (queue->attrs.max_workers / 2))
         return max / 4;
 
     return min;
 }
 
 int workqueue_reserve_slot(struct workqueue *queue) {
-    for (uint64_t i = 1; i < queue->max_workers; ++i) {
+    for (uint64_t i = 1; i < queue->attrs.max_workers; ++i) {
         uint64_t bit = 1ull << i;
         uint64_t old =
             atomic_load_explicit(&queue->worker_bitmap, memory_order_relaxed);
@@ -46,7 +46,7 @@ void workqueue_unreserve_slot(struct workqueue *queue, int idx) {
     atomic_fetch_and_explicit(&queue->worker_bitmap, bit, memory_order_acq_rel);
 }
 
-void workqueue_link_thread_and_worker(struct worker_thread *worker,
+void workqueue_link_thread_and_worker(struct worker *worker,
                                       struct thread *thread) {
     worker->present = true;
     worker->timeout_ran = true;
@@ -60,16 +60,16 @@ void workqueue_update_queue_after_spawn(struct workqueue *queue) {
 }
 
 static bool claim_spawner(struct workqueue *p) {
-    return atomic_flag_test_and_set_explicit(&p->spawner_flag,
+    return atomic_flag_test_and_set_explicit(&p->spawner_flag_internal,
                                              memory_order_acq_rel) == 0;
 }
 
 static void release_spawner(struct workqueue *p) {
-    atomic_flag_clear_explicit(&p->spawner_flag, memory_order_release);
+    atomic_flag_clear_explicit(&p->spawner_flag_internal, memory_order_release);
 }
 
-static void worker_complete_init(struct workqueue *queue,
-                                 struct worker_thread *w, struct thread *t) {
+static void worker_complete_init(struct workqueue *queue, struct worker *w,
+                                 struct thread *t) {
     w->thread = t;
     w->present = true;
     w->timeout_ran = true;
@@ -92,10 +92,15 @@ bool workqueue_spawn_worker(struct workqueue *queue) {
         return false;
     }
 
-    struct worker_thread *w = &queue->workers[slot];
+    struct worker *w = &queue->workers[slot];
     w->inactivity_check_period = get_inactivity_timeout(queue);
 
-    struct thread *t = worker_create_unmigratable();
+    struct thread *t;
+    if (WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS))
+        t = worker_create_unmigratable();
+    else
+        t = worker_create();
+
     if (!t) {
         workqueue_unreserve_slot(queue, slot);
         release_spawner(queue);
@@ -104,7 +109,10 @@ bool workqueue_spawn_worker(struct workqueue *queue) {
 
     worker_complete_init(queue, w, t);
 
-    scheduler_enqueue_on_core(t, queue->core);
+    if (WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_PERMANENT))
+        scheduler_enqueue_on_core(t, queue - global.workqueues[0]); /* Core num */
+    else
+        scheduler_enqueue(t);
 
     release_spawner(queue);
 
@@ -113,16 +121,18 @@ bool workqueue_spawn_worker(struct workqueue *queue) {
 
 static bool should_spawn_worker(struct workqueue *queue) {
     time_t now = time_get_ms_fast();
-    if (now - queue->last_spawn_attempt <= queue->spawn_delay)
+    if (now - queue->last_spawn_attempt <= queue->attrs.spawn_delay)
         return false;
 
     bool no_idle = atomic_load(&queue->idle_workers) == 0;
     bool work_pending = !workqueue_empty(queue);
 
-    bool under_limit = atomic_load(&queue->num_workers) < queue->max_workers;
-    bool not_spawning = !atomic_flag_test_and_set(&queue->spawner_flag);
+    bool under_limit =
+        atomic_load(&queue->num_workers) < queue->attrs.max_workers;
 
-    return no_idle && work_pending && under_limit && not_spawning;
+    bool spawning = atomic_flag_test_and_set(&queue->spawner_flag_internal);
+
+    return no_idle && work_pending && under_limit && !spawning;
 }
 
 bool workqueue_try_spawn_worker(struct workqueue *queue) {
@@ -135,4 +145,19 @@ bool workqueue_try_spawn_worker(struct workqueue *queue) {
     }
 
     return workqueue_spawn_worker(queue);
+}
+
+struct thread *worker_create(void) {
+    uint64_t stack_size = PAGE_SIZE;
+    return thread_create_custom_stack(worker_main, stack_size);
+}
+
+struct thread *worker_create_unmigratable() {
+    uint64_t stack_size = PAGE_SIZE;
+    struct thread *t = thread_create_custom_stack(worker_main, stack_size);
+    if (!t)
+        return NULL;
+
+    t->flags = THREAD_FLAGS_NO_STEAL;
+    return t;
 }
