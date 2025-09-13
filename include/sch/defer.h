@@ -46,6 +46,7 @@ struct work {
 
 struct worker {
     struct thread *thread;
+    struct workqueue *workqueue;
     time_t last_active;
     time_t inactivity_check_period;
     time_t start_idle;
@@ -54,19 +55,21 @@ struct worker {
     bool is_permanent : 1;
     bool present : 1;
     bool idle : 1;
+    refcount_t refcount;
 };
 
-enum work_list_flags {
+enum worklist_flags {
     WORK_LIST_FLAG_EXECUTING = 1,
     WORK_LIST_FLAG_ALLOW_MULTIPLE_WORKERS = 1 << 1,
 };
 
-struct work_list {
+struct worklist {
     struct list_head list;          /* List of individual works */
     struct list_head worklist_node; /* Node for list of worklists in a queue */
     time_t creation_time;
-    struct spinlock lock;  /* Lock for the list */
-    uint64_t work_list_id; /* ID for the list */
+    struct spinlock lock;        /* Lock for the list */
+    struct workqueue *workqueue; /* What queue is this associated
+                                  * with? Can be NULL */
 };
 
 /* TODO: Get in profiling.h and put these under there */
@@ -141,11 +144,19 @@ enum workqueue_flags : uint16_t {
 #define WORKQUEUE_FLAG_TEST(q, f) (q->attrs.flags & f)
 
 enum workqueue_state : uint16_t {
-    WORKQUEUE_STATE_IDLE,        /* All workers idle */
-    WORKQUEUE_STATE_ACTIVE_LOW,  /* 0/4 - 1/4th of workers busy */
-    WORKQUEUE_STATE_ACTIVE_MID,  /* 1/4 - 3/4th of workers busy */
-    WORKQUEUE_STATE_ACTIVE_HIGH, /* 3/4 - 4/4th of workers busy */
+    WORKQUEUE_STATE_DESTROYING, /* Destroying - Do not spawn threads */
+    WORKQUEUE_STATE_IDLE,       /* All workers idle */
+    WORKQUEUE_STATE_BUSY_LOW,   /* 0/4 - 1/4th of workers busy */
+    WORKQUEUE_STATE_BUSY_MID,   /* 1/4 - 3/4th of workers busy */
+    WORKQUEUE_STATE_BUSY_HIGH,  /* 3/4 - 4/4th of workers busy */
 };
+#define WORKQUEUE_STATE_IDLE_PCT 0 /* 0% */
+#define WORKQUEUE_STATE_BUSY_LOW_PCT_BASE 1
+#define WORKQUEUE_STATE_BUSY_LOW_PCT_CEIL 24
+#define WORKQUEUE_STATE_BUSY_MID_PCT_BASE 25
+#define WORKQUEUE_STATE_BUSY_MID_PCT_CEIL 74
+#define WORKQUEUE_STATE_BUSY_HIGH_PCT_BASE 75
+#define WORKQUEUE_STATE_BUSY_HIGH_PCT_CEIL 100
 
 #define WORKQUEUE_STATE_SET(q, s) (atomic_store(&q->state, s))
 #define WORKQUEUE_STATE_GET(q) (atomic_load(&q->state))
@@ -206,20 +217,11 @@ struct workqueue {
  *
  * Negative values are errors */
 enum workqueue_error : int32_t {
-    WORKQUEUE_ERROR_NEED_NEW_WORKER = 4,
-    WORKQUEUE_ERROR_NEED_NEW_WQ = 3,
-    WORKQUEUE_ERROR_OK = 0,
-    WORKQUEUE_ERROR_FULL = -1,
+    WORKQUEUE_ERROR_NEED_NEW_WORKER = 4, /* For manual worker spawn */
+    WORKQUEUE_ERROR_NEED_NEW_WQ = 3,     /* All worker slots filled */
+    WORKQUEUE_ERROR_OK = 0,              /* No message */
+    WORKQUEUE_ERROR_FULL = -1,           /* Full ringbuffer */
 };
-
-static inline bool workqueue_get(struct workqueue *queue) {
-    return refcount_inc(&queue->refcount);
-}
-
-static inline void workqueue_put(struct workqueue *queue) {
-    if (refcount_dec_and_test(&queue->refcount))
-        return; /* TODO: free */
-}
 
 void defer_init(void);
 
@@ -229,6 +231,7 @@ void workqueues_permanent_init(void);
 
 struct work *work_create(dpc_t func, struct work_args args);
 struct workqueue *workqueue_create(struct workqueue_attributes *attrs);
+void workqueue_free(struct workqueue *queue);
 enum workqueue_error workqueue_add(dpc_t func, struct work_args args);
 enum workqueue_error workqueue_add_remote(dpc_t func, struct work_args args);
 enum workqueue_error workqueue_add_local(dpc_t func, struct work_args args);
@@ -237,6 +240,15 @@ enum workqueue_error workqueue_add_fast(dpc_t func, struct work_args args);
 void work_execute(struct work *task);
 struct thread *worker_create(void);
 struct thread *worker_create_unmigratable();
-struct work_list *work_list_create(void);
+struct worklist *work_list_create(void);
 
 void worker_main(void);
+
+static inline bool workqueue_get(struct workqueue *queue) {
+    return refcount_inc(&queue->refcount);
+}
+
+static inline void workqueue_put(struct workqueue *queue) {
+    if (refcount_dec_and_test(&queue->refcount))
+        return workqueue_free(queue);
+}

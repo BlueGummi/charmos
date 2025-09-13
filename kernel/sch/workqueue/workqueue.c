@@ -18,7 +18,7 @@ enum workqueue_error workqueue_add_remote(dpc_t func, struct work_args args) {
 }
 
 enum workqueue_error workqueue_add_local(dpc_t func, struct work_args args) {
-    struct workqueue *queue = workqueue_local();
+    struct workqueue *queue = global.workqueues[get_this_core_id()];
     return workqueue_enqueue_task(queue, func, args.arg1, args.arg2);
 }
 

@@ -14,6 +14,7 @@ static void spawn_permanent_thread_on_core(uint64_t core) {
     struct worker *worker = &queue->workers[0];
     worker->is_permanent = true;
     worker->inactivity_check_period = MINUTES_TO_MS(5);
+    worker->workqueue = queue;
     workqueue_link_thread_and_worker(worker, thread);
     scheduler_enqueue_on_core(thread, core);
     workqueue_update_queue_after_spawn(queue);
@@ -43,7 +44,15 @@ struct workqueue *workqueue_create(struct workqueue_attributes *attrs) {
     for (uint64_t i = 0; i < attrs->capacity; i++)
         atomic_store_explicit(&ret->tasks[i].seq, i, memory_order_relaxed);
 
+    INIT_LIST_HEAD(&ret->worklist_list);
+    refcount_init(&ret->refcount, 1);
+    ret->state = WORKQUEUE_STATE_IDLE;
     return ret;
+}
+
+/* Give all threads the exit signal and clean up the structs */
+void workqueue_free(struct workqueue *queue) {
+    k_panic("Should not be reachable right now\n");
 }
 
 void workqueues_permanent_init(void) {
@@ -54,10 +63,6 @@ void workqueues_permanent_init(void) {
         k_panic("Failed to allocate space for workqueues!\n");
 
     for (int64_t i = 0; i < num_workqueues; ++i) {
-
-        global.workqueues[i] = kzalloc(sizeof(struct workqueue));
-        if (!global.workqueues[i])
-            k_panic("Failed to allocate space for workqueue %ld!\n", i);
 
         struct workqueue_attributes attrs = {
             .capacity = DEFAULT_WORKQUEUE_CAPACITY,

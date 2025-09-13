@@ -72,14 +72,15 @@ static void worker_complete_init(struct workqueue *queue, struct worker *w,
                                  struct thread *t) {
     w->thread = t;
     w->present = true;
+    w->workqueue = queue;
     w->timeout_ran = true;
+    
+    refcount_init(&w->refcount, 1);
+
     t->worker = w;
 
     atomic_fetch_add(&queue->num_workers, 1);
-    atomic_fetch_add(&queue->total_spawned, 1);
-    queue->last_spawn_attempt = time_get_ms(); /* This is a slowpath so we
-                                                * can safely run this
-                                                * more costly MMIO op */
+    workqueue_update_queue_after_spawn(queue);
 }
 
 bool workqueue_spawn_worker(struct workqueue *queue) {

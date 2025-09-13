@@ -10,7 +10,8 @@ static void do_block_on_queue(struct thread_queue *q) {
         enable_interrupts();
 }
 
-bool condvar_wait(struct condvar *cv, struct spinlock *lock, enum irql irql) {
+enum wake_reason condvar_wait(struct condvar *cv, struct spinlock *lock,
+                              enum irql irql) {
     struct thread *curr = scheduler_get_curr_thread();
     curr->wake_reason = WAKE_REASON_NONE;
 
@@ -18,11 +19,13 @@ bool condvar_wait(struct condvar *cv, struct spinlock *lock, enum irql irql) {
     do_block_on_queue(&cv->waiters);
     spin_lock_irq_disable(lock);
 
-    return curr->wake_reason != WAKE_REASON_TIMEOUT;
+    return curr->wake_reason;
 }
 
 void condvar_init(struct condvar *cv) {
     thread_queue_init(&cv->waiters);
+    cv->cb = NULL;
+    cv->cb_arg = NULL;
 }
 
 static inline void set_wake_reason_and_wake(struct thread *t,
@@ -56,13 +59,36 @@ static void condvar_timeout_wakeup(void *arg, void *arg2) {
         set_wake_reason_and_wake(t, WAKE_REASON_TIMEOUT);
 }
 
-bool condvar_wait_timeout(struct condvar *cv, struct spinlock *lock,
-                          time_t timeout_ms, enum irql irql) {
+enum wake_reason condvar_wait_timeout(struct condvar *cv, struct spinlock *lock,
+                                      time_t timeout_ms, enum irql irql) {
     struct thread *curr = scheduler_get_curr_thread();
     curr->wake_reason = WAKE_REASON_NONE;
 
     defer_enqueue(condvar_timeout_wakeup, WORK_ARGS(curr, cv), timeout_ms);
     condvar_wait(cv, lock, irql);
 
-    return curr->wake_reason != WAKE_REASON_TIMEOUT;
+    return curr->wake_reason;
+}
+
+static void condvar_timeout_wakeup_callback(void *arg1, void *arg2) {
+    condvar_timeout_wakeup(arg1, arg2);
+    struct condvar *cv = arg2;
+    cv->cb(cv->cb_arg);
+}
+
+enum wake_reason
+condvar_wait_timeout_callback(struct condvar *cv, struct spinlock *lock,
+                              time_t timeout_ms, enum irql irql,
+                              condvar_callback cb, void *cb_arg) {
+    struct thread *curr = scheduler_get_curr_thread();
+    curr->wake_reason = WAKE_REASON_NONE;
+
+    cv->cb = cb;
+    cv->cb_arg = cb_arg;
+    defer_enqueue(condvar_timeout_wakeup_callback, WORK_ARGS(curr, cv),
+                  timeout_ms);
+
+    condvar_wait(cv, lock, irql);
+
+    return curr->wake_reason;
 }

@@ -1,18 +1,12 @@
 #include <sch/defer.h>
 
-#define work_list_from_work_list_list_node(node)                               \
-    container_of(node, struct work_list, worklist_list)
+#define worklist_from_worklist_list_node(node)                                 \
+    container_of(node, struct worklist, worklist_list)
 
-#define work_from_work_list_node(node)                                         \
-    container_of(node, struct work, list_node)
+#define work_from_worklist_node(node) container_of(node, struct work, list_node)
 
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(workqueue, lock);
-SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(work_list, lock);
-
-static inline struct workqueue *workqueue_local(void) {
-    uint64_t core_id = get_this_core_id();
-    return global.workqueues[core_id];
-}
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(worklist, lock);
 
 static inline uint64_t workqueue_current_worker_count(struct workqueue *q) {
     return atomic_load(&q->num_workers);
