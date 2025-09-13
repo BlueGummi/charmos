@@ -1,60 +1,92 @@
 #include "internal.h"
 
-static atomic_uint_fast64_t worklist_id = 0;
-struct work_list *work_list_create(void) {
-    struct work_list *ret = kmalloc(sizeof(struct work_list));
-    INIT_LIST_HEAD(&ret->worklist_node);
+struct worklist *worklist_create(enum worklist_flags flags) {
+    struct worklist *ret = kmalloc(sizeof(struct worklist));
     INIT_LIST_HEAD(&ret->list);
     ret->creation_time = time_get_ms();
+    ret->flags = flags;
+    ret->state = WORKLIST_STATE_EMPTY;
     spinlock_init(&ret->lock);
-    ret->work_list_id = atomic_fetch_add(&worklist_id, 1);
+    refcount_init(&ret->refcount, 1);
     return ret;
 }
 
-void work_list_destroy(struct work_list *list) {
+void worklist_destroy(struct worklist *list) {
     kfree(list);
 }
 
-void work_list_add_to_queue(struct workqueue *queue, struct work_list *list) {
-    enum irql irql = workqueue_lock_irq_disable(queue);
-    list_add(&list->worklist_node, &queue->worklist_list);
-    workqueue_unlock(queue, irql);
+static enum worklist_state worklist_change_state(struct worklist *wlist,
+                                                 enum worklist_state new) {
+    enum worklist_state old = atomic_load(&wlist->state);
+    if (old < WORKLIST_STATE_RUNNING)
+        atomic_store(&wlist->state, new);
+
+    return old;
 }
 
-void work_list_remove_from_queue(struct workqueue *queue,
-                                 struct work_list *list) {
-    enum irql irql = workqueue_lock_irq_disable(queue);
-    list_del(&list->worklist_node);
-    workqueue_unlock(queue, irql);
-}
+#define WORKLIST_MARK_READY(wl)                                                \
+    (worklist_change_state(wl, WORKLIST_STATE_READY))
 
-void work_list_add_work(struct work_list *list, struct work *task) {
-    enum irql irql = work_list_lock_irq_disable(list);
+static void worklist_add_work(struct worklist *list, struct work *task) {
+    enum irql irql = worklist_lock_irq_disable(list);
     list_add_tail(&task->list_node, &list->list);
-    work_list_unlock(list, irql);
+    WORKLIST_MARK_READY(list);
+    worklist_unlock(list, irql);
 }
 
-void work_list_remove_work(struct work_list *list, struct work *task) {
-    enum irql irql = work_list_lock_irq_disable(list);
+static void worklist_remove_work(struct worklist *list, struct work *task) {
+    enum irql irql = worklist_lock_irq_disable(list);
     list_del(&task->list_node);
-    work_list_unlock(list, irql);
+
+    if (list_empty(&list->list))
+        worklist_change_state(list, WORKLIST_STATE_EMPTY);
+
+    worklist_unlock(list, irql);
 }
 
-struct work *work_list_pop_front(struct work_list *list) {
-    enum irql irql = work_list_lock_irq_disable(list);
+struct work *worklist_pop_front(struct worklist *list) {
+    enum irql irql = worklist_lock_irq_disable(list);
     struct list_head *node = list_pop_front(&list->list);
-    work_list_unlock(list, irql);
-    return work_from_work_list_node(node);
+
+    if (list_empty(&list->list))
+        worklist_change_state(list, WORKLIST_STATE_EMPTY);
+
+    worklist_unlock(list, irql);
+    return work_from_worklist_node(node);
 }
 
-static bool work_list_empty(struct work_list *list) {
-    enum irql irql = work_list_lock_irq_disable(list);
+static bool worklist_empty(struct worklist *list) {
+    enum irql irql = worklist_lock_irq_disable(list);
     bool empty = list_empty(&list->list);
-    work_list_unlock(list, irql);
+    worklist_unlock(list, irql);
     return empty;
 }
 
-void work_list_execute(struct work_list *list) {
-    while (!work_list_empty(list))
-        work_execute(work_list_pop_front(list));
+static void worklist_execute_internal(struct workqueue *queue,
+                                      struct worklist *list) {
+    struct list_head *iter;
+    struct list_head *works = &list->list;
+    list_for_each(iter, works) {
+        struct work *work = work_from_worklist_node(iter);
+
+        while (workqueue_enqueue_task(queue, work->func, work->arg,
+                                      work->arg2) == WORKQUEUE_ERROR_FULL)
+            ;
+    }
+}
+
+void worklist_cancel_work(struct worklist *wl, struct work *wlw) {
+    worklist_remove_work(wl, wlw);
+}
+
+enum workqueue_error worklist_execute(struct workqueue *queue,
+                                      struct worklist *wlist) {
+    if (atomic_exchange(&wlist->state, WORKLIST_STATE_RUNNING) ==
+            WORKLIST_STATE_RUNNING &&
+        !(wlist->flags & WORKLIST_FLAG_UNBOUND))
+        return WORKQUEUE_ERROR_OK; /* OK - Already running and serialized */
+
+    worklist_execute_internal(queue, wlist);
+
+    return WORKQUEUE_ERROR_OK;
 }

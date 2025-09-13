@@ -28,17 +28,25 @@ bool workqueue_dequeue_task(struct workqueue *queue, struct work *out) {
     }
 }
 
+static void signal_callback(struct thread *t) {
+    if (t)
+        t->worker->next_action = WORKER_NEXT_ACTION_RUN;
+}
+
 static enum workqueue_error signal_worker(struct workqueue *queue) {
-    struct thread *woke = condvar_signal(&queue->queue_cv);
+    struct thread *woke =
+        condvar_signal_callback(&queue->queue_cv, signal_callback);
+
     enum workqueue_error ret = WORKQUEUE_ERROR_OK;
 
     /* No worker was woken up because all are busy */
     if (!woke) {
-        if (!WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_AUTO_SPAWN))
+        if (!WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_AUTO_SPAWN)) {
             ret = WORKQUEUE_ERROR_NEED_NEW_WORKER;
-        else if (workqueue_current_worker_count(queue) ==
-                 queue->attrs.max_workers)
+        } else if (workqueue_current_worker_count(queue) ==
+                   queue->attrs.max_workers) {
             ret = WORKQUEUE_ERROR_NEED_NEW_WQ;
+        }
     }
 
     workqueue_try_spawn_worker(queue);

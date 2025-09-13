@@ -77,3 +77,22 @@ static inline bool spin_trylock(struct spinlock *lock) {
     static inline bool type##_trylock(struct type *obj) {                      \
         return spin_trylock(&obj->member);                                     \
     }
+
+#define SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT_NAMED(type, member, name)     \
+    static inline enum irql type##_##name##_lock(struct type *obj) {           \
+        return spin_lock(&obj->member);                                        \
+    }                                                                          \
+                                                                               \
+    static inline enum irql type##_##name##_lock_irq_disable(                  \
+        struct type *obj) {                                                    \
+        return spin_lock_irq_disable(&obj->member);                            \
+    }                                                                          \
+                                                                               \
+    static inline void type##_##name##_unlock(struct type *obj,                \
+                                              enum irql irql) {                \
+        spin_unlock(&obj->member, irql);                                       \
+    }                                                                          \
+                                                                               \
+    static inline bool type##_##name##_trylock(struct type *obj) {             \
+        return spin_trylock(&obj->member);                                     \
+    }

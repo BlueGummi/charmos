@@ -21,31 +21,6 @@ static time_t get_inactivity_timeout(struct workqueue *queue) {
     return min;
 }
 
-int workqueue_reserve_slot(struct workqueue *queue) {
-    for (uint64_t i = 1; i < queue->attrs.max_workers; ++i) {
-        uint64_t bit = 1ull << i;
-        uint64_t old =
-            atomic_load_explicit(&queue->worker_bitmap, memory_order_relaxed);
-
-        if (old & bit)
-            continue; /* already used */
-        if (atomic_compare_exchange_weak_explicit(
-                &queue->worker_bitmap, &old, old | bit, memory_order_acq_rel,
-                memory_order_relaxed)) {
-            return (int) i;
-        }
-        /* retry - someone else raced */
-    }
-
-    k_panic("Unreachable, all worker slots in use\n");
-    return -1;
-}
-
-void workqueue_unreserve_slot(struct workqueue *queue, int idx) {
-    uint64_t bit = ~(1ull << idx);
-    atomic_fetch_and_explicit(&queue->worker_bitmap, bit, memory_order_acq_rel);
-}
-
 void workqueue_link_thread_and_worker(struct worker *worker,
                                       struct thread *thread) {
     worker->present = true;
@@ -72,28 +47,28 @@ static void worker_complete_init(struct workqueue *queue, struct worker *w,
                                  struct thread *t) {
     w->thread = t;
     w->present = true;
+    w->workqueue = queue;
     w->timeout_ran = true;
+
+    refcount_init(&w->refcount, 1);
+
     t->worker = w;
 
     atomic_fetch_add(&queue->num_workers, 1);
-    atomic_fetch_add(&queue->total_spawned, 1);
-    queue->last_spawn_attempt = time_get_ms(); /* This is a slowpath so we
-                                                * can safely run this
-                                                * more costly MMIO op */
+    workqueue_update_queue_after_spawn(queue);
 }
 
 bool workqueue_spawn_worker(struct workqueue *queue) {
     if (!claim_spawner(queue))
         return false;
 
-    int slot = workqueue_reserve_slot(queue);
-    if (slot < 0) {
-        release_spawner(queue);
+    struct worker *w = kzalloc(sizeof(struct worker));
+    if (!w)
         return false;
-    }
 
-    struct worker *w = &queue->workers[slot];
     w->inactivity_check_period = get_inactivity_timeout(queue);
+
+    workqueue_add_worker(queue, w);
 
     struct thread *t;
     if (WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS))
@@ -102,7 +77,6 @@ bool workqueue_spawn_worker(struct workqueue *queue) {
         t = worker_create();
 
     if (!t) {
-        workqueue_unreserve_slot(queue, slot);
         release_spawner(queue);
         return false;
     }
@@ -110,7 +84,8 @@ bool workqueue_spawn_worker(struct workqueue *queue) {
     worker_complete_init(queue, w, t);
 
     if (WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_PERMANENT))
-        scheduler_enqueue_on_core(t, queue - global.workqueues[0]); /* Core num */
+        scheduler_enqueue_on_core(t,
+                                  queue - global.workqueues[0]); /* Core num */
     else
         scheduler_enqueue(t);
 

@@ -1,26 +1,28 @@
 #include "internal.h"
 
-static inline bool signaled_by_timeout(bool signaled) {
-    return !signaled;
+static void workqueue_timer_callback(void *arg) {
+    struct workqueue *workqueue = arg;
+    workqueue_put(workqueue);
 }
 
-static bool worker_wait(struct workqueue *queue, struct worker *w,
-                        enum irql irql) {
-    bool signal;
-    queue->idle_workers++;
+static enum wake_reason worker_wait(struct workqueue *queue, struct worker *w,
+                                    enum irql irql) {
+    enum wake_reason signal;
+    atomic_fetch_add(&queue->idle_workers, 1);
 
     if (w->timeout_ran && !w->is_permanent) {
-        signal = condvar_wait_timeout(&queue->queue_cv, &queue->lock,
-                                      w->inactivity_check_period, irql);
+        workqueue_get(queue);
+        signal = condvar_wait_timeout_callback(&queue->queue_cv, &queue->lock,
+                                               w->inactivity_check_period, irql,
+                                               workqueue_timer_callback, queue);
         w->timeout_ran = false;
-
     } else {
         signal = condvar_wait(&queue->queue_cv, &queue->lock, irql);
     }
 
-    queue->idle_workers--;
+    atomic_fetch_sub(&queue->idle_workers, 1);
 
-    if (signaled_by_timeout(signal)) {
+    if (signal == WAKE_REASON_TIMEOUT && !ignore_timeouts(queue)) {
         w->timeout_ran = true;
         if (!w->idle) {
             w->idle = true;
@@ -32,9 +34,14 @@ static bool worker_wait(struct workqueue *queue, struct worker *w,
 }
 
 static inline bool worker_should_exit(const struct worker *worker,
-                                      bool signal) {
+                                      enum wake_reason signal) {
+    if (worker->next_action == WORKER_NEXT_ACTION_EXIT)
+        return true;
+
     const time_t timeout = worker->inactivity_check_period;
-    if (!worker->is_permanent && worker->idle && signaled_by_timeout(signal))
+
+    /* We don't mark `idle` if timeouts are to be ignored */
+    if (!worker->is_permanent && worker->idle && signal == WAKE_REASON_TIMEOUT)
         if (time_get_ms() - worker->start_idle >= timeout)
             return true;
 
@@ -49,19 +56,23 @@ static void worker_exit(struct workqueue *queue, struct worker *worker,
 
     worker->thread = NULL;
 
-    int slot_idx = (int) (worker - &queue->workers[0]);
-    workqueue_unreserve_slot(queue, slot_idx);
-
+    workqueue_remove_worker(queue, worker);
     atomic_fetch_sub(&queue->num_workers, 1);
 
     workqueue_unlock(queue, irql);
+
+    kfree(worker);
+
+    workqueue_put(queue);
 
     thread_exit();
 }
 
 void worker_main(void) {
-    struct worker *w = get_this_worker_thread();
-    struct workqueue *queue = workqueue_local();
+    struct worker *w = scheduler_get_curr_thread()->worker;
+    struct workqueue *queue = w->workqueue;
+
+    workqueue_get(queue);
 
     while (1) {
 
@@ -77,14 +88,15 @@ void worker_main(void) {
         enum irql irql = workqueue_lock_irq_disable(queue);
 
         while (workqueue_empty(queue)) {
-            if (workqueue_needs_spawn(queue)) {
+            if (workqueue_needs_spawn(queue) &&
+                WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_AUTO_SPAWN)) {
                 workqueue_set_needs_spawn(queue, false);
                 workqueue_spawn_worker(queue);
             }
 
-            bool signaled = worker_wait(queue, w, irql);
+            enum wake_reason signal = worker_wait(queue, w, irql);
 
-            if (worker_should_exit(w, signaled))
+            if (worker_should_exit(w, signal))
                 worker_exit(queue, w, irql);
         }
 

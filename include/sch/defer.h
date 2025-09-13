@@ -9,15 +9,6 @@
 #include <types/refcount.h>
 #include <types/types.h>
 
-/* TODO: Make the values below scale */
-
-/* Must be a power of two for modulo optimization */
-#define DEFAULT_WORKQUEUE_CAPACITY 512
-#define DEFAULT_MAX_WORKERS 16
-#define DEFAULT_SPAWN_DELAY 150 /* 150ms delay between worker thread spawns */
-#define DEFAULT_MIN_INTERACTIVITY_CHECK_PERIOD SECONDS_TO_MS(2)
-#define DEFAULT_MAX_INTERACTIVITY_CHECK_PERIOD SECONDS_TO_MS(10)
-
 typedef void (*dpc_t)(void *arg, void *arg2);
 
 /* TODO: Merge this with standard workqueue infra */
@@ -44,30 +35,61 @@ struct work {
     atomic_uint_fast64_t seq;
 };
 
+enum worker_next_action {
+    WORKER_NEXT_ACTION_RUN,
+    WORKER_NEXT_ACTION_EXIT,
+};
+
 struct worker {
-    struct thread *thread;
-    time_t last_active;
-    time_t inactivity_check_period;
-    time_t start_idle;
+    struct thread *thread;       /* Assoc. thread */
+    struct workqueue *workqueue; /* Assoc. wq */
+
+    time_t last_active; /* Monotonic starting time of most
+                         * recent work execution */
+
+    time_t inactivity_check_period; /* How much time in between
+                                     * timeout GC events */
+
+    time_t start_idle; /* Monotonic starting time of
+                        * most recent idle */
+
+    /* Internal flags */
     bool timeout_ran : 1;
     bool should_exit : 1;
     bool is_permanent : 1;
     bool present : 1;
     bool idle : 1;
+
+    refcount_t refcount;
+
+    enum worker_next_action next_action;
+
+    struct list_head list_node;
 };
 
-enum work_list_flags {
-    WORK_LIST_FLAG_EXECUTING = 1,
-    WORK_LIST_FLAG_ALLOW_MULTIPLE_WORKERS = 1 << 1,
+enum worklist_state {
+    WORKLIST_STATE_EMPTY = 0,      /* No works */
+    WORKLIST_STATE_READY = 1,      /* Works available */
+    WORKLIST_STATE_RUNNING = 2,    /* Executing works */
+    WORKLIST_STATE_DESTROYING = 3, /* Destroying */
+    WORKLIST_STATE_DEAD = 4,       /* Gone */
 };
 
-struct work_list {
-    struct list_head list;          /* List of individual works */
-    struct list_head worklist_node; /* Node for list of worklists in a queue */
+enum worklist_flags {
+    WORKLIST_FLAG_UNBOUND = 1,
+};
+
+struct worklist {
+    _Atomic enum worklist_state state;
+    struct list_head list; /* List of individual works */
     time_t creation_time;
-    struct spinlock lock;  /* Lock for the list */
-    uint64_t work_list_id; /* ID for the list */
+    struct spinlock lock; /* Lock for the list */
+
+    enum worklist_flags flags;
+    refcount_t refcount;
 };
+#define WORKLIST_GET_STATE(wlist) (atomic_load(&wlist->state))
+#define WORKLIST_SET_STATE(wlist, state) (atomic_store(&wlist->state, state))
 
 /* TODO: Get in profiling.h and put these under there */
 #ifdef TESTS
@@ -86,24 +108,14 @@ struct workqueue_stats {
 #endif
 
 enum workqueue_flags : uint16_t {
-    WORKQUEUE_FLAG_LAZY = 1 << 1, /* Inverse: Active
-                                   *
-                                   * Lazy workqueues only execute works
-                                   * when explicitly 'kicked'.
-                                   *
-                                   * Active workqueues execute works
-                                   * as they are enqueued. The workqueue
-                                   * is effectively 'kicked' on each
-                                   * enqueue to wake a worker */
-
-    WORKQUEUE_FLAG_PERMANENT = 1 << 2, /* Inverse: On-demand
+    WORKQUEUE_FLAG_PERMANENT = 1 << 1, /* Inverse: On-demand
                                         *
                                         * Permanent workqueues are attached
                                         * to each core and are always Active
                                         * workqueues with on-demand
                                         * worker spawning */
 
-    WORKQUEUE_FLAG_ALLOW_NO_WORKERS = 1 << 3, /* Inverse: Disallow no workers
+    WORKQUEUE_FLAG_ALLOW_NO_WORKERS = 1 << 2, /* Inverse: Disallow no workers
                                                *
                                                * Allowing no workers allows
                                                * all workers to eventually
@@ -116,7 +128,7 @@ enum workqueue_flags : uint16_t {
                                                * if all workers are gone,
                                                * but can save some memory */
 
-    WORKQUEUE_FLAG_AUTO_SPAWN = 1 << 4, /* Inverse: No auto spawn
+    WORKQUEUE_FLAG_AUTO_SPAWN = 1 << 3, /* Inverse: No auto spawn
                                          *
                                          * This flag allows workqueues
                                          * with multiple workers to
@@ -127,10 +139,9 @@ enum workqueue_flags : uint16_t {
                                          * workers are manually spawned */
 
     WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS =
-        1 << 5, /* Inverse: Migratable workers */
+        1 << 4, /* Inverse: Migratable workers */
 
     /* "Inverses of flags" represented as a 0 */
-    WORKQUEUE_FLAG_MANUAL_SPAWN = 0,
     WORKQUEUE_FLAG_NOT_LAZY = 0,
     WORKQUEUE_FLAG_MIGRATABLE_WORKERS = 0,
     WORKQUEUE_FLAG_NEEDS_AT_LEAST_ONE_WORKER = 0,
@@ -141,10 +152,9 @@ enum workqueue_flags : uint16_t {
 #define WORKQUEUE_FLAG_TEST(q, f) (q->attrs.flags & f)
 
 enum workqueue_state : uint16_t {
-    WORKQUEUE_STATE_IDLE,        /* All workers idle */
-    WORKQUEUE_STATE_ACTIVE_LOW,  /* 0/4 - 1/4th of workers busy */
-    WORKQUEUE_STATE_ACTIVE_MID,  /* 1/4 - 3/4th of workers busy */
-    WORKQUEUE_STATE_ACTIVE_HIGH, /* 3/4 - 4/4th of workers busy */
+    WORKQUEUE_STATE_DEAD,       /* Gone, about to be freed */
+    WORKQUEUE_STATE_DESTROYING, /* Destroying - Do not spawn threads */
+    WORKQUEUE_STATE_ACTIVE,     /* Active */
 };
 
 #define WORKQUEUE_STATE_SET(q, s) (atomic_store(&q->state, s))
@@ -162,22 +172,23 @@ struct workqueue_attributes {
     enum workqueue_flags flags;
 };
 
-_Static_assert(DEFAULT_MAX_WORKERS < 64, ""); /* Won't fit in our bitmap */
 struct workqueue {
+    atomic_bool ignore_timeouts;
+
+    struct spinlock worker_lock;
     struct spinlock lock; /* Lock for condvar and other things
                            * like the worklists */
 
     struct condvar queue_cv;
 
-    struct work *tasks;     /* Ringbuffer of ``capacity`` tasks */
-    struct worker *workers; /* Array of ``max_workers`` workers */
+    struct work *tasks; /* Ringbuffer of ``capacity`` tasks */
+    struct list_head workers;
 
     atomic_uint_fast64_t head;
     atomic_uint_fast64_t tail;
 
     atomic_bool spawn_pending; /* Some enqueue wants us to spawn a worker */
     atomic_uint num_tasks;     /* How many tasks do we have in the ringbuf */
-    atomic_uint_fast64_t worker_bitmap; /* Bitmap of used/available workers */
 
     atomic_uint num_workers;  /* Current # workers */
     atomic_uint idle_workers; /* # idle */
@@ -188,7 +199,6 @@ struct workqueue {
     atomic_flag spawner_flag_internal;
 
     struct workqueue_attributes attrs;
-    struct list_head worklist_list; /* List of worklists */
 
 #ifdef TESTS
     struct workqueue_stats stats;
@@ -206,20 +216,13 @@ struct workqueue {
  *
  * Negative values are errors */
 enum workqueue_error : int32_t {
-    WORKQUEUE_ERROR_NEED_NEW_WORKER = 4,
-    WORKQUEUE_ERROR_NEED_NEW_WQ = 3,
-    WORKQUEUE_ERROR_OK = 0,
-    WORKQUEUE_ERROR_FULL = -1,
+    WORKQUEUE_ERROR_NEED_NEW_WORKER = 4,   /* For manual worker spawn */
+    WORKQUEUE_ERROR_NEED_NEW_WQ = 3,       /* All worker slots filled */
+    WORKQUEUE_ERROR_OK = 0,                /* No message */
+    WORKQUEUE_ERROR_FULL = -1,             /* Full ringbuffer */
+    WORKQUEUE_ERROR_WLIST_EXECUTING = -2,  /* Worklist executing */
+    WORKQUEUE_ERROR_WLIST_UNRUNNABLE = -3, /* Being destroyed, etc. */
 };
-
-static inline bool workqueue_get(struct workqueue *queue) {
-    return refcount_inc(&queue->refcount);
-}
-
-static inline void workqueue_put(struct workqueue *queue) {
-    if (refcount_dec_and_test(&queue->refcount))
-        return; /* TODO: free */
-}
 
 void defer_init(void);
 
@@ -227,8 +230,11 @@ void defer_init(void);
 bool defer_enqueue(dpc_t func, struct work_args args, uint64_t delay_ms);
 void workqueues_permanent_init(void);
 
-struct work *work_create(dpc_t func, struct work_args args);
 struct workqueue *workqueue_create(struct workqueue_attributes *attrs);
+struct work *work_create(dpc_t func, struct work_args args);
+
+void workqueue_free(struct workqueue *queue);
+
 enum workqueue_error workqueue_add(dpc_t func, struct work_args args);
 enum workqueue_error workqueue_add_remote(dpc_t func, struct work_args args);
 enum workqueue_error workqueue_add_local(dpc_t func, struct work_args args);
@@ -237,6 +243,9 @@ enum workqueue_error workqueue_add_fast(dpc_t func, struct work_args args);
 void work_execute(struct work *task);
 struct thread *worker_create(void);
 struct thread *worker_create_unmigratable();
-struct work_list *work_list_create(void);
+struct worklist *worklist_create(enum worklist_flags);
+void worklist_free(struct worklist *wlist);
+
+void workqueue_kick(struct workqueue *queue);
 
 void worker_main(void);
