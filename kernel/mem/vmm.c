@@ -90,10 +90,6 @@ static void do_tlb_shootdown(uintptr_t addr) {
 
         struct core *target = global.cores[i];
 
-        /* FIXME: This is a bandaid fix to avoid deadlock */
-        if (target->current_irql > IRQL_PASSIVE_LEVEL)
-            continue;
-
         while (atomic_load_explicit(&target->tlb_ack_gen,
                                     memory_order_acquire) < gen)
             cpu_relax();
