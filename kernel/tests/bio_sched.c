@@ -116,7 +116,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
 
     prng_seed(time_get_us());
 
-    uint64_t test_runs = 512;
+    uint64_t test_runs = 1024;
     uint64_t runs_per_lvl[BIO_SCHED_LEVELS] = {0};
     uint8_t **buffers = kmalloc(test_runs * sizeof(uint8_t *));
     struct bio_request **rqs =

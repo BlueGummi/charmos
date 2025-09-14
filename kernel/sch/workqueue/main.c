@@ -1,10 +1,5 @@
 #include "internal.h"
 
-static void workqueue_timer_callback(void *arg) {
-    struct workqueue *workqueue = arg;
-    workqueue_put(workqueue);
-}
-
 static enum wake_reason worker_wait(struct workqueue *queue, struct worker *w,
                                     enum irql irql) {
     enum wake_reason signal;
@@ -12,10 +7,8 @@ static enum wake_reason worker_wait(struct workqueue *queue, struct worker *w,
     atomic_fetch_add(&queue->idle_workers, 1);
 
     if (w->timeout_ran && !w->is_permanent) {
-        workqueue_get(queue);
-        signal = condvar_wait_timeout_callback(&queue->queue_cv, &queue->lock,
-                                               w->inactivity_check_period, irql,
-                                               workqueue_timer_callback, queue);
+        signal = condvar_wait_timeout(&queue->queue_cv, &queue->lock,
+                                      w->inactivity_check_period, irql);
         w->timeout_ran = false;
     } else {
         signal = condvar_wait(&queue->queue_cv, &queue->lock, irql);

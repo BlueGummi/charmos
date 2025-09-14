@@ -51,9 +51,7 @@ void work_execute(struct work *task) {
     if (!task)
         return;
 
-    enum irql old = irql_raise(IRQL_DISPATCH_LEVEL);
     task->func(task->arg, task->arg2);
-    irql_lower(old);
 }
 
 struct workqueue *
@@ -124,10 +122,11 @@ struct worker *workqueue_spawn_initial_worker(struct workqueue *queue,
                                               int64_t core) {
     struct thread *thread;
 
-    if (WORKQUEUE_FLAG_SET(queue, WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS))
+    if (WORKQUEUE_FLAG_SET(queue, WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS)) {
         thread = worker_create_unmigratable();
-    else
+    } else {
         thread = worker_create();
+    }
 
     if (!thread)
         return NULL;
@@ -144,14 +143,14 @@ struct worker *workqueue_spawn_initial_worker(struct workqueue *queue,
 
     workqueue_link_thread_and_worker(worker, thread);
 
-    if (core != -1)
+    if (core != -1) {
         scheduler_enqueue_on_core(thread, core);
-    else
+    } else {
         scheduler_enqueue(thread);
-
-    workqueue_update_queue_after_spawn(queue);
+    }
 
     workqueue_add_worker(queue, worker);
+    queue->num_workers = 1;
 
     return worker;
 }

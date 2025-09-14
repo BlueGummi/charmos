@@ -86,6 +86,7 @@ enum workqueue_error workqueue_enqueue_task(struct workqueue *queue, dpc_t func,
                 atomic_fetch_add(&queue->num_tasks, 1);
 
                 atomic_store_explicit(&t->seq, pos + 1, memory_order_release);
+
                 return signal_worker(queue);
             }
         } else if (diff < 0) {

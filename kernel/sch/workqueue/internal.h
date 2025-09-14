@@ -90,7 +90,6 @@ bool workqueue_try_spawn_worker(struct workqueue *queue);
 bool workqueue_dequeue_task(struct workqueue *queue, struct work *out);
 void workqueue_link_thread_and_worker(struct worker *worker,
                                       struct thread *thread);
-void workqueue_update_queue_after_spawn(struct workqueue *queue);
 bool workqueue_spawn_worker(struct workqueue *queue);
 struct workqueue *workqueue_least_loaded_queue_except(int64_t except_core_num);
 struct workqueue *workqueue_get_least_loaded(void);

@@ -138,3 +138,56 @@ REGISTER_TEST(sched_sleepy_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     thread_spawn(sleepy_entry);
     SET_SUCCESS;
 }
+
+#define WQ_2_TIMES 4096
+#define WQ_2_THREADS 8
+
+static atomic_uint times_2 = 0;
+
+static void wq_test_2(void *a, void *b) {
+    (void) a, (void) b;
+    atomic_fetch_add(&times_2, 1);
+    for (uint64_t i = 0; i < 500; i++)
+        cpu_relax();
+}
+
+static struct workqueue *wq = NULL;
+static atomic_uint threads_left = WQ_2_THREADS;
+
+static void enqueue_thread(void) {
+    for (size_t i = 0; i < WQ_2_TIMES / WQ_2_THREADS; i++) {
+        for (uint64_t i = 0; i < 500; i++)
+            cpu_relax();
+
+        workqueue_enqueue_task(wq, wq_test_2, WORK_ARGS(NULL, wq));
+    }
+    atomic_fetch_sub(&threads_left, 1);
+}
+
+REGISTER_TEST(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    struct workqueue_attributes attrs = {
+        .capacity = 4096,
+        .flags = WORKQUEUE_FLAG_AUTO_SPAWN | WORKQUEUE_FLAG_ON_DEMAND,
+        .spawn_delay = 1,
+        .inactive_check_period.max = 10000,
+        .inactive_check_period.min = 2000,
+        .max_workers = 64,
+    };
+
+    wq = workqueue_create(&attrs);
+    for (size_t i = 0; i < WQ_2_THREADS; i++)
+        thread_spawn(enqueue_thread);
+
+    while (atomic_load(&times_2) < WQ_2_TIMES && threads_left > 0) {
+        scheduler_yield();
+    }
+
+    uint64_t workers = wq->num_workers;
+
+    char *msg = kmalloc(100);
+    snprintf(msg, 100, "There are %d workers", workers);
+    ADD_MESSAGE(msg);
+
+    workqueue_destroy(wq);
+    SET_SUCCESS;
+}

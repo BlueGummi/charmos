@@ -98,10 +98,8 @@ void minheap_insert(struct minheap *heap, struct minheap_node *node,
 
 void minheap_remove(struct minheap *heap, struct minheap_node *node) {
     uint32_t idx = node->index;
-    if (idx >= heap->size) {
-        k_panic("Minheap node index '%u' exceeds minheap capacity!", idx);
+    if (idx >= heap->size)
         return;
-    }
 
     heap->size--;
     if (idx != heap->size) {

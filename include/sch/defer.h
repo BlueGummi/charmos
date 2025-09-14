@@ -129,7 +129,7 @@ enum workqueue_flags : uint16_t {
                                                    * workers */
 
     /* "Inverses of flags" represented as a 0 */
-    WORKQUEUE_FLAG_NOT_LAZY = 0,
+    WORKQUEUE_FLAG_NO_AUTO_SPAWN = 0,
     WORKQUEUE_FLAG_MIGRATABLE_WORKERS = 0,
     WORKQUEUE_FLAG_ON_DEMAND = 0,
 };

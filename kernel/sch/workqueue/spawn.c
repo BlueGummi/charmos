@@ -29,11 +29,6 @@ void workqueue_link_thread_and_worker(struct worker *worker,
     thread->worker = worker;
 }
 
-void workqueue_update_queue_after_spawn(struct workqueue *queue) {
-    atomic_fetch_add(&queue->num_workers, 1);
-    queue->last_spawn_attempt = time_get_ms();
-}
-
 static bool claim_spawner(struct workqueue *p) {
     return atomic_flag_test_and_set_explicit(&p->spawner_flag_internal,
                                              memory_order_acq_rel) == 0;
@@ -49,13 +44,13 @@ static void worker_complete_init(struct workqueue *queue, struct worker *w,
     w->present = true;
     w->workqueue = queue;
     w->timeout_ran = true;
+    queue->last_spawn_attempt = time_get_ms();
 
     refcount_init(&w->refcount, 1);
 
     t->worker = w;
 
     atomic_fetch_add(&queue->num_workers, 1);
-    workqueue_update_queue_after_spawn(queue);
 }
 
 bool workqueue_spawn_worker(struct workqueue *queue) {
