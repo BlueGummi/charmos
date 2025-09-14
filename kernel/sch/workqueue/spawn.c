@@ -64,7 +64,7 @@ bool workqueue_spawn_worker(struct workqueue *queue) {
 
     struct worker *w = kzalloc(sizeof(struct worker));
     if (!w)
-        return false;
+        goto fail;
 
     w->inactivity_check_period = get_inactivity_timeout(queue);
 
@@ -76,22 +76,26 @@ bool workqueue_spawn_worker(struct workqueue *queue) {
     else
         t = worker_create();
 
-    if (!t) {
-        release_spawner(queue);
-        return false;
-    }
+    if (!t)
+        goto fail;
 
     worker_complete_init(queue, w, t);
 
-    if (WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_PERMANENT))
-        scheduler_enqueue_on_core(t,
-                                  queue - global.workqueues[0]); /* Core num */
-    else
+    if (WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_PERMANENT)) {
+        scheduler_enqueue_on_core(t, queue->core);
+    } else {
         scheduler_enqueue(t);
+    }
 
     release_spawner(queue);
-
     return true;
+
+fail:
+    if (w)
+        kfree(w);
+
+    release_spawner(queue);
+    return false;
 }
 
 static bool should_spawn_worker(struct workqueue *queue) {
@@ -105,9 +109,11 @@ static bool should_spawn_worker(struct workqueue *queue) {
     bool under_limit =
         atomic_load(&queue->num_workers) < queue->attrs.max_workers;
 
-    bool spawning = atomic_flag_test_and_set(&queue->spawner_flag_internal);
+    /* Permanent workqueues are per-core and spawning
+     * extra threads on them doesn't help */
+    bool non_permanent = !WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_PERMANENT);
 
-    return no_idle && work_pending && under_limit && !spawning;
+    return no_idle && work_pending && under_limit && non_permanent;
 }
 
 bool workqueue_try_spawn_worker(struct workqueue *queue) {

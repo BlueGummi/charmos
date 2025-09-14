@@ -115,20 +115,7 @@ enum workqueue_flags : uint16_t {
                                         * workqueues with on-demand
                                         * worker spawning */
 
-    WORKQUEUE_FLAG_ALLOW_NO_WORKERS = 1 << 2, /* Inverse: Disallow no workers
-                                               *
-                                               * Allowing no workers allows
-                                               * all workers to eventually
-                                               * timeout and get cleaned up.
-                                               *
-                                               * This can sometimes cause
-                                               * issues where each
-                                               * workqueue must spawn
-                                               * the worker manually
-                                               * if all workers are gone,
-                                               * but can save some memory */
-
-    WORKQUEUE_FLAG_AUTO_SPAWN = 1 << 3, /* Inverse: No auto spawn
+    WORKQUEUE_FLAG_AUTO_SPAWN = 1 << 2, /* Inverse: No auto spawn
                                          *
                                          * This flag allows workqueues
                                          * with multiple workers to
@@ -138,13 +125,12 @@ enum workqueue_flags : uint16_t {
                                          * Otherwise, that doesn't happen, and
                                          * workers are manually spawned */
 
-    WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS = 1 << 4, /* Inverse: Migratable
+    WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS = 1 << 3, /* Inverse: Migratable
                                                    * workers */
 
     /* "Inverses of flags" represented as a 0 */
     WORKQUEUE_FLAG_NOT_LAZY = 0,
     WORKQUEUE_FLAG_MIGRATABLE_WORKERS = 0,
-    WORKQUEUE_FLAG_NEEDS_AT_LEAST_ONE_WORKER = 0,
     WORKQUEUE_FLAG_ON_DEMAND = 0,
 };
 #define WORKQUEUE_FLAG_SET(q, f) (q->attrs.flags |= f)
@@ -193,6 +179,7 @@ struct workqueue {
     atomic_uint num_workers;  /* Current # workers */
     atomic_uint idle_workers; /* # idle */
 
+    uint64_t core;
     time_t last_spawn_attempt;
 
     atomic_flag spawner_flag_internal;
