@@ -3,25 +3,42 @@
 #include <kassert.h>
 #include <mem/alloc.h>
 
-static void spawn_permanent_thread_on_core(uint64_t core) {
-    struct workqueue *queue = global.workqueues[core];
+struct worker *workqueue_spawn_initial_worker(struct workqueue *queue,
+                                              int64_t core) {
+    struct thread *thread;
 
-    struct thread *thread = worker_create_unmigratable();
-    if (!thread) {
-        k_panic("Failed to spawn permanent worker thread on core %llu\n", core);
-    }
+    if (WORKQUEUE_FLAG_SET(queue, WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS))
+        thread = worker_create_unmigratable();
+    else
+        thread = worker_create();
+
+    if (!thread)
+        return NULL;
 
     struct worker *worker = kzalloc(sizeof(struct worker));
+    if (!worker)
+        return NULL;
 
     INIT_LIST_HEAD(&worker->list_node);
-    worker->is_permanent = true;
-    worker->inactivity_check_period = MINUTES_TO_MS(5);
+
+    if (!WORKQUEUE_FLAG_SET(queue, WORKQUEUE_FLAG_ALLOW_NO_WORKERS))
+        worker->is_permanent = true;
+
+    worker->inactivity_check_period = queue->attrs.inactive_check_period.max;
     worker->workqueue = queue;
+
     workqueue_link_thread_and_worker(worker, thread);
-    scheduler_enqueue_on_core(thread, core);
+
+    if (core != -1)
+        scheduler_enqueue_on_core(thread, core);
+    else
+        scheduler_enqueue(thread);
+
     workqueue_update_queue_after_spawn(queue);
 
     workqueue_add_worker(queue, worker);
+
+    return worker;
 }
 
 void workqueues_permanent_init(void) {
@@ -43,12 +60,12 @@ void workqueues_permanent_init(void) {
                      WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS,
         };
 
-        global.workqueues[i] = workqueue_create(&attrs);
+        global.workqueues[i] = workqueue_create_internal(&attrs);
 
         if (!global.workqueues[i])
             k_panic("Failed to spawn permanent workqueue\n");
 
-        uint64_t core_id = i;
-        spawn_permanent_thread_on_core(core_id);
+        if (!workqueue_spawn_initial_worker(global.workqueues[i], i))
+            k_panic("Failed to spawn initial worker on workqueue %u\n", i);
     }
 }

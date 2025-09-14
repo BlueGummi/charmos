@@ -18,6 +18,9 @@ bool workqueue_dequeue_task(struct workqueue *queue, struct work *out) {
                 *out = *t;
                 atomic_store_explicit(&t->seq, pos + queue->attrs.capacity,
                                       memory_order_release);
+
+                atomic_fetch_sub(&queue->num_tasks, 1);
+
                 return true;
             }
 
@@ -56,7 +59,12 @@ static enum workqueue_error signal_worker(struct workqueue *queue) {
 }
 
 enum workqueue_error workqueue_enqueue_task(struct workqueue *queue, dpc_t func,
-                                            void *arg, void *arg2) {
+                                            struct work_args args) {
+    if (!workqueue_usable(queue))
+        return WORKQUEUE_ERROR_UNUSABLE;
+
+    void *arg = args.arg1;
+    void *arg2 = args.arg2;
     uint64_t pos;
     struct work *t;
 
@@ -74,6 +82,8 @@ enum workqueue_error workqueue_enqueue_task(struct workqueue *queue, dpc_t func,
                 t->func = func;
                 t->arg = arg;
                 t->arg2 = arg2;
+
+                atomic_fetch_add(&queue->num_tasks, 1);
 
                 atomic_store_explicit(&t->seq, pos + 1, memory_order_release);
                 return signal_worker(queue);

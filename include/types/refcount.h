@@ -1,5 +1,6 @@
 #pragma once
 #include <console/printf.h>
+#include <kassert.h>
 #include <limits.h>
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -50,3 +51,5 @@ static inline bool refcount_dec_and_test(refcount_t *rc) {
         old = expected;
     }
 }
+
+#define REFCOUNT_ASSERT_ZERO(rc) (kassert(atomic_load(&rc) == 0))

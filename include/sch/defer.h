@@ -138,8 +138,8 @@ enum workqueue_flags : uint16_t {
                                          * Otherwise, that doesn't happen, and
                                          * workers are manually spawned */
 
-    WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS =
-        1 << 4, /* Inverse: Migratable workers */
+    WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS = 1 << 4, /* Inverse: Migratable
+                                                   * workers */
 
     /* "Inverses of flags" represented as a 0 */
     WORKQUEUE_FLAG_NOT_LAZY = 0,
@@ -192,7 +192,6 @@ struct workqueue {
 
     atomic_uint num_workers;  /* Current # workers */
     atomic_uint idle_workers; /* # idle */
-    atomic_uint total_spawned;
 
     time_t last_spawn_attempt;
 
@@ -216,12 +215,12 @@ struct workqueue {
  *
  * Negative values are errors */
 enum workqueue_error : int32_t {
-    WORKQUEUE_ERROR_NEED_NEW_WORKER = 4,   /* For manual worker spawn */
-    WORKQUEUE_ERROR_NEED_NEW_WQ = 3,       /* All worker slots filled */
-    WORKQUEUE_ERROR_OK = 0,                /* No message */
-    WORKQUEUE_ERROR_FULL = -1,             /* Full ringbuffer */
-    WORKQUEUE_ERROR_WLIST_EXECUTING = -2,  /* Worklist executing */
-    WORKQUEUE_ERROR_WLIST_UNRUNNABLE = -3, /* Being destroyed, etc. */
+    WORKQUEUE_ERROR_NEED_NEW_WORKER = 4,  /* For manual worker spawn */
+    WORKQUEUE_ERROR_NEED_NEW_WQ = 3,      /* All worker slots filled */
+    WORKQUEUE_ERROR_OK = 0,               /* No message */
+    WORKQUEUE_ERROR_FULL = -1,            /* Full ringbuffer */
+    WORKQUEUE_ERROR_WLIST_EXECUTING = -2, /* Worklist executing */
+    WORKQUEUE_ERROR_UNUSABLE = -3,        /* Being destroyed, etc. */
 };
 
 void defer_init(void);
@@ -234,7 +233,10 @@ struct workqueue *workqueue_create(struct workqueue_attributes *attrs);
 struct work *work_create(dpc_t func, struct work_args args);
 
 void workqueue_free(struct workqueue *queue);
+enum workqueue_error workqueue_enqueue_task(struct workqueue *queue, dpc_t func,
+                                            struct work_args args);
 
+/* Permanent workqueues */
 enum workqueue_error workqueue_add(dpc_t func, struct work_args args);
 enum workqueue_error workqueue_add_remote(dpc_t func, struct work_args args);
 enum workqueue_error workqueue_add_local(dpc_t func, struct work_args args);
@@ -247,5 +249,6 @@ struct worklist *worklist_create(enum worklist_flags);
 void worklist_free(struct worklist *wlist);
 
 void workqueue_kick(struct workqueue *queue);
+void workqueue_destroy(struct workqueue *queue);
 
 void worker_main(void);

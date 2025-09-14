@@ -17,6 +17,8 @@ SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(workqueue, lock);
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(worklist, lock);
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT_NAMED(workqueue, worker_lock, worker);
 
+#define WORKQUEUE_CORE_UNBOUND (-1)
+
 #define WORKQUEUE_NUM_WORKS(wq) (atomic_load(&wq->num_tasks))
 
 static inline uint64_t workqueue_current_worker_count(struct workqueue *q) {
@@ -72,10 +74,20 @@ static inline bool ignore_timeouts(struct workqueue *q) {
     return atomic_load(&q->ignore_timeouts);
 }
 
+static inline bool workqueue_usable(struct workqueue *q) {
+    return atomic_load(&q->state) == WORKQUEUE_STATE_ACTIVE;
+}
+
+static inline size_t workqueue_workers(struct workqueue *wq) {
+    return atomic_load(&wq->num_workers);
+}
+
+static inline size_t workqueue_idlers(struct workqueue *wq) {
+    return atomic_load(&wq->idle_workers);
+}
+
 bool workqueue_try_spawn_worker(struct workqueue *queue);
 bool workqueue_dequeue_task(struct workqueue *queue, struct work *out);
-enum workqueue_error workqueue_enqueue_task(struct workqueue *queue, dpc_t func,
-                                            void *arg, void *arg2);
 void workqueue_link_thread_and_worker(struct worker *worker,
                                       struct thread *thread);
 void workqueue_update_queue_after_spawn(struct workqueue *queue);
@@ -83,3 +95,6 @@ bool workqueue_spawn_worker(struct workqueue *queue);
 struct workqueue *workqueue_least_loaded_queue_except(int64_t except_core_num);
 struct workqueue *workqueue_get_least_loaded(void);
 struct workqueue *workqueue_get_least_loaded_remote(void);
+struct worker *workqueue_spawn_initial_worker(struct workqueue *queue,
+                                              int64_t core);
+struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs);

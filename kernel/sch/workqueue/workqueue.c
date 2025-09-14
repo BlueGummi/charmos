@@ -11,17 +11,17 @@
 
 enum workqueue_error workqueue_add(dpc_t func, struct work_args args) {
     struct workqueue *queue = workqueue_get_least_loaded();
-    return workqueue_enqueue_task(queue, func, args.arg1, args.arg2);
+    return workqueue_enqueue_task(queue, func, args);
 }
 
 enum workqueue_error workqueue_add_remote(dpc_t func, struct work_args args) {
     struct workqueue *queue = workqueue_get_least_loaded_remote();
-    return workqueue_enqueue_task(queue, func, args.arg1, args.arg2);
+    return workqueue_enqueue_task(queue, func, args);
 }
 
 enum workqueue_error workqueue_add_local(dpc_t func, struct work_args args) {
     struct workqueue *queue = global.workqueues[get_this_core_id()];
-    return workqueue_enqueue_task(queue, func, args.arg1, args.arg2);
+    return workqueue_enqueue_task(queue, func, args);
 }
 
 enum workqueue_error workqueue_add_fast(dpc_t func, struct work_args args) {
@@ -44,7 +44,7 @@ enum workqueue_error workqueue_add_fast(dpc_t func, struct work_args args) {
         }
     }
 
-    return workqueue_enqueue_task(optimal, func, args.arg1, args.arg2);
+    return workqueue_enqueue_task(optimal, func, args);
 }
 
 void work_execute(struct work *task) {
@@ -56,7 +56,7 @@ void work_execute(struct work *task) {
     irql_lower(old);
 }
 
-struct workqueue *workqueue_create(struct workqueue_attributes *attrs) {
+struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs) {
     struct workqueue *ret = kzalloc(sizeof(struct workqueue));
     if (!ret)
         return NULL;
@@ -76,6 +76,13 @@ struct workqueue *workqueue_create(struct workqueue_attributes *attrs) {
 
     refcount_init(&ret->refcount, 1);
     ret->state = WORKQUEUE_STATE_ACTIVE;
+
+    return ret;
+}
+
+struct workqueue *workqueue_create(struct workqueue_attributes *attrs) {
+    struct workqueue *ret = workqueue_create_internal(attrs);
+    workqueue_spawn_initial_worker(ret, WORKQUEUE_CORE_UNBOUND);
     return ret;
 }
 
@@ -85,21 +92,24 @@ static void mark_worker_exit(struct thread *t) {
 }
 
 void workqueue_free(struct workqueue *wq) {
+    kassert(atomic_load(&wq->refcount) == 0);
+    WORKQUEUE_STATE_SET(wq, WORKQUEUE_STATE_DEAD);
     kfree(wq->tasks);
     kfree(wq);
 }
 
 /* Give all threads the exit signal and clean up the structs */
 void workqueue_destroy(struct workqueue *queue) {
+    WORKQUEUE_STATE_SET(queue, WORKQUEUE_STATE_DESTROYING);
     atomic_store(&queue->ignore_timeouts, true);
 
-    while (queue->num_workers > queue->idle_workers)
+    while (workqueue_workers(queue) > workqueue_idlers(queue))
         scheduler_yield();
 
     /* All workers now idle */
     condvar_broadcast_callback(&queue->queue_cv, mark_worker_exit);
 
-    while (queue->num_workers > 0)
+    while (workqueue_workers(queue) > 0)
         scheduler_yield();
 
     workqueue_put(queue);
