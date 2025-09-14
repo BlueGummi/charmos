@@ -35,7 +35,7 @@ void hugepage_tb_remove(struct hugepage_tb *htb, struct hugepage *hp) {
     if (!e->valid)
         return;
 
-    enum irql irql = hugepage_tb_entry_lock(e);
+    enum irql irql = hugepage_tb_entry_lock_irq_disable(e);
 
     e->valid = false;
     e->hp = NULL;
@@ -50,7 +50,7 @@ bool hugepage_tb_insert(struct hugepage_tb *htb, struct hugepage *hp) {
     size_t idx = hugepage_tb_hash(addr, htb);
     struct hugepage_tb_entry *e = &htb->entries[idx];
 
-    enum irql irql = hugepage_tb_entry_lock(e);
+    enum irql irql = hugepage_tb_entry_lock_irq_disable(e);
 
     /* Cooldown avoids thrashing, and there's no
      * need to re-insert the same hugepage */

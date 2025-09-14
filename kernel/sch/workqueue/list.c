@@ -24,13 +24,10 @@ static enum worklist_state worklist_change_state(struct worklist *wlist,
     return old;
 }
 
-#define WORKLIST_MARK_READY(wl)                                                \
-    (worklist_change_state(wl, WORKLIST_STATE_READY))
-
 static void worklist_add_work(struct worklist *list, struct work *task) {
     enum irql irql = worklist_lock_irq_disable(list);
     list_add_tail(&task->list_node, &list->list);
-    WORKLIST_MARK_READY(list);
+    worklist_change_state(list, WORKLIST_STATE_READY);
     worklist_unlock(list, irql);
 }
 
@@ -71,7 +68,7 @@ static void worklist_execute_internal(struct workqueue *queue,
 
         while (workqueue_enqueue_task(queue, work->func, work->arg,
                                       work->arg2) == WORKQUEUE_ERROR_FULL)
-            ;
+            scheduler_yield();
     }
 }
 

@@ -32,6 +32,7 @@ struct core {
     uint32_t smt_id;
     uint32_t core_id;
 
+    struct core_domain *domain;
     struct topology_node *topo_node;
     struct topo_cache_info llc;
     struct domain_buddy *domain_buddy;

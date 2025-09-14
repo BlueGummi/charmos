@@ -31,6 +31,10 @@ static void construct_domains_from_numa_nodes(void) {
         cd->associated_node = nn;
         cd->num_cores = num_cores;
         cd->cores = arr;
+
+        for (size_t i = 0; i < num_cores; i++) {
+            arr[i]->domain = cd;
+        }
     }
 }
 
@@ -61,6 +65,7 @@ static void construct_domains_from_cores(void) {
             k_panic("Cannot allocate core array for domain %zu\n", i);
 
         for (size_t j = 0; j < cores_this_domain; j++) {
+            global.cores[core_index]->domain = cd;
             cd->cores[j] = global.cores[core_index++];
         }
     }

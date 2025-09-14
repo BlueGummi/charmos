@@ -10,7 +10,7 @@
 #include "internal.h"
 
 void hugepage_print(struct hugepage *hp) {
-    enum irql irql = hugepage_lock(hp);
+    enum irql irql = hugepage_lock_irq_disable(hp);
     k_printf("struct hugepage 0x%lx {\n", hp);
     k_printf("       .phys_base = 0x%lx\n", hp->phys_base);
     k_printf("       .virt_base = 0x%lx\n", hp->virt_base);
@@ -29,7 +29,7 @@ void hugepage_print_all(void) {
 
     for (size_t i = 0; i < global.core_count; i++) {
         struct hugepage_core_list *hcl = &hugepage_full_tree->core_lists[i];
-        enum irql irql = hugepage_core_list_lock(hcl);
+        enum irql irql = hugepage_core_list_lock_irq_disable(hcl);
         struct minheap_node *mhn;
         minheap_for_each(hcl->hugepage_minheap, mhn) {
             struct hugepage *hp = hugepage_from_minheap_node(mhn);
@@ -38,7 +38,7 @@ void hugepage_print_all(void) {
         hugepage_core_list_unlock(hcl, irql);
     }
     k_printf("hugepage gc list:\n");
-    enum irql irql = hugepage_gc_list_lock(&hugepage_gc_list);
+    enum irql irql = hugepage_gc_list_lock_irq_disable(&hugepage_gc_list);
     struct list_head *gclh = &hugepage_gc_list.hugepages_list;
     struct list_head *pos;
     list_for_each(pos, gclh) {
@@ -51,7 +51,7 @@ void hugepage_print_all(void) {
 /* We check hugepage allocation counts, bitmaps,
  * states, and their pointers */
 bool hugepage_is_valid(struct hugepage *hp) {
-    enum irql irql = hugepage_lock(hp);
+    enum irql irql = hugepage_lock_irq_disable(hp);
 
     uint64_t pused = 0;
 

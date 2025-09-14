@@ -53,7 +53,7 @@ void *hugepage_alloc_from_hugepage(struct hugepage *hp, size_t page_count) {
     if (unlikely(alloc_requires_multiple_hugepages(page_count)))
         return NULL;
 
-    enum irql irql = hugepage_lock(hp);
+    enum irql irql = hugepage_lock_irq_disable(hp);
 
     if (page_count == 1)
         return do_fastpath_alloc(hp, irql);
@@ -106,7 +106,7 @@ static void *alloc_search_core_list(struct hugepage_core_list *hcl,
         return NULL;
 
     struct minheap_node *mhn;
-    enum irql irql = hugepage_core_list_lock(hcl);
+    enum irql irql = hugepage_core_list_lock_irq_disable(hcl);
 
     minheap_for_each(hcl->hugepage_minheap, mhn) {
         struct hugepage *hp = hugepage_from_minheap_node(mhn);
@@ -147,7 +147,7 @@ alloc_from_hugepage_at_base_and_adjust(struct hugepage *hp, size_t pages,
     hugepage_sanity_assert(hp);
     hugepage_remove_from_core_list_safe(hp, minheap_locked);
 
-    enum irql irql = hugepage_lock(hp);
+    enum irql irql = hugepage_lock_irq_disable(hp);
 
     /* sanity: ensure first 'pages' bits are free */
     for (size_t i = 0; i < pages; i++) {

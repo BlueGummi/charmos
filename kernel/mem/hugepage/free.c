@@ -11,7 +11,7 @@
  * hugepage if it becomes fully empty */
 void hugepage_free_from_hugepage(struct hugepage *hp, void *ptr,
                                  size_t page_count) {
-    enum irql irql = hugepage_lock(hp);
+    enum irql irql = hugepage_lock_irq_disable(hp);
 
     kassert(page_count > 0);
     vaddr_t addr = (vaddr_t) ptr;
@@ -57,7 +57,7 @@ static struct hugepage *search_core_list(struct hugepage_core_list *hcl,
                                          vaddr_t vaddr) {
     struct minheap_node *mhn = NULL;
 
-    enum irql irql = hugepage_core_list_lock(hcl);
+    enum irql irql = hugepage_core_list_lock_irq_disable(hcl);
     minheap_for_each(hcl->hugepage_minheap, mhn) {
         struct hugepage *hp = hugepage_from_minheap_node(mhn);
         if (hp->virt_base == vaddr) {
@@ -72,7 +72,7 @@ static struct hugepage *search_core_list(struct hugepage_core_list *hcl,
 
 static struct hugepage *search_global_tree(struct hugepage_tree *tree,
                                            vaddr_t vaddr) {
-    enum irql irql = hugepage_tree_lock(tree);
+    enum irql irql = hugepage_tree_lock_irq_disable(tree);
 
     struct rbt_node *n = rbt_search(tree->root_node->root, vaddr);
     if (!n) {

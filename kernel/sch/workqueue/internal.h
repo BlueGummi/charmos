@@ -17,6 +17,8 @@ SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(workqueue, lock);
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(worklist, lock);
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT_NAMED(workqueue, worker_lock, worker);
 
+#define WORKQUEUE_NUM_WORKS(wq) (atomic_load(&wq->num_tasks))
+
 static inline uint64_t workqueue_current_worker_count(struct workqueue *q) {
     return atomic_load(&q->num_workers);
 }

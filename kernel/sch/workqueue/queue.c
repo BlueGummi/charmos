@@ -49,7 +49,8 @@ static enum workqueue_error signal_worker(struct workqueue *queue) {
         }
     }
 
-    workqueue_try_spawn_worker(queue);
+    if (WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_AUTO_SPAWN))
+        workqueue_try_spawn_worker(queue);
 
     return ret;
 }

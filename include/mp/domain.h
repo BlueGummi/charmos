@@ -11,3 +11,8 @@ struct core_domain {
 };
 
 void core_domain_init(void);
+
+#define core_domain_for_each_local(__pos)                                      \
+    for (size_t __i = 0; (__pos = (get_current_core()->domain->cores[__i]),    \
+                         __i < (get_current_core())->domain->num_cores);       \
+         __i++)

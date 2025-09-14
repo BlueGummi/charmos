@@ -161,7 +161,7 @@ void hugepage_delete(struct hugepage *hp) {
 
 /* Only used inside of this allocator */
 void hugepage_delete_and_unlink(struct hugepage *hp) {
-    enum irql irql = hugepage_gc_list_lock(&hugepage_gc_list);
+    enum irql irql = hugepage_gc_list_lock_irq_disable(&hugepage_gc_list);
 
     if (hugepage_is_marked_for_deletion(hp)) {
         hugepage_mark_being_deleted(hp);

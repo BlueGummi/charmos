@@ -8,6 +8,7 @@ static void workqueue_timer_callback(void *arg) {
 static enum wake_reason worker_wait(struct workqueue *queue, struct worker *w,
                                     enum irql irql) {
     enum wake_reason signal;
+
     atomic_fetch_add(&queue->idle_workers, 1);
 
     if (w->timeout_ran && !w->is_permanent) {
@@ -88,10 +89,10 @@ void worker_main(void) {
         enum irql irql = workqueue_lock_irq_disable(queue);
 
         while (workqueue_empty(queue)) {
-            if (workqueue_needs_spawn(queue) &&
-                WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_AUTO_SPAWN)) {
+            if (workqueue_needs_spawn(queue)) {
                 workqueue_set_needs_spawn(queue, false);
-                workqueue_spawn_worker(queue);
+                if (WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_AUTO_SPAWN))
+                    workqueue_spawn_worker(queue);
             }
 
             enum wake_reason signal = worker_wait(queue, w, irql);

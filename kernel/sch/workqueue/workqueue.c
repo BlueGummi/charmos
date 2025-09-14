@@ -1,6 +1,7 @@
 #include <compiler.h>
 #include <kassert.h>
 #include <mem/alloc.h>
+#include <mp/domain.h>
 #include <sch/defer.h>
 #include <sch/sched.h>
 #include <sync/condvar.h>
@@ -24,9 +25,26 @@ enum workqueue_error workqueue_add_local(dpc_t func, struct work_args args) {
 }
 
 enum workqueue_error workqueue_add_fast(dpc_t func, struct work_args args) {
-    struct workqueue *queue =
+    struct core *pos;
+
+    struct workqueue *optimal =
         global.workqueues[(get_this_core_id() + 1) % global.core_count];
-    return workqueue_enqueue_task(queue, func, args.arg1, args.arg2);
+
+    struct workqueue *local = global.workqueues[get_this_core_id()];
+
+    size_t least_loaded = WORKQUEUE_NUM_WORKS(optimal);
+
+    core_domain_for_each_local(pos) {
+        struct workqueue *queue = global.workqueues[pos->id];
+        size_t load = WORKQUEUE_NUM_WORKS(queue);
+
+        if (load < least_loaded && queue != local) {
+            least_loaded = load;
+            optimal = queue;
+        }
+    }
+
+    return workqueue_enqueue_task(optimal, func, args.arg1, args.arg2);
 }
 
 void work_execute(struct work *task) {
