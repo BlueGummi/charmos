@@ -132,17 +132,12 @@ void thread_queue_clear(struct thread_queue *q) {
 }
 
 void thread_block_on(struct thread_queue *q) {
-    bool interrupts = are_interrupts_enabled();
-
-    disable_interrupts();
-
     struct thread *current = scheduler_get_curr_thread();
 
+    enum irql irql = thread_queue_lock_irq_disable(q);
     thread_block(current, THREAD_BLOCK_REASON_MANUAL);
-    thread_queue_push_back(q, current);
-
-    if (interrupts)
-        enable_interrupts();
+    queue_push_back(q, current);
+    thread_queue_unlock(q, irql);
 }
 
 static void wake_thread(void *a, void *unused) {

@@ -24,6 +24,7 @@ void hugepage_tree_remove(struct hugepage_tree *tree, struct hugepage *hp) {
 void hugepage_core_list_insert(struct hugepage_core_list *list,
                                struct hugepage *hp, bool locked) {
     enum irql irql;
+    enum irql hugepage_irql = hugepage_lock_irq_disable(hp);
 
     if (!locked)
         irql = hugepage_core_list_lock_irq_disable(list);
@@ -33,6 +34,8 @@ void hugepage_core_list_insert(struct hugepage_core_list *list,
 
     if (!locked)
         hugepage_core_list_unlock(list, irql);
+
+    hugepage_unlock(hp, hugepage_irql);
 }
 
 void hugepage_return_to_list_internal(struct hugepage *hp) {
@@ -54,6 +57,7 @@ static struct hugepage *core_list_do_op(struct hugepage_core_list *hcl,
         hugepage_core_list_unlock(hcl, irql);
         return NULL;
     }
+
     hugepage_core_list_unlock(hcl, irql);
 
     return hugepage_from_minheap_node(nd);
@@ -69,13 +73,18 @@ struct hugepage *hugepage_core_list_pop(struct hugepage_core_list *hcl) {
 
 void hugepage_core_list_remove_hugepage(struct hugepage_core_list *hcl,
                                         struct hugepage *hp, bool locked) {
+    enum irql hugepage_irql = hugepage_lock_irq_disable(hp);
+
     enum irql irql = IRQL_PASSIVE_LEVEL;
     if (!locked)
         irql = hugepage_core_list_lock_irq_disable(hcl);
 
     kassert(hp->owner_core == hcl->core_num);
+
     minheap_remove(hcl->hugepage_minheap, &hp->minheap_node);
 
     if (!locked)
         hugepage_core_list_unlock(hcl, irql);
+
+    hugepage_unlock(hp, hugepage_irql);
 }

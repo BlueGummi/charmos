@@ -24,14 +24,14 @@ static enum worklist_state worklist_change_state(struct worklist *wlist,
     return old;
 }
 
-static void worklist_add_work(struct worklist *list, struct work *task) {
+void worklist_add_work(struct worklist *list, struct work *task) {
     enum irql irql = worklist_lock_irq_disable(list);
     list_add_tail(&task->list_node, &list->list);
     worklist_change_state(list, WORKLIST_STATE_READY);
     worklist_unlock(list, irql);
 }
 
-static void worklist_remove_work(struct worklist *list, struct work *task) {
+void worklist_remove_work(struct worklist *list, struct work *task) {
     enum irql irql = worklist_lock_irq_disable(list);
     list_del(&task->list_node);
 
@@ -52,7 +52,7 @@ struct work *worklist_pop_front(struct worklist *list) {
     return work_from_worklist_node(node);
 }
 
-static bool worklist_empty(struct worklist *list) {
+bool worklist_empty(struct worklist *list) {
     enum irql irql = worklist_lock_irq_disable(list);
     bool empty = list_empty(&list->list);
     worklist_unlock(list, irql);
@@ -66,8 +66,8 @@ static void worklist_execute_internal(struct workqueue *queue,
     list_for_each(iter, works) {
         struct work *work = work_from_worklist_node(iter);
 
-        while (workqueue_enqueue_task(queue, work->func,
-                                      WORK_ARGS(work->arg, work->arg2)) ==
+        while (workqueue_enqueue_oneshot(queue, work->func,
+                                         WORK_ARGS(work->arg, work->arg2)) ==
                WORKQUEUE_ERROR_FULL)
             scheduler_yield();
     }
@@ -78,13 +78,14 @@ void worklist_cancel_work(struct worklist *wl, struct work *wlw) {
 }
 
 enum workqueue_error worklist_execute(struct workqueue *queue,
-                                      struct worklist *wlist) {
-    if (atomic_exchange(&wlist->state, WORKLIST_STATE_RUNNING) ==
-            WORKLIST_STATE_RUNNING &&
-        !(wlist->flags & WORKLIST_FLAG_UNBOUND))
+                                      struct worklist *w) {
+    enum worklist_state o = atomic_exchange(&w->state, WORKLIST_STATE_RUNNING);
+
+    if (o == WORKLIST_STATE_RUNNING && !(w->flags & WORKLIST_FLAG_UNBOUND))
         return WORKQUEUE_ERROR_OK; /* OK - Already running and serialized */
 
-    worklist_execute_internal(queue, wlist);
+    worklist_execute_internal(queue, w);
+    atomic_store(&w->state, o);
 
     return WORKQUEUE_ERROR_OK;
 }

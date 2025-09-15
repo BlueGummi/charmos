@@ -27,17 +27,12 @@ static enum bio_request_status nvme_to_bio_status(uint16_t status) {
     return BIO_STATUS_OK;
 }
 
-static inline void wake_waiter(struct nvme_request *req) {
-    struct thread *t = req->waiter;
-    if (t) {
-        scheduler_wake_from_io_block(t);
-    }
-}
-
 static void nvme_dpc(void *rvoid, void *dvoid) {
     struct nvme_device *dev = dvoid;
     struct nvme_request *req = rvoid;
-    wake_waiter(req);
+    struct thread *t = req->waiter;
+    if (t)
+        scheduler_wake_from_io_block(t);
 
     if (--req->remaining_parts == 0) {
         kfree(req->bio_data->prps);
@@ -49,16 +44,22 @@ static void nvme_dpc(void *rvoid, void *dvoid) {
     }
 
     struct nvme_waiting_requests *waiters = &dev->waiting_requests;
-    if (waiters->head) {
-        struct nvme_request *next = waiters->head;
-        waiters->head = waiters->head->next;
+
+    enum irql irql = nvme_waiting_requests_lock_irq_disable(waiters);
+    if (!list_empty(&waiters->list)) {
+        struct list_head *pop = list_pop_front(&waiters->list);
+        struct nvme_request *next =
+            container_of(pop, struct nvme_request, list_node);
+        nvme_waiting_requests_unlock(waiters, irql);
         nvme_send_nvme_req(dev->generic_disk, next);
+    } else {
+        nvme_waiting_requests_unlock(waiters, irql);
     }
 }
 
 void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
     struct nvme_queue *queue = dev->io_queues[qid];
-    queue->outstanding--;
+    atomic_fetch_sub(&queue->outstanding, 1);
 
     enum irql irql = nvme_queue_lock_irq_disable(queue);
 
@@ -74,7 +75,11 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
         struct nvme_request *req = dev->io_requests[qid][cid];
 
         req->status = status;
-        workqueue_add_fast(nvme_dpc, WORK_ARGS(req, dev));
+
+        while (workqueue_add_fast_oneshot(nvme_dpc, WORK_ARGS(req, dev)) ==
+               WORKQUEUE_ERROR_FULL)
+            cpu_relax();
+
         dev->io_requests[qid][cid] = NULL;
 
         queue->cq_head = (queue->cq_head + 1) % queue->cq_depth;
@@ -105,7 +110,7 @@ void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
 
     cmd->cid = tail;
 
-    this_queue->outstanding++;
+    atomic_fetch_add(&this_queue->outstanding, 1);
 
     this_queue->sq[tail] = *cmd;
 

@@ -16,6 +16,7 @@ _Static_assert(DEFAULT_MAX_WORKERS < 64, ""); /* Won't fit in our bitmap */
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(workqueue, lock);
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(worklist, lock);
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT_NAMED(workqueue, worker_lock, worker);
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT_NAMED(workqueue, work_lock, work);
 
 #define WORKQUEUE_CORE_UNBOUND (-1)
 

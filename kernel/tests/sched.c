@@ -49,7 +49,7 @@ REGISTER_TEST(workqueue_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     uint64_t times = 256;
 
     for (uint64_t i = 0; i < times; i++)
-        workqueue_add_fast(workqueue_fn, WORK_ARGS(NULL, NULL));
+        workqueue_add_fast_oneshot(workqueue_fn, WORK_ARGS(NULL, NULL));
 
     uint64_t total = rdtsc() - tsc;
     sleep_ms(50);
@@ -159,7 +159,7 @@ static void enqueue_thread(void) {
         for (uint64_t i = 0; i < 500; i++)
             cpu_relax();
 
-        workqueue_enqueue_task(wq, wq_test_2, WORK_ARGS(NULL, wq));
+        workqueue_enqueue_oneshot(wq, wq_test_2, WORK_ARGS(NULL, wq));
     }
     atomic_fetch_sub(&threads_left, 1);
 }
@@ -175,12 +175,9 @@ REGISTER_TEST(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     };
 
     wq = workqueue_create(&attrs);
+
     for (size_t i = 0; i < WQ_2_THREADS; i++)
         thread_spawn(enqueue_thread);
-
-    while (atomic_load(&times_2) < WQ_2_TIMES && threads_left > 0) {
-        scheduler_yield();
-    }
 
     uint64_t workers = wq->num_workers;
 

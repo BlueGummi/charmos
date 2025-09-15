@@ -9,22 +9,24 @@
 
 #include "internal.h"
 
-enum workqueue_error workqueue_add(dpc_t func, struct work_args args) {
+enum workqueue_error workqueue_add_oneshot(dpc_t func, struct work_args args) {
     struct workqueue *queue = workqueue_get_least_loaded();
-    return workqueue_enqueue_task(queue, func, args);
+    return workqueue_enqueue_oneshot(queue, func, args);
 }
 
-enum workqueue_error workqueue_add_remote(dpc_t func, struct work_args args) {
+enum workqueue_error workqueue_add_remote_oneshot(dpc_t func,
+                                                  struct work_args args) {
     struct workqueue *queue = workqueue_get_least_loaded_remote();
-    return workqueue_enqueue_task(queue, func, args);
+    return workqueue_enqueue_oneshot(queue, func, args);
 }
 
-enum workqueue_error workqueue_add_local(dpc_t func, struct work_args args) {
+enum workqueue_error workqueue_add_local_oneshot(dpc_t func,
+                                                 struct work_args args) {
     struct workqueue *queue = global.workqueues[get_this_core_id()];
-    return workqueue_enqueue_task(queue, func, args);
+    return workqueue_enqueue_oneshot(queue, func, args);
 }
 
-enum workqueue_error workqueue_add_fast(dpc_t func, struct work_args args) {
+static struct workqueue *find_optimal_domain_wq(void) {
     struct core *pos;
 
     struct workqueue *optimal =
@@ -44,7 +46,13 @@ enum workqueue_error workqueue_add_fast(dpc_t func, struct work_args args) {
         }
     }
 
-    return workqueue_enqueue_task(optimal, func, args);
+    return optimal;
+}
+
+enum workqueue_error workqueue_add_fast_oneshot(dpc_t func,
+                                                struct work_args args) {
+    struct workqueue *optimal = find_optimal_domain_wq();
+    return workqueue_enqueue_oneshot(optimal, func, args);
 }
 
 void work_execute(struct work *task) {
@@ -62,16 +70,18 @@ workqueue_create_internal(struct workqueue_attributes *attrs) {
 
     spinlock_init(&ret->lock);
     ret->attrs = *attrs;
-    ret->tasks = kzalloc(sizeof(struct work) * attrs->capacity);
-    if (!ret->tasks) {
+    ret->oneshot_works = kzalloc(sizeof(struct work) * attrs->capacity);
+    if (!ret->oneshot_works) {
         kfree(ret);
         return NULL;
     }
 
     INIT_LIST_HEAD(&ret->workers);
+    INIT_LIST_HEAD(&ret->works);
 
     for (uint64_t i = 0; i < attrs->capacity; i++)
-        atomic_store_explicit(&ret->tasks[i].seq, i, memory_order_relaxed);
+        atomic_store_explicit(&ret->oneshot_works[i].seq, i,
+                              memory_order_relaxed);
 
     refcount_init(&ret->refcount, 1);
     ret->state = WORKQUEUE_STATE_ACTIVE;
@@ -93,7 +103,7 @@ static void mark_worker_exit(struct thread *t) {
 void workqueue_free(struct workqueue *wq) {
     kassert(atomic_load(&wq->refcount) == 0);
     WORKQUEUE_STATE_SET(wq, WORKQUEUE_STATE_DEAD);
-    kfree(wq->tasks);
+    kfree(wq->oneshot_works);
     kfree(wq);
 }
 

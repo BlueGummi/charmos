@@ -145,7 +145,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
     for (uint64_t i = 0; i < test_runs; i++) {
         struct bio_request *rq = rqs[i];
         runs_per_lvl[rq->priority]++;
-        rq->user_data = (void *) ((time_get_ms() << 12) | rq->priority);
+        rq->user_data = (void *) ((time_get_ms_fast() << 12) | rq->priority);
         bio_sched_enqueue(d, rq);
     }
     ms = time_get_ms() - ms;
@@ -155,6 +155,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
     snprintf(msg, 100, "Total time spent enqueuing is %d ms", ms);
     ADD_MESSAGE(msg);
     bio_sched_dispatch_all(d);
+
     sleep_ms(500);
 
     for (uint64_t i = 0; i < BIO_SCHED_LEVELS; i++) {

@@ -1,12 +1,12 @@
 #include "internal.h"
 
-bool workqueue_dequeue_task(struct workqueue *queue, struct work *out) {
+static bool dequeue_oneshot_task(struct workqueue *queue, struct work *out) {
     uint64_t pos;
     struct work *t;
 
     while (1) {
         pos = atomic_load_explicit(&queue->tail, memory_order_relaxed);
-        t = &queue->tasks[pos % queue->attrs.capacity];
+        t = &queue->oneshot_works[pos % queue->attrs.capacity];
         uint64_t seq = atomic_load_explicit(&t->seq, memory_order_acquire);
         int64_t diff = (int64_t) seq - (int64_t) (pos + 1);
 
@@ -29,6 +29,25 @@ bool workqueue_dequeue_task(struct workqueue *queue, struct work *out) {
             return false;
         }
     }
+}
+
+bool workqueue_dequeue_task(struct workqueue *queue, struct work *out) {
+    if (dequeue_oneshot_task(queue, out))
+        return true;
+
+    enum irql irql = workqueue_work_lock_irq_disable(queue);
+    struct list_head *lh = list_pop_front(&queue->works);
+    workqueue_work_unlock(queue, irql);
+
+    if (lh) {
+        struct work *work = work_from_worklist_node(lh);
+        *out = *work;
+        atomic_store(&work->enqueued, false);
+        atomic_fetch_sub(&queue->num_tasks, 1);
+        return true;
+    }
+
+    return false;
 }
 
 static void signal_callback(struct thread *t) {
@@ -58,8 +77,25 @@ static enum workqueue_error signal_worker(struct workqueue *queue) {
     return ret;
 }
 
-enum workqueue_error workqueue_enqueue_task(struct workqueue *queue, dpc_t func,
-                                            struct work_args args) {
+enum workqueue_error workqueue_enqueue(struct workqueue *queue,
+                                       struct work *work) {
+    if (atomic_load(&work->enqueued))
+        return WORKQUEUE_ERROR_WORK_EXECUTING;
+
+    enum irql irql = workqueue_work_lock_irq_disable(queue);
+    list_add_tail(&work->list_node, &queue->works);
+    atomic_store(&work->enqueued, true);
+
+    workqueue_work_unlock(queue, irql);
+
+    atomic_fetch_add(&queue->num_tasks, 1);
+
+    return signal_worker(queue);
+}
+
+enum workqueue_error workqueue_enqueue_oneshot(struct workqueue *queue,
+                                               dpc_t func,
+                                               struct work_args args) {
     if (!workqueue_usable(queue))
         return WORKQUEUE_ERROR_UNUSABLE;
 
@@ -70,7 +106,7 @@ enum workqueue_error workqueue_enqueue_task(struct workqueue *queue, dpc_t func,
 
     while (1) {
         pos = atomic_load_explicit(&queue->head, memory_order_relaxed);
-        t = &queue->tasks[pos % queue->attrs.capacity];
+        t = &queue->oneshot_works[pos % queue->attrs.capacity];
         uint64_t seq = atomic_load_explicit(&t->seq, memory_order_acquire);
         int64_t diff = (int64_t) seq - (int64_t) pos;
 

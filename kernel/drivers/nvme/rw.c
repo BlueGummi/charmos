@@ -15,13 +15,12 @@
 typedef bool (*sync_fn)(struct generic_disk *, uint64_t, uint8_t *, uint16_t);
 typedef bool (*async_fn)(struct generic_disk *, struct nvme_request *);
 
-SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(nvme_waiting_requests, lock);
-
 static void enqueue_request(struct nvme_device *dev, struct nvme_request *req) {
     struct nvme_waiting_requests *q = &dev->waiting_requests;
+
     enum irql irql = nvme_waiting_requests_lock_irq_disable(q);
 
-    sll_add(q, req);
+    list_add_tail(&req->list_node, &q->list);
 
     nvme_waiting_requests_unlock(q, irql);
 }
@@ -79,7 +78,7 @@ static bool rw_send_command(struct generic_disk *disk, struct nvme_request *req,
 
     struct nvme_queue *q = nvme->io_queues[qid];
 
-    if (q->outstanding >= q->sq_depth) {
+    if (atomic_load(&q->outstanding) >= q->sq_depth) {
         enqueue_request(nvme, req);
 
         /* No room */

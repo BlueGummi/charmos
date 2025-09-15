@@ -79,7 +79,7 @@ void worker_main(void) {
             continue;
         }
 
-        enum irql irql = workqueue_lock_irq_disable(queue);
+        enum irql irql = workqueue_lock(queue);
 
         while (workqueue_empty(queue)) {
             if (workqueue_needs_spawn(queue)) {

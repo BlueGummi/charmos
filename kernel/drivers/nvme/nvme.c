@@ -121,6 +121,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
             k_panic("Could not allocate space for NVMe structures");
     }
 
+    INIT_LIST_HEAD(&nvme->waiting_requests.list);
     return nvme;
 }
 

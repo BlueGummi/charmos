@@ -311,8 +311,6 @@ void scheduler_yield() {
 
     if (were_enabled)
         enable_interrupts();
-    else
-        disable_interrupts();
 }
 
 void scheduler_force_resched(struct scheduler *sched) {

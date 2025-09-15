@@ -9,8 +9,8 @@ static void minheap_swap(struct minheap *heap, uint32_t a, uint32_t b) {
     heap->nodes[a] = heap->nodes[b];
     heap->nodes[b] = tmp;
 
-    heap->nodes[a]->index = a;
-    heap->nodes[b]->index = b;
+    MINHEAP_NODE_SET_INDEX(heap->nodes[a], a);
+    MINHEAP_NODE_SET_INDEX(heap->nodes[b], b);
 }
 
 static void minheap_sift_up(struct minheap *heap, uint32_t idx) {
@@ -18,6 +18,7 @@ static void minheap_sift_up(struct minheap *heap, uint32_t idx) {
         uint32_t parent = (idx - 1) / 2;
         if (heap->nodes[idx]->key >= heap->nodes[parent]->key)
             break;
+
         minheap_swap(heap, idx, parent);
         idx = parent;
     }
@@ -34,6 +35,7 @@ static void minheap_sift_down(struct minheap *heap, uint32_t idx) {
         if (left < heap->size &&
             heap->nodes[left]->key < heap->nodes[smallest]->key)
             smallest = left;
+
         if (right < heap->size &&
             heap->nodes[right]->key < heap->nodes[smallest]->key)
             smallest = right;
@@ -69,7 +71,7 @@ void minheap_expand(struct minheap *heap, uint32_t new_size) {
 
     kfree(heap->nodes);
     heap->nodes = new_nodes;
-    heap->capacity = new_size;
+    MINHEAP_SET_CAPACITY(heap, new_size);
 }
 
 void minheap_insert(struct minheap *heap, struct minheap_node *node,
@@ -89,17 +91,18 @@ void minheap_insert(struct minheap *heap, struct minheap_node *node,
         heap->capacity = new_cap;
     }
 
-    node->key = key;
-    node->index = heap->size;
+    MINHEAP_NODE_SET_INDEX(node, heap->size);
+    MINHEAP_NODE_SET_KEY(node, key);
+
     heap->nodes[heap->size++] = node;
 
     minheap_sift_up(heap, node->index);
 }
 
 void minheap_remove(struct minheap *heap, struct minheap_node *node) {
-    uint32_t idx = node->index;
-    if (idx >= heap->size)
-        return;
+    uint32_t idx = MINHEAP_NODE_INDEX(node);
+    if (idx >= MINHEAP_SIZE(heap))
+        k_panic("Invalid minheap index %u\n", idx);
 
     heap->size--;
     if (idx != heap->size) {
@@ -109,11 +112,11 @@ void minheap_remove(struct minheap *heap, struct minheap_node *node) {
         minheap_sift_up(heap, idx);
     }
 
-    node->index = MINHEAP_INDEX_INVALID;
+    MINHEAP_MARK_NODE_INVALID(node);
 }
 
 struct minheap_node *minheap_pop(struct minheap *heap) {
-    if (heap->size == 0)
+    if (MINHEAP_SIZE(heap) == 0)
         return NULL;
 
     struct minheap_node *top = heap->nodes[0];
@@ -124,6 +127,6 @@ struct minheap_node *minheap_pop(struct minheap *heap) {
         minheap_sift_down(heap, 0);
     }
 
-    top->index = MINHEAP_INDEX_INVALID;
+    MINHEAP_MARK_NODE_INVALID(top);
     return top;
 }

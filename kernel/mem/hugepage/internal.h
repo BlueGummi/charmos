@@ -47,6 +47,11 @@ struct hugepage_gc_list {
     atomic_uint pages_in_list;
 };
 
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(hugepage_gc_list, lock)
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(hugepage_core_list, lock)
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(hugepage_tree, lock)
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(hugepage_tb_entry, lock)
+
 #define hugepage_from_tree_node(node)                                          \
     container_of(node, struct hugepage, tree_node)
 
@@ -113,6 +118,11 @@ static inline void hugepage_zero_bitmap(struct hugepage *hp) {
     memset(hp->bitmap, 0, HUGEPAGE_U64_BITMAP_SIZE * 8);
 }
 
+static inline struct hugepage_core_list *
+hugepage_get_core_list(struct hugepage *hp) {
+    return &hugepage_full_tree->core_lists[hp->owner_core];
+}
+
 static inline void hugepage_gc_list_dec_count(struct hugepage_gc_list *hgcl) {
     atomic_fetch_sub(&hgcl->pages_in_list, 1);
 }
@@ -122,17 +132,16 @@ static inline void hugepage_gc_list_inc_count(struct hugepage_gc_list *hgcl) {
 }
 
 static inline bool hugepage_still_in_core_list(struct hugepage *hp) {
-    return hp->minheap_node.index != MINHEAP_INDEX_INVALID;
+    struct minheap_node *mhn = &hp->minheap_node;
+    enum irql irql = hugepage_lock_irq_disable(hp);
+    bool valid = MINHEAP_NODE_INDEX(mhn) != MINHEAP_INDEX_INVALID;
+    hugepage_unlock(hp, irql);
+    return valid;
 }
 
 static inline size_t hugepage_num_pages_free(struct hugepage *hp) {
     return HUGEPAGE_SIZE_IN_4KB_PAGES - hp->pages_used;
 }
-
-SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(hugepage_gc_list, lock)
-SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(hugepage_core_list, lock)
-SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(hugepage_tree, lock)
-SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(hugepage_tb_entry, lock)
 
 /* You cannot unmark the 'being_deleted' since that is a UAF */
 static inline void hugepage_mark_being_deleted(struct hugepage *hp) {
@@ -166,11 +175,6 @@ static inline uint64_t popcount_uint64(uint64_t n) {
     return count;
 }
 
-static inline struct hugepage_core_list *
-hugepage_get_core_list(struct hugepage *hp) {
-    return &hugepage_full_tree->core_lists[hp->owner_core];
-}
-
 static inline struct hugepage_core_list *hugepage_this_core_list(void) {
     if (global.current_bootstage < BOOTSTAGE_MID_MP)
         return &hugepage_full_tree->core_lists[0];
@@ -190,6 +194,7 @@ static inline bool hugepage_remove_from_core_list_safe(struct hugepage *hp,
         hugepage_remove_from_core_list(hp, locked);
         return true;
     }
+
     return false;
 }
 

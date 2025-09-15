@@ -30,8 +30,10 @@ struct work {
     dpc_t func;
     void *arg;
     void *arg2;
+
     struct list_head list_node;
-    atomic_bool cancelled;
+
+    atomic_bool enqueued;
     atomic_uint_fast64_t seq;
 };
 
@@ -161,14 +163,15 @@ struct workqueue_attributes {
 struct workqueue {
     atomic_bool ignore_timeouts;
 
+    struct spinlock work_lock;
     struct spinlock worker_lock;
-    struct spinlock lock; /* Lock for condvar and other things
-                           * like the worklists */
+    struct spinlock lock;
 
     struct condvar queue_cv;
 
-    struct work *tasks; /* Ringbuffer of ``capacity`` tasks */
+    struct work *oneshot_works; /* Ringbuffer of ``capacity`` oneshot tasks */
     struct list_head workers;
+    struct list_head works;
 
     atomic_uint_fast64_t head;
     atomic_uint_fast64_t tail;
@@ -208,6 +211,7 @@ enum workqueue_error : int32_t {
     WORKQUEUE_ERROR_FULL = -1,            /* Full ringbuffer */
     WORKQUEUE_ERROR_WLIST_EXECUTING = -2, /* Worklist executing */
     WORKQUEUE_ERROR_UNUSABLE = -3,        /* Being destroyed, etc. */
+    WORKQUEUE_ERROR_WORK_EXECUTING = -4,
 };
 
 void defer_init(void);
@@ -220,14 +224,26 @@ struct workqueue *workqueue_create(struct workqueue_attributes *attrs);
 struct work *work_create(dpc_t func, struct work_args args);
 
 void workqueue_free(struct workqueue *queue);
-enum workqueue_error workqueue_enqueue_task(struct workqueue *queue, dpc_t func,
-                                            struct work_args args);
+enum workqueue_error workqueue_enqueue_oneshot(struct workqueue *queue,
+                                               dpc_t func,
+                                               struct work_args args);
+
+enum workqueue_error workqueue_enqueue(struct workqueue *queue,
+                                       struct work *work);
 
 /* Permanent workqueues */
-enum workqueue_error workqueue_add(dpc_t func, struct work_args args);
-enum workqueue_error workqueue_add_remote(dpc_t func, struct work_args args);
-enum workqueue_error workqueue_add_local(dpc_t func, struct work_args args);
-enum workqueue_error workqueue_add_fast(dpc_t func, struct work_args args);
+enum workqueue_error workqueue_add_oneshot(dpc_t func, struct work_args args);
+enum workqueue_error workqueue_add_remote_oneshot(dpc_t func,
+                                                  struct work_args args);
+enum workqueue_error workqueue_add_local_oneshot(dpc_t func,
+                                                 struct work_args args);
+enum workqueue_error workqueue_add_fast_oneshot(dpc_t func,
+                                                struct work_args args);
+
+enum workqueue_error workqueue_add(struct work *work);
+enum workqueue_error workqueue_add_remote(struct work *work);
+enum workqueue_error workqueue_add_local(struct work *work);
+enum workqueue_error workqueue_add_fast(struct work *work);
 
 void work_execute(struct work *task);
 struct thread *worker_create(void);

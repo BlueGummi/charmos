@@ -102,7 +102,7 @@ struct nvme_request {
 
     void *user_data;
 
-    struct nvme_request *next;
+    struct list_head list_node;
 };
 
 struct nvme_queue {
@@ -119,15 +119,14 @@ struct nvme_queue {
     uint32_t *sq_db;
     uint32_t *cq_db;
 
-    uint16_t outstanding;
+    atomic_uint_fast16_t outstanding;
 
     struct spinlock lock;
 };
 
 struct nvme_waiting_requests {
     struct spinlock lock;
-    struct nvme_request *head;
-    struct nvme_request *tail;
+    struct list_head list;
 };
 
 struct nvme_device {
@@ -353,3 +352,5 @@ void nvme_do_coalesce(struct generic_disk *disk, struct bio_request *into,
                       struct bio_request *from);
 
 void nvme_reorder(struct generic_disk *disk);
+
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(nvme_waiting_requests, lock);
