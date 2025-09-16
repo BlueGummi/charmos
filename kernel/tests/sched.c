@@ -166,7 +166,7 @@ static void enqueue_thread(void) {
 
 REGISTER_TEST(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct workqueue_attributes attrs = {
-        .capacity = 4096,
+        .capacity = WQ_2_TIMES,
         .flags = WORKQUEUE_FLAG_AUTO_SPAWN | WORKQUEUE_FLAG_ON_DEMAND,
         .spawn_delay = 1,
         .inactive_check_period.max = 10000,
@@ -178,6 +178,9 @@ REGISTER_TEST(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     for (size_t i = 0; i < WQ_2_THREADS; i++)
         thread_spawn(enqueue_thread);
+
+    while (atomic_load(&threads_left) > 0)
+        scheduler_yield();
 
     uint64_t workers = wq->num_workers;
 

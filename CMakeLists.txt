@@ -108,7 +108,7 @@ set(QEMU_COMMON_FLAGS
 
     -s
     #-S
-    -monitor telnet:127.0.0.1:1234,server,nowait
+    -monitor telnet:127.0.0.1:5555,server,nowait
 
     -device qemu-xhci,id=xhci
     -device usb-kbd,bus=xhci.0

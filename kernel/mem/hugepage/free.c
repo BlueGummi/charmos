@@ -140,6 +140,9 @@ static void free_from_multiple_hugepages(vaddr_t base, size_t page_count) {
 
 void hugepage_free_pages(void *ptr, size_t page_count) {
     vaddr_t vaddr_aligned = HUGEPAGE_ALIGN((vaddr_t) ptr);
+
+    kassert(ALIGN_DOWN((vaddr_t) ptr, PAGE_SIZE) == (vaddr_t) ptr);
+
     if (free_requires_multiple_hugepages(page_count))
         return free_from_multiple_hugepages(vaddr_aligned, page_count);
 
