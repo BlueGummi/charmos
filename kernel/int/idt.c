@@ -46,8 +46,8 @@ MAKE_HANDLER(double_fault, "DOUBLE FAULT");
 
 void isr_common_entry(uint8_t vector, void *rsp) {
     enum irql old = irql_raise(IRQL_HIGH_LEVEL);
-    mark_self_in_interrupt();
-    unmark_self_idle();
+    mark_self_in_interrupt(true);
+    mark_self_idle(false);
 
     if (isr_table[vector].handler) {
         isr_table[vector].handler(isr_table[vector].ctx, vector, rsp);
@@ -58,21 +58,22 @@ void isr_common_entry(uint8_t vector, void *rsp) {
     }
 
     rcu_mark_quiescent();
-    unmark_self_in_interrupt();
+    mark_self_in_interrupt(false);
     irql_lower(old);
 }
 
 void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {
     (void) ctx, (void) vector, (void) rsp;
-    /*if (!preemption_disabled()) { */
+    if (!preemption_disabled()) {
         lapic_write(LAPIC_REG_EOI, 0);
 
         /* Doing this as the `schedule()` will go to another thread */
-        unmark_self_in_interrupt();
+        mark_self_in_interrupt(false);
         schedule();
-    /*} else {
+    } else {
+        mark_self_needs_resched(true);
         lapic_write(LAPIC_REG_EOI, 0);
-    }*/
+    }
 }
 
 /* Literally a no-op. Used to break out of "wait for interrupt" loops */

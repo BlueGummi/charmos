@@ -32,6 +32,8 @@ struct core {
     uint32_t smt_id;
     uint32_t core_id;
 
+    atomic_bool needs_resched;
+
     struct core_domain *domain;
     struct topology_node *topo_node;
     struct topo_cache_info llc;
@@ -54,22 +56,21 @@ static inline struct core *get_current_core(void) {
     return global.cores[get_this_core_id()];
 }
 
-static inline void mark_self_idle(void) {
-    get_current_core()->idle = true;
-    topo_mark_core_idle(get_this_core_id(), true);
+static inline void mark_self_needs_resched(bool new) {
+    atomic_store(&get_current_core()->needs_resched, new);
 }
 
-static inline void unmark_self_idle(void) {
-    get_current_core()->idle = false;
-    topo_mark_core_idle(get_this_core_id(), false);
+static inline bool needs_resched(void) {
+    return atomic_load(&get_current_core()->needs_resched);
 }
 
-static inline void mark_self_in_interrupt(void) {
-    get_current_core()->in_interrupt = true;
+static inline void mark_self_idle(bool new) {
+    get_current_core()->idle = new;
+    topo_mark_core_idle(get_this_core_id(), new);
 }
 
-static inline void unmark_self_in_interrupt(void) {
-    get_current_core()->in_interrupt = false;
+static inline void mark_self_in_interrupt(bool new) {
+    get_current_core()->in_interrupt = new;
 }
 
 static inline bool in_interrupt(void) {
@@ -101,7 +102,7 @@ static inline uint32_t preempt_disable(void) {
     do {
         old = atomic_load(&cpu->preempt_disable_depth);
         if (old == UINT32_MAX)
-            return 0;
+            k_panic("overflow\n");
 
         new = old + 1;
 
@@ -118,7 +119,7 @@ static inline uint32_t preempt_enable(void) {
     do {
         old = atomic_load(&cpu->preempt_disable_depth);
         if (old == 0)
-            return 0;
+            k_panic("underflow\n");
 
         new = old - 1;
     } while (

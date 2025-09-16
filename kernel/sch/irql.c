@@ -29,17 +29,25 @@ void irql_lower(enum irql new_level) {
 
     struct core *cpu = get_current_core();
     enum irql old_irql = cpu->current_irql;
+    bool preempt_re_enabled = false;
 
     cpu->current_irql = new_level;
 
     if (old_irql >= IRQL_HIGH_LEVEL && new_level < IRQL_HIGH_LEVEL)
         enable_interrupts();
 
-    if (old_irql >= IRQL_DISPATCH_LEVEL && new_level < IRQL_DISPATCH_LEVEL)
+    if (old_irql >= IRQL_DISPATCH_LEVEL && new_level < IRQL_DISPATCH_LEVEL) {
+        preempt_re_enabled = true;
         preempt_enable();
+    }
 
     if (in_thread_context() && old_irql > IRQL_APC_LEVEL &&
         new_level == IRQL_PASSIVE_LEVEL) {
         thread_check_and_deliver_apcs(scheduler_get_curr_thread());
+    }
+
+    if (preempt_re_enabled && needs_resched()) {
+        mark_self_needs_resched(false);
+        scheduler_yield();
     }
 }

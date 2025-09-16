@@ -52,7 +52,7 @@ void scheduler_idle_main(void) {
     atomic_store(&idle->state, IDLE_THREAD_WORK_STEAL);
 
     while (true) {
-        mark_self_idle();
+        mark_self_idle(true);
         rcu_mark_quiescent();
         enable_interrupts();
         wait_for_interrupt();
