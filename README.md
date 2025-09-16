@@ -38,6 +38,8 @@ make run # run this in the build directory
 
 - [x] numa buddy allocator
 
+- [ ] make generic thread/worker pool for daemon and workqueue
+
 - [ ] complete usb devices, xhci, ehci, uhci, ohci
 
 - [ ] clean up all drivers. less bitfields, more #defines

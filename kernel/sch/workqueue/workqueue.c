@@ -97,7 +97,7 @@ struct workqueue *workqueue_create(struct workqueue_attributes *attrs) {
 
 static void mark_worker_exit(struct thread *t) {
     if (t)
-        t->worker->next_action = WORKER_NEXT_ACTION_EXIT;
+        ((struct worker *) (t->private))->next_action = WORKER_NEXT_ACTION_EXIT;
 }
 
 void workqueue_free(struct workqueue *wq) {

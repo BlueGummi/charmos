@@ -63,7 +63,7 @@ static void worker_exit(struct workqueue *queue, struct worker *worker,
 }
 
 void worker_main(void) {
-    struct worker *w = scheduler_get_curr_thread()->worker;
+    struct worker *w = scheduler_get_curr_thread()->private;
     struct workqueue *queue = w->workqueue;
 
     workqueue_get(queue);

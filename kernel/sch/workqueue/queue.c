@@ -52,7 +52,7 @@ bool workqueue_dequeue_task(struct workqueue *queue, struct work *out) {
 
 static void signal_callback(struct thread *t) {
     if (t)
-        t->worker->next_action = WORKER_NEXT_ACTION_RUN;
+        ((struct worker *) (t->private))->next_action = WORKER_NEXT_ACTION_RUN;
 }
 
 static enum workqueue_error signal_worker(struct workqueue *queue) {

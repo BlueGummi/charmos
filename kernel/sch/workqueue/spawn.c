@@ -26,7 +26,8 @@ void workqueue_link_thread_and_worker(struct worker *worker,
     worker->present = true;
     worker->timeout_ran = true;
     worker->thread = thread;
-    thread->worker = worker;
+
+    thread->private = worker;
 }
 
 static bool claim_spawner(struct workqueue *p) {
@@ -46,9 +47,7 @@ static void worker_complete_init(struct workqueue *queue, struct worker *w,
     w->timeout_ran = true;
     queue->last_spawn_attempt = time_get_ms();
 
-    refcount_init(&w->refcount, 1);
-
-    t->worker = w;
+    t->private = w;
 
     atomic_fetch_add(&queue->num_workers, 1);
 }

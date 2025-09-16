@@ -45,8 +45,12 @@ static void serial_puts(struct printf_cursor *csr, const char *str, int len) {
         if (!csr)
             serial_putc(str[i]);
 
-        if (csr && csr->cursor < csr->buffer_len - 1)
-            csr->buffer[csr->cursor++] = str[i];
+        if (csr && csr->cursor < csr->buffer_len - 1) {
+            if (csr->buffer)
+                csr->buffer[csr->cursor] = str[i];
+
+            csr->cursor++;
+        }
     }
 }
 

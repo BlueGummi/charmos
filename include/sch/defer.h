@@ -60,8 +60,6 @@ struct worker {
     bool present : 1;
     bool idle : 1;
 
-    refcount_t refcount;
-
     enum worker_next_action next_action;
 
     struct list_head list_node;
@@ -132,6 +130,8 @@ enum workqueue_flags : uint16_t {
     WORKQUEUE_FLAG_NO_AUTO_SPAWN = 0,
     WORKQUEUE_FLAG_MIGRATABLE_WORKERS = 0,
     WORKQUEUE_FLAG_ON_DEMAND = 0,
+
+    WORKQUEUE_FLAG_DEFAULTS = WORKQUEUE_FLAG_AUTO_SPAWN,
 };
 #define WORKQUEUE_FLAG_SET(q, f) (q->attrs.flags |= f)
 #define WORKQUEUE_FLAG_UNSET(q, f) (q->attrs.flags &= ~f)

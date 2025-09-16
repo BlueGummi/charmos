@@ -294,7 +294,7 @@ struct thread {
 
     int64_t curr_core; /* -1 if not being ran */
 
-    struct worker *worker; /* NULL if this is not a worker */
+    void *private;
 
     /* Lock + rc */
     struct spinlock lock;
@@ -439,4 +439,9 @@ static inline void thread_sleep(struct thread *t, enum thread_sleep_reason r) {
 static inline void thread_wake(struct thread *t, enum thread_wake_reason r) {
     set_state_and_update_reason(t, r, THREAD_STATE_READY,
                                 thread_add_wake_reason);
+}
+
+static inline void thread_set_background(struct thread *t) {
+    t->base_priority = THREAD_PRIO_CLASS_BACKGROUND;
+    t->perceived_priority = THREAD_PRIO_CLASS_BACKGROUND;
 }

@@ -258,8 +258,7 @@ static void domain_init_worker(struct domain_buddy *domain) {
     uint64_t id = domain->cores[0]->id;
 
     worker->curr_core = id;
-    worker->base_priority = THREAD_PRIO_CLASS_BACKGROUND;
-    worker->perceived_priority = THREAD_PRIO_CLASS_BACKGROUND;
+    thread_set_background(worker);
     scheduler_enqueue_on_core(worker, id);
 }
 
