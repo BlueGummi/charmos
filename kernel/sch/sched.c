@@ -303,14 +303,10 @@ void schedule(void) {
 }
 
 void scheduler_yield() {
-    bool were_enabled = are_interrupts_enabled();
-
-    disable_interrupts();
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     schedule();
+    irql_lower(irql);
     thread_check_and_deliver_apcs(scheduler_get_curr_thread());
-
-    if (were_enabled)
-        enable_interrupts();
 }
 
 void scheduler_force_resched(struct scheduler *sched) {

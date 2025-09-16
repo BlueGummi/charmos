@@ -22,6 +22,7 @@
 
 static bool done2 = false;
 static bool cb1d = false, cb2d = false;
+static bool bio_sched_delay_done = false;
 static uint64_t avg_complete_time[BIO_SCHED_LEVELS] = {0};
 static uint64_t total_complete_time[BIO_SCHED_LEVELS] = {0};
 static atomic_uint runs = 0;
@@ -37,6 +38,8 @@ static void bio_sch_callback(struct bio_request *req) {
     req->user_data = NULL;
     atomic_fetch_add(&runs, 1);
     TEST_ASSERT(req->status == BIO_STATUS_OK);
+    if (bio_sched_delay_done)
+        k_printf("Run %u finished after test\n", atomic_load(&runs));
 }
 
 static void bio_sch_callback1(struct bio_request *req) {
@@ -156,7 +159,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
     ADD_MESSAGE(msg);
     bio_sched_dispatch_all(d);
 
-    sleep_ms(500);
+    bio_sched_delay_done = true;
 
     for (uint64_t i = 0; i < BIO_SCHED_LEVELS; i++) {
         avg_complete_time[i] = total_complete_time[i] / runs_per_lvl[i];
