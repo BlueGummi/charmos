@@ -59,7 +59,7 @@ void work_execute(struct work *task) {
     if (!task)
         return;
 
-    task->func(task->arg, task->arg2);
+    task->func(task->args.arg1, task->args.arg2);
 }
 
 struct workqueue *

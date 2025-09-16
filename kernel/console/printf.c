@@ -13,6 +13,12 @@ struct flanterm_context;
 struct spinlock k_printf_lock = SPINLOCK_INIT;
 struct flanterm_context *ft_ctx;
 
+struct printf_cursor {
+    char *buffer;
+    int buffer_len;
+    int cursor;
+};
+
 void serial_init() {
     outb(0x3F8 + 1, 0x00);
     outb(0x3F8 + 3, 0x80);
@@ -34,14 +40,19 @@ static void serial_putc(char c) {
     outb(0x3F8, c);
 }
 
-static void serial_puts(const char *str, uint64_t len) {
-    for (uint64_t i = 0; i < len; i++) {
-        serial_putc(str[i]);
+static void serial_puts(struct printf_cursor *csr, const char *str, int len) {
+    for (int i = 0; i < len; i++) {
+        if (!csr)
+            serial_putc(str[i]);
+
+        if (csr && csr->cursor < csr->buffer_len - 1)
+            csr->buffer[csr->cursor++] = str[i];
     }
 }
 
-void double_print(struct flanterm_context *f, const char *str, uint64_t len) {
-    serial_puts(str, len);
+void double_print(struct flanterm_context *f, struct printf_cursor *csr,
+                  const char *str, int len) {
+    serial_puts(csr, str, len);
     flanterm_write(f, str, len);
 }
 
@@ -180,9 +191,9 @@ static int print_octal(char *buffer, uint64_t num) {
 }
 
 static void apply_padding(const char *str, int len, int width, bool left_align,
-                          bool zero_pad) {
+                          bool zero_pad, struct printf_cursor *csr) {
     if (len >= width) {
-        double_print(ft_ctx, str, len);
+        double_print(ft_ctx, csr, str, len);
         return;
     }
 
@@ -191,23 +202,24 @@ static void apply_padding(const char *str, int len, int width, bool left_align,
 
     if (!left_align) {
         if (zero_pad && len > 0 && (str[0] == '-' || str[0] == '+')) {
-            double_print(ft_ctx, str, 1);
+            double_print(ft_ctx, csr, str, 1);
             for (int i = 0; i < padding; i++)
-                double_print(ft_ctx, &pad_char, 1);
-            double_print(ft_ctx, str + 1, len - 1);
+                double_print(ft_ctx, csr, &pad_char, 1);
+            double_print(ft_ctx, csr, str + 1, len - 1);
         } else {
             for (int i = 0; i < padding; i++)
-                double_print(ft_ctx, &pad_char, 1);
-            double_print(ft_ctx, str, len);
+                double_print(ft_ctx, csr, &pad_char, 1);
+            double_print(ft_ctx, csr, str, len);
         }
     } else {
-        double_print(ft_ctx, str, len);
+        double_print(ft_ctx, csr, str, len);
         for (int i = 0; i < padding; i++)
-            double_print(ft_ctx, " ", 1);
+            double_print(ft_ctx, csr, " ", 1);
     }
 }
 
-static void handle_format_specifier(const char **format_ptr, va_list args) {
+static void handle_format_specifier(struct printf_cursor *csr,
+                                    const char **format_ptr, va_list args) {
     const char *format = *format_ptr;
     bool left_align = false;
     bool zero_pad = false;
@@ -342,7 +354,7 @@ static void handle_format_specifier(const char **format_ptr, va_list args) {
     case 's': {
         char *str = va_arg(args, char *);
         len = strlen(str);
-        apply_padding(str, len, width, left_align, false);
+        apply_padding(str, len, width, left_align, false, csr);
         *format_ptr = format;
         return;
     }
@@ -367,21 +379,21 @@ static void handle_format_specifier(const char **format_ptr, va_list args) {
     }
     }
 
-    apply_padding(buffer, len, width, left_align, zero_pad);
+    apply_padding(buffer, len, width, left_align, zero_pad, csr);
     *format_ptr = format;
 }
 
-void v_k_printf(const char *format, va_list args) {
+void v_k_printf(struct printf_cursor *csr, const char *format, va_list args) {
 
     while (*format) {
         if (*format == '%') {
             format++;
-            handle_format_specifier(&format, args);
+            handle_format_specifier(csr, &format, args);
         } else {
             if (*format == '\n') {
-                double_print(ft_ctx, "\n", 1);
+                double_print(ft_ctx, csr, "\n", 1);
             } else {
-                double_print(ft_ctx, format, 1);
+                double_print(ft_ctx, csr, format, 1);
             }
             format++;
         }
@@ -394,17 +406,34 @@ void k_printf(const char *format, ...) {
     spin_lock_raw(&k_printf_lock);
     va_list args;
     va_start(args, format);
-    v_k_printf(format, args);
+    v_k_printf(NULL, format, args);
     va_end(args);
     spin_unlock_raw(&k_printf_lock);
     if (i)
         enable_interrupts();
 }
 
+int snprintf(char *buffer, int buffer_len, const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    struct printf_cursor csr = {
+        .buffer = buffer,
+        .buffer_len = buffer_len,
+        .cursor = 0,
+    };
+
+    v_k_printf(&csr, format, args);
+    va_end(args);
+
+    csr.buffer[csr.cursor] = '\0';
+
+    return csr.cursor;
+}
+
 void panic(const char *format, ...) {
     va_list args;
     va_start(args, format);
-    v_k_printf(format, args);
+    v_k_printf(NULL, format, args);
     va_end(args);
 
     while (1) {

@@ -9,7 +9,7 @@ struct tid_range {
 };
 
 struct tid_space {
-    struct rbt *tree;
+    struct rbt tree;
     struct spinlock lock;
 };
 

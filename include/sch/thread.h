@@ -440,12 +440,3 @@ static inline void thread_wake(struct thread *t, enum thread_wake_reason r) {
     set_state_and_update_reason(t, r, THREAD_STATE_READY,
                                 thread_add_wake_reason);
 }
-
-#define FIXED_SHIFT 12
-static inline uint64_t thread_compute_weight(struct thread *t) {
-    thread_prio_t priority = t->priority_score;
-
-    /* weight = 1 + (priority / 2^20) in fixed point */
-    return (1 << FIXED_SHIFT) + ((uint64_t) priority >> (20 - FIXED_SHIFT));
-}
-#undef FIXED_SHIFT

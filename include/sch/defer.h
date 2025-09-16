@@ -11,25 +11,23 @@
 
 typedef void (*dpc_t)(void *arg, void *arg2);
 
-/* TODO: Merge this with standard workqueue infra */
-struct deferred_event {
-    uint64_t timestamp_ms;
-    dpc_t callback;
-    void *arg;
-    void *arg2;
-    struct deferred_event *next;
-};
-
 struct work_args {
     void *arg1;
     void *arg2;
 };
 #define WORK_ARGS(a, b) ((struct work_args) {.arg1 = a, .arg2 = b})
 
+/* TODO: Merge this with standard workqueue infra */
+struct deferred_event {
+    uint64_t timestamp_ms;
+    dpc_t callback;
+    struct work_args args;
+    struct deferred_event *next;
+};
+
 struct work {
     dpc_t func;
-    void *arg;
-    void *arg2;
+    struct work_args args;
 
     struct list_head list_node;
 

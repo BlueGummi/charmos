@@ -99,8 +99,6 @@ enum workqueue_error workqueue_enqueue_oneshot(struct workqueue *queue,
     if (!workqueue_usable(queue))
         return WORKQUEUE_ERROR_UNUSABLE;
 
-    void *arg = args.arg1;
-    void *arg2 = args.arg2;
     uint64_t pos;
     struct work *t;
 
@@ -116,8 +114,7 @@ enum workqueue_error workqueue_enqueue_oneshot(struct workqueue *queue,
                     memory_order_relaxed)) {
 
                 t->func = func;
-                t->arg = arg;
-                t->arg2 = arg2;
+                t->args = args;
 
                 atomic_fetch_add(&queue->num_tasks, 1);
 

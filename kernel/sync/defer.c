@@ -42,7 +42,7 @@ static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
         spin_unlock(lock, irql);
 
         if (ev->callback)
-            ev->callback(ev->arg, ev->arg2);
+            ev->callback(ev->args.arg1, ev->args.arg2);
 
         kfree(ev);
         irql = spin_lock_irq_disable(lock);
@@ -69,8 +69,7 @@ bool defer_enqueue(dpc_t func, struct work_args args, uint64_t delay_ms) {
     uint64_t now = hpet_timestamp_ms();
     ev->timestamp_ms = now + delay_ms;
     ev->callback = func;
-    ev->arg = args.arg1;
-    ev->arg2 = args.arg2;
+    ev->args = args;
 
     struct spinlock *lock = this_lock();
     enum irql irql = spin_lock_irq_disable(lock);

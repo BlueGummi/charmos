@@ -66,8 +66,9 @@ static void worklist_execute_internal(struct workqueue *queue,
     list_for_each(iter, works) {
         struct work *work = work_from_worklist_node(iter);
 
-        while (workqueue_enqueue_oneshot(queue, work->func,
-                                         WORK_ARGS(work->arg, work->arg2)) ==
+        while (workqueue_enqueue_oneshot(
+                   queue, work->func,
+                   WORK_ARGS(work->args.arg1, work->args.arg2)) ==
                WORKQUEUE_ERROR_FULL)
             scheduler_yield();
     }
