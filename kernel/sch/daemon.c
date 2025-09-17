@@ -2,15 +2,115 @@
 #include <mem/alloc.h>
 #include <sch/daemon.h>
 
-void daemon_main(void) {}
+static struct daemon_thread *current_daemon_thread(void) {
+    return scheduler_get_curr_thread()->private;
+}
 
-struct daemon_thread *daemon_thread_create(struct daemon *daemon,
-                                           bool background) {
+static size_t total_workers(struct daemon *daemon) {
+    return atomic_load(&daemon->attrs.timesharing_threads);
+}
+
+static size_t idle_workers(struct daemon *daemon) {
+    return atomic_load(&daemon->attrs.idle_timesharing_threads);
+}
+
+static size_t max_workers(struct daemon *daemon) {
+    return daemon->attrs.max_timesharing_threads;
+}
+
+static bool busy(struct daemon *d) {
+
+    /* No idle workers */
+    return idle_workers(d) == 0 && total_workers(d) > 0;
+}
+
+static bool daemon_needs_spawn_worker(struct daemon *d) {
+    bool want_spawn = busy(d) && DAEMON_FLAG_TEST(d, DAEMON_FLAG_AUTO_SPAWN);
+    bool allowed_to_spawn = total_workers(d) < max_workers(d);
+    return want_spawn && allowed_to_spawn;
+}
+
+static struct daemon_work *work_on_thread(struct daemon_thread *thread) {
+    return thread->background ? thread->daemon->background_work
+                              : thread->daemon->timesharing_work;
+}
+
+static void daemon_work_execute(struct daemon_work *work,
+                                struct daemon_thread *self) {
+    self->command = DAEMON_THREAD_COMMAND_DEFAULT;
+    work->function(work, self, work->args.arg1, work->args.arg2);
+}
+
+static void daemon_wait(struct daemon *daemon, struct daemon_thread *self) {
+    atomic_fetch_add(&daemon->attrs.idle_timesharing_threads, 1);
+
+    if (self->background)
+        semaphore_wait(&daemon->bg_sem);
+    else
+        semaphore_wait(&daemon->ts_sem);
+
+    atomic_fetch_sub(&daemon->attrs.idle_timesharing_threads, 1);
+}
+
+static void daemon_list_add(struct daemon *daemon,
+                            struct daemon_thread *thread) {
+    enum irql irql = daemon_lock(daemon);
+    list_add(&thread->list_node, &daemon->timesharing_threads);
+    daemon_unlock(daemon, irql);
+}
+
+static void daemon_list_del(struct daemon *daemon,
+                            struct daemon_thread *thread) {
+    enum irql irql = daemon_lock(daemon);
+    list_del(&thread->list_node);
+    daemon_unlock(daemon, irql);
+}
+
+static void daemon_thread_exit(struct daemon *daemon,
+                               struct daemon_thread *self) {
+    kassert(!self->background); /* Singular background thread cannot exit */
+
+    atomic_fetch_sub(&daemon->attrs.timesharing_threads, 1);
+    daemon_list_del(daemon, self);
+    kfree(self);
+    thread_exit();
+}
+
+void daemon_main(void) {
+    struct daemon_thread *self = current_daemon_thread();
+    struct daemon *daemon = self->daemon;
+    bool timesharing = !self->background;
+
+    if (timesharing)
+        atomic_fetch_add(&daemon->attrs.timesharing_threads, 1);
+
+    struct daemon_work *work = work_on_thread(self);
+
+    while (true) {
+        daemon_wait(daemon, self);
+
+    start_execute:
+
+        daemon_work_execute(work, self);
+
+        switch (self->command) {
+        case DAEMON_THREAD_COMMAND_SLEEP: break; /* Go wait on the semaphore */
+        case DAEMON_THREAD_COMMAND_RESTART: goto start_execute;
+        case DAEMON_THREAD_COMMAND_EXIT: daemon_thread_exit(daemon, self);
+        default:
+            k_panic("Unknown daemon thread command with value %u\n",
+                    self->command);
+        }
+    }
+
+    k_panic("Daemon thread should not be able to exit the loop\n");
+}
+
+struct daemon_thread *daemon_thread_create(struct daemon *daemon) {
     struct daemon_thread *thread = kmalloc(sizeof(struct daemon_thread));
     if (!thread)
         return NULL;
 
-    thread->background = background;
     thread->daemon = daemon;
     INIT_LIST_HEAD(&thread->list_node);
 
@@ -20,22 +120,40 @@ struct daemon_thread *daemon_thread_create(struct daemon *daemon,
         return NULL;
     }
 
-    if (background)
-        thread_set_background(t);
-
     t->private = thread;
 
     return thread;
 }
 
-void daemon_thread_destroy(struct daemon_thread *dt) {
+static struct daemon_thread *daemon_thread_create_bg(struct daemon *daemon) {
+    struct daemon_thread *ret = daemon_thread_create(daemon);
+    if (!ret)
+        return NULL;
+
+    ret->background = true;
+    thread_set_background(ret->thread);
+    return ret;
+}
+
+static struct daemon_thread *
+daemon_thread_spawn(struct daemon *daemon,
+                    struct daemon_thread *(*create)(struct daemon *) ) {
+    struct daemon_thread *t = create(daemon);
+    if (!t)
+        return NULL;
+
+    scheduler_enqueue(t->thread);
+    return t;
+}
+
+void daemon_thread_destroy_unsafe(struct daemon_thread *dt) {
     thread_free(dt->thread);
     kfree(dt);
 }
 
 struct daemon *daemon_create(struct daemon_attributes *attrs,
-                             struct daemon_work timesharing_work,
-                             struct daemon_work background_work,
+                             struct daemon_work *timesharing_work,
+                             struct daemon_work *background_work,
                              struct workqueue_attributes *wq_attrs,
                              const char *fmt, ...) {
     va_list args;
@@ -44,6 +162,8 @@ struct daemon *daemon_create(struct daemon_attributes *attrs,
     int needed = snprintf(NULL, 0, fmt, args) + 1;
 
     struct daemon *daemon = kzalloc(sizeof(struct daemon));
+    struct daemon_thread *dt = NULL, *bg = NULL;
+
     if (!daemon)
         goto err;
 
@@ -62,6 +182,9 @@ struct daemon *daemon_create(struct daemon_attributes *attrs,
     daemon->attrs.timesharing_threads = 0;
 
     spinlock_init(&daemon->lock);
+    semaphore_init(&daemon->bg_sem, 0);
+    semaphore_init(&daemon->ts_sem, 0);
+
     INIT_LIST_HEAD(&daemon->timesharing_threads);
     daemon->timesharing_work = timesharing_work;
     daemon->background_work = background_work;
@@ -74,24 +197,24 @@ struct daemon *daemon_create(struct daemon_attributes *attrs,
         daemon->workqueue = wq;
     }
 
-    struct daemon_thread *dt = daemon_thread_create(daemon, false);
+    dt = daemon_thread_spawn(daemon, daemon_thread_create);
     if (!dt)
         goto err;
 
-    struct daemon_thread *dtb = daemon_thread_create(daemon, true);
-    if (!dt) {
-        daemon_thread_destroy(dt);
+    bg = daemon_thread_spawn(daemon, daemon_thread_create_bg);
+    if (!bg)
         goto err;
-    }
 
-    list_add(&dt->list_node, &daemon->timesharing_threads);
-
-    daemon->background_thread = dtb;
+    daemon_list_add(daemon, dt);
+    daemon->background_thread = bg;
 
     va_end(args);
     return daemon;
 
 err:
+    if (dt)
+        daemon_thread_destroy_unsafe(dt);
+
     if (daemon && daemon->name)
         kfree(daemon->name);
 
@@ -100,4 +223,38 @@ err:
 
     va_end(args);
     return NULL;
+}
+
+struct daemon_thread *daemon_spawn_worker(struct daemon *daemon) {
+    struct daemon_thread *dt =
+        daemon_thread_spawn(daemon, daemon_thread_create);
+
+    daemon_list_add(daemon, dt);
+    return dt;
+}
+
+enum workqueue_error daemon_submit_oneshot_work(struct daemon *daemon,
+                                                dpc_t function,
+                                                struct work_args args) {
+    kassert(daemon->workqueue &&
+            DAEMON_FLAG_TEST(daemon, DAEMON_FLAG_HAS_WORKQUEUE));
+    return workqueue_enqueue_oneshot(daemon->workqueue, function, args);
+}
+
+enum workqueue_error daemon_submit_work(struct daemon *daemon,
+                                        struct work *work) {
+    kassert(daemon->workqueue &&
+            DAEMON_FLAG_TEST(daemon, DAEMON_FLAG_HAS_WORKQUEUE));
+    return workqueue_enqueue(daemon->workqueue, work);
+}
+
+void daemon_wake_background_worker(struct daemon *daemon) {
+    semaphore_post(&daemon->bg_sem);
+}
+
+void daemon_wake_timesharing_worker(struct daemon *daemon) {
+    if (daemon_needs_spawn_worker(daemon))
+        daemon_spawn_worker(daemon);
+
+    semaphore_post(&daemon->ts_sem);
 }
