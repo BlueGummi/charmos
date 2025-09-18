@@ -6,50 +6,35 @@ static struct daemon_thread *current_daemon_thread(void) {
     return scheduler_get_curr_thread()->private;
 }
 
-static size_t total_workers(struct daemon *daemon) {
+static bool mark_daemon_thread_executing(struct daemon_thread *thread,
+                                         bool state) {
+    return atomic_exchange(&thread->executing_work, state);
+}
+
+static size_t total_ts_workers(struct daemon *daemon) {
     return atomic_load(&daemon->attrs.timesharing_threads);
 }
 
-static size_t idle_workers(struct daemon *daemon) {
+static size_t idle_ts_workers(struct daemon *daemon) {
     return atomic_load(&daemon->attrs.idle_timesharing_threads);
 }
 
-static size_t max_workers(struct daemon *daemon) {
+static size_t max_ts_workers(struct daemon *daemon) {
     return daemon->attrs.max_timesharing_threads;
 }
 
-static bool busy(struct daemon *d) {
+static bool bg_present(struct daemon *daemon) {
+    return atomic_load(&daemon->attrs.background_thread_present);
+}
+
+static bool set_bg_present(struct daemon *daemon, bool state) {
+    return atomic_exchange(&daemon->attrs.background_thread_present, state);
+}
+
+static bool ts_busy(struct daemon *d) {
 
     /* No idle workers */
-    return idle_workers(d) == 0 && total_workers(d) > 0;
-}
-
-static bool daemon_needs_spawn_worker(struct daemon *d) {
-    bool want_spawn = busy(d) && DAEMON_FLAG_TEST(d, DAEMON_FLAG_AUTO_SPAWN);
-    bool allowed_to_spawn = total_workers(d) < max_workers(d);
-    return want_spawn && allowed_to_spawn;
-}
-
-static struct daemon_work *work_on_thread(struct daemon_thread *thread) {
-    return thread->background ? thread->daemon->background_work
-                              : thread->daemon->timesharing_work;
-}
-
-static void daemon_work_execute(struct daemon_work *work,
-                                struct daemon_thread *self) {
-    self->command = DAEMON_THREAD_COMMAND_DEFAULT;
-    work->function(work, self, work->args.arg1, work->args.arg2);
-}
-
-static void daemon_wait(struct daemon *daemon, struct daemon_thread *self) {
-    atomic_fetch_add(&daemon->attrs.idle_timesharing_threads, 1);
-
-    if (self->background)
-        semaphore_wait(&daemon->bg_sem);
-    else
-        semaphore_wait(&daemon->ts_sem);
-
-    atomic_fetch_sub(&daemon->attrs.idle_timesharing_threads, 1);
+    return idle_ts_workers(d) == 0 && total_ts_workers(d) > 0;
 }
 
 static void daemon_list_add(struct daemon *daemon,
@@ -68,12 +53,58 @@ static void daemon_list_del(struct daemon *daemon,
 
 static void daemon_thread_exit(struct daemon *daemon,
                                struct daemon_thread *self) {
-    kassert(!self->background); /* Singular background thread cannot exit */
+    bool background = self->background;
 
-    atomic_fetch_sub(&daemon->attrs.timesharing_threads, 1);
-    daemon_list_del(daemon, self);
+    if (!background) {
+        daemon_list_del(daemon, self);
+        atomic_fetch_sub(&daemon->attrs.timesharing_threads, 1);
+    } else {
+        daemon->background_thread = NULL;
+        set_bg_present(daemon, false);
+    }
+
     kfree(self);
     thread_exit();
+}
+
+static bool daemon_needs_spawn_worker(struct daemon *d) {
+    bool want_spawn = ts_busy(d) && DAEMON_FLAG_TEST(d, DAEMON_FLAG_AUTO_SPAWN);
+    bool allowed_to_spawn = total_ts_workers(d) < max_ts_workers(d);
+    return want_spawn && allowed_to_spawn;
+}
+
+static struct daemon_work *work_on_thread(struct daemon_thread *thread) {
+    return thread->background ? thread->daemon->background_work
+                              : thread->daemon->timesharing_work;
+}
+
+static void daemon_work_execute(struct daemon_work *work,
+                                struct daemon_thread *self) {
+    self->command = DAEMON_THREAD_COMMAND_DEFAULT;
+
+    mark_daemon_thread_executing(self, true);
+
+    work->function(work, self, work->args.arg1, work->args.arg2);
+
+    /* Exit if we are destroying */
+    if (self->daemon->state == DAEMON_STATE_DESTROYING)
+        self->command = DAEMON_THREAD_COMMAND_EXIT;
+
+    mark_daemon_thread_executing(self, false);
+}
+
+static void daemon_wait(struct daemon *daemon, struct daemon_thread *self) {
+    atomic_fetch_add(&daemon->attrs.idle_timesharing_threads, 1);
+
+    if (self->background)
+        semaphore_wait(&daemon->bg_sem);
+    else
+        semaphore_wait(&daemon->ts_sem);
+
+    atomic_fetch_sub(&daemon->attrs.idle_timesharing_threads, 1);
+
+    if (daemon->state == DAEMON_STATE_DESTROYING)
+        daemon_thread_exit(daemon, self);
 }
 
 void daemon_main(void) {
@@ -197,16 +228,22 @@ struct daemon *daemon_create(struct daemon_attributes *attrs,
         daemon->workqueue = wq;
     }
 
-    dt = daemon_thread_spawn(daemon, daemon_thread_create);
-    if (!dt)
-        goto err;
+    if (!DAEMON_FLAG_TEST(daemon, DAEMON_FlAG_NO_TS_THREADS)) {
+        dt = daemon_thread_spawn(daemon, daemon_thread_create);
+        if (!dt)
+            goto err;
+
+        daemon_list_add(daemon, dt);
+    }
 
     bg = daemon_thread_spawn(daemon, daemon_thread_create_bg);
     if (!bg)
         goto err;
 
-    daemon_list_add(daemon, dt);
     daemon->background_thread = bg;
+
+    set_bg_present(daemon, true);
+    daemon->state = DAEMON_STATE_ACTIVE;
 
     va_end(args);
     return daemon;
@@ -223,6 +260,45 @@ err:
 
     va_end(args);
     return NULL;
+}
+
+static void boost_bg_thread_to_ts(struct daemon *daemon) {
+    thread_set_timesharing(daemon->background_thread->thread);
+}
+
+/* Assume that all daemons must have daemon works
+ * finish executing before they can be safely destroyed */
+void daemon_destroy(struct daemon *daemon) {
+    /* Make all the threads go sleep on the semaphore */
+    daemon->state = DAEMON_STATE_DESTROYING;
+
+    boost_bg_thread_to_ts(daemon);
+
+    /* Wait for all currently running threads to exit or sleep */
+    while (total_ts_workers(daemon) > idle_ts_workers(daemon))
+        scheduler_yield();
+
+    /* Great, now we send the signal and wake everyone */
+    while (total_ts_workers(daemon) > 0) {
+        semaphore_post(&daemon->ts_sem);
+        scheduler_yield();
+    }
+
+    /* All timesharing threads should be gone now.
+     * Time to handle the background thread. */
+    while (bg_present(daemon)) {
+        semaphore_post(&daemon->bg_sem);
+        scheduler_yield();
+    }
+
+    /* Ok now all threads are gone */
+    if (daemon->workqueue)
+        workqueue_destroy(daemon->workqueue);
+
+    if (daemon->name)
+        kfree(daemon->name);
+
+    kfree(daemon);
 }
 
 struct daemon_thread *daemon_spawn_worker(struct daemon *daemon) {

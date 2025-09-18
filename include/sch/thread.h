@@ -441,6 +441,11 @@ static inline void thread_wake(struct thread *t, enum thread_wake_reason r) {
                                 thread_add_wake_reason);
 }
 
+static inline void thread_set_timesharing(struct thread *t) {
+    t->base_priority = THREAD_PRIO_CLASS_TIMESHARE;
+    t->perceived_priority = THREAD_PRIO_CLASS_TIMESHARE;
+}
+
 static inline void thread_set_background(struct thread *t) {
     t->base_priority = THREAD_PRIO_CLASS_BACKGROUND;
     t->perceived_priority = THREAD_PRIO_CLASS_BACKGROUND;

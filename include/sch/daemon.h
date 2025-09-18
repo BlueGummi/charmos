@@ -8,6 +8,7 @@
  * thread executing a daemon work and are operated
  * upon the completion of the daemon work */
 enum daemon_thread_command {
+    DAEMON_THREAD_COMMAND_NONE,
     DAEMON_THREAD_COMMAND_EXIT,    /* Daemon thread exit */
     DAEMON_THREAD_COMMAND_RESTART, /* Restart the function */
     DAEMON_THREAD_COMMAND_SLEEP,   /* Go to sleep */
@@ -22,6 +23,7 @@ struct daemon_thread {
     struct thread *thread;
     struct daemon *daemon; /* What daemon are we attached to? */
 
+    atomic_bool executing_work;
     enum daemon_thread_command command;
 };
 
@@ -50,6 +52,7 @@ enum daemon_flags {
     DAEMON_FLAG_HAS_WORKQUEUE = 1,
     DAEMON_FLAG_HAS_NAME = 1 << 1,
     DAEMON_FLAG_AUTO_SPAWN = 1 << 2,
+    DAEMON_FlAG_NO_TS_THREADS = 1 << 3,
     DAEMON_FLAG_NONE = 0,
 };
 
@@ -57,8 +60,15 @@ struct daemon_attributes {
     size_t max_timesharing_threads;
     atomic_size_t timesharing_threads;
     atomic_size_t idle_timesharing_threads;
+    atomic_bool background_thread_present;
 
     enum daemon_flags flags;
+};
+
+enum daemon_state {
+    DAEMON_STATE_ACTIVE,
+    DAEMON_STATE_DESTROYING,
+    DAEMON_STATE_DEAD,
 };
 
 struct daemon {
@@ -77,6 +87,8 @@ struct daemon {
     struct spinlock lock;
 
     struct daemon_attributes attrs;
+
+    enum daemon_state state;
 };
 
 #define daemon_thread_from_list_node(ln)                                       \

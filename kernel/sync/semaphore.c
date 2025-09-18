@@ -59,3 +59,24 @@ void semaphore_postn(struct semaphore *s, int n) {
 
     semaphore_unlock(s, irql);
 }
+
+void semaphore_post_callback(struct semaphore *s, thread_action_callback cb) {
+    enum irql irql = semaphore_lock(s);
+
+    inc_count(s);
+
+    condvar_signal_callback(&s->cv, cb);
+
+    semaphore_unlock(s, irql);
+}
+
+void semaphore_postn_callback(struct semaphore *s, int n,
+                              thread_action_callback cb) {
+    enum irql irql = semaphore_lock(s);
+
+    add_count(s, n);
+    for (int i = 0; i < n; i++)
+        condvar_signal_callback(&s->cv, cb);
+
+    semaphore_unlock(s, irql);
+}
