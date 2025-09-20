@@ -179,7 +179,7 @@ static inline struct hugepage_core_list *hugepage_this_core_list(void) {
     if (global.current_bootstage < BOOTSTAGE_MID_MP)
         return &hugepage_full_tree->core_lists[0];
 
-    return &hugepage_full_tree->core_lists[get_this_core_id()];
+    return &hugepage_full_tree->core_lists[smp_core_id()];
 }
 
 static inline void hugepage_remove_from_core_list(struct hugepage *hp,

@@ -1,6 +1,6 @@
 #include <acpi/lapic.h>
 #include <int/idt.h>
-#include <mp/mp.h>
+#include <smp/smp.h>
 #include <sch/apc.h>
 #include <sch/sched.h>
 #include <types/rcu.h>
@@ -60,7 +60,7 @@ void scheduler_change_timeslice_duration(uint64_t new_duration) {
 }
 
 static inline void update_core_current_thread(struct thread *next) {
-    struct core *c = global.cores[get_this_core_id()];
+    struct core *c = global.cores[smp_core_id()];
     c->current_thread = next;
 }
 
@@ -116,7 +116,7 @@ static inline void do_re_enqueue_thread(struct scheduler *sched,
 }
 
 static inline void update_idle_thread(uint64_t time) {
-    struct idle_thread_data *data = get_this_core_idle_thread();
+    struct idle_thread_data *data = smp_core_idle_thread();
     data->did_work_recently = true;
     data->last_exit_ms = time;
 }
@@ -212,7 +212,7 @@ static void load_thread(struct scheduler *sched, struct thread *next,
     if (!next)
         return;
 
-    next->curr_core = get_this_core_id();
+    next->curr_core = smp_core_id();
     next->run_start_time = time;
     thread_calculate_activity_data(next);
     thread_classify_activity(next, time);

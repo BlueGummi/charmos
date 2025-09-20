@@ -1,7 +1,7 @@
 #include <charmos.h>
 #include <console/panic.h>
 #include <mem/alloc.h>
-#include <mp/domain.h>
+#include <smp/domain.h>
 #include <stdbool.h>
 #include <sync/spinlock.h>
 

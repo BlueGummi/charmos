@@ -35,7 +35,7 @@ extern uint64_t hpet_fs_per_tick;
 
 #define HPET_TIMER_CONF_OFFSET(num) (0x100 + (num * 0x20))
 #define HPET_TIMER_COMPARATOR_OFFSET(num) (HPET_TIMER_CONF_OFFSET(num) + 0x8)
-#define HPET_CURRENT (get_this_core_id() % hpet_timer_count)
+#define HPET_CURRENT (smp_core_id() % hpet_timer_count)
 
 #define HPET_IRQ_LINE 2
 

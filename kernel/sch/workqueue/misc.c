@@ -25,5 +25,5 @@ struct workqueue *workqueue_get_least_loaded(void) {
 }
 
 struct workqueue *workqueue_get_least_loaded_remote(void) {
-    return workqueue_least_loaded_queue_except(get_this_core_id());
+    return workqueue_least_loaded_queue_except(smp_core_id());
 }

@@ -7,7 +7,7 @@
 #include <mem/alloc.h>
 #include <mem/hugepage.h>
 #include <mem/vmm.h>
-#include <mp/core.h>
+#include <smp/core.h>
 #include <pit.h>
 #include <sch/sched.h>
 #include <stdbool.h>

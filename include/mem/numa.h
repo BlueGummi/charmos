@@ -1,4 +1,4 @@
-#include <mp/topology.h>
+#include <smp/topology.h>
 #include <stdbool.h>
 #include <stdint.h>
 #pragma once

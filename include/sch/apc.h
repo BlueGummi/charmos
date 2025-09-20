@@ -1,5 +1,5 @@
 #include <misc/list.h>
-#include <mp/core.h>
+#include <smp/core.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>

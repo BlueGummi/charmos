@@ -1,11 +1,11 @@
 #include <mem/alloc.h>
 #include <mem/buddy.h>
-#include <mem/domain.h>
+#include <smp/domain.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <misc/align.h>
 #include <misc/sort.h>
-#include <mp/domain.h>
+#include <smp/domain.h>
 #include <sch/thread.h>
 #include <string.h>
 

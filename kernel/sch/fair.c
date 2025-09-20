@@ -2,7 +2,7 @@
 #include <boot/stage.h>
 #include <crypto/prng.h>
 #include <int/idt.h>
-#include <mp/mp.h>
+#include <smp/smp.h>
 #include <registry.h>
 #include <sch/sched.h>
 #include <stdatomic.h>

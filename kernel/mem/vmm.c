@@ -5,7 +5,7 @@
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <misc/linker_symbols.h>
-#include <mp/mp.h>
+#include <smp/smp.h>
 #include <sch/sched.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -51,7 +51,7 @@ uintptr_t vmm_make_user_pml4(void) {
 void tlb_shootdown(void *ctx, uint8_t irq, void *rsp) {
     (void) ctx, (void) irq, (void) rsp;
 
-    struct core *core = global.cores[get_this_core_id()];
+    struct core *core = global.cores[smp_core_id()];
     uint64_t req_gen =
         atomic_load_explicit(&core->tlb_req_gen, memory_order_acquire);
 
@@ -71,7 +71,7 @@ static void do_tlb_shootdown(uintptr_t addr) {
         return;
 
     uint64_t gen = atomic_fetch_add(&global.next_tlb_gen, 1);
-    uint64_t this_core = get_this_core_id();
+    uint64_t this_core = smp_core_id();
     uint64_t cores = global.core_count;
 
     for (uint64_t i = 0; i < cores; i++) {

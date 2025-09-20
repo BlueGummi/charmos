@@ -1,12 +1,12 @@
 #include <mem/alloc.h>
-#include <mp/core.h>
+#include <smp/core.h>
 #include <sch/defer.h>
 #include <types/rcu.h>
 
 atomic_uint_fast64_t rcu_global_gen;
 
 void rcu_mark_quiescent(void) {
-    struct core *c = get_current_core();
+    struct core *c = smp_core();
     if (!c)
         return;
 
@@ -57,7 +57,7 @@ void rcu_maintenance_tick(void) {
 }
 
 void rcu_read_lock(void) {
-    struct core *c = get_current_core();
+    struct core *c = smp_core();
     if (!c)
         return;
 
@@ -67,7 +67,7 @@ void rcu_read_lock(void) {
 }
 
 void rcu_read_unlock(void) {
-    struct core *c = get_current_core();
+    struct core *c = smp_core();
     if (!c || c->rcu_nesting == 0) {
         k_panic("RCU bug\n");
         return;

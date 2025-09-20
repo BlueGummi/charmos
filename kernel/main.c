@@ -25,9 +25,9 @@
 #include <mem/vmm.h>
 #include <misc/cmdline.h>
 #include <misc/logo.h>
-#include <mp/core.h>
-#include <mp/domain.h>
-#include <mp/mp.h>
+#include <smp/core.h>
+#include <smp/domain.h>
+#include <smp/smp.h>
 #include <registry.h>
 #include <requests.h>
 #include <sch/defer.h>

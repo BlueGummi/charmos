@@ -103,7 +103,7 @@ REGISTER_TEST(rt_thread_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     thread->base_priority = THREAD_PRIO_CLASS_URGENT;
     thread->perceived_priority = THREAD_PRIO_CLASS_URGENT;
 
-    scheduler_enqueue_on_core(thread, get_this_core_id());
+    scheduler_enqueue_on_core(thread, smp_core_id());
     scheduler_yield();
     TEST_ASSERT(!atomic_load(&rt_thread_fail));
 

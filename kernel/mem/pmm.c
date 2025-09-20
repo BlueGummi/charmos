@@ -5,7 +5,7 @@
 #include <mem/domain.h>
 #include <mem/pmm.h>
 #include <misc/align.h>
-#include <mp/domain.h>
+#include <smp/domain.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>

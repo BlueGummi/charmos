@@ -3,9 +3,9 @@
 #include <int/idt.h>
 #include <limine.h>
 #include <mem/alloc.h>
-#include <mp/core.h>
-#include <mp/mp.h>
-#include <mp/topology.h>
+#include <smp/core.h>
+#include <smp/smp.h>
+#include <smp/topology.h>
 #include <stdatomic.h>
 #include <sync/spinlock.h>
 

@@ -1,7 +1,7 @@
 #include <kassert.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <mp/domain.h>
+#include <smp/domain.h>
 
 #include "mem/buddy/internal.h"
 #include "internal.h"

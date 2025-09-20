@@ -1,5 +1,5 @@
 #include <kassert.h>
-#include <mp/core.h>
+#include <smp/core.h>
 #include <sch/apc.h>
 #include <sch/sched.h>
 #include <sch/thread.h>

@@ -2,7 +2,7 @@
 #include <console/printf.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
-#include <mp/core.h>
+#include <smp/core.h>
 #include <stdint.h>
 #include <uacpi/tables.h>
 

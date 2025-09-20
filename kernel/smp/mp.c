@@ -4,7 +4,7 @@
 #include <int/idt.h>
 #include <limine.h>
 #include <mem/alloc.h>
-#include <mp/mp.h>
+#include <smp/smp.h>
 #include <sch/sched.h>
 #include <sync/spinlock.h>
 
@@ -72,6 +72,7 @@ static struct core *setup_cpu(uint64_t cpu) {
     if (!c)
         k_panic("Core %d could not allocate space for struct\n", cpu);
     c->id = cpu;
+    c->core = c;
     init_smt_info(c);
     detect_llc(&c->llc);
 

@@ -4,7 +4,7 @@
 #include <mem/hugepage.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <mp/core.h>
+#include <smp/core.h>
 
 #include "internal.h"
 
@@ -136,7 +136,7 @@ struct hugepage *hugepage_create_internal(core_t owner) {
 }
 
 struct hugepage *hugepage_alloc_hugepage(void) {
-    core_t core = get_this_core_id();
+    core_t core = smp_core_id();
     struct hugepage *recycled = hugepage_get_from_gc_list();
 
     if (recycled) {
@@ -148,7 +148,7 @@ struct hugepage *hugepage_alloc_hugepage(void) {
 }
 
 struct hugepage *hugepage_create_new_hugepage(void) {
-    return create(get_this_core_id());
+    return create(smp_core_id());
 }
 
 void hugepage_delete(struct hugepage *hp) {

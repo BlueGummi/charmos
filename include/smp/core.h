@@ -42,9 +42,11 @@ struct core {
     size_t rr_current_domain;
 
     atomic_uint preempt_disable_depth;
+
+    struct core *core;
 };
 
-static inline uint64_t get_this_core_id() {
+static inline uint64_t smp_core_id() {
     uint64_t id;
     asm volatile("movq %%gs:%c1, %0"
                  : "=r"(id)
@@ -52,33 +54,33 @@ static inline uint64_t get_this_core_id() {
     return id;
 }
 
-static inline struct core *get_current_core(void) {
-    return global.cores[get_this_core_id()];
+static inline struct core *smp_core(void) {
+    return global.cores[smp_core_id()];
 }
 
 static inline void mark_self_needs_resched(bool new) {
-    atomic_store(&get_current_core()->needs_resched, new);
+    atomic_store(&smp_core()->needs_resched, new);
 }
 
 static inline bool needs_resched(void) {
-    return atomic_load(&get_current_core()->needs_resched);
+    return atomic_load(&smp_core()->needs_resched);
 }
 
 static inline void mark_self_idle(bool new) {
-    get_current_core()->idle = new;
-    topo_mark_core_idle(get_this_core_id(), new);
+    smp_core()->idle = new;
+    topo_mark_core_idle(smp_core_id(), new);
 }
 
 static inline void mark_self_in_interrupt(bool new) {
-    get_current_core()->in_interrupt = new;
+    smp_core()->in_interrupt = new;
 }
 
 static inline bool in_interrupt(void) {
-    return get_current_core()->in_interrupt;
+    return smp_core()->in_interrupt;
 }
 
 static inline enum irql get_irql(void) {
-    return get_current_core()->current_irql;
+    return smp_core()->current_irql;
 }
 
 static inline bool in_thread_context(void) {
@@ -86,7 +88,7 @@ static inline bool in_thread_context(void) {
 }
 
 static inline bool preemption_disabled(void) {
-    return atomic_load(&get_current_core()->preempt_disable_depth) > 0;
+    return atomic_load(&smp_core()->preempt_disable_depth) > 0;
 }
 
 /*
@@ -96,7 +98,7 @@ static inline bool preemption_disabled(void) {
  *
  */
 static inline uint32_t preempt_disable(void) {
-    struct core *cpu = get_current_core();
+    struct core *cpu = smp_core();
     uint32_t old, new;
 
     do {
@@ -113,7 +115,7 @@ static inline uint32_t preempt_disable(void) {
 }
 
 static inline uint32_t preempt_enable(void) {
-    struct core *cpu = get_current_core();
+    struct core *cpu = smp_core();
     uint32_t old, new;
 
     do {

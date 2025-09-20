@@ -4,7 +4,7 @@
 #include <int/idt.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
-#include <mp/core.h>
+#include <smp/core.h>
 #include <sleep.h>
 uint32_t *lapic;
 bool x2apic_enabled = false;
@@ -39,7 +39,7 @@ void lapic_timer_init(uint64_t core_id) {
 }
 
 void lapic_timer_set_ms(uint32_t ms) {
-    uint32_t ticks = (get_current_core()->lapic_freq * ms) / 1000;
+    uint32_t ticks = (smp_core()->lapic_freq * ms) / 1000;
 
     lapic_write(LAPIC_REG_TIMER_INIT, ticks);
 }

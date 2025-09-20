@@ -45,7 +45,7 @@ static void do_idle_loop(struct idle_thread_data *idle,
 }
 
 void scheduler_idle_main(void) {
-    struct idle_thread_data *idle = get_this_core_idle_thread();
+    struct idle_thread_data *idle = smp_core_idle_thread();
 
     atomic_store(&idle->woken_from_timer, false);
     atomic_store(&idle->last_entry_ms, time_get_ms());

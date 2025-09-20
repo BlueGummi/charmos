@@ -1,7 +1,7 @@
 #include <acpi/lapic.h>
 #include <asm.h>
 #include <console/printf.h>
-#include <mp/core.h>
+#include <smp/core.h>
 #include <sleep.h>
 
 void panic_handler(struct panic_regs *regs) {
@@ -20,7 +20,7 @@ void panic_handler(struct panic_regs *regs) {
     k_printf("    [R14]: %016lx  [R15]: %016lx\n\n", regs->r14, regs->r15);
 
     if (global.current_bootstage >= BOOTSTAGE_MID_MP) {
-        broadcast_nmi_except(get_this_core_id());
+        broadcast_nmi_except(smp_core_id());
         sleep_ms(50);
     }
 }

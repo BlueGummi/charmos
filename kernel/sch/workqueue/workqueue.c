@@ -1,7 +1,7 @@
 #include <compiler.h>
 #include <kassert.h>
 #include <mem/alloc.h>
-#include <mp/domain.h>
+#include <smp/domain.h>
 #include <sch/defer.h>
 #include <sch/sched.h>
 #include <sync/condvar.h>
@@ -22,7 +22,7 @@ enum workqueue_error workqueue_add_remote_oneshot(dpc_t func,
 
 enum workqueue_error workqueue_add_local_oneshot(dpc_t func,
                                                  struct work_args args) {
-    struct workqueue *queue = global.workqueues[get_this_core_id()];
+    struct workqueue *queue = global.workqueues[smp_core_id()];
     return workqueue_enqueue_oneshot(queue, func, args);
 }
 
@@ -30,9 +30,9 @@ static struct workqueue *find_optimal_domain_wq(void) {
     struct core *pos;
 
     struct workqueue *optimal =
-        global.workqueues[(get_this_core_id() + 1) % global.core_count];
+        global.workqueues[(smp_core_id() + 1) % global.core_count];
 
-    struct workqueue *local = global.workqueues[get_this_core_id()];
+    struct workqueue *local = global.workqueues[smp_core_id()];
 
     size_t least_loaded = WORKQUEUE_NUM_WORKS(optimal);
 

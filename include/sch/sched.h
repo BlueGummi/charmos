@@ -1,6 +1,6 @@
 #pragma once
 #include <charmos.h>
-#include <mp/core.h>
+#include <smp/core.h>
 #include <sch/thread.h>
 #include <stdbool.h>
 #include <sync/spinlock.h>
@@ -113,7 +113,7 @@ extern struct scheduler_data scheduler_data;
 
 /* TODO: no rdmsr */
 static inline struct thread *scheduler_get_curr_thread() {
-    return global.cores[get_this_core_id()]->current_thread;
+    return global.cores[smp_core_id()]->current_thread;
 }
 
 static inline struct thread *thread_spawn(void (*entry)(void)) {
@@ -130,10 +130,10 @@ static inline struct thread *thread_spawn_on_core(void (*entry)(void),
 }
 
 static inline struct scheduler *get_this_core_sched(void) {
-    return global.schedulers[get_this_core_id()];
+    return global.schedulers[smp_core_id()];
 }
 
-static inline struct idle_thread_data *get_this_core_idle_thread(void) {
+static inline struct idle_thread_data *smp_core_idle_thread(void) {
     return &get_this_core_sched()->idle_thread_data;
 }
 

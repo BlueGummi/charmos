@@ -1,7 +1,7 @@
 #pragma once
 #include <asm.h>
 #include <console/panic.h>
-#include <mp/core.h>
+#include <smp/core.h>
 #include <sch/irql.h>
 #include <stdatomic.h>
 #include <stdbool.h>

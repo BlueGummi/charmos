@@ -73,7 +73,7 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     for (uint64_t i = 0; i < NUM_RCU_READERS; i++)
         thread_spawn(rcu_reader_thread);
 
-    k_printf("Readers spawned - we are core %llu\n", get_this_core_id());
+    k_printf("Readers spawned - we are core %llu\n", smp_core_id());
     enable_interrupts();
 
     sleep_ms(50);

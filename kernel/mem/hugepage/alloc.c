@@ -123,7 +123,7 @@ static void *alloc_search_core_list(struct hugepage_core_list *hcl,
 }
 
 static struct hugepage **create_hp_arr(size_t needed) {
-    core_t owner = get_this_core_id();
+    core_t owner = smp_core_id();
     struct hugepage **hp_arr = kzalloc(sizeof(struct hugepage *) * needed);
     if (!hp_arr)
         return NULL;

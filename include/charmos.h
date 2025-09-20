@@ -3,7 +3,7 @@
 #include <fs/vfs.h>
 #include <mem/numa.h>
 #include <misc/list.h>
-#include <mp/topology.h>
+#include <smp/topology.h>
 #include <stdatomic.h>
 
 struct charmos_globals {

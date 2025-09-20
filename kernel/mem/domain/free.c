@@ -1,5 +1,5 @@
 #include <misc/align.h>
-#include <mp/domain.h>
+#include <smp/domain.h>
 
 #include "internal.h"
 

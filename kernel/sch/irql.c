@@ -1,16 +1,16 @@
-#include <mp/core.h>
+#include <smp/core.h>
 #include <sch/apc.h>
 #include <sch/sched.h>
 
 void irql_set_raw(enum irql new_level) {
-    get_current_core()->current_irql = new_level;
+    smp_core()->current_irql = new_level;
 }
 
 enum irql irql_raise(enum irql new_level) {
     if (global.current_bootstage < BOOTSTAGE_LATE_DEVICES)
         return IRQL_PASSIVE_LEVEL;
 
-    struct core *cpu = get_current_core();
+    struct core *cpu = smp_core();
     enum irql old = cpu->current_irql;
 
     if (new_level > old) {
@@ -30,7 +30,7 @@ void irql_lower(enum irql new_level) {
     if (global.current_bootstage < BOOTSTAGE_LATE_DEVICES)
         return;
 
-    struct core *cpu = get_current_core();
+    struct core *cpu = smp_core();
     enum irql old_irql = cpu->current_irql;
     bool preempt_re_enabled = false;
 

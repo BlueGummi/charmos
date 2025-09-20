@@ -5,7 +5,7 @@
 #include <mem/vaddr_alloc.h>
 #include <mem/vmm.h>
 #include <misc/magic_numbers.h>
-#include <mp/core.h>
+#include <smp/core.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
