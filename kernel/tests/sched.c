@@ -1,3 +1,4 @@
+#include <sch/daemon.h>
 #include <sch/defer.h>
 #include <sch/reaper.h>
 #include <sch/sched.h>
@@ -189,5 +190,39 @@ REGISTER_TEST(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ADD_MESSAGE(msg);
 
     workqueue_destroy(wq);
+    SET_SUCCESS;
+}
+
+static atomic_bool daemon_work_run = false;
+static void daemon_work(struct daemon_work *work, struct daemon_thread *thread,
+                        void *a, void *b) {
+    (void) work, (void) a, (void) b;
+    atomic_store(&daemon_work_run, true);
+    DAEMON_SEND_CMD(thread, DAEMON_THREAD_COMMAND_SLEEP);
+}
+
+static struct daemon_work dwork =
+    DAEMON_WORK_FROM(daemon_work, WORK_ARGS(NULL, NULL));
+
+REGISTER_TEST(daemon_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    struct daemon_attributes attrs = {
+        .max_timesharing_threads = 67,
+        .flags = DAEMON_FLAG_AUTO_SPAWN | DAEMON_FLAG_HAS_NAME,
+    };
+
+    struct daemon *daemon = daemon_create(
+        /* attrs = */ &attrs,
+        /* timesharing_work = */ &dwork,
+        /* background_work = */ NULL,
+        /* wq_attrs = */ NULL,
+        /* fmt = */ "daemon_test");
+
+    kassert(daemon);
+
+    daemon_wake_timesharing_worker(daemon);
+    while (!atomic_load(&daemon_work_run))
+        scheduler_yield();
+
+    daemon_destroy(daemon);
     SET_SUCCESS;
 }

@@ -138,7 +138,7 @@ void daemon_main(void) {
 }
 
 struct daemon_thread *daemon_thread_create(struct daemon *daemon) {
-    struct daemon_thread *thread = kmalloc(sizeof(struct daemon_thread));
+    struct daemon_thread *thread = kzalloc(sizeof(struct daemon_thread));
     if (!thread)
         return NULL;
 
@@ -151,6 +151,7 @@ struct daemon_thread *daemon_thread_create(struct daemon *daemon) {
         return NULL;
     }
 
+    thread->thread = t;
     t->private = thread;
 
     return thread;
@@ -201,7 +202,7 @@ struct daemon *daemon_create(struct daemon_attributes *attrs,
     daemon->attrs = *attrs;
 
     if (DAEMON_FLAG_TEST(daemon, DAEMON_FLAG_HAS_NAME)) {
-        char *name = kmalloc(needed);
+        char *name = kzalloc(needed);
         if (!name)
             goto err;
 
@@ -209,6 +210,7 @@ struct daemon *daemon_create(struct daemon_attributes *attrs,
         daemon->name = name;
     }
 
+    daemon->attrs.background_thread_present = false;
     daemon->attrs.idle_timesharing_threads = 0;
     daemon->attrs.timesharing_threads = 0;
 
@@ -228,7 +230,8 @@ struct daemon *daemon_create(struct daemon_attributes *attrs,
         daemon->workqueue = wq;
     }
 
-    if (!DAEMON_FLAG_TEST(daemon, DAEMON_FlAG_NO_TS_THREADS)) {
+    if (!DAEMON_FLAG_TEST(daemon, DAEMON_FlAG_NO_TS_THREADS) &&
+        timesharing_work) {
         dt = daemon_thread_spawn(daemon, daemon_thread_create);
         if (!dt)
             goto err;
@@ -236,13 +239,15 @@ struct daemon *daemon_create(struct daemon_attributes *attrs,
         daemon_list_add(daemon, dt);
     }
 
-    bg = daemon_thread_spawn(daemon, daemon_thread_create_bg);
-    if (!bg)
-        goto err;
+    if (background_work) {
+        bg = daemon_thread_spawn(daemon, daemon_thread_create_bg);
+        if (!bg)
+            goto err;
 
-    daemon->background_thread = bg;
+        daemon->background_thread = bg;
+        set_bg_present(daemon, true);
+    }
 
-    set_bg_present(daemon, true);
     daemon->state = DAEMON_STATE_ACTIVE;
 
     va_end(args);
@@ -263,7 +268,8 @@ err:
 }
 
 static void boost_bg_thread_to_ts(struct daemon *daemon) {
-    thread_set_timesharing(daemon->background_thread->thread);
+    if (daemon->background_thread)
+        thread_set_timesharing(daemon->background_thread->thread);
 }
 
 /* Assume that all daemons must have daemon works
@@ -291,9 +297,15 @@ void daemon_destroy(struct daemon *daemon) {
         scheduler_yield();
     }
 
+    daemon->state = DAEMON_STATE_DEAD;
+
     /* Ok now all threads are gone */
-    if (daemon->workqueue)
+    if (daemon->workqueue) {
+        kassert(DAEMON_FLAG_TEST(daemon, DAEMON_FLAG_HAS_WORKQUEUE));
         workqueue_destroy(daemon->workqueue);
+    }
+
+    kassert(!total_ts_workers(daemon));
 
     if (daemon->name)
         kfree(daemon->name);
@@ -333,4 +345,21 @@ void daemon_wake_timesharing_worker(struct daemon *daemon) {
         daemon_spawn_worker(daemon);
 
     semaphore_post(&daemon->ts_sem);
+}
+
+void daemon_print(struct daemon *daemon) {
+    struct daemon_attributes *attrs = &daemon->attrs;
+    k_printf("struct daemon \"%s\" = {\n",
+             daemon->name ? daemon->name : "NULL");
+    k_printf("    .attrs = {\n");
+    k_printf("                  .max_timesharing_threads = %u\n",
+             attrs->max_timesharing_threads);
+    k_printf("                  .idle_timesharing_threads = %u\n",
+             attrs->idle_timesharing_threads);
+    k_printf("                  .timesharing_threads = %u\n",
+             attrs->timesharing_threads);
+    k_printf("                  .flags = 0b%b\n", attrs->flags);
+    k_printf("             }\n");
+    k_printf("    .state = %s\n", daemon_state_str(daemon->state));
+    k_printf("}\n");
 }

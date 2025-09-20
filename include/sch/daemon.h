@@ -42,11 +42,8 @@ struct daemon_work {
     struct daemon *daemon;
     void *private; /* Whatever anything wants */
 };
-
-#define DAEMON_WORK(function, args)                                            \
-    (struct daemon_work) {                                                     \
-        .function = function, .args = args                                     \
-    }
+#define DAEMON_WORK_FROM(fn, a)                                                \
+    ((struct daemon_work) {.function = fn, .args = a})
 
 enum daemon_flags {
     DAEMON_FLAG_HAS_WORKQUEUE = 1,
@@ -70,6 +67,15 @@ enum daemon_state {
     DAEMON_STATE_DESTROYING,
     DAEMON_STATE_DEAD,
 };
+
+static inline const char *daemon_state_str(enum daemon_state s) {
+    switch (s) {
+    case DAEMON_STATE_ACTIVE: return "ACTIVE";
+    case DAEMON_STATE_DESTROYING: return "DESTROYING";
+    case DAEMON_STATE_DEAD: return "DEAD";
+    }
+    return "UNKNOWN";
+}
 
 struct daemon {
     char *name;
@@ -100,7 +106,7 @@ struct daemon *daemon_create(struct daemon_attributes *attrs,
                              struct workqueue_attributes *wq_attrs,
                              const char *fmt, ...);
 
-void daemon_destory(struct daemon *daemon);
+void daemon_destroy(struct daemon *daemon);
 
 struct daemon_thread *daemon_spawn_worker(struct daemon *daemon);
 
@@ -111,10 +117,15 @@ enum workqueue_error daemon_submit_oneshot_work(struct daemon *daemon,
 enum workqueue_error daemon_submit_work(struct daemon *daemon,
                                         struct work *work);
 
-static inline void daemon_set_command(struct daemon_thread *self,
-                                      enum daemon_thread_command cmd) {
-    self->command = cmd;
-}
+void daemon_print(struct daemon *daemon);
+void daemon_wake_background_worker(struct daemon *daemon);
+void daemon_wake_timesharing_worker(struct daemon *daemon);
+
+#define DAEMON_SEND_CMD(__self, __cmd)                                         \
+    do {                                                                       \
+        __self->command = __cmd;                                               \
+        return;                                                                \
+    } while (0)
 
 #define DAEMON_FLAG_TEST(daemon, flag) (daemon->attrs.flags & flag)
 

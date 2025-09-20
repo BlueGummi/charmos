@@ -25,6 +25,15 @@ For things not specified here, such as multi-line comments, simply use the same 
 Comments should exist to explain **why** something exists or needs to exist. It can be helpful to leave a comment about how something functions sometimes, but do not be overly enthusiastic about leaving comments on every last little thing, as this causes creates unnecessary noise.
 
 Comments in places such as enum members and struct members are encouraged, as many IDEs will generate documentation on the fly from these comments.
+
+If a function has multiple arguments, it is acceptable to call it like this
+
+```c
+function(
+     /* arg1 = */ arg1,
+     /* arg2 = */ arg2,
+     /* arg3 = */ arg3);
+```
     
 ### Group by context, sort by behavior
 

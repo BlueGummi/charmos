@@ -1,5 +1,6 @@
 #include <asm.h>
 #include <limine.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -420,6 +421,10 @@ void k_printf(const char *format, ...) {
 int snprintf(char *buffer, int buffer_len, const char *format, ...) {
     va_list args;
     va_start(args, format);
+
+    if (!buffer_len)
+        buffer_len = INT_MAX;
+
     struct printf_cursor csr = {
         .buffer = buffer,
         .buffer_len = buffer_len,
@@ -429,7 +434,8 @@ int snprintf(char *buffer, int buffer_len, const char *format, ...) {
     v_k_printf(&csr, format, args);
     va_end(args);
 
-    csr.buffer[csr.cursor] = '\0';
+    if (buffer)
+        csr.buffer[csr.cursor] = '\0';
 
     return csr.cursor;
 }
