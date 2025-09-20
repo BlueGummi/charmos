@@ -2,7 +2,10 @@
 #include <sch/apc.h>
 #include <sch/sched.h>
 
-extern bool bug_here;
+void irql_set_raw(enum irql new_level) {
+    get_current_core()->current_irql = new_level;
+}
+
 enum irql irql_raise(enum irql new_level) {
     if (global.current_bootstage < BOOTSTAGE_LATE_DEVICES)
         return IRQL_PASSIVE_LEVEL;

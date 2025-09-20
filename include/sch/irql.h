@@ -18,5 +18,6 @@ static inline const char *irql_to_str(enum irql level) {
     return "UNKNOWN";
 }
 
+void irql_set_raw(enum irql new_level);
 enum irql irql_raise(enum irql new_level);
 void irql_lower(enum irql old_level);
