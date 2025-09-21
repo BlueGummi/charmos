@@ -22,7 +22,7 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
     enum thread_prio_class prio = task->perceived_priority;
 
     /* Put it on the tree since this is timesharing */
-    if (prio_type_of(prio) == THREAD_PRIO_TYPE_TS) {
+    if (prio == THREAD_PRIO_CLASS_TIMESHARE) {
         /* This will be a new thread this period */
         task->completed_period = sched->current_period - 1;
         enqueue_to_tree(sched, task);

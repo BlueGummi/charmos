@@ -86,12 +86,6 @@ enum thread_prio_class : uint8_t {
     THREAD_PRIO_CLASS_BACKGROUND = 3, /* Background thread */
 };
 
-enum thread_prio_type : uint8_t {
-    THREAD_PRIO_TYPE_RT = 1, /* Realtime type */
-    THREAD_PRIO_TYPE_TS = 2, /* Timesharing type */
-    THREAD_PRIO_TYPE_BG = 3, /* Background type */
-};
-
 enum thread_wake_reason : uint8_t {
     THREAD_WAKE_REASON_BLOCKING_IO = 1,
     THREAD_WAKE_REASON_BLOCKING_MANUAL = 2,
@@ -158,25 +152,13 @@ enum wake_reason {
     WAKE_REASON_TIMEOUT = 2, /* Timeout */
 };
 
-static inline enum thread_prio_type prio_type_of(enum thread_prio_class prio) {
-    switch (prio) {
-    case THREAD_PRIO_CLASS_URGENT: /* fallthrough */
-    case THREAD_PRIO_CLASS_RT: return THREAD_PRIO_TYPE_RT;
-    case THREAD_PRIO_CLASS_TIMESHARE: return THREAD_PRIO_TYPE_TS;
-    case THREAD_PRIO_CLASS_BACKGROUND: return THREAD_PRIO_TYPE_BG;
-    }
-    return THREAD_PRIO_TYPE_TS;
-}
-
 #define thread_from_rbt_node(node) rbt_entry(node, struct thread, tree_node)
 
-#define THREAD_PRIO_IS_TIMESHARING(prio)                                       \
-    (prio_type_of(prio) == THREAD_PRIO_TYPE_TS)
+#define THREAD_PRIO_IS_TIMESHARING(prio) (prio == THREAD_PRIO_CLASS_TIMESHARE)
 
 /* Background threads share timeslices */
 #define THREAD_PRIO_HAS_TIMESLICE(prio)                                        \
-    (prio_type_of(prio) == THREAD_PRIO_TYPE_TS ||                              \
-     prio_type_of(prio) == THREAD_PRIO_TYPE_BG)
+    (THREAD_PRIO_IS_TIMESHARING(prio) || prio == THREAD_PRIO_CLASS_BACKGROUND)
 
 #define THREAD_ACTIVITY_BUCKET_COUNT 8
 #define THREAD_ACTIVITY_BUCKET_DURATION 1000 /* 1 second per bucket */
@@ -409,6 +391,11 @@ static inline enum thread_state thread_get_state(struct thread *t) {
 
 static inline void thread_set_state(struct thread *t, enum thread_state state) {
     atomic_store(&t->state, state);
+}
+
+static inline bool thread_is_rt(struct thread *t) {
+    return t->perceived_priority == THREAD_PRIO_CLASS_URGENT ||
+           t->perceived_priority == THREAD_PRIO_CLASS_RT;
 }
 
 static inline void set_state_internal(struct thread *t,

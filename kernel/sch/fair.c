@@ -2,9 +2,9 @@
 #include <boot/stage.h>
 #include <crypto/prng.h>
 #include <int/idt.h>
-#include <smp/smp.h>
 #include <registry.h>
 #include <sch/sched.h>
+#include <smp/smp.h>
 #include <stdatomic.h>
 #include <stdint.h>
 #include <sync/spinlock.h>
@@ -213,7 +213,7 @@ static inline void clamp_thread_delta(struct thread *t) {
 }
 
 void thread_apply_wake_boost(struct thread *t) {
-    if (prio_type_of(t->perceived_priority) == THREAD_PRIO_TYPE_RT)
+    if (thread_is_rt(t))
         return;
 
     uint32_t score_pct = compute_activity_score_pct(&t->activity_metrics);

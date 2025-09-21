@@ -1,8 +1,8 @@
 #include <acpi/lapic.h>
 #include <int/idt.h>
-#include <smp/smp.h>
 #include <sch/apc.h>
 #include <sch/sched.h>
+#include <smp/smp.h>
 #include <types/rcu.h>
 
 #include "internal.h"
@@ -194,9 +194,8 @@ static struct thread *pick_thread(struct scheduler *sched, uint64_t now_ms) {
     struct thread *next = NULL;
 
     enum thread_prio_class prio = available_prio_level_from_bitmap(bitmap);
-    enum thread_prio_type ptype = prio_type_of(prio);
 
-    if (ptype != THREAD_PRIO_TYPE_TS) {
+    if (prio != THREAD_PRIO_CLASS_TIMESHARE) {
         next = pick_from_special_queues(sched, prio);
     } else {
         next = pick_from_regular_queues(sched, now_ms, prio);

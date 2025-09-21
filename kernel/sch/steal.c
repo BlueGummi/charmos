@@ -135,9 +135,8 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
     while (mask) {
         int level = 31 - __builtin_clz((uint32_t) mask);
         mask &= ~(1 << level); /* remove that bit from local copy */
-        enum thread_prio_type ptype = prio_type_of(level);
 
-        if (ptype == THREAD_PRIO_TYPE_TS) {
+        if (level == THREAD_PRIO_CLASS_TIMESHARE) {
             stolen = steal_from_ts_threads(victim, level);
             if (stolen)
                 break;
