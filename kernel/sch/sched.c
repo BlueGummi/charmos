@@ -147,24 +147,16 @@ available_prio_level_from_bitmap(uint8_t bitmap) {
 static struct thread *pick_from_special_queues(struct scheduler *sched,
                                                enum thread_prio_class prio) {
     struct thread_queue *q = scheduler_get_this_thread_queue(sched, prio);
-    struct thread *next = q->head;
 
-    /* Dequeue */
-    if (next == q->tail) {
-        q->head = NULL;
-        q->tail = NULL;
-    } else {
-        q->head = next->next;
-        q->head->prev = q->tail;
-        q->tail->next = q->head;
-    }
+    struct list_head *node = list_pop_front(&q->list);
+    kassert(node);
+
+    struct thread *next = thread_from_list_node(node);
 
     /* No more threads at this queue level */
-    if (q->head == NULL)
+    if (list_empty(&q->list))
         scheduler_clear_queue_bitmap(sched, prio);
 
-    next->next = NULL;
-    next->prev = NULL;
     return next;
 }
 

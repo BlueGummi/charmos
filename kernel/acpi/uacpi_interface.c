@@ -7,9 +7,9 @@
 #include <mem/alloc.h>
 #include <mem/hugepage.h>
 #include <mem/vmm.h>
-#include <smp/core.h>
 #include <pit.h>
 #include <sch/sched.h>
+#include <smp/core.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <sync/mutex.h>
@@ -171,18 +171,17 @@ uacpi_kernel_uninstall_interrupt_handler(uacpi_interrupt_handler handler,
 }
 
 uacpi_handle uacpi_kernel_create_spinlock(void) {
-
     struct spinlock *lock = kzalloc(sizeof(struct spinlock));
     return lock;
 }
 
 void uacpi_kernel_free_spinlock(uacpi_handle a) {
-
     kfree(a);
 }
 
 uacpi_handle uacpi_kernel_create_mutex(void) {
     struct mutex *m = kzalloc(sizeof(struct mutex));
+    mutex_init(m);
     return m;
 }
 
@@ -199,8 +198,8 @@ uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle m, uacpi_u16 b) {
 void uacpi_kernel_release_mutex(uacpi_handle m) {
     mutex_unlock(m);
 }
-uacpi_cpu_flags uacpi_kernel_lock_spinlock(uacpi_handle a) {
 
+uacpi_cpu_flags uacpi_kernel_lock_spinlock(uacpi_handle a) {
     return spin_lock((struct spinlock *) a);
 }
 

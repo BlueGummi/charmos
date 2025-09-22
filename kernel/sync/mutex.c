@@ -83,3 +83,7 @@ void mutex_unlock(struct mutex *m) {
 
     spin_unlock(&m->lock, irql);
 }
+
+void mutex_init(struct mutex *m) {
+    thread_queue_init(&m->waiters);
+}

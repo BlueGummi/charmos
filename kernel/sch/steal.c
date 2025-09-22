@@ -73,47 +73,28 @@ static struct thread *steal_from_ts_threads(struct scheduler *victim,
 static struct thread *steal_from_special_threads(struct scheduler *victim,
                                                  struct thread_queue *q,
                                                  int level) {
-    if (!q->head)
+    if (list_empty(&q->list))
         return NULL;
 
-    struct thread *start = q->head;
-    struct thread *current = start;
+    struct list_head *pos, *n;
+    list_for_each_safe(pos, n, &q->list) {
+        struct thread *t = thread_from_list_node(pos);
 
-    do {
-        if (current->flags & THREAD_FLAGS_NO_STEAL)
-            goto check_next;
+        if (t->flags & THREAD_FLAGS_NO_STEAL)
+            continue;
 
-        if (thread_get_state(current) != THREAD_STATE_READY)
-            goto check_next;
+        if (thread_get_state(t) != THREAD_STATE_READY)
+            continue;
 
-        if (current == q->head && current == q->tail) {
-            q->head = NULL;
-            q->tail = NULL;
-        } else if (current == q->head) {
-            q->head = current->next;
-            q->head->prev = q->tail;
-            q->tail->next = q->head;
-        } else if (current == q->tail) {
-            q->tail = current->prev;
-            q->tail->next = q->head;
-            q->head->prev = q->tail;
-        } else {
-            current->prev->next = current->next;
-            current->next->prev = current->prev;
-        }
+        list_del_init(&t->list_node);
 
-        if (q->head == NULL)
+        if (list_empty(&q->list))
             scheduler_clear_queue_bitmap(victim, level);
 
-        current->next = NULL;
-        current->prev = NULL;
-
         scheduler_decrement_thread_count(victim);
-        return current;
+        return t;
+    }
 
-    check_next:
-        current = current->next;
-    } while (current != start);
     return NULL;
 }
 

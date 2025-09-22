@@ -393,6 +393,7 @@ void *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
         if (!ent)
             return NULL;
 
+        mutex_init(&ent->lock);
         ent->buffer = buf;
         ent->lba = base_lba;
         ent->size = block_size;

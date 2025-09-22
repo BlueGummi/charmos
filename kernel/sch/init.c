@@ -41,6 +41,10 @@ void scheduler_init(void) {
         idle_thread->state = THREAD_STATE_IDLE_THREAD;
         s->idle_thread = idle_thread;
 
+        thread_queue_init(&s->rt_threads);
+        thread_queue_init(&s->urgent_threads);
+        thread_queue_init(&s->bg_threads);
+
         if (!i) {
             struct thread *t = thread_create(k_sch_main);
             t->flags = THREAD_FLAGS_NO_STEAL;

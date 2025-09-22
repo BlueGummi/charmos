@@ -76,6 +76,7 @@ workqueue_create_internal(struct workqueue_attributes *attrs) {
         return NULL;
     }
 
+    condvar_init(&ret->queue_cv);
     INIT_LIST_HEAD(&ret->workers);
     INIT_LIST_HEAD(&ret->works);
 

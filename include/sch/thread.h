@@ -10,6 +10,7 @@
 #include <time.h>
 #include <types/refcount.h>
 #include <types/types.h>
+
 #pragma once
 #define STACK_SIZE (PAGE_SIZE * 4)
 
@@ -237,8 +238,7 @@ struct thread {
 
     /* Nodes */
     struct rbt_node tree_node;
-    struct thread *next;
-    struct thread *prev;
+    struct list_head list_node;
 
     /* State */
     _Atomic enum thread_state state;
@@ -312,9 +312,10 @@ struct thread {
     struct apc *on_event_apcs[APC_EVENT_COUNT];
 };
 
+#define thread_from_list_node(ln) (container_of(ln, struct thread, list_node))
+
 struct thread_queue {
-    struct thread *head;
-    struct thread *tail;
+    struct list_head list;
     struct spinlock lock;
 };
 

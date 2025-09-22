@@ -8,14 +8,6 @@
 #include <stdint.h>
 #include <string.h>
 
-static inline void tmpfs_node_lock(struct tmpfs_node *tn) {
-    mutex_lock(&tn->lock);
-}
-
-static inline void tmpfs_node_unlock(struct tmpfs_node *tn) {
-    mutex_unlock(&tn->lock);
-}
-
 struct vfs_node *tmpfs_create_vfs_node(struct tmpfs_node *tnode);
 
 struct vfs_node *tmpfs_mkroot(const char *mount_point) {

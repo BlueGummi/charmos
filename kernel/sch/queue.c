@@ -28,7 +28,7 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
         enqueue_to_tree(sched, task);
     } else {
         struct thread_queue *q = scheduler_get_this_thread_queue(sched, prio);
-        dll_add(q, task);
+        list_add_tail(&task->list_node, &q->list);
     }
 
     sched->queue_bitmap |= (1 << prio);

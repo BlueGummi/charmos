@@ -1,7 +1,7 @@
 #pragma once
 #include <charmos.h>
-#include <smp/core.h>
 #include <sch/thread.h>
+#include <smp/core.h>
 #include <stdbool.h>
 #include <sync/spinlock.h>
 

@@ -69,6 +69,7 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->activity_stats = kzalloc(sizeof(struct thread_activity_stats));
     INIT_LIST_HEAD(&new_thread->apc_head[0]);
     INIT_LIST_HEAD(&new_thread->apc_head[1]);
+    INIT_LIST_HEAD(&new_thread->list_node);
 
     return new_thread;
 }
@@ -83,8 +84,6 @@ struct thread *thread_create_custom_stack(void (*entry_point)(void),
 }
 
 void thread_free(struct thread *t) {
-    t->prev = NULL;
-    t->next = NULL;
 
     tid_free(thread_tid_space, t->id);
     hugepage_free_pages(t->stack, t->stack_size / PAGE_SIZE);
@@ -95,40 +94,43 @@ void thread_free(struct thread *t) {
 }
 
 void thread_queue_init(struct thread_queue *q) {
-    q->head = NULL;
-    q->tail = NULL;
+    INIT_LIST_HEAD(&q->list);
+    spinlock_init(&q->lock);
 }
 
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(thread_queue, lock);
 
 void thread_queue_push_back(struct thread_queue *q, struct thread *t) {
     enum irql irql = thread_queue_lock_irq_disable(q);
-    queue_push_back(q, t);
+    list_add_tail(&t->list_node, &q->list);
     thread_queue_unlock(q, irql);
 }
 
 bool thread_queue_remove(struct thread_queue *q, struct thread *t) {
     enum irql irql = thread_queue_lock_irq_disable(q);
-    bool val = false;
-    queue_remove(q, t, val);
+    struct list_head *pos, *n;
+
+    list_for_each_safe(pos, n, &q->list) {
+        struct thread *thread = thread_from_list_node(pos);
+        if (thread == t) {
+            list_del_init(&t->list_node);
+            thread_queue_unlock(q, irql);
+            return true;
+        }
+    }
+
     thread_queue_unlock(q, irql);
-    return val;
+    return false;
 }
 
 struct thread *thread_queue_pop_front(struct thread_queue *q) {
     enum irql irql = thread_queue_lock_irq_disable(q);
-    queue_pop_front(q, t);
+    struct list_head *lhead = list_pop_front(&q->list);
     thread_queue_unlock(q, irql);
-    return t;
-}
+    if (!lhead)
+        return NULL;
 
-void thread_queue_clear(struct thread_queue *q) {
-    if (!q || !q->head)
-        return;
-
-    enum irql irql = thread_queue_lock_irq_disable(q);
-    dll_clear(q);
-    thread_queue_unlock(q, irql);
+    return thread_from_list_node(lhead);
 }
 
 void thread_block_on(struct thread_queue *q) {
@@ -136,7 +138,7 @@ void thread_block_on(struct thread_queue *q) {
 
     enum irql irql = thread_queue_lock_irq_disable(q);
     thread_block(current, THREAD_BLOCK_REASON_MANUAL);
-    queue_push_back(q, current);
+    list_add_tail(&current->list_node, &q->list);
     thread_queue_unlock(q, irql);
 }
 
