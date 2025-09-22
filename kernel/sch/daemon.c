@@ -32,7 +32,6 @@ static bool set_bg_present(struct daemon *daemon, bool state) {
 }
 
 static bool ts_busy(struct daemon *d) {
-
     /* No idle workers */
     return idle_ts_workers(d) == 0 && total_ts_workers(d) > 0;
 }
@@ -86,11 +85,11 @@ static void daemon_work_execute(struct daemon_work *work,
 
     work->function(work, self, work->args.arg1, work->args.arg2);
 
+    mark_daemon_thread_executing(self, false);
+
     /* Exit if we are destroying */
     if (self->daemon->state == DAEMON_STATE_DESTROYING)
         self->command = DAEMON_THREAD_COMMAND_EXIT;
-
-    mark_daemon_thread_executing(self, false);
 }
 
 static void daemon_wait(struct daemon *daemon, struct daemon_thread *self) {
@@ -191,8 +190,6 @@ struct daemon *daemon_create(struct daemon_attributes *attrs,
     va_list args;
     va_start(args, fmt);
 
-    int needed = snprintf(NULL, 0, fmt, args) + 1;
-
     struct daemon *daemon = kzalloc(sizeof(struct daemon));
     struct daemon_thread *dt = NULL, *bg = NULL;
 
@@ -202,6 +199,7 @@ struct daemon *daemon_create(struct daemon_attributes *attrs,
     daemon->attrs = *attrs;
 
     if (DAEMON_FLAG_TEST(daemon, DAEMON_FLAG_HAS_NAME)) {
+        int needed = snprintf(NULL, 0, fmt, args) + 1;
         char *name = kzalloc(needed);
         if (!name)
             goto err;
@@ -290,6 +288,7 @@ void daemon_destroy(struct daemon *daemon) {
         scheduler_yield();
     }
 
+    kassert(!total_ts_workers(daemon));
     /* All timesharing threads should be gone now.
      * Time to handle the background thread. */
     while (bg_present(daemon)) {
@@ -304,8 +303,6 @@ void daemon_destroy(struct daemon *daemon) {
         kassert(DAEMON_FLAG_TEST(daemon, DAEMON_FLAG_HAS_WORKQUEUE));
         workqueue_destroy(daemon->workqueue);
     }
-
-    kassert(!total_ts_workers(daemon));
 
     if (daemon->name)
         kfree(daemon->name);

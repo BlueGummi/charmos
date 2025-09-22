@@ -10,12 +10,12 @@
 
 static inline bool domain_free_queue_available(struct domain_free_queue *fq,
                                                struct domain_buddy *domain) {
-    return fq->num_elements > domain->core_count;
+    return atomic_load(&fq->num_elements)> domain->core_count;
 }
 
 static inline size_t domain_freequeue_flush_quota(struct domain_free_queue *fq,
                                                   struct domain_buddy *domain) {
-    size_t quota = fq->num_elements / domain->core_count;
+    size_t quota = atomic_load(&fq->num_elements) / domain->core_count;
     if (quota == 0)
         quota = 1;
 

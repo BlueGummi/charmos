@@ -90,7 +90,7 @@ static struct domain_arena *find_non_full_arena(struct domain_buddy *domain,
         if (!ret)
             return NULL;
 
-        if (ret->num_pages < ret->capacity)
+        if (atomic_load(&ret->num_pages) < ret->capacity)
             return ret;
     }
 }
@@ -102,10 +102,10 @@ static size_t compute_min_elements_to_free(struct domain_buddy *domain,
     struct domain_arena *curr;
 
     domain_for_each_arena(domain, curr) {
-        total_slots_available += curr->capacity - curr->num_pages;
+        total_slots_available += curr->capacity - atomic_load(&curr->num_pages);
     }
 
-    size_t target = queue->num_elements / 2;
+    size_t target = atomic_load(&queue->num_elements) / 2;
     if (target > total_slots_available)
         target = total_slots_available;
 
