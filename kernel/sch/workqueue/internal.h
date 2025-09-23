@@ -27,7 +27,7 @@ static inline uint64_t workqueue_current_worker_count(struct workqueue *q) {
 }
 
 static inline bool workqueue_empty(struct workqueue *queue) {
-    return atomic_load(&queue->head) == atomic_load(&queue->tail);
+    return atomic_load(&queue->head) == atomic_load(&queue->tail) && list_empty(&queue->works);
 }
 
 static inline void workqueue_set_needs_spawn(struct workqueue *queue,

@@ -149,12 +149,10 @@ static void wake_thread(void *a, void *unused) {
 }
 
 void thread_sleep_for_ms(uint64_t ms) {
-    disable_interrupts();
     struct thread *curr = scheduler_get_curr_thread();
-
-    thread_sleep(curr, THREAD_SLEEP_REASON_MANUAL);
     defer_enqueue(wake_thread, WORK_ARGS(curr, NULL), ms);
-    enable_interrupts();
+    thread_sleep(curr, THREAD_SLEEP_REASON_MANUAL);
+
     scheduler_yield();
 }
 

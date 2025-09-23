@@ -91,12 +91,6 @@ static inline bool preemption_disabled(void) {
     return atomic_load(&smp_core()->preempt_disable_depth) > 0;
 }
 
-/*
- *
- * FIXME: Bugs happening here, replace the old == 0 and UINT32_MAX with
- * checks to fix these weird bugs that are happening!
- *
- */
 static inline uint32_t preempt_disable(void) {
     struct core *cpu = smp_core();
     uint32_t old, new;

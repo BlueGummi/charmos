@@ -27,9 +27,8 @@ static enum bio_request_status nvme_to_bio_status(uint16_t status) {
     return BIO_STATUS_OK;
 }
 
-static void nvme_dpc(void *rvoid, void *dvoid) {
-    struct nvme_device *dev = dvoid;
-    struct nvme_request *req = rvoid;
+static void nvme_process_one(struct nvme_device *dev,
+                             struct nvme_request *req) {
     struct thread *t = req->waiter;
     if (t)
         scheduler_wake_from_io_block(t);
@@ -57,6 +56,28 @@ static void nvme_dpc(void *rvoid, void *dvoid) {
     }
 }
 
+void nvme_work(void *dvoid, void *nothing) {
+    (void) nothing;
+
+    struct nvme_device *dev = dvoid;
+    while (true) {
+        enum irql irql =
+            nvme_waiting_requests_lock_irq_disable(&dev->finished_requests);
+
+        struct list_head *lh = list_pop_front(&dev->finished_requests.list);
+        if (!lh) {
+            nvme_waiting_requests_unlock(&dev->finished_requests, irql);
+            return;
+        }
+
+        struct nvme_request *req =
+            container_of(lh, struct nvme_request, list_node);
+        nvme_waiting_requests_unlock(&dev->finished_requests, irql);
+
+        nvme_process_one(dev, req);
+    }
+}
+
 void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
     struct nvme_queue *queue = dev->io_queues[qid];
     atomic_fetch_sub(&queue->outstanding, 1);
@@ -75,10 +96,15 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
         struct nvme_request *req = dev->io_requests[qid][cid];
 
         req->status = status;
+        enum irql irql =
+            nvme_waiting_requests_lock_irq_disable(&dev->finished_requests);
 
-        while (workqueue_add_fast_oneshot(nvme_dpc, WORK_ARGS(req, dev)) ==
-               WORKQUEUE_ERROR_FULL)
-            cpu_relax();
+        list_add_tail(&req->list_node, &dev->finished_requests.list);
+
+        nvme_waiting_requests_unlock(&dev->finished_requests, irql);
+
+        if (!work_enqueued(&dev->work) && !work_executing(&dev->work))
+            workqueue_add_fast(&dev->work);
 
         dev->io_requests[qid][cid] = NULL;
 

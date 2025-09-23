@@ -90,8 +90,11 @@ static void do_tlb_shootdown(uintptr_t addr) {
 
         struct core *target = global.cores[i];
 
+        /* Bandaid fix because this deadlocks if we unmap from the allocator
+         * and another core is spinning with interrupts disabled on the allocator */
+        uint64_t spins = 500;
         while (atomic_load_explicit(&target->tlb_ack_gen,
-                                    memory_order_acquire) < gen)
+                                    memory_order_acquire) < gen && spins--)
             cpu_relax();
     }
 }

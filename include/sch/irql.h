@@ -4,7 +4,8 @@ enum irql {
     IRQL_APC_LEVEL = 1,      /* Allow only high interrupts */
     IRQL_DISPATCH_LEVEL = 2, /* Allow higher than DPC interrupts */
     IRQL_DEVICE_LEVEL = 3,   /* Device interrupts */
-    IRQL_HIGH_LEVEL = 4      /* All interrupts masked */
+    IRQL_HIGH_LEVEL = 4,      /* All interrupts masked */
+    IRQL_NONE = -1,
 };
 
 static inline const char *irql_to_str(enum irql level) {
@@ -14,6 +15,7 @@ static inline const char *irql_to_str(enum irql level) {
     case IRQL_DISPATCH_LEVEL: return "DISPATCH LEVEL";
     case IRQL_DEVICE_LEVEL: return "DEVICE LEVEL";
     case IRQL_HIGH_LEVEL: return "HIGH LEVEL";
+    case IRQL_NONE: return "NONE";
     }
     return "UNKNOWN";
 }

@@ -1,8 +1,8 @@
 #pragma once
 #include <asm.h>
 #include <console/panic.h>
-#include <smp/core.h>
 #include <sch/irql.h>
+#include <smp/core.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 
@@ -18,13 +18,17 @@ static inline void spinlock_init(struct spinlock *lock) {
 
 static inline void spin_lock_raw(struct spinlock *lock) {
     bool expected;
-    do {
+    for (;;) {
         expected = 0;
+        if (atomic_compare_exchange_weak_explicit(&lock->state, &expected, 1,
+                                                  memory_order_acquire,
+                                                  memory_order_relaxed)) {
+            return;
+        }
+
         while (atomic_load_explicit(&lock->state, memory_order_relaxed) != 0)
             cpu_relax();
-    } while (!atomic_compare_exchange_weak_explicit(&lock->state, &expected, 1,
-                                                    memory_order_acquire,
-                                                    memory_order_relaxed));
+    }
 }
 
 static inline void spin_unlock_raw(struct spinlock *lock) {
@@ -51,10 +55,35 @@ static inline enum irql spin_lock_irq_disable(struct spinlock *lock) {
     return irql;
 }
 
-static inline bool spin_trylock(struct spinlock *lock) {
+static inline bool spin_trylock_raw(struct spinlock *lock) {
     bool expected = 0;
     return atomic_compare_exchange_strong_explicit(
         &lock->state, &expected, 1, memory_order_acquire, memory_order_relaxed);
+}
+
+static inline bool spin_trylock(struct spinlock *lock, enum irql *out) {
+    bool expected = 0;
+    if (atomic_compare_exchange_strong_explicit(&lock->state, &expected, 1,
+                                                memory_order_acquire,
+                                                memory_order_relaxed)) {
+        *out = irql_raise(IRQL_DISPATCH_LEVEL);
+        return true;
+    }
+
+    return false;
+}
+
+static inline bool spin_trylock_irq_disable(struct spinlock *lock,
+                                            enum irql *out) {
+    bool expected = 0;
+    if (atomic_compare_exchange_strong_explicit(&lock->state, &expected, 1,
+                                                memory_order_acquire,
+                                                memory_order_relaxed)) {
+        *out = irql_raise(IRQL_HIGH_LEVEL);
+        return true;
+    }
+
+    return false;
 }
 
 /* Keep these static inline so you only "pay for what you need" (e.g. if you
@@ -74,8 +103,8 @@ static inline bool spin_trylock(struct spinlock *lock) {
         spin_unlock(&obj->member, irql);                                       \
     }                                                                          \
                                                                                \
-    static inline bool type##_trylock(struct type *obj) {                      \
-        return spin_trylock(&obj->member);                                     \
+    static inline bool type##_trylock(struct type *obj, enum irql *out) {      \
+        return spin_trylock(&obj->member, out);                                \
     }
 
 #define SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT_NAMED(type, member, name)     \
@@ -93,6 +122,7 @@ static inline bool spin_trylock(struct spinlock *lock) {
         spin_unlock(&obj->member, irql);                                       \
     }                                                                          \
                                                                                \
-    static inline bool type##_##name##_trylock(struct type *obj) {             \
-        return spin_trylock(&obj->member);                                     \
+    static inline bool type##_##name##_trylock(struct type *obj,               \
+                                               enum irql *out) {               \
+        return spin_trylock(&obj->member, out);                                \
     }

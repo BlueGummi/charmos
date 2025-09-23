@@ -108,7 +108,7 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
         return NULL;
 
     /* do not wait in a loop */
-    if (!spin_trylock(&victim->lock))
+    if (!spin_trylock_raw(&victim->lock))
         return NULL;
 
     struct thread *stolen = NULL;
@@ -132,7 +132,7 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
         }
     }
 
-    spin_unlock(&victim->lock, false);
+    spin_unlock_raw(&victim->lock);
     return stolen;
 }
 

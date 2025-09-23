@@ -262,7 +262,7 @@ static inline void context_switch(struct thread *curr, struct thread *next) {
 
 void schedule(void) {
     struct scheduler *sched = get_this_core_sched();
-    enum irql irql = scheduler_lock(sched);
+    enum irql irql = scheduler_lock_irq_disable(sched);
 
     uint64_t time = time_get_ms_fast();
     struct thread *curr = sched->current;

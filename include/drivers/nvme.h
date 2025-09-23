@@ -2,6 +2,7 @@
 #include <block/generic.h>
 #include <block/sched.h>
 #include <mem/vmm.h>
+#include <sch/defer.h>
 #include <sch/thread.h>
 #include <stdatomic.h>
 #include <stdint.h>
@@ -155,6 +156,8 @@ struct nvme_device {
      * in queues and queue entries */
     struct nvme_request ***io_requests;
     struct nvme_waiting_requests waiting_requests;
+    struct nvme_waiting_requests finished_requests;
+    struct work work;
 
     uint8_t *isr_index;
     uint32_t queue_count;
@@ -352,5 +355,6 @@ void nvme_do_coalesce(struct generic_disk *disk, struct bio_request *into,
                       struct bio_request *from);
 
 void nvme_reorder(struct generic_disk *disk);
+void nvme_work(void *rvoid, void *dvoid);
 
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(nvme_waiting_requests, lock);

@@ -102,7 +102,7 @@ void minheap_insert(struct minheap *heap, struct minheap_node *node,
 void minheap_remove(struct minheap *heap, struct minheap_node *node) {
     uint32_t idx = MINHEAP_NODE_INDEX(node);
     if (idx >= MINHEAP_SIZE(heap))
-        k_panic("Invalid minheap index %u\n", idx);
+        return;
 
     heap->size--;
     if (idx != heap->size) {

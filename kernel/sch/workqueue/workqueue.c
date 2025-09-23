@@ -1,9 +1,9 @@
 #include <compiler.h>
 #include <kassert.h>
 #include <mem/alloc.h>
-#include <smp/domain.h>
 #include <sch/defer.h>
 #include <sch/sched.h>
+#include <smp/domain.h>
 #include <sync/condvar.h>
 #include <sync/spinlock.h>
 
@@ -55,11 +55,33 @@ enum workqueue_error workqueue_add_fast_oneshot(dpc_t func,
     return workqueue_enqueue_oneshot(optimal, func, args);
 }
 
+enum workqueue_error workqueue_add_fast(struct work *work) {
+    struct workqueue *optimal = find_optimal_domain_wq();
+    return workqueue_enqueue(optimal, work);
+}
+
+enum workqueue_error workqueue_add(struct work *work) {
+    struct workqueue *queue = workqueue_get_least_loaded();
+    return workqueue_enqueue(queue, work);
+}
+
+enum workqueue_error workqueue_add_local(struct work *work) {
+    struct workqueue *queue = global.workqueues[smp_core_id()];
+    return workqueue_enqueue(queue, work);
+}
+
+enum workqueue_error workqueue_add_remote(struct work *work) {
+    struct workqueue *queue = workqueue_get_least_loaded_remote();
+    return workqueue_enqueue(queue, work);
+}
+
 void work_execute(struct work *task) {
     if (!task)
         return;
 
+    atomic_store(&task->executing, true);
     task->func(task->args.arg1, task->args.arg2);
+    atomic_store(&task->executing, false);
 }
 
 struct workqueue *

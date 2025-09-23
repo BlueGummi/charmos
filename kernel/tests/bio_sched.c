@@ -99,7 +99,8 @@ REGISTER_TEST(bio_sched_coalesce_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ADD_MESSAGE(name);
 
     bio_sched_dispatch_all(d);
-    sleep_ms(200);
+    for (uint64_t i = 0; i < 15000; i++)
+        cpu_relax();
 
     TEST_ASSERT(cb1d && cb2d);
     SET_SUCCESS;

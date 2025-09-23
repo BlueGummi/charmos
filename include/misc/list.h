@@ -60,6 +60,23 @@ static inline struct list_head *list_pop_front(struct list_head *head) {
     return entry;
 }
 
+static inline void list_splice_init(struct list_head *src,
+                                    struct list_head *dst) {
+    if (!list_empty(src)) {
+        struct list_head *first = src->next;
+        struct list_head *last = src->prev;
+        struct list_head *at = dst;
+
+        first->prev = at->prev;
+        at->prev->next = first;
+
+        last->next = at;
+        at->prev = last;
+
+        INIT_LIST_HEAD(src);
+    }
+}
+
 #define list_entry(ptr, type, member)                                          \
     ((type *) ((char *) (ptr) - (offsetof(type, member))))
 

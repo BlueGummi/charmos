@@ -6,13 +6,8 @@ static struct thread_reaper reaper = {0};
 static struct thread *reaper_thread = NULL;
 
 void reaper_enqueue(struct thread *t) {
-    enum irql irql = spin_lock_irq_disable(&reaper.lock);
-
     thread_queue_push_back(&reaper.queue, t);
-
     condvar_signal(&reaper.cv);
-
-    spin_unlock(&reaper.lock, irql);
 }
 
 void reaper_init(void) {
@@ -25,33 +20,34 @@ uint64_t reaper_get_reaped_thread_count(void) {
     return reaper.reaped_threads;
 }
 
-void reaper_thread_main() {
+void reaper_thread_main(void) {
     while (1) {
-        enum irql irql = spin_lock_irq_disable(&reaper.lock);
+        enum irql irql = spin_lock(&reaper.lock);
 
         while (list_empty(&reaper.queue.list))
             condvar_wait(&reaper.cv, &reaper.lock, irql);
 
-        struct list_head *l = list_pop_front(&reaper.queue.list);
-        struct thread *t = thread_from_list_node(l);
+        struct thread_queue local;
+        thread_queue_init(&local);
+
+        enum irql tlist = spin_lock_irq_disable(&reaper.queue.lock);
+        list_splice_init(&reaper.queue.list, &local.list);
+        spin_unlock(&reaper.queue.lock, tlist);
+
+        spin_unlock(&reaper.lock, irql);
 
         bool reaped_something = false;
-        while (!list_empty(&reaper.queue.list)) {
-            atomic_store(&t->state, THREAD_STATE_TERMINATED);
-            struct list_head *l = list_pop_front(&reaper.queue.list);
-            struct thread *next = thread_from_list_node(l);
+        struct thread *t;
+        while ((t = thread_queue_pop_front(&local)) != NULL) {
+            thread_set_state(t, THREAD_STATE_TERMINATED);
             reaper.reaped_threads++;
             thread_put(t);
             reaped_something = true;
-            t = next;
         }
-
-        spin_unlock(&reaper.lock, irql);
 
         if (reaped_something) {
             thread_sleep_for_ms(100);
         } else {
-            thread_sleep(t, THREAD_SLEEP_REASON_MANUAL);
             scheduler_yield();
         }
     }
