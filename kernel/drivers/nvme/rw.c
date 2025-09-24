@@ -78,7 +78,7 @@ static bool rw_send_command(struct generic_disk *disk, struct nvme_request *req,
 
     struct nvme_queue *q = nvme->io_queues[qid];
 
-    if (atomic_load(&q->outstanding) >= q->sq_depth) {
+    if (atomic_load(&q->outstanding) > q->sq_depth) {
         enqueue_request(nvme, req);
 
         /* No room */

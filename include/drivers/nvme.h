@@ -165,6 +165,8 @@ struct nvme_device {
     uint32_t sector_size;
     uint64_t max_transfer_size;
     struct generic_disk *generic_disk;
+
+    atomic_uint_fast64_t total_outstanding;
 };
 
 struct nvme_identify {
