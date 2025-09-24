@@ -87,6 +87,8 @@ enum thread_prio_class : uint8_t {
     THREAD_PRIO_CLASS_BACKGROUND = 3, /* Background thread */
 };
 
+#define THREAD_PRIO_CLASS_COUNT (4)
+
 enum thread_wake_reason : uint8_t {
     THREAD_WAKE_REASON_BLOCKING_IO = 1,
     THREAD_WAKE_REASON_BLOCKING_MANUAL = 2,

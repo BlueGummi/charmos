@@ -290,7 +290,7 @@ void thread_update_effective_priority(struct thread *t) {
 }
 
 static uint64_t compute_period(struct scheduler *s) {
-    uint64_t load = s->thread_count;
+    uint64_t load = s->total_thread_count;
     uint64_t period = BASE_PERIOD_MS + (load * 2); /* Linear growth */
     CLAMP(period, MIN_PERIOD_MS, MAX_PERIOD_MS);
     return period;

@@ -47,7 +47,8 @@ struct scheduler {
 
     struct thread *current;
 
-    uint64_t thread_count;
+    uint64_t thread_count[THREAD_PRIO_CLASS_COUNT];
+    uint64_t total_thread_count;
 
     /* Period information */
     bool period_enabled;
@@ -129,38 +130,11 @@ static inline struct thread *thread_spawn_on_core(void (*entry)(void),
     return t;
 }
 
-static inline struct scheduler *get_this_core_sched(void) {
-    return global.schedulers[smp_core_id()];
-}
-
-static inline struct idle_thread_data *smp_core_idle_thread(void) {
-    return &get_this_core_sched()->idle_thread_data;
-}
-
-static inline void scheduler_decrement_thread_count(struct scheduler *sched) {
-    sched->thread_count--;
-    atomic_fetch_sub(&scheduler_data.total_threads, 1);
-}
-
-static inline void scheduler_increment_thread_count(struct scheduler *sched) {
-    sched->thread_count++;
-    atomic_fetch_add(&scheduler_data.total_threads, 1);
-}
-
-static inline struct thread_queue *
-scheduler_get_this_thread_queue(struct scheduler *sched,
-                                enum thread_prio_class prio) {
-    switch (prio) {
-    case THREAD_PRIO_CLASS_URGENT: return &sched->urgent_threads;
-    case THREAD_PRIO_CLASS_RT: return &sched->rt_threads;
-    case THREAD_PRIO_CLASS_TIMESHARE: return NULL; /* Use the tree */
-    case THREAD_PRIO_CLASS_BACKGROUND: return &sched->bg_threads;
-    }
-    k_panic("unreachable!\n");
-}
-
 static inline void scheduler_wake_from_io_block(struct thread *t) {
     scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_IO, THREAD_PRIO_CLASS_URGENT);
 }
 
 #define TICKS_FOR_PRIO(level) (level == THREAD_PRIO_LOW ? 64 : 1ULL << level)
+
+uint32_t preempt_disable(void);
+uint32_t preempt_enable(void);

@@ -6,6 +6,8 @@
 #include <sch/sched.h>
 #include <types/rcu.h>
 
+#include "internal.h"
+
 static inline void reset_idle_thread_stage(struct idle_thread_data *idle) {
     atomic_store(&idle->state, IDLE_THREAD_WORK_STEAL);
     scheduler_yield();
@@ -58,7 +60,7 @@ void scheduler_idle_main(void) {
         wait_for_interrupt();
     }
 
-    struct scheduler *sched = get_this_core_sched();
+    struct scheduler *sched = smp_core_scheduler();
     while (true) {
         do_idle_loop(idle, sched);
     }

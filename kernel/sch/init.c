@@ -33,7 +33,6 @@ void scheduler_init(void) {
                                 * being mistakenly identified
                                 * as completed */
 
-        s->thread_count = 0;
         s->core_id = i;
 
         struct thread *idle_thread = thread_create(scheduler_idle_main);

@@ -27,7 +27,7 @@ struct scheduler_data scheduler_data = {
 };
 
 static inline void tick_disable() {
-    struct scheduler *self = get_this_core_sched();
+    struct scheduler *self = smp_core_scheduler();
     if (atomic_load(&self->tick_enabled)) {
         lapic_timer_disable();
         atomic_store(&self->tick_enabled, false);
@@ -35,7 +35,7 @@ static inline void tick_disable() {
 }
 
 static inline void tick_enable() {
-    struct scheduler *self = get_this_core_sched();
+    struct scheduler *self = smp_core_scheduler();
     if (!atomic_load(&self->tick_enabled)) {
         lapic_timer_enable();
         atomic_store(&self->tick_enabled, true);
@@ -43,7 +43,7 @@ static inline void tick_enable() {
 }
 
 static inline void change_timeslice_duration(uint64_t new_duration) {
-    struct scheduler *self = get_this_core_sched();
+    struct scheduler *self = smp_core_scheduler();
 
     /* No need to unnecessarily write to MMIO */
     if (self->timeslice_duration == new_duration &&
@@ -108,7 +108,7 @@ static inline void do_re_enqueue_thread(struct scheduler *sched,
         thread->timeslices_remaining == 0) {
         scheduler_set_queue_bitmap(sched, thread->perceived_priority);
         retire_thread(sched, thread);
-        scheduler_increment_thread_count(sched);
+        scheduler_increment_thread_count(sched, thread);
     } else {
         bool locked = true;
         scheduler_add_thread(sched, thread, locked);
@@ -193,7 +193,8 @@ static struct thread *pick_thread(struct scheduler *sched, uint64_t now_ms) {
         next = pick_from_regular_queues(sched, now_ms, prio);
     }
 
-    scheduler_decrement_thread_count(sched);
+    kassert(next); /* cannot be NULL - if it is the bitmap is lying */
+    scheduler_decrement_thread_count(sched, next);
     return next;
 }
 
@@ -228,7 +229,7 @@ static inline struct thread *load_idle_thread(struct scheduler *sched) {
 
 static void change_timeslice(struct scheduler *sched, struct thread *next) {
     /* Only one thread is running - no timeslice needed */
-    if (sched->thread_count == 0) {
+    if (sched->total_thread_count == 0) {
         /* Disable the scheduling period because
          * there is no need for period
          * tracking when we have
@@ -261,7 +262,7 @@ static inline void context_switch(struct thread *curr, struct thread *next) {
 }
 
 void schedule(void) {
-    struct scheduler *sched = get_this_core_sched();
+    struct scheduler *sched = smp_core_scheduler();
     enum irql irql = scheduler_lock_irq_disable(sched);
 
     uint64_t time = time_get_ms_fast();

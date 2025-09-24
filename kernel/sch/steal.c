@@ -26,15 +26,16 @@ struct scheduler *scheduler_pick_victim(struct scheduler *self) {
         bool victim_busy = atomic_load(&potential_victim->being_robbed) ||
                            atomic_load(&potential_victim->stealing_work);
 
-        uint64_t victim_scaled = potential_victim->thread_count * 100;
-        uint64_t scaled = self->thread_count * scheduler_data.steal_min_diff;
+        uint64_t victim_scaled = potential_victim->total_thread_count * 100;
+        uint64_t scaled =
+            self->total_thread_count * scheduler_data.steal_min_diff;
         bool victim_is_poor = victim_scaled < scaled;
 
         if (victim_busy || victim_is_poor)
             continue;
 
-        if (potential_victim->thread_count > max_thread_count) {
-            max_thread_count = potential_victim->thread_count;
+        if (potential_victim->total_thread_count > max_thread_count) {
+            max_thread_count = potential_victim->total_thread_count;
             victim = potential_victim;
         }
     }
@@ -63,7 +64,7 @@ static struct thread *steal_from_ts_threads(struct scheduler *victim,
         if (scheduler_has_no_timesharing_threads(victim))
             scheduler_clear_queue_bitmap(victim, level);
 
-        scheduler_decrement_thread_count(victim);
+        scheduler_decrement_thread_count(victim, target);
         return target;
     }
 
@@ -91,7 +92,7 @@ static struct thread *steal_from_special_threads(struct scheduler *victim,
         if (list_empty(&q->list))
             scheduler_clear_queue_bitmap(victim, level);
 
-        scheduler_decrement_thread_count(victim);
+        scheduler_decrement_thread_count(victim, t);
         return t;
     }
 
@@ -104,7 +105,7 @@ static struct thread *steal_from_special_threads(struct scheduler *victim,
  *
  * TODO: Make this pick the busiest thread to steal from */
 struct thread *scheduler_steal_work(struct scheduler *victim) {
-    if (!victim || victim->thread_count == 0)
+    if (!victim || victim->total_thread_count == 0)
         return NULL;
 
     /* do not wait in a loop */

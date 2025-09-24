@@ -33,9 +33,9 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
 
     sched->queue_bitmap |= (1 << prio);
 
-    scheduler_increment_thread_count(sched);
+    scheduler_increment_thread_count(sched, task);
 
-    if (!sched->period_enabled && sched->thread_count > 1) {
+    if (!sched->period_enabled && sched->total_thread_count > 1) {
         sched->period_enabled = true;
         scheduler_period_start(sched, time_get_ms());
     }
@@ -57,8 +57,8 @@ void scheduler_enqueue(struct thread *t) {
     uint64_t min_load = UINT64_MAX;
 
     for (uint64_t i = 0; i < global.core_count; i++) {
-        if (global.schedulers[i]->thread_count < min_load) {
-            min_load = global.schedulers[i]->thread_count;
+        if (global.schedulers[i]->total_thread_count < min_load) {
+            min_load = global.schedulers[i]->total_thread_count;
             s = global.schedulers[i];
         }
     }
