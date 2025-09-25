@@ -26,26 +26,28 @@ jobs:
       - name: Compile 
         run:  ./build.sh
 
-      - name: Run tests
+      - name: Run tests 
         run: |
           cd build
-          dd if=/dev/zero of=disk.img bs=10M count=1
-          mkfs.ext2 disk.img
-
-          set +e
           export TERM=dumb
-          timeout 30s make tests | tee qemu.log
-          EXIT_CODE=${PIPESTATUS[0]}
-          echo "[INFO]: make tests exited with $EXIT_CODE"
 
-          e2fsck disk.img
-          if grep -q "all tests pass" qemu.log; then
-            echo "[PASS] Tests passed!"
-            exit 0
-          else
-            echo "[FAIL] Test failure or panic detected:"
-            tail -n 40 qemu.log
-            exit 1
-          fi
+          for i in $(seq 1 10); do
+            echo "[INFO] Test iteration $i/10"
 
+            dd if=/dev/zero of=disk.img bs=10M count=1
+            mkfs.ext2 -F disk.img
+
+            set +e
+            timeout 30s make tests | tee qemu.log
+            EXIT_CODE=${PIPESTATUS[0]}
+            echo "[INFO]: make tests exited with $EXIT_CODE"
+
+            if grep -q "all tests pass" qemu.log; then
+              echo "[PASS] Iteration $i passed!"
+            else
+              echo "[FAIL] Iteration $i failed:"
+              tail -n 40 qemu.log
+              exit 1
+            fi
+          done
 
