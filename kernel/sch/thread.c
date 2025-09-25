@@ -58,7 +58,7 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->regs.r12 = (uint64_t) entry_point;
     new_thread->regs.rip = (uint64_t) thread_entry_wrapper;
     new_thread->stack = (void *) stack;
-    new_thread->curr_core = -1; // nobody is running this
+    new_thread->curr_core = -1;
     new_thread->id = tid_alloc(thread_tid_space);
     new_thread->refcount = 1;
     new_thread->timeslices_remaining = 1;

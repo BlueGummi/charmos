@@ -1,6 +1,7 @@
 #include <asm.h>
 #include <console/printf.h>
 #include <int/idt.h>
+#include <kassert.h>
 #include <limine.h>
 #include <mem/alloc.h>
 #include <smp/core.h>
@@ -355,7 +356,7 @@ static size_t build_llc_nodes(size_t n_cores) {
             if (existing->level == c->llc.level &&
                 existing->type == c->llc.type &&
                 existing->size_kb == c->llc.size_kb &&
-                llc_nodes[j].parent == pkg_id) {
+                llc_nodes[j].parent == pkg_id) { /* Real */
                 exists = true;
                 cpu_mask_or(&llc_nodes[j].cpus, &core_nodes[i].cpus);
                 cpu_mask_or(&llc_nodes[j].idle, &core_nodes[i].idle);
@@ -475,7 +476,6 @@ static void build_machine_node(size_t n_packages) {
     machine_node.first_child = -1;
     machine_node.nr_children = n_packages;
     machine_node.core = NULL;
-    machine_node.parent_node = NULL;
 
     cpu_mask_init(&machine_node.cpus, global.core_count);
     cpu_mask_init(&machine_node.idle, global.core_count);
@@ -492,7 +492,7 @@ static void build_machine_node(size_t n_packages) {
 }
 
 void topology_init(void) {
-    size_t n_cpus = global.core_count;
+    size_t n_cpus = global.core_count; /* Logical processor count */
 
     size_t n_cores = build_core_nodes(n_cpus);
     size_t n_smt = build_smt_nodes(n_cpus);
@@ -569,39 +569,55 @@ void topo_mark_core_idle(size_t cpu_id, bool idle) {
     }
 }
 
-struct core *topo_find_idle_core(struct core *local_core) {
-    if (!global.topology.level[TL_MACHINE])
-        return NULL;
+struct core *topo_find_idle_core(struct core *local_core,
+                                 enum topology_level max_search) {
+    kassert(max_search > TL_SMT); /* 'SMT' will be the core itself.
+                                   * It has no neighbors, and thus
+                                   * cannot be searched through (one core) */
 
-    struct topology_node *smt_node = local_core->topo_node;
+    struct topology_node *smt_node = local_core->topo_node; /* Direct node  */
     struct topology_node *core_node = smt_node->parent_node;
     struct topology_node *numa_node = core_node->parent_node;
-    struct topology_node *llc_node = numa_node ? numa_node->parent_node : NULL;
-    struct topology_node *pkg_node = llc_node ? llc_node->parent_node : NULL;
+    struct topology_node *llc_node = numa_node->parent_node;
+    struct topology_node *pkg_node = llc_node->parent_node;
 
+    /* First try SMT siblings */
     for (int32_t i = 0; i < core_node->nr_children; i++) {
         struct topology_node *sibling = &smt_nodes[core_node->first_child + i];
         if (!cpu_mask_empty(&sibling->idle))
             return sibling->core;
     }
 
+    /* Not allowed to search to NUMA */
+    if (max_search < TL_NUMA)
+        return NULL;
+
+    /* Next try NUMA siblings */
     for (int32_t i = 0; i < numa_node->nr_children; i++) {
         struct topology_node *core = &core_nodes[numa_node->first_child + i];
         if (!cpu_mask_empty(&core->idle))
             return core->core;
     }
 
-    if (pkg_node) {
-        for (int32_t i = 0; i < pkg_node->nr_children; i++) {
-            struct topology_node *llc = &llc_nodes[pkg_node->first_child + i];
-            if (cpu_mask_empty(&llc->idle))
-                continue;
+    if (max_search < TL_LLC)
+        return NULL;
 
-            for (int32_t j = 0; j < smt_nodes->nr_children; j++) {
-                struct topology_node *smt = &smt_nodes[llc->first_child + j];
-                if (!cpu_mask_empty(&smt->idle))
-                    return smt->core;
-            }
+    for (int32_t i = 0; i < llc_node->nr_children; i++) {
+        struct topology_node *core = &core_nodes[llc_node->first_child + i];
+        if (!cpu_mask_empty(&core->idle))
+            return core->core;
+    }
+
+    /* Finally do a full CPU scan */
+    for (int32_t i = 0; i < pkg_node->nr_children; i++) {
+        struct topology_node *llc = &llc_nodes[pkg_node->first_child + i];
+        if (cpu_mask_empty(&llc->idle))
+            continue;
+
+        for (int32_t j = 0; j < smt_nodes->nr_children; j++) {
+            struct topology_node *smt = &smt_nodes[llc->first_child + j];
+            if (!cpu_mask_empty(&smt->idle))
+                return smt->core;
         }
     }
 

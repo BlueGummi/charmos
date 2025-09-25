@@ -127,7 +127,6 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     INIT_LIST_HEAD(&nvme->work.list_node);
     nvme->work.func = nvme_work;
 
-    k_printf("0x%lx go \n", &nvme->work);
     workqueue_add_fast(&nvme->work);
 
     return nvme;

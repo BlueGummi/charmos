@@ -28,26 +28,26 @@ struct scheduler_data scheduler_data = {
 
 static inline void tick_disable() {
     struct scheduler *self = smp_core_scheduler();
-    if (atomic_load(&self->tick_enabled)) {
+    if (scheduler_tick_enabled(self)) {
         lapic_timer_disable();
-        atomic_store(&self->tick_enabled, false);
+        scheduler_set_tick_enabled(self, false);
     }
 }
 
 static inline void tick_enable() {
     struct scheduler *self = smp_core_scheduler();
-    if (!atomic_load(&self->tick_enabled)) {
+    if (!scheduler_tick_enabled(self)) {
         lapic_timer_enable();
-        atomic_store(&self->tick_enabled, true);
+        scheduler_set_tick_enabled(self, true);
     }
 }
 
 static inline void change_timeslice_duration(uint64_t new_duration) {
     struct scheduler *self = smp_core_scheduler();
 
-    /* No need to unnecessarily write to MMIO */
+    /* Tick duration is the same */
     if (self->timeslice_duration == new_duration &&
-        atomic_load(&self->tick_enabled))
+        scheduler_tick_enabled(self))
         return;
 
     self->timeslice_duration = new_duration;
@@ -77,8 +77,7 @@ static inline void decay_thread_timeslice(struct scheduler *sched,
         return;
 
     if (thread->timeslices_remaining == 0)
-        k_panic("Bug: Thread with no timeslices remaining was saved "
-                "to the run queues");
+        return;
 
     thread->timeslices_remaining--;
 
@@ -106,8 +105,8 @@ static inline void do_re_enqueue_thread(struct scheduler *sched,
     /* Scheduler is locked - called from `schedule()` */
     if (THREAD_PRIO_IS_TIMESHARING(thread->perceived_priority) &&
         thread->timeslices_remaining == 0) {
-        scheduler_set_queue_bitmap(sched, thread->perceived_priority);
         retire_thread(sched, thread);
+        scheduler_set_queue_bitmap(sched, thread->perceived_priority);
         scheduler_increment_thread_count(sched, thread);
     } else {
         bool locked = true;
@@ -170,8 +169,7 @@ static struct thread *pick_from_regular_queues(struct scheduler *sched,
     /* Here, we have been unable to find
      * a thread in the ready queues,
      * so we shall start a new period and swap
-     * the pointers and find the
-     * thread again */
+     * the pointers and find the thread again */
     swap_queues(sched);
     scheduler_period_start(sched, now_ms);
     return find_highest_prio(sched, prio);
@@ -266,6 +264,7 @@ void schedule(void) {
     enum irql irql = scheduler_lock_irq_disable(sched);
 
     uint64_t time = time_get_ms_fast();
+
     struct thread *curr = sched->current;
     struct thread *next = NULL;
 

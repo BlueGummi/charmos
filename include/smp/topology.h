@@ -5,13 +5,16 @@
 #include <types/types.h>
 
 enum topology_level {
-    TL_SMT,
-    TL_CORE,
-    TL_LLC,
-    TL_NUMA,
-    TL_PACKAGE,
-    TL_MACHINE,
-    TL_MAX
+    TL_SMT,  /* Symmetric multiprocessing threads */
+    TL_CORE, /* SMTs under a core */
+    TL_LLC,  /* Last level cache (some processors
+              * have multiple L3 caches for a given
+              * physical processor) */
+
+    TL_NUMA,    /* NUMA node */
+    TL_PACKAGE, /* Physical processor in a socket */
+    TL_MACHINE, /* All processors in a machine */
+    TL_MAX      /* count */
 };
 
 struct cpu_mask {
@@ -41,7 +44,11 @@ struct topology_node {
     uint64_t id;     /* Index in this node */
     uint64_t parent; /* Parent node index, -1 for root */
     struct topology_node *parent_node;
-    int32_t first_child; /* Index in child array */
+    int32_t first_child; /* For cores this is in the cores array.
+                          * For NUMA this is also in the cores array.
+                          * For LLC this is in the numa array.
+                          * For package this is LLC.
+                          * For machine this is package.  */
     int32_t nr_children;
 
     struct cpu_mask cpus;
@@ -62,6 +69,7 @@ struct topology {
 };
 
 void topo_mark_core_idle(size_t cpu_id, bool idle);
-struct core *topo_find_idle_core(struct core *local_core);
+struct core *topo_find_idle_core(struct core *local_core,
+                                 enum topology_level max_search);
 struct core **topo_get_smts_under_numa(struct topology_node *numa,
                                        size_t *count);

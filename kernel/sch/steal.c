@@ -205,3 +205,35 @@ struct thread *scheduler_try_do_steal(struct scheduler *sched) {
 
     return stolen;
 }
+
+/* for work_steal_victim_min_diff */
+static inline uint8_t ilog2(uint64_t x) {
+    uint8_t r = 0;
+    while (x >>= 1)
+        r++;
+    return r;
+}
+
+uint64_t scheduler_compute_steal_threshold() {
+    uint64_t threads = atomic_load(&scheduler_data.total_threads);
+    uint64_t threads_per_core = threads / global.core_count;
+
+    if (threads_per_core <= 1)
+        return 150;
+
+    if (threads_per_core >= 64)
+        return 110;
+
+    uint8_t log = ilog2(threads_per_core);
+    return 150 - (log * 5);
+}
+
+bool scheduler_can_steal_work(struct scheduler *sched) {
+    int64_t val = atomic_load(&scheduler_data.total_threads);
+    int64_t avg_core_threads = val / global.core_count;
+
+    uint64_t threshold_load =
+        ((avg_core_threads * WORK_STEAL_THRESHOLD) / 100ULL) ?: 1;
+
+    return (sched->total_thread_count < threshold_load);
+}

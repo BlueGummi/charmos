@@ -74,14 +74,14 @@ void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req) {
 void bio_sched_dequeue(struct generic_disk *disk, struct bio_request *req,
                        bool already_locked) {
     struct bio_scheduler *sched = disk->scheduler;
-    bool i = false;
+    enum irql irql;
     if (!already_locked)
-        i = spin_lock_irq_disable(&sched->lock);
+        irql = spin_lock_irq_disable(&sched->lock);
 
     bio_sched_dequeue_internal(sched, req);
 
     if (!already_locked)
-        spin_unlock(&sched->lock, i);
+        spin_unlock(&sched->lock, irql);
 }
 
 struct bio_scheduler *bio_sched_create(struct generic_disk *disk,

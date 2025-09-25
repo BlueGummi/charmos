@@ -91,4 +91,13 @@ static inline uint8_t scheduler_get_bitmap(struct scheduler *sched) {
     return atomic_load(&sched->queue_bitmap);
 }
 
+static inline bool scheduler_tick_enabled(struct scheduler *sched) {
+    return atomic_load(&sched->tick_enabled);
+}
+
+static inline bool scheduler_set_tick_enabled(struct scheduler *sched,
+                                              bool new) {
+    return atomic_exchange(&sched->tick_enabled, new);
+}
+
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(scheduler, lock);

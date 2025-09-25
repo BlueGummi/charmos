@@ -120,7 +120,7 @@ static void ide_start_next(struct ide_channel *chan, bool locked) {
     struct ide_request *req = chan->head;
     struct ata_drive *d = chan->current_drive;
 
-    bool i = false;
+    enum irql i;
     if (!locked)
         i = spin_lock(&chan->lock);
 
@@ -153,7 +153,7 @@ static void ide_start_next(struct ide_channel *chan, bool locked) {
 static void enqueue_request(struct ide_channel *chan, struct ide_request *req,
                             bool locked) {
 
-    bool i = false;
+    enum irql i;
     if (!locked)
         i = spin_lock(&chan->lock);
 
