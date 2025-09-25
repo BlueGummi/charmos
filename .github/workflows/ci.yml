@@ -53,7 +53,6 @@ jobs:
                   -ex "info threads" \
                   -ex "thread apply all bt full" \
                   -ex "quit" || true
-              tail -n 40 qemu.log
               pkill -f qemu-system-x86_64
               exit 1
             fi

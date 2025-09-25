@@ -106,6 +106,11 @@ struct nvme_request {
     struct list_head list_node;
 };
 
+struct nvme_waiting_requests {
+    struct spinlock lock;
+    struct list_head list;
+};
+
 struct nvme_queue {
     struct nvme_command *sq;    // Submission queue (virtual)
     struct nvme_completion *cq; // Completion queue (virtual)
@@ -120,14 +125,10 @@ struct nvme_queue {
     uint32_t *sq_db;
     uint32_t *cq_db;
 
+    struct nvme_waiting_requests outgoing;
     atomic_uint_fast16_t outstanding;
 
     struct spinlock lock;
-};
-
-struct nvme_waiting_requests {
-    struct spinlock lock;
-    struct list_head list;
 };
 
 struct nvme_device {
@@ -152,9 +153,6 @@ struct nvme_device {
     /* Array of pointers to queues */
     struct nvme_queue **io_queues;
 
-    /* 2D array of pointers to io requests
-     * in queues and queue entries */
-    struct nvme_request ***io_requests;
     struct nvme_waiting_requests waiting_requests;
     struct nvme_waiting_requests finished_requests;
     struct work work;

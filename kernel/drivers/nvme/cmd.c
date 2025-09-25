@@ -42,8 +42,15 @@ static void nvme_send_waiters(struct nvme_device *dev) {
     }
 }
 
+static bool done_first = false;
 static void nvme_process_one(struct nvme_request *req) {
     struct thread *t = req->waiter;
+
+    if (!done_first) {
+        k_printf("First interrupt caught\n");
+        done_first = true;
+    }
+
     if (t)
         scheduler_wake_from_io_block(t);
 
@@ -80,11 +87,16 @@ void nvme_work(void *dvoid, void *nothing) {
 
         if (req) {
             nvme_process_one(req);
-            nvme_send_waiters(dev);
         } else {
             if (atomic_load(&dev->total_outstanding) == 0) {
-                break;
+                req = nvme_finished_pop_front(dev);
+                if (!req && atomic_load(&dev->total_outstanding) == 0) {
+                    break;
+                } else {
+                    nvme_process_one(req);
+                }
             }
+            continue;
         }
 
         nvme_send_waiters(dev);
@@ -102,10 +114,17 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
         if ((mmio_read_32(&entry->status) & 1) != queue->cq_phase)
             break;
 
-        uint16_t cid = mmio_read_32(&entry->cid);
         uint16_t status = mmio_read_32(&entry->status) & 0xFFFE;
 
-        struct nvme_request *req = dev->io_requests[qid][cid];
+        enum irql irql =
+            nvme_waiting_requests_lock_irq_disable(&queue->outgoing);
+
+        struct list_head *pop = list_pop_front_init(&queue->outgoing.list);
+
+        nvme_waiting_requests_unlock(&queue->outgoing, irql);
+
+        struct nvme_request *req =
+            container_of(pop, struct nvme_request, list_node);
 
         if (req) {
             req->status = status;
@@ -118,13 +137,8 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
             nvme_waiting_requests_unlock(&dev->finished_requests, irql);
         }
 
-        if (!work_active(&dev->work))
-            workqueue_add_fast(&dev->work);
-
         atomic_fetch_sub(&queue->outstanding, 1);
         atomic_fetch_sub(&dev->total_outstanding, 1);
-
-        dev->io_requests[qid][cid] = NULL;
 
         queue->cq_head = (queue->cq_head + 1) % queue->cq_depth;
         if (queue->cq_head == 0)
@@ -162,7 +176,13 @@ void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
 
     this_queue->sq[tail] = *cmd;
 
-    nvme->io_requests[qid][tail] = req;
+    enum irql out =
+        nvme_waiting_requests_lock_irq_disable(&this_queue->outgoing);
+
+    list_add_tail(&req->list_node, &this_queue->outgoing.list);
+
+    nvme_waiting_requests_unlock(&this_queue->outgoing, out);
+
     req->status = BIO_STATUS_INFLIGHT; /* In flight */
 
     this_queue->sq_tail = next_tail;

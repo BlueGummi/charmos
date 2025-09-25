@@ -108,15 +108,17 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
         pmm_alloc_pages(sq_pages, ALLOC_CLASS_DEFAULT, ALLOC_FLAGS_NONE);
 
     this_queue->sq =
-        vmm_map_phys(sq_phys, sq_pages * nvme->page_size, PAGING_UNCACHABLE);
+        vmm_map_phys(sq_phys, sq_pages * nvme->page_size, PAGING_NO_FLAGS);
     memset(this_queue->sq, 0, sq_pages * nvme->page_size);
 
     uint64_t cq_phys =
         pmm_alloc_pages(cq_pages, ALLOC_CLASS_DEFAULT, ALLOC_FLAGS_NONE);
 
     this_queue->cq =
-        vmm_map_phys(cq_phys, cq_pages * nvme->page_size, PAGING_UNCACHABLE);
+        vmm_map_phys(cq_phys, cq_pages * nvme->page_size, PAGING_NO_FLAGS);
     memset(this_queue->cq, 0, cq_pages * nvme->page_size);
+
+    INIT_LIST_HEAD(&this_queue->outgoing.list);
 
     this_queue->sq_phys = sq_phys;
     this_queue->cq_phys = cq_phys;

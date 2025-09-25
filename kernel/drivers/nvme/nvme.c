@@ -99,9 +99,8 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme_info(K_INFO, "Controller max transfer size is %u bytes",
               nvme->max_transfer_size);
     nvme->isr_index = kzalloc(sizeof(uint8_t) * sqs_to_make);
-    nvme->io_requests = kzalloc(sizeof(struct nvme_request *) * sqs_to_make);
     nvme->io_queues = kzalloc(sizeof(struct nvme_queue *) * sqs_to_make);
-    if (unlikely(!nvme->isr_index || !nvme->io_requests || !nvme->io_queues))
+    if (unlikely(!nvme->isr_index || !nvme->io_queues))
         k_panic("Could not allocate space for NVMe structures");
 
     nvme->queue_count = sqs_to_make;
@@ -115,10 +114,6 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
         nvme->isr_index[i] = nvme_isr;
 
         nvme_alloc_io_queues(nvme, i);
-
-        nvme->io_requests[i] = kzalloc(sizeof(struct nvme_request *) * 64);
-        if (unlikely(!nvme->io_requests[i]))
-            k_panic("Could not allocate space for NVMe structures");
     }
 
     INIT_LIST_HEAD(&nvme->finished_requests.list);
