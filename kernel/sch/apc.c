@@ -1,8 +1,8 @@
 #include <kassert.h>
-#include <smp/core.h>
 #include <sch/apc.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
+#include <smp/core.h>
 
 #define apc_from_list_node(n) container_of(n, struct apc, node)
 
@@ -78,11 +78,11 @@ static void deliver_apc_type(struct thread *t, enum apc_type type) {
     struct apc *apc;
 
     while (true) {
-        bool iflag = thread_acquire(t);
+        enum irql irql = thread_acquire(t);
 
         if (apc_list_empty(t, type)) {
             apc_list_unset_bitmask(t, type);
-            thread_release(t, iflag);
+            thread_release(t, irql);
             return;
         }
 
@@ -90,7 +90,7 @@ static void deliver_apc_type(struct thread *t, enum apc_type type) {
         apc_list_del(apc);
         apc->enqueued = false;
 
-        thread_release(t, iflag);
+        thread_release(t, irql);
 
         if (!apc_is_cancelled(apc))
             exec_apc(apc);
@@ -140,11 +140,11 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
 
     thread_apc_sanity_check(t);
 
-    bool iflag = thread_acquire(t);
+    enum irql irql = thread_acquire(t);
 
     add_apc_to_thread(t, a, type);
 
-    thread_release(t, iflag);
+    thread_release(t, irql);
     /* Let's go and execute em */
     if (thread_is_curr_thread(t)) {
         thread_check_and_deliver_apcs(t);
@@ -165,13 +165,13 @@ void apc_enqueue_event_apc(struct thread *t, struct apc *a,
 
     thread_apc_sanity_check(t);
 
-    bool iflag = thread_acquire(t);
+    enum irql irql = thread_acquire(t);
 
     t->on_event_apcs[evt] = a;
     a->enqueued = true;
     a->owner = t;
 
-    thread_release(t, iflag);
+    thread_release(t, irql);
 }
 
 static inline void apc_unlink(struct apc *apc) {
@@ -207,7 +207,7 @@ bool apc_cancel(struct apc *a) {
 
     struct thread *t = a->owner;
     bool removed = false;
-    bool iflag = thread_acquire(t);
+    enum irql irql = thread_acquire(t);
 
     apc_set_cancelled(a);
 
@@ -220,7 +220,7 @@ bool apc_cancel(struct apc *a) {
         }
     }
 
-    thread_release(t, iflag);
+    thread_release(t, irql);
     return removed;
 }
 

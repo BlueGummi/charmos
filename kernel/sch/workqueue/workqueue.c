@@ -76,12 +76,9 @@ enum workqueue_error workqueue_add_remote(struct work *work) {
 }
 
 void work_execute(struct work *task) {
-    if (!task)
-        return;
-
-    atomic_store(&task->executing, true);
+    kassert(task);
     task->func(task->args.arg1, task->args.arg2);
-    atomic_store(&task->executing, false);
+    atomic_store(&task->active, false);
 }
 
 struct workqueue *
@@ -132,6 +129,8 @@ void workqueue_free(struct workqueue *wq) {
 
 /* Give all threads the exit signal and clean up the structs */
 void workqueue_destroy(struct workqueue *queue) {
+    kassert(queue);
+
     WORKQUEUE_STATE_SET(queue, WORKQUEUE_STATE_DESTROYING);
     atomic_store(&queue->ignore_timeouts, true);
 
@@ -141,8 +140,10 @@ void workqueue_destroy(struct workqueue *queue) {
     /* All workers now idle */
     condvar_broadcast_callback(&queue->queue_cv, mark_worker_exit);
 
-    while (workqueue_workers(queue) > 0)
+    while (workqueue_workers(queue) > 0) {
+        condvar_broadcast_callback(&queue->queue_cv, mark_worker_exit);
         scheduler_yield();
+    }
 
     workqueue_put(queue);
 }

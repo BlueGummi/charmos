@@ -31,9 +31,10 @@ static bool dequeue_oneshot_task(struct workqueue *queue, struct work *out) {
     }
 }
 
-bool workqueue_dequeue_task(struct workqueue *queue, struct work *out) {
-    if (dequeue_oneshot_task(queue, out))
-        return true;
+int32_t workqueue_dequeue_task(struct workqueue *queue, struct work **out,
+                               struct work *oneshot_task) {
+    if (dequeue_oneshot_task(queue, oneshot_task))
+        return DEQUEUE_FROM_ONESHOT_CODE;
 
     enum irql irql = workqueue_work_lock_irq_disable(queue);
     struct list_head *lh = list_pop_front(&queue->works);
@@ -41,13 +42,13 @@ bool workqueue_dequeue_task(struct workqueue *queue, struct work *out) {
 
     if (lh) {
         struct work *work = work_from_worklist_node(lh);
-        *out = *work;
+        *out = work;
         atomic_store(&work->enqueued, false);
         atomic_fetch_sub(&queue->num_tasks, 1);
-        return true;
+        return DEQUEUE_FROM_REGULAR_CODE;
     }
 
-    return false;
+    return 0;
 }
 
 static void signal_callback(struct thread *t) {
@@ -84,7 +85,9 @@ enum workqueue_error workqueue_enqueue(struct workqueue *queue,
 
     enum irql irql = workqueue_work_lock_irq_disable(queue);
     list_add_tail(&work->list_node, &queue->works);
+
     atomic_store(&work->enqueued, true);
+    atomic_store(&work->active, true);
 
     workqueue_work_unlock(queue, irql);
 

@@ -91,13 +91,4 @@ static inline uint8_t scheduler_get_bitmap(struct scheduler *sched) {
     return atomic_load(&sched->queue_bitmap);
 }
 
-#define FIXED_SHIFT 12
-static inline uint64_t thread_compute_weight(struct thread *t) {
-    thread_prio_t priority = t->priority_score;
-
-    /* weight = 1 + (priority / 2^20) in fixed point */
-    return (1 << FIXED_SHIFT) + ((uint64_t) priority >> (20 - FIXED_SHIFT));
-}
-#undef FIXED_SHIFT
-
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(scheduler, lock);

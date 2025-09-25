@@ -8,6 +8,9 @@
 #define DEFAULT_MAX_INTERACTIVITY_CHECK_PERIOD SECONDS_TO_MS(10)
 _Static_assert(DEFAULT_MAX_WORKERS < 64, ""); /* Won't fit in our bitmap */
 
+#define DEQUEUE_FROM_ONESHOT_CODE 2
+#define DEQUEUE_FROM_REGULAR_CODE 1
+
 #define worklist_from_worklist_list_node(node)                                 \
     container_of(node, struct worklist, worklist_list)
 
@@ -26,8 +29,15 @@ static inline uint64_t workqueue_current_worker_count(struct workqueue *q) {
     return atomic_load(&q->num_workers);
 }
 
+static inline bool workqueue_works_empty(struct workqueue *queue) {
+    enum irql irql = workqueue_work_lock_irq_disable(queue);
+    bool empty = list_empty(&queue->works);
+    workqueue_work_unlock(queue, irql);
+    return empty;
+}
+
 static inline bool workqueue_empty(struct workqueue *queue) {
-    return atomic_load(&queue->head) == atomic_load(&queue->tail) && list_empty(&queue->works);
+    return atomic_load(&queue->num_tasks) == 0;
 }
 
 static inline void workqueue_set_needs_spawn(struct workqueue *queue,
@@ -88,7 +98,8 @@ static inline size_t workqueue_idlers(struct workqueue *wq) {
 }
 
 bool workqueue_try_spawn_worker(struct workqueue *queue);
-bool workqueue_dequeue_task(struct workqueue *queue, struct work *out);
+int32_t workqueue_dequeue_task(struct workqueue *queue, struct work **out,
+                           struct work *oneshot_out);
 void workqueue_link_thread_and_worker(struct worker *worker,
                                       struct thread *thread);
 bool workqueue_spawn_worker(struct workqueue *queue);

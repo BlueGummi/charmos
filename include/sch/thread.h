@@ -365,14 +365,15 @@ static inline void thread_put(struct thread *t) {
     }
 }
 
-static inline bool thread_acquire(struct thread *t) {
+static inline enum irql thread_acquire(struct thread *t) {
     if (!refcount_inc_not_zero(&t->refcount))
         k_panic("UAF");
+
     return spin_lock(&t->lock);
 }
 
-static inline void thread_release(struct thread *t, bool iflag) {
-    spin_unlock(&t->lock, iflag);
+static inline void thread_release(struct thread *t, enum irql irql) {
+    spin_unlock(&t->lock, irql);
     thread_put(t);
 }
 

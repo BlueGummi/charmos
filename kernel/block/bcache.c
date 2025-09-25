@@ -29,9 +29,9 @@ static enum errno prefetch(struct generic_disk *disk, struct bcache *cache,
 /* eviction must be explicitly and separately called */
 static bool insert(struct bcache *cache, uint64_t key,
                    struct bcache_entry *value, bool already_locked) {
-    bool ints = false;
+    enum irql irql;
     if (!already_locked)
-        ints = spin_lock(&cache->lock);
+        irql = spin_lock(&cache->lock);
 
     uint64_t index = bcache_hash(key, cache->capacity);
     struct bcache_wrapper *head = cache->entries[index];
@@ -42,7 +42,7 @@ static bool insert(struct bcache *cache, uint64_t key,
             node->value = value;
             node->value->access_time = bcache_get_ticks(cache);
             if (!already_locked)
-                spin_unlock(&cache->lock, ints);
+                spin_unlock(&cache->lock, irql);
             return true;
         }
     }
@@ -51,7 +51,7 @@ static bool insert(struct bcache *cache, uint64_t key,
     struct bcache_wrapper *new_node = kmalloc(sizeof(struct bcache_wrapper));
     if (!new_node) {
         if (!already_locked)
-            spin_unlock(&cache->lock, ints);
+            spin_unlock(&cache->lock, irql);
         return false;
     }
 
@@ -64,7 +64,7 @@ static bool insert(struct bcache *cache, uint64_t key,
     cache->count++;
 
     if (!already_locked)
-        spin_unlock(&cache->lock, ints);
+        spin_unlock(&cache->lock, irql);
     return true;
 }
 

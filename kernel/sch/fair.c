@@ -10,6 +10,8 @@
 #include <sync/spinlock.h>
 #include <tests.h>
 
+/* TODO: #define things */
+
 static void derive_timeshare_prio_range(enum thread_activity_class cls,
                                         uint32_t *min, uint32_t *max);
 #define MAX(a, b) ((a) > (b) ? (a) : (b))

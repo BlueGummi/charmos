@@ -80,6 +80,7 @@ void nvme_work(void *dvoid, void *nothing) {
 
         if (req) {
             nvme_process_one(req);
+            nvme_send_waiters(dev);
         } else {
             if (atomic_load(&dev->total_outstanding) == 0) {
                 break;
@@ -146,10 +147,10 @@ void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
     atomic_fetch_add(&this_queue->outstanding, 1);
     atomic_fetch_add(&nvme->total_outstanding, 1);
 
-    if (!work_enqueued(&nvme->work) && !work_executing(&nvme->work))
-        workqueue_add_fast(&nvme->work);
-
     enum irql irql = nvme_queue_lock_irq_disable(this_queue);
+
+    if (!work_active(&nvme->work))
+        workqueue_add_fast(&nvme->work);
 
     uint16_t tail = this_queue->sq_tail;
     uint16_t next_tail = (tail + 1) % this_queue->sq_depth;

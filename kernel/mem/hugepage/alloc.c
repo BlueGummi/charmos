@@ -27,7 +27,7 @@ static size_t find_free_range(struct hugepage *hp, size_t page_count) {
     return (size_t) -1;
 }
 
-static void *do_fastpath_alloc(struct hugepage *hp, bool iflag) {
+static void *do_fastpath_alloc(struct hugepage *hp, enum irql irql) {
     size_t start = hp->last_allocated_idx;
     for (size_t i = 0; i < HUGEPAGE_SIZE_IN_4KB_PAGES; i++) {
         size_t idx = (start + i) % HUGEPAGE_SIZE_IN_4KB_PAGES;
@@ -35,12 +35,12 @@ static void *do_fastpath_alloc(struct hugepage *hp, bool iflag) {
             set_bit(hp, idx);
             hp->pages_used++;
             hp->last_allocated_idx = (idx + 1) % HUGEPAGE_SIZE_IN_4KB_PAGES;
-            hugepage_unlock(hp, iflag);
+            hugepage_unlock(hp, irql);
             return hugepage_idx_to_addr(hp, idx);
         }
     }
 
-    hugepage_unlock(hp, iflag);
+    hugepage_unlock(hp, irql);
     return NULL;
 }
 
@@ -73,15 +73,11 @@ void *hugepage_alloc_from_hugepage(struct hugepage *hp, size_t page_count) {
     return hugepage_idx_to_addr(hp, idx);
 }
 
-static inline bool hugepage_is_not_full(struct hugepage *hp) {
-    return !hugepage_is_full(hp);
-}
-
 static inline void reinsert_hugepage(struct hugepage *hp, bool locked) {
     struct hugepage_core_list *hcl = hugepage_get_core_list(hp);
 
     /* Re-insert if it is not full to balance the minheap */
-    if (likely(hugepage_is_not_full(hp)))
+    if (likely(!hugepage_is_full(hp)))
         hugepage_core_list_insert(hcl, hp, locked);
 }
 

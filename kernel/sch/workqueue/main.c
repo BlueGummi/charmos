@@ -70,12 +70,19 @@ void worker_main(void) {
 
     while (1) {
 
-        struct work task;
-        if (workqueue_dequeue_task(queue, &task)) {
+        struct work *task = NULL;
+        struct work oneshot_task = {0};
+        int32_t dequeue = workqueue_dequeue_task(queue, &task, &oneshot_task);
+        if (dequeue > 0) {
             w->last_active = time_get_ms();
             w->idle = false;
 
-            work_execute(&task);
+            if (dequeue == DEQUEUE_FROM_ONESHOT_CODE) {
+                work_execute(&oneshot_task);
+            } else {
+                work_execute(task);
+            }
+
             continue;
         }
 

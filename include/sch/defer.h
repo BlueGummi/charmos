@@ -32,7 +32,7 @@ struct work {
     struct list_head list_node;
 
     atomic_bool enqueued;
-    atomic_bool executing;
+    atomic_bool active;
     atomic_uint_fast64_t seq;
 };
 
@@ -255,10 +255,6 @@ void workqueue_destroy(struct workqueue *queue);
 
 void worker_main(void);
 
-static inline bool work_enqueued(struct work *work) {
-    return atomic_load(&work->enqueued);
-}
-
-static inline bool work_executing(struct work *work) {
-    return atomic_load(&work->executing);
+static inline bool work_active(struct work *work) {
+    return atomic_load(&work->active);
 }

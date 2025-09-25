@@ -51,15 +51,15 @@ scheduler_has_no_timesharing_threads(struct scheduler *sched) {
     return sched->thread_rbt.root == NULL && sched->completed_rbt.root == NULL;
 }
 
-static struct thread *steal_from_ts_threads(struct scheduler *victim,
-                                            int level) {
+static struct thread *steal_from_thread_rbt(struct scheduler *victim,
+                                            struct rbt *tree, int level) {
     struct rbt_node *node;
-    rbt_for_each_reverse(node, &victim->thread_rbt) {
+    rbt_for_each_reverse(node, tree) {
         struct thread *target = thread_from_rbt_node(node);
         if (target->flags & THREAD_FLAGS_NO_STEAL)
             continue;
 
-        rb_delete(&victim->thread_rbt, node);
+        rb_delete(tree, node);
 
         if (scheduler_has_no_timesharing_threads(victim))
             scheduler_clear_queue_bitmap(victim, level);
@@ -67,6 +67,24 @@ static struct thread *steal_from_ts_threads(struct scheduler *victim,
         scheduler_decrement_thread_count(victim, target);
         return target;
     }
+
+    /* Nothing found here */
+    return NULL;
+}
+
+static struct thread *steal_from_ts_threads(struct scheduler *victim,
+                                            int level) {
+    struct thread *stolen;
+
+    /* We first try to pick from threads that have not run this period */
+    stolen = steal_from_thread_rbt(victim, &victim->thread_rbt, level);
+    if (stolen)
+        return stolen;
+
+    /* Nothing found? Let's try from the completed threads this period */
+    stolen = steal_from_thread_rbt(victim, &victim->completed_rbt, level);
+    if (stolen)
+        return stolen;
 
     return NULL;
 }
@@ -105,9 +123,6 @@ static struct thread *steal_from_special_threads(struct scheduler *victim,
  *
  * TODO: Make this pick the busiest thread to steal from */
 struct thread *scheduler_steal_work(struct scheduler *victim) {
-    if (!victim || victim->total_thread_count == 0)
-        return NULL;
-
     /* do not wait in a loop */
     if (!spin_trylock_raw(&victim->lock))
         return NULL;
