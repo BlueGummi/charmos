@@ -63,7 +63,9 @@ REGISTER_TEST(workqueue_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     snprintf(msg, 100, "Took %d clock cycles to add to event pool %d times",
              total, times);
     ADD_MESSAGE(msg);
+
     TEST_ASSERT(atomic_load(&workqueue_ran));
+
     msg = kzalloc(100);
     snprintf(msg, 100,
              "Event pool ran %d times, tests should've had it run %d times",

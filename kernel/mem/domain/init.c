@@ -1,12 +1,11 @@
 #include <mem/alloc.h>
 #include <mem/buddy.h>
-#include <smp/domain.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <misc/align.h>
 #include <misc/sort.h>
-#include <smp/domain.h>
 #include <sch/thread.h>
+#include <smp/domain.h>
 #include <string.h>
 
 #include "internal.h"
@@ -30,8 +29,10 @@ static void domain_build_zonelist(struct domain_buddy *dom) {
 
     for (size_t i = 0; i < global.domain_count; i++) {
         dom->zonelist.entries[i].domain = &domain_buddies[i];
-        dom->zonelist.entries[i].distance =
-            global.numa_nodes[dom - domain_buddies].distance[i];
+        if (global.numa_node_count > 1)
+            dom->zonelist.entries[i].distance =
+                global.numa_nodes[dom - domain_buddies].distance[i];
+
         dom->zonelist.entries[i].free_pages =
             domain_buddies[i].total_pages - domain_buddies[i].pages_used;
     }

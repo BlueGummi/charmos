@@ -32,7 +32,7 @@ static void nvme_send_waiters(struct nvme_device *dev) {
 
     enum irql irql = nvme_waiting_requests_lock_irq_disable(waiters);
     if (!list_empty(&waiters->list)) {
-        struct list_head *pop = list_pop_front_init(&waiters->list);
+        struct list_head *pop = list_pop_front(&waiters->list);
         struct nvme_request *next =
             container_of(pop, struct nvme_request, list_node);
         nvme_waiting_requests_unlock(waiters, irql);
@@ -42,14 +42,8 @@ static void nvme_send_waiters(struct nvme_device *dev) {
     }
 }
 
-static bool done_first = false;
 static void nvme_process_one(struct nvme_request *req) {
     struct thread *t = req->waiter;
-
-    if (!done_first) {
-        k_printf("First interrupt caught\n");
-        done_first = true;
-    }
 
     if (t)
         scheduler_wake_from_io_block(t);
@@ -87,16 +81,10 @@ void nvme_work(void *dvoid, void *nothing) {
 
         if (req) {
             nvme_process_one(req);
-        } else {
-            if (atomic_load(&dev->total_outstanding) == 0) {
-                req = nvme_finished_pop_front(dev);
-                if (!req && atomic_load(&dev->total_outstanding) == 0) {
-                    break;
-                } else {
-                    nvme_process_one(req);
-                }
-            }
-            continue;
+        } else if (atomic_load(&dev->total_outstanding) == 0) {
+            req = nvme_finished_pop_front(dev);
+            if (!req && atomic_load(&dev->total_outstanding) == 0)
+                return;
         }
 
         nvme_send_waiters(dev);
@@ -162,12 +150,12 @@ void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
     struct nvme_queue *this_queue = nvme->io_queues[qid];
 
     atomic_fetch_add(&this_queue->outstanding, 1);
-    atomic_fetch_add(&nvme->total_outstanding, 1);
+    uint64_t old = atomic_fetch_add(&nvme->total_outstanding, 1);
+
+    if (old == 0)
+        workqueue_add_fast(&nvme->work);
 
     enum irql irql = nvme_queue_lock_irq_disable(this_queue);
-
-    if (!work_active(&nvme->work))
-        workqueue_add_fast(&nvme->work);
 
     uint16_t tail = this_queue->sq_tail;
     uint16_t next_tail = (tail + 1) % this_queue->sq_depth;
