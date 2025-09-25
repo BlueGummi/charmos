@@ -61,6 +61,7 @@ static struct hugepage *search_core_list(struct hugepage_core_list *hcl,
     minheap_for_each(hcl->hugepage_minheap, mhn) {
         struct hugepage *hp = hugepage_from_minheap_node(mhn);
         if (hp->virt_base == vaddr) {
+            hugepage_remove_from_core_list_safe(hp, /* locked= */ true);
             hugepage_core_list_unlock(hcl, irql);
             return hp;
         }

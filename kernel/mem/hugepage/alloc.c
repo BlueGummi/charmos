@@ -177,10 +177,8 @@ static void *alloc_from_multiple_hugepages(size_t page_count) {
         struct hugepage *hp = hp_arr[i];
 
         void *p = alloc_from_hugepage_at_base_and_adjust(hp, chunk, false);
-        if (!p) {
-            kfree(hp_arr);
-            return NULL;
-        }
+        if (!p) 
+            goto out;
 
         if (i == 0)
             first_ptr = p;
@@ -188,6 +186,7 @@ static void *alloc_from_multiple_hugepages(size_t page_count) {
         page_count -= chunk;
     }
 
+out:
     kfree(hp_arr);
     return first_ptr;
 }
@@ -211,6 +210,8 @@ static void *alloc_from_new_hugepage(struct hugepage_core_list *hcl,
 
 /* TODO: Fallback to stealing hugepages from other cores */
 void *hugepage_alloc_pages(size_t page_count) {
+    kassert(page_count > 0);
+
     struct hugepage_core_list *hcl = hugepage_this_core_list();
 
     /* Fastpath */

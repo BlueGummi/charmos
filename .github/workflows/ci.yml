@@ -21,12 +21,12 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Dependencies
-        run: sudo apt update -y && sudo apt install xorriso nasm qemu-system -y 
+        run: sudo apt update -y && sudo apt install xorriso nasm qemu-system gdb -y 
 
       - name: Compile 
         run:  ./build.sh
 
-      - name: Run tests 
+      - name: Run tests 10 times with GDB on failure
         run: |
           cd build
           export TERM=dumb
@@ -38,16 +38,23 @@ jobs:
             mkfs.ext2 -F disk.img
 
             set +e
-            timeout 30s make tests | tee qemu.log
-            EXIT_CODE=${PIPESTATUS[0]}
-            echo "[INFO]: make tests exited with $EXIT_CODE"
+            make tests | tee qemu.log &
+
+            sleep 30
 
             if grep -q "all tests pass" qemu.log; then
               echo "[PASS] Iteration $i passed!"
+              pkill -f qemu-system-x86_64
             else
-              echo "[FAIL] Iteration $i failed:"
+              echo "[FAIL] Iteration $i failed, collecting GDB backtrace..."
+              gdb -ex "target remote localhost:1234" \
+                   kernel/kernel \
+                  -ex "set pagination off" \
+                  -ex "info threads" \
+                  -ex "thread apply all bt full" \
+                  -ex "quit" || true
               tail -n 40 qemu.log
+              pkill -f qemu-system-x86_64
               exit 1
             fi
           done
-

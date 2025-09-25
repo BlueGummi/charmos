@@ -118,6 +118,9 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
             nvme_waiting_requests_unlock(&dev->finished_requests, irql);
         }
 
+        if (!work_active(&dev->work))
+            workqueue_add_fast(&dev->work);
+
         atomic_fetch_sub(&queue->outstanding, 1);
         atomic_fetch_sub(&dev->total_outstanding, 1);
 
