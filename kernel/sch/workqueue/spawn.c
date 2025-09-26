@@ -114,7 +114,7 @@ bool workqueue_try_spawn_worker(struct workqueue *queue) {
     if (!should_spawn_worker(queue))
         return false;
 
-    if (in_interrupt()) {
+    if (irq_in_interrupt()) {
         workqueue_set_needs_spawn(queue, true);
         return true;
     }

@@ -124,6 +124,7 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
     req.buffer = buffer;
     req.sector_count = count;
     req.remaining_parts = 1;
+    INIT_LIST_HEAD(&req.list_node);
 
     struct thread *curr = scheduler_get_curr_thread();
 

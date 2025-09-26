@@ -1,5 +1,4 @@
 #include <asm.h>
-#include <block/sched.h>
 #include <int/idt.h>
 #include <kassert.h>
 #include <sch/defer.h>
@@ -54,9 +53,10 @@ void scheduler_idle_main(void) {
     atomic_store(&idle->state, IDLE_THREAD_WORK_STEAL);
 
     while (true) {
-        mark_self_idle(true);
+        smp_mark_self_idle(true);
         rcu_mark_quiescent();
         enable_interrupts();
+        smp_resched_if_needed();
         wait_for_interrupt();
     }
 

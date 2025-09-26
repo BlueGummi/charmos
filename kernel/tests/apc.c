@@ -14,19 +14,20 @@ static void the_apc(struct apc *a, void *arg1, void *arg2) {
 
 static void apc_thread(void) {
     while (!atomic_load(&apc_ran)) {
-        cpu_relax();
+        scheduler_yield();
     }
 }
 
+static struct thread *ted = NULL;
 REGISTER_TEST(apc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    struct thread *ted = thread_spawn(apc_thread);
+    ted = thread_spawn(apc_thread);
     struct apc *a = kzalloc(sizeof(struct apc));
     apc_init(a, the_apc, NULL, NULL);
 
     apc_enqueue(ted, a, APC_TYPE_KERNEL);
 
     while (!atomic_load(&apc_ran)) {
-        cpu_relax();
+        scheduler_yield();
     }
 
     SET_SUCCESS;

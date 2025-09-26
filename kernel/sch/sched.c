@@ -301,5 +301,19 @@ void scheduler_yield() {
 }
 
 void scheduler_force_resched(struct scheduler *sched) {
-    ipi_send(sched->core_id, IRQ_SCHEDULER);
+    if (sched == smp_core_scheduler()) {
+        smp_mark_self_needs_resched(true);
+    } else {
+        struct core *other = global.cores[sched->core_id];
+        if (!other) {
+            ipi_send(sched->core_id, IRQ_SCHEDULER);
+            return;
+        }
+
+        if (smp_core_idle(other)) {
+            ipi_send(sched->core_id, IRQ_SCHEDULER);
+        } else {
+            smp_mark_core_needs_resched(other, true);
+        }
+    }
 }

@@ -41,7 +41,7 @@ static inline void spin_unlock(struct spinlock *lock, enum irql old) {
 }
 
 static inline enum irql spin_lock(struct spinlock *lock) {
-    if (global.current_bootstage >= BOOTSTAGE_MID_MP && in_interrupt())
+    if (global.current_bootstage >= BOOTSTAGE_MID_MP && irq_in_interrupt())
         k_panic("Attempted to take non-ISR safe spinlock from an ISR!\n");
 
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);

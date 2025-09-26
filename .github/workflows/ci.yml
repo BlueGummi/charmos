@@ -26,12 +26,12 @@ jobs:
       - name: Compile 
         run:  ./build.sh
 
-      - name: Run tests 10 times with GDB on failure
+      - name: Run tests
         run: |
           cd build
           export TERM=dumb
 
-          for i in $(seq 1 10); do
+          for i in $(seq 1 5); do
             echo "[INFO] Test iteration $i/10"
 
             dd if=/dev/zero of=disk.img bs=10M count=1

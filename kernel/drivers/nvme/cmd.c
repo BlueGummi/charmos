@@ -50,9 +50,6 @@ done:
 static void nvme_process_one(struct nvme_request *req) {
     struct thread *t = req->waiter;
 
-    if (t)
-        scheduler_wake_from_io_block(t);
-
     if (--req->remaining_parts == 0) {
         kfree(req->bio_data->prps);
         kfree(req->bio_data);
@@ -61,6 +58,9 @@ static void nvme_process_one(struct nvme_request *req) {
         if (req->on_complete)
             req->on_complete(req);
     }
+
+    if (t)
+        scheduler_wake_from_io_block(t);
 }
 
 static struct nvme_request *nvme_finished_pop_front(struct nvme_device *dev) {

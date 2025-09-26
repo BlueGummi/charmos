@@ -1,4 +1,3 @@
-#include <sch/apc.h>
 #include <sch/sched.h>
 #include <smp/core.h>
 
@@ -45,13 +44,11 @@ void irql_lower(enum irql new_level) {
         preempt_enable();
     }
 
-    if (in_thread_context() && old_irql > IRQL_APC_LEVEL &&
+    if (irq_in_thread_context() && old_irql > IRQL_APC_LEVEL &&
         new_level == IRQL_PASSIVE_LEVEL) {
         thread_check_and_deliver_apcs(scheduler_get_curr_thread());
     }
 
-    if (preempt_re_enabled && needs_resched()) {
-        mark_self_needs_resched(false);
-        scheduler_yield();
-    }
+    if (preempt_re_enabled)
+        smp_resched_if_needed();
 }

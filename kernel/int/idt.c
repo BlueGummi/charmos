@@ -6,10 +6,10 @@
 #include <int/kb.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
-#include <sch/apc.h>
-#include <sch/sched.h>
 #include <smp/core.h>
 #include <smp/smp.h>
+#include <sch/apc.h>
+#include <sch/sched.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -28,7 +28,7 @@ static struct isr_entry isr_table[MAX_IDT_ENTRIES] = {0};
 #define MAKE_HANDLER(handler_name, message)                                    \
     void handler_name##_handler(void *ctx, uint8_t vector, void *rsp) {        \
         (void) ctx, (void) vector, (void) rsp;                                 \
-        uint64_t core = smp_core_id();                                         \
+        uint64_t core = smp_core_id();                                    \
         k_printf("\n=== " #handler_name " fault! ===\n");                      \
         k_printf("Message -> %s\n", message);                                  \
         k_panic("Core %u faulted\n", core);                                    \
@@ -46,8 +46,8 @@ MAKE_HANDLER(double_fault, "DOUBLE FAULT");
 
 void isr_common_entry(uint8_t vector, void *rsp) {
     enum irql old = irql_raise(IRQL_HIGH_LEVEL);
-    mark_self_in_interrupt(true);
-    mark_self_idle(false);
+    smp_mark_self_in_interrupt(true);
+    smp_mark_self_idle(false);
 
     if (isr_table[vector].handler) {
         isr_table[vector].handler(isr_table[vector].ctx, vector, rsp);
@@ -58,7 +58,7 @@ void isr_common_entry(uint8_t vector, void *rsp) {
     }
 
     rcu_mark_quiescent();
-    mark_self_in_interrupt(false);
+    smp_mark_self_in_interrupt(false);
     irql_lower(old);
 }
 
@@ -68,10 +68,10 @@ void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {
         lapic_write(LAPIC_REG_EOI, 0);
 
         /* Doing this as the `schedule()` will go to another thread */
-        mark_self_in_interrupt(false);
+        smp_mark_self_in_interrupt(false);
         schedule();
     } else {
-        mark_self_needs_resched(true);
+        smp_mark_self_needs_resched(true);
         lapic_write(LAPIC_REG_EOI, 0);
     }
 }
@@ -85,7 +85,8 @@ void panic_isr(void *ctx, uint8_t vector, void *rsp) {
     (void) ctx, (void) vector, (void) rsp;
     if (global.panic_in_progress) {
         disable_interrupts();
-        k_printf("    [CPU %u] Halting due to system panic\n", smp_core_id());
+        k_printf("    [CPU %u] Halting due to system panic\n",
+                 smp_core_id());
         while (1)
             wait_for_interrupt();
     }

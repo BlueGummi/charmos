@@ -375,8 +375,6 @@ void *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
     uint64_t base_lba = ALIGN_DOWN(lba, sectors_per_block);
 
     struct bcache_entry *ent = get(disk->cache, base_lba);
-    enum irql irql = spin_lock(&disk->cache->lock);
-
     if (!ent) {
         uint8_t *buf = hugepage_alloc_page();
         if (!buf)
@@ -384,7 +382,6 @@ void *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
 
         if (!disk->read_sector(disk, base_lba, buf, sectors_per_block)) {
             hugepage_free_page(buf);
-            spin_unlock(&disk->cache->lock, irql);
             *out_entry = NULL;
             return NULL;
         }
@@ -394,18 +391,14 @@ void *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
             return NULL;
 
         mutex_init(&ent->lock);
+
         ent->buffer = buf;
         ent->lba = base_lba;
         ent->size = block_size;
         ent->no_evict = no_evict;
 
-        if (!insert(disk->cache, base_lba, ent, true)) {
-            evict(disk->cache, sectors_per_block);
-            insert(disk->cache, base_lba, ent, true);
-        }
+        bcache_insert(disk, base_lba, ent, sectors_per_block);
     }
-
-    spin_unlock(&disk->cache->lock, irql);
 
     *out_entry = ent;
 

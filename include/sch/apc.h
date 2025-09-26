@@ -52,5 +52,5 @@ void thread_disable_kernel_apcs(struct thread *t);
 void thread_free_event_apcs(struct thread *t);
 
 static inline bool safe_to_exec_apcs(void) {
-    return get_irql() == IRQL_PASSIVE_LEVEL && in_thread_context();
+    return irql_get() == IRQL_PASSIVE_LEVEL && irq_in_thread_context();
 }

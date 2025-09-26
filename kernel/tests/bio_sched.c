@@ -21,7 +21,7 @@
     struct vfs_node *root = global.root_node;
 
 static bool done2 = false;
-static bool cb1d = false, cb2d = false;
+static atomic_bool cb1d = false, cb2d = false;
 static uint64_t avg_complete_time[BIO_SCHED_LEVELS] = {0};
 static uint64_t total_complete_time[BIO_SCHED_LEVELS] = {0};
 static atomic_uint runs = 0;
@@ -42,14 +42,14 @@ static void bio_sch_callback(struct bio_request *req) {
 static void bio_sch_callback1(struct bio_request *req) {
     (void) req;
 
-    cb1d = true;
+    atomic_store(&cb1d, true);
     ADD_MESSAGE("cb 1 success");
 }
 
 static void bio_sch_callback2(struct bio_request *req) {
     (void) req;
 
-    cb2d = true;
+    atomic_store(&cb2d, true);
     ADD_MESSAGE("cb 2 success");
 }
 
@@ -99,10 +99,9 @@ REGISTER_TEST(bio_sched_coalesce_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ADD_MESSAGE(name);
 
     bio_sched_dispatch_all(d);
-    for (uint64_t i = 0; i < 15000; i++)
-        cpu_relax();
 
-    TEST_ASSERT(cb1d && cb2d);
+    while (!atomic_load(&cb1d) || !atomic_load(&cb2d))
+        scheduler_yield();
     SET_SUCCESS;
 }
 
