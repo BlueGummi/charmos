@@ -11,6 +11,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "internal.h"
+
 /* we poll in setup */
 void nvme_enable_controller(struct nvme_device *nvme) {
 

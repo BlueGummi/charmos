@@ -83,6 +83,7 @@ set(QEMU_COMMON_FLAGS
     -cdrom ${IMAGE_NAME}.iso
     -boot d
     -m 8G
+    #    -smp cores=1
     -smp sockets=2,cores=2,threads=2
     -object memory-backend-ram,size=2G,id=mem0
     -object memory-backend-ram,size=2G,id=mem1
@@ -105,7 +106,7 @@ set(QEMU_COMMON_FLAGS
     -numa dist,src=3,dst=1,val=35
     -numa dist,src=2,dst=3,val=15
     -numa dist,src=3,dst=2,val=15
-
+    
     -s
     #-S
     -monitor telnet:127.0.0.1:5555,server,nowait

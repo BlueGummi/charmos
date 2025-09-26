@@ -1,7 +1,7 @@
 #include "internal.h"
 
-_Static_assert(DEFAULT_MAX_INTERACTIVITY_CHECK_PERIOD / 4 >
-                   DEFAULT_MIN_INTERACTIVITY_CHECK_PERIOD,
+_Static_assert(WORKQUEUE_DEFAULT_MAX_INACTIVE_CHECK_PERIOD / 4 >
+                   WORKQUEUE_DEFAULT_MIN_INACTIVE_CHECK_PERIOD,
                "");
 
 static time_t get_inactivity_timeout(struct workqueue *queue) {

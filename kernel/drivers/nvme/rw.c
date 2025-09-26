@@ -30,7 +30,7 @@ static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
     uint64_t offset = (uintptr_t) buffer & (PAGE_SIZE - 1);
     uint64_t num_pages = (offset + size + PAGE_SIZE - 1) / PAGE_SIZE;
 
-    data->prps = kmalloc(sizeof(uint64_t) * num_pages);
+    data->prps = kzalloc(sizeof(uint64_t) * num_pages);
     if (!data->prps)
         return false;
 
@@ -123,14 +123,15 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
     req.lba = lba;
     req.buffer = buffer;
     req.sector_count = count;
+    req.remaining_parts = 1;
 
     struct thread *curr = scheduler_get_curr_thread();
 
-    preempt_disable();
-    thread_block(curr, THREAD_BLOCK_REASON_IO);
+    enum irql irql = irql_raise(IRQL_HIGH_LEVEL);
     req.waiter = curr;
+    thread_block(curr, THREAD_BLOCK_REASON_IO);
     function(disk, &req);
-    preempt_enable();
+    irql_lower(irql);
 
     /* Go run something else now */
     scheduler_yield();

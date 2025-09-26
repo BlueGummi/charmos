@@ -199,11 +199,15 @@ void workqueues_permanent_init(void) {
     for (int64_t i = 0; i < num_workqueues; ++i) {
 
         struct workqueue_attributes attrs = {
-            .capacity = DEFAULT_WORKQUEUE_CAPACITY,
-            .max_workers = DEFAULT_MAX_WORKERS,
-            .spawn_delay = DEFAULT_SPAWN_DELAY,
-            .inactive_check_period.min = DEFAULT_MIN_INTERACTIVITY_CHECK_PERIOD,
-            .inactive_check_period.max = DEFAULT_MAX_INTERACTIVITY_CHECK_PERIOD,
+            .capacity = WORKQUEUE_DEFAULT_CAPACITY,
+            .max_workers = WORKQUEUE_DEFAULT_MAX_WORKERS,
+            .spawn_delay = WORKQUEUE_DEFAULT_SPAWN_DELAY,
+
+            .inactive_check_period.min =
+                WORKQUEUE_DEFAULT_MIN_INACTIVE_CHECK_PERIOD,
+            .inactive_check_period.max =
+                WORKQUEUE_DEFAULT_MAX_INACTIVE_CHECK_PERIOD,
+
             .flags = WORKQUEUE_FLAG_PERMANENT | WORKQUEUE_FLAG_AUTO_SPAWN |
                      WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS,
         };

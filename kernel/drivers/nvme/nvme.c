@@ -14,6 +14,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "internal.h"
+
 struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
                                          uint8_t func) {
 
@@ -23,7 +25,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     bool is_io = original_bar0 & 1;
 
     if (is_io) {
-        panic("doesnt look like mmio to me");
+        k_panic("doesnt look like mmio to me");
     }
 
     pci_write(bus, slot, func, 0x10, 0xFFFFFFFF);
@@ -98,6 +100,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme->max_transfer_size = (1 << c->mdts) * PAGE_SIZE;
     nvme_info(K_INFO, "Controller max transfer size is %u bytes",
               nvme->max_transfer_size);
+
     nvme->isr_index = kzalloc(sizeof(uint8_t) * sqs_to_make);
     nvme->io_queues = kzalloc(sizeof(struct nvme_queue *) * sqs_to_make);
     if (unlikely(!nvme->isr_index || !nvme->io_queues))
@@ -122,7 +125,24 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme->work.args = WORK_ARGS(nvme, NULL);
     nvme->work.func = nvme_work;
 
-    workqueue_add_fast(&nvme->work);
+    struct workqueue_attributes attrs = {
+        .capacity = 64, /* small, oneshots are rare */
+        .inactive_check_period =
+            {
+                .max = WORKQUEUE_DEFAULT_MAX_INACTIVE_CHECK_PERIOD,
+                .min = WORKQUEUE_DEFAULT_MIN_INACTIVE_CHECK_PERIOD,
+            },
+        .max_workers = WORKQUEUE_DEFAULT_MAX_WORKERS,
+        .spawn_delay = WORKQUEUE_DEFAULT_SPAWN_DELAY,
+        .flags = WORKQUEUE_FLAG_DEFAULTS,
+    };
+
+    nvme->workqueue = workqueue_create(&attrs);
+    if (!nvme->workqueue)
+        k_panic("Could not allocate workqueue\n");
+
+    semaphore_init(&nvme->sem, 0);
+    nvme_work_enqueue(nvme, &nvme->work);
 
     return nvme;
 }

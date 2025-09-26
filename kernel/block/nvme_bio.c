@@ -6,6 +6,8 @@
 #include <mem/vmm.h>
 #include <sch/defer.h>
 
+#include "drivers/nvme/internal.h"
+
 static void nvme_on_bio_complete(struct nvme_request *req) {
     struct bio_request *bio = (struct bio_request *) req->user_data;
 

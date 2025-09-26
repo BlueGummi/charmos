@@ -1,7 +1,10 @@
 #include <asm.h>
 #include <stdint.h>
 
-struct ata_drive;
+#define PCI_CLASS_MASS_STORAGE 0x01
+#define PCI_SUBCLASS_NVM 0x08
+#define PCI_PROGIF_NVME 0x02
+
 struct pci_device {
     uint8_t bus;
     uint8_t device;

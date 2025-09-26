@@ -24,22 +24,27 @@ static enum bio_request_status nvme_to_bio_status(uint16_t status) {
     } else if (status == NVME_STATUS_INVALID_PROT_INFO) {
         return BIO_STATUS_INVAL_INTERNAL;
     }
+
     return BIO_STATUS_OK;
 }
 
 static void nvme_send_waiters(struct nvme_device *dev) {
     struct nvme_waiting_requests *waiters = &dev->waiting_requests;
+    struct nvme_request *next = NULL;
 
     enum irql irql = nvme_waiting_requests_lock_irq_disable(waiters);
-    if (!list_empty(&waiters->list)) {
-        struct list_head *pop = list_pop_front(&waiters->list);
-        struct nvme_request *next =
-            container_of(pop, struct nvme_request, list_node);
-        nvme_waiting_requests_unlock(waiters, irql);
+
+    struct list_head *pop = list_pop_front_init(&waiters->list);
+    if (!pop)
+        goto done;
+
+    next = container_of(pop, struct nvme_request, list_node);
+
+done:
+    nvme_waiting_requests_unlock(waiters, irql);
+
+    if (next)
         nvme_send_nvme_req(dev->generic_disk, next);
-    } else {
-        nvme_waiting_requests_unlock(waiters, irql);
-    }
 }
 
 static void nvme_process_one(struct nvme_request *req) {
@@ -62,7 +67,7 @@ static struct nvme_request *nvme_finished_pop_front(struct nvme_device *dev) {
     enum irql irql =
         nvme_waiting_requests_lock_irq_disable(&dev->finished_requests);
 
-    struct list_head *lh = list_pop_front(&dev->finished_requests.list);
+    struct list_head *lh = list_pop_front_init(&dev->finished_requests.list);
 
     nvme_waiting_requests_unlock(&dev->finished_requests, irql);
 
@@ -79,15 +84,13 @@ void nvme_work(void *dvoid, void *nothing) {
     while (true) {
         struct nvme_request *req = nvme_finished_pop_front(dev);
 
-        if (req) {
+        if (req)
             nvme_process_one(req);
-        } else if (atomic_load(&dev->total_outstanding) == 0) {
-            req = nvme_finished_pop_front(dev);
-            if (!req && atomic_load(&dev->total_outstanding) == 0)
-                return;
-        }
 
         nvme_send_waiters(dev);
+
+        if (atomic_load(&dev->total_outstanding) == 0)
+            semaphore_wait(&dev->sem);
     }
 }
 
@@ -114,16 +117,14 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
         struct nvme_request *req =
             container_of(pop, struct nvme_request, list_node);
 
-        if (req) {
-            req->status = status;
+        req->status = status;
 
-            enum irql irql =
-                nvme_waiting_requests_lock_irq_disable(&dev->finished_requests);
+        enum irql irql2 =
+            nvme_waiting_requests_lock_irq_disable(&dev->finished_requests);
 
-            list_add_tail(&req->list_node, &dev->finished_requests.list);
+        list_add_tail(&req->list_node, &dev->finished_requests.list);
 
-            nvme_waiting_requests_unlock(&dev->finished_requests, irql);
-        }
+        nvme_waiting_requests_unlock(&dev->finished_requests, irql2);
 
         atomic_fetch_sub(&queue->outstanding, 1);
         atomic_fetch_sub(&dev->total_outstanding, 1);
@@ -136,6 +137,8 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
     }
 
     nvme_queue_unlock(queue, irql);
+
+    semaphore_post(&dev->sem);
 }
 
 void nvme_isr_handler(void *ctx, uint8_t vector, void *rsp) {
@@ -150,13 +153,11 @@ void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
     struct nvme_queue *this_queue = nvme->io_queues[qid];
 
     atomic_fetch_add(&this_queue->outstanding, 1);
-    uint64_t old = atomic_fetch_add(&nvme->total_outstanding, 1);
-
-    if (old == 0)
-        workqueue_add_fast(&nvme->work);
+    atomic_fetch_add(&nvme->total_outstanding, 1);
 
     enum irql irql = nvme_queue_lock_irq_disable(this_queue);
 
+    semaphore_post(&nvme->sem);
     uint16_t tail = this_queue->sq_tail;
     uint16_t next_tail = (tail + 1) % this_queue->sq_depth;
 

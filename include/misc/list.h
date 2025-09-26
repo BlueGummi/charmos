@@ -62,7 +62,9 @@ static inline struct list_head *list_pop_front(struct list_head *head) {
 
 static inline struct list_head *list_pop_front_init(struct list_head *head) {
     struct list_head *ret = list_pop_front(head);
-    INIT_LIST_HEAD(ret);
+    if (ret)
+        INIT_LIST_HEAD(ret);
+
     return ret;
 }
 

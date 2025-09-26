@@ -127,7 +127,6 @@ enum workqueue_flags : uint16_t {
     WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS = 1 << 3, /* Inverse: Migratable
                                                    * workers */
 
-    /* "Inverses of flags" represented as a 0 */
     WORKQUEUE_FLAG_NO_AUTO_SPAWN = 0,
     WORKQUEUE_FLAG_MIGRATABLE_WORKERS = 0,
     WORKQUEUE_FLAG_ON_DEMAND = 0,
@@ -158,6 +157,12 @@ struct workqueue_attributes {
 
     enum workqueue_flags flags;
 };
+
+#define WORKQUEUE_DEFAULT_CAPACITY 512
+#define WORKQUEUE_DEFAULT_MAX_WORKERS 16
+#define WORKQUEUE_DEFAULT_SPAWN_DELAY 150
+#define WORKQUEUE_DEFAULT_MIN_INACTIVE_CHECK_PERIOD SECONDS_TO_MS(2)
+#define WORKQUEUE_DEFAULT_MAX_INACTIVE_CHECK_PERIOD SECONDS_TO_MS(40)
 
 struct workqueue {
     atomic_bool ignore_timeouts;

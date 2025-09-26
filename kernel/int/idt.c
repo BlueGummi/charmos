@@ -6,10 +6,10 @@
 #include <int/kb.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
-#include <smp/core.h>
-#include <smp/smp.h>
 #include <sch/apc.h>
 #include <sch/sched.h>
+#include <smp/core.h>
+#include <smp/smp.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -28,7 +28,7 @@ static struct isr_entry isr_table[MAX_IDT_ENTRIES] = {0};
 #define MAKE_HANDLER(handler_name, message)                                    \
     void handler_name##_handler(void *ctx, uint8_t vector, void *rsp) {        \
         (void) ctx, (void) vector, (void) rsp;                                 \
-        uint64_t core = smp_core_id();                                    \
+        uint64_t core = smp_core_id();                                         \
         k_printf("\n=== " #handler_name " fault! ===\n");                      \
         k_printf("Message -> %s\n", message);                                  \
         k_panic("Core %u faulted\n", core);                                    \
@@ -85,8 +85,7 @@ void panic_isr(void *ctx, uint8_t vector, void *rsp) {
     (void) ctx, (void) vector, (void) rsp;
     if (global.panic_in_progress) {
         disable_interrupts();
-        k_printf("    [CPU %u] Halting due to system panic\n",
-                 smp_core_id());
+        k_printf("    [CPU %u] Halting due to system panic\n", smp_core_id());
         while (1)
             wait_for_interrupt();
     }
@@ -215,7 +214,6 @@ static void page_fault_handler(void *context, uint8_t vector, void *rsp) {
 }
 
 void idt_init() {
-    /*
     isr_register(IRQ_DIV_BY_Z, divbyz_handler, NULL);
     isr_register(IRQ_DEBUG, debug_handler, NULL);
     isr_register(IRQ_BREAKPOINT, breakpoint_handler, NULL);
@@ -223,7 +221,7 @@ void idt_init() {
     isr_register(IRQ_SSF, ss_handler, NULL);
     isr_register(IRQ_GPF, gpf_handler, NULL);
     isr_register(IRQ_DBF, double_fault_handler, NULL);
-    isr_register(IRQ_PAGE_FAULT, page_fault_handler, NULL);*/
+    isr_register(IRQ_PAGE_FAULT, page_fault_handler, NULL);
 
     isr_register(IRQ_TIMER, isr_timer_routine, NULL);
     isr_register(IRQ_PANIC, panic_isr, NULL);

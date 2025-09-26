@@ -1,13 +1,5 @@
 #include <sch/defer.h>
 
-/* Must be a power of two for modulo optimization */
-#define DEFAULT_WORKQUEUE_CAPACITY 512
-#define DEFAULT_MAX_WORKERS 16
-#define DEFAULT_SPAWN_DELAY 150 /* 150ms delay between worker thread spawns */
-#define DEFAULT_MIN_INTERACTIVITY_CHECK_PERIOD SECONDS_TO_MS(2)
-#define DEFAULT_MAX_INTERACTIVITY_CHECK_PERIOD SECONDS_TO_MS(10)
-_Static_assert(DEFAULT_MAX_WORKERS < 64, ""); /* Won't fit in our bitmap */
-
 #define DEQUEUE_FROM_ONESHOT_CODE 2
 #define DEQUEUE_FROM_REGULAR_CODE 1
 
@@ -99,7 +91,7 @@ static inline size_t workqueue_idlers(struct workqueue *wq) {
 
 bool workqueue_try_spawn_worker(struct workqueue *queue);
 int32_t workqueue_dequeue_task(struct workqueue *queue, struct work **out,
-                           struct work *oneshot_out);
+                               struct work *oneshot_out);
 void workqueue_link_thread_and_worker(struct worker *worker,
                                       struct thread *thread);
 bool workqueue_spawn_worker(struct workqueue *queue);

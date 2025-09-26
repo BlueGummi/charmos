@@ -1,19 +1,11 @@
 #pragma once
 #include <block/generic.h>
 #include <block/sched.h>
-#include <mem/vmm.h>
 #include <sch/defer.h>
-#include <sch/thread.h>
 #include <stdatomic.h>
 #include <stdint.h>
+#include <sync/semaphore.h>
 #include <sync/spinlock.h>
-
-#define NVME_CMD_TIMEOUT_MS 2000    // Normal command timeout
-#define NVME_ADMIN_TIMEOUT_MS 5000  // Admin commands
-#define NVME_RESET_TIMEOUT_MS 30000 // Controller reset or format NVM
-
-#define DIV_ROUND_UP(x, y) (((x) + (y) - 1) / (y))
-#define THIS_QID(nvme) (1 + (smp_core_id() % (nvme->queue_count)))
 
 struct nvme_command {
     uint8_t opc;
@@ -95,7 +87,7 @@ struct nvme_request {
 
     volatile bool done;
     volatile uint16_t status;
-    volatile int remaining_parts;
+    int32_t remaining_parts;
 
     void (*on_complete)(struct nvme_request *);
     struct nvme_bio_data *bio_data;
@@ -157,6 +149,8 @@ struct nvme_device {
     struct nvme_waiting_requests finished_requests;
     struct work work;
 
+    struct semaphore sem;
+
     uint8_t *isr_index;
     uint32_t queue_count;
 
@@ -165,6 +159,8 @@ struct nvme_device {
     struct generic_disk *generic_disk;
 
     atomic_uint_fast64_t total_outstanding;
+
+    struct workqueue *workqueue;
 };
 
 struct nvme_identify {
@@ -269,33 +265,6 @@ struct nvme_identify_controller {
     // TODO: there is more but me lazy and dont need it
 } __attribute__((packed));
 
-#define NVME_COMPLETION_PHASE(cpl) ((cpl)->status & 0x1)
-#define NVME_COMPLETION_STATUS(cpl) (((cpl)->status >> 1) & 0x7FFF)
-#define PCI_CLASS_MASS_STORAGE 0x01
-#define PCI_SUBCLASS_NVM 0x08
-#define PCI_PROGIF_NVME 0x02
-#define nvme_info(lvl, fmt, ...) k_info("NVMe", lvl, fmt, ##__VA_ARGS__)
-
-#define NVME_DOORBELL_BASE 0x1000
-
-#define NVME_OP_ADMIN_DELETE_IOSQ 0x0
-#define NVME_OP_ADMIN_CREATE_IOSQ 0x1
-
-#define NVME_OP_ADMIN_GET_LOG_PG 0x2
-
-#define NVME_OP_ADMIN_DELETE_IOCQ 0x4
-#define NVME_OP_ADMIN_CREATE_IOCQ 0x5
-
-#define NVME_OP_ADMIN_IDENT 0x6
-#define NVME_OP_ADMIN_SET_FEATS 0x9
-#define NVME_OP_ADMIN_GET_FEATS 0x10
-
-#define NVME_OP_IO_READ 0x02
-#define NVME_OP_IO_WRITE 0x01
-
-#define NVME_STATUS_CONFLICTING_ATTRIBUTES 0x80
-#define NVME_STATUS_INVALID_PROT_INFO 0x81
-
 uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
                                struct nvme_command *cmd, uint32_t *);
 uint32_t nvme_set_num_queues(struct nvme_device *nvme, uint16_t desired_sq,
@@ -315,18 +284,6 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
 struct generic_disk *nvme_create_generic(struct nvme_device *nvme);
 void nvme_print_identify(const struct nvme_identify_controller *ctrl);
 void nvme_print_namespace(const struct nvme_identify_namespace *ns);
-
-bool nvme_read_sector_async(struct generic_disk *disk,
-                            struct nvme_request *req);
-
-bool nvme_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
-                      uint16_t cnt);
-
-bool nvme_write_sector_async(struct generic_disk *disk,
-                             struct nvme_request *req);
-
-bool nvme_write_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
-                       uint16_t cnt);
 
 bool nvme_read_sector_wrapper(struct generic_disk *disk, uint64_t lba,
                               uint8_t *buf, uint64_t cnt);

@@ -13,7 +13,7 @@ enum wake_reason condvar_wait(struct condvar *cv, struct spinlock *lock,
 
     spin_unlock(lock, irql);
     do_block_on_queue(&cv->waiters);
-    spin_lock(lock);
+    spin_lock_irq_disable(lock);
 
     return curr->wake_reason;
 }
