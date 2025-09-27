@@ -5,6 +5,11 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch: # manual trigger 
+  workflow_run:
+    workflows: ["Update CI Container"]
+    types:
+      - completed
 
 permissions:
   contents: read
@@ -13,21 +18,32 @@ permissions:
 
 jobs:
   build:
-    name: Build
-    runs-on: ghcr.io/bluegummi/charmos-x86-env:latest 
+    name: Build and Test
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bluegummi/charmos-x86-env:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_KEY }}
 
     steps:
       - name: Check out code
         uses: actions/checkout@v2
 
-      - name: Compile 
-        run:  ./build.sh
+      - name: Compile
+        run: ./build.sh
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: build/charmos-x86_64.iso
+          retention-days: 7
 
       - name: Run tests
         run: |
           cd build
           export TERM=dumb
-
           for i in $(seq 1 5); do
             echo "[INFO] Test iteration $i/5"
 

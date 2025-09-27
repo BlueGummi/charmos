@@ -17,7 +17,7 @@ enum irql irql_raise(enum irql new_level) {
         if (old < IRQL_DISPATCH_LEVEL && new_level >= IRQL_DISPATCH_LEVEL)
             preempt_disable();
 
-        if (irq_in_thread_context() && new_level >= IRQL_HIGH_LEVEL)
+        if (new_level >= IRQL_HIGH_LEVEL)
             disable_interrupts();
     }
 

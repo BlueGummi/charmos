@@ -1,0 +1,31 @@
+name: Update CI Container
+
+on:
+  schedule:
+    # Runs every Sunday at 03:00 UTC
+    - cron: "0 3 * * 0"
+  workflow_dispatch: # manual trigger 
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_KEY }}
+
+      - name: Build Docker image
+        run: |
+          docker build -t ghcr.io/bluegummi/charmos-x86-env:latest .
+
+      - name: Push Docker image
+        run: |
+          docker push ghcr.io/bluegummi/charmos-x86-env:latest
+
