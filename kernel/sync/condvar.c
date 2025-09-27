@@ -7,14 +7,14 @@ static void do_block_on_queue(struct thread_queue *q) {
 }
 
 enum wake_reason condvar_wait(struct condvar *cv, struct spinlock *lock,
-                              enum irql irql) {
+                              enum irql irql, enum irql *out) {
     struct thread *curr = scheduler_get_curr_thread();
     curr->wake_reason = WAKE_REASON_NONE;
     curr->wait_cookie++;
 
     spin_unlock(lock, irql);
     do_block_on_queue(&cv->waiters);
-    spin_lock_irq_disable(lock);
+    *out = spin_lock_irq_disable(lock);
 
     return curr->wake_reason;
 }
@@ -97,7 +97,8 @@ static void condvar_timeout_wakeup(void *arg, void *arg2) {
 }
 
 enum wake_reason condvar_wait_timeout(struct condvar *cv, struct spinlock *lock,
-                                      time_t timeout_ms, enum irql irql) {
+                                      time_t timeout_ms, enum irql irql,
+                                      enum irql *out) {
     struct thread *curr = scheduler_get_curr_thread();
     curr->wake_reason = WAKE_REASON_NONE;
 
@@ -108,7 +109,7 @@ enum wake_reason condvar_wait_timeout(struct condvar *cv, struct spinlock *lock,
 
     thread_get(curr);
     defer_enqueue(condvar_timeout_wakeup, WORK_ARGS(curr, cwcb), timeout_ms);
-    condvar_wait(cv, lock, irql);
+    condvar_wait(cv, lock, irql, out);
 
     return curr->wake_reason;
 }

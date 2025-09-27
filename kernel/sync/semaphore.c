@@ -17,19 +17,21 @@ void semaphore_init(struct semaphore *s, int value) {
 void semaphore_wait(struct semaphore *s) {
     enum irql irql = semaphore_lock_irq_disable(s);
 
+    enum irql out;
     while (get_count(s) == 0)
-        condvar_wait(&s->cv, &s->lock, false);
+        condvar_wait(&s->cv, &s->lock, irql, &out);
 
     dec_count(s);
-    semaphore_unlock(s, irql);
+    semaphore_unlock(s, out);
 }
 
 bool semaphore_timedwait(struct semaphore *s, time_t timeout_ms) {
     enum irql irql = semaphore_lock_irq_disable(s);
 
     while (get_count(s) == 0) {
-        if (!condvar_wait_timeout(&s->cv, &s->lock, timeout_ms, false)) {
-            semaphore_unlock(s, irql);
+        enum irql out;
+        if (!condvar_wait_timeout(&s->cv, &s->lock, timeout_ms, irql, &out)) {
+            semaphore_unlock(s, out);
             return false;
         }
     }

@@ -24,8 +24,9 @@ void reaper_thread_main(void) {
     while (1) {
         enum irql irql = spin_lock(&reaper.lock);
 
+        enum irql out;
         while (list_empty(&reaper.queue.list))
-            condvar_wait(&reaper.cv, &reaper.lock, irql);
+            condvar_wait(&reaper.cv, &reaper.lock, irql, &out);
 
         struct thread_queue local;
         thread_queue_init(&local);
@@ -34,7 +35,7 @@ void reaper_thread_main(void) {
         list_splice_init(&reaper.queue.list, &local.list);
         spin_unlock(&reaper.queue.lock, tlist);
 
-        spin_unlock(&reaper.lock, irql);
+        spin_unlock(&reaper.lock, out);
 
         bool reaped_something = false;
         struct thread *t;

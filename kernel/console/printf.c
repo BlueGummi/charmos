@@ -41,7 +41,7 @@ static void serial_putc(char c) {
     outb(0x3F8, c);
 }
 
-static void serial_puts(struct printf_cursor *csr, const char *str, int len) {
+void serial_puts(struct printf_cursor *csr, const char *str, int len) {
     for (int i = 0; i < len; i++) {
         if (!csr)
             serial_putc(str[i]);

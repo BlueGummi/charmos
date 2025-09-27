@@ -62,4 +62,7 @@ void k_printf(const char *format, ...);
 void panic(const char *format, ...);
 void serial_init();
 void k_printf_init(struct limine_framebuffer *fb);
+
+struct printf_cursor;
+void serial_puts(struct printf_cursor *csr, const char *str, int len);
 #pragma once

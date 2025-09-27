@@ -2,33 +2,22 @@
 
 uint32_t preempt_disable(void) {
     struct core *cpu = smp_core();
-    uint32_t old, new;
 
-    do {
-        old = atomic_load(&cpu->preempt_disable_depth);
-        if (old == UINT32_MAX)
-            k_panic("overflow\n");
+    uint32_t old = atomic_fetch_add(&cpu->preempt_disable_depth, 1);
 
-        new = old + 1;
+    if (old == UINT32_MAX)
+        k_panic("overflow\n");
 
-    } while (
-        !atomic_compare_exchange_weak(&cpu->preempt_disable_depth, &old, new));
-
-    return new;
+    return old + 1;
 }
 
 uint32_t preempt_enable(void) {
     struct core *cpu = smp_core();
-    uint32_t old, new;
 
-    do {
-        old = atomic_load(&cpu->preempt_disable_depth);
-        if (old == 0)
-            k_panic("underflow\n");
+    uint32_t old = atomic_fetch_sub(&cpu->preempt_disable_depth, 1);
 
-        new = old - 1;
-    } while (
-        !atomic_compare_exchange_weak(&cpu->preempt_disable_depth, &old, new));
+    if (old == 0)
+        k_panic("underflow\n");
 
-    return new;
+    return old - 1;
 }

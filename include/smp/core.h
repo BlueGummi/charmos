@@ -41,7 +41,7 @@ struct core {
     struct domain_arena *domain_arena;
     size_t rr_current_domain;
 
-    atomic_uint preempt_disable_depth;
+    atomic_uint_fast32_t preempt_disable_depth;
 
     struct core *core;
 };

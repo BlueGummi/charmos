@@ -60,12 +60,14 @@ static inline bool thread_is_dying(struct thread *t) {
     return s == THREAD_STATE_TERMINATED || s == THREAD_STATE_ZOMBIE;
 }
 
-static void thread_apc_sanity_check(struct thread *t) {
+static bool thread_apc_sanity_check(struct thread *t) {
     if (unlikely(thread_get_state(t) == THREAD_STATE_IDLE_THREAD))
         k_panic("Attempted to put an APC on the idle thread");
 
     if (unlikely(thread_is_dying(t)))
-        k_panic("Attempted to put an APC on a dying thread");
+        return false;
+
+    return true;
 }
 
 static void exec_apc(struct apc *a) {
@@ -129,7 +131,9 @@ static void wake_if_waiting(struct thread *t) {
         return maybe_force_reschedule(t);
 
     /* Get it running again */
-    thread_apc_sanity_check(t);
+    if (!thread_apc_sanity_check(t))
+        return;
+
     thread_wake_manual(t);
 }
 
@@ -138,7 +142,8 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
     if (a->enqueued)
         return;
 
-    thread_apc_sanity_check(t);
+    if (!thread_apc_sanity_check(t))
+        return;
 
     enum irql irql = thread_acquire(t);
 
@@ -163,7 +168,8 @@ void apc_enqueue_event_apc(struct thread *t, struct apc *a,
     /* Only one of each type please */
     kassert(t->on_event_apcs[evt] == NULL);
 
-    thread_apc_sanity_check(t);
+    if (!thread_apc_sanity_check(t))
+        return;
 
     enum irql irql = thread_acquire(t);
 

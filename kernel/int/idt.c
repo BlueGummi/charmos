@@ -45,19 +45,19 @@ MAKE_HANDLER(ss, "STACK SEGMENT FAULT");
 MAKE_HANDLER(double_fault, "DOUBLE FAULT");
 
 void isr_common_entry(uint8_t vector, void *rsp) {
-    enum irql old = irql_raise(IRQL_HIGH_LEVEL);
     smp_mark_self_in_interrupt(true);
     smp_mark_self_idle(false);
 
+    enum irql old = irql_raise(IRQL_HIGH_LEVEL);
     if (isr_table[vector].handler) {
         isr_table[vector].handler(isr_table[vector].ctx, vector, rsp);
     } else {
         k_panic("Unhandled ISR vector: %u\n", vector);
     }
+    irql_lower(old);
 
     rcu_mark_quiescent();
     smp_mark_self_in_interrupt(false);
-    irql_lower(old);
 }
 
 void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {

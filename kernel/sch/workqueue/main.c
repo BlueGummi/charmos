@@ -1,17 +1,17 @@
 #include "internal.h"
 
 static enum wake_reason worker_wait(struct workqueue *queue, struct worker *w,
-                                    enum irql irql) {
+                                    enum irql irql, enum irql *out) {
     enum wake_reason signal;
 
     atomic_fetch_add(&queue->idle_workers, 1);
 
     if (w->timeout_ran && !w->is_permanent) {
         signal = condvar_wait_timeout(&queue->queue_cv, &queue->lock,
-                                      w->inactivity_check_period, irql);
+                                      w->inactivity_check_period, irql, out);
         w->timeout_ran = false;
     } else {
-        signal = condvar_wait(&queue->queue_cv, &queue->lock, irql);
+        signal = condvar_wait(&queue->queue_cv, &queue->lock, irql, out);
     }
 
     atomic_fetch_sub(&queue->idle_workers, 1);
@@ -95,10 +95,11 @@ void worker_main(void) {
                     workqueue_spawn_worker(queue);
             }
 
-            enum wake_reason signal = worker_wait(queue, w, irql);
+            enum irql out;
+            enum wake_reason signal = worker_wait(queue, w, irql, &out);
 
             if (worker_should_exit(w, signal))
-                worker_exit(queue, w, irql);
+                worker_exit(queue, w, out);
         }
 
         workqueue_unlock(queue, irql);
