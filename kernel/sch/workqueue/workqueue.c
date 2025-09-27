@@ -9,18 +9,18 @@
 
 #include "internal.h"
 
-enum workqueue_error workqueue_add_oneshot(dpc_t func, struct work_args args) {
+enum workqueue_error workqueue_add_oneshot(work_function func, struct work_args args) {
     struct workqueue *queue = workqueue_get_least_loaded();
     return workqueue_enqueue_oneshot(queue, func, args);
 }
 
-enum workqueue_error workqueue_add_remote_oneshot(dpc_t func,
+enum workqueue_error workqueue_add_remote_oneshot(work_function func,
                                                   struct work_args args) {
     struct workqueue *queue = workqueue_get_least_loaded_remote();
     return workqueue_enqueue_oneshot(queue, func, args);
 }
 
-enum workqueue_error workqueue_add_local_oneshot(dpc_t func,
+enum workqueue_error workqueue_add_local_oneshot(work_function func,
                                                  struct work_args args) {
     struct workqueue *queue = global.workqueues[smp_core_id()];
     return workqueue_enqueue_oneshot(queue, func, args);
@@ -49,7 +49,7 @@ static struct workqueue *find_optimal_domain_wq(void) {
     return optimal;
 }
 
-enum workqueue_error workqueue_add_fast_oneshot(dpc_t func,
+enum workqueue_error workqueue_add_fast_oneshot(work_function func,
                                                 struct work_args args) {
     struct workqueue *optimal = find_optimal_domain_wq();
     return workqueue_enqueue_oneshot(optimal, func, args);

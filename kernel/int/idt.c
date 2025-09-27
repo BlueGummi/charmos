@@ -6,10 +6,10 @@
 #include <int/kb.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
-#include <smp/core.h>
-#include <smp/smp.h>
 #include <sch/apc.h>
 #include <sch/sched.h>
+#include <smp/core.h>
+#include <smp/smp.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -28,7 +28,7 @@ static struct isr_entry isr_table[MAX_IDT_ENTRIES] = {0};
 #define MAKE_HANDLER(handler_name, message)                                    \
     void handler_name##_handler(void *ctx, uint8_t vector, void *rsp) {        \
         (void) ctx, (void) vector, (void) rsp;                                 \
-        uint64_t core = smp_core_id();                                    \
+        uint64_t core = smp_core_id();                                         \
         k_printf("\n=== " #handler_name " fault! ===\n");                      \
         k_printf("Message -> %s\n", message);                                  \
         k_panic("Core %u faulted\n", core);                                    \
@@ -52,9 +52,7 @@ void isr_common_entry(uint8_t vector, void *rsp) {
     if (isr_table[vector].handler) {
         isr_table[vector].handler(isr_table[vector].ctx, vector, rsp);
     } else {
-        k_printf("Unhandled ISR vector: %u\n", vector);
-        while (1)
-            wait_for_interrupt();
+        k_panic("Unhandled ISR vector: %u\n", vector);
     }
 
     rcu_mark_quiescent();
@@ -86,8 +84,7 @@ void panic_isr(void *ctx, uint8_t vector, void *rsp) {
     (void) ctx, (void) vector, (void) rsp;
     if (global.panic_in_progress) {
         disable_interrupts();
-        k_printf("    [CPU %u] Halting due to system panic\n",
-                 smp_core_id());
+        k_printf("    [CPU %u] Halting due to system panic\n", smp_core_id());
         while (1)
             wait_for_interrupt();
     }

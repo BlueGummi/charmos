@@ -97,7 +97,7 @@ enum workqueue_error workqueue_enqueue(struct workqueue *queue,
 }
 
 enum workqueue_error workqueue_enqueue_oneshot(struct workqueue *queue,
-                                               dpc_t func,
+                                               work_function func,
                                                struct work_args args) {
     if (!workqueue_usable(queue))
         return WORKQUEUE_ERROR_UNUSABLE;

@@ -111,7 +111,7 @@ void daemon_destroy(struct daemon *daemon);
 struct daemon_thread *daemon_spawn_worker(struct daemon *daemon);
 
 enum workqueue_error daemon_submit_oneshot_work(struct daemon *daemon,
-                                                dpc_t func,
+                                                work_function func,
                                                 struct work_args args);
 
 enum workqueue_error daemon_submit_work(struct daemon *daemon,

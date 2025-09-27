@@ -414,8 +414,11 @@ static inline void set_state_and_update_reason(struct thread *t, uint8_t reason,
                                                                 uint8_t)) {
     set_state_internal(t, state);
     callback(t, reason);
+
+    uint64_t time = irq_in_interrupt() ? time_get_ms_fast() : time_get_ms();
+
     if (state != THREAD_STATE_READY)
-        thread_update_runtime_buckets(t, time_get_ms());
+        thread_update_runtime_buckets(t, time);
 }
 
 static inline void thread_block(struct thread *t, enum thread_block_reason r) {

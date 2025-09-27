@@ -9,7 +9,7 @@
 #include <types/refcount.h>
 #include <types/types.h>
 
-typedef void (*dpc_t)(void *arg, void *arg2);
+typedef void (*work_function)(void *arg, void *arg2);
 
 struct work_args {
     void *arg1;
@@ -20,13 +20,13 @@ struct work_args {
 /* TODO: Merge this with standard workqueue infra */
 struct deferred_event {
     uint64_t timestamp_ms;
-    dpc_t callback;
+    work_function callback;
     struct work_args args;
     struct deferred_event *next;
 };
 
 struct work {
-    dpc_t func;
+    work_function func;
     struct work_args args;
 
     struct list_head list_node;
@@ -221,27 +221,27 @@ enum workqueue_error : int32_t {
 void defer_init(void);
 
 /* can only fail from allocation fail */
-bool defer_enqueue(dpc_t func, struct work_args args, uint64_t delay_ms);
+bool defer_enqueue(work_function func, struct work_args args, uint64_t delay_ms);
 void workqueues_permanent_init(void);
 
 struct workqueue *workqueue_create(struct workqueue_attributes *attrs);
-struct work *work_create(dpc_t func, struct work_args args);
+struct work *work_create(work_function func, struct work_args args);
 
 void workqueue_free(struct workqueue *queue);
 enum workqueue_error workqueue_enqueue_oneshot(struct workqueue *queue,
-                                               dpc_t func,
+                                               work_function func,
                                                struct work_args args);
 
 enum workqueue_error workqueue_enqueue(struct workqueue *queue,
                                        struct work *work);
 
 /* Permanent workqueues */
-enum workqueue_error workqueue_add_oneshot(dpc_t func, struct work_args args);
-enum workqueue_error workqueue_add_remote_oneshot(dpc_t func,
+enum workqueue_error workqueue_add_oneshot(work_function func, struct work_args args);
+enum workqueue_error workqueue_add_remote_oneshot(work_function func,
                                                   struct work_args args);
-enum workqueue_error workqueue_add_local_oneshot(dpc_t func,
+enum workqueue_error workqueue_add_local_oneshot(work_function func,
                                                  struct work_args args);
-enum workqueue_error workqueue_add_fast_oneshot(dpc_t func,
+enum workqueue_error workqueue_add_fast_oneshot(work_function func,
                                                 struct work_args args);
 
 enum workqueue_error workqueue_add(struct work *work);

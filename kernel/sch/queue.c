@@ -48,10 +48,6 @@ static inline void put_on_scheduler(struct scheduler *s, struct thread *t) {
     scheduler_add_thread(s, t, false);
 }
 
-static void do_wake_other_core(struct scheduler *target) {
-    scheduler_force_resched(target);
-}
-
 void scheduler_enqueue(struct thread *t) {
     struct scheduler *s = global.schedulers[0];
     uint64_t min_load = UINT64_MAX;
@@ -64,14 +60,14 @@ void scheduler_enqueue(struct thread *t) {
     }
 
     put_on_scheduler(s, t);
-    do_wake_other_core(s);
+    scheduler_force_resched(s);
 }
 
 /* TODO: Make scheduler_add_thread an internal function so I don't need to
  * pass in the 'false false true' here and all over the place */
 void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id) {
     put_on_scheduler(global.schedulers[core_id], t);
-    do_wake_other_core(global.schedulers[core_id]);
+    scheduler_force_resched(global.schedulers[core_id]);
 }
 
 void scheduler_wake(struct thread *t, enum thread_wake_reason reason,
@@ -88,5 +84,5 @@ void scheduler_wake(struct thread *t, enum thread_wake_reason reason,
     struct scheduler *sch = global.schedulers[c];
     put_on_scheduler(sch, t);
 
-    do_wake_other_core(sch);
+    scheduler_force_resched(sch);
 }

@@ -61,7 +61,7 @@ static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
     lapic_write(LAPIC_REG_EOI, 0);
 }
 
-bool defer_enqueue(dpc_t func, struct work_args args, uint64_t delay_ms) {
+bool defer_enqueue(work_function func, struct work_args args, uint64_t delay_ms) {
     struct deferred_event *ev = kzalloc(sizeof(struct deferred_event));
     if (!ev)
         return false;

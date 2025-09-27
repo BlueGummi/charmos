@@ -105,12 +105,7 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
 
         uint16_t status = mmio_read_32(&entry->status) & 0xFFFE;
 
-        enum irql irql =
-            nvme_waiting_requests_lock_irq_disable(&queue->outgoing);
-
-        struct list_head *pop = list_pop_front_init(&queue->outgoing.list);
-
-        nvme_waiting_requests_unlock(&queue->outgoing, irql);
+        struct list_head *pop = list_pop_front_init(&queue->outgoing);
 
         struct nvme_request *req =
             container_of(pop, struct nvme_request, list_node);
@@ -162,12 +157,7 @@ void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
 
     this_queue->sq[tail] = *cmd;
 
-    enum irql out =
-        nvme_waiting_requests_lock_irq_disable(&this_queue->outgoing);
-
-    list_add_tail(&req->list_node, &this_queue->outgoing.list);
-
-    nvme_waiting_requests_unlock(&this_queue->outgoing, out);
+    list_add_tail(&req->list_node, &this_queue->outgoing);
 
     req->status = BIO_STATUS_INFLIGHT; /* In flight */
 

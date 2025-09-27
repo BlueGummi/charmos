@@ -120,7 +120,7 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
         vmm_map_phys(cq_phys, cq_pages * nvme->page_size, PAGING_NO_FLAGS);
     memset(this_queue->cq, 0, cq_pages * nvme->page_size);
 
-    INIT_LIST_HEAD(&this_queue->outgoing.list);
+    INIT_LIST_HEAD(&this_queue->outgoing);
 
     this_queue->sq_phys = sq_phys;
     this_queue->cq_phys = cq_phys;

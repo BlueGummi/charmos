@@ -117,7 +117,7 @@ struct nvme_queue {
     uint32_t *sq_db;
     uint32_t *cq_db;
 
-    struct nvme_waiting_requests outgoing;
+    struct list_head outgoing;
     atomic_uint_fast16_t outstanding;
 
     struct spinlock lock;
