@@ -58,50 +58,7 @@ static inline struct core *smp_core(void) {
     return global.cores[smp_core_id()];
 }
 
-static inline bool smp_mark_core_needs_resched(struct core *c, bool new) {
-    return atomic_exchange(&c->needs_resched, new);
-}
 
-static inline bool smp_mark_self_needs_resched(bool new) {
-    return smp_mark_core_needs_resched(smp_core(), new);
-}
-
-static inline bool smp_self_needs_resched(void) {
-    return atomic_load(&smp_core()->needs_resched);
-}
-
-extern void scheduler_yield();
-static inline void smp_resched_if_needed(void) {
-    if (smp_mark_self_needs_resched(false)) {
-        scheduler_yield();
-    }
-}
-
-static inline void smp_mark_self_idle(bool new) {
-    atomic_store(&smp_core()->idle, new);
-    topo_mark_core_idle(smp_core_id(), new);
-}
-
-static inline bool smp_core_idle(struct core *c) {
-    return atomic_load(&c->idle);
-}
-
-static inline void smp_mark_self_in_interrupt(bool new) {
-    smp_core()->in_interrupt = new;
-}
-
-static inline bool irq_in_interrupt(void) {
-    return smp_core()->in_interrupt;
-}
-
-static inline enum irql irql_get(void) {
-    return smp_core()->current_irql;
-}
-
-static inline bool irq_in_thread_context(void) {
-    return !irq_in_interrupt();
-}
-
-static inline bool preemption_disabled(void) {
+static inline bool scheduler_preemption_disabled(void) {
     return atomic_load(&smp_core()->preempt_disable_depth) > 0;
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include <asm.h>
 #include <console/panic.h>
+#include <int/irq.h>
 #include <sch/irql.h>
 #include <smp/core.h>
 #include <stdatomic.h>

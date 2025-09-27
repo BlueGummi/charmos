@@ -1,3 +1,4 @@
+#include <int/irq.h>
 #include <misc/list.h>
 #include <smp/core.h>
 #include <stdatomic.h>

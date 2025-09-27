@@ -54,9 +54,9 @@ void scheduler_idle_main(void) {
     atomic_store(&idle->state, IDLE_THREAD_WORK_STEAL);
 
     while (true) {
-        smp_mark_self_idle(true);
+        scheduler_mark_self_idle(true);
         rcu_mark_quiescent();
-        smp_resched_if_needed();
+        scheduler_resched_if_needed();
         wait_for_interrupt();
     }
 

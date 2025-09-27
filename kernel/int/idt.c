@@ -45,8 +45,8 @@ MAKE_HANDLER(ss, "STACK SEGMENT FAULT");
 MAKE_HANDLER(double_fault, "DOUBLE FAULT");
 
 void isr_common_entry(uint8_t vector, void *rsp) {
-    smp_mark_self_in_interrupt(true);
-    smp_mark_self_idle(false);
+    irq_mark_self_in_interrupt(true);
+    scheduler_mark_self_idle(false);
 
     enum irql old = irql_raise(IRQL_HIGH_LEVEL);
     if (isr_table[vector].handler) {
@@ -57,20 +57,20 @@ void isr_common_entry(uint8_t vector, void *rsp) {
     irql_lower(old);
 
     rcu_mark_quiescent();
-    smp_mark_self_in_interrupt(false);
+    irq_mark_self_in_interrupt(false);
 }
 
 void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {
     (void) ctx, (void) vector, (void) rsp;
-    if (!preemption_disabled()) {
+    if (!scheduler_preemption_disabled()) {
         lapic_write(LAPIC_REG_EOI, 0);
 
         /* Doing this as the `schedule()` will go to another thread */
-        smp_mark_self_needs_resched(false);
-        smp_mark_self_in_interrupt(false);
+        scheduler_mark_self_needs_resched(false);
+        irq_mark_self_in_interrupt(false);
         schedule();
     } else {
-        smp_mark_self_needs_resched(true);
+        scheduler_mark_self_needs_resched(true);
         lapic_write(LAPIC_REG_EOI, 0);
     }
 }

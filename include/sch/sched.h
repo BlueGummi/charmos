@@ -103,6 +103,13 @@ struct thread *scheduler_try_do_steal(struct scheduler *sched);
 struct scheduler *scheduler_pick_victim(struct scheduler *self);
 struct thread *scheduler_steal_work(struct scheduler *victim);
 
+bool scheduler_mark_core_needs_resched(struct core *c, bool new);
+bool scheduler_mark_self_needs_resched(bool new);
+bool scheduler_self_needs_resched(void);
+void scheduler_resched_if_needed(void);
+void scheduler_mark_self_idle(bool new);
+bool scheduler_core_idle(struct core *c);
+
 struct scheduler_data {
     uint32_t max_concurrent_stealers;
     atomic_uint active_stealers;

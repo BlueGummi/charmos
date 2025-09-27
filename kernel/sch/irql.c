@@ -1,6 +1,10 @@
 #include <sch/sched.h>
 #include <smp/core.h>
 
+enum irql irql_get(void) {
+    return smp_core()->current_irql;
+}
+
 enum irql irql_raise(enum irql new_level) {
     if (global.current_bootstage < BOOTSTAGE_LATE_DEVICES)
         return IRQL_NONE;
@@ -45,6 +49,6 @@ void irql_lower(enum irql new_level) {
         }
 
         if (irq_in_thread_context() && preempt_re_enabled)
-            smp_resched_if_needed();
+            scheduler_resched_if_needed();
     }
 }
