@@ -46,6 +46,7 @@ static void do_idle_loop(struct idle_thread_data *idle,
 }
 
 void scheduler_idle_main(void) {
+    enable_interrupts();
     struct idle_thread_data *idle = smp_core_idle_thread();
 
     atomic_store(&idle->woken_from_timer, false);
@@ -55,7 +56,6 @@ void scheduler_idle_main(void) {
     while (true) {
         smp_mark_self_idle(true);
         rcu_mark_quiescent();
-        enable_interrupts();
         smp_resched_if_needed();
         wait_for_interrupt();
     }

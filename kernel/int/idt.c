@@ -68,6 +68,7 @@ void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {
         lapic_write(LAPIC_REG_EOI, 0);
 
         /* Doing this as the `schedule()` will go to another thread */
+        smp_mark_self_needs_resched(false);
         smp_mark_self_in_interrupt(false);
         schedule();
     } else {

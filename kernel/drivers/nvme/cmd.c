@@ -81,16 +81,14 @@ void nvme_work(void *dvoid, void *nothing) {
     (void) nothing;
 
     struct nvme_device *dev = dvoid;
+    struct nvme_request *req;
     while (true) {
-        struct nvme_request *req = nvme_finished_pop_front(dev);
-
-        if (req)
+        while ((req = nvme_finished_pop_front(dev)) != NULL) {
             nvme_process_one(req);
+            nvme_send_waiters(dev);
+        }
 
-        nvme_send_waiters(dev);
-
-        if (atomic_load(&dev->total_outstanding) == 0)
-            semaphore_wait(&dev->sem);
+        semaphore_wait(&dev->sem);
     }
 }
 
@@ -157,7 +155,6 @@ void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
 
     enum irql irql = nvme_queue_lock_irq_disable(this_queue);
 
-    semaphore_post(&nvme->sem);
     uint16_t tail = this_queue->sq_tail;
     uint16_t next_tail = (tail + 1) % this_queue->sq_depth;
 

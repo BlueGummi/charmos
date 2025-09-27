@@ -7,8 +7,6 @@ typedef void (*thread_action_callback)(struct thread *woke);
 
 struct condvar {
     struct thread_queue waiters;
-    condvar_callback cb;
-    void *cb_arg;
 };
 
 enum wake_reason condvar_wait(struct condvar *cv, struct spinlock *lock,

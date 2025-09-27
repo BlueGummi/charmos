@@ -268,6 +268,7 @@ struct thread {
 
     /* For condvar */
     volatile enum wake_reason wake_reason;
+    size_t wait_cookie;
 
     uint64_t run_start_time; /* When did we start running */
 

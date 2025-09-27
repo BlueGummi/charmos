@@ -147,7 +147,7 @@ static struct thread *pick_from_special_queues(struct scheduler *sched,
                                                enum thread_prio_class prio) {
     struct thread_queue *q = scheduler_get_this_thread_queue(sched, prio);
 
-    struct list_head *node = list_pop_front(&q->list);
+    struct list_head *node = list_pop_front_init(&q->list);
     kassert(node);
 
     struct thread *next = thread_from_list_node(node);
@@ -311,6 +311,7 @@ void scheduler_force_resched(struct scheduler *sched) {
         }
 
         if (smp_core_idle(other)) {
+            smp_mark_core_needs_resched(other, true);
             ipi_send(sched->core_id, IRQ_SCHEDULER);
         } else {
             smp_mark_core_needs_resched(other, true);

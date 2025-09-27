@@ -108,9 +108,10 @@ void thread_queue_push_back(struct thread_queue *q, struct thread *t) {
 
 bool thread_queue_remove(struct thread_queue *q, struct thread *t) {
     enum irql irql = thread_queue_lock_irq_disable(q);
-    struct list_head *pos, *n;
+    struct list_head *pos;
 
-    list_for_each_safe(pos, n, &q->list) {
+    wait_for_interrupt();
+    list_for_each(pos, &q->list) {
         struct thread *thread = thread_from_list_node(pos);
         if (thread == t) {
             list_del_init(&t->list_node);
@@ -125,7 +126,7 @@ bool thread_queue_remove(struct thread_queue *q, struct thread *t) {
 
 struct thread *thread_queue_pop_front(struct thread_queue *q) {
     enum irql irql = thread_queue_lock_irq_disable(q);
-    struct list_head *lhead = list_pop_front(&q->list);
+    struct list_head *lhead = list_pop_front_init(&q->list);
     thread_queue_unlock(q, irql);
     if (!lhead)
         return NULL;

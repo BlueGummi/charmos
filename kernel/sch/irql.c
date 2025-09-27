@@ -36,7 +36,8 @@ void irql_lower(enum irql new_level) {
 
     cpu->current_irql = new_level;
 
-    if (old_irql >= IRQL_HIGH_LEVEL && new_level < IRQL_HIGH_LEVEL)
+    if (irq_in_thread_context() && old_irql >= IRQL_HIGH_LEVEL &&
+        new_level < IRQL_HIGH_LEVEL)
         enable_interrupts();
 
     if (old_irql >= IRQL_DISPATCH_LEVEL && new_level < IRQL_DISPATCH_LEVEL) {
@@ -49,6 +50,6 @@ void irql_lower(enum irql new_level) {
         thread_check_and_deliver_apcs(scheduler_get_curr_thread());
     }
 
-    if (preempt_re_enabled)
+    if (irq_in_thread_context() && preempt_re_enabled)
         smp_resched_if_needed();
 }
