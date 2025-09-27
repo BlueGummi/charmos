@@ -14,14 +14,11 @@ permissions:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: ghcr.io/bluegummi/charmos-x86-env:latest 
 
     steps:
       - name: Check out code
         uses: actions/checkout@v2
-
-      - name: Dependencies
-        run: sudo apt update -y && sudo apt install xorriso nasm qemu-system gdb -y 
 
       - name: Compile 
         run:  ./build.sh
@@ -32,7 +29,7 @@ jobs:
           export TERM=dumb
 
           for i in $(seq 1 5); do
-            echo "[INFO] Test iteration $i/10"
+            echo "[INFO] Test iteration $i/5"
 
             dd if=/dev/zero of=disk.img bs=10M count=1
             mkfs.ext2 -F disk.img
