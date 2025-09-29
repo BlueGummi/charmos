@@ -7,8 +7,8 @@
 #include <smp/smp.h>
 #include <stdatomic.h>
 #include <stdint.h>
-#include <sync/spinlock.h>
-#include <tests.h>
+
+#include "internal.h"
 
 /* TODO: #define things */
 

@@ -1,6 +1,7 @@
-#include "string.h"
 #include <mem/alloc.h>
 #include <sch/daemon.h>
+
+#include <string.h>
 
 static struct daemon_thread *current_daemon_thread(void) {
     return scheduler_get_curr_thread()->private;

@@ -34,19 +34,19 @@ void irql_lower(enum irql new_level) {
 
     cpu->current_irql = new_level;
     if (new_level < old) {
-        bool preempt_re_enabled = false;
-        if (old >= IRQL_HIGH_LEVEL && new_level < IRQL_HIGH_LEVEL)
+        if (irq_in_thread_context() && old >= IRQL_HIGH_LEVEL &&
+            new_level < IRQL_HIGH_LEVEL)
             enable_interrupts();
 
+        bool preempt_re_enabled = false;
         if (old >= IRQL_DISPATCH_LEVEL && new_level < IRQL_DISPATCH_LEVEL) {
-            preempt_re_enabled = true;
             preempt_enable();
+            preempt_re_enabled = true;
         }
 
         if (irq_in_thread_context() && old > IRQL_APC_LEVEL &&
-            new_level < IRQL_APC_LEVEL) {
+            new_level < IRQL_APC_LEVEL)
             thread_check_and_deliver_apcs(scheduler_get_curr_thread());
-        }
 
         if (irq_in_thread_context() && preempt_re_enabled)
             scheduler_resched_if_needed();

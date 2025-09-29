@@ -1,5 +1,4 @@
 #include <acpi/lapic.h>
-#include <int/idt.h>
 #include <sch/apc.h>
 #include <sch/sched.h>
 #include <smp/smp.h>

@@ -1,8 +1,6 @@
 #include <mem/alloc.h>
 #include <mem/hugepage.h>
 #include <mem/vmm.h>
-#include <misc/dll.h>
-#include <misc/queue.h>
 #include <sch/defer.h>
 #include <sch/reaper.h>
 #include <sch/sched.h>
@@ -34,18 +32,26 @@ void thread_entry_wrapper(void) {
     void (*entry)(void);
     asm("mov %%r12, %0" : "=r"(entry));
     irql_lower(IRQL_PASSIVE_LEVEL);
-    enable_interrupts();
     entry();
     thread_exit();
+}
+
+static void thread_free_stack(struct thread *t) {
+    hugepage_free_pages(t->stack, t->stack_size / PAGE_SIZE);
 }
 
 static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     struct thread *new_thread =
         (struct thread *) kzalloc(sizeof(struct thread));
+    if (unlikely(!new_thread))
+        return NULL;
+
     void *stack = hugepage_alloc_pages(stack_size / PAGE_SIZE);
 
-    if (unlikely(!new_thread || !stack))
+    if (unlikely(!stack)) {
+        kfree(new_thread);
         return NULL;
+    }
 
     memset(stack, 0, stack_size);
     uint64_t stack_top = (uint64_t) stack + stack_size;
@@ -67,6 +73,20 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     thread_update_effective_priority(new_thread);
     new_thread->activity_data = kzalloc(sizeof(struct thread_activity_data));
     new_thread->activity_stats = kzalloc(sizeof(struct thread_activity_stats));
+
+    if (!new_thread->activity_data || !new_thread->activity_stats) {
+        if (new_thread->activity_data)
+            kfree(new_thread->activity_data);
+
+        if (new_thread->activity_stats)
+            kfree(new_thread->activity_stats);
+
+        tid_free(thread_tid_space, new_thread->id);
+        thread_free_stack(new_thread);
+        kfree(new_thread);
+        return NULL;
+    }
+
     INIT_LIST_HEAD(&new_thread->apc_head[0]);
     INIT_LIST_HEAD(&new_thread->apc_head[1]);
     INIT_LIST_HEAD(&new_thread->list_node);
@@ -84,9 +104,8 @@ struct thread *thread_create_custom_stack(void (*entry_point)(void),
 }
 
 void thread_free(struct thread *t) {
-
     tid_free(thread_tid_space, t->id);
-    hugepage_free_pages(t->stack, t->stack_size / PAGE_SIZE);
+    thread_free_stack(t);
     kfree(t->activity_data);
     kfree(t->activity_stats);
     thread_free_event_apcs(t);

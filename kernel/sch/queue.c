@@ -1,7 +1,5 @@
-#include <acpi/lapic.h>
 #include <int/idt.h>
 #include <kassert.h>
-#include <misc/dll.h>
 #include <sch/sched.h>
 #include <stdatomic.h>
 #include <stdbool.h>
