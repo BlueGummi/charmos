@@ -58,7 +58,6 @@ static inline struct core *smp_core(void) {
     return global.cores[smp_core_id()];
 }
 
-
 static inline bool scheduler_preemption_disabled(void) {
     return atomic_load(&smp_core()->preempt_disable_depth) > 0;
 }

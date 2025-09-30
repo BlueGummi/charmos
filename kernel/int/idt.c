@@ -58,21 +58,15 @@ void isr_common_entry(uint8_t vector, void *rsp) {
 
     rcu_mark_quiescent();
     irq_mark_self_in_interrupt(false);
+
+    if (!scheduler_preemption_disabled())
+        scheduler_resched_if_needed();
 }
 
 void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {
+    scheduler_mark_self_needs_resched(true);
+    lapic_write(LAPIC_REG_EOI, 0);
     (void) ctx, (void) vector, (void) rsp;
-    if (!scheduler_preemption_disabled()) {
-        lapic_write(LAPIC_REG_EOI, 0);
-
-        /* Doing this as the `schedule()` will go to another thread */
-        scheduler_mark_self_needs_resched(false);
-        irq_mark_self_in_interrupt(false);
-        schedule();
-    } else {
-        scheduler_mark_self_needs_resched(true);
-        lapic_write(LAPIC_REG_EOI, 0);
-    }
 }
 
 /* Literally a no-op. Used to break out of "wait for interrupt" loops */

@@ -91,8 +91,9 @@ static void condvar_timeout_wakeup(void *arg, void *arg2) {
     if (!list_empty(&t->list_node)) {
         list_del_init(&t->list_node);
     }
-    spin_unlock(&ck->cv->waiters.lock, irql);
 
+    spin_unlock(&ck->cv->waiters.lock, irql);
+    kfree(ck);
     set_wake_reason_and_wake(t, WAKE_REASON_TIMEOUT);
 }
 

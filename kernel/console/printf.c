@@ -406,12 +406,18 @@ void v_k_printf(struct printf_cursor *csr, const char *format, va_list args) {
 }
 
 void k_printf(const char *format, ...) {
-    enum irql irql = spin_lock_irq_disable(&k_printf_lock);
+    bool i = are_interrupts_enabled(); /* pattern is used since this is called
+                                          from preempt_raise/lower */
+    disable_interrupts();
+    spin_lock_raw(&k_printf_lock);
     va_list args;
     va_start(args, format);
     v_k_printf(NULL, format, args);
     va_end(args);
-    spin_unlock(&k_printf_lock, irql);
+    spin_unlock_raw(&k_printf_lock);
+
+    if (i)
+        enable_interrupts();
 }
 
 int snprintf(char *buffer, int buffer_len, const char *format, ...) {
