@@ -100,4 +100,45 @@ static inline bool scheduler_set_tick_enabled(struct scheduler *sched,
     return atomic_exchange(&sched->tick_enabled, new);
 }
 
+static inline const char *thread_state_str(const enum thread_state state) {
+    switch (state) {
+    case THREAD_STATE_NEW: return "NEW";
+    case THREAD_STATE_IDLE_THREAD: return "IDLE THREAD";
+    case THREAD_STATE_READY: return "READY";
+    case THREAD_STATE_RUNNING: return "RUNNING";
+    case THREAD_STATE_BLOCKED: return "BLOCKED";
+    case THREAD_STATE_SLEEPING: return "SLEEPING";
+    case THREAD_STATE_ZOMBIE: return "ZOMBIE";
+    case THREAD_STATE_TERMINATED: return "TERMINATED";
+    case THREAD_STATE_HALTED: return "HALTED";
+    }
+}
+
+static inline const char *
+thread_activity_class_str(enum thread_activity_class c) {
+    switch (c) {
+    case THREAD_ACTIVITY_CLASS_CPU_BOUND: return "CPU BOUND";
+    case THREAD_ACTIVITY_CLASS_IO_BOUND: return "IO BOUND";
+    case THREAD_ACTIVITY_CLASS_INTERACTIVE: return "INTERACTIVE";
+    case THREAD_ACTIVITY_CLASS_SLEEPY: return "SLEEPY";
+    case THREAD_ACTIVITY_CLASS_UNKNOWN: return "UNKNOWN";
+    }
+}
+
+static inline const char *thread_event_reason_str(const uint8_t reason) {
+    switch (reason) {
+    case THREAD_WAKE_REASON_BLOCKING_IO: return "WAKE FROM BLOCKING IO";
+    case THREAD_WAKE_REASON_BLOCKING_MANUAL: return "WAKE FROM BLOCKING WAKE";
+    case THREAD_WAKE_REASON_SLEEP_TIMEOUT: return "WAKE FROM SLEEP TIMEOUT";
+    case THREAD_WAKE_REASON_SLEEP_MANUAL: return "WAKE FROM MANUAL SLEEP WAKE";
+    case THREAD_WAKE_REASON_UNKNOWN: return "WAKE FROM UNKNOWN REASON";
+    case THREAD_BLOCK_REASON_IO: return "BLOCK FROM IO";
+    case THREAD_BLOCK_REASON_MANUAL: return "BLOCK FROM MANUAL BLOCK";
+    case THREAD_BLOCK_REASON_UNKNOWN: return "BLOCK FROM UNKNOWN REASON";
+    case THREAD_SLEEP_REASON_MANUAL: return "SLEEP FROM MANUAL SLEEP";
+    case THREAD_SLEEP_REASON_UNKNOWN: return "SLEEP FROM UNKNOWN REASON";
+    default: return "UNKNOWN EVENT REASON";
+    }
+}
+
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(scheduler, lock);

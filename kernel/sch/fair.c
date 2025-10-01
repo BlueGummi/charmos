@@ -312,8 +312,6 @@ static void allocate_slices(struct scheduler *s, uint64_t now_ms) {
     if (total_weight == 0)
         total_weight = 1;
 
-    s->total_weight_fp = total_weight;
-
     rbt_for_each(node, &s->thread_rbt) {
         struct thread *t = thread_from_rbt_node(node);
 
@@ -321,16 +319,8 @@ static void allocate_slices(struct scheduler *s, uint64_t now_ms) {
         if (budget_ms < MIN_SLICE_MS)
             budget_ms = MIN_SLICE_MS;
 
-        uint64_t slice_ms = MIN_SLICE_MS;
-
-        if (budget_ms > MAX_SLICE_MS) {
-            slice_ms = MAX_SLICE_MS;
-        } else if (budget_ms > MIN_SLICE_MS) {
-            slice_ms = budget_ms;
-        }
-
-        t->timeslice_duration_ms = slice_ms;
-        t->timeslices_remaining = (budget_ms + slice_ms - 1) / slice_ms;
+        t->time_spent_this_period = 0;
+        t->budget_time = budget_ms;
         t->completed_period = s->current_period - 1;
     }
 }

@@ -1,3 +1,4 @@
+#pragma once
 #include <asm.h>
 #include <mem/alloc.h>
 #include <misc/list.h>
@@ -11,7 +12,6 @@
 #include <types/refcount.h>
 #include <types/types.h>
 
-#pragma once
 #define STACK_SIZE (PAGE_SIZE * 4)
 
 /* Thread priority magic numbers */
@@ -25,6 +25,7 @@ typedef uint32_t thread_prio_t;
 #define THREAD_PRIO_MAX UINT32_MAX
 #define THREAD_PRIO_MIN UINT32_MIN
 
+/* Ranges for thread priorities of different interactivities */
 #define THREAD_PRIO_TS_INTERACTIVE_MIN 0xB8000000u
 #define THREAD_PRIO_TS_INTERACTIVE_MAX 0xE7FFFFFFu
 
@@ -39,6 +40,7 @@ typedef uint32_t thread_prio_t;
 
 #define THREAD_PRIO_APPROX_MIDDLE 0x90000000u
 
+/* pluh */
 struct cpu_context {
     uint64_t rbx;
     uint64_t rbp;
@@ -62,20 +64,6 @@ enum thread_state : uint8_t {
     THREAD_STATE_HALTED,     /* Thread manually suspended */
 };
 
-static inline const char *thread_state_str(const enum thread_state state) {
-    switch (state) {
-    case THREAD_STATE_NEW: return "NEW";
-    case THREAD_STATE_IDLE_THREAD: return "IDLE THREAD";
-    case THREAD_STATE_READY: return "READY";
-    case THREAD_STATE_RUNNING: return "RUNNING";
-    case THREAD_STATE_BLOCKED: return "BLOCKED";
-    case THREAD_STATE_SLEEPING: return "SLEEPING";
-    case THREAD_STATE_ZOMBIE: return "ZOMBIE";
-    case THREAD_STATE_TERMINATED: return "TERMINATED";
-    case THREAD_STATE_HALTED: return "HALTED";
-    }
-}
-
 enum thread_flags : uint8_t {
     THREAD_FLAGS_NO_STEAL = 1, /* Do not migrate between cores */
 };
@@ -89,6 +77,9 @@ enum thread_prio_class : uint8_t {
 
 #define THREAD_PRIO_CLASS_COUNT (4)
 
+/* Different enums are used for the little
+ * bit of type safety since different ringbuffers
+ * are used to keep track of different reasons */
 enum thread_wake_reason : uint8_t {
     THREAD_WAKE_REASON_BLOCKING_IO = 1,
     THREAD_WAKE_REASON_BLOCKING_MANUAL = 2,
@@ -108,32 +99,6 @@ enum thread_sleep_reason : uint8_t {
     THREAD_SLEEP_REASON_UNKNOWN = 10,
 
 };
-
-static inline bool thread_wake_is_from_block(uint8_t wake_reason) {
-    return wake_reason == THREAD_WAKE_REASON_BLOCKING_IO ||
-           wake_reason == THREAD_WAKE_REASON_BLOCKING_MANUAL;
-}
-
-static inline bool thread_wake_is_from_sleep(uint8_t wake_reason) {
-    return wake_reason == THREAD_WAKE_REASON_SLEEP_TIMEOUT ||
-           wake_reason == THREAD_WAKE_REASON_SLEEP_MANUAL;
-}
-
-static inline const char *thread_event_reason_str(const uint8_t reason) {
-    switch (reason) {
-    case THREAD_WAKE_REASON_BLOCKING_IO: return "WAKE FROM BLOCKING IO";
-    case THREAD_WAKE_REASON_BLOCKING_MANUAL: return "WAKE FROM BLOCKING WAKE";
-    case THREAD_WAKE_REASON_SLEEP_TIMEOUT: return "WAKE FROM SLEEP TIMEOUT";
-    case THREAD_WAKE_REASON_SLEEP_MANUAL: return "WAKE FROM MANUAL SLEEP WAKE";
-    case THREAD_WAKE_REASON_UNKNOWN: return "WAKE FROM UNKNOWN REASON";
-    case THREAD_BLOCK_REASON_IO: return "BLOCK FROM IO";
-    case THREAD_BLOCK_REASON_MANUAL: return "BLOCK FROM MANUAL BLOCK";
-    case THREAD_BLOCK_REASON_UNKNOWN: return "BLOCK FROM UNKNOWN REASON";
-    case THREAD_SLEEP_REASON_MANUAL: return "SLEEP FROM MANUAL SLEEP";
-    case THREAD_SLEEP_REASON_UNKNOWN: return "SLEEP FROM UNKNOWN REASON";
-    default: return "UNKNOWN EVENT REASON";
-    }
-}
 
 struct thread_event_association {
     uint8_t reason;
@@ -155,8 +120,6 @@ enum wake_reason {
     WAKE_REASON_TIMEOUT = 2, /* Timeout */
 };
 
-#define thread_from_rbt_node(node) rbt_entry(node, struct thread, tree_node)
-
 #define THREAD_PRIO_IS_TIMESHARING(prio) (prio == THREAD_PRIO_CLASS_TIMESHARE)
 
 /* Background threads share timeslices */
@@ -169,32 +132,7 @@ enum wake_reason {
 #define TOTAL_BUCKET_DURATION                                                  \
     (THREAD_ACTIVITY_BUCKET_COUNT * THREAD_ACTIVITY_BUCKET_DURATION)
 
-enum thread_activity_class {
-    THREAD_ACTIVITY_CLASS_CPU_BOUND,
-    THREAD_ACTIVITY_CLASS_IO_BOUND,
-    THREAD_ACTIVITY_CLASS_INTERACTIVE,
-    THREAD_ACTIVITY_CLASS_SLEEPY,
-    THREAD_ACTIVITY_CLASS_UNKNOWN
-};
-
-static inline const char *
-thread_activity_class_str(enum thread_activity_class c) {
-    switch (c) {
-    case THREAD_ACTIVITY_CLASS_CPU_BOUND: return "CPU BOUND";
-    case THREAD_ACTIVITY_CLASS_IO_BOUND: return "IO BOUND";
-    case THREAD_ACTIVITY_CLASS_INTERACTIVE: return "INTERACTIVE";
-    case THREAD_ACTIVITY_CLASS_SLEEPY: return "SLEEPY";
-    case THREAD_ACTIVITY_CLASS_UNKNOWN: return "UNKNOWN";
-    }
-}
-
-struct thread_activity_metrics {
-    uint64_t run_ratio;
-    uint64_t block_ratio;
-    uint64_t sleep_ratio;
-    uint64_t wake_freq;
-};
-
+/* Buckets */
 struct thread_runtime_bucket {
     uint64_t run_time_ms;
     uint64_t wall_clock_sec;
@@ -211,6 +149,7 @@ struct thread_activity_bucket {
     uint64_t sleep_duration;
 };
 
+/* Fine grained, exact activity stats */
 struct thread_activity_stats {
     struct thread_runtime_bucket rt_buckets[THREAD_EVENT_RINGBUFFER_CAPACITY];
     struct thread_activity_bucket buckets[THREAD_ACTIVITY_BUCKET_COUNT];
@@ -230,12 +169,33 @@ struct thread_activity_data {
     MAKE_THREAD_RINGBUFFER(sleep_reasons);
 };
 
+/* Activity aggregations */
+enum thread_activity_class {
+    THREAD_ACTIVITY_CLASS_CPU_BOUND,
+    THREAD_ACTIVITY_CLASS_IO_BOUND,
+    THREAD_ACTIVITY_CLASS_INTERACTIVE,
+    THREAD_ACTIVITY_CLASS_SLEEPY,
+    THREAD_ACTIVITY_CLASS_UNKNOWN
+};
+
+struct thread_activity_metrics {
+    uint64_t run_ratio;
+    uint64_t block_ratio;
+    uint64_t sleep_ratio;
+    uint64_t wake_freq;
+};
+
 struct thread {
-    /* Thread contexts */
+    /* Unique ID allocated from global thread ID tree */
     uint64_t id;
+
+    /* ========== Processor context data ========== */
+
+    /* Stack */
     void *stack;
     size_t stack_size;
 
+    /* Registers */
     struct cpu_context regs;
 
     /* Nodes */
@@ -245,55 +205,65 @@ struct thread {
     /* State */
     _Atomic enum thread_state state;
 
+    /* Who is running us? */
+    int64_t curr_core;     /* -1 if not being ran */
+    time_t run_start_time; /* When did we start running */
+
+    /* Flags */
+    enum thread_flags flags;
+
+    /* ======== Raw priority + timeslice data ======== */
+
     /* Priorities */
     thread_prio_t priority_score;
     int32_t dynamic_delta; /* Signed delta applied to base */
     uint64_t weight;
 
     /* Class changes */
-    uint64_t last_class_change_ms;
+    time_t last_class_change_ms;
 
     /* Timeslice info and periods */
     uint64_t completed_period;
-    uint64_t timeslice_duration_ms;
-    uint64_t timeslices_remaining;
+    time_t time_spent_this_period;
+    time_t budget_time;
 
-    /* Used to derive/impact the priorty_in_level */
+    /* ========== Thread activity stats ========== */
+
     enum thread_activity_class activity_class;
-    enum thread_prio_class base_priority; /* priority level
+
+    enum thread_prio_class base_priority; /* priority class
                                            * at creation time */
     enum thread_prio_class perceived_priority;
-
-    enum thread_flags flags;
-
-    /* For condvar */
-    volatile enum wake_reason wake_reason;
-    size_t wait_cookie;
-
-    uint64_t run_start_time; /* When did we start running */
 
     /* Activity data */
     struct thread_activity_data *activity_data;
     struct thread_activity_stats *activity_stats;
+
+    /* "Overview" derived from data and stats */
     struct thread_activity_metrics activity_metrics;
 
-    int64_t curr_core; /* -1 if not being ran */
-
-    void *private;
+    /* ========== Synchronization data ========== */
 
     /* Lock + rc */
     struct spinlock lock;
     refcount_t refcount;
 
+    /* For condvar */
+    volatile enum wake_reason wake_reason;
+    size_t wait_cookie;
+
+    /* ========== APC data ========== */
+    bool executing_apc; /* Executing an APC right now? */
+
     /* Standard APC queues */
     struct list_head apc_head[APC_TYPE_COUNT];
 
-    /* any APC pending */
+    /* Any APC pending */
     atomic_uintptr_t apc_pending_mask; /* bitmask of APC_TYPE_* pending */
 
     /* APC disable counts */
-    int special_apc_disable;
-    int kernel_apc_disable;
+    uint32_t special_apc_disable;
+    uint32_t kernel_apc_disable;
 
     /* The most recent APC event, set to APC_EVENT_NONE if no event
      * on a thread has happened */
@@ -313,8 +283,26 @@ struct thread {
      * Hooray, I love saving 24 bytes! Also everything in here
      * MUST be allocated with `kmalloc`. Memory leaks are kinda bad */
     struct apc *on_event_apcs[APC_EVENT_COUNT];
+
+    /* ========== Profiling data ========== */
+    size_t context_switches; /* Total context switches */
+
+    size_t preemptions; /* Manual yields = context_switches - preemptions */
+
+    time_t creation_time_ms; /* When were we created? */
+
+    size_t total_wake_count;
+    size_t total_block_count;
+    size_t total_sleep_count;
+    size_t total_apcs_ran;
+
+    /* TODO: More */
+
+    /* Misc. private field for whatever needs it */
+    void *private;
 };
 
+#define thread_from_rbt_node(node) rbt_entry(node, struct thread, tree_node)
 #define thread_from_list_node(ln) (container_of(ln, struct thread, list_node))
 
 struct thread_queue {
@@ -353,15 +341,32 @@ thread_add_event_reason(struct thread_event_reason *ring, size_t *head,
                         uint8_t reason, uint64_t time,
                         struct thread_activity_stats *stats);
 
+void thread_add_block_reason(struct thread *t, uint8_t reason);
+void thread_add_sleep_reason(struct thread *t, uint8_t reason);
+
+void thread_block(struct thread *t, enum thread_block_reason r);
+void thread_sleep(struct thread *t, enum thread_sleep_reason r);
+void thread_set_timesharing(struct thread *t);
+void thread_set_background(struct thread *t);
+void thread_wake(struct thread *t, enum thread_wake_reason r);
+
 static inline bool thread_get(struct thread *t) {
     return refcount_inc_not_zero(&t->refcount);
 }
 
+static inline enum thread_state thread_get_state(struct thread *t) {
+    return atomic_load(&t->state);
+}
+
+static inline void thread_set_state(struct thread *t, enum thread_state state) {
+    atomic_store(&t->state, state);
+}
+
 static inline void thread_put(struct thread *t) {
     if (refcount_dec_and_test(&t->refcount)) {
-        if (atomic_load(&t->state) != THREAD_STATE_TERMINATED) {
+        if (thread_get_state(t) != THREAD_STATE_TERMINATED)
             k_panic("final ref dropped while thread not terminated\n");
-        }
+
         thread_free(t);
     }
 }
@@ -378,70 +383,7 @@ static inline void thread_release(struct thread *t, enum irql irql) {
     thread_put(t);
 }
 
-static inline void thread_add_block_reason(struct thread *t, uint8_t reason) {
-    struct thread_activity_data *d = t->activity_data;
-    thread_add_event_reason(d->block_reasons, &d->block_reasons_head, reason,
-                            time_get_ms(), t->activity_stats);
-}
-
-static inline void thread_add_sleep_reason(struct thread *t, uint8_t reason) {
-    struct thread_activity_data *d = t->activity_data;
-    thread_add_event_reason(d->sleep_reasons, &d->sleep_reasons_head, reason,
-                            time_get_ms(), t->activity_stats);
-}
-
-static inline enum thread_state thread_get_state(struct thread *t) {
-    return atomic_load(&t->state);
-}
-
-static inline void thread_set_state(struct thread *t, enum thread_state state) {
-    atomic_store(&t->state, state);
-}
-
 static inline bool thread_is_rt(struct thread *t) {
     return t->perceived_priority == THREAD_PRIO_CLASS_URGENT ||
            t->perceived_priority == THREAD_PRIO_CLASS_RT;
-}
-
-static inline void set_state_internal(struct thread *t,
-                                      enum thread_state state) {
-    atomic_store(&t->state, state);
-}
-
-static inline void set_state_and_update_reason(struct thread *t, uint8_t reason,
-                                               enum thread_state state,
-                                               void (*callback)(struct thread *,
-                                                                uint8_t)) {
-    set_state_internal(t, state);
-    callback(t, reason);
-
-    uint64_t time = irq_in_interrupt() ? time_get_ms_fast() : time_get_ms();
-
-    if (state != THREAD_STATE_READY)
-        thread_update_runtime_buckets(t, time);
-}
-
-static inline void thread_block(struct thread *t, enum thread_block_reason r) {
-    set_state_and_update_reason(t, r, THREAD_STATE_BLOCKED,
-                                thread_add_block_reason);
-}
-
-static inline void thread_sleep(struct thread *t, enum thread_sleep_reason r) {
-    set_state_and_update_reason(t, r, THREAD_STATE_SLEEPING,
-                                thread_add_sleep_reason);
-}
-
-static inline void thread_wake(struct thread *t, enum thread_wake_reason r) {
-    set_state_and_update_reason(t, r, THREAD_STATE_READY,
-                                thread_add_wake_reason);
-}
-
-static inline void thread_set_timesharing(struct thread *t) {
-    t->base_priority = THREAD_PRIO_CLASS_TIMESHARE;
-    t->perceived_priority = THREAD_PRIO_CLASS_TIMESHARE;
-}
-
-static inline void thread_set_background(struct thread *t) {
-    t->base_priority = THREAD_PRIO_CLASS_BACKGROUND;
-    t->perceived_priority = THREAD_PRIO_CLASS_BACKGROUND;
 }

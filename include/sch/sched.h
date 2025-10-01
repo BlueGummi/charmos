@@ -32,7 +32,7 @@ struct idle_thread_data {
 struct scheduler {
     /* Current timeslice data */
     atomic_bool tick_enabled;
-    uint64_t timeslice_duration;
+    time_t timeslice_duration;
 
     /* Structures */
     struct thread_queue urgent_threads;
@@ -47,16 +47,23 @@ struct scheduler {
 
     struct thread *current;
 
-    uint64_t thread_count[THREAD_PRIO_CLASS_COUNT];
-    uint64_t total_thread_count;
+    /* Thread count at each prio */
+    size_t thread_count[THREAD_PRIO_CLASS_COUNT];
+    size_t total_thread_count;
 
     /* Period information */
     bool period_enabled;
     uint64_t current_period;
 
-    uint64_t period_ms;
-    uint64_t period_start_ms;
-    uint64_t total_weight_fp;
+    time_t period_ms;
+    time_t period_start_ms; /* Timestamp */
+
+#ifdef PROFILING_SCHED
+    size_t periods_started; /* How many have we started?
+                             * (Each one must complete) */
+
+    size_t idle_thread_loads;
+#endif
 
     int64_t core_id;
 
@@ -81,8 +88,8 @@ void scheduler_rm_thread(struct scheduler *sched, struct thread *thread,
 void schedule(void);
 void k_sch_main(void);
 void scheduler_idle_main(void);
-void scheduler_preempt_enable();
-void scheduler_preempt_disable();
+void scheduler_scheduler_preemption_enable();
+void scheduler_scheduler_preemption_disable();
 void scheduler_yield();
 void scheduler_enqueue(struct thread *t);
 void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id);
@@ -110,6 +117,7 @@ void scheduler_resched_if_needed(void);
 void scheduler_mark_self_idle(bool new);
 bool scheduler_core_idle(struct core *c);
 
+/* For a global structure containing central scheduler data */
 struct scheduler_data {
     uint32_t max_concurrent_stealers;
     atomic_uint active_stealers;
@@ -119,7 +127,6 @@ struct scheduler_data {
 
 extern struct scheduler_data scheduler_data;
 
-/* TODO: no rdmsr */
 static inline struct thread *scheduler_get_curr_thread() {
     return global.cores[smp_core_id()]->current_thread;
 }
@@ -143,5 +150,6 @@ static inline void scheduler_wake_from_io_block(struct thread *t) {
 
 #define TICKS_FOR_PRIO(level) (level == THREAD_PRIO_LOW ? 64 : 1ULL << level)
 
-uint32_t preempt_disable(void);
-uint32_t preempt_enable(void);
+bool scheduler_preemption_disabled(void);
+uint32_t scheduler_preemption_disable(void);
+uint32_t scheduler_preemption_enable(void);

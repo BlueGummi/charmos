@@ -41,7 +41,7 @@ struct core {
     struct domain_arena *domain_arena;
     size_t rr_current_domain;
 
-    atomic_uint_fast32_t preempt_disable_depth;
+    atomic_uint_fast32_t scheduler_preemption_disable_depth;
 
     struct core *core;
 };
@@ -56,8 +56,4 @@ static inline uint64_t smp_core_id() {
 
 static inline struct core *smp_core(void) {
     return global.cores[smp_core_id()];
-}
-
-static inline bool scheduler_preemption_disabled(void) {
-    return atomic_load(&smp_core()->preempt_disable_depth) > 0;
 }

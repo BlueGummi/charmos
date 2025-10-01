@@ -63,35 +63,16 @@ static inline void update_core_current_thread(struct thread *next) {
     c->current_thread = next;
 }
 
-static inline void decay_thread_timeslice(struct scheduler *sched,
-                                          struct thread *thread) {
-    /* If there is no period enabled right now,
-     * the thread should not decay timeslices,
-     * and we'll just keep it in the ready-queue */
-    if (!sched->period_enabled)
-        return;
-
-    /* We do not decay non-timesharing thread timeslices */
-    if (!THREAD_PRIO_IS_TIMESHARING(thread->perceived_priority))
-        return;
-
-    if (thread->timeslices_remaining == 0)
-        return;
-
-    thread->timeslices_remaining--;
-
-    /* We are done for this period */
-    if (thread->timeslices_remaining == 0)
-        thread->completed_period = sched->current_period;
-}
-
-static inline void update_thread_before_save(struct scheduler *sched,
-                                             struct thread *thread,
-                                             uint64_t time) {
+static inline void update_thread_before_save(struct thread *thread,
+                                             time_t time) {
     thread_set_state(thread, THREAD_STATE_READY);
     thread->curr_core = -1;
     thread_update_runtime_buckets(thread, time);
-    decay_thread_timeslice(sched, thread);
+}
+
+static inline bool thread_done_for_period(struct thread *thread) {
+    return THREAD_PRIO_IS_TIMESHARING(thread->perceived_priority) &&
+           thread->time_spent_this_period >= thread->budget_time;
 }
 
 static inline void do_re_enqueue_thread(struct scheduler *sched,
@@ -102,8 +83,8 @@ static inline void do_re_enqueue_thread(struct scheduler *sched,
         thread->perceived_priority = thread->base_priority;
 
     /* Scheduler is locked - called from `schedule()` */
-    if (THREAD_PRIO_IS_TIMESHARING(thread->perceived_priority) &&
-        thread->timeslices_remaining == 0) {
+    if (thread_done_for_period(thread)) {
+        thread->completed_period = sched->current_period;
         retire_thread(sched, thread);
         scheduler_set_queue_bitmap(sched, thread->perceived_priority);
         scheduler_increment_thread_count(sched, thread);
@@ -113,7 +94,7 @@ static inline void do_re_enqueue_thread(struct scheduler *sched,
     }
 }
 
-static inline void update_idle_thread(uint64_t time) {
+static inline void update_idle_thread(time_t time) {
     struct idle_thread_data *data = smp_core_idle_thread();
     data->did_work_recently = true;
     data->last_exit_ms = time;
@@ -125,12 +106,12 @@ static inline void update_min_steal_diff(void) {
 }
 
 static inline void save_thread(struct scheduler *sched, struct thread *curr,
-                               uint64_t time) {
+                               time_t time) {
     update_min_steal_diff();
 
     /* Only save a running thread that exists */
     if (curr && thread_get_state(curr) == THREAD_STATE_RUNNING) {
-        update_thread_before_save(sched, curr, time);
+        update_thread_before_save(curr, time);
         do_re_enqueue_thread(sched, curr);
     } else if (curr && thread_get_state(curr) == THREAD_STATE_IDLE_THREAD) {
         update_idle_thread(time);
@@ -159,7 +140,7 @@ static struct thread *pick_from_special_queues(struct scheduler *sched,
 }
 
 static struct thread *pick_from_regular_queues(struct scheduler *sched,
-                                               uint64_t now_ms,
+                                               time_t now_ms,
                                                enum thread_prio_class prio) {
     struct thread *next = find_highest_prio(sched, prio);
     if (next)
@@ -174,7 +155,7 @@ static struct thread *pick_from_regular_queues(struct scheduler *sched,
     return find_highest_prio(sched, prio);
 }
 
-static struct thread *pick_thread(struct scheduler *sched, uint64_t now_ms) {
+static struct thread *pick_thread(struct scheduler *sched, time_t now_ms) {
     uint8_t bitmap = scheduler_get_bitmap(sched);
     /* Nothing in queues */
     if (!bitmap)
@@ -196,7 +177,7 @@ static struct thread *pick_thread(struct scheduler *sched, uint64_t now_ms) {
 }
 
 static void load_thread(struct scheduler *sched, struct thread *next,
-                        uint64_t time) {
+                        time_t time) {
     sched->current = next;
     if (!next)
         return;
@@ -238,7 +219,7 @@ static void change_timeslice(struct scheduler *sched, struct thread *next) {
 
     if (THREAD_PRIO_HAS_TIMESLICE(next->perceived_priority)) {
         /* Timesharing threads need timeslices */
-        change_timeslice_duration(next->timeslice_duration_ms);
+        change_timeslice_duration(next->budget_time);
     } else {
         /* RT threads do not share time*/
         tick_disable();
@@ -262,7 +243,7 @@ void schedule(void) {
     struct scheduler *sched = smp_core_scheduler();
     enum irql irql = scheduler_lock_irq_disable(sched);
 
-    uint64_t time = time_get_ms_fast();
+    time_t time = time_get_ms_fast();
 
     struct thread *curr = sched->current;
     struct thread *next = NULL;

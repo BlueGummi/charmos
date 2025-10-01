@@ -15,7 +15,7 @@ enum irql irql_raise(enum irql new_level) {
     cpu->current_irql = new_level;
     if (new_level > old) {
         if (old < IRQL_DISPATCH_LEVEL && new_level >= IRQL_DISPATCH_LEVEL)
-            preempt_disable();
+            scheduler_preemption_disable();
 
         if (new_level >= IRQL_HIGH_LEVEL)
             disable_interrupts();
@@ -40,7 +40,7 @@ void irql_lower(enum irql new_level) {
 
         bool preempt_re_enabled = false;
         if (old >= IRQL_DISPATCH_LEVEL && new_level < IRQL_DISPATCH_LEVEL) {
-            preempt_enable();
+            scheduler_preemption_enable();
             preempt_re_enabled = true;
         }
 

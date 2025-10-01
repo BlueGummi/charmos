@@ -2,6 +2,18 @@
 #include <sch/thread.h>
 #include <string.h>
 
+#include "internal.h"
+
+static inline bool thread_wake_is_from_block(uint8_t wake_reason) {
+    return wake_reason == THREAD_WAKE_REASON_BLOCKING_IO ||
+           wake_reason == THREAD_WAKE_REASON_BLOCKING_MANUAL;
+}
+
+static inline bool thread_wake_is_from_sleep(uint8_t wake_reason) {
+    return wake_reason == THREAD_WAKE_REASON_SLEEP_TIMEOUT ||
+           wake_reason == THREAD_WAKE_REASON_SLEEP_MANUAL;
+}
+
 void thread_log_event_reasons(struct thread *t) {
     k_printf("Thread %llu event reason logs:\n", t->id);
 
@@ -327,4 +339,61 @@ void thread_update_runtime_buckets(struct thread *thread, uint64_t time) {
 
         bucket->run_time_ms += slice_end - slice_start;
     }
+
+    thread->time_spent_this_period += time - thread->run_start_time;
+}
+
+void thread_add_block_reason(struct thread *t, uint8_t reason) {
+    struct thread_activity_data *d = t->activity_data;
+    thread_add_event_reason(d->block_reasons, &d->block_reasons_head, reason,
+                            time_get_ms(), t->activity_stats);
+}
+
+void thread_add_sleep_reason(struct thread *t, uint8_t reason) {
+    struct thread_activity_data *d = t->activity_data;
+    thread_add_event_reason(d->sleep_reasons, &d->sleep_reasons_head, reason,
+                            time_get_ms(), t->activity_stats);
+}
+
+static inline void set_state_internal(struct thread *t,
+                                      enum thread_state state) {
+    atomic_store(&t->state, state);
+}
+
+static void set_state_and_update_reason(struct thread *t, uint8_t reason,
+                                        enum thread_state state,
+                                        void (*callback)(struct thread *,
+                                                         uint8_t)) {
+    set_state_internal(t, state);
+    callback(t, reason);
+
+    uint64_t time = irq_in_interrupt() ? time_get_ms_fast() : time_get_ms();
+
+    if (state != THREAD_STATE_READY)
+        thread_update_runtime_buckets(t, time);
+}
+
+void thread_wake(struct thread *t, enum thread_wake_reason r) {
+    set_state_and_update_reason(t, r, THREAD_STATE_READY,
+                                thread_add_wake_reason);
+}
+
+void thread_set_timesharing(struct thread *t) {
+    t->base_priority = THREAD_PRIO_CLASS_TIMESHARE;
+    t->perceived_priority = THREAD_PRIO_CLASS_TIMESHARE;
+}
+
+void thread_set_background(struct thread *t) {
+    t->base_priority = THREAD_PRIO_CLASS_BACKGROUND;
+    t->perceived_priority = THREAD_PRIO_CLASS_BACKGROUND;
+}
+
+void thread_block(struct thread *t, enum thread_block_reason r) {
+    set_state_and_update_reason(t, r, THREAD_STATE_BLOCKED,
+                                thread_add_block_reason);
+}
+
+void thread_sleep(struct thread *t, enum thread_sleep_reason r) {
+    set_state_and_update_reason(t, r, THREAD_STATE_SLEEPING,
+                                thread_add_sleep_reason);
 }

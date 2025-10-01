@@ -56,6 +56,7 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     memset(stack, 0, stack_size);
     uint64_t stack_top = (uint64_t) stack + stack_size;
 
+    new_thread->creation_time_ms = time_get_ms();
     new_thread->stack_size = stack_size;
     new_thread->regs.rsp = (uint64_t) stack_top;
     new_thread->base_priority = THREAD_PRIO_CLASS_TIMESHARE;
@@ -67,7 +68,6 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->curr_core = -1;
     new_thread->id = tid_alloc(thread_tid_space);
     new_thread->refcount = 1;
-    new_thread->timeslices_remaining = 1;
     new_thread->recent_event = APC_EVENT_NONE;
     new_thread->activity_class = THREAD_ACTIVITY_CLASS_UNKNOWN;
     thread_update_effective_priority(new_thread);
