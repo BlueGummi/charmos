@@ -14,31 +14,29 @@
 
 #define STACK_SIZE (PAGE_SIZE * 4)
 
-/* Thread priority magic numbers */
-
-/* 4 billion threads all running
- * at once is probably an upper
- * limit we won't hit
- *
- * - famous last words */
 typedef uint32_t thread_prio_t;
-#define THREAD_PRIO_MAX UINT32_MAX
-#define THREAD_PRIO_MIN UINT32_MIN
+#define THREAD_CLASS_WIDTH 1024
+#define THREAD_CLASS_HALF (THREAD_CLASS_WIDTH / 2)
 
-/* Ranges for thread priorities of different interactivities */
-#define THREAD_PRIO_TS_INTERACTIVE_MIN 0xB8000000u
-#define THREAD_PRIO_TS_INTERACTIVE_MAX 0xE7FFFFFFu
+#define THREAD_BAND_MIN(avg) ((avg) - THREAD_CLASS_HALF)
+#define THREAD_BAND_MAX(avg) ((avg) + THREAD_CLASS_HALF)
 
-#define THREAD_PRIO_TS_IO_BOUND_MIN 0x98000000u
-#define THREAD_PRIO_TS_IO_BOUND_MAX 0xB7FFFFFFu
+#define THREAD_ACT_INTERACTIVE_AVG 4000u
+#define THREAD_ACT_IO_BOUND_AVG 2500u
+#define THREAD_ACT_CPU_BOUND_AVG 1200u
+#define THREAD_ACT_SLEEPY_AVG 4500u
 
-#define THREAD_PRIO_TS_CPU_BOUND_MIN 0x78000000u
-#define THREAD_PRIO_TS_CPU_BOUND_MAX 0x97FFFFFFu
+#define THREAD_ACT_INTERACTIVE_MIN THREAD_BAND_MIN(THREAD_ACT_INTERACTIVE_AVG)
+#define THREAD_ACT_INTERACTIVE_MAX THREAD_BAND_MAX(THREAD_ACT_INTERACTIVE_AVG)
 
-#define THREAD_PRIO_TS_SLEEPY_MIN 0x60000000u
-#define THREAD_PRIO_TS_SLEEPY_MAX 0x77FFFFFFu
+#define THREAD_ACT_IO_BOUND_MIN THREAD_BAND_MIN(THREAD_ACT_IO_BOUND_AVG)
+#define THREAD_ACT_IO_BOUND_MAX THREAD_BAND_MAX(THREAD_ACT_IO_BOUND_AVG)
 
-#define THREAD_PRIO_APPROX_MIDDLE 0x90000000u
+#define THREAD_ACT_CPU_BOUND_MIN THREAD_BAND_MIN(THREAD_ACT_CPU_BOUND_AVG)
+#define THREAD_ACT_CPU_BOUND_MAX THREAD_BAND_MAX(THREAD_ACT_CPU_BOUND_AVG)
+
+#define THREAD_ACT_SLEEPY_MIN THREAD_BAND_MIN(THREAD_ACT_SLEEPY_AVG)
+#define THREAD_ACT_SLEEPY_MAX THREAD_BAND_MAX(THREAD_ACT_SLEEPY_AVG)
 
 /* pluh */
 struct cpu_context {
@@ -215,17 +213,23 @@ struct thread {
     /* ======== Raw priority + timeslice data ======== */
 
     /* Priorities */
-    thread_prio_t priority_score;
+    thread_prio_t activity_score;
     int32_t dynamic_delta; /* Signed delta applied to base */
     uint64_t weight;
 
     /* Class changes */
     time_t last_class_change_ms;
 
+    uint64_t effective_priority;
+
     /* Timeslice info and periods */
     uint64_t completed_period;
-    time_t time_spent_this_period;
-    time_t budget_time;
+    time_t period_runtime_raw_ms; /* Raw MS time of runtime this period */
+    time_t budget_time_raw_ms;    /* Raw MS time of budget */
+    time_t timeslice_length_raw_ms;
+
+    uint64_t virtual_period_runtime;
+    uint64_t virtual_budget;
 
     /* ========== Thread activity stats ========== */
 
@@ -287,14 +291,14 @@ struct thread {
     /* ========== Profiling data ========== */
     size_t context_switches; /* Total context switches */
 
-    size_t preemptions; /* Manual yields = context_switches - preemptions */
+    size_t preemptions; /* Manual yields = (context_switches - preemptions) */
 
     time_t creation_time_ms; /* When were we created? */
 
-    size_t total_wake_count;
-    size_t total_block_count;
-    size_t total_sleep_count;
-    size_t total_apcs_ran;
+    size_t total_wake_count;  /* Aggregate count of all wake events */
+    size_t total_block_count; /* Aggregate count of all block events */
+    size_t total_sleep_count; /* Aggregate count of all sleep events */
+    size_t total_apcs_ran;    /* Total APCs executed on a given thread */
 
     /* TODO: More */
 

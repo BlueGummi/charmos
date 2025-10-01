@@ -59,24 +59,24 @@ void scheduler_change_timeslice_duration(uint64_t new_duration) {
 }
 
 static inline void update_core_current_thread(struct thread *next) {
-    struct core *c = global.cores[smp_core_id()];
-    c->current_thread = next;
+    smp_core()->current_thread = next;
 }
 
 static inline void update_thread_before_save(struct thread *thread,
                                              time_t time) {
     thread_set_state(thread, THREAD_STATE_READY);
+    thread_scale_back_delta(thread);
     thread->curr_core = -1;
     thread_update_runtime_buckets(thread, time);
 }
 
 static inline bool thread_done_for_period(struct thread *thread) {
     return THREAD_PRIO_IS_TIMESHARING(thread->perceived_priority) &&
-           thread->time_spent_this_period >= thread->budget_time;
+           thread->virtual_period_runtime >= thread->virtual_budget;
 }
 
-static inline void do_re_enqueue_thread(struct scheduler *sched,
-                                        struct thread *thread) {
+static inline void re_enqueue_thread(struct scheduler *sched,
+                                     struct thread *thread) {
 
     /* Thread just finished an URGENT boost */
     if (thread->perceived_priority == THREAD_PRIO_CLASS_URGENT)
@@ -112,7 +112,7 @@ static inline void save_thread(struct scheduler *sched, struct thread *curr,
     /* Only save a running thread that exists */
     if (curr && thread_get_state(curr) == THREAD_STATE_RUNNING) {
         update_thread_before_save(curr, time);
-        do_re_enqueue_thread(sched, curr);
+        re_enqueue_thread(sched, curr);
     } else if (curr && thread_get_state(curr) == THREAD_STATE_IDLE_THREAD) {
         update_idle_thread(time);
     }
@@ -219,7 +219,7 @@ static void change_timeslice(struct scheduler *sched, struct thread *next) {
 
     if (THREAD_PRIO_HAS_TIMESLICE(next->perceived_priority)) {
         /* Timesharing threads need timeslices */
-        change_timeslice_duration(next->budget_time);
+        change_timeslice_duration(next->timeslice_length_raw_ms);
     } else {
         /* RT threads do not share time*/
         tick_disable();

@@ -70,9 +70,18 @@ static bool thread_apc_sanity_check(struct thread *t) {
     return true;
 }
 
-static void exec_apc(struct apc *a) {
+static void apc_execute(struct apc *a) {
     enum irql old = irql_raise(IRQL_APC_LEVEL);
+
+    struct thread *curr = scheduler_get_curr_thread();
+
+    curr->executing_apc = true;
+
     a->func(a, a->arg1, a->arg2);
+
+    curr->executing_apc = false;
+    curr->total_apcs_ran++;
+
     irql_lower(old);
 }
 
@@ -95,7 +104,7 @@ static void deliver_apc_type(struct thread *t, enum apc_type type) {
         thread_release(t, irql);
 
         if (!apc_is_cancelled(apc))
-            exec_apc(apc);
+            apc_execute(apc);
     }
 }
 
@@ -270,7 +279,7 @@ void thread_exec_event_apcs(struct thread *t) {
     if (!ea) /* No APC for this event */
         return;
 
-    exec_apc(ea);
+    apc_execute(ea);
 
     t->recent_event = APC_EVENT_NONE;
 }

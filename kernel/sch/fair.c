@@ -10,13 +10,13 @@
 
 #include "internal.h"
 
-/* TODO: #define things */
+/* TODO: #define things <--- do this */
 
 static void derive_timeshare_prio_range(enum thread_activity_class cls,
                                         uint32_t *min, uint32_t *max);
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#define THREAD_DELTA_UNIT (1ULL << 16)
+#define THREAD_DELTA_UNIT (1ULL << 3)
 
 #define THREAD_BOOST_WAKE_SMALL                                                \
     (4ULL * THREAD_DELTA_UNIT) /* provisional boost for wake */
@@ -27,15 +27,7 @@ static void derive_timeshare_prio_range(enum thread_activity_class cls,
 #define THREAD_PENALTY_CPU_RUN                                                 \
     (3ULL * THREAD_DELTA_UNIT) /* penalize heavy CPU usage per run period */
 
-#define THREAD_DELTA_MAX_UNITS 0x200
-
-#define THREAD_DELTA_MAX_U64                                                   \
-    (THREAD_DELTA_UNIT * (uint64_t) THREAD_DELTA_MAX_UNITS)
-
-#define THREAD_DELTA_MAX                                                       \
-    ((THREAD_DELTA_MAX_U64 > (uint64_t) INT32_MAX)                             \
-         ? INT32_MAX                                                           \
-         : (int32_t) THREAD_DELTA_MAX_U64)
+#define THREAD_DELTA_MAX (1 << 9)
 
 #define THREAD_REINSERT_THRESHOLD                                              \
     (8ULL * THREAD_DELTA_UNIT) /* only reinsert if effective priority changes  \
@@ -44,8 +36,8 @@ static void derive_timeshare_prio_range(enum thread_activity_class cls,
 #define THREAD_HYSTERESIS_MS 250ULL
 #define THREAD_PROV_BOOST_MS 50ULL /* provisional boost expiration */
 
-#define THREAD_MUL_INTERACTIVE 5ULL /* Big boost */
-#define THREAD_MUL_IO_BOUND 3ULL    /* Small boost */
+#define THREAD_MUL_INTERACTIVE 3ULL /* Big boost */
+#define THREAD_MUL_IO_BOUND 2ULL    /* Small boost */
 #define THREAD_MUL_CPU_BOUND 1ULL   /* No boost */
 #define THREAD_MUL_SLEEPY 1ULL      /* No boost */
 
@@ -60,8 +52,9 @@ static void derive_timeshare_prio_range(enum thread_activity_class cls,
 
 #define WAKE_FREQ_MAX 20
 #define WAKE_FREQ_SCALE 5
-#define BIAS_SCALE_NUM 1
-#define BIAS_SCALE_DEN 8
+
+#define THREAD_SLICE_MIN 1
+#define THREAD_SLICE_MAX 8
 
 #define SET_MUL(__multiplier)                                                  \
     class_mul = __multiplier;                                                  \
@@ -145,24 +138,24 @@ static void derive_timeshare_prio_range(enum thread_activity_class cls,
                                         uint32_t *min, uint32_t *max) {
     switch (cls) {
     case THREAD_ACTIVITY_CLASS_INTERACTIVE:
-        *min = THREAD_PRIO_TS_INTERACTIVE_MIN;
-        *max = THREAD_PRIO_TS_INTERACTIVE_MAX;
+        *min = THREAD_ACT_INTERACTIVE_MIN;
+        *max = THREAD_ACT_INTERACTIVE_MAX;
         break;
 
     case THREAD_ACTIVITY_CLASS_IO_BOUND:
-        *min = THREAD_PRIO_TS_IO_BOUND_MIN;
-        *max = THREAD_PRIO_TS_IO_BOUND_MAX;
+        *min = THREAD_ACT_IO_BOUND_MIN;
+        *max = THREAD_ACT_IO_BOUND_MAX;
         break;
 
     case THREAD_ACTIVITY_CLASS_CPU_BOUND:
-        *min = THREAD_PRIO_TS_CPU_BOUND_MIN;
-        *max = THREAD_PRIO_TS_CPU_BOUND_MAX;
+        *min = THREAD_ACT_CPU_BOUND_MIN;
+        *max = THREAD_ACT_CPU_BOUND_MAX;
         break;
 
     case THREAD_ACTIVITY_CLASS_SLEEPY:
     default:
-        *min = THREAD_PRIO_TS_SLEEPY_MIN;
-        *max = THREAD_PRIO_TS_SLEEPY_MAX;
+        *min = THREAD_ACT_SLEEPY_MIN;
+        *max = THREAD_ACT_SLEEPY_MAX;
         break;
     }
 }
@@ -266,12 +259,12 @@ void thread_apply_cpu_penalty(struct thread *t) {
 static int64_t base_weight_of(struct thread *t) {
     struct thread_activity_metrics *m = &t->activity_metrics;
 
-    int64_t w = 10240;
+    int64_t w = 1024;
 
     w += m->wake_freq * 100;
     w += (100 - m->run_ratio) * 50;
 
-    w += t->dynamic_delta / 100000;
+    w += t->dynamic_delta / 100;
 
     if (w < 1)
         w = 1;
@@ -283,11 +276,17 @@ void thread_update_effective_priority(struct thread *t) {
     uint32_t min, max;
     derive_timeshare_prio_range(t->activity_class, &min, &max);
 
-    int64_t eff = ((int64_t) min + (int64_t) max) / 2 + t->dynamic_delta;
+    int64_t avg = ((int64_t) min + (int64_t) max) / 2;
+    int64_t eff = avg + t->dynamic_delta;
     CLAMP(eff, min, max);
 
-    t->priority_score = (thread_prio_t) eff;
-    t->tree_node.data = t->priority_score;
+    t->activity_score = (thread_prio_t) eff;
+
+    int64_t vrt_left = thread_virtual_runtime_left(t);
+    if (vrt_left < 0)
+        vrt_left = 0;
+
+    t->tree_node.data = vrt_left;
     t->weight = base_weight_of(t);
 }
 
@@ -296,6 +295,41 @@ static uint64_t compute_period(struct scheduler *s) {
     uint64_t period = BASE_PERIOD_MS + (load * 2); /* Linear growth */
     CLAMP(period, MIN_PERIOD_MS, MAX_PERIOD_MS);
     return period;
+}
+
+static uint64_t map_activity_score(uint64_t score) {
+    const uint64_t min_score = THREAD_ACT_SLEEPY_MIN;
+    const uint64_t max_score = THREAD_ACT_INTERACTIVE_MAX;
+    const uint64_t slice_delta = THREAD_SLICE_MAX - THREAD_SLICE_MIN;
+    const uint64_t score_range = max_score - min_score;
+
+    CLAMP(score, min_score, max_score);
+
+    uint64_t score_delta = score - min_score;
+
+    return 1 + (score_delta * slice_delta) / score_range;
+}
+
+static uint64_t thread_derive_slice_count(struct thread *t) {
+    uint64_t base = map_activity_score(t->activity_score);
+    int64_t adjust = 0;
+
+    adjust += 1;
+
+    if (t->activity_metrics.block_ratio > t->activity_metrics.run_ratio)
+        adjust += 1;
+
+    if (t->activity_metrics.run_ratio > 70)
+        adjust -= 1;
+
+    if (t->activity_metrics.sleep_ratio > 70)
+        adjust -= 1;
+
+    int64_t result = (int64_t) base + adjust;
+
+    CLAMP(result, THREAD_SLICE_MIN, THREAD_SLICE_MAX);
+
+    return (uint64_t) result;
 }
 
 static void allocate_slices(struct scheduler *s, uint64_t now_ms) {
@@ -319,8 +353,15 @@ static void allocate_slices(struct scheduler *s, uint64_t now_ms) {
         if (budget_ms < MIN_SLICE_MS)
             budget_ms = MIN_SLICE_MS;
 
-        t->time_spent_this_period = 0;
-        t->budget_time = budget_ms;
+        t->period_runtime_raw_ms = 0;
+        t->budget_time_raw_ms = budget_ms;
+
+        uint64_t slices = thread_derive_slice_count(t);
+        t->timeslice_length_raw_ms = budget_ms / slices;
+
+        uint64_t mult = t->activity_score == 0 ? 1 : t->activity_score;
+
+        t->virtual_budget = budget_ms * mult;
         t->completed_period = s->current_period - 1;
     }
 }

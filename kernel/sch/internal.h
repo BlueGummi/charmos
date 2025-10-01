@@ -141,4 +141,12 @@ static inline const char *thread_event_reason_str(const uint8_t reason) {
     }
 }
 
+static inline int64_t thread_virtual_runtime_left(struct thread *t) {
+    return t->virtual_budget - t->virtual_period_runtime;
+}
+
+static inline void thread_scale_back_delta(struct thread *thread) {
+    thread->dynamic_delta = (thread->dynamic_delta * 7) / 8;
+}
+
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(scheduler, lock);
