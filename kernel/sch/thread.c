@@ -18,12 +18,13 @@ void thread_init_thread_ids(void) {
 }
 
 void thread_exit() {
-    disable_interrupts();
+    scheduler_preemption_disable();
+
     struct thread *self = scheduler_get_curr_thread();
     atomic_store(&self->state, THREAD_STATE_ZOMBIE);
     reaper_enqueue(self);
 
-    enable_interrupts();
+    scheduler_preemption_enable();
 
     scheduler_yield();
 }

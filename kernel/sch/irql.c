@@ -19,6 +19,8 @@ enum irql irql_raise(enum irql new_level) {
 
         if (new_level >= IRQL_HIGH_LEVEL)
             disable_interrupts();
+    } else if (new_level < old) {
+        k_panic("Raising to lower IRQL\n");
     }
 
     return old;
@@ -50,5 +52,7 @@ void irql_lower(enum irql new_level) {
 
         if (irq_in_thread_context() && preempt_re_enabled)
             scheduler_resched_if_needed();
+    } else if (new_level > old) {
+        k_panic("Lowering to higher IRQL\n");
     }
 }

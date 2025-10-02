@@ -229,11 +229,7 @@ uint64_t scheduler_compute_steal_threshold() {
 }
 
 bool scheduler_can_steal_work(struct scheduler *sched) {
-    int64_t val = atomic_load(&scheduler_data.total_threads);
-    int64_t avg_core_threads = val / global.core_count;
-
-    uint64_t threshold_load =
-        ((avg_core_threads * WORK_STEAL_THRESHOLD) / 100ULL) ?: 1;
-
-    return (sched->total_thread_count < threshold_load);
+    uint64_t val = atomic_load(&scheduler_data.total_threads);
+    uint64_t avg_core_threads = val / global.core_count;
+    return sched->total_thread_count < avg_core_threads;
 }
