@@ -12,6 +12,9 @@ enum irql irql_raise(enum irql new_level) {
     struct core *cpu = smp_core();
     enum irql old = cpu->current_irql;
 
+    bool iflag = are_interrupts_enabled();
+    disable_interrupts();
+
     cpu->current_irql = new_level;
     if (new_level > old) {
         if (old < IRQL_DISPATCH_LEVEL && new_level >= IRQL_DISPATCH_LEVEL)
@@ -20,8 +23,12 @@ enum irql irql_raise(enum irql new_level) {
         if (new_level >= IRQL_HIGH_LEVEL)
             disable_interrupts();
     } else if (new_level < old) {
-        k_panic("Raising to lower IRQL\n");
+        k_panic("Raising to lower IRQL, from %s to %s\n", irql_to_str(old),
+                irql_to_str(new_level));
     }
+
+    if (iflag && new_level < IRQL_HIGH_LEVEL)
+        enable_interrupts();
 
     return old;
 }
@@ -53,6 +60,7 @@ void irql_lower(enum irql new_level) {
         if (irq_in_thread_context() && preempt_re_enabled)
             scheduler_resched_if_needed();
     } else if (new_level > old) {
-        k_panic("Lowering to higher IRQL\n");
+        k_panic("Lowering to higher IRQL, from %s to %s\n", irql_to_str(old),
+                irql_to_str(new_level));
     }
 }

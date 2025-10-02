@@ -42,8 +42,8 @@ void hugepage_free_from_hugepage(struct hugepage *hp, void *ptr,
 /* Alter the bitmap and possibly put a hugepage back into the minheap
  * from the tree, or enqueue for deletion if everything is free */
 static void free_and_adjust(struct hugepage *hp, void *ptr, size_t page_count) {
-    hugepage_remove_from_core_list_safe(hp, false);
     hugepage_free_from_hugepage(hp, ptr, page_count);
+    hugepage_remove_from_core_list_safe(hp, false);
 
     /* Put this up for garbage collection */
     if (unlikely(hugepage_is_empty(hp)))
