@@ -133,10 +133,7 @@ static inline void hugepage_gc_list_inc_count(struct hugepage_gc_list *hgcl) {
 
 static inline bool hugepage_still_in_core_list(struct hugepage *hp) {
     struct minheap_node *mhn = &hp->minheap_node;
-    enum irql irql = hugepage_lock_irq_disable(hp);
-    bool valid = MINHEAP_NODE_INDEX(mhn) != MINHEAP_INDEX_INVALID;
-    hugepage_unlock(hp, irql);
-    return valid;
+    return MINHEAP_NODE_INDEX(mhn) != MINHEAP_INDEX_INVALID;
 }
 
 static inline size_t hugepage_num_pages_free(struct hugepage *hp) {

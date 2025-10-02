@@ -281,12 +281,7 @@ void thread_update_effective_priority(struct thread *t) {
     CLAMP(eff, min, max);
 
     t->activity_score = (thread_prio_t) eff;
-
-    int64_t vrt_left = thread_virtual_runtime_left(t);
-    if (vrt_left < 0)
-        vrt_left = 0;
-
-    t->tree_node.data = vrt_left;
+    t->tree_node.data = thread_virtual_runtime_left(t);
     t->weight = base_weight_of(t);
 }
 

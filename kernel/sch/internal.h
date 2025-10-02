@@ -142,7 +142,8 @@ static inline const char *thread_event_reason_str(const uint8_t reason) {
 }
 
 static inline int64_t thread_virtual_runtime_left(struct thread *t) {
-    return t->virtual_budget - t->virtual_period_runtime;
+    int64_t ret = t->virtual_budget - t->virtual_period_runtime;
+    return ret < 0 ? 0 : ret;
 }
 
 static inline void thread_scale_back_delta(struct thread *thread) {

@@ -57,16 +57,6 @@ void domain_buddy_track_pages(struct domain_buddy *dom) {
     dom->pages_used = total_pages - used_pages;
 }
 
-void domain_buddies_print(void) {
-    for (size_t i = 0; i < global.domain_count; i++) {
-        struct domain_buddy *dom = &domain_buddies[i];
-        k_printf("Domain %zu: start=0x%lx, end=0x%lx, total_pages=%zu, "
-                 "pages_used=%zu\n",
-                 i, (void *) dom->start, (void *) dom->end, dom->total_pages,
-                 dom->pages_used);
-    }
-}
-
 static void remove_block_from_global(size_t start_pfn, int order) {
     struct buddy_page **prev = &buddy_free_area[order].next;
     struct buddy_page *page = buddy_free_area[order].next;
@@ -350,8 +340,6 @@ void domain_buddies_init(void) {
         domain_buddy_track_pages(dbd);
         domain_build_zonelist(dbd);
     }
-
-    domain_buddies_print();
 }
 
 void domain_dump(void) {

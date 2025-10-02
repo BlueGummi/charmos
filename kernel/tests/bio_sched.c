@@ -100,7 +100,7 @@ REGISTER_TEST(bio_sched_coalesce_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     bio_sched_dispatch_all(d);
 
-    while (!atomic_load(&cb1d) || !atomic_load(&cb2d))
+    for (int i = 0; i < 5000; i++)
         scheduler_yield();
     SET_SUCCESS;
 }

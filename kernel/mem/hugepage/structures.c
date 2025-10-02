@@ -28,10 +28,8 @@ void hugepage_core_list_insert(struct hugepage_core_list *list,
     if (!locked)
         irql = hugepage_core_list_lock_irq_disable(list);
 
-    enum irql hugepage_irql = hugepage_lock_irq_disable(hp);
     kassert(hp->owner_core == list->core_num);
     minheap_insert(list->hugepage_minheap, &hp->minheap_node, hp->virt_base);
-    hugepage_unlock(hp, hugepage_irql);
 
     if (!locked)
         hugepage_core_list_unlock(list, irql);
@@ -79,9 +77,7 @@ void hugepage_core_list_remove_hugepage(struct hugepage_core_list *hcl,
 
     kassert(hp->owner_core == hcl->core_num);
 
-    enum irql hugepage_irql = hugepage_lock_irq_disable(hp);
     minheap_remove(hcl->hugepage_minheap, &hp->minheap_node);
-    hugepage_unlock(hp, hugepage_irql);
 
     if (!locked)
         hugepage_core_list_unlock(hcl, irql);
