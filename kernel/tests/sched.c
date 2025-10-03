@@ -134,7 +134,7 @@ REGISTER_TEST(sched_spawn_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
 static void sleepy_entry(void) {
     thread_sleep_for_ms(9000);
-    thread_log_event_reasons(scheduler_get_curr_thread());
+    thread_print(scheduler_get_curr_thread());
 }
 
 REGISTER_TEST(sched_sleepy_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {

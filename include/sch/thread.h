@@ -326,8 +326,8 @@ struct thread *thread_queue_pop_front(struct thread_queue *q);
 void thread_queue_clear(struct thread_queue *q);
 bool thread_queue_remove(struct thread_queue *q, struct thread *t);
 void thread_sleep_for_ms(uint64_t ms);
-void thread_log_event_reasons(struct thread *t);
 void thread_exit(void);
+void thread_print(const struct thread *t);
 
 void thread_update_activity_stats(struct thread *t, uint64_t time);
 void thread_classify_activity(struct thread *t, uint64_t now_ms);

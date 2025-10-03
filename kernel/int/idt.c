@@ -59,8 +59,13 @@ void isr_common_entry(uint8_t vector, void *rsp) {
     rcu_mark_quiescent();
     irq_mark_self_in_interrupt(false);
 
-    if (!scheduler_preemption_disabled())
+    if (!scheduler_preemption_disabled()) {
+        struct thread *curr = scheduler_get_curr_thread();
+        if (curr)
+            curr->preemptions++;
+
         scheduler_resched_if_needed();
+    }
 }
 
 void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {

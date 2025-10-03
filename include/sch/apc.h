@@ -20,6 +20,16 @@ enum apc_event {
     APC_EVENT_NONE, /* Nothing happened */
 };
 
+static inline const char *apc_event_str(enum apc_event evt) {
+    switch (evt) {
+    case APC_EVENT_THREAD_MIGRATE: return "THREAD MIGRATE";
+    case APC_EVENT_THREAD_EXIT: return "THREAD EXIT";
+    case APC_EVENT_COUNT:
+    case APC_EVENT_NONE: return "NONE";
+    }
+    return "?";
+}
+
 typedef void (*apc_func_t)(struct apc *apc, void *arg1, void *arg2);
 
 struct apc {

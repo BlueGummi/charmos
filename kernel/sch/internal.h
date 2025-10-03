@@ -147,7 +147,7 @@ static inline int64_t thread_virtual_runtime_left(struct thread *t) {
 }
 
 static inline void thread_scale_back_delta(struct thread *thread) {
-    thread->dynamic_delta = (thread->dynamic_delta * 11) / 12;
+    thread->dynamic_delta = (thread->dynamic_delta * 1000) / 1100;
 }
 
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(scheduler, lock);

@@ -231,6 +231,8 @@ static void change_timeslice(struct scheduler *sched, struct thread *next) {
 static inline void context_switch(struct thread *curr, struct thread *next) {
     rcu_mark_quiescent();
 
+    next->context_switches++;
+
     if (curr && curr->state != THREAD_STATE_IDLE_THREAD) {
         switch_context(&curr->regs, &next->regs);
     } else {

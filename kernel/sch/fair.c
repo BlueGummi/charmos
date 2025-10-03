@@ -198,15 +198,6 @@ static int get_class_multiplier(enum thread_activity_class class) {
     return class_mul;
 }
 
-static inline void clamp_thread_delta(struct thread *t) {
-    const int32_t max = THREAD_DELTA_MAX;
-    if (t->dynamic_delta > max)
-        t->dynamic_delta = max;
-
-    if (t->dynamic_delta < -max)
-        t->dynamic_delta = -max;
-}
-
 void thread_apply_wake_boost(struct thread *t) {
     if (thread_is_rt(t))
         return;
@@ -249,8 +240,9 @@ void thread_apply_cpu_penalty(struct thread *t) {
         /* Small penalty */
         int32_t penalty = compute_cpu_penalty(t, THREAD_PENALTY_CPU_RUN);
         int64_t scaled_delta = penalty * t->weight / MAX(t->weight, 1ULL);
+
+        CLAMP(scaled_delta, -THREAD_DELTA_MAX, THREAD_DELTA_MAX);
         t->dynamic_delta -= scaled_delta;
-        clamp_thread_delta(t);
     }
 
     thread_update_effective_priority(t);
@@ -356,6 +348,7 @@ static void allocate_slices(struct scheduler *s, uint64_t now_ms) {
 
         uint64_t mult = t->activity_score == 0 ? 1 : t->activity_score;
 
+        t->virtual_period_runtime = 0;
         t->virtual_budget = budget_ms * mult;
         t->completed_period = s->current_period - 1;
     }

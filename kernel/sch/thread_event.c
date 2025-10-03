@@ -14,31 +14,124 @@ static inline bool thread_wake_is_from_sleep(uint8_t wake_reason) {
            wake_reason == THREAD_WAKE_REASON_SLEEP_MANUAL;
 }
 
-void thread_log_event_reasons(struct thread *t) {
-    k_printf("Thread %llu event reason logs:\n", t->id);
-
-    struct thread_activity_stats *stats = t->activity_stats;
-    for (size_t i = 0; i < THREAD_ACTIVITY_BUCKET_COUNT; i++) {
-        struct thread_activity_bucket *b = &stats->buckets[i];
-        struct thread_runtime_bucket *bk = &t->activity_stats->rt_buckets[i];
-
-        k_printf(
-            "Bucket %llu shows: block_count %llu, sleep_count %llu, "
-            "wake_count %llu, "
-            "block_duration %llu, sleep_duration %llu, run duration %llu\n",
-            i, b->block_count, b->sleep_count, b->wake_count, b->block_duration,
-            b->sleep_duration, bk->run_time_ms);
+static const char *thread_prio_class_str(enum thread_prio_class c) {
+    switch (c) {
+    case THREAD_PRIO_CLASS_URGENT: return "URGENT";
+    case THREAD_PRIO_CLASS_RT: return "RT";
+    case THREAD_PRIO_CLASS_TIMESHARE: return "TS";
+    case THREAD_PRIO_CLASS_BACKGROUND: return "BG";
+    default: return "?";
     }
-    k_printf("Thread activity metrics show block ratio %llu, sleep ratio %llu, "
-             "run ratio %llu, wake freq %llu\n",
-             t->activity_metrics.block_ratio, t->activity_metrics.sleep_ratio,
-             t->activity_metrics.run_ratio, t->activity_metrics.wake_freq);
-    k_printf("Thread activity class is %s\n",
+}
+
+static const char *reason_str(uint8_t reason) {
+    switch (reason) {
+    case THREAD_WAKE_REASON_BLOCKING_IO: return "WAKE_IO";
+    case THREAD_WAKE_REASON_BLOCKING_MANUAL: return "WAKE_MANUAL";
+    case THREAD_WAKE_REASON_SLEEP_TIMEOUT: return "WAKE_TIMEOUT";
+    case THREAD_WAKE_REASON_SLEEP_MANUAL: return "WAKE_SLEEP_MANUAL";
+    case THREAD_WAKE_REASON_UNKNOWN: return "WAKE_UNKNOWN";
+    case THREAD_BLOCK_REASON_IO: return "BLOCK_IO";
+    case THREAD_BLOCK_REASON_MANUAL: return "BLOCK_MANUAL";
+    case THREAD_BLOCK_REASON_UNKNOWN: return "BLOCK_UNKNOWN";
+    case THREAD_SLEEP_REASON_MANUAL: return "SLEEP_MANUAL";
+    case THREAD_SLEEP_REASON_UNKNOWN: return "SLEEP_UNKNOWN";
+    case THREAD_ASSOCIATED_REASON_NONE: return "NONE";
+    default: return "?";
+    }
+}
+
+static void print_ringbuffer(const char *label, struct thread_event_reason *buf,
+                             size_t head) {
+    k_printf("    %s: [\n", label);
+    for (size_t i = 0; i < THREAD_EVENT_RINGBUFFER_CAPACITY; i++) {
+        struct thread_event_reason *e = &buf[i];
+        if (e->reason == THREAD_ASSOCIATED_REASON_NONE)
+            continue;
+
+        k_printf("        { reason: %s, ts: %lld, cycle: %llu",
+                 reason_str(e->reason), (long long) e->timestamp,
+                 (unsigned long long) e->cycle);
+
+        if (e->associated_reason.reason != THREAD_ASSOCIATED_REASON_NONE) {
+            k_printf(", assoc: { reason: %s, cycle: %llu }",
+                     reason_str(e->associated_reason.reason),
+                     (unsigned long long) e->associated_reason.cycle);
+        }
+
+        if (i == head % THREAD_EVENT_RINGBUFFER_CAPACITY)
+            k_printf(" <-- head");
+
+        k_printf(" },\n");
+    }
+    k_printf("    ],\n");
+}
+
+void thread_print(const struct thread *t) {
+    k_printf("Thread {\n");
+    k_printf("    id: %llu,\n", (unsigned long long) t->id);
+    k_printf("    state: %s,\n", thread_state_str(atomic_load(&t->state)));
+    k_printf("    core: %lld,\n", (long long) t->curr_core);
+    k_printf("    stack_size: %zu,\n", t->stack_size);
+
+    /* priorities */
+    k_printf("    base_prio: %s,\n", thread_prio_class_str(t->base_priority));
+    k_printf("    perceived_prio: %s,\n",
+             thread_prio_class_str(t->perceived_priority));
+    k_printf("    effective_priority: %llu,\n",
+             (unsigned long long) t->effective_priority);
+    k_printf("    activity_score: %u, dynamic_delta: %d, weight: %llu,\n",
+             t->activity_score, t->dynamic_delta,
+             (unsigned long long) t->weight);
+
+    k_printf("    activity_class: %s,\n",
              thread_activity_class_str(t->activity_class));
-    k_printf("Activity score is %u, dynamic_delta is %d\nweight is %u, "
-             "last_class_change_ms is %u\n",
-             t->activity_score, t->dynamic_delta, t->weight,
-             t->last_class_change_ms);
+
+    /* time / slice info */
+    k_printf("    run: %llu ms / budget: %llu ms,\n",
+             (unsigned long long) t->period_runtime_raw_ms,
+             (unsigned long long) t->budget_time_raw_ms);
+    k_printf("    timeslice_length: %llu ms,\n",
+             (unsigned long long) t->timeslice_length_raw_ms);
+    k_printf("    completed_period: %llu,\n",
+             (unsigned long long) t->completed_period);
+    k_printf("    virtual_runtime: %llu / virtual_budget: %llu,\n",
+             (unsigned long long) t->virtual_period_runtime,
+             (unsigned long long) t->virtual_budget);
+
+    /* metrics overview */
+    k_printf("    activity_metrics: { run_ratio: %llu, block_ratio: %llu, "
+             "sleep_ratio: %llu, wake_freq: %llu },\n",
+             (unsigned long long) t->activity_metrics.run_ratio,
+             (unsigned long long) t->activity_metrics.block_ratio,
+             (unsigned long long) t->activity_metrics.sleep_ratio,
+             (unsigned long long) t->activity_metrics.wake_freq);
+
+    /* profiling */
+    k_printf("    context_switches: %zu,\n", t->context_switches);
+    k_printf("    preemptions: %zu,\n", t->preemptions);
+    k_printf("    wakes: %zu, blocks: %zu, sleeps: %zu,\n", t->total_wake_count,
+             t->total_block_count, t->total_sleep_count);
+    k_printf("    apcs: %zu,\n", t->total_apcs_ran);
+    k_printf("    creation_time: %lld ms,\n", (long long) t->creation_time_ms);
+
+    /* APC state */
+    k_printf("    executing_apc: %s,\n", t->executing_apc ? "true" : "false");
+    k_printf("    special_apc_disable: %u, kernel_apc_disable: %u,\n",
+             t->special_apc_disable, t->kernel_apc_disable);
+    k_printf("    recent_event: %s,\n", apc_event_str(t->recent_event));
+
+    /* activity ringbuffers */
+    if (t->activity_data) {
+        print_ringbuffer("wake_reasons", t->activity_data->wake_reasons,
+                         t->activity_data->wake_reasons_head);
+        print_ringbuffer("block_reasons", t->activity_data->block_reasons,
+                         t->activity_data->block_reasons_head);
+        print_ringbuffer("sleep_reasons", t->activity_data->sleep_reasons,
+                         t->activity_data->sleep_reasons_head);
+    }
+
+    k_printf("}\n");
 }
 
 static struct thread_event_reason *
@@ -311,6 +404,8 @@ void thread_add_wake_reason(struct thread *t, uint8_t reason) {
         link_wake_reason(past, curr, past_head, this_past_head);
 
     thread_update_activity_stats(t, now);
+
+    t->total_wake_count++;
 }
 
 void thread_update_runtime_buckets(struct thread *thread, uint64_t time) {
@@ -351,12 +446,14 @@ void thread_update_runtime_buckets(struct thread *thread, uint64_t time) {
 
 void thread_add_block_reason(struct thread *t, uint8_t reason) {
     struct thread_activity_data *d = t->activity_data;
+    t->total_block_count++;
     thread_add_event_reason(d->block_reasons, &d->block_reasons_head, reason,
                             time_get_ms(), t->activity_stats);
 }
 
 void thread_add_sleep_reason(struct thread *t, uint8_t reason) {
     struct thread_activity_data *d = t->activity_data;
+    t->total_sleep_count++;
     thread_add_event_reason(d->sleep_reasons, &d->sleep_reasons_head, reason,
                             time_get_ms(), t->activity_stats);
 }
