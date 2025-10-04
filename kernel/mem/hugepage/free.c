@@ -11,8 +11,6 @@
  * hugepage if it becomes fully empty */
 void hugepage_free_from_hugepage(struct hugepage *hp, void *ptr,
                                  size_t page_count) {
-    enum irql irql = hugepage_lock_irq_disable(hp);
-
     kassert(page_count > 0);
     vaddr_t addr = (vaddr_t) ptr;
     kassert(addr >= hp->virt_base);
@@ -34,23 +32,39 @@ void hugepage_free_from_hugepage(struct hugepage *hp, void *ptr,
 
     kassert(hp->pages_used >= page_count);
     hp->pages_used -= page_count;
+}
 
-    hugepage_unlock(hp, irql);
-    hugepage_sanity_assert(hp);
+static void reinsert_hugepage(struct hugepage *hp) {
+    struct hugepage_core_list *hcl = hugepage_get_core_list(hp);
+
+    /* This must happen as one atomic operation because other threads
+     * may see an invalid state where they think that a given
+     * hugepage is not in the list when it "is" but is just removed
+     * during re-insertion */
+    enum irql irql = hugepage_core_list_lock_irq_disable(hcl);
+
+    hugepage_remove_from_core_list_safe(hp, /* locked = */ true);
+    hugepage_core_list_insert(hcl, hp, /* locked = */ true);
+
+    hugepage_core_list_unlock(hcl, irql);
 }
 
 /* Alter the bitmap and possibly put a hugepage back into the minheap
  * from the tree, or enqueue for deletion if everything is free */
 static void free_and_adjust(struct hugepage *hp, void *ptr, size_t page_count) {
+    enum irql irql = hugepage_lock_irq_disable(hp);
     hugepage_free_from_hugepage(hp, ptr, page_count);
-    hugepage_remove_from_core_list_safe(hp, false);
 
     /* Put this up for garbage collection */
-    if (unlikely(hugepage_is_empty(hp)))
+    if (unlikely(hugepage_is_empty(hp))) {
+        hugepage_unlock(hp, irql);
+        hugepage_sanity_assert(hp);
         return hugepage_gc_enqueue(hp);
+    }
 
-    /* Or just re-insert it */
-    hugepage_core_list_insert(hugepage_get_core_list(hp), hp, false);
+    hugepage_unlock(hp, irql);
+    hugepage_sanity_assert(hp);
+    reinsert_hugepage(hp);
 }
 
 static struct hugepage *search_core_list(struct hugepage_core_list *hcl,
