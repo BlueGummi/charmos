@@ -5,14 +5,14 @@
 
 static bool try_push_page_onto_arena(struct domain_arena *arena,
                                      paddr_t address) {
-    struct buddy_page *buddy = buddy_page_for_addr(address);
+    struct page *buddy = buddy_page_for_addr(address);
     return domain_arena_push(arena, buddy);
 }
 
 static bool try_push_page_onto_domain_arenas(struct domain_buddy *domain,
                                              paddr_t address) {
     struct domain_arena *arena;
-    struct buddy_page *this_page = buddy_page_for_addr(address);
+    struct page *this_page = buddy_page_for_addr(address);
 
     domain_for_each_arena(domain, arena) {
         if (domain_arena_push(arena, this_page))
@@ -131,7 +131,7 @@ static void flush_free_queue_internal(struct domain_buddy *domain,
             continue;
         }
 
-        struct buddy_page *this = buddy_page_for_addr(addr);
+        struct page *this = buddy_page_for_addr(addr);
         if (domain_arena_push(current_arena, this)) /* Pushed it onto arena */
             continue;
 

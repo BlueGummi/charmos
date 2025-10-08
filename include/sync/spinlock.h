@@ -87,6 +87,10 @@ static inline bool spin_trylock_irq_disable(struct spinlock *lock,
     return false;
 }
 
+static inline bool spinlock_held(struct spinlock *lock) {
+    return atomic_load(&lock->state);
+}
+
 /* Keep these static inline so you only "pay for what you need" (e.g. if you
  * never call trylock() you don't pay the cost of having that dead function
  * in the object file/binary) */

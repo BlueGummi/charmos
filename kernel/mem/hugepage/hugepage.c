@@ -160,6 +160,8 @@ void hugepage_delete(struct hugepage *hp) {
 }
 
 /* Only used inside of this allocator */
+
+/* TODO: actually call this somewhere, maybe in the future OOM handler chain */
 void hugepage_delete_and_unlink(struct hugepage *hp) {
     enum irql irql = hugepage_gc_list_lock_irq_disable(&hugepage_gc_list);
 

@@ -74,6 +74,8 @@ void hugepage_core_list_remove_hugepage(struct hugepage_core_list *hcl,
     enum irql irql = IRQL_PASSIVE_LEVEL;
     if (!locked)
         irql = hugepage_core_list_lock_irq_disable(hcl);
+    else
+        kassert(spinlock_held(&hcl->lock));
 
     kassert(hp->owner_core == hcl->core_num);
 

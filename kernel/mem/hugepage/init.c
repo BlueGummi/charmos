@@ -34,6 +34,7 @@ static inline void state_init(struct hugepage *hp, core_t owner) {
 
 void hugepage_init(struct hugepage *hp, vaddr_t vaddr_base, paddr_t phys_base,
                    core_t owner) {
+    kassert(HUGEPAGE_ALIGN(vaddr_base) == vaddr_base);
     lock_init(hp);
     hugepage_zero_bitmap(hp);
     deletion_init(hp);

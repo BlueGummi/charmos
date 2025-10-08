@@ -61,17 +61,21 @@ SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(hugepage_tb_entry, lock)
 #define hugepage_from_minheap_node(node)                                       \
     container_of(node, struct hugepage, minheap_node)
 
-#define hugepage_sanity_assert(hp) kassert(hugepage_is_valid(hp))
+#define hugepage_sanity_assert(hp) kassert(hugepage_is_valid(hp, false))
+
+#define hugepage_sanity_assert_locked(hp) kassert(hugepage_is_valid(hp, true))
+
 #define hugepage_deletion_sanity_assert(hp)                                    \
     kassert(hugepage_safe_for_deletion(hp))
 
 /* Sanity checks */
-bool hugepage_is_valid(struct hugepage *hp);
+bool hugepage_is_valid(struct hugepage *hp, bool locked);
 bool hugepage_safe_for_deletion(struct hugepage *hp);
 
 /* GC list */
 void hugepage_gc_add(struct hugepage *hp);
-void hugepage_gc_enqueue(struct hugepage *hp);
+bool /* returns if hp should be deleted */
+hugepage_gc_enqueue(struct hugepage *hp);
 void hugepage_gc_remove(struct hugepage *hp);
 void hugepage_gc_remove_internal(struct hugepage *hp);
 struct hugepage *hugepage_get_from_gc_list(void);

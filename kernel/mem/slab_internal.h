@@ -1,3 +1,4 @@
+#include <mem/page.h>
 #include <stdatomic.h>
 #include <stdint.h>
 #include <sync/spinlock.h>
@@ -14,6 +15,7 @@ struct slab {
 
     atomic_uint_fast8_t *bitmap;
     void *mem;
+    struct page *backing_page;
     atomic_uint_fast64_t used;
     enum slab_state state;
     struct slab_cache *parent_cache;

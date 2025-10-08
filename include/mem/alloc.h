@@ -36,7 +36,6 @@ enum alloc_flags : uint16_t {
 
 enum alloc_class {
     ALLOC_CLASS_DEFAULT = 0,
-    ALLOC_CLASS_NONMOVABLE,
     ALLOC_CLASS_INTERLEAVED,
     ALLOC_CLASS_HIGH_BANDWIDTH,
 };

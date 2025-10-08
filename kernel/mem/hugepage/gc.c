@@ -64,30 +64,23 @@ struct hugepage *hugepage_get_from_gc_list(void) {
     return hp;
 }
 
-static inline bool hugepage_try_instant_delete(struct hugepage *hp) {
-    if (hugepage_gc_list.pages_in_list > HUGEPAGE_GC_LIST_MAX_HUGEPAGES) {
-        /* We do not use `delete_and_unlink` because this hugepage
-         * will already not exist in any data structures to track it.
-         * `delete_and_unlink` would be used to delete hps **in** the
-         * gc_list for whatever reason they need to be deleted */
-        hugepage_delete(hp);
-        return true;
-    }
-    return false;
+static inline bool hugepage_should_delete() {
+    return hugepage_gc_list.pages_in_list > HUGEPAGE_GC_LIST_MAX_HUGEPAGES;
 }
 
-static inline void hugepage_untrack(struct hugepage *hp) {
+static void hugepage_untrack(struct hugepage *hp) {
     hugepage_tb_remove(hugepage_full_tree->htb, hp);
-    hugepage_remove_from_core_list_safe(hp, false);
+    hugepage_remove_from_core_list_safe(hp, /* locked = */ false);
     hugepage_tree_remove(hugepage_full_tree, hp);
 }
 
-void hugepage_gc_enqueue(struct hugepage *hp) {
+bool hugepage_gc_enqueue(struct hugepage *hp) {
     hugepage_untrack(hp);
     hugepage_deletion_sanity_assert(hp);
     hugepage_mark_for_deletion(hp);
-    if (hugepage_try_instant_delete(hp))
-        return;
+    if (hugepage_should_delete())
+        return true;
 
     hugepage_gc_add(hp);
+    return false;
 }

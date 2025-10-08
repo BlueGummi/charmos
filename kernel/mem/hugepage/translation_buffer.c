@@ -10,16 +10,21 @@ static inline bool tb_entry_on_cooldown(struct hugepage_tb *htb,
 }
 
 static inline bool tb_entry_matches_addr(struct hugepage_tb_entry *e,
-                                         vaddr_t addr) {
-    return e->valid && (e->tag == (addr & HTB_TAG_MASK));
+                                         vaddr_t addr, struct hugepage **out) {
+    enum irql irql = hugepage_tb_entry_lock_irq_disable(e);
+    bool valid = e->valid && (e->tag == (addr & HTB_TAG_MASK));
+    *out = e->hp;
+    hugepage_tb_entry_unlock(e, irql);
+    return valid;
 }
 
 struct hugepage *hugepage_tb_lookup(struct hugepage_tb *htb, vaddr_t addr) {
     size_t idx = hugepage_tb_hash(addr, htb);
     struct hugepage_tb_entry *e = &htb->entries[idx];
 
-    if (tb_entry_matches_addr(e, addr))
-        return e->hp;
+    struct hugepage *out;
+    if (tb_entry_matches_addr(e, addr, &out))
+        return out;
 
     return NULL;
 }

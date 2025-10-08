@@ -24,8 +24,9 @@ static inline uint64_t round_up_pow2(uint64_t x, uint64_t a) {
 static struct vas_space *slab_vas = NULL;
 static struct slab_cache slab_caches[SLAB_CLASS_COUNT];
 
-static void *slab_map_new_page() {
+static void *slab_map_new_page(paddr_t *phys_out) {
     uintptr_t phys = pmm_alloc_page(ALLOC_CLASS_DEFAULT, ALLOC_FLAGS_NONE);
+    *phys_out = phys;
     if (!phys)
         return NULL;
 
@@ -69,12 +70,14 @@ static void slab_cache_init(struct slab_cache *cache, uint64_t obj_size) {
 }
 
 static struct slab *slab_create(struct slab_cache *cache) {
-    void *page = slab_map_new_page();
+    paddr_t phys;
+    void *page = slab_map_new_page(&phys);
     if (!page)
         return NULL;
 
     struct slab *slab = (struct slab *) page;
     slab->parent_cache = cache;
+    slab->backing_page = page_for_pfn(PAGE_TO_PFN(phys));
 
     uint64_t max_objs = (PAGE_SIZE - sizeof(struct slab)) / cache->obj_size;
     if (max_objs == 0) {

@@ -50,8 +50,13 @@ void hugepage_print_all(void) {
 
 /* We check hugepage allocation counts, bitmaps,
  * states, and their pointers */
-bool hugepage_is_valid(struct hugepage *hp) {
-    enum irql irql = hugepage_lock_irq_disable(hp);
+bool hugepage_is_valid(struct hugepage *hp, bool locked) {
+    enum irql irql;
+
+    if (!locked)
+        irql = hugepage_lock_irq_disable(hp);
+    else
+        kassert(spinlock_held(&hp->lock));
 
     uint64_t pused = 0;
 
@@ -61,16 +66,21 @@ bool hugepage_is_valid(struct hugepage *hp) {
     }
 
     if (pused != hp->pages_used) {
-        hugepage_unlock(hp, irql);
+        if (!locked)
+            hugepage_unlock(hp, irql);
+
         return false;
     }
 
-    hugepage_unlock(hp, irql);
+    if (!locked)
+        hugepage_unlock(hp, irql);
+
     return true;
 }
 
+/* Lock must be held */
 bool hugepage_safe_for_deletion(struct hugepage *hp) {
-    if (!hugepage_is_valid(hp))
+    if (!hugepage_is_valid(hp, /* locked = */ true))
         return false;
 
     bool nothing_allocated = hp->pages_used == 0;

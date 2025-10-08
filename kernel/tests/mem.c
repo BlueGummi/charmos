@@ -182,11 +182,12 @@ static void mt_hugepage_worker() {
         ptrs[i] = hugepage_alloc_page();
 
         TEST_ASSERT(ptrs[i] != NULL);
-        ASSERT_ALIGNED(ptrs[i], 4096);
+        ASSERT_ALIGNED(ptrs[i], PAGE_SIZE);
     }
 
     for (uint64_t i = 0; i < MT_ALLOC_TIMES; i++) {
         hugepage_free_page(ptrs[i]);
+        ptrs[i] = NULL;
     }
 }
 

@@ -11,6 +11,7 @@
  * hugepage if it becomes fully empty */
 void hugepage_free_from_hugepage(struct hugepage *hp, void *ptr,
                                  size_t page_count) {
+    kassert(spinlock_held(&hp->lock));
     kassert(page_count > 0);
     vaddr_t addr = (vaddr_t) ptr;
     kassert(addr >= hp->virt_base);
@@ -57,13 +58,23 @@ static void free_and_adjust(struct hugepage *hp, void *ptr, size_t page_count) {
 
     /* Put this up for garbage collection */
     if (unlikely(hugepage_is_empty(hp))) {
+        hugepage_sanity_assert_locked(hp);
+
+        /* This must be called with the lock held. The lock here
+         * prevents preemption, and prevents a scenario where another
+         * thread on the same core sees that there is a hugepage in the
+         * core list, when in reality, that hugepage is being destroyed,
+         * which would cause a UAF once this thread runs again */
+        bool should_delete = hugepage_gc_enqueue(hp);
         hugepage_unlock(hp, irql);
-        hugepage_sanity_assert(hp);
-        return hugepage_gc_enqueue(hp);
+        if (should_delete)
+            hugepage_delete(hp);
+
+        return;
     }
 
+    hugepage_sanity_assert_locked(hp);
     hugepage_unlock(hp, irql);
-    hugepage_sanity_assert(hp);
     reinsert_hugepage(hp);
 }
 
@@ -122,12 +133,6 @@ out:
     return found;
 }
 
-struct hugepage *hugepage_lookup(void *ptr) {
-    vaddr_t vaddr = HUGEPAGE_ALIGN((vaddr_t) ptr);
-    struct hugepage *hp = search_for_hugepage(vaddr);
-    return hp;
-}
-
 static inline bool free_requires_multiple_hugepages(size_t page_count) {
     return hugepage_hps_needed_for(page_count) > 1;
 }
@@ -166,4 +171,10 @@ void hugepage_free_pages(void *ptr, size_t page_count) {
         k_panic("Likely double free of addr 0x%lx\n", ptr);
 
     free_and_adjust(hp, ptr, page_count);
+}
+
+struct hugepage *hugepage_lookup(void *ptr) {
+    vaddr_t vaddr = HUGEPAGE_ALIGN((vaddr_t) ptr);
+    struct hugepage *hp = search_for_hugepage(vaddr);
+    return hp;
 }

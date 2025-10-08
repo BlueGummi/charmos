@@ -9,9 +9,9 @@
 #define DOMAIN_ARENA_SIZE 64
 #define DOMAIN_FREE_QUEUE_SIZE 64
 
-struct buddy_page;
+struct page;
 struct domain_arena {
-    struct buddy_page **pages;
+    struct page **pages;
     size_t head;
     size_t tail;
     size_t capacity;
@@ -72,7 +72,7 @@ struct domain_buddy {
     struct domain_buddy_stats stats;
     struct domain_zonelist zonelist;
 
-    struct buddy_page *buddy;
+    struct page *buddy;
     struct free_area *free_area;
 
     struct domain_arena **arenas; /* One per core */
@@ -92,7 +92,7 @@ struct domain_buddy {
     struct domain_flush_worker worker;
 };
 
-extern struct buddy_page *buddy_page_array;
+extern struct page *page_array;
 extern struct domain_buddy *domain_buddies;
 
 void domain_buddies_init(void);
@@ -103,8 +103,8 @@ bool domain_free_queue_enqueue(struct domain_free_queue *fq, paddr_t addr,
                                size_t pages);
 bool domain_free_queue_dequeue(struct domain_free_queue *fq, paddr_t *addr_out,
                                size_t *pages_out);
-bool domain_arena_push(struct domain_arena *arena, struct buddy_page *page);
-struct buddy_page *domain_arena_pop(struct domain_arena *arena);
+bool domain_arena_push(struct domain_arena *arena, struct page *page);
+struct page *domain_arena_pop(struct domain_arena *arena);
 
 void domain_flush_free_queue(struct domain_buddy *domain,
                              struct domain_free_queue *queue);
@@ -185,8 +185,8 @@ static inline void mark_free_in_progress(struct domain_free_queue *fq, bool s) {
     atomic_store_explicit(&fq->free_in_progress, s, memory_order_relaxed);
 }
 
-static inline struct buddy_page *buddy_page_for_addr(paddr_t address) {
-    return &buddy_page_array[PAGE_TO_PFN(address)];
+static inline struct page *buddy_page_for_addr(paddr_t address) {
+    return &page_array[PAGE_TO_PFN(address)];
 }
 
 static inline void free_from_buddy_internal(struct domain_buddy *target,

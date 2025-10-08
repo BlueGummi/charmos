@@ -11,7 +11,7 @@
 #include "internal.h"
 
 struct free_area buddy_free_area[MAX_ORDER] = {0};
-struct buddy_page *buddy_page_array = NULL;
+struct page *page_array = NULL;
 struct domain_buddy *domain_buddies;
 
 paddr_t buddy_alloc_pages(struct free_area *free_area, size_t count) {
@@ -39,16 +39,16 @@ paddr_t buddy_alloc_pages(struct free_area *free_area, size_t count) {
     }
 
     while (current_order > order) {
-        struct buddy_page *page =
+        struct page *page =
             buddy_remove_from_free_area(&free_area[current_order]);
 
         if (!page)
             return 0x0;
 
         uint64_t new_order = current_order - 1;
-        uint64_t buddy_pfn = pfn_for_buddy_page(page) + (1ULL << new_order);
+        uint64_t buddy_pfn = page_get_pfn(page) + (1ULL << new_order);
 
-        struct buddy_page *buddy = &buddy_page_array[buddy_pfn];
+        struct page *buddy = &page_array[buddy_pfn];
         memset(buddy, 0, sizeof(*buddy));
 
         page->order = new_order;
@@ -60,11 +60,11 @@ paddr_t buddy_alloc_pages(struct free_area *free_area, size_t count) {
         current_order--;
     }
 
-    struct buddy_page *page = buddy_remove_from_free_area(&free_area[order]);
+    struct page *page = buddy_remove_from_free_area(&free_area[order]);
     if (!page)
         return 0x0;
 
-    return PFN_TO_PAGE(pfn_for_buddy_page(page));
+    return PFN_TO_PAGE(page_get_pfn(page));
 }
 
 void buddy_free_pages(paddr_t addr, size_t count, struct free_area *free_area,
@@ -82,7 +82,7 @@ void buddy_free_pages(paddr_t addr, size_t count, struct free_area *free_area,
         size <<= 1;
     }
 
-    struct buddy_page *page = &buddy_page_array[pfn];
+    struct page *page = &page_array[pfn];
     memset(page, 0, sizeof(*page));
     page->order = order;
 
@@ -92,11 +92,11 @@ void buddy_free_pages(paddr_t addr, size_t count, struct free_area *free_area,
         if (buddy_pfn >= total_pages)
             break;
 
-        struct buddy_page *buddy = &buddy_page_array[buddy_pfn];
+        struct page *buddy = &page_array[buddy_pfn];
         if (!buddy->is_free || buddy->order != order)
             break;
 
-        struct buddy_page **prev = &free_area[order].next;
+        struct page **prev = &free_area[order].next;
         while (*prev && *prev != buddy)
             prev = &(*prev)->next;
 
@@ -106,7 +106,7 @@ void buddy_free_pages(paddr_t addr, size_t count, struct free_area *free_area,
         }
 
         pfn = (pfn < buddy_pfn) ? pfn : buddy_pfn;
-        page = &buddy_page_array[pfn];
+        page = &page_array[pfn];
         memset(page, 0, sizeof(*page));
         page->order = ++order;
     }
