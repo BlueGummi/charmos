@@ -125,22 +125,6 @@ thread_activity_class_str(enum thread_activity_class c) {
     }
 }
 
-static inline const char *thread_event_reason_str(const uint8_t reason) {
-    switch (reason) {
-    case THREAD_WAKE_REASON_BLOCKING_IO: return "WAKE FROM BLOCKING IO";
-    case THREAD_WAKE_REASON_BLOCKING_MANUAL: return "WAKE FROM BLOCKING WAKE";
-    case THREAD_WAKE_REASON_SLEEP_TIMEOUT: return "WAKE FROM SLEEP TIMEOUT";
-    case THREAD_WAKE_REASON_SLEEP_MANUAL: return "WAKE FROM MANUAL SLEEP WAKE";
-    case THREAD_WAKE_REASON_UNKNOWN: return "WAKE FROM UNKNOWN REASON";
-    case THREAD_BLOCK_REASON_IO: return "BLOCK FROM IO";
-    case THREAD_BLOCK_REASON_MANUAL: return "BLOCK FROM MANUAL BLOCK";
-    case THREAD_BLOCK_REASON_UNKNOWN: return "BLOCK FROM UNKNOWN REASON";
-    case THREAD_SLEEP_REASON_MANUAL: return "SLEEP FROM MANUAL SLEEP";
-    case THREAD_SLEEP_REASON_UNKNOWN: return "SLEEP FROM UNKNOWN REASON";
-    default: return "UNKNOWN EVENT REASON";
-    }
-}
-
 static inline int64_t thread_virtual_runtime_left(struct thread *t) {
     int64_t ret = t->virtual_budget - t->virtual_period_runtime;
     return ret < 0 ? 0 : ret;

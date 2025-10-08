@@ -30,18 +30,16 @@ static const char *reason_str(uint8_t reason) {
     case THREAD_WAKE_REASON_BLOCKING_MANUAL: return "WAKE_MANUAL";
     case THREAD_WAKE_REASON_SLEEP_TIMEOUT: return "WAKE_TIMEOUT";
     case THREAD_WAKE_REASON_SLEEP_MANUAL: return "WAKE_SLEEP_MANUAL";
-    case THREAD_WAKE_REASON_UNKNOWN: return "WAKE_UNKNOWN";
     case THREAD_BLOCK_REASON_IO: return "BLOCK_IO";
     case THREAD_BLOCK_REASON_MANUAL: return "BLOCK_MANUAL";
-    case THREAD_BLOCK_REASON_UNKNOWN: return "BLOCK_UNKNOWN";
     case THREAD_SLEEP_REASON_MANUAL: return "SLEEP_MANUAL";
-    case THREAD_SLEEP_REASON_UNKNOWN: return "SLEEP_UNKNOWN";
-    case THREAD_ASSOCIATED_REASON_NONE: return "NONE";
+    case THREAD_EVENT_REASON_NONE: return "NONE";
     default: return "?";
     }
 }
 
-static void print_ringbuffer(const char *label, struct thread_event_reason *buf,
+static void print_ringbuffer(const struct thread *t, bool wake_reasons,
+                             const char *label, struct thread_event_reason *buf,
                              size_t head) {
     k_printf("    %s: [\n", label);
     for (size_t i = 0; i < THREAD_EVENT_RINGBUFFER_CAPACITY; i++) {
@@ -54,9 +52,15 @@ static void print_ringbuffer(const char *label, struct thread_event_reason *buf,
                  (unsigned long long) e->cycle);
 
         if (e->associated_reason.reason != THREAD_ASSOCIATED_REASON_NONE) {
-            k_printf(", assoc: { reason: %s, cycle: %llu }",
-                     reason_str(e->associated_reason.reason),
-                     (unsigned long long) e->associated_reason.cycle);
+            if (!wake_reasons)
+                k_printf(
+                    ", assoc: { reason: %s, ts: %lld, cycle: %llu }",
+                    reason_str(t->activity_data
+                                   ->wake_reasons[e->associated_reason.reason]
+                                   .reason),
+                    t->activity_data->wake_reasons[e->associated_reason.reason]
+                        .timestamp,
+                    (unsigned long long) e->associated_reason.cycle);
         }
 
         if (i == head % THREAD_EVENT_RINGBUFFER_CAPACITY)
@@ -123,11 +127,14 @@ void thread_print(const struct thread *t) {
 
     /* activity ringbuffers */
     if (t->activity_data) {
-        print_ringbuffer("wake_reasons", t->activity_data->wake_reasons,
+        print_ringbuffer(t, /* wake_reasons = */ true, "wake_reasons",
+                         t->activity_data->wake_reasons,
                          t->activity_data->wake_reasons_head);
-        print_ringbuffer("block_reasons", t->activity_data->block_reasons,
+        print_ringbuffer(t, /* wake_reasons = */ false, "block_reasons",
+                         t->activity_data->block_reasons,
                          t->activity_data->block_reasons_head);
-        print_ringbuffer("sleep_reasons", t->activity_data->sleep_reasons,
+        print_ringbuffer(t, /* wake_reasons = */ false, "sleep_reasons",
+                         t->activity_data->sleep_reasons,
                          t->activity_data->sleep_reasons_head);
     }
 
@@ -162,13 +169,11 @@ static bool thread_event_reason_is_valid(struct thread_activity_data *data,
 
 static bool is_block(uint8_t reason) {
     return reason == THREAD_BLOCK_REASON_IO ||
-           reason == THREAD_BLOCK_REASON_MANUAL ||
-           reason == THREAD_BLOCK_REASON_UNKNOWN;
+           reason == THREAD_BLOCK_REASON_MANUAL;
 }
 
 static bool is_sleep(uint8_t reason) {
-    return reason == THREAD_SLEEP_REASON_MANUAL ||
-           reason == THREAD_SLEEP_REASON_UNKNOWN;
+    return reason == THREAD_SLEEP_REASON_MANUAL;
 }
 
 static size_t get_bucket_index(time_t timestamp_ms) {
@@ -238,7 +243,7 @@ static void advance_buckets_to_time(struct thread_activity_stats *stats,
 static void clear_event_slot(struct thread_event_reason *slot) {
     slot->associated_reason.reason = THREAD_ASSOCIATED_REASON_NONE;
     slot->associated_reason.cycle = 0;
-    slot->reason = 0;
+    slot->reason = THREAD_EVENT_REASON_NONE;
     slot->timestamp = 0;
 }
 

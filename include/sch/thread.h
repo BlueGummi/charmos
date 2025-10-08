@@ -83,20 +83,19 @@ enum thread_wake_reason : uint8_t {
     THREAD_WAKE_REASON_BLOCKING_MANUAL = 2,
     THREAD_WAKE_REASON_SLEEP_TIMEOUT = 3,
     THREAD_WAKE_REASON_SLEEP_MANUAL = 4,
-    THREAD_WAKE_REASON_UNKNOWN = 5,
 };
 
 enum thread_block_reason : uint8_t {
-    THREAD_BLOCK_REASON_IO = 6,
-    THREAD_BLOCK_REASON_MANUAL = 7,
-    THREAD_BLOCK_REASON_UNKNOWN = 8,
+    THREAD_BLOCK_REASON_IO = 5,
+    THREAD_BLOCK_REASON_MANUAL = 6,
 };
 
 enum thread_sleep_reason : uint8_t {
-    THREAD_SLEEP_REASON_MANUAL = 9,
-    THREAD_SLEEP_REASON_UNKNOWN = 10,
+    THREAD_SLEEP_REASON_MANUAL = 7,
 
 };
+
+#define THREAD_EVENT_REASON_NONE 0xFF
 
 struct thread_event_association {
     uint8_t reason;
