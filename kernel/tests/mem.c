@@ -167,7 +167,8 @@ REGISTER_TEST(kmalloc_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct thread *threads[MT_THREAD_COUNT];
 
     for (int i = 0; i < MT_THREAD_COUNT; i++) {
-        threads[i] = thread_spawn(mt_kmalloc_worker);
+        threads[i] =
+            thread_spawn_custom_stack(mt_kmalloc_worker, PAGE_SIZE * 16);
         TEST_ASSERT(threads[i] != NULL);
     }
 
@@ -195,7 +196,8 @@ REGISTER_TEST(hugepage_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct thread *threads[MT_THREAD_COUNT];
 
     for (int i = 0; i < MT_THREAD_COUNT; i++) {
-        threads[i] = thread_spawn(mt_hugepage_worker);
+        threads[i] =
+            thread_spawn_custom_stack(mt_hugepage_worker, PAGE_SIZE * 16);
         TEST_ASSERT(threads[i] != NULL);
     }
 
@@ -224,7 +226,7 @@ REGISTER_TEST(pmm_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct thread *threads[MT_PMM_THREAD_COUNT];
 
     for (int i = 0; i < MT_PMM_THREAD_COUNT; i++) {
-        threads[i] = thread_spawn(mt_pmm_worker);
+        threads[i] = thread_spawn_custom_stack(mt_pmm_worker, PAGE_SIZE * 16);
         TEST_ASSERT(threads[i] != NULL);
     }
 

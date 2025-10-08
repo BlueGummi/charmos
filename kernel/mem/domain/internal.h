@@ -141,7 +141,7 @@ static inline struct domain_arena *domain_arena_on_this_core(void) {
 }
 
 static inline struct domain_free_queue *domain_free_queue_on_this_core(void) {
-    return smp_core()->domain_buddy->free_queue;
+    return domain_buddy_on_this_core()->free_queue;
 }
 
 static inline size_t *domain_rr_on_this_core(void) {

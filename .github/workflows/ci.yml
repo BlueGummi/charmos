@@ -60,12 +60,7 @@ jobs:
               pkill -f qemu-system-x86_64
             else
               echo "[FAIL] Iteration $i failed, collecting GDB backtrace..."
-              gdb -ex "target remote localhost:1234" \
-                   kernel/kernel \
-                  -ex "set pagination off" \
-                  -ex "info threads" \
-                  -ex "thread apply all bt full" \
-                  -ex "quit" || true
+              gdb -batch -x .gdb-test-dump kernel/kernel || true
               pkill -f qemu-system-x86_64
               exit 1
             fi

@@ -137,6 +137,13 @@ static inline struct thread *thread_spawn(void (*entry)(void)) {
     return t;
 }
 
+static inline struct thread *thread_spawn_custom_stack(void (*entry)(void),
+                                                       size_t stack_size) {
+    struct thread *t = thread_create_custom_stack(entry, stack_size);
+    scheduler_enqueue(t);
+    return t;
+}
+
 static inline struct thread *thread_spawn_on_core(void (*entry)(void),
                                                   uint64_t core_id) {
     struct thread *t = thread_create(entry);

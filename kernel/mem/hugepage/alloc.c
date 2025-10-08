@@ -88,11 +88,23 @@ static inline void *alloc_and_adjust(struct hugepage *hp, size_t pages,
         return NULL;
 
     hugepage_sanity_assert(hp);
-    hugepage_remove_from_core_list_safe(hp, minheap_locked);
+
+    /* This must complete as one atomic operation to avoid a race */
+
+    enum irql irql;
+    struct hugepage_core_list *hcl = hugepage_get_core_list(hp);
+    if (!minheap_locked)
+        irql = hugepage_core_list_lock_irq_disable(hcl);
+
+    hugepage_remove_from_core_list_safe(hp, /* locked = */ true);
 
     void *ret = hugepage_alloc_from_hugepage(hp, pages);
 
-    reinsert_hugepage(hp, minheap_locked);
+    reinsert_hugepage(hp, /* locked = */ true);
+
+    if (!minheap_locked)
+        hugepage_core_list_unlock(hcl, irql);
+
     return ret;
 }
 
@@ -106,7 +118,7 @@ static void *alloc_search_core_list(struct hugepage_core_list *hcl,
 
     minheap_for_each(hcl->hugepage_minheap, mhn) {
         struct hugepage *hp = hugepage_from_minheap_node(mhn);
-        void *p = alloc_and_adjust(hp, page_count, /* minheap_locked= */ true);
+        void *p = alloc_and_adjust(hp, page_count, /* minheap_locked = */ true);
         if (p) {
             hugepage_core_list_unlock(hcl, irql);
             return p;
@@ -132,27 +144,21 @@ static struct hugepage **create_hp_arr(size_t needed) {
     return hp_arr;
 }
 
-static inline void *
-alloc_from_hugepage_at_base_and_adjust(struct hugepage *hp, size_t pages,
-                                       bool minheap_locked) {
+/* This will only ever be called on NEW hugepages */
+static void *alloc_from_base_and_adjust(struct hugepage *hp, size_t pages) {
     kassert(pages > 0);
 
     if (hugepage_num_pages_free(hp) < pages)
         return NULL;
 
     hugepage_sanity_assert(hp);
-    hugepage_remove_from_core_list_safe(hp, minheap_locked);
 
     enum irql irql = hugepage_lock_irq_disable(hp);
 
     /* sanity: ensure first 'pages' bits are free */
-    for (size_t i = 0; i < pages; i++) {
-        if (test_bit(hp, i)) {
-            hugepage_unlock(hp, irql);
-            reinsert_hugepage(hp, minheap_locked);
-            return NULL;
-        }
-    }
+    for (size_t i = 0; i < pages; i++)
+        if (test_bit(hp, i))
+            k_panic("First %zu bits are NOT free\n", pages);
 
     for (size_t i = 0; i < pages; i++)
         set_bit(hp, i);
@@ -160,7 +166,7 @@ alloc_from_hugepage_at_base_and_adjust(struct hugepage *hp, size_t pages,
     hp->pages_used += pages;
     hugepage_unlock(hp, irql);
 
-    reinsert_hugepage(hp, minheap_locked);
+    reinsert_hugepage(hp, /* locked = */ false);
     return hugepage_idx_to_addr(hp, 0);
 }
 
@@ -176,8 +182,8 @@ static void *alloc_from_multiple_hugepages(size_t page_count) {
         size_t chunk = hugepage_chunk_for(page_count);
         struct hugepage *hp = hp_arr[i];
 
-        void *p = alloc_from_hugepage_at_base_and_adjust(hp, chunk, false);
-        if (!p) 
+        void *p = alloc_from_base_and_adjust(hp, chunk);
+        if (!p)
             goto out;
 
         if (i == 0)

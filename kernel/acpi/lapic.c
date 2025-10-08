@@ -4,8 +4,8 @@
 #include <int/idt.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
-#include <smp/core.h>
 #include <sleep.h>
+#include <smp/core.h>
 uint32_t *lapic;
 bool x2apic_enabled = false;
 

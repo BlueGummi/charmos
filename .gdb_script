@@ -1,0 +1,20 @@
+set pagination off
+set confirm off
+
+target remote localhost:1234
+info threads
+
+echo \n[INFO] Dumping per-core states...\n
+
+set $max_cores = global.core_count
+set $i = 0
+while ($i < $max_cores)
+  printf "[CORE %d]\n", $i
+  p/x *global.cores[$i]
+  set $i = $i + 1
+end
+
+echo \n[INFO] Dumping thread backtraces...\n
+thread apply all bt full
+
+quit
