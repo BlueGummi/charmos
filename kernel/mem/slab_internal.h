@@ -25,6 +25,7 @@ struct slab_cache {
     struct slab *slabs_free;
     struct slab *slabs_partial;
     struct slab *slabs_full;
+    uint64_t free_slabs_count;
 };
 
 struct slab_phdr {

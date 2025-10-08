@@ -112,6 +112,8 @@ static struct slab *slab_create(struct slab_cache *cache) {
     uint64_t bitmap_bytes = (cache->objs_per_slab + 7) / 8;
     memset((void *) slab->bitmap, 0, bitmap_bytes);
 
+    cache->free_slabs_count++;
+
     return slab;
 }
 
@@ -173,6 +175,7 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
             if (used == cache->objs_per_slab) {
                 slab_move_slab(cache, slab, SLAB_FULL);
             } else if (used == 1) {
+                cache->free_slabs_count--;
                 slab_move_slab(cache, slab, SLAB_PARTIAL);
             }
 
@@ -183,6 +186,16 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
     }
 
     return NULL;
+}
+
+static void slab_destroy(struct slab_cache *cache, struct slab *slab) {
+    slab_list_remove(&cache->slabs_free, slab);
+
+    uintptr_t virt = (uintptr_t) slab;
+    paddr_t phys = vmm_get_phys(virt);
+    vmm_unmap_page(virt);
+    pmm_free_page(phys);
+    vas_free(slab_vas, virt);
 }
 
 static void slab_free(struct slab_cache *cache, struct slab *slab, void *obj) {
@@ -203,6 +216,11 @@ static void slab_free(struct slab_cache *cache, struct slab *slab, void *obj) {
 
     if (new_used == 0) {
         slab_move_slab(cache, slab, SLAB_FREE);
+        cache->free_slabs_count++;
+        if (cache->free_slabs_count > 4) {
+            slab_destroy(cache, slab);
+            cache->free_slabs_count--;
+        }
     } else if (slab->state == SLAB_FULL) {
         slab_move_slab(cache, slab, SLAB_PARTIAL);
     }
