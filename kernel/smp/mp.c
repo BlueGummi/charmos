@@ -13,7 +13,7 @@ static atomic_char cr3_ready = 0;
 static struct spinlock wakeup_lock = SPINLOCK_INIT;
 static atomic_uint cores_awake = 0;
 
-static void detect_llc(struct topo_cache_info *llc) {
+static void detect_llc(struct topology_cache_info *llc) {
     uint32_t eax, ebx, ecx, edx;
     for (uint32_t idx = 0;; idx++) {
 
@@ -89,7 +89,7 @@ static inline void set_core_awake(void) {
     }
 }
 
-void wakeup() {
+void smp_wakeup() {
     enum irql irql = spin_lock(&wakeup_lock);
     disable_interrupts();
     smap_init();
@@ -118,12 +118,12 @@ void wakeup() {
         wait_for_interrupt();
 }
 
-void mp_wakeup_processors(struct limine_mp_response *mpr) {
+void smp_wakeup_processors(struct limine_mp_response *mpr) {
     for (uint64_t i = 0; i < mpr->cpu_count; i++)
-        mpr->cpus[i]->goto_address = wakeup;
+        mpr->cpus[i]->goto_address = smp_wakeup;
 }
 
-void mp_complete_init() {
+void smp_complete_init() {
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
     atomic_store(&cr3_ready, 1);
     if (global.core_count == 1)
@@ -135,7 +135,7 @@ void mp_complete_init() {
         ;
 }
 
-void mp_setup_bsp() {
+void smp_setup_bsp() {
     struct core *c = kzalloc(sizeof(struct core));
     if (!c)
         k_panic("Could not allocate space for core structure on BSP");

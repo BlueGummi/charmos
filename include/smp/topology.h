@@ -5,16 +5,17 @@
 #include <types/types.h>
 
 enum topology_level {
-    TL_SMT,  /* Symmetric multiprocessing threads */
-    TL_CORE, /* SMTs under a core */
-    TL_LLC,  /* Last level cache (some processors
-              * have multiple L3 caches for a given
-              * physical processor) */
+    TOPOLOGY_LEVEL_SMT,  /* Symmetric multiprocessing threads */
+    TOPOLOGY_LEVEL_CORE, /* SMTs under a core */
+    TOPOLOGY_LEVEL_LLC,  /* Last level cache (some processors
+                          * have multiple L3 caches for a given
+                          * physical processor) */
 
-    TL_NUMA,    /* NUMA node */
-    TL_PACKAGE, /* Physical processor in a socket */
-    TL_MACHINE, /* All processors in a machine */
-    TL_MAX      /* count */
+    TOPOLOGY_LEVEL_NUMA,    /* NUMA node */
+    TOPOLOGY_LEVEL_PACKAGE, /* Physical processor in a socket */
+    TOPOLOGY_LEVEL_MACHINE, /* All processors in a machine */
+    TOPOLOGY_LEVEL_MAX,     /* count */
+    TOPOLOGY_LEVEL_COUNT = TOPOLOGY_LEVEL_MAX
 };
 
 struct cpu_mask {
@@ -26,7 +27,7 @@ struct cpu_mask {
     size_t nbits;
 };
 
-struct topo_cache_info {
+struct topology_cache_info {
     uint8_t level; /* 1, 2, 3 */
     uint8_t type;  /* Data, unified, instruction */
     uint32_t size_kb;
@@ -34,7 +35,7 @@ struct topo_cache_info {
     uint32_t cores_sharing; /* Who shares this */
 };
 
-struct topo_package_info {
+struct topology_package_info {
     uint32_t package_id;
     struct cpu_mask cores;
 };
@@ -58,18 +59,18 @@ struct topology_node {
 
     union {
         struct numa_node *numa;
-        struct topo_cache_info *cache;
-        struct topo_package_info *package;
+        struct topology_cache_info *cache;
+        struct topology_package_info *package;
     } data;
 };
 
 struct topology {
-    struct topology_node *level[TL_MAX];
-    uint16_t count[TL_MAX];
+    struct topology_node *level[TOPOLOGY_LEVEL_MAX];
+    uint16_t count[TOPOLOGY_LEVEL_MAX];
 };
 
-void topo_mark_core_idle(size_t cpu_id, bool idle);
-struct core *topo_find_idle_core(struct core *local_core,
-                                 enum topology_level max_search);
-struct core **topo_get_smts_under_numa(struct topology_node *numa,
-                                       size_t *count);
+void topology_mark_core_idle(size_t cpu_id, bool idle);
+struct core *topology_find_idle_core(struct core *local_core,
+                                     enum topology_level max_search);
+struct core **topology_get_smts_under_numa(struct topology_node *numa,
+                                           size_t *count);

@@ -31,13 +31,13 @@ static void cpu_mask_print(const struct cpu_mask *m) {
 
 #define TOPO_MAKE_STR(__color, __str) (__color __str ANSI_RESET)
 
-static const char *topo_node_str[TL_MAX] = {
-    [TL_SMT] = TOPO_MAKE_STR(ANSI_MAGENTA, "SMT"),
-    [TL_CORE] = TOPO_MAKE_STR(ANSI_BLUE, "CORE"),
-    [TL_LLC] = TOPO_MAKE_STR(ANSI_CYAN, "LLC"),
-    [TL_PACKAGE] = TOPO_MAKE_STR(ANSI_GREEN, "PACKAGE"),
-    [TL_NUMA] = TOPO_MAKE_STR(ANSI_YELLOW, "NUMA NODE"),
-    [TL_MACHINE] = TOPO_MAKE_STR(ANSI_RED, "MACHINE"),
+static const char *topo_node_str[TOPOLOGY_LEVEL_MAX] = {
+    [TOPOLOGY_LEVEL_SMT] = TOPO_MAKE_STR(ANSI_MAGENTA, "SMT"),
+    [TOPOLOGY_LEVEL_CORE] = TOPO_MAKE_STR(ANSI_BLUE, "CORE"),
+    [TOPOLOGY_LEVEL_LLC] = TOPO_MAKE_STR(ANSI_CYAN, "LLC"),
+    [TOPOLOGY_LEVEL_PACKAGE] = TOPO_MAKE_STR(ANSI_GREEN, "PACKAGE"),
+    [TOPOLOGY_LEVEL_NUMA] = TOPO_MAKE_STR(ANSI_YELLOW, "NUMA NODE"),
+    [TOPOLOGY_LEVEL_MACHINE] = TOPO_MAKE_STR(ANSI_RED, "MACHINE"),
 };
 
 static void print_topology_node(struct topology_node *node, int depth) {
@@ -52,32 +52,32 @@ static void print_topology_node(struct topology_node *node, int depth) {
     k_printf("\n");
 
     switch (node->level) {
-    case TL_MACHINE:
-        for (int i = 0; i < global.topology.count[TL_PACKAGE]; i++)
+    case TOPOLOGY_LEVEL_MACHINE:
+        for (int i = 0; i < global.topology.count[TOPOLOGY_LEVEL_PACKAGE]; i++)
             if (package_nodes[i].parent == node->id)
                 print_topology_node(&package_nodes[i], depth + 1);
         break;
 
-    case TL_PACKAGE:
-        for (int i = 0; i < global.topology.count[TL_LLC]; i++)
+    case TOPOLOGY_LEVEL_PACKAGE:
+        for (int i = 0; i < global.topology.count[TOPOLOGY_LEVEL_LLC]; i++)
             if (llc_nodes[i].parent == node->id)
                 print_topology_node(&llc_nodes[i], depth + 1);
         break;
 
-    case TL_LLC:
-        for (int i = 0; i < global.topology.count[TL_NUMA]; i++)
+    case TOPOLOGY_LEVEL_LLC:
+        for (int i = 0; i < global.topology.count[TOPOLOGY_LEVEL_NUMA]; i++)
             if (numa_nodes[i].parent == node->id)
                 print_topology_node(&numa_nodes[i], depth + 1);
         break;
 
-    case TL_NUMA:
-        for (int i = 0; i < global.topology.count[TL_CORE]; i++)
+    case TOPOLOGY_LEVEL_NUMA:
+        for (int i = 0; i < global.topology.count[TOPOLOGY_LEVEL_CORE]; i++)
             if (core_nodes[i].parent == node->id)
                 print_topology_node(&core_nodes[i], depth + 1);
         break;
 
-    case TL_CORE:
-        for (int i = 0; i < global.topology.count[TL_SMT]; i++)
+    case TOPOLOGY_LEVEL_CORE:
+        for (int i = 0; i < global.topology.count[TOPOLOGY_LEVEL_SMT]; i++)
             if (smt_nodes[i].parent == node->id)
                 print_topology_node(&smt_nodes[i], depth + 1);
         break;
@@ -167,7 +167,7 @@ static size_t build_smt_nodes(size_t n_cpus) {
             }
         }
 
-        node->level = TL_SMT;
+        node->level = TOPOLOGY_LEVEL_SMT;
         node->id = i;
         node->parent = core_index;
         node->core = c;
@@ -215,7 +215,7 @@ static size_t build_core_nodes(size_t n_cpus) {
 
         struct topology_node *node = &core_nodes[core_count];
 
-        node->level = TL_CORE;
+        node->level = TOPOLOGY_LEVEL_CORE;
         node->id = c->core_id;
         node->first_child = -1;
         node->nr_children = 0;
@@ -280,7 +280,7 @@ static size_t build_numa_nodes(size_t n_cores, size_t n_llc) {
 
     for (size_t i = 0; i < n_numa_nodes; i++) {
         struct topology_node *numa = &numa_nodes[i];
-        numa->level = TL_NUMA;
+        numa->level = TOPOLOGY_LEVEL_NUMA;
         numa->id = i;
         numa->parent = -1;
         numa->first_child = -1;
@@ -352,7 +352,7 @@ static size_t build_llc_nodes(size_t n_cores) {
 
         bool exists = false;
         for (size_t j = 0; j < llc_count; j++) {
-            struct topo_cache_info *existing = llc_nodes[j].data.cache;
+            struct topology_cache_info *existing = llc_nodes[j].data.cache;
             if (existing->level == c->llc.level &&
                 existing->type == c->llc.type &&
                 existing->size_kb == c->llc.size_kb &&
@@ -368,7 +368,7 @@ static size_t build_llc_nodes(size_t n_cores) {
             continue;
 
         struct topology_node *node = &llc_nodes[llc_count];
-        node->level = TL_LLC;
+        node->level = TOPOLOGY_LEVEL_LLC;
         node->id = llc_count;
         node->parent = pkg_id;
         node->core = NULL;
@@ -399,7 +399,7 @@ static size_t build_llc_nodes(size_t n_cores) {
 
     for (size_t p = 0; p < n_packages; p++) {
         struct topology_node *node = &llc_nodes[llc_count];
-        node->level = TL_LLC;
+        node->level = TOPOLOGY_LEVEL_LLC;
         node->id = llc_count;
         node->parent = p;
         node->core = NULL;
@@ -438,7 +438,7 @@ static size_t build_package_nodes(size_t n_cores, size_t n_llc) {
 
     for (size_t i = 0; i < n_packages; i++) {
         struct topology_node *pkg = &package_nodes[i];
-        pkg->level = TL_PACKAGE;
+        pkg->level = TOPOLOGY_LEVEL_PACKAGE;
         pkg->id = i;
         pkg->parent = 0;
         pkg->first_child = -1;
@@ -470,7 +470,7 @@ static size_t build_package_nodes(size_t n_cores, size_t n_llc) {
 }
 
 static void build_machine_node(size_t n_packages) {
-    machine_node.level = TL_MACHINE;
+    machine_node.level = TOPOLOGY_LEVEL_MACHINE;
     machine_node.id = 0;
     machine_node.parent = -1;
     machine_node.first_child = -1;
@@ -502,27 +502,27 @@ void topology_init(void) {
 
     build_machine_node(n_packages);
 
-    global.topology.level[TL_SMT] = smt_nodes;
-    global.topology.count[TL_SMT] = n_smt;
-    global.topology.level[TL_CORE] = core_nodes;
-    global.topology.count[TL_CORE] = n_cores;
-    global.topology.level[TL_NUMA] = numa_nodes;
-    global.topology.count[TL_NUMA] = n_numa;
-    global.topology.level[TL_LLC] = llc_nodes;
-    global.topology.count[TL_LLC] = n_llc;
-    global.topology.level[TL_PACKAGE] = package_nodes;
-    global.topology.count[TL_PACKAGE] = n_packages;
-    global.topology.level[TL_MACHINE] = &machine_node;
-    global.topology.count[TL_MACHINE] = 1;
+    global.topology.level[TOPOLOGY_LEVEL_SMT] = smt_nodes;
+    global.topology.count[TOPOLOGY_LEVEL_SMT] = n_smt;
+    global.topology.level[TOPOLOGY_LEVEL_CORE] = core_nodes;
+    global.topology.count[TOPOLOGY_LEVEL_CORE] = n_cores;
+    global.topology.level[TOPOLOGY_LEVEL_NUMA] = numa_nodes;
+    global.topology.count[TOPOLOGY_LEVEL_NUMA] = n_numa;
+    global.topology.level[TOPOLOGY_LEVEL_LLC] = llc_nodes;
+    global.topology.count[TOPOLOGY_LEVEL_LLC] = n_llc;
+    global.topology.level[TOPOLOGY_LEVEL_PACKAGE] = package_nodes;
+    global.topology.count[TOPOLOGY_LEVEL_PACKAGE] = n_packages;
+    global.topology.level[TOPOLOGY_LEVEL_MACHINE] = &machine_node;
+    global.topology.count[TOPOLOGY_LEVEL_MACHINE] = 1;
 
     topology_dump();
 }
 
-struct core **topo_get_smts_under_numa(struct topology_node *numa,
+struct core **topology_get_smts_under_numa(struct topology_node *numa,
                                        size_t *count) {
     size_t total = 0;
     struct core **smts = NULL;
-    if (!numa || numa->level != TL_NUMA)
+    if (!numa || numa->level != TOPOLOGY_LEVEL_NUMA)
         goto out;
 
     for (int32_t i = 0; i < numa->nr_children; i++) {
@@ -552,8 +552,8 @@ out:
     return smts;
 }
 
-void topo_mark_core_idle(size_t cpu_id, bool idle) {
-    if (!global.topology.level[TL_MACHINE])
+void topology_mark_core_idle(size_t cpu_id, bool idle) {
+    if (!global.topology.level[TOPOLOGY_LEVEL_MACHINE])
         return;
 
     struct topology_node *smt = &smt_nodes[cpu_id];
@@ -569,9 +569,9 @@ void topo_mark_core_idle(size_t cpu_id, bool idle) {
     }
 }
 
-struct core *topo_find_idle_core(struct core *local_core,
+struct core *topology_find_idle_core(struct core *local_core,
                                  enum topology_level max_search) {
-    kassert(max_search > TL_SMT); /* 'SMT' will be the core itself.
+    kassert(max_search > TOPOLOGY_LEVEL_SMT); /* 'SMT' will be the core itself.
                                    * It has no neighbors, and thus
                                    * cannot be searched through (one core) */
 
@@ -589,7 +589,7 @@ struct core *topo_find_idle_core(struct core *local_core,
     }
 
     /* Not allowed to search to NUMA */
-    if (max_search < TL_NUMA)
+    if (max_search < TOPOLOGY_LEVEL_NUMA)
         return NULL;
 
     /* Next try NUMA siblings */
@@ -599,7 +599,7 @@ struct core *topo_find_idle_core(struct core *local_core,
             return core->core;
     }
 
-    if (max_search < TL_LLC)
+    if (max_search < TOPOLOGY_LEVEL_LLC)
         return NULL;
 
     for (int32_t i = 0; i < llc_node->nr_children; i++) {

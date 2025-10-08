@@ -36,7 +36,7 @@ struct core {
 
     struct core_domain *domain;
     struct topology_node *topo_node;
-    struct topo_cache_info llc;
+    struct topology_cache_info llc;
     struct domain_buddy *domain_buddy;
     struct domain_arena *domain_arena;
     size_t rr_current_domain;

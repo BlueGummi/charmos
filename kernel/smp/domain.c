@@ -26,7 +26,7 @@ static void construct_domains_from_numa_nodes(void) {
         struct core_domain *cd = global.core_domains[i];
         struct topology_node *tpn = nn->topo;
         size_t num_cores;
-        struct core **arr = topo_get_smts_under_numa(tpn, &num_cores);
+        struct core **arr = topology_get_smts_under_numa(tpn, &num_cores);
 
         cd->associated_node = nn;
         cd->num_cores = num_cores;

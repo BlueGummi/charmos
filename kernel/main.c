@@ -25,15 +25,15 @@
 #include <mem/vmm.h>
 #include <misc/cmdline.h>
 #include <misc/logo.h>
-#include <smp/core.h>
-#include <smp/domain.h>
-#include <smp/smp.h>
 #include <registry.h>
 #include <requests.h>
 #include <sch/defer.h>
+#include <sch/reaper.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
-#include <sch/tid.h>
+#include <smp/core.h>
+#include <smp/domain.h>
+#include <smp/smp.h>
 #include <stdint.h>
 #include <syscall.h>
 #include <tests.h>
@@ -53,7 +53,7 @@ void k_main(void) {
     k_printf("%s", OS_LOGO_SMALL);
 
     /* Early */
-    mp_wakeup_processors(mp_request.response);
+    smp_wakeup_processors(mp_request.response);
     smap_init();
     global.current_bootstage = BOOTSTAGE_EARLY_MP;
 
@@ -69,7 +69,7 @@ void k_main(void) {
 
     gdt_install();
     syscall_setup(syscall_entry);
-    mp_setup_bsp();
+    smp_setup_bsp();
 
     /* Early devices */
     idt_init();
@@ -87,6 +87,8 @@ void k_main(void) {
     /* Scheduler */
     thread_init_thread_ids();
     scheduler_init();
+    reaper_init();
+    workqueues_permanent_init();
     defer_init();
     prng_seed(time_get_us());
     global.current_bootstage = BOOTSTAGE_MID_SCHEDULER;
@@ -94,13 +96,13 @@ void k_main(void) {
 
     /* Command line + MP complete */
     cmdline_parse(cmdline_request.response->cmdline);
-    lapic_timer_init(0);
-
-    mp_complete_init();
+    lapic_timer_init(/* core_id = */ 0);
+    smp_complete_init();
     srat_init();
     slit_init();
     topology_init();
     core_domain_init();
+
     pmm_late_init();
 
     restore_interrupts();
