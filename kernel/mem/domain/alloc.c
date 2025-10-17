@@ -303,3 +303,8 @@ paddr_t domain_alloc(size_t pages, enum alloc_class class,
 
     return alloc_with_locality(pages, flexible_locality, locality_degree);
 }
+
+
+paddr_t domain_alloc_from_domain(struct core_domain *cd, size_t pages) {
+    return alloc_from_remote_domain(cd->cores[0]->domain_buddy, pages);
+}

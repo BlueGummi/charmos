@@ -9,11 +9,11 @@ enum irql irql_raise(enum irql new_level) {
     if (global.current_bootstage < BOOTSTAGE_LATE_DEVICES)
         return IRQL_NONE;
 
-    struct core *cpu = smp_core();
-    enum irql old = cpu->current_irql;
-
     bool iflag = are_interrupts_enabled();
     disable_interrupts();
+
+    struct core *cpu = smp_core();
+    enum irql old = cpu->current_irql;
 
     cpu->current_irql = new_level;
     if (new_level > old) {

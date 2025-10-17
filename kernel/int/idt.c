@@ -59,12 +59,13 @@ void isr_common_entry(uint8_t vector, void *rsp) {
     rcu_mark_quiescent();
     irq_mark_self_in_interrupt(false);
 
-    if (!scheduler_preemption_disabled()) {
+    if (!scheduler_preemption_disabled() &&
+        scheduler_mark_self_needs_resched(false)) {
         struct thread *curr = scheduler_get_curr_thread();
         if (curr)
             curr->preemptions++;
 
-        scheduler_resched_if_needed();
+        scheduler_yield();
     }
 }
 
@@ -104,20 +105,6 @@ void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags) {
 
     isr_table[num].handler = (void *) base;
     base = (uint64_t) isr_vectors[num];
-
-    idt[num].base_low = (base & 0xFFFF);
-    idt[num].base_mid = (base >> 16) & 0xFFFF;
-    idt[num].base_high = (base >> 32) & 0xFFFFFFFF;
-    idt[num].selector = sel;
-    idt[num].ist = 0;
-    idt[num].flags = flags;
-    idt[num].reserved = 0;
-
-    idt_entry_used[num] = true;
-}
-
-static void set(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags) {
-    struct idt_entry *idt = idts.entries;
 
     idt[num].base_low = (base & 0xFFFF);
     idt[num].base_mid = (base >> 16) & 0xFFFF;
@@ -225,7 +212,6 @@ void idt_init() {
     isr_register(IRQ_PANIC, panic_isr, NULL);
     isr_register(IRQ_TLB_SHOOTDOWN, tlb_shootdown, NULL);
     isr_register(IRQ_NOP, nop_handler, NULL);
-
-    set(0x80, (uint64_t) syscall_entry, 0x2b, 0xee);
+    idt_set_gate(0x80, (uint64_t) syscall_entry, 0x2b, 0xee);
     idt_load();
 }

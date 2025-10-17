@@ -13,7 +13,7 @@ enable_language(ASM-ATT)
 set_source_files_properties(${NASM_SOURCES} PROPERTIES LANGUAGE ASM_NASM)
 set_source_files_properties(${ASM_SOURCES} PROPERTIES LANGUAGE ASM-ATT)
 
-include_directories(. freestnd-c-hdrs)
+include_directories(.)
 include(uACPI/uacpi.cmake)
 add_executable(kernel ${C_SOURCES} ${ASM_SOURCES} ${NASM_SOURCES})
 

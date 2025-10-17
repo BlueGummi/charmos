@@ -1,41 +1,6 @@
 #include <console/printf.h>
+#include <mem/page.h>
 #include <stdint.h>
-
-#define PAGING_PRESENT (0x1UL)
-#define PAGING_WRITE (0x2UL)
-#define PAGING_USER_ALLOWED (0x4UL)
-#define PAGING_ALL 0xFFFUL
-#define PAGING_XD (1UL << 63) // E(x)ecute (D)isable
-#define PAGING_PHYS_MASK (0x00FFFFFFF000UL)
-#define PAGING_PAGE_SIZE (1UL << 7)
-#define PAGING_UNCACHABLE (1UL << 4)
-#define PAGING_NO_FLAGS (0)
-#define PAGING_WRITETHROUGH (1UL << 3)
-#define PAGING_2MB_page (1ULL << 7)
-#define PAGE_SIZE 4096
-#define PAGE_2MB 0x200000
-#define SUB_HHDM_OFFSET(v) (v - hhdm_offset)
-#define PT_KERNEL_RO (PAGING_PRESENT | PAGING_XD)
-#define PT_KERNEL_RX (PAGING_PRESENT)
-#define PT_KERNEL_RW (PAGING_PRESENT | PAGING_WRITE | PAGING_XD)
-
-#define PAGING_2MB_PHYS_MASK (~((uintptr_t) PAGE_2MB - 1))
-#define PAGE_ALIGN_DOWN(x) ((x) & ~(PAGE_SIZE - 1))
-#define PAGE_ALIGN_UP(x) (((x) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1))
-
-#define PAGE_TO_PFN(addr) (addr / PAGE_SIZE)
-#define PFN_TO_PAGE(pfn) (pfn * PAGE_SIZE)
-
-#define UACPI_MAP_BASE 0xFFFFA00000000000
-#define UACPI_MAP_LIMIT 0xFFFFA00000100000
-#define VMM_MAP_BASE 0xFFFFA00000200000
-#define VMM_MAP_LIMIT 0xFFFFA00010000000
-
-typedef uint64_t pte_t; // Page Table Entry
-
-struct page_table {
-    pte_t entries[512];
-} __attribute__((packed));
 
 uint64_t sub_offset(uint64_t a);
 unsigned long get_cr3(void);

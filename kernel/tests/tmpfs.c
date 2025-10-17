@@ -41,7 +41,6 @@ REGISTER_TEST(tmpfs_rw_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 
     FAIL_IF_FATAL(node->ops->read(node, out_buf, len, 0));
     FAIL_IF_FATAL(node->ops->unlink(root, "place"));
-    FAIL_IF_FATAL(node->ops->destroy(node));
 
     enum errno e = root->ops->finddir(root, "place", &ent);
     TEST_ASSERT(e == ERR_NO_ENT);
