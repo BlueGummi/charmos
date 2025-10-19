@@ -38,14 +38,10 @@ struct kernel_test {
 
 #define ADD_MESSAGE(msg)                                                       \
     do {                                                                       \
-        if (current_test->messages == NULL)                                    \
-            current_test->messages = kmalloc(sizeof(char *));                  \
-        else                                                                   \
             current_test->messages =                                           \
                 krealloc(current_test->messages,                               \
-                         sizeof(char *) * current_test->message_count);        \
-        current_test->messages[current_test->message_count] = msg;             \
-        current_test->message_count++;                                         \
+                         sizeof(char *) * ++current_test->message_count);        \
+        current_test->messages[current_test->message_count - 1] = msg;             \
     } while (0)
 
 #define TEST_ASSERT(x)                                                         \
