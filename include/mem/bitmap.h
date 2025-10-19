@@ -11,8 +11,7 @@ extern uint8_t boot_bitmap[BOOT_BITMAP_SIZE];
 extern uint8_t *bitmap;
 extern uint64_t bitmap_size;
 
-paddr_t bitmap_alloc_pages(uint64_t count, enum alloc_class c,
-                           enum alloc_flags f);
+paddr_t bitmap_alloc_pages(uint64_t count, enum alloc_flags f);
 void bitmap_free_pages(paddr_t addr, uint64_t count);
 
 static inline void set_bit(uint64_t index) {

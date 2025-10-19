@@ -12,7 +12,7 @@
 REGISTER_TEST(pmm_alloc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
-    paddr_t p = pmm_alloc_page(ALLOC_CLASS_DEFAULT, ALLOC_FLAGS_NONE);
+    paddr_t p = pmm_alloc_page(ALLOC_FLAGS_NONE);
     TEST_ASSERT(p);
     SET_SUCCESS;
 }
@@ -20,7 +20,7 @@ REGISTER_TEST(pmm_alloc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 REGISTER_TEST(vmm_map_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
-    uint64_t p = pmm_alloc_page(ALLOC_CLASS_DEFAULT, ALLOC_FLAGS_NONE);
+    uint64_t p = pmm_alloc_page(ALLOC_FLAGS_NONE);
     TEST_ASSERT(p != 0);
     void *ptr = vmm_map_phys(p, PAGE_SIZE, 0);
     TEST_ASSERT(ptr != NULL);
@@ -70,7 +70,7 @@ REGISTER_TEST(pmm_stress_alloc_free_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     paddr_t addrs[STRESS_ALLOC_TIMES];
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
-        addrs[i] = pmm_alloc_page(ALLOC_CLASS_DEFAULT, ALLOC_FLAGS_NONE);
+        addrs[i] = pmm_alloc_page(ALLOC_FLAGS_NONE);
         TEST_ASSERT(addrs[i] != 0);
     }
 
@@ -212,7 +212,7 @@ static void mt_pmm_worker() {
     paddr_t addrs[MT_PMM_ALLOC_TIMES];
 
     for (uint64_t i = 0; i < MT_PMM_ALLOC_TIMES; i++) {
-        addrs[i] = pmm_alloc_page(ALLOC_CLASS_DEFAULT, ALLOC_FLAGS_NONE);
+        addrs[i] = pmm_alloc_page(ALLOC_FLAGS_NONE);
         TEST_ASSERT(addrs[i] != 0);
     }
 

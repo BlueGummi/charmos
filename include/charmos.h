@@ -18,14 +18,17 @@ struct charmos_globals {
     struct generic_disk *root_node_disk;
 
     struct topology topology;
+
     size_t numa_node_count;
     struct numa_node *numa_nodes;
+
     uint64_t core_count;
-    struct scheduler **schedulers;
     struct core **cores;
+    struct scheduler **schedulers;
 
     uint64_t domain_count;
-    struct core_domain **core_domains;
+    struct domain **domains;
+
     uint64_t hhdm_offset;
 
     uint64_t total_pages;
@@ -34,6 +37,7 @@ struct charmos_globals {
     /* TODO: no more of this */
     atomic_uint_fast64_t next_tlb_gen;
 
+    /* Per core workqueues */
     struct workqueue **workqueues;
 
     /* Conditional compilation globals go down here */

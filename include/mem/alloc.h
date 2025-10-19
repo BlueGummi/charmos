@@ -4,16 +4,47 @@
 #include <stdint.h>
 
 #define ALLOC_LOCALITY_SHIFT 8
+#define ALLOC_CLASS_SHIFT 12
+#define ALLOC_CLASS_MASK 0xF
+
 #define ALLOC_LOCALITY_MAX 7
 #define ALLOC_LOCALITY_MIN 0
 #define ALLOC_LOCALITY_MASK 0x7
+
 #define ALLOC_LOCALITY_FROM_FLAGS(flags)                                       \
     (((flags) >> ALLOC_LOCALITY_SHIFT) & ALLOC_LOCALITY_MASK)
 
 #define ALLOC_LOCALITY_TO_FLAGS(locality)                                      \
     (((locality) & ALLOC_LOCALITY_MASK) << ALLOC_LOCALITY_SHIFT)
 
-#define ALLOC_FLAG_SET(flags, mask) (flags & mask)
+#define ALLOC_FLAG_TEST(flags, mask) (flags & mask)
+#define ALLOC_FLAG_CLASS(flags)                                                \
+    ((flags >> ALLOC_CLASS_SHIFT) & ALLOC_CLASS_MASK)
+
+/* alloc_flags: 16 bit bitflags
+ *
+ *      +---------------------------+
+ * Bits | 15--12  11--8  7--4  3--0 |
+ * Use  |  %%%%    *###  mMpP  fFcC |
+ *      +---------------------------+
+ *
+ * C - "Prefer cache alignment"
+ * c - "Do not prefer cache alignment"
+ *
+ * F - "Allow flexible NUMA locality"
+ * f - "Do not allow flexible NUMA locality"
+ *
+ * P - "Allow memory to be pageable"
+ * p - "Do not allow memory to be pageable"
+ *
+ * M - "Allow memory to be movable"
+ * m - "Do not allow memory to be movable"
+ *
+ * ### - Locality bits
+ * * - Unused
+ * %%%% - Allocation class bits
+ *
+ */
 
 enum alloc_flags : uint16_t {
     /* Cache alignment */
@@ -21,7 +52,7 @@ enum alloc_flags : uint16_t {
     ALLOC_FLAG_NO_CACHE_ALIGN = (1 << 1),
 
     /* Flexible locality */
-    ALLOC_FLAG_FLEXIBILE_LOCALITY = (1 << 2),
+    ALLOC_FLAG_FLEXIBLE_LOCALITY = (1 << 2),
     ALLOC_FLAG_STRICT_LOCALITY = (1 << 3),
 
     /* Pageable */
@@ -31,19 +62,20 @@ enum alloc_flags : uint16_t {
     /* Movable */
     ALLOC_FLAG_MOVABLE = (1 << 6),
     ALLOC_FLAG_NONMOVABLE = (1 << 7),
-};
-#define ALLOC_FLAGS_NONE                                                       \
-    (ALLOC_FLAG_FLEXIBILE_LOCALITY | ALLOC_FLAG_NONMOVABLE |                   \
-     ALLOC_FLAG_NONPAGEABLE | ALLOC_FLAG_NO_CACHE_ALIGN)
 
-enum alloc_class {
-    ALLOC_CLASS_DEFAULT = 0,
-    ALLOC_CLASS_INTERLEAVED,
-    ALLOC_CLASS_HIGH_BANDWIDTH,
+    /* Allocation classes */
+    ALLOC_FLAG_CLASS_DEFAULT = (0 << ALLOC_CLASS_SHIFT),
+    ALLOC_FLAG_CLASS_INTERLEAVED = (1 << ALLOC_CLASS_SHIFT),
+    ALLOC_FLAG_CLASS_HIGH_BANDWIDTH = (2 << ALLOC_CLASS_SHIFT),
 };
+
+#define ALLOC_FLAGS_NONE                                                       \
+    (ALLOC_FLAG_CLASS_DEFAULT | ALLOC_FLAG_FLEXIBLE_LOCALITY |                 \
+     ALLOC_FLAG_NONMOVABLE | ALLOC_FLAG_NONPAGEABLE |                          \
+     ALLOC_FLAG_NO_CACHE_ALIGN)
 
 static inline bool alloc_flags_valid(uint16_t flags) {
-    if ((flags & ALLOC_FLAG_FLEXIBILE_LOCALITY) &&
+    if ((flags & ALLOC_FLAG_FLEXIBLE_LOCALITY) &&
         (flags & ALLOC_FLAG_STRICT_LOCALITY))
         return false;
 
@@ -64,6 +96,7 @@ void *kmalloc(uint64_t size);
 void *krealloc(void *ptr, uint64_t size);
 void *kzalloc(uint64_t size);
 void kfree(void *ptr);
+uint64_t ksize(void *ptr);
 void *kmalloc_aligned(uint64_t size, uint64_t align);
 void *kzalloc_aligned(uint64_t size, uint64_t align);
 void kfree_aligned(void *ptr);

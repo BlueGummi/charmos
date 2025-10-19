@@ -519,7 +519,7 @@ void topology_init(void) {
 }
 
 struct core **topology_get_smts_under_numa(struct topology_node *numa,
-                                       size_t *count) {
+                                           size_t *count) {
     size_t total = 0;
     struct core **smts = NULL;
     if (!numa || numa->level != TOPOLOGY_LEVEL_NUMA)
@@ -570,10 +570,11 @@ void topology_mark_core_idle(size_t cpu_id, bool idle) {
 }
 
 struct core *topology_find_idle_core(struct core *local_core,
-                                 enum topology_level max_search) {
-    kassert(max_search > TOPOLOGY_LEVEL_SMT); /* 'SMT' will be the core itself.
-                                   * It has no neighbors, and thus
-                                   * cannot be searched through (one core) */
+                                     enum topology_level max_search) {
+    kassert(max_search >
+            TOPOLOGY_LEVEL_SMT); /* 'SMT' will be the core itself.
+                                  * It has no neighbors, and thus
+                                  * cannot be searched through (one core) */
 
     struct topology_node *smt_node = local_core->topo_node; /* Direct node  */
     struct topology_node *core_node = smt_node->parent_node;

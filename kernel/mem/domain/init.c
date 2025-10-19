@@ -158,8 +158,8 @@ static void domain_buddy_init(struct domain_buddy *dom) {
                 continue;
             }
 
-            domain_buddy_split_for_domain(dom, page_get_pfn(page),
-                                          page->order, dom_start, dom_end);
+            domain_buddy_split_for_domain(dom, page_get_pfn(page), page->order,
+                                          dom_start, dom_end);
 
             page = next_page;
         }
@@ -168,7 +168,7 @@ static void domain_buddy_init(struct domain_buddy *dom) {
 
 static void domain_structs_init(struct domain_buddy *dom, size_t arena_capacity,
                                 size_t fq_capacity,
-                                struct core_domain *core_domain) {
+                                struct domain *core_domain) {
     dom->free_area = kzalloc(sizeof(struct free_area) * MAX_ORDER);
     if (!dom->free_area)
         k_panic("Failed to allocate domain free area\n");
@@ -253,7 +253,7 @@ static void domain_init_worker(struct domain_buddy *domain) {
     scheduler_enqueue_on_core(worker, id);
 }
 
-static void link_domain_cores_to_buddy(struct core_domain *cd,
+static void link_domain_cores_to_buddy(struct domain *cd,
                                        struct domain_buddy *bd) {
     for (size_t i = 0; i < cd->num_cores; i++) {
         cd->cores[i]->domain_buddy = bd;
@@ -267,7 +267,7 @@ static inline uint64_t pages_to_bytes(size_t pages) {
 static void late_init_from_numa(size_t domain_count) {
     for (size_t i = 0; i < domain_count; i++) {
         struct numa_node *node = &global.numa_nodes[i % global.numa_node_count];
-        struct core_domain *cd = global.core_domains[i];
+        struct domain *cd = global.domains[i];
 
         domain_buddies[i].start = node->mem_base;                /* bytes */
         domain_buddies[i].end = node->mem_base + node->mem_size; /* bytes */
@@ -294,7 +294,7 @@ static void late_init_non_numa(size_t domain_count) {
         if (i == domain_count - 1)
             this_pages += remainder_pages;
 
-        struct core_domain *cd = global.core_domains[i];
+        struct domain *cd = global.domains[i];
 
         uint64_t domain_start_bytes = pages_to_bytes(page_cursor); /* bytes */
 
@@ -327,7 +327,7 @@ void domain_buddies_init(void) {
     size_t freequeue_size = compute_freequeue_max(global.total_pages);
 
     for (size_t i = 0; i < domain_count; i++) {
-        struct core_domain *d = global.core_domains[i];
+        struct domain *d = global.domains[i];
         struct domain_buddy *dbd = &domain_buddies[i];
         size_t arena_size = compute_arena_max(dbd->end - dbd->start);
         domain_structs_init(dbd, arena_size, freequeue_size, d);
@@ -342,7 +342,7 @@ void domain_buddies_init(void) {
     }
 }
 
-void domain_dump(void) {
+void domain_buddy_dump(void) {
     for (size_t i = 0; i < global.domain_count; i++) {
         struct domain_buddy *dom = &domain_buddies[i];
         struct domain_buddy_stats *stat = &dom->stats;

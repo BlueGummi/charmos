@@ -17,6 +17,7 @@ struct vas_space {
     struct rbt tree;
     vaddr_t base;
     vaddr_t limit;
+    struct vas_range *freelist;
 };
 
 struct vas_space *vas_space_init(vaddr_t base, vaddr_t limit);

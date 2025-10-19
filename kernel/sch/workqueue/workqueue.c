@@ -9,7 +9,8 @@
 
 #include "internal.h"
 
-enum workqueue_error workqueue_add_oneshot(work_function func, struct work_args args) {
+enum workqueue_error workqueue_add_oneshot(work_function func,
+                                           struct work_args args) {
     struct workqueue *queue = workqueue_get_least_loaded();
     return workqueue_enqueue_oneshot(queue, func, args);
 }
@@ -36,7 +37,7 @@ static struct workqueue *find_optimal_domain_wq(void) {
 
     size_t least_loaded = WORKQUEUE_NUM_WORKS(optimal);
 
-    core_domain_for_each_local(pos) {
+    domain_for_each_local(pos) {
         struct workqueue *queue = global.workqueues[pos->id];
         size_t load = WORKQUEUE_NUM_WORKS(queue);
 

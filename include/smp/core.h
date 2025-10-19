@@ -34,7 +34,7 @@ struct core {
 
     atomic_bool needs_resched;
 
-    struct core_domain *domain;
+    struct domain *domain;
     struct topology_node *topo_node;
     struct topology_cache_info llc;
     struct domain_buddy *domain_buddy;

@@ -5,7 +5,6 @@
 #include <mem/slab.h>
 #include <mem/vaddr_alloc.h>
 #include <mem/vmm.h>
-#include <misc/magic_numbers.h>
 #include <smp/core.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -18,12 +17,12 @@ struct vas_space *slab_vas = NULL;
 struct slab_cache slab_caches[SLAB_CLASS_COUNT];
 
 static void *slab_map_new_page(paddr_t *phys_out) {
-    uintptr_t phys = pmm_alloc_page(ALLOC_CLASS_DEFAULT, ALLOC_FLAGS_NONE);
+    paddr_t phys = pmm_alloc_page(ALLOC_FLAGS_NONE);
     *phys_out = phys;
     if (!phys)
         return NULL;
 
-    uintptr_t virt = vas_alloc(slab_vas, PAGE_SIZE, PAGE_SIZE);
+    vaddr_t virt = vas_alloc(slab_vas, PAGE_SIZE, PAGE_SIZE);
 
     if (!virt) {
         pmm_free_page(phys);
@@ -46,7 +45,9 @@ static void slab_free_virt_and_phys(vaddr_t virt, paddr_t phys) {
 }
 
 static void slab_cache_init_lists(struct slab_cache *cache) {
-    cache->slabs_free = cache->slabs_partial = cache->slabs_free = NULL;
+    cache->slabs_free = NULL;
+    cache->slabs_partial = NULL;
+    cache->slabs_full = NULL;
 }
 
 static void slab_cache_init(struct slab_cache *cache, uint64_t obj_size) {
@@ -62,9 +63,9 @@ static void slab_cache_init(struct slab_cache *cache, uint64_t obj_size) {
 
     cache->objs_per_slab = (available * 8) / (8 * cache->obj_size + 1);
     if (cache->objs_per_slab == 0)
-        cache->objs_per_slab = 1;
+        k_panic("Slab cache cannot hold any objects per slab!\n");
 
-    cache->max_objects = PAGE_NON_SLAB_SPACE / cache->obj_size;
+    cache->max_objects = available / cache->obj_size;
     if (cache->max_objects == 0)
         k_panic("Slab cache cannot hold any objects per slab!\n");
 
@@ -79,7 +80,6 @@ static struct slab *slab_create(struct slab_cache *cache) {
 
     struct slab *slab = (struct slab *) page;
     slab->parent_cache = cache;
-    slab->backing_page = page_for_pfn(PAGE_TO_PFN(phys));
 
     const vaddr_t page_start = (vaddr_t) page;
     const vaddr_t page_end = page_start + PAGE_SIZE;
@@ -105,12 +105,12 @@ static struct slab *slab_create(struct slab_cache *cache) {
     }
 
     cache->objs_per_slab = best_fit;
-    slab->bitmap = (uint8_t *) page + sizeof(struct slab);
+    slab->bitmap = (uint8_t *) (page + sizeof(struct slab));
 
     uint64_t bitmap_bytes = (best_fit + 7) / 8;
     uintptr_t data_start = page_start + sizeof(struct slab) + bitmap_bytes;
     data_start = slab_round_up_pow2(data_start, SLAB_OBJ_ALIGN);
-    slab->mem = (void *) data_start;
+    slab->mem = data_start;
 
     slab->used = 0;
     slab->state = SLAB_FREE;
@@ -123,7 +123,7 @@ static struct slab *slab_create(struct slab_cache *cache) {
 }
 
 static void slab_move_slab(struct slab_cache *cache, struct slab *slab,
-                           int new_state) {
+                           enum slab_state new_state) {
 
     switch (slab->state) {
     case SLAB_FREE: slab_list_remove(&cache->slabs_free, slab); break;
@@ -162,9 +162,7 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
             } /* No need to move it if the used count is in between
                * 0 and the max -- it will be in the partial list */
 
-            uint8_t *obj = (uint8_t *) slab->mem + i * cache->obj_size;
-            *((struct slab **) obj) = slab;
-            return obj + sizeof(struct slab *);
+            return (void *) (slab->mem + i * cache->obj_size);
         }
     }
 
@@ -180,18 +178,14 @@ static void slab_destroy(struct slab_cache *cache, struct slab *slab) {
 }
 
 static void slab_free(struct slab_cache *cache, struct slab *slab, void *obj) {
-    obj = (uint8_t *) obj - sizeof(struct slab *);
-
-    uint64_t index = ((vaddr_t) obj - (vaddr_t) slab->mem) / cache->obj_size;
+    uint64_t index = ((vaddr_t) obj - slab->mem) / cache->obj_size;
     uint64_t byte_idx = index / 8;
     uint8_t bit_mask = (uint8_t) (1u << (index % 8));
 
-    uint8_t old = slab->bitmap[byte_idx];
-    slab->bitmap[byte_idx] &= (uint8_t) ~bit_mask;
-
-    if (!SLAB_BITMAP_TEST(old, bit_mask))
+    if (!SLAB_BITMAP_TEST(slab->bitmap[byte_idx], bit_mask))
         k_panic("Likely double free of address 0x%lx\n", obj);
 
+    slab->bitmap[byte_idx] &= (uint8_t) ~bit_mask;
     uint64_t new_used = atomic_fetch_sub(&slab->used, 1) - 1;
 
     if (new_used == 0) {
@@ -206,24 +200,27 @@ static void slab_free(struct slab_cache *cache, struct slab *slab, void *obj) {
     }
 }
 
+static void *slab_try_alloc_from_slab_list(struct slab_cache *cache,
+                                           struct slab *list) {
+    for (struct slab *slab = list; slab; slab = slab->next) {
+        if (slab->state == SLAB_FULL)
+            continue;
+
+        void *ret = slab_alloc_from(cache, slab);
+        if (ret)
+            return ret;
+    }
+    return NULL;
+}
+
 static void *slab_alloc(struct slab_cache *cache) {
-    for (struct slab *slab = cache->slabs_partial; slab; slab = slab->next) {
-        if (slab->state == SLAB_FULL)
-            continue;
+    void *ret = slab_try_alloc_from_slab_list(cache, cache->slabs_partial);
+    if (ret)
+        return ret;
 
-        void *obj = slab_alloc_from(cache, slab);
-        if (obj)
-            return obj;
-    }
-
-    for (struct slab *slab = cache->slabs_free; slab; slab = slab->next) {
-        if (slab->state == SLAB_FULL)
-            continue;
-
-        void *obj = slab_alloc_from(cache, slab);
-        if (obj)
-            return obj;
-    }
+    ret = slab_try_alloc_from_slab_list(cache, cache->slabs_free);
+    if (ret)
+        return ret;
 
     struct slab *slab = slab_create(cache);
     if (!slab)
@@ -234,14 +231,12 @@ static void *slab_alloc(struct slab_cache *cache) {
     return slab_alloc_from(cache, slab);
 }
 
-static int slab_size_to_index(uint64_t size) {
-    if (size == 0)
-        return -1;
-    int shift = SLAB_MIN_SHIFT;
-    while ((1UL << shift) < size + sizeof(struct slab *) &&
-           shift <= SLAB_MAX_SHIFT) {
+static int32_t slab_size_to_index(uint64_t size) {
+    kassert(size != 0);
+    int32_t shift = SLAB_MIN_SHIFT;
+    while ((1UL << shift) < size && shift <= SLAB_MAX_SHIFT)
         shift++;
-    }
+
     return (shift > SLAB_MAX_SHIFT) ? -1 : shift - SLAB_MIN_SHIFT;
 }
 
@@ -258,52 +253,48 @@ void slab_init() {
 
 static struct spinlock kmalloc_lock = SPINLOCK_INIT;
 
-static uint64_t kmalloc_usable_size(void *ptr) {
+uint64_t ksize(void *ptr) {
     if (!ptr)
         return 0;
 
-    struct slab_phdr *hdr =
-        (struct slab_phdr *) ((uint8_t *) ptr - sizeof(struct slab_phdr));
+    struct slab_page_hdr *hdr = slab_page_hdr_for_addr(ptr);
 
-    if (hdr->magic == MAGIC_KMALLOC_PAGE) {
-        return hdr->pages * PAGE_SIZE - sizeof(struct slab_phdr);
-    }
+    if (hdr->magic == KMALLOC_PAGE_MAGIC)
+        return hdr->pages * PAGE_SIZE - sizeof(struct slab_page_hdr);
 
-    void *raw_obj = (uint8_t *) ptr - sizeof(struct slab *);
-    struct slab *slab = *((struct slab **) raw_obj);
+    struct slab *slab = slab_for_ptr(ptr);
     if (!slab)
         return 0;
+
     struct slab_cache *cache = slab->parent_cache;
-    return cache->obj_size - sizeof(struct slab *);
+    return cache->obj_size;
 }
 
 void *kmalloc(uint64_t size) {
     if (size == 0)
         return NULL;
 
-    enum irql irql = spin_lock_irq_disable(&kmalloc_lock);
-
     int idx = slab_size_to_index(size);
 
     if (idx >= 0 && slab_caches[idx].objs_per_slab > 0) {
+        enum irql irql = spin_lock_irq_disable(&kmalloc_lock);
         void *ret = slab_alloc(&slab_caches[idx]);
         spin_unlock(&kmalloc_lock, irql);
         return ret;
     }
 
-    uint64_t total_size = size + sizeof(struct slab_phdr);
-    uint64_t pages = (total_size + PAGE_SIZE - 1) / PAGE_SIZE;
+    uint64_t total_size = size + sizeof(struct slab_page_hdr);
+    uint64_t pages = PAGES_NEEDED_FOR(total_size);
 
     uintptr_t virt = vas_alloc(slab_vas, pages * PAGE_SIZE, PAGE_SIZE);
     uintptr_t phys_pages[pages];
     uint64_t allocated = 0;
 
     for (uint64_t i = 0; i < pages; i++) {
-        uintptr_t phys = pmm_alloc_page(ALLOC_CLASS_DEFAULT, ALLOC_FLAGS_NONE);
+        uintptr_t phys = pmm_alloc_page(ALLOC_FLAGS_NONE);
         if (!phys) {
             for (uint64_t j = 0; j < allocated; j++)
                 pmm_free_page(phys_pages[j]);
-            spin_unlock(&kmalloc_lock, irql);
             return NULL;
         }
 
@@ -313,18 +304,16 @@ void *kmalloc(uint64_t size) {
             pmm_free_page(phys);
             for (uint64_t j = 0; j < allocated; j++)
                 pmm_free_page(phys_pages[j]);
-            spin_unlock(&kmalloc_lock, irql);
             return NULL;
         }
 
         phys_pages[allocated++] = phys;
     }
 
-    struct slab_phdr *hdr = (struct slab_phdr *) virt;
-    hdr->magic = MAGIC_KMALLOC_PAGE;
+    struct slab_page_hdr *hdr = (struct slab_page_hdr *) virt;
+    hdr->magic = KMALLOC_PAGE_MAGIC;
     hdr->pages = pages;
 
-    spin_unlock(&kmalloc_lock, irql);
     return (void *) (hdr + 1);
 }
 
@@ -342,12 +331,9 @@ void kfree(void *ptr) {
     if (!ptr)
         return;
 
-    enum irql irql = spin_lock_irq_disable(&kmalloc_lock);
+    struct slab_page_hdr *hdr_candidate = slab_page_hdr_for_addr(ptr);
 
-    struct slab_phdr *hdr_candidate =
-        (struct slab_phdr *) ((uint8_t *) ptr - sizeof(struct slab_phdr));
-
-    if (hdr_candidate->magic == MAGIC_KMALLOC_PAGE) {
+    if (hdr_candidate->magic == KMALLOC_PAGE_MAGIC) {
         uintptr_t virt = (uintptr_t) hdr_candidate;
         uint64_t pages = hdr_candidate->pages;
         for (uint64_t i = 0; i < pages; i++) {
@@ -358,7 +344,6 @@ void kfree(void *ptr) {
         }
 
         vas_free(slab_vas, virt);
-        spin_unlock(&kmalloc_lock, irql);
         return;
     }
 
@@ -368,8 +353,9 @@ void kfree(void *ptr) {
         k_panic("Likely double free!\n");
 
     struct slab_cache *cache = slab->parent_cache;
-    slab_free(cache, slab, ptr);
 
+    enum irql irql = spin_lock_irq_disable(&kmalloc_lock);
+    slab_free(cache, slab, ptr);
     spin_unlock(&kmalloc_lock, irql);
 }
 
@@ -382,7 +368,7 @@ void *krealloc(void *ptr, uint64_t size) {
         return NULL;
     }
 
-    uint64_t old = kmalloc_usable_size(ptr);
+    uint64_t old = ksize(ptr);
     void *new_ptr = kmalloc(size);
 
     if (!new_ptr)

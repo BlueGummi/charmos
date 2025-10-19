@@ -1,5 +1,5 @@
 #include <charmos.h>
-#include <console/panic.h>
+#include <console/printf.h>
 #include <mem/alloc.h>
 #include <smp/domain.h>
 #include <stdbool.h>
@@ -7,14 +7,16 @@
 
 static void init_global_domain(uint64_t domain_count) {
     global.domain_count = domain_count;
-    global.core_domains = kzalloc(sizeof(struct core_domain *) * domain_count);
-    if (!global.core_domains)
+    global.domains = kzalloc(sizeof(struct domain *) * domain_count);
+    if (!global.domains)
         k_panic("Cannot allocate core domains\n");
 
     for (size_t i = 0; i < domain_count; i++) {
-        global.core_domains[i] = kzalloc(sizeof(struct core_domain));
-        if (!global.core_domains[i])
+        global.domains[i] = kzalloc(sizeof(struct domain));
+        if (!global.domains[i])
             k_panic("Cannot allocate core domain %u\n");
+
+        global.domains[i]->id = i;
     }
 }
 
@@ -23,7 +25,7 @@ static void construct_domains_from_numa_nodes(void) {
     init_global_domain(global.numa_node_count);
     for (size_t i = 0; i < global.numa_node_count; i++) {
         struct numa_node *nn = &global.numa_nodes[i];
-        struct core_domain *cd = global.core_domains[i];
+        struct domain *cd = global.domains[i];
         struct topology_node *tpn = nn->topo;
         size_t num_cores;
         struct core **arr = topology_get_smts_under_numa(tpn, &num_cores);
@@ -49,7 +51,7 @@ static void construct_domains_from_cores(void) {
 
     size_t core_index = 0;
     for (size_t i = 0; i < n_domains; i++) {
-        struct core_domain *cd = global.core_domains[i];
+        struct domain *cd = global.domains[i];
 
         cd->associated_node = NULL;
 
@@ -71,31 +73,27 @@ static void construct_domains_from_cores(void) {
     }
 }
 
-void core_domain_dump(void) {
-    k_printf("=== Core Domains (%zu total) ===\n", global.domain_count);
+#define domain_info(fmt, ...) k_info("DOMAIN", K_INFO, fmt, ##__VA_ARGS__)
+
+void domain_dump(void) {
+    domain_info("Domains (%zu total)", global.domain_count);
 
     for (size_t i = 0; i < global.domain_count; i++) {
-        struct core_domain *cd = global.core_domains[i];
-        if (!cd) {
-            k_printf(" [Domain %zu] <NULL>\n", i);
-            continue;
-        }
-
-        k_printf(" [Domain %zu]\n", i);
-
+        struct domain *cd = global.domains[i];
         if (cd->associated_node) {
-            k_printf("   NUMA node: %zu\n", cd->associated_node->topo->id);
+            domain_info(" Domain %zu: Cores = %zu, NUMA node = %zu", i,
+                        cd->num_cores, cd->associated_node->topo->id);
         } else {
-            k_printf("   NUMA node: <none>\n");
+            domain_info(" Domain %zu: Cores = %zu, NUMA node = <none>", i,
+                        cd->num_cores);
         }
 
-        k_printf("   cores: %zu\n", cd->num_cores);
         for (size_t j = 0; j < cd->num_cores; j++) {
             if (cd->cores && cd->cores[j]) {
                 struct core *c = cd->cores[j];
-                k_printf("     core[%zu] = id %zu\n", j, c->id);
+                domain_info("  Core %zu", c->id);
             } else {
-                k_printf("     core[%zu] = <NULL>\n", j);
+                domain_info("  Core <NULL>");
             }
         }
     }
@@ -104,12 +102,12 @@ void core_domain_dump(void) {
 /* If NUMA is present, domains map 1:1 with
  * NUMA nodes. If not, we just group cores into
  * groups of 4 and construct domains from them. */
-void core_domain_init(void) {
+void domain_init(void) {
     if (global.numa_node_count > 1) {
         construct_domains_from_numa_nodes();
     } else {
         construct_domains_from_cores();
     }
 
-    core_domain_dump();
+    domain_dump();
 }

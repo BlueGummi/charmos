@@ -101,7 +101,7 @@ void k_main(void) {
     srat_init();
     slit_init();
     topology_init();
-    core_domain_init();
+    domain_init();
 
     pmm_late_init();
 
@@ -123,7 +123,7 @@ void k_sch_main() {
 
     thread_print(scheduler_get_curr_thread());
 
-    domain_dump();
+    domain_buddy_dump();
     while (1) {
         wait_for_interrupt();
     }

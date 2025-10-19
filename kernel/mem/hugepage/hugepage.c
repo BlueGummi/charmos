@@ -14,8 +14,7 @@ struct hugepage_gc_list hugepage_gc_list = {0};
 #define IS_ALIGNED(ptr, align) (((uintptr_t) (ptr) & ((align) - 1)) == 0)
 
 static paddr_t alloc_2mb_phys(void) {
-    paddr_t ret = pmm_alloc_pages(HUGEPAGE_SIZE_IN_4KB_PAGES,
-                                  ALLOC_CLASS_DEFAULT, ALLOC_FLAGS_NONE);
+    paddr_t ret = pmm_alloc_pages(HUGEPAGE_SIZE_IN_4KB_PAGES, ALLOC_FLAGS_NONE);
     kassert(IS_ALIGNED(ret, HUGEPAGE_SIZE));
     return ret;
 }

@@ -5,8 +5,8 @@
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <misc/linker_symbols.h>
-#include <smp/smp.h>
 #include <sch/sched.h>
+#include <smp/smp.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -25,8 +25,7 @@ uint64_t sub_offset(uint64_t a) {
 
 static inline struct page_table *alloc_pt(void) {
     struct page_table *ret =
-        (void *) (pmm_alloc_page(ALLOC_CLASS_DEFAULT, ALLOC_FLAGS_NONE) +
-                  global.hhdm_offset);
+        (void *) (pmm_alloc_page(ALLOC_FLAGS_NONE) + global.hhdm_offset);
     if (!ret)
         return NULL;
 
@@ -91,10 +90,12 @@ static void do_tlb_shootdown(uintptr_t addr) {
         struct core *target = global.cores[i];
 
         /* Bandaid fix because this deadlocks if we unmap from the allocator
-         * and another core is spinning with interrupts disabled on the allocator */
+         * and another core is spinning with interrupts disabled on the
+         * allocator */
         uint64_t spins = 500;
         while (atomic_load_explicit(&target->tlb_ack_gen,
-                                    memory_order_acquire) < gen && spins--)
+                                    memory_order_acquire) < gen &&
+               spins--)
             cpu_relax();
     }
 }

@@ -11,8 +11,7 @@
 #include <string.h>
 
 struct limine_memmap_response *memmap;
-typedef paddr_t (*alloc_fn)(size_t pages, enum alloc_class class,
-                            enum alloc_flags f);
+typedef paddr_t (*alloc_fn)(size_t pages, enum alloc_flags f);
 
 typedef void (*free_fn)(paddr_t addr, size_t pages);
 
@@ -76,18 +75,16 @@ void pmm_late_init(void) {
     current_free_fn = domain_free;
 }
 
-paddr_t pmm_alloc_page(enum alloc_class c, enum alloc_flags f) {
-    return pmm_alloc_pages(1, c, f);
+paddr_t pmm_alloc_page(enum alloc_flags f) {
+    return pmm_alloc_pages(1, f);
 }
 
 void pmm_free_page(paddr_t addr) {
     pmm_free_pages(addr, 1);
 }
 
-paddr_t pmm_alloc_pages(uint64_t count, enum alloc_class c,
-                        enum alloc_flags f) {
-    paddr_t ret = current_alloc_fn(count, c, f);
-    return ret;
+paddr_t pmm_alloc_pages(uint64_t count, enum alloc_flags f) {
+    return current_alloc_fn(count, f);
 }
 
 void pmm_free_pages(paddr_t addr, uint64_t count) {

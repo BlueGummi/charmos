@@ -12,12 +12,11 @@ uint8_t *bitmap;
 static uint64_t last_allocated_index = 0;
 
 paddr_t bitmap_alloc_page() {
-    return bitmap_alloc_pages(1, 0, 0);
+    return bitmap_alloc_pages(1, 0);
 }
 
-paddr_t bitmap_alloc_pages(uint64_t count, enum alloc_class class,
-                           enum alloc_flags flags) {
-    (void) class, (void) flags;
+paddr_t bitmap_alloc_pages(uint64_t count, enum alloc_flags flags) {
+    (void) flags;
     if (count == 0)
         k_panic("Zero pages requested\n");
 

@@ -97,8 +97,7 @@ extern struct domain_buddy *domain_buddies;
 
 void domain_buddies_init(void);
 void domain_free(paddr_t address, size_t page_count);
-paddr_t domain_alloc(size_t pages, enum alloc_class class,
-                     enum alloc_flags flags);
+paddr_t domain_alloc(size_t pages, enum alloc_flags flags);
 bool domain_free_queue_enqueue(struct domain_free_queue *fq, paddr_t addr,
                                size_t pages);
 bool domain_free_queue_dequeue(struct domain_free_queue *fq, paddr_t *addr_out,
