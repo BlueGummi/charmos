@@ -33,5 +33,5 @@ REGISTER_TEST(defer_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     sleep_ms(100);
 
     if (defer_worked)
-        SET_SUCCESS;
+        SET_SUCCESS();
 }

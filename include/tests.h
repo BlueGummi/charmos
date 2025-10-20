@@ -7,9 +7,6 @@
 
 typedef void (*test_fn_t)(void);
 
-/* TODO: Turn the macros into things that look like functions,
- * so rather than SET_SUCCESS, it would be SET_SUCCESS() */
-
 struct kernel_test {
     const char *name;
     test_fn_t func;
@@ -30,18 +27,18 @@ struct kernel_test {
             #name, name, is_integration, should_fail, false, false, 0, NULL};  \
     static void name(void)
 
-#define SET_SUCCESS current_test->success = true
+#define SET_SUCCESS() current_test->success = true
 
-#define SET_FAIL current_test->success = false
+#define SET_FAIL() current_test->success = false
 
-#define SET_SKIP current_test->skipped = true
+#define SET_SKIP() () current_test->skipped = true
 
 #define ADD_MESSAGE(msg)                                                       \
     do {                                                                       \
-            current_test->messages =                                           \
-                krealloc(current_test->messages,                               \
-                         sizeof(char *) * ++current_test->message_count);        \
-        current_test->messages[current_test->message_count - 1] = msg;             \
+        current_test->messages =                                               \
+            krealloc(current_test->messages,                                   \
+                     sizeof(char *) * ++current_test->message_count);          \
+        current_test->messages[current_test->message_count - 1] = msg;         \
     } while (0)
 
 #define TEST_ASSERT(x)                                                         \
@@ -58,7 +55,7 @@ struct kernel_test {
 #define ABORT_IF_RAM_LOW()                                                     \
     if (pmm_get_usable_ram() < 1024 * 1024 * 8) {                              \
         ADD_MESSAGE("RAM too low for test to continue!\n");                    \
-        SET_SKIP;                                                              \
+        SET_SKIP();                                                            \
         return;                                                                \
     }
 

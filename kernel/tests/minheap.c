@@ -33,5 +33,5 @@ REGISTER_TEST(minheap_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(minheap_peek(mh)->key == 1);
     TEST_ASSERT(minheap_pop(mh)->key == 1);
 
-    SET_SUCCESS;
+    SET_SUCCESS();
 }

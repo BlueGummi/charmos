@@ -14,7 +14,7 @@ REGISTER_TEST(pmm_alloc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     paddr_t p = pmm_alloc_page(ALLOC_FLAGS_NONE);
     TEST_ASSERT(p);
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 REGISTER_TEST(vmm_map_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
@@ -26,7 +26,7 @@ REGISTER_TEST(vmm_map_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(ptr != NULL);
     vmm_unmap_virt(ptr, PAGE_SIZE);
     TEST_ASSERT(vmm_get_phys((uint64_t) ptr) == (uint64_t) -1);
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 /* probably don't need these at all but I'll keep
@@ -44,7 +44,7 @@ REGISTER_TEST(vmm_map_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
             TEST_ASSERT(ptr != NULL);                                          \
             ASSERT_ALIGNED(ptr, align);                                        \
         }                                                                      \
-        SET_SUCCESS;                                                           \
+        SET_SUCCESS();                                                           \
     }
 
 KMALLOC_ALIGNMENT_TEST(32, 32)
@@ -59,7 +59,7 @@ REGISTER_TEST(kmalloc_aligned_4096_test, false, false) {
         TEST_ASSERT(ptr != NULL);
         ASSERT_ALIGNED(ptr, 4096);
     }
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 #define STRESS_ALLOC_TIMES 2048
@@ -78,7 +78,7 @@ REGISTER_TEST(pmm_stress_alloc_free_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         pmm_free_page(addrs[i]);
     }
 
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 REGISTER_TEST(kmalloc_stress_alloc_free_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
@@ -105,7 +105,7 @@ REGISTER_TEST(kmalloc_stress_alloc_free_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         }
     }
 
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 REGISTER_TEST(kmalloc_mixed_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
@@ -132,7 +132,7 @@ REGISTER_TEST(kmalloc_mixed_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         kfree(small_ptrs[i]);
     }
 
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 #define MT_THREAD_COUNT 8
@@ -172,7 +172,7 @@ REGISTER_TEST(kmalloc_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         TEST_ASSERT(threads[i] != NULL);
     }
 
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 static void mt_hugepage_worker() {
@@ -202,7 +202,7 @@ REGISTER_TEST(hugepage_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         TEST_ASSERT(threads[i] != NULL);
     }
 
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 #define MT_PMM_THREAD_COUNT 8
@@ -231,5 +231,5 @@ REGISTER_TEST(pmm_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         TEST_ASSERT(threads[i] != NULL);
     }
 
-    SET_SUCCESS;
+    SET_SUCCESS();
 }

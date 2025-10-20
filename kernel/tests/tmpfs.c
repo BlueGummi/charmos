@@ -46,7 +46,7 @@ REGISTER_TEST(tmpfs_rw_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     TEST_ASSERT(e == ERR_NO_ENT);
 
     TEST_ASSERT(strlen(out_buf) == len / 2);
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 REGISTER_TEST(tmpfs_dir_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
@@ -78,7 +78,7 @@ REGISTER_TEST(tmpfs_dir_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     e = root->ops->finddir(root, "place", &ent);
     TEST_ASSERT(e == ERR_NO_ENT);
 
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 REGISTER_TEST(tmpfs_general_tests, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
@@ -113,5 +113,5 @@ REGISTER_TEST(tmpfs_general_tests, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 
     TEST_ASSERT(strcmp(buf, "/tmp") == 0);
 
-    SET_SUCCESS;
+    SET_SUCCESS();
 }

@@ -52,5 +52,5 @@ REGISTER_TEST(hugepage_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
              firsttsc, secondtsc);
     ADD_MESSAGE(msg2);
 
-    SET_SUCCESS;
+    SET_SUCCESS();
 }

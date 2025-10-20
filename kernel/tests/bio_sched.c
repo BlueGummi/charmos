@@ -15,7 +15,7 @@
 #define EXT2_INIT                                                              \
     if (global.root_node->fs_type != FS_EXT2) {                                \
         ADD_MESSAGE("the mounted root is not ext2");                           \
-        SET_SKIP;                                                              \
+        SET_SKIP();                                                              \
         return;                                                                \
     }                                                                          \
     struct vfs_node *root = global.root_node;
@@ -102,7 +102,7 @@ REGISTER_TEST(bio_sched_coalesce_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     for (int i = 0; i < 5000; i++)
         scheduler_yield();
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
@@ -174,5 +174,5 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
     ADD_MESSAGE(m2);
     TEST_ASSERT(atomic_load(&runs) <= test_runs);
 
-    SET_SUCCESS;
+    SET_SUCCESS();
 }

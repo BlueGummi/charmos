@@ -16,7 +16,7 @@
 #define EXT2_INIT                                                              \
     if (global.root_node->fs_type != FS_EXT2) {                                \
         ADD_MESSAGE("the mounted root is not ext2");                           \
-        SET_SKIP;                                                              \
+        SET_SKIP();                                                              \
         return;                                                                \
     }                                                                          \
     struct vfs_node *root = global.root_node;
@@ -51,7 +51,7 @@ REGISTER_TEST(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         };
 
         if (!d->submit_bio_async) {
-            SET_SKIP;
+            SET_SKIP();
             ADD_MESSAGE("BIO function is NULL");
             return;
         }
@@ -59,7 +59,7 @@ REGISTER_TEST(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         bool submitted = d->submit_bio_async(d, bio);
         if (!submitted) {
             hugepage_free_pages(bio->buffer, 64);
-            SET_FAIL;
+            SET_FAIL();
             return;
         }
 
@@ -70,5 +70,5 @@ REGISTER_TEST(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     }
     TEST_ASSERT(done == true);
     TEST_ASSERT(current_test->message_count == run_times);
-    SET_SUCCESS;
+    SET_SUCCESS();
 }

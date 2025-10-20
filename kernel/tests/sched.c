@@ -30,11 +30,11 @@ REGISTER_TEST(sched_reaper_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         sleep_us(10);
 
     if (!timeout) {
-        SET_FAIL;
+        SET_FAIL();
         return;
     }
 
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 static atomic_bool workqueue_ran = false;
@@ -72,7 +72,7 @@ REGISTER_TEST(workqueue_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
              workqueue_times, times);
     ADD_MESSAGE(msg);
 
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 static atomic_bool rt_thread_fail = false;
@@ -109,7 +109,7 @@ REGISTER_TEST(rt_thread_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     scheduler_yield();
     TEST_ASSERT(!atomic_load(&rt_thread_fail));
 
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 static atomic_uint ran_count = 0;
@@ -129,7 +129,7 @@ REGISTER_TEST(sched_spawn_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     TEST_ASSERT(run_times == ran_count);
 
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 static void sleepy_entry(void) {
@@ -139,7 +139,7 @@ static void sleepy_entry(void) {
 
 REGISTER_TEST(sched_sleepy_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     thread_spawn(sleepy_entry);
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 #define WQ_2_TIMES 4096
@@ -194,7 +194,7 @@ REGISTER_TEST(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ADD_MESSAGE(msg);
 
     workqueue_destroy(wq);
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 static atomic_bool daemon_work_run = false;
@@ -228,5 +228,5 @@ REGISTER_TEST(daemon_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         scheduler_yield();
 
     daemon_destroy(daemon);
-    SET_SUCCESS;
+    SET_SUCCESS();
 }

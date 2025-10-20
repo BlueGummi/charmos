@@ -10,7 +10,7 @@
 #define EXT2_INIT                                                              \
     if (global.root_node->fs_type != FS_EXT2) {                                \
         ADD_MESSAGE("the mounted root is not ext2");                           \
-        SET_SKIP;                                                              \
+        SET_SKIP();                                                              \
         return;                                                                \
     }                                                                          \
     struct vfs_node *root = global.root_node;
@@ -66,7 +66,7 @@ REGISTER_TEST(ext2_stat_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(memcmp(&stat_out, &empty_stat, sizeof(struct vfs_stat)) != 0);
 
     flush();
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 REGISTER_TEST(ext2_rename_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
@@ -94,7 +94,7 @@ REGISTER_TEST(ext2_rename_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(node != NULL);
 
     flush();
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 REGISTER_TEST(ext2_chmod_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
@@ -120,7 +120,7 @@ REGISTER_TEST(ext2_chmod_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(node->mode & VFS_MODE_O_EXEC);
 
     flush();
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 REGISTER_TEST(ext2_symlink_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
@@ -144,7 +144,7 @@ REGISTER_TEST(ext2_symlink_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(strcmp(buf, "/tmp") == 0);
 
     flush();
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 REGISTER_TEST(ext2_dir_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
@@ -163,7 +163,7 @@ REGISTER_TEST(ext2_dir_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     FAIL_IF_FATAL(root->ops->rmdir(root, "ext2_dir_test"));
 
     flush();
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
 
 REGISTER_TEST(ext2_integration_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
@@ -207,5 +207,5 @@ REGISTER_TEST(ext2_integration_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 
     flush();
 
-    SET_SUCCESS;
+    SET_SUCCESS();
 }

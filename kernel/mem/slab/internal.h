@@ -71,8 +71,6 @@ struct slab_cache {
 
     uint64_t obj_size;
     uint64_t objs_per_slab;
-    uint64_t max_objects; /* Max amount of objects for
-                           * a slab in this slab cache */
 
     struct slab *slabs_free;
     struct slab *slabs_partial;

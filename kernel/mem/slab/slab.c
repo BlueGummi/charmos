@@ -51,9 +51,7 @@ static void slab_cache_init_lists(struct slab_cache *cache) {
 }
 
 static void slab_cache_init(struct slab_cache *cache, uint64_t obj_size) {
-    const uint64_t header = sizeof(struct slab *);
-
-    cache->obj_size = header + obj_size;
+    cache->obj_size = obj_size;
     uint64_t available = PAGE_NON_SLAB_SPACE;
 
     if (cache->obj_size > available)
@@ -61,12 +59,19 @@ static void slab_cache_init(struct slab_cache *cache, uint64_t obj_size) {
                 "bytes -- insufficient\n",
                 cache->obj_size, available);
 
-    cache->objs_per_slab = (available * 8) / (8 * cache->obj_size + 1);
-    if (cache->objs_per_slab == 0)
-        k_panic("Slab cache cannot hold any objects per slab!\n");
+    uint64_t n;
+    for (n = PAGE_NON_SLAB_SPACE / obj_size; n > 0; n--) {
+        uint64_t bitmap_bytes = (n + 7) / 8;
+        uintptr_t data_start = sizeof(struct slab) + bitmap_bytes;
+        data_start = slab_round_up_pow2(data_start, SLAB_OBJ_ALIGN);
+        uintptr_t data_end = data_start + n * obj_size;
 
-    cache->max_objects = available / cache->obj_size;
-    if (cache->max_objects == 0)
+        if (data_end <= PAGE_SIZE)
+            break;
+    }
+    cache->objs_per_slab = n;
+
+    if (cache->objs_per_slab == 0)
         k_panic("Slab cache cannot hold any objects per slab!\n");
 
     slab_cache_init_lists(cache);
@@ -87,7 +92,7 @@ static struct slab *slab_create(struct slab_cache *cache) {
     uint64_t best_fit = 0;
 
     /* Try to find the largest n that fits entirely in the page */
-    for (uint64_t n = cache->max_objects; n > 0; n--) {
+    for (uint64_t n = cache->objs_per_slab; n > 0; n--) {
         uint64_t bitmap_bytes = (n + 7) / 8;
         uintptr_t data_start = page_start + sizeof(struct slab) + bitmap_bytes;
         data_start = slab_round_up_pow2(data_start, SLAB_OBJ_ALIGN);

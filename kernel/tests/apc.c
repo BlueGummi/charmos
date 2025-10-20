@@ -30,5 +30,5 @@ REGISTER_TEST(apc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         scheduler_yield();
     }
 
-    SET_SUCCESS;
+    SET_SUCCESS();
 }
