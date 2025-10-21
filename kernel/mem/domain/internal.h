@@ -9,6 +9,12 @@
 #define DOMAIN_ARENA_SIZE 64
 #define DOMAIN_FREE_QUEUE_SIZE 64
 
+#define ARENA_SCALE_PERMILLE 10    /* 1% of domain pages per-core arena */
+#define FREEQUEUE_SCALE_PERMILLE 5 /* 0.5% of total pages for freequeues */
+
+#define MAX_ARENA_PAGES 4096      /* absolute cap per-core arena */
+#define MAX_FREEQUEUE_PAGES 16384 /* absolute cap per-domain freequeue */
+
 struct page;
 struct domain_arena {
     struct page **pages;

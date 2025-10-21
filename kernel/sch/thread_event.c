@@ -463,16 +463,11 @@ void thread_add_sleep_reason(struct thread *t, uint8_t reason) {
                             time_get_ms(), t->activity_stats);
 }
 
-static inline void set_state_internal(struct thread *t,
-                                      enum thread_state state) {
-    atomic_store(&t->state, state);
-}
-
 static void set_state_and_update_reason(struct thread *t, uint8_t reason,
                                         enum thread_state state,
                                         void (*callback)(struct thread *,
                                                          uint8_t)) {
-    set_state_internal(t, state);
+    atomic_store(&t->state, state);
     callback(t, reason);
 
     uint64_t time = irq_in_interrupt() ? time_get_ms_fast() : time_get_ms();

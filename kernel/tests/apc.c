@@ -22,6 +22,9 @@ static struct thread *ted = NULL;
 REGISTER_TEST(apc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ted = thread_spawn(apc_thread);
     struct apc *a = kzalloc(sizeof(struct apc));
+    if (!a || !ted)
+        goto pluh;
+
     apc_init(a, the_apc, NULL, NULL);
 
     apc_enqueue(ted, a, APC_TYPE_KERNEL);
@@ -30,5 +33,6 @@ REGISTER_TEST(apc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         scheduler_yield();
     }
 
+pluh:
     SET_SUCCESS();
 }

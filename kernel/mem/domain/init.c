@@ -217,12 +217,6 @@ static void domain_structs_init(struct domain_buddy *dom, size_t arena_capacity,
     spinlock_init(&dom->free_queue->lock);
 }
 
-#define ARENA_SCALE_PERMILLE 10    /* 1% of domain pages per-core arena */
-#define FREEQUEUE_SCALE_PERMILLE 5 /* 0.5% of total pages for freequeues */
-
-#define MAX_ARENA_PAGES 4096      /* absolute cap per-core arena */
-#define MAX_FREEQUEUE_PAGES 16384 /* absolute cap per-domain freequeue */
-
 static size_t compute_arena_max(size_t domain_total_pages) {
     size_t scaled = (domain_total_pages * ARENA_SCALE_PERMILLE) / 1000;
     if (scaled > MAX_ARENA_PAGES)

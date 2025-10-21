@@ -14,9 +14,9 @@
 #include "internal.h"
 
 struct vas_space *slab_vas = NULL;
-struct slab_cache slab_caches[SLAB_CLASS_COUNT];
+struct slab_cache slab_caches[SLAB_CLASS_COUNT] = {0};
 
-static void *slab_map_new_page(paddr_t *phys_out) {
+void *slab_map_new_page(paddr_t *phys_out) {
     paddr_t phys = pmm_alloc_page(ALLOC_FLAGS_NONE);
     *phys_out = phys;
     if (!phys)
@@ -44,13 +44,7 @@ static void slab_free_virt_and_phys(vaddr_t virt, paddr_t phys) {
     vas_free(slab_vas, virt);
 }
 
-static void slab_cache_init_lists(struct slab_cache *cache) {
-    cache->slabs_free = NULL;
-    cache->slabs_partial = NULL;
-    cache->slabs_full = NULL;
-}
-
-static void slab_cache_init(struct slab_cache *cache, uint64_t obj_size) {
+void slab_cache_init(struct slab_cache *cache, uint64_t obj_size) {
     cache->obj_size = obj_size;
     uint64_t available = PAGE_NON_SLAB_SPACE;
 
@@ -69,12 +63,16 @@ static void slab_cache_init(struct slab_cache *cache, uint64_t obj_size) {
         if (data_end <= PAGE_SIZE)
             break;
     }
+
+    spinlock_init(&cache->lock);
     cache->objs_per_slab = n;
 
     if (cache->objs_per_slab == 0)
         k_panic("Slab cache cannot hold any objects per slab!\n");
 
-    slab_cache_init_lists(cache);
+    INIT_LIST_HEAD(&cache->slabs_free);
+    INIT_LIST_HEAD(&cache->slabs_partial);
+    INIT_LIST_HEAD(&cache->slabs_full);
 }
 
 static struct slab *slab_create(struct slab_cache *cache) {
@@ -117,38 +115,36 @@ static struct slab *slab_create(struct slab_cache *cache) {
     data_start = slab_round_up_pow2(data_start, SLAB_OBJ_ALIGN);
     slab->mem = data_start;
 
+    spinlock_init(&slab->lock);
     slab->used = 0;
     slab->state = SLAB_FREE;
-    slab->next = slab->prev = NULL;
+    INIT_LIST_HEAD(&slab->list);
 
     memset(slab->bitmap, 0, bitmap_bytes);
-    cache->free_slabs_count++;
+    atomic_fetch_add(&cache->free_slabs_count, 1);
 
     return slab;
 }
 
 static void slab_move_slab(struct slab_cache *cache, struct slab *slab,
                            enum slab_state new_state) {
-
-    switch (slab->state) {
-    case SLAB_FREE: slab_list_remove(&cache->slabs_free, slab); break;
-    case SLAB_PARTIAL: slab_list_remove(&cache->slabs_partial, slab); break;
-    case SLAB_FULL: slab_list_remove(&cache->slabs_full, slab); break;
-    default: k_panic("Unknown slab state %d\n", slab->state);
-    }
+    kassert(spinlock_held(&cache->lock));
+    list_del(&slab->list);
 
     slab->state = new_state;
 
     switch (new_state) {
-    case SLAB_FREE: slab_list_add(&cache->slabs_free, slab); break;
-    case SLAB_PARTIAL: slab_list_add(&cache->slabs_partial, slab); break;
-    case SLAB_FULL: slab_list_add(&cache->slabs_full, slab); break;
+    case SLAB_FREE: list_add(&slab->list, &cache->slabs_free); break;
+    case SLAB_PARTIAL: list_add(&slab->list, &cache->slabs_partial); break;
+    case SLAB_FULL: list_add(&slab->list, &cache->slabs_full); break;
     default: k_panic("Unknown new slab state %d\n", new_state);
     }
 }
 
 static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
+    enum irql irql = slab_lock_irq_disable(slab);
     kassert(slab->state != SLAB_FULL);
+
     for (uint64_t i = 0; i < cache->objs_per_slab; i++) {
         uint64_t byte_idx = i / 8;
         uint8_t bit_mask = (uint8_t) (1u << (i % 8));
@@ -162,20 +158,22 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
             if (used == cache->objs_per_slab) {
                 slab_move_slab(cache, slab, SLAB_FULL);
             } else if (used == 1) {
-                cache->free_slabs_count--;
+                atomic_fetch_sub(&cache->free_slabs_count, 1);
                 slab_move_slab(cache, slab, SLAB_PARTIAL);
             } /* No need to move it if the used count is in between
                * 0 and the max -- it will be in the partial list */
 
+            slab_unlock(slab, irql);
             return (void *) (slab->mem + i * cache->obj_size);
         }
     }
 
+    slab_unlock(slab, irql);
     return NULL;
 }
 
-static void slab_destroy(struct slab_cache *cache, struct slab *slab) {
-    slab_list_remove(&cache->slabs_free, slab);
+void slab_destroy(struct slab *slab) {
+    list_del(&slab->list);
 
     uintptr_t virt = (uintptr_t) slab;
     paddr_t phys = vmm_get_phys(virt);
@@ -183,6 +181,8 @@ static void slab_destroy(struct slab_cache *cache, struct slab *slab) {
 }
 
 static void slab_free(struct slab_cache *cache, struct slab *slab, void *obj) {
+    enum irql slab_cache_irql = slab_cache_lock_irq_disable(cache);
+    enum irql irql = slab_lock_irq_disable(slab);
     uint64_t index = ((vaddr_t) obj - slab->mem) / cache->obj_size;
     uint64_t byte_idx = index / 8;
     uint8_t bit_mask = (uint8_t) (1u << (index % 8));
@@ -195,54 +195,71 @@ static void slab_free(struct slab_cache *cache, struct slab *slab, void *obj) {
 
     if (new_used == 0) {
         slab_move_slab(cache, slab, SLAB_FREE);
-        cache->free_slabs_count++;
-        if (cache->free_slabs_count > 4) {
-            slab_destroy(cache, slab);
-            cache->free_slabs_count--;
+        if (atomic_fetch_add(&cache->free_slabs_count, 1) > 4) {
+            slab_unlock(slab, irql);
+            slab_cache_unlock(cache, slab_cache_irql);
+            slab_destroy(slab);
+            atomic_fetch_sub(&cache->free_slabs_count, 1);
+            return;
         }
     } else if (slab->state == SLAB_FULL) {
         slab_move_slab(cache, slab, SLAB_PARTIAL);
     }
+
+    slab_unlock(slab, irql);
+    slab_cache_unlock(cache, slab_cache_irql);
 }
 
 static void *slab_try_alloc_from_slab_list(struct slab_cache *cache,
-                                           struct slab *list) {
-    for (struct slab *slab = list; slab; slab = slab->next) {
+                                           struct list_head *list) {
+    kassert(spinlock_held(&cache->lock));
+    struct list_head *node;
+    struct slab *slab;
+    void *ret = NULL;
+
+    list_for_each(node, list) {
+        slab = slab_from_list_node(node);
         if (slab->state == SLAB_FULL)
             continue;
 
-        void *ret = slab_alloc_from(cache, slab);
+        ret = slab_alloc_from(cache, slab);
         if (ret)
-            return ret;
+            goto out;
     }
-    return NULL;
+
+out:
+    return ret;
 }
 
 static void *slab_alloc(struct slab_cache *cache) {
-    void *ret = slab_try_alloc_from_slab_list(cache, cache->slabs_partial);
+    void *ret = NULL;
+    enum irql irql = slab_cache_lock_irq_disable(cache);
+    ret = slab_try_alloc_from_slab_list(cache, &cache->slabs_partial);
     if (ret)
-        return ret;
+        goto out;
 
-    ret = slab_try_alloc_from_slab_list(cache, cache->slabs_free);
+    ret = slab_try_alloc_from_slab_list(cache, &cache->slabs_free);
     if (ret)
-        return ret;
+        goto out;
 
     struct slab *slab = slab_create(cache);
     if (!slab)
-        return NULL;
+        goto out;
 
-    slab_list_add(&cache->slabs_free, slab);
+    list_add(&slab->list, &cache->slabs_free);
+    ret = slab_alloc_from(cache, slab);
 
-    return slab_alloc_from(cache, slab);
+out:
+    slab_cache_unlock(cache, irql);
+    return ret;
 }
 
-static int32_t slab_size_to_index(uint64_t size) {
-    kassert(size != 0);
-    int32_t shift = SLAB_MIN_SHIFT;
-    while ((1UL << shift) < size && shift <= SLAB_MAX_SHIFT)
-        shift++;
+int32_t slab_size_to_index(size_t size) {
+    for (uint64_t i = 0; i < SLAB_CLASS_COUNT; i++)
+        if (slab_class_sizes[i] >= size)
+            return i;
 
-    return (shift > SLAB_MAX_SHIFT) ? -1 : shift - SLAB_MIN_SHIFT;
+    return -1;
 }
 
 void slab_init() {
@@ -250,15 +267,11 @@ void slab_init() {
     if (!slab_vas)
         k_panic("Could not initialize slab VAS\n");
 
-    for (int i = 0; i < SLAB_CLASS_COUNT; i++) {
-        uint64_t size = 1UL << (i + SLAB_MIN_SHIFT);
-        slab_cache_init(&slab_caches[i], size);
-    }
+    for (uint64_t i = 0; i < SLAB_CLASS_COUNT; i++)
+        slab_cache_init(&slab_caches[i], slab_class_sizes[i]);
 }
 
-static struct spinlock kmalloc_lock = SPINLOCK_INIT;
-
-uint64_t ksize(void *ptr) {
+size_t ksize(void *ptr) {
     if (!ptr)
         return 0;
 
@@ -267,12 +280,11 @@ uint64_t ksize(void *ptr) {
     if (hdr->magic == KMALLOC_PAGE_MAGIC)
         return hdr->pages * PAGE_SIZE - sizeof(struct slab_page_hdr);
 
-    struct slab *slab = slab_for_ptr(ptr);
-    if (!slab)
-        return 0;
+    return slab_for_ptr(ptr)->parent_cache->obj_size;
+}
 
-    struct slab_cache *cache = slab->parent_cache;
-    return cache->obj_size;
+size_t slab_object_size(vaddr_t addr) {
+    return ksize((void *) addr);
 }
 
 void *kmalloc(uint64_t size) {
@@ -282,9 +294,7 @@ void *kmalloc(uint64_t size) {
     int idx = slab_size_to_index(size);
 
     if (idx >= 0 && slab_caches[idx].objs_per_slab > 0) {
-        enum irql irql = spin_lock_irq_disable(&kmalloc_lock);
         void *ret = slab_alloc(&slab_caches[idx]);
-        spin_unlock(&kmalloc_lock, irql);
         return ret;
     }
 
@@ -332,25 +342,40 @@ void *kzalloc(uint64_t size) {
     return ptr;
 }
 
+void slab_free_page_hdr(struct slab_page_hdr *hdr) {
+    uintptr_t virt = (uintptr_t) hdr;
+    uint64_t pages = hdr->pages;
+    for (uint64_t i = 0; i < pages; i++) {
+        uintptr_t vaddr = virt + i * PAGE_SIZE;
+        paddr_t phys = (paddr_t) vmm_get_phys(vaddr);
+        vmm_unmap_page(vaddr);
+        pmm_free_page(phys);
+    }
+
+    vas_free(slab_vas, virt);
+}
+
+void slab_free_addr_to_cache(void *addr) {
+    struct slab_page_hdr *hdr_candidate = slab_page_hdr_for_addr(addr);
+    if (hdr_candidate->magic == KMALLOC_PAGE_MAGIC)
+        return slab_free_page_hdr(hdr_candidate);
+
+    struct slab *slab = slab_for_ptr(addr);
+    if (!slab)
+        k_panic("Likely double free of 0x%lx!\n", addr);
+
+    struct slab_cache *cache = slab->parent_cache;
+    slab_free(cache, slab, addr);
+}
+
 void kfree(void *ptr) {
     if (!ptr)
         return;
 
     struct slab_page_hdr *hdr_candidate = slab_page_hdr_for_addr(ptr);
 
-    if (hdr_candidate->magic == KMALLOC_PAGE_MAGIC) {
-        uintptr_t virt = (uintptr_t) hdr_candidate;
-        uint64_t pages = hdr_candidate->pages;
-        for (uint64_t i = 0; i < pages; i++) {
-            uintptr_t vaddr = virt + i * PAGE_SIZE;
-            paddr_t phys = (paddr_t) vmm_get_phys(vaddr);
-            vmm_unmap_page(vaddr);
-            pmm_free_page(phys);
-        }
-
-        vas_free(slab_vas, virt);
-        return;
-    }
+    if (hdr_candidate->magic == KMALLOC_PAGE_MAGIC)
+        return slab_free_page_hdr(hdr_candidate);
 
     struct slab *slab = slab_for_ptr(ptr);
 
@@ -359,9 +384,7 @@ void kfree(void *ptr) {
 
     struct slab_cache *cache = slab->parent_cache;
 
-    enum irql irql = spin_lock_irq_disable(&kmalloc_lock);
     slab_free(cache, slab, ptr);
-    spin_unlock(&kmalloc_lock, irql);
 }
 
 void *krealloc(void *ptr, uint64_t size) {

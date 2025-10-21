@@ -31,7 +31,7 @@ struct kernel_test {
 
 #define SET_FAIL() current_test->success = false
 
-#define SET_SKIP() () current_test->skipped = true
+#define SET_SKIP() current_test->skipped = true
 
 #define ADD_MESSAGE(msg)                                                       \
     do {                                                                       \

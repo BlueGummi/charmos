@@ -1,12 +1,14 @@
 #pragma once
-#define PAGE_SIZE 4096
+#include <mem/page.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #define ALLOC_LOCALITY_SHIFT 8
 #define ALLOC_CLASS_SHIFT 12
 #define ALLOC_CLASS_MASK 0xF
 
+/* The larger the locality, the closer it must be */
 #define ALLOC_LOCALITY_MAX 7
 #define ALLOC_LOCALITY_MIN 0
 #define ALLOC_LOCALITY_MASK 0x7
@@ -96,7 +98,7 @@ void *kmalloc(uint64_t size);
 void *krealloc(void *ptr, uint64_t size);
 void *kzalloc(uint64_t size);
 void kfree(void *ptr);
-uint64_t ksize(void *ptr);
+size_t ksize(void *ptr);
 void *kmalloc_aligned(uint64_t size, uint64_t align);
 void *kzalloc_aligned(uint64_t size, uint64_t align);
 void kfree_aligned(void *ptr);

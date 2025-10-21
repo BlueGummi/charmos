@@ -353,16 +353,16 @@ void thread_set_timesharing(struct thread *t);
 void thread_set_background(struct thread *t);
 void thread_wake(struct thread *t, enum thread_wake_reason r);
 
-static inline bool thread_get(struct thread *t) {
-    return refcount_inc_not_zero(&t->refcount);
-}
-
 static inline enum thread_state thread_get_state(struct thread *t) {
     return atomic_load(&t->state);
 }
 
 static inline void thread_set_state(struct thread *t, enum thread_state state) {
     atomic_store(&t->state, state);
+}
+
+static inline bool thread_get(struct thread *t) {
+    return refcount_inc_not_zero(&t->refcount);
 }
 
 static inline void thread_put(struct thread *t) {
@@ -378,7 +378,7 @@ static inline enum irql thread_acquire(struct thread *t) {
     if (!refcount_inc_not_zero(&t->refcount))
         k_panic("UAF");
 
-    return spin_lock(&t->lock);
+    return spin_lock_irq_disable(&t->lock);
 }
 
 static inline void thread_release(struct thread *t, enum irql irql) {

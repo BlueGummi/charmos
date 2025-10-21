@@ -1,3 +1,5 @@
+#include "internal.h"
+#include <acpi/lapic.h>
 #include <sch/sched.h>
 
 bool scheduler_mark_core_needs_resched(struct core *c, bool new) {
@@ -24,4 +26,20 @@ void scheduler_mark_self_idle(bool new) {
 
 bool scheduler_core_idle(struct core *c) {
     return atomic_load(&c->idle);
+}
+
+void scheduler_force_resched(struct scheduler *sched) {
+    if (sched == smp_core_scheduler()) {
+        scheduler_mark_self_needs_resched(true);
+    } else {
+        struct core *other = global.cores[sched->core_id];
+        if (!other) {
+            ipi_send(sched->core_id, IRQ_SCHEDULER);
+            return;
+        }
+
+        scheduler_mark_core_needs_resched(other, true);
+        if (scheduler_core_idle(other))
+            ipi_send(sched->core_id, IRQ_SCHEDULER);
+    }
 }

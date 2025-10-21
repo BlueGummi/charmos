@@ -247,7 +247,7 @@ void schedule(void) {
     struct scheduler *sched = smp_core_scheduler();
     enum irql irql = scheduler_lock_irq_disable(sched);
 
-    time_t time = time_get_ms_fast();
+    time_t time = time_get_ms();
 
     struct thread *curr = sched->current;
     struct thread *next = NULL;
@@ -282,23 +282,4 @@ void scheduler_yield() {
     schedule();
     irql_lower(irql);
     thread_check_and_deliver_apcs(scheduler_get_curr_thread());
-}
-
-void scheduler_force_resched(struct scheduler *sched) {
-    if (sched == smp_core_scheduler()) {
-        scheduler_mark_self_needs_resched(true);
-    } else {
-        struct core *other = global.cores[sched->core_id];
-        if (!other) {
-            ipi_send(sched->core_id, IRQ_SCHEDULER);
-            return;
-        }
-
-        if (scheduler_core_idle(other)) {
-            scheduler_mark_core_needs_resched(other, true);
-            ipi_send(sched->core_id, IRQ_SCHEDULER);
-        } else {
-            scheduler_mark_core_needs_resched(other, true);
-        }
-    }
 }

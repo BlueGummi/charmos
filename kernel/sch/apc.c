@@ -130,8 +130,7 @@ static inline bool thread_is_active(struct thread *t) {
  * because we need the thread to reschedule to run its APC */
 static void maybe_force_reschedule(struct thread *t) {
     struct scheduler *target = global.schedulers[t->curr_core];
-    struct core *core = global.cores[t->curr_core];
-    if (!target->tick_enabled && core->current_irql == IRQL_PASSIVE_LEVEL)
+    if (!atomic_load(&target->tick_enabled))
         scheduler_force_resched(target);
 }
 
