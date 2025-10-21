@@ -117,10 +117,6 @@ static void add_apc_to_thread(struct thread *t, struct apc *a,
     atomic_fetch_or(&t->apc_pending_mask, apc_type_bit(type));
 }
 
-static inline bool thread_is_curr_thread(struct thread *t) {
-    return t == scheduler_get_curr_thread();
-}
-
 static inline bool thread_is_active(struct thread *t) {
     enum thread_state s = thread_get_state(t);
     return s == THREAD_STATE_READY || s == THREAD_STATE_RUNNING;
@@ -129,7 +125,7 @@ static inline bool thread_is_active(struct thread *t) {
 /* Poke the target core if there is no preemption on it
  * because we need the thread to reschedule to run its APC */
 static void maybe_force_reschedule(struct thread *t) {
-    struct scheduler *target = global.schedulers[t->curr_core];
+    struct scheduler *target = global.schedulers[t->last_ran];
     if (!atomic_load(&target->tick_enabled))
         scheduler_force_resched(target);
 }
@@ -159,7 +155,7 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
 
     thread_release(t, irql);
     /* Let's go and execute em */
-    if (thread_is_curr_thread(t)) {
+    if (t == scheduler_get_curr_thread()) {
         thread_check_and_deliver_apcs(t);
     } else {
         /* Not us, go wake up the other guy */

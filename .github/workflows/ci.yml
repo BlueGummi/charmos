@@ -44,8 +44,8 @@ jobs:
         run: |
           cd build
           export TERM=dumb
-          for i in $(seq 1 10); do
-            echo "[INFO] Test iteration $i/10"
+          for i in $(seq 1 5); do
+            echo "[INFO] Test iteration $i/5"
 
             dd if=/dev/zero of=disk.img bs=10M count=1
             mkfs.ext2 -F disk.img

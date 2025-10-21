@@ -23,14 +23,12 @@ void slab_domain_build_locality_lists(struct slab_domain *sdom) {
                  ->cores[0]
                  ->slab_domain[bd - domain_buddies];
 
-        sdom->pageable_zonelist.entries[i] =
-            (struct slab_cache_ref) {.domain = remote_sdom,
-                                     .caches = remote_sdom->local_pageable_cache,
-                                     .type = SLAB_CACHE_TYPE_PAGEABLE,
-                                     .locality = zent->distance};
+        sdom->pageable_zonelist.entries[i] = (struct slab_cache_ref) {
+            .caches = remote_sdom->local_pageable_cache,
+            .type = SLAB_CACHE_TYPE_PAGEABLE,
+            .locality = zent->distance};
 
         sdom->nonpageable_zonelist.entries[i] = (struct slab_cache_ref) {
-            .domain = remote_sdom,
             .caches = remote_sdom->local_nonpageable_cache,
             .type = SLAB_CACHE_TYPE_NONPAGEABLE,
             .locality = zent->distance};

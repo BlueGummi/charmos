@@ -51,7 +51,6 @@ struct cpu_context {
 };
 
 enum thread_state : uint8_t {
-    THREAD_STATE_NEW,         /* New thread */
     THREAD_STATE_IDLE_THREAD, /* Specifically the idle thread */
     THREAD_STATE_READY,   /* Thread is ready to run but not currently running */
     THREAD_STATE_RUNNING, /* Thread is currently executing */
@@ -204,6 +203,7 @@ struct thread {
 
     /* Who is running us? */
     int64_t curr_core;     /* -1 if not being ran */
+    uint64_t last_ran;     /* What core last ran us? */
     time_t run_start_time; /* When did we start running */
 
     /* Flags */
@@ -378,7 +378,7 @@ static inline enum irql thread_acquire(struct thread *t) {
     if (!refcount_inc_not_zero(&t->refcount))
         k_panic("UAF");
 
-    return spin_lock_irq_disable(&t->lock);
+    return spin_lock(&t->lock);
 }
 
 static inline void thread_release(struct thread *t, enum irql irql) {

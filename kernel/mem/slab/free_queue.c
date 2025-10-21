@@ -120,32 +120,47 @@ vaddr_t slab_free_queue_drain_singular(struct slab_free_queue *q) {
     return slab_free_queue_list_dequeue(q);
 }
 
-size_t slab_free_queue_drain_to_per_cpu_cache(struct slab_per_cpu_cache *cache, struct slab_free_queue *queue) {
-    size_t objects_drained = 0;
+/* TODO: */
+static inline bool page_is_pageable(struct page *page) {
+    return false;
+}
 
+size_t slab_free_queue_drain_to_per_cpu_cache(struct slab_per_cpu_cache *cache,
+                                              struct slab_free_queue *queue) {
+    size_t total_elements_pushed = 0;
     while (true) {
         vaddr_t addr = slab_free_queue_drain_singular(queue);
         if (addr == 0x0)
-            break;
+            return total_elements_pushed;
 
-        size_t size = slab_object_size(addr);
+        size_t size = slab_allocation_size(addr);
         int32_t class = slab_size_to_index(size);
+        if (class < 0)
+            goto flush_to_cache;
 
-        if (class >= 0) {
-            struct slab_magazine *mag = &cache->mag[class];
-            bool success = slab_magazine_push(mag, addr);
-            if (success) {
-                objects_drained++;
-            } else {
-                
-            }
-        } else {
-            
-        }
-    
+        struct slab *slab = slab_for_ptr((void *) addr);
+        struct page *backing = slab_get_backing_page(slab);
+
+        if (page_is_pageable(backing))
+            goto flush_to_cache;
+
+        struct slab_magazine *mag = &cache->mag[class];
+        if (!slab_magazine_push(mag, addr))
+            goto flush_to_cache;
+
+        total_elements_pushed++;
+    flush_to_cache:
+        slab_free_addr_to_cache((void *) addr);
     }
-
-    return objects_drained;
-
 }
 
+size_t slab_free_queue_flush(struct slab_free_queue *queue) {
+    size_t total_freed = 0;
+    while (true) {
+        vaddr_t addr = slab_free_queue_drain_singular(queue);
+        if (addr == 0x0)
+            return total_freed;
+
+        slab_free_addr_to_cache((void *) addr);
+    }
+}

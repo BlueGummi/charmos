@@ -23,8 +23,8 @@ void condvar_init(struct condvar *cv) {
     thread_queue_init(&cv->waiters);
 }
 
-static inline void set_wake_reason_and_wake(struct thread *t,
-                                            enum wake_reason reason) {
+static void set_wake_reason_and_wake(struct thread *t,
+                                     enum wake_reason reason) {
     if (!t)
         return;
 
@@ -40,15 +40,11 @@ static void nop_callback(struct thread *unused) {
     (void) unused;
 }
 
-static inline void send_manual_wake_signal(struct thread *t) {
-    set_wake_reason_and_wake(t, WAKE_REASON_SIGNAL);
-}
-
 struct thread *condvar_signal_callback(struct condvar *cv,
                                        thread_action_callback tac) {
     struct thread *t = thread_queue_pop_front(&cv->waiters);
     tac(t);
-    send_manual_wake_signal(t);
+    set_wake_reason_and_wake(t, WAKE_REASON_SIGNAL);
     return t;
 }
 
@@ -61,7 +57,7 @@ void condvar_broadcast_callback(struct condvar *cv,
     struct thread *t;
     while ((t = thread_queue_pop_front(&cv->waiters)) != NULL) {
         tac(t);
-        send_manual_wake_signal(t);
+        set_wake_reason_and_wake(t, WAKE_REASON_SIGNAL);
     }
 }
 

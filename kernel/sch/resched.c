@@ -20,12 +20,13 @@ void scheduler_resched_if_needed(void) {
 }
 
 void scheduler_mark_self_idle(bool new) {
-    atomic_store(&smp_core()->idle, new);
-    topology_mark_core_idle(smp_core_id(), new);
+    if (!atomic_exchange(&smp_core()->idle, new))
+        topology_mark_core_idle(smp_core_id(), new);
 }
 
 bool scheduler_core_idle(struct core *c) {
-    return atomic_load(&c->idle);
+    return atomic_load(&c->idle) || global.schedulers[c->id]->current ==
+                                        global.schedulers[c->id]->idle_thread;
 }
 
 void scheduler_force_resched(struct scheduler *sched) {

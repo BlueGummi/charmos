@@ -30,7 +30,7 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
     }
 
     sched->queue_bitmap |= (1 << prio);
-
+    task->last_ran = sched->core_id;
     scheduler_increment_thread_count(sched, task);
 
     if (!sched->period_enabled && sched->total_thread_count > 1) {

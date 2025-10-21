@@ -46,6 +46,7 @@ static void slab_free_virt_and_phys(vaddr_t virt, paddr_t phys) {
 
 void slab_cache_init(struct slab_cache *cache, uint64_t obj_size) {
     cache->obj_size = obj_size;
+    cache->pages_per_slab = 1;
     uint64_t available = PAGE_NON_SLAB_SPACE;
 
     if (cache->obj_size > available)
@@ -70,9 +71,9 @@ void slab_cache_init(struct slab_cache *cache, uint64_t obj_size) {
     if (cache->objs_per_slab == 0)
         k_panic("Slab cache cannot hold any objects per slab!\n");
 
-    INIT_LIST_HEAD(&cache->slabs_free);
-    INIT_LIST_HEAD(&cache->slabs_partial);
-    INIT_LIST_HEAD(&cache->slabs_full);
+    INIT_LIST_HEAD(&cache->slabs[SLAB_FREE]);
+    INIT_LIST_HEAD(&cache->slabs[SLAB_PARTIAL]);
+    INIT_LIST_HEAD(&cache->slabs[SLAB_FULL]);
 }
 
 static struct slab *slab_create(struct slab_cache *cache) {
@@ -118,27 +119,34 @@ static struct slab *slab_create(struct slab_cache *cache) {
     spinlock_init(&slab->lock);
     slab->used = 0;
     slab->state = SLAB_FREE;
+    slab->self = slab;
     INIT_LIST_HEAD(&slab->list);
 
     memset(slab->bitmap, 0, bitmap_bytes);
-    atomic_fetch_add(&cache->free_slabs_count, 1);
 
     return slab;
+}
+
+void slab_list_del(struct slab *slab) {
+    enum slab_state state = slab->state;
+    list_del(&slab->list);
+    atomic_fetch_sub(&slab->parent_cache->slabs_count[state], 1);
+}
+
+void slab_list_add(struct slab_cache *cache, struct slab *slab) {
+    enum slab_state state = slab->state;
+    list_add(&slab->list, &cache->slabs[state]);
+    atomic_fetch_add(&slab->parent_cache->slabs_count[state], 1);
 }
 
 static void slab_move_slab(struct slab_cache *cache, struct slab *slab,
                            enum slab_state new_state) {
     kassert(spinlock_held(&cache->lock));
-    list_del(&slab->list);
+    slab_list_del(slab);
 
     slab->state = new_state;
 
-    switch (new_state) {
-    case SLAB_FREE: list_add(&slab->list, &cache->slabs_free); break;
-    case SLAB_PARTIAL: list_add(&slab->list, &cache->slabs_partial); break;
-    case SLAB_FULL: list_add(&slab->list, &cache->slabs_full); break;
-    default: k_panic("Unknown new slab state %d\n", new_state);
-    }
+    slab_list_add(cache, slab);
 }
 
 static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
@@ -158,7 +166,6 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
             if (used == cache->objs_per_slab) {
                 slab_move_slab(cache, slab, SLAB_FULL);
             } else if (used == 1) {
-                atomic_fetch_sub(&cache->free_slabs_count, 1);
                 slab_move_slab(cache, slab, SLAB_PARTIAL);
             } /* No need to move it if the used count is in between
                * 0 and the max -- it will be in the partial list */
@@ -173,8 +180,7 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
 }
 
 void slab_destroy(struct slab *slab) {
-    list_del(&slab->list);
-
+    slab_list_del(slab);
     uintptr_t virt = (uintptr_t) slab;
     paddr_t phys = vmm_get_phys(virt);
     slab_free_virt_and_phys(virt, phys);
@@ -195,11 +201,10 @@ static void slab_free(struct slab_cache *cache, struct slab *slab, void *obj) {
 
     if (new_used == 0) {
         slab_move_slab(cache, slab, SLAB_FREE);
-        if (atomic_fetch_add(&cache->free_slabs_count, 1) > 4) {
+        if (atomic_load(&cache->slabs_count[SLAB_FREE]) > 4) {
             slab_unlock(slab, irql);
             slab_cache_unlock(cache, slab_cache_irql);
             slab_destroy(slab);
-            atomic_fetch_sub(&cache->free_slabs_count, 1);
             return;
         }
     } else if (slab->state == SLAB_FULL) {
@@ -231,14 +236,14 @@ out:
     return ret;
 }
 
-static void *slab_alloc(struct slab_cache *cache) {
+void *slab_alloc(struct slab_cache *cache) {
     void *ret = NULL;
     enum irql irql = slab_cache_lock_irq_disable(cache);
-    ret = slab_try_alloc_from_slab_list(cache, &cache->slabs_partial);
+    ret = slab_try_alloc_from_slab_list(cache, &cache->slabs[SLAB_PARTIAL]);
     if (ret)
         goto out;
 
-    ret = slab_try_alloc_from_slab_list(cache, &cache->slabs_free);
+    ret = slab_try_alloc_from_slab_list(cache, &cache->slabs[SLAB_FREE]);
     if (ret)
         goto out;
 
@@ -246,7 +251,7 @@ static void *slab_alloc(struct slab_cache *cache) {
     if (!slab)
         goto out;
 
-    list_add(&slab->list, &cache->slabs_free);
+    slab_list_add(cache, slab);
     ret = slab_alloc_from(cache, slab);
 
 out:
@@ -283,7 +288,7 @@ size_t ksize(void *ptr) {
     return slab_for_ptr(ptr)->parent_cache->obj_size;
 }
 
-size_t slab_object_size(vaddr_t addr) {
+size_t slab_allocation_size(vaddr_t addr) {
     return ksize((void *) addr);
 }
 
@@ -293,10 +298,8 @@ void *kmalloc(uint64_t size) {
 
     int idx = slab_size_to_index(size);
 
-    if (idx >= 0 && slab_caches[idx].objs_per_slab > 0) {
-        void *ret = slab_alloc(&slab_caches[idx]);
-        return ret;
-    }
+    if (idx >= 0 && slab_caches[idx].objs_per_slab > 0)
+        return slab_alloc(&slab_caches[idx]);
 
     uint64_t total_size = size + sizeof(struct slab_page_hdr);
     uint64_t pages = PAGES_NEEDED_FOR(total_size);
@@ -372,19 +375,7 @@ void kfree(void *ptr) {
     if (!ptr)
         return;
 
-    struct slab_page_hdr *hdr_candidate = slab_page_hdr_for_addr(ptr);
-
-    if (hdr_candidate->magic == KMALLOC_PAGE_MAGIC)
-        return slab_free_page_hdr(hdr_candidate);
-
-    struct slab *slab = slab_for_ptr(ptr);
-
-    if (!slab)
-        k_panic("Likely double free!\n");
-
-    struct slab_cache *cache = slab->parent_cache;
-
-    slab_free(cache, slab, ptr);
+    slab_free_addr_to_cache(ptr);
 }
 
 void *krealloc(void *ptr, uint64_t size) {

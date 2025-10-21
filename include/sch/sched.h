@@ -24,7 +24,6 @@ struct idle_thread_data {
     _Atomic enum idle_thread_state state;
 
     atomic_bool woken_from_timer;
-    atomic_bool did_work_recently;
     atomic_uint_fast64_t last_entry_ms;
     uint64_t last_exit_ms;
 };

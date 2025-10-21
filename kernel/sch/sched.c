@@ -98,7 +98,6 @@ static inline void re_enqueue_thread(struct scheduler *sched,
 
 static inline void update_idle_thread(time_t time) {
     struct idle_thread_data *data = smp_core_idle_thread();
-    data->did_work_recently = true;
     data->last_exit_ms = time;
 }
 
@@ -109,6 +108,7 @@ static inline void update_min_steal_diff(void) {
 
 static inline void save_thread(struct scheduler *sched, struct thread *curr,
                                time_t time) {
+    scheduler_mark_self_idle(false);
     update_min_steal_diff();
 
     /* Only save a running thread that exists */
@@ -184,6 +184,7 @@ static void load_thread(struct scheduler *sched, struct thread *next,
     if (!next)
         return;
 
+    next->last_ran = smp_core_id();
     next->curr_core = smp_core_id();
     next->run_start_time = time;
     thread_calculate_activity_data(next);

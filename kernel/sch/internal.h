@@ -102,7 +102,6 @@ static inline bool scheduler_set_tick_enabled(struct scheduler *sched,
 
 static inline const char *thread_state_str(const enum thread_state state) {
     switch (state) {
-    case THREAD_STATE_NEW: return "NEW";
     case THREAD_STATE_IDLE_THREAD: return "IDLE THREAD";
     case THREAD_STATE_READY: return "READY";
     case THREAD_STATE_RUNNING: return "RUNNING";

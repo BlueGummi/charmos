@@ -18,7 +18,7 @@
 #define SLAB_NONPAGEABLE_RESERVED_RATIO (1 / 16)
 #define SLAB_DESTROY_HIGH_WATERMARK 4
 #define SLAB_INTERLEAVE_STRIDE 1
-#define SLAB_PER_CORE_MAGAZINE_ENTRIES 32
+#define SLAB_MAG_ENTRIES 32
 #define SLAB_MIN_SIZE (sizeof(vaddr_t))
 #define SLAB_MAX_SIZE (PAGE_SIZE / 4)
 
@@ -27,9 +27,22 @@ static const uint64_t slab_class_sizes[] = {
 
 #define SLAB_CLASS_COUNT (sizeof(slab_class_sizes) / sizeof(*slab_class_sizes))
 
-enum slab_state { SLAB_FREE, SLAB_PARTIAL, SLAB_FULL };
+enum slab_state {
+    SLAB_FREE = 0,
+    SLAB_PARTIAL = 1,
+    SLAB_FULL = 2,
+    SLAB_STATE_COUNT = 3
+};
 
 struct slab {
+    struct slab *self; /* We need this field because multi-page slabs
+                        * will keep a pointer to the parent slab at
+                        * the start of each page, and if we add this
+                        * to the actual slab itself, we can branchlessly
+                        * retrieve the slab for any given pointer.
+                        *
+                        * Must be first element in structure  */
+
     struct list_head list;
 
     uint8_t *bitmap;
@@ -43,28 +56,32 @@ struct slab {
     enum slab_state state;
 };
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab, lock);
+
 #define slab_from_list_node(ln) (container_of(ln, struct slab, list))
+#define PAGE_NON_SLAB_SPACE (PAGE_SIZE - sizeof(struct slab))
+
+_Static_assert(offsetof(struct slab, self) == 0,
+               "self pointer not at start of struct");
 
 static inline struct page *slab_get_backing_page(struct slab *slab) {
     return page_for_pfn(PAGE_TO_PFN(vmm_get_phys((vaddr_t) slab)));
 }
 
-#define PAGE_NON_SLAB_SPACE (PAGE_SIZE - sizeof(struct slab))
-
 /* Just a simple stack */
 struct slab_magazine {
-    vaddr_t objs[SLAB_PER_CORE_MAGAZINE_ENTRIES];
+    vaddr_t objs[SLAB_MAG_ENTRIES];
     uint8_t count;
 };
 
+static inline bool slab_magazine_full(struct slab_magazine *mag) {
+    return mag->count == SLAB_MAG_ENTRIES;
+}
+
 struct slab_per_cpu_cache {
+    /* Magazines are always nonpageable */
     struct slab_magazine mag[SLAB_CLASS_COUNT];
     struct slab *active_slab[SLAB_CLASS_COUNT];
 };
-
-static inline bool slab_magazine_full(struct slab_magazine *mag) {
-    return mag->count == SLAB_PER_CORE_MAGAZINE_ENTRIES;
-}
 
 struct slab_free_slot {
     atomic_uint_fast64_t seq;
@@ -115,24 +132,29 @@ enum slab_cache_type { SLAB_CACHE_TYPE_PAGEABLE, SLAB_CACHE_TYPE_NONPAGEABLE };
 struct slab_cache {
     uint64_t obj_size;
     uint64_t objs_per_slab;
+    size_t pages_per_slab;
 
-    struct list_head slabs_free;
-    struct list_head slabs_partial;
-    struct list_head slabs_full;
-    atomic_size_t free_slabs_count;
+    struct list_head slabs[SLAB_STATE_COUNT];
+    atomic_size_t slabs_count[SLAB_STATE_COUNT];
 
     enum slab_cache_type type;
+
+    struct slab_domain *parent_domain;
 
     struct spinlock lock;
 };
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab_cache, lock);
+
+static inline size_t slab_cache_count_for(struct slab_cache *cache,
+                                          enum slab_state state) {
+    return atomic_load(&cache->slabs_count[state]);
+}
 
 struct slab_caches {
     struct slab_cache caches[SLAB_CLASS_COUNT];
 };
 
 struct slab_cache_ref {
-    struct slab_domain *domain; /* owning domain of the cache */
     struct slab_caches *caches; /* pointer to caches */
     enum slab_cache_type type;  /* pageable / nonpageable */
     uint8_t locality;           /* NUMA proximity, 0 = local */
@@ -173,14 +195,27 @@ struct slab_page_hdr {
 void slab_destroy(struct slab *slab);
 int32_t slab_size_to_index(size_t size);
 void slab_init();
-size_t slab_object_size(vaddr_t addr);
+void *slab_alloc(struct slab_cache *cache);
+void slab_free_page_hdr(struct slab_page_hdr *hdr);
+size_t slab_allocation_size(vaddr_t addr);
 
+/* Magazine */
 bool slab_magazine_push(struct slab_magazine *mag, vaddr_t obj);
 vaddr_t slab_magazine_pop(struct slab_magazine *mag);
 vaddr_t slab_percpu_alloc(struct slab_domain *dom, size_t class_idx);
-void slab_percpu_free(struct slab_domain *dom, size_t class_idx, vaddr_t obj);
+void slab_percpu_free(size_t class_idx, vaddr_t obj);
+void slab_free_addr_to_cache(void *addr);
 void slab_domain_init_percpu(struct slab_domain *dom);
-void slab_free_page_hdr(struct slab_page_hdr *hdr);
+
+/* Freequeue */
+bool slab_free_queue_ringbuffer_enqueue(struct slab_free_queue *q,
+                                        vaddr_t addr);
+vaddr_t slab_free_queue_ringbuffer_dequeue(struct slab_free_queue *q);
+void slab_free_queue_list_enqueue(struct slab_free_queue *q, vaddr_t addr);
+vaddr_t slab_free_queue_list_dequeue(struct slab_free_queue *q);
+vaddr_t slab_free_queue_drain_singular(struct slab_free_queue *q);
+size_t slab_free_queue_drain_to_per_cpu_cache(struct slab_per_cpu_cache *cache,
+                                              struct slab_free_queue *queue);
 
 static inline bool slab_get(struct slab *slab) {
     return refcount_inc(&slab->refcount);
@@ -199,8 +234,20 @@ static inline struct slab_page_hdr *slab_page_hdr_for_addr(void *ptr) {
     return (struct slab_page_hdr *) PAGE_ALIGN_DOWN(ptr);
 }
 
+static inline size_t slab_object_count(struct slab *slab) {
+    return slab->parent_cache->objs_per_slab;
+}
+
+static inline size_t slab_object_size(struct slab *slab) {
+    return slab->parent_cache->obj_size;
+}
+
+/* The parent slab object has a pointer
+ * to itself at the start of the structure,
+ * and following pages all contain a backpointer
+ * to the slab at the start of every page */
 static inline struct slab *slab_for_ptr(void *ptr) {
-    return (struct slab *) PAGE_ALIGN_DOWN(ptr);
+    return *(struct slab **) PAGE_ALIGN_DOWN(ptr);
 }
 
 static inline struct slab_domain *slab_local_domain(void) {

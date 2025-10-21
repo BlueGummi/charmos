@@ -63,7 +63,7 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->regs.rsp = (uint64_t) stack_top;
     new_thread->base_priority = THREAD_PRIO_CLASS_TIMESHARE;
     new_thread->perceived_priority = THREAD_PRIO_CLASS_TIMESHARE;
-    new_thread->state = THREAD_STATE_NEW;
+    new_thread->state = THREAD_STATE_READY;
     new_thread->regs.r12 = (uint64_t) entry_point;
     new_thread->regs.rip = (uint64_t) thread_entry_wrapper;
     new_thread->stack = (void *) stack;

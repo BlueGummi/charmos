@@ -11,6 +11,7 @@ set $i = 0
 while ($i < $max_cores)
   printf "[CORE %d]\n", $i
   p/x *global.cores[$i]
+  p/x *global.schedulers[$i]
   set $i = $i + 1
 end
 

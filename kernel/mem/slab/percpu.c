@@ -1,5 +1,31 @@
-#include "internal.h"
+#include <sch/sched.h>
 #include <smp/domain.h>
+
+#include "internal.h"
+#include "mem/domain/internal.h"
+
+bool slab_magazine_push(struct slab_magazine *mag, vaddr_t obj) {
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
+
+    if (mag->count < SLAB_MAG_ENTRIES) {
+        mag->objs[mag->count++] = obj;
+        irql_lower(irql);
+        return true;
+    }
+
+    irql_lower(irql);
+    return false;
+}
+
+vaddr_t slab_magazine_pop(struct slab_magazine *mag) {
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
+    vaddr_t ret = 0x0;
+    if (mag->count > 0)
+        ret = mag->objs[--mag->count];
+
+    irql_lower(irql);
+    return ret;
+}
 
 void slab_domain_init_percpu(struct slab_domain *dom) {
     size_t ncpu = dom->domain->num_cores;
@@ -18,27 +44,45 @@ void slab_domain_init_percpu(struct slab_domain *dom) {
 }
 
 /* TODO: */
+bool slab_cache_available(struct slab_cache *cache) {
+    if (slab_cache_count_for(cache, SLAB_FREE) > 0 ||
+        slab_cache_count_for(cache, SLAB_PARTIAL) > 0)
+        return true;
 
-static inline bool slab_cache_available(struct slab_cache *cache) {
-    return true;
+    struct domain_buddy *buddy =
+        cache->parent_domain->domain->cores[0]->domain_buddy;
+
+    size_t free_pages = buddy->total_pages - buddy->pages_used;
+
+    return free_pages >= cache->pages_per_slab;
 }
 
-static inline size_t slab_cache_bulk_alloc(struct slab_cache *cache,
-                                           vaddr_t *addr_array,
-                                           size_t num_objects) {
-    return 0;
+size_t slab_cache_bulk_alloc(struct slab_cache *cache, vaddr_t *addr_array,
+                             size_t num_objects) {
+    size_t total_allocated = 0;
+
+    for (size_t i = 0; i < num_objects; i++) {
+        void *obj = slab_alloc(cache);
+        if (!obj)
+            break;
+
+        addr_array[i] = (vaddr_t) obj;
+    }
+
+    return total_allocated;
 }
 
-static inline void slab_cache_bulk_free(struct slab_cache *cache,
-                                        vaddr_t *addr_array,
-                                        size_t num_objects) {
+void slab_cache_bulk_free(vaddr_t *addr_array, size_t num_objects) {
+    for (size_t i = 0; i < num_objects; i++) {
+        vaddr_t addr = addr_array[i];
+        slab_free_addr_to_cache((void *) addr);
+    }
+
     return;
 }
 
-struct slab_cache *slab_pick_best_local_cache(struct slab_domain *sdom,
-                                              size_t class_idx, bool pageable) {
-    struct slab_cache_zonelist *zl =
-        pageable ? &sdom->pageable_zonelist : &sdom->nonpageable_zonelist;
+struct slab_cache *slab_pick_cache(struct slab_domain *sdom, size_t class_idx) {
+    struct slab_cache_zonelist *zl = &sdom->nonpageable_zonelist;
 
     for (size_t i = 0; i < zl->count; i++) {
         struct slab_cache_ref *ref = &zl->entries[i];
@@ -49,31 +93,38 @@ struct slab_cache *slab_pick_best_local_cache(struct slab_domain *sdom,
     return NULL;
 }
 
-void slab_percpu_flush(struct slab_domain *dom, struct slab_per_cpu_cache *pc,
-                       size_t class_idx, vaddr_t overflow_obj) {
-    struct slab_cache *cache =
-        slab_pick_best_local_cache(dom, class_idx, /*pageable=*/false);
-    vaddr_t objs[SLAB_PER_CORE_MAGAZINE_ENTRIES + 1];
+void slab_percpu_flush(struct slab_per_cpu_cache *pc, size_t class_idx,
+                       vaddr_t overflow_obj) {
+    struct slab_magazine *mag = &pc->mag[class_idx];
+    vaddr_t objs[SLAB_MAG_ENTRIES + 1];
 
-    for (size_t i = 0; i < SLAB_PER_CORE_MAGAZINE_ENTRIES; i++)
-        objs[i] = pc->mag[class_idx].objs[i];
-    objs[SLAB_PER_CORE_MAGAZINE_ENTRIES] = overflow_obj;
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
 
-    pc->mag[class_idx].count = 0;
+    for (size_t i = 0; i < SLAB_MAG_ENTRIES; i++)
+        objs[i] = mag->objs[i];
 
-    slab_cache_bulk_free(cache, objs, SLAB_PER_CORE_MAGAZINE_ENTRIES + 1);
+    objs[SLAB_MAG_ENTRIES] = overflow_obj;
+    mag->count = 0;
+
+    irql_lower(irql);
+
+    slab_cache_bulk_free(objs, SLAB_MAG_ENTRIES + 1);
 }
 
 vaddr_t slab_percpu_refill(struct slab_domain *dom,
                            struct slab_per_cpu_cache *pc, size_t class_idx) {
-    struct slab_cache *cache =
-        slab_pick_best_local_cache(dom, class_idx, /*pageable=*/false);
-    vaddr_t objs[SLAB_PER_CORE_MAGAZINE_ENTRIES];
-    size_t got =
-        slab_cache_bulk_alloc(cache, objs, SLAB_PER_CORE_MAGAZINE_ENTRIES);
+    struct slab_cache *cache = slab_pick_cache(dom, class_idx);
+    struct slab_magazine *mag = &pc->mag[class_idx];
+
+    vaddr_t objs[SLAB_MAG_ENTRIES];
+    size_t got = slab_cache_bulk_alloc(cache, objs, SLAB_MAG_ENTRIES);
+
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
 
     for (size_t i = 1; i < got; i++)
-        pc->mag[class_idx].objs[pc->mag[class_idx].count++] = objs[i];
+        mag->objs[mag->count++] = objs[i];
+
+    irql_lower(irql);
 
     return got > 0 ? objs[0] : 0x0;
 }
@@ -82,37 +133,19 @@ vaddr_t slab_percpu_alloc(struct slab_domain *dom, size_t class_idx) {
     struct slab_per_cpu_cache *pc = slab_local_percpu_cache();
     struct slab_magazine *mag = &pc->mag[class_idx];
 
-    if (mag->count > 0) {
-        return mag->objs[--mag->count];
-    }
+    vaddr_t ret = slab_magazine_pop(mag);
+    if (ret)
+        return ret;
 
     return slab_percpu_refill(dom, pc, class_idx);
 }
 
-bool slab_magazine_push(struct slab_magazine *mag, vaddr_t obj) {
-    if (mag->count < SLAB_PER_CORE_MAGAZINE_ENTRIES) {
-        mag->objs[mag->count++] = obj;
-        return true;
-    }
-
-    return false;
-}
-
-vaddr_t slab_magazine_pop(struct slab_magazine *mag) {
-    if (mag->count > 0)
-        return mag->objs[--mag->count];
-
-    return 0x0;
-}
-
-void slab_percpu_free(struct slab_domain *dom, size_t class_idx, vaddr_t obj) {
+void slab_percpu_free(size_t class_idx, vaddr_t obj) {
     struct slab_per_cpu_cache *pc = slab_local_percpu_cache();
     struct slab_magazine *mag = &pc->mag[class_idx];
 
-    if (mag->count < SLAB_PER_CORE_MAGAZINE_ENTRIES) {
-        mag->objs[mag->count++] = obj;
+    if (slab_magazine_push(mag, obj))
         return;
-    }
 
-    slab_percpu_flush(dom, pc, class_idx, obj);
+    slab_percpu_flush(pc, class_idx, obj);
 }
