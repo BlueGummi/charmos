@@ -78,13 +78,11 @@ static struct daemon_work *work_on_thread(struct daemon_thread *thread) {
                               : thread->daemon->timesharing_work;
 }
 
-static void daemon_work_execute(struct daemon_work *work,
+static void daemon_work_execute(struct daemon_work *w,
                                 struct daemon_thread *self) {
-    self->command = DAEMON_THREAD_COMMAND_DEFAULT;
-
     mark_daemon_thread_executing(self, true);
 
-    work->function(work, self, work->args.arg1, work->args.arg2);
+    self->command = w->function(w, self, w->args.arg1, w->args.arg2);
 
     mark_daemon_thread_executing(self, false);
 
@@ -174,7 +172,17 @@ daemon_thread_spawn(struct daemon *daemon,
     if (!t)
         return NULL;
 
-    scheduler_enqueue(t->thread);
+    bool no_migrate = daemon->attrs.flags & DAEMON_FLAG_UNMIGRATABLE_THREADS;
+
+    if (no_migrate)
+        t->thread->flags |= THREAD_FLAGS_NO_STEAL;
+
+    if (daemon->attrs.thread_cpu != -1 && no_migrate) {
+        scheduler_enqueue_on_core(t->thread, daemon->attrs.thread_cpu);
+    } else {
+        scheduler_enqueue(t->thread);
+    }
+
     return t;
 }
 
@@ -229,7 +237,7 @@ struct daemon *daemon_create(struct daemon_attributes *attrs,
         daemon->workqueue = wq;
     }
 
-    if (!DAEMON_FLAG_TEST(daemon, DAEMON_FlAG_NO_TS_THREADS) &&
+    if (!DAEMON_FLAG_TEST(daemon, DAEMON_FLAG_NO_TS_THREADS) &&
         timesharing_work) {
         dt = daemon_thread_spawn(daemon, daemon_thread_create);
         if (!dt)

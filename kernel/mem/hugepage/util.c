@@ -4,6 +4,7 @@
 #include <mem/hugepage.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
+#include <misc/popcount.h>
 #include <sch/defer.h>
 #include <types/refcount.h>
 
@@ -62,7 +63,7 @@ bool hugepage_is_valid(struct hugepage *hp, bool locked) {
 
     for (int i = 0; i < HUGEPAGE_U64_BITMAP_SIZE; i++) {
         uint64_t bm_part = hp->bitmap[i];
-        pused += popcount_uint64(bm_part);
+        pused += popcount(bm_part);
     }
 
     if (pused != hp->pages_used) {

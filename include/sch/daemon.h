@@ -29,7 +29,7 @@ struct daemon_thread {
 
 struct daemon_work;
 
-typedef void (*daemon_fn)(
+typedef enum daemon_thread_command (*daemon_fn)(
     struct daemon_work *work,       /* Work in question */
     struct daemon_thread *executor, /* Current executing thread */
     void *arg,                      /* Daemon work provided arg1 */
@@ -49,7 +49,8 @@ enum daemon_flags {
     DAEMON_FLAG_HAS_WORKQUEUE = 1,
     DAEMON_FLAG_HAS_NAME = 1 << 1,
     DAEMON_FLAG_AUTO_SPAWN = 1 << 2,
-    DAEMON_FlAG_NO_TS_THREADS = 1 << 3,
+    DAEMON_FLAG_NO_TS_THREADS = 1 << 3,
+    DAEMON_FLAG_UNMIGRATABLE_THREADS = 1 << 4,
     DAEMON_FLAG_NONE = 0,
 };
 
@@ -58,6 +59,11 @@ struct daemon_attributes {
     atomic_size_t timesharing_threads;
     atomic_size_t idle_timesharing_threads;
     atomic_bool background_thread_present;
+
+    /* TODO: Once we get threads to have CPUmasks
+     * that indicate where they can be run, I'll
+     * need to fix this and just allow assigned CPUmasks */
+    int64_t thread_cpu;
 
     enum daemon_flags flags;
 };
@@ -90,10 +96,9 @@ struct daemon {
 
     struct workqueue *workqueue;
 
-    struct spinlock lock;
-
     struct daemon_attributes attrs;
 
+    struct spinlock lock;
     enum daemon_state state;
 };
 
@@ -120,12 +125,6 @@ enum workqueue_error daemon_submit_work(struct daemon *daemon,
 void daemon_print(struct daemon *daemon);
 void daemon_wake_background_worker(struct daemon *daemon);
 void daemon_wake_timesharing_worker(struct daemon *daemon);
-
-#define DAEMON_SEND_CMD(__self, __cmd)                                         \
-    do {                                                                       \
-        __self->command = __cmd;                                               \
-        return;                                                                \
-    } while (0)
 
 #define DAEMON_FLAG_TEST(daemon, flag) (daemon->attrs.flags & flag)
 

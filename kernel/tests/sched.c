@@ -198,11 +198,12 @@ REGISTER_TEST(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 }
 
 static atomic_bool daemon_work_run = false;
-static void daemon_work(struct daemon_work *work, struct daemon_thread *thread,
-                        void *a, void *b) {
+static enum daemon_thread_command daemon_work(struct daemon_work *work,
+                                              struct daemon_thread *thread,
+                                              void *a, void *b) {
     (void) work, (void) a, (void) b;
     atomic_store(&daemon_work_run, true);
-    DAEMON_SEND_CMD(thread, DAEMON_THREAD_COMMAND_SLEEP);
+    return DAEMON_THREAD_COMMAND_SLEEP;
 }
 
 static struct daemon_work dwork =

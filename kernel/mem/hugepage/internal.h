@@ -165,17 +165,6 @@ static inline bool hugepage_is_marked_for_deletion(struct hugepage *hp) {
     return atomic_load(&hp->for_deletion);
 }
 
-static inline uint64_t popcount_uint64(uint64_t n) {
-    uint64_t count = 0;
-    while (n > 0) {
-        if (n & 1) {
-            count++;
-        }
-        n >>= 1;
-    }
-    return count;
-}
-
 static inline struct hugepage_core_list *hugepage_this_core_list(void) {
     if (global.current_bootstage < BOOTSTAGE_MID_MP)
         return &hugepage_full_tree->core_lists[0];

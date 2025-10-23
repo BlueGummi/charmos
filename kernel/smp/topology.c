@@ -86,7 +86,7 @@ static void print_topology_node(struct topology_node *node, int depth) {
     }
 }
 
-static void cpu_mask_init(struct cpu_mask *m, size_t nbits) {
+void cpu_mask_init(struct cpu_mask *m, size_t nbits) {
     m->nbits = nbits;
     if (nbits <= 64) {
         m->uses_large = false;
@@ -133,7 +133,7 @@ void cpu_mask_or(struct cpu_mask *dst, const struct cpu_mask *b) {
     }
 }
 
-static bool cpu_mask_empty(const struct cpu_mask *mask) {
+bool cpu_mask_empty(const struct cpu_mask *mask) {
     if (!mask->uses_large)
         return atomic_load(&mask->small) == 0;
 

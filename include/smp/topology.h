@@ -69,6 +69,13 @@ struct topology {
     uint16_t count[TOPOLOGY_LEVEL_MAX];
 };
 
+void cpu_mask_init(struct cpu_mask *m, size_t nbits);
+void cpu_mask_set(struct cpu_mask *m, size_t cpu);
+void cpu_mask_clear(struct cpu_mask *m, size_t cpu);
+bool cpu_mask_test(const struct cpu_mask *m, size_t cpu);
+void cpu_mask_or(struct cpu_mask *dst, const struct cpu_mask *b);
+bool cpu_mask_empty(const struct cpu_mask *mask);
+
 void topology_mark_core_idle(size_t cpu_id, bool idle);
 struct core *topology_find_idle_core(struct core *local_core,
                                      enum topology_level max_search);

@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* --------------------------- ALLOC FLAGS --------------------------- */
+
 #define ALLOC_LOCALITY_SHIFT 8
 #define ALLOC_CLASS_SHIFT 12
 #define ALLOC_CLASS_MASK 0xF
@@ -93,6 +95,18 @@ static inline bool alloc_flags_valid(uint16_t flags) {
 
     return true;
 }
+
+/* --------------------------- ALLOC BEHAVIORS --------------------------- */
+
+/* Behaviors define what the allocator is
+ * allowed to do in a given invocation. */
+enum alloc_behavior {
+    ALLOC_BEHAVIOR_NORMAL,     /* may block, may fault, may reclaim */
+    ALLOC_BEHAVIOR_ATOMIC,     /* may NOT block or fault (ISR-safe) */
+    ALLOC_BEHAVIOR_NO_WAIT,    /* may block briefly, but not reclaim or fault */
+    ALLOC_BEHAVIOR_NO_RECLAIM, /* may fault, may block, but not trigger GC */
+    ALLOC_BEHAVIOR_FAULT_SAFE, /* may block but not access pageable metadata */
+};
 
 void *kmalloc(uint64_t size);
 void *krealloc(void *ptr, uint64_t size);

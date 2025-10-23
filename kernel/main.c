@@ -63,7 +63,7 @@ void k_main(void) {
     vmm_init(memmap_request.response, xa_request.response);
     pmm_mid_init();
 
-    slab_init();
+    slab_allocator_init();
     hugepage_alloc_init();
     global.current_bootstage = BOOTSTAGE_EARLY_ALLOCATORS;
 

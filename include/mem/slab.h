@@ -1,3 +1,2 @@
 #pragma once
-void slab_init();
-
+void slab_allocator_init();

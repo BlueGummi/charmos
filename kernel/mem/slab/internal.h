@@ -1,37 +1,75 @@
 #pragma once
-
+#include <kassert.h>
 #include <mem/alloc.h>
 #include <mem/page.h>
 #include <mem/vmm.h>
+#include <misc/align.h>
+#include <misc/containerof.h>
 #include <misc/list.h>
+#include <misc/locked_list.h>
+#include <smp/domain.h>
 #include <stdatomic.h>
 #include <stdint.h>
 #include <sync/spinlock.h>
-#include <types/refcount.h>
+
+/* Lock order:
+ *
+ * First acquire slab cache lock, then
+ * per-slab lock. Freequeue has lockless
+ * ringbuffer, but there is also a locked
+ * singly linked list */
 
 #define KMALLOC_PAGE_MAGIC 0xC0FFEE42
+
 #define SLAB_HEAP_START 0xFFFFF00000000000ULL
 #define SLAB_HEAP_END 0xFFFFF10000000000ULL
+
 #define SLAB_OBJ_ALIGN 16u
 #define SLAB_BITMAP_TEST(__bitmap, __idx) (__bitmap & __idx)
+
 #define SLAB_CROSSFREE_RING_SIZE 64
 #define SLAB_NONPAGEABLE_RESERVED_RATIO (1 / 16)
 #define SLAB_DESTROY_HIGH_WATERMARK 4
 #define SLAB_INTERLEAVE_STRIDE 1
 #define SLAB_MAG_ENTRIES 32
+
 #define SLAB_MIN_SIZE (sizeof(vaddr_t))
 #define SLAB_MAX_SIZE (PAGE_SIZE / 4)
+
+#define SLAB_BITMAP_BYTES_FOR(x) ((x + 7) / 8)
+#define SLAB_BITMAP_SET(bm, mask) (bm |= (uint8_t) mask)
+#define SLAB_BITMAP_UNSET(bm, mask) (bm &= (uint8_t) ~mask)
+
+#define SLAB_ALIGN_UP(x, a) ALIGN_UP(x, a)
+#define SLAB_OBJ_ALIGN_UP(x) SLAB_ALIGN_UP(x, SLAB_OBJ_ALIGN)
 
 static const uint64_t slab_class_sizes[] = {
     SLAB_MIN_SIZE, 16, 32, 64, 96, 128, 192, 256, 512, SLAB_MAX_SIZE};
 
 #define SLAB_CLASS_COUNT (sizeof(slab_class_sizes) / sizeof(*slab_class_sizes))
 
+/* This value determines the scale at which cores in a slab domain
+ * will be weighted when they attempt to fill up their per-cpu
+ * caches from free_queue elements.
+ *
+ * It is used to derive a "target amount of elements" to try to drain.
+ *
+ * The computation is as follows:
+ *
+ * target = fq_total_elems / (slab_domain_core_count / REFILL_PER_CORE_WEIGHT)
+ *
+ * Where (slab_domain_core_count / REFILL_PER_CORE_WEIGHT) is at least 1.
+ *
+ * Thus, as this number increases, the portion of all the free_queue elements
+ * that will attempted to be flushed (the target) increases. */
+#define SLAB_PERCPU_REFILL_PER_CORE_WEIGHT 2
+
 enum slab_state {
     SLAB_FREE = 0,
     SLAB_PARTIAL = 1,
     SLAB_FULL = 2,
-    SLAB_STATE_COUNT = 3
+    SLAB_STANDARD_STATE_COUNT = 3,
+    SLAB_IN_GC_LIST = 4,
 };
 
 struct slab {
@@ -48,36 +86,34 @@ struct slab {
     uint8_t *bitmap;
 
     vaddr_t mem;
-    atomic_uint_fast64_t used;
+    size_t used;
     struct slab_cache *parent_cache;
 
     struct spinlock lock;
-    refcount_t refcount;
     enum slab_state state;
 };
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab, lock);
 
 #define slab_from_list_node(ln) (container_of(ln, struct slab, list))
 #define PAGE_NON_SLAB_SPACE (PAGE_SIZE - sizeof(struct slab))
+#define slab_error(fmt, ...) k_info("SLAB", K_ERROR, fmt, ##__VA_ARGS__)
 
 _Static_assert(offsetof(struct slab, self) == 0,
                "self pointer not at start of struct");
-
-static inline struct page *slab_get_backing_page(struct slab *slab) {
-    return page_for_pfn(PAGE_TO_PFN(vmm_get_phys((vaddr_t) slab)));
-}
 
 /* Just a simple stack */
 struct slab_magazine {
     vaddr_t objs[SLAB_MAG_ENTRIES];
     uint8_t count;
+    struct spinlock lock;
 };
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab_magazine, lock);
 
 static inline bool slab_magazine_full(struct slab_magazine *mag) {
     return mag->count == SLAB_MAG_ENTRIES;
 }
 
-struct slab_per_cpu_cache {
+struct slab_percpu_cache {
     /* Magazines are always nonpageable */
     struct slab_magazine mag[SLAB_CLASS_COUNT];
     struct slab *active_slab[SLAB_CLASS_COUNT];
@@ -108,10 +144,16 @@ struct slab_free_slot {
  *
  * Because the minimum slab size is the pointer
  * size, we can guarantee that the pointer fits */
+struct slab_free_queue_list_node {
+    struct slab_free_queue_list_node *next;
+};
 
 struct slab_free_queue_list {
-    struct slab_free_queue_list *next;
+    struct slab_free_queue_list_node *head;
+    struct slab_free_queue_list_node *tail;
+    struct spinlock lock;
 };
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab_free_queue_list, lock);
 
 struct slab_free_queue {
     atomic_uint_fast64_t head;
@@ -119,13 +161,13 @@ struct slab_free_queue {
     size_t capacity;
     struct slab_free_slot *slots;
 
-    struct slab_free_queue_list *list_head;
-    struct slab_free_queue_list *list_tail;
-
-    /* For the free_queue_list */
-    struct spinlock lock;
+    struct slab_free_queue_list list;
+    atomic_size_t count;
 };
-SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT_NAMED(slab_free_queue, lock, list);
+#define SLAB_FREE_QUEUE_GET_COUNT(fq) (atomic_load(&(fq)->count))
+#define SLAB_FREE_QUEUE_INC_COUNT(fq) (atomic_fetch_add(&(fq)->count, 1))
+#define SLAB_FREE_QUEUE_ADD_COUNT(fq, n) (atomic_fetch_add(&(fq)->count, n))
+#define SLAB_FREE_QUEUE_DEC_COUNT(fq) (atomic_fetch_sub(&(fq)->count, 1))
 
 enum slab_cache_type { SLAB_CACHE_TYPE_PAGEABLE, SLAB_CACHE_TYPE_NONPAGEABLE };
 
@@ -134,8 +176,8 @@ struct slab_cache {
     uint64_t objs_per_slab;
     size_t pages_per_slab;
 
-    struct list_head slabs[SLAB_STATE_COUNT];
-    atomic_size_t slabs_count[SLAB_STATE_COUNT];
+    struct list_head slabs[SLAB_STANDARD_STATE_COUNT];
+    atomic_size_t slabs_count[SLAB_STANDARD_STATE_COUNT];
 
     enum slab_cache_type type;
 
@@ -179,22 +221,31 @@ struct slab_domain {
 
     /* Pointer to an array of pointers to per CPU single-slabs for each class */
     /* # CPUs determined by the domain struct */
-    struct slab_per_cpu_cache **per_cpu_caches;
+    struct slab_percpu_cache **percpu_caches;
 
     /* Freequeue for remote frees */
-    struct slab_free_queue freequeue;
+    struct slab_free_queue free_queue;
 
-    struct list_head slab_gc_list;
+    /* List of slabs that are reusable and can be
+     * garbage collected safely/kept here */
+    struct locked_list slab_gc_list;
+
+    struct daemon *daemon;
 };
+
+static inline struct domain_buddy *
+slab_domain_buddy(struct slab_domain *domain) {
+    return domain->domain->cores[0]->domain_buddy;
+}
 
 struct slab_page_hdr {
     uint32_t magic;
     uint32_t pages;
 };
 
+struct slab *slab_init(struct slab *slab, struct slab_cache *parent);
 void slab_destroy(struct slab *slab);
 int32_t slab_size_to_index(size_t size);
-void slab_init();
 void *slab_alloc(struct slab_cache *cache);
 void slab_free_page_hdr(struct slab_page_hdr *hdr);
 size_t slab_allocation_size(vaddr_t addr);
@@ -203,7 +254,7 @@ size_t slab_allocation_size(vaddr_t addr);
 bool slab_magazine_push(struct slab_magazine *mag, vaddr_t obj);
 vaddr_t slab_magazine_pop(struct slab_magazine *mag);
 vaddr_t slab_percpu_alloc(struct slab_domain *dom, size_t class_idx);
-void slab_percpu_free(size_t class_idx, vaddr_t obj);
+void slab_percpu_free(struct slab_domain *dom, size_t class_idx, vaddr_t obj);
 void slab_free_addr_to_cache(void *addr);
 void slab_domain_init_percpu(struct slab_domain *dom);
 
@@ -213,21 +264,15 @@ bool slab_free_queue_ringbuffer_enqueue(struct slab_free_queue *q,
 vaddr_t slab_free_queue_ringbuffer_dequeue(struct slab_free_queue *q);
 void slab_free_queue_list_enqueue(struct slab_free_queue *q, vaddr_t addr);
 vaddr_t slab_free_queue_list_dequeue(struct slab_free_queue *q);
-vaddr_t slab_free_queue_drain_singular(struct slab_free_queue *q);
-size_t slab_free_queue_drain_to_per_cpu_cache(struct slab_per_cpu_cache *cache,
-                                              struct slab_free_queue *queue);
+vaddr_t slab_free_queue_dequeue(struct slab_free_queue *q);
+size_t slab_free_queue_drain(struct slab_percpu_cache *cache,
+                             struct slab_free_queue *queue, size_t target,
+                             bool flush_to_cache);
 
-static inline bool slab_get(struct slab *slab) {
-    return refcount_inc(&slab->refcount);
-}
+bool slab_check(struct slab *slab);
 
-static inline void slab_put(struct slab *slab) {
-    if (refcount_dec_and_test(&slab->refcount))
-        slab_destroy(slab);
-}
-
-static inline uint64_t slab_round_up_pow2(uint64_t x, uint64_t a) {
-    return (x + (a - 1)) & ~(a - 1);
+static inline struct page *slab_get_backing_page(struct slab *slab) {
+    return page_for_pfn(PAGE_TO_PFN(vmm_get_phys((vaddr_t) slab)));
 }
 
 static inline struct slab_page_hdr *slab_page_hdr_for_addr(void *ptr) {
@@ -254,8 +299,35 @@ static inline struct slab_domain *slab_local_domain(void) {
     return smp_core()->slab_domain;
 }
 
-static inline struct slab_per_cpu_cache *slab_local_percpu_cache(void) {
-    return slab_local_domain()->per_cpu_caches[smp_core_id()];
+static inline struct slab_percpu_cache *slab_local_percpu_cache(void) {
+    return slab_local_domain()->percpu_caches[smp_core_id()];
+}
+
+static inline void slab_list_del(struct slab *slab) {
+    if (list_empty(&slab->list))
+        return;
+
+    enum slab_state state = slab->state;
+    list_del(&slab->list);
+
+    if (state != SLAB_IN_GC_LIST)
+        atomic_fetch_sub(&slab->parent_cache->slabs_count[state], 1);
+}
+
+static inline void slab_list_add(struct slab_cache *cache, struct slab *slab) {
+    enum slab_state state = slab->state;
+    list_add(&slab->list, &cache->slabs[state]);
+    atomic_fetch_add(&slab->parent_cache->slabs_count[state], 1);
+}
+
+static inline void slab_move(struct slab_cache *c, struct slab *slab,
+                             enum slab_state new) {
+    kassert(spinlock_held(&c->lock));
+    slab_list_del(slab);
+
+    slab->state = new;
+
+    slab_list_add(c, slab);
 }
 
 extern struct vas_space *slab_vas;
