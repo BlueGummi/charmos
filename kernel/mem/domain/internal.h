@@ -201,6 +201,7 @@ static inline void free_from_buddy_internal(struct domain_buddy *target,
     buddy_free_pages(address, page_count, target->free_area,
                      target->total_pages);
     domain_stat_free(target);
+    atomic_fetch_sub(&target->pages_used, page_count);
 
     domain_buddy_unlock(target, irql);
 }
