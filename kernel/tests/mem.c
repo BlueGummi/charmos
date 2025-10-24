@@ -53,62 +53,60 @@ KMALLOC_ALIGNMENT_TEST(256, 256)
 
 #define STRESS_ALLOC_TIMES 2048
 
+static paddr_t pmm_stress_test_ptrs[STRESS_ALLOC_TIMES];
 REGISTER_TEST(pmm_stress_alloc_free_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
-    paddr_t addrs[STRESS_ALLOC_TIMES];
-
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
-        addrs[i] = pmm_alloc_page(ALLOC_FLAGS_NONE);
-        TEST_ASSERT(addrs[i] != 0);
+        pmm_stress_test_ptrs[i] = pmm_alloc_page(ALLOC_FLAGS_NONE);
+        TEST_ASSERT(pmm_stress_test_ptrs[i] != 0);
     }
 
     for (int64_t i = STRESS_ALLOC_TIMES - 1; i >= 0; i--) {
-        pmm_free_page(addrs[i]);
+        pmm_free_page(pmm_stress_test_ptrs[i]);
     }
 
     SET_SUCCESS();
 }
 
+static void *stress_alloc_free_ptrs[STRESS_ALLOC_TIMES] = {0};
 REGISTER_TEST(kmalloc_stress_alloc_free_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
-    void *ptrs[STRESS_ALLOC_TIMES];
-
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
-        ptrs[i] = kmalloc(64);
-        TEST_ASSERT(ptrs[i] != NULL);
+        stress_alloc_free_ptrs[i] = kmalloc(64);
+        TEST_ASSERT(stress_alloc_free_ptrs[i] != NULL);
     }
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
         uint64_t idx = prng_next() % STRESS_ALLOC_TIMES;
-        if (ptrs[idx]) {
-            kfree(ptrs[idx]);
-            ptrs[idx] = NULL;
+        if (stress_alloc_free_ptrs[idx]) {
+            kfree(stress_alloc_free_ptrs[idx]);
+            stress_alloc_free_ptrs[idx] = NULL;
         }
     }
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
-        if (ptrs[i]) {
-            kfree(ptrs[i]);
+        if (stress_alloc_free_ptrs[i]) {
+            kfree(stress_alloc_free_ptrs[i]);
         }
     }
 
     SET_SUCCESS();
 }
 
+/* Put it here to avoid it eating things up */
+static void *mixed_stress_test_ptrs[STRESS_ALLOC_TIMES] = {0};
 REGISTER_TEST(kmalloc_mixed_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
-    void *small_ptrs[STRESS_ALLOC_TIMES];
-
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
-        small_ptrs[i] = kmalloc(128);
-        TEST_ASSERT(small_ptrs[i] != NULL);
+        mixed_stress_test_ptrs[i] = kmalloc(128);
+        TEST_ASSERT(mixed_stress_test_ptrs[i] != NULL);
     }
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
-        kfree(small_ptrs[i]);
+        kfree(mixed_stress_test_ptrs[i]);
     }
 
     SET_SUCCESS();

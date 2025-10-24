@@ -1,4 +1,6 @@
 #include <mem/alloc.h>
+#include <mem/pmm.h>
+#include <mem/vaddr_alloc.h>
 #include <mem/vmm.h>
 #include <sch/defer.h>
 #include <sch/reaper.h>
@@ -9,11 +11,17 @@
 #include <stddef.h>
 #include <string.h>
 
+#define THREAD_STACKS_HEAP_START 0xFFFFF10000000000ULL
+#define THREAD_STACKS_HEAP_END 0xFFFFF20000000000ULL
+
 /* lol */
-static struct tid_space *thread_tid_space = NULL;
+static struct tid_space *global_tid_space = NULL;
+static struct vas_space *stacks_space = NULL;
 
 void thread_init_thread_ids(void) {
-    thread_tid_space = tid_space_init(UINT64_MAX);
+    stacks_space =
+        vas_space_init(THREAD_STACKS_HEAP_START, THREAD_STACKS_HEAP_END);
+    global_tid_space = tid_space_init(UINT64_MAX);
 }
 
 void thread_exit() {
@@ -37,12 +45,40 @@ void thread_entry_wrapper(void) {
     thread_exit();
 }
 
+void *thread_allocate_stack(size_t pages) {
+    size_t needed = (pages + 1) * PAGE_SIZE;
+    vaddr_t virt_base = vas_alloc(stacks_space, needed, PAGE_SIZE);
+
+    /* Leave the first page unmapped, protector page */
+    virt_base += PAGE_SIZE;
+    for (size_t i = 0; i < pages; i++) {
+        vaddr_t virt = virt_base + (i * PAGE_SIZE);
+        paddr_t phys = pmm_alloc_page(ALLOC_FLAGS_NONE);
+        kassert(phys);
+        vmm_map_page(virt, phys, PAGING_PRESENT | PAGING_WRITE);
+    }
+    return (void *) virt_base;
+}
+
+void thread_free_stack(struct thread *thread) {
+    vaddr_t stack_real_virt = (vaddr_t) thread->stack - PAGE_SIZE;
+    size_t pages = thread->stack_size / PAGE_SIZE;
+    for (size_t i = 0; i < pages; i++) {
+        vaddr_t virt = (vaddr_t) thread->stack + i * PAGE_SIZE;
+        paddr_t phys = vmm_get_phys(virt);
+        kassert(phys != (paddr_t) -1);
+        vmm_unmap_page(virt);
+        pmm_free_page(phys);
+    }
+    vas_free(stacks_space, stack_real_virt);
+}
+
 static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     struct thread *new_thread = kzalloc(sizeof(struct thread));
     if (unlikely(!new_thread))
         goto err;
 
-    void *stack = kmalloc(stack_size);
+    void *stack = thread_allocate_stack(stack_size / PAGE_SIZE);
     if (unlikely(!stack))
         goto err;
 
@@ -59,7 +95,7 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->curr_core = -1;
 
     /* We assume that ID allocation is infallible */
-    new_thread->id = tid_alloc(thread_tid_space);
+    new_thread->id = tid_alloc(global_tid_space);
     new_thread->refcount = 1;
     new_thread->recent_event = APC_EVENT_NONE;
     new_thread->activity_class = THREAD_ACTIVITY_CLASS_UNKNOWN;
@@ -94,7 +130,7 @@ err:
     if (new_thread->stack)
         kfree_aligned(new_thread->stack);
 
-    tid_free(thread_tid_space, new_thread->id);
+    tid_free(global_tid_space, new_thread->id);
     kfree(new_thread);
 
 out:
@@ -111,11 +147,11 @@ struct thread *thread_create_custom_stack(void (*entry_point)(void),
 }
 
 void thread_free(struct thread *t) {
-    tid_free(thread_tid_space, t->id);
+    tid_free(global_tid_space, t->id);
     kfree(t->activity_data);
     kfree(t->activity_stats);
     thread_free_event_apcs(t);
-    kfree(t->stack);
+    thread_free_stack(t);
     kfree(t);
 }
 

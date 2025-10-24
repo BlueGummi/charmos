@@ -423,7 +423,58 @@ void *krealloc(void *ptr, uint64_t size) {
  *
  * The general allocation flow is as follows:
  *
- * If the allocation does not fit in a slab, 
+ * If the allocation does not fit in a slab, simply allocate and
+ * map multiple pages to satisfy the allocation. Then, check the
+ * flags and see if we're allowed to do other things. If we can
+ * block/GC, then go through the freequeue and slab GC lists
+ * and do a little bit of flush work if some slabs are too
+ * old/there are too many elements in the freequeue. Reduce
+ * the amount of flush/draining if the fast behavior is specified.
+ *
+ *    ----------------------------------------------------------------
+ * << The slab allocator ignores movability. All slabs are nonmovable >>
+ *    ----------------------------------------------------------------
+ *
+ * If the allocation does fit in a slab, then...
+ *
+ * First, we determine if we should scale up our allocation to satisfy
+ * cache alignment if cache alignment is requested.
+ *
+ * Second, we check if our magazine has anything. If pageable memory
+ * is requested, and the magazines are very full, and the allocation
+ * size is small, just take from the magazines (they are nonpageable).
+ *
+ * If pageable memory is requested, and the magazines are not so full,
+ * and a larger size is requested, do not take from them.
+ *
+ * Determining whether we should take from our magazine depending on
+ * the size of an allocation and the input memory type will be done
+ * via heuristics that will scale steadily both ways.
+ *
+ *    ----------------------------------------------------------------
+ * << The goal is to make sure that pageable allocations do not steal >>
+ * << everything from nonpageable allocations from the magazines      >>
+ *    ----------------------------------------------------------------
+ *
+ * If nonpageable memory is requested, and the magazines are not empty,
+ * just take memory from the magazines.
+ *
+ * If the magazines are not chosen for the allocation, then things get
+ * a bit hairier.
+ *
+ * First, check if the allocation MUST be from the local node. If this
+ * is the case, simply allocate from the local pageable/nonpageable slab
+ * cache. If an allocation is pageable, then there will be a heuristic
+ * that checks whether or not there are so many things in a given
+ * nonpageable cache that it is worth it to allocate from the nonpageable cache.
+ *
+ * If the slab cache has nothing available, just map a new page to the local
+ * node if the allocation MUST be from the local node.
+ *
+ * Now, if the allocation does not need to come from the local node, then things
+ * get real fun.
+ *
+ *
  */
 void *kmalloc_new(size_t size, enum alloc_flags flags,
                   enum alloc_behavior behavior) {
