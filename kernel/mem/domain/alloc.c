@@ -277,15 +277,20 @@ static paddr_t alloc_with_locality(size_t pages, bool flexible_locality,
 
 paddr_t domain_alloc(size_t pages, enum alloc_flags flags) {
     kassert(pages != 0);
+    enum thread_flags thread_flags = scheduler_pin_current_thread();
+
+    paddr_t ret = 0x0;
 
     /* We only care about INTERLEAVED at the buddy allocator level */
-    if (ALLOC_FLAG_CLASS(flags) == ALLOC_FLAG_CLASS_INTERLEAVED)
-        return alloc_interleaved(pages);
+    if (ALLOC_FLAG_CLASS(flags) == ALLOC_FLAG_CLASS_INTERLEAVED) {
+        ret = alloc_interleaved(pages);
+        goto done;
+    }
 
     /* Fastpath: Get it from an arena or the freequeue */
-    paddr_t ret = try_alloc_from_arenas(pages);
+    ret = try_alloc_from_arenas(pages);
     if (ret)
-        return ret;
+        goto done;
 
     /* We don't care about any other flags in the domain buddy allocator */
     uint16_t locality_degree = ALLOC_LOCALITY_FROM_FLAGS(flags);
@@ -294,10 +299,16 @@ paddr_t domain_alloc(size_t pages, enum alloc_flags flags) {
         locality_degree == ALLOC_LOCALITY_MIN || global.numa_node_count == 1;
 
     /* No other options. Allocate from the local buddy. */
-    if (locality_degree == ALLOC_LOCALITY_MAX)
-        return alloc_from_local_buddy(pages);
+    if (locality_degree == ALLOC_LOCALITY_MAX) {
+        ret = alloc_from_local_buddy(pages);
+        goto done;
+    }
 
-    return alloc_with_locality(pages, flexible_locality, locality_degree);
+    ret = alloc_with_locality(pages, flexible_locality, locality_degree);
+
+done:
+    scheduler_unpin_current_thread(thread_flags);
+    return ret;
 }
 
 paddr_t domain_alloc_from_domain(struct domain *cd, size_t pages) {

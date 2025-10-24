@@ -207,7 +207,7 @@ void uacpi_kernel_unlock_spinlock(uacpi_handle a, uacpi_cpu_flags b) {
 }
 
 uacpi_thread_id uacpi_kernel_get_thread_id(void) {
-    return scheduler_get_curr_thread();
+    return scheduler_get_current_thread();
 }
 
 //

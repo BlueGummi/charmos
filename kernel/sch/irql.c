@@ -55,7 +55,7 @@ void irql_lower(enum irql new_level) {
 
         if (irq_in_thread_context() && old > IRQL_APC_LEVEL &&
             new_level < IRQL_APC_LEVEL)
-            thread_check_and_deliver_apcs(scheduler_get_curr_thread());
+            thread_check_and_deliver_apcs(scheduler_get_current_thread());
 
         if (irq_in_thread_context() && preempt_re_enabled)
             scheduler_resched_if_needed();

@@ -62,13 +62,13 @@ void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req) {
 
     try_rq_reorder(sched);
 
+    spin_unlock(&sched->lock, irql);
+
     if (!sched->defer_pending) {
         sched->defer_pending = true;
         defer_enqueue(bio_sched_tick, WORK_ARGS(sched, NULL),
                       disk->ops->tick_ms);
     }
-
-    spin_unlock(&sched->lock, irql);
 }
 
 void bio_sched_dequeue(struct generic_disk *disk, struct bio_request *req,

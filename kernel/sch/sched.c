@@ -282,5 +282,5 @@ void scheduler_yield() {
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     schedule();
     irql_lower(irql);
-    thread_check_and_deliver_apcs(scheduler_get_curr_thread());
+    thread_check_and_deliver_apcs(scheduler_get_current_thread());
 }

@@ -28,13 +28,13 @@ static void enqueue_request(struct nvme_device *dev, struct nvme_request *req) {
 static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
                                uint64_t size) {
     uint64_t offset = (uintptr_t) buffer & (PAGE_SIZE - 1);
-    uint64_t num_pages = (offset + size + PAGE_SIZE - 1) / PAGE_SIZE;
+    uint64_t num_pages = PAGES_NEEDED_FOR(offset + size);
 
     data->prps = kmalloc(sizeof(uint64_t) * num_pages);
     if (!data->prps)
         return false;
 
-    uintptr_t vaddr = (uintptr_t) buffer & ~(PAGE_SIZE - 1);
+    uintptr_t vaddr = PAGE_ALIGN_DOWN(buffer);
 
     for (size_t i = 0; i < num_pages; ++i) {
         data->prps[i] = vmm_get_phys(vaddr);
@@ -47,25 +47,28 @@ static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
 }
 
 static void nvme_setup_prps(struct nvme_command *cmd,
-                            struct nvme_bio_data *data,
-                            const void *fallback_buffer, uint64_t size) {
-    if (data->prp_count == 0) {
-        uint64_t buffer_phys = vmm_get_phys((vaddr_t) fallback_buffer);
-        cmd->prp1 = buffer_phys;
-        if (size > PAGE_SIZE)
-            cmd->prp2 = buffer_phys + PAGE_SIZE;
-        return;
-    }
+                            struct nvme_bio_data *data) {
+    kassert(data->prp_count > 0);
 
     cmd->prp1 = data->prps[0];
 
     if (data->prp_count == 1) {
         cmd->prp2 = 0;
+        goto free_prps;
     } else if (data->prp_count == 2) {
         cmd->prp2 = data->prps[1];
+        goto free_prps;
     } else {
-        cmd->prp2 = vmm_get_phys((uint64_t) (data->prps + 1));
+        cmd->prp2 = vmm_get_phys((uint64_t) (&data->prps[1]));
     }
+
+    return;
+
+    /* For when there is no need for multiple PRPs */
+free_prps:
+    kfree(data->prps);
+    data->prps = NULL;
+    return;
 }
 
 static bool rw_send_command(struct generic_disk *disk, struct nvme_request *req,
@@ -103,7 +106,7 @@ static bool rw_send_command(struct generic_disk *disk, struct nvme_request *req,
     cmd.cdw11 = lba >> 32;
     cmd.cdw12 = count - 1;
 
-    nvme_setup_prps(&cmd, data, buffer, count * disk->sector_size);
+    nvme_setup_prps(&cmd, data);
 
     req->lba = lba;
     req->buffer = buffer;
@@ -126,7 +129,7 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
     req.remaining_parts = 1;
     INIT_LIST_HEAD(&req.list_node);
 
-    struct thread *curr = scheduler_get_curr_thread();
+    struct thread *curr = scheduler_get_current_thread();
 
     enum irql irql = irql_raise(IRQL_HIGH_LEVEL);
     req.waiter = curr;

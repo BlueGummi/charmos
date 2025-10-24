@@ -15,7 +15,7 @@ static inline uint64_t hpet_timestamp_us_fast(void) {
 }
 
 static inline uint64_t hpet_timestamp_ms_fast(void) {
-    return hpet_cached_time_ms;
+    return hpet_cached_time_us / 1000;
 }
 
 void hpet_disable(void);

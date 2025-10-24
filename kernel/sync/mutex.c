@@ -48,7 +48,7 @@ static void block_on_mutex(struct mutex *m, struct thread *curr) {
 }
 
 void mutex_lock(struct mutex *m) {
-    struct thread *curr = scheduler_get_curr_thread();
+    struct thread *curr = scheduler_get_current_thread();
 
     while (true) {
         if (try_acquire_mutex(m, curr)) {
@@ -66,7 +66,7 @@ void mutex_lock(struct mutex *m) {
 }
 
 void mutex_unlock(struct mutex *m) {
-    struct thread *curr = scheduler_get_curr_thread();
+    struct thread *curr = scheduler_get_current_thread();
 
     enum irql irql = spin_lock(&m->lock);
 

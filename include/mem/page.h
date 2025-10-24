@@ -1,5 +1,6 @@
 #pragma once
 #include <charmos.h>
+#include <misc/align.h>
 #include <stdint.h>
 
 #define PAGE_SIZE 4096
@@ -18,13 +19,13 @@
 #define PAGING_2MB_page (1ULL << 7)
 
 #define PAGING_2MB_PHYS_MASK (~((uintptr_t) PAGE_2MB - 1))
-#define PAGE_ALIGN_DOWN(x) (((uintptr_t) x) & ~(PAGE_SIZE - 1))
-#define PAGE_ALIGN_UP(x) ((((uintptr_t) x) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1))
+#define PAGE_ALIGN_DOWN(x) ALIGN_DOWN((uintptr_t)(x), PAGE_SIZE)
+#define PAGE_ALIGN_UP(x) ALIGN_UP((uintptr_t)(x), PAGE_SIZE)
 
-#define PAGE_TO_PFN(addr) (addr / PAGE_SIZE)
-#define PFN_TO_PAGE(pfn) (pfn * PAGE_SIZE)
+#define PAGE_TO_PFN(addr) ((addr) / PAGE_SIZE)
+#define PFN_TO_PAGE(pfn) ((pfn) * PAGE_SIZE)
 
-#define PAGES_NEEDED_FOR(bytes) ((bytes + PAGE_SIZE - 1) / PAGE_SIZE)
+#define PAGES_NEEDED_FOR(bytes) (((bytes) + PAGE_SIZE - 1) / PAGE_SIZE)
 
 #define VMM_MAP_BASE 0xFFFFA00000200000
 #define VMM_MAP_LIMIT 0xFFFFA00010000000

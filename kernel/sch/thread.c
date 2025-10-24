@@ -19,7 +19,7 @@ void thread_init_thread_ids(void) {
 void thread_exit() {
     scheduler_preemption_disable();
 
-    struct thread *self = scheduler_get_curr_thread();
+    struct thread *self = scheduler_get_current_thread();
     atomic_store(&self->state, THREAD_STATE_ZOMBIE);
     reaper_enqueue(self);
 
@@ -42,7 +42,7 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     if (unlikely(!new_thread))
         goto err;
 
-    void *stack = kmalloc_aligned(stack_size, PAGE_SIZE);
+    void *stack = kmalloc(stack_size);
     if (unlikely(!stack))
         goto err;
 
@@ -115,7 +115,7 @@ void thread_free(struct thread *t) {
     kfree(t->activity_data);
     kfree(t->activity_stats);
     thread_free_event_apcs(t);
-    kfree_aligned(t->stack);
+    kfree(t->stack);
     kfree(t);
 }
 
@@ -160,7 +160,7 @@ struct thread *thread_queue_pop_front(struct thread_queue *q) {
 }
 
 void thread_block_on(struct thread_queue *q) {
-    struct thread *current = scheduler_get_curr_thread();
+    struct thread *current = scheduler_get_current_thread();
 
     enum irql irql = thread_queue_lock_irq_disable(q);
     thread_block(current, THREAD_BLOCK_REASON_MANUAL);
@@ -175,7 +175,7 @@ static void wake_thread(void *a, void *unused) {
 }
 
 void thread_sleep_for_ms(uint64_t ms) {
-    struct thread *curr = scheduler_get_curr_thread();
+    struct thread *curr = scheduler_get_current_thread();
     defer_enqueue(wake_thread, WORK_ARGS(curr, NULL), ms);
     thread_sleep(curr, THREAD_SLEEP_REASON_MANUAL);
 

@@ -177,6 +177,8 @@ void domain_flush_free_queue(struct domain_buddy *domain,
 }
 
 void domain_free(paddr_t address, size_t page_count) {
+    enum thread_flags flags = scheduler_pin_current_thread();
+
     struct domain_buddy *local = domain_buddy_on_this_core();
     struct domain_buddy *target = domain_buddy_for_addr(address);
     struct domain_free_queue *free_queue = domain_free_queue_on_this_core();
@@ -191,6 +193,8 @@ void domain_free(paddr_t address, size_t page_count) {
 
     domain_enqueue_flush_worker(&local->worker);
     domain_flush_free_queue(local, free_queue);
+
+    scheduler_unpin_current_thread(flags);
 }
 
 void domain_flush_thread() {
@@ -198,7 +202,9 @@ void domain_flush_thread() {
     while (!worker->stop) {
         semaphore_wait(&worker->sema);
         struct domain_free_queue *fq = worker->domain->free_queue;
+        enum thread_flags flags = scheduler_pin_current_thread();
         domain_flush_free_queue(worker->domain, fq);
+        scheduler_unpin_current_thread(flags);
         atomic_store(&worker->enqueued, false);
     }
 }

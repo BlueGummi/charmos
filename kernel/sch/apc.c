@@ -73,7 +73,7 @@ static bool thread_apc_sanity_check(struct thread *t) {
 static void apc_execute(struct apc *a) {
     enum irql old = irql_raise(IRQL_APC_LEVEL);
 
-    struct thread *curr = scheduler_get_curr_thread();
+    struct thread *curr = scheduler_get_current_thread();
 
     curr->executing_apc = true;
 
@@ -155,7 +155,7 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
 
     thread_release(t, irql);
     /* Let's go and execute em */
-    if (t == scheduler_get_curr_thread()) {
+    if (t == scheduler_get_current_thread()) {
         thread_check_and_deliver_apcs(t);
     } else {
         /* Not us, go wake up the other guy */
@@ -235,7 +235,7 @@ bool apc_cancel(struct apc *a) {
 }
 
 void apc_enqueue_on_curr(struct apc *a, enum apc_type type) {
-    apc_enqueue(scheduler_get_curr_thread(), a, type);
+    apc_enqueue(scheduler_get_current_thread(), a, type);
 }
 
 struct apc *apc_create(void) {

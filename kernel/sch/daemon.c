@@ -4,7 +4,7 @@
 #include <string.h>
 
 static struct daemon_thread *current_daemon_thread(void) {
-    return scheduler_get_curr_thread()->private;
+    return scheduler_get_current_thread()->private;
 }
 
 static bool mark_daemon_thread_executing(struct daemon_thread *thread,

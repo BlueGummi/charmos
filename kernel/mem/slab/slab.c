@@ -185,10 +185,7 @@ void slab_reset(struct slab *slab) {
     slab->self = slab;
 }
 
-/* TODO: FIXME */
 void slab_destroy(struct slab *slab) {
-    return;
-
     slab_list_del(slab);
     uintptr_t virt = (uintptr_t) slab;
     paddr_t phys = vmm_get_phys(virt);
@@ -306,15 +303,7 @@ size_t slab_allocation_size(vaddr_t addr) {
     return ksize((void *) addr);
 }
 
-void *kmalloc(uint64_t size) {
-    if (size == 0)
-        return NULL;
-
-    int idx = slab_size_to_index(size);
-
-    if (idx >= 0 && slab_caches[idx].objs_per_slab > 0)
-        return slab_alloc(&slab_caches[idx]);
-
+void *kmalloc_pages(size_t size) {
     uint64_t total_size = size + sizeof(struct slab_page_hdr);
     uint64_t pages = PAGES_NEEDED_FOR(total_size);
 
@@ -347,6 +336,18 @@ void *kmalloc(uint64_t size) {
     hdr->pages = pages;
 
     return (void *) (hdr + 1);
+}
+
+void *kmalloc(size_t size) {
+    if (size == 0)
+        return NULL;
+
+    int idx = slab_size_to_index(size);
+
+    if (idx >= 0 && slab_caches[idx].objs_per_slab > 0)
+        return slab_alloc(&slab_caches[idx]);
+
+    return kmalloc_pages(size);
 }
 
 void *kzalloc(uint64_t size) {
@@ -412,4 +413,23 @@ void *krealloc(void *ptr, uint64_t size) {
     memcpy(new_ptr, ptr, to_copy);
     kfree(ptr);
     return new_ptr;
+}
+
+/* Alrighty, this will be a doozy.
+ *
+ * This slab allocator takes in a size, alloc_flags, and behavior.
+ *
+ * Depending on behavior, we are(n't) allowed to do certain things.
+ *
+ * The general allocation flow is as follows:
+ *
+ * If the allocation does not fit in a slab, 
+ */
+void *kmalloc_new(size_t size, enum alloc_flags flags,
+                  enum alloc_behavior behavior) {
+    /* Validate parameters */
+    kassert(alloc_flags_valid(flags));
+    kassert(alloc_flag_behavior_verify(flags, behavior));
+    if (!size)
+        return NULL;
 }

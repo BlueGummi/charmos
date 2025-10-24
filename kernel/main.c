@@ -120,7 +120,7 @@ void k_sch_main() {
     k_info("MAIN", K_INFO, "Boot OK");
     global.current_bootstage = BOOTSTAGE_COMPLETE;
 
-    thread_print(scheduler_get_curr_thread());
+    thread_print(scheduler_get_current_thread());
 
     domain_buddy_dump();
     while (1) {

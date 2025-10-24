@@ -67,7 +67,7 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
     /* tells ISR handler to mark status properly */
     req.trigger_completion = true;
 
-    struct thread *curr = scheduler_get_curr_thread();
+    struct thread *curr = scheduler_get_current_thread();
     thread_block(curr, THREAD_BLOCK_REASON_IO);
     dev->io_waiters[ahci_disk->port][req.slot] = curr;
 

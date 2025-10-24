@@ -80,7 +80,7 @@ static struct thread *rt = NULL;
 
 static void rt_thread(void) {
     uint64_t spins = 50;
-    struct thread *me = scheduler_get_curr_thread();
+    struct thread *me = scheduler_get_current_thread();
     if (me != rt) {
         k_printf("Different thread\n");
         goto fail;
@@ -134,7 +134,7 @@ REGISTER_TEST(sched_spawn_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
 static void sleepy_entry(void) {
     thread_sleep_for_ms(9000);
-    thread_print(scheduler_get_curr_thread());
+    thread_print(scheduler_get_current_thread());
 }
 
 REGISTER_TEST(sched_sleepy_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {

@@ -72,9 +72,7 @@ struct nvme_regs {
 
 struct nvme_bio_data {
     uint64_t *prps;
-    uint64_t prp_count;    // current number of PRPs
-    uint64_t prp_capacity; // allocated capacity
-    struct bio_request *coalescee;
+    uint64_t prp_count;
 };
 
 struct nvme_request {

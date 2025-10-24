@@ -35,7 +35,8 @@
             current->next->prev = current->prev;                               \
         }                                                                      \
     }                                                                          \
-    thing->next = thing->prev = NULL;
+    thing->next = NULL;                                                        \
+    thing->prev = NULL;
 
 #define dll_clear(q)                                                           \
     typeof(q->head) start = q->head;                                           \

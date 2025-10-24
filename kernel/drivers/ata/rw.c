@@ -175,7 +175,7 @@ static void submit_async(struct ata_drive *d, struct ide_request *req) {
 static inline void submit_and_wait(struct ata_drive *d,
                                    struct ide_request *req) {
     enum irql irql = spin_lock(&req->lock);
-    struct thread *t = scheduler_get_curr_thread();
+    struct thread *t = scheduler_get_current_thread();
     thread_block(t, THREAD_BLOCK_REASON_IO);
     req->waiter = t;
     submit_async(d, req);
