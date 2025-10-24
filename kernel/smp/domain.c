@@ -111,3 +111,27 @@ void domain_init(void) {
 
     domain_dump();
 }
+
+void domain_set_cpu_mask(struct cpu_mask *mask, struct domain *domain) {
+    for (size_t i = 0; i < domain->num_cores; i++)
+        cpu_mask_set(mask, domain->cores[i]->id);
+}
+
+/* Create a CPU mask that has all the bits for the domain set */
+struct cpu_mask *domain_create_cpu_mask(struct domain *domain) {
+    struct cpu_mask *ret = cpu_mask_create();
+    if (!ret)
+        goto err;
+
+    if (!cpu_mask_init(ret, global.core_count))
+        goto err;
+
+    domain_set_cpu_mask(ret, domain);
+
+    return ret;
+err:
+    if (ret)
+        kfree(ret);
+
+    return NULL;
+}

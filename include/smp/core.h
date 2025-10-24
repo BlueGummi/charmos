@@ -13,7 +13,7 @@
 /* Let's put commonly accessed fields up here
  * to make the cache a bit happier */
 struct core {
-    uint64_t id;
+    size_t id;
     struct thread *current_thread;
 
     atomic_bool idle;
@@ -43,7 +43,7 @@ struct core {
     struct topology_node *topo_node;
     struct topology_cache_info llc;
 
-    uint64_t numa_node;
+    size_t numa_node;
     uint32_t package_id;
     uint32_t smt_mask;
     uint32_t smt_id;

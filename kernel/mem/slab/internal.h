@@ -116,7 +116,6 @@ static inline bool slab_magazine_full(struct slab_magazine *mag) {
 struct slab_percpu_cache {
     /* Magazines are always nonpageable */
     struct slab_magazine mag[SLAB_CLASS_COUNT];
-    struct slab *active_slab[SLAB_CLASS_COUNT];
 };
 
 struct slab_free_slot {
@@ -152,6 +151,7 @@ struct slab_free_queue_list {
     struct slab_free_queue_list_node *head;
     struct slab_free_queue_list_node *tail;
     struct spinlock lock;
+    size_t elements;
 };
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab_free_queue_list, lock);
 
@@ -164,9 +164,11 @@ struct slab_free_queue {
     struct slab_free_queue_list list;
     atomic_size_t count;
 };
+#define SLAB_FREE_QUEUE_CAPACITY 2048 /* TODO: */
 #define SLAB_FREE_QUEUE_GET_COUNT(fq) (atomic_load(&(fq)->count))
 #define SLAB_FREE_QUEUE_INC_COUNT(fq) (atomic_fetch_add(&(fq)->count, 1))
 #define SLAB_FREE_QUEUE_ADD_COUNT(fq, n) (atomic_fetch_add(&(fq)->count, n))
+#define SLAB_FREE_QUEUE_SUB_COUNT(fq, n) (atomic_fetch_sub(&(fq)->count, n))
 #define SLAB_FREE_QUEUE_DEC_COUNT(fq) (atomic_fetch_sub(&(fq)->count, 1))
 
 enum slab_cache_type { SLAB_CACHE_TYPE_PAGEABLE, SLAB_CACHE_TYPE_NONPAGEABLE };
@@ -244,11 +246,13 @@ struct slab_page_hdr {
 };
 
 struct slab *slab_init(struct slab *slab, struct slab_cache *parent);
+struct slab *slab_create(struct slab_domain *domain, struct slab_cache *cache);
 void slab_destroy(struct slab *slab);
 int32_t slab_size_to_index(size_t size);
 void *slab_alloc(struct slab_cache *cache);
 void slab_free_page_hdr(struct slab_page_hdr *hdr);
 size_t slab_allocation_size(vaddr_t addr);
+void slab_cache_init(struct slab_cache *cache, uint64_t obj_size);
 
 /* Magazine */
 bool slab_magazine_push(struct slab_magazine *mag, vaddr_t obj);
@@ -256,9 +260,10 @@ vaddr_t slab_magazine_pop(struct slab_magazine *mag);
 vaddr_t slab_percpu_alloc(struct slab_domain *dom, size_t class_idx);
 void slab_percpu_free(struct slab_domain *dom, size_t class_idx, vaddr_t obj);
 void slab_free_addr_to_cache(void *addr);
-void slab_domain_init_percpu(struct slab_domain *dom);
+void slab_domain_percpu_init(struct slab_domain *domain);
 
 /* Freequeue */
+void slab_free_queue_init(struct slab_free_queue *q, size_t capacity);
 bool slab_free_queue_ringbuffer_enqueue(struct slab_free_queue *q,
                                         vaddr_t addr);
 vaddr_t slab_free_queue_ringbuffer_dequeue(struct slab_free_queue *q);
@@ -269,7 +274,17 @@ size_t slab_free_queue_drain(struct slab_percpu_cache *cache,
                              struct slab_free_queue *queue, size_t target,
                              bool flush_to_cache);
 
+/* Check */
 bool slab_check(struct slab *slab);
+
+/* GC */
+void slab_reset(struct slab *slab);
+void slab_gc_enqueue(struct slab_domain *domain, struct slab *slab);
+void slab_gc_dequeue(struct slab_domain *domain, struct slab *slab);
+struct slab *slab_gc_pop_front(struct slab_domain *domain);
+size_t slab_gc_num_slabs(struct slab_domain *domain);
+size_t slab_gc_list_flush_up_to(struct slab_domain *domain, size_t max);
+size_t slab_gc_list_flush_full(struct slab_domain *domain);
 
 static inline struct page *slab_get_backing_page(struct slab *slab) {
     return page_for_pfn(PAGE_TO_PFN(vmm_get_phys((vaddr_t) slab)));

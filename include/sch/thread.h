@@ -206,6 +206,9 @@ struct thread {
     uint64_t last_ran;     /* What core last ran us? */
     time_t run_start_time; /* When did we start running */
 
+    /* Who is allowed to run us? */
+    struct cpu_mask allowed_cpus;
+
     /* Flags */
     enum thread_flags flags;
 

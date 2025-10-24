@@ -39,21 +39,18 @@ void thread_entry_wrapper(void) {
 }
 
 static void thread_free_stack(struct thread *t) {
-    hugepage_free_pages(t->stack, t->stack_size / PAGE_SIZE);
+    if (t->stack)
+        hugepage_free_pages(t->stack, t->stack_size / PAGE_SIZE);
 }
 
 static struct thread *create(void (*entry_point)(void), size_t stack_size) {
-    struct thread *new_thread =
-        (struct thread *) kzalloc(sizeof(struct thread));
+    struct thread *new_thread = kzalloc(sizeof(struct thread));
     if (unlikely(!new_thread))
-        return NULL;
+        goto err;
 
     void *stack = hugepage_alloc_pages(stack_size / PAGE_SIZE);
-
-    if (unlikely(!stack)) {
-        kfree(new_thread);
-        return NULL;
-    }
+    if (unlikely(!stack))
+        goto err;
 
     memset(stack, 0, stack_size);
     uint64_t stack_top = (uint64_t) stack + stack_size;
@@ -68,32 +65,44 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->regs.rip = (uint64_t) thread_entry_wrapper;
     new_thread->stack = (void *) stack;
     new_thread->curr_core = -1;
+    /* We assume that ID allocation is infallible */
     new_thread->id = tid_alloc(thread_tid_space);
     new_thread->refcount = 1;
     new_thread->recent_event = APC_EVENT_NONE;
     new_thread->activity_class = THREAD_ACTIVITY_CLASS_UNKNOWN;
     thread_update_effective_priority(new_thread);
     new_thread->activity_data = kzalloc(sizeof(struct thread_activity_data));
+    if (unlikely(!new_thread->activity_data))
+        goto err;
+
     new_thread->activity_stats = kzalloc(sizeof(struct thread_activity_stats));
+    if (unlikely(!new_thread->activity_stats))
+        goto err;
 
-    if (!new_thread->activity_data || !new_thread->activity_stats) {
-        if (new_thread->activity_data)
-            kfree(new_thread->activity_data);
-
-        if (new_thread->activity_stats)
-            kfree(new_thread->activity_stats);
-
-        tid_free(thread_tid_space, new_thread->id);
-        thread_free_stack(new_thread);
-        kfree(new_thread);
-        return NULL;
-    }
+    if (unlikely(!cpu_mask_init(&new_thread->allowed_cpus, global.core_count)))
+        goto err;
 
     INIT_LIST_HEAD(&new_thread->apc_head[0]);
     INIT_LIST_HEAD(&new_thread->apc_head[1]);
     INIT_LIST_HEAD(&new_thread->list_node);
 
     return new_thread;
+
+err:
+    if (!new_thread)
+        return NULL;
+
+    if (new_thread->activity_data)
+        kfree(new_thread->activity_data);
+
+    if (new_thread->activity_stats)
+        kfree(new_thread->activity_stats);
+
+    tid_free(thread_tid_space, new_thread->id);
+    thread_free_stack(new_thread);
+    kfree(new_thread);
+
+    return NULL;
 }
 
 struct thread *thread_create(void (*entry_point)(void)) {

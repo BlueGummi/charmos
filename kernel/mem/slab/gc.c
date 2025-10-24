@@ -2,6 +2,7 @@
 
 void slab_gc_enqueue(struct slab_domain *domain, struct slab *slab) {
     slab_list_del(slab);
+    slab_reset(slab);
     slab->state = SLAB_IN_GC_LIST;
     locked_list_add(&domain->slab_gc_list, &slab->list);
 }

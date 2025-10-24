@@ -1,10 +1,11 @@
 #pragma once
+#include <console/printf.h>
 #include <mem/page.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-/* --------------------------- ALLOC FLAGS --------------------------- */
+/* ─────────────────────────── ALLOC FLAGS ─────────────────────────── */
 
 #define ALLOC_LOCALITY_SHIFT 8
 #define ALLOC_CLASS_SHIFT 12
@@ -27,10 +28,10 @@
 
 /* alloc_flags: 16 bit bitflags
  *
- *      +---------------------------+
- * Bits | 15--12  11--8  7--4  3--0 |
- * Use  |  %%%%    *###  mMpP  fFcC |
- *      +---------------------------+
+ *      ┌───────────────────────────┐
+ * Bits │ 15..12  11..8  7..4  3..0 │
+ * Use  │  %%%%    *###  mMpP  fFcC │
+ *      └───────────────────────────┘
  *
  * C - "Prefer cache alignment"
  * c - "Do not prefer cache alignment"
@@ -50,6 +51,8 @@
  *
  */
 
+/* Flags define properties regarding
+ * the memory the allocator will return */
 enum alloc_flags : uint16_t {
     /* Cache alignment */
     ALLOC_FLAG_PREFER_CACHE_ALIGNED = (1 << 0),
@@ -96,17 +99,139 @@ static inline bool alloc_flags_valid(uint16_t flags) {
     return true;
 }
 
-/* --------------------------- ALLOC BEHAVIORS --------------------------- */
+/* ─────────────────────────── ALLOC BEHAVIORS ─────────────────────────── */
+
+#define ALLOC_BEHAVIOR_FLAG_SHIFT 4
+#define ALLOC_BEHAVIOR_MASK (0xF)
+
+/* alloc_behavior: 8 bits for a behavior and flags
+ *
+ *      ┌────────────┐
+ * Bits │ 7..4  3..0 │
+ * Use  │ ***F  %%%% │
+ *      └────────────┘
+ *
+ * %%%% - Allocation behavior bits
+ *
+ * F - "Prefer fast allocation" -- may fail fast/early
+ * * - Unused
+ *
+ */
 
 /* Behaviors define what the allocator is
  * allowed to do in a given invocation. */
-enum alloc_behavior {
-    ALLOC_BEHAVIOR_NORMAL,     /* may block, may fault, may reclaim */
-    ALLOC_BEHAVIOR_ATOMIC,     /* may NOT block or fault (ISR-safe) */
-    ALLOC_BEHAVIOR_NO_WAIT,    /* may block briefly, but not reclaim or fault */
-    ALLOC_BEHAVIOR_NO_RECLAIM, /* may fault, may block, but not trigger GC */
-    ALLOC_BEHAVIOR_FAULT_SAFE, /* may block but not access pageable metadata */
+
+/* Allocation behavior restricts flags. If non-faulting behaviors
+ * are selected, then the allocator cannot allocate pageable memory */
+enum alloc_behavior : uint8_t {
+    ALLOC_BEHAVIOR_NORMAL,
+    ALLOC_BEHAVIOR_ATOMIC,
+    ALLOC_BEHAVIOR_NO_WAIT,
+    ALLOC_BEHAVIOR_NO_RECLAIM,
+    ALLOC_BEHAVIOR_FAULT_SAFE,
+    ALLOC_BEHAVIOR_FLAG_FAST = 1 << ALLOC_BEHAVIOR_FLAG_SHIFT,
 };
+
+/* ────────────────────────────────────────────────────────────────────────── */
+
+/* Allocation Behavior Semantics
+ *
+ * Behaviors define what the allocator is ALLOWED to do
+ * Behaviors allow/forbid blocking, faulting, and use in ISRs
+ *
+ *              ┌─────────────────────┐
+ *              │  Allowed Behaviors  │
+ * ┌────────────┼───────┬───────┬─────┼──────────────────────────────────────┐
+ * │ Behavior   │ Fault │ Block │ ISR │ Comments                             │
+ * ├────────────┼───────┼───────┼─────┼──────────────────────────────────────┤
+ * │ NORMAL     │  ✅   │  ✅   │ ❌  │ General─purpose; unrestricted        │
+ * ├────────────┼───────┼───────┼─────┼──────────────────────────────────────┤
+ * │ ATOMIC     │  ❌   │  ❌   │ ✅  │ For ISRs or hard contexts. Only uses │
+ * │            │       │       │     │ pre─resident, nonpageable memory     │
+ * ├────────────┼───────┼───────┼─────┼──────────────────────────────────────┤
+ * │ NO_WAIT    │  ✅   │  ❌   │ ❌  │ Non─blocking but can fault. For soft │
+ * │            │       │       │     │ real─time / fast─path code           │
+ * ├────────────┼───────┼───────┼─────┼──────────────────────────────────────┤
+ * │ NO_RECLAIM │  ✅   │  ✅   │ ❌  │ May block but cannot trigger GC or   │
+ * │            │       │       │     │ reclaim. For paging or low─mem code  │
+ * ├────────────┼───────┼───────┼─────┼──────────────────────────────────────┤
+ * │ FAULT_SAFE │  ❌   │  ✅   │ ❌  │ Must not fault, but may block        │
+ * └────────────┴───────┴───────┴─────┴──────────────────────────────────────┘
+ *
+ * Fast allocation flag (FLAG_FAST):
+ *     - Optional performance hint
+ *     - May fail early or skip slower reclaim/GC steps
+ *     - Does not change fundamental fault/block/ISR semantics */
+
+/* ────────────────────────────────────────────────────────────────────────── */
+
+/* Extract base behavior (mask out flags) */
+static inline enum alloc_behavior alloc_behavior_base(enum alloc_behavior raw) {
+    return raw & ALLOC_BEHAVIOR_MASK;
+}
+
+/* Does this behavior allow page faults? */
+static inline bool alloc_behavior_may_fault(enum alloc_behavior raw) {
+    switch (alloc_behavior_base(raw)) {
+    case ALLOC_BEHAVIOR_ATOMIC:
+    case ALLOC_BEHAVIOR_FAULT_SAFE: return false;
+    default: return true;
+    }
+}
+
+/* Does this behavior allow blocking or waiting? */
+static inline bool alloc_behavior_may_block(enum alloc_behavior raw) {
+    switch (alloc_behavior_base(raw)) {
+    case ALLOC_BEHAVIOR_ATOMIC:
+    case ALLOC_BEHAVIOR_NO_WAIT: return false;
+    default: return true;
+    }
+}
+
+/* Is this behavior ISR-safe? */
+static inline bool alloc_behavior_is_isr_safe(enum alloc_behavior raw) {
+    return alloc_behavior_base(raw) == ALLOC_BEHAVIOR_ATOMIC;
+}
+
+/* Does this behavior skip reclamation (e.g., GC, slab draining)? */
+static inline bool alloc_behavior_no_reclaim(enum alloc_behavior raw) {
+    return alloc_behavior_base(raw) == ALLOC_BEHAVIOR_NO_RECLAIM ||
+           alloc_behavior_base(raw) == ALLOC_BEHAVIOR_ATOMIC;
+}
+
+/* Fast hint: should this allocation prefer short paths? */
+static inline bool alloc_behavior_is_fast(enum alloc_behavior raw) {
+    return (raw & ALLOC_BEHAVIOR_FLAG_FAST);
+}
+
+static inline bool alloc_flag_behavior_verify(enum alloc_flags f,
+                                              enum alloc_behavior behavior) {
+    bool may_fault = alloc_behavior_may_fault(behavior);
+    bool flag_requires_residency = (f & ALLOC_FLAG_NONPAGEABLE);
+    bool flag_can_fault = (f & ALLOC_FLAG_MOVABLE) || (f & ALLOC_FLAG_PAGEABLE);
+
+    /* Non-faulting behavior cannot tolerate pageable or movable allocations */
+    if (!may_fault && flag_can_fault)
+        return false;
+
+    /* ISR-safe behavior must use nonpageable memory */
+    if (alloc_behavior_is_isr_safe(behavior) && !flag_requires_residency)
+        return false;
+
+    return true;
+}
+
+static inline void alloc_request_sanitize(enum alloc_flags *f,
+                                          enum alloc_behavior *b) {
+    if (!alloc_flag_behavior_verify(*f, *b)) {
+        /* Force safety first */
+        k_info("ALLOC", K_WARN, "Allocation flag discrepancy");
+        if (alloc_behavior_is_isr_safe(*b) || !alloc_behavior_may_fault(*b)) {
+            *f &= ~(ALLOC_FLAG_PAGEABLE | ALLOC_FLAG_MOVABLE);
+            *f |= ALLOC_FLAG_NONPAGEABLE;
+        }
+    }
+}
 
 void *kmalloc(uint64_t size);
 void *krealloc(void *ptr, uint64_t size);

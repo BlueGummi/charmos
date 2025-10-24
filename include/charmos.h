@@ -28,6 +28,7 @@ struct charmos_globals {
 
     uint64_t domain_count;
     struct domain **domains;
+    struct slab_domain **slab_domains;
 
     uint64_t hhdm_offset;
 

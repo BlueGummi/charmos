@@ -69,8 +69,10 @@ struct topology {
     uint16_t count[TOPOLOGY_LEVEL_MAX];
 };
 
-void cpu_mask_init(struct cpu_mask *m, size_t nbits);
+struct cpu_mask *cpu_mask_create(void);
+bool cpu_mask_init(struct cpu_mask *m, size_t nbits);
 void cpu_mask_set(struct cpu_mask *m, size_t cpu);
+void cpu_mask_set_all(struct cpu_mask *m);
 void cpu_mask_clear(struct cpu_mask *m, size_t cpu);
 bool cpu_mask_test(const struct cpu_mask *m, size_t cpu);
 void cpu_mask_or(struct cpu_mask *dst, const struct cpu_mask *b);

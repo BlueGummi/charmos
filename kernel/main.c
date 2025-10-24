@@ -104,6 +104,7 @@ void k_main(void) {
     domain_init();
 
     pmm_late_init();
+    slab_domain_init();
 
     restore_interrupts();
     scheduler_yield();

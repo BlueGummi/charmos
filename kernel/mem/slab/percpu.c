@@ -30,22 +30,6 @@ vaddr_t slab_magazine_pop(struct slab_magazine *mag) {
     return ret;
 }
 
-void slab_domain_init_percpu(struct slab_domain *dom) {
-    size_t ncpu = dom->domain->num_cores;
-    dom->percpu_caches = kzalloc(sizeof(struct slab_percpu_cache *) * ncpu);
-
-    for (size_t i = 0; i < ncpu; i++) {
-        struct slab_percpu_cache *c = kzalloc(sizeof(*c));
-        for (size_t cidx = 0; cidx < SLAB_CLASS_COUNT; cidx++) {
-            c->mag[cidx].count = 0;
-            c->active_slab[cidx] = NULL;
-        }
-
-        dom->domain->cores[i]->slab_domain = dom;
-        dom->percpu_caches[i] = c;
-    }
-}
-
 bool slab_cache_available(struct slab_cache *cache) {
     if (slab_cache_count_for(cache, SLAB_FREE) > 0 ||
         slab_cache_count_for(cache, SLAB_PARTIAL) > 0)
@@ -191,4 +175,23 @@ void slab_percpu_free(struct slab_domain *dom, size_t class_idx, vaddr_t obj) {
         return;
 
     slab_percpu_flush(dom, pc, class_idx, obj);
+}
+
+void slab_domain_percpu_init(struct slab_domain *domain) {
+    size_t cpus = domain->domain->num_cores;
+    domain->percpu_caches = kzalloc(sizeof(struct slab_percpu_cache *) * cpus);
+    if (!domain->percpu_caches)
+        k_panic("Could not allocate domain's percpu caches\n");
+
+    for (size_t i = 0; i < cpus; i++) {
+        domain->percpu_caches[i] = kzalloc(sizeof(struct slab_percpu_cache));
+        if (!domain->percpu_caches[i])
+            k_panic("Could not allocate domain's percpu caches\n");
+
+        for (size_t j = 0; j < SLAB_CLASS_COUNT; j++) {
+            struct slab_magazine *mag = &domain->percpu_caches[i]->mag[j];
+            mag->count = 0;
+            spinlock_init(&mag->lock);
+        }
+    }
 }

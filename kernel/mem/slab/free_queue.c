@@ -1,14 +1,28 @@
 #include "internal.h"
 
+/* Free_queue function naming semantics:
+ *
+ * "Draining" is when the free_queue elements are removed one by one,
+ * and each element first tries to get put on a given per-core
+ * cache's magazines. The free_queue elements that do not fit in the
+ * magazine are then optionally freed from the slab cache or re-enqueued.
+ *
+ * "Flushing" is when the free_queue elements are all freed from the
+ * slab cache. The per-core magazines are not touched */
+
 void slab_free_queue_init(struct slab_free_queue *q, size_t capacity) {
     q->capacity = capacity;
     q->slots = kmalloc(sizeof(struct slab_free_slot) * capacity);
+    if (!q->slots)
+        k_panic("Could not allocate slab free queue slots!\n");
+
     atomic_store(&q->head, 0);
     atomic_store(&q->tail, 0);
 
     for (size_t i = 0; i < capacity; i++)
         atomic_store(&q->slots[i].seq, i);
 
+    q->list.elements = 0;
     q->count = 0;
     q->list.head = NULL;
     q->list.tail = NULL;
@@ -80,6 +94,7 @@ vaddr_t slab_free_queue_ringbuffer_dequeue(struct slab_free_queue *q) {
 void slab_free_queue_list_init(struct slab_free_queue_list *list) {
     list->head = NULL;
     list->tail = NULL;
+    list->elements = 0;
     spinlock_init(&list->lock);
 }
 
@@ -96,19 +111,35 @@ static void free_queue_list_add_internal(struct slab_free_queue_list *q,
         q->tail->next = n;
         q->tail = n;
     }
+
+    q->elements++;
+}
+
+/* Detach and return the free queue's extended list */
+struct slab_free_queue_list_node *
+slab_free_queue_detach_list(struct slab_free_queue *queue) {
+    struct slab_free_queue_list *list = &queue->list;
+    enum irql irql = slab_free_queue_list_lock_irq_disable(list);
+
+    struct slab_free_queue_list_node *head = list->head;
+    list->head = NULL;
+    list->tail = NULL;
+    SLAB_FREE_QUEUE_SUB_COUNT(queue, list->elements);
+
+    slab_free_queue_list_unlock(list, irql);
+    return head;
 }
 
 /* Enqueue a chain of elements to free onto the list and increment count */
-static void slab_free_queue_enqueue_chain(struct slab_free_queue *queue,
-                                          struct slab_free_queue_list *chain,
-                                          size_t num_elements) {
+void slab_free_queue_enqueue_chain(struct slab_free_queue *queue,
+                                   struct slab_free_queue_list *chain) {
     struct slab_free_queue_list *list = &queue->list;
 
     enum irql irql = slab_free_queue_list_lock_irq_disable(list);
     free_queue_list_add_internal(list, chain->head);
     slab_free_queue_list_unlock(list, irql);
 
-    SLAB_FREE_QUEUE_ADD_COUNT(queue, num_elements);
+    SLAB_FREE_QUEUE_ADD_COUNT(queue, chain->elements);
 }
 
 /* This will always succeed */
@@ -137,6 +168,7 @@ vaddr_t slab_free_queue_list_dequeue(struct slab_free_queue *q) {
         if (slab_free_queue_list_empty(&q->list))
             q->list.tail = NULL;
 
+        q->list.elements--;
         SLAB_FREE_QUEUE_DEC_COUNT(q);
     }
 
@@ -161,7 +193,7 @@ vaddr_t slab_free_queue_dequeue(struct slab_free_queue *q) {
     return slab_free_queue_list_dequeue(q);
 }
 
-/* TODO: */
+/* TODO: Eventually this will be a real function */
 static inline bool page_is_pageable(struct page *page) {
     (void) page;
     return false;
@@ -185,15 +217,14 @@ size_t slab_free_queue_drain(struct slab_percpu_cache *cache,
     struct slab_free_queue_list chain;
     slab_free_queue_list_init(&chain);
 
-    /* Need to keep track of this to appropriately increment the
-     * slab_free_queue element counter by the time we add it all back */
-    size_t chain_length = 0;
-    size_t drained = 0;
+    size_t drained_to_magazine = 0; /* Return value */
+    size_t addrs_dequeued = 0; /* Used to check against `target` */
 
     while (true) {
         /* Drain an element from our free_queue */
         vaddr_t addr = slab_free_queue_dequeue(queue);
-        if (addr == 0x0 || drained >= target)
+        addrs_dequeued++;
+        if (addr == 0x0 || addrs_dequeued >= target)
             break;
 
         /* What class? */
@@ -212,7 +243,7 @@ size_t slab_free_queue_drain(struct slab_percpu_cache *cache,
             goto flush;
 
         /* Success - pushed onto magazine */
-        drained++;
+        drained_to_magazine++;
         continue;
 
     flush:
@@ -226,24 +257,37 @@ size_t slab_free_queue_drain(struct slab_percpu_cache *cache,
             struct slab_free_queue_list_node *node = (void *) addr;
             node->next = NULL;
             free_queue_list_add_internal(&chain, node);
-            chain_length++;
         }
     }
 
     /* Not empty - let's append it to our slab cache's free_queue */
     if (!slab_free_queue_list_empty(&chain))
-        slab_free_queue_enqueue_chain(queue, &chain, chain_length);
+        slab_free_queue_enqueue_chain(queue, &chain);
 
-    return drained;
+    return drained_to_magazine;
 }
 
 size_t slab_free_queue_flush(struct slab_free_queue *queue) {
     size_t total_freed = 0;
+
+    /* Drain the ringbuffer one element at a time */
     while (true) {
-        vaddr_t addr = slab_free_queue_dequeue(queue);
+        vaddr_t addr = slab_free_queue_ringbuffer_dequeue(queue);
         if (addr == 0x0)
             return total_freed;
 
         slab_free_addr_to_cache((void *) addr);
+    }
+
+    /* Detach the whole list and free it all in one go */
+    struct slab_free_queue_list_node *node = slab_free_queue_detach_list(queue);
+
+    while (true) {
+        if (!node)
+            break;
+
+        struct slab_free_queue_list_node *next = node->next;
+        slab_free_addr_to_cache(node);
+        node = next;
     }
 }

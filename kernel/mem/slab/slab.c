@@ -17,12 +17,15 @@ struct vas_space *slab_vas = NULL;
 struct slab_cache slab_caches[SLAB_CLASS_COUNT] = {0};
 
 void *slab_map_new_page(paddr_t *phys_out) {
-    paddr_t phys = pmm_alloc_page(ALLOC_FLAGS_NONE);
+    paddr_t phys = 0x0;
+    vaddr_t virt = 0x0;
+
+    phys = pmm_alloc_page(ALLOC_FLAGS_NONE);
     if (unlikely(!phys))
         goto err;
 
     *phys_out = phys;
-    vaddr_t virt = vas_alloc(slab_vas, PAGE_SIZE, PAGE_SIZE);
+    virt = vas_alloc(slab_vas, PAGE_SIZE, PAGE_SIZE);
     if (unlikely(!virt))
         goto err;
 
@@ -35,6 +38,9 @@ void *slab_map_new_page(paddr_t *phys_out) {
 err:
     if (phys)
         pmm_free_page(phys);
+
+    if (virt)
+        vas_free(slab_vas, virt);
 
     return NULL;
 }
@@ -107,6 +113,16 @@ struct slab *slab_create_new(struct slab_cache *cache) {
     return slab_init(slab, cache);
 }
 
+/* First we try and steal a slab from the GC list.
+ * If this does not work, we will map a new one. */
+struct slab *slab_create(struct slab_domain *domain, struct slab_cache *cache) {
+    struct slab *slab = slab_gc_pop_front(domain);
+    if (slab)
+        return slab_init(slab, cache);
+
+    return slab_create_new(cache);
+}
+
 static void slab_byte_idx_and_mask_from_idx(uint64_t index,
                                             uint64_t *byte_idx_out,
                                             uint8_t *bitmask_out) {
@@ -156,7 +172,6 @@ void slab_reset(struct slab *slab) {
     kassert(slab->list.next == NULL && slab->list.prev == NULL ||
             list_empty(&slab->list));
 
-    INIT_LIST_HEAD(&slab->list);
     spinlock_init(&slab->lock);
     slab->parent_cache = NULL;
     slab->used = 0;
