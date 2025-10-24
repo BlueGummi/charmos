@@ -365,13 +365,14 @@ void vmm_unmap_page(uintptr_t virt) {
 
 uintptr_t vmm_get_phys(uintptr_t virt) {
     struct page_table *current_table = kernel_pml4;
+    enum irql irql = spin_lock_irq_disable(&vmm_lock);
 
     for (uint64_t i = 0; i < 2; i++) {
         uint64_t level = (virt >> (39 - i * 9)) & 0x1FF;
         pte_t *entry = &current_table->entries[level];
 
         if (!ENTRY_PRESENT(*entry))
-            return (uintptr_t) -1;
+            goto err;
 
         current_table = (struct page_table *) ((*entry & PAGING_PHYS_MASK) +
                                                global.hhdm_offset);
@@ -381,11 +382,12 @@ uintptr_t vmm_get_phys(uintptr_t virt) {
     pte_t *entry = &current_table->entries[L2];
 
     if (!ENTRY_PRESENT(*entry))
-        return (uintptr_t) -1;
+        goto err;
 
     if (*entry & PAGING_2MB_page) {
         uintptr_t phys_base = *entry & PAGING_2MB_PHYS_MASK;
         uintptr_t offset = virt & (PAGE_2MB - 1);
+        spin_unlock(&vmm_lock, irql);
         return phys_base + offset;
     }
 
@@ -395,9 +397,13 @@ uintptr_t vmm_get_phys(uintptr_t virt) {
     entry = &current_table->entries[L1];
 
     if (!ENTRY_PRESENT(*entry))
-        return (uintptr_t) -1;
+        goto err;
 
+    spin_unlock(&vmm_lock, irql);
     return (*entry & PAGING_PHYS_MASK) + (virt & 0xFFF);
+err:
+    spin_unlock(&vmm_lock, irql);
+    return (uintptr_t) -1;
 }
 
 void *vmm_map_phys(uint64_t addr, uint64_t len, uint64_t flags) {

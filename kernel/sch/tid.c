@@ -11,10 +11,11 @@ struct tid_space *tid_space_init(uint64_t max_id) {
     spinlock_init(&ts->lock);
 
     struct tid_range *r = kzalloc(sizeof(*r));
-    r->start = 1;
 
+    r->start = 1;
     r->length = max_id;
     r->node.data = r->start;
+
     rbt_insert(&ts->tree, &r->node);
 
     return ts;

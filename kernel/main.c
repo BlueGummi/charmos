@@ -19,7 +19,6 @@
 #include <mem/alloc.h>
 #include <mem/buddy.h>
 #include <mem/domain.h>
-#include <mem/hugepage.h>
 #include <mem/pmm.h>
 #include <mem/slab.h>
 #include <mem/vmm.h>
@@ -64,7 +63,6 @@ void k_main(void) {
     pmm_mid_init();
 
     slab_allocator_init();
-    hugepage_alloc_init();
     global.current_bootstage = BOOTSTAGE_EARLY_ALLOCATORS;
 
     gdt_install();

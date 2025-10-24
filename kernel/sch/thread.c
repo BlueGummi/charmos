@@ -1,5 +1,4 @@
 #include <mem/alloc.h>
-#include <mem/hugepage.h>
 #include <mem/vmm.h>
 #include <sch/defer.h>
 #include <sch/reaper.h>
@@ -38,26 +37,19 @@ void thread_entry_wrapper(void) {
     thread_exit();
 }
 
-static void thread_free_stack(struct thread *t) {
-    if (t->stack)
-        hugepage_free_pages(t->stack, t->stack_size / PAGE_SIZE);
-}
-
 static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     struct thread *new_thread = kzalloc(sizeof(struct thread));
     if (unlikely(!new_thread))
         goto err;
 
-    void *stack = hugepage_alloc_pages(stack_size / PAGE_SIZE);
+    void *stack = kmalloc_aligned(stack_size, PAGE_SIZE);
     if (unlikely(!stack))
         goto err;
 
-    memset(stack, 0, stack_size);
     uint64_t stack_top = (uint64_t) stack + stack_size;
-
     new_thread->creation_time_ms = time_get_ms();
     new_thread->stack_size = stack_size;
-    new_thread->regs.rsp = (uint64_t) stack_top;
+    new_thread->regs.rsp = stack_top;
     new_thread->base_priority = THREAD_PRIO_CLASS_TIMESHARE;
     new_thread->perceived_priority = THREAD_PRIO_CLASS_TIMESHARE;
     new_thread->state = THREAD_STATE_READY;
@@ -65,6 +57,7 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     new_thread->regs.rip = (uint64_t) thread_entry_wrapper;
     new_thread->stack = (void *) stack;
     new_thread->curr_core = -1;
+
     /* We assume that ID allocation is infallible */
     new_thread->id = tid_alloc(thread_tid_space);
     new_thread->refcount = 1;
@@ -90,7 +83,7 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
 
 err:
     if (!new_thread)
-        return NULL;
+        goto out;
 
     if (new_thread->activity_data)
         kfree(new_thread->activity_data);
@@ -98,15 +91,18 @@ err:
     if (new_thread->activity_stats)
         kfree(new_thread->activity_stats);
 
+    if (new_thread->stack)
+        kfree_aligned(new_thread->stack);
+
     tid_free(thread_tid_space, new_thread->id);
-    thread_free_stack(new_thread);
     kfree(new_thread);
 
+out:
     return NULL;
 }
 
 struct thread *thread_create(void (*entry_point)(void)) {
-    return create(entry_point, STACK_SIZE);
+    return create(entry_point, THREAD_STACK_SIZE);
 }
 
 struct thread *thread_create_custom_stack(void (*entry_point)(void),
@@ -116,10 +112,10 @@ struct thread *thread_create_custom_stack(void (*entry_point)(void),
 
 void thread_free(struct thread *t) {
     tid_free(thread_tid_space, t->id);
-    thread_free_stack(t);
     kfree(t->activity_data);
     kfree(t->activity_stats);
     thread_free_event_apcs(t);
+    kfree_aligned(t->stack);
     kfree(t);
 }
 
@@ -140,7 +136,6 @@ bool thread_queue_remove(struct thread_queue *q, struct thread *t) {
     enum irql irql = thread_queue_lock_irq_disable(q);
     struct list_head *pos;
 
-    wait_for_interrupt();
     list_for_each(pos, &q->list) {
         struct thread *thread = thread_from_list_node(pos);
         if (thread == t) {

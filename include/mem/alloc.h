@@ -139,24 +139,24 @@ enum alloc_behavior : uint8_t {
  * Behaviors define what the allocator is ALLOWED to do
  * Behaviors allow/forbid blocking, faulting, and use in ISRs
  *
- *              ┌─────────────────────┐
- *              │  Allowed Behaviors  │
- * ┌────────────┼───────┬───────┬─────┼──────────────────────────────────────┐
- * │ Behavior   │ Fault │ Block │ ISR │ Comments                             │
- * ├────────────┼───────┼───────┼─────┼──────────────────────────────────────┤
- * │ NORMAL     │  ✅   │  ✅   │ ❌  │ General─purpose; unrestricted        │
- * ├────────────┼───────┼───────┼─────┼──────────────────────────────────────┤
- * │ ATOMIC     │  ❌   │  ❌   │ ✅  │ For ISRs or hard contexts. Only uses │
- * │            │       │       │     │ pre─resident, nonpageable memory     │
- * ├────────────┼───────┼───────┼─────┼──────────────────────────────────────┤
- * │ NO_WAIT    │  ✅   │  ❌   │ ❌  │ Non─blocking but can fault. For soft │
- * │            │       │       │     │ real─time / fast─path code           │
- * ├────────────┼───────┼───────┼─────┼──────────────────────────────────────┤
- * │ NO_RECLAIM │  ✅   │  ✅   │ ❌  │ May block but cannot trigger GC or   │
- * │            │       │       │     │ reclaim. For paging or low─mem code  │
- * ├────────────┼───────┼───────┼─────┼──────────────────────────────────────┤
- * │ FAULT_SAFE │  ❌   │  ✅   │ ❌  │ Must not fault, but may block        │
- * └────────────┴───────┴───────┴─────┴──────────────────────────────────────┘
+ *              ┌───────────────────────┐
+ *              │   Allowed Behaviors   │
+ * ┌────────────┼───────┬───────┬───────┼──────────────────────────────────────┐
+ * │ Behavior   │ Fault │ Block │  ISR  │ Comments                             │
+ * ├────────────┼───────┼───────┼───────┼──────────────────────────────────────┤
+ * │ NORMAL     │  ✅   │  ✅   │  ❌   │ General─purpose; unrestricted        │
+ * ├────────────┼───────┼───────┼───────┼──────────────────────────────────────┤
+ * │ ATOMIC     │  ❌   │  ❌   │  ✅   │ For ISRs or hard contexts. Only uses │
+ * │            │       │       │       │ pre─resident, nonpageable memory     │
+ * ├────────────┼───────┼───────┼───────┼──────────────────────────────────────┤
+ * │ NO_WAIT    │  ✅   │  ❌   │  ❌   │ Non─blocking but can fault. For soft │
+ * │            │       │       │       │ real─time / fast─path code           │
+ * ├────────────┼───────┼───────┼───────┼──────────────────────────────────────┤
+ * │ NO_RECLAIM │  ✅   │  ✅   │  ❌   │ May block but cannot trigger GC or   │
+ * │            │       │       │       │ reclaim. For paging or low─mem code  │
+ * ├────────────┼───────┼───────┼───────┼──────────────────────────────────────┤
+ * │ FAULT_SAFE │  ❌   │  ✅   │  ❌   │ Must not fault, but may block        │
+ * └────────────┴───────┴───────┴───────┴──────────────────────────────────────┘
  *
  * Fast allocation flag (FLAG_FAST):
  *     - Optional performance hint

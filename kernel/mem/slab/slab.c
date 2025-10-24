@@ -96,6 +96,7 @@ struct slab *slab_init(struct slab *slab, struct slab_cache *parent) {
     slab->used = 0;
     slab->state = SLAB_FREE;
     slab->self = slab;
+    rbt_init_node(&slab->rb);
     INIT_LIST_HEAD(&slab->list);
 
     memset(slab->bitmap, 0, bitmap_bytes);
@@ -116,7 +117,7 @@ struct slab *slab_create_new(struct slab_cache *cache) {
 /* First we try and steal a slab from the GC list.
  * If this does not work, we will map a new one. */
 struct slab *slab_create(struct slab_domain *domain, struct slab_cache *cache) {
-    struct slab *slab = slab_gc_pop_front(domain);
+    struct slab *slab = slab_gc_get_newest(domain);
     if (slab)
         return slab_init(slab, cache);
 
@@ -126,8 +127,8 @@ struct slab *slab_create(struct slab_domain *domain, struct slab_cache *cache) {
 static void slab_byte_idx_and_mask_from_idx(uint64_t index,
                                             uint64_t *byte_idx_out,
                                             uint8_t *bitmask_out) {
-    *byte_idx_out = index / 8;
-    *bitmask_out = (uint8_t) (1ULL << (index % 8));
+    *byte_idx_out = index / 8ULL;
+    *bitmask_out = (uint8_t) (1ULL << (index % 8ULL));
 }
 
 static void slab_index_and_mask_from_ptr(struct slab *slab, void *obj,
@@ -139,6 +140,9 @@ static void slab_index_and_mask_from_ptr(struct slab *slab, void *obj,
 
 static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
     enum irql irql = slab_lock_irq_disable(slab);
+    slab_check_assert(slab);
+
+    kassert(spinlock_held(&cache->lock));
     kassert(slab->state != SLAB_FULL);
 
     for (uint64_t i = 0; i < cache->objs_per_slab; i++) {
@@ -146,6 +150,7 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
         uint8_t bit_mask;
         slab_byte_idx_and_mask_from_idx(i, &byte_idx, &bit_mask);
 
+        kassert(byte_idx < SLAB_BITMAP_BYTES_FOR(cache->objs_per_slab));
         if (!SLAB_BITMAP_TEST(slab->bitmap[byte_idx], bit_mask)) {
             SLAB_BITMAP_SET(slab->bitmap[byte_idx], bit_mask);
             slab->used += 1;
@@ -157,11 +162,13 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
             } /* No need to move it if the used count is in between
                * 0 and the max -- it will be in the partial list */
 
+            slab_check_assert(slab);
             slab_unlock(slab, irql);
             return (void *) (slab->mem + i * cache->obj_size);
         }
     }
 
+    slab_check_assert(slab);
     slab_unlock(slab, irql);
     return NULL;
 }
@@ -178,7 +185,10 @@ void slab_reset(struct slab *slab) {
     slab->self = slab;
 }
 
+/* TODO: FIXME */
 void slab_destroy(struct slab *slab) {
+    return;
+
     slab_list_del(slab);
     uintptr_t virt = (uintptr_t) slab;
     paddr_t phys = vmm_get_phys(virt);
@@ -186,16 +196,18 @@ void slab_destroy(struct slab *slab) {
 }
 
 static void slab_free(struct slab *slab, void *obj) {
-
     struct slab_cache *cache = slab->parent_cache;
 
     enum irql slab_cache_irql = slab_cache_lock_irq_disable(cache);
     enum irql irql = slab_lock_irq_disable(slab);
 
+    slab_check_assert(slab);
+
     uint64_t byte_idx;
     uint8_t bit_mask;
     slab_index_and_mask_from_ptr(slab, obj, &byte_idx, &bit_mask);
 
+    kassert(byte_idx < SLAB_BITMAP_BYTES_FOR(cache->objs_per_slab));
     if (!SLAB_BITMAP_TEST(slab->bitmap[byte_idx], bit_mask))
         k_panic("Likely double free of address 0x%lx\n", obj);
 
@@ -214,6 +226,7 @@ static void slab_free(struct slab *slab, void *obj) {
         slab_move(cache, slab, SLAB_PARTIAL);
     }
 
+    slab_check_assert(slab);
     slab_unlock(slab, irql);
     slab_cache_unlock(cache, slab_cache_irql);
 }
@@ -221,15 +234,13 @@ static void slab_free(struct slab *slab, void *obj) {
 static void *slab_try_alloc_from_slab_list(struct slab_cache *cache,
                                            struct list_head *list) {
     kassert(spinlock_held(&cache->lock));
-    struct list_head *node;
+    struct list_head *node, *pos;
     struct slab *slab;
     void *ret = NULL;
 
-    list_for_each(node, list) {
+    list_for_each_safe(node, pos, list) {
         slab = slab_from_list_node(node);
-        if (slab->state == SLAB_FULL)
-            continue;
-
+        kassert(slab->state != SLAB_FULL);
         ret = slab_alloc_from(cache, slab);
         if (ret)
             goto out;
@@ -343,14 +354,13 @@ void *kzalloc(uint64_t size) {
     if (!ptr)
         return NULL;
 
-    memset(ptr, 0, size);
-
-    return ptr;
+    return memset(ptr, 0, size);
 }
 
 void slab_free_page_hdr(struct slab_page_hdr *hdr) {
     uintptr_t virt = (uintptr_t) hdr;
     uint64_t pages = hdr->pages;
+    hdr->magic = 0;
     for (uint64_t i = 0; i < pages; i++) {
         uintptr_t vaddr = virt + i * PAGE_SIZE;
         paddr_t phys = (paddr_t) vmm_get_phys(vaddr);
@@ -362,13 +372,16 @@ void slab_free_page_hdr(struct slab_page_hdr *hdr) {
 }
 
 void slab_free_addr_to_cache(void *addr) {
+    vaddr_t vaddr = (vaddr_t) addr;
+    kassert(vaddr >= SLAB_HEAP_START && vaddr <= SLAB_HEAP_END);
+
     struct slab_page_hdr *hdr_candidate = slab_page_hdr_for_addr(addr);
     if (hdr_candidate->magic == KMALLOC_PAGE_MAGIC)
         return slab_free_page_hdr(hdr_candidate);
 
     struct slab *slab = slab_for_ptr(addr);
     if (!slab)
-        k_panic("Likely double free of 0x%lx!\n", addr);
+        k_panic("Likely double free of address 0x%lx\n", addr);
 
     slab_free(slab, addr);
 }

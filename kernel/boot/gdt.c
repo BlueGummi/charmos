@@ -2,7 +2,6 @@
 #include <boot/tss.h>
 #include <console/printf.h>
 #include <mem/alloc.h>
-#include <mem/hugepage.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -74,7 +73,7 @@ void gdt_init(struct gdt_entry *gdt, struct tss *tss) {
     tss->io_map_base = sizeof(struct tss);
 
     gdt_load(gdt, GDT_ENTRIES);
-    tss->rsp0 = (uint64_t) hugepage_alloc_pages(8);
+    tss->rsp0 = (uint64_t) kmalloc_aligned(8 * PAGE_SIZE, PAGE_SIZE);
     if (!tss->rsp0)
         k_panic("GDT TSS RSP0 stack allocation failed!\n");
 

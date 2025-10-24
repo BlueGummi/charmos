@@ -13,7 +13,7 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
                           bool already_locked) {
     kassert(task->state != THREAD_STATE_IDLE_THREAD);
 
-    enum irql irql = IRQL_PASSIVE_LEVEL;
+    enum irql irql;
     if (!already_locked)
         irql = scheduler_lock_irq_disable(sched);
 
@@ -29,7 +29,8 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
         list_add_tail(&task->list_node, &q->list);
     }
 
-    sched->queue_bitmap |= (1 << prio);
+    scheduler_set_queue_bitmap(sched, prio);
+
     task->last_ran = sched->core_id;
     scheduler_increment_thread_count(sched, task);
 
@@ -40,10 +41,6 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
 
     if (!already_locked)
         scheduler_unlock(sched, irql);
-}
-
-static inline void put_on_scheduler(struct scheduler *s, struct thread *t) {
-    scheduler_add_thread(s, t, false);
 }
 
 void scheduler_enqueue(struct thread *t) {
@@ -57,14 +54,14 @@ void scheduler_enqueue(struct thread *t) {
         }
     }
 
-    put_on_scheduler(s, t);
+    scheduler_add_thread(s, t, false);
     scheduler_force_resched(s);
 }
 
 /* TODO: Make scheduler_add_thread an internal function so I don't need to
  * pass in the 'false false true' here and all over the place */
 void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id) {
-    put_on_scheduler(global.schedulers[core_id], t);
+    scheduler_add_thread(global.schedulers[core_id], t, false);
     scheduler_force_resched(global.schedulers[core_id]);
 }
 
@@ -80,7 +77,7 @@ void scheduler_wake(struct thread *t, enum thread_wake_reason reason,
         k_panic("Tried to put_back a thread in the ready queues\n");
 
     struct scheduler *sch = global.schedulers[c];
-    put_on_scheduler(sch, t);
+    scheduler_add_thread(sch, t, false);
 
     scheduler_force_resched(sch);
 }

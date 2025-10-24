@@ -5,7 +5,6 @@
 #include <console/printf.h>
 #include <int/idt.h>
 #include <mem/alloc.h>
-#include <mem/hugepage.h>
 #include <mem/vmm.h>
 #include <pit.h>
 #include <sch/sched.h>

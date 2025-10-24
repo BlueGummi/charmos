@@ -30,7 +30,7 @@ static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
     uint64_t offset = (uintptr_t) buffer & (PAGE_SIZE - 1);
     uint64_t num_pages = (offset + size + PAGE_SIZE - 1) / PAGE_SIZE;
 
-    data->prps = kzalloc(sizeof(uint64_t) * num_pages);
+    data->prps = kmalloc(sizeof(uint64_t) * num_pages);
     if (!data->prps)
         return false;
 
@@ -50,7 +50,7 @@ static void nvme_setup_prps(struct nvme_command *cmd,
                             struct nvme_bio_data *data,
                             const void *fallback_buffer, uint64_t size) {
     if (data->prp_count == 0) {
-        uint64_t buffer_phys = vmm_get_phys((uint64_t) fallback_buffer);
+        uint64_t buffer_phys = vmm_get_phys((vaddr_t) fallback_buffer);
         cmd->prp1 = buffer_phys;
         if (size > PAGE_SIZE)
             cmd->prp2 = buffer_phys + PAGE_SIZE;

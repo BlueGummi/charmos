@@ -1,6 +1,5 @@
 #include <crypto/prng.h>
 #include <mem/alloc.h>
-#include <mem/hugepage.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <sch/sched.h>
@@ -44,23 +43,13 @@ REGISTER_TEST(vmm_map_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
             TEST_ASSERT(ptr != NULL);                                          \
             ASSERT_ALIGNED(ptr, align);                                        \
         }                                                                      \
-        SET_SUCCESS();                                                           \
+        SET_SUCCESS();                                                         \
     }
 
 KMALLOC_ALIGNMENT_TEST(32, 32)
 KMALLOC_ALIGNMENT_TEST(64, 64)
 KMALLOC_ALIGNMENT_TEST(128, 128)
 KMALLOC_ALIGNMENT_TEST(256, 256)
-
-REGISTER_TEST(kmalloc_aligned_4096_test, false, false) {
-    ABORT_IF_RAM_LOW();
-    for (uint64_t i = 0; i < ALIGNED_ALLOC_TIMES; i++) {
-        void *ptr = hugepage_alloc_page();
-        TEST_ASSERT(ptr != NULL);
-        ASSERT_ALIGNED(ptr, 4096);
-    }
-    SET_SUCCESS();
-}
 
 #define STRESS_ALLOC_TIMES 2048
 
@@ -113,19 +102,9 @@ REGISTER_TEST(kmalloc_mixed_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     void *small_ptrs[STRESS_ALLOC_TIMES];
 
-    void *huge_ptrs[STRESS_ALLOC_TIMES / 8];
-
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
         small_ptrs[i] = kmalloc(128);
         TEST_ASSERT(small_ptrs[i] != NULL);
-        if (i % 8 == 0) {
-            huge_ptrs[i / 8] = hugepage_alloc_page();
-            TEST_ASSERT(huge_ptrs[i / 8] != NULL);
-        }
-    }
-
-    for (uint64_t i = 0; i < STRESS_ALLOC_TIMES / 8; i++) {
-        hugepage_free_page(huge_ptrs[i]);
     }
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
@@ -169,36 +148,6 @@ REGISTER_TEST(kmalloc_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     for (int i = 0; i < MT_THREAD_COUNT; i++) {
         threads[i] =
             thread_spawn_custom_stack(mt_kmalloc_worker, PAGE_SIZE * 16);
-        TEST_ASSERT(threads[i] != NULL);
-    }
-
-    SET_SUCCESS();
-}
-
-static void mt_hugepage_worker() {
-    void *ptrs[MT_ALLOC_TIMES];
-
-    for (uint64_t i = 0; i < MT_ALLOC_TIMES; i++) {
-        ptrs[i] = hugepage_alloc_page();
-
-        TEST_ASSERT(ptrs[i] != NULL);
-        ASSERT_ALIGNED(ptrs[i], PAGE_SIZE);
-    }
-
-    for (uint64_t i = 0; i < MT_ALLOC_TIMES; i++) {
-        hugepage_free_page(ptrs[i]);
-        ptrs[i] = NULL;
-    }
-}
-
-REGISTER_TEST(hugepage_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    ABORT_IF_RAM_LOW();
-
-    struct thread *threads[MT_THREAD_COUNT];
-
-    for (int i = 0; i < MT_THREAD_COUNT; i++) {
-        threads[i] =
-            thread_spawn_custom_stack(mt_hugepage_worker, PAGE_SIZE * 16);
         TEST_ASSERT(threads[i] != NULL);
     }
 

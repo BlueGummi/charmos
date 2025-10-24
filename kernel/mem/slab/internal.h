@@ -6,7 +6,7 @@
 #include <misc/align.h>
 #include <misc/containerof.h>
 #include <misc/list.h>
-#include <misc/locked_list.h>
+#include <misc/rbt.h>
 #include <smp/domain.h>
 #include <stdatomic.h>
 #include <stdint.h>
@@ -83,17 +83,23 @@ struct slab {
 
     struct list_head list;
 
+    /* Sorted by gc_enqueue_time_ms */
+    struct rbt_node rb;
+
     uint8_t *bitmap;
 
     vaddr_t mem;
     size_t used;
     struct slab_cache *parent_cache;
 
+    time_t gc_enqueue_time_ms; /* When were we put on the GC list? */
+
     struct spinlock lock;
     enum slab_state state;
 };
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab, lock);
 
+#define slab_from_rbt_node(rb) (container_of(rb, struct slab, rb))
 #define slab_from_list_node(ln) (container_of(ln, struct slab, list))
 #define PAGE_NON_SLAB_SPACE (PAGE_SIZE - sizeof(struct slab))
 #define slab_error(fmt, ...) k_info("SLAB", K_ERROR, fmt, ##__VA_ARGS__)
@@ -209,6 +215,13 @@ struct slab_cache_zonelist {
     size_t count;
 };
 
+struct slab_gc {
+    struct rbt rbt;
+    struct spinlock lock;
+    atomic_size_t num_elements;
+};
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab_gc, lock);
+
 struct slab_domain {
     /* Actual domain that this corresponds to */
     struct domain *domain;
@@ -230,7 +243,7 @@ struct slab_domain {
 
     /* List of slabs that are reusable and can be
      * garbage collected safely/kept here */
-    struct locked_list slab_gc_list;
+    struct slab_gc slab_gc;
 
     struct daemon *daemon;
 };
@@ -276,15 +289,17 @@ size_t slab_free_queue_drain(struct slab_percpu_cache *cache,
 
 /* Check */
 bool slab_check(struct slab *slab);
+#define slab_check_assert(slab) kassert(slab_check(slab))
 
 /* GC */
 void slab_reset(struct slab *slab);
+void slab_gc_init(struct slab_gc *gc);
 void slab_gc_enqueue(struct slab_domain *domain, struct slab *slab);
 void slab_gc_dequeue(struct slab_domain *domain, struct slab *slab);
-struct slab *slab_gc_pop_front(struct slab_domain *domain);
+struct slab *slab_gc_get_newest(struct slab_domain *domain);
 size_t slab_gc_num_slabs(struct slab_domain *domain);
-size_t slab_gc_list_flush_up_to(struct slab_domain *domain, size_t max);
-size_t slab_gc_list_flush_full(struct slab_domain *domain);
+size_t slab_gc_flush_up_to(struct slab_domain *domain, size_t max);
+size_t slab_gc_flush_full(struct slab_domain *domain);
 
 static inline struct page *slab_get_backing_page(struct slab *slab) {
     return page_for_pfn(PAGE_TO_PFN(vmm_get_phys((vaddr_t) slab)));

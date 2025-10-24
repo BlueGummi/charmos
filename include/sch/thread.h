@@ -12,7 +12,7 @@
 #include <types/refcount.h>
 #include <types/types.h>
 
-#define STACK_SIZE (PAGE_SIZE * 4)
+#define THREAD_STACK_SIZE (PAGE_SIZE * 4)
 
 typedef uint32_t thread_prio_t;
 #define THREAD_CLASS_WIDTH 1024

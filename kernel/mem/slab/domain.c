@@ -39,6 +39,7 @@ void slab_domain_build_locality_lists(struct slab_domain *sdom) {
     }
 }
 
+/* Ok, there's quite a bit of background work to be done. */
 enum daemon_thread_command slab_background_work(struct daemon_work *work,
                                                 struct daemon_thread *thread,
                                                 void *a, void *b) {
@@ -97,7 +98,7 @@ void slab_domain_init(void) {
             k_panic("Failed to allocate slab domain!\n");
 
         sdomain->domain = domain;
-        locked_list_init(&sdomain->slab_gc_list);
+        slab_gc_init(&sdomain->slab_gc);
         slab_free_queue_init(&sdomain->free_queue, SLAB_FREE_QUEUE_CAPACITY);
         slab_domain_init_daemon(sdomain);
         slab_domain_percpu_init(sdomain);

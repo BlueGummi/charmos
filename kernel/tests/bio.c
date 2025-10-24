@@ -4,7 +4,6 @@
 #include <fs/ext2.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
-#include <mem/hugepage.h>
 #include <sleep.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -40,7 +39,7 @@ REGISTER_TEST(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         struct bio_request *bio = kmalloc(sizeof(struct bio_request));
         *bio = (struct bio_request) {
             .lba = 0,
-            .buffer = hugepage_alloc_pages(64),
+            .buffer = kmalloc_aligned(64 * PAGE_SIZE, PAGE_SIZE),
             .size = 512 * 512,
             .sector_count = 512,
             .write = false,
@@ -58,7 +57,6 @@ REGISTER_TEST(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
         bool submitted = d->submit_bio_async(d, bio);
         if (!submitted) {
-            hugepage_free_pages(bio->buffer, 64);
             SET_FAIL();
             return;
         }
@@ -66,7 +64,6 @@ REGISTER_TEST(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         sleep_ms(100);
 
         TEST_ASSERT(bio->status == 0);
-        hugepage_free_pages(bio->buffer, 64);
     }
     TEST_ASSERT(done == true);
     TEST_ASSERT(current_test->message_count == run_times);

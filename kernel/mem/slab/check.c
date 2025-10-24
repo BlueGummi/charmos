@@ -44,6 +44,14 @@ bool slab_check(struct slab *slab) {
     /* Caller must deal with this */
     kassert(spinlock_held(&slab->lock));
 
+    switch (slab->state) {
+    case SLAB_FREE:
+    case SLAB_PARTIAL:
+    case SLAB_IN_GC_LIST:
+    case SLAB_FULL: break;
+    default: return false; /* Invalid state */
+    }
+
     struct slab_cache *cache = slab->parent_cache;
     if (!cache)
         return slab_check_reset_slab(slab);

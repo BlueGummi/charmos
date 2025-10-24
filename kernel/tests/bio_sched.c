@@ -15,7 +15,7 @@
 #define EXT2_INIT                                                              \
     if (global.root_node->fs_type != FS_EXT2) {                                \
         ADD_MESSAGE("the mounted root is not ext2");                           \
-        SET_SKIP();                                                              \
+        SET_SKIP();                                                            \
         return;                                                                \
     }                                                                          \
     struct vfs_node *root = global.root_node;
@@ -105,6 +105,11 @@ REGISTER_TEST(bio_sched_coalesce_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
 }
 
+#define BIO_SCHED_TEST_RUNS 1024
+static uint64_t runs_per_lvl[BIO_SCHED_LEVELS] = {0};
+struct bio_request *rqs[BIO_SCHED_TEST_RUNS] = {0};
+uint8_t *buffers[BIO_SCHED_TEST_RUNS] = {0};
+
 REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
               IS_INTEGRATION_TEST) {
     EXT2_INIT;
@@ -116,15 +121,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
 
     prng_seed(time_get_us());
 
-    uint64_t test_runs = 1024;
-    uint64_t runs_per_lvl[BIO_SCHED_LEVELS] = {0};
-    uint8_t **buffers = kmalloc(test_runs * sizeof(uint8_t *));
-    struct bio_request **rqs =
-        kmalloc(test_runs * sizeof(struct bio_request *));
-
-    TEST_ASSERT(buffers && rqs);
-
-    for (uint64_t i = 0; i < test_runs; i++) {
+    for (uint64_t i = 0; i < BIO_SCHED_TEST_RUNS; i++) {
         buffers[i] = kmalloc_aligned(512, PAGE_SIZE);
         rqs[i] = kzalloc(sizeof(struct bio_request));
         TEST_ASSERT(buffers[i] && rqs[i]);
@@ -142,7 +139,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
 
     enable_interrupts();
     uint64_t ms = time_get_ms();
-    for (uint64_t i = 0; i < test_runs; i++) {
+    for (uint64_t i = 0; i < BIO_SCHED_TEST_RUNS; i++) {
         struct bio_request *rq = rqs[i];
         runs_per_lvl[rq->priority]++;
         rq->user_data = (void *) ((time_get_ms_fast() << 12) | rq->priority);
@@ -170,9 +167,9 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
     char *m2 = kmalloc(100);
     TEST_ASSERT(m2);
     snprintf(m2, 100, "Runs is %d, test_runs is %d", atomic_load(&runs),
-             test_runs);
+             BIO_SCHED_TEST_RUNS);
     ADD_MESSAGE(m2);
-    TEST_ASSERT(atomic_load(&runs) <= test_runs);
+    TEST_ASSERT(atomic_load(&runs) <= BIO_SCHED_TEST_RUNS);
 
     SET_SUCCESS();
 }

@@ -130,6 +130,9 @@ static struct thread_activity_metrics calc_activity_metrics(struct thread *t) {
 }
 
 void thread_calculate_activity_data(struct thread *t) {
+    if (thread_get_state(t) == THREAD_STATE_IDLE_THREAD)
+        return;
+
     struct thread_activity_metrics mtcs = calc_activity_metrics(t);
     t->activity_metrics = mtcs;
 }
