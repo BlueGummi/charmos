@@ -18,6 +18,10 @@
 #define PAGING_WRITETHROUGH (1UL << 3)
 #define PAGING_2MB_page (1ULL << 7)
 
+/* TODO: */
+#define PAGING_PAGEABLE (0)
+#define PAGING_MOVABLE (0)
+
 #define PAGING_2MB_PHYS_MASK (~((uintptr_t) PAGE_2MB - 1))
 #define PAGE_ALIGN_DOWN(x) ALIGN_DOWN((uintptr_t)(x), PAGE_SIZE)
 #define PAGE_ALIGN_UP(x) ALIGN_UP((uintptr_t)(x), PAGE_SIZE)

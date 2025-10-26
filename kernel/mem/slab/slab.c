@@ -5,6 +5,7 @@
 #include <mem/slab.h>
 #include <mem/vaddr_alloc.h>
 #include <mem/vmm.h>
+#include <sch/sched.h>
 #include <smp/core.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -86,6 +87,7 @@ void slab_cache_init(struct slab_cache *cache, uint64_t obj_size) {
 struct slab *slab_init(struct slab *slab, struct slab_cache *parent) {
     void *page = slab;
     slab->parent_cache = parent;
+    slab->pages = parent->pages_per_slab;
     slab->bitmap = (uint8_t *) (page + sizeof(struct slab));
     uint64_t bitmap_bytes = SLAB_BITMAP_BYTES_FOR(parent->objs_per_slab);
     uintptr_t data_start = (vaddr_t) page + sizeof(struct slab) + bitmap_bytes;
@@ -173,7 +175,7 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
     return NULL;
 }
 
-void slab_reset(struct slab *slab) {
+struct slab *slab_reset(struct slab *slab) {
     slab->mem = 0x0;
     slab->bitmap = NULL;
     kassert(slab->list.next == NULL && slab->list.prev == NULL ||
@@ -183,6 +185,7 @@ void slab_reset(struct slab *slab) {
     slab->parent_cache = NULL;
     slab->used = 0;
     slab->self = slab;
+    return slab;
 }
 
 void slab_destroy(struct slab *slab) {
@@ -215,8 +218,8 @@ static void slab_free(struct slab *slab, void *obj) {
         slab_move(cache, slab, SLAB_FREE);
         if (slab_cache_count_for(cache, SLAB_FREE) > 4) {
             slab_unlock(slab, irql);
-            slab_cache_unlock(cache, slab_cache_irql);
             slab_destroy(slab);
+            slab_cache_unlock(cache, slab_cache_irql);
             return;
         }
     } else if (slab->state == SLAB_FULL) {
@@ -278,6 +281,10 @@ int32_t slab_size_to_index(size_t size) {
     return -1;
 }
 
+static inline bool kmalloc_size_fits_in_slab(size_t size) {
+    return slab_size_to_index(size) >= 0;
+}
+
 void slab_allocator_init() {
     slab_vas = vas_space_bootstrap(SLAB_HEAP_START, SLAB_HEAP_END);
     if (!slab_vas)
@@ -303,7 +310,7 @@ size_t slab_allocation_size(vaddr_t addr) {
     return ksize((void *) addr);
 }
 
-void *kmalloc_pages(size_t size) {
+void *kmalloc_pages_raw(size_t size, enum alloc_flags flags) {
     uint64_t total_size = size + sizeof(struct slab_page_hdr);
     uint64_t pages = PAGES_NEEDED_FOR(total_size);
 
@@ -311,20 +318,24 @@ void *kmalloc_pages(size_t size) {
     uintptr_t phys_pages[pages];
     uint64_t allocated = 0;
 
+    page_flags_t page_flags = PAGING_PRESENT | PAGING_WRITE;
+    if (flags & ALLOC_FLAG_PAGEABLE)
+        page_flags |= PAGING_PAGEABLE;
+
     for (uint64_t i = 0; i < pages; i++) {
-        uintptr_t phys = pmm_alloc_page(ALLOC_FLAGS_NONE);
+        uintptr_t phys = pmm_alloc_page(flags);
         if (!phys) {
             for (uint64_t j = 0; j < allocated; j++)
                 pmm_free_page(phys_pages[j]);
             return NULL;
         }
 
-        enum errno e = vmm_map_page(virt + i * PAGE_SIZE, phys,
-                                    PAGING_PRESENT | PAGING_WRITE);
+        enum errno e = vmm_map_page(virt + i * PAGE_SIZE, phys, page_flags);
         if (e < 0) {
             pmm_free_page(phys);
             for (uint64_t j = 0; j < allocated; j++)
                 pmm_free_page(phys_pages[j]);
+
             return NULL;
         }
 
@@ -335,6 +346,10 @@ void *kmalloc_pages(size_t size) {
     hdr->magic = KMALLOC_PAGE_MAGIC;
     hdr->pages = pages;
 
+    /* TODO: Do something about #defining the cacheline width */
+    if (flags & ALLOC_FLAG_PREFER_CACHE_ALIGNED)
+        return ((uint8_t *) hdr + 64);
+
     return (void *) (hdr + 1);
 }
 
@@ -344,10 +359,10 @@ void *kmalloc(size_t size) {
 
     int idx = slab_size_to_index(size);
 
-    if (idx >= 0 && slab_caches[idx].objs_per_slab > 0)
+    if (kmalloc_size_fits_in_slab(size) && slab_caches[idx].objs_per_slab > 0)
         return slab_alloc(&slab_caches[idx]);
 
-    return kmalloc_pages(size);
+    return kmalloc_pages_raw(size, ALLOC_FLAGS_NONE);
 }
 
 void *kzalloc(uint64_t size) {
@@ -415,11 +430,43 @@ void *krealloc(void *ptr, uint64_t size) {
     return new_ptr;
 }
 
+void *kmalloc_pages(size_t size, enum alloc_flags flags,
+                    enum alloc_behavior behavior) {
+    void *ret = kmalloc_pages_raw(size, flags);
+    if (alloc_behavior_can_gc(behavior) && !alloc_behavior_is_fast(behavior)) {
+        struct slab_domain *local = slab_domain_local();
+        struct slab_percpu_cache *pcpu = slab_percpu_cache_local();
+
+        /* Scale down this free_queue drain target */
+        size_t target = slab_free_queue_get_target_drain(local);
+        target /= 2;
+
+        bool flush_to_cache = true;
+        slab_free_queue_drain(pcpu, &local->free_queue, target, flush_to_cache);
+    }
+
+    return ret;
+}
+
+/* Lock ordering:
+ *
+ * Slab cache -> Slab lists -> Slab
+ *
+ */
+
 /* Alrighty, this will be a doozy.
  *
  * This slab allocator takes in a size, alloc_flags, and behavior.
  *
  * Depending on behavior, we are(n't) allowed to do certain things.
+ *
+ *   ┌────────────────────────────────────────────────────────────────┐
+ *   │ All allocation paths are influenced by the specified behavior, │
+ *   │ but that won't be discussed here to keep things brief.         │
+ *   │ The general rule is that touching the freequeue may cause      │
+ *   │ faults, and the physical memory allocator may trigger blocks.  │
+ *   │ The physical memory allocator can be requested to not block.   │
+ *   └────────────────────────────────────────────────────────────────┘
  *
  * The general allocation flow is as follows:
  *
@@ -431,13 +478,13 @@ void *krealloc(void *ptr, uint64_t size) {
  * old/there are too many elements in the freequeue. Reduce
  * the amount of flush/draining if the fast behavior is specified.
  *
- *    ----------------------------------------------------------------
- * << The slab allocator ignores movability. All slabs are nonmovable >>
- *    ----------------------------------------------------------------
+ *   ┌────────────────────────────────────────────────────────────────┐
+ *   │ All slabs anywhere in the slab allocator are nonmovable.       │
+ *   └────────────────────────────────────────────────────────────────┘
  *
  * If the allocation does fit in a slab, then...
  *
- * First, we determine if we should scale up our allocation to satisfy
+ * First, we determine if we MUST scale up our allocation to satisfy
  * cache alignment if cache alignment is requested.
  *
  * Second, we check if our magazine has anything. If pageable memory
@@ -447,14 +494,14 @@ void *krealloc(void *ptr, uint64_t size) {
  * If pageable memory is requested, and the magazines are not so full,
  * and a larger size is requested, do not take from them.
  *
- * Determining whether we should take from our magazine depending on
+ * Determining whether we MUST take from our magazine depending on
  * the size of an allocation and the input memory type will be done
  * via heuristics that will scale steadily both ways.
  *
- *    ----------------------------------------------------------------
- * << The goal is to make sure that pageable allocations do not steal >>
- * << everything from nonpageable allocations from the magazines      >>
- *    ----------------------------------------------------------------
+ *   ┌────────────────────────────────────────────────────────────────┐
+ *   │ The goal is to make sure that pageable allocations do not steal│
+ *   │ everything from nonpageable allocations from the magazines     │
+ *   └────────────────────────────────────────────────────────────────┘
  *
  * If nonpageable memory is requested, and the magazines are not empty,
  * just take memory from the magazines.
@@ -464,23 +511,95 @@ void *krealloc(void *ptr, uint64_t size) {
  *
  * First, check if the allocation MUST be from the local node. If this
  * is the case, simply allocate from the local pageable/nonpageable slab
- * cache. If an allocation is pageable, then there will be a heuristic
- * that checks whether or not there are so many things in a given
- * nonpageable cache that it is worth it to allocate from the nonpageable cache.
+ * cache.
+ *
+ *   ┌────────────────────────────────────────────────────────────────┐
+ *   │ If an allocation is pageable, then there will be a heuristic   │
+ *   │ that checks whether or not there are so many things in a given │
+ *   │ nonpageable cache that it is worth it to allocate from it.     │
+ *   └────────────────────────────────────────────────────────────────┘
  *
  * If the slab cache has nothing available, just map a new page to the local
  * node if the allocation MUST be from the local node.
  *
- * Now, if the allocation does not need to come from the local node, then things
- * get real fun.
+ *   ┌────────────────────────────────────────────────────────────────┐
+ *   │ Slab creation uses a GC list of slabs that are going to be     │
+ *   │ destroyed, so instead of constantly calling into the physical  │
+ *   │ memory allocator, slabs can be reused.                         │
+ *   └────────────────────────────────────────────────────────────────┘
  *
+ * Now, if the allocation does not need to come from the local node, then things
+ * get real fun. Each slab domain has a zonelist for the other domains relative
+ * to itself, sorted by distance. This list is traversed, and depending on slab
+ * cache slab availability and physical memory availability, a cache is selected
+ * for allocation. If a flexible locality is selected, a scoring heuristic is
+ * applied to bias the result towards within the selected locality, but
+ * potentially selecting a further node if it has high availability
+ * compared to the closer nodes.
+ *
+ * The slab cache picking logic may be biased based on given input arguments.
+ * For example, if a FAST behavior is specified, the slab cache picking logic
+ * might apply a higher weight to the local cache to minimize lock contention
+ * and maximize memory locality.
+ *
+ * Now a slab cache MUST have been selected for this allocation. If the slab
+ * cache is the local node, then first try and free the freequeue to
+ * the local magazines or to the slab cache until a given amount of target
+ * elements is flushed from it or the freequeue becomes empty. Afterwards,
+ * if there is still an unsatisfactory amount of elements in the per-cpu
+ * cache/magazine (too few), allocations from the slab cache are performed.
+ *
+ * Just like all slab cache allocations, the same heuristics on picking
+ * whether or not a nonpageable cache MUST fulfill a pageable allocation,
+ * and the use of the GC list for creation of new slabs are used here.
+ *
+ * Finally, we MAY have a memory address to return. If we have none,
+ * then we have likely ran out of memory, and so, MUST return NULL.
+ *
+ * If we do return NULL after the initial allocation, and a flexible
+ * locality is permitted, then we just try again with a further node.
+ *
+ * But, we are not done yet. If the FAST behavior is not specified,
+ * and if we are allowed to take faults, the slab GC list will be
+ * checked to figure out what slabs MUST be fully deleted (since
+ * this will free them up for use in other memory management subsystems).
+ *
+ * This selection operation depends on a variety of things, such as the
+ * memory pressure (recent usage), recycling frequency, and other
+ * heuristics about recent memory recycling usage.
+ *
+ * After the slab GC list has some elements truly deleted (or not, if
+ * the heuristics determine that it is not necessary), we are finally
+ * done, and can return the memory address that we had been anticipating
+ * all along.
+ *
+ * The GC list uses a red-black tree ordered by slab enqueue time,
+ * so the oldest slab can be picked for deletion in amortized time.
+ *
+ * The freequeue contains both a ringbuffer and a singly linked list.
+ *
+ * The ringbuffer is used for fast, one-shot enqueues and is fully
+ * lockless. The singly linked list uses *next pointers that are
+ * threaded through the memory that is to be freed. This can be
+ * done because the minimum slab object size is the pointer size,
+ * and thus, each pointer to memory being returned is guaranteed
+ * to be enough to hold at least a pointer.
  *
  */
+
 void *kmalloc_new(size_t size, enum alloc_flags flags,
                   enum alloc_behavior behavior) {
-    /* Validate parameters */
-    kassert(alloc_flags_valid(flags));
-    kassert(alloc_flag_behavior_verify(flags, behavior));
-    if (!size)
-        return NULL;
+    kmalloc_validate_params(size, flags, behavior);
+    void *ret = NULL;
+
+    enum thread_flags thread_flags = scheduler_pin_current_thread();
+
+    if (!kmalloc_size_fits_in_slab(size)) {
+        ret = kmalloc_pages(size, flags, behavior);
+        goto out;
+    }
+
+out:
+    scheduler_unpin_current_thread(thread_flags);
+    return ret;
 }

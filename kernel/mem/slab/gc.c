@@ -1,5 +1,16 @@
 #include "internal.h"
 
+/*
+ * Slab GC per-slab scoring:
+ *
+ * size_factor = 2.0 per page
+ * recycle_penalty = 8.0 per recycle
+ * age_seconds = now - enqueue_time
+ *
+ * score = age_seconds + size_factor * pages - recycle_penalty * recycle_count
+ *
+ */
+
 void slab_gc_enqueue(struct slab_domain *domain, struct slab *slab) {
     slab_list_del(slab);
     slab_reset(slab);
@@ -22,6 +33,7 @@ void slab_gc_dequeue(struct slab_domain *domain, struct slab *slab) {
 
     rbt_remove(&domain->slab_gc.rbt, slab->rb.data);
     atomic_fetch_sub(&gc->num_elements, 1);
+
     slab_gc_unlock(gc, irql);
 
     slab->gc_enqueue_time_ms = 0;
@@ -75,4 +87,9 @@ void slab_gc_init(struct slab_gc *gc) {
     gc->num_elements = 0;
     spinlock_init(&gc->lock);
     gc->rbt.root = NULL;
+}
+
+struct slab *slab_gc_recycle_slab(struct slab *slab) {
+    slab->recycle_count++;
+    return slab_reset(slab);
 }

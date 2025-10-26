@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <time.h>
 
+#define HPET_REFRESH_CYCLES (smp_core()->tsc_hz / 500)
 #define CMOS_ADDRESS 0x70
 #define CMOS_DATA 0x71
 
@@ -127,11 +128,25 @@ uint32_t time_get_unix() {
 }
 
 uint64_t time_get_ms(void) {
-    return hpet_timestamp_ms();
+    return time_get_us() / 1000;
 }
 
 uint64_t time_get_us(void) {
-    return hpet_timestamp_us();
+    if (global.current_bootstage < BOOTSTAGE_MID_MP)
+        return hpet_timestamp_us();
+
+    uint64_t now_tsc = rdtsc();
+    uint64_t delta = now_tsc - smp_core()->last_tsc;
+
+    if (delta < HPET_REFRESH_CYCLES && smp_core()->last_us != 0) {
+        uint64_t elapsed_us = (delta * 1000000ULL) / smp_core()->tsc_hz;
+        return smp_core()->last_us + elapsed_us;
+    }
+
+    uint64_t now_us = hpet_timestamp_us();
+    smp_core()->last_us = now_us;
+    smp_core()->last_tsc = now_tsc;
+    return now_us;
 }
 
 uint64_t time_get_ms_fast(void) {
@@ -140,4 +155,25 @@ uint64_t time_get_ms_fast(void) {
 
 uint64_t time_get_us_fast(void) {
     return hpet_timestamp_us_fast();
+}
+
+uint64_t tsc_calibrate(void) {
+    (void) hpet_timestamp_us();
+
+    uint64_t start_tsc = rdtsc();
+    uint64_t start_us = hpet_timestamp_us();
+
+    uint64_t target_us = start_us + 50000; // 50 ms
+
+    while (hpet_timestamp_us() < target_us)
+        ;
+
+    uint64_t end_tsc = rdtsc();
+    uint64_t end_us = hpet_timestamp_us();
+
+    uint64_t delta_tsc = end_tsc - start_tsc;
+    uint64_t delta_us = end_us - start_us;
+
+    uint64_t tsc_hz = (delta_tsc * 1000000ULL) / delta_us;
+    return tsc_hz;
 }

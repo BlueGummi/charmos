@@ -73,6 +73,7 @@ static struct core *setup_cpu(uint64_t cpu) {
         k_panic("Core %d could not allocate space for struct\n", cpu);
     c->id = cpu;
     c->core = c;
+    c->tsc_hz = tsc_calibrate(); 
     init_smt_info(c);
     detect_llc(&c->llc);
 
@@ -126,6 +127,7 @@ void smp_wakeup_processors(struct limine_mp_response *mpr) {
 void smp_complete_init() {
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
     atomic_store(&cr3_ready, 1);
+    smp_core()->tsc_hz = tsc_calibrate(); 
     if (global.core_count == 1)
         return;
 

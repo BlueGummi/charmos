@@ -22,20 +22,23 @@ void slab_domain_build_locality_lists(struct slab_domain *sdom) {
     for (size_t i = 0; i < zl->count; i++) {
         struct domain_zonelist_entry *zent = &zl->entries[i];
         struct domain_buddy *bd = zent->domain;
-        struct slab_domain *remote_sdom =
-            &global.domains[bd - domain_buddies]
-                 ->cores[0]
-                 ->slab_domain[bd - domain_buddies];
+
+        size_t idx = bd - domain_buddies;
+        struct slab_domain *remote_sdom = global.slab_domains[idx];
 
         sdom->pageable_zonelist.entries[i] = (struct slab_cache_ref) {
             .caches = remote_sdom->local_pageable_cache,
             .type = SLAB_CACHE_TYPE_PAGEABLE,
-            .locality = zent->distance};
+            .locality = zent->distance,
+            .domain = remote_sdom,
+        };
 
         sdom->nonpageable_zonelist.entries[i] = (struct slab_cache_ref) {
             .caches = remote_sdom->local_nonpageable_cache,
             .type = SLAB_CACHE_TYPE_NONPAGEABLE,
-            .locality = zent->distance};
+            .locality = zent->distance,
+            .domain = remote_sdom,
+        };
     }
 }
 

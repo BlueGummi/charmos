@@ -48,6 +48,13 @@ static const uint64_t slab_class_sizes[] = {
 
 #define SLAB_CLASS_COUNT (sizeof(slab_class_sizes) / sizeof(*slab_class_sizes))
 
+#define kmalloc_validate_params(size, flags, behavior)                         \
+    do {                                                                       \
+        kassert(alloc_flags_valid(flags));                                     \
+        kassert(alloc_flag_behavior_verify(flags, behavior));                  \
+        kassert((size) != 0);                                                  \
+    } while (0)
+
 /* This value determines the scale at which cores in a slab domain
  * will be weighted when they attempt to fill up their per-cpu
  * caches from free_queue elements.
@@ -79,23 +86,27 @@ struct slab {
                         * to the actual slab itself, we can branchlessly
                         * retrieve the slab for any given pointer.
                         *
-                        * Must be first element in structure  */
+                        * MUST be first element in structure  */
 
-    struct list_head list;
-
-    /* Sorted by gc_enqueue_time_ms */
-    struct rbt_node rb;
-
+    /* Put commonly accessed fields up here to make cache happier */
     uint8_t *bitmap;
-
     vaddr_t mem;
     size_t used;
     struct slab_cache *parent_cache;
 
+    enum slab_state state;
+    struct spinlock lock;
+
+    size_t pages;
+
+    /* Sorted by gc_enqueue_time_ms */
+    struct rbt_node rb;
+    struct list_head list;
+
     time_t gc_enqueue_time_ms; /* When were we put on the GC list? */
 
-    struct spinlock lock;
-    enum slab_state state;
+    size_t recycle_count; /* How many times has this been
+                           * recycled from the GC list? */
 };
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab, lock);
 
@@ -205,6 +216,7 @@ struct slab_caches {
 };
 
 struct slab_cache_ref {
+    struct slab_domain *domain;
     struct slab_caches *caches; /* pointer to caches */
     enum slab_cache_type type;  /* pageable / nonpageable */
     uint8_t locality;           /* NUMA proximity, 0 = local */
@@ -286,13 +298,16 @@ vaddr_t slab_free_queue_dequeue(struct slab_free_queue *q);
 size_t slab_free_queue_drain(struct slab_percpu_cache *cache,
                              struct slab_free_queue *queue, size_t target,
                              bool flush_to_cache);
+size_t slab_free_queue_get_target_drain(struct slab_domain *domain);
+void slab_free_queue_drain_limited(struct slab_percpu_cache *pc,
+                                   struct slab_domain *dom);
 
 /* Check */
 bool slab_check(struct slab *slab);
 #define slab_check_assert(slab) kassert(slab_check(slab))
 
 /* GC */
-void slab_reset(struct slab *slab);
+struct slab *slab_reset(struct slab *slab);
 void slab_gc_init(struct slab_gc *gc);
 void slab_gc_enqueue(struct slab_domain *domain, struct slab *slab);
 void slab_gc_dequeue(struct slab_domain *domain, struct slab *slab);
@@ -325,12 +340,12 @@ static inline struct slab *slab_for_ptr(void *ptr) {
     return *(struct slab **) PAGE_ALIGN_DOWN(ptr);
 }
 
-static inline struct slab_domain *slab_local_domain(void) {
+static inline struct slab_domain *slab_domain_local(void) {
     return smp_core()->slab_domain;
 }
 
-static inline struct slab_percpu_cache *slab_local_percpu_cache(void) {
-    return slab_local_domain()->percpu_caches[smp_core_id()];
+static inline struct slab_percpu_cache *slab_percpu_cache_local(void) {
+    return slab_domain_local()->percpu_caches[smp_core_id()];
 }
 
 static inline void slab_list_del(struct slab *slab) {
@@ -358,6 +373,10 @@ static inline void slab_move(struct slab_cache *c, struct slab *slab,
     slab->state = new;
 
     slab_list_add(c, slab);
+}
+
+static inline bool alloc_behavior_can_gc(enum alloc_behavior b) {
+    return alloc_behavior_may_fault(b);
 }
 
 extern struct vas_space *slab_vas;

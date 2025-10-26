@@ -49,6 +49,10 @@ struct core {
     uint32_t smt_id;
     uint32_t core_id;
 
+    uint64_t tsc_hz;
+    uint64_t last_us;
+    uint64_t last_tsc; /* For time.c */
+
     struct core *core;
 };
 

@@ -98,28 +98,6 @@ void slab_percpu_flush(struct slab_domain *dom, struct slab_percpu_cache *pc,
     slab_cache_bulk_free(dom, objs, SLAB_MAG_ENTRIES + 1);
 }
 
-size_t slab_percpu_get_target_free_queue_drain(struct slab_domain *domain) {
-    size_t slab_domain_cpus = domain->domain->num_cores;
-    size_t total_fq_elems = SLAB_FREE_QUEUE_GET_COUNT(&domain->free_queue);
-    size_t portion = slab_domain_cpus / SLAB_PERCPU_REFILL_PER_CORE_WEIGHT;
-    if (portion == 0)
-        portion = 1;
-
-    return total_fq_elems / portion;
-}
-
-void slab_free_queue_drain_limited(struct slab_percpu_cache *pc,
-                                   struct slab_domain *dom) {
-    size_t target = slab_percpu_get_target_free_queue_drain(dom);
-
-    /* This will also fill up the magazines for other orders. We set the target
-     * to prevent overly aggressive stealing from the free_queue into our
-     * percpu cache to allow other CPUs in our domain to get their fair share of
-     * what remains in the free_queue in the event that they must also refill */
-    slab_free_queue_drain(pc, &dom->free_queue, target,
-                          /* flush_to_cache = */ false);
-}
-
 vaddr_t slab_percpu_refill_class(struct slab_domain *dom,
                                  struct slab_percpu_cache *pc,
                                  size_t class_idx) {
@@ -157,7 +135,7 @@ void slab_percpu_refill(struct slab_domain *dom,
 }
 
 vaddr_t slab_percpu_alloc(struct slab_domain *dom, size_t class_idx) {
-    struct slab_percpu_cache *pc = slab_local_percpu_cache();
+    struct slab_percpu_cache *pc = slab_percpu_cache_local();
     struct slab_magazine *mag = &pc->mag[class_idx];
 
     vaddr_t ret = slab_magazine_pop(mag);
@@ -168,7 +146,7 @@ vaddr_t slab_percpu_alloc(struct slab_domain *dom, size_t class_idx) {
 }
 
 void slab_percpu_free(struct slab_domain *dom, size_t class_idx, vaddr_t obj) {
-    struct slab_percpu_cache *pc = slab_local_percpu_cache();
+    struct slab_percpu_cache *pc = slab_percpu_cache_local();
     struct slab_magazine *mag = &pc->mag[class_idx];
 
     if (slab_magazine_push(mag, obj))

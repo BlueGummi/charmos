@@ -218,7 +218,7 @@ size_t slab_free_queue_drain(struct slab_percpu_cache *cache,
     slab_free_queue_list_init(&chain);
 
     size_t drained_to_magazine = 0; /* Return value */
-    size_t addrs_dequeued = 0; /* Used to check against `target` */
+    size_t addrs_dequeued = 0;      /* Used to check against `target` */
 
     while (true) {
         /* Drain an element from our free_queue */
@@ -290,4 +290,26 @@ size_t slab_free_queue_flush(struct slab_free_queue *queue) {
         slab_free_addr_to_cache(node);
         node = next;
     }
+}
+
+size_t slab_free_queue_get_target_drain(struct slab_domain *domain) {
+    size_t slab_domain_cpus = domain->domain->num_cores;
+    size_t total_fq_elems = SLAB_FREE_QUEUE_GET_COUNT(&domain->free_queue);
+    size_t portion = slab_domain_cpus / SLAB_PERCPU_REFILL_PER_CORE_WEIGHT;
+    if (portion == 0)
+        portion = 1;
+
+    return total_fq_elems / portion;
+}
+
+void slab_free_queue_drain_limited(struct slab_percpu_cache *pc,
+                                   struct slab_domain *dom) {
+    size_t target = slab_free_queue_get_target_drain(dom);
+
+    /* This will also fill up the magazines for other orders. We set the target
+     * to prevent overly aggressive stealing from the free_queue into our
+     * percpu cache to allow other CPUs in our domain to get their fair share of
+     * what remains in the free_queue in the event that they must also refill */
+    slab_free_queue_drain(pc, &dom->free_queue, target,
+                          /* flush_to_cache = */ false);
 }

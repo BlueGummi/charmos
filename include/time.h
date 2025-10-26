@@ -15,6 +15,7 @@ time_t time_get_ms(void);
 uint64_t time_get_ms_fast(void);
 time_t time_get_us(void);
 uint64_t time_get_us_fast(void);
+uint64_t tsc_calibrate(void);
 
 /* Time unit conversion macros */
 #define SECONDS_TO_MS(s) ((s) * 1000LL)
