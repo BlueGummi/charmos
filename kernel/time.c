@@ -149,14 +149,6 @@ uint64_t time_get_us(void) {
     return now_us;
 }
 
-uint64_t time_get_ms_fast(void) {
-    return hpet_timestamp_ms_fast();
-}
-
-uint64_t time_get_us_fast(void) {
-    return hpet_timestamp_us_fast();
-}
-
 uint64_t tsc_calibrate(void) {
     (void) hpet_timestamp_us();
 

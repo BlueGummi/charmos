@@ -11,7 +11,6 @@
 uint64_t *hpet_base;
 uint64_t hpet_timer_count;
 uint64_t hpet_fs_per_tick;
-atomic_uint_fast64_t hpet_cached_time_us = 0;
 
 void hpet_enable(void) {
     uint64_t conf = hpet_read64(HPET_GEN_CONF_OFFSET);
@@ -153,8 +152,7 @@ uint64_t hpet_timestamp_us(void) {
     uint64_t ticks = hpet_read64(HPET_MAIN_COUNTER_OFFSET);
 
     uint64_t fs_total = ticks * hpet_fs_per_tick;
-    atomic_store(&hpet_cached_time_us, fs_total / 1000000000ULL);
-    return hpet_cached_time_us;
+    return fs_total / 1000000000ULL;
 }
 
 uint64_t hpet_timestamp_ms(void) {

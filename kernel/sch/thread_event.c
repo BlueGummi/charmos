@@ -197,7 +197,7 @@ static void clear_bucket_set_cycle(struct thread_activity_bucket *b,
 
 static void advance_to_next_bucket(struct thread_activity_stats *stats,
                                    size_t steps, time_t now) {
-    for (size_t i = 1; i <= steps && i <= THREAD_ACTIVITY_BUCKET_COUNT; ++i) {
+    for (size_t i = 1; i <= steps && i <= THREAD_ACTIVITY_BUCKET_COUNT; i++) {
         size_t next_bucket = stats->current_bucket + i;
         size_t index = next_bucket % THREAD_ACTIVITY_BUCKET_COUNT;
 
@@ -352,7 +352,7 @@ void thread_update_activity_stats(struct thread *t, uint64_t time) {
     size_t wake_head = data->wake_reasons_head;
     size_t last = stats->last_wake_index;
 
-    for (size_t i = last; i < wake_head; ++i) {
+    for (size_t i = last; i < wake_head; i++) {
         size_t idx = i % THREAD_EVENT_RINGBUFFER_CAPACITY;
         struct thread_event_reason *wake = &data->wake_reasons[idx];
 
@@ -470,7 +470,7 @@ static void set_state_and_update_reason(struct thread *t, uint8_t reason,
     atomic_store(&t->state, state);
     callback(t, reason);
 
-    uint64_t time = irq_in_interrupt() ? time_get_ms_fast() : time_get_ms();
+    uint64_t time = time_get_ms();
 
     if (state != THREAD_STATE_READY)
         thread_update_runtime_buckets(t, time);

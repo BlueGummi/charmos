@@ -31,8 +31,8 @@ vaddr_t slab_magazine_pop(struct slab_magazine *mag) {
 }
 
 bool slab_cache_available(struct slab_cache *cache) {
-    if (slab_cache_count_for(cache, SLAB_FREE) > 0 ||
-        slab_cache_count_for(cache, SLAB_PARTIAL) > 0)
+    if (SLAB_CACHE_COUNT_FOR(cache, SLAB_FREE) > 0 ||
+        SLAB_CACHE_COUNT_FOR(cache, SLAB_PARTIAL) > 0)
         return true;
 
     struct domain_buddy *buddy = slab_domain_buddy(cache->parent_domain);

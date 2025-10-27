@@ -25,7 +25,7 @@ static void e1000_setup_tx_ring(struct e1000_device *dev) {
     dev->tx_descs = vmm_map_phys(dev->tx_descs_phys, space, PAGING_UNCACHABLE);
     memset(dev->tx_descs, 0, space);
 
-    for (int i = 0; i < E1000_NUM_TX_DESC; ++i) {
+    for (int i = 0; i < E1000_NUM_TX_DESC; i++) {
         dev->tx_buffers[i] = kmalloc(2048);
         if (!dev->tx_buffers[i])
             k_panic("e1000 ring setup allocation failed!\n");
@@ -56,7 +56,7 @@ static void e1000_setup_rx_ring(struct e1000_device *dev) {
     dev->rx_descs = vmm_map_phys(dev->rx_descs_phys, space, PAGING_UNCACHABLE);
     memset(dev->rx_descs, 0, space);
 
-    for (int i = 0; i < E1000_NUM_RX_DESC; ++i) {
+    for (int i = 0; i < E1000_NUM_RX_DESC; i++) {
         dev->rx_buffers[i] = kmalloc(E1000_RX_BUF_SIZE);
         if (!dev->rx_buffers[i])
             k_panic("e1000 ring allocation failed\n");

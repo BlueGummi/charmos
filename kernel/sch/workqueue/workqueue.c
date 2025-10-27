@@ -197,7 +197,7 @@ void workqueues_permanent_init(void) {
     if (!global.workqueues)
         k_panic("Failed to allocate space for workqueues!\n");
 
-    for (int64_t i = 0; i < num_workqueues; ++i) {
+    for (int64_t i = 0; i < num_workqueues; i++) {
 
         struct workqueue_attributes attrs = {
             .capacity = WORKQUEUE_DEFAULT_CAPACITY,

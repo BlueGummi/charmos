@@ -12,12 +12,11 @@
 #include <stdint.h>
 #include <sync/spinlock.h>
 
-/* Lock order:
+/* Lock ordering:
  *
- * First acquire slab cache lock, then
- * per-slab lock. Freequeue has lockless
- * ringbuffer, but there is also a locked
- * singly linked list */
+ * Slab GC -> Slab cache -> Freequeue -> Slab -> Mag
+ *
+ */
 
 #define KMALLOC_PAGE_MAGIC 0xC0FFEE42
 
@@ -36,6 +35,7 @@
 #define SLAB_MIN_SIZE (sizeof(vaddr_t))
 #define SLAB_MAX_SIZE (PAGE_SIZE / 4)
 
+/* Bitmap */
 #define SLAB_BITMAP_BYTES_FOR(x) ((x + 7) / 8)
 #define SLAB_BITMAP_SET(bm, mask) (bm |= (uint8_t) mask)
 #define SLAB_BITMAP_UNSET(bm, mask) (bm &= (uint8_t) ~mask)
@@ -47,6 +47,35 @@ static const uint64_t slab_class_sizes[] = {
     SLAB_MIN_SIZE, 16, 32, 64, 96, 128, 192, 256, 512, SLAB_MAX_SIZE};
 
 #define SLAB_CLASS_COUNT (sizeof(slab_class_sizes) / sizeof(*slab_class_sizes))
+
+/* GC */
+#define SLAB_GC_FLAG_DESTROY_BIAS_SHIFT 4
+#define SLAB_GC_FLAG_DESTROY_BIAS_MASK 0xF
+#define SLAB_GC_FLAG_DESTROY_BIAS_MAX 16
+#define SLAB_GC_FLAG_SET_DESTROY_BIAS                                          \
+    (flags, bias)(flags |= bias << SLAB_GC_FLAG_DESTROY_BIAS_SHIFT)
+
+#define SLAB_GC_FLAG_ORDER_BIAS_SHIFT 16
+#define SLAB_GC_FLAG_ORDER_BIAS_MASK 0x3FF
+
+#define SLAB_GC_FLAG_AGG_MASK 0xF
+#define SLAB_GC_SIZE_FACTOR 2
+#define SLAB_GC_RECYCLE_PENALTY 8
+#define SLAB_GC_SCORE_MIN_DELTA 5
+#define SLAB_GC_MAX_UNFIT_SLABS_FACTOR 8
+
+#define SLAB_GC_SCORE_SCALE 1024         /* fixed point scale */
+#define SLAB_GC_WEIGHT_UNDER_SUPPLY 3    /* favor undersupplied orders */
+#define SLAB_GC_WEIGHT_RECYCLED 4        /* penalize orders recycled to */
+#define SLAB_GC_WEIGHT_ORDER_PREFERRED 1 /* prefer close order */
+#define SLAB_GC_ORDER_BIAS_SCALE 4
+
+#define SLAB_FREE_RATIO_PCT 25
+#define SLAB_ORDER_EXCESS_PCT 50
+#define SLAB_SPIKE_THRESHOLD_PCT 50
+
+#define SLAB_EWMA_SCALE 1024                     /* Fixed-point precision */
+#define SLAB_EWMA_ALPHA_FP (SLAB_EWMA_SCALE / 4) /* a = 0.25 */
 
 #define kmalloc_validate_params(size, flags, behavior)                         \
     do {                                                                       \
@@ -79,6 +108,11 @@ enum slab_state {
     SLAB_IN_GC_LIST = 4,
 };
 
+enum slab_type {
+    SLAB_TYPE_NONPAGEABLE,
+    SLAB_TYPE_PAGEABLE,
+};
+
 struct slab {
     struct slab *self; /* We need this field because multi-page slabs
                         * will keep a pointer to the parent slab at
@@ -94,6 +128,7 @@ struct slab {
     size_t used;
     struct slab_cache *parent_cache;
 
+    enum slab_type type;
     enum slab_state state;
     struct spinlock lock;
 
@@ -110,7 +145,7 @@ struct slab {
 };
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab, lock);
 
-#define slab_from_rbt_node(rb) (container_of(rb, struct slab, rb))
+#define slab_from_rbt_node(n) (container_of(n, struct slab, rb))
 #define slab_from_list_node(ln) (container_of(ln, struct slab, list))
 #define PAGE_NON_SLAB_SPACE (PAGE_SIZE - sizeof(struct slab))
 #define slab_error(fmt, ...) k_info("SLAB", K_ERROR, fmt, ##__VA_ARGS__)
@@ -181,7 +216,7 @@ struct slab_free_queue {
     struct slab_free_queue_list list;
     atomic_size_t count;
 };
-#define SLAB_FREE_QUEUE_CAPACITY 2048 /* TODO: */
+#define SLAB_FREE_QUEUE_CAPACITY 2048
 #define SLAB_FREE_QUEUE_GET_COUNT(fq) (atomic_load(&(fq)->count))
 #define SLAB_FREE_QUEUE_INC_COUNT(fq) (atomic_fetch_add(&(fq)->count, 1))
 #define SLAB_FREE_QUEUE_ADD_COUNT(fq, n) (atomic_fetch_add(&(fq)->count, n))
@@ -191,9 +226,11 @@ struct slab_free_queue {
 enum slab_cache_type { SLAB_CACHE_TYPE_PAGEABLE, SLAB_CACHE_TYPE_NONPAGEABLE };
 
 struct slab_cache {
+    struct slab_caches *parent;
     uint64_t obj_size;
     uint64_t objs_per_slab;
     size_t pages_per_slab;
+    size_t order;
 
     struct list_head slabs[SLAB_STANDARD_STATE_COUNT];
     atomic_size_t slabs_count[SLAB_STANDARD_STATE_COUNT];
@@ -202,17 +239,20 @@ struct slab_cache {
 
     struct slab_domain *parent_domain;
 
+    /* Exponential weighted moving average */
+    size_t ewma_free_slabs;
+    size_t ewma_total_slabs;
+
     struct spinlock lock;
 };
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab_cache, lock);
 
-static inline size_t slab_cache_count_for(struct slab_cache *cache,
-                                          enum slab_state state) {
-    return atomic_load(&cache->slabs_count[state]);
-}
+#define SLAB_CACHE_COUNT_FOR(cache, state)                                     \
+    (atomic_load(&cache->slabs_count[state]))
 
 struct slab_caches {
     struct slab_cache caches[SLAB_CLASS_COUNT];
+    atomic_size_t slabs_count[SLAB_STANDARD_STATE_COUNT];
 };
 
 struct slab_cache_ref {
@@ -227,7 +267,90 @@ struct slab_cache_zonelist {
     size_t count;
 };
 
+/* gc_flags: 32 bit bitflags
+ *
+ *      ┌───────────────────────────────────────────────────────┐
+ * Bits │ 31..28 27..24 23..18 17..16 15..12  11..8  7..4  3..0 │
+ * Use  │  $$$$   $$$$   $$$$   $$$$   RRRR    RRSF  ####  %%%% │
+ *      └───────────────────────────────────────────────────────┘
+ *
+ * %%%% - Aggressiveness - Defines how eagerly the GC will try to recycle
+ *                         or destroy slabs. Doesn't necessarily correspond
+ *                         to how many pages the GC will try to reclaim,
+ *                         has more of an impact on how long it will
+ *                         spend scanning, and to what extent is it
+ *                         willing to go to destroy slabs (the threshold
+ *                         of destruction of a slab fluctuates)
+ *
+ *        Possible values:
+ *
+ *        o Background - background work aggressiveness - this doesn't
+ *                       have a huge impact on how many slabs it tries
+ *                       to destroy, but rather, spends more time on slab
+ *                       recycling, since it's run from a background thread
+ *
+ *        o Reclaim    - standard reclaim aggressiveness on allocation
+ *
+ *        o Standard   - standard aggressiveness on normal frees
+ *
+ *        o Low Mem    - less memory available but OOMs aren't happening
+ *
+ *        o Emergency  - OOM occurred in allocation path
+ *
+ *        o Max        - Emergency failed, and the OOM handler chain was called
+ *                       This is never called from the alloc/free paths
+ *
+ * #### - Destruction bias - Defines how much the GC should bias towards
+ *                           the destruction of a slab over just recycling it.
+ *                           If this number is higher, bias towards destruction.
+ *                           If this number is lower, bias away.
+ *
+ *                           Value must be [0, 16)
+ *
+ * $$$$ - Bias bitmap - If this bitmap is not 0, this bitmap
+ *                      will be used to indicate which orders should
+ *                      be biased towards. Lower bit index -> lower order.
+ *
+ * F - Fast          - skip slowpaths and try to not dilly dally too much
+ * D - Force destroy - always destroy slabs
+ * S - Skip destroy  - don't destroy slabs that would've
+ *                     otherwise been destroyed
+ * R - Reserved      - for future use
+ *
+ * * - Unused, not reserved
+ *
+ */
+
+enum slab_gc_flags : uint32_t {
+    SLAB_GC_FLAG_AGG_BG = 0, /* Background work */
+
+    SLAB_GC_FLAG_AGG_RECLAIM = 1, /* Reclaim memory on allocation */
+
+    SLAB_GC_FLAG_AGG_STANDARD = 2, /* Standard aggressiveness on free */
+
+    SLAB_GC_FLAG_AGG_LOW_MEM = 3, /* Running low on memory but not OOMing */
+
+    SLAB_GC_FLAG_AGG_EMERGENCY = 4, /* We are OOMing in an alloc path */
+
+    SLAB_GC_FLAG_AGG_MAX = 5, /* Used in the OOM handler chain - this
+                               * will do crazy things like page compaction,
+                               * migration, etc., it is never called from
+                               * the standard kmalloc/kfree */
+
+    SLAB_GC_FLAG_AGG_COUNT = 6, /* Count */
+
+    SLAB_GC_FLAG_FAST = 1 << 8, /* Try to be fast about it */
+
+    SLAB_GC_FLAG_FORCE_DESTROY = 1 << 9, /* Destroy all slabs */
+
+    SLAB_GC_FLAG_SKIP_DESTROY = 1 << 10, /* Do not destroy slabs that should've
+                                          * otherwise been destroyed. Just
+                                          * skip them */
+
+};
+
 struct slab_gc {
+    struct slab_domain *parent;
     struct rbt rbt;
     struct spinlock lock;
     atomic_size_t num_elements;
@@ -277,7 +400,8 @@ int32_t slab_size_to_index(size_t size);
 void *slab_alloc(struct slab_cache *cache);
 void slab_free_page_hdr(struct slab_page_hdr *hdr);
 size_t slab_allocation_size(vaddr_t addr);
-void slab_cache_init(struct slab_cache *cache, uint64_t obj_size);
+void slab_cache_init(size_t order, struct slab_cache *cache, uint64_t obj_size);
+void slab_cache_insert(struct slab_cache *cache, struct slab *slab);
 
 /* Magazine */
 bool slab_magazine_push(struct slab_magazine *mag, vaddr_t obj);
@@ -307,14 +431,31 @@ bool slab_check(struct slab *slab);
 #define slab_check_assert(slab) kassert(slab_check(slab))
 
 /* GC */
+
+/* Returns # slabs removed from GC list - maybe recycled, maybe destroyed */
+size_t slab_gc_run(struct slab_gc *gc, enum slab_gc_flags flags);
+
 struct slab *slab_reset(struct slab *slab);
-void slab_gc_init(struct slab_gc *gc);
+void slab_gc_init(struct slab_domain *dom);
 void slab_gc_enqueue(struct slab_domain *domain, struct slab *slab);
 void slab_gc_dequeue(struct slab_domain *domain, struct slab *slab);
 struct slab *slab_gc_get_newest(struct slab_domain *domain);
+struct slab *slab_gc_get_oldest(struct slab_domain *domain);
 size_t slab_gc_num_slabs(struct slab_domain *domain);
-size_t slab_gc_flush_up_to(struct slab_domain *domain, size_t max);
-size_t slab_gc_flush_full(struct slab_domain *domain);
+
+/* Recall that the EWMA formula is
+ *
+ * ewma_t = (ewma_(t - 1) * (1 - alpha)) + (alpha * r)
+ *
+ * where r is the value that we are scaling with
+ */
+
+static inline void slab_gc_update_ewma(struct slab_cache *cache, size_t alpha) {
+    cache->ewma_free_slabs =
+        ((cache->ewma_free_slabs * (SLAB_EWMA_SCALE - alpha)) +
+         (cache->slabs_count[SLAB_FREE] * alpha)) /
+        SLAB_EWMA_SCALE;
+}
 
 static inline struct page *slab_get_backing_page(struct slab *slab) {
     return page_for_pfn(PAGE_TO_PFN(vmm_get_phys((vaddr_t) slab)));
@@ -352,17 +493,30 @@ static inline void slab_list_del(struct slab *slab) {
     if (list_empty(&slab->list))
         return;
 
-    enum slab_state state = slab->state;
-    list_del(&slab->list);
+    if (slab->state != SLAB_IN_GC_LIST)
+        kassert(spinlock_held(&slab->parent_cache->lock));
 
-    if (state != SLAB_IN_GC_LIST)
+    enum slab_state state = slab->state;
+    list_del_init(&slab->list);
+
+    if (state != SLAB_IN_GC_LIST) {
+        if (state == SLAB_FREE)
+            slab_gc_update_ewma(slab->parent_cache, SLAB_EWMA_ALPHA_FP);
+
         atomic_fetch_sub(&slab->parent_cache->slabs_count[state], 1);
+        atomic_fetch_sub(&slab->parent_cache->parent->slabs_count[state], 1);
+    }
 }
 
 static inline void slab_list_add(struct slab_cache *cache, struct slab *slab) {
     enum slab_state state = slab->state;
     list_add(&slab->list, &cache->slabs[state]);
+
+    if (state == SLAB_FREE)
+        slab_gc_update_ewma(cache, SLAB_EWMA_ALPHA_FP);
+
     atomic_fetch_add(&slab->parent_cache->slabs_count[state], 1);
+    atomic_fetch_add(&slab->parent_cache->parent->slabs_count[state], 1);
 }
 
 static inline void slab_move(struct slab_cache *c, struct slab *slab,
@@ -379,5 +533,19 @@ static inline bool alloc_behavior_can_gc(enum alloc_behavior b) {
     return alloc_behavior_may_fault(b);
 }
 
+static inline void slab_byte_idx_and_mask_from_idx(uint64_t index,
+                                                   uint64_t *byte_idx_out,
+                                                   uint8_t *bitmask_out) {
+    *byte_idx_out = index / 8ULL;
+    *bitmask_out = (uint8_t) (1ULL << (index % 8ULL));
+}
+
+static inline void slab_index_and_mask_from_ptr(struct slab *slab, void *obj,
+                                                uint64_t *byte_idx_out,
+                                                uint8_t *bitmask_out) {
+    uint64_t index = ((vaddr_t) obj - slab->mem) / slab->parent_cache->obj_size;
+    slab_byte_idx_and_mask_from_idx(index, byte_idx_out, bitmask_out);
+}
+
 extern struct vas_space *slab_vas;
-extern struct slab_cache slab_caches[SLAB_CLASS_COUNT];
+extern struct slab_caches slab_caches;

@@ -58,7 +58,7 @@ struct generic_disk *registry_get_by_name(const char *name) {
 
 struct generic_disk *registry_get_by_index(uint64_t index) {
     struct disk_node *node = disk_list;
-    for (uint64_t i = 0; node && i < index; ++i)
+    for (uint64_t i = 0; node && i < index; i++)
         node = node->next;
     return node ? node->disk : NULL;
 }

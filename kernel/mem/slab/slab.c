@@ -15,7 +15,7 @@
 #include "internal.h"
 
 struct vas_space *slab_vas = NULL;
-struct slab_cache slab_caches[SLAB_CLASS_COUNT] = {0};
+struct slab_caches slab_caches = {0};
 
 void *slab_map_new_page(paddr_t *phys_out) {
     paddr_t phys = 0x0;
@@ -52,7 +52,9 @@ static void slab_free_virt_and_phys(vaddr_t virt, paddr_t phys) {
     vas_free(slab_vas, virt);
 }
 
-void slab_cache_init(struct slab_cache *cache, uint64_t obj_size) {
+void slab_cache_init(size_t order, struct slab_cache *cache,
+                     uint64_t obj_size) {
+    cache->order = order;
     cache->obj_size = obj_size;
     cache->pages_per_slab = 1;
     uint64_t available = PAGE_NON_SLAB_SPACE;
@@ -126,20 +128,6 @@ struct slab *slab_create(struct slab_domain *domain, struct slab_cache *cache) {
     return slab_create_new(cache);
 }
 
-static void slab_byte_idx_and_mask_from_idx(uint64_t index,
-                                            uint64_t *byte_idx_out,
-                                            uint8_t *bitmask_out) {
-    *byte_idx_out = index / 8ULL;
-    *bitmask_out = (uint8_t) (1ULL << (index % 8ULL));
-}
-
-static void slab_index_and_mask_from_ptr(struct slab *slab, void *obj,
-                                         uint64_t *byte_idx_out,
-                                         uint8_t *bitmask_out) {
-    uint64_t index = ((vaddr_t) obj - slab->mem) / slab->parent_cache->obj_size;
-    slab_byte_idx_and_mask_from_idx(index, byte_idx_out, bitmask_out);
-}
-
 static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
     enum irql irql = slab_lock_irq_disable(slab);
     slab_check_assert(slab);
@@ -175,19 +163,6 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
     return NULL;
 }
 
-struct slab *slab_reset(struct slab *slab) {
-    slab->mem = 0x0;
-    slab->bitmap = NULL;
-    kassert(slab->list.next == NULL && slab->list.prev == NULL ||
-            list_empty(&slab->list));
-
-    spinlock_init(&slab->lock);
-    slab->parent_cache = NULL;
-    slab->used = 0;
-    slab->self = slab;
-    return slab;
-}
-
 void slab_destroy(struct slab *slab) {
     slab_list_del(slab);
     uintptr_t virt = (uintptr_t) slab;
@@ -195,7 +170,23 @@ void slab_destroy(struct slab *slab) {
     slab_free_virt_and_phys(virt, phys);
 }
 
-static void slab_free(struct slab *slab, void *obj) {
+bool slab_should_enqueue_gc(struct slab *slab) {
+    struct slab_cache *parent = slab->parent_cache;
+    struct slab_caches *parent_caches = parent->parent;
+
+    size_t class = SLAB_CACHE_COUNT_FOR(parent, SLAB_FREE);
+    size_t total = SLAB_CACHE_COUNT_FOR(parent_caches, SLAB_FREE);
+    size_t avg = total / SLAB_CLASS_COUNT;
+    size_t smoothed = parent->ewma_free_slabs;
+
+    bool spike = class * 100 > smoothed * (100 + SLAB_SPIKE_THRESHOLD_PCT);
+    bool exceeds_free_ratio = class > total * SLAB_FREE_RATIO_PCT / 100;
+    bool exceeds_excess = class > avg * (100 + SLAB_ORDER_EXCESS_PCT) / 100;
+
+    return exceeds_free_ratio || exceeds_excess || spike;
+}
+
+void slab_free(struct slab *slab, void *obj) {
     struct slab_cache *cache = slab->parent_cache;
 
     enum irql slab_cache_irql = slab_cache_lock_irq_disable(cache);
@@ -216,10 +207,12 @@ static void slab_free(struct slab *slab, void *obj) {
 
     if (slab->used == 0) {
         slab_move(cache, slab, SLAB_FREE);
-        if (slab_cache_count_for(cache, SLAB_FREE) > 4) {
+        /* TODO: actually put it on a GC list */
+        if (slab_should_enqueue_gc(slab)) {
             slab_unlock(slab, irql);
-            slab_destroy(slab);
+            slab_list_del(slab);
             slab_cache_unlock(cache, slab_cache_irql);
+            slab_destroy(slab);
             return;
         }
     } else if (slab->state == SLAB_FULL) {
@@ -248,6 +241,15 @@ static void *slab_try_alloc_from_slab_list(struct slab_cache *cache,
 
 out:
     return ret;
+}
+
+void slab_cache_insert(struct slab_cache *cache, struct slab *slab) {
+    enum irql irql = slab_cache_lock_irq_disable(cache);
+
+    slab_init(slab, cache);
+    slab_list_add(cache, slab);
+
+    slab_cache_unlock(cache, irql);
 }
 
 void *slab_alloc(struct slab_cache *cache) {
@@ -290,8 +292,10 @@ void slab_allocator_init() {
     if (!slab_vas)
         k_panic("Could not initialize slab VAS\n");
 
-    for (uint64_t i = 0; i < SLAB_CLASS_COUNT; i++)
-        slab_cache_init(&slab_caches[i], slab_class_sizes[i]);
+    for (uint64_t i = 0; i < SLAB_CLASS_COUNT; i++) {
+        slab_cache_init(i, &slab_caches.caches[i], slab_class_sizes[i]);
+        slab_caches.caches[i].parent = &slab_caches;
+    }
 }
 
 size_t ksize(void *ptr) {
@@ -359,8 +363,9 @@ void *kmalloc(size_t size) {
 
     int idx = slab_size_to_index(size);
 
-    if (kmalloc_size_fits_in_slab(size) && slab_caches[idx].objs_per_slab > 0)
-        return slab_alloc(&slab_caches[idx]);
+    if (kmalloc_size_fits_in_slab(size) &&
+        slab_caches.caches[idx].objs_per_slab > 0)
+        return slab_alloc(&slab_caches.caches[idx]);
 
     return kmalloc_pages_raw(size, ALLOC_FLAGS_NONE);
 }
@@ -447,12 +452,6 @@ void *kmalloc_pages(size_t size, enum alloc_flags flags,
 
     return ret;
 }
-
-/* Lock ordering:
- *
- * Slab cache -> Slab lists -> Slab
- *
- */
 
 /* Alrighty, this will be a doozy.
  *

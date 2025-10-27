@@ -107,8 +107,8 @@ REGISTER_TEST(bio_sched_coalesce_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
 #define BIO_SCHED_TEST_RUNS 1024
 static uint64_t runs_per_lvl[BIO_SCHED_LEVELS] = {0};
-struct bio_request *rqs[BIO_SCHED_TEST_RUNS] = {0};
-uint8_t *buffers[BIO_SCHED_TEST_RUNS] = {0};
+static struct bio_request *rqs[BIO_SCHED_TEST_RUNS] = {0};
+static uint8_t *buffers[BIO_SCHED_TEST_RUNS] = {0};
 
 REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
               IS_INTEGRATION_TEST) {
@@ -125,6 +125,8 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
         buffers[i] = kmalloc_aligned(512, PAGE_SIZE);
         rqs[i] = kzalloc(sizeof(struct bio_request));
         TEST_ASSERT(buffers[i] && rqs[i]);
+        TEST_ASSERT(ALIGN_DOWN((vaddr_t) buffers[i], PAGE_SIZE) ==
+                    (vaddr_t) buffers[i]);
 
         struct bio_request *rq = rqs[i];
         rq->disk = d;

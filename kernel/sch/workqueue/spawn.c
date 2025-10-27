@@ -93,7 +93,7 @@ fail:
 }
 
 static bool should_spawn_worker(struct workqueue *queue) {
-    time_t now = time_get_ms_fast();
+    time_t now = time_get_ms();
     if (now - queue->last_spawn_attempt <= queue->attrs.spawn_delay)
         return false;
 

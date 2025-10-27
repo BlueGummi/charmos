@@ -74,7 +74,7 @@ void slab_init_caches(struct slab_caches *caches, bool pageable) {
         struct slab_cache *cache = &caches->caches[i];
         cache->type =
             pageable ? SLAB_CACHE_TYPE_PAGEABLE : SLAB_CACHE_TYPE_NONPAGEABLE;
-        slab_cache_init(cache, slab_class_sizes[i]);
+        slab_cache_init(i, cache, slab_class_sizes[i]);
     }
 }
 
@@ -101,7 +101,7 @@ void slab_domain_init(void) {
             k_panic("Failed to allocate slab domain!\n");
 
         sdomain->domain = domain;
-        slab_gc_init(&sdomain->slab_gc);
+        slab_gc_init(sdomain);
         slab_free_queue_init(&sdomain->free_queue, SLAB_FREE_QUEUE_CAPACITY);
         slab_domain_init_daemon(sdomain);
         slab_domain_percpu_init(sdomain);

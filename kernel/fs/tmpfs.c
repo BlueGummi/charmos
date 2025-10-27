@@ -145,7 +145,7 @@ static enum errno tmpfs_close(struct vfs_node *node) {
 
 static struct tmpfs_node *tmpfs_find_child(struct tmpfs_node *dir,
                                            const char *name) {
-    for (uint64_t i = 0; i < dir->child_count; ++i)
+    for (uint64_t i = 0; i < dir->child_count; i++)
         if (strcmp(dir->children[i]->name, name) == 0)
             return dir->children[i];
     return NULL;
@@ -253,7 +253,7 @@ static enum errno tmpfs_mkdir(struct vfs_node *parent, const char *name,
 
 static enum errno tmpfs_rmdir(struct vfs_node *parent, const char *name) {
     struct tmpfs_node *pt = parent->fs_node_data;
-    for (uint64_t i = 0; i < pt->child_count; ++i) {
+    for (uint64_t i = 0; i < pt->child_count; i++) {
         struct tmpfs_node *c = pt->children[i];
         if (strcmp(c->name, name) == 0 && c->type == TMPFS_DIR) {
             // remove
@@ -270,7 +270,7 @@ static enum errno tmpfs_rmdir(struct vfs_node *parent, const char *name) {
 }
 
 static void tmpfs_free_node(struct tmpfs_node *tn) {
-    for (uint64_t i = 0; i < tn->num_pages; ++i) {
+    for (uint64_t i = 0; i < tn->num_pages; i++) {
         if (tn->pages[i]) {
             kfree_aligned(tn->pages[i]);
             tn->pages[i] = NULL;
@@ -281,7 +281,7 @@ static void tmpfs_free_node(struct tmpfs_node *tn) {
 
 static enum errno tmpfs_unlink(struct vfs_node *parent, const char *name) {
     struct tmpfs_node *pt = parent->fs_node_data;
-    for (uint64_t i = 0; i < pt->child_count; ++i) {
+    for (uint64_t i = 0; i < pt->child_count; i++) {
         struct tmpfs_node *c = pt->children[i];
         if (strcmp(c->name, name) == 0 && c->type != TMPFS_DIR) {
             memmove(&pt->children[i], &pt->children[i + 1],
@@ -306,7 +306,7 @@ static enum errno tmpfs_rename(struct vfs_node *old_parent,
     if (!node)
         return ERR_NO_ENT;
 
-    for (uint64_t i = 0; i < old_pt->child_count; ++i) {
+    for (uint64_t i = 0; i < old_pt->child_count; i++) {
         if (old_pt->children[i] == node) {
             memmove(&old_pt->children[i], &old_pt->children[i + 1],
                     (old_pt->child_count - i - 1) * sizeof(void *));
@@ -330,7 +330,7 @@ static enum errno tmpfs_truncate(struct vfs_node *node, uint64_t length) {
     uint64_t new_pages = (length + PAGE_SIZE - 1) / PAGE_SIZE;
 
     if (new_pages < tn->num_pages) {
-        for (uint64_t i = new_pages; i < tn->num_pages; ++i) {
+        for (uint64_t i = new_pages; i < tn->num_pages; i++) {
             if (tn->pages[i]) {
                 kfree_aligned(tn->pages[i]);
                 tn->pages[i] = NULL;

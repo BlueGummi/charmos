@@ -24,13 +24,13 @@ static void bio_sched_tick(void *ctx, void *unused) {
     bio_sched_try_early_dispatch(sched);
 
     if (!sched_is_empty(sched)) {
+        spin_unlock(&sched->lock, irql);
         defer_enqueue(bio_sched_tick, WORK_ARGS(sched, NULL),
                       sched->disk->ops->tick_ms);
     } else {
         sched->defer_pending = false;
+        spin_unlock(&sched->lock, irql);
     }
-
-    spin_unlock(&sched->lock, irql);
 }
 
 static bool try_early_submit(struct bio_scheduler *sched,
@@ -62,12 +62,13 @@ void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req) {
 
     try_rq_reorder(sched);
 
-    spin_unlock(&sched->lock, irql);
-
     if (!sched->defer_pending) {
         sched->defer_pending = true;
+        spin_unlock(&sched->lock, irql);
         defer_enqueue(bio_sched_tick, WORK_ARGS(sched, NULL),
                       disk->ops->tick_ms);
+    } else {
+        spin_unlock(&sched->lock, irql);
     }
 }
 

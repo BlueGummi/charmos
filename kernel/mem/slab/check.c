@@ -3,8 +3,10 @@
 
 #define slab_check_assert_return_false(statement)                              \
     do {                                                                       \
-        if (!(statement))                                                      \
+        if (!(statement)) {                                                    \
+            k_printf("%s is false\n", #statement);                             \
             return false;                                                      \
+        }                                                                      \
     } while (0)
 
 bool slab_check_reset_slab(struct slab *slab) {

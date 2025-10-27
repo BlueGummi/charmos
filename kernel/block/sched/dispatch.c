@@ -2,6 +2,7 @@
 #include <block/sched.h>
 #include <console/printf.h>
 #include <mem/alloc.h>
+#include <misc/dll.h>
 #include <sch/defer.h>
 #include <stdint.h>
 #include <sync/spinlock.h>
@@ -25,22 +26,34 @@ static bool try_dispatch_queue_head(struct bio_scheduler *sched,
 }
 
 static void dispatch_queue(struct generic_disk *disk, struct bio_rqueue *q) {
+    enum irql irql = spin_lock_irq_disable(&disk->scheduler->lock);
     struct bio_request *req = q->head;
+
+    struct bio_rqueue copy = {.head = q->head, .tail = q->tail};
+    struct bio_rqueue *copyptr = &copy;
+
+    q->request_count = 0;
+    q->head = NULL;
+    q->tail = NULL;
+
+    spin_unlock(&disk->scheduler->lock, irql);
+
+    /* We have full ownership of the list now */
     while (req) {
         if (req->skip)
             k_panic("'skip' request found during dispatch");
 
-        bio_sched_dequeue(disk, req, false);
+        dll_remove(copyptr, req);
         disk->submit_bio_async(disk, req);
-        req = q->head;
+
+        req = copyptr->head;
     }
 }
 
 static void do_early_dispatch(struct bio_scheduler *sched) {
-    for (int prio = 0; prio < BIO_SCHED_LEVELS; prio++) {
+    for (int prio = 0; prio < BIO_SCHED_LEVELS; prio++)
         if (try_dispatch_queue_head(sched, &sched->queues[prio]))
             return;
-    }
 }
 
 void bio_sched_try_early_dispatch(struct bio_scheduler *sched) {

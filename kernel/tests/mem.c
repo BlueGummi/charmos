@@ -113,7 +113,7 @@ REGISTER_TEST(kmalloc_mixed_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 }
 
 #define MT_THREAD_COUNT 8
-#define MT_ALLOC_TIMES 512
+#define MT_ALLOC_TIMES 1024
 
 static void mt_kmalloc_worker() {
     void *ptrs[MT_ALLOC_TIMES];

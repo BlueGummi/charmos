@@ -2,6 +2,7 @@
 #include <boot/stage.h>
 #include <crypto/prng.h>
 #include <int/idt.h>
+#include <misc/clamp.h>
 #include <registry.h>
 #include <sch/sched.h>
 #include <smp/smp.h>
@@ -59,12 +60,6 @@ static void derive_timeshare_prio_range(enum thread_activity_class cls,
 #define SET_MUL(__multiplier)                                                  \
     class_mul = __multiplier;                                                  \
     break;
-
-#define CLAMP(__var, __min, __max)                                             \
-    if (__var > __max)                                                         \
-        __var = __max;                                                         \
-    if (__var < __min)                                                         \
-        __var = __min;
 
 static enum thread_activity_class
 classify_activity(struct thread_activity_metrics m) {

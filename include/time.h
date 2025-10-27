@@ -12,9 +12,7 @@ uint8_t time_get_month();
 uint8_t time_get_year();
 uint8_t time_get_century();
 time_t time_get_ms(void);
-uint64_t time_get_ms_fast(void);
 time_t time_get_us(void);
-uint64_t time_get_us_fast(void);
 uint64_t tsc_calibrate(void);
 
 /* Time unit conversion macros */

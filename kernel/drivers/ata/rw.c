@@ -44,7 +44,7 @@ void ide_irq_handler(void *ctx, uint8_t irq_num, void *rsp) {
 
     struct ata_drive *d = chan->current_drive;
 
-    for (int i = 0; i < 1000; ++i) {
+    for (int i = 0; i < 1000; i++) {
         uint8_t status = inb(REG_STATUS(d->io_base));
         if ((status & STATUS_BSY) == 0 &&
             (status & STATUS_DRQ || status & STATUS_ERR))

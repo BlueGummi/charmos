@@ -19,7 +19,7 @@ void ide_print_info(struct generic_disk *d) {
 }
 
 static void swap_str(char *dst, const uint16_t *src, uint64_t word_len) {
-    for (uint64_t i = 0; i < word_len; ++i) {
+    for (uint64_t i = 0; i < word_len; i++) {
         dst[2 * i] = (src[i] >> 8) & 0xFF;
         dst[2 * i + 1] = src[i] & 0xFF;
     }
@@ -92,7 +92,7 @@ void ide_identify(struct ata_drive *drive) {
 
     drive->udma_mode = 0;
     if (buf[88] & (1 << 13)) {
-        for (int i = 0; i < 8; ++i) {
+        for (int i = 0; i < 8; i++) {
             if (buf[88] & (1 << i)) {
                 drive->udma_mode = i;
             }

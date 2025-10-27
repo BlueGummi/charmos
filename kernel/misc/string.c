@@ -165,7 +165,7 @@ char *strdup(const char *str) {
     if (!copy)
         return NULL;
 
-    for (uint64_t i = 0; i <= len; ++i)
+    for (uint64_t i = 0; i <= len; i++)
         copy[i] = str[i];
 
     return copy;

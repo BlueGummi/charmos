@@ -23,7 +23,7 @@ static inline uint64_t get_boosted_prio(struct bio_request *req) {
 }
 
 static bool should_boost(struct bio_request *req) {
-    uint64_t curr_timestamp = time_get_ms_fast();
+    uint64_t curr_timestamp = time_get_ms();
 
     struct bio_scheduler_ops *ops = req->disk->ops;
     uint64_t base_wait = ops->max_wait_time[req->priority];
@@ -79,6 +79,7 @@ static inline bool try_boost(struct bio_scheduler *sched,
 
 /* this will be called with the lock already acquired */
 bool bio_sched_boost_starved(struct bio_scheduler *sched) {
+    kassert(spinlock_held(&sched->lock));
     bool boosted_any = false;
 
     for (int64_t i = BIO_RQ_HIGH; i >= 0; i--) {

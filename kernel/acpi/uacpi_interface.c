@@ -131,7 +131,7 @@ void uacpi_kernel_stall(uacpi_u8 usec) {
 
 void uacpi_kernel_sleep(uacpi_u64 msec) {
 
-    for (uacpi_u64 i = 0; i < msec * 10; ++i)
+    for (uacpi_u64 i = 0; i < msec * 10; i++)
         uacpi_kernel_stall(100);
 }
 

@@ -65,7 +65,7 @@ struct fat_bpb *fat_read_bpb(struct generic_disk *drive,
         if (drive->read_sector(drive, 0, sector, 1)) {
             struct mbr *mbr = (struct mbr *) sector;
             if (mbr->signature == 0xAA55) {
-                for (int i = 0; i < 4; ++i) {
+                for (int i = 0; i < 4; i++) {
                     uint8_t type = mbr->partitions[i].type;
                     if (type == FAT32_PARTITION_TYPE1 ||
                         type == FAT32_PARTITION_TYPE2 ||

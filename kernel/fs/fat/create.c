@@ -24,7 +24,7 @@ static bool fat_find_free_dirent_slot(struct fat_fs *fs, uint32_t dir_cluster,
     if (dir_cluster == FAT_DIR_CLUSTER_ROOT && fs->type != FAT_32) {
         uint32_t root_lba = fat12_16_root_dir_lba(fs);
         uint32_t root_secs = fat12_16_root_dir_sectors(fs);
-        for (uint32_t i = 0; i < root_secs; ++i) {
+        for (uint32_t i = 0; i < root_secs; i++) {
             if (!fs->disk->read_sector(fs->disk, root_lba + i, dir_buf, 1))
                 return false;
 

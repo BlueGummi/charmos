@@ -7,17 +7,6 @@ void hpet_program_oneshot(uint64_t future_ms);
 uint64_t hpet_timestamp_ms(void);
 uint64_t hpet_timestamp_us(void);
 
-extern atomic_uint_fast64_t hpet_cached_time_us;
-extern atomic_uint_fast64_t hpet_cached_time_ms;
-
-static inline uint64_t hpet_timestamp_us_fast(void) {
-    return hpet_cached_time_us;
-}
-
-static inline uint64_t hpet_timestamp_ms_fast(void) {
-    return hpet_cached_time_us / 1000;
-}
-
 void hpet_disable(void);
 void hpet_enable(void);
 void hpet_clear_interrupt_status(void);

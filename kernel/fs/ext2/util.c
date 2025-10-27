@@ -39,7 +39,7 @@ static uint32_t ext2_get_block(struct ext2_fs *fs, uint32_t block_num,
 
     uint32_t index = block_index;
     uint32_t divisor = 1;
-    for (uint32_t i = 1; i < depth; ++i)
+    for (uint32_t i = 1; i < depth; i++)
         divisor *= pointers_per_block;
 
     uint32_t entry_index = index / divisor;

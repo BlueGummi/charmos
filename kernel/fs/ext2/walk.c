@@ -39,7 +39,7 @@ static bool walk_direct_blocks(struct ext2_fs *fs,
                                struct ext2_full_inode *inode,
                                dir_entry_callback cb, void *ctx,
                                bool ff_avail) {
-    for (uint32_t i = 0; i < 12; ++i) {
+    for (uint32_t i = 0; i < 12; i++) {
         if (!inode->node.block[i] && ff_avail) {
             inode->node.block[i] = *(uint32_t *) ctx;
             inode->node.blocks += fs->block_size / fs->drive->sector_size;
@@ -65,7 +65,7 @@ static bool walk_indirect(struct ext2_fs *fs, uint32_t block_num, int level,
     if (!ptrs)
         return false;
 
-    for (uint32_t i = 0; i < PTRS_PER_BLOCK; ++i) {
+    for (uint32_t i = 0; i < PTRS_PER_BLOCK; i++) {
         if (!ptrs[i] && ff_avail) {
 
             ptrs[i] = *(uint32_t *) ctx;
