@@ -96,14 +96,19 @@ bool bio_sched_boost_starved(struct bio_scheduler *sched) {
 
         struct bio_request *start = iter;
         do {
-            if (!iter->skip && try_boost(sched, iter))
+            if (!iter)
                 goto next_level;
+
+            if (!iter->skip && try_boost(sched, iter)) {
+                boosted_any = true;
+                goto next_level;
+            }
 
             if (--checks_left == 0)
                 goto next_level;
 
             iter = iter->next;
-        } while (iter && iter != start);
+        } while (iter != start);
 
     next_level:
         continue;
