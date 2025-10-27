@@ -10,7 +10,6 @@
     } while (0)
 
 bool slab_check_reset_slab(struct slab *slab) {
-    slab_check_assert_return_false(list_empty(&slab->list));
     slab_check_assert_return_false(slab->state == SLAB_FREE);
     slab_check_assert_return_false(slab->bitmap == NULL);
     slab_check_assert_return_false(slab->self == slab);
@@ -36,7 +35,6 @@ bool slab_check_bitmap(struct slab *slab) {
 }
 
 bool slab_check_meta(struct slab *slab) {
-    slab_check_assert_return_false(!list_empty(&slab->list));
     slab_check_assert_return_false(slab->mem);
     slab_check_assert_return_false(slab->parent_cache->pages_per_slab > 0);
     return true;

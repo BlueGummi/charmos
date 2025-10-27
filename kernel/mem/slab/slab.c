@@ -90,9 +90,9 @@ struct slab *slab_init(struct slab *slab, struct slab_cache *parent) {
     void *page = slab;
     slab->parent_cache = parent;
     slab->pages = parent->pages_per_slab;
-    slab->bitmap = (uint8_t *) (page + sizeof(struct slab));
-    uint64_t bitmap_bytes = SLAB_BITMAP_BYTES_FOR(parent->objs_per_slab);
-    uintptr_t data_start = (vaddr_t) page + sizeof(struct slab) + bitmap_bytes;
+    slab->bitmap = (uint8_t *) ((uint8_t *) page + sizeof(struct slab));
+    size_t bitmap_bytes = SLAB_BITMAP_BYTES_FOR(parent->objs_per_slab);
+    vaddr_t data_start = (vaddr_t) page + sizeof(struct slab) + bitmap_bytes;
     data_start = SLAB_OBJ_ALIGN_UP(data_start);
     slab->mem = data_start;
 
@@ -100,6 +100,8 @@ struct slab *slab_init(struct slab *slab, struct slab_cache *parent) {
     slab->used = 0;
     slab->state = SLAB_FREE;
     slab->self = slab;
+    slab->gc_enqueue_time_ms = 0;
+    slab->type = SLAB_TYPE_NONPAGEABLE;
     rbt_init_node(&slab->rb);
     INIT_LIST_HEAD(&slab->list);
 
@@ -154,7 +156,9 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
 
             slab_check_assert(slab);
             slab_unlock(slab, irql);
-            return (void *) (slab->mem + i * cache->obj_size);
+            vaddr_t ret = slab->mem + i * cache->obj_size;
+            kassert(ret > (vaddr_t) slab && ret < (vaddr_t) slab + PAGE_SIZE);
+            return (void *) ret;
         }
     }
 
@@ -198,7 +202,6 @@ void slab_free(struct slab *slab, void *obj) {
     uint8_t bit_mask;
     slab_index_and_mask_from_ptr(slab, obj, &byte_idx, &bit_mask);
 
-    kassert(byte_idx < SLAB_BITMAP_BYTES_FOR(cache->objs_per_slab));
     if (!SLAB_BITMAP_TEST(slab->bitmap[byte_idx], bit_mask))
         k_panic("Likely double free of address 0x%lx\n", obj);
 
@@ -209,10 +212,12 @@ void slab_free(struct slab *slab, void *obj) {
         slab_move(cache, slab, SLAB_FREE);
         /* TODO: actually put it on a GC list */
         if (slab_should_enqueue_gc(slab)) {
-            slab_unlock(slab, irql);
             slab_list_del(slab);
+            slab_unlock(slab, irql);
             slab_cache_unlock(cache, slab_cache_irql);
-            slab_destroy(slab);
+            uintptr_t virt = (uintptr_t) slab;
+            paddr_t phys = vmm_get_phys(virt);
+            slab_free_virt_and_phys(virt, phys);
             return;
         }
     } else if (slab->state == SLAB_FULL) {

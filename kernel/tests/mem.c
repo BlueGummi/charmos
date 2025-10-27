@@ -116,7 +116,7 @@ REGISTER_TEST(kmalloc_mixed_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 #define MT_ALLOC_TIMES 1024
 
 static void mt_kmalloc_worker() {
-    void *ptrs[MT_ALLOC_TIMES];
+    void *ptrs[MT_ALLOC_TIMES] = {0};
 
     for (uint64_t i = 0; i < MT_ALLOC_TIMES; i++) {
         ptrs[i] = kmalloc(64);

@@ -95,12 +95,11 @@ slab_gc_get_order_score(size_t inv_free, size_t order,
                         size_t slabs_recycled[SLAB_CLASS_COUNT]) {
     /* scale down by how many we've already thrown into this order */
     size_t recycled = slabs_recycled[order];
-    recycled = recycled * SLAB_GC_SCORE_SCALE / (recycled + 1);
+    recycled = (recycled * SLAB_GC_SCORE_SCALE) / (recycled + 1);
 
     size_t recycled_weight = SLAB_GC_WEIGHT_RECYCLED * recycled;
     size_t supply_weight = SLAB_GC_WEIGHT_UNDER_SUPPLY * inv_free;
-    int64_t score = supply_weight - recycled_weight;
-    return order;
+    return supply_weight - recycled_weight;
 }
 
 /* When choosing which cache order we want to recycle to, we need

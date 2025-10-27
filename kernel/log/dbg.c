@@ -1,5 +1,6 @@
 #include <console/printf.h>
 #include <misc/syms.h>
+#include <sch/sched.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -20,26 +21,33 @@ const char *find_symbol(uint64_t addr, uint64_t *out_sym_addr) {
     return result;
 }
 
-void debug_print_stack() {
-    uint64_t *rbp;
-    asm volatile("mov %%rbp, %0" : "=r"(rbp));
+void debug_print_stack(void) {
+    uint64_t *stack_top;
 
-    int frame = 0;
-    while (rbp) {
-        uint64_t ret_addr = rbp[1];
-        if (ret_addr >= 0xffffffff80000000) {
+    uint64_t *rbp, *rsp;
+    asm volatile("mov %%rbp, %0" : "=r"(rbp));
+    asm volatile("mov %%rsp, %0" : "=r"(rsp));
+
+    stack_top = (void *) ((uint8_t *) scheduler_get_current_thread()->stack +
+                          scheduler_get_current_thread()->stack_size);
+
+    int hits = 0;
+    for (uint64_t *p = rsp; p < stack_top; p++) {
+        uint64_t val = *p;
+
+        if (val >= 0xffffffff80000000ULL && val <= 0xffffffffffffffffULL) {
             uint64_t sym_addr;
-            const char *sym = find_symbol(ret_addr, &sym_addr);
+            const char *sym = find_symbol(val, &sym_addr);
             if (sym) {
-                k_printf("    [%d] 0x%016lx <%s+0x%lx>\n", frame, ret_addr, sym,
-                         ret_addr - sym_addr);
-            } else {
-                k_printf("    [%d] 0x%016lx <unknown>\n", frame, ret_addr);
+                k_printf("    [0x%016lx] %s+0x%lx (sp=0x%016lx)\n", val, sym,
+                         val - sym_addr, (uint64_t) p);
+                hits++;
             }
         }
-        rbp = (uint64_t *) rbp[0];
-        frame++;
     }
+
+    if (hits == 0)
+        k_printf("  <no kernel symbols found>\n");
 }
 
 void debug_print_memory(void *addr, uint64_t size) {
