@@ -1,5 +1,5 @@
 #include <asm.h>
-#include <boot/stage.h>
+#include <bootstage.h>
 #include <crypto/prng.h>
 #include <int/idt.h>
 #include <misc/clamp.h>

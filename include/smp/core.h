@@ -1,5 +1,5 @@
 #pragma once
-#include <boot/stage.h>
+#include <bootstage.h>
 #include <boot/tss.h>
 #include <charmos.h>
 #include <compiler.h>

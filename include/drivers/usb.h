@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* Defines generic USB constants, functions, and structures */
+
 /* All page numbers are for the USB 2.0 Specification */
 
 /* Page 279 - Descriptor types */
@@ -307,9 +309,10 @@ struct usb_controller_ops {
     bool (*submit_bulk_transfer)(struct usb_controller *ctrl, uint8_t port,
                                  struct usb_packet *pkt);
 
-    bool (*submit_interrupt_transfer)(struct usb_controller *ctrl, uint8_t port,
-                                      struct usb_packet *pkt,
-                                      struct usb_endpoint *ep);
+    bool (*submit_interrupt_transfer)(struct usb_controller *ctrl,
+                                      struct usb_device *usb,
+                                      struct usb_endpoint *ep, void *buf,
+                                      uint32_t len);
 
     bool (*reset_port)(struct usb_controller *ctrl, uint8_t port);
 
@@ -378,6 +381,7 @@ bool usb_parse_config_descriptor(struct usb_device *dev);
 bool usb_set_configuration(struct usb_device *dev);
 
 void usb_try_bind_driver(struct usb_device *dev);
+uint8_t usb_construct_rq_bitmap(uint8_t transfer, uint8_t type, uint8_t recip);
 
 static inline uint8_t get_ep_index(struct usb_endpoint *ep) {
     return (ep->number * 2) + (ep->in ? 1 : 0);

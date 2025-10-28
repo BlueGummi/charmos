@@ -1,5 +1,5 @@
 #pragma once
-#include <boot/stage.h>
+#include <bootstage.h>
 #include <fs/vfs.h>
 #include <mem/numa.h>
 #include <misc/list.h>

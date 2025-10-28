@@ -396,6 +396,7 @@ struct slab_page_hdr {
 struct slab *slab_init(struct slab *slab, struct slab_cache *parent);
 struct slab *slab_create(struct slab_domain *domain, struct slab_cache *cache);
 void slab_destroy(struct slab *slab);
+void slab_domain_init_daemon(struct slab_domain *domain);
 int32_t slab_size_to_index(size_t size);
 void *slab_alloc(struct slab_cache *cache);
 void slab_free_page_hdr(struct slab_page_hdr *hdr);

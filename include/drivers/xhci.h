@@ -169,6 +169,7 @@ struct xhci_usbcmd {
 
 _Static_assert(sizeof(struct xhci_usbcmd) == sizeof(uint32_t), "");
 
+/* Page 444 */
 struct xhci_slot_ctx {
     uint32_t route_string : 20; // Location in USB topology
 
@@ -404,15 +405,13 @@ _Static_assert(sizeof(struct xhci_input_ctrl_ctx) == 0x20, "");
 struct xhci_input_ctx { // Refer to page 460 of the XHCI Spec
     struct xhci_input_ctrl_ctx ctrl_ctx;
     struct xhci_slot_ctx slot_ctx;
-    struct xhci_ep_ctx ep0_ctx;
-    struct xhci_ep_ctx ep_ctx[30];
+    struct xhci_ep_ctx ep_ctx[31];
 } __attribute__((packed));
 _Static_assert(sizeof(struct xhci_input_ctx) == 0x420, "");
 
 struct xhci_device_ctx {
     struct xhci_slot_ctx slot_ctx;
-    struct xhci_ep_ctx ep0_ctx;
-    struct xhci_ep_ctx ep_ctx[31]; // Endpoint 1–31 (ep0 separate)
+    struct xhci_ep_ctx ep_ctx[32]; // Endpoint 1–31 (ep0 separate)
 } __attribute__((packed));
 
 struct xhci_op_regs {
@@ -510,6 +509,7 @@ struct xhci_ext_cap {
 };
 
 struct xhci_device {
+    struct xhci_input_ctx *input_ctx;
     struct xhci_cap_regs *cap_regs;
     struct xhci_op_regs *op_regs;
     struct xhci_intr_regs *intr_regs; // Interrupt registers
@@ -545,8 +545,10 @@ struct usb_controller;
 struct usb_packet;
 struct usb_endpoint;
 
-bool xhci_submit_interrupt_transfer(struct usb_controller *ctrl, uint8_t port,
-                                    struct usb_packet *pkt, struct usb_endpoint *ep);
+bool xhci_submit_interrupt_transfer(struct usb_controller *ctrl,
+                                    struct usb_device *dev,
+                                    struct usb_endpoint *ep, void *buf,
+                                    uint32_t len);
 
 void xhci_send_command(struct xhci_device *dev, uint64_t parameter,
                        uint32_t control);

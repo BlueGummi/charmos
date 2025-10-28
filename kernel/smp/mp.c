@@ -4,8 +4,8 @@
 #include <int/idt.h>
 #include <limine.h>
 #include <mem/alloc.h>
-#include <smp/smp.h>
 #include <sch/sched.h>
+#include <smp/smp.h>
 #include <sync/spinlock.h>
 
 static uint64_t cr3 = 0;
@@ -73,7 +73,7 @@ static struct core *setup_cpu(uint64_t cpu) {
         k_panic("Core %d could not allocate space for struct\n", cpu);
     c->id = cpu;
     c->core = c;
-    c->tsc_hz = tsc_calibrate(); 
+    c->tsc_hz = tsc_calibrate();
     init_smt_info(c);
     detect_llc(&c->llc);
 
@@ -127,13 +127,11 @@ void smp_wakeup_processors(struct limine_mp_response *mpr) {
 void smp_complete_init() {
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
     atomic_store(&cr3_ready, 1);
-    smp_core()->tsc_hz = tsc_calibrate(); 
+    smp_core()->tsc_hz = tsc_calibrate();
     if (global.core_count == 1)
         return;
 
-    /* I know, I know, mmio is used here to force the read */
-    while (mmio_read_8((uint8_t *) &global.current_bootstage) !=
-           BOOTSTAGE_MID_MP)
+    while (global.current_bootstage != BOOTSTAGE_MID_MP)
         ;
 }
 

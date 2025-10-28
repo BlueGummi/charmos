@@ -81,7 +81,7 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
 
     ctrl->port_info[port - 1].ep_rings[0] = ring;
 
-    struct xhci_ep_ctx *ep0 = &input_ctx->ep0_ctx;
+    struct xhci_ep_ctx *ep0 = &input_ctx->ep_ctx[0];
     ep0->ep_type = XHCI_ENDPOINT_TYPE_CONTROL_BI;
     ep0->max_packet_size =
         (speed == PORT_SPEED_LOW || speed == PORT_SPEED_FULL) ? 8 : 64;
@@ -197,26 +197,33 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
     for (size_t i = 0; i < usb->num_endpoints; i++) {
         struct usb_endpoint *ep = usb->endpoints[i];
         uint8_t ep_index = get_ep_index(ep);
-        max_ep_index = (ep_index > max_ep_index) ? ep_index : max_ep_index;
-        input_ctx->ctrl_ctx.add_flags |= (1 << ep_index);
 
-        struct xhci_ep_ctx *ep_ctx = &input_ctx->ep_ctx[ep_index];
+        uint8_t input_ctx_idx = ep->number * 2 - (ep->in ? 0 : 1);
+
+        max_ep_index =
+            (input_ctx_idx > max_ep_index) ? input_ctx_idx : max_ep_index;
+
+        /* Add one, there is a slot that the add flags account for */
+        input_ctx->ctrl_ctx.add_flags |= (1 << (input_ctx_idx + 1));
+
+        struct xhci_ep_ctx *ep_ctx = &input_ctx->ep_ctx[input_ctx_idx];
 
         ep_ctx->ep_type = usb_to_xhci_ep_type(ep->in, ep->type);
 
         ep_ctx->max_packet_size = ep->max_packet_size;
         ep_ctx->interval = ep->interval;
+
         ep_ctx->max_burst_size = 0;
 
         struct xhci_ring *ring = allocate_endpoint_ring();
 
         ep_ctx->dequeue_ptr_raw = ring->phys | 1;
-        ep_ctx->dcs = 1;
+        ep_ctx->ep_state = 1;
 
         xhci->port_info[usb->port - 1].ep_rings[ep_index] = ring;
     }
 
-    input_ctx->slot_ctx.context_entries = max_ep_index + 1;
+    input_ctx->slot_ctx.context_entries = max_ep_index;
 
     uint32_t control = TRB_SET_TYPE(TRB_TYPE_CONFIGURE_ENDPOINT);
     control |= xhci->cmd_ring->cycle & 1;
@@ -245,7 +252,7 @@ static bool xhci_control_transfer(struct usb_controller *ctrl, uint8_t port,
 static struct usb_controller_ops xhci_ctrl_ops = {
     .submit_control_transfer = xhci_control_transfer,
     .submit_bulk_transfer = NULL,
-    .submit_interrupt_transfer = NULL /*xhci_submit_interrupt_transfer*/,
+    .submit_interrupt_transfer = xhci_submit_interrupt_transfer,
     .reset_port = NULL,
 };
 
@@ -313,8 +320,10 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
         usb_get_device_descriptor(usb);
         if (!usb_parse_config_descriptor(usb))
             continue;
+
         if (!usb_set_configuration(usb))
             continue;
+
         xhci_configure_device_endpoints(dev, usb);
 
         usb_try_bind_driver(usb);

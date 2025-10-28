@@ -7,7 +7,7 @@
 #include <asm.h>
 #include <boot/gdt.h>
 #include <boot/smap.h>
-#include <boot/stage.h>
+#include <bootstage.h>
 #include <charmos.h>
 #include <compiler.h>
 #include <console/printf.h>
@@ -49,6 +49,8 @@ void k_main(void) {
 
     /* Framebuffer */
     k_printf_init(framebuffer_request.response->framebuffers[0]);
+    global.current_bootstage = BOOTSTAGE_EARLY_FB;
+
     k_printf("%s", OS_LOGO_SMALL);
 
     /* Early */
@@ -57,11 +59,17 @@ void k_main(void) {
     global.current_bootstage = BOOTSTAGE_EARLY_MP;
 
     /* Allocators */
+
+    /* Get us up and running with a bitmap allocator */
     pmm_early_init(memmap_request);
 
+    /* Paging, please! */
     vmm_init(memmap_request.response, xa_request.response);
+
+    /* Switches us to a buddy allocator */
     pmm_mid_init();
 
+    /* kmalloc can be used */
     slab_allocator_init();
     global.current_bootstage = BOOTSTAGE_EARLY_ALLOCATORS;
 
@@ -101,12 +109,14 @@ void k_main(void) {
     topology_init();
     domain_init();
 
+    /* NUMA awareness now */
     pmm_late_init();
     slab_domain_init();
 
     restore_interrupts();
     scheduler_yield();
 
+    /* Should be unreachable */
     while (1) {
         wait_for_interrupt();
     }

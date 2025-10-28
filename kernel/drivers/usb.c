@@ -4,8 +4,7 @@
 #include <mem/vmm.h>
 #include <string.h>
 
-static inline uint8_t construct_rq_bitmap(uint8_t transfer, uint8_t type,
-                                          uint8_t recip) {
+uint8_t usb_construct_rq_bitmap(uint8_t transfer, uint8_t type, uint8_t recip) {
     uint8_t bitmap = 0;
     bitmap |= transfer << USB_REQUEST_TRANSFER_SHIFT;
     bitmap |= type << USB_REQUEST_TYPE_SHIFT;
@@ -14,8 +13,9 @@ static inline uint8_t construct_rq_bitmap(uint8_t transfer, uint8_t type,
 }
 
 static uint8_t get_desc_bitmap(void) {
-    return construct_rq_bitmap(USB_REQUEST_TRANS_DTH, USB_REQUEST_TYPE_STANDARD,
-                               USB_REQUEST_RECIPIENT_DEVICE);
+    return usb_construct_rq_bitmap(USB_REQUEST_TRANS_DTH,
+                                   USB_REQUEST_TYPE_STANDARD,
+                                   USB_REQUEST_RECIPIENT_DEVICE);
 }
 
 bool usb_get_string_descriptor(struct usb_device *dev, uint8_t string_idx,
@@ -214,9 +214,9 @@ bool usb_set_configuration(struct usb_device *dev) {
     struct usb_controller *ctrl = dev->host;
     uint8_t port = dev->port;
 
-    uint8_t bitmap =
-        construct_rq_bitmap(USB_REQUEST_TRANS_HTD, USB_REQUEST_TYPE_STANDARD,
-                            USB_REQUEST_RECIPIENT_DEVICE);
+    uint8_t bitmap = usb_construct_rq_bitmap(USB_REQUEST_TRANS_HTD,
+                                             USB_REQUEST_TYPE_STANDARD,
+                                             USB_REQUEST_RECIPIENT_DEVICE);
 
     struct usb_setup_packet set_cfg = {
         .bitmap_request_type = bitmap,

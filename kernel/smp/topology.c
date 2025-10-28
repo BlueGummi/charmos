@@ -97,6 +97,7 @@ bool cpu_mask_init(struct cpu_mask *m, size_t nbits) {
         m->small = 0;
         return true;
     }
+
     m->uses_large = true;
     size_t nwords = (nbits + 63) / 64;
     m->large = kzalloc(sizeof(uint64_t) * nwords);
@@ -111,7 +112,6 @@ void cpu_mask_set(struct cpu_mask *m, size_t cpu) {
     if (!m->uses_large) {
         atomic_fetch_or(&m->small, 1ULL << cpu);
     } else {
-
         atomic_fetch_or(&m->large[cpu / 64], 1ULL << (cpu % 64));
     }
 }

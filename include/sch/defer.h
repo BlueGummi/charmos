@@ -1,6 +1,8 @@
 #pragma once
+
 #include <mem/alloc.h>
 #include <misc/list.h>
+#include <smp/topology.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -128,7 +130,7 @@ enum workqueue_flags : uint16_t {
     WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS = 1 << 3, /* Inverse: Migratable
                                                    * workers */
 
-    WORKQUEUE_FLAG_NO_AUTO_SPAWN = 0, /* Do not auto spawn workers */
+    WORKQUEUE_FLAG_NO_AUTO_SPAWN = 0,      /* Do not auto spawn workers */
     WORKQUEUE_FLAG_MIGRATABLE_WORKERS = 0, /* Allow migratable workers */
     WORKQUEUE_FLAG_ON_DEMAND = 0, /* Inverse of a permanent workqueue */
 
@@ -157,6 +159,7 @@ struct workqueue_attributes {
     } inactive_check_period;
 
     enum workqueue_flags flags;
+    struct cpu_mask worker_cpu_mask;
 };
 
 #define WORKQUEUE_DEFAULT_CAPACITY 512
@@ -222,7 +225,8 @@ enum workqueue_error : int32_t {
 void defer_init(void);
 
 /* can only fail from allocation fail */
-bool defer_enqueue(work_function func, struct work_args args, uint64_t delay_ms);
+bool defer_enqueue(work_function func, struct work_args args,
+                   uint64_t delay_ms);
 void workqueues_permanent_init(void);
 
 struct workqueue *workqueue_create(struct workqueue_attributes *attrs);
@@ -239,7 +243,8 @@ enum workqueue_error workqueue_enqueue(struct workqueue *queue,
                                        struct work *work);
 
 /* Permanent workqueues */
-enum workqueue_error workqueue_add_oneshot(work_function func, struct work_args args);
+enum workqueue_error workqueue_add_oneshot(work_function func,
+                                           struct work_args args);
 enum workqueue_error workqueue_add_remote_oneshot(work_function func,
                                                   struct work_args args);
 enum workqueue_error workqueue_add_local_oneshot(work_function func,
