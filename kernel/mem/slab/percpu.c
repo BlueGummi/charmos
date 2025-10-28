@@ -5,7 +5,7 @@
 #include "mem/domain/internal.h"
 
 bool slab_magazine_push(struct slab_magazine *mag, vaddr_t obj) {
-    enum irql irql = slab_magazine_lock_irq_disable(mag);
+    enum irql irql = slab_magazine_lock(mag);
 
     if (mag->count < SLAB_MAG_ENTRIES) {
         mag->objs[mag->count++] = obj;
@@ -18,7 +18,7 @@ bool slab_magazine_push(struct slab_magazine *mag, vaddr_t obj) {
 }
 
 vaddr_t slab_magazine_pop(struct slab_magazine *mag) {
-    enum irql irql = slab_magazine_lock_irq_disable(mag);
+    enum irql irql = slab_magazine_lock(mag);
 
     vaddr_t ret = 0x0;
     if (mag->count > 0) {
@@ -85,7 +85,7 @@ void slab_percpu_flush(struct slab_domain *dom, struct slab_percpu_cache *pc,
     struct slab_magazine *mag = &pc->mag[class_idx];
     vaddr_t objs[SLAB_MAG_ENTRIES + 1];
 
-    enum irql irql = slab_magazine_lock_irq_disable(mag);
+    enum irql irql = slab_magazine_lock(mag);
 
     for (size_t i = 0; i < SLAB_MAG_ENTRIES; i++)
         objs[i] = mag->objs[i];
@@ -110,7 +110,7 @@ vaddr_t slab_percpu_refill_class(struct slab_domain *dom,
     vaddr_t objs[remaining];
     size_t got = slab_cache_bulk_alloc(cache, objs, remaining);
 
-    enum irql irql = slab_magazine_lock_irq_disable(mag);
+    enum irql irql = slab_magazine_lock(mag);
 
     for (size_t i = 1; i < got; i++)
         mag->objs[mag->count++] = objs[i];

@@ -22,7 +22,7 @@ static inline uint64_t workqueue_current_worker_count(struct workqueue *q) {
 }
 
 static inline bool workqueue_works_empty(struct workqueue *queue) {
-    enum irql irql = workqueue_work_lock_irq_disable(queue);
+    enum irql irql = workqueue_work_lock(queue);
     bool empty = list_empty(&queue->works);
     workqueue_work_unlock(queue, irql);
     return empty;
@@ -61,14 +61,14 @@ static inline void worklist_put(struct worklist *wlist) {
 
 static inline void workqueue_add_worker(struct workqueue *wq,
                                         struct worker *wker) {
-    enum irql irql = workqueue_worker_lock_irq_disable(wq);
+    enum irql irql = workqueue_worker_lock(wq);
     list_add(&wker->list_node, &wq->workers);
     workqueue_worker_unlock(wq, irql);
 }
 
 static inline void workqueue_remove_worker(struct workqueue *wq,
                                            struct worker *worker) {
-    enum irql irql = workqueue_worker_lock_irq_disable(wq);
+    enum irql irql = workqueue_worker_lock(wq);
     list_del(&worker->list_node);
     workqueue_worker_unlock(wq, irql);
 }

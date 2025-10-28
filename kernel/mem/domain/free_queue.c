@@ -10,7 +10,7 @@
 bool domain_free_queue_enqueue(struct domain_free_queue *fq, paddr_t addr,
                                size_t pages) {
     bool success = false;
-    enum irql irql = domain_free_queue_lock_irq_disable(fq);
+    enum irql irql = domain_free_queue_lock(fq);
 
     size_t next = (fq->tail + 1) % fq->capacity;
     if (next != fq->head) {
@@ -30,7 +30,7 @@ bool domain_free_queue_enqueue(struct domain_free_queue *fq, paddr_t addr,
 bool domain_free_queue_dequeue(struct domain_free_queue *fq, paddr_t *addr_out,
                                size_t *pages_out) {
     bool success = false;
-    enum irql irql = domain_free_queue_lock_irq_disable(fq);
+    enum irql irql = domain_free_queue_lock(fq);
 
     if (fq->head != fq->tail) {
         *addr_out = fq->queue[fq->head].addr;

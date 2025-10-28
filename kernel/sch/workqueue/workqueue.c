@@ -135,12 +135,15 @@ void workqueue_destroy(struct workqueue *queue) {
     WORKQUEUE_STATE_SET(queue, WORKQUEUE_STATE_DESTROYING);
     atomic_store(&queue->ignore_timeouts, true);
 
-    while (workqueue_workers(queue) > workqueue_idlers(queue))
+    thread_apply_cpu_penalty(scheduler_get_current_thread());
+    while (workqueue_workers(queue) > workqueue_idlers(queue)) {
         scheduler_yield();
+    }
 
     /* All workers now idle */
     condvar_broadcast_callback(&queue->queue_cv, mark_worker_exit);
 
+    thread_apply_cpu_penalty(scheduler_get_current_thread());
     while (workqueue_workers(queue) > 0) {
         condvar_broadcast_callback(&queue->queue_cv, mark_worker_exit);
         scheduler_yield();
@@ -222,4 +225,23 @@ void workqueues_permanent_init(void) {
         if (!workqueue_spawn_initial_worker(global.workqueues[i], i))
             k_panic("Failed to spawn initial worker on workqueue %u\n", i);
     }
+}
+
+struct work *work_init(struct work *work, work_function fn,
+                       struct work_args args) {
+    work->args = args;
+    work->active = false;
+    work->enqueued = false;
+    work->seq = 0;
+    work->func = fn;
+    INIT_LIST_HEAD(&work->list_node);
+    return work;
+}
+
+struct work *work_create(work_function fn, struct work_args args) {
+    struct work *work = kzalloc(sizeof(struct work));
+    if (!work)
+        return NULL;
+
+    return work_init(work, fn, args);
 }

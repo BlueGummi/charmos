@@ -25,14 +25,14 @@ static enum worklist_state worklist_change_state(struct worklist *wlist,
 }
 
 void worklist_add_work(struct worklist *list, struct work *task) {
-    enum irql irql = worklist_lock_irq_disable(list);
+    enum irql irql = worklist_lock(list);
     list_add_tail(&task->list_node, &list->list);
     worklist_change_state(list, WORKLIST_STATE_READY);
     worklist_unlock(list, irql);
 }
 
 void worklist_remove_work(struct worklist *list, struct work *task) {
-    enum irql irql = worklist_lock_irq_disable(list);
+    enum irql irql = worklist_lock(list);
     list_del(&task->list_node);
 
     if (list_empty(&list->list))
@@ -42,7 +42,7 @@ void worklist_remove_work(struct worklist *list, struct work *task) {
 }
 
 struct work *worklist_pop_front(struct worklist *list) {
-    enum irql irql = worklist_lock_irq_disable(list);
+    enum irql irql = worklist_lock(list);
     struct list_head *node = list_pop_front(&list->list);
 
     if (list_empty(&list->list))

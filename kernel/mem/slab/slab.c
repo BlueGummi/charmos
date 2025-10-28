@@ -131,7 +131,7 @@ struct slab *slab_create(struct slab_domain *domain, struct slab_cache *cache) {
 }
 
 static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
-    enum irql irql = slab_lock_irq_disable(slab);
+    enum irql irql = slab_lock(slab);
     slab_check_assert(slab);
 
     kassert(spinlock_held(&cache->lock));
@@ -193,8 +193,8 @@ bool slab_should_enqueue_gc(struct slab *slab) {
 void slab_free(struct slab *slab, void *obj) {
     struct slab_cache *cache = slab->parent_cache;
 
-    enum irql slab_cache_irql = slab_cache_lock_irq_disable(cache);
-    enum irql irql = slab_lock_irq_disable(slab);
+    enum irql slab_cache_irql = slab_cache_lock(cache);
+    enum irql irql = slab_lock(slab);
 
     slab_check_assert(slab);
 
@@ -249,7 +249,7 @@ out:
 }
 
 void slab_cache_insert(struct slab_cache *cache, struct slab *slab) {
-    enum irql irql = slab_cache_lock_irq_disable(cache);
+    enum irql irql = slab_cache_lock(cache);
 
     slab_init(slab, cache);
     slab_list_add(cache, slab);
@@ -259,7 +259,7 @@ void slab_cache_insert(struct slab_cache *cache, struct slab *slab) {
 
 void *slab_alloc(struct slab_cache *cache) {
     void *ret = NULL;
-    enum irql irql = slab_cache_lock_irq_disable(cache);
+    enum irql irql = slab_cache_lock(cache);
     ret = slab_try_alloc_from_slab_list(cache, &cache->slabs[SLAB_PARTIAL]);
     if (ret)
         goto out;

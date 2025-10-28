@@ -15,8 +15,12 @@ size_t slab_gc_derive_target_gc_slabs(struct slab_gc *gc,
     return target;
 }
 
-size_t slab_gc_score(struct slab *slab, size_t age_factor_pct,
-                     size_t size_factor_pct, size_t recycle_penalty_pct) {
+size_t slab_gc_score(struct slab *slab, enum thread_flags flags) {
+    enum slab_gc_flags aggressiveness = flags & SLAB_GC_FLAG_AGG_MASK;
+    size_t age_factor_pct = gc_agg_age_factor_pct[aggressiveness];
+    size_t size_factor_pct = gc_agg_size_factor_pct[aggressiveness];
+    size_t recycle_penalty_pct = gc_agg_recycle_penalty_pct[aggressiveness];
+
     size_t size_part_raw = SLAB_GC_SIZE_FACTOR * slab->pages;
     time_t age_seconds = time_get_ms() - slab->gc_enqueue_time_ms;
     size_t recycle_part_raw = SLAB_GC_RECYCLE_PENALTY * slab->recycle_count;
@@ -102,46 +106,67 @@ slab_gc_get_order_score(size_t inv_free, size_t order,
     return supply_weight - recycled_weight;
 }
 
+/* prefer under-supplied orders (lower free_per_order)
+ * and penalize orders we've already recycled to */
+static int64_t score_order(size_t total_free, uint32_t bias_map, size_t order,
+                           size_t free_per_order[SLAB_CLASS_COUNT],
+                           size_t recycled[SLAB_CLASS_COUNT],
+                           size_t original_order) {
+    int32_t inv_free =
+        slab_gc_get_inv_free(total_free, bias_map, order, free_per_order);
+    int64_t score = slab_gc_get_order_score(inv_free, order, recycled);
+
+    /* prefer the original order */
+    if (order == original_order)
+        score += SLAB_GC_WEIGHT_ORDER_PREFERRED * SLAB_GC_SCORE_SCALE;
+    else {
+        /* prefer smaller order index difference */
+        bool far = order > original_order;
+        int64_t dist = far ? order - original_order : original_order - order;
+        score -= dist; /* negative penalty for farther classes */
+    }
+    return score;
+}
+
+static struct slab_caches *slab_gc_pick_caches(struct slab_domain *domain,
+                                               struct slab *slab) {
+    if (slab->type == SLAB_TYPE_PAGEABLE) {
+        return domain->local_pageable_cache;
+    } else {
+        return domain->local_nonpageable_cache;
+    }
+}
+
+static void slab_recycle(struct slab_cache *best, struct slab *slab,
+                         size_t slabs_recycled[SLAB_CLASS_COUNT], size_t idx) {
+
+    slab->recycle_count++;
+    slab_cache_insert(best, slab);
+
+    slabs_recycled[idx]++;
+}
+
 /* When choosing which cache order we want to recycle to, we need
  * to consider both the amount of free slabs in the cache order,
  * and the amount of slabs we have already recycled to that order,
  * to prevent overly aggressive draining to one order */
-size_t slab_gc_recycle(struct slab_domain *domain, struct slab *slab,
-                       size_t slabs_recycled[SLAB_CLASS_COUNT],
-                       uint32_t bias_bitmap) {
+void slab_gc_recycle(struct slab_domain *domain, struct slab *slab,
+                     size_t slabs_recycled[SLAB_CLASS_COUNT],
+                     uint32_t bias_bitmap) {
 
-    struct slab_caches *caches = NULL;
-
-    if (slab->type == SLAB_TYPE_PAGEABLE) {
-        caches = domain->local_pageable_cache;
-    } else {
-        caches = domain->local_nonpageable_cache;
-    }
+    struct slab_caches *caches = slab_gc_pick_caches(domain, slab);
 
     /* Gather totals */
     size_t free_per_order[SLAB_CLASS_COUNT];
     size_t total_free = slab_gc_get_total_free_for(caches, free_per_order);
     size_t original_order = slab->parent_cache->order;
 
-    /* prefer under-supplied orders (lower free_per_order)
-     * and penalize orders we've already recycled to */
-    int32_t best_idx = -1;
+    int32_t best_idx = original_order; /* Default */
     int64_t best_score = INT64_MIN;
 
     for (size_t i = 0; i < SLAB_CLASS_COUNT; i++) {
-        int32_t inv_free =
-            slab_gc_get_inv_free(total_free, bias_bitmap, i, free_per_order);
-        int64_t score = slab_gc_get_order_score(inv_free, i, slabs_recycled);
-
-        /* prefer the original order */
-        if (i == original_order)
-            score += SLAB_GC_WEIGHT_ORDER_PREFERRED * SLAB_GC_SCORE_SCALE;
-        else {
-            /* prefer smaller order index difference */
-            bool farther = i > original_order;
-            int64_t dist = farther ? i - original_order : original_order - i;
-            score -= dist; /* negative penalty for farther classes */
-        }
+        int64_t score = score_order(total_free, bias_bitmap, i, free_per_order,
+                                    slabs_recycled, original_order);
 
         if (score > best_score) {
             best_score = score;
@@ -149,18 +174,8 @@ size_t slab_gc_recycle(struct slab_domain *domain, struct slab *slab,
         }
     }
 
-    /* Nothing? Set a default */
-    if (best_idx < 0)
-        best_idx = original_order;
-
-    struct slab_cache *best = &caches->caches[best_idx];
-
-    slab->recycle_count++;
-    slab_cache_insert(best, slab);
-
     /* We did it! */
-    slabs_recycled[best_idx]++;
-    return best_idx;
+    slab_recycle(&caches->caches[best_idx], slab, slabs_recycled, best_idx);
 }
 
 static void slab_gc_destroy(struct slab_gc *gc, struct slab *slab) {
@@ -168,89 +183,104 @@ static void slab_gc_destroy(struct slab_gc *gc, struct slab *slab) {
     slab_destroy(slab);
 }
 
+static inline uint8_t slab_flags_get_bias(enum slab_gc_flags flags) {
+    uint8_t bias = flags >> SLAB_GC_FLAG_DESTROY_BIAS_SHIFT;
+    bias &= SLAB_GC_FLAG_DESTROY_BIAS_MASK;
+    return bias;
+}
+
+static inline uint32_t
+slab_flags_get_order_bias_bitmap(enum slab_gc_flags flags) {
+    uint32_t order_bias_bitmap = flags >> SLAB_GC_FLAG_ORDER_BIAS_SHIFT;
+    order_bias_bitmap &= SLAB_GC_FLAG_ORDER_BIAS_MASK;
+    return order_bias_bitmap;
+}
+
+static bool slab_do_gc(struct slab_gc *gc, struct slab *slab,
+                       enum slab_gc_flags flags,
+                       size_t slabs_recycled[SLAB_CLASS_COUNT]) {
+
+    uint8_t bias = slab_flags_get_bias(flags);
+    uint32_t order_bias_bitmap = slab_flags_get_order_bias_bitmap(flags);
+
+    if (flags & SLAB_GC_FLAG_FORCE_DESTROY) {
+        slab_gc_destroy(gc, slab);
+        return true;
+    }
+
+    bool recycle = slab_gc_should_recycle(slab, bias);
+
+    struct slab_domain *parent = slab->parent_cache->parent_domain;
+    if (recycle) {
+        slab_gc_recycle(parent, slab, slabs_recycled, order_bias_bitmap);
+    } else if (flags & SLAB_GC_FLAG_SKIP_DESTROY) {
+        return false;
+    } else {
+        slab_gc_destroy(gc, slab);
+    }
+
+    return true;
+}
+
+static size_t slab_gc_derive_threshold_score(struct slab_gc *gc,
+                                             enum slab_gc_flags flags) {
+    enum slab_gc_flags aggressiveness = flags & SLAB_GC_FLAG_AGG_MASK;
+    struct rbt_node *min = rbt_min(&gc->rbt);
+    struct rbt_node *max = rb_last(&gc->rbt);
+    struct slab *min_slab = slab_from_rbt_node(min);
+    struct slab *max_slab = slab_from_rbt_node(max);
+    size_t min_score = slab_gc_score(min_slab, aggressiveness);
+    size_t max_score = slab_gc_score(max_slab, aggressiveness);
+
+    if (min_score >= max_score)
+        min_score = max_score - SLAB_GC_SCORE_MIN_DELTA;
+
+    size_t score_delta = max_score - min_score;
+
+    /* compute range midpoint / threshold */
+    size_t threshold_score = max_score / 2;
+    threshold_score += score_delta * slab_flags_get_bias(flags) /
+                       SLAB_GC_FLAG_DESTROY_BIAS_MAX * 2;
+    return threshold_score;
+}
+
+static inline size_t slab_gc_get_max_unfit_slabs(size_t target,
+                                                 enum slab_gc_flags flags) {
+    enum slab_gc_flags aggressiveness = flags & SLAB_GC_FLAG_AGG_MASK;
+    return target / gc_agg_max_unfit_slabs[aggressiveness];
+}
+
 /* DON'T run GC on slab creation (if there are no available slabs).
  * This is a slow function! The slab cache lock must not be held when
  * calling this function because this will lock the slab cache */
 size_t slab_gc_run(struct slab_gc *gc, enum slab_gc_flags flags) {
     enum thread_flags thread_flags = scheduler_pin_current_thread();
-
-    enum slab_gc_flags aggressiveness = flags & SLAB_GC_FLAG_AGG_MASK;
-
-    uint8_t bias = flags >> SLAB_GC_FLAG_DESTROY_BIAS_SHIFT;
-    bias &= SLAB_GC_FLAG_DESTROY_BIAS_MASK;
-
-    uint32_t order_bias_bitmap = flags >> SLAB_GC_FLAG_ORDER_BIAS_SHIFT;
-    order_bias_bitmap &= SLAB_GC_FLAG_ORDER_BIAS_MASK;
-
-    bool fast = flags & SLAB_GC_FLAG_FAST;
-    bool force_destroy = flags & SLAB_GC_FLAG_FORCE_DESTROY;
-    bool skip_destroy = flags & SLAB_GC_FLAG_SKIP_DESTROY;
-    kassert(!(force_destroy && skip_destroy));
-
-    size_t slabs_recycled[SLAB_CLASS_COUNT] = {0};
-
     enum irql irql = slab_gc_lock(gc);
 
+    size_t slabs_recycled[SLAB_CLASS_COUNT] = {0};
     size_t target = slab_gc_derive_target_gc_slabs(gc, flags);
+    size_t threshold = slab_gc_derive_threshold_score(gc, flags);
+    size_t max_unfit = slab_gc_get_max_unfit_slabs(target, flags);
     size_t reclaimed = 0;
-    size_t consecutive_unfit = 0;
-
-    size_t max_unfit_slabs = target / gc_agg_max_unfit_slabs[aggressiveness];
-    size_t age_pct = gc_agg_age_factor_pct[aggressiveness];
-    size_t size_pct = gc_agg_size_factor_pct[aggressiveness];
-    size_t recycle_pct = gc_agg_recycle_penalty_pct[aggressiveness];
-
-    struct slab_domain *parent = gc->parent;
-
-    struct rbt_node *min = rbt_min(&gc->rbt);
-    struct rbt_node *max = rb_last(&gc->rbt);
-    struct slab *min_slab = slab_from_rbt_node(min);
-    struct slab *max_slab = slab_from_rbt_node(max);
-    size_t min_score = slab_gc_score(min_slab, age_pct, size_pct, recycle_pct);
-    size_t max_score = slab_gc_score(max_slab, age_pct, size_pct, recycle_pct);
-
-    if (min_score >= max_score)
-        min_score = max_score - SLAB_GC_SCORE_MIN_DELTA;
-
-    /* compute range midpoint / threshold */
-    size_t score_delta = max_score - min_score;
-    size_t threshold_score = max_score / 2;
-    threshold_score += score_delta * bias / SLAB_GC_FLAG_DESTROY_BIAS_MAX * 2;
+    size_t unfit = 0;
 
     struct rbt_node *node = rbt_min(&gc->rbt);
     while (node && reclaimed < target) {
         struct rbt_node *next = rbt_next(node);
         struct slab *slab = slab_from_rbt_node(node);
-        size_t score = slab_gc_score(slab, age_pct, size_pct, recycle_pct);
 
-        if (score < threshold_score) {
-            if (++consecutive_unfit >= max_unfit_slabs || fast)
+        if (slab_gc_score(slab, flags) < threshold) {
+            if (++unfit >= max_unfit || flags & SLAB_GC_FLAG_FAST)
                 break;
 
-            goto next_slab_no_inc_reclaimed;
+            goto next_slab;
         }
 
-        consecutive_unfit = 0;
+        unfit = 0;
+        if (slab_do_gc(gc, slab, flags, slabs_recycled))
+            reclaimed++;
 
-        if (force_destroy) {
-            slab_gc_destroy(gc, slab);
-            goto next_slab_inc_reclaimed;
-        }
-
-        bool recycle = slab_gc_should_recycle(slab, bias);
-
-        if (recycle) {
-            slab_gc_recycle(parent, slab, slabs_recycled, order_bias_bitmap);
-        } else if (skip_destroy) {
-            goto next_slab_no_inc_reclaimed;
-        } else {
-            slab_gc_destroy(gc, slab);
-        }
-
-    next_slab_inc_reclaimed:
-        reclaimed++;
-
-    next_slab_no_inc_reclaimed:
+    next_slab:
         node = next;
     }
 
@@ -269,7 +299,7 @@ void slab_gc_enqueue(struct slab_domain *domain, struct slab *slab) {
     slab->rb.data = slab->gc_enqueue_time_ms;
 
     struct slab_gc *gc = &domain->slab_gc;
-    enum irql irql = slab_gc_lock_irq_disable(gc);
+    enum irql irql = slab_gc_lock(gc);
 
     rbt_insert(&domain->slab_gc.rbt, &slab->rb);
     atomic_fetch_add(&gc->num_elements, 1);
@@ -279,7 +309,7 @@ void slab_gc_enqueue(struct slab_domain *domain, struct slab *slab) {
 
 void slab_gc_dequeue(struct slab_domain *domain, struct slab *slab) {
     struct slab_gc *gc = &domain->slab_gc;
-    enum irql irql = slab_gc_lock_irq_disable(gc);
+    enum irql irql = slab_gc_lock(gc);
 
     rbt_remove(&domain->slab_gc.rbt, slab->rb.data);
     atomic_fetch_sub(&gc->num_elements, 1);
@@ -296,7 +326,7 @@ static struct slab *gc_do_op(struct slab_domain *domain,
     struct slab *ret = NULL;
 
     struct slab_gc *gc = &domain->slab_gc;
-    enum irql irql = slab_gc_lock_irq_disable(gc);
+    enum irql irql = slab_gc_lock(gc);
 
     struct rbt_node *rb = op(&gc->rbt);
     if (!rb)

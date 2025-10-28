@@ -76,7 +76,7 @@ void minheap_expand(struct minheap *heap, uint32_t new_size) {
 
 void minheap_insert(struct minheap *heap, struct minheap_node *node,
                     uint64_t key) {
-    enum irql irql = minheap_node_lock_irq_disable(node);
+    enum irql irql = minheap_node_lock(node);
     if (heap->size >= heap->capacity) {
         uint32_t new_cap = heap->capacity * 2;
         struct minheap_node **new_nodes =
@@ -102,7 +102,7 @@ void minheap_insert(struct minheap *heap, struct minheap_node *node,
 }
 
 void minheap_remove(struct minheap *heap, struct minheap_node *node) {
-    enum irql irql = minheap_node_lock_irq_disable(node);
+    enum irql irql = minheap_node_lock(node);
     uint32_t idx = MINHEAP_NODE_INDEX(node);
 
     if (idx >= MINHEAP_SIZE(heap)) {

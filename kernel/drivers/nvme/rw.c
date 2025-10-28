@@ -131,10 +131,10 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
 
     struct thread *curr = scheduler_get_current_thread();
 
-    enum irql irql = irql_raise(IRQL_HIGH_LEVEL);
     req.waiter = curr;
-    thread_block(curr, THREAD_BLOCK_REASON_IO);
     function(disk, &req);
+    enum irql irql = irql_raise(IRQL_HIGH_LEVEL);
+    thread_block(curr, THREAD_BLOCK_REASON_IO);
     irql_lower(irql);
 
     /* Go run something else now */

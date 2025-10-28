@@ -119,7 +119,7 @@ static void free_queue_list_add_internal(struct slab_free_queue_list *q,
 struct slab_free_queue_list_node *
 slab_free_queue_detach_list(struct slab_free_queue *queue) {
     struct slab_free_queue_list *list = &queue->list;
-    enum irql irql = slab_free_queue_list_lock_irq_disable(list);
+    enum irql irql = slab_free_queue_list_lock(list);
 
     struct slab_free_queue_list_node *head = list->head;
     list->head = NULL;
@@ -135,7 +135,7 @@ void slab_free_queue_enqueue_chain(struct slab_free_queue *queue,
                                    struct slab_free_queue_list *chain) {
     struct slab_free_queue_list *list = &queue->list;
 
-    enum irql irql = slab_free_queue_list_lock_irq_disable(list);
+    enum irql irql = slab_free_queue_list_lock(list);
     free_queue_list_add_internal(list, chain->head);
     slab_free_queue_list_unlock(list, irql);
 
@@ -144,7 +144,7 @@ void slab_free_queue_enqueue_chain(struct slab_free_queue *queue,
 
 /* This will always succeed */
 void slab_free_queue_list_enqueue(struct slab_free_queue *q, vaddr_t addr) {
-    enum irql irql = slab_free_queue_list_lock_irq_disable(&q->list);
+    enum irql irql = slab_free_queue_list_lock(&q->list);
     struct slab_free_queue_list_node *node = (void *) addr;
 
     node->next = NULL;
@@ -156,7 +156,7 @@ void slab_free_queue_list_enqueue(struct slab_free_queue *q, vaddr_t addr) {
 }
 
 vaddr_t slab_free_queue_list_dequeue(struct slab_free_queue *q) {
-    enum irql irql = slab_free_queue_list_lock_irq_disable(&q->list);
+    enum irql irql = slab_free_queue_list_lock(&q->list);
     vaddr_t ret = 0x0;
 
     if (slab_free_queue_list_empty(&q->list)) {

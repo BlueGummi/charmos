@@ -19,6 +19,7 @@ struct work_args {
 
 /* TODO: Merge this with standard workqueue infra */
 struct deferred_event {
+    size_t timer;
     uint64_t timestamp_ms;
     work_function callback;
     struct work_args args;
@@ -127,9 +128,9 @@ enum workqueue_flags : uint16_t {
     WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS = 1 << 3, /* Inverse: Migratable
                                                    * workers */
 
-    WORKQUEUE_FLAG_NO_AUTO_SPAWN = 0,
-    WORKQUEUE_FLAG_MIGRATABLE_WORKERS = 0,
-    WORKQUEUE_FLAG_ON_DEMAND = 0,
+    WORKQUEUE_FLAG_NO_AUTO_SPAWN = 0, /* Do not auto spawn workers */
+    WORKQUEUE_FLAG_MIGRATABLE_WORKERS = 0, /* Allow migratable workers */
+    WORKQUEUE_FLAG_ON_DEMAND = 0, /* Inverse of a permanent workqueue */
 
     WORKQUEUE_FLAG_DEFAULTS = WORKQUEUE_FLAG_AUTO_SPAWN,
 };
@@ -226,6 +227,8 @@ void workqueues_permanent_init(void);
 
 struct workqueue *workqueue_create(struct workqueue_attributes *attrs);
 struct work *work_create(work_function func, struct work_args args);
+struct work *work_init(struct work *work, work_function fn,
+                       struct work_args args);
 
 void workqueue_free(struct workqueue *queue);
 enum workqueue_error workqueue_enqueue_oneshot(struct workqueue *queue,

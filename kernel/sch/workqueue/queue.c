@@ -36,7 +36,7 @@ int32_t workqueue_dequeue_task(struct workqueue *queue, struct work **out,
     if (dequeue_oneshot_task(queue, oneshot_task))
         return DEQUEUE_FROM_ONESHOT_CODE;
 
-    enum irql irql = workqueue_work_lock_irq_disable(queue);
+    enum irql irql = workqueue_work_lock(queue);
     struct list_head *lh = list_pop_front(&queue->works);
     workqueue_work_unlock(queue, irql);
 
@@ -83,7 +83,7 @@ enum workqueue_error workqueue_enqueue(struct workqueue *queue,
     if (atomic_load(&work->enqueued))
         return WORKQUEUE_ERROR_WORK_EXECUTING;
 
-    enum irql irql = workqueue_work_lock_irq_disable(queue);
+    enum irql irql = workqueue_work_lock(queue);
     list_add_tail(&work->list_node, &queue->works);
 
     atomic_store(&work->enqueued, true);

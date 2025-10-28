@@ -197,7 +197,7 @@ static inline struct page *buddy_page_for_addr(paddr_t address) {
 static inline void free_from_buddy_internal(struct domain_buddy *target,
                                             paddr_t address,
                                             size_t page_count) {
-    enum irql irql = domain_buddy_lock_irq_disable(target);
+    enum irql irql = domain_buddy_lock(target);
     buddy_free_pages(address, page_count, target->free_area,
                      target->total_pages);
     domain_stat_free(target);

@@ -70,7 +70,7 @@ struct vas_space *vas_space_init(vaddr_t base, vaddr_t limit) {
 }
 
 vaddr_t vas_alloc(struct vas_space *vas, size_t size, size_t align) {
-    enum irql irql = vas_space_lock_irq_disable(vas);
+    enum irql irql = vas_space_lock(vas);
 
     vaddr_t prev_end = ALIGN_UP(vas->base, align);
 
@@ -107,7 +107,7 @@ vaddr_t vas_alloc(struct vas_space *vas, size_t size, size_t align) {
 }
 
 void vas_free(struct vas_space *vas, vaddr_t addr) {
-    enum irql irql = vas_space_lock_irq_disable(vas);
+    enum irql irql = vas_space_lock(vas);
 
     struct rbt_node *node = vas->tree.root;
     while (node) {

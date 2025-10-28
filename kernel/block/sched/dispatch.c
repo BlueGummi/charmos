@@ -26,7 +26,7 @@ static bool try_dispatch_queue_head(struct bio_scheduler *sched,
 }
 
 static void dispatch_queue(struct generic_disk *disk, struct bio_rqueue *q) {
-    enum irql irql = spin_lock_irq_disable(&disk->scheduler->lock);
+    enum irql irql = spin_lock(&disk->scheduler->lock);
     struct bio_request *req = q->head;
 
     struct bio_rqueue copy = {.head = q->head, .tail = q->tail};

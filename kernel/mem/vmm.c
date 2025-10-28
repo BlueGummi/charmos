@@ -189,7 +189,7 @@ enum errno vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
                 virt, phys);
     }
 
-    enum irql irql = spin_lock_irq_disable(&vmm_lock);
+    enum irql irql = spin_lock(&vmm_lock);
     uint64_t L2 = (virt >> 21) & 0x1FF;
 
     struct page_table *current_table = kernel_pml4;
@@ -227,7 +227,7 @@ void vmm_unmap_2mb_page(uintptr_t virt) {
     struct page_table *tables[3];
     pte_t *entries[3];
 
-    enum irql irql = spin_lock_irq_disable(&vmm_lock);
+    enum irql irql = spin_lock(&vmm_lock);
     tables[0] = kernel_pml4;
 
     for (uint64_t level = 0; level < 2; level++) {
@@ -269,7 +269,7 @@ enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
         k_panic("CANNOT MAP PAGE 0x0!!!\n");
     }
 
-    enum irql irql = spin_lock_irq_disable(&vmm_lock);
+    enum irql irql = spin_lock(&vmm_lock);
     struct page_table *current_table = kernel_pml4;
 
     for (uint64_t i = 0; i < 3; i++) {
@@ -328,7 +328,7 @@ void vmm_unmap_page(uintptr_t virt) {
     struct page_table *tables[4];
     pte_t *entries[4];
 
-    enum irql irql = spin_lock_irq_disable(&vmm_lock);
+    enum irql irql = spin_lock(&vmm_lock);
 
     tables[0] = kernel_pml4;
     for (uint64_t level = 0; level < 3; level++) {
@@ -365,7 +365,7 @@ void vmm_unmap_page(uintptr_t virt) {
 
 uintptr_t vmm_get_phys(uintptr_t virt) {
     struct page_table *current_table = kernel_pml4;
-    enum irql irql = spin_lock_irq_disable(&vmm_lock);
+    enum irql irql = spin_lock(&vmm_lock);
 
     for (uint64_t i = 0; i < 2; i++) {
         uint64_t level = (virt >> (39 - i * 9)) & 0x1FF;

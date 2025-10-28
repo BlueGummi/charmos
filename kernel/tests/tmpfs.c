@@ -27,7 +27,7 @@ REGISTER_TEST(tmpfs_rw_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 
     TEST_ASSERT(node->size == len);
 
-    char *out_buf = kzalloc(len);
+    char *out_buf = kzalloc(len + 1);
     TEST_ASSERT(out_buf != NULL);
 
     FAIL_IF_FATAL(node->ops->read(node, out_buf, len, 0));
@@ -54,7 +54,7 @@ REGISTER_TEST(tmpfs_dir_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     const char *lstr = large_test_string;
     uint64_t len = strlen(lstr);
 
-    char *out_buf = kzalloc(len);
+    char *out_buf = kzalloc(len + 1);
     TEST_ASSERT(out_buf != NULL);
 
     FAIL_IF_FATAL(root->ops->mkdir(root, "place", VFS_MODE_DIR));

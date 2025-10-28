@@ -9,7 +9,7 @@
 
 bool domain_arena_push(struct domain_arena *arena, struct page *page) {
     bool success = false;
-    enum irql irql = domain_arena_lock_irq_disable(arena);
+    enum irql irql = domain_arena_lock(arena);
 
     size_t next = (arena->tail + 1) % arena->capacity;
     if (next != arena->head) {
@@ -27,7 +27,7 @@ bool domain_arena_push(struct domain_arena *arena, struct page *page) {
 
 struct page *domain_arena_pop(struct domain_arena *arena) {
     struct page *page = NULL;
-    enum irql irql = domain_arena_lock_irq_disable(arena);
+    enum irql irql = domain_arena_lock(arena);
 
     if (arena->head != arena->tail) {
         page = arena->pages[arena->head];

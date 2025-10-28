@@ -17,7 +17,7 @@ static void bio_sched_tick(void *ctx, void *unused) {
     (void) unused;
     struct bio_scheduler *sched = ctx;
 
-    enum irql irql = spin_lock_irq_disable(&sched->lock);
+    enum irql irql = spin_lock(&sched->lock);
 
     bio_sched_boost_starved(sched);
     try_rq_reorder(sched);
@@ -51,7 +51,7 @@ void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req) {
     if (try_early_submit(sched, req))
         return;
 
-    enum irql irql = spin_lock_irq_disable(&sched->lock);
+    enum irql irql = spin_lock(&sched->lock);
 
     bio_sched_enqueue_internal(sched, req);
 
@@ -77,7 +77,7 @@ void bio_sched_dequeue(struct generic_disk *disk, struct bio_request *req,
     struct bio_scheduler *sched = disk->scheduler;
     enum irql irql;
     if (!already_locked)
-        irql = spin_lock_irq_disable(&sched->lock);
+        irql = spin_lock(&sched->lock);
 
     bio_sched_dequeue_internal(sched, req);
 

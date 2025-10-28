@@ -181,11 +181,15 @@ REGISTER_TEST(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     wq = workqueue_create(&attrs);
 
-    for (size_t i = 0; i < WQ_2_THREADS; i++)
+    for (size_t i = 0; i < WQ_2_THREADS; i++) {
+        k_printf("spawning workqueue enqueue threads\n");
         thread_spawn(enqueue_thread);
+    }
 
-    while (atomic_load(&threads_left) > 0)
+    k_printf("yielding\n");
+    while (atomic_load(&threads_left) > 0) {
         scheduler_yield();
+    }
 
     uint64_t workers = wq->num_workers;
 
@@ -193,6 +197,7 @@ REGISTER_TEST(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     snprintf(msg, 100, "There are %d workers", workers);
     ADD_MESSAGE(msg);
 
+    k_printf("destroy\n");
     workqueue_destroy(wq);
     SET_SUCCESS();
 }
