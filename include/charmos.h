@@ -41,6 +41,9 @@ struct charmos_globals {
     /* Per core workqueues */
     struct workqueue **workqueues;
 
+    /* Big ol' global one */
+    struct workqueue *system_workqueue;
+
     /* Conditional compilation globals go down here */
 #ifdef PROFILING_ENABLED
     struct list_head profiling_list_head;

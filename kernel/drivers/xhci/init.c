@@ -24,7 +24,7 @@ void xhci_setup_event_ring(struct xhci_device *dev) {
     erst_table[0].ring_segment_size = 256;
     erst_table[0].reserved = 0;
 
-    struct xhci_intr_regs *ir = dev->intr_regs;
+    struct xhci_interrupter_regs *ir = dev->intr_regs;
     struct xhci_erdp erdp;
     erdp.raw = event_ring_phys;
     erdp.desi = 1;

@@ -230,7 +230,10 @@ struct daemon *daemon_create(struct daemon_attributes *attrs,
     daemon->background_work = background_work;
 
     if (DAEMON_FLAG_TEST(daemon, DAEMON_FLAG_HAS_WORKQUEUE)) {
-        struct workqueue *wq = workqueue_create(wq_attrs);
+        wq_attrs->flags |= WORKQUEUE_FLAG_NAMED;
+        struct workqueue *wq = workqueue_create(
+            wq_attrs, "workqueue_daemon_%s", daemon->name ? daemon->name : "");
+
         if (!wq)
             goto err;
 

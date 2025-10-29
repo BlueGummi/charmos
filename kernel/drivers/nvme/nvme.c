@@ -137,7 +137,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
         .flags = WORKQUEUE_FLAG_DEFAULTS,
     };
 
-    nvme->workqueue = workqueue_create(&attrs);
+    nvme->workqueue = workqueue_create(&attrs, /* fmt = */ NULL);
     if (!nvme->workqueue)
         k_panic("Could not allocate workqueue\n");
 

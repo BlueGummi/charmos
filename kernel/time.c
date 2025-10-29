@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <time.h>
 
-#define HPET_REFRESH_CYCLES (smp_core()->tsc_hz / 500)
+#define HPET_REFRESH_CYCLES (smp_core()->tsc_hz / 100)
 #define CMOS_ADDRESS 0x70
 #define CMOS_DATA 0x71
 

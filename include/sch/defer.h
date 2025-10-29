@@ -130,9 +130,12 @@ enum workqueue_flags : uint16_t {
     WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS = 1 << 3, /* Inverse: Migratable
                                                    * workers */
 
+    WORKQUEUE_FLAG_NAMED = 1 << 4, /* Has name - will honor (fmt, ...) */
+
     WORKQUEUE_FLAG_NO_AUTO_SPAWN = 0,      /* Do not auto spawn workers */
     WORKQUEUE_FLAG_MIGRATABLE_WORKERS = 0, /* Allow migratable workers */
     WORKQUEUE_FLAG_ON_DEMAND = 0, /* Inverse of a permanent workqueue */
+    WORKQUEUE_FLAG_NAMELESS = 0,
 
     WORKQUEUE_FLAG_DEFAULTS = WORKQUEUE_FLAG_AUTO_SPAWN,
 };
@@ -169,11 +172,13 @@ struct workqueue_attributes {
 #define WORKQUEUE_DEFAULT_MAX_INACTIVE_CHECK_PERIOD SECONDS_TO_MS(40)
 
 struct workqueue {
+    char *name;
+
     atomic_bool ignore_timeouts;
 
     struct spinlock work_lock;
     struct spinlock worker_lock;
-    struct spinlock lock;
+    struct spinlock lock; /* For condvar */
 
     struct condvar queue_cv;
 
@@ -190,7 +195,7 @@ struct workqueue {
     atomic_uint num_workers;  /* Current # workers */
     atomic_uint idle_workers; /* # idle */
 
-    uint64_t core;
+    core_t core;
     time_t last_spawn_attempt;
 
     atomic_flag spawner_flag_internal;
@@ -229,7 +234,8 @@ bool defer_enqueue(work_function func, struct work_args args,
                    uint64_t delay_ms);
 void workqueues_permanent_init(void);
 
-struct workqueue *workqueue_create(struct workqueue_attributes *attrs);
+struct workqueue *workqueue_create(struct workqueue_attributes *attrs,
+                                   const char *fmt, ...);
 struct work *work_create(work_function func, struct work_args args);
 struct work *work_init(struct work *work, work_function fn,
                        struct work_args args);

@@ -127,7 +127,7 @@ void defer_init(void) {
             },
         .spawn_delay = WORKQUEUE_DEFAULT_SPAWN_DELAY,
     };
-    defer_workqueue = workqueue_create(&attrs);
+    defer_workqueue = workqueue_create(&attrs, /* fmt = */ NULL);
 
     for (uint64_t i = 0; i < hpet_timer_count; i++) {
         work_init(&defer_queues[i].work, hpet_work,

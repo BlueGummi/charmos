@@ -108,6 +108,8 @@ void usb_keyboard_poll(struct usb_device *dev) {
         return;
     }
 
+    return;
+
     struct usb_kbd_report last = {0}, report = {0};
 
     while (true) {

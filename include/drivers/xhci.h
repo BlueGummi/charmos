@@ -70,6 +70,7 @@
 #define TRB_IOC_BIT (1 << 5) // Interrupt On Completion
 #define TRB_IDT_BIT (1 << 6) // Immediate Data
 #define TRB_BEI_BIT (1 << 9) // Block Event Interrupt (ISO)
+#define TRB_TYPE_SHIFT 10
 
 #define TRB_SET_SLOT_ID(id) (((id) & 0xFF) << 24)
 #define TRB_GET_SLOT_ID(ctrl) (((ctrl) >> 24) & 0xFF)
@@ -440,8 +441,8 @@ struct xhci_trb {
             uint32_t isp : 1;
             uint32_t ns : 1;
             uint32_t ch : 1;
-            uint32_t ioc : 1; // Bit 5 (interrupt on completion)
-            uint32_t idt : 1; // Bit 6 (immediate data)
+            uint32_t ioc : 1; /* interrupt on completion */
+            uint32_t idt : 1; /* Bit 6 (immediate data) */
             uint32_t reserved1 : 3;
             uint32_t trb_type : 6;
             uint32_t reserved2 : 16;
@@ -452,12 +453,12 @@ struct xhci_trb {
 _Static_assert(sizeof(struct xhci_trb) == 0x10, "");
 
 struct xhci_ring {
-    struct xhci_trb *trbs;  // Virtual mapped TRB buffer
-    uint64_t phys;          // Physical address of TRB buffer
-    uint32_t enqueue_index; // Next TRB to fill
-    uint32_t dequeue_index; // Point where controller sends back things
-    uint8_t cycle;          // Cycle bit, toggles after ring wrap
-    uint32_t size;          // Number of TRBs in ring (e.g., 256)
+    struct xhci_trb *trbs;  /* Virtual mapped TRB buffer */
+    uint64_t phys;          /* Physical address of TRB buffer */
+    uint32_t enqueue_index; /* Next TRB to fill */
+    uint32_t dequeue_index; /* Point where controller sends back things */
+    uint8_t cycle;          /* Cycle bit, toggles after ring wrap */
+    uint32_t size;          /* Number of TRBs in ring */
 };
 
 struct xhci_erst_entry {
@@ -478,12 +479,16 @@ struct xhci_erdp {
 } __attribute__((packed));
 _Static_assert(sizeof(struct xhci_erdp) == 8, "");
 
-struct xhci_intr_regs {
-    uint32_t iman;   // Interrupt Management
-    uint32_t imod;   // Interrupt Moderation
-    uint32_t erstsz; // Event Ring Segment Table Size
+#define XHCI_INTERRUPTER_INTERRUPT_PENDING 1
+#define XHCI_INTERRUPTER_INTERRUPT_ENABLE (1 << 1)
+
+/* Page 424 */
+struct xhci_interrupter_regs {
+    uint32_t iman;   /* Interrupt management */
+    uint32_t imod;   /* Interrupt moderation */
+    uint32_t erstsz; /* Event Ring Segment Table Size */
     uint32_t reserved;
-    uint64_t erstba; // Event Ring Segment Table Base Address
+    uint64_t erstba; /* Event Ring Segment Table Base Address */
     union {
         struct xhci_erdp erdp;
         uint64_t erdp_raw;
@@ -512,7 +517,7 @@ struct xhci_device {
     struct xhci_input_ctx *input_ctx;
     struct xhci_cap_regs *cap_regs;
     struct xhci_op_regs *op_regs;
-    struct xhci_intr_regs *intr_regs; // Interrupt registers
+    struct xhci_interrupter_regs *intr_regs; // Interrupt registers
 
     struct xhci_dcbaa *dcbaa; // Virtual address of DCBAA
 

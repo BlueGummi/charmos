@@ -179,7 +179,7 @@ REGISTER_TEST(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         .max_workers = 64,
     };
 
-    wq = workqueue_create(&attrs);
+    wq = workqueue_create(&attrs, /* fmt = */ NULL);
 
     for (size_t i = 0; i < WQ_2_THREADS; i++) {
         k_printf("spawning workqueue enqueue threads\n");

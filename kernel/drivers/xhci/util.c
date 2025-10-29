@@ -31,7 +31,7 @@ struct xhci_device *xhci_device_create(void *mmio) {
     struct xhci_cap_regs *cap = mmio;
     struct xhci_op_regs *op = mmio + cap->cap_length;
     void *runtime_regs = (void *) mmio + cap->rtsoff;
-    struct xhci_intr_regs *ir_base = (void *) ((uint8_t *) runtime_regs + 0x20);
+    struct xhci_interrupter_regs *ir_base = (void *) ((uint8_t *) runtime_regs + 0x20);
 
     dev->num_devices = 0;
     dev->port_regs = op->regs;

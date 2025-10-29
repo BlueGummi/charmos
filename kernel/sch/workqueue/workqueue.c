@@ -4,6 +4,8 @@
 #include <sch/defer.h>
 #include <sch/sched.h>
 #include <smp/domain.h>
+#include <stdarg.h>
+#include <string.h>
 #include <sync/condvar.h>
 #include <sync/spinlock.h>
 
@@ -82,8 +84,8 @@ void work_execute(struct work *task) {
     atomic_store(&task->active, false);
 }
 
-struct workqueue *
-workqueue_create_internal(struct workqueue_attributes *attrs) {
+struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
+                                            const char *fmt, va_list args) {
     struct workqueue *ret = kzalloc(sizeof(struct workqueue));
     if (!ret)
         return NULL;
@@ -94,6 +96,18 @@ workqueue_create_internal(struct workqueue_attributes *attrs) {
     if (!ret->oneshot_works) {
         kfree(ret);
         return NULL;
+    }
+
+    if (attrs->flags & WORKQUEUE_FLAG_NAMED) {
+        kassert(fmt);
+        size_t needed = snprintf(NULL, 0, fmt, args) + 1;
+        ret->name = kzalloc(needed);
+        if (!ret->name) {
+            kfree(ret->oneshot_works);
+            kfree(ret);
+        }
+
+        snprintf(ret->name, needed, fmt, args);
     }
 
     condvar_init(&ret->queue_cv);
@@ -110,8 +124,14 @@ workqueue_create_internal(struct workqueue_attributes *attrs) {
     return ret;
 }
 
-struct workqueue *workqueue_create(struct workqueue_attributes *attrs) {
-    struct workqueue *ret = workqueue_create_internal(attrs);
+struct workqueue *workqueue_create(struct workqueue_attributes *attrs,
+                                   const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+
+    struct workqueue *ret = workqueue_create_internal(attrs, fmt, args);
+    va_end(args);
+
     workqueue_spawn_initial_worker(ret, WORKQUEUE_CORE_UNBOUND);
     return ret;
 }
@@ -216,7 +236,8 @@ void workqueues_permanent_init(void) {
                      WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS,
         };
 
-        global.workqueues[i] = workqueue_create_internal(&attrs);
+        global.workqueues[i] = workqueue_create_internal(
+            &attrs, /* fmt = */ NULL, /* args = */ NULL);
         global.workqueues[i]->core = i;
 
         if (!global.workqueues[i])

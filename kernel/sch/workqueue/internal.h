@@ -1,4 +1,5 @@
 #include <sch/defer.h>
+#include <stdarg.h>
 
 #define DEQUEUE_FROM_ONESHOT_CODE 2
 #define DEQUEUE_FROM_REGULAR_CODE 1
@@ -100,4 +101,5 @@ struct workqueue *workqueue_get_least_loaded(void);
 struct workqueue *workqueue_get_least_loaded_remote(void);
 struct worker *workqueue_spawn_initial_worker(struct workqueue *queue,
                                               int64_t core);
-struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs);
+struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
+                                            const char *fmt, va_list args);

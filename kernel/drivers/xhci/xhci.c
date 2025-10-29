@@ -190,8 +190,6 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
     struct xhci_input_ctx *input_ctx = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
     uintptr_t input_ctx_phys = vmm_get_phys((uintptr_t) input_ctx);
 
-    input_ctx->ctrl_ctx.add_flags = (1 << 0);
-
     uint8_t max_ep_index = 0;
 
     for (size_t i = 0; i < usb->num_endpoints; i++) {
@@ -231,7 +229,7 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
 
     xhci_send_command(xhci, input_ctx_phys, control);
 
-    if (!(xhci_wait_for_response(xhci) & (1 << 0))) {
+    if (!xhci_wait_for_response(xhci)) {
         xhci_warn("Failed to configure endpoints for slot %u\n", usb->slot_id);
         return false;
     }
@@ -299,6 +297,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
             dev->port_info[port - 1].slot_id = slot_id;
             xhci_address_device(dev, slot_id, speed, port);
             struct usb_device *usb = kzalloc(sizeof(struct usb_device));
+
             /* Panic since this is boot-time only */
             if (!usb)
                 k_panic("No space for the USB device\n");
