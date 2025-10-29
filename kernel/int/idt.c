@@ -20,7 +20,7 @@ extern void page_fault_handler_wrapper();
 extern void syscall_entry();
 #define MAX_IDT_ENTRIES 256
 static bool idt_entry_used[MAX_IDT_ENTRIES] = {0};
-static struct isr_entry isr_table[MAX_IDT_ENTRIES] = {0};
+static struct irq_entry isr_table[MAX_IDT_ENTRIES] = {0};
 
 #include "isr_stubs.h"
 #include "isr_vectors_array.h"
@@ -90,7 +90,7 @@ void panic_isr(void *ctx, uint8_t vector, void *rsp) {
     }
 }
 
-void isr_register(uint8_t vector, isr_handler_t handler, void *ctx) {
+void irq_register(uint8_t vector, irq_handler_t handler, void *ctx) {
     isr_table[vector].handler = handler;
     isr_table[vector].ctx = ctx;
 
@@ -118,7 +118,7 @@ void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags) {
 }
 
 int idt_install_handler(uint8_t flags, void (*handler)(void)) {
-    int entry = idt_alloc_entry();
+    int entry = irq_alloc_entry();
     if (entry == -1)
         return -1;
 
@@ -132,7 +132,7 @@ void idt_load(void) {
     asm volatile("lidt %0" : : "m"(idtps));
 }
 
-int idt_alloc_entry() {
+int irq_alloc_entry() {
     for (int i = 32; i < MAX_IDT_ENTRIES; i++) { // skip first 32: exceptions
         if (!idt_entry_used[i]) {
             idt_entry_used[i] = true;
@@ -142,15 +142,15 @@ int idt_alloc_entry() {
     return -1; // none available
 }
 
-void idt_set_alloc(int entry, bool used) {
+void irq_set_alloc(int entry, bool used) {
     idt_entry_used[entry] = used;
 }
 
-bool idt_is_installed(int entry) {
+bool irq_is_installed(int entry) {
     return idt_entry_used[entry];
 }
 
-void idt_free_entry(int entry) {
+void irq_free_entry(int entry) {
     if (entry < 32 || entry >= MAX_IDT_ENTRIES)
         return;
 
@@ -199,19 +199,19 @@ static void page_fault_handler(void *context, uint8_t vector, void *rsp) {
 }
 
 void idt_init() {
-    isr_register(IRQ_DIV_BY_Z, divbyz_handler, NULL);
-    isr_register(IRQ_DEBUG, debug_handler, NULL);
-    isr_register(IRQ_BREAKPOINT, breakpoint_handler, NULL);
+    irq_register(IRQ_DIV_BY_Z, divbyz_handler, NULL);
+    irq_register(IRQ_DEBUG, debug_handler, NULL);
+    irq_register(IRQ_BREAKPOINT, breakpoint_handler, NULL);
 
-    isr_register(IRQ_SSF, ss_handler, NULL);
-    isr_register(IRQ_GPF, gpf_handler, NULL);
-    isr_register(IRQ_DBF, double_fault_handler, NULL);
-    isr_register(IRQ_PAGE_FAULT, page_fault_handler, NULL);
+    irq_register(IRQ_SSF, ss_handler, NULL);
+    irq_register(IRQ_GPF, gpf_handler, NULL);
+    irq_register(IRQ_DBF, double_fault_handler, NULL);
+    irq_register(IRQ_PAGE_FAULT, page_fault_handler, NULL);
 
-    isr_register(IRQ_TIMER, isr_timer_routine, NULL);
-    isr_register(IRQ_PANIC, panic_isr, NULL);
-    isr_register(IRQ_TLB_SHOOTDOWN, tlb_shootdown, NULL);
-    isr_register(IRQ_NOP, nop_handler, NULL);
+    irq_register(IRQ_TIMER, isr_timer_routine, NULL);
+    irq_register(IRQ_PANIC, panic_isr, NULL);
+    irq_register(IRQ_TLB_SHOOTDOWN, tlb_shootdown, NULL);
+    irq_register(IRQ_NOP, nop_handler, NULL);
     idt_set_gate(0x80, (uint64_t) syscall_entry, 0x2b, 0xee);
     idt_load();
 }

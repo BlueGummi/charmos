@@ -18,7 +18,8 @@
 // boundary. Following TRDs must point to page-aligned boundaries.
 
 #define XHCI_EXT_CAP_ID_LEGACY_SUPPORT 1
-#define XHCI_EXT_CAP_ID_SUPPORTED_PROTOCOL 2
+#define XHCI_EXT_CAP_ID_USB 2
+
 // TRB Types (bits 10–15 in control word)
 #define TRB_TYPE_RESERVED 0x00
 #define TRB_TYPE_NORMAL 0x01
@@ -61,6 +62,8 @@
 // Control field helpers
 #define TRB_GET_TYPE(ctrl) (((ctrl) >> 10) & 0x3F)
 #define TRB_SET_TYPE(val) (((val) & 0x3F) << 10)
+#define TRB_SET_CYCLE(val) (((val) & 1))
+#define TRB_SET_INTERRUPTER_TARGET(target) ((target) >> 21)
 
 #define TRB_CYCLE_BIT (1 << 0)
 #define TRB_ENT_BIT (1 << 1) // Evaluate Next TRB
@@ -86,6 +89,8 @@
 #define PORTSC_SPEED_MASK (0xF << 10) // Bits 10–13: Port Speed
 #define PORTSC_SPEED_SHIFT 10
 
+#define PORTSC_PLS_SHIFT 5
+#define PORTSC_PLS_MASK (0xF << 5)
 #define PORTSC_LWS (1 << 16) // Link Write Strobe
 #define PORTSC_CSC (1 << 17) // Connect Status Change
 #define PORTSC_PEC (1 << 18) // Port Enable/Disable Change
@@ -94,6 +99,12 @@
 #define PORTSC_PRC (1 << 21) // Port Reset Change
 #define PORTSC_PLC (1 << 22) // Port Link State Change
 #define PORTSC_CEC (1 << 23) // Port Config Error Change
+
+#define PORTSC_PLS_POLLING 7
+#define PORTSC_PLS_U0 0
+#define PORTSC_PLS_U2 2
+#define PORTSC_PLS_U3 3
+#define PORTSC_PLS_RXDETECT 5
 
 #define PORTSC_IND (1 << 24)     // Port Indicator Control
 #define PORTSC_LWS_BIT (1 << 16) // Link Write Strobe
@@ -432,22 +443,7 @@ struct xhci_op_regs {
 struct xhci_trb {
     uint64_t parameter;
     uint32_t status;
-
-    union {
-        uint32_t control;
-        struct {
-            uint32_t cycle : 1;
-            uint32_t ent : 1;
-            uint32_t isp : 1;
-            uint32_t ns : 1;
-            uint32_t ch : 1;
-            uint32_t ioc : 1; /* interrupt on completion */
-            uint32_t idt : 1; /* Bit 6 (immediate data) */
-            uint32_t reserved1 : 3;
-            uint32_t trb_type : 6;
-            uint32_t reserved2 : 16;
-        };
-    };
+    uint32_t control;
 } __attribute__((packed));
 
 _Static_assert(sizeof(struct xhci_trb) == 0x10, "");
@@ -500,6 +496,7 @@ struct xhci_port_info {
     bool device_connected;
     uint8_t speed;
     uint8_t slot_id;
+    bool usb3;
     struct xhci_ring *ep_rings[32];
 };
 
@@ -514,6 +511,8 @@ struct xhci_ext_cap {
 };
 
 struct xhci_device {
+    uint8_t irq;
+    struct pci_device *pci;
     struct xhci_input_ctx *input_ctx;
     struct xhci_cap_regs *cap_regs;
     struct xhci_op_regs *op_regs;
@@ -532,7 +531,14 @@ struct xhci_device {
     struct usb_device **devices;
 };
 
-void xhci_init(uint8_t bus, uint8_t slot, uint8_t func);
+/* I don't want to cause even longer compile times
+ * by including the ever-growing USB header in here */
+struct usb_controller;
+struct usb_packet;
+struct usb_endpoint;
+struct pci_device;
+
+void xhci_init(uint8_t bus, uint8_t slot, uint8_t func, struct pci_device *dev);
 void *xhci_map_mmio(uint8_t bus, uint8_t slot, uint8_t func);
 struct xhci_device *xhci_device_create(void *mmio);
 bool xhci_controller_stop(struct xhci_device *dev);
@@ -541,27 +547,19 @@ bool xhci_controller_start(struct xhci_device *dev);
 void xhci_controller_enable_ints(struct xhci_device *dev);
 void xhci_setup_event_ring(struct xhci_device *dev);
 void xhci_setup_command_ring(struct xhci_device *dev);
-void xhci_ring_doorbell(struct xhci_device *dev, uint32_t slot_id,
-                        uint32_t ep_id);
 
-/* I don't want to cause even longer compile times
- * by including the ever-growing USB header in here */
-struct usb_controller;
-struct usb_packet;
-struct usb_endpoint;
-
-bool xhci_submit_interrupt_transfer(struct usb_controller *ctrl,
-                                    struct usb_device *dev,
-                                    struct usb_endpoint *ep, void *buf,
-                                    uint32_t len);
+bool xhci_submit_interrupt_transfer(struct usb_device *dev,
+                                    struct usb_packet *packet);
 
 void xhci_send_command(struct xhci_device *dev, uint64_t parameter,
                        uint32_t control);
+
 uint64_t xhci_wait_for_response(struct xhci_device *dev);
 bool xhci_wait_for_transfer_event(struct xhci_device *dev, uint8_t slot_id);
 uint8_t xhci_enable_slot(struct xhci_device *dev);
 void xhci_parse_ext_caps(struct xhci_device *dev);
 bool xhci_reset_port(struct xhci_device *dev, uint32_t port_index);
+void xhci_detect_usb3_ports(struct xhci_device *dev);
 
 #define xhci_info(string, ...) k_info("XHCI", K_INFO, string, ##__VA_ARGS__)
 #define xhci_warn(string, ...) k_info("XHCI", K_WARN, string, ##__VA_ARGS__)

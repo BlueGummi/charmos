@@ -9,23 +9,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-void xhci_ring_doorbell(struct xhci_device *dev, uint32_t slot_id,
-                        uint32_t ep_id) {
-    uint32_t *doorbell = (void *) dev->cap_regs + dev->cap_regs->dboff;
-    mmio_write_32(&doorbell[slot_id], ep_id);
-}
-
-void xhci_advance_dequeue(struct xhci_ring *event_ring, uint32_t *dq_idx,
-                          uint8_t *expected_cycle) {
-
-    *dq_idx += 1;
-    if (*dq_idx == event_ring->size) {
-        *dq_idx = 0;
-        *expected_cycle ^= 1;
-    }
-    event_ring->dequeue_index = *dq_idx;
-    event_ring->cycle = *expected_cycle;
-}
+#include "internal.h"
 
 void xhci_advance_enqueue(struct xhci_ring *cmd_ring) {
     cmd_ring->enqueue_index++;
@@ -197,15 +181,15 @@ bool xhci_wait_for_transfer_event(struct xhci_device *dev, uint8_t slot_id) {
 }
 
 /* Submit a single interrupt IN transfer, blocking until completion */
-bool xhci_submit_interrupt_transfer(struct usb_controller *ctrl,
-                                    struct usb_device *dev,
-                                    struct usb_endpoint *ep, void *buf,
-                                    uint32_t len) {
-    struct xhci_device *xhci = ctrl->driver_data;
+bool xhci_submit_interrupt_transfer(struct usb_device *dev,
+                                    struct usb_packet *packet) {
+    struct xhci_device *xhci = dev->host->driver_data;
     uint8_t slot_id = dev->slot_id;
+    struct usb_endpoint *ep = packet->ep;
+
     uint8_t ep_id = get_ep_index(ep);
     struct xhci_ring *ring = xhci->port_info[dev->port - 1].ep_rings[ep_id];
-    if (!ring || !buf || len == 0) {
+    if (!ring || !packet->data || packet->length == 0) {
         xhci_warn("Invalid parameters for interrupt transfer");
         return false;
     }
@@ -213,11 +197,13 @@ bool xhci_submit_interrupt_transfer(struct usb_controller *ctrl,
     uint32_t idx = ring->enqueue_index;
 
     struct xhci_trb *trb = &ring->trbs[idx];
-    trb->parameter = (paddr_t) vmm_get_phys((vaddr_t) buf);
-    trb->status = len;
-    trb->control = (TRB_TYPE_NORMAL << 10) /* TRB type */
-                   | (1 << 5)              /* IOC */
-                   | (ring->cycle & 1);    /* cycle bit */
+    trb->parameter = (paddr_t) vmm_get_phys((vaddr_t) packet->data);
+    trb->status = packet->length;
+    trb->status |= TRB_SET_INTERRUPTER_TARGET(0);
+
+    trb->control = TRB_SET_TYPE(TRB_TYPE_NORMAL);
+    trb->control |= TRB_IOC_BIT;
+    trb->control |= TRB_SET_CYCLE(ring->cycle);
 
     xhci_advance_enqueue(ring);
     xhci_ring_doorbell(xhci, slot_id, ep_id);
@@ -228,6 +214,8 @@ bool xhci_submit_interrupt_transfer(struct usb_controller *ctrl,
                   get_ep_index(ep));
         return false;
     }
+
+//    xhci_clear_interrupt_pending(xhci);
 
     return true;
 }

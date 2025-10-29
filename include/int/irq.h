@@ -2,10 +2,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-typedef void (*isr_handler_t)(void *ctx, uint8_t vector, void *rsp);
+typedef void (*irq_handler_t)(void *ctx, uint8_t vector, void *rsp);
 
-struct isr_entry {
-    isr_handler_t handler;
+struct irq_entry {
+    irq_handler_t handler;
     void *ctx;
 };
 
@@ -25,4 +25,4 @@ struct isr_entry {
 bool irq_in_thread_context();
 bool irq_in_interrupt();
 void irq_mark_self_in_interrupt(bool new);
-void isr_register(uint8_t vector, isr_handler_t handler, void *ctx);
+void irq_register(uint8_t vector, irq_handler_t handler, void *ctx);

@@ -123,6 +123,7 @@ void k_main(void) {
 }
 
 void k_sch_main() {
+    enable_interrupts();
     k_info("MAIN", K_INFO, "Device setup");
     global.current_bootstage = BOOTSTAGE_LATE_DEVICES;
     registry_setup();

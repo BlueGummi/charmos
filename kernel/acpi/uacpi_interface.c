@@ -143,7 +143,7 @@ uacpi_status uacpi_kernel_install_interrupt_handler(
     if (irq >= 256)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    isr_register(irq, (void *) handler, ctx);
+    irq_register(irq, (void *) handler, ctx);
 
     if (out_irq_handle)
         *out_irq_handle = (uacpi_handle) (uintptr_t) irq;
@@ -162,10 +162,10 @@ uacpi_kernel_uninstall_interrupt_handler(uacpi_interrupt_handler handler,
     if (irq >= 256)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    if (!idt_is_installed(irq))
+    if (!irq_is_installed(irq))
         return UACPI_STATUS_NOT_FOUND;
 
-    idt_free_entry(irq);
+    irq_free_entry(irq);
     return UACPI_STATUS_OK;
 }
 

@@ -1,3 +1,4 @@
+#pragma once
 #include <asm.h>
 #include <stdint.h>
 
@@ -71,7 +72,7 @@ struct pci_msix_cap {
     uint16_t msg_ctl;          // 0x2
     uint32_t table_offset_bir; // 0x4
     uint32_t pba_offset_bir;   // 0x8
-};
+} __attribute__((packed));
 
 #define PCI_BAR0 0x10
 #define PCI_BAR1 0x14
@@ -187,4 +188,8 @@ void pci_enable_msix(uint8_t bus, uint8_t slot, uint8_t func);
 void pci_enable_msix_on_core(uint8_t bus, uint8_t slot, uint8_t func,
                              uint8_t vector, uint8_t core);
 void pci_init_devices(struct pci_device *devices, uint64_t count);
-#pragma once
+uint8_t pci_find_capability(uint8_t bus, uint8_t slot, uint8_t func,
+                            uint8_t cap_id);
+void pci_program_msix_entry(uint8_t bus, uint8_t slot, uint8_t func,
+                            uint32_t table_index, uint8_t vector,
+                            uint8_t apic_id);

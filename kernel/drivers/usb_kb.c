@@ -1,6 +1,7 @@
 #include <console/printf.h>
 #include <drivers/usb.h>
 #include <drivers/usb_hid.h>
+#include <drivers/xhci.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
@@ -53,8 +54,9 @@ void parse_keyboard_report(const struct usb_kbd_report *report) {
 
         if (memchr(prev_keys, code, sizeof(prev_keys)) == NULL) {
             char ch = table[code];
-            if (ch)
+            if (ch) {
                 k_printf("%c", ch);
+            }
         }
     }
 
@@ -89,8 +91,12 @@ bool usb_keyboard_get_descriptor(struct usb_device *dev,
         .index = interface_number,
     };
 
-    return dev->host->ops.submit_control_transfer(dev->host, dev->port, &setup,
-                                                  buf);
+    struct usb_packet packet = {
+        .setup = &setup,
+        .data = buf,
+    };
+
+    return dev->host->ops.submit_control_transfer(dev, &packet);
 }
 
 void usb_keyboard_poll(struct usb_device *dev) {
@@ -112,14 +118,21 @@ void usb_keyboard_poll(struct usb_device *dev) {
 
     struct usb_kbd_report last = {0}, report = {0};
 
+    struct usb_packet packet = {
+        .data = &report,
+        .length = sizeof(report),
+        .ep = ep,
+    };
+
     while (true) {
-        bool ok = dev->host->ops.submit_interrupt_transfer(
-            dev->host, dev, ep, &report, sizeof(report));
+        bool ok = dev->host->ops.submit_interrupt_transfer(dev, &packet);
 
         if (!ok)
             continue;
 
         if (memcmp(&last, &report, sizeof(report)) != 0) {
+            struct xhci_device *x = dev->host->driver_data;
+            k_printf("0b%b\n", x->intr_regs->iman);
             parse_keyboard_report(&report);
             last = report;
         }

@@ -137,12 +137,12 @@ struct generic_disk *ide_create_generic(struct ata_drive *ide) {
     if (!ide->actually_exists)
         return NULL;
 
-    uint8_t irq = idt_alloc_entry();
+    uint8_t irq = irq_alloc_entry();
     k_info("IDE", K_INFO, "IDE drive IRQ on line %u, allocated entry %u",
            ide->irq, irq);
 
     ioapic_route_irq(ide->irq, irq, 0, false);
-    isr_register(irq, ide_irq_handler, &ide->channel);
+    irq_register(irq, ide_irq_handler, &ide->channel);
     ide->channel.current_drive = ide;
 
     struct generic_disk *d = kmalloc(sizeof(struct generic_disk));

@@ -1,9 +1,11 @@
+#include <acpi/lapic.h>
 #include <asm.h>
 #include <compiler.h>
 #include <console/printf.h>
 #include <drivers/pci.h>
 #include <drivers/usb.h>
 #include <drivers/xhci.h>
+#include <int/idt.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
 #include <sleep.h>
@@ -11,39 +13,7 @@
 #include <stdint.h>
 #include <string.h>
 
-static inline uint8_t usb_to_xhci_ep_type(bool in, uint8_t type) {
-    if (in) {
-        switch (type) {
-        case USB_ENDPOINT_ATTR_TRANS_TYPE_BULK:
-            return XHCI_ENDPOINT_TYPE_BULK_IN;
-
-        case USB_ENDPOINT_ATTR_TRANS_TYPE_CONTROL:
-            return XHCI_ENDPOINT_TYPE_CONTROL_BI;
-
-        case USB_ENDPOINT_ATTR_TRANS_TYPE_INTERRUPT:
-            return XHCI_ENDPOINT_TYPE_INTERRUPT_IN;
-
-        case USB_ENDPOINT_ATTR_TRANS_TYPE_ISOCHRONOUS:
-            return XHCI_ENDPOINT_TYPE_ISOCH_IN;
-
-        default: xhci_error("Invalid type detected: %u\n", type); return 0;
-        }
-    }
-    switch (type) {
-    case USB_ENDPOINT_ATTR_TRANS_TYPE_BULK: return XHCI_ENDPOINT_TYPE_BULK_OUT;
-
-    case USB_ENDPOINT_ATTR_TRANS_TYPE_CONTROL:
-        return XHCI_ENDPOINT_TYPE_CONTROL_BI;
-
-    case USB_ENDPOINT_ATTR_TRANS_TYPE_INTERRUPT:
-        return XHCI_ENDPOINT_TYPE_INTERRUPT_OUT;
-
-    case USB_ENDPOINT_ATTR_TRANS_TYPE_ISOCHRONOUS:
-        return XHCI_ENDPOINT_TYPE_ISOCH_OUT;
-
-    default: xhci_error("Invalid type detected: %u\n", type); return 0;
-    }
-}
+#include "internal.h"
 
 bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
                          uint8_t speed, uint8_t port) {
@@ -66,9 +36,10 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
     uintptr_t ep0_ring_phys = vmm_get_phys((uintptr_t) ep0_ring);
 
     ep0_ring[TRB_RING_SIZE - 1].parameter = ep0_ring_phys;
-    ep0_ring[TRB_RING_SIZE - 1].control = (TRB_TYPE_LINK << 10) | (1 << 1);
+    ep0_ring[TRB_RING_SIZE - 1].control = TRB_SET_TYPE(TRB_TYPE_LINK);
+    ep0_ring[TRB_RING_SIZE - 1].control |= (1 << 1);
 
-    struct xhci_ring *ring = kmalloc(sizeof(struct xhci_ring));
+    struct xhci_ring *ring = kzalloc(sizeof(struct xhci_ring));
     if (unlikely(!ring))
         k_panic("Could not allocate space for ep0 ring");
 
@@ -96,8 +67,8 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
 
     uint32_t control = 0;
     control |= TRB_SET_TYPE(TRB_TYPE_ADDRESS_DEVICE);
-    control |= ctrl->cmd_ring->cycle & 1;
-    control |= slot_id << 24;
+    control |= TRB_SET_CYCLE(ctrl->cmd_ring->cycle);
+    control |= TRB_SET_SLOT_ID(slot_id);
 
     xhci_send_command(ctrl, input_ctx_phys, control);
 
@@ -127,9 +98,9 @@ bool xhci_send_control_transfer(struct xhci_device *dev, uint8_t slot_id,
     /* Transfer length */
     setup_trb->status = 8;
 
-    setup_trb->idt = 1;
-    setup_trb->trb_type = TRB_TYPE_SETUP_STAGE;
-    setup_trb->cycle = ep0_ring->cycle & 1;
+    setup_trb->control |= TRB_IDT_BIT;
+    setup_trb->control |= TRB_SET_TYPE(TRB_TYPE_SETUP_STAGE);
+    setup_trb->control |= TRB_SET_CYCLE(ep0_ring->cycle);
 
     /* OUT */
     setup_trb->control |= (2 << 16);
@@ -139,8 +110,8 @@ bool xhci_send_control_transfer(struct xhci_device *dev, uint8_t slot_id,
     data_trb->parameter = buffer_phys;
     data_trb->status = setup->length;
 
-    data_trb->trb_type = TRB_TYPE_DATA_STAGE;
-    data_trb->cycle = ep0_ring->cycle & 1;
+    data_trb->control |= TRB_SET_TYPE(TRB_TYPE_DATA_STAGE);
+    data_trb->control |= TRB_SET_CYCLE(ep0_ring->cycle);
 
     /* IN */
     data_trb->control |= (3 << 16);
@@ -149,9 +120,10 @@ bool xhci_send_control_transfer(struct xhci_device *dev, uint8_t slot_id,
     struct xhci_trb *status_trb = &ep0_ring->trbs[idx++];
     status_trb->parameter = 0;
     status_trb->status = 0;
-    status_trb->trb_type = TRB_TYPE_STATUS_STAGE;
-    status_trb->cycle = ep0_ring->cycle & 1;
-    status_trb->ioc = 1;
+
+    status_trb->control |= TRB_SET_TYPE(TRB_TYPE_STATUS_STAGE);
+    status_trb->control |= TRB_IOC_BIT;
+    status_trb->control |= TRB_SET_CYCLE(ep0_ring->cycle);
 
     ep0_ring->enqueue_index = idx;
     xhci_ring_doorbell(dev, slot_id, 1);
@@ -169,7 +141,7 @@ static struct xhci_ring *allocate_endpoint_ring(void) {
     trbs[TRB_RING_SIZE - 1].parameter = ring_phys;
     trbs[TRB_RING_SIZE - 1].control = (TRB_TYPE_LINK << 10) | (1 << 1);
 
-    struct xhci_ring *ring = kmalloc(sizeof(struct xhci_ring));
+    struct xhci_ring *ring = kzalloc(sizeof(struct xhci_ring));
     if (!ring) {
         kfree_aligned(trbs);
         return NULL;
@@ -190,6 +162,7 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
     struct xhci_input_ctx *input_ctx = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
     uintptr_t input_ctx_phys = vmm_get_phys((uintptr_t) input_ctx);
 
+    input_ctx->ctrl_ctx.add_flags = (1 << 0);
     uint8_t max_ep_index = 0;
 
     for (size_t i = 0; i < usb->num_endpoints; i++) {
@@ -224,8 +197,8 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
     input_ctx->slot_ctx.context_entries = max_ep_index;
 
     uint32_t control = TRB_SET_TYPE(TRB_TYPE_CONFIGURE_ENDPOINT);
-    control |= xhci->cmd_ring->cycle & 1;
-    control |= usb->slot_id << 24;
+    control |= TRB_SET_CYCLE(xhci->cmd_ring->cycle);
+    control |= TRB_SET_SLOT_ID(usb->slot_id);
 
     xhci_send_command(xhci, input_ctx_phys, control);
 
@@ -234,17 +207,20 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
         return false;
     }
 
+    xhci_clear_interrupt_pending(xhci);
     return true;
 }
 
-static bool xhci_control_transfer(struct usb_controller *ctrl, uint8_t port,
-                                  struct usb_setup_packet *setup,
-                                  void *buffer) {
-    struct xhci_device *xhci = ctrl->driver_data;
-    struct xhci_ring *ep0_ring = xhci->port_info[port - 1].ep_rings[0];
-    uint8_t slot_id = xhci->port_info[port - 1].slot_id;
+static bool xhci_control_transfer(struct usb_device *dev,
+                                  struct usb_packet *packet) {
+    struct xhci_device *xhci = dev->host->driver_data;
+    struct xhci_ring *ep0_ring = xhci->port_info[dev->port - 1].ep_rings[0];
+    uint8_t slot_id = xhci->port_info[dev->port - 1].slot_id;
 
-    return xhci_send_control_transfer(xhci, slot_id, ep0_ring, setup, buffer);
+    bool ret = xhci_send_control_transfer(xhci, slot_id, ep0_ring,
+                                          packet->setup, packet->data);
+    xhci_clear_interrupt_pending(xhci);
+    return ret;
 }
 
 static struct usb_controller_ops xhci_ctrl_ops = {
@@ -254,11 +230,29 @@ static struct usb_controller_ops xhci_ctrl_ops = {
     .reset_port = NULL,
 };
 
-void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
+static void xhci_isr(void *ctx, uint8_t vector, void *rsp) {
+    struct xhci_device *dev = ctx;
+    k_printf("interrupt\n");
+    xhci_clear_interrupt_pending(dev);
+
+    lapic_write(LAPIC_REG_EOI, 0);
+}
+
+static void xhci_device_start_interrupts(uint8_t bus, uint8_t slot,
+                                         uint8_t func,
+                                         struct xhci_device *dev) {
+    dev->irq = irq_alloc_entry();
+    irq_register(dev->irq, xhci_isr, dev);
+    pci_program_msix_entry(bus, slot, func, 0, dev->irq, /*core=*/0);
+}
+
+void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
+               struct pci_device *pci) {
     xhci_info("Found device at %02x:%02x.%02x", bus, slot, func);
     void *mmio = xhci_map_mmio(bus, slot, func);
 
     struct xhci_device *dev = xhci_device_create(mmio);
+    dev->pci = pci;
 
     if (!xhci_controller_stop(dev))
         return;
@@ -267,14 +261,19 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
         return;
 
     xhci_parse_ext_caps(dev);
+    xhci_detect_usb3_ports(dev);
     xhci_setup_event_ring(dev);
 
     xhci_setup_command_ring(dev);
 
+    pci_enable_msix(bus, slot, func);
+    xhci_device_start_interrupts(bus, slot, func, dev);
+
     xhci_controller_start(dev);
     xhci_controller_enable_ints(dev);
+    xhci_interrupt_enable_ints(dev);
 
-    struct usb_controller *ctrl = kmalloc(sizeof(struct usb_controller));
+    struct usb_controller *ctrl = kzalloc(sizeof(struct usb_controller));
     ctrl->driver_data = dev;
     ctrl->type = USB_CONTROLLER_XHCI;
     ctrl->ops = xhci_ctrl_ops;
@@ -287,6 +286,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
 
             xhci_reset_port(dev, port);
             uint8_t slot_id = xhci_enable_slot(dev);
+
             if (slot_id == 0) {
                 xhci_warn("Failed to enable slot for port %lu\n", port);
                 continue;
@@ -334,7 +334,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func) {
 static void xhci_pci_init(uint8_t bus, uint8_t slot, uint8_t func,
                           struct pci_device *dev) {
     switch (dev->prog_if) {
-    case 0x30: xhci_init(bus, slot, func);
+    case 0x30: xhci_init(bus, slot, func, dev);
     default: break;
     }
 }

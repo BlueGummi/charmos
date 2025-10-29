@@ -24,7 +24,6 @@ bool usb_get_string_descriptor(struct usb_device *dev, uint8_t string_idx,
         return false;
 
     struct usb_controller *ctrl = dev->host;
-    uint8_t port = dev->port;
     uint8_t *desc = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
 
     struct usb_setup_packet setup = {
@@ -35,7 +34,12 @@ bool usb_get_string_descriptor(struct usb_device *dev, uint8_t string_idx,
         .length = 255,
     };
 
-    if (!ctrl->ops.submit_control_transfer(ctrl, port, &setup, desc))
+    struct usb_packet packet = {
+        .setup = &setup,
+        .data = desc,
+    };
+
+    if (!ctrl->ops.submit_control_transfer(dev, &packet))
         return false;
 
     uint8_t bLength = desc[0];
@@ -65,7 +69,13 @@ void usb_get_device_descriptor(struct usb_device *dev) {
 
     struct usb_controller *ctrl = dev->host;
     uint8_t port = dev->port;
-    if (!ctrl->ops.submit_control_transfer(ctrl, port, &setup, desc)) {
+
+    struct usb_packet packet = {
+        .setup = &setup,
+        .data = desc,
+    };
+
+    if (!ctrl->ops.submit_control_transfer(dev, &packet)) {
         usb_warn("Failed to get device descriptor on port %u", port);
         return;
     }
@@ -183,7 +193,13 @@ bool usb_parse_config_descriptor(struct usb_device *dev) {
     struct usb_controller *ctrl = dev->host;
     uint8_t port = dev->port;
 
-    if (!ctrl->ops.submit_control_transfer(ctrl, port, &setup, desc)) {
+    struct usb_packet packet = {
+        .setup = &setup,
+        .data = desc,
+
+    };
+
+    if (!ctrl->ops.submit_control_transfer(dev, &packet)) {
         usb_warn("Failed to get config descriptor header on port %u", port);
         kfree_aligned(desc);
         return false;
@@ -195,7 +211,7 @@ bool usb_parse_config_descriptor(struct usb_device *dev) {
     uint16_t total_len = cdesc->total_length;
     setup.length = total_len;
 
-    if (!ctrl->ops.submit_control_transfer(ctrl, port, &setup, desc)) {
+    if (!ctrl->ops.submit_control_transfer(dev, &packet)) {
         usb_warn("Failed to get full config descriptor on port %u", port);
         kfree_aligned(desc);
         return false;
@@ -226,7 +242,12 @@ bool usb_set_configuration(struct usb_device *dev) {
         .length = 0,
     };
 
-    if (!ctrl->ops.submit_control_transfer(ctrl, port, &set_cfg, NULL)) {
+    struct usb_packet packet = {
+        .setup = &set_cfg,
+        .data = NULL,
+    };
+
+    if (!ctrl->ops.submit_control_transfer(dev, &packet)) {
         usb_warn("Failed to set configuration on port %u\n", port);
         return false;
     }

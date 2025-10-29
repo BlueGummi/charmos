@@ -28,7 +28,7 @@ void idt_init();
 void idt_load();
 void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags);
 
-void idt_set_alloc(int entry, bool used);
-int idt_alloc_entry(void);
-void idt_free_entry(int entry);
-bool idt_is_installed(int entry);
+void irq_set_alloc(int entry, bool used);
+int irq_alloc_entry(void);
+void irq_free_entry(int entry);
+bool irq_is_installed(int entry);

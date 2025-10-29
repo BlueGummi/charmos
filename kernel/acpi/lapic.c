@@ -107,6 +107,7 @@ void x2apic_init(void) {
     apic_base = rdmsr(IA32_APIC_BASE);
     apic_base |= APIC_X2APIC_ENABLE;
     wrmsr(IA32_APIC_BASE, apic_base);
+    k_info("X2APIC", K_INFO, "X2APIC enabled\n");
 }
 
 uint32_t x2apic_get_id(void) {

@@ -167,15 +167,78 @@ uint32_t pci_read_bar(uint8_t bus, uint8_t device, uint8_t function,
     return pci_read(bus, device, function, offset);
 }
 
-void pci_enable_msix_on_core(uint8_t bus, uint8_t slot, uint8_t func,
-                             uint8_t vector_index, uint8_t apic_id) {
-    uint8_t msix_cap_offset =
-        pci_find_capability(bus, slot, func, PCI_CAP_ID_MSIX);
-    if (msix_cap_offset == 0) {
+static uint64_t pci_read_bar64(uint8_t bus, uint8_t slot, uint8_t func,
+                               uint8_t bar_index) {
+    uint32_t low = pci_read(bus, slot, func, 0x10 + 4 * bar_index);
+    uint8_t type = (low >> 1) & 0x3;
+    if (type == 0x2) {
+        uint32_t high = pci_read(bus, slot, func, 0x10 + 4 * (bar_index + 1));
+        return (((uint64_t) high) << 32) | (low & ~0xFULL);
+    } else {
+        return (uint64_t) (low & ~0xFULL);
+    }
+}
+
+void pci_program_msix_entry(uint8_t bus, uint8_t slot, uint8_t func,
+                            uint32_t table_index, uint8_t vector,
+                            uint8_t apic_id) {
+    uint8_t cap = pci_find_capability(bus, slot, func, PCI_CAP_ID_MSIX);
+    if (!cap) {
         k_info("PCI", K_ERROR, "MSI-X capability not found");
         return;
     }
-    uint32_t table_offset_bir = pci_read(bus, slot, func, msix_cap_offset + 4);
+
+    uint32_t table_offset_bir = pci_read(bus, slot, func, cap + 4);
+    uint8_t bir = table_offset_bir & 0x7;
+    uint32_t table_offset = table_offset_bir & ~0x7;
+
+    if (bir > 5) {
+        k_info("PCI", K_ERROR, "MSIX BIR out of range");
+        return;
+    }
+
+    uint64_t bar_addr = pci_read_bar64(bus, slot, func, bir);
+    if (bar_addr == 0) {
+        k_info("PCI", K_ERROR, "PCI BAR%u is zero/unassigned", bir);
+        return;
+    }
+
+    size_t entry_size = sizeof(struct pci_msix_table_entry);
+    uint64_t table_base = bar_addr + table_offset; // physical
+    uint64_t entry_phys = table_base + (uint64_t) table_index * entry_size;
+
+    uint64_t map_base = entry_phys & ~(PAGE_SIZE - 1);
+    size_t map_size = (entry_phys & (PAGE_SIZE - 1)) + entry_size;
+    map_size = (map_size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+
+    void *map = vmm_map_phys(map_base, map_size, PAGING_UNCACHABLE);
+    if (!map) {
+        k_info("PCI", K_ERROR, "vmm_map_phys failed for MSI-X table");
+        return;
+    }
+
+    struct pci_msix_table_entry *entry =
+        (struct pci_msix_table_entry *) ((uintptr_t) map +
+                                         (entry_phys & (PAGE_SIZE - 1)));
+
+    uint64_t msg_addr = 0xFEE00000ull | ((uint64_t) apic_id << 12);
+    mmio_write_32(&entry->msg_addr_low, (uint32_t) (msg_addr & 0xFFFFFFFF));
+    mmio_write_32(&entry->msg_addr_high, (uint32_t) (msg_addr >> 32));
+    mmio_write_32(&entry->msg_data, (uint32_t) vector);
+
+    uint32_t ctrl = mmio_read_32(&entry->vector_ctrl);
+    ctrl &= ~1u;
+    mmio_write_32(&entry->vector_ctrl, ctrl);
+}
+
+void pci_enable_msix_on_core(uint8_t bus, uint8_t slot, uint8_t func,
+                             uint8_t vector_index, uint8_t apic_id) {
+    uint8_t cap = pci_find_capability(bus, slot, func, PCI_CAP_ID_MSIX);
+    if (cap == 0) {
+        k_info("PCI", K_ERROR, "MSI-X capability not found");
+        return;
+    }
+    uint32_t table_offset_bir = pci_read(bus, slot, func, cap + 4);
 
     uint8_t bir = table_offset_bir & 0x7;
     uint32_t table_offset = table_offset_bir & ~0x7;

@@ -290,6 +290,8 @@ usb_transfer_type_str(const enum usb_transfer_type type) {
 }
 
 struct usb_packet {
+    struct usb_endpoint *ep;
+
     enum usb_transfer_type type;
 
     struct usb_setup_packet *setup;
@@ -303,18 +305,16 @@ struct usb_packet {
 
 struct usb_device;
 struct usb_controller_ops {
-    bool (*submit_control_transfer)(struct usb_controller *ctrl, uint8_t port,
-                                    struct usb_setup_packet *pkt, void *buf);
+    bool (*submit_control_transfer)(struct usb_device *dev,
+                                    struct usb_packet *pkt);
 
-    bool (*submit_bulk_transfer)(struct usb_controller *ctrl, uint8_t port,
+    bool (*submit_bulk_transfer)(struct usb_device *dev,
                                  struct usb_packet *pkt);
 
-    bool (*submit_interrupt_transfer)(struct usb_controller *ctrl,
-                                      struct usb_device *usb,
-                                      struct usb_endpoint *ep, void *buf,
-                                      uint32_t len);
+    bool (*submit_interrupt_transfer)(struct usb_device *dev,
+                                      struct usb_packet *pkt);
 
-    bool (*reset_port)(struct usb_controller *ctrl, uint8_t port);
+    bool (*reset_port)(struct usb_device *dev);
 
     bool (*setup_interrupt_endpoint)(
         struct usb_controller *ctrl, uint8_t port, struct usb_endpoint *ep,

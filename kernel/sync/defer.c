@@ -139,9 +139,9 @@ void defer_init(void) {
         semaphore_init(&defer_queues[i].semaphore, 0);
         spinlock_init(&defer_queues[i].lock);
 
-        uint8_t vector = idt_alloc_entry();
+        uint8_t vector = irq_alloc_entry();
 
-        isr_register(vector, hpet_irq_handler, NULL);
+        irq_register(vector, hpet_irq_handler, NULL);
         ioapic_route_irq(i + 3, vector, i, false);
 
         hpet_setup_timer(i, i + 3, false, true);

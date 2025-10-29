@@ -178,7 +178,7 @@ struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
         k_panic("Could not allocate space for AHCI device setup\n");
 
     dev->ctrl = ctrl;
-    dev->irq_num = idt_alloc_entry();
+    dev->irq_num = irq_alloc_entry();
 
     uint32_t disk_count = 0;
     struct ahci_disk *d = device_setup(dev, ctrl, &disk_count);
