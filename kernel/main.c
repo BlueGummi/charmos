@@ -93,7 +93,6 @@ void k_main(void) {
     /* Scheduler */
     thread_init_thread_ids();
     scheduler_init();
-    reaper_init();
     workqueues_permanent_init();
     defer_init();
     prng_seed(time_get_us());
@@ -109,6 +108,7 @@ void k_main(void) {
     slit_init();
     topology_init();
     domain_init();
+    reaper_init();
     global.current_bootstage = BOOTSTAGE_MID_TOPOLOGY;
 
     thread_init_rq_lists();
