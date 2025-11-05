@@ -6,6 +6,9 @@
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
 
+#define DISTANCE_WEIGHT 1000 /* distance is heavily weighted */
+#define FREE_PAGES_WEIGHT 1  /* free pages count less */
+
 #define DOMAIN_ARENA_SIZE 64
 #define DOMAIN_FREE_QUEUE_SIZE 64
 
@@ -205,3 +208,7 @@ static inline void free_from_buddy_internal(struct domain_buddy *target,
 
     domain_buddy_unlock(target, irql);
 }
+
+struct domain *domain_alloc_pick_best_domain(struct domain *local, size_t pages,
+                                             size_t max_scan,
+                                             bool flexible_locality);

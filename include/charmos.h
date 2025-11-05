@@ -22,18 +22,18 @@ struct charmos_globals {
     size_t numa_node_count;
     struct numa_node *numa_nodes;
 
-    uint64_t core_count;
+    size_t core_count;
     struct core **cores;
     struct scheduler **schedulers;
 
-    uint64_t domain_count;
+    size_t domain_count;
     struct domain **domains;
     struct slab_domain **slab_domains;
 
-    uint64_t hhdm_offset;
+    vaddr_t hhdm_offset;
 
     uint64_t total_pages;
-    uintptr_t last_pfn;
+    paddr_t last_pfn;
 
     /* TODO: no more of this */
     atomic_uint_fast64_t next_tlb_gen;

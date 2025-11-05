@@ -282,9 +282,17 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
         uint32_t portsc = mmio_read_32(&dev->port_regs[port - 1]);
 
         if (portsc & PORTSC_CCS) {
-            uint8_t speed = portsc & 0xF;
+            if (!xhci_reset_port(dev, port)) {
+                xhci_warn("Failed to reset port %lu", port);
+            }
+        }
+    }
 
-            xhci_reset_port(dev, port);
+    for (uint64_t port = 1; port <= dev->ports; port++) {
+        uint32_t portsc = mmio_read_32(&dev->port_regs[port - 1]);
+
+        if (portsc & PORTSC_CCS) {
+            uint8_t speed = portsc & 0xF;
             uint8_t slot_id = xhci_enable_slot(dev);
 
             if (slot_id == 0) {
@@ -295,10 +303,10 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
             dev->port_info[port - 1].device_connected = true;
             dev->port_info[port - 1].speed = speed;
             dev->port_info[port - 1].slot_id = slot_id;
-            xhci_address_device(dev, slot_id, speed, port);
-            struct usb_device *usb = kzalloc(sizeof(struct usb_device));
 
-            /* Panic since this is boot-time only */
+            xhci_address_device(dev, slot_id, speed, port);
+
+            struct usb_device *usb = kzalloc(sizeof(struct usb_device));
             if (!usb)
                 k_panic("No space for the USB device\n");
 

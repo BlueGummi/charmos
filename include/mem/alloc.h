@@ -241,5 +241,7 @@ size_t ksize(void *ptr);
 void *kmalloc_aligned(uint64_t size, uint64_t align);
 void *kzalloc_aligned(uint64_t size, uint64_t align);
 void kfree_aligned(void *ptr);
+void *kmalloc_new(size_t size, enum alloc_flags flags,
+                  enum alloc_behavior behavior);
 
 #pragma once

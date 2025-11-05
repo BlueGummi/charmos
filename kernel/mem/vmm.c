@@ -50,17 +50,16 @@ uintptr_t vmm_make_user_pml4(void) {
 void tlb_shootdown(void *ctx, uint8_t irq, void *rsp) {
     (void) ctx, (void) irq, (void) rsp;
 
-    struct core *core = global.cores[smp_core_id()];
-    uint64_t req_gen =
+    struct core *core = smp_core();
+    uint64_t gen =
         atomic_load_explicit(&core->tlb_req_gen, memory_order_acquire);
 
-    uintptr_t page =
-        atomic_load_explicit(&core->tlb_page, memory_order_acquire);
+    vaddr_t page = atomic_load_explicit(&core->tlb_page, memory_order_acquire);
     if (page)
         invlpg(page);
 
     atomic_store_explicit(&core->tlb_page, 0, memory_order_release);
-    atomic_store_explicit(&core->tlb_ack_gen, req_gen, memory_order_release);
+    atomic_store_explicit(&core->tlb_ack_gen, gen, memory_order_release);
 
     lapic_write(LAPIC_REG_EOI, 0);
 }

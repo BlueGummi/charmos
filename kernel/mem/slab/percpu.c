@@ -42,11 +42,15 @@ bool slab_cache_available(struct slab_cache *cache) {
 }
 
 size_t slab_cache_bulk_alloc(struct slab_cache *cache, vaddr_t *addr_array,
-                             size_t num_objects) {
+                             size_t num_objects, enum alloc_behavior behavior) {
     size_t total_allocated = 0;
 
     for (size_t i = 0; i < num_objects; i++) {
-        void *obj = slab_alloc(cache);
+
+        /* We don't allow allocations of new slabs - that
+         * is not the point of our percpu caches */
+        bool allow_new = false;
+        void *obj = slab_create(cache, behavior, allow_new);
         if (!obj)
             break;
 
@@ -68,18 +72,6 @@ void slab_cache_bulk_free(struct slab_domain *domain, vaddr_t *addr_array,
     return;
 }
 
-struct slab_cache *slab_pick_cache(struct slab_domain *sdom, size_t class_idx) {
-    struct slab_cache_zonelist *zl = &sdom->nonpageable_zonelist;
-
-    for (size_t i = 0; i < zl->count; i++) {
-        struct slab_cache_ref *ref = &zl->entries[i];
-        if (slab_cache_available(&ref->caches->caches[class_idx]))
-            return &ref->caches->caches[class_idx];
-    }
-
-    return NULL;
-}
-
 void slab_percpu_flush(struct slab_domain *dom, struct slab_percpu_cache *pc,
                        size_t class_idx, vaddr_t overflow_obj) {
     struct slab_magazine *mag = &pc->mag[class_idx];
@@ -99,16 +91,21 @@ void slab_percpu_flush(struct slab_domain *dom, struct slab_percpu_cache *pc,
 }
 
 vaddr_t slab_percpu_refill_class(struct slab_domain *dom,
-                                 struct slab_percpu_cache *pc,
-                                 size_t class_idx) {
-    slab_free_queue_drain_limited(pc, dom);
+                                 struct slab_percpu_cache *pc, size_t class_idx,
+                                 enum alloc_behavior behavior) {
+    /* maybe try refilling it from the freequeue? */
+    if (alloc_behavior_may_fault(behavior))
+        slab_free_queue_drain_limited(pc, dom, /* pct = */ 100);
 
-    struct slab_cache *cache = slab_pick_cache(dom, class_idx);
+    /* steal em from here */
+    struct slab_cache *cache = &dom->local_nonpageable_cache->caches[class_idx];
     struct slab_magazine *mag = &pc->mag[class_idx];
+
+    /* fill the slab magazine all the way back up to maximize slab mag hits */
     size_t remaining = SLAB_MAG_ENTRIES - mag->count;
 
     vaddr_t objs[remaining];
-    size_t got = slab_cache_bulk_alloc(cache, objs, remaining);
+    size_t got = slab_cache_bulk_alloc(cache, objs, remaining, behavior);
 
     enum irql irql = slab_magazine_lock(mag);
 
@@ -127,22 +124,12 @@ vaddr_t slab_percpu_refill_class(struct slab_domain *dom,
 }
 
 void slab_percpu_refill(struct slab_domain *dom,
-                        struct slab_percpu_cache *cache) {
+                        struct slab_percpu_cache *cache,
+                        enum alloc_behavior behavior) {
     /* This flushes a portion of the freequeue into the percpu cache */
-    slab_free_queue_drain_limited(cache, dom);
+    slab_free_queue_drain_limited(cache, dom, /* pct = */ 100);
     for (size_t class = 0; class < SLAB_CLASS_COUNT; class ++)
-        slab_percpu_refill_class(dom, cache, class);
-}
-
-vaddr_t slab_percpu_alloc(struct slab_domain *dom, size_t class_idx) {
-    struct slab_percpu_cache *pc = slab_percpu_cache_local();
-    struct slab_magazine *mag = &pc->mag[class_idx];
-
-    vaddr_t ret = slab_magazine_pop(mag);
-    if (ret)
-        return ret;
-
-    return slab_percpu_refill_class(dom, pc, class_idx);
+        slab_percpu_refill_class(dom, cache, class, behavior);
 }
 
 void slab_percpu_free(struct slab_domain *dom, size_t class_idx, vaddr_t obj) {

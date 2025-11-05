@@ -13,6 +13,10 @@ static inline void scheduler_decrement_thread_count(struct scheduler *sched,
                                                     struct thread *t) {
     sched->total_thread_count--;
     sched->thread_count[t->perceived_priority]--;
+
+    if (t->effective_priority == THREAD_PRIO_CLASS_TIMESHARE)
+        sched->total_weight -= t->weight;
+
     atomic_fetch_sub(&scheduler_data.total_threads, 1);
 }
 
@@ -20,6 +24,10 @@ static inline void scheduler_increment_thread_count(struct scheduler *sched,
                                                     struct thread *t) {
     sched->total_thread_count++;
     sched->thread_count[t->perceived_priority]++;
+
+    if (t->effective_priority == THREAD_PRIO_CLASS_TIMESHARE)
+        sched->total_weight += t->weight;
+
     atomic_fetch_add(&scheduler_data.total_threads, 1);
 }
 

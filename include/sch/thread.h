@@ -1,3 +1,6 @@
+/* File defines thread structures and public APIs
+ * for boost and event recording + scoring */
+
 #pragma once
 #include <asm.h>
 #include <mem/alloc.h>
@@ -205,6 +208,7 @@ struct thread {
     int64_t curr_core;     /* -1 if not being ran */
     uint64_t last_ran;     /* What core last ran us? */
     time_t run_start_time; /* When did we start running */
+    size_t owner_domain;   /* What domain created us? */
 
     /* Who is allowed to run us? */
     struct cpu_mask allowed_cpus;
@@ -217,12 +221,12 @@ struct thread {
     /* Priorities */
     thread_prio_t activity_score;
     int32_t dynamic_delta; /* Signed delta applied to base */
-    uint64_t weight;
+    size_t weight;
 
     /* Class changes */
     time_t last_class_change_ms;
 
-    uint64_t effective_priority;
+    size_t effective_priority;
 
     /* Timeslice info and periods */
     uint64_t completed_period;
@@ -230,8 +234,8 @@ struct thread {
     time_t budget_time_raw_ms;    /* Raw MS time of budget */
     time_t timeslice_length_raw_ms;
 
-    uint64_t virtual_period_runtime;
-    uint64_t virtual_budget;
+    size_t virtual_period_runtime;
+    size_t virtual_budget;
 
     /* ========== Thread activity stats ========== */
 
@@ -283,12 +287,10 @@ struct thread {
      * It is suboptimal to hardcode such functions, and thus, a dynamic
      * `on_event_apcs` is chosen to perform these tasks.
      *
-     * There can only be one APC for each APC_EVENT_type, and thus,
-     * this simple array is chosen rather than a set of list_heads.
-     *
-     * Hooray, I love saving 24 bytes! Also everything in here
-     * MUST be allocated with `kmalloc`. Memory leaks are kinda bad */
-    struct apc *on_event_apcs[APC_EVENT_COUNT];
+     * All `on_event_apc`s must be allocated with `kmalloc`
+     */
+
+    struct list_head on_event_apcs[APC_EVENT_COUNT];
 
     /* ========== Profiling data ========== */
     size_t context_switches; /* Total context switches */
@@ -311,22 +313,13 @@ struct thread {
 #define thread_from_rbt_node(node) rbt_entry(node, struct thread, tree_node)
 #define thread_from_list_node(ln) (container_of(ln, struct thread, list_node))
 
-struct thread_queue {
-    struct list_head list;
-    struct spinlock lock;
-};
-
 struct thread *thread_create(void (*entry_point)(void));
 struct thread *thread_create_custom_stack(void (*entry_point)(void),
                                           size_t stack_size);
 void thread_free(struct thread *t);
-void thread_queue_init(struct thread_queue *q);
-void thread_queue_push_back(struct thread_queue *q, struct thread *t);
-void thread_block_on(struct thread_queue *q);
+
 void thread_init_thread_ids(void);
-struct thread *thread_queue_pop_front(struct thread_queue *q);
-void thread_queue_clear(struct thread_queue *q);
-bool thread_queue_remove(struct thread_queue *q, struct thread *t);
+void thread_init_rq_lists(void);
 void thread_sleep_for_ms(uint64_t ms);
 void thread_exit(void);
 void thread_print(const struct thread *t);

@@ -10,11 +10,12 @@ void slab_domain_build_locality_lists(struct slab_domain *sdom) {
 
     sdom->pageable_zonelist.count = zl->count;
     sdom->nonpageable_zonelist.count = zl->count;
+    sdom->zonelist_entry_count = zl->count;
 
     sdom->pageable_zonelist.entries =
-        kmalloc(sizeof(struct slab_cache_ref) * zl->count);
+        kzalloc(sizeof(struct slab_cache_ref) * zl->count);
     sdom->nonpageable_zonelist.entries =
-        kmalloc(sizeof(struct slab_cache_ref) * zl->count);
+        kzalloc(sizeof(struct slab_cache_ref) * zl->count);
 
     if (!sdom->nonpageable_zonelist.entries || !sdom->pageable_zonelist.entries)
         k_panic("Could not allocate slab domain zonelist entries!\n");
@@ -28,14 +29,14 @@ void slab_domain_build_locality_lists(struct slab_domain *sdom) {
 
         sdom->pageable_zonelist.entries[i] = (struct slab_cache_ref) {
             .caches = remote_sdom->local_pageable_cache,
-            .type = SLAB_CACHE_TYPE_PAGEABLE,
+            .type = SLAB_TYPE_PAGEABLE,
             .locality = zent->distance,
             .domain = remote_sdom,
         };
 
         sdom->nonpageable_zonelist.entries[i] = (struct slab_cache_ref) {
             .caches = remote_sdom->local_nonpageable_cache,
-            .type = SLAB_CACHE_TYPE_NONPAGEABLE,
+            .type = SLAB_TYPE_NONPAGEABLE,
             .locality = zent->distance,
             .domain = remote_sdom,
         };
@@ -45,9 +46,16 @@ void slab_domain_build_locality_lists(struct slab_domain *sdom) {
 void slab_init_caches(struct slab_caches *caches, bool pageable) {
     for (size_t i = 0; i < SLAB_CLASS_COUNT; i++) {
         struct slab_cache *cache = &caches->caches[i];
-        cache->type =
-            pageable ? SLAB_CACHE_TYPE_PAGEABLE : SLAB_CACHE_TYPE_NONPAGEABLE;
+        cache->type = pageable ? SLAB_TYPE_PAGEABLE : SLAB_TYPE_NONPAGEABLE;
         slab_cache_init(i, cache, slab_class_sizes[i]);
+    }
+}
+
+void slab_domain_link_caches(struct slab_domain *domain,
+                             struct slab_caches *caches) {
+    for (size_t i = 0; i < SLAB_CLASS_COUNT; i++) {
+        caches->caches[i].parent_domain = domain;
+        caches->caches[i].parent = caches;
     }
 }
 
@@ -59,6 +67,8 @@ void slab_domain_init_caches(struct slab_domain *dom) {
 
     slab_init_caches(dom->local_nonpageable_cache, /* pageable = */ false);
     slab_init_caches(dom->local_pageable_cache, /* pageable = */ true);
+    slab_domain_link_caches(dom, dom->local_pageable_cache);
+    slab_domain_link_caches(dom, dom->local_nonpageable_cache);
 }
 
 void slab_domain_init(void) {
@@ -77,6 +87,7 @@ void slab_domain_init(void) {
         slab_gc_init(sdomain);
         slab_free_queue_init(&sdomain->free_queue, SLAB_FREE_QUEUE_CAPACITY);
         slab_domain_init_daemon(sdomain);
+        slab_domain_init_workqueue(sdomain);
         slab_domain_percpu_init(sdomain);
         slab_domain_init_caches(sdomain);
 

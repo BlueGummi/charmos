@@ -198,13 +198,15 @@ slab_flags_get_order_bias_bitmap(enum slab_gc_flags flags) {
 
 static bool slab_do_gc(struct slab_gc *gc, struct slab *slab,
                        enum slab_gc_flags flags,
-                       size_t slabs_recycled[SLAB_CLASS_COUNT]) {
+                       size_t slabs_recycled[SLAB_CLASS_COUNT],
+                       size_t *destroyed, size_t destroy_target) {
 
     uint8_t bias = slab_flags_get_bias(flags);
     uint32_t order_bias_bitmap = slab_flags_get_order_bias_bitmap(flags);
 
-    if (flags & SLAB_GC_FLAG_FORCE_DESTROY) {
+    if (flags & SLAB_GC_FLAG_FORCE_DESTROY || *destroyed < destroy_target) {
         slab_gc_destroy(gc, slab);
+        (*destroyed)++;
         return true;
     }
 
@@ -217,6 +219,7 @@ static bool slab_do_gc(struct slab_gc *gc, struct slab *slab,
         return false;
     } else {
         slab_gc_destroy(gc, slab);
+        (*destroyed)++;
     }
 
     return true;
@@ -227,6 +230,10 @@ static size_t slab_gc_derive_threshold_score(struct slab_gc *gc,
     enum slab_gc_flags aggressiveness = flags & SLAB_GC_FLAG_AGG_MASK;
     struct rbt_node *min = rbt_min(&gc->rbt);
     struct rbt_node *max = rb_last(&gc->rbt);
+
+    if (!min || !max)
+        return 0; /* We have no slabs or just one in GC */
+
     struct slab *min_slab = slab_from_rbt_node(min);
     struct slab *max_slab = slab_from_rbt_node(max);
     size_t min_score = slab_gc_score(min_slab, aggressiveness);
@@ -261,8 +268,12 @@ size_t slab_gc_run(struct slab_gc *gc, enum slab_gc_flags flags) {
     size_t target = slab_gc_derive_target_gc_slabs(gc, flags);
     size_t threshold = slab_gc_derive_threshold_score(gc, flags);
     size_t max_unfit = slab_gc_get_max_unfit_slabs(target, flags);
+    size_t destroy_target = (flags >> SLAB_GC_FLAG_DESTROY_TARGET_SHIFT) &
+                            SLAB_GC_FLAG_DESTROY_TARGET_MASK;
+
     size_t reclaimed = 0;
     size_t unfit = 0;
+    size_t destroyed = 0;
 
     struct rbt_node *node = rbt_min(&gc->rbt);
     while (node && reclaimed < target) {
@@ -277,7 +288,8 @@ size_t slab_gc_run(struct slab_gc *gc, enum slab_gc_flags flags) {
         }
 
         unfit = 0;
-        if (slab_do_gc(gc, slab, flags, slabs_recycled))
+        if (slab_do_gc(gc, slab, flags, slabs_recycled, &destroyed,
+                       destroy_target))
             reclaimed++;
 
     next_slab:
@@ -345,6 +357,38 @@ struct slab *slab_gc_get_newest(struct slab_domain *domain) {
     return gc_do_op(domain, rb_last);
 }
 
+static struct rbt_node *gc_search_for_first_pageable(const struct rbt *rbt) {
+    struct rbt_node *iter = rb_first(rbt);
+    while (iter) {
+        struct slab *slab = slab_from_rbt_node(iter);
+        if (slab->type == SLAB_TYPE_PAGEABLE)
+            break;
+
+        iter = rbt_next(iter);
+    }
+    return iter;
+}
+
+static struct rbt_node *gc_search_for_first_nonpageable(const struct rbt *rbt) {
+    struct rbt_node *iter = rb_first(rbt);
+    while (iter) {
+        struct slab *slab = slab_from_rbt_node(iter);
+        if (slab->type == SLAB_TYPE_NONPAGEABLE)
+            break;
+
+        iter = rbt_next(iter);
+    }
+    return iter;
+}
+
+struct slab *slab_gc_get_newest_pageable(struct slab_domain *domain) {
+    return gc_do_op(domain, gc_search_for_first_pageable);
+}
+
+struct slab *slab_gc_get_newest_nonpageable(struct slab_domain *domain) {
+    return gc_do_op(domain, gc_search_for_first_nonpageable);
+}
+
 struct slab *slab_gc_get_oldest(struct slab_domain *domain) {
     return gc_do_op(domain, rb_first);
 }
@@ -359,4 +403,40 @@ void slab_gc_init(struct slab_domain *dom) {
     spinlock_init(&gc->lock);
     gc->rbt.root = NULL;
     gc->parent = dom;
+}
+
+bool slab_should_enqueue_gc(struct slab *slab) {
+    struct slab_cache *parent = slab->parent_cache;
+    struct slab_caches *parent_caches = parent->parent;
+
+    size_t class = SLAB_CACHE_COUNT_FOR(parent, SLAB_FREE);
+    size_t total = SLAB_CACHE_COUNT_FOR(parent_caches, SLAB_FREE);
+
+    /* skip GC for tiny totals */
+    if (total < SLAB_EWMA_MIN_TOTAL || class < SLAB_EWMA_MIN_TOTAL)
+        return false;
+
+    size_t avg = total / SLAB_CLASS_COUNT;
+    size_t smoothed = parent->ewma_free_slabs;
+
+    /* scale thresholds for mid-sized caches */
+    size_t scale = SLAB_EWMA_SCALE;
+    if (total < (SLAB_EWMA_MIN_TOTAL * 4)) {
+        scale = (total * SLAB_EWMA_SCALE) / (SLAB_EWMA_MIN_TOTAL * 4);
+        if (scale < SLAB_EWMA_MIN_SCALE)
+            scale = SLAB_EWMA_MIN_SCALE;
+    }
+
+    size_t spike_threshold =
+        (smoothed * (100 + SLAB_SPIKE_THRESHOLD_PCT) * scale) / SLAB_EWMA_SCALE;
+    size_t free_ratio_threshold =
+        (total * SLAB_FREE_RATIO_PCT * scale) / (100 * SLAB_EWMA_SCALE);
+    size_t excess_threshold =
+        (avg * (100 + SLAB_ORDER_EXCESS_PCT) * scale) / SLAB_EWMA_SCALE;
+
+    bool spike = class * 100 > spike_threshold;
+    bool exceeds_free_ratio = class > free_ratio_threshold;
+    bool exceeds_excess = class > excess_threshold;
+
+    return exceeds_free_ratio || exceeds_excess || spike;
 }

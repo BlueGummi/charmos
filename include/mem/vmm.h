@@ -3,7 +3,6 @@
 #include <stdint.h>
 
 uint64_t sub_offset(uint64_t a);
-unsigned long get_cr3(void);
 void vmm_init(struct limine_memmap_response *memmap,
               struct limine_executable_address_response *xa);
 enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags);

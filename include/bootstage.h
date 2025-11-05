@@ -13,8 +13,9 @@ enum bootstage : uint8_t {
 
     BOOTSTAGE_MID_SCHEDULER, /* Scheduler and threads brought up */
 
-    BOOTSTAGE_MID_MP, /* APs exit busy-spin and enter idle thread,
-                       * topology is initialized and available */
+    BOOTSTAGE_MID_MP, /* APs exit busy-spin and enter idle thread */
+
+    BOOTSTAGE_MID_TOPOLOGY, /* Topology parsed */
 
     BOOTSTAGE_LATE_DEVICES, /* Rest of kernel is brought up -- filesystems,
                              * drivers, etc. almost all

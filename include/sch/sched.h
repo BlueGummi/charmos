@@ -1,11 +1,10 @@
 #pragma once
 #include <charmos.h>
 #include <sch/thread.h>
+#include <sch/thread_queue.h>
 #include <smp/core.h>
 #include <stdbool.h>
 #include <sync/spinlock.h>
-
-#define MLFQ_LEVELS 6
 
 #define WORK_STEAL_THRESHOLD                                                   \
     75ULL /* How little work the core needs to be                              \
@@ -49,6 +48,7 @@ struct scheduler {
     /* Thread count at each prio */
     size_t thread_count[THREAD_PRIO_CLASS_COUNT];
     size_t total_thread_count;
+    size_t total_weight;
 
     /* Period information */
     bool period_enabled;

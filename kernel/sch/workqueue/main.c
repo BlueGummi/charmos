@@ -1,4 +1,5 @@
 #include "internal.h"
+#include <string.h>
 
 static enum wake_reason worker_wait(struct workqueue *queue, struct worker *w,
                                     enum irql irql, enum irql *out) {
@@ -42,6 +43,35 @@ static inline bool worker_should_exit(const struct worker *worker,
     return false;
 }
 
+static void worker_reset(struct worker *worker) {
+    memset(worker, 0, sizeof(struct worker));
+}
+
+static void worker_destroy(struct workqueue *queue, struct worker *worker) {
+    if (queue->attrs.flags & WORKQUEUE_FLAG_STATIC_WORKERS) {
+        enum irql irql = workqueue_worker_array_lock(queue);
+
+        bool found = false;
+
+        for (size_t i = 0; i < queue->attrs.max_workers; i++) {
+            struct worker *maybe = &queue->worker_array[i];
+            if (maybe == worker) {
+                found = true;
+                worker_reset(worker);
+                break;
+            }
+        }
+
+        if (!found)
+            k_panic("Potential corrupted worker 0x%lx in STATIC_WORKERS "
+                    "workqueue\n");
+
+        workqueue_worker_array_unlock(queue, irql);
+    } else {
+        kfree(worker);
+    }
+}
+
 static void worker_exit(struct workqueue *queue, struct worker *worker,
                         enum irql irql) {
     worker->present = false;
@@ -55,7 +85,7 @@ static void worker_exit(struct workqueue *queue, struct worker *worker,
 
     workqueue_unlock(queue, irql);
 
-    kfree(worker);
+    worker_destroy(queue, worker);
 
     workqueue_put(queue);
 
@@ -92,7 +122,7 @@ void worker_main(void) {
             if (workqueue_needs_spawn(queue)) {
                 workqueue_set_needs_spawn(queue, false);
                 if (WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_AUTO_SPAWN))
-                    workqueue_spawn_worker(queue);
+                    workqueue_spawn_worker_internal(queue);
             }
 
             enum irql out;

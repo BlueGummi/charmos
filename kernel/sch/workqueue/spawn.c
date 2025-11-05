@@ -39,8 +39,9 @@ static void release_spawner(struct workqueue *p) {
     atomic_flag_clear_explicit(&p->spawner_flag_internal, memory_order_release);
 }
 
-static void worker_complete_init(struct workqueue *queue, struct worker *w,
-                                 struct thread *t) {
+static void worker_init(struct workqueue *queue, struct worker *w,
+                        struct thread *t) {
+    INIT_LIST_HEAD(&w->list_node);
     w->thread = t;
     w->present = true;
     w->workqueue = queue;
@@ -52,47 +53,109 @@ static void worker_complete_init(struct workqueue *queue, struct worker *w,
     atomic_fetch_add(&queue->num_workers, 1);
 }
 
-bool workqueue_spawn_worker(struct workqueue *queue) {
-    if (!claim_spawner(queue))
-        return false;
+static struct thread *workqueue_worker_thread_create(struct workqueue *queue) {
+    if (WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS))
+        return worker_create_unmigratable();
+    else
+        return worker_create();
+}
 
-    struct worker *w = kzalloc(sizeof(struct worker));
-    if (!w)
-        goto fail;
+static void workqueue_enqueue_thread(struct workqueue *queue,
+                                     struct thread *t) {
+    if (WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_PERMANENT))
+        scheduler_enqueue_on_core(t, queue->core);
+    else
+        scheduler_enqueue(t);
+}
 
+struct worker *workqueue_worker_create(struct workqueue *queue) {
+    if (queue->attrs.flags & WORKQUEUE_FLAG_STATIC_WORKERS) {
+        enum irql irql = workqueue_worker_array_lock(queue);
+        struct worker *ret = NULL;
+        for (size_t i = 0; i < queue->attrs.max_workers; i++) {
+            if (queue->worker_array[i].thread == NULL) {
+                ret = &queue->worker_array[i];
+                goto out;
+            }
+        }
+
+    out:
+        workqueue_worker_array_unlock(queue, irql);
+        return ret;
+    } else {
+        return kzalloc(sizeof(struct worker));
+    }
+}
+
+static void workqueue_init_new_worker(struct workqueue *queue, struct worker *w,
+                                      struct thread *t) {
     w->inactivity_check_period = get_inactivity_timeout(queue);
 
     workqueue_add_worker(queue, w);
+    worker_init(queue, w, t);
+    workqueue_enqueue_thread(queue, t);
+}
 
-    struct thread *t;
-    if (WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS))
-        t = worker_create_unmigratable();
-    else
-        t = worker_create();
+enum thread_request_decision workqueue_request_callback(struct thread *t,
+                                                        void *data) {
+    struct workqueue *queue = data;
+    struct worker *worker = workqueue_worker_create(queue);
+    if (!worker) {
+        workqueue_put(queue);
+        return THREAD_REQUEST_DECISION_DESTROY; /* whatever... we can't
+                                                 * make this thread anyways */
+    }
 
+    /* splendid, let's enqueue it */
+    workqueue_init_new_worker(queue, worker, t);
+    workqueue_put(queue);
+    return THREAD_REQUEST_DECISION_KEEP;
+}
+
+void workqueue_spawn_via_request(struct workqueue *queue) {
+    kassert(queue->attrs.flags & WORKQUEUE_FLAG_SPAWN_VIA_REQUEST);
+    if (!claim_spawner(queue))
+        return;
+
+    /* We just submit our request, and in the callback see if we
+     * still need a new thread */
+    if (THREAD_REQUEST_STATE(queue->request) == THREAD_REQUEST_PENDING)
+        return;
+
+    workqueue_get(queue);
+    thread_request_enqueue(queue->request);
+
+    release_spawner(queue);
+}
+
+/* This is only for non-request based worker thread spawning */
+bool workqueue_spawn_worker_internal(struct workqueue *queue) {
+    kassert(!(queue->attrs.flags & WORKQUEUE_FLAG_SPAWN_VIA_REQUEST));
+    if (!claim_spawner(queue))
+        return false;
+
+    struct worker *w = workqueue_worker_create(queue);
+    if (!w)
+        goto fail;
+
+    struct thread *t = workqueue_worker_thread_create(queue);
     if (!t)
         goto fail;
 
-    worker_complete_init(queue, w, t);
-
-    if (WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_PERMANENT)) {
-        scheduler_enqueue_on_core(t, queue->core);
-    } else {
-        scheduler_enqueue(t);
-    }
+    workqueue_init_new_worker(queue, w, t);
 
     release_spawner(queue);
     return true;
 
 fail:
-    if (w)
+    if (w && !(queue->attrs.flags & WORKQUEUE_FLAG_STATIC_WORKERS))
         kfree(w);
 
     release_spawner(queue);
     return false;
 }
 
-static bool should_spawn_worker(struct workqueue *queue) {
+bool workqueue_should_spawn_worker(struct workqueue *queue) {
     time_t now = time_get_ms();
     if (now - queue->last_spawn_attempt <= queue->attrs.spawn_delay)
         return false;
@@ -111,7 +174,7 @@ static bool should_spawn_worker(struct workqueue *queue) {
 }
 
 bool workqueue_try_spawn_worker(struct workqueue *queue) {
-    if (!should_spawn_worker(queue))
+    if (!workqueue_should_spawn_worker(queue))
         return false;
 
     if (irq_in_interrupt()) {
@@ -119,7 +182,7 @@ bool workqueue_try_spawn_worker(struct workqueue *queue) {
         return true;
     }
 
-    return workqueue_spawn_worker(queue);
+    return workqueue_spawn_worker_internal(queue);
 }
 
 struct thread *worker_create(void) {

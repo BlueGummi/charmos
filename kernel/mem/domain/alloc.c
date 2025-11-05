@@ -5,9 +5,6 @@
 
 #include "internal.h"
 
-#define DISTANCE_WEIGHT 1000 /* distance is heavily weighted */
-#define FREE_PAGES_WEIGHT 1  /* free pages count less */
-
 static inline bool domain_free_queue_available(struct domain_free_queue *fq,
                                                struct domain_buddy *domain) {
     return atomic_load(&fq->num_elements) > domain->core_count;
@@ -227,6 +224,38 @@ static size_t derive_max_scan_from_zonelist(struct domain_zonelist *zl,
     return max_scan;
 }
 
+struct domain *domain_alloc_pick_best_domain(struct domain *local, size_t pages,
+                                             size_t max_scan,
+                                             bool flexible_locality) {
+    struct domain_buddy *best = NULL;
+    int32_t best_score = INT32_MAX;
+    struct domain_buddy *buddy = local->cores[0]->domain_buddy;
+    struct domain_zonelist *zl = &buddy->zonelist;
+
+    for (size_t i = 0; i < max_scan; i++) {
+        struct domain_zonelist_entry *ent = &zl->entries[i];
+        struct domain_buddy *candidate = ent->domain;
+
+        size_t free_pages = candidate->total_pages - candidate->pages_used;
+        if (free_pages < pages)
+            continue;
+
+        int32_t dist_weight =
+            flexible_locality ? DISTANCE_WEIGHT / 4 : DISTANCE_WEIGHT;
+
+        int32_t score =
+            (ent->distance * dist_weight) - (free_pages * FREE_PAGES_WEIGHT);
+
+        if (!best || score < best_score) {
+            best = candidate;
+            best_score = score;
+        }
+    }
+
+    kassert(best);
+    return best->cores[0]->domain;
+}
+
 static paddr_t alloc_with_locality(size_t pages, bool flexible_locality,
                                    uint16_t locality_degree) {
     struct domain_buddy *local = domain_buddy_on_this_core();
@@ -238,7 +267,6 @@ static paddr_t alloc_with_locality(size_t pages, bool flexible_locality,
 
     /* Just pick the best domain */
     struct domain_buddy *best = NULL;
-
     int32_t best_score = INT32_MAX;
 
     for (size_t i = 0; i < max_scan; i++) {

@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include <tests.h>
 
 REGISTER_TEST(pmm_alloc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
@@ -178,5 +179,13 @@ REGISTER_TEST(pmm_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         TEST_ASSERT(threads[i] != NULL);
     }
 
+    SET_SUCCESS();
+}
+
+static char hooray[128] = {0};
+REGISTER_TEST(kmalloc_new_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    void *p = kmalloc_new(67, ALLOC_FLAGS_NONE, ALLOC_BEHAVIOR_NORMAL);
+    snprintf(hooray, 128, "allocated 0x%lx", p);
+    ADD_MESSAGE(hooray);
     SET_SUCCESS();
 }

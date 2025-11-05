@@ -11,6 +11,8 @@
 
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(workqueue, lock);
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(worklist, lock);
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT_NAMED(workqueue, worker_array_lock,
+                                               worker_array);
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT_NAMED(workqueue, worker_lock, worker);
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT_NAMED(workqueue, work_lock, work);
 
@@ -60,6 +62,8 @@ static inline void worklist_put(struct worklist *wlist) {
         worklist_free(wlist);
 }
 
+/* Regardless of if we use static workers or not this will
+ * always be the list of workers we have */
 static inline void workqueue_add_worker(struct workqueue *wq,
                                         struct worker *wker) {
     enum irql irql = workqueue_worker_lock(wq);
@@ -95,11 +99,13 @@ int32_t workqueue_dequeue_task(struct workqueue *queue, struct work **out,
                                struct work *oneshot_out);
 void workqueue_link_thread_and_worker(struct worker *worker,
                                       struct thread *thread);
-bool workqueue_spawn_worker(struct workqueue *queue);
+bool workqueue_spawn_worker_internal(struct workqueue *queue);
 struct workqueue *workqueue_least_loaded_queue_except(int64_t except_core_num);
 struct workqueue *workqueue_get_least_loaded(void);
 struct workqueue *workqueue_get_least_loaded_remote(void);
-struct worker *workqueue_spawn_initial_worker(struct workqueue *queue,
-                                              int64_t core);
+struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue,
+                                                int64_t core);
 struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
                                             const char *fmt, va_list args);
+enum thread_request_decision workqueue_request_callback(struct thread *t,
+                                                        void *data);

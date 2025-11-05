@@ -86,42 +86,74 @@ void work_execute(struct work *task) {
 
 struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
                                             const char *fmt, va_list args) {
-    struct workqueue *ret = kzalloc(sizeof(struct workqueue));
-    if (!ret)
-        return NULL;
+    struct workqueue *wq = kzalloc(sizeof(struct workqueue));
+    if (!wq)
+        goto err;
 
-    spinlock_init(&ret->lock);
-    ret->attrs = *attrs;
-    ret->oneshot_works = kzalloc(sizeof(struct work) * attrs->capacity);
-    if (!ret->oneshot_works) {
-        kfree(ret);
-        return NULL;
+    spinlock_init(&wq->lock);
+    wq->attrs = *attrs;
+    wq->oneshot_works = kzalloc(sizeof(struct work) * attrs->capacity);
+    if (!wq->oneshot_works)
+        goto err;
+
+    if (attrs->flags & WORKQUEUE_FLAG_SPAWN_VIA_REQUEST) {
+        wq->request = kzalloc(sizeof(struct thread_request));
+        if (!wq->request)
+            goto err;
+
+        struct thread_request *req = wq->request;
+        thread_request_init(req);
+        req->thread_entry = worker_main;
+        req->data = wq;
+        req->callback = workqueue_request_callback;
+    }
+
+    if (attrs->flags & WORKQUEUE_FLAG_STATIC_WORKERS) {
+        wq->worker_array = kzalloc(sizeof(struct worker) * attrs->max_workers);
+        if (!wq->worker_array)
+            goto err;
     }
 
     if (attrs->flags & WORKQUEUE_FLAG_NAMED) {
         kassert(fmt);
         size_t needed = snprintf(NULL, 0, fmt, args) + 1;
-        ret->name = kzalloc(needed);
-        if (!ret->name) {
-            kfree(ret->oneshot_works);
-            kfree(ret);
-        }
+        wq->name = kzalloc(needed);
+        if (!wq->name)
+            goto err;
 
-        snprintf(ret->name, needed, fmt, args);
+        snprintf(wq->name, needed, fmt, args);
     }
 
-    condvar_init(&ret->queue_cv);
-    INIT_LIST_HEAD(&ret->workers);
-    INIT_LIST_HEAD(&ret->works);
+    condvar_init(&wq->queue_cv);
+    INIT_LIST_HEAD(&wq->workers);
+    INIT_LIST_HEAD(&wq->works);
 
     for (uint64_t i = 0; i < attrs->capacity; i++)
-        atomic_store_explicit(&ret->oneshot_works[i].seq, i,
+        atomic_store_explicit(&wq->oneshot_works[i].seq, i,
                               memory_order_relaxed);
 
-    refcount_init(&ret->refcount, 1);
-    ret->state = WORKQUEUE_STATE_ACTIVE;
+    refcount_init(&wq->refcount, 1);
+    wq->state = WORKQUEUE_STATE_ACTIVE;
 
-    return ret;
+    return wq;
+
+err:
+    if (wq && wq->worker_array)
+        kfree(wq->worker_array);
+
+    if (wq && wq->request)
+        kfree(wq->request);
+
+    if (wq && wq->name)
+        kfree(wq->name);
+
+    if (wq && wq->oneshot_works)
+        kfree(wq->oneshot_works);
+
+    if (wq)
+        kfree(wq);
+
+    return NULL;
 }
 
 struct workqueue *workqueue_create(struct workqueue_attributes *attrs,
@@ -132,7 +164,12 @@ struct workqueue *workqueue_create(struct workqueue_attributes *attrs,
     struct workqueue *ret = workqueue_create_internal(attrs, fmt, args);
     va_end(args);
 
-    workqueue_spawn_initial_worker(ret, WORKQUEUE_CORE_UNBOUND);
+    if (attrs->min_workers == 0)
+        attrs->min_workers = 1;
+
+    for (size_t i = 0; i < attrs->min_workers; i++)
+        workqueue_spawn_permanent_worker(ret, WORKQUEUE_CORE_UNBOUND);
+
     return ret;
 }
 
@@ -145,6 +182,7 @@ void workqueue_free(struct workqueue *wq) {
     kassert(atomic_load(&wq->refcount) == 0);
     WORKQUEUE_STATE_SET(wq, WORKQUEUE_STATE_DEAD);
     kfree(wq->oneshot_works);
+    kfree(wq->request);
     kfree(wq);
 }
 
@@ -154,6 +192,16 @@ void workqueue_destroy(struct workqueue *queue) {
 
     WORKQUEUE_STATE_SET(queue, WORKQUEUE_STATE_DESTROYING);
     atomic_store(&queue->ignore_timeouts, true);
+
+    if (queue->attrs.flags & WORKQUEUE_FLAG_SPAWN_VIA_REQUEST) {
+        /* We successfully cancelled an outgoing request
+         * which would've incremented the reference count,
+         * so we decrement it here. Otherwise, the outgoing
+         * request is happening and we will just wait
+         * for it to eventually come back and dec the rc */
+        if (thread_request_cancel(queue->request))
+            workqueue_put(queue);
+    }
 
     thread_apply_cpu_penalty(scheduler_get_current_thread());
     while (workqueue_workers(queue) > workqueue_idlers(queue)) {
@@ -176,8 +224,8 @@ void workqueue_kick(struct workqueue *queue) {
     condvar_signal(&queue->queue_cv);
 }
 
-struct worker *workqueue_spawn_initial_worker(struct workqueue *queue,
-                                              int64_t core) {
+struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue,
+                                                int64_t core) {
     struct thread *thread;
 
     if (WORKQUEUE_FLAG_SET(queue, WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS)) {
@@ -208,7 +256,7 @@ struct worker *workqueue_spawn_initial_worker(struct workqueue *queue,
     }
 
     workqueue_add_worker(queue, worker);
-    queue->num_workers = 1;
+    queue->num_workers++;
 
     return worker;
 }
@@ -243,7 +291,7 @@ void workqueues_permanent_init(void) {
         if (!global.workqueues[i])
             k_panic("Failed to spawn permanent workqueue\n");
 
-        if (!workqueue_spawn_initial_worker(global.workqueues[i], i))
+        if (!workqueue_spawn_permanent_worker(global.workqueues[i], i))
             k_panic("Failed to spawn initial worker on workqueue %u\n", i);
     }
 }

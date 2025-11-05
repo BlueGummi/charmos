@@ -31,6 +31,9 @@
 #define SLAB_DESTROY_HIGH_WATERMARK 4
 #define SLAB_INTERLEAVE_STRIDE 1
 #define SLAB_MAG_ENTRIES 32
+#define SLAB_MAG_WATERMARK_PCT                                                 \
+    15 /* Leave 15% of magazine entries for nonpageable requests */
+#define SLAB_MAG_WATERMARK (SLAB_MAG_ENTRIES * SLAB_MAG_WATERMARK_PCT / 100)
 
 #define SLAB_MIN_SIZE (sizeof(vaddr_t))
 #define SLAB_MAX_SIZE (PAGE_SIZE / 4)
@@ -51,12 +54,20 @@ static const uint64_t slab_class_sizes[] = {
 /* GC */
 #define SLAB_GC_FLAG_DESTROY_BIAS_SHIFT 4
 #define SLAB_GC_FLAG_DESTROY_BIAS_MASK 0xF
-#define SLAB_GC_FLAG_DESTROY_BIAS_MAX 16
-#define SLAB_GC_FLAG_SET_DESTROY_BIAS                                          \
-    (flags, bias)(flags |= bias << SLAB_GC_FLAG_DESTROY_BIAS_SHIFT)
+#define SLAB_GC_FLAG_DESTROY_BIAS_MAX 15
+#define SLAB_GC_FLAG_DESTROY_BIAS_SET(flags, bias)                             \
+    (flags |= bias << SLAB_GC_FLAG_DESTROY_BIAS_SHIFT)
+
+#define SLAB_GC_FLAG_DESTROY_TARGET_SHIFT 10
+#define SLAB_GC_FLAG_DESTROY_TARGET_MASK 0xFFF
+#define SLAB_GC_FLAG_DESTROY_TARGET_MAX 63
+#define SLAB_GC_FLAG_DESTROY_TARGET_SET(flags, target)                         \
+    (flags |= target << SLAB_GC_FLAG_DESTROY_TARGET_SHIFT)
 
 #define SLAB_GC_FLAG_ORDER_BIAS_SHIFT 16
 #define SLAB_GC_FLAG_ORDER_BIAS_MASK 0x3FF
+#define SLAB_GC_FLAG_ORDER_BIAS_SET(flags, order)                              \
+    (flags |= order << SLAB_GC_FLAG_ORDER_BIAS_SHIFT)
 
 #define SLAB_GC_FLAG_AGG_MASK 0xF
 #define SLAB_GC_SIZE_FACTOR 2
@@ -70,12 +81,22 @@ static const uint64_t slab_class_sizes[] = {
 #define SLAB_GC_WEIGHT_ORDER_PREFERRED 1 /* prefer close order */
 #define SLAB_GC_ORDER_BIAS_SCALE 4
 
+#define SLAB_FREE_QUEUE_ALLOC_PCT 25 /* Don't do as much */
+
 #define SLAB_FREE_RATIO_PCT 25
 #define SLAB_ORDER_EXCESS_PCT 50
 #define SLAB_SPIKE_THRESHOLD_PCT 50
 
-#define SLAB_EWMA_SCALE 1024                     /* Fixed-point precision */
-#define SLAB_EWMA_ALPHA_FP (SLAB_EWMA_SCALE / 4) /* a = 0.25 */
+#define SLAB_CACHE_DISTANCE_WEIGHT 1024
+#define SLAB_CACHE_FLEXIBLE_DISTANCE_WEIGHT 512
+
+#define SLAB_EWMA_SCALE 1024 /* Fixed-point precision */
+#define SLAB_EWMA_ALPHA_FP 128
+
+#define SLAB_EWMA_MIN_TOTAL 16 /* below this, GC is less aggressive */
+#define SLAB_EWMA_MIN_SCALE 26 /* min ~0.1 of scale to never fully ignore */
+
+#define SLAB_SCORE_NONPAGEABLE_BETTER_PCT 25 /* must score 25% better */
 
 #define kmalloc_validate_params(size, flags, behavior)                         \
     do {                                                                       \
@@ -132,6 +153,7 @@ struct slab {
     enum slab_state state;
     struct spinlock lock;
 
+    struct page *backing_page; /* TODO: array */
     size_t pages;
 
     /* Sorted by gc_enqueue_time_ms */
@@ -223,8 +245,6 @@ struct slab_free_queue {
 #define SLAB_FREE_QUEUE_SUB_COUNT(fq, n) (atomic_fetch_sub(&(fq)->count, n))
 #define SLAB_FREE_QUEUE_DEC_COUNT(fq) (atomic_fetch_sub(&(fq)->count, 1))
 
-enum slab_cache_type { SLAB_CACHE_TYPE_PAGEABLE, SLAB_CACHE_TYPE_NONPAGEABLE };
-
 struct slab_cache {
     struct slab_caches *parent;
     uint64_t obj_size;
@@ -235,18 +255,18 @@ struct slab_cache {
     struct list_head slabs[SLAB_STANDARD_STATE_COUNT];
     atomic_size_t slabs_count[SLAB_STANDARD_STATE_COUNT];
 
-    enum slab_cache_type type;
+    enum slab_type type;
 
     struct slab_domain *parent_domain;
 
     /* Exponential weighted moving average */
     size_t ewma_free_slabs;
-    size_t ewma_total_slabs;
 
     struct spinlock lock;
 };
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab_cache, lock);
 
+/* works for both `struct slab_cache` and `struct slab_caches` */
 #define SLAB_CACHE_COUNT_FOR(cache, state)                                     \
     (atomic_load(&cache->slabs_count[state]))
 
@@ -258,7 +278,7 @@ struct slab_caches {
 struct slab_cache_ref {
     struct slab_domain *domain;
     struct slab_caches *caches; /* pointer to caches */
-    enum slab_cache_type type;  /* pageable / nonpageable */
+    enum slab_type type;        /* pageable / nonpageable */
     uint8_t locality;           /* NUMA proximity, 0 = local */
 };
 
@@ -271,7 +291,7 @@ struct slab_cache_zonelist {
  *
  *      ┌───────────────────────────────────────────────────────┐
  * Bits │ 31..28 27..24 23..18 17..16 15..12  11..8  7..4  3..0 │
- * Use  │  $$$$   $$$$   $$$$   $$$$   RRRR    RRSF  ####  %%%% │
+ * Use  │  $$$$   $$$$   $$$$   $$$$   ^^^^    ^^SF  ####  %%%% │
  *      └───────────────────────────────────────────────────────┘
  *
  * %%%% - Aggressiveness - Defines how eagerly the GC will try to recycle
@@ -307,9 +327,12 @@ struct slab_cache_zonelist {
  *
  *                           Value must be [0, 16)
  *
- * $$$$ - Bias bitmap - If this bitmap is not 0, this bitmap
- *                      will be used to indicate which orders should
- *                      be biased towards. Lower bit index -> lower order.
+ * ^^^^ - Destruction target - Defines what the target amount of slabs the GC
+ *                             will try to destroy. Must be [0, 64)
+ *
+ * $$$$ - Order Bias bitmap - If this bitmap is not 0, this bitmap
+ *                            will be used to indicate which orders should
+ *                            be biased towards. Lower bit index -> lower order.
  *
  * F - Fast          - skip slowpaths and try to not dilly dally too much
  * D - Force destroy - always destroy slabs
@@ -368,6 +391,7 @@ struct slab_domain {
     /* Slab caches for each distance */
     struct slab_cache_zonelist nonpageable_zonelist;
     struct slab_cache_zonelist pageable_zonelist;
+    size_t zonelist_entry_count;
 
     /* Pointer to an array of pointers to per CPU single-slabs for each class */
     /* # CPUs determined by the domain struct */
@@ -381,6 +405,8 @@ struct slab_domain {
     struct slab_gc slab_gc;
 
     struct daemon *daemon;
+
+    struct workqueue *workqueue;
 };
 
 static inline struct domain_buddy *
@@ -394,23 +420,30 @@ struct slab_page_hdr {
 };
 
 struct slab *slab_init(struct slab *slab, struct slab_cache *parent);
-struct slab *slab_create(struct slab_domain *domain, struct slab_cache *cache);
 void slab_destroy(struct slab *slab);
 void slab_domain_init_daemon(struct slab_domain *domain);
+void slab_domain_init_workqueue(struct slab_domain *domain);
 int32_t slab_size_to_index(size_t size);
-void *slab_alloc(struct slab_cache *cache);
+void *slab_alloc_old(struct slab_cache *cache);
 void slab_free_page_hdr(struct slab_page_hdr *hdr);
 size_t slab_allocation_size(vaddr_t addr);
+void *slab_cache_try_alloc_from_lists(struct slab_cache *c);
 void slab_cache_init(size_t order, struct slab_cache *cache, uint64_t obj_size);
 void slab_cache_insert(struct slab_cache *cache, struct slab *slab);
+struct slab *slab_create(struct slab_cache *cache, enum alloc_behavior behavior,
+                         bool allow_create_new);
+void *slab_alloc(struct slab_cache *cache, enum alloc_behavior behavior,
+                 bool allow_create_new);
 
-/* Magazine */
+/* Magazine + percpu */
 bool slab_magazine_push(struct slab_magazine *mag, vaddr_t obj);
 vaddr_t slab_magazine_pop(struct slab_magazine *mag);
-vaddr_t slab_percpu_alloc(struct slab_domain *dom, size_t class_idx);
 void slab_percpu_free(struct slab_domain *dom, size_t class_idx, vaddr_t obj);
 void slab_free_addr_to_cache(void *addr);
 void slab_domain_percpu_init(struct slab_domain *domain);
+void slab_percpu_refill(struct slab_domain *dom,
+                        struct slab_percpu_cache *cache,
+                        enum alloc_behavior behavior);
 
 /* Freequeue */
 void slab_free_queue_init(struct slab_free_queue *q, size_t capacity);
@@ -423,9 +456,9 @@ vaddr_t slab_free_queue_dequeue(struct slab_free_queue *q);
 size_t slab_free_queue_drain(struct slab_percpu_cache *cache,
                              struct slab_free_queue *queue, size_t target,
                              bool flush_to_cache);
-size_t slab_free_queue_get_target_drain(struct slab_domain *domain);
-void slab_free_queue_drain_limited(struct slab_percpu_cache *pc,
-                                   struct slab_domain *dom);
+size_t slab_free_queue_get_target_drain(struct slab_domain *domain, size_t pct);
+size_t slab_free_queue_drain_limited(struct slab_percpu_cache *pc,
+                                     struct slab_domain *dom, size_t pct);
 
 /* Check */
 bool slab_check(struct slab *slab);
@@ -435,14 +468,16 @@ bool slab_check(struct slab *slab);
 
 /* Returns # slabs removed from GC list - maybe recycled, maybe destroyed */
 size_t slab_gc_run(struct slab_gc *gc, enum slab_gc_flags flags);
-
 struct slab *slab_reset(struct slab *slab);
 void slab_gc_init(struct slab_domain *dom);
 void slab_gc_enqueue(struct slab_domain *domain, struct slab *slab);
 void slab_gc_dequeue(struct slab_domain *domain, struct slab *slab);
 struct slab *slab_gc_get_newest(struct slab_domain *domain);
+struct slab *slab_gc_get_newest_nonpageable(struct slab_domain *domain);
+struct slab *slab_gc_get_newest_pageable(struct slab_domain *domain);
 struct slab *slab_gc_get_oldest(struct slab_domain *domain);
 size_t slab_gc_num_slabs(struct slab_domain *domain);
+bool slab_should_enqueue_gc(struct slab *slab);
 
 /* Recall that the EWMA formula is
  *
@@ -451,15 +486,23 @@ size_t slab_gc_num_slabs(struct slab_domain *domain);
  * where r is the value that we are scaling with
  */
 
-static inline void slab_gc_update_ewma(struct slab_cache *cache, size_t alpha) {
-    cache->ewma_free_slabs =
-        ((cache->ewma_free_slabs * (SLAB_EWMA_SCALE - alpha)) +
-         (cache->slabs_count[SLAB_FREE] * alpha)) /
-        SLAB_EWMA_SCALE;
-}
+static inline void slab_gc_update_ewma(struct slab_cache *cache) {
+    size_t free_slabs = cache->slabs_count[SLAB_FREE];
 
-static inline struct page *slab_get_backing_page(struct slab *slab) {
-    return page_for_pfn(PAGE_TO_PFN(vmm_get_phys((vaddr_t) slab)));
+    if (cache->ewma_free_slabs == 0) {
+        cache->ewma_free_slabs = free_slabs;
+    } else {
+        size_t new_ewma =
+            ((cache->ewma_free_slabs * (SLAB_EWMA_SCALE - SLAB_EWMA_ALPHA_FP)) +
+             (free_slabs * SLAB_EWMA_ALPHA_FP)) /
+            SLAB_EWMA_SCALE;
+
+        /* ensure growth for very small counts */
+        if (new_ewma == 0 && free_slabs > 0)
+            new_ewma = 1;
+
+        cache->ewma_free_slabs = new_ewma;
+    }
 }
 
 static inline struct slab_page_hdr *slab_page_hdr_for_addr(void *ptr) {
@@ -502,7 +545,7 @@ static inline void slab_list_del(struct slab *slab) {
 
     if (state != SLAB_IN_GC_LIST) {
         if (state == SLAB_FREE)
-            slab_gc_update_ewma(slab->parent_cache, SLAB_EWMA_ALPHA_FP);
+            slab_gc_update_ewma(slab->parent_cache);
 
         atomic_fetch_sub(&slab->parent_cache->slabs_count[state], 1);
         atomic_fetch_sub(&slab->parent_cache->parent->slabs_count[state], 1);
@@ -514,7 +557,7 @@ static inline void slab_list_add(struct slab_cache *cache, struct slab *slab) {
     list_add(&slab->list, &cache->slabs[state]);
 
     if (state == SLAB_FREE)
-        slab_gc_update_ewma(cache, SLAB_EWMA_ALPHA_FP);
+        slab_gc_update_ewma(cache);
 
     atomic_fetch_add(&slab->parent_cache->slabs_count[state], 1);
     atomic_fetch_add(&slab->parent_cache->parent->slabs_count[state], 1);
@@ -528,10 +571,6 @@ static inline void slab_move(struct slab_cache *c, struct slab *slab,
     slab->state = new;
 
     slab_list_add(c, slab);
-}
-
-static inline bool alloc_behavior_can_gc(enum alloc_behavior b) {
-    return alloc_behavior_may_fault(b);
 }
 
 static inline void slab_byte_idx_and_mask_from_idx(uint64_t index,

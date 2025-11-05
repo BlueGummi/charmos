@@ -104,10 +104,14 @@ void k_main(void) {
     cmdline_parse(cmdline_request.response->cmdline);
     lapic_timer_init(/* core_id = */ 0);
     smp_complete_init();
+    
     srat_init();
     slit_init();
     topology_init();
     domain_init();
+    global.current_bootstage = BOOTSTAGE_MID_TOPOLOGY;
+
+    thread_init_rq_lists();
 
     /* NUMA awareness now */
     pmm_late_init();

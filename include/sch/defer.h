@@ -2,6 +2,7 @@
 
 #include <mem/alloc.h>
 #include <misc/list.h>
+#include <sch/thread_request.h>
 #include <smp/topology.h>
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -45,7 +46,7 @@ enum worker_next_action {
 };
 
 struct worker {
-    struct thread *thread;       /* Assoc. thread */
+    struct thread *thread;       /* Assoc. thread. */
     struct workqueue *workqueue; /* Assoc. wq */
 
     time_t last_active; /* Monotonic starting time of most
@@ -132,10 +133,28 @@ enum workqueue_flags : uint16_t {
 
     WORKQUEUE_FLAG_NAMED = 1 << 4, /* Has name - will honor (fmt, ...) */
 
+    WORKQUEUE_FLAG_SPAWN_VIA_REQUEST = 1 << 5, /* Spawn threads via
+                                                * thread requests instead
+                                                * of directly invoking
+                                                * the allocator. Will be
+                                                * slower, may not always
+                                                * be satisfied */
+
+    WORKQUEUE_FLAG_STATIC_WORKERS = 1 << 6, /* `struct worker` will be
+                                             * statically allocated
+                                             * during workqueue creation.
+                                             *
+                                             * This allows allocators to
+                                             * safely use workqueues that
+                                             * dynamically spawn threads,
+                                             * but shouldn't be used everywhere
+                                             * because it can waste memory */
+
     WORKQUEUE_FLAG_NO_AUTO_SPAWN = 0,      /* Do not auto spawn workers */
     WORKQUEUE_FLAG_MIGRATABLE_WORKERS = 0, /* Allow migratable workers */
     WORKQUEUE_FLAG_ON_DEMAND = 0, /* Inverse of a permanent workqueue */
     WORKQUEUE_FLAG_NAMELESS = 0,
+    WORKQUEUE_FLAG_SPAWN_NORMALLY = 0,
 
     WORKQUEUE_FLAG_DEFAULTS = WORKQUEUE_FLAG_AUTO_SPAWN,
 };
@@ -153,6 +172,7 @@ enum workqueue_state : uint16_t {
 #define WORKQUEUE_STATE_GET(q) (atomic_load(&q->state))
 
 struct workqueue_attributes {
+    size_t min_workers; /* If set to 0, this field will be treated as a "1" */
     size_t max_workers;
     size_t capacity;
     time_t spawn_delay;
@@ -176,15 +196,17 @@ struct workqueue {
 
     atomic_bool ignore_timeouts;
 
-    struct spinlock work_lock;
-    struct spinlock worker_lock;
-    struct spinlock lock; /* For condvar */
+    struct spinlock work_lock;         /* For works */
+    struct spinlock worker_lock;       /* For worker list */
+    struct spinlock worker_array_lock; /* For worker array */
+    struct spinlock lock;              /* For condvar */
 
     struct condvar queue_cv;
 
     struct work *oneshot_works; /* Ringbuffer of ``capacity`` oneshot tasks */
     struct list_head workers;
     struct list_head works;
+    struct worker *worker_array; /* if STATIC_WORKER is needed */
 
     atomic_uint_fast64_t head;
     atomic_uint_fast64_t tail;
@@ -209,7 +231,7 @@ struct workqueue {
     _Atomic enum workqueue_state state; /* Atomic to avoid
                                          * race where stale
                                          * state is seen */
-
+    struct thread_request *request;
     refcount_t refcount;
 };
 
@@ -264,6 +286,7 @@ enum workqueue_error workqueue_add_local(struct work *work);
 enum workqueue_error workqueue_add_fast(struct work *work);
 
 void work_execute(struct work *task);
+bool workqueue_should_spawn_worker(struct workqueue *queue);
 struct thread *worker_create(void);
 struct thread *worker_create_unmigratable();
 struct worklist *worklist_create(enum worklist_flags);

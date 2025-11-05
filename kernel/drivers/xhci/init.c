@@ -136,6 +136,74 @@ bool xhci_consume_port_status_change(struct xhci_device *dev) {
     return false;
 }
 
+bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
+    uint32_t *portsc = (uint32_t *) &dev->port_regs[portnum];
+    uint32_t val = mmio_read_32(portsc);
+    bool is_usb3 = dev->port_info[portnum].usb3;
+
+    /* Power */
+    if (!(val & PORTSC_PP)) {
+        val |= PORTSC_PP;
+        mmio_write_32(portsc, val);
+        sleep_us(5000);
+
+        if (!(mmio_read_32(portsc) & PORTSC_PP)) {
+            xhci_warn("Port %u power enable failed", portnum);
+            return false;
+        }
+    }
+
+    uint32_t old_ped = val & PORTSC_PED;
+
+    if (is_usb3) {
+        val |= PORTSC_WPR;
+        mmio_write_32(portsc, val);
+
+        uint16_t timeout = 25;
+        while (mmio_read_32(portsc) & PORTSC_RESET) {
+            if (timeout-- == 0) {
+                xhci_warn("Can't reset USB 3.0 device on port %u", portnum);
+                return false;
+            }
+            sleep_us(5000);
+        }
+    } else {
+        val |= PORTSC_RESET;
+        mmio_write_32(portsc, val);
+
+        uint16_t timeout = 25;
+        while ((mmio_read_32(portsc) & PORTSC_PED) == old_ped) {
+            if (timeout-- == 0) {
+                xhci_warn("Can't reset USB 2.0 device on port %u", portnum);
+                return false;
+            }
+            sleep_us(5000);
+        }
+    }
+
+    sleep_us(5000);
+
+    if (is_usb3) {
+        val = mmio_read_32(portsc);
+        val &= ~PORTSC_PLS_MASK;
+        val |= PORTSC_PLS_U0 << PORTSC_PLS_SHIFT;
+        mmio_write_32(portsc, val);
+    }
+
+    if ((mmio_read_32(portsc) & PORTSC_SPEED_MASK) == 0) {
+        xhci_warn("Port Reset failed -- port speed undefined");
+    }
+
+    if (!xhci_consume_port_status_change(dev)) {
+        xhci_warn("Port %u reset did not generate a PSC event", portnum);
+        return false;
+    }
+
+    return true;
+}
+
+/*
+
 bool xhci_reset_port(struct xhci_device *dev, uint32_t port_index) {
     uint32_t *portsc = (void *) &dev->port_regs[port_index];
     uint32_t val = mmio_read_32(portsc);
@@ -201,6 +269,8 @@ bool xhci_reset_port(struct xhci_device *dev, uint32_t port_index) {
     return true;
 }
 
+*/
+
 void xhci_parse_ext_caps(struct xhci_device *dev) {
     uint32_t hcc_params1 = mmio_read_32(&dev->cap_regs->hcc_params1);
     uint32_t offset = (hcc_params1 >> 16) & 0xFFFF;
@@ -265,8 +335,9 @@ void xhci_detect_usb3_ports(struct xhci_device *dev) {
             if (portoffset == 0 || portcount == 0) {
                 xhci_warn("USB capability with invalid port offset/count");
             } else {
-                for (uint8_t i = portoffset - 1; i < portoffset - 1 + portcount;
-                     i++) {
+                uint8_t start = portoffset - 1;
+
+                for (uint8_t i = start; i < start + portcount; i++) {
                     dev->port_info[i].usb3 = major >= 3;
                     xhci_info("Port %u detected as USB%u", i + 1, major);
                 }

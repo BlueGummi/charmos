@@ -39,7 +39,7 @@ struct apc {
     bool enqueued;
     atomic_bool cancelled;
     struct thread *owner;
-    struct list_head node;
+    struct list_head list;
 };
 
 struct apc *apc_create(void);

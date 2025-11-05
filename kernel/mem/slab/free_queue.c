@@ -12,7 +12,7 @@
 
 void slab_free_queue_init(struct slab_free_queue *q, size_t capacity) {
     q->capacity = capacity;
-    q->slots = kmalloc(sizeof(struct slab_free_slot) * capacity);
+    q->slots = kzalloc(sizeof(struct slab_free_slot) * capacity);
     if (!q->slots)
         k_panic("Could not allocate slab free queue slots!\n");
 
@@ -233,7 +233,7 @@ size_t slab_free_queue_drain(struct slab_percpu_cache *cache,
             goto flush;
 
         /* Magazines only cache nonpageable addresses */
-        struct page *page = slab_get_backing_page(slab_for_ptr((void *) addr));
+        struct page *page = slab_for_ptr((void *) addr)->backing_page;
         if (page_is_pageable(page))
             goto flush;
 
@@ -282,34 +282,32 @@ size_t slab_free_queue_flush(struct slab_free_queue *queue) {
     /* Detach the whole list and free it all in one go */
     struct slab_free_queue_list_node *node = slab_free_queue_detach_list(queue);
 
-    while (true) {
-        if (!node)
-            break;
-
+    while (node) {
         struct slab_free_queue_list_node *next = node->next;
         slab_free_addr_to_cache(node);
         node = next;
     }
 }
 
-size_t slab_free_queue_get_target_drain(struct slab_domain *domain) {
+size_t slab_free_queue_get_target_drain(struct slab_domain *domain,
+                                        size_t pct) {
     size_t slab_domain_cpus = domain->domain->num_cores;
     size_t total_fq_elems = SLAB_FREE_QUEUE_GET_COUNT(&domain->free_queue);
     size_t portion = slab_domain_cpus / SLAB_PERCPU_REFILL_PER_CORE_WEIGHT;
     if (portion == 0)
         portion = 1;
 
-    return total_fq_elems / portion;
+    return (total_fq_elems / portion) * pct / 100;
 }
 
-void slab_free_queue_drain_limited(struct slab_percpu_cache *pc,
-                                   struct slab_domain *dom) {
-    size_t target = slab_free_queue_get_target_drain(dom);
+size_t slab_free_queue_drain_limited(struct slab_percpu_cache *pc,
+                                     struct slab_domain *dom, size_t pct) {
+    size_t target = slab_free_queue_get_target_drain(dom, pct);
 
     /* This will also fill up the magazines for other orders. We set the target
      * to prevent overly aggressive stealing from the free_queue into our
      * percpu cache to allow other CPUs in our domain to get their fair share of
      * what remains in the free_queue in the event that they must also refill */
-    slab_free_queue_drain(pc, &dom->free_queue, target,
-                          /* flush_to_cache = */ false);
+    return slab_free_queue_drain(pc, &dom->free_queue, target,
+                                 /* flush_to_cache = */ false);
 }

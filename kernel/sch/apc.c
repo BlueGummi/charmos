@@ -4,7 +4,7 @@
 #include <sch/thread.h>
 #include <smp/core.h>
 
-#define apc_from_list_node(n) container_of(n, struct apc, node)
+#define apc_from_list_node(n) container_of(n, struct apc, list)
 
 static inline bool thread_has_apcs(struct thread *t) {
     return t->apc_pending_mask != 0;
@@ -19,12 +19,12 @@ static inline bool apc_list_empty(struct thread *t, enum apc_type type) {
 }
 
 static inline void apc_list_del(struct apc *a) {
-    list_del(&a->node);
+    list_del(&a->list);
 }
 
 static inline void apc_add_tail(struct thread *t, struct apc *a,
                                 enum apc_type type) {
-    list_add_tail(&a->node, &t->apc_head[type]);
+    list_add_tail(&a->list, &t->apc_head[type]);
 }
 
 static inline void apc_list_unset_bitmask(struct thread *t,
@@ -97,7 +97,7 @@ static void deliver_apc_type(struct thread *t, enum apc_type type) {
             return;
         }
 
-        apc = list_first_entry(&t->apc_head[type], struct apc, node);
+        apc = list_first_entry(&t->apc_head[type], struct apc, list);
         apc_list_del(apc);
         apc->enqueued = false;
 
@@ -169,15 +169,13 @@ void apc_enqueue_event_apc(struct thread *t, struct apc *a,
     kassert(!a->enqueued && !a->owner); /* Panic - this might be accidentally
                                          * placed on multiple threads */
 
-    /* Only one of each type please */
-    kassert(t->on_event_apcs[evt] == NULL);
-
     if (!thread_apc_sanity_check(t))
         return;
 
     enum irql irql = thread_acquire(t);
 
-    t->on_event_apcs[evt] = a;
+    list_add_tail(&a->list, &t->on_event_apcs[evt]);
+
     a->enqueued = true;
     a->owner = t;
 
@@ -246,7 +244,7 @@ void apc_init(struct apc *a, apc_func_t fn, void *arg1, void *arg2) {
     a->func = fn;
     a->arg1 = arg1;
     a->arg2 = arg2;
-    INIT_LIST_HEAD(&a->node);
+    INIT_LIST_HEAD(&a->list);
     a->cancelled = false;
     a->owner = NULL;
     a->enqueued = false;
@@ -254,9 +252,14 @@ void apc_init(struct apc *a, apc_func_t fn, void *arg1, void *arg2) {
 
 void thread_free_event_apcs(struct thread *t) {
     for (int i = 0; i < APC_EVENT_COUNT; i++) {
-        struct apc *this = t->on_event_apcs[i];
-        if (this)
-            kfree(this);
+        struct list_head *list = &t->on_event_apcs[i];
+
+        struct list_head *iter, *n;
+        list_for_each_safe(iter, n, list) {
+            struct apc *apc = apc_from_list_node(iter);
+            if (apc)
+                kfree(apc);
+        }
     }
 }
 
@@ -270,11 +273,13 @@ void thread_exec_event_apcs(struct thread *t) {
     if (event == APC_EVENT_NONE)
         return;
 
-    struct apc *ea = t->on_event_apcs[event];
-    if (!ea) /* No APC for this event */
-        return;
+    struct list_head *iter;
+    struct list_head *list = &t->on_event_apcs[event];
 
-    apc_execute(ea);
+    list_for_each(iter, list) {
+        struct apc *apc = apc_from_list_node(iter);
+        apc_execute(apc);
+    }
 
     t->recent_event = APC_EVENT_NONE;
 }
