@@ -6,7 +6,7 @@
 #include <tests.h>
 
 #include "acpi/hpet.h"
-#include "misc/colors.h"
+#include <colors.h>
 
 extern struct kernel_test __skernel_tests[];
 extern struct kernel_test __ekernel_tests[];

@@ -1,5 +1,5 @@
 #include "internal.h"
-#include <misc/popcount.h>
+#include <math/popcount.h>
 
 #define slab_check_assert_return_false(statement)                              \
     do {                                                                       \

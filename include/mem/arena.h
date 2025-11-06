@@ -1,7 +1,7 @@
 #pragma once
 #include <kassert.h>
-#include <misc/list.h>
-#include <misc/minheap.h>
+#include <structures/list.h>
+#include <structures/minheap.h>
 #include <stdatomic.h>
 #include <stdint.h>
 #include <sync/spinlock.h>

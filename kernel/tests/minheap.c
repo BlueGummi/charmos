@@ -1,5 +1,5 @@
 #include <mem/alloc.h>
-#include <misc/minheap.h>
+#include <structures/minheap.h>
 #include <tests.h>
 
 #define MINHEAP_TEST_TIMES 50

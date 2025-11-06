@@ -1,7 +1,7 @@
 #pragma once
 
 #include <mem/alloc.h>
-#include <misc/list.h>
+#include <structures/list.h>
 #include <sch/thread_request.h>
 #include <smp/topology.h>
 #include <stdatomic.h>

@@ -1,8 +1,9 @@
 #pragma once
+#include <mem/movealloc.h>
 #include <bootstage.h>
 #include <fs/vfs.h>
 #include <mem/numa.h>
-#include <misc/list.h>
+#include <structures/list.h>
 #include <smp/topology.h>
 #include <stdatomic.h>
 
@@ -24,6 +25,7 @@ struct charmos_globals {
 
     size_t core_count;
     struct core **cores;
+    struct tlb_shootdown_data *shootdown_data;
     struct scheduler **schedulers;
 
     size_t domain_count;
@@ -34,6 +36,8 @@ struct charmos_globals {
 
     uint64_t total_pages;
     paddr_t last_pfn;
+
+    struct movealloc_callback_chain movealloc_chain;
 
     /* TODO: no more of this */
     atomic_uint_fast64_t next_tlb_gen;

@@ -65,6 +65,12 @@ SECTIONS {
         __ekernel_profiling_data = .;
     }
 
+    .kernel_movealloc_callbacks : {
+        __skernel_movealloc_callbacks = .;
+        KEEP(*(.kernel_movealloc_callbacks))
+        __ekernel_movealloc_callbacks = .;
+    }
+
     .bss : ALIGN(4K) {
         __sbss = .;
         *(.bss .bss.*)

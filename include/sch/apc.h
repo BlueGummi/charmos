@@ -1,5 +1,5 @@
 #include <int/irq.h>
-#include <misc/list.h>
+#include <structures/list.h>
 #include <smp/core.h>
 #include <stdatomic.h>
 #include <stdbool.h>

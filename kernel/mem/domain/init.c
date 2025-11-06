@@ -1,9 +1,9 @@
+#include <math/align.h>
+#include <math/sort.h>
 #include <mem/alloc.h>
 #include <mem/buddy.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <misc/align.h>
-#include <misc/sort.h>
 #include <sch/thread.h>
 #include <smp/domain.h>
 #include <string.h>
@@ -166,29 +166,33 @@ static void domain_buddy_init(struct domain_buddy *dom) {
     }
 }
 
+static void *alloc_up(size_t size) {
+    return kzalloc(PAGE_ALIGN_UP(size));
+}
+
 static void domain_structs_init(struct domain_buddy *dom, size_t arena_capacity,
                                 size_t fq_capacity,
                                 struct domain *core_domain) {
-    dom->free_area = kzalloc(sizeof(struct free_area) * MAX_ORDER);
+    dom->free_area = alloc_up(sizeof(struct free_area) * MAX_ORDER);
     if (!dom->free_area)
         k_panic("Failed to allocate domain free area\n");
 
     dom->zonelist.entries =
-        kzalloc(sizeof(struct domain_zonelist_entry) * global.domain_count);
+        alloc_up(sizeof(struct domain_zonelist_entry) * global.domain_count);
     if (!dom->zonelist.entries)
         k_panic("Failed to allocate domain zonelist entries\n");
 
-    dom->arenas = kzalloc(sizeof(struct domain_arena *) * dom->core_count);
+    dom->arenas = alloc_up(sizeof(struct domain_arena *) * dom->core_count);
     if (!dom->arenas)
         k_panic("Failed to allocate domain arena\n");
 
     for (size_t i = 0; i < dom->core_count; i++) {
-        dom->arenas[i] = kzalloc(sizeof(struct domain_arena));
+        dom->arenas[i] = alloc_up(sizeof(struct domain_arena));
         if (!dom->arenas[i])
             k_panic("Failed to allocate domain arena\n");
 
         struct domain_arena *this = dom->arenas[i];
-        this->pages = kzalloc(sizeof(struct page *) * arena_capacity);
+        this->pages = alloc_up(sizeof(struct page *) * arena_capacity);
         if (!this->pages)
             k_panic("Failed to allocate domain arena pages\n");
 
@@ -202,12 +206,12 @@ static void domain_structs_init(struct domain_buddy *dom, size_t arena_capacity,
         core_domain->cores[i]->domain_arena = this;
     }
 
-    dom->free_queue = kzalloc(sizeof(struct domain_free_queue));
+    dom->free_queue = alloc_up(sizeof(struct domain_free_queue));
     if (!dom->free_queue)
         k_panic("Failed to allocate domain free queue\n");
 
     size_t fq_size = sizeof(*dom->free_queue->queue) * fq_capacity;
-    dom->free_queue->queue = kzalloc(fq_size);
+    dom->free_queue->queue = alloc_up(fq_size);
     if (!dom->free_queue->queue)
         k_panic("Failed to allocate domain free queue array\n");
 
@@ -347,3 +351,25 @@ void domain_buddy_dump(void) {
                  stat->free_count, dom->pages_used, dom->total_pages);
     }
 }
+
+static void move_buddy(struct domain_buddy *buddy) {
+    size_t domain = buddy->cores[0]->domain->id;
+    movealloc(domain, buddy->free_queue);
+    movealloc(domain, buddy->free_area);
+    movealloc(domain, buddy->free_queue->queue);
+    movealloc(domain, buddy->zonelist.entries);
+    movealloc(domain, buddy->arenas);
+    for (size_t i = 0; i < buddy->core_count; i++) {
+        movealloc(domain, buddy->arenas[i]);
+        movealloc(domain, buddy->arenas[i]->pages);
+    }
+}
+
+static void domain_buddy_movealloc(void *a, void *b) {
+    (void) a, (void) b;
+    for (size_t i = 0; i < global.domain_count; i++)
+        move_buddy(global.domains[i]->cores[0]->domain_buddy);
+}
+
+REGISTER_MOVEALLOC_CALLBACK(domain_move, domain_buddy_movealloc, /*a=*/NULL,
+                            /*b=*/NULL);

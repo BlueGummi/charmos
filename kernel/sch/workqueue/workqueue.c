@@ -86,13 +86,26 @@ void work_execute(struct work *task) {
 
 struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
                                             const char *fmt, va_list args) {
-    struct workqueue *wq = kzalloc(sizeof(struct workqueue));
+    bool permanent = attrs->flags & WORKQUEUE_FLAG_PERMANENT;
+
+    /* Permanent workqueues are moved after initialization so
+     * their structs are aligned up a page so that they can be
+     * properly moved without overlapping with each other */
+    size_t size = permanent ? sizeof(struct workqueue)
+                            : PAGE_ALIGN_UP(sizeof(struct workqueue));
+
+    struct workqueue *wq = kzalloc(size);
     if (!wq)
         goto err;
 
     spinlock_init(&wq->lock);
     wq->attrs = *attrs;
-    wq->oneshot_works = kzalloc(sizeof(struct work) * attrs->capacity);
+
+    size = sizeof(struct work) * attrs->capacity;
+    if (permanent)
+        size = PAGE_ALIGN_UP(size);
+
+    wq->oneshot_works = kzalloc(size);
     if (!wq->oneshot_works)
         goto err;
 

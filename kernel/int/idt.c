@@ -199,7 +199,6 @@ static void page_fault_handler(void *context, uint8_t vector, void *rsp) {
 }
 
 void idt_init() {
-    /*
     irq_register(IRQ_DIV_BY_Z, divbyz_handler, NULL);
     irq_register(IRQ_DEBUG, debug_handler, NULL);
     irq_register(IRQ_BREAKPOINT, breakpoint_handler, NULL);
@@ -207,7 +206,7 @@ void idt_init() {
     irq_register(IRQ_SSF, ss_handler, NULL);
     irq_register(IRQ_GPF, gpf_handler, NULL);
     irq_register(IRQ_DBF, double_fault_handler, NULL);
-    irq_register(IRQ_PAGE_FAULT, page_fault_handler, NULL);*/
+    irq_register(IRQ_PAGE_FAULT, page_fault_handler, NULL);
 
     irq_register(IRQ_TIMER, isr_timer_routine, NULL);
     irq_register(IRQ_PANIC, panic_isr, NULL);

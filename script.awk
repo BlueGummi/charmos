@@ -3,7 +3,7 @@ BEGIN {
 
     print "#ifndef SYMS_DEFINED";
     print "#define SYMS_DEFINED";
-    print "#include <misc/syms.h>";
+    print "#include <linker/symbol_table.h>";
     print "const struct sym syms[] = {";
 }
 / [tT] / {

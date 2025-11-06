@@ -2,9 +2,9 @@
 #include <console/printf.h>
 #include <int/idt.h>
 #include <limine.h>
+#include <linker/symbols.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <misc/linker_symbols.h>
 #include <sch/sched.h>
 #include <smp/smp.h>
 #include <stdbool.h>
@@ -50,7 +50,7 @@ uintptr_t vmm_make_user_pml4(void) {
 void tlb_shootdown(void *ctx, uint8_t irq, void *rsp) {
     (void) ctx, (void) irq, (void) rsp;
 
-    struct core *core = smp_core();
+    struct tlb_shootdown_data *core = &global.shootdown_data[smp_core_id()];
     uint64_t gen =
         atomic_load_explicit(&core->tlb_req_gen, memory_order_acquire);
 
@@ -76,7 +76,7 @@ static void do_tlb_shootdown(uintptr_t addr) {
         if (i == this_core)
             continue;
 
-        struct core *target = global.cores[i];
+        struct tlb_shootdown_data *target = &global.shootdown_data[i];
         atomic_store_explicit(&target->tlb_page, addr, memory_order_release);
         atomic_store_explicit(&target->tlb_req_gen, gen, memory_order_release);
         ipi_send(i, IRQ_TLB_SHOOTDOWN);
@@ -86,7 +86,7 @@ static void do_tlb_shootdown(uintptr_t addr) {
         if (i == this_core)
             continue;
 
-        struct core *target = global.cores[i];
+        struct tlb_shootdown_data *target = &global.shootdown_data[i];
 
         while (atomic_load_explicit(&target->tlb_ack_gen,
                                     memory_order_acquire) < gen)

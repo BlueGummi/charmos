@@ -1,5 +1,5 @@
 #pragma once
-#include <misc/list.h>
+#include <structures/list.h>
 #include <sync/spinlock.h>
 
 struct thread_queue {

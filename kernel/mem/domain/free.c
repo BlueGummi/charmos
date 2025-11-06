@@ -1,4 +1,4 @@
-#include <misc/align.h>
+#include <math/align.h>
 #include <smp/domain.h>
 
 #include "internal.h"

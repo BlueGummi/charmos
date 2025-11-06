@@ -69,13 +69,33 @@ void slab_domain_init_caches(struct slab_domain *dom) {
     slab_init_caches(dom->local_pageable_cache, /* pageable = */ true);
     slab_domain_link_caches(dom, dom->local_pageable_cache);
     slab_domain_link_caches(dom, dom->local_nonpageable_cache);
+
+    for (size_t j = 0; j < dom->domain->num_cores; j++)
+        dom->domain->cores[j]->slab_domain = dom;
+
+    global.slab_domains[dom->domain->id] = dom;
+}
+
+static size_t slab_bucket_reset(struct stat_bucket *bucket) {
+    struct slab_domain_bucket *db = bucket->private;
+    memset(db, 0, sizeof(struct slab_domain_bucket));
+    return 0;
+}
+
+void slab_domain_init_stats(struct slab_domain *domain) {
+    domain->stats = stat_series_create(SLAB_STAT_SERIES_CAPACITY,
+                                       SLAB_STAT_SERIES_BUCKET_US,
+                                       slab_bucket_reset, domain);
+
+    if (!domain->stats || !domain->stats->buckets)
+        k_panic("Failed to create domain stat series\n");
 }
 
 void slab_domain_init(void) {
-    /* Ok... we should have topology data now */
-
     global.slab_domains =
         kzalloc(sizeof(struct slab_domain *) * global.domain_count);
+    if (!global.slab_domains)
+        k_panic("Failed to allocate global slab domain array\n");
 
     for (size_t i = 0; i < global.domain_count; i++) {
         struct domain *domain = global.domains[i];
@@ -90,12 +110,6 @@ void slab_domain_init(void) {
         slab_domain_init_workqueue(sdomain);
         slab_domain_percpu_init(sdomain);
         slab_domain_init_caches(sdomain);
-
-        /* Great, now we link all the cores back to this */
-        for (size_t j = 0; j < domain->num_cores; j++)
-            domain->cores[j]->slab_domain = sdomain;
-
-        global.slab_domains[i] = sdomain;
     }
 
     for (size_t i = 0; i < global.domain_count; i++)

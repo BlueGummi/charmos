@@ -2,7 +2,7 @@
 #include <mem/buddy.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <misc/align.h>
+#include <math/align.h>
 #include <string.h>
 
 #include "internal.h"

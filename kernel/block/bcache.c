@@ -2,7 +2,7 @@
 #include <block/generic.h>
 #include <block/sched.h>
 #include <mem/alloc.h>
-#include <misc/align.h>
+#include <math/align.h>
 #include <sch/defer.h>
 #include <stdbool.h>
 #include <stddef.h>

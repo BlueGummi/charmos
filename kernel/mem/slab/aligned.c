@@ -1,6 +1,6 @@
 #include <kassert.h>
 #include <mem/alloc.h>
-#include <misc/align.h>
+#include <math/align.h>
 #include <stddef.h>
 
 void *kmalloc_aligned(uint64_t size, uint64_t align) {

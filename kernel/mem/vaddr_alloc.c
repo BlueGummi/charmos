@@ -3,7 +3,7 @@
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vaddr_alloc.h>
-#include <misc/align.h>
+#include <math/align.h>
 #include <string.h>
 
 #define VASRANGE_PER_PAGE (PAGE_SIZE / sizeof(struct vas_range))

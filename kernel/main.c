@@ -9,6 +9,7 @@
 #include <boot/smap.h>
 #include <bootstage.h>
 #include <charmos.h>
+#include <cmdline.h>
 #include <compiler.h>
 #include <console/printf.h>
 #include <crypto/prng.h>
@@ -16,14 +17,14 @@
 #include <fs/vfs.h>
 #include <int/idt.h>
 #include <limine.h>
+#include <logo.h>
 #include <mem/alloc.h>
 #include <mem/buddy.h>
 #include <mem/domain.h>
+#include <mem/movealloc.h>
 #include <mem/pmm.h>
 #include <mem/slab.h>
 #include <mem/vmm.h>
-#include <misc/cmdline.h>
-#include <misc/logo.h>
 #include <registry.h>
 #include <requests.h>
 #include <sch/defer.h>
@@ -72,7 +73,6 @@ void k_main(void) {
     /* kmalloc can be used */
     slab_allocator_init();
     global.current_bootstage = BOOTSTAGE_EARLY_ALLOCATORS;
-
     gdt_install();
     syscall_setup(syscall_entry);
     smp_setup_bsp();
@@ -103,7 +103,7 @@ void k_main(void) {
     cmdline_parse(cmdline_request.response->cmdline);
     lapic_timer_init(/* core_id = */ 0);
     smp_complete_init();
-    
+
     srat_init();
     slit_init();
     topology_init();
@@ -116,6 +116,7 @@ void k_main(void) {
     /* NUMA awareness now */
     pmm_late_init();
     slab_domain_init();
+    movealloc_exec_all();
 
     restore_interrupts();
     scheduler_yield();

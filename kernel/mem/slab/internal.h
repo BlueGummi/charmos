@@ -1,16 +1,18 @@
 #pragma once
+#include <containerof.h>
 #include <kassert.h>
+#include <math/align.h>
 #include <mem/alloc.h>
 #include <mem/page.h>
 #include <mem/vmm.h>
-#include <misc/align.h>
-#include <misc/containerof.h>
-#include <misc/list.h>
-#include <misc/rbt.h>
 #include <smp/domain.h>
+#include <stat_series.h>
 #include <stdatomic.h>
 #include <stdint.h>
+#include <structures/list.h>
+#include <structures/rbt.h>
 #include <sync/spinlock.h>
+#include <time.h>
 
 /* Lock ordering:
  *
@@ -97,6 +99,10 @@ static const uint64_t slab_class_sizes[] = {
 #define SLAB_EWMA_MIN_SCALE 26 /* min ~0.1 of scale to never fully ignore */
 
 #define SLAB_SCORE_NONPAGEABLE_BETTER_PCT 25 /* must score 25% better */
+
+/* 64 buckets of 500ms granularity = 32 seconds of data */
+#define SLAB_STAT_SERIES_CAPACITY 64
+#define SLAB_STAT_SERIES_BUCKET_US MS_TO_US(500)
 
 #define kmalloc_validate_params(size, flags, behavior)                         \
     do {                                                                       \
@@ -380,6 +386,32 @@ struct slab_gc {
 };
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab_gc, lock);
 
+struct slab_domain_bucket {
+    /* ---- Allocation path stats ---- */
+    uint64_t alloc_calls;           /* calls to `kmalloc` */
+    uint64_t alloc_magazine_hits;   /* Local magazine served the alloc */
+    uint64_t alloc_local_hits;      /* Local domain cache hit (not magazine) */
+    uint64_t alloc_remote_hits;     /* Remote cache used (cross-core steal) */
+    uint64_t alloc_gc_recycle_hits; /* GC provided an available object */
+    uint64_t alloc_new_slab;        /* Had to allocate a new slab */
+    uint64_t alloc_failures;        /* Out of memory or other failures */
+
+    /* ---- Free path stats ---- */
+    uint64_t free_calls;            /* Total calls to kfree() */
+    uint64_t free_to_ring;          /* Freed into local freequeue ringbuffer */
+    uint64_t free_to_freelist;      /* Freed into endless freelist (overflow) */
+    uint64_t free_to_local_slab;    /* Freed directly into local slab */
+    uint64_t free_to_remote_domain; /* Freed to another domain's freelist */
+
+    /* ---- Background operations ---- */
+    uint64_t freequeue_enqueues;
+    uint64_t freequeue_dequeues;
+    uint64_t freelist_enqueues;
+    uint64_t freelist_dequeues;
+    uint64_t gc_collections;       /* Number of times GC ran */
+    uint64_t gc_objects_reclaimed; /* Objects GC returned to free state */
+};
+
 struct slab_domain {
     /* Actual domain that this corresponds to */
     struct domain *domain;
@@ -407,6 +439,8 @@ struct slab_domain {
     struct daemon *daemon;
 
     struct workqueue *workqueue;
+
+    struct stat_series *stats;
 };
 
 static inline struct domain_buddy *

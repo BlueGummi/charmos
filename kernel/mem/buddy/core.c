@@ -3,7 +3,7 @@
 #include <mem/bitmap.h>
 #include <mem/buddy.h>
 #include <mem/pmm.h>
-#include <misc/align.h>
+#include <math/align.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>

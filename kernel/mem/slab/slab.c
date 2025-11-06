@@ -76,9 +76,9 @@
  * get real fun. Each slab domain has a zonelist for the other domains relative
  * to itself, sorted by distance. This list is traversed, and depending on slab
  * cache slab availability and physical memory availability, a cache is selected
- * for allocation. If a flexible locality is selected, a scoring heuristic is
- * applied to bias the result towards within the selected locality, but
- * potentially selecting a further node if it has high availability
+ * for allocation. A scoring heuristic is applied to bias the result towards
+ * within the selected locality. If flexible locality is selected, the
+ * algo will potentially select a further node if it has high availability
  * compared to the closer nodes.
  *
  * The slab cache picking logic may be biased based on given input arguments.
@@ -157,10 +157,11 @@ void *slab_map_new_page(struct slab_domain *domain, paddr_t *phys_out,
     paddr_t phys = 0x0;
     vaddr_t virt = 0x0;
 
-    if (domain)
+    if (domain) {
         phys = domain_alloc_from_domain(domain->domain, 1);
-    else
+    } else {
         phys = pmm_alloc_page(ALLOC_FLAGS_NONE);
+    }
 
     if (unlikely(!phys))
         goto err;
@@ -462,6 +463,8 @@ size_t ksize(void *ptr) {
     if (!ptr)
         return 0;
 
+    vaddr_t vp = (vaddr_t) ptr;
+    kassert(vp >= SLAB_HEAP_START && vp <= SLAB_HEAP_END);
     struct slab_page_hdr *hdr = slab_page_hdr_for_addr(ptr);
 
     if (hdr->magic == KMALLOC_PAGE_MAGIC)
@@ -817,7 +820,7 @@ void *kmalloc_new(size_t size, enum alloc_flags flags,
 
     struct slab_domain *local_dom = slab_domain_local();
     struct slab_percpu_cache *pcpu = slab_percpu_cache_local();
-    struct slab_domain *selected = local_dom;
+    struct slab_domain *selected_dom = local_dom;
 
     /* this has its own path */
     if (!kmalloc_size_fits_in_slab(size)) {
@@ -847,7 +850,7 @@ void *kmalloc_new(size_t size, enum alloc_flags flags,
      * slab caches to allocate from a slab that may or may not be local */
     struct slab_cache *cache = slab_search_for_cache(local_dom, flags, size);
 
-    selected = cache->parent_domain;
+    selected_dom = cache->parent_domain;
 
     /* now we have picked a slab cache - it may or may not have free slabs but
      * we definitely know where we want to get memory from now */
@@ -872,7 +875,7 @@ garbage_collect:
             goto exit;
 
         /* try one last time - this will run emergency GC */
-        ret = slab_alloc_retry(selected, size, flags, behavior);
+        ret = slab_alloc_retry(selected_dom, size, flags, behavior);
     }
 
 exit:

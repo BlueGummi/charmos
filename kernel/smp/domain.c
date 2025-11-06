@@ -12,7 +12,10 @@ static void init_global_domain(uint64_t domain_count) {
         k_panic("Cannot allocate core domains\n");
 
     for (size_t i = 0; i < domain_count; i++) {
-        global.domains[i] = kzalloc(sizeof(struct domain));
+
+        /* We align this up so that they can all be migrated later on
+         * to pages on each domain... */
+        global.domains[i] = kzalloc(PAGE_ALIGN_UP(sizeof(struct domain)));
         if (!global.domains[i])
             k_panic("Cannot allocate core domain %u\n");
 
@@ -135,3 +138,14 @@ err:
 
     return NULL;
 }
+
+static void domains_move(void *a, void *b) {
+    (void) a, (void) b;
+    for (size_t i = 0; i < global.domain_count; i++) {
+        struct domain *domain = global.domains[i];
+        movealloc(domain->id, domain);
+    }
+}
+
+REGISTER_MOVEALLOC_CALLBACK(domain_move, domains_move, /* a = */ NULL,
+                            /* b = */ NULL);

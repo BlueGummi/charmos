@@ -33,9 +33,9 @@
  */
 
 #pragma once
-#include <misc/containerof.h>
-#include <misc/list.h>
-#include <misc/locked_list.h>
+#include <containerof.h>
+#include <structures/list.h>
+#include <structures/locked_list.h>
 #include <stdatomic.h>
 #include <stdint.h>
 

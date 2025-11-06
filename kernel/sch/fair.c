@@ -2,7 +2,7 @@
 #include <bootstage.h>
 #include <crypto/prng.h>
 #include <int/idt.h>
-#include <misc/clamp.h>
+#include <math/clamp.h>
 #include <registry.h>
 #include <sch/sched.h>
 #include <smp/smp.h>

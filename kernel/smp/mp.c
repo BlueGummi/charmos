@@ -5,6 +5,7 @@
 #include <limine.h>
 #include <mem/alloc.h>
 #include <sch/sched.h>
+#include <smp/domain.h>
 #include <smp/smp.h>
 #include <sync/spinlock.h>
 
@@ -68,7 +69,7 @@ static void init_smt_info(struct core *c) {
 }
 
 static struct core *setup_cpu(uint64_t cpu) {
-    struct core *c = kzalloc(sizeof(struct core));
+    struct core *c = kzalloc(PAGE_ALIGN_UP(sizeof(struct core)));
     if (!c)
         k_panic("Core %d could not allocate space for struct\n", cpu);
     c->id = cpu;
@@ -147,7 +148,23 @@ void smp_setup_bsp() {
     if (unlikely(!global.cores))
         k_panic("Could not allocate space for global core structures");
 
+    global.shootdown_data =
+        kzalloc(sizeof(struct tlb_shootdown_data) * global.core_count);
+    if (!global.shootdown_data)
+        k_panic("Could not allocate global shootdown data\n");
+
     global.cores[0] = c;
     init_smt_info(c);
     detect_llc(&c->llc);
 }
+
+static void smp_movealloc(void *a, void *b) {
+    (void) a, (void) b;
+    for (size_t i = 1; i < global.core_count; i++) {
+        struct core *c = global.cores[i];
+        size_t domain = global.cores[i]->domain->id;
+        movealloc(domain, c);
+    }
+}
+
+REGISTER_MOVEALLOC_CALLBACK(smp, smp_movealloc, /*a=*/NULL, /*b=*/NULL);

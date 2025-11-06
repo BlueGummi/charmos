@@ -4,7 +4,7 @@
 #include <mem/buddy.h>
 #include <mem/domain.h>
 #include <mem/pmm.h>
-#include <misc/align.h>
+#include <math/align.h>
 #include <smp/domain.h>
 #include <stdbool.h>
 #include <stdint.h>

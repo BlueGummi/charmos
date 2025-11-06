@@ -1,6 +1,6 @@
 #include <asm.h>
 #include <console/printf.h>
-#include <misc/dbg.h>
+#include <dbg.h>
 #include <stdint.h>
 #include <string.h>
 #define KB_DOWN_LSHIFT 0x2A

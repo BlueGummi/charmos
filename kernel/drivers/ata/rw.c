@@ -4,7 +4,7 @@
 #include <console/printf.h>
 #include <drivers/ata.h>
 #include <mem/alloc.h>
-#include <misc/sll.h>
+#include <structures/sll.h>
 #include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>

@@ -1,6 +1,6 @@
 #include <console/panic.h>
 #include <mem/alloc.h>
-#include <misc/minheap.h>
+#include <structures/minheap.h>
 #include <string.h>
 #include <sync/spinlock.h>
 

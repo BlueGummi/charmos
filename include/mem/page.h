@@ -1,6 +1,6 @@
 #pragma once
 #include <charmos.h>
-#include <misc/align.h>
+#include <math/align.h>
 #include <stdint.h>
 
 #define PAGE_SIZE 4096

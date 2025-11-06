@@ -1,5 +1,5 @@
 #include <console/printf.h>
-#include <misc/syms.h>
+#include <linker/symbol_table.h>
 #include <sch/sched.h>
 #include <stddef.h>
 #include <stdint.h>

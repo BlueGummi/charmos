@@ -1,5 +1,5 @@
 #include <kassert.h>
-#include <misc/list.h>
+#include <structures/list.h>
 #include <sync/spinlock.h>
 
 /* Doubly linked list with a lock and counter for elements */

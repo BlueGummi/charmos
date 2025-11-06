@@ -1,8 +1,8 @@
 #pragma once
 #include <charmos.h>
 #include <compiler.h>
-#include <misc/linker_symbols.h>
-#include <misc/list.h>
+#include <linker/symbols.h>
+#include <structures/list.h>
 #include <stdbool.h>
 #include <stdint.h>
 

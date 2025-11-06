@@ -1,6 +1,6 @@
 #include <block/sched.h>
 #include <mem/alloc.h>
-#include <misc/sort.h>
+#include <math/sort.h>
 
 #define MAX_REORDER_SCAN 8
 #define REORDER_THRESHOLD 32

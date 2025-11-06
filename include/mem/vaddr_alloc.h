@@ -1,5 +1,5 @@
 #pragma once
-#include <misc/rbt.h>
+#include <structures/rbt.h>
 #include <stdatomic.h>
 #include <stdint.h>
 #include <sync/spinlock.h>

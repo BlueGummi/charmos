@@ -4,8 +4,8 @@
 #pragma once
 #include <asm.h>
 #include <mem/alloc.h>
-#include <misc/list.h>
-#include <misc/rbt.h>
+#include <structures/list.h>
+#include <structures/rbt.h>
 #include <sch/apc.h>
 #include <stdatomic.h>
 #include <stddef.h>

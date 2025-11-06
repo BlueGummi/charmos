@@ -4,8 +4,8 @@
 #include <flanterm/src/flanterm.h>
 #include <flanterm/src/flanterm_backends/fb.h>
 #include <limine.h>
-#include <misc/colors.h>
-#include <misc/logo.h>
+#include <colors.h>
+#include <logo.h>
 #include <sync/spinlock.h>
 #include <time.h>
 

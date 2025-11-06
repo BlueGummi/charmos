@@ -2,8 +2,8 @@
 #include <asm.h>
 #include <charmos.h>
 #include <limine.h>
-#include <misc/colors.h>
-#include <misc/logo.h>
+#include <colors.h>
+#include <logo.h>
 #include <time.h>
 
 #define STRINGIZE2(x) #x

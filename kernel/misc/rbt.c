@@ -1,7 +1,7 @@
 #include <console/printf.h>
 #include <kassert.h>
 #include <mem/alloc.h>
-#include <misc/rbt.h>
+#include <structures/rbt.h>
 #include <stddef.h>
 #include <stdint.h>
 

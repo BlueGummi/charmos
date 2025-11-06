@@ -1,6 +1,6 @@
 #pragma once
-#include <bootstage.h>
 #include <boot/tss.h>
+#include <bootstage.h>
 #include <charmos.h>
 #include <compiler.h>
 #include <console/panic.h>
@@ -9,6 +9,13 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+
+/* TODO: move this outta here */
+struct tlb_shootdown_data {
+    atomic_uintptr_t tlb_page;
+    atomic_uint_fast64_t tlb_req_gen;
+    atomic_uint_fast64_t tlb_ack_gen;
+};
 
 /* Let's put commonly accessed fields up here
  * to make the cache a bit happier */
@@ -31,9 +38,6 @@ struct core {
     size_t rr_current_domain;
 
     struct tss *tss;
-    atomic_uintptr_t tlb_page;        // page to invalidate (or 0 = none)
-    atomic_uint_fast64_t tlb_req_gen; // generation to process
-    atomic_uint_fast64_t tlb_ack_gen; // last processed
 
     uint32_t lapic_freq;
     uint64_t rcu_seen_gen;
