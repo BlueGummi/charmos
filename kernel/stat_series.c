@@ -83,14 +83,17 @@ void stat_series_advance_internal(struct stat_series *s, time_t now_us,
     if (steps > s->nbuckets)
         steps = s->nbuckets;
 
+    size_t series_current = s->current;
+
     for (uint32_t i = 0; i < steps; i++) {
         /* update canonical non-atomic s->current while holding lock */
-        s->current = (s->current + 1) % s->nbuckets;
-        struct stat_bucket *bucket = &s->buckets[s->current];
+        size_t current = (series_current + 1) % s->nbuckets;
+        struct stat_bucket *bucket = &s->buckets[current];
 
         atomic_store(&bucket->count, 0);
         atomic_store(&bucket->sum, 0);
         s->bucket_reset(bucket);
+        s->current = current; /* publish */
     }
 
     /* publish last_update_us atomically for lockless readers/writers */

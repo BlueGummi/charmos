@@ -164,10 +164,11 @@ void *slab_map_new_page(struct slab_domain *domain, paddr_t *phys_out,
         phys = pmm_alloc_page(ALLOC_FLAGS_NONE);
     }
 
+    *phys_out = phys;
+
     if (unlikely(!phys))
         goto err;
 
-    *phys_out = phys;
     virt = vas_alloc(slab_vas, PAGE_SIZE, PAGE_SIZE);
     if (unlikely(!virt))
         goto err;
@@ -264,7 +265,7 @@ struct slab *slab_create_new(struct slab_domain *domain,
         return NULL;
 
     struct slab *slab = (struct slab *) page;
-    slab->backing_page = page_for_pfn(PFN_TO_PAGE(phys));
+    slab->backing_page = page_for_pfn(PAGE_TO_PFN(phys));
     return slab_init(slab, cache);
 }
 
@@ -295,8 +296,10 @@ struct slab *slab_create(struct slab_cache *cache, enum alloc_behavior behavior,
         slab = slab_create_new(cache->parent_domain, cache,
                                cache->type == SLAB_TYPE_PAGEABLE);
 
-        if (slab)
+        if (slab && cache->parent_domain == local)
             slab_stat_alloc_new_slab(local);
+        if (slab && cache->parent_domain != local)
+            slab_stat_alloc_new_remote_slab(local);
     }
 
     return slab;
@@ -766,7 +769,7 @@ void slab_stat_alloc_from_cache(struct slab_cache *cache) {
 }
 
 void *slab_alloc(struct slab_cache *cache, enum alloc_behavior behavior,
-                 bool allow_create_new) {
+                 bool allow_create_new, bool called_from_alloc) {
     void *ret = NULL;
 
     if (!alloc_behavior_may_fault(behavior) &&
@@ -778,7 +781,8 @@ void *slab_alloc(struct slab_cache *cache, enum alloc_behavior behavior,
     /* First try from lists */
     ret = slab_cache_try_alloc_from_lists(cache);
     if (ret) {
-        slab_stat_alloc_from_cache(cache);
+        if (called_from_alloc)
+            slab_stat_alloc_from_cache(cache);
         goto out;
     }
 
@@ -792,18 +796,6 @@ void *slab_alloc(struct slab_cache *cache, enum alloc_behavior behavior,
 out:
     slab_cache_unlock(cache, irql);
     return ret;
-}
-
-void slab_alloc_gc(struct slab_domain *domain, enum alloc_behavior behavior) {
-    if (!alloc_behavior_may_fault(behavior))
-        return; /* pluh... no use in trying GC since
-                 * we will likely touch pageable memory */
-
-    enum slab_gc_flags flags = SLAB_GC_FLAG_AGG_RECLAIM;
-    if (alloc_behavior_is_fast(behavior))
-        flags |= SLAB_GC_FLAG_FAST;
-
-    slab_gc_run(&domain->slab_gc, flags);
 }
 
 void *slab_alloc_retry(struct slab_domain *domain, size_t size,
@@ -841,7 +833,8 @@ void *slab_alloc_retry(struct slab_domain *domain, size_t size,
         struct slab_cache *cache = &cs->caches[slab_size_to_index(size)];
 
         bool allow_new = true;
-        return slab_alloc(cache, behavior, allow_new);
+        return slab_alloc(cache, behavior, allow_new,
+                          /*called_from_alloc=*/true);
     }
 }
 
@@ -861,7 +854,7 @@ void *kmalloc_new(size_t size, enum alloc_flags flags,
     /* this has its own path */
     if (!kmalloc_size_fits_in_slab(size)) {
         ret = kmalloc_pages(local_dom, size, flags, behavior);
-        goto garbage_collect;
+        goto exit;
     }
 
     /* alloc fits in slab - TODO: scale size if cache alignment is requested */
@@ -895,15 +888,12 @@ void *kmalloc_new(size_t size, enum alloc_flags flags,
 
     /* allocate from an existing slab or pull from the GC lists
      * or call into the physical memory allocator to get a new slab */
-    ret = slab_alloc(cache, behavior, allow_new_slabs);
+    ret = slab_alloc(cache, behavior, allow_new_slabs,
+                     /*called_from_alloc=*/true);
 
     /* slowpath - let's try and fill up our percpu caches so we don't
      * end up in this slowpath over and over again... */
     slab_percpu_refill(local_dom, pcpu, behavior);
-
-garbage_collect:
-    /* do lightweight alloc GC on successful allocation */
-    slab_alloc_gc(local_dom, behavior);
 
     /* uh oh... we found NOTHING...
      * try one last time - this will run emergency GC */
@@ -956,8 +946,10 @@ bool kfree_free_queue_enqueue(struct slab_domain *domain, void *ptr,
     vaddr_t vptr = (vaddr_t) ptr;
 
     /* Splendid, it worked */
-    if (slab_free_queue_ringbuffer_enqueue(&domain->free_queue, vptr))
+    if (slab_free_queue_ringbuffer_enqueue(&domain->free_queue, vptr)) {
+        slab_stat_free_to_ring(local);
         return true;
+    }
 
     /* We don't try to add to our free queue list */
     if (domain == local)
@@ -968,8 +960,10 @@ bool kfree_free_queue_enqueue(struct slab_domain *domain, void *ptr,
     bool can_fault = alloc_behavior_may_fault(behavior);
     bool busy = slab_domain_busy(domain);
 
-    if (fits_in_slab && can_fault && busy)
+    if (fits_in_slab && can_fault && busy) {
+        slab_stat_free_to_freelist(local);
         return slab_free_queue_list_enqueue(&domain->free_queue, vptr);
+    }
 
     return false;
 }
@@ -1022,7 +1016,11 @@ static bool kfree_try_free_to_magazine(struct slab_percpu_cache *pcpu,
 
     int32_t idx = slab_size_to_index(size);
     struct slab_magazine *mag = &pcpu->mag[idx];
-    return slab_magazine_push(mag, (vaddr_t) ptr);
+    bool ret = slab_magazine_push(mag, (vaddr_t) ptr);
+    if (ret)
+        slab_stat_free_to_percpu(pcpu->domain);
+
+    return ret;
 }
 
 static bool kfree_magazine_push_trylock(struct slab_magazine *mag, void *ptr) {
@@ -1044,8 +1042,10 @@ static bool kfree_try_put_on_percpu_caches(struct slab_domain *domain,
     for (size_t i = 0; i < domain->domain->num_cores; i++) {
         struct slab_percpu_cache *try = domain->percpu_caches[i];
         struct slab_magazine *mag = &try->mag[idx];
-        if (kfree_magazine_push_trylock(mag, ptr))
+        if (kfree_magazine_push_trylock(mag, ptr)) {
+            slab_stat_free_to_percpu(domain);
             return true;
+        }
     }
 
     return false;
@@ -1065,6 +1065,7 @@ void slab_free(struct slab_domain *domain, void *obj) {
             slab_list_del(slab);
             slab_unlock(slab, irql);
             slab_cache_unlock(cache, slab_cache_irql);
+            slab_stat_gc_collection(domain);
             slab_gc_enqueue(domain, slab);
             return;
         }
@@ -1094,6 +1095,8 @@ void kfree_new(void *ptr, enum alloc_behavior behavior) {
     struct slab_domain *local_domain = slab_domain_local();
     struct slab_percpu_cache *pcpu = slab_percpu_cache_local();
 
+    slab_stat_free_call(local_domain);
+
     if (idx < 0) {
         kfree_pages(ptr, size, behavior);
         goto garbage_collect;
@@ -1118,14 +1121,18 @@ void kfree_new(void *ptr, enum alloc_behavior behavior) {
 
     /* could not put on percpu cache or freequeue, now we free to
      * the slab cache that owns this data */
+
+    if (owner == local_domain) {
+        slab_stat_free_to_local_slab(local_domain);
+    } else {
+        slab_stat_free_to_remote_domain(local_domain);
+    }
+
     slab_free(owner, ptr);
 
 garbage_collect:
 
     slab_free_queue_drain_on_free(local_domain, pcpu, behavior);
-
-    enum slab_gc_flags gc_flags = SLAB_GC_FLAG_AGG_STANDARD;
-    slab_gc_run(&local_domain->slab_gc, gc_flags);
 
 exit:
     scheduler_unpin_current_thread(flags);

@@ -138,16 +138,19 @@ static inline struct thread *scheduler_get_current_thread() {
 }
 
 static inline enum thread_flags scheduler_pin_current_thread() {
-    struct thread *thread = scheduler_get_current_thread();
-    if (!thread)
-        return 0x0;
+    if (global.current_bootstage < BOOTSTAGE_LATE_DEVICES)
+        return 0;
 
+    struct thread *thread = scheduler_get_current_thread();
     enum thread_flags flags = thread->flags;
     thread->flags |= THREAD_FLAGS_NO_STEAL;
     return flags;
 }
 
 static inline void scheduler_unpin_current_thread(enum thread_flags flags) {
+    if (global.current_bootstage < BOOTSTAGE_LATE_DEVICES)
+        return;
+
     struct thread *thread = scheduler_get_current_thread();
     if (thread)
         thread->flags = flags;

@@ -54,7 +54,8 @@ size_t slab_cache_bulk_alloc(struct slab_cache *cache, vaddr_t *addr_array,
         /* We don't allow allocations of new slabs - that
          * is not the point of our percpu caches */
         bool allow_new = false;
-        void *obj = slab_alloc(cache, behavior, allow_new);
+        void *obj =
+            slab_alloc(cache, behavior, allow_new, /*called_from_alloc=*/false);
         if (!obj)
             break;
 
@@ -97,18 +98,15 @@ void slab_percpu_flush(struct slab_domain *dom, struct slab_percpu_cache *pc,
 vaddr_t slab_percpu_refill_class(struct slab_domain *dom,
                                  struct slab_percpu_cache *pc, size_t class_idx,
                                  enum alloc_behavior behavior) {
-    /* maybe try refilling it from the freequeue? */
-    if (alloc_behavior_may_fault(behavior))
-        slab_free_queue_drain_limited(pc, dom, /* pct = */ 100);
-
     /* steal em from here */
     struct slab_cache *cache = &dom->local_nonpageable_cache->caches[class_idx];
     struct slab_magazine *mag = &pc->mag[class_idx];
 
-    /* fill the slab magazine all the way back up to maximize slab mag hits */
     size_t remaining = SLAB_MAG_ENTRIES - mag->count;
+    remaining /= 8;
 
     vaddr_t objs[remaining];
+    
     size_t got = slab_cache_bulk_alloc(cache, objs, remaining, behavior);
 
     enum irql irql = slab_magazine_lock(mag);

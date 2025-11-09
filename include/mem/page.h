@@ -2,8 +2,9 @@
 #include <charmos.h>
 #include <math/align.h>
 #include <stdint.h>
+#include <sync/spinlock.h>
 
-#define PAGE_SIZE 4096
+#define PAGE_SIZE 4096ULL
 #define PAGE_2MB 0x200000
 
 #define PAGING_PRESENT (0x1UL)
@@ -23,8 +24,8 @@
 #define PAGING_MOVABLE (0)
 
 #define PAGING_2MB_PHYS_MASK (~((uintptr_t) PAGE_2MB - 1))
-#define PAGE_ALIGN_DOWN(x) ALIGN_DOWN((uintptr_t)(x), PAGE_SIZE)
-#define PAGE_ALIGN_UP(x) ALIGN_UP((uintptr_t)(x), PAGE_SIZE)
+#define PAGE_ALIGN_DOWN(x) ALIGN_DOWN((uintptr_t) (x), PAGE_SIZE)
+#define PAGE_ALIGN_UP(x) ALIGN_UP((uintptr_t) (x), PAGE_SIZE)
 
 #define PAGE_TO_PFN(addr) ((addr) / PAGE_SIZE)
 #define PFN_TO_PAGE(pfn) ((pfn) * PAGE_SIZE)
@@ -35,16 +36,18 @@
 #define VMM_MAP_LIMIT 0xFFFFA00010000000
 
 struct page {
-    struct page *next;
     uint8_t phys_usable : 1;
     uint8_t is_free : 1;
     uint8_t order : 6;
+    struct page *next;
+    struct spinlock lock;
 };
 extern struct page *page_array;
 
 struct page_table {
     pte_t entries[512];
 } __attribute__((packed));
+_Static_assert(sizeof(struct page_table) == PAGE_SIZE, "");
 
 static inline bool page_pfn_free(uint64_t pfn) {
     if (pfn >= global.last_pfn) {

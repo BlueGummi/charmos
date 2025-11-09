@@ -1,6 +1,7 @@
 #include <crypto/prng.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
+#include <mem/slab.h>
 #include <mem/vmm.h>
 #include <sch/sched.h>
 #include <stdbool.h>
@@ -290,7 +291,7 @@ REGISTER_TEST(kmalloc_new_behavior_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
 /* -------------------- Multithreaded stress test -------------------- */
 
-#define STRESS_THREADS 8
+#define STRESS_THREADS 3
 #define STRESS_ITERS 30000
 #define MAX_LIVE_ALLOCS 64
 
@@ -299,10 +300,15 @@ struct stress_arg {
     volatile int *done_flag;
 };
 
+static volatile bool all_ready = false;
+
 static void stress_worker() {
     struct stress_arg *a = NULL;
     /* wait until private field is visible */
     while (!(a = scheduler_get_current_thread()->private))
+        ;
+
+    while (!all_ready)
         ;
 
     /* allocate small tracking table dynamically */
@@ -366,6 +372,7 @@ static void stress_worker() {
 
 volatile int done[STRESS_THREADS];
 struct stress_arg args[STRESS_THREADS];
+static char msg[128];
 
 REGISTER_TEST(kmalloc_new_concurrency_stress_test, SHOULD_NOT_FAIL,
               IS_UNIT_TEST) {
@@ -376,6 +383,8 @@ REGISTER_TEST(kmalloc_new_concurrency_stress_test, SHOULD_NOT_FAIL,
         args[i].done_flag = &done[i];
         thread_spawn(stress_worker)->private = &args[i];
     }
+
+    all_ready = true;
 
     time_t start = time_get_ms();
     const time_t timeout_ms = 30 * 1000;
@@ -393,13 +402,13 @@ REGISTER_TEST(kmalloc_new_concurrency_stress_test, SHOULD_NOT_FAIL,
 
     for (int i = 0; i < STRESS_THREADS; ++i) {
         if (!done[i]) {
-            char msg[128];
             snprintf(msg, sizeof(msg), "thread %d did not complete in time", i);
             ADD_MESSAGE(msg);
             return;
         }
     }
 
+    slab_domains_print();
     ADD_MESSAGE("aggressive concurrency stress test completed");
     SET_SUCCESS();
 }

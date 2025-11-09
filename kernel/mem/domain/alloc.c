@@ -340,6 +340,10 @@ done:
 }
 
 paddr_t domain_alloc_from_domain(struct domain *cd, size_t pages) {
+    paddr_t ret = 0x0;
+    if ((ret = try_alloc_from_arenas(pages)))
+        return ret;
+
     return alloc_from_remote_domain(cd->cores[0]->domain_buddy, pages);
 }
 

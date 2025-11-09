@@ -116,10 +116,8 @@ void defer_init(void) {
 
     struct workqueue_attributes attrs = {
         .capacity = WORKQUEUE_DEFAULT_CAPACITY,
-        .flags = WORKQUEUE_FLAG_AUTO_SPAWN | WORKQUEUE_FLAG_ON_DEMAND |
-                 WORKQUEUE_FLAG_MIGRATABLE_WORKERS,
-        .max_workers = hpet_timer_count, /* Doesn't make much sense
-                                          * to have more than this */
+        .flags = WORKQUEUE_FLAG_ON_DEMAND | WORKQUEUE_FLAG_MIGRATABLE_WORKERS,
+        .max_workers = hpet_timer_count,
         .inactive_check_period =
             {
                 .min = WORKQUEUE_DEFAULT_MIN_INACTIVE_CHECK_PERIOD,

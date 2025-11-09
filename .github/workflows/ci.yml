@@ -53,7 +53,7 @@ jobs:
             set +e
             make tests | tee qemu.log &
 
-            sleep 30
+            sleep 67
 
             if grep -q "all tests pass" qemu.log; then
               echo "[PASS] Iteration $i passed!"

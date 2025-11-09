@@ -1,8 +1,11 @@
 #include "internal.h"
 
 static void signal_callback(struct thread *t) {
-    if (t)
-        ((struct worker *) (t->private))->next_action = WORKER_NEXT_ACTION_RUN;
+    if (t) {
+        struct worker *worker = t->private;
+        if (worker)
+            worker->next_action = WORKER_NEXT_ACTION_RUN;
+    }
 }
 
 static enum workqueue_error signal_worker(struct workqueue *queue) {

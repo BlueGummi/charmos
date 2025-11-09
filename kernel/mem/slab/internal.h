@@ -32,7 +32,7 @@
 #define SLAB_NONPAGEABLE_RESERVED_RATIO (1 / 16)
 #define SLAB_DESTROY_HIGH_WATERMARK 4
 #define SLAB_INTERLEAVE_STRIDE 1
-#define SLAB_MAG_ENTRIES 32
+#define SLAB_MAG_ENTRIES 512
 #define SLAB_MAG_WATERMARK_PCT                                                 \
     15 /* Leave 15% of magazine entries for nonpageable requests */
 #define SLAB_MAG_WATERMARK (SLAB_MAG_ENTRIES * SLAB_MAG_WATERMARK_PCT / 100)
@@ -90,7 +90,7 @@ static const uint64_t slab_class_sizes[] = {
 #define SLAB_SPIKE_THRESHOLD_PCT 50
 
 #define SLAB_CACHE_DISTANCE_WEIGHT 1024
-#define SLAB_CACHE_FLEXIBLE_DISTANCE_WEIGHT 512
+#define SLAB_CACHE_FLEXIBLE_DISTANCE_WEIGHT 256
 
 #define SLAB_EWMA_SCALE 1024 /* Fixed-point precision */
 #define SLAB_EWMA_ALPHA_FP 128
@@ -184,7 +184,7 @@ _Static_assert(offsetof(struct slab, self) == 0,
 /* Just a simple stack */
 struct slab_magazine {
     vaddr_t objs[SLAB_MAG_ENTRIES];
-    uint8_t count;
+    size_t count;
     struct spinlock lock;
 };
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab_magazine, lock);
@@ -403,6 +403,7 @@ struct slab_domain_bucket {
     atomic_size_t alloc_remote_hits; /* Remote cache used (cross-core steal) */
     atomic_size_t alloc_gc_recycle_hits; /* GC provided an available object */
     atomic_size_t alloc_new_slab;        /* Had to allocate a new slab */
+    atomic_size_t alloc_new_remote_slab;
     atomic_size_t alloc_failures;        /* Out of memory or other failures */
 
     /* ---- Free path stats ---- */
@@ -411,6 +412,7 @@ struct slab_domain_bucket {
     atomic_size_t free_to_freelist; /* Freed into endless freelist (overflow) */
     atomic_size_t free_to_local_slab;    /* Freed directly into local slab */
     atomic_size_t free_to_remote_domain; /* Freed to other domain's freelist */
+    atomic_size_t free_to_percpu; 
 
     /* Other */
     atomic_size_t freequeue_enqueues;
@@ -481,7 +483,7 @@ void slab_cache_insert(struct slab_cache *cache, struct slab *slab);
 struct slab *slab_create(struct slab_cache *cache, enum alloc_behavior behavior,
                          bool allow_create_new);
 void *slab_alloc(struct slab_cache *cache, enum alloc_behavior behavior,
-                 bool allow_create_new);
+                 bool allow_create_new, bool called_from_alloc);
 
 /* Magazine + percpu */
 bool slab_magazine_push(struct slab_magazine *mag, vaddr_t obj);

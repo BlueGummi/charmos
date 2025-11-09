@@ -176,6 +176,7 @@ REGISTER_TEST(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         .spawn_delay = 1,
         .inactive_check_period.max = 10000,
         .inactive_check_period.min = 2000,
+        .min_workers = 2,
         .max_workers = 64,
     };
 

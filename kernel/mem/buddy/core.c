@@ -1,9 +1,9 @@
 #include <console/printf.h>
+#include <math/align.h>
 #include <mem/alloc.h>
 #include <mem/bitmap.h>
 #include <mem/buddy.h>
 #include <mem/pmm.h>
-#include <math/align.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
