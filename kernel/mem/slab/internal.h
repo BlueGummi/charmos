@@ -32,7 +32,7 @@
 #define SLAB_NONPAGEABLE_RESERVED_RATIO (1 / 16)
 #define SLAB_DESTROY_HIGH_WATERMARK 4
 #define SLAB_INTERLEAVE_STRIDE 1
-#define SLAB_MAG_ENTRIES 512
+#define SLAB_MAG_ENTRIES 32
 #define SLAB_MAG_WATERMARK_PCT                                                 \
     15 /* Leave 15% of magazine entries for nonpageable requests */
 #define SLAB_MAG_WATERMARK (SLAB_MAG_ENTRIES * SLAB_MAG_WATERMARK_PCT / 100)
