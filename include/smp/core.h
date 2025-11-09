@@ -10,13 +10,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* TODO: move this outta here */
-struct tlb_shootdown_data {
-    atomic_uintptr_t tlb_page;
-    atomic_uint_fast64_t tlb_req_gen;
-    atomic_uint_fast64_t tlb_ack_gen;
-};
-
 /* Let's put commonly accessed fields up here
  * to make the cache a bit happier */
 struct core {
@@ -59,6 +52,8 @@ struct core {
     uint64_t tsc_hz;
     uint64_t last_us;
     uint64_t last_tsc; /* For time.c */
+
+    struct dpc *tlb_shootdown_dpc;
 };
 
 static inline uint64_t smp_core_id() {

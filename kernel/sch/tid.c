@@ -65,7 +65,7 @@ static void tid_range_free(struct tid_space *ts, struct tid_range *r) {
 }
 
 uint64_t tid_alloc(struct tid_space *ts) {
-    enum irql irql = spin_lock_irq_disable(&ts->lock);
+    enum irql irql = spin_lock(&ts->lock);
 
     struct rbt_node *node = rbt_min(&ts->tree);
     if (!node) {
@@ -90,7 +90,7 @@ uint64_t tid_alloc(struct tid_space *ts) {
 }
 
 void tid_free(struct tid_space *ts, uint64_t id) {
-    enum irql irql = spin_lock_irq_disable(&ts->lock);
+    enum irql irql = spin_lock(&ts->lock);
 
     struct rbt_node *node = ts->tree.root;
     struct tid_range *prev = NULL;

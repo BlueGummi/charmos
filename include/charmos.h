@@ -25,8 +25,9 @@ struct charmos_globals {
 
     size_t core_count;
     struct core **cores;
-    struct tlb_shootdown_data *shootdown_data;
+    struct tlb_shootdown_cpu *shootdown_data;
     struct scheduler **schedulers;
+    struct dpc_cpu *dpc_data;
 
     size_t domain_count;
     struct domain **domains;

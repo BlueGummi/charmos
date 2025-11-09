@@ -238,6 +238,22 @@ static inline void invlpg(uint64_t virt) {
     asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
 }
 
+
+static inline uint64_t read_cr3() {
+    uint64_t cr3;
+    asm volatile("mov %%cr3, %0" : "=r"(cr3));
+    return cr3;
+}
+
+static inline void write_cr3(uint64_t cr3) {
+    asm volatile("mov %0, %%cr3" ::"r"(cr3));
+}
+
+static inline void tlb_flush() {
+    uint64_t cr3 = read_cr3();
+    write_cr3(cr3);
+}
+
 static inline void cpu_relax(void) {
     asm volatile("pause");
 }

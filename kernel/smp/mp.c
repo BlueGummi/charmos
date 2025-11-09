@@ -4,6 +4,7 @@
 #include <int/idt.h>
 #include <limine.h>
 #include <mem/alloc.h>
+#include <mem/tlb.h>
 #include <sch/sched.h>
 #include <smp/domain.h>
 #include <smp/smp.h>
@@ -150,7 +151,7 @@ void smp_setup_bsp() {
         k_panic("Could not allocate space for global core structures");
 
     global.shootdown_data =
-        kzalloc(sizeof(struct tlb_shootdown_data) * global.core_count);
+        kzalloc(sizeof(struct tlb_shootdown_cpu) * global.core_count);
     if (!global.shootdown_data)
         k_panic("Could not allocate global shootdown data\n");
 

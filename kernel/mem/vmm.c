@@ -5,6 +5,7 @@
 #include <limine.h>
 #include <linker/symbols.h>
 #include <mem/pmm.h>
+#include <mem/tlb.h>
 #include <mem/vmm.h>
 #include <sch/sched.h>
 #include <smp/smp.h>
@@ -46,53 +47,6 @@ uintptr_t vmm_make_user_pml4(void) {
     }
 
     return (uintptr_t) user_pml4 - global.hhdm_offset;
-}
-
-void tlb_shootdown(void *ctx, uint8_t irq, void *rsp) {
-    (void) ctx, (void) irq, (void) rsp;
-
-    struct tlb_shootdown_data *core = &global.shootdown_data[smp_core_id()];
-    uint64_t gen =
-        atomic_load_explicit(&core->tlb_req_gen, memory_order_acquire);
-
-    vaddr_t page = atomic_load_explicit(&core->tlb_page, memory_order_acquire);
-    if (page)
-        invlpg(page);
-
-    atomic_store_explicit(&core->tlb_page, 0, memory_order_release);
-    atomic_store_explicit(&core->tlb_ack_gen, gen, memory_order_release);
-
-    lapic_write(LAPIC_REG_EOI, 0);
-}
-
-static void do_tlb_shootdown(uintptr_t addr) {
-    if (global.current_bootstage < BOOTSTAGE_MID_MP)
-        return;
-
-    uint64_t gen = atomic_fetch_add(&global.next_tlb_gen, 1);
-    uint64_t this_core = smp_core_id();
-    uint64_t cores = global.core_count;
-
-    for (uint64_t i = 0; i < cores; i++) {
-        if (i == this_core)
-            continue;
-
-        struct tlb_shootdown_data *target = &global.shootdown_data[i];
-        atomic_store_explicit(&target->tlb_page, addr, memory_order_release);
-        atomic_store_explicit(&target->tlb_req_gen, gen, memory_order_release);
-        ipi_send(i, IRQ_TLB_SHOOTDOWN);
-    }
-
-    for (uint64_t i = 0; i < cores; i++) {
-        if (i == this_core)
-            continue;
-
-        struct tlb_shootdown_data *target = &global.shootdown_data[i];
-
-        while (atomic_load_explicit(&target->tlb_ack_gen,
-                                    memory_order_acquire) < gen)
-            cpu_relax();
-    }
 }
 
 void vmm_init(struct limine_memmap_response *memmap,
@@ -224,7 +178,7 @@ enum errno vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     pte_t *entry = &current_table->entries[L2];
     if (ENTRY_PRESENT(*entry)) {
         invlpg(virt);
-        do_tlb_shootdown(virt);
+        tlb_shootdown(virt, false);
     }
     *entry =
         (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT | PAGING_2MB_page;
@@ -267,7 +221,7 @@ void vmm_unmap_2mb_page(uintptr_t virt) {
     page_table_unlock(tables[2], irql);
 
     invlpg(virt);
-    do_tlb_shootdown(virt);
+    tlb_shootdown(virt, false);
 
     for (uint64_t level = 2; level > 0; level--) {
         if (vmm_is_table_empty(tables[level])) {
@@ -308,7 +262,7 @@ enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     pte_t *entry = &current_table->entries[L1];
     if (ENTRY_PRESENT(*entry)) {
         invlpg(virt);
-        do_tlb_shootdown(virt);
+        tlb_shootdown(virt, false);
     }
 
     *entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
@@ -371,7 +325,7 @@ void vmm_unmap_page(uintptr_t virt) {
     page_table_unlock(tables[3], irql);
 
     invlpg(virt);
-    do_tlb_shootdown(virt);
+    tlb_shootdown(virt, false);
     for (uint64_t level = 3; level > 0; level--) {
         if (vmm_is_table_empty(tables[level])) {
             uintptr_t phys = (uintptr_t) tables[level] - global.hhdm_offset;

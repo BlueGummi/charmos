@@ -1,3 +1,4 @@
+#include <mem/tlb.h>
 #include <acpi/lapic.h>
 #include <asm.h>
 #include <compiler.h>
@@ -210,7 +211,7 @@ void idt_init() {
 
     irq_register(IRQ_TIMER, isr_timer_routine, NULL);
     irq_register(IRQ_PANIC, panic_isr, NULL);
-    irq_register(IRQ_TLB_SHOOTDOWN, tlb_shootdown, NULL);
+    irq_register(IRQ_TLB_SHOOTDOWN, tlb_shootdown_isr, NULL);
     irq_register(IRQ_NOP, nop_handler, NULL);
     idt_set_gate(0x80, (uint64_t) syscall_entry, 0x2b, 0xee);
     idt_load();

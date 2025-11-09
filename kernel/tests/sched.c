@@ -188,6 +188,7 @@ REGISTER_TEST(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     }
 
     k_printf("yielding\n");
+    thread_apply_cpu_penalty(scheduler_get_current_thread());
     while (atomic_load(&threads_left) > 0) {
         scheduler_yield();
     }

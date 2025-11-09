@@ -118,6 +118,7 @@ void defer_init(void) {
         .capacity = WORKQUEUE_DEFAULT_CAPACITY,
         .flags = WORKQUEUE_FLAG_ON_DEMAND | WORKQUEUE_FLAG_MIGRATABLE_WORKERS,
         .max_workers = hpet_timer_count,
+        .min_workers = hpet_timer_count,
         .inactive_check_period =
             {
                 .min = WORKQUEUE_DEFAULT_MIN_INACTIVE_CHECK_PERIOD,

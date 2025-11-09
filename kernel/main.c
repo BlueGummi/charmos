@@ -24,10 +24,12 @@
 #include <mem/movealloc.h>
 #include <mem/pmm.h>
 #include <mem/slab.h>
+#include <mem/tlb.h>
 #include <mem/vmm.h>
 #include <registry.h>
 #include <requests.h>
 #include <sch/defer.h>
+#include <sch/dpc.h>
 #include <sch/reaper.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
@@ -92,6 +94,8 @@ void k_main(void) {
     reaper_init();
     bootstage_advance(BOOTSTAGE_MID_TOPOLOGY);
 
+    dpc_init_percpu();
+    tlb_init();
     thread_init_rq_lists();
 
     pmm_late_init();

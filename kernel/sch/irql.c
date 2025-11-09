@@ -1,3 +1,4 @@
+#include <sch/dpc.h>
 #include <sch/sched.h>
 #include <smp/core.h>
 
@@ -52,6 +53,10 @@ void irql_lower(enum irql new_level) {
             scheduler_preemption_enable();
             preempt_re_enabled = true;
         }
+
+        if (irq_in_thread_context() && old > IRQL_DISPATCH_LEVEL &&
+            new_level < IRQL_DISPATCH_LEVEL)
+            dpc_run_local();
 
         if (irq_in_thread_context() && old > IRQL_APC_LEVEL &&
             new_level < IRQL_APC_LEVEL)

@@ -14,5 +14,4 @@ void vmm_unmap_virt(void *addr, uint64_t len);
 uintptr_t vmm_make_user_pml4(void);
 void vmm_map_page_user(uintptr_t pml4_phys, uintptr_t virt, uintptr_t phys,
                        uint64_t flags);
-void tlb_shootdown(void *ctx, uint8_t irq, void *rsp);
 #pragma once
