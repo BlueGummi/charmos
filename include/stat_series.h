@@ -16,6 +16,7 @@
  */
 
 struct stat_bucket {
+    struct stat_series *parent;
     atomic_size_t count; /* count for this bucket */
     atomic_size_t sum;   /* optional aggregate */
     void *private;       /* private, per subsystem */
@@ -23,13 +24,13 @@ struct stat_bucket {
 typedef size_t (*stat_series_callback)(struct stat_bucket *bucket);
 
 struct stat_series {
-    stat_series_callback bucket_reset; /* to call upon bucket reset */
-    struct stat_bucket *buckets;       /* ringbuffer */
-    uint32_t nbuckets;                 /* how many buckets */
-    uint32_t current;                  /* current bucket idx */
-    time_t bucket_us;                  /* duration for each bucket */
-    time_t last_update_us;             /* last time we advanced */
-    void *private;                     /* private, per subsystem */
+    stat_series_callback bucket_reset;   /* to call upon bucket reset */
+    struct stat_bucket *buckets;         /* ringbuffer */
+    uint32_t nbuckets;                   /* how many buckets */
+    atomic_uint_fast32_t current;        /* current bucket idx */
+    time_t bucket_us;                    /* duration for each bucket */
+    atomic_uint_fast64_t last_update_us; /* last time we advanced */
+    void *private;                       /* private, per subsystem */
     struct spinlock lock;
 };
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(stat_series, lock);
@@ -44,12 +45,6 @@ void stat_series_init(struct stat_series *s, struct stat_bucket *buckets,
 void stat_series_reset(struct stat_series *s);
 void stat_series_record(struct stat_series *s, size_t value,
                         stat_series_callback callback);
-
-size_t stat_series_count_sum(struct stat_series *s, uint32_t nbuckets,
-                             stat_series_callback sum_callback);
-
-size_t stat_series_value_sum(struct stat_series *s, uint32_t nbuckets,
-                             stat_series_callback sum_callback);
 
 void stat_series_advance(struct stat_series *s, time_t now_us);
 

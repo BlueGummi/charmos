@@ -148,6 +148,7 @@
 
 #include "internal.h"
 #include "mem/domain/internal.h"
+#include "stat_internal.h"
 
 struct vas_space *slab_vas = NULL;
 struct slab_caches slab_caches = {0};
@@ -272,6 +273,7 @@ struct slab *slab_create_new(struct slab_domain *domain,
 struct slab *slab_create(struct slab_cache *cache, enum alloc_behavior behavior,
                          bool allow_create_new) {
     struct slab *slab = NULL;
+    struct slab_domain *local = slab_domain_local();
 
     /* This is only searched if we are allowed to fault -
      * iteration through GC slabs may touch pageable slabs and
@@ -284,15 +286,20 @@ struct slab *slab_create(struct slab_cache *cache, enum alloc_behavior behavior,
         }
     }
 
-    if (slab)
+    if (slab) {
+        slab_stat_gc_object_reclaimed(local);
         return slab_init(slab, cache);
+    }
 
     if (allow_create_new) {
-        return slab_create_new(cache->parent_domain, cache,
+        slab = slab_create_new(cache->parent_domain, cache,
                                cache->type == SLAB_TYPE_PAGEABLE);
-    } else {
-        return NULL;
+
+        if (slab)
+            slab_stat_alloc_new_slab(local);
     }
+
+    return slab;
 }
 
 static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
@@ -339,12 +346,7 @@ void slab_destroy(struct slab *slab) {
     slab_free_virt_and_phys(virt, phys);
 }
 
-void slab_free(struct slab *slab, void *obj) {
-    struct slab_cache *cache = slab->parent_cache;
-
-    enum irql slab_cache_irql = slab_cache_lock(cache);
-    enum irql irql = slab_lock(slab);
-
+static void slab_bitmap_free(struct slab *slab, void *obj) {
     slab_check_assert(slab);
 
     uint64_t byte_idx;
@@ -356,6 +358,15 @@ void slab_free(struct slab *slab, void *obj) {
 
     SLAB_BITMAP_UNSET(slab->bitmap[byte_idx], bit_mask);
     slab->used -= 1;
+}
+
+void slab_free_old(struct slab *slab, void *obj) {
+    struct slab_cache *cache = slab->parent_cache;
+
+    enum irql slab_cache_irql = slab_cache_lock(cache);
+    enum irql irql = slab_lock(slab);
+
+    slab_bitmap_free(slab, obj);
 
     if (slab->used == 0) {
         slab_move(cache, slab, SLAB_FREE);
@@ -477,7 +488,8 @@ size_t slab_allocation_size(vaddr_t addr) {
     return ksize((void *) addr);
 }
 
-void *kmalloc_pages_raw(size_t size, enum alloc_flags flags) {
+void *kmalloc_pages_raw(struct slab_domain *parent, size_t size,
+                        enum alloc_flags flags) {
     uint64_t total_size = size + sizeof(struct slab_page_hdr);
     uint64_t pages = PAGES_NEEDED_FOR(total_size);
 
@@ -512,6 +524,8 @@ void *kmalloc_pages_raw(size_t size, enum alloc_flags flags) {
     struct slab_page_hdr *hdr = (struct slab_page_hdr *) virt;
     hdr->magic = KMALLOC_PAGE_MAGIC;
     hdr->pages = pages;
+    hdr->domain = parent;
+    hdr->pageable = (flags & ALLOC_FLAG_PAGEABLE);
 
     /* TODO: Do something about #defining the cacheline width */
     if (flags & ALLOC_FLAG_PREFER_CACHE_ALIGNED)
@@ -530,7 +544,8 @@ void *kmalloc(size_t size) {
         slab_caches.caches[idx].objs_per_slab > 0)
         return slab_alloc_old(&slab_caches.caches[idx]);
 
-    return kmalloc_pages_raw(size, ALLOC_FLAGS_NONE);
+    /* we say NULL and just free these to domain 0 */
+    return kmalloc_pages_raw(NULL, size, ALLOC_FLAGS_NONE);
 }
 
 void *kzalloc(uint64_t size) {
@@ -543,9 +558,9 @@ void *kzalloc(uint64_t size) {
 
 void slab_free_page_hdr(struct slab_page_hdr *hdr) {
     uintptr_t virt = (uintptr_t) hdr;
-    uint64_t pages = hdr->pages;
+    uint32_t pages = hdr->pages;
     hdr->magic = 0;
-    for (uint64_t i = 0; i < pages; i++) {
+    for (uint32_t i = 0; i < pages; i++) {
         uintptr_t vaddr = virt + i * PAGE_SIZE;
         paddr_t phys = (paddr_t) vmm_get_phys(vaddr);
         vmm_unmap_page(vaddr);
@@ -567,7 +582,7 @@ void slab_free_addr_to_cache(void *addr) {
     if (!slab)
         k_panic("Likely double free of address 0x%lx\n", addr);
 
-    slab_free(slab, addr);
+    slab_free_old(slab, addr);
 }
 
 void kfree(void *ptr) {
@@ -598,9 +613,9 @@ void *krealloc(void *ptr, uint64_t size) {
     return new_ptr;
 }
 
-void *kmalloc_pages(size_t size, enum alloc_flags flags,
-                    enum alloc_behavior behavior) {
-    void *ret = kmalloc_pages_raw(size, flags);
+void *kmalloc_pages(struct slab_domain *domain, size_t size,
+                    enum alloc_flags flags, enum alloc_behavior behavior) {
+    void *ret = kmalloc_pages_raw(domain, size, flags);
 
     if (alloc_behavior_may_fault(behavior) &&
         !alloc_behavior_is_fast(behavior)) {
@@ -616,19 +631,27 @@ void *kmalloc_pages(size_t size, enum alloc_flags flags,
         slab_free_queue_drain(pcpu, &local->free_queue, target, flush_to_cache);
     }
 
+    if (ret)
+        slab_stat_alloc_page_hit(domain);
+
     return ret;
 }
 
-void *kmalloc_try_from_magazine(size_t size, enum alloc_flags flags) {
+void *kmalloc_try_from_magazine(struct slab_domain *domain,
+                                struct slab_percpu_cache *pcpu, size_t size,
+                                enum alloc_flags flags) {
     size_t class_idx = slab_size_to_index(size);
-    struct slab_percpu_cache *pcpu = slab_percpu_cache_local();
     struct slab_magazine *mag = &pcpu->mag[class_idx];
 
     /* Reserve SLAB_MAG_WATERMARK_PCT% entries for nonpageable requests */
     if (flags & ALLOC_FLAG_PAGEABLE && mag->count < SLAB_MAG_WATERMARK)
         return NULL;
 
-    return (void *) slab_magazine_pop(mag);
+    void *ret = (void *) slab_magazine_pop(mag);
+    if (ret)
+        slab_stat_alloc_magazine_hit(domain);
+
+    return ret;
 }
 
 static size_t slab_free_queue_drain_on_alloc(struct slab_domain *dom,
@@ -733,6 +756,15 @@ struct slab_cache *slab_search_for_cache(struct slab_domain *dom,
     return ret;
 }
 
+void slab_stat_alloc_from_cache(struct slab_cache *cache) {
+    struct slab_domain *local = slab_domain_local();
+    if (cache->parent_domain == local) {
+        slab_stat_alloc_local_hit(local);
+    } else {
+        slab_stat_alloc_remote_hit(local);
+    }
+}
+
 void *slab_alloc(struct slab_cache *cache, enum alloc_behavior behavior,
                  bool allow_create_new) {
     void *ret = NULL;
@@ -745,8 +777,10 @@ void *slab_alloc(struct slab_cache *cache, enum alloc_behavior behavior,
 
     /* First try from lists */
     ret = slab_cache_try_alloc_from_lists(cache);
-    if (ret)
+    if (ret) {
+        slab_stat_alloc_from_cache(cache);
         goto out;
+    }
 
     struct slab *slab = slab_create(cache, behavior, allow_create_new);
     if (!slab)
@@ -797,7 +831,7 @@ void *slab_alloc_retry(struct slab_domain *domain, size_t size,
     /* ok now we have ran the emergency GC, let's try again... */
     if (!kmalloc_size_fits_in_slab(size)) {
         /* here, `domain` should be the local domain... */
-        return kmalloc_pages(size, flags, behavior);
+        return kmalloc_pages(domain, size, flags, behavior);
     } else {
         /* here, `domain` might be another domain */
         struct slab_caches *cs = flags & ALLOC_FLAG_PAGEABLE
@@ -822,14 +856,16 @@ void *kmalloc_new(size_t size, enum alloc_flags flags,
     struct slab_percpu_cache *pcpu = slab_percpu_cache_local();
     struct slab_domain *selected_dom = local_dom;
 
+    slab_stat_alloc_call(local_dom);
+
     /* this has its own path */
     if (!kmalloc_size_fits_in_slab(size)) {
-        ret = kmalloc_pages(size, flags, behavior);
+        ret = kmalloc_pages(local_dom, size, flags, behavior);
         goto garbage_collect;
     }
 
     /* alloc fits in slab - TODO: scale size if cache alignment is requested */
-    ret = kmalloc_try_from_magazine(size, flags);
+    ret = kmalloc_try_from_magazine(local_dom, pcpu, size, flags);
 
     /* if the mag alloc fails, drain our full portion of the freequeue */
     size_t pct = ret ? SLAB_FREE_QUEUE_ALLOC_PCT : 100;
@@ -837,8 +873,9 @@ void *kmalloc_new(size_t size, enum alloc_flags flags,
         slab_free_queue_drain_on_alloc(local_dom, pcpu, behavior, pct);
 
     /* did the initial allocation fail but we drained something? go again... */
-    if (!ret && drained)
-        ret = kmalloc_try_from_magazine(size, flags);
+    if (!ret && drained) {
+        ret = kmalloc_try_from_magazine(local_dom, pcpu, size, flags);
+    }
 
     /* found something -- all done, this is the fastpath.
      * we don't bother with GC or any funny stuff. */
@@ -868,17 +905,228 @@ garbage_collect:
     /* do lightweight alloc GC on successful allocation */
     slab_alloc_gc(local_dom, behavior);
 
-    /* uh oh... we found NOTHING */
-    if (!ret) {
-        /* fail early */
-        if (alloc_behavior_is_fast(behavior))
-            goto exit;
-
-        /* try one last time - this will run emergency GC */
+    /* uh oh... we found NOTHING...
+     * try one last time - this will run emergency GC */
+    if (unlikely(!ret) && !alloc_behavior_is_fast(behavior))
         ret = slab_alloc_retry(selected_dom, size, flags, behavior);
-    }
 
 exit:
+
+    /* only hit if there is truly nothing left */
+    if (unlikely(!ret))
+        slab_stat_alloc_failure(local_dom);
+
     scheduler_unpin_current_thread(thread_flags);
     return ret;
+}
+
+/* okay, our free policy (in terms of freequeue usage) is:
+ *
+ * If the freequeue is the local freequeue, we immediately drain
+ * to the slab cache if the freequeue ringbuffer fills up.
+ *
+ * If the freequeue is a remote freequeue, we first try and add
+ * to its ringbuffer. If this fails, then, if the allocation
+ * is a slab allocation (did not come from kmalloc_pages), we
+ * will add to its freequeue chain if the other allocator is busy
+ * (we look at our stats and see that it is doing a LOT of work)
+ *
+ * Otherwise, if the allocator is not too busy, we just free
+ * to the slab cache on the remote side.
+ *
+ * This freequeue policy is only relevant if we actually
+ * choose to use the freequeue. Hopefully most frees can just
+ * go to the magazine instead of the freequeue.
+ *
+ * Later on we'll do GC and all that fun stuff.
+ *
+ */
+
+bool slab_domain_busy(struct slab_domain *domain) {
+    bool idle = domain_idle(domain->domain);
+    struct slab_domain_bucket *curr = &domain->buckets[domain->stats->current];
+    bool recent_call = curr->alloc_calls && curr->free_calls;
+
+    return recent_call && !idle;
+}
+
+bool kfree_free_queue_enqueue(struct slab_domain *domain, void *ptr,
+                              size_t size, enum alloc_behavior behavior) {
+    struct slab_domain *local = slab_domain_local();
+    vaddr_t vptr = (vaddr_t) ptr;
+
+    /* Splendid, it worked */
+    if (slab_free_queue_ringbuffer_enqueue(&domain->free_queue, vptr))
+        return true;
+
+    /* We don't try to add to our free queue list */
+    if (domain == local)
+        return false;
+
+    /* This will always succeed... */
+    bool fits_in_slab = kmalloc_size_fits_in_slab(size);
+    bool can_fault = alloc_behavior_may_fault(behavior);
+    bool busy = slab_domain_busy(domain);
+
+    if (fits_in_slab && can_fault && busy)
+        return slab_free_queue_list_enqueue(&domain->free_queue, vptr);
+
+    return false;
+}
+
+void kfree_pages(void *ptr, size_t size, enum alloc_behavior behavior) {
+    struct slab_page_hdr *header = slab_page_hdr_for_addr(ptr);
+
+    /* early allocations do not have topology data and set their
+     * `header->domain` to NULL. in this case, we just assume that
+     * we should flush to domain 0 since that is most likely where
+     * the allocation had come from. */
+    struct slab_domain *owner = header->domain;
+    owner = owner ? owner : global.slab_domains[0];
+
+    /* these pages don't turn into slabs and thus don't get added
+     * into the slab caches. instead, we just directly free it to
+     * the physical memory allocator. we will first try and append
+     * to the freequeue ringbuf.
+     *
+     * if that fails, if the allocator is busy, we will append it
+     * to the freequeue freelist, otherwise just flush the allocation.
+     *
+     * only touch the freelist if we are looking at a remote domain */
+
+    /* no touchy */
+    if (!alloc_behavior_may_fault(behavior))
+        kassert(!header->pageable);
+
+    if (kfree_free_queue_enqueue(owner, ptr, size, behavior))
+        return;
+
+    /* could not put it on the freequeue... */
+
+    /* TODO: We can try and figure out how to turn these pages
+     * back into slabs and recycle them as such... for now, it
+     * is fine to just free them to the physical memory allocator */
+    slab_free_page_hdr(header);
+}
+
+static bool kfree_try_free_to_magazine(struct slab_percpu_cache *pcpu,
+                                       void *ptr, size_t size) {
+    struct slab *slab = slab_for_ptr(ptr);
+
+    /* wrong domain */
+    if (slab->parent_cache->parent_domain != pcpu->domain)
+        return false;
+
+    if (slab->type == SLAB_TYPE_PAGEABLE)
+        return false;
+
+    int32_t idx = slab_size_to_index(size);
+    struct slab_magazine *mag = &pcpu->mag[idx];
+    return slab_magazine_push(mag, (vaddr_t) ptr);
+}
+
+static bool kfree_magazine_push_trylock(struct slab_magazine *mag, void *ptr) {
+    vaddr_t vptr = (vaddr_t) ptr;
+    enum irql irql;
+    if (!slab_magazine_trylock(mag, &irql))
+        return false;
+
+    bool ret = slab_magazine_push_internal(mag, vptr);
+
+    slab_magazine_unlock(mag, irql);
+
+    return ret;
+}
+
+static bool kfree_try_put_on_percpu_caches(struct slab_domain *domain,
+                                           void *ptr, size_t size) {
+    int32_t idx = slab_size_to_index(size);
+    for (size_t i = 0; i < domain->domain->num_cores; i++) {
+        struct slab_percpu_cache *try = domain->percpu_caches[i];
+        struct slab_magazine *mag = &try->mag[idx];
+        if (kfree_magazine_push_trylock(mag, ptr))
+            return true;
+    }
+
+    return false;
+}
+
+void slab_free(struct slab_domain *domain, void *obj) {
+    struct slab *slab = slab_for_ptr(obj);
+    struct slab_cache *cache = slab->parent_cache;
+
+    enum irql slab_cache_irql = slab_cache_lock(cache);
+    enum irql irql = slab_lock(slab);
+    slab_bitmap_free(slab, obj);
+
+    if (slab->used == 0) {
+        slab_move(cache, slab, SLAB_FREE);
+        if (slab_should_enqueue_gc(slab)) {
+            slab_list_del(slab);
+            slab_unlock(slab, irql);
+            slab_cache_unlock(cache, slab_cache_irql);
+            slab_gc_enqueue(domain, slab);
+            return;
+        }
+    } else if (slab->state == SLAB_FULL) {
+        slab_move(cache, slab, SLAB_PARTIAL);
+    }
+
+    slab_check_assert(slab);
+    slab_unlock(slab, irql);
+    slab_cache_unlock(cache, slab_cache_irql);
+}
+
+static size_t slab_free_queue_drain_on_free(struct slab_domain *domain,
+                                            struct slab_percpu_cache *pcpu,
+                                            enum alloc_behavior behavior) {
+    if (!alloc_behavior_may_fault(behavior))
+        return 0;
+
+    return slab_free_queue_drain_limited(pcpu, domain, /* pct = */ 100);
+}
+
+void kfree_new(void *ptr, enum alloc_behavior behavior) {
+    enum thread_flags flags = scheduler_pin_current_thread();
+
+    size_t size = ksize(ptr);
+    int32_t idx = slab_size_to_index(size);
+    struct slab_domain *local_domain = slab_domain_local();
+    struct slab_percpu_cache *pcpu = slab_percpu_cache_local();
+
+    if (idx < 0) {
+        kfree_pages(ptr, size, behavior);
+        goto garbage_collect;
+    }
+
+    /* nice, we freed it to the magazine and we are all good now -- fastpath,
+     * so we don't try GC or any funny business */
+    if (kfree_try_free_to_magazine(pcpu, ptr, size))
+        goto exit;
+
+    /* did not free to magazine - this is an alloc from a slab */
+    struct slab *slab = slab_for_ptr(ptr);
+    struct slab_domain *owner = slab->parent_cache->parent_domain;
+
+    /* did not enqueue into the freequeue... try putting it on
+     * any magazine... we acquire the trylock() here... */
+    if (kfree_try_put_on_percpu_caches(owner, ptr, size))
+        goto exit;
+
+    if (kfree_free_queue_enqueue(owner, ptr, size, behavior))
+        goto exit;
+
+    /* could not put on percpu cache or freequeue, now we free to
+     * the slab cache that owns this data */
+    slab_free(owner, ptr);
+
+garbage_collect:
+
+    slab_free_queue_drain_on_free(local_domain, pcpu, behavior);
+
+    enum slab_gc_flags gc_flags = SLAB_GC_FLAG_AGG_STANDARD;
+    slab_gc_run(&local_domain->slab_gc, gc_flags);
+
+exit:
+    scheduler_unpin_current_thread(flags);
 }

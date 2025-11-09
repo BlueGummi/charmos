@@ -100,9 +100,9 @@ static const uint64_t slab_class_sizes[] = {
 
 #define SLAB_SCORE_NONPAGEABLE_BETTER_PCT 25 /* must score 25% better */
 
-/* 64 buckets of 500ms granularity = 32 seconds of data */
+/* 64 buckets of 250ms granularity = 16 seconds of data */
 #define SLAB_STAT_SERIES_CAPACITY 64
-#define SLAB_STAT_SERIES_BUCKET_US MS_TO_US(500)
+#define SLAB_STAT_SERIES_BUCKET_US MS_TO_US(250)
 
 #define kmalloc_validate_params(size, flags, behavior)                         \
     do {                                                                       \
@@ -196,6 +196,7 @@ static inline bool slab_magazine_full(struct slab_magazine *mag) {
 struct slab_percpu_cache {
     /* Magazines are always nonpageable */
     struct slab_magazine mag[SLAB_CLASS_COUNT];
+    struct slab_domain *domain;
 };
 
 struct slab_free_slot {
@@ -243,6 +244,8 @@ struct slab_free_queue {
 
     struct slab_free_queue_list list;
     atomic_size_t count;
+
+    struct slab_domain *parent;
 };
 #define SLAB_FREE_QUEUE_CAPACITY 2048
 #define SLAB_FREE_QUEUE_GET_COUNT(fq) (atomic_load(&(fq)->count))
@@ -386,30 +389,36 @@ struct slab_gc {
 };
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab_gc, lock);
 
+/* NOTE: Every element in this structure must be `size_t`.
+ *
+ * This is because on bucket reset, when we subtract the
+ * reset bucket from the parent, we treat the parent and the
+ * bucket both as a `size_t` array */
 struct slab_domain_bucket {
     /* ---- Allocation path stats ---- */
-    uint64_t alloc_calls;           /* calls to `kmalloc` */
-    uint64_t alloc_magazine_hits;   /* Local magazine served the alloc */
-    uint64_t alloc_local_hits;      /* Local domain cache hit (not magazine) */
-    uint64_t alloc_remote_hits;     /* Remote cache used (cross-core steal) */
-    uint64_t alloc_gc_recycle_hits; /* GC provided an available object */
-    uint64_t alloc_new_slab;        /* Had to allocate a new slab */
-    uint64_t alloc_failures;        /* Out of memory or other failures */
+    atomic_size_t alloc_calls;         /* calls to `kmalloc` */
+    atomic_size_t alloc_magazine_hits; /* Local magazine served the alloc */
+    atomic_size_t alloc_page_hits;     /* Page allocations serviced */
+    atomic_size_t alloc_local_hits;  /* Local domain cache hit (not magazine) */
+    atomic_size_t alloc_remote_hits; /* Remote cache used (cross-core steal) */
+    atomic_size_t alloc_gc_recycle_hits; /* GC provided an available object */
+    atomic_size_t alloc_new_slab;        /* Had to allocate a new slab */
+    atomic_size_t alloc_failures;        /* Out of memory or other failures */
 
     /* ---- Free path stats ---- */
-    uint64_t free_calls;            /* Total calls to kfree() */
-    uint64_t free_to_ring;          /* Freed into local freequeue ringbuffer */
-    uint64_t free_to_freelist;      /* Freed into endless freelist (overflow) */
-    uint64_t free_to_local_slab;    /* Freed directly into local slab */
-    uint64_t free_to_remote_domain; /* Freed to another domain's freelist */
+    atomic_size_t free_calls;       /* Total calls to kfree() */
+    atomic_size_t free_to_ring;     /* Freed into local freequeue ringbuffer */
+    atomic_size_t free_to_freelist; /* Freed into endless freelist (overflow) */
+    atomic_size_t free_to_local_slab;    /* Freed directly into local slab */
+    atomic_size_t free_to_remote_domain; /* Freed to other domain's freelist */
 
-    /* ---- Background operations ---- */
-    uint64_t freequeue_enqueues;
-    uint64_t freequeue_dequeues;
-    uint64_t freelist_enqueues;
-    uint64_t freelist_dequeues;
-    uint64_t gc_collections;       /* Number of times GC ran */
-    uint64_t gc_objects_reclaimed; /* Objects GC returned to free state */
+    /* Other */
+    atomic_size_t freequeue_enqueues;
+    atomic_size_t freequeue_dequeues;
+    atomic_size_t freelist_enqueues;
+    atomic_size_t freelist_dequeues;
+    atomic_size_t gc_collections;       /* Number of times GC ran */
+    atomic_size_t gc_objects_reclaimed; /* Objects GC returned to free state */
 };
 
 struct slab_domain {
@@ -441,6 +450,8 @@ struct slab_domain {
     struct workqueue *workqueue;
 
     struct stat_series *stats;
+    struct slab_domain_bucket *buckets;
+    struct slab_domain_bucket aggregate;
 };
 
 static inline struct domain_buddy *
@@ -450,7 +461,9 @@ slab_domain_buddy(struct slab_domain *domain) {
 
 struct slab_page_hdr {
     uint32_t magic;
-    uint32_t pages;
+    bool pageable : 1; /* Pack it in here to keep this at 2 qwords in size */
+    uint32_t pages : 31;
+    struct slab_domain *domain;
 };
 
 struct slab *slab_init(struct slab *slab, struct slab_cache *parent);
@@ -471,6 +484,7 @@ void *slab_alloc(struct slab_cache *cache, enum alloc_behavior behavior,
 
 /* Magazine + percpu */
 bool slab_magazine_push(struct slab_magazine *mag, vaddr_t obj);
+bool slab_magazine_push_internal(struct slab_magazine *mag, vaddr_t obj);
 vaddr_t slab_magazine_pop(struct slab_magazine *mag);
 void slab_percpu_free(struct slab_domain *dom, size_t class_idx, vaddr_t obj);
 void slab_free_addr_to_cache(void *addr);
@@ -480,11 +494,12 @@ void slab_percpu_refill(struct slab_domain *dom,
                         enum alloc_behavior behavior);
 
 /* Freequeue */
-void slab_free_queue_init(struct slab_free_queue *q, size_t capacity);
+void slab_free_queue_init(struct slab_domain *domain, struct slab_free_queue *q,
+                          size_t capacity);
 bool slab_free_queue_ringbuffer_enqueue(struct slab_free_queue *q,
                                         vaddr_t addr);
 vaddr_t slab_free_queue_ringbuffer_dequeue(struct slab_free_queue *q);
-void slab_free_queue_list_enqueue(struct slab_free_queue *q, vaddr_t addr);
+bool slab_free_queue_list_enqueue(struct slab_free_queue *q, vaddr_t addr);
 vaddr_t slab_free_queue_list_dequeue(struct slab_free_queue *q);
 vaddr_t slab_free_queue_dequeue(struct slab_free_queue *q);
 size_t slab_free_queue_drain(struct slab_percpu_cache *cache,

@@ -33,10 +33,10 @@ static void run(bool run_units, struct kernel_test *start,
         k_printf("[%-4d]: ", i);
         k_printf("%s... ", t->name);
 
-        uint64_t start_ms = hpet_timestamp_ms();
+        uint64_t start_ms = time_get_ms();
         /* supa important */
         t->func();
-        uint64_t end_ms = hpet_timestamp_ms();
+        uint64_t end_ms = time_get_ms();
 
         if (t->skipped) {
             k_printf(ANSI_GRAY " skipped  " ANSI_RESET);

@@ -20,6 +20,7 @@ struct tlb_shootdown_data {
 /* Let's put commonly accessed fields up here
  * to make the cache a bit happier */
 struct core {
+    struct core *self;
     size_t id;
     struct thread *current_thread;
 
@@ -56,8 +57,6 @@ struct core {
     uint64_t tsc_hz;
     uint64_t last_us;
     uint64_t last_tsc; /* For time.c */
-
-    struct core *core;
 };
 
 static inline uint64_t smp_core_id() {
@@ -69,5 +68,9 @@ static inline uint64_t smp_core_id() {
 }
 
 static inline struct core *smp_core(void) {
-    return global.cores[smp_core_id()];
+    uintptr_t core;
+    asm volatile("movq %%gs:%c1, %0"
+                 : "=r"(core)
+                 : "i"(offsetof(struct core, self)));
+    return (struct core *) core;
 }

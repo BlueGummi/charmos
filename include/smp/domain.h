@@ -24,6 +24,7 @@ static inline size_t domain_local_id(void) {
 void domain_init(void);
 struct cpu_mask *domain_create_cpu_mask(struct domain *domain);
 void domain_set_cpu_mask(struct cpu_mask *mask, struct domain *domain);
+bool domain_idle(struct domain *domain);
 
 #define domain_for_each(__dom, __pos)                                         \
     for (size_t __i = 0;                                                       \

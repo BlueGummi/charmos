@@ -126,8 +126,15 @@ struct scheduler_data {
 
 extern struct scheduler_data scheduler_data;
 
+/* We directly read out of GS to save a singular instruction
+ * that would be used if we did smp_core()->current_thread because
+ * that would do a tiny pointer arithmetic op */
 static inline struct thread *scheduler_get_current_thread() {
-    return global.cores[smp_core_id()]->current_thread;
+    uintptr_t thread;
+    asm volatile("movq %%gs:%c1, %0"
+                 : "=r"(thread)
+                 : "i"(offsetof(struct core, current_thread)));
+    return (struct thread *) thread;
 }
 
 static inline enum thread_flags scheduler_pin_current_thread() {

@@ -40,7 +40,6 @@ void scheduler_force_resched(struct scheduler *sched) {
         }
 
         scheduler_mark_core_needs_resched(other, true);
-        if (scheduler_core_idle(other))
-            ipi_send(sched->core_id, IRQ_SCHEDULER);
+        ipi_send(sched->core_id, IRQ_SCHEDULER);
     }
 }

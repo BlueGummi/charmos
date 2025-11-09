@@ -4,17 +4,22 @@
 #include "internal.h"
 #include "mem/domain/internal.h"
 
+bool slab_magazine_push_internal(struct slab_magazine *mag, vaddr_t obj) {
+    kassert(spinlock_held(&mag->lock));
+    if (mag->count < SLAB_MAG_ENTRIES) {
+        mag->objs[mag->count++] = obj;
+        return true;
+    }
+    return false;
+}
+
 bool slab_magazine_push(struct slab_magazine *mag, vaddr_t obj) {
     enum irql irql = slab_magazine_lock(mag);
 
-    if (mag->count < SLAB_MAG_ENTRIES) {
-        mag->objs[mag->count++] = obj;
-        slab_magazine_unlock(mag, irql);
-        return true;
-    }
+    bool ret = slab_magazine_push_internal(mag, obj);
 
     slab_magazine_unlock(mag, irql);
-    return false;
+    return ret;
 }
 
 vaddr_t slab_magazine_pop(struct slab_magazine *mag) {
@@ -153,6 +158,7 @@ void slab_domain_percpu_init(struct slab_domain *domain) {
         if (!domain->percpu_caches[i])
             k_panic("Could not allocate domain's percpu caches\n");
 
+        domain->percpu_caches[i]->domain = domain;
         for (size_t j = 0; j < SLAB_CLASS_COUNT; j++) {
             struct slab_magazine *mag = &domain->percpu_caches[i]->mag[j];
             mag->count = 0;

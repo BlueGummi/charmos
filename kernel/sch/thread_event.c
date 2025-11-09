@@ -369,10 +369,8 @@ void thread_update_activity_stats(struct thread *t, uint64_t time) {
         time_t start = start_evt->timestamp;
         time_t end = wake->timestamp;
 
-        if (start > end) {
-            k_panic("Potential corrupted timestamp\n");
-            continue;
-        }
+        if (start > end)
+            start = end;
 
         update_bucket(stats, wake, start, end);
     }

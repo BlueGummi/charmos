@@ -1,6 +1,7 @@
 #include <charmos.h>
 #include <console/printf.h>
 #include <mem/alloc.h>
+#include <sch/sched.h>
 #include <smp/domain.h>
 #include <stdbool.h>
 #include <sync/spinlock.h>
@@ -145,6 +146,14 @@ static void domains_move(void *a, void *b) {
         struct domain *domain = global.domains[i];
         movealloc(domain->id, domain);
     }
+}
+
+bool domain_idle(struct domain *domain) {
+    for (size_t i = 0; i < domain->num_cores; i++)
+        if (!scheduler_core_idle(domain->cores[i]))
+            return false;
+
+    return true;
 }
 
 REGISTER_MOVEALLOC_CALLBACK(domain_move, domains_move, /* a = */ NULL,

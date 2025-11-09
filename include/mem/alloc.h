@@ -243,6 +243,7 @@ void *kzalloc_aligned(uint64_t size, uint64_t align);
 void kfree_aligned(void *ptr);
 void *kmalloc_new(size_t size, enum alloc_flags flags,
                   enum alloc_behavior behavior);
+void kfree_new(void *ptr, enum alloc_behavior behavior);
 void *kmalloc_from_domain(size_t domain, size_t size);
 
 #pragma once

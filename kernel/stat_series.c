@@ -14,6 +14,9 @@ void stat_series_init(struct stat_series *s, struct stat_bucket *buckets,
     s->last_update_us = time_get_us();
     s->private = private;
     spinlock_init(&s->lock);
+
+    for (size_t i = 0; i < nbuckets; i++)
+        s->buckets[i].parent = s;
 }
 
 struct stat_series *stat_series_create(uint32_t nbuckets, time_t bucket_us,
@@ -43,7 +46,6 @@ void stat_series_reset(struct stat_series *s) {
     stat_series_for_each(s, bucket) {
         atomic_store(&bucket->count, 0);
         atomic_store(&bucket->sum, 0);
-        bucket->private = NULL;
         s->bucket_reset(bucket);
     }
 
@@ -53,15 +55,28 @@ void stat_series_reset(struct stat_series *s) {
 void stat_series_advance_internal(struct stat_series *s, time_t now_us,
                                   bool already_locked) {
     enum irql irql;
+
+    if (!already_locked) {
+        /* Fast-path: check without taking lock */
+        time_t last = atomic_load(&s->last_update_us);
+        size_t delta = now_us - last;
+        uint32_t steps = delta / s->bucket_us;
+        if (steps == 0)
+            return; /* no rotation required, avoid locking */
+    } else {
+        kassert(spinlock_held(&s->lock));
+    }
+
+    /* Take lock and re-check/recompute using the protected fields */
     if (!already_locked) {
         irql = stat_series_lock(s);
     } else {
         kassert(spinlock_held(&s->lock));
     }
 
+    /* re-evaluate based on locked state (canonical update) */
     size_t delta = now_us - s->last_update_us;
     uint32_t steps = delta / s->bucket_us;
-
     if (steps == 0)
         goto out;
 
@@ -69,16 +84,17 @@ void stat_series_advance_internal(struct stat_series *s, time_t now_us,
         steps = s->nbuckets;
 
     for (uint32_t i = 0; i < steps; i++) {
+        /* update canonical non-atomic s->current while holding lock */
         s->current = (s->current + 1) % s->nbuckets;
         struct stat_bucket *bucket = &s->buckets[s->current];
 
         atomic_store(&bucket->count, 0);
         atomic_store(&bucket->sum, 0);
-        bucket->private = NULL;
         s->bucket_reset(bucket);
     }
 
-    s->last_update_us += steps * s->bucket_us;
+    /* publish last_update_us atomically for lockless readers/writers */
+    atomic_store(&s->last_update_us, s->last_update_us + steps * s->bucket_us);
 
 out:
     if (!already_locked)
@@ -91,50 +107,18 @@ void stat_series_advance(struct stat_series *s, time_t now_us) {
 
 void stat_series_record(struct stat_series *s, size_t value,
                         stat_series_callback callback) {
-    enum irql irql = stat_series_lock(s);
-
     time_t now_us = time_get_us();
-    stat_series_advance_internal(s, now_us, /* already_locked = */ true);
 
-    struct stat_bucket *b = &s->buckets[s->current];
+    /* attempt to advance if needed */
+    stat_series_advance_internal(s, now_us, /* already_locked = */ false);
+
+    /* read canonical current published by advance (atomic load) */
+    uint32_t cur = atomic_load(&s->current); /* acquire ordering */
+    struct stat_bucket *b = &s->buckets[cur];
+
+    /* hot path: only atomic RMWs on bucket */
     atomic_fetch_add(&b->count, 1);
     atomic_fetch_add(&b->sum, value);
-    callback(b);
-
-    stat_series_unlock(s, irql);
-}
-
-size_t stat_series_count_sum(struct stat_series *s, uint32_t nbuckets,
-                             stat_series_callback sum_callback) {
-    enum irql irql = stat_series_lock(s);
-
-    size_t total = 0;
-    if (nbuckets > s->nbuckets)
-        nbuckets = s->nbuckets;
-
-    for (uint32_t i = 0; i < nbuckets; i++) {
-        uint32_t idx = (s->current + s->nbuckets - i) % s->nbuckets;
-        total += atomic_load(&s->buckets[idx].count);
-        total += sum_callback(&s->buckets[idx]);
-    }
-
-    stat_series_unlock(s, irql);
-    return total;
-}
-
-size_t stat_series_value_sum(struct stat_series *s, uint32_t nbuckets,
-                             stat_series_callback sum_callback) {
-    enum irql irql = stat_series_lock(s);
-    size_t total = 0;
-    if (nbuckets > s->nbuckets)
-        nbuckets = s->nbuckets;
-
-    for (uint32_t i = 0; i < nbuckets; i++) {
-        uint32_t idx = (s->current + s->nbuckets - i) % s->nbuckets;
-        total += atomic_load(&s->buckets[idx].sum);
-        total += sum_callback(&s->buckets[idx]);
-    }
-
-    stat_series_unlock(s, irql);
-    return total;
+    if (callback)
+        callback(b);
 }

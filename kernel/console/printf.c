@@ -1,6 +1,7 @@
 #include <asm.h>
 #include <limine.h>
 #include <limits.h>
+#include <logo.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -68,6 +69,8 @@ void k_printf_init(struct limine_framebuffer *fb) {
         fb->red_mask_size, fb->red_mask_shift, fb->green_mask_size,
         fb->green_mask_shift, fb->blue_mask_size, fb->blue_mask_shift, NULL,
         NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 1, 0, 0, 0);
+
+    k_printf("%s", OS_LOGO_SMALL);
 }
 
 static int print_signed(char *buffer, int64_t num) {

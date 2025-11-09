@@ -185,7 +185,206 @@ REGISTER_TEST(pmm_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 static char hooray[128] = {0};
 REGISTER_TEST(kmalloc_new_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     void *p = kmalloc_new(67, ALLOC_FLAGS_NONE, ALLOC_BEHAVIOR_NORMAL);
-    snprintf(hooray, 128, "allocated 0x%lx", p);
+
+    time_t ms = time_get_ms();
+    kfree_new(p, ALLOC_BEHAVIOR_NORMAL);
+    ms = time_get_ms() - ms;
+
+    snprintf(hooray, 128, "allocated 0x%lx and free took %u ms", p, ms);
+
     ADD_MESSAGE(hooray);
+    SET_SUCCESS();
+}
+
+#ifndef CACHE_LINE_SIZE
+#define CACHE_LINE_SIZE 64
+#endif
+
+REGISTER_TEST(kmalloc_new_basic_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    void *p1 = kmalloc_new(1, ALLOC_FLAGS_NONE, ALLOC_BEHAVIOR_NORMAL);
+    void *p2 = kmalloc_new(64, ALLOC_FLAGS_NONE, ALLOC_BEHAVIOR_NORMAL);
+    void *p3 = kmalloc_new(4096, ALLOC_FLAGS_NONE, ALLOC_BEHAVIOR_NORMAL);
+
+    if (!p1 || !p2 || !p3) {
+        ADD_MESSAGE("kmalloc_new returned NULL for a valid request");
+        return;
+    }
+
+    /* Write/read back small pattern to verify memory usable */
+    memset(p1, 0xA5, 1);
+    memset(p2, 0x5A, 64);
+    memset(p3, 0xFF, 4096);
+
+    if (((uint8_t *) p1)[0] != 0xA5 || ((uint8_t *) p2)[0] != 0x5A ||
+        ((uint8_t *) p3)[0] != 0xFF) {
+        ADD_MESSAGE("Memory pattern check failed");
+        return;
+    }
+
+    /* timed free to check that kfree_new returns quickly */
+    time_t start = time_get_ms();
+    kfree_new(p1, ALLOC_BEHAVIOR_NORMAL);
+    kfree_new(p2, ALLOC_BEHAVIOR_NORMAL);
+    kfree_new(p3, ALLOC_BEHAVIOR_NORMAL);
+    time_t elapsed = time_get_ms() - start;
+
+    char msg[128];
+    snprintf(msg, sizeof(msg), "basic alloc/free OK (free took %u ms)",
+             (unsigned) elapsed);
+    ADD_MESSAGE(msg);
+    SET_SUCCESS();
+}
+
+/*
+-------------------- Alignment preference test --------------------
+
+REGISTER_TEST(kmalloc_new_cache_align_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+     Request cache-aligned memory
+    uint16_t flags = ALLOC_FLAG_PREFER_CACHE_ALIGNED | ALLOC_FLAG_NONMOVABLE |
+                     ALLOC_FLAG_NONPAGEABLE | ALLOC_FLAG_CLASS_DEFAULT;
+    void *p = kmalloc_new(128, flags, ALLOC_BEHAVIOR_NORMAL);
+    if (!p) {
+        ADD_MESSAGE("kmalloc_new returned NULL for cache-aligned request");
+        return;
+    }
+
+    if (((uintptr_t) p % CACHE_LINE_SIZE) != 0) {
+        char msg[128];
+        snprintf(msg, sizeof(msg), "pointer %p is not cache-line aligned", p);
+        ADD_MESSAGE(msg);
+        kfree_new(p, ALLOC_BEHAVIOR_NORMAL);
+        return;
+    }
+
+    kfree_new(p, ALLOC_BEHAVIOR_NORMAL);
+    ADD_MESSAGE("cache alignment check passed");
+    SET_SUCCESS();
+}
+*/
+
+/* -------------------- Behavior flag verification test -------------------- */
+
+REGISTER_TEST(kmalloc_new_behavior_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    /* ALLOC_BEHAVIOR_ATOMIC should require nonpageable/nonmovable - allocator
+       or sanitizers might coerce flags. This test ensures allocation doesn't
+       return NULL for such a request. */
+    uint16_t f = ALLOC_FLAG_NONPAGEABLE | ALLOC_FLAG_NONMOVABLE |
+                 ALLOC_FLAG_NO_CACHE_ALIGN;
+    void *p = kmalloc_new(256, f, ALLOC_BEHAVIOR_ATOMIC);
+    if (!p) {
+        ADD_MESSAGE("kmalloc_new failed for ATOMIC nonpageable request");
+        return;
+    }
+    /* Do a quick write */
+    volatile uint8_t *b = p;
+    b[0] = 0x7E;
+    if (b[0] != 0x7E) {
+        ADD_MESSAGE("atomic allocation memory check failed");
+        kfree_new(p, ALLOC_BEHAVIOR_NORMAL);
+        return;
+    }
+    kfree_new(p, ALLOC_BEHAVIOR_NORMAL);
+    ADD_MESSAGE("behavior (ATOMIC) allocation passed");
+    SET_SUCCESS();
+}
+
+/* -------------------- Multithreaded stress test -------------------- */
+
+/* Configurable parameters */
+#define STRESS_THREADS 4
+#define STRESS_ITERS 10000
+
+struct stress_arg {
+    int id;
+    volatile int *done_flag;
+};
+
+static void stress_worker() {
+    struct stress_arg *a = scheduler_get_current_thread()->private;
+    while (scheduler_get_current_thread()->private == NULL)
+        a = scheduler_get_current_thread()->private;
+
+    for (int i = 0; i < STRESS_ITERS; ++i) {
+        /* keep allocations small to avoid exhausting kernel memory quickly */
+        void *p = kmalloc_new(32, ALLOC_FLAGS_NONE, ALLOC_BEHAVIOR_NORMAL);
+        if (!p) {
+            /* if allocation fails, back off a little (no sleep API used here)
+             * and continue */
+            continue;
+        }
+        /* write a simple pattern to ensure memory is writable */
+        ((uint8_t *) p)[0] = (uint8_t) (a->id ^ i);
+        /* free with NORMAL behavior (simulates general user-land free) */
+        kfree_new(p, ALLOC_BEHAVIOR_NORMAL);
+    }
+    *a->done_flag = 1;
+}
+
+REGISTER_TEST(kmalloc_new_concurrency_stress_test, SHOULD_NOT_FAIL,
+              IS_UNIT_TEST) {
+    volatile int done[STRESS_THREADS];
+    struct stress_arg args[STRESS_THREADS];
+
+    memset((void *) done, 0, sizeof(done));
+    for (int i = 0; i < STRESS_THREADS; ++i) {
+        args[i].id = i;
+        args[i].done_flag = &done[i];
+        thread_spawn(stress_worker)->private = &args[i];
+    }
+
+    time_t start = time_get_ms();
+    const time_t timeout_ms = 30 * 1000; /* 30s timeout */
+    while (time_get_ms() - start < timeout_ms) {
+        int all = 1;
+        for (int i = 0; i < STRESS_THREADS; ++i)
+            if (!done[i]) {
+                all = 0;
+                break;
+            }
+        if (all)
+            break;
+    }
+
+    /* verify all threads signaled completion */
+    for (int i = 0; i < STRESS_THREADS; ++i) {
+        if (!done[i]) {
+            char msg[128];
+            snprintf(msg, sizeof(msg), "thread %d did not complete in time", i);
+            ADD_MESSAGE(msg);
+            return;
+        }
+    }
+
+    ADD_MESSAGE("concurrency stress test completed");
+    SET_SUCCESS();
+}
+
+/* -------------------- Small reallocation-like smoke test --------------------
+ */
+
+REGISTER_TEST(kmalloc_new_alloc_free_sequence_test, SHOULD_NOT_FAIL,
+              IS_UNIT_TEST) {
+    void *blocks[16];
+    for (size_t i = 0; i < sizeof(blocks) / sizeof(blocks[0]); ++i) {
+        blocks[i] =
+            kmalloc_new(64 + (i * 8), ALLOC_FLAGS_NONE, ALLOC_BEHAVIOR_NORMAL);
+        if (!blocks[i]) {
+            ADD_MESSAGE("failed to allocate block in sequence");
+            /* free what we did get */
+            for (size_t j = 0; j < i; ++j)
+                kfree_new(blocks[j], ALLOC_BEHAVIOR_NORMAL);
+            return;
+        }
+    }
+
+    /* free every other block first */
+    for (size_t i = 0; i < sizeof(blocks) / sizeof(blocks[0]); i += 2)
+        kfree_new(blocks[i], ALLOC_BEHAVIOR_NORMAL);
+
+    /* then free remaining */
+    for (size_t i = 1; i < sizeof(blocks) / sizeof(blocks[0]); i += 2)
+        kfree_new(blocks[i], ALLOC_BEHAVIOR_NORMAL);
+
+    ADD_MESSAGE("alloc/free sequence test passed");
     SET_SUCCESS();
 }

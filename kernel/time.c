@@ -1,11 +1,12 @@
 #include <acpi/hpet.h>
 #include <asm.h>
 #include <console/printf.h>
+#include <sch/sched.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <time.h>
 
-#define HPET_REFRESH_CYCLES (smp_core()->tsc_hz / 100)
+#define TIME_REFRESH_CYCLES (smp_core()->tsc_hz / 100)
 #define CMOS_ADDRESS 0x70
 #define CMOS_DATA 0x71
 
@@ -135,17 +136,22 @@ uint64_t time_get_us(void) {
     if (global.current_bootstage < BOOTSTAGE_MID_MP)
         return hpet_timestamp_us();
 
+    enum thread_flags flags = scheduler_pin_current_thread();
+
     uint64_t now_tsc = rdtsc();
     uint64_t delta = now_tsc - smp_core()->last_tsc;
 
-    if (delta < HPET_REFRESH_CYCLES && smp_core()->last_us != 0) {
+    if (delta < TIME_REFRESH_CYCLES && smp_core()->last_us != 0) {
         uint64_t elapsed_us = (delta * 1000000ULL) / smp_core()->tsc_hz;
-        return smp_core()->last_us + elapsed_us;
+        uint64_t ret = smp_core()->last_us + elapsed_us;
+        scheduler_unpin_current_thread(flags);
+        return ret;
     }
 
     uint64_t now_us = hpet_timestamp_us();
     smp_core()->last_us = now_us;
     smp_core()->last_tsc = now_tsc;
+    scheduler_unpin_current_thread(flags);
     return now_us;
 }
 

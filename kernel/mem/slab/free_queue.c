@@ -10,7 +10,8 @@
  * "Flushing" is when the free_queue elements are all freed from the
  * slab cache. The per-core magazines are not touched */
 
-void slab_free_queue_init(struct slab_free_queue *q, size_t capacity) {
+void slab_free_queue_init(struct slab_domain *domain, struct slab_free_queue *q,
+                          size_t capacity) {
     q->capacity = capacity;
     q->slots = kzalloc(sizeof(struct slab_free_slot) * capacity);
     if (!q->slots)
@@ -22,6 +23,7 @@ void slab_free_queue_init(struct slab_free_queue *q, size_t capacity) {
     for (size_t i = 0; i < capacity; i++)
         atomic_store(&q->slots[i].seq, i);
 
+    q->parent = domain;
     q->list.elements = 0;
     q->count = 0;
     q->list.head = NULL;
@@ -112,6 +114,7 @@ static void free_queue_list_add_internal(struct slab_free_queue_list *q,
         q->tail = n;
     }
 
+    n->next = NULL;
     q->elements++;
 }
 
@@ -143,7 +146,7 @@ void slab_free_queue_enqueue_chain(struct slab_free_queue *queue,
 }
 
 /* This will always succeed */
-void slab_free_queue_list_enqueue(struct slab_free_queue *q, vaddr_t addr) {
+bool slab_free_queue_list_enqueue(struct slab_free_queue *q, vaddr_t addr) {
     enum irql irql = slab_free_queue_list_lock(&q->list);
     struct slab_free_queue_list_node *node = (void *) addr;
 
@@ -153,6 +156,8 @@ void slab_free_queue_list_enqueue(struct slab_free_queue *q, vaddr_t addr) {
     slab_free_queue_list_unlock(&q->list, irql);
 
     SLAB_FREE_QUEUE_INC_COUNT(q);
+
+    return true;
 }
 
 vaddr_t slab_free_queue_list_dequeue(struct slab_free_queue *q) {

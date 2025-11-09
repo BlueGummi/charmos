@@ -78,6 +78,27 @@ void slab_domain_init_caches(struct slab_domain *dom) {
 
 static size_t slab_bucket_reset(struct stat_bucket *bucket) {
     struct slab_domain_bucket *db = bucket->private;
+    struct slab_domain *sd = bucket->parent->private;
+    struct slab_domain_bucket *agg = &sd->aggregate;
+    size_t stats_len =
+        sizeof(struct slab_domain_bucket) / sizeof(atomic_size_t);
+
+    atomic_size_t *parent_stats = (atomic_size_t *) agg;
+    atomic_size_t *bucket_stats = (atomic_size_t *) db;
+
+    /* Subtract this bucket's values from the parent */
+    for (size_t i = 0; i < stats_len; i++) {
+        size_t val = bucket_stats[i];
+        atomic_size_t *parent = &parent_stats[i];
+
+        /* This would underflow anyways... */
+        if (*parent < val) {
+            atomic_store(parent, 0);
+        } else {
+            atomic_fetch_sub(parent, val);
+        }
+    }
+
     memset(db, 0, sizeof(struct slab_domain_bucket));
     return 0;
 }
@@ -87,8 +108,17 @@ void slab_domain_init_stats(struct slab_domain *domain) {
                                        SLAB_STAT_SERIES_BUCKET_US,
                                        slab_bucket_reset, domain);
 
-    if (!domain->stats || !domain->stats->buckets)
+    domain->stats->private = domain;
+    domain->buckets =
+        kzalloc(sizeof(struct slab_domain_bucket) * SLAB_STAT_SERIES_CAPACITY);
+
+    if (!domain->stats || !domain->stats->buckets || !domain->buckets)
         k_panic("Failed to create domain stat series\n");
+
+    struct stat_bucket *iter;
+    stat_series_for_each(domain->stats, iter) {
+        iter->private = &domain->buckets[__i];
+    }
 }
 
 void slab_domain_init(void) {
@@ -105,11 +135,13 @@ void slab_domain_init(void) {
 
         sdomain->domain = domain;
         slab_gc_init(sdomain);
-        slab_free_queue_init(&sdomain->free_queue, SLAB_FREE_QUEUE_CAPACITY);
+        slab_free_queue_init(sdomain, &sdomain->free_queue,
+                             SLAB_FREE_QUEUE_CAPACITY);
         slab_domain_init_daemon(sdomain);
         slab_domain_init_workqueue(sdomain);
         slab_domain_percpu_init(sdomain);
         slab_domain_init_caches(sdomain);
+        slab_domain_init_stats(sdomain);
     }
 
     for (size_t i = 0; i < global.domain_count; i++)

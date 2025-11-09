@@ -73,7 +73,7 @@ static struct core *setup_cpu(uint64_t cpu) {
     if (!c)
         k_panic("Core %d could not allocate space for struct\n", cpu);
     c->id = cpu;
-    c->core = c;
+    c->self = c;
     c->tsc_hz = tsc_calibrate();
     init_smt_info(c);
     detect_llc(&c->llc);
@@ -87,7 +87,7 @@ static inline void set_core_awake(void) {
     atomic_fetch_add_explicit(&cores_awake, 1, memory_order_release);
     if (atomic_load_explicit(&cores_awake, memory_order_acquire) ==
         (global.core_count - 1)) {
-        global.current_bootstage = BOOTSTAGE_MID_MP;
+        bootstage_advance(BOOTSTAGE_MID_MP);
     }
 }
 
@@ -142,6 +142,7 @@ void smp_setup_bsp() {
         k_panic("Could not allocate space for core structure on BSP");
 
     c->id = 0;
+    c->self = c;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
     global.cores = kmalloc(sizeof(struct core *) * global.core_count);
 

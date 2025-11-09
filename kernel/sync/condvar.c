@@ -1,8 +1,10 @@
 #include <sch/defer.h>
 #include <sync/condvar.h>
 
-static void do_block_on_queue(struct thread_queue *q) {
+static void do_block_on_queue(struct thread_queue *q, struct spinlock *lock,
+                              enum irql irql) {
     thread_block_on(q);
+    spin_unlock(lock, irql);
     scheduler_yield();
 }
 
@@ -12,8 +14,7 @@ enum wake_reason condvar_wait(struct condvar *cv, struct spinlock *lock,
     curr->wake_reason = WAKE_REASON_NONE;
     curr->wait_cookie++;
 
-    spin_unlock(lock, irql);
-    do_block_on_queue(&cv->waiters);
+    do_block_on_queue(&cv->waiters, lock, irql);
     *out = spin_lock(lock);
 
     return curr->wake_reason;
