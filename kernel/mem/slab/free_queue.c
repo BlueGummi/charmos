@@ -254,7 +254,7 @@ size_t slab_free_queue_drain(struct slab_percpu_cache *cache,
     flush:
         if (flush_to_cache) {
             /* Directly flush to the slab cache */
-            slab_free_addr_to_cache((void *) addr);
+            slab_free(cache->domain, (void *) addr);
         } else {
             /* We will thread a list through the addresses and add
              * the list onto the free_queue_list of the slab cache
@@ -272,7 +272,8 @@ size_t slab_free_queue_drain(struct slab_percpu_cache *cache,
     return drained_to_magazine;
 }
 
-size_t slab_free_queue_flush(struct slab_free_queue *queue) {
+size_t slab_free_queue_flush(struct slab_domain *domain,
+                             struct slab_free_queue *queue) {
     size_t total_freed = 0;
 
     /* Drain the ringbuffer one element at a time */
@@ -281,7 +282,7 @@ size_t slab_free_queue_flush(struct slab_free_queue *queue) {
         if (addr == 0x0)
             return total_freed;
 
-        slab_free_addr_to_cache((void *) addr);
+        slab_free(domain, (void *) addr);
     }
 
     /* Detach the whole list and free it all in one go */
@@ -289,7 +290,7 @@ size_t slab_free_queue_flush(struct slab_free_queue *queue) {
 
     while (node) {
         struct slab_free_queue_list_node *next = node->next;
-        slab_free_addr_to_cache(node);
+        slab_free(domain, (void *) node);
         node = next;
     }
 }

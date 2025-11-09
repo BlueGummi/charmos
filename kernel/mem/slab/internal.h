@@ -474,6 +474,7 @@ int32_t slab_size_to_index(size_t size);
 void *slab_alloc_old(struct slab_cache *cache);
 void slab_free_page_hdr(struct slab_page_hdr *hdr);
 size_t slab_allocation_size(vaddr_t addr);
+void slab_free(struct slab_domain *domain, void *obj);
 void *slab_cache_try_alloc_from_lists(struct slab_cache *c);
 void slab_cache_init(size_t order, struct slab_cache *cache, uint64_t obj_size);
 void slab_cache_insert(struct slab_cache *cache, struct slab *slab);
@@ -579,7 +580,7 @@ static inline struct slab_domain *slab_domain_local(void) {
 }
 
 static inline struct slab_percpu_cache *slab_percpu_cache_local(void) {
-    return slab_domain_local()->percpu_caches[smp_core_id()];
+    return slab_domain_local()->percpu_caches[smp_core()->domain_cpu_id];
 }
 
 static inline void slab_list_del(struct slab *slab) {

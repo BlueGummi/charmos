@@ -1,6 +1,7 @@
 #include <int/idt.h>
 #include <kassert.h>
 #include <sch/sched.h>
+#include <smp/core.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -34,7 +35,11 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
     task->last_ran = sched->core_id;
     scheduler_increment_thread_count(sched, task);
 
-    if (!sched->period_enabled && sched->total_thread_count > 1) {
+    bool is_local = sched == smp_core_scheduler();
+    bool period_disabled = !sched->period_enabled;
+
+    if (period_disabled && (is_local ? sched->total_thread_count >= 1
+                                     : sched->total_thread_count > 1)) {
         sched->period_enabled = true;
         scheduler_period_start(sched, time_get_ms());
     }
@@ -48,14 +53,22 @@ void scheduler_enqueue(struct thread *t) {
     uint64_t min_load = UINT64_MAX;
 
     for (uint64_t i = 0; i < global.core_count; i++) {
-        if (global.schedulers[i]->total_thread_count < min_load) {
-            min_load = global.schedulers[i]->total_thread_count;
+        size_t this_load = global.schedulers[i]->total_thread_count;
+
+        if (global.cores && global.cores[i] &&
+            !scheduler_core_idle(global.cores[i]))
+            this_load++;
+
+        if (this_load < min_load) {
+            min_load = this_load;
             s = global.schedulers[i];
         }
     }
 
     scheduler_add_thread(s, t, false);
     scheduler_force_resched(s);
+    if (s == smp_core_scheduler() && irq_in_thread_context())
+        scheduler_yield();
 }
 
 /* TODO: Make scheduler_add_thread an internal function so I don't need to

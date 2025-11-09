@@ -5,7 +5,6 @@
 #include "mem/domain/internal.h"
 
 bool slab_magazine_push_internal(struct slab_magazine *mag, vaddr_t obj) {
-    kassert(spinlock_held(&mag->lock));
     if (mag->count < SLAB_MAG_ENTRIES) {
         mag->objs[mag->count++] = obj;
         return true;
@@ -55,7 +54,7 @@ size_t slab_cache_bulk_alloc(struct slab_cache *cache, vaddr_t *addr_array,
         /* We don't allow allocations of new slabs - that
          * is not the point of our percpu caches */
         bool allow_new = false;
-        void *obj = slab_create(cache, behavior, allow_new);
+        void *obj = slab_alloc(cache, behavior, allow_new);
         if (!obj)
             break;
 
@@ -71,7 +70,7 @@ void slab_cache_bulk_free(struct slab_domain *domain, vaddr_t *addr_array,
         vaddr_t addr = addr_array[i];
 
         if (!slab_free_queue_ringbuffer_enqueue(&domain->free_queue, addr))
-            slab_free_addr_to_cache((void *) addr);
+            slab_free(domain, (void *) addr);
     }
 
     return;

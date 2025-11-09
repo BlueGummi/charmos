@@ -290,9 +290,9 @@ REGISTER_TEST(kmalloc_new_behavior_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
 /* -------------------- Multithreaded stress test -------------------- */
 
-/* Configurable parameters */
-#define STRESS_THREADS 4
-#define STRESS_ITERS 10000
+#define STRESS_THREADS 8
+#define STRESS_ITERS 30000
+#define MAX_LIVE_ALLOCS 64
 
 struct stress_arg {
     int id;
@@ -300,32 +300,77 @@ struct stress_arg {
 };
 
 static void stress_worker() {
-    struct stress_arg *a = scheduler_get_current_thread()->private;
-    while (scheduler_get_current_thread()->private == NULL)
-        a = scheduler_get_current_thread()->private;
+    struct stress_arg *a = NULL;
+    /* wait until private field is visible */
+    while (!(a = scheduler_get_current_thread()->private))
+        ;
 
-    for (int i = 0; i < STRESS_ITERS; ++i) {
-        /* keep allocations small to avoid exhausting kernel memory quickly */
-        void *p = kmalloc_new(32, ALLOC_FLAGS_NONE, ALLOC_BEHAVIOR_NORMAL);
-        if (!p) {
-            /* if allocation fails, back off a little (no sleep API used here)
-             * and continue */
-            continue;
+    /* allocate small tracking table dynamically */
+    void **live_ptrs = kmalloc(sizeof(void *) * MAX_LIVE_ALLOCS);
+    memset(live_ptrs, 0, sizeof(void *) * MAX_LIVE_ALLOCS);
+
+    for (int iter = 0; iter < STRESS_ITERS; ++iter) {
+        /* 1 in 8 chance to free something early (chaotic order) */
+        if ((prng_next() & 7) == 0) {
+            int idx = prng_next() % MAX_LIVE_ALLOCS;
+            if (live_ptrs[idx]) {
+                kfree_new(live_ptrs[idx], ALLOC_BEHAVIOR_NORMAL);
+                live_ptrs[idx] = NULL;
+            }
         }
-        /* write a simple pattern to ensure memory is writable */
-        ((uint8_t *) p)[0] = (uint8_t) (a->id ^ i);
-        /* free with NORMAL behavior (simulates general user-land free) */
-        kfree_new(p, ALLOC_BEHAVIOR_NORMAL);
+
+        /* Allocate with randomized size and flags */
+        size_t sz = 8 + (prng_next() % 512); /* small to moderate allocations */
+        uint16_t flags = ALLOC_FLAGS_NONE;
+
+        if (prng_next() & 1) {
+            flags |= ALLOC_FLAG_PREFER_CACHE_ALIGNED;
+            flags &= ~ALLOC_FLAG_NO_CACHE_ALIGN;
+        }
+        if (prng_next() & 2) {
+            flags |= ALLOC_FLAG_NONMOVABLE;
+            flags &= ~ALLOC_FLAG_MOVABLE;
+        } else {
+            flags |= ALLOC_FLAG_MOVABLE;
+            flags &= ~ALLOC_FLAG_NONMOVABLE;
+        }
+
+        enum alloc_behavior behavior = (prng_next() & 3)
+                                           ? ALLOC_BEHAVIOR_NORMAL
+                                           : ALLOC_BEHAVIOR_NO_RECLAIM;
+
+        void *p = kmalloc_new(sz, flags, behavior);
+        if (!p)
+            continue;
+
+        /* write simple pattern to verify memory */
+        ((uint8_t *) p)[0] = (uint8_t) (a->id + iter);
+        ((uint8_t *) p)[sz - 1] = (uint8_t) (a->id ^ iter);
+
+        /* randomly decide where to place it */
+        int idx = prng_next() % MAX_LIVE_ALLOCS;
+        if (live_ptrs[idx])
+            kfree_new(live_ptrs[idx], ALLOC_BEHAVIOR_NORMAL);
+        live_ptrs[idx] = p;
     }
+
+    /* Final cleanup */
+    for (int i = 0; i < MAX_LIVE_ALLOCS; ++i) {
+        if (live_ptrs[i])
+            kfree_new(live_ptrs[i], ALLOC_BEHAVIOR_NORMAL);
+    }
+
+    kfree(live_ptrs);
     *a->done_flag = 1;
 }
 
+volatile int done[STRESS_THREADS];
+struct stress_arg args[STRESS_THREADS];
+
 REGISTER_TEST(kmalloc_new_concurrency_stress_test, SHOULD_NOT_FAIL,
               IS_UNIT_TEST) {
-    volatile int done[STRESS_THREADS];
-    struct stress_arg args[STRESS_THREADS];
-
     memset((void *) done, 0, sizeof(done));
+
     for (int i = 0; i < STRESS_THREADS; ++i) {
         args[i].id = i;
         args[i].done_flag = &done[i];
@@ -333,19 +378,19 @@ REGISTER_TEST(kmalloc_new_concurrency_stress_test, SHOULD_NOT_FAIL,
     }
 
     time_t start = time_get_ms();
-    const time_t timeout_ms = 30 * 1000; /* 30s timeout */
+    const time_t timeout_ms = 30 * 1000;
     while (time_get_ms() - start < timeout_ms) {
         int all = 1;
-        for (int i = 0; i < STRESS_THREADS; ++i)
+        for (int i = 0; i < STRESS_THREADS; ++i) {
             if (!done[i]) {
                 all = 0;
                 break;
             }
+        }
         if (all)
             break;
     }
 
-    /* verify all threads signaled completion */
     for (int i = 0; i < STRESS_THREADS; ++i) {
         if (!done[i]) {
             char msg[128];
@@ -355,7 +400,7 @@ REGISTER_TEST(kmalloc_new_concurrency_stress_test, SHOULD_NOT_FAIL,
         }
     }
 
-    ADD_MESSAGE("concurrency stress test completed");
+    ADD_MESSAGE("aggressive concurrency stress test completed");
     SET_SUCCESS();
 }
 

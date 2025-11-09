@@ -113,6 +113,13 @@ void domain_init(void) {
         construct_domains_from_cores();
     }
 
+    for (size_t i = 0; i < global.domain_count; i++) {
+        struct domain *domain = global.domains[i];
+        for (size_t j = 0; j < domain->num_cores; j++) {
+            domain->cores[j]->domain_cpu_id = j;
+        }
+    }
+
     domain_dump();
 }
 

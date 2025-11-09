@@ -64,13 +64,14 @@ static inline bool spin_trylock_raw(struct spinlock *lock) {
 
 static inline bool spin_trylock(struct spinlock *lock, enum irql *out) {
     bool expected = 0;
+    *out = irql_raise(IRQL_DISPATCH_LEVEL);
     if (atomic_compare_exchange_strong_explicit(&lock->state, &expected, 1,
                                                 memory_order_acquire,
                                                 memory_order_relaxed)) {
-        *out = irql_raise(IRQL_DISPATCH_LEVEL);
         return true;
     }
 
+    irql_lower(*out);
     return false;
 }
 

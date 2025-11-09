@@ -24,6 +24,8 @@ struct core {
     size_t id;
     struct thread *current_thread;
 
+    size_t domain_cpu_id; /* what CPU in the domain? */
+
     atomic_bool idle;
 
     bool in_interrupt;

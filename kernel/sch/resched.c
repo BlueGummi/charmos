@@ -25,7 +25,7 @@ void scheduler_mark_self_idle(bool new) {
 }
 
 bool scheduler_core_idle(struct core *c) {
-    return atomic_load(&c->idle) || global.schedulers[c->id]->current ==
+    return atomic_load(&c->idle) && global.schedulers[c->id]->current ==
                                         global.schedulers[c->id]->idle_thread;
 }
 
