@@ -59,6 +59,7 @@ size_t slab_cache_bulk_alloc(struct slab_cache *cache, vaddr_t *addr_array,
         if (!obj)
             break;
 
+        total_allocated++;
         addr_array[i] = (vaddr_t) obj;
     }
 
@@ -104,6 +105,9 @@ vaddr_t slab_percpu_refill_class(struct slab_domain *dom,
 
     size_t remaining = SLAB_MAG_ENTRIES - mag->count;
     remaining /= 8;
+
+    if (remaining == 0)
+        remaining = 1;
 
     vaddr_t objs[remaining];
     

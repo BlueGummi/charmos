@@ -201,6 +201,7 @@ REGISTER_TEST(kmalloc_new_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 #define CACHE_LINE_SIZE 64
 #endif
 
+static char a_msg[128];
 REGISTER_TEST(kmalloc_new_basic_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     void *p1 = kmalloc_new(1, ALLOC_FLAGS_NONE, ALLOC_BEHAVIOR_NORMAL);
     void *p2 = kmalloc_new(64, ALLOC_FLAGS_NONE, ALLOC_BEHAVIOR_NORMAL);
@@ -229,10 +230,9 @@ REGISTER_TEST(kmalloc_new_basic_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     kfree_new(p3, ALLOC_BEHAVIOR_NORMAL);
     time_t elapsed = time_get_ms() - start;
 
-    char msg[128];
-    snprintf(msg, sizeof(msg), "basic alloc/free OK (free took %u ms)",
+    snprintf(a_msg, sizeof(a_msg), "basic alloc/free OK (free took %u ms)",
              (unsigned) elapsed);
-    ADD_MESSAGE(msg);
+    ADD_MESSAGE(a_msg);
     SET_SUCCESS();
 }
 

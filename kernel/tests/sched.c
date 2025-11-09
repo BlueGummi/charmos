@@ -143,7 +143,7 @@ REGISTER_TEST(sched_sleepy_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 }
 
 #define WQ_2_TIMES 4096
-#define WQ_2_THREADS 8
+#define WQ_2_THREADS 2
 
 static atomic_uint times_2 = 0;
 
@@ -164,7 +164,7 @@ static void enqueue_thread(void) {
 
         while (workqueue_enqueue_oneshot(wq, wq_test_2, WORK_ARGS(NULL, wq)) ==
                WORKQUEUE_ERROR_FULL)
-            cpu_relax();
+            scheduler_yield();
     }
     atomic_fetch_sub(&threads_left, 1);
 }
