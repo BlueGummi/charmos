@@ -4,12 +4,12 @@
 #pragma once
 #include <asm.h>
 #include <mem/alloc.h>
-#include <structures/list.h>
-#include <structures/rbt.h>
 #include <sch/apc.h>
 #include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <structures/list.h>
+#include <structures/rbt.h>
 #include <sync/spinlock.h>
 #include <time.h>
 #include <types/refcount.h>

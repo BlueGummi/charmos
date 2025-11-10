@@ -16,7 +16,10 @@ struct vas_set {
     unsigned ncpus;
     struct vas_space **spaces; /* array length ncpus; each pointer to a
                                   vas_space created by vas_space_bootstrap() */
+    struct spinlock lock;
 };
+
+SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(vas_set, lock);
 
 /* bootstraps a vas_set for ncpus; must not call kmalloc/kfree */
 struct vas_set *vas_set_bootstrap(vaddr_t base, vaddr_t limit, unsigned ncpus);

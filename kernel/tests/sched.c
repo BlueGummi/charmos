@@ -162,9 +162,8 @@ static void enqueue_thread(void) {
         for (uint64_t i = 0; i < 500; i++)
             cpu_relax();
 
-        while (workqueue_enqueue_oneshot(wq, wq_test_2, WORK_ARGS(NULL, wq)) ==
-               WORKQUEUE_ERROR_FULL)
-            scheduler_yield();
+        workqueue_enqueue_oneshot(wq, wq_test_2, WORK_ARGS(NULL, wq));
+        scheduler_yield();
     }
     atomic_fetch_sub(&threads_left, 1);
 }

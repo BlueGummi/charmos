@@ -64,7 +64,7 @@ static void worker_destroy(struct workqueue *queue, struct worker *worker) {
 
         if (!found)
             k_panic("Potential corrupted worker 0x%lx in STATIC_WORKERS "
-                    "workqueue\n");
+                    "workqueue\n", worker);
 
         workqueue_worker_array_unlock(queue, irql);
     } else {

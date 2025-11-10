@@ -26,7 +26,12 @@ struct scheduler *scheduler_pick_victim(struct scheduler *self) {
         bool victim_busy = atomic_load(&potential_victim->being_robbed) ||
                            atomic_load(&potential_victim->stealing_work);
 
-        uint64_t victim_scaled = potential_victim->total_thread_count * 100;
+        size_t victim_thread_count = potential_victim->total_thread_count;
+        if (global.cores && global.cores[i] &&
+            !scheduler_core_idle(global.cores[i]))
+            victim_thread_count++;
+
+        uint64_t victim_scaled = victim_thread_count * 100;
         uint64_t scaled =
             self->total_thread_count * scheduler_data.steal_min_diff;
         bool victim_is_poor = victim_scaled < scaled;
@@ -35,7 +40,7 @@ struct scheduler *scheduler_pick_victim(struct scheduler *self) {
             continue;
 
         if (potential_victim->total_thread_count > max_thread_count) {
-            max_thread_count = potential_victim->total_thread_count;
+            max_thread_count = victim_thread_count;
             victim = potential_victim;
         }
     }

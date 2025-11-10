@@ -88,72 +88,8 @@ struct vas_space *vas_space_init(vaddr_t base, vaddr_t limit) {
 
 vaddr_t vas_alloc(struct vas_space *vas, size_t size, size_t align) {
     return vas_set_alloc(vas->percpu_sets, size, align);
-
-    enum irql irql = vas_space_lock(vas);
-
-    vaddr_t prev_end = ALIGN_UP(vas->base, align);
-
-    struct rbt_node *node = rbt_min(&vas->tree);
-    while (node) {
-        struct vas_range *vr = rbt_entry(node, struct vas_range, node);
-
-        if (prev_end + size <= vr->start) {
-            struct vas_range *new_range = vasrange_alloc(vas);
-            if (!new_range)
-                goto out;
-
-            new_range->start = prev_end;
-            new_range->length = size;
-            new_range->node.data = new_range->start;
-            rbt_insert(&vas->tree, &new_range->node);
-            vas_space_unlock(vas, irql);
-            return prev_end;
-        }
-
-        prev_end = ALIGN_UP(vr->start + vr->length, align);
-        node = rbt_next(node);
-    }
-
-    if (prev_end + size <= vas->limit) {
-        struct vas_range *new_range = vasrange_alloc(vas);
-        if (!new_range)
-            goto out;
-
-        new_range->start = prev_end;
-        new_range->length = size;
-        new_range->node.data = new_range->start;
-        rbt_insert(&vas->tree, &new_range->node);
-        vas_space_unlock(vas, irql);
-        return prev_end;
-    }
-
-out:
-    vas_space_unlock(vas, irql);
-    return 0;
 }
 
 void vas_free(struct vas_space *vas, vaddr_t addr) {
     return vas_set_free(vas->percpu_sets, addr);
-
-    enum irql irql = vas_space_lock(vas);
-
-    struct rbt_node *node = vas->tree.root;
-    while (node) {
-        struct vas_range *vr = rbt_entry(node, struct vas_range, node);
-
-        if (addr < vr->start) {
-            node = node->left;
-        } else if (addr > vr->start) {
-            node = node->right;
-        } else {
-            rbt_remove(&vas->tree, vr->node.data);
-            vasrange_free(vas, vr);
-            vas_space_unlock(vas, irql);
-            return;
-        }
-    }
-
-    vas_space_unlock(vas, irql);
-    bool invalid_free_happened = true;
-    kassert(invalid_free_happened == true);
 }

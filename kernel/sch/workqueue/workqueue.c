@@ -191,6 +191,8 @@ static void mark_worker_exit(struct thread *t) {
         struct worker *worker = t->private;
         if (worker)
             worker->next_action = WORKER_NEXT_ACTION_EXIT;
+        else
+            k_printf("thread with NULL private 0x%lx detected\n", t);
     }
 }
 
@@ -227,10 +229,10 @@ void workqueue_destroy(struct workqueue *queue) {
     /* All workers now idle */
     condvar_broadcast_callback(&queue->queue_cv, mark_worker_exit);
 
-    thread_apply_cpu_penalty(scheduler_get_current_thread());
     while (workqueue_workers(queue) > 0) {
-        condvar_broadcast_callback(&queue->queue_cv, mark_worker_exit);
+        thread_apply_cpu_penalty(scheduler_get_current_thread());
         scheduler_yield();
+        condvar_broadcast_callback(&queue->queue_cv, mark_worker_exit);
     }
 
     workqueue_put(queue);

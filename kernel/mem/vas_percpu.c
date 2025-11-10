@@ -72,6 +72,8 @@ struct vas_set *vas_set_init(vaddr_t base, vaddr_t limit, unsigned ncpus) {
     set->ncpus = ncpus;
     set->per_size = (size_t) (limit - base) / ncpus;
     set->spaces = kzalloc(sizeof(struct vas_space *) * ncpus);
+    spinlock_init(&set->lock);
+
     if (!set->spaces) {
         k_panic("OOM\n");
     }
@@ -79,6 +81,7 @@ struct vas_set *vas_set_init(vaddr_t base, vaddr_t limit, unsigned ncpus) {
         vaddr_t sb = base + (vaddr_t) (i * set->per_size);
         vaddr_t sl = (i == ncpus - 1) ? limit : (sb + (vaddr_t) set->per_size);
         set->spaces[i] = vas_space_init_internal(sb, sl);
+        spinlock_init(&set->spaces[i]->lock);
         if (!set->spaces[i]) {
             k_panic("OOM\n");
         }
@@ -133,6 +136,9 @@ out:
 
 vaddr_t vas_set_alloc(struct vas_set *set, size_t size, size_t align) {
     enum thread_flags flags = scheduler_pin_current_thread();
+
+    enum irql irql = vas_set_lock(set);
+
     unsigned cpu = vas_percpu_id();
     vaddr_t ret = 0;
 
@@ -140,6 +146,7 @@ vaddr_t vas_set_alloc(struct vas_set *set, size_t size, size_t align) {
     struct vas_space *local = set->spaces[cpu];
     ret = vas_space_try_alloc_local(local, size, align);
     if (ret) {
+        vas_set_unlock(set, irql);
         scheduler_unpin_current_thread(flags);
         return ret;
     }
@@ -153,15 +160,17 @@ vaddr_t vas_set_alloc(struct vas_set *set, size_t size, size_t align) {
             break;
     }
 
+    vas_set_unlock(set, irql);
     scheduler_unpin_current_thread(flags);
     return ret; /* 0 on failure */
 }
 
 void vas_set_free(struct vas_set *set, vaddr_t addr) {
+    return;
     enum thread_flags flags = scheduler_pin_current_thread();
+    enum irql set_irql = vas_set_lock(set);
 
     if (addr < set->base || addr >= set->limit) {
-        scheduler_unpin_current_thread(flags);
         kassert(false && "vas_set_free: address outside set range");
         return;
     }
@@ -185,14 +194,11 @@ void vas_set_free(struct vas_set *set, vaddr_t addr) {
             rbt_remove(&owner->tree, vr->node.data);
             vasrange_free(owner, vr);
             vas_space_unlock(owner, irql);
+            vas_set_unlock(set, set_irql);
             scheduler_unpin_current_thread(flags);
             return;
         }
     }
 
-    vas_space_unlock(owner, irql);
-    scheduler_unpin_current_thread(flags);
-
-    bool invalid_free_happened = true;
-    kassert(invalid_free_happened == true);
+    k_panic("invalid free of 0x%lx\n", addr);
 }

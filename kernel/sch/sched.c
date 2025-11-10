@@ -204,7 +204,6 @@ static inline struct thread *load_idle_thread(struct scheduler *sched) {
     /* Idle thread has no need to have a timeslice
      * No preemption will be occurring since nothing else runs */
     disable_period(sched);
-    tick_disable();
 
     struct idle_thread_data *idle = smp_core_idle_thread();
 
@@ -225,21 +224,20 @@ static void change_timeslice(struct scheduler *sched, struct thread *next) {
          * tracking when we have
          * one thread running */
         disable_period(sched);
-        tick_disable();
         return;
     }
 
     if (THREAD_PRIO_HAS_TIMESLICE(next->perceived_priority)) {
         /* Timesharing threads need timeslices */
         change_timeslice_duration(next->timeslice_length_raw_ms);
-    } else {
-        /* RT threads do not share time*/
-        tick_disable();
     }
 }
 
 static inline void context_switch(struct thread *curr, struct thread *next) {
     rcu_mark_quiescent();
+
+    /* assert that we are switching somewhere - for debug */
+    kassert(next->regs.rip);
 
     next->context_switches++;
 

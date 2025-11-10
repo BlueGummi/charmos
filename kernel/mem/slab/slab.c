@@ -395,11 +395,11 @@ void slab_free_old(struct slab *slab, void *obj) {
 static void *slab_try_alloc_from_slab_list(struct slab_cache *cache,
                                            struct list_head *list) {
     kassert(spinlock_held(&cache->lock));
-    struct list_head *node, *pos;
+    struct list_head *node, *temp;
     struct slab *slab;
     void *ret = NULL;
 
-    list_for_each_safe(node, pos, list) {
+    list_for_each_safe(node, temp, list) {
         slab = slab_from_list_node(node);
         kassert(slab->state != SLAB_FULL);
         ret = slab_alloc_from(cache, slab);

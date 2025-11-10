@@ -12,10 +12,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define HALT                                                                   \
-    while (1)                                                                  \
-        disable_interrupts();                                                  \
-    wait_for_interrupt();
+#define HALT k_panic("UBSAN HALT ASSERTED\n");
 
 #define is_aligned(value, align) (((value) & ((align) - 1)) == 0)
 
@@ -239,9 +236,6 @@ void __ubsan_handle_type_mismatch(data_type_mismatch_t *data, void *pointer) {
                                       "cast to virtual base of",
                                       "nonnull binding to",
                                       "dynamic operation on"};
-    if (strcmp(data->location.filename, "src/flanterm/backends/fb.c") == 0) {
-        HALT return;
-    }
     if (pointer == NULL) {
         k_printf(
             "UBSAN: type_mismatch @ %s:%u:%u (%s NULL pointer of type %s)\n",
@@ -280,9 +274,6 @@ void __ubsan_handle_type_mismatch_v1(data_type_mismatch_t *data,
                                       "nonnull binding to",
                                       "dynamic operation on"};
     data->alignment = 1UL << data->alignment;
-    if (strcmp(data->location.filename, "src/flanterm/backends/fb.c") == 0) {
-        HALT return;
-    }
     if (pointer == NULL) {
         k_printf(
             "UBSAN: type_mismatch @ %s:%u:%u (%s NULL pointer of type %s)\n",
