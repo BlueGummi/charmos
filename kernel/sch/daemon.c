@@ -47,7 +47,7 @@ static void daemon_list_add(struct daemon *daemon,
 static void daemon_list_del(struct daemon *daemon,
                             struct daemon_thread *thread) {
     enum irql irql = daemon_lock(daemon);
-    list_del(&thread->list_node);
+    list_del_init(&thread->list_node);
     daemon_unlock(daemon, irql);
 }
 

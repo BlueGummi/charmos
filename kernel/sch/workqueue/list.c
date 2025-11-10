@@ -33,7 +33,7 @@ void worklist_add_work(struct worklist *list, struct work *task) {
 
 void worklist_remove_work(struct worklist *list, struct work *task) {
     enum irql irql = worklist_lock(list);
-    list_del(&task->list_node);
+    list_del_init(&task->list_node);
 
     if (list_empty(&list->list))
         worklist_change_state(list, WORKLIST_STATE_EMPTY);

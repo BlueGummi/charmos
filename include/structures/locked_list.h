@@ -33,14 +33,14 @@ static inline void locked_list_add(struct locked_list *ll,
 
 static inline void locked_list_del(struct locked_list *ll,
                                    struct list_head *lh) {
-    LOCKED_LIST_DO(ll, list_del(lh));
+    LOCKED_LIST_DO(ll, list_del_init(lh));
     LOCKED_LIST_DEC_NUM_ELEMS(ll);
 }
 
 static inline void locked_list_del_locked(struct locked_list *ll,
                                           struct list_head *lh) {
     kassert(spinlock_held(&ll->lock));
-    list_del(lh);
+    list_del_init(lh);
     LOCKED_LIST_DEC_NUM_ELEMS(ll);
 }
 

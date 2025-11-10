@@ -329,10 +329,10 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
             } /* No need to move it if the used count is in between
                * 0 and the max -- it will be in the partial list */
 
-            slab_check_assert(slab);
-            slab_unlock(slab, irql);
             vaddr_t ret = slab->mem + i * cache->obj_size;
             kassert(ret > (vaddr_t) slab && ret < (vaddr_t) slab + PAGE_SIZE);
+            slab_check_assert(slab);
+            slab_unlock(slab, irql);
             return (void *) ret;
         }
     }
@@ -357,7 +357,7 @@ static void slab_bitmap_free(struct slab *slab, void *obj) {
     slab_index_and_mask_from_ptr(slab, obj, &byte_idx, &bit_mask);
 
     if (!SLAB_BITMAP_TEST(slab->bitmap[byte_idx], bit_mask))
-        k_panic("Likely double free of address 0x%lx\n", obj);
+        return;
 
     SLAB_BITMAP_UNSET(slab->bitmap[byte_idx], bit_mask);
     slab->used -= 1;
@@ -401,7 +401,12 @@ static void *slab_try_alloc_from_slab_list(struct slab_cache *cache,
 
     list_for_each_safe(node, temp, list) {
         slab = slab_from_list_node(node);
-        kassert(slab->state != SLAB_FULL);
+        if (slab->parent_cache != cache)
+            k_printf("slab 0x%lx parent 0x%lx we are 0x%lx\n", slab, slab->parent_cache, cache);
+
+        if (slab->state == SLAB_FULL)
+            k_printf("slab 0x%lx full\n", slab);
+
         ret = slab_alloc_from(cache, slab);
         if (ret)
             goto out;

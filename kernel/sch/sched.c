@@ -203,6 +203,7 @@ static void load_thread(struct scheduler *sched, struct thread *next,
 static inline struct thread *load_idle_thread(struct scheduler *sched) {
     /* Idle thread has no need to have a timeslice
      * No preemption will be occurring since nothing else runs */
+    scheduler_change_timeslice_duration(SECONDS_TO_MS(1));
     disable_period(sched);
 
     struct idle_thread_data *idle = smp_core_idle_thread();

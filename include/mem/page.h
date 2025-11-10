@@ -14,7 +14,7 @@
 #define PAGING_XD (1UL << 63) // E(x)ecute (D)isable
 #define PAGING_PHYS_MASK (0x00FFFFFFF000UL)
 #define PAGING_PAGE_SIZE (1UL << 7)
-#define PAGING_UNCACHABLE (1UL << 4)
+#define PAGING_UNCACHABLE ((1UL << 4) | PAGING_WRITE)
 #define PAGING_NO_FLAGS (0)
 #define PAGING_WRITETHROUGH (1UL << 3)
 #define PAGING_2MB_page (1ULL << 7)

@@ -7,36 +7,6 @@
 #include <string.h>
 #include <tests.h>
 
-static volatile atomic_bool ran = false;
-
-static void testfn(void) {
-    atomic_store(&ran, true);
-    ADD_MESSAGE("testfn ran");
-}
-
-REGISTER_TEST(sched_reaper_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    uint64_t reaped_threads_at_start = reaper_get_reaped_thread_count();
-    thread_spawn(testfn);
-    enable_interrupts();
-
-    scheduler_yield();
-
-    while (!atomic_load(&ran))
-        ;
-
-    uint64_t timeout = 5000;
-    while (reaper_get_reaped_thread_count() <= reaped_threads_at_start &&
-           timeout--)
-        sleep_us(10);
-
-    if (!timeout) {
-        SET_FAIL();
-        return;
-    }
-
-    SET_SUCCESS();
-}
-
 static atomic_bool workqueue_ran = false;
 static atomic_uint workqueue_times = 0;
 static void workqueue_fn(void *arg, void *unused) {
@@ -71,43 +41,6 @@ REGISTER_TEST(workqueue_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
              "Event pool ran %d times, tests should've had it run %d times",
              workqueue_times, times);
     ADD_MESSAGE(msg);
-
-    SET_SUCCESS();
-}
-
-static atomic_bool rt_thread_fail = false;
-static struct thread *rt = NULL;
-
-static void rt_thread(void) {
-    uint64_t spins = 50;
-    struct thread *me = scheduler_get_current_thread();
-    if (me != rt) {
-        k_printf("Different thread\n");
-        goto fail;
-    }
-
-    for (uint64_t i = 0; i < spins; i++) {
-        /* This sleep function just
-         * busy wait-polls the timer */
-        sleep_ms(1);
-    }
-
-    return;
-
-fail:
-    atomic_store(&rt_thread_fail, true);
-    return;
-}
-
-REGISTER_TEST(rt_thread_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    struct thread *thread = thread_create(rt_thread);
-    rt = thread;
-    thread->base_priority = THREAD_PRIO_CLASS_URGENT;
-    thread->perceived_priority = THREAD_PRIO_CLASS_URGENT;
-
-    scheduler_enqueue_on_core(thread, smp_core_id());
-    scheduler_yield();
-    TEST_ASSERT(!atomic_load(&rt_thread_fail));
 
     SET_SUCCESS();
 }

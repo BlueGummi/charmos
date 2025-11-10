@@ -28,10 +28,6 @@
 #define SLAB_OBJ_ALIGN 16u
 #define SLAB_BITMAP_TEST(__bitmap, __idx) (__bitmap & __idx)
 
-#define SLAB_CROSSFREE_RING_SIZE 64
-#define SLAB_NONPAGEABLE_RESERVED_RATIO (1 / 16)
-#define SLAB_DESTROY_HIGH_WATERMARK 4
-#define SLAB_INTERLEAVE_STRIDE 1
 #define SLAB_MAG_ENTRIES 32
 #define SLAB_MAG_WATERMARK_PCT                                                 \
     15 /* Leave 15% of magazine entries for nonpageable requests */
@@ -41,7 +37,7 @@
 #define SLAB_MAX_SIZE (PAGE_SIZE / 4)
 
 /* Bitmap */
-#define SLAB_BITMAP_BYTES_FOR(x) ((x + 7) / 8)
+#define SLAB_BITMAP_BYTES_FOR(x) ((x + 7ull) / 8ull)
 #define SLAB_BITMAP_SET(bm, mask) (bm |= (uint8_t) mask)
 #define SLAB_BITMAP_UNSET(bm, mask) (bm &= (uint8_t) ~mask)
 
@@ -54,19 +50,19 @@ static const uint64_t slab_class_sizes[] = {
 #define SLAB_CLASS_COUNT (sizeof(slab_class_sizes) / sizeof(*slab_class_sizes))
 
 /* GC */
-#define SLAB_GC_FLAG_DESTROY_BIAS_SHIFT 4
+#define SLAB_GC_FLAG_DESTROY_BIAS_SHIFT 4ull
 #define SLAB_GC_FLAG_DESTROY_BIAS_MASK 0xF
 #define SLAB_GC_FLAG_DESTROY_BIAS_MAX 15
 #define SLAB_GC_FLAG_DESTROY_BIAS_SET(flags, bias)                             \
     (flags |= bias << SLAB_GC_FLAG_DESTROY_BIAS_SHIFT)
 
-#define SLAB_GC_FLAG_DESTROY_TARGET_SHIFT 10
+#define SLAB_GC_FLAG_DESTROY_TARGET_SHIFT 10ull
 #define SLAB_GC_FLAG_DESTROY_TARGET_MASK 0xFFF
 #define SLAB_GC_FLAG_DESTROY_TARGET_MAX 63
 #define SLAB_GC_FLAG_DESTROY_TARGET_SET(flags, target)                         \
     (flags |= target << SLAB_GC_FLAG_DESTROY_TARGET_SHIFT)
 
-#define SLAB_GC_FLAG_ORDER_BIAS_SHIFT 16
+#define SLAB_GC_FLAG_ORDER_BIAS_SHIFT 16ull
 #define SLAB_GC_FLAG_ORDER_BIAS_MASK 0x3FF
 #define SLAB_GC_FLAG_ORDER_BIAS_SET(flags, order)                              \
     (flags |= order << SLAB_GC_FLAG_ORDER_BIAS_SHIFT)
@@ -404,7 +400,7 @@ struct slab_domain_bucket {
     atomic_size_t alloc_gc_recycle_hits; /* GC provided an available object */
     atomic_size_t alloc_new_slab;        /* Had to allocate a new slab */
     atomic_size_t alloc_new_remote_slab;
-    atomic_size_t alloc_failures;        /* Out of memory or other failures */
+    atomic_size_t alloc_failures; /* Out of memory or other failures */
 
     /* ---- Free path stats ---- */
     atomic_size_t free_calls;       /* Total calls to kfree() */
@@ -412,7 +408,7 @@ struct slab_domain_bucket {
     atomic_size_t free_to_freelist; /* Freed into endless freelist (overflow) */
     atomic_size_t free_to_local_slab;    /* Freed directly into local slab */
     atomic_size_t free_to_remote_domain; /* Freed to other domain's freelist */
-    atomic_size_t free_to_percpu; 
+    atomic_size_t free_to_percpu;
 
     /* Other */
     atomic_size_t freequeue_enqueues;
@@ -603,7 +599,7 @@ static inline void slab_list_del(struct slab *slab) {
 
 static inline void slab_list_add(struct slab_cache *cache, struct slab *slab) {
     enum slab_state state = slab->state;
-    list_add(&slab->list, &cache->slabs[state]);
+    list_add_tail(&slab->list, &cache->slabs[state]);
 
     if (state == SLAB_FREE)
         slab_gc_update_ewma(cache);

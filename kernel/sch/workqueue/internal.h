@@ -74,7 +74,7 @@ static inline void workqueue_add_worker(struct workqueue *wq,
 static inline void workqueue_remove_worker(struct workqueue *wq,
                                            struct worker *worker) {
     enum irql irql = workqueue_worker_lock(wq);
-    list_del(&worker->list_node);
+    list_del_init(&worker->list_node);
     workqueue_worker_unlock(wq, irql);
 }
 

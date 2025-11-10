@@ -19,7 +19,7 @@ static inline bool apc_list_empty(struct thread *t, enum apc_type type) {
 }
 
 static inline void apc_list_del(struct apc *a) {
-    list_del(&a->list);
+    list_del_init(&a->list);
 }
 
 static inline void apc_add_tail(struct thread *t, struct apc *a,
