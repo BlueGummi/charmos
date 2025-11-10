@@ -91,6 +91,9 @@ void thread_exit() {
 void thread_entry_wrapper(void) {
     void (*entry)(void);
     asm("mov %%r12, %0" : "=r"(entry));
+    if (entry == k_sch_main)
+        bootstage_advance(BOOTSTAGE_LATE_DEVICES);
+
     kassert(irql_get() < IRQL_HIGH_LEVEL);
     irql_lower(IRQL_PASSIVE_LEVEL);
     kassert(entry);

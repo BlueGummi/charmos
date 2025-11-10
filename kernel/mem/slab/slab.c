@@ -379,7 +379,7 @@ void slab_free_old(struct slab *slab, void *obj) {
             slab_unlock(slab, irql);
             slab_cache_unlock(cache, slab_cache_irql);
             uintptr_t virt = (uintptr_t) slab;
-            paddr_t phys = vmm_get_phys(virt);
+            paddr_t phys = PFN_TO_PAGE(page_get_pfn(slab->backing_page));
             slab_free_virt_and_phys(virt, phys);
             return;
         }

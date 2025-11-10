@@ -103,15 +103,12 @@ void k_main(void) {
     movealloc_exec_all();
     bootstage_advance(BOOTSTAGE_MID_ALLOCATORS);
 
-    restore_interrupts();
     scheduler_yield();
 
     k_panic("unreachable!\n");
 }
 
 void k_sch_main() {
-    enable_interrupts();
-    bootstage_advance(BOOTSTAGE_LATE_DEVICES);
     registry_setup();
     tests_run();
     bootstage_advance(BOOTSTAGE_COMPLETE);

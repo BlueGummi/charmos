@@ -440,7 +440,7 @@ REGISTER_TEST(kmalloc_new_alloc_free_sequence_test, SHOULD_NOT_FAIL,
               IS_UNIT_TEST) {
     SET_SUCCESS();
     return;
-    
+
     void *blocks[16];
     for (size_t i = 0; i < sizeof(blocks) / sizeof(blocks[0]); ++i) {
         blocks[i] =

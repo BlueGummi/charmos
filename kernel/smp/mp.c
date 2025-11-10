@@ -75,6 +75,7 @@ static struct core *setup_cpu(uint64_t cpu) {
         k_panic("Core %d could not allocate space for struct\n", cpu);
     c->id = cpu;
     c->self = c;
+    c->current_irql = IRQL_PASSIVE_LEVEL;
     c->tsc_hz = tsc_calibrate();
     init_smt_info(c);
     detect_llc(&c->llc);
@@ -115,10 +116,10 @@ void smp_wakeup() {
     set_core_awake();
     spin_unlock(&wakeup_lock, irql);
 
-    enable_interrupts();
+    while (global.current_bootstage != BOOTSTAGE_MID_MP)
+        ;
+
     scheduler_yield();
-    while (1)
-        wait_for_interrupt();
 }
 
 void smp_wakeup_processors(struct limine_mp_response *mpr) {
@@ -144,8 +145,9 @@ void smp_setup_bsp() {
 
     c->id = 0;
     c->self = c;
+    c->current_irql = IRQL_PASSIVE_LEVEL;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
-    global.cores = kmalloc(sizeof(struct core *) * global.core_count);
+    global.cores = kzalloc(sizeof(struct core *) * global.core_count);
 
     if (unlikely(!global.cores))
         k_panic("Could not allocate space for global core structures");

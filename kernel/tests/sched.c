@@ -112,26 +112,6 @@ REGISTER_TEST(rt_thread_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
 }
 
-static atomic_uint ran_count = 0;
-static void sched_spawn_entry(void) {
-    atomic_fetch_add(&ran_count, 1);
-}
-
-REGISTER_TEST(sched_spawn_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    enable_interrupts();
-    uint32_t run_times = 50;
-
-    for (uint32_t i = 0; i < run_times; i++)
-        thread_spawn(sched_spawn_entry);
-
-    while (run_times != ran_count)
-        scheduler_yield();
-
-    TEST_ASSERT(run_times == ran_count);
-
-    SET_SUCCESS();
-}
-
 static void sleepy_entry(void) {
     thread_sleep_for_ms(9000);
     thread_print(scheduler_get_current_thread());

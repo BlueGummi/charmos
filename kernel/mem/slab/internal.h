@@ -586,9 +586,6 @@ static inline struct slab_percpu_cache *slab_percpu_cache_local(void) {
 }
 
 static inline void slab_list_del(struct slab *slab) {
-    if (list_empty(&slab->list))
-        return;
-
     if (slab->state != SLAB_IN_GC_LIST)
         kassert(spinlock_held(&slab->parent_cache->lock));
 

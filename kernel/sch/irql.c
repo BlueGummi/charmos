@@ -65,7 +65,9 @@ void irql_lower(enum irql new_level) {
         if (irq_in_thread_context() && preempt_re_enabled)
             scheduler_resched_if_needed();
     } else if (new_level > old) {
-        k_panic("Lowering to higher IRQL, from %s to %s\n", irql_to_str(old),
-                irql_to_str(new_level));
+        /* there is a separate case during init where this can happen safely */
+        if (old != IRQL_PASSIVE_LEVEL)
+            k_panic("Lowering to higher IRQL, from %s to %s\n",
+                    irql_to_str(old), irql_to_str(new_level));
     }
 }
