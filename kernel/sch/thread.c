@@ -77,13 +77,13 @@ struct thread_request *thread_request_pop(struct thread_request_list *rq_list) {
 }
 
 void thread_exit() {
-    scheduler_preemption_disable();
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
 
     struct thread *self = scheduler_get_current_thread();
     atomic_store(&self->state, THREAD_STATE_ZOMBIE);
     reaper_enqueue(self);
 
-    scheduler_preemption_enable();
+    irql_lower(irql);
 
     scheduler_yield();
 }
@@ -91,8 +91,6 @@ void thread_exit() {
 void thread_entry_wrapper(void) {
     void (*entry)(void);
     asm("mov %%r12, %0" : "=r"(entry));
-    if (entry == k_sch_main)
-        bootstage_advance(BOOTSTAGE_LATE_DEVICES);
 
     kassert(irql_get() < IRQL_HIGH_LEVEL);
     irql_lower(IRQL_PASSIVE_LEVEL);
@@ -178,7 +176,8 @@ static struct thread *thread_init(struct thread *thread,
     return thread;
 }
 
-static struct thread *create(void (*entry_point)(void), size_t stack_size) {
+struct thread *thread_create_internal(char *name, void (*entry_point)(void),
+                                      size_t stack_size, va_list args) {
     struct thread *new_thread = kmalloc(sizeof(struct thread));
     if (unlikely(!new_thread))
         goto err;
@@ -201,11 +200,21 @@ static struct thread *create(void (*entry_point)(void), size_t stack_size) {
     if (unlikely(!cpu_mask_init(&new_thread->allowed_cpus, global.core_count)))
         goto err;
 
+    size_t needed = snprintf(NULL, 0, name, args) + 1;
+    new_thread->name = kzalloc(needed);
+    if (!new_thread->name)
+        goto err;
+
+    snprintf(new_thread->name, needed, name, args);
+
     return thread_init(new_thread, entry_point, stack, stack_size);
 
 err:
     if (!new_thread)
         return NULL;
+
+    if (new_thread->name)
+        kfree(new_thread->name);
 
     if (new_thread->activity_data)
         kfree(new_thread->activity_data);
@@ -259,13 +268,23 @@ bool thread_request_cancel(struct thread_request *rq) {
     return true;
 }
 
-struct thread *thread_create(void (*entry_point)(void)) {
-    return create(entry_point, THREAD_STACK_SIZE);
+struct thread *thread_create(char *name, void (*entry_point)(void), ...) {
+    va_list args;
+    va_start(args, entry_point);
+    struct thread *ret =
+        thread_create_internal(name, entry_point, THREAD_STACK_SIZE, args);
+    va_end(args);
+    return ret;
 }
 
-struct thread *thread_create_custom_stack(void (*entry_point)(void),
-                                          size_t stack_size) {
-    return create(entry_point, stack_size);
+struct thread *thread_create_custom_stack(char *name, void (*entry_point)(void),
+                                          size_t stack_size, ...) {
+    va_list args;
+    va_start(args, stack_size);
+    struct thread *ret =
+        thread_create_internal(name, entry_point, stack_size, args);
+    va_end(args);
+    return ret;
 }
 
 void thread_free(struct thread *t) {
@@ -291,6 +310,7 @@ destroy:
     tid_free(global_tid_space, t->id);
     kfree(t->activity_data);
     kfree(t->activity_stats);
+    kfree(t->name);
     thread_free_event_apcs(t);
     thread_free_stack(t);
     kfree(t);

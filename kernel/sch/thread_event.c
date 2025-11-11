@@ -72,7 +72,7 @@ static void print_ringbuffer(const struct thread *t, bool wake_reasons,
 }
 
 void thread_print(const struct thread *t) {
-    k_printf("Thread {\n");
+    k_printf("Thread %s {\n", t->name);
     k_printf("    id: %llu,\n", (unsigned long long) t->id);
     k_printf("    state: %s,\n", thread_state_str(atomic_load(&t->state)));
     k_printf("    core: %lld,\n", (long long) t->curr_core);

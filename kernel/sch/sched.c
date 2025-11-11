@@ -203,6 +203,9 @@ static void load_thread(struct scheduler *sched, struct thread *next,
 static inline struct thread *load_idle_thread(struct scheduler *sched) {
     /* Idle thread has no need to have a timeslice
      * No preemption will be occurring since nothing else runs */
+
+    /* set a REALLY long slice. eventually I will be productive enough
+     * to decide that I want to add a config option for tickless idle */
     scheduler_change_timeslice_duration(SECONDS_TO_MS(1));
     disable_period(sched);
 
@@ -234,10 +237,15 @@ static void change_timeslice(struct scheduler *sched, struct thread *next) {
     }
 }
 
-static inline void context_switch(struct thread *curr, struct thread *next) {
+static inline void context_switch(struct scheduler *sched, struct thread *curr,
+                                  struct thread *next, enum irql irql) {
     rcu_mark_quiescent();
 
     next->context_switches++;
+
+    kassert(next->regs.rip != 0ULL);
+
+    scheduler_unlock(sched, irql);
 
     if (curr && curr->state != THREAD_STATE_IDLE_THREAD) {
         switch_context(&curr->regs, &next->regs);
@@ -278,9 +286,8 @@ void schedule(void) {
     }
 
     load_thread(sched, next, time);
-    scheduler_unlock(sched, irql);
 
-    context_switch(curr, next);
+    context_switch(sched, curr, next, irql);
 }
 
 void scheduler_yield() {

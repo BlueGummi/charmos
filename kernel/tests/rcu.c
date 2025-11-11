@@ -71,13 +71,13 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     shared_ptr = initial;
 
     for (uint64_t i = 0; i < NUM_RCU_READERS; i++)
-        thread_spawn(rcu_reader_thread);
+        thread_spawn("rcu_reader_test", rcu_reader_thread);
 
     k_printf("Readers spawned - we are core %llu\n", smp_core_id());
     enable_interrupts();
 
     sleep_ms(50);
-    thread_spawn(rcu_writer_thread);
+    thread_spawn("rcu_writer_test", rcu_writer_thread);
 
     while (atomic_load(&rcu_reads_done) < NUM_RCU_READERS)
         scheduler_yield();

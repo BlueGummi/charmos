@@ -5,6 +5,7 @@
 #include <asm.h>
 #include <mem/alloc.h>
 #include <sch/apc.h>
+#include <stdarg.h>
 #include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -187,6 +188,7 @@ struct thread_activity_metrics {
 struct thread {
     /* Unique ID allocated from global thread ID tree */
     uint64_t id;
+    char *name;
 
     /* ========== Processor context data ========== */
 
@@ -312,10 +314,12 @@ struct thread {
 
 #define thread_from_rbt_node(node) rbt_entry(node, struct thread, tree_node)
 #define thread_from_list_node(ln) (container_of(ln, struct thread, list_node))
+struct thread *thread_create_internal(char *name, void (*entry_point)(void),
+                                      size_t stack_size, va_list args);
 
-struct thread *thread_create(void (*entry_point)(void));
-struct thread *thread_create_custom_stack(void (*entry_point)(void),
-                                          size_t stack_size);
+struct thread *thread_create(char *name, void (*entry_point)(void), ...);
+struct thread *thread_create_custom_stack(char *name, void (*entry_point)(void),
+                                          size_t stack_size, ...);
 void thread_free(struct thread *t);
 
 void thread_init_thread_ids(void);

@@ -3,6 +3,7 @@
 #include <sch/thread.h>
 #include <sch/thread_queue.h>
 #include <smp/core.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <sync/spinlock.h>
 
@@ -156,22 +157,32 @@ static inline void scheduler_unpin_current_thread(enum thread_flags flags) {
         thread->flags = flags;
 }
 
-static inline struct thread *thread_spawn(void (*entry)(void)) {
-    struct thread *t = thread_create(entry);
+static inline struct thread *thread_spawn(char *name, void (*entry)(void),
+                                          ...) {
+    va_list args;
+    va_start(args, entry);
+    struct thread *t =
+        thread_create_internal(name, entry, THREAD_STACK_SIZE, args);
+    va_end(args);
     scheduler_enqueue(t);
     return t;
 }
 
-static inline struct thread *thread_spawn_custom_stack(void (*entry)(void),
-                                                       size_t stack_size) {
-    struct thread *t = thread_create_custom_stack(entry, stack_size);
+static inline struct thread *thread_spawn_custom_stack(char *name,
+                                                       void (*entry)(void),
+                                                       size_t stack_size, ...) {
+    va_list args;
+    va_start(args, stack_size);
+    struct thread *t = thread_create_internal(name, entry, stack_size, args);
+    va_end(args);
+
     scheduler_enqueue(t);
     return t;
 }
 
-static inline struct thread *thread_spawn_on_core(void (*entry)(void),
-                                                  uint64_t core_id) {
-    struct thread *t = thread_create(entry);
+static inline struct thread *
+thread_spawn_on_core(char *name, void (*entry)(void), uint64_t core_id) {
+    struct thread *t = thread_create(name, entry);
     scheduler_enqueue_on_core(t, core_id);
     return t;
 }

@@ -73,9 +73,14 @@ void gdt_init(struct gdt_entry *gdt, struct tss *tss) {
     tss->io_map_base = sizeof(struct tss);
 
     gdt_load(gdt, GDT_ENTRIES);
+    tss->ist1 = (uint64_t) kmalloc_aligned(8 * PAGE_SIZE, PAGE_SIZE);
     tss->rsp0 = (uint64_t) kmalloc_aligned(8 * PAGE_SIZE, PAGE_SIZE);
-    if (!tss->rsp0)
-        k_panic("GDT TSS RSP0 stack allocation failed!\n");
+    if (!tss->rsp0 || !tss->ist1)
+        k_panic("GDT TSS stack allocation failed!\n");
+    
+    /* stacks grow down */
+    tss->ist1 += 8 * PAGE_SIZE;
+    tss->rsp0 += 8 * PAGE_SIZE;
 
     reload_segment_registers(GDT_KERNEL_CODE, GDT_KERNEL_DATA);
 
@@ -84,10 +89,10 @@ void gdt_init(struct gdt_entry *gdt, struct tss *tss) {
 
 void gdt_install(void) {
     struct gdt_entry *gdt =
-        kmalloc_aligned(sizeof(struct gdt_entry) * GDT_ENTRIES, 64);
-    struct tss *tss = kmalloc_aligned(sizeof(struct tss), 64);
+        kzalloc_aligned(sizeof(struct gdt_entry) * GDT_ENTRIES, 64);
+    struct tss *tss = kzalloc_aligned(sizeof(struct tss), 64);
     if (!gdt || !tss)
-        return;
+        k_panic("GDT INIT NOT OK!!!\n");
 
     memset(tss, 0, sizeof(struct tss));
     memset(gdt, 0, sizeof(struct gdt_entry) * GDT_ENTRIES);

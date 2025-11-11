@@ -402,7 +402,8 @@ static void *slab_try_alloc_from_slab_list(struct slab_cache *cache,
     list_for_each_safe(node, temp, list) {
         slab = slab_from_list_node(node);
         if (slab->parent_cache != cache)
-            k_printf("slab 0x%lx parent 0x%lx we are 0x%lx\n", slab, slab->parent_cache, cache);
+            k_printf("slab 0x%lx parent 0x%lx we are 0x%lx\n", slab,
+                     slab->parent_cache, cache);
 
         if (slab->state == SLAB_FULL)
             k_printf("slab 0x%lx full\n", slab);

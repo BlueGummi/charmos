@@ -58,11 +58,12 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
     if (global.current_bootstage < BOOTSTAGE_MID_MP)
         return;
 
-    enum thread_flags flags = scheduler_pin_current_thread();
-    uint64_t gen = atomic_fetch_add(&global.next_tlb_gen, 1);
-    unsigned this_cpu = smp_core_id();
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
 
-    for (unsigned i = 0; i < global.core_count; i++) {
+    uint64_t gen = atomic_fetch_add(&global.next_tlb_gen, 1);
+    size_t this_cpu = smp_core_id();
+
+    for (size_t i = 0; i < global.core_count; i++) {
         if (i == this_cpu) {
             invlpg(addr);
             continue;
@@ -89,19 +90,21 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
             ipi_send(i, IRQ_TLB_SHOOTDOWN);
     }
 
-    scheduler_unpin_current_thread(flags);
-
     /* wait if needed */
     if (!synchronous)
-        return;
+        goto out;
 
-    for (unsigned i = 0; i < global.core_count; i++) {
+    for (size_t i = 0; i < global.core_count; i++) {
         if (i == this_cpu)
             continue;
         while (atomic_load_explicit(&global.shootdown_data[i].ack_gen,
                                     memory_order_acquire) < gen)
             cpu_relax();
     }
+
+out:
+
+    irql_lower(irql);
 }
 
 void tlb_init(void) {

@@ -51,7 +51,7 @@ static void sleepy_entry(void) {
 }
 
 REGISTER_TEST(sched_sleepy_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    thread_spawn(sleepy_entry);
+    thread_spawn("sched_sleepy_test", sleepy_entry);
     SET_SUCCESS();
 }
 
@@ -96,7 +96,7 @@ REGISTER_TEST(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     for (size_t i = 0; i < WQ_2_THREADS; i++) {
         k_printf("spawning workqueue enqueue threads\n");
-        thread_spawn(enqueue_thread);
+        thread_spawn("workqueue_enqueue_thread", enqueue_thread);
     }
 
     k_printf("yielding\n");

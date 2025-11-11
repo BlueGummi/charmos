@@ -67,8 +67,6 @@ void scheduler_enqueue(struct thread *t) {
 
     scheduler_add_thread(s, t, false);
     scheduler_force_resched(s);
-    if (s == smp_core_scheduler() && irq_in_thread_context())
-        scheduler_yield();
 }
 
 /* TODO: Make scheduler_add_thread an internal function so I don't need to

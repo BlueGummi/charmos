@@ -109,6 +109,7 @@ void k_main(void) {
 }
 
 void k_sch_main() {
+    bootstage_advance(BOOTSTAGE_LATE_DEVICES);
     registry_setup();
     tests_run();
     bootstage_advance(BOOTSTAGE_COMPLETE);

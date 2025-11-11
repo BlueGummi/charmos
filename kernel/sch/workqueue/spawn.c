@@ -187,12 +187,14 @@ bool workqueue_try_spawn_worker(struct workqueue *queue) {
 
 struct thread *worker_create(void) {
     uint64_t stack_size = PAGE_SIZE;
-    return thread_create_custom_stack(worker_main, stack_size);
+    return thread_create_custom_stack("workqueue_worker", worker_main,
+                                      stack_size);
 }
 
 struct thread *worker_create_unmigratable() {
     uint64_t stack_size = PAGE_SIZE;
-    struct thread *t = thread_create_custom_stack(worker_main, stack_size);
+    struct thread *t =
+        thread_create_custom_stack("workqueue_worker", worker_main, stack_size);
     if (!t)
         return NULL;
 

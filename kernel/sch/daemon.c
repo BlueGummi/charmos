@@ -143,7 +143,8 @@ struct daemon_thread *daemon_thread_create(struct daemon *daemon) {
     thread->daemon = daemon;
     INIT_LIST_HEAD(&thread->list_node);
 
-    struct thread *t = thread_create(daemon_main);
+    struct thread *t = thread_create("daemon_%s_thread", daemon_main,
+                                     daemon->name ? daemon->name : "unnamed");
     if (!t) {
         kfree(thread);
         return NULL;

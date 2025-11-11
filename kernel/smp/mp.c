@@ -116,8 +116,9 @@ void smp_wakeup() {
     set_core_awake();
     spin_unlock(&wakeup_lock, irql);
 
-    while (global.current_bootstage != BOOTSTAGE_MID_MP)
-        ;
+    /* wait for all cores to catch up with us... */
+    while (global.current_bootstage < BOOTSTAGE_MID_MP)
+        cpu_relax();
 
     scheduler_yield();
 }
@@ -135,7 +136,7 @@ void smp_complete_init() {
         return;
 
     while (global.current_bootstage != BOOTSTAGE_MID_MP)
-        ;
+        cpu_relax();
 }
 
 void smp_setup_bsp() {

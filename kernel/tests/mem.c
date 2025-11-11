@@ -150,8 +150,8 @@ REGISTER_TEST(kmalloc_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct thread *threads[MT_THREAD_COUNT];
 
     for (int i = 0; i < MT_THREAD_COUNT; i++) {
-        threads[i] =
-            thread_spawn_custom_stack(mt_kmalloc_worker, PAGE_SIZE * 16);
+        threads[i] = thread_spawn_custom_stack(
+            "mt_kmalloc_thread", mt_kmalloc_worker, PAGE_SIZE * 16);
         TEST_ASSERT(threads[i] != NULL);
     }
 
@@ -183,7 +183,8 @@ REGISTER_TEST(pmm_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct thread *threads[MT_PMM_THREAD_COUNT];
 
     for (int i = 0; i < MT_PMM_THREAD_COUNT; i++) {
-        threads[i] = thread_spawn_custom_stack(mt_pmm_worker, PAGE_SIZE * 16);
+        threads[i] = thread_spawn_custom_stack("mt_pmm_thread", mt_pmm_worker,
+                                               PAGE_SIZE * 16);
         TEST_ASSERT(threads[i] != NULL);
     }
 
@@ -192,9 +193,6 @@ REGISTER_TEST(pmm_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
 static char hooray[128] = {0};
 REGISTER_TEST(kmalloc_new_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-
-    SET_SUCCESS();
-    return;
 
     void *p = kmalloc_new(67, ALLOC_FLAGS_NONE, ALLOC_BEHAVIOR_NORMAL);
 
@@ -214,8 +212,6 @@ REGISTER_TEST(kmalloc_new_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
 static char a_msg[128];
 REGISTER_TEST(kmalloc_new_basic_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    SET_SUCCESS();
-    return;
 
     void *p1 = kmalloc_new(1, ALLOC_FLAGS_NONE, ALLOC_BEHAVIOR_NORMAL);
     void *p2 = kmalloc_new(64, ALLOC_FLAGS_NONE, ALLOC_BEHAVIOR_NORMAL);
@@ -393,15 +389,13 @@ static char msg[128];
 
 REGISTER_TEST(kmalloc_new_concurrency_stress_test, SHOULD_NOT_FAIL,
               IS_UNIT_TEST) {
-    SET_SUCCESS();
-    return;
-
     memset((void *) done, 0, sizeof(done));
 
     for (int i = 0; i < STRESS_THREADS; ++i) {
         args[i].id = i;
         args[i].done_flag = &done[i];
-        thread_spawn(stress_worker)->private = &args[i];
+        thread_spawn("kmalloc_new_stress_worker", stress_worker)->private =
+            &args[i];
     }
 
     all_ready = true;
@@ -438,8 +432,6 @@ REGISTER_TEST(kmalloc_new_concurrency_stress_test, SHOULD_NOT_FAIL,
 
 REGISTER_TEST(kmalloc_new_alloc_free_sequence_test, SHOULD_NOT_FAIL,
               IS_UNIT_TEST) {
-    SET_SUCCESS();
-    return;
 
     void *blocks[16];
     for (size_t i = 0; i < sizeof(blocks) / sizeof(blocks[0]); ++i) {

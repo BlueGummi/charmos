@@ -35,7 +35,8 @@ void scheduler_init(void) {
 
         s->core_id = i;
 
-        struct thread *idle_thread = thread_create(scheduler_idle_main);
+        struct thread *idle_thread =
+            thread_create("idle_thread_%u", scheduler_idle_main, i);
         idle_thread->flags = THREAD_FLAGS_NO_STEAL;
         idle_thread->state = THREAD_STATE_IDLE_THREAD;
         s->idle_thread = idle_thread;
@@ -45,7 +46,7 @@ void scheduler_init(void) {
         thread_queue_init(&s->bg_threads);
 
         if (!i) {
-            struct thread *t = thread_create(k_sch_main);
+            struct thread *t = thread_create("main_thread", k_sch_main);
             t->flags = THREAD_FLAGS_NO_STEAL;
             scheduler_add_thread(s, t, false);
         }

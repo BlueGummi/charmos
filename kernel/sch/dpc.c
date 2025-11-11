@@ -8,7 +8,7 @@
 
 void dpc_run_local(void) {
 
-    unsigned cpu = smp_core_id();
+    size_t cpu = smp_core_id();
     struct dpc_cpu *dc = &global.dpc_data[cpu];
 
     for (;;) {
@@ -17,7 +17,8 @@ void dpc_run_local(void) {
             atomic_exchange_explicit(&dc->head, NULL, memory_order_acquire);
 
         if (!list) {
-            if (atomic_load_explicit(&dc->dpc_queued, memory_order_acquire) == 0)
+            if (atomic_load_explicit(&dc->dpc_queued, memory_order_acquire) ==
+                0)
                 return;
 
             uint8_t expected = 1;
@@ -42,7 +43,9 @@ void dpc_run_local(void) {
         struct dpc *it = rev;
         while (it) {
             atomic_store_explicit(&it->enqueued, false, memory_order_release);
+            enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
             it->func(it->ctx);
+            irql_lower(irql);
             it = atomic_load_explicit(&it->next, memory_order_relaxed);
         }
 
@@ -96,7 +99,7 @@ bool dpc_enqueue_local(struct dpc *d) {
 /* Helpers: init */
 void dpc_init_percpu(void) {
     global.dpc_data = kzalloc(sizeof(struct dpc_cpu) * global.core_count);
-    for (unsigned i = 0; i < global.core_count; ++i) {
+    for (size_t i = 0; i < global.core_count; ++i) {
         atomic_store_explicit(&global.dpc_data[i].head, NULL,
                               memory_order_relaxed);
         atomic_store_explicit(&global.dpc_data[i].dpc_queued, 0,

@@ -132,18 +132,12 @@ static enum errno pte_init(pte_t *entry, uint64_t flags) {
 }
 
 enum irql page_table_lock(struct page_table *pt) {
-    if (global.current_bootstage < BOOTSTAGE_EARLY_ALLOCATORS)
-        return spin_lock(&vmm_lock);
-
     paddr_t phys = (vaddr_t) pt - global.hhdm_offset;
     struct page *page = page_for_pfn(PAGE_TO_PFN(phys));
     return spin_lock(&page->lock);
 }
 
 void page_table_unlock(struct page_table *pt, enum irql irql) {
-    if (global.current_bootstage < BOOTSTAGE_EARLY_ALLOCATORS)
-        return spin_unlock(&vmm_lock, irql);
-
     paddr_t phys = (vaddr_t) pt - global.hhdm_offset;
     struct page *page = page_for_pfn(PAGE_TO_PFN(phys));
     spin_unlock(&page->lock, irql);
@@ -397,13 +391,70 @@ void vmm_unmap_page(uintptr_t virt) {
 }
 
 uintptr_t vmm_get_phys(uintptr_t virt) {
+    struct page_table *tables[4] = {0};
+    enum irql irqls[4] = {0};
+    pte_t *entry = NULL;
+    uintptr_t phys = (uintptr_t) -1;
+
+    tables[0] = kernel_pml4;
+    if (global.current_bootstage < BOOTSTAGE_EARLY_ALLOCATORS) {
+        irqls[0] = spin_lock(&vmm_lock);
+    } else {
+        irqls[0] = page_table_lock(tables[0]);
+    }
+
+    for (int level = 0; level < 3; level++) {
+        uint64_t index = (virt >> (39 - level * 9)) & 0x1FF;
+        entry = &tables[level]->entries[index];
+
+        if (!ENTRY_PRESENT(*entry)) {
+            goto cleanup;
+        }
+
+        if (level == 2 && (*entry & PAGING_2MB_page)) {
+            uintptr_t phys_base = *entry & PAGING_2MB_PHYS_MASK;
+            uintptr_t offset = virt & (PAGE_2MB - 1);
+            phys = phys_base + offset;
+            goto cleanup;
+        }
+
+        tables[level + 1] = (struct page_table *) ((*entry & PAGING_PHYS_MASK) +
+                                                   global.hhdm_offset);
+
+        if (global.current_bootstage >= BOOTSTAGE_EARLY_ALLOCATORS)
+            irqls[level + 1] = page_table_lock(tables[level + 1]);
+    }
+
+    {
+        uint64_t L1 = (virt >> 12) & 0x1FF;
+        entry = &tables[3]->entries[L1];
+        if (!ENTRY_PRESENT(*entry))
+            goto cleanup;
+
+        uintptr_t phys_base = *entry & PAGING_PHYS_MASK;
+        uintptr_t offset = virt & 0xFFF;
+        phys = phys_base + offset;
+    }
+
+cleanup:
+    if (global.current_bootstage < BOOTSTAGE_EARLY_ALLOCATORS) {
+        spin_unlock(&vmm_lock, irqls[0]);
+    } else {
+        for (int i = 3; i >= 0; i--) {
+            if (tables[i])
+                page_table_unlock(tables[i], irqls[i]);
+        }
+    }
+
+    return phys;
+}
+
+uintptr_t vmm_get_phys_unsafe(uintptr_t virt) {
     struct page_table *current_table = kernel_pml4;
-    enum irql irql = spin_lock(&vmm_lock);
 
     for (uint64_t i = 0; i < 2; i++) {
         uint64_t level = (virt >> (39 - i * 9)) & 0x1FF;
         pte_t *entry = &current_table->entries[level];
-
         if (!ENTRY_PRESENT(*entry))
             goto err;
 
@@ -420,22 +471,21 @@ uintptr_t vmm_get_phys(uintptr_t virt) {
     if (*entry & PAGING_2MB_page) {
         uintptr_t phys_base = *entry & PAGING_2MB_PHYS_MASK;
         uintptr_t offset = virt & (PAGE_2MB - 1);
-        spin_unlock(&vmm_lock, irql);
         return phys_base + offset;
     }
 
     current_table = (struct page_table *) ((*entry & PAGING_PHYS_MASK) +
                                            global.hhdm_offset);
+
     uint64_t L1 = (virt >> 12) & 0x1FF;
     entry = &current_table->entries[L1];
 
     if (!ENTRY_PRESENT(*entry))
         goto err;
 
-    spin_unlock(&vmm_lock, irql);
     return (*entry & PAGING_PHYS_MASK) + (virt & 0xFFF);
+
 err:
-    spin_unlock(&vmm_lock, irql);
     return (uintptr_t) -1;
 }
 

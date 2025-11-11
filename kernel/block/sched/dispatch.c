@@ -2,9 +2,9 @@
 #include <block/sched.h>
 #include <console/printf.h>
 #include <mem/alloc.h>
-#include <structures/dll.h>
 #include <sch/defer.h>
 #include <stdint.h>
+#include <structures/dll.h>
 #include <sync/spinlock.h>
 #include <time.h>
 
@@ -30,7 +30,6 @@ static void dispatch_queue(struct generic_disk *disk, struct bio_rqueue *q) {
     struct bio_request *req = q->head;
 
     struct bio_rqueue copy = {.head = q->head, .tail = q->tail};
-    struct bio_rqueue *copyptr = &copy;
 
     q->request_count = 0;
     q->head = NULL;
@@ -40,13 +39,10 @@ static void dispatch_queue(struct generic_disk *disk, struct bio_rqueue *q) {
 
     /* We have full ownership of the list now */
     while (req) {
-        if (req->skip)
-            k_panic("'skip' request found during dispatch");
-
-        dll_remove(copyptr, req);
+        dll_remove((&copy), req);
         disk->submit_bio_async(disk, req);
 
-        req = copyptr->head;
+        req = copy.head;
     }
 }
 
@@ -57,6 +53,7 @@ static void do_early_dispatch(struct bio_scheduler *sched) {
 }
 
 void bio_sched_try_early_dispatch(struct bio_scheduler *sched) {
+    kassert(spinlock_held(&sched->lock));
     if (should_early_dispatch(sched))
         do_early_dispatch(sched);
 }
