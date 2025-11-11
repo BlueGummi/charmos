@@ -13,7 +13,7 @@ struct spinlock {
 
 #define SPINLOCK_INIT {ATOMIC_VAR_INIT(0)}
 
-static inline void spinlock_init(struct spinlock *lock) {
+__no_sanitize_address static inline void spinlock_init(struct spinlock *lock) {
     atomic_store(&lock->state, 0);
 }
 
@@ -32,16 +32,18 @@ __no_sanitize_address static inline void spin_lock_raw(struct spinlock *lock) {
     }
 }
 
-static inline void spin_unlock_raw(struct spinlock *lock) {
+__no_sanitize_address static inline void
+spin_unlock_raw(struct spinlock *lock) {
     atomic_store_explicit(&lock->state, 0, memory_order_release);
 }
 
-static inline void spin_unlock(struct spinlock *lock, enum irql old) {
+__no_sanitize_address static inline void spin_unlock(struct spinlock *lock,
+                                                     enum irql old) {
     atomic_exchange_explicit(&lock->state, 0, memory_order_release);
     irql_lower(old);
 }
 
-static inline enum irql spin_lock(struct spinlock *lock) {
+__no_sanitize_address static inline enum irql spin_lock(struct spinlock *lock) {
     if (global.current_bootstage >= BOOTSTAGE_MID_MP && irq_in_interrupt())
         k_panic("Attempted to take non-ISR safe spinlock from an ISR!\n");
 
@@ -50,19 +52,22 @@ static inline enum irql spin_lock(struct spinlock *lock) {
     return irql;
 }
 
-static inline enum irql spin_lock_irq_disable(struct spinlock *lock) {
+__no_sanitize_address static inline enum irql
+spin_lock_irq_disable(struct spinlock *lock) {
     enum irql irql = irql_raise(IRQL_HIGH_LEVEL);
     spin_lock_raw(lock);
     return irql;
 }
 
-static inline bool spin_trylock_raw(struct spinlock *lock) {
+__no_sanitize_address static inline bool
+spin_trylock_raw(struct spinlock *lock) {
     bool expected = 0;
     return atomic_compare_exchange_strong_explicit(
         &lock->state, &expected, 1, memory_order_acquire, memory_order_relaxed);
 }
 
-static inline bool spin_trylock(struct spinlock *lock, enum irql *out) {
+__no_sanitize_address static inline bool spin_trylock(struct spinlock *lock,
+                                                      enum irql *out) {
     bool expected = 0;
     *out = irql_raise(IRQL_DISPATCH_LEVEL);
     if (atomic_compare_exchange_strong_explicit(&lock->state, &expected, 1,
@@ -75,8 +80,8 @@ static inline bool spin_trylock(struct spinlock *lock, enum irql *out) {
     return false;
 }
 
-static inline bool spin_trylock_irq_disable(struct spinlock *lock,
-                                            enum irql *out) {
+__no_sanitize_address static inline bool
+spin_trylock_irq_disable(struct spinlock *lock, enum irql *out) {
     bool expected = 0;
     *out = irql_raise(IRQL_HIGH_LEVEL);
     if (atomic_compare_exchange_strong_explicit(&lock->state, &expected, 1,
@@ -89,7 +94,7 @@ static inline bool spin_trylock_irq_disable(struct spinlock *lock,
     return false;
 }
 
-static inline bool spinlock_held(struct spinlock *lock) {
+__no_sanitize_address static inline bool spinlock_held(struct spinlock *lock) {
     return atomic_load(&lock->state);
 }
 

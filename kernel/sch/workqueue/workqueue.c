@@ -189,10 +189,7 @@ struct workqueue *workqueue_create(struct workqueue_attributes *attrs,
 static void mark_worker_exit(struct thread *t) {
     if (t) {
         struct worker *worker = t->private;
-        if (worker)
-            worker->next_action = WORKER_NEXT_ACTION_EXIT;
-        else
-            k_printf("thread with NULL private 0x%lx detected\n", t);
+        worker->next_action = WORKER_NEXT_ACTION_EXIT;
     }
 }
 

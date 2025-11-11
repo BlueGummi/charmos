@@ -14,7 +14,7 @@ extern uint64_t bitmap_size;
 paddr_t bitmap_alloc_pages(uint64_t count, enum alloc_flags f);
 void bitmap_free_pages(paddr_t addr, uint64_t count);
 
-static inline void set_bit(uint64_t index) {
+__no_sanitize_address static inline void set_bit(uint64_t index) {
     uint64_t byte = index / 8;
     uint8_t mask = 1 << (index % 8);
     if (byte > BOOT_BITMAP_SIZE)
@@ -23,7 +23,7 @@ static inline void set_bit(uint64_t index) {
     __atomic_fetch_or(&bitmap[byte], mask, __ATOMIC_SEQ_CST);
 }
 
-static inline void clear_bit(uint64_t index) {
+__no_sanitize_address static inline void clear_bit(uint64_t index) {
     uint64_t byte = index / 8;
     uint8_t mask = ~(1 << (index % 8));
     if (byte > BOOT_BITMAP_SIZE)
@@ -32,7 +32,7 @@ static inline void clear_bit(uint64_t index) {
     __atomic_fetch_and(&bitmap[byte], mask, __ATOMIC_SEQ_CST);
 }
 
-static inline bool test_bit(uint64_t index) {
+__no_sanitize_address static inline bool test_bit(uint64_t index) {
     uint64_t byte = index / 8;
     uint8_t value;
     if (byte > BOOT_BITMAP_SIZE)

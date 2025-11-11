@@ -84,7 +84,7 @@ static void condvar_timeout_wakeup(void *arg, void *arg2) {
 
     thread_put(t);
 
-    enum irql irql = spin_lock_irq_disable(&ck->cv->waiters.lock);
+    enum irql irql = spin_lock(&ck->cv->waiters.lock);
     if (!list_empty(&t->list_node)) {
         list_del_init(&t->list_node);
     }

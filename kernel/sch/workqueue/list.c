@@ -53,7 +53,7 @@ struct work *worklist_pop_front(struct worklist *list) {
 }
 
 bool worklist_empty(struct worklist *list) {
-    enum irql irql = worklist_lock_irq_disable(list);
+    enum irql irql = worklist_lock(list);
     bool empty = list_empty(&list->list);
     worklist_unlock(list, irql);
     return empty;

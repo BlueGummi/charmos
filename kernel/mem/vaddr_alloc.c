@@ -1,9 +1,9 @@
 #include <console/panic.h>
 #include <kassert.h>
+#include <math/align.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vaddr_alloc.h>
-#include <math/align.h>
 #include <string.h>
 
 #define VASRANGE_PER_PAGE (PAGE_SIZE / sizeof(struct vas_range))
@@ -39,7 +39,8 @@ void vasrange_free(struct vas_space *space, struct vas_range *r) {
     space->freelist = r;
 }
 
-struct vas_space *vas_space_bootstrap(vaddr_t base, vaddr_t limit) {
+__no_sanitize_address struct vas_space *vas_space_bootstrap(vaddr_t base,
+                                                            vaddr_t limit) {
     uintptr_t phys = pmm_alloc_page(ALLOC_FLAGS_NONE);
     if (!phys)
         k_panic("OOM creating vas_space");

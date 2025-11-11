@@ -115,7 +115,6 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
               IS_INTEGRATION_TEST) {
     EXT2_INIT;
     ABORT_IF_RAM_LOW();
-    enable_interrupts();
 
     struct ext2_fs *fs = root->fs_data;
     struct generic_disk *d = fs->drive;
@@ -141,7 +140,6 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
         INIT_LIST_HEAD(&rq->list);
     }
 
-    enable_interrupts();
     uint64_t ms = time_get_ms();
     for (uint64_t i = 0; i < BIO_SCHED_TEST_RUNS; i++) {
         struct bio_request *rq = rqs[i];

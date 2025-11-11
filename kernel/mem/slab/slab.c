@@ -151,7 +151,7 @@
 #include "stat_internal.h"
 
 struct vas_space *slab_vas = NULL;
-struct slab_caches slab_caches = {0};
+__no_sanitize_address struct slab_caches slab_caches = {0};
 
 void *slab_map_new_page(struct slab_domain *domain, paddr_t *phys_out,
                         bool pageable) {
@@ -199,8 +199,8 @@ static void slab_free_virt_and_phys(vaddr_t virt, paddr_t phys) {
     vas_free(slab_vas, virt);
 }
 
-void slab_cache_init(size_t order, struct slab_cache *cache,
-                     uint64_t obj_size) {
+__no_sanitize_address void
+slab_cache_init(size_t order, struct slab_cache *cache, uint64_t obj_size) {
     cache->order = order;
     cache->obj_size = obj_size;
     cache->pages_per_slab = 1;
@@ -468,7 +468,7 @@ static inline bool kmalloc_size_fits_in_slab(size_t size) {
     return slab_size_to_index(size) >= 0;
 }
 
-void slab_allocator_init() {
+__no_sanitize_address void slab_allocator_init() {
     slab_vas = vas_space_bootstrap(SLAB_HEAP_START, SLAB_HEAP_END);
     if (!slab_vas)
         k_panic("Could not initialize slab VAS\n");

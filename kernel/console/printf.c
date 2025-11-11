@@ -23,23 +23,29 @@ struct printf_cursor {
 
 void serial_init() {
     outb(0x3F8 + 1, 0x00);
+
     outb(0x3F8 + 3, 0x80);
     outb(0x3F8 + 0, 0x03);
     outb(0x3F8 + 1, 0x00);
     outb(0x3F8 + 3, 0x03);
+
     outb(0x3F8 + 2, 0xC7);
+
     outb(0x3F8 + 4, 0x0B);
+
+    for (volatile int i = 0; i < 1000; i++)
+        cpu_relax();
 }
 
-/*
 static int serial_is_transmit_empty() {
     return inb(0x3F8 + 5) & 0x20;
-}*/
+}
 
 static void serial_putc(char c) {
-    /*    while (serial_is_transmit_empty() == 0)
-            ;*/
-    outb(0x3F8, c);
+    while (serial_is_transmit_empty() == 0)
+        ;
+
+    outb(0x3F8, (uint8_t) c);
 }
 
 void serial_puts(struct printf_cursor *csr, const char *str, int len) {
@@ -63,7 +69,7 @@ void double_print(struct flanterm_context *f, struct printf_cursor *csr,
      flanterm_write(f, str, len); */
 }
 
-__no_sanitize_address void k_printf_init(struct limine_framebuffer *fb) {
+void k_printf_init(struct limine_framebuffer *fb) {
     serial_init();
     /* TODO: get this back up
     ft_ctx = flanterm_fb_init(
@@ -410,7 +416,6 @@ void v_k_printf(struct printf_cursor *csr, const char *format, va_list args) {
     }
 }
 
-__no_sanitize_address
 void k_printf(const char *format, ...) {
     bool i = are_interrupts_enabled(); /* pattern is used since this is called
                                           from preempt_raise/lower */

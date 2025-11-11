@@ -1,3 +1,4 @@
+#include <mem/asan.h>
 #include <charmos.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
@@ -5,11 +6,7 @@
 #include <string.h>
 #include <sync/spinlock.h>
 
-#define ASAN_SHADOW_SCALE 3 /* 1 shadow byte per 8 real bytes */
-#define ASAN_SHADOW_OFFSET                                                     \
-    0xffffc00000000000UL /* fixed virtual base for shadow memory */
-#define ASAN_REDZONE 16  /* optional redzone per allocation */
-
+static bool asan_ready = false;
 static uint8_t *asan_shadow_base;
 static size_t asan_shadow_size;
 
@@ -20,6 +17,7 @@ static inline uint8_t *asan_shadow_for_internal(void *addr) {
 
 /* Poison/unpoison helpers */
 void asan_poison(void *addr, size_t size) {
+    ASAN_ABORT_IF_NOT_READY();
     uint8_t *shadow_start = asan_shadow_for_internal(addr);
     uint8_t *shadow_end = asan_shadow_for_internal((uint8_t *) addr + size - 1);
     for (uint8_t *s = shadow_start; s <= shadow_end; s++)
@@ -27,6 +25,7 @@ void asan_poison(void *addr, size_t size) {
 }
 
 void asan_unpoison(void *addr, size_t size) {
+    ASAN_ABORT_IF_NOT_READY();
     uint8_t *shadow_start = asan_shadow_for_internal(addr);
     uint8_t *shadow_end = asan_shadow_for_internal((uint8_t *) addr + size - 1);
     for (uint8_t *s = shadow_start; s <= shadow_end; s++)
@@ -34,6 +33,8 @@ void asan_unpoison(void *addr, size_t size) {
 }
 
 void asan_init(void) {
+    return;
+    k_info("ASAN", K_INFO, "Bringing up ASAN... this will take time...");
     asan_shadow_size = (global.total_pages * PAGE_SIZE) >> ASAN_SHADOW_SCALE;
 
     paddr_t shadow_phys = pmm_alloc_pages(
@@ -65,47 +66,20 @@ void asan_init(void) {
         remaining = remaining > PAGE_SIZE ? remaining - PAGE_SIZE : 0;
     }
 
+    k_info("ASAN", K_INFO, "ASAN mapped up and brought up... memsetting..");
     /* Initialize shadow memory to poisoned */
     memset(asan_shadow_base, 0xFF, asan_shadow_size);
 
     k_info("ASAN", K_INFO, "shadow memory initialized at 0x%lx",
            asan_shadow_base);
+
+    asan_ready = true;
 }
 
-/* asan_runtime.c
- *
- * Minimal kernel AddressSanitizer runtime for -fsanitize=address
- * Uses coarse 1:8 shadow mapping: 1 shadow byte per 8 real bytes.
- *
- * Requires:
- *   - asan_shadow_base (uint8_t *) and asan_shadow_size (size_t) set up by
- * asan_init()
- *   - k_printf / k_panic / backtrace or other kernel helpers (adjust names as
- * needed)
- *
- * Warning: expensive. Use in debug builds only.
- */
-
-#include <charmos.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-
-extern uint8_t *asan_shadow_base; /* set by asan_init() */
-extern size_t asan_shadow_size;
-
-#define ASAN_SHADOW_SCALE 3 /* 1 shadow byte per 8 real bytes */
-#define ASAN_POISON_VALUE 0xFF
-
-/* Helper: compute shadow pointer for real address.
- * Assumes shadow region has already been mapped at asan_shadow_base.
- */
 static inline uint8_t *asan_shadow_for(const void *addr) {
     uintptr_t a = (uintptr_t) addr;
     size_t idx = a >> ASAN_SHADOW_SCALE;
     if (idx >= asan_shadow_size) {
-        /* Out-of-range shadow index: treat as poisoned (conservative).
-           But we also try to avoid reading past shadow map. */
         return NULL;
     }
     return asan_shadow_base + idx;
@@ -125,6 +99,7 @@ static void __asan_report_and_panic(const char *what, const void *addr,
 #include "mem/slab/internal.h"
 static inline void asan_check_access_core(const void *addr, size_t size,
                                           bool is_write) {
+    ASAN_ABORT_IF_NOT_READY();
     vaddr_t v = (vaddr_t) addr;
     if (v < SLAB_HEAP_START || v > SLAB_HEAP_END)
         return;
@@ -203,8 +178,10 @@ void __asan_storeN(const void *addr, size_t size) {
 }
 
 void __asan_poison_memory_region(void *addr, size_t size) {
+    ASAN_ABORT_IF_NOT_READY();
     if (size == 0)
         return;
+
     uint8_t *start_shadow = asan_shadow_for(addr);
     if (!start_shadow)
         return; /* out-of-range: ignore conservatively */
@@ -223,8 +200,10 @@ void __asan_poison_memory_region(void *addr, size_t size) {
 }
 
 void __asan_unpoison_memory_region(void *addr, size_t size) {
+    ASAN_ABORT_IF_NOT_READY();
     if (size == 0)
         return;
+
     uint8_t *start_shadow = asan_shadow_for(addr);
     if (!start_shadow)
         return;
@@ -260,6 +239,7 @@ struct __asan_global {
 };
 
 void __asan_register_globals(struct __asan_global *globals, size_t n) {
+    ASAN_ABORT_IF_NOT_READY();
     const size_t redzone = 16;
     for (size_t i = 0; i < n; i++) {
         void *addr = globals[i].addr;
@@ -291,6 +271,7 @@ static struct stack_record stack_records[ASAN_MAX_STACK_RECORDS];
 static size_t stack_records_count = 0;
 
 void __asan_stack_malloc(void *addr, size_t size) {
+    ASAN_ABORT_IF_NOT_READY();
     if (!addr || size == 0)
         return;
     /* Poison entire region, then unpoison the real payload so redzones are left
@@ -307,6 +288,7 @@ void __asan_stack_malloc(void *addr, size_t size) {
 }
 
 void __asan_stack_free(void *addr) {
+    ASAN_ABORT_IF_NOT_READY();
     /* Unpoison and remove record. */
     for (size_t i = 0; i < stack_records_count; i++) {
         if (stack_records[i].addr == addr) {
@@ -528,6 +510,7 @@ void __asan_set_shadow_00_to_0x00(void) {}
 void __asan_set_shadow_f8_to_0x00(void) {}
 
 void __asan_alloca_poison(void *addr, size_t size) {
+    ASAN_ABORT_IF_NOT_READY();
     if (!addr || size == 0)
         return;
     /* Conservative: poison the whole region. The compiler expects
@@ -536,6 +519,7 @@ void __asan_alloca_poison(void *addr, size_t size) {
 }
 
 void __asan_allocas_unpoison(void *addr, size_t size) {
+    ASAN_ABORT_IF_NOT_READY();
     if (!addr || size == 0)
         return;
     __asan_unpoison_memory_region(addr, size);

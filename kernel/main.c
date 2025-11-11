@@ -6,7 +6,6 @@
 #include <acpi/uacpi_interface.h>
 #include <asm.h>
 #include <boot/gdt.h>
-#include <boot/smap.h>
 #include <bootstage.h>
 #include <charmos.h>
 #include <cmdline.h>
@@ -55,7 +54,6 @@ __no_sanitize_address void k_main(void) {
     bootstage_advance(BOOTSTAGE_EARLY_FB);
 
     smp_wakeup_processors(mp_request.response);
-    smap_init();
     bootstage_advance(BOOTSTAGE_EARLY_MP);
 
     pmm_early_init(memmap_request);

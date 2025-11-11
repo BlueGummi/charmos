@@ -1,6 +1,5 @@
 #include <acpi/lapic.h>
 #include <boot/gdt.h>
-#include <boot/smap.h>
 #include <int/idt.h>
 #include <limine.h>
 #include <mem/alloc.h>
@@ -93,11 +92,9 @@ static inline void set_core_awake(void) {
     }
 }
 
-void smp_wakeup() {
+__no_sanitize_address void smp_wakeup() {
     enum irql irql = spin_lock(&wakeup_lock);
     disable_interrupts();
-    smap_init();
-    serial_init();
 
     while (!cr3_ready)
         cpu_relax();

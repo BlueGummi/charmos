@@ -1,10 +1,10 @@
 #include <console/printf.h>
+#include <math/align.h>
 #include <mem/alloc.h>
 #include <mem/bitmap.h>
 #include <mem/buddy.h>
 #include <mem/domain.h>
 #include <mem/pmm.h>
-#include <math/align.h>
 #include <smp/domain.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -18,7 +18,7 @@ typedef void (*free_fn)(paddr_t addr, size_t pages);
 static alloc_fn current_alloc_fn = bitmap_alloc_pages;
 static free_fn current_free_fn = bitmap_free_pages;
 
-void pmm_early_init(struct limine_memmap_request m) {
+__no_sanitize_address void pmm_early_init(struct limine_memmap_request m) {
     bitmap = boot_bitmap;
     memmap = m.response;
 
@@ -63,7 +63,7 @@ void pmm_early_init(struct limine_memmap_request m) {
     global.total_pages = total_phys / PAGE_SIZE;
 }
 
-void pmm_mid_init() {
+__no_sanitize_address void pmm_mid_init() {
     buddy_init();
     current_alloc_fn = buddy_alloc_pages_global;
     current_free_fn = buddy_free_pages_global;

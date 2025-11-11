@@ -1,4 +1,5 @@
 #pragma once
+#include <compiler.h>
 #include <stddef.h>
 
 struct list_head {
@@ -9,7 +10,8 @@ struct list_head {
 
 #define LIST_HEAD(name) struct list_head name = LIST_HEAD_INIT(name)
 
-static inline void INIT_LIST_HEAD(struct list_head *list) {
+__no_sanitize_address static inline void
+INIT_LIST_HEAD(struct list_head *list) {
     list->next = list;
     list->prev = list;
 }

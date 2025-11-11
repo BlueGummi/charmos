@@ -213,18 +213,10 @@ err:
     if (!new_thread)
         return NULL;
 
-    if (new_thread->name)
-        kfree(new_thread->name);
-
-    if (new_thread->activity_data)
-        kfree(new_thread->activity_data);
-
-    if (new_thread->activity_stats)
-        kfree(new_thread->activity_stats);
-
-    if (new_thread->stack)
-        thread_free_stack(new_thread);
-
+    kfree(new_thread->name);
+    kfree(new_thread->activity_data);
+    kfree(new_thread->activity_stats);
+    thread_free_stack(new_thread);
     tid_free(global_tid_space, new_thread->id);
     kfree(new_thread);
 

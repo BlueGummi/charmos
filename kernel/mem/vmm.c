@@ -4,6 +4,7 @@
 #include <int/idt.h>
 #include <limine.h>
 #include <linker/symbols.h>
+#include <mem/asan.h>
 #include <mem/pmm.h>
 #include <mem/tlb.h>
 #include <mem/vmm.h>
@@ -20,6 +21,11 @@ static struct spinlock vmm_lock = SPINLOCK_INIT;
 static struct page_table *kernel_pml4 = NULL;
 static uintptr_t kernel_pml4_phys = 0;
 static uintptr_t vmm_map_top = VMM_MAP_BASE;
+
+static void vmm_tlb_shootdown(vaddr_t addr) {
+    if (global.current_bootstage >= BOOTSTAGE_MID_MP)
+        tlb_shootdown(addr, false);
+}
 
 uint64_t sub_offset(uint64_t a) {
     return a - global.hhdm_offset;
@@ -63,6 +69,10 @@ void vmm_init(struct limine_memmap_response *memmap,
     uint64_t kernel_virt_end = (uint64_t) &__kernel_virt_end;
     uint64_t kernel_size = kernel_virt_end - kernel_virt_start;
 
+    paddr_t dummy_phys = pmm_alloc_pages(1, ALLOC_FLAGS_NONE);
+    uint8_t *dummy_virt = (uint8_t *) (dummy_phys + global.hhdm_offset);
+    memset(dummy_virt, 0xFF, PAGE_SIZE);
+
     enum errno e;
 
     for (uint64_t i = 0; i < kernel_size; i += PAGE_SIZE) {
@@ -70,6 +80,13 @@ void vmm_init(struct limine_memmap_response *memmap,
                          PAGING_WRITE | PAGING_PRESENT);
         if (e < 0)
             k_panic("Error %s whilst mapping kernel\n", errno_to_str(e));
+    }
+
+    for (uint64_t addr = kernel_virt_start; addr < kernel_virt_end;
+         addr += PAGE_SIZE) {
+        uint64_t shadow_addr = ASAN_SHADOW_OFFSET + (addr >> ASAN_SHADOW_SCALE);
+        shadow_addr = PAGE_ALIGN_DOWN(shadow_addr);
+        vmm_map_page(shadow_addr, dummy_phys, PAGING_PRESENT | PAGING_WRITE);
     }
 
     for (uint64_t i = 0; i < memmap->entry_count; i++) {
@@ -186,7 +203,7 @@ enum errno vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     pte_t *entry = &tables[2]->entries[L2];
     if (ENTRY_PRESENT(*entry)) {
         invlpg(virt);
-        tlb_shootdown(virt, false);
+        vmm_tlb_shootdown(virt);
     }
     *entry =
         (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT | PAGING_2MB_page;
@@ -239,7 +256,7 @@ void vmm_unmap_2mb_page(uintptr_t virt) {
     *entries[2] &= ~PAGING_PRESENT;
 
     invlpg(virt);
-    tlb_shootdown(virt, false);
+    vmm_tlb_shootdown(virt);
 
     for (int level = 2; level > 0; level--) {
         if (vmm_is_table_empty(tables[level])) {
@@ -277,14 +294,9 @@ enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
 
         if (!ENTRY_PRESENT(*entry)) {
             enum errno ret = pte_init(entry, 0);
-            if (ret < 0) {
-                if (global.current_bootstage < BOOTSTAGE_EARLY_ALLOCATORS)
-                    spin_unlock(&vmm_lock, irqls[0]);
-                else
-                    for (int j = level; j >= 0; j--)
-                        page_table_unlock(tables[j], irqls[j]);
-                return ret;
-            }
+            if (ret < 0) 
+                k_panic("early mapping out of memory\n");
+            
         }
 
         tables[level + 1] = (struct page_table *) ((*entry & PAGING_PHYS_MASK) +
@@ -296,8 +308,10 @@ enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     uint64_t L1 = (virt >> 12) & 0x1FF;
     pte_t *entry = &tables[3]->entries[L1];
     if (ENTRY_PRESENT(*entry)) {
+        if (global.current_bootstage > BOOTSTAGE_MID_ALLOCATORS)
+            k_panic("Moving virtual memory with this function is not allowed\n");
         invlpg(virt);
-        tlb_shootdown(virt, false);
+        vmm_tlb_shootdown(virt);
     }
     *entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
 
@@ -371,7 +385,7 @@ void vmm_unmap_page(uintptr_t virt) {
     *entries[3] &= ~PAGING_PRESENT;
 
     invlpg(virt);
-    tlb_shootdown(virt, false);
+    vmm_tlb_shootdown(virt);
 
     for (int level = 3; level > 0; level--) {
         if (vmm_is_table_empty(tables[level])) {

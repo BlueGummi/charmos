@@ -2,9 +2,7 @@
 
 static void signal_callback(struct thread *t) {
     if (t) {
-        struct worker *worker = t->private;
-        if (worker)
-            worker->next_action = WORKER_NEXT_ACTION_RUN;
+        ((struct worker *) (t->private))->next_action = WORKER_NEXT_ACTION_RUN;
     }
 }
 

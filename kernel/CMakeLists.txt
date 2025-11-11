@@ -18,9 +18,19 @@ include(uACPI/uacpi.cmake)
 
 set(EARLY_INIT_FILES
     ${CMAKE_SOURCE_DIR}/kernel/main.c
+    ${CMAKE_SOURCE_DIR}/kernel/smp/mp.c
+    ${CMAKE_SOURCE_DIR}/kernel/bootstage.c
+    ${CMAKE_SOURCE_DIR}/kernel/misc/string.c
     ${CMAKE_SOURCE_DIR}/kernel/console/printf.c
+    ${CMAKE_SOURCE_DIR}/kernel/mem/asan.c
+    ${CMAKE_SOURCE_DIR}/kernel/mem/buddy/init.c
+    ${CMAKE_SOURCE_DIR}/kernel/mem/bitmap.c
+    ${CMAKE_SOURCE_DIR}/kernel/mem/vmm.c
+    ${CMAKE_SOURCE_DIR}/kernel/mem/buddy/core.c
+    ${CMAKE_SOURCE_DIR}/kernel/sch/irql.c
 )
 
+#[[
 set(SANITIZED_C_SOURCES "")
 foreach(f ${C_SOURCES})
     list(FIND EARLY_INIT_FILES ${f} idx)
@@ -30,8 +40,9 @@ foreach(f ${C_SOURCES})
 endforeach()
 
 set_source_files_properties(${SANITIZED_C_SOURCES} PROPERTIES COMPILE_OPTIONS "-fsanitize=address")
+set_source_files_properties(${SANITIZED_C_SOURCES} PROPERTIES COMPILE_OPTIONS "-fsanitize-address-shadow-offset=0xfffffc0000000000")
 set_source_files_properties(${EARLY_INIT_FILES} PROPERTIES COMPILE_OPTIONS "-fno-sanitize=address")
-
+]]
 add_executable(kernel ${C_SOURCES} ${ASM_SOURCES} ${NASM_SOURCES})
 
 set(SYMS_SOURCE "${CMAKE_SOURCE_DIR}/syms/syms_dummy.c")
