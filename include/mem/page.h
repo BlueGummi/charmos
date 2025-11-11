@@ -30,7 +30,7 @@
 #define PAGE_TO_PFN(addr) ((addr) / PAGE_SIZE)
 #define PFN_TO_PAGE(pfn) ((pfn) * PAGE_SIZE)
 
-#define PAGES_NEEDED_FOR(bytes) (((bytes) + PAGE_SIZE - 1) / PAGE_SIZE)
+#define PAGES_NEEDED_FOR(bytes) (((bytes) + PAGE_SIZE - 1ULL) / PAGE_SIZE)
 
 #define VMM_MAP_BASE 0xFFFFA00000200000
 #define VMM_MAP_LIMIT 0xFFFFA00010000000

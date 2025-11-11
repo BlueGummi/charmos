@@ -59,16 +59,18 @@ void serial_puts(struct printf_cursor *csr, const char *str, int len) {
 void double_print(struct flanterm_context *f, struct printf_cursor *csr,
                   const char *str, int len) {
     serial_puts(csr, str, len);
-    flanterm_write(f, str, len);
+    /* if (global.current_bootstage >= BOOTSTAGE_EARLY_FB)
+     flanterm_write(f, str, len); */
 }
 
-void k_printf_init(struct limine_framebuffer *fb) {
+__no_sanitize_address void k_printf_init(struct limine_framebuffer *fb) {
     serial_init();
+    /* TODO: get this back up
     ft_ctx = flanterm_fb_init(
         NULL, NULL, fb->address, fb->width, fb->height, fb->pitch,
         fb->red_mask_size, fb->red_mask_shift, fb->green_mask_size,
         fb->green_mask_shift, fb->blue_mask_size, fb->blue_mask_shift, NULL,
-        NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 1, 0, 0, 0);
+        NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 1, 0, 0, 0); */
 
     k_printf("%s", OS_LOGO_SMALL);
 }
@@ -408,6 +410,7 @@ void v_k_printf(struct printf_cursor *csr, const char *format, va_list args) {
     }
 }
 
+__no_sanitize_address
 void k_printf(const char *format, ...) {
     bool i = are_interrupts_enabled(); /* pattern is used since this is called
                                           from preempt_raise/lower */

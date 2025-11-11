@@ -4,11 +4,11 @@
 #include <drivers/nvme.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
-#include <structures/sll.h>
 #include <sch/defer.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <structures/sll.h>
 
 #include "internal.h"
 
@@ -102,8 +102,8 @@ static bool rw_send_command(struct generic_disk *disk, struct nvme_request *req,
     struct nvme_command cmd = {0};
     cmd.opc = opc;
     cmd.nsid = 1;
-    cmd.cdw10 = lba & 0xFFFFFFFF;
-    cmd.cdw11 = lba >> 32;
+    cmd.cdw10 = lba & 0xFFFFFFFFULL;
+    cmd.cdw11 = lba >> 32ULL;
     cmd.cdw12 = count - 1;
 
     nvme_setup_prps(&cmd, data);

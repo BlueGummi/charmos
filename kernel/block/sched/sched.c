@@ -91,6 +91,9 @@ struct bio_scheduler *bio_sched_create(struct generic_disk *disk,
     if (!sched)
         k_panic("Could not allocate space for block device IO scheduler\n");
 
+    for (size_t i = 0; i < BIO_SCHED_LEVELS; i++) {
+        INIT_LIST_HEAD(&sched->queues[i].list);
+    }
     sched->disk = disk;
     disk->ops = ops;
 

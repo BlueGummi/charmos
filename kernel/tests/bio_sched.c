@@ -109,6 +109,7 @@ REGISTER_TEST(bio_sched_coalesce_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 static uint64_t runs_per_lvl[BIO_SCHED_LEVELS] = {0};
 static struct bio_request *rqs[BIO_SCHED_TEST_RUNS] = {0};
 static uint8_t *buffers[BIO_SCHED_TEST_RUNS] = {0};
+static volatile int send_dispatch = 0;
 
 REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
               IS_INTEGRATION_TEST) {
@@ -122,7 +123,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
     prng_seed(time_get_us());
 
     for (uint64_t i = 0; i < BIO_SCHED_TEST_RUNS; i++) {
-        buffers[i] = kmalloc_aligned(512, PAGE_SIZE);
+        buffers[i] = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
         rqs[i] = kzalloc(sizeof(struct bio_request));
         TEST_ASSERT(buffers[i] && rqs[i]);
         TEST_ASSERT(ALIGN_DOWN((vaddr_t) buffers[i], PAGE_SIZE) ==
@@ -137,6 +138,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
         rq->buffer = buffers[i];
         rq->priority = prng_next() % BIO_SCHED_LEVELS;
         rq->write = false;
+        INIT_LIST_HEAD(&rq->list);
     }
 
     enable_interrupts();
@@ -153,7 +155,10 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
     TEST_ASSERT(msg);
     snprintf(msg, 100, "Total time spent enqueuing is %d ms", ms);
     ADD_MESSAGE(msg);
+    send_dispatch = 1;
     bio_sched_dispatch_all(d);
+    send_dispatch = 2;
+
     for (uint64_t i = 0; i < 150000; i++)
         cpu_relax();
 

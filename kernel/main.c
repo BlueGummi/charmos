@@ -19,6 +19,7 @@
 #include <limine.h>
 #include <logo.h>
 #include <mem/alloc.h>
+#include <mem/asan.h>
 #include <mem/buddy.h>
 #include <mem/domain.h>
 #include <mem/movealloc.h>
@@ -44,7 +45,7 @@ struct charmos_globals global = {0};
 
 #define BEHAVIOR /* avoids undefined behavior */
 
-void k_main(void) {
+__no_sanitize_address void k_main(void) {
     global.core_count = mp_request.response->cpu_count;
     global.hhdm_offset = hhdm_request.response->offset;
 
@@ -62,6 +63,7 @@ void k_main(void) {
     pmm_mid_init();
 
     slab_allocator_init();
+    asan_init();
     bootstage_advance(BOOTSTAGE_EARLY_ALLOCATORS);
     gdt_install();
     syscall_setup(syscall_entry);

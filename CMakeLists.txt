@@ -35,6 +35,7 @@ if(PROFILING_ALL)
     add_compile_definitions(PROFILING_ALL)
 endif()
 
+
 if(PROFILING_ENABLED)
     add_compile_definitions(PROFILING_ENABLED)
 endif()

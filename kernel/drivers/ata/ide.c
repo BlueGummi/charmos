@@ -106,7 +106,7 @@ out:
 
 static struct bio_scheduler_ops ide_bio_ops = {
     .should_coalesce = noop_should_coalesce,
-    .reorder = ide_reorder,
+    /* .reorder = ide_reorder, */
     .do_coalesce = noop_do_coalesce,
 
     .max_wait_time =

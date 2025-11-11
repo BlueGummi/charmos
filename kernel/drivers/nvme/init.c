@@ -140,6 +140,8 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
     cq_cmd.prp1 = cq_phys;
 
     cq_cmd.cdw10 = (15) << 16 | qid;
+
+    /* isr enabled, physicall contiguous */
     cq_cmd.cdw11 = this_isr << 16 | 0b11;
 
     irq_register(this_isr, nvme_isr_handler, nvme);

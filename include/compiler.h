@@ -24,6 +24,8 @@
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
+#define __no_sanitize_address __attribute__((no_sanitize("address")))
+
 #define __deprecated __attribute__((deprecated))
 #define __deprecated_msg(msg) __attribute__((deprecated(msg)))
 

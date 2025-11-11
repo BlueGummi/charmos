@@ -120,8 +120,7 @@
 #define BIO_SCHED_MAX_COALESCES 4
 
 struct bio_rqueue {
-    struct bio_request *head;
-    struct bio_request *tail;
+    struct list_head list;
 
     uint64_t request_count;
 
@@ -220,7 +219,7 @@ static inline bool submit_if_urgent(struct bio_scheduler *sched,
 
 static inline bool sched_is_empty(struct bio_scheduler *sched) {
     for (uint32_t i = 0; i < BIO_SCHED_LEVELS; i++)
-        if (sched->queues[i].head)
+        if (!list_empty(&sched->queues[i].list))
             return false;
 
     return true;

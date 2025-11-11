@@ -1,16 +1,12 @@
 #include <block/bcache.h>
 #include <block/generic.h>
 #include <block/sched.h>
-#include <mem/alloc.h>
 #include <math/align.h>
+#include <mem/alloc.h>
 #include <sch/defer.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-
-/* TODO: File is getting big, split into multiple */
-
-/* TODO: use linked list in hashmap collisions */
 
 static bool remove(struct bcache *cache, uint64_t key, uint64_t spb);
 
@@ -182,6 +178,8 @@ static enum errno prefetch(struct generic_disk *disk, struct bcache *cache,
 
     struct bio_request *req = bio_create_read(disk, base_lba, spb, block_size,
                                               prefetch_callback, pf, NULL);
+    if (!req)
+        return ERR_NO_MEM;
 
     pf->cache = cache;
     pf->new_entry = kzalloc(sizeof(struct bcache_entry));

@@ -1,3 +1,4 @@
+/*
 #include <block/sched.h>
 #include <mem/alloc.h>
 #include <math/sort.h>
@@ -69,4 +70,4 @@ void ide_reorder(struct generic_disk *disk) {
 
         q->dirty = false;
     }
-}
+}*/

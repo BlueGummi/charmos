@@ -15,7 +15,7 @@
 #define EXT2_INIT                                                              \
     if (global.root_node->fs_type != FS_EXT2) {                                \
         ADD_MESSAGE("the mounted root is not ext2");                           \
-        SET_SKIP();                                                              \
+        SET_SKIP();                                                            \
         return;                                                                \
     }                                                                          \
     struct vfs_node *root = global.root_node;
@@ -48,6 +48,7 @@ REGISTER_TEST(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
             .on_complete = bio_callback,
             .user_data = NULL,
         };
+        INIT_LIST_HEAD(&bio->list);
 
         if (!d->submit_bio_async) {
             SET_SKIP();

@@ -1,7 +1,9 @@
 #pragma once
+#include <containerof.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <structures/list.h>
 
 /* urgent requests bypass the bio_scheduler,
  * they get submitted immediately */
@@ -62,9 +64,9 @@ struct bio_request {
     void *driver_private;
     void *driver_private2;
 
+    struct list_head list;
+
     /* everything below this is internally used in scheduler */
-    struct bio_request *next;
-    struct bio_request *prev;
 
     /* coalescing */
     bool skip;
@@ -79,6 +81,8 @@ struct bio_request {
      * boosts often */
     uint8_t boost_count;
 };
+#define bio_request_from_list_node(ln)                                         \
+    (container_of(ln, struct bio_request, list))
 
 struct bio_request *bio_create_write(struct generic_disk *d, uint64_t lba,
                                      uint64_t sectors, uint64_t size,

@@ -7,9 +7,6 @@
 #include <sync/spinlock.h>
 #include <time.h>
 
-static bool coalesce_priority_queue(struct generic_disk *disk,
-                                    struct bio_rqueue *queue);
-
 static inline void set_coalesced(struct bio_request *into,
                                  struct bio_request *from) {
     into->is_aggregate = true;
@@ -26,118 +23,115 @@ static bool try_do_coalesce(struct generic_disk *disk, struct bio_request *into,
     return false;
 }
 
+/* Try to merge candidates in the same queue */
 static bool try_merge_candidates(struct generic_disk *disk,
                                  struct bio_request *iter,
-                                 struct bio_request *start) {
-    struct bio_request *candidate = iter->next;
+                                 struct bio_request *start,
+                                 struct bio_rqueue *queue) {
+    struct bio_request *candidate = NULL, *tmp;
     bool merged = false;
     uint8_t coalesces_left = BIO_SCHED_MAX_COALESCES;
 
-    while (candidate && candidate != start && coalesces_left) {
-        struct bio_request *next_candidate = candidate->next;
-        if (candidate->skip || candidate->priority != iter->priority) {
-            candidate = next_candidate;
+    list_for_each_entry_safe_continue(candidate, tmp, &queue->list, list) {
+        if (candidate == start)
+            break;
+
+        if (candidate->skip || candidate->priority != iter->priority)
             continue;
-        }
 
         if (try_do_coalesce(disk, iter, candidate)) {
             coalesces_left--;
             merged = true;
         }
 
-        candidate = next_candidate;
+        if (!coalesces_left)
+            break;
     }
+
     return merged;
 }
 
+/* Try to coalesce candidate from lower queue with higher queue */
 static bool check_higher_queue(struct bio_scheduler *sched,
                                struct bio_rqueue *higher,
                                struct bio_request *candidate) {
     struct generic_disk *disk = sched->disk;
-    struct bio_request *iter = higher->head;
-    struct bio_request *hc_start = iter;
+    struct bio_request *iter, *tmp;
 
-    do {
-
-        struct bio_request *hc_next = iter->next;
-        if (iter->skip) {
-            iter = hc_next;
+    list_for_each_entry_safe(iter, tmp, &higher->list, list) {
+        if (iter->skip)
             continue;
-        }
 
-        /* stop after one */
-        if (try_do_coalesce(disk, iter, candidate)) {
-            return true;
-        }
+        if (try_do_coalesce(disk, iter, candidate))
+            return true; /* only one coalesce per candidate */
+    }
 
-        iter = hc_next;
-    } while (iter && iter != hc_start);
     return false;
 }
 
+/* Cross-priority coalescing between two adjacent queues */
 static bool coalesce_adjacent_queues(struct generic_disk *disk,
                                      struct bio_rqueue *lower,
                                      struct bio_rqueue *higher) {
-    if (!lower->head || !higher->head)
+    if (list_empty(&lower->list) || list_empty(&higher->list))
         return false;
 
     if (!lower->dirty || !higher->dirty)
         return false;
 
     struct bio_scheduler *sched = disk->scheduler;
-    struct bio_request *candidate = lower->head;
-    struct bio_request *start = candidate;
+    struct bio_request *candidate, *tmp;
     bool coalesced = false;
     uint8_t coalesces_left = BIO_SCHED_MAX_COALESCES;
 
-    do {
-        struct bio_request *next = candidate->next;
-        if (candidate->skip) {
-            candidate = next;
+    list_for_each_entry_safe(candidate, tmp, &lower->list, list) {
+        if (candidate->skip)
             continue;
-        }
 
         if (check_higher_queue(sched, higher, candidate)) {
             coalesces_left--;
             coalesced = true;
         }
 
-        candidate = next;
-    } while (candidate && candidate != start && coalesces_left);
+        if (!coalesces_left)
+            break;
+    }
 
     lower->dirty = false;
     higher->dirty = false;
     return coalesced;
 }
 
+/* Coalesce requests inside a single priority queue */
 static bool coalesce_priority_queue(struct generic_disk *disk,
                                     struct bio_rqueue *queue) {
-    if (!queue->head)
+    if (list_empty(&queue->list))
         return false;
 
     if (!queue->dirty)
         return false;
 
-    struct bio_request *start = queue->head;
-    struct bio_request *iter = start;
+    struct bio_request *start =
+        list_first_entry(&queue->list, struct bio_request, list);
+    struct bio_request *rq, *tmp;
     bool coalesced = false;
     uint8_t coalesces_left = BIO_SCHED_MAX_COALESCES;
-    do {
-        struct bio_request *next = iter->next;
 
-        if (!iter->skip && try_merge_candidates(disk, iter, start)) {
-            coalesced = true;
+    list_for_each_entry_safe(rq, tmp, &queue->list, list) {
+        if (!rq->skip && try_merge_candidates(disk, rq, start, queue)) {
             coalesces_left--;
+            coalesced = true;
         }
 
-        iter = next;
-    } while (iter && iter != start && coalesces_left);
+        if (!coalesces_left)
+            break;
+    }
 
     queue->dirty = false;
-
     return coalesced;
 }
 
+/* Try to coalesce across all queues and priorities */
 bool bio_sched_try_coalesce(struct bio_scheduler *sched) {
     struct generic_disk *disk = sched->disk;
     if (disk_skip_coalesce(disk))
@@ -145,12 +139,13 @@ bool bio_sched_try_coalesce(struct bio_scheduler *sched) {
 
     bool coalesced_any = false;
 
+    /* coalesce within each priority queue */
     for (int prio = 0; prio < BIO_SCHED_LEVELS; prio++) {
         if (coalesce_priority_queue(disk, &sched->queues[prio]))
             coalesced_any = true;
     }
 
-    /* cross-prio coalescing */
+    /* cross-priority coalescing */
     for (int prio = 0; prio < BIO_SCHED_LEVELS - 1; prio++) {
         if (coalesce_adjacent_queues(disk, &sched->queues[prio],
                                      &sched->queues[prio + 1]))

@@ -243,8 +243,6 @@ static inline void context_switch(struct scheduler *sched, struct thread *curr,
 
     next->context_switches++;
 
-    kassert(next->regs.rip != 0ULL);
-
     scheduler_unlock(sched, irql);
 
     if (curr && curr->state != THREAD_STATE_IDLE_THREAD) {

@@ -2,9 +2,9 @@
 #include <block/sched.h>
 #include <console/printf.h>
 #include <mem/alloc.h>
-#include <structures/dll.h>
 #include <sch/defer.h>
 #include <stdint.h>
+#include <structures/dll.h>
 #include <sync/spinlock.h>
 #include <time.h>
 
@@ -20,7 +20,7 @@ void bio_sched_enqueue_internal(struct bio_scheduler *sched,
     enum bio_request_priority prio = req->priority;
     struct bio_rqueue *q = &sched->queues[prio];
 
-    dll_add(q, req);
+    list_add_tail(&req->list, &q->list);
 
     q->dirty = true;
     q->request_count++;
@@ -32,10 +32,8 @@ void bio_sched_dequeue_internal(struct bio_scheduler *sched,
     kassert(spinlock_held(&sched->lock));
     enum bio_request_priority prio = req->priority;
     struct bio_rqueue *q = &sched->queues[prio];
-    if (!q->head)
-        return;
 
-    dll_remove(q, req);
+    list_del_init(&req->list);
 
     q->dirty = true;
     q->request_count--;

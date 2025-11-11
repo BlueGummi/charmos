@@ -27,6 +27,7 @@ static struct bio_request *create(struct generic_disk *d, uint64_t lba,
         return NULL;
     }
 
+    INIT_LIST_HEAD(&req->list);
     req->write = write;
     req->user_data = user;
     req->status = -1;

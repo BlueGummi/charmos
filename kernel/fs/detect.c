@@ -199,6 +199,7 @@ enum fs_type detect_fs(struct generic_disk *disk) {
     uint8_t *sector = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
     if (!sector)
         return FS_UNKNOWN;
+
     k_info("FS", K_INFO, "attempting to detect %s's filesystem(s)", disk->name);
 
     if (!disk->read_sector(disk, 0, sector, 1)) {
@@ -207,6 +208,8 @@ enum fs_type detect_fs(struct generic_disk *disk) {
         kfree_aligned(sector);
         return FS_UNKNOWN;
     }
+
+    k_info("FS", K_INFO, "read sector 0 of %s", disk->name);
 
     bool found_partitions = false;
     struct mbr *mbr = (struct mbr *) sector;

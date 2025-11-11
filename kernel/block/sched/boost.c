@@ -84,31 +84,24 @@ bool bio_sched_boost_starved(struct bio_scheduler *sched) {
 
     for (int64_t i = BIO_RQ_HIGH; i >= 0; i--) {
         struct bio_rqueue *queue = &sched->queues[i];
-        struct bio_request *iter = queue->head;
-
-        if (!iter)
-            continue;
 
         uint64_t checks_left = queue->request_count;
 
         if (checks_left > BIO_SCHED_MAX_BOOST_SCAN)
             checks_left = BIO_SCHED_MAX_BOOST_SCAN;
 
-        struct bio_request *start = iter;
-        do {
-            if (!iter)
-                goto next_level;
+        struct list_head *iter, *temp;
 
-            if (!iter->skip && try_boost(sched, iter)) {
+        list_for_each_safe(iter, temp, &queue->list) {
+            struct bio_request *rq = bio_request_from_list_node(iter);
+            if (!rq->skip && try_boost(sched, rq)) {
                 boosted_any = true;
                 goto next_level;
             }
 
             if (--checks_left == 0)
                 goto next_level;
-
-            iter = iter->next;
-        } while (iter != start);
+        }
 
     next_level:
         continue;

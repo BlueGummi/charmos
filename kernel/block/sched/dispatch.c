@@ -6,7 +6,6 @@
 #include <stdint.h>
 #include <structures/dll.h>
 #include <sync/spinlock.h>
-#include <time.h>
 
 /* enqueuing skips enqueuing if the req is URGENT */
 
@@ -16,7 +15,12 @@ static inline bool should_early_dispatch(struct bio_scheduler *sched) {
 
 static bool try_dispatch_queue_head(struct bio_scheduler *sched,
                                     struct bio_rqueue *q) {
-    struct bio_request *head = q->head;
+    if (list_empty(&q->list))
+        return false;
+
+    struct bio_request *head =
+        list_first_entry(&q->list, struct bio_request, list);
+
     if (head) {
         bio_sched_dequeue_internal(sched, head);
         sched->disk->submit_bio_async(sched->disk, head);
@@ -26,23 +30,31 @@ static bool try_dispatch_queue_head(struct bio_scheduler *sched,
 }
 
 static void dispatch_queue(struct generic_disk *disk, struct bio_rqueue *q) {
-    enum irql irql = spin_lock(&disk->scheduler->lock);
-    struct bio_request *req = q->head;
+    struct spinlock *lock = &disk->scheduler->lock;
+    enum irql irql = spin_lock(lock);
 
-    struct bio_rqueue copy = {.head = q->head, .tail = q->tail};
+    /* Move the entire list out of the queue under lock */
+    struct list_head tmp_list;
+    INIT_LIST_HEAD(&tmp_list);
+    if (!list_empty(&q->list)) {
+        tmp_list.next = q->list.next;
+        tmp_list.prev = q->list.prev;
+        tmp_list.next->prev = &tmp_list;
+        tmp_list.prev->next = &tmp_list;
+    }
 
+    /* Reset the queue */
+    INIT_LIST_HEAD(&q->list);
+    disk->scheduler->total_requests -= q->request_count;
     q->request_count = 0;
-    q->head = NULL;
-    q->tail = NULL;
 
-    spin_unlock(&disk->scheduler->lock, irql);
+    spin_unlock(lock, irql);
 
-    /* We have full ownership of the list now */
-    while (req) {
-        dll_remove((&copy), req);
+    /* Dispatch requests from the copied list */
+    struct bio_request *req, *tmp;
+    list_for_each_entry_safe(req, tmp, &tmp_list, list) {
+        list_del(&req->list); /* remove from tmp_list */
         disk->submit_bio_async(disk, req);
-
-        req = copy.head;
     }
 }
 

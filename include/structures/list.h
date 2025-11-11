@@ -97,3 +97,15 @@ static inline void list_splice_init(struct list_head *src,
 
 #define list_first_entry(ptr, type, member)                                    \
     list_entry((ptr)->next, type, member)
+
+#define list_for_each_entry_safe(pos, n, head, member)                         \
+    for (pos = list_entry((head)->next, typeof(*pos), member),                 \
+        n = list_entry(pos->member.next, typeof(*pos), member);                \
+         &pos->member != (head);                                               \
+         pos = n, n = list_entry(n->member.next, typeof(*n), member))
+
+#define list_for_each_entry_safe_continue(pos, n, head, member)                \
+    for (pos = list_entry(pos->member.next, typeof(*pos), member),             \
+        n = list_entry(pos->member.next, typeof(*pos), member);                \
+         &pos->member != (head);                                               \
+         pos = n, n = list_entry(n->member.next, typeof(*n), member))
