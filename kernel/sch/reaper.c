@@ -12,7 +12,7 @@ void reaper_enqueue(struct thread *t) {
 
 void reaper_init(void) {
     thread_queue_init(&reaper.queue);
-    condvar_init(&reaper.cv);
+    condvar_init(&reaper.cv, CONDVAR_INIT_NORMAL);
     reaper_thread = thread_spawn("reaper_thread", reaper_thread_main);
 }
 

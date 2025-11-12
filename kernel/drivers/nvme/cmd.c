@@ -88,6 +88,7 @@ void nvme_work(void *dvoid, void *nothing) {
             nvme_send_waiters(dev);
         }
 
+        atomic_store(&dev->on_sem, true);
         semaphore_wait(&dev->sem);
     }
 }

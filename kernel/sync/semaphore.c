@@ -8,14 +8,22 @@
 #define dec_count(sem) atomic_fetch_sub(&sem->count, 1)
 #define add_count(sem, val) atomic_fetch_add(&sem->count, val)
 
-void semaphore_init(struct semaphore *s, int value) {
+void semaphore_init(struct semaphore *s, int value, bool irq_disable) {
     s->count = value;
+    s->irq_disable = irq_disable;
     spinlock_init(&s->lock);
-    condvar_init(&s->cv);
+    condvar_init(&s->cv, irq_disable);
+}
+
+static enum irql semaphore_lock_internal(struct semaphore *sem) {
+    if (sem->irq_disable)
+        return spin_lock_irq_disable(&sem->lock);
+
+    return spin_lock(&sem->lock);
 }
 
 void semaphore_wait(struct semaphore *s) {
-    enum irql irql = semaphore_lock_irq_disable(s);
+    enum irql irql = semaphore_lock_internal(s);
 
     while (get_count(s) == 0)
         condvar_wait(&s->cv, &s->lock, irql, &irql);
@@ -25,7 +33,7 @@ void semaphore_wait(struct semaphore *s) {
 }
 
 bool semaphore_timedwait(struct semaphore *s, time_t timeout_ms) {
-    enum irql irql = semaphore_lock_irq_disable(s);
+    enum irql irql = semaphore_lock_internal(s);
 
     while (get_count(s) == 0) {
         enum irql out;
@@ -42,7 +50,7 @@ bool semaphore_timedwait(struct semaphore *s, time_t timeout_ms) {
 }
 
 void semaphore_post(struct semaphore *s) {
-    enum irql irql = semaphore_lock_irq_disable(s);
+    enum irql irql = semaphore_lock_internal(s);
 
     inc_count(s);
 
@@ -52,7 +60,7 @@ void semaphore_post(struct semaphore *s) {
 }
 
 void semaphore_postn(struct semaphore *s, int n) {
-    enum irql irql = semaphore_lock_irq_disable(s);
+    enum irql irql = semaphore_lock_internal(s);
 
     add_count(s, n);
     for (int i = 0; i < n; i++)
@@ -62,7 +70,7 @@ void semaphore_postn(struct semaphore *s, int n) {
 }
 
 void semaphore_post_callback(struct semaphore *s, thread_action_callback cb) {
-    enum irql irql = semaphore_lock_irq_disable(s);
+    enum irql irql = semaphore_lock_internal(s);
 
     inc_count(s);
 
@@ -73,7 +81,7 @@ void semaphore_post_callback(struct semaphore *s, thread_action_callback cb) {
 
 void semaphore_postn_callback(struct semaphore *s, int n,
                               thread_action_callback cb) {
-    enum irql irql = semaphore_lock_irq_disable(s);
+    enum irql irql = semaphore_lock_internal(s);
 
     add_count(s, n);
     for (int i = 0; i < n; i++)

@@ -223,8 +223,8 @@ struct daemon *daemon_create(struct daemon_attributes *attrs,
     daemon->attrs.timesharing_threads = 0;
 
     spinlock_init(&daemon->lock);
-    semaphore_init(&daemon->bg_sem, 0);
-    semaphore_init(&daemon->ts_sem, 0);
+    semaphore_init(&daemon->bg_sem, 0, SEMAPHORE_INIT_NORMAL);
+    semaphore_init(&daemon->ts_sem, 0, SEMAPHORE_INIT_NORMAL);
 
     INIT_LIST_HEAD(&daemon->timesharing_threads);
     daemon->timesharing_work = timesharing_work;

@@ -147,6 +147,7 @@ struct nvme_device {
     struct nvme_waiting_requests finished_requests;
     struct work work;
 
+    atomic_bool on_sem;
     struct semaphore sem;
 
     uint8_t *isr_index;

@@ -3,14 +3,18 @@
 #include <sync/condvar.h>
 #include <sync/spinlock.h>
 
+#define SEMAPHORE_INIT_IRQ_DISABLE true
+#define SEMAPHORE_INIT_NORMAL false
+
 struct semaphore {
     atomic_int count;
+    bool irq_disable;
 
     struct spinlock lock;
     struct condvar cv;
 };
 
-void semaphore_init(struct semaphore *s, int value);
+void semaphore_init(struct semaphore *s, int value, bool irq_disable);
 void semaphore_wait(struct semaphore *s);
 bool semaphore_timedwait(struct semaphore *s, time_t timeout_ms);
 void semaphore_post(struct semaphore *s);

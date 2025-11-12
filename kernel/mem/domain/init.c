@@ -241,7 +241,7 @@ static void domain_init_worker(struct domain_buddy *domain) {
     domain->worker.domain = domain;
     domain->worker.enqueued = false;
     domain->worker.stop = false;
-    semaphore_init(&domain->worker.sema, 0);
+    semaphore_init(&domain->worker.sema, 0, SEMAPHORE_INIT_NORMAL);
     domain->worker.thread =
         thread_create("domain_flush_thread%u", domain_flush_thread,
                       domain->cores[0]->domain->id);

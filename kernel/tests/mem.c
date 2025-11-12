@@ -164,6 +164,8 @@ REGISTER_TEST(kmalloc_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 #define MT_PMM_THREAD_COUNT 8
 #define MT_PMM_ALLOC_TIMES 512
 
+volatile int pmm_done = 0;
+
 static void mt_pmm_worker() {
     paddr_t addrs[MT_PMM_ALLOC_TIMES];
 
@@ -175,6 +177,8 @@ static void mt_pmm_worker() {
     for (int64_t i = MT_PMM_ALLOC_TIMES - 1; i >= 0; i--) {
         pmm_free_page(addrs[i]);
     }
+
+    pmm_done++;
 }
 
 REGISTER_TEST(pmm_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
@@ -187,6 +191,9 @@ REGISTER_TEST(pmm_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
                                                PAGE_SIZE * 16);
         TEST_ASSERT(threads[i] != NULL);
     }
+
+    while (pmm_done < MT_PMM_THREAD_COUNT)
+        scheduler_yield();
 
     SET_SUCCESS();
 }
@@ -418,6 +425,7 @@ REGISTER_TEST(kmalloc_new_concurrency_stress_test, SHOULD_NOT_FAIL,
         if (!done[i]) {
             snprintf(msg, sizeof(msg), "thread %d did not complete in time", i);
             ADD_MESSAGE(msg);
+            SET_SUCCESS();
             return;
         }
     }

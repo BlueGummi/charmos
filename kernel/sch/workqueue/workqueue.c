@@ -137,7 +137,7 @@ struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
         snprintf(wq->name, needed, fmt, args);
     }
 
-    condvar_init(&wq->queue_cv);
+    condvar_init(&wq->queue_cv, CONDVAR_INIT_NORMAL);
     INIT_LIST_HEAD(&wq->workers);
     INIT_LIST_HEAD(&wq->works);
 

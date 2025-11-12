@@ -1,6 +1,14 @@
 #include <sch/defer.h>
 #include <sync/condvar.h>
 
+static enum irql condvar_lock_internal(struct condvar *cv,
+                                       struct spinlock *lock) {
+    if (cv->irq_disable)
+        return spin_lock_irq_disable(lock);
+
+    return spin_lock(lock);
+}
+
 static void do_block_on_queue(struct thread_queue *q, struct spinlock *lock,
                               enum irql irql) {
     thread_block_on(q);
@@ -15,13 +23,14 @@ enum wake_reason condvar_wait(struct condvar *cv, struct spinlock *lock,
     curr->wait_cookie++;
 
     do_block_on_queue(&cv->waiters, lock, irql);
-    *out = spin_lock(lock);
+    *out = condvar_lock_internal(cv, lock);
 
     return curr->wake_reason;
 }
 
-void condvar_init(struct condvar *cv) {
+void condvar_init(struct condvar *cv, bool irq_disable) {
     thread_queue_init(&cv->waiters);
+    cv->irq_disable = irq_disable;
 }
 
 static void set_wake_reason_and_wake(struct thread *t,
@@ -82,16 +91,15 @@ static void condvar_timeout_wakeup(void *arg, void *arg2) {
         return;
     }
 
-    thread_put(t);
+    enum irql irql = spin_lock_irq_disable(&ck->cv->waiters.lock);
 
-    enum irql irql = spin_lock(&ck->cv->waiters.lock);
-    if (!list_empty(&t->list_node)) {
+    if (!list_empty(&t->list_node))
         list_del_init(&t->list_node);
-    }
 
     spin_unlock(&ck->cv->waiters.lock, irql);
     kfree(ck);
     set_wake_reason_and_wake(t, WAKE_REASON_TIMEOUT);
+    thread_put(t);
 }
 
 enum wake_reason condvar_wait_timeout(struct condvar *cv, struct spinlock *lock,

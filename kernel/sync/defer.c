@@ -135,7 +135,7 @@ void defer_init(void) {
         defer_queues[i].next_fire_time = UINT64_MAX;
         defer_queues[i].timer = i;
         workqueue_enqueue(defer_workqueue, &defer_queues[i].work);
-        semaphore_init(&defer_queues[i].semaphore, 0);
+        semaphore_init(&defer_queues[i].semaphore, 0, SEMAPHORE_INIT_IRQ_DISABLE);
         spinlock_init(&defer_queues[i].lock);
 
         uint8_t vector = irq_alloc_entry();
