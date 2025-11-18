@@ -8,6 +8,16 @@
 #include "internal.h"
 #include "sched_profiling.h"
 
+bool scheduler_can_steal_thread(size_t core, struct thread *target) {
+    if (target->flags & THREAD_FLAGS_NO_STEAL)
+        return false;
+
+    if (!cpu_mask_test(&target->allowed_cpus, core))
+        return false;
+
+    return true;
+}
+
 /* self->stealing_work should already be set before this is called */
 /* TODO: Rate limit me so I don't do a full scan of all cores due to that being
  * expensive */
@@ -61,7 +71,7 @@ static struct thread *steal_from_thread_rbt(struct scheduler *victim,
     struct rbt_node *node;
     rbt_for_each_reverse(node, tree) {
         struct thread *target = thread_from_rbt_node(node);
-        if (target->flags & THREAD_FLAGS_NO_STEAL)
+        if (!scheduler_can_steal_thread(smp_core_id(), target))
             continue;
 
         rb_delete(tree, node);
@@ -104,7 +114,7 @@ static struct thread *steal_from_special_threads(struct scheduler *victim,
     list_for_each_safe(pos, n, &q->list) {
         struct thread *t = thread_from_list_node(pos);
 
-        if (t->flags & THREAD_FLAGS_NO_STEAL)
+        if (!scheduler_can_steal_thread(smp_core_id(), t))
             continue;
 
         if (thread_get_state(t) != THREAD_STATE_READY)

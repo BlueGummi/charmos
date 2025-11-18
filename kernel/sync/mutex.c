@@ -39,10 +39,9 @@ static bool spin_wait_mutex(struct mutex *m, struct thread *curr) {
     return false;
 }
 
-static void block_on_mutex(struct mutex *m, struct thread *curr) {
+static void block_on_mutex(struct mutex *m) {
     enum irql irql = spin_lock(&m->lock);
-    thread_queue_push_back(&m->waiters, curr);
-    thread_block(curr, THREAD_BLOCK_REASON_MANUAL);
+    thread_block_on(&m->waiters);
     spin_unlock(&m->lock, irql);
     scheduler_yield();
 }
@@ -51,17 +50,14 @@ void mutex_lock(struct mutex *m) {
     struct thread *curr = scheduler_get_current_thread();
 
     while (true) {
-        if (try_acquire_mutex(m, curr)) {
+        if (try_acquire_mutex(m, curr))
             return;
-        }
 
-        if (should_spin_on_mutex(m)) {
-            if (spin_wait_mutex(m, curr)) {
+        if (should_spin_on_mutex(m))
+            if (spin_wait_mutex(m, curr))
                 return;
-            }
-        }
 
-        block_on_mutex(m, curr);
+        block_on_mutex(m);
     }
 }
 
@@ -79,7 +75,7 @@ void mutex_unlock(struct mutex *m) {
     struct thread *next = thread_queue_pop_front(&m->waiters);
     if (next != NULL)
         scheduler_wake(next, THREAD_WAKE_REASON_BLOCKING_MANUAL,
-                       next->perceived_priority);
+                       next->perceived_prio_class);
 
     spin_unlock(&m->lock, irql);
 }

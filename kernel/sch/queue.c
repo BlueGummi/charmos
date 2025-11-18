@@ -11,14 +11,14 @@
 #include "internal.h"
 
 void scheduler_add_thread(struct scheduler *sched, struct thread *task,
-                          bool already_locked) {
+                          bool lock_held) {
     kassert(task->state != THREAD_STATE_IDLE_THREAD);
 
     enum irql irql;
-    if (!already_locked)
+    if (!lock_held)
         irql = scheduler_lock_irq_disable(sched);
 
-    enum thread_prio_class prio = task->perceived_priority;
+    enum thread_prio_class prio = task->perceived_prio_class;
 
     /* Put it on the tree since this is timesharing */
     if (prio == THREAD_PRIO_CLASS_TIMESHARE) {
@@ -44,7 +44,34 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
         scheduler_period_start(sched, time_get_ms());
     }
 
-    if (!already_locked)
+    if (!lock_held)
+        scheduler_unlock(sched, irql);
+}
+
+void scheduler_remove_thread(struct scheduler *sched, struct thread *t,
+                             bool lock_held) {
+    enum irql irql;
+    if (!lock_held)
+        irql = scheduler_lock_irq_disable(sched);
+    else
+        kassert(spinlock_held(&sched->lock));
+
+    enum thread_prio_class prio = t->perceived_prio_class;
+    kassert(thread_get_state(t) == THREAD_STATE_READY);
+
+    if (t->perceived_prio_class == THREAD_PRIO_CLASS_TIMESHARE) {
+        dequeue_from_tree(sched, t);
+        if (scheduler_ts_empty(sched))
+            scheduler_clear_queue_bitmap(sched, prio);
+    } else {
+        struct thread_queue *q = scheduler_get_this_thread_queue(sched, prio);
+        list_del_init(&t->list_node);
+        if (list_empty(&q->list))
+            scheduler_clear_queue_bitmap(sched, prio);
+    }
+
+    scheduler_decrement_thread_count(sched, t);
+    if (!lock_held)
         scheduler_unlock(sched, irql);
 }
 
@@ -80,7 +107,7 @@ void scheduler_wake(struct thread *t, enum thread_wake_reason reason,
                     enum thread_prio_class prio) {
     thread_wake(t, reason);
     thread_apply_wake_boost(t);
-    t->perceived_priority = prio;
+    t->perceived_prio_class = prio;
 
     /* boost */
     int64_t c = t->curr_core;

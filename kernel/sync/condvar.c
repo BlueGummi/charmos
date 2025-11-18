@@ -43,7 +43,7 @@ static void set_wake_reason_and_wake(struct thread *t,
                                     ? THREAD_WAKE_REASON_SLEEP_TIMEOUT
                                     : THREAD_WAKE_REASON_SLEEP_MANUAL;
 
-    scheduler_wake(t, r, t->perceived_priority);
+    scheduler_wake(t, r, t->perceived_prio_class);
 }
 
 static void nop_callback(struct thread *unused) {

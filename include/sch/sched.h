@@ -81,10 +81,9 @@ struct scheduler {
 void scheduler_init();
 
 void scheduler_add_thread(struct scheduler *sched, struct thread *thread,
-                          bool already_locked);
-
-void scheduler_rm_thread(struct scheduler *sched, struct thread *thread,
-                         bool already_locked);
+                          bool lock_held);
+void scheduler_remove_thread(struct scheduler *sched, struct thread *t,
+                             bool lock_held);
 void schedule(void);
 void k_sch_main(void);
 void scheduler_idle_main(void);
@@ -127,9 +126,6 @@ struct scheduler_data {
 
 extern struct scheduler_data scheduler_data;
 
-/* We directly read out of GS to save a singular instruction
- * that would be used if we did smp_core()->current_thread because
- * that would do a tiny pointer arithmetic op */
 static inline struct thread *scheduler_get_current_thread() {
     uintptr_t thread;
     asm volatile("movq %%gs:%c1, %0"
@@ -196,3 +192,5 @@ static inline void scheduler_wake_from_io_block(struct thread *t) {
 bool scheduler_preemption_disabled(void);
 uint32_t scheduler_preemption_disable(void);
 uint32_t scheduler_preemption_enable(void);
+void scheduler_inherit_priority(struct thread *boosted, size_t new_weight,
+                                enum thread_prio_class new_class);

@@ -18,8 +18,15 @@ uint32_t scheduler_preemption_enable(void) {
     uint32_t old =
         atomic_fetch_sub(&cpu->scheduler_preemption_disable_depth, 1);
 
-    if (old == 0)
-        k_panic("underflow\n");
+    /* FIXME: there is a weird bug during init where this codepath is taken.
+     * something strange with bringing up the APs as they enter 
+     * their idle threads */
+
+    if (old == 0) {
+        /* bandaid fix */
+        atomic_store(&cpu->scheduler_preemption_disable_depth, 0);
+        old = 1;
+    }
 
     return old - 1;
 }

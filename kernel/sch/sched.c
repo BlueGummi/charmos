@@ -72,7 +72,7 @@ static inline void update_thread_before_save(struct thread *thread,
 }
 
 static inline bool thread_done_for_period(struct thread *thread) {
-    return THREAD_PRIO_IS_TIMESHARING(thread->perceived_priority) &&
+    return THREAD_PRIO_IS_TIMESHARING(thread->perceived_prio_class) &&
            thread->virtual_period_runtime >= thread->virtual_budget;
 }
 
@@ -80,15 +80,15 @@ static inline void re_enqueue_thread(struct scheduler *sched,
                                      struct thread *thread) {
 
     /* Thread just finished an URGENT boost */
-    if (thread->perceived_priority == THREAD_PRIO_CLASS_URGENT)
-        thread->perceived_priority = thread->base_priority;
+    if (thread->perceived_prio_class == THREAD_PRIO_CLASS_URGENT)
+        thread->perceived_prio_class = thread->base_prio_class;
 
     /* Scheduler is locked - called from `schedule()` */
     if (thread_done_for_period(thread)) {
         thread->tree_node.data = thread->virtual_budget;
         thread->completed_period = sched->current_period;
         retire_thread(sched, thread);
-        scheduler_set_queue_bitmap(sched, thread->perceived_priority);
+        scheduler_set_queue_bitmap(sched, thread->perceived_prio_class);
         scheduler_increment_thread_count(sched, thread);
     } else {
         bool locked = true;
@@ -231,7 +231,7 @@ static void change_timeslice(struct scheduler *sched, struct thread *next) {
         return;
     }
 
-    if (THREAD_PRIO_HAS_TIMESLICE(next->perceived_priority)) {
+    if (THREAD_PRIO_HAS_TIMESLICE(next->perceived_prio_class)) {
         /* Timesharing threads need timeslices */
         change_timeslice_duration(next->timeslice_length_raw_ms);
     }

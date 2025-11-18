@@ -133,9 +133,11 @@
 
 #include <console/printf.h>
 #include <kassert.h>
+#include <math/sort.h>
 #include <mem/alloc.h>
 #include <mem/domain.h>
 #include <mem/pmm.h>
+#include <mem/simple_alloc.h>
 #include <mem/slab.h>
 #include <mem/vaddr_alloc.h>
 #include <mem/vmm.h>
@@ -150,6 +152,8 @@
 #include "mem/domain/internal.h"
 #include "stat_internal.h"
 
+size_t *slab_class_sizes = NULL;
+size_t slab_num_sizes = 0;
 struct vas_space *slab_vas = NULL;
 __no_sanitize_address struct slab_caches slab_caches = {0};
 
@@ -457,7 +461,7 @@ out:
 }
 
 int32_t slab_size_to_index(size_t size) {
-    for (uint64_t i = 0; i < SLAB_CLASS_COUNT; i++)
+    for (uint64_t i = 0; i < slab_num_sizes; i++)
         if (slab_class_sizes[i] >= size)
             return i;
 
@@ -468,12 +472,40 @@ static inline bool kmalloc_size_fits_in_slab(size_t size) {
     return slab_size_to_index(size) >= 0;
 }
 
+static int slab_class_sort_cmp(const void *a, const void *b) {
+    return *(size_t *) a - *(size_t *) b;
+}
+
 __no_sanitize_address void slab_allocator_init() {
+    /* bootstrap VAS */
     slab_vas = vas_space_bootstrap(SLAB_HEAP_START, SLAB_HEAP_END);
     if (!slab_vas)
         k_panic("Could not initialize slab VAS\n");
 
-    for (uint64_t i = 0; i < SLAB_CLASS_COUNT; i++) {
+    struct slab_size_constant *start = __skernel_slab_sizes;
+    struct slab_size_constant *end = __ekernel_slab_sizes;
+    slab_num_sizes = (end - start) + SLAB_CLASS_CONST_COUNT;
+    size_t size =
+        (end - start) * sizeof(size_t) + sizeof(slab_class_sizes_const);
+
+    slab_class_sizes = simple_alloc(slab_vas, size);
+
+    /* set it all up */
+    size_t idx = 0;
+    for (struct slab_size_constant *ssc = start; ssc < end; ssc++, idx++) {
+        slab_class_sizes[idx] = ssc->size;
+    }
+
+    for (size_t i = idx; i < slab_num_sizes; i++) {
+        slab_class_sizes[i] = slab_class_sizes_const[i - idx];
+    }
+
+    qsort(slab_class_sizes, slab_num_sizes, sizeof(size_t),
+          slab_class_sort_cmp);
+
+    slab_caches.caches = slab_caches_alloc();
+
+    for (uint64_t i = 0; i < slab_num_sizes; i++) {
         slab_cache_init(i, &slab_caches.caches[i], slab_class_sizes[i]);
         slab_caches.caches[i].parent = &slab_caches;
     }

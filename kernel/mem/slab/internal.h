@@ -4,6 +4,7 @@
 #include <math/align.h>
 #include <mem/alloc.h>
 #include <mem/page.h>
+#include <mem/simple_alloc.h>
 #include <mem/vmm.h>
 #include <smp/domain.h>
 #include <stat_series.h>
@@ -25,7 +26,6 @@
 #define SLAB_HEAP_START 0xFFFFF00000000000ULL
 #define SLAB_HEAP_END 0xFFFFF10000000000ULL
 
-#define SLAB_OBJ_ALIGN 16u
 #define SLAB_BITMAP_TEST(__bitmap, __idx) (__bitmap & __idx)
 
 #define SLAB_MAG_ENTRIES 32
@@ -44,10 +44,11 @@
 #define SLAB_ALIGN_UP(x, a) ALIGN_UP(x, a)
 #define SLAB_OBJ_ALIGN_UP(x) SLAB_ALIGN_UP(x, SLAB_OBJ_ALIGN)
 
-static const uint64_t slab_class_sizes[] = {
+static const uint64_t slab_class_sizes_const[] = {
     SLAB_MIN_SIZE, 16, 32, 64, 96, 128, 192, 256, 512, SLAB_MAX_SIZE};
 
-#define SLAB_CLASS_COUNT (sizeof(slab_class_sizes) / sizeof(*slab_class_sizes))
+#define SLAB_CLASS_CONST_COUNT                                                 \
+    (sizeof(slab_class_sizes_const) / sizeof(*slab_class_sizes_const))
 
 /* GC */
 #define SLAB_GC_FLAG_DESTROY_BIAS_SHIFT 4ull
@@ -191,7 +192,7 @@ static inline bool slab_magazine_full(struct slab_magazine *mag) {
 
 struct slab_percpu_cache {
     /* Magazines are always nonpageable */
-    struct slab_magazine mag[SLAB_CLASS_COUNT];
+    struct slab_magazine *mag; /* the size of this is slab_num_sizes */
     struct slab_domain *domain;
 };
 
@@ -276,7 +277,7 @@ SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab_cache, lock);
     (atomic_load(&cache->slabs_count[state]))
 
 struct slab_caches {
-    struct slab_cache caches[SLAB_CLASS_COUNT];
+    struct slab_cache *caches; /* slab_num_sizes caches */
     atomic_size_t slabs_count[SLAB_STANDARD_STATE_COUNT];
 };
 
@@ -634,3 +635,9 @@ static inline void slab_index_and_mask_from_ptr(struct slab *slab, void *obj,
 
 extern struct vas_space *slab_vas;
 extern struct slab_caches slab_caches;
+extern size_t *slab_class_sizes;
+extern size_t slab_num_sizes;
+
+static inline struct slab_cache *slab_caches_alloc() {
+    return simple_alloc(slab_vas, sizeof(struct slab_cache) * slab_num_sizes);
+}

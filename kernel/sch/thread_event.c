@@ -79,9 +79,9 @@ void thread_print(const struct thread *t) {
     k_printf("    stack_size: %zu,\n", t->stack_size);
 
     /* priorities */
-    k_printf("    base_prio: %s,\n", thread_prio_class_str(t->base_priority));
+    k_printf("    base_prio: %s,\n", thread_prio_class_str(t->base_prio_class));
     k_printf("    perceived_prio: %s,\n",
-             thread_prio_class_str(t->perceived_priority));
+             thread_prio_class_str(t->perceived_prio_class));
     k_printf("    effective_priority: %llu,\n",
              (unsigned long long) t->effective_priority);
     k_printf("    activity_score: %u, dynamic_delta: %d, weight: %llu,\n",
@@ -480,13 +480,13 @@ void thread_wake(struct thread *t, enum thread_wake_reason r) {
 }
 
 void thread_set_timesharing(struct thread *t) {
-    t->base_priority = THREAD_PRIO_CLASS_TIMESHARE;
-    t->perceived_priority = THREAD_PRIO_CLASS_TIMESHARE;
+    t->base_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
+    t->perceived_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
 }
 
 void thread_set_background(struct thread *t) {
-    t->base_priority = THREAD_PRIO_CLASS_BACKGROUND;
-    t->perceived_priority = THREAD_PRIO_CLASS_BACKGROUND;
+    t->base_prio_class = THREAD_PRIO_CLASS_BACKGROUND;
+    t->perceived_prio_class = THREAD_PRIO_CLASS_BACKGROUND;
 }
 
 void thread_block(struct thread *t, enum thread_block_reason r) {

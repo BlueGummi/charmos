@@ -18,7 +18,6 @@
 
 #define THREAD_STACK_SIZE (PAGE_SIZE * 4)
 
-typedef uint32_t thread_prio_t;
 #define THREAD_CLASS_WIDTH 1024
 #define THREAD_CLASS_HALF (THREAD_CLASS_WIDTH / 2)
 
@@ -207,8 +206,14 @@ struct thread {
     _Atomic enum thread_state state;
 
     /* Who is running us? */
-    int64_t curr_core;     /* -1 if not being ran */
-    uint64_t last_ran;     /* What core last ran us? */
+    int64_t curr_core; /* -1 if not being ran */
+
+    int64_t core_to_wake_on; /* When I run again, where should I be placed?
+                              * -1 if the scheduler should select the most
+                              * optimal core */
+
+    uint64_t last_ran; /* What core last ran us? */
+
     time_t run_start_time; /* When did we start running */
     size_t owner_domain;   /* What domain created us? */
 
@@ -224,6 +229,13 @@ struct thread {
     thread_prio_t activity_score;
     int32_t dynamic_delta; /* Signed delta applied to base */
     size_t weight;
+
+    /* shadow copy
+     *
+     * this is for PI so when we un-boost we know where to go back to */
+    bool has_pi_boost;
+    size_t saved_weight;
+    enum thread_prio_class saved_class;
 
     /* Class changes */
     time_t last_class_change_ms;
@@ -243,9 +255,9 @@ struct thread {
 
     enum thread_activity_class activity_class;
 
-    enum thread_prio_class base_priority; /* priority class
-                                           * at creation time */
-    enum thread_prio_class perceived_priority;
+    enum thread_prio_class base_prio_class; /* priority class
+                                             * at creation time */
+    enum thread_prio_class perceived_prio_class;
 
     /* Activity data */
     struct thread_activity_data *activity_data;
@@ -293,6 +305,10 @@ struct thread {
      */
 
     struct list_head on_event_apcs[APC_EVENT_COUNT];
+
+    struct turnstile *turnstile_born; /* turnstile it was born with */
+    struct turnstile *turnstile;      /* my turnstile */
+    void *blocked_on;                 /* what am I blocked on */
 
     /* ========== Profiling data ========== */
     size_t context_switches; /* Total context switches */
@@ -387,6 +403,6 @@ static inline void thread_release(struct thread *t, enum irql irql) {
 }
 
 static inline bool thread_is_rt(struct thread *t) {
-    return t->perceived_priority == THREAD_PRIO_CLASS_URGENT ||
-           t->perceived_priority == THREAD_PRIO_CLASS_RT;
+    return t->perceived_prio_class == THREAD_PRIO_CLASS_URGENT ||
+           t->perceived_prio_class == THREAD_PRIO_CLASS_RT;
 }

@@ -1,5 +1,6 @@
 #include <mem/alloc.h>
 #include <mem/pmm.h>
+#include <mem/slab.h>
 #include <mem/vaddr_alloc.h>
 #include <mem/vmm.h>
 #include <sch/defer.h>
@@ -12,6 +13,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
+
+REGISTER_SLAB_SIZE(thread, sizeof(struct thread));
 
 #define THREAD_STACKS_HEAP_START 0xFFFFF10000000000ULL
 #define THREAD_STACKS_HEAP_END 0xFFFFF20000000000ULL
@@ -143,6 +146,9 @@ static void thread_init_activity_data(struct thread *thread) {
     data->block_reasons_head = 0;
     data->sleep_reasons_head = 0;
     data->wake_reasons_head = 0;
+    thread_init_event_reasons(thread->activity_data->block_reasons);
+    thread_init_event_reasons(thread->activity_data->wake_reasons);
+    thread_init_event_reasons(thread->activity_data->sleep_reasons);
 }
 
 static struct thread *thread_init(struct thread *thread,
@@ -155,8 +161,8 @@ static struct thread *thread_init(struct thread *thread,
     thread->creation_time_ms = time_get_ms();
     thread->stack_size = stack_size;
     thread->regs.rsp = stack_top;
-    thread->base_priority = THREAD_PRIO_CLASS_TIMESHARE;
-    thread->perceived_priority = THREAD_PRIO_CLASS_TIMESHARE;
+    thread->base_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
+    thread->perceived_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
     thread->state = THREAD_STATE_READY;
     thread->regs.r12 = (uint64_t) entry_point;
     thread->regs.rip = (uint64_t) thread_entry_wrapper;
@@ -360,7 +366,7 @@ void thread_block_on(struct thread_queue *q) {
 static void wake_thread(void *a, void *unused) {
     (void) unused;
     struct thread *t = a;
-    scheduler_wake(t, THREAD_WAKE_REASON_SLEEP_TIMEOUT, t->base_priority);
+    scheduler_wake(t, THREAD_WAKE_REASON_SLEEP_TIMEOUT, t->base_prio_class);
 }
 
 void thread_sleep_for_ms(uint64_t ms) {
@@ -375,7 +381,8 @@ void thread_wake_manual(struct thread *t) {
     enum thread_state s = thread_get_state(t);
 
     if (s == THREAD_STATE_BLOCKED)
-        scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_MANUAL, t->base_priority);
+        scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_MANUAL,
+                       t->base_prio_class);
     else if (s == THREAD_STATE_SLEEPING)
-        scheduler_wake(t, THREAD_WAKE_REASON_SLEEP_MANUAL, t->base_priority);
+        scheduler_wake(t, THREAD_WAKE_REASON_SLEEP_MANUAL, t->base_prio_class);
 }

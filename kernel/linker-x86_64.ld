@@ -70,6 +70,12 @@ SECTIONS {
         KEEP(*(.kernel_movealloc_callbacks))
         __ekernel_movealloc_callbacks = .;
     }
+    
+    .kernel_slab_sizes : {
+        __skernel_slab_sizes = .;
+        KEEP(*(.kernel_slab_sizes))
+        __ekernel_slab_sizes = .;
+    }
 
     .bss : ALIGN(4K) {
         __sbss = .;

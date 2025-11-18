@@ -45,7 +45,7 @@ bool slab_gc_should_recycle(struct slab *slab, uint8_t bias_destroy) {
     struct slab_caches *parent_caches = parent->parent;
     size_t class = SLAB_CACHE_COUNT_FOR(parent, SLAB_FREE);
     size_t total = SLAB_CACHE_COUNT_FOR(parent_caches, SLAB_FREE);
-    size_t avg = total / SLAB_CLASS_COUNT;
+    size_t avg = total / slab_num_sizes;
     size_t smoothed = parent->ewma_free_slabs;
 
     /* scale the thresholds by bias_destroy: higher bias = more destruction */
@@ -63,11 +63,10 @@ bool slab_gc_should_recycle(struct slab *slab, uint8_t bias_destroy) {
     return below_free_ratio || excess || dip;
 }
 
-static size_t
-slab_gc_get_total_free_for(struct slab_caches *caches,
-                           size_t free_per_order[SLAB_CLASS_COUNT]) {
+static size_t slab_gc_get_total_free_for(struct slab_caches *caches,
+                                         size_t *free_per_order) {
     size_t total_free = 0;
-    for (size_t i = 0; i < SLAB_CLASS_COUNT; i++) {
+    for (size_t i = 0; i < slab_num_sizes; i++) {
         free_per_order[i] = SLAB_CACHE_COUNT_FOR(caches, SLAB_FREE);
         total_free += free_per_order[i];
     }
@@ -76,8 +75,7 @@ slab_gc_get_total_free_for(struct slab_caches *caches,
 }
 
 static int32_t slab_gc_get_inv_free(size_t total_free, uint32_t bias_bitmap,
-                                    size_t order,
-                                    size_t free_per_order[SLAB_CLASS_COUNT]) {
+                                    size_t order, size_t *free_per_order) {
     int32_t inv_free;
     if (total_free == 0) {
         /* prefer the original order or smaller ones */
@@ -94,9 +92,8 @@ static int32_t slab_gc_get_inv_free(size_t total_free, uint32_t bias_bitmap,
     return inv_free;
 }
 
-static int64_t
-slab_gc_get_order_score(size_t inv_free, size_t order,
-                        size_t slabs_recycled[SLAB_CLASS_COUNT]) {
+static int64_t slab_gc_get_order_score(size_t inv_free, size_t order,
+                                       size_t *slabs_recycled) {
     /* scale down by how many we've already thrown into this order */
     size_t recycled = slabs_recycled[order];
     recycled = (recycled * SLAB_GC_SCORE_SCALE) / (recycled + 1);
@@ -109,8 +106,7 @@ slab_gc_get_order_score(size_t inv_free, size_t order,
 /* prefer under-supplied orders (lower free_per_order)
  * and penalize orders we've already recycled to */
 static int64_t score_order(size_t total_free, uint32_t bias_map, size_t order,
-                           size_t free_per_order[SLAB_CLASS_COUNT],
-                           size_t recycled[SLAB_CLASS_COUNT],
+                           size_t *free_per_order, size_t *recycled,
                            size_t original_order) {
     int32_t inv_free =
         slab_gc_get_inv_free(total_free, bias_map, order, free_per_order);
@@ -138,7 +134,7 @@ static struct slab_caches *slab_gc_pick_caches(struct slab_domain *domain,
 }
 
 static void slab_recycle(struct slab_cache *best, struct slab *slab,
-                         size_t slabs_recycled[SLAB_CLASS_COUNT], size_t idx) {
+                         size_t *slabs_recycled, size_t idx) {
 
     slab->recycle_count++;
     slab_cache_insert(best, slab);
@@ -151,20 +147,19 @@ static void slab_recycle(struct slab_cache *best, struct slab *slab,
  * and the amount of slabs we have already recycled to that order,
  * to prevent overly aggressive draining to one order */
 void slab_gc_recycle(struct slab_domain *domain, struct slab *slab,
-                     size_t slabs_recycled[SLAB_CLASS_COUNT],
-                     uint32_t bias_bitmap) {
+                     size_t *slabs_recycled, uint32_t bias_bitmap) {
 
     struct slab_caches *caches = slab_gc_pick_caches(domain, slab);
 
     /* Gather totals */
-    size_t free_per_order[SLAB_CLASS_COUNT];
+    size_t free_per_order[slab_num_sizes];
     size_t total_free = slab_gc_get_total_free_for(caches, free_per_order);
     size_t original_order = slab->parent_cache->order;
 
     int32_t best_idx = original_order; /* Default */
     int64_t best_score = INT64_MIN;
 
-    for (size_t i = 0; i < SLAB_CLASS_COUNT; i++) {
+    for (size_t i = 0; i < slab_num_sizes; i++) {
         int64_t score = score_order(total_free, bias_bitmap, i, free_per_order,
                                     slabs_recycled, original_order);
 
@@ -197,8 +192,7 @@ slab_flags_get_order_bias_bitmap(enum slab_gc_flags flags) {
 }
 
 static bool slab_do_gc(struct slab_gc *gc, struct slab *slab,
-                       enum slab_gc_flags flags,
-                       size_t slabs_recycled[SLAB_CLASS_COUNT],
+                       enum slab_gc_flags flags, size_t *slabs_recycled,
                        size_t *destroyed, size_t destroy_target) {
 
     uint8_t bias = slab_flags_get_bias(flags);
@@ -264,7 +258,8 @@ size_t slab_gc_run(struct slab_gc *gc, enum slab_gc_flags flags) {
     enum thread_flags thread_flags = scheduler_pin_current_thread();
     enum irql irql = slab_gc_lock(gc);
 
-    size_t slabs_recycled[SLAB_CLASS_COUNT] = {0};
+    size_t slabs_recycled[slab_num_sizes];
+    memset(slabs_recycled, 0, sizeof(size_t) * slab_num_sizes);
     size_t target = slab_gc_derive_target_gc_slabs(gc, flags);
     size_t threshold = slab_gc_derive_threshold_score(gc, flags);
     size_t max_unfit = slab_gc_get_max_unfit_slabs(target, flags);
@@ -416,7 +411,7 @@ bool slab_should_enqueue_gc(struct slab *slab) {
     if (total < SLAB_EWMA_MIN_TOTAL || class < SLAB_EWMA_MIN_TOTAL)
         return false;
 
-    size_t avg = total / SLAB_CLASS_COUNT;
+    size_t avg = total / slab_num_sizes;
     size_t smoothed = parent->ewma_free_slabs;
 
     /* scale thresholds for mid-sized caches */

@@ -1,7 +1,9 @@
 #pragma once
-#include <stdint.h>
 
-/* TODO: Migrate these out probably */
+/* defines linker sections for commonly accessed regions,
+ * .text, .bss, .rodata, etc... */
+
+#include <stdint.h>
 
 extern uint64_t __stext, __etext;
 extern uint64_t __srodata, __erodata;

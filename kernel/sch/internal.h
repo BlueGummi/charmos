@@ -9,10 +9,15 @@ static inline struct idle_thread_data *smp_core_idle_thread(void) {
     return &smp_core_scheduler()->idle_thread_data;
 }
 
+static inline bool thread_exhausted_period(struct scheduler *sched,
+                                           struct thread *thread) {
+    return thread->completed_period == sched->current_period;
+}
+
 static inline void scheduler_decrement_thread_count(struct scheduler *sched,
                                                     struct thread *t) {
     sched->total_thread_count--;
-    sched->thread_count[t->perceived_priority]--;
+    sched->thread_count[t->perceived_prio_class]--;
 
     if (t->effective_priority == THREAD_PRIO_CLASS_TIMESHARE)
         sched->total_weight -= t->weight;
@@ -23,7 +28,7 @@ static inline void scheduler_decrement_thread_count(struct scheduler *sched,
 static inline void scheduler_increment_thread_count(struct scheduler *sched,
                                                     struct thread *t) {
     sched->total_thread_count++;
-    sched->thread_count[t->perceived_priority]++;
+    sched->thread_count[t->perceived_prio_class]++;
 
     if (t->effective_priority == THREAD_PRIO_CLASS_TIMESHARE)
         sched->total_weight += t->weight;
@@ -53,11 +58,24 @@ static inline void retire_thread(struct scheduler *sched,
     rbt_insert(&sched->completed_rbt, &thread->tree_node);
 }
 
+static inline void dequeue_from_tree(struct scheduler *sched,
+                                     struct thread *thread) {
+    if (thread_exhausted_period(sched, thread)) {
+        rb_delete(&sched->completed_rbt, &thread->tree_node);
+    } else {
+        rb_delete(&sched->thread_rbt, &thread->tree_node);
+    }
+}
+
 /* The `thread_rbt` should be NULL here */
 static inline void swap_queues(struct scheduler *sched) {
     kassert(sched->thread_rbt.root == NULL);
     sched->thread_rbt.root = sched->completed_rbt.root;
     sched->completed_rbt.root = NULL;
+}
+
+static inline bool scheduler_ts_empty(struct scheduler *sched) {
+    return sched->thread_rbt.root == NULL && sched->completed_rbt.root == NULL;
 }
 
 static inline struct thread *find_highest_prio(struct scheduler *sched,
@@ -67,15 +85,10 @@ static inline struct thread *find_highest_prio(struct scheduler *sched,
         return NULL;
 
     rb_delete(&sched->thread_rbt, node);
-    if (sched->thread_rbt.root == NULL && sched->completed_rbt.root == NULL)
+    if (scheduler_ts_empty(sched))
         atomic_fetch_and(&sched->queue_bitmap, ~(1 << prio));
 
     return thread_from_rbt_node(node);
-}
-
-static inline bool thread_exhausted_period(struct scheduler *sched,
-                                           struct thread *thread) {
-    return thread->completed_period == sched->current_period;
 }
 
 /* Don't touch `current_period` here */
