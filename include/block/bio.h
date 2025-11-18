@@ -81,6 +81,7 @@ struct bio_request {
      * boosts often */
     uint8_t boost_count;
 };
+
 #define bio_request_from_list_node(ln)                                         \
     (container_of(ln, struct bio_request, list))
 

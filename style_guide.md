@@ -154,10 +154,6 @@ The commonly used style of `[scope]: {subject}` is helpful, but it is not prohib
 
 In cases where the size of an integer matters, it is better to use the `stdint.h` type, as it is easier to read and understand. However, if a short-lived integer is being used, such as in a loop counter, it is acceptable to use the standard `int` type or other default C types.
 
-### Citing sources
-
-As this project is under the GPL-3.0, a more restrictive OSS license, it is permissible to take code from similarly-licensed or less restrictively licensed projects. However, include the name, link, and path (and preferably a thank you note) in a comment when code from another source or repository is used. Contributors must ensure their contributions are compatible with the GPL-3.0 license.
-
-### Libraries
+### Librarie
 
 If libraries are to be added, it is preferred to add them as submodules. If this is not possible, modify the build script to include them.

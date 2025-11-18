@@ -70,13 +70,22 @@ cd build || exit
 cond_print "${GREEN}configuring cmake${NC}"
 
 if [ ! -f "CMakeCache.txt" ]; then
-    if uname -s | grep -q "Darwin" || arch | grep -q "aarch64"; then
+    if ! uname -s | grep -q "Darwin" && arch | grep -q "aarch64"; then
         if [ "$cmake_quiet_arg" ]; then 
             cmake -DCMAKE_TOOLCHAIN_FILE=../toolchain.cmake .. 2>&1 >/dev/null
         else
             cmake -DCMAKE_TOOLCHAIN_FILE=../toolchain.cmake ..
         fi
     fi
+
+    if uname -s | grep -q "Darwin"; then
+        if [ "$cmake_quiet_arg" ]; then 
+            cmake -DCMAKE_TOOLCHAIN_FILE=../macos_toolchain.cmake .. 2>&1 >/dev/null
+        else
+            cmake -DCMAKE_TOOLCHAIN_FILE=../macos_toolchain.cmake ..
+        fi
+    fi
+
     if [ "$cmake_quiet_arg" ]; then 
         cmake .. 2>&1 >/dev/null
     else

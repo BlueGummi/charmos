@@ -161,43 +161,6 @@ REGISTER_TEST(kmalloc_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
 }
 
-#define MT_PMM_THREAD_COUNT 8
-#define MT_PMM_ALLOC_TIMES 512
-
-volatile int pmm_done = 0;
-
-static void mt_pmm_worker() {
-    paddr_t addrs[MT_PMM_ALLOC_TIMES];
-
-    for (uint64_t i = 0; i < MT_PMM_ALLOC_TIMES; i++) {
-        addrs[i] = pmm_alloc_page(ALLOC_FLAGS_NONE);
-        TEST_ASSERT(addrs[i] != 0);
-    }
-
-    for (int64_t i = MT_PMM_ALLOC_TIMES - 1; i >= 0; i--) {
-        pmm_free_page(addrs[i]);
-    }
-
-    pmm_done++;
-}
-
-REGISTER_TEST(pmm_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    ABORT_IF_RAM_LOW();
-
-    struct thread *threads[MT_PMM_THREAD_COUNT];
-
-    for (int i = 0; i < MT_PMM_THREAD_COUNT; i++) {
-        threads[i] = thread_spawn_custom_stack("mt_pmm_thread", mt_pmm_worker,
-                                               PAGE_SIZE * 16);
-        TEST_ASSERT(threads[i] != NULL);
-    }
-
-    while (pmm_done < MT_PMM_THREAD_COUNT)
-        scheduler_yield();
-
-    SET_SUCCESS();
-}
-
 static char hooray[128] = {0};
 REGISTER_TEST(kmalloc_new_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 

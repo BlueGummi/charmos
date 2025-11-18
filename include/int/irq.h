@@ -22,6 +22,11 @@ struct irq_entry {
 #define IRQ_PANIC 0x23
 #define IRQ_NOP 0x24 /* This is here so cores can bother each other */
 
+struct irq_context {
+    uint64_t rax, rbx, rcx, rdx, rbp, rdi, rsi, r8, r9, r10, r11, r12, r13, r14,
+        r15, rip, cs, rflags;
+};
+
 bool irq_in_thread_context();
 bool irq_in_interrupt();
 void irq_mark_self_in_interrupt(bool new);

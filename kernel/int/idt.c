@@ -168,9 +168,11 @@ static void page_fault_handler(void *context, uint8_t vector, void *rsp) {
 
     asm volatile("mov %%cr2, %0" : "=r"(fault_addr));
 
+    struct irq_context *ctx = rsp;
+
     spin_lock_raw(&pf_lock);
     k_printf("\n=== PAGE FAULT ===\n");
-    k_printf("Faulting Address (CR2): 0x%lx\n", fault_addr);
+    k_printf("Faulting Address (CR2): 0x%lx, instruction: 0x%lx\n", fault_addr, ctx->rip);
     k_printf("Error Code: 0x%lx\n", error_code);
     k_printf("  - Page not Present (P): %s\n",
              (error_code & 0x01) ? "Yes" : "No");

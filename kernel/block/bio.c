@@ -1,9 +1,12 @@
+#include <mem/slab.h>
 #include <block/bio.h>
 #include <block/generic.h>
 #include <block/sched.h>
 #include <mem/alloc.h>
 #include <stdbool.h>
 #include <stdint.h>
+
+REGISTER_SLAB_SIZE(bio_request, sizeof(struct bio_request));
 
 static struct bio_request *create(struct generic_disk *d, uint64_t lba,
                                   uint64_t sec, uint64_t size,

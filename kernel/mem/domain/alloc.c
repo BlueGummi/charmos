@@ -305,7 +305,8 @@ static paddr_t alloc_with_locality(size_t pages, bool flexible_locality,
 
 paddr_t domain_alloc(size_t pages, enum alloc_flags flags) {
     kassert(pages != 0);
-    enum thread_flags thread_flags = scheduler_pin_current_thread();
+    /* pin our core and disable preemption */
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
 
     paddr_t ret = 0x0;
 
@@ -335,7 +336,7 @@ paddr_t domain_alloc(size_t pages, enum alloc_flags flags) {
     ret = alloc_with_locality(pages, flexible_locality, locality_degree);
 
 done:
-    scheduler_unpin_current_thread(thread_flags);
+    irql_lower(irql);
     return ret;
 }
 

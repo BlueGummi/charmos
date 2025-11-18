@@ -118,17 +118,16 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
 
     struct ext2_fs *fs = root->fs_data;
     struct generic_disk *d = fs->drive;
+    kassert(d);
 
     prng_seed(time_get_us());
 
     for (uint64_t i = 0; i < BIO_SCHED_TEST_RUNS; i++) {
-        buffers[i] = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
-        rqs[i] = kzalloc(sizeof(struct bio_request));
-        TEST_ASSERT(buffers[i] && rqs[i]);
-        TEST_ASSERT(ALIGN_DOWN((vaddr_t) buffers[i], PAGE_SIZE) ==
-                    (vaddr_t) buffers[i]);
+        uint8_t *buf = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+        struct bio_request *rq = kzalloc(sizeof(struct bio_request));
+        TEST_ASSERT(rq && buf);
+        TEST_ASSERT(ALIGN_DOWN((vaddr_t) buf, PAGE_SIZE) == (vaddr_t) buf);
 
-        struct bio_request *rq = rqs[i];
         rq->disk = d;
         rq->lba = (i * 2) % 512;
         rq->sector_count = 1;
@@ -138,6 +137,16 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
         rq->priority = prng_next() % BIO_SCHED_LEVELS;
         rq->write = false;
         INIT_LIST_HEAD(&rq->list);
+
+        rqs[i] = rq;
+        buffers[i] = buf;
+    }
+
+    for (size_t i = 0; i < BIO_SCHED_TEST_RUNS; i++) {
+        if (!rqs[i]->disk)
+            k_printf("rq 0x%lx %u\n", rqs[i], i);
+
+        kassert(rqs[i]->disk);
     }
 
     uint64_t ms = time_get_ms();

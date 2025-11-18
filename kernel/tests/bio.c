@@ -47,6 +47,7 @@ REGISTER_TEST(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
             .status = -1,
             .on_complete = bio_callback,
             .user_data = NULL,
+            .disk = d,
         };
         INIT_LIST_HEAD(&bio->list);
 

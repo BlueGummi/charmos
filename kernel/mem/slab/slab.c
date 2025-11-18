@@ -630,6 +630,7 @@ void kfree(void *ptr) {
     if (!ptr)
         return;
 
+    memset(ptr, 0x67, ksize(ptr));
     slab_free_addr_to_cache(ptr);
 }
 

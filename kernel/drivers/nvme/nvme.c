@@ -143,9 +143,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
 
     semaphore_init(&nvme->sem, 0, SEMAPHORE_INIT_IRQ_DISABLE);
     nvme_work_enqueue(nvme, &nvme->work);
-
-    while (!atomic_load(&nvme->on_sem))
-        scheduler_yield();
+    workqueue_kick(nvme->workqueue);
 
     return nvme;
 }

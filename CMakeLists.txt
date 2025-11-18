@@ -40,7 +40,7 @@ if(PROFILING_ENABLED)
     add_compile_definitions(PROFILING_ENABLED)
 endif()
 
-set(KERNEL_COMMON_FLAGS "-O0 -pipe -Wall -Wextra -Wpointer-sign -fno-optimize-sibling-calls -Wenum-compare -ffreestanding -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -mno-red-zone -fno-stack-protector -fno-omit-frame-pointer -fno-stack-check -fno-PIC -ffunction-sections -fdata-sections  -m64 -mcmodel=kernel -mgeneral-regs-only -DLIMINE_API_REVISION=2 -Wno-address-of-packed-member -Wno-unused-command-line-argument -ggdb")
+set(KERNEL_COMMON_FLAGS "-O3 -pipe -Wall -Wextra -Wpointer-sign -fno-optimize-sibling-calls -Wenum-compare -ffreestanding -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -mno-red-zone -fno-stack-protector -fno-omit-frame-pointer -fno-stack-check -fno-PIC -ffunction-sections -fdata-sections  -m64 -mcmodel=kernel -mgeneral-regs-only -DLIMINE_API_REVISION=2 -Wno-address-of-packed-member -Wno-unused-command-line-argument -ggdb")
 
 set(CMAKE_C_FLAGS "${KERNEL_COMMON_FLAGS} -std=gnu11")
 

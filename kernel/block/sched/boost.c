@@ -25,6 +25,8 @@ static inline uint64_t get_boosted_prio(struct bio_request *req) {
 static bool should_boost(struct bio_request *req) {
     uint64_t curr_timestamp = time_get_ms();
 
+    kassert(req->disk);
+    
     struct bio_scheduler_ops *ops = req->disk->ops;
     uint64_t base_wait = ops->max_wait_time[req->priority];
 

@@ -37,19 +37,13 @@ void reaper_thread_main(void) {
 
         spin_unlock(&reaper.lock, out);
 
-        bool reaped_something = false;
         struct thread *t;
         while ((t = thread_queue_pop_front(&local)) != NULL) {
             thread_set_state(t, THREAD_STATE_TERMINATED);
             reaper.reaped_threads++;
             thread_put(t);
-            reaped_something = true;
         }
 
-        if (reaped_something) {
-            thread_sleep_for_ms(100);
-        } else {
-            scheduler_yield();
-        }
+        scheduler_yield();
     }
 }
