@@ -26,7 +26,7 @@ struct bcache_entry {
 
     /* used with a counter - not a real 'timestamp' */
     uint64_t access_time;
-    struct mutex lock;
+    struct mutex_old lock;
     bool dirty;
     bool no_evict;
 
@@ -97,11 +97,11 @@ static inline uint64_t bcache_get_ticks(struct bcache *cache) {
 }
 
 static inline void bcache_ent_lock(struct bcache_entry *ent) {
-    mutex_lock(&ent->lock);
+    mutex_old_lock(&ent->lock);
 }
 
 static inline void bcache_ent_unlock(struct bcache_entry *ent) {
-    mutex_unlock(&ent->lock);
+    mutex_old_unlock(&ent->lock);
 }
 
 static inline void bcache_ent_pin(struct bcache_entry *ent) {

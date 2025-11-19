@@ -192,5 +192,6 @@ static inline void scheduler_wake_from_io_block(struct thread *t) {
 bool scheduler_preemption_disabled(void);
 uint32_t scheduler_preemption_disable(void);
 uint32_t scheduler_preemption_enable(void);
-void scheduler_inherit_priority(struct thread *boosted, size_t new_weight,
+bool scheduler_inherit_priority(struct thread *boosted, size_t new_weight,
                                 enum thread_prio_class new_class);
+void scheduler_uninherit_priority();

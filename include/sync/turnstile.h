@@ -1,5 +1,6 @@
 #include <sch/thread_queue.h>
 #include <stdatomic.h>
+#include <structures/pairing_heap.h>
 
 #define TURNSTILE_WRITER_QUEUE 0
 #define TURNSTILE_READER_QUEUE 1
@@ -19,12 +20,13 @@ enum turnstile_state {
 
 struct turnstile {
     struct thread *inheritor; /* who are we inheriting priority from? */
+    bool applied_pi_boost;
     struct list_head hash_list;
     struct list_head freelist;
     size_t waiters; /* how many goobers are blocking on me? */
     thread_prio_t waiter_max_prio;
     void *lock_obj; /* lock we are for */
-    struct thread_queue queues[TURNSTILE_NUM_QUEUES];
+    struct pairing_heap queues[TURNSTILE_NUM_QUEUES];
     enum turnstile_state state;
 };
 
@@ -51,3 +53,14 @@ SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(turnstile_hash_chain, lock);
 struct turnstile_hash_table {
     struct turnstile_hash_chain heads[TURNSTILE_HASH_SIZE];
 };
+
+void turnstiles_init();
+struct turnstile *turnstile_create(void);
+void turnstile_destroy(struct turnstile *ts);
+struct turnstile *turnstile_init(struct turnstile *ts);
+struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
+                                  void *lock_obj, enum irql lock_irql);
+struct turnstile *turnstile_lookup(void *obj, enum irql *irql_out);
+void turnstile_unlock(void *obj, enum irql irql);
+void turnstile_wake(struct turnstile *ts, size_t queue, size_t num_threads,
+                    enum irql lock_irql);

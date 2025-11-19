@@ -1,3 +1,4 @@
+#include <mem/slab.h>
 #include <sch/daemon.h>
 #include <smp/domain.h>
 
@@ -47,7 +48,7 @@ void slab_init_caches(struct slab_caches *caches, bool pageable) {
     for (size_t i = 0; i < slab_num_sizes; i++) {
         struct slab_cache *cache = &caches->caches[i];
         cache->type = pageable ? SLAB_TYPE_PAGEABLE : SLAB_TYPE_NONPAGEABLE;
-        slab_cache_init(i, cache, slab_class_sizes[i]);
+        slab_cache_init(i, cache, slab_class_sizes[i].size);
     }
 }
 

@@ -13,6 +13,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
+#include <sync/turnstile.h>
 
 REGISTER_SLAB_SIZE(thread, sizeof(struct thread));
 
@@ -172,6 +173,13 @@ static struct thread *thread_init(struct thread *thread,
     thread->refcount = 1;
     thread->recent_event = APC_EVENT_NONE;
     thread->activity_class = THREAD_ACTIVITY_CLASS_UNKNOWN;
+
+    thread->pairing_node.sibling = NULL;
+    thread->pairing_node.child = NULL;
+    thread->pairing_node.parent = NULL;
+
+    turnstile_init(thread->turnstile);
+
     thread_update_effective_priority(thread);
 
     INIT_LIST_HEAD(&thread->on_event_apcs[0]);
@@ -199,6 +207,10 @@ struct thread *thread_create_internal(char *name, void (*entry_point)(void),
     if (unlikely(!new_thread->activity_data))
         goto err;
 
+    new_thread->turnstile = turnstile_create();
+    if (unlikely(!new_thread->turnstile))
+        goto err;
+
     new_thread->activity_stats = kmalloc(sizeof(struct thread_activity_stats));
     if (unlikely(!new_thread->activity_stats))
         goto err;
@@ -219,6 +231,7 @@ err:
     if (!new_thread)
         return NULL;
 
+    kfree(new_thread->turnstile);
     kfree(new_thread->name);
     kfree(new_thread->activity_data);
     kfree(new_thread->activity_stats);
@@ -309,6 +322,7 @@ destroy:
     kfree(t->activity_data);
     kfree(t->activity_stats);
     kfree(t->name);
+    kfree(t->turnstile);
     thread_free_event_apcs(t);
     thread_free_stack(t);
     kfree(t);
@@ -366,7 +380,8 @@ void thread_block_on(struct thread_queue *q) {
 static void wake_thread(void *a, void *unused) {
     (void) unused;
     struct thread *t = a;
-    scheduler_wake(t, THREAD_WAKE_REASON_SLEEP_TIMEOUT, t->base_prio_class);
+    scheduler_wake(t, THREAD_WAKE_REASON_SLEEP_TIMEOUT,
+                   t->perceived_prio_class);
 }
 
 void thread_sleep_for_ms(uint64_t ms) {
@@ -382,7 +397,8 @@ void thread_wake_manual(struct thread *t) {
 
     if (s == THREAD_STATE_BLOCKED)
         scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_MANUAL,
-                       t->base_prio_class);
+                       t->perceived_prio_class);
     else if (s == THREAD_STATE_SLEEPING)
-        scheduler_wake(t, THREAD_WAKE_REASON_SLEEP_MANUAL, t->base_prio_class);
+        scheduler_wake(t, THREAD_WAKE_REASON_SLEEP_MANUAL,
+                       t->perceived_prio_class);
 }

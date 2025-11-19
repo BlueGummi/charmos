@@ -37,6 +37,7 @@
 #include <smp/domain.h>
 #include <smp/smp.h>
 #include <stdint.h>
+#include <sync/turnstile.h>
 #include <syscall.h>
 #include <tests.h>
 
@@ -78,6 +79,7 @@ __no_sanitize_address void k_main(void) {
 
     thread_init_thread_ids();
     scheduler_init();
+    turnstiles_init();
     workqueues_permanent_init();
     defer_init();
     prng_seed(time_get_us());

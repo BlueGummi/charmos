@@ -635,7 +635,7 @@ static inline void slab_index_and_mask_from_ptr(struct slab *slab, void *obj,
 
 extern struct vas_space *slab_vas;
 extern struct slab_caches slab_caches;
-extern size_t *slab_class_sizes;
+extern struct slab_size_constant *slab_class_sizes;
 extern size_t slab_num_sizes;
 
 static inline struct slab_cache *slab_caches_alloc() {

@@ -10,6 +10,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <structures/list.h>
+#include <structures/pairing_heap.h>
 #include <structures/rbt.h>
 #include <sync/spinlock.h>
 #include <time.h>
@@ -201,6 +202,7 @@ struct thread {
     /* Nodes */
     struct rbt_node tree_node;
     struct list_head list_node;
+    struct pairing_node pairing_node;
 
     /* State */
     _Atomic enum thread_state state;
@@ -306,9 +308,8 @@ struct thread {
 
     struct list_head on_event_apcs[APC_EVENT_COUNT];
 
-    struct turnstile *turnstile_born; /* turnstile it was born with */
-    struct turnstile *turnstile;      /* my turnstile */
-    void *blocked_on;                 /* what am I blocked on */
+    struct turnstile *turnstile; /* my turnstile */
+    void *blocked_on;            /* what am I blocked on */
 
     /* ========== Profiling data ========== */
     size_t context_switches; /* Total context switches */
@@ -328,6 +329,8 @@ struct thread {
     void *private;
 };
 
+#define thread_from_pairing_node(pn)                                           \
+    (container_of(pn, struct thread, pairing_node))
 #define thread_from_rbt_node(node) rbt_entry(node, struct thread, tree_node)
 #define thread_from_list_node(ln) (container_of(ln, struct thread, list_node))
 struct thread *thread_create_internal(char *name, void (*entry_point)(void),

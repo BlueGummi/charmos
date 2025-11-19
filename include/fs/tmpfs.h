@@ -30,7 +30,7 @@ struct tmpfs_node {
 
     struct tmpfs_node **children;
     uint64_t child_count;
-    struct mutex lock;
+    struct mutex_old lock;
 };
 
 struct tmpfs_fs {
