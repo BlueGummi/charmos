@@ -251,6 +251,10 @@ void rb_delete(struct rbt *tree, struct rbt_node *z) {
     if (y_original_color == TREE_NODE_BLACK) {
         fix_deletion(tree, x);
     }
+
+    z->left = NULL;
+    z->right = NULL;
+    z->parent = NULL;
 }
 
 struct rbt_node *rbt_search(struct rbt_node *root, uint64_t data) {

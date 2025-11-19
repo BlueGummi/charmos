@@ -173,9 +173,15 @@ void *slab_map_new_page(struct slab_domain *domain, paddr_t *phys_out,
     if (unlikely(!phys))
         goto err;
 
-    virt = vas_alloc(slab_vas, PAGE_SIZE, PAGE_SIZE);
+    /* map three pages for the slab so that OOB writes are caught */
+    virt = vas_alloc(slab_vas, PAGE_SIZE * 3, PAGE_SIZE);
     if (unlikely(!virt))
         goto err;
+
+    /* go one page up so that the memory is as follows
+     *
+     * [unmapped] [mapped] [unmapped] */
+    virt += PAGE_SIZE;
 
     uint64_t pflags = PAGING_PRESENT | PAGING_WRITE;
     if (pageable)
@@ -200,6 +206,9 @@ err:
 static void slab_free_virt_and_phys(vaddr_t virt, paddr_t phys) {
     vmm_unmap_page(virt);
     pmm_free_page(phys);
+
+    /* go back down a PAGE_SIZE for our virt allocation */
+    virt -= PAGE_SIZE;
     vas_free(slab_vas, virt);
 }
 

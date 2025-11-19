@@ -92,8 +92,14 @@ void scheduler_enqueue(struct thread *t) {
         }
     }
 
-    scheduler_add_thread(s, t, false);
+    /* hold the lock to prevent that thread from being ran
+     * while we are going to signal the other core */
+    enum irql irql = scheduler_lock_irq_disable(s);
+
+    scheduler_add_thread(s, t, /* lock_held = */ true);
     scheduler_force_resched(s);
+
+    scheduler_unlock(s, irql);
 }
 
 /* TODO: Make scheduler_add_thread an internal function so I don't need to
@@ -115,7 +121,13 @@ void scheduler_wake(struct thread *t, enum thread_wake_reason reason,
         k_panic("Tried to put_back a thread in the ready queues\n");
 
     struct scheduler *sch = global.schedulers[c];
-    scheduler_add_thread(sch, t, false);
 
+    /* hold the lock to prevent that thread from being ran
+     * while we are going to signal the other core */
+    enum irql irql = scheduler_lock_irq_disable(sch);
+
+    scheduler_add_thread(sch, t, /* lock_held = */ true);
     scheduler_force_resched(sch);
+
+    scheduler_unlock(sch, irql);
 }
