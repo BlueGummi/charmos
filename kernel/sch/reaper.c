@@ -40,8 +40,12 @@ void reaper_thread_main(void) {
         struct thread *t;
         while ((t = thread_queue_pop_front(&local)) != NULL) {
             thread_set_state(t, THREAD_STATE_TERMINATED);
-            reaper.reaped_threads++;
+            /* no one else can grab refs now */
+            atomic_store_explicit(&t->dying, true, memory_order_release);
+
+            /* drop last ref */
             thread_put(t);
+            reaper.reaped_threads++;
         }
 
         scheduler_yield();

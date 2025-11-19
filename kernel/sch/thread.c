@@ -161,6 +161,7 @@ static struct thread *thread_init(struct thread *thread,
     uint64_t stack_top = (uint64_t) stack + stack_size;
     thread->creation_time_ms = time_get_ms();
     thread->stack_size = stack_size;
+    thread->dying = false;
     thread->regs.rsp = stack_top;
     thread->base_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
     thread->perceived_prio_class = THREAD_PRIO_CLASS_TIMESHARE;

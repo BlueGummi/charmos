@@ -206,6 +206,7 @@ struct thread {
 
     /* State */
     _Atomic enum thread_state state;
+    atomic_bool dying;
 
     /* Who is running us? */
     int64_t curr_core; /* -1 if not being ran */
@@ -378,6 +379,37 @@ static inline enum thread_state thread_get_state(struct thread *t) {
 
 static inline void thread_set_state(struct thread *t, enum thread_state state) {
     atomic_store(&t->state, state);
+}
+
+static inline bool thread_try_getref(struct thread *t) {
+    uint32_t old;
+
+    for (;;) {
+        old = atomic_load_explicit(&t->refcount, memory_order_acquire);
+        if (old == 0) {
+            /* object is being (or has been) freed */
+            return false;
+        }
+
+        /* try to bump refcount */
+        if (atomic_compare_exchange_weak_explicit(&t->refcount, &old, old + 1,
+                                                  memory_order_acquire,
+                                                  memory_order_relaxed)) {
+            /* We succeeded in grabbing a ref. Now check if the target is dying.
+             */
+            /* If dying is set, back out and fail. */
+            if (atomic_load_explicit(&t->dying, memory_order_acquire)) {
+                /* somebody is tearing it down - drop our ref and fail */
+                atomic_fetch_sub_explicit(&t->refcount, 1,
+                                          memory_order_release);
+                return false;
+            }
+            return true;
+        }
+
+        /* CAS failed, old was updated by another actor; loop and retry. */
+        cpu_relax();
+    }
 }
 
 static inline bool thread_get(struct thread *t) {
