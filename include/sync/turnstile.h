@@ -64,3 +64,4 @@ struct turnstile *turnstile_lookup(void *obj, enum irql *irql_out);
 void turnstile_unlock(void *obj, enum irql irql);
 void turnstile_wake(struct turnstile *ts, size_t queue, size_t num_threads,
                     enum irql lock_irql);
+size_t turnstile_get_waiter_count(void *lock_obj);

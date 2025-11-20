@@ -250,7 +250,7 @@ void mutex_unlock(struct mutex *mutex) {
         turnstile_unlock(mutex, ts_lock_irql);
     } else {
         turnstile_wake(ts, TURNSTILE_WRITER_QUEUE,
-                       MUTEX_UNLOCK_WAKE_THREAD_COUNT, ts_lock_irql);
+                       MUTEX_UNLOCK_WAKE_THREAD_COUNT(mutex), ts_lock_irql);
     }
 
     irql_lower(irql);

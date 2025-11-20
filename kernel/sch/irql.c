@@ -55,7 +55,7 @@ void irql_lower(enum irql new_level) {
         }
 
         if (irq_in_thread_context() && old > IRQL_DISPATCH_LEVEL &&
-            new_level < IRQL_DISPATCH_LEVEL)
+            new_level < IRQL_DISPATCH_LEVEL && !scheduler_self_in_resched())
             dpc_run_local();
 
         if (irq_in_thread_context() && old > IRQL_APC_LEVEL &&

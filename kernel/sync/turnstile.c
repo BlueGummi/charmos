@@ -151,6 +151,20 @@ static void turnstile_remove(struct turnstile_hash_chain *chain,
     ts->lock_obj = NULL;
 }
 
+struct turnstile *turnstile_lookup_internal(void *obj) {
+    struct turnstile_hash_chain *chain = turnstile_chain_for(obj);
+    struct list_head *pos;
+
+    struct turnstile *ts = NULL;
+    list_for_each(pos, &chain->list) {
+        if ((ts = turnstile_from_hash_list_node(pos))->lock_obj == obj)
+            goto out;
+    }
+
+out:
+    return ts;
+}
+
 struct turnstile *turnstile_lookup(void *obj, enum irql *irql_out) {
     struct turnstile_hash_chain *chain = turnstile_chain_for(obj);
 
@@ -374,4 +388,13 @@ struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
     scheduler_yield(); /* bye bye I'm blocked now... */
 
     return ts;
+}
+
+size_t turnstile_get_waiter_count(void *lock_obj) {
+    size_t count = 0;
+    struct turnstile *ts = turnstile_lookup_internal(lock_obj);
+    if (ts)
+        count = ts->waiters;
+
+    return count;
 }

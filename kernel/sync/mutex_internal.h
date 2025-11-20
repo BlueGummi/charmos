@@ -8,7 +8,7 @@
 #define MUTEX_BACKOFF_MAX 65536
 #define MUTEX_BACKOFF_SHIFT 1
 #define MUTEX_BACKOFF_JITTER_PCT 15      /* 15% variation of base backoff */
-#define MUTEX_UNLOCK_WAKE_THREAD_COUNT 1 /* wake one thread */
+#define MUTEX_UNLOCK_WAKE_THREAD_COUNT(__m) turnstile_get_waiter_count(__m) /* wake one thread */
 
 static inline struct thread *mutex_get_owner(struct mutex *mtx) {
     return (struct thread *) (MUTEX_READ_LOCK_WORD(mtx) & (~MUTEX_META_BITS));
