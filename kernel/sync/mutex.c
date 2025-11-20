@@ -84,28 +84,26 @@ void mutex_old_init(struct mutex_old *m) {
 }
 
 size_t mutex_lock_get_backoff(size_t current_backoff) {
-    /* pluh */
     if (!current_backoff)
         return MUTEX_BACKOFF_DEFAULT;
 
-    /* we shift it over and then return the new value
-     * or cap it if it's exceeded our maximum */
-    size_t new_backoff = current_backoff << MUTEX_BACKOFF_SHIFT;
-    if (new_backoff > MUTEX_BACKOFF_MAX)
+    if (current_backoff >= (MUTEX_BACKOFF_MAX >> MUTEX_BACKOFF_SHIFT))
         return MUTEX_BACKOFF_MAX;
 
-    return new_backoff;
+    size_t new_backoff = current_backoff << MUTEX_BACKOFF_SHIFT;
+    return new_backoff > MUTEX_BACKOFF_MAX ? MUTEX_BACKOFF_MAX : new_backoff;
 }
 
+/* compute random jitter for lock backoff to reduce chances
+ * of spinning on the same lock for the same amount of time */
 static inline int32_t backoff_jitter(size_t backoff) {
-    int32_t v = (int32_t) prng_next();
+    uint32_t v = (uint32_t) prng_next();
+    int32_t denom = (int32_t) (backoff * MUTEX_BACKOFF_JITTER_PCT / 100);
 
-    int32_t denom = backoff * MUTEX_BACKOFF_JITTER_PCT / 100;
-    if (denom == 0)
+    if (denom <= 0)
         denom = 1;
 
-    int32_t j = (int32_t) (v % (denom));
-    return j;
+    return (int32_t) (v % (uint32_t) denom);
 }
 
 void mutex_lock_delay(size_t backoff) {
@@ -122,7 +120,7 @@ static bool mutex_owner_running(struct mutex *mutex) {
     if (!owner) /* no owner, can't possibly be running */
         return false;
 
-    /* thread last ref dropped */
+    /* thread last ref dropped, owner gone and freed */
     if (!thread_get(owner))
         return false;
 
@@ -132,8 +130,15 @@ static bool mutex_owner_running(struct mutex *mutex) {
     return running;
 }
 
+static void mutex_sanity_check() {
+    kassert(irq_in_thread_context());
+    kassert(irql_get() < IRQL_HIGH_LEVEL);
+}
+
 /* TODO: would be cool to see mutex spin/sleep stats get recorded! */
 void mutex_lock(struct mutex *mutex) {
+    mutex_sanity_check();
+
     struct thread *current_thread = scheduler_get_current_thread();
 
     /* easy peasy nothing to do */
@@ -144,9 +149,16 @@ void mutex_lock(struct mutex *mutex) {
     struct thread *last_owner = mutex_get_owner(mutex);
     struct thread *current_owner = last_owner;
 
+    /* we set a backoff to say how much we want to spin in between acquisition
+     * attempts. this is done to prevent cache thrashing from atomic RMWs */
     size_t backoff = MUTEX_BACKOFF_DEFAULT;
+
+    /* how many times we have seen the lock owner change without ever getting
+     * a chance to acquire the lock ourselves. used to reset the backoff so that
+     * we don't wait too long on a lock... */
     size_t owner_change_count = 0;
 
+    /* let's go gambling! */
     while (true) {
         mutex_lock_delay(backoff);
 
@@ -155,14 +167,14 @@ void mutex_lock(struct mutex *mutex) {
             if (mutex_try_lock(mutex, current_thread))
                 break; /* got it */
 
-            /* increase backoff */
+            /* increase backoff, better luck next time */
             backoff = mutex_lock_get_backoff(backoff);
             owner_change_count++;
             continue;
         } else if (last_owner != current_owner) {
             /* someone swapped out the owner thread */
             last_owner = current_owner;
-            mutex_lock_get_backoff(backoff);
+            backoff = mutex_lock_get_backoff(backoff);
             owner_change_count++;
         }
 
@@ -195,6 +207,7 @@ void mutex_lock(struct mutex *mutex) {
         if (mutex_get_owner(mutex) == current_owner &&
             mutex_get_waiter_bit(mutex)) {
             turnstile_block(ts, TURNSTILE_WRITER_QUEUE, mutex, ts_lock_irql);
+
             /* we do the dance all over again */
             backoff = MUTEX_BACKOFF_DEFAULT;
         } else {
@@ -208,6 +221,8 @@ void mutex_lock(struct mutex *mutex) {
 }
 
 void mutex_unlock(struct mutex *mutex) {
+    mutex_sanity_check();
+
     struct thread *current_thread = scheduler_get_current_thread();
 
     if (mutex_get_owner(mutex) != current_thread)
@@ -224,4 +239,8 @@ void mutex_unlock(struct mutex *mutex) {
         turnstile_wake(ts, TURNSTILE_WRITER_QUEUE,
                        MUTEX_UNLOCK_WAKE_THREAD_COUNT, ts_lock_irql);
     }
+}
+
+void mutex_init(struct mutex *mtx) {
+    mtx->lock_word = 0;
 }

@@ -1,16 +1,17 @@
 #include <sync/mutex.h>
 
 #define MUTEX_READ_LOCK_WORD(__mtx)                                            \
-    (atomic_load_explicit(&__mtx->lock_word, memory_order_relaxed))
+    (atomic_load_explicit(&((struct mutex *) (__mtx))->lock_word,              \
+                          memory_order_acquire))
 #define MUTEX_MAX_SPIN_ATTEMPTS 500
 #define MUTEX_BACKOFF_DEFAULT 4
 #define MUTEX_BACKOFF_MAX 4194304 /* 2 ^ 22 */
 #define MUTEX_BACKOFF_SHIFT 1
-#define MUTEX_BACKOFF_JITTER_PCT 15 /* 15% variation of base backoff */
+#define MUTEX_BACKOFF_JITTER_PCT 15      /* 15% variation of base backoff */
 #define MUTEX_UNLOCK_WAKE_THREAD_COUNT 1 /* wake one thread */
 
 static inline struct thread *mutex_get_owner(struct mutex *mtx) {
-    return (struct thread *) (MUTEX_READ_LOCK_WORD(mtx) & (~1ULL));
+    return (struct thread *) (MUTEX_READ_LOCK_WORD(mtx) & (~MUTEX_META_BITS));
 }
 
 static inline uintptr_t mutex_make_lock_word(struct thread *owner) {
@@ -37,13 +38,13 @@ static inline void mutex_lock_word_unlock(struct mutex *mtx) {
 
 static inline bool mutex_set_waiter_bit(struct mutex *mtx) {
     return atomic_fetch_or_explicit(&mtx->lock_word, MUTEX_WAITER_BIT,
-                                    memory_order_release) &
+                                    memory_order_acq_rel) &
            MUTEX_WAITER_BIT;
 }
 
 static inline bool mutex_unset_waiter_bit(struct mutex *mtx) {
     return atomic_fetch_and_explicit(&mtx->lock_word, ~MUTEX_WAITER_BIT,
-                                     memory_order_release) &
+                                     memory_order_acq_rel) &
            MUTEX_WAITER_BIT;
 }
 
