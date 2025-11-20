@@ -62,14 +62,14 @@ REGISTER_TEST(mutex_many_waiters, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     SET_SUCCESS();
 }
 
-/*
-#define CHAOS_THREAD_COUNT 8
+
+#define CHAOS_THREAD_COUNT 20
 
 static struct mutex chaos_mtx = MUTEX_INIT;
 static atomic_uint chaos_left = CHAOS_THREAD_COUNT;
 
 static void chaos() {
-    for (int i = 0; i < 200; i++) {
+    for (int i = 0; i < 2000; i++) {
         mutex_lock(&chaos_mtx);
 
         for (volatile size_t j = 0; j < (prng_next() & 0x1F); j++)
@@ -96,4 +96,4 @@ REGISTER_TEST(mutex_chaos, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
         scheduler_yield();
 
     SET_SUCCESS();
-}*/
+}

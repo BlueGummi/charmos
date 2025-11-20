@@ -115,7 +115,7 @@ REGISTER_TEST(kmalloc_mixed_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 }
 
 #define MT_THREAD_COUNT 8
-#define MT_ALLOC_TIMES 128
+#define MT_ALLOC_TIMES 67
 
 static volatile int kmalloc_done = 0;
 

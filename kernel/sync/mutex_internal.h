@@ -23,12 +23,31 @@ static inline uintptr_t mutex_make_unlocked_word(void) {
 }
 
 static inline bool mutex_try_lock(struct mutex *mtx, struct thread *self) {
-    uintptr_t expected = 0;
-    uintptr_t new_value = mutex_make_lock_word(self);
+    uintptr_t old = atomic_load_explicit(&mtx->lock_word, memory_order_acquire);
 
-    return atomic_compare_exchange_strong_explicit(
-        &mtx->lock_word, &expected, new_value, memory_order_acquire,
-        memory_order_relaxed);
+    for (;;) {
+        /* held: no can do! */
+        if (old & MUTEX_HELD_BIT)
+            return false;
+    
+
+        /* We want to preserve other bits */
+        uintptr_t waiter_bits = old & MUTEX_WAITER_BIT;
+
+        uintptr_t newval = (uintptr_t)self | MUTEX_HELD_BIT | waiter_bits;
+
+        if (atomic_compare_exchange_weak_explicit(
+                &mtx->lock_word,
+                &old,             /* If CAS fails, 'old' is updated to current value */
+                newval,
+                memory_order_acquire,
+                memory_order_relaxed)) {
+            return true;
+        }
+
+        /* CAS failed. `old` now holds the current word. */
+        /* Loop again, but if someone has set held, give up. */
+    }
 }
 
 static inline void mutex_lock_word_unlock(struct mutex *mtx) {
