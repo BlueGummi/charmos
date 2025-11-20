@@ -122,17 +122,18 @@ void mutex_lock_delay(size_t backoff) {
 }
 
 static bool mutex_owner_running(struct mutex *mutex) {
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
+    bool ret = false;
+
     struct thread *owner = mutex_get_owner(mutex);
     if (!owner) /* no owner, can't possibly be running */
-        return false;
+        goto out;
 
-    if (!thread_get(owner))
-        return false;
+    ret = thread_get_state(owner) == THREAD_STATE_RUNNING;
 
-    bool running = thread_get_state(owner) == THREAD_STATE_RUNNING;
-
-    thread_put(owner);
-    return running;
+out:
+    irql_lower(irql);
+    return ret;
 }
 
 static void mutex_sanity_check() {
