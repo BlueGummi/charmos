@@ -310,7 +310,7 @@ struct thread {
     struct list_head on_event_apcs[APC_EVENT_COUNT];
 
     struct turnstile *turnstile; /* my turnstile */
-    void *blocked_on;            /* what am I blocked on */
+    struct turnstile *blocked_on;            /* what am I blocked on */
 
     /* ========== Profiling data ========== */
     size_t context_switches; /* Total context switches */
