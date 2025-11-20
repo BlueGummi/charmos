@@ -241,7 +241,8 @@ static inline void context_switch(struct scheduler *sched, struct thread *curr,
                                   struct thread *next, enum irql irql) {
     rcu_mark_quiescent();
 
-    next->context_switches++;
+    if (curr != next)
+        next->context_switches++;
 
     scheduler_unlock(sched, irql);
 

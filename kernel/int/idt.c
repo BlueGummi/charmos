@@ -48,8 +48,9 @@ MAKE_HANDLER(double_fault, "DOUBLE FAULT");
 void isr_common_entry(uint8_t vector, void *rsp) {
     irq_mark_self_in_interrupt(true);
     scheduler_mark_self_idle(false);
-
+    
     enum irql old = irql_raise(IRQL_HIGH_LEVEL);
+
     if (isr_table[vector].handler) {
         isr_table[vector].handler(isr_table[vector].ctx, vector, rsp);
     } else {

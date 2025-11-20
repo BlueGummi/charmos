@@ -223,6 +223,12 @@ struct thread *turnstile_dequeue_first(struct turnstile *ts, size_t queue) {
 
     /* you take this turnstile with you as you wake up please */
     thread->turnstile = got;
+    
+    /* you are no longer blocked on a lock */
+    thread->blocked_on = NULL;
+
+    /* you are also no longer a waiter */
+    ts->waiters--;
     return thread;
 }
 
@@ -318,28 +324,12 @@ void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
 }
 
 static void turnstile_block_on(void *lock_obj, struct turnstile *ts,
-                               size_t queue_num,
-                               struct turnstile_hash_chain *chain,
-                               enum irql chain_irql) {
+                               size_t queue_num) {
     struct thread *curr = scheduler_get_current_thread();
-
-    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL); /* do not preempt me
-                                                       * while I do this */
 
     thread_block(curr, THREAD_BLOCK_REASON_MANUAL);
     curr->blocked_on = lock_obj;
     pairing_heap_insert(&ts->queues[queue_num], &curr->pairing_node);
-
-    ts->waiters++;
-
-    turnstile_hash_chain_unlock(chain, chain_irql);
-
-    scheduler_yield(); /* bye bye I'm blocked now... */
-
-    /* we came back... */
-    ts->waiters--;
-    curr->blocked_on = NULL; /* no longer blocked */
-    irql_lower(irql);
 }
 
 /* ok... the we first assign a turnstile to the lock object,
@@ -368,10 +358,20 @@ struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
 
     kassert(thread_get_state(current_thread) != THREAD_STATE_IDLE_THREAD);
 
+    /*
     turnstile_propagate_boost(chain, lock_obj, current_thread->weight,
-                              current_thread->perceived_prio_class);
+                              current_thread->perceived_prio_class);*/
 
-    turnstile_block_on(lock_obj, ts, queue_num, chain, lock_irql);
+    turnstile_block_on(lock_obj, ts, queue_num);
+
+    ts->waiters++;
+
+    turnstile_hash_chain_unlock(chain, lock_irql);
+
+    /* it is the waking thread's job to decrement waiters and
+     * mark me as no longer being blocked on the lock object */
+
+    scheduler_yield(); /* bye bye I'm blocked now... */
 
     return ts;
 }

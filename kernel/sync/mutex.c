@@ -30,11 +30,10 @@ static bool should_spin_on_mutex(struct mutex_old *m) {
 }
 
 static bool spin_wait_mutex(struct mutex_old *m, struct thread *curr) {
-    for (int i = 0; i < MUTEX_MAX_SPIN_ATTEMPTS; i++) {
-        if (try_acquire_mutex(m, curr)) {
+    for (int i = 0; i < 500; i++)
+        if (try_acquire_mutex(m, curr))
             return true;
-        }
-    }
+
     return false;
 }
 
@@ -109,7 +108,12 @@ static inline int32_t backoff_jitter(size_t backoff) {
 void mutex_lock_delay(size_t backoff) {
     /* give it jitter so we don't all spin for
      * precisely the same amount of cycles */
-    backoff += backoff_jitter(backoff);
+    int32_t jitter = backoff_jitter(backoff);
+
+    if ((int64_t) backoff + (int64_t) jitter < 0)
+        jitter = 0; /* no jitter, we are underflowing */
+
+    backoff += jitter;
 
     for (size_t i = 0; i < backoff; i++)
         cpu_relax();
@@ -120,7 +124,6 @@ static bool mutex_owner_running(struct mutex *mutex) {
     if (!owner) /* no owner, can't possibly be running */
         return false;
 
-    /* thread last ref dropped, owner gone and freed */
     if (!thread_get(owner))
         return false;
 
@@ -223,6 +226,9 @@ void mutex_lock(struct mutex *mutex) {
 void mutex_unlock(struct mutex *mutex) {
     mutex_sanity_check();
 
+    /* do not preempt us, let's get this done fast. */
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
+
     struct thread *current_thread = scheduler_get_current_thread();
 
     if (mutex_get_owner(mutex) != current_thread)
@@ -239,6 +245,8 @@ void mutex_unlock(struct mutex *mutex) {
         turnstile_wake(ts, TURNSTILE_WRITER_QUEUE,
                        MUTEX_UNLOCK_WAKE_THREAD_COUNT, ts_lock_irql);
     }
+
+    irql_lower(irql);
 }
 
 void mutex_init(struct mutex *mtx) {

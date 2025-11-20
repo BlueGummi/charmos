@@ -3,9 +3,9 @@
 #define MUTEX_READ_LOCK_WORD(__mtx)                                            \
     (atomic_load_explicit(&((struct mutex *) (__mtx))->lock_word,              \
                           memory_order_acquire))
-#define MUTEX_MAX_SPIN_ATTEMPTS 500
+
 #define MUTEX_BACKOFF_DEFAULT 4
-#define MUTEX_BACKOFF_MAX 4194304 /* 2 ^ 22 */
+#define MUTEX_BACKOFF_MAX 65536
 #define MUTEX_BACKOFF_SHIFT 1
 #define MUTEX_BACKOFF_JITTER_PCT 15      /* 15% variation of base backoff */
 #define MUTEX_UNLOCK_WAKE_THREAD_COUNT 1 /* wake one thread */

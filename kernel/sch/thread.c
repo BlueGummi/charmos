@@ -193,7 +193,7 @@ static struct thread *thread_init(struct thread *thread,
 
 struct thread *thread_create_internal(char *name, void (*entry_point)(void),
                                       size_t stack_size, va_list args) {
-    struct thread *new_thread = kmalloc(sizeof(struct thread));
+    struct thread *new_thread = kzalloc(sizeof(struct thread));
     if (unlikely(!new_thread))
         goto err;
 
@@ -204,7 +204,7 @@ struct thread *thread_create_internal(char *name, void (*entry_point)(void),
     if (unlikely(!stack))
         goto err;
 
-    new_thread->activity_data = kmalloc(sizeof(struct thread_activity_data));
+    new_thread->activity_data = kzalloc(sizeof(struct thread_activity_data));
     if (unlikely(!new_thread->activity_data))
         goto err;
 
@@ -212,7 +212,7 @@ struct thread *thread_create_internal(char *name, void (*entry_point)(void),
     if (unlikely(!new_thread->turnstile))
         goto err;
 
-    new_thread->activity_stats = kmalloc(sizeof(struct thread_activity_stats));
+    new_thread->activity_stats = kzalloc(sizeof(struct thread_activity_stats));
     if (unlikely(!new_thread->activity_stats))
         goto err;
 
