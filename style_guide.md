@@ -150,10 +150,6 @@ The commonly used style of `[scope]: {subject}` is helpful, but it is not prohib
 
 ## Miscellaneous
 
-### Integer sizes
-
-In cases where the size of an integer matters, it is better to use the `stdint.h` type, as it is easier to read and understand. However, if a short-lived integer is being used, such as in a loop counter, it is acceptable to use the standard `int` type or other default C types.
-
-### Librarie
+### Libraries
 
 If libraries are to be added, it is preferred to add them as submodules. If this is not possible, modify the build script to include them.
