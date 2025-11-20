@@ -32,7 +32,7 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
 
     scheduler_set_queue_bitmap(sched, prio);
 
-    task->last_ran = sched->core_id;
+    thread_set_last_ran(task, sched->core_id);
     scheduler_increment_thread_count(sched, task);
 
     bool is_local = sched == smp_core_scheduler();

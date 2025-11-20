@@ -215,7 +215,7 @@ struct thread {
                               * -1 if the scheduler should select the most
                               * optimal core */
 
-    uint64_t last_ran; /* What core last ran us? */
+    atomic_uint_fast64_t last_ran; /* What core last ran us? */
 
     time_t run_start_time; /* When did we start running */
     size_t owner_domain;   /* What domain created us? */
@@ -224,7 +224,7 @@ struct thread {
     struct cpu_mask allowed_cpus;
 
     /* Flags */
-    enum thread_flags flags;
+    _Atomic(enum thread_flags) flags;
 
     /* ======== Raw priority + timeslice data ======== */
 
@@ -239,6 +239,8 @@ struct thread {
     bool has_pi_boost;
     size_t saved_weight;
     enum thread_prio_class saved_class;
+
+    atomic_bool being_moved; /* stolen, migrating... */
 
     /* Class changes */
     time_t last_class_change_ms;
@@ -309,8 +311,8 @@ struct thread {
 
     struct list_head on_event_apcs[APC_EVENT_COUNT];
 
-    struct turnstile *turnstile; /* my turnstile */
-    struct turnstile *blocked_on;            /* what am I blocked on */
+    struct turnstile *turnstile;  /* my turnstile */
+    struct turnstile *blocked_on; /* what am I blocked on */
 
     /* ========== Profiling data ========== */
     size_t context_switches; /* Total context switches */
@@ -379,6 +381,32 @@ static inline enum thread_state thread_get_state(struct thread *t) {
 
 static inline void thread_set_state(struct thread *t, enum thread_state state) {
     atomic_store(&t->state, state);
+}
+
+static inline enum thread_flags thread_get_flags(struct thread *t) {
+    return atomic_load(&t->flags);
+}
+
+static inline void thread_set_flags(struct thread *t, enum thread_flags flags) {
+    atomic_store(&t->flags, flags);
+}
+
+static inline enum thread_flags thread_or_flags(struct thread *t,
+                                                enum thread_flags flags) {
+    return atomic_fetch_or(&t->flags, flags);
+}
+
+static inline enum thread_flags thread_and_flags(struct thread *t,
+                                                 enum thread_flags flags) {
+    return atomic_fetch_and(&t->flags, flags);
+}
+
+static inline uint64_t thread_get_last_ran(struct thread *t) {
+    return atomic_load(&t->last_ran);
+}
+
+static inline uint64_t thread_set_last_ran(struct thread *t, uint64_t new) {
+    return atomic_exchange(&t->last_ran, new);
 }
 
 static inline bool thread_try_getref(struct thread *t) {

@@ -122,17 +122,11 @@ static inline bool thread_is_active(struct thread *t) {
     return s == THREAD_STATE_READY || s == THREAD_STATE_RUNNING;
 }
 
-/* Poke the target core if there is no preemption on it
- * because we need the thread to reschedule to run its APC */
-static void maybe_force_reschedule(struct thread *t) {
-    struct scheduler *target = global.schedulers[t->last_ran];
-    if (!atomic_load(&target->tick_enabled))
-        scheduler_force_resched(target);
-}
-
+/* TODO: once we have tickless as an option, make sure to poke
+ * the other core if the thread is active... */
 static void wake_if_waiting(struct thread *t) {
     if (thread_is_active(t))
-        return maybe_force_reschedule(t);
+        return;
 
     /* Get it running again */
     if (!thread_apc_sanity_check(t))

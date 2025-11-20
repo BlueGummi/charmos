@@ -184,9 +184,10 @@ static void load_thread(struct scheduler *sched, struct thread *next,
     if (!next)
         return;
 
-    next->last_ran = smp_core_id();
+    thread_set_last_ran(next, smp_core_id());
     next->curr_core = smp_core_id();
     next->run_start_time = time;
+    atomic_store(&next->being_moved, false);
     thread_calculate_activity_data(next);
     thread_classify_activity(next, time);
 
@@ -244,6 +245,7 @@ static inline void context_switch(struct scheduler *sched, struct thread *curr,
     if (curr != next)
         next->context_switches++;
 
+
     scheduler_unlock(sched, irql);
 
     if (curr && curr->state != THREAD_STATE_IDLE_THREAD) {
@@ -290,8 +292,11 @@ void schedule(void) {
 }
 
 void scheduler_yield() {
+    kassert(!scheduler_self_in_resched());
+
+    scheduler_mark_self_in_resched(true);
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     schedule();
     irql_lower(irql);
-    thread_check_and_deliver_apcs(scheduler_get_current_thread());
+    scheduler_mark_self_in_resched(false);
 }

@@ -9,7 +9,7 @@
 #include "sched_profiling.h"
 
 bool scheduler_can_steal_thread(size_t core, struct thread *target) {
-    if (target->flags & THREAD_FLAGS_NO_STEAL)
+    if (thread_get_flags(target) & THREAD_FLAGS_NO_STEAL)
         return false;
 
     if (!cpu_mask_test(&target->allowed_cpus, core))
@@ -110,15 +110,16 @@ static struct thread *steal_from_special_threads(struct scheduler *victim,
     if (list_empty(&q->list))
         return NULL;
 
+    size_t core = smp_core_id();
+
     struct list_head *pos, *n;
     list_for_each_safe(pos, n, &q->list) {
         struct thread *t = thread_from_list_node(pos);
 
-        if (!scheduler_can_steal_thread(smp_core_id(), t))
+        if (!scheduler_can_steal_thread(core, t))
             continue;
 
-        if (thread_get_state(t) != THREAD_STATE_READY)
-            continue;
+        kassert(thread_get_state(t) == THREAD_STATE_READY);
 
         list_del_init(&t->list_node);
 
@@ -132,11 +133,6 @@ static struct thread *steal_from_special_threads(struct scheduler *victim,
     return NULL;
 }
 
-/* We do not enable interrupts here because this is only ever
- * called from the `schedule()` function which should not enable
- * interrupts inside of itself
- *
- * TODO: Make this pick the busiest thread to steal from */
 struct thread *scheduler_steal_work(struct scheduler *victim) {
     /* do not wait in a loop */
     if (!spin_trylock_raw(&victim->lock))
@@ -146,7 +142,7 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
     uint8_t mask = atomic_load(&victim->queue_bitmap);
     while (mask) {
         int level = 31 - __builtin_clz((uint32_t) mask);
-        mask &= ~(1 << level); /* remove that bit from local copy */
+        mask &= ~(1ULL << level); /* remove that bit from local copy */
 
         if (level == THREAD_PRIO_CLASS_TIMESHARE) {
             stolen = steal_from_ts_threads(victim, level);
@@ -162,6 +158,9 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
                 break;
         }
     }
+
+    if (stolen)
+        atomic_store(&stolen->being_moved, true);
 
     spin_unlock_raw(&victim->lock);
     return stolen;
@@ -182,17 +181,13 @@ static inline bool try_begin_steal() {
     return false;
 }
 
-static inline void end_steal() {
-    atomic_fetch_sub(&scheduler_data.active_stealers, 1);
-}
-
 static inline void stop_steal(struct scheduler *sched,
                               struct scheduler *victim) {
     if (victim)
         atomic_store(&victim->being_robbed, false);
 
     atomic_store(&sched->stealing_work, false);
-    end_steal();
+    atomic_fetch_sub(&scheduler_data.active_stealers, 1);
 }
 
 struct thread *scheduler_try_do_steal(struct scheduler *sched) {

@@ -15,6 +15,9 @@ bool scheduler_self_needs_resched(void) {
 }
 
 void scheduler_resched_if_needed(void) {
+    if (scheduler_self_in_resched())
+        return;
+
     if (scheduler_mark_self_needs_resched(false)) {
         scheduler_mark_self_idle(false);
         scheduler_yield();

@@ -176,7 +176,7 @@ daemon_thread_spawn(struct daemon *daemon,
     bool no_migrate = daemon->attrs.flags & DAEMON_FLAG_UNMIGRATABLE_THREADS;
 
     if (no_migrate)
-        t->thread->flags |= THREAD_FLAGS_NO_STEAL;
+        thread_set_flags(t->thread, THREAD_FLAGS_NO_STEAL);
 
     if (daemon->attrs.thread_cpu != -1 && no_migrate) {
         scheduler_enqueue_on_core(t->thread, daemon->attrs.thread_cpu);

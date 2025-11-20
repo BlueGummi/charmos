@@ -25,6 +25,7 @@ struct core {
     enum irql current_irql;
 
     atomic_bool needs_resched;
+    atomic_bool in_resched; /* in scheduler_yield() */
     atomic_uint_fast32_t scheduler_preemption_disable_depth;
 
     struct domain *domain;

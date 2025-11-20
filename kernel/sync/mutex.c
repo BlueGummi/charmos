@@ -140,6 +140,9 @@ static void mutex_sanity_check() {
 
 /* TODO: would be cool to see mutex spin/sleep stats get recorded! */
 void mutex_lock(struct mutex *mutex) {
+
+    enum thread_flags flags = scheduler_pin_current_thread();
+
     mutex_sanity_check();
 
     struct thread *current_thread = scheduler_get_current_thread();
@@ -221,6 +224,7 @@ void mutex_lock(struct mutex *mutex) {
 
     /* hey ho! we got the mutex! */
     kassert(mutex_get_owner(mutex) == current_thread);
+    scheduler_unpin_current_thread(flags);
 }
 
 void mutex_unlock(struct mutex *mutex) {

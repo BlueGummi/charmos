@@ -198,6 +198,6 @@ struct thread *worker_create_unmigratable() {
     if (!t)
         return NULL;
 
-    t->flags = THREAD_FLAGS_NO_STEAL;
+    thread_set_flags(t, THREAD_FLAGS_NO_STEAL);
     return t;
 }

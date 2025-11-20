@@ -94,7 +94,6 @@ bool cpu_mask_init(struct cpu_mask *m, size_t nbits) {
     m->nbits = nbits;
     if (nbits <= 64) {
         m->uses_large = false;
-        m->small = 0;
         return true;
     }
 

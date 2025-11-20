@@ -97,7 +97,10 @@ void thread_entry_wrapper(void) {
     asm("mov %%r12, %0" : "=r"(entry));
 
     kassert(irql_get() < IRQL_HIGH_LEVEL);
+    scheduler_mark_self_in_resched(false);
+
     irql_lower(IRQL_PASSIVE_LEVEL);
+
     kassert(entry);
     entry();
     thread_exit();
@@ -219,6 +222,7 @@ struct thread *thread_create_internal(char *name, void (*entry_point)(void),
     if (unlikely(!cpu_mask_init(&new_thread->allowed_cpus, global.core_count)))
         goto err;
 
+    cpu_mask_set_all(&new_thread->allowed_cpus);
     size_t needed = snprintf(NULL, 0, name, args) + 1;
     new_thread->name = kzalloc(needed);
     if (!new_thread->name)

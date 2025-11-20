@@ -28,12 +28,17 @@ static bool scheduler_boost_thread_internal(struct thread *boosted,
 
 bool scheduler_inherit_priority(struct thread *boosted, size_t new_weight,
                                 enum thread_prio_class new_class) {
-    /* update the boosted's priority to the booster's priority */
 
-    struct scheduler *sched = global.schedulers[boosted->last_ran];
+    enum thread_flags old = thread_or_flags(boosted, THREAD_FLAGS_NO_STEAL);
 
-    /* acquire this lock to make sure no funny business happens with thread
-     * states */
+    /* wait for it to no longer be being moved so we KNOW
+     * we can see the right last_ran */
+    while (atomic_load(&boosted->being_moved))
+        cpu_relax();
+
+    struct scheduler *sched = global.schedulers[thread_get_last_ran(boosted)];
+
+    /* acquire this lock */
     enum irql irql = scheduler_lock_irq_disable(sched);
 
     bool did_boost = false;
@@ -54,6 +59,7 @@ bool scheduler_inherit_priority(struct thread *boosted, size_t new_weight,
     }
 
     scheduler_unlock(sched, irql);
+    thread_set_flags(boosted, old);
     return did_boost;
 }
 

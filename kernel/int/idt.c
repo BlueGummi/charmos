@@ -61,6 +61,9 @@ void isr_common_entry(uint8_t vector, void *rsp) {
     rcu_mark_quiescent();
     irq_mark_self_in_interrupt(false);
 
+    if (scheduler_self_in_resched())
+        return;
+
     if (!scheduler_preemption_disabled() &&
         scheduler_mark_self_needs_resched(false)) {
         struct thread *curr = scheduler_get_current_thread();
@@ -72,7 +75,9 @@ void isr_common_entry(uint8_t vector, void *rsp) {
 }
 
 void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {
-    scheduler_mark_self_needs_resched(true);
+    if (!scheduler_self_in_resched())
+        scheduler_mark_self_needs_resched(true);
+
     lapic_write(LAPIC_REG_EOI, 0);
     (void) ctx, (void) vector, (void) rsp;
 }

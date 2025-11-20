@@ -139,9 +139,8 @@ static inline enum thread_flags scheduler_pin_current_thread() {
         return 0;
 
     struct thread *thread = scheduler_get_current_thread();
-    enum thread_flags flags = thread->flags;
-    thread->flags |= THREAD_FLAGS_NO_STEAL;
-    return flags;
+
+    return thread_or_flags(thread, THREAD_FLAGS_NO_STEAL);
 }
 
 static inline void scheduler_unpin_current_thread(enum thread_flags flags) {
@@ -150,7 +149,7 @@ static inline void scheduler_unpin_current_thread(enum thread_flags flags) {
 
     struct thread *thread = scheduler_get_current_thread();
     if (thread)
-        thread->flags = flags;
+        thread_set_flags(thread, flags);
 }
 
 static inline struct thread *thread_spawn(char *name, void (*entry)(void),
@@ -185,6 +184,14 @@ thread_spawn_on_core(char *name, void (*entry)(void), uint64_t core_id) {
 
 static inline void scheduler_wake_from_io_block(struct thread *t) {
     scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_IO, THREAD_PRIO_CLASS_URGENT);
+}
+
+static inline bool scheduler_self_in_resched() {
+    return atomic_load(&smp_core()->in_resched);
+}
+
+static inline bool scheduler_mark_self_in_resched(bool new) {
+    return atomic_exchange(&smp_core()->in_resched, new);
 }
 
 #define TICKS_FOR_PRIO(level) (level == THREAD_PRIO_LOW ? 64 : 1ULL << level)
