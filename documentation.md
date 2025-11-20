@@ -99,15 +99,15 @@ The table below describes all statuses and whether or not they have bugs, their 
 
 **Ideas** must transition from one status to another, and potential successors and predecessors to a given status (what it can transition into and what it transitioned from) are also listed in this table.
 
-| Status Name | Description | Maintenance | Bugs | Age | Persistence | Predecessors | Successors
-| :---------- | :---------- | :----------- | :--- | :-- | :---------- | :----------- | :---------
-| EXPERIMENTAL | New and experimental code | Maintained | Maybe | New | TBD | None | STABILIZING, DEPRECATING |
-| STABILIZING | Formerly EXPERIMENTAL code that will be kept | Maintained | Maybe | Recent | Persistent | EXPERIMENTAL | STABLE |
-| STABLE | Stable code | Maintained | None or non-fatal | Recent-Old | Persistent | STABILIZING, UNSTABLE | UNSTABLE, LEGACY |
-| UNSTABLE | Unstable code | Maintained | Yes, fatal | Recent-Old | Persistent | STABLE | STABLE, DEPRECATING |
-| LEGACY | Stable Legacy code | Possibly Unmaintained | None or non-fatal | Old | Persistent | STABLE | DEPRECATING |
-| DEPRECATING | Deprecating code | Unmaintained | Varied | Varied | Non-Persistent | LEGACY, EXPERIMENTAL, UNSTABLE | DEPRECATED |
-| DEPRECATED | Deprecated code | Unmaintained | Varied | Varied | Removed | DEPRECATING | None |
+| Name |  Maintained | Bugs | Age | Persistent | Predecessors | Successors |
+| :--- |:----------- | :--- | :-- | :--------- | :----------- | :--------- |
+| **EXPERIMENTAL** (*EX*) | Yes | Maybe | New | TBD | None | S, US, D |
+| **STABLE** (*S*) | Yes | Non-fatal | Recent-Old | Yes | EX, US | US, L |
+| **UNSTABLE** (*US*) | Yes | Yes, fatal | Recent-Old | Yes | S | S, D |
+| **LEGACY** (*L*) | Maybe | Non-fatal | Old | Yes | S | D |
+| **DEPRECATED** (*D*) | No | Varied | Varied | No | EX, US, L | None |
+
+Legacy **Ideas** cannot have fatal bugs. If 
 
 ## How do I name **Ideas**?
 
