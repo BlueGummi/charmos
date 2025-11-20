@@ -10,7 +10,8 @@
 #include "console/printf.h"
 #include "mutex_internal.h"
 
-static bool try_acquire_mutex(struct mutex_old *m, struct thread *curr) {
+static bool try_acquire_simple_mutex(struct mutex_simple *m,
+                                     struct thread *curr) {
     enum irql irql = spin_lock(&m->lock);
     if (m->owner == NULL) {
         m->owner = curr;
@@ -21,7 +22,7 @@ static bool try_acquire_mutex(struct mutex_old *m, struct thread *curr) {
     return false;
 }
 
-static bool should_spin_on_mutex(struct mutex_old *m) {
+static bool should_spin_on_mutex(struct mutex_simple *m) {
     enum irql irql = spin_lock(&m->lock);
     struct thread *owner = m->owner;
     bool active = owner && atomic_load(&owner->state) == THREAD_STATE_RUNNING;
@@ -29,37 +30,38 @@ static bool should_spin_on_mutex(struct mutex_old *m) {
     return active;
 }
 
-static bool spin_wait_mutex(struct mutex_old *m, struct thread *curr) {
+static bool spin_wait_simple_mutex(struct mutex_simple *m,
+                                   struct thread *curr) {
     for (int i = 0; i < 500; i++)
-        if (try_acquire_mutex(m, curr))
+        if (try_acquire_simple_mutex(m, curr))
             return true;
 
     return false;
 }
 
-static void block_on_mutex(struct mutex_old *m) {
+static void block_on_simple_mutex(struct mutex_simple *m) {
     enum irql irql = spin_lock(&m->lock);
     thread_block_on(&m->waiters);
     spin_unlock(&m->lock, irql);
     scheduler_yield();
 }
 
-void mutex_old_lock(struct mutex_old *m) {
+void mutex_simple_lock(struct mutex_simple *m) {
     struct thread *curr = scheduler_get_current_thread();
 
     while (true) {
-        if (try_acquire_mutex(m, curr))
+        if (try_acquire_simple_mutex(m, curr))
             return;
 
         if (should_spin_on_mutex(m))
-            if (spin_wait_mutex(m, curr))
+            if (spin_wait_simple_mutex(m, curr))
                 return;
 
-        block_on_mutex(m);
+        block_on_simple_mutex(m);
     }
 }
 
-void mutex_old_unlock(struct mutex_old *m) {
+void mutex_simple_unlock(struct mutex_simple *m) {
     struct thread *curr = scheduler_get_current_thread();
 
     enum irql irql = spin_lock(&m->lock);
@@ -78,7 +80,7 @@ void mutex_old_unlock(struct mutex_old *m) {
     spin_unlock(&m->lock, irql);
 }
 
-void mutex_old_init(struct mutex_old *m) {
+void mutex_simple_init(struct mutex_simple *m) {
     thread_queue_init(&m->waiters);
 }
 

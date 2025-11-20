@@ -179,8 +179,8 @@ void uacpi_kernel_free_spinlock(uacpi_handle a) {
 }
 
 uacpi_handle uacpi_kernel_create_mutex(void) {
-    struct mutex_old *m = kzalloc(sizeof(struct mutex_old));
-    mutex_old_init(m);
+    struct mutex_simple *m = kzalloc(sizeof(struct mutex_simple));
+    mutex_simple_init(m);
     return m;
 }
 
@@ -190,12 +190,12 @@ void uacpi_kernel_free_mutex(uacpi_handle a) {
 
 uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle m, uacpi_u16 b) {
     (void) b;
-    mutex_old_lock(m);
+    mutex_simple_lock(m);
     return UACPI_STATUS_OK;
 }
 
 void uacpi_kernel_release_mutex(uacpi_handle m) {
-    mutex_old_unlock(m);
+    mutex_simple_unlock(m);
 }
 
 uacpi_cpu_flags uacpi_kernel_lock_spinlock(uacpi_handle a) {

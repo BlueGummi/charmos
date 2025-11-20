@@ -3,14 +3,15 @@
 #include <sync/spinlock.h>
 #pragma once
 
-struct mutex_old {
+struct mutex_simple {
     struct thread *owner;
     struct thread_queue waiters;
     struct spinlock lock;
 };
-void mutex_old_init(struct mutex_old *m);
-void mutex_old_lock(struct mutex_old *m);
-void mutex_old_unlock(struct mutex_old *m);
+
+void mutex_simple_init(struct mutex_simple *m);
+void mutex_simple_lock(struct mutex_simple *m);
+void mutex_simple_unlock(struct mutex_simple *m);
 
 /* mutex: pointer sized mutex
  *
