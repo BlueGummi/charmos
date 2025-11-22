@@ -4,6 +4,19 @@ Similar to the **style guide**, this is a documentation *guide*, not a set of do
 instances where documentation may deviate from this guide, and that is expected and allowed, but try to follow these
 guidelines with most things.
 
+# File titling and other naming
+
+To title a file such that it shows up with a name other than its file name in documentation, simply write
+
+```c
+/* @title: Title */
+```
+
+anywhere in the file.
+
+To give directories a name other than the directory name itself in documentation, simply create a file called
+`dir_doc_name` (no file extension) in the directory, and write the chosen name inside of it.
+
 # What is the format?
 
 Documentation for this codebase should be written in a unified format. This format will be referred to as the "**Idea Structure**".
