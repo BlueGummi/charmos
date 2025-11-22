@@ -38,10 +38,14 @@ e.g.
 
 `locking_idea.md`
 
-To adhere to the style guide, all file names for **Huge Ideas** in the `/docs/` directory should be lowercase
+To adhere to the style guide, all file names for **Huge Ideas** in the `./docs/` directory should be lowercase
 `snake_case`.
 
 **Big Ideas** and **Small Ideas** should always be in code comments. **Small Ideas** should be "spatially near" the code that they are related to.
+
+### **Big Ideas** and **Small Ideas** MUST go in `./include/` if they are intended to be visible from the documentation website.
+
+> **Ideas** in `./kernel/` will only be visible to those viewing the source code.
 
 In code, **Big Ideas** should come before everything else, even before `include`, `#pragma once`, etc. unless there
 is truly a reason why it would not be possible to write the **Idea** without putting it underneath the first few lines.
