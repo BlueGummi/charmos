@@ -30,6 +30,7 @@ static inline void tick_disable() {
     if (scheduler_tick_enabled(self)) {
         lapic_timer_disable();
         scheduler_set_tick_enabled(self, false);
+        self->tick_duration_ms = 0;
     }
 }
 
@@ -41,21 +42,20 @@ static inline void tick_enable() {
     }
 }
 
-static inline void change_timeslice_duration(uint64_t new_duration) {
+static inline void change_tick_duration(uint64_t new_duration) {
     struct scheduler *self = smp_core_scheduler();
 
     /* Tick duration is the same */
-    if (self->timeslice_duration == new_duration &&
-        scheduler_tick_enabled(self))
+    if (self->tick_duration_ms == new_duration && scheduler_tick_enabled(self))
         return;
 
-    self->timeslice_duration = new_duration;
+    self->tick_duration_ms = new_duration;
     lapic_timer_set_ms(new_duration);
     tick_enable();
 }
 
-void scheduler_change_timeslice_duration(uint64_t new_duration) {
-    change_timeslice_duration(new_duration);
+void scheduler_change_tick_duration(uint64_t new_duration) {
+    change_tick_duration(new_duration);
 }
 
 static inline void update_core_current_thread(struct thread *next) {
@@ -194,7 +194,6 @@ static void load_thread(struct scheduler *sched, struct thread *next,
     /* Do not mark the idle thread as RUNNING because this causes
      * it to enter the runqueues, which is Very Bad™ (it gets enqueued,
      * and becomes treated like a regular thread)! */
-
     if (thread_get_state(next) != THREAD_STATE_IDLE_THREAD)
         thread_set_state(next, THREAD_STATE_RUNNING);
 
@@ -202,12 +201,10 @@ static void load_thread(struct scheduler *sched, struct thread *next,
 }
 
 static inline struct thread *load_idle_thread(struct scheduler *sched) {
-    /* Idle thread has no need to have a timeslice
-     * No preemption will be occurring since nothing else runs */
 
-    /* set a REALLY long slice. eventually I will be productive enough
-     * to decide that I want to add a config option for tickless idle */
-    scheduler_change_timeslice_duration(SECONDS_TO_MS(1));
+    /* Idle thread has no need to have a tick
+     * No preemption will be occurring since nothing else runs */
+    tick_disable();
     disable_period(sched);
 
     struct idle_thread_data *idle = smp_core_idle_thread();
@@ -232,9 +229,10 @@ static void change_timeslice(struct scheduler *sched, struct thread *next) {
         return;
     }
 
-    if (THREAD_PRIO_HAS_TIMESLICE(next->perceived_prio_class)) {
+    if (THREAD_PRIO_HAS_TIMESLICE(next->perceived_prio_class) &&
+        thread_get_state(next) != THREAD_STATE_IDLE_THREAD) {
         /* Timesharing threads need timeslices */
-        change_timeslice_duration(next->timeslice_length_raw_ms);
+        change_tick_duration(next->timeslice_length_raw_ms);
     }
 }
 
@@ -244,7 +242,6 @@ static inline void context_switch(struct scheduler *sched, struct thread *curr,
 
     if (curr != next)
         next->context_switches++;
-
 
     scheduler_unlock(sched, irql);
 

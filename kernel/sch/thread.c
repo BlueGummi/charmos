@@ -175,6 +175,7 @@ static struct thread *thread_init(struct thread *thread,
     thread->curr_core = -1;
     thread->id = tid_alloc(global_tid_space);
     thread->refcount = 1;
+    thread->timeslice_length_raw_ms = THREAD_DEFAULT_TIMESLICE;
     thread->recent_event = APC_EVENT_NONE;
     thread->activity_class = THREAD_ACTIVITY_CLASS_UNKNOWN;
 

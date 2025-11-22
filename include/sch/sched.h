@@ -29,9 +29,9 @@ struct idle_thread_data {
 };
 
 struct scheduler {
-    /* Current timeslice data */
+    /* Current tick data */
     atomic_bool tick_enabled;
-    time_t timeslice_duration;
+    time_t tick_duration_ms;
 
     /* Structures */
     struct thread_queue urgent_threads;

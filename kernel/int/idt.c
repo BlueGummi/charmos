@@ -61,6 +61,7 @@ void isr_common_entry(uint8_t vector, void *rsp) {
     rcu_mark_quiescent();
     irq_mark_self_in_interrupt(false);
 
+    /* in reschedule, don't check if we need to preempt */
     if (scheduler_self_in_resched())
         return;
 
@@ -75,8 +76,7 @@ void isr_common_entry(uint8_t vector, void *rsp) {
 }
 
 void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {
-    if (!scheduler_self_in_resched())
-        scheduler_mark_self_needs_resched(true);
+    scheduler_mark_self_needs_resched(true);
 
     lapic_write(LAPIC_REG_EOI, 0);
     (void) ctx, (void) vector, (void) rsp;

@@ -102,10 +102,11 @@ In code, **Ideas** **Sections** should be formatted as follows:
  *   Multi
  *   Line
  *   Body
+ * < space >
  *   ## Subsection Header:
- *     Multi
- *     Line
- *     Body
+ *   Multi
+ *   Line
+ *   Body
  * < space >
  */
 ```
@@ -162,7 +163,11 @@ Some **Ideas** will be removed, which will be discussed [later on](#how-do-i-dep
 
 ### **Ideas** should be written in standard markdown in code comments
 
-**Ideas** should be written in an active voice, without unnecessary jargon.
+**Ideas** should be written in an active voice, without unnecessary jargon. 
+
+Referring to the reader with "you", or the author/speaker as "I" is permissible for **Ideas**, 
+particularly **Big** and **Small** ones that are more "inward facing" (less about theory, more about implementation). 
+However, try to keep the **Idea** more like a piece of documentation and less like a text message.
 
 Unicode diagrams can be embedded in **Ideas** if needed.
 
@@ -264,6 +269,8 @@ You can find more **Ideas** throughout code to give you a better sense of how th
  * # Interactions: Turnstiles are used in our mutex implementation and are not to be used on their own outside of tests...
  *
  * # Constraints: Turnstiles must be efficient and avoid taking the slow blocking path too frequently...
+ *
+ * # Internals: Turnstiles internally use x, y, and z...
  *
  * # Errors: Turnstiles don't "fail", but these things can...
  *
@@ -368,7 +375,7 @@ The layout for a **Huge Idea** is as follows:
  * # Audience: Who is meant to see this?
  *
  * # Overview:
- *   This Huge Idea has a small, succint overview that describes in 1-2
+ *   This Huge Idea has a small, succinct overview that describes in 1-2
  *   sentences what the Idea is about.
  *
  * # Background:
@@ -436,7 +443,7 @@ The layout for a **Big Idea** is as follows:
  * # Audience: Who is meant to see this?
  *
  * # Overview:
- *   This Big Idea has a small, succint overview that describes in 1-2
+ *   This Big Idea has a small, succinct overview that describes in 1-2
  *   sentences what the Idea is about.
  *
  * # Background:
@@ -465,11 +472,11 @@ The layout for a **Big Idea** is as follows:
  * # Constraints:
  *   What is preventing this Idea from doing certain things, and how are we able to work around them?
  *
- * # Internal Details:
+ * # Internals:
  *   What are concerns that people working on this should have? Things like locking, memory ordering,
  *   and handling preemption should be discussed here. This is also a place where authors can create
- *   extra Sections, such as "Internal Detail - lock ordering". Pitfalls and other weird things can
- *   be talked about in these Internal Details.
+ *   extra Sections, such as "Internals - lock ordering". Pitfalls and other weird things can
+ *   be talked about in the Internals.
  *
  * # Strategy:
  *   Specifically what steps are we taking to achieve the goals we outlined earlier? What do we need

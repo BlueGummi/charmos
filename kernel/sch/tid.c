@@ -105,7 +105,7 @@ void tid_free(struct tid_space *ts, uint64_t id) {
             prev = r;
             node = node->right;
         } else {
-            kassert(false);
+            goto out;
         }
     }
 
@@ -132,10 +132,8 @@ void tid_free(struct tid_space *ts, uint64_t id) {
     if (!merged_prev && !merged_next) {
         struct tid_range *new_range = tid_range_alloc(ts);
 
-        if (!new_range) {
-            spin_unlock(&ts->lock, irql);
-            return;
-        }
+        if (!new_range)
+            goto out;
 
         new_range->start = id;
         new_range->length = 1;
@@ -143,5 +141,6 @@ void tid_free(struct tid_space *ts, uint64_t id) {
         rbt_insert(&ts->tree, &new_range->node);
     }
 
+out:
     spin_unlock(&ts->lock, irql);
 }

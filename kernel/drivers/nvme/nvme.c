@@ -132,7 +132,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
                 .max = WORKQUEUE_DEFAULT_MAX_INACTIVE_CHECK_PERIOD,
                 .min = WORKQUEUE_DEFAULT_MIN_INACTIVE_CHECK_PERIOD,
             },
-        .max_workers = WORKQUEUE_DEFAULT_MAX_WORKERS,
+        .max_workers = 1,
         .spawn_delay = WORKQUEUE_DEFAULT_SPAWN_DELAY,
         .flags = WORKQUEUE_FLAG_DEFAULTS,
     };
