@@ -1,7 +1,7 @@
 # charmos - Compact, Hobbyist And Recreational Monolithic Operating System
 
 <p align="center">
-<img src="https://github.com/BlueGummi/charmos/blob/main/charmos.png" width="240">
+<img src="https://github.com/BlueGummi/charmos/blob/main/charmos.png" width="500">
 </p>
 
 ## Build
