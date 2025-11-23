@@ -10,6 +10,7 @@
 static void tlb_shootdown_internal(void) {
     size_t cpu = smp_core_id();
     struct tlb_shootdown_cpu *c = &global.shootdown_data[cpu];
+    atomic_store_explicit(&c->in_tlb_shootdown, true, memory_order_release);
 
     uint32_t tail = atomic_load_explicit(&c->tail, memory_order_relaxed);
     for (;;) {
@@ -38,6 +39,8 @@ static void tlb_shootdown_internal(void) {
     atomic_store_explicit(&c->ack_gen, global.next_tlb_gen,
                           memory_order_release);
 
+    atomic_store_explicit(&c->ipi_pending, false, memory_order_release);
+    atomic_store_explicit(&c->in_tlb_shootdown, false, memory_order_release);
 }
 
 void tlb_shootdown_isr(void *ctx, uint8_t irq, void *rsp) {
@@ -74,9 +77,11 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
         /* try reserve slot */
         uint32_t slot =
             atomic_fetch_add_explicit(&t->head, 1, memory_order_acq_rel);
+        bool full = false;
         if ((slot - atomic_load_explicit(&t->tail, memory_order_acquire)) >=
             TLB_QUEUE_SIZE) {
             /* full */
+            full = true;
             atomic_store_explicit(&t->flush_all, 1, memory_order_release);
         } else {
             /* write address into slot */
@@ -84,7 +89,12 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
                                   (uintptr_t) addr, memory_order_release);
         }
 
-        ipi_send(i, IRQ_TLB_SHOOTDOWN);
+        bool old =
+            atomic_exchange_explicit(&t->ipi_pending, 1, memory_order_acq_rel);
+
+        if (!old || full) {
+            ipi_send(i, IRQ_TLB_SHOOTDOWN);
+        }
     }
 
     /* wait if needed */
@@ -94,9 +104,15 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
     for (size_t i = 0; i < global.core_count; i++) {
         if (i == this_cpu)
             continue;
-        while (atomic_load_explicit(&global.shootdown_data[i].ack_gen,
-                                    memory_order_acquire) < gen)
-            cpu_relax();
+        struct tlb_shootdown_cpu *other = &global.shootdown_data[i];
+        while (atomic_load_explicit(&other->ack_gen, memory_order_acquire) <
+               gen) {
+            if (atomic_load_explicit(&other->in_tlb_shootdown,
+                                     memory_order_acquire))
+                cpu_relax();
+            else
+                ipi_send(i, IRQ_TLB_SHOOTDOWN);
+        }
     }
 
 out:

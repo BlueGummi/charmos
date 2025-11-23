@@ -10,6 +10,8 @@ struct tlb_shootdown_cpu {
     atomic_uintptr_t queue[TLB_QUEUE_SIZE];
     atomic_uint_fast32_t head;
     atomic_uint_fast32_t tail;
+    atomic_bool ipi_pending;
+    atomic_bool in_tlb_shootdown;
     atomic_uint_fast64_t ack_gen;
     atomic_uint_fast8_t flush_all;
     atomic_uint_fast8_t dpc_queued;
