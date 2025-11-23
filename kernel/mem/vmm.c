@@ -22,11 +22,6 @@ static struct page_table *kernel_pml4 = NULL;
 static uintptr_t kernel_pml4_phys = 0;
 static uintptr_t vmm_map_top = VMM_MAP_BASE;
 
-static void vmm_tlb_shootdown(vaddr_t addr) {
-    if (global.current_bootstage >= BOOTSTAGE_MID_MP)
-        tlb_shootdown(addr, false);
-}
-
 uint64_t sub_offset(uint64_t a) {
     return a - global.hhdm_offset;
 }
@@ -203,7 +198,7 @@ enum errno vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     pte_t *entry = &tables[2]->entries[L2];
     if (ENTRY_PRESENT(*entry)) {
         invlpg(virt);
-        vmm_tlb_shootdown(virt);
+        tlb_shootdown(virt, false);
     }
     *entry =
         (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT | PAGING_2MB_page;
@@ -256,7 +251,7 @@ void vmm_unmap_2mb_page(uintptr_t virt) {
     *entries[2] &= ~PAGING_PRESENT;
 
     invlpg(virt);
-    vmm_tlb_shootdown(virt);
+    tlb_shootdown(virt, true);
 
     for (int level = 2; level > 0; level--) {
         if (vmm_is_table_empty(tables[level])) {
@@ -294,9 +289,8 @@ enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
 
         if (!ENTRY_PRESENT(*entry)) {
             enum errno ret = pte_init(entry, 0);
-            if (ret < 0) 
+            if (ret < 0)
                 k_panic("early mapping out of memory\n");
-            
         }
 
         tables[level + 1] = (struct page_table *) ((*entry & PAGING_PHYS_MASK) +
@@ -309,9 +303,10 @@ enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     pte_t *entry = &tables[3]->entries[L1];
     if (ENTRY_PRESENT(*entry)) {
         if (global.current_bootstage > BOOTSTAGE_MID_ALLOCATORS)
-            k_panic("Moving virtual memory with this function is not allowed\n");
+            k_panic(
+                "Moving virtual memory with this function is not allowed\n");
         invlpg(virt);
-        vmm_tlb_shootdown(virt);
+        tlb_shootdown(virt, false);
     }
     *entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
 
@@ -385,7 +380,7 @@ void vmm_unmap_page(uintptr_t virt) {
     *entries[3] &= ~PAGING_PRESENT;
 
     invlpg(virt);
-    vmm_tlb_shootdown(virt);
+    tlb_shootdown(virt, true);
 
     for (int level = 3; level > 0; level--) {
         if (vmm_is_table_empty(tables[level])) {

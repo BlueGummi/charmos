@@ -1,8 +1,8 @@
 #pragma once
 #include <asm.h>
 #include <charmos.h>
-#include <limine.h>
 #include <colors.h>
+#include <limine.h>
 #include <logo.h>
 #include <time.h>
 
@@ -37,7 +37,8 @@ struct panic_regs {
         global.panic_in_progress = true;                                       \
         k_printf("\n" EIGHTY_EIGHT_LINES "\n");                                \
         k_printf("\n                                    [" ANSI_BG_RED         \
-                 "KERNEL PANIC" ANSI_RESET "]\n\n");                           \
+                 "KERNEL PANIC" ANSI_RESET "] @ %llu\n\n",                     \
+                 time_get_ms());                                               \
         k_printf(ANSI_RED "%s\n\n" ANSI_RESET, OS_LOGO_PANIC_CENTERED);        \
         panic_entry();                                                         \
         k_printf("\n    [" ANSI_BRIGHT_BLUE "AT" ANSI_RESET " ");              \

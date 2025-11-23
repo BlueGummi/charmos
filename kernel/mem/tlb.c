@@ -45,6 +45,7 @@ void tlb_shootdown_isr(void *ctx, uint8_t irq, void *rsp) {
     (void) ctx;
     (void) irq;
     (void) rsp;
+
     dpc_enqueue_local(smp_core()->tlb_shootdown_dpc);
 
     lapic_write(LAPIC_REG_EOI, 0);
@@ -74,9 +75,11 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
         /* try reserve slot */
         uint32_t slot =
             atomic_fetch_add_explicit(&t->head, 1, memory_order_acq_rel);
+        bool full = false;
         if ((slot - atomic_load_explicit(&t->tail, memory_order_acquire)) >=
             TLB_QUEUE_SIZE) {
             /* full */
+            full = true;
             atomic_store_explicit(&t->flush_all, 1, memory_order_release);
         } else {
             /* write address into slot */
@@ -86,8 +89,10 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
 
         uint8_t old =
             atomic_exchange_explicit(&t->ipi_pending, 1, memory_order_acq_rel);
-        if (old == 0)
+
+        if (old == 0 || full) {
             ipi_send(i, IRQ_TLB_SHOOTDOWN);
+        }
     }
 
     /* wait if needed */
