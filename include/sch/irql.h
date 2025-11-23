@@ -87,7 +87,7 @@
  *   processor.
  *
  * # Errors:
- *   No errors besides the possible panics described aboev are possible.
+ *   No errors besides the possible panics described above are possible.
  *
  * # Context:
  *   IRQL usage interacts with many subsystems, but primarily interacts with

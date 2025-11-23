@@ -1,3 +1,4 @@
+/* @title: Singly linked list */
 #define sll_add(q, thing)                                                      \
     if (!q->head) {                                                            \
         q->head = thing;                                                       \

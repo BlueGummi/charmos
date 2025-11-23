@@ -1,3 +1,4 @@
+/* @title: Hashmap */
 // Taken from
 // https://github.com/menix-os/menix/blob/legacy/include/menix/util/hash_map.h
 //

@@ -1,3 +1,4 @@
+/* @title: SMP initialization */
 #include <limine.h>
 #include <stdatomic.h>
 #include <stdbool.h>

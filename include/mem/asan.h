@@ -1,3 +1,4 @@
+/* @title: Address sanitization */
 #include <stddef.h>
 
 #define ASAN_SHADOW_SCALE 3ULL /* 1 shadow byte per 8 real bytes */

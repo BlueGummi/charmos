@@ -1,3 +1,4 @@
+/* @title: Entropy Pool */
 #include <stdint.h>
 #include <sync/spinlock.h>
 #pragma once

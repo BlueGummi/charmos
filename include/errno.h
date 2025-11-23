@@ -1,3 +1,4 @@
+/* @title: Error Codes */
 #pragma once
 #include <stdint.h>
 

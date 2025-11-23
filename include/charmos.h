@@ -1,3 +1,4 @@
+/* @title: Global Variables */
 #pragma once
 #include <bootstage.h>
 #include <fs/vfs.h>

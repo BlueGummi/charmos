@@ -1,3 +1,4 @@
+/* @title: Stat series */
 #pragma once
 #include <stdatomic.h>
 #include <stddef.h>

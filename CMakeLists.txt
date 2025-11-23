@@ -83,6 +83,8 @@ add_custom_target(iso
 set(QEMU_COMMON_FLAGS
     -cdrom ${IMAGE_NAME}.iso
     -boot d
+    #-enable-kvm
+    #-cpu host
     -m 8G
     -smp sockets=2,cores=2,threads=2
     -object memory-backend-ram,size=2G,id=mem0

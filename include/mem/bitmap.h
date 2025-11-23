@@ -1,3 +1,4 @@
+/* @title: Bitmap allocator */
 #pragma once
 #include <mem/alloc.h>
 #include <mem/vmm.h>

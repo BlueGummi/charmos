@@ -6,7 +6,7 @@
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
 
-#define DISTANCE_WEIGHT 10000 /* distance is heavily weighted */
+#define DISTANCE_WEIGHT 100000 /* distance is heavily weighted */
 #define FREE_PAGES_WEIGHT 1  /* free pages count less */
 
 #define DOMAIN_ARENA_SIZE 64

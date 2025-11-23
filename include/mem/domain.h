@@ -1,3 +1,4 @@
+/* @title: Domain buddy allocator */
 #include <mem/alloc.h>
 #include <smp/domain.h>
 #include <stdint.h>

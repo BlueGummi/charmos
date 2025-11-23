@@ -1,3 +1,4 @@
+/* @title: Deprecated doubly linked list */
 #define dll_add(q, thing)                                                      \
     thing->next = NULL;                                                        \
     thing->prev = NULL;                                                        \

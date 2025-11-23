@@ -1,3 +1,4 @@
+/* @title: Per-CPU structure */
 #pragma once
 #include <boot/tss.h>
 #include <bootstage.h>

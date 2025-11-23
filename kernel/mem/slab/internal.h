@@ -86,7 +86,7 @@ static const uint64_t slab_class_sizes_const[] = {
 #define SLAB_ORDER_EXCESS_PCT 50
 #define SLAB_SPIKE_THRESHOLD_PCT 50
 
-#define SLAB_CACHE_DISTANCE_WEIGHT 65536
+#define SLAB_CACHE_DISTANCE_WEIGHT 65536 * 64
 #define SLAB_CACHE_FLEXIBLE_DISTANCE_WEIGHT 32768
 
 #define SLAB_EWMA_SCALE 1024 /* Fixed-point precision */

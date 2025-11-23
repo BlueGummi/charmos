@@ -1,3 +1,4 @@
+/* @title: USB HID */
 #pragma once
 
 #define USB_HID_DESC_TYPE_HID 0x21

@@ -1,3 +1,4 @@
+/* @title: Deprecated queue */
 #define queue_pop_front(q, var)                                                \
     typeof(q->head) var = q->head;                                             \
     if (var) {                                                                 \

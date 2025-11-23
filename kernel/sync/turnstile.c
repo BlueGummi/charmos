@@ -283,7 +283,6 @@ void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
 
     struct thread *original = ts->inheritor;
 
-    bool checked_first = false;
     while (true) {
         enum irql lock_irql;
 
@@ -302,10 +301,8 @@ void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
         if (!owner)
             goto done;
 
-        if (original == owner && checked_first)
+        if (original == owner && ts != cur_lock)
             k_panic("Turnstile waiter cycle deadlock\n");
-
-        checked_first = true;
 
         /* if owner already has equal-or-higher effective inputs, stop */
         if (owner->weight >= boost_weight &&

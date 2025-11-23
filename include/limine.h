@@ -1,3 +1,4 @@
+/* @title: Limine */
 /* BSD Zero Clause License */
 
 /* Copyright (C) 2022-2025 Mintsuki and contributors.
