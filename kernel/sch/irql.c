@@ -10,9 +10,10 @@ enum irql irql_raise(enum irql new_level) {
     if (global.current_bootstage < BOOTSTAGE_LATE_DEVICES)
         return IRQL_NONE;
 
+    bool in_thread = irq_in_thread_context();
     bool iflag = false;
 
-    if (irq_in_thread_context()) {
+    if (in_thread) {
         /* pin ourselves so that there exists NO GAP in between checking
          * are_interrupts_enabled() and disable_interrupts() where we can
          * get stolen and whisked away to another core... */
@@ -34,9 +35,7 @@ enum irql irql_raise(enum irql new_level) {
             scheduler_preemption_disable();
 
         /* raising past PASSIVE, pin the thread... */
-        if (old == IRQL_PASSIVE_LEVEL && irq_in_thread_context() &&
-            !scheduler_self_in_resched()) {
-
+        if (old == IRQL_PASSIVE_LEVEL && in_thread && !cpu->in_resched) {
             /* first we branchlessly OR it */
             enum thread_flags old_flags = thread_or_flags(
                 scheduler_get_current_thread(), THREAD_FLAGS_NO_STEAL);
@@ -70,7 +69,7 @@ void irql_lower(enum irql raw_level) {
     /* mask out the bit */
     enum irql new_level = raw_level & IRQL_IRQL_MASK;
 
-    /* Bind variables here to avoid repeated function calls.
+    /* Bind variables here to avoid repeated function calls
      * This function needs to be fast, it's called a lot. */
     struct core *cpu = smp_core();
     enum irql old = cpu->current_irql;
@@ -81,14 +80,18 @@ void irql_lower(enum irql raw_level) {
 
     cpu->current_irql = new_level;
     if (new_level < old) {
+        if (in_thread && old >= IRQL_HIGH_LEVEL && new_level < IRQL_HIGH_LEVEL)
+            enable_interrupts();
+
+        if (old >= IRQL_DISPATCH_LEVEL && new_level <= IRQL_DISPATCH_LEVEL) {
+            dpc_run_local();
+        }
+
         bool preempt_re_enabled = false;
         if (old >= IRQL_DISPATCH_LEVEL && new_level < IRQL_DISPATCH_LEVEL) {
             scheduler_preemption_enable();
             preempt_re_enabled = true;
         }
-
-        if (in_thread && old >= IRQL_HIGH_LEVEL && new_level < IRQL_HIGH_LEVEL)
-            enable_interrupts();
 
         if (in_thread && old > IRQL_APC_LEVEL && new_level < IRQL_APC_LEVEL)
             thread_check_and_deliver_apcs(curr);

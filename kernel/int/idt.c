@@ -208,6 +208,7 @@ static void page_fault_handler(void *context, uint8_t vector, void *rsp) {
 }
 
 void idt_init() {
+
     irq_register(IRQ_DIV_BY_Z, divbyz_handler, NULL);
     irq_register(IRQ_DEBUG, debug_handler, NULL);
     irq_register(IRQ_BREAKPOINT, breakpoint_handler, NULL);

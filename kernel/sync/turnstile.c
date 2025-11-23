@@ -354,7 +354,6 @@ struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
     struct turnstile_hash_chain *chain = turnstile_chain_for(lock_obj);
     struct thread *current_thread = scheduler_get_current_thread();
     struct turnstile *my_turnstile = current_thread->turnstile;
-    kassert(spinlock_held(&chain->lock));
 
     /* turnstile donation */
     if (!ts) {

@@ -87,6 +87,7 @@ __no_sanitize_address void k_main(void) {
 
     cmdline_parse(cmdline_request.response->cmdline);
     lapic_timer_init(/* core_id = */ 0);
+    dpc_init_percpu();
     smp_complete_init();
 
     srat_init();
@@ -96,12 +97,11 @@ __no_sanitize_address void k_main(void) {
     reaper_init();
     bootstage_advance(BOOTSTAGE_MID_TOPOLOGY);
 
-    dpc_init_percpu();
-    tlb_init();
     thread_init_rq_lists();
 
     pmm_late_init();
     slab_domain_init();
+    tlb_init();
     movealloc_exec_all();
     bootstage_advance(BOOTSTAGE_MID_ALLOCATORS);
 

@@ -529,6 +529,11 @@ __no_sanitize_address void slab_allocator_init() {
     for (uint64_t i = 0; i < slab_num_sizes; i++) {
         slab_cache_init(i, &slab_caches.caches[i], slab_class_sizes[i].size);
         slab_caches.caches[i].parent = &slab_caches;
+        k_info("SLAB", K_INFO,
+               "Initialized slab cache of size %u with name %s with %u objects "
+               "per slab",
+               slab_class_sizes[i].size, slab_class_sizes[i].name,
+               slab_caches.caches[i].objs_per_slab);
     }
 }
 

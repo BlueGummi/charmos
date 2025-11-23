@@ -43,9 +43,7 @@ void dpc_run_local(void) {
         struct dpc *it = rev;
         while (it) {
             atomic_store_explicit(&it->enqueued, false, memory_order_release);
-            enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
             it->func(it->ctx);
-            irql_lower(irql);
             it = atomic_load_explicit(&it->next, memory_order_relaxed);
         }
 
@@ -90,9 +88,7 @@ bool dpc_enqueue_on_cpu(size_t cpu, struct dpc *d) {
 
 /* Convenience: enqueue on current cpu */
 bool dpc_enqueue_local(struct dpc *d) {
-    enum thread_flags flags = scheduler_pin_current_thread();
     bool ret = dpc_enqueue_on_cpu(smp_core_id(), d);
-    scheduler_unpin_current_thread(flags);
     return ret;
 }
 

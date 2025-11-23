@@ -245,6 +245,10 @@ static inline void context_switch(struct scheduler *sched, struct thread *curr,
 
     scheduler_unlock(sched, irql);
 
+    /* these are the exact same threads, let's get outta here */
+    if (curr == next)
+        return;
+
     if (curr && curr->state != THREAD_STATE_IDLE_THREAD) {
         switch_context(&curr->regs, &next->regs);
     } else {

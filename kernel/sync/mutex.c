@@ -122,17 +122,14 @@ void mutex_lock_delay(size_t backoff) {
 }
 
 static bool mutex_owner_running(struct mutex *mutex) {
-    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     bool ret = false;
 
     struct thread *owner = mutex_get_owner(mutex);
     if (!owner) /* no owner, can't possibly be running */
-        goto out;
+        return false;
 
     ret = thread_get_state(owner) == THREAD_STATE_RUNNING;
 
-out:
-    irql_lower(irql);
     return ret;
 }
 
@@ -219,6 +216,7 @@ void mutex_lock(struct mutex *mutex) {
 
             /* we do the dance all over again */
             backoff = MUTEX_BACKOFF_DEFAULT;
+            owner_change_count = 0;
         } else {
             /* nevermind, something changed again */
             turnstile_unlock(mutex, ts_lock_irql);
@@ -239,11 +237,14 @@ void mutex_unlock(struct mutex *mutex) {
     struct thread *current_thread = scheduler_get_current_thread();
 
     if (mutex_get_owner(mutex) != current_thread)
-        k_panic("non-owner thread tried to unlock mutex\n");
+        k_panic("non-owner thread tried to unlock mutex. mutex owner is 0x%lx, "
+                "current thread is 0x%lx\n",
+                mutex_get_owner(mutex), current_thread);
+
+    mutex_lock_word_unlock(mutex);
 
     enum irql ts_lock_irql;
     struct turnstile *ts = turnstile_lookup(mutex, &ts_lock_irql);
-    mutex_lock_word_unlock(mutex);
 
     /* no turnstile :) */
     if (!ts) {
