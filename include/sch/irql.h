@@ -131,13 +131,9 @@
  *   of this kernel because of the structure and strict rules they
  *   provide and enforce. DPCs and APCs also require IRQLs.
  *
- * # References:
- *   [^1]: "APCs"
- *   [^2]: "DPCs"
- *   [^3]: "Bootstages"
- *
  * # Changelog:
  *   11/22/2025 - gummi: created file
+ *   11/23/2025 - gummi: move references
  *
  * # Notes:
  *   I primarily decided to bring IRQLs to this kernel because I had read
@@ -146,6 +142,11 @@
  *   and thought "This could really be simplified with a state machine!",
  *   but then realized that VMS and NT basically did that already.
  *   So, I chose to introduce IRQLs.
+ *
+ * # References:
+ *   [^1]: "APCs"
+ *   [^2]: "DPCs"
+ *   [^3]: "Bootstages"
  *
  */
 

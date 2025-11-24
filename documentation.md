@@ -236,13 +236,13 @@ You can find more **Ideas** throughout code to give you a better sense of how th
  *
  * # Rationale: We use turnstiles to have pointer sized adaptive mutexes...
  *
- * # References: [^1]: "Name of Idea" `./optional/path` 
- *
  * # Changelog:
  *   09/05/2005 - Sally Mutex: Added information about rwlocks (commit 3a5b9)
  *   09/01/2005 - Sally Mutex: Created Idea
  *
  * # Notes: <Link to Solaris internals book> you can read more about Solaris, which has similar locking philosophy, here.
+ *
+ * # References: [^1]: "Name of Idea" `./optional/path` 
  *
  */
 ```
@@ -302,14 +302,14 @@ You can find more **Ideas** throughout code to give you a better sense of how th
  *   `./kernel/tests/turnstile.c` - general turnstile tests
  *   `./kernel/tests/mutex.c` - general mutex tests that use turnstiles
  *
- * # References: [^1] "Locking Philosophy" `./docs/locking_idea.md`
- *
  * # Changelog:
  *   09/02/2005 - Eleanor Semaphore: Added second queue for rwlocks (commit 0b4e)
  *   09/01/2005 - Eleanor Semaphore: Created Idea (commit 62ef)
  *
  * # Notes:
  *   Here is some stuff you might be interested in reading regarding the history of turnstiles
+ *
+ * # References: [^1] "Locking Philosophy" `./docs/locking_idea.md`
  *
  */
 ```
@@ -327,12 +327,13 @@ You can find more **Ideas** throughout code to give you a better sense of how th
  *
  * # Strategy: We increment the waiter count in the block path, but decrement it from the owner unblocking a thread...
  *
- * # References: [^1] "Turnstiles" `./kernel/sync/turnstile.c`
- *
  * # Changelog:
  *    09/01/2005 - Eleanor Semaphore: Created Idea (commit 62ef)
  *
  * // notes section not present
+ *
+ * # References: [^1] "Turnstiles" `./kernel/sync/turnstile.c`
+ *
  *
  */
 ```
@@ -492,14 +493,14 @@ The layout for a **Big Idea** is as follows:
  * # (optional) Tests:
  *   What tests are related to this Idea?
  *
- * # (optional) References:
- *   Other Ideas to reference and look at related to this.
- *
  * # (optional) Changelog:
  *   Major changes to this Idea and dates for the changes.
  *
  * # (optional) Notes:
  *   Other things that could not fit into the other Sections of the Idea
+ *
+ * # (optional) References:
+ *   Other Ideas to reference and look at related to this.
  *
  */
 ```
@@ -538,16 +539,14 @@ The layout for a **Small Idea** is as follows:
  *   Exactly what are we doing to resolve this problem? What other Ideas is this interacting with and how?
  *   This Section can be merged with the Problem part if the Problem part adequately covers this Section.
  *
- *
- *
- * # (optional) References:
- *   Other Ideas to reference and look at related to this Idea.
- *
  * # (optional) Changelog:
  *   Major changes to this Idea and dates for the changes.
  *
  * # (optional) Notes:
  *   Other things that could not fit into the other Sections of the Idea
+ *
+ * # (optional) References:
+ *   Other Ideas to reference and look at related to this Idea.
  *
  */
 ```

@@ -6,7 +6,6 @@ on:
       - main
     paths:
       - 'kernel/**'
-      - 'include/**'
   pull_request:
     paths:
       - 'kernel/**'
