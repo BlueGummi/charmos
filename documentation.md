@@ -79,7 +79,6 @@ In general, each Idea MUST include the following **Sections**.
 - Credits: who wrote this **Idea**?
 - Status: status of the **Idea**. if there is no status, the **Idea** is assumed to be stable.
 - Alerts: important information about the **Idea** (e.g. why is this unstable?)
-- References: other **Ideas** mentioned
 - Notes: other things not covered by other **Sections** of the **Idea**
 - Audience: who is supposed to read this **Idea**?
 - Diagrams: section for diagrams and names of diagrams
@@ -242,7 +241,7 @@ You can find more **Ideas** throughout code to give you a better sense of how th
  *
  * # Notes: <Link to Solaris internals book> you can read more about Solaris, which has similar locking philosophy, here.
  *
- * # References: [^1]: "Name of Idea" `./optional/path` 
+ * [^1]: "Name of Idea" `./optional/path` 
  *
  */
 ```
@@ -309,7 +308,7 @@ You can find more **Ideas** throughout code to give you a better sense of how th
  * # Notes:
  *   Here is some stuff you might be interested in reading regarding the history of turnstiles
  *
- * # References: [^1] "Locking Philosophy" `./docs/locking_idea.md`
+ * [^1] "Locking Philosophy" `./docs/locking_idea.md`
  *
  */
 ```
@@ -332,7 +331,7 @@ You can find more **Ideas** throughout code to give you a better sense of how th
  *
  * // notes section not present
  *
- * # References: [^1] "Turnstiles" `./kernel/sync/turnstile.c`
+ * [^1] "Turnstiles" `./kernel/sync/turnstile.c`
  *
  *
  */
@@ -350,7 +349,7 @@ In text, make references such as
  */
 ```
 
-Then, in the **References** **Section** of the **Idea**, provide a source.
+Then, provide a source.
 ```c
 /*
  * [^1]: "Name"  `./optional/relative/path/to/idea/from/project/root`
@@ -403,9 +402,6 @@ The layout for a **Huge Idea** is as follows:
  *
  * # Rationale:
  *   Why were specific choices made that were brought up earlier (use this to go in depth)?
- *
- * # (optional) References:
- *   Other Ideas to reference and look at related to this.
  *
  * # (optional) Changelog:
  *   Major changes to this Idea and dates for the changes.
@@ -499,9 +495,6 @@ The layout for a **Big Idea** is as follows:
  * # (optional) Notes:
  *   Other things that could not fit into the other Sections of the Idea
  *
- * # (optional) References:
- *   Other Ideas to reference and look at related to this.
- *
  */
 ```
 
@@ -544,9 +537,6 @@ The layout for a **Small Idea** is as follows:
  *
  * # (optional) Notes:
  *   Other things that could not fit into the other Sections of the Idea
- *
- * # (optional) References:
- *   Other Ideas to reference and look at related to this Idea.
  *
  */
 ```

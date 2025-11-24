@@ -143,7 +143,6 @@
  *   but then realized that VMS and NT basically did that already.
  *   So, I chose to introduce IRQLs.
  *
- * # References:
  *   [^1]: "APCs"
  *   [^2]: "DPCs"
  *   [^3]: "Bootstages"
