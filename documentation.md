@@ -95,14 +95,14 @@ In code, **Ideas** **Sections** should be formatted as follows:
 ```c
 /*
  * < space >
- * # Section Name One: Single line body
+ * ## Section Name One: Single line body
  * < space >
- * # Section Name Two:
+ * ## Section Name Two:
  *   Multi
  *   Line
  *   Body
  * < space >
- *   ## Subsection Header:
+ *   ### Subsection Header:
  *   Multi
  *   Line
  *   Body
@@ -217,29 +217,29 @@ You can find more **Ideas** throughout code to give you a better sense of how th
 /*
  * # Huge Idea: Locking Philosophy
  *
- * # Credits: Sally Mutex
+ * ## Credits: Sally Mutex
  *
- * # Audience: Everyone
+ * ## Audience: Everyone
  *
- * # Overview: Locking allows for safe access of shared objects on multitasking kernels...
+ * ## Overview: Locking allows for safe access of shared objects on multitasking kernels...
  *
- * # Background: This is how other operating systems use locks and a bit of history...
+ * ## Background: This is how other operating systems use locks and a bit of history...
  *
- * # Summary: Locking is not a magic wand for instant scalability. A few main types of locks and uses (see struct mutex)...
+ * ## Summary: Locking is not a magic wand for instant scalability. A few main types of locks and uses (see struct mutex)...
  *
- * # Interactions: Locking is used almost everywhere that requires shared ownership[^1]...
+ * ## Interactions: Locking is used almost everywhere that requires shared ownership[^1]...
  *
- * # Constraints: Locking on an SMP preemptible kernel introduces a few problems...
+ * ## Constraints: Locking on an SMP preemptible kernel introduces a few problems...
  *
- * # Errors: Deadlocks are a problem and we don't attempt to recover, just report them...
+ * ## Errors: Deadlocks are a problem and we don't attempt to recover, just report them...
  *
- * # Rationale: We use turnstiles to have pointer sized adaptive mutexes...
+ * ## Rationale: We use turnstiles to have pointer sized adaptive mutexes...
  *
- * # Changelog:
+ * ## Changelog:
  *   09/05/2005 - Sally Mutex: Added information about rwlocks (commit 3a5b9)
  *   09/01/2005 - Sally Mutex: Created Idea
  *
- * # Notes: <Link to Solaris internals book> you can read more about Solaris, which has similar locking philosophy, here.
+ * ## Notes: <Link to Solaris internals book> you can read more about Solaris, which has similar locking philosophy, here.
  *
  * [^1]: "Name of Idea" `./optional/path` 
  *
@@ -251,31 +251,31 @@ You can find more **Ideas** throughout code to give you a better sense of how th
 /*
  * # Big Idea: Turnstiles (EXPERIMENTAL)
  *
- * # Alerts: This is still EXPERIMENTAL. Be wary of bugs that may be from this component.
+ * ## Alerts: This is still EXPERIMENTAL. Be wary of bugs that may be from this component.
  *
- * # Credits: Eleanor Semaphore
+ * ## Credits: Eleanor Semaphore
  *
- * # Audience: Synchronization subsystem authors and others interested. not necessary to read.
+ * ## Audience: Synchronization subsystem authors and others interested. not necessary to read.
  *
- * # Overview: Turnstiles give us pointer sized adaptive mutexes (see "Locking Philosophy" [^1])...
+ * ## Overview: Turnstiles give us pointer sized adaptive mutexes (see "Locking Philosophy" [^1])...
  *
- * # Background: Turnstiles were invented by Solaris, and are used in FreeBSD and XNU...
+ * ## Background: Turnstiles were invented by Solaris, and are used in FreeBSD and XNU...
  *
- * # Summary: Turnstiles give us a unified structure with functionalities... this functionality is provided by turnstile_block()...
+ * ## Summary: Turnstiles give us a unified structure with functionalities... this functionality is provided by turnstile_block()...
  *
- * # API: Turnstiles expose these functions, use them like such...
+ * ## API: Turnstiles expose these functions, use them like such...
  *
- * # Interactions: Turnstiles are used in our mutex implementation and are not to be used on their own outside of tests...
+ * ## Interactions: Turnstiles are used in our mutex implementation and are not to be used on their own outside of tests...
  *
- * # Constraints: Turnstiles must be efficient and avoid taking the slow blocking path too frequently...
+ * ## Constraints: Turnstiles must be efficient and avoid taking the slow blocking path too frequently...
  *
- * # Internals: Turnstiles internally use x, y, and z...
+ * ## Internals: Turnstiles internally use x, y, and z...
  *
- * # Errors: Turnstiles don't "fail", but these things can...
+ * ## Errors: Turnstiles don't "fail", but these things can...
  *
- * # Rationale: Turnstiles spin when the owner is running because it avoids a slowpath...
+ * ## Rationale: Turnstiles spin when the owner is running because it avoids a slowpath...
  *
- * # Diagrams:
+ * ## Diagrams:
  *
  * -- note: diagrams should have the 3 grave stones preceding and following them. this is omitted
  * here because this document is also in markdown and that would interfere with this.
@@ -293,19 +293,19 @@ You can find more **Ideas** throughout code to give you a better sense of how th
  *  │Add Turnstile to freelist│                      │ Donate Turnstile │
  *  └─────────────────────────┘                      └──────────────────┘
  *
- * # Bugs:
+ * ## Bugs:
  *   #44 "missed wakeup"
  *
  *
- * # Tests:
+ * ## Tests:
  *   `./kernel/tests/turnstile.c` - general turnstile tests
  *   `./kernel/tests/mutex.c` - general mutex tests that use turnstiles
  *
- * # Changelog:
+ * ## Changelog:
  *   09/02/2005 - Eleanor Semaphore: Added second queue for rwlocks (commit 0b4e)
  *   09/01/2005 - Eleanor Semaphore: Created Idea (commit 62ef)
  *
- * # Notes:
+ * ## Notes:
  *   Here is some stuff you might be interested in reading regarding the history of turnstiles
  *
  * [^1] "Locking Philosophy" `./docs/locking_idea.md`
@@ -318,15 +318,15 @@ You can find more **Ideas** throughout code to give you a better sense of how th
 /*
  * # Small Idea: Turnstile Blocking
  *
- * # Credits: Eleanor Semaphore
+ * ## Credits: Eleanor Semaphore
  *
- * # Context: This is the blocking portion of the Turnstile implementation. See "Turnstiles" [^1]...
+ * ## Context: This is the blocking portion of the Turnstile implementation. See "Turnstiles" [^1]...
  *
- * # Problem: We aim to solve the issue regarding how threads block on the turnstile and orderings for that...
+ * ## Problem: We aim to solve the issue regarding how threads block on the turnstile and orderings for that...
  *
- * # Strategy: We increment the waiter count in the block path, but decrement it from the owner unblocking a thread...
+ * ## Strategy: We increment the waiter count in the block path, but decrement it from the owner unblocking a thread...
  *
- * # Changelog:
+ * ## Changelog:
  *    09/01/2005 - Eleanor Semaphore: Created Idea (commit 62ef)
  *
  * // notes section not present
@@ -368,45 +368,45 @@ The layout for a **Huge Idea** is as follows:
 /*
  * # Huge Idea: Name of Idea (optional status)
  *
- * # (optional) Alerts: Short message regarding anything related to this Idea's status.
+ * ## (optional) Alerts: Short message regarding anything related to this Idea's status.
  *
- * # (optional) Credits: Who wrote this Idea?
+ * ## (optional) Credits: Who wrote this Idea?
  *
- * # Audience: Who is meant to see this?
+ * ## Audience: Who is meant to see this?
  *
- * # Overview:
+ * ## Overview:
  *   This Huge Idea has a small, succinct overview that describes in 1-2
  *   sentences what the Idea is about.
  *
- * # Background:
+ * ## Background:
  *   This Huge Idea requires some prior background knowledge, which will be discussed here.
  *   Background knowledge is general knowledge that is not just specific to this codebase.
  *
- * # Summary:
+ * ## Summary:
  *   This describes the various features that this Idea aims to provide,
  *   and the high level goals that it seeks to accomplish, and also not accomplish.
  *
- * # Interactions:
+ * ## Interactions:
  *   This explains how this Idea interacts with other Ideas, whether they are
  *   Huge Ideas, Big Ideas, or otherwise. It aims to give context surrounding the
  *   Idea by detailing what and how it interacts with other Ideas.
  *   Context knowledge is context specific to this codebase.
  *
- * # Constraints:
+ * ## Constraints:
  *   What other Ideas and things prevent this Idea from doing certain things? how
  *   are they constraining this Idea? Do we have workarounds? (e.g. this Idea must
  *   be fast and so we do X, Y, and Z to maximize speed)
  *
- * # Errors:
+ * ## Errors:
  *   What potential issues can arise from this Idea and how do we plan to recover/avoid them?
  *
- * # Rationale:
+ * ## Rationale:
  *   Why were specific choices made that were brought up earlier (use this to go in depth)?
  *
- * # (optional) Changelog:
+ * ## (optional) Changelog:
  *   Major changes to this Idea and dates for the changes.
  *
- * # (optional) Notes:
+ * ## (optional) Notes:
  *   Other things that could not fit into the other Sections of the Idea
  *
  */
@@ -433,66 +433,66 @@ The layout for a **Big Idea** is as follows:
 /*
  * # Big Idea: Name of Idea (optional status)
  *
- * # (optional) Alerts: Short message regarding anything related to this Idea's status.
+ * ## (optional) Alerts: Short message regarding anything related to this Idea's status.
  *
- * # (optional) Credits: Who wrote this Idea?
+ * ## (optional) Credits: Who wrote this Idea?
  *
- * # Audience: Who is meant to see this?
+ * ## Audience: Who is meant to see this?
  *
- * # Overview:
+ * ## Overview:
  *   This Big Idea has a small, succinct overview that describes in 1-2
  *   sentences what the Idea is about.
  *
- * # Background:
+ * ## Background:
  *   This Big Idea requires some prior background knowledge, which will be discussed here.
  *   Background knowledge is general knowledge that is not just specific to this codebase.
  *
- * # Summary:
+ * ## Summary:
  *   This describes the various features that this Idea aims to provide,
  *   and the high level goals that it seeks to accomplish, and also not accomplish.
  *
- * # API:
+ * ## API:
  *   This goes further into detail than Features alone. It describes functions and structures
  *   that the "outside world" is allowed to use, and how they are provided by this Idea, as well
  *   as the use cases for such functions and structures outside of the scope of this Idea. Potential
  *   errors are also detailed here for each function, but are expanded upon in the next Section.
  *
- * # Errors:
+ * ## Errors:
  *   What potential issues can arise from this Idea and how do we plan to recover/avoid them?
  *
- * # Context:
+ * ## Context:
  *   Similar to "Interactions" from Huge Ideas, the Context of a Big Idea describes the Huge Idea(s)
  *   it resides beneath, and the Small Ideas that reside beneath it. It should not go
  *   too far away and start discussing other Huge Ideas unless necessary.
  *   Context knowledge is context specific to this codebase.
  *
- * # Constraints:
+ * ## Constraints:
  *   What is preventing this Idea from doing certain things, and how are we able to work around them?
  *
- * # Internals:
+ * ## Internals:
  *   What are concerns that people working on this should have? Things like locking, memory ordering,
  *   and handling preemption should be discussed here. This is also a place where authors can create
  *   extra Sections, such as "Internals - lock ordering". Pitfalls and other weird things can
  *   be talked about in the Internals.
  *
- * # Strategy:
+ * ## Strategy:
  *   Specifically what steps are we taking to achieve the goals we outlined earlier? What do we need
  *   for those goals to come to fruition? How are they accomplished internally?
  *   (e.g., why did we pick X instead of Y?)
  *
- * # Rationale:
+ * ## Rationale:
  *   Why were specific choices made that were brought up earlier (use this to go in depth)?
  *
- * # (optional) Bugs:
+ * ## (optional) Bugs:
  *   Any bugs related to this Idea?
  *
- * # (optional) Tests:
+ * ## (optional) Tests:
  *   What tests are related to this Idea?
  *
- * # (optional) Changelog:
+ * ## (optional) Changelog:
  *   Major changes to this Idea and dates for the changes.
  *
- * # (optional) Notes:
+ * ## (optional) Notes:
  *   Other things that could not fit into the other Sections of the Idea
  *
  */
@@ -516,26 +516,26 @@ The layout for a **Small Idea** is as follows:
 /*
  * # Small Idea: Name of Idea (optional status)
  *
- * # (optional) Alerts: Short message regarding anything related to this Idea's status.
+ * ## (optional) Alerts: Short message regarding anything related to this Idea's status.
  *
- * # (optional) Credits: Who wrote this Idea?
+ * ## (optional) Credits: Who wrote this Idea?
  *
- * # Context:
+ * ## Context:
  *   Which Ideas does this reside under?
  *
- * # Problem:
+ * ## Problem:
  *   Specifically which piece of the problem are we trying to solve?
  *
  * -- note: external APIs should've already been discussed at this point. we are looking at a single function
  *
- * # Strategy:
+ * ## Strategy:
  *   Exactly what are we doing to resolve this problem? What other Ideas is this interacting with and how?
  *   This Section can be merged with the Problem part if the Problem part adequately covers this Section.
  *
- * # (optional) Changelog:
+ * ## (optional) Changelog:
  *   Major changes to this Idea and dates for the changes.
  *
- * # (optional) Notes:
+ * ## (optional) Notes:
  *   Other things that could not fit into the other Sections of the Idea
  *
  */
@@ -561,7 +561,7 @@ Changes for **Ideas** should be kept in the **Changelog** **Section** of the **I
 For example:
 
 ```c
-/* # Changelog:
+/* ## Changelog:
  *   11/12/1997 - Bumblebee: Added ham to the sandwich recipe (commit a4f0e19)
  *   02/13/1994 - Raven: Changed toaster model (commit c4e814)
  *

@@ -1,24 +1,24 @@
 # Huge Idea: Locking Philosophy
 
-# Credits:
+## Credits:
 
 Written 11/20/2025, updated 11/20/2025
 
-# Audience:
+## Audience:
 
 Everyone
 
 > Locking is integral to the design of this operating system, and is arguably one of,
 > if not the most important subsystems, thus, it is intended for everyone to read.
 
-# Overview:
+## Overview:
 
 Locking is the component of multitasking operating systems and programs that faciliates protection of shared resources.
 This kernel is allows preemption and is SMP-compatible, which introduces a few more locking problems.
 
-# Background:
+## Background:
 
-## History:
+### History:
 
 Throughout the history of operating systems, the concept of "virtualizing" physical resources has been front and
 center in the design of various OS components. For example, memory management units virtualize memory to
@@ -31,7 +31,7 @@ at almost any time. The ability for threads to be started and stopped is used to
 CPU by rapidly starting, stopping, and switching between threads. This is known as "context switching", which is one
 component of the much larger concept of "scheduling", which will be discussed in more detail elsewhere.
 
-## "The Problem":
+### "The Problem":
 
 However, "with great power comes great responsiblity", and multitasking operating systems and multithreaded programs
 come with much responsiblity.
@@ -73,7 +73,7 @@ thread_spawn(t2_entry);
 
 These scenarios in which timing-dependent events can impact the overall behavior of a program are known as "race conditions".
 
-## "The Solution":
+### "The Solution":
 
 One way to resolve this particular kind of race condition is with a lock.
 
@@ -113,7 +113,7 @@ lock = false;
 Now there is a variable that the threads are waiting on before they read or modify the list, which guarantees that only one
 thread is reading or modifying the list at once.
 
-## Lock Types
+### Lock Types
 
 There are two primary types of locks, spin locks and blocking locks.
 
@@ -136,9 +136,9 @@ a higher priority thread can indefinitely starve a lower priority thread because
 the lower priority thread is holding. This is also referred to as "Priority Inheritance" (or moreso, is a simpler
 form of PI), which will be discussed later.
 
-# Summary
+## Summary
 
-## Lock Rules
+### Lock Rules
 
 Locks have strict rules. For example, is prohibited for a non-owner thread to release a lock. This means
 that you cannot do funny things like acquire a lock with one thread and then spawn another to release it for you.

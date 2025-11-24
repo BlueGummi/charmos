@@ -3,26 +3,26 @@
 /* @idea:big IRQLs */
 /* # Big Idea: IRQLs (STABLE)
  *
- * # Credits: gummi
+ * ## Credits: gummi
  *
- * # Audience:
+ * ## Audience:
  *   Everyone
  *
  *   > IRQLs play a major role in the preemption and interrupt
  *     control mechanisms of this kernel. Thus, this document regarding
  *     the details of the IRQLs and usages is quite important.
  *
- * # Overview:
+ * ## Overview:
  *   IRQLs provide a centralized preemption and interrupt control mechanism.
  *   IRQLs are software only, meaning they are strictly enforced only by
  *   software and used as an abstraction in software.
  *
- * # Background:
+ * ## Background:
  *   IRQLs are a feature of quite a few other kernels. Windows NT is the
  *   most prominent of the many kernels that have IRQLs. Similar concepts exist
  *   in other kernels, however. For example, VMS had 
  *
- * # Summary:
+ * ## Summary:
  *   Each logical processor (or CPU) on the machine has its own IRQL.
  *
  *   At each IRQL, the effects of lower IRQLs are also applied.
@@ -40,13 +40,13 @@
  *   that you cannot change the current IRQL willy-nilly and expect everything
  *   to work out just fine.
  *
- *   ## Bootstage exception:
+ *   ### Bootstage exception:
  *
  *   There is also another "pseudo-IRQL" that is used as a placeholder so that
  *   IRQL functions can be called at early bootstages[^3] (making the IRQL
  *   functions effectively no-ops), which is NONE.
  *
- * # API:
+ * ## API:
  *   There are three primary IRQL related functions:
  *
  *   `irql_raise()`, `irql_lower()`, and `irql_get()`.
@@ -86,20 +86,20 @@
  *   `irql_get()` will return the current IRQL of the caller's logical
  *   processor.
  *
- * # Errors:
+ * ## Errors:
  *   No errors besides the possible panics described above are possible.
  *
- * # Context:
+ * ## Context:
  *   IRQL usage interacts with many subsystems, but primarily interacts with
  *   synchronization, interrupt handlers, and scheduling.
  *
- * # Constraints:
+ * ## Constraints:
  *   The `irql_raise()` and `irql_lower()` functions cannot call themselves.
  *   Thus, inside the functions, whenever interrupts need to be disabled,
  *   they use the raw `disable_interrupts()` and `enable_interrupts()`
  *   assembly routines.
  *
- * # Internals:
+ * ## Internals:
  *   Whenever a thread raises the IRQL above PASSIVE, the thread will be pinned
  *   to the current core it is executing on. Then, when the IRQL is lowered
  *   to PASSIVE, the thread is unpinned if it was not pinned prior to raising
@@ -107,7 +107,7 @@
  *   an IRQL above PASSIVE and modifying the IRQL of a different logical
  *   processor when it lowers the IRQL.
  *
- * # Strategy:
+ * ## Strategy:
  *   To raise the IRQL, if we are not inside of an ISR, we first
  *   temporarily pin the running thread, and check if interrupts are enabled,
  *   and then disable interrupts, before unpinning the running thread.
@@ -126,16 +126,16 @@
  *   attempt DPC and APC execution if we are currently running in the
  *   context of a thread.
  *
- * # Rationale:
+ * ## Rationale:
  *   IRQLs were introduced as the preemption/interrupt control mechanism
  *   of this kernel because of the structure and strict rules they
  *   provide and enforce. DPCs and APCs also require IRQLs.
  *
- * # Changelog:
+ * ## Changelog:
  *   11/22/2025 - gummi: created file
  *   11/23/2025 - gummi: move references
  *
- * # Notes:
+ * ## Notes:
  *   I primarily decided to bring IRQLs to this kernel because I had read
  *   code from kernels without IRQLs (with the constant
  *   enable/disable_interrupts, preempt_disable_enable sprinkled about),
