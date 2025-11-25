@@ -1,6 +1,8 @@
+/* @title: Preemption */
+
 #include <sch/sched.h>
 
-uint32_t scheduler_preemption_disable(void) {
+static inline uint32_t scheduler_preemption_disable(void) {
     struct core *cpu = smp_core();
 
     uint32_t old =
@@ -13,7 +15,7 @@ uint32_t scheduler_preemption_disable(void) {
     return old + 1;
 }
 
-uint32_t scheduler_preemption_enable(void) {
+static inline uint32_t scheduler_preemption_enable(void) {
     struct core *cpu = smp_core();
 
     uint32_t old =
@@ -27,6 +29,6 @@ uint32_t scheduler_preemption_enable(void) {
     return old - 1;
 }
 
-bool scheduler_preemption_disabled(void) {
+static inline bool scheduler_preemption_disabled(void) {
     return atomic_load(&smp_core()->scheduler_preemption_disable_depth) > 0;
 }

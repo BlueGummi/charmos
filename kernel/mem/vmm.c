@@ -198,7 +198,7 @@ enum errno vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     pte_t *entry = &tables[2]->entries[L2];
     if (ENTRY_PRESENT(*entry)) {
         invlpg(virt);
-        tlb_shootdown(virt, false);
+        tlb_shootdown(virt, true);
     }
     *entry =
         (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT | PAGING_2MB_page;
@@ -306,7 +306,7 @@ enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
             k_panic(
                 "Moving virtual memory with this function is not allowed\n");
         invlpg(virt);
-        tlb_shootdown(virt, false);
+        tlb_shootdown(virt, true);
     }
     *entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
 

@@ -10,7 +10,6 @@ void scheduler_idle_main(void) {
 
     while (true) {
         enable_interrupts();
-        dpc_run_local();
         rcu_mark_quiescent();
         scheduler_resched_if_needed();
         wait_for_interrupt();

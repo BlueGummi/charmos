@@ -36,8 +36,10 @@ static void tlb_shootdown_internal(void) {
             break;
     }
 
-    atomic_store_explicit(&c->ack_gen, global.next_tlb_gen,
-                          memory_order_release);
+    atomic_store_explicit(
+        &c->ack_gen,
+        atomic_load_explicit(&global.next_tlb_gen, memory_order_acquire),
+        memory_order_release);
 
     atomic_store_explicit(&c->ipi_pending, false, memory_order_release);
     atomic_store_explicit(&c->in_tlb_shootdown, false, memory_order_release);
@@ -48,8 +50,11 @@ void tlb_shootdown_isr(void *ctx, uint8_t irq, void *rsp) {
     (void) irq;
     (void) rsp;
 
-    dpc_enqueue_local(smp_core()->tlb_shootdown_dpc);
-
+    if (global.current_bootstage < BOOTSTAGE_LATE_DEVICES) {
+        tlb_shootdown_internal();
+    } else {
+        dpc_enqueue_local(smp_core()->tlb_shootdown_dpc);
+    }
     lapic_write(LAPIC_REG_EOI, 0);
 }
 
@@ -108,10 +113,11 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
         while (atomic_load_explicit(&other->ack_gen, memory_order_acquire) <
                gen) {
             if (atomic_load_explicit(&other->in_tlb_shootdown,
-                                     memory_order_acquire))
+                                     memory_order_acquire)) {
                 cpu_relax();
-            else
+            } else {
                 ipi_send(i, IRQ_TLB_SHOOTDOWN);
+            }
         }
     }
 

@@ -83,9 +83,8 @@ void irql_lower(enum irql raw_level) {
         if (in_thread && old >= IRQL_HIGH_LEVEL && new_level < IRQL_HIGH_LEVEL)
             enable_interrupts();
 
-        if (old >= IRQL_DISPATCH_LEVEL && new_level <= IRQL_DISPATCH_LEVEL) {
+        if (old >= IRQL_DISPATCH_LEVEL && new_level <= IRQL_DISPATCH_LEVEL)
             dpc_run_local();
-        }
 
         bool preempt_re_enabled = false;
         if (old >= IRQL_DISPATCH_LEVEL && new_level < IRQL_DISPATCH_LEVEL) {
@@ -93,7 +92,7 @@ void irql_lower(enum irql raw_level) {
             preempt_re_enabled = true;
         }
 
-        if (in_thread && old > IRQL_APC_LEVEL && new_level < IRQL_APC_LEVEL)
+        if (in_thread && old > IRQL_APC_LEVEL && new_level <= IRQL_APC_LEVEL)
             thread_check_and_deliver_apcs(curr);
 
         /* unmark the thread as NO_STEAL, allow it to be migrated */
@@ -106,9 +105,7 @@ void irql_lower(enum irql raw_level) {
             scheduler_resched_if_needed();
 
     } else if (new_level > old) {
-        /* there is a separate case during init where this can happen safely */
-        if (old != IRQL_PASSIVE_LEVEL)
-            k_panic("Lowering to higher IRQL, from %s to %s\n",
-                    irql_to_str(old), irql_to_str(new_level));
+        k_panic("Lowering to higher IRQL, from %s to %s\n", irql_to_str(old),
+                irql_to_str(new_level));
     }
 }

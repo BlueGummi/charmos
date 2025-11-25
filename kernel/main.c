@@ -89,6 +89,7 @@ __no_sanitize_address void k_main(void) {
     lapic_timer_init(/* core_id = */ 0);
     dpc_init_percpu();
     smp_complete_init();
+    tlb_init();
 
     srat_init();
     slit_init();
@@ -101,7 +102,6 @@ __no_sanitize_address void k_main(void) {
 
     pmm_late_init();
     slab_domain_init();
-    tlb_init();
     movealloc_exec_all();
     bootstage_advance(BOOTSTAGE_MID_ALLOCATORS);
 

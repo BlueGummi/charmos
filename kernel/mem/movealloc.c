@@ -2,6 +2,7 @@
 #include <mem/alloc.h>
 #include <mem/domain.h>
 #include <mem/movealloc.h>
+#include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <string.h>
 
@@ -52,6 +53,7 @@ void movealloc(size_t new_domain, void *ptr) {
 
     for (size_t i = 0; i < pages; i++) {
         vaddr_t vaddr = aligned_down + i * PAGE_SIZE;
+        paddr_t paddr = vmm_get_phys(vaddr);
         paddr_t new_phys = domain_alloc_from_domain(d, 1);
         if (!new_phys)
             k_panic("movealloc failed!\n");

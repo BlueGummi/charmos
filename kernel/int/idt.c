@@ -1,4 +1,3 @@
-#include <mem/tlb.h>
 #include <acpi/lapic.h>
 #include <asm.h>
 #include <compiler.h>
@@ -6,6 +5,7 @@
 #include <int/idt.h>
 #include <int/kb.h>
 #include <mem/alloc.h>
+#include <mem/tlb.h>
 #include <mem/vmm.h>
 #include <sch/apc.h>
 #include <sch/sched.h>
@@ -48,7 +48,7 @@ MAKE_HANDLER(double_fault, "DOUBLE FAULT");
 void isr_common_entry(uint8_t vector, void *rsp) {
     irq_mark_self_in_interrupt(true);
     scheduler_mark_self_idle(false);
-    
+
     enum irql old = irql_raise(IRQL_HIGH_LEVEL);
 
     if (isr_table[vector].handler) {
@@ -56,8 +56,8 @@ void isr_common_entry(uint8_t vector, void *rsp) {
     } else {
         k_panic("Unhandled ISR vector: %u\n", vector);
     }
-    irql_lower(old);
 
+    irql_lower(old);
     rcu_mark_quiescent();
     irq_mark_self_in_interrupt(false);
 
@@ -178,7 +178,8 @@ static void page_fault_handler(void *context, uint8_t vector, void *rsp) {
 
     spin_lock_raw(&pf_lock);
     k_printf("\n=== PAGE FAULT ===\n");
-    k_printf("Faulting Address (CR2): 0x%lx, instruction: 0x%lx\n", fault_addr, ctx->rip);
+    k_printf("Faulting Address (CR2): 0x%lx, instruction: 0x%lx\n", fault_addr,
+             ctx->rip);
     k_printf("Error Code: 0x%lx\n", error_code);
     k_printf("  - Page not Present (P): %s\n",
              (error_code & 0x01) ? "Yes" : "No");

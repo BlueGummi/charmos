@@ -1,5 +1,6 @@
 /* @title: Scheduler */
 #pragma once
+#include <acpi/lapic.h>
 #include <charmos.h>
 #include <sch/thread.h>
 #include <sch/thread_queue.h>
@@ -66,7 +67,7 @@ struct scheduler {
     size_t idle_thread_loads;
 #endif
 
-    int64_t core_id;
+    uint64_t core_id;
 
     /* Work steal/migration */
     atomic_bool being_robbed;
@@ -93,7 +94,6 @@ void scheduler_scheduler_preemption_disable();
 void scheduler_yield();
 void scheduler_enqueue(struct thread *t);
 void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id);
-void scheduler_force_resched(struct scheduler *sched);
 
 void scheduler_wake(struct thread *t, enum thread_wake_reason reason,
                     enum thread_prio_class prio);
@@ -109,13 +109,6 @@ struct thread *scheduler_try_do_steal(struct scheduler *sched);
 
 struct scheduler *scheduler_pick_victim(struct scheduler *self);
 struct thread *scheduler_steal_work(struct scheduler *victim);
-
-bool scheduler_mark_core_needs_resched(struct core *c, bool new);
-bool scheduler_mark_self_needs_resched(bool new);
-bool scheduler_self_needs_resched(void);
-void scheduler_resched_if_needed(void);
-void scheduler_mark_self_idle(bool new);
-bool scheduler_core_idle(struct core *c);
 
 /* For a global structure containing central scheduler data */
 struct scheduler_data {
@@ -197,9 +190,84 @@ static inline bool scheduler_mark_self_in_resched(bool new) {
 
 #define TICKS_FOR_PRIO(level) (level == THREAD_PRIO_LOW ? 64 : 1ULL << level)
 
-bool scheduler_preemption_disabled(void);
-uint32_t scheduler_preemption_disable(void);
-uint32_t scheduler_preemption_enable(void);
 bool scheduler_inherit_priority(struct thread *boosted, size_t new_weight,
                                 enum thread_prio_class new_class);
 void scheduler_uninherit_priority();
+
+static inline bool scheduler_mark_core_needs_resched(struct core *c, bool new) {
+    return atomic_exchange(&c->needs_resched, new);
+}
+
+static inline bool scheduler_mark_self_needs_resched(bool new) {
+    return scheduler_mark_core_needs_resched(smp_core(), new);
+}
+
+static inline bool scheduler_self_needs_resched(void) {
+    return atomic_load(&smp_core()->needs_resched);
+}
+
+static inline void scheduler_mark_self_idle(bool new) {
+    if (!atomic_exchange(&smp_core()->idle, new))
+        topology_mark_core_idle(smp_core_id(), new);
+}
+
+static inline void scheduler_resched_if_needed(void) {
+    if (scheduler_self_in_resched())
+        return;
+
+    if (scheduler_mark_self_needs_resched(false)) {
+        scheduler_mark_self_idle(false);
+        scheduler_yield();
+    }
+}
+
+static inline bool scheduler_core_idle(struct core *c) {
+    return atomic_load(&c->idle) && global.schedulers[c->id]->current ==
+                                        global.schedulers[c->id]->idle_thread;
+}
+
+static inline void scheduler_force_resched(struct scheduler *sched) {
+    if (sched->core_id == smp_core_id()) {
+        scheduler_mark_self_needs_resched(true);
+    } else {
+        struct core *other = global.cores[sched->core_id];
+        if (!other) {
+            ipi_send(sched->core_id, IRQ_SCHEDULER);
+            return;
+        }
+
+        scheduler_mark_core_needs_resched(other, true);
+        ipi_send(sched->core_id, IRQ_SCHEDULER);
+    }
+}
+
+static inline uint32_t scheduler_preemption_disable(void) {
+    struct core *cpu = smp_core();
+
+    uint32_t old =
+        atomic_fetch_add(&cpu->scheduler_preemption_disable_depth, 1);
+
+    if (old == UINT32_MAX) {
+        k_panic("overflow\n");
+    }
+
+    return old + 1;
+}
+
+static inline uint32_t scheduler_preemption_enable(void) {
+    struct core *cpu = smp_core();
+
+    uint32_t old =
+        atomic_fetch_sub(&cpu->scheduler_preemption_disable_depth, 1);
+
+    if (old == 0) {
+        atomic_store(&cpu->scheduler_preemption_disable_depth, 0);
+        old = 1;
+    }
+
+    return old - 1;
+}
+
+static inline bool scheduler_preemption_disabled(void) {
+    return atomic_load(&smp_core()->scheduler_preemption_disable_depth) > 0;
+}

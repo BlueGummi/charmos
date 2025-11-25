@@ -159,14 +159,3 @@ void smp_setup_bsp() {
     init_smt_info(c);
     detect_llc(&c->llc);
 }
-
-static void smp_movealloc(void *a, void *b) {
-    (void) a, (void) b;
-    for (size_t i = 1; i < global.core_count; i++) {
-        struct core *c = global.cores[i];
-        size_t domain = global.cores[i]->domain->id;
-        movealloc(domain, c);
-    }
-}
-
-REGISTER_MOVEALLOC_CALLBACK(smp, smp_movealloc, /*a=*/NULL, /*b=*/NULL);
