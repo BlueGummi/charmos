@@ -451,8 +451,10 @@ void *slab_cache_try_alloc_from_lists(struct slab_cache *c) {
 
 void *slab_alloc_old(struct slab_cache *cache) {
     void *ret = NULL;
+
     enum irql irql = slab_cache_lock(cache);
     ret = slab_cache_try_alloc_from_lists(cache);
+    slab_cache_unlock(cache, irql);
     if (ret)
         goto out;
 
@@ -461,11 +463,12 @@ void *slab_alloc_old(struct slab_cache *cache) {
     if (!slab)
         goto out;
 
+    irql = slab_cache_lock(cache);
     slab_list_add(cache, slab);
     ret = slab_alloc_from(cache, slab);
+    slab_cache_unlock(cache, irql);
 
 out:
-    slab_cache_unlock(cache, irql);
     return ret;
 }
 

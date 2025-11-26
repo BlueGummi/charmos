@@ -89,7 +89,6 @@ __no_sanitize_address void k_main(void) {
     lapic_timer_init(/* core_id = */ 0);
     dpc_init_percpu();
     smp_complete_init();
-    tlb_init();
 
     srat_init();
     slit_init();

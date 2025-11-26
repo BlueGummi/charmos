@@ -28,6 +28,7 @@ struct charmos_globals {
     size_t numa_node_count;
     struct numa_node *numa_nodes;
 
+    atomic_size_t idle_core_count;
     size_t core_count;
     struct core **cores;
     struct tlb_shootdown_cpu *shootdown_data;

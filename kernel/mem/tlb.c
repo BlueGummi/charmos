@@ -7,6 +7,8 @@
 #include <stdatomic.h>
 #include <stdint.h>
 
+/* NOTE: we avoid using a DPC for TLB shootdown due to the overhead of that */
+
 static void tlb_shootdown_internal(void) {
     size_t cpu = smp_core_id();
     struct tlb_shootdown_cpu *c = &global.shootdown_data[cpu];
@@ -50,16 +52,8 @@ void tlb_shootdown_isr(void *ctx, uint8_t irq, void *rsp) {
     (void) irq;
     (void) rsp;
 
-    if (global.current_bootstage < BOOTSTAGE_LATE_DEVICES) {
-        tlb_shootdown_internal();
-    } else {
-        dpc_enqueue_local(smp_core()->tlb_shootdown_dpc);
-    }
-    lapic_write(LAPIC_REG_EOI, 0);
-}
-
-void tlb_dpc_func(void *ctx) {
     tlb_shootdown_internal();
+    lapic_write(LAPIC_REG_EOI, 0);
 }
 
 void tlb_shootdown(uintptr_t addr, bool synchronous) {
@@ -112,10 +106,13 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
         struct tlb_shootdown_cpu *other = &global.shootdown_data[i];
         while (atomic_load_explicit(&other->ack_gen, memory_order_acquire) <
                gen) {
+
+            /* spin on it if it's entered that ISR */
             if (atomic_load_explicit(&other->in_tlb_shootdown,
                                      memory_order_acquire)) {
                 cpu_relax();
             } else {
+                /* ping it again */
                 ipi_send(i, IRQ_TLB_SHOOTDOWN);
             }
         }
@@ -124,10 +121,4 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
 out:
 
     irql_lower(irql);
-}
-
-void tlb_init(void) {
-    for (size_t i = 0; i < global.core_count; i++) {
-        global.cores[i]->tlb_shootdown_dpc = dpc_create(tlb_dpc_func, NULL);
-    }
 }

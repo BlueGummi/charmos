@@ -132,7 +132,13 @@ void smp_complete_init() {
     if (global.core_count == 1)
         return;
 
+    /* wait for bootstage to progress */
     while (global.current_bootstage != BOOTSTAGE_MID_MP)
+        cpu_relax();
+
+    /* wait for them to enter idle threads */
+    size_t expected_idle = global.core_count - 1;
+    while (atomic_load(&global.idle_core_count) < expected_idle)
         cpu_relax();
 }
 

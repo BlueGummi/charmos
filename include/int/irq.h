@@ -1,5 +1,6 @@
 /* @title: IRQs */
 #pragma once
+#include <smp/core.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -28,7 +29,16 @@ struct irq_context {
         r15, rip, cs, rflags;
 };
 
-bool irq_in_thread_context();
-bool irq_in_interrupt();
-void irq_mark_self_in_interrupt(bool new);
 void irq_register(uint8_t vector, irq_handler_t handler, void *ctx);
+
+static inline void irq_mark_self_in_interrupt(bool new) {
+    smp_core()->in_interrupt = new;
+}
+
+static inline bool irq_in_interrupt(void) {
+    return smp_core()->in_interrupt;
+}
+
+static inline bool irq_in_thread_context(void) {
+    return !irq_in_interrupt();
+}

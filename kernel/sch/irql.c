@@ -24,7 +24,8 @@ enum irql irql_raise(enum irql new_level) {
 
         /* we have interrupts off now... */
         scheduler_unpin_current_thread(initial_tf);
-    } /* otherwise, we are in an interrupt and there is nothing to do */
+    } /* otherwise, we are in an interrupt and there is nothing to do. 
+       * irqs are off */
 
     struct core *cpu = smp_core();
     enum irql old = cpu->current_irql;
@@ -83,7 +84,7 @@ void irql_lower(enum irql raw_level) {
         if (in_thread && old >= IRQL_HIGH_LEVEL && new_level < IRQL_HIGH_LEVEL)
             enable_interrupts();
 
-        if (old >= IRQL_DISPATCH_LEVEL && new_level <= IRQL_DISPATCH_LEVEL)
+        if (old >= IRQL_DISPATCH_LEVEL && new_level < IRQL_DISPATCH_LEVEL)
             dpc_run_local();
 
         bool preempt_re_enabled = false;

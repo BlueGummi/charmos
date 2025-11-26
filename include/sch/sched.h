@@ -207,8 +207,18 @@ static inline bool scheduler_self_needs_resched(void) {
 }
 
 static inline void scheduler_mark_self_idle(bool new) {
-    if (!atomic_exchange(&smp_core()->idle, new))
+
+    /* the old value is different from the new one */
+    if (atomic_exchange(&smp_core()->idle, new) != new) {
         topology_mark_core_idle(smp_core_id(), new);
+        if (new) {
+            atomic_fetch_add_explicit(&global.idle_core_count, 1,
+                                      memory_order_acq_rel);
+        } else {
+            atomic_fetch_sub_explicit(&global.idle_core_count, 1,
+                                      memory_order_acq_rel);
+        }
+    }
 }
 
 static inline void scheduler_resched_if_needed(void) {
@@ -222,8 +232,7 @@ static inline void scheduler_resched_if_needed(void) {
 }
 
 static inline bool scheduler_core_idle(struct core *c) {
-    return atomic_load(&c->idle) && global.schedulers[c->id]->current ==
-                                        global.schedulers[c->id]->idle_thread;
+    return atomic_load(&c->idle);
 }
 
 static inline void scheduler_force_resched(struct scheduler *sched) {
