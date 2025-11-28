@@ -80,8 +80,6 @@ __no_sanitize_address void k_main(void) {
     thread_init_thread_ids();
     scheduler_init();
     turnstiles_init();
-    workqueues_permanent_init();
-    defer_init();
     prng_seed(time_get_us());
     bootstage_advance(BOOTSTAGE_MID_SCHEDULER);
 
@@ -94,7 +92,6 @@ __no_sanitize_address void k_main(void) {
     slit_init();
     topology_init();
     domain_init();
-    reaper_init();
     bootstage_advance(BOOTSTAGE_MID_TOPOLOGY);
 
     thread_init_rq_lists();
@@ -111,6 +108,12 @@ __no_sanitize_address void k_main(void) {
 
 void k_sch_main() {
     bootstage_advance(BOOTSTAGE_LATE_DEVICES);
+    
+    defer_init();
+    slab_domain_init_late();
+    domain_buddies_init_late();
+    workqueues_permanent_init();
+    reaper_init();
     registry_setup();
     tests_run();
     bootstage_advance(BOOTSTAGE_COMPLETE);

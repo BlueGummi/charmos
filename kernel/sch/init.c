@@ -7,6 +7,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+static size_t scheduler_thread_get_data(struct rbt_node *n) {
+    return thread_from_rbt_node(n)->virtual_runtime_left;
+}
+
 void scheduler_init(void) {
     scheduler_data.max_concurrent_stealers = global.core_count / 4;
 
@@ -25,7 +29,9 @@ void scheduler_init(void) {
             k_panic("Could not allocate scheduler %lu\n", i);
 
         s->thread_rbt.root = NULL;
+        s->thread_rbt.get_data = scheduler_thread_get_data;
         s->completed_rbt.root = NULL;
+        s->completed_rbt.get_data = scheduler_thread_get_data;
         s->tick_enabled = false;
         s->current_period = 1; /* Start at period 1 to avoid
                                 * starting at 0 because

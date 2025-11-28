@@ -202,9 +202,7 @@ void domain_flush_thread() {
     while (!worker->stop) {
         semaphore_wait(&worker->sema);
         struct domain_free_queue *fq = worker->domain->free_queue;
-        enum thread_flags flags = scheduler_pin_current_thread();
         domain_flush_free_queue(worker->domain, fq);
-        scheduler_unpin_current_thread(flags);
         atomic_store(&worker->enqueued, false);
     }
 }

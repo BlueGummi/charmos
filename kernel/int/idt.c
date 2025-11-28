@@ -174,7 +174,7 @@ static void page_fault_handler(void *context, uint8_t vector, void *rsp) {
 
     asm volatile("mov %%cr2, %0" : "=r"(fault_addr));
 
-    struct irq_context *ctx = rsp;
+    struct isr_regs *ctx = rsp;
 
     spin_lock_raw(&pf_lock);
     k_printf("\n=== PAGE FAULT ===\n");

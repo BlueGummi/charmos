@@ -3,12 +3,17 @@
 #include <sch/tid.h>
 #include <string.h>
 
+static size_t tid_space_get_data(struct rbt_node *node) {
+    return container_of(node, struct tid_range, node)->start;
+}
+
 struct tid_space *tid_space_init(uint64_t max_id) {
     struct tid_space *ts = kzalloc(sizeof(*ts));
     if (!ts)
         return NULL;
 
     ts->tree.root = NULL;
+    ts->tree.get_data = tid_space_get_data;
     spinlock_init(&ts->lock);
 
     // Initialize reserve pool
@@ -17,7 +22,6 @@ struct tid_space *tid_space_init(uint64_t max_id) {
         ts->reserve_pool[i].node.left = NULL;
         ts->reserve_pool[i].node.right = NULL;
         ts->reserve_pool[i].node.parent = NULL;
-        ts->reserve_pool[i].node.data = 0;
         ts->reserve_pool[i].start = 0;
         ts->reserve_pool[i].length = 0;
         ts->reserve_pool[i].next = ts->reserve_free;
@@ -30,7 +34,6 @@ struct tid_space *tid_space_init(uint64_t max_id) {
 
     r->start = 1;
     r->length = max_id;
-    r->node.data = r->start;
     rbt_insert(&ts->tree, &r->node);
 
     return ts;
@@ -77,12 +80,11 @@ uint64_t tid_alloc(struct tid_space *ts) {
     uint64_t id = range->start;
 
     if (range->length == 1) {
-        rbt_remove(&ts->tree, node->data);
+        rb_delete(&ts->tree, node);
         tid_range_free(ts, range);
     } else {
         range->start++;
         range->length--;
-        node->data = range->start;
     }
 
     spin_unlock(&ts->lock, irql);
@@ -119,12 +121,11 @@ void tid_free(struct tid_space *ts, uint64_t id) {
     if (next && next->start == id + 1) {
         if (merged_prev) {
             prev->length += next->length;
-            rbt_remove(&ts->tree, next->node.data);
+            rb_delete(&ts->tree, &next->node);
             kfree(next);
         } else {
             next->start = id;
             next->length++;
-            next->node.data = next->start;
         }
         merged_next = true;
     }
@@ -137,7 +138,6 @@ void tid_free(struct tid_space *ts, uint64_t id) {
 
         new_range->start = id;
         new_range->length = 1;
-        new_range->node.data = id;
         rbt_insert(&ts->tree, &new_range->node);
     }
 

@@ -141,8 +141,6 @@ void slab_domain_init(void) {
         slab_gc_init(sdomain);
         slab_free_queue_init(sdomain, &sdomain->free_queue,
                              SLAB_FREE_QUEUE_CAPACITY);
-        slab_domain_init_daemon(sdomain);
-        slab_domain_init_workqueue(sdomain);
         slab_domain_percpu_init(sdomain);
         slab_domain_init_caches(sdomain);
         slab_domain_init_stats(sdomain);
@@ -150,4 +148,12 @@ void slab_domain_init(void) {
 
     for (size_t i = 0; i < global.domain_count; i++)
         slab_domain_build_locality_lists(global.slab_domains[i]);
+}
+
+void slab_domain_init_late() {
+    for (size_t i = 0; i < global.domain_count; i++) {
+        struct slab_domain *sd = global.slab_domains[i];
+        slab_domain_init_workqueue(sd);
+        slab_domain_init_daemon(sd);
+    }
 }

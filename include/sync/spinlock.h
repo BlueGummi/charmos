@@ -13,13 +13,13 @@ struct spinlock {
 
 #define SPINLOCK_INIT {ATOMIC_VAR_INIT(0)}
 
-__no_sanitize_address static inline void spinlock_init(struct spinlock *lock) {
+static inline void spinlock_init(struct spinlock *lock) {
     atomic_store(&lock->state, 0);
 }
 
-__no_sanitize_address static inline void spin_lock_raw(struct spinlock *lock) {
+static inline void spin_lock_raw(struct spinlock *lock) {
     bool expected;
-    for (;;) {
+    while (true) {
         expected = 0;
         if (atomic_compare_exchange_weak_explicit(&lock->state, &expected, 1,
                                                   memory_order_acquire,
@@ -32,8 +32,7 @@ __no_sanitize_address static inline void spin_lock_raw(struct spinlock *lock) {
     }
 }
 
-__no_sanitize_address static inline void
-spin_unlock_raw(struct spinlock *lock) {
+static inline void spin_unlock_raw(struct spinlock *lock) {
     atomic_store_explicit(&lock->state, 0, memory_order_release);
 }
 

@@ -1,3 +1,4 @@
+#include <crypto/prng.h>
 #include <sync/mutex.h>
 
 #define MUTEX_READ_LOCK_WORD(__mtx)                                            \
@@ -5,10 +6,10 @@
                           memory_order_acquire))
 
 #define MUTEX_BACKOFF_DEFAULT 4
-#define MUTEX_BACKOFF_MAX 65536
+#define MUTEX_BACKOFF_MAX 32768
 #define MUTEX_BACKOFF_SHIFT 1
-#define MUTEX_BACKOFF_JITTER_PCT 15      /* 15% variation of base backoff */
-#define MUTEX_UNLOCK_WAKE_THREAD_COUNT(__m) turnstile_get_waiter_count(__m) 
+#define MUTEX_BACKOFF_JITTER_PCT 15 /* 15% variation of base backoff */
+#define MUTEX_UNLOCK_WAKE_THREAD_COUNT(__m) turnstile_get_waiter_count(__m)
 
 static inline struct thread *mutex_get_owner(struct mutex *mtx) {
     return (struct thread *) (MUTEX_READ_LOCK_WORD(mtx) & (~MUTEX_META_BITS));
@@ -29,19 +30,16 @@ static inline bool mutex_try_lock(struct mutex *mtx, struct thread *self) {
         /* held: no can do! */
         if (old & MUTEX_HELD_BIT)
             return false;
-    
 
         /* We want to preserve other bits */
         uintptr_t waiter_bits = old & MUTEX_WAITER_BIT;
 
-        uintptr_t newval = (uintptr_t)self | MUTEX_HELD_BIT | waiter_bits;
+        uintptr_t newval = (uintptr_t) self | MUTEX_HELD_BIT | waiter_bits;
 
         if (atomic_compare_exchange_weak_explicit(
                 &mtx->lock_word,
-                &old,             /* If CAS fails, 'old' is updated to current value */
-                newval,
-                memory_order_acquire,
-                memory_order_relaxed)) {
+                &old, /* If CAS fails, 'old' is updated to current value */
+                newval, memory_order_acquire, memory_order_relaxed)) {
             return true;
         }
 

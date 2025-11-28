@@ -249,6 +249,7 @@ static void domain_init_worker(struct domain_buddy *domain) {
     uint64_t id = domain->cores[0]->id;
 
     worker->curr_core = id;
+    worker->flags = THREAD_FLAGS_NO_STEAL;
     thread_set_background(worker);
     scheduler_enqueue_on_core(worker, id);
 }
@@ -331,7 +332,6 @@ void domain_buddies_init(void) {
         struct domain_buddy *dbd = &domain_buddies[i];
         size_t arena_size = compute_arena_max(dbd->end - dbd->start);
         domain_structs_init(dbd, arena_size, freequeue_size, d);
-        domain_init_worker(dbd);
     }
 
     for (size_t i = 0; i < domain_count; i++) {
@@ -341,6 +341,12 @@ void domain_buddies_init(void) {
         domain_build_zonelist(dbd);
     }
 }
+
+void domain_buddies_init_late() {
+    for (size_t i = 0; i < global.domain_count; i++)
+        domain_init_worker(&domain_buddies[i]);
+}
+
 
 void domain_buddy_dump(void) {
     for (size_t i = 0; i < global.domain_count; i++) {

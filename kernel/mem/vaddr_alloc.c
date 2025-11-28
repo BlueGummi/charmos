@@ -6,6 +6,10 @@
 #include <mem/vaddr_alloc.h>
 #include <string.h>
 
+static size_t vas_range_get_data(struct rbt_node *n) {
+    return container_of(n, struct vas_range, node)->start;
+}
+
 #define VASRANGE_PER_PAGE (PAGE_SIZE / sizeof(struct vas_range))
 
 static void vasrange_refill(struct vas_space *space) {
@@ -53,6 +57,7 @@ __no_sanitize_address struct vas_space *vas_space_bootstrap(vaddr_t base,
     vas->base = base;
     vas->limit = limit;
     vas->tree.root = NULL;
+    vas->tree.get_data = vas_range_get_data;
     spinlock_init(&vas->lock);
 
     return vas;
@@ -66,6 +71,7 @@ struct vas_space *vas_space_init(vaddr_t base, vaddr_t limit) {
     vas->base = base;
     vas->limit = limit;
     vas->tree.root = NULL;
+    vas->tree.get_data = vas_range_get_data;
     spinlock_init(&vas->lock);
     return vas;
 }
@@ -83,7 +89,6 @@ vaddr_t vas_alloc(struct vas_space *vas, size_t size, size_t align) {
             struct vas_range *new_range = vasrange_alloc(vas);
             new_range->start = prev_end;
             new_range->length = size;
-            new_range->node.data = new_range->start;
             rbt_insert(&vas->tree, &new_range->node);
             vas_space_unlock(vas, irql);
             return prev_end;
@@ -97,7 +102,6 @@ vaddr_t vas_alloc(struct vas_space *vas, size_t size, size_t align) {
         struct vas_range *new_range = vasrange_alloc(vas);
         new_range->start = prev_end;
         new_range->length = size;
-        new_range->node.data = new_range->start;
         rbt_insert(&vas->tree, &new_range->node);
         vas_space_unlock(vas, irql);
         return prev_end;
@@ -119,7 +123,7 @@ void vas_free(struct vas_space *vas, vaddr_t addr) {
         } else if (addr > vr->start) {
             node = node->right;
         } else {
-            rbt_remove(&vas->tree, vr->node.data);
+            rb_delete(&vas->tree, &vr->node);
             vasrange_free(vas, vr);
             vas_space_unlock(vas, irql);
             return;

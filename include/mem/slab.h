@@ -23,4 +23,5 @@ extern struct slab_size_constant __ekernel_slab_sizes[];
 void slab_allocator_init();
 void slab_domain_init(void);
 void slab_domains_print();
+void slab_domain_init_late();
 #define SLAB_OBJ_ALIGN 16u

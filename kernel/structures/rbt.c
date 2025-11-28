@@ -1,12 +1,16 @@
 #include <console/printf.h>
 #include <kassert.h>
 #include <mem/alloc.h>
-#include <structures/rbt.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <structures/rbt.h>
 
-struct rbt *rbt_create(void) {
+struct rbt *rbt_create(rbt_get_data get) {
     struct rbt *tree = kmalloc(sizeof(struct rbt));
+    if (!tree)
+        return NULL;
+
+    tree->get_data = get;
     tree->root = NULL;
     return tree;
 }
@@ -184,40 +188,6 @@ static void fix_deletion(struct rbt *tree, struct rbt_node *x) {
         x->color = TREE_NODE_BLACK;
 }
 
-static int validate_rbtree(struct rbt_node *node, int *black_height) {
-    if (node == NULL) {
-        *black_height = 1;
-        return 1;
-    }
-
-    if (node->color == TREE_NODE_RED) {
-        if ((node->left && node->left->color == TREE_NODE_RED) ||
-            (node->right && node->right->color == TREE_NODE_RED)) {
-            k_printf("Red-Red violation at node 0x%lx\n", node->data);
-            return 0;
-        }
-    }
-
-    int left_black_height = 0;
-    int right_black_height = 0;
-
-    if (!validate_rbtree(node->left, &left_black_height))
-        return 0;
-    if (!validate_rbtree(node->right, &right_black_height))
-        return 0;
-
-    if (left_black_height != right_black_height) {
-        k_printf("Black-height violation at node 0x%lx (left height=%d, right "
-                 "height=%d)\n",
-                 node->data, left_black_height, right_black_height);
-        return 0;
-    }
-
-    *black_height =
-        left_black_height + (node->color == TREE_NODE_BLACK ? 1 : 0);
-    return 1;
-}
-
 void rb_delete(struct rbt *tree, struct rbt_node *z) {
     struct rbt_node *y = z;
     struct rbt_node *x = NULL;
@@ -257,9 +227,10 @@ void rb_delete(struct rbt *tree, struct rbt_node *z) {
     z->parent = NULL;
 }
 
-struct rbt_node *rbt_search(struct rbt_node *root, uint64_t data) {
-    while (root && root->data != data) {
-        if (data < root->data)
+struct rbt_node *rbt_search(struct rbt *tree, struct rbt_node *root,
+                            uint64_t data) {
+    while (root && tree->get_data(root) != data) {
+        if (data < tree->get_data(root))
             root = root->left;
         else
             root = root->right;
@@ -268,7 +239,7 @@ struct rbt_node *rbt_search(struct rbt_node *root, uint64_t data) {
 }
 
 void rbt_remove(struct rbt *tree, uint64_t data) {
-    struct rbt_node *node = rbt_search(tree->root, data);
+    struct rbt_node *node = rbt_search(tree, tree->root, data);
     if (node)
         rb_delete(tree, node);
 }
@@ -333,14 +304,14 @@ void rbt_insert(struct rbt *tree, struct rbt_node *new_node) {
     struct rbt_node *parent = NULL;
     while (current != NULL) {
         parent = current;
-        if (new_node->data < current->data)
+        if (tree->get_data(new_node) < tree->get_data(current))
             current = current->left;
         else
             current = current->right;
     }
 
     new_node->parent = parent;
-    if (new_node->data < parent->data)
+    if (tree->get_data(new_node) < tree->get_data(parent))
         parent->left = new_node;
     else
         parent->right = new_node;
@@ -350,4 +321,10 @@ void rbt_insert(struct rbt *tree, struct rbt_node *new_node) {
     if (parent)
         kassert(!(parent->color == TREE_NODE_RED &&
                   new_node->color == TREE_NODE_RED));
+}
+
+struct rbt *rbt_init(struct rbt *tree, rbt_get_data get_data) {
+    tree->root = NULL;
+    tree->get_data = get_data;
+    return tree;
 }

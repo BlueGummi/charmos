@@ -38,15 +38,14 @@ enum mutex_bits : uintptr_t {
 #define MUTEX_META_BITS (MUTEX_HELD_BIT | MUTEX_WAITER_BIT)
 
 struct mutex {
-    union {
-        _Atomic(void *) lock_word_ptr;
-        _Atomic(uintptr_t) lock_word;
-    };
+    _Atomic(uintptr_t) lock_word;
 };
 _Static_assert(sizeof(struct mutex) == sizeof(uintptr_t), "");
 
 #define MUTEX_INIT {ATOMIC_VAR_INIT(0)}
+static inline void mutex_init(struct mutex *mtx) {
+    mtx->lock_word = 0;
+}
 
-void mutex_init(struct mutex *mtx);
 void mutex_unlock(struct mutex *mutex);
 void mutex_lock(struct mutex *mutex);

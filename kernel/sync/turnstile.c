@@ -56,7 +56,7 @@ void turnstiles_init() {
 #define TURNSTILE_RT_PRIO 1001
 #define TURNSTILE_URGENT_PRIO 1002
 
-static int32_t turnstile_thread_priority(struct thread *t) {
+int32_t turnstile_thread_priority(struct thread *t) {
     switch (t->perceived_prio_class) {
     case THREAD_PRIO_CLASS_BACKGROUND: return TURNSTILE_BACKGROUND_PRIO;
     case THREAD_PRIO_CLASS_TIMESHARE:
@@ -68,17 +68,8 @@ static int32_t turnstile_thread_priority(struct thread *t) {
     }
 }
 
-static int32_t turnstile_pairing_heap_cmp(struct pairing_node *l,
-                                          struct pairing_node *r) {
-    struct thread *lt = thread_from_pairing_node(l);
-    struct thread *rt = thread_from_pairing_node(r);
-    int32_t ltp = turnstile_thread_priority(lt);
-    int32_t rtp = turnstile_thread_priority(rt);
-
-    if (ltp == rtp)
-        return l > r; /* compare addresses to break the tie */
-
-    return ltp - rtp;
+static size_t turnstile_thread_get_data(struct rbt_node *n) {
+    return turnstile_thread_priority(thread_from_rbt_node(n));
 }
 
 struct turnstile *turnstile_init(struct turnstile *ts) {
@@ -87,10 +78,9 @@ struct turnstile *turnstile_init(struct turnstile *ts) {
     ts->waiter_max_prio = 0;
     ts->state = TURNSTILE_STATE_UNUSED;
     ts->inheritor = NULL;
-    pairing_heap_init(&ts->queues[TURNSTILE_READER_QUEUE],
-                      turnstile_pairing_heap_cmp);
-    pairing_heap_init(&ts->queues[TURNSTILE_WRITER_QUEUE],
-                      turnstile_pairing_heap_cmp);
+
+    rbt_init(&ts->queues[TURNSTILE_READER_QUEUE], turnstile_thread_get_data);
+    rbt_init(&ts->queues[TURNSTILE_WRITER_QUEUE], turnstile_thread_get_data);
     INIT_LIST_HEAD(&ts->freelist);
     INIT_LIST_HEAD(&ts->hash_list);
 
@@ -220,8 +210,9 @@ struct thread *turnstile_dequeue_first(struct turnstile *ts, size_t queue) {
     void *obj = ts->lock_obj;
     struct turnstile_hash_chain *chain = turnstile_chain_for(obj);
 
-    struct pairing_node *pn = pairing_heap_pop(&ts->queues[queue]);
-    struct thread *thread = thread_from_pairing_node(pn);
+    struct rbt_node *last = rb_last(&ts->queues[queue]);
+    rb_delete(&ts->queues[queue], last);
+    struct thread *thread = thread_from_rbt_node(last);
 
     struct turnstile *got = ts;
     if (ts->waiters == 1) { /* last waiter, take the turnstile with you! */
@@ -340,8 +331,8 @@ static void turnstile_block_on(void *lock_obj, struct turnstile *ts,
     struct thread *curr = scheduler_get_current_thread();
 
     thread_block(curr, THREAD_BLOCK_REASON_MANUAL);
+    rbt_insert(&ts->queues[queue_num], &curr->tree_node);
     curr->blocked_on = lock_obj;
-    pairing_heap_insert(&ts->queues[queue_num], &curr->pairing_node);
 }
 
 /* ok... the we first assign a turnstile to the lock object,

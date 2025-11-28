@@ -68,7 +68,7 @@ static inline void update_thread_before_save(struct thread *thread,
     thread_scale_back_delta(thread);
     thread->curr_core = -1;
     thread_update_runtime_buckets(thread, time);
-    thread->tree_node.data = thread_virtual_runtime_left(thread);
+    thread->virtual_runtime_left = thread_virtual_runtime_left(thread);
 }
 
 static inline bool thread_done_for_period(struct thread *thread) {
@@ -85,7 +85,7 @@ static inline void re_enqueue_thread(struct scheduler *sched,
 
     /* Scheduler is locked - called from `schedule()` */
     if (thread_done_for_period(thread)) {
-        thread->tree_node.data = thread->virtual_budget;
+        thread->virtual_runtime_left = thread->virtual_budget;
         thread->completed_period = sched->current_period;
         retire_thread(sched, thread);
         scheduler_set_queue_bitmap(sched, thread->perceived_prio_class);
@@ -204,7 +204,7 @@ static inline struct thread *load_idle_thread(struct scheduler *sched) {
 
     /* Idle thread has no need to have a tick
      * No preemption will be occurring since nothing else runs */
-    tick_disable();
+    scheduler_change_tick_duration(250); /* longer tick */
     disable_period(sched);
 
     struct idle_thread_data *idle = smp_core_idle_thread();
@@ -293,6 +293,7 @@ void schedule(void) {
 }
 
 void scheduler_yield() {
+    kassert(irql_get() != IRQL_DISPATCH_LEVEL);
     kassert(!scheduler_self_in_resched());
 
     scheduler_mark_self_in_resched(true);

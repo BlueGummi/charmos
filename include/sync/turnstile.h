@@ -1,6 +1,7 @@
 #include <sch/thread_queue.h>
 #include <stdatomic.h>
 #include <structures/pairing_heap.h>
+#include <structures/rbt.h>
 
 #define TURNSTILE_WRITER_QUEUE 0
 #define TURNSTILE_READER_QUEUE 1
@@ -26,7 +27,7 @@ struct turnstile {
     size_t waiters; /* how many goobers are blocking on me? */
     thread_prio_t waiter_max_prio;
     void *lock_obj; /* lock we are for */
-    struct pairing_heap queues[TURNSTILE_NUM_QUEUES];
+    struct rbt queues[TURNSTILE_NUM_QUEUES];
     enum turnstile_state state;
 };
 
@@ -65,3 +66,4 @@ void turnstile_unlock(void *obj, enum irql irql);
 void turnstile_wake(struct turnstile *ts, size_t queue, size_t num_threads,
                     enum irql lock_irql);
 size_t turnstile_get_waiter_count(void *lock_obj);
+int32_t turnstile_thread_priority(struct thread *t);

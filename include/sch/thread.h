@@ -258,6 +258,7 @@ struct thread {
 
     size_t virtual_period_runtime;
     size_t virtual_budget;
+    size_t virtual_runtime_left;
 
     /* ========== Thread activity stats ========== */
 

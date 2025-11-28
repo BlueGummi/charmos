@@ -126,11 +126,10 @@ void worker_main(void) {
                     workqueue_spawn_worker_internal(queue);
             }
 
-            enum irql out;
-            enum wake_reason signal = worker_wait(queue, w, irql, &out);
+            enum wake_reason signal = worker_wait(queue, w, irql, &irql);
 
             if (worker_should_exit(w, signal))
-                worker_exit(queue, w, out);
+                worker_exit(queue, w, irql);
         }
 
         workqueue_unlock(queue, irql);

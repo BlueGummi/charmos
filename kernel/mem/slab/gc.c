@@ -303,7 +303,6 @@ void slab_gc_enqueue(struct slab_domain *domain, struct slab *slab) {
      * to the same order it was pulled from */
     slab->state = SLAB_IN_GC_LIST;
     slab->gc_enqueue_time_ms = time_get_ms();
-    slab->rb.data = slab->gc_enqueue_time_ms;
 
     struct slab_gc *gc = &domain->slab_gc;
     enum irql irql = slab_gc_lock(gc);
@@ -318,13 +317,12 @@ void slab_gc_dequeue(struct slab_domain *domain, struct slab *slab) {
     struct slab_gc *gc = &domain->slab_gc;
     enum irql irql = slab_gc_lock(gc);
 
-    rbt_remove(&domain->slab_gc.rbt, slab->rb.data);
+    rb_delete(&domain->slab_gc.rbt, &slab->rb);
     atomic_fetch_sub(&gc->num_elements, 1);
 
     slab_gc_unlock(gc, irql);
 
     slab->gc_enqueue_time_ms = 0;
-    slab->rb.data = 0;
     slab->state = SLAB_FREE;
 }
 
@@ -392,10 +390,15 @@ size_t slab_gc_num_slabs(struct slab_domain *domain) {
     return atomic_load(&domain->slab_gc.num_elements);
 }
 
+static size_t slab_get_data(struct rbt_node *node) {
+    return slab_from_rbt_node(node)->gc_enqueue_time_ms;
+}
+
 void slab_gc_init(struct slab_domain *dom) {
     struct slab_gc *gc = &dom->slab_gc;
     gc->num_elements = 0;
     spinlock_init(&gc->lock);
+    gc->rbt.get_data = slab_get_data;
     gc->rbt.root = NULL;
     gc->parent = dom;
 }

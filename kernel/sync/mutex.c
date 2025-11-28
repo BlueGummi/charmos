@@ -1,4 +1,3 @@
-#include <crypto/prng.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
 #include <sleep.h>
@@ -8,6 +7,7 @@
 #include <sync/turnstile.h>
 
 #include "console/printf.h"
+#include "lock_general_internal.h"
 #include "mutex_internal.h"
 
 static bool try_acquire_simple_mutex(struct mutex_simple *m,
@@ -95,32 +95,6 @@ size_t mutex_lock_get_backoff(size_t current_backoff) {
     return new_backoff > MUTEX_BACKOFF_MAX ? MUTEX_BACKOFF_MAX : new_backoff;
 }
 
-/* compute random jitter for lock backoff to reduce chances
- * of spinning on the same lock for the same amount of time */
-static inline int32_t backoff_jitter(size_t backoff) {
-    uint32_t v = (uint32_t) prng_next();
-    int32_t denom = (int32_t) (backoff * MUTEX_BACKOFF_JITTER_PCT / 100);
-
-    if (denom <= 0)
-        denom = 1;
-
-    return (int32_t) (v % (uint32_t) denom);
-}
-
-void mutex_lock_delay(size_t backoff) {
-    /* give it jitter so we don't all spin for
-     * precisely the same amount of cycles */
-    int32_t jitter = backoff_jitter(backoff);
-
-    if ((int64_t) backoff + (int64_t) jitter < 0)
-        jitter = 0; /* no jitter, we are underflowing */
-
-    backoff += jitter;
-
-    for (size_t i = 0; i < backoff; i++)
-        cpu_relax();
-}
-
 static bool mutex_owner_running(struct mutex *mutex) {
     bool ret = false;
 
@@ -166,7 +140,7 @@ void mutex_lock(struct mutex *mutex) {
 
     /* let's go gambling! */
     while (true) {
-        mutex_lock_delay(backoff);
+        lock_delay(backoff, MUTEX_BACKOFF_JITTER_PCT);
 
         /* owner is gone, let's try and get the lock */
         if (!(current_owner = mutex_get_owner(mutex))) {
@@ -231,9 +205,6 @@ void mutex_lock(struct mutex *mutex) {
 void mutex_unlock(struct mutex *mutex) {
     mutex_sanity_check();
 
-    /* do not preempt us, let's get this done fast. */
-    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
-
     struct thread *current_thread = scheduler_get_current_thread();
 
     if (mutex_get_owner(mutex) != current_thread)
@@ -241,10 +212,10 @@ void mutex_unlock(struct mutex *mutex) {
                 "current thread is 0x%lx\n",
                 mutex_get_owner(mutex), current_thread);
 
-    mutex_lock_word_unlock(mutex);
-
     enum irql ts_lock_irql;
     struct turnstile *ts = turnstile_lookup(mutex, &ts_lock_irql);
+
+    mutex_lock_word_unlock(mutex);
 
     /* no turnstile :) */
     if (!ts) {
@@ -253,10 +224,4 @@ void mutex_unlock(struct mutex *mutex) {
         turnstile_wake(ts, TURNSTILE_WRITER_QUEUE,
                        MUTEX_UNLOCK_WAKE_THREAD_COUNT(mutex), ts_lock_irql);
     }
-
-    irql_lower(irql);
-}
-
-void mutex_init(struct mutex *mtx) {
-    mtx->lock_word = 0;
 }
