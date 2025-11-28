@@ -54,7 +54,6 @@ REGISTER_TEST(rwlock_two_writer_basic, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
 #define RWLOCK_READER_COUNT_TEST_N 10
 
-/*
 static struct rwlock rw_readers = {0};
 static atomic_uint rw_readers_left = RWLOCK_READER_COUNT_TEST_N;
 
@@ -79,7 +78,7 @@ REGISTER_TEST(rwlock_many_readers, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 }
 
 #define RWLOCK_MIXED_THREADS 12
-
+volatile struct thread *mixed_threads[RWLOCK_MIXED_THREADS];
 static struct rwlock rw_mixed = {0};
 static atomic_uint rw_mixed_left = RWLOCK_MIXED_THREADS;
 
@@ -107,7 +106,7 @@ static void rw_mixed_worker() {
 
 REGISTER_TEST(rwlock_mixed_stress, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     for (int i = 0; i < RWLOCK_MIXED_THREADS; i++)
-        thread_spawn("rm", rw_mixed_worker);
+        mixed_threads[i] = thread_spawn("rm", rw_mixed_worker);
 
     while (atomic_load(&rw_mixed_left))
         scheduler_yield();
@@ -137,7 +136,6 @@ static void rw_chaos_worker() {
     }
 
     atomic_fetch_sub(&rw_chaos_left, 1);
-    k_printf("%u chaos left :cold_face:\n", rw_chaos_left);
 }
 
 REGISTER_TEST(rwlock_chaos, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
@@ -200,4 +198,4 @@ REGISTER_TEST(rwlock_correctness, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
         scheduler_yield();
 
     SET_SUCCESS();
-}*/
+}

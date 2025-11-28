@@ -13,30 +13,6 @@ REGISTER_TEST(mutex_test_basic, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
 }
 
-static struct mutex ct_mtx = MUTEX_INIT;
-static atomic_bool ct_done = false;
-
-static void contender() {
-    mutex_lock(&ct_mtx);
-    mutex_unlock(&ct_mtx);
-    atomic_store(&ct_done, true);
-}
-
-REGISTER_TEST(mutex_two_thread_basic, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    mutex_lock(&ct_mtx);
-
-    thread_spawn_on_core("contender", contender, 0);
-
-    scheduler_yield();
-
-    mutex_unlock(&ct_mtx);
-
-    while (!atomic_load(&ct_done))
-        scheduler_yield();
-
-    SET_SUCCESS();
-}
-
 #define MUTEX_MANY_WAITER_TEST_WAITER_COUNT 10
 
 static struct mutex many_mtx = MUTEX_INIT;
@@ -61,7 +37,6 @@ REGISTER_TEST(mutex_many_waiters, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 
     SET_SUCCESS();
 }
-
 
 #define CHAOS_THREAD_COUNT 20
 

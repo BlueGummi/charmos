@@ -125,6 +125,9 @@ void rwlock_lock(struct rwlock *lock, enum rwlock_acquire_type acq_type) {
         if (RWLOCK_GET_OWNER_FROM_WORD(old) == (uintptr_t) curr)
             rwlock_panic("recursive lock", lock);
 
+        enum irql irql_out;
+        struct turnstile *ts = turnstile_lookup(lock, &irql_out);
+
         /* try to set our wait bits, stop if lock becomes available */
         while (true) {
             old = atomic_load_explicit(&lock->lock_word, memory_order_acquire);
@@ -143,12 +146,12 @@ void rwlock_lock(struct rwlock *lock, enum rwlock_acquire_type acq_type) {
                 break;
         }
 
-        if (!RWLOCK_BUSY(old, busy_mask))
+        if (!RWLOCK_BUSY(old, busy_mask)) {
+            turnstile_unlock(lock, irql_out);
             continue;
+        }
 
         /* okay we could not get the lock */
-        enum irql irql_out;
-        struct turnstile *ts = turnstile_lookup(lock, &irql_out);
 
         /* make sure we've set the lock bits */
         kassert(RWLOCK_READ_LOCK_WORD(lock) & wait_bits);
@@ -181,7 +184,7 @@ size_t rwlock_get_readers_to_wake(struct turnstile *ts) {
     kassert(wnode || rnode);
 
     if (wnode)
-        writer = thread_from_pairing_node(wnode);
+        writer = thread_from_rbt_node(wnode);
 
     /* for each reader that beats this priority,
      * increment the count of readers to wake */
@@ -192,7 +195,9 @@ size_t rwlock_get_readers_to_wake(struct turnstile *ts) {
         struct thread *check_reader = thread_from_rbt_node(iter);
 
         /* can no longer beat the thread priority of the writer */
-        if (turnstile_thread_priority(check_reader) < prio_to_beat)
+        int32_t prio = turnstile_thread_priority(check_reader);
+
+        if (prio < prio_to_beat)
             break;
 
         to_wake++;
@@ -233,11 +238,8 @@ void rwlock_unlock(struct rwlock *lock) {
 
         /* there are still readers left and there are still waiters, this
          * is not the final exit of a lock, so we just drop the lock */
-        bool one_holder = (old & RWLOCK_WRITER_HELD_BIT) || ((old >> 3) == 1);
-        bool we_are_last_holder = one_holder && (old & RWLOCK_WAITER_BIT);
-
-        if (!we_are_last_holder) {
-
+        if ((new & (RWLOCK_READER_COUNT_MASK | RWLOCK_WAITER_BIT)) !=
+            RWLOCK_WAITER_BIT) {
             /* successful swap, we're all good */
             if (atomic_compare_exchange_weak_explicit(&lock->lock_word, &old,
                                                       new, memory_order_release,
@@ -266,7 +268,7 @@ void rwlock_unlock(struct rwlock *lock) {
         struct thread *writer = wnode ? thread_from_rbt_node(wnode) : NULL;
         size_t to_wake = rwlock_get_readers_to_wake(ts);
 
-        if (writer && (old & RWLOCK_WRITER_HELD_BIT) == 0 && to_wake == 0) {
+        if (writer && to_wake == 0) {
             /* directly transfer ownership to the very next writer */
             kassert(old & RWLOCK_WRITER_WANT_BIT);
             new = rwlock_make_write_word(writer);
@@ -274,7 +276,7 @@ void rwlock_unlock(struct rwlock *lock) {
             if (ts->waiters > 1)
                 new |= RWLOCK_WAITER_BIT;
 
-            if (rbt_next(wnode))
+            if (rbt_prev(wnode))
                 new |= RWLOCK_WRITER_WANT_BIT;
 
             RWLOCK_WRITE_LOCK_WORD(lock, new);
@@ -292,8 +294,6 @@ void rwlock_unlock(struct rwlock *lock) {
             RWLOCK_WRITE_LOCK_WORD(lock, new);
             turnstile_wake(ts, TURNSTILE_READER_QUEUE, to_wake, irql_out);
         }
-
-        k_printf("woke\n");
 
         /* all done */
         break;

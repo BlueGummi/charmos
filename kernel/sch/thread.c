@@ -183,7 +183,7 @@ static struct thread *thread_init(struct thread *thread,
     thread->pairing_node.child = NULL;
     thread->pairing_node.parent = NULL;
 
-    turnstile_init(thread->turnstile);
+    thread->born_with = turnstile_init(thread->turnstile);
 
     thread_update_effective_priority(thread);
 
