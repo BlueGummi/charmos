@@ -10,9 +10,6 @@
 
 #include "internal.h"
 
-struct free_area buddy_free_area[MAX_ORDER] = {0};
-struct page *page_array = NULL;
-struct domain_buddy *domain_buddies;
 
 paddr_t buddy_alloc_pages(struct free_area *free_area, size_t count) {
     if (count == 0)
@@ -48,7 +45,7 @@ paddr_t buddy_alloc_pages(struct free_area *free_area, size_t count) {
         uint64_t new_order = current_order - 1;
         uint64_t buddy_pfn = page_get_pfn(page) + (1ULL << new_order);
 
-        struct page *buddy = &page_array[buddy_pfn];
+        struct page *buddy = &global.page_array[buddy_pfn];
         memset(buddy, 0, sizeof(*buddy));
 
         page->order = new_order;
@@ -82,7 +79,7 @@ void buddy_free_pages(paddr_t addr, size_t count, struct free_area *free_area,
         size <<= 1;
     }
 
-    struct page *page = &page_array[pfn];
+    struct page *page = &global.page_array[pfn];
     memset(page, 0, sizeof(*page));
     page->order = order;
 
@@ -92,7 +89,7 @@ void buddy_free_pages(paddr_t addr, size_t count, struct free_area *free_area,
         if (buddy_pfn >= total_pages)
             break;
 
-        struct page *buddy = &page_array[buddy_pfn];
+        struct page *buddy = &global.page_array[buddy_pfn];
         if (!buddy->is_free || buddy->order != order)
             break;
 
@@ -106,7 +103,7 @@ void buddy_free_pages(paddr_t addr, size_t count, struct free_area *free_area,
         }
 
         pfn = (pfn < buddy_pfn) ? pfn : buddy_pfn;
-        page = &page_array[pfn];
+        page = &global.page_array[pfn];
         memset(page, 0, sizeof(*page));
         page->order = ++order;
     }
@@ -117,14 +114,14 @@ void buddy_free_pages(paddr_t addr, size_t count, struct free_area *free_area,
 static struct spinlock buddy_lock = SPINLOCK_INIT;
 void buddy_free_pages_global(paddr_t addr, uint64_t count) {
     enum irql irql = spin_lock(&buddy_lock);
-    buddy_free_pages(addr, count, buddy_free_area, global.last_pfn);
+    buddy_free_pages(addr, count, global.buddy_free_area, global.last_pfn);
     spin_unlock(&buddy_lock, irql);
 }
 
 paddr_t buddy_alloc_pages_global(size_t count, enum alloc_flags f) {
     (void) f;
     enum irql irql = spin_lock(&buddy_lock);
-    paddr_t ret = buddy_alloc_pages(buddy_free_area, count);
+    paddr_t ret = buddy_alloc_pages(global.buddy_free_area, count);
     spin_unlock(&buddy_lock, irql);
     return ret;
 }

@@ -2,6 +2,7 @@
 #pragma once
 #include <bootstage.h>
 #include <fs/vfs.h>
+#include <mem/buddy.h>
 #include <mem/movealloc.h>
 #include <mem/numa.h>
 #include <smp/topology.h>
@@ -38,6 +39,9 @@ struct charmos_globals {
     size_t domain_count;
     struct domain **domains;
     struct slab_domain **slab_domains;
+    struct domain_buddy *domain_buddies;
+    struct page *page_array;
+    struct free_area buddy_free_area[MAX_ORDER];
 
     vaddr_t hhdm_offset;
 

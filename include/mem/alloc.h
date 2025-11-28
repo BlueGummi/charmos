@@ -1,7 +1,6 @@
 /* @title: Allocator API */
 #pragma once
 #include <console/printf.h>
-#include <mem/page.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

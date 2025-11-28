@@ -2,6 +2,7 @@
 #include <kassert.h>
 #include <math/align.h>
 #include <mem/alloc.h>
+#include <mem/page.h>
 #include <mem/pmm.h>
 #include <mem/vaddr_alloc.h>
 #include <string.h>

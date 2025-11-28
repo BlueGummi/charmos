@@ -1,7 +1,9 @@
 #include <boot/gdt.h>
 #include <boot/tss.h>
+#include <console/panic.h>
 #include <console/printf.h>
 #include <mem/alloc.h>
+#include <mem/page.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -77,7 +79,7 @@ void gdt_init(struct gdt_entry *gdt, struct tss *tss) {
     tss->rsp0 = (uint64_t) kmalloc_aligned(8 * PAGE_SIZE, PAGE_SIZE);
     if (!tss->rsp0 || !tss->ist1)
         k_panic("GDT TSS stack allocation failed!\n");
-    
+
     /* stacks grow down */
     tss->ist1 += 8 * PAGE_SIZE;
     tss->rsp0 += 8 * PAGE_SIZE;

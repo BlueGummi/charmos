@@ -1,8 +1,10 @@
 #include <compiler.h>
+#include <console/panic.h>
 #include <console/printf.h>
 #include <fs/tmpfs.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
+#include <mem/page.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>

@@ -1,5 +1,6 @@
 /* @title: Assertions */
 #include <compiler.h>
+#include <console/panic.h>
 #define kassert(x)                                                             \
     do {                                                                       \
         if (!unlikely(x))                                                      \

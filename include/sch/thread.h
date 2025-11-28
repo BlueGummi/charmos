@@ -5,6 +5,7 @@
 #pragma once
 #include <asm.h>
 #include <mem/alloc.h>
+#include <mem/page.h>
 #include <sch/apc.h>
 #include <stdarg.h>
 #include <stdatomic.h>
@@ -315,7 +316,7 @@ struct thread {
 
     struct list_head on_event_apcs[APC_EVENT_COUNT];
 
-    struct turnstile *born_with; /* born with - used for debug */
+    struct turnstile *born_with;  /* born with - used for debug */
     struct turnstile *turnstile;  /* my turnstile */
     struct turnstile *blocked_on; /* what am I blocked on */
 

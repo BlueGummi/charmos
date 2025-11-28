@@ -20,6 +20,12 @@ struct core {
 
     size_t domain_cpu_id; /* what CPU in the domain? */
 
+    /* array [domain_levels_enabled] -> domain reference */
+    struct sched_domain **domains;
+
+    /* index within each domain's groups */
+    int32_t group_idx[TOPOLOGY_LEVEL_MAX];
+
     atomic_bool idle;
 
     bool in_interrupt;

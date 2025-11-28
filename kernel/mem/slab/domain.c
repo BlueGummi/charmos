@@ -25,7 +25,7 @@ void slab_domain_build_locality_lists(struct slab_domain *sdom) {
         struct domain_zonelist_entry *zent = &zl->entries[i];
         struct domain_buddy *bd = zent->domain;
 
-        size_t idx = bd - domain_buddies;
+        size_t idx = bd - global.domain_buddies;
         struct slab_domain *remote_sdom = global.slab_domains[idx];
 
         sdom->pageable_zonelist.entries[i] = (struct slab_cache_ref) {

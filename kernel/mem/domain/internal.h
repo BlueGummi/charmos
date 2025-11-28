@@ -7,7 +7,7 @@
 #include <sync/spinlock.h>
 
 #define DISTANCE_WEIGHT 100000 /* distance is heavily weighted */
-#define FREE_PAGES_WEIGHT 1  /* free pages count less */
+#define FREE_PAGES_WEIGHT 1    /* free pages count less */
 
 #define DOMAIN_ARENA_SIZE 64
 #define DOMAIN_FREE_QUEUE_SIZE 64
@@ -101,9 +101,6 @@ struct domain_buddy {
     struct domain_flush_worker worker;
 };
 
-extern struct page *page_array;
-extern struct domain_buddy *domain_buddies;
-
 void domain_buddies_init(void);
 void domain_free(paddr_t address, size_t page_count);
 paddr_t domain_alloc(size_t pages, enum alloc_flags flags);
@@ -130,7 +127,7 @@ SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(domain_arena, lock);
 
 static inline struct domain_buddy *domain_buddy_for_addr(paddr_t addr) {
     for (size_t i = 0; i < global.domain_count; i++) {
-        struct domain_buddy *d = &domain_buddies[i];
+        struct domain_buddy *d = &global.domain_buddies[i];
         if (addr >= d->start && addr < d->end)
             return d;
     }
@@ -194,7 +191,7 @@ static inline void mark_free_in_progress(struct domain_free_queue *fq, bool s) {
 }
 
 static inline struct page *buddy_page_for_addr(paddr_t address) {
-    return &page_array[PAGE_TO_PFN(address)];
+    return &global.page_array[PAGE_TO_PFN(address)];
 }
 
 static inline void free_from_buddy_internal(struct domain_buddy *target,

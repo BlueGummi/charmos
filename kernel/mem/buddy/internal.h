@@ -1,3 +1,4 @@
+#pragma once
 #include <mem/bitmap.h>
 #include <mem/buddy.h>
 #include <stdbool.h>
@@ -6,16 +7,6 @@
 #include <types/types.h>
 
 #define MIN(x, y) ((x) > (y) ? (y) : (x))
-#define MAX_ORDER 23
-#pragma once
-
-struct free_area {
-    struct page *next;
-    uint64_t nr_free;
-};
-
-extern struct free_area buddy_free_area[MAX_ORDER];
-
 static inline bool page_pfn_allocated_in_boot_bitmap(uint64_t pfn) {
     return test_bit(pfn);
 }

@@ -1,3 +1,4 @@
+#include <console/panic.h>
 #include <console/printf.h>
 
 void __assert_fail(const char *assertion, const char *file, unsigned int line,

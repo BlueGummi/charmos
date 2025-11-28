@@ -43,7 +43,6 @@ struct page {
     struct page *next;
     struct spinlock lock;
 };
-extern struct page *page_array;
 
 struct page_table {
     pte_t entries[512];
@@ -55,22 +54,22 @@ static inline bool page_pfn_free(uint64_t pfn) {
         return false;
     }
 
-    return page_array[pfn].is_free;
+    return global.page_array[pfn].is_free;
 }
 
 static inline struct page *page_for_pfn(uint64_t pfn) {
     if (pfn >= global.last_pfn)
         return NULL;
 
-    return &page_array[pfn];
+    return &global.page_array[pfn];
 }
 
 static inline uint64_t page_get_pfn(struct page *bp) {
-    return (uint64_t) (bp - page_array);
+    return (uint64_t) (bp - global.page_array);
 }
 
 static inline bool page_pfn_phys_usable(uint64_t pfn) {
     if (pfn >= global.last_pfn)
         return false;
-    return page_array[pfn].phys_usable;
+    return global.page_array[pfn].phys_usable;
 }

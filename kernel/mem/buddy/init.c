@@ -147,8 +147,8 @@ static void mid_init_buddy(size_t pages_needed) {
         uint64_t run_len = end > start ? (end - start) / PAGE_SIZE : 0;
 
         if (run_len >= pages_needed) {
-            page_array = (void *) (start + global.hhdm_offset);
-            fast_memset(page_array, 0, pages_needed * PAGE_SIZE);
+            global.page_array = (void *) (start + global.hhdm_offset);
+            fast_memset(global.page_array, 0, pages_needed * PAGE_SIZE);
 
             for (uint64_t j = 0; j < pages_needed; j++)
                 set_bit((start / PAGE_SIZE) + j);
@@ -161,7 +161,7 @@ static void mid_init_buddy(size_t pages_needed) {
         }
     }
 
-    if (!page_array)
+    if (!global.page_array)
         k_panic("Failed to allocate buddy metadata");
 }
 
@@ -173,12 +173,12 @@ void buddy_init(void) {
     mid_init_buddy(pages_needed);
 
     for (int i = 0; i < MAX_ORDER; i++) {
-        buddy_free_area[i].next = NULL;
-        buddy_free_area[i].nr_free = 0;
+        global.buddy_free_area[i].next = NULL;
+        global.buddy_free_area[i].nr_free = 0;
     }
 
     for (uint64_t i = 0; i < memmap->entry_count; i++)
-        buddy_add_entry(page_array, memmap->entries[i], buddy_free_area);
+        buddy_add_entry(global.page_array, memmap->entries[i], global.buddy_free_area);
 
     for (uint64_t i = 0; i < memmap->entry_count; i++) {
         struct limine_memmap_entry *e = memmap->entries[i];
@@ -187,7 +187,7 @@ void buddy_init(void) {
 
         if (e->type == LIMINE_MEMMAP_USABLE) {
             for (uint64_t p = start; p < end; p++)
-                page_array[p].phys_usable = 1;
+                global.page_array[p].phys_usable = 1;
         }
     }
 }

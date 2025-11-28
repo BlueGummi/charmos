@@ -1,6 +1,7 @@
 #include <block/bcache.h>
 #include <block/generic.h>
 #include <block/sched.h>
+#include <console/panic.h>
 #include <math/align.h>
 #include <mem/alloc.h>
 #include <sch/defer.h>

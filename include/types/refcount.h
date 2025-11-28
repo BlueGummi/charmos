@@ -1,5 +1,6 @@
 /* @title: Reference count */
 #pragma once
+#include <console/panic.h>
 #include <console/printf.h>
 #include <kassert.h>
 #include <limits.h>
