@@ -40,6 +40,10 @@ static const char *topo_node_str[TOPOLOGY_LEVEL_MAX] = {
     [TOPOLOGY_LEVEL_MACHINE] = TOPO_MAKE_STR(ANSI_RED, "MACHINE"),
 };
 
+const char *topology_level_name(enum topology_level l) {
+    return topo_node_str[l];
+}
+
 static void print_topology_node(struct topology_node *node, int depth) {
     for (int i = 0; i < depth; i++)
         k_printf("  ");
@@ -168,7 +172,7 @@ void topology_dump(void) {
     print_topology_node(&machine_node, 0);
 }
 
-#define PANIC_IF_CPUMASK_FAILED(op)                                            \
+#define PANIC_IF_CPU_MASK_FAILED(op)                                           \
     do {                                                                       \
         if (unlikely(!op))                                                     \
             k_panic("CPU mask allocation failed!\n");                          \
@@ -248,8 +252,8 @@ static size_t build_core_nodes(size_t n_cpus) {
         node->parent = -1;
         node->parent_node = NULL;
 
-        PANIC_IF_CPUMASK_FAILED(cpu_mask_init(&node->cpus, n_cpus));
-        PANIC_IF_CPUMASK_FAILED(cpu_mask_init(&node->idle, n_cpus));
+        PANIC_IF_CPU_MASK_FAILED(cpu_mask_init(&node->cpus, n_cpus));
+        PANIC_IF_CPU_MASK_FAILED(cpu_mask_init(&node->idle, n_cpus));
 
         for (size_t j = 0; j < n_cpus; j++) {
             struct core *cj = global.cores[j];
@@ -319,8 +323,8 @@ static size_t build_numa_nodes(size_t n_cores, size_t n_llc) {
             global.numa_nodes[i].topo = numa;
         }
 
-        PANIC_IF_CPUMASK_FAILED(cpu_mask_init(&numa->cpus, global.core_count));
-        PANIC_IF_CPUMASK_FAILED(cpu_mask_init(&numa->idle, global.core_count));
+        PANIC_IF_CPU_MASK_FAILED(cpu_mask_init(&numa->cpus, global.core_count));
+        PANIC_IF_CPU_MASK_FAILED(cpu_mask_init(&numa->idle, global.core_count));
     }
 
     for (size_t i = 0; i < n_cores; i++) {
@@ -402,10 +406,10 @@ static size_t build_llc_nodes(size_t n_cores) {
         node->first_child = -1;
         node->nr_children = 0;
 
-        PANIC_IF_CPUMASK_FAILED(cpu_mask_init(&node->cpus, global.core_count));
+        PANIC_IF_CPU_MASK_FAILED(cpu_mask_init(&node->cpus, global.core_count));
         cpu_mask_or(&node->cpus, &core_nodes[i].cpus);
 
-        PANIC_IF_CPUMASK_FAILED(cpu_mask_init(&node->idle, global.core_count));
+        PANIC_IF_CPU_MASK_FAILED(cpu_mask_init(&node->idle, global.core_count));
         cpu_mask_or(&node->idle, &core_nodes[i].idle);
 
         llc_count++;
@@ -433,8 +437,8 @@ static size_t build_llc_nodes(size_t n_cores) {
         node->first_child = -1;
         node->nr_children = 0;
 
-        PANIC_IF_CPUMASK_FAILED(cpu_mask_init(&node->cpus, global.core_count));
-        PANIC_IF_CPUMASK_FAILED(cpu_mask_init(&node->idle, global.core_count));
+        PANIC_IF_CPU_MASK_FAILED(cpu_mask_init(&node->cpus, global.core_count));
+        PANIC_IF_CPU_MASK_FAILED(cpu_mask_init(&node->idle, global.core_count));
 
         for (size_t i = 0; i < n_cores; i++) {
 
@@ -469,8 +473,8 @@ static size_t build_package_nodes(size_t n_cores, size_t n_llc) {
         pkg->first_child = -1;
         pkg->nr_children = 0;
         pkg->core = NULL;
-        PANIC_IF_CPUMASK_FAILED(cpu_mask_init(&pkg->cpus, global.core_count));
-        PANIC_IF_CPUMASK_FAILED(cpu_mask_init(&pkg->idle, global.core_count));
+        PANIC_IF_CPU_MASK_FAILED(cpu_mask_init(&pkg->cpus, global.core_count));
+        PANIC_IF_CPU_MASK_FAILED(cpu_mask_init(&pkg->idle, global.core_count));
     }
 
     for (size_t j = 0; j < n_llc; j++) {
@@ -502,9 +506,9 @@ static void build_machine_node(size_t n_packages) {
     machine_node.nr_children = n_packages;
     machine_node.core = NULL;
 
-    PANIC_IF_CPUMASK_FAILED(
+    PANIC_IF_CPU_MASK_FAILED(
         cpu_mask_init(&machine_node.cpus, global.core_count));
-    PANIC_IF_CPUMASK_FAILED(
+    PANIC_IF_CPU_MASK_FAILED(
         cpu_mask_init(&machine_node.idle, global.core_count));
 
     for (size_t i = 0; i < n_packages; i++) {

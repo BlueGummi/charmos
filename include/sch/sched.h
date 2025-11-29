@@ -2,9 +2,11 @@
 #pragma once
 #include <acpi/lapic.h>
 #include <charmos.h>
+#include <sch/domain.h>
 #include <sch/thread.h>
 #include <sch/thread_queue.h>
 #include <smp/core.h>
+#include <smp/topology.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <sync/spinlock.h>
@@ -104,11 +106,13 @@ void switch_context(struct cpu_context *old, struct cpu_context *new);
 void load_context(struct cpu_context *new);
 
 bool scheduler_can_steal_work(struct scheduler *sched);
+bool scheduler_can_steal_thread(size_t core, struct thread *target);
 uint64_t scheduler_compute_steal_threshold();
 struct thread *scheduler_try_do_steal(struct scheduler *sched);
 
 struct scheduler *scheduler_pick_victim(struct scheduler *self);
 struct thread *scheduler_steal_work(struct scheduler *victim);
+size_t scheduler_try_push_to_idle_core(struct scheduler *sched);
 
 /* For a global structure containing central scheduler data */
 struct scheduler_data {
@@ -211,6 +215,7 @@ static inline void scheduler_mark_self_idle(bool new) {
     /* the old value is different from the new one */
     if (atomic_exchange(&smp_core()->idle, new) != new) {
         topology_mark_core_idle(smp_core_id(), new);
+        scheduler_domain_mark_self_idle(new);
         if (new) {
             atomic_fetch_add_explicit(&global.idle_core_count, 1,
                                       memory_order_acq_rel);

@@ -88,7 +88,6 @@ static inline void re_enqueue_thread(struct scheduler *sched,
         thread->virtual_runtime_left = thread->virtual_budget;
         thread->completed_period = sched->current_period;
         retire_thread(sched, thread);
-        scheduler_set_queue_bitmap(sched, thread->perceived_prio_class);
         scheduler_increment_thread_count(sched, thread);
     } else {
         bool locked = true;
@@ -128,23 +127,15 @@ available_prio_level_from_bitmap(uint8_t bitmap) {
 static struct thread *pick_from_special_queues(struct scheduler *sched,
                                                enum thread_prio_class prio) {
     struct thread_queue *q = scheduler_get_this_thread_queue(sched, prio);
-
     struct list_head *node = list_pop_front_init(&q->list);
     kassert(node);
 
-    struct thread *next = thread_from_list_node(node);
-
-    /* No more threads at this queue level */
-    if (list_empty(&q->list))
-        scheduler_clear_queue_bitmap(sched, prio);
-
-    return next;
+    return thread_from_list_node(node);
 }
 
 static struct thread *pick_from_regular_queues(struct scheduler *sched,
-                                               time_t now_ms,
-                                               enum thread_prio_class prio) {
-    struct thread *next = find_highest_prio(sched, prio);
+                                               time_t now_ms) {
+    struct thread *next = find_highest_prio(sched);
     if (next)
         return next;
 
@@ -154,7 +145,7 @@ static struct thread *pick_from_regular_queues(struct scheduler *sched,
      * the pointers and find the thread again */
     swap_queues(sched);
     scheduler_period_start(sched, now_ms);
-    return find_highest_prio(sched, prio);
+    return find_highest_prio(sched);
 }
 
 static struct thread *pick_thread(struct scheduler *sched, time_t now_ms) {
@@ -170,7 +161,7 @@ static struct thread *pick_thread(struct scheduler *sched, time_t now_ms) {
     if (prio != THREAD_PRIO_CLASS_TIMESHARE) {
         next = pick_from_special_queues(sched, prio);
     } else {
-        next = pick_from_regular_queues(sched, now_ms, prio);
+        next = pick_from_regular_queues(sched, now_ms);
     }
 
     kassert(next); /* cannot be NULL - if it is the bitmap is lying */
@@ -204,7 +195,7 @@ static inline struct thread *load_idle_thread(struct scheduler *sched) {
 
     /* Idle thread has no need to have a tick
      * No preemption will be occurring since nothing else runs */
-    scheduler_change_tick_duration(250); /* longer tick */
+    tick_disable();
     disable_period(sched);
 
     struct idle_thread_data *idle = smp_core_idle_thread();
@@ -226,6 +217,7 @@ static void change_timeslice(struct scheduler *sched, struct thread *next) {
          * tracking when we have
          * one thread running */
         disable_period(sched);
+        tick_disable();
         return;
     }
 

@@ -61,13 +61,8 @@ struct scheduler *scheduler_pick_victim(struct scheduler *self) {
     return victim;
 }
 
-static inline bool
-scheduler_has_no_timesharing_threads(struct scheduler *sched) {
-    return sched->thread_rbt.root == NULL && sched->completed_rbt.root == NULL;
-}
-
 static struct thread *steal_from_thread_rbt(struct scheduler *victim,
-                                            struct rbt *tree, int level) {
+                                            struct rbt *tree) {
     struct rbt_node *node;
     rbt_for_each_reverse(node, tree) {
         struct thread *target = thread_from_rbt_node(node);
@@ -75,9 +70,6 @@ static struct thread *steal_from_thread_rbt(struct scheduler *victim,
             continue;
 
         rb_delete(tree, node);
-
-        if (scheduler_has_no_timesharing_threads(victim))
-            scheduler_clear_queue_bitmap(victim, level);
 
         scheduler_decrement_thread_count(victim, target);
         return target;
@@ -87,17 +79,16 @@ static struct thread *steal_from_thread_rbt(struct scheduler *victim,
     return NULL;
 }
 
-static struct thread *steal_from_ts_threads(struct scheduler *victim,
-                                            int level) {
+static struct thread *steal_from_ts_threads(struct scheduler *victim) {
     struct thread *stolen;
 
     /* We first try to pick from threads that have not run this period */
-    stolen = steal_from_thread_rbt(victim, &victim->thread_rbt, level);
+    stolen = steal_from_thread_rbt(victim, &victim->thread_rbt);
     if (stolen)
         return stolen;
 
     /* Nothing found? Let's try from the completed threads this period */
-    stolen = steal_from_thread_rbt(victim, &victim->completed_rbt, level);
+    stolen = steal_from_thread_rbt(victim, &victim->completed_rbt);
     if (stolen)
         return stolen;
 
@@ -123,9 +114,6 @@ static struct thread *steal_from_special_threads(struct scheduler *victim,
 
         list_del_init(&t->list_node);
 
-        if (list_empty(&q->list))
-            scheduler_clear_queue_bitmap(victim, level);
-
         scheduler_decrement_thread_count(victim, t);
         return t;
     }
@@ -145,7 +133,7 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
         mask &= ~(1ULL << level); /* remove that bit from local copy */
 
         if (level == THREAD_PRIO_CLASS_TIMESHARE) {
-            stolen = steal_from_ts_threads(victim, level);
+            stolen = steal_from_ts_threads(victim);
             if (stolen)
                 break;
 
@@ -211,6 +199,8 @@ struct thread *scheduler_try_do_steal(struct scheduler *sched) {
     if (stolen) {
         sched_profiling_record_steal();
         thread_set_recent_apc_event(stolen, APC_EVENT_THREAD_MIGRATE);
+    } else {
+        scheduler_try_push_to_idle_core(sched);
     }
 
     return stolen;

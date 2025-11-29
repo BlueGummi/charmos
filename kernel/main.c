@@ -29,6 +29,7 @@
 #include <registry.h>
 #include <requests.h>
 #include <sch/defer.h>
+#include <sch/domain.h>
 #include <sch/dpc.h>
 #include <sch/reaper.h>
 #include <sch/sched.h>
@@ -92,6 +93,7 @@ __no_sanitize_address void k_main(void) {
     slit_init();
     topology_init();
     domain_init();
+    scheduler_domains_init();
     bootstage_advance(BOOTSTAGE_MID_TOPOLOGY);
 
     thread_init_rq_lists();
@@ -108,7 +110,7 @@ __no_sanitize_address void k_main(void) {
 
 void k_sch_main() {
     bootstage_advance(BOOTSTAGE_LATE_DEVICES);
-    
+
     defer_init();
     slab_domain_init_late();
     domain_buddies_init_late();
@@ -121,7 +123,4 @@ void k_sch_main() {
     thread_print(scheduler_get_current_thread());
 
     domain_buddy_dump();
-    while (1) {
-        wait_for_interrupt();
-    }
 }

@@ -1,8 +1,9 @@
 #include <acpi/lapic.h>
 #include <asm.h>
+#include <console/panic.h>
 #include <console/printf.h>
-#include <smp/core.h>
 #include <sleep.h>
+#include <smp/core.h>
 
 void panic_handler(struct panic_regs *regs) {
     disable_interrupts();

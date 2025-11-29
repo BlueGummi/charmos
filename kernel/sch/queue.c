@@ -30,8 +30,6 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
         list_add_tail(&task->list_node, &q->list);
     }
 
-    scheduler_set_queue_bitmap(sched, prio);
-
     thread_set_last_ran(task, sched->core_id);
     scheduler_increment_thread_count(sched, task);
 
@@ -56,18 +54,12 @@ void scheduler_remove_thread(struct scheduler *sched, struct thread *t,
     else
         kassert(spinlock_held(&sched->lock));
 
-    enum thread_prio_class prio = t->perceived_prio_class;
     kassert(thread_get_state(t) == THREAD_STATE_READY);
 
     if (t->perceived_prio_class == THREAD_PRIO_CLASS_TIMESHARE) {
         dequeue_from_tree(sched, t);
-        if (scheduler_ts_empty(sched))
-            scheduler_clear_queue_bitmap(sched, prio);
     } else {
-        struct thread_queue *q = scheduler_get_this_thread_queue(sched, prio);
         list_del_init(&t->list_node);
-        if (list_empty(&q->list))
-            scheduler_clear_queue_bitmap(sched, prio);
     }
 
     scheduler_decrement_thread_count(sched, t);

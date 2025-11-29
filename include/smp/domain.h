@@ -1,6 +1,5 @@
 /* @title: Domains */
 #pragma once
-#include <mem/numa.h>
 #include <smp/core.h>
 #include <stdint.h>
 

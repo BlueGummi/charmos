@@ -1,6 +1,20 @@
 #include <kassert.h>
 #include <sch/sched.h>
 
+static inline void scheduler_set_queue_bitmap(struct scheduler *sched,
+                                              uint8_t prio) {
+    atomic_fetch_or(&sched->queue_bitmap, 1 << prio);
+}
+
+static inline void scheduler_clear_queue_bitmap(struct scheduler *sched,
+                                                uint8_t prio) {
+    atomic_fetch_and(&sched->queue_bitmap, ~(1 << prio));
+}
+
+static inline uint8_t scheduler_get_bitmap(struct scheduler *sched) {
+    return atomic_load(&sched->queue_bitmap);
+}
+
 static inline struct scheduler *smp_core_scheduler(void) {
     return global.schedulers[smp_core_id()];
 }
@@ -19,6 +33,9 @@ static inline void scheduler_decrement_thread_count(struct scheduler *sched,
     sched->total_thread_count--;
     sched->thread_count[t->perceived_prio_class]--;
 
+    if (sched->thread_count[t->perceived_prio_class] == 0)
+        scheduler_clear_queue_bitmap(sched, t->perceived_prio_class);
+
     if (t->effective_priority == THREAD_PRIO_CLASS_TIMESHARE)
         sched->total_weight -= t->weight;
 
@@ -29,6 +46,7 @@ static inline void scheduler_increment_thread_count(struct scheduler *sched,
                                                     struct thread *t) {
     sched->total_thread_count++;
     sched->thread_count[t->perceived_prio_class]++;
+    scheduler_set_queue_bitmap(sched, t->perceived_prio_class);
 
     if (t->effective_priority == THREAD_PRIO_CLASS_TIMESHARE)
         sched->total_weight += t->weight;
@@ -78,15 +96,12 @@ static inline bool scheduler_ts_empty(struct scheduler *sched) {
     return sched->thread_rbt.root == NULL && sched->completed_rbt.root == NULL;
 }
 
-static inline struct thread *find_highest_prio(struct scheduler *sched,
-                                               enum thread_prio_class prio) {
+static inline struct thread *find_highest_prio(struct scheduler *sched) {
     struct rbt_node *node = rbt_max(&sched->thread_rbt);
     if (!node)
         return NULL;
 
     rb_delete(&sched->thread_rbt, node);
-    if (scheduler_ts_empty(sched))
-        atomic_fetch_and(&sched->queue_bitmap, ~(1 << prio));
 
     return thread_from_rbt_node(node);
 }
@@ -96,20 +111,6 @@ static inline void disable_period(struct scheduler *sched) {
     sched->period_enabled = false;
     sched->period_ms = 0;
     sched->period_start_ms = 0;
-}
-
-static inline void scheduler_set_queue_bitmap(struct scheduler *sched,
-                                              uint8_t prio) {
-    atomic_fetch_or(&sched->queue_bitmap, 1 << prio);
-}
-
-static inline void scheduler_clear_queue_bitmap(struct scheduler *sched,
-                                                uint8_t prio) {
-    atomic_fetch_and(&sched->queue_bitmap, ~(1 << prio));
-}
-
-static inline uint8_t scheduler_get_bitmap(struct scheduler *sched) {
-    return atomic_load(&sched->queue_bitmap);
 }
 
 static inline bool scheduler_tick_enabled(struct scheduler *sched) {

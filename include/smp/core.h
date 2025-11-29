@@ -1,11 +1,7 @@
 /* @title: Per-CPU structure */
 #pragma once
-#include <boot/tss.h>
-#include <bootstage.h>
-#include <charmos.h>
-#include <compiler.h>
-#include <console/panic.h>
 #include <sch/irql.h>
+#include <smp/topology.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -21,10 +17,10 @@ struct core {
     size_t domain_cpu_id; /* what CPU in the domain? */
 
     /* array [domain_levels_enabled] -> domain reference */
-    struct sched_domain **domains;
+    struct scheduler_domain *domains[TOPOLOGY_LEVEL_MAX];
 
     /* index within each domain's groups */
-    int32_t group_idx[TOPOLOGY_LEVEL_MAX];
+    int32_t group_index[TOPOLOGY_LEVEL_MAX];
 
     atomic_bool idle;
 
