@@ -231,6 +231,7 @@ static void change_timeslice(struct scheduler *sched, struct thread *next) {
 static inline void context_switch(struct scheduler *sched, struct thread *curr,
                                   struct thread *next, enum irql irql) {
     rcu_mark_quiescent();
+    rcu_note_context_switch_out(curr);
 
     if (curr != next)
         next->context_switches++;

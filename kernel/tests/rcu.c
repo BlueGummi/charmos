@@ -21,7 +21,7 @@ static void rcu_reader_thread(void) {
     uint64_t end = time_get_ms() + RCU_TEST_DURATION_MS;
 
     while (time_get_ms() < end) {
-        enum irql irql = rcu_read_lock();
+        rcu_read_lock();
 
         struct rcu_test_data *p = shared_ptr;
         if (p) {
@@ -33,7 +33,9 @@ static void rcu_reader_thread(void) {
             }
         }
 
-        rcu_read_unlock(irql);
+        rcu_read_unlock();
+
+        scheduler_yield();
     }
 
     atomic_fetch_add(&rcu_reads_done, 1);
@@ -73,8 +75,9 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     thread_spawn("rcu_writer_test", rcu_writer_thread);
 
-    while (atomic_load(&rcu_reads_done) < NUM_RCU_READERS)
+    while (atomic_load(&rcu_reads_done) < NUM_RCU_READERS) {
         scheduler_yield();
+    }
 
     for (int i = 0; i < 100 && !atomic_load(&rcu_deferred_freed); i++)
         sleep_ms(1);
@@ -82,8 +85,9 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(!atomic_load(&rcu_test_failed));
 
     k_printf("Waiting on defer free\n");
-    while (!atomic_load(&rcu_deferred_freed))
+    while (!atomic_load(&rcu_deferred_freed)) {
         scheduler_yield();
+    }
 
     SET_SUCCESS();
 }

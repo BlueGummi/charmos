@@ -13,6 +13,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
+#include <sync/rcu.h>
 #include <sync/turnstile.h>
 
 REGISTER_SLAB_SIZE(thread, sizeof(struct thread));
@@ -328,6 +329,11 @@ destroy:
     kfree(t->activity_data);
     kfree(t->activity_stats);
     kfree(t->name);
+    if (atomic_load(&t->rcu_blocked)) {
+        atomic_store(&t->rcu_blocked, false);
+        rcu_blocked_remove(t);
+    }
+
     kfree(t->turnstile);
     thread_free_event_apcs(t);
     thread_free_stack(t);

@@ -42,7 +42,7 @@ struct core {
     uint32_t lapic_freq;
     atomic_size_t rcu_seen_gen;
     uint32_t rcu_nesting;
-    bool rcu_quiescent;
+    atomic_bool rcu_quiescent;
 
     struct topology_node *topo_node;
     struct topology_cache_info llc;

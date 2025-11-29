@@ -286,6 +286,14 @@ struct thread {
     volatile enum wake_reason wake_reason;
     size_t wait_cookie;
 
+    /* RCU */
+    atomic_uint rcu_nesting;           /* incremented by this thread only */
+    atomic_uint_fast64_t rcu_seen_gen; /* last gen seen (release store) */
+    atomic_bool rcu_blocked;           /* task was queued as blocked for GP */
+    uint64_t rcu_start_gen;
+    uint64_t rcu_blocked_gen;
+    struct thread *rcu_next_blocked;   /* blocked-list */
+
     /* ========== APC data ========== */
     bool executing_apc; /* Executing an APC right now? */
 
