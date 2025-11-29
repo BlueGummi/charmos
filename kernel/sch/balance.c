@@ -5,6 +5,9 @@
 
 #define SCHEDULER_REMOTE_NODE_SCALE_NUMERATOR 1
 #define SCHEDULER_REMOTE_NODE_SCALE_DENOMINATOR 5
+#define IDLE_LONG_ENOUGH 10   /* if the other core is idle for 10ms */
+#define IDLE_MIN_MIGRATABLE 3 /* and we have 3 migratable */
+
 /* fraction = remote_scale * (1 / (1 + dist))
  *
  * using integer math:
@@ -184,7 +187,6 @@ size_t scheduler_try_push_to_idle_core(struct scheduler *sched) {
             migrated += migrate_from_prio_class(other, sched, i, to_migrate);
         }
     } else {
-
         /* remote node */
         size_t numa_id = other_core->domain->id;
         size_t dist = this_core->domain->associated_node->rel_dists[numa_id];
@@ -208,9 +210,12 @@ size_t scheduler_try_push_to_idle_core(struct scheduler *sched) {
             if (to_migrate == 0 && count > 0)
                 to_migrate = 1;
 
-            /* Do not drain too aggressively */
-            if (to_migrate > count / 2)
-                to_migrate = count / 2;
+            time_t idle_entry = other->idle_thread_data.last_entry_ms;
+            time_t idle_for = time_get_ms() - idle_entry;
+            if (to_migrate == 0 && count >= IDLE_MIN_MIGRATABLE &&
+                idle_for >= IDLE_LONG_ENOUGH) {
+                to_migrate = 1;
+            }
 
             migrated += migrate_from_prio_class(other, sched, i, to_migrate);
         }
