@@ -4,7 +4,6 @@
 #include <stdint.h>
 
 #define RCU_GRACE_DELAY_MS (100)
-extern atomic_uint_fast64_t rcu_global_gen;
 
 struct rcu_defer_op {
     void (*func)(void *);

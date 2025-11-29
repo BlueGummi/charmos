@@ -55,6 +55,7 @@ struct charmos_globals {
 
     /* TODO: no more of this */
     atomic_uint_fast64_t next_tlb_gen;
+    atomic_uint_fast64_t rcu_gen;
 
     /* Per core workqueues */
     struct workqueue **workqueues;

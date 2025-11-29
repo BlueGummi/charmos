@@ -6,24 +6,17 @@
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
 
-#include <mem/alloc.h>
-#include <sch/defer.h>
-#include <smp/core.h>
-#include <sync/rcu.h>
-
-atomic_uint_fast64_t rcu_global_gen;
-
 void rcu_mark_quiescent(void) {
     struct core *c = smp_core();
     if (!c)
         return;
 
     c->rcu_quiescent = true;
-    c->rcu_seen_gen = atomic_load(&rcu_global_gen);
+    c->rcu_seen_gen = atomic_load(&global.rcu_gen);
 }
 
 void rcu_synchronize(void) {
-    uint64_t new_gen = atomic_fetch_add(&rcu_global_gen, 1) + 1;
+    uint64_t new_gen = atomic_fetch_add(&global.rcu_gen, 1) + 1;
 
     for (;;) {
         bool all_seen = true;
@@ -49,7 +42,7 @@ void rcu_defer(void (*func)(void *), void *arg) {
 
 void rcu_maintenance_tick(void) {
     static uint64_t last_gen = 0;
-    uint64_t gen = atomic_load(&rcu_global_gen);
+    uint64_t gen = atomic_load(&global.rcu_gen);
 
     if (gen != last_gen) {
         last_gen = gen;
@@ -72,7 +65,6 @@ enum irql rcu_read_lock(void) {
 }
 
 void rcu_read_unlock(enum irql irql) {
-
     struct core *c = smp_core();
     if (!c) {
         k_panic("RCU: missing core in unlock\n");
@@ -81,7 +73,6 @@ void rcu_read_unlock(enum irql irql) {
 
     if (c->rcu_nesting == 0) {
         k_panic("RCU bug: unlock without lock\n");
-
         return;
     }
 
@@ -91,7 +82,7 @@ void rcu_read_unlock(enum irql irql) {
         /* mark quiescent and capture generation atomically */
         c->rcu_quiescent = true;
         c->rcu_seen_gen =
-            atomic_load_explicit(&rcu_global_gen, memory_order_acquire);
+            atomic_load_explicit(&global.rcu_gen, memory_order_acquire);
     }
 
     irql_lower(irql);
@@ -138,7 +129,7 @@ void rcu_call(void (*func)(void *), void *arg) {
     cb->func = func;
     cb->arg = arg;
 
-    uint64_t gen = atomic_load_explicit(&rcu_global_gen, memory_order_acquire);
+    uint64_t gen = atomic_load_explicit(&global.rcu_gen, memory_order_acquire);
     int bucket = gen & (RCU_BUCKETS - 1);
 
     enum irql irql = spin_lock(&rcu_buckets[bucket].lock);
@@ -167,7 +158,7 @@ static void rcu_gp_worker() {
         semaphore_wait(&rcu_sem);
 
         /* Start a new grace period by bumping global generation */
-        uint64_t target = atomic_fetch_add_explicit(&rcu_global_gen, 1,
+        uint64_t target = atomic_fetch_add_explicit(&global.rcu_gen, 1,
                                                     memory_order_acq_rel) +
                           1;
 
@@ -176,10 +167,6 @@ static void rcu_gp_worker() {
 
             for (unsigned i = 0; i < global.core_count; ++i) {
                 struct core *c = global.cores[i];
-
-                /* If a core pointer can be NULL (unlikely), skip it */
-                if (!c)
-                    continue;
 
                 uint64_t seen = atomic_load_explicit(&c->rcu_seen_gen,
                                                      memory_order_acquire);

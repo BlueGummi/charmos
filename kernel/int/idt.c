@@ -58,7 +58,6 @@ void isr_common_entry(uint8_t vector, void *rsp) {
     }
 
     irql_lower(old);
-    rcu_mark_quiescent();
     irq_mark_self_in_interrupt(false);
 
     /* in reschedule, don't check if we need to preempt */
