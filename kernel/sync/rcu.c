@@ -1,7 +1,7 @@
 #include <mem/alloc.h>
 #include <sch/defer.h>
 #include <smp/core.h>
-#include <types/rcu.h>
+#include <sync/rcu.h>
 
 atomic_uint_fast64_t rcu_global_gen;
 
@@ -35,14 +35,8 @@ void rcu_synchronize(void) {
     }
 }
 
-static void rcu_defer_wrapper(void *argument, void *fn) {
-    void (*f)(void *) = fn;
-    f(argument);
-}
-
 void rcu_defer(void (*func)(void *), void *arg) {
-    defer_enqueue(rcu_defer_wrapper, WORK_ARGS(arg, (void *) func),
-                  RCU_GRACE_DELAY_MS);
+    rcu_call(func, arg);
 }
 
 void rcu_maintenance_tick(void) {
@@ -57,25 +51,40 @@ void rcu_maintenance_tick(void) {
     rcu_synchronize();
 }
 
-void rcu_read_lock(void) {
+enum irql rcu_read_lock(void) {
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     struct core *c = smp_core();
-    if (!c)
-        return;
 
-    if (c->rcu_nesting++ == 0) {
+    c->rcu_nesting++;
+    /* first nesting disables the "quiescent" state */
+    if (c->rcu_nesting == 1)
         c->rcu_quiescent = false;
-    }
+
+    return irql;
 }
 
-void rcu_read_unlock(void) {
+void rcu_read_unlock(enum irql irql) {
+
     struct core *c = smp_core();
-    if (!c || c->rcu_nesting == 0) {
-        k_panic("RCU bug\n");
+    if (!c) {
+        k_panic("RCU: missing core in unlock\n");
         return;
     }
 
-    if (--c->rcu_nesting == 0) {
-        c->rcu_quiescent = true;
-        c->rcu_seen_gen = atomic_load(&rcu_global_gen);
+    if (c->rcu_nesting == 0) {
+        k_panic("RCU bug: unlock without lock\n");
+
+        return;
     }
+
+    c->rcu_nesting--;
+
+    if (c->rcu_nesting == 0) {
+        /* mark quiescent and capture generation atomically */
+        c->rcu_quiescent = true;
+        c->rcu_seen_gen =
+            atomic_load_explicit(&rcu_global_gen, memory_order_acquire);
+    }
+
+    irql_lower(irql);
 }

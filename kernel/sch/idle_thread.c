@@ -4,7 +4,7 @@
 #include <sch/defer.h>
 #include <sch/dpc.h>
 #include <sch/sched.h>
-#include <types/rcu.h>
+#include <sync/rcu.h>
 
 void scheduler_idle_main(void) {
 

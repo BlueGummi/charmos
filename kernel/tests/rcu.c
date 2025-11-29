@@ -3,8 +3,8 @@
 #include <sch/sched.h>
 #include <sch/thread.h>
 #include <sleep.h>
+#include <sync/rcu.h>
 #include <tests.h>
-#include <types/rcu.h>
 
 #define NUM_RCU_READERS (global.core_count)
 #define RCU_TEST_DURATION_MS 50
@@ -21,7 +21,7 @@ static void rcu_reader_thread(void) {
     uint64_t end = time_get_ms() + RCU_TEST_DURATION_MS;
 
     while (time_get_ms() < end) {
-        rcu_read_lock();
+        enum irql irql = rcu_read_lock();
 
         struct rcu_test_data *p = shared_ptr;
         if (p) {
@@ -33,7 +33,7 @@ static void rcu_reader_thread(void) {
             }
         }
 
-        rcu_read_unlock();
+        rcu_read_unlock(irql);
     }
 
     atomic_fetch_add(&rcu_reads_done, 1);
@@ -62,10 +62,6 @@ static void rcu_writer_thread(void) {
 }
 
 REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    ADD_MESSAGE(
-        "This test is borked and I'm not using RCU + me lazy so we skip");
-    SET_SKIP();
-    return;
     struct rcu_test_data *initial = kmalloc(sizeof(*initial));
     initial->value = 42;
     shared_ptr = initial;
@@ -74,22 +70,18 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         thread_spawn("rcu_reader_test", rcu_reader_thread);
 
     k_printf("Readers spawned - we are core %llu\n", smp_core_id());
-    enable_interrupts();
 
-    sleep_ms(50);
     thread_spawn("rcu_writer_test", rcu_writer_thread);
 
     while (atomic_load(&rcu_reads_done) < NUM_RCU_READERS)
         scheduler_yield();
 
-    enable_interrupts();
     for (int i = 0; i < 100 && !atomic_load(&rcu_deferred_freed); i++)
         sleep_ms(1);
 
     TEST_ASSERT(!atomic_load(&rcu_test_failed));
 
     k_printf("Waiting on defer free\n");
-    enable_interrupts();
     while (!atomic_load(&rcu_deferred_freed))
         scheduler_yield();
 

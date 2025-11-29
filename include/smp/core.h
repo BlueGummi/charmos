@@ -40,7 +40,7 @@ struct core {
     struct tss *tss;
 
     uint32_t lapic_freq;
-    uint64_t rcu_seen_gen;
+    atomic_size_t rcu_seen_gen;
     uint32_t rcu_nesting;
     bool rcu_quiescent;
 

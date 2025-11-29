@@ -2,7 +2,7 @@
 #include <sch/apc.h>
 #include <sch/sched.h>
 #include <smp/smp.h>
-#include <types/rcu.h>
+#include <sync/rcu.h>
 
 #include "internal.h"
 

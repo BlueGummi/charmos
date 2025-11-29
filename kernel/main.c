@@ -38,6 +38,7 @@
 #include <smp/domain.h>
 #include <smp/smp.h>
 #include <stdint.h>
+#include <sync/rcu.h>
 #include <sync/turnstile.h>
 #include <syscall.h>
 #include <tests.h>
@@ -111,6 +112,7 @@ __no_sanitize_address void k_main(void) {
 void k_sch_main() {
     bootstage_advance(BOOTSTAGE_LATE_DEVICES);
 
+    rcu_init();
     defer_init();
     slab_domain_init_late();
     domain_buddies_init_late();

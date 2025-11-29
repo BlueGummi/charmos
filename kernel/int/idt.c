@@ -14,7 +14,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <types/rcu.h>
+#include <sync/rcu.h>
 
 extern void context_switch();
 extern void page_fault_handler_wrapper();
