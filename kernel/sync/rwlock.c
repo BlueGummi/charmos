@@ -270,7 +270,6 @@ void rwlock_unlock(struct rwlock *lock) {
 
         if (writer && to_wake == 0) {
             /* directly transfer ownership to the very next writer */
-            kassert(old & RWLOCK_WRITER_WANT_BIT);
             new = rwlock_make_write_word(writer);
 
             if (ts->waiters > 1)
