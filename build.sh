@@ -95,9 +95,9 @@ fi
 
 cond_print "${YELLOW}First initial build...${NC}"
 if [ "$make_quiet_arg" ]; then
-    make 2>&1 >/dev/null
+    make -j  2>&1 >/dev/null
 else
-    make 
+    make -j
 fi
 
 nm "kernel/kernel" | awk -f "../script.awk" > "../syms/fullsyms.c"
