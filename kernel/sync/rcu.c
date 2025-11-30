@@ -2,6 +2,7 @@
 #include <sch/defer.h>
 #include <sch/thread.h>
 #include <smp/core.h>
+#include <smp/percpu.h>
 #include <stdatomic.h>
 #include <sync/rcu.h>
 #include <sync/semaphore.h>

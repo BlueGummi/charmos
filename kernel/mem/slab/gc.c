@@ -15,7 +15,7 @@ size_t slab_gc_derive_target_gc_slabs(struct slab_gc *gc,
     return target;
 }
 
-size_t slab_gc_score(struct slab *slab, enum thread_flags flags) {
+size_t slab_gc_score(struct slab *slab, enum slab_gc_flags flags) {
     enum slab_gc_flags aggressiveness = flags & SLAB_GC_FLAG_AGG_MASK;
     size_t age_factor_pct = gc_agg_age_factor_pct[aggressiveness];
     size_t size_factor_pct = gc_agg_size_factor_pct[aggressiveness];

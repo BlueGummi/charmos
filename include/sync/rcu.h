@@ -1,9 +1,9 @@
 #pragma once
-#include <structures/list.h>
 #include <compiler.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <structures/list.h>
 
 #define RCU_GRACE_DELAY_MS (100)
 #define RCU_RING_ORDER 8
@@ -27,22 +27,6 @@ struct rcu_item {
     void *arg;
 
     uint64_t gen; /* optional: assign gen at enqueue time for ordering */
-};
-
-struct rcu_cpu_data {
-    /* ring buffer */
-    struct rcu_item ring[RCU_RING_SIZE];
-    atomic_uint head; /* producer index */
-    atomic_uint tail; /* consumer index (worker reads) */
-
-    /* small per-cpu freelist for overflow nodes (if needed) */
-    struct rcu_cb *freelist; /* simple singly-linked; only used on slowpath */
-
-    /* optional counters for diagnostics */
-    atomic_uint queued;
-    atomic_uint drops;
-    /* node id for mapping to per-node worker */
-    int node;
 };
 
 void rcu_mark_quiescent(void);

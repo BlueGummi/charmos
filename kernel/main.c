@@ -1,3 +1,4 @@
+#include <smp/percpu.h>
 #include <acpi/acpi.h>
 #include <acpi/cst.h>
 #include <acpi/hpet.h>
@@ -89,6 +90,7 @@ __no_sanitize_address void k_main(void) {
     lapic_timer_init(/* core_id = */ 0);
     dpc_init_percpu();
     smp_complete_init();
+    percpu_obj_init();
 
     srat_init();
     slit_init();
@@ -105,8 +107,6 @@ __no_sanitize_address void k_main(void) {
     bootstage_advance(BOOTSTAGE_MID_ALLOCATORS);
 
     scheduler_yield();
-
-    k_panic("unreachable!\n");
 }
 
 void k_sch_main() {

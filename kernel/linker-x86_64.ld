@@ -77,6 +77,12 @@ SECTIONS {
         __ekernel_slab_sizes = .;
     }
 
+    .kernel_percpu_desc : {
+        __skernel_percpu_desc = .;
+        KEEP(*(.kernel_percpu_desc))
+        __ekernel_percpu_desc = .;
+    }
+
     .bss : ALIGN(4K) {
         __sbss = .;
         *(.bss .bss.*)
