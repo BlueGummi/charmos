@@ -1,23 +1,28 @@
 #include "internal.h"
 #include <string.h>
 
-static enum wake_reason worker_wait(struct workqueue *queue, struct worker *w,
+static enum wake_reason worker_wait(struct workqueue *wq, struct worker *w,
                                     enum irql irql, enum irql *out) {
-    enum wake_reason signal;
+    enum wake_reason sig;
 
-    atomic_fetch_add(&queue->idle_workers, 1);
+    atomic_fetch_add(&wq->idle_workers, 1);
 
-    if (w->timeout_ran && !w->is_permanent) {
-        signal = condvar_wait_timeout(&queue->queue_cv, &queue->lock,
-                                      w->inactivity_check_period, irql, out);
-        w->timeout_ran = false;
+    /* Do not garbage collect workers, just wait... */
+    if (wq->attrs.flags & WORKQUEUE_FLAG_NO_WORKER_GC) {
+        sig = condvar_wait(&wq->queue_cv, &wq->lock, irql, out);
     } else {
-        signal = condvar_wait(&queue->queue_cv, &queue->lock, irql, out);
+        if (w->timeout_ran && !w->is_permanent) {
+            sig = condvar_wait_timeout(&wq->queue_cv, &wq->lock,
+                                       w->inactivity_check_period, irql, out);
+            w->timeout_ran = false;
+        } else {
+            sig = condvar_wait(&wq->queue_cv, &wq->lock, irql, out);
+        }
     }
 
-    atomic_fetch_sub(&queue->idle_workers, 1);
+    atomic_fetch_sub(&wq->idle_workers, 1);
 
-    if (signal == WAKE_REASON_TIMEOUT && !ignore_timeouts(queue)) {
+    if (sig == WAKE_REASON_TIMEOUT && !ignore_timeouts(wq)) {
         w->timeout_ran = true;
         if (!w->idle) {
             w->idle = true;
@@ -25,7 +30,7 @@ static enum wake_reason worker_wait(struct workqueue *queue, struct worker *w,
         }
     }
 
-    return signal;
+    return sig;
 }
 
 static inline bool worker_should_exit(const struct worker *worker,
@@ -64,7 +69,8 @@ static void worker_destroy(struct workqueue *queue, struct worker *worker) {
 
         if (!found)
             k_panic("Potential corrupted worker 0x%lx in STATIC_WORKERS "
-                    "workqueue\n", worker);
+                    "workqueue\n",
+                    worker);
 
         workqueue_worker_array_unlock(queue, irql);
     } else {

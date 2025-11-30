@@ -39,7 +39,7 @@ static struct workqueue *find_optimal_domain_wq(void) {
 
     size_t least_loaded = WORKQUEUE_NUM_WORKS(optimal);
 
-    domain_for_each_local(pos) {
+    domain_for_each_core_local(pos) {
         struct workqueue *queue = global.workqueues[pos->id];
         size_t load = WORKQUEUE_NUM_WORKS(queue);
 
@@ -99,6 +99,10 @@ struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
         goto err;
 
     spinlock_init(&wq->lock);
+
+    if (attrs->worker_cpu_mask.nbits == 0)
+        k_panic("please set a CPU mask before creating the workqueue\n");
+
     wq->attrs = *attrs;
 
     size = sizeof(struct work) * attrs->capacity;
@@ -244,9 +248,9 @@ struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue,
     struct thread *thread;
 
     if (WORKQUEUE_FLAG_SET(queue, WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS)) {
-        thread = worker_create_unmigratable();
+        thread = worker_create_unmigratable(queue->attrs.worker_cpu_mask);
     } else {
-        thread = worker_create();
+        thread = worker_create(queue->attrs.worker_cpu_mask);
     }
 
     if (!thread)
@@ -259,7 +263,7 @@ struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue,
     INIT_LIST_HEAD(&worker->list_node);
 
     worker->is_permanent = true;
-    worker->inactivity_check_period = queue->attrs.inactive_check_period.max;
+    worker->inactivity_check_period = queue->attrs.idle_check.max;
     worker->workqueue = queue;
 
     workqueue_link_thread_and_worker(worker, thread);
@@ -285,18 +289,24 @@ void workqueues_permanent_init(void) {
 
     for (int64_t i = 0; i < num_workqueues; i++) {
 
+        struct cpu_mask mask;
+        if (!cpu_mask_init(&mask, global.core_count))
+            k_panic("Failed to initialize CPU mask\n");
+
+        cpu_mask_set(&mask, i);
+
         struct workqueue_attributes attrs = {
             .capacity = WORKQUEUE_DEFAULT_CAPACITY,
             .max_workers = WORKQUEUE_DEFAULT_MAX_WORKERS,
             .spawn_delay = WORKQUEUE_DEFAULT_SPAWN_DELAY,
 
-            .inactive_check_period.min =
-                WORKQUEUE_DEFAULT_MIN_INACTIVE_CHECK_PERIOD,
-            .inactive_check_period.max =
-                WORKQUEUE_DEFAULT_MAX_INACTIVE_CHECK_PERIOD,
+            .idle_check.min = WORKQUEUE_DEFAULT_MIN_IDLE_CHECK,
+            .idle_check.max = WORKQUEUE_DEFAULT_MAX_IDLE_CHECK,
 
             .flags = WORKQUEUE_FLAG_PERMANENT | WORKQUEUE_FLAG_AUTO_SPAWN |
-                     WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS,
+                     WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS |
+                     WORKQUEUE_FLAG_NO_WORKER_GC,
+            .worker_cpu_mask = mask,
         };
 
         global.workqueues[i] = workqueue_create_internal(

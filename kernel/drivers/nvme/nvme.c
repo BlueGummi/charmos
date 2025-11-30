@@ -125,19 +125,26 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme->work.args = WORK_ARGS(nvme, NULL);
     nvme->work.func = nvme_work;
 
+    struct cpu_mask mask;
+    if (!cpu_mask_init(&mask, global.core_count))
+        k_panic("Could not initialize CPU mask\n");
+
+    cpu_mask_set_all(&mask);
+
     struct workqueue_attributes attrs = {
         .capacity = 64, /* small, oneshots are rare */
-        .inactive_check_period =
+        .idle_check =
             {
-                .max = WORKQUEUE_DEFAULT_MAX_INACTIVE_CHECK_PERIOD,
-                .min = WORKQUEUE_DEFAULT_MIN_INACTIVE_CHECK_PERIOD,
+                .max = WORKQUEUE_DEFAULT_MAX_IDLE_CHECK,
+                .min = WORKQUEUE_DEFAULT_MIN_IDLE_CHECK,
             },
         .max_workers = 1,
         .spawn_delay = WORKQUEUE_DEFAULT_SPAWN_DELAY,
-        .flags = WORKQUEUE_FLAG_DEFAULTS,
+        .flags = WORKQUEUE_FLAG_DEFAULTS | WORKQUEUE_FLAG_NO_WORKER_GC,
+        .worker_cpu_mask = mask,
     };
 
-    nvme->workqueue = workqueue_create(&attrs, /* fmt = */ NULL);
+    nvme->workqueue = workqueue_create(&attrs, "nvme_wq");
     if (!nvme->workqueue)
         k_panic("Could not allocate workqueue\n");
 

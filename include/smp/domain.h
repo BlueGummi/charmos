@@ -11,6 +11,8 @@ struct domain {
     size_t num_cores;
     struct core **cores;
     struct numa_node *associated_node;
+    struct workqueue *rcu_wq;
+    struct slab_domain *slab_domain;
 };
 
 static inline struct domain *domain_local(void) {
@@ -26,8 +28,13 @@ struct cpu_mask *domain_create_cpu_mask(struct domain *domain);
 void domain_set_cpu_mask(struct cpu_mask *mask, struct domain *domain);
 bool domain_idle(struct domain *domain);
 
-#define domain_for_each(__dom, __pos)                                         \
+#define domain_for_each_domain(__dom)                                          \
+    for (size_t __i = 0;                                                       \
+         (__dom = global.domains[__i]), (__i < global.domain_count); __i++)
+
+#define domain_for_each_core(__dom, __pos)                                     \
     for (size_t __i = 0;                                                       \
          (__pos = __dom->cores[__i]), (__i < __dom->num_cores); __i++)
 
-#define domain_for_each_local(__pos) domain_for_each(smp_core()->domain, __pos)
+#define domain_for_each_core_local(__pos)                                      \
+    domain_for_each_core(smp_core()->domain, __pos)

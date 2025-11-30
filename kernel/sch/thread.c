@@ -193,6 +193,7 @@ static struct thread *thread_init(struct thread *thread,
     INIT_LIST_HEAD(&thread->apc_head[0]);
     INIT_LIST_HEAD(&thread->apc_head[1]);
     INIT_LIST_HEAD(&thread->list_node);
+    INIT_LIST_HEAD(&thread->rcu_list_node);
     return thread;
 }
 

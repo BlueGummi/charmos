@@ -1,6 +1,7 @@
 /* @title: Linked list */
 #pragma once
 #include <compiler.h>
+#include <containerof.h>
 #include <stddef.h>
 
 struct list_head {

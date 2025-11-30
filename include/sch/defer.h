@@ -2,12 +2,12 @@
 #pragma once
 
 #include <mem/alloc.h>
-#include <structures/list.h>
 #include <sch/thread_request.h>
 #include <smp/topology.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <structures/list.h>
 #include <sync/condvar.h>
 #include <sync/spinlock.h>
 #include <types/refcount.h>
@@ -151,13 +151,17 @@ enum workqueue_flags : uint16_t {
                                              * but shouldn't be used everywhere
                                              * because it can waste memory */
 
+    WORKQUEUE_FLAG_NO_WORKER_GC = 1 << 7, /* Do not timeout workers */
+
     WORKQUEUE_FLAG_NO_AUTO_SPAWN = 0,      /* Do not auto spawn workers */
     WORKQUEUE_FLAG_MIGRATABLE_WORKERS = 0, /* Allow migratable workers */
     WORKQUEUE_FLAG_ON_DEMAND = 0, /* Inverse of a permanent workqueue */
     WORKQUEUE_FLAG_NAMELESS = 0,
     WORKQUEUE_FLAG_SPAWN_NORMALLY = 0,
+    WORKQUEUE_FLAG_NON_STATIC_WORKERS = 0,
+    WORKQUEUE_FLAG_WORKER_GC = 0,
 
-    WORKQUEUE_FLAG_DEFAULTS = WORKQUEUE_FLAG_AUTO_SPAWN,
+    WORKQUEUE_FLAG_DEFAULTS = WORKQUEUE_FLAG_AUTO_SPAWN | WORKQUEUE_FLAG_NAMED,
 };
 #define WORKQUEUE_FLAG_SET(q, f) (q->attrs.flags |= f)
 #define WORKQUEUE_FLAG_UNSET(q, f) (q->attrs.flags &= ~f)
@@ -180,7 +184,7 @@ struct workqueue_attributes {
     struct {
         uint64_t min;
         uint64_t max;
-    } inactive_check_period;
+    } idle_check;
 
     enum workqueue_flags flags;
     struct cpu_mask worker_cpu_mask;
@@ -189,8 +193,8 @@ struct workqueue_attributes {
 #define WORKQUEUE_DEFAULT_CAPACITY 512
 #define WORKQUEUE_DEFAULT_MAX_WORKERS 16
 #define WORKQUEUE_DEFAULT_SPAWN_DELAY 150
-#define WORKQUEUE_DEFAULT_MIN_INACTIVE_CHECK_PERIOD SECONDS_TO_MS(2)
-#define WORKQUEUE_DEFAULT_MAX_INACTIVE_CHECK_PERIOD SECONDS_TO_MS(40)
+#define WORKQUEUE_DEFAULT_MIN_IDLE_CHECK SECONDS_TO_MS(2)
+#define WORKQUEUE_DEFAULT_MAX_IDLE_CHECK SECONDS_TO_MS(40)
 
 struct workqueue {
     char *name;
@@ -288,8 +292,8 @@ enum workqueue_error workqueue_add_fast(struct work *work);
 
 void work_execute(struct work *task);
 bool workqueue_should_spawn_worker(struct workqueue *queue);
-struct thread *worker_create(void);
-struct thread *worker_create_unmigratable();
+struct thread *worker_create(struct cpu_mask mask);
+struct thread *worker_create_unmigratable(struct cpu_mask mask);
 struct worklist *worklist_create(enum worklist_flags);
 void worklist_free(struct worklist *wlist);
 

@@ -1,13 +1,13 @@
 #include "internal.h"
 
-_Static_assert(WORKQUEUE_DEFAULT_MAX_INACTIVE_CHECK_PERIOD / 4 >
-                   WORKQUEUE_DEFAULT_MIN_INACTIVE_CHECK_PERIOD,
+_Static_assert(WORKQUEUE_DEFAULT_MAX_IDLE_CHECK / 4 >
+                   WORKQUEUE_DEFAULT_MIN_IDLE_CHECK,
                "");
 
 static time_t get_inactivity_timeout(struct workqueue *queue) {
     uint32_t num_workers = atomic_load(&queue->num_workers);
-    size_t min = queue->attrs.inactive_check_period.min;
-    size_t max = queue->attrs.inactive_check_period.max;
+    size_t min = queue->attrs.idle_check.min;
+    size_t max = queue->attrs.idle_check.max;
 
     if (num_workers <= (queue->attrs.max_workers / 8))
         return max;
@@ -55,9 +55,9 @@ static void worker_init(struct workqueue *queue, struct worker *w,
 
 static struct thread *workqueue_worker_thread_create(struct workqueue *queue) {
     if (WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS))
-        return worker_create_unmigratable();
+        return worker_create_unmigratable(queue->attrs.worker_cpu_mask);
     else
-        return worker_create();
+        return worker_create(queue->attrs.worker_cpu_mask);
 }
 
 static void workqueue_enqueue_thread(struct workqueue *queue,
@@ -185,13 +185,18 @@ bool workqueue_try_spawn_worker(struct workqueue *queue) {
     return workqueue_spawn_worker_internal(queue);
 }
 
-struct thread *worker_create(void) {
+struct thread *worker_create(struct cpu_mask mask) {
     uint64_t stack_size = PAGE_SIZE;
-    return thread_create_custom_stack("workqueue_worker", worker_main,
-                                      stack_size);
+    struct thread *ret =
+        thread_create_custom_stack("workqueue_worker", worker_main, stack_size);
+    if (!ret)
+        return NULL;
+
+    ret->allowed_cpus = mask;
+    return ret;
 }
 
-struct thread *worker_create_unmigratable() {
+struct thread *worker_create_unmigratable(struct cpu_mask mask) {
     uint64_t stack_size = PAGE_SIZE;
     struct thread *t =
         thread_create_custom_stack("workqueue_worker", worker_main, stack_size);
@@ -199,5 +204,6 @@ struct thread *worker_create_unmigratable() {
         return NULL;
 
     thread_set_flags(t, THREAD_FLAGS_NO_STEAL);
+    t->allowed_cpus = mask;
     return t;
 }

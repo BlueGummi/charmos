@@ -38,7 +38,6 @@ struct charmos_globals {
 
     size_t domain_count;
     struct domain **domains;
-    struct slab_domain **slab_domains;
     struct domain_buddy *domain_buddies;
     struct page *page_array;
     struct free_area buddy_free_area[MAX_ORDER];
@@ -59,9 +58,6 @@ struct charmos_globals {
 
     /* Per core workqueues */
     struct workqueue **workqueues;
-
-    /* Big ol' global one */
-    struct workqueue *system_workqueue;
 
     struct turnstile_hash_table *turnstiles;
 

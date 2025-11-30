@@ -114,17 +114,24 @@ void defer_init(void) {
     if (!defer_queues)
         k_panic("Defer queue allocation failed!\n");
 
+    struct cpu_mask mask;
+    if (!cpu_mask_init(&mask, global.core_count))
+        k_panic("workqueue creation failed\n");
+
+    cpu_mask_set_all(&mask);
     struct workqueue_attributes attrs = {
         .capacity = WORKQUEUE_DEFAULT_CAPACITY,
-        .flags = WORKQUEUE_FLAG_ON_DEMAND | WORKQUEUE_FLAG_MIGRATABLE_WORKERS,
+        .flags = WORKQUEUE_FLAG_ON_DEMAND | WORKQUEUE_FLAG_MIGRATABLE_WORKERS |
+                 WORKQUEUE_FLAG_NO_WORKER_GC,
         .max_workers = 1,
         .min_workers = 1,
-        .inactive_check_period =
+        .idle_check =
             {
-                .min = WORKQUEUE_DEFAULT_MIN_INACTIVE_CHECK_PERIOD,
-                .max = WORKQUEUE_DEFAULT_MAX_INACTIVE_CHECK_PERIOD,
+                .min = WORKQUEUE_DEFAULT_MIN_IDLE_CHECK,
+                .max = WORKQUEUE_DEFAULT_MAX_IDLE_CHECK,
             },
         .spawn_delay = WORKQUEUE_DEFAULT_SPAWN_DELAY,
+        .worker_cpu_mask = mask,
     };
     defer_workqueue = workqueue_create(&attrs, /* fmt = */ NULL);
 
@@ -135,7 +142,8 @@ void defer_init(void) {
         defer_queues[i].next_fire_time = UINT64_MAX;
         defer_queues[i].timer = i;
         workqueue_enqueue(defer_workqueue, &defer_queues[i].work);
-        semaphore_init(&defer_queues[i].semaphore, 0, SEMAPHORE_INIT_IRQ_DISABLE);
+        semaphore_init(&defer_queues[i].semaphore, 0,
+                       SEMAPHORE_INIT_IRQ_DISABLE);
         spinlock_init(&defer_queues[i].lock);
 
         uint8_t vector = irq_alloc_entry();

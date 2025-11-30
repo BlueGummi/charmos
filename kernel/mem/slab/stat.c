@@ -32,5 +32,5 @@ void slab_domain_bucket_print(const struct slab_domain_bucket *bucket) {
 
 void slab_domains_print() {
     for (size_t i = 0; i < global.domain_count; i++)
-        slab_domain_bucket_print(&global.slab_domains[i]->aggregate);
+        slab_domain_bucket_print(&global.domains[i]->slab_domain->aggregate);
 }

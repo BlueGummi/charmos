@@ -82,14 +82,21 @@ static void enqueue_thread(void) {
 }
 
 REGISTER_TEST(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    struct cpu_mask mask;
+    if (!cpu_mask_init(&mask, global.core_count))
+        k_panic("OOM\n");
+
+    cpu_mask_set_all(&mask);
+
     struct workqueue_attributes attrs = {
         .capacity = WQ_2_TIMES,
         .flags = WORKQUEUE_FLAG_AUTO_SPAWN | WORKQUEUE_FLAG_ON_DEMAND,
         .spawn_delay = 1,
-        .inactive_check_period.max = 10000,
-        .inactive_check_period.min = 2000,
+        .idle_check.max = 10000,
+        .idle_check.min = 2000,
         .min_workers = 2,
         .max_workers = 64,
+        .worker_cpu_mask = mask,
     };
 
     wq = workqueue_create(&attrs, /* fmt = */ NULL);

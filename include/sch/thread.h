@@ -206,6 +206,7 @@ struct thread {
     /* Nodes */
     struct rbt_node tree_node;
     struct list_head list_node;
+    struct list_head rcu_list_node;
     struct pairing_node pairing_node;
 
     /* State */
@@ -292,7 +293,6 @@ struct thread {
     atomic_bool rcu_blocked;           /* task was queued as blocked for GP */
     uint64_t rcu_start_gen;
     uint64_t rcu_blocked_gen;
-    struct thread *rcu_next_blocked;   /* blocked-list */
 
     /* ========== APC data ========== */
     bool executing_apc; /* Executing an APC right now? */
@@ -350,6 +350,7 @@ struct thread {
     (container_of(pn, struct thread, pairing_node))
 #define thread_from_rbt_node(node) rbt_entry(node, struct thread, tree_node)
 #define thread_from_list_node(ln) (container_of(ln, struct thread, list_node))
+#define thread_from_rcu_list_node(ln) (container_of(ln, struct thread, rcu_list_node))
 struct thread *thread_create_internal(char *name, void (*entry_point)(void),
                                       size_t stack_size, va_list args);
 

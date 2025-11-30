@@ -26,7 +26,7 @@ void slab_domain_build_locality_lists(struct slab_domain *sdom) {
         struct domain_buddy *bd = zent->domain;
 
         size_t idx = bd - global.domain_buddies;
-        struct slab_domain *remote_sdom = global.slab_domains[idx];
+        struct slab_domain *remote_sdom = global.domains[idx]->slab_domain;
 
         sdom->pageable_zonelist.entries[i] = (struct slab_cache_ref) {
             .caches = remote_sdom->local_pageable_cache,
@@ -77,7 +77,7 @@ void slab_domain_init_caches(struct slab_domain *dom) {
     for (size_t j = 0; j < dom->domain->num_cores; j++)
         dom->domain->cores[j]->slab_domain = dom;
 
-    global.slab_domains[dom->domain->id] = dom;
+    global.domains[dom->domain->id]->slab_domain = dom;
 }
 
 static size_t slab_bucket_reset(struct stat_bucket *bucket) {
@@ -126,10 +126,6 @@ void slab_domain_init_stats(struct slab_domain *domain) {
 }
 
 void slab_domain_init(void) {
-    global.slab_domains =
-        kzalloc(sizeof(struct slab_domain *) * global.domain_count);
-    if (!global.slab_domains)
-        k_panic("Failed to allocate global slab domain array\n");
 
     for (size_t i = 0; i < global.domain_count; i++) {
         struct domain *domain = global.domains[i];
@@ -147,12 +143,12 @@ void slab_domain_init(void) {
     }
 
     for (size_t i = 0; i < global.domain_count; i++)
-        slab_domain_build_locality_lists(global.slab_domains[i]);
+        slab_domain_build_locality_lists(global.domains[i]->slab_domain);
 }
 
 void slab_domain_init_late() {
     for (size_t i = 0; i < global.domain_count; i++) {
-        struct slab_domain *sd = global.slab_domains[i];
+        struct slab_domain *sd = global.domains[i]->slab_domain;
         slab_domain_init_workqueue(sd);
         slab_domain_init_daemon(sd);
     }

@@ -818,7 +818,7 @@ struct slab_cache *slab_search_for_cache(struct slab_domain *dom,
     struct domain *d = domain_alloc_pick_best_domain(dom->domain, /*pages=*/1,
                                                      search_distance, flexible);
 
-    struct slab_domain *sd = global.slab_domains[d->id];
+    struct slab_domain *sd = global.domains[d->id]->slab_domain;
     struct slab_caches *sc =
         pageable ? sd->local_pageable_cache : sd->local_nonpageable_cache;
 
@@ -1044,7 +1044,7 @@ void kfree_pages(void *ptr, size_t size, enum alloc_behavior behavior) {
      * we should flush to domain 0 since that is most likely where
      * the allocation had come from. */
     struct slab_domain *owner = header->domain;
-    owner = owner ? owner : global.slab_domains[0];
+    owner = owner ? owner : global.domains[0]->slab_domain;
 
     /* these pages don't turn into slabs and thus don't get added
      * into the slab caches. instead, we just directly free it to

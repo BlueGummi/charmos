@@ -39,7 +39,11 @@ void slab_domain_init_daemon(struct slab_domain *domain) {
 
 void slab_domain_init_workqueue(struct slab_domain *domain) {
     struct cpu_mask mask = {0};
+    if (!cpu_mask_init(&mask, global.core_count))
+        k_panic("CPU mask initialization failed\n");
+
     domain_set_cpu_mask(&mask, domain->domain);
+
     struct workqueue_attributes attrs = {
         .capacity = WORKQUEUE_DEFAULT_CAPACITY,
 
@@ -47,7 +51,8 @@ void slab_domain_init_workqueue(struct slab_domain *domain) {
          * here since if those weren't set the dynamic memory allocation
          * could potentially spiral into bigger problems... */
         .flags = WORKQUEUE_FLAG_DEFAULTS | WORKQUEUE_FLAG_STATIC_WORKERS |
-                 WORKQUEUE_FLAG_SPAWN_VIA_REQUEST | WORKQUEUE_FLAG_NAMED,
+                 WORKQUEUE_FLAG_SPAWN_VIA_REQUEST | WORKQUEUE_FLAG_NAMED |
+                 WORKQUEUE_FLAG_NO_WORKER_GC,
         .max_workers = domain->domain->num_cores,
         .min_workers = 1,
         .spawn_delay = WORKQUEUE_DEFAULT_SPAWN_DELAY,

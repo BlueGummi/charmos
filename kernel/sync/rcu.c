@@ -1,4 +1,5 @@
 #include <mem/alloc.h>
+#include <sch/defer.h>
 #include <sch/thread.h>
 #include <smp/core.h>
 #include <stdatomic.h>
@@ -6,26 +7,17 @@
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
 
-#define RCU_BUCKETS 2
-
 static struct semaphore rcu_sem;
-static struct thread *rcu_thread;
-static atomic_bool rcu_thread_running = ATOMIC_VAR_INIT(false);
+static LIST_HEAD(rcu_thread_list);
 static struct spinlock rcu_blocked_lock = SPINLOCK_INIT;
-static struct thread *rcu_blocked_list = NULL;
-
-struct rcu_cb {
-    struct rcu_cb *next;
-    void (*func)(void *);
-    void *arg;
-};
 
 /* bucketed callback lists (head is singly-linked list) */
 static struct {
     struct spinlock lock;
-    struct rcu_cb *head;
+    struct list_head list;
 } rcu_buckets[RCU_BUCKETS];
 
+/* power-of-two ring capacity */
 void rcu_worker_notify() {
     semaphore_post(&rcu_sem);
 }
@@ -33,25 +25,14 @@ void rcu_worker_notify() {
 void rcu_blocked_enqueue(struct thread *t, uint64_t gen) {
     t->rcu_blocked_gen = gen;
     enum irql irql = spin_lock_irq_disable(&rcu_blocked_lock);
-    t->rcu_next_blocked = rcu_blocked_list;
-    rcu_blocked_list = t;
+    list_add_tail(&t->rcu_list_node, &rcu_thread_list);
     spin_unlock(&rcu_blocked_lock, irql);
 }
 
-bool rcu_blocked_remove(struct thread *t) {
+void rcu_blocked_remove(struct thread *t) {
     enum irql irql = spin_lock_irq_disable(&rcu_blocked_lock);
-    struct thread **pp = &rcu_blocked_list;
-    while (*pp) {
-        if (*pp == t) {
-            *pp = t->rcu_next_blocked;
-            t->rcu_next_blocked = NULL;
-            spin_unlock(&rcu_blocked_lock, irql);
-            return true;
-        }
-        pp = &(*pp)->rcu_next_blocked;
-    }
+    list_del_init(&t->rcu_list_node);
     spin_unlock(&rcu_blocked_lock, irql);
-    return false;
 }
 
 void rcu_note_context_switch_out(struct thread *old) {
@@ -121,25 +102,14 @@ void rcu_maintenance_tick(void) {
 
 void rcu_read_lock(void) {
     struct thread *t = scheduler_get_current_thread();
-    if (!t) {
-        /* non-thread (boot/irq) path: nothing to do, assume quiescent handled
-         * elsewhere */
-        return;
-    }
-
-    if (atomic_fetch_add(&t->rcu_nesting, 1) == 0) {
+    if (atomic_fetch_add(&t->rcu_nesting, 1) == 0)
         t->rcu_start_gen = atomic_load(&global.rcu_gen);
-    }
+
     smp_mb(); /* prevent compiler reorder of loads/stores in critical section */
 }
 
 void rcu_read_unlock(void) {
     struct thread *t = scheduler_get_current_thread();
-    if (!t) {
-        k_panic("rcu_unlock without thread\n");
-        return;
-    }
-
     smp_mb(); /* pair with entry barrier */
 
     unsigned old =
@@ -158,9 +128,7 @@ void rcu_read_unlock(void) {
            clear the flag and remove from blocked list; wake GP worker. */
         if (atomic_exchange_explicit(&t->rcu_blocked, false,
                                      memory_order_acq_rel)) {
-            bool removed = rcu_blocked_remove(t);
-            (void) removed; /* OK if already removed by worker; we just ensure
-                               consistency */
+            rcu_blocked_remove(t);
             semaphore_post(&rcu_sem);
         }
     }
@@ -170,7 +138,7 @@ bool rcu_work_pending(void) {
     for (int i = 0; i < RCU_BUCKETS; ++i) {
         /* fast-check: read head without acquiring the lock.
            It's OK if this races: we'll re-check under lock in worker. */
-        if (rcu_buckets[i].head)
+        if (!list_empty(&rcu_buckets[i].list))
             return true;
     }
     return false;
@@ -188,116 +156,156 @@ void rcu_call(void (*func)(void *), void *arg) {
 
     cb->func = func;
     cb->arg = arg;
+    INIT_LIST_HEAD(&cb->list);
 
-    int bucket = (atomic_load(&global.rcu_gen) + 1) & (RCU_BUCKETS - 1);
+    size_t bucket = (atomic_load(&global.rcu_gen) + 1) & (RCU_BUCKETS - 1);
 
     enum irql irql = spin_lock(&rcu_buckets[bucket].lock);
-    cb->next = rcu_buckets[bucket].head;
-    rcu_buckets[bucket].head = cb;
+    list_add_tail(&cb->list, &rcu_buckets[bucket].list);
     spin_unlock(&rcu_buckets[bucket].lock, irql);
 
     semaphore_post(&rcu_sem);
 }
 
 /* internal: detach and return head under lock for a given bucket */
-static struct rcu_cb *rcu_detach_bucket(int bucket) {
-    struct rcu_cb *head;
+static void rcu_detach_bucket(size_t bucket, struct list_head *lh) {
     enum irql irql = spin_lock(&rcu_buckets[bucket].lock);
-    head = rcu_buckets[bucket].head;
-    rcu_buckets[bucket].head = NULL;
 
+    INIT_LIST_HEAD(lh);
+    if (!list_empty(&rcu_buckets[bucket].list)) {
+        lh->next = rcu_buckets[bucket].list.next;
+        lh->prev = rcu_buckets[bucket].list.prev;
+        lh->next->prev = lh;
+        lh->prev->next = lh;
+    }
+
+    INIT_LIST_HEAD(&rcu_buckets[bucket].list);
     spin_unlock(&rcu_buckets[bucket].lock, irql);
-    return head;
+}
+
+static void rcu_exec_callbacks(uint64_t target) {
+    /* Now safe to run callbacks for older bucket */
+    int old_bucket = (target - 1) & (RCU_BUCKETS - 1);
+    struct list_head lh;
+    rcu_detach_bucket(old_bucket, &lh);
+
+    struct rcu_cb *iter, *tmp;
+
+    list_for_each_entry_safe(iter, tmp, &lh, list) {
+        iter->func(iter->arg);
+        list_del(&iter->list);
+        kfree(iter);
+    }
+}
+
+static uint64_t rcu_advance_gp() {
+    uint64_t start = atomic_load(&global.rcu_gen);
+    uint64_t target = start + 1;
+    atomic_store(&global.rcu_gen, target);
+    return target;
+}
+
+/* check cores */
+static bool rcu_all_cores_seen_gp(uint64_t target) {
+    for (size_t i = 0; i < global.core_count; i++) {
+        struct core *c = global.cores[i];
+        uint64_t seen =
+            atomic_load_explicit(&c->rcu_seen_gen, memory_order_acquire);
+        if (seen < target)
+            return false;
+    }
+    return true;
+}
+
+static void rcu_remove_quiescent_thread(struct thread *t) {
+    /* thread is quiescent, remove it from list */
+    list_del_init(&t->rcu_list_node);
+    atomic_store_explicit(&t->rcu_blocked, false, memory_order_release);
+}
+
+static inline bool thread_rcu_not_reached_target(struct thread *t,
+                                                 uint64_t target) {
+    return atomic_load_explicit(&t->rcu_nesting, memory_order_acquire) != 0 ||
+           atomic_load_explicit(&t->rcu_seen_gen, memory_order_acquire) <
+               target;
 }
 
 static void rcu_gp_worker(void) {
-    atomic_store_explicit(&rcu_thread_running, true, memory_order_release);
-
     while (true) {
         semaphore_wait(&rcu_sem);
 
         /* new GP */
-        uint64_t start = atomic_load(&global.rcu_gen);
-        uint64_t target = start + 1;
-        atomic_store(&global.rcu_gen, target);
+        uint64_t target = rcu_advance_gp();
 
-        for (;;) {
-            bool all_cores = true;
+        while (true) {
+            bool all_cores = rcu_all_cores_seen_gp(target);
             bool all_blocked = true;
-
-            /* check cores */
-            for (unsigned i = 0; i < global.core_count; ++i) {
-                struct core *c = global.cores[i];
-                uint64_t seen = atomic_load_explicit(&c->rcu_seen_gen,
-                                                     memory_order_acquire);
-                if (seen < target) {
-                    all_cores = false;
-                    break;
-                }
-            }
 
             /* check blocked threads list under lock */
             enum irql irql = spin_lock_irq_disable(&rcu_blocked_lock);
-            struct thread **pp = &rcu_blocked_list;
-            while (*pp) {
-                struct thread *t = *pp;
 
-                unsigned nest =
-                    atomic_load_explicit(&t->rcu_nesting, memory_order_acquire);
-                uint64_t seen = atomic_load_explicit(&t->rcu_seen_gen,
-                                                     memory_order_acquire);
+            struct thread *t, *tmp;
+            list_for_each_entry_safe(t, tmp, &rcu_thread_list, rcu_list_node) {
 
-                /* if thread is still in RCU read-side, or hasn't published the
-                   target gen, we cannot finish yet. */
-                if (nest != 0 || seen < target) {
-                    /* keep thread in list for next round */
+                if (thread_rcu_not_reached_target(t, target)) {
                     all_blocked = false;
-                    pp = &t->rcu_next_blocked;
-                } else {
-                    /* thread is quiescent for target; remove from list now */
-                    *pp = t->rcu_next_blocked;
-                    t->rcu_next_blocked = NULL;
-                    /* also try to clear the rcu_blocked flag (might already be
-                     * false) */
-                    atomic_store_explicit(&t->rcu_blocked, false,
-                                          memory_order_release);
-                    /* continue scanning at same pp (already updated) */
+                    continue;
                 }
+
+                rcu_remove_quiescent_thread(t);
             }
+
             spin_unlock(&rcu_blocked_lock, irql);
 
             if (all_cores && all_blocked)
                 break;
 
-            /* avoid busy spinning: yield briefly, then sleep if still long */
             scheduler_yield();
-            /* optional: small delay or semaphore/timed-wait scheme for
-             * efficiency */
         }
 
-        /* Now safe to run callbacks for older bucket */
-        int old_bucket = (target - 1) & (RCU_BUCKETS - 1);
-        struct rcu_cb *cb = rcu_detach_bucket(old_bucket);
-
-        while (cb) {
-            struct rcu_cb *next = cb->next;
-            cb->func(cb->arg);
-            kfree(cb);
-            cb = next;
-        }
+        rcu_exec_callbacks(target);
     }
-
-    atomic_store_explicit(&rcu_thread_running, false, memory_order_release);
 }
 
-/* Initialize the RCU worker; call early at kernel init */
+struct workqueue *rcu_create_workqueue_for_domain(struct domain *domain) {
+    struct cpu_mask mask;
+    if (!cpu_mask_init(&mask, global.core_count))
+        k_panic("CPU mask init failed\n");
+
+    domain_set_cpu_mask(&mask, domain);
+    struct workqueue_attributes attrs = {
+        .capacity = WORKQUEUE_DEFAULT_CAPACITY,
+        .min_workers = 1,
+        .max_workers = domain->num_cores,
+        .idle_check =
+            {
+                .min = WORKQUEUE_DEFAULT_MIN_IDLE_CHECK,
+                .max = WORKQUEUE_DEFAULT_MAX_IDLE_CHECK,
+            },
+        .spawn_delay = WORKQUEUE_DEFAULT_SPAWN_DELAY,
+        .worker_cpu_mask = mask,
+        .flags = WORKQUEUE_FLAG_AUTO_SPAWN | WORKQUEUE_FLAG_NAMED |
+                 WORKQUEUE_FLAG_MIGRATABLE_WORKERS |
+                 WORKQUEUE_FLAG_STATIC_WORKERS,
+    };
+
+    return workqueue_create(&attrs, "rcu_domain_%zu_workqueue", domain->id);
+}
+
+/* we initialize per-domain RCU queues */
 void rcu_init(void) {
-    for (int i = 0; i < RCU_BUCKETS; ++i) {
+    for (int i = 0; i < RCU_BUCKETS; i++) {
         spinlock_init(&rcu_buckets[i].lock);
-        rcu_buckets[i].head = NULL;
+        INIT_LIST_HEAD(&rcu_buckets[i].list);
     }
     semaphore_init(&rcu_sem, 0, SEMAPHORE_INIT_NORMAL);
 
     /* create worker thread */
-    rcu_thread = thread_spawn("rcu_gp", rcu_gp_worker);
+    thread_spawn("rcu_gp", rcu_gp_worker);
+    struct domain *iter;
+    domain_for_each_domain(iter) {
+        iter->rcu_wq = rcu_create_workqueue_for_domain(iter);
+        if (!iter->rcu_wq)
+            k_panic("OOM\n");
+    }
 }
