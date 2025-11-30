@@ -253,6 +253,7 @@ void turnstile_wake(struct turnstile *ts, size_t queue, size_t num_threads,
         thread_wake_manual(to_wake);
     }
 
+    ts->inheritor = NULL;
     turnstile_hash_chain_unlock(chain, lock_irql);
 }
 
@@ -384,4 +385,13 @@ size_t turnstile_get_waiter_count(void *lock_obj) {
         count = ts->waiters;
 
     return count;
+}
+
+void turnstile_set_inheritor(void *lobj, struct thread *t) {
+    enum irql chain_lock;
+    struct turnstile *ts;
+    if ((ts = turnstile_lookup(lobj, &chain_lock)))
+        ts->inheritor = t;
+
+    turnstile_unlock(lobj, chain_lock);
 }

@@ -67,3 +67,4 @@ void turnstile_wake(struct turnstile *ts, size_t queue, size_t num_threads,
                     enum irql lock_irql);
 size_t turnstile_get_waiter_count(void *lock_obj);
 int32_t turnstile_thread_priority(struct thread *t);
+void turnstile_set_inheritor(void *lobj, struct thread *t);

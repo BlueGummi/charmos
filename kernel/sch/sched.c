@@ -225,6 +225,8 @@ static void change_timeslice(struct scheduler *sched, struct thread *next) {
         thread_get_state(next) != THREAD_STATE_IDLE_THREAD) {
         /* Timesharing threads need timeslices */
         change_tick_duration(next->timeslice_length_raw_ms);
+    } else {
+        tick_disable();
     }
 }
 

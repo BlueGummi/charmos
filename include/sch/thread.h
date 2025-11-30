@@ -130,7 +130,7 @@ enum wake_reason {
 #define THREAD_PRIO_HAS_TIMESLICE(prio)                                        \
     (THREAD_PRIO_IS_TIMESHARING(prio) || prio == THREAD_PRIO_CLASS_BACKGROUND)
 
-#define THREAD_ACTIVITY_BUCKET_COUNT 8
+#define THREAD_ACTIVITY_BUCKET_COUNT 4
 #define THREAD_ACTIVITY_BUCKET_DURATION 1000 /* 1 second per bucket */
 #define THREAD_EVENT_RINGBUFFER_CAPACITY THREAD_ACTIVITY_BUCKET_COUNT
 #define TOTAL_BUCKET_DURATION                                                  \

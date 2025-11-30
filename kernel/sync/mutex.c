@@ -200,6 +200,7 @@ void mutex_lock(struct mutex *mutex) {
     /* hey ho! we got the mutex! */
     kassert(mutex_get_owner(mutex) == current_thread);
     scheduler_unpin_current_thread(flags);
+    turnstile_set_inheritor(mutex, current_thread);
 }
 
 void mutex_unlock(struct mutex *mutex) {
