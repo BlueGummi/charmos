@@ -24,7 +24,8 @@ void scheduler_init(void) {
     if (!global.schedulers)
         k_panic("Could not allocate scheduler pointer array\n");
 
-    for (uint64_t i = 0; i < global.core_count; i++) {
+    size_t i;
+    for_each_cpu_id(i) {
         struct scheduler *s =
             kzalloc(sizeof(struct scheduler), ALLOC_PARAMS_DEFAULT);
         if (!s)

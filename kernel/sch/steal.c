@@ -26,7 +26,8 @@ struct scheduler *scheduler_pick_victim(struct scheduler *self) {
     uint64_t max_thread_count = 0;
     struct scheduler *victim = NULL;
 
-    for (uint64_t i = 0; i < global.core_count; i++) {
+    size_t i;
+    for_each_cpu_id(i) {
         struct scheduler *potential_victim = global.schedulers[i];
 
         /* duh.... */

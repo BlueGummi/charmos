@@ -72,8 +72,9 @@ static void link_parent_groups(struct scheduler_domain *child,
 }
 
 static void map_cpus_to_groups(void) {
-    for (size_t cpu = 0; cpu < global.core_count; cpu++) {
-        struct core *c = global.cores[cpu];
+    struct core *c;
+    for_each_cpu_struct(c) {
+        struct core *c = global.cores[__id];
 
         for (size_t i = 0; i < TOPOLOGY_LEVEL_MAX; i++) {
             struct scheduler_domain *d = global.scheduler_domains[i];
@@ -82,7 +83,7 @@ static void map_cpus_to_groups(void) {
             /* find group for this CPU */
             int found = -1;
             for (size_t g = 0; g < d->ngroups; g++) {
-                if (cpu_mask_test(&d->groups[g].cpus, cpu)) {
+                if (cpu_mask_test(&d->groups[g].cpus, __id)) {
                     found = g;
                     break;
                 }

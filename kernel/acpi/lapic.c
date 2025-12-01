@@ -78,8 +78,9 @@ void x2apic_send_ipi(uint32_t apic_id, uint8_t vector) {
     wrmsr(IA32_X2APIC_ICR, icr);
 }
 
-void broadcast_nmi_except(uint64_t exclude_core) {
-    for (uint64_t i = 0; i < global.core_count; i++) {
+void panic_broadcast(uint64_t exclude_core) {
+    size_t i;
+    for_each_cpu_id(i) {
         if (i == exclude_core)
             continue;
 

@@ -189,7 +189,8 @@ static size_t build_smt_nodes(size_t n_cpus) {
         struct topology_node *node = &smt_nodes[i];
 
         size_t core_index = 0;
-        for (size_t j = 0; j < global.core_count; j++) {
+        size_t j;
+        for_each_cpu_id(j) {
             if (core_nodes[j].core->core_id == c->core_id &&
                 core_nodes[j].core->package_id == c->package_id) {
                 core_index = j;
@@ -658,7 +659,8 @@ struct core *topology_find_idle_core(struct core *local_core,
         }
     }
 
-    for (uint64_t i = 0; i < global.core_count; i++) {
+    size_t i;
+    for_each_cpu_id(i) {
         struct topology_node *smt = &smt_nodes[i];
         if (!cpu_mask_empty(&smt->idle))
             return smt->core;

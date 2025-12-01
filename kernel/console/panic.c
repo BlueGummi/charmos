@@ -26,7 +26,7 @@ void panic_handler(struct panic_regs *regs) {
     k_printf("    [R14]: %016lx  [R15]: %016lx\n\n", regs->r14, regs->r15);
 
     if (global.current_bootstage >= BOOTSTAGE_MID_MP) {
-        broadcast_nmi_except(smp_core_id());
+        panic_broadcast(smp_core_id());
         sleep_ms(50);
     }
 }

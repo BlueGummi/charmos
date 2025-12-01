@@ -65,7 +65,8 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
     uint64_t gen = atomic_fetch_add(&global.next_tlb_gen, 1);
     size_t this_cpu = smp_core_id();
 
-    for (size_t i = 0; i < global.core_count; i++) {
+    size_t i;
+    for_each_cpu_id(i) {
         if (i == this_cpu) {
             invlpg(addr);
             continue;
@@ -100,7 +101,7 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
     if (!synchronous)
         goto out;
 
-    for (size_t i = 0; i < global.core_count; i++) {
+    for_each_cpu_id(i) {
         if (i == this_cpu)
             continue;
         struct tlb_shootdown_cpu *other = &global.shootdown_data[i];

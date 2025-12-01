@@ -208,12 +208,22 @@ static uint64_t rcu_advance_gp() {
 
 /* check cores */
 static bool rcu_all_cores_seen_gp(uint64_t target) {
-    for (size_t i = 0; i < global.core_count; i++) {
-        struct core *c = global.cores[i];
+    struct core *c;
+
+restart:
+    for_each_cpu_struct(c) {
         uint64_t seen =
             atomic_load_explicit(&c->rcu_seen_gen, memory_order_acquire);
-        if (seen < target)
-            return false;
+        if (seen < target) {
+            /* if the other CPU is idle, we send it an IPI and retry.
+             * otherwise, we return false */
+            if (scheduler_core_idle(c) && c != smp_core()) {
+                ipi_send(c->id, IRQ_SCHEDULER);
+                goto restart;
+            } else {
+                return false;
+            }
+        }
     }
     return true;
 }

@@ -96,7 +96,8 @@ bool dpc_enqueue_local(struct dpc *d) {
 void dpc_init_percpu(void) {
     global.dpc_data = kzalloc(sizeof(struct dpc_cpu) * global.core_count,
                               ALLOC_PARAMS_DEFAULT);
-    for (size_t i = 0; i < global.core_count; ++i) {
+    size_t i;
+    for_each_cpu_id(i) {
         atomic_store_explicit(&global.dpc_data[i].head, NULL,
                               memory_order_relaxed);
         atomic_store_explicit(&global.dpc_data[i].dpc_queued, 0,

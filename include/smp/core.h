@@ -73,3 +73,9 @@ static inline struct core *smp_core(void) {
                  : "i"(offsetof(struct core, self)));
     return (struct core *) core;
 }
+
+#define for_each_cpu_struct(__iter)                                            \
+    for (size_t __id = 0;                                                      \
+         ((__iter = global.cores[__id]), __id < global.core_count); __id++)
+
+#define for_each_cpu_id(__id) for (__id = 0; __id < global.core_count; __id++)
