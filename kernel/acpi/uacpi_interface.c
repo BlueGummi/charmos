@@ -78,12 +78,12 @@ void uacpi_kernel_log(uacpi_log_level level, const uacpi_char *data) {
 }
 
 void *uacpi_kernel_alloc(uacpi_size size) {
-    void *ret = kmalloc(size);
+    void *ret = kmalloc(size, ALLOC_PARAMS_DEFAULT);
     return ret;
 }
 
 void uacpi_kernel_free(void *mem) {
-    kfree(mem);
+    kfree(mem, FREE_PARAMS_DEFAULT);
 }
 
 uacpi_status uacpi_kernel_io_map(uacpi_io_addr base, uacpi_size len,
@@ -92,8 +92,8 @@ uacpi_status uacpi_kernel_io_map(uacpi_io_addr base, uacpi_size len,
         return UACPI_STATUS_INVALID_ARGUMENT;
     }
 
-    uacpi_io_handle *handle =
-        (uacpi_io_handle *) kmalloc(sizeof(uacpi_io_handle));
+    uacpi_io_handle *handle = (uacpi_io_handle *) kmalloc(
+        sizeof(uacpi_io_handle), ALLOC_PARAMS_DEFAULT);
     if (!handle) {
         return UACPI_STATUS_INTERNAL_ERROR;
     }
@@ -112,7 +112,7 @@ void uacpi_kernel_io_unmap(uacpi_handle h) {
 
     uacpi_io_handle *handle = (uacpi_io_handle *) h;
     handle->valid = false;
-    kfree(handle);
+    kfree(handle, FREE_PARAMS_DEFAULT);
 }
 
 uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void) {
@@ -170,22 +170,24 @@ uacpi_kernel_uninstall_interrupt_handler(uacpi_interrupt_handler handler,
 }
 
 uacpi_handle uacpi_kernel_create_spinlock(void) {
-    struct spinlock *lock = kzalloc(sizeof(struct spinlock));
+    struct spinlock *lock =
+        kzalloc(sizeof(struct spinlock), ALLOC_PARAMS_DEFAULT);
     return lock;
 }
 
 void uacpi_kernel_free_spinlock(uacpi_handle a) {
-    kfree(a);
+    kfree(a, FREE_PARAMS_DEFAULT);
 }
 
 uacpi_handle uacpi_kernel_create_mutex(void) {
-    struct mutex_simple *m = kzalloc(sizeof(struct mutex_simple));
+    struct mutex_simple *m =
+        kzalloc(sizeof(struct mutex_simple), ALLOC_PARAMS_DEFAULT);
     mutex_simple_init(m);
     return m;
 }
 
 void uacpi_kernel_free_mutex(uacpi_handle a) {
-    kfree(a);
+    kfree(a, FREE_PARAMS_DEFAULT);
 }
 
 uacpi_status uacpi_kernel_acquire_mutex(uacpi_handle m, uacpi_u16 b) {
@@ -233,11 +235,11 @@ uacpi_status uacpi_kernel_wait_for_work_completion(void) {
 
 uacpi_handle uacpi_kernel_create_event(void) {
 
-    return kzalloc(8);
+    return kzalloc(8, ALLOC_PARAMS_DEFAULT);
 }
 void uacpi_kernel_free_event(uacpi_handle a) {
 
-    kfree(a);
+    kfree(a, FREE_PARAMS_DEFAULT);
 }
 
 uacpi_bool uacpi_kernel_wait_for_event(uacpi_handle, uacpi_u16) {

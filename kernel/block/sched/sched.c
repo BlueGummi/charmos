@@ -89,7 +89,8 @@ void bio_sched_dequeue(struct generic_disk *disk, struct bio_request *req,
 
 struct bio_scheduler *bio_sched_create(struct generic_disk *disk,
                                        struct bio_scheduler_ops *ops) {
-    struct bio_scheduler *sched = kzalloc(sizeof(struct bio_scheduler));
+    struct bio_scheduler *sched =
+        kzalloc(sizeof(struct bio_scheduler), ALLOC_PARAMS_DEFAULT);
     if (!sched)
         k_panic("Could not allocate space for block device IO scheduler\n");
 

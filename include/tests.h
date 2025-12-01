@@ -38,7 +38,8 @@ struct kernel_test {
     do {                                                                       \
         current_test->messages =                                               \
             krealloc(current_test->messages,                                   \
-                     sizeof(char *) * ++current_test->message_count);          \
+                     sizeof(char *) * ++current_test->message_count,           \
+                     ALLOC_PARAMS_DEFAULT);                                    \
         current_test->messages[current_test->message_count - 1] = msg;         \
     } while (0)
 

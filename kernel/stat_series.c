@@ -1,6 +1,7 @@
 #include <kassert.h>
 #include <mem/alloc.h>
 #include <stat_series.h>
+#include <time.h>
 
 void stat_series_init(struct stat_series *s, struct stat_bucket *buckets,
                       uint32_t nbuckets, time_t bucket_us,
@@ -23,13 +24,14 @@ struct stat_series *stat_series_create(uint32_t nbuckets, time_t bucket_us,
                                        stat_series_callback bucket_reset,
                                        void *private) {
     struct stat_bucket *buckets =
-        kzalloc(sizeof(struct stat_bucket) * nbuckets);
+        kzalloc(sizeof(struct stat_bucket) * nbuckets, ALLOC_PARAMS_DEFAULT);
     if (!buckets)
         return NULL;
 
-    struct stat_series *series = kzalloc(sizeof(struct stat_series));
+    struct stat_series *series =
+        kzalloc(sizeof(struct stat_series), ALLOC_PARAMS_DEFAULT);
     if (!series) {
-        kfree(buckets);
+        kfree(buckets, FREE_PARAMS_DEFAULT);
         return NULL;
     }
 

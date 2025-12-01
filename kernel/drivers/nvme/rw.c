@@ -30,7 +30,7 @@ static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
     uint64_t offset = (uintptr_t) buffer & (PAGE_SIZE - 1);
     uint64_t num_pages = PAGES_NEEDED_FOR(offset + size);
 
-    data->prps = kmalloc(sizeof(uint64_t) * num_pages);
+    data->prps = kmalloc(sizeof(uint64_t) * num_pages, ALLOC_PARAMS_DEFAULT);
     if (!data->prps)
         return false;
 
@@ -66,7 +66,7 @@ static void nvme_setup_prps(struct nvme_command *cmd,
 
     /* For when there is no need for multiple PRPs */
 free_prps:
-    kfree(data->prps);
+    kfree(data->prps, FREE_PARAMS_DEFAULT);
     data->prps = NULL;
     return;
 }
@@ -88,12 +88,13 @@ static bool rw_send_command(struct generic_disk *disk, struct nvme_request *req,
         return true;
     }
 
-    struct nvme_bio_data *data = kzalloc(sizeof(struct nvme_bio_data));
+    struct nvme_bio_data *data =
+        kzalloc(sizeof(struct nvme_bio_data), ALLOC_PARAMS_DEFAULT);
     if (!data)
         return false;
 
     if (!nvme_bio_fill_prps(data, buffer, count * disk->sector_size)) {
-        kfree(data);
+        kfree(data, FREE_PARAMS_DEFAULT);
         return false;
     }
 

@@ -48,7 +48,8 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
 
     uint32_t dstrd = (cap >> 32) & 0xF;
 
-    struct nvme_device *nvme = kzalloc(sizeof(struct nvme_device));
+    struct nvme_device *nvme =
+        kzalloc(sizeof(struct nvme_device), ALLOC_PARAMS_DEFAULT);
     if (!nvme)
         k_panic("Could not allocate space for NVMe drive\n");
 
@@ -59,7 +60,8 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme->version = version;
     nvme->regs = regs;
     nvme->admin_q_depth = ((nvme->cap) & 0xFFFF) + 1;
-    nvme->io_queues = kzalloc(sizeof(struct nvme_queue *));
+    nvme->io_queues =
+        kzalloc(sizeof(struct nvme_queue *), ALLOC_PARAMS_DEFAULT);
     if (!nvme->io_queues)
         k_panic("Could not allocate space for NVMe IO queues\n");
 
@@ -101,8 +103,10 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme_info(K_INFO, "Controller max transfer size is %u bytes",
               nvme->max_transfer_size);
 
-    nvme->isr_index = kzalloc(sizeof(uint8_t) * sqs_to_make);
-    nvme->io_queues = kzalloc(sizeof(struct nvme_queue *) * sqs_to_make);
+    nvme->isr_index =
+        kzalloc(sizeof(uint8_t) * sqs_to_make, ALLOC_PARAMS_DEFAULT);
+    nvme->io_queues = kzalloc(sizeof(struct nvme_queue *) * sqs_to_make,
+                              ALLOC_PARAMS_DEFAULT);
     if (unlikely(!nvme->isr_index || !nvme->io_queues))
         k_panic("Could not allocate space for NVMe structures");
 
@@ -189,7 +193,8 @@ static struct bio_scheduler_ops nvme_bio_sched_ops = {
 };
 
 struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {
-    struct generic_disk *d = kzalloc(sizeof(struct generic_disk));
+    struct generic_disk *d =
+        kzalloc(sizeof(struct generic_disk), ALLOC_PARAMS_DEFAULT);
     if (!d)
         k_panic("Could not allocate space for NVMe device\n");
 
@@ -199,7 +204,7 @@ struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {
     d->write_sector = nvme_write_sector_wrapper;
     d->submit_bio_async = nvme_submit_bio_request;
     d->flags = DISK_FLAG_NO_REORDER | DISK_FLAG_NO_COALESCE;
-    d->cache = kzalloc(sizeof(struct bcache));
+    d->cache = kzalloc(sizeof(struct bcache), ALLOC_PARAMS_DEFAULT);
     if (unlikely(!d->cache))
         k_panic("Could not allocate space for NVMe block cache\n");
 

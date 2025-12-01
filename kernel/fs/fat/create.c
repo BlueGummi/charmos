@@ -78,12 +78,12 @@ static bool fat_extend_directory(struct fat_fs *fs, uint32_t prev_cluster,
     if (new_cluster == 0)
         return false;
 
-    uint8_t *cluster_buf = kzalloc(fs->cluster_size);
+    uint8_t *cluster_buf = kzalloc(fs->cluster_size, ALLOC_PARAMS_DEFAULT);
     if (!fat_write_cluster(fs, new_cluster, cluster_buf)) {
-        kfree(cluster_buf);
+        kfree(cluster_buf, FREE_PARAMS_DEFAULT);
         return false;
     }
-    kfree(cluster_buf);
+    kfree(cluster_buf, FREE_PARAMS_DEFAULT);
 
     if (prev_cluster)
         fat_write_fat_entry(fs, prev_cluster, new_cluster);
@@ -134,7 +134,7 @@ bool fat_create(struct fat_fs *fs, uint32_t dir_cluster, const char *filename,
     if (fat_contains(fs, dir_cluster, filename))
         return false;
 
-    uint8_t *dir_buf = kmalloc(fs->cluster_size);
+    uint8_t *dir_buf = kmalloc(fs->cluster_size, ALLOC_PARAMS_DEFAULT);
     if (!dir_buf)
         return false;
 
@@ -145,7 +145,7 @@ bool fat_create(struct fat_fs *fs, uint32_t dir_cluster, const char *filename,
 
     if (!found && fs->type == FAT_32) {
         if (!fat_extend_directory(fs, prev_cluster, &slot_cluster, dir_buf)) {
-            kfree(dir_buf);
+            kfree(dir_buf, FREE_PARAMS_DEFAULT);
             return false;
         }
         slot_offset = 0;
@@ -153,7 +153,7 @@ bool fat_create(struct fat_fs *fs, uint32_t dir_cluster, const char *filename,
     }
 
     if (!found) {
-        kfree(dir_buf);
+        kfree(dir_buf, FREE_PARAMS_DEFAULT);
         return false;
     }
 
@@ -180,7 +180,7 @@ bool fat_create(struct fat_fs *fs, uint32_t dir_cluster, const char *filename,
         success = fat_write_cluster(fs, slot_cluster, dir_buf);
     }
 
-    kfree(dir_buf);
+    kfree(dir_buf, FREE_PARAMS_DEFAULT);
 
     if (success && out_dirent)
         memcpy(out_dirent, new_ent, sizeof(struct fat_dirent));
@@ -199,7 +199,7 @@ bool fat_mkdir(struct fat_fs *fs, uint32_t parent_cluster, const char *name,
 
     *out_dirent = new_dirent;
 
-    uint8_t *buf = kzalloc(fs->cluster_size);
+    uint8_t *buf = kzalloc(fs->cluster_size, ALLOC_PARAMS_DEFAULT);
     if (!buf)
         return false;
 
@@ -214,6 +214,6 @@ bool fat_mkdir(struct fat_fs *fs, uint32_t parent_cluster, const char *name,
         FAT_DIR);
 
     bool ok = fat_write_cluster(fs, new_cluster, buf);
-    kfree(buf);
+    kfree(buf, FREE_PARAMS_DEFAULT);
     return ok;
 }

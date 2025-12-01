@@ -38,7 +38,7 @@ struct fat_dirent *fat_lookup(struct fat_fs *fs, uint32_t cluster,
 bool fat_contains(struct fat_fs *fs, uint32_t cluster, const char *f) {
     struct fat_dirent *d = fat_lookup(fs, cluster, f, NULL);
     if (d) {
-        kfree(d);
+        kfree(d, FREE_PARAMS_DEFAULT);
         return true;
     }
     return false;

@@ -400,7 +400,6 @@ static void handle_format_specifier(struct printf_cursor *csr,
 }
 
 void v_k_printf(struct printf_cursor *csr, const char *format, va_list args) {
-
     while (*format) {
         if (*format == '%') {
             format++;

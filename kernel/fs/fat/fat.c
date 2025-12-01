@@ -11,7 +11,7 @@ void fat_write_fsinfo(struct fat_fs *fs) { // making fsck happy
     if (fs->type != FAT_32)
         return; // no-op
 
-    uint8_t *buf = kmalloc(fs->disk->sector_size);
+    uint8_t *buf = kmalloc(fs->disk->sector_size, ALLOC_PARAMS_DEFAULT);
     if (!buf)
         return;
 
@@ -22,7 +22,7 @@ void fat_write_fsinfo(struct fat_fs *fs) { // making fsck happy
     *(uint32_t *) (buf + 0x1ec) = fs->last_alloc_cluster;
 
     fs->disk->write_sector(fs->disk, fs->fsinfo_sector, buf, 1);
-    kfree(buf);
+    kfree(buf, FREE_PARAMS_DEFAULT);
 }
 
 uint32_t fat_first_data_sector(const struct fat_fs *fs) {
@@ -53,7 +53,7 @@ uint32_t fat_cluster_to_lba(const struct fat_fs *fs, uint32_t cluster) {
 struct fat_bpb *fat_read_bpb(struct generic_disk *drive,
                              enum fat_fstype *out_type, uint32_t *out_lba,
                              uint32_t base_lba) {
-    uint8_t *sector = kmalloc(drive->sector_size);
+    uint8_t *sector = kmalloc(drive->sector_size, ALLOC_PARAMS_DEFAULT);
     if (!sector)
         return NULL;
 
@@ -108,7 +108,8 @@ struct fat_bpb *fat_read_bpb(struct generic_disk *drive,
         if (type == 0xFF)
             continue;
 
-        struct fat_bpb *out_bpb = kmalloc(sizeof(struct fat_bpb));
+        struct fat_bpb *out_bpb =
+            kmalloc(sizeof(struct fat_bpb), ALLOC_PARAMS_DEFAULT);
         if (!out_bpb)
             return NULL;
 
@@ -116,14 +117,14 @@ struct fat_bpb *fat_read_bpb(struct generic_disk *drive,
             memcpy(out_bpb, bpb, sizeof(struct fat_bpb));
             *out_type = type;
             *out_lba = lba;
-            kfree(sector);
+            kfree(sector, FREE_PARAMS_DEFAULT);
             return out_bpb;
         }
 
         break;
     }
 
-    kfree(sector);
+    kfree(sector, FREE_PARAMS_DEFAULT);
     return NULL;
 }
 
@@ -131,7 +132,7 @@ struct vfs_node *fat_g_mount(struct generic_partition *p) {
     if (!p || !p->disk)
         return NULL;
 
-    struct fat_fs *fs = kmalloc(sizeof(struct fat_fs));
+    struct fat_fs *fs = kmalloc(sizeof(struct fat_fs), ALLOC_PARAMS_DEFAULT);
     if (!fs)
         return NULL;
 
@@ -140,7 +141,7 @@ struct vfs_node *fat_g_mount(struct generic_partition *p) {
     struct generic_disk *d = p->disk;
     struct fat_bpb *bpb = fat_read_bpb(d, &type, &lba, p->start_lba);
     if (!bpb) {
-        kfree(fs);
+        kfree(fs, FREE_PARAMS_DEFAULT);
         return NULL;
     }
 
@@ -175,13 +176,13 @@ struct vfs_node *fat_g_mount(struct generic_partition *p) {
 
     if (f32) {
         uint16_t fsinfo_rel_sector = f32_ext.fs_info;
-        uint8_t *buf = kmalloc(fs->disk->sector_size);
+        uint8_t *buf = kmalloc(fs->disk->sector_size, ALLOC_PARAMS_DEFAULT);
         if (!buf)
             return NULL;
 
         if (!d->read_sector(d, fs->volume_base_lba + fsinfo_rel_sector, buf,
                             1)) {
-            kfree(fs);
+            kfree(fs, FREE_PARAMS_DEFAULT);
             return NULL;
         }
 
@@ -189,7 +190,7 @@ struct vfs_node *fat_g_mount(struct generic_partition *p) {
         uint32_t lead_sig = *(uint32_t *) (buf + 0x00);
         uint32_t struc_sig = *(uint32_t *) (buf + 0x1fc);
         if (lead_sig != 0x41615252 || struc_sig != 0xAA550000) {
-            kfree(fs);
+            kfree(fs, FREE_PARAMS_DEFAULT);
             return NULL;
         }
 

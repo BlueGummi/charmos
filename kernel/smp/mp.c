@@ -69,7 +69,8 @@ static void init_smt_info(struct core *c) {
 }
 
 static struct core *setup_cpu(uint64_t cpu) {
-    struct core *c = kzalloc(PAGE_ALIGN_UP(sizeof(struct core)));
+    struct core *c =
+        kzalloc(PAGE_ALIGN_UP(sizeof(struct core)), ALLOC_PARAMS_DEFAULT);
     if (!c)
         k_panic("Core %d could not allocate space for struct\n", cpu);
     c->id = cpu;
@@ -143,7 +144,7 @@ void smp_complete_init() {
 }
 
 void smp_setup_bsp() {
-    struct core *c = kzalloc(sizeof(struct core));
+    struct core *c = kzalloc(sizeof(struct core), ALLOC_PARAMS_DEFAULT);
     if (!c)
         k_panic("Could not allocate space for core structure on BSP");
 
@@ -151,13 +152,15 @@ void smp_setup_bsp() {
     c->self = c;
     c->current_irql = IRQL_PASSIVE_LEVEL;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
-    global.cores = kzalloc(sizeof(struct core *) * global.core_count);
+    global.cores = kzalloc(sizeof(struct core *) * global.core_count,
+                           ALLOC_PARAMS_DEFAULT);
 
     if (unlikely(!global.cores))
         k_panic("Could not allocate space for global core structures");
 
     global.shootdown_data =
-        kzalloc(sizeof(struct tlb_shootdown_cpu) * global.core_count);
+        kzalloc(sizeof(struct tlb_shootdown_cpu) * global.core_count,
+                ALLOC_PARAMS_DEFAULT);
     if (!global.shootdown_data)
         k_panic("Could not allocate global shootdown data\n");
 

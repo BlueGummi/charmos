@@ -63,7 +63,7 @@ static void daemon_thread_exit(struct daemon *daemon,
         set_bg_present(daemon, false);
     }
 
-    kfree(self);
+    kfree(self, FREE_PARAMS_DEFAULT);
     thread_exit();
 }
 
@@ -136,7 +136,8 @@ void daemon_main(void) {
 }
 
 struct daemon_thread *daemon_thread_create(struct daemon *daemon) {
-    struct daemon_thread *thread = kzalloc(sizeof(struct daemon_thread));
+    struct daemon_thread *thread =
+        kzalloc(sizeof(struct daemon_thread), ALLOC_PARAMS_DEFAULT);
     if (!thread)
         return NULL;
 
@@ -146,7 +147,7 @@ struct daemon_thread *daemon_thread_create(struct daemon *daemon) {
     struct thread *t = thread_create("daemon_%s_thread", daemon_main,
                                      daemon->name ? daemon->name : "unnamed");
     if (!t) {
-        kfree(thread);
+        kfree(thread, FREE_PARAMS_DEFAULT);
         return NULL;
     }
 
@@ -189,7 +190,7 @@ daemon_thread_spawn(struct daemon *daemon,
 
 void daemon_thread_destroy_unsafe(struct daemon_thread *dt) {
     thread_free(dt->thread);
-    kfree(dt);
+    kfree(dt, FREE_PARAMS_DEFAULT);
 }
 
 struct daemon *daemon_create(struct daemon_attributes *attrs,
@@ -200,7 +201,8 @@ struct daemon *daemon_create(struct daemon_attributes *attrs,
     va_list args;
     va_start(args, fmt);
 
-    struct daemon *daemon = kzalloc(sizeof(struct daemon));
+    struct daemon *daemon =
+        kzalloc(sizeof(struct daemon), ALLOC_PARAMS_DEFAULT);
     struct daemon_thread *dt = NULL, *bg = NULL;
 
     if (!daemon)
@@ -210,7 +212,7 @@ struct daemon *daemon_create(struct daemon_attributes *attrs,
 
     if (DAEMON_FLAG_TEST(daemon, DAEMON_FLAG_HAS_NAME)) {
         int needed = snprintf(NULL, 0, fmt, args) + 1;
-        char *name = kzalloc(needed);
+        char *name = kzalloc(needed, ALLOC_PARAMS_DEFAULT);
         if (!name)
             goto err;
 
@@ -269,10 +271,10 @@ err:
         daemon_thread_destroy_unsafe(dt);
 
     if (daemon && daemon->name)
-        kfree(daemon->name);
+        kfree(daemon->name, FREE_PARAMS_DEFAULT);
 
     if (daemon)
-        kfree(daemon);
+        kfree(daemon, FREE_PARAMS_DEFAULT);
 
     va_end(args);
     return NULL;
@@ -318,9 +320,9 @@ void daemon_destroy(struct daemon *daemon) {
     }
 
     if (daemon->name)
-        kfree(daemon->name);
+        kfree(daemon->name, FREE_PARAMS_DEFAULT);
 
-    kfree(daemon);
+    kfree(daemon, FREE_PARAMS_DEFAULT);
 }
 
 struct daemon_thread *daemon_spawn_worker(struct daemon *daemon) {

@@ -1,5 +1,6 @@
 #include <acpi/lapic.h>
 #include <asm.h>
+#include <charmos.h>
 #include <compiler.h>
 #include <console/printf.h>
 #include <int/idt.h>
@@ -88,7 +89,7 @@ static void nop_handler(void *ctx, uint8_t vector, void *rsp) {
 
 void panic_isr(void *ctx, uint8_t vector, void *rsp) {
     (void) ctx, (void) vector, (void) rsp;
-    if (global.panic_in_progress) {
+    if (atomic_load(&global.panicked)) {
         disable_interrupts();
         k_printf("    [CPU %u] Halting due to system panic\n", smp_core_id());
         while (1)

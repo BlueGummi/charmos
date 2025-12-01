@@ -97,7 +97,7 @@ static void condvar_timeout_wakeup(void *arg, void *arg2) {
         list_del_init(&t->list_node);
 
     spin_unlock(&ck->cv->waiters.lock, irql);
-    kfree(ck);
+    kfree(ck, FREE_PARAMS_DEFAULT);
     set_wake_reason_and_wake(t, WAKE_REASON_TIMEOUT);
     thread_put(t);
 }
@@ -109,7 +109,8 @@ enum wake_reason condvar_wait_timeout(struct condvar *cv, struct spinlock *lock,
     curr->wake_reason = WAKE_REASON_NONE;
 
     /* TODO: No allocate */
-    struct condvar_with_cb *cwcb = kmalloc(sizeof(struct condvar_with_cb));
+    struct condvar_with_cb *cwcb =
+        kmalloc(sizeof(struct condvar_with_cb), ALLOC_PARAMS_DEFAULT);
     cwcb->cv = cv;
     cwcb->cookie = curr->wait_cookie + 1; /* +1 from condvar */
 

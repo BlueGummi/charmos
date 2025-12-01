@@ -51,8 +51,8 @@ static void nvme_process_one(struct nvme_request *req) {
     struct thread *t = req->waiter;
 
     if (--req->remaining_parts == 0) {
-        kfree(req->bio_data->prps);
-        kfree(req->bio_data);
+        kfree(req->bio_data->prps, FREE_PARAMS_DEFAULT);
+        kfree(req->bio_data, FREE_PARAMS_DEFAULT);
         req->done = true;
         req->status = nvme_to_bio_status(req->status);
         if (req->on_complete)
@@ -209,7 +209,7 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
 }
 
 uint8_t *nvme_identify_controller(struct nvme_device *nvme) {
-    uint64_t buffer_phys = pmm_alloc_page(ALLOC_FLAGS_NONE);
+    uint64_t buffer_phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
 
     void *buffer = vmm_map_phys(buffer_phys, PAGE_SIZE, PAGING_UNCACHABLE);
 
@@ -258,7 +258,7 @@ uint32_t nvme_set_num_queues(struct nvme_device *nvme, uint16_t desired_sq,
 }
 
 uint8_t *nvme_identify_namespace(struct nvme_device *nvme, uint32_t nsid) {
-    uint64_t buffer_phys = pmm_alloc_page(ALLOC_FLAGS_NONE);
+    uint64_t buffer_phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
 
     void *buffer = vmm_map_phys(buffer_phys, PAGE_SIZE, PAGING_UNCACHABLE);
 

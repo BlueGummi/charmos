@@ -12,10 +12,12 @@
 #include "internal.h"
 
 void xhci_setup_event_ring(struct xhci_device *dev) {
-    struct xhci_erst_entry *erst_table = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    struct xhci_erst_entry *erst_table =
+        kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
     uintptr_t erst_table_phys = vmm_get_phys((uintptr_t) erst_table);
 
-    struct xhci_trb *event_ring = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    struct xhci_trb *event_ring =
+        kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
     uintptr_t event_ring_phys = vmm_get_phys((uintptr_t) event_ring);
 
     event_ring[0].control = 1;
@@ -33,7 +35,8 @@ void xhci_setup_event_ring(struct xhci_device *dev) {
     mmio_write_64(&ir->erstba, erst_table_phys);
     mmio_write_64(&ir->erdp, erdp.raw);
 
-    struct xhci_ring *ring = kzalloc(sizeof(struct xhci_ring));
+    struct xhci_ring *ring =
+        kzalloc(sizeof(struct xhci_ring), ALLOC_PARAMS_DEFAULT);
     if (unlikely(!ring))
         k_panic("Could not allocate space for XHCI ring\n");
 
@@ -49,7 +52,8 @@ void xhci_setup_event_ring(struct xhci_device *dev) {
 void xhci_setup_command_ring(struct xhci_device *dev) {
     struct xhci_op_regs *op = dev->op_regs;
 
-    struct xhci_trb *cmd_ring = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    struct xhci_trb *cmd_ring =
+        kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
     uintptr_t cmd_ring_phys = vmm_get_phys((uintptr_t) cmd_ring);
 
     int last_index = TRB_RING_SIZE - 1;
@@ -60,10 +64,12 @@ void xhci_setup_command_ring(struct xhci_device *dev) {
     cmd_ring[last_index].control = TRB_SET_TYPE(TRB_TYPE_LINK);
     cmd_ring[last_index].control |= 1 << 1;
 
-    struct xhci_dcbaa *dcbaa_virt = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    struct xhci_dcbaa *dcbaa_virt =
+        kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
     uintptr_t dcbaa_phys = vmm_get_phys((uintptr_t) dcbaa_virt);
 
-    struct xhci_ring *ring = kzalloc(sizeof(struct xhci_ring));
+    struct xhci_ring *ring =
+        kzalloc(sizeof(struct xhci_ring), ALLOC_PARAMS_DEFAULT);
     if (unlikely(!ring))
         k_panic("Could not allocate space for XHCI ring\n");
 

@@ -4,10 +4,10 @@
 #include <console/printf.h>
 #include <drivers/ata.h>
 #include <mem/alloc.h>
-#include <structures/sll.h>
 #include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <structures/sll.h>
 
 static void ide_start_next(struct ide_channel *chan, bool locked);
 typedef bool (*sync_fn)(struct ata_drive *, uint64_t, uint8_t *, uint8_t);
@@ -108,7 +108,7 @@ static void ide_on_complete(struct ide_request *req) {
     if (bio->on_complete)
         bio->on_complete(bio);
 
-    kfree(req);
+    kfree(req, FREE_PARAMS_DEFAULT);
 }
 
 static void ide_wait_ready(struct ata_drive *d) {
@@ -184,7 +184,8 @@ static inline void submit_and_wait(struct ata_drive *d,
 
 static struct ide_request *request_init(uint64_t lba, uint8_t *buffer,
                                         uint8_t count, bool write) {
-    struct ide_request *req = kzalloc(sizeof(struct ide_request));
+    struct ide_request *req =
+        kzalloc(sizeof(struct ide_request), ALLOC_PARAMS_DEFAULT);
     if (!req)
         return NULL;
 
@@ -237,7 +238,7 @@ static bool rw_sync(struct ata_drive *d, uint64_t lba, uint8_t *b, uint8_t cnt,
 
     bool ret = !req->status;
 
-    kfree(req);
+    kfree(req, FREE_PARAMS_DEFAULT);
     return ret;
 }
 

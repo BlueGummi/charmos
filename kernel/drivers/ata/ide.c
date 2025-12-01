@@ -34,7 +34,7 @@ static void swap_str(char *dst, const uint16_t *src, uint64_t word_len) {
 }
 
 void ide_identify(struct ata_drive *drive) {
-    uint16_t *buf = kmalloc(256 * sizeof(uint16_t));
+    uint16_t *buf = kmalloc(256 * sizeof(uint16_t), ALLOC_PARAMS_DEFAULT);
     if (unlikely(!buf))
         k_panic("IDE identify buffer allocation failed\n");
 
@@ -101,7 +101,7 @@ void ide_identify(struct ata_drive *drive) {
 
     drive->pio_mode = buf[64] & 0x03;
 out:
-    kfree(buf);
+    kfree(buf, FREE_PARAMS_DEFAULT);
 }
 
 static struct bio_scheduler_ops ide_bio_ops = {
@@ -145,7 +145,8 @@ struct generic_disk *ide_create_generic(struct ata_drive *ide) {
     irq_register(irq, ide_irq_handler, &ide->channel);
     ide->channel.current_drive = ide;
 
-    struct generic_disk *d = kmalloc(sizeof(struct generic_disk));
+    struct generic_disk *d =
+        kmalloc(sizeof(struct generic_disk), ALLOC_PARAMS_DEFAULT);
     if (unlikely(!d))
         k_panic("IDE drive allocation failed!\n");
 
@@ -157,7 +158,7 @@ struct generic_disk *ide_create_generic(struct ata_drive *ide) {
 
     d->flags = DISK_FLAG_NO_COALESCE | DISK_FLAG_NO_REORDER;
 
-    d->cache = kzalloc(sizeof(struct bcache));
+    d->cache = kzalloc(sizeof(struct bcache), ALLOC_PARAMS_DEFAULT);
     if (!d->cache)
         k_panic("Could not allocate space for IDE drive block cache\n");
 

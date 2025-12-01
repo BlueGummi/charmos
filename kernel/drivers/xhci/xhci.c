@@ -17,7 +17,8 @@
 
 bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
                          uint8_t speed, uint8_t port) {
-    struct xhci_input_ctx *input_ctx = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    struct xhci_input_ctx *input_ctx =
+        kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
     uintptr_t input_ctx_phys = vmm_get_phys((uintptr_t) input_ctx);
 
     input_ctx->ctrl_ctx.add_flags = (1 << 0) | (1 << 1); // slot + ep0
@@ -32,14 +33,16 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
     slot->hub = 0;
     slot->num_ports = 0;
 
-    struct xhci_trb *ep0_ring = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    struct xhci_trb *ep0_ring =
+        kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
     uintptr_t ep0_ring_phys = vmm_get_phys((uintptr_t) ep0_ring);
 
     ep0_ring[TRB_RING_SIZE - 1].parameter = ep0_ring_phys;
     ep0_ring[TRB_RING_SIZE - 1].control = TRB_SET_TYPE(TRB_TYPE_LINK);
     ep0_ring[TRB_RING_SIZE - 1].control |= (1 << 1);
 
-    struct xhci_ring *ring = kzalloc(sizeof(struct xhci_ring));
+    struct xhci_ring *ring =
+        kzalloc(sizeof(struct xhci_ring), ALLOC_PARAMS_DEFAULT);
     if (unlikely(!ring))
         k_panic("Could not allocate space for ep0 ring");
 
@@ -60,7 +63,8 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
     ep0->interval = 0;
     ep0->dequeue_ptr_raw = ep0_ring_phys | 1;
 
-    struct xhci_device_ctx *dev_ctx = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    struct xhci_device_ctx *dev_ctx =
+        kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
     uintptr_t dev_ctx_phys = vmm_get_phys((uintptr_t) dev_ctx);
 
     ctrl->dcbaa->ptrs[slot_id] = dev_ctx_phys;
@@ -132,7 +136,8 @@ bool xhci_send_control_transfer(struct xhci_device *dev, uint8_t slot_id,
 }
 
 static struct xhci_ring *allocate_endpoint_ring(void) {
-    struct xhci_trb *trbs = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    struct xhci_trb *trbs =
+        kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
     if (!trbs)
         return NULL;
 
@@ -141,9 +146,10 @@ static struct xhci_ring *allocate_endpoint_ring(void) {
     trbs[TRB_RING_SIZE - 1].parameter = ring_phys;
     trbs[TRB_RING_SIZE - 1].control = (TRB_TYPE_LINK << 10) | (1 << 1);
 
-    struct xhci_ring *ring = kzalloc(sizeof(struct xhci_ring));
+    struct xhci_ring *ring =
+        kzalloc(sizeof(struct xhci_ring), ALLOC_PARAMS_DEFAULT);
     if (!ring) {
-        kfree_aligned(trbs);
+        kfree_aligned(trbs, FREE_PARAMS_DEFAULT);
         return NULL;
     }
 
@@ -159,7 +165,8 @@ static struct xhci_ring *allocate_endpoint_ring(void) {
 
 bool xhci_configure_device_endpoints(struct xhci_device *xhci,
                                      struct usb_device *usb) {
-    struct xhci_input_ctx *input_ctx = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    struct xhci_input_ctx *input_ctx =
+        kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
     uintptr_t input_ctx_phys = vmm_get_phys((uintptr_t) input_ctx);
 
     input_ctx->ctrl_ctx.add_flags = (1 << 0);
@@ -273,7 +280,8 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
     xhci_controller_enable_ints(dev);
     xhci_interrupt_enable_ints(dev);
 
-    struct usb_controller *ctrl = kzalloc(sizeof(struct usb_controller));
+    struct usb_controller *ctrl =
+        kzalloc(sizeof(struct usb_controller), ALLOC_PARAMS_DEFAULT);
     ctrl->driver_data = dev;
     ctrl->type = USB_CONTROLLER_XHCI;
     ctrl->ops = xhci_ctrl_ops;
@@ -306,7 +314,8 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
 
             xhci_address_device(dev, slot_id, speed, port);
 
-            struct usb_device *usb = kzalloc(sizeof(struct usb_device));
+            struct usb_device *usb =
+                kzalloc(sizeof(struct usb_device), ALLOC_PARAMS_DEFAULT);
             if (!usb)
                 k_panic("No space for the USB device\n");
 
@@ -317,7 +326,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
             usb->host = ctrl;
 
             size_t size = (dev->num_devices + 1) * sizeof(void *);
-            dev->devices = krealloc(dev->devices, size);
+            dev->devices = krealloc(dev->devices, size, ALLOC_PARAMS_DEFAULT);
             dev->devices[dev->num_devices++] = usb;
         }
     }

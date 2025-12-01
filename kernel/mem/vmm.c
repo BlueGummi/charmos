@@ -28,7 +28,7 @@ uint64_t sub_offset(uint64_t a) {
 
 static inline struct page_table *alloc_pt(void) {
     struct page_table *ret =
-        (void *) (pmm_alloc_page(ALLOC_FLAGS_NONE) + global.hhdm_offset);
+        (void *) (pmm_alloc_page(ALLOC_FLAGS_DEFAULT) + global.hhdm_offset);
     if (!ret)
         return NULL;
 
@@ -64,7 +64,7 @@ void vmm_init(struct limine_memmap_response *memmap,
     uint64_t kernel_virt_end = (uint64_t) &__kernel_virt_end;
     uint64_t kernel_size = kernel_virt_end - kernel_virt_start;
 
-    paddr_t dummy_phys = pmm_alloc_pages(1, ALLOC_FLAGS_NONE);
+    paddr_t dummy_phys = pmm_alloc_pages(1, ALLOC_FLAGS_DEFAULT);
     uint8_t *dummy_virt = (uint8_t *) (dummy_phys + global.hhdm_offset);
     memset(dummy_virt, 0xFF, PAGE_SIZE);
 

@@ -24,14 +24,16 @@ void *xhci_map_mmio(uint8_t bus, uint8_t slot, uint8_t func) {
 }
 
 struct xhci_device *xhci_device_create(void *mmio) {
-    struct xhci_device *dev = kzalloc(sizeof(struct xhci_device));
+    struct xhci_device *dev =
+        kzalloc(sizeof(struct xhci_device), ALLOC_PARAMS_DEFAULT);
     if (unlikely(!dev))
         k_panic("Could not allocate space for XHCI device");
 
     struct xhci_cap_regs *cap = mmio;
     struct xhci_op_regs *op = mmio + cap->cap_length;
     void *runtime_regs = (void *) mmio + cap->rtsoff;
-    struct xhci_interrupter_regs *ir_base = (void *) ((uint8_t *) runtime_regs + 0x20);
+    struct xhci_interrupter_regs *ir_base =
+        (void *) ((uint8_t *) runtime_regs + 0x20);
 
     dev->num_devices = 0;
     dev->port_regs = op->regs;

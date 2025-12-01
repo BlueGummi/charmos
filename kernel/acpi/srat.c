@@ -17,7 +17,8 @@ void srat_init(void) {
         k_info("SRAT", K_WARN,
                "SRAT table not found, assuming single NUMA node");
 
-        global.numa_nodes = kzalloc(sizeof(struct numa_node));
+        global.numa_nodes =
+            kzalloc(sizeof(struct numa_node), ALLOC_PARAMS_DEFAULT);
         if (!global.numa_nodes)
             k_panic("OOM Whilst allocating NUMA node array");
 
@@ -61,7 +62,8 @@ void srat_init(void) {
 
     global.numa_node_count = max_prox_domain + 1;
     size_t numa_node_count = global.numa_node_count;
-    global.numa_nodes = kzalloc(numa_node_count * sizeof(struct numa_node));
+    global.numa_nodes = kzalloc(numa_node_count * sizeof(struct numa_node),
+                                ALLOC_PARAMS_DEFAULT);
     if (!global.numa_nodes)
         k_panic("OOM Whilst allocating NUMA node array");
 
@@ -71,7 +73,7 @@ void srat_init(void) {
         global.numa_nodes[i].mem_size = 0;
         global.numa_nodes[i].distances_cnt = numa_node_count;
         global.numa_nodes[i].distance =
-            kzalloc(numa_node_count * sizeof(uint8_t));
+            kzalloc(numa_node_count * sizeof(uint8_t), ALLOC_PARAMS_DEFAULT);
 
         if (!global.numa_nodes[i].distance)
             k_panic("OOM whilst allocating NUMA node array");
@@ -163,8 +165,8 @@ static uint8_t idx_of_val(uint8_t *buf, size_t len, size_t search_for) {
 }
 
 void numa_construct_relative_distances(struct numa_node *node) {
-    node->rel_dists = kzalloc(node->distances_cnt);
-    uint8_t *tmp = kzalloc(node->distances_cnt);
+    node->rel_dists = kzalloc(node->distances_cnt, ALLOC_PARAMS_DEFAULT);
+    uint8_t *tmp = kzalloc(node->distances_cnt, ALLOC_PARAMS_DEFAULT);
     if (!node->rel_dists || !tmp)
         k_panic("could not allocate numa relative distances\n");
 
@@ -180,7 +182,7 @@ void numa_construct_relative_distances(struct numa_node *node) {
             idx_of_val(tmp, node->distances_cnt, node->distance[i]);
     }
 
-    kfree(tmp);
+    kfree(tmp, FREE_PARAMS_DEFAULT);
 }
 
 /* I will just shove this here because of laziness */

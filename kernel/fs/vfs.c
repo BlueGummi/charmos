@@ -17,7 +17,8 @@ static void mount_table_add(struct vfs_mount *mnt) {
             (mount_table_capacity == 0) ? 4 : mount_table_capacity * 2;
 
         struct vfs_mount **new_table;
-        new_table = krealloc(mount_table, new_capacity * sizeof(*mount_table));
+        new_table = krealloc(mount_table, new_capacity * sizeof(*mount_table),
+                             ALLOC_PARAMS_DEFAULT);
 
         if (!new_table)
             return;
@@ -98,7 +99,8 @@ enum errno vfs_mount(struct vfs_node *mountpoint, struct vfs_node *target,
     if (mountpoint->child_mount)
         return ERR_BUSY; // Already mounted here
 
-    struct vfs_mount *mnt = kmalloc(sizeof(struct vfs_mount));
+    struct vfs_mount *mnt =
+        kmalloc(sizeof(struct vfs_mount), ALLOC_PARAMS_DEFAULT);
     if (!mnt)
         return ERR_NO_MEM;
 
@@ -121,15 +123,15 @@ enum errno vfs_unmount(struct vfs_mount *mnt) {
         mnt->mount_point->child_mount = NULL;
 
     mount_table_remove(mnt);
-    kfree(mnt);
+    kfree(mnt, FREE_PARAMS_DEFAULT);
     return ERR_OK;
 }
 
 void vfs_clear_mounts(void) {
     for (uint64_t i = 0; i < mount_table_count; i++) {
-        kfree(mount_table[i]);
+        kfree(mount_table[i], FREE_PARAMS_DEFAULT);
     }
-    kfree(mount_table);
+    kfree(mount_table, FREE_PARAMS_DEFAULT);
     mount_table = NULL;
     mount_table_count = 0;
     mount_table_capacity = 0;

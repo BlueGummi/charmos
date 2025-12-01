@@ -53,15 +53,15 @@ static inline uint32_t hash(const void *data, uint64_t length) {
         /* Allocate buckets */                                                 \
         if (__map->buckets == NULL)                                            \
             __map->buckets =                                                   \
-                kzalloc(__map->capacity * sizeof(*(__map->buckets)));          \
+                kzalloc_default(__map->capacity * sizeof(*(__map->buckets)));  \
         uint64_t __hash = hash(__key, __key_len);                              \
         uint64_t __index = __hash % __map->capacity;                           \
         auto __bucket = &__map->buckets[__index];                              \
         /* Allocate items for current bucket. */                               \
         if (__bucket->capacity == 0) {                                         \
             __bucket->capacity = 16;                                           \
-            __bucket->items =                                                  \
-                kzalloc(__bucket->capacity * sizeof(*__bucket->items));        \
+            __bucket->items = kzalloc_default(__bucket->capacity *             \
+                                              sizeof(*__bucket->items));       \
         }                                                                      \
         if (__bucket->count == __bucket->capacity) {                           \
             __bucket->capacity *= 2;                                           \

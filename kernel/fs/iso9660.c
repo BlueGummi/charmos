@@ -22,7 +22,7 @@ bool iso9660_read_file(struct iso9660_fs *fs, uint32_t lba, uint32_t size,
 
 bool iso9660_parse_pvd(struct generic_partition *p,
                        struct iso9660_pvd *out_pvd) {
-    uint8_t *buffer = kmalloc(ISO9660_SECTOR_SIZE);
+    uint8_t *buffer = kmalloc(ISO9660_SECTOR_SIZE, ALLOC_PARAMS_DEFAULT);
     if (!buffer)
         return false;
 
@@ -31,7 +31,7 @@ bool iso9660_parse_pvd(struct generic_partition *p,
     if (!disk->read_sector(disk, ISO9660_PVD_SECTOR + p->start_lba, buffer,
                            1)) {
         k_printf("Failed to read ISO9660 PVD sector\n");
-        kfree(buffer);
+        kfree(buffer, FREE_PARAMS_DEFAULT);
         return false;
     }
 
@@ -40,13 +40,13 @@ bool iso9660_parse_pvd(struct generic_partition *p,
     if (pvd->type != 1 || strncmp(pvd->id, "CD001", 5) != 0 ||
         pvd->version != 1) {
         k_printf("Not a valid Primary Volume Descriptor\n");
-        kfree(buffer);
+        kfree(buffer, FREE_PARAMS_DEFAULT);
         return false;
     }
 
     memcpy(out_pvd, pvd, sizeof(struct iso9660_pvd));
 
-    kfree(buffer);
+    kfree(buffer, FREE_PARAMS_DEFAULT);
     return true;
 }
 
@@ -85,8 +85,10 @@ struct vfs_node *iso9660_mount(struct generic_partition *p) {
     struct iso9660_pvd pvd;
     struct generic_disk *disk = p->disk;
     if (iso9660_parse_pvd(p, &pvd)) {
-        struct iso9660_fs *fs = kzalloc(sizeof(struct iso9660_fs));
-        struct iso9660_pvd *new_pvd = kzalloc(sizeof(struct iso9660_pvd));
+        struct iso9660_fs *fs =
+            kzalloc(sizeof(struct iso9660_fs), ALLOC_PARAMS_DEFAULT);
+        struct iso9660_pvd *new_pvd =
+            kzalloc(sizeof(struct iso9660_pvd), ALLOC_PARAMS_DEFAULT);
         if (!fs || !new_pvd)
             return NULL;
 
@@ -106,13 +108,14 @@ struct vfs_node *iso9660_mount(struct generic_partition *p) {
 
 void iso9660_ls(struct iso9660_fs *fs, uint32_t lba, uint32_t size) {
     uint32_t num_blocks = (size + fs->block_size - 1) / fs->block_size;
-    uint8_t *dir_data = kmalloc(num_blocks * fs->block_size);
+    uint8_t *dir_data =
+        kmalloc(num_blocks * fs->block_size, ALLOC_PARAMS_DEFAULT);
     if (!dir_data)
         return;
 
     if (!fs->disk->read_sector(fs->disk, lba + fs->partition->start_lba,
                                dir_data, num_blocks)) {
-        kfree(dir_data);
+        kfree(dir_data, FREE_PARAMS_DEFAULT);
         return;
     }
 
@@ -145,7 +148,7 @@ void iso9660_ls(struct iso9660_fs *fs, uint32_t lba, uint32_t size) {
 
         offset += rec->length;
     }
-    kfree(dir_data);
+    kfree(dir_data, FREE_PARAMS_DEFAULT);
 }
 
 void iso9660_print(struct generic_partition *disk) {
@@ -164,13 +167,14 @@ struct iso9660_dir_record *iso9660_find(struct iso9660_fs *fs,
                                         const char *target_name, uint32_t lba,
                                         uint32_t size) {
     uint32_t num_blocks = (size + fs->block_size - 1) / fs->block_size;
-    uint8_t *dir_data = kmalloc(num_blocks * fs->block_size);
+    uint8_t *dir_data =
+        kmalloc(num_blocks * fs->block_size, ALLOC_PARAMS_DEFAULT);
     if (!dir_data)
         return NULL;
 
     if (!fs->disk->read_sector(fs->disk, lba + fs->partition->start_lba,
                                dir_data, num_blocks)) {
-        kfree(dir_data);
+        kfree(dir_data, FREE_PARAMS_DEFAULT);
         return NULL;
     }
 
@@ -189,13 +193,13 @@ struct iso9660_dir_record *iso9660_find(struct iso9660_fs *fs,
             name[rec->name_len] = '\0';
 
             if (strcmp(name, target_name) == 0) {
-                struct iso9660_dir_record *found =
-                    kmalloc(sizeof(struct iso9660_dir_record));
+                struct iso9660_dir_record *found = kmalloc(
+                    sizeof(struct iso9660_dir_record), ALLOC_PARAMS_DEFAULT);
                 if (!found)
                     return NULL;
 
                 memcpy(found, rec, sizeof(struct iso9660_dir_record));
-                kfree(dir_data);
+                kfree(dir_data, FREE_PARAMS_DEFAULT);
                 return found;
             }
         }
@@ -203,7 +207,7 @@ struct iso9660_dir_record *iso9660_find(struct iso9660_fs *fs,
         offset += rec->length;
     }
 
-    kfree(dir_data);
+    kfree(dir_data, FREE_PARAMS_DEFAULT);
     return NULL;
 }
 
@@ -217,25 +221,25 @@ void iso9660_read_and_print_file(struct iso9660_fs *fs, const char *name) {
 
     if (rec->flags & 0x02) {
         k_printf("'%s' is a directory, not a file\n", name);
-        kfree(rec);
+        kfree(rec, FREE_PARAMS_DEFAULT);
         return;
     }
 
-    void *buf = kmalloc(rec->size_le);
+    void *buf = kmalloc(rec->size_le, ALLOC_PARAMS_DEFAULT);
     if (!buf)
         return;
 
     if (!iso9660_read_file(fs, rec->extent_lba_le, rec->size_le, buf)) {
         k_printf("Failed to read file contents\n");
-        kfree(buf);
-        kfree(rec);
+        kfree(buf, FREE_PARAMS_DEFAULT);
+        kfree(rec, FREE_PARAMS_DEFAULT);
         return;
     }
 
     k_printf("Contents of '%s':\n%.*s\n", name, rec->size_le, (char *) buf);
 
-    kfree(buf);
-    kfree(rec);
+    kfree(buf, FREE_PARAMS_DEFAULT);
+    kfree(rec, FREE_PARAMS_DEFAULT);
 }
 
 struct iso9660_datetime iso9660_get_current_date(void) {

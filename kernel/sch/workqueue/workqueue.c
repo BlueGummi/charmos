@@ -94,7 +94,7 @@ struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
     size_t size = permanent ? sizeof(struct workqueue)
                             : PAGE_ALIGN_UP(sizeof(struct workqueue));
 
-    struct workqueue *wq = kzalloc(size);
+    struct workqueue *wq = kzalloc(size, ALLOC_PARAMS_DEFAULT);
     if (!wq)
         goto err;
 
@@ -110,12 +110,13 @@ struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
     if (permanent)
         size = PAGE_ALIGN_UP(size);
 
-    wq->oneshot_works = kzalloc(size);
+    wq->oneshot_works = kzalloc(size, ALLOC_PARAMS_DEFAULT);
     if (!wq->oneshot_works)
         goto err;
 
     if (attrs->flags & WORKQUEUE_FLAG_SPAWN_VIA_REQUEST) {
-        wq->request = kzalloc(sizeof(struct thread_request));
+        wq->request =
+            kzalloc(sizeof(struct thread_request), ALLOC_PARAMS_DEFAULT);
         if (!wq->request)
             goto err;
 
@@ -127,7 +128,8 @@ struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
     }
 
     if (attrs->flags & WORKQUEUE_FLAG_STATIC_WORKERS) {
-        wq->worker_array = kzalloc(sizeof(struct worker) * attrs->max_workers);
+        wq->worker_array = kzalloc(sizeof(struct worker) * attrs->max_workers,
+                                   ALLOC_PARAMS_DEFAULT);
         if (!wq->worker_array)
             goto err;
     }
@@ -135,7 +137,7 @@ struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
     if (attrs->flags & WORKQUEUE_FLAG_NAMED) {
         kassert(fmt);
         size_t needed = snprintf(NULL, 0, fmt, args) + 1;
-        wq->name = kzalloc(needed);
+        wq->name = kzalloc(needed, ALLOC_PARAMS_DEFAULT);
         if (!wq->name)
             goto err;
 
@@ -157,19 +159,19 @@ struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
 
 err:
     if (wq && wq->worker_array)
-        kfree(wq->worker_array);
+        kfree(wq->worker_array, FREE_PARAMS_DEFAULT);
 
     if (wq && wq->request)
-        kfree(wq->request);
+        kfree(wq->request, FREE_PARAMS_DEFAULT);
 
     if (wq && wq->name)
-        kfree(wq->name);
+        kfree(wq->name, FREE_PARAMS_DEFAULT);
 
     if (wq && wq->oneshot_works)
-        kfree(wq->oneshot_works);
+        kfree(wq->oneshot_works, FREE_PARAMS_DEFAULT);
 
     if (wq)
-        kfree(wq);
+        kfree(wq, FREE_PARAMS_DEFAULT);
 
     return NULL;
 }
@@ -201,9 +203,9 @@ static void mark_worker_exit(struct thread *t) {
 void workqueue_free(struct workqueue *wq) {
     kassert(atomic_load(&wq->refcount) == 0);
     WORKQUEUE_STATE_SET(wq, WORKQUEUE_STATE_DEAD);
-    kfree(wq->oneshot_works);
-    kfree(wq->request);
-    kfree(wq);
+    kfree(wq->oneshot_works, FREE_PARAMS_DEFAULT);
+    kfree(wq->request, FREE_PARAMS_DEFAULT);
+    kfree(wq, FREE_PARAMS_DEFAULT);
 }
 
 /* Give all threads the exit signal and clean up the structs */
@@ -253,7 +255,8 @@ struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue,
     if (!thread)
         return NULL;
 
-    struct worker *worker = kzalloc(sizeof(struct worker));
+    struct worker *worker =
+        kzalloc(sizeof(struct worker), ALLOC_PARAMS_DEFAULT);
     if (!worker)
         return NULL;
 
@@ -279,7 +282,8 @@ struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue,
 
 void workqueues_permanent_init(void) {
     int64_t num_workqueues = global.core_count;
-    global.workqueues = kzalloc(sizeof(struct workqueue *) * num_workqueues);
+    global.workqueues = kzalloc(sizeof(struct workqueue *) * num_workqueues,
+                                ALLOC_PARAMS_DEFAULT);
 
     if (!global.workqueues)
         k_panic("Failed to allocate space for workqueues!\n");
@@ -330,7 +334,7 @@ struct work *work_init(struct work *work, work_function fn,
 }
 
 struct work *work_create(work_function fn, struct work_args args) {
-    struct work *work = kzalloc(sizeof(struct work));
+    struct work *work = kzalloc(sizeof(struct work), ALLOC_PARAMS_DEFAULT);
     if (!work)
         return NULL;
 

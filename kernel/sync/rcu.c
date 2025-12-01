@@ -146,7 +146,7 @@ bool rcu_work_pending(void) {
 }
 
 void rcu_call(void (*func)(void *), void *arg) {
-    struct rcu_cb *cb = kmalloc(sizeof(*cb));
+    struct rcu_cb *cb = kmalloc(sizeof(*cb), ALLOC_PARAMS_DEFAULT);
     if (!cb) {
         /* Allocation failure: fallback to synchronous path */
         /* Block until safe then call synchronously */
@@ -195,7 +195,7 @@ static void rcu_exec_callbacks(uint64_t target) {
     list_for_each_entry_safe(iter, tmp, &lh, list) {
         iter->func(iter->arg);
         list_del(&iter->list);
-        kfree(iter);
+        kfree(iter, FREE_PARAMS_DEFAULT);
     }
 }
 

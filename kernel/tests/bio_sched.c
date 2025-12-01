@@ -58,11 +58,11 @@ REGISTER_TEST(bio_sched_coalesce_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct ext2_fs *fs = root->fs_data;
     struct generic_disk *d = fs->drive;
 
-    struct bio_request *bio = kmalloc(sizeof(*bio));
+    struct bio_request *bio = kmalloc(sizeof(*bio), ALLOC_PARAMS_DEFAULT);
     *bio = (struct bio_request) {
         .lba = 0,
         .disk = d,
-        .buffer = kmalloc_aligned(512, 4096),
+        .buffer = kmalloc_aligned(512, 4096, ALLOC_PARAMS_DEFAULT),
         .size = 512,
         .sector_count = 1,
         .write = false,
@@ -73,11 +73,11 @@ REGISTER_TEST(bio_sched_coalesce_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         .user_data = (void *) BIO_RQ_MEDIUM,
     };
 
-    struct bio_request *bio2 = kmalloc(sizeof(*bio2));
+    struct bio_request *bio2 = kmalloc(sizeof(*bio2), ALLOC_PARAMS_DEFAULT);
     *bio2 = (struct bio_request) {
         .lba = 1,
         .disk = d,
-        .buffer = kmalloc_aligned(512, 4096),
+        .buffer = kmalloc_aligned(512, 4096, ALLOC_PARAMS_DEFAULT),
         .size = 512,
         .sector_count = 1,
         .write = false,
@@ -91,7 +91,7 @@ REGISTER_TEST(bio_sched_coalesce_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     bio->on_complete = bio_sch_callback1;
     bio2->on_complete = bio_sch_callback2;
 
-    char *name = kmalloc(100);
+    char *name = kmalloc(100, ALLOC_PARAMS_DEFAULT);
     uint64_t t = time_get_us();
     bio_sched_enqueue(d, bio);
     bio_sched_enqueue(d, bio2);
@@ -123,8 +123,10 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
     prng_seed(time_get_us());
 
     for (uint64_t i = 0; i < BIO_SCHED_TEST_RUNS; i++) {
-        uint8_t *buf = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
-        struct bio_request *rq = kzalloc(sizeof(struct bio_request));
+        uint8_t *buf =
+            kmalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
+        struct bio_request *rq =
+            kzalloc(sizeof(struct bio_request), ALLOC_PARAMS_DEFAULT);
         TEST_ASSERT(rq && buf);
         TEST_ASSERT(ALIGN_DOWN((vaddr_t) buf, PAGE_SIZE) == (vaddr_t) buf);
 
@@ -166,7 +168,7 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
     }
     ms = time_get_ms() - ms;
 
-    char *msg = kmalloc(100);
+    char *msg = kmalloc(100, ALLOC_PARAMS_DEFAULT);
     TEST_ASSERT(msg);
     snprintf(msg, 100, "Total time spent enqueuing is %d ms", ms);
     ADD_MESSAGE(msg);
@@ -179,14 +181,14 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
 
     for (uint64_t i = 0; i < BIO_SCHED_LEVELS; i++) {
         avg_complete_time[i] = total_complete_time[i] / runs_per_lvl[i];
-        char *msg = kzalloc(100);
+        char *msg = kzalloc(100, ALLOC_PARAMS_DEFAULT);
         TEST_ASSERT(msg);
         snprintf(msg, 100, "Average completion time of level %d is %d ms", i,
                  avg_complete_time[i]);
         ADD_MESSAGE(msg);
     }
 
-    char *m2 = kmalloc(100);
+    char *m2 = kmalloc(100, ALLOC_PARAMS_DEFAULT);
     TEST_ASSERT(m2);
     snprintf(m2, 100, "Runs is %d, test_runs is %d", atomic_load(&runs),
              BIO_SCHED_TEST_RUNS);

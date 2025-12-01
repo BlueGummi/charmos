@@ -28,7 +28,7 @@ REGISTER_TEST(workqueue_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     while (!atomic_load(&workqueue_ran))
         cpu_relax();
 
-    char *msg = kzalloc(100);
+    char *msg = kzalloc(100, ALLOC_PARAMS_DEFAULT);
     TEST_ASSERT(msg);
     snprintf(msg, 100, "Took %d clock cycles to add to event pool %d times",
              total, times);
@@ -36,7 +36,7 @@ REGISTER_TEST(workqueue_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     TEST_ASSERT(atomic_load(&workqueue_ran));
 
-    msg = kzalloc(100);
+    msg = kzalloc(100, ALLOC_PARAMS_DEFAULT);
     snprintf(msg, 100,
              "Event pool ran %d times, tests should've had it run %d times",
              workqueue_times, times);
@@ -114,7 +114,7 @@ REGISTER_TEST(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     uint64_t workers = wq->num_workers;
 
-    char *msg = kmalloc(100);
+    char *msg = kmalloc(100, ALLOC_PARAMS_DEFAULT);
     snprintf(msg, 100, "There are %d workers", workers);
     ADD_MESSAGE(msg);
 

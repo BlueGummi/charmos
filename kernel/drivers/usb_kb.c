@@ -149,12 +149,12 @@ bool usb_keyboard_probe(struct usb_device *dev) {
 
     uint8_t iface_num = intf->interface_number;
 
-    uint8_t *report_buf = kzalloc_aligned(256, PAGE_SIZE);
+    uint8_t *report_buf = kzalloc_aligned(256, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
     if (!usb_keyboard_get_descriptor(dev, iface_num, 256, report_buf)) {
         usb_warn("usbkbd: Failed to fetch report descriptor");
         return false;
     }
-    kfree_aligned(report_buf);
+    kfree_aligned(report_buf, FREE_PARAMS_DEFAULT);
 
     for (uint8_t i = 0; i < dev->num_endpoints; i++) {
         struct usb_endpoint *ep = dev->endpoints[i];

@@ -1,3 +1,4 @@
+#include <charmos.h>
 #include <console/panic.h>
 #include <mem/alloc.h>
 #include <sch/domain.h>
@@ -26,10 +27,11 @@ build_domain_for_level(enum topology_level lvl) {
     size_t n = t->count[lvl];
     struct topology_node *nodes = t->level[lvl];
 
-    struct scheduler_domain *d = kzalloc(sizeof(*d));
+    struct scheduler_domain *d = kzalloc(sizeof(*d), ALLOC_PARAMS_DEFAULT);
     d->level = lvl;
     d->ngroups = n;
-    d->groups = kzalloc(sizeof(struct scheduler_group) * n);
+    d->groups =
+        kzalloc(sizeof(struct scheduler_group) * n, ALLOC_PARAMS_DEFAULT);
 
     for (size_t i = 0; i < n; i++) {
         struct topology_node *node = &nodes[i];

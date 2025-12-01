@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <tests.h>
+#include <time.h>
 
 #include "acpi/hpet.h"
 #include <colors.h>

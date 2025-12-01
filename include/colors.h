@@ -1,4 +1,7 @@
-typedef enum {
+/* @title: Colors */
+
+#pragma once
+enum color {
     COLOR_RED,
     COLOR_GREEN,
     COLOR_YELLOW,
@@ -16,7 +19,7 @@ typedef enum {
     COLOR_BG_MAGENTA,
     COLOR_BG_CYAN,
     COLOR_BG_WHITE,
-} Color;
+};
 
 #define ANSI_RESET "\033[0m"
 #define ANSI_BOLD "\033[1m"
@@ -49,4 +52,3 @@ typedef enum {
 #define ANSI_BRIGHT_WHITE "\033[97m"
 #define ANSI_RED_CONST "\033[31m"
 #define ANSI_BOLD_CONST "\033[1m"
-#pragma once

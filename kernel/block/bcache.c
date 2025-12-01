@@ -44,7 +44,8 @@ static bool insert(struct bcache *cache, uint64_t key,
     }
 
     /* New head */
-    struct bcache_wrapper *new_node = kmalloc(sizeof(struct bcache_wrapper));
+    struct bcache_wrapper *new_node =
+        kmalloc(sizeof(struct bcache_wrapper), ALLOC_PARAMS_PAGEABLE);
     if (!new_node) {
         if (!already_locked)
             spin_unlock(&cache->lock, irql);
@@ -126,7 +127,7 @@ static bool remove(struct bcache *cache, uint64_t key, uint64_t spb) {
 
             struct bcache_entry *val = node->value;
             cache->count--;
-            kfree(node);
+            kfree(node, FREE_PARAMS_DEFAULT);
 
             bool should_free = false;
             if (val && key == val->lba && !val->no_evict) {
@@ -136,8 +137,8 @@ static bool remove(struct bcache *cache, uint64_t key, uint64_t spb) {
             }
 
             if (should_free) {
-                kfree_aligned(val->buffer);
-                kfree(val);
+                kfree_aligned(val->buffer, FREE_PARAMS_DEFAULT);
+                kfree(val, FREE_PARAMS_DEFAULT);
             }
 
             spin_unlock(&cache->lock, irql);
@@ -161,8 +162,8 @@ static void prefetch_callback(struct bio_request *bio) {
     struct bcache_pf_data *data = bio->user_data;
     insert(data->cache, bio->lba, data->new_entry, false);
 
-    kfree(data);
-    kfree(bio);
+    kfree(data, FREE_PARAMS_DEFAULT);
+    kfree(bio, FREE_PARAMS_DEFAULT);
 }
 
 static enum errno prefetch(struct generic_disk *disk, struct bcache *cache,
@@ -173,7 +174,8 @@ static enum errno prefetch(struct generic_disk *disk, struct bcache *cache,
     if (get(cache, base_lba))
         return ERR_EXIST;
 
-    struct bcache_pf_data *pf = kmalloc(sizeof(struct bcache_pf_data));
+    struct bcache_pf_data *pf =
+        kmalloc(sizeof(struct bcache_pf_data), ALLOC_PARAMS_DEFAULT);
     if (!pf)
         return ERR_NO_MEM;
 
@@ -183,7 +185,7 @@ static enum errno prefetch(struct generic_disk *disk, struct bcache *cache,
         return ERR_NO_MEM;
 
     pf->cache = cache;
-    pf->new_entry = kzalloc(sizeof(struct bcache_entry));
+    pf->new_entry = kzalloc(sizeof(struct bcache_entry), ALLOC_PARAMS_DEFAULT);
     if (!pf->new_entry)
         return ERR_NO_MEM;
 
@@ -271,7 +273,7 @@ static bool write(struct generic_disk *d, struct bcache *cache,
     bool ret = d->write_sector(d, ent->lba, ent->buffer, spb);
     uint64_t aligned = ALIGN_DOWN(ent->lba, spb);
     if (aligned != ent->lba)
-        kfree(ent);
+        kfree(ent, FREE_PARAMS_DEFAULT);
 
     spin_unlock(&cache->lock, irql);
     return ret;
@@ -284,7 +286,7 @@ static void write_enqueue_cb(struct bio_request *req) {
     ent->request = NULL;
     bcache_ent_unpin(ent);
 
-    kfree(req);
+    kfree(req, FREE_PARAMS_DEFAULT);
 }
 
 static void write_queue(struct generic_disk *d, struct bcache_entry *ent,
@@ -308,15 +310,15 @@ void bcache_destroy(struct bcache *cache) {
         while (node) {
             struct bcache_wrapper *next = node->next;
             if (node->value) {
-                kfree_aligned(node->value->buffer);
-                kfree(node->value);
+                kfree_aligned(node->value->buffer, FREE_PARAMS_DEFAULT);
+                kfree(node->value, FREE_PARAMS_DEFAULT);
             }
-            kfree(node);
+            kfree(node, FREE_PARAMS_DEFAULT);
             node = next;
         }
     }
 
-    kfree(cache->entries);
+    kfree(cache->entries, FREE_PARAMS_DEFAULT);
     cache->entries = NULL;
     cache->capacity = 0;
     cache->count = 0;
@@ -374,17 +376,18 @@ void *bcache_create_ent(struct generic_disk *disk, uint64_t lba,
 
     struct bcache_entry *ent = get(disk->cache, base_lba);
     if (!ent) {
-        uint8_t *buf = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+        uint8_t *buf = kmalloc_aligned(
+            PAGE_SIZE, PAGE_SIZE, ALLOC_FLAGS_PAGEABLE, ALLOC_BEHAVIOR_NORMAL);
         if (!buf)
             return NULL;
 
         if (!disk->read_sector(disk, base_lba, buf, sectors_per_block)) {
-            kfree_aligned(buf);
+            kfree_aligned(buf, FREE_PARAMS_DEFAULT);
             *out_entry = NULL;
             return NULL;
         }
 
-        ent = kzalloc(sizeof(struct bcache_entry));
+        ent = kzalloc(sizeof(struct bcache_entry), ALLOC_PARAMS_DEFAULT);
         if (!ent)
             return NULL;
 
@@ -413,7 +416,8 @@ void bcache_init(struct bcache *cache, uint64_t capacity) {
     spinlock_init(&cache->lock);
     cache->capacity = capacity;
     cache->count = 0;
-    cache->entries = kzalloc(sizeof(struct bcache_wrapper *) * capacity);
+    cache->entries = kzalloc(sizeof(struct bcache_wrapper *) * capacity,
+                             ALLOC_PARAMS_DEFAULT);
     if (!cache->entries)
         k_panic("Block cache initialization allocation failed\n");
 }

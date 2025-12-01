@@ -14,7 +14,7 @@
  * I can clone these per-NUMA node and make backpointers
  * via the per-core 'struct core' in the G segment register */
 struct charmos_globals {
-    volatile bool panic_in_progress;
+    volatile atomic_bool panicked;
     volatile enum bootstage current_bootstage;
 
     char *root_partition;

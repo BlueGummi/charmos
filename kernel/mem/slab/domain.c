@@ -13,10 +13,10 @@ void slab_domain_build_locality_lists(struct slab_domain *sdom) {
     sdom->nonpageable_zonelist.count = zl->count;
     sdom->zonelist_entry_count = zl->count;
 
-    sdom->pageable_zonelist.entries =
-        kzalloc(sizeof(struct slab_cache_ref) * zl->count);
-    sdom->nonpageable_zonelist.entries =
-        kzalloc(sizeof(struct slab_cache_ref) * zl->count);
+    sdom->pageable_zonelist.entries = kzalloc(
+        sizeof(struct slab_cache_ref) * zl->count, ALLOC_PARAMS_DEFAULT);
+    sdom->nonpageable_zonelist.entries = kzalloc(
+        sizeof(struct slab_cache_ref) * zl->count, ALLOC_PARAMS_DEFAULT);
 
     if (!sdom->nonpageable_zonelist.entries || !sdom->pageable_zonelist.entries)
         k_panic("Could not allocate slab domain zonelist entries!\n");
@@ -61,8 +61,10 @@ void slab_domain_link_caches(struct slab_domain *domain,
 }
 
 void slab_domain_init_caches(struct slab_domain *dom) {
-    dom->local_nonpageable_cache = kzalloc(sizeof(struct slab_caches));
-    dom->local_pageable_cache = kzalloc(sizeof(struct slab_caches));
+    dom->local_nonpageable_cache =
+        kzalloc(sizeof(struct slab_caches), ALLOC_PARAMS_DEFAULT);
+    dom->local_pageable_cache =
+        kzalloc(sizeof(struct slab_caches), ALLOC_PARAMS_DEFAULT);
     if (!dom->local_pageable_cache || !dom->local_nonpageable_cache)
         k_panic("Could not allocate slab cache\n");
 
@@ -114,7 +116,8 @@ void slab_domain_init_stats(struct slab_domain *domain) {
 
     domain->stats->private = domain;
     domain->buckets =
-        kzalloc(sizeof(struct slab_domain_bucket) * SLAB_STAT_SERIES_CAPACITY);
+        kzalloc(sizeof(struct slab_domain_bucket) * SLAB_STAT_SERIES_CAPACITY,
+                ALLOC_PARAMS_DEFAULT);
 
     if (!domain->stats || !domain->stats->buckets || !domain->buckets)
         k_panic("Failed to create domain stat series\n");
@@ -129,7 +132,8 @@ void slab_domain_init(void) {
 
     for (size_t i = 0; i < global.domain_count; i++) {
         struct domain *domain = global.domains[i];
-        struct slab_domain *sdomain = kzalloc(sizeof(struct slab_domain));
+        struct slab_domain *sdomain =
+            kzalloc(sizeof(struct slab_domain), ALLOC_PARAMS_DEFAULT);
         if (!sdomain)
             k_panic("Failed to allocate slab domain!\n");
 

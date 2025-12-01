@@ -132,6 +132,7 @@
  */
 
 #include <console/printf.h>
+#include <console/warn.h>
 #include <kassert.h>
 #include <math/sort.h>
 #include <mem/alloc.h>
@@ -165,7 +166,7 @@ void *slab_map_new_page(struct slab_domain *domain, paddr_t *phys_out,
     if (domain) {
         phys = domain_alloc_from_domain(domain->domain, 1);
     } else {
-        phys = pmm_alloc_page(ALLOC_FLAGS_NONE);
+        phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
     }
 
     *phys_out = phys;
@@ -604,7 +605,7 @@ void *kmalloc_pages_raw(struct slab_domain *parent, size_t size,
     return (void *) (hdr + 1);
 }
 
-void *kmalloc(size_t size) {
+void *kmalloc_old(size_t size) {
     if (size == 0)
         return NULL;
 
@@ -615,15 +616,7 @@ void *kmalloc(size_t size) {
         return slab_alloc_old(&slab_caches.caches[idx]);
 
     /* we say NULL and just free these to domain 0 */
-    return kmalloc_pages_raw(NULL, size, ALLOC_FLAGS_NONE);
-}
-
-void *kzalloc(uint64_t size) {
-    void *ptr = kmalloc(size);
-    if (!ptr)
-        return NULL;
-
-    return memset(ptr, 0, size);
+    return kmalloc_pages_raw(NULL, size, ALLOC_FLAGS_DEFAULT);
 }
 
 void slab_free_page_hdr(struct slab_page_hdr *hdr) {
@@ -655,33 +648,12 @@ void slab_free_addr_to_cache(void *addr) {
     slab_free_old(slab, addr);
 }
 
-void kfree(void *ptr) {
+void kfree_old(void *ptr) {
     if (!ptr)
         return;
 
     memset(ptr, 0x67, ksize(ptr));
     slab_free_addr_to_cache(ptr);
-}
-
-void *krealloc(void *ptr, uint64_t size) {
-    if (!ptr)
-        return kmalloc(size);
-
-    if (size == 0) {
-        kfree(ptr);
-        return NULL;
-    }
-
-    uint64_t old = ksize(ptr);
-    void *new_ptr = kmalloc(size);
-
-    if (!new_ptr)
-        return NULL;
-
-    uint64_t to_copy = (old < size) ? old : size;
-    memcpy(new_ptr, ptr, to_copy);
-    kfree(ptr);
-    return new_ptr;
 }
 
 void *kmalloc_pages(struct slab_domain *domain, size_t size,
@@ -1204,4 +1176,46 @@ garbage_collect:
 
 exit:
     scheduler_unpin_current_thread(flags);
+}
+
+void *kmalloc(size_t size, enum alloc_flags flags,
+              enum alloc_behavior behavior) {
+    return kmalloc_old(size);
+}
+
+void kfree(void *p, enum alloc_behavior behavior) {
+    if ((uint16_t)behavior == (uint16_t) ALLOC_FLAGS_DEFAULT)
+        k_info("SLAB", K_WARN, "Likely incorrect arguments passed into `kfree`");
+
+    kfree_old(p);
+}
+
+void *kzalloc(uint64_t size, enum alloc_flags f, enum alloc_behavior b) {
+    void *ptr = kmalloc(size, f, b);
+    if (!ptr)
+        return NULL;
+
+    return memset(ptr, 0, size);
+}
+
+void *krealloc(void *ptr, size_t size, enum alloc_flags flags,
+               enum alloc_behavior behavior) {
+    if (!ptr)
+        return kmalloc(size, flags, behavior);
+
+    if (size == 0) {
+        kfree(ptr, behavior);
+        return NULL;
+    }
+
+    uint64_t old = ksize(ptr);
+    void *new_ptr = kmalloc(size, flags, behavior);
+
+    if (!new_ptr)
+        return NULL;
+
+    uint64_t to_copy = (old < size) ? old : size;
+    memcpy(new_ptr, ptr, to_copy);
+    kfree_old(ptr);
+    return new_ptr;
 }

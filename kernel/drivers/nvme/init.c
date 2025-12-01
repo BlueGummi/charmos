@@ -71,14 +71,14 @@ void nvme_alloc_admin_queues(struct nvme_device *nvme) {
     uint64_t asq_pages = DIV_ROUND_UP(asq_size, nvme->page_size);
     uint64_t acq_pages = DIV_ROUND_UP(acq_size, nvme->page_size);
 
-    uint64_t asq_phys = pmm_alloc_pages(asq_pages, ALLOC_FLAGS_NONE);
+    uint64_t asq_phys = pmm_alloc_pages(asq_pages, ALLOC_FLAGS_DEFAULT);
 
     struct nvme_command *asq_virt =
         vmm_map_phys(asq_phys, asq_pages * nvme->page_size, PAGING_UNCACHABLE);
 
     memset(asq_virt, 0, asq_pages * nvme->page_size);
 
-    uint64_t acq_phys = pmm_alloc_pages(acq_pages, ALLOC_FLAGS_NONE);
+    uint64_t acq_phys = pmm_alloc_pages(acq_pages, ALLOC_FLAGS_DEFAULT);
 
     struct nvme_completion *acq_virt =
         vmm_map_phys(acq_phys, acq_pages * nvme->page_size, PAGING_UNCACHABLE);
@@ -95,7 +95,8 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
     if (!qid)
         k_panic("Can't allocate IO queue zero!\n");
 
-    nvme->io_queues[qid] = kzalloc(sizeof(struct nvme_queue));
+    nvme->io_queues[qid] =
+        kzalloc(sizeof(struct nvme_queue), ALLOC_PARAMS_DEFAULT);
     if (unlikely(!nvme->io_queues[qid]))
         k_panic("NVMe IO queue allocation failed!\n");
 
@@ -104,13 +105,13 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
     uint64_t sq_pages = 2;
     uint64_t cq_pages = 2;
 
-    uint64_t sq_phys = pmm_alloc_pages(sq_pages, ALLOC_FLAGS_NONE);
+    uint64_t sq_phys = pmm_alloc_pages(sq_pages, ALLOC_FLAGS_DEFAULT);
 
     this_queue->sq =
         vmm_map_phys(sq_phys, sq_pages * nvme->page_size, PAGING_NO_FLAGS);
     memset(this_queue->sq, 0, sq_pages * nvme->page_size);
 
-    uint64_t cq_phys = pmm_alloc_pages(cq_pages, ALLOC_FLAGS_NONE);
+    uint64_t cq_phys = pmm_alloc_pages(cq_pages, ALLOC_FLAGS_DEFAULT);
 
     this_queue->cq =
         vmm_map_phys(cq_phys, cq_pages * nvme->page_size, PAGING_NO_FLAGS);

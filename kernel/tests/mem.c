@@ -13,7 +13,7 @@
 REGISTER_TEST(pmm_alloc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
-    paddr_t p = pmm_alloc_page(ALLOC_FLAGS_NONE);
+    paddr_t p = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
     TEST_ASSERT(p);
     SET_SUCCESS();
 }
@@ -21,7 +21,7 @@ REGISTER_TEST(pmm_alloc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 REGISTER_TEST(vmm_map_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
-    uint64_t p = pmm_alloc_page(ALLOC_FLAGS_NONE);
+    uint64_t p = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
     TEST_ASSERT(p != 0);
     void *ptr = vmm_map_phys(p, PAGE_SIZE, 0);
     TEST_ASSERT(ptr != NULL);
@@ -41,7 +41,7 @@ REGISTER_TEST(vmm_map_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     REGISTER_TEST(kmalloc_aligned_##name##_test, false, false) {               \
         ABORT_IF_RAM_LOW();                                                    \
         for (uint64_t i = 0; i < ALIGNED_ALLOC_TIMES; i++) {                   \
-            void *ptr = kmalloc_aligned(align, align);                         \
+            void *ptr = kmalloc_aligned(align, align, ALLOC_PARAMS_DEFAULT);   \
             TEST_ASSERT(ptr != NULL);                                          \
             ASSERT_ALIGNED(ptr, align);                                        \
         }                                                                      \
@@ -60,7 +60,7 @@ REGISTER_TEST(pmm_stress_alloc_free_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
-        pmm_stress_test_ptrs[i] = pmm_alloc_page(ALLOC_FLAGS_NONE);
+        pmm_stress_test_ptrs[i] = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
         TEST_ASSERT(pmm_stress_test_ptrs[i] != 0);
     }
 
@@ -76,21 +76,21 @@ REGISTER_TEST(kmalloc_stress_alloc_free_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
-        stress_alloc_free_ptrs[i] = kmalloc(64);
+        stress_alloc_free_ptrs[i] = kmalloc(64, ALLOC_PARAMS_DEFAULT);
         TEST_ASSERT(stress_alloc_free_ptrs[i] != NULL);
     }
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
         uint64_t idx = prng_next() % STRESS_ALLOC_TIMES;
         if (stress_alloc_free_ptrs[idx]) {
-            kfree(stress_alloc_free_ptrs[idx]);
+            kfree(stress_alloc_free_ptrs[idx], FREE_PARAMS_DEFAULT);
             stress_alloc_free_ptrs[idx] = NULL;
         }
     }
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
         if (stress_alloc_free_ptrs[i]) {
-            kfree(stress_alloc_free_ptrs[i]);
+            kfree(stress_alloc_free_ptrs[i], FREE_PARAMS_DEFAULT);
         }
     }
 
@@ -103,12 +103,12 @@ REGISTER_TEST(kmalloc_mixed_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
-        mixed_stress_test_ptrs[i] = kmalloc(128);
+        mixed_stress_test_ptrs[i] = kmalloc(128, ALLOC_PARAMS_DEFAULT);
         TEST_ASSERT(mixed_stress_test_ptrs[i] != NULL);
     }
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
-        kfree(mixed_stress_test_ptrs[i]);
+        kfree(mixed_stress_test_ptrs[i], FREE_PARAMS_DEFAULT);
     }
 
     SET_SUCCESS();
@@ -123,7 +123,7 @@ static void mt_kmalloc_worker() {
     void *ptrs[MT_ALLOC_TIMES] = {0};
 
     for (uint64_t i = 0; i < MT_ALLOC_TIMES; i++) {
-        ptrs[i] = kmalloc(64);
+        ptrs[i] = kmalloc(64, ALLOC_PARAMS_DEFAULT);
         TEST_ASSERT(ptrs[i] != NULL);
     }
 
@@ -131,14 +131,14 @@ static void mt_kmalloc_worker() {
         uint64_t idx = prng_next() % MT_ALLOC_TIMES;
 
         if (ptrs[idx]) {
-            kfree(ptrs[idx]);
+            kfree(ptrs[idx], FREE_PARAMS_DEFAULT);
             ptrs[idx] = NULL;
         }
     }
 
     for (uint64_t i = 0; i < MT_ALLOC_TIMES; i++) {
         if (ptrs[i])
-            kfree(ptrs[i]);
+            kfree(ptrs[i], FREE_PARAMS_DEFAULT);
     }
 
     kmalloc_done++;
@@ -164,7 +164,7 @@ REGISTER_TEST(kmalloc_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 static char hooray[128] = {0};
 REGISTER_TEST(kmalloc_new_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
-    void *p = kmalloc_new(67, ALLOC_FLAGS_NONE, ALLOC_BEHAVIOR_NORMAL);
+    void *p = kmalloc_new(67, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
 
     time_t ms = time_get_ms();
     kfree_new(p, ALLOC_BEHAVIOR_NORMAL);
@@ -183,9 +183,9 @@ REGISTER_TEST(kmalloc_new_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 static char a_msg[128];
 REGISTER_TEST(kmalloc_new_basic_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
-    void *p1 = kmalloc_new(1, ALLOC_FLAGS_NONE, ALLOC_BEHAVIOR_NORMAL);
-    void *p2 = kmalloc_new(64, ALLOC_FLAGS_NONE, ALLOC_BEHAVIOR_NORMAL);
-    void *p3 = kmalloc_new(4096, ALLOC_FLAGS_NONE, ALLOC_BEHAVIOR_NORMAL);
+    void *p1 = kmalloc_new(1, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
+    void *p2 = kmalloc_new(64, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
+    void *p3 = kmalloc_new(4096, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
 
     if (!p1 || !p2 || !p3) {
         ADD_MESSAGE("kmalloc_new returned NULL for a valid request");
@@ -295,7 +295,8 @@ static void stress_worker() {
         ;
 
     /* allocate small tracking table dynamically */
-    void **live_ptrs = kmalloc(sizeof(void *) * MAX_LIVE_ALLOCS);
+    void **live_ptrs =
+        kmalloc(sizeof(void *) * MAX_LIVE_ALLOCS, ALLOC_PARAMS_DEFAULT);
     memset(live_ptrs, 0, sizeof(void *) * MAX_LIVE_ALLOCS);
 
     for (int iter = 0; iter < STRESS_ITERS; ++iter) {
@@ -310,7 +311,7 @@ static void stress_worker() {
 
         /* Allocate with randomized size and flags */
         size_t sz = 8 + (prng_next() % 512); /* small to moderate allocations */
-        uint16_t flags = ALLOC_FLAGS_NONE;
+        uint16_t flags = ALLOC_FLAGS_DEFAULT;
 
         if (prng_next() & 1) {
             flags |= ALLOC_FLAG_PREFER_CACHE_ALIGNED;
@@ -349,7 +350,7 @@ static void stress_worker() {
             kfree_new(live_ptrs[i], ALLOC_BEHAVIOR_NORMAL);
     }
 
-    kfree(live_ptrs);
+    kfree(live_ptrs, FREE_PARAMS_DEFAULT);
     *a->done_flag = 1;
 }
 
@@ -406,8 +407,8 @@ REGISTER_TEST(kmalloc_new_alloc_free_sequence_test, SHOULD_NOT_FAIL,
 
     void *blocks[16];
     for (size_t i = 0; i < sizeof(blocks) / sizeof(blocks[0]); ++i) {
-        blocks[i] =
-            kmalloc_new(64 + (i * 8), ALLOC_FLAGS_NONE, ALLOC_BEHAVIOR_NORMAL);
+        blocks[i] = kmalloc_new(64 + (i * 8), ALLOC_FLAGS_DEFAULT,
+                                ALLOC_BEHAVIOR_NORMAL);
         if (!blocks[i]) {
             ADD_MESSAGE("failed to allocate block in sequence");
             /* free what we did get */

@@ -20,12 +20,13 @@ static void nvme_on_bio_complete(struct nvme_request *req) {
     if (bio->on_complete)
         bio->on_complete(bio);
 
-    kfree(req);
+    kfree(req, FREE_PARAMS_DEFAULT);
 }
 
 bool nvme_submit_bio_request(struct generic_disk *disk,
                              struct bio_request *bio) {
-    struct nvme_request *req = kzalloc(sizeof(struct nvme_request));
+    struct nvme_request *req =
+        kzalloc(sizeof(struct nvme_request), ALLOC_PARAMS_DEFAULT);
     if (!req)
         return false;
 

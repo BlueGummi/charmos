@@ -15,7 +15,7 @@ static size_t vas_range_get_data(struct rbt_node *n) {
 
 static void vasrange_refill(struct vas_space *space) {
     kassert(spinlock_held(&space->lock));
-    uintptr_t phys = pmm_alloc_page(ALLOC_FLAGS_NONE);
+    uintptr_t phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
     if (!phys)
         k_panic("OOM allocating vas_range page");
 
@@ -46,7 +46,7 @@ void vasrange_free(struct vas_space *space, struct vas_range *r) {
 
 __no_sanitize_address struct vas_space *vas_space_bootstrap(vaddr_t base,
                                                             vaddr_t limit) {
-    uintptr_t phys = pmm_alloc_page(ALLOC_FLAGS_NONE);
+    uintptr_t phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
     if (!phys)
         k_panic("OOM creating vas_space");
 
@@ -65,7 +65,8 @@ __no_sanitize_address struct vas_space *vas_space_bootstrap(vaddr_t base,
 }
 
 struct vas_space *vas_space_init(vaddr_t base, vaddr_t limit) {
-    struct vas_space *vas = kzalloc(sizeof(struct vas_space));
+    struct vas_space *vas =
+        kzalloc(sizeof(struct vas_space), ALLOC_PARAMS_DEFAULT);
     if (!vas)
         return NULL;
 

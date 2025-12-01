@@ -38,7 +38,7 @@ void asan_init(void) {
     asan_shadow_size = (global.total_pages * PAGE_SIZE) >> ASAN_SHADOW_SCALE;
 
     paddr_t shadow_phys = pmm_alloc_pages(
-        (asan_shadow_size + PAGE_SIZE - 1) / PAGE_SIZE, ALLOC_FLAGS_NONE);
+        (asan_shadow_size + PAGE_SIZE - 1) / PAGE_SIZE, ALLOC_FLAGS_DEFAULT);
 
     if (!shadow_phys)
         k_panic("ASAN: could not allocate shadow memory\n");

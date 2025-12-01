@@ -45,8 +45,8 @@ static bool fat12_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
     uint32_t fat_size = fs->fat_size;
     bool result = true;
 
-    uint8_t *buf1 = kmalloc(disk->sector_size);
-    uint8_t *buf2 = kmalloc(disk->sector_size);
+    uint8_t *buf1 = kmalloc(disk->sector_size, ALLOC_PARAMS_DEFAULT);
+    uint8_t *buf2 = kmalloc(disk->sector_size, ALLOC_PARAMS_DEFAULT);
     if (!buf1 || !buf2)
         return false;
 
@@ -99,8 +99,8 @@ static bool fat12_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
         }
     }
 
-    kfree(buf1);
-    kfree(buf2);
+    kfree(buf1, FREE_PARAMS_DEFAULT);
+    kfree(buf2, FREE_PARAMS_DEFAULT);
     return result;
 }
 
@@ -111,7 +111,7 @@ static bool fat16_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
     uint32_t fat_offset = cluster * 2;
     uint32_t offset = fat_offset % fs->bpb->bytes_per_sector;
     uint32_t fat_size = fs->bpb->fat_size_16;
-    uint8_t *buf = kmalloc(disk->sector_size);
+    uint8_t *buf = kmalloc(disk->sector_size, ALLOC_PARAMS_DEFAULT);
     if (!buf)
         return false;
 
@@ -136,7 +136,7 @@ static bool fat16_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
         }
     }
 
-    kfree(buf);
+    kfree(buf, FREE_PARAMS_DEFAULT);
     return result;
 }
 
@@ -146,7 +146,7 @@ static bool fat32_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
     uint32_t fat_offset = cluster * 4;
     uint32_t offset = fat_offset % fs->bpb->bytes_per_sector;
     uint32_t fat_size = fs->fat_size;
-    uint8_t *buf = kmalloc(disk->sector_size);
+    uint8_t *buf = kmalloc(disk->sector_size, ALLOC_PARAMS_DEFAULT);
     if (!buf)
         return false;
 
@@ -172,7 +172,7 @@ static bool fat32_write_fat_entry(struct fat_fs *fs, uint32_t cluster,
         }
     }
 
-    kfree(buf);
+    kfree(buf, FREE_PARAMS_DEFAULT);
     return result;
 }
 
@@ -214,7 +214,7 @@ static uint32_t fat12_read_fat_entry(struct fat_fs *fs, uint32_t cluster) {
 
     sector += fs->volume_base_lba;
 
-    uint8_t *buf = kmalloc(disk->sector_size);
+    uint8_t *buf = kmalloc(disk->sector_size, ALLOC_PARAMS_DEFAULT);
     uint8_t *buf2 = NULL;
     uint32_t result = 0xFFFFFFFF;
 
@@ -225,7 +225,7 @@ static uint32_t fat12_read_fat_entry(struct fat_fs *fs, uint32_t cluster) {
         goto done;
 
     if (offset == fs->bpb->bytes_per_sector - 1) {
-        buf2 = kmalloc(disk->sector_size);
+        buf2 = kmalloc(disk->sector_size, ALLOC_PARAMS_DEFAULT);
         if (!buf2)
             return result;
 
@@ -239,9 +239,9 @@ static uint32_t fat12_read_fat_entry(struct fat_fs *fs, uint32_t cluster) {
     }
 
 done:
-    kfree(buf);
+    kfree(buf, FREE_PARAMS_DEFAULT);
     if (buf2)
-        kfree(buf2);
+        kfree(buf2, FREE_PARAMS_DEFAULT);
     return result;
 }
 
@@ -256,7 +256,7 @@ static uint32_t fat16_read_fat_entry(struct fat_fs *fs, uint32_t cluster) {
 
     sector += fs->volume_base_lba;
 
-    uint8_t *buf = kmalloc(disk->sector_size);
+    uint8_t *buf = kmalloc(disk->sector_size, ALLOC_PARAMS_DEFAULT);
     uint32_t result = 0xFFFFFFFF;
     if (!buf)
         return result;
@@ -264,7 +264,7 @@ static uint32_t fat16_read_fat_entry(struct fat_fs *fs, uint32_t cluster) {
     if (disk->read_sector(disk, sector, buf, 1))
         result = *(uint16_t *) &buf[offset];
 
-    kfree(buf);
+    kfree(buf, FREE_PARAMS_DEFAULT);
     return result;
 }
 
@@ -277,7 +277,7 @@ static uint32_t fat32_read_fat_entry(struct fat_fs *fs, uint32_t cluster) {
 
     sector += fs->volume_base_lba;
 
-    uint8_t *buf = kmalloc(disk->sector_size);
+    uint8_t *buf = kmalloc(disk->sector_size, ALLOC_PARAMS_DEFAULT);
     uint32_t result = 0xFFFFFFFF;
     if (!buf)
         return result;
@@ -285,7 +285,7 @@ static uint32_t fat32_read_fat_entry(struct fat_fs *fs, uint32_t cluster) {
     if (disk->read_sector(disk, sector, buf, 1))
         result = *(uint32_t *) &buf[offset] & 0x0FFFFFFF;
 
-    kfree(buf);
+    kfree(buf, FREE_PARAMS_DEFAULT);
     return result;
 }
 
@@ -317,28 +317,28 @@ bool fat_write_dirent(struct fat_fs *fs, uint32_t dir_cluster,
         uint32_t lba =
             fat_cluster_to_lba(fs, FAT_DIR_CLUSTER_ROOT) + sector_offset;
 
-        uint8_t *sector_buf = kmalloc(bytes_per_sector);
+        uint8_t *sector_buf = kmalloc(bytes_per_sector, ALLOC_PARAMS_DEFAULT);
         if (!sector_buf)
             return false;
 
         if (!fs->disk->read_sector(fs->disk, lba, sector_buf, 1)) {
-            kfree(sector_buf);
+            kfree(sector_buf, FREE_PARAMS_DEFAULT);
             return false;
         }
 
         memcpy(sector_buf + offset_in_sector, dirent_to_write, dirent_size);
 
         bool success = fs->disk->write_sector(fs->disk, lba, sector_buf, 1);
-        kfree(sector_buf);
+        kfree(sector_buf, FREE_PARAMS_DEFAULT);
         return success;
     }
 
-    uint8_t *cluster_buf = kmalloc(fs->cluster_size);
+    uint8_t *cluster_buf = kmalloc(fs->cluster_size, ALLOC_PARAMS_DEFAULT);
     if (!cluster_buf)
         return false;
 
     if (!fat_read_cluster(fs, current_cluster, cluster_buf)) {
-        kfree(cluster_buf);
+        kfree(cluster_buf, FREE_PARAMS_DEFAULT);
         return false;
     }
 
@@ -347,6 +347,6 @@ bool fat_write_dirent(struct fat_fs *fs, uint32_t dir_cluster,
 
     bool success = fat_write_cluster(fs, current_cluster, cluster_buf);
 
-    kfree(cluster_buf);
+    kfree(cluster_buf, FREE_PARAMS_DEFAULT);
     return success;
 }

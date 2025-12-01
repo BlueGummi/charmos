@@ -99,7 +99,8 @@ void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
         }
     }
 
-    pci_devices = kmalloc(space_to_alloc * sizeof(struct pci_device));
+    pci_devices = kmalloc(space_to_alloc * sizeof(struct pci_device),
+                          ALLOC_PARAMS_DEFAULT);
     if (!pci_devices)
         k_panic("Could not allocate space for PCI devices\n");
 

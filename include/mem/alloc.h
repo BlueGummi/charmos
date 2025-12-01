@@ -5,6 +5,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/*
+ * TL;DR: ALLOCATION FLAGS TELL THE ALLOCATOR WHAT KIND OF MEMORY
+ *        YOU WANT, ALLOCATION BEHAVIORS TELL THE ALLOCATOR
+ *        WHAT IT IS ALLOWED TO DO TO GET THAT MEMORY.
+ */
+
 /* ─────────────────────────── ALLOC FLAGS ─────────────────────────── */
 
 #define ALLOC_LOCALITY_SHIFT 8
@@ -76,10 +82,14 @@ enum alloc_flags : uint16_t {
     ALLOC_FLAG_CLASS_HIGH_BANDWIDTH = (2 << ALLOC_CLASS_SHIFT),
 };
 
-#define ALLOC_FLAGS_NONE                                                       \
+#define ALLOC_FLAGS_DEFAULT                                                    \
     (ALLOC_FLAG_CLASS_DEFAULT | ALLOC_FLAG_FLEXIBLE_LOCALITY |                 \
      ALLOC_FLAG_NONMOVABLE | ALLOC_FLAG_NONPAGEABLE |                          \
-     ALLOC_FLAG_NO_CACHE_ALIGN)
+     ALLOC_FLAG_NO_CACHE_ALIGN | ALLOC_LOCALITY_TO_FLAGS(ALLOC_LOCALITY_MIN))
+
+#define ALLOC_FLAGS_PAGEABLE                                                   \
+    ALLOC_FLAG_PAGEABLE | ALLOC_FLAG_CLASS_DEFAULT |                           \
+        ALLOC_FLAG_FLEXIBLE_LOCALITY
 
 static inline bool alloc_flags_valid(uint16_t flags) {
     if ((flags & ALLOC_FLAG_FLEXIBLE_LOCALITY) &&
@@ -131,6 +141,7 @@ enum alloc_behavior : uint8_t {
     ALLOC_BEHAVIOR_FAULT_SAFE,
     ALLOC_BEHAVIOR_FLAG_FAST = 1 << ALLOC_BEHAVIOR_FLAG_SHIFT,
 };
+#define ALLOC_BEHAVIOR_DEFAULT ALLOC_BEHAVIOR_NORMAL
 
 /* ────────────────────────────────────────────────────────────────────────── */
 
@@ -233,17 +244,26 @@ static inline void alloc_request_sanitize(enum alloc_flags *f,
     }
 }
 
-void *kmalloc(uint64_t size);
-void *krealloc(void *ptr, uint64_t size);
-void *kzalloc(uint64_t size);
-void kfree(void *ptr);
-size_t ksize(void *ptr);
-void *kmalloc_aligned(uint64_t size, uint64_t align);
-void *kzalloc_aligned(uint64_t size, uint64_t align);
-void kfree_aligned(void *ptr);
+#define ALLOC_PARAMS_PAGEABLE ALLOC_FLAGS_PAGEABLE, ALLOC_BEHAVIOR_DEFAULT
+#define ALLOC_PARAMS_DEFAULT ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_DEFAULT
+#define FREE_PARAMS_DEFAULT ALLOC_BEHAVIOR_DEFAULT
+
 void *kmalloc_new(size_t size, enum alloc_flags flags,
                   enum alloc_behavior behavior);
 void kfree_new(void *ptr, enum alloc_behavior behavior);
 void *kmalloc_from_domain(size_t domain, size_t size);
 
-#pragma once
+void *kmalloc(size_t size, enum alloc_flags flags,
+              enum alloc_behavior behavior);
+void *krealloc(void *ptr, size_t size, enum alloc_flags flags,
+               enum alloc_behavior behavior);
+void *kzalloc(size_t size, enum alloc_flags flags,
+              enum alloc_behavior behavior);
+void kfree(void *ptr, enum alloc_behavior behavior);
+size_t ksize(void *ptr);
+void *kmalloc_aligned(size_t size, size_t align, enum alloc_flags flags,
+                      enum alloc_behavior behavior);
+void *kzalloc_aligned(size_t size, size_t align, enum alloc_flags flags,
+                      enum alloc_behavior behavior);
+
+void kfree_aligned(void *ptr, enum alloc_behavior behavior);

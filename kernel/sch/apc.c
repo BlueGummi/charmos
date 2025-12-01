@@ -231,7 +231,7 @@ void apc_enqueue_on_curr(struct apc *a, enum apc_type type) {
 }
 
 struct apc *apc_create(void) {
-    return kmalloc(sizeof(struct apc));
+    return kmalloc(sizeof(struct apc), ALLOC_PARAMS_DEFAULT);
 }
 
 void apc_init(struct apc *a, apc_func_t fn, void *arg1, void *arg2) {
@@ -252,7 +252,7 @@ void thread_free_event_apcs(struct thread *t) {
         list_for_each_safe(iter, n, list) {
             struct apc *apc = apc_from_list_node(iter);
             if (apc)
-                kfree(apc);
+                kfree(apc, FREE_PARAMS_DEFAULT);
         }
     }
 }

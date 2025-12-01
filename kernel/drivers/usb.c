@@ -24,7 +24,7 @@ bool usb_get_string_descriptor(struct usb_device *dev, uint8_t string_idx,
         return false;
 
     struct usb_controller *ctrl = dev->host;
-    uint8_t *desc = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    uint8_t *desc = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
 
     struct usb_setup_packet setup = {
         .bitmap_request_type = get_desc_bitmap(),
@@ -52,12 +52,12 @@ bool usb_get_string_descriptor(struct usb_device *dev, uint8_t string_idx,
     }
     out[out_idx] = '\0';
 
-    kfree_aligned(desc);
+    kfree_aligned(desc, FREE_PARAMS_DEFAULT);
     return true;
 }
 
 void usb_get_device_descriptor(struct usb_device *dev) {
-    uint8_t *desc = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    uint8_t *desc = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
 
     struct usb_setup_packet setup = {
         .bitmap_request_type = get_desc_bitmap(),
@@ -131,22 +131,23 @@ static void
 usb_register_dev_interface(struct usb_device *dev,
                            struct usb_interface_descriptor *interface) {
     struct usb_interface_descriptor *new_int =
-        kmalloc(sizeof(struct usb_interface_descriptor));
+        kmalloc(sizeof(struct usb_interface_descriptor), ALLOC_PARAMS_DEFAULT);
     memcpy(new_int, interface, sizeof(struct usb_interface_descriptor));
 
     size_t size = (dev->num_interfaces + 1) * sizeof(void *);
 
-    dev->interfaces = krealloc(dev->interfaces, size);
+    dev->interfaces = krealloc(dev->interfaces, size, ALLOC_PARAMS_DEFAULT);
     dev->interfaces[dev->num_interfaces++] = new_int;
 }
 
 static void usb_register_dev_ep(struct usb_device *dev,
                                 struct usb_endpoint_descriptor *endpoint) {
     struct usb_endpoint_descriptor *new_ep =
-        kmalloc(sizeof(struct usb_endpoint_descriptor));
+        kmalloc(sizeof(struct usb_endpoint_descriptor), ALLOC_PARAMS_DEFAULT);
     memcpy(new_ep, endpoint, sizeof(struct usb_endpoint_descriptor));
 
-    struct usb_endpoint *ep = kzalloc(sizeof(struct usb_endpoint));
+    struct usb_endpoint *ep =
+        kzalloc(sizeof(struct usb_endpoint), ALLOC_PARAMS_DEFAULT);
 
     ep->type = USB_ENDPOINT_ATTR_TRANS_TYPE(endpoint->attributes);
     ep->number = USB_ENDPOINT_ADDR_EP_NUM(endpoint->address);
@@ -157,7 +158,7 @@ static void usb_register_dev_ep(struct usb_device *dev,
     ep->in = USB_ENDPOINT_ADDR_EP_DIRECTION(endpoint->address);
 
     size_t size = (dev->num_endpoints + 1) * sizeof(void *);
-    dev->endpoints = krealloc(dev->endpoints, size);
+    dev->endpoints = krealloc(dev->endpoints, size, ALLOC_PARAMS_DEFAULT);
     dev->endpoints[dev->num_endpoints++] = ep;
 }
 
@@ -180,7 +181,7 @@ static void setup_config_descriptor(struct usb_device *dev, uint8_t *ptr,
 }
 
 bool usb_parse_config_descriptor(struct usb_device *dev) {
-    uint8_t *desc = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    uint8_t *desc = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
 
     struct usb_setup_packet setup = {
         .bitmap_request_type = get_desc_bitmap(),
@@ -201,7 +202,7 @@ bool usb_parse_config_descriptor(struct usb_device *dev) {
 
     if (!ctrl->ops.submit_control_transfer(dev, &packet)) {
         usb_warn("Failed to get config descriptor header on port %u", port);
-        kfree_aligned(desc);
+        kfree_aligned(desc, FREE_PARAMS_DEFAULT);
         return false;
     }
 
@@ -213,7 +214,7 @@ bool usb_parse_config_descriptor(struct usb_device *dev) {
 
     if (!ctrl->ops.submit_control_transfer(dev, &packet)) {
         usb_warn("Failed to get full config descriptor on port %u", port);
-        kfree_aligned(desc);
+        kfree_aligned(desc, FREE_PARAMS_DEFAULT);
         return false;
     }
 
@@ -222,7 +223,7 @@ bool usb_parse_config_descriptor(struct usb_device *dev) {
     k_printf("CONFIG is %s\n", conf);
 
     setup_config_descriptor(dev, desc, desc + total_len);
-    kfree_aligned(desc);
+    kfree_aligned(desc, FREE_PARAMS_DEFAULT);
     return true;
 }
 

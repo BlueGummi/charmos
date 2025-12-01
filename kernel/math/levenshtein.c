@@ -8,8 +8,8 @@ int64_t levenshtein_distance(const char *s1, const char *s2) {
     int64_t len1 = strlen(s1);
     int64_t len2 = strlen(s2);
 
-    int64_t *prev = kmalloc((len2 + 1) * sizeof(int64_t));
-    int64_t *curr = kmalloc((len2 + 1) * sizeof(int64_t));
+    int64_t *prev = kmalloc((len2 + 1) * sizeof(int64_t), ALLOC_PARAMS_DEFAULT);
+    int64_t *curr = kmalloc((len2 + 1) * sizeof(int64_t), ALLOC_PARAMS_DEFAULT);
     if (!prev || !curr)
         return -1;
 
@@ -29,7 +29,7 @@ int64_t levenshtein_distance(const char *s1, const char *s2) {
     }
 
     int64_t result = prev[len2];
-    kfree(prev);
-    kfree(curr);
+    kfree(prev, FREE_PARAMS_DEFAULT);
+    kfree(curr, FREE_PARAMS_DEFAULT);
     return result;
 }

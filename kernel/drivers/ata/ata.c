@@ -98,7 +98,7 @@ bool ata_setup_drive(struct ata_drive *ide, struct pci_device *devices,
                     : ((channel == 0) ? ATA_PRIMARY_CTRL : ATA_SECONDARY_CTRL);
 
             ide->slave = is_slave;
-            ide->identify_data = kmalloc(512);
+            ide->identify_data = kmalloc(512, ALLOC_PARAMS_DEFAULT);
             if (!ide->identify_data)
                 k_panic("Could not allocate space for IDE Identify\n");
 
@@ -128,7 +128,8 @@ bool ata_setup_drive(struct ata_drive *ide, struct pci_device *devices,
 static uint64_t ide_cnt = 1, atapi_cnt = 1;
 
 void ata_init(struct pci_device *devices, uint64_t count) {
-    struct ata_drive *drives = kzalloc(sizeof(struct ata_drive) * 4);
+    struct ata_drive *drives =
+        kzalloc(sizeof(struct ata_drive) * 4, ALLOC_PARAMS_DEFAULT);
     if (!drives)
         k_panic("Could not allocate space for devices\n");
 

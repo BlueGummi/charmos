@@ -6,7 +6,7 @@
 /* simple alloc used for bootstrapping systems */
 void *simple_alloc(struct vas_space *space, size_t size) {
     size_t pages = PAGES_NEEDED_FOR(size);
-    paddr_t phys_base = pmm_alloc_pages(pages, ALLOC_FLAGS_NONE);
+    paddr_t phys_base = pmm_alloc_pages(pages, ALLOC_FLAGS_DEFAULT);
 
     vaddr_t area = vas_alloc(space, size, PAGE_SIZE);
 

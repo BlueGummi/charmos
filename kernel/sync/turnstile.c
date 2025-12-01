@@ -41,7 +41,8 @@
  */
 
 void turnstiles_init() {
-    global.turnstiles = kzalloc(sizeof(struct turnstile_hash_table));
+    global.turnstiles =
+        kzalloc(sizeof(struct turnstile_hash_table), ALLOC_PARAMS_DEFAULT);
     if (!global.turnstiles)
         k_panic("Could not allocate turnstile hash table\n");
     for (size_t i = 0; i < TURNSTILE_HASH_SIZE; i++) {
@@ -88,11 +89,12 @@ struct turnstile *turnstile_init(struct turnstile *ts) {
 }
 
 void turnstile_destroy(struct turnstile *ts) {
-    kfree(ts);
+    kfree(ts, FREE_PARAMS_DEFAULT);
 }
 
 struct turnstile *turnstile_create(void) {
-    struct turnstile *ts = kmalloc(sizeof(struct turnstile));
+    struct turnstile *ts =
+        kmalloc(sizeof(struct turnstile), ALLOC_PARAMS_DEFAULT);
     if (!ts)
         return NULL;
 

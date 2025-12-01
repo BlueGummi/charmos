@@ -1,7 +1,8 @@
 #include "internal.h"
 
 struct worklist *worklist_create(enum worklist_flags flags) {
-    struct worklist *ret = kmalloc(sizeof(struct worklist));
+    struct worklist *ret =
+        kmalloc(sizeof(struct worklist), ALLOC_PARAMS_DEFAULT);
     INIT_LIST_HEAD(&ret->list);
     ret->creation_time = time_get_ms();
     ret->flags = flags;
@@ -12,7 +13,7 @@ struct worklist *worklist_create(enum worklist_flags flags) {
 }
 
 void worklist_destroy(struct worklist *list) {
-    kfree(list);
+    kfree(list, FREE_PARAMS_DEFAULT);
 }
 
 static enum worklist_state worklist_change_state(struct worklist *wlist,

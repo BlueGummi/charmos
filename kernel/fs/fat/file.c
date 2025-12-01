@@ -20,7 +20,7 @@ bool fat_read_file(struct fat_fs *fs, struct fat_dirent *ent, uint32_t offset,
     if (cluster == 0)
         return false;
 
-    uint8_t *temp_buf = kmalloc(cluster_size);
+    uint8_t *temp_buf = kmalloc(cluster_size, ALLOC_PARAMS_DEFAULT);
     uint32_t read = 0;
 
     // reach the starting offset
@@ -50,10 +50,10 @@ bool fat_read_file(struct fat_fs *fs, struct fat_dirent *ent, uint32_t offset,
             cluster = fat_read_fat_entry(fs, cluster);
     }
 
-    kfree(temp_buf);
+    kfree(temp_buf, FREE_PARAMS_DEFAULT);
     return true;
 oops:
-    kfree(temp_buf);
+    kfree(temp_buf, FREE_PARAMS_DEFAULT);
     return false;
 }
 
@@ -107,7 +107,7 @@ bool fat_write_file(struct fat_fs *fs, struct fat_dirent *ent, uint32_t offset,
         current = fat_read_fat_entry(fs, current);
     }
 
-    uint8_t *temp_buf = kmalloc(cluster_size);
+    uint8_t *temp_buf = kmalloc(cluster_size, ALLOC_PARAMS_DEFAULT);
     uint32_t written = 0;
 
     while (written < size && !fat_is_eoc(fs, current)) {
@@ -136,9 +136,9 @@ bool fat_write_file(struct fat_fs *fs, struct fat_dirent *ent, uint32_t offset,
     if (end_offset > ent->filesize)
         ent->filesize = end_offset;
 
-    kfree(temp_buf);
+    kfree(temp_buf, FREE_PARAMS_DEFAULT);
     return true;
 oops:
-    kfree(temp_buf);
+    kfree(temp_buf, FREE_PARAMS_DEFAULT);
     return false;
 }

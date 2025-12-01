@@ -33,8 +33,8 @@ void thread_init_thread_ids(void) {
 }
 
 void thread_init_rq_lists(void) {
-    rq_lists =
-        kzalloc(sizeof(struct thread_request_list) * global.domain_count);
+    rq_lists = kzalloc(sizeof(struct thread_request_list) * global.domain_count,
+                       ALLOC_PARAMS_DEFAULT);
 
     if (!rq_lists)
         k_panic("Thread request list init allocation failed\n");
@@ -115,7 +115,7 @@ void *thread_allocate_stack(size_t pages) {
     virt_base += PAGE_SIZE;
     for (size_t i = 0; i < pages; i++) {
         vaddr_t virt = virt_base + (i * PAGE_SIZE);
-        paddr_t phys = pmm_alloc_page(ALLOC_FLAGS_NONE);
+        paddr_t phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
         kassert(phys);
         vmm_map_page(virt, phys, PAGING_PRESENT | PAGING_WRITE);
     }
@@ -201,7 +201,8 @@ static struct thread *thread_init(struct thread *thread,
 
 struct thread *thread_create_internal(char *name, void (*entry_point)(void),
                                       size_t stack_size, va_list args) {
-    struct thread *new_thread = kzalloc(sizeof(struct thread));
+    struct thread *new_thread =
+        kzalloc(sizeof(struct thread), ALLOC_PARAMS_DEFAULT);
     if (unlikely(!new_thread))
         goto err;
 
@@ -212,7 +213,8 @@ struct thread *thread_create_internal(char *name, void (*entry_point)(void),
     if (unlikely(!stack))
         goto err;
 
-    new_thread->activity_data = kzalloc(sizeof(struct thread_activity_data));
+    new_thread->activity_data =
+        kzalloc(sizeof(struct thread_activity_data), ALLOC_PARAMS_DEFAULT);
     if (unlikely(!new_thread->activity_data))
         goto err;
 
@@ -220,7 +222,8 @@ struct thread *thread_create_internal(char *name, void (*entry_point)(void),
     if (unlikely(!new_thread->turnstile))
         goto err;
 
-    new_thread->activity_stats = kzalloc(sizeof(struct thread_activity_stats));
+    new_thread->activity_stats =
+        kzalloc(sizeof(struct thread_activity_stats), ALLOC_PARAMS_DEFAULT);
     if (unlikely(!new_thread->activity_stats))
         goto err;
 
@@ -229,7 +232,7 @@ struct thread *thread_create_internal(char *name, void (*entry_point)(void),
 
     cpu_mask_set_all(&new_thread->allowed_cpus);
     size_t needed = snprintf(NULL, 0, name, args) + 1;
-    new_thread->name = kzalloc(needed);
+    new_thread->name = kzalloc(needed, ALLOC_PARAMS_DEFAULT);
     if (!new_thread->name)
         goto err;
 
@@ -241,13 +244,13 @@ err:
     if (!new_thread)
         return NULL;
 
-    kfree(new_thread->turnstile);
-    kfree(new_thread->name);
-    kfree(new_thread->activity_data);
-    kfree(new_thread->activity_stats);
+    kfree(new_thread->turnstile, FREE_PARAMS_DEFAULT);
+    kfree(new_thread->name, FREE_PARAMS_DEFAULT);
+    kfree(new_thread->activity_data, FREE_PARAMS_DEFAULT);
+    kfree(new_thread->activity_stats, FREE_PARAMS_DEFAULT);
     thread_free_stack(new_thread);
     tid_free(global_tid_space, new_thread->id);
-    kfree(new_thread);
+    kfree(new_thread, FREE_PARAMS_DEFAULT);
 
     return NULL;
 }
@@ -329,18 +332,18 @@ void thread_free(struct thread *t) {
 
 destroy:
     tid_free(global_tid_space, t->id);
-    kfree(t->activity_data);
-    kfree(t->activity_stats);
-    kfree(t->name);
+    kfree(t->activity_data, FREE_PARAMS_DEFAULT);
+    kfree(t->activity_stats, FREE_PARAMS_DEFAULT);
+    kfree(t->name, FREE_PARAMS_DEFAULT);
     if (atomic_load(&t->rcu_blocked)) {
         atomic_store(&t->rcu_blocked, false);
         rcu_blocked_remove(t);
     }
 
-    kfree(t->turnstile);
+    kfree(t->turnstile, FREE_PARAMS_DEFAULT);
     thread_free_event_apcs(t);
     thread_free_stack(t);
-    kfree(t);
+    kfree(t, FREE_PARAMS_DEFAULT);
 }
 
 void thread_queue_init(struct thread_queue *q) {

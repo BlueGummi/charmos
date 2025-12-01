@@ -45,7 +45,7 @@ static atomic_bool volatile rcu_deferred_freed = false;
 
 static void rcu_free_fn(void *ptr) {
     k_printf("RCU defer free\n");
-    kfree(ptr);
+    kfree(ptr, FREE_PARAMS_DEFAULT);
     atomic_store(&rcu_deferred_freed, true);
 }
 
@@ -54,7 +54,7 @@ static void rcu_writer_thread(void) {
 
     struct rcu_test_data *old = shared_ptr;
 
-    struct rcu_test_data *new = kmalloc(sizeof(*new));
+    struct rcu_test_data *new = kmalloc(sizeof(*new), ALLOC_PARAMS_DEFAULT);
     new->value = 43;
     shared_ptr = new;
 
@@ -64,7 +64,8 @@ static void rcu_writer_thread(void) {
 }
 
 REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    struct rcu_test_data *initial = kmalloc(sizeof(*initial));
+    struct rcu_test_data *initial =
+        kmalloc(sizeof(*initial), ALLOC_PARAMS_DEFAULT);
     initial->value = 42;
     shared_ptr = initial;
 

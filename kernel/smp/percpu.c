@@ -7,12 +7,14 @@
 void percpu_obj_init(void) {
     for (struct percpu_descriptor *d = __skernel_percpu_desc;
          d < __ekernel_percpu_desc; d++) {
-        d->percpu_ptrs = kmalloc(sizeof(void *) * global.core_count);
+        d->percpu_ptrs =
+            kmalloc(sizeof(void *) * global.core_count, ALLOC_PARAMS_DEFAULT);
         if (!d->percpu_ptrs)
             k_panic("OOM\n");
 
         for (size_t cpu = 0; cpu < global.core_count; cpu++) {
-            d->percpu_ptrs[cpu] = kzalloc_aligned(d->size, d->align);
+            d->percpu_ptrs[cpu] =
+                kzalloc_aligned(d->size, d->align, ALLOC_PARAMS_DEFAULT);
             if (!d->percpu_ptrs[cpu])
                 k_panic("OOM\n");
 

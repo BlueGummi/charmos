@@ -146,7 +146,7 @@ int heapsort(void *vbase, size_t nmemb, size_t size,
         return (-1);
     }
 
-    if ((k = kmalloc(size)) == NULL) {
+    if ((k = kmalloc(size, ALLOC_PARAMS_DEFAULT)) == NULL) {
         return (-1);
     }
 
@@ -172,7 +172,7 @@ int heapsort(void *vbase, size_t nmemb, size_t size,
         SELECT(i, j, nmemb, t, p, size, k, cnt, tmp1, tmp2);
     }
 
-    kfree(k);
+    kfree(k, FREE_PARAMS_DEFAULT);
 
     return (0);
 }

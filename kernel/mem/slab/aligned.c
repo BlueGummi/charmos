@@ -3,8 +3,9 @@
 #include <mem/alloc.h>
 #include <stddef.h>
 
-void *kmalloc_aligned(uint64_t size, uint64_t align) {
-    uintptr_t raw = (uintptr_t) kmalloc(size + align + sizeof(uintptr_t));
+void *kmalloc_aligned(size_t size, size_t align, enum alloc_flags f,
+                      enum alloc_behavior b) {
+    uintptr_t raw = (uintptr_t) kmalloc(size + align + sizeof(uintptr_t), f, b);
     if (!raw)
         return NULL;
 
@@ -15,8 +16,9 @@ void *kmalloc_aligned(uint64_t size, uint64_t align) {
     return (void *) aligned;
 }
 
-void *kzalloc_aligned(uint64_t size, uint64_t align) {
-    uintptr_t raw = (uintptr_t) kzalloc(size + align + sizeof(uintptr_t));
+void *kzalloc_aligned(size_t size, size_t align, enum alloc_flags f,
+                      enum alloc_behavior b) {
+    uintptr_t raw = (uintptr_t) kzalloc(size + align + sizeof(uintptr_t), f, b);
     if (!raw)
         return NULL;
 
@@ -27,9 +29,9 @@ void *kzalloc_aligned(uint64_t size, uint64_t align) {
     return (void *) aligned;
 }
 
-void kfree_aligned(void *ptr) {
+void kfree_aligned(void *ptr, enum alloc_behavior b) {
     if (!ptr)
         return;
     uintptr_t raw = ((uintptr_t *) ptr)[-1];
-    kfree((void *) raw);
+    kfree((void *) raw, b);
 }
