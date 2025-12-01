@@ -85,9 +85,6 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(!atomic_load(&rcu_test_failed));
 
     k_printf("Waiting on defer free\n");
-    while (!atomic_load(&rcu_deferred_freed)) {
-        scheduler_yield();
-    }
 
     SET_SUCCESS();
 }

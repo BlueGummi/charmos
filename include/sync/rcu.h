@@ -10,11 +10,6 @@
 #define RCU_BUCKETS 2
 #define RCU_RING_SIZE (1 << RCU_RING_ORDER)
 
-struct rcu_defer_op {
-    void (*func)(void *);
-    void *arg;
-};
-
 struct rcu_cb {
     struct list_head list;
     void (*func)(void *);

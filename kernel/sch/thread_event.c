@@ -87,6 +87,9 @@ void thread_print(const struct thread *t) {
     k_printf("    activity_score: %u, dynamic_delta: %d, weight: %llu,\n",
              t->activity_score, t->dynamic_delta,
              (unsigned long long) t->weight);
+    k_printf("    saved_weight: %u\n", t->saved_weight);
+    k_printf("    saved_prio_class: %s\n", thread_prio_class_str(t->saved_class));
+    k_printf("    boost_count: %u\n", t->boost_count);
 
     k_printf("    activity_class: %s,\n",
              thread_activity_class_str(t->activity_class));

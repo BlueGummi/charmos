@@ -168,7 +168,9 @@ static struct thread *thread_init(struct thread *thread,
     thread->dying = false;
     thread->regs.rsp = stack_top;
     thread->base_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
+    thread->niceness = 0;
     thread->perceived_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
+    thread->saved_class = THREAD_PRIO_CLASS_TIMESHARE;
     thread->state = THREAD_STATE_READY;
     thread->regs.r12 = (uint64_t) entry_point;
     thread->regs.rip = (uint64_t) thread_entry_wrapper;

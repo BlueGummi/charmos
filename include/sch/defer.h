@@ -181,6 +181,7 @@ struct workqueue_attributes {
     size_t max_workers;
     size_t capacity;
     time_t spawn_delay;
+    nice_t worker_niceness;
     struct {
         uint64_t min;
         uint64_t max;
@@ -292,8 +293,6 @@ enum workqueue_error workqueue_add_fast(struct work *work);
 
 void work_execute(struct work *task);
 bool workqueue_should_spawn_worker(struct workqueue *queue);
-struct thread *worker_create(struct cpu_mask mask);
-struct thread *worker_create_unmigratable(struct cpu_mask mask);
 struct worklist *worklist_create(enum worklist_flags);
 void worklist_free(struct worklist *wlist);
 

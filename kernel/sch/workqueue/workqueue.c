@@ -104,6 +104,7 @@ struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
         k_panic("please set a CPU mask before creating the workqueue\n");
 
     wq->attrs = *attrs;
+    kassert(THREAD_NICENESS_VALID(attrs->worker_niceness));
 
     size = sizeof(struct work) * attrs->capacity;
     if (permanent)
@@ -245,13 +246,9 @@ void workqueue_kick(struct workqueue *queue) {
 
 struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue,
                                                 int64_t core) {
-    struct thread *thread;
-
-    if (WORKQUEUE_FLAG_SET(queue, WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS)) {
-        thread = worker_create_unmigratable(queue->attrs.worker_cpu_mask);
-    } else {
-        thread = worker_create(queue->attrs.worker_cpu_mask);
-    }
+    struct thread *thread = worker_create(
+        queue->attrs.worker_cpu_mask, queue->attrs.worker_niceness,
+        WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS));
 
     if (!thread)
         return NULL;

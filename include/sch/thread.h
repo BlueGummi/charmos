@@ -46,6 +46,9 @@
 #define THREAD_ACT_SLEEPY_MIN THREAD_BAND_MIN(THREAD_ACT_SLEEPY_AVG)
 #define THREAD_ACT_SLEEPY_MAX THREAD_BAND_MAX(THREAD_ACT_SLEEPY_AVG)
 
+#define THREAD_NICENESS_VALID(n)                                               \
+    ((((nice_t) (n)) >= -19) && (((nice_t) (n)) <= 20))
+
 /* pluh */
 struct cpu_context {
     uint64_t rbx;
@@ -237,6 +240,7 @@ struct thread {
     thread_prio_t activity_score;
     int32_t dynamic_delta; /* Signed delta applied to base */
     size_t weight;
+    nice_t niceness; /* -20 .. + 19 */
 
     /* shadow copy
      *
@@ -335,6 +339,7 @@ struct thread {
 
     time_t creation_time_ms; /* When were we created? */
 
+    size_t boost_count;
     size_t total_wake_count;  /* Aggregate count of all wake events */
     size_t total_block_count; /* Aggregate count of all block events */
     size_t total_sleep_count; /* Aggregate count of all sleep events */
@@ -350,7 +355,8 @@ struct thread {
     (container_of(pn, struct thread, pairing_node))
 #define thread_from_rbt_node(node) rbt_entry(node, struct thread, tree_node)
 #define thread_from_list_node(ln) (container_of(ln, struct thread, list_node))
-#define thread_from_rcu_list_node(ln) (container_of(ln, struct thread, rcu_list_node))
+#define thread_from_rcu_list_node(ln)                                          \
+    (container_of(ln, struct thread, rcu_list_node))
 struct thread *thread_create_internal(char *name, void (*entry_point)(void),
                                       size_t stack_size, va_list args);
 

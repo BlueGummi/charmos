@@ -3,6 +3,7 @@
 #include <crypto/prng.h>
 #include <int/idt.h>
 #include <math/clamp.h>
+#include <math/fixed.h>
 #include <registry.h>
 #include <sch/sched.h>
 #include <smp/smp.h>
@@ -56,6 +57,11 @@ static void derive_timeshare_prio_range(enum thread_activity_class cls,
 
 #define THREAD_SLICE_MIN 1
 #define THREAD_SLICE_MAX 8
+
+#define THREAD_BASE_WEIGHT 1024
+#define THREAD_WEIGHT_SCALING 100
+
+#define NICE_BASE_FP FX(1.022)
 
 #define SET_MUL(__multiplier)                                                  \
     class_mul = __multiplier;                                                  \
@@ -249,12 +255,16 @@ void thread_apply_cpu_penalty(struct thread *t) {
 static int64_t base_weight_of(struct thread *t) {
     struct thread_activity_metrics *m = &t->activity_metrics;
 
-    int64_t w = 1024;
+    int64_t w = THREAD_BASE_WEIGHT;
 
-    w += m->wake_freq * 100;
-    w += (100 - m->run_ratio) * 50;
+    w += m->wake_freq * THREAD_WEIGHT_SCALING;
+    w += (THREAD_WEIGHT_SCALING - m->run_ratio) * (THREAD_WEIGHT_SCALING / 2);
+    w += t->dynamic_delta / THREAD_WEIGHT_SCALING;
 
-    w += t->dynamic_delta / 100;
+    if (t->niceness != 0) {
+        int32_t nf = fx_pow_i32(NICE_BASE_FP, t->niceness);
+        w = (w * nf) >> 16;
+    }
 
     if (w < 1)
         w = 1;

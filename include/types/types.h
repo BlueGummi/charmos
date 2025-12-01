@@ -16,3 +16,5 @@ typedef uint64_t core_t; /* CPU Core number */
 typedef uint64_t pte_t;
 typedef uint64_t page_flags_t;
 typedef uint32_t thread_prio_t;
+typedef int32_t fx16_16_t;
+typedef int32_t nice_t;

@@ -23,6 +23,9 @@ static bool scheduler_boost_thread_internal(struct thread *boosted,
         boosted->weight = new_weight;
     }
 
+    if (did_boost)
+        boosted->boost_count++;
+
     return did_boost;
 }
 

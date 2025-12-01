@@ -54,18 +54,18 @@ static void worker_init(struct workqueue *queue, struct worker *w,
 }
 
 static struct thread *workqueue_worker_thread_create(struct workqueue *queue) {
-    if (WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS))
-        return worker_create_unmigratable(queue->attrs.worker_cpu_mask);
-    else
-        return worker_create(queue->attrs.worker_cpu_mask);
+    return worker_create(
+        queue->attrs.worker_cpu_mask, queue->attrs.worker_niceness,
+        WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS));
 }
 
 static void workqueue_enqueue_thread(struct workqueue *queue,
                                      struct thread *t) {
-    if (WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_PERMANENT))
+    if (WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_PERMANENT)) {
         scheduler_enqueue_on_core(t, queue->core);
-    else
+    } else {
         scheduler_enqueue(t);
+    }
 }
 
 struct worker *workqueue_worker_create(struct workqueue *queue) {
@@ -185,25 +185,18 @@ bool workqueue_try_spawn_worker(struct workqueue *queue) {
     return workqueue_spawn_worker_internal(queue);
 }
 
-struct thread *worker_create(struct cpu_mask mask) {
+struct thread *worker_create(struct cpu_mask mask, nice_t niceness,
+                             bool migratable) {
     uint64_t stack_size = PAGE_SIZE;
     struct thread *ret =
         thread_create_custom_stack("workqueue_worker", worker_main, stack_size);
     if (!ret)
         return NULL;
 
+    ret->niceness = niceness;
     ret->allowed_cpus = mask;
+    if (!migratable)
+        ret->flags = THREAD_FLAGS_NO_STEAL;
+
     return ret;
-}
-
-struct thread *worker_create_unmigratable(struct cpu_mask mask) {
-    uint64_t stack_size = PAGE_SIZE;
-    struct thread *t =
-        thread_create_custom_stack("workqueue_worker", worker_main, stack_size);
-    if (!t)
-        return NULL;
-
-    thread_set_flags(t, THREAD_FLAGS_NO_STEAL);
-    t->allowed_cpus = mask;
-    return t;
 }

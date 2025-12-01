@@ -52,9 +52,9 @@ void turnstiles_init() {
 
 #define TURNSTILE_BACKGROUND_PRIO 1
 #define TURNSTILE_TS_PRIO_BASE 2
-#define TURNSTILE_TS_PRIO_MAX 1000
-#define TURNSTILE_RT_PRIO 1001
-#define TURNSTILE_URGENT_PRIO 1002
+#define TURNSTILE_TS_PRIO_MAX 100000
+#define TURNSTILE_RT_PRIO 100001
+#define TURNSTILE_URGENT_PRIO 100002
 
 int32_t turnstile_thread_priority(struct thread *t) {
     switch (t->perceived_prio_class) {
