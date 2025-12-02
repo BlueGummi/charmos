@@ -36,6 +36,7 @@ void lapic_timer_init(uint64_t core_id) {
     lapic_write(LAPIC_REG_LVT_TIMER, TIMER_VECTOR | TIMER_MODE_PERIODIC);
 
     lapic_write(LAPIC_REG_TIMER_INIT, timeslice_ticks);
+    lapic_timer_disable();
 }
 
 void lapic_timer_set_ms(uint32_t ms) {

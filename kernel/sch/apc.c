@@ -4,6 +4,8 @@
 #include <sch/thread.h>
 #include <smp/core.h>
 
+#include "internal.h"
+
 #define apc_from_list_node(n) container_of(n, struct apc, list)
 
 static inline bool thread_has_apcs(struct thread *t) {
@@ -122,11 +124,32 @@ static inline bool thread_is_active(struct thread *t) {
     return s == THREAD_STATE_READY || s == THREAD_STATE_RUNNING;
 }
 
+static void maybe_force_resched(struct thread *t) {
+    enum thread_flags old = thread_or_flags(t, THREAD_FLAGS_NO_STEAL);
+
+    /* similar to the strategy in sch/boost.c... */
+    while (atomic_load(&t->being_moved))
+        cpu_relax();
+
+    /* it's ok if the read of tick_enabled races here. if we read it as
+     * `enabled`, it means that it is either truly enabled or is in
+     * the schedule() routine about to disable it, meaning that
+     * if it does get disabled, it'll still have a chance to check
+     * and run the APCs of the only thread active */
+    struct scheduler *sched = global.schedulers[thread_get_last_ran(t)];
+
+    bool needs_resched = !sched->tick_enabled;
+    if (needs_resched)
+        scheduler_force_resched(sched);
+
+    thread_set_flags(t, old);
+}
+
 /* TODO: once we have tickless as an option, make sure to poke
  * the other core if the thread is active... */
 static void wake_if_waiting(struct thread *t) {
     if (thread_is_active(t))
-        return;
+        maybe_force_resched(t);
 
     /* Get it running again */
     if (!thread_apc_sanity_check(t))
@@ -147,13 +170,14 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
 
     add_apc_to_thread(t, a, type);
 
-    thread_release(t, irql);
     /* Let's go and execute em */
     if (t == scheduler_get_current_thread()) {
+        thread_release(t, irql);
         thread_check_and_deliver_apcs(t);
     } else {
         /* Not us, go wake up the other guy */
         wake_if_waiting(t);
+        thread_release(t, irql);
     }
 }
 

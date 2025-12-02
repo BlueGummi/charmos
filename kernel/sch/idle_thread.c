@@ -9,6 +9,7 @@
 void scheduler_idle_main(void) {
 
     while (true) {
+        scheduler_mark_self_idle(true);
         enable_interrupts();
         rcu_mark_quiescent();
         scheduler_resched_if_needed();

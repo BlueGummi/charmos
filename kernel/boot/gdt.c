@@ -99,9 +99,6 @@ void gdt_install(void) {
     if (!gdt || !tss)
         k_panic("GDT INIT NOT OK!!!\n");
 
-    memset(tss, 0, sizeof(struct tss));
-    memset(gdt, 0, sizeof(struct gdt_entry) * GDT_ENTRIES);
-
     gdt_init(gdt, tss);
 
     return;

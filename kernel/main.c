@@ -110,6 +110,9 @@ __no_sanitize_address void k_main(void) {
 }
 
 void k_sch_main() {
+    /* make sure everyone else is idle before we 
+     * advance the bootstage here... */
+    smp_wait_for_others_to_idle();
     bootstage_advance(BOOTSTAGE_LATE_DEVICES);
 
     rcu_init();

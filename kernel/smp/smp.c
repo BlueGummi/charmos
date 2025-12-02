@@ -93,8 +93,7 @@ static inline void set_core_awake(void) {
     }
 }
 
-__no_sanitize_address void smp_wakeup() {
-    enum irql irql = spin_lock(&wakeup_lock);
+void smp_wakeup() {
     disable_interrupts();
 
     while (!cr3_ready)
@@ -112,7 +111,6 @@ __no_sanitize_address void smp_wakeup() {
     setup_cpu(cpu);
     lapic_timer_init(cpu);
     set_core_awake();
-    spin_unlock(&wakeup_lock, irql);
 
     /* wait for all cores to catch up with us... */
     while (global.current_bootstage < BOOTSTAGE_MID_MP)
@@ -126,6 +124,14 @@ void smp_wakeup_processors(struct limine_mp_response *mpr) {
         mpr->cpus[i]->goto_address = smp_wakeup;
 }
 
+void smp_wait_for_others_to_idle() {
+    /* wait for them to enter idle threads */
+    size_t expected_idle = global.core_count - 1;
+    while (atomic_load(&global.idle_core_count) < expected_idle) {
+        cpu_relax();
+    }
+}
+
 void smp_complete_init() {
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
     atomic_store(&cr3_ready, 1);
@@ -137,10 +143,7 @@ void smp_complete_init() {
     while (global.current_bootstage != BOOTSTAGE_MID_MP)
         cpu_relax();
 
-    /* wait for them to enter idle threads */
-    size_t expected_idle = global.core_count - 1;
-    while (atomic_load(&global.idle_core_count) < expected_idle)
-        cpu_relax();
+    smp_wait_for_others_to_idle();
 }
 
 void smp_setup_bsp() {

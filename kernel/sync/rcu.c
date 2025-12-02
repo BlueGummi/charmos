@@ -1,5 +1,6 @@
 #include <mem/alloc.h>
 #include <sch/defer.h>
+#include <sch/sched.h>
 #include <sch/thread.h>
 #include <smp/core.h>
 #include <smp/percpu.h>
@@ -7,6 +8,8 @@
 #include <sync/rcu.h>
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
+
+#include "sch/internal.h" /* for tick_enabled */
 
 static struct semaphore rcu_sem;
 static LIST_HEAD(rcu_thread_list);
@@ -217,7 +220,9 @@ restart:
         if (seen < target) {
             /* if the other CPU is idle, we send it an IPI and retry.
              * otherwise, we return false */
-            if (scheduler_core_idle(c) && c != smp_core()) {
+            if ((scheduler_core_idle(c) ||
+                 !scheduler_tick_enabled(global.schedulers[c->id])) &&
+                c != smp_core()) {
                 ipi_send(c->id, IRQ_SCHEDULER);
                 goto restart;
             } else {
