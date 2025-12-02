@@ -54,7 +54,7 @@ static inline void scheduler_increment_thread_count(struct scheduler *sched,
     atomic_fetch_add(&scheduler_data.total_threads, 1);
 }
 
-static inline struct thread_queue *
+static inline struct list_head *
 scheduler_get_this_thread_queue(struct scheduler *sched,
                                 enum thread_prio_class prio) {
     switch (prio) {
@@ -68,20 +68,20 @@ scheduler_get_this_thread_queue(struct scheduler *sched,
 
 static inline void enqueue_to_tree(struct scheduler *sched,
                                    struct thread *thread) {
-    rbt_insert(&sched->thread_rbt, &thread->tree_node);
+    rbt_insert(&sched->thread_rbt, &thread->rq_tree_node);
 }
 
 static inline void retire_thread(struct scheduler *sched,
                                  struct thread *thread) {
-    rbt_insert(&sched->completed_rbt, &thread->tree_node);
+    rbt_insert(&sched->completed_rbt, &thread->rq_tree_node);
 }
 
 static inline void dequeue_from_tree(struct scheduler *sched,
                                      struct thread *thread) {
     if (thread_exhausted_period(sched, thread)) {
-        rb_delete(&sched->completed_rbt, &thread->tree_node);
+        rb_delete(&sched->completed_rbt, &thread->rq_tree_node);
     } else {
-        rb_delete(&sched->thread_rbt, &thread->tree_node);
+        rb_delete(&sched->thread_rbt, &thread->rq_tree_node);
     }
 }
 
@@ -103,7 +103,7 @@ static inline struct thread *find_highest_prio(struct scheduler *sched) {
 
     rb_delete(&sched->thread_rbt, node);
 
-    return thread_from_rbt_node(node);
+    return thread_from_rq_rbt_node(node);
 }
 
 /* Don't touch `current_period` here */

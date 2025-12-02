@@ -126,11 +126,11 @@ available_prio_level_from_bitmap(uint8_t bitmap) {
 
 static struct thread *pick_from_special_queues(struct scheduler *sched,
                                                enum thread_prio_class prio) {
-    struct thread_queue *q = scheduler_get_this_thread_queue(sched, prio);
-    struct list_head *node = list_pop_front_init(&q->list);
+    struct list_head *q = scheduler_get_this_thread_queue(sched, prio);
+    struct list_head *node = list_pop_front_init(q);
     kassert(node);
 
-    return thread_from_list_node(node);
+    return thread_from_rq_list_node(node);
 }
 
 static struct thread *pick_from_regular_queues(struct scheduler *sched,

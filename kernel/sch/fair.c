@@ -334,7 +334,7 @@ static void allocate_slices(struct scheduler *s, uint64_t now_ms) {
     uint64_t total_weight = 0;
     struct rbt_node *node;
     rbt_for_each(node, &s->thread_rbt) {
-        struct thread *t = thread_from_rbt_node(node);
+        struct thread *t = thread_from_rq_rbt_node(node);
         total_weight += t->weight;
     }
 
@@ -342,7 +342,7 @@ static void allocate_slices(struct scheduler *s, uint64_t now_ms) {
         total_weight = 1;
 
     rbt_for_each(node, &s->thread_rbt) {
-        struct thread *t = thread_from_rbt_node(node);
+        struct thread *t = thread_from_rq_rbt_node(node);
 
         uint64_t budget_ms = (s->period_ms * t->weight) / total_weight;
         if (budget_ms < MIN_SLICE_MS)
@@ -365,7 +365,7 @@ static void allocate_slices(struct scheduler *s, uint64_t now_ms) {
 static void scheduler_update_thread_weights(struct scheduler *s) {
     struct rbt_node *node;
     rbt_for_each(node, &s->thread_rbt) {
-        struct thread *t = rbt_entry(node, struct thread, tree_node);
+        struct thread *t = rbt_entry(node, struct thread, rq_tree_node);
 
         /* This will recalculate activity data
          * and update the effective priority */

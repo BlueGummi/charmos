@@ -19,18 +19,18 @@ static size_t migratable_in_tree(size_t caller, struct rbt *rbt) {
     struct rbt_node *rb;
     size_t agg = 0;
     rbt_for_each(rb, rbt) {
-        struct thread *t = thread_from_rbt_node(rb);
+        struct thread *t = thread_from_rq_rbt_node(rb);
         if (scheduler_can_steal_thread(caller, t))
             agg++;
     }
     return agg;
 }
 
-static size_t migratable_in_list(size_t caller, struct thread_queue *tq) {
+static size_t migratable_in_list(size_t caller, struct list_head *tq) {
     struct list_head *ln;
     size_t agg = 0;
-    list_for_each(ln, &tq->list) {
-        struct thread *t = thread_from_list_node(ln);
+    list_for_each(ln, tq) {
+        struct thread *t = thread_from_rq_list_node(ln);
         if (scheduler_can_steal_thread(caller, t))
             agg++;
     }
@@ -61,10 +61,10 @@ static inline bool cores_in_same_numa_node(struct core *a, struct core *b) {
 
 static void move_ts_thread_raw(struct scheduler *dest, struct scheduler *source,
                                struct rbt *tree, struct thread *thread) {
-    rb_delete(tree, &thread->tree_node);
+    rb_delete(tree, &thread->rq_tree_node);
     scheduler_decrement_thread_count(source, thread);
 
-    rbt_insert(&dest->thread_rbt, &thread->tree_node);
+    rbt_insert(&dest->thread_rbt, &thread->rq_tree_node);
     scheduler_increment_thread_count(dest, thread);
 }
 
@@ -84,7 +84,7 @@ static size_t migrate_from_tree(struct scheduler *to,
         if (migrated >= target)
             break;
 
-        struct thread *t = thread_from_rbt_node(rb);
+        struct thread *t = thread_from_rq_rbt_node(rb);
 
         /* we are on a thread we will give priority to migrating */
         if (!prev_migrated) {
@@ -115,22 +115,21 @@ static size_t migrate_from_prio_class(struct scheduler *to,
 
     size_t migrated = 0;
     if (class != THREAD_PRIO_CLASS_TIMESHARE) {
-        struct thread_queue *from_queue =
+        struct list_head *from_queue =
             scheduler_get_this_thread_queue(from, class);
-        struct thread_queue *to_queue =
-            scheduler_get_this_thread_queue(to, class);
+        struct list_head *to_queue = scheduler_get_this_thread_queue(to, class);
 
         struct list_head *ln, *tmp;
-        list_for_each_safe(ln, tmp, &from_queue->list) {
+        list_for_each_safe(ln, tmp, from_queue) {
             if (migrated >= nthreads)
                 break;
 
-            struct thread *t = thread_from_list_node(ln);
+            struct thread *t = thread_from_rq_list_node(ln);
 
             list_del_init(ln);
             scheduler_decrement_thread_count(from, t);
 
-            list_add_tail(ln, &to_queue->list);
+            list_add_tail(ln, to_queue);
             scheduler_increment_thread_count(to, t);
 
             migrated++;

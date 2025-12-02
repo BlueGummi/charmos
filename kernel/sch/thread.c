@@ -182,9 +182,7 @@ static struct thread *thread_init(struct thread *thread,
     thread->recent_event = APC_EVENT_NONE;
     thread->activity_class = THREAD_ACTIVITY_CLASS_UNKNOWN;
 
-    thread->pairing_node.sibling = NULL;
-    thread->pairing_node.child = NULL;
-    thread->pairing_node.parent = NULL;
+    pairing_node_init(&thread->wq_pairing_node);
 
     thread->born_with = turnstile_init(thread->turnstile);
 
@@ -194,8 +192,11 @@ static struct thread *thread_init(struct thread *thread,
     INIT_LIST_HEAD(&thread->on_event_apcs[1]);
     INIT_LIST_HEAD(&thread->apc_head[0]);
     INIT_LIST_HEAD(&thread->apc_head[1]);
-    INIT_LIST_HEAD(&thread->list_node);
+    INIT_LIST_HEAD(&thread->rq_list_node);
+    INIT_LIST_HEAD(&thread->wq_list_node);
     INIT_LIST_HEAD(&thread->rcu_list_node);
+    rbt_init_node(&thread->rq_tree_node);
+    rbt_init_node(&thread->wq_tree_node);
     return thread;
 }
 
@@ -355,7 +356,7 @@ SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(thread_queue, lock);
 
 void thread_queue_push_back(struct thread_queue *q, struct thread *t) {
     enum irql irql = thread_queue_lock_irq_disable(q);
-    list_add_tail(&t->list_node, &q->list);
+    list_add_tail(&t->wq_list_node, &q->list);
     thread_queue_unlock(q, irql);
 }
 
@@ -364,9 +365,9 @@ bool thread_queue_remove(struct thread_queue *q, struct thread *t) {
     struct list_head *pos;
 
     list_for_each(pos, &q->list) {
-        struct thread *thread = thread_from_list_node(pos);
+        struct thread *thread = thread_from_wq_list_node(pos);
         if (thread == t) {
-            list_del_init(&t->list_node);
+            list_del_init(&t->wq_list_node);
             thread_queue_unlock(q, irql);
             return true;
         }
@@ -383,7 +384,7 @@ struct thread *thread_queue_pop_front(struct thread_queue *q) {
     if (!lhead)
         return NULL;
 
-    return thread_from_list_node(lhead);
+    return thread_from_wq_list_node(lhead);
 }
 
 void thread_block_on(struct thread_queue *q) {
@@ -391,7 +392,7 @@ void thread_block_on(struct thread_queue *q) {
 
     enum irql irql = thread_queue_lock_irq_disable(q);
     thread_block(current, THREAD_BLOCK_REASON_MANUAL);
-    list_add_tail(&current->list_node, &q->list);
+    list_add_tail(&current->wq_list_node, &q->list);
     thread_queue_unlock(q, irql);
 }
 

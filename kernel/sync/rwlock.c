@@ -184,7 +184,7 @@ size_t rwlock_get_readers_to_wake(struct turnstile *ts) {
     kassert(wnode || rnode);
 
     if (wnode)
-        writer = thread_from_rbt_node(wnode);
+        writer = thread_from_wq_rbt_node(wnode);
 
     /* for each reader that beats this priority,
      * increment the count of readers to wake */
@@ -192,7 +192,7 @@ size_t rwlock_get_readers_to_wake(struct turnstile *ts) {
     size_t to_wake = 0;
 
     rbt_for_each_reverse(iter, &ts->queues[TURNSTILE_READER_QUEUE]) {
-        struct thread *check_reader = thread_from_rbt_node(iter);
+        struct thread *check_reader = thread_from_wq_rbt_node(iter);
 
         /* can no longer beat the thread priority of the writer */
         int32_t prio = turnstile_thread_priority(check_reader);
@@ -265,7 +265,7 @@ void rwlock_unlock(struct rwlock *lock) {
 
         struct rbt_node *wnode = rb_last(&ts->queues[TURNSTILE_WRITER_QUEUE]);
 
-        struct thread *writer = wnode ? thread_from_rbt_node(wnode) : NULL;
+        struct thread *writer = wnode ? thread_from_wq_rbt_node(wnode) : NULL;
         size_t to_wake = rwlock_get_readers_to_wake(ts);
 
         if (writer && to_wake == 0) {

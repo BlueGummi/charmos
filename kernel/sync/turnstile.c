@@ -70,7 +70,7 @@ int32_t turnstile_thread_priority(struct thread *t) {
 }
 
 static size_t turnstile_thread_get_data(struct rbt_node *n) {
-    return turnstile_thread_priority(thread_from_rbt_node(n));
+    return turnstile_thread_priority(thread_from_wq_rbt_node(n));
 }
 
 struct turnstile *turnstile_init(struct turnstile *ts) {
@@ -214,7 +214,7 @@ struct thread *turnstile_dequeue_first(struct turnstile *ts, size_t queue) {
 
     struct rbt_node *last = rb_last(&ts->queues[queue]);
     rb_delete(&ts->queues[queue], last);
-    struct thread *thread = thread_from_rbt_node(last);
+    struct thread *thread = thread_from_wq_rbt_node(last);
 
     struct turnstile *got = ts;
     if (ts->waiters == 1) { /* last waiter, take the turnstile with you! */
@@ -334,7 +334,7 @@ static void turnstile_block_on(void *lock_obj, struct turnstile *ts,
     struct thread *curr = scheduler_get_current_thread();
 
     thread_block(curr, THREAD_BLOCK_REASON_MANUAL);
-    rbt_insert(&ts->queues[queue_num], &curr->tree_node);
+    rbt_insert(&ts->queues[queue_num], &curr->wq_tree_node);
     curr->blocked_on = lock_obj;
 }
 

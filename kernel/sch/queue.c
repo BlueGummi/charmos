@@ -26,8 +26,8 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
         task->completed_period = sched->current_period - 1;
         enqueue_to_tree(sched, task);
     } else {
-        struct thread_queue *q = scheduler_get_this_thread_queue(sched, prio);
-        list_add_tail(&task->list_node, &q->list);
+        struct list_head *q = scheduler_get_this_thread_queue(sched, prio);
+        list_add_tail(&task->rq_list_node, q);
     }
 
     thread_set_last_ran(task, sched->core_id);
@@ -59,7 +59,7 @@ void scheduler_remove_thread(struct scheduler *sched, struct thread *t,
     if (t->perceived_prio_class == THREAD_PRIO_CLASS_TIMESHARE) {
         dequeue_from_tree(sched, t);
     } else {
-        list_del_init(&t->list_node);
+        list_del_init(&t->rq_list_node);
     }
 
     scheduler_decrement_thread_count(sched, t);

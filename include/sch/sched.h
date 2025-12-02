@@ -4,7 +4,6 @@
 #include <charmos.h>
 #include <sch/domain.h>
 #include <sch/thread.h>
-#include <sch/thread_queue.h>
 #include <smp/core.h>
 #include <smp/topology.h>
 #include <stdarg.h>
@@ -38,13 +37,13 @@ struct scheduler {
     time_t tick_duration_ms;
 
     /* Structures */
-    struct thread_queue urgent_threads;
+    struct list_head urgent_threads;
 
     struct rbt thread_rbt;
     struct rbt completed_rbt;
 
-    struct thread_queue rt_threads;
-    struct thread_queue bg_threads;
+    struct list_head rt_threads;
+    struct list_head bg_threads;
 
     _Atomic uint8_t queue_bitmap;
 

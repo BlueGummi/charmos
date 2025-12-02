@@ -207,10 +207,17 @@ struct thread {
     struct cpu_context regs;
 
     /* Nodes */
-    struct rbt_node tree_node;
-    struct list_head list_node;
-    struct list_head rcu_list_node;
-    struct pairing_node pairing_node;
+
+    /* Runqueue nodes */
+    struct rbt_node rq_tree_node;  /* runqueue tree node */
+    struct list_head rq_list_node; /* runqueue list node */
+
+    /* Waitqueue nodes */
+    struct rbt_node wq_tree_node;        /* waitqueue tree node */
+    struct list_head wq_list_node;       /* waitqueue list node */
+    struct pairing_node wq_pairing_node; /* waitqueue pairing node */
+
+    struct list_head rcu_list_node; /* rcu list node */
 
     /* State */
     _Atomic enum thread_state state;
@@ -292,9 +299,9 @@ struct thread {
     size_t wait_cookie;
 
     /* RCU */
-    _Atomic uint32_t rcu_nesting;           /* incremented by this thread only */
+    _Atomic uint32_t rcu_nesting;  /* incremented by this thread only */
     _Atomic uint64_t rcu_seen_gen; /* last gen seen (release store) */
-    atomic_bool rcu_blocked;           /* task was queued as blocked for GP */
+    atomic_bool rcu_blocked;       /* task was queued as blocked for GP */
     uint64_t rcu_start_gen;
     uint64_t rcu_blocked_gen;
 
@@ -351,12 +358,21 @@ struct thread {
     void *private;
 };
 
-#define thread_from_pairing_node(pn)                                           \
-    (container_of(pn, struct thread, pairing_node))
-#define thread_from_rbt_node(node) rbt_entry(node, struct thread, tree_node)
-#define thread_from_list_node(ln) (container_of(ln, struct thread, list_node))
+#define thread_from_rq_rbt_node(node)                                          \
+    rbt_entry(node, struct thread, rq_tree_node)
+#define thread_from_rq_list_node(ln)                                           \
+    (container_of(ln, struct thread, rq_list_node))
+
 #define thread_from_rcu_list_node(ln)                                          \
     (container_of(ln, struct thread, rcu_list_node))
+
+#define thread_from_wq_pairing_node(pn)                                        \
+    (container_of(pn, struct thread, wq_pairing_node))
+#define thread_from_wq_list_node(ln)                                           \
+    (container_of(ln, struct thread, wq_list_node))
+#define thread_from_wq_rbt_node(ln)                                            \
+    (container_of(ln, struct thread, wq_tree_node))
+
 struct thread *thread_create_internal(char *name, void (*entry_point)(void),
                                       size_t stack_size, va_list args);
 

@@ -23,3 +23,9 @@ void pairing_heap_insert(struct pairing_heap *h, struct pairing_node *node);
 struct pairing_node *pairing_heap_peek(struct pairing_heap *h);
 struct pairing_node *pairing_heap_pop(struct pairing_heap *h);
 void pairing_heap_decrease(struct pairing_heap *h, struct pairing_node *node);
+
+static inline void pairing_node_init(struct pairing_node *pn) {
+    pn->parent = NULL;
+    pn->child = NULL;
+    pn->sibling = NULL;
+}

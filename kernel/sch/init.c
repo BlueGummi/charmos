@@ -8,7 +8,7 @@
 #include <stdint.h>
 
 static size_t scheduler_thread_get_data(struct rbt_node *n) {
-    return thread_from_rbt_node(n)->virtual_runtime_left;
+    return thread_from_rq_rbt_node(n)->virtual_runtime_left;
 }
 
 void scheduler_init(void) {
@@ -50,9 +50,9 @@ void scheduler_init(void) {
         idle_thread->state = THREAD_STATE_IDLE_THREAD;
         s->idle_thread = idle_thread;
 
-        thread_queue_init(&s->rt_threads);
-        thread_queue_init(&s->urgent_threads);
-        thread_queue_init(&s->bg_threads);
+        INIT_LIST_HEAD(&s->rt_threads);
+        INIT_LIST_HEAD(&s->urgent_threads);
+        INIT_LIST_HEAD(&s->bg_threads);
 
         if (!i) {
             struct thread *t = thread_create("main_thread", k_sch_main);

@@ -66,7 +66,7 @@ static struct thread *steal_from_thread_rbt(struct scheduler *victim,
                                             struct rbt *tree) {
     struct rbt_node *node;
     rbt_for_each_reverse(node, tree) {
-        struct thread *target = thread_from_rbt_node(node);
+        struct thread *target = thread_from_rq_rbt_node(node);
         if (!scheduler_can_steal_thread(smp_core_id(), target))
             continue;
 
@@ -97,23 +97,22 @@ static struct thread *steal_from_ts_threads(struct scheduler *victim) {
 }
 
 static struct thread *steal_from_special_threads(struct scheduler *victim,
-                                                 struct thread_queue *q,
-                                                 int level) {
-    if (list_empty(&q->list))
+                                                 struct list_head *q) {
+    if (list_empty(q))
         return NULL;
 
     size_t core = smp_core_id();
 
     struct list_head *pos, *n;
-    list_for_each_safe(pos, n, &q->list) {
-        struct thread *t = thread_from_list_node(pos);
+    list_for_each_safe(pos, n, q) {
+        struct thread *t = thread_from_rq_list_node(pos);
 
         if (!scheduler_can_steal_thread(core, t))
             continue;
 
         kassert(thread_get_state(t) == THREAD_STATE_READY);
 
-        list_del_init(&t->list_node);
+        list_del_init(&t->rq_list_node);
 
         scheduler_decrement_thread_count(victim, t);
         return t;
@@ -139,10 +138,10 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
                 break;
 
         } else {
-            struct thread_queue *q =
+            struct list_head *q =
                 scheduler_get_this_thread_queue(victim, level);
 
-            stolen = steal_from_special_threads(victim, q, level);
+            stolen = steal_from_special_threads(victim, q);
             if (stolen)
                 break;
         }
