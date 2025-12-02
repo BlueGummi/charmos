@@ -8,7 +8,7 @@
 #include <tests.h>
 
 static atomic_bool workqueue_ran = false;
-static atomic_uint workqueue_times = 0;
+static _Atomic uint32_t workqueue_times = 0;
 static void workqueue_fn(void *arg, void *unused) {
     (void) arg, (void) unused;
     atomic_store(&workqueue_ran, true);
@@ -58,7 +58,7 @@ REGISTER_TEST(sched_sleepy_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 #define WQ_2_TIMES 4096
 #define WQ_2_THREADS 2
 
-static atomic_uint times_2 = 0;
+static _Atomic uint32_t times_2 = 0;
 
 static void wq_test_2(void *a, void *b) {
     (void) a, (void) b;
@@ -68,7 +68,7 @@ static void wq_test_2(void *a, void *b) {
 }
 
 static struct workqueue *wq = NULL;
-static atomic_uint threads_left = WQ_2_THREADS;
+static _Atomic uint32_t threads_left = WQ_2_THREADS;
 
 static void enqueue_thread(void) {
     for (size_t i = 0; i < WQ_2_TIMES / WQ_2_THREADS; i++) {

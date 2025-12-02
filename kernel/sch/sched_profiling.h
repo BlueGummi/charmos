@@ -1,7 +1,7 @@
 #include <profiling.h>
 
 struct scheduler_stats {
-    atomic_uint_fast64_t steals;
+    _Atomic uint64_t steals;
 };
 
 #ifdef PROFILING_SCHED

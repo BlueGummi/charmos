@@ -197,7 +197,7 @@ struct slab_percpu_cache {
 };
 
 struct slab_free_slot {
-    atomic_uint_fast64_t seq;
+    _Atomic uint64_t seq;
     vaddr_t addr;
 };
 
@@ -234,8 +234,8 @@ struct slab_free_queue_list {
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab_free_queue_list, lock);
 
 struct slab_free_queue {
-    atomic_uint_fast64_t head;
-    atomic_uint_fast64_t tail;
+    _Atomic uint64_t head;
+    _Atomic uint64_t tail;
     size_t capacity;
     struct slab_free_slot *slots;
 

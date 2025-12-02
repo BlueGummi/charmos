@@ -12,7 +12,7 @@
 static uint64_t cr3 = 0;
 static atomic_char cr3_ready = 0;
 static struct spinlock wakeup_lock = SPINLOCK_INIT;
-static atomic_uint cores_awake = 0;
+static _Atomic uint32_t cores_awake = 0;
 
 static void detect_llc(struct topology_cache_info *llc) {
     uint32_t eax, ebx, ecx, edx;

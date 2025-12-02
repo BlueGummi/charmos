@@ -55,7 +55,7 @@ REGISTER_TEST(rwlock_two_writer_basic, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 #define RWLOCK_READER_COUNT_TEST_N 10
 
 static struct rwlock rw_readers = {0};
-static atomic_uint rw_readers_left = RWLOCK_READER_COUNT_TEST_N;
+static _Atomic uint32_t rw_readers_left = RWLOCK_READER_COUNT_TEST_N;
 
 static void rw_reader_worker() {
     for (int i = 0; i < 1000; i++) {
@@ -80,7 +80,7 @@ REGISTER_TEST(rwlock_many_readers, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 #define RWLOCK_MIXED_THREADS 12
 volatile struct thread *mixed_threads[RWLOCK_MIXED_THREADS];
 static struct rwlock rw_mixed = {0};
-static atomic_uint rw_mixed_left = RWLOCK_MIXED_THREADS;
+static _Atomic uint32_t rw_mixed_left = RWLOCK_MIXED_THREADS;
 
 static void rw_mixed_worker() {
     for (int i = 0; i < 1500; i++) {
@@ -117,7 +117,7 @@ REGISTER_TEST(rwlock_mixed_stress, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 #define RWLOCK_CHAOS_THREADS 20
 
 static struct rwlock rw_chaos = {0};
-static atomic_uint rw_chaos_left = RWLOCK_CHAOS_THREADS;
+static _Atomic uint32_t rw_chaos_left = RWLOCK_CHAOS_THREADS;
 
 static void rw_chaos_worker() {
     for (int i = 0; i < 3000; i++) {
@@ -151,9 +151,9 @@ REGISTER_TEST(rwlock_chaos, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 }
 
 static struct rwlock rw_correct = {0};
-static atomic_uint active_readers = 0;
+static _Atomic uint32_t active_readers = 0;
 
-static atomic_uint active_writers = 0;
+static _Atomic uint32_t active_writers = 0;
 static atomic_bool correctness_ok = true;
 
 static void rw_correct_worker() {

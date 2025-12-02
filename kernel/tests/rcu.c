@@ -15,7 +15,7 @@ struct rcu_test_data {
 
 static struct rcu_test_data *volatile shared_ptr = NULL;
 static atomic_bool rcu_test_failed = false;
-static atomic_uint rcu_reads_done = 0;
+static _Atomic uint32_t rcu_reads_done = 0;
 
 static void rcu_reader_thread(void) {
     uint64_t end = time_get_ms() + RCU_TEST_DURATION_MS;

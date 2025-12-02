@@ -47,7 +47,7 @@ struct bcache_wrapper {
 /* TODO: bitmap to mark present entries */
 struct bcache {
     struct bcache_wrapper **entries;
-    atomic_uint_fast64_t ticks;
+    _Atomic uint64_t ticks;
     uint64_t capacity;
     uint64_t count;
     uint64_t spb;

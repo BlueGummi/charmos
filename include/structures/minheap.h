@@ -13,15 +13,15 @@
 
 struct minheap_node {
     struct spinlock lock;
-    atomic_uint_fast64_t key;
-    atomic_uint_fast32_t index;
+    _Atomic uint64_t key;
+    _Atomic uint32_t index;
 };
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(minheap_node, lock);
 
 struct minheap {
     struct minheap_node **nodes;
-    atomic_uint_fast32_t capacity;
-    atomic_uint_fast32_t size;
+    _Atomic uint32_t capacity;
+    _Atomic uint32_t size;
 };
 
 struct minheap *minheap_create(void);

@@ -223,7 +223,7 @@ struct thread {
                               * -1 if the scheduler should select the most
                               * optimal core */
 
-    atomic_uint_fast64_t last_ran; /* What core last ran us? */
+    _Atomic uint64_t last_ran; /* What core last ran us? */
 
     time_t run_start_time; /* When did we start running */
     size_t owner_domain;   /* What domain created us? */
@@ -292,8 +292,8 @@ struct thread {
     size_t wait_cookie;
 
     /* RCU */
-    atomic_uint rcu_nesting;           /* incremented by this thread only */
-    atomic_uint_fast64_t rcu_seen_gen; /* last gen seen (release store) */
+    _Atomic uint32_t rcu_nesting;           /* incremented by this thread only */
+    _Atomic uint64_t rcu_seen_gen; /* last gen seen (release store) */
     atomic_bool rcu_blocked;           /* task was queued as blocked for GP */
     uint64_t rcu_start_gen;
     uint64_t rcu_blocked_gen;
@@ -305,7 +305,7 @@ struct thread {
     struct list_head apc_head[APC_TYPE_COUNT];
 
     /* Any APC pending */
-    atomic_uintptr_t apc_pending_mask; /* bitmask of APC_TYPE_* pending */
+    _Atomic uintptr_t apc_pending_mask; /* bitmask of APC_TYPE_* pending */
 
     /* APC disable counts */
     uint32_t special_apc_disable;

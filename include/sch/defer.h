@@ -38,7 +38,7 @@ struct work {
 
     atomic_bool enqueued;
     atomic_bool active;
-    atomic_uint_fast64_t seq;
+    _Atomic uint64_t seq;
 };
 
 enum worker_next_action {
@@ -214,14 +214,14 @@ struct workqueue {
     struct list_head works;
     struct worker *worker_array; /* if STATIC_WORKER is needed */
 
-    atomic_uint_fast64_t head;
-    atomic_uint_fast64_t tail;
+    _Atomic uint64_t head;
+    _Atomic uint64_t tail;
 
     atomic_bool spawn_pending; /* Some enqueue wants us to spawn a worker */
-    atomic_uint num_tasks;     /* How many tasks do we have in the ringbuf */
+    _Atomic uint32_t num_tasks;     /* How many tasks do we have in the ringbuf */
 
-    atomic_uint num_workers;  /* Current # workers */
-    atomic_uint idle_workers; /* # idle */
+    _Atomic uint32_t num_workers;  /* Current # workers */
+    _Atomic uint32_t idle_workers; /* # idle */
 
     core_t core;
     time_t last_spawn_attempt;

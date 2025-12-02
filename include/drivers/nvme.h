@@ -117,7 +117,7 @@ struct nvme_queue {
     uint32_t *cq_db;
 
     struct list_head outgoing;
-    atomic_uint_fast16_t outstanding;
+    _Atomic uint16_t outstanding;
 
     struct spinlock lock;
 };
@@ -158,7 +158,7 @@ struct nvme_device {
     uint64_t max_transfer_size;
     struct generic_disk *generic_disk;
 
-    atomic_uint_fast64_t total_outstanding;
+    _Atomic uint64_t total_outstanding;
 
     struct workqueue *workqueue;
 };

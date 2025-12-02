@@ -28,9 +28,9 @@ struct stat_series {
     stat_series_callback bucket_reset;   /* to call upon bucket reset */
     struct stat_bucket *buckets;         /* ringbuffer */
     uint32_t nbuckets;                   /* how many buckets */
-    atomic_uint_fast32_t current;        /* current bucket idx */
+    _Atomic uint32_t current;        /* current bucket idx */
     time_t bucket_us;                    /* duration for each bucket */
-    atomic_uint_fast64_t last_update_us; /* last time we advanced */
+    _Atomic uint64_t last_update_us; /* last time we advanced */
     void *private;                       /* private, per subsystem */
     struct spinlock lock;
 };

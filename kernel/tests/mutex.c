@@ -16,7 +16,7 @@ REGISTER_TEST(mutex_test_basic, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 #define MUTEX_MANY_WAITER_TEST_WAITER_COUNT 10
 
 static struct mutex many_mtx = MUTEX_INIT;
-static atomic_uint many_waiter_done = MUTEX_MANY_WAITER_TEST_WAITER_COUNT;
+static _Atomic uint32_t many_waiter_done = MUTEX_MANY_WAITER_TEST_WAITER_COUNT;
 
 static void many_worker() {
     for (int i = 0; i < 1000; i++) {
@@ -41,7 +41,7 @@ REGISTER_TEST(mutex_many_waiters, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 #define CHAOS_THREAD_COUNT 20
 
 static struct mutex chaos_mtx = MUTEX_INIT;
-static atomic_uint chaos_left = CHAOS_THREAD_COUNT;
+static _Atomic uint32_t chaos_left = CHAOS_THREAD_COUNT;
 
 static void chaos() {
     for (int i = 0; i < 2000; i++) {

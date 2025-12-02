@@ -24,7 +24,7 @@ static bool done2 = false;
 static atomic_bool cb1d = false, cb2d = false;
 static uint64_t avg_complete_time[BIO_SCHED_LEVELS] = {0};
 static uint64_t total_complete_time[BIO_SCHED_LEVELS] = {0};
-static atomic_uint runs = 0;
+static _Atomic uint32_t runs = 0;
 
 static void bio_sch_callback(struct bio_request *req) {
     (void) req;

@@ -28,7 +28,7 @@ struct idle_thread_data {
     _Atomic enum idle_thread_state state;
 
     atomic_bool woken_from_timer;
-    atomic_uint_fast64_t last_entry_ms;
+    _Atomic uint64_t last_entry_ms;
     uint64_t last_exit_ms;
 };
 
@@ -46,7 +46,7 @@ struct scheduler {
     struct thread_queue rt_threads;
     struct thread_queue bg_threads;
 
-    atomic_uint_fast8_t queue_bitmap;
+    _Atomic uint8_t queue_bitmap;
 
     struct thread *current;
 
@@ -117,9 +117,9 @@ size_t scheduler_try_push_to_idle_core(struct scheduler *sched);
 /* For a global structure containing central scheduler data */
 struct scheduler_data {
     uint32_t max_concurrent_stealers;
-    atomic_uint active_stealers;
-    atomic_uint total_threads;
-    atomic_int_fast64_t steal_min_diff;
+    _Atomic uint32_t active_stealers;
+    _Atomic uint32_t total_threads;
+    _Atomic int64_t steal_min_diff;
 };
 
 extern struct scheduler_data scheduler_data;
