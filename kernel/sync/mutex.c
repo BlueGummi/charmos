@@ -41,7 +41,7 @@ static bool spin_wait_simple_mutex(struct mutex_simple *m,
 
 static void block_on_simple_mutex(struct mutex_simple *m) {
     enum irql irql = spin_lock(&m->lock);
-    thread_block_on(&m->waiters);
+    thread_block_on(&m->waiters, m);
     spin_unlock(&m->lock, irql);
     scheduler_yield();
 }
@@ -75,7 +75,7 @@ void mutex_simple_unlock(struct mutex_simple *m) {
     struct thread *next = thread_queue_pop_front(&m->waiters);
     if (next != NULL)
         scheduler_wake(next, THREAD_WAKE_REASON_BLOCKING_MANUAL,
-                       next->perceived_prio_class);
+                       next->perceived_prio_class, m);
 
     spin_unlock(&m->lock, irql);
 }

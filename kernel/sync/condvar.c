@@ -10,10 +10,10 @@ static enum irql condvar_lock_internal(struct condvar *cv,
 }
 
 static void do_block_on_queue(struct thread_queue *q, struct spinlock *lock,
-                              enum irql irql) {
-    thread_block_on(q);
+                              enum irql irql, struct condvar *cv) {
+    thread_block_on(q, cv);
     spin_unlock(lock, irql);
-    scheduler_yield();
+    thread_wait_for_wake_match(thread_block, THREAD_BLOCK_REASON_MANUAL, cv);
 }
 
 enum wake_reason condvar_wait(struct condvar *cv, struct spinlock *lock,
@@ -22,7 +22,7 @@ enum wake_reason condvar_wait(struct condvar *cv, struct spinlock *lock,
     curr->wake_reason = WAKE_REASON_NONE;
     curr->wait_cookie++;
 
-    do_block_on_queue(&cv->waiters, lock, irql);
+    do_block_on_queue(&cv->waiters, lock, irql, cv);
     *out = condvar_lock_internal(cv, lock);
 
     return curr->wake_reason;
@@ -33,7 +33,7 @@ void condvar_init(struct condvar *cv, bool irq_disable) {
     cv->irq_disable = irq_disable;
 }
 
-static void set_wake_reason_and_wake(struct thread *t,
+static void set_wake_reason_and_wake(struct condvar *cv, struct thread *t,
                                      enum wake_reason reason) {
     if (!t)
         return;
@@ -43,7 +43,7 @@ static void set_wake_reason_and_wake(struct thread *t,
                                     ? THREAD_WAKE_REASON_SLEEP_TIMEOUT
                                     : THREAD_WAKE_REASON_SLEEP_MANUAL;
 
-    scheduler_wake(t, r, t->perceived_prio_class);
+    scheduler_wake(t, r, t->perceived_prio_class, cv);
 }
 
 static void nop_callback(struct thread *unused) {
@@ -54,7 +54,7 @@ struct thread *condvar_signal_callback(struct condvar *cv,
                                        thread_action_callback tac) {
     struct thread *t = thread_queue_pop_front(&cv->waiters);
     tac(t);
-    set_wake_reason_and_wake(t, WAKE_REASON_SIGNAL);
+    set_wake_reason_and_wake(cv, t, WAKE_REASON_SIGNAL);
     return t;
 }
 
@@ -67,7 +67,7 @@ void condvar_broadcast_callback(struct condvar *cv,
     struct thread *t;
     while ((t = thread_queue_pop_front(&cv->waiters)) != NULL) {
         tac(t);
-        set_wake_reason_and_wake(t, WAKE_REASON_SIGNAL);
+        set_wake_reason_and_wake(cv, t, WAKE_REASON_SIGNAL);
     }
 }
 
@@ -75,6 +75,9 @@ void condvar_broadcast(struct condvar *cv) {
     condvar_broadcast_callback(cv, nop_callback);
 }
 
+/* TODO: Move me into `struct thread` to avoid a scenario where the
+ * dynamic allocation of this structure fails (we cannot recover from
+ * that allocation failure - it should be statically allocated) */
 struct condvar_with_cb {
     struct condvar *cv;
     condvar_callback cb;
@@ -98,7 +101,7 @@ static void condvar_timeout_wakeup(void *arg, void *arg2) {
 
     spin_unlock(&ck->cv->waiters.lock, irql);
     kfree(ck, FREE_PARAMS_DEFAULT);
-    set_wake_reason_and_wake(t, WAKE_REASON_TIMEOUT);
+    set_wake_reason_and_wake(ck->cv, t, WAKE_REASON_TIMEOUT);
     thread_put(t);
 }
 

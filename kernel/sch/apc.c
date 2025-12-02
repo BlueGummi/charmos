@@ -155,7 +155,8 @@ static void wake_if_waiting(struct thread *t) {
     if (!thread_apc_sanity_check(t))
         return;
 
-    thread_wake_manual(t);
+    /* set the wake_src as the thread that enqueued the APC */
+    thread_wake_manual(t, scheduler_get_current_thread());
 }
 
 void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {

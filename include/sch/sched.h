@@ -97,7 +97,7 @@ void scheduler_enqueue(struct thread *t);
 void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id);
 
 void scheduler_wake(struct thread *t, enum thread_wake_reason reason,
-                    enum thread_prio_class prio);
+                    enum thread_prio_class prio, void *wake_src);
 
 void scheduler_period_start(struct scheduler *s, uint64_t now_ms);
 
@@ -179,8 +179,8 @@ thread_spawn_on_core(char *name, void (*entry)(void), uint64_t core_id) {
     return t;
 }
 
-static inline void scheduler_wake_from_io_block(struct thread *t) {
-    scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_IO, THREAD_PRIO_CLASS_URGENT);
+static inline void scheduler_wake_from_io_block(struct thread *t, void *wake_src) {
+    scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_IO, THREAD_PRIO_CLASS_URGENT, wake_src);
 }
 
 static inline bool scheduler_self_in_resched() {

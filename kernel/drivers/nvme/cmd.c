@@ -47,7 +47,7 @@ done:
         nvme_send_nvme_req(dev->generic_disk, next);
 }
 
-static void nvme_process_one(struct nvme_request *req) {
+static void nvme_process_one(struct nvme_device *dev, struct nvme_request *req) {
     struct thread *t = req->waiter;
 
     if (--req->remaining_parts == 0) {
@@ -60,7 +60,7 @@ static void nvme_process_one(struct nvme_request *req) {
     }
 
     if (t)
-        scheduler_wake_from_io_block(t);
+        scheduler_wake_from_io_block(t, dev);
 }
 
 static struct nvme_request *nvme_finished_pop_front(struct nvme_device *dev) {
@@ -84,7 +84,7 @@ void nvme_work(void *dvoid, void *nothing) {
     struct nvme_request *req;
     while (true) {
         while ((req = nvme_finished_pop_front(dev)) != NULL) {
-            nvme_process_one(req);
+            nvme_process_one(dev, req);
             nvme_send_waiters(dev);
         }
 

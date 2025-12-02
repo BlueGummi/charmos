@@ -193,6 +193,7 @@ struct thread_activity_metrics {
 };
 
 struct thread {
+    /* ========== Metadata ========== */
     /* Unique ID allocated from global thread ID tree */
     uint64_t id;
     char *name;
@@ -206,7 +207,7 @@ struct thread {
     /* Registers */
     struct cpu_context regs;
 
-    /* Nodes */
+    /* ========== Structure nodes ========== */
 
     /* Runqueue nodes */
     struct rbt_node rq_tree_node;  /* runqueue tree node */
@@ -218,6 +219,8 @@ struct thread {
     struct pairing_node wq_pairing_node; /* waitqueue pairing node */
 
     struct list_head rcu_list_node; /* rcu list node */
+
+    /* ========== State ========== */
 
     /* State */
     _Atomic enum thread_state state;
@@ -304,6 +307,11 @@ struct thread {
     atomic_bool rcu_blocked;       /* task was queued as blocked for GP */
     uint64_t rcu_start_gen;
     uint64_t rcu_blocked_gen;
+
+    /* Block/sleep and wake sync. */
+    void *expected_wake_src;
+    _Atomic(void *) wake_src;
+    atomic_bool wake_matched;
 
     /* ========== APC data ========== */
     bool executing_apc; /* Executing an APC right now? */
@@ -395,7 +403,7 @@ void thread_update_effective_priority(struct thread *t);
 void thread_apply_cpu_penalty(struct thread *t);
 
 void thread_add_wake_reason(struct thread *t, uint8_t reason);
-void thread_wake_manual(struct thread *t);
+void thread_wake_manual(struct thread *t, void *wake_src);
 void thread_calculate_activity_data(struct thread *t);
 
 struct thread_event_reason *
@@ -406,11 +414,17 @@ thread_add_event_reason(struct thread_event_reason *ring, size_t *head,
 void thread_add_block_reason(struct thread *t, uint8_t reason);
 void thread_add_sleep_reason(struct thread *t, uint8_t reason);
 
-void thread_block(struct thread *t, enum thread_block_reason r);
-void thread_sleep(struct thread *t, enum thread_sleep_reason r);
+void thread_block(struct thread *t, enum thread_block_reason r,
+                  void *expect_wake_src);
+void thread_sleep(struct thread *t, enum thread_sleep_reason r,
+                  void *expect_wake_src);
 void thread_set_timesharing(struct thread *t);
 void thread_set_background(struct thread *t);
-void thread_wake(struct thread *t, enum thread_wake_reason r);
+void thread_wake(struct thread *t, enum thread_wake_reason r, void *wake_src);
+void thread_wait_for_wake_match(void (*no_match_action)(struct thread *t,
+                                                        uint8_t reason,
+                                                        void *expected),
+                                uint8_t reason, void *expected);
 
 static inline enum thread_state thread_get_state(struct thread *t) {
     return atomic_load(&t->state);
@@ -494,7 +508,7 @@ static inline enum irql thread_acquire(struct thread *t) {
     if (!refcount_inc_not_zero(&t->refcount))
         k_panic("UAF");
 
-    return spin_lock(&t->lock);
+    return spin_lock_irq_disable(&t->lock);
 }
 
 static inline void thread_release(struct thread *t, enum irql irql) {
@@ -505,4 +519,10 @@ static inline void thread_release(struct thread *t, enum irql irql) {
 static inline bool thread_is_rt(struct thread *t) {
     return t->perceived_prio_class == THREAD_PRIO_CLASS_URGENT ||
            t->perceived_prio_class == THREAD_PRIO_CLASS_RT;
+}
+
+static inline void thread_clear_wake_src(struct thread *t) {
+    atomic_store_explicit(&t->wake_src, NULL, memory_order_release);
+    atomic_store_explicit(&t->wake_matched, false, memory_order_release);
+    t->expected_wake_src = NULL;
 }

@@ -88,7 +88,8 @@ void thread_print(const struct thread *t) {
              t->activity_score, t->dynamic_delta,
              (unsigned long long) t->weight);
     k_printf("    saved_weight: %u\n", t->saved_weight);
-    k_printf("    saved_prio_class: %s\n", thread_prio_class_str(t->saved_class));
+    k_printf("    saved_prio_class: %s\n",
+             thread_prio_class_str(t->saved_class));
     k_printf("    boost_count: %u\n", t->boost_count);
 
     k_printf("    activity_class: %s,\n",
@@ -464,10 +465,22 @@ void thread_add_sleep_reason(struct thread *t, uint8_t reason) {
                             time_get_ms(), t->activity_stats);
 }
 
-static void set_state_and_update_reason(struct thread *t, uint8_t reason,
-                                        enum thread_state state,
-                                        void (*callback)(struct thread *,
-                                                         uint8_t)) {
+static void set_state_and_update_reason(
+    struct thread *t, uint8_t reason, enum thread_state state,
+    void (*callback)(struct thread *, uint8_t), void *wake_src) {
+    /* do not preempt us. this is raised to HIGH because it is sometimes
+     * called from HIGH and we can't "raise from HIGH to DISPATCH" */
+    enum irql irql = thread_acquire(t);
+
+    if (state == THREAD_STATE_READY) {
+        atomic_store_explicit(&t->wake_src, wake_src, memory_order_release);
+        if (wake_src == t->expected_wake_src)
+            atomic_store_explicit(&t->wake_matched, true, memory_order_release);
+
+    } else {
+        t->expected_wake_src = wake_src;
+    }
+
     atomic_store(&t->state, state);
     callback(t, reason);
 
@@ -475,11 +488,13 @@ static void set_state_and_update_reason(struct thread *t, uint8_t reason,
 
     if (state != THREAD_STATE_READY)
         thread_update_runtime_buckets(t, time);
+
+    thread_release(t, irql);
 }
 
-void thread_wake(struct thread *t, enum thread_wake_reason r) {
+void thread_wake(struct thread *t, enum thread_wake_reason r, void *wake_src) {
     set_state_and_update_reason(t, r, THREAD_STATE_READY,
-                                thread_add_wake_reason);
+                                thread_add_wake_reason, wake_src);
 }
 
 void thread_set_timesharing(struct thread *t) {
@@ -492,12 +507,27 @@ void thread_set_background(struct thread *t) {
     t->perceived_prio_class = THREAD_PRIO_CLASS_BACKGROUND;
 }
 
-void thread_block(struct thread *t, enum thread_block_reason r) {
+void thread_block(struct thread *t, enum thread_block_reason r,
+                  void *expect_wake_src) {
     set_state_and_update_reason(t, r, THREAD_STATE_BLOCKED,
-                                thread_add_block_reason);
+                                thread_add_block_reason, expect_wake_src);
 }
 
-void thread_sleep(struct thread *t, enum thread_sleep_reason r) {
+void thread_sleep(struct thread *t, enum thread_sleep_reason r,
+                  void *expect_wake_src) {
     set_state_and_update_reason(t, r, THREAD_STATE_SLEEPING,
-                                thread_add_sleep_reason);
+                                thread_add_sleep_reason, expect_wake_src);
+}
+
+void thread_wait_for_wake_match(void (*no_match_action)(struct thread *t,
+                                                        uint8_t reason,
+                                                        void *expected),
+                                uint8_t reason, void *expected) {
+    scheduler_yield();
+    struct thread *curr = scheduler_get_current_thread();
+    while (!atomic_load_explicit(&curr->wake_matched, memory_order_acquire)) {
+        no_match_action(curr, reason, expected);
+        scheduler_yield();
+    }
+    thread_clear_wake_src(curr);
 }

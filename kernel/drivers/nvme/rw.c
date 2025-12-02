@@ -133,13 +133,10 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
 
     req.waiter = curr;
     function(disk, &req);
-    enum irql irql = irql_raise(IRQL_HIGH_LEVEL);
-    thread_block(curr, THREAD_BLOCK_REASON_IO);
-    irql_lower(irql);
+    thread_block(curr, THREAD_BLOCK_REASON_IO, disk->driver_data);
 
     /* Go run something else now */
-    scheduler_yield();
-
+    thread_wait_for_wake_match(thread_block, THREAD_BLOCK_REASON_IO, disk->driver_data);
     return !req.status;
 }
 

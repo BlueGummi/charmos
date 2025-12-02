@@ -44,7 +44,7 @@ void ahci_process_completions(struct ahci_device *dev, uint32_t port) {
 
         struct thread *t = dev->io_waiters[port][slot];
         if (t)
-            scheduler_wake_from_io_block(t);
+            scheduler_wake_from_io_block(t, dev);
 
         dev->io_requests[port][slot] = NULL;
     }

@@ -387,11 +387,11 @@ struct thread *thread_queue_pop_front(struct thread_queue *q) {
     return thread_from_wq_list_node(lhead);
 }
 
-void thread_block_on(struct thread_queue *q) {
+void thread_block_on(struct thread_queue *q, void *wake_src) {
     struct thread *current = scheduler_get_current_thread();
 
     enum irql irql = thread_queue_lock_irq_disable(q);
-    thread_block(current, THREAD_BLOCK_REASON_MANUAL);
+    thread_block(current, THREAD_BLOCK_REASON_MANUAL, wake_src);
     list_add_tail(&current->wq_list_node, &q->list);
     thread_queue_unlock(q, irql);
 }
@@ -399,25 +399,25 @@ void thread_block_on(struct thread_queue *q) {
 static void wake_thread(void *a, void *unused) {
     (void) unused;
     struct thread *t = a;
-    scheduler_wake(t, THREAD_WAKE_REASON_SLEEP_TIMEOUT,
-                   t->perceived_prio_class);
+    scheduler_wake(t, THREAD_WAKE_REASON_SLEEP_TIMEOUT, t->perceived_prio_class,
+                   t);
 }
 
 void thread_sleep_for_ms(uint64_t ms) {
     struct thread *curr = scheduler_get_current_thread();
     defer_enqueue(wake_thread, WORK_ARGS(curr, NULL), ms);
-    thread_sleep(curr, THREAD_SLEEP_REASON_MANUAL);
+    thread_sleep(curr, THREAD_SLEEP_REASON_MANUAL, curr);
 
     scheduler_yield();
 }
 
-void thread_wake_manual(struct thread *t) {
+void thread_wake_manual(struct thread *t, void *wake_src) {
     enum thread_state s = thread_get_state(t);
 
     if (s == THREAD_STATE_BLOCKED)
         scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_MANUAL,
-                       t->perceived_prio_class);
+                       t->perceived_prio_class, wake_src);
     else if (s == THREAD_STATE_SLEEPING)
         scheduler_wake(t, THREAD_WAKE_REASON_SLEEP_MANUAL,
-                       t->perceived_prio_class);
+                       t->perceived_prio_class, wake_src);
 }

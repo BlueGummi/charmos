@@ -68,7 +68,7 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
     req.trigger_completion = true;
 
     struct thread *curr = scheduler_get_current_thread();
-    thread_block(curr, THREAD_BLOCK_REASON_IO);
+    thread_block(curr, THREAD_BLOCK_REASON_IO, dev);
     dev->io_waiters[ahci_disk->port][req.slot] = curr;
 
     if (!function(disk, lba, buf, count, &req)) {
@@ -77,7 +77,7 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
     }
 
     spin_unlock(&dev->lock, irql);
-    scheduler_yield();
+    thread_wait_for_wake_match(thread_block, THREAD_BLOCK_REASON_IO, dev);
 
     dev->io_waiters[ahci_disk->port][req.slot] = NULL;
     return req.status == 0;

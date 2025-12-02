@@ -103,8 +103,8 @@ void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id) {
 }
 
 void scheduler_wake(struct thread *t, enum thread_wake_reason reason,
-                    enum thread_prio_class prio) {
-    thread_wake(t, reason);
+                    enum thread_prio_class prio, void *wake_src) {
+    thread_wake(t, reason, wake_src);
     thread_apply_wake_boost(t);
     t->perceived_prio_class = prio;
 
