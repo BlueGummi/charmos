@@ -486,7 +486,8 @@ static bool set_state_and_update_reason(struct thread *t, uint8_t reason,
      * block loop in wait_for_wake_match */
     bool ok = false;
     if (state != THREAD_STATE_READY) {
-        if (atomic_load_explicit(&t->wake_matched, memory_order_acquire)) {
+        if (atomic_load_explicit(&t->wake_matched, memory_order_acquire) &&
+            t->wake_token == t->wait_token) {
             ok = true;
             goto out;
         }
@@ -494,16 +495,21 @@ static bool set_state_and_update_reason(struct thread *t, uint8_t reason,
 
     if (state == THREAD_STATE_READY) {
         atomic_store_explicit(&t->wake_src, wake_src, memory_order_release);
-        if (wake_src == t->expected_wake_src)
+        if (wake_src == t->expected_wake_src) {
+            t->wake_token = t->wait_token;
             atomic_store_explicit(&t->wake_matched, true, memory_order_release);
+        }
     } else {
+        t->wait_token = ++t->token_ctr;
+        t->wake_token = 0;
         t->expected_wake_src = wake_src;
     }
 
     /* only change the state if it is NOT both RUNNING and being set to READY */
-    if (!(state == THREAD_STATE_READY && thread_get_state(t) == THREAD_STATE_RUNNING))
+    if (!(state == THREAD_STATE_READY &&
+          thread_get_state(t) == THREAD_STATE_RUNNING))
         atomic_store(&t->state, state);
-    
+
     callback(t, reason);
 
     uint64_t time = time_get_ms();
@@ -561,6 +567,8 @@ void thread_wait_for_wake_match(bool (*no_match_action)(struct thread *t,
                                 uint8_t reason, void *expected) {
     scheduler_yield();
     struct thread *curr = scheduler_get_current_thread();
+    /* we can safely avoid checking the token in the loop because that will 
+     * become set if wake_matched is set... */
     while (!atomic_load_explicit(&curr->wake_matched, memory_order_acquire)) {
         /* if this returns true, it is because the wake_matched flag was set
          * by another thread waking it up. in this case, we should simply exit

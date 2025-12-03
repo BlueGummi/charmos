@@ -310,8 +310,13 @@ struct thread {
 
     /* Block/sleep and wake sync. */
     void *expected_wake_src;
+    uint64_t wait_token;
+
     _Atomic(void *) wake_src;
     atomic_bool wake_matched;
+    uint64_t wake_token;
+
+    uint64_t token_ctr;
 
     /* ========== APC data ========== */
     bool executing_apc; /* Executing an APC right now? */
