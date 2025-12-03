@@ -18,47 +18,6 @@ Prerequisites: `nasm` and `xorriso`
 make run # run this in the build directory
 ```
 
-## Roadmap 
+## More
 
-> The :trophy: means the task is a challenge, the :broom: means something is trivial
-
-### TODO:
-
-- [x] blkdev bcache
-
-- [x] bcache async io prefetch/readahead
-
-- [x] async blkdev io request scheduler
-
-- [ ] fix header file stuff. move big public functions to `include/` and then keep literally everything else in `_internal.h` files that live next to the `.c` files
-
-- [ ] fix rcu
-
-- [x] figure out how to represent processor topology (NUMA, SMT)
-
-- [x] numa buddy allocator
-
-- [ ] make generic thread/worker pool for daemon and workqueue
-
-- [ ] complete usb devices, xhci, ehci, uhci, ohci
-
-- [ ] clean up all drivers. less bitfields, more #defines
-
-- [x] async blkdev io operations
-
-- [ ] lots of acpi things to do stuff - C states
-
-- [ ] devtmpfs 
-
-- [ ] proper system of using ifdefs to log info, track info, do profiling, etc.
-
-- [ ] ports for programs
-
-- [ ] proper userland
-
-- [ ] ia32 port + gub support
-
-- [ ] finish up vfs and add page cache - dual cache model, metadata in private block cache, file data in page cache
-
-- [ ] networking :boom: + networking stack :boom: :boom:
-
+[documentation](https://docs.charmos.dev)
