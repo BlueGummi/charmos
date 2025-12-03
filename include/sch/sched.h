@@ -96,7 +96,7 @@ void scheduler_yield();
 void scheduler_enqueue(struct thread *t);
 void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id);
 
-void scheduler_wake(struct thread *t, enum thread_wake_reason reason,
+bool scheduler_wake(struct thread *t, enum thread_wake_reason reason,
                     enum thread_prio_class prio, void *wake_src);
 
 void scheduler_period_start(struct scheduler *s, uint64_t now_ms);

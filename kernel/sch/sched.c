@@ -181,7 +181,7 @@ static void load_thread(struct scheduler *sched, struct thread *next,
     thread_set_last_ran(next, smp_core_id());
     next->curr_core = smp_core_id();
     next->run_start_time = time;
-    atomic_store(&next->being_moved, false);
+    thread_set_being_moved(next, false);
     thread_calculate_activity_data(next);
     thread_classify_activity(next, time);
 

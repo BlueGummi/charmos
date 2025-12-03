@@ -72,6 +72,14 @@ enum thread_state : uint8_t {
     THREAD_STATE_HALTED,     /* Thread manually suspended */
 };
 
+enum thread_wait_type : uint8_t {
+    THREAD_WAIT_NONE,
+    THREAD_WAIT_UNINTERRUPTIBLE, /* Cannot be interrupted by anything
+                                    besides the wake source */
+
+    THREAD_WAIT_INTERRUPTIBLE, /* Can be interrupted */
+};
+
 enum thread_flags : uint8_t {
     THREAD_FLAGS_NO_STEAL = 1, /* Do not migrate between cores */
 };
@@ -309,8 +317,13 @@ struct thread {
     uint64_t rcu_blocked_gen;
 
     /* Block/sleep and wake sync. */
+    _Atomic enum thread_wait_type wait_type;
     void *expected_wake_src;
     uint64_t wait_token;
+
+    uint8_t last_action_reason;
+    /* used in wait_for_wake */
+    enum thread_state last_action;
 
     _Atomic(void *) wake_src;
     atomic_bool wake_matched;
@@ -422,18 +435,18 @@ void thread_add_sleep_reason(struct thread *t, uint8_t reason);
 /* these two functions return if the thread had `wake_matched`
  * satisfied on return */
 bool thread_block(struct thread *t, enum thread_block_reason r,
-                  void *expect_wake_src);
+                  enum thread_wait_type wait_type, void *expect_wake_src);
 bool thread_sleep(struct thread *t, enum thread_sleep_reason r,
-                  void *expect_wake_src);
+                  enum thread_wait_type wait_type, void *expect_wake_src);
 
 void thread_set_timesharing(struct thread *t);
 void thread_set_background(struct thread *t);
 void thread_wake(struct thread *t, enum thread_wake_reason r, void *wake_src);
+void thread_wait_for_wake_match();
 
-void thread_wait_for_wake_match(bool (*no_match_action)(struct thread *t,
-                                                        uint8_t reason,
-                                                        void *expected),
-                                uint8_t reason, void *expected);
+struct thread_queue;
+void thread_block_on(struct thread_queue *q, enum thread_wait_type type,
+                     void *wake_src);
 
 static inline enum thread_state thread_get_state(struct thread *t) {
     return atomic_load(&t->state);
@@ -539,8 +552,18 @@ static inline bool thread_is_rt(struct thread *t) {
            t->perceived_prio_class == THREAD_PRIO_CLASS_RT;
 }
 
-static inline void thread_clear_wake_src(struct thread *t) {
+static inline void thread_clear_wake_data(struct thread *t) {
     atomic_store_explicit(&t->wake_src, NULL, memory_order_release);
     atomic_store_explicit(&t->wake_matched, false, memory_order_release);
     t->expected_wake_src = NULL;
+    t->wait_type = THREAD_WAIT_NONE;
+    t->last_action_reason = 0;
+}
+
+static inline bool thread_set_being_moved(struct thread *t, bool new) {
+    return atomic_exchange_explicit(&t->being_moved, new, memory_order_acq_rel);
+}
+
+static inline enum thread_wait_type thread_get_wait_type(struct thread *t) {
+    return atomic_load_explicit(&t->wait_type, memory_order_acquire);
 }

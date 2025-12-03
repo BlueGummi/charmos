@@ -70,10 +70,9 @@ static struct thread *steal_from_thread_rbt(struct scheduler *victim,
 
         /* we must first set the thread as `being_moved` before we
          * check if we can steal the thread... */
-        atomic_store_explicit(&target->being_moved, true, memory_order_release);
+        thread_set_being_moved(target, true);
         if (!scheduler_can_steal_thread(smp_core_id(), target)) {
-            atomic_store_explicit(&target->being_moved, false,
-                                  memory_order_release);
+            thread_set_being_moved(target, false);
             continue;
         }
 
@@ -114,9 +113,9 @@ static struct thread *steal_from_special_threads(struct scheduler *victim,
     list_for_each_safe(pos, n, q) {
         struct thread *t = thread_from_rq_list_node(pos);
 
-        atomic_store_explicit(&t->being_moved, true, memory_order_release);
+        thread_set_being_moved(t, true);
         if (!scheduler_can_steal_thread(core, t)) {
-            atomic_store_explicit(&t->being_moved, false, memory_order_release);
+            thread_set_being_moved(t, false);
             continue;
         }
 

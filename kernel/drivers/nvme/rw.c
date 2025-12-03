@@ -133,10 +133,12 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
 
     req.waiter = curr;
     function(disk, &req);
-    thread_block(curr, THREAD_BLOCK_REASON_IO, disk->driver_data);
+    thread_block(curr, THREAD_BLOCK_REASON_IO, THREAD_WAIT_UNINTERRUPTIBLE,
+                 disk->driver_data);
 
     /* Go run something else now */
-    thread_wait_for_wake_match(thread_block, THREAD_BLOCK_REASON_IO, disk->driver_data);
+    thread_wait_for_wake_match();
+
     return !req.status;
 }
 

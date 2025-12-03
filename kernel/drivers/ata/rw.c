@@ -176,7 +176,7 @@ static inline void submit_and_wait(struct ata_drive *d,
                                    struct ide_request *req) {
     enum irql irql = spin_lock(&req->lock);
     struct thread *t = scheduler_get_current_thread();
-    thread_block(t, THREAD_BLOCK_REASON_IO, d);
+    thread_block(t, THREAD_BLOCK_REASON_IO, THREAD_WAIT_UNINTERRUPTIBLE, d);
     req->waiter = t;
     submit_async(d, req);
     spin_unlock(&req->lock, irql);
@@ -234,8 +234,8 @@ static bool rw_sync(struct ata_drive *d, uint64_t lba, uint8_t *b, uint8_t cnt,
     struct ide_request *req = request_init(lba, b, cnt, write);
 
     submit_and_wait(d, req);
-    thread_wait_for_wake_match(thread_block, THREAD_BLOCK_REASON_IO, d);
-    
+    thread_wait_for_wake_match();
+
     bool ret = !req->status;
 
     kfree(req, FREE_PARAMS_DEFAULT);

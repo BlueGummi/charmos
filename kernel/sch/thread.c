@@ -387,11 +387,12 @@ struct thread *thread_queue_pop_front(struct thread_queue *q) {
     return thread_from_wq_list_node(lhead);
 }
 
-void thread_block_on(struct thread_queue *q, void *wake_src) {
+void thread_block_on(struct thread_queue *q, enum thread_wait_type type,
+                     void *wake_src) {
     struct thread *current = scheduler_get_current_thread();
 
     enum irql irql = thread_queue_lock_irq_disable(q);
-    thread_block(current, THREAD_BLOCK_REASON_MANUAL, wake_src);
+    thread_block(current, THREAD_BLOCK_REASON_MANUAL, type, wake_src);
     list_add_tail(&current->wq_list_node, &q->list);
     thread_queue_unlock(q, irql);
 }
@@ -406,7 +407,8 @@ static void wake_thread(void *a, void *unused) {
 void thread_sleep_for_ms(uint64_t ms) {
     struct thread *curr = scheduler_get_current_thread();
     defer_enqueue(wake_thread, WORK_ARGS(curr, NULL), ms);
-    thread_sleep(curr, THREAD_SLEEP_REASON_MANUAL, curr);
+    thread_sleep(curr, THREAD_SLEEP_REASON_MANUAL, THREAD_WAIT_INTERRUPTIBLE,
+                 curr);
 
     scheduler_yield();
 }
