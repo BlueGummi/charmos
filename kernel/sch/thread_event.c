@@ -465,23 +465,45 @@ void thread_add_sleep_reason(struct thread *t, uint8_t reason) {
                             time_get_ms(), t->activity_stats);
 }
 
-static void set_state_and_update_reason(
-    struct thread *t, uint8_t reason, enum thread_state state,
-    void (*callback)(struct thread *, uint8_t), void *wake_src) {
+static bool set_state_and_update_reason(struct thread *t, uint8_t reason,
+                                        enum thread_state state,
+                                        void (*callback)(struct thread *,
+                                                         uint8_t),
+                                        void *wake_src, bool already_locked) {
     /* do not preempt us. this is raised to HIGH because it is sometimes
      * called from HIGH and we can't "raise from HIGH to DISPATCH" */
-    enum irql irql = thread_acquire(t);
+    enum irql irql;
+
+    if (!already_locked)
+        irql = thread_acquire(t);
+    else
+        kassert(spinlock_held(&t->lock));
+
+    /* wake_matched can only be altered from within this locked section.
+     *
+     * we first check at the start if we are blocking and the wake has
+     * matched so that in that case we do not block and can exit our
+     * block loop in wait_for_wake_match */
+    bool ok = false;
+    if (state != THREAD_STATE_READY) {
+        if (atomic_load_explicit(&t->wake_matched, memory_order_acquire)) {
+            ok = true;
+            goto out;
+        }
+    }
 
     if (state == THREAD_STATE_READY) {
         atomic_store_explicit(&t->wake_src, wake_src, memory_order_release);
         if (wake_src == t->expected_wake_src)
             atomic_store_explicit(&t->wake_matched, true, memory_order_release);
-
     } else {
         t->expected_wake_src = wake_src;
     }
 
-    atomic_store(&t->state, state);
+    /* only change the state if it is NOT both RUNNING and being set to READY */
+    if (!(state == THREAD_STATE_READY && thread_get_state(t) == THREAD_STATE_RUNNING))
+        atomic_store(&t->state, state);
+    
     callback(t, reason);
 
     uint64_t time = time_get_ms();
@@ -489,12 +511,24 @@ static void set_state_and_update_reason(
     if (state != THREAD_STATE_READY)
         thread_update_runtime_buckets(t, time);
 
-    thread_release(t, irql);
+out:
+    if (!already_locked)
+        thread_release(t, irql);
+
+    return ok;
 }
 
 void thread_wake(struct thread *t, enum thread_wake_reason r, void *wake_src) {
     set_state_and_update_reason(t, r, THREAD_STATE_READY,
-                                thread_add_wake_reason, wake_src);
+                                thread_add_wake_reason, wake_src,
+                                /*already_locked=*/false);
+}
+
+void thread_wake_locked(struct thread *t, enum thread_wake_reason r,
+                        void *wake_src) {
+    set_state_and_update_reason(t, r, THREAD_STATE_READY,
+                                thread_add_wake_reason, wake_src,
+                                /*already_locked=*/true);
 }
 
 void thread_set_timesharing(struct thread *t) {
@@ -507,26 +541,35 @@ void thread_set_background(struct thread *t) {
     t->perceived_prio_class = THREAD_PRIO_CLASS_BACKGROUND;
 }
 
-void thread_block(struct thread *t, enum thread_block_reason r,
+bool thread_block(struct thread *t, enum thread_block_reason r,
                   void *expect_wake_src) {
-    set_state_and_update_reason(t, r, THREAD_STATE_BLOCKED,
-                                thread_add_block_reason, expect_wake_src);
+    return set_state_and_update_reason(t, r, THREAD_STATE_BLOCKED,
+                                       thread_add_block_reason, expect_wake_src,
+                                       /*already_locked=*/false);
 }
 
-void thread_sleep(struct thread *t, enum thread_sleep_reason r,
+bool thread_sleep(struct thread *t, enum thread_sleep_reason r,
                   void *expect_wake_src) {
-    set_state_and_update_reason(t, r, THREAD_STATE_SLEEPING,
-                                thread_add_sleep_reason, expect_wake_src);
+    return set_state_and_update_reason(t, r, THREAD_STATE_SLEEPING,
+                                       thread_add_sleep_reason, expect_wake_src,
+                                       /*already_locked=*/false);
 }
 
-void thread_wait_for_wake_match(void (*no_match_action)(struct thread *t,
+void thread_wait_for_wake_match(bool (*no_match_action)(struct thread *t,
                                                         uint8_t reason,
                                                         void *expected),
                                 uint8_t reason, void *expected) {
     scheduler_yield();
     struct thread *curr = scheduler_get_current_thread();
     while (!atomic_load_explicit(&curr->wake_matched, memory_order_acquire)) {
-        no_match_action(curr, reason, expected);
+        /* if this returns true, it is because the wake_matched flag was set
+         * by another thread waking it up. in this case, we should simply exit
+         * because we had a scenario where another thread woke us up (acquiring
+         * our lock), which sets the wake_matched flag and then releases the
+         * lock, which we then see afterwards */
+        if (no_match_action(curr, reason, expected))
+            break;
+
         scheduler_yield();
     }
     thread_clear_wake_src(curr);

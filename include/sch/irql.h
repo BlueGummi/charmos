@@ -20,7 +20,7 @@
  * ## Background:
  *   IRQLs are a feature of quite a few other kernels. Windows NT is the
  *   most prominent of the many kernels that have IRQLs. Similar concepts exist
- *   in other kernels, however. For example, VMS had 
+ *   in other kernels, however. 
  *
  * ## Summary:
  *   Each logical processor (or CPU) on the machine has its own IRQL.

@@ -230,7 +230,6 @@ static inline void scheduler_resched_if_needed(void) {
         return;
 
     if (scheduler_mark_self_needs_resched(false)) {
-        scheduler_mark_self_idle(false);
         scheduler_yield();
     }
 }

@@ -156,3 +156,7 @@ static inline void thread_scale_back_delta(struct thread *thread) {
 }
 
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(scheduler, lock);
+
+/* Internal use only */
+void thread_wake_locked(struct thread *t, enum thread_wake_reason r,
+                        void *wake_src);

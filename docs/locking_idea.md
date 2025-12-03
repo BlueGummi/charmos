@@ -14,7 +14,7 @@ Everyone
 ## Overview:
 
 Locking is the component of multitasking operating systems and programs that faciliates protection of shared resources.
-This kernel is allows preemption and is SMP-compatible, which introduces a few more locking problems.
+This OS allows preemption and is SMP-compatible, which introduces a few more locking problems.
 
 ## Background:
 
@@ -24,22 +24,23 @@ Throughout the history of operating systems, the concept of "virtualizing" physi
 center in the design of various OS components. For example, memory management units virtualize memory to
 map virtual addresses to physical addresses.
 
-Similarly, operating systems "virtualize" the processor to split it between different tasks.
+Similarly, the OS "virtualizes" the processor to split it between different tasks.
 
 This is accomplished through "threads", which are effectively "virtual CPUs" that can be created, started, and stopped
-at almost any time. The ability for threads to be started and stopped is used to run multiple threads at the same time on one
-CPU by rapidly starting, stopping, and switching between threads. This is known as "context switching", which is one
-component of the much larger concept of "scheduling", which will be discussed in more detail elsewhere.
+at almost any time. The ability for threads to be started and stopped is used to give the illusion of
+runnin multiple threads at the same time on one CPU by rapidly starting, stopping, and switching between them.
+This is known as "context switching", which is one component of the much larger concept of "scheduling",
+which will be discussed in more detail elsewhere.
 
 ### "The Problem":
 
-However, "with great power comes great responsiblity", and multitasking operating systems and multithreaded programs
+However, "with great power comes great responsiblity"[^1], and multitasking operating systems and multithreaded programs
 come with much responsiblity.
 
-One major struggle that comes with the multitasking is synchronization, or the ability to coordinate threads.
+One major struggle that comes with multitasking is synchronization, or the ability to coordinate threads.
 
-One subset of synchronization predicaments is known as "locking". In multitasking SMP (Shared Memory/Symmetric
-Multi-Processing) systems, there are oftentimes structures which cannot be safely accessed by multiple entities simulatenously.
+One subset of synchronization predicaments is known as "locking". In multitasking SMP
+systems, there are often structures which cannot be safely accessed by multiple entities simulatenously.
 
 Thus, the access to such structures and objects must be protected.
 
@@ -58,7 +59,7 @@ list = NULL;
 
 In this example thread 1 is attempting to read the first element of the list and thread 2 is setting the list to NULL.
 
-Although it seems like this would always succeed because of the NULL pointer check in thread 1, there exists a small
+Although it would seem like this would always be OK because of the NULL pointer check in thread 1, there exists a small
 window in between the time that the list is checked to the time that the list is dereferenced where thread 2 can run
 and set the list to NULL, thus causing thread 1 to read the invalid pointer and crash :boom:.
 
@@ -115,17 +116,21 @@ thread is reading or modifying the list at once.
 
 ### Lock Types
 
-There are two primary types of locks, spin locks and blocking locks.
+There are two primary types of locks: spin locks and blocking locks.
 
-The difference between them resides in threads wait on a lock that is held.
+Blocking locks are typically referred to as "mutexes", and spin locks are referred to as "spin locks".
+
+To avoid confusion, we will refer to them as such from here on out.
+
+The difference between them resides in how contending threads wait on a lock that is held.
 
 In short, threads attempting to acquire a spin lock will spin in a loop, whereas threads attempting
-to acquire a blocking lock will stop running, or yield, while they wait for the lock to be released.
+to acquire a mutex will stop running, or yield, while they wait for the lock to be released.
 
-Spin locks and blocking locks also have different use cases. In general, blocking locks are more
-restrictive in how they can be called compared to spin locks.
+Spin locks and mutexes also have different use cases. In general, mutexes are more
+restrictive in when they can be called compared to spin locks.
 
-For example, it is not possible to acquire a blocking lock from a non-thread context, such as within
+For example, it is not possible to acquire a mutex from a non-thread context, such as within
 an interrupt service routine. However, spin locks can be acquired just fine from thread and non-thread contexts.
 
 In addition to the two types of locks, there are also rules that locks follow. Operating systems often have "priorites"
@@ -134,7 +139,7 @@ for threads, and "preemption", which allows higher priority threads to run befor
 Spin locks temporarily disable preemption and re-enable it when they are released. This is to prevent a scenario in which
 a higher priority thread can indefinitely starve a lower priority thread because it is waiting on a spin lock that
 the lower priority thread is holding. This is also referred to as "Priority Inheritance" (or moreso, is a simpler
-form of PI), which will be discussed later.
+form of PI), which will be discussed elsewhere.
 
 ## Summary
 
@@ -150,15 +155,38 @@ In addition, per-CPU structures must be protected with locks. Take the following
 struct shared_data lock_me[CPU_COUNT];
 
 /* Thread 1 runs... */
-lock_me[smp_core_id()] = var;
+val = lock_me[smp_core_id()];
+if (var == CONST)
+    /* Thread 1 is about to do something with the structure... */
+
 /* Thread 1 gets preempted... */
 /* Thread 2 runs on the same processor... */
-another_value = lock_me[smp_core_id()];
+lock_me[smp_core_id()] = another_value;
 ```
 
-This creates a possible scenario where thread 2 gets preempted, and the old value it read in the per-CPU variable
-becomes invalid because thread 1 modified the variable. Thus, such objects must also be protected with a lock.
+Similar to the previous example demonstrating why locks are necessary, this example
+shows a similar instance where threads preempting each other on CPU-local variables can still
+result in race conditions. Here, the structure can be read on one thread (which is preempted),
+modified by another, and incorrectly operated upon based on an old, now invalid value.
 
-You can also just use IRQLs[^1] to disable preemption during such code segments to protect the structure.
+You can also just use IRQLs[^2] to disable preemption during such code segments to protect the structure.
 
+### Memory Usage
 
+Due to the differences between mutexes and spin locks, and how the former requires much more bookkeeping
+to handle the thread blocking and waking, there is a distinct memory usage difference in between the two.
+
+Whilst a spin lock can be implemented with just one singular bit of data (though it is actually more like a byte
+or a word because spinning on a single bit is expensive), mutexes require much more.
+
+Mutexes are quite common, but are not always contended. Thus, the >32 bytes of memory they take up
+often go mostly unused if the mutex metadata is embedded directly in the struct.
+
+For example:
+
+```c
+struct mutex {
+    struct thread_queue waiters; /* 16 bytes */
+    struct thread *owner; /* 8 bytes */
+};
+```

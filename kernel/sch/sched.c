@@ -107,7 +107,6 @@ static inline void update_min_steal_diff(void) {
 
 static inline void save_thread(struct scheduler *sched, struct thread *curr,
                                time_t time) {
-    scheduler_mark_self_idle(false);
     update_min_steal_diff();
 
     /* Only save a running thread that exists */
@@ -166,6 +165,10 @@ static struct thread *pick_thread(struct scheduler *sched, time_t now_ms) {
 
     kassert(next); /* cannot be NULL - if it is the bitmap is lying */
     scheduler_decrement_thread_count(sched, next);
+    
+    if (next)
+        scheduler_mark_self_idle(false);
+
     return next;
 }
 
@@ -288,6 +291,11 @@ void schedule(void) {
 }
 
 void scheduler_yield() {
+    /* NOTE: we use this assertion here to also protect against someone
+     * calling this routine whilst a spinlock is held. spinlocks will
+     * always raise the IRQL to at least DISPATCH. this assertion
+     * catches that case, and the assertion in the `irql_raise` catches
+     * the case where the IRQL is higher than DISPATCH (i.e. HIGH */
     kassert(irql_get() != IRQL_DISPATCH_LEVEL);
     kassert(!scheduler_self_in_resched());
 

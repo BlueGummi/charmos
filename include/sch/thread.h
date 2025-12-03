@@ -414,14 +414,18 @@ thread_add_event_reason(struct thread_event_reason *ring, size_t *head,
 void thread_add_block_reason(struct thread *t, uint8_t reason);
 void thread_add_sleep_reason(struct thread *t, uint8_t reason);
 
-void thread_block(struct thread *t, enum thread_block_reason r,
+/* these two functions return if the thread had `wake_matched`
+ * satisfied on return */
+bool thread_block(struct thread *t, enum thread_block_reason r,
                   void *expect_wake_src);
-void thread_sleep(struct thread *t, enum thread_sleep_reason r,
+bool thread_sleep(struct thread *t, enum thread_sleep_reason r,
                   void *expect_wake_src);
+
 void thread_set_timesharing(struct thread *t);
 void thread_set_background(struct thread *t);
 void thread_wake(struct thread *t, enum thread_wake_reason r, void *wake_src);
-void thread_wait_for_wake_match(void (*no_match_action)(struct thread *t,
+
+void thread_wait_for_wake_match(bool (*no_match_action)(struct thread *t,
                                                         uint8_t reason,
                                                         void *expected),
                                 uint8_t reason, void *expected);
@@ -452,8 +456,17 @@ static inline enum thread_flags thread_and_flags(struct thread *t,
     return atomic_fetch_and(&t->flags, flags);
 }
 
-static inline uint64_t thread_get_last_ran(struct thread *t) {
-    return atomic_load(&t->last_ran);
+static inline uint64_t thread_get_last_ran(struct thread *t,
+                                           enum thread_flags *out_flags) {
+    enum thread_flags old = thread_or_flags(t, THREAD_FLAGS_NO_STEAL);
+
+    /* we pin the thread so that it doesn't get migrated and we
+     * properly read the last_ran field in a non-racy way */
+    while (atomic_load_explicit(&t->being_moved, memory_order_acquire))
+        cpu_relax();
+
+    *out_flags = old;
+    return atomic_load_explicit(&t->last_ran, memory_order_acquire);
 }
 
 static inline uint64_t thread_set_last_ran(struct thread *t, uint64_t new) {

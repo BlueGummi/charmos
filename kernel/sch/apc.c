@@ -125,18 +125,14 @@ static inline bool thread_is_active(struct thread *t) {
 }
 
 static void maybe_force_resched(struct thread *t) {
-    enum thread_flags old = thread_or_flags(t, THREAD_FLAGS_NO_STEAL);
-
-    /* similar to the strategy in sch/boost.c... */
-    while (atomic_load(&t->being_moved))
-        cpu_relax();
+    enum thread_flags old;
 
     /* it's ok if the read of tick_enabled races here. if we read it as
      * `enabled`, it means that it is either truly enabled or is in
      * the schedule() routine about to disable it, meaning that
      * if it does get disabled, it'll still have a chance to check
      * and run the APCs of the only thread active */
-    struct scheduler *sched = global.schedulers[thread_get_last_ran(t)];
+    struct scheduler *sched = global.schedulers[thread_get_last_ran(t, &old)];
 
     bool needs_resched = !sched->tick_enabled;
     if (needs_resched)
