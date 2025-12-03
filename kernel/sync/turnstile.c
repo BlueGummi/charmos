@@ -333,7 +333,7 @@ static void turnstile_block_on(void *lock_obj, struct turnstile *ts,
                                size_t queue_num) {
     struct thread *curr = scheduler_get_current_thread();
 
-    thread_block(curr, THREAD_BLOCK_REASON_MANUAL, THREAD_WAIT_INTERRUPTIBLE,
+    thread_block(curr, THREAD_BLOCK_REASON_MANUAL, THREAD_WAIT_UNINTERRUPTIBLE,
                  ts);
     rbt_insert(&ts->queues[queue_num], &curr->wq_tree_node);
     curr->blocked_on = lock_obj;

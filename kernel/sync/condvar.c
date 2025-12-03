@@ -11,7 +11,7 @@ static enum irql condvar_lock_internal(struct condvar *cv,
 
 static void do_block_on_queue(struct thread_queue *q, struct spinlock *lock,
                               enum irql irql, struct condvar *cv) {
-    thread_block_on(q, THREAD_WAIT_INTERRUPTIBLE, cv);
+    thread_block_on(q, THREAD_WAIT_UNINTERRUPTIBLE, cv);
     spin_unlock(lock, irql);
     thread_wait_for_wake_match();
 }
