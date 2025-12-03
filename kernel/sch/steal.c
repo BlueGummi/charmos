@@ -67,8 +67,15 @@ static struct thread *steal_from_thread_rbt(struct scheduler *victim,
     struct rbt_node *node;
     rbt_for_each_reverse(node, tree) {
         struct thread *target = thread_from_rq_rbt_node(node);
-        if (!scheduler_can_steal_thread(smp_core_id(), target))
+
+        /* we must first set the thread as `being_moved` before we
+         * check if we can steal the thread... */
+        atomic_store_explicit(&target->being_moved, true, memory_order_release);
+        if (!scheduler_can_steal_thread(smp_core_id(), target)) {
+            atomic_store_explicit(&target->being_moved, false,
+                                  memory_order_release);
             continue;
+        }
 
         rb_delete(tree, node);
 
@@ -107,8 +114,11 @@ static struct thread *steal_from_special_threads(struct scheduler *victim,
     list_for_each_safe(pos, n, q) {
         struct thread *t = thread_from_rq_list_node(pos);
 
-        if (!scheduler_can_steal_thread(core, t))
+        atomic_store_explicit(&t->being_moved, true, memory_order_release);
+        if (!scheduler_can_steal_thread(core, t)) {
+            atomic_store_explicit(&t->being_moved, false, memory_order_release);
             continue;
+        }
 
         kassert(thread_get_state(t) == THREAD_STATE_READY);
 
@@ -146,9 +156,6 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
                 break;
         }
     }
-
-    if (stolen)
-        atomic_store(&stolen->being_moved, true);
 
     spin_unlock_raw(&victim->lock);
     return stolen;

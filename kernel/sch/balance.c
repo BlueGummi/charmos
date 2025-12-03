@@ -15,6 +15,7 @@
  * to_migrate = (count * remote_scale_num)  / ((1 + dist) * remote_scale_den);
  */
 
+/* it's OK if this races, we are just counting threads */
 static size_t migratable_in_tree(size_t caller, struct rbt *rbt) {
     struct rbt_node *rb;
     size_t agg = 0;
@@ -66,6 +67,7 @@ static void move_ts_thread_raw(struct scheduler *dest, struct scheduler *source,
 
     rbt_insert(&dest->thread_rbt, &thread->rq_tree_node);
     scheduler_increment_thread_count(dest, thread);
+    thread_set_last_ran(thread, dest->core_id);
 }
 
 static size_t migrate_from_tree(struct scheduler *to,
@@ -88,11 +90,15 @@ static size_t migrate_from_tree(struct scheduler *to,
 
         /* we are on a thread we will give priority to migrating */
         if (!prev_migrated) {
+            atomic_store_explicit(&t->being_moved, true, memory_order_release);
             if (scheduler_can_steal_thread(to->core_id, t)) {
                 move_ts_thread_raw(to, from_sched, from, t);
                 prev_migrated = true;
                 migrated++;
             }
+
+            atomic_store_explicit(&t->being_moved, false, memory_order_release);
+
         } else {
             prev_migrated = false;
         }
@@ -125,14 +131,19 @@ static size_t migrate_from_prio_class(struct scheduler *to,
                 break;
 
             struct thread *t = thread_from_rq_list_node(ln);
+            atomic_store_explicit(&t->being_moved, true, memory_order_release);
+            if (scheduler_can_steal_thread(to->core_id, t)) {
 
-            list_del_init(ln);
-            scheduler_decrement_thread_count(from, t);
+                list_del_init(ln);
+                scheduler_decrement_thread_count(from, t);
 
-            list_add_tail(ln, to_queue);
-            scheduler_increment_thread_count(to, t);
+                list_add_tail(ln, to_queue);
+                scheduler_increment_thread_count(to, t);
 
-            migrated++;
+                migrated++;
+                thread_set_last_ran(t, to->core_id);
+            }
+            atomic_store_explicit(&t->being_moved, false, memory_order_release);
         }
     } else {
         /* migrating timesharing threads. first try to migrate threads that have
