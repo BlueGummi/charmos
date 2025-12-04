@@ -248,6 +248,7 @@ struct thread {
 
     /* Who is allowed to run us? */
     struct cpu_mask allowed_cpus;
+    int64_t migrate_to; /* -1 if no migration target */
 
     /* Flags */
     _Atomic(enum thread_flags) flags;
@@ -304,6 +305,9 @@ struct thread {
     /* Lock + rc */
     struct spinlock lock;
     refcount_t refcount;
+
+    struct spinlock switch_lock; /* protect thread under context switch.
+                                  * only ever acquire this raw. */
 
     /* For condvar */
     volatile enum wake_reason wake_reason;

@@ -98,9 +98,11 @@ void thread_entry_wrapper(void) {
     asm("mov %%r12, %0" : "=r"(entry));
 
     kassert(irql_get() < IRQL_HIGH_LEVEL);
-    scheduler_mark_self_in_resched(false);
 
+    spin_unlock_raw(&scheduler_get_current_thread()->switch_lock);
     irql_lower(IRQL_PASSIVE_LEVEL);
+    
+    scheduler_mark_self_in_resched(false);
 
     kassert(entry);
     entry();
@@ -167,6 +169,7 @@ static struct thread *thread_init(struct thread *thread,
     thread->stack_size = stack_size;
     thread->dying = false;
     thread->regs.rsp = stack_top;
+    thread->migrate_to = -1;
     thread->base_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
     thread->niceness = 0;
     thread->perceived_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
@@ -181,7 +184,8 @@ static struct thread *thread_init(struct thread *thread,
     thread->timeslice_length_raw_ms = THREAD_DEFAULT_TIMESLICE;
     thread->recent_event = APC_EVENT_NONE;
     thread->activity_class = THREAD_ACTIVITY_CLASS_UNKNOWN;
-
+    spinlock_init(&thread->lock);
+    spinlock_init(&thread->switch_lock);
     pairing_node_init(&thread->wq_pairing_node);
 
     thread->born_with = turnstile_init(thread->turnstile);

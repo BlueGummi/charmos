@@ -58,6 +58,10 @@ void scheduler_change_tick_duration(uint64_t new_duration) {
     change_tick_duration(new_duration);
 }
 
+static inline bool needs_migration(struct thread *t) {
+    return t->migrate_to != -1;
+}
+
 static inline void update_core_current_thread(struct thread *next) {
     smp_core()->current_thread = next;
 }
@@ -78,7 +82,6 @@ static inline bool thread_done_for_period(struct thread *thread) {
 
 static inline void re_enqueue_thread(struct scheduler *sched,
                                      struct thread *thread) {
-
     /* Thread just finished an URGENT boost */
     if (thread->perceived_prio_class == THREAD_PRIO_CLASS_URGENT)
         thread->perceived_prio_class = thread->base_prio_class;
@@ -93,6 +96,14 @@ static inline void re_enqueue_thread(struct scheduler *sched,
         bool locked = true;
         scheduler_add_thread(sched, thread, locked);
     }
+}
+
+static inline void migrate_to_destination(struct thread *t) {
+    struct scheduler *dst = global.schedulers[t->migrate_to];
+
+    enum irql irql = scheduler_lock_irq_disable(dst);
+
+    scheduler_unlock(dst, irql);
 }
 
 static inline void update_idle_thread(time_t time) {
@@ -165,7 +176,7 @@ static struct thread *pick_thread(struct scheduler *sched, time_t now_ms) {
 
     kassert(next); /* cannot be NULL - if it is the bitmap is lying */
     scheduler_decrement_thread_count(sched, next);
-    
+
     if (next)
         scheduler_mark_self_idle(false);
 
@@ -247,6 +258,8 @@ static inline void context_switch(struct scheduler *sched, struct thread *curr,
     if (curr == next)
         return;
 
+    spin_lock_raw(&next->switch_lock);
+
     if (curr && curr->state != THREAD_STATE_IDLE_THREAD) {
         switch_context(&curr->regs, &next->regs);
     } else {
@@ -258,13 +271,14 @@ static inline void context_switch(struct scheduler *sched, struct thread *curr,
 }
 
 void schedule(void) {
-    struct scheduler *sched = smp_core_scheduler();
-    enum irql irql = scheduler_lock_irq_disable(sched);
-
     time_t time = time_get_ms();
+
+    struct scheduler *sched = smp_core_scheduler();
 
     struct thread *curr = sched->current;
     struct thread *next = NULL;
+
+    enum irql irql = scheduler_lock_irq_disable(sched);
 
     save_thread(sched, curr, time);
 
@@ -302,6 +316,9 @@ void scheduler_yield() {
     scheduler_mark_self_in_resched(true);
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     schedule();
+
+    spin_unlock_raw(&scheduler_get_current_thread()->switch_lock);
+
     irql_lower(irql);
     scheduler_mark_self_in_resched(false);
 }
