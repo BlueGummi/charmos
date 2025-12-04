@@ -537,7 +537,7 @@ void thread_wake_locked(struct thread *t, enum thread_wake_reason r,
                         void *wake_src) {
     set_state_and_update_reason(t, r, THREAD_STATE_READY,
                                 thread_add_wake_reason, wake_src,
-                                /*already_locked=*/true, 0);
+                                /*already_locked=*/true, /* type = */ 0);
 }
 
 void thread_set_timesharing(struct thread *t) {

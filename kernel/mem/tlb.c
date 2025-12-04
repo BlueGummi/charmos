@@ -9,6 +9,14 @@
 
 /* NOTE: we avoid using a DPC for TLB shootdown due to the overhead of that */
 
+#define TLB_SHOOTDOWN_INITIAL_SPIN 2000u /* tight CPU_relax loop first */
+#define TLB_SHOOTDOWN_MAX_RETRIES 6u     /* total times we try sending IPIs */
+#define TLB_SHOOTDOWN_BACKOFF_MULT                                             \
+    4u /* multiply spin by this on each retry                                  \
+        */
+#define TLB_SHOOTDOWN_RESEND_PERIOD                                            \
+    1u /* we will try to resend once per retry */
+
 static void tlb_shootdown_internal(void) {
     size_t cpu = smp_core_id();
     struct tlb_shootdown_cpu *c = &global.shootdown_data[cpu];
@@ -105,17 +113,58 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
         if (i == this_cpu)
             continue;
         struct tlb_shootdown_cpu *other = &global.shootdown_data[i];
-        while (atomic_load_explicit(&other->ack_gen, memory_order_acquire) <
-               gen) {
 
-            /* spin on it if it's entered that ISR */
-            if (atomic_load_explicit(&other->in_tlb_shootdown,
-                                     memory_order_acquire)) {
-                cpu_relax();
-            } else {
-                /* ping it again */
+        uint64_t target_gen = gen;
+        unsigned spin = TLB_SHOOTDOWN_INITIAL_SPIN;
+        unsigned attempts = 0;
+
+        for (;;) {
+            /* spin for 'spin' iterations checking the ack */
+            unsigned s;
+            for (s = 0; s < spin; ++s) {
+                if (atomic_load_explicit(&other->ack_gen,
+                                         memory_order_acquire) >= target_gen)
+                    break;
+                /* if the other core has started
+                 * handling the shootdown, give it more time */
+                if (atomic_load_explicit(&other->in_tlb_shootdown,
+                                         memory_order_acquire)) {
+                    cpu_relax();
+                } else {
+                    /* if not in shootdown, still do a relax so we don't
+                     * hot-loop */
+                    cpu_relax();
+                }
+            }
+
+            if (atomic_load_explicit(&other->ack_gen, memory_order_acquire) >=
+                target_gen)
+                break; /* done for this CPU */
+
+            /* not acked yet */
+            if (attempts >= TLB_SHOOTDOWN_MAX_RETRIES) {
+                /* Give up spinning/resending so we don't flood IPIs.
+                 * As a fallback, set flush_all for that cpu so it will
+                 * full-flush on next visit or when it wakes; also leave
+                 * ipi_pending alone. */
+                atomic_store_explicit(&other->flush_all, 1,
+                                      memory_order_release);
+                break;
+            }
+
+            /* Only resend if the target doesn't already have an IPI pending */
+            bool already_pending =
+                atomic_load_explicit(&other->ipi_pending, memory_order_acquire);
+            if (!already_pending) {
                 ipi_send(i, IRQ_TLB_SHOOTDOWN);
             }
+            /* back off and increase spin budget */
+            attempts++;
+            /* multiply spin, but clamp to some sane max to avoid huge loops */
+            if ((uint64_t) spin * TLB_SHOOTDOWN_BACKOFF_MULT > (1u << 20))
+                spin = (1u << 20);
+            else
+                spin *= TLB_SHOOTDOWN_BACKOFF_MULT;
         }
     }
 

@@ -38,9 +38,9 @@ bool scheduler_wake(struct thread *t, enum thread_wake_reason reason,
 
     thread_wake_locked(t, reason, wake_src);
     thread_apply_wake_boost(t);
-    t->perceived_prio_class = prio;
 
     if (state != THREAD_STATE_RUNNING && state != THREAD_STATE_READY) {
+        t->perceived_prio_class = prio;
         scheduler_add_thread(sch, t, /* lock_held = */ true);
         scheduler_force_resched(sch);
     }

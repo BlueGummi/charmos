@@ -157,3 +157,55 @@ REGISTER_TEST(daemon_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     daemon_destroy(daemon);
     SET_SUCCESS();
 }
+
+static atomic_bool apc_executed_on_sleeping = false;
+static struct thread *sleepy_kitty;
+static atomic_bool sleepy_kitty_ok = false;
+
+static void apc_silly(struct apc *apc, void *a, void *b) {
+    (void) a, (void) b;
+    k_printf("apc 0x%lx ran\n", apc);
+    atomic_store(&apc_executed_on_sleeping, true);
+}
+
+static void apc_enqueue_thread() {
+    while (thread_get_state(sleepy_kitty) == THREAD_STATE_RUNNING ||
+           thread_get_state(sleepy_kitty) == THREAD_STATE_READY)
+        scheduler_yield();
+
+    struct apc *apc = apc_create();
+    apc_init(apc, apc_silly, NULL, NULL);
+    k_printf("apc enqueued\n");
+    apc_enqueue(sleepy_kitty, apc, APC_TYPE_KERNEL);
+}
+
+static void sleeping_thread() {
+    k_printf("thread sleeping\n");
+
+    thread_sleep(scheduler_get_current_thread(), THREAD_SLEEP_REASON_MANUAL,
+                 THREAD_WAIT_INTERRUPTIBLE, (void *) 4);
+
+    thread_wait_for_wake_match();
+
+    atomic_store(&sleepy_kitty_ok, true);
+}
+
+static void waking_thread() {
+    while (!atomic_load(&apc_executed_on_sleeping))
+        scheduler_yield();
+
+    k_printf("thread waking\n");
+    scheduler_wake(sleepy_kitty, THREAD_WAKE_REASON_SLEEP_MANUAL,
+                   sleepy_kitty->perceived_prio_class, (void *) 4);
+}
+
+REGISTER_TEST(thread_sleep_interruptible_test, SHOULD_NOT_FAIL,
+              IS_INTEGRATION_TEST) {
+    sleepy_kitty = thread_spawn("sleepy_kitty", sleeping_thread);
+    thread_spawn("waking", waking_thread);
+    thread_spawn("apc enqueuer", apc_enqueue_thread);
+    while (!atomic_load(&sleepy_kitty_ok))
+        scheduler_yield();
+
+    SET_SUCCESS();
+}

@@ -152,7 +152,7 @@ static void wake_if_waiting(struct thread *t) {
         return;
 
     /* set the wake_src as the thread that enqueued the APC */
-    thread_wake_manual(t, scheduler_get_current_thread());
+    thread_wake_manual(t, /* wake_src = */ t);
 }
 
 void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
@@ -166,15 +166,14 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
     enum irql irql = thread_acquire(t);
 
     add_apc_to_thread(t, a, type);
+    thread_release(t, irql);
 
     /* Let's go and execute em */
     if (t == scheduler_get_current_thread()) {
-        thread_release(t, irql);
         thread_check_and_deliver_apcs(t);
     } else {
         /* Not us, go wake up the other guy */
         wake_if_waiting(t);
-        thread_release(t, irql);
     }
 }
 
