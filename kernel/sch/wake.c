@@ -27,8 +27,10 @@ bool scheduler_wake(struct thread *t, enum thread_wake_reason reason,
      *
      * if it is UNINTERRUPTIBLE and we are NOT the expected waker, then we leave
      */
-    if (thread_get_wait_type(t) == THREAD_WAIT_UNINTERRUPTIBLE &&
-        t->expected_wake_src != wake_src)
+    enum thread_wait_type wt = thread_get_wait_type(t);
+    if ((wt == THREAD_WAIT_UNINTERRUPTIBLE &&
+         t->expected_wake_src != wake_src) ||
+        wt == THREAD_WAIT_NONE)
         goto out;
 
     woke = true;

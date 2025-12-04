@@ -565,12 +565,13 @@ bool thread_sleep(struct thread *t, enum thread_sleep_reason r,
 }
 
 void thread_wait_for_wake_match() {
+    scheduler_yield();
+
     struct thread *curr = scheduler_get_current_thread();
     if (curr->last_action != THREAD_STATE_BLOCKED &&
         curr->last_action != THREAD_STATE_SLEEPING)
-        k_panic("maybe you didn't block or sleep?\n");
+        return;
 
-    scheduler_yield();
     /* we can safely avoid checking the token in the loop because that will
      * become set if wake_matched is set... */
     while (!atomic_load_explicit(&curr->wake_matched, memory_order_acquire)) {
@@ -579,6 +580,10 @@ void thread_wait_for_wake_match() {
          * because we had a scenario where another thread woke us up (acquiring
          * our lock), which sets the wake_matched flag and then releases the
          * lock, which we then see afterwards */
+        if (curr->last_action != THREAD_STATE_BLOCKED &&
+            curr->last_action != THREAD_STATE_SLEEPING)
+            k_panic("uh oh\n");
+
         if (curr->last_action == THREAD_STATE_BLOCKED) {
             if (thread_block(curr, curr->last_action_reason, curr->wait_type,
                              curr->expected_wake_src))

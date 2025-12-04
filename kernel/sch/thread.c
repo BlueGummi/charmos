@@ -99,7 +99,6 @@ void thread_entry_wrapper(void) {
 
     kassert(irql_get() < IRQL_HIGH_LEVEL);
 
-    spin_unlock_raw(&scheduler_get_current_thread()->switch_lock);
     irql_lower(IRQL_PASSIVE_LEVEL);
     
     scheduler_mark_self_in_resched(false);
@@ -182,10 +181,10 @@ static struct thread *thread_init(struct thread *thread,
     thread->id = tid_alloc(global_tid_space);
     thread->refcount = 1;
     thread->timeslice_length_raw_ms = THREAD_DEFAULT_TIMESLICE;
+    thread->wait_type = THREAD_WAIT_NONE;
     thread->recent_event = APC_EVENT_NONE;
     thread->activity_class = THREAD_ACTIVITY_CLASS_UNKNOWN;
     spinlock_init(&thread->lock);
-    spinlock_init(&thread->switch_lock);
     spinlock_init(&thread->being_moved);
     pairing_node_init(&thread->wq_pairing_node);
 

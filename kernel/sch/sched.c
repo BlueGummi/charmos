@@ -258,16 +258,7 @@ static inline void context_switch(struct scheduler *sched, struct thread *curr,
     if (curr == next)
         return;
 
-    spin_lock_raw(&next->switch_lock);
-
-    if (curr && curr->state != THREAD_STATE_IDLE_THREAD) {
-        switch_context(&curr->regs, &next->regs);
-    } else {
-        /* Only `load_context` here since nothing was running,
-         * typically only used in the very first yield or when
-         * exiting the idle thread */
-        load_context(&next->regs);
-    }
+    load_context(&next->regs);
 }
 
 void schedule(void) {
@@ -279,6 +270,9 @@ void schedule(void) {
     struct thread *next = NULL;
 
     enum irql irql = scheduler_lock_irq_disable(sched);
+
+    if (curr && curr->state != THREAD_STATE_IDLE_THREAD)
+        save_context(&curr->regs);
 
     save_thread(sched, curr, time);
 
@@ -316,8 +310,6 @@ void scheduler_yield() {
     scheduler_mark_self_in_resched(true);
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     schedule();
-
-    spin_unlock_raw(&scheduler_get_current_thread()->switch_lock);
 
     irql_lower(irql);
     scheduler_mark_self_in_resched(false);

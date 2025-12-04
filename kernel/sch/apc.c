@@ -73,6 +73,7 @@ static bool thread_apc_sanity_check(struct thread *t) {
 }
 
 static void apc_execute(struct apc *a) {
+    thread_disable_kernel_apcs(scheduler_get_current_thread());
     enum irql old = irql_raise(IRQL_APC_LEVEL);
 
     struct thread *curr = scheduler_get_current_thread();
@@ -85,6 +86,7 @@ static void apc_execute(struct apc *a) {
     curr->total_apcs_ran++;
 
     irql_lower(old);
+    thread_enable_kernel_apcs(scheduler_get_current_thread());
 }
 
 static void deliver_apc_type(struct thread *t, enum apc_type type) {
@@ -327,8 +329,13 @@ void thread_exec_apcs(struct thread *t) {
 }
 
 void thread_check_and_deliver_apcs(struct thread *t) {
+    if (t->checking_apcs)
+        return;
+
     if (!t || !thread_has_apcs(t) || !safe_to_exec_apcs())
         return;
 
+    t->checking_apcs = true;
     thread_exec_apcs(t);
+    t->checking_apcs = false;
 }

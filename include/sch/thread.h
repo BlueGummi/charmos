@@ -307,9 +307,6 @@ struct thread {
     struct spinlock lock;
     refcount_t refcount;
 
-    struct spinlock switch_lock; /* protect thread under context switch.
-                                  * only ever acquire this raw. */
-
     /* For condvar */
     volatile enum wake_reason wake_reason;
     size_t wait_cookie;
@@ -338,6 +335,7 @@ struct thread {
 
     /* ========== APC data ========== */
     bool executing_apc; /* Executing an APC right now? */
+    bool checking_apcs;
 
     /* Standard APC queues */
     struct list_head apc_head[APC_TYPE_COUNT];

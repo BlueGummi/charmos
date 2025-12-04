@@ -103,6 +103,7 @@ void scheduler_period_start(struct scheduler *s, uint64_t now_ms);
 
 void switch_context(struct cpu_context *old, struct cpu_context *new);
 void load_context(struct cpu_context *new);
+void save_context(struct cpu_context *new);
 
 bool scheduler_can_steal_work(struct scheduler *sched);
 bool scheduler_can_steal_thread(size_t core, struct thread *target);
