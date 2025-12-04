@@ -43,7 +43,7 @@ static void block_on_simple_mutex(struct mutex_simple *m) {
     enum irql irql = spin_lock(&m->lock);
     thread_block_on(&m->waiters, THREAD_WAIT_UNINTERRUPTIBLE, m);
     spin_unlock(&m->lock, irql);
-    scheduler_yield();
+    thread_wait_for_wake_match();
 }
 
 void mutex_simple_lock(struct mutex_simple *m) {

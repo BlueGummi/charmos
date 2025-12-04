@@ -112,6 +112,10 @@ struct thread *scheduler_try_do_steal(struct scheduler *sched);
 struct scheduler *scheduler_pick_victim(struct scheduler *self);
 struct thread *scheduler_steal_work(struct scheduler *victim);
 size_t scheduler_try_push_to_idle_core(struct scheduler *sched);
+bool scheduler_inherit_priority(struct thread *boosted, size_t new_weight,
+                                enum thread_prio_class new_class);
+void scheduler_uninherit_priority();
+void thread_migrate(struct thread *t, size_t dest_core);
 
 /* For a global structure containing central scheduler data */
 struct scheduler_data {
@@ -179,8 +183,10 @@ thread_spawn_on_core(char *name, void (*entry)(void), uint64_t core_id) {
     return t;
 }
 
-static inline void scheduler_wake_from_io_block(struct thread *t, void *wake_src) {
-    scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_IO, THREAD_PRIO_CLASS_URGENT, wake_src);
+static inline void scheduler_wake_from_io_block(struct thread *t,
+                                                void *wake_src) {
+    scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_IO, THREAD_PRIO_CLASS_URGENT,
+                   wake_src);
 }
 
 static inline bool scheduler_self_in_resched() {
@@ -192,10 +198,6 @@ static inline bool scheduler_mark_self_in_resched(bool new) {
 }
 
 #define TICKS_FOR_PRIO(level) (level == THREAD_PRIO_LOW ? 64 : 1ULL << level)
-
-bool scheduler_inherit_priority(struct thread *boosted, size_t new_weight,
-                                enum thread_prio_class new_class);
-void scheduler_uninherit_priority();
 
 static inline bool scheduler_mark_core_needs_resched(struct core *c, bool new) {
     return atomic_exchange(&c->needs_resched, new);

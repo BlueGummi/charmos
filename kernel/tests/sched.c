@@ -157,3 +157,59 @@ REGISTER_TEST(daemon_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     daemon_destroy(daemon);
     SET_SUCCESS();
 }
+
+static atomic_bool si_apc_ran = false;
+static struct thread *si_t;
+static atomic_bool si_ok = false;
+static atomic_bool si_started = false;
+
+static void apc_si(struct apc *apc, void *a, void *b) {
+    (void) a, (void) b, (void) apc;
+    atomic_store(&si_apc_ran, true);
+}
+
+static void apc_enqueue_thread() {
+    struct apc *apc = apc_create();
+    apc_init(apc, apc_si, NULL, NULL);
+
+    while (!atomic_load(&si_started))
+        cpu_relax();
+
+    apc_enqueue(si_t, apc, APC_TYPE_KERNEL);
+}
+
+static void sleeping_thread() {
+    atomic_store(&si_started, true);
+
+    thread_sleep(scheduler_get_current_thread(), THREAD_SLEEP_REASON_MANUAL,
+                 THREAD_WAIT_INTERRUPTIBLE, (void *) 4);
+
+    thread_wait_for_wake_match();
+
+    atomic_store(&si_ok, true);
+}
+
+static void waking_thread() {
+    while (!atomic_load(&si_apc_ran))
+        scheduler_yield();
+
+    scheduler_wake(si_t, THREAD_WAKE_REASON_SLEEP_MANUAL,
+                   si_t->perceived_prio_class, (void *) 4);
+}
+
+REGISTER_TEST(thread_sleep_interruptible_test, SHOULD_NOT_FAIL,
+              IS_INTEGRATION_TEST) {
+    if (global.core_count < 4) {
+        ADD_MESSAGE("too few cores");
+        SET_SKIP();
+        return;
+    }
+
+    si_t = thread_spawn_on_core("si_thread", sleeping_thread, 1);
+    thread_spawn_on_core("si_wake", waking_thread, 2);
+    thread_spawn_on_core("si_apc_e", apc_enqueue_thread, 3);
+    while (!atomic_load(&si_ok))
+        scheduler_yield();
+
+    SET_SUCCESS();
+}

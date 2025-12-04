@@ -20,6 +20,7 @@
 //
 //static struct chaos_thread_state states[CHAOS_THREADS];
 //static atomic_bool chaos_stop = false;
+//static atomic_bool starter_ok = false;
 //
 ///* ------------------------------------
 // * APC spammer callback
@@ -36,7 +37,11 @@
 // * Random interruptible sleeps
 // * ------------------------------------ */
 //static void chaos_sleeper() {
-//    struct chaos_thread_state *s = &states[0];
+//    while (!atomic_load(&starter_ok))
+//        cpu_relax();
+//
+//    struct chaos_thread_state *s =
+//        &states[(size_t) scheduler_get_current_thread()->private];
 //
 //    for (int i = 0; i < CHAOS_ITERS && !atomic_load(&chaos_stop); i++) {
 //
@@ -129,11 +134,14 @@
 //    }
 //
 //    /* Spawn chaos sleeper threads */
-//    for (int i = 0; i < CHAOS_THREADS; i++) {
+//    for (size_t i = 0; i < CHAOS_THREADS; i++) {
 //        atomic_store(&states[i].alive, true);
 //        states[i].t = thread_spawn_on_core("chaos_sleeper", chaos_sleeper,
 //                                           i % global.core_count);
+//        states[i].t->private = (void *) i;
 //    }
+//
+//    atomic_store(&starter_ok, true);
 //
 //    /* Spawn chaos components */
 //    thread_spawn("chaos_wake", chaos_waker, NULL);
@@ -157,4 +165,3 @@
 //
 //    SET_SUCCESS();
 //}
-//

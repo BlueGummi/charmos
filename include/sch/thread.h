@@ -268,7 +268,8 @@ struct thread {
     size_t saved_weight;
     enum thread_prio_class saved_class;
 
-    atomic_bool being_moved; /* stolen, migrating... */
+    struct spinlock being_moved; /* only to be spin_raw, spinlock_raw,
+                                  * and spin_unlock_raw */
 
     /* Class changes */
     time_t last_class_change_ms;
@@ -484,8 +485,7 @@ static inline uint64_t thread_get_last_ran(struct thread *t,
 
     /* we pin the thread so that it doesn't get migrated and we
      * properly read the last_ran field in a non-racy way */
-    while (atomic_load_explicit(&t->being_moved, memory_order_acquire))
-        cpu_relax();
+    spin_raw(&t->being_moved);
 
     *out_flags = old;
     return atomic_load_explicit(&t->last_ran, memory_order_acquire);
@@ -562,10 +562,7 @@ static inline void thread_clear_wake_data(struct thread *t) {
     t->expected_wake_src = NULL;
     t->wait_type = THREAD_WAIT_NONE;
     t->last_action_reason = 0;
-}
-
-static inline bool thread_set_being_moved(struct thread *t, bool new) {
-    return atomic_exchange_explicit(&t->being_moved, new, memory_order_acq_rel);
+    t->last_action = THREAD_STATE_READY;
 }
 
 static inline enum thread_wait_type thread_get_wait_type(struct thread *t) {

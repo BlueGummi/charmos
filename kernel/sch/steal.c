@@ -70,9 +70,9 @@ static struct thread *steal_from_thread_rbt(struct scheduler *victim,
 
         /* we must first set the thread as `being_moved` before we
          * check if we can steal the thread... */
-        thread_set_being_moved(target, true);
+        spin_lock_raw(&target->being_moved);
         if (!scheduler_can_steal_thread(smp_core_id(), target)) {
-            thread_set_being_moved(target, false);
+            spin_unlock_raw(&target->being_moved);
             continue;
         }
 
@@ -113,9 +113,9 @@ static struct thread *steal_from_special_threads(struct scheduler *victim,
     list_for_each_safe(pos, n, q) {
         struct thread *t = thread_from_rq_list_node(pos);
 
-        thread_set_being_moved(t, true);
+        spin_lock_raw(&t->being_moved);
         if (!scheduler_can_steal_thread(core, t)) {
-            thread_set_being_moved(t, false);
+            spin_unlock_raw(&t->being_moved);
             continue;
         }
 

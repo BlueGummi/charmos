@@ -186,6 +186,7 @@ static struct thread *thread_init(struct thread *thread,
     thread->activity_class = THREAD_ACTIVITY_CLASS_UNKNOWN;
     spinlock_init(&thread->lock);
     spinlock_init(&thread->switch_lock);
+    spinlock_init(&thread->being_moved);
     pairing_node_init(&thread->wq_pairing_node);
 
     thread->born_with = turnstile_init(thread->turnstile);
@@ -414,7 +415,7 @@ void thread_sleep_for_ms(uint64_t ms) {
     thread_sleep(curr, THREAD_SLEEP_REASON_MANUAL, THREAD_WAIT_UNINTERRUPTIBLE,
                  curr);
 
-    scheduler_yield();
+    thread_wait_for_wake_match();
 }
 
 void thread_wake_manual(struct thread *t, void *wake_src) {
