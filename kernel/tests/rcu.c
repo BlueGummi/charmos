@@ -17,7 +17,7 @@ static struct rcu_test_data *volatile shared_ptr = NULL;
 static atomic_bool rcu_test_failed = false;
 static _Atomic uint32_t rcu_reads_done = 0;
 
-static void rcu_reader_thread(void) {
+static void rcu_reader_thread(void *) {
     uint64_t end = time_get_ms() + RCU_TEST_DURATION_MS;
 
     while (time_get_ms() < end) {
@@ -49,7 +49,7 @@ static void rcu_free_fn(void *ptr) {
     atomic_store(&rcu_deferred_freed, true);
 }
 
-static void rcu_writer_thread(void) {
+static void rcu_writer_thread(void *) {
     sleep_ms(30);
 
     struct rcu_test_data *old = shared_ptr;
@@ -70,11 +70,11 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     shared_ptr = initial;
 
     for (uint64_t i = 0; i < NUM_RCU_READERS; i++)
-        thread_spawn("rcu_reader_test", rcu_reader_thread);
+        thread_spawn("rcu_reader_test", rcu_reader_thread, NULL);
 
     k_printf("Readers spawned - we are core %llu\n", smp_core_id());
 
-    thread_spawn("rcu_writer_test", rcu_writer_thread);
+    thread_spawn("rcu_writer_test", rcu_writer_thread, NULL);
 
     while (atomic_load(&rcu_reads_done) < NUM_RCU_READERS) {
         scheduler_yield();

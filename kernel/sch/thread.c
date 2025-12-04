@@ -94,17 +94,20 @@ void thread_exit() {
 }
 
 void thread_entry_wrapper(void) {
-    void (*entry)(void);
-    asm("mov %%r12, %0" : "=r"(entry));
+    void (*entry)(void *);
+    asm volatile("mov %%r12, %0" : "=r"(entry));
+
+    void *arg;
+    asm volatile("mov %%r13, %0" : "=r"(arg));
 
     kassert(irql_get() < IRQL_HIGH_LEVEL);
 
     irql_lower(IRQL_PASSIVE_LEVEL);
-    
+
     scheduler_mark_self_in_resched(false);
 
     kassert(entry);
-    entry();
+    entry(arg);
     thread_exit();
 }
 
@@ -158,12 +161,13 @@ static void thread_init_activity_data(struct thread *thread) {
 }
 
 static struct thread *thread_init(struct thread *thread,
-                                  void (*entry_point)(void), void *stack,
-                                  size_t stack_size) {
+                                  void (*entry_point)(void *), void *arg,
+                                  void *stack, size_t stack_size) {
     thread_init_activity_data(thread);
     memset(thread->activity_stats, 0, sizeof(struct thread_activity_stats));
 
     uint64_t stack_top = (uint64_t) stack + stack_size;
+    thread->entry = entry_point;
     thread->creation_time_ms = time_get_ms();
     thread->stack_size = stack_size;
     thread->dying = false;
@@ -175,6 +179,7 @@ static struct thread *thread_init(struct thread *thread,
     thread->saved_class = THREAD_PRIO_CLASS_TIMESHARE;
     thread->state = THREAD_STATE_READY;
     thread->regs.r12 = (uint64_t) entry_point;
+    thread->regs.r13 = (uint64_t) arg;
     thread->regs.rip = (uint64_t) thread_entry_wrapper;
     thread->stack = (void *) stack;
     thread->curr_core = -1;
@@ -204,8 +209,9 @@ static struct thread *thread_init(struct thread *thread,
     return thread;
 }
 
-struct thread *thread_create_internal(char *name, void (*entry_point)(void),
-                                      size_t stack_size, va_list args) {
+struct thread *thread_create_internal(char *name, void (*entry_point)(void *),
+                                      void *arg, size_t stack_size,
+                                      va_list args) {
     struct thread *new_thread =
         kzalloc(sizeof(struct thread), ALLOC_PARAMS_DEFAULT);
     if (unlikely(!new_thread))
@@ -243,7 +249,7 @@ struct thread *thread_create_internal(char *name, void (*entry_point)(void),
 
     snprintf(new_thread->name, needed, name, args);
 
-    return thread_init(new_thread, entry_point, stack, stack_size);
+    return thread_init(new_thread, entry_point, arg, stack, stack_size);
 
 err:
     if (!new_thread)
@@ -297,21 +303,23 @@ bool thread_request_cancel(struct thread_request *rq) {
     return true;
 }
 
-struct thread *thread_create(char *name, void (*entry_point)(void), ...) {
+struct thread *thread_create(char *name, void (*entry_point)(void *), void *arg,
+                             ...) {
     va_list args;
-    va_start(args, entry_point);
+    va_start(args, arg);
     struct thread *ret =
-        thread_create_internal(name, entry_point, THREAD_STACK_SIZE, args);
+        thread_create_internal(name, entry_point, arg, THREAD_STACK_SIZE, args);
     va_end(args);
     return ret;
 }
 
-struct thread *thread_create_custom_stack(char *name, void (*entry_point)(void),
-                                          size_t stack_size, ...) {
+struct thread *thread_create_custom_stack(char *name,
+                                          void (*entry_point)(void *),
+                                          void *arg, size_t stack_size, ...) {
     va_list args;
     va_start(args, stack_size);
     struct thread *ret =
-        thread_create_internal(name, entry_point, stack_size, args);
+        thread_create_internal(name, entry_point, arg, stack_size, args);
     va_end(args);
     return ret;
 }
@@ -324,7 +332,8 @@ void thread_free(struct thread *t) {
             atomic_store(&request->parent_internal, NULL);
             if (atomic_exchange(&request->state, THREAD_REQUEST_FULFILLED) ==
                 THREAD_REQUEST_PENDING) {
-                thread_init(t, request->thread_entry, t->stack, t->stack_size);
+                thread_init(t, request->thread_entry, request->arg, t->stack,
+                            t->stack_size);
                 enum thread_request_decision d =
                     request->callback(t, request->data);
                 if (d == THREAD_REQUEST_DECISION_DESTROY)

@@ -29,7 +29,7 @@ REGISTER_TEST(rwlock_basic_write, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 static struct rwlock rw_two_writers = {0};
 static atomic_bool rw_two_done = false;
 
-static void rw_two_writer_thread() {
+static void rw_two_writer_thread(void *) {
     rwlock_lock(&rw_two_writers, RWLOCK_ACQUIRE_WRITE);
     rwlock_unlock(&rw_two_writers);
 
@@ -40,7 +40,7 @@ REGISTER_TEST(rwlock_two_writer_basic, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     rwlock_lock(&rw_two_writers, RWLOCK_ACQUIRE_WRITE);
 
-    thread_spawn_on_core("rw_two_writer", rw_two_writer_thread, 0);
+    thread_spawn_on_core("rw_two_writer", rw_two_writer_thread, NULL, 0);
 
     scheduler_yield(); // let second writer block
 
@@ -57,7 +57,7 @@ REGISTER_TEST(rwlock_two_writer_basic, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 static struct rwlock rw_readers = {0};
 static _Atomic uint32_t rw_readers_left = RWLOCK_READER_COUNT_TEST_N;
 
-static void rw_reader_worker() {
+static void rw_reader_worker(void *) {
     for (int i = 0; i < 1000; i++) {
         rwlock_lock(&rw_readers, RWLOCK_ACQUIRE_READ);
         scheduler_yield();
@@ -69,7 +69,7 @@ static void rw_reader_worker() {
 
 REGISTER_TEST(rwlock_many_readers, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     for (int i = 0; i < RWLOCK_READER_COUNT_TEST_N; i++)
-        thread_spawn("rr", rw_reader_worker);
+        thread_spawn("rr", rw_reader_worker, NULL);
 
     while (atomic_load(&rw_readers_left))
         scheduler_yield();
@@ -82,7 +82,7 @@ volatile struct thread *mixed_threads[RWLOCK_MIXED_THREADS];
 static struct rwlock rw_mixed = {0};
 static _Atomic uint32_t rw_mixed_left = RWLOCK_MIXED_THREADS;
 
-static void rw_mixed_worker() {
+static void rw_mixed_worker(void *) {
     for (int i = 0; i < 1500; i++) {
         if (prng_next() & 1) {
             // Reader
@@ -106,7 +106,7 @@ static void rw_mixed_worker() {
 
 REGISTER_TEST(rwlock_mixed_stress, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     for (int i = 0; i < RWLOCK_MIXED_THREADS; i++)
-        mixed_threads[i] = thread_spawn("rm", rw_mixed_worker);
+        mixed_threads[i] = thread_spawn("rm", rw_mixed_worker, NULL);
 
     while (atomic_load(&rw_mixed_left))
         scheduler_yield();
@@ -119,7 +119,7 @@ REGISTER_TEST(rwlock_mixed_stress, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 static struct rwlock rw_chaos = {0};
 static _Atomic uint32_t rw_chaos_left = RWLOCK_CHAOS_THREADS;
 
-static void rw_chaos_worker() {
+static void rw_chaos_worker(void *) {
     for (int i = 0; i < 3000; i++) {
         if (prng_next() & 1)
             rwlock_lock(&rw_chaos, RWLOCK_ACQUIRE_READ);
@@ -140,7 +140,7 @@ static void rw_chaos_worker() {
 
 REGISTER_TEST(rwlock_chaos, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     for (int i = 0; i < RWLOCK_CHAOS_THREADS; i++)
-        thread_spawn("rch", rw_chaos_worker);
+        thread_spawn("rch", rw_chaos_worker, NULL);
 
     while (atomic_load(&rw_chaos_left)) {
         thread_apply_cpu_penalty(scheduler_get_current_thread());
@@ -156,7 +156,7 @@ static _Atomic uint32_t active_readers = 0;
 static _Atomic uint32_t active_writers = 0;
 static atomic_bool correctness_ok = true;
 
-static void rw_correct_worker() {
+static void rw_correct_worker(void *) {
     for (int i = 0; i < 2000; i++) {
         if (prng_next() & 1) {
             // Reader
@@ -192,7 +192,7 @@ static void rw_correct_worker() {
 
 REGISTER_TEST(rwlock_correctness, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     for (int i = 0; i < RWLOCK_CORRECT_THREADS; i++)
-        thread_spawn("rwc", rw_correct_worker);
+        thread_spawn("rwc", rw_correct_worker, NULL);
 
     while (!atomic_load(&correctness_ok))
         scheduler_yield();

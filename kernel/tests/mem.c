@@ -119,7 +119,7 @@ REGISTER_TEST(kmalloc_mixed_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
 static volatile int kmalloc_done = 0;
 
-static void mt_kmalloc_worker() {
+static void mt_kmalloc_worker(void *) {
     void *ptrs[MT_ALLOC_TIMES] = {0};
 
     for (uint64_t i = 0; i < MT_ALLOC_TIMES; i++) {
@@ -151,7 +151,7 @@ REGISTER_TEST(kmalloc_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     for (int i = 0; i < MT_THREAD_COUNT; i++) {
         threads[i] = thread_spawn_custom_stack(
-            "mt_kmalloc_thread", mt_kmalloc_worker, PAGE_SIZE * 16);
+            "mt_kmalloc_thread", mt_kmalloc_worker, NULL, PAGE_SIZE * 16);
         TEST_ASSERT(threads[i] != NULL);
     }
 
@@ -285,7 +285,7 @@ struct stress_arg {
 
 static volatile bool all_ready = false;
 
-static void stress_worker() {
+static void stress_worker(void *) {
     struct stress_arg *a = NULL;
     /* wait until private field is visible */
     while (!(a = scheduler_get_current_thread()->private))
@@ -365,8 +365,8 @@ REGISTER_TEST(kmalloc_new_concurrency_stress_test, SHOULD_NOT_FAIL,
     for (int i = 0; i < STRESS_THREADS; ++i) {
         args[i].id = i;
         args[i].done_flag = &done[i];
-        thread_spawn("kmalloc_new_stress_worker", stress_worker)->private =
-            &args[i];
+        thread_spawn("kmalloc_new_stress_worker", stress_worker, NULL)
+            ->private = &args[i];
     }
 
     all_ready = true;

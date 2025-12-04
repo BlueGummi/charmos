@@ -88,8 +88,8 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *thread,
 void scheduler_remove_thread(struct scheduler *sched, struct thread *t,
                              bool lock_held);
 void schedule(void);
-void k_sch_main(void);
-void scheduler_idle_main(void);
+void k_sch_main(void*);
+void scheduler_idle_main(void*);
 void scheduler_scheduler_preemption_enable();
 void scheduler_scheduler_preemption_disable();
 void scheduler_yield();
@@ -154,32 +154,41 @@ static inline void scheduler_unpin_current_thread(enum thread_flags flags) {
         thread_set_flags(thread, flags);
 }
 
-static inline struct thread *thread_spawn(char *name, void (*entry)(void),
-                                          ...) {
+static inline struct thread *thread_spawn(char *name, void (*entry)(void *),
+                                          void *arg, ...) {
     va_list args;
-    va_start(args, entry);
+    va_start(args, arg);
     struct thread *t =
-        thread_create_internal(name, entry, THREAD_STACK_SIZE, args);
+        thread_create_internal(name, entry, arg, THREAD_STACK_SIZE, args);
     va_end(args);
     scheduler_enqueue(t);
     return t;
 }
 
 static inline struct thread *thread_spawn_custom_stack(char *name,
-                                                       void (*entry)(void),
+                                                       void (*entry)(void *),
+                                                       void *arg,
                                                        size_t stack_size, ...) {
     va_list args;
     va_start(args, stack_size);
-    struct thread *t = thread_create_internal(name, entry, stack_size, args);
+    struct thread *t =
+        thread_create_internal(name, entry, arg, stack_size, args);
     va_end(args);
 
     scheduler_enqueue(t);
     return t;
 }
 
-static inline struct thread *
-thread_spawn_on_core(char *name, void (*entry)(void), uint64_t core_id) {
-    struct thread *t = thread_create(name, entry);
+static inline struct thread *thread_spawn_on_core(char *name,
+                                                  void (*entry)(void *),
+                                                  void *arg, uint64_t core_id,
+                                                  ...) {
+    va_list args;
+    va_start(args, core_id);
+    struct thread *t =
+        thread_create_internal(name, entry, arg, THREAD_STACK_SIZE, args);
+    va_end(args);
+
     scheduler_enqueue_on_core(t, core_id);
     return t;
 }

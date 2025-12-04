@@ -105,7 +105,9 @@ static void daemon_wait(struct daemon *daemon, struct daemon_thread *self) {
         daemon_thread_exit(daemon, self);
 }
 
-void daemon_main(void) {
+void daemon_main(void *a) {
+    (void) a;
+
     struct daemon_thread *self = current_daemon_thread();
     struct daemon *daemon = self->daemon;
     bool timesharing = !self->background;
@@ -144,7 +146,7 @@ struct daemon_thread *daemon_thread_create(struct daemon *daemon) {
     thread->daemon = daemon;
     INIT_LIST_HEAD(&thread->list_node);
 
-    struct thread *t = thread_create("daemon_%s_thread", daemon_main,
+    struct thread *t = thread_create("daemon_%s_thread", daemon_main, NULL,
                                      daemon->name ? daemon->name : "unnamed");
     if (!t) {
         kfree(thread, FREE_PARAMS_DEFAULT);

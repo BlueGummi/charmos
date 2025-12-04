@@ -12,14 +12,14 @@ static void the_apc(struct apc *a, void *arg1, void *arg2) {
     atomic_store(&apc_ran, true);
 }
 
-static void apc_thread(void) {
+static void apc_thread(void*) {
     while (!atomic_load(&apc_ran))
         scheduler_yield();
 }
 
 static struct thread *ted = NULL;
 REGISTER_TEST(apc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    ted = thread_spawn("apc_test_thread", apc_thread);
+    ted = thread_spawn("apc_test_thread", apc_thread, NULL);
     struct apc *a = kzalloc(sizeof(struct apc), ALLOC_PARAMS_DEFAULT);
     if (!a || !ted)
         goto pluh;

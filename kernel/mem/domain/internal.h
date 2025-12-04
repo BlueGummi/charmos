@@ -113,7 +113,7 @@ struct page *domain_arena_pop(struct domain_arena *arena);
 
 void domain_flush_free_queue(struct domain_buddy *domain,
                              struct domain_free_queue *queue);
-void domain_flush_thread();
+void domain_flush_thread(void *arg);
 void domain_enqueue_flush_worker(struct domain_flush_worker *worker);
 
 #define domain_for_each_arena(domain, arena_ptr)                               \

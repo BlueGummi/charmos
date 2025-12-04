@@ -1,4 +1,3 @@
-#include <smp/percpu.h>
 #include <acpi/acpi.h>
 #include <acpi/cst.h>
 #include <acpi/hpet.h>
@@ -37,6 +36,7 @@
 #include <sch/thread.h>
 #include <smp/core.h>
 #include <smp/domain.h>
+#include <smp/percpu.h>
 #include <smp/smp.h>
 #include <stdint.h>
 #include <sync/rcu.h>
@@ -109,8 +109,9 @@ __no_sanitize_address void k_main(void) {
     scheduler_yield();
 }
 
-void k_sch_main() {
-    /* make sure everyone else is idle before we 
+void k_sch_main(void *nop) {
+    (void) nop;
+    /* make sure everyone else is idle before we
      * advance the bootstage here... */
     smp_wait_for_others_to_idle();
     bootstage_advance(BOOTSTAGE_LATE_DEVICES);

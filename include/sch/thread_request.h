@@ -34,10 +34,10 @@
 
 #pragma once
 #include <containerof.h>
-#include <structures/list.h>
-#include <structures/locked_list.h>
 #include <stdatomic.h>
 #include <stdint.h>
+#include <structures/list.h>
+#include <structures/locked_list.h>
 
 struct thread; /* thread.h header is huge, just forward define */
 
@@ -69,7 +69,8 @@ struct thread_request_list {
 struct thread_request {
     struct list_head list_node;
     thread_request_callback callback;
-    void (*thread_entry)(void);
+    void (*thread_entry)(void *);
+    void *arg;
     void *data;
     enum thread_request_priority prio;
     _Atomic enum thread_request_state state;

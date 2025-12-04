@@ -189,7 +189,7 @@ struct thread *worker_create(struct cpu_mask mask, nice_t niceness,
                              bool migratable) {
     uint64_t stack_size = PAGE_SIZE;
     struct thread *ret =
-        thread_create_custom_stack("workqueue_worker", worker_main, stack_size);
+        thread_create_custom_stack("workqueue_worker", worker_main, NULL, stack_size);
     if (!ret)
         return NULL;
 

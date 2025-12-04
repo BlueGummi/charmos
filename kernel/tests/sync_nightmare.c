@@ -36,12 +36,11 @@ static void chaos_apc_fn(struct apc *apc, void *a, void *b) {
  * Thread: Sleeper
  * Random interruptible sleeps
  * ------------------------------------ */
-static void chaos_sleeper() {
+static void chaos_sleeper(void *arg) {
     while (!atomic_load(&starter_ok))
         cpu_relax();
 
-    struct chaos_thread_state *s =
-        &states[(size_t) scheduler_get_current_thread()->private];
+    struct chaos_thread_state *s = &states[(size_t) arg];
 
     for (int i = 0; i < CHAOS_ITERS && !atomic_load(&chaos_stop); i++) {
 
@@ -150,8 +149,7 @@ REGISTER_TEST(thread_interruptible_chaos_fuzz, SHOULD_NOT_FAIL,
     for (size_t i = 0; i < CHAOS_THREADS; i++) {
         atomic_store(&states[i].alive, true);
         states[i].t = thread_spawn_on_core("chaos_sleeper", chaos_sleeper,
-                                           i % global.core_count);
-        states[i].t->private = (void *) i;
+                                           (void *) i, i % global.core_count);
     }
 
     atomic_store(&starter_ok, true);

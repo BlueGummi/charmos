@@ -45,13 +45,13 @@ REGISTER_TEST(workqueue_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
 }
 
-static void sleepy_entry(void) {
+static void sleepy_entry(void *) {
     thread_sleep_for_ms(9000);
     thread_print(scheduler_get_current_thread());
 }
 
 REGISTER_TEST(sched_sleepy_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    thread_spawn("sched_sleepy_test", sleepy_entry);
+    thread_spawn("sched_sleepy_test", sleepy_entry, NULL);
     SET_SUCCESS();
 }
 
@@ -70,7 +70,7 @@ static void wq_test_2(void *a, void *b) {
 static struct workqueue *wq = NULL;
 static _Atomic uint32_t threads_left = WQ_2_THREADS;
 
-static void enqueue_thread(void) {
+static void enqueue_thread(void *) {
     for (size_t i = 0; i < WQ_2_TIMES / WQ_2_THREADS; i++) {
         for (uint64_t i = 0; i < 500; i++)
             cpu_relax();
@@ -103,7 +103,7 @@ REGISTER_TEST(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     for (size_t i = 0; i < WQ_2_THREADS; i++) {
         k_printf("spawning workqueue enqueue threads\n");
-        thread_spawn("workqueue_enqueue_thread", enqueue_thread);
+        thread_spawn("workqueue_enqueue_thread", enqueue_thread, NULL);
     }
 
     k_printf("yielding\n");
@@ -168,7 +168,7 @@ static void apc_si(struct apc *apc, void *a, void *b) {
     atomic_store(&si_apc_ran, true);
 }
 
-static void apc_enqueue_thread() {
+static void apc_enqueue_thread(void *) {
     struct apc *apc = apc_create();
     apc_init(apc, apc_si, NULL, NULL);
 
@@ -178,7 +178,7 @@ static void apc_enqueue_thread() {
     apc_enqueue(si_t, apc, APC_TYPE_KERNEL);
 }
 
-static void sleeping_thread() {
+static void sleeping_thread(void *) {
     atomic_store(&si_started, true);
 
     thread_sleep(scheduler_get_current_thread(), THREAD_SLEEP_REASON_MANUAL,
@@ -189,7 +189,7 @@ static void sleeping_thread() {
     atomic_store(&si_ok, true);
 }
 
-static void waking_thread() {
+static void waking_thread(void *) {
     while (!atomic_load(&si_apc_ran))
         scheduler_yield();
 
@@ -205,9 +205,9 @@ REGISTER_TEST(thread_sleep_interruptible_test, SHOULD_NOT_FAIL,
         return;
     }
 
-    si_t = thread_spawn_on_core("si_thread", sleeping_thread, 1);
-    thread_spawn_on_core("si_wake", waking_thread, 2);
-    thread_spawn_on_core("si_apc_e", apc_enqueue_thread, 3);
+    si_t = thread_spawn_on_core("si_thread", sleeping_thread, NULL, 1);
+    thread_spawn_on_core("si_wake", waking_thread, NULL, 2);
+    thread_spawn_on_core("si_apc_e", apc_enqueue_thread, NULL, 3);
     while (!atomic_load(&si_ok))
         scheduler_yield();
 

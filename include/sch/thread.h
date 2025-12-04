@@ -205,6 +205,7 @@ struct thread {
     /* Unique ID allocated from global thread ID tree */
     uint64_t id;
     char *name;
+    void (*entry)(void *); /* For debug */
 
     /* ========== Processor context data ========== */
 
@@ -402,12 +403,16 @@ struct thread {
 #define thread_from_wq_rbt_node(ln)                                            \
     (container_of(ln, struct thread, wq_tree_node))
 
-struct thread *thread_create_internal(char *name, void (*entry_point)(void),
-                                      size_t stack_size, va_list args);
+struct thread *thread_create_internal(char *name, void (*entry_point)(void *),
+                                      void *arg, size_t stack_size,
+                                      va_list args);
 
-struct thread *thread_create(char *name, void (*entry_point)(void), ...);
-struct thread *thread_create_custom_stack(char *name, void (*entry_point)(void),
-                                          size_t stack_size, ...);
+struct thread *thread_create(char *name, void (*entry_point)(void *), void *arg,
+                             ...);
+
+struct thread *thread_create_custom_stack(char *name,
+                                          void (*entry_point)(void *),
+                                          void *arg, size_t stack_size, ...);
 void thread_free(struct thread *t);
 
 void thread_init_thread_ids(void);

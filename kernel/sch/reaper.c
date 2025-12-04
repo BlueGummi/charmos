@@ -13,14 +13,15 @@ void reaper_enqueue(struct thread *t) {
 void reaper_init(void) {
     thread_queue_init(&reaper.queue);
     condvar_init(&reaper.cv, CONDVAR_INIT_NORMAL);
-    reaper_thread = thread_spawn("reaper_thread", reaper_thread_main);
+    reaper_thread = thread_spawn("reaper_thread", reaper_thread_main, NULL);
 }
 
 uint64_t reaper_get_reaped_thread_count(void) {
     return reaper.reaped_threads;
 }
 
-void reaper_thread_main(void) {
+void reaper_thread_main(void *unused) {
+    (void) unused;
     while (1) {
         enum irql irql = spin_lock(&reaper.lock);
 

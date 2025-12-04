@@ -217,8 +217,8 @@ struct workqueue {
     _Atomic uint64_t head;
     _Atomic uint64_t tail;
 
-    atomic_bool spawn_pending; /* Some enqueue wants us to spawn a worker */
-    _Atomic uint32_t num_tasks;     /* How many tasks do we have in the ringbuf */
+    atomic_bool spawn_pending;  /* Some enqueue wants us to spawn a worker */
+    _Atomic uint32_t num_tasks; /* How many tasks do we have in the ringbuf */
 
     _Atomic uint32_t num_workers;  /* Current # workers */
     _Atomic uint32_t idle_workers; /* # idle */
@@ -299,7 +299,7 @@ void worklist_free(struct worklist *wlist);
 void workqueue_kick(struct workqueue *queue);
 void workqueue_destroy(struct workqueue *queue);
 
-void worker_main(void);
+void worker_main(void *);
 
 static inline bool work_active(struct work *work) {
     return atomic_load(&work->active);

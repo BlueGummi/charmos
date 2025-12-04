@@ -246,7 +246,8 @@ static inline bool thread_rcu_not_reached_target(struct thread *t,
                target;
 }
 
-static void rcu_gp_worker(void) {
+static void rcu_gp_worker(void *unused) {
+    (void) unused;
     while (true) {
         semaphore_wait(&rcu_sem);
 
@@ -317,7 +318,7 @@ void rcu_init(void) {
     semaphore_init(&rcu_sem, 0, SEMAPHORE_INIT_NORMAL);
 
     /* create worker thread */
-    thread_spawn("rcu_gp", rcu_gp_worker);
+    thread_spawn("rcu_gp", rcu_gp_worker, NULL);
     struct domain *iter;
     domain_for_each_domain(iter) {
         iter->rcu_wq = rcu_create_workqueue_for_domain(iter);

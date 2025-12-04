@@ -6,8 +6,8 @@
 #include <sch/sched.h>
 #include <sync/rcu.h>
 
-void scheduler_idle_main(void) {
-
+void scheduler_idle_main(void *nop) {
+    (void) nop;
     while (true) {
         enable_interrupts();
         rcu_mark_quiescent();
