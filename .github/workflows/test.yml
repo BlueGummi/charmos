@@ -1,0 +1,66 @@
+name: Test 
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'kernel/**'
+      - 'include/**'
+  pull_request:
+    paths:
+      - 'kernel/**'
+      - 'include/**'
+  workflow_dispatch: # manual trigger
+  workflow_run:
+    workflows: ["Update CI Container"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bluegummi/charmos-x86-env:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_KEY }}
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Compile
+        run: ./build.sh
+
+      - name: Run tests
+        run: |
+          cd build
+          export TERM=dumb
+          for i in $(seq 1 5); do
+            echo "[INFO] Test iteration $i/5"
+
+            dd if=/dev/zero of=disk.img bs=10M count=1
+            mkfs.ext2 -F disk.img
+
+            set +e
+            make tests | tee qemu.log &
+
+            sleep 67
+
+            if grep -q "all tests pass" qemu.log; then
+              echo "[PASS] Iteration $i passed!"
+              pkill -f qemu-system-x86_64
+            else
+              echo "[FAIL] Iteration $i failed, collecting GDB backtrace..."
+              gdb -batch -x "../.gdb_script" kernel/kernel || true
+              pkill -f qemu-system-x86_64
+              exit 1
+            fi
+          done

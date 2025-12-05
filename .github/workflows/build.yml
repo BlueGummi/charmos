@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'kernel/**'
+      - 'include/**'
   pull_request:
     paths:
       - 'kernel/**'
@@ -44,29 +45,3 @@ jobs:
           name: build-output
           path: build/charmos-x86_64.iso
           retention-days: 7
-
-      - name: Run tests
-        run: |
-          cd build
-          export TERM=dumb
-          for i in $(seq 1 5); do
-            echo "[INFO] Test iteration $i/5"
-
-            dd if=/dev/zero of=disk.img bs=10M count=1
-            mkfs.ext2 -F disk.img
-
-            set +e
-            make tests | tee qemu.log &
-
-            sleep 67
-
-            if grep -q "all tests pass" qemu.log; then
-              echo "[PASS] Iteration $i passed!"
-              pkill -f qemu-system-x86_64
-            else
-              echo "[FAIL] Iteration $i failed, collecting GDB backtrace..."
-              gdb -batch -x "../.gdb_script" kernel/kernel || true
-              pkill -f qemu-system-x86_64
-              exit 1
-            fi
-          done
