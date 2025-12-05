@@ -47,6 +47,12 @@ SECTIONS {
         __ekernel_tests = .;
     }
 
+    .kernel_nightmare_tests : {
+        __skernel_nightmare_tests = .;
+        KEEP(*(.kernel_nightmare_tests))
+        __ekernel_nightmare_tests = .;
+    }
+
     .kernel_pci_devices : { 
         __skernel_pci_devices = .;
         KEEP(*(.kernel_pci_devices))

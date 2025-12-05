@@ -1,3 +1,5 @@
+#ifdef TEST_TMPFS
+
 #include <fs/tmpfs.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
@@ -115,3 +117,5 @@ REGISTER_TEST(tmpfs_general_tests, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 
     SET_SUCCESS();
 }
+
+#endif

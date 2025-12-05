@@ -293,6 +293,11 @@ void schedule(void) {
         change_timeslice(sched, next);
     }
 
+    /* We are responsible for dropping references
+     * on threads entering their last yield */
+    if (unlikely(curr && thread_get_state(curr) == THREAD_STATE_ZOMBIE))
+        thread_put(curr);
+
     load_thread(sched, next, time);
 
     context_switch(sched, curr, next, irql);

@@ -1,3 +1,4 @@
+#ifdef TEST_APC
 #include <sch/apc.h>
 #include <sch/defer.h>
 #include <sch/reaper.h>
@@ -34,3 +35,4 @@ REGISTER_TEST(apc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 pluh:
     SET_SUCCESS();
 }
+#endif

@@ -1,3 +1,5 @@
+#ifdef TEST_TIMER_DEFER
+
 #include <mem/alloc.h>
 #include <sch/defer.h>
 #include <sch/sched.h>
@@ -31,3 +33,5 @@ REGISTER_TEST(defer_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     enqueue_ms = time_get_ms();
     sleep_ms(100);
 }
+
+#endif

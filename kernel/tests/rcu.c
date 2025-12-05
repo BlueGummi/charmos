@@ -1,3 +1,5 @@
+#ifdef TEST_RCU
+
 #include <mem/alloc.h>
 #include <sch/defer.h>
 #include <sch/sched.h>
@@ -87,3 +89,5 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     SET_SUCCESS();
 }
+
+#endif

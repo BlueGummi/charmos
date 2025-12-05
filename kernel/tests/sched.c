@@ -1,3 +1,5 @@
+#ifdef TEST_SCHED
+
 #include <sch/daemon.h>
 #include <sch/defer.h>
 #include <sch/reaper.h>
@@ -213,3 +215,5 @@ REGISTER_TEST(thread_sleep_interruptible_test, SHOULD_NOT_FAIL,
 
     SET_SUCCESS();
 }
+
+#endif

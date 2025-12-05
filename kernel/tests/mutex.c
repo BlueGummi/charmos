@@ -1,3 +1,5 @@
+#ifdef TEST_MUTEX
+
 #include <crypto/prng.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
@@ -72,3 +74,5 @@ REGISTER_TEST(mutex_chaos, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 
     SET_SUCCESS();
 }
+
+#endif

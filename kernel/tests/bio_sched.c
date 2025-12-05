@@ -1,3 +1,4 @@
+#ifdef TEST_BIO_SCHED
 #include <block/generic.h>
 #include <block/sched.h>
 #include <crypto/prng.h>
@@ -197,3 +198,4 @@ REGISTER_TEST(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
 
     SET_SUCCESS();
 }
+#endif

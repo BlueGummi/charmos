@@ -5,6 +5,11 @@
 static struct thread_reaper reaper = {0};
 static struct thread *reaper_thread = NULL;
 
+void reaper_signal() {
+    if (reaper_thread)
+        condvar_signal(&reaper.cv);
+}
+
 void reaper_enqueue(struct thread *t) {
     thread_queue_push_back(&reaper.queue, t);
     condvar_signal(&reaper.cv);
@@ -40,11 +45,13 @@ void reaper_thread_main(void *unused) {
 
         struct thread *t;
         while ((t = thread_queue_pop_front(&local)) != NULL) {
-            thread_set_state(t, THREAD_STATE_TERMINATED);
-            /* no one else can grab refs now */
-            atomic_store_explicit(&t->dying, true, memory_order_release);
 
-            /* drop last ref */
+            if (refcount_read(&t->refcount) != 1) {
+                thread_queue_push_back(&reaper.queue, t);
+                break;
+            }
+
+            thread_set_state(t, THREAD_STATE_TERMINATED);
             thread_put(t);
             reaper.reaped_threads++;
         }

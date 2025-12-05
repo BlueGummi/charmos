@@ -1,3 +1,5 @@
+#ifdef TEST_MINHEAP
+
 #include <mem/alloc.h>
 #include <structures/minheap.h>
 #include <tests.h>
@@ -36,3 +38,5 @@ REGISTER_TEST(minheap_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     SET_SUCCESS();
 }
+
+#endif

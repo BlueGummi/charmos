@@ -77,11 +77,16 @@ static void chaos_waker() {
         if (!atomic_load(&s->alive))
             continue;
 
+        if (!thread_get(states[id].t))
+            continue;
+
         uintptr_t maybe_cookie =
             (prng_next() % 3 == 0) ? s->last_cookie : prng_next();
 
         scheduler_wake(s->t, THREAD_WAKE_REASON_SLEEP_MANUAL,
                        s->t->perceived_prio_class, (void *) maybe_cookie);
+
+        thread_put(states[id].t);
 
         if (prng_next() % 2)
             scheduler_yield();
@@ -99,9 +104,14 @@ static void chaos_apc_spammer() {
         if (!atomic_load(&s->alive))
             continue;
 
+        if (!thread_get(states[id].t))
+            continue;
+
         struct apc *apc = apc_create();
         apc_init(apc, chaos_apc_fn, NULL, NULL);
         apc_enqueue(s->t, apc, APC_TYPE_KERNEL);
+
+        thread_put(states[id].t);
 
         scheduler_yield();
     }
@@ -123,7 +133,11 @@ static void chaos_migrator() {
         if (!atomic_load(&states[id].alive))
             continue;
 
+        if (!thread_get(states[id].t))
+            continue;
+
         thread_migrate(states[id].t, core);
+        thread_put(states[id].t);
 
         scheduler_yield();
     }

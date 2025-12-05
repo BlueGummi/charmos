@@ -4,41 +4,91 @@ project(charmOS C ASM_NASM)
 set(CMAKE_C_STANDARD 11)
 set(ARCH "x86_64")
 set(IMAGE_NAME "charmos-${ARCH}")
-option(ENABLE_TESTS "Enable tests" ON)
 
 set(PROFILING_FLAGS
     PROFILING_SCHED
     PROFILING_VFS
 )
 
-option(PROFILING_ALL "Enable all profiling" OFF)
+set(TEST_FLAGS
+    TEST_SCHED
+    TEST_TMPFS
+    TEST_EXT2
+    TEST_MEM
+    TEST_MINHEAP
+    TEST_RCU
+    TEST_RWLOCK
+    TEST_MUTEX
+    TEST_TIMER_DEFER
+    TEST_FS
+    TEST_APC
+    TEST_BIO
+    TEST_BIO_SCHED
+)
 
-foreach(flag ${PROFILING_FLAGS})
-    option(${flag} "Enable ${flag}" OFF)
-endforeach()
+set(TEST_NIGHTMARE_FLAGS
+    TEST_NIGHTMARE_LOCKS
+    TEST_NIGHTMARE_WAKE
+)
 
-if(PROFILING_ALL)
-    foreach(flag ${PROFILING_FLAGS})
-        set(${flag} ON CACHE BOOL "" FORCE)
+function(define_flag_group GROUP_NAME ENABLE_ALL DEFAULT_ALL FLAGS)
+    option(${ENABLE_ALL} "Enable all ${GROUP_NAME} flags" ${DEFAULT_ALL})
+
+    foreach(flag ${FLAGS})
+        option(${flag} "Enable ${flag}" OFF)
     endforeach()
-endif()
 
-set(PROFILING_ENABLED OFF)
-foreach(flag ${PROFILING_FLAGS})
-    if(${flag})
-        set(PROFILING_ENABLED ON)
-        add_compile_definitions(${flag})
+    if(${ENABLE_ALL})
+        foreach(flag ${FLAGS})
+            set(${flag} ON CACHE BOOL "" FORCE)
+        endforeach()
     endif()
-endforeach()
 
-if(PROFILING_ALL)
-    add_compile_definitions(PROFILING_ALL)
-endif()
+    # Track group enabled internally
+    set(_LOCAL_GROUP_ENABLED OFF)
+
+    foreach(flag ${FLAGS})
+        if(${flag})
+            set(_LOCAL_GROUP_ENABLED ON)
+            add_compile_definitions(${flag})
+        endif()
+    endforeach()
+
+    # Expose to parent
+    set(${GROUP_NAME}_ENABLED ${_LOCAL_GROUP_ENABLED} PARENT_SCOPE)
+
+    # Emit GROUP_ALL
+    if(${ENABLE_ALL})
+        add_compile_definitions(${ENABLE_ALL})
+    endif()
+
+    # Emit GROUP_ENABLED
+    if(_LOCAL_GROUP_ENABLED)
+        add_compile_definitions(${GROUP_NAME}_ENABLED)
+    endif()
+endfunction()
 
 
-if(PROFILING_ENABLED)
-    add_compile_definitions(PROFILING_ENABLED)
-endif()
+define_flag_group(
+    PROFILING
+    PROFILING_ALL
+    OFF
+    "${PROFILING_FLAGS}"
+)
+
+define_flag_group(
+    TEST
+    TEST_ALL
+    ON
+    "${TEST_FLAGS}"
+)
+
+define_flag_group(
+    TEST_NIGHTMARE
+    TEST_NIGHTMARE_ALL
+    ON
+    "${TEST_NIGHTMARE_FLAGS}"
+)
 
 set(KERNEL_COMMON_FLAGS "-O3 -pipe -Wall -Wextra -Wpointer-sign -fno-optimize-sibling-calls -Wenum-compare -ffreestanding -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -mno-red-zone -fno-stack-protector -fno-omit-frame-pointer -fno-stack-check -fno-PIC -ffunction-sections -fdata-sections  -m64 -mcmodel=kernel -mgeneral-regs-only -DLIMINE_API_REVISION=2 -Wno-address-of-packed-member -Wno-unused-command-line-argument -ggdb")
 

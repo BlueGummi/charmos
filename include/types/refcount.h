@@ -38,6 +38,10 @@ static inline bool refcount_inc_not_zero(refcount_t *rc) {
     }
 }
 
+static inline uint32_t refcount_read(refcount_t *rc) {
+    return atomic_load(rc);
+}
+
 static inline bool refcount_dec_and_test(refcount_t *rc) {
     for (;;) {
         unsigned int old = atomic_load(rc);

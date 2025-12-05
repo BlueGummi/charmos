@@ -65,6 +65,7 @@ static void run(bool run_units, struct kernel_test *start,
 }
 
 void tests_run(void) {
+#ifdef TEST_ENABLED
     struct kernel_test *start = __skernel_tests;
     struct kernel_test *end = __ekernel_tests;
 
@@ -111,8 +112,5 @@ end:
     k_info("TEST", K_TEST, "%s%s" ANSI_RESET " (%llu ms)\n", color, msg,
            total_time);
 
-#ifdef TESTS
-//    sleep(30);
-//    all_ok ? qemu_exit(0) : qemu_exit(1);
 #endif
 }

@@ -1,3 +1,4 @@
+#ifdef TEST_BIO
 #include <block/bio.h>
 #include <block/generic.h>
 #include <charmos.h>
@@ -73,3 +74,4 @@ REGISTER_TEST(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(current_test->message_count == run_times);
     SET_SUCCESS();
 }
+#endif

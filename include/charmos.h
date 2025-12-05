@@ -65,6 +65,10 @@ struct charmos_globals {
 #ifdef PROFILING_ENABLED
     struct list_head profiling_list_head;
 #endif
+
+#ifdef TEST_NIGHTMARE_ENABLED
+    atomic_bool nightmare_stop;
+#endif
 };
 
 extern struct charmos_globals global;

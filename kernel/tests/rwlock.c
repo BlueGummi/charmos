@@ -1,3 +1,5 @@
+#ifdef TEST_RWLOCK
+
 #include <crypto/prng.h>
 #include <sch/sched.h>
 #include <sch/thread.h>
@@ -199,3 +201,5 @@ REGISTER_TEST(rwlock_correctness, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 
     SET_SUCCESS();
 }
+
+#endif

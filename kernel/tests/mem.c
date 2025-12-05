@@ -1,3 +1,5 @@
+#ifdef TEST_MEM
+
 #include <crypto/prng.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
@@ -429,3 +431,5 @@ REGISTER_TEST(kmalloc_new_alloc_free_sequence_test, SHOULD_NOT_FAIL,
     ADD_MESSAGE("alloc/free sequence test passed");
     SET_SUCCESS();
 }
+
+#endif

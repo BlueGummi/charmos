@@ -85,6 +85,10 @@ void thread_exit() {
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
 
     struct thread *self = scheduler_get_current_thread();
+
+    /* acquire the ref - yield will drop it once it's done */
+    thread_get(self);
+
     atomic_store(&self->state, THREAD_STATE_ZOMBIE);
     reaper_enqueue(self);
 
