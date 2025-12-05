@@ -1,10 +1,10 @@
 #include <kassert.h>
-#include <sch/apc.h>
+#include <thread/apc.h>
 #include <sch/sched.h>
-#include <sch/thread.h>
+#include <thread/thread.h>
 #include <smp/core.h>
 
-#include "internal.h"
+#include "sch/internal.h"
 
 #define apc_from_list_node(n) container_of(n, struct apc, list)
 

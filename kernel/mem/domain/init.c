@@ -4,7 +4,7 @@
 #include <mem/buddy.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <sch/thread.h>
+#include <thread/thread.h>
 #include <smp/domain.h>
 #include <string.h>
 

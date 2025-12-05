@@ -1,7 +1,7 @@
 #include <compiler.h>
 #include <kassert.h>
 #include <mem/alloc.h>
-#include <sch/defer.h>
+#include <thread/defer.h>
 #include <sch/sched.h>
 #include <smp/domain.h>
 #include <stdarg.h>

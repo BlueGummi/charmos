@@ -3,7 +3,7 @@
 #include <acpi/lapic.h>
 #include <charmos.h>
 #include <sch/domain.h>
-#include <sch/thread.h>
+#include <thread/thread.h>
 #include <smp/core.h>
 #include <smp/topology.h>
 #include <stdarg.h>

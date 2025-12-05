@@ -2,7 +2,7 @@
 #pragma once
 
 #include <mem/alloc.h>
-#include <sch/thread_request.h>
+#include <thread/request.h>
 #include <smp/topology.h>
 #include <stdatomic.h>
 #include <stdbool.h>

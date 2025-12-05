@@ -2,7 +2,7 @@
 
 #include <crypto/prng.h>
 #include <sch/sched.h>
-#include <sch/thread.h>
+#include <thread/thread.h>
 #include <sync/mutex.h>
 #include <tests.h>
 

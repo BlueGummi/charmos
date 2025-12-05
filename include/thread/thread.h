@@ -6,7 +6,7 @@
 #include <asm.h>
 #include <mem/alloc.h>
 #include <mem/page.h>
-#include <sch/apc.h>
+#include <thread/apc.h>
 #include <stdarg.h>
 #include <stdatomic.h>
 #include <stddef.h>

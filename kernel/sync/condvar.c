@@ -1,4 +1,4 @@
-#include <sch/defer.h>
+#include <thread/defer.h>
 #include <sync/condvar.h>
 
 static enum irql condvar_lock_internal(struct condvar *cv,

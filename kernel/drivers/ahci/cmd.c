@@ -8,7 +8,7 @@
 #include <mem/alloc.h>
 #include <mem/vmm.h>
 #include <sch/sched.h>
-#include <sch/thread.h>
+#include <thread/thread.h>
 #include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>

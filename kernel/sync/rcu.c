@@ -1,7 +1,7 @@
 #include <mem/alloc.h>
-#include <sch/defer.h>
+#include <thread/defer.h>
 #include <sch/sched.h>
-#include <sch/thread.h>
+#include <thread/thread.h>
 #include <smp/core.h>
 #include <smp/percpu.h>
 #include <stdatomic.h>

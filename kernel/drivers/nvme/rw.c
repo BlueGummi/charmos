@@ -4,7 +4,7 @@
 #include <drivers/nvme.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
-#include <sch/defer.h>
+#include <thread/defer.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

@@ -1,4 +1,4 @@
-#include <sch/thread_queue.h>
+#include <thread/queue.h>
 #include <stdbool.h>
 #include <sync/spinlock.h>
 #pragma once

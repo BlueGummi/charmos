@@ -1,7 +1,7 @@
 #include <console/printf.h>
 #include <mem/alloc.h>
-#include <sch/defer.h>
-#include <sch/reaper.h>
+#include <thread/defer.h>
+#include <thread/reaper.h>
 #include <sch/sched.h>
 #include <stdbool.h>
 #include <stddef.h>

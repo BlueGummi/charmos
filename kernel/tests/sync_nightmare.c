@@ -1,8 +1,8 @@
 #include <crypto/prng.h>
 #include <mem/alloc.h>
-#include <sch/apc.h>
+#include <thread/apc.h>
 #include <sch/sched.h>
-#include <sch/thread.h>
+#include <thread/thread.h>
 #include <smp/core.h>
 #include <stdatomic.h>
 #include <tests.h>

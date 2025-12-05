@@ -2,7 +2,7 @@
 #pragma once
 #include <block/generic.h>
 #include <block/sched.h>
-#include <sch/defer.h>
+#include <thread/defer.h>
 #include <stdatomic.h>
 #include <stdint.h>
 #include <sync/semaphore.h>

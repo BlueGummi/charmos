@@ -5,7 +5,7 @@
 #include <block/generic.h>
 #include <fs/detect.h>
 #include <sch/sched.h>
-#include <sch/thread.h>
+#include <thread/thread.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>

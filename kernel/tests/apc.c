@@ -1,9 +1,9 @@
 #ifdef TEST_APC
-#include <sch/apc.h>
-#include <sch/defer.h>
-#include <sch/reaper.h>
+#include <thread/apc.h>
+#include <thread/defer.h>
+#include <thread/reaper.h>
 #include <sch/sched.h>
-#include <sch/thread.h>
+#include <thread/thread.h>
 #include <sleep.h>
 #include <tests.h>
 

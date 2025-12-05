@@ -2,7 +2,7 @@
 #include <mem/alloc.h>
 #include <mem/page.h>
 #include <mem/tlb.h>
-#include <sch/dpc.h>
+#include <thread/dpc.h>
 #include <sch/sched.h>
 #include <stdatomic.h>
 #include <stdint.h>

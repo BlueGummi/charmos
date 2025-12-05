@@ -2,7 +2,7 @@
 #pragma once
 #include <block/generic.h>
 #include <block/sched.h>
-#include <sch/thread.h>
+#include <thread/thread.h>
 #include <stdbool.h>
 #include <stdint.h>
 

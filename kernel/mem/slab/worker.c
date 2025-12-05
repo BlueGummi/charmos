@@ -1,7 +1,7 @@
 /* Implements slab workers and daemon threads */
 
-#include <sch/daemon.h>
-#include <sch/defer.h>
+#include <thread/daemon.h>
+#include <thread/defer.h>
 #include <smp/domain.h>
 
 #include "gc_internal.h"

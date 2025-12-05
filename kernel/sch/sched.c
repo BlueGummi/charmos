@@ -1,5 +1,5 @@
 #include <acpi/lapic.h>
-#include <sch/apc.h>
+#include <thread/apc.h>
 #include <sch/sched.h>
 #include <smp/smp.h>
 #include <sync/rcu.h>

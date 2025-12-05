@@ -1,7 +1,7 @@
 /* @title: Thread reaper */
 #pragma once
-#include <sch/thread.h>
-#include <sch/thread_queue.h>
+#include <thread/thread.h>
+#include <thread/queue.h>
 #include <sync/condvar.h>
 #include <sync/spinlock.h>
 

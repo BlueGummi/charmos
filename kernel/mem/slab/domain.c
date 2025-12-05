@@ -1,5 +1,5 @@
 #include <mem/slab.h>
-#include <sch/daemon.h>
+#include <thread/daemon.h>
 #include <smp/domain.h>
 
 #include "internal.h"

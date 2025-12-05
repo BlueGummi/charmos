@@ -3,12 +3,12 @@
 #include <mem/slab.h>
 #include <mem/vaddr_alloc.h>
 #include <mem/vmm.h>
-#include <sch/defer.h>
-#include <sch/reaper.h>
+#include <thread/defer.h>
+#include <thread/reaper.h>
 #include <sch/sched.h>
-#include <sch/thread.h>
-#include <sch/thread_request.h>
-#include <sch/tid.h>
+#include <thread/thread.h>
+#include <thread/request.h>
+#include <thread/tid.h>
 #include <smp/domain.h>
 #include <stdbool.h>
 #include <stddef.h>

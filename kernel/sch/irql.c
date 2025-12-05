@@ -1,4 +1,4 @@
-#include <sch/dpc.h>
+#include <thread/dpc.h>
 #include <sch/sched.h>
 #include <smp/core.h>
 

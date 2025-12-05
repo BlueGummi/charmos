@@ -1,8 +1,8 @@
 /* @title: Daemons */
 #pragma once
 #include <structures/list.h>
-#include <sch/defer.h>
-#include <sch/thread.h>
+#include <thread/defer.h>
+#include <thread/thread.h>
 #include <sync/semaphore.h>
 
 /* These commands are sent back up to the daemon

@@ -1,5 +1,5 @@
 #include <mem/alloc.h>
-#include <sch/daemon.h>
+#include <thread/daemon.h>
 
 #include <string.h>
 

@@ -2,7 +2,7 @@
 #include <block/sched.h>
 #include <console/printf.h>
 #include <mem/alloc.h>
-#include <sch/defer.h>
+#include <thread/defer.h>
 #include <sync/spinlock.h>
 
 static void try_rq_reorder(struct bio_scheduler *sched) {

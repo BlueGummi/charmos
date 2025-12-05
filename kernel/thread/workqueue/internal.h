@@ -1,4 +1,4 @@
-#include <sch/defer.h>
+#include <thread/defer.h>
 #include <stdarg.h>
 
 #define DEQUEUE_FROM_ONESHOT_CODE 2

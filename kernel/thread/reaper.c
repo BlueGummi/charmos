@@ -1,5 +1,5 @@
-#include <sch/defer.h>
-#include <sch/reaper.h>
+#include <thread/defer.h>
+#include <thread/reaper.h>
 #include <sch/sched.h>
 
 static struct thread_reaper reaper = {0};

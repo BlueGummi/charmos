@@ -1,10 +1,10 @@
 #ifdef TEST_SCHED
 
-#include <sch/daemon.h>
-#include <sch/defer.h>
-#include <sch/reaper.h>
+#include <thread/daemon.h>
+#include <thread/defer.h>
+#include <thread/reaper.h>
 #include <sch/sched.h>
-#include <sch/thread.h>
+#include <thread/thread.h>
 #include <sleep.h>
 #include <string.h>
 #include <tests.h>

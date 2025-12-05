@@ -1,7 +1,7 @@
 #ifdef TEST_TIMER_DEFER
 
 #include <mem/alloc.h>
-#include <sch/defer.h>
+#include <thread/defer.h>
 #include <sch/sched.h>
 #include <sleep.h>
 #include <stdbool.h>

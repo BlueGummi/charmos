@@ -1,9 +1,9 @@
 #ifdef TEST_RCU
 
 #include <mem/alloc.h>
-#include <sch/defer.h>
+#include <thread/defer.h>
 #include <sch/sched.h>
-#include <sch/thread.h>
+#include <thread/thread.h>
 #include <sleep.h>
 #include <sync/rcu.h>
 #include <tests.h>

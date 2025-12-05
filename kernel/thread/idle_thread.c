@@ -1,8 +1,8 @@
 #include <asm.h>
 #include <int/idt.h>
 #include <kassert.h>
-#include <sch/defer.h>
-#include <sch/dpc.h>
+#include <thread/defer.h>
+#include <thread/dpc.h>
 #include <sch/sched.h>
 #include <sync/rcu.h>
 

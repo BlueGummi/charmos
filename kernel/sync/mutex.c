@@ -1,5 +1,5 @@
 #include <sch/sched.h>
-#include <sch/thread.h>
+#include <thread/thread.h>
 #include <sleep.h>
 #include <stddef.h>
 #include <sync/mutex.h>

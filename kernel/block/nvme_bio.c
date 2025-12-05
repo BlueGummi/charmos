@@ -4,7 +4,7 @@
 #include <kassert.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
-#include <sch/defer.h>
+#include <thread/defer.h>
 
 #include "drivers/nvme/internal.h"
 

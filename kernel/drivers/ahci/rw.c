@@ -1,7 +1,7 @@
 #include <block/generic.h>
 #include <drivers/ahci.h>
 #include <sch/sched.h>
-#include <sch/thread.h>
+#include <thread/thread.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

@@ -8,7 +8,7 @@
 #include <mem/alloc.h>
 #include <mem/tlb.h>
 #include <mem/vmm.h>
-#include <sch/apc.h>
+#include <thread/apc.h>
 #include <sch/sched.h>
 #include <smp/core.h>
 #include <smp/smp.h>

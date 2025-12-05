@@ -1,6 +1,6 @@
 #include <kassert.h>
 #include <mem/alloc.h>
-#include <sch/tid.h>
+#include <thread/tid.h>
 #include <string.h>
 
 static size_t tid_space_get_data(struct rbt_node *node) {

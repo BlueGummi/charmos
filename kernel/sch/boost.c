@@ -1,6 +1,6 @@
 #include "internal.h"
 #include <sch/sched.h>
-#include <sch/thread.h>
+#include <thread/thread.h>
 
 static bool scheduler_boost_thread_internal(struct thread *boosted,
                                             size_t new_weight,

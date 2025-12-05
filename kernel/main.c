@@ -28,12 +28,12 @@
 #include <mem/vmm.h>
 #include <registry.h>
 #include <requests.h>
-#include <sch/defer.h>
+#include <thread/defer.h>
 #include <sch/domain.h>
-#include <sch/dpc.h>
-#include <sch/reaper.h>
+#include <thread/dpc.h>
+#include <thread/reaper.h>
 #include <sch/sched.h>
-#include <sch/thread.h>
+#include <thread/thread.h>
 #include <smp/core.h>
 #include <smp/domain.h>
 #include <smp/percpu.h>

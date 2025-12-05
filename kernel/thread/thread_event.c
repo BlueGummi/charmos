@@ -1,8 +1,8 @@
 #include <sch/sched.h>
-#include <sch/thread.h>
+#include <thread/thread.h>
 #include <string.h>
 
-#include "internal.h"
+#include "sch/internal.h"
 
 static inline bool thread_wake_is_from_block(uint8_t wake_reason) {
     return wake_reason == THREAD_WAKE_REASON_BLOCKING_IO ||
