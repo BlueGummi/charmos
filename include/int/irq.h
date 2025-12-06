@@ -13,6 +13,7 @@ struct irq_entry {
 
 #define IRQ_DIV_BY_Z 0x0
 #define IRQ_DEBUG 0x1
+#define IRQ_NMI 0x2
 #define IRQ_BREAKPOINT 0x3
 #define IRQ_DBF 0x8
 #define IRQ_SSF 0xC
@@ -21,7 +22,6 @@ struct irq_entry {
 #define IRQ_TIMER 0x20
 #define IRQ_SCHEDULER IRQ_TIMER
 #define IRQ_TLB_SHOOTDOWN 0x22
-#define IRQ_PANIC 0x23
 #define IRQ_NOP 0x24 /* This is here so cores can bother each other */
 
 struct isr_regs {
@@ -64,3 +64,6 @@ static inline bool irq_in_interrupt(void) {
 static inline bool irq_in_thread_context(void) {
     return !irq_in_interrupt();
 }
+
+void ipi_send(uint32_t apic_id, uint8_t vector);
+void nmi_send(uint32_t apic_id);

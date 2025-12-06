@@ -1,5 +1,6 @@
 /* @title: PCI */
 #pragma once
+#include <compiler.h>
 #include <asm.h>
 #include <stdint.h>
 
@@ -28,7 +29,7 @@ struct pci_driver {
     uint8_t prog_if;
     uint16_t vendor_id;
     void (*initialize)(uint8_t, uint8_t, uint8_t, struct pci_device *);
-} __attribute__((aligned(64)));
+} __linker_aligned; 
 
 extern struct pci_driver __skernel_pci_devices[];
 extern struct pci_driver __ekernel_pci_devices[];

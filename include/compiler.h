@@ -15,11 +15,13 @@
 
 #define __cache_aligned __attribute__((aligned(64)))
 
+#define __linker_aligned __attribute__((aligned(64)))
+
 #define __used __attribute__((used))
 
 #define __section(x) __attribute__((section(x)))
 
-#define __hidden __attribute__((visibility("hidden")))`
+#define __hidden __attribute__((visibility("hidden")))
 #define __export __attribute__((visibility("default")))
 
 #define likely(x) __builtin_expect(!!(x), 1)

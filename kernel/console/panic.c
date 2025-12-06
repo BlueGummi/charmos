@@ -42,7 +42,7 @@ void k_panic_impl(const char *file, int line, const char *func, const char *fmt,
 
     k_printf("\n" EIGHTY_LINES "\n");
     k_printf("\n                                    [" ANSI_BG_RED
-             "KERNEL PANIC" ANSI_RESET "] @ %llu\n\n",
+             "KERNEL PANIC" ANSI_RESET "] @ time %llu\n\n",
              time_get_ms());
     k_printf(ANSI_RED "%s\n\n" ANSI_RESET, OS_LOGO_PANIC_CENTERED);
 

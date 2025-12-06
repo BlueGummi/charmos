@@ -85,8 +85,38 @@ void panic_broadcast(uint64_t exclude_core) {
         if (i == exclude_core)
             continue;
 
-        ipi_send(i, IRQ_PANIC);
+        nmi_send(i);
     }
+}
+
+void nmi_send(uint32_t apic_id) {
+    if (x2apic_enabled) {
+        uint64_t icr = 0;
+
+        /* Delivery mode = NMI. Vector ignored. */
+        icr |= LAPIC_DELIVERY_NMI;  /* bits 10:8 = 100b for NMI */
+        icr |= LAPIC_DEST_PHYSICAL; /* physical dest mode */
+        icr |= ((uint64_t) apic_id << 32);
+
+        wrmsr(IA32_X2APIC_ICR, icr);
+        return;
+    }
+
+    uint32_t hi = apic_id << LAPIC_DEST_SHIFT;
+    uint32_t lo = 0;
+
+    lo |= LAPIC_DELIVERY_NMI;
+    lo |= LAPIC_DEST_PHYSICAL;
+    lo |= LAPIC_LEVEL_ASSERT; /* irrelevant but harmless; most OSes set it */
+    /* Vector is irrelevant for NMI; set to zero */
+
+    /* High must be written before low */
+    lapic_write(LAPIC_ICR_HIGH, hi);
+    lapic_write(LAPIC_ICR_LOW, lo);
+
+    /* Poll delivery status bit to avoid siccing two NMIs at once */
+    while (lapic_read(LAPIC_ICR_LOW) & (1u << 12))
+        cpu_relax();
 }
 
 static int cpu_has_x2apic(void) {

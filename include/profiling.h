@@ -3,9 +3,9 @@
 #include <charmos.h>
 #include <compiler.h>
 #include <linker/symbols.h>
-#include <structures/list.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <structures/list.h>
 
 struct profiling_entry {
     const char *name;
@@ -13,7 +13,7 @@ struct profiling_entry {
     const char *(*to_str)(void *data);
     void (*log)(void *data);
     struct list_head list_node;
-} __aligned(64);
+} __linker_aligned;
 
 /* Current set of profiling flags:
  *

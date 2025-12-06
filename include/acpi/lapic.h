@@ -98,9 +98,11 @@ void lapic_timer_disable();
 bool lapic_timer_is_enabled();
 void lapic_timer_enable();
 void lapic_timer_set_ms(uint32_t ms);
-void ipi_send(uint32_t apic_id, uint8_t vector);
 void panic_broadcast(uint64_t exclude_core);
 void x2apic_init();
+
+void ipi_send(uint32_t apic_id, uint8_t vector);
+void nmi_send(uint32_t apic_id);
 #define IA32_APIC_BASE_MSR 0x1B
 #define IA32_APIC_BASE_MASK 0xFFFFF000UL
 #define IA32_APIC_BASE_ENABLE (1 << 11)

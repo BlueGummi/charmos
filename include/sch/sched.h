@@ -285,8 +285,7 @@ static inline uint32_t scheduler_preemption_enable(void) {
         atomic_fetch_sub(&cpu->scheduler_preemption_disable_depth, 1);
 
     if (old == 0) {
-        atomic_store(&cpu->scheduler_preemption_disable_depth, 0);
-        old = 1;
+        k_panic("underflow\n");
     }
 
     return old - 1;

@@ -1,4 +1,5 @@
 /* @title: Slab allocator */
+#include <compiler.h>
 #include <stddef.h>
 #pragma once
 
@@ -8,7 +9,7 @@
 struct slab_size_constant {
     const char *name;
     size_t size;
-} __attribute__((aligned(64)));
+} __linker_aligned;
 
 extern struct slab_size_constant __skernel_slab_sizes[];
 extern struct slab_size_constant __ekernel_slab_sizes[];

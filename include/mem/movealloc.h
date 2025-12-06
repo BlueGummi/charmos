@@ -7,6 +7,7 @@
  * allocations to the right node. this lives entirely separate
  * from our real page migration */
 #pragma once
+#include <compiler.h>
 #include <containerof.h>
 #include <structures/list.h>
 
@@ -19,7 +20,7 @@ struct movealloc_callback_node {
     movealloc_callback callback;
     void *a, *b;
     struct list_head list;
-} __attribute__((aligned(64)));
+} __linker_aligned;
 
 struct movealloc_callback_chain {
     struct list_head list;

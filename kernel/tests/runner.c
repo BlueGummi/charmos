@@ -1,12 +1,15 @@
+#include <charmos.h>
+#include <console/panic.h>
 #include <console/printf.h>
+#include <int/irq.h>
 #include <sleep.h>
+#include <smp/core.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <tests.h>
 #include <time.h>
 
-#include "acpi/hpet.h"
 #include <colors.h>
 
 extern struct kernel_test __skernel_tests[];

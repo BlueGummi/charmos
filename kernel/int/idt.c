@@ -8,7 +8,6 @@
 #include <mem/alloc.h>
 #include <mem/tlb.h>
 #include <mem/vmm.h>
-#include <thread/apc.h>
 #include <sch/sched.h>
 #include <smp/core.h>
 #include <smp/smp.h>
@@ -16,6 +15,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <sync/rcu.h>
+#include <thread/apc.h>
 
 extern void context_switch();
 extern void page_fault_handler_wrapper();
@@ -86,7 +86,7 @@ static void nop_handler(void *ctx, uint8_t vector, void *rsp) {
     (void) ctx, (void) vector, (void) rsp;
 }
 
-void panic_isr(void *ctx, uint8_t vector, void *rsp) {
+void nmi_isr(void *ctx, uint8_t vector, void *rsp) {
     (void) ctx, (void) vector, (void) rsp;
     if (atomic_load(&global.panicked)) {
         disable_interrupts();
@@ -116,7 +116,14 @@ void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags) {
     idt[num].base_mid = (base >> 16) & 0xFFFF;
     idt[num].base_high = (base >> 32) & 0xFFFFFFFF;
     idt[num].selector = sel;
-    idt[num].ist = 0;
+
+    /* TODO: maybe don't hardcode this */
+    if (num == IRQ_NMI) {
+        idt[num].ist = 1;
+    } else {
+        idt[num].ist = 0;
+    }
+
     idt[num].flags = flags;
     idt[num].reserved = 0;
 
@@ -219,7 +226,7 @@ void idt_init() {
     irq_register(IRQ_PAGE_FAULT, page_fault_handler, NULL);
 
     irq_register(IRQ_TIMER, isr_timer_routine, NULL);
-    irq_register(IRQ_PANIC, panic_isr, NULL);
+    irq_register(IRQ_NMI, nmi_isr, NULL);
     irq_register(IRQ_TLB_SHOOTDOWN, tlb_shootdown_isr, NULL);
     irq_register(IRQ_NOP, nop_handler, NULL);
     idt_set_gate(0x80, (uint64_t) syscall_entry, 0x2b, 0xee);

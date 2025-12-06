@@ -1,5 +1,6 @@
 /* @title: Tests */
 #pragma once
+#include <compiler.h>
 #include <console/printf.h>
 #include <errno.h>
 #include <mem/alloc.h>
@@ -19,7 +20,7 @@ struct kernel_test {
 
     uint64_t message_count;
     char **messages;
-} __attribute__((aligned(64)));
+} __linker_aligned;
 
 #define REGISTER_TEST(name, should_fail, is_integration)                       \
     static void name(void);                                                    \

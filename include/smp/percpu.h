@@ -1,5 +1,6 @@
 /* @title: Per-CPU dynamic objects */
 #pragma once
+#include <compiler.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -12,7 +13,7 @@ struct percpu_descriptor {
     size_t align;
     void **percpu_ptrs;
     percpu_descriptor_constructor constructor;
-} __attribute__((aligned(64)));
+} __linker_aligned;
 
 extern struct percpu_descriptor __skernel_percpu_desc[];
 extern struct percpu_descriptor __ekernel_percpu_desc[];

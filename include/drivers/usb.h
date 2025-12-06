@@ -1,5 +1,6 @@
 /* @title: USB */
 #pragma once
+#include <compiler.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -336,7 +337,8 @@ struct usb_driver {
 
     bool (*probe)(struct usb_device *dev);      /* Attach and set up */
     void (*disconnect)(struct usb_device *dev); /* Clean up and unplug */
-} __attribute__((aligned(64)));
+} __linker_aligned;
+
 extern struct usb_driver __skernel_usb_drivers[];
 extern struct usb_driver __ekernel_usb_drivers[];
 
