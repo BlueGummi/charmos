@@ -186,10 +186,6 @@ struct slab_magazine {
 };
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab_magazine, lock);
 
-static inline bool slab_magazine_full(struct slab_magazine *mag) {
-    return mag->count == SLAB_MAG_ENTRIES;
-}
-
 struct slab_percpu_cache {
     /* Magazines are always nonpageable */
     struct slab_magazine *mag; /* the size of this is slab_num_sizes */
@@ -201,45 +197,12 @@ struct slab_free_slot {
     vaddr_t addr;
 };
 
-/* This is a cheeky little structure that
- * we embed into the data itself when
- * the free_queue ringbuffer is full.
- *
- * The idea is as follows:
- *
- * When we free an address, if the free_queue list
- * is empty, we set the free_queue list's head
- * address to the address that we are freeing,
- * as well as the free_queue list's tail.
- *
- * Upon subsequent frees, we read the
- * free_queue list's tail, and then
- * set its *next to the address we are
- * freeing, and set the tail to point
- * to the new address we are freeing, and
- * repeat this process.
- *
- * Because the minimum slab size is the pointer
- * size, we can guarantee that the pointer fits */
-struct slab_free_queue_list_node {
-    struct slab_free_queue_list_node *next;
-};
-
-struct slab_free_queue_list {
-    struct slab_free_queue_list_node *head;
-    struct slab_free_queue_list_node *tail;
-    struct spinlock lock;
-    size_t elements;
-};
-SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab_free_queue_list, lock);
-
 struct slab_free_queue {
     _Atomic uint64_t head;
     _Atomic uint64_t tail;
     size_t capacity;
     struct slab_free_slot *slots;
 
-    struct slab_free_queue_list list;
     atomic_size_t count;
 
     struct slab_domain *parent;
@@ -404,9 +367,8 @@ struct slab_domain_bucket {
     atomic_size_t alloc_failures; /* Out of memory or other failures */
 
     /* ---- Free path stats ---- */
-    atomic_size_t free_calls;       /* Total calls to kfree() */
-    atomic_size_t free_to_ring;     /* Freed into local freequeue ringbuffer */
-    atomic_size_t free_to_freelist; /* Freed into endless freelist (overflow) */
+    atomic_size_t free_calls;   /* Total calls to kfree() */
+    atomic_size_t free_to_ring; /* Freed into local freequeue ringbuffer */
     atomic_size_t free_to_local_slab;    /* Freed directly into local slab */
     atomic_size_t free_to_remote_domain; /* Freed to other domain's freelist */
     atomic_size_t free_to_percpu;
@@ -414,8 +376,6 @@ struct slab_domain_bucket {
     /* Other */
     atomic_size_t freequeue_enqueues;
     atomic_size_t freequeue_dequeues;
-    atomic_size_t freelist_enqueues;
-    atomic_size_t freelist_dequeues;
     atomic_size_t gc_collections;       /* Number of times GC ran */
     atomic_size_t gc_objects_reclaimed; /* Objects GC returned to free state */
 };
@@ -499,8 +459,6 @@ void slab_free_queue_init(struct slab_domain *domain, struct slab_free_queue *q,
 bool slab_free_queue_ringbuffer_enqueue(struct slab_free_queue *q,
                                         vaddr_t addr);
 vaddr_t slab_free_queue_ringbuffer_dequeue(struct slab_free_queue *q);
-bool slab_free_queue_list_enqueue(struct slab_free_queue *q, vaddr_t addr);
-vaddr_t slab_free_queue_list_dequeue(struct slab_free_queue *q);
 vaddr_t slab_free_queue_dequeue(struct slab_free_queue *q);
 size_t slab_free_queue_drain(struct slab_percpu_cache *cache,
                              struct slab_free_queue *queue, size_t target,
@@ -527,6 +485,8 @@ struct slab *slab_gc_get_newest_pageable(struct slab_domain *domain);
 struct slab *slab_gc_get_oldest(struct slab_domain *domain);
 size_t slab_gc_num_slabs(struct slab_domain *domain);
 bool slab_should_enqueue_gc(struct slab *slab);
+
+void slab_switch_to_domain_allocations(void);
 
 /* Recall that the EWMA formula is
  *
@@ -600,6 +560,7 @@ static inline void slab_list_del(struct slab *slab) {
 
 static inline void slab_list_add(struct slab_cache *cache, struct slab *slab) {
     enum slab_state state = slab->state;
+    slab->parent_cache = cache;
     list_add_tail(&slab->list, &cache->slabs[state]);
 
     if (state == SLAB_FREE)

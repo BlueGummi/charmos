@@ -1,5 +1,6 @@
 /* @title: Virtual memory management */
 #include <console/printf.h>
+#include <errno.h>
 #include <mem/page.h>
 #include <stdint.h>
 

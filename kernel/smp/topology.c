@@ -4,6 +4,7 @@
 #include <kassert.h>
 #include <limine.h>
 #include <mem/alloc.h>
+#include <mem/numa.h>
 #include <smp/core.h>
 #include <smp/smp.h>
 #include <smp/topology.h>

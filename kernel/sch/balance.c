@@ -1,7 +1,8 @@
 /* Scheduler load balancing policy */
+#include <mem/numa.h>
+#include <smp/domain.h>
 
 #include "internal.h"
-#include <smp/domain.h>
 
 #define SCHEDULER_REMOTE_NODE_SCALE_NUMERATOR 1
 #define SCHEDULER_REMOTE_NODE_SCALE_DENOMINATOR 5

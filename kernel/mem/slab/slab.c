@@ -213,8 +213,8 @@ static void slab_free_virt_and_phys(vaddr_t virt, paddr_t phys) {
     vas_free(slab_vas, virt);
 }
 
-__no_sanitize_address void
-slab_cache_init(size_t order, struct slab_cache *cache, uint64_t obj_size) {
+void slab_cache_init(size_t order, struct slab_cache *cache,
+                     uint64_t obj_size) {
     cache->order = order;
     cache->obj_size = obj_size;
     cache->pages_per_slab = 1;
@@ -546,7 +546,10 @@ size_t ksize(void *ptr) {
         return 0;
 
     vaddr_t vp = (vaddr_t) ptr;
-    kassert(vp >= SLAB_HEAP_START && vp <= SLAB_HEAP_END);
+
+    if (!(vp >= SLAB_HEAP_START && vp <= SLAB_HEAP_END))
+        k_panic("0x%lx out of bounds\n", vp);
+
     struct slab_page_hdr *hdr = slab_page_hdr_for_addr(ptr);
 
     if (hdr->magic == KMALLOC_PAGE_MAGIC)
@@ -980,8 +983,7 @@ bool slab_domain_busy(struct slab_domain *domain) {
     return recent_call && !idle;
 }
 
-bool kfree_free_queue_enqueue(struct slab_domain *domain, void *ptr,
-                              size_t size, enum alloc_behavior behavior) {
+bool kfree_free_queue_enqueue(struct slab_domain *domain, void *ptr) {
     struct slab_domain *local = slab_domain_local();
     vaddr_t vptr = (vaddr_t) ptr;
 
@@ -989,20 +991,6 @@ bool kfree_free_queue_enqueue(struct slab_domain *domain, void *ptr,
     if (slab_free_queue_ringbuffer_enqueue(&domain->free_queue, vptr)) {
         slab_stat_free_to_ring(local);
         return true;
-    }
-
-    /* We don't try to add to our free queue list */
-    if (domain == local)
-        return false;
-
-    /* This will always succeed... */
-    bool fits_in_slab = kmalloc_size_fits_in_slab(size);
-    bool can_fault = alloc_behavior_may_fault(behavior);
-    bool busy = slab_domain_busy(domain);
-
-    if (fits_in_slab && can_fault && busy) {
-        slab_stat_free_to_freelist(local);
-        return slab_free_queue_list_enqueue(&domain->free_queue, vptr);
     }
 
     return false;
@@ -1032,7 +1020,7 @@ void kfree_pages(void *ptr, size_t size, enum alloc_behavior behavior) {
     if (!alloc_behavior_may_fault(behavior))
         kassert(!header->pageable);
 
-    if (kfree_free_queue_enqueue(owner, ptr, size, behavior))
+    if (kfree_free_queue_enqueue(owner, ptr))
         return;
 
     /* could not put it on the freequeue... */
@@ -1128,6 +1116,9 @@ static size_t slab_free_queue_drain_on_free(struct slab_domain *domain,
 }
 
 void kfree_new(void *ptr, enum alloc_behavior behavior) {
+    if (!ptr)
+        return;
+
     enum thread_flags flags = scheduler_pin_current_thread();
 
     size_t size = ksize(ptr);
@@ -1156,7 +1147,7 @@ void kfree_new(void *ptr, enum alloc_behavior behavior) {
     if (kfree_try_put_on_percpu_caches(owner, ptr, size))
         goto exit;
 
-    if (kfree_free_queue_enqueue(owner, ptr, size, behavior))
+    if (kfree_free_queue_enqueue(owner, ptr))
         goto exit;
 
     /* could not put on percpu cache or freequeue, now we free to
@@ -1178,16 +1169,37 @@ exit:
     scheduler_unpin_current_thread(flags);
 }
 
-void *kmalloc(size_t size, enum alloc_flags flags,
-              enum alloc_behavior behavior) {
+static void *kmalloc_init(size_t size, enum alloc_flags f,
+                          enum alloc_behavior b) {
+    (void) b, (void) f;
     return kmalloc_old(size);
 }
 
-void kfree(void *p, enum alloc_behavior behavior) {
-    if ((uint16_t)behavior == (uint16_t) ALLOC_FLAGS_DEFAULT)
-        k_info("SLAB", K_WARN, "Likely incorrect arguments passed into `kfree`");
-
+static void kfree_init(void *p, enum alloc_behavior b) {
+    (void) b;
     kfree_old(p);
+}
+
+static void *(*alloc)(size_t, enum alloc_flags,
+                      enum alloc_behavior) = kmalloc_init;
+static void (*free)(void *, enum alloc_behavior) = kfree_init;
+
+void slab_switch_to_domain_allocations(void) {
+    alloc = kmalloc_new;
+    free = kfree_new;
+}
+
+void *kmalloc(size_t size, enum alloc_flags flags,
+              enum alloc_behavior behavior) {
+    return alloc(size, flags, behavior);
+}
+
+void kfree(void *p, enum alloc_behavior behavior) {
+    if ((uint16_t) behavior == (uint16_t) ALLOC_FLAGS_DEFAULT)
+        k_info("SLAB", K_WARN,
+               "Likely incorrect arguments passed into `kfree`");
+
+    free(p, behavior);
 }
 
 void *kzalloc(uint64_t size, enum alloc_flags f, enum alloc_behavior b) {

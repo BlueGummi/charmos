@@ -1,10 +1,8 @@
 /* @title: Global Variables */
 #pragma once
 #include <bootstage.h>
-#include <fs/vfs.h>
 #include <mem/buddy.h>
 #include <mem/movealloc.h>
-#include <mem/numa.h>
 #include <smp/topology.h>
 #include <stdatomic.h>
 #include <structures/list.h>

@@ -2,11 +2,12 @@
 #include <math/sort.h>
 #include <mem/alloc.h>
 #include <mem/buddy.h>
+#include <mem/numa.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <thread/thread.h>
 #include <smp/domain.h>
 #include <string.h>
+#include <thread/thread.h>
 
 #include "internal.h"
 #include "mem/buddy/internal.h"

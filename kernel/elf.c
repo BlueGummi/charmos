@@ -32,8 +32,7 @@ uint64_t elf_load(const void *elf_data) {
         uint64_t va_end = PAGE_ALIGN_UP(ph->vaddr + ph->memsz);
 
         for (uint64_t va = va_start; va < va_end; va += 0x1000) {
-            uint64_t phys =
-                pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+            uint64_t phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
             vmm_map_page(va, phys,
                          PAGING_PRESENT | PAGING_USER_ALLOWED | PAGING_WRITE);
         }
@@ -66,8 +65,7 @@ void elf_map(uintptr_t user_pml4_phys, void *elf_data) {
         for (uintptr_t vaddr = seg_vaddr_start; vaddr < seg_vaddr_end;
              vaddr += PAGE_SIZE) {
 
-            uintptr_t phys =
-                pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+            uintptr_t phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
             if (!phys)
                 k_panic("Failed to allocate page for user ELF segment\n");
 

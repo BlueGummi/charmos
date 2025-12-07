@@ -1,6 +1,7 @@
 #include <charmos.h>
 #include <console/printf.h>
 #include <mem/alloc.h>
+#include <mem/numa.h>
 #include <sch/sched.h>
 #include <smp/domain.h>
 #include <stdbool.h>

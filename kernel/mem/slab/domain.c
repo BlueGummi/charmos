@@ -1,6 +1,7 @@
+#include <mem/domain.h>
 #include <mem/slab.h>
-#include <thread/daemon.h>
 #include <smp/domain.h>
+#include <thread/daemon.h>
 
 #include "internal.h"
 #include "mem/domain/internal.h"
@@ -128,8 +129,33 @@ void slab_domain_init_stats(struct slab_domain *domain) {
     }
 }
 
-void slab_domain_init(void) {
+static struct slab_cache *slab_domain_cache_for_slab(struct slab *slab) {
+    struct domain *d = domain_for_addr(vmm_get_phys((vaddr_t) slab));
+    d = d ? d : global.domains[0];
 
+    size_t o = slab->parent_cache->order;
+
+    return &d->slab_domain->local_nonpageable_cache->caches[o];
+}
+
+void slab_domain_move_slabs(void) {
+    for (size_t i = 0; i < slab_num_sizes; i++) {
+        struct slab_cache *c = &slab_caches.caches[i];
+        for (size_t j = 0; j < SLAB_STANDARD_STATE_COUNT; j++) {
+            struct slab *slab, *tmp;
+            list_for_each_entry_safe(slab, tmp, &c->slabs[j], list) {
+                struct slab_cache *dest = slab_domain_cache_for_slab(slab);
+                enum irql irql = slab_cache_lock(c);
+                slab_list_del(slab);
+                slab_cache_unlock(c, irql);
+
+                slab_list_add(dest, slab);
+            }
+        }
+    }
+}
+
+void slab_domain_init(void) {
     for (size_t i = 0; i < global.domain_count; i++) {
         struct domain *domain = global.domains[i];
         struct slab_domain *sdomain =
@@ -148,6 +174,9 @@ void slab_domain_init(void) {
 
     for (size_t i = 0; i < global.domain_count; i++)
         slab_domain_build_locality_lists(global.domains[i]->slab_domain);
+
+    slab_domain_move_slabs();
+    slab_switch_to_domain_allocations();
 }
 
 void slab_domain_init_late() {

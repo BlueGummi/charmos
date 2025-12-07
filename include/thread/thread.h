@@ -217,6 +217,7 @@ struct thread {
     struct cpu_context regs;
 
     /* ========== Structure nodes ========== */
+    struct list_head thread_list; /* global list of threads */
 
     /* Runqueue nodes */
     struct rbt_node rq_tree_node;  /* runqueue tree node */

@@ -25,11 +25,13 @@ REGISTER_SLAB_SIZE(thread, sizeof(struct thread));
 static struct tid_space *global_tid_space = NULL;
 static struct vas_space *stacks_space = NULL;
 static struct thread_request_list *rq_lists = NULL;
+static struct locked_list thread_list;
 
 void thread_init_thread_ids(void) {
     stacks_space =
         vas_space_init(THREAD_STACKS_HEAP_START, THREAD_STACKS_HEAP_END);
     global_tid_space = tid_space_init(UINT64_MAX);
+    locked_list_init(&thread_list);
 }
 
 void thread_init_rq_lists(void) {
@@ -203,6 +205,7 @@ static struct thread *thread_init(struct thread *thread,
 
     INIT_LIST_HEAD(&thread->on_event_apcs[0]);
     INIT_LIST_HEAD(&thread->on_event_apcs[1]);
+    INIT_LIST_HEAD(&thread->thread_list);
     INIT_LIST_HEAD(&thread->apc_head[0]);
     INIT_LIST_HEAD(&thread->apc_head[1]);
     INIT_LIST_HEAD(&thread->rq_list_node);
@@ -210,6 +213,9 @@ static struct thread *thread_init(struct thread *thread,
     INIT_LIST_HEAD(&thread->rcu_list_node);
     rbt_init_node(&thread->rq_tree_node);
     rbt_init_node(&thread->wq_tree_node);
+
+    locked_list_add(&thread_list, &thread->thread_list);
+
     return thread;
 }
 
@@ -357,6 +363,8 @@ destroy:
         atomic_store(&t->rcu_blocked, false);
         rcu_blocked_remove(t);
     }
+
+    locked_list_del(&thread_list, &t->thread_list);
 
     kfree(t->turnstile, FREE_PARAMS_DEFAULT);
     thread_free_event_apcs(t);

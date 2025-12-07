@@ -133,7 +133,6 @@ static inline struct domain_buddy *domain_buddy_for_addr(paddr_t addr) {
     }
 
     /* None? */
-    k_panic("Likely invalid free address 0x%lx", addr);
     return NULL;
 }
 

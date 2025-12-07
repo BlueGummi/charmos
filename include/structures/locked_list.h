@@ -1,4 +1,5 @@
 /* @title: Locked list */
+#pragma once
 #include <kassert.h>
 #include <structures/list.h>
 #include <sync/spinlock.h>

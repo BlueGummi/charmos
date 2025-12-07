@@ -350,5 +350,8 @@ paddr_t domain_alloc_from_domain(struct domain *cd, size_t pages) {
 
 struct domain *domain_for_addr(paddr_t addr) {
     struct domain_buddy *dbd = domain_buddy_for_addr(addr);
+    if (!dbd)
+        return NULL;
+
     return dbd->cores[0]->domain;
 }

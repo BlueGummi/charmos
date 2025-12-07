@@ -2,6 +2,7 @@
 #include <console/printf.h>
 #include <math/sort.h>
 #include <mem/alloc.h>
+#include <mem/numa.h>
 #include <mem/vmm.h>
 #include <smp/core.h>
 #include <stdint.h>

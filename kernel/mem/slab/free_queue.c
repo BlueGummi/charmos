@@ -13,7 +13,8 @@
 void slab_free_queue_init(struct slab_domain *domain, struct slab_free_queue *q,
                           size_t capacity) {
     q->capacity = capacity;
-    q->slots = kzalloc(sizeof(struct slab_free_slot) * capacity, ALLOC_PARAMS_DEFAULT);
+    q->slots =
+        kzalloc(sizeof(struct slab_free_slot) * capacity, ALLOC_PARAMS_DEFAULT);
     if (!q->slots)
         k_panic("Could not allocate slab free queue slots!\n");
 
@@ -24,10 +25,7 @@ void slab_free_queue_init(struct slab_domain *domain, struct slab_free_queue *q,
         atomic_store(&q->slots[i].seq, i);
 
     q->parent = domain;
-    q->list.elements = 0;
     q->count = 0;
-    q->list.head = NULL;
-    q->list.tail = NULL;
 }
 
 bool slab_free_queue_ringbuffer_enqueue(struct slab_free_queue *q,
@@ -93,115 +91,33 @@ vaddr_t slab_free_queue_ringbuffer_dequeue(struct slab_free_queue *q) {
     }
 }
 
-void slab_free_queue_list_init(struct slab_free_queue_list *list) {
-    list->head = NULL;
-    list->tail = NULL;
-    list->elements = 0;
-    spinlock_init(&list->lock);
-}
-
-static inline bool slab_free_queue_list_empty(struct slab_free_queue_list *q) {
-    return !q->head;
-}
-
-static void free_queue_list_add_internal(struct slab_free_queue_list *q,
-                                         struct slab_free_queue_list_node *n) {
-    if (slab_free_queue_list_empty(q)) {
-        q->head = n;
-        q->tail = n;
-    } else {
-        q->tail->next = n;
-        q->tail = n;
-    }
-
-    n->next = NULL;
-    q->elements++;
-}
-
-/* Detach and return the free queue's extended list */
-struct slab_free_queue_list_node *
-slab_free_queue_detach_list(struct slab_free_queue *queue) {
-    struct slab_free_queue_list *list = &queue->list;
-    enum irql irql = slab_free_queue_list_lock(list);
-
-    struct slab_free_queue_list_node *head = list->head;
-    list->head = NULL;
-    list->tail = NULL;
-    SLAB_FREE_QUEUE_SUB_COUNT(queue, list->elements);
-
-    slab_free_queue_list_unlock(list, irql);
-    return head;
-}
-
-/* Enqueue a chain of elements to free onto the list and increment count */
-void slab_free_queue_enqueue_chain(struct slab_free_queue *queue,
-                                   struct slab_free_queue_list *chain) {
-    struct slab_free_queue_list *list = &queue->list;
-
-    enum irql irql = slab_free_queue_list_lock(list);
-    free_queue_list_add_internal(list, chain->head);
-    slab_free_queue_list_unlock(list, irql);
-
-    SLAB_FREE_QUEUE_ADD_COUNT(queue, chain->elements);
-}
-
-/* This will always succeed */
-bool slab_free_queue_list_enqueue(struct slab_free_queue *q, vaddr_t addr) {
-    enum irql irql = slab_free_queue_list_lock(&q->list);
-    struct slab_free_queue_list_node *node = (void *) addr;
-
-    node->next = NULL;
-    free_queue_list_add_internal(&q->list, node);
-
-    slab_free_queue_list_unlock(&q->list, irql);
-
-    SLAB_FREE_QUEUE_INC_COUNT(q);
-
-    return true;
-}
-
-vaddr_t slab_free_queue_list_dequeue(struct slab_free_queue *q) {
-    enum irql irql = slab_free_queue_list_lock(&q->list);
-    vaddr_t ret = 0x0;
-
-    if (slab_free_queue_list_empty(&q->list)) {
-        goto out;
-    } else {
-        ret = (vaddr_t) q->list.head;
-        q->list.head = q->list.head->next;
-
-        if (slab_free_queue_list_empty(&q->list))
-            q->list.tail = NULL;
-
-        q->list.elements--;
-        SLAB_FREE_QUEUE_DEC_COUNT(q);
-    }
-
-out:
-    slab_free_queue_list_unlock(&q->list, irql);
-    return ret;
-}
-
 /* Non-fallible free queue enqueue. If the ringbuffer enqueue fails,
  * it enqueues onto the indefinite list of addresses to free */
 void slab_free_queue_enqueue(struct slab_free_queue *q, vaddr_t addr) {
-    if (!slab_free_queue_ringbuffer_enqueue(q, addr))
-        slab_free_queue_list_enqueue(q, addr);
+    slab_free_queue_ringbuffer_enqueue(q, addr);
 }
 
 vaddr_t slab_free_queue_dequeue(struct slab_free_queue *q) {
     /* Prioritize the ringbuffer */
     vaddr_t ret = slab_free_queue_ringbuffer_dequeue(q);
-    if (ret)
-        return ret;
-
-    return slab_free_queue_list_dequeue(q);
+    return ret;
 }
 
 /* TODO: Eventually this will be a real function */
 static inline bool page_is_pageable(struct page *page) {
     (void) page;
     return false;
+}
+
+void slab_free_queue_free(struct slab_domain *d, void *ptr) {
+    int32_t class = slab_size_to_index(slab_allocation_size((vaddr_t) ptr));
+    bool fits_in_slab = class >= 0;
+
+    if (fits_in_slab)
+        return slab_free(d, ptr);
+
+    struct slab_page_hdr *header = slab_page_hdr_for_addr(ptr);
+    return slab_free_page_hdr(header);
 }
 
 /* The reason we have the "flush to cache" option is because in hot paths,
@@ -216,11 +132,18 @@ static inline bool page_is_pageable(struct page *page) {
  * If this is turned off, the addresses that are not successfully freed
  * will simply be re-enqueued to the free_queue so that in a future drain
  * attempt/free attempt, these addresses may be freed. */
+
+struct entry {
+    SLIST_ENTRY(entry) data;
+};
+
+SLIST_HEAD(free_queue_list_tmp, entry);
+
 size_t slab_free_queue_drain(struct slab_percpu_cache *cache,
                              struct slab_free_queue *queue, size_t target,
                              bool flush_to_cache) {
-    struct slab_free_queue_list chain;
-    slab_free_queue_list_init(&chain);
+    struct free_queue_list_tmp chain;
+    SLIST_INIT(&chain);
 
     size_t drained_to_magazine = 0; /* Return value */
     size_t addrs_dequeued = 0;      /* Used to check against `target` */
@@ -254,20 +177,23 @@ size_t slab_free_queue_drain(struct slab_percpu_cache *cache,
     flush:
         if (flush_to_cache) {
             /* Directly flush to the slab cache */
-            slab_free(cache->domain, (void *) addr);
+            slab_free_queue_free(cache->domain, (void *) addr);
         } else {
             /* We will thread a list through the addresses and add
              * the list onto the free_queue_list of the slab cache
              * once we are done with the slab cache free_queue */
-            struct slab_free_queue_list_node *node = (void *) addr;
-            node->next = NULL;
-            free_queue_list_add_internal(&chain, node);
+            struct entry *node = (void *) addr;
+            SLIST_INSERT_HEAD(&chain, node, data);
         }
     }
 
     /* Not empty - let's append it to our slab cache's free_queue */
-    if (!slab_free_queue_list_empty(&chain))
-        slab_free_queue_enqueue_chain(queue, &chain);
+    while (!SLIST_EMPTY(&chain)) {
+        struct entry *ent = SLIST_FIRST(&chain);
+        SLIST_REMOVE_HEAD(&chain, data);
+        if (!slab_free_queue_ringbuffer_enqueue(queue, (vaddr_t) ent))
+            slab_free_queue_free(cache->domain, ent);
+    }
 
     return drained_to_magazine;
 }
@@ -280,19 +206,11 @@ size_t slab_free_queue_flush(struct slab_domain *domain,
     while (true) {
         vaddr_t addr = slab_free_queue_ringbuffer_dequeue(queue);
         if (addr == 0x0)
-            return total_freed;
+            break;
 
         slab_free(domain, (void *) addr);
     }
-
-    /* Detach the whole list and free it all in one go */
-    struct slab_free_queue_list_node *node = slab_free_queue_detach_list(queue);
-
-    while (node) {
-        struct slab_free_queue_list_node *next = node->next;
-        slab_free(domain, (void *) node);
-        node = next;
-    }
+    return total_freed;
 }
 
 size_t slab_free_queue_get_target_drain(struct slab_domain *domain,

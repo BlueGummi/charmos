@@ -117,7 +117,7 @@ REGISTER_TEST(kmalloc_mixed_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 }
 
 #define MT_THREAD_COUNT 8
-#define MT_ALLOC_TIMES 67
+#define MT_ALLOC_TIMES 1024
 
 static volatile int kmalloc_done = 0;
 
@@ -132,15 +132,12 @@ static void mt_kmalloc_worker(void *) {
     for (uint64_t i = 0; i < MT_ALLOC_TIMES; i++) {
         uint64_t idx = prng_next() % MT_ALLOC_TIMES;
 
-        if (ptrs[idx]) {
-            kfree(ptrs[idx], FREE_PARAMS_DEFAULT);
-            ptrs[idx] = NULL;
-        }
+        kfree(ptrs[idx], FREE_PARAMS_DEFAULT);
+        ptrs[idx] = NULL;
     }
 
     for (uint64_t i = 0; i < MT_ALLOC_TIMES; i++) {
-        if (ptrs[i])
-            kfree(ptrs[i], FREE_PARAMS_DEFAULT);
+        kfree(ptrs[i], FREE_PARAMS_DEFAULT);
     }
 
     kmalloc_done++;

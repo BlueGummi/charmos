@@ -113,3 +113,40 @@ static inline void list_splice_init(struct list_head *src,
         n = list_entry(pos->member.next, typeof(*pos), member);                \
          &pos->member != (head);                                               \
          pos = n, n = list_entry(n->member.next, typeof(*n), member))
+
+#define SLIST_HEAD(name, type)                                                 \
+    struct name {                                                              \
+        struct type *slh_first;                                                \
+    }
+
+#define SLIST_EMPTY(head) ((head)->slh_first == NULL)
+
+#define SLIST_HEAD_INIT(head) {.slh_first = NULL}
+
+#define SLIST_INIT(head)                                                       \
+    do {                                                                       \
+        (head)->slh_first = NULL;                                              \
+    } while (0)
+
+#define SLIST_ENTRY(type)                                                      \
+    struct {                                                                   \
+        struct type *sle_next;                                                 \
+    }
+
+#define SLIST_FIRST(head) ((head)->slh_first)
+
+#define SLIST_NEXT(elm, field) ((elm)->field.sle_next)
+
+#define SLIST_INSERT_HEAD(head, elm, field)                                    \
+    do {                                                                       \
+        (elm)->field.sle_next = (head)->slh_first;                             \
+        (head)->slh_first = (elm);                                             \
+    } while (0)
+
+#define SLIST_REMOVE_HEAD(head, field)                                         \
+    do {                                                                       \
+        (head)->slh_first = (head)->slh_first->field.sle_next;                 \
+    } while (0)
+
+#define SLIST_FOREACH(var, head, field)                                        \
+    for ((var) = (head)->slh_first; (var); (var) = (var)->field.sle_next)

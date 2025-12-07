@@ -15,7 +15,6 @@ void slab_domain_bucket_print(const struct slab_domain_bucket *bucket) {
     k_printf("\n");
     k_printf("    free_calls: %zu,\n", bucket->free_calls);
     k_printf("    free_to_ring: %zu,\n", bucket->free_to_ring);
-    k_printf("    free_to_freelist: %zu,\n", bucket->free_to_freelist);
     k_printf("    free_to_local_slab: %zu,\n", bucket->free_to_local_slab);
     k_printf("    free_to_remote_domain: %zu,\n",
              bucket->free_to_remote_domain);
@@ -23,8 +22,6 @@ void slab_domain_bucket_print(const struct slab_domain_bucket *bucket) {
     k_printf("\n");
     k_printf("    freequeue_enqueues: %zu,\n", bucket->freequeue_enqueues);
     k_printf("    freequeue_dequeues: %zu,\n", bucket->freequeue_dequeues);
-    k_printf("    freelist_enqueues: %zu,\n", bucket->freelist_enqueues);
-    k_printf("    freelist_dequeues: %zu,\n", bucket->freelist_dequeues);
     k_printf("    gc_collections: %zu,\n", bucket->gc_collections);
     k_printf("    gc_objects_reclaimed: %zu\n", bucket->gc_objects_reclaimed);
     k_printf("}\n");

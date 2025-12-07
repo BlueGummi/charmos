@@ -25,6 +25,7 @@ vaddr_t slab_magazine_pop(struct slab_magazine *mag) {
     enum irql irql = slab_magazine_lock(mag);
 
     vaddr_t ret = 0x0;
+
     if (mag->count > 0) {
         ret = mag->objs[--mag->count];
         mag->objs[mag->count] = 0x0; /* Reset it */
@@ -81,52 +82,68 @@ void slab_cache_bulk_free(struct slab_domain *domain, vaddr_t *addr_array,
 void slab_percpu_flush(struct slab_domain *dom, struct slab_percpu_cache *pc,
                        size_t class_idx, vaddr_t overflow_obj) {
     struct slab_magazine *mag = &pc->mag[class_idx];
-    vaddr_t objs[SLAB_MAG_ENTRIES + 1];
 
+    /* capture how many valid items we have */
     enum irql irql = slab_magazine_lock(mag);
+    size_t valid = mag->count;
 
-    for (size_t i = 0; i < SLAB_MAG_ENTRIES; i++)
+    /* copy only valid objects */
+    vaddr_t objs[SLAB_MAG_ENTRIES + 1];
+    for (size_t i = 0; i < valid; i++)
         objs[i] = mag->objs[i];
 
-    objs[SLAB_MAG_ENTRIES] = overflow_obj;
+    /* reset magazine */
     mag->count = 0;
-
+    for (size_t i = 0; i < valid; i++)
+        mag->objs[i] = 0x0;
     slab_magazine_unlock(mag, irql);
 
-    slab_cache_bulk_free(dom, objs, SLAB_MAG_ENTRIES + 1);
+    /* add overflow object to the end and free (valid + 1) objects */
+    objs[valid] = overflow_obj;
+    slab_cache_bulk_free(dom, objs, valid + 1);
 }
 
 vaddr_t slab_percpu_refill_class(struct slab_domain *dom,
                                  struct slab_percpu_cache *pc, size_t class_idx,
                                  enum alloc_behavior behavior) {
-    /* steal em from here */
     struct slab_cache *cache = &dom->local_nonpageable_cache->caches[class_idx];
     struct slab_magazine *mag = &pc->mag[class_idx];
 
-    size_t remaining = SLAB_MAG_ENTRIES - mag->count;
-    remaining /= 8;
-
-    if (remaining == 0)
-        remaining = 1;
-
-    vaddr_t objs[remaining];
-
-    size_t got = slab_cache_bulk_alloc(cache, objs, remaining, behavior);
-
+    /* Determine how many we can safely take into the magazine under the lock.
+     */
     enum irql irql = slab_magazine_lock(mag);
-
-    for (size_t i = 1; i < got; i++)
-        mag->objs[mag->count++] = objs[i];
-
+    size_t space = SLAB_MAG_ENTRIES - mag->count;
     slab_magazine_unlock(mag, irql);
 
-    if (got > 0) {
-        return objs[0];
-    } else if (mag->count > 0) {
+    if (space == 0)
+        space = 1; /* we still want 1 so we can return an object */
+
+    /* Bound space to a reasonable maximum to avoid huge VLAs */
+    if (space > SLAB_MAG_ENTRIES)
+        space = SLAB_MAG_ENTRIES;
+
+    vaddr_t objs[/* compile-time max */ SLAB_MAG_ENTRIES];
+    size_t want = space;
+    size_t got = slab_cache_bulk_alloc(cache, objs, want, behavior);
+    if (got == 0) {
+        /* if nothing returned, try to pop from magazine (safe path) */
         return slab_magazine_pop(mag);
     }
 
-    return 0x0;
+    /* Insert (got - 1) items into magazine but re-check capacity under lock */
+    enum irql irql2 = slab_magazine_lock(mag);
+    size_t can_insert = SLAB_MAG_ENTRIES - mag->count;
+    size_t to_insert = (got > 0) ? (got - 1) : 0;
+    if (to_insert > can_insert)
+        to_insert = can_insert;
+
+    for (size_t i = 1; i <= to_insert; i++)
+        mag->objs[mag->count++] = objs[i];
+
+    slab_magazine_unlock(mag, irql2);
+
+    /* return first object (objs[0]) */
+    return objs[0];
 }
 
 void slab_percpu_refill(struct slab_domain *dom,
