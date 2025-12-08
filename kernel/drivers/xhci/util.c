@@ -4,6 +4,7 @@
 #include <drivers/usb.h>
 #include <drivers/xhci.h>
 #include <mem/alloc.h>
+#include <mem/page.h>
 #include <mem/vmm.h>
 #include <sleep.h>
 #include <stdbool.h>
@@ -20,7 +21,7 @@ void *xhci_map_mmio(uint8_t bus, uint8_t slot, uint8_t func) {
     uint32_t size = ~(size_mask & ~0xF) + 1;
 
     uint32_t phys_addr = original_bar0 & ~0xF;
-    return vmm_map_phys(phys_addr, size, PAGING_UNCACHABLE);
+    return vmm_map_phys(phys_addr, size, PAGING_UNCACHABLE, VMM_FLAG_NONE);
 }
 
 struct xhci_device *xhci_device_create(void *mmio) {

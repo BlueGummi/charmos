@@ -8,11 +8,11 @@
 #include <mem/alloc.h>
 #include <mem/vmm.h>
 #include <sch/sched.h>
-#include <thread/thread.h>
 #include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <thread/thread.h>
 
 #define MAX_PRDT_ENTRY_SIZE (4 * 1024 * 1024) // 4MB
 
@@ -133,7 +133,8 @@ void ahci_prepare_command(struct ahci_full_port *port, uint32_t slot,
 
     uint64_t remaining = size;
     uint64_t offset = 0;
-    uint64_t phys_base = vmm_get_phys((uint64_t) buf) & ~(PAGE_SIZE - 1);
+    uint64_t phys_base =
+        vmm_get_phys((uint64_t) buf, VMM_FLAG_NONE) & ~(PAGE_SIZE - 1);
 
     for (uint32_t i = 0; i < prdt_count; i++) {
         uint64_t chunk =

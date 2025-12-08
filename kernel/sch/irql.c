@@ -1,6 +1,6 @@
-#include <thread/dpc.h>
 #include <sch/sched.h>
 #include <smp/core.h>
+#include <thread/dpc.h>
 
 enum irql irql_get(void) {
     return smp_core()->current_irql;
@@ -11,21 +11,8 @@ enum irql irql_raise(enum irql new_level) {
         return IRQL_NONE;
 
     bool in_thread = irq_in_thread_context();
-    bool iflag = false;
-
-    if (in_thread) {
-        /* pin ourselves so that there exists NO GAP in between checking
-         * are_interrupts_enabled() and disable_interrupts() where we can
-         * get stolen and whisked away to another core... */
-        enum thread_flags initial_tf = scheduler_pin_current_thread();
-
-        iflag = are_interrupts_enabled();
-        disable_interrupts();
-
-        /* we have interrupts off now... */
-        scheduler_unpin_current_thread(initial_tf);
-    } /* otherwise, we are in an interrupt and there is nothing to do. 
-       * irqs are off */
+    bool iflag = are_interrupts_enabled();
+    disable_interrupts();
 
     struct core *cpu = smp_core();
     enum irql old = cpu->current_irql;
@@ -84,7 +71,8 @@ void irql_lower(enum irql raw_level) {
         if (in_thread && old >= IRQL_HIGH_LEVEL && new_level < IRQL_HIGH_LEVEL)
             enable_interrupts();
 
-        if (old >= IRQL_DISPATCH_LEVEL && new_level < IRQL_DISPATCH_LEVEL)
+        if (in_thread && old >= IRQL_DISPATCH_LEVEL &&
+            new_level < IRQL_DISPATCH_LEVEL)
             dpc_run_local();
 
         bool preempt_re_enabled = false;

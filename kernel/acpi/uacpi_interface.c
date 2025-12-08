@@ -59,12 +59,12 @@ uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
 extern uintptr_t vmm_map_top;
 
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
-    void *ret = vmm_map_phys(addr, len, PAGING_UNCACHABLE);
+    void *ret = vmm_map_phys(addr, len, PAGING_UNCACHABLE, VMM_FLAG_NONE);
     return ret;
 }
 
 void uacpi_kernel_unmap(void *addr, uacpi_size len) {
-    vmm_unmap_virt(addr, len);
+    vmm_unmap_virt(addr, len, VMM_FLAG_NONE);
 }
 
 void uacpi_kernel_log(uacpi_log_level level, const uacpi_char *data) {

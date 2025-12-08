@@ -72,7 +72,7 @@ void vmm_init(struct limine_memmap_response *memmap,
 
     for (uint64_t i = 0; i < kernel_size; i += PAGE_SIZE) {
         e = vmm_map_page(kernel_virt_start + i, kernel_phys_start + i,
-                         PAGING_WRITE | PAGING_PRESENT);
+                         PAGING_WRITE | PAGING_PRESENT, VMM_FLAG_NONE);
         if (e < 0)
             k_panic("Error %s whilst mapping kernel\n", errno_to_str(e));
     }
@@ -81,7 +81,8 @@ void vmm_init(struct limine_memmap_response *memmap,
          addr += PAGE_SIZE) {
         uint64_t shadow_addr = ASAN_SHADOW_OFFSET + (addr >> ASAN_SHADOW_SCALE);
         shadow_addr = PAGE_ALIGN_DOWN(shadow_addr);
-        vmm_map_page(shadow_addr, dummy_phys, PAGING_PRESENT | PAGING_WRITE);
+        vmm_map_page(shadow_addr, dummy_phys, PAGING_PRESENT | PAGING_WRITE,
+                     VMM_FLAG_NONE);
     }
 
     for (uint64_t i = 0; i < memmap->entry_count; i++) {
@@ -110,10 +111,10 @@ void vmm_init(struct limine_memmap_response *memmap,
                                ((end - phys) >= PAGE_2MB);
 
             if (can_use_2mb) {
-                e = vmm_map_2mb_page(virt, phys, flags);
+                e = vmm_map_2mb_page(virt, phys, flags, VMM_FLAG_NONE);
                 phys += PAGE_2MB;
             } else {
-                e = vmm_map_page(virt, phys, flags);
+                e = vmm_map_page(virt, phys, flags, VMM_FLAG_NONE);
                 phys += PAGE_SIZE;
             }
             if (e < 0)
@@ -155,7 +156,8 @@ void page_table_unlock(struct page_table *pt, enum irql irql) {
     spin_unlock(&page->lock, irql);
 }
 
-enum errno vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
+enum errno vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags,
+                            enum vmm_flags vflags) {
     if (virt == 0 || (virt & 0x1FFFFF) || (phys & 0x1FFFFF))
         k_panic(
             "vmm_map_2mb_page: addresses must be 2MiB aligned and non-zero\n");
@@ -189,8 +191,10 @@ enum errno vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     uint64_t L2 = (virt >> 21) & 0x1FF;
     pte_t *entry = &tables[2]->entries[L2];
     if (ENTRY_PRESENT(*entry)) {
-        invlpg(virt);
-        tlb_shootdown(virt, true);
+        if (!(vflags & VMM_FLAG_NO_TLB_SHOOTDOWN)) {
+            invlpg(virt);
+            tlb_shootdown(virt, true);
+        }
     }
     *entry =
         (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT | PAGING_2MB_page;
@@ -205,7 +209,7 @@ out:
     return ret;
 }
 
-void vmm_unmap_2mb_page(uintptr_t virt) {
+void vmm_unmap_2mb_page(uintptr_t virt, enum vmm_flags vflags) {
     if (virt & (PAGE_2MB - 1))
         k_panic("vmm_unmap_2mb_page: virtual address not 2MiB aligned!\n");
 
@@ -238,8 +242,10 @@ void vmm_unmap_2mb_page(uintptr_t virt) {
     entries[2] = &tables[2]->entries[L2];
     *entries[2] &= ~PAGING_PRESENT;
 
-    invlpg(virt);
-    tlb_shootdown(virt, true);
+    if (!(vflags & VMM_FLAG_NO_TLB_SHOOTDOWN)) {
+        invlpg(virt);
+        tlb_shootdown(virt, true);
+    }
 
     for (int level_inner = 2; level_inner > 0; level_inner--) {
         if (vmm_is_table_empty(tables[level_inner])) {
@@ -260,7 +266,8 @@ out:
             page_table_unlock(tables[i], irqls[i]);
 }
 
-enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
+enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags,
+                        enum vmm_flags vflags) {
     if (virt == 0)
         k_panic("CANNOT MAP PAGE 0x0!!!\n");
 
@@ -292,11 +299,10 @@ enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags) {
     uint64_t L1 = (virt >> 12) & 0x1FF;
     pte_t *entry = &tables[3]->entries[L1];
     if (ENTRY_PRESENT(*entry)) {
-        if (global.current_bootstage > BOOTSTAGE_MID_ALLOCATORS)
-            k_panic(
-                "Moving virtual memory with this function is not allowed\n");
-        invlpg(virt);
-        tlb_shootdown(virt, true);
+        if (!(vflags & VMM_FLAG_NO_TLB_SHOOTDOWN)) {
+            invlpg(virt);
+            tlb_shootdown(virt, true);
+        }
     }
     *entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
 
@@ -311,7 +317,7 @@ out:
 }
 
 void vmm_map_page_user(uintptr_t pml4_phys, uintptr_t virt, uintptr_t phys,
-                       uint64_t flags) {
+                       uint64_t flags, enum vmm_flags vflags) {
     if (virt == 0) {
         k_panic("CANNOT MAP PAGE 0x0!!!\n");
     }
@@ -334,7 +340,7 @@ void vmm_map_page_user(uintptr_t pml4_phys, uintptr_t virt, uintptr_t phys,
     *entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
 }
 
-void vmm_unmap_page(uintptr_t virt) {
+void vmm_unmap_page(uintptr_t virt, enum vmm_flags vflags) {
     struct page_table *tables[4];
     pte_t *entries[4];
     enum irql irqls[4];
@@ -365,8 +371,10 @@ void vmm_unmap_page(uintptr_t virt) {
 
     *entries[3] &= ~PAGING_PRESENT;
 
-    invlpg(virt);
-    tlb_shootdown(virt, true);
+    if (!(vflags & VMM_FLAG_NO_TLB_SHOOTDOWN)) {
+        invlpg(virt);
+        tlb_shootdown(virt, true);
+    }
 
     for (int level_inner = 3; level_inner > 0; level_inner--) {
         if (vmm_is_table_empty(tables[level_inner])) {
@@ -387,7 +395,8 @@ out:
             page_table_unlock(tables[i], irqls[i]);
 }
 
-uintptr_t vmm_get_phys(uintptr_t virt) {
+uintptr_t vmm_get_phys(uintptr_t virt, enum vmm_flags vflags) {
+    (void) vflags;
     struct page_table *tables[4] = {0};
     enum irql irqls[4] = {0};
     pte_t *entry = NULL;
@@ -486,7 +495,8 @@ err:
     return (uintptr_t) -1;
 }
 
-void *vmm_map_phys(uint64_t addr, uint64_t len, uint64_t flags) {
+void *vmm_map_phys(uint64_t addr, uint64_t len, uint64_t flags,
+                   enum vmm_flags vflags) {
 
     uintptr_t phys_start = PAGE_ALIGN_DOWN(addr);
     uintptr_t offset = addr - phys_start;
@@ -503,13 +513,13 @@ void *vmm_map_phys(uint64_t addr, uint64_t len, uint64_t flags) {
 
     for (uint64_t i = 0; i < total_pages; i++) {
         vmm_map_page(virt_start + i * PAGE_SIZE, phys_start + i * PAGE_SIZE,
-                     PAGING_PRESENT | PAGING_WRITE | flags);
+                     PAGING_PRESENT | PAGING_WRITE | flags, vflags);
     }
 
     return (void *) (virt_start + offset);
 }
 
-void vmm_unmap_virt(void *addr, uint64_t len) {
+void vmm_unmap_virt(void *addr, uint64_t len, enum vmm_flags vflags) {
     uintptr_t virt_addr = (uintptr_t) addr;
     uintptr_t page_offset = virt_addr & (PAGE_SIZE - 1);
     uintptr_t aligned_virt = PAGE_ALIGN_DOWN(virt_addr);
@@ -518,6 +528,6 @@ void vmm_unmap_virt(void *addr, uint64_t len) {
     uint64_t total_pages = (total_len + PAGE_SIZE - 1) / PAGE_SIZE;
 
     for (uint64_t i = 0; i < total_pages; i++) {
-        vmm_unmap_page(aligned_virt + i * PAGE_SIZE);
+        vmm_unmap_page(aligned_virt + i * PAGE_SIZE, vflags);
     }
 }

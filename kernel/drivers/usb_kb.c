@@ -3,6 +3,7 @@
 #include <drivers/usb_hid.h>
 #include <drivers/xhci.h>
 #include <mem/alloc.h>
+#include <mem/page.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <sleep.h>

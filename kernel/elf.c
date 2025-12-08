@@ -1,6 +1,7 @@
 #include <asm.h>
 #include <console/printf.h>
 #include <elf.h>
+#include <mem/page.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <stdbool.h>
@@ -34,7 +35,8 @@ uint64_t elf_load(const void *elf_data) {
         for (uint64_t va = va_start; va < va_end; va += 0x1000) {
             uint64_t phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
             vmm_map_page(va, phys,
-                         PAGING_PRESENT | PAGING_USER_ALLOWED | PAGING_WRITE);
+                         PAGING_PRESENT | PAGING_USER_ALLOWED | PAGING_WRITE,
+                         VMM_FLAG_NONE);
         }
     }
 
@@ -69,7 +71,7 @@ void elf_map(uintptr_t user_pml4_phys, void *elf_data) {
             if (!phys)
                 k_panic("Failed to allocate page for user ELF segment\n");
 
-            void *phys_mapped = vmm_map_phys(phys, PAGE_SIZE, 0);
+            void *phys_mapped = vmm_map_phys(phys, PAGE_SIZE, 0, VMM_FLAG_NONE);
             memset(phys_mapped, 0, PAGE_SIZE);
 
             uintptr_t offset_in_seg = vaddr - seg_vaddr_start;
@@ -92,7 +94,8 @@ void elf_map(uintptr_t user_pml4_phys, void *elf_data) {
                        (uint8_t *) elf_data + file_pos, to_copy);
             }
 
-            vmm_map_page_user(user_pml4_phys, vaddr, phys, flags);
+            vmm_map_page_user(user_pml4_phys, vaddr, phys, flags,
+                              VMM_FLAG_NONE);
         }
     }
 }
@@ -106,7 +109,8 @@ uintptr_t map_user_stack(uintptr_t user_pml4_phys) {
             k_panic("Failed to alloc user stack\n");
 
         vmm_map_page_user(user_pml4_phys, v, phys,
-                          PAGING_WRITE | PAGING_USER_ALLOWED | PAGING_PRESENT);
+                          PAGING_WRITE | PAGING_USER_ALLOWED | PAGING_PRESENT,
+                          VMM_FLAG_NONE);
     }
 
     return USER_STACK_TOP - 0x2000;

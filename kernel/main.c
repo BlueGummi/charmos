@@ -28,12 +28,8 @@
 #include <mem/vmm.h>
 #include <registry.h>
 #include <requests.h>
-#include <thread/defer.h>
 #include <sch/domain.h>
-#include <thread/dpc.h>
-#include <thread/reaper.h>
 #include <sch/sched.h>
-#include <thread/thread.h>
 #include <smp/core.h>
 #include <smp/domain.h>
 #include <smp/percpu.h>
@@ -43,6 +39,10 @@
 #include <sync/turnstile.h>
 #include <syscall.h>
 #include <tests.h>
+#include <thread/defer.h>
+#include <thread/dpc.h>
+#include <thread/reaper.h>
+#include <thread/thread.h>
 
 struct charmos_globals global = {0};
 
@@ -121,6 +121,7 @@ void k_sch_main(void *nop) {
     slab_domain_init_late();
     domain_buddies_init_late();
     workqueues_permanent_init();
+    movealloc_move_all_cores();
     reaper_init();
     registry_setup();
     tests_run();

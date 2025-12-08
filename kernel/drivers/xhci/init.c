@@ -4,6 +4,7 @@
 #include <drivers/usb.h>
 #include <drivers/xhci.h>
 #include <mem/alloc.h>
+#include <mem/page.h>
 #include <mem/vmm.h>
 #include <sleep.h>
 #include <stdbool.h>
@@ -14,11 +15,13 @@
 void xhci_setup_event_ring(struct xhci_device *dev) {
     struct xhci_erst_entry *erst_table =
         kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
-    uintptr_t erst_table_phys = vmm_get_phys((uintptr_t) erst_table);
+    uintptr_t erst_table_phys =
+        vmm_get_phys((uintptr_t) erst_table, VMM_FLAG_NONE);
 
     struct xhci_trb *event_ring =
         kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
-    uintptr_t event_ring_phys = vmm_get_phys((uintptr_t) event_ring);
+    uintptr_t event_ring_phys =
+        vmm_get_phys((uintptr_t) event_ring, VMM_FLAG_NONE);
 
     event_ring[0].control = 1;
 
@@ -54,7 +57,7 @@ void xhci_setup_command_ring(struct xhci_device *dev) {
 
     struct xhci_trb *cmd_ring =
         kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
-    uintptr_t cmd_ring_phys = vmm_get_phys((uintptr_t) cmd_ring);
+    uintptr_t cmd_ring_phys = vmm_get_phys((uintptr_t) cmd_ring, VMM_FLAG_NONE);
 
     int last_index = TRB_RING_SIZE - 1;
     cmd_ring[last_index].parameter = cmd_ring_phys;
@@ -66,7 +69,7 @@ void xhci_setup_command_ring(struct xhci_device *dev) {
 
     struct xhci_dcbaa *dcbaa_virt =
         kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
-    uintptr_t dcbaa_phys = vmm_get_phys((uintptr_t) dcbaa_virt);
+    uintptr_t dcbaa_phys = vmm_get_phys((uintptr_t) dcbaa_virt, VMM_FLAG_NONE);
 
     struct xhci_ring *ring =
         kzalloc(sizeof(struct xhci_ring), ALLOC_PARAMS_DEFAULT);

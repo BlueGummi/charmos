@@ -3,6 +3,7 @@
 #include <charmos.h>
 #include <int/idt.h>
 #include <mem/alloc.h>
+#include <mem/page.h>
 #include <mem/vmm.h>
 #include <sleep.h>
 #include <smp/core.h>
@@ -11,7 +12,8 @@ bool x2apic_enabled = false;
 
 void lapic_init(void) {
     uintptr_t lapic_phys = rdmsr(IA32_APIC_BASE_MSR) & IA32_APIC_BASE_MASK;
-    lapic = vmm_map_phys(lapic_phys, PAGE_SIZE, PAGING_UNCACHABLE);
+    lapic =
+        vmm_map_phys(lapic_phys, PAGE_SIZE, PAGING_UNCACHABLE, VMM_FLAG_NONE);
 }
 
 void lapic_timer_init(uint64_t core_id) {

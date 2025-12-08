@@ -365,14 +365,14 @@ void domain_buddy_dump(void) {
 
 static void move_buddy(struct domain_buddy *buddy) {
     size_t domain = buddy->cores[0]->domain->id;
-    movealloc(domain, buddy->free_queue);
-    movealloc(domain, buddy->free_area);
-    movealloc(domain, buddy->free_queue->queue);
-    movealloc(domain, buddy->zonelist.entries);
-    movealloc(domain, buddy->arenas);
+    movealloc(domain, buddy->free_queue, VMM_FLAG_NONE);
+    movealloc(domain, buddy->free_area, VMM_FLAG_NONE);
+    movealloc(domain, buddy->free_queue->queue, VMM_FLAG_NONE);
+    movealloc(domain, buddy->zonelist.entries, VMM_FLAG_NONE);
+    movealloc(domain, buddy->arenas, VMM_FLAG_NONE);
     for (size_t i = 0; i < buddy->core_count; i++) {
-        movealloc(domain, buddy->arenas[i]);
-        movealloc(domain, buddy->arenas[i]->pages);
+        movealloc(domain, buddy->arenas[i], VMM_FLAG_NONE);
+        movealloc(domain, buddy->arenas[i]->pages, VMM_FLAG_NONE);
     }
 }
 

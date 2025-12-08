@@ -9,10 +9,11 @@
 #pragma once
 #include <compiler.h>
 #include <containerof.h>
+#include <mem/vmm.h>
 #include <structures/list.h>
 
 /* this will always panic upon alloc failure - only to be used in init code! */
-void movealloc(size_t domain, void *ptr);
+void movealloc(size_t domain, void *ptr, enum vmm_flags vf);
 
 typedef void (*movealloc_callback)(void *a, void *b);
 
@@ -35,3 +36,4 @@ struct movealloc_callback_chain {
             callback, a, b, .list = {0}};
 
 void movealloc_exec_all(void);
+void movealloc_move_all_cores(void);

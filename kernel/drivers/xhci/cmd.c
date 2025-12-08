@@ -4,6 +4,7 @@
 #include <drivers/usb.h>
 #include <drivers/xhci.h>
 #include <mem/alloc.h>
+#include <mem/page.h>
 #include <mem/vmm.h>
 #include <sleep.h>
 #include <stdbool.h>
@@ -197,7 +198,8 @@ bool xhci_submit_interrupt_transfer(struct usb_device *dev,
     uint32_t idx = ring->enqueue_index;
 
     struct xhci_trb *trb = &ring->trbs[idx];
-    trb->parameter = (paddr_t) vmm_get_phys((vaddr_t) packet->data);
+    trb->parameter =
+        (paddr_t) vmm_get_phys((vaddr_t) packet->data, VMM_FLAG_NONE);
     trb->status = packet->length;
     trb->status |= TRB_SET_INTERRUPTER_TARGET(0);
 
@@ -215,7 +217,7 @@ bool xhci_submit_interrupt_transfer(struct usb_device *dev,
         return false;
     }
 
-//    xhci_clear_interrupt_pending(xhci);
+    //    xhci_clear_interrupt_pending(xhci);
 
     return true;
 }

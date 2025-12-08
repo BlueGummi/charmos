@@ -20,8 +20,8 @@ static void setup_port_slots(struct ahci_device *dev, uint32_t port_id) {
     for (uint64_t slot = 0; slot < 32; slot++) {
         uint64_t cmdtbl_phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
 
-        void *cmdtbl_virt =
-            vmm_map_phys(cmdtbl_phys, PAGE_SIZE, PAGING_UNCACHABLE);
+        void *cmdtbl_virt = vmm_map_phys(cmdtbl_phys, PAGE_SIZE,
+                                         PAGING_UNCACHABLE, VMM_FLAG_NONE);
         memset(cmdtbl_virt, 0, PAGE_SIZE);
 
         struct ahci_cmd_header *cmd_header =
@@ -39,8 +39,10 @@ static void allocate_port(struct ahci_device *dev, struct ahci_port *port,
                           uint32_t port_num) {
     uint64_t cmdlist_phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
     uint64_t fis_phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
-    void *cmdlist = vmm_map_phys(cmdlist_phys, PAGE_SIZE, PAGING_UNCACHABLE);
-    void *fis = vmm_map_phys(fis_phys, PAGE_SIZE, PAGING_UNCACHABLE);
+    void *cmdlist =
+        vmm_map_phys(cmdlist_phys, PAGE_SIZE, PAGING_UNCACHABLE, VMM_FLAG_NONE);
+    void *fis =
+        vmm_map_phys(fis_phys, PAGE_SIZE, PAGING_UNCACHABLE, VMM_FLAG_NONE);
     memset(cmdlist, 0, PAGE_SIZE);
     memset(fis, 0, PAGE_SIZE);
 

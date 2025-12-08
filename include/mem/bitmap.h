@@ -1,6 +1,7 @@
 /* @title: Bitmap allocator */
 #pragma once
 #include <mem/alloc.h>
+#include <mem/page.h>
 #include <mem/vmm.h>
 #include <stdbool.h>
 #include <stdint.h>

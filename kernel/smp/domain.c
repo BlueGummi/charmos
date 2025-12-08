@@ -155,7 +155,7 @@ static void domains_move(void *a, void *b) {
     (void) a, (void) b;
     for (size_t i = 0; i < global.domain_count; i++) {
         struct domain *domain = global.domains[i];
-        movealloc(domain->id, domain);
+        movealloc(domain->id, domain, VMM_FLAG_NONE);
     }
 }
 

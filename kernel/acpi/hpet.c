@@ -1,6 +1,7 @@
 #include <acpi/hpet.h>
 #include <asm.h>
 #include <console/printf.h>
+#include <mem/page.h>
 #include <mem/vmm.h>
 #include <smp/core.h>
 #include <uacpi/tables.h>
@@ -128,7 +129,8 @@ void hpet_init(void) {
     struct acpi_hpet *hpet = hpet_table.ptr;
     uint64_t hpet_addr = hpet->address.address;
 
-    hpet_base = vmm_map_phys(hpet_addr, PAGE_SIZE, PAGING_UNCACHABLE);
+    hpet_base =
+        vmm_map_phys(hpet_addr, PAGE_SIZE, PAGING_UNCACHABLE, VMM_FLAG_NONE);
 
     hpet_disable();
     hpet_write64(HPET_MAIN_COUNTER_OFFSET, 0);

@@ -28,7 +28,8 @@ struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
     uint64_t abar_size = ~(size_mask & ~0xFU) + 1;
     uint64_t map_size = (abar_size + 0xFFFU) & ~0xFFFU;
 
-    void *abar_virt = vmm_map_phys(abar_base, map_size, PAGING_UNCACHABLE);
+    void *abar_virt =
+        vmm_map_phys(abar_base, map_size, PAGING_UNCACHABLE, VMM_FLAG_NONE);
     if (!abar_virt) {
         ahci_info(K_ERROR, "failed to map BAR - likely OOM error");
         return NULL;

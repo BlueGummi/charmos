@@ -79,6 +79,7 @@ bool dpc_enqueue_on_cpu(size_t cpu, struct dpc *d) {
 
     uint8_t old =
         atomic_exchange_explicit(&dc->dpc_queued, 1, memory_order_acq_rel);
+
     if (old == 0 && cpu != smp_core_id()) {
         ipi_send(cpu, IRQ_SCHEDULER);
     }

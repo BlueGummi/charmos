@@ -10,11 +10,11 @@
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <thread/defer.h>
 #include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <thread/defer.h>
 
 #include "internal.h"
 
@@ -47,7 +47,8 @@ done:
         nvme_send_nvme_req(dev->generic_disk, next);
 }
 
-static void nvme_process_one(struct nvme_device *dev, struct nvme_request *req) {
+static void nvme_process_one(struct nvme_device *dev,
+                             struct nvme_request *req) {
     struct thread *t = req->waiter;
 
     if (--req->remaining_parts == 0) {
@@ -211,7 +212,8 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
 uint8_t *nvme_identify_controller(struct nvme_device *nvme) {
     uint64_t buffer_phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
 
-    void *buffer = vmm_map_phys(buffer_phys, PAGE_SIZE, PAGING_UNCACHABLE);
+    void *buffer =
+        vmm_map_phys(buffer_phys, PAGE_SIZE, PAGING_UNCACHABLE, VMM_FLAG_NONE);
 
     memset(buffer, 0, PAGE_SIZE);
 
@@ -260,7 +262,8 @@ uint32_t nvme_set_num_queues(struct nvme_device *nvme, uint16_t desired_sq,
 uint8_t *nvme_identify_namespace(struct nvme_device *nvme, uint32_t nsid) {
     uint64_t buffer_phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
 
-    void *buffer = vmm_map_phys(buffer_phys, PAGE_SIZE, PAGING_UNCACHABLE);
+    void *buffer =
+        vmm_map_phys(buffer_phys, PAGE_SIZE, PAGING_UNCACHABLE, VMM_FLAG_NONE);
 
     memset(buffer, 0, PAGE_SIZE);
 

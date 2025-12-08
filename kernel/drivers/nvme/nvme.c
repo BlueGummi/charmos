@@ -40,7 +40,8 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     uint64_t phys_addr =
         ((uint64_t) original_bar1 << 32) | (original_bar0 & ~0xFU);
 
-    void *mmio = vmm_map_phys(phys_addr, size, PAGING_UNCACHABLE);
+    void *mmio =
+        vmm_map_phys(phys_addr, size, PAGING_UNCACHABLE, VMM_FLAG_NONE);
 
     struct nvme_regs *regs = (struct nvme_regs *) mmio;
     uint64_t cap = ((uint64_t) regs->cap_hi << 32) | regs->cap_lo;

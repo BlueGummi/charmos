@@ -37,7 +37,7 @@ static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
     uintptr_t vaddr = PAGE_ALIGN_DOWN(buffer);
 
     for (size_t i = 0; i < num_pages; i++) {
-        data->prps[i] = vmm_get_phys(vaddr);
+        data->prps[i] = vmm_get_phys(vaddr, VMM_FLAG_NONE);
         vaddr += PAGE_SIZE;
     }
 
@@ -59,7 +59,7 @@ static void nvme_setup_prps(struct nvme_command *cmd,
         cmd->prp2 = data->prps[1];
         goto free_prps;
     } else {
-        cmd->prp2 = vmm_get_phys((uint64_t) (&data->prps[1]));
+        cmd->prp2 = vmm_get_phys((uint64_t) (&data->prps[1]), VMM_FLAG_NONE);
     }
 
     return;

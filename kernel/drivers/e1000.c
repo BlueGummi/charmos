@@ -4,6 +4,7 @@
 #include <drivers/e1000.h>
 #include <drivers/pci.h>
 #include <mem/alloc.h>
+#include <mem/page.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <sleep.h>
@@ -22,7 +23,8 @@ static void e1000_reset(struct e1000_device *dev) {
 static void e1000_setup_tx_ring(struct e1000_device *dev) {
     uint64_t space = sizeof(struct e1000_tx_desc) * E1000_NUM_TX_DESC;
     dev->tx_descs_phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
-    dev->tx_descs = vmm_map_phys(dev->tx_descs_phys, space, PAGING_UNCACHABLE);
+    dev->tx_descs = vmm_map_phys(dev->tx_descs_phys, space, PAGING_UNCACHABLE,
+                                 VMM_FLAG_NONE);
     memset(dev->tx_descs, 0, space);
 
     for (int i = 0; i < E1000_NUM_TX_DESC; i++) {
@@ -30,7 +32,8 @@ static void e1000_setup_tx_ring(struct e1000_device *dev) {
         if (!dev->tx_buffers[i])
             k_panic("e1000 ring setup allocation failed!\n");
 
-        dev->tx_descs[i].addr = vmm_get_phys((uintptr_t) dev->tx_buffers[i]);
+        dev->tx_descs[i].addr =
+            vmm_get_phys((uintptr_t) dev->tx_buffers[i], VMM_FLAG_NONE);
         dev->tx_descs[i].status = E1000_TXD_STAT_DD;
     }
 
@@ -53,7 +56,8 @@ static void e1000_setup_tx_ring(struct e1000_device *dev) {
 static void e1000_setup_rx_ring(struct e1000_device *dev) {
     uint64_t space = sizeof(struct e1000_rx_desc) * E1000_NUM_RX_DESC;
     dev->rx_descs_phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
-    dev->rx_descs = vmm_map_phys(dev->rx_descs_phys, space, PAGING_UNCACHABLE);
+    dev->rx_descs = vmm_map_phys(dev->rx_descs_phys, space, PAGING_UNCACHABLE,
+                                 VMM_FLAG_NONE);
     memset(dev->rx_descs, 0, space);
 
     for (int i = 0; i < E1000_NUM_RX_DESC; i++) {
@@ -61,7 +65,8 @@ static void e1000_setup_rx_ring(struct e1000_device *dev) {
         if (!dev->rx_buffers[i])
             k_panic("e1000 ring allocation failed\n");
 
-        dev->rx_descs[i].addr = vmm_get_phys((uintptr_t) dev->rx_buffers[i]);
+        dev->rx_descs[i].addr =
+            vmm_get_phys((uintptr_t) dev->rx_buffers[i], VMM_FLAG_NONE);
         dev->rx_descs[i].status = 0;
     }
 
@@ -191,7 +196,8 @@ bool e1000_init(struct pci_device *pci, struct e1000_device *dev) {
     if (mmio_size == 0 || mmio_size > (1 << 24))
         return false;
 
-    dev->regs = vmm_map_phys(phys_addr, mmio_size, PAGING_UNCACHABLE);
+    dev->regs =
+        vmm_map_phys(phys_addr, mmio_size, PAGING_UNCACHABLE, VMM_FLAG_NONE);
     if (!dev->regs)
         return false;
 

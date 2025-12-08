@@ -147,7 +147,8 @@ void smp_complete_init() {
 }
 
 void smp_setup_bsp() {
-    struct core *c = kzalloc(sizeof(struct core), ALLOC_PARAMS_DEFAULT);
+    struct core *c =
+        kzalloc(PAGE_ALIGN_UP(sizeof(struct core)), ALLOC_PARAMS_DEFAULT);
     if (!c)
         k_panic("Could not allocate space for core structure on BSP");
 

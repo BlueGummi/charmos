@@ -188,7 +188,7 @@ void *slab_map_new_page(struct slab_domain *domain, paddr_t *phys_out,
     if (pageable)
         pflags |= PAGING_PAGEABLE;
 
-    enum errno e = vmm_map_page(virt, phys, pflags);
+    enum errno e = vmm_map_page(virt, phys, pflags, VMM_FLAG_NONE);
     if (unlikely(e < 0))
         goto err;
 
@@ -205,7 +205,7 @@ err:
 }
 
 static void slab_free_virt_and_phys(vaddr_t virt, paddr_t phys) {
-    vmm_unmap_page(virt);
+    vmm_unmap_page(virt, VMM_FLAG_NONE);
     pmm_free_page(phys);
 
     /* go back down a PAGE_SIZE for our virt allocation */
@@ -359,7 +359,7 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
 void slab_destroy(struct slab *slab) {
     slab_list_del(slab);
     uintptr_t virt = (uintptr_t) slab;
-    paddr_t phys = vmm_get_phys(virt);
+    paddr_t phys = vmm_get_phys(virt, VMM_FLAG_NONE);
     slab_free_virt_and_phys(virt, phys);
 }
 
@@ -583,7 +583,8 @@ void *kmalloc_pages_raw(struct slab_domain *parent, size_t size,
             return NULL;
         }
 
-        enum errno e = vmm_map_page(virt + i * PAGE_SIZE, phys, page_flags);
+        enum errno e =
+            vmm_map_page(virt + i * PAGE_SIZE, phys, page_flags, VMM_FLAG_NONE);
         if (e < 0) {
             pmm_free_page(phys);
             for (uint64_t j = 0; j < allocated; j++)
@@ -628,8 +629,8 @@ void slab_free_page_hdr(struct slab_page_hdr *hdr) {
     hdr->magic = 0;
     for (uint32_t i = 0; i < pages; i++) {
         uintptr_t vaddr = virt + i * PAGE_SIZE;
-        paddr_t phys = (paddr_t) vmm_get_phys(vaddr);
-        vmm_unmap_page(vaddr);
+        paddr_t phys = (paddr_t) vmm_get_phys(vaddr, VMM_FLAG_NONE);
+        vmm_unmap_page(vaddr, VMM_FLAG_NONE);
         pmm_free_page(phys);
     }
 

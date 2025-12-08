@@ -1,5 +1,6 @@
 #include <drivers/usb.h>
 #include <mem/alloc.h>
+#include <mem/page.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <string.h>

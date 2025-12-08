@@ -5,6 +5,7 @@
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <string.h>
+#include <thread/dpc.h>
 
 #include "mem/slab/internal.h"
 
@@ -42,7 +43,7 @@ static void change_slab_backing_page(void *ptr) {
     k_panic("Moved allocations cannot come from slab\n");
 }
 
-void movealloc(size_t new_domain, void *ptr) {
+void movealloc(size_t new_domain, void *ptr, enum vmm_flags flags) {
     if (global.current_bootstage >= BOOTSTAGE_COMPLETE)
         k_panic("movealloc cannot be called after boot completes\n");
 
@@ -53,7 +54,7 @@ void movealloc(size_t new_domain, void *ptr) {
 
     for (size_t i = 0; i < pages; i++) {
         vaddr_t vaddr = aligned_down + i * PAGE_SIZE;
-        paddr_t paddr = vmm_get_phys(vaddr);
+        paddr_t paddr = vmm_get_phys(vaddr, flags);
         paddr_t new_phys = domain_alloc_from_domain(d, 1);
         if (!new_phys)
             k_panic("movealloc failed!\n");
@@ -62,9 +63,33 @@ void movealloc(size_t new_domain, void *ptr) {
         void *pvaddr = (void *) vaddr;
         void *pnew_virt = (void *) new_virt;
         memcpy(pnew_virt, pvaddr, PAGE_SIZE);
-        vmm_map_page(vaddr, new_phys, PAGING_WRITE | PAGING_PRESENT);
-        kassert(vmm_get_phys(vaddr) == new_phys);
+        vmm_map_page(vaddr, new_phys, PAGING_WRITE | PAGING_PRESENT, flags);
+        kassert(vmm_get_phys(vaddr, flags) == new_phys);
     }
 
     change_slab_backing_page(ptr);
+}
+
+static atomic_uint cores_ran_move_core_dpc = 0;
+
+void move_core_dpc(void *v) {
+    (void) v;
+    movealloc(domain_local_id(), smp_core(), VMM_FLAG_NONE);
+    atomic_fetch_add(&cores_ran_move_core_dpc, 1);
+    tlb_flush();
+}
+
+void movealloc_move_all_cores(void) {
+    for (size_t i = 0; i < global.core_count; i++) {
+        uint32_t before = atomic_load(&cores_ran_move_core_dpc);
+        struct dpc *dpc = dpc_create(move_core_dpc, NULL);
+        if (!dpc)
+            k_panic("OOM\n");
+
+        dpc_enqueue_on_cpu(i, dpc);
+        while (atomic_load(&cores_ran_move_core_dpc) == before)
+            cpu_relax();
+
+        kfree(dpc, FREE_PARAMS_DEFAULT);
+    }
 }

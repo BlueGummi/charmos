@@ -7,6 +7,7 @@
 #include <drivers/xhci.h>
 #include <int/idt.h>
 #include <mem/alloc.h>
+#include <mem/page.h>
 #include <mem/vmm.h>
 #include <sleep.h>
 #include <stdbool.h>
@@ -19,7 +20,8 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
                          uint8_t speed, uint8_t port) {
     struct xhci_input_ctx *input_ctx =
         kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
-    uintptr_t input_ctx_phys = vmm_get_phys((uintptr_t) input_ctx);
+    uintptr_t input_ctx_phys =
+        vmm_get_phys((uintptr_t) input_ctx, VMM_FLAG_NONE);
 
     input_ctx->ctrl_ctx.add_flags = (1 << 0) | (1 << 1); // slot + ep0
     input_ctx->ctrl_ctx.drop_flags = 0;
@@ -35,7 +37,7 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
 
     struct xhci_trb *ep0_ring =
         kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
-    uintptr_t ep0_ring_phys = vmm_get_phys((uintptr_t) ep0_ring);
+    uintptr_t ep0_ring_phys = vmm_get_phys((uintptr_t) ep0_ring, VMM_FLAG_NONE);
 
     ep0_ring[TRB_RING_SIZE - 1].parameter = ep0_ring_phys;
     ep0_ring[TRB_RING_SIZE - 1].control = TRB_SET_TYPE(TRB_TYPE_LINK);
@@ -65,7 +67,7 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
 
     struct xhci_device_ctx *dev_ctx =
         kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
-    uintptr_t dev_ctx_phys = vmm_get_phys((uintptr_t) dev_ctx);
+    uintptr_t dev_ctx_phys = vmm_get_phys((uintptr_t) dev_ctx, VMM_FLAG_NONE);
 
     ctrl->dcbaa->ptrs[slot_id] = dev_ctx_phys;
 
@@ -88,7 +90,8 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
 bool xhci_send_control_transfer(struct xhci_device *dev, uint8_t slot_id,
                                 struct xhci_ring *ep0_ring,
                                 struct usb_setup_packet *setup, void *buffer) {
-    uint64_t buffer_phys = (uint64_t) vmm_get_phys((uintptr_t) buffer);
+    uint64_t buffer_phys =
+        (uint64_t) vmm_get_phys((uintptr_t) buffer, VMM_FLAG_NONE);
 
     int idx = ep0_ring->enqueue_index;
 
@@ -141,7 +144,7 @@ static struct xhci_ring *allocate_endpoint_ring(void) {
     if (!trbs)
         return NULL;
 
-    uintptr_t ring_phys = vmm_get_phys((uintptr_t) trbs);
+    uintptr_t ring_phys = vmm_get_phys((uintptr_t) trbs, VMM_FLAG_NONE);
 
     trbs[TRB_RING_SIZE - 1].parameter = ring_phys;
     trbs[TRB_RING_SIZE - 1].control = (TRB_TYPE_LINK << 10) | (1 << 1);
@@ -167,7 +170,8 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
                                      struct usb_device *usb) {
     struct xhci_input_ctx *input_ctx =
         kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
-    uintptr_t input_ctx_phys = vmm_get_phys((uintptr_t) input_ctx);
+    uintptr_t input_ctx_phys =
+        vmm_get_phys((uintptr_t) input_ctx, VMM_FLAG_NONE);
 
     input_ctx->ctrl_ctx.add_flags = (1 << 0);
     uint8_t max_ep_index = 0;
