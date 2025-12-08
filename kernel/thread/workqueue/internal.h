@@ -1,5 +1,5 @@
-#include <thread/defer.h>
 #include <stdarg.h>
+#include <thread/defer.h>
 
 #define DEQUEUE_FROM_ONESHOT_CODE 2
 #define DEQUEUE_FROM_REGULAR_CODE 1
@@ -11,10 +11,6 @@
 
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(workqueue, lock);
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(worklist, lock);
-SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT_NAMED(workqueue, worker_array_lock,
-                                               worker_array);
-SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT_NAMED(workqueue, worker_lock, worker);
-SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT_NAMED(workqueue, work_lock, work);
 
 #define WORKQUEUE_CORE_UNBOUND (-1)
 
@@ -25,9 +21,9 @@ static inline uint64_t workqueue_current_worker_count(struct workqueue *q) {
 }
 
 static inline bool workqueue_works_empty(struct workqueue *queue) {
-    enum irql irql = workqueue_work_lock(queue);
+    enum irql irql = spin_lock(&queue->work_lock);
     bool empty = list_empty(&queue->works);
-    workqueue_work_unlock(queue, irql);
+    spin_unlock(&queue->work_lock, irql);
     return empty;
 }
 
@@ -66,16 +62,16 @@ static inline void worklist_put(struct worklist *wlist) {
  * always be the list of workers we have */
 static inline void workqueue_add_worker(struct workqueue *wq,
                                         struct worker *wker) {
-    enum irql irql = workqueue_worker_lock(wq);
+    enum irql irql = spin_lock(&wq->worker_lock);
     list_add(&wker->list_node, &wq->workers);
-    workqueue_worker_unlock(wq, irql);
+    spin_unlock(&wq->worker_lock, irql);
 }
 
 static inline void workqueue_remove_worker(struct workqueue *wq,
                                            struct worker *worker) {
-    enum irql irql = workqueue_worker_lock(wq);
+    enum irql irql = spin_lock(&wq->worker_lock);
     list_del_init(&worker->list_node);
-    workqueue_worker_unlock(wq, irql);
+    spin_unlock(&wq->worker_lock, irql);
 }
 
 static inline bool ignore_timeouts(struct workqueue *q) {
@@ -109,4 +105,5 @@ struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
                                             const char *fmt, va_list args);
 enum thread_request_decision workqueue_request_callback(struct thread *t,
                                                         void *data);
-struct thread *worker_create(struct cpu_mask mask, nice_t niceness, bool migratable);
+struct thread *worker_create(struct cpu_mask mask, nice_t niceness,
+                             bool migratable);

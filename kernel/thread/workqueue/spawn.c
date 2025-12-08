@@ -70,7 +70,7 @@ static void workqueue_enqueue_thread(struct workqueue *queue,
 
 struct worker *workqueue_worker_create(struct workqueue *queue) {
     if (queue->attrs.flags & WORKQUEUE_FLAG_STATIC_WORKERS) {
-        enum irql irql = workqueue_worker_array_lock(queue);
+        enum irql irql = spin_lock(&queue->worker_array_lock);
         struct worker *ret = NULL;
         for (size_t i = 0; i < queue->attrs.max_workers; i++) {
             if (queue->worker_array[i].thread == NULL) {
@@ -80,7 +80,7 @@ struct worker *workqueue_worker_create(struct workqueue *queue) {
         }
 
     out:
-        workqueue_worker_array_unlock(queue, irql);
+        spin_unlock(&queue->worker_array_lock, irql);
         return ret;
     } else {
         return kzalloc(sizeof(struct worker), ALLOC_PARAMS_DEFAULT);
@@ -188,8 +188,8 @@ bool workqueue_try_spawn_worker(struct workqueue *queue) {
 struct thread *worker_create(struct cpu_mask mask, nice_t niceness,
                              bool migratable) {
     uint64_t stack_size = PAGE_SIZE;
-    struct thread *ret =
-        thread_create_custom_stack("workqueue_worker", worker_main, NULL, stack_size);
+    struct thread *ret = thread_create_custom_stack(
+        "workqueue_worker", worker_main, NULL, stack_size);
     if (!ret)
         return NULL;
 

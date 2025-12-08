@@ -306,12 +306,12 @@ static inline uint32_t ext2_get_inode_group(struct ext2_fs *fs,
     return (inode - 1) / fs->inodes_per_group;
 }
 
-static inline bool ext2_fs_lock(struct ext2_fs *fs) {
+static inline enum irql ext2_fs_lock(struct ext2_fs *fs) {
     return spin_lock(&fs->lock);
 }
 
-static inline void ext2_fs_unlock(struct ext2_fs *fs, bool b) {
-    spin_unlock(&fs->lock, b);
+static inline void ext2_fs_unlock(struct ext2_fs *fs, enum irql i) {
+    spin_unlock(&fs->lock, i);
 }
 
 static inline void ext2_prefetch_block(struct ext2_fs *fs, uint32_t block) {

@@ -54,7 +54,7 @@ static void worker_reset(struct worker *worker) {
 
 static void worker_destroy(struct workqueue *queue, struct worker *worker) {
     if (queue->attrs.flags & WORKQUEUE_FLAG_STATIC_WORKERS) {
-        enum irql irql = workqueue_worker_array_lock(queue);
+        enum irql irql = spin_lock(&queue->worker_array_lock);
 
         bool found = false;
 
@@ -72,7 +72,7 @@ static void worker_destroy(struct workqueue *queue, struct worker *worker) {
                     "workqueue\n",
                     worker);
 
-        workqueue_worker_array_unlock(queue, irql);
+        spin_unlock(&queue->worker_array_lock, irql);
     } else {
         kfree(worker, FREE_PARAMS_DEFAULT);
     }
