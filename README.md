@@ -9,7 +9,7 @@
 Prerequisites: `nasm` and `xorriso`
 
 ```bash
-./build.sh
+./scripts/build.sh
 
 ```
 ## Run

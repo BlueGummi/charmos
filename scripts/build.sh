@@ -72,17 +72,17 @@ cond_print "${GREEN}configuring cmake${NC}"
 if [ ! -f "CMakeCache.txt" ]; then
     if ! uname -s | grep -q "Darwin" && arch | grep -q "aarch64"; then
         if [ "$cmake_quiet_arg" ]; then 
-            cmake -DCMAKE_TOOLCHAIN_FILE=../toolchain.cmake .. 2>&1 >/dev/null
+            cmake -DCMAKE_TOOLCHAIN_FILE=../scripts/toolchain.cmake .. 2>&1 >/dev/null
         else
-            cmake -DCMAKE_TOOLCHAIN_FILE=../toolchain.cmake ..
+            cmake -DCMAKE_TOOLCHAIN_FILE=../scripts/toolchain.cmake ..
         fi
     fi
 
     if uname -s | grep -q "Darwin"; then
         if [ "$cmake_quiet_arg" ]; then 
-            cmake -DCMAKE_TOOLCHAIN_FILE=../macos_toolchain.cmake .. 2>&1 >/dev/null
+            cmake -DCMAKE_TOOLCHAIN_FILE=../scripts/macos_toolchain.cmake .. 2>&1 >/dev/null
         else
-            cmake -DCMAKE_TOOLCHAIN_FILE=../macos_toolchain.cmake ..
+            cmake -DCMAKE_TOOLCHAIN_FILE=../scripts/macos_toolchain.cmake ..
         fi
     fi
 
@@ -100,7 +100,7 @@ else
     make -j
 fi
 
-nm "kernel/kernel" | awk -f "../script.awk" > "../syms/fullsyms.c"
+nm "kernel/kernel" | awk -f "../scripts/script.awk" > "../syms/fullsyms.c"
 
 cond_print "${YELLOW}Build after symbol table creation...${NC}"
 if [ "$make_quiet_arg" ]; then
