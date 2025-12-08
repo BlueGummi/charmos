@@ -51,6 +51,7 @@ void movealloc(size_t new_domain, void *ptr, enum vmm_flags flags) {
     size_t size = ksize(ptr);
     size_t pages = PAGES_NEEDED_FOR(size);
     vaddr_t aligned_down = PAGE_ALIGN_DOWN(ptr);
+    paddr_t phys_addrs[pages];
 
     for (size_t i = 0; i < pages; i++) {
         vaddr_t vaddr = aligned_down + i * PAGE_SIZE;
@@ -65,6 +66,12 @@ void movealloc(size_t new_domain, void *ptr, enum vmm_flags flags) {
         memcpy(pnew_virt, pvaddr, PAGE_SIZE);
         vmm_map_page(vaddr, new_phys, PAGING_WRITE | PAGING_PRESENT, flags);
         kassert(vmm_get_phys(vaddr, flags) == new_phys);
+
+        phys_addrs[i] = paddr;
+    }
+
+    for (size_t i = 0; i < pages; i++) {
+        pmm_free_page(phys_addrs[i]);
     }
 
     change_slab_backing_page(ptr);

@@ -2,10 +2,10 @@
 #include <mem/alloc.h>
 #include <mem/page.h>
 #include <mem/tlb.h>
-#include <thread/dpc.h>
 #include <sch/sched.h>
 #include <stdatomic.h>
 #include <stdint.h>
+#include <thread/dpc.h>
 
 /* NOTE: we avoid using a DPC for TLB shootdown due to the overhead of that */
 
@@ -116,7 +116,6 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
 
         uint64_t target_gen = gen;
         unsigned spin = TLB_SHOOTDOWN_INITIAL_SPIN;
-        unsigned attempts = 0;
 
         for (;;) {
             /* spin for 'spin' iterations checking the ack */
@@ -141,25 +140,12 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
                 target_gen)
                 break; /* done for this CPU */
 
-            /* not acked yet */
-            if (attempts >= TLB_SHOOTDOWN_MAX_RETRIES) {
-                /* Give up spinning/resending so we don't flood IPIs.
-                 * As a fallback, set flush_all for that cpu so it will
-                 * full-flush on next visit or when it wakes; also leave
-                 * ipi_pending alone. */
-                atomic_store_explicit(&other->flush_all, 1,
-                                      memory_order_release);
-                break;
-            }
-
             /* Only resend if the target doesn't already have an IPI pending */
             bool already_pending =
                 atomic_load_explicit(&other->ipi_pending, memory_order_acquire);
             if (!already_pending) {
                 ipi_send(i, IRQ_TLB_SHOOTDOWN);
             }
-            /* back off and increase spin budget */
-            attempts++;
             /* multiply spin, but clamp to some sane max to avoid huge loops */
             if ((uint64_t) spin * TLB_SHOOTDOWN_BACKOFF_MULT > (1u << 20))
                 spin = (1u << 20);

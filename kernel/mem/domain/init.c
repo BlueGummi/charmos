@@ -239,11 +239,7 @@ static size_t compute_freequeue_max(size_t system_total_pages) {
     return scaled;
 }
 
-static void domain_init_worker(struct domain_buddy *domain) {
-    domain->worker.domain = domain;
-    domain->worker.enqueued = false;
-    domain->worker.stop = false;
-    semaphore_init(&domain->worker.sema, 0, SEMAPHORE_INIT_NORMAL);
+static void domain_spawn(struct domain_buddy *domain) {
     domain->worker.thread =
         thread_create("domain_flush_thread%zu", domain_flush_thread, NULL,
                       domain->cores[0]->domain->id);
@@ -341,6 +337,10 @@ void domain_buddies_init(void) {
     for (size_t i = 0; i < domain_count; i++) {
         struct domain_buddy *dbd = &global.domain_buddies[i];
         domain_buddy_init(dbd);
+        semaphore_init(&dbd->worker.sema, 0, SEMAPHORE_INIT_NORMAL);
+        dbd->worker.domain = dbd;
+        dbd->worker.enqueued = false;
+        dbd->worker.stop = false;
         domain_buddy_track_pages(dbd);
         domain_build_zonelist(dbd);
     }
@@ -348,7 +348,7 @@ void domain_buddies_init(void) {
 
 void domain_buddies_init_late() {
     for (size_t i = 0; i < global.domain_count; i++)
-        domain_init_worker(&global.domain_buddies[i]);
+        domain_spawn(&global.domain_buddies[i]);
 }
 
 void domain_buddy_dump(void) {
