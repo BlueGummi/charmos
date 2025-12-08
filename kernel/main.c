@@ -114,7 +114,19 @@ void k_sch_main(void *nop) {
     /* make sure everyone else is idle before we
      * advance the bootstage here... */
     smp_wait_for_others_to_idle();
+
+    /* we have to force everyone to disable their
+     * ticks because this prevents anyone from
+     * possibly entering an ISR since IRQL
+     * operations check bootstages and they can
+     * see the MID_ALLOCATORS bootstage (no-op) in
+     * an early `irql_raise` and the LATE_DEVICES
+     * bootstage later on (causing mis-raised IRQLs) */
+    smp_disable_all_ticks();
+
     bootstage_advance(BOOTSTAGE_LATE_DEVICES);
+
+    smp_enable_all_ticks();
 
     rcu_init();
     defer_init();

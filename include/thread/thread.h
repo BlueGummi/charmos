@@ -451,6 +451,7 @@ bool thread_sleep(struct thread *t, enum thread_sleep_reason r,
 void thread_set_timesharing(struct thread *t);
 void thread_set_background(struct thread *t);
 void thread_wake(struct thread *t, enum thread_wake_reason r, void *wake_src);
+void thread_migrate(struct thread *t, size_t dest_core);
 void thread_wait_for_wake_match();
 
 struct thread_queue;

@@ -1,10 +1,10 @@
 #include <acpi/lapic.h>
 #include <kassert.h>
-#include <thread/dpc.h>
 #include <sch/sched.h>
 #include <smp/core.h>
 #include <stdatomic.h>
 #include <stdint.h>
+#include <thread/dpc.h>
 
 void dpc_run_local(void) {
 
@@ -44,7 +44,9 @@ void dpc_run_local(void) {
         while (it) {
             atomic_store_explicit(&it->enqueued, false, memory_order_release);
             it->func(it->ctx);
+            struct dpc *prev = it;
             it = atomic_load_explicit(&it->next, memory_order_relaxed);
+            atomic_store_explicit(&prev->executed, true, memory_order_relaxed);
         }
 
         /* loop to steal any newly enqueued DPCs */
@@ -116,5 +118,6 @@ struct dpc *dpc_create(dpc_func_t fn, void *ctx) {
     d->ctx = ctx;
     atomic_store_explicit(&d->next, NULL, memory_order_relaxed);
     atomic_store_explicit(&d->enqueued, false, memory_order_relaxed);
+    atomic_store_explicit(&d->executed, false, memory_order_relaxed);
     return d;
 }

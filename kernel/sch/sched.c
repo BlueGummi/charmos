@@ -1,8 +1,8 @@
 #include <acpi/lapic.h>
-#include <thread/apc.h>
 #include <sch/sched.h>
 #include <smp/smp.h>
 #include <sync/rcu.h>
+#include <thread/apc.h>
 
 #include "internal.h"
 
@@ -40,6 +40,14 @@ static inline void tick_enable() {
         lapic_timer_enable();
         scheduler_set_tick_enabled(self, true);
     }
+}
+
+void scheduler_tick_enable() {
+    tick_enable();
+}
+
+void scheduler_tick_disable() {
+    tick_disable();
 }
 
 static inline void change_tick_duration(uint64_t new_duration) {

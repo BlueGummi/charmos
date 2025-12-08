@@ -6,8 +6,10 @@
 #include <mem/tlb.h>
 #include <sch/sched.h>
 #include <smp/domain.h>
+#include <smp/percpu.h>
 #include <smp/smp.h>
 #include <sync/spinlock.h>
+#include <thread/dpc.h>
 
 static uint64_t cr3 = 0;
 static atomic_char cr3_ready = 0;
@@ -171,4 +173,48 @@ void smp_setup_bsp() {
     global.cores[0] = c;
     init_smt_info(c);
     detect_llc(&c->llc);
+}
+
+static atomic_uint tick_change_state = 0;
+static bool enable = false;
+static uint8_t entry = 0;
+
+static void tick_op_isr(void *ctx, uint8_t vector, void *rsp) {
+    if (enable) {
+        scheduler_tick_enable();
+    } else {
+        scheduler_tick_disable();
+    }
+
+    atomic_fetch_add(&tick_change_state, 1);
+    lapic_write(LAPIC_REG_EOI, 0);
+}
+
+static void send_em_all_out(bool e) {
+    enable = e;
+
+    atomic_store(&tick_change_state, 0);
+    size_t i;
+    for_each_cpu_id(i) {
+        if (i == 0)
+            continue;
+
+        ipi_send(i, entry);
+    }
+
+    /* wait for everyone to change their tick state */
+    while (atomic_load(&tick_change_state) < (global.core_count - 1))
+        cpu_relax();
+}
+
+void smp_disable_all_ticks() {
+    entry = irq_alloc_entry();
+    irq_register(entry, tick_op_isr, NULL);
+    send_em_all_out(false);
+}
+
+extern void nop_handler(void *, uint8_t, void *);
+void smp_enable_all_ticks() {
+    send_em_all_out(true);
+    irq_free_entry(entry);
 }

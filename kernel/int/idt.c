@@ -81,8 +81,7 @@ void isr_timer_routine(void *ctx, uint8_t vector, void *rsp) {
     (void) ctx, (void) vector, (void) rsp;
 }
 
-/* Literally a no-op. Used to break out of "wait for interrupt" loops */
-static void nop_handler(void *ctx, uint8_t vector, void *rsp) {
+void nop_handler(void *ctx, uint8_t vector, void *rsp) {
     (void) ctx, (void) vector, (void) rsp;
 }
 

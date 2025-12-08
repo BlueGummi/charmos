@@ -116,7 +116,8 @@ size_t scheduler_try_push_to_idle_core(struct scheduler *sched);
 bool scheduler_inherit_priority(struct thread *boosted, size_t new_weight,
                                 enum thread_prio_class new_class);
 void scheduler_uninherit_priority();
-void thread_migrate(struct thread *t, size_t dest_core);
+void scheduler_tick_enable();
+void scheduler_tick_disable();
 
 /* For a global structure containing central scheduler data */
 struct scheduler_data {

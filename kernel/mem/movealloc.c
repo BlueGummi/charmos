@@ -80,7 +80,8 @@ void move_core_dpc(void *v) {
 }
 
 void movealloc_move_all_cores(void) {
-    for (size_t i = 0; i < global.core_count; i++) {
+    size_t i;
+    for_each_cpu_id(i) {
         uint32_t before = atomic_load(&cores_ran_move_core_dpc);
         struct dpc *dpc = dpc_create(move_core_dpc, NULL);
         if (!dpc)

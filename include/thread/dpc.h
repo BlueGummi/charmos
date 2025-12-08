@@ -12,6 +12,7 @@ struct dpc {
     void *ctx;
     _Atomic(struct dpc *) next; /* for MPSC push */
     _Atomic(bool) enqueued;     /* prevents double-enqueue */
+    _Atomic(bool) executed;
 };
 
 /* Per-cpu DPC data */
