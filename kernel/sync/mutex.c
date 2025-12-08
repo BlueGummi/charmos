@@ -1,10 +1,10 @@
 #include <sch/sched.h>
-#include <thread/thread.h>
 #include <sleep.h>
 #include <stddef.h>
 #include <sync/mutex.h>
 #include <sync/spinlock.h>
 #include <sync/turnstile.h>
+#include <thread/thread.h>
 
 #include "console/printf.h"
 #include "lock_general_internal.h"
@@ -225,4 +225,8 @@ void mutex_unlock(struct mutex *mutex) {
         turnstile_wake(ts, TURNSTILE_WRITER_QUEUE,
                        MUTEX_UNLOCK_WAKE_THREAD_COUNT(mutex), ts_lock_irql);
     }
+}
+
+bool mutex_held(struct mutex *mtx) {
+    return MUTEX_READ_LOCK_WORD(mtx) & MUTEX_HELD_BIT;
 }

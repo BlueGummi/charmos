@@ -546,7 +546,7 @@ static inline void thread_put(struct thread *t) {
 
 static inline enum irql thread_acquire(struct thread *t) {
     if (!refcount_inc_not_zero(&t->refcount))
-        k_panic("UAF");
+        k_panic("UAF\n");
 
     return spin_lock_irq_disable(&t->lock);
 }

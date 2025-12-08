@@ -89,7 +89,8 @@ void thread_exit() {
     struct thread *self = scheduler_get_current_thread();
 
     /* acquire the ref - yield will drop it once it's done */
-    thread_get(self);
+    if (!thread_get(self))
+        k_panic("What? Thread is already dying but has not exited\n");
 
     atomic_store(&self->state, THREAD_STATE_ZOMBIE);
     reaper_enqueue(self);

@@ -2,8 +2,8 @@
 #include <block/sched.h>
 #include <console/printf.h>
 #include <mem/alloc.h>
-#include <thread/defer.h>
 #include <sync/spinlock.h>
+#include <thread/defer.h>
 
 static void try_rq_reorder(struct bio_scheduler *sched) {
     struct generic_disk *disk = sched->disk;
@@ -17,19 +17,19 @@ static void bio_sched_tick(void *ctx, void *unused) {
     (void) unused;
     struct bio_scheduler *sched = ctx;
 
-    enum irql irql = spin_lock(&sched->lock);
+    mutex_lock(&sched->lock);
 
     bio_sched_boost_starved(sched);
     try_rq_reorder(sched);
     bio_sched_try_early_dispatch(sched);
 
     if (!sched_is_empty(sched)) {
-        spin_unlock(&sched->lock, irql);
+        mutex_unlock(&sched->lock);
         defer_enqueue(bio_sched_tick, WORK_ARGS(sched, NULL),
                       sched->disk->ops->tick_ms);
     } else {
         sched->defer_pending = false;
-        spin_unlock(&sched->lock, irql);
+        mutex_unlock(&sched->lock);
     }
 }
 
@@ -53,7 +53,7 @@ void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req) {
     if (try_early_submit(sched, req))
         return;
 
-    enum irql irql = spin_lock(&sched->lock);
+    mutex_lock(&sched->lock);
 
     bio_sched_enqueue_internal(sched, req);
 
@@ -66,25 +66,24 @@ void bio_sched_enqueue(struct generic_disk *disk, struct bio_request *req) {
 
     if (!sched->defer_pending) {
         sched->defer_pending = true;
-        spin_unlock(&sched->lock, irql);
+        mutex_unlock(&sched->lock);
         defer_enqueue(bio_sched_tick, WORK_ARGS(sched, NULL),
                       disk->ops->tick_ms);
     } else {
-        spin_unlock(&sched->lock, irql);
+        mutex_unlock(&sched->lock);
     }
 }
 
 void bio_sched_dequeue(struct generic_disk *disk, struct bio_request *req,
                        bool already_locked) {
     struct bio_scheduler *sched = disk->scheduler;
-    enum irql irql;
     if (!already_locked)
-        irql = spin_lock(&sched->lock);
+        mutex_lock(&sched->lock);
 
     bio_sched_dequeue_internal(sched, req);
 
     if (!already_locked)
-        spin_unlock(&sched->lock, irql);
+        mutex_unlock(&sched->lock);
 }
 
 struct bio_scheduler *bio_sched_create(struct generic_disk *disk,

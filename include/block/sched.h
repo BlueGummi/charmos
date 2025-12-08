@@ -5,11 +5,11 @@
 #include <block/generic.h>
 #include <fs/detect.h>
 #include <sch/sched.h>
-#include <thread/thread.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <sync/spinlock.h>
+#include <sync/mutex.h>
+#include <thread/thread.h>
 
 /*
  * This is the asynchronous block device
@@ -131,7 +131,7 @@ struct bio_rqueue {
 
 struct bio_scheduler {
     struct generic_disk *disk;
-    struct spinlock lock;
+    struct mutex lock;
     uint64_t total_requests;
     struct bio_rqueue queues[BIO_SCHED_LEVELS];
     bool defer_pending;

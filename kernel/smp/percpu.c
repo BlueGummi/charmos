@@ -16,6 +16,7 @@ void percpu_obj_init(void) {
         for_each_cpu_id(cpu) {
             d->percpu_ptrs[cpu] =
                 kzalloc_aligned(d->size, d->align, ALLOC_PARAMS_DEFAULT);
+            
             if (!d->percpu_ptrs[cpu])
                 k_panic("OOM\n");
 

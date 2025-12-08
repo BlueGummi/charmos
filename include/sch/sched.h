@@ -3,12 +3,12 @@
 #include <acpi/lapic.h>
 #include <charmos.h>
 #include <sch/domain.h>
-#include <thread/thread.h>
 #include <smp/core.h>
 #include <smp/topology.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <sync/spinlock.h>
+#include <thread/thread.h>
 
 #define WORK_STEAL_THRESHOLD                                                   \
     75ULL /* How little work the core needs to be                              \
@@ -88,8 +88,8 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *thread,
 void scheduler_remove_thread(struct scheduler *sched, struct thread *t,
                              bool lock_held);
 void schedule(void);
-void k_sch_main(void*);
-void scheduler_idle_main(void*);
+void k_sch_main(void *);
+void scheduler_idle_main(void *);
 void scheduler_scheduler_preemption_enable();
 void scheduler_scheduler_preemption_disable();
 void scheduler_yield();
@@ -222,11 +222,14 @@ static inline bool scheduler_self_needs_resched(void) {
     return atomic_load(&smp_core()->needs_resched);
 }
 
+/* this is only ever called when a thread is loaded */
 static inline void scheduler_mark_self_idle(bool new) {
-
     /* the old value is different from the new one */
-    if (atomic_exchange(&smp_core()->idle, new) != new) {
-        topology_mark_core_idle(smp_core_id(), new);
+    struct core *c = smp_core();
+
+    if (c->idle != new) {
+        c->idle = new;
+        topology_mark_core_idle(c->id, new);
         scheduler_domain_mark_self_idle(new);
         if (new) {
             atomic_fetch_add_explicit(&global.idle_core_count, 1,
@@ -235,6 +238,11 @@ static inline void scheduler_mark_self_idle(bool new) {
             atomic_fetch_sub_explicit(&global.idle_core_count, 1,
                                       memory_order_acq_rel);
         }
+
+        /* set the DPC event. once we exit the yield(),
+         * we will run DPCs that correspond to the status of
+         * IDLE/WOKE, and then unset the status */
+        c->dpc_event = new ? DPC_CPU_IDLE : DPC_CPU_WOKE;
     }
 }
 

@@ -30,8 +30,8 @@ static bool try_dispatch_queue_head(struct bio_scheduler *sched,
 }
 
 static void dispatch_queue(struct generic_disk *disk, struct bio_rqueue *q) {
-    struct spinlock *lock = &disk->scheduler->lock;
-    enum irql irql = spin_lock(lock);
+    struct mutex *lock = &disk->scheduler->lock;
+    mutex_lock(lock);
 
     /* Move the entire list out of the queue under lock */
     struct list_head tmp_list;
@@ -48,7 +48,7 @@ static void dispatch_queue(struct generic_disk *disk, struct bio_rqueue *q) {
     disk->scheduler->total_requests -= q->request_count;
     q->request_count = 0;
 
-    spin_unlock(lock, irql);
+    mutex_unlock(lock);
 
     /* Dispatch requests from the copied list */
     struct bio_request *req, *tmp;
@@ -65,7 +65,7 @@ static void do_early_dispatch(struct bio_scheduler *sched) {
 }
 
 void bio_sched_try_early_dispatch(struct bio_scheduler *sched) {
-    kassert(spinlock_held(&sched->lock));
+    kassert(mutex_held(&sched->lock));
     if (should_early_dispatch(sched))
         do_early_dispatch(sched);
 }

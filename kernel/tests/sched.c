@@ -1,13 +1,13 @@
 #ifdef TEST_SCHED
 
-#include <thread/daemon.h>
-#include <thread/defer.h>
-#include <thread/reaper.h>
 #include <sch/sched.h>
-#include <thread/thread.h>
 #include <sleep.h>
 #include <string.h>
 #include <tests.h>
+#include <thread/daemon.h>
+#include <thread/defer.h>
+#include <thread/reaper.h>
+#include <thread/thread.h>
 
 static atomic_bool workqueue_ran = false;
 static _Atomic uint32_t workqueue_times = 0;
@@ -212,6 +212,61 @@ REGISTER_TEST(thread_sleep_interruptible_test, SHOULD_NOT_FAIL,
     thread_spawn_on_core("si_apc_e", apc_enqueue_thread, NULL, 3);
     while (!atomic_load(&si_ok))
         scheduler_yield();
+
+    SET_SUCCESS();
+}
+
+static atomic_bool gogo = false;
+static atomic_bool eq = false;
+
+static void dpc_idle(struct dpc *dpc, void *ctx) {
+    (void) dpc, (void) ctx;
+
+    atomic_store(&gogo, true);
+    kassert(scheduler_core_idle(smp_core()));
+}
+
+static void dpc_on_event_dummy_thread(void *a) {
+    (void) a;
+    while (!atomic_load(&eq))
+        cpu_relax();
+
+    for (size_t i = 0; i < 5000; i++)
+        scheduler_yield();
+
+    kassert(!atomic_load(&gogo));
+}
+
+/* we put a thread on a core that is not idle, enqueue a DPC over
+ * there, trigger some reschedules, and then verify that the DPC
+ * only ever runs once the core actually goes idle */
+REGISTER_TEST(dpc_on_event_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    size_t i;
+    size_t found = SIZE_MAX;
+    for_each_cpu_id(i) {
+        if (scheduler_core_idle(global.cores[i])) {
+            found = i;
+            break;
+        }
+    }
+
+    if (found == SIZE_MAX) {
+        ADD_MESSAGE("Could not find idle CPU");
+        SET_SKIP();
+        return;
+    }
+
+    struct thread *t =
+        thread_create("dpc_dummy", dpc_on_event_dummy_thread, NULL);
+    t->flags = THREAD_FLAGS_NO_STEAL;
+    scheduler_enqueue_on_core(t, found);
+
+    /* we now know the other processor is in the thread */
+    struct dpc *dp = dpc_create(dpc_idle, NULL);
+    dpc_enqueue_on_cpu(found, dp, DPC_CPU_IDLE);
+    atomic_store(&eq, true);
+    while (!atomic_load(&gogo))
+        cpu_relax();
 
     SET_SUCCESS();
 }

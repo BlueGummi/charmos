@@ -117,7 +117,9 @@ enum wake_reason condvar_wait_timeout(struct condvar *cv, struct spinlock *lock,
     cwcb->cv = cv;
     cwcb->cookie = curr->wait_cookie + 1; /* +1 from condvar */
 
-    thread_get(curr);
+    if (!thread_get(curr))
+        k_panic("What? Someone has pulled the rug out from under me!\n");
+
     defer_enqueue(condvar_timeout_wakeup, WORK_ARGS(curr, cwcb), timeout_ms);
     condvar_wait(cv, lock, irql, out);
 

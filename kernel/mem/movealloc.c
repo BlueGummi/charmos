@@ -79,7 +79,8 @@ void movealloc(size_t new_domain, void *ptr, enum vmm_flags flags) {
 
 static atomic_uint cores_ran_move_core_dpc = 0;
 
-void move_core_dpc(void *v) {
+void move_core_dpc(struct dpc *dpc, void *v) {
+    (void) dpc;
     (void) v;
     movealloc(domain_local_id(), smp_core(), VMM_FLAG_NONE);
     atomic_fetch_add(&cores_ran_move_core_dpc, 1);
@@ -94,7 +95,7 @@ void movealloc_move_all_cores(void) {
         if (!dpc)
             k_panic("OOM\n");
 
-        dpc_enqueue_on_cpu(i, dpc);
+        dpc_enqueue_on_cpu(i, dpc, DPC_NONE);
         while (atomic_load(&cores_ran_move_core_dpc) == before)
             cpu_relax();
 

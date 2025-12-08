@@ -1,5 +1,6 @@
 /* @title: Per-CPU structure */
 #pragma once
+#include <thread/dpc.h>
 #include <sch/irql.h>
 #include <smp/topology.h>
 #include <stdatomic.h>
@@ -26,6 +27,8 @@ struct core {
 
     bool in_interrupt;
     enum irql current_irql;
+
+    enum dpc_event dpc_event;
 
     atomic_bool needs_resched;
     atomic_bool in_resched; /* in scheduler_yield() */

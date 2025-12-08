@@ -188,6 +188,7 @@ static struct thread *pick_thread(struct scheduler *sched, time_t now_ms) {
     kassert(next); /* cannot be NULL - if it is the bitmap is lying */
     scheduler_decrement_thread_count(sched, next);
 
+    /* found something, make sure we are not idle */
     if (next)
         scheduler_mark_self_idle(false);
 
