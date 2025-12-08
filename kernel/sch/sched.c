@@ -126,6 +126,9 @@ static inline void update_min_steal_diff(void) {
 
 static inline void save_thread(struct scheduler *sched, struct thread *curr,
                                time_t time) {
+    if (curr && curr->state != THREAD_STATE_IDLE_THREAD)
+        save_context(&curr->regs);
+
     update_min_steal_diff();
 
     /* Only save a running thread that exists */
@@ -260,6 +263,11 @@ static inline void context_switch(struct scheduler *sched, struct thread *curr,
     if (curr != next)
         next->context_switches++;
 
+    /* We are responsible for dropping references
+     * on threads entering their last yield */
+    if (unlikely(curr && thread_get_state(curr) == THREAD_STATE_ZOMBIE))
+        thread_put(curr);
+
     scheduler_unlock(sched, irql);
 
     /* these are the exact same threads, let's get outta here */
@@ -279,9 +287,6 @@ void schedule(void) {
 
     enum irql irql = scheduler_lock_irq_disable(sched);
 
-    if (curr && curr->state != THREAD_STATE_IDLE_THREAD)
-        save_context(&curr->regs);
-
     save_thread(sched, curr, time);
 
     /* Checks if we can steal, finds a victim, and tries to steal.
@@ -300,11 +305,6 @@ void schedule(void) {
          * disabled if an RT thread is chosen to run */
         change_timeslice(sched, next);
     }
-
-    /* We are responsible for dropping references
-     * on threads entering their last yield */
-    if (unlikely(curr && thread_get_state(curr) == THREAD_STATE_ZOMBIE))
-        thread_put(curr);
 
     load_thread(sched, next, time);
 
