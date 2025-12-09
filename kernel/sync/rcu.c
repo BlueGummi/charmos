@@ -43,8 +43,7 @@ void rcu_note_context_switch_out(struct thread *old) {
     if (!old)
         return;
 
-    unsigned nest =
-        atomic_load_explicit(&old->rcu_nesting, memory_order_acquire);
+    unsigned nest = old->rcu_nesting;
 
     if (nest == 0) {
         /* thread is quiescent — publish core / thread seen_gen */
@@ -106,7 +105,7 @@ void rcu_maintenance_tick(void) {
 
 void rcu_read_lock(void) {
     struct thread *t = scheduler_get_current_thread();
-    if (atomic_fetch_add(&t->rcu_nesting, 1) == 0)
+    if (t->rcu_nesting++ == 0)
         t->rcu_start_gen = atomic_load(&global.rcu_gen);
 
     smp_mb(); /* prevent compiler reorder of loads/stores in critical section */
@@ -116,10 +115,9 @@ void rcu_read_unlock(void) {
     struct thread *t = scheduler_get_current_thread();
     smp_mb(); /* pair with entry barrier */
 
-    unsigned old =
-        atomic_fetch_sub_explicit(&t->rcu_nesting, 1, memory_order_release);
+    unsigned old = t->rcu_nesting--;
     if (old == 0) {
-        k_panic("rcu_unlock: underflow\n");
+        k_panic("underflow\n");
     }
 
     if (old == 1) {
