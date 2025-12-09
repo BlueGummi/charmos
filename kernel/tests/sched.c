@@ -101,7 +101,7 @@ REGISTER_TEST(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         .worker_cpu_mask = mask,
     };
 
-    wq = workqueue_create(&attrs, /* fmt = */ NULL);
+    wq = workqueue_create(NULL, &attrs);
 
     for (size_t i = 0; i < WQ_2_THREADS; i++) {
         k_printf("spawning workqueue enqueue threads\n");
@@ -138,17 +138,18 @@ static struct daemon_work dwork =
     DAEMON_WORK_FROM(daemon_work, WORK_ARGS(NULL, NULL));
 
 REGISTER_TEST(daemon_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    struct cpu_mask cmask;
+    cpu_mask_init(&cmask, global.core_count);
+    cpu_mask_set_all(&cmask);
+
     struct daemon_attributes attrs = {
         .max_timesharing_threads = 67,
         .flags = DAEMON_FLAG_AUTO_SPAWN | DAEMON_FLAG_HAS_NAME,
+        .thread_cpu_mask = cmask,
     };
 
-    struct daemon *daemon = daemon_create(
-        /* attrs = */ &attrs,
-        /* timesharing_work = */ &dwork,
-        /* background_work = */ NULL,
-        /* wq_attrs = */ NULL,
-        /* fmt = */ "daemon_test");
+    struct daemon *daemon =
+        daemon_create("daemon_test", &attrs, &dwork, NULL, NULL);
 
     kassert(daemon);
 

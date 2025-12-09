@@ -1,7 +1,9 @@
+#include <sch/sched.h>
+#include <thread/daemon.h>
 #include <thread/defer.h>
 #include <thread/reaper.h>
-#include <sch/sched.h>
 
+static struct daemon *reaper_daemon = NULL;
 static struct thread_reaper reaper = {0};
 static struct thread *reaper_thread = NULL;
 
@@ -19,6 +21,16 @@ void reaper_init(void) {
     thread_queue_init(&reaper.queue);
     condvar_init(&reaper.cv, CONDVAR_INIT_NORMAL);
     reaper_thread = thread_spawn("reaper_thread", reaper_thread_main, NULL);
+
+    struct cpu_mask cmask;
+    cpu_mask_init(&cmask, global.core_count);
+    cpu_mask_set_all(&cmask);
+
+    struct daemon_attributes attrs = {
+        .max_timesharing_threads = 1,
+        .thread_cpu_mask = cmask,
+        .flags = DAEMON_FLAG_HAS_NAME,
+    };
 }
 
 uint64_t reaper_get_reaped_thread_count(void) {

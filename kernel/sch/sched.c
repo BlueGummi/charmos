@@ -188,9 +188,8 @@ static struct thread *pick_thread(struct scheduler *sched, time_t now_ms) {
     kassert(next); /* cannot be NULL - if it is the bitmap is lying */
     scheduler_decrement_thread_count(sched, next);
 
-    /* found something, make sure we are not idle */
-    if (next)
-        scheduler_mark_self_idle(false);
+    /* make sure we are not idle */
+    scheduler_mark_self_idle(false);
 
     return next;
 }
@@ -235,7 +234,7 @@ static inline struct thread *load_idle_thread(struct scheduler *sched) {
     return sched->idle_thread;
 }
 
-static void change_timeslice(struct scheduler *sched, struct thread *next) {
+static void change_tick(struct scheduler *sched, struct thread *next) {
     /* Only one thread is running - no timeslice needed */
     if (sched->total_thread_count == 0) {
         /* Disable the scheduling period because
@@ -304,7 +303,7 @@ void schedule(void) {
          * need to adjust the timeslice. RT threads do not
          * have timeslices, so the timeslice needs to be
          * disabled if an RT thread is chosen to run */
-        change_timeslice(sched, next);
+        change_tick(sched, next);
     }
 
     load_thread(sched, next, time);
@@ -317,7 +316,7 @@ void scheduler_yield() {
      * calling this routine whilst a spinlock is held. spinlocks will
      * always raise the IRQL to at least DISPATCH. this assertion
      * catches that case, and the assertion in the `irql_raise` catches
-     * the case where the IRQL is higher than DISPATCH (i.e. HIGH */
+     * the case where the IRQL is higher than DISPATCH (i.e. HIGH) */
     kassert(irql_get() != IRQL_DISPATCH_LEVEL);
     kassert(!scheduler_self_in_resched());
 

@@ -1,13 +1,13 @@
 #include <compiler.h>
 #include <kassert.h>
 #include <mem/alloc.h>
-#include <thread/defer.h>
 #include <sch/sched.h>
 #include <smp/domain.h>
 #include <stdarg.h>
 #include <string.h>
 #include <sync/condvar.h>
 #include <sync/spinlock.h>
+#include <thread/defer.h>
 
 #include "internal.h"
 
@@ -136,12 +136,19 @@ struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
 
     if (attrs->flags & WORKQUEUE_FLAG_NAMED) {
         kassert(fmt);
-        size_t needed = snprintf(NULL, 0, fmt, args) + 1;
+
+        va_list args_copy;
+        va_copy(args_copy, args);
+        size_t needed = vsnprintf(NULL, 0, fmt, args_copy) + 1;
+        va_end(args_copy);
+
         wq->name = kzalloc(needed, ALLOC_PARAMS_DEFAULT);
         if (!wq->name)
             goto err;
 
-        snprintf(wq->name, needed, fmt, args);
+        va_copy(args_copy, args);
+        vsnprintf(wq->name, needed, fmt, args_copy);
+        va_end(args_copy);
     }
 
     condvar_init(&wq->queue_cv, CONDVAR_INIT_NORMAL);
@@ -176,12 +183,13 @@ err:
     return NULL;
 }
 
-struct workqueue *workqueue_create(struct workqueue_attributes *attrs,
-                                   const char *fmt, ...) {
+struct workqueue *workqueue_create(const char *fmt,
+                                   struct workqueue_attributes *attrs, ...) {
     va_list args;
-    va_start(args, fmt);
+    va_start(args, attrs);
 
     struct workqueue *ret = workqueue_create_internal(attrs, fmt, args);
+
     va_end(args);
 
     if (attrs->min_workers == 0)

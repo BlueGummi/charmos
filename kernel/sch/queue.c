@@ -68,11 +68,17 @@ void scheduler_remove_thread(struct scheduler *sched, struct thread *t,
 }
 
 void scheduler_enqueue(struct thread *t) {
+    kassert(t->allowed_cpus.nbits);
+
     struct scheduler *s = global.schedulers[0];
     uint64_t min_load = UINT64_MAX;
 
     size_t i;
     for_each_cpu_id(i) {
+        /* skip */
+        if (!cpu_mask_test(&t->allowed_cpus, i))
+            continue;
+
         size_t this_load = global.schedulers[i]->total_thread_count;
 
         if (global.cores && global.cores[i] &&

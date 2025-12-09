@@ -16,8 +16,8 @@ static void init_global_domain(uint64_t domain_count) {
 
     for (size_t i = 0; i < domain_count; i++) {
 
-        /* We align this up so that they can all be migrated later on
-         * to pages on each domain... */
+        /* We align this up to the page so that they can all be
+         * migrated later on to pages on each domain... */
         global.domains[i] =
             kzalloc(PAGE_ALIGN_UP(sizeof(struct domain)), ALLOC_PARAMS_DEFAULT);
         if (!global.domains[i])
@@ -109,7 +109,8 @@ void domain_dump(void) {
 
 /* If NUMA is present, domains map 1:1 with
  * NUMA nodes. If not, we just group cores into
- * groups of 4 and construct domains from them. */
+ * groups of CORES_PER_DOMAIN
+ * and construct domains from them. */
 void domain_init(void) {
     if (global.numa_node_count > 1) {
         construct_domains_from_numa_nodes();

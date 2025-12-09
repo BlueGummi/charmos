@@ -135,7 +135,7 @@ void defer_init(void) {
         .spawn_delay = WORKQUEUE_DEFAULT_SPAWN_DELAY,
         .worker_cpu_mask = mask,
     };
-    defer_workqueue = workqueue_create(&attrs, /* fmt = */ NULL);
+    defer_workqueue = workqueue_create(/* fmt = */ NULL, &attrs);
 
     for (uint64_t i = 0; i < hpet_timer_count; i++) {
         work_init(&defer_queues[i].work, hpet_work,

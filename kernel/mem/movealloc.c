@@ -70,8 +70,10 @@ void movealloc(size_t new_domain, void *ptr, enum vmm_flags flags) {
         phys_addrs[i] = paddr;
     }
 
-    for (size_t i = 0; i < pages; i++) {
-        pmm_free_page(phys_addrs[i]);
+    if (ptr != smp_core()) {
+        for (size_t i = 0; i < pages; i++) {
+            pmm_free_page(phys_addrs[i]);
+        }
     }
 
     change_slab_backing_page(ptr);

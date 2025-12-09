@@ -181,11 +181,8 @@ daemon_thread_spawn(struct daemon *daemon,
     if (no_migrate)
         thread_set_flags(t->thread, THREAD_FLAGS_NO_STEAL);
 
-    if (daemon->attrs.thread_cpu != -1 && no_migrate) {
-        scheduler_enqueue_on_core(t->thread, daemon->attrs.thread_cpu);
-    } else {
-        scheduler_enqueue(t->thread);
-    }
+    t->thread->allowed_cpus = daemon->attrs.thread_cpu_mask;
+    scheduler_enqueue(t->thread);
 
     return t;
 }
@@ -195,13 +192,12 @@ void daemon_thread_destroy_unsafe(struct daemon_thread *dt) {
     kfree(dt, FREE_PARAMS_DEFAULT);
 }
 
-struct daemon *daemon_create(struct daemon_attributes *attrs,
+struct daemon *daemon_create(const char *fmt, struct daemon_attributes *attrs,
                              struct daemon_work *timesharing_work,
                              struct daemon_work *background_work,
-                             struct workqueue_attributes *wq_attrs,
-                             const char *fmt, ...) {
+                             struct workqueue_attributes *wq_attrs, ...) {
     va_list args;
-    va_start(args, fmt);
+    va_start(args, wq_attrs);
 
     struct daemon *daemon =
         kzalloc(sizeof(struct daemon), ALLOC_PARAMS_DEFAULT);
@@ -210,15 +206,24 @@ struct daemon *daemon_create(struct daemon_attributes *attrs,
     if (!daemon)
         goto err;
 
+    if (attrs->thread_cpu_mask.nbits == 0)
+        k_panic("please set a valid CPU mask\n");
+
     daemon->attrs = *attrs;
 
     if (DAEMON_FLAG_TEST(daemon, DAEMON_FLAG_HAS_NAME)) {
-        int needed = snprintf(NULL, 0, fmt, args) + 1;
+        va_list args_copy;
+        va_copy(args_copy, args);
+        int needed = vsnprintf(NULL, 0, fmt, args_copy) + 1;
+        va_end(args_copy);
+
         char *name = kzalloc(needed, ALLOC_PARAMS_DEFAULT);
         if (!name)
             goto err;
 
-        snprintf(name, needed, fmt, args);
+        va_copy(args_copy, args);
+        vsnprintf(name, needed, fmt, args_copy);
+        va_end(args_copy);
         daemon->name = name;
     }
 
@@ -237,7 +242,7 @@ struct daemon *daemon_create(struct daemon_attributes *attrs,
     if (DAEMON_FLAG_TEST(daemon, DAEMON_FLAG_HAS_WORKQUEUE)) {
         wq_attrs->flags |= WORKQUEUE_FLAG_NAMED;
         struct workqueue *wq = workqueue_create(
-            wq_attrs, "workqueue_daemon_%s", daemon->name ? daemon->name : "");
+            "workqueue_daemon_%s", wq_attrs, daemon->name ? daemon->name : "");
 
         if (!wq)
             goto err;

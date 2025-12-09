@@ -1,9 +1,9 @@
 /* @title: Daemons */
 #pragma once
 #include <structures/list.h>
+#include <sync/semaphore.h>
 #include <thread/defer.h>
 #include <thread/thread.h>
-#include <sync/semaphore.h>
 
 /* These commands are sent back up to the daemon
  * thread executing a daemon work and are operated
@@ -57,14 +57,12 @@ enum daemon_flags {
 
 struct daemon_attributes {
     size_t max_timesharing_threads;
-    atomic_size_t timesharing_threads;
-    atomic_size_t idle_timesharing_threads;
-    atomic_bool background_thread_present;
 
-    /* TODO: Once we get threads to have CPUmasks
-     * that indicate where they can be run, I'll
-     * need to fix this and just allow assigned CPUmasks */
-    int64_t thread_cpu;
+    atomic_size_t timesharing_threads;      /* Internal */
+    atomic_size_t idle_timesharing_threads; /* Internal */
+    atomic_bool background_thread_present;  /* Internal */
+
+    struct cpu_mask thread_cpu_mask;
 
     enum daemon_flags flags;
 };
@@ -106,11 +104,10 @@ struct daemon {
 #define daemon_thread_from_list_node(ln)                                       \
     container_of(ln, struct daemon_thread, list_node)
 
-struct daemon *daemon_create(struct daemon_attributes *attrs,
+struct daemon *daemon_create(const char *fmt, struct daemon_attributes *attrs,
                              struct daemon_work *timesharing_work,
                              struct daemon_work *background_work,
-                             struct workqueue_attributes *wq_attrs,
-                             const char *fmt, ...);
+                             struct workqueue_attributes *wq_attrs, ...);
 
 void daemon_destroy(struct daemon *daemon);
 

@@ -430,6 +430,25 @@ void k_printf(const char *format, ...) {
         enable_interrupts();
 }
 
+int vsnprintf(char *buffer, int buffer_len, const char *format, va_list args) {
+
+    if (!buffer_len)
+        buffer_len = INT_MAX;
+
+    struct printf_cursor csr = {
+        .buffer = buffer,
+        .buffer_len = buffer_len,
+        .cursor = 0,
+    };
+
+    v_k_printf(&csr, format, args);
+
+    if (buffer)
+        csr.buffer[csr.cursor] = '\0';
+
+    return csr.cursor;
+}
+
 int snprintf(char *buffer, int buffer_len, const char *format, ...) {
     va_list args;
     va_start(args, format);

@@ -262,8 +262,8 @@ bool defer_enqueue(work_function func, struct work_args args,
                    uint64_t delay_ms);
 void workqueues_permanent_init(void);
 
-struct workqueue *workqueue_create(struct workqueue_attributes *attrs,
-                                   const char *fmt, ...);
+struct workqueue *workqueue_create(const char *fmt,
+                                   struct workqueue_attributes *attrs, ...);
 struct work *work_create(work_function func, struct work_args args);
 struct work *work_init(struct work *work, work_function fn,
                        struct work_args args);

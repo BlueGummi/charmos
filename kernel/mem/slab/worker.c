@@ -1,8 +1,8 @@
 /* Implements slab workers and daemon threads */
 
+#include <smp/domain.h>
 #include <thread/daemon.h>
 #include <thread/defer.h>
-#include <smp/domain.h>
 
 #include "gc_internal.h"
 
@@ -21,19 +21,24 @@ static struct daemon_work bg =
     DAEMON_WORK_FROM(slab_background_work, WORK_ARGS(NULL, NULL));
 
 void slab_domain_init_daemon(struct slab_domain *domain) {
+    struct cpu_mask cmask;
+    if (!cpu_mask_init(&cmask, global.core_count))
+        k_panic("OOM\n");
+
+    domain_set_cpu_mask(&cmask, domain->domain);
     struct daemon_attributes attrs = {
         .max_timesharing_threads = 0,
-        .thread_cpu = domain->domain->cores[0]->id,
+        .thread_cpu_mask = cmask,
         .flags = DAEMON_FLAG_UNMIGRATABLE_THREADS | DAEMON_FLAG_NO_TS_THREADS |
                  DAEMON_FLAG_HAS_NAME,
     };
 
     domain->daemon = daemon_create(
+        /* fmt = */ "slab_domain_%u",
         /* attrs = */ &attrs,
         /* timesharing_work = */ NULL,
         /* background_work = */ &bg,
         /* wq_attrs = */ NULL,
-        /* fmt = */ "slab_domain_%u",
         /* ... = */ domain->domain->id);
 }
 
@@ -60,5 +65,5 @@ void slab_domain_init_workqueue(struct slab_domain *domain) {
     };
 
     domain->workqueue =
-        workqueue_create(&attrs, "slab_domain%u_wq", domain->domain->id);
+        workqueue_create("slab_domain_%u_wq", &attrs, domain->domain->id);
 }

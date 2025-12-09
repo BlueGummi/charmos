@@ -1,13 +1,13 @@
 #include <mem/alloc.h>
-#include <thread/defer.h>
 #include <sch/sched.h>
-#include <thread/thread.h>
 #include <smp/core.h>
 #include <smp/percpu.h>
 #include <stdatomic.h>
 #include <sync/rcu.h>
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
+#include <thread/defer.h>
+#include <thread/thread.h>
 
 #include "sch/internal.h" /* for tick_enabled */
 
@@ -306,7 +306,7 @@ struct workqueue *rcu_create_workqueue_for_domain(struct domain *domain) {
                  WORKQUEUE_FLAG_STATIC_WORKERS,
     };
 
-    return workqueue_create(&attrs, "rcu_domain_%zu_workqueue", domain->id);
+    return workqueue_create("rcu_domain_%zu_workqueue", &attrs, domain->id);
 }
 
 /* we initialize per-domain RCU queues */

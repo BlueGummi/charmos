@@ -3,18 +3,18 @@
 #include <mem/slab.h>
 #include <mem/vaddr_alloc.h>
 #include <mem/vmm.h>
-#include <thread/defer.h>
-#include <thread/reaper.h>
 #include <sch/sched.h>
-#include <thread/thread.h>
-#include <thread/request.h>
-#include <thread/tid.h>
 #include <smp/domain.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
 #include <sync/rcu.h>
 #include <sync/turnstile.h>
+#include <thread/defer.h>
+#include <thread/reaper.h>
+#include <thread/request.h>
+#include <thread/thread.h>
+#include <thread/tid.h>
 
 REGISTER_SLAB_SIZE(thread, sizeof(struct thread));
 
@@ -253,12 +253,19 @@ struct thread *thread_create_internal(char *name, void (*entry_point)(void *),
         goto err;
 
     cpu_mask_set_all(&new_thread->allowed_cpus);
-    size_t needed = snprintf(NULL, 0, name, args) + 1;
+
+    va_list args_copy;
+    va_copy(args_copy, args);
+    size_t needed = vsnprintf(NULL, 0, name, args_copy) + 1;
+    va_end(args_copy);
+
     new_thread->name = kzalloc(needed, ALLOC_PARAMS_DEFAULT);
     if (!new_thread->name)
         goto err;
 
-    snprintf(new_thread->name, needed, name, args);
+    va_copy(args_copy, args);
+    vsnprintf(new_thread->name, needed, name, args_copy);
+    va_end(args_copy);
 
     return thread_init(new_thread, entry_point, arg, stack, stack_size);
 

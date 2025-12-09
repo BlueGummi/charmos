@@ -171,7 +171,7 @@ enum irql {
 };
 
 static inline const char *irql_to_str(enum irql level) {
-    switch (level) {
+    switch (level & IRQL_IRQL_MASK) {
     case IRQL_PASSIVE_LEVEL: return "PASSIVE LEVEL";
     case IRQL_APC_LEVEL: return "APC LEVEL";
     case IRQL_DISPATCH_LEVEL: return "DISPATCH LEVEL";
