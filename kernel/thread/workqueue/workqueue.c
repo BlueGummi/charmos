@@ -256,9 +256,8 @@ void workqueue_kick(struct workqueue *queue) {
 
 struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue,
                                                 int64_t core) {
-    struct thread *thread = worker_create(
-        queue->attrs.worker_cpu_mask, queue->attrs.worker_niceness,
-        WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS));
+    struct thread *thread = worker_create(queue->attrs.worker_cpu_mask,
+                                          queue->attrs.worker_niceness);
 
     if (!thread)
         return NULL;
@@ -313,7 +312,6 @@ void workqueues_permanent_init(void) {
             .idle_check.max = WORKQUEUE_DEFAULT_MAX_IDLE_CHECK,
 
             .flags = WORKQUEUE_FLAG_PERMANENT | WORKQUEUE_FLAG_AUTO_SPAWN |
-                     WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS |
                      WORKQUEUE_FLAG_NO_WORKER_GC,
             .worker_cpu_mask = mask,
         };

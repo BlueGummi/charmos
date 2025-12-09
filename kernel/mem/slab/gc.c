@@ -255,7 +255,6 @@ static inline size_t slab_gc_get_max_unfit_slabs(size_t target,
  * This is a slow function! The slab cache lock must not be held when
  * calling this function because this will lock the slab cache */
 size_t slab_gc_run(struct slab_gc *gc, enum slab_gc_flags flags) {
-    enum thread_flags thread_flags = scheduler_pin_current_thread();
     enum irql irql = slab_gc_lock(gc);
 
     size_t slabs_recycled[slab_num_sizes];
@@ -292,7 +291,6 @@ size_t slab_gc_run(struct slab_gc *gc, enum slab_gc_flags flags) {
     }
 
     slab_gc_unlock(gc, irql);
-    scheduler_unpin_current_thread(thread_flags);
     return reclaimed;
 }
 

@@ -51,7 +51,6 @@ enum daemon_flags {
     DAEMON_FLAG_HAS_NAME = 1 << 1,
     DAEMON_FLAG_AUTO_SPAWN = 1 << 2,
     DAEMON_FLAG_NO_TS_THREADS = 1 << 3,
-    DAEMON_FLAG_UNMIGRATABLE_THREADS = 1 << 4,
     DAEMON_FLAG_NONE = 0,
 };
 

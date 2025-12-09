@@ -29,8 +29,7 @@ void slab_domain_init_daemon(struct slab_domain *domain) {
     struct daemon_attributes attrs = {
         .max_timesharing_threads = 0,
         .thread_cpu_mask = cmask,
-        .flags = DAEMON_FLAG_UNMIGRATABLE_THREADS | DAEMON_FLAG_NO_TS_THREADS |
-                 DAEMON_FLAG_HAS_NAME,
+        .flags = DAEMON_FLAG_NO_TS_THREADS | DAEMON_FLAG_HAS_NAME,
     };
 
     domain->daemon = daemon_create(

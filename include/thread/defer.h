@@ -129,19 +129,16 @@ enum workqueue_flags : uint16_t {
                                          * Otherwise, that doesn't happen, and
                                          * workers are manually spawned */
 
-    WORKQUEUE_FLAG_UNMIGRATABLE_WORKERS = 1 << 3, /* Inverse: Migratable
-                                                   * workers */
+    WORKQUEUE_FLAG_NAMED = 1 << 3, /* Has name - will honor (fmt, ...) */
 
-    WORKQUEUE_FLAG_NAMED = 1 << 4, /* Has name - will honor (fmt, ...) */
-
-    WORKQUEUE_FLAG_SPAWN_VIA_REQUEST = 1 << 5, /* Spawn threads via
+    WORKQUEUE_FLAG_SPAWN_VIA_REQUEST = 1 << 4, /* Spawn threads via
                                                 * thread requests instead
                                                 * of directly invoking
                                                 * the allocator. Will be
                                                 * slower, may not always
                                                 * be satisfied */
 
-    WORKQUEUE_FLAG_STATIC_WORKERS = 1 << 6, /* `struct worker` will be
+    WORKQUEUE_FLAG_STATIC_WORKERS = 1 << 5, /* `struct worker` will be
                                              * statically allocated
                                              * during workqueue creation.
                                              *
@@ -151,11 +148,10 @@ enum workqueue_flags : uint16_t {
                                              * but shouldn't be used everywhere
                                              * because it can waste memory */
 
-    WORKQUEUE_FLAG_NO_WORKER_GC = 1 << 7, /* Do not timeout workers */
+    WORKQUEUE_FLAG_NO_WORKER_GC = 1 << 6, /* Do not timeout workers */
 
-    WORKQUEUE_FLAG_NO_AUTO_SPAWN = 0,      /* Do not auto spawn workers */
-    WORKQUEUE_FLAG_MIGRATABLE_WORKERS = 0, /* Allow migratable workers */
-    WORKQUEUE_FLAG_ON_DEMAND = 0, /* Inverse of a permanent workqueue */
+    WORKQUEUE_FLAG_NO_AUTO_SPAWN = 0, /* Do not auto spawn workers */
+    WORKQUEUE_FLAG_ON_DEMAND = 0,     /* Inverse of a permanent workqueue */
     WORKQUEUE_FLAG_NAMELESS = 0,
     WORKQUEUE_FLAG_SPAWN_NORMALLY = 0,
     WORKQUEUE_FLAG_NON_STATIC_WORKERS = 0,

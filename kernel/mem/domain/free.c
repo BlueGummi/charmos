@@ -177,7 +177,7 @@ void domain_flush_free_queue(struct domain_buddy *domain,
 }
 
 void domain_free(paddr_t address, size_t page_count) {
-    enum thread_flags flags = scheduler_pin_current_thread();
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
 
     struct domain_buddy *local = domain_buddy_on_this_core();
     struct domain_buddy *target = domain_buddy_for_addr(address);
@@ -194,7 +194,7 @@ void domain_free(paddr_t address, size_t page_count) {
     domain_enqueue_flush_worker(&local->worker);
     domain_flush_free_queue(local, free_queue);
 
-    scheduler_unpin_current_thread(flags);
+    irql_lower(irql);
 }
 
 void domain_flush_thread(void *arg) {

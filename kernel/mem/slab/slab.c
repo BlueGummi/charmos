@@ -887,7 +887,7 @@ void *kmalloc_new(size_t size, enum alloc_flags flags,
     kmalloc_validate_params(size, flags, behavior);
     void *ret = NULL;
 
-    enum thread_flags thread_flags = scheduler_pin_current_thread();
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
 
     struct slab_domain *local_dom = slab_domain_local();
     struct slab_percpu_cache *pcpu = slab_percpu_cache_local();
@@ -950,7 +950,7 @@ exit:
     if (unlikely(!ret))
         slab_stat_alloc_failure(local_dom);
 
-    scheduler_unpin_current_thread(thread_flags);
+    irql_lower(irql);
     return ret;
 }
 
@@ -1120,7 +1120,7 @@ void kfree_new(void *ptr, enum alloc_behavior behavior) {
     if (!ptr)
         return;
 
-    enum thread_flags flags = scheduler_pin_current_thread();
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
 
     size_t size = ksize(ptr);
     int32_t idx = slab_size_to_index(size);
@@ -1167,7 +1167,7 @@ garbage_collect:
     slab_free_queue_drain_on_free(local_domain, pcpu, behavior);
 
 exit:
-    scheduler_unpin_current_thread(flags);
+    irql_lower(irql);
 }
 
 static void *kmalloc_init(size_t size, enum alloc_flags f,

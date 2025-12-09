@@ -3,10 +3,10 @@
 #include <acpi/lapic.h>
 #include <int/idt.h>
 #include <mem/alloc.h>
-#include <thread/defer.h>
 #include <sch/sched.h>
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
+#include <thread/defer.h>
 
 struct deferred_event_queue {
     struct deferred_event *head;
@@ -123,8 +123,7 @@ void defer_init(void) {
     cpu_mask_set_all(&mask);
     struct workqueue_attributes attrs = {
         .capacity = WORKQUEUE_DEFAULT_CAPACITY,
-        .flags = WORKQUEUE_FLAG_ON_DEMAND | WORKQUEUE_FLAG_MIGRATABLE_WORKERS |
-                 WORKQUEUE_FLAG_NO_WORKER_GC,
+        .flags = WORKQUEUE_FLAG_ON_DEMAND | WORKQUEUE_FLAG_NO_WORKER_GC,
         .max_workers = 1,
         .min_workers = 1,
         .idle_check =

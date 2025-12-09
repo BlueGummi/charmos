@@ -176,11 +176,6 @@ daemon_thread_spawn(struct daemon *daemon,
     if (!t)
         return NULL;
 
-    bool no_migrate = daemon->attrs.flags & DAEMON_FLAG_UNMIGRATABLE_THREADS;
-
-    if (no_migrate)
-        thread_set_flags(t->thread, THREAD_FLAGS_NO_STEAL);
-
     t->thread->allowed_cpus = daemon->attrs.thread_cpu_mask;
     scheduler_enqueue(t->thread);
 

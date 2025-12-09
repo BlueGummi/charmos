@@ -105,5 +105,4 @@ struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
                                             const char *fmt, va_list args);
 enum thread_request_decision workqueue_request_callback(struct thread *t,
                                                         void *data);
-struct thread *worker_create(struct cpu_mask mask, nice_t niceness,
-                             bool migratable);
+struct thread *worker_create(struct cpu_mask mask, nice_t niceness);

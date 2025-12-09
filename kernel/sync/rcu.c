@@ -302,7 +302,6 @@ struct workqueue *rcu_create_workqueue_for_domain(struct domain *domain) {
         .spawn_delay = WORKQUEUE_DEFAULT_SPAWN_DELAY,
         .worker_cpu_mask = mask,
         .flags = WORKQUEUE_FLAG_AUTO_SPAWN | WORKQUEUE_FLAG_NAMED |
-                 WORKQUEUE_FLAG_MIGRATABLE_WORKERS |
                  WORKQUEUE_FLAG_STATIC_WORKERS,
     };
 
