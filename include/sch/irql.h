@@ -20,7 +20,7 @@
  * ## Background:
  *   IRQLs are a feature of quite a few other kernels. Windows NT is the
  *   most prominent of the many kernels that have IRQLs. Similar concepts exist
- *   in other kernels, however. 
+ *   in other kernels, however.
  *
  * ## Summary:
  *   Each logical processor (or CPU) on the machine has its own IRQL.
@@ -108,19 +108,8 @@
  *   processor when it lowers the IRQL.
  *
  * ## Strategy:
- *   To raise the IRQL, if we are not inside of an ISR, we first
- *   temporarily pin the running thread, and check if interrupts are enabled,
- *   and then disable interrupts, before unpinning the running thread.
- *
- *   This is done because the IRQL function operates on per-core variables,
- *   and thus, if it is interrupted and run again by another thread or an ISR,
- *   an invalid state can be read.
- *
- *   The pin-check-disable-unpin prevents the thread from being migrated in the
- *   window in between the check and disable operations.
- *
- *   Then, the necessary operations are performed depending on the IRQL being
- *   raised to. (disable preemption, interrupts, etc.).
+ *   To raise the IRQL, the necessary operations are performed depending on 
+ *   the IRQL being raised to. (disable preemption, interrupts, etc.).
  *
  *   To lower the IRQL, we simply re-enable the blocked event types, and
  *   attempt DPC and APC execution if we are currently running in the
@@ -151,16 +140,6 @@
 
 #pragma once
 
-/* We use a bit of the IRQL variable upon raising
- * and lowering the IRQL to identify if the thread was pinned
- * prior to the raise to pin threads on IRQL changes */
-
-#define IRQL_MARK_THREAD_PINNED(irql) (irql |= (1ULL << 5ULL))
-#define IRQL_THREAD_PINNED_SHIFT 5
-#define IRQL_THREAD_PINNED(irql) ((irql >> 5ULL) & 1ULL)
-
-#define IRQL_IRQL_MASK 0b1111
-
 enum irql {
     IRQL_PASSIVE_LEVEL = 0,  /* Normal execution */
     IRQL_APC_LEVEL = 1,      /* Allow only high interrupts */
@@ -171,7 +150,7 @@ enum irql {
 };
 
 static inline const char *irql_to_str(enum irql level) {
-    switch (level & IRQL_IRQL_MASK) {
+    switch (level) {
     case IRQL_PASSIVE_LEVEL: return "PASSIVE LEVEL";
     case IRQL_APC_LEVEL: return "APC LEVEL";
     case IRQL_DISPATCH_LEVEL: return "DISPATCH LEVEL";
