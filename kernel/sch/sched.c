@@ -132,10 +132,10 @@ static inline void save_thread(struct scheduler *sched, struct thread *curr,
     update_min_steal_diff();
 
     /* Only save a running thread that exists */
-    if (curr && thread_get_state(curr) == THREAD_STATE_RUNNING) {
+    if (curr && curr->state == THREAD_STATE_RUNNING) {
         update_thread_before_save(curr, time);
         re_enqueue_thread(sched, curr);
-    } else if (curr && thread_get_state(curr) == THREAD_STATE_IDLE_THREAD) {
+    } else if (curr && curr->state == THREAD_STATE_IDLE_THREAD) {
         update_idle_thread(time);
     }
 }
@@ -210,7 +210,7 @@ static void load_thread(struct scheduler *sched, struct thread *next,
     /* Do not mark the idle thread as RUNNING because this causes
      * it to enter the runqueues, which is Very Bad™ (it gets enqueued,
      * and becomes treated like a regular thread)! */
-    if (thread_get_state(next) != THREAD_STATE_IDLE_THREAD)
+    if (next->state != THREAD_STATE_IDLE_THREAD)
         thread_set_state(next, THREAD_STATE_RUNNING);
 
     update_core_current_thread(next);
@@ -247,7 +247,7 @@ static void change_tick(struct scheduler *sched, struct thread *next) {
     }
 
     if (THREAD_PRIO_HAS_TIMESLICE(next->perceived_prio_class) &&
-        thread_get_state(next) != THREAD_STATE_IDLE_THREAD) {
+        next->state != THREAD_STATE_IDLE_THREAD) {
         /* Timesharing threads need timeslices */
         change_tick_duration(next->timeslice_length_raw_ms);
     } else {
@@ -265,14 +265,10 @@ static inline void context_switch(struct scheduler *sched, struct thread *curr,
 
     /* We are responsible for dropping references
      * on threads entering their last yield */
-    if (unlikely(curr && thread_get_state(curr) == THREAD_STATE_ZOMBIE))
+    if (unlikely(curr && curr->state == THREAD_STATE_ZOMBIE))
         thread_put(curr);
 
     scheduler_unlock(sched, irql);
-
-    /* these are the exact same threads, let's get outta here */
-    if (curr == next)
-        return;
 
     load_context(&next->regs);
 }

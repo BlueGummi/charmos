@@ -41,8 +41,6 @@ void irql_lower(enum irql new_level) {
         new_level == IRQL_NONE)
         return;
 
-    /* Bind variables here to avoid repeated function calls
-     * This function needs to be fast, it's called a lot. */
     struct core *cpu = smp_core();
     enum irql old = cpu->current_irql;
 
