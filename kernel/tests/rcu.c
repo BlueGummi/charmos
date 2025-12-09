@@ -86,6 +86,8 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         sleep_ms(1);
 
     TEST_ASSERT(!atomic_load(&rcu_test_failed));
+    while (!rcu_deferred_freed)
+        cpu_relax();
 
     SET_SUCCESS();
 }

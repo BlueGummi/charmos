@@ -162,7 +162,9 @@ void rcu_call(void (*func)(void *), void *arg) {
     cb->arg = arg;
     INIT_LIST_HEAD(&cb->list);
 
-    size_t bucket = (atomic_load(&global.rcu_gen) + 1) & (RCU_BUCKETS - 1);
+    size_t bucket =
+        atomic_load_explicit(&global.rcu_gen, memory_order_acquire) &
+        (RCU_BUCKETS - 1);
 
     enum irql irql = spin_lock(&rcu_buckets[bucket].lock);
     list_add_tail(&cb->list, &rcu_buckets[bucket].list);

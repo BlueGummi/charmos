@@ -111,7 +111,6 @@ bool dpc_enqueue_local(struct dpc *d, enum dpc_event e) {
     return ret;
 }
 
-/* TODO: numa locality */
 void dpc_init_percpu(void) {
     global.dpc_data = kzalloc(sizeof(struct dpc_cpu) * global.core_count,
                               ALLOC_PARAMS_DEFAULT);

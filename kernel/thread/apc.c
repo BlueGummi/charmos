@@ -143,8 +143,6 @@ static void maybe_force_resched(struct thread *t) {
     thread_set_flags(t, old);
 }
 
-/* TODO: once we have tickless as an option, make sure to poke
- * the other core if the thread is active... */
 static void wake_if_waiting(struct thread *t) {
     if (thread_is_active(t))
         maybe_force_resched(t);
