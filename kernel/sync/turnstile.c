@@ -252,7 +252,8 @@ void turnstile_wake(struct turnstile *ts, size_t queue, size_t num_threads,
     while (num_threads-- > 0) {
         /* wake the one of highest priority */
         struct thread *to_wake = turnstile_dequeue_first(ts, queue);
-        thread_wake_manual(to_wake, ts);
+        scheduler_wake(to_wake, THREAD_WAKE_REASON_BLOCKING_MANUAL,
+                       to_wake->perceived_prio_class, ts);
     }
 
     ts->inheritor = NULL;
@@ -341,11 +342,15 @@ static void turnstile_block_on(void *lock_obj, struct turnstile *ts,
 
 /* ok... the we first assign a turnstile to the lock object,
  * and then we boost priorities and finally block */
+
+/* we already have preemption off when we get in here */
 struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
                                   void *lock_obj, enum irql lock_irql) {
     struct turnstile_hash_chain *chain = turnstile_chain_for(lock_obj);
     struct thread *current_thread = scheduler_get_current_thread();
     struct turnstile *my_turnstile = current_thread->turnstile;
+
+    kassert(my_turnstile);
 
     /* turnstile donation */
     if (!ts) {
@@ -362,14 +367,12 @@ struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
 
     current_thread->turnstile = NULL;
 
-    kassert(thread_get_state(current_thread) != THREAD_STATE_IDLE_THREAD);
-
     turnstile_propagate_boost(chain, ts, current_thread->weight,
                               current_thread->perceived_prio_class);
 
-    turnstile_block_on(lock_obj, ts, queue_num);
-
     ts->waiters++;
+
+    turnstile_block_on(lock_obj, ts, queue_num);
 
     turnstile_hash_chain_unlock(chain, lock_irql);
 

@@ -461,8 +461,7 @@ bool slab_free_queue_ringbuffer_enqueue(struct slab_free_queue *q,
 vaddr_t slab_free_queue_ringbuffer_dequeue(struct slab_free_queue *q);
 vaddr_t slab_free_queue_dequeue(struct slab_free_queue *q);
 size_t slab_free_queue_drain(struct slab_percpu_cache *cache,
-                             struct slab_free_queue *queue, size_t target,
-                             bool flush_to_cache);
+                             struct slab_free_queue *queue, size_t target);
 size_t slab_free_queue_get_target_drain(struct slab_domain *domain, size_t pct);
 size_t slab_free_queue_drain_limited(struct slab_percpu_cache *pc,
                                      struct slab_domain *dom, size_t pct);

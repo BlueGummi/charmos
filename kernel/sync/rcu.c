@@ -207,7 +207,7 @@ static void rcu_exec_callbacks(struct rcu_buckets *buckets, uint64_t target) {
     struct rcu_cb *iter, *tmp;
 
     list_for_each_entry_safe(iter, tmp, &lh, list) {
-        list_del(&iter->list);
+        list_del_init(&iter->list);
         iter->fn(iter, iter->arg);
     }
 }

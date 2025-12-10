@@ -117,7 +117,7 @@ void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags) {
     idt[num].selector = sel;
 
     /* TODO: maybe don't hardcode this */
-    if (num == IRQ_NMI) {
+    if (num == IRQ_NMI || num == IRQ_DBF) {
         idt[num].ist = 1;
     } else {
         idt[num].ist = 0;
@@ -171,20 +171,24 @@ void irq_free_entry(int entry) {
 
 static struct spinlock pf_lock = SPINLOCK_INIT;
 static void page_fault_handler(void *context, uint8_t vector, void *rsp) {
-    (void) context, (void) vector;
+    (void) context, (void) vector, (void) rsp;
 
-    uint64_t *stack = (uint64_t *) rsp;
-    uint64_t error_code = stack[15];
+    uint64_t error_code = UINT64_MAX;
+    paddr_t rsp_phys = vmm_get_phys_unsafe((vaddr_t) rsp);
+    
+    if (rsp_phys != (paddr_t) -1) {
+
+        uint64_t *stack = (uint64_t *) rsp;
+        error_code = stack[15];
+    }
+
     uint64_t fault_addr;
 
     asm volatile("mov %%cr2, %0" : "=r"(fault_addr));
 
-    struct isr_regs *ctx = rsp;
-
     spin_lock_raw(&pf_lock);
     k_printf("\n=== PAGE FAULT ===\n");
-    k_printf("Faulting Address (CR2): 0x%lx, instruction: 0x%lx\n", fault_addr,
-             ctx->rip);
+    k_printf("Faulting Address (CR2): 0x%lx\n", fault_addr);
     k_printf("Error Code: 0x%lx\n", error_code);
     k_printf("  - Page not Present (P): %s\n",
              (error_code & 0x01) ? "Yes" : "No");

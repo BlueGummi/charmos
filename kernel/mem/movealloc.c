@@ -70,37 +70,9 @@ void movealloc(size_t new_domain, void *ptr, enum vmm_flags flags) {
         phys_addrs[i] = paddr;
     }
 
-    if (ptr != smp_core()) {
-        for (size_t i = 0; i < pages; i++) {
-            pmm_free_page(phys_addrs[i]);
-        }
+    for (size_t i = 0; i < pages; i++) {
+        pmm_free_page(phys_addrs[i]);
     }
 
     change_slab_backing_page(ptr);
-}
-
-static atomic_uint cores_ran_move_core_dpc = 0;
-
-void move_core_dpc(struct dpc *dpc, void *v) {
-    (void) dpc;
-    (void) v;
-    movealloc(domain_local_id(), smp_core(), VMM_FLAG_NONE);
-    atomic_fetch_add(&cores_ran_move_core_dpc, 1);
-    tlb_flush();
-}
-
-void movealloc_move_all_cores(void) {
-    size_t i;
-    for_each_cpu_id(i) {
-        uint32_t before = atomic_load(&cores_ran_move_core_dpc);
-        struct dpc *dpc = dpc_create(move_core_dpc, NULL);
-        if (!dpc)
-            k_panic("OOM\n");
-
-        dpc_enqueue_on_cpu(i, dpc, DPC_NONE);
-        while (atomic_load(&cores_ran_move_core_dpc) == before)
-            cpu_relax();
-
-        kfree(dpc, FREE_PARAMS_DEFAULT);
-    }
 }

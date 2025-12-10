@@ -135,7 +135,6 @@ void k_sch_main(void *nop) {
     slab_domain_init_late();
     domain_buddies_init_late();
     workqueues_permanent_init();
-    movealloc_move_all_cores();
     reaper_init();
     registry_setup();
     tests_run();

@@ -140,10 +140,7 @@ struct entry {
 SLIST_HEAD(free_queue_list_tmp, entry);
 
 size_t slab_free_queue_drain(struct slab_percpu_cache *cache,
-                             struct slab_free_queue *queue, size_t target,
-                             bool flush_to_cache) {
-    struct free_queue_list_tmp chain;
-    SLIST_INIT(&chain);
+                             struct slab_free_queue *queue, size_t target) {
 
     size_t drained_to_magazine = 0; /* Return value */
     size_t addrs_dequeued = 0;      /* Used to check against `target` */
@@ -175,24 +172,7 @@ size_t slab_free_queue_drain(struct slab_percpu_cache *cache,
         continue;
 
     flush:
-        if (flush_to_cache) {
-            /* Directly flush to the slab cache */
-            slab_free_queue_free(cache->domain, (void *) addr);
-        } else {
-            /* We will thread a list through the addresses and add
-             * the list onto the free_queue_list of the slab cache
-             * once we are done with the slab cache free_queue */
-            struct entry *node = (void *) addr;
-            SLIST_INSERT_HEAD(&chain, node, data);
-        }
-    }
-
-    /* Not empty - let's append it to our slab cache's free_queue */
-    while (!SLIST_EMPTY(&chain)) {
-        struct entry *ent = SLIST_FIRST(&chain);
-        SLIST_REMOVE_HEAD(&chain, data);
-        if (!slab_free_queue_ringbuffer_enqueue(queue, (vaddr_t) ent))
-            slab_free_queue_free(cache->domain, ent);
+        slab_free_queue_free(cache->domain, (void *) addr);
     }
 
     return drained_to_magazine;
@@ -232,6 +212,5 @@ size_t slab_free_queue_drain_limited(struct slab_percpu_cache *pc,
      * to prevent overly aggressive stealing from the free_queue into our
      * percpu cache to allow other CPUs in our domain to get their fair share of
      * what remains in the free_queue in the event that they must also refill */
-    return slab_free_queue_drain(pc, &dom->free_queue, target,
-                                 /* flush_to_cache = */ false);
+    return slab_free_queue_drain(pc, &dom->free_queue, target);
 }

@@ -126,16 +126,16 @@ static inline void update_min_steal_diff(void) {
 
 static inline void save_thread(struct scheduler *sched, struct thread *curr,
                                time_t time) {
-    if (curr && curr->state != THREAD_STATE_IDLE_THREAD)
+    if (curr && thread_get_state(curr) != THREAD_STATE_IDLE_THREAD)
         save_context(&curr->regs);
 
     update_min_steal_diff();
 
     /* Only save a running thread that exists */
-    if (curr && curr->state == THREAD_STATE_RUNNING) {
+    if (curr && thread_get_state(curr) == THREAD_STATE_RUNNING) {
         update_thread_before_save(curr, time);
         re_enqueue_thread(sched, curr);
-    } else if (curr && curr->state == THREAD_STATE_IDLE_THREAD) {
+    } else if (curr && thread_get_state(curr) == THREAD_STATE_IDLE_THREAD) {
         update_idle_thread(time);
     }
 }
@@ -247,7 +247,7 @@ static void change_tick(struct scheduler *sched, struct thread *next) {
     }
 
     if (THREAD_PRIO_HAS_TIMESLICE(next->perceived_prio_class) &&
-        next->state != THREAD_STATE_IDLE_THREAD) {
+        thread_get_state(next) != THREAD_STATE_IDLE_THREAD) {
         /* Timesharing threads need timeslices */
         change_tick_duration(next->timeslice_length_raw_ms);
     } else {
@@ -265,7 +265,7 @@ static inline void context_switch(struct scheduler *sched, struct thread *curr,
 
     /* We are responsible for dropping references
      * on threads entering their last yield */
-    if (unlikely(curr && curr->state == THREAD_STATE_ZOMBIE))
+    if (unlikely(curr && thread_get_state(curr) == THREAD_STATE_ZOMBIE))
         thread_put(curr);
 
     scheduler_unlock(sched, irql);

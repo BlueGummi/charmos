@@ -1,5 +1,6 @@
 #ifdef TEST_RCU
 
+#include <crypto/prng.h>
 #include <mem/alloc.h>
 #include <sch/sched.h>
 #include <sleep.h>
@@ -108,8 +109,7 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
 #define STRESS_NUM_READERS (global.core_count * 4)
 #define STRESS_NUM_WRITERS (global.core_count)
-#define STRESS_DURATION_MS 500
-#define STRESS_PRINT_INTERVAL_MS 100
+#define STRESS_DURATION_MS 1200
 
 struct rcu_stress_node {
     uint64_t seq; /* monotonic sequence number (for debugging) */
@@ -137,10 +137,16 @@ static void stress_free_cb(struct rcu_cb *cb, void *ptr) {
 /* reader thread: very tight loop, yields frequently */
 static void rcu_stress_reader(void *arg) {
     (void) arg;
-    uint64_t last_print = time_get_ms();
 
     while (!atomic_load(&stress_stop)) {
         rcu_read_lock();
+
+        size_t go_do_it_again = prng_next() & 0xff;
+        for (size_t i = 0; i < go_do_it_again; i++) {
+            rcu_read_lock();
+            if (prng_next() & 0x3)
+                scheduler_yield();
+        }
 
         struct rcu_stress_node *p = rcu_dereference(stress_shared);
         if (p) {
@@ -158,16 +164,21 @@ static void rcu_stress_reader(void *arg) {
             (void) seq;
         }
 
+        for (size_t i = 0; i < go_do_it_again; i++) {
+            rcu_read_unlock();
+            if (prng_next() & 0x3)
+                scheduler_yield();
+        }
+
         rcu_read_unlock();
 
         /* yield to exercise scheduler preemption and context switching */
         scheduler_yield();
-
-        /* occasionally print progress (only a tiny amount to avoid flood) */
-        if (time_get_ms() - last_print >= STRESS_PRINT_INTERVAL_MS) {
-            last_print = time_get_ms();
-        }
     }
+
+    k_printf("RCU stress reader %s left, %u remaining\n",
+             scheduler_get_current_thread()->name,
+             STRESS_NUM_READERS - stress_readers_done - 1);
 
     atomic_fetch_add(&stress_readers_done, 1);
 }
@@ -249,16 +260,12 @@ REGISTER_TEST(rcu_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     /* spawn readers (more than cores) */
     for (uint32_t i = 0; i < STRESS_NUM_READERS; ++i) {
-        char name[32];
-        snprintf(name, sizeof(name), "rcu_str_reader_%u", i);
-        thread_spawn(name, rcu_stress_reader, NULL);
+        thread_spawn("rcu_str_reader_%u", rcu_stress_reader, NULL, i);
     }
 
     /* spawn writers */
     for (uint32_t i = 0; i < STRESS_NUM_WRITERS; ++i) {
-        char name[32];
-        snprintf(name, sizeof(name), "rcu_str_writer_%u", i);
-        thread_spawn(name, rcu_stress_writer, NULL);
+        thread_spawn("rcu_str_writer_%u", rcu_stress_writer, NULL, i);
     }
 
     /* spawn one reclaimer to periodically call synchronize */

@@ -575,11 +575,6 @@ void thread_wait_for_wake_match() {
     /* we can safely avoid checking the token in the loop because that will
      * become set if wake_matched is set... */
     while (!atomic_load_explicit(&curr->wake_matched, memory_order_acquire)) {
-        /* if this returns true, it is because the wake_matched flag was set
-         * by another thread waking it up. in this case, we should simply exit
-         * because we had a scenario where another thread woke us up (acquiring
-         * our lock), which sets the wake_matched flag and then releases the
-         * lock, which we then see afterwards */
         if (curr->last_action != THREAD_STATE_BLOCKED &&
             curr->last_action != THREAD_STATE_SLEEPING)
             k_panic("uh oh\n");

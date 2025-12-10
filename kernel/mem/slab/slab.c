@@ -674,8 +674,7 @@ void *kmalloc_pages(struct slab_domain *domain, size_t size,
         size_t target = slab_free_queue_get_target_drain(local, pct);
         target /= 2;
 
-        bool flush_to_cache = true;
-        slab_free_queue_drain(pcpu, &local->free_queue, target, flush_to_cache);
+        slab_free_queue_drain(pcpu, &local->free_queue, target);
     }
 
     if (ret)

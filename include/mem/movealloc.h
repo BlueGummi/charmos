@@ -36,4 +36,3 @@ struct movealloc_callback_chain {
             callback, a, b, .list = {0}};
 
 void movealloc_exec_all(void);
-void movealloc_move_all_cores(void);
