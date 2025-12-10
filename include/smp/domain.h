@@ -11,7 +11,6 @@ struct domain {
     size_t num_cores;
     struct core **cores;
     struct numa_node *associated_node;
-    struct workqueue *rcu_wq;
     struct slab_domain *slab_domain;
 };
 

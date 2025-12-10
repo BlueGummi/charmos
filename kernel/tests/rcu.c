@@ -46,9 +46,10 @@ static void rcu_reader_thread(void *) {
 
 static atomic_bool volatile rcu_deferred_freed = false;
 
-static void rcu_free_fn(void *ptr) {
+static void rcu_free_fn(struct rcu_cb *cb, void *ptr) {
     kfree(ptr, FREE_PARAMS_DEFAULT);
     atomic_store(&rcu_deferred_freed, true);
+    kfree(cb, FREE_PARAMS_DEFAULT);
 }
 
 static void rcu_writer_thread(void *) {
@@ -61,7 +62,8 @@ static void rcu_writer_thread(void *) {
     rcu_assign_pointer(shared_ptr, new);
 
     rcu_synchronize();
-    rcu_defer(rcu_free_fn, old);
+    rcu_defer(kmalloc(sizeof(struct rcu_cb), ALLOC_PARAMS_DEFAULT), rcu_free_fn,
+              old);
 }
 
 REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
@@ -124,11 +126,12 @@ static _Atomic uint32_t stress_deferred_freed = 0;
 static _Atomic uint32_t stress_replacements = 0;
 
 /* deferred free callback */
-static void stress_free_cb(void *ptr) {
+static void stress_free_cb(struct rcu_cb *cb, void *ptr) {
     struct rcu_stress_node *n = ptr;
     /* optional debug trace */
     kfree(n, FREE_PARAMS_DEFAULT);
     atomic_fetch_add(&stress_deferred_freed, 1);
+    kfree(cb, FREE_PARAMS_DEFAULT);
 }
 
 /* reader thread: very tight loop, yields frequently */
@@ -199,7 +202,8 @@ static void rcu_stress_writer(void *arg) {
          * freed to assert correctness.
          */
         if (old)
-            rcu_defer(stress_free_cb, old);
+            rcu_defer(kmalloc(sizeof(struct rcu_cb), ALLOC_PARAMS_DEFAULT),
+                      stress_free_cb, old);
 
         /*
          * Occasionally force a synchronize call to exercise explicit grace

@@ -1,36 +1,45 @@
+/* @title: RCU */
 #pragma once
 #include <compiler.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <structures/list.h>
+#include <sync/semaphore.h>
+#include <sync/spinlock.h>
 
 #define RCU_GRACE_DELAY_MS (100)
 #define RCU_RING_ORDER 8
 #define RCU_BUCKETS 2
 #define RCU_RING_SIZE (1 << RCU_RING_ORDER)
 
+struct rcu_cb;
+typedef void (*rcu_fn)(struct rcu_cb *, void *);
+
 struct rcu_cb {
     struct list_head list;
-    void (*func)(void *);
+    rcu_fn fn;
     void *arg;
 };
 #define rcu_cb_from_list_node(ln) (container_of(ln, struct rcu_cb, list))
 
-struct rcu_item {
-    void (*func)(void *);
-    void *arg;
+struct rcu_bucket {
+    struct spinlock lock;
+    struct list_head list;
+};
 
-    uint64_t gen; /* optional: assign gen at enqueue time for ordering */
+struct rcu_buckets {
+    struct semaphore sem;
+    struct rcu_bucket buckets[RCU_BUCKETS];
 };
 
 void rcu_mark_quiescent(void);
 void rcu_synchronize(void);
-void rcu_defer(void (*func)(void *), void *arg);
+void rcu_defer(struct rcu_cb *cb, rcu_fn fn, void *arg);
 void rcu_maintenance_tick(void);
 void rcu_read_lock(void);
 void rcu_read_unlock(void);
-void rcu_call(void (*func)(void *), void *arg);
+void rcu_call(struct rcu_cb *cb, rcu_fn fn, void *arg);
 void rcu_init(void);
 void rcu_worker_notify(void);
 

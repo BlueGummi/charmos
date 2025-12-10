@@ -156,6 +156,16 @@ void cpu_mask_set_all(struct cpu_mask *m) {
     }
 }
 
+void cpu_mask_clear_all(struct cpu_mask *m) {
+    if (!m->uses_large) {
+        atomic_store(&m->small, 0);
+    } else {
+        size_t nwords = (m->nbits + 63) / 64;
+        for (size_t i = 0; i < nwords; i++)
+            atomic_store(&m->large[i], 0);
+    }
+}
+
 bool cpu_mask_empty(const struct cpu_mask *mask) {
     if (!mask->uses_large)
         return atomic_load(&mask->small) == 0;

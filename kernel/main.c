@@ -33,6 +33,7 @@
 #include <smp/core.h>
 #include <smp/domain.h>
 #include <smp/percpu.h>
+#include <smp/perdomain.h>
 #include <smp/smp.h>
 #include <stdint.h>
 #include <sync/rcu.h>
@@ -97,6 +98,7 @@ __no_sanitize_address void k_main(void) {
     topology_init();
     domain_init();
     scheduler_domains_init();
+    perdomain_obj_init();
     bootstage_advance(BOOTSTAGE_MID_TOPOLOGY);
 
     thread_init_rq_lists();
