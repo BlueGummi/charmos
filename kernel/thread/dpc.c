@@ -100,6 +100,8 @@ bool dpc_enqueue_on_cpu(size_t cpu, struct dpc *d, enum dpc_event e) {
                                   memory_order_acq_rel) &&
         cpu != smp_core_id()) {
         ipi_send(cpu, IRQ_SCHEDULER);
+    } else {
+        scheduler_mark_self_needs_resched(true);
     }
 
     return true;

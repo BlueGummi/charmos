@@ -89,6 +89,12 @@ SECTIONS {
         __ekernel_percpu_desc = .;
     }
 
+    .kernel_perdomain_desc : {
+        __skernel_perdomain_desc = .;
+        KEEP(*(.kernel_perdomain_desc))
+        __ekernel_perdomain_desc = .;
+    }
+
     .bss : ALIGN(4K) {
         __sbss = .;
         *(.bss .bss.*)

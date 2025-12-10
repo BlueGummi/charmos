@@ -36,6 +36,11 @@ extern struct percpu_descriptor __ekernel_percpu_desc[];
 
 void percpu_obj_init(void);
 
-#define PERCPU_PTR(name) (__percpu_desc_##name.percpu_ptrs[smp_core_id()])
+#define PERCPU_PTR_FOR_CPU(name, cpu) (__percpu_desc_##name.percpu_ptrs[cpu])
+#define PERCPU_READ_FOR_CPU(name, cpu)                                         \
+    (*((typeof(__percpu_##name) *) PERCPU_PTR_FOR_CPU(name, cpu)))
+
+#define PERCPU_PTR(name) PERCPU_PTR_FOR_CPU(name, smp_core_id())
 #define PERCPU_READ(name) (*((typeof(__percpu_##name) *) PERCPU_PTR(name)))
+
 #define PERCPU_WRITE(name, val) (PERCPU_READ(name) = (val))
