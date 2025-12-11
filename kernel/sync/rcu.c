@@ -38,8 +38,8 @@ static inline bool thread_rcu_not_reached_target(struct thread *t,
            >= (target-1). If qgen < (target-1), this thread hasn't yet quiesced
            since that generation. */
 
-        /* U64 max is used here as the value for threads not participating in
-         * RCU */
+        /* U64 max is used here as the value for threads
+         * not participating in RCU */
         return qgen != UINT64_MAX && (qgen < (target - 1));
     }
 }
@@ -177,17 +177,48 @@ static void rcu_detach_bucket(struct rcu_buckets *bkts, size_t bucket,
 }
 
 static void rcu_exec_callbacks(struct rcu_buckets *buckets, uint64_t target) {
-    /* Now safe to run callbacks for older bucket */
-    size_t old_bucket = (target - 1) & (RCU_BUCKETS - 1);
-    struct list_head lh;
-    rcu_detach_bucket(buckets, old_bucket, &lh);
+    /* Now safe to run callbacks for older bucket (generation target-1) */
+    size_t mask = RCU_BUCKETS - 1;
+    size_t old_bucket = (target - 1) & mask;
 
-    struct rcu_cb *iter, *tmp;
+    struct list_head detached;
+    rcu_detach_bucket(buckets, old_bucket, &detached);
 
-    list_for_each_entry_safe(iter, tmp, &lh, list) {
+    if (list_empty(&detached))
+        return;
+
+    /* Temporary per-bucket lists for callbacks that don't belong to (target-1).
+     */
+    struct list_head tmp[RCU_BUCKETS];
+    for (size_t i = 0; i < RCU_BUCKETS; ++i)
+        INIT_LIST_HEAD(&tmp[i]);
+
+    struct rcu_cb *iter, *tmpn;
+    list_for_each_entry_safe(iter, tmpn, &detached, list) {
         list_del_init(&iter->list);
-        iter->gen_when_called = target - 1;
-        iter->fn(iter, iter->arg);
+
+        uint64_t cb_gen = iter->enqueued_waiting_on_gen;
+        if (cb_gen == (target - 1)) {
+            iter->gen_when_called = target - 1;
+            iter->fn(iter, iter->arg);
+        } else {
+            /* Not this generation: requeue into the correct bucket list for
+             * future processing. Add to a temporary list to avoid holding
+             * the bucket lock while iterating. */
+            size_t idx = (size_t) (cb_gen & mask);
+            list_add_tail(&iter->list, &tmp[idx]);
+        }
+    }
+
+    /* Reinsert the postponed callbacks into their corresponding buckets. */
+    for (size_t i = 0; i < RCU_BUCKETS; ++i) {
+        if (list_empty(&tmp[i]))
+            continue;
+
+        enum irql lirql = spin_lock(&buckets->buckets[i].lock);
+        /* Splice the tmp list into the real bucket list (tail) */
+        list_splice_tail_init(&tmp[i], &buckets->buckets[i].list);
+        spin_unlock(&buckets->buckets[i].lock, lirql);
     }
 }
 

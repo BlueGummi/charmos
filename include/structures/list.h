@@ -72,6 +72,19 @@ static inline struct list_head *list_pop_front_init(struct list_head *head) {
     return ret;
 }
 
+static inline void __list_splice(const struct list_head *list,
+                                 struct list_head *prev,
+                                 struct list_head *next) {
+    struct list_head *first = list->next;
+    struct list_head *last = list->prev;
+
+    first->prev = prev;
+    prev->next = first;
+
+    last->next = next;
+    next->prev = last;
+}
+
 static inline void list_splice_init(struct list_head *src,
                                     struct list_head *dst) {
     if (!list_empty(src)) {
@@ -86,6 +99,14 @@ static inline void list_splice_init(struct list_head *src,
         at->prev = last;
 
         INIT_LIST_HEAD(src);
+    }
+}
+
+static inline void list_splice_tail_init(struct list_head *list,
+                                         struct list_head *head) {
+    if (!list_empty(list)) {
+        __list_splice(list, head->prev, head);
+        INIT_LIST_HEAD(list);
     }
 }
 

@@ -107,7 +107,7 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
 #define STRESS_NUM_READERS (global.core_count * 4)
 #define STRESS_NUM_WRITERS (global.core_count)
-#define STRESS_DURATION_MS 2400
+#define STRESS_DURATION_MS 12000
 
 struct rcu_stress_node {
     uint64_t seq; /* monotonic sequence number (for debugging) */
@@ -153,9 +153,10 @@ static void rcu_stress_reader(void *arg) {
                 ADD_MESSAGE("RCU stress reader saw invalid value");
                 k_printf("RCU stress reader observed invalid value %d, "
                          "freed during gen %zu enqueued_on %zu currently "
-                         "started gen %zu\n",
+                         "started gen %zu quiescent for gen %zu\n",
                          v, p->freed_gen, p->enqueued_on,
-                         scheduler_get_current_thread()->rcu_start_gen);
+                         scheduler_get_current_thread()->rcu_start_gen,
+                         scheduler_get_current_thread()->rcu_quiescent_gen);
             }
             volatile uint64_t seq = p->seq;
             (void) seq;

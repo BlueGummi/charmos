@@ -16,8 +16,6 @@
 static struct rwlock rw_basic = {0};
 
 REGISTER_TEST(rwlock_basic_read, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    RWLOCK_REPORT_PROBLEMS();
-
     rwlock_lock(&rw_basic, RWLOCK_ACQUIRE_READ);
     scheduler_yield();
     rwlock_unlock(&rw_basic);
@@ -28,7 +26,6 @@ REGISTER_TEST(rwlock_basic_read, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 static struct rwlock rw_basic_w = {0};
 
 REGISTER_TEST(rwlock_basic_write, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    RWLOCK_REPORT_PROBLEMS();
 
     rwlock_lock(&rw_basic_w, RWLOCK_ACQUIRE_WRITE);
     scheduler_yield();
@@ -48,7 +45,6 @@ static void rw_two_writer_thread(void *) {
 }
 
 REGISTER_TEST(rwlock_two_writer_basic, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    RWLOCK_REPORT_PROBLEMS();
 
     rwlock_lock(&rw_two_writers, RWLOCK_ACQUIRE_WRITE);
 
@@ -64,13 +60,14 @@ REGISTER_TEST(rwlock_two_writer_basic, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
 }
 
-#define RWLOCK_READER_COUNT_TEST_N 10
+#define RWLOCK_READER_COUNT_TEST_N 20
+#define RWLOCK_READER_COUNT_LOOPS 500
 
 static struct rwlock rw_readers = {0};
 static _Atomic uint32_t rw_readers_left = RWLOCK_READER_COUNT_TEST_N;
 
 static void rw_reader_worker(void *) {
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < RWLOCK_READER_COUNT_LOOPS; i++) {
         rwlock_lock(&rw_readers, RWLOCK_ACQUIRE_READ);
         scheduler_yield();
         rwlock_unlock(&rw_readers);
@@ -89,13 +86,14 @@ REGISTER_TEST(rwlock_many_readers, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     SET_SUCCESS();
 }
 
-#define RWLOCK_MIXED_THREADS 12
+#define RWLOCK_MIXED_THREADS 24
+#define RWLOCK_MIXED_LOOPS 500
 volatile struct thread *mixed_threads[RWLOCK_MIXED_THREADS];
 static struct rwlock rw_mixed = {0};
 static _Atomic uint32_t rw_mixed_left = RWLOCK_MIXED_THREADS;
 
 static void rw_mixed_worker(void *) {
-    for (int i = 0; i < 1500; i++) {
+    for (int i = 0; i < RWLOCK_MIXED_LOOPS; i++) {
         if (prng_next() & 1) {
             // Reader
             rwlock_lock(&rw_mixed, RWLOCK_ACQUIRE_READ);
@@ -117,7 +115,6 @@ static void rw_mixed_worker(void *) {
 }
 
 REGISTER_TEST(rwlock_mixed_stress, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
-    RWLOCK_REPORT_PROBLEMS();
 
     for (int i = 0; i < RWLOCK_MIXED_THREADS; i++)
         mixed_threads[i] = thread_spawn("rm", rw_mixed_worker, NULL);
@@ -128,13 +125,14 @@ REGISTER_TEST(rwlock_mixed_stress, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     SET_SUCCESS();
 }
 
-#define RWLOCK_CHAOS_THREADS 20
+#define RWLOCK_CHAOS_THREADS 24
+#define RWLOCK_CHAOS_LOOPS 500
 
 static struct rwlock rw_chaos = {0};
 static _Atomic uint32_t rw_chaos_left = RWLOCK_CHAOS_THREADS;
 
 static void rw_chaos_worker(void *) {
-    for (int i = 0; i < 3000; i++) {
+    for (int i = 0; i < RWLOCK_CHAOS_LOOPS; i++) {
         if (prng_next() & 1)
             rwlock_lock(&rw_chaos, RWLOCK_ACQUIRE_READ);
         else
@@ -153,7 +151,6 @@ static void rw_chaos_worker(void *) {
 }
 
 REGISTER_TEST(rwlock_chaos, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
-    RWLOCK_REPORT_PROBLEMS();
 
     for (int i = 0; i < RWLOCK_CHAOS_THREADS; i++)
         thread_spawn("rch", rw_chaos_worker, NULL);
@@ -172,8 +169,13 @@ static _Atomic uint32_t active_readers = 0;
 static _Atomic uint32_t active_writers = 0;
 static atomic_bool correctness_ok = true;
 
+#define RWLOCK_CORRECT_LOOPS 5000
+#define RWLOCK_CORRECT_THREADS 16
+
+static atomic_uint correctness_left = RWLOCK_CORRECT_THREADS;
+
 static void rw_correct_worker(void *) {
-    for (int i = 0; i < 2000; i++) {
+    for (int i = 0; i < RWLOCK_CORRECT_LOOPS; i++) {
         if (prng_next() & 1) {
             // Reader
             rwlock_lock(&rw_correct, RWLOCK_ACQUIRE_READ);
@@ -202,15 +204,17 @@ static void rw_correct_worker(void *) {
             rwlock_unlock(&rw_correct);
         }
     }
+    atomic_fetch_sub(&correctness_left, 1);
 }
 
-#define RWLOCK_CORRECT_THREADS 8
 
 REGISTER_TEST(rwlock_correctness, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
-    RWLOCK_REPORT_PROBLEMS();
 
     for (int i = 0; i < RWLOCK_CORRECT_THREADS; i++)
         thread_spawn("rwc", rw_correct_worker, NULL);
+
+    while (!atomic_load(&correctness_left))
+        scheduler_yield();
 
     while (!atomic_load(&correctness_ok))
         scheduler_yield();
