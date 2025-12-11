@@ -2,7 +2,6 @@
 #include <sch/sched.h>
 #include <smp/core.h>
 #include <smp/percpu.h>
-#include <smp/perdomain.h>
 #include <stdatomic.h>
 #include <sync/rcu.h>
 #include <sync/semaphore.h>
@@ -13,6 +12,7 @@
 #include "sch/internal.h" /* for tick_enabled */
 
 extern struct locked_list thread_list;
+static struct rcu_buckets rcu_buckets;
 
 static uint64_t rcu_advance_gp() {
     return atomic_fetch_add(&global.rcu_gen, 1) + 1;
@@ -48,25 +48,9 @@ static uint64_t rcu_read_global_gen(void) {
     return atomic_load_explicit(&global.rcu_gen, memory_order_acquire);
 }
 
-static void rcu_build_buckets(struct rcu_buckets *bkt, size_t domain);
-
-PERDOMAIN_DECLARE(rcu_buckets, struct rcu_buckets, rcu_build_buckets);
-
-static void rcu_build_buckets(struct rcu_buckets *bkt, size_t domain) {
-    (void) domain;
-    semaphore_init(&bkt->sem, 0, SEMAPHORE_INIT_NORMAL);
-    for (size_t i = 0; i < RCU_BUCKETS; i++) {
-        INIT_LIST_HEAD(&bkt->buckets[i].list);
-        spinlock_init(&bkt->buckets[i].lock);
-    }
-}
-
 /* power-of-two ring capacity */
 void rcu_worker_notify() {
-    struct domain *dom;
-    domain_for_each_domain(dom) {
-        semaphore_post(&PERDOMAIN_READ_FOR_DOMAIN(rcu_buckets, dom->id).sem);
-    }
+    semaphore_post(&rcu_buckets.sem);
 }
 
 void rcu_synchronize(void) {
@@ -104,7 +88,7 @@ void rcu_defer(struct rcu_cb *cb, rcu_fn func, void *arg) {
     INIT_LIST_HEAD(&cb->list);
 
     size_t bucket = (gen) & (RCU_BUCKETS - 1);
-    struct rcu_buckets *buckets = &PERDOMAIN_READ(rcu_buckets);
+    struct rcu_buckets *buckets = &rcu_buckets;
 
     enum irql lirql = spin_lock(&buckets->buckets[bucket].lock);
     list_add_tail(&cb->list, &buckets->buckets[bucket].list);
@@ -149,16 +133,11 @@ void rcu_read_unlock(void) {
 }
 
 bool rcu_work_pending(void) {
-    struct domain *dom;
-    domain_for_each_domain(dom) {
-        struct rcu_buckets *rcu_buckets =
-            &PERDOMAIN_READ_FOR_DOMAIN(rcu_buckets, dom->id);
-        for (int i = 0; i < RCU_BUCKETS; ++i) {
-            /* fast-check: read head without acquiring the lock.
-               It's OK if this races: we'll re-check under lock in worker. */
-            if (!list_empty(&rcu_buckets->buckets[i].list))
-                return true;
-        }
+    for (int i = 0; i < RCU_BUCKETS; ++i) {
+        /* fast-check: read head without acquiring the lock.
+           It's OK if this races: we'll re-check under lock in worker. */
+        if (!list_empty(&rcu_buckets.buckets[i].list))
+            return true;
     }
     return false;
 }
@@ -187,8 +166,7 @@ static void rcu_exec_callbacks(struct rcu_buckets *buckets, uint64_t target) {
     if (list_empty(&detached))
         return;
 
-    /* Temporary per-bucket lists for callbacks that don't belong to (target-1).
-     */
+    /* Per-bucket lists for callbacks that don't belong to (target-1) */
     struct list_head tmp[RCU_BUCKETS];
     for (size_t i = 0; i < RCU_BUCKETS; ++i)
         INIT_LIST_HEAD(&tmp[i]);
@@ -224,8 +202,8 @@ static void rcu_exec_callbacks(struct rcu_buckets *buckets, uint64_t target) {
 
 static void rcu_gp_worker(void *unused) {
     (void) unused;
-    struct semaphore *rcu_sem = &PERDOMAIN_READ(rcu_buckets).sem;
-    struct rcu_buckets *buckets = &PERDOMAIN_READ(rcu_buckets);
+    struct semaphore *rcu_sem = &(rcu_buckets).sem;
+    struct rcu_buckets *buckets = &(rcu_buckets);
     while (true) {
         semaphore_wait(rcu_sem);
 
@@ -256,15 +234,13 @@ static void rcu_gp_worker(void *unused) {
     }
 }
 
-/* we initialize per-domain RCU queues */
 void rcu_init(void) {
-    /* create worker thread */
-    struct domain *iter;
-    domain_for_each_domain(iter) {
-        struct thread *goob =
-            thread_create("rcu_gp_worker_%zu", rcu_gp_worker, NULL, iter->id);
-        cpu_mask_clear_all(&goob->allowed_cpus);
-        domain_set_cpu_mask(&goob->allowed_cpus, iter);
-        scheduler_enqueue(goob);
+    semaphore_init(&rcu_buckets.sem, 0, SEMAPHORE_INIT_NORMAL);
+    for (size_t i = 0; i < RCU_BUCKETS; i++) {
+        INIT_LIST_HEAD(&rcu_buckets.buckets[i].list);
+        spinlock_init(&rcu_buckets.buckets[i].lock);
     }
+
+    /* create worker thread */
+    thread_spawn("rcu_gp_worker", rcu_gp_worker, NULL);
 }

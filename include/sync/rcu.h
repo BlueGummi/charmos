@@ -8,7 +8,7 @@
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
 
-#define RCU_BUCKETS 8
+#define RCU_BUCKETS 64
 
 struct rcu_cb;
 typedef void (*rcu_fn)(struct rcu_cb *, void *);

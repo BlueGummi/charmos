@@ -105,9 +105,9 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 *
 */
 
-#define STRESS_NUM_READERS (global.core_count * 4)
-#define STRESS_NUM_WRITERS (global.core_count)
-#define STRESS_DURATION_MS 12000
+#define STRESS_NUM_READERS (global.core_count * 8)
+#define STRESS_NUM_WRITERS (global.core_count * 4)
+#define STRESS_DURATION_MS 1200
 
 struct rcu_stress_node {
     uint64_t seq; /* monotonic sequence number (for debugging) */
