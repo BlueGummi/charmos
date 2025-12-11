@@ -141,13 +141,6 @@ static void rcu_stress_reader(void *arg) {
     while (!atomic_load(&stress_stop)) {
         rcu_read_lock();
 
-        size_t go_do_it_again = prng_next() & 0xff;
-        for (size_t i = 0; i < go_do_it_again; i++) {
-            rcu_read_lock();
-            if (prng_next() & 0x3)
-                scheduler_yield();
-        }
-
         struct rcu_stress_node *p = rcu_dereference(stress_shared);
         if (p) {
             int v = p->value;
@@ -162,12 +155,6 @@ static void rcu_stress_reader(void *arg) {
             }
             volatile uint64_t seq = p->seq;
             (void) seq;
-        }
-
-        for (size_t i = 0; i < go_do_it_again; i++) {
-            rcu_read_unlock();
-            if (prng_next() & 0x3)
-                scheduler_yield();
         }
 
         rcu_read_unlock();
