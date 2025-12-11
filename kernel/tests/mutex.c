@@ -22,13 +22,14 @@ REGISTER_TEST(mutex_test_basic, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
 }
 
-#define MUTEX_MANY_WAITER_TEST_WAITER_COUNT 10
+#define MUTEX_MANY_WAITER_TEST_WAITER_COUNT 67
+#define MUTEX_MANY_WAITER_LOOP_COUNT 5000
 
 static struct mutex many_mtx = MUTEX_INIT;
 static _Atomic uint32_t many_waiter_done = MUTEX_MANY_WAITER_TEST_WAITER_COUNT;
 
 static void many_worker(void *) {
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < MUTEX_MANY_WAITER_LOOP_COUNT; i++) {
         mutex_lock(&many_mtx);
         scheduler_yield();
         mutex_unlock(&many_mtx);
@@ -39,7 +40,6 @@ static void many_worker(void *) {
 
 REGISTER_TEST(mutex_many_waiters, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     MUTEX_REPORT_PROBLEMS();
-
     for (int i = 0; i < MUTEX_MANY_WAITER_TEST_WAITER_COUNT; i++)
         thread_spawn_on_core("mw", many_worker, NULL, 0);
 

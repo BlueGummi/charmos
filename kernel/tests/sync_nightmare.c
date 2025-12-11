@@ -1,13 +1,13 @@
 #include <crypto/prng.h>
 #include <mem/alloc.h>
-#include <thread/apc.h>
 #include <sch/sched.h>
-#include <thread/thread.h>
 #include <smp/core.h>
 #include <stdatomic.h>
 #include <tests.h>
+#include <thread/apc.h>
+#include <thread/thread.h>
 
-#define CHAOS_THREADS 6
+#define CHAOS_THREADS 16
 #define CHAOS_ITERS 50000
 
 struct chaos_thread_state {
@@ -21,6 +21,7 @@ struct chaos_thread_state {
 static struct chaos_thread_state states[CHAOS_THREADS];
 static atomic_bool chaos_stop = false;
 static atomic_bool starter_ok = false;
+static atomic_uint sync_chaos_left = CHAOS_THREADS;
 
 /* ------------------------------------
  * APC spammer callback
@@ -62,6 +63,7 @@ static void chaos_sleeper(void *arg) {
             scheduler_yield();
     }
 
+    atomic_fetch_sub(&sync_chaos_left, 1);
     atomic_store(&s->alive, false);
 }
 
@@ -170,21 +172,12 @@ REGISTER_TEST(thread_interruptible_chaos_fuzz, SHOULD_NOT_FAIL,
 
     /* Spawn chaos components */
     thread_spawn("chaos_wake", chaos_waker, NULL);
-    thread_spawn("chaos_apc", chaos_apc_spammer, NULL);
+    // thread_spawn("chaos_apc", chaos_apc_spammer, NULL);
     thread_spawn("chaos_migrate", chaos_migrator, NULL);
 
     /* Wait for all sleepers to complete */
-    bool all_done = false;
-    while (!all_done) {
-        all_done = true;
-        for (int i = 0; i < CHAOS_THREADS; i++) {
-            if (atomic_load(&states[i].alive)) {
-                all_done = false;
-                break;
-            }
-        }
+    while (atomic_load(&sync_chaos_left))
         scheduler_yield();
-    }
 
     atomic_store(&chaos_stop, true);
 

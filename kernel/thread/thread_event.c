@@ -499,6 +499,7 @@ static bool set_state_and_update_reason(
             atomic_store_explicit(&t->wake_matched, true, memory_order_release);
         }
     } else {
+        atomic_store_explicit(&t->yielded_after_wait, false, memory_order_release);
         atomic_store_explicit(&t->wait_type, type, memory_order_release);
         t->last_action_reason = reason;
         t->last_action = state;

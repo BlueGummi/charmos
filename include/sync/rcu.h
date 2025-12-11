@@ -18,6 +18,7 @@ struct rcu_cb {
     rcu_fn fn;
     void *arg;
     size_t gen_when_called;
+    size_t enqueued_waiting_on_gen;
 };
 #define rcu_cb_from_list_node(ln) (container_of(ln, struct rcu_cb, list))
 
@@ -38,9 +39,6 @@ void rcu_read_lock(void);
 void rcu_read_unlock(void);
 void rcu_init(void);
 void rcu_worker_notify(void);
-
-struct thread;
-void rcu_note_context_switch_out(struct thread *old);
 
 #define rcu_dereference(p) atomic_load_explicit(&(p), memory_order_acquire)
 

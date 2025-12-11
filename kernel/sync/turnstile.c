@@ -94,18 +94,12 @@ void turnstile_destroy(struct turnstile *ts) {
 
 struct turnstile *turnstile_create(void) {
     struct turnstile *ts =
-        kmalloc(sizeof(struct turnstile), ALLOC_PARAMS_DEFAULT);
+        kzalloc(sizeof(struct turnstile), ALLOC_PARAMS_DEFAULT);
     if (!ts)
         return NULL;
 
     return turnstile_init(ts);
 }
-
-/* we don't have an official way of making a "priority" for a thread
- * because we combine priority classes and priority scoring in
- * thread scheduling. here, we take an approach where a given
- * number is a given priority with the timesharing class
- * having multiple numbers that the thread can get for its "priority" */
 
 static inline struct turnstile_hash_chain *turnstile_chain_for(void *obj) {
     size_t idx = TURNSTILE_OBJECT_HASH(obj);
@@ -367,8 +361,8 @@ struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
 
     current_thread->turnstile = NULL;
 
-    turnstile_propagate_boost(chain, ts, current_thread->weight,
-                              current_thread->perceived_prio_class);
+    /* turnstile_propagate_boost(chain, ts, current_thread->weight,
+                              current_thread->perceived_prio_class); */
 
     ts->waiters++;
 

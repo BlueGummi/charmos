@@ -14,13 +14,34 @@
 
 extern struct locked_list thread_list;
 
+static uint64_t rcu_advance_gp() {
+    return atomic_fetch_add(&global.rcu_gen, 1) + 1;
+}
+
 static inline bool thread_rcu_not_reached_target(struct thread *t,
                                                  uint64_t target) {
+    /* If the thread is inside an RCU CS, and that CS started before target,
+       it has not yet quiesced. If it's not inside a CS, check the last
+       quiescent generation. */
     uint32_t nesting =
         atomic_load_explicit(&t->rcu_nesting, memory_order_acquire);
-    uint64_t start_gen =
-        atomic_load_explicit(&t->rcu_start_gen, memory_order_acquire);
-    return (nesting != 0) || (start_gen != 0 && start_gen < target);
+    if (nesting != 0) {
+        uint64_t start_gen =
+            atomic_load_explicit(&t->rcu_start_gen, memory_order_acquire);
+        /* If the read-side CS began before target, we must wait */
+        return (start_gen != 0 && start_gen < target);
+    } else {
+        uint64_t qgen =
+            atomic_load_explicit(&t->rcu_quiescent_gen, memory_order_acquire);
+        /* We need the thread to have been quiescent *after or at* (target-1).
+           Callbacks enqueued on generation (target-1) must wait for quiescence
+           >= (target-1). If qgen < (target-1), this thread hasn't yet quiesced
+           since that generation. */
+
+        /* U64 max is used here as the value for threads not participating in
+         * RCU */
+        return qgen != UINT64_MAX && (qgen < (target - 1));
+    }
 }
 
 static uint64_t rcu_read_global_gen(void) {
@@ -45,19 +66,6 @@ void rcu_worker_notify() {
     struct domain *dom;
     domain_for_each_domain(dom) {
         semaphore_post(&PERDOMAIN_READ_FOR_DOMAIN(rcu_buckets, dom->id).sem);
-    }
-}
-
-void rcu_note_context_switch_out(struct thread *old) {
-    if (!old)
-        return;
-
-    uint32_t nest =
-        atomic_load_explicit(&old->rcu_nesting, memory_order_acquire);
-
-    if (nest == 0) {
-        atomic_store_explicit(&old->rcu_seen_gen, rcu_read_global_gen(),
-                              memory_order_release);
     }
 }
 
@@ -86,15 +94,16 @@ void rcu_synchronize(void) {
 }
 
 void rcu_defer(struct rcu_cb *cb, rcu_fn func, void *arg) {
-
     cb->fn = func;
     cb->arg = arg;
-    INIT_LIST_HEAD(&cb->list);
-
-    size_t bucket = (rcu_read_global_gen() + 1) & (RCU_BUCKETS - 1);
 
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
 
+    uint64_t gen = rcu_read_global_gen();
+    cb->enqueued_waiting_on_gen = gen;
+    INIT_LIST_HEAD(&cb->list);
+
+    size_t bucket = (gen) & (RCU_BUCKETS - 1);
     struct rcu_buckets *buckets = &PERDOMAIN_READ(rcu_buckets);
 
     enum irql lirql = spin_lock(&buckets->buckets[bucket].lock);
@@ -106,43 +115,37 @@ void rcu_defer(struct rcu_cb *cb, rcu_fn func, void *arg) {
     irql_lower(irql);
 }
 
-void rcu_maintenance_tick(void) {
-    static uint64_t last_gen = 0;
-    uint64_t gen = rcu_read_global_gen();
-
-    if (gen != last_gen) {
-        last_gen = gen;
-        return;
-    }
-
-    rcu_synchronize();
-}
-
 void rcu_read_lock(void) {
-    enum irql irql = spin_lock(&thread_list.lock);
     struct thread *t = scheduler_get_current_thread();
     uint64_t gen = rcu_read_global_gen();
-    uint32_t old = atomic_fetch_add(&t->rcu_nesting, 1);
+    uint32_t old =
+        atomic_fetch_add_explicit(&t->rcu_nesting, 1, memory_order_acq_rel);
     if (old == 0) {
-        atomic_store_explicit(&t->rcu_start_gen, gen, memory_order_relaxed);
+        /* mark the generation we entered under (release to publish). */
+        atomic_store_explicit(&t->rcu_start_gen, gen, memory_order_release);
     }
-    spin_unlock(&thread_list.lock, irql);
 }
 
 void rcu_read_unlock(void) {
-    enum irql irql = spin_lock(&thread_list.lock);
     struct thread *t = scheduler_get_current_thread();
 
-    uint32_t old = atomic_fetch_sub(&t->rcu_nesting, 1);
+    uint32_t old =
+        atomic_fetch_sub_explicit(&t->rcu_nesting, 1, memory_order_acq_rel);
     if (old == 0) {
         k_panic("RCU nesting underflow\n");
     }
 
     if (old == 1) {
-        atomic_store_explicit(&t->rcu_start_gen, 0, memory_order_release);
+        /* We are leaving the outermost read-side CS. First clear start_gen,
+           then publish the quiescent generation so GP worker can observe it. */
+        atomic_store_explicit(&t->rcu_start_gen, 0, memory_order_relaxed);
+
+        /* Use acquire/release so stores inside the CS happen-before this
+           quiescent publication. Read the current global generation and
+           publish it as the quiescent generation. */
+        uint64_t cur = rcu_read_global_gen();
+        atomic_store_explicit(&t->rcu_quiescent_gen, cur, memory_order_release);
     }
-    
-    spin_unlock(&thread_list.lock, irql);
 }
 
 bool rcu_work_pending(void) {
@@ -167,13 +170,9 @@ static void rcu_detach_bucket(struct rcu_buckets *bkts, size_t bucket,
 
     INIT_LIST_HEAD(lh);
     if (!list_empty(&bkts->buckets[bucket].list)) {
-        lh->next = bkts->buckets[bucket].list.next;
-        lh->prev = bkts->buckets[bucket].list.prev;
-        lh->next->prev = lh;
-        lh->prev->next = lh;
+        list_splice_init(&bkts->buckets[bucket].list, lh);
     }
 
-    INIT_LIST_HEAD(&bkts->buckets[bucket].list);
     spin_unlock(&bkts->buckets[bucket].lock, irql);
 }
 
@@ -187,13 +186,9 @@ static void rcu_exec_callbacks(struct rcu_buckets *buckets, uint64_t target) {
 
     list_for_each_entry_safe(iter, tmp, &lh, list) {
         list_del_init(&iter->list);
-        iter->gen_when_called = target;
+        iter->gen_when_called = target - 1;
         iter->fn(iter, iter->arg);
     }
-}
-
-static uint64_t rcu_advance_gp() {
-    return atomic_fetch_add(&global.rcu_gen, 1) + 1;
 }
 
 static void rcu_gp_worker(void *unused) {
@@ -206,22 +201,23 @@ static void rcu_gp_worker(void *unused) {
         /* new GP */
         uint64_t target = rcu_advance_gp();
 
-        while (true) {
-            bool all_cores = true, all_blocked = true;
+        for (;;) {
+            bool everybody_ok = true;
 
             enum irql irql = spin_lock(&thread_list.lock);
             struct thread *t, *tmp;
             list_for_each_entry_safe(t, tmp, &thread_list.list, thread_list) {
                 if (thread_rcu_not_reached_target(t, target)) {
-                    all_blocked = false;
+                    everybody_ok = false;
                     break;
                 }
             }
             spin_unlock(&thread_list.lock, irql);
 
-            if (all_cores && all_blocked)
+            if (everybody_ok)
                 break;
 
+            /* yield so readers can make progress */
             scheduler_yield();
         }
 

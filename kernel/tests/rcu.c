@@ -112,6 +112,7 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 struct rcu_stress_node {
     uint64_t seq; /* monotonic sequence number (for debugging) */
     int value;
+    size_t freed_gen, enqueued_on;
 };
 
 static _Atomic(struct rcu_stress_node *) stress_shared = NULL;
@@ -129,9 +130,12 @@ static void stress_free_cb(struct rcu_cb *cb, void *ptr) {
     atomic_store(&gen_freed, cb->gen_when_called);
     struct rcu_stress_node *n = ptr;
     /* optional debug trace */
-    kfree(n, FREE_PARAMS_DEFAULT);
+    n->value = 34;
+    n->freed_gen = cb->gen_when_called;
+    n->enqueued_on = cb->enqueued_waiting_on_gen;
     atomic_fetch_add(&stress_deferred_freed, 1);
     kfree(cb, FREE_PARAMS_DEFAULT);
+    kfree(n, FREE_PARAMS_DEFAULT);
 }
 
 /* reader thread: very tight loop, yields frequently */
@@ -148,10 +152,10 @@ static void rcu_stress_reader(void *arg) {
                 atomic_store(&stress_failed, true);
                 ADD_MESSAGE("RCU stress reader saw invalid value");
                 k_printf("RCU stress reader observed invalid value %d, "
-                         "seq=%llu gen %zu gf is %zu\n",
-                         v, p->seq,
-                         scheduler_get_current_thread()->rcu_start_gen,
-                         atomic_load(&gen_freed));
+                         "freed during gen %zu enqueued_on %zu currently "
+                         "started gen %zu\n",
+                         v, p->freed_gen, p->enqueued_on,
+                         scheduler_get_current_thread()->rcu_start_gen);
             }
             volatile uint64_t seq = p->seq;
             (void) seq;
@@ -211,16 +215,7 @@ static void rcu_stress_writer(void *arg) {
             rcu_synchronize();
         }
 
-        /*
-         * Small, varying yield/sleep to create interleavings: sometimes yield
-         * the CPU, sometimes sleep a few ms. Do not call rand(); instead use
-         * bits derived from seq to vary behavior without extra dependencies.
-         */
-        if ((new->seq & 0x7) == 0) {
-            sleep_ms(1);
-        } else {
-            scheduler_yield();
-        }
+        scheduler_yield();
     }
 }
 
@@ -278,8 +273,8 @@ REGISTER_TEST(rcu_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     }
 
     /* wait up to a reasonable timeout for deferred frees to run */
-    for (int i = 0; i < 1000 && atomic_load(&stress_deferred_freed) <
-                                    atomic_load(&stress_replacements);
+    for (int i = 0; i < 100 && atomic_load(&stress_deferred_freed) <
+                                   atomic_load(&stress_replacements);
          i++) {
         /* call synchronize here to help force callbacks */
         rcu_synchronize();

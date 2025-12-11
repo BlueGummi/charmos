@@ -317,8 +317,10 @@ struct thread {
     _Atomic uint32_t rcu_nesting;  /* incremented by this thread only */
     _Atomic uint64_t rcu_seen_gen; /* last gen seen (release store) */
     _Atomic uint64_t rcu_start_gen;
+    _Atomic uint64_t rcu_quiescent_gen;
 
     /* Block/sleep and wake sync. */
+    atomic_bool yielded_after_wait;
     _Atomic enum thread_wait_type wait_type;
     void *expected_wake_src;
     uint64_t wait_token;

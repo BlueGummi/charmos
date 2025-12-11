@@ -70,10 +70,6 @@ static inline bool needs_migration(struct thread *t) {
     return t->migrate_to != -1;
 }
 
-static inline void update_core_current_thread(struct thread *next) {
-    smp_core()->current_thread = next;
-}
-
 static inline void update_thread_before_save(struct thread *thread,
                                              time_t time) {
     thread_set_state(thread, THREAD_STATE_READY);
@@ -197,8 +193,7 @@ static struct thread *pick_thread(struct scheduler *sched, time_t now_ms) {
 static void load_thread(struct scheduler *sched, struct thread *next,
                         time_t time) {
     sched->current = next;
-    if (!next)
-        return;
+    smp_core()->current_thread = next;
 
     thread_set_last_ran(next, smp_core_id());
     next->curr_core = smp_core_id();
@@ -212,8 +207,6 @@ static void load_thread(struct scheduler *sched, struct thread *next,
      * and becomes treated like a regular thread)! */
     if (next->state != THREAD_STATE_IDLE_THREAD)
         thread_set_state(next, THREAD_STATE_RUNNING);
-
-    update_core_current_thread(next);
 }
 
 static inline struct thread *load_idle_thread(struct scheduler *sched) {
@@ -257,7 +250,9 @@ static void change_tick(struct scheduler *sched, struct thread *next) {
 
 static inline void context_switch(struct scheduler *sched, struct thread *curr,
                                   struct thread *next, enum irql irql) {
-    rcu_note_context_switch_out(curr);
+    if (curr)
+        atomic_store_explicit(&curr->yielded_after_wait, true,
+                              memory_order_release);
 
     if (curr != next)
         next->context_switches++;

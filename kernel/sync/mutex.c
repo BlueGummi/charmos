@@ -43,7 +43,7 @@ static void block_on_simple_mutex(struct mutex_simple *m) {
     enum irql irql = spin_lock(&m->lock);
     thread_block_on(&m->waiters, THREAD_WAIT_UNINTERRUPTIBLE, m);
     spin_unlock(&m->lock, irql);
-    thread_wait_for_wake_match();
+    scheduler_yield();
 }
 
 void mutex_simple_lock(struct mutex_simple *m) {
@@ -171,7 +171,6 @@ void mutex_lock(struct mutex *mutex) {
          * or something. regardless, this is turnstile time */
         enum irql ts_lock_irql;
         struct turnstile *ts = turnstile_lookup(mutex, &ts_lock_irql);
-        mutex_set_waiter_bit(mutex); /* time to wait */
 
         /* just kidding, the owner went back to running, we spin again :^) */
         if (mutex_owner_running(mutex)) {
@@ -181,8 +180,7 @@ void mutex_lock(struct mutex *mutex) {
 
         /* owner unchanged, waiter bit still the same...
          * time to do the slow path */
-        if (mutex_get_owner(mutex) == current_owner &&
-            mutex_get_waiter_bit(mutex)) {
+        if (mutex_get_owner(mutex) == current_owner) {
             turnstile_block(ts, TURNSTILE_WRITER_QUEUE, mutex, ts_lock_irql);
 
             /* we do the dance all over again */

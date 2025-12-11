@@ -70,6 +70,7 @@ void isr_common_entry(uint8_t vector, void *rsp) {
         if (curr)
             curr->preemptions++;
 
+        kassert(old != IRQL_DISPATCH_LEVEL);
         scheduler_yield();
     }
 }

@@ -416,8 +416,7 @@ void v_k_printf(struct printf_cursor *csr, const char *format, va_list args) {
 }
 
 void k_printf(const char *format, ...) {
-    bool i = are_interrupts_enabled(); /* pattern is used since this is called
-                                          from preempt_raise/lower */
+    bool i = are_interrupts_enabled(); 
     disable_interrupts();
     spin_lock_raw(&k_printf_lock);
     va_list args;

@@ -115,25 +115,17 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
         struct tlb_shootdown_cpu *other = &global.shootdown_data[i];
 
         uint64_t target_gen = gen;
-        unsigned spin = TLB_SHOOTDOWN_INITIAL_SPIN;
+        size_t spin = TLB_SHOOTDOWN_INITIAL_SPIN;
 
         for (;;) {
             /* spin for 'spin' iterations checking the ack */
-            unsigned s;
+            size_t s;
             for (s = 0; s < spin; ++s) {
                 if (atomic_load_explicit(&other->ack_gen,
                                          memory_order_acquire) >= target_gen)
                     break;
-                /* if the other core has started
-                 * handling the shootdown, give it more time */
-                if (atomic_load_explicit(&other->in_tlb_shootdown,
-                                         memory_order_acquire)) {
-                    cpu_relax();
-                } else {
-                    /* if not in shootdown, still do a relax so we don't
-                     * hot-loop */
-                    cpu_relax();
-                }
+
+                cpu_relax();
             }
 
             if (atomic_load_explicit(&other->ack_gen, memory_order_acquire) >=

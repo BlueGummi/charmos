@@ -17,12 +17,10 @@ void mutex_simple_unlock(struct mutex_simple *m);
  *
  *      ┌─────────────────────────┐
  * Bits │  ....  ....  ....  3..0 │
- * Use  │  %%%%  %%%%  %%%%  %rwh │
+ * Use  │  %%%%  %%%%  %%%%  %rrh │
  *      └─────────────────────────┘
  *
  * h - "held" - is the lock held?
- *
- * w - "waiters" - is there a waiter?
  *
  * r - reserved for future use
  *
@@ -32,10 +30,9 @@ void mutex_simple_unlock(struct mutex_simple *m);
 
 enum mutex_bits : uintptr_t {
     MUTEX_HELD_BIT = 1,
-    MUTEX_WAITER_BIT = 1 << 1,
 };
 
-#define MUTEX_META_BITS (MUTEX_HELD_BIT | MUTEX_WAITER_BIT)
+#define MUTEX_META_BITS (MUTEX_HELD_BIT)
 
 struct mutex {
     _Atomic(uintptr_t) lock_word;

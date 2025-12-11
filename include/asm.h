@@ -266,29 +266,3 @@ static inline void wait_for_interrupt(void) {
 static inline int clz(uint8_t a) {
     return __builtin_clz(a);
 }
-
-#define compiler_barrier() asm volatile("" ::: "memory")
-
-#if defined(__x86_64__) || defined(__i386__)
-
-#define memory_barrier() asm volatile("mfence" ::: "memory")
-#define memory_barrier_acquire()                                               \
-    compiler_barrier() // loads are never reordered after loads
-#define memory_barrier_release()                                               \
-    compiler_barrier() // stores before stores guaranteed
-
-#elif defined(__aarch64__)
-
-#define memory_barrier() asm volatile("dsb sy" ::: "memory")
-#define memory_barrier_acquire() asm volatile("dmb ishld" ::: "memory")
-#define memory_barrier_release() asm volatile("dmb ishst" ::: "memory")
-
-#elif defined(__riscv)
-
-#define memory_barrier() asm volatile("fence iorw, iorw" ::: "memory")
-#define memory_barrier_acquire() asm volatile("fence ir, ir" ::: "memory")
-#define memory_barrier_release() asm volatile("fence ow, ow" ::: "memory")
-
-#else
-#error "Unsupported architecture for memory barriers"
-#endif

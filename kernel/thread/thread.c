@@ -95,6 +95,8 @@ void thread_exit() {
     atomic_store(&self->state, THREAD_STATE_ZOMBIE);
     reaper_enqueue(self);
 
+    locked_list_del(&thread_list, &self->thread_list);
+
     irql_lower(irql);
 
     scheduler_yield();
@@ -190,6 +192,7 @@ static struct thread *thread_init(struct thread *thread,
     thread->regs.rip = (uint64_t) thread_entry_wrapper;
     thread->stack = (void *) stack;
     thread->curr_core = -1;
+    thread->rcu_quiescent_gen = UINT64_MAX;
     thread->id = tid_alloc(global_tid_space);
     thread->refcount = 1;
     thread->timeslice_length_raw_ms = THREAD_DEFAULT_TIMESLICE;
@@ -363,11 +366,11 @@ void thread_free(struct thread *t) {
     }
 
 destroy:
+
     tid_free(global_tid_space, t->id);
     kfree(t->activity_data, FREE_PARAMS_DEFAULT);
     kfree(t->activity_stats, FREE_PARAMS_DEFAULT);
     kfree(t->name, FREE_PARAMS_DEFAULT);
-    locked_list_del(&thread_list, &t->thread_list);
 
     kfree(t->turnstile, FREE_PARAMS_DEFAULT);
     thread_free_event_apcs(t);

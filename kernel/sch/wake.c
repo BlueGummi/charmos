@@ -2,6 +2,9 @@
 
 bool scheduler_wake(struct thread *t, enum thread_wake_reason reason,
                     enum thread_prio_class prio, void *wake_src) {
+    while (!atomic_load_explicit(&t->yielded_after_wait, memory_order_acquire))
+        cpu_relax();
+    
     enum thread_flags old;
     struct scheduler *sch = global.schedulers[thread_get_last_ran(t, &old)];
 
