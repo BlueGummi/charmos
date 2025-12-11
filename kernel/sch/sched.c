@@ -195,6 +195,8 @@ static void load_thread(struct scheduler *sched, struct thread *next,
     sched->current = next;
     smp_core()->current_thread = next;
 
+    kassert(next);
+
     thread_set_last_ran(next, smp_core_id());
     next->curr_core = smp_core_id();
     next->run_start_time = time;

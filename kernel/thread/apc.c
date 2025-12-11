@@ -93,7 +93,9 @@ static void deliver_apc_type(struct thread *t, enum apc_type type) {
     struct apc *apc;
 
     while (true) {
-        enum irql irql = thread_acquire(t);
+        bool ok;
+        enum irql irql = thread_acquire(t, &ok);
+        kassert(ok); /* should not fail */
 
         if (apc_list_empty(t, type)) {
             apc_list_unset_bitmask(t, type);
@@ -163,7 +165,10 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
     if (!thread_apc_sanity_check(t))
         return;
 
-    enum irql irql = thread_acquire(t);
+    bool ok;
+    enum irql irql = thread_acquire(t, &ok);
+    if (!ok)
+        return;
 
     add_apc_to_thread(t, a, type);
     thread_release(t, irql);
@@ -186,7 +191,10 @@ void apc_enqueue_event_apc(struct thread *t, struct apc *a,
     if (!thread_apc_sanity_check(t))
         return;
 
-    enum irql irql = thread_acquire(t);
+    bool ok;
+    enum irql irql = thread_acquire(t, &ok);
+    if (!ok)
+        return;
 
     list_add_tail(&a->list, &t->on_event_apcs[evt]);
 
@@ -229,7 +237,10 @@ bool apc_cancel(struct apc *a) {
 
     struct thread *t = a->owner;
     bool removed = false;
-    enum irql irql = thread_acquire(t);
+    bool ok;
+    enum irql irql = thread_acquire(t, &ok);
+    if (!ok)
+        return false;
 
     apc_set_cancelled(a);
 

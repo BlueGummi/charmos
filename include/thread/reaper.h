@@ -1,12 +1,13 @@
 /* @title: Thread reaper */
 #pragma once
-#include <thread/thread.h>
-#include <thread/queue.h>
+#include <structures/locked_list.h>
 #include <sync/condvar.h>
 #include <sync/spinlock.h>
+#include <thread/queue.h>
+#include <thread/thread.h>
 
 struct thread_reaper {
-    struct thread_queue queue;
+    struct locked_list list;
     struct spinlock lock;
     struct condvar cv;
     uint64_t reaped_threads;

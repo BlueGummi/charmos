@@ -93,6 +93,7 @@ void thread_exit() {
         k_panic("What? Thread is already dying but has not exited\n");
 
     atomic_store(&self->state, THREAD_STATE_ZOMBIE);
+    atomic_store_explicit(&self->dying, true, memory_order_release);
     reaper_enqueue(self);
 
     locked_list_del(&thread_list, &self->thread_list);
@@ -215,6 +216,7 @@ static struct thread *thread_init(struct thread *thread,
     INIT_LIST_HEAD(&thread->rq_list_node);
     INIT_LIST_HEAD(&thread->wq_list_node);
     INIT_LIST_HEAD(&thread->rcu_list_node);
+    INIT_LIST_HEAD(&thread->reaper_list);
     rbt_init_node(&thread->rq_tree_node);
     rbt_init_node(&thread->wq_tree_node);
 

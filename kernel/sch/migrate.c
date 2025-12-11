@@ -71,7 +71,11 @@ void thread_migrate(struct thread *t, size_t dest_core) {
      * unmark it as NO_STEAL */
     thread_set_flags(t, flags);
 
-    tirql = thread_acquire(t);
+    bool ok;
+    tirql = thread_acquire(t, &ok);
+    if (!ok)
+        goto end;
+
     spin_lock_raw(&t->being_moved);
 
     /* bro cannot be migrated */
@@ -93,6 +97,7 @@ out:
 
     spin_unlock_raw(&t->being_moved);
     thread_release(t, tirql);
+end:
     if (src < dst) {
         scheduler_unlock(dst, dirql);
         scheduler_unlock(src, sirql);

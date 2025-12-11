@@ -217,6 +217,7 @@ struct thread {
     struct cpu_context regs;
 
     /* ========== Structure nodes ========== */
+    struct list_head reaper_list; /* reaper list */
     struct list_head thread_list; /* global list of threads */
 
     /* Runqueue nodes */
@@ -500,7 +501,7 @@ static inline uint64_t thread_set_last_ran(struct thread *t, uint64_t new) {
     return atomic_exchange(&t->last_ran, new);
 }
 
-static inline bool thread_try_getref(struct thread *t) {
+static inline bool thread_get(struct thread *t) {
     uint32_t old;
 
     for (;;) {
@@ -531,10 +532,6 @@ static inline bool thread_try_getref(struct thread *t) {
     }
 }
 
-static inline bool thread_get(struct thread *t) {
-    return refcount_inc_not_zero(&t->refcount);
-}
-
 static inline void thread_put(struct thread *t) {
     if (refcount_dec_and_test(&t->refcount)) {
         if (thread_get_state(t) != THREAD_STATE_TERMINATED)
@@ -544,10 +541,13 @@ static inline void thread_put(struct thread *t) {
     }
 }
 
-static inline enum irql thread_acquire(struct thread *t) {
-    if (!refcount_inc_not_zero(&t->refcount))
-        k_panic("UAF\n");
+static inline enum irql thread_acquire(struct thread *t, bool *success) {
+    if (!thread_get(t)) {
+        *success = false;
+        return IRQL_NONE;
+    }
 
+    *success = true;
     return spin_lock_irq_disable(&t->lock);
 }
 

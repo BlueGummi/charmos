@@ -2,9 +2,11 @@
 
 bool scheduler_wake(struct thread *t, enum thread_wake_reason reason,
                     enum thread_prio_class prio, void *wake_src) {
+    kassert(t);
+    enum irql outer = irql_raise(IRQL_HIGH_LEVEL);
     while (!atomic_load_explicit(&t->yielded_after_wait, memory_order_acquire))
         cpu_relax();
-    
+
     enum thread_flags old;
     struct scheduler *sch = global.schedulers[thread_get_last_ran(t, &old)];
 
@@ -22,8 +24,11 @@ bool scheduler_wake(struct thread *t, enum thread_wake_reason reason,
      */
 
     bool woke = false;
+    bool ok;
     enum irql irql = scheduler_lock_irq_disable(sch);
-    enum irql tirql = thread_acquire(t);
+    enum irql tirql = thread_acquire(t, &ok);
+    if (!ok)
+        goto end;
 
     /* now that we have acquired the locks, we will take a
      * peek at the wait type.
@@ -33,8 +38,10 @@ bool scheduler_wake(struct thread *t, enum thread_wake_reason reason,
     enum thread_wait_type wt = thread_get_wait_type(t);
     if ((wt == THREAD_WAIT_UNINTERRUPTIBLE &&
          t->expected_wake_src != wake_src) ||
-        wt == THREAD_WAIT_NONE)
+        wt == THREAD_WAIT_NONE) {
+        k_printf("hmmmm\n");
         goto out;
+    }
 
     woke = true;
 
@@ -51,8 +58,10 @@ bool scheduler_wake(struct thread *t, enum thread_wake_reason reason,
     }
 
 out:
-    thread_release(t, tirql);
-    scheduler_unlock(sch, irql);
     thread_set_flags(t, old);
+    thread_release(t, tirql);
+end:
+    scheduler_unlock(sch, irql);
+    irql_lower(outer);
     return woke;
 }

@@ -472,11 +472,14 @@ static bool set_state_and_update_reason(
     /* do not preempt us. this is raised to HIGH because it is sometimes
      * called from HIGH and we can't "raise from HIGH to DISPATCH" */
     enum irql irql;
+    bool aok = true;
 
     if (!already_locked)
-        irql = thread_acquire(t);
+        irql = thread_acquire(t, &aok);
     else
         kassert(spinlock_held(&t->lock));
+
+    kassert(aok);
 
     /* wake_matched can only be altered from within this locked section.
      *

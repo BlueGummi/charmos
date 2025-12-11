@@ -13,24 +13,14 @@ void reaper_signal() {
 }
 
 void reaper_enqueue(struct thread *t) {
-    thread_queue_push_back(&reaper.queue, t);
-    condvar_signal(&reaper.cv);
+    locked_list_add(&reaper.list, &t->reaper_list);
+    reaper_signal();
 }
 
 void reaper_init(void) {
-    thread_queue_init(&reaper.queue);
+    locked_list_init(&reaper.list);
     condvar_init(&reaper.cv, CONDVAR_INIT_NORMAL);
     reaper_thread = thread_spawn("reaper_thread", reaper_thread_main, NULL);
-
-    struct cpu_mask cmask;
-    cpu_mask_init(&cmask, global.core_count);
-    cpu_mask_set_all(&cmask);
-
-    struct daemon_attributes attrs = {
-        .max_timesharing_threads = 1,
-        .thread_cpu_mask = cmask,
-        .flags = DAEMON_FLAG_HAS_NAME,
-    };
 }
 
 uint64_t reaper_get_reaped_thread_count(void) {
@@ -43,23 +33,24 @@ void reaper_thread_main(void *unused) {
         enum irql irql = spin_lock(&reaper.lock);
 
         enum irql out;
-        while (list_empty(&reaper.queue.list))
+        while (locked_list_empty(&reaper.list))
             condvar_wait(&reaper.cv, &reaper.lock, irql, &out);
 
-        struct thread_queue local;
-        thread_queue_init(&local);
+        struct list_head local;
+        INIT_LIST_HEAD(&local);
 
-        enum irql tlist = spin_lock_irq_disable(&reaper.queue.lock);
-        list_splice_init(&reaper.queue.list, &local.list);
-        spin_unlock(&reaper.queue.lock, tlist);
+        enum irql tlist = spin_lock_irq_disable(&reaper.list.lock);
+        list_splice_init(&reaper.list.list, &local);
+        spin_unlock(&reaper.list.lock, tlist);
 
         spin_unlock(&reaper.lock, out);
 
-        struct thread *t;
-        while ((t = thread_queue_pop_front(&local)) != NULL) {
+        struct list_head *lh;
+        while ((lh = list_pop_front_init(&local)) != NULL) {
+            struct thread *t = container_of(lh, struct thread, reaper_list);
 
             if (refcount_read(&t->refcount) != 1) {
-                thread_queue_push_back(&reaper.queue, t);
+                locked_list_add(&reaper.list, &t->reaper_list);
                 break;
             }
 
