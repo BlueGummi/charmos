@@ -12,6 +12,17 @@
 
 #include "sch/internal.h" /* for tick_enabled */
 
+static bool rcu_all_cores_seen_gp(uint64_t target);
+
+static inline bool thread_rcu_not_reached_target(struct thread *t,
+                                                 uint64_t target) {
+    uint32_t nesting =
+        atomic_load_explicit(&t->rcu_nesting, memory_order_acquire);
+    uint64_t seen =
+        atomic_load_explicit(&t->rcu_seen_gen, memory_order_acquire);
+    return (nesting != 0) || (seen < target);
+}
+
 static uint64_t rcu_read_global_gen(void) {
     return atomic_load_explicit(&global.rcu_gen, memory_order_acquire);
 }
@@ -91,7 +102,30 @@ void rcu_synchronize(void) {
     rcu_worker_notify();
 
     for (;;) {
-        if (rcu_read_global_gen() >= target)
+        bool all_done = true;
+
+        struct core *c;
+        for_each_cpu_struct(c) {
+            if (atomic_load_explicit(&c->rcu_seen_gen, memory_order_acquire) <
+                    target ||
+                atomic_load_explicit(&c->rcu_quiescent, memory_order_acquire) ==
+                    false) {
+                all_done = false;
+                break;
+            }
+        }
+
+        enum irql irql = spin_lock_irq_disable(&rcu_blocked_lock);
+        struct thread *t, *tmp;
+        list_for_each_entry_safe(t, tmp, &rcu_thread_list, rcu_list_node) {
+            if (thread_rcu_not_reached_target(t, target)) {
+                all_done = false;
+                break;
+            }
+        }
+        spin_unlock(&rcu_blocked_lock, irql);
+
+        if (all_done)
             break;
 
         scheduler_yield();
@@ -116,7 +150,7 @@ void rcu_maintenance_tick(void) {
 
 void rcu_read_lock(void) {
     struct thread *t = scheduler_get_current_thread();
-    if (t->rcu_nesting++ == 0)
+    if (atomic_fetch_add(&t->rcu_nesting, 1) == 0)
         t->rcu_start_gen = rcu_read_global_gen();
 
     smp_mb(); /* prevent compiler reorder of loads/stores in critical section */
@@ -126,7 +160,7 @@ void rcu_read_unlock(void) {
     struct thread *t = scheduler_get_current_thread();
     smp_mb(); /* pair with entry barrier */
 
-    uint32_t old = t->rcu_nesting--;
+    uint32_t old = atomic_fetch_sub(&t->rcu_nesting, 1);
     if (old == 0) {
         k_panic("underflow\n");
     }
@@ -247,13 +281,6 @@ static void rcu_remove_quiescent_thread(struct thread *t) {
     /* thread is quiescent, remove it from list */
     list_del_init(&t->rcu_list_node);
     atomic_store_explicit(&t->rcu_blocked, false, memory_order_release);
-}
-
-static inline bool thread_rcu_not_reached_target(struct thread *t,
-                                                 uint64_t target) {
-    return atomic_load_explicit(&t->rcu_nesting, memory_order_acquire) != 0 ||
-           atomic_load_explicit(&t->rcu_seen_gen, memory_order_acquire) <
-               target;
 }
 
 static void rcu_gp_worker(void *unused) {

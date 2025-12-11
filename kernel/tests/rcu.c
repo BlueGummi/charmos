@@ -144,14 +144,12 @@ static void rcu_stress_reader(void *arg) {
         struct rcu_stress_node *p = rcu_dereference(stress_shared);
         if (p) {
             int v = p->value;
-            /* allowed values are 42 or 43; anything else indicates corruption
-             */
             if (v != 42 && v != 43) {
                 atomic_store(&stress_failed, true);
                 ADD_MESSAGE("RCU stress reader saw invalid value");
                 k_printf(
                     "RCU stress reader observed invalid value %d, seq=%llu\n",
-                    v, (unsigned long long) p->seq);
+                    v, p->seq);
             }
             volatile uint64_t seq = p->seq;
             (void) seq;

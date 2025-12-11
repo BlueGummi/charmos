@@ -84,7 +84,6 @@ __no_sanitize_address void k_main(void) {
     thread_init_thread_ids();
     scheduler_init();
     turnstiles_init();
-    prng_seed(time_get_us());
     bootstage_advance(BOOTSTAGE_MID_SCHEDULER);
 
     cmdline_parse(cmdline_request.response->cmdline);
@@ -92,6 +91,7 @@ __no_sanitize_address void k_main(void) {
     dpc_init_percpu();
     smp_complete_init();
     percpu_obj_init();
+    prng_seed(time_get_us());
 
     srat_init();
     slit_init();

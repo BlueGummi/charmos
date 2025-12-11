@@ -272,4 +272,33 @@ REGISTER_TEST(dpc_on_event_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
 }
 
+#define SCHED_PUSH_TEST_THREADS 256
+
+static atomic_uint left = SCHED_PUSH_TEST_THREADS;
+static atomic_bool at_least_one_migrated = false;
+
+static void sched_push_try(void *) {
+    while (smp_core_id() == 0 && !atomic_load(&at_least_one_migrated))
+        scheduler_yield();
+
+    atomic_fetch_sub(&left, 1);
+    atomic_store(&at_least_one_migrated, true);
+}
+
+REGISTER_TEST(sched_push_target_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+    ADD_MESSAGE("This test takes a bit. uncomment me to run it");
+    SET_SKIP();
+    return;
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
+    for (size_t i = 0; i < SCHED_PUSH_TEST_THREADS; i++) {
+        thread_spawn_on_core("push_test_%zu", sched_push_try, NULL, 0, i);
+    }
+    irql_lower(irql);
+
+    while (!atomic_load(&left))
+        scheduler_yield();
+
+    SET_SUCCESS();
+}
+
 #endif
