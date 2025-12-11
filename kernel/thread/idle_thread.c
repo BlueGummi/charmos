@@ -11,7 +11,6 @@ void scheduler_idle_main(void *nop) {
 
     while (true) {
         enable_interrupts();
-        rcu_mark_quiescent();
         scheduler_resched_if_needed();
         wait_for_interrupt();
     }

@@ -1,12 +1,12 @@
 /* @title: Per-CPU structure */
 #pragma once
-#include <thread/dpc.h>
 #include <sch/irql.h>
 #include <smp/topology.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <thread/dpc.h>
 
 /* Let's put commonly accessed fields up here
  * to make the cache a bit happier */
@@ -43,9 +43,6 @@ struct core {
     struct tss *tss;
 
     uint32_t lapic_freq;
-    atomic_size_t rcu_seen_gen;
-    uint32_t rcu_nesting;
-    atomic_bool rcu_quiescent;
 
     struct topology_node *topo_node;
     struct topology_cache_info llc;

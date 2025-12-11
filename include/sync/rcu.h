@@ -8,10 +8,7 @@
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
 
-#define RCU_GRACE_DELAY_MS (100)
-#define RCU_RING_ORDER 8
 #define RCU_BUCKETS 2
-#define RCU_RING_SIZE (1 << RCU_RING_ORDER)
 
 struct rcu_cb;
 typedef void (*rcu_fn)(struct rcu_cb *, void *);
@@ -20,6 +17,7 @@ struct rcu_cb {
     struct list_head list;
     rcu_fn fn;
     void *arg;
+    size_t gen_when_called;
 };
 #define rcu_cb_from_list_node(ln) (container_of(ln, struct rcu_cb, list))
 
@@ -33,20 +31,16 @@ struct rcu_buckets {
     struct rcu_bucket buckets[RCU_BUCKETS];
 };
 
-void rcu_mark_quiescent(void);
 void rcu_synchronize(void);
 void rcu_defer(struct rcu_cb *cb, rcu_fn fn, void *arg);
 void rcu_maintenance_tick(void);
 void rcu_read_lock(void);
 void rcu_read_unlock(void);
-void rcu_call(struct rcu_cb *cb, rcu_fn fn, void *arg);
 void rcu_init(void);
 void rcu_worker_notify(void);
 
 struct thread;
 void rcu_note_context_switch_out(struct thread *old);
-void rcu_blocked_enqueue(struct thread *t, uint64_t gen);
-void rcu_blocked_remove(struct thread *t);
 
 #define rcu_dereference(p) atomic_load_explicit(&(p), memory_order_acquire)
 

@@ -25,7 +25,7 @@ REGISTER_SLAB_SIZE(thread, sizeof(struct thread));
 static struct tid_space *global_tid_space = NULL;
 static struct vas_space *stacks_space = NULL;
 static struct thread_request_list *rq_lists = NULL;
-static struct locked_list thread_list;
+struct locked_list thread_list;
 
 void thread_init_thread_ids(void) {
     stacks_space =
@@ -367,11 +367,6 @@ destroy:
     kfree(t->activity_data, FREE_PARAMS_DEFAULT);
     kfree(t->activity_stats, FREE_PARAMS_DEFAULT);
     kfree(t->name, FREE_PARAMS_DEFAULT);
-    if (atomic_load(&t->rcu_blocked)) {
-        atomic_store(&t->rcu_blocked, false);
-        rcu_blocked_remove(t);
-    }
-
     locked_list_del(&thread_list, &t->thread_list);
 
     kfree(t->turnstile, FREE_PARAMS_DEFAULT);

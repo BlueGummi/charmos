@@ -12,15 +12,15 @@
 
 #include "sch/internal.h" /* for tick_enabled */
 
-static bool rcu_all_cores_seen_gp(uint64_t target);
+extern struct locked_list thread_list;
 
 static inline bool thread_rcu_not_reached_target(struct thread *t,
                                                  uint64_t target) {
     uint32_t nesting =
         atomic_load_explicit(&t->rcu_nesting, memory_order_acquire);
-    uint64_t seen =
-        atomic_load_explicit(&t->rcu_seen_gen, memory_order_acquire);
-    return (nesting != 0) || (seen < target);
+    uint64_t start_gen =
+        atomic_load_explicit(&t->rcu_start_gen, memory_order_acquire);
+    return (nesting != 0) || (start_gen != 0 && start_gen < target);
 }
 
 static uint64_t rcu_read_global_gen(void) {
@@ -29,8 +29,6 @@ static uint64_t rcu_read_global_gen(void) {
 
 static void rcu_build_buckets(struct rcu_buckets *bkt, size_t domain);
 
-static LIST_HEAD(rcu_thread_list);
-static struct spinlock rcu_blocked_lock = SPINLOCK_INIT;
 PERDOMAIN_DECLARE(rcu_buckets, struct rcu_buckets, rcu_build_buckets);
 
 static void rcu_build_buckets(struct rcu_buckets *bkt, size_t domain) {
@@ -50,51 +48,17 @@ void rcu_worker_notify() {
     }
 }
 
-void rcu_blocked_enqueue(struct thread *t, uint64_t gen) {
-    t->rcu_blocked_gen = gen;
-    enum irql irql = spin_lock_irq_disable(&rcu_blocked_lock);
-    list_add_tail(&t->rcu_list_node, &rcu_thread_list);
-    spin_unlock(&rcu_blocked_lock, irql);
-}
-
-void rcu_blocked_remove(struct thread *t) {
-    enum irql irql = spin_lock_irq_disable(&rcu_blocked_lock);
-    list_del_init(&t->rcu_list_node);
-    spin_unlock(&rcu_blocked_lock, irql);
-}
-
 void rcu_note_context_switch_out(struct thread *old) {
     if (!old)
         return;
 
-    uint32_t nest = old->rcu_nesting;
+    uint32_t nest =
+        atomic_load_explicit(&old->rcu_nesting, memory_order_acquire);
 
     if (nest == 0) {
-        /* thread is quiescent — publish core / thread seen_gen */
         atomic_store_explicit(&old->rcu_seen_gen, rcu_read_global_gen(),
                               memory_order_release);
-    } else {
-        /* thread was preempted inside an RCU read-side critical section:
-           mark blocked and add to blocked list for GP accounting */
-        bool was_blocked = atomic_exchange_explicit(&old->rcu_blocked, true,
-                                                    memory_order_acq_rel);
-        if (!was_blocked) {
-            uint64_t cur_gen = rcu_read_global_gen();
-            old->rcu_blocked_gen = cur_gen;
-            rcu_blocked_enqueue(old, cur_gen);
-        }
     }
-}
-
-void rcu_mark_quiescent(void) {
-    struct core *c = smp_core();
-    if (!c)
-        return;
-
-    /* publish current generation as seen by core */
-    uint64_t gen = rcu_read_global_gen();
-    atomic_store_explicit(&c->rcu_seen_gen, gen, memory_order_release);
-    atomic_store_explicit(&c->rcu_quiescent, true, memory_order_release);
 }
 
 void rcu_synchronize(void) {
@@ -104,26 +68,15 @@ void rcu_synchronize(void) {
     for (;;) {
         bool all_done = true;
 
-        struct core *c;
-        for_each_cpu_struct(c) {
-            if (atomic_load_explicit(&c->rcu_seen_gen, memory_order_acquire) <
-                    target ||
-                atomic_load_explicit(&c->rcu_quiescent, memory_order_acquire) ==
-                    false) {
-                all_done = false;
-                break;
-            }
-        }
-
-        enum irql irql = spin_lock_irq_disable(&rcu_blocked_lock);
+        enum irql irql = spin_lock(&thread_list.lock);
         struct thread *t, *tmp;
-        list_for_each_entry_safe(t, tmp, &rcu_thread_list, rcu_list_node) {
+        list_for_each_entry_safe(t, tmp, &thread_list.list, thread_list) {
             if (thread_rcu_not_reached_target(t, target)) {
                 all_done = false;
                 break;
             }
         }
-        spin_unlock(&rcu_blocked_lock, irql);
+        spin_unlock(&thread_list.lock, irql);
 
         if (all_done)
             break;
@@ -133,7 +86,24 @@ void rcu_synchronize(void) {
 }
 
 void rcu_defer(struct rcu_cb *cb, rcu_fn func, void *arg) {
-    rcu_call(cb, func, arg);
+
+    cb->fn = func;
+    cb->arg = arg;
+    INIT_LIST_HEAD(&cb->list);
+
+    size_t bucket = (rcu_read_global_gen() + 1) & (RCU_BUCKETS - 1);
+
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
+
+    struct rcu_buckets *buckets = &PERDOMAIN_READ(rcu_buckets);
+
+    enum irql lirql = spin_lock(&buckets->buckets[bucket].lock);
+    list_add_tail(&cb->list, &buckets->buckets[bucket].list);
+    spin_unlock(&buckets->buckets[bucket].lock, lirql);
+
+    semaphore_post(&buckets->sem);
+
+    irql_lower(irql);
 }
 
 void rcu_maintenance_tick(void) {
@@ -149,35 +119,30 @@ void rcu_maintenance_tick(void) {
 }
 
 void rcu_read_lock(void) {
+    enum irql irql = spin_lock(&thread_list.lock);
     struct thread *t = scheduler_get_current_thread();
-    if (atomic_fetch_add(&t->rcu_nesting, 1) == 0)
-        t->rcu_start_gen = rcu_read_global_gen();
-
-    smp_mb(); /* prevent compiler reorder of loads/stores in critical section */
+    uint64_t gen = rcu_read_global_gen();
+    uint32_t old = atomic_fetch_add(&t->rcu_nesting, 1);
+    if (old == 0) {
+        atomic_store_explicit(&t->rcu_start_gen, gen, memory_order_relaxed);
+    }
+    spin_unlock(&thread_list.lock, irql);
 }
 
 void rcu_read_unlock(void) {
+    enum irql irql = spin_lock(&thread_list.lock);
     struct thread *t = scheduler_get_current_thread();
-    smp_mb(); /* pair with entry barrier */
 
     uint32_t old = atomic_fetch_sub(&t->rcu_nesting, 1);
     if (old == 0) {
-        k_panic("underflow\n");
+        k_panic("RCU nesting underflow\n");
     }
 
     if (old == 1) {
-        /* publish quiescent for this thread */
-        uint64_t gen = rcu_read_global_gen();
-        atomic_store_explicit(&t->rcu_seen_gen, gen, memory_order_release);
-
-        /* If we were flagged blocked (preempted earlier and enqueued),
-           clear the flag and remove from blocked list; wake GP worker. */
-        if (atomic_exchange_explicit(&t->rcu_blocked, false,
-                                     memory_order_acq_rel)) {
-            rcu_blocked_remove(t);
-            semaphore_post(&PERDOMAIN_READ(rcu_buckets).sem);
-        }
+        atomic_store_explicit(&t->rcu_start_gen, 0, memory_order_release);
     }
+    
+    spin_unlock(&thread_list.lock, irql);
 }
 
 bool rcu_work_pending(void) {
@@ -193,26 +158,6 @@ bool rcu_work_pending(void) {
         }
     }
     return false;
-}
-
-void rcu_call(struct rcu_cb *cb, rcu_fn func, void *arg) {
-    cb->fn = func;
-    cb->arg = arg;
-    INIT_LIST_HEAD(&cb->list);
-
-    size_t bucket = rcu_read_global_gen() & (RCU_BUCKETS - 1);
-
-    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
-
-    struct rcu_buckets *buckets = &PERDOMAIN_READ(rcu_buckets);
-
-    enum irql lirql = spin_lock(&buckets->buckets[bucket].lock);
-    list_add_tail(&cb->list, &buckets->buckets[bucket].list);
-    spin_unlock(&buckets->buckets[bucket].lock, lirql);
-
-    semaphore_post(&buckets->sem);
-
-    irql_lower(irql);
 }
 
 /* internal: detach and return head under lock for a given bucket */
@@ -242,45 +187,13 @@ static void rcu_exec_callbacks(struct rcu_buckets *buckets, uint64_t target) {
 
     list_for_each_entry_safe(iter, tmp, &lh, list) {
         list_del_init(&iter->list);
+        iter->gen_when_called = target;
         iter->fn(iter, iter->arg);
     }
 }
 
 static uint64_t rcu_advance_gp() {
-    uint64_t start = rcu_read_global_gen();
-    uint64_t target = start + 1;
-    atomic_store(&global.rcu_gen, target);
-    return target;
-}
-
-/* check cores */
-static bool rcu_all_cores_seen_gp(uint64_t target) {
-    struct core *c;
-
-restart:
-    for_each_cpu_struct(c) {
-        uint64_t seen =
-            atomic_load_explicit(&c->rcu_seen_gen, memory_order_acquire);
-        if (seen < target) {
-            /* if the other CPU is idle, we send it an IPI and retry.
-             * otherwise, we return false */
-            if ((scheduler_core_idle(c) ||
-                 !scheduler_tick_enabled(global.schedulers[c->id])) &&
-                c != smp_core()) {
-                ipi_send(c->id, IRQ_SCHEDULER);
-                goto restart;
-            } else {
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-static void rcu_remove_quiescent_thread(struct thread *t) {
-    /* thread is quiescent, remove it from list */
-    list_del_init(&t->rcu_list_node);
-    atomic_store_explicit(&t->rcu_blocked, false, memory_order_release);
+    return atomic_fetch_add(&global.rcu_gen, 1) + 1;
 }
 
 static void rcu_gp_worker(void *unused) {
@@ -294,24 +207,17 @@ static void rcu_gp_worker(void *unused) {
         uint64_t target = rcu_advance_gp();
 
         while (true) {
-            bool all_cores = rcu_all_cores_seen_gp(target);
-            bool all_blocked = true;
+            bool all_cores = true, all_blocked = true;
 
-            /* check blocked threads list under lock */
-            enum irql irql = spin_lock_irq_disable(&rcu_blocked_lock);
-
+            enum irql irql = spin_lock(&thread_list.lock);
             struct thread *t, *tmp;
-            list_for_each_entry_safe(t, tmp, &rcu_thread_list, rcu_list_node) {
-
+            list_for_each_entry_safe(t, tmp, &thread_list.list, thread_list) {
                 if (thread_rcu_not_reached_target(t, target)) {
                     all_blocked = false;
-                    continue;
+                    break;
                 }
-
-                rcu_remove_quiescent_thread(t);
             }
-
-            spin_unlock(&rcu_blocked_lock, irql);
+            spin_unlock(&thread_list.lock, irql);
 
             if (all_cores && all_blocked)
                 break;

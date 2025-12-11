@@ -6,7 +6,6 @@
 #include <asm.h>
 #include <mem/alloc.h>
 #include <mem/page.h>
-#include <thread/apc.h>
 #include <stdarg.h>
 #include <stdatomic.h>
 #include <stddef.h>
@@ -15,6 +14,7 @@
 #include <structures/pairing_heap.h>
 #include <structures/rbt.h>
 #include <sync/spinlock.h>
+#include <thread/apc.h>
 #include <time.h>
 #include <types/refcount.h>
 #include <types/types.h>
@@ -316,9 +316,7 @@ struct thread {
     /* RCU */
     _Atomic uint32_t rcu_nesting;  /* incremented by this thread only */
     _Atomic uint64_t rcu_seen_gen; /* last gen seen (release store) */
-    atomic_bool rcu_blocked;       /* task was queued as blocked for GP */
-    uint64_t rcu_start_gen;
-    uint64_t rcu_blocked_gen;
+    _Atomic uint64_t rcu_start_gen;
 
     /* Block/sleep and wake sync. */
     _Atomic enum thread_wait_type wait_type;

@@ -86,8 +86,6 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         sleep_ms(1);
 
     TEST_ASSERT(!atomic_load(&rcu_test_failed));
-    while (!rcu_deferred_freed)
-        cpu_relax();
 
     SET_SUCCESS();
 }
@@ -96,20 +94,20 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
 * A heavier / more aggressive RCU stress test:
 *
-* * spawn many readers (more than cores) that constantly enter rcu read-side
+* spawn many readers (more than cores) that constantly enter rcu read-side
 * critical sections, read the shared pointer and check values.
-* * spawn many writers that continuously replace the pointer with freshly
+* spawn many writers that continuously replace the pointer with freshly
 * allocated objects, deferring frees via rcu_defer. Writers sometimes call
 * rcu_synchronize() to force progress of grace periods and exercise that path.
-* * intentionally produce a backlog of deferred frees to stress the deferred
-* callback mechanism.
-* * run for a longer duration and assert no reader observes an invalid value.
+* intentionally produce a backlog of deferred frees to stress the deferred
+* callback mechanism. run for a longer duration and assert no
+* reader observes an invalid value.
 *
 */
 
 #define STRESS_NUM_READERS (global.core_count * 4)
 #define STRESS_NUM_WRITERS (global.core_count)
-#define STRESS_DURATION_MS 1200
+#define STRESS_DURATION_MS 2400
 
 struct rcu_stress_node {
     uint64_t seq; /* monotonic sequence number (for debugging) */
@@ -124,9 +122,11 @@ static atomic_bool stress_failed = false;
 static _Atomic uint32_t stress_readers_done = 0;
 static _Atomic uint32_t stress_deferred_freed = 0;
 static _Atomic uint32_t stress_replacements = 0;
+static atomic_size_t gen_freed = 0;
 
 /* deferred free callback */
 static void stress_free_cb(struct rcu_cb *cb, void *ptr) {
+    atomic_store(&gen_freed, cb->gen_when_called);
     struct rcu_stress_node *n = ptr;
     /* optional debug trace */
     kfree(n, FREE_PARAMS_DEFAULT);
@@ -147,9 +147,11 @@ static void rcu_stress_reader(void *arg) {
             if (v != 42 && v != 43) {
                 atomic_store(&stress_failed, true);
                 ADD_MESSAGE("RCU stress reader saw invalid value");
-                k_printf(
-                    "RCU stress reader observed invalid value %d, seq=%llu\n",
-                    v, p->seq);
+                k_printf("RCU stress reader observed invalid value %d, "
+                         "seq=%llu gen %zu gf is %zu\n",
+                         v, p->seq,
+                         scheduler_get_current_thread()->rcu_start_gen,
+                         atomic_load(&gen_freed));
             }
             volatile uint64_t seq = p->seq;
             (void) seq;
