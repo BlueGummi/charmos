@@ -1,8 +1,8 @@
 #include <kassert.h>
-#include <thread/apc.h>
 #include <sch/sched.h>
-#include <thread/thread.h>
 #include <smp/core.h>
+#include <thread/apc.h>
+#include <thread/thread.h>
 
 #include "sch/internal.h"
 
@@ -158,10 +158,6 @@ static void wake_if_waiting(struct thread *t) {
 }
 
 void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
-    /* avoid double-enqueue */
-    if (a->enqueued)
-        return;
-
     if (!thread_apc_sanity_check(t))
         return;
 
@@ -169,6 +165,11 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
     enum irql irql = thread_acquire(t, &ok);
     if (!ok)
         return;
+
+    if (a->enqueued) {
+        thread_release(t, irql);
+        return;
+    }
 
     add_apc_to_thread(t, a, type);
     thread_release(t, irql);

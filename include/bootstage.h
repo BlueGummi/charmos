@@ -20,9 +20,9 @@ enum bootstage : uint8_t {
 
     BOOTSTAGE_MID_ALLOCATORS, /* Allocators are topology aware */
 
-    BOOTSTAGE_LATE_DEVICES, /* Rest of kernel is brought up -- filesystems,
-                             * drivers, etc. almost all
-                             * features are available in APIs */
+    BOOTSTAGE_LATE, /* Rest of kernel is brought up -- filesystems,
+                     * drivers, etc. almost all
+                     * features are available in APIs */
 
     BOOTSTAGE_COMPLETE, /* Complete - enter init */
 

@@ -126,7 +126,7 @@ void k_sch_main(void *nop) {
      * bootstage later on (causing mis-raised IRQLs) */
     smp_disable_all_ticks();
 
-    bootstage_advance(BOOTSTAGE_LATE_DEVICES);
+    bootstage_advance(BOOTSTAGE_LATE);
 
     smp_enable_all_ticks();
 
@@ -136,6 +136,7 @@ void k_sch_main(void *nop) {
     domain_buddies_init_late();
     workqueues_permanent_init();
     reaper_init();
+
     registry_setup();
     tests_run();
     bootstage_advance(BOOTSTAGE_COMPLETE);

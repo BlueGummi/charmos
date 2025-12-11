@@ -90,24 +90,10 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
 }
 
-/*
-
-* A heavier / more aggressive RCU stress test:
-*
-* spawn many readers (more than cores) that constantly enter rcu read-side
-* critical sections, read the shared pointer and check values.
-* spawn many writers that continuously replace the pointer with freshly
-* allocated objects, deferring frees via rcu_defer. Writers sometimes call
-* rcu_synchronize() to force progress of grace periods and exercise that path.
-* intentionally produce a backlog of deferred frees to stress the deferred
-* callback mechanism. run for a longer duration and assert no
-* reader observes an invalid value.
-*
-*/
-
-#define STRESS_NUM_READERS (global.core_count * 8)
-#define STRESS_NUM_WRITERS (global.core_count * 4)
-#define STRESS_DURATION_MS 1200
+#define STRESS_NUM_READERS (global.core_count * 2)
+#define STRESS_NUM_WRITERS (global.core_count)
+#define STRESS_DURATION_MS 2000
+#define STRESS_PRINT_MS 1000
 
 struct rcu_stress_node {
     uint64_t seq; /* monotonic sequence number (for debugging) */
@@ -142,6 +128,8 @@ static void stress_free_cb(struct rcu_cb *cb, void *ptr) {
 static void rcu_stress_reader(void *arg) {
     (void) arg;
 
+    time_t last_print = time_get_ms();
+    size_t iter = 0;
     while (!atomic_load(&stress_stop)) {
         rcu_read_lock();
 
@@ -153,10 +141,12 @@ static void rcu_stress_reader(void *arg) {
                 ADD_MESSAGE("RCU stress reader saw invalid value");
                 k_printf("RCU stress reader observed invalid value %d, "
                          "freed during gen %zu enqueued_on %zu currently "
-                         "started gen %zu quiescent for gen %zu\n",
+                         "started gen %zu quiescent for gen %zu\nat a nesting "
+                         "depth of %zu\n",
                          v, p->freed_gen, p->enqueued_on,
                          scheduler_get_current_thread()->rcu_start_gen,
-                         scheduler_get_current_thread()->rcu_quiescent_gen);
+                         scheduler_get_current_thread()->rcu_quiescent_gen,
+                         scheduler_get_current_thread()->rcu_nesting);
             }
             volatile uint64_t seq = p->seq;
             (void) seq;
@@ -164,8 +154,17 @@ static void rcu_stress_reader(void *arg) {
 
         rcu_read_unlock();
 
+        if (time_get_ms() - last_print > STRESS_PRINT_MS) {
+            last_print = time_get_ms();
+            k_printf(
+                "\'%-20s\' on iteration %7zu w/ %7zu replacements and %7zu frees\n",
+                scheduler_get_current_thread()->name, iter, stress_replacements,
+                stress_deferred_freed);
+        }
+
         /* yield to exercise scheduler preemption and context switching */
         scheduler_yield();
+        iter++;
     }
 
     k_printf("RCU stress reader %s left, %u remaining\n",

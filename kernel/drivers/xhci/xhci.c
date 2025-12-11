@@ -241,10 +241,24 @@ static struct usb_controller_ops xhci_ctrl_ops = {
     .reset_port = NULL,
 };
 
+static void xhci_update_erdp(struct xhci_device *dev) {
+    struct xhci_ring *er = dev->event_ring;
+
+    uint64_t erdp = (uint64_t) er->phys & ~1UL;
+    if (er->cycle)
+        erdp |= 1;
+
+    mmio_write_64(&dev->intr_regs->erdp, erdp);
+}
+
 static void xhci_isr(void *ctx, uint8_t vector, void *rsp) {
     struct xhci_device *dev = ctx;
-    k_printf("interrupt\n");
-    xhci_clear_interrupt_pending(dev);
+
+    xhci_info("Interrupt");
+
+    xhci_update_erdp(dev);
+
+    mmio_write_32(&dev->op_regs->usbsts, XHCI_USBSTS_EI);
 
     lapic_write(LAPIC_REG_EOI, 0);
 }
@@ -293,11 +307,8 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
     for (uint64_t port = 1; port <= dev->ports; port++) {
         uint32_t portsc = mmio_read_32(&dev->port_regs[port - 1]);
 
-        if (portsc & PORTSC_CCS) {
-            if (!xhci_reset_port(dev, port)) {
-                xhci_warn("Failed to reset port %lu", port);
-            }
-        }
+        if (portsc & PORTSC_CCS)
+            xhci_reset_port(dev, port);
     }
 
     for (uint64_t port = 1; port <= dev->ports; port++) {

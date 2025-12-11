@@ -145,67 +145,108 @@ bool xhci_consume_port_status_change(struct xhci_device *dev) {
     return false;
 }
 
+static void dump_portsc_state(uint32_t v, const char *tag) {
+    uint32_t pls = (v >> PORTSC_PLS_SHIFT) & PORTSC_PLS_MASK;
+    xhci_info("%s: PORTSC=%08x PP=%u PED=%u PR=%u PRC=%u CSC=%u CCS=%u PLS=%u "
+              "SPEED=%u",
+              tag, v, !!(v & PORTSC_PP), !!(v & PORTSC_PED), !!(v & PORTSC_PR),
+              !!(v & PORTSC_PRC), !!(v & PORTSC_CSC), !!(v & PORTSC_CCS), pls,
+              v & PORTSC_SPEED_MASK);
+}
+
 bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
-    uint32_t *portsc = (uint32_t *) &dev->port_regs[portnum];
-    uint32_t val = mmio_read_32(portsc);
-    bool is_usb3 = dev->port_info[portnum].usb3;
+    uint32_t *portsc = &dev->port_regs[portnum - 1].portsc;
+    uint32_t old = mmio_read_32(portsc);
+    bool is_usb3 = dev->port_info[portnum - 1].usb3;
 
-    /* Power */
-    if (!(val & PORTSC_PP)) {
-        val |= PORTSC_PP;
-        mmio_write_32(portsc, val);
-        sleep_us(5000);
+    dump_portsc_state(old, "before");
 
-        if (!(mmio_read_32(portsc) & PORTSC_PP)) {
-            xhci_warn("Port %u power enable failed", portnum);
+    if (!(old & PORTSC_PP)) {
+        /* Only write the PP bit */
+        mmio_write_32(portsc, PORTSC_PP);
+        sleep_us(2000);
+        old = mmio_read_32(portsc);
+        dump_portsc_state(old, "after power on");
+        if (!(old & PORTSC_PP)) {
+            xhci_warn("port %u: power enable failed", portnum);
             return false;
         }
     }
 
-    uint32_t old_ped = val & PORTSC_PED;
+    uint32_t cur = mmio_read_32(portsc);
 
-    if (is_usb3) {
-        val |= PORTSC_WPR;
-        mmio_write_32(portsc, val);
+    uint32_t clear_mask = PORTSC_PRC | PORTSC_CSC | PORTSC_PEC | PORTSC_WRC;
 
-        uint16_t timeout = 25;
-        while (mmio_read_32(portsc) & PORTSC_RESET) {
-            if (timeout-- == 0) {
-                xhci_warn("Can't reset USB 3.0 device on port %u", portnum);
-                return false;
-            }
-            sleep_us(5000);
-        }
-    } else {
-        val |= PORTSC_RESET;
-        mmio_write_32(portsc, val);
+    uint32_t preserve =
+        cur & (PORTSC_PP | PORTSC_PED | (PORTSC_PLS_MASK << PORTSC_PLS_SHIFT));
 
-        uint16_t timeout = 25;
-        while ((mmio_read_32(portsc) & PORTSC_PED) == old_ped) {
-            if (timeout-- == 0) {
-                xhci_warn("Can't reset USB 2.0 device on port %u", portnum);
-                return false;
-            }
-            sleep_us(5000);
-        }
+    uint32_t to_write = clear_mask | preserve;
+
+    mmio_write_32(portsc, to_write);
+
+    sleep_us(500);
+    old = mmio_read_32(portsc);
+    dump_portsc_state(old, "after clear change bits");
+
+    uint32_t write_mask = PORTSC_PR;
+
+    if (old & PORTSC_PED) {
+        write_mask |= PORTSC_PED;
     }
 
-    sleep_us(5000);
-
     if (is_usb3) {
-        val = mmio_read_32(portsc);
-        val &= ~PORTSC_PLS_MASK;
-        val |= PORTSC_PLS_U0 << PORTSC_PLS_SHIFT;
-        mmio_write_32(portsc, val);
+        write_mask |= PORTSC_WPR;
     }
 
-    if ((mmio_read_32(portsc) & PORTSC_SPEED_MASK) == 0) {
-        xhci_warn("Port Reset failed -- port speed undefined");
+    xhci_info("port %u: writing PR request mask %08x", portnum, write_mask);
+    mmio_write_32(portsc, write_mask);
+
+    int timeout_ms = 100; /* Expand if necessary */
+    int settled = 0;
+
+    while (timeout_ms-- > 0) {
+        uint32_t cur = mmio_read_32(portsc);
+        if (is_usb3) {
+            if (!(cur & PORTSC_PR)) {
+                dump_portsc_state(cur, "after PR cleared");
+                settled = 1;
+                break;
+            }
+        } else {
+            if (cur & PORTSC_PED) {
+                dump_portsc_state(cur, "after PED set (USB2 reset complete)");
+                settled = 1;
+                break;
+            }
+        }
+        sleep_us(1000); /* 1ms */
+    }
+
+    if (!settled) {
+        xhci_warn(
+            "port %u: reset timed out (PR did not clear or PED did not change)",
+            portnum);
+        return false;
     }
 
     if (!xhci_consume_port_status_change(dev)) {
-        xhci_warn("Port %u reset did not generate a PSC event", portnum);
+        xhci_warn("port %u reset did not generate a PSC event", portnum);
         return false;
+    }
+
+    uint32_t final = mmio_read_32(portsc);
+    uint32_t pls = (final >> PORTSC_PLS_SHIFT) & PORTSC_PLS_MASK;
+    if (is_usb3) {
+        if (pls == PORTSC_PLS_U0 && (final & PORTSC_SPEED_MASK)) {
+            xhci_info("port %u: USB3 reset success (PLS=U0, speed=%u)", portnum,
+                      final & PORTSC_SPEED_MASK);
+        } else if (pls == PORTSC_PLS_RXDETECT) {
+            xhci_info("port %u: USB3 reset failed (PLS=RXDETECT)", portnum);
+            return false;
+        } else {
+            xhci_info("port %u: USB3 reset unknown state pls=%u speed=%u",
+                      portnum, pls, final & PORTSC_SPEED_MASK);
+        }
     }
 
     return true;

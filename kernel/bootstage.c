@@ -11,7 +11,7 @@ static const char *bootstage_str[BOOTSTAGE_COUNT] = {
     [BOOTSTAGE_MID_MP] = "Mid - SMP",
     [BOOTSTAGE_MID_TOPOLOGY] = "Mid - Topology",
     [BOOTSTAGE_MID_ALLOCATORS] = "Mid - Allocators",
-    [BOOTSTAGE_LATE_DEVICES] = "Late - Devices",
+    [BOOTSTAGE_LATE] = "Late",
     [BOOTSTAGE_COMPLETE] = "Complete",
 };
 

@@ -164,16 +164,14 @@ set(QEMU_COMMON_FLAGS
     -monitor telnet:127.0.0.1:5555,server,nowait
 
     -device qemu-xhci,id=xhci
-    -device usb-kbd,bus=xhci.0
+    -device usb-kbd,bus=xhci.0,port=1
+    -device usb-mouse,bus=xhci.0,port=2,id=usbmouse
 
     -M q35
-    -device usb-mouse,bus=xhci.0,id=usbmouse
 
     -drive id=nvme0,file=disk.img,format=raw,if=none
     -device nvme,serial=boom,drive=disk0,drive=nvme0#,num_queues=4
     -device isa-debug-exit,iobase=0xf4,iosize=0x04
-
-
 
     #-drive id=fatdisk,file=fat32.img,format=raw,if=none
     # -device nvme,serial=yay,drive=fatdisk

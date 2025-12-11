@@ -6,6 +6,13 @@
 #define XHCI_DEVICE_TIMEOUT 1000
 #define TRB_RING_SIZE 256
 
+#define XHCI_USBSTS_HCH 1        /* HC halted */
+#define XHCI_USBSTS_HSE (1 << 2) /* host system error */
+#define XHCI_USBSTS_EI (1 << 3)  /* event interrupt */
+#define XHCI_USBSTS_PCD (1 << 4) /* port change detect */
+#define XHCI_IMAN_MASK 0x2
+#define XHCI_IMAN_INT_EN 0x1
+
 #define XHCI_ENDPOINT_TYPE_INVAL 0
 #define XHCI_ENDPOINT_TYPE_ISOCH_OUT 1
 #define XHCI_ENDPOINT_TYPE_BULK_OUT 2
@@ -84,6 +91,7 @@
 #define PORTSC_PED (1 << 1)           // Port Enabled/Disabled
 #define PORTSC_OCA (1 << 3)           // Over-Current Active
 #define PORTSC_RESET (1 << 4)         // Port Reset
+#define PORTSC_PR (1 << 4)            // Port Reset
 #define PORTSC_PLSE (1 << 5)          // Port Link State Enable
 #define PORTSC_PRES (1 << 6)          // Port Resume
 #define PORTSC_PP (1 << 9)            // Port Power

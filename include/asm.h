@@ -263,6 +263,10 @@ static inline void wait_for_interrupt(void) {
     asm volatile("hlt");
 }
 
+static inline void hcf(void) {
+    asm volatile("cli; hlt");
+}
+
 static inline int clz(uint8_t a) {
     return __builtin_clz(a);
 }

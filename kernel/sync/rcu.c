@@ -122,13 +122,13 @@ void rcu_read_unlock(void) {
     if (old == 1) {
         /* We are leaving the outermost read-side CS. First clear start_gen,
            then publish the quiescent generation so GP worker can observe it. */
-        atomic_store_explicit(&t->rcu_start_gen, 0, memory_order_relaxed);
+        atomic_exchange_explicit(&t->rcu_start_gen, 0, memory_order_relaxed);
 
         /* Use acquire/release so stores inside the CS happen-before this
            quiescent publication. Read the current global generation and
            publish it as the quiescent generation. */
-        uint64_t cur = rcu_read_global_gen();
-        atomic_store_explicit(&t->rcu_quiescent_gen, cur, memory_order_release);
+        atomic_store_explicit(&t->rcu_quiescent_gen, rcu_read_global_gen() - 1,
+                              memory_order_release);
     }
 }
 
@@ -235,6 +235,7 @@ static void rcu_gp_worker(void *unused) {
 }
 
 void rcu_init(void) {
+    global.rcu_gen = 1;
     semaphore_init(&rcu_buckets.sem, 0, SEMAPHORE_INIT_NORMAL);
     for (size_t i = 0; i < RCU_BUCKETS; i++) {
         INIT_LIST_HEAD(&rcu_buckets.buckets[i].list);

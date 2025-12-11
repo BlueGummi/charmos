@@ -7,7 +7,7 @@ enum irql irql_get(void) {
 }
 
 enum irql irql_raise(enum irql new_level) {
-    if (global.current_bootstage < BOOTSTAGE_LATE_DEVICES)
+    if (global.current_bootstage < BOOTSTAGE_LATE)
         return IRQL_NONE;
 
     bool iflag = are_interrupts_enabled();
@@ -37,7 +37,7 @@ enum irql irql_raise(enum irql new_level) {
 }
 
 void irql_lower(enum irql new_level) {
-    if (global.current_bootstage < BOOTSTAGE_LATE_DEVICES ||
+    if (global.current_bootstage < BOOTSTAGE_LATE ||
         new_level == IRQL_NONE)
         return;
 

@@ -1091,9 +1091,9 @@ void slab_free(struct slab_domain *domain, void *obj) {
         if (slab_should_enqueue_gc(slab)) {
             slab_list_del(slab);
             slab_unlock(slab, irql);
-            slab_cache_unlock(cache, slab_cache_irql);
             slab_stat_gc_collection(domain);
             slab_gc_enqueue(domain, slab);
+            slab_cache_unlock(cache, slab_cache_irql);
             return;
         }
     } else if (slab->state == SLAB_FULL) {
