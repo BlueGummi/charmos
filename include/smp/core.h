@@ -23,6 +23,7 @@ struct core {
     /* index within each domain's groups */
     int32_t group_index[TOPOLOGY_LEVEL_MAX];
 
+    atomic_bool executing_dpcs;
     atomic_bool idle;
 
     bool in_interrupt;

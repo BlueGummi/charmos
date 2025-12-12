@@ -55,6 +55,9 @@ static void dpc_execute_all_in_queue(struct dpc_queue *dq, struct dpc_cpu *dc) {
 
 void dpc_run_local(void) {
     struct core *me = smp_core();
+    if (atomic_exchange(&me->executing_dpcs, true))
+        return;
+
     size_t cpu = me->id;
     enum dpc_event recent = me->dpc_event;
     struct dpc_cpu *dc = &global.dpc_data[cpu];
@@ -66,6 +69,7 @@ void dpc_run_local(void) {
 
     /* all clear */
     me->dpc_event = DPC_NONE;
+    atomic_store(&me->executing_dpcs, false);
 }
 
 static void dpc_queue_enqueue(struct dpc_queue *dq, struct dpc *d) {

@@ -62,23 +62,33 @@ REGISTER_TEST(rwlock_two_writer_basic, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
 #define RWLOCK_READER_COUNT_TEST_N 20
 #define RWLOCK_READER_COUNT_LOOPS 500
+#define RWLOCK_READER_PRINT_INTERVAL 10000
 
 static struct rwlock rw_readers = {0};
 static _Atomic uint32_t rw_readers_left = RWLOCK_READER_COUNT_TEST_N;
 
 static void rw_reader_worker(void *) {
-    for (int i = 0; i < RWLOCK_READER_COUNT_LOOPS; i++) {
+    time_t last_print = time_get_ms();
+    for (size_t i = 0; i < RWLOCK_READER_COUNT_LOOPS; i++) {
         rwlock_lock(&rw_readers, RWLOCK_ACQUIRE_READ);
         scheduler_yield();
         rwlock_unlock(&rw_readers);
+        time_t now = time_get_ms();
+        if ((now - last_print) > RWLOCK_READER_PRINT_INTERVAL) {
+            k_printf("RWlock reader %s on iteration %zu\n",
+                     scheduler_get_current_thread()->name, i);
+        }
+        last_print = now;
     }
 
     atomic_fetch_sub(&rw_readers_left, 1);
 }
 
 REGISTER_TEST(rwlock_many_readers, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     for (int i = 0; i < RWLOCK_READER_COUNT_TEST_N; i++)
-        thread_spawn("rr", rw_reader_worker, NULL);
+        thread_spawn("rr_%zu", rw_reader_worker, NULL, i);
+    irql_lower(irql);
 
     while (atomic_load(&rw_readers_left))
         scheduler_yield();
@@ -206,7 +216,6 @@ static void rw_correct_worker(void *) {
     }
     atomic_fetch_sub(&correctness_left, 1);
 }
-
 
 REGISTER_TEST(rwlock_correctness, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 
