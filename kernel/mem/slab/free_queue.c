@@ -35,7 +35,7 @@ bool slab_free_queue_ringbuffer_enqueue(struct slab_free_queue *q,
     uint64_t seq;
     int64_t diff;
 
-    while (1) {
+    while (true) {
         pos = atomic_load_explicit(&q->head, memory_order_relaxed);
         slot = &q->slots[pos % q->capacity];
         seq = atomic_load_explicit(&slot->seq, memory_order_acquire);
@@ -66,7 +66,7 @@ vaddr_t slab_free_queue_ringbuffer_dequeue(struct slab_free_queue *q) {
     uint64_t seq;
     int64_t diff;
 
-    while (1) {
+    while (true) {
         pos = atomic_load_explicit(&q->tail, memory_order_relaxed);
         slot = &q->slots[pos % q->capacity];
         seq = atomic_load_explicit(&slot->seq, memory_order_acquire);

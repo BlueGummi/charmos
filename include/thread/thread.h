@@ -503,7 +503,7 @@ static inline uint64_t thread_set_last_ran(struct thread *t, uint64_t new) {
 static inline bool thread_get(struct thread *t) {
     uint32_t old;
 
-    for (;;) {
+    while (true) {
         old = atomic_load_explicit(&t->refcount, memory_order_acquire);
         if (old == 0) {
             /* object is being (or has been) freed */

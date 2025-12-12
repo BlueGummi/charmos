@@ -7,7 +7,7 @@
 #include <thread/dpc.h>
 
 static struct dpc *dpc_steal_queue(struct dpc_queue *dq, struct dpc_cpu *dc) {
-    for (;;) {
+    while (true) {
         struct dpc *list =
             atomic_exchange_explicit(&dq->head, NULL, memory_order_acquire);
 
@@ -38,7 +38,7 @@ static struct dpc *dpc_steal_queue(struct dpc_queue *dq, struct dpc_cpu *dc) {
 }
 
 static void dpc_execute_all_in_queue(struct dpc_queue *dq, struct dpc_cpu *dc) {
-    for (;;) {
+    while (true) {
         struct dpc *it = dpc_steal_queue(dq, dc);
         if (!it)
             break;
@@ -73,7 +73,7 @@ void dpc_run_local(void) {
 }
 
 static void dpc_queue_enqueue(struct dpc_queue *dq, struct dpc *d) {
-    for (;;) {
+    while (true) {
         struct dpc *old_head =
             atomic_load_explicit(&dq->head, memory_order_acquire);
         atomic_store_explicit(&d->next, old_head, memory_order_relaxed);

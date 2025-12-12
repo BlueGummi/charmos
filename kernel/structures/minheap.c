@@ -27,7 +27,7 @@ static void minheap_sift_up(struct minheap *heap, uint32_t idx) {
 static void minheap_sift_down(struct minheap *heap, uint32_t idx) {
     uint32_t left, right, smallest;
 
-    while (1) {
+    while (true) {
         left = 2 * idx + 1;
         right = 2 * idx + 2;
         smallest = idx;

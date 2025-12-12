@@ -13,7 +13,7 @@ static inline void refcount_init(refcount_t *rc, unsigned int val) {
 }
 
 static inline bool refcount_inc(refcount_t *rc) {
-    for (;;) {
+    while (true) {
         unsigned int old = atomic_load(rc);
         if (old == UINT_MAX)
             return false;
@@ -25,7 +25,7 @@ static inline bool refcount_inc(refcount_t *rc) {
 }
 
 static inline bool refcount_inc_not_zero(refcount_t *rc) {
-    for (;;) {
+    while (true) {
         unsigned int old = atomic_load(rc);
         if (old == 0)
             return false;
@@ -43,7 +43,7 @@ static inline uint32_t refcount_read(refcount_t *rc) {
 }
 
 static inline bool refcount_dec_and_test(refcount_t *rc) {
-    for (;;) {
+    while (true) {
         unsigned int old = atomic_load(rc);
         if (old == 0) {
             k_panic("%s(): Possible UAF!\n", __func__);

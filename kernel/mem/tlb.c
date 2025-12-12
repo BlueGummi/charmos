@@ -23,7 +23,7 @@ static void tlb_shootdown_internal(void) {
     atomic_store_explicit(&c->in_tlb_shootdown, true, memory_order_release);
 
     uint32_t tail = atomic_load_explicit(&c->tail, memory_order_relaxed);
-    for (;;) {
+    while (true) {
         uint32_t head = atomic_load_explicit(&c->head, memory_order_acquire);
         while (tail != head) {
             uintptr_t addr = atomic_load_explicit(
@@ -117,7 +117,7 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
         uint64_t target_gen = gen;
         size_t spin = TLB_SHOOTDOWN_INITIAL_SPIN;
 
-        for (;;) {
+        while (true) {
             /* spin for 'spin' iterations checking the ack */
             size_t s;
             for (s = 0; s < spin; ++s) {

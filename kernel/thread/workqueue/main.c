@@ -107,7 +107,7 @@ void worker_main(void *unused) {
 
     workqueue_get(queue);
 
-    while (1) {
+    while (true) {
 
         struct work *task = NULL;
         struct work oneshot_task = {0};

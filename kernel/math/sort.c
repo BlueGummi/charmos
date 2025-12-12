@@ -110,7 +110,7 @@
             par = base + par_i * size;                                         \
             COPY(par, child, count, size, tmp1, tmp2);                         \
         }                                                                      \
-        for (;;) {                                                             \
+        while (true) {                                                             \
             child_i = par_i;                                                   \
             par_i = child_i / 2;                                               \
             child = base + child_i * size;                                     \
@@ -314,7 +314,7 @@ loop:
     pa = pb = (char *) a + es;
 
     pc = pd = (char *) a + (n - 1) * es;
-    for (;;) {
+    while (true) {
         while (pb <= pc && (cmp_result = CMP(thunk, pb, a)) <= 0) {
             if (cmp_result == 0) {
                 swap_cnt = 1;

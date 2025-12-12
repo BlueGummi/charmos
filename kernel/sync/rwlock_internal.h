@@ -43,7 +43,7 @@ static inline bool rwlock_try_lock_write(struct rwlock *lock,
     uintptr_t old =
         atomic_load_explicit(&lock->lock_word, memory_order_acquire);
 
-    for (;;) {
+    while (true) {
         /* If there's a writer held or any readers, we cannot acquire now */
         if (old & (RWLOCK_WRITER_HELD_BIT | RWLOCK_READER_COUNT_MASK))
             return false;

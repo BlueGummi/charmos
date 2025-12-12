@@ -15,7 +15,7 @@ static uint16_t pit_read_count() {
 }
 
 static void pit_wait_until_zero() {
-    while (1) {
+    while (true) {
         uint16_t count = pit_read_count();
         if (count <= 1)
             break;

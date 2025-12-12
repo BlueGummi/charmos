@@ -29,7 +29,7 @@ uint64_t reaper_get_reaped_thread_count(void) {
 
 void reaper_thread_main(void *unused) {
     (void) unused;
-    while (1) {
+    while (true) {
         enum irql irql = spin_lock(&reaper.lock);
 
         enum irql out;

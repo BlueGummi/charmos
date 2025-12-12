@@ -47,7 +47,7 @@ void rcu_synchronize(void) {
     uint64_t target = rcu_advance_gp();
     rcu_worker_notify();
 
-    for (;;) {
+    while (true) {
         bool all_done = true;
 
         enum irql irql = spin_lock(&thread_list.lock);
@@ -200,7 +200,7 @@ static void rcu_gp_worker(void *unused) {
         /* new GP */
         uint64_t target = rcu_advance_gp();
 
-        for (;;) {
+        while (true) {
             bool everybody_ok = true;
 
             enum irql irql = spin_lock(&thread_list.lock);

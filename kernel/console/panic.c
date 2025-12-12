@@ -68,6 +68,6 @@ void k_panic_impl(const char *file, int line, const char *func, const char *fmt,
     k_printf("\n" EIGHTY_LINES "\n");
 
     spin_unlock_raw(&panic_lock);
-    while (1)
+    while (true)
         wait_for_interrupt();
 }

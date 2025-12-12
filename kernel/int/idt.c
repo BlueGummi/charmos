@@ -34,7 +34,7 @@ static struct irq_entry isr_table[MAX_IDT_ENTRIES] = {0};
         k_printf("\n=== " #handler_name " fault! ===\n");                      \
         k_printf("Message -> %s\n", message);                                  \
         k_panic("Core %u faulted\n", core);                                    \
-        while (1) {                                                            \
+        while (true) {                                                            \
             wait_for_interrupt();                                              \
         }                                                                      \
     }
@@ -91,7 +91,7 @@ void nmi_isr(void *ctx, uint8_t vector, void *rsp) {
     if (atomic_load(&global.panicked)) {
         disable_interrupts();
         k_printf("    [CPU %u] Halting due to system panic\n", smp_core_id());
-        while (1)
+        while (true)
             wait_for_interrupt();
     }
 }
@@ -207,7 +207,7 @@ static void page_fault_handler(void *context, uint8_t vector, void *rsp) {
     if (!(error_code & 0x04)) {
         spin_unlock_raw(&pf_lock);
         k_panic("KERNEL PAGE FAULT ON CORE %llu\n", smp_core_id());
-        while (1) {
+        while (true) {
             disable_interrupts();
             wait_for_interrupt();
         }

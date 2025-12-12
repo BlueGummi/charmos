@@ -28,7 +28,7 @@ static inline bool mutex_try_lock(struct mutex *mtx, struct thread *self) {
     uintptr_t old = atomic_load_explicit(&mtx->lock_word, memory_order_acquire);
     uintptr_t newval = mutex_make_lock_word(self);
 
-    for (;;) {
+    while (true) {
         /* held: no can do! */
         if (old & MUTEX_HELD_BIT)
             return false;

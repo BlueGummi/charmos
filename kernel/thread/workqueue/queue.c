@@ -32,7 +32,7 @@ static bool dequeue_oneshot_task(struct workqueue *queue, struct work *out) {
     uint64_t pos;
     struct work *t;
 
-    while (1) {
+    while (true) {
         pos = atomic_load_explicit(&queue->tail, memory_order_relaxed);
         t = &queue->oneshot_works[pos % queue->attrs.capacity];
         uint64_t seq = atomic_load_explicit(&t->seq, memory_order_acquire);
@@ -68,7 +68,7 @@ enum workqueue_error workqueue_enqueue_oneshot(struct workqueue *queue,
     uint64_t pos;
     struct work *t;
 
-    while (1) {
+    while (true) {
         pos = atomic_load_explicit(&queue->head, memory_order_relaxed);
         t = &queue->oneshot_works[pos % queue->attrs.capacity];
         uint64_t seq = atomic_load_explicit(&t->seq, memory_order_acquire);

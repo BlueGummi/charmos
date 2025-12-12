@@ -476,7 +476,7 @@ void panic(const char *format, ...) {
     v_k_printf(NULL, format, args);
     va_end(args);
 
-    while (1) {
+    while (true) {
         disable_interrupts();
         wait_for_interrupt();
     }
