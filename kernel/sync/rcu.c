@@ -22,6 +22,7 @@ static inline bool thread_rcu_not_reached_target(struct thread *t,
                                                  uint64_t target) {
     uint32_t nesting =
         atomic_load_explicit(&t->rcu_nesting, memory_order_acquire);
+
     if (nesting != 0) {
         uint64_t start_gen =
             atomic_load_explicit(&t->rcu_start_gen, memory_order_acquire);
@@ -43,7 +44,7 @@ void rcu_worker_notify() {
 }
 
 void rcu_synchronize(void) {
-    uint64_t target = rcu_read_global_gen() + 1;
+    uint64_t target = rcu_advance_gp();
     rcu_worker_notify();
 
     for (;;) {
@@ -94,9 +95,11 @@ void rcu_read_lock(void) {
     uint32_t old =
         atomic_fetch_add_explicit(&t->rcu_nesting, 1, memory_order_relaxed);
     if (old == 0) {
-        uint64_t gen = rcu_read_global_gen();
-
-        atomic_store_explicit(&t->rcu_start_gen, gen, memory_order_release);
+        uint64_t gen;
+        do {
+            gen = rcu_read_global_gen();
+            atomic_store_explicit(&t->rcu_start_gen, gen, memory_order_release);
+        } while (gen != rcu_read_global_gen());
     }
 }
 
@@ -110,7 +113,7 @@ void rcu_read_unlock(void) {
     if (old == 1) {
         uint64_t start_gen =
             atomic_load_explicit(&t->rcu_start_gen, memory_order_acquire);
-        atomic_store_explicit(&t->rcu_quiescent_gen, start_gen,
+        atomic_store_explicit(&t->rcu_quiescent_gen, start_gen - 1,
                               memory_order_release);
 
         atomic_store_explicit(&t->rcu_start_gen, 0, memory_order_release);
@@ -148,17 +151,14 @@ static bool thread_list_has_pending_readers(uint64_t gen) {
 
 static void rcu_exec_callbacks(struct rcu_buckets *buckets, uint64_t target) {
     /* Now safe to run callbacks for older bucket (generation target-1) */
-    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     size_t mask = RCU_BUCKETS - 1;
     size_t old_bucket = (target - 1) & mask;
 
     struct list_head detached;
     rcu_detach_bucket(buckets, old_bucket, &detached);
 
-    if (list_empty(&detached)) {
-        irql_lower(irql);
+    if (list_empty(&detached))
         return;
-    }
 
     /* Per-bucket lists for callbacks that don't belong to (target-1) */
     struct list_head tmp[RCU_BUCKETS];
@@ -188,7 +188,6 @@ static void rcu_exec_callbacks(struct rcu_buckets *buckets, uint64_t target) {
         list_splice_tail_init(&tmp[i], &buckets->buckets[i].list);
         spin_unlock(&buckets->buckets[i].lock, lirql);
     }
-    irql_lower(irql);
 }
 
 static void rcu_gp_worker(void *unused) {

@@ -147,6 +147,7 @@ static void rcu_stress_reader(void *arg) {
                          scheduler_get_current_thread()->rcu_start_gen,
                          scheduler_get_current_thread()->rcu_quiescent_gen,
                          scheduler_get_current_thread()->rcu_nesting);
+                break;
             }
             volatile uint64_t seq = p->seq;
             (void) seq;
