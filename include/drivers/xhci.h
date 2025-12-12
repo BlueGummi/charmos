@@ -1,10 +1,13 @@
 /* @title: xHCI */
+#include <math/bit_range.h>
 #include <stdbool.h>
 #include <stdint.h>
 #pragma once
 
 #define XHCI_DEVICE_TIMEOUT 1000
 #define TRB_RING_SIZE 256
+
+#define XHCI_INPUT_CTX_ADD_FLAGS ((1 << 0) | (1 << 1))
 
 #define XHCI_SETUP_TRANSFER_TYPE_NONE 0
 #define XHCI_SETUP_TRANSFER_TYPE_OUT 2
@@ -72,7 +75,14 @@
 #define TRB_TYPE_DEVICE_NOTIFICATION 0x26
 #define TRB_TYPE_MFINDEX_WRAP 0x27
 
-// Control field helpers
+#define TRB_FIELD(val, lo, hi) BIT_RANGE(val, lo, hi)
+
+#define TRB_TYPE(ctrl) TRB_FIELD(ctrl, 10, 15)
+#define TRB_SLOT(ctrl) TRB_FIELD(ctrl, 24, 31)
+#define TRB_EP(ctrl) TRB_FIELD(ctrl, 16, 23)
+
+#define TRB_CC(status) TRB_FIELD(status, 24, 31)
+
 #define TRB_GET_TYPE(ctrl) (((ctrl) >> 10) & 0x3F)
 #define TRB_SET_TYPE(val) (((val) & 0x3F) << 10)
 #define TRB_SET_CYCLE(val) (((val) & 1))

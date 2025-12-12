@@ -132,8 +132,6 @@ void usb_keyboard_poll(struct usb_device *dev) {
             continue;
 
         if (memcmp(&last, &report, sizeof(report)) != 0) {
-            struct xhci_device *x = dev->host->driver_data;
-            k_printf("0b%b\n", x->intr_regs->iman);
             parse_keyboard_report(&report);
             last = report;
         }

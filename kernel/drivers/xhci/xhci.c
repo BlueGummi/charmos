@@ -23,7 +23,7 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
     uintptr_t input_ctx_phys =
         vmm_get_phys((uintptr_t) input_ctx, VMM_FLAG_NONE);
 
-    input_ctx->ctrl_ctx.add_flags = (1 << 0) | (1 << 1); // slot + ep0
+    input_ctx->ctrl_ctx.add_flags = XHCI_INPUT_CTX_ADD_FLAGS;
     input_ctx->ctrl_ctx.drop_flags = 0;
 
     struct xhci_slot_ctx *slot = &input_ctx->slot_ctx;
@@ -78,7 +78,7 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
 
     xhci_send_command(ctrl, input_ctx_phys, control);
 
-    if (!(xhci_wait_for_response(ctrl) & (1 << 0))) {
+    if (xhci_wait_for_response(ctrl) != CC_SUCCESS) {
         xhci_warn("Address device failed for slot %u, port %u", slot_id, port);
         return false;
     }
@@ -147,7 +147,7 @@ static struct xhci_ring *allocate_endpoint_ring(void) {
     uintptr_t ring_phys = vmm_get_phys((uintptr_t) trbs, VMM_FLAG_NONE);
 
     trbs[TRB_RING_SIZE - 1].parameter = ring_phys;
-    trbs[TRB_RING_SIZE - 1].control = (TRB_TYPE_LINK << 10) | (1 << 1);
+    trbs[TRB_RING_SIZE - 1].control = TRB_SET_TYPE(TRB_TYPE_LINK) | (1 << 1);
 
     struct xhci_ring *ring =
         kzalloc(sizeof(struct xhci_ring), ALLOC_PARAMS_DEFAULT);
@@ -166,6 +166,10 @@ static struct xhci_ring *allocate_endpoint_ring(void) {
     return ring;
 }
 
+static uint8_t xhci_ep_to_input_ctx_idx(struct usb_endpoint *ep) {
+    return ep->number * 2 - (ep->in ? 0 : 1);
+}
+
 bool xhci_configure_device_endpoints(struct xhci_device *xhci,
                                      struct usb_device *usb) {
     struct xhci_input_ctx *input_ctx =
@@ -173,14 +177,14 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
     uintptr_t input_ctx_phys =
         vmm_get_phys((uintptr_t) input_ctx, VMM_FLAG_NONE);
 
-    input_ctx->ctrl_ctx.add_flags = (1 << 0);
+    input_ctx->ctrl_ctx.add_flags = 1;
     uint8_t max_ep_index = 0;
 
     for (size_t i = 0; i < usb->num_endpoints; i++) {
         struct usb_endpoint *ep = usb->endpoints[i];
         uint8_t ep_index = get_ep_index(ep);
 
-        uint8_t input_ctx_idx = ep->number * 2 - (ep->in ? 0 : 1);
+        uint8_t input_ctx_idx = xhci_ep_to_input_ctx_idx(ep);
 
         max_ep_index =
             (input_ctx_idx > max_ep_index) ? input_ctx_idx : max_ep_index;
