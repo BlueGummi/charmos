@@ -90,7 +90,7 @@ REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
 }
 
-#define STRESS_NUM_READERS (global.core_count * 2)
+#define STRESS_NUM_READERS (global.core_count * 8)
 #define STRESS_NUM_WRITERS (global.core_count)
 #define STRESS_DURATION_MS 2000
 #define STRESS_PRINT_MS 1000

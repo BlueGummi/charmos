@@ -19,6 +19,7 @@ struct rcu_cb {
     void *arg;
     size_t gen_when_called;
     size_t enqueued_waiting_on_gen;
+    size_t target_gen;
 };
 #define rcu_cb_from_list_node(ln) (container_of(ln, struct rcu_cb, list))
 

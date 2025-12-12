@@ -20,27 +20,16 @@ static uint64_t rcu_advance_gp() {
 
 static inline bool thread_rcu_not_reached_target(struct thread *t,
                                                  uint64_t target) {
-    /* If the thread is inside an RCU CS, and that CS started before target,
-       it has not yet quiesced. If it's not inside a CS, check the last
-       quiescent generation. */
     uint32_t nesting =
         atomic_load_explicit(&t->rcu_nesting, memory_order_acquire);
     if (nesting != 0) {
         uint64_t start_gen =
             atomic_load_explicit(&t->rcu_start_gen, memory_order_acquire);
-        /* If the read-side CS began before target, we must wait */
-        return (start_gen != 0 && start_gen < target);
+        return start_gen != 0 && start_gen < target;
     } else {
         uint64_t qgen =
             atomic_load_explicit(&t->rcu_quiescent_gen, memory_order_acquire);
-        /* We need the thread to have been quiescent *after or at* (target-1).
-           Callbacks enqueued on generation (target-1) must wait for quiescence
-           >= (target-1). If qgen < (target-1), this thread hasn't yet quiesced
-           since that generation. */
-
-        /* U64 max is used here as the value for threads
-         * not participating in RCU */
-        return qgen != UINT64_MAX && (qgen < (target - 1));
+        return qgen != UINT64_MAX && qgen < target;
     }
 }
 
@@ -83,8 +72,9 @@ void rcu_defer(struct rcu_cb *cb, rcu_fn func, void *arg) {
 
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
 
-    uint64_t gen = rcu_read_global_gen();
-    cb->enqueued_waiting_on_gen = gen;
+    uint64_t gen = rcu_advance_gp();
+    cb->target_gen = gen;
+    cb->enqueued_waiting_on_gen = gen - 1;
     INIT_LIST_HEAD(&cb->list);
 
     size_t bucket = (gen) & (RCU_BUCKETS - 1);
@@ -101,45 +91,30 @@ void rcu_defer(struct rcu_cb *cb, rcu_fn func, void *arg) {
 
 void rcu_read_lock(void) {
     struct thread *t = scheduler_get_current_thread();
-    uint64_t gen = rcu_read_global_gen();
     uint32_t old =
-        atomic_fetch_add_explicit(&t->rcu_nesting, 1, memory_order_acq_rel);
+        atomic_fetch_add_explicit(&t->rcu_nesting, 1, memory_order_relaxed);
     if (old == 0) {
-        /* mark the generation we entered under (release to publish). */
+        uint64_t gen = rcu_read_global_gen();
+
         atomic_store_explicit(&t->rcu_start_gen, gen, memory_order_release);
     }
 }
 
 void rcu_read_unlock(void) {
     struct thread *t = scheduler_get_current_thread();
-
     uint32_t old =
         atomic_fetch_sub_explicit(&t->rcu_nesting, 1, memory_order_acq_rel);
-    if (old == 0) {
+    if (old == 0)
         k_panic("RCU nesting underflow\n");
-    }
 
     if (old == 1) {
-        /* We are leaving the outermost read-side CS. First clear start_gen,
-           then publish the quiescent generation so GP worker can observe it. */
-        atomic_exchange_explicit(&t->rcu_start_gen, 0, memory_order_relaxed);
-
-        /* Use acquire/release so stores inside the CS happen-before this
-           quiescent publication. Read the current global generation and
-           publish it as the quiescent generation. */
-        atomic_store_explicit(&t->rcu_quiescent_gen, rcu_read_global_gen() - 1,
+        uint64_t start_gen =
+            atomic_load_explicit(&t->rcu_start_gen, memory_order_acquire);
+        atomic_store_explicit(&t->rcu_quiescent_gen, start_gen,
                               memory_order_release);
-    }
-}
 
-bool rcu_work_pending(void) {
-    for (int i = 0; i < RCU_BUCKETS; ++i) {
-        /* fast-check: read head without acquiring the lock.
-           It's OK if this races: we'll re-check under lock in worker. */
-        if (!list_empty(&rcu_buckets.buckets[i].list))
-            return true;
+        atomic_store_explicit(&t->rcu_start_gen, 0, memory_order_release);
     }
-    return false;
 }
 
 /* internal: detach and return head under lock for a given bucket */
@@ -155,16 +130,35 @@ static void rcu_detach_bucket(struct rcu_buckets *bkts, size_t bucket,
     spin_unlock(&bkts->buckets[bucket].lock, irql);
 }
 
+static bool thread_list_has_pending_readers(uint64_t gen) {
+    bool pending = false;
+
+    enum irql irql = spin_lock(&thread_list.lock);
+    struct thread *t, *tmp;
+    list_for_each_entry_safe(t, tmp, &thread_list.list, thread_list) {
+        if (thread_rcu_not_reached_target(t, gen)) {
+            pending = true;
+            break;
+        }
+    }
+    spin_unlock(&thread_list.lock, irql);
+
+    return pending;
+}
+
 static void rcu_exec_callbacks(struct rcu_buckets *buckets, uint64_t target) {
     /* Now safe to run callbacks for older bucket (generation target-1) */
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     size_t mask = RCU_BUCKETS - 1;
     size_t old_bucket = (target - 1) & mask;
 
     struct list_head detached;
     rcu_detach_bucket(buckets, old_bucket, &detached);
 
-    if (list_empty(&detached))
+    if (list_empty(&detached)) {
+        irql_lower(irql);
         return;
+    }
 
     /* Per-bucket lists for callbacks that don't belong to (target-1) */
     struct list_head tmp[RCU_BUCKETS];
@@ -175,15 +169,11 @@ static void rcu_exec_callbacks(struct rcu_buckets *buckets, uint64_t target) {
     list_for_each_entry_safe(iter, tmpn, &detached, list) {
         list_del_init(&iter->list);
 
-        uint64_t cb_gen = iter->enqueued_waiting_on_gen;
-        if (cb_gen == (target - 1)) {
-            iter->gen_when_called = target - 1;
+        if (!thread_list_has_pending_readers(iter->target_gen)) {
+            iter->gen_when_called = iter->target_gen;
             iter->fn(iter, iter->arg);
         } else {
-            /* Not this generation: requeue into the correct bucket list for
-             * future processing. Add to a temporary list to avoid holding
-             * the bucket lock while iterating. */
-            size_t idx = (size_t) (cb_gen & mask);
+            size_t idx = iter->target_gen & mask;
             list_add_tail(&iter->list, &tmp[idx]);
         }
     }
@@ -198,6 +188,7 @@ static void rcu_exec_callbacks(struct rcu_buckets *buckets, uint64_t target) {
         list_splice_tail_init(&tmp[i], &buckets->buckets[i].list);
         spin_unlock(&buckets->buckets[i].lock, lirql);
     }
+    irql_lower(irql);
 }
 
 static void rcu_gp_worker(void *unused) {

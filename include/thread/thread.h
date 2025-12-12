@@ -315,7 +315,7 @@ struct thread {
     size_t wait_cookie;
 
     /* RCU */
-    _Atomic uint32_t rcu_nesting;  /* incremented by this thread only */
+    _Atomic uint32_t rcu_nesting; /* incremented by this thread only */
     _Atomic uint64_t rcu_start_gen;
     _Atomic uint64_t rcu_quiescent_gen;
 
