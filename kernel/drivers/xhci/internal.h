@@ -5,13 +5,24 @@
 
 static inline void xhci_clear_interrupt_pending(struct xhci_device *dev) {
     uint32_t iman = mmio_read_32(&dev->intr_regs->iman);
-    iman |= 1 << 0;
+    iman |= XHCI_IMAN_INT_PENDING;
     mmio_write_32(&dev->intr_regs->iman, iman);
 }
 
 static inline void xhci_interrupt_enable_ints(struct xhci_device *dev) {
     uint32_t iman = mmio_read_32(&dev->intr_regs->iman);
-    mmio_write_32(&dev->intr_regs->iman, iman | (1 << 1));
+    mmio_write_32(&dev->intr_regs->iman, iman | (XHCI_IMAN_INT_ENABLE));
+}
+
+static inline void xhci_interrupt_disable_ints(struct xhci_device *dev) {
+    uint32_t iman = mmio_read_32(&dev->intr_regs->iman);
+    mmio_write_32(&dev->intr_regs->iman, iman & (~XHCI_IMAN_INT_ENABLE));
+}
+
+static inline void xhci_erdp_ack(struct xhci_device *dev, uint64_t erdp) {
+    erdp |= XHCI_ERDP_EHB_BIT;
+    erdp |= 1ULL;
+    mmio_write_64(&dev->intr_regs->erdp, erdp);
 }
 
 static inline uint8_t usb_to_xhci_ep_type(bool in, uint8_t type) {

@@ -128,7 +128,9 @@ bool xhci_consume_port_status_change(struct xhci_device *dev) {
             /* Advance the dequeue and program ERDP */
             xhci_advance_dequeue(event_ring, &dq_idx, &expected_cycle);
             uint64_t offset = (uint64_t) dq_idx * sizeof(struct xhci_trb);
-            mmio_write_64(&intr->erdp, event_ring->phys + offset | 1ULL);
+
+            uint64_t erdp = event_ring->phys + offset;
+            xhci_erdp_ack(dev, erdp);
 
             /* commit back to software state */
             event_ring->dequeue_index = dq_idx;
@@ -145,28 +147,17 @@ bool xhci_consume_port_status_change(struct xhci_device *dev) {
     return false;
 }
 
-static void dump_portsc_state(uint32_t v, const char *tag) {
-    uint32_t pls = (v >> PORTSC_PLS_SHIFT) & PORTSC_PLS_MASK;
-    xhci_info("%s: PORTSC=%08x PP=%u PED=%u PR=%u PRC=%u CSC=%u CCS=%u PLS=%u "
-              "SPEED=%u",
-              tag, v, !!(v & PORTSC_PP), !!(v & PORTSC_PED), !!(v & PORTSC_PR),
-              !!(v & PORTSC_PRC), !!(v & PORTSC_CSC), !!(v & PORTSC_CCS), pls,
-              v & PORTSC_SPEED_MASK);
-}
-
 bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
     uint32_t *portsc = &dev->port_regs[portnum - 1].portsc;
-    uint32_t old = mmio_read_32(portsc);
     bool is_usb3 = dev->port_info[portnum - 1].usb3;
 
-    dump_portsc_state(old, "before");
+    uint32_t old = mmio_read_32(portsc);
 
     if (!(old & PORTSC_PP)) {
         /* Only write the PP bit */
         mmio_write_32(portsc, PORTSC_PP);
         sleep_us(2000);
         old = mmio_read_32(portsc);
-        dump_portsc_state(old, "after power on");
         if (!(old & PORTSC_PP)) {
             xhci_warn("port %u: power enable failed", portnum);
             return false;
@@ -186,7 +177,6 @@ bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
 
     sleep_us(500);
     old = mmio_read_32(portsc);
-    dump_portsc_state(old, "after clear change bits");
 
     uint32_t write_mask = PORTSC_PR;
 
@@ -198,24 +188,21 @@ bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
         write_mask |= PORTSC_WPR;
     }
 
-    xhci_info("port %u: writing PR request mask %08x", portnum, write_mask);
     mmio_write_32(portsc, write_mask);
 
-    int timeout_ms = 100; /* Expand if necessary */
-    int settled = 0;
+    time_t timeout_ms = 100;
+    bool settled = false;
 
     while (timeout_ms-- > 0) {
         uint32_t cur = mmio_read_32(portsc);
         if (is_usb3) {
             if (!(cur & PORTSC_PR)) {
-                dump_portsc_state(cur, "after PR cleared");
-                settled = 1;
+                settled = true;
                 break;
             }
         } else {
             if (cur & PORTSC_PED) {
-                dump_portsc_state(cur, "after PED set (USB2 reset complete)");
-                settled = 1;
+                settled = true;
                 break;
             }
         }
@@ -247,6 +234,8 @@ bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
             xhci_info("port %u: USB3 reset unknown state pls=%u speed=%u",
                       portnum, pls, final & PORTSC_SPEED_MASK);
         }
+    } else {
+        xhci_info("port %u: USB2 reset success", portnum);
     }
 
     return true;

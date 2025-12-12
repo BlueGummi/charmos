@@ -6,12 +6,17 @@
 #define XHCI_DEVICE_TIMEOUT 1000
 #define TRB_RING_SIZE 256
 
+#define XHCI_SETUP_TRANSFER_TYPE_NONE 0
+#define XHCI_SETUP_TRANSFER_TYPE_OUT 2
+#define XHCI_SETUP_TRANSFER_TYPE_IN 3
+
 #define XHCI_USBSTS_HCH 1        /* HC halted */
 #define XHCI_USBSTS_HSE (1 << 2) /* host system error */
 #define XHCI_USBSTS_EI (1 << 3)  /* event interrupt */
 #define XHCI_USBSTS_PCD (1 << 4) /* port change detect */
 #define XHCI_IMAN_MASK 0x2
-#define XHCI_IMAN_INT_EN 0x1
+#define XHCI_IMAN_INT_PENDING 0x1
+#define XHCI_IMAN_INT_ENABLE 0x2
 
 #define XHCI_ENDPOINT_TYPE_INVAL 0
 #define XHCI_ENDPOINT_TYPE_ISOCH_OUT 1
@@ -82,6 +87,7 @@
 #define TRB_IDT_BIT (1 << 6) // Immediate Data
 #define TRB_BEI_BIT (1 << 9) // Block Event Interrupt (ISO)
 #define TRB_TYPE_SHIFT 10
+#define TRB_GET_CC(x) (((x) >> 24) & 0xFF)
 
 #define TRB_SET_SLOT_ID(id) (((id) & 0xFF) << 24)
 #define TRB_GET_SLOT_ID(ctrl) (((ctrl) >> 24) & 0xFF)
@@ -484,8 +490,7 @@ struct xhci_erdp {
 } __attribute__((packed));
 _Static_assert(sizeof(struct xhci_erdp) == 8, "");
 
-#define XHCI_INTERRUPTER_INTERRUPT_PENDING 1
-#define XHCI_INTERRUPTER_INTERRUPT_ENABLE (1 << 1)
+#define XHCI_ERDP_EHB_BIT (1 << 3)
 
 /* Page 424 */
 struct xhci_interrupter_regs {

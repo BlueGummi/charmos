@@ -110,7 +110,7 @@ bool xhci_send_control_transfer(struct xhci_device *dev, uint8_t slot_id,
     setup_trb->control |= TRB_SET_CYCLE(ep0_ring->cycle);
 
     /* OUT */
-    setup_trb->control |= (2 << 16);
+    setup_trb->control |= (XHCI_SETUP_TRANSFER_TYPE_OUT << 16);
 
     /* Data Stage */
     struct xhci_trb *data_trb = &ep0_ring->trbs[idx++];
@@ -121,7 +121,7 @@ bool xhci_send_control_transfer(struct xhci_device *dev, uint8_t slot_id,
     data_trb->control |= TRB_SET_CYCLE(ep0_ring->cycle);
 
     /* IN */
-    data_trb->control |= (3 << 16);
+    data_trb->control |= (XHCI_SETUP_TRANSFER_TYPE_IN << 16);
 
     /* Status Stage */
     struct xhci_trb *status_trb = &ep0_ring->trbs[idx++];
@@ -241,14 +241,9 @@ static struct usb_controller_ops xhci_ctrl_ops = {
     .reset_port = NULL,
 };
 
-static void xhci_update_erdp(struct xhci_device *dev) {
-    struct xhci_ring *er = dev->event_ring;
-
-    uint64_t erdp = (uint64_t) er->phys & ~1UL;
-    if (er->cycle)
-        erdp |= 1;
-
-    mmio_write_64(&dev->intr_regs->erdp, erdp);
+static void xhci_clear_usbsts_ei(struct xhci_device *dev) {
+    mmio_write_32(&dev->op_regs->usbsts,
+                  mmio_read_32(&dev->op_regs->usbsts) | XHCI_USBSTS_EI);
 }
 
 static void xhci_isr(void *ctx, uint8_t vector, void *rsp) {
@@ -256,9 +251,9 @@ static void xhci_isr(void *ctx, uint8_t vector, void *rsp) {
 
     xhci_info("Interrupt");
 
-    xhci_update_erdp(dev);
+    xhci_clear_interrupt_pending(dev);
 
-    mmio_write_32(&dev->op_regs->usbsts, XHCI_USBSTS_EI);
+    xhci_clear_usbsts_ei(dev);
 
     lapic_write(LAPIC_REG_EOI, 0);
 }
@@ -273,11 +268,15 @@ static void xhci_device_start_interrupts(uint8_t bus, uint8_t slot,
 
 void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
                struct pci_device *pci) {
+
     xhci_info("Found device at %02x:%02x.%02x", bus, slot, func);
     void *mmio = xhci_map_mmio(bus, slot, func);
 
     struct xhci_device *dev = xhci_device_create(mmio);
     dev->pci = pci;
+
+    pci_enable_msix(bus, slot, func);
+    xhci_device_start_interrupts(bus, slot, func, dev);
 
     if (!xhci_controller_stop(dev))
         return;
@@ -290,9 +289,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
     xhci_setup_event_ring(dev);
 
     xhci_setup_command_ring(dev);
-
-    pci_enable_msix(bus, slot, func);
-    xhci_device_start_interrupts(bus, slot, func, dev);
+    xhci_clear_interrupt_pending(dev);
 
     xhci_controller_start(dev);
     xhci_controller_enable_ints(dev);

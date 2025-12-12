@@ -74,7 +74,7 @@ static uint64_t wait_for_response(struct xhci_device *dev, struct xhci_trb *evt,
 
         uint64_t offset = *dq_idx * sizeof(struct xhci_trb);
         uint64_t erdp = event_ring->phys + offset;
-        mmio_write_64(&dev->intr_regs->erdp, erdp | 1);
+        xhci_erdp_ack(dev, erdp);
 
         *success_out = true;
         return control;
@@ -91,25 +91,19 @@ static uint64_t wait_for_transfer_event(struct xhci_device *dev,
                                         uint8_t expected_cycle,
                                         bool *success_out) {
     uint32_t control = mmio_read_32(&evt->control);
-    uint8_t trb_type = (control >> 10) & 0x3F;
+    uint8_t trb_type = TRB_GET_TYPE(control);
     if (trb_type == TRB_TYPE_TRANSFER_EVENT) {
-        uint8_t completion_code = (evt->status >> 24) & 0xFF;
+        uint8_t completion_code = TRB_GET_CC(evt->status);
         uint8_t evt_slot_id = (control >> 24) & 0xFF;
 
-        if (evt_slot_id != slot_id) {
-            (*dq_idx)++;
-            if (*dq_idx == event_ring->size) {
-                *dq_idx = 0;
-                expected_cycle ^= 1;
-            }
+        if (evt_slot_id != slot_id)
             *success_out = false;
-        }
 
         xhci_advance_dequeue(event_ring, dq_idx, &expected_cycle);
 
         uint64_t offset = *dq_idx * sizeof(struct xhci_trb);
         uint64_t erdp = event_ring->phys + offset;
-        mmio_write_64(&dev->intr_regs->erdp, erdp | 1);
+        xhci_erdp_ack(dev, erdp);
 
         *success_out = true;
         return (completion_code == 1);
@@ -119,35 +113,36 @@ static uint64_t wait_for_transfer_event(struct xhci_device *dev,
     }
 }
 
-static uint64_t wait_for_interrupt_event(struct xhci_trb *evt, uint8_t slot_id,
+static uint64_t wait_for_interrupt_event(struct xhci_device *dev,
+                                         struct xhci_trb *evt, uint8_t slot_id,
                                          uint32_t *dq_idx,
                                          struct xhci_ring *event_ring,
                                          uint8_t expected_cycle,
                                          bool *success_out, uint8_t ep_id) {
     uint32_t control = mmio_read_32(&evt->control);
-    uint8_t trb_type = (control >> 10) & 0x3F;
+    uint8_t trb_type = TRB_GET_TYPE(control);
 
     if (trb_type == TRB_TYPE_TRANSFER_EVENT) {
         uint8_t evt_slot_id = (control >> 24) & 0xFF;
         uint8_t evt_ep_id = (control >> 16) & 0xFF;
         if (evt_slot_id != slot_id || evt_ep_id != ep_id) {
             *success_out = false;
-            goto advance;
         }
 
-        uint8_t completion_code = (evt->status >> 24) & 0xFF;
+        uint8_t completion_code = TRB_GET_CC(evt->status);
+
+        xhci_advance_dequeue(event_ring, dq_idx, &expected_cycle);
+
+        uint64_t offset = *dq_idx * sizeof(struct xhci_trb);
+        uint64_t erdp = event_ring->phys + offset;
+        xhci_erdp_ack(dev, erdp);
 
         *success_out = true;
         return (completion_code == 1);
-
-    advance:
-
-        xhci_advance_dequeue(event_ring, dq_idx, &expected_cycle);
+    } else {
+        *success_out = false;
         return 0;
     }
-
-    *success_out = false;
-    return 0;
 }
 
 static bool xhci_wait_for_interrupt(struct xhci_device *xhci, uint8_t slot_id,
@@ -164,8 +159,9 @@ static bool xhci_wait_for_interrupt(struct xhci_device *xhci, uint8_t slot_id,
             continue;
 
         bool success = false;
-        uint64_t ret = wait_for_interrupt_event(
-            evt, slot_id, &dq_idx, event_ring, expected_cycle, &success, ep_id);
+        uint64_t ret =
+            wait_for_interrupt_event(xhci, evt, slot_id, &dq_idx, event_ring,
+                                     expected_cycle, &success, ep_id);
         if (success)
             return ret != 0;
 
@@ -217,7 +213,6 @@ bool xhci_submit_interrupt_transfer(struct usb_device *dev,
         return false;
     }
 
-    //    xhci_clear_interrupt_pending(xhci);
-
+    xhci_clear_interrupt_pending(xhci);
     return true;
 }
