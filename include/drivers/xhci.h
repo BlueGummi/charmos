@@ -5,10 +5,9 @@
 #include <stdint.h>
 #include <structures/list.h>
 #include <structures/locked_list.h>
-/* I don't want to cause even longer compile times
- * by including the ever-growing USB header in here */
 struct usb_controller;
 struct usb_packet;
+struct xhci_request;
 struct usb_endpoint;
 struct pci_device;
 
@@ -90,8 +89,8 @@ struct pci_device;
 #define TRB_EP(ctrl) TRB_FIELD(ctrl, 16, 23)
 
 #define TRB_CC(status) TRB_FIELD(status, 24, 31)
+#define TRB_PORT(parameter) TRB_FIELD(parameter, 24, 31)
 
-#define TRB_GET_TYPE(ctrl) (((ctrl) >> 10) & 0x3F)
 #define TRB_SET_TYPE(val) (((val) & 0x3F) << 10)
 #define TRB_SET_CYCLE(val) (((val) & 1))
 #define TRB_SET_INTERRUPTER_TARGET(target) ((target) >> 21)
@@ -106,10 +105,8 @@ struct pci_device;
 #define TRB_BEI_BIT (1 << 9) // Block Event Interrupt (ISO)
 #define TRB_TOGGLE_CYCLE_BIT (1 << 1)
 #define TRB_TYPE_SHIFT 10
-#define TRB_GET_CC(x) (((x) >> 24) & 0xFF)
 
 #define TRB_SET_SLOT_ID(id) (((id) & 0xFF) << 24)
-#define TRB_GET_SLOT_ID(ctrl) (((ctrl) >> 24) & 0xFF)
 
 // Bit definitions for XHCI PORTSC register
 #define PORTSC_CCS (1 << 0)           // Current Connect Status
@@ -503,7 +500,7 @@ struct xhci_trb {
 static_assert_struct_size_eq(xhci_trb, 0x10);
 
 struct xhci_ring {
-    struct xhci_trb *trbs;  /* Virtual mapped TRB buffer */
+    struct xhci_trb *trbs; /* Virtual mapped TRB buffer */
     uint64_t phys;          /* Physical address of TRB buffer */
     uint32_t enqueue_index; /* Next TRB to fill */
     uint32_t dequeue_index; /* Point where controller sends back things */
@@ -558,7 +555,6 @@ struct xhci_ext_cap {
 };
 
 enum xhci_request_status {
-    XHCI_REQUEST_STATUS_OUTGOING, /* On the outgoing list */
     XHCI_REQUEST_STATUS_WAITING,  /* On the waiting list */
     XHCI_REQUEST_STATUS_FINISHED, /* On the finished list */
     XHCI_REQUEST_STATUS_MAX,
@@ -583,13 +579,16 @@ struct xhci_device {
     struct xhci_ring *event_ring;
     struct xhci_ring *cmd_ring;
     struct xhci_erst_entry *erst;
+
     struct xhci_port_regs *port_regs;
     uint64_t ports;
     struct xhci_port_info port_info[64];
+
     struct locked_list requests[XHCI_REQUEST_STATUS_MAX];
 
     uint64_t num_devices;
     struct usb_device **devices;
+    struct spinlock lock; /* protects regs */
 };
 
 struct xhci_command {
@@ -628,29 +627,4 @@ struct xhci_return {
     uint32_t status;
 };
 
-struct xhci_ring *xhci_allocate_ring();
 void xhci_init(uint8_t bus, uint8_t slot, uint8_t func, struct pci_device *dev);
-void *xhci_map_mmio(uint8_t bus, uint8_t slot, uint8_t func);
-struct xhci_device *xhci_device_create(void *mmio);
-bool xhci_controller_stop(struct xhci_device *dev);
-bool xhci_controller_reset(struct xhci_device *dev);
-bool xhci_controller_start(struct xhci_device *dev);
-void xhci_controller_enable_ints(struct xhci_device *dev);
-void xhci_setup_event_ring(struct xhci_device *dev);
-void xhci_setup_command_ring(struct xhci_device *dev);
-
-bool xhci_submit_interrupt_transfer(struct usb_device *dev,
-                                    struct usb_packet *packet);
-
-void xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd);
-
-/* returns CONTROL */
-struct xhci_return xhci_wait_for_response(struct xhci_device *dev);
-
-/* returns STATUS */
-struct xhci_return xhci_wait_for_transfer_event(struct xhci_device *dev,
-                                                uint8_t slot_id);
-uint8_t xhci_enable_slot(struct xhci_device *dev);
-void xhci_parse_ext_caps(struct xhci_device *dev);
-bool xhci_reset_port(struct xhci_device *dev, uint32_t port_index);
-void xhci_detect_usb3_ports(struct xhci_device *dev);

@@ -65,7 +65,7 @@ static void do_early_dispatch(struct bio_scheduler *sched) {
 }
 
 void bio_sched_try_early_dispatch(struct bio_scheduler *sched) {
-    kassert(mutex_held(&sched->lock));
+    MUTEX_ASSERT_HELD(&sched->lock);
     if (should_early_dispatch(sched))
         do_early_dispatch(sched);
 }

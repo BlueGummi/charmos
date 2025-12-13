@@ -124,7 +124,7 @@ void idt_set_gate(uint8_t num, uint16_t sel, uint8_t flags) {
     idt[num].selector = sel;
 
     /* TODO: maybe don't hardcode this */
-    if (num == IRQ_NMI || num == IRQ_DBF) {
+    if (num == IRQ_NMI || num == IRQ_DBF || num == IRQ_PAGE_FAULT) {
         idt[num].ist = 1;
     } else {
         idt[num].ist = 0;

@@ -1,11 +1,13 @@
 #include <console/printf.h>
 #include <irq/irq.h>
+#include <sch/sched.h>
 #include <sync/spinlock.h>
 
 static struct spinlock pf_lock = SPINLOCK_INIT;
 enum irq_result page_fault_handler(void *context, uint8_t vector,
                                    struct irq_context *rsp) {
     (void) context, (void) vector, (void) rsp;
+    struct thread *curr = scheduler_get_current_thread();
 
     uint64_t error_code = UINT64_MAX;
     paddr_t rsp_phys = vmm_get_phys_unsafe((vaddr_t) rsp);
@@ -36,6 +38,13 @@ enum irq_result page_fault_handler(void *context, uint8_t vector,
              (error_code & 0x10) ? "Yes" : "No");
     k_printf("  - Protection Key Violation (PK): %s\n",
              (error_code & 0x20) ? "Yes" : "No");
+    k_printf("  - Kernel stack 0x%lx -> 0x%lx\n", curr->stack,
+             (uintptr_t) curr->stack + curr->stack_size);
+    vaddr_t protector_base = (uintptr_t) curr->stack - PAGE_SIZE;
+    vaddr_t protector_top = (uintptr_t) curr->stack;
+    if (fault_addr >= protector_base && fault_addr <= protector_top)
+        k_printf(
+            "Likely stack overflow!! Fault occurred in protector page!!!\n");
 
     if (!(error_code & 0x04)) {
         spin_unlock_raw(&pf_lock);

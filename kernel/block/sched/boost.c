@@ -81,7 +81,7 @@ static inline bool try_boost(struct bio_scheduler *sched,
 
 /* this will be called with the lock already acquired */
 bool bio_sched_boost_starved(struct bio_scheduler *sched) {
-    kassert(mutex_held(&sched->lock));
+    MUTEX_ASSERT_HELD(&sched->lock);
     bool boosted_any = false;
 
     for (int64_t i = BIO_RQ_HIGH; i >= 0; i--) {

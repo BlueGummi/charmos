@@ -108,7 +108,7 @@ static inline struct turnstile_hash_chain *turnstile_chain_for(void *obj) {
 
 static void turnstile_insert_to_freelist(struct turnstile *parent,
                                          struct turnstile *child) {
-    kassert(spinlock_held(&turnstile_chain_for(parent->lock_obj)->lock));
+    SPINLOCK_ASSERT_HELD(&turnstile_chain_for(parent->lock_obj)->lock);
     list_add_tail(&child->freelist, &parent->freelist);
     child->state = TURNSTILE_STATE_IN_FREE_LIST;
 }
@@ -123,7 +123,7 @@ static struct turnstile *turnstile_freelist_pop(struct turnstile *ts) {
 
 static void turnstile_insert(struct turnstile_hash_chain *chain,
                              struct turnstile *ts, void *lock_obj) {
-    kassert(spinlock_held(&chain->lock));
+    SPINLOCK_ASSERT_HELD(&chain->lock);
     list_add_tail(&chain->list, &ts->hash_list);
     ts->state = TURNSTILE_STATE_IN_HASH_TABLE;
     ts->lock_obj = lock_obj;
@@ -131,7 +131,7 @@ static void turnstile_insert(struct turnstile_hash_chain *chain,
 
 static void turnstile_remove(struct turnstile_hash_chain *chain,
                              struct turnstile *ts) {
-    kassert(spinlock_held(&chain->lock));
+    SPINLOCK_ASSERT_HELD(&chain->lock);
     list_del_init(&ts->hash_list);
     ts->state = TURNSTILE_STATE_UNUSED;
     ts->lock_obj = NULL;

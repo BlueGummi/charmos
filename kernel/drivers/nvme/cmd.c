@@ -106,11 +106,9 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
             break;
 
         uint16_t status = mmio_read_32(&entry->status) & 0xFFFE;
+        uint16_t cid = mmio_read_32(&entry->cid);
 
-        struct list_head *pop = list_pop_front_init(&queue->outgoing);
-
-        struct nvme_request *req =
-            container_of(pop, struct nvme_request, list_node);
+        struct nvme_request *req = queue->sq_requests[cid];
 
         req->status = status;
 
@@ -160,8 +158,7 @@ void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,
     cmd->cid = tail;
 
     this_queue->sq[tail] = *cmd;
-
-    list_add_tail(&req->list_node, &this_queue->outgoing);
+    this_queue->sq_requests[tail] = req;
 
     req->status = BIO_STATUS_INFLIGHT; /* In flight */
 

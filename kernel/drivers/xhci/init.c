@@ -48,7 +48,7 @@ struct xhci_ring *xhci_allocate_event_ring(void) {
     er->trbs = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
     er->phys = vmm_get_phys((vaddr_t) er->trbs, VMM_FLAG_NONE);
 
-    er->size = 256;
+    er->size = TRB_RING_SIZE;
     er->dequeue_index = 0;
     er->cycle = 1;
 
@@ -62,7 +62,6 @@ void xhci_setup_event_ring(struct xhci_device *dev) {
     paddr_t erst_phys = vmm_get_phys((vaddr_t) erst, VMM_FLAG_NONE);
 
     dev->event_ring = xhci_allocate_event_ring();
-
     erst[0].ring_segment_base = dev->event_ring->phys;
     erst[0].ring_segment_size = dev->event_ring->size;
     erst[0].reserved = 0;
@@ -104,49 +103,6 @@ uint8_t xhci_enable_slot(struct xhci_device *dev) {
     xhci_send_command(dev, &cmd);
 
     return TRB_SLOT(xhci_wait_for_response(dev).control);
-}
-
-bool xhci_consume_port_status_change(struct xhci_device *dev) {
-    struct xhci_ring *event_ring = dev->event_ring;
-
-    while (true) {
-        struct xhci_trb *evt = &event_ring->trbs[event_ring->dequeue_index];
-        uint32_t control = mmio_read_32(&evt->control);
-
-        if ((control & TRB_CYCLE_BIT) != event_ring->cycle)
-            break;
-
-        uint8_t trb_type = TRB_GET_TYPE(control);
-        if (trb_type == TRB_TYPE_PORT_STATUS_CHANGE) {
-            uint32_t dw0 = (uint32_t) mmio_read_32(&evt->parameter);
-            uint8_t port_id = (dw0 >> 24) & 0xFF;
-
-            bool bad_port_id = port_id == 0 || port_id > dev->ports;
-
-            if (bad_port_id)
-                xhci_warn("Unexpected port id %u in PSC event", port_id);
-
-            uint32_t *portsc = (void *) &dev->port_regs[port_id];
-            uint32_t pval = mmio_read_32(portsc);
-            mmio_write_32(portsc, pval | PORTSC_PRC);
-
-            /* Advance the dequeue and program ERDP */
-            xhci_advance_dequeue(event_ring);
-            uint64_t offset =
-                (uint64_t) event_ring->dequeue_index * sizeof(struct xhci_trb);
-
-            uint64_t erdp = event_ring->phys + offset;
-            xhci_erdp_ack(dev, erdp);
-
-            return true;
-        }
-
-        /* Not PSC, just advance */
-        xhci_advance_dequeue(event_ring);
-    }
-
-    /* No PSC found */
-    return false;
 }
 
 bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
@@ -218,7 +174,9 @@ bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
         return false;
     }
 
-    if (!xhci_consume_port_status_change(dev)) {
+    struct xhci_return xr = xhci_wait_for_port_status_change(dev, portnum);
+
+    if (TRB_CC(xr.status) != CC_SUCCESS) {
         xhci_warn("port %u reset did not generate a PSC event", portnum);
         return false;
     }

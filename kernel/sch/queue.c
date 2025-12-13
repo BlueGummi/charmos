@@ -52,7 +52,7 @@ void scheduler_remove_thread(struct scheduler *sched, struct thread *t,
     if (!lock_held)
         irql = scheduler_lock_irq_disable(sched);
     else
-        kassert(spinlock_held(&sched->lock));
+        SPINLOCK_ASSERT_HELD(&sched->lock);
 
     kassert(thread_get_state(t) == THREAD_STATE_READY);
 

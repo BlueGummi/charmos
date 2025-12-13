@@ -218,18 +218,37 @@ static struct usb_controller_ops xhci_ctrl_ops = {
     .reset_port = NULL,
 };
 
-static void xhci_clear_usbsts_ei(struct xhci_device *dev) {
-    mmio_write_32(&dev->op_regs->usbsts,
-                  mmio_read_32(&dev->op_regs->usbsts) | XHCI_USBSTS_EI);
+void xhci_process_event_ring(struct xhci_device *xhci) {
+    struct xhci_ring *ring = xhci->event_ring;
+
+    enum irql irql = spin_lock_irq_disable(&ring->lock);
+
+    while (true) {
+        struct xhci_trb *evt = &ring->trbs[ring->dequeue_index];
+        uint32_t control = mmio_read_32(&evt->control);
+
+        if ((control & TRB_CYCLE_BIT) != ring->cycle)
+            break;
+
+       // dispatch_event(evt);
+
+        xhci_advance_dequeue(ring);
+
+        uint64_t erdp =
+            ring->phys + ring->dequeue_index * sizeof(struct xhci_trb);
+        xhci_erdp_ack(xhci, erdp);
+    }
+
+    spin_unlock(&ring->lock, irql);
 }
 
 static enum irq_result xhci_isr(void *ctx, uint8_t vector,
                                 struct irq_context *rsp) {
     struct xhci_device *dev = ctx;
 
-    static int did = 0;
-    xhci_info("Interrupt %u", ++did);
     xhci_clear_interrupt_pending(dev);
+
+    /* TODO: handle the event ring in here */
 
     xhci_clear_usbsts_ei(dev);
 

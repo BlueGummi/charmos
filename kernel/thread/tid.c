@@ -40,7 +40,7 @@ struct tid_space *tid_space_init(uint64_t max_id) {
 }
 
 static struct tid_range *tid_range_alloc(struct tid_space *ts) {
-    kassert(spinlock_held(&ts->lock));
+    SPINLOCK_ASSERT_HELD(&ts->lock);
     struct tid_range *r = kzalloc(sizeof(*r), ALLOC_PARAMS_DEFAULT);
     if (r)
         return r;
@@ -56,7 +56,7 @@ static struct tid_range *tid_range_alloc(struct tid_space *ts) {
 }
 
 static void tid_range_free(struct tid_space *ts, struct tid_range *r) {
-    kassert(spinlock_held(&ts->lock));
+    SPINLOCK_ASSERT_HELD(&ts->lock);
     if ((uintptr_t) r >= (uintptr_t) &ts->reserve_pool[0] &&
         (uintptr_t) r <
             (uintptr_t) &ts->reserve_pool[TID_RANGE_RESERVE_COUNT]) {

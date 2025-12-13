@@ -2,6 +2,37 @@
 #include <console/printf.h>
 #include <drivers/usb.h>
 #include <drivers/xhci.h>
+#include <sch/sched.h>
+
+void xhci_advance_dequeue(struct xhci_ring *ring);
+struct xhci_return xhci_wait_for_port_status_change(struct xhci_device *dev,
+                                                    uint32_t port_id);
+
+struct xhci_ring *xhci_allocate_ring();
+void *xhci_map_mmio(uint8_t bus, uint8_t slot, uint8_t func);
+struct xhci_device *xhci_device_create(void *mmio);
+bool xhci_controller_stop(struct xhci_device *dev);
+bool xhci_controller_reset(struct xhci_device *dev);
+bool xhci_controller_start(struct xhci_device *dev);
+void xhci_controller_enable_ints(struct xhci_device *dev);
+void xhci_setup_event_ring(struct xhci_device *dev);
+void xhci_setup_command_ring(struct xhci_device *dev);
+
+bool xhci_submit_interrupt_transfer(struct usb_device *dev,
+                                    struct usb_packet *packet);
+
+void xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd);
+
+/* returns CONTROL */
+struct xhci_return xhci_wait_for_response(struct xhci_device *dev);
+
+/* returns STATUS */
+struct xhci_return xhci_wait_for_transfer_event(struct xhci_device *dev,
+                                                uint8_t slot_id);
+uint8_t xhci_enable_slot(struct xhci_device *dev);
+void xhci_parse_ext_caps(struct xhci_device *dev);
+bool xhci_reset_port(struct xhci_device *dev, uint32_t port_index);
+void xhci_detect_usb3_ports(struct xhci_device *dev);
 
 static inline void xhci_clear_interrupt_pending(struct xhci_device *dev) {
     uint32_t iman = mmio_read_32(&dev->intr_regs->iman);
@@ -87,9 +118,12 @@ static inline enum usb_status xhci_cc_to_usb_status(uint8_t cc) {
 static inline void xhci_request_init(struct xhci_request *req) {
     req->state = XHCI_REQUEST_DONE;
     req->completion_code = 0;
-    req->waiter = NULL;
-    req->status = XHCI_REQUEST_STATUS_OUTGOING; /* NONE */
+    req->waiter = scheduler_get_current_thread();
+    req->status = XHCI_REQUEST_STATUS_WAITING;
     INIT_LIST_HEAD(&req->list);
 }
 
-void xhci_advance_dequeue(struct xhci_ring *ring);
+static inline void xhci_clear_usbsts_ei(struct xhci_device *dev) {
+    mmio_write_32(&dev->op_regs->usbsts,
+                  mmio_read_32(&dev->op_regs->usbsts) | XHCI_USBSTS_EI);
+}

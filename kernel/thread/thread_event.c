@@ -477,7 +477,7 @@ static bool set_state_and_update_reason(
     if (!already_locked)
         irql = thread_acquire(t, &aok);
     else
-        kassert(spinlock_held(&t->lock));
+        SPINLOCK_ASSERT_HELD(&t->lock);
 
     kassert(aok);
 

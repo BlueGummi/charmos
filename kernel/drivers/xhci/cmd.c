@@ -20,12 +20,28 @@ struct wait_result {
     uint32_t status;
 };
 
+#define WAIT_RESULT_UNMATCHED                                                  \
+    (struct wait_result) {                                                     \
+        .matches = false                                                       \
+    }
+
+#define WAIT_RESULT_MATCHED(ctrl, sts)                                         \
+    (struct wait_result) {                                                     \
+        .matches = true, .complete = true, .control = ctrl, .status = sts      \
+    }
+
 struct wait_ctx {
     uint8_t slot_id;
     uint8_t ep_id;
 };
 
+struct portsc_ctx {
+    struct xhci_device *dev;
+    uint32_t port_id;
+};
+
 void xhci_advance_dequeue(struct xhci_ring *ring) {
+    SPINLOCK_ASSERT_HELD(&ring->lock);
     ring->dequeue_index++;
     if (ring->dequeue_index == ring->size) {
         ring->dequeue_index = 0;
@@ -34,7 +50,9 @@ void xhci_advance_dequeue(struct xhci_ring *ring) {
 }
 
 void xhci_advance_enqueue(struct xhci_ring *ring) {
+    SPINLOCK_ASSERT_HELD(&ring->lock);
     ring->enqueue_index++;
+    /* -1 here because the last TRB is the LINK */
     if (ring->enqueue_index == ring->size - 1) {
         ring->enqueue_index = 0;
         ring->cycle ^= 1;
@@ -43,6 +61,7 @@ void xhci_advance_enqueue(struct xhci_ring *ring) {
 
 void xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd) {
     struct xhci_ring *cmd_ring = cmd->ring;
+    enum irql irql = spin_lock_irq_disable(&cmd_ring->lock);
     struct xhci_trb *trb = &cmd_ring->trbs[cmd_ring->enqueue_index];
 
     trb->parameter = cmd->parameter;
@@ -51,12 +70,14 @@ void xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd) {
 
     xhci_advance_enqueue(cmd_ring);
     xhci_ring_doorbell(dev, cmd->slot_id, cmd->ep_id);
+    spin_unlock(&cmd_ring->lock, irql);
 }
 
 struct xhci_return
 xhci_wait(struct xhci_device *dev,
           struct wait_result (*cb)(struct xhci_trb *, void *), void *ctx) {
     struct xhci_ring *ring = dev->event_ring;
+    enum irql irql = spin_lock_irq_disable(&ring->lock);
 
     while (true) {
         struct xhci_trb *evt = &ring->trbs[ring->dequeue_index];
@@ -75,6 +96,7 @@ xhci_wait(struct xhci_device *dev,
         xhci_erdp_ack(dev, erdp);
 
         if (r.matches && r.complete) {
+            spin_unlock(&ring->lock, irql);
             return (struct xhci_return) {.status = r.status,
                                          .control = r.control};
         }
@@ -87,12 +109,9 @@ static struct wait_result wait_cmd(struct xhci_trb *evt, void *unused) {
     uint8_t type = TRB_TYPE(control);
 
     if (type != TRB_TYPE_COMMAND_COMPLETION)
-        return (struct wait_result) {.matches = false};
+        return WAIT_RESULT_UNMATCHED;
 
-    return (struct wait_result) {.matches = true,
-                                 .complete = true,
-                                 .control = control,
-                                 .status = evt->status};
+    return WAIT_RESULT_MATCHED(control, evt->status);
 }
 
 static struct wait_result wait_xfer_event(struct xhci_trb *evt,
@@ -102,15 +121,12 @@ static struct wait_result wait_xfer_event(struct xhci_trb *evt,
     uint32_t control = mmio_read_32(&evt->control);
 
     if (TRB_TYPE(control) != TRB_TYPE_TRANSFER_EVENT)
-        return (struct wait_result) {.matches = false};
+        return WAIT_RESULT_UNMATCHED;
 
     if (TRB_SLOT(control) != ctx->slot_id)
-        return (struct wait_result) {.matches = false};
+        return WAIT_RESULT_UNMATCHED;
 
-    return (struct wait_result) {.matches = true,
-                                 .complete = true,
-                                 .control = control,
-                                 .status = evt->status};
+    return WAIT_RESULT_MATCHED(control, evt->status);
 }
 
 static struct wait_result wait_interrupt_event(struct xhci_trb *evt,
@@ -120,18 +136,41 @@ static struct wait_result wait_interrupt_event(struct xhci_trb *evt,
     uint32_t control = mmio_read_32(&evt->control);
 
     if (TRB_TYPE(control) != TRB_TYPE_TRANSFER_EVENT)
-        return (struct wait_result) {.matches = false};
+        return WAIT_RESULT_UNMATCHED;
 
     if (TRB_SLOT(control) != ctx->slot_id)
-        return (struct wait_result) {.matches = false};
+        return WAIT_RESULT_UNMATCHED;
 
     if (TRB_EP(control) != ctx->ep_id)
-        return (struct wait_result) {.matches = false};
+        return WAIT_RESULT_UNMATCHED;
 
-    return (struct wait_result) {.matches = true,
-                                 .complete = true,
-                                 .control = control,
-                                 .status = evt->status};
+    return WAIT_RESULT_MATCHED(control, evt->status);
+}
+
+static struct wait_result wait_port_status_change(struct xhci_trb *evt,
+                                                  void *userdata) {
+    struct portsc_ctx *psc = userdata;
+    struct xhci_device *dev = psc->dev;
+    uint32_t expected = psc->port_id;
+
+    uint32_t control = mmio_read_32(&evt->control);
+    if (TRB_TYPE(control) != TRB_TYPE_PORT_STATUS_CHANGE)
+        return WAIT_RESULT_UNMATCHED;
+
+    uint32_t pm = (uint32_t) mmio_read_32(&evt->parameter);
+    uint8_t port_id = TRB_PORT(pm);
+
+    bool bad_port = port_id == 0 || port_id > dev->ports || port_id != expected;
+
+    if (bad_port) {
+        xhci_error("Bad port id %u in PSC, expected %u", port_id, expected);
+        return WAIT_RESULT_UNMATCHED;
+    }
+
+    uint32_t *portsc = &dev->port_regs[port_id].portsc;
+    mmio_write_32(portsc, mmio_read_32(portsc) | PORTSC_PRC);
+
+    return WAIT_RESULT_MATCHED(control, evt->status);
 }
 
 struct xhci_return xhci_wait_for_response(struct xhci_device *dev) {
@@ -142,6 +181,12 @@ struct xhci_return xhci_wait_for_transfer_event(struct xhci_device *dev,
                                                 uint8_t slot_id) {
     struct wait_ctx ctx = {.slot_id = slot_id};
     return xhci_wait(dev, wait_xfer_event, &ctx);
+}
+
+struct xhci_return xhci_wait_for_port_status_change(struct xhci_device *dev,
+                                                    uint32_t port_id) {
+    struct portsc_ctx ctx = {.port_id = port_id, .dev = dev};
+    return xhci_wait(dev, wait_port_status_change, &ctx);
 }
 
 /* Submit a single interrupt IN transfer, blocking until completion */
@@ -168,7 +213,6 @@ bool xhci_submit_interrupt_transfer(struct usb_device *dev,
 
     struct xhci_request req;
     xhci_request_init(&req);
-    req.waiter = scheduler_get_current_thread();
 
     struct xhci_command cmd = {
         .ring = ring,

@@ -42,8 +42,8 @@ static size_t migratable_in_list(size_t caller, struct list_head *tq) {
 void scheduler_count_migratable_threads(struct scheduler *caller,
                                         struct scheduler *s,
                                         size_t agg[THREAD_PRIO_CLASS_COUNT]) {
-    kassert(spinlock_held(&caller->lock));
-    kassert(spinlock_held(&s->lock));
+    SPINLOCK_ASSERT_HELD(&caller->lock);
+    SPINLOCK_ASSERT_HELD(&s->lock);
     /* count urgent, count realtime, count timesharing, count background */
     size_t c = caller->core_id;
     agg[THREAD_PRIO_CLASS_URGENT] = migratable_in_list(c, &s->urgent_threads);

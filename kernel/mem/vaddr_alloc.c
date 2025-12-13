@@ -14,7 +14,7 @@ static size_t vas_range_get_data(struct rbt_node *n) {
 #define VASRANGE_PER_PAGE (PAGE_SIZE / sizeof(struct vas_range))
 
 static void vasrange_refill(struct vas_space *space) {
-    kassert(spinlock_held(&space->lock));
+    SPINLOCK_ASSERT_HELD(&space->lock);
     uintptr_t phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
     if (!phys)
         k_panic("OOM allocating vas_range page");
@@ -29,7 +29,7 @@ static void vasrange_refill(struct vas_space *space) {
 }
 
 struct vas_range *vasrange_alloc(struct vas_space *space) {
-    kassert(spinlock_held(&space->lock));
+    SPINLOCK_ASSERT_HELD(&space->lock);
     if (!space->freelist)
         vasrange_refill(space);
 
@@ -39,7 +39,7 @@ struct vas_range *vasrange_alloc(struct vas_space *space) {
 }
 
 void vasrange_free(struct vas_space *space, struct vas_range *r) {
-    kassert(spinlock_held(&space->lock));
+    SPINLOCK_ASSERT_HELD(&space->lock);
     r->next_free = space->freelist;
     space->freelist = r;
 }

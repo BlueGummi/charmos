@@ -3,6 +3,7 @@
 #include <charmos.h>
 #include <console/panic.h>
 #include <irq/irq.h>
+#include <kassert.h>
 #include <sch/irql.h>
 #include <smp/core.h>
 #include <stdatomic.h>
@@ -81,9 +82,10 @@ static inline bool spin_trylock_irq_disable(struct spinlock *lock,
     return false;
 }
 
-__no_sanitize_address static inline bool spinlock_held(struct spinlock *lock) {
+static inline bool spinlock_held(struct spinlock *lock) {
     return atomic_load(&lock->state);
 }
+#define SPINLOCK_ASSERT_HELD(l) kassert(spinlock_held(l))
 
 /* Keep these static inline so you only "pay for what you need" (e.g. if you
  * never call trylock() you don't pay the cost of having that dead function

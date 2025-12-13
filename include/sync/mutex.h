@@ -47,3 +47,4 @@ static inline void mutex_init(struct mutex *mtx) {
 void mutex_unlock(struct mutex *mutex);
 void mutex_lock(struct mutex *mutex);
 bool mutex_held(struct mutex *mtx);
+#define MUTEX_ASSERT_HELD(m) kassert(mutex_held(m))

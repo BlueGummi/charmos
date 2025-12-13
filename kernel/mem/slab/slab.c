@@ -323,7 +323,7 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
     enum irql irql = slab_lock(slab);
     slab_check_assert(slab);
 
-    kassert(spinlock_held(&cache->lock));
+    SPINLOCK_ASSERT_HELD(&cache->lock);
     kassert(slab->state != SLAB_FULL);
 
     for (uint64_t i = 0; i < cache->objs_per_slab; i++) {
@@ -408,7 +408,7 @@ void slab_free_old(struct slab *slab, void *obj) {
 
 static void *slab_try_alloc_from_slab_list(struct slab_cache *cache,
                                            struct list_head *list) {
-    kassert(spinlock_held(&cache->lock));
+    SPINLOCK_ASSERT_HELD(&cache->lock);
     struct list_head *node, *temp;
     struct slab *slab;
     void *ret = NULL;
@@ -441,7 +441,7 @@ void slab_cache_insert(struct slab_cache *cache, struct slab *slab) {
 }
 
 void *slab_cache_try_alloc_from_lists(struct slab_cache *c) {
-    kassert(spinlock_held(&c->lock));
+    SPINLOCK_ASSERT_HELD(&c->lock);
 
     void *ret = slab_try_alloc_from_slab_list(c, &c->slabs[SLAB_PARTIAL]);
     if (ret)

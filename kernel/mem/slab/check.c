@@ -42,7 +42,7 @@ bool slab_check_meta(struct slab *slab) {
 
 bool slab_check(struct slab *slab) {
     /* Caller must deal with this */
-    kassert(spinlock_held(&slab->lock));
+    SPINLOCK_ASSERT_HELD(&slab->lock);
 
     switch (slab->state) {
     case SLAB_FREE:

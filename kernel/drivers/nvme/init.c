@@ -119,8 +119,6 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
                                   PAGING_NO_FLAGS, VMM_FLAG_NONE);
     memset(this_queue->cq, 0, cq_pages * nvme->page_size);
 
-    INIT_LIST_HEAD(&this_queue->outgoing);
-
     this_queue->sq_phys = sq_phys;
     this_queue->cq_phys = cq_phys;
     this_queue->sq_tail = 0;
@@ -136,6 +134,12 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
                       ((2 * qid + 1) * nvme->doorbell_stride));
 
     uint8_t this_isr = nvme->isr_index[qid];
+
+    this_queue->sq_requests =
+        kzalloc(sizeof(struct nvme_request *) * this_queue->sq_depth,
+                ALLOC_PARAMS_DEFAULT);
+    if (!this_queue->sq_requests)
+        k_panic("OOM\n");
 
     // complete queue
     struct nvme_command cq_cmd = {0};

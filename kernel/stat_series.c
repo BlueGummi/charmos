@@ -66,14 +66,14 @@ void stat_series_advance_internal(struct stat_series *s, time_t now_us,
         if (steps == 0)
             return; /* no rotation required, avoid locking */
     } else {
-        kassert(spinlock_held(&s->lock));
+        SPINLOCK_ASSERT_HELD(&s->lock);
     }
 
     /* Take lock and re-check/recompute using the protected fields */
     if (!already_locked) {
         irql = stat_series_lock(s);
     } else {
-        kassert(spinlock_held(&s->lock));
+        SPINLOCK_ASSERT_HELD(&s->lock);
     }
 
     /* re-evaluate based on locked state (canonical update) */

@@ -16,7 +16,7 @@ static struct pairing_node *pairing_merge(struct pairing_heap *h,
     if (!b)
         return a;
 
-    kassert(spinlock_held(&h->lock));
+    SPINLOCK_ASSERT_HELD(&h->lock);
 
     if (h->cmp(a, b) <= 0) {
         /* a is smaller, b becomes child of a */
@@ -55,7 +55,7 @@ static struct pairing_node *pairing_two_pass(struct pairing_heap *h,
     if (!first || !first->sibling)
         return first;
 
-    kassert(spinlock_held(&h->lock));
+    SPINLOCK_ASSERT_HELD(&h->lock);
 
     struct pairing_node *a = first;
     struct pairing_node *b = first->sibling;
