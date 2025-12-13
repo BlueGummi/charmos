@@ -38,11 +38,18 @@ void isr_common_entry(uint8_t vector, struct irq_context *rsp) {
     if (!desc->present || list_empty(&irq_table[vector].actions))
         k_panic("Unhandled ISR vector: %u\n", vector);
 
+    bool handled = false;
     struct list_head *lh;
     list_for_each(lh, &desc->actions) {
         struct irq_action *act = container_of(lh, struct irq_action, list);
-        act->handler(act->data, vector, rsp);
+        if (act->handler(act->data, vector, rsp) == IRQ_HANDLED) {
+            handled = true;
+            break;
+        }
     }
+
+    if (handled && desc->chip && desc->chip->eoi)
+        desc->chip->eoi(desc);
 
     irql_lower(old);
     irq_mark_self_in_interrupt(false);
@@ -70,6 +77,7 @@ void irq_register(char *name, uint8_t vector, irq_handler_t handler, void *ctx,
     bool was = me->present;
     me->present = true;
     me->allocated = true;
+    me->enabled = true;
 
     if (was && !(flags & IRQ_FLAG_SHARED))
         k_panic("need to be shared to have many, registered by %s\n", me->name);
@@ -89,9 +97,6 @@ void irq_register(char *name, uint8_t vector, irq_handler_t handler, void *ctx,
         me->name = name;
 
     me->flags = flags;
-
-    if (!was)
-        idt_set_gate(vector, 0x08, 0x8e);
 
     spin_unlock(&irq_table_lock, irql);
 }
@@ -154,6 +159,7 @@ static void irq_desc_clear(struct irq_desc *desc) {
     INIT_LIST_HEAD(&desc->actions);
     desc->present = false;
     desc->allocated = false;
+    desc->enabled = false;
     desc->flags = 0;
     desc->name = "none";
 }
@@ -179,6 +185,20 @@ void irq_free_entry(int32_t entry) {
     spin_unlock(&irq_table_lock, irql);
 }
 
+void irq_disable(uint8_t irq) {
+    struct irq_desc *desc = &irq_table[irq];
+    desc->enabled = false;
+    if (desc->chip && desc->chip->mask)
+        desc->chip->mask(desc);
+}
+
+void irq_enable(uint8_t irq) {
+    struct irq_desc *desc = &irq_table[irq];
+    desc->enabled = true;
+    if (desc->chip && desc->chip->unmask)
+        desc->chip->unmask(desc);
+}
+
 void irq_init() {
     for (size_t i = 0; i < IDT_ENTRIES; i++) {
         struct irq_desc *desc = &irq_table[i];
@@ -190,6 +210,7 @@ void irq_init() {
 
         desc->vector = i;
         irq_desc_clear(desc);
+        idt_set_gate(i, 0x08, 0x8e);
     }
 
     irq_register("division_by_zero", IRQ_DIV_BY_Z, divbyz_handler, NULL,
