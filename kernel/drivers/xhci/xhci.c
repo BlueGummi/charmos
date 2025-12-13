@@ -39,7 +39,6 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
     slot->num_ports = 0;
 
     struct xhci_ring *ring = xhci_allocate_ring();
-    xhci_ring_set_trb_link(ring);
     ctrl->port_info[port - 1].ep_rings[0] = ring;
 
     struct xhci_ep_ctx *ep0 = &input_ctx->ep_ctx[0];
@@ -48,7 +47,7 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
         (speed == PORT_SPEED_LOW || speed == PORT_SPEED_FULL) ? 8 : 64;
     ep0->max_burst_size = 0;
     ep0->interval = 0;
-    ep0->dequeue_ptr_raw = ring->phys | 1;
+    ep0->dequeue_ptr_raw = ring->phys | TRB_CYCLE_BIT;
 
     struct xhci_device_ctx *dev_ctx =
         kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
@@ -133,12 +132,6 @@ bool xhci_send_control_transfer(struct xhci_device *dev, uint8_t slot_id,
            CC_SUCCESS;
 }
 
-static struct xhci_ring *allocate_endpoint_ring(void) {
-    struct xhci_ring *ret = xhci_allocate_ring();
-    xhci_ring_set_trb_link(ret);
-    return ret;
-}
-
 static uint8_t xhci_ep_to_input_ctx_idx(struct usb_endpoint *ep) {
     return ep->number * 2 - (ep->in ? 0 : 1);
 }
@@ -174,9 +167,9 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
 
         ep_ctx->max_burst_size = 0;
 
-        struct xhci_ring *ring = allocate_endpoint_ring();
+        struct xhci_ring *ring = xhci_allocate_ring();
 
-        ep_ctx->dequeue_ptr_raw = ring->phys | 1;
+        ep_ctx->dequeue_ptr_raw = ring->phys | TRB_CYCLE_BIT;
         ep_ctx->ep_state = 1;
 
         xhci->port_info[usb->port - 1].ep_rings[ep_index] = ring;
@@ -234,7 +227,8 @@ static enum irq_result xhci_isr(void *ctx, uint8_t vector,
                                 struct irq_context *rsp) {
     struct xhci_device *dev = ctx;
 
-    xhci_info("Interrupt");
+    static int did = 0;
+    xhci_info("Interrupt %u", ++did);
     xhci_clear_interrupt_pending(dev);
 
     xhci_clear_usbsts_ei(dev);

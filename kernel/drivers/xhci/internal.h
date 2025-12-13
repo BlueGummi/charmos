@@ -20,9 +20,7 @@ static inline void xhci_interrupt_disable_ints(struct xhci_device *dev) {
 }
 
 static inline void xhci_erdp_ack(struct xhci_device *dev, uint64_t erdp) {
-    erdp |= XHCI_ERDP_EHB_BIT;
-    erdp |= 1ULL;
-    mmio_write_64(&dev->intr_regs->erdp, erdp);
+    mmio_write_64(&dev->intr_regs->erdp, erdp | XHCI_ERDP_EHB_BIT);
 }
 
 static inline uint8_t usb_to_xhci_ep_type(bool in, uint8_t type) {
@@ -65,19 +63,6 @@ static inline void xhci_ring_doorbell(struct xhci_device *dev, uint32_t slot_id,
     mmio_write_32(&doorbell[slot_id], ep_id);
 }
 
-static inline void xhci_advance_dequeue(struct xhci_ring *event_ring,
-                                        uint32_t *dq_idx,
-                                        uint8_t *expected_cycle) {
-
-    *dq_idx += 1;
-    if (*dq_idx == event_ring->size) {
-        *dq_idx = 0;
-        *expected_cycle ^= 1;
-    }
-    event_ring->dequeue_index = *dq_idx;
-    event_ring->cycle = *expected_cycle;
-}
-
 static inline void xhci_controller_restart(struct xhci_device *dev) {
     xhci_controller_stop(dev);
     xhci_controller_start(dev);
@@ -107,9 +92,4 @@ static inline void xhci_request_init(struct xhci_request *req) {
     INIT_LIST_HEAD(&req->list);
 }
 
-static inline void xhci_ring_set_trb_link(struct xhci_ring *ring) {
-    struct xhci_trb *trbs = ring->trbs;
-    uintptr_t ring_phys = ring->phys;
-    trbs[TRB_RING_SIZE - 1].parameter = ring_phys;
-    trbs[TRB_RING_SIZE - 1].control = TRB_SET_TYPE(TRB_TYPE_LINK) | (1 << 1);
-}
+void xhci_advance_dequeue(struct xhci_ring *ring);

@@ -31,42 +31,55 @@ struct xhci_ring *xhci_allocate_ring() {
     ring->trbs = trbs;
     ring->enqueue_index = 0;
     ring->dequeue_index = 0;
+
+    struct xhci_trb *link = &trbs[TRB_RING_SIZE - 1];
+
+    link->parameter = phys;
+    link->status = 0;
+    link->control = TRB_SET_TYPE(TRB_TYPE_LINK) | TRB_TOGGLE_CYCLE_BIT |
+                    TRB_CH_BIT | (ring->cycle ? TRB_CYCLE_BIT : 0);
+
     return ring;
 }
 
+struct xhci_ring *xhci_allocate_event_ring(void) {
+    struct xhci_ring *er = kzalloc(sizeof(*er), ALLOC_PARAMS_DEFAULT);
+
+    er->trbs = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
+    er->phys = vmm_get_phys((vaddr_t) er->trbs, VMM_FLAG_NONE);
+
+    er->size = 256;
+    er->dequeue_index = 0;
+    er->cycle = 1;
+
+    return er;
+}
+
 void xhci_setup_event_ring(struct xhci_device *dev) {
-    struct xhci_erst_entry *erst_table =
+    struct xhci_erst_entry *erst =
         kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
-    uintptr_t erst_table_phys =
-        vmm_get_phys((uintptr_t) erst_table, VMM_FLAG_NONE);
 
-    dev->event_ring = xhci_allocate_ring();
+    paddr_t erst_phys = vmm_get_phys((vaddr_t) erst, VMM_FLAG_NONE);
 
-    struct xhci_trb *event_ring = dev->event_ring->trbs;
-    paddr_t event_ring_phys = dev->event_ring->phys;
+    dev->event_ring = xhci_allocate_event_ring();
 
-    event_ring[0].control = 1;
-
-    erst_table[0].ring_segment_base = event_ring_phys;
-    erst_table[0].ring_segment_size = 256;
-    erst_table[0].reserved = 0;
+    erst[0].ring_segment_base = dev->event_ring->phys;
+    erst[0].ring_segment_size = dev->event_ring->size;
+    erst[0].reserved = 0;
 
     struct xhci_interrupter_regs *ir = dev->intr_regs;
-    struct xhci_erdp erdp;
-    erdp.raw = event_ring_phys;
 
     mmio_write_32(&ir->imod, 0);
     mmio_write_32(&ir->erstsz, 1);
-    mmio_write_64(&ir->erstba, erst_table_phys);
-    mmio_write_64(&ir->erdp, erdp.raw);
+    mmio_write_64(&ir->erstba, erst_phys);
+
+    mmio_write_64(&ir->erdp, dev->event_ring->phys | XHCI_ERDP_EHB_BIT);
 }
 
 void xhci_setup_command_ring(struct xhci_device *dev) {
     struct xhci_op_regs *op = dev->op_regs;
     dev->cmd_ring = xhci_allocate_ring();
     uintptr_t trb_phys = dev->cmd_ring->phys;
-
-    xhci_ring_set_trb_link(dev->cmd_ring);
 
     struct xhci_dcbaa *dcbaa_virt =
         kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
@@ -96,14 +109,11 @@ uint8_t xhci_enable_slot(struct xhci_device *dev) {
 bool xhci_consume_port_status_change(struct xhci_device *dev) {
     struct xhci_ring *event_ring = dev->event_ring;
 
-    uint32_t dq_idx = event_ring->dequeue_index;
-    uint8_t expected_cycle = event_ring->cycle;
-
     while (true) {
-        struct xhci_trb *evt = &event_ring->trbs[dq_idx];
+        struct xhci_trb *evt = &event_ring->trbs[event_ring->dequeue_index];
         uint32_t control = mmio_read_32(&evt->control);
 
-        if ((control & TRB_CYCLE_BIT) != expected_cycle)
+        if ((control & TRB_CYCLE_BIT) != event_ring->cycle)
             break;
 
         uint8_t trb_type = TRB_GET_TYPE(control);
@@ -121,20 +131,18 @@ bool xhci_consume_port_status_change(struct xhci_device *dev) {
             mmio_write_32(portsc, pval | PORTSC_PRC);
 
             /* Advance the dequeue and program ERDP */
-            xhci_advance_dequeue(event_ring, &dq_idx, &expected_cycle);
-            uint64_t offset = (uint64_t) dq_idx * sizeof(struct xhci_trb);
+            xhci_advance_dequeue(event_ring);
+            uint64_t offset =
+                (uint64_t) event_ring->dequeue_index * sizeof(struct xhci_trb);
 
             uint64_t erdp = event_ring->phys + offset;
             xhci_erdp_ack(dev, erdp);
-
-            event_ring->dequeue_index = dq_idx;
-            event_ring->cycle = expected_cycle;
 
             return true;
         }
 
         /* Not PSC, just advance */
-        xhci_advance_dequeue(event_ring, &dq_idx, &expected_cycle);
+        xhci_advance_dequeue(event_ring);
     }
 
     /* No PSC found */

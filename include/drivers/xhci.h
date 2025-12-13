@@ -104,6 +104,7 @@ struct pci_device;
 #define TRB_IOC_BIT (1 << 5) // Interrupt On Completion
 #define TRB_IDT_BIT (1 << 6) // Immediate Data
 #define TRB_BEI_BIT (1 << 9) // Block Event Interrupt (ISO)
+#define TRB_TOGGLE_CYCLE_BIT (1 << 1)
 #define TRB_TYPE_SHIFT 10
 #define TRB_GET_CC(x) (((x) >> 24) & 0xFF)
 

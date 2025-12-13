@@ -25,11 +25,19 @@ struct wait_ctx {
     uint8_t ep_id;
 };
 
-void xhci_advance_enqueue(struct xhci_ring *cmd_ring) {
-    cmd_ring->enqueue_index++;
-    if (cmd_ring->enqueue_index == cmd_ring->size) {
-        cmd_ring->enqueue_index = 0;
-        cmd_ring->cycle ^= 1;
+void xhci_advance_dequeue(struct xhci_ring *ring) {
+    ring->dequeue_index++;
+    if (ring->dequeue_index == ring->size) {
+        ring->dequeue_index = 0;
+        ring->cycle ^= 1;
+    }
+}
+
+void xhci_advance_enqueue(struct xhci_ring *ring) {
+    ring->enqueue_index++;
+    if (ring->enqueue_index == ring->size - 1) {
+        ring->enqueue_index = 0;
+        ring->cycle ^= 1;
     }
 }
 
@@ -49,27 +57,24 @@ struct xhci_return
 xhci_wait(struct xhci_device *dev,
           struct wait_result (*cb)(struct xhci_trb *, void *), void *ctx) {
     struct xhci_ring *ring = dev->event_ring;
-    uint32_t dq = ring->dequeue_index;
-    uint8_t cycle = ring->cycle;
 
     while (true) {
-        struct xhci_trb *evt = &ring->trbs[dq];
+        struct xhci_trb *evt = &ring->trbs[ring->dequeue_index];
         uint32_t control = mmio_read_32(&evt->control);
 
-        if ((control & 1) != cycle)
+        if ((control & TRB_CYCLE_BIT) != ring->cycle)
             continue;
 
         struct wait_result r = cb(evt, ctx);
 
-        xhci_advance_dequeue(ring, &dq, &cycle);
-        if (!r.matches)
-            continue;
+        xhci_advance_dequeue(ring);
 
-        uint64_t offset = dq * sizeof(struct xhci_trb);
-        uint64_t erdp = ring->phys + offset;
+        uint64_t erdp =
+            ring->phys + ring->dequeue_index * sizeof(struct xhci_trb);
+
         xhci_erdp_ack(dev, erdp);
 
-        if (r.complete) {
+        if (r.matches && r.complete) {
             return (struct xhci_return) {.status = r.status,
                                          .control = r.control};
         }
