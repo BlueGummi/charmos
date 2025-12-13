@@ -1,7 +1,7 @@
 #include <asm.h>
 #include <bootstage.h>
 #include <crypto/prng.h>
-#include <int/idt.h>
+#include <irq/idt.h>
 #include <math/clamp.h>
 #include <math/fixed.h>
 #include <registry.h>

@@ -5,7 +5,7 @@
 #include <drivers/pci.h>
 #include <drivers/usb.h>
 #include <drivers/xhci.h>
-#include <int/idt.h>
+#include <irq/idt.h>
 #include <mem/alloc.h>
 #include <mem/page.h>
 #include <mem/vmm.h>
@@ -250,7 +250,8 @@ static void xhci_clear_usbsts_ei(struct xhci_device *dev) {
                   mmio_read_32(&dev->op_regs->usbsts) | XHCI_USBSTS_EI);
 }
 
-static void xhci_isr(void *ctx, uint8_t vector, void *rsp) {
+static enum irq_result xhci_isr(void *ctx, uint8_t vector,
+                                struct irq_context *rsp) {
     struct xhci_device *dev = ctx;
 
     xhci_info("Interrupt");
@@ -260,13 +261,14 @@ static void xhci_isr(void *ctx, uint8_t vector, void *rsp) {
     xhci_clear_usbsts_ei(dev);
 
     lapic_write(LAPIC_REG_EOI, 0);
+    return IRQ_HANDLED;
 }
 
 static void xhci_device_start_interrupts(uint8_t bus, uint8_t slot,
                                          uint8_t func,
                                          struct xhci_device *dev) {
     dev->irq = irq_alloc_entry();
-    irq_register(dev->irq, xhci_isr, dev);
+    irq_register("xhci", dev->irq, xhci_isr, dev, IRQ_FLAG_NONE);
     pci_program_msix_entry(bus, slot, func, 0, dev->irq, /*core=*/0);
 }
 

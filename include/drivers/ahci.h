@@ -2,9 +2,9 @@
 #pragma once
 #include <block/generic.h>
 #include <block/sched.h>
-#include <thread/thread.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <thread/thread.h>
 
 #define AHCI_CMD_TIMEOUT_MS 5000    // Data commands (read/write)
 #define AHCI_IDENT_TIMEOUT_MS 10000 // Identify, flush cache, etc.
@@ -343,7 +343,8 @@ bool ahci_should_coalesce(struct generic_disk *disk,
 void ahci_reorder(struct generic_disk *disk);
 
 struct generic_disk *ahci_create_generic(struct ahci_disk *disk);
-void ahci_isr_handler(void *ctx, uint8_t vector, void *rsp);
+enum irq_result ahci_isr_handler(void *ctx, uint8_t vector,
+                                 struct irq_context *);
 
 #define AHCI_PORT_OFFSET(n) (0x100 + (n) * 0x80)
 

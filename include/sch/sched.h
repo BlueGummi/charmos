@@ -118,6 +118,8 @@ bool scheduler_inherit_priority(struct thread *boosted, size_t new_weight,
 void scheduler_uninherit_priority();
 void scheduler_tick_enable();
 void scheduler_tick_disable();
+enum irq_result scheduler_timer_isr(void *ctx, uint8_t vector,
+                                    struct irq_context *rsp);
 
 /* For a global structure containing central scheduler data */
 struct scheduler_data {

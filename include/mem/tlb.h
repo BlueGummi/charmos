@@ -19,5 +19,5 @@ struct tlb_shootdown_cpu {
 };
 
 void tlb_init(void);
-void tlb_shootdown_isr(void *ctx, uint8_t irq, void *rsp);
+enum irq_result tlb_shootdown_isr(void *ctx, uint8_t irq, struct irq_context *rsp);
 void tlb_shootdown(uintptr_t addr, bool synchronous);

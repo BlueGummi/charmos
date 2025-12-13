@@ -2,7 +2,7 @@
 #include <asm.h>
 #include <charmos.h>
 #include <console/panic.h>
-#include <int/irq.h>
+#include <irq/irq.h>
 #include <sch/irql.h>
 #include <smp/core.h>
 #include <stdatomic.h>

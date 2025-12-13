@@ -1,6 +1,6 @@
 #include <acpi/lapic.h>
 #include <boot/gdt.h>
-#include <int/idt.h>
+#include <irq/idt.h>
 #include <limine.h>
 #include <mem/alloc.h>
 #include <mem/tlb.h>
@@ -108,7 +108,7 @@ void smp_wakeup() {
     uint64_t cpu = cpu_get_this_id();
 
     gdt_install();
-    idt_load();
+    irq_load();
 
     setup_cpu(cpu);
     lapic_timer_init(cpu);
@@ -179,7 +179,8 @@ static atomic_uint tick_change_state = 0;
 static bool enable = false;
 static uint8_t entry = 0;
 
-static void tick_op_isr(void *ctx, uint8_t vector, void *rsp) {
+static enum irq_result tick_op_isr(void *ctx, uint8_t vector,
+                                   struct irq_context *rsp) {
     if (enable) {
         scheduler_tick_enable();
     } else {
@@ -188,6 +189,7 @@ static void tick_op_isr(void *ctx, uint8_t vector, void *rsp) {
 
     atomic_fetch_add(&tick_change_state, 1);
     lapic_write(LAPIC_REG_EOI, 0);
+    return IRQ_HANDLED;
 }
 
 static void send_em_all_out(bool e) {
@@ -209,7 +211,7 @@ static void send_em_all_out(bool e) {
 
 void smp_disable_all_ticks() {
     entry = irq_alloc_entry();
-    irq_register(entry, tick_op_isr, NULL);
+    irq_register("tick_op", entry, tick_op_isr, NULL, IRQ_FLAG_NONE);
     send_em_all_out(false);
 }
 

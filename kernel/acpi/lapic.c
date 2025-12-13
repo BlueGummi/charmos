@@ -1,7 +1,7 @@
 #include <acpi/lapic.h>
 #include <asm.h>
 #include <charmos.h>
-#include <int/idt.h>
+#include <irq/idt.h>
 #include <mem/alloc.h>
 #include <mem/page.h>
 #include <mem/vmm.h>

@@ -1,4 +1,4 @@
-static void *isr_vectors[MAX_IDT_ENTRIES] = {
+static void *isr_vectors[IDT_ENTRIES] = {
     &isr_vector_0,   &isr_vector_1,   &isr_vector_2,   &isr_vector_3,
     &isr_vector_4,   &isr_vector_5,   &isr_vector_6,   &isr_vector_7,
     &isr_vector_8,   &isr_vector_9,   &isr_vector_10,  &isr_vector_11,

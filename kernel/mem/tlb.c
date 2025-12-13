@@ -55,13 +55,14 @@ static void tlb_shootdown_internal(void) {
     atomic_store_explicit(&c->in_tlb_shootdown, false, memory_order_release);
 }
 
-void tlb_shootdown_isr(void *ctx, uint8_t irq, void *rsp) {
+enum irq_result tlb_shootdown_isr(void *ctx, uint8_t irq, struct irq_context *rsp) {
     (void) ctx;
     (void) irq;
     (void) rsp;
 
     tlb_shootdown_internal();
     lapic_write(LAPIC_REG_EOI, 0);
+    return IRQ_HANDLED;
 }
 
 void tlb_shootdown(uintptr_t addr, bool synchronous) {

@@ -1,7 +1,7 @@
 #include <acpi/ioapic.h>
 #include <drivers/ahci.h>
 #include <drivers/pci.h>
-#include <int/idt.h>
+#include <irq/idt.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
 #include <registry.h>
@@ -47,7 +47,7 @@ struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
     }
 
     uint64_t core = smp_core_id();
-    irq_register(disk->device->irq_num, ahci_isr_handler, disk->device);
+    irq_register("ahci", disk->device->irq_num, ahci_isr_handler, disk->device, IRQ_FLAG_NONE);
     ioapic_route_irq(irq_line, disk->device->irq_num, core, false);
     return disk;
 }

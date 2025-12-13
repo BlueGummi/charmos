@@ -1,5 +1,5 @@
 #include <asm.h>
-#include <int/idt.h>
+#include <irq/idt.h>
 #include <kassert.h>
 #include <thread/defer.h>
 #include <thread/dpc.h>

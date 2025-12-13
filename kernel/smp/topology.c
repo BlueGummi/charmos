@@ -1,6 +1,6 @@
 #include <asm.h>
 #include <console/printf.h>
-#include <int/idt.h>
+#include <irq/idt.h>
 #include <kassert.h>
 #include <limine.h>
 #include <mem/alloc.h>

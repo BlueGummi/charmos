@@ -3,7 +3,7 @@
 #include <asm.h>
 #include <compiler.h>
 #include <console/printf.h>
-#include <int/idt.h>
+#include <irq/idt.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
 #include <pit.h>
@@ -143,7 +143,7 @@ uacpi_status uacpi_kernel_install_interrupt_handler(
     if (irq >= 256)
         return UACPI_STATUS_INVALID_ARGUMENT;
 
-    irq_register(irq, (void *) handler, ctx);
+    irq_register("uacpi", irq, (void *) handler, ctx, IRQ_FLAG_NONE);
 
     if (out_irq_handle)
         *out_irq_handle = (uacpi_handle) (uintptr_t) irq;
@@ -161,9 +161,6 @@ uacpi_kernel_uninstall_interrupt_handler(uacpi_interrupt_handler handler,
 
     if (irq >= 256)
         return UACPI_STATUS_INVALID_ARGUMENT;
-
-    if (!irq_is_installed(irq))
-        return UACPI_STATUS_NOT_FOUND;
 
     irq_free_entry(irq);
     return UACPI_STATUS_OK;

@@ -4,7 +4,7 @@
 #include <block/generic.h>
 #include <drivers/ahci.h>
 #include <drivers/ata.h>
-#include <int/idt.h>
+#include <irq/idt.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
 #include <sch/sched.h>
@@ -52,7 +52,7 @@ void ahci_process_completions(struct ahci_device *dev, uint32_t port) {
     mmio_write_32(&p->is, p->is);
 }
 
-void ahci_isr_handler(void *ctx, uint8_t vector, void *rsp) {
+enum irq_result ahci_isr_handler(void *ctx, uint8_t vector, struct irq_context *rsp) {
     (void) vector, (void) rsp;
 
     struct ahci_device *dev = ctx;
@@ -64,6 +64,7 @@ void ahci_isr_handler(void *ctx, uint8_t vector, void *rsp) {
     }
 
     lapic_write(LAPIC_REG_EOI, 0);
+    return IRQ_HANDLED;
 }
 
 void ahci_send_command(struct ahci_disk *disk, struct ahci_full_port *port,

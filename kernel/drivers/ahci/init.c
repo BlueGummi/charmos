@@ -1,7 +1,7 @@
 #include <asm.h>
 #include <console/printf.h>
 #include <drivers/ahci.h>
-#include <int/idt.h>
+#include <irq/idt.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>

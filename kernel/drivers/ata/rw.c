@@ -31,7 +31,7 @@ static enum bio_request_status translate_status(uint8_t status, uint8_t error) {
     return BIO_STATUS_UNKNOWN_ERR;
 }
 
-void ide_irq_handler(void *ctx, uint8_t irq_num, void *rsp) {
+enum irq_result ide_irq_handler(void *ctx, uint8_t irq_num, struct irq_context *rsp) {
     (void) irq_num, (void) rsp;
 
     struct ide_channel *chan = ctx;
@@ -98,6 +98,7 @@ next_request:
 out:
     spin_unlock(&chan->lock, irql);
     lapic_write(LAPIC_REG_EOI, 0);
+    return IRQ_HANDLED;
 }
 
 static void ide_on_complete(struct ide_request *req) {

@@ -6,7 +6,7 @@
 #include <compiler.h>
 #include <console/printf.h>
 #include <drivers/ata.h>
-#include <int/idt.h>
+#include <irq/idt.h>
 #include <mem/alloc.h>
 #include <sleep.h>
 #include <stddef.h>
@@ -142,7 +142,7 @@ struct generic_disk *ide_create_generic(struct ata_drive *ide) {
            ide->irq, irq);
 
     ioapic_route_irq(ide->irq, irq, 0, false);
-    irq_register(irq, ide_irq_handler, &ide->channel);
+    irq_register("ata", irq, ide_irq_handler, &ide->channel, IRQ_FLAG_NONE);
     ide->channel.current_drive = ide;
 
     struct generic_disk *d =

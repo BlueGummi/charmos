@@ -5,7 +5,7 @@
 #include <block/sched.h>
 #include <console/printf.h>
 #include <drivers/nvme.h>
-#include <int/idt.h>
+#include <irq/idt.h>
 #include <kassert.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
@@ -136,11 +136,13 @@ void nvme_process_completions(struct nvme_device *dev, uint32_t qid) {
     semaphore_post(&dev->sem);
 }
 
-void nvme_isr_handler(void *ctx, uint8_t vector, void *rsp) {
+enum irq_result nvme_isr_handler(void *ctx, uint8_t vector,
+                                 struct irq_context *rsp) {
     (void) vector, (void) rsp;
     struct nvme_device *dev = ctx;
     nvme_process_completions(dev, THIS_QID(dev));
     lapic_write(LAPIC_REG_EOI, 0);
+    return IRQ_HANDLED;
 }
 
 void nvme_submit_io_cmd(struct nvme_device *nvme, struct nvme_command *cmd,

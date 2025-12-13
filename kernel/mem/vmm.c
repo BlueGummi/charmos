@@ -1,7 +1,7 @@
 #include <acpi/lapic.h>
 #include <charmos.h>
 #include <console/printf.h>
-#include <int/idt.h>
+#include <irq/idt.h>
 #include <limine.h>
 #include <linker/symbols.h>
 #include <mem/asan.h>

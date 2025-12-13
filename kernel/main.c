@@ -14,7 +14,7 @@
 #include <crypto/prng.h>
 #include <elf.h>
 #include <fs/vfs.h>
-#include <int/idt.h>
+#include <irq/idt.h>
 #include <limine.h>
 #include <logo.h>
 #include <mem/alloc.h>
@@ -72,7 +72,7 @@ __no_sanitize_address void k_main(void) {
     syscall_setup(syscall_entry);
     smp_setup_bsp();
 
-    idt_init();
+    irq_init();
     uacpi_init(rsdp_request.response->address);
     x2apic_init();
     lapic_init();

@@ -299,7 +299,7 @@ bool nvme_send_nvme_req(struct generic_disk *d, struct nvme_request *r);
 bool nvme_write_sector_wrapper(struct generic_disk *disk, uint64_t lba,
                                const uint8_t *buf, uint64_t cnt);
 
-void nvme_isr_handler(void *ctx, uint8_t vector, void *rsp);
+enum irq_result nvme_isr_handler(void *ctx, uint8_t vector, struct irq_context *rsp);
 
 bool nvme_submit_bio_request(struct generic_disk *disk,
                              struct bio_request *bio);

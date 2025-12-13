@@ -2,7 +2,7 @@
 #include <compiler.h>
 #include <console/printf.h>
 #include <drivers/nvme.h>
-#include <int/idt.h>
+#include <irq/idt.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
@@ -147,7 +147,7 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
     /* isr enabled, physicall contiguous */
     cq_cmd.cdw11 = this_isr << 16 | 0b11;
 
-    irq_register(this_isr, nvme_isr_handler, nvme);
+    irq_register("nvme", this_isr, nvme_isr_handler, nvme, IRQ_FLAG_NONE);
 
     if (nvme_submit_admin_cmd(nvme, &cq_cmd, NULL) != 0) {
         nvme_info(K_ERROR, "failed to create IOCQ %u, code 0x%x, ISR %u", qid,

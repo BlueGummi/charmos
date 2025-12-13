@@ -1,5 +1,5 @@
 /* @title: APCs */
-#include <int/irq.h>
+#include <irq/irq.h>
 #include <structures/list.h>
 #include <smp/core.h>
 #include <stdatomic.h>

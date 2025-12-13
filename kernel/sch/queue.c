@@ -1,4 +1,4 @@
-#include <int/idt.h>
+#include <irq/idt.h>
 #include <kassert.h>
 #include <sch/sched.h>
 #include <smp/core.h>

@@ -1,7 +1,7 @@
 #include <acpi/hpet.h>
 #include <acpi/ioapic.h>
 #include <acpi/lapic.h>
-#include <int/idt.h>
+#include <irq/idt.h>
 #include <mem/alloc.h>
 #include <sch/sched.h>
 #include <sync/semaphore.h>
@@ -61,7 +61,8 @@ static void hpet_work(void *a, void *b) {
     }
 }
 
-static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
+static enum irq_result hpet_irq_handler(void *ctx, uint8_t irq,
+                                        struct irq_context *rsp) {
     (void) irq, (void) ctx, (void) rsp;
 
     struct deferred_event_queue *defer_queue = this_defer_queue();
@@ -70,6 +71,7 @@ static void hpet_irq_handler(void *ctx, uint8_t irq, void *rsp) {
 
     hpet_clear_interrupt_status();
     lapic_write(LAPIC_REG_EOI, 0);
+    return IRQ_HANDLED;
 }
 
 bool defer_enqueue(work_function func, struct work_args args,
@@ -149,7 +151,7 @@ void defer_init(void) {
 
         uint8_t vector = irq_alloc_entry();
 
-        irq_register(vector, hpet_irq_handler, NULL);
+        irq_register("hpet_irq", vector, hpet_irq_handler, NULL, IRQ_FLAG_NONE);
         ioapic_route_irq(i + 3, vector, i, false);
 
         hpet_setup_timer(i, i + 3, false, true);
