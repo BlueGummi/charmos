@@ -81,7 +81,7 @@ enum workqueue_error workqueue_add_remote(struct work *work) {
 void work_execute(struct work *task) {
     kassert(task);
     task->func(task->args.arg1, task->args.arg2);
-    atomic_store(&task->active, false);
+    atomic_exchange(&task->active, false);
 }
 
 struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,

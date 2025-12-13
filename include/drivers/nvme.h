@@ -2,11 +2,11 @@
 #pragma once
 #include <block/generic.h>
 #include <block/sched.h>
-#include <thread/defer.h>
 #include <stdatomic.h>
 #include <stdint.h>
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
+#include <thread/defer.h>
 
 struct nvme_command {
     uint8_t opc;
@@ -50,8 +50,7 @@ struct nvme_cc {
         };
     };
 } __attribute__((packed));
-_Static_assert(sizeof(struct nvme_cc) == sizeof(uint32_t),
-               "nvme_cc != sizeof(uint64_t)");
+static_assert_struct_size_eq(nvme_cc, sizeof(uint32_t));
 
 struct nvme_regs {
     uint32_t cap_lo;
@@ -215,7 +214,7 @@ struct nvme_identify_namespace {
     struct nvme_lbaf lbaf[64]; // LBA format descriptions
     uint8_t vendor_specific[3712];
 } __attribute__((packed));
-_Static_assert(sizeof(struct nvme_identify_namespace) == 0x1000, "");
+static_assert_struct_size_eq(nvme_identify_namespace, 0x1000);
 
 struct nvme_identify_controller {
     uint16_t vid;    // PCI Vendor ID
@@ -299,7 +298,8 @@ bool nvme_send_nvme_req(struct generic_disk *d, struct nvme_request *r);
 bool nvme_write_sector_wrapper(struct generic_disk *disk, uint64_t lba,
                                const uint8_t *buf, uint64_t cnt);
 
-enum irq_result nvme_isr_handler(void *ctx, uint8_t vector, struct irq_context *rsp);
+enum irq_result nvme_isr_handler(void *ctx, uint8_t vector,
+                                 struct irq_context *rsp);
 
 bool nvme_submit_bio_request(struct generic_disk *disk,
                              struct bio_request *bio);

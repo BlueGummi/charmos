@@ -12,16 +12,38 @@
 
 #include "internal.h"
 
+struct xhci_ring *xhci_allocate_ring() {
+    struct xhci_trb *trbs =
+        kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
+    if (!trbs)
+        k_panic("OOM\n");
+
+    paddr_t phys = vmm_get_phys((vaddr_t) trbs, VMM_FLAG_NONE);
+    struct xhci_ring *ring =
+        kzalloc(sizeof(struct xhci_ring), ALLOC_PARAMS_DEFAULT);
+    if (!ring)
+        k_panic("OOM\n");
+
+    spinlock_init(&ring->lock);
+    ring->phys = phys;
+    ring->cycle = 1;
+    ring->size = TRB_RING_SIZE;
+    ring->trbs = trbs;
+    ring->enqueue_index = 0;
+    ring->dequeue_index = 0;
+    return ring;
+}
+
 void xhci_setup_event_ring(struct xhci_device *dev) {
     struct xhci_erst_entry *erst_table =
         kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
     uintptr_t erst_table_phys =
         vmm_get_phys((uintptr_t) erst_table, VMM_FLAG_NONE);
 
-    struct xhci_trb *event_ring =
-        kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
-    uintptr_t event_ring_phys =
-        vmm_get_phys((uintptr_t) event_ring, VMM_FLAG_NONE);
+    dev->event_ring = xhci_allocate_ring();
+
+    struct xhci_trb *event_ring = dev->event_ring->trbs;
+    paddr_t event_ring_phys = dev->event_ring->phys;
 
     event_ring[0].control = 1;
 
@@ -37,62 +59,36 @@ void xhci_setup_event_ring(struct xhci_device *dev) {
     mmio_write_32(&ir->erstsz, 1);
     mmio_write_64(&ir->erstba, erst_table_phys);
     mmio_write_64(&ir->erdp, erdp.raw);
-
-    struct xhci_ring *ring =
-        kzalloc(sizeof(struct xhci_ring), ALLOC_PARAMS_DEFAULT);
-    if (unlikely(!ring))
-        k_panic("Could not allocate space for XHCI ring\n");
-
-    ring->phys = event_ring_phys;
-    ring->cycle = 1;
-    ring->size = 256;
-    ring->trbs = event_ring;
-    ring->enqueue_index = 0;
-    ring->dequeue_index = 0;
-    dev->event_ring = ring;
 }
 
 void xhci_setup_command_ring(struct xhci_device *dev) {
     struct xhci_op_regs *op = dev->op_regs;
+    dev->cmd_ring = xhci_allocate_ring();
+    uintptr_t trb_phys = dev->cmd_ring->phys;
 
-    struct xhci_trb *cmd_ring =
-        kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
-    uintptr_t cmd_ring_phys = vmm_get_phys((uintptr_t) cmd_ring, VMM_FLAG_NONE);
-
-    int last_index = TRB_RING_SIZE - 1;
-    cmd_ring[last_index].parameter = cmd_ring_phys;
-    cmd_ring[last_index].status = 0;
-
-    /* Toggle Cycle, Cycle bit = 1 */
-    cmd_ring[last_index].control = TRB_SET_TYPE(TRB_TYPE_LINK);
-    cmd_ring[last_index].control |= 1 << 1;
+    xhci_ring_set_trb_link(dev->cmd_ring);
 
     struct xhci_dcbaa *dcbaa_virt =
         kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
     uintptr_t dcbaa_phys = vmm_get_phys((uintptr_t) dcbaa_virt, VMM_FLAG_NONE);
 
-    struct xhci_ring *ring =
-        kzalloc(sizeof(struct xhci_ring), ALLOC_PARAMS_DEFAULT);
-    if (unlikely(!ring))
-        k_panic("Could not allocate space for XHCI ring\n");
-
-    ring->phys = cmd_ring_phys;
-    ring->trbs = cmd_ring;
-    ring->size = TRB_RING_SIZE;
-    ring->cycle = 1;
-    ring->enqueue_index = 0;
-    ring->dequeue_index = 0;
-
     dev->dcbaa = dcbaa_virt;
-    dev->cmd_ring = ring;
-    mmio_write_64(&op->crcr, cmd_ring_phys | 1);
+    mmio_write_64(&op->crcr, trb_phys | 1);
     mmio_write_64(&op->dcbaap, dcbaa_phys | 1);
 }
 
 uint8_t xhci_enable_slot(struct xhci_device *dev) {
-    xhci_send_command(dev, 0,
-                      TRB_SET_TYPE(TRB_TYPE_ENABLE_SLOT) |
-                          TRB_SET_CYCLE(dev->cmd_ring->cycle));
+    struct xhci_command cmd = {
+        .parameter = 0,
+        .control = TRB_SET_TYPE(TRB_TYPE_ENABLE_SLOT) |
+                   TRB_SET_CYCLE(dev->cmd_ring->cycle),
+        .status = 0,
+        .ep_id = 0,
+        .slot_id = 0,
+        .ring = dev->cmd_ring,
+    };
+
+    xhci_send_command(dev, &cmd);
 
     return TRB_SLOT(xhci_wait_for_response(dev).control);
 }
@@ -122,7 +118,7 @@ bool xhci_consume_port_status_change(struct xhci_device *dev) {
 
             uint32_t *portsc = (void *) &dev->port_regs[port_id];
             uint32_t pval = mmio_read_32(portsc);
-            mmio_write_32(portsc, pval | PORTSC_PRC); /* clear PRC */
+            mmio_write_32(portsc, pval | PORTSC_PRC);
 
             /* Advance the dequeue and program ERDP */
             xhci_advance_dequeue(event_ring, &dq_idx, &expected_cycle);
@@ -131,7 +127,6 @@ bool xhci_consume_port_status_change(struct xhci_device *dev) {
             uint64_t erdp = event_ring->phys + offset;
             xhci_erdp_ack(dev, erdp);
 
-            /* commit back to software state */
             event_ring->dequeue_index = dq_idx;
             event_ring->cycle = expected_cycle;
 
@@ -240,75 +235,6 @@ bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
     return true;
 }
 
-/*
-
-bool xhci_reset_port(struct xhci_device *dev, uint32_t port_index) {
-    uint32_t *portsc = (void *) &dev->port_regs[port_index];
-    uint32_t val = mmio_read_32(portsc);
-
-    bool is_usb3 = dev->port_info[port_index].usb3;
-
-    val |= PORTSC_PRC | PORTSC_CSC | PORTSC_CCS | PORTSC_PEC | PORTSC_PLC;
-    mmio_write_32(portsc, val);
-
-    val = mmio_read_32(portsc);
-
-    if (is_usb3) {
-        val &= ~PORTSC_PLS_MASK;
-        val |= PORTSC_PLS_RXDETECT << PORTSC_PLS_SHIFT;
-        mmio_write_32(portsc, val);
-
-        uint64_t timeout = 100 * 1000;
-        while (!(mmio_read_32(portsc) & PORTSC_PED) && timeout--) {
-            sleep_us(50);
-        }
-
-        if (!(mmio_read_32(portsc) & PORTSC_PED)) {
-            xhci_warn("Port %u USB3 never enabled (PED=0)", port_index);
-            return false;
-        }
-    }
-
-    val = mmio_read_32(portsc);
-    uint32_t old_ped = val & PORTSC_PED;
-    val = mmio_read_32(portsc);
-    val |= PORTSC_RESET;
-    mmio_write_32(portsc, val);
-
-    uint64_t timeout = 100;
-    if (is_usb3) {
-        while ((mmio_read_32(portsc) & PORTSC_RESET) && timeout--) {
-            sleep_us(50);
-        }
-    } else {
-        while ((mmio_read_32(portsc) & PORTSC_PED) == old_ped && timeout--) {
-            sleep_us(50);
-        }
-    }
-
-    if ((mmio_read_32(portsc) & PORTSC_RESET) && is_usb3) {
-        xhci_warn("Port %u USB3 reset timed out", port_index);
-        return false;
-    } else if (!(is_usb3) && (mmio_read_32(portsc) & PORTSC_PED) == old_ped) {
-        xhci_warn("Port %u USB2 reset timed out", port_index);
-        return false;
-    }
-
-    if (!xhci_consume_port_status_change(dev)) {
-        xhci_warn("Port %u reset did not generate a PSC event", port_index);
-        return false;
-    }
-
-    val = mmio_read_32(portsc);
-    val &= ~PORTSC_PLS_MASK;
-    val |= PORTSC_PLS_U0 << PORTSC_PLS_SHIFT;
-    mmio_write_32(portsc, val);
-
-    return true;
-}
-
-*/
-
 void xhci_parse_ext_caps(struct xhci_device *dev) {
     uint32_t hcc_params1 = mmio_read_32(&dev->cap_regs->hcc_params1);
     uint32_t offset = (hcc_params1 >> 16) & 0xFFFF;
@@ -384,4 +310,43 @@ void xhci_detect_usb3_ports(struct xhci_device *dev) {
 
         offset = next;
     }
+}
+
+void *xhci_map_mmio(uint8_t bus, uint8_t slot, uint8_t func) {
+    uint32_t original_bar0 = pci_read(bus, slot, func, 0x10);
+
+    pci_write(bus, slot, func, 0x10, 0xFFFFFFFF);
+    uint32_t size_mask = pci_read(bus, slot, func, 0x10);
+    pci_write(bus, slot, func, 0x10, original_bar0);
+
+    uint32_t size = ~(size_mask & ~0xF) + 1;
+
+    uint32_t phys_addr = original_bar0 & ~0xF;
+    return vmm_map_phys(phys_addr, size, PAGING_UNCACHABLE, VMM_FLAG_NONE);
+}
+
+struct xhci_device *xhci_device_create(void *mmio) {
+    struct xhci_device *dev =
+        kzalloc(sizeof(struct xhci_device), ALLOC_PARAMS_DEFAULT);
+    if (unlikely(!dev))
+        k_panic("Could not allocate space for XHCI device");
+
+    struct xhci_cap_regs *cap = mmio;
+    struct xhci_op_regs *op = mmio + cap->cap_length;
+    void *runtime_regs = (void *) mmio + cap->rtsoff;
+    struct xhci_interrupter_regs *ir_base =
+        (void *) ((uint8_t *) runtime_regs + 0x20);
+
+    for (size_t i = 0; i < XHCI_REQUEST_STATUS_MAX; i++) {
+        locked_list_init(&dev->requests[i]);
+    }
+
+    dev->num_devices = 0;
+    dev->port_regs = op->regs;
+    dev->intr_regs = ir_base;
+    dev->cap_regs = cap;
+    dev->op_regs = op;
+    dev->ports = cap->hcs_params1 & 0xff;
+
+    return dev;
 }

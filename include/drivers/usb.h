@@ -6,6 +6,7 @@
 #include <stdint.h>
 struct usb_controller;
 struct usb_device;
+struct usb_request;
 
 /* Defines generic USB constants, functions, and structures */
 
@@ -129,6 +130,20 @@ struct usb_device;
 #define USB_CLASS_APPLICATION_SPECIFIC 0xFE
 #define USB_CLASS_VENDOR_SPECIFIC 0xFF
 
+#define usb_info(string, ...) k_info("USB", K_INFO, string, ##__VA_ARGS__)
+#define usb_warn(string, ...) k_info("USB", K_WARN, string, ##__VA_ARGS__)
+#define usb_error(string, ...) k_info("USB", K_ERROR, string, ##__VA_ARGS__)
+
+#define REGISTER_USB_DRIVER(n, cc, sc, proto, probe_fn, disconnect_fn)         \
+    static struct usb_driver usb_driver_##n                                    \
+        __attribute__((section(".kernel_usb_drivers"), used)) = {              \
+            .name = #n,                                                        \
+            .class_code = cc,                                                  \
+            .subclass = sc,                                                    \
+            .protocol = proto,                                                 \
+            .probe = probe_fn,                                                 \
+            .disconnect = disconnect_fn};
+
 /* Request codes */
 enum usb_rq_code : uint8_t {
     USB_RQ_CODE_GET_STATUS = 0,    /* Page 282 */
@@ -148,27 +163,29 @@ enum usb_rq_code : uint8_t {
     USB_RQ_CODE_SYNCH_FRAME = 12, /* Page 288 */
 };
 
-static inline const char *usb_rq_code_str(const enum usb_rq_code code) {
-    switch (code) {
-    case USB_RQ_CODE_GET_STATUS: return "GET_STATUS";
-    case USB_RQ_CODE_CLEAR_FEATURE: return "CLEAR_FEATURE";
-    case USB_RQ_CODE_SET_FEATURE: return "SET_FEATURE";
-    case USB_RQ_CODE_SET_ADDR: return "SET_ADDR";
-    case USB_RQ_CODE_GET_DESCRIPTOR: return "GET_DESCRIPTOR";
-    case USB_RQ_CODE_SET_DESCRIPTOR: return "SET_DESCRIPTOR";
-    case USB_RQ_CODE_GET_CONFIG: return "GET_CONFIG";
-    case USB_RQ_CODE_SET_CONFIG: return "SET_CONFIG";
-    case USB_RQ_CODE_GET_INTERFACE: return "GET_INTERFACE";
-    case USB_RQ_CODE_SET_INTERFACE: return "SET_INTERFACE";
-    case USB_RQ_CODE_SYNCH_FRAME: return "SYNCH_FRAME";
-    default: return "UNKNOWN_CODE";
-    }
-}
-
 enum usb_controller_type {
     USB_CONTROLLER_UHCI,
     USB_CONTROLLER_EHCI,
     USB_CONTROLLER_XHCI,
+};
+
+enum usb_transfer_type {
+    USB_TRANSFER_CONTROL,
+    USB_TRANSFER_BULK,
+    USB_TRANSFER_INTERRUPT,
+};
+
+enum usb_status {
+    USB_OK = 0,
+    USB_ERR_STALL,
+    USB_ERR_TIMEOUT,
+    USB_ERR_DISCONNECT,
+    USB_ERR_OVERFLOW,
+    USB_ERR_CRC,
+    USB_ERR_IO,
+    USB_ERR_PROTO,
+    USB_ERR_NO_DEVICE,
+    USB_ERR_CANCELLED,
 };
 
 struct usb_setup_packet {        /* Refer to page 276 */
@@ -184,7 +201,7 @@ struct usb_setup_packet {        /* Refer to page 276 */
     uint16_t length; /* Number of bytes if there is a data stage */
 
 } __attribute__((packed));
-_Static_assert(sizeof(struct usb_setup_packet) == 8, "");
+static_assert_struct_size_eq(usb_setup_packet, 8);
 
 struct usb_device_descriptor { /* Refer to page 290 */
     uint8_t length;
@@ -207,7 +224,7 @@ struct usb_device_descriptor { /* Refer to page 290 */
 
     uint8_t num_configs; /* Number of possible configurations */
 } __attribute__((packed));
-_Static_assert(sizeof(struct usb_device_descriptor) == 18, "");
+static_assert_struct_size_eq(usb_device_descriptor, 18);
 
 struct usb_interface_descriptor { /* Page 296 */
     uint8_t length;
@@ -228,7 +245,7 @@ struct usb_interface_descriptor { /* Page 296 */
     uint8_t interface; /* Index of string desc. describing this interface */
 
 } __attribute__((packed));
-_Static_assert(sizeof(struct usb_interface_descriptor) == 9, "");
+static_assert_struct_size_eq(usb_interface_descriptor, 9);
 
 struct usb_config_descriptor { /* Page 293 */
     uint8_t length;
@@ -243,7 +260,7 @@ struct usb_config_descriptor { /* Page 293 */
 
     uint8_t max_power; /* Max power of USB device in milliamps */
 } __attribute__((packed));
-_Static_assert(sizeof(struct usb_config_descriptor) == 9, "");
+static_assert_struct_size_eq(usb_config_descriptor, 9);
 
 struct usb_endpoint_descriptor { /* Page 297 */
     uint8_t length;
@@ -255,7 +272,7 @@ struct usb_endpoint_descriptor { /* Page 297 */
 
     uint8_t interval; /* Interval for polling this EP for data transfer */
 } __attribute__((packed));
-_Static_assert(sizeof(struct usb_endpoint_descriptor) == 7, "");
+static_assert_struct_size_eq(usb_endpoint_descriptor, 7);
 
 struct usb_endpoint {
     struct usb_endpoint_descriptor *desc;
@@ -274,22 +291,6 @@ struct usb_endpoint {
 
     void *hc_data;
 };
-
-enum usb_transfer_type {
-    USB_TRANSFER_CONTROL,
-    USB_TRANSFER_BULK,
-    USB_TRANSFER_INTERRUPT,
-};
-
-static inline const char *
-usb_transfer_type_str(const enum usb_transfer_type type) {
-    switch (type) {
-    case USB_TRANSFER_CONTROL: return "USB TRANSFER CONTROL";
-    case USB_TRANSFER_BULK: return "USB TRANSFER BULK";
-    case USB_TRANSFER_INTERRUPT: return "USB TRANSFER INTERRUPT";
-    default: return "UNKNOWN";
-    }
-}
 
 struct usb_packet {
     struct usb_endpoint *ep;
@@ -363,19 +364,6 @@ struct usb_device {
     bool configured;
 };
 
-enum usb_status {
-    USB_OK = 0,
-    USB_ERR_STALL,
-    USB_ERR_TIMEOUT,
-    USB_ERR_DISCONNECT,
-    USB_ERR_OVERFLOW,
-    USB_ERR_CRC,
-    USB_ERR_IO,
-    USB_ERR_PROTO,
-    USB_ERR_NO_DEVICE,
-    USB_ERR_CANCELLED,
-};
-
 struct usb_request {
     struct usb_device *dev;
     struct usb_endpoint *ep;
@@ -409,19 +397,32 @@ static inline uint8_t get_ep_index(struct usb_endpoint *ep) {
     return (ep->number * 2) + (ep->in ? 1 : 0);
 }
 
-#define usb_info(string, ...) k_info("USB", K_INFO, string, ##__VA_ARGS__)
-#define usb_warn(string, ...) k_info("USB", K_WARN, string, ##__VA_ARGS__)
-#define usb_error(string, ...) k_info("USB", K_ERROR, string, ##__VA_ARGS__)
+static inline const char *usb_rq_code_str(const enum usb_rq_code code) {
+    switch (code) {
+    case USB_RQ_CODE_GET_STATUS: return "GET_STATUS";
+    case USB_RQ_CODE_CLEAR_FEATURE: return "CLEAR_FEATURE";
+    case USB_RQ_CODE_SET_FEATURE: return "SET_FEATURE";
+    case USB_RQ_CODE_SET_ADDR: return "SET_ADDR";
+    case USB_RQ_CODE_GET_DESCRIPTOR: return "GET_DESCRIPTOR";
+    case USB_RQ_CODE_SET_DESCRIPTOR: return "SET_DESCRIPTOR";
+    case USB_RQ_CODE_GET_CONFIG: return "GET_CONFIG";
+    case USB_RQ_CODE_SET_CONFIG: return "SET_CONFIG";
+    case USB_RQ_CODE_GET_INTERFACE: return "GET_INTERFACE";
+    case USB_RQ_CODE_SET_INTERFACE: return "SET_INTERFACE";
+    case USB_RQ_CODE_SYNCH_FRAME: return "SYNCH_FRAME";
+    default: return "UNKNOWN_CODE";
+    }
+}
+
+static inline const char *
+usb_transfer_type_str(const enum usb_transfer_type type) {
+    switch (type) {
+    case USB_TRANSFER_CONTROL: return "USB TRANSFER CONTROL";
+    case USB_TRANSFER_BULK: return "USB TRANSFER BULK";
+    case USB_TRANSFER_INTERRUPT: return "USB TRANSFER INTERRUPT";
+    default: return "UNKNOWN";
+    }
+}
 
 extern struct usb_driver __skernel_usb_drivers[];
 extern struct usb_driver __ekernel_usb_drivers[];
-
-#define REGISTER_USB_DRIVER(n, cc, sc, proto, probe_fn, disconnect_fn)         \
-    static struct usb_driver usb_driver_##n                                    \
-        __attribute__((section(".kernel_usb_drivers"), used)) = {              \
-            .name = #n,                                                        \
-            .class_code = cc,                                                  \
-            .subclass = sc,                                                    \
-            .protocol = proto,                                                 \
-            .probe = probe_fn,                                                 \
-            .disconnect = disconnect_fn};

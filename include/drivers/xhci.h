@@ -180,6 +180,10 @@ struct pci_device;
 #define CC_STOPPED_SHORT_PACKET 28
 #define CC_MAX_EXIT_LATENCY_TOO_LARGE 29
 
+#define xhci_info(string, ...) k_info("XHCI", K_INFO, string, ##__VA_ARGS__)
+#define xhci_warn(string, ...) k_info("XHCI", K_WARN, string, ##__VA_ARGS__)
+#define xhci_error(string, ...) k_info("XHCI", K_ERROR, string, ##__VA_ARGS__)
+
 // 5.3: XHCI Capability Registers
 struct xhci_cap_regs {
     uint8_t cap_length;
@@ -229,8 +233,7 @@ struct xhci_usbcmd {
         };
     };
 } __attribute__((packed));
-
-_Static_assert(sizeof(struct xhci_usbcmd) == sizeof(uint32_t), "");
+static_assert_struct_size_eq(xhci_usbcmd, sizeof(uint32_t));
 
 /* Page 444 */
 struct xhci_slot_ctx {
@@ -285,7 +288,7 @@ struct xhci_slot_ctx {
                               * addressed, 3 - configured, rest reserved*/
     uint32_t reserved3[4];
 } __attribute__((packed));
-_Static_assert(sizeof(struct xhci_slot_ctx) == 0x20, "");
+static_assert_struct_size_eq(xhci_slot_ctx, 0x20);
 
 struct xhci_ep_ctx { // Refer to page 450 of the XHCI specification
 
@@ -406,7 +409,7 @@ struct xhci_ep_ctx { // Refer to page 450 of the XHCI specification
                                         */
     uint32_t reserved5[3];
 } __attribute__((packed));
-_Static_assert(sizeof(struct xhci_ep_ctx) == 0x20, "");
+static_assert_struct_size_eq(xhci_ep_ctx, 0x20);
 
 struct xhci_input_ctrl_ctx { // Refer to page 461 of the XHCI specification
 
@@ -463,14 +466,14 @@ struct xhci_input_ctrl_ctx { // Refer to page 461 of the XHCI specification
 
     uint32_t reserved1 : 8;
 } __attribute__((packed));
-_Static_assert(sizeof(struct xhci_input_ctrl_ctx) == 0x20, "");
+static_assert_struct_size_eq(xhci_input_ctrl_ctx, 0x20);
 
 struct xhci_input_ctx { // Refer to page 460 of the XHCI Spec
     struct xhci_input_ctrl_ctx ctrl_ctx;
     struct xhci_slot_ctx slot_ctx;
     struct xhci_ep_ctx ep_ctx[31];
 } __attribute__((packed));
-_Static_assert(sizeof(struct xhci_input_ctx) == 0x420, "");
+static_assert_struct_size_eq(xhci_input_ctx, 0x420);
 
 struct xhci_device_ctx {
     struct xhci_slot_ctx slot_ctx;
@@ -496,8 +499,7 @@ struct xhci_trb {
     uint32_t status;
     uint32_t control;
 } __attribute__((packed));
-
-_Static_assert(sizeof(struct xhci_trb) == 0x10, "");
+static_assert_struct_size_eq(xhci_trb, 0x10);
 
 struct xhci_ring {
     struct xhci_trb *trbs;  /* Virtual mapped TRB buffer */
@@ -506,6 +508,8 @@ struct xhci_ring {
     uint32_t dequeue_index; /* Point where controller sends back things */
     uint8_t cycle;          /* Cycle bit, toggles after ring wrap */
     uint32_t size;          /* Number of TRBs in ring */
+    size_t outgoing;
+    struct spinlock lock;
 };
 
 struct xhci_erst_entry {
@@ -515,16 +519,8 @@ struct xhci_erst_entry {
 } __attribute__((packed));
 
 struct xhci_erdp {
-    union {
-        uint64_t raw;
-        struct {
-            uint64_t desi : 3; /* Dequeue ERST Segment Index */
-            uint64_t ehb : 1;  /* Event Handler Busy */
-            uint64_t event_ring_pointer : 60;
-        };
-    };
+    uint64_t raw;
 } __attribute__((packed));
-_Static_assert(sizeof(struct xhci_erdp) == 8, "");
 
 #define XHCI_ERDP_EHB_BIT (1 << 3)
 
@@ -560,15 +556,28 @@ struct xhci_ext_cap {
     uint16_t cap_specific;
 };
 
+enum xhci_request_status {
+    XHCI_REQUEST_STATUS_OUTGOING, /* On the outgoing list */
+    XHCI_REQUEST_STATUS_WAITING,  /* On the waiting list */
+    XHCI_REQUEST_STATUS_FINISHED, /* On the finished list */
+    XHCI_REQUEST_STATUS_MAX,
+};
+
+enum xhci_request_state {
+    XHCI_REQUEST_PENDING,
+    XHCI_REQUEST_DONE,
+    XHCI_REQUEST_CANCELLED,
+};
+
 struct xhci_device {
-    uint8_t irq;
+    uint8_t irq; /* What IRQ line have we routed to this? */
     struct pci_device *pci;
     struct xhci_input_ctx *input_ctx;
-    struct xhci_cap_regs *cap_regs;
-    struct xhci_op_regs *op_regs;
-    struct xhci_interrupter_regs *intr_regs; // Interrupt registers
+    struct xhci_cap_regs *cap_regs;          /* Capability registers */
+    struct xhci_op_regs *op_regs;            /* Operational registers */
+    struct xhci_interrupter_regs *intr_regs; /* Interrupter registers */
 
-    struct xhci_dcbaa *dcbaa; // Virtual address of DCBAA
+    struct xhci_dcbaa *dcbaa;
 
     struct xhci_ring *event_ring;
     struct xhci_ring *cmd_ring;
@@ -576,13 +585,24 @@ struct xhci_device {
     struct xhci_port_regs *port_regs;
     uint64_t ports;
     struct xhci_port_info port_info[64];
-    struct locked_list request_list;
+    struct locked_list requests[XHCI_REQUEST_STATUS_MAX];
 
     uint64_t num_devices;
     struct usb_device **devices;
 };
 
+struct xhci_command {
+    struct xhci_ring *ring; /* what ring? */
+    uint64_t parameter;
+    uint32_t status;
+    uint32_t control;
+    uint32_t slot_id;
+    uint32_t ep_id;
+    struct xhci_request *request; /* associated request */
+};
+
 struct xhci_request {
+    /* Tied back to the USB request */
     struct usb_request *urb;
 
     uint8_t slot_id;
@@ -591,12 +611,14 @@ struct xhci_request {
     uint64_t trb_phys;
     uint32_t completion_code;
 
-    enum {
-        XHCI_REQ_PENDING,
-        XHCI_REQ_DONE,
-        XHCI_REQ_CANCELLED,
-    } state;
+    /* This is the "which list are we on" status that tells the driver
+     * if this is on the outgoing, waiting, or finished list */
+    enum xhci_request_status status;
+    enum xhci_request_state state;
 
+    /* This is the status that tells us "how is this request doing"? */
+
+    struct thread *waiter;
     struct list_head list;
 };
 
@@ -605,6 +627,7 @@ struct xhci_return {
     uint32_t status;
 };
 
+struct xhci_ring *xhci_allocate_ring();
 void xhci_init(uint8_t bus, uint8_t slot, uint8_t func, struct pci_device *dev);
 void *xhci_map_mmio(uint8_t bus, uint8_t slot, uint8_t func);
 struct xhci_device *xhci_device_create(void *mmio);
@@ -618,8 +641,7 @@ void xhci_setup_command_ring(struct xhci_device *dev);
 bool xhci_submit_interrupt_transfer(struct usb_device *dev,
                                     struct usb_packet *packet);
 
-void xhci_send_command(struct xhci_device *dev, uint64_t parameter,
-                       uint32_t control);
+void xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd);
 
 /* returns CONTROL */
 struct xhci_return xhci_wait_for_response(struct xhci_device *dev);
@@ -631,7 +653,3 @@ uint8_t xhci_enable_slot(struct xhci_device *dev);
 void xhci_parse_ext_caps(struct xhci_device *dev);
 bool xhci_reset_port(struct xhci_device *dev, uint32_t port_index);
 void xhci_detect_usb3_ports(struct xhci_device *dev);
-
-#define xhci_info(string, ...) k_info("XHCI", K_INFO, string, ##__VA_ARGS__)
-#define xhci_warn(string, ...) k_info("XHCI", K_WARN, string, ##__VA_ARGS__)
-#define xhci_error(string, ...) k_info("XHCI", K_ERROR, string, ##__VA_ARGS__)

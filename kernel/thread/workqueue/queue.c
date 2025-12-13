@@ -116,14 +116,13 @@ int32_t workqueue_dequeue_task(struct workqueue *queue, struct work **out,
 
 enum workqueue_error workqueue_enqueue(struct workqueue *queue,
                                        struct work *work) {
-    if (atomic_load(&work->enqueued))
+    if (atomic_exchange(&work->active, true))
         return WORKQUEUE_ERROR_WORK_EXECUTING;
 
     enum irql irql = spin_lock(&queue->work_lock);
     list_add_tail(&work->list_node, &queue->works);
 
     atomic_store(&work->enqueued, true);
-    atomic_store(&work->active, true);
 
     spin_unlock(&queue->work_lock, irql);
 

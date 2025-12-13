@@ -54,6 +54,11 @@
 #define __restrict
 #endif
 
+#define static_assert_struct_size_eq(__struct, __want)                         \
+    _Static_assert(sizeof(struct __struct) == __want,                          \
+                   "size of struct" #__struct                                  \
+                   " does not match expected size " #__want)
+
 #define smp_mb() atomic_thread_fence(memory_order_seq_cst)
 #define smp_rmb() atomic_thread_fence(memory_order_acquire)
 #define smp_wmb() atomic_thread_fence(memory_order_release)

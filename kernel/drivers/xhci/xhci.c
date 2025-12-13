@@ -13,8 +13,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <thread/defer.h>
 
 #include "internal.h"
+
+struct workqueue *xhci_wq;
 
 bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
                          uint8_t speed, uint8_t port) {
@@ -35,26 +38,8 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
     slot->hub = 0;
     slot->num_ports = 0;
 
-    struct xhci_trb *ep0_ring =
-        kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
-    uintptr_t ep0_ring_phys = vmm_get_phys((uintptr_t) ep0_ring, VMM_FLAG_NONE);
-
-    ep0_ring[TRB_RING_SIZE - 1].parameter = ep0_ring_phys;
-    ep0_ring[TRB_RING_SIZE - 1].control = TRB_SET_TYPE(TRB_TYPE_LINK);
-    ep0_ring[TRB_RING_SIZE - 1].control |= (1 << 1);
-
-    struct xhci_ring *ring =
-        kzalloc(sizeof(struct xhci_ring), ALLOC_PARAMS_DEFAULT);
-    if (unlikely(!ring))
-        k_panic("Could not allocate space for ep0 ring");
-
-    ring->phys = ep0_ring_phys;
-    ring->trbs = ep0_ring;
-    ring->size = TRB_RING_SIZE;
-    ring->cycle = 1;
-    ring->enqueue_index = 0;
-    ring->dequeue_index = 0;
-
+    struct xhci_ring *ring = xhci_allocate_ring();
+    xhci_ring_set_trb_link(ring);
     ctrl->port_info[port - 1].ep_rings[0] = ring;
 
     struct xhci_ep_ctx *ep0 = &input_ctx->ep_ctx[0];
@@ -63,7 +48,7 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
         (speed == PORT_SPEED_LOW || speed == PORT_SPEED_FULL) ? 8 : 64;
     ep0->max_burst_size = 0;
     ep0->interval = 0;
-    ep0->dequeue_ptr_raw = ep0_ring_phys | 1;
+    ep0->dequeue_ptr_raw = ring->phys | 1;
 
     struct xhci_device_ctx *dev_ctx =
         kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
@@ -76,7 +61,16 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
     control |= TRB_SET_CYCLE(ctrl->cmd_ring->cycle);
     control |= TRB_SET_SLOT_ID(slot_id);
 
-    xhci_send_command(ctrl, input_ctx_phys, control);
+    struct xhci_command cmd = {
+        .ring = ctrl->cmd_ring,
+        .control = control,
+        .parameter = input_ctx_phys,
+        .status = 0,
+        .ep_id = 0,
+        .slot_id = 0,
+    };
+
+    xhci_send_command(ctrl, &cmd);
 
     if (TRB_CC(xhci_wait_for_response(ctrl).status) != CC_SUCCESS) {
         xhci_warn("Address device failed for slot %u, port %u", slot_id, port);
@@ -140,31 +134,9 @@ bool xhci_send_control_transfer(struct xhci_device *dev, uint8_t slot_id,
 }
 
 static struct xhci_ring *allocate_endpoint_ring(void) {
-    struct xhci_trb *trbs =
-        kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
-    if (!trbs)
-        return NULL;
-
-    uintptr_t ring_phys = vmm_get_phys((uintptr_t) trbs, VMM_FLAG_NONE);
-
-    trbs[TRB_RING_SIZE - 1].parameter = ring_phys;
-    trbs[TRB_RING_SIZE - 1].control = TRB_SET_TYPE(TRB_TYPE_LINK) | (1 << 1);
-
-    struct xhci_ring *ring =
-        kzalloc(sizeof(struct xhci_ring), ALLOC_PARAMS_DEFAULT);
-    if (!ring) {
-        kfree_aligned(trbs, FREE_PARAMS_DEFAULT);
-        return NULL;
-    }
-
-    ring->phys = ring_phys;
-    ring->trbs = trbs;
-    ring->size = TRB_RING_SIZE;
-    ring->cycle = 1;
-    ring->enqueue_index = 0;
-    ring->dequeue_index = 0;
-
-    return ring;
+    struct xhci_ring *ret = xhci_allocate_ring();
+    xhci_ring_set_trb_link(ret);
+    return ret;
 }
 
 static uint8_t xhci_ep_to_input_ctx_idx(struct usb_endpoint *ep) {
@@ -216,14 +188,22 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
     control |= TRB_SET_CYCLE(xhci->cmd_ring->cycle);
     control |= TRB_SET_SLOT_ID(usb->slot_id);
 
-    xhci_send_command(xhci, input_ctx_phys, control);
+    struct xhci_command cmd = {
+        .slot_id = 0,
+        .ep_id = 0,
+        .parameter = input_ctx_phys,
+        .control = control,
+        .status = 0,
+        .ring = xhci->cmd_ring,
+    };
+
+    xhci_send_command(xhci, &cmd);
 
     if (TRB_CC(xhci_wait_for_response(xhci).status) != CC_SUCCESS) {
         xhci_warn("Failed to configure endpoints for slot %u\n", usb->slot_id);
         return false;
     }
 
-    xhci_clear_interrupt_pending(xhci);
     return true;
 }
 
@@ -235,7 +215,6 @@ static bool xhci_control_transfer(struct usb_device *dev,
 
     bool ret = xhci_send_control_transfer(xhci, slot_id, ep0_ring,
                                           packet->setup, packet->data);
-    xhci_clear_interrupt_pending(xhci);
     return ret;
 }
 
@@ -256,7 +235,6 @@ static enum irq_result xhci_isr(void *ctx, uint8_t vector,
     struct xhci_device *dev = ctx;
 
     xhci_info("Interrupt");
-
     xhci_clear_interrupt_pending(dev);
 
     xhci_clear_usbsts_ei(dev);
@@ -275,6 +253,23 @@ static void xhci_device_start_interrupts(uint8_t bus, uint8_t slot,
 
 void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
                struct pci_device *pci) {
+    struct cpu_mask cmask;
+    if (!cpu_mask_init(&cmask, global.core_count))
+        k_panic("OOM\n");
+
+    cpu_mask_set_all(&cmask);
+    struct workqueue_attributes attrs = {
+        .capacity = WORKQUEUE_DEFAULT_CAPACITY,
+        .idle_check.min = WORKQUEUE_DEFAULT_MIN_IDLE_CHECK,
+        .idle_check.max = WORKQUEUE_DEFAULT_MAX_IDLE_CHECK,
+        .min_workers = 1,
+        .spawn_delay = WORKQUEUE_DEFAULT_SPAWN_DELAY,
+        .worker_cpu_mask = cmask,
+        .worker_niceness = 0,
+        .flags = WORKQUEUE_FLAG_DEFAULTS,
+    };
+
+    xhci_wq = workqueue_create("xhci_wq", &attrs);
 
     xhci_info("Found device at %02x:%02x.%02x", bus, slot, func);
     void *mmio = xhci_map_mmio(bus, slot, func);
@@ -296,7 +291,6 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
     xhci_setup_event_ring(dev);
 
     xhci_setup_command_ring(dev);
-    xhci_clear_interrupt_pending(dev);
 
     xhci_controller_start(dev);
     xhci_controller_enable_ints(dev);

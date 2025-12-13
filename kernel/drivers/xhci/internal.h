@@ -83,7 +83,7 @@ static inline void xhci_controller_restart(struct xhci_device *dev) {
     xhci_controller_start(dev);
 }
 
-static enum usb_status xhci_cc_to_usb_status(uint8_t cc) {
+static inline enum usb_status xhci_cc_to_usb_status(uint8_t cc) {
     switch (cc) {
     case CC_SUCCESS: return USB_OK;
     case CC_STALL_ERROR: return USB_ERR_STALL;
@@ -97,4 +97,19 @@ static enum usb_status xhci_cc_to_usb_status(uint8_t cc) {
     case CC_NO_SLOTS_AVAILABLE: return USB_ERR_NO_DEVICE;
     default: return USB_ERR_IO;
     }
+}
+
+static inline void xhci_request_init(struct xhci_request *req) {
+    req->state = XHCI_REQUEST_DONE;
+    req->completion_code = 0;
+    req->waiter = NULL;
+    req->status = XHCI_REQUEST_STATUS_OUTGOING; /* NONE */
+    INIT_LIST_HEAD(&req->list);
+}
+
+static inline void xhci_ring_set_trb_link(struct xhci_ring *ring) {
+    struct xhci_trb *trbs = ring->trbs;
+    uintptr_t ring_phys = ring->phys;
+    trbs[TRB_RING_SIZE - 1].parameter = ring_phys;
+    trbs[TRB_RING_SIZE - 1].control = TRB_SET_TYPE(TRB_TYPE_LINK) | (1 << 1);
 }

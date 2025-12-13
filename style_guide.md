@@ -20,6 +20,59 @@ For things not specified here, such as multi-line comments, simply use the same 
 
 > A "group" refers to a collection of behaviors under a related context
 
+## Header format
+
+Header code should be organized in a similar structure to this.
+The exact ordering doesn't matter as much (e.g. structs can come before unions),
+but the general structure of things should try and adhere to this.
+```c
+/* @title: Title */
+#pragma once
+#include "my_file.h"
+struct forward_def; /* Forward definitions first */
+
+#define GLOBAL_DEFINITION VALUE /* Global macros and definitions next */
+
+enum my_enum { /* Enums and related macros right under each enum */
+    MY_MEMBER_1,
+    MY_MEMBER_2,
+};
+#define MACRO_RELATED_TO_MY_ENUM VALUE
+/* More my_enum related things here... static assertions, etc. */
+
+union my_union { /* Unions and related macros right under each union */
+    uint32_t name_1;
+    uint32_t name_2;
+};
+#define MACRO_RELATED_TO_MY_UNION VALUE
+/* More my_union related things here... static assertions, etc. */
+
+struct my_struct { /* Structs and related macros right under each struct */
+    uint32_t member_1;
+    uint32_t member_2;
+};
+#define MACRO_RELATED_TO_MY_STRUCT VALUE
+/* More my_struct related things here... static assertions, etc. */
+
+typedef int my_type; /* Typedefs and related macros right under each typedef */
+#define MACRO_RELATED_TO_MY_TYPE VALUE
+/* More my_type related things here... static assertions, etc. */
+
+/* External references */
+extern int external_integer;
+
+/* Function prototypes */
+void my_function(void);
+
+/* Static inline functions */
+static inline void my_static_inline_function(void) {
+    /* nop */
+}
+
+/* Static variables */
+static const my_type my_const_static_var = 0;
+```
+
 ### Create comments to rationalize and reason, not to explain
 
 Comments should exist to explain **why** something exists or needs to exist. It can be helpful to leave a comment about how something functions sometimes, but do not be overly enthusiastic about leaving comments on every last little thing, as this causes creates unnecessary noise.

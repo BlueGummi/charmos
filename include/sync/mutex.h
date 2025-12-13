@@ -1,6 +1,6 @@
-#include <thread/queue.h>
 #include <stdbool.h>
 #include <sync/spinlock.h>
+#include <thread/queue.h>
 #pragma once
 
 struct mutex_simple {
@@ -37,7 +37,7 @@ enum mutex_bits : uintptr_t {
 struct mutex {
     _Atomic(uintptr_t) lock_word;
 };
-_Static_assert(sizeof(struct mutex) == sizeof(uintptr_t), "");
+static_assert_struct_size_eq(mutex, sizeof(uintptr_t));
 
 #define MUTEX_INIT {ATOMIC_VAR_INIT(0)}
 static inline void mutex_init(struct mutex *mtx) {

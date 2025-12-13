@@ -263,9 +263,7 @@ struct ahci_cmd_header {
     // DW4 - 7
     uint32_t rsv1[4]; // Reserved
 } __attribute__((packed));
-
-_Static_assert((sizeof(struct ahci_cmd_header) == 32),
-               "AHCI command header must be 28 bytes large!");
+static_assert_struct_size_eq(ahci_cmd_header, 32);
 
 #define ahci_info(log_level, fmt, ...)                                         \
     k_info("AHCI", log_level, fmt, ##__VA_ARGS__)
