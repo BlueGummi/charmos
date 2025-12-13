@@ -82,3 +82,19 @@ static inline void xhci_controller_restart(struct xhci_device *dev) {
     xhci_controller_stop(dev);
     xhci_controller_start(dev);
 }
+
+static enum usb_status xhci_cc_to_usb_status(uint8_t cc) {
+    switch (cc) {
+    case CC_SUCCESS: return USB_OK;
+    case CC_STALL_ERROR: return USB_ERR_STALL;
+    case CC_SHORT_PACKET: return USB_OK;
+    case CC_USB_TRANSACTION_ERROR: return USB_ERR_CRC;
+    case CC_BABBLE_DETECTED: return USB_ERR_OVERFLOW;
+    case CC_RING_OVERRUN:
+    case CC_RING_UNDERRUN: return USB_ERR_IO;
+    case CC_CONTEXT_STATE_ERROR: return USB_ERR_PROTO;
+    case CC_STOPPED: return USB_ERR_CANCELLED;
+    case CC_NO_SLOTS_AVAILABLE: return USB_ERR_NO_DEVICE;
+    default: return USB_ERR_IO;
+    }
+}

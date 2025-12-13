@@ -78,7 +78,7 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
 
     xhci_send_command(ctrl, input_ctx_phys, control);
 
-    if (xhci_wait_for_response(ctrl) != CC_SUCCESS) {
+    if (TRB_CC(xhci_wait_for_response(ctrl).status) != CC_SUCCESS) {
         xhci_warn("Address device failed for slot %u, port %u", slot_id, port);
         return false;
     }
@@ -135,7 +135,8 @@ bool xhci_send_control_transfer(struct xhci_device *dev, uint8_t slot_id,
     ep0_ring->enqueue_index = idx;
     xhci_ring_doorbell(dev, slot_id, 1);
 
-    return xhci_wait_for_transfer_event(dev, slot_id);
+    return TRB_CC(xhci_wait_for_transfer_event(dev, slot_id).status) ==
+           CC_SUCCESS;
 }
 
 static struct xhci_ring *allocate_endpoint_ring(void) {
@@ -217,7 +218,7 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
 
     xhci_send_command(xhci, input_ctx_phys, control);
 
-    if (!xhci_wait_for_response(xhci)) {
+    if (TRB_CC(xhci_wait_for_response(xhci).status) != CC_SUCCESS) {
         xhci_warn("Failed to configure endpoints for slot %u\n", usb->slot_id);
         return false;
     }

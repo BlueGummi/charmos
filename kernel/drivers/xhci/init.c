@@ -94,12 +94,11 @@ uint8_t xhci_enable_slot(struct xhci_device *dev) {
                       TRB_SET_TYPE(TRB_TYPE_ENABLE_SLOT) |
                           TRB_SET_CYCLE(dev->cmd_ring->cycle));
 
-    return (xhci_wait_for_response(dev) >> 24) & 0xff;
+    return TRB_SLOT(xhci_wait_for_response(dev).control);
 }
 
 bool xhci_consume_port_status_change(struct xhci_device *dev) {
     struct xhci_ring *event_ring = dev->event_ring;
-    struct xhci_interrupter_regs *intr = dev->intr_regs;
 
     uint32_t dq_idx = event_ring->dequeue_index;
     uint8_t expected_cycle = event_ring->cycle;
@@ -123,7 +122,7 @@ bool xhci_consume_port_status_change(struct xhci_device *dev) {
 
             uint32_t *portsc = (void *) &dev->port_regs[port_id];
             uint32_t pval = mmio_read_32(portsc);
-            mmio_write_32(portsc, pval | (1U << 21)); /* clear PRC */
+            mmio_write_32(portsc, pval | PORTSC_PRC); /* clear PRC */
 
             /* Advance the dequeue and program ERDP */
             xhci_advance_dequeue(event_ring, &dq_idx, &expected_cycle);

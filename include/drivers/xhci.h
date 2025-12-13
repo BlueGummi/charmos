@@ -1,8 +1,16 @@
 /* @title: xHCI */
+#pragma once
 #include <math/bit_range.h>
 #include <stdbool.h>
 #include <stdint.h>
-#pragma once
+#include <structures/list.h>
+#include <structures/locked_list.h>
+/* I don't want to cause even longer compile times
+ * by including the ever-growing USB header in here */
+struct usb_controller;
+struct usb_packet;
+struct usb_endpoint;
+struct pci_device;
 
 #define XHCI_DEVICE_TIMEOUT 1000
 #define TRB_RING_SIZE 256
@@ -142,17 +150,35 @@
 #define PORT_SPEED_SUPER 4      // USB 3.0 SuperSpeed
 #define PORT_SPEED_SUPER_PLUS 5 // USB 3.1 Gen2 (SuperSpeed+)
 
-#define CC_SUCCESS 0x01
-#define CC_DATA_BUFFER_ERROR 0x02
-#define CC_BABBLE_DETECTED 0x03
-#define CC_USB_TRANSACTION_ERROR 0x04
-#define CC_TRB_ERROR 0x05
-#define CC_STALL_ERROR 0x06
-#define CC_RESOURCE_ERROR 0x07
-#define CC_BANDWIDTH_ERROR 0x08
-#define CC_NO_SLOTS_AVAILABLE 0x09
-#define CC_INVALID_STREAM_TYPE 0x0A
-#define CC_SLOT_NOT_ENABLED_ERROR 0x0B
+#define CC_SUCCESS 1
+#define CC_DATA_BUFFER_ERROR 2
+#define CC_BABBLE_DETECTED 3
+#define CC_USB_TRANSACTION_ERROR 4
+#define CC_TRB_ERROR 5
+#define CC_STALL_ERROR 6
+#define CC_RESOURCE_ERROR 7
+#define CC_BANDWIDTH_ERROR 8
+#define CC_NO_SLOTS_AVAILABLE 9
+#define CC_INVALID_STREAM_TYPE 10
+#define CC_SLOT_NOT_ENABLED_ERROR 11
+#define CC_ENDPOINT_NOT_ENABLED 12
+#define CC_SHORT_PACKET 13
+#define CC_RING_UNDERRUN 14
+#define CC_RING_OVERRUN 15
+#define CC_VF_EVENT_RING_FULL_ERROR 16
+#define CC_PARAMETER_ERROR 17
+#define CC_BANDWIDTH_OVERRUN_ERROR 18
+#define CC_CONTEXT_STATE_ERROR 19
+#define CC_NO_PING_RESPONSE_ERROR 20
+#define CC_EVENT_RING_FULL 21
+#define CC_INCOMPATIBLE_DEVICE 22
+#define CC_MISSED_SERVICE 23
+#define CC_COMMAND_RING_STOPPED 24
+#define CC_COMMAND_ABORTED 25
+#define CC_STOPPED 26
+#define CC_STOPPED_LEN_INVALID 27
+#define CC_STOPPED_SHORT_PACKET 28
+#define CC_MAX_EXIT_LATENCY_TOO_LARGE 29
 
 // 5.3: XHCI Capability Registers
 struct xhci_cap_regs {
@@ -550,17 +576,34 @@ struct xhci_device {
     struct xhci_port_regs *port_regs;
     uint64_t ports;
     struct xhci_port_info port_info[64];
+    struct locked_list request_list;
 
     uint64_t num_devices;
     struct usb_device **devices;
 };
 
-/* I don't want to cause even longer compile times
- * by including the ever-growing USB header in here */
-struct usb_controller;
-struct usb_packet;
-struct usb_endpoint;
-struct pci_device;
+struct xhci_request {
+    struct usb_request *urb;
+
+    uint8_t slot_id;
+    uint8_t ep_id;
+
+    uint64_t trb_phys;
+    uint32_t completion_code;
+
+    enum {
+        XHCI_REQ_PENDING,
+        XHCI_REQ_DONE,
+        XHCI_REQ_CANCELLED,
+    } state;
+
+    struct list_head list;
+};
+
+struct xhci_return {
+    uint32_t control;
+    uint32_t status;
+};
 
 void xhci_init(uint8_t bus, uint8_t slot, uint8_t func, struct pci_device *dev);
 void *xhci_map_mmio(uint8_t bus, uint8_t slot, uint8_t func);
@@ -578,8 +621,12 @@ bool xhci_submit_interrupt_transfer(struct usb_device *dev,
 void xhci_send_command(struct xhci_device *dev, uint64_t parameter,
                        uint32_t control);
 
-uint64_t xhci_wait_for_response(struct xhci_device *dev);
-bool xhci_wait_for_transfer_event(struct xhci_device *dev, uint8_t slot_id);
+/* returns CONTROL */
+struct xhci_return xhci_wait_for_response(struct xhci_device *dev);
+
+/* returns STATUS */
+struct xhci_return xhci_wait_for_transfer_event(struct xhci_device *dev,
+                                                uint8_t slot_id);
 uint8_t xhci_enable_slot(struct xhci_device *dev);
 void xhci_parse_ext_caps(struct xhci_device *dev);
 bool xhci_reset_port(struct xhci_device *dev, uint32_t port_index);

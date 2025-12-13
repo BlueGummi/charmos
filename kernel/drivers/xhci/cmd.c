@@ -15,7 +15,8 @@
 struct wait_result {
     bool matches;
     bool complete;
-    uint64_t value;
+    uint32_t control;
+    uint32_t status;
 };
 
 void xhci_advance_enqueue(struct xhci_ring *cmd_ring) {
@@ -40,9 +41,9 @@ void xhci_send_command(struct xhci_device *dev, uint64_t parameter,
     xhci_ring_doorbell(dev, 0, 0);
 }
 
-static uint64_t xhci_wait(struct xhci_device *dev,
-                          struct wait_result (*cb)(struct xhci_trb *, void *),
-                          void *userdata) {
+static struct xhci_return
+xhci_wait(struct xhci_device *dev,
+          struct wait_result (*cb)(struct xhci_trb *, void *), void *userdata) {
     struct xhci_ring *ring = dev->event_ring;
     uint32_t dq = ring->dequeue_index;
     uint8_t cycle = ring->cycle;
@@ -56,32 +57,33 @@ static uint64_t xhci_wait(struct xhci_device *dev,
 
         struct wait_result r = cb(evt, userdata);
 
-        if (!r.matches) {
-            xhci_advance_dequeue(ring, &dq, &cycle);
-            continue;
-        }
-
         xhci_advance_dequeue(ring, &dq, &cycle);
+        if (!r.matches)
+            continue;
 
         uint64_t offset = dq * sizeof(struct xhci_trb);
         uint64_t erdp = ring->phys + offset;
         xhci_erdp_ack(dev, erdp);
 
-        if (r.complete)
-            return r.value;
+        if (r.complete) {
+            return (struct xhci_return) {.status = r.status,
+                                         .control = r.control};
+        }
     }
 }
 
 static struct wait_result wait_cmd(struct xhci_trb *evt, void *unused) {
     (void) unused;
     uint32_t control = mmio_read_32(&evt->control);
-    uint8_t type = TRB_GET_TYPE(control);
+    uint8_t type = TRB_TYPE(control);
 
     if (type != TRB_TYPE_COMMAND_COMPLETION)
         return (struct wait_result) {.matches = false};
 
-    return (struct wait_result) {
-        .matches = true, .complete = true, .value = control};
+    return (struct wait_result) {.matches = true,
+                                 .complete = true,
+                                 .control = control,
+                                 .status = evt->status};
 }
 
 struct xfer_wait_ctx {
@@ -100,10 +102,10 @@ static struct wait_result wait_xfer_event(struct xhci_trb *evt,
     if (TRB_SLOT(control) != ctx->slot_id)
         return (struct wait_result) {.matches = false};
 
-    uint8_t cc = TRB_GET_CC(evt->status);
-
-    return (struct wait_result) {
-        .matches = true, .complete = true, .value = (cc == 1)};
+    return (struct wait_result) {.matches = true,
+                                 .complete = true,
+                                 .control = evt->control,
+                                 .status = evt->status};
 }
 
 static uint64_t wait_for_interrupt_event(struct xhci_device *dev,
@@ -163,13 +165,14 @@ static bool xhci_wait_for_interrupt(struct xhci_device *xhci, uint8_t slot_id,
     }
 }
 
-uint64_t xhci_wait_for_response(struct xhci_device *dev) {
+struct xhci_return xhci_wait_for_response(struct xhci_device *dev) {
     return xhci_wait(dev, wait_cmd, NULL);
 }
 
-bool xhci_wait_for_transfer_event(struct xhci_device *dev, uint8_t slot_id) {
+struct xhci_return xhci_wait_for_transfer_event(struct xhci_device *dev,
+                                                uint8_t slot_id) {
     struct xfer_wait_ctx ctx = {.slot_id = slot_id};
-    return (bool) xhci_wait(dev, wait_xfer_event, &ctx);
+    return xhci_wait(dev, wait_xfer_event, &ctx);
 }
 
 /* Submit a single interrupt IN transfer, blocking until completion */

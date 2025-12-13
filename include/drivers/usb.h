@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+struct usb_controller;
+struct usb_device;
 
 /* Defines generic USB constants, functions, and structures */
 
@@ -273,8 +275,6 @@ struct usb_endpoint {
     void *hc_data;
 };
 
-struct usb_controller;
-
 enum usb_transfer_type {
     USB_TRANSFER_CONTROL,
     USB_TRANSFER_BULK,
@@ -305,7 +305,6 @@ struct usb_packet {
     void *context;
 };
 
-struct usb_device;
 struct usb_controller_ops {
     bool (*submit_control_transfer)(struct usb_device *dev,
                                     struct usb_packet *pkt);
@@ -339,19 +338,6 @@ struct usb_driver {
     void (*disconnect)(struct usb_device *dev); /* Clean up and unplug */
 } __linker_aligned;
 
-extern struct usb_driver __skernel_usb_drivers[];
-extern struct usb_driver __ekernel_usb_drivers[];
-
-#define REGISTER_USB_DRIVER(n, cc, sc, proto, probe_fn, disconnect_fn)         \
-    static struct usb_driver usb_driver_##n                                    \
-        __attribute__((section(".kernel_usb_drivers"), used)) = {              \
-            .name = #n,                                                        \
-            .class_code = cc,                                                  \
-            .subclass = sc,                                                    \
-            .protocol = proto,                                                 \
-            .probe = probe_fn,                                                 \
-            .disconnect = disconnect_fn};
-
 struct usb_device {
     uint8_t address;
     uint8_t speed;
@@ -377,6 +363,39 @@ struct usb_device {
     bool configured;
 };
 
+enum usb_status {
+    USB_OK = 0,
+    USB_ERR_STALL,
+    USB_ERR_TIMEOUT,
+    USB_ERR_DISCONNECT,
+    USB_ERR_OVERFLOW,
+    USB_ERR_CRC,
+    USB_ERR_IO,
+    USB_ERR_PROTO,
+    USB_ERR_NO_DEVICE,
+    USB_ERR_CANCELLED,
+};
+
+struct usb_request {
+    struct usb_device *dev;
+    struct usb_endpoint *ep;
+
+    void *buffer;
+    size_t length;
+    size_t actual_length;
+
+    enum usb_status status;
+
+    uint32_t flags;
+    uint64_t timeout_ns;
+
+    void (*complete)(struct usb_request *);
+    void *context;
+
+    /* Controller-private data */
+    void *hc_priv;
+};
+
 bool usb_get_string_descriptor(struct usb_device *dev, uint8_t string_idx,
                                char *out, size_t max_len);
 void usb_get_device_descriptor(struct usb_device *dev);
@@ -393,3 +412,16 @@ static inline uint8_t get_ep_index(struct usb_endpoint *ep) {
 #define usb_info(string, ...) k_info("USB", K_INFO, string, ##__VA_ARGS__)
 #define usb_warn(string, ...) k_info("USB", K_WARN, string, ##__VA_ARGS__)
 #define usb_error(string, ...) k_info("USB", K_ERROR, string, ##__VA_ARGS__)
+
+extern struct usb_driver __skernel_usb_drivers[];
+extern struct usb_driver __ekernel_usb_drivers[];
+
+#define REGISTER_USB_DRIVER(n, cc, sc, proto, probe_fn, disconnect_fn)         \
+    static struct usb_driver usb_driver_##n                                    \
+        __attribute__((section(".kernel_usb_drivers"), used)) = {              \
+            .name = #n,                                                        \
+            .class_code = cc,                                                  \
+            .subclass = sc,                                                    \
+            .protocol = proto,                                                 \
+            .probe = probe_fn,                                                 \
+            .disconnect = disconnect_fn};
