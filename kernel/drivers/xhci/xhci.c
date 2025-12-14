@@ -3,7 +3,7 @@
 #include <compiler.h>
 #include <console/printf.h>
 #include <drivers/pci.h>
-#include <drivers/usb.h>
+#include <drivers/usb_generic/usb.h>
 #include <drivers/xhci.h>
 #include <irq/idt.h>
 #include <mem/alloc.h>

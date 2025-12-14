@@ -1,7 +1,7 @@
 #include <asm.h>
 #include <compiler.h>
 #include <drivers/pci.h>
-#include <drivers/usb.h>
+#include <drivers/usb_generic/usb.h>
 #include <drivers/xhci.h>
 #include <mem/alloc.h>
 #include <mem/page.h>

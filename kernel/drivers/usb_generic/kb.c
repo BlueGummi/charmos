@@ -1,6 +1,7 @@
 #include <console/printf.h>
-#include <drivers/usb.h>
-#include <drivers/usb_hid.h>
+#include <drivers/usb_generic/hid.h>
+#include <drivers/usb_generic/kb.h>
+#include <drivers/usb_generic/usb.h>
 #include <drivers/xhci.h>
 #include <mem/alloc.h>
 #include <mem/page.h>
@@ -8,12 +9,6 @@
 #include <mem/vmm.h>
 #include <sleep.h>
 #include <string.h>
-
-struct usb_kbd_report {
-    uint8_t modifiers;
-    uint8_t reserved;
-    uint8_t keys[6];
-};
 
 static const char keycode_to_ascii[256] = {
     [0x04] = 'a',  [0x05] = 'b',  [0x06] = 'c',  [0x07] = 'd', [0x08] = 'e',
@@ -42,26 +37,87 @@ static const char keycode_to_ascii_shifted[256] = {
     [0x31] = '|', [0x33] = ':', [0x34] = '"', [0x35] = '~', [0x36] = '<',
     [0x37] = '>', [0x38] = '?'};
 
-void parse_keyboard_report(const struct usb_kbd_report *report) {
-    static uint8_t prev_keys[6] = {0};
+static inline bool generic_keyboard_is_modifier(uint32_t keycode) {
+    return keycode >= USB_HID_MODIFIER_BASE &&
+           keycode < USB_HID_MODIFIER_BASE + 8;
+}
 
-    const bool shift = (report->modifiers & 0x22) != 0;
-    const char *table = shift ? keycode_to_ascii_shifted : keycode_to_ascii;
+static void generic_keyboard_dispatch(struct generic_keyboard *kbd,
+                                      uint32_t keycode, bool pressed) {
+    if (generic_keyboard_is_modifier(keycode)) {
+        uint8_t bit = keycode - USB_HID_MODIFIER_BASE;
+        if (pressed)
+            kbd->modifiers |= (1 << bit);
+        else
+            kbd->modifiers &= ~(1 << bit);
+        return;
+    }
 
-    for (int i = 0; i < 6; i++) {
-        uint8_t code = report->keys[i];
-        if (!code)
-            continue;
+    kbd->emit(kbd, keycode, pressed);
+}
 
-        if (memchr(prev_keys, code, sizeof(prev_keys)) == NULL) {
-            char ch = table[code];
-            if (ch) {
-                k_printf("%c", ch);
-            }
+static inline bool usb_kbd_shift_active(const struct generic_keyboard *kbd) {
+    const uint8_t shift_mask = (1 << 1) | /* Left Shift */
+                               (1 << 5);  /* Right Shift */
+
+    return (kbd->modifiers & shift_mask) != 0;
+}
+
+static void tty_keyboard_emit(struct generic_keyboard *kbd, uint32_t keycode,
+                              bool pressed) {
+    if (!pressed)
+        return;
+
+    bool shift = usb_kbd_shift_active(kbd);
+    char ch =
+        shift ? keycode_to_ascii_shifted[keycode] : keycode_to_ascii[keycode];
+
+    k_printf("%c", ch);
+}
+
+static bool key_in_report(uint8_t key, const struct usb_kbd_report *r) {
+    for (int i = 0; i < 6; i++)
+        if (r->keys[i] == key)
+            return true;
+    return false;
+}
+
+void usb_kbd_process_report(struct usb_hid_keyboard *kbd,
+                            const struct usb_kbd_report *cur) {
+    const struct usb_kbd_report *prev = &kbd->last;
+
+    uint8_t changed = prev->modifiers ^ cur->modifiers;
+    if (changed) {
+        for (int bit = 0; bit < 8; bit++) {
+            if (!(changed & (1 << bit)))
+                continue;
+
+            uint32_t keycode = USB_HID_MODIFIER_BASE + bit;
+            bool pressed = cur->modifiers & (1 << bit);
+
+            kbd->gkbd.emit(&kbd->gkbd, keycode, pressed);
         }
     }
 
-    memcpy(prev_keys, report->keys, sizeof(prev_keys));
+    for (int i = 0; i < 6; i++) {
+        uint8_t key = prev->keys[i];
+        if (!key)
+            continue;
+
+        if (!key_in_report(key, cur)) {
+            kbd->gkbd.emit(&kbd->gkbd, key, false);
+        }
+    }
+
+    for (int i = 0; i < 6; i++) {
+        uint8_t key = cur->keys[i];
+        if (!key)
+            continue;
+
+        if (!key_in_report(key, prev)) {
+            kbd->gkbd.emit(&kbd->gkbd, key, true);
+        }
+    }
 }
 
 struct usb_interface_descriptor *usb_find_interface(struct usb_device *dev,
@@ -101,45 +157,39 @@ enum usb_status usb_keyboard_get_descriptor(struct usb_device *dev,
     return usb_transfer_sync(dev->host->ops.submit_control_transfer, &req);
 }
 
-void usb_keyboard_poll(struct usb_device *dev) {
-    struct usb_endpoint *ep = NULL;
-    for (uint8_t i = 0; i < dev->num_endpoints; i++) {
-        if ((dev->endpoints[i]->address & 0x80) &&
-            dev->endpoints[i]->type == USB_ENDPOINT_ATTR_TRANS_TYPE_INTERRUPT) {
-            ep = dev->endpoints[i];
-            break;
-        }
-    }
-
-    if (!ep) {
-        usb_warn("usbkbd: no interrupt IN endpoint found");
-        return;
-    }
-
-    return;
-
-    struct usb_kbd_report last = {0}, report = {0};
-
-    struct usb_request req = {
-        .buffer = &report,
-        .length = sizeof(report),
-        .ep = ep,
-        .dev = dev,
-    };
+static void usb_kbd_worker(void *arg) {
+    struct usb_hid_keyboard *kbd = arg;
 
     while (true) {
-        enum usb_status ret =
-            usb_transfer_sync(dev->host->ops.submit_interrupt_transfer, &req);
+        enum usb_status ret = usb_transfer_sync(
+            kbd->dev->host->ops.submit_interrupt_transfer, &kbd->req);
         if (ret != USB_OK)
             continue;
 
-        if (memcmp(&last, &report, sizeof(report)) != 0) {
-            parse_keyboard_report(&report);
-            last = report;
-        }
-
-        sleep_us(10);
+        usb_kbd_process_report(kbd, &kbd->cur);
+        kbd->last = kbd->cur;
     }
+}
+
+struct usb_hid_keyboard *usb_keyboard_create(struct usb_device *dev,
+                                             struct usb_endpoint *ep) {
+    struct usb_hid_keyboard *kbd = kzalloc(sizeof(*kbd), ALLOC_PARAMS_DEFAULT);
+
+    kbd->dev = dev;
+    kbd->ep = ep;
+
+    kbd->gkbd.emit = tty_keyboard_emit;
+    kbd->gkbd.priv = kbd;
+
+    kbd->req = (struct usb_request) {
+        .buffer = &kbd->cur,
+        .length = sizeof(kbd->cur),
+        .ep = kbd->ep,
+        .dev = dev,
+    };
+
+    thread_spawn("usb_kbd_worker", usb_kbd_worker, kbd);
+    return kbd;
 }
 
 bool usb_keyboard_probe(struct usb_device *dev) {
@@ -163,7 +213,7 @@ bool usb_keyboard_probe(struct usb_device *dev) {
         if ((ep->address & 0x80) &&
             ep->type == USB_ENDPOINT_ATTR_TRANS_TYPE_INTERRUPT) {
 
-            usb_keyboard_poll(dev);
+            usb_keyboard_create(dev, ep);
             k_info("usbkbd", K_INFO, "Keyboard endpoint 0x%02x ready",
                    ep->address);
             return true;

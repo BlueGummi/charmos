@@ -1,4 +1,4 @@
-#include <drivers/usb.h>
+#include <drivers/usb_generic/usb.h>
 #include <mem/alloc.h>
 #include <mem/page.h>
 #include <mem/pmm.h>

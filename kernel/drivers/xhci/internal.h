@@ -1,6 +1,6 @@
 #include <asm.h>
 #include <console/printf.h>
-#include <drivers/usb.h>
+#include <drivers/usb_generic/usb.h>
 #include <drivers/xhci.h>
 #include <sch/sched.h>
 
