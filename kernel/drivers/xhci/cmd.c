@@ -180,49 +180,49 @@ struct xhci_return xhci_wait_for_port_status_change(struct xhci_device *dev,
 }
 
 /* Submit a single interrupt IN transfer, blocking until completion */
-bool xhci_submit_interrupt_transfer(struct usb_device *dev,
-                                    struct usb_packet *packet) {
+enum usb_status xhci_submit_interrupt_transfer(struct usb_request *req) {
+    struct usb_device *dev = req->dev;
     struct xhci_device *xhci = dev->host->driver_data;
     uint8_t slot_id = dev->slot_id;
-    struct usb_endpoint *ep = packet->ep;
+    struct usb_endpoint *ep = req->ep;
 
     uint8_t ep_id = get_ep_index(ep);
     struct xhci_ring *ring = xhci->port_info[dev->port - 1].ep_rings[ep_id];
-    if (!ring || !packet->data || packet->length == 0) {
+    if (!ring || !req->buffer || req->length == 0) {
         xhci_warn("Invalid parameters for interrupt transfer");
-        return false;
+        return USB_ERR_INVALID_ARGUMENT;
     }
 
-    uint64_t parameter = vmm_get_phys((vaddr_t) packet->data, VMM_FLAG_NONE);
-    uint32_t status = packet->length;
+    uint64_t parameter = vmm_get_phys((vaddr_t) req->buffer, VMM_FLAG_NONE);
+    uint32_t status = req->length;
     status |= TRB_SET_INTERRUPTER_TARGET(0);
 
     uint32_t control = TRB_SET_TYPE(TRB_TYPE_NORMAL);
     control |= TRB_IOC_BIT;
     control |= TRB_SET_CYCLE(ring->cycle);
 
-    struct xhci_request req;
-    struct xhci_command cmd;
-    xhci_request_init_blocking(&req, &cmd);
+    struct xhci_request *xreq =
+        kzalloc(sizeof(struct xhci_request), ALLOC_PARAMS_DEFAULT);
+    if (!xreq)
+        return USB_ERR_OOM;
 
-    cmd = (struct xhci_command) {
+    struct xhci_command *cmd =
+        kzalloc(sizeof(struct xhci_command), ALLOC_PARAMS_DEFAULT);
+    if (!cmd)
+        return USB_ERR_OOM;
+
+    xhci_request_init(xreq, cmd, req);
+
+    *cmd = (struct xhci_command) {
         .ring = ring,
         .parameter = parameter,
         .control = control,
         .status = status,
         .ep_id = ep_id,
         .slot_id = slot_id,
-        .request = &req,
+        .request = xreq,
     };
 
-    xhci_send_command_and_block(xhci, &cmd);
-
-    bool ok = TRB_CC(cmd.status) == CC_SUCCESS;
-    if (!ok) {
-        xhci_warn("Interrupt transfer failed for slot %u, ep %u", slot_id,
-                  get_ep_index(ep));
-        return false;
-    }
-
-    return true;
+    xhci_send_command(xhci, cmd);
+    return USB_OK;
 }

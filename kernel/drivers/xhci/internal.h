@@ -8,6 +8,7 @@ struct xhci_return xhci_wait_for_port_status_change(struct xhci_device *dev,
                                                     uint32_t port_id);
 
 void xhci_wake_waiter(struct xhci_device *dev, struct xhci_request *request);
+void xhci_cleanup(struct xhci_device *dev, struct xhci_request *req);
 struct xhci_ring *xhci_allocate_ring();
 void *xhci_map_mmio(uint8_t bus, uint8_t slot, uint8_t func);
 struct xhci_device *xhci_device_create(void *mmio);
@@ -18,8 +19,7 @@ void xhci_controller_enable_ints(struct xhci_device *dev);
 void xhci_setup_event_ring(struct xhci_device *dev);
 void xhci_setup_command_ring(struct xhci_device *dev);
 
-bool xhci_submit_interrupt_transfer(struct usb_device *dev,
-                                    struct usb_packet *packet);
+enum usb_status xhci_submit_interrupt_transfer(struct usb_request *r);
 
 void xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd);
 
@@ -116,13 +116,25 @@ static inline enum usb_status xhci_cc_to_usb_status(uint8_t cc) {
 }
 
 static inline void xhci_request_init_blocking(struct xhci_request *req,
-                                     struct xhci_command *cmd) {
+                                              struct xhci_command *cmd) {
     req->status = XHCI_REQUEST_MAX;
     req->completion_code = 0;
     req->command = cmd;
     req->private = scheduler_get_current_thread();
     req->callback = xhci_wake_waiter;
     INIT_LIST_HEAD(&req->list);
+}
+
+static inline void xhci_request_init(struct xhci_request *req,
+                                     struct xhci_command *cmd,
+                                     struct usb_request *rq) {
+    req->status = XHCI_REQUEST_MAX;
+    req->completion_code = 0;
+    req->command = cmd;
+    INIT_LIST_HEAD(&req->list);
+    req->urb = rq;
+    req->private = NULL;
+    req->callback = xhci_cleanup;
 }
 
 static inline void xhci_clear_usbsts_ei(struct xhci_device *dev) {

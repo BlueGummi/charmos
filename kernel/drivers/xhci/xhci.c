@@ -94,12 +94,16 @@ static inline struct xhci_trb *xhci_ring_next_trb(struct xhci_ring *ring) {
     return trb;
 }
 
-bool xhci_send_control_transfer(struct xhci_device *dev, uint8_t slot_id,
-                                struct xhci_ring *ep0_ring,
-                                struct usb_setup_packet *setup, void *buffer) {
+enum usb_status xhci_send_control_transfer(struct xhci_device *dev,
+                                           uint8_t slot_id,
+                                           struct xhci_ring *ep0_ring,
+                                           struct usb_request *req) {
+    void *buffer = req->buffer;
+    struct usb_setup_packet *setup = req->setup;
     uint64_t buffer_phys =
         (uint64_t) vmm_get_phys((uintptr_t) buffer, VMM_FLAG_NONE);
 
+    enum irql outer = irql_raise(IRQL_DISPATCH_LEVEL);
     enum irql irql = spin_lock_irq_disable(&dev->lock);
 
     struct xhci_trb *setup_trb = xhci_ring_next_trb(ep0_ring);
@@ -141,23 +145,29 @@ bool xhci_send_control_transfer(struct xhci_device *dev, uint8_t slot_id,
     status_trb->control |= TRB_IOC_BIT;
     status_trb->control |= TRB_SET_CYCLE(ep0_ring->cycle);
 
-    struct xhci_request request;
-    struct xhci_command cmd;
-    xhci_request_init_blocking(&request, &cmd);
-    request.status = XHCI_REQUEST_OUTGOING;
-    request.trb_phys = xhci_get_trb_phys(ep0_ring, status_trb);
+    spin_unlock(&dev->lock, irql);
 
-    thread_block(scheduler_get_current_thread(), THREAD_BLOCK_REASON_IO,
-                 THREAD_WAIT_UNINTERRUPTIBLE, dev);
-    list_add(&request.list, &dev->requests[XHCI_REQUEST_OUTGOING]);
+    struct xhci_request *request =
+        kzalloc(sizeof(struct xhci_request), ALLOC_PARAMS_DEFAULT);
+    if (!request)
+        return USB_ERR_OOM;
+
+    struct xhci_command *cmd =
+        kzalloc(sizeof(struct xhci_command), ALLOC_PARAMS_DEFAULT);
+    if (!cmd)
+        return USB_ERR_OOM;
+
+    xhci_request_init(request, cmd, req);
+    request->status = XHCI_REQUEST_OUTGOING;
+    request->trb_phys = xhci_get_trb_phys(ep0_ring, status_trb);
+
+    list_add(&request->list, &dev->requests[XHCI_REQUEST_OUTGOING]);
 
     xhci_ring_doorbell(dev, slot_id, 1);
 
-    spin_unlock(&dev->lock, irql);
+    irql_lower(outer);
 
-    thread_wait_for_wake_match();
-
-    return TRB_CC(cmd.status) == CC_SUCCESS;
+    return USB_OK;
 }
 
 static uint8_t xhci_ep_to_input_ctx_idx(struct usb_endpoint *ep) {
@@ -233,15 +243,13 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
     return true;
 }
 
-static bool xhci_control_transfer(struct usb_device *dev,
-                                  struct usb_packet *packet) {
-    struct xhci_device *xhci = dev->host->driver_data;
-    struct xhci_ring *ep0_ring = xhci->port_info[dev->port - 1].ep_rings[0];
-    uint8_t slot_id = xhci->port_info[dev->port - 1].slot_id;
+static enum usb_status xhci_control_transfer(struct usb_request *request) {
+    struct xhci_device *xhci = request->dev->host->driver_data;
+    struct xhci_ring *ep0_ring =
+        xhci->port_info[request->dev->port - 1].ep_rings[0];
+    uint8_t slot_id = xhci->port_info[request->dev->port - 1].slot_id;
 
-    bool ret = xhci_send_control_transfer(xhci, slot_id, ep0_ring,
-                                          packet->setup, packet->data);
-    return ret;
+    return xhci_send_control_transfer(xhci, slot_id, ep0_ring, request);
 }
 
 static struct usb_controller_ops xhci_ctrl_ops = {
@@ -268,17 +276,13 @@ out:
     return ret;
 }
 
-static void xhci_process_request(struct xhci_device *dev,
-                                 struct xhci_request *req) {
-    req->callback(dev, req);
-}
-
 static void xhci_worker(void *arg) {
     struct xhci_device *dev = arg;
     struct xhci_request *req;
     while (true) {
         while ((req = xhci_finished_requests_pop_front(dev)) != NULL) {
-            xhci_process_request(dev, req);
+            if (req->callback)
+                req->callback(dev, req);
         }
 
         atomic_store(&dev->worker_waiting, true);

@@ -186,6 +186,8 @@ enum usb_status {
     USB_ERR_PROTO,
     USB_ERR_NO_DEVICE,
     USB_ERR_CANCELLED,
+    USB_ERR_OOM,
+    USB_ERR_INVALID_ARGUMENT,
 };
 
 struct usb_setup_packet {        /* Refer to page 276 */
@@ -292,30 +294,11 @@ struct usb_endpoint {
     void *hc_data;
 };
 
-struct usb_packet {
-    struct usb_endpoint *ep;
-    enum usb_transfer_type type;
-    struct usb_setup_packet *setup;
-    void *data;
-    size_t length;
-    bool direction_in;
-};
-
 struct usb_controller_ops {
-    bool (*submit_control_transfer)(struct usb_device *dev,
-                                    struct usb_packet *pkt);
-
-    bool (*submit_bulk_transfer)(struct usb_device *dev,
-                                 struct usb_packet *pkt);
-
-    bool (*submit_interrupt_transfer)(struct usb_device *dev,
-                                      struct usb_packet *pkt);
-
-    bool (*reset_port)(struct usb_device *dev);
-
-    bool (*setup_interrupt_endpoint)(
-        struct usb_controller *ctrl, uint8_t port, struct usb_endpoint *ep,
-        void (*callback)(void *ctx, uint8_t *data, size_t len), void *ctx);
+    enum usb_status (*submit_control_transfer)(struct usb_request *);
+    enum usb_status (*submit_bulk_transfer)(struct usb_request *);
+    enum usb_status (*submit_interrupt_transfer)(struct usb_request *);
+    enum usb_status (*reset_port)(struct usb_device *dev);
 };
 
 struct usb_controller { /* Generic USB controller */
@@ -362,22 +345,29 @@ struct usb_device {
 struct usb_request {
     struct usb_device *dev;
     struct usb_endpoint *ep;
+    enum usb_transfer_type type;
+    struct usb_setup_packet *setup;
 
     void *buffer;
     size_t length;
-    size_t actual_length;
 
-    enum usb_status status;
+    volatile enum usb_status status;
 
     uint32_t flags;
     uint64_t timeout_ns;
 
     void (*complete)(struct usb_request *);
     void *context;
+    bool direction_in;
 
     /* Controller-private data */
     void *hc_priv;
 };
+#define USB_REQ_INIT(_req, _dev)                                               \
+    do {                                                                       \
+        memset((_req), 0, sizeof(*(_req)));                                    \
+        (_req)->dev = (_dev);                                                  \
+    } while (0)
 
 bool usb_get_string_descriptor(struct usb_device *dev, uint8_t string_idx,
                                char *out, size_t max_len);
@@ -387,6 +377,8 @@ bool usb_set_configuration(struct usb_device *dev);
 
 void usb_try_bind_driver(struct usb_device *dev);
 uint8_t usb_construct_rq_bitmap(uint8_t transfer, uint8_t type, uint8_t recip);
+enum usb_status usb_transfer_sync(enum usb_status (*fn)(struct usb_request *),
+                                  struct usb_request *request);
 
 static inline uint8_t get_ep_index(struct usb_endpoint *ep) {
     return (ep->number * 2) + (ep->in ? 1 : 0);

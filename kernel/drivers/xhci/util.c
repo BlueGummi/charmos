@@ -10,6 +10,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "internal.h"
+
 bool xhci_controller_stop(struct xhci_device *dev) {
     struct xhci_op_regs *op = dev->op_regs;
 
@@ -66,4 +68,17 @@ void xhci_controller_enable_ints(struct xhci_device *dev) {
 
 void xhci_wake_waiter(struct xhci_device *dev, struct xhci_request *req) {
     scheduler_wake_from_io_block(req->private, dev);
+}
+
+void xhci_cleanup(struct xhci_device *dev, struct xhci_request *req) {
+    (void) dev;
+
+    if (req->urb) {
+        struct usb_request *urb = req->urb;
+        urb->status = xhci_cc_to_usb_status(req->completion_code);
+        urb->complete(urb);
+    }
+
+    kfree(req->command, FREE_PARAMS_DEFAULT);
+    kfree(req, FREE_PARAMS_DEFAULT);
 }

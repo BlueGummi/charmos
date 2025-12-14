@@ -77,9 +77,9 @@ struct usb_interface_descriptor *usb_find_interface(struct usb_device *dev,
     return NULL;
 }
 
-bool usb_keyboard_get_descriptor(struct usb_device *dev,
-                                 uint8_t interface_number, uint16_t len,
-                                 void *buf) {
+enum usb_status usb_keyboard_get_descriptor(struct usb_device *dev,
+                                            uint8_t interface_number,
+                                            uint16_t len, void *buf) {
     uint8_t bm = usb_construct_rq_bitmap(USB_REQUEST_TRANS_DTH,
                                          USB_REQUEST_TYPE_STANDARD,
                                          USB_REQUEST_RECIPIENT_INTERFACE);
@@ -92,12 +92,13 @@ bool usb_keyboard_get_descriptor(struct usb_device *dev,
         .index = interface_number,
     };
 
-    struct usb_packet packet = {
+    struct usb_request req = {
         .setup = &setup,
-        .data = buf,
+        .buffer = buf,
+        .dev = dev,
     };
 
-    return dev->host->ops.submit_control_transfer(dev, &packet);
+    return usb_transfer_sync(dev->host->ops.submit_control_transfer, &req);
 }
 
 void usb_keyboard_poll(struct usb_device *dev) {
@@ -119,16 +120,17 @@ void usb_keyboard_poll(struct usb_device *dev) {
 
     struct usb_kbd_report last = {0}, report = {0};
 
-    struct usb_packet packet = {
-        .data = &report,
+    struct usb_request req = {
+        .buffer = &report,
         .length = sizeof(report),
         .ep = ep,
+        .dev = dev,
     };
 
     while (true) {
-        bool ok = dev->host->ops.submit_interrupt_transfer(dev, &packet);
-
-        if (!ok)
+        enum usb_status ret =
+            usb_transfer_sync(dev->host->ops.submit_interrupt_transfer, &req);
+        if (ret != USB_OK)
             continue;
 
         if (memcmp(&last, &report, sizeof(report)) != 0) {
@@ -149,7 +151,8 @@ bool usb_keyboard_probe(struct usb_device *dev) {
     uint8_t iface_num = intf->interface_number;
 
     uint8_t *report_buf = kzalloc_aligned(256, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
-    if (!usb_keyboard_get_descriptor(dev, iface_num, 256, report_buf)) {
+    if (usb_keyboard_get_descriptor(dev, iface_num, 256, report_buf) !=
+        USB_OK) {
         usb_warn("usbkbd: Failed to fetch report descriptor");
         return false;
     }

@@ -3,7 +3,39 @@
 #include <mem/page.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
+#include <sch/sched.h>
 #include <string.h>
+
+#include "internal.h"
+
+enum usb_status usb_transfer_sync(enum usb_status (*fn)(struct usb_request *),
+                                  struct usb_request *request) {
+    request->complete = usb_wake_waiter;
+    struct thread *curr = scheduler_get_current_thread();
+    request->context = curr;
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
+    enum usb_status ret;
+    thread_block(curr, THREAD_BLOCK_REASON_IO, THREAD_WAIT_UNINTERRUPTIBLE,
+                 request->dev);
+
+    if ((ret = fn(request)) != USB_OK) {
+        thread_wake(curr, THREAD_WAKE_REASON_BLOCKING_MANUAL, request->dev);
+        irql_lower(irql);
+        return ret;
+    }
+
+    irql_lower(irql);
+    thread_wait_for_wake_match();
+    return request->status;
+}
+
+void usb_wake_waiter(struct usb_request *rq) {
+    scheduler_wake_from_io_block(rq->context, rq->dev);
+}
+
+void usb_destroy(struct usb_request *rq) {
+    kfree(rq, FREE_PARAMS_DEFAULT);
+}
 
 uint8_t usb_construct_rq_bitmap(uint8_t transfer, uint8_t type, uint8_t recip) {
     uint8_t bitmap = 0;
@@ -13,7 +45,7 @@ uint8_t usb_construct_rq_bitmap(uint8_t transfer, uint8_t type, uint8_t recip) {
     return bitmap;
 }
 
-static uint8_t get_desc_bitmap(void) {
+static uint8_t usb_get_desc_bitmap(void) {
     return usb_construct_rq_bitmap(USB_REQUEST_TRANS_DTH,
                                    USB_REQUEST_TYPE_STANDARD,
                                    USB_REQUEST_RECIPIENT_DEVICE);
@@ -28,19 +60,20 @@ bool usb_get_string_descriptor(struct usb_device *dev, uint8_t string_idx,
     uint8_t *desc = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
 
     struct usb_setup_packet setup = {
-        .bitmap_request_type = get_desc_bitmap(),
+        .bitmap_request_type = usb_get_desc_bitmap(),
         .request = USB_RQ_CODE_GET_DESCRIPTOR,
         .value = (USB_DESC_TYPE_STRING << USB_DESC_TYPE_SHIFT) | string_idx,
         .index = 0,
         .length = 255,
     };
 
-    struct usb_packet packet = {
+    struct usb_request req = {
         .setup = &setup,
-        .data = desc,
+        .buffer = desc,
+        .dev = dev,
     };
 
-    if (!ctrl->ops.submit_control_transfer(dev, &packet))
+    if (usb_transfer_sync(ctrl->ops.submit_control_transfer, &req) != USB_OK)
         return false;
 
     uint8_t bLength = desc[0];
@@ -61,7 +94,7 @@ void usb_get_device_descriptor(struct usb_device *dev) {
     uint8_t *desc = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
 
     struct usb_setup_packet setup = {
-        .bitmap_request_type = get_desc_bitmap(),
+        .bitmap_request_type = usb_get_desc_bitmap(),
         .request = USB_RQ_CODE_GET_DESCRIPTOR,
         .value = (USB_DESC_TYPE_DEVICE << USB_DESC_TYPE_SHIFT),
         .index = 0,
@@ -71,12 +104,14 @@ void usb_get_device_descriptor(struct usb_device *dev) {
     struct usb_controller *ctrl = dev->host;
     uint8_t port = dev->port;
 
-    struct usb_packet packet = {
+    struct usb_request request = {
         .setup = &setup,
-        .data = desc,
+        .buffer = desc,
+        .dev = dev,
     };
 
-    if (!ctrl->ops.submit_control_transfer(dev, &packet)) {
+    if (usb_transfer_sync(ctrl->ops.submit_control_transfer, &request) !=
+        USB_OK) {
         usb_warn("Failed to get device descriptor on port %u", port);
         return;
     }
@@ -185,7 +220,7 @@ bool usb_parse_config_descriptor(struct usb_device *dev) {
     uint8_t *desc = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
 
     struct usb_setup_packet setup = {
-        .bitmap_request_type = get_desc_bitmap(),
+        .bitmap_request_type = usb_get_desc_bitmap(),
         .request = USB_RQ_CODE_GET_DESCRIPTOR,
         .value = (USB_DESC_TYPE_CONFIG << USB_DESC_TYPE_SHIFT),
         .index = 0,
@@ -195,13 +230,15 @@ bool usb_parse_config_descriptor(struct usb_device *dev) {
     struct usb_controller *ctrl = dev->host;
     uint8_t port = dev->port;
 
-    struct usb_packet packet = {
+    struct usb_request request = {
         .setup = &setup,
-        .data = desc,
+        .buffer = desc,
+        .dev = dev,
 
     };
 
-    if (!ctrl->ops.submit_control_transfer(dev, &packet)) {
+    if (usb_transfer_sync(ctrl->ops.submit_control_transfer, &request) !=
+        USB_OK) {
         usb_warn("Failed to get config descriptor header on port %u", port);
         kfree_aligned(desc, FREE_PARAMS_DEFAULT);
         return false;
@@ -213,7 +250,8 @@ bool usb_parse_config_descriptor(struct usb_device *dev) {
     uint16_t total_len = cdesc->total_length;
     setup.length = total_len;
 
-    if (!ctrl->ops.submit_control_transfer(dev, &packet)) {
+    if (usb_transfer_sync(ctrl->ops.submit_control_transfer, &request) !=
+        USB_OK) {
         usb_warn("Failed to get full config descriptor on port %u", port);
         kfree_aligned(desc, FREE_PARAMS_DEFAULT);
         return false;
@@ -244,12 +282,14 @@ bool usb_set_configuration(struct usb_device *dev) {
         .length = 0,
     };
 
-    struct usb_packet packet = {
+    struct usb_request request = {
         .setup = &set_cfg,
-        .data = NULL,
+        .buffer = NULL,
+        .dev = dev,
     };
 
-    if (!ctrl->ops.submit_control_transfer(dev, &packet)) {
+    if (usb_transfer_sync(ctrl->ops.submit_control_transfer, &request) !=
+        USB_OK) {
         usb_warn("Failed to set configuration on port %u\n", port);
         return false;
     }
