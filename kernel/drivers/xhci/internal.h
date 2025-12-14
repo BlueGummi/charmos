@@ -7,6 +7,7 @@
 struct xhci_return xhci_wait_for_port_status_change(struct xhci_device *dev,
                                                     uint32_t port_id);
 
+void xhci_wake_waiter(struct xhci_device *dev, struct xhci_request *request);
 struct xhci_ring *xhci_allocate_ring();
 void *xhci_map_mmio(uint8_t bus, uint8_t slot, uint8_t func);
 struct xhci_device *xhci_device_create(void *mmio);
@@ -114,12 +115,13 @@ static inline enum usb_status xhci_cc_to_usb_status(uint8_t cc) {
     }
 }
 
-static inline void xhci_request_init(struct xhci_request *req,
+static inline void xhci_request_init_blocking(struct xhci_request *req,
                                      struct xhci_command *cmd) {
     req->status = XHCI_REQUEST_MAX;
     req->completion_code = 0;
     req->command = cmd;
-    req->waiter = scheduler_get_current_thread();
+    req->private = scheduler_get_current_thread();
+    req->callback = xhci_wake_waiter;
     INIT_LIST_HEAD(&req->list);
 }
 

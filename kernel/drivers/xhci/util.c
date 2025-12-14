@@ -63,3 +63,7 @@ void xhci_controller_enable_ints(struct xhci_device *dev) {
     usbcmd.interrupter_enable = 1;
     mmio_write_32(&op->usbcmd, usbcmd.raw);
 }
+
+void xhci_wake_waiter(struct xhci_device *dev, struct xhci_request *req) {
+    scheduler_wake_from_io_block(req->private, dev);
+}

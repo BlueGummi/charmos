@@ -91,7 +91,7 @@ void xhci_setup_command_ring(struct xhci_device *dev) {
 uint8_t xhci_enable_slot(struct xhci_device *dev) {
     struct xhci_request request;
     struct xhci_command cmd;
-    xhci_request_init(&request, &cmd);
+    xhci_request_init_blocking(&request, &cmd);
 
     cmd = (struct xhci_command) {
         .parameter = 0,
@@ -140,7 +140,7 @@ bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
 
     struct xhci_request request;
     struct xhci_command cmd;
-    xhci_request_init(&request, &cmd);
+    xhci_request_init_blocking(&request, &cmd);
     list_add_tail(&request.list, &dev->requests[XHCI_REQUEST_OUTGOING]);
 
     mmio_write_32(portsc, to_write);

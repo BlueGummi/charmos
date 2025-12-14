@@ -608,13 +608,11 @@ struct xhci_request {
     uint64_t trb_phys;
     volatile uint32_t completion_code;
 
-    /* This is the "which list are we on" status that tells the driver
-     * if this is on the outgoing, waiting, or finished list */
     enum xhci_request_status status;
 
-    /* This is the status that tells us "how is this request doing"? */
-    struct thread *waiter;
     struct list_head list;
+    void (*callback)(struct xhci_device *, struct xhci_request *);
+    void *private;
 };
 
 struct xhci_return {

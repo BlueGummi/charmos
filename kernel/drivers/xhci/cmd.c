@@ -203,7 +203,7 @@ bool xhci_submit_interrupt_transfer(struct usb_device *dev,
 
     struct xhci_request req;
     struct xhci_command cmd;
-    xhci_request_init(&req, &cmd);
+    xhci_request_init_blocking(&req, &cmd);
 
     cmd = (struct xhci_command) {
         .ring = ring,

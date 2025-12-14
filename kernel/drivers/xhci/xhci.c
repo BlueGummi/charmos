@@ -62,7 +62,7 @@ bool xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
 
     struct xhci_request request;
     struct xhci_command cmd;
-    xhci_request_init(&request, &cmd);
+    xhci_request_init_blocking(&request, &cmd);
 
     cmd = (struct xhci_command) {
         .ring = ctrl->cmd_ring,
@@ -143,7 +143,7 @@ bool xhci_send_control_transfer(struct xhci_device *dev, uint8_t slot_id,
 
     struct xhci_request request;
     struct xhci_command cmd;
-    xhci_request_init(&request, &cmd);
+    xhci_request_init_blocking(&request, &cmd);
     request.status = XHCI_REQUEST_OUTGOING;
     request.trb_phys = xhci_get_trb_phys(ep0_ring, status_trb);
 
@@ -211,7 +211,7 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
 
     struct xhci_request request;
     struct xhci_command cmd;
-    xhci_request_init(&request, &cmd);
+    xhci_request_init_blocking(&request, &cmd);
 
     cmd = (struct xhci_command) {
         .slot_id = 0,
@@ -270,8 +270,7 @@ out:
 
 static void xhci_process_request(struct xhci_device *dev,
                                  struct xhci_request *req) {
-    if (req->waiter)
-        scheduler_wake_from_io_block(req->waiter, dev);
+    req->callback(dev, req);
 }
 
 static void xhci_worker(void *arg) {

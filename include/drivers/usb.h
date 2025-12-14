@@ -294,16 +294,11 @@ struct usb_endpoint {
 
 struct usb_packet {
     struct usb_endpoint *ep;
-
     enum usb_transfer_type type;
-
     struct usb_setup_packet *setup;
     void *data;
     size_t length;
     bool direction_in;
-
-    void (*completion_cb)(void *ctx, bool success);
-    void *context;
 };
 
 struct usb_controller_ops {
