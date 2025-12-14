@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <structures/list.h>
 #include <structures/locked_list.h>
+#include <sync/semaphore.h>
 struct usb_controller;
 struct usb_packet;
 struct xhci_request;
@@ -500,14 +501,13 @@ struct xhci_trb {
 static_assert_struct_size_eq(xhci_trb, 0x10);
 
 struct xhci_ring {
-    struct xhci_trb *trbs; /* Virtual mapped TRB buffer */
+    struct xhci_trb *trbs;  /* Virtual mapped TRB buffer */
     uint64_t phys;          /* Physical address of TRB buffer */
     uint32_t enqueue_index; /* Next TRB to fill */
     uint32_t dequeue_index; /* Point where controller sends back things */
     uint8_t cycle;          /* Cycle bit, toggles after ring wrap */
     uint32_t size;          /* Number of TRBs in ring */
     size_t outgoing;
-    struct spinlock lock;
 };
 
 struct xhci_erst_entry {
@@ -555,13 +555,10 @@ struct xhci_ext_cap {
 };
 
 enum xhci_request_status {
-    XHCI_REQUEST_STATUS_WAITING,  /* On the waiting list */
-    XHCI_REQUEST_STATUS_FINISHED, /* On the finished list */
-    XHCI_REQUEST_STATUS_MAX,
-};
-
-enum xhci_request_state {
-    XHCI_REQUEST_PENDING,
+    XHCI_REQUEST_OUTGOING,
+    XHCI_REQUEST_WAITING,   /* On the waiting list */
+    XHCI_REQUEST_PROCESSED, /* On the finished list */
+    XHCI_REQUEST_MAX,
     XHCI_REQUEST_DONE,
     XHCI_REQUEST_CANCELLED,
 };
@@ -584,18 +581,20 @@ struct xhci_device {
     uint64_t ports;
     struct xhci_port_info port_info[64];
 
-    struct locked_list requests[XHCI_REQUEST_STATUS_MAX];
+    struct list_head requests[XHCI_REQUEST_MAX];
 
     uint64_t num_devices;
     struct usb_device **devices;
     struct spinlock lock; /* protects regs */
+    struct semaphore sem;
+    atomic_bool worker_waiting;
 };
 
 struct xhci_command {
     struct xhci_ring *ring; /* what ring? */
-    uint64_t parameter;
-    uint32_t status;
-    uint32_t control;
+    volatile uint64_t parameter;
+    volatile uint32_t status;
+    volatile uint32_t control;
     uint32_t slot_id;
     uint32_t ep_id;
     struct xhci_request *request; /* associated request */
@@ -604,20 +603,16 @@ struct xhci_command {
 struct xhci_request {
     /* Tied back to the USB request */
     struct usb_request *urb;
-
-    uint8_t slot_id;
-    uint8_t ep_id;
+    struct xhci_command *command;
 
     uint64_t trb_phys;
-    uint32_t completion_code;
+    volatile uint32_t completion_code;
 
     /* This is the "which list are we on" status that tells the driver
      * if this is on the outgoing, waiting, or finished list */
     enum xhci_request_status status;
-    enum xhci_request_state state;
 
     /* This is the status that tells us "how is this request doing"? */
-
     struct thread *waiter;
     struct list_head list;
 };

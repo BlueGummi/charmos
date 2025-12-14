@@ -24,7 +24,6 @@ struct xhci_ring *xhci_allocate_ring() {
     if (!ring)
         k_panic("OOM\n");
 
-    spinlock_init(&ring->lock);
     ring->phys = phys;
     ring->cycle = 1;
     ring->size = TRB_RING_SIZE;
@@ -90,7 +89,11 @@ void xhci_setup_command_ring(struct xhci_device *dev) {
 }
 
 uint8_t xhci_enable_slot(struct xhci_device *dev) {
-    struct xhci_command cmd = {
+    struct xhci_request request;
+    struct xhci_command cmd;
+    xhci_request_init(&request, &cmd);
+
+    cmd = (struct xhci_command) {
         .parameter = 0,
         .control = TRB_SET_TYPE(TRB_TYPE_ENABLE_SLOT) |
                    TRB_SET_CYCLE(dev->cmd_ring->cycle),
@@ -98,11 +101,12 @@ uint8_t xhci_enable_slot(struct xhci_device *dev) {
         .ep_id = 0,
         .slot_id = 0,
         .ring = dev->cmd_ring,
+        .request = &request,
     };
 
-    xhci_send_command(dev, &cmd);
+    xhci_send_command_and_block(dev, &cmd);
 
-    return TRB_SLOT(xhci_wait_for_response(dev).control);
+    return TRB_SLOT(cmd.control);
 }
 
 bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
@@ -131,6 +135,14 @@ bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
 
     uint32_t to_write = clear_mask | preserve;
 
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
+    enum irql lirql = spin_lock_irq_disable(&dev->lock);
+
+    struct xhci_request request;
+    struct xhci_command cmd;
+    xhci_request_init(&request, &cmd);
+    list_add_tail(&request.list, &dev->requests[XHCI_REQUEST_OUTGOING]);
+
     mmio_write_32(portsc, to_write);
 
     sleep_us(500);
@@ -147,6 +159,14 @@ bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
     }
 
     mmio_write_32(portsc, write_mask);
+
+    thread_block(scheduler_get_current_thread(), THREAD_BLOCK_REASON_IO,
+                 THREAD_WAIT_UNINTERRUPTIBLE, dev);
+
+    spin_unlock(&dev->lock, lirql);
+    irql_lower(irql);
+
+    thread_wait_for_wake_match();
 
     time_t timeout_ms = 100;
     bool settled = false;
@@ -174,9 +194,7 @@ bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
         return false;
     }
 
-    struct xhci_return xr = xhci_wait_for_port_status_change(dev, portnum);
-
-    if (TRB_CC(xr.status) != CC_SUCCESS) {
+    if (TRB_CC(cmd.status) != CC_SUCCESS) {
         xhci_warn("port %u reset did not generate a PSC event", portnum);
         return false;
     }
@@ -303,8 +321,8 @@ struct xhci_device *xhci_device_create(void *mmio) {
     struct xhci_interrupter_regs *ir_base =
         (void *) ((uint8_t *) runtime_regs + 0x20);
 
-    for (size_t i = 0; i < XHCI_REQUEST_STATUS_MAX; i++) {
-        locked_list_init(&dev->requests[i]);
+    for (size_t i = 0; i < XHCI_REQUEST_MAX; i++) {
+        INIT_LIST_HEAD(&dev->requests[i]);
     }
 
     dev->num_devices = 0;

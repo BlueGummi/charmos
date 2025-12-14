@@ -4,11 +4,11 @@
 #include <drivers/nvme.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
-#include <thread/defer.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <structures/sll.h>
+#include <thread/defer.h>
 
 #include "internal.h"
 
@@ -131,10 +131,13 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
 
     struct thread *curr = scheduler_get_current_thread();
 
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     req.waiter = curr;
-    function(disk, &req);
     thread_block(curr, THREAD_BLOCK_REASON_IO, THREAD_WAIT_UNINTERRUPTIBLE,
                  disk->driver_data);
+
+    function(disk, &req);
+    irql_lower(irql);
 
     /* Go run something else now */
     thread_wait_for_wake_match();

@@ -40,44 +40,34 @@ struct portsc_ctx {
     uint32_t port_id;
 };
 
-void xhci_advance_dequeue(struct xhci_ring *ring) {
-    SPINLOCK_ASSERT_HELD(&ring->lock);
-    ring->dequeue_index++;
-    if (ring->dequeue_index == ring->size) {
-        ring->dequeue_index = 0;
-        ring->cycle ^= 1;
-    }
-}
-
-void xhci_advance_enqueue(struct xhci_ring *ring) {
-    SPINLOCK_ASSERT_HELD(&ring->lock);
-    ring->enqueue_index++;
-    /* -1 here because the last TRB is the LINK */
-    if (ring->enqueue_index == ring->size - 1) {
-        ring->enqueue_index = 0;
-        ring->cycle ^= 1;
-    }
-}
-
 void xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd) {
     struct xhci_ring *cmd_ring = cmd->ring;
-    enum irql irql = spin_lock_irq_disable(&cmd_ring->lock);
+    enum irql irql = spin_lock_irq_disable(&dev->lock);
     struct xhci_trb *trb = &cmd_ring->trbs[cmd_ring->enqueue_index];
 
-    trb->parameter = cmd->parameter;
-    trb->status = cmd->status;
-    trb->control = cmd->control;
+    if (cmd_ring->outgoing < cmd_ring->size) {
+        trb->parameter = cmd->parameter;
+        trb->status = cmd->status;
+        trb->control = cmd->control;
+        cmd->request->trb_phys = xhci_get_trb_phys(cmd_ring, trb);
+        cmd->request->status = XHCI_REQUEST_OUTGOING;
+        list_add(&cmd->request->list, &dev->requests[XHCI_REQUEST_OUTGOING]);
 
-    xhci_advance_enqueue(cmd_ring);
-    xhci_ring_doorbell(dev, cmd->slot_id, cmd->ep_id);
-    spin_unlock(&cmd_ring->lock, irql);
+        xhci_advance_enqueue(cmd_ring);
+        xhci_ring_doorbell(dev, cmd->slot_id, cmd->ep_id);
+    } else {
+        cmd->request->status = XHCI_REQUEST_WAITING;
+        list_add(&cmd->request->list, &dev->requests[XHCI_REQUEST_WAITING]);
+    }
+
+    spin_unlock(&dev->lock, irql);
 }
 
 struct xhci_return
 xhci_wait(struct xhci_device *dev,
           struct wait_result (*cb)(struct xhci_trb *, void *), void *ctx) {
     struct xhci_ring *ring = dev->event_ring;
-    enum irql irql = spin_lock_irq_disable(&ring->lock);
+    enum irql irql = spin_lock_irq_disable(&dev->lock);
 
     while (true) {
         struct xhci_trb *evt = &ring->trbs[ring->dequeue_index];
@@ -96,7 +86,7 @@ xhci_wait(struct xhci_device *dev,
         xhci_erdp_ack(dev, erdp);
 
         if (r.matches && r.complete) {
-            spin_unlock(&ring->lock, irql);
+            spin_unlock(&dev->lock, irql);
             return (struct xhci_return) {.status = r.status,
                                          .control = r.control};
         }
@@ -212,9 +202,10 @@ bool xhci_submit_interrupt_transfer(struct usb_device *dev,
     control |= TRB_SET_CYCLE(ring->cycle);
 
     struct xhci_request req;
-    xhci_request_init(&req);
+    struct xhci_command cmd;
+    xhci_request_init(&req, &cmd);
 
-    struct xhci_command cmd = {
+    cmd = (struct xhci_command) {
         .ring = ring,
         .parameter = parameter,
         .control = control,
@@ -224,15 +215,9 @@ bool xhci_submit_interrupt_transfer(struct usb_device *dev,
         .request = &req,
     };
 
-    struct wait_ctx ctx = {
-        .ep_id = ep_id,
-        .slot_id = slot_id,
-    };
+    xhci_send_command_and_block(xhci, &cmd);
 
-    xhci_send_command(xhci, &cmd);
-
-    bool ok = TRB_CC(xhci_wait(xhci, wait_interrupt_event, &ctx).status) ==
-              CC_SUCCESS;
+    bool ok = TRB_CC(cmd.status) == CC_SUCCESS;
     if (!ok) {
         xhci_warn("Interrupt transfer failed for slot %u, ep %u", slot_id,
                   get_ep_index(ep));

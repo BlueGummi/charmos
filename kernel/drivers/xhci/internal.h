@@ -4,7 +4,6 @@
 #include <drivers/xhci.h>
 #include <sch/sched.h>
 
-void xhci_advance_dequeue(struct xhci_ring *ring);
 struct xhci_return xhci_wait_for_port_status_change(struct xhci_device *dev,
                                                     uint32_t port_id);
 
@@ -115,15 +114,52 @@ static inline enum usb_status xhci_cc_to_usb_status(uint8_t cc) {
     }
 }
 
-static inline void xhci_request_init(struct xhci_request *req) {
-    req->state = XHCI_REQUEST_DONE;
+static inline void xhci_request_init(struct xhci_request *req,
+                                     struct xhci_command *cmd) {
+    req->status = XHCI_REQUEST_MAX;
     req->completion_code = 0;
+    req->command = cmd;
     req->waiter = scheduler_get_current_thread();
-    req->status = XHCI_REQUEST_STATUS_WAITING;
     INIT_LIST_HEAD(&req->list);
 }
 
 static inline void xhci_clear_usbsts_ei(struct xhci_device *dev) {
     mmio_write_32(&dev->op_regs->usbsts,
                   mmio_read_32(&dev->op_regs->usbsts) | XHCI_USBSTS_EI);
+}
+
+static inline void xhci_send_command_and_block(struct xhci_device *dev,
+                                               struct xhci_command *cmd) {
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
+
+    thread_block(scheduler_get_current_thread(), THREAD_BLOCK_REASON_IO,
+                 THREAD_WAIT_UNINTERRUPTIBLE, dev);
+    xhci_send_command(dev, cmd);
+
+    irql_lower(irql);
+
+    thread_wait_for_wake_match();
+}
+
+static inline void xhci_advance_dequeue(struct xhci_ring *ring) {
+    ring->dequeue_index++;
+    if (ring->dequeue_index == ring->size) {
+        ring->dequeue_index = 0;
+        ring->cycle ^= 1;
+    }
+}
+
+static inline void xhci_advance_enqueue(struct xhci_ring *ring) {
+    ring->enqueue_index++;
+    /* -1 here because the last TRB is the LINK */
+    if (ring->enqueue_index == ring->size - 1) {
+        ring->enqueue_index = 0;
+        ring->cycle ^= 1;
+    }
+}
+
+static inline uint64_t xhci_get_trb_phys(struct xhci_ring *ring,
+                                         struct xhci_trb *trb) {
+    uint64_t offset = (uint8_t *) trb - (uint8_t *) ring->trbs;
+    return ring->phys + offset;
 }

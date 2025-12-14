@@ -4,11 +4,13 @@ bool scheduler_wake(struct thread *t, enum thread_wake_reason reason,
                     enum thread_prio_class prio, void *wake_src) {
     kassert(t);
     enum irql outer = irql_raise(IRQL_HIGH_LEVEL);
-    while (!atomic_load_explicit(&t->yielded_after_wait, memory_order_acquire))
-        cpu_relax();
 
     enum thread_flags old;
     struct scheduler *sch = global.schedulers[thread_get_last_ran(t, &old)];
+
+    if (sch->core_id != smp_core_id())
+        while (!atomic_load(&t->yielded_after_wait))
+            cpu_relax();
 
     /* this is a fun one. because threads can sleep/block in modes
      * that aren't just wakeable in one way, we must take care here.
@@ -24,6 +26,7 @@ bool scheduler_wake(struct thread *t, enum thread_wake_reason reason,
      */
 
     bool woke = false;
+    bool yielded = atomic_load(&t->yielded_after_wait);
     bool ok;
     enum irql irql = scheduler_lock_irq_disable(sch);
     enum irql tirql = thread_acquire(t, &ok);
@@ -39,7 +42,6 @@ bool scheduler_wake(struct thread *t, enum thread_wake_reason reason,
     if ((wt == THREAD_WAIT_UNINTERRUPTIBLE &&
          t->expected_wake_src != wake_src) ||
         wt == THREAD_WAIT_NONE) {
-        k_printf("hmmmm\n");
         goto out;
     }
 
@@ -51,7 +53,12 @@ bool scheduler_wake(struct thread *t, enum thread_wake_reason reason,
     thread_wake_locked(t, reason, wake_src);
     thread_apply_wake_boost(t);
 
-    if (state != THREAD_STATE_RUNNING && state != THREAD_STATE_READY) {
+    /* if the thread has NOT yielded after it set itself blocked it is completely
+     * unsafe to put it back on the runqueues as it is currently running, but is
+     * marked as BLOCKED or SLEEPING. This can happen when an ISR enters this code, 
+     * when the thread we are looking at is on the same CPU and marked as BLOCKED/SLEEPING
+     * when in reality it is actually running but wanting to block/sleep but has not yielded */
+    if (yielded && state != THREAD_STATE_RUNNING && state != THREAD_STATE_READY) {
         t->perceived_prio_class = prio;
         scheduler_add_thread(sch, t, /* lock_held = */ true);
         scheduler_force_resched(sch);
