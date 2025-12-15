@@ -73,9 +73,35 @@ uint8_t xhci_enable_slot(struct xhci_device *dev) {
     return TRB_SLOT(request.return_control);
 }
 
+void xhci_disable_slot(struct xhci_device *dev, uint8_t slot_id) {
+    struct xhci_request request;
+    struct xhci_command cmd;
+
+    xhci_request_init_blocking(&request, &cmd, /* port = */ 0);
+
+    struct xhci_trb outgoing = {
+        .parameter = slot_id,
+        .status = 0,
+        .control = TRB_SET_TYPE(TRB_TYPE_DISABLE_SLOT) |
+                   TRB_SET_CYCLE(dev->cmd_ring->cycle),
+    };
+
+    cmd = (struct xhci_command) {
+        .private = &outgoing,
+        .emit = xhci_emit_singular,
+        .ep_id = 0,
+        .slot_id = slot_id,
+        .ring = dev->cmd_ring,
+        .request = &request,
+        .num_trbs = 1,
+    };
+
+    xhci_send_command_and_block(dev, &cmd);
+}
+
 bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
     uint32_t *portsc = xhci_portsc_ptr(dev, portnum);
-    bool is_usb3 = xhci_port_info_for_port(dev, portnum)->usb3;
+    bool is_usb3 = dev->port_info[portnum - 1].usb3;
 
     uint32_t old = mmio_read_32(portsc);
 

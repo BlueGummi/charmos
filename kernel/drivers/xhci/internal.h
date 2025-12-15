@@ -12,7 +12,7 @@ void xhci_device_start_interrupts(uint8_t bus, uint8_t slot, uint8_t func,
                                   struct xhci_device *dev);
 
 void xhci_emit_singular(struct xhci_command *cmd, struct xhci_ring *ring);
-void xhci_teardown_port(struct xhci_port_info *me);
+void xhci_teardown_slot(struct xhci_slot *me);
 void xhci_wake_waiter(struct xhci_device *dev, struct xhci_request *request);
 void xhci_cleanup(struct xhci_device *dev, struct xhci_request *req);
 struct xhci_ring *xhci_allocate_ring();
@@ -39,6 +39,7 @@ struct xhci_return xhci_wait_for_response(struct xhci_device *dev);
 struct xhci_return xhci_wait_for_transfer_event(struct xhci_device *dev,
                                                 uint8_t slot_id);
 uint8_t xhci_enable_slot(struct xhci_device *dev);
+void xhci_disable_slot(struct xhci_device *dev, uint8_t slot_id);
 void xhci_parse_ext_caps(struct xhci_device *dev);
 bool xhci_reset_port(struct xhci_device *dev, uint32_t port_index);
 void xhci_detect_usb3_ports(struct xhci_device *dev);
@@ -184,7 +185,7 @@ static inline void xhci_advance_dequeue(struct xhci_ring *ring) {
 
 static inline void xhci_advance_enqueue(struct xhci_ring *ring) {
     ring->enqueue_index++;
-    /* -1 here because the last TRB is the LINK */
+
     if (ring->enqueue_index == ring->size - 1) {
         ring->enqueue_index = 0;
         ring->cycle ^= 1;
@@ -205,9 +206,18 @@ static inline uint32_t xhci_read_portsc(struct xhci_device *dev, uint8_t port) {
     return mmio_read_32(&dev->port_regs[port - 1]);
 }
 
-static inline struct xhci_port_info *
-xhci_port_info_for_port(struct xhci_device *dev, uint8_t port) {
-    return &dev->port_info[port - 1];
+static inline struct xhci_slot *xhci_get_slot(struct xhci_device *dev,
+                                              uint8_t id) {
+    return &dev->slots[id - 1];
+}
+
+static inline enum xhci_slot_state xhci_get_slot_state(struct xhci_slot *slot) {
+    return atomic_load_explicit(&slot->state, memory_order_acquire);
+}
+
+static inline void xhci_set_slot_state(struct xhci_slot *slot,
+                                       enum xhci_slot_state new) {
+    atomic_store_explicit(&slot->state, new, memory_order_release);
 }
 
 /* A request is OK if it is CC_SUCCESS and PROCESSED */
@@ -216,24 +226,13 @@ static inline bool xhci_request_ok(struct xhci_request *rq) {
            rq->status == XHCI_REQUEST_PROCESSED;
 }
 
-static inline enum xhci_port_status
-xhci_get_port_status(struct xhci_port_info *info) {
-    return atomic_load_explicit(&info->status, memory_order_acquire);
-}
+REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(
+    xhci_slot, refcount, state, >= XHCI_SLOT_STATE_DISCONNECTING);
 
-static inline void xhci_set_port_status(struct xhci_port_info *info,
-                                        enum xhci_port_status status) {
-    atomic_store_explicit(&info->status, status, memory_order_release);
-}
-
-REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(xhci_port_info, refcount,
-                                                   status,
-                                                   >= XHCI_PORT_DISCONNECTING);
-
-static inline void xhci_port_info_put(struct xhci_port_info *pinfo) {
-    if (refcount_dec_and_test(&pinfo->refcount)) {
-        kassert(xhci_get_port_status(pinfo) == XHCI_PORT_DISCONNECTING);
-        xhci_teardown_port(pinfo);
+static inline void xhci_slot_put(struct xhci_slot *slot) {
+    if (refcount_dec_and_test(&slot->refcount)) {
+        kassert(xhci_get_slot_state(slot) == XHCI_SLOT_STATE_DISCONNECTING);
+        xhci_teardown_slot(slot);
     }
 }
 
@@ -253,7 +252,7 @@ static inline struct xhci_trb *xhci_ring_next_trb(struct xhci_ring *ring) {
     struct xhci_trb *trb = &ring->trbs[ring->enqueue_index];
 
     memset(trb, 0, sizeof(*trb));
-    xhci_advance_enqueue(ring);
 
+    xhci_advance_enqueue(ring);
     return trb;
 }

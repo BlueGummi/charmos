@@ -183,13 +183,16 @@ struct pci_device;
 #define xhci_warn(string, ...) k_info("XHCI", K_WARN, string, ##__VA_ARGS__)
 #define xhci_error(string, ...) k_info("XHCI", K_ERROR, string, ##__VA_ARGS__)
 
-enum xhci_port_status {
-    XHCI_PORT_RESETTING,
-    XHCI_PORT_ERROR,
-    XHCI_PORT_CONNECTED,     /* Currently up and running */
-    XHCI_PORT_DISCONNECTING, /* Received a DISCONNECT PORT STATUS CHANGE */
-    XHCI_PORT_DISCONNECTED,  /* Disconnected */
-};
+/*
+ * Lifetime invariant:
+ * - Slot refcount > 0 implies:
+ *   - Slot is ENABLED or DISCONNECTING
+ *   - Endpoint rings may exist
+ * - When slot refcount reaches 0:
+ *   - Disable Slot has completed
+ *   - No TRBs may be issued
+ *   - All memory may be freed
+ */
 
 // 5.3: XHCI Capability Registers
 struct xhci_cap_regs {
@@ -544,16 +547,6 @@ struct xhci_interrupter_regs {
 
 } __attribute__((packed));
 
-struct xhci_port_info {
-    _Atomic enum xhci_port_status status;
-    uint8_t speed;
-    uint8_t slot_id;
-    bool usb3;
-    struct xhci_ring *ep_rings[32];
-    refcount_t
-        refcount; /* As soon as this drops to zero we clear the ep_rings */
-};
-
 struct xhci_dcbaa { // Device context base address array - check page 441
     uint64_t ptrs[256];
 } __attribute__((aligned(64)));
@@ -562,6 +555,32 @@ struct xhci_ext_cap {
     uint8_t cap_id;
     uint8_t next;
     uint16_t cap_specific;
+};
+
+enum xhci_slot_state {
+    XHCI_SLOT_STATE_UNDEF,
+    XHCI_SLOT_STATE_ENABLED,
+    XHCI_SLOT_STATE_DISCONNECTING,
+    XHCI_SLOT_STATE_DISABLED,
+    XHCI_SLOT_STATE_DISABLING,
+};
+
+struct xhci_slot {
+    _Atomic enum xhci_slot_state state;
+    struct xhci_device *dev;
+    struct xhci_ring *ep_rings[32];
+    uint8_t slot_id; /* Just so everyone knows what slot we are */
+
+    /* As soon as this drops to zero we clear the ep_rings */
+    refcount_t refcount;
+    uint8_t port_id;
+    struct usb_device *udev;
+};
+
+struct xhci_port {
+    uint8_t slot_id;
+    uint8_t speed;
+    bool usb3;
 };
 
 enum xhci_request_status {
@@ -602,9 +621,8 @@ struct xhci_device {
 
     struct xhci_port_regs *port_regs;
     uint64_t ports;
-    /* This is THE ONLY PLACE where we use `port - 1` in indexing because
-     * xHCI ports are ones-based and this is zeros based */
-    struct xhci_port_info port_info[64];
+    struct xhci_slot slots[255];
+    struct xhci_port port_info[64];
 
     struct list_head requests[XHCI_REQUEST_MAX];
 
@@ -617,7 +635,7 @@ struct xhci_device {
 
 struct xhci_command {
     struct xhci_ring *ring; /* what ring? */
-    uint32_t slot_id;
+    uint8_t slot_id;
     uint32_t ep_id;
 
     size_t num_trbs;
@@ -632,6 +650,7 @@ struct xhci_request {
     struct usb_request *urb;
     struct xhci_command *command;
 
+    struct xhci_trb *last_trb;
     uint64_t trb_phys;
     uint8_t port; /* What port is this for? Used to match
                    * requests on disconnect */

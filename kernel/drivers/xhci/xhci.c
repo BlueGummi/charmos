@@ -58,7 +58,7 @@ enum usb_status xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
     slot->hub = 0;
     slot->num_ports = 0;
 
-    xhci_port_info_for_port(ctrl, port)->ep_rings[0] = ring;
+    xhci_get_slot(ctrl, slot_id)->ep_rings[0] = ring;
 
     struct xhci_ep_ctx *ep0 = &input_ctx->ep_ctx[0];
     ep0->ep_type = XHCI_ENDPOINT_TYPE_CONTROL_BI;
@@ -148,7 +148,7 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
         ep_ctx->dequeue_ptr_raw = ring->phys | TRB_CYCLE_BIT;
         ep_ctx->ep_state = 1;
 
-        xhci_port_info_for_port(xhci, usb->port)->ep_rings[ep_index] = ring;
+        xhci_get_slot(xhci, usb->slot_id)->ep_rings[ep_index] = ring;
     }
 
     input_ctx->slot_ctx.context_entries = max_ep_index;
@@ -188,11 +188,11 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
     return true;
 }
 
-static void xhci_worker_cleanup_ports(struct xhci_device *dev) {
-    for (size_t i = 0; i < 32; i++) {
-        struct xhci_port_info *pinfo = &dev->port_info[i];
-        if (xhci_get_port_status(pinfo) == XHCI_PORT_DISCONNECTING)
-            xhci_port_info_put(pinfo);
+static void xhci_worker_cleanup_slots(struct xhci_device *dev) {
+    for (size_t i = 0; i < 255; i++) {
+        struct xhci_slot *s = &dev->slots[i];
+        if (xhci_get_slot_state(s) == XHCI_SLOT_STATE_DISCONNECTING)
+            xhci_slot_put(s);
     }
 }
 
@@ -239,7 +239,7 @@ static void xhci_worker(void *arg) {
         }
 
         xhci_worker_submit_waiting(dev);
-        xhci_worker_cleanup_ports(dev);
+        xhci_worker_cleanup_slots(dev);
         atomic_store(&dev->worker_waiting, true);
         semaphore_wait(&dev->sem);
     }
@@ -265,11 +265,11 @@ static struct xhci_request *xhci_lookup_trb(struct xhci_device *dev,
  *
  * whenever a port becomes disconnected, the following steps happen:
  *
- * 1. in the ISR, move all requests for that port into the finished requests
- *    list, and go through and mark all of the requests as having the status of
- *    DISCONNECTED
+ * 1. in the ISR, move all requests for that port's slot into the
+ *    finished requests list, and go through and mark all of the requests
+ *    as having the status of DISCONNECTED
  *
- * 2. mark the port as being DISCONNECTING (no one can grab refs, but the port
+ * 2. mark the slot as being DISCONNECTING (no one can grab refs, but the port
  *    is still there and nothing has been freed yet)
  *
  * 3. wake worker
@@ -280,18 +280,18 @@ static struct xhci_request *xhci_lookup_trb(struct xhci_device *dev,
  *  at this point, there is still the possibility of an outgoing request being
  *  sent. because this is the case, the ISR will ALWAYS do a final pass of the
  *  request list (after processing event TRBs) to find any of these "oddball
- *  requests" that are going to a port that no longer exists
+ *  requests" that are going to a slot that no longer exists
  *  -------------------------------------------------------------------------
  *
- * 4. in the worker thread, it will then check all ports (under the lock of the
- *    xhci device) to see if any ports have become DISCONNECTING. for each port
+ * 4. in the worker thread, it will then check all slots (under the lock of the
+ *    xhci device) to see if any slots have become DISCONNECTING. for each slot
  *    that is DISCONNECTING, it will first call into the usb_device to tell it
  *    to clean up (no more requests being sent out. usb_device itself will
  *    handle how this works internally. probably just dropping the initial ref
- *    is fine), and then drop the initial ref of the port.
+ *    is fine), and then drop the initial ref of the slot.
  *
  * 5. later on, as the xhci device generates interrupts, the list will be
- *    checked in the ISR for any requests that might have a port that doesnt
+ *    checked in the ISR for any requests that might have a slot that doesnt
  *    exist.
  *
  */
@@ -307,8 +307,12 @@ static void catch_stragglers_on_list(struct xhci_device *dev,
                                      enum xhci_request_status status) {
     struct xhci_request *req, *tmp;
     list_for_each_entry_safe(req, tmp, &dev->requests[status], list) {
-        if (req->port &&
-            dev->port_info[req->port - 1].status != XHCI_PORT_CONNECTED) {
+        uint8_t slot = req->command->slot_id;
+        struct xhci_slot *s = xhci_get_slot(dev, slot);
+        enum xhci_slot_state state = xhci_get_slot_state(s);
+        bool slot_here = state == XHCI_SLOT_STATE_ENABLED;
+
+        if (!slot_here) {
             xhci_request_list_del(req);
             req->status = XHCI_REQUEST_DISCONNECT;
             list_add_tail(&req->list, &dev->requests[XHCI_REQUEST_PROCESSED]);
@@ -345,16 +349,6 @@ static struct list_head xhci_lookup_by_port(struct xhci_device *dev,
     return got;
 }
 
-static struct usb_device *xhci_find_usb_device_on_port(struct xhci_device *dev,
-                                                       uint8_t port) {
-    for (size_t i = 0; i < dev->num_devices; i++) {
-        if (dev->devices[i]->port == port)
-            return dev->devices[i];
-    }
-
-    return NULL;
-}
-
 static void xhci_process_trb_into_request(struct xhci_request *request,
                                           struct xhci_trb *trb) {
     request->completion_code = TRB_CC(trb->status);
@@ -364,13 +358,27 @@ static void xhci_process_trb_into_request(struct xhci_request *request,
     request->return_parameter = trb->parameter;
 }
 
+static bool xhci_trb_slot_exists(struct xhci_device *dev, struct xhci_trb *trb,
+                                 struct xhci_request *request) {
+    struct xhci_trb *source = request->last_trb;
+    if (TRB_TYPE(source->control) == TRB_TYPE_ENABLE_SLOT)
+        return true;
+
+    return xhci_get_slot_state(xhci_get_slot(dev, TRB_SLOT(trb->control))) ==
+           XHCI_SLOT_STATE_ENABLED;
+}
+
 static void xhci_process_request(struct xhci_device *dev,
                                  struct xhci_trb *trb) {
     struct xhci_request *found = xhci_lookup_trb(dev, trb);
     if (!found) {
-        xhci_warn("No matching request for address 0x%lx\n", trb->parameter);
+        xhci_warn("No matching request for address 0x%lx", trb->parameter);
         return;
     }
+
+    if (!xhci_trb_slot_exists(dev, trb, found))
+        xhci_warn("Request seems to be going to non-enabled slot %u",
+                  TRB_SLOT(trb->control));
 
     xhci_request_list_del(found);
     xhci_process_trb_into_request(found, trb);
@@ -406,8 +414,12 @@ static void xhci_process_port_disconnect(struct xhci_device *dev,
                                          struct xhci_trb *trb) {
     uint64_t pm = mmio_read_64(&trb->parameter);
     uint8_t port_id = TRB_PORT(pm);
-    xhci_set_port_status(xhci_port_info_for_port(dev, port_id),
-                         XHCI_PORT_DISCONNECTING);
+
+    uint8_t slot_id = dev->port_info[port_id - 1].slot_id;
+    dev->port_info[port_id - 1].slot_id = 0;
+
+    xhci_set_slot_state(xhci_get_slot(dev, slot_id),
+                        XHCI_SLOT_STATE_DISCONNECTING);
 
     uint8_t cc = TRB_CC(mmio_read_32(&trb->status));
     /* We obtained the port number. Now it is our job to signal
@@ -427,13 +439,6 @@ static void xhci_process_port_disconnect(struct xhci_device *dev,
         xhci_request_list_del(iter);
         list_add(&iter->list, &dev->requests[XHCI_REQUEST_PROCESSED]);
     }
-
-    /* Now we give the USB device the signal */
-    struct usb_device *udev = xhci_find_usb_device_on_port(dev, port_id);
-    if (!udev)
-        xhci_warn("Bug? No matching device for port id %u", port_id);
-
-    udev->status = USB_DEV_DISCONNECTED;
 }
 
 static void xhci_process_port_status_change(struct xhci_device *dev,
@@ -578,7 +583,6 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
         uint32_t portsc = xhci_read_portsc(dev, port);
 
         if (portsc & PORTSC_CCS) {
-            refcount_init(&xhci_port_info_for_port(dev, port)->refcount, 1);
             xhci_reset_port(dev, port);
         }
     }
@@ -595,10 +599,15 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
                 continue;
             }
 
-            struct xhci_port_info *pinf = xhci_port_info_for_port(dev, port);
-            xhci_set_port_status(pinf, XHCI_PORT_CONNECTED);
-            pinf->speed = speed;
-            pinf->slot_id = slot_id;
+            xhci_get_slot(dev, slot_id)->state = XHCI_SLOT_STATE_ENABLED;
+            struct xhci_port *this_port = &dev->port_info[port - 1];
+            struct xhci_slot *this_slot = &dev->slots[slot_id - 1];
+
+            this_port->slot_id = slot_id;
+            this_slot->dev = dev;
+            this_slot->slot_id = slot_id;
+            this_slot->port_id = port;
+            refcount_init(&this_slot->refcount, 1);
 
             if (xhci_address_device(dev, slot_id, speed, port) != USB_OK) {
                 xhci_warn("Failed to address device for port %u\n", port);
@@ -615,6 +624,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
             usb->port = port;
             usb->configured = false;
             usb->host = ctrl;
+            this_slot->udev = usb;
             refcount_init(&usb->refcount, 1);
 
             size_t size = (dev->num_devices + 1) * sizeof(void *);

@@ -24,6 +24,7 @@ void xhci_emit_singular(struct xhci_command *cmd, struct xhci_ring *ring) {
 
     /* Track completion TRB */
     cmd->request->trb_phys = xhci_get_trb_phys(ring, dst);
+    cmd->request->last_trb = dst;
 }
 
 void xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd) {
@@ -56,10 +57,10 @@ void xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd) {
 enum usb_status xhci_submit_interrupt_transfer(struct usb_request *req) {
     struct usb_device *dev = req->dev;
     struct xhci_device *xhci = dev->host->driver_data;
-    struct xhci_port_info *pinfo = xhci_port_info_for_port(xhci, dev->port);
+    struct xhci_slot *slot = xhci_get_slot(xhci, dev->slot_id);
     enum usb_status ret = USB_OK;
 
-    if (!xhci_port_info_get(pinfo)) {
+    if (!xhci_slot_get(slot)) {
         ret = USB_ERR_NO_DEVICE;
         goto out;
     }
@@ -69,7 +70,7 @@ enum usb_status xhci_submit_interrupt_transfer(struct usb_request *req) {
     uint8_t slot_id = dev->slot_id;
     uint8_t ep_id = get_ep_index(ep);
 
-    struct xhci_ring *ring = xhci->port_info[dev->port - 1].ep_rings[ep_id];
+    struct xhci_ring *ring = slot->ep_rings[ep_id];
     if (!ring || !req->buffer || req->length == 0) {
         xhci_warn("Invalid parameters for interrupt transfer");
         ret = USB_ERR_INVALID_ARGUMENT;
@@ -120,7 +121,7 @@ enum usb_status xhci_submit_interrupt_transfer(struct usb_request *req) {
     xhci_send_command(xhci, cmd);
 
 out:
-    xhci_port_info_put(pinfo);
+    xhci_slot_put(slot);
     return ret;
 }
 
@@ -163,19 +164,19 @@ void xhci_emit_control(struct xhci_command *cmd, struct xhci_ring *ring) {
                    TRB_SET_CYCLE(ring->cycle);
 
     /* Completion on status stage */
+    cmd->request->last_trb = trb;
     cmd->request->trb_phys = xhci_get_trb_phys(ring, trb);
 }
 
 enum usb_status xhci_send_control_transfer(struct xhci_device *dev,
-                                           uint8_t slot_id,
-                                           struct xhci_port_info *pinfo,
+                                           struct xhci_slot *slot,
                                            struct usb_request *req) {
-    if (!xhci_port_info_get(pinfo))
+    if (!xhci_slot_get(slot))
         return USB_ERR_NO_DEVICE;
 
-    struct xhci_ring *ring = pinfo->ep_rings[0];
+    struct xhci_ring *ring = slot->ep_rings[0];
     if (!ring || !req->setup) {
-        xhci_port_info_put(pinfo);
+        xhci_slot_put(slot);
         return USB_ERR_INVALID_ARGUMENT;
     }
 
@@ -200,7 +201,7 @@ enum usb_status xhci_send_control_transfer(struct xhci_device *dev,
 
     *cmd = (struct xhci_command) {
         .ring = ring,
-        .slot_id = slot_id,
+        .slot_id = slot->slot_id,
         .ep_id = 1,
         .request = xreq,
         .private = emit,
@@ -209,19 +210,17 @@ enum usb_status xhci_send_control_transfer(struct xhci_device *dev,
     };
 
     xhci_send_command(dev, cmd);
-    xhci_port_info_put(pinfo);
+    xhci_slot_put(slot);
     return USB_OK;
 
 oom:
-    xhci_port_info_put(pinfo);
+    xhci_slot_put(slot);
     return USB_ERR_OOM;
 }
 
 enum usb_status xhci_control_transfer(struct usb_request *request) {
     struct xhci_device *xhci = request->dev->host->driver_data;
-    struct xhci_port_info *pinfo =
-        xhci_port_info_for_port(xhci, request->dev->port);
-    uint8_t slot_id = pinfo->slot_id;
+    struct xhci_slot *slot = xhci_get_slot(xhci, request->dev->slot_id);
 
-    return xhci_send_control_transfer(xhci, slot_id, pinfo, request);
+    return xhci_send_control_transfer(xhci, slot, request);
 }

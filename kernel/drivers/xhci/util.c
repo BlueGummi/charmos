@@ -107,8 +107,7 @@ struct xhci_ring *xhci_allocate_ring() {
 
     link->parameter = phys;
     link->status = 0;
-    link->control = TRB_SET_TYPE(TRB_TYPE_LINK) | TRB_TOGGLE_CYCLE_BIT |
-                    TRB_CH_BIT | (ring->cycle ? TRB_CYCLE_BIT : 0);
+    link->control = TRB_SET_TYPE(TRB_TYPE_LINK) | ring->cycle;
 
     return ring;
 }
@@ -130,12 +129,11 @@ void xhci_free_ring(struct xhci_ring *ring) {
     kfree(ring, FREE_PARAMS_DEFAULT);
 }
 
-void xhci_teardown_port(struct xhci_port_info *me) {
-    xhci_set_port_status(me, XHCI_PORT_DISCONNECTED);
+void xhci_teardown_slot(struct xhci_slot *me) {
+    xhci_set_slot_state(me, XHCI_SLOT_STATE_DISABLED);
     /* tear down the rings */
+    xhci_disable_slot(me->dev, me->slot_id);
     me->slot_id = 0;
-    me->usb3 = false;
-    me->speed = 0;
     for (size_t i = 0; i < 32; i++) {
         struct xhci_ring *ring = me->ep_rings[i];
         xhci_free_ring(ring);
