@@ -578,7 +578,7 @@ struct xhci_slot {
 };
 
 struct xhci_port {
-    uint8_t slot_id;
+    struct xhci_slot *slot;
     uint8_t speed;
     bool usb3;
 };
@@ -635,7 +635,7 @@ struct xhci_device {
 
 struct xhci_command {
     struct xhci_ring *ring; /* what ring? */
-    uint8_t slot_id;
+    struct xhci_slot *slot;
     uint32_t ep_id;
 
     size_t num_trbs;

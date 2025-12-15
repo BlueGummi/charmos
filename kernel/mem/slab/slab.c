@@ -1198,7 +1198,7 @@ void kfree(void *p, enum alloc_behavior behavior) {
         k_info("SLAB", K_WARN,
                "Likely incorrect arguments passed into `kfree`");
 
-    // memset(p, 0x67, ksize(p));
+    memset(p, 0x67, ksize(p));
     free(p, behavior);
 }
 

@@ -91,7 +91,7 @@ enum usb_status xhci_address_device(struct xhci_device *ctrl, uint8_t slot_id,
         .emit = xhci_emit_singular,
         .num_trbs = 1,
         .ep_id = 0,
-        .slot_id = 0,
+        .slot = NULL,
         .request = &request,
     };
 
@@ -121,6 +121,7 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
 
     input_ctx->ctrl_ctx.add_flags = 1;
     uint8_t max_ep_index = 0;
+    struct xhci_slot *xslot = usb->slot;
 
     for (size_t i = 0; i < usb->num_endpoints; i++) {
         struct usb_endpoint *ep = usb->endpoints[i];
@@ -148,14 +149,14 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
         ep_ctx->dequeue_ptr_raw = ring->phys | TRB_CYCLE_BIT;
         ep_ctx->ep_state = 1;
 
-        xhci_get_slot(xhci, usb->slot_id)->ep_rings[ep_index] = ring;
+        xslot->ep_rings[ep_index] = ring;
     }
 
     input_ctx->slot_ctx.context_entries = max_ep_index;
 
     uint32_t control = TRB_SET_TYPE(TRB_TYPE_CONFIGURE_ENDPOINT);
     control |= TRB_SET_CYCLE(xhci->cmd_ring->cycle);
-    control |= TRB_SET_SLOT_ID(usb->slot_id);
+    control |= TRB_SET_SLOT_ID(xslot->slot_id);
 
     struct xhci_request request;
     struct xhci_command cmd;
@@ -168,7 +169,7 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
     };
 
     cmd = (struct xhci_command) {
-        .slot_id = 0,
+        .slot = NULL,
         .ep_id = 0,
         .private = &outgoing,
         .emit = xhci_emit_singular,
@@ -181,7 +182,8 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
     kfree_aligned(input_ctx, FREE_PARAMS_DEFAULT);
 
     if (!xhci_request_ok(&request)) {
-        xhci_warn("Failed to configure endpoints for slot %u\n", usb->slot_id);
+        xhci_warn("Failed to configure endpoints for slot %u\n",
+                  xhci_usb_slot(usb)->slot_id);
         return false;
     }
 
@@ -308,7 +310,7 @@ static void catch_stragglers_on_list(struct xhci_device *dev,
                                      enum xhci_request_status status) {
     struct xhci_request *req, *tmp;
     list_for_each_entry_safe(req, tmp, &dev->requests[status], list) {
-        uint8_t slot = req->command->slot_id;
+        uint8_t slot = req->command->slot ? req->command->slot->slot_id : 0;
         struct xhci_slot *s = xhci_get_slot(dev, slot);
         enum xhci_slot_state state = xhci_get_slot_state(s);
         bool slot_here = state == XHCI_SLOT_STATE_ENABLED;
@@ -413,8 +415,7 @@ static void xhci_process_port_disconnect(struct xhci_device *dev,
     uint64_t pm = mmio_read_64(&trb->parameter);
     uint8_t port_id = TRB_PORT(pm);
 
-    uint8_t slot_id = dev->port_info[port_id - 1].slot_id;
-    dev->port_info[port_id - 1].slot_id = 0;
+    uint8_t slot_id = dev->port_info[port_id - 1].slot->slot_id;
 
     xhci_set_slot_state(xhci_get_slot(dev, slot_id),
                         XHCI_SLOT_STATE_DISCONNECTING);
@@ -602,7 +603,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
             struct xhci_port *this_port = &dev->port_info[port - 1];
             struct xhci_slot *this_slot = &dev->slots[slot_id - 1];
 
-            this_port->slot_id = slot_id;
+            this_port->slot = this_slot;
             this_slot->dev = dev;
             this_slot->slot_id = slot_id;
             this_slot->port_id = port;
@@ -619,7 +620,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
                 k_panic("No space for the USB device\n");
 
             usb->speed = speed;
-            usb->slot_id = slot_id;
+            usb->slot = this_slot;
             usb->port = port;
             usb->configured = false;
             usb->host = ctrl;

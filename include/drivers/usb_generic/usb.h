@@ -334,8 +334,8 @@ struct usb_device {
     char config_str[128];
     uint8_t address;
     uint8_t speed;
-    uint8_t port;    /* Port number on the root hub */
-    uint8_t slot_id; /* Used for xHCI */
+    uint8_t port; /* Port number on the root hub */
+    void *slot;
     uint8_t max_packet_size;
 
     struct usb_device_descriptor *descriptor;

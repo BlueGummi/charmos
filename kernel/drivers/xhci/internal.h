@@ -39,7 +39,7 @@ struct xhci_return xhci_wait_for_response(struct xhci_device *dev);
 struct xhci_return xhci_wait_for_transfer_event(struct xhci_device *dev,
                                                 uint8_t slot_id);
 uint8_t xhci_enable_slot(struct xhci_device *dev);
-void xhci_disable_slot(struct xhci_device *dev, uint8_t slot_id);
+void xhci_disable_slot(struct xhci_device *dev, struct xhci_slot *slot);
 void xhci_parse_ext_caps(struct xhci_device *dev);
 bool xhci_reset_port(struct xhci_device *dev, uint32_t port_index);
 void xhci_detect_usb3_ports(struct xhci_device *dev);
@@ -255,4 +255,8 @@ static inline struct xhci_trb *xhci_ring_next_trb(struct xhci_ring *ring) {
 
     xhci_advance_enqueue(ring);
     return trb;
+}
+
+static inline struct xhci_slot *xhci_usb_slot(struct usb_device *dev) {
+    return dev->slot;
 }

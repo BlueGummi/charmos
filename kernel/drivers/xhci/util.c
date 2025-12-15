@@ -132,7 +132,7 @@ void xhci_free_ring(struct xhci_ring *ring) {
 void xhci_teardown_slot(struct xhci_slot *me) {
     xhci_set_slot_state(me, XHCI_SLOT_STATE_DISABLED);
     /* tear down the rings */
-    xhci_disable_slot(me->dev, me->slot_id);
+    xhci_disable_slot(me->dev, me);
     me->slot_id = 0;
     for (size_t i = 0; i < 32; i++) {
         struct xhci_ring *ring = me->ep_rings[i];

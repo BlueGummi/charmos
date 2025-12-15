@@ -157,13 +157,14 @@ static void rw_chaos_worker(void *) {
             scheduler_yield();
     }
 
-    atomic_fetch_sub(&rw_chaos_left, 1);
+    k_printf("%u threads left\n", atomic_fetch_sub(&rw_chaos_left, 1) - 1);
 }
 
 TEST_REGISTER(rwlock_chaos, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
-
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     for (int i = 0; i < RWLOCK_CHAOS_THREADS; i++)
         thread_spawn("rch", rw_chaos_worker, NULL);
+    irql_lower(irql);
 
     while (atomic_load(&rw_chaos_left)) {
         thread_apply_cpu_penalty(scheduler_get_current_thread());

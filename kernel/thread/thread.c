@@ -115,10 +115,8 @@ void thread_entry_wrapper(void) {
     kassert(irql_get() < IRQL_HIGH_LEVEL);
 
     scheduler_drop_locks_after_switch_in();
-
-    irql_lower(IRQL_PASSIVE_LEVEL);
-
     scheduler_mark_self_in_resched(false);
+    irql_lower(IRQL_PASSIVE_LEVEL);
 
     kassert(entry);
     entry(arg);

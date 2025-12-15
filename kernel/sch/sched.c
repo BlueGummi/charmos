@@ -343,12 +343,27 @@ void scheduler_yield() {
     kassert(irql_get() != IRQL_DISPATCH_LEVEL);
     kassert(!scheduler_self_in_resched());
 
-    scheduler_mark_self_in_resched(true);
+    /* NOTE: the IRQL must be raised first to prevent a race where we
+     * can get swapped out while mark_self_in_resched occurs. 
+     *
+     * if we do not disable preemption, the following race is possible
+     *
+     * read smp_core();
+     * <<-- here -->>
+     * write `true` to smp_core()->in_resched;
+     *
+     * where we can get swapped if preemption is enabled.
+     *
+     * thus, this approach of "first raise IRQL outside of
+     * mark_self_in_resched" is taken
+     */
+
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
+    scheduler_mark_self_in_resched(true);
     schedule();
 
     scheduler_drop_locks_after_switch_in();
 
-    irql_lower(irql);
     scheduler_mark_self_in_resched(false);
+    irql_lower(irql);
 }

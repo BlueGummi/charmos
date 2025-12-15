@@ -48,7 +48,7 @@ void xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd) {
     cmd->request->status = XHCI_REQUEST_OUTGOING;
     list_add_tail(&cmd->request->list, &dev->requests[XHCI_REQUEST_OUTGOING]);
 
-    xhci_ring_doorbell(dev, cmd->slot_id, cmd->ep_id);
+    xhci_ring_doorbell(dev, cmd->slot ? cmd->slot->slot_id : 0, cmd->ep_id);
 
     spin_unlock(&dev->lock, irql);
 }
@@ -57,7 +57,7 @@ void xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd) {
 enum usb_status xhci_submit_interrupt_transfer(struct usb_request *req) {
     struct usb_device *dev = req->dev;
     struct xhci_device *xhci = dev->host->driver_data;
-    struct xhci_slot *slot = xhci_get_slot(xhci, dev->slot_id);
+    struct xhci_slot *slot = dev->slot;
     enum usb_status return_status = USB_OK;
 
     if (!xhci_slot_get(slot)) {
@@ -66,7 +66,7 @@ enum usb_status xhci_submit_interrupt_transfer(struct usb_request *req) {
 
     struct usb_endpoint *ep = req->ep;
 
-    uint8_t slot_id = dev->slot_id;
+    uint8_t slot_id = slot->slot_id;
     uint8_t ep_id = get_ep_index(ep);
 
     struct xhci_ring *ring = slot->ep_rings[ep_id];
@@ -111,7 +111,7 @@ enum usb_status xhci_submit_interrupt_transfer(struct usb_request *req) {
         .ring = ring,
         .private = &outgoing,
         .ep_id = ep_id,
-        .slot_id = slot_id,
+        .slot = slot,
         .request = xreq,
         .emit = xhci_emit_singular,
         .num_trbs = 1,
@@ -200,7 +200,7 @@ enum usb_status xhci_send_control_transfer(struct xhci_device *dev,
 
     *cmd = (struct xhci_command) {
         .ring = ring,
-        .slot_id = slot->slot_id,
+        .slot = slot,
         .ep_id = 1,
         .request = xreq,
         .private = emit,
@@ -219,7 +219,7 @@ oom:
 
 enum usb_status xhci_control_transfer(struct usb_request *request) {
     struct xhci_device *xhci = request->dev->host->driver_data;
-    struct xhci_slot *slot = xhci_get_slot(xhci, request->dev->slot_id);
+    struct xhci_slot *slot = request->dev->slot;
 
     return xhci_send_control_transfer(xhci, slot, request);
 }

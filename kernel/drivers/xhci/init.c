@@ -62,7 +62,7 @@ uint8_t xhci_enable_slot(struct xhci_device *dev) {
         .private = &outgoing,
         .emit = xhci_emit_singular,
         .ep_id = 0,
-        .slot_id = 0,
+        .slot = NULL,
         .ring = dev->cmd_ring,
         .request = &request,
         .num_trbs = 1,
@@ -73,14 +73,14 @@ uint8_t xhci_enable_slot(struct xhci_device *dev) {
     return TRB_SLOT(request.return_control);
 }
 
-void xhci_disable_slot(struct xhci_device *dev, uint8_t slot_id) {
+void xhci_disable_slot(struct xhci_device *dev, struct xhci_slot *slot) {
     struct xhci_request request;
     struct xhci_command cmd;
 
     xhci_request_init_blocking(&request, &cmd, /* port = */ 0);
 
     struct xhci_trb outgoing = {
-        .parameter = slot_id,
+        .parameter = slot->slot_id,
         .status = 0,
         .control = TRB_SET_TYPE(TRB_TYPE_DISABLE_SLOT) |
                    TRB_SET_CYCLE(dev->cmd_ring->cycle),
@@ -90,7 +90,7 @@ void xhci_disable_slot(struct xhci_device *dev, uint8_t slot_id) {
         .private = &outgoing,
         .emit = xhci_emit_singular,
         .ep_id = 0,
-        .slot_id = slot_id,
+        .slot = slot,
         .ring = dev->cmd_ring,
         .request = &request,
         .num_trbs = 1,
