@@ -55,8 +55,7 @@ void slab_domain_init_workqueue(struct slab_domain *domain) {
          * here since if those weren't set the dynamic memory allocation
          * could potentially spiral into bigger problems... */
         .flags = WORKQUEUE_FLAG_DEFAULTS | WORKQUEUE_FLAG_STATIC_WORKERS |
-                 WORKQUEUE_FLAG_SPAWN_VIA_REQUEST | WORKQUEUE_FLAG_NAMED |
-                 WORKQUEUE_FLAG_NO_WORKER_GC,
+                 WORKQUEUE_FLAG_NAMED | WORKQUEUE_FLAG_NO_WORKER_GC,
         .max_workers = domain->domain->num_cores,
         .min_workers = 1,
         .spawn_delay = WORKQUEUE_DEFAULT_SPAWN_DELAY,

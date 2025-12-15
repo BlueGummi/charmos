@@ -418,7 +418,6 @@ struct thread *thread_create_custom_stack(char *name,
 void thread_free(struct thread *t);
 
 void thread_init_thread_ids(void);
-void thread_init_rq_lists(void);
 void thread_sleep_for_ms(uint64_t ms);
 void thread_exit(void);
 void thread_print(const struct thread *t);

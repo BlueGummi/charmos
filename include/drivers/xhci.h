@@ -6,6 +6,7 @@
 #include <structures/list.h>
 #include <structures/locked_list.h>
 #include <sync/semaphore.h>
+#include <thread/defer.h>
 struct usb_controller;
 struct usb_packet;
 struct xhci_request;
@@ -630,6 +631,7 @@ struct xhci_device {
     struct usb_device **devices;
     struct spinlock lock;
     struct semaphore sem;
+    struct work slot_disconnect_work;
     atomic_bool worker_waiting;
 };
 

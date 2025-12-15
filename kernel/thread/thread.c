@@ -12,7 +12,6 @@
 #include <sync/turnstile.h>
 #include <thread/defer.h>
 #include <thread/reaper.h>
-#include <thread/request.h>
 #include <thread/thread.h>
 #include <thread/tid.h>
 
@@ -26,7 +25,6 @@ SLAB_SIZE_REGISTER(thread, sizeof(struct thread));
 /* lol */
 static struct tid_space *global_tid_space = NULL;
 static struct vas_space *stacks_space = NULL;
-static struct thread_request_list *rq_lists = NULL;
 struct locked_list thread_list;
 
 void thread_init_thread_ids(void) {
@@ -34,55 +32,6 @@ void thread_init_thread_ids(void) {
         vas_space_init(THREAD_STACKS_HEAP_START, THREAD_STACKS_HEAP_END);
     global_tid_space = tid_space_init(UINT64_MAX);
     locked_list_init(&thread_list);
-}
-
-void thread_init_rq_lists(void) {
-    rq_lists = kzalloc(sizeof(struct thread_request_list) * global.domain_count,
-                       ALLOC_PARAMS_DEFAULT);
-
-    if (!rq_lists)
-        k_panic("Thread request list init allocation failed\n");
-
-    for (size_t i = 0; i < global.domain_count; i++) {
-        locked_list_init(&rq_lists[i].lists[0]);
-        locked_list_init(&rq_lists[i].lists[1]);
-    }
-}
-
-struct thread_request *thread_request_init(struct thread_request *request) {
-    INIT_LIST_HEAD(&request->list_node);
-    request->state = THREAD_REQUEST_FULFILLED; /* Mark it fulfilled so that
-                                                * no one accidentally thinks
-                                                * that this request is outgoing
-                                                * or something funny */
-    return request;
-}
-
-void thread_request_enqueue(struct thread_request *request) {
-    /* Already outbound */
-    if (THREAD_REQUEST_STATE(request) == THREAD_REQUEST_PENDING)
-        return;
-
-    struct thread_request_list *rq_list = &rq_lists[domain_local_id()];
-    locked_list_add(&rq_list->lists[request->prio], &request->list_node);
-
-    atomic_store(&request->parent_internal, rq_list);
-    atomic_store(&request->state, THREAD_REQUEST_PENDING);
-}
-
-struct thread_request *thread_request_pop(struct thread_request_list *rq_list) {
-    struct list_head *lh =
-        locked_list_pop_front(&rq_list->lists[THREAD_REQUEST_PRIORITY_HIGH]);
-
-    if (lh)
-        return thread_request_from_list_node(lh);
-
-    lh = locked_list_pop_front(&rq_list->lists[THREAD_REQUEST_PRIORITY_LOW]);
-
-    if (lh)
-        return thread_request_from_list_node(lh);
-
-    return NULL;
 }
 
 void thread_exit() {
@@ -292,43 +241,6 @@ err:
     return NULL;
 }
 
-bool thread_request_cancel(struct thread_request *rq) {
-    /* Ok... there are races possible here so we must be wary.
-     * First we want to just load the parent of the thread request.
-     * If there is no parent, we ditch this.
-     *
-     * Afterwards, we lock the parent list. This prevents our
-     * request from being touched because that lock must be
-     * acquired for the dequeue of the request (pop).
-     *
-     * Then, we xchg the state of the request. If we see that it is
-     * either fulfilled or already cancelled, we go and exit.
-     *
-     * Otherwise, it must be in the list, and we now guarantee
-     * that we have authority over the request (no one could possibly
-     * touch our request). Now, we can dequeue it, mark it cancelled,
-     * and detach the parent list from the request, and succeed.
-     */
-
-    struct thread_request_list *list;
-    if (!(list = atomic_load(&rq->parent_internal)))
-        return false;
-
-    struct locked_list *ll = &list->lists[rq->prio];
-    enum irql irql = locked_list_lock(ll);
-
-    if (atomic_exchange(&rq->state, THREAD_REQUEST_CANCELLED) !=
-        THREAD_REQUEST_PENDING) {
-        locked_list_unlock(ll, irql);
-        return false;
-    }
-
-    locked_list_del_locked(ll, &rq->list_node);
-
-    locked_list_unlock(ll, irql);
-    return true;
-}
-
 struct thread *thread_create(char *name, void (*entry_point)(void *), void *arg,
                              ...) {
     va_list args;
@@ -351,27 +263,6 @@ struct thread *thread_create_custom_stack(char *name,
 }
 
 void thread_free(struct thread *t) {
-    if (t->stack_size >= THREAD_STACK_SIZE) {
-        struct thread_request *request =
-            thread_request_pop(&rq_lists[t->owner_domain]);
-        if (request) {
-            atomic_store(&request->parent_internal, NULL);
-            if (atomic_exchange(&request->state, THREAD_REQUEST_FULFILLED) ==
-                THREAD_REQUEST_PENDING) {
-                thread_init(t, request->thread_entry, request->arg, t->stack,
-                            t->stack_size);
-                enum thread_request_decision d =
-                    request->callback(t, request->data);
-                if (d == THREAD_REQUEST_DECISION_DESTROY)
-                    goto destroy;
-            }
-
-            return;
-        }
-    }
-
-destroy:
-
     tid_free(global_tid_space, t->id);
     kfree(t->activity_data, FREE_PARAMS_DEFAULT);
     kfree(t->activity_stats, FREE_PARAMS_DEFAULT);

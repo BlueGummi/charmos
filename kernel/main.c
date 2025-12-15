@@ -101,8 +101,6 @@ __no_sanitize_address void k_main(void) {
     perdomain_obj_init();
     bootstage_advance(BOOTSTAGE_MID_TOPOLOGY);
 
-    thread_init_rq_lists();
-
     pmm_late_init();
     slab_domain_init();
     movealloc_exec_all();

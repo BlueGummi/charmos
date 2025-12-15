@@ -69,7 +69,7 @@ static void workqueue_enqueue_thread(struct workqueue *queue,
 
 struct worker *workqueue_worker_create(struct workqueue *queue) {
     if (queue->attrs.flags & WORKQUEUE_FLAG_STATIC_WORKERS) {
-        enum irql irql = spin_lock(&queue->worker_array_lock);
+        enum irql irql = spin_lock_irq_disable(&queue->worker_array_lock);
         struct worker *ret = NULL;
         for (size_t i = 0; i < queue->attrs.max_workers; i++) {
             if (queue->worker_array[i].thread == NULL) {
@@ -95,41 +95,8 @@ static void workqueue_init_new_worker(struct workqueue *queue, struct worker *w,
     workqueue_enqueue_thread(queue, t);
 }
 
-enum thread_request_decision workqueue_request_callback(struct thread *t,
-                                                        void *data) {
-    struct workqueue *queue = data;
-    struct worker *worker = workqueue_worker_create(queue);
-    if (!worker) {
-        workqueue_put(queue);
-        return THREAD_REQUEST_DECISION_DESTROY; /* whatever... we can't
-                                                 * make this thread anyways */
-    }
-
-    /* splendid, let's enqueue it */
-    workqueue_init_new_worker(queue, worker, t);
-    workqueue_put(queue);
-    return THREAD_REQUEST_DECISION_KEEP;
-}
-
-void workqueue_spawn_via_request(struct workqueue *queue) {
-    kassert(queue->attrs.flags & WORKQUEUE_FLAG_SPAWN_VIA_REQUEST);
-    if (!claim_spawner(queue))
-        return;
-
-    /* We just submit our request, and in the callback see if we
-     * still need a new thread */
-    if (THREAD_REQUEST_STATE(queue->request) == THREAD_REQUEST_PENDING)
-        return;
-
-    workqueue_get(queue);
-    thread_request_enqueue(queue->request);
-
-    release_spawner(queue);
-}
-
 /* This is only for non-request based worker thread spawning */
 bool workqueue_spawn_worker_internal(struct workqueue *queue) {
-    kassert(!(queue->attrs.flags & WORKQUEUE_FLAG_SPAWN_VIA_REQUEST));
     if (!claim_spawner(queue))
         return false;
 

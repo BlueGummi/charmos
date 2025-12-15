@@ -190,13 +190,10 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
     return true;
 }
 
-static void xhci_worker_cleanup_slots(struct xhci_device *dev) {
-    for (size_t i = 0; i < 255; i++) {
-        struct xhci_slot *s = &dev->slots[i];
-        if (xhci_get_slot_state(s) == XHCI_SLOT_STATE_DISCONNECTING) {
-            xhci_slot_put(s);
-        }
-    }
+static void xhci_work_destroy_slot(void *arg1, void *arg2) {
+    (void) arg2;
+    struct xhci_slot *s = arg1;
+    xhci_slot_put(s);
 }
 
 static struct xhci_request *
@@ -242,26 +239,9 @@ static void xhci_worker(void *arg) {
         }
 
         xhci_worker_submit_waiting(dev);
-        xhci_worker_cleanup_slots(dev);
         atomic_store(&dev->worker_waiting, true);
         semaphore_wait(&dev->sem);
     }
-}
-
-static struct xhci_request *xhci_lookup_trb(struct xhci_device *dev,
-                                            struct xhci_trb *trb) {
-    paddr_t phys = trb->parameter;
-
-    struct xhci_request *req, *tmp, *found = NULL;
-    list_for_each_entry_safe(req, tmp, &dev->requests[XHCI_REQUEST_OUTGOING],
-                             list) {
-        if (req->trb_phys == phys) {
-            found = req;
-            break;
-        }
-    }
-
-    return found;
 }
 
 /*
@@ -298,6 +278,22 @@ static struct xhci_request *xhci_lookup_trb(struct xhci_device *dev,
  *    exist.
  *
  */
+
+static struct xhci_request *xhci_lookup_trb(struct xhci_device *dev,
+                                            struct xhci_trb *trb) {
+    paddr_t phys = trb->parameter;
+
+    struct xhci_request *req, *tmp, *found = NULL;
+    list_for_each_entry_safe(req, tmp, &dev->requests[XHCI_REQUEST_OUTGOING],
+                             list) {
+        if (req->trb_phys == phys) {
+            found = req;
+            break;
+        }
+    }
+
+    return found;
+}
 
 static void xhci_request_list_del(struct xhci_request *req) {
     if (req->status == XHCI_REQUEST_OUTGOING)
@@ -417,8 +413,8 @@ static void xhci_process_port_disconnect(struct xhci_device *dev,
 
     uint8_t slot_id = dev->port_info[port_id - 1].slot->slot_id;
 
-    xhci_set_slot_state(xhci_get_slot(dev, slot_id),
-                        XHCI_SLOT_STATE_DISCONNECTING);
+    struct xhci_slot *s = xhci_get_slot(dev, slot_id);
+    xhci_set_slot_state(s, XHCI_SLOT_STATE_DISCONNECTING);
 
     uint8_t cc = TRB_CC(mmio_read_32(&trb->status));
     /* We obtained the port number. Now it is our job to signal
@@ -439,6 +435,10 @@ static void xhci_process_port_disconnect(struct xhci_device *dev,
         list_del_init(&iter->list);
         list_add(&iter->list, &dev->requests[XHCI_REQUEST_PROCESSED]);
     }
+
+    work_init(&dev->slot_disconnect_work, xhci_work_destroy_slot,
+              WORK_ARGS(s, NULL));
+    workqueue_enqueue(xhci_wq, &dev->slot_disconnect_work);
 }
 
 static void xhci_process_port_status_change(struct xhci_device *dev,

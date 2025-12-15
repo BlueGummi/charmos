@@ -54,7 +54,7 @@ static void worker_reset(struct worker *worker) {
 
 static void worker_destroy(struct workqueue *queue, struct worker *worker) {
     if (queue->attrs.flags & WORKQUEUE_FLAG_STATIC_WORKERS) {
-        enum irql irql = spin_lock(&queue->worker_array_lock);
+        enum irql irql = spin_lock_irq_disable(&queue->worker_array_lock);
 
         bool found = false;
 
@@ -89,7 +89,7 @@ static void worker_exit(struct workqueue *queue, struct worker *worker,
     workqueue_remove_worker(queue, worker);
     atomic_fetch_sub(&queue->num_workers, 1);
 
-    workqueue_unlock(queue, irql);
+    spin_unlock(&queue->lock, irql);
 
     worker_destroy(queue, worker);
 
@@ -140,6 +140,6 @@ void worker_main(void *unused) {
                 worker_exit(queue, w, irql);
         }
 
-        workqueue_unlock(queue, irql);
+        spin_unlock(&queue->lock, irql);
     }
 }

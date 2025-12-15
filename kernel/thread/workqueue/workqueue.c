@@ -104,7 +104,9 @@ struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
         k_panic("please set a CPU mask before creating the workqueue\n");
 
     wq->attrs = *attrs;
-    condvar_init(&wq->queue_cv, CONDVAR_INIT_NORMAL);
+    condvar_init(&wq->queue_cv, attrs->flags & WORKQUEUE_FLAG_ISR_SAFE
+                                    ? CONDVAR_INIT_IRQ_DISABLE
+                                    : CONDVAR_INIT_NORMAL);
     kassert(THREAD_NICENESS_VALID(attrs->worker_niceness));
 
     size = sizeof(struct work) * attrs->capacity;
@@ -114,19 +116,6 @@ struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
     wq->oneshot_works = kzalloc(size, ALLOC_PARAMS_DEFAULT);
     if (!wq->oneshot_works)
         goto err;
-
-    if (attrs->flags & WORKQUEUE_FLAG_SPAWN_VIA_REQUEST) {
-        wq->request =
-            kzalloc(sizeof(struct thread_request), ALLOC_PARAMS_DEFAULT);
-        if (!wq->request)
-            goto err;
-
-        struct thread_request *req = wq->request;
-        thread_request_init(req);
-        req->thread_entry = worker_main;
-        req->data = wq;
-        req->callback = workqueue_request_callback;
-    }
 
     if (attrs->flags & WORKQUEUE_FLAG_STATIC_WORKERS) {
         wq->worker_array = kzalloc(sizeof(struct worker) * attrs->max_workers,
@@ -222,16 +211,6 @@ void workqueue_destroy(struct workqueue *queue) {
 
     WORKQUEUE_STATE_SET(queue, WORKQUEUE_STATE_DESTROYING);
     atomic_store(&queue->ignore_timeouts, true);
-
-    if (queue->attrs.flags & WORKQUEUE_FLAG_SPAWN_VIA_REQUEST) {
-        /* We successfully cancelled an outgoing request
-         * which would've incremented the reference count,
-         * so we decrement it here. Otherwise, the outgoing
-         * request is happening and we will just wait
-         * for it to eventually come back and dec the rc */
-        if (thread_request_cancel(queue->request))
-            workqueue_put(queue);
-    }
 
     thread_apply_cpu_penalty(scheduler_get_current_thread());
     while (workqueue_workers(queue) > workqueue_idlers(queue)) {

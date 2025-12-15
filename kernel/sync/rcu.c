@@ -3,6 +3,7 @@
 #include <smp/core.h>
 #include <smp/percpu.h>
 #include <stdatomic.h>
+#include <structures/locked_list.h>
 #include <sync/rcu.h>
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
