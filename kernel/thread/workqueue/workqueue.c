@@ -104,6 +104,7 @@ struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
         k_panic("please set a CPU mask before creating the workqueue\n");
 
     wq->attrs = *attrs;
+    condvar_init(&wq->queue_cv, CONDVAR_INIT_NORMAL);
     kassert(THREAD_NICENESS_VALID(attrs->worker_niceness));
 
     size = sizeof(struct work) * attrs->capacity;
@@ -151,7 +152,6 @@ struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
         va_end(args_copy);
     }
 
-    condvar_init(&wq->queue_cv, CONDVAR_INIT_NORMAL);
     INIT_LIST_HEAD(&wq->workers);
     INIT_LIST_HEAD(&wq->works);
 

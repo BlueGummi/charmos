@@ -122,9 +122,6 @@ static inline void update_min_steal_diff(void) {
 
 static inline void save_thread(struct scheduler *sched, struct thread *curr,
                                time_t time) {
-    if (curr && thread_get_state(curr) != THREAD_STATE_IDLE_THREAD)
-        save_context(&curr->regs);
-
     update_min_steal_diff();
 
     /* Only save a running thread that exists */
@@ -264,9 +261,26 @@ static inline void context_switch(struct scheduler *sched, struct thread *curr,
     if (unlikely(curr && thread_get_state(curr) == THREAD_STATE_ZOMBIE))
         thread_put(curr);
 
+    sched->switched_out = curr;
     scheduler_unlock(sched, irql);
 
-    load_context(&next->regs);
+    if (curr == next)
+        return;
+
+    /* TODO: fix this, janky strange way to protect thread states */
+    if (curr && curr->state != THREAD_STATE_IDLE_THREAD) {
+        if (curr < next) {
+            spin_lock_raw(&curr->ctx_lock);
+            spin_lock_raw(&next->ctx_lock);
+        } else {
+            spin_lock_raw(&next->ctx_lock);
+            spin_lock_raw(&curr->ctx_lock);
+        }
+        switch_context(&curr->regs, &next->regs);
+    } else {
+        spin_lock_raw(&next->ctx_lock);
+        load_context(&next->regs);
+    }
 }
 
 void schedule(void) {
@@ -303,6 +317,23 @@ void schedule(void) {
     context_switch(sched, curr, next, irql);
 }
 
+void scheduler_drop_locks_after_switch_in() {
+    struct thread *switched_out = smp_core_scheduler()->switched_out;
+    struct thread *curr = scheduler_get_current_thread();
+
+    if (switched_out && switched_out != curr) {
+        if (switched_out < curr) {
+            spin_unlock_raw(&curr->ctx_lock);
+            spin_unlock_raw(&switched_out->ctx_lock);
+        } else {
+            spin_unlock_raw(&switched_out->ctx_lock);
+            spin_unlock_raw(&curr->ctx_lock);
+        }
+    } else {
+        spin_unlock_raw(&curr->ctx_lock);
+    }
+}
+
 void scheduler_yield() {
     /* NOTE: we use this assertion here to also protect against someone
      * calling this routine whilst a spinlock is held. spinlocks will
@@ -315,6 +346,8 @@ void scheduler_yield() {
     scheduler_mark_self_in_resched(true);
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     schedule();
+
+    scheduler_drop_locks_after_switch_in();
 
     irql_lower(irql);
     scheduler_mark_self_in_resched(false);

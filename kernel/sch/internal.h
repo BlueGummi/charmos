@@ -160,3 +160,4 @@ SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(scheduler, lock);
 /* Internal use only */
 void thread_wake_locked(struct thread *t, enum thread_wake_reason r,
                         void *wake_src);
+void scheduler_drop_locks_after_switch_in();

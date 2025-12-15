@@ -90,7 +90,7 @@ define_flag_group(
     "${TEST_NIGHTMARE_FLAGS}"
 )
 
-set(KERNEL_COMMON_FLAGS "-O3 -pipe -Wall -Wextra -Wpointer-sign -fno-optimize-sibling-calls -Wenum-compare -ffreestanding -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -mno-red-zone -fno-stack-protector -fno-omit-frame-pointer -fno-stack-check -fno-PIC -ffunction-sections -fdata-sections  -m64 -mcmodel=kernel -fstack-usage -mgeneral-regs-only -DLIMINE_API_REVISION=2 -Wno-address-of-packed-member -Wno-unused-command-line-argument -ggdb")
+set(KERNEL_COMMON_FLAGS "-O3 -pipe -Wall -Wextra -Wpointer-sign -fno-optimize-sibling-calls -Wenum-compare -ffreestanding -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -mno-red-zone -fno-stack-protector -fno-omit-frame-pointer -fno-stack-check -fno-PIC -ffunction-sections -fdata-sections  -m64 -mcmodel=kernel -mgeneral-regs-only -DLIMINE_API_REVISION=2 -Wno-address-of-packed-member -Wno-unused-command-line-argument -ggdb")
 
 set(CMAKE_C_FLAGS "${KERNEL_COMMON_FLAGS} -std=gnu11")
 
@@ -164,7 +164,7 @@ set(QEMU_COMMON_FLAGS
     -monitor telnet:127.0.0.1:5555,server,nowait
 
     -device qemu-xhci,id=xhci
-    -device usb-kbd,bus=xhci.0,port=1
+    -device usb-kbd,bus=xhci.0,port=1,id=usbkbd
     -device usb-mouse,bus=xhci.0,port=2,id=usbmouse
 
     -M q35

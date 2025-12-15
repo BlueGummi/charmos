@@ -16,6 +16,8 @@
 #include <thread/thread.h>
 #include <thread/tid.h>
 
+#include "sch/internal.h"
+
 SLAB_SIZE_REGISTER(thread, sizeof(struct thread));
 
 #define THREAD_STACKS_HEAP_START 0xFFFFF10000000000ULL
@@ -112,6 +114,8 @@ void thread_entry_wrapper(void) {
 
     kassert(irql_get() < IRQL_HIGH_LEVEL);
 
+    scheduler_drop_locks_after_switch_in();
+
     irql_lower(IRQL_PASSIVE_LEVEL);
 
     scheduler_mark_self_in_resched(false);
@@ -200,6 +204,7 @@ static struct thread *thread_init(struct thread *thread,
     thread->wait_type = THREAD_WAIT_NONE;
     thread->recent_event = APC_EVENT_NONE;
     thread->activity_class = THREAD_ACTIVITY_CLASS_UNKNOWN;
+    spinlock_init(&thread->ctx_lock);
     spinlock_init(&thread->lock);
     spinlock_init(&thread->being_moved);
     pairing_node_init(&thread->wq_pairing_node);

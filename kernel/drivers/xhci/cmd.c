@@ -58,11 +58,10 @@ enum usb_status xhci_submit_interrupt_transfer(struct usb_request *req) {
     struct usb_device *dev = req->dev;
     struct xhci_device *xhci = dev->host->driver_data;
     struct xhci_slot *slot = xhci_get_slot(xhci, dev->slot_id);
-    enum usb_status ret = USB_OK;
+    enum usb_status return_status = USB_OK;
 
     if (!xhci_slot_get(slot)) {
-        ret = USB_ERR_NO_DEVICE;
-        goto out;
+        return USB_ERR_NO_DEVICE;
     }
 
     struct usb_endpoint *ep = req->ep;
@@ -73,7 +72,7 @@ enum usb_status xhci_submit_interrupt_transfer(struct usb_request *req) {
     struct xhci_ring *ring = slot->ep_rings[ep_id];
     if (!ring || !req->buffer || req->length == 0) {
         xhci_warn("Invalid parameters for interrupt transfer");
-        ret = USB_ERR_INVALID_ARGUMENT;
+        return_status = USB_ERR_INVALID_ARGUMENT;
         goto out;
     }
 
@@ -88,7 +87,7 @@ enum usb_status xhci_submit_interrupt_transfer(struct usb_request *req) {
     struct xhci_request *xreq =
         kzalloc(sizeof(struct xhci_request), ALLOC_PARAMS_DEFAULT);
     if (!xreq) {
-        ret = USB_ERR_OOM;
+        return_status = USB_ERR_OOM;
         goto out;
     }
 
@@ -96,7 +95,7 @@ enum usb_status xhci_submit_interrupt_transfer(struct usb_request *req) {
         kzalloc(sizeof(struct xhci_command), ALLOC_PARAMS_DEFAULT);
 
     if (!cmd) {
-        ret = USB_ERR_OOM;
+        return_status = USB_ERR_OOM;
         goto out;
     }
 
@@ -122,7 +121,7 @@ enum usb_status xhci_submit_interrupt_transfer(struct usb_request *req) {
 
 out:
     xhci_slot_put(slot);
-    return ret;
+    return return_status;
 }
 
 struct xhci_ctrl_emit {

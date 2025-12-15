@@ -164,7 +164,7 @@ static void usb_kbd_worker(void *arg) {
         enum usb_status ret = usb_transfer_sync(
             kbd->dev->host->ops.submit_interrupt_transfer, &kbd->req);
         if (ret != USB_OK)
-            continue;
+            break;
 
         usb_kbd_process_report(kbd, &kbd->cur);
         kbd->last = kbd->cur;

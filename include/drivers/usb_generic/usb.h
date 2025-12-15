@@ -358,6 +358,7 @@ struct usb_device {
     atomic_bool alive;
 
     /* only called at the VERY last rc drop */
+    void (*teardown)(struct usb_device *dev);
     void (*free)(struct usb_device *dev);
 };
 REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(usb_device, refcount, alive,

@@ -131,10 +131,10 @@ void k_sch_main(void *nop) {
     smp_enable_all_ticks();
 
     rcu_init();
+    workqueues_permanent_init();
     defer_init();
     slab_domain_init_late();
     domain_buddies_init_late();
-    workqueues_permanent_init();
     reaper_init();
 
     registry_setup();

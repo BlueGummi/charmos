@@ -79,6 +79,7 @@ struct scheduler {
     /* Idle thread data */
     struct thread *idle_thread;
     struct idle_thread_data idle_thread_data;
+    struct thread *switched_out;
 };
 
 void scheduler_init();

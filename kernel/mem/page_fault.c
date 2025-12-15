@@ -48,7 +48,8 @@ enum irq_result page_fault_handler(void *context, uint8_t vector,
 
     if (!(error_code & 0x04)) {
         spin_unlock_raw(&pf_lock);
-        k_panic("KERNEL PAGE FAULT ON CORE %llu\n", smp_core_id());
+        k_panic("KERNEL PAGE FAULT ON CORE %llu under thread %s\n",
+                smp_core_id(), scheduler_get_current_thread()->name);
         while (true) {
             disable_interrupts();
             wait_for_interrupt();

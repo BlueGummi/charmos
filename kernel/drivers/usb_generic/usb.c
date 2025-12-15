@@ -13,12 +13,13 @@ enum usb_status usb_transfer_sync(enum usb_status (*fn)(struct usb_request *),
     struct thread *curr = scheduler_get_current_thread();
     request->complete = usb_wake_waiter;
     request->context = curr;
+
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
-    enum usb_status ret;
     thread_block(curr, THREAD_BLOCK_REASON_IO, THREAD_WAIT_UNINTERRUPTIBLE,
                  request->dev);
 
-    if ((ret = fn(request)) != USB_OK) {
+    enum usb_status ret = fn(request);
+    if (ret != USB_OK) {
         thread_wake(curr, THREAD_WAKE_REASON_BLOCKING_MANUAL, request->dev);
         irql_lower(irql);
         return ret;

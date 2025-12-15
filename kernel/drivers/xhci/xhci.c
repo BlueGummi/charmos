@@ -191,8 +191,9 @@ bool xhci_configure_device_endpoints(struct xhci_device *xhci,
 static void xhci_worker_cleanup_slots(struct xhci_device *dev) {
     for (size_t i = 0; i < 255; i++) {
         struct xhci_slot *s = &dev->slots[i];
-        if (xhci_get_slot_state(s) == XHCI_SLOT_STATE_DISCONNECTING)
+        if (xhci_get_slot_state(s) == XHCI_SLOT_STATE_DISCONNECTING) {
             xhci_slot_put(s);
+        }
     }
 }
 
@@ -339,14 +340,11 @@ static void xhci_add_matches_to_list(struct list_head *from,
 }
 
 /* Find all OUTGOING requests with a matching port, returning them on a list */
-static struct list_head xhci_lookup_by_port(struct xhci_device *dev,
-                                            uint8_t port) {
-    struct list_head got;
-    INIT_LIST_HEAD(&got);
-    xhci_add_matches_to_list(&dev->requests[XHCI_REQUEST_OUTGOING], &got, port);
-    xhci_add_matches_to_list(&dev->requests[XHCI_REQUEST_WAITING], &got, port);
-
-    return got;
+static void xhci_lookup_by_port(struct xhci_device *dev, uint8_t port,
+                                struct list_head *out) {
+    INIT_LIST_HEAD(out);
+    xhci_add_matches_to_list(&dev->requests[XHCI_REQUEST_OUTGOING], out, port);
+    xhci_add_matches_to_list(&dev->requests[XHCI_REQUEST_WAITING], out, port);
 }
 
 static void xhci_process_trb_into_request(struct xhci_request *request,
@@ -425,7 +423,8 @@ static void xhci_process_port_disconnect(struct xhci_device *dev,
     /* We obtained the port number. Now it is our job to signal
      * all `struct xhci_request`s with matching port numbers
      * and give them the PORT_DISCONNECT status */
-    struct list_head matching = xhci_lookup_by_port(dev, port_id);
+    struct list_head matching;
+    xhci_lookup_by_port(dev, port_id, &matching);
 
     struct xhci_request *iter, *n;
     list_for_each_entry(iter, &matching, list) {
@@ -436,7 +435,7 @@ static void xhci_process_port_disconnect(struct xhci_device *dev,
 
     /* send them over to the completion list */
     list_for_each_entry_safe(iter, n, &matching, list) {
-        xhci_request_list_del(iter);
+        list_del_init(&iter->list);
         list_add(&iter->list, &dev->requests[XHCI_REQUEST_PROCESSED]);
     }
 }

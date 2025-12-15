@@ -361,8 +361,8 @@ struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
 
     current_thread->turnstile = NULL;
 
-    /* turnstile_propagate_boost(chain, ts, current_thread->weight,
-                              current_thread->perceived_prio_class); */
+    turnstile_propagate_boost(chain, ts, current_thread->weight,
+                              current_thread->perceived_prio_class);
 
     ts->waiters++;
 
