@@ -16,7 +16,7 @@
 #include <thread/thread.h>
 #include <thread/tid.h>
 
-REGISTER_SLAB_SIZE(thread, sizeof(struct thread));
+SLAB_SIZE_REGISTER(thread, sizeof(struct thread));
 
 #define THREAD_STACKS_HEAP_START 0xFFFFF10000000000ULL
 #define THREAD_STACKS_HEAP_END 0xFFFFF20000000000ULL

@@ -67,7 +67,7 @@ static void rcu_writer_thread(void *) {
               old);
 }
 
-REGISTER_TEST(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct rcu_test_data *initial =
         kmalloc(sizeof(*initial), ALLOC_PARAMS_DEFAULT);
     initial->value = 42;
@@ -232,7 +232,7 @@ static void rcu_stress_reclaimer(void *arg) {
 }
 
 /* Test registration */
-REGISTER_TEST(rcu_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(rcu_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     /* initial object */
     struct rcu_stress_node *initial =
         kmalloc(sizeof(*initial), ALLOC_PARAMS_DEFAULT);

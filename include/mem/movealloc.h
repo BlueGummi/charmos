@@ -30,7 +30,7 @@ struct movealloc_callback_chain {
 #define movealloc_callback_node_from_list_node(ln)                             \
     (container_of(ln, struct movealloc_callback_node, list))
 
-#define REGISTER_MOVEALLOC_CALLBACK(name, callback, a, b)                      \
+#define MOVEALLOC_REGISTER_CALL(name, callback, a, b)                      \
     static struct movealloc_callback_node movealloc_##name                     \
         __attribute__((section(".kernel_movealloc_callbacks"), used)) = {      \
             callback, a, b, .list = {0}};

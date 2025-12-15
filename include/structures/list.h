@@ -120,6 +120,11 @@ static inline void list_splice_tail_init(struct list_head *list,
     for (pos = (head)->next, n = pos->next; pos != (head);                     \
          pos = n, n = pos->next)
 
+#define list_for_each_entry(pos, head, member)                                 \
+    for (pos = list_entry((head)->next, typeof(*pos), member);                 \
+         &pos->member != (head);                                               \
+         pos = list_entry(pos->member.next, typeof(*pos), member))
+
 #define list_first_entry(ptr, type, member)                                    \
     list_entry((ptr)->next, type, member)
 

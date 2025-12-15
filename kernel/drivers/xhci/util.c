@@ -9,6 +9,7 @@
 #include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "internal.h"
 
@@ -75,10 +76,70 @@ void xhci_cleanup(struct xhci_device *dev, struct xhci_request *req) {
 
     if (req->urb) {
         struct usb_request *urb = req->urb;
-        urb->status = xhci_cc_to_usb_status(req->completion_code);
+        urb->status = xhci_rq_to_usb_status(req);
         urb->complete(urb);
     }
 
     kfree(req->command, FREE_PARAMS_DEFAULT);
     kfree(req, FREE_PARAMS_DEFAULT);
+}
+
+struct xhci_ring *xhci_allocate_ring() {
+    struct xhci_trb *trbs =
+        kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
+    if (!trbs)
+        return NULL;
+
+    paddr_t phys = vmm_get_phys((vaddr_t) trbs, VMM_FLAG_NONE);
+    struct xhci_ring *ring =
+        kzalloc(sizeof(struct xhci_ring), ALLOC_PARAMS_DEFAULT);
+    if (!ring)
+        return NULL;
+
+    ring->phys = phys;
+    ring->cycle = 1;
+    ring->size = TRB_RING_SIZE;
+    ring->trbs = trbs;
+    ring->enqueue_index = 0;
+    ring->dequeue_index = 0;
+
+    struct xhci_trb *link = &trbs[TRB_RING_SIZE - 1];
+
+    link->parameter = phys;
+    link->status = 0;
+    link->control = TRB_SET_TYPE(TRB_TYPE_LINK) | TRB_TOGGLE_CYCLE_BIT |
+                    TRB_CH_BIT | (ring->cycle ? TRB_CYCLE_BIT : 0);
+
+    return ring;
+}
+
+struct xhci_ring *xhci_allocate_event_ring(void) {
+    struct xhci_ring *er = kzalloc(sizeof(*er), ALLOC_PARAMS_DEFAULT);
+
+    er->trbs = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
+    er->phys = vmm_get_phys((vaddr_t) er->trbs, VMM_FLAG_NONE);
+
+    er->size = TRB_RING_SIZE;
+    er->dequeue_index = 0;
+    er->cycle = 1;
+    return er;
+}
+
+void xhci_free_ring(struct xhci_ring *ring) {
+    kfree_aligned(ring->trbs, FREE_PARAMS_DEFAULT);
+    kfree(ring, FREE_PARAMS_DEFAULT);
+}
+
+void xhci_teardown_port(struct xhci_port_info *me) {
+    xhci_set_port_status(me, XHCI_PORT_DISCONNECTED);
+    /* tear down the rings */
+    me->slot_id = 0;
+    me->usb3 = false;
+    me->speed = 0;
+    for (size_t i = 0; i < 32; i++) {
+        struct xhci_ring *ring = me->ep_rings[i];
+        xhci_free_ring(ring);
+    }
+
+    memset(me, 0, sizeof(*me));
 }

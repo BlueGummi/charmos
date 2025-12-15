@@ -500,36 +500,8 @@ static inline uint64_t thread_set_last_ran(struct thread *t, uint64_t new) {
     return atomic_exchange(&t->last_ran, new);
 }
 
-static inline bool thread_get(struct thread *t) {
-    uint32_t old;
-
-    while (true) {
-        old = atomic_load_explicit(&t->refcount, memory_order_acquire);
-        if (old == 0) {
-            /* object is being (or has been) freed */
-            return false;
-        }
-
-        /* try to bump refcount */
-        if (atomic_compare_exchange_weak_explicit(&t->refcount, &old, old + 1,
-                                                  memory_order_acquire,
-                                                  memory_order_relaxed)) {
-            /* We succeeded in grabbing a ref. Now check if the target is dying.
-             */
-            /* If dying is set, back out and fail. */
-            if (atomic_load_explicit(&t->dying, memory_order_acquire)) {
-                /* somebody is tearing it down - drop our ref and fail */
-                atomic_fetch_sub_explicit(&t->refcount, 1,
-                                          memory_order_release);
-                return false;
-            }
-            return true;
-        }
-
-        /* CAS failed, old was updated by another actor; loop and retry. */
-        cpu_relax();
-    }
-}
+REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(thread, refcount, dying,
+                                                   == true);
 
 static inline void thread_put(struct thread *t) {
     if (refcount_dec_and_test(&t->refcount)) {

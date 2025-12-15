@@ -17,7 +17,7 @@ static void workqueue_fn(void *arg, void *unused) {
     atomic_fetch_add(&workqueue_times, 1);
 }
 
-REGISTER_TEST(workqueue_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(workqueue_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     uint64_t tsc = rdtsc();
     uint64_t times = 256;
 
@@ -52,7 +52,7 @@ static void sleepy_entry(void *) {
     thread_print(scheduler_get_current_thread());
 }
 
-REGISTER_TEST(sched_sleepy_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(sched_sleepy_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     thread_spawn("sched_sleepy_test", sleepy_entry, NULL);
     SET_SUCCESS();
 }
@@ -83,7 +83,7 @@ static void enqueue_thread(void *) {
     atomic_fetch_sub(&threads_left, 1);
 }
 
-REGISTER_TEST(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct cpu_mask mask;
     if (!cpu_mask_init(&mask, global.core_count))
         k_panic("OOM\n");
@@ -137,7 +137,7 @@ static enum daemon_thread_command daemon_work(struct daemon_work *work,
 static struct daemon_work dwork =
     DAEMON_WORK_FROM(daemon_work, WORK_ARGS(NULL, NULL));
 
-REGISTER_TEST(daemon_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(daemon_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct cpu_mask cmask;
     cpu_mask_init(&cmask, global.core_count);
     cpu_mask_set_all(&cmask);
@@ -200,7 +200,7 @@ static void waking_thread(void *) {
                    si_t->perceived_prio_class, (void *) 4);
 }
 
-REGISTER_TEST(thread_sleep_interruptible_test, SHOULD_NOT_FAIL,
+TEST_REGISTER(thread_sleep_interruptible_test, SHOULD_NOT_FAIL,
               IS_INTEGRATION_TEST) {
     if (global.core_count < 4) {
         ADD_MESSAGE("too few cores");
@@ -241,7 +241,7 @@ static void dpc_on_event_dummy_thread(void *a) {
 /* we put a thread on a core that is not idle, enqueue a DPC over
  * there, trigger some reschedules, and then verify that the DPC
  * only ever runs once the core actually goes idle */
-REGISTER_TEST(dpc_on_event_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(dpc_on_event_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     size_t i;
     size_t found = SIZE_MAX;
     for_each_cpu_id(i) {
@@ -285,7 +285,7 @@ static void sched_push_try(void *) {
     atomic_store(&at_least_one_migrated, true);
 }
 
-REGISTER_TEST(sched_push_target_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_REGISTER(sched_push_target_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     ADD_MESSAGE("This test takes a bit. uncomment me to run it");
     SET_SKIP();
     return;

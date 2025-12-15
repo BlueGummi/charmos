@@ -10,8 +10,8 @@
 
 enum usb_status usb_transfer_sync(enum usb_status (*fn)(struct usb_request *),
                                   struct usb_request *request) {
-    request->complete = usb_wake_waiter;
     struct thread *curr = scheduler_get_current_thread();
+    request->complete = usb_wake_waiter;
     request->context = curr;
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     enum usb_status ret;
@@ -118,22 +118,12 @@ void usb_get_device_descriptor(struct usb_device *dev) {
 
     struct usb_device_descriptor *ddesc = (void *) desc;
 
-    char manufacturer[128] = {0};
-    char product[128] = {0};
-
-    usb_get_string_descriptor(dev, ddesc->manufacturer, manufacturer,
-                              sizeof(manufacturer));
-    usb_get_string_descriptor(dev, ddesc->product, product, sizeof(product));
+    usb_get_string_descriptor(dev, ddesc->manufacturer, dev->manufacturer,
+                              sizeof(dev->manufacturer));
+    usb_get_string_descriptor(dev, ddesc->product, dev->product,
+                              sizeof(dev->product));
 
     dev->descriptor = ddesc;
-    k_printf("%s manufactured by %s:\n", product, manufacturer);
-    k_printf("  Length: %u\n", ddesc->length);
-    k_printf("  DescriptorType: %u\n", ddesc->type);
-    k_printf("  USB: %04x\n", ddesc->usb_num_bcd);
-    k_printf("  DeviceClass: %u\n", ddesc->class);
-    k_printf("  Vendor: %04x\n", ddesc->vendor_id);
-    k_printf("  Product: %04x\n", ddesc->product_id);
-    k_printf("  NumConfigurations: %u\n", ddesc->num_configs);
 }
 
 static void match_interfaces(struct usb_driver *driver,
@@ -149,6 +139,7 @@ static void match_interfaces(struct usb_driver *driver,
         if (everything_matches) {
             if (driver->probe && driver->probe(dev)) {
                 dev->driver = driver;
+                dev->free = driver->free;
                 return;
             }
         }
@@ -257,9 +248,8 @@ bool usb_parse_config_descriptor(struct usb_device *dev) {
         return false;
     }
 
-    char conf[128] = {0};
-    usb_get_string_descriptor(dev, cdesc->configuration, conf, sizeof(conf));
-    k_printf("CONFIG is %s\n", conf);
+    usb_get_string_descriptor(dev, cdesc->configuration, dev->config_str,
+                              sizeof(dev->config_str));
 
     setup_config_descriptor(dev, desc, desc + total_len);
     kfree_aligned(desc, FREE_PARAMS_DEFAULT);
@@ -295,4 +285,9 @@ bool usb_set_configuration(struct usb_device *dev) {
     }
 
     return true;
+}
+
+void usb_print_device(struct usb_device *dev) {
+    usb_info("Found device '%s' manufactured by '%s' of type '%s'",
+             dev->product, dev->manufacturer, dev->config_str);
 }

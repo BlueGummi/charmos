@@ -34,7 +34,7 @@ struct pci_driver {
 extern struct pci_driver __skernel_pci_devices[];
 extern struct pci_driver __ekernel_pci_devices[];
 
-#define REGISTER_PCI_DEV(n, cc, sc, pi, vi, init)                              \
+#define PCI_DEV_REGISTER(n, cc, sc, pi, vi, init)                              \
     static struct pci_driver pci_device_##n __attribute__((                    \
         section(".kernel_pci_devices"), used)) = {.name = #n,                  \
                                                   .class_code = cc,            \

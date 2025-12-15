@@ -229,5 +229,5 @@ static void nvme_pci_init(uint8_t bus, uint8_t device, uint8_t function,
     k_print_register(disk->name);
 }
 
-REGISTER_PCI_DEV(nvme, PCI_CLASS_MASS_STORAGE, PCI_SUBCLASS_NVM,
+PCI_DEV_REGISTER(nvme, PCI_CLASS_MASS_STORAGE, PCI_SUBCLASS_NVM,
                  PCI_PROGIF_NVME, 0xFFFF, nvme_pci_init);

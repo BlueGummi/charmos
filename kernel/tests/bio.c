@@ -29,7 +29,7 @@ static void bio_callback(struct bio_request *req) {
     ADD_MESSAGE("blkdev_bio callback succeeded");
 }
 
-REGISTER_TEST(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     EXT2_INIT;
     struct ext2_fs *fs = root->fs_data;
     struct generic_disk *d = fs->drive;

@@ -183,6 +183,14 @@ struct pci_device;
 #define xhci_warn(string, ...) k_info("XHCI", K_WARN, string, ##__VA_ARGS__)
 #define xhci_error(string, ...) k_info("XHCI", K_ERROR, string, ##__VA_ARGS__)
 
+enum xhci_port_status {
+    XHCI_PORT_RESETTING,
+    XHCI_PORT_ERROR,
+    XHCI_PORT_CONNECTED,     /* Currently up and running */
+    XHCI_PORT_DISCONNECTING, /* Received a DISCONNECT PORT STATUS CHANGE */
+    XHCI_PORT_DISCONNECTED,  /* Disconnected */
+};
+
 // 5.3: XHCI Capability Registers
 struct xhci_cap_regs {
     uint8_t cap_length;
@@ -537,11 +545,13 @@ struct xhci_interrupter_regs {
 } __attribute__((packed));
 
 struct xhci_port_info {
-    bool device_connected;
+    _Atomic enum xhci_port_status status;
     uint8_t speed;
     uint8_t slot_id;
     bool usb3;
     struct xhci_ring *ep_rings[32];
+    refcount_t
+        refcount; /* As soon as this drops to zero we clear the ep_rings */
 };
 
 struct xhci_dcbaa { // Device context base address array - check page 441
@@ -555,12 +565,25 @@ struct xhci_ext_cap {
 };
 
 enum xhci_request_status {
+    /* The first 3 statuses indicate list state.
+     *
+     * OUTGOING requests have a TRB, and have rang the doorbell.
+     *
+     * WAITING requests cannot be currently satisfied because the
+     * command ring is full.
+     *
+     * PROCESSED requests have been handled by the ISR with a success state.
+     * Technically they run in the worker thread but the status is set from ISR.
+     *
+     * DISCONNECT requests occur when a port is disconnected and the request
+     * no longer goes anywhere (because the port is gone)
+     */
     XHCI_REQUEST_OUTGOING,
-    XHCI_REQUEST_WAITING,   /* On the waiting list */
-    XHCI_REQUEST_PROCESSED, /* On the finished list */
+    XHCI_REQUEST_WAITING,
+    XHCI_REQUEST_PROCESSED,
     XHCI_REQUEST_MAX,
-    XHCI_REQUEST_DONE,
     XHCI_REQUEST_CANCELLED,
+    XHCI_REQUEST_DISCONNECT,
 };
 
 struct xhci_device {
@@ -579,25 +602,29 @@ struct xhci_device {
 
     struct xhci_port_regs *port_regs;
     uint64_t ports;
+    /* This is THE ONLY PLACE where we use `port - 1` in indexing because
+     * xHCI ports are ones-based and this is zeros based */
     struct xhci_port_info port_info[64];
 
     struct list_head requests[XHCI_REQUEST_MAX];
 
-    uint64_t num_devices;
+    size_t num_devices;
     struct usb_device **devices;
-    struct spinlock lock; /* protects regs */
+    struct spinlock lock;
     struct semaphore sem;
     atomic_bool worker_waiting;
 };
 
 struct xhci_command {
     struct xhci_ring *ring; /* what ring? */
-    volatile uint64_t parameter;
-    volatile uint32_t status;
-    volatile uint32_t control;
     uint32_t slot_id;
     uint32_t ep_id;
+
+    size_t num_trbs;
+    void (*emit)(struct xhci_command *cmd, struct xhci_ring *ring);
+
     struct xhci_request *request; /* associated request */
+    void *private;
 };
 
 struct xhci_request {
@@ -606,9 +633,16 @@ struct xhci_request {
     struct xhci_command *command;
 
     uint64_t trb_phys;
-    volatile uint32_t completion_code;
+    uint8_t port; /* What port is this for? Used to match
+                   * requests on disconnect */
 
-    enum xhci_request_status status;
+    /* the raw completion code for this request */
+    volatile uint8_t completion_code;
+    volatile uint64_t return_parameter;
+    volatile uint32_t return_status;
+    volatile uint32_t return_control;
+
+    volatile enum xhci_request_status status;
 
     struct list_head list;
     void (*callback)(struct xhci_device *, struct xhci_request *);

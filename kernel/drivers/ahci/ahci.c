@@ -121,4 +121,4 @@ static void ahci_pci_init(uint8_t bus, uint8_t slot, uint8_t func,
     }
 }
 
-REGISTER_PCI_DEV(ahci, 1, 6, 1, 0xFFFF, ahci_pci_init)
+PCI_DEV_REGISTER(ahci, 1, 6, 1, 0xFFFF, ahci_pci_init)

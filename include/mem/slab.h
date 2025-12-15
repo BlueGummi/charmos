@@ -14,7 +14,7 @@ struct slab_size_constant {
 extern struct slab_size_constant __skernel_slab_sizes[];
 extern struct slab_size_constant __ekernel_slab_sizes[];
 
-#define REGISTER_SLAB_SIZE(n, s)                                               \
+#define SLAB_SIZE_REGISTER(n, s)                                               \
     static struct slab_size_constant slab_size_constant_##n                    \
         __attribute__((section(".kernel_slab_sizes"), used)) = {               \
             .name = #n,                                                        \

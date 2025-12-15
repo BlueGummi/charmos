@@ -382,5 +382,5 @@ static void domain_buddy_movealloc(void *a, void *b) {
         move_buddy(global.domains[i]->cores[0]->domain_buddy);
 }
 
-REGISTER_MOVEALLOC_CALLBACK(domain_move, domain_buddy_movealloc, /*a=*/NULL,
+MOVEALLOC_REGISTER_CALL(domain_move, domain_buddy_movealloc, /*a=*/NULL,
                             /*b=*/NULL);

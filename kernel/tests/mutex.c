@@ -13,7 +13,7 @@
 
 static struct mutex basic_test_mtx = MUTEX_INIT;
 
-REGISTER_TEST(mutex_test_basic, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(mutex_test_basic, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     mutex_lock(&basic_test_mtx);
     scheduler_yield();
     mutex_unlock(&basic_test_mtx);
@@ -36,7 +36,7 @@ static void many_worker(void *) {
     atomic_fetch_sub(&many_waiter_done, 1);
 }
 
-REGISTER_TEST(mutex_many_waiters, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_REGISTER(mutex_many_waiters, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     for (int i = 0; i < MUTEX_MANY_WAITER_TEST_WAITER_COUNT; i++) {
         struct thread *t = thread_create("mw", many_worker, NULL);
         t->flags = THREAD_FLAGS_NO_STEAL;
@@ -74,7 +74,7 @@ static void chaos(void *) {
 volatile struct thread *main_thread = NULL;
 volatile struct thread *other_threads[CHAOS_THREAD_COUNT] = {0};
 
-REGISTER_TEST(mutex_chaos, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_REGISTER(mutex_chaos, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     main_thread = scheduler_get_current_thread();
     for (int i = 0; i < CHAOS_THREAD_COUNT; i++)
         other_threads[i] = thread_spawn("ch", chaos, NULL);

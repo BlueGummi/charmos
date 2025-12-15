@@ -22,7 +22,7 @@ struct kernel_test {
     char **messages;
 } __linker_aligned;
 
-#define REGISTER_TEST(name, should_fail, is_integration)                       \
+#define TEST_REGISTER(name, should_fail, is_integration)                       \
     static void name(void);                                                    \
     static struct kernel_test __test_##name                                    \
         __attribute__((section(".kernel_tests"), used)) = {                    \

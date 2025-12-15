@@ -225,4 +225,4 @@ static void e1000_pci_init(uint8_t bus, uint8_t d, uint8_t func,
     }
 }
 
-REGISTER_PCI_DEV(e1000, 2, 0, 0xff, 0x8086, e1000_pci_init);
+PCI_DEV_REGISTER(e1000, 2, 0, 0xff, 0x8086, e1000_pci_init);

@@ -19,7 +19,7 @@ static void apc_thread(void*) {
 }
 
 static struct thread *ted = NULL;
-REGISTER_TEST(apc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(apc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ted = thread_spawn("apc_test_thread", apc_thread, NULL);
     struct apc *a = kzalloc(sizeof(struct apc), ALLOC_PARAMS_DEFAULT);
     if (!a || !ted)

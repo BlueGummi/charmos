@@ -12,7 +12,7 @@
 #include <string.h>
 #include <tests.h>
 
-REGISTER_TEST(pmm_alloc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(pmm_alloc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
     paddr_t p = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
@@ -20,7 +20,7 @@ REGISTER_TEST(pmm_alloc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
 }
 
-REGISTER_TEST(vmm_map_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(vmm_map_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
     uint64_t p = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
@@ -40,7 +40,7 @@ REGISTER_TEST(vmm_map_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(((uintptr_t) (ptr) & ((alignment) - 1)) == 0)
 
 #define KMALLOC_ALIGNMENT_TEST(name, align)                                    \
-    REGISTER_TEST(kmalloc_aligned_##name##_test, false, false) {               \
+    TEST_REGISTER(kmalloc_aligned_##name##_test, false, false) {               \
         ABORT_IF_RAM_LOW();                                                    \
         for (uint64_t i = 0; i < ALIGNED_ALLOC_TIMES; i++) {                   \
             void *ptr = kmalloc_aligned(align, align, ALLOC_PARAMS_DEFAULT);   \
@@ -58,7 +58,7 @@ KMALLOC_ALIGNMENT_TEST(256, 256)
 #define STRESS_ALLOC_TIMES 2048
 
 static paddr_t pmm_stress_test_ptrs[STRESS_ALLOC_TIMES];
-REGISTER_TEST(pmm_stress_alloc_free_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(pmm_stress_alloc_free_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
@@ -74,7 +74,7 @@ REGISTER_TEST(pmm_stress_alloc_free_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 }
 
 static void *stress_alloc_free_ptrs[STRESS_ALLOC_TIMES] = {0};
-REGISTER_TEST(kmalloc_stress_alloc_free_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(kmalloc_stress_alloc_free_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
@@ -101,7 +101,7 @@ REGISTER_TEST(kmalloc_stress_alloc_free_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
 /* Put it here to avoid it eating things up */
 static void *mixed_stress_test_ptrs[STRESS_ALLOC_TIMES] = {0};
-REGISTER_TEST(kmalloc_mixed_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(kmalloc_mixed_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
@@ -143,7 +143,7 @@ static void mt_kmalloc_worker(void *) {
     kmalloc_done++;
 }
 
-REGISTER_TEST(kmalloc_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(kmalloc_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
     struct thread *threads[MT_THREAD_COUNT];
@@ -161,7 +161,7 @@ REGISTER_TEST(kmalloc_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 }
 
 static char hooray[128] = {0};
-REGISTER_TEST(kmalloc_new_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(kmalloc_new_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     void *p = kmalloc_new(67, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
 
@@ -180,7 +180,7 @@ REGISTER_TEST(kmalloc_new_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 #endif
 
 static char a_msg[128];
-REGISTER_TEST(kmalloc_new_basic_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(kmalloc_new_basic_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     void *p1 = kmalloc_new(1, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
     void *p2 = kmalloc_new(64, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
@@ -218,7 +218,7 @@ REGISTER_TEST(kmalloc_new_basic_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 /*
 -------------------- Alignment preference test --------------------
 
-REGISTER_TEST(kmalloc_new_cache_align_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(kmalloc_new_cache_align_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
      Request cache-aligned memory
     uint16_t flags = ALLOC_FLAG_PREFER_CACHE_ALIGNED | ALLOC_FLAG_NONMOVABLE |
                      ALLOC_FLAG_NONPAGEABLE | ALLOC_FLAG_CLASS_DEFAULT;
@@ -244,7 +244,7 @@ REGISTER_TEST(kmalloc_new_cache_align_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
 /* -------------------- Behavior flag verification test -------------------- */
 
-REGISTER_TEST(kmalloc_new_behavior_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(kmalloc_new_behavior_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     /* ALLOC_BEHAVIOR_ATOMIC should require nonpageable/nonmovable - allocator
        or sanitizers might coerce flags. This test ensures allocation doesn't
        return NULL for such a request. */
@@ -357,7 +357,7 @@ volatile int done[STRESS_THREADS];
 struct stress_arg args[STRESS_THREADS];
 static char msg[128];
 
-REGISTER_TEST(kmalloc_new_concurrency_stress_test, SHOULD_NOT_FAIL,
+TEST_REGISTER(kmalloc_new_concurrency_stress_test, SHOULD_NOT_FAIL,
               IS_UNIT_TEST) {
     memset((void *) done, 0, sizeof(done));
 
@@ -401,7 +401,7 @@ REGISTER_TEST(kmalloc_new_concurrency_stress_test, SHOULD_NOT_FAIL,
 /* -------------------- Small reallocation-like smoke test --------------------
  */
 
-REGISTER_TEST(kmalloc_new_alloc_free_sequence_test, SHOULD_NOT_FAIL,
+TEST_REGISTER(kmalloc_new_alloc_free_sequence_test, SHOULD_NOT_FAIL,
               IS_UNIT_TEST) {
 
     void *blocks[16];

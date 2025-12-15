@@ -168,5 +168,5 @@ bool domain_idle(struct domain *domain) {
     return true;
 }
 
-REGISTER_MOVEALLOC_CALLBACK(domain_move, domains_move, /* a = */ NULL,
+MOVEALLOC_REGISTER_CALL(domain_move, domains_move, /* a = */ NULL,
                             /* b = */ NULL);

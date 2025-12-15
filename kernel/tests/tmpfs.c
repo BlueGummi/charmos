@@ -18,7 +18,7 @@
     node = ent.node;                                                           \
     TEST_ASSERT(node != NULL);
 
-REGISTER_TEST(tmpfs_rw_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_REGISTER(tmpfs_rw_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     TMPFS_SETUP_NODE(root, node, "place", e);
     TEST_ASSERT(node->size == 0);
 
@@ -51,7 +51,7 @@ REGISTER_TEST(tmpfs_rw_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     SET_SUCCESS();
 }
 
-REGISTER_TEST(tmpfs_dir_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_REGISTER(tmpfs_dir_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     struct vfs_node *root = tmpfs_mkroot("tmp");
     const char *lstr = large_test_string;
     uint64_t len = strlen(lstr);
@@ -83,7 +83,7 @@ REGISTER_TEST(tmpfs_dir_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     SET_SUCCESS();
 }
 
-REGISTER_TEST(tmpfs_general_tests, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_REGISTER(tmpfs_general_tests, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     TMPFS_SETUP_NODE(root, node, "place", e);
 
     FAIL_IF_FATAL(node->ops->chmod(node, VFS_MODE_EXEC));

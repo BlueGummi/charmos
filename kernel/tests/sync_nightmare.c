@@ -148,7 +148,7 @@ static void chaos_migrator() {
 /* ------------------------------------
  * Main Test
  * ------------------------------------ */
-REGISTER_TEST(thread_interruptible_chaos_fuzz, SHOULD_NOT_FAIL,
+TEST_REGISTER(thread_interruptible_chaos_fuzz, SHOULD_NOT_FAIL,
               IS_INTEGRATION_TEST) {
     ADD_MESSAGE("This test takes a long time and is off by default. "
                 "Comment out these messages to run it.");

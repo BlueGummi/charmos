@@ -15,7 +15,7 @@
 
 static struct rwlock rw_basic = {0};
 
-REGISTER_TEST(rwlock_basic_read, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(rwlock_basic_read, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     rwlock_lock(&rw_basic, RWLOCK_ACQUIRE_READ);
     scheduler_yield();
     rwlock_unlock(&rw_basic);
@@ -25,7 +25,7 @@ REGISTER_TEST(rwlock_basic_read, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
 static struct rwlock rw_basic_w = {0};
 
-REGISTER_TEST(rwlock_basic_write, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(rwlock_basic_write, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     rwlock_lock(&rw_basic_w, RWLOCK_ACQUIRE_WRITE);
     scheduler_yield();
@@ -44,7 +44,7 @@ static void rw_two_writer_thread(void *) {
     atomic_store(&rw_two_done, true);
 }
 
-REGISTER_TEST(rwlock_two_writer_basic, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(rwlock_two_writer_basic, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     rwlock_lock(&rw_two_writers, RWLOCK_ACQUIRE_WRITE);
 
@@ -84,7 +84,7 @@ static void rw_reader_worker(void *) {
     atomic_fetch_sub(&rw_readers_left, 1);
 }
 
-REGISTER_TEST(rwlock_many_readers, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_REGISTER(rwlock_many_readers, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     for (int i = 0; i < RWLOCK_READER_COUNT_TEST_N; i++)
         thread_spawn("rr_%zu", rw_reader_worker, NULL, i);
@@ -124,7 +124,7 @@ static void rw_mixed_worker(void *) {
     atomic_fetch_sub(&rw_mixed_left, 1);
 }
 
-REGISTER_TEST(rwlock_mixed_stress, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_REGISTER(rwlock_mixed_stress, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 
     for (int i = 0; i < RWLOCK_MIXED_THREADS; i++)
         mixed_threads[i] = thread_spawn("rm", rw_mixed_worker, NULL);
@@ -160,7 +160,7 @@ static void rw_chaos_worker(void *) {
     atomic_fetch_sub(&rw_chaos_left, 1);
 }
 
-REGISTER_TEST(rwlock_chaos, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_REGISTER(rwlock_chaos, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 
     for (int i = 0; i < RWLOCK_CHAOS_THREADS; i++)
         thread_spawn("rch", rw_chaos_worker, NULL);
@@ -217,7 +217,7 @@ static void rw_correct_worker(void *) {
     atomic_fetch_sub(&correctness_left, 1);
 }
 
-REGISTER_TEST(rwlock_correctness, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_REGISTER(rwlock_correctness, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 
     for (int i = 0; i < RWLOCK_CORRECT_THREADS; i++)
         thread_spawn("rwc", rw_correct_worker, NULL);

@@ -47,7 +47,7 @@ static void flush() {
     check_bcache();*/
 }
 
-REGISTER_TEST(ext2_stat_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(ext2_stat_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     EXT2_INIT;
 
     FAIL_IF_FATAL(root->ops->create(root, "ext2_stat_test", VFS_MODE_FILE));
@@ -71,7 +71,7 @@ REGISTER_TEST(ext2_stat_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
 }
 
-REGISTER_TEST(ext2_rename_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(ext2_rename_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     EXT2_INIT;
 
     FAIL_IF_FATAL(root->ops->create(root, "ext2_rename_test", VFS_MODE_FILE));
@@ -99,7 +99,7 @@ REGISTER_TEST(ext2_rename_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
 }
 
-REGISTER_TEST(ext2_chmod_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(ext2_chmod_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     EXT2_INIT;
 
     FAIL_IF_FATAL(root->ops->create(root, "ext2_chmod_test", VFS_MODE_FILE));
@@ -125,7 +125,7 @@ REGISTER_TEST(ext2_chmod_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
 }
 
-REGISTER_TEST(ext2_symlink_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(ext2_symlink_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     EXT2_INIT;
 
     FAIL_IF_FATAL(root->ops->symlink(root, "/tmp", "ext2_symlink_test"));
@@ -149,7 +149,7 @@ REGISTER_TEST(ext2_symlink_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
 }
 
-REGISTER_TEST(ext2_dir_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(ext2_dir_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     EXT2_INIT;
 
     FAIL_IF_FATAL(root->ops->mkdir(root, "ext2_dir_test", VFS_MODE_DIR));
@@ -168,7 +168,7 @@ REGISTER_TEST(ext2_dir_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
 }
 
-REGISTER_TEST(ext2_integration_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_REGISTER(ext2_integration_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     EXT2_INIT;
 
     FAIL_IF_FATAL(

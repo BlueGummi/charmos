@@ -12,48 +12,6 @@
 
 #include "internal.h"
 
-struct xhci_ring *xhci_allocate_ring() {
-    struct xhci_trb *trbs =
-        kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
-    if (!trbs)
-        k_panic("OOM\n");
-
-    paddr_t phys = vmm_get_phys((vaddr_t) trbs, VMM_FLAG_NONE);
-    struct xhci_ring *ring =
-        kzalloc(sizeof(struct xhci_ring), ALLOC_PARAMS_DEFAULT);
-    if (!ring)
-        k_panic("OOM\n");
-
-    ring->phys = phys;
-    ring->cycle = 1;
-    ring->size = TRB_RING_SIZE;
-    ring->trbs = trbs;
-    ring->enqueue_index = 0;
-    ring->dequeue_index = 0;
-
-    struct xhci_trb *link = &trbs[TRB_RING_SIZE - 1];
-
-    link->parameter = phys;
-    link->status = 0;
-    link->control = TRB_SET_TYPE(TRB_TYPE_LINK) | TRB_TOGGLE_CYCLE_BIT |
-                    TRB_CH_BIT | (ring->cycle ? TRB_CYCLE_BIT : 0);
-
-    return ring;
-}
-
-struct xhci_ring *xhci_allocate_event_ring(void) {
-    struct xhci_ring *er = kzalloc(sizeof(*er), ALLOC_PARAMS_DEFAULT);
-
-    er->trbs = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
-    er->phys = vmm_get_phys((vaddr_t) er->trbs, VMM_FLAG_NONE);
-
-    er->size = TRB_RING_SIZE;
-    er->dequeue_index = 0;
-    er->cycle = 1;
-
-    return er;
-}
-
 void xhci_setup_event_ring(struct xhci_device *dev) {
     struct xhci_erst_entry *erst =
         kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
@@ -91,30 +49,37 @@ void xhci_setup_command_ring(struct xhci_device *dev) {
 uint8_t xhci_enable_slot(struct xhci_device *dev) {
     struct xhci_request request;
     struct xhci_command cmd;
-    xhci_request_init_blocking(&request, &cmd);
+    xhci_request_init_blocking(&request, &cmd, /* port = */ 0);
 
-    cmd = (struct xhci_command) {
+    struct xhci_trb outgoing = {
         .parameter = 0,
         .control = TRB_SET_TYPE(TRB_TYPE_ENABLE_SLOT) |
                    TRB_SET_CYCLE(dev->cmd_ring->cycle),
         .status = 0,
+    };
+
+    cmd = (struct xhci_command) {
+        .private = &outgoing,
+        .emit = xhci_emit_singular,
         .ep_id = 0,
         .slot_id = 0,
         .ring = dev->cmd_ring,
         .request = &request,
+        .num_trbs = 1,
     };
 
     xhci_send_command_and_block(dev, &cmd);
 
-    return TRB_SLOT(cmd.control);
+    return TRB_SLOT(request.return_control);
 }
 
 bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
-    uint32_t *portsc = &dev->port_regs[portnum - 1].portsc;
-    bool is_usb3 = dev->port_info[portnum - 1].usb3;
+    uint32_t *portsc = xhci_portsc_ptr(dev, portnum);
+    bool is_usb3 = xhci_port_info_for_port(dev, portnum)->usb3;
 
     uint32_t old = mmio_read_32(portsc);
 
+    /* Power on the port */
     if (!(old & PORTSC_PP)) {
         /* Only write the PP bit */
         mmio_write_32(portsc, PORTSC_PP);
@@ -140,7 +105,7 @@ bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
 
     struct xhci_request request;
     struct xhci_command cmd;
-    xhci_request_init_blocking(&request, &cmd);
+    xhci_request_init_blocking(&request, &cmd, /* port = */ 0);
     list_add_tail(&request.list, &dev->requests[XHCI_REQUEST_OUTGOING]);
 
     mmio_write_32(portsc, to_write);
@@ -194,7 +159,7 @@ bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
         return false;
     }
 
-    if (TRB_CC(cmd.status) != CC_SUCCESS) {
+    if (!xhci_request_ok(&request)) {
         xhci_warn("port %u reset did not generate a PSC event", portnum);
         return false;
     }
@@ -333,4 +298,11 @@ struct xhci_device *xhci_device_create(void *mmio) {
     dev->ports = cap->hcs_params1 & 0xff;
 
     return dev;
+}
+
+void xhci_device_start_interrupts(uint8_t bus, uint8_t slot, uint8_t func,
+                                  struct xhci_device *dev) {
+    dev->irq = irq_alloc_entry();
+    irq_register("xhci", dev->irq, xhci_isr, dev, IRQ_FLAG_NONE);
+    pci_program_msix_entry(bus, slot, func, 0, dev->irq, /*core=*/0);
 }

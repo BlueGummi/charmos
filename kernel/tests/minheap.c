@@ -18,7 +18,7 @@ static void mhtest_do_inserts(struct minheap *mh) {
     }
 }
 
-REGISTER_TEST(minheap_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_REGISTER(minheap_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct minheap *mh = minheap_create();
     mhtest_do_inserts(mh);
     TEST_ASSERT(mh->size == MINHEAP_TEST_TIMES);
