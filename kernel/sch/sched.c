@@ -258,17 +258,28 @@ static inline void context_switch(struct scheduler *sched, struct thread *curr,
 
     /* We are responsible for dropping references
      * on threads entering their last yield */
-    if (unlikely(curr && thread_get_state(curr) == THREAD_STATE_ZOMBIE))
+    bool just_load = false;
+    if (!curr)
+        just_load = true;
+
+    if (unlikely(curr && thread_get_state(curr) == THREAD_STATE_ZOMBIE)) {
+        just_load = true;
         thread_put(curr);
+    }
 
-    sched->switched_out = curr;
-    scheduler_unlock(sched, irql);
+    if (curr && curr->state == THREAD_STATE_IDLE_THREAD) {
+        just_load = true;
+    }
 
-    if (curr == next)
+    sched->switched_out = just_load ? NULL : curr;
+
+    if (curr == next) {
+        scheduler_unlock(sched, irql);
         return;
+    }
 
     /* TODO: fix this, janky strange way to protect thread states */
-    if (curr && curr->state != THREAD_STATE_IDLE_THREAD) {
+    if (!just_load) {
         if (curr < next) {
             spin_lock_raw(&curr->ctx_lock);
             spin_lock_raw(&next->ctx_lock);
@@ -276,9 +287,11 @@ static inline void context_switch(struct scheduler *sched, struct thread *curr,
             spin_lock_raw(&next->ctx_lock);
             spin_lock_raw(&curr->ctx_lock);
         }
+        scheduler_unlock(sched, irql);
         switch_context(&curr->regs, &next->regs);
     } else {
         spin_lock_raw(&next->ctx_lock);
+        scheduler_unlock(sched, irql);
         load_context(&next->regs);
     }
 }
@@ -344,7 +357,7 @@ void scheduler_yield() {
     kassert(!scheduler_self_in_resched());
 
     /* NOTE: the IRQL must be raised first to prevent a race where we
-     * can get swapped out while mark_self_in_resched occurs. 
+     * can get swapped out while mark_self_in_resched occurs.
      *
      * if we do not disable preemption, the following race is possible
      *

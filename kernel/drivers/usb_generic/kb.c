@@ -184,7 +184,9 @@ enum usb_status usb_keyboard_bringup(struct usb_device *dev) {
         usb_find_interface(dev, USB_CLASS_HID, USB_SUBCLASS_HID_BOOT_INTERFACE,
                            USB_PROTOCOL_HID_KEYBOARD);
     if (!intf)
-        return false;
+        return USB_ERR_NO_DEVICE;
+
+    k_info("USBKB", K_INFO, "Keyboard connected");
 
     uint8_t iface_num = intf->interface_number;
 
@@ -204,9 +206,7 @@ enum usb_status usb_keyboard_bringup(struct usb_device *dev) {
         if ((ep->address & 0x80) &&
             ep->type == USB_ENDPOINT_ATTR_TRANS_TYPE_INTERRUPT) {
 
-            usb_keyboard_create(dev, ep);
-            k_info("USBKB", K_INFO, "Keyboard endpoint 0x%02x ready",
-                   ep->address);
+            dev->driver_private = usb_keyboard_create(dev, ep);
             return USB_OK;
         }
     }
@@ -215,6 +215,15 @@ enum usb_status usb_keyboard_bringup(struct usb_device *dev) {
     return USB_ERR_NO_ENDPOINT;
 }
 
+void usb_keyboard_teardown(struct usb_device *dev) {
+    (void) dev;
+}
+
+void usb_keyboard_free(struct usb_device *dev) {
+    kfree(dev->driver_private, FREE_PARAMS_DEFAULT);
+    k_info("USBKB", K_INFO, "Keyboard disconnected");
+}
+
 USB_DRIVER_REGISTER(keyboard, USB_CLASS_HID, USB_SUBCLASS_HID_BOOT_INTERFACE,
-                    USB_PROTOCOL_HID_KEYBOARD, usb_keyboard_bringup, NULL,
-                    NULL);
+                    USB_PROTOCOL_HID_KEYBOARD, usb_keyboard_bringup,
+                    usb_keyboard_teardown, usb_keyboard_free);

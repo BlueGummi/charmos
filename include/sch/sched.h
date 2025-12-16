@@ -140,7 +140,6 @@ static inline struct thread *scheduler_get_current_thread() {
     return (struct thread *) thread;
 }
 
-
 static inline struct thread *thread_spawn(char *name, void (*entry)(void *),
                                           void *arg, ...) {
     va_list args;
@@ -263,7 +262,8 @@ static inline void scheduler_force_resched(struct scheduler *sched) {
 static inline uint32_t scheduler_preemption_disable(void) {
     struct core *cpu = smp_core();
 
-    uint32_t old = cpu->scheduler_preemption_disable_depth++;
+    uint32_t old =
+        atomic_fetch_add(&cpu->scheduler_preemption_disable_depth, 1);
 
     if (old == UINT32_MAX) {
         k_panic("overflow\n");
@@ -275,7 +275,8 @@ static inline uint32_t scheduler_preemption_disable(void) {
 static inline uint32_t scheduler_preemption_enable(void) {
     struct core *cpu = smp_core();
 
-    uint32_t old = cpu->scheduler_preemption_disable_depth--;
+    uint32_t old =
+        atomic_fetch_sub(&cpu->scheduler_preemption_disable_depth, 1);
 
     if (old == 0) {
         k_panic("underflow\n");
@@ -285,5 +286,5 @@ static inline uint32_t scheduler_preemption_enable(void) {
 }
 
 static inline bool scheduler_preemption_disabled(void) {
-    return smp_core()->scheduler_preemption_disable_depth > 0;
+    return atomic_load(&smp_core()->scheduler_preemption_disable_depth) > 0;
 }

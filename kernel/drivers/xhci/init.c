@@ -100,7 +100,7 @@ void xhci_disable_slot(struct xhci_device *dev, struct xhci_slot *slot) {
     xhci_send_command_and_block(dev, &cmd);
 }
 
-bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
+enum usb_status xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
     uint32_t *portsc = xhci_portsc_ptr(dev, portnum);
     bool is_usb3 = dev->port_info[portnum - 1].usb3;
 
@@ -114,7 +114,7 @@ bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
         old = mmio_read_32(portsc);
         if (!(old & PORTSC_PP)) {
             xhci_warn("port %u: power enable failed", portnum);
-            return false;
+            return USB_ERR_IO;
         }
     }
 
@@ -183,32 +183,27 @@ bool xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
         xhci_warn(
             "port %u: reset timed out (PR did not clear or PED did not change)",
             portnum);
-        return false;
+        return USB_ERR_IO;
     }
 
     if (!xhci_request_ok(&request)) {
         xhci_warn("port %u reset did not generate a PSC event", portnum);
-        return false;
+        return xhci_rq_to_usb_status(&request);
     }
 
     uint32_t final = mmio_read_32(portsc);
     uint32_t pls = (final >> PORTSC_PLS_SHIFT) & PORTSC_PLS_MASK;
     if (is_usb3) {
-        if (pls == PORTSC_PLS_U0 && (final & PORTSC_SPEED_MASK)) {
-            xhci_info("port %u: USB3 reset success (PLS=U0, speed=%u)", portnum,
-                      final & PORTSC_SPEED_MASK);
-        } else if (pls == PORTSC_PLS_RXDETECT) {
+        if (pls == PORTSC_PLS_RXDETECT) {
             xhci_info("port %u: USB3 reset failed (PLS=RXDETECT)", portnum);
-            return false;
+            return USB_ERR_IO;
         } else {
             xhci_info("port %u: USB3 reset unknown state pls=%u speed=%u",
                       portnum, pls, final & PORTSC_SPEED_MASK);
+            return USB_ERR_IO;
         }
-    } else {
-        xhci_info("port %u: USB2 reset success", portnum);
     }
-
-    return true;
+    return USB_OK;
 }
 
 void xhci_parse_ext_caps(struct xhci_device *dev) {
@@ -330,6 +325,7 @@ struct xhci_device *xhci_device_create(void *mmio) {
         uint32_t portsc = xhci_read_portsc(dev, i + 1);
         uint8_t speed = portsc & 0xF;
         p->speed = speed;
+        p->dev = dev;
         p->port_id = (i + 1);
     }
 
@@ -348,4 +344,56 @@ void xhci_device_start_interrupts(uint8_t bus, uint8_t slot, uint8_t func,
     dev->irq = irq_alloc_entry();
     irq_register("xhci", dev->irq, xhci_isr, dev, IRQ_FLAG_NONE);
     pci_program_msix_entry(bus, slot, func, 0, dev->irq, /*core=*/0);
+}
+
+enum usb_status xhci_port_init(struct xhci_port *p) {
+    struct xhci_device *dev = p->dev;
+    uint8_t port = p->port_id;
+    enum usb_status err = USB_OK;
+    uint8_t slot_id;
+    struct usb_device *usb;
+
+    if ((err = xhci_reset_port(dev, port)) != USB_OK)
+        return err;
+
+    if ((slot_id = xhci_enable_slot(dev)) == 0)
+        return USB_ERR_NO_DEVICE;
+
+    struct xhci_slot *this_slot = xhci_get_slot(dev, slot_id);
+    this_slot->state = XHCI_SLOT_STATE_ENABLED;
+
+    struct xhci_port *this_port = &dev->port_info[port - 1];
+    if ((err = xhci_address_device(this_port, slot_id)) != USB_OK) {
+        xhci_teardown_slot(this_slot);
+        return err;
+    }
+
+    if (!(usb = kzalloc(sizeof(struct usb_device), ALLOC_PARAMS_DEFAULT))) {
+        xhci_teardown_slot(this_slot);
+        return USB_ERR_OOM;
+    }
+
+    usb->speed = this_port->speed;
+    usb->slot = this_slot;
+    usb->port = port;
+    usb->configured = false;
+    usb->host = dev->controller;
+    usb->driver_private = dev;
+    refcount_init(&usb->refcount, 1);
+    INIT_LIST_HEAD(&usb->hc_list);
+
+    enum irql irql = spin_lock_irq_disable(&dev->lock);
+
+    xhci_port_set_state(this_port, XHCI_PORT_STATE_CONNECTED);
+    refcount_init(&this_slot->refcount, 1);
+    this_port->slot = this_slot;
+    this_slot->port = this_port;
+    this_slot->udev = usb;
+
+    list_add_tail(&usb->hc_list, &dev->devices);
+    dev->num_devices++;
+
+    spin_unlock(&dev->lock, irql);
+
+    return err;
 }

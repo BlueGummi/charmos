@@ -158,7 +158,7 @@ set(QEMU_COMMON_FLAGS
     -numa dist,src=3,dst=1,val=35
     -numa dist,src=2,dst=3,val=15
     -numa dist,src=3,dst=2,val=15
-
+    -qmp unix:/tmp/qmp.sock,server,nowait
     -s
     #-S
     -monitor telnet:127.0.0.1:5555,server,nowait

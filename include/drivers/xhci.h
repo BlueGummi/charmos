@@ -595,6 +595,7 @@ struct xhci_port {
     bool usb3;
     uint64_t generation;
     enum xhci_port_state state;
+    struct xhci_device *dev;
 };
 
 enum xhci_request_status {
@@ -617,6 +618,7 @@ enum xhci_request_status {
     XHCI_REQUEST_MAX,
     XHCI_REQUEST_CANCELLED,
     XHCI_REQUEST_DISCONNECT,
+    XHCI_REQUEST_ERR,
 };
 
 struct xhci_device {
@@ -644,7 +646,9 @@ struct xhci_device {
     struct list_head devices;
     struct spinlock lock;
     struct semaphore sem;
-    struct work slot_disconnect_work;
+    struct work port_disconnect_work;
+    struct work port_connect_work;
+    struct usb_controller *controller;
     atomic_bool worker_waiting;
 };
 

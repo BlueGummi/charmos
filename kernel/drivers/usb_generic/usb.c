@@ -343,7 +343,6 @@ void usb_teardown_device(struct usb_device *dev) {
 }
 
 void usb_free_device(struct usb_device *dev) {
-    kassert(refcount_read(&dev->refcount) == 0);
     if (dev->free)
         dev->free(dev);
 
@@ -352,6 +351,7 @@ void usb_free_device(struct usb_device *dev) {
         kfree(infdr, FREE_PARAMS_DEFAULT);
     }
     kfree(dev->interfaces, FREE_PARAMS_DEFAULT);
+
     for (size_t i = 0; i < dev->num_endpoints; i++) {
         struct usb_endpoint *uep = dev->endpoints[i];
         kfree(uep, FREE_PARAMS_DEFAULT);

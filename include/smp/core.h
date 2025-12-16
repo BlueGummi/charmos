@@ -33,7 +33,7 @@ struct core {
 
     atomic_bool needs_resched;
     atomic_bool in_resched; /* in scheduler_yield() */
-    uint32_t scheduler_preemption_disable_depth;
+    atomic_uint scheduler_preemption_disable_depth;
 
     struct domain *domain;
     struct domain_buddy *domain_buddy;
