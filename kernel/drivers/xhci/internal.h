@@ -142,6 +142,7 @@ static inline void xhci_request_init_blocking(struct xhci_request *req,
     req->private = scheduler_get_current_thread();
     req->callback = xhci_wake_waiter;
     req->port = port;
+    req->port_reset = false;
     INIT_LIST_HEAD(&req->list);
 }
 
@@ -157,6 +158,7 @@ static inline void xhci_request_init(struct xhci_request *req,
     req->private = NULL;
     req->callback = xhci_cleanup;
     req->port = rq->dev->port;
+    req->port_reset = false;
 }
 
 static inline void xhci_clear_usbsts_ei(struct xhci_device *dev) {
@@ -265,6 +267,12 @@ static inline struct xhci_slot *xhci_usb_slot(struct usb_device *dev) {
 
 static inline void xhci_port_set_state(struct xhci_port *port,
                                        enum xhci_port_state state) {
+    if (state == XHCI_PORT_STATE_DISCONNECTING)
+        k_printf("Disconnecting\n");
+
+    if (state == XHCI_PORT_STATE_CONNECTING)
+        k_printf("Connecting\n");
+
     port->state = state;
     port->generation++;
 }

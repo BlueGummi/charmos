@@ -236,6 +236,7 @@ static void xhci_work_port_connect(void *arg1, void *arg2) {
     struct xhci_device *d = arg1;
 
     enum irql irql = spin_lock_irq_disable(&d->lock);
+
     for (size_t i = 0; i < XHCI_PORT_COUNT; i++) {
         port = &d->port_info[i];
         if (port->state == XHCI_PORT_STATE_CONNECTING) {
@@ -304,8 +305,9 @@ static void xhci_worker(void *arg) {
     struct xhci_request *req;
     while (true) {
         while ((req = xhci_finished_requests_pop_front(dev))) {
-            if (req->callback)
+            if (req->callback) {
                 req->callback(dev, req);
+            }
         }
 
         xhci_worker_submit_waiting(dev);
@@ -377,6 +379,9 @@ static void catch_stragglers_on_list(struct xhci_device *dev,
     struct xhci_request *req, *tmp;
     list_for_each_entry_safe(req, tmp, &dev->requests[status], list) {
         uint8_t slot = req->command->slot ? req->command->slot->slot_id : 0;
+        if (!slot)
+            continue;
+
         struct xhci_slot *s = xhci_get_slot(dev, slot);
         enum xhci_slot_state state = xhci_get_slot_state(s);
         bool slot_here = state == XHCI_SLOT_STATE_ENABLED;
@@ -480,7 +485,12 @@ static void xhci_process_request(struct xhci_device *dev,
                                  struct xhci_trb *trb) {
     struct xhci_request *found = xhci_lookup_trb(dev, trb);
     if (!found) {
-        xhci_warn("No matching request for address 0x%lx", trb->parameter);
+        k_printf("No matching request for address 0x%lx on port %u\n",
+                 trb->parameter, TRB_PORT(trb->parameter));
+        struct xhci_request *rq;
+        list_for_each_entry(rq, &dev->requests[XHCI_REQUEST_OUTGOING], list) {
+            k_printf("Request has TRB addr 0x%lx\n", rq->trb_phys);
+        }
         return;
     }
 
@@ -512,13 +522,22 @@ static void xhci_process_port_reset(struct xhci_device *dev,
                                     struct xhci_trb *trb, uint32_t *portsc) {
     mmio_write_32(portsc, mmio_read_32(portsc) | PORTSC_PRC);
 
-    /* for RESET there should be one and only request */
-    struct list_head *lh =
-        list_pop_front_init(&dev->requests[XHCI_REQUEST_OUTGOING]);
+    bool got_it = false;
+    struct xhci_request *found, *n;
+    list_for_each_entry_safe(found, n, &dev->requests[XHCI_REQUEST_OUTGOING],
+                             list) {
+        if (found->port_reset) {
+            got_it = true;
+            break;
+        }
+    }
 
-    struct xhci_request *req = container_of(lh, struct xhci_request, list);
-    xhci_process_trb_into_request(dev, req, trb);
-    list_add_tail(&req->list, &dev->requests[XHCI_REQUEST_PROCESSED]);
+    if (!got_it)
+        return;
+
+    list_del(&found->list);
+    xhci_process_trb_into_request(dev, found, trb);
+    list_add_tail(&found->list, &dev->requests[XHCI_REQUEST_PROCESSED]);
 }
 
 static struct xhci_port *xhci_port_for_trb(struct xhci_device *dev,
@@ -539,11 +558,15 @@ static void xhci_process_port_connect(struct xhci_device *dev,
 static void xhci_process_port_disconnect(struct xhci_device *dev,
                                          struct xhci_trb *trb) {
     struct xhci_port *port = xhci_port_for_trb(dev, trb);
+    xhci_port_set_state(port, XHCI_PORT_STATE_DISCONNECTING);
+
+    /* Port did not have a slot */
+    if (!port->slot)
+        goto end;
 
     uint8_t slot_id = port->slot->slot_id;
 
     struct xhci_slot *s = xhci_get_slot(dev, slot_id);
-    xhci_port_set_state(port, XHCI_PORT_STATE_DISCONNECTING);
     xhci_set_slot_state(s, XHCI_SLOT_STATE_DISCONNECTING);
 
     uint8_t cc = TRB_CC(mmio_read_32(&trb->status));
@@ -567,6 +590,7 @@ static void xhci_process_port_disconnect(struct xhci_device *dev,
         list_add_tail(&iter->list, &dev->requests[XHCI_REQUEST_PROCESSED]);
     }
 
+end:
     workqueue_enqueue(xhci_wq, &dev->port_disconnect_work);
 }
 
@@ -636,7 +660,6 @@ enum irq_result xhci_isr(void *ctx, uint8_t vector, struct irq_context *rsp) {
 
     xhci_clear_interrupt_pending(dev);
     xhci_clear_usbsts_ei(dev);
-
     semaphore_post(&dev->sem);
 
     lapic_write(LAPIC_REG_EOI, 0);

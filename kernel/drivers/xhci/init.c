@@ -134,6 +134,7 @@ enum usb_status xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
     struct xhci_command cmd;
     xhci_request_init_blocking(&request, &cmd, /* port = */ 0);
     list_add_tail(&request.list, &dev->requests[XHCI_REQUEST_OUTGOING]);
+    request.port_reset = true;
 
     mmio_write_32(portsc, to_write);
 
@@ -187,7 +188,7 @@ enum usb_status xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
     }
 
     if (!xhci_request_ok(&request)) {
-        xhci_warn("port %u reset did not generate a PSC event", portnum);
+        k_printf("Request not ok\n");
         return xhci_rq_to_usb_status(&request);
     }
 
@@ -347,23 +348,29 @@ void xhci_device_start_interrupts(uint8_t bus, uint8_t slot, uint8_t func,
 }
 
 enum usb_status xhci_port_init(struct xhci_port *p) {
+    k_printf("Port %u init\n", p->port_id);
     struct xhci_device *dev = p->dev;
     uint8_t port = p->port_id;
     enum usb_status err = USB_OK;
     uint8_t slot_id;
     struct usb_device *usb;
 
-    if ((err = xhci_reset_port(dev, port)) != USB_OK)
+    if ((err = xhci_reset_port(dev, port)) != USB_OK) {
+        k_printf("reset fail\n");
         return err;
+    }
 
-    if ((slot_id = xhci_enable_slot(dev)) == 0)
+    if ((slot_id = xhci_enable_slot(dev)) == 0) {
+        k_printf("es fail\n");
         return USB_ERR_NO_DEVICE;
+    }
 
     struct xhci_slot *this_slot = xhci_get_slot(dev, slot_id);
     this_slot->state = XHCI_SLOT_STATE_ENABLED;
 
     struct xhci_port *this_port = &dev->port_info[port - 1];
     if ((err = xhci_address_device(this_port, slot_id)) != USB_OK) {
+        k_printf("address fail\n");
         xhci_teardown_slot(this_slot);
         return err;
     }
