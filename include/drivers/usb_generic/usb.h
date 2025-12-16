@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <structures/list.h>
 #include <types/refcount.h>
 struct usb_controller;
 struct usb_device;
@@ -136,13 +137,15 @@ struct usb_request;
 #define usb_warn(string, ...) k_info("USB", K_WARN, string, ##__VA_ARGS__)
 #define usb_error(string, ...) k_info("USB", K_ERROR, string, ##__VA_ARGS__)
 
-#define USB_DRIVER_REGISTER(n, cc, sc, proto, probe_fn, free_fn)               \
+#define USB_DRIVER_REGISTER(n, cc, sc, proto, bringup_fn, teardown_fn,         \
+                            free_fn)                                           \
     static struct usb_driver usb_driver_##n __attribute__((                    \
         section(".kernel_usb_drivers"), used)) = {.name = #n,                  \
                                                   .class_code = cc,            \
                                                   .subclass = sc,              \
                                                   .protocol = proto,           \
-                                                  .probe = probe_fn,           \
+                                                  .bringup = bringup_fn,       \
+                                                  .teardown = teardown_fn,     \
                                                   .free = free_fn};
 
 /* Request codes */
@@ -189,9 +192,11 @@ enum usb_status {
     USB_ERR_CANCELLED,
     USB_ERR_OOM,
     USB_ERR_INVALID_ARGUMENT,
+    USB_ERR_NO_ENDPOINT,
 };
 
 enum usb_dev_status {
+    USB_DEV_UNDEF,
     USB_DEV_DISCONNECTED,
     USB_DEV_CONNECTED,
     USB_DEV_ENABLED,
@@ -308,6 +313,7 @@ struct usb_controller_ops {
     enum usb_status (*submit_bulk_transfer)(struct usb_request *);
     enum usb_status (*submit_interrupt_transfer)(struct usb_request *);
     enum usb_status (*reset_port)(struct usb_device *dev);
+    enum usb_status (*configure_endpoint)(struct usb_device *dev);
     void (*poll_ports)(struct usb_controller *);
 };
 
@@ -323,12 +329,14 @@ struct usb_driver {
     uint8_t subclass;
     uint8_t protocol;
 
-    bool (*probe)(struct usb_device *dev); /* Attach and set up */
-    void (*free)(struct usb_device *dev);  /* Clean up */
+    enum usb_status (*bringup)(struct usb_device *dev); /* Called on connect */
+    void (*teardown)(struct usb_device *dev); /* Called on disconnect */
+    void (*free)(struct usb_device *dev);     /* Called on last ref drop */
 } __linker_aligned;
 
 struct usb_device {
-    volatile enum usb_dev_status status;
+    struct list_head hc_list;
+    _Atomic enum usb_dev_status status;
     char manufacturer[128];
     char product[128];
     char config_str[128];
@@ -357,17 +365,9 @@ struct usb_device {
     refcount_t refcount;
     atomic_bool alive;
 
-    /* only called at the VERY last rc drop */
-    void (*teardown)(struct usb_device *dev);
-    void (*free)(struct usb_device *dev);
+    void (*teardown)(struct usb_device *dev); /* called during disconnect */
+    void (*free)(struct usb_device *dev);     /* called during last rc drop */
 };
-REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(usb_device, refcount, alive,
-                                                   == false);
-
-static inline void usb_device_put(struct usb_device *dev) {
-    if (refcount_dec_and_test(&dev->refcount))
-        dev->free(dev);
-}
 
 struct usb_request {
     struct usb_device *dev;
@@ -396,17 +396,32 @@ struct usb_request {
         (_req)->dev = (_dev);                                                  \
     } while (0)
 
-bool usb_get_string_descriptor(struct usb_device *dev, uint8_t string_idx,
-                               char *out, size_t max_len);
-void usb_get_device_descriptor(struct usb_device *dev);
-bool usb_parse_config_descriptor(struct usb_device *dev);
-bool usb_set_configuration(struct usb_device *dev);
+REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(usb_device, refcount, status,
+                                                   == USB_DEV_DISCONNECTED);
 
+void usb_free_device(struct usb_device *dev);
+static inline void usb_device_put(struct usb_device *dev) {
+    if (refcount_dec_and_test(&dev->refcount))
+        usb_free_device(dev);
+}
+
+void usb_teardown_device(struct usb_device *dev);
+enum usb_status usb_get_string_descriptor(struct usb_device *dev,
+                                          uint8_t string_idx, char *out,
+                                          size_t max_len);
+enum usb_status usb_get_device_descriptor(struct usb_device *dev);
+enum usb_status usb_parse_config_descriptor(struct usb_device *dev);
+enum usb_status usb_set_configuration(struct usb_device *dev);
+enum usb_status usb_init_device(struct usb_device *dev);
 void usb_try_bind_driver(struct usb_device *dev);
 uint8_t usb_construct_rq_bitmap(uint8_t transfer, uint8_t type, uint8_t recip);
 enum usb_status usb_transfer_sync(enum usb_status (*fn)(struct usb_request *),
                                   struct usb_request *request);
 void usb_print_device(struct usb_device *dev);
+struct usb_interface_descriptor *usb_find_interface(struct usb_device *dev,
+                                                    uint8_t class,
+                                                    uint8_t subclass,
+                                                    uint8_t protocol);
 
 static inline uint8_t get_ep_index(struct usb_endpoint *ep) {
     return (ep->number * 2) + (ep->in ? 1 : 0);

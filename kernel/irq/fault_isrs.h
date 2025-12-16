@@ -23,7 +23,6 @@ enum irq_result nmi_isr(void *ctx, uint8_t vector, struct irq_context *rsp) {
     (void) ctx, (void) vector, (void) rsp;
     if (atomic_load(&global.panicked)) {
         disable_interrupts();
-        k_printf("    [CPU %u] Halting due to system panic\n", smp_core_id());
         while (true)
             wait_for_interrupt();
     }

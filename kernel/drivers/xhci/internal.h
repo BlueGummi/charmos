@@ -147,6 +147,7 @@ static inline void xhci_request_init_blocking(struct xhci_request *req,
 static inline void xhci_request_init(struct xhci_request *req,
                                      struct xhci_command *cmd,
                                      struct usb_request *rq) {
+
     req->status = XHCI_REQUEST_MAX;
     req->completion_code = 0;
     req->command = cmd;
@@ -259,4 +260,10 @@ static inline struct xhci_trb *xhci_ring_next_trb(struct xhci_ring *ring) {
 
 static inline struct xhci_slot *xhci_usb_slot(struct usb_device *dev) {
     return dev->slot;
+}
+
+static inline void xhci_port_set_state(struct xhci_port *port,
+                                       enum xhci_port_state state) {
+    port->state = state;
+    port->generation++;
 }

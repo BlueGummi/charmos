@@ -201,6 +201,8 @@ void irq_enable(uint8_t irq) {
 
 void irq_init() {
     for (size_t i = 0; i < IDT_ENTRIES; i++) {
+        if (i == IRQ_PAGE_FAULT || i == IRQ_DBF)
+            continue;
         struct irq_desc *desc = &irq_table[i];
         if (!cpu_mask_init(&desc->masked_cpus, global.core_count))
             k_panic("OOM\n");
@@ -221,10 +223,11 @@ void irq_init() {
 
     irq_register("ssf", IRQ_SSF, ss_handler, NULL, IRQ_FLAG_NONE);
     irq_register("gpf", IRQ_GPF, gpf_handler, NULL, IRQ_FLAG_NONE);
+    /*
     irq_register("double_fault", IRQ_DBF, double_fault_handler, NULL,
                  IRQ_FLAG_NONE);
     irq_register("page_fault", IRQ_PAGE_FAULT, page_fault_handler, NULL,
-                 IRQ_FLAG_NONE);
+                 IRQ_FLAG_NONE);*/
 
     irq_register("timer", IRQ_TIMER, scheduler_timer_isr, NULL, IRQ_FLAG_NONE);
     irq_register("nmi", IRQ_NMI, nmi_isr, NULL, IRQ_FLAG_NONE);

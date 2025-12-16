@@ -10,7 +10,6 @@
 #include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <string.h>
 
 #include "internal.h"
 
@@ -44,9 +43,11 @@ void xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd) {
 
     /* Emit TRBs */
     cmd->emit(cmd, ring);
+    struct xhci_request *rq = cmd->request;
 
-    cmd->request->status = XHCI_REQUEST_OUTGOING;
-    list_add_tail(&cmd->request->list, &dev->requests[XHCI_REQUEST_OUTGOING]);
+    rq->generation = dev->port_info[rq->port - 1].generation;
+    rq->status = XHCI_REQUEST_OUTGOING;
+    list_add_tail(&rq->list, &dev->requests[XHCI_REQUEST_OUTGOING]);
 
     xhci_ring_doorbell(dev, cmd->slot ? cmd->slot->slot_id : 0, cmd->ep_id);
 
@@ -66,7 +67,6 @@ enum usb_status xhci_submit_interrupt_transfer(struct usb_request *req) {
 
     struct usb_endpoint *ep = req->ep;
 
-    uint8_t slot_id = slot->slot_id;
     uint8_t ep_id = get_ep_index(ep);
 
     struct xhci_ring *ring = slot->ep_rings[ep_id];

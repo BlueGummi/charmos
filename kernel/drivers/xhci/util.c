@@ -125,19 +125,27 @@ struct xhci_ring *xhci_allocate_event_ring(void) {
 }
 
 void xhci_free_ring(struct xhci_ring *ring) {
+    if (!ring)
+        return;
+
     kfree_aligned(ring->trbs, FREE_PARAMS_DEFAULT);
     kfree(ring, FREE_PARAMS_DEFAULT);
 }
 
 void xhci_teardown_slot(struct xhci_slot *me) {
-    xhci_set_slot_state(me, XHCI_SLOT_STATE_DISABLED);
+    struct xhci_ring *copy_into[32];
+    enum irql irql = spin_lock_irq_disable(&me->dev->lock);
+    xhci_set_slot_state(me, XHCI_SLOT_STATE_DISCONNECTED);
+    me->udev = NULL;
+    me->port = NULL;
+    memmove(copy_into, me->ep_rings, sizeof(struct xhci_ring *) * 32);
+    spin_unlock(&me->dev->lock, irql);
+
     /* tear down the rings */
-    xhci_disable_slot(me->dev, me);
-    me->slot_id = 0;
     for (size_t i = 0; i < 32; i++) {
-        struct xhci_ring *ring = me->ep_rings[i];
+        struct xhci_ring *ring = copy_into[i];
         xhci_free_ring(ring);
     }
 
-    memset(me, 0, sizeof(*me));
+    xhci_disable_slot(me->dev, me);
 }

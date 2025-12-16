@@ -6,12 +6,6 @@
  */
 #pragma once
 
-/* ================================
- * USB class / subclass / protocol
- * ================================ */
-
-#define USB_CLASS_HID 0x03
-
 /* HID subclasses */
 #define USB_HID_SUBCLASS_NONE 0x00
 #define USB_HID_SUBCLASS_BOOT 0x01

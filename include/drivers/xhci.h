@@ -15,6 +15,8 @@ struct pci_device;
 
 #define XHCI_DEVICE_TIMEOUT 1000
 #define TRB_RING_SIZE 256
+#define XHCI_PORT_COUNT 64
+#define XHCI_SLOT_COUNT 255
 
 #define XHCI_INPUT_CTX_ADD_FLAGS ((1 << 0) | (1 << 1))
 
@@ -562,8 +564,15 @@ enum xhci_slot_state {
     XHCI_SLOT_STATE_UNDEF,
     XHCI_SLOT_STATE_ENABLED,
     XHCI_SLOT_STATE_DISCONNECTING,
-    XHCI_SLOT_STATE_DISABLED,
-    XHCI_SLOT_STATE_DISABLING,
+    XHCI_SLOT_STATE_DISCONNECTED,
+};
+
+enum xhci_port_state {
+    XHCI_PORT_STATE_UNDEF,
+    XHCI_PORT_STATE_CONNECTING,
+    XHCI_PORT_STATE_CONNECTED,
+    XHCI_PORT_STATE_DISCONNECTING,
+    XHCI_PORT_STATE_DISCONNECTED,
 };
 
 struct xhci_slot {
@@ -574,14 +583,18 @@ struct xhci_slot {
 
     /* As soon as this drops to zero we clear the ep_rings */
     refcount_t refcount;
-    uint8_t port_id;
+    struct xhci_port *port;
     struct usb_device *udev;
 };
 
+/* protected by xhci_device->lock */
 struct xhci_port {
+    uint8_t port_id;
     struct xhci_slot *slot;
     uint8_t speed;
     bool usb3;
+    uint64_t generation;
+    enum xhci_port_state state;
 };
 
 enum xhci_request_status {
@@ -622,13 +635,13 @@ struct xhci_device {
 
     struct xhci_port_regs *port_regs;
     uint64_t ports;
-    struct xhci_slot slots[255];
-    struct xhci_port port_info[64];
+    struct xhci_slot slots[XHCI_SLOT_COUNT];
+    struct xhci_port port_info[XHCI_PORT_COUNT];
 
     struct list_head requests[XHCI_REQUEST_MAX];
 
     size_t num_devices;
-    struct usb_device **devices;
+    struct list_head devices;
     struct spinlock lock;
     struct semaphore sem;
     struct work slot_disconnect_work;
@@ -662,6 +675,7 @@ struct xhci_request {
     volatile uint64_t return_parameter;
     volatile uint32_t return_status;
     volatile uint32_t return_control;
+    uint64_t generation;
 
     volatile enum xhci_request_status status;
 

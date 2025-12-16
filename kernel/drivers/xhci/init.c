@@ -80,17 +80,18 @@ void xhci_disable_slot(struct xhci_device *dev, struct xhci_slot *slot) {
     xhci_request_init_blocking(&request, &cmd, /* port = */ 0);
 
     struct xhci_trb outgoing = {
-        .parameter = slot->slot_id,
+        .parameter = 0,
         .status = 0,
         .control = TRB_SET_TYPE(TRB_TYPE_DISABLE_SLOT) |
-                   TRB_SET_CYCLE(dev->cmd_ring->cycle),
+                   TRB_SET_CYCLE(dev->cmd_ring->cycle) |
+                   TRB_SET_SLOT_ID(slot->slot_id),
     };
 
     cmd = (struct xhci_command) {
         .private = &outgoing,
         .emit = xhci_emit_singular,
         .ep_id = 0,
-        .slot = slot,
+        .slot = NULL,
         .ring = dev->cmd_ring,
         .request = &request,
         .num_trbs = 1,
@@ -251,10 +252,6 @@ void xhci_detect_usb3_ports(struct xhci_device *dev) {
     uint32_t hcc_params1 = mmio_read_32(&dev->cap_regs->hcc_params1);
     uint32_t offset = (hcc_params1 >> 16) & 0xFFFF;
 
-    for (uint32_t i = 0; i < 64; i++) {
-        dev->port_info[i].usb3 = false;
-    }
-
     while (offset) {
         void *ext_cap_addr = (uint8_t *) dev->cap_regs + offset * 4;
         uint32_t cap_header = mmio_read_32(ext_cap_addr);
@@ -322,6 +319,26 @@ struct xhci_device *xhci_device_create(void *mmio) {
     dev->cap_regs = cap;
     dev->op_regs = op;
     dev->ports = cap->hcs_params1 & 0xff;
+    INIT_LIST_HEAD(&dev->devices);
+
+    for (uint32_t i = 0; i < XHCI_PORT_COUNT; i++) {
+
+        struct xhci_port *p = &dev->port_info[i];
+        p->generation = 0;
+        p->usb3 = false;
+        p->state = XHCI_PORT_STATE_DISCONNECTED;
+        uint32_t portsc = xhci_read_portsc(dev, i + 1);
+        uint8_t speed = portsc & 0xF;
+        p->speed = speed;
+        p->port_id = (i + 1);
+    }
+
+    for (size_t i = 0; i < XHCI_SLOT_COUNT; i++) {
+        struct xhci_slot *xs = &dev->slots[i];
+        xs->dev = dev;
+        xs->state = XHCI_SLOT_STATE_DISCONNECTED;
+        xs->slot_id = (i + 1);
+    }
 
     return dev;
 }

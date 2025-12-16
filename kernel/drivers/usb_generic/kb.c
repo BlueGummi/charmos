@@ -120,19 +120,6 @@ void usb_kbd_process_report(struct usb_hid_keyboard *kbd,
     }
 }
 
-struct usb_interface_descriptor *usb_find_interface(struct usb_device *dev,
-                                                    uint8_t class,
-                                                    uint8_t subclass,
-                                                    uint8_t protocol) {
-    for (size_t i = 0; i < dev->num_interfaces; i++) {
-        struct usb_interface_descriptor *intf = dev->interfaces[i];
-        if (intf->class == class && intf->subclass == subclass &&
-            intf->protocol == protocol)
-            return intf;
-    }
-    return NULL;
-}
-
 enum usb_status usb_keyboard_get_descriptor(struct usb_device *dev,
                                             uint8_t interface_number,
                                             uint16_t len, void *buf) {
@@ -192,7 +179,7 @@ struct usb_hid_keyboard *usb_keyboard_create(struct usb_device *dev,
     return kbd;
 }
 
-bool usb_keyboard_probe(struct usb_device *dev) {
+enum usb_status usb_keyboard_bringup(struct usb_device *dev) {
     struct usb_interface_descriptor *intf =
         usb_find_interface(dev, USB_CLASS_HID, USB_SUBCLASS_HID_BOOT_INTERFACE,
                            USB_PROTOCOL_HID_KEYBOARD);
@@ -202,11 +189,14 @@ bool usb_keyboard_probe(struct usb_device *dev) {
     uint8_t iface_num = intf->interface_number;
 
     uint8_t *report_buf = kzalloc_aligned(256, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
-    if (usb_keyboard_get_descriptor(dev, iface_num, 256, report_buf) !=
+
+    enum usb_status err = USB_OK;
+    if ((err = usb_keyboard_get_descriptor(dev, iface_num, 256, report_buf)) !=
         USB_OK) {
-        k_info("USBKB", K_WARN, "Failed to fetch report descriptor");
-        return false;
+        kfree_aligned(report_buf, FREE_PARAMS_DEFAULT);
+        return err;
     }
+
     kfree_aligned(report_buf, FREE_PARAMS_DEFAULT);
 
     for (uint8_t i = 0; i < dev->num_endpoints; i++) {
@@ -217,13 +207,14 @@ bool usb_keyboard_probe(struct usb_device *dev) {
             usb_keyboard_create(dev, ep);
             k_info("USBKB", K_INFO, "Keyboard endpoint 0x%02x ready",
                    ep->address);
-            return true;
+            return USB_OK;
         }
     }
 
     k_info("USBKB", K_WARN, "No interrupt IN endpoint found");
-    return false;
+    return USB_ERR_NO_ENDPOINT;
 }
 
 USB_DRIVER_REGISTER(keyboard, USB_CLASS_HID, USB_SUBCLASS_HID_BOOT_INTERFACE,
-                    USB_PROTOCOL_HID_KEYBOARD, usb_keyboard_probe, NULL);
+                    USB_PROTOCOL_HID_KEYBOARD, usb_keyboard_bringup, NULL,
+                    NULL);

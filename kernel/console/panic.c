@@ -13,6 +13,7 @@
 void panic_handler(struct panic_regs *regs) {
     disable_interrupts();
 
+    /*
     k_printf("    [RAX]: %016lx  [RBX]: %016lx  [RCX]: %016lx\n", regs->rax,
              regs->rbx, regs->rcx);
     k_printf("    [RDX]: %016lx  [RSI]: %016lx  [RDI]: %016lx\n", regs->rdx,
@@ -23,7 +24,7 @@ void panic_handler(struct panic_regs *regs) {
              regs->r9, regs->r10);
     k_printf("    [R11]: %016lx  [R12]: %016lx  [R13]: %016lx\n", regs->r11,
              regs->r12, regs->r13);
-    k_printf("    [R14]: %016lx  [R15]: %016lx\n\n", regs->r14, regs->r15);
+    k_printf("    [R14]: %016lx  [R15]: %016lx\n\n", regs->r14, regs->r15);*/
 
     if (global.current_bootstage >= BOOTSTAGE_MID_MP) {
         panic_broadcast(smp_core_id());
@@ -42,13 +43,13 @@ void k_panic_impl(const char *file, int line, const char *func, const char *fmt,
 
     k_printf("\n" EIGHTY_LINES "\n");
     k_printf("\n                                [" ANSI_BG_RED
-             "KERNEL PANIC" ANSI_RESET "] @ time %llu\n\n",
+             "KERNEL PANIC" ANSI_RESET "] @ time %llu\n",
              time_get_ms());
-    k_printf(ANSI_RED "%s\n\n" ANSI_RESET, OS_LOGO_PANIC_CENTERED);
+    k_printf(ANSI_RED "%s\n" ANSI_RESET, OS_LOGO_PANIC_CENTERED);
 
     panic_entry();
 
-    k_printf("\n    [" ANSI_BRIGHT_BLUE "AT" ANSI_RESET " ");
+    k_printf("    [" ANSI_BRIGHT_BLUE "AT" ANSI_RESET " ");
     time_print_current();
     k_printf("]\n");
 

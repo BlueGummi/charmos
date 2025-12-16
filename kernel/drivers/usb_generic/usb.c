@@ -52,10 +52,12 @@ static uint8_t usb_get_desc_bitmap(void) {
                                    USB_REQUEST_RECIPIENT_DEVICE);
 }
 
-bool usb_get_string_descriptor(struct usb_device *dev, uint8_t string_idx,
-                               char *out, size_t max_len) {
+enum usb_status usb_get_string_descriptor(struct usb_device *dev,
+                                          uint8_t string_idx, char *out,
+                                          size_t max_len) {
+    enum usb_status err = USB_OK;
     if (!string_idx)
-        return false;
+        return USB_ERR_INVALID_ARGUMENT;
 
     struct usb_controller *ctrl = dev->host;
     uint8_t *desc = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
@@ -74,12 +76,13 @@ bool usb_get_string_descriptor(struct usb_device *dev, uint8_t string_idx,
         .dev = dev,
     };
 
-    if (usb_transfer_sync(ctrl->ops.submit_control_transfer, &req) != USB_OK)
-        return false;
+    if ((err = usb_transfer_sync(ctrl->ops.submit_control_transfer, &req)) !=
+        USB_OK)
+        return err;
 
     uint8_t bLength = desc[0];
-    if (bLength < 2 || bLength > 255)
-        return false;
+    if (bLength < 2)
+        return USB_ERR_INVALID_ARGUMENT;
 
     size_t out_idx = 0;
     for (size_t i = 2; i < bLength && out_idx < (max_len - 1); i += 2) {
@@ -88,10 +91,10 @@ bool usb_get_string_descriptor(struct usb_device *dev, uint8_t string_idx,
     out[out_idx] = '\0';
 
     kfree_aligned(desc, FREE_PARAMS_DEFAULT);
-    return true;
+    return err;
 }
 
-void usb_get_device_descriptor(struct usb_device *dev) {
+enum usb_status usb_get_device_descriptor(struct usb_device *dev) {
     uint8_t *desc = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
 
     struct usb_setup_packet setup = {
@@ -103,7 +106,6 @@ void usb_get_device_descriptor(struct usb_device *dev) {
     };
 
     struct usb_controller *ctrl = dev->host;
-    uint8_t port = dev->port;
 
     struct usb_request request = {
         .setup = &setup,
@@ -111,10 +113,10 @@ void usb_get_device_descriptor(struct usb_device *dev) {
         .dev = dev,
     };
 
-    if (usb_transfer_sync(ctrl->ops.submit_control_transfer, &request) !=
-        USB_OK) {
-        usb_warn("Failed to get device descriptor on port %u", port);
-        return;
+    enum usb_status err;
+    if ((err = usb_transfer_sync(ctrl->ops.submit_control_transfer,
+                                 &request)) != USB_OK) {
+        return err;
     }
 
     struct usb_device_descriptor *ddesc = (void *) desc;
@@ -125,6 +127,7 @@ void usb_get_device_descriptor(struct usb_device *dev) {
                               sizeof(dev->product));
 
     dev->descriptor = ddesc;
+    return USB_OK;
 }
 
 static void match_interfaces(struct usb_driver *driver,
@@ -138,9 +141,15 @@ static void match_interfaces(struct usb_driver *driver,
 
         bool everything_matches = class && subclass && proto;
         if (everything_matches) {
-            if (driver->probe && driver->probe(dev)) {
+            if (driver->bringup) {
+                /* driver gets a ref */
+                if (!usb_device_get(dev))
+                    return; 
+
+                driver->bringup(dev);
                 dev->driver = driver;
                 dev->free = driver->free;
+                dev->teardown = driver->teardown;
                 return;
             }
         }
@@ -208,7 +217,7 @@ static void setup_config_descriptor(struct usb_device *dev, uint8_t *ptr,
     }
 }
 
-bool usb_parse_config_descriptor(struct usb_device *dev) {
+enum usb_status usb_parse_config_descriptor(struct usb_device *dev) {
     uint8_t *desc = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
 
     struct usb_setup_packet setup = {
@@ -220,7 +229,6 @@ bool usb_parse_config_descriptor(struct usb_device *dev) {
     };
 
     struct usb_controller *ctrl = dev->host;
-    uint8_t port = dev->port;
 
     struct usb_request request = {
         .setup = &setup,
@@ -229,11 +237,11 @@ bool usb_parse_config_descriptor(struct usb_device *dev) {
 
     };
 
-    if (usb_transfer_sync(ctrl->ops.submit_control_transfer, &request) !=
-        USB_OK) {
-        usb_warn("Failed to get config descriptor header on port %u", port);
+    enum usb_status err;
+    if ((err = usb_transfer_sync(ctrl->ops.submit_control_transfer,
+                                 &request)) != USB_OK) {
         kfree_aligned(desc, FREE_PARAMS_DEFAULT);
-        return false;
+        return err;
     }
 
     struct usb_config_descriptor *cdesc = (void *) desc;
@@ -242,11 +250,10 @@ bool usb_parse_config_descriptor(struct usb_device *dev) {
     uint16_t total_len = cdesc->total_length;
     setup.length = total_len;
 
-    if (usb_transfer_sync(ctrl->ops.submit_control_transfer, &request) !=
-        USB_OK) {
-        usb_warn("Failed to get full config descriptor on port %u", port);
+    if ((err = usb_transfer_sync(ctrl->ops.submit_control_transfer,
+                                 &request)) != USB_OK) {
         kfree_aligned(desc, FREE_PARAMS_DEFAULT);
-        return false;
+        return err;
     }
 
     usb_get_string_descriptor(dev, cdesc->configuration, dev->config_str,
@@ -254,12 +261,11 @@ bool usb_parse_config_descriptor(struct usb_device *dev) {
 
     setup_config_descriptor(dev, desc, desc + total_len);
     kfree_aligned(desc, FREE_PARAMS_DEFAULT);
-    return true;
+    return USB_OK;
 }
 
-bool usb_set_configuration(struct usb_device *dev) {
+enum usb_status usb_set_configuration(struct usb_device *dev) {
     struct usb_controller *ctrl = dev->host;
-    uint8_t port = dev->port;
 
     uint8_t bitmap = usb_construct_rq_bitmap(USB_REQUEST_TRANS_HTD,
                                              USB_REQUEST_TYPE_STANDARD,
@@ -279,16 +285,77 @@ bool usb_set_configuration(struct usb_device *dev) {
         .dev = dev,
     };
 
-    if (usb_transfer_sync(ctrl->ops.submit_control_transfer, &request) !=
-        USB_OK) {
-        usb_warn("Failed to set configuration on port %u\n", port);
-        return false;
+    enum usb_status err;
+    if ((err = usb_transfer_sync(ctrl->ops.submit_control_transfer,
+                                 &request)) != USB_OK) {
+        return err;
     }
 
-    return true;
+    return USB_OK;
+}
+
+struct usb_interface_descriptor *usb_find_interface(struct usb_device *dev,
+                                                    uint8_t class,
+                                                    uint8_t subclass,
+                                                    uint8_t protocol) {
+    for (size_t i = 0; i < dev->num_interfaces; i++) {
+        struct usb_interface_descriptor *intf = dev->interfaces[i];
+        if (intf->class == class && intf->subclass == subclass &&
+            intf->protocol == protocol)
+            return intf;
+    }
+    return NULL;
 }
 
 void usb_print_device(struct usb_device *dev) {
     usb_info("Found device '%s' manufactured by '%s' of type '%s'",
              dev->product, dev->manufacturer, dev->config_str);
+}
+
+enum usb_status usb_init_device(struct usb_device *dev) {
+    enum usb_status err = USB_OK;
+    if ((err = usb_get_device_descriptor(dev)) != USB_OK)
+        return err;
+
+    if ((err = usb_parse_config_descriptor(dev)) != USB_OK)
+        return err;
+
+    if ((err = usb_set_configuration(dev)) != USB_OK)
+        return err;
+
+    if ((err = dev->host->ops.configure_endpoint(dev)) != USB_OK)
+        return err;
+
+    usb_print_device(dev);
+
+    usb_try_bind_driver(dev);
+    return err;
+}
+
+/* get rid of the driver's reference */
+void usb_teardown_device(struct usb_device *dev) {
+    atomic_store_explicit(&dev->status, USB_DEV_DISCONNECTED,
+                          memory_order_release);
+    if (dev->teardown)
+        dev->teardown(dev);
+
+    usb_device_put(dev);
+}
+
+void usb_free_device(struct usb_device *dev) {
+    kassert(refcount_read(&dev->refcount) == 0);
+    if (dev->free)
+        dev->free(dev);
+
+    for (size_t i = 0; i < dev->num_interfaces; i++) {
+        struct usb_interface_descriptor *infdr = dev->interfaces[i];
+        kfree(infdr, FREE_PARAMS_DEFAULT);
+    }
+    kfree(dev->interfaces, FREE_PARAMS_DEFAULT);
+    for (size_t i = 0; i < dev->num_endpoints; i++) {
+        struct usb_endpoint *uep = dev->endpoints[i];
+        kfree(uep, FREE_PARAMS_DEFAULT);
+    }
+    kfree(dev->endpoints, FREE_PARAMS_DEFAULT);
+    kfree_aligned(dev->descriptor, FREE_PARAMS_DEFAULT);
 }
