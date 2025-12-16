@@ -62,7 +62,8 @@ static inline void xhci_interrupt_disable_ints(struct xhci_device *dev) {
 }
 
 static inline void xhci_erdp_ack(struct xhci_device *dev, uint64_t erdp) {
-    mmio_write_64(&dev->intr_regs->erdp, erdp | XHCI_ERDP_EHB_BIT);
+    mmio_write_64(&dev->intr_regs->erdp,
+                  erdp | XHCI_ERDP_EHB_BIT | dev->event_ring->cycle);
 }
 
 static inline uint8_t usb_to_xhci_ep_type(bool in, uint8_t type) {
@@ -267,10 +268,10 @@ static inline struct xhci_slot *xhci_usb_slot(struct usb_device *dev) {
 
 static inline void xhci_port_set_state(struct xhci_port *port,
                                        enum xhci_port_state state) {
-    if (state == XHCI_PORT_STATE_DISCONNECTING)
+    if (state == XHCI_PORT_STATE_DISCONNECTED)
         k_printf("Disconnecting\n");
 
-    if (state == XHCI_PORT_STATE_CONNECTING)
+    if (state == XHCI_PORT_STATE_CONNECTED)
         k_printf("Connecting\n");
 
     port->state = state;

@@ -27,9 +27,8 @@ void xhci_setup_event_ring(struct xhci_device *dev) {
 
     mmio_write_32(&ir->imod, 0);
     mmio_write_32(&ir->erstsz, 1);
+    mmio_write_64(&ir->erdp, dev->event_ring->phys);
     mmio_write_64(&ir->erstba, erst_phys);
-
-    mmio_write_64(&ir->erdp, dev->event_ring->phys | XHCI_ERDP_EHB_BIT);
 }
 
 void xhci_setup_command_ring(struct xhci_device *dev) {

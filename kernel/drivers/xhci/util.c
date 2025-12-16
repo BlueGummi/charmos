@@ -107,7 +107,8 @@ struct xhci_ring *xhci_allocate_ring() {
 
     link->parameter = phys;
     link->status = 0;
-    link->control = TRB_SET_TYPE(TRB_TYPE_LINK) | ring->cycle;
+    link->control =
+        TRB_SET_TYPE(TRB_TYPE_LINK) | ring->cycle | TRB_TOGGLE_CYCLE_BIT;
 
     return ring;
 }

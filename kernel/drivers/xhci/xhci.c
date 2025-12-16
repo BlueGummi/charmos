@@ -426,8 +426,10 @@ xhci_make_request_status(struct xhci_device *dev,
     if (request->port) {
         struct xhci_port *port = &dev->port_info[request->port - 1];
 
-        if (request->generation && request->generation != port->generation)
+        if (request->generation && request->generation != port->generation) {
+            k_printf("Request generation mismatch\n");
             return XHCI_REQUEST_DISCONNECT;
+        }
     }
     switch (request->completion_code) {
     case CC_STOPPED:
@@ -657,6 +659,9 @@ enum irq_result xhci_isr(void *ctx, uint8_t vector, struct irq_context *rsp) {
     struct xhci_device *dev = ctx;
 
     xhci_process_event_ring(dev);
+
+    static int irq = 0;
+    k_printf("irq %u\n", ++irq);
 
     xhci_clear_interrupt_pending(dev);
     xhci_clear_usbsts_ei(dev);

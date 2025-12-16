@@ -530,10 +530,6 @@ struct xhci_erst_entry {
     uint32_t reserved;
 } __attribute__((packed));
 
-struct xhci_erdp {
-    uint64_t raw;
-} __attribute__((packed));
-
 #define XHCI_ERDP_EHB_BIT (1 << 3)
 
 /* Page 424 */
@@ -543,10 +539,7 @@ struct xhci_interrupter_regs {
     uint32_t erstsz; /* Event Ring Segment Table Size */
     uint32_t reserved;
     uint64_t erstba; /* Event Ring Segment Table Base Address */
-    union {
-        struct xhci_erdp erdp;
-        uint64_t erdp_raw;
-    };
+    uint64_t erdp;
 
 } __attribute__((packed));
 
