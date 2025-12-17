@@ -81,6 +81,8 @@ void xhci_cleanup(struct xhci_device *dev, struct xhci_request *req) {
 
     kfree(req->command, FREE_PARAMS_DEFAULT);
     kfree(req, FREE_PARAMS_DEFAULT);
+
+    k_printf("XHCI: cleanup device_put\n");
     usb_device_put(udev);
 }
 
@@ -140,8 +142,9 @@ void xhci_teardown_slot(struct xhci_slot *me) {
     me->port = NULL;
     memcpy(copy_into, me->ep_rings, sizeof(struct xhci_ring *) * 32);
     memset(me->ep_rings, 0, sizeof(struct xhci_ring *) * 32);
-    xhci_set_slot_state(me, XHCI_SLOT_STATE_DISCONNECTED);
+    xhci_slot_set_state(me, XHCI_SLOT_STATE_DISCONNECTED);
     spin_unlock(&me->dev->lock, irql);
+    k_printf("teardown_slot going\n");
 
     /* tear down the rings */
     for (size_t i = 0; i < 32; i++) {

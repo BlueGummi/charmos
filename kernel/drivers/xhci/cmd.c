@@ -173,8 +173,10 @@ enum usb_status xhci_send_control_transfer(struct xhci_device *dev,
     if (!usb_device_get(req->dev))
         return USB_ERR_NO_DEVICE;
 
-    if (!xhci_slot_get(slot))
+    if (!xhci_slot_get(slot)) {
+        usb_device_put(req->dev);
         return USB_ERR_NO_DEVICE;
+    }
 
     struct xhci_ring *ring = slot->ep_rings[0];
     if (!ring || !req->setup) {

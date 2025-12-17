@@ -202,12 +202,13 @@ static inline struct xhci_slot *xhci_get_slot(struct xhci_device *dev,
     return &dev->slots[id - 1];
 }
 
-static inline enum xhci_slot_state xhci_get_slot_state(struct xhci_slot *slot) {
+static inline enum xhci_slot_state xhci_slot_get_state(struct xhci_slot *slot) {
     return atomic_load_explicit(&slot->state, memory_order_acquire);
 }
 
-static inline void xhci_set_slot_state(struct xhci_slot *slot,
+static inline void xhci_slot_set_state(struct xhci_slot *slot,
                                        enum xhci_slot_state new) {
+    k_printf("slot_set_state %s\n", xhci_slot_state_str(new));
     atomic_store_explicit(&slot->state, new, memory_order_release);
 }
 
@@ -222,7 +223,7 @@ REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(
 
 static inline void xhci_slot_put(struct xhci_slot *slot) {
     if (refcount_dec_and_test(&slot->refcount)) {
-        kassert(xhci_get_slot_state(slot) == XHCI_SLOT_STATE_DISCONNECTING);
+        kassert(xhci_slot_get_state(slot) == XHCI_SLOT_STATE_DISCONNECTING);
         xhci_teardown_slot(slot);
     }
 }
@@ -274,6 +275,7 @@ static inline struct xhci_slot *xhci_usb_slot(struct usb_device *dev) {
 
 static inline void xhci_port_set_state(struct xhci_port *port,
                                        enum xhci_port_state state) {
+    k_printf("port_set_state to %s on gen %llu\n", xhci_port_state_str(state), port->generation);
     port->state = state;
     port->generation++;
 }

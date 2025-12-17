@@ -239,8 +239,6 @@ static void xhci_work_port_disconnect(void *arg1, void *arg2) {
             spin_unlock(&d->lock, irql);
 
             usb_teardown_device(dev);
-            usb_device_put(dev);
-
             xhci_slot_put(slot);
         } else {
             spin_unlock(&d->lock, irql);
@@ -256,12 +254,9 @@ static void xhci_work_port_connect(void *arg1, void *arg2) {
 
     enum irql irql = spin_lock_irq_disable(&d->lock);
 
-    for (size_t i = 0; i < XHCI_PORT_COUNT; i++) {
-        port = &d->port_info[i];
-        if (port->state == XHCI_PORT_STATE_CONNECTING) {
+    for (size_t i = 0; i < XHCI_PORT_COUNT; i++)
+        if ((port = &d->port_info[i])->state == XHCI_PORT_STATE_CONNECTING)
             break;
-        }
-    }
 
     spin_unlock(&d->lock, irql);
 
@@ -273,15 +268,12 @@ static void xhci_work_port_connect(void *arg1, void *arg2) {
     if (!(portsc & PORTSC_CCS))
         return;
 
-    if (xhci_port_init(port, &irql) != USB_OK) {
-        spin_unlock(&d->lock, irql);
+    if (xhci_port_init(port, &irql) != USB_OK)
         return;
-    }
 
     struct usb_device *dev = port->slot->udev;
     spin_unlock(&d->lock, irql);
 
-    /* TODO: handle the failure case here */
     usb_init_device(dev);
 }
 
@@ -408,10 +400,11 @@ static void catch_stragglers_on_list(struct xhci_device *dev,
         if (!slot)
             continue;
 
-        enum xhci_slot_state state = xhci_get_slot_state(slot);
+        enum xhci_slot_state state = xhci_slot_get_state(slot);
         bool slot_here = state == XHCI_SLOT_STATE_ENABLED;
 
         if (!slot_here) {
+            k_printf("XHCI: found straggler\n");
             xhci_request_list_del(req);
             req->status = XHCI_REQUEST_DISCONNECT;
             list_add_tail(&req->list, &dev->requests[XHCI_REQUEST_PROCESSED]);
@@ -504,7 +497,7 @@ static bool xhci_trb_slot_exists(struct xhci_device *dev, struct xhci_trb *trb,
         type == TRB_TYPE_NO_OP || type == TRB_TYPE_ADDRESS_DEVICE)
         return true;
 
-    return xhci_get_slot_state(xhci_get_slot(dev, TRB_SLOT(trb->control))) ==
+    return xhci_slot_get_state(xhci_get_slot(dev, TRB_SLOT(trb->control))) ==
            XHCI_SLOT_STATE_ENABLED;
 }
 
@@ -598,7 +591,7 @@ static void xhci_process_port_disconnect(struct xhci_device *dev,
     uint8_t slot_id = port->slot->slot_id;
 
     struct xhci_slot *s = xhci_get_slot(dev, slot_id);
-    xhci_set_slot_state(s, XHCI_SLOT_STATE_DISCONNECTING);
+    xhci_slot_set_state(s, XHCI_SLOT_STATE_DISCONNECTING);
 
     uint8_t cc = TRB_CC(mmio_read_32(&trb->status));
 
@@ -635,14 +628,10 @@ static void xhci_process_port_status_change(struct xhci_device *dev,
 
     enum port_event_type event_type = xhci_detect_port_event(portsc);
     switch (event_type) {
-    case PORT_DISCONNECT:
-        xhci_process_port_disconnect(dev, evt);
-        break;
+    case PORT_DISCONNECT: xhci_process_port_disconnect(dev, evt); break;
     case PORT_RESET: xhci_process_port_reset(dev, evt, portsc_ptr); break;
     case PORT_NONE:
-    case PORT_CONNECT:
-        xhci_process_port_connect(dev, evt);
-        break;
+    case PORT_CONNECT: xhci_process_port_connect(dev, evt); break;
     default:
         xhci_warn("Unknown port %u status change, PORTSC state 0x%lx\n",
                   port_id, portsc);

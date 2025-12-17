@@ -560,6 +560,16 @@ enum xhci_slot_state {
     XHCI_SLOT_STATE_DISCONNECTED,
 };
 
+static inline const char *xhci_slot_state_str(enum xhci_slot_state s) {
+    switch (s) {
+    case XHCI_SLOT_STATE_UNDEF: return "SLOT UNDEF";
+    case XHCI_SLOT_STATE_ENABLED: return "SLOT ENABLED";
+    case XHCI_SLOT_STATE_DISCONNECTING: return "SLOT DISCONNECTING";
+    case XHCI_SLOT_STATE_DISCONNECTED: return "SLOT DISCONNECTED";
+    default: return "SLOT UNKNOWN";
+    }
+}
+
 enum xhci_port_state {
     XHCI_PORT_STATE_UNDEF,
     XHCI_PORT_STATE_CONNECTING,
@@ -567,6 +577,17 @@ enum xhci_port_state {
     XHCI_PORT_STATE_DISCONNECTING,
     XHCI_PORT_STATE_DISCONNECTED,
 };
+
+static inline const char *xhci_port_state_str(enum xhci_port_state s) {
+    switch (s) {
+    case XHCI_PORT_STATE_UNDEF: return "PORT UNDEF";
+    case XHCI_PORT_STATE_CONNECTING: return "PORT CONNECTING";
+    case XHCI_PORT_STATE_CONNECTED: return "PORT CONNECTED";
+    case XHCI_PORT_STATE_DISCONNECTING: return "PORT DISCONNECTING";
+    case XHCI_PORT_STATE_DISCONNECTED: return "PORT DISCONNECTED";
+    default: return "PORT UNKNOWN";
+    }
+}
 
 struct xhci_slot {
     _Atomic enum xhci_slot_state state;

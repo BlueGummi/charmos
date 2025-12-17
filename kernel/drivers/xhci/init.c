@@ -347,7 +347,7 @@ void xhci_device_start_interrupts(uint8_t bus, uint8_t slot, uint8_t func,
 }
 
 enum usb_status xhci_port_init(struct xhci_port *p, enum irql *lock_irql) {
-    k_printf("Port %u init\n", p->port_id);
+    k_printf("XHCI: Port %u init\n", p->port_id);
     struct xhci_device *dev = p->dev;
     uint8_t port = p->port_id;
     enum usb_status err = USB_OK;
@@ -381,10 +381,7 @@ enum usb_status xhci_port_init(struct xhci_port *p, enum irql *lock_irql) {
     usb->host = dev->controller;
     usb->driver_private = dev;
 
-    /* NOTE: we initialize the refcount to 2 here. One for the initial ref,
-     * one for the upcoming usb ref. The driver is supposed to just drop
-     * one ref near the end of its lifetime */
-    refcount_init(&usb->refcount, 2);
+    refcount_init(&usb->refcount, 1);
     INIT_LIST_HEAD(&usb->hc_list);
 
     *lock_irql = spin_lock_irq_disable(&dev->lock);
@@ -402,5 +399,6 @@ enum usb_status xhci_port_init(struct xhci_port *p, enum irql *lock_irql) {
     dev->num_devices++;
     usb->slot = this_slot;
 
+    k_printf("XHCI: Port %u init complete\n", p->port_id);
     return err;
 }

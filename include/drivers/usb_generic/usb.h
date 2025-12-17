@@ -401,6 +401,7 @@ REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(usb_device, refcount, status,
 
 void usb_free_device(struct usb_device *dev);
 static inline void usb_device_put(struct usb_device *dev) {
+    k_printf("refcount dropping on 0x%lx, is %u\n", dev, refcount_read(&dev->refcount));
     if (refcount_dec_and_test(&dev->refcount))
         usb_free_device(dev);
 }
