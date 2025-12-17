@@ -6,14 +6,15 @@
 #include <string.h>
 
 void xhci_nop(struct xhci_device *dev);
-enum usb_status xhci_port_init(struct xhci_port *p);
+enum usb_status xhci_port_init(struct xhci_port *p, enum irql *lock_irql);
 enum irq_result xhci_isr(void *ctx, uint8_t vector, struct irq_context *rsp);
 struct xhci_return xhci_wait_for_port_status_change(struct xhci_device *dev,
                                                     uint32_t port_id);
 void xhci_device_start_interrupts(uint8_t bus, uint8_t slot, uint8_t func,
                                   struct xhci_device *dev);
 void xhci_emit_singular(struct xhci_command *cmd, struct xhci_ring *ring);
-enum usb_status xhci_address_device(struct xhci_port *p, uint8_t slot_id);
+enum usb_status xhci_address_device(struct xhci_port *p, uint8_t slot_id,
+                                    struct xhci_slot *publish_to);
 void xhci_teardown_slot(struct xhci_slot *me);
 void xhci_wake_waiter(struct xhci_device *dev, struct xhci_request *request);
 void xhci_cleanup(struct xhci_device *dev, struct xhci_request *req);
@@ -174,6 +175,7 @@ static inline void xhci_send_command_and_block(struct xhci_device *dev,
 
     thread_block(scheduler_get_current_thread(), THREAD_BLOCK_REASON_IO,
                  THREAD_WAIT_UNINTERRUPTIBLE, dev);
+
     xhci_send_command(dev, cmd);
 
     irql_lower(irql);
@@ -272,12 +274,6 @@ static inline struct xhci_slot *xhci_usb_slot(struct usb_device *dev) {
 
 static inline void xhci_port_set_state(struct xhci_port *port,
                                        enum xhci_port_state state) {
-    if (state == XHCI_PORT_STATE_DISCONNECTED)
-        k_printf("Disconnecting\n");
-
-    if (state == XHCI_PORT_STATE_CONNECTED)
-        k_printf("Connecting\n");
-
     port->state = state;
     port->generation++;
 }

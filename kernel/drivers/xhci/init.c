@@ -159,6 +159,7 @@ enum usb_status xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
     xhci_request_init_blocking(&request, &cmd, /* port = */ 0);
     list_add_tail(&request.list, &dev->requests[XHCI_REQUEST_OUTGOING]);
     request.port_reset = true;
+    request.port = portnum;
 
     mmio_write_32(portsc, to_write);
 
@@ -184,32 +185,6 @@ enum usb_status xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
     irql_lower(irql);
 
     thread_wait_for_wake_match();
-
-    time_t timeout_ms = 100;
-    bool settled = false;
-
-    while (timeout_ms-- > 0) {
-        uint32_t cur = mmio_read_32(portsc);
-        if (is_usb3) {
-            if (!(cur & PORTSC_PR)) {
-                settled = true;
-                break;
-            }
-        } else {
-            if (cur & PORTSC_PED) {
-                settled = true;
-                break;
-            }
-        }
-        sleep_us(1000); /* 1ms */
-    }
-
-    if (!settled) {
-        xhci_warn(
-            "port %u: reset timed out (PR did not clear or PED did not change)",
-            portnum);
-        return USB_ERR_IO;
-    }
 
     if (!xhci_request_ok(&request)) {
         k_printf("Request not ok\n");
@@ -371,49 +346,51 @@ void xhci_device_start_interrupts(uint8_t bus, uint8_t slot, uint8_t func,
     pci_program_msix_entry(bus, slot, func, 0, dev->irq, /*core=*/0);
 }
 
-enum usb_status xhci_port_init(struct xhci_port *p) {
+enum usb_status xhci_port_init(struct xhci_port *p, enum irql *lock_irql) {
     k_printf("Port %u init\n", p->port_id);
     struct xhci_device *dev = p->dev;
     uint8_t port = p->port_id;
     enum usb_status err = USB_OK;
     uint8_t slot_id;
     struct usb_device *usb;
+    if (!(usb = kzalloc(sizeof(struct usb_device), ALLOC_PARAMS_DEFAULT))) {
+        return USB_ERR_OOM;
+    }
 
     if ((err = xhci_reset_port(dev, port)) != USB_OK) {
-        k_printf("reset fail\n");
         return err;
     }
 
     if ((slot_id = xhci_enable_slot(dev)) == 0) {
-        k_printf("es fail\n");
         return USB_ERR_NO_DEVICE;
     }
 
-    struct xhci_slot *this_slot = xhci_get_slot(dev, slot_id);
-    this_slot->state = XHCI_SLOT_STATE_ENABLED;
+    struct xhci_slot temp_slot = {0};
+    temp_slot.state = XHCI_SLOT_STATE_ENABLED;
+    temp_slot.slot_id = slot_id;
+    temp_slot.dev = dev;
 
     struct xhci_port *this_port = &dev->port_info[port - 1];
-    if ((err = xhci_address_device(this_port, slot_id)) != USB_OK) {
-        k_printf("address fail\n");
-        xhci_teardown_slot(this_slot);
+    if ((err = xhci_address_device(this_port, slot_id, &temp_slot)) != USB_OK) {
         return err;
     }
 
-    if (!(usb = kzalloc(sizeof(struct usb_device), ALLOC_PARAMS_DEFAULT))) {
-        xhci_teardown_slot(this_slot);
-        return USB_ERR_OOM;
-    }
-
     usb->speed = this_port->speed;
-    usb->slot = this_slot;
     usb->port = port;
     usb->configured = false;
     usb->host = dev->controller;
     usb->driver_private = dev;
-    refcount_init(&usb->refcount, 1);
+
+    /* NOTE: we initialize the refcount to 2 here. One for the initial ref,
+     * one for the upcoming usb ref. The driver is supposed to just drop
+     * one ref near the end of its lifetime */
+    refcount_init(&usb->refcount, 2);
     INIT_LIST_HEAD(&usb->hc_list);
 
-    enum irql irql = spin_lock_irq_disable(&dev->lock);
+    *lock_irql = spin_lock_irq_disable(&dev->lock);
+
+    struct xhci_slot *this_slot = xhci_get_slot(dev, slot_id);
+    memcpy(this_slot, &temp_slot, sizeof(struct xhci_slot));
 
     xhci_port_set_state(this_port, XHCI_PORT_STATE_CONNECTED);
     refcount_init(&this_slot->refcount, 1);
@@ -423,8 +400,7 @@ enum usb_status xhci_port_init(struct xhci_port *p) {
 
     list_add_tail(&usb->hc_list, &dev->devices);
     dev->num_devices++;
-
-    spin_unlock(&dev->lock, irql);
+    usb->slot = this_slot;
 
     return err;
 }

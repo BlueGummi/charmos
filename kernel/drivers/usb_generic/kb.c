@@ -156,6 +156,7 @@ static void usb_kbd_worker(void *arg) {
         usb_kbd_process_report(kbd, &kbd->cur);
         kbd->last = kbd->cur;
     }
+    atomic_store(&kbd->worker_here, false);
 }
 
 struct usb_hid_keyboard *usb_keyboard_create(struct usb_device *dev,
@@ -176,6 +177,7 @@ struct usb_hid_keyboard *usb_keyboard_create(struct usb_device *dev,
     };
 
     thread_spawn("usb_kbd_worker", usb_kbd_worker, kbd);
+    atomic_store(&kbd->worker_here, true);
     return kbd;
 }
 
@@ -216,6 +218,10 @@ enum usb_status usb_keyboard_bringup(struct usb_device *dev) {
 }
 
 void usb_keyboard_teardown(struct usb_device *dev) {
+    struct usb_hid_keyboard *kb = dev->driver_private;
+    while (atomic_load(&kb->worker_here))
+        scheduler_yield();
+
     (void) dev;
 }
 

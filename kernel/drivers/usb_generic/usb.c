@@ -144,7 +144,7 @@ static void match_interfaces(struct usb_driver *driver,
             if (driver->bringup) {
                 /* driver gets a ref */
                 if (!usb_device_get(dev))
-                    return; 
+                    return;
 
                 driver->bringup(dev);
                 dev->driver = driver;
@@ -234,7 +234,6 @@ enum usb_status usb_parse_config_descriptor(struct usb_device *dev) {
         .setup = &setup,
         .buffer = desc,
         .dev = dev,
-
     };
 
     enum usb_status err;
@@ -315,20 +314,25 @@ void usb_print_device(struct usb_device *dev) {
 enum usb_status usb_init_device(struct usb_device *dev) {
     enum usb_status err = USB_OK;
     if ((err = usb_get_device_descriptor(dev)) != USB_OK)
-        return err;
+        goto out;
 
     if ((err = usb_parse_config_descriptor(dev)) != USB_OK)
-        return err;
+        goto out;
 
     if ((err = usb_set_configuration(dev)) != USB_OK)
-        return err;
+        goto out;
 
     if ((err = dev->host->ops.configure_endpoint(dev)) != USB_OK)
-        return err;
+        goto out;
 
     usb_print_device(dev);
 
     usb_try_bind_driver(dev);
+
+out:
+    usb_device_put(dev);
+    if (err != USB_OK)
+        k_printf("USB error in setup\n");
     return err;
 }
 
@@ -346,6 +350,7 @@ void usb_free_device(struct usb_device *dev) {
     if (dev->free)
         dev->free(dev);
 
+    k_printf("usb last ref gone, freeing\n");
     for (size_t i = 0; i < dev->num_interfaces; i++) {
         struct usb_interface_descriptor *infdr = dev->interfaces[i];
         kfree(infdr, FREE_PARAMS_DEFAULT);

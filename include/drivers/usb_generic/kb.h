@@ -17,5 +17,5 @@ struct usb_hid_keyboard {
     struct usb_kbd_report cur;
 
     struct usb_request req;
-    atomic_bool worker_exietd;
+    atomic_bool worker_here;
 };

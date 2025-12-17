@@ -36,7 +36,6 @@ void xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd) {
         list_add_tail(&cmd->request->list,
                       &dev->requests[XHCI_REQUEST_WAITING]);
         spin_unlock(&dev->lock, irql);
-        return;
     }
 
     xhci_ring_reserve(ring, cmd->num_trbs);
@@ -50,7 +49,6 @@ void xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd) {
     list_add_tail(&rq->list, &dev->requests[XHCI_REQUEST_OUTGOING]);
 
     xhci_ring_doorbell(dev, cmd->slot ? cmd->slot->slot_id : 0, cmd->ep_id);
-
     spin_unlock(&dev->lock, irql);
 }
 
@@ -60,6 +58,11 @@ enum usb_status xhci_submit_interrupt_transfer(struct usb_request *req) {
     struct xhci_device *xhci = dev->host->driver_data;
     struct xhci_slot *slot = dev->slot;
     enum usb_status return_status = USB_OK;
+
+    /* we drop this ref in the callback to the urb */
+    if (!usb_device_get(dev)) {
+        return USB_ERR_NO_DEVICE;
+    }
 
     if (!xhci_slot_get(slot)) {
         return USB_ERR_NO_DEVICE;
@@ -167,26 +170,23 @@ void xhci_emit_control(struct xhci_command *cmd, struct xhci_ring *ring) {
 enum usb_status xhci_send_control_transfer(struct xhci_device *dev,
                                            struct xhci_slot *slot,
                                            struct usb_request *req) {
+    if (!usb_device_get(req->dev))
+        return USB_ERR_NO_DEVICE;
+
     if (!xhci_slot_get(slot))
         return USB_ERR_NO_DEVICE;
 
     struct xhci_ring *ring = slot->ep_rings[0];
     if (!ring || !req->setup) {
         xhci_slot_put(slot);
+        usb_device_put(req->dev);
         return USB_ERR_INVALID_ARGUMENT;
     }
 
+    /* TODO: OOM */
     struct xhci_request *xreq = kzalloc(sizeof(*xreq), ALLOC_PARAMS_DEFAULT);
-    if (!xreq)
-        goto oom;
-
     struct xhci_command *cmd = kzalloc(sizeof(*cmd), ALLOC_PARAMS_DEFAULT);
-    if (!cmd)
-        goto oom;
-
     struct xhci_ctrl_emit *emit = kzalloc(sizeof(*emit), ALLOC_PARAMS_DEFAULT);
-    if (!emit)
-        goto oom;
 
     emit->setup = req->setup;
     emit->length = req->setup->length;
@@ -208,10 +208,6 @@ enum usb_status xhci_send_control_transfer(struct xhci_device *dev,
     xhci_send_command(dev, cmd);
     xhci_slot_put(slot);
     return USB_OK;
-
-oom:
-    xhci_slot_put(slot);
-    return USB_ERR_OOM;
 }
 
 enum usb_status xhci_control_transfer(struct usb_request *request) {

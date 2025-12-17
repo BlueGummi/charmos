@@ -74,14 +74,14 @@ void xhci_wake_waiter(struct xhci_device *dev, struct xhci_request *req) {
 void xhci_cleanup(struct xhci_device *dev, struct xhci_request *req) {
     (void) dev;
 
-    if (req->urb) {
-        struct usb_request *urb = req->urb;
-        urb->status = xhci_rq_to_usb_status(req);
-        urb->complete(urb);
-    }
+    struct usb_request *urb = req->urb;
+    struct usb_device *udev = urb->dev;
+    urb->status = xhci_rq_to_usb_status(req);
+    urb->complete(urb);
 
     kfree(req->command, FREE_PARAMS_DEFAULT);
     kfree(req, FREE_PARAMS_DEFAULT);
+    usb_device_put(udev);
 }
 
 struct xhci_ring *xhci_allocate_ring() {
@@ -107,7 +107,8 @@ struct xhci_ring *xhci_allocate_ring() {
 
     link->parameter = phys;
     link->status = 0;
-    link->control = TRB_SET_TYPE(TRB_TYPE_LINK) | TRB_TOGGLE_CYCLE_BIT | ring->cycle;
+    link->control =
+        TRB_SET_TYPE(TRB_TYPE_LINK) | TRB_TOGGLE_CYCLE_BIT | ring->cycle;
 
     return ring;
 }
@@ -133,12 +134,13 @@ void xhci_free_ring(struct xhci_ring *ring) {
 }
 
 void xhci_teardown_slot(struct xhci_slot *me) {
-    struct xhci_ring *copy_into[32];
     enum irql irql = spin_lock_irq_disable(&me->dev->lock);
-    xhci_set_slot_state(me, XHCI_SLOT_STATE_DISCONNECTED);
+    struct xhci_ring *copy_into[32];
     me->udev = NULL;
     me->port = NULL;
-    memmove(copy_into, me->ep_rings, sizeof(struct xhci_ring *) * 32);
+    memcpy(copy_into, me->ep_rings, sizeof(struct xhci_ring *) * 32);
+    memset(me->ep_rings, 0, sizeof(struct xhci_ring *) * 32);
+    xhci_set_slot_state(me, XHCI_SLOT_STATE_DISCONNECTED);
     spin_unlock(&me->dev->lock, irql);
 
     /* tear down the rings */

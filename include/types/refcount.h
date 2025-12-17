@@ -70,22 +70,25 @@ static inline bool refcount_dec_and_test(refcount_t *rc) {
         while (true) {                                                         \
             old = atomic_load_explicit(&obj->__refcount_member,                \
                                        memory_order_acquire);                  \
+                                                                               \
+            /* panic if refcount is zero (possible UAF) */                     \
             if (!old) {                                                        \
                 k_panic("possible UAF\n");                                     \
             }                                                                  \
                                                                                \
+            /* check failure before attempting to increment */                 \
+            if (atomic_load_explicit(&obj->__failure_member,                   \
+                                     memory_order_acquire) __failure_state) {  \
+                return false;                                                  \
+            }                                                                  \
+                                                                               \
+            /* attempt to increment refcount */                                \
             if (atomic_compare_exchange_weak_explicit(                         \
                     &obj->__refcount_member, &old, old + 1,                    \
                     memory_order_acquire, memory_order_relaxed)) {             \
-                if (atomic_load_explicit(&obj->__failure_member,               \
-                                         memory_order_acquire)                 \
-                        __failure_state) {                                     \
-                    atomic_fetch_sub_explicit(&obj->__refcount_member, 1,      \
-                                              memory_order_release);           \
-                    return false;                                              \
-                }                                                              \
                 return true;                                                   \
             }                                                                  \
+                                                                               \
             cpu_relax();                                                       \
         }                                                                      \
     }
