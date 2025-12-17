@@ -307,7 +307,6 @@ struct thread {
     /* ========== Synchronization data ========== */
 
     /* Lock + rc */
-    struct spinlock ctx_lock; /* Only raw acquires */
     struct spinlock lock;
     refcount_t refcount;
 

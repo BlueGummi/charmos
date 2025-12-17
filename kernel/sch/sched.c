@@ -30,7 +30,6 @@ static inline void tick_disable() {
     if (scheduler_tick_enabled(self)) {
         lapic_timer_disable();
         scheduler_set_tick_enabled(self, false);
-        self->tick_duration_ms = 0;
     }
 }
 
@@ -248,7 +247,7 @@ static void change_tick(struct scheduler *sched, struct thread *next) {
 }
 
 static inline void context_switch(struct scheduler *sched, struct thread *curr,
-                                  struct thread *next, enum irql irql) {
+                                  struct thread *next) {
     if (curr)
         atomic_store_explicit(&curr->yielded_after_wait, true,
                               memory_order_release);
@@ -259,10 +258,11 @@ static inline void context_switch(struct scheduler *sched, struct thread *curr,
     /* We are responsible for dropping references
      * on threads entering their last yield */
     bool just_load = false;
+
     if (!curr)
         just_load = true;
 
-    if (unlikely(curr && thread_get_state(curr) == THREAD_STATE_ZOMBIE)) {
+    if (unlikely(curr && curr->state == THREAD_STATE_ZOMBIE)) {
         just_load = true;
         thread_put(curr);
     }
@@ -273,25 +273,13 @@ static inline void context_switch(struct scheduler *sched, struct thread *curr,
 
     sched->switched_out = just_load ? NULL : curr;
 
-    if (curr == next) {
-        scheduler_unlock(sched, irql);
+    if (curr == next)
         return;
-    }
 
     /* TODO: fix this, janky strange way to protect thread states */
     if (!just_load) {
-        if (curr < next) {
-            spin_lock_raw(&curr->ctx_lock);
-            spin_lock_raw(&next->ctx_lock);
-        } else {
-            spin_lock_raw(&next->ctx_lock);
-            spin_lock_raw(&curr->ctx_lock);
-        }
-        scheduler_unlock(sched, irql);
         switch_context(&curr->regs, &next->regs);
     } else {
-        spin_lock_raw(&next->ctx_lock);
-        scheduler_unlock(sched, irql);
         load_context(&next->regs);
     }
 }
@@ -304,7 +292,7 @@ void schedule(void) {
     struct thread *curr = sched->current;
     struct thread *next = NULL;
 
-    enum irql irql = scheduler_lock_irq_disable(sched);
+    spin_lock_raw(&sched->lock);
 
     save_thread(sched, curr, time);
 
@@ -327,24 +315,11 @@ void schedule(void) {
 
     load_thread(sched, next, time);
 
-    context_switch(sched, curr, next, irql);
+    context_switch(sched, curr, next);
 }
 
 void scheduler_drop_locks_after_switch_in() {
-    struct thread *switched_out = smp_core_scheduler()->switched_out;
-    struct thread *curr = scheduler_get_current_thread();
-
-    if (switched_out && switched_out != curr) {
-        if (switched_out < curr) {
-            spin_unlock_raw(&curr->ctx_lock);
-            spin_unlock_raw(&switched_out->ctx_lock);
-        } else {
-            spin_unlock_raw(&switched_out->ctx_lock);
-            spin_unlock_raw(&curr->ctx_lock);
-        }
-    } else {
-        spin_unlock_raw(&curr->ctx_lock);
-    }
+    spin_unlock_raw(&smp_core_scheduler()->lock);
 }
 
 void scheduler_yield() {
@@ -353,7 +328,6 @@ void scheduler_yield() {
      * always raise the IRQL to at least DISPATCH. this assertion
      * catches that case, and the assertion in the `irql_raise` catches
      * the case where the IRQL is higher than DISPATCH (i.e. HIGH) */
-    kassert(irql_get() != IRQL_DISPATCH_LEVEL);
     kassert(!scheduler_self_in_resched());
 
     /* NOTE: the IRQL must be raised first to prevent a race where we
@@ -373,6 +347,7 @@ void scheduler_yield() {
 
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     scheduler_mark_self_in_resched(true);
+
     schedule();
 
     scheduler_drop_locks_after_switch_in();

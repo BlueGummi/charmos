@@ -49,12 +49,17 @@ void thread_exit() {
 
     locked_list_del(&thread_list, &self->thread_list);
 
+    atomic_fetch_sub(&global.thread_count, 1);
+
     irql_lower(irql);
 
     scheduler_yield();
 }
 
 void thread_entry_wrapper(void) {
+    if (scheduler_get_current_thread()->state != THREAD_STATE_IDLE_THREAD)
+        atomic_fetch_add(&global.thread_count, 1);
+
     void (*entry)(void *);
     asm volatile("mov %%r12, %0" : "=r"(entry));
 
@@ -151,7 +156,6 @@ static struct thread *thread_init(struct thread *thread,
     thread->wait_type = THREAD_WAIT_NONE;
     thread->recent_event = APC_EVENT_NONE;
     thread->activity_class = THREAD_ACTIVITY_CLASS_UNKNOWN;
-    spinlock_init(&thread->ctx_lock);
     spinlock_init(&thread->lock);
     spinlock_init(&thread->being_moved);
     pairing_node_init(&thread->wq_pairing_node);

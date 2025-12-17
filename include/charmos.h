@@ -33,6 +33,8 @@ struct charmos_globals {
     struct tlb_shootdown_cpu *shootdown_data;
     struct scheduler **schedulers;
     struct dpc_cpu *dpc_data;
+    
+    atomic_size_t thread_count;
 
     size_t domain_count;
     struct domain **domains;

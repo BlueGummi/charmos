@@ -361,12 +361,14 @@ TEST_REGISTER(kmalloc_new_concurrency_stress_test, SHOULD_NOT_FAIL,
               IS_UNIT_TEST) {
     memset((void *) done, 0, sizeof(done));
 
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     for (int i = 0; i < STRESS_THREADS; ++i) {
         args[i].id = i;
         args[i].done_flag = &done[i];
         thread_spawn("kmalloc_new_stress_worker", stress_worker, NULL)
             ->private = &args[i];
     }
+    irql_lower(irql);
 
     all_ready = true;
 
