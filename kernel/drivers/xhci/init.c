@@ -45,6 +45,31 @@ void xhci_setup_command_ring(struct xhci_device *dev) {
     mmio_write_64(&op->dcbaap, dcbaa_phys | 1);
 }
 
+void xhci_nop(struct xhci_device *dev) {
+    struct xhci_request request;
+    struct xhci_command cmd;
+    xhci_request_init_blocking(&request, &cmd, /* port = */ 0);
+
+    struct xhci_trb outgoing = {
+        .parameter = 0,
+        .control =
+            TRB_SET_TYPE(TRB_TYPE_NO_OP) | TRB_SET_CYCLE(dev->cmd_ring->cycle),
+        .status = 0,
+    };
+
+    cmd = (struct xhci_command) {
+        .private = &outgoing,
+        .emit = xhci_emit_singular,
+        .ep_id = 0,
+        .slot = NULL,
+        .ring = dev->cmd_ring,
+        .request = &request,
+        .num_trbs = 1,
+    };
+
+    xhci_send_command_and_block(dev, &cmd);
+}
+
 uint8_t xhci_enable_slot(struct xhci_device *dev) {
     struct xhci_request request;
     struct xhci_command cmd;

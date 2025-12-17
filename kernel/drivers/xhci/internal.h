@@ -5,6 +5,7 @@
 #include <sch/sched.h>
 #include <string.h>
 
+void xhci_nop(struct xhci_device *dev);
 enum usb_status xhci_port_init(struct xhci_port *p);
 enum irq_result xhci_isr(void *ctx, uint8_t vector, struct irq_context *rsp);
 struct xhci_return xhci_wait_for_port_status_change(struct xhci_device *dev,
@@ -180,23 +181,6 @@ static inline void xhci_send_command_and_block(struct xhci_device *dev,
     thread_wait_for_wake_match();
 }
 
-static inline void xhci_advance_dequeue(struct xhci_ring *ring) {
-    ring->dequeue_index++;
-    if (ring->dequeue_index == ring->size) {
-        ring->dequeue_index = 0;
-        ring->cycle ^= 1;
-    }
-}
-
-static inline void xhci_advance_enqueue(struct xhci_ring *ring) {
-    ring->enqueue_index++;
-
-    if (ring->enqueue_index == ring->size - 1) {
-        ring->enqueue_index = 0;
-        ring->cycle ^= 1;
-    }
-}
-
 static inline uint64_t xhci_get_trb_phys(struct xhci_ring *ring,
                                          struct xhci_trb *trb) {
     uint64_t offset = (uint8_t *) trb - (uint8_t *) ring->trbs;
@@ -253,10 +237,30 @@ static inline void xhci_ring_unreserve(struct xhci_ring *ring, size_t ntrbs) {
     ring->outgoing -= ntrbs;
 }
 
+static inline void xhci_advance_dequeue(struct xhci_ring *ring) {
+    ring->dequeue_index++;
+    if (ring->dequeue_index == ring->size) {
+        ring->dequeue_index = 0;
+        ring->cycle ^= 1;
+    }
+}
+
+static inline void xhci_advance_enqueue(struct xhci_ring *ring) {
+    ring->enqueue_index++;
+
+    if (ring->enqueue_index == ring->size - 1) {
+        ring->trbs[ring->size - 1].control &= ~TRB_CYCLE_BIT;
+        ring->trbs[ring->size - 1].control |= ring->cycle;
+        ring->enqueue_index = 0;
+        ring->cycle ^= 1;
+    }
+}
+
 static inline struct xhci_trb *xhci_ring_next_trb(struct xhci_ring *ring) {
     struct xhci_trb *trb = &ring->trbs[ring->enqueue_index];
 
     memset(trb, 0, sizeof(*trb));
+    trb->control |= ring->cycle;
 
     xhci_advance_enqueue(ring);
     return trb;

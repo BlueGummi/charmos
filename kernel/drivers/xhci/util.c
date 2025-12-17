@@ -33,7 +33,7 @@ bool xhci_controller_reset(struct xhci_device *dev) {
 
     struct xhci_usbcmd usbcmd = {.raw = mmio_read_32(&op->usbcmd)};
     usbcmd.host_controller_reset = 1;
-    mmio_write_32(&op->usbcmd, usbcmd.raw); // Reset
+    mmio_write_32(&op->usbcmd, usbcmd.raw);
     uint64_t timeout = XHCI_DEVICE_TIMEOUT * 1000;
 
     while (mmio_read_32(&op->usbcmd) & (1 << 1) && timeout--) {
@@ -107,8 +107,7 @@ struct xhci_ring *xhci_allocate_ring() {
 
     link->parameter = phys;
     link->status = 0;
-    link->control =
-        TRB_SET_TYPE(TRB_TYPE_LINK) | ring->cycle | TRB_TOGGLE_CYCLE_BIT;
+    link->control = TRB_SET_TYPE(TRB_TYPE_LINK) | TRB_TOGGLE_CYCLE_BIT | ring->cycle;
 
     return ring;
 }

@@ -476,7 +476,7 @@ static bool xhci_trb_slot_exists(struct xhci_device *dev, struct xhci_trb *trb,
                                  struct xhci_request *request) {
     struct xhci_trb *source = request->last_trb;
     uint8_t type = TRB_TYPE(source->control);
-    if (type == TRB_TYPE_ENABLE_SLOT || type == TRB_TYPE_DISABLE_SLOT)
+    if (type == TRB_TYPE_ENABLE_SLOT || type == TRB_TYPE_DISABLE_SLOT || type == TRB_TYPE_NO_OP)
         return true;
 
     return xhci_get_slot_state(xhci_get_slot(dev, TRB_SLOT(trb->control))) ==
