@@ -97,7 +97,7 @@ uint8_t xhci_enable_slot(struct xhci_device *dev) {
     return TRB_SLOT(request.return_control);
 }
 
-void xhci_disable_slot(struct xhci_device *dev, struct xhci_slot *slot) {
+void xhci_disable_slot(struct xhci_device *dev, uint8_t slot_id) {
     struct xhci_request request;
     struct xhci_command cmd;
 
@@ -108,7 +108,7 @@ void xhci_disable_slot(struct xhci_device *dev, struct xhci_slot *slot) {
         .status = 0,
         .control = TRB_SET_TYPE(TRB_TYPE_DISABLE_SLOT) |
                    TRB_SET_CYCLE(dev->cmd_ring->cycle) |
-                   TRB_SET_SLOT_ID(slot->slot_id),
+                   TRB_SET_SLOT_ID(slot_id),
     };
 
     cmd = (struct xhci_command) {
@@ -358,10 +358,12 @@ enum usb_status xhci_port_init(struct xhci_port *p, enum irql *lock_irql) {
     }
 
     if ((err = xhci_reset_port(dev, port)) != USB_OK) {
+        k_printf("XHCI: reset_port failure\n");
         return err;
     }
 
     if ((slot_id = xhci_enable_slot(dev)) == 0) {
+        k_printf("XHCI: enable_slot failure\n");
         return USB_ERR_NO_DEVICE;
     }
 
@@ -372,6 +374,8 @@ enum usb_status xhci_port_init(struct xhci_port *p, enum irql *lock_irql) {
 
     struct xhci_port *this_port = &dev->port_info[port - 1];
     if ((err = xhci_address_device(this_port, slot_id, &temp_slot)) != USB_OK) {
+        k_printf("XHCI: address_device failure\n");
+        xhci_disable_slot(dev, slot_id);
         return err;
     }
 

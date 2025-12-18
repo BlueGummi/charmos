@@ -207,6 +207,7 @@ enum usb_status xhci_configure_device_endpoints(struct usb_device *usb) {
 }
 
 static void xhci_work_port_disconnect(void *arg1, void *arg2) {
+    k_printf("port_disconnect work ran\n");
     (void) arg2;
     struct xhci_device *d = arg1;
 
@@ -248,6 +249,7 @@ static void xhci_work_port_disconnect(void *arg1, void *arg2) {
 }
 
 static void xhci_work_port_connect(void *arg1, void *arg2) {
+    k_printf("port_connect work ran\n");
     (void) arg2;
     struct xhci_port *port = NULL;
     struct xhci_device *d = arg1;
@@ -575,6 +577,7 @@ static void xhci_process_port_connect(struct xhci_device *dev,
                                       struct xhci_trb *trb) {
     struct xhci_port *port = xhci_port_for_trb(dev, trb);
     xhci_port_set_state(port, XHCI_PORT_STATE_CONNECTING);
+    k_printf("port_connect work enqueued\n");
     workqueue_enqueue_oneshot(xhci_wq, xhci_work_port_connect,
                               WORK_ARGS(dev, NULL));
 }
@@ -615,6 +618,7 @@ static void xhci_process_port_disconnect(struct xhci_device *dev,
     }
 
 end:
+    k_printf("port_disconnect work enqueued\n");
     workqueue_enqueue_oneshot(xhci_wq, xhci_work_port_disconnect,
                               WORK_ARGS(dev, NULL));
 }
@@ -695,8 +699,9 @@ static struct usb_controller_ops xhci_ctrl_ops = {
     .submit_control_transfer = xhci_control_transfer,
     .submit_bulk_transfer = NULL,
     .submit_interrupt_transfer = xhci_submit_interrupt_transfer,
-    .reset_port = NULL,
+    .reset_slot = xhci_reset_slot,
     .configure_endpoint = xhci_configure_device_endpoints,
+    .abort = xhci_abort,
 };
 
 void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,

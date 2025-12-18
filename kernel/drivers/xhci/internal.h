@@ -6,6 +6,8 @@
 #include <string.h>
 
 void xhci_nop(struct xhci_device *dev);
+enum usb_status xhci_abort(struct usb_device *dev);
+void xhci_reset_slot(struct usb_device *dev);
 enum usb_status xhci_port_init(struct xhci_port *p, enum irql *lock_irql);
 enum irq_result xhci_isr(void *ctx, uint8_t vector, struct irq_context *rsp);
 struct xhci_return xhci_wait_for_port_status_change(struct xhci_device *dev,
@@ -42,7 +44,7 @@ struct xhci_return xhci_wait_for_response(struct xhci_device *dev);
 struct xhci_return xhci_wait_for_transfer_event(struct xhci_device *dev,
                                                 uint8_t slot_id);
 uint8_t xhci_enable_slot(struct xhci_device *dev);
-void xhci_disable_slot(struct xhci_device *dev, struct xhci_slot *slot);
+void xhci_disable_slot(struct xhci_device *dev, uint8_t slot_id);
 void xhci_parse_ext_caps(struct xhci_device *dev);
 enum usb_status xhci_reset_port(struct xhci_device *dev, uint32_t port_index);
 void xhci_detect_usb3_ports(struct xhci_device *dev);
@@ -223,7 +225,6 @@ REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(
 
 static inline void xhci_slot_put(struct xhci_slot *slot) {
     if (refcount_dec_and_test(&slot->refcount)) {
-        kassert(xhci_slot_get_state(slot) == XHCI_SLOT_STATE_DISCONNECTING);
         xhci_teardown_slot(slot);
     }
 }
@@ -275,7 +276,8 @@ static inline struct xhci_slot *xhci_usb_slot(struct usb_device *dev) {
 
 static inline void xhci_port_set_state(struct xhci_port *port,
                                        enum xhci_port_state state) {
-    k_printf("port_set_state to %s on gen %llu\n", xhci_port_state_str(state), port->generation);
+    k_printf("port_set_state %u to %s on gen %llu\n", port->port_id,
+             xhci_port_state_str(state), port->generation);
     port->state = state;
     port->generation++;
 }

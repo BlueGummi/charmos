@@ -82,7 +82,6 @@ void xhci_cleanup(struct xhci_device *dev, struct xhci_request *req) {
     kfree(req->command, FREE_PARAMS_DEFAULT);
     kfree(req, FREE_PARAMS_DEFAULT);
 
-    k_printf("XHCI: cleanup device_put\n");
     usb_device_put(udev);
 }
 
@@ -152,5 +151,42 @@ void xhci_teardown_slot(struct xhci_slot *me) {
         xhci_free_ring(ring);
     }
 
-    xhci_disable_slot(me->dev, me);
+    xhci_disable_slot(me->dev, me->slot_id);
+}
+
+enum usb_status xhci_abort(struct usb_device *dev) {
+    /* Disable slot */
+    struct xhci_device *xdev = dev->host->driver_data;
+    struct xhci_slot *slot = dev->slot;
+    xhci_disable_slot(xdev, slot->slot_id);
+    return USB_OK;
+}
+
+void xhci_reset_slot(struct usb_device *dev) {
+    struct xhci_device *xdev = dev->host->driver_data;
+    uint8_t slot_id = ((struct xhci_slot *) dev->slot)->slot_id;
+    struct xhci_request request;
+    struct xhci_command cmd;
+
+    xhci_request_init_blocking(&request, &cmd, /* port = */ 0);
+
+    struct xhci_trb outgoing = {
+        .parameter = 0,
+        .status = 0,
+        .control = TRB_SET_TYPE(TRB_TYPE_RESET_DEVICE) |
+                   TRB_SET_CYCLE(xdev->cmd_ring->cycle) |
+                   TRB_SET_SLOT_ID(slot_id),
+    };
+
+    cmd = (struct xhci_command) {
+        .private = &outgoing,
+        .emit = xhci_emit_singular,
+        .ep_id = 0,
+        .slot = NULL,
+        .ring = xdev->cmd_ring,
+        .request = &request,
+        .num_trbs = 1,
+    };
+
+    xhci_send_command_and_block(xdev, &cmd);
 }
