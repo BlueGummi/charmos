@@ -1,6 +1,6 @@
 #include <sch/sched.h>
-#include <thread/thread.h>
 #include <string.h>
+#include <thread/thread.h>
 
 #include "sch/internal.h"
 
@@ -502,7 +502,8 @@ static bool set_state_and_update_reason(
             atomic_store_explicit(&t->wake_matched, true, memory_order_release);
         }
     } else {
-        atomic_store_explicit(&t->yielded_after_wait, false, memory_order_release);
+        atomic_store_explicit(&t->yielded_after_wait, false,
+                              memory_order_release);
         atomic_store_explicit(&t->wait_type, type, memory_order_release);
         t->last_action_reason = reason;
         t->last_action = state;
@@ -515,6 +516,11 @@ static bool set_state_and_update_reason(
     if (!(state == THREAD_STATE_READY &&
           thread_get_state(t) == THREAD_STATE_RUNNING))
         atomic_store(&t->state, state);
+
+    /* NOTE: special case: this is if we are waking ourselves after deciding to not block */
+    if (!atomic_load_explicit(&t->yielded_after_wait, memory_order_acquire) &&
+        t == scheduler_get_current_thread() && state == THREAD_STATE_READY)
+        atomic_store(&t->state, THREAD_STATE_RUNNING);
 
     callback(t, reason);
 

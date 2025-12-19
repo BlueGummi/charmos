@@ -6,7 +6,6 @@
 #include <string.h>
 
 void xhci_nop(struct xhci_device *dev);
-enum usb_status xhci_abort(struct usb_device *dev);
 void xhci_reset_slot(struct usb_device *dev);
 enum usb_status xhci_port_init(struct xhci_port *p, enum irql *lock_irql);
 enum irq_result xhci_isr(void *ctx, uint8_t vector, struct irq_context *rsp);
@@ -35,7 +34,7 @@ void xhci_setup_command_ring(struct xhci_device *dev);
 enum usb_status xhci_submit_interrupt_transfer(struct usb_request *r);
 enum usb_status xhci_control_transfer(struct usb_request *request);
 
-void xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd);
+bool xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd);
 
 /* returns CONTROL */
 struct xhci_return xhci_wait_for_response(struct xhci_device *dev);
@@ -171,18 +170,25 @@ static inline void xhci_clear_usbsts_ei(struct xhci_device *dev) {
                   mmio_read_32(&dev->op_regs->usbsts) | XHCI_USBSTS_EI);
 }
 
-static inline void xhci_send_command_and_block(struct xhci_device *dev,
+static inline bool xhci_send_command_and_block(struct xhci_device *dev,
                                                struct xhci_command *cmd) {
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
 
     thread_block(scheduler_get_current_thread(), THREAD_BLOCK_REASON_IO,
                  THREAD_WAIT_UNINTERRUPTIBLE, dev);
 
-    xhci_send_command(dev, cmd);
+    if (!xhci_send_command(dev, cmd)) {
+        k_printf("blep\n");
+        thread_wake(scheduler_get_current_thread(),
+                    THREAD_WAKE_REASON_BLOCKING_MANUAL, dev);
+        irql_lower(irql);
+        return false;
+    }
 
     irql_lower(irql);
 
     thread_wait_for_wake_match();
+    return true;
 }
 
 static inline uint64_t xhci_get_trb_phys(struct xhci_ring *ring,

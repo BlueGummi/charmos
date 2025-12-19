@@ -154,21 +154,15 @@ void xhci_teardown_slot(struct xhci_slot *me) {
     xhci_disable_slot(me->dev, me->slot_id);
 }
 
-enum usb_status xhci_abort(struct usb_device *dev) {
-    /* Disable slot */
-    struct xhci_device *xdev = dev->host->driver_data;
-    struct xhci_slot *slot = dev->slot;
-    xhci_disable_slot(xdev, slot->slot_id);
-    return USB_OK;
-}
-
 void xhci_reset_slot(struct usb_device *dev) {
     struct xhci_device *xdev = dev->host->driver_data;
     uint8_t slot_id = ((struct xhci_slot *) dev->slot)->slot_id;
-    struct xhci_request request;
-    struct xhci_command cmd;
+    struct xhci_request request = {0};
+    struct xhci_command cmd = {0};
 
     xhci_request_init_blocking(&request, &cmd, /* port = */ 0);
+    
+    request.slot_reset = true;
 
     struct xhci_trb outgoing = {
         .parameter = 0,
@@ -188,5 +182,7 @@ void xhci_reset_slot(struct usb_device *dev) {
         .num_trbs = 1,
     };
 
+    k_printf("Sending reset slot\n");
     xhci_send_command_and_block(xdev, &cmd);
+    k_printf("Reset slot returned\n");
 }

@@ -660,8 +660,8 @@ struct xhci_device {
     struct list_head devices;
     struct spinlock lock;
     struct semaphore sem;
-    struct work port_disconnect_work;
-    struct work port_connect_work;
+    struct semaphore port_disconnect;
+    struct semaphore port_connect;
     struct usb_controller *controller;
     atomic_bool worker_waiting;
 };
@@ -684,6 +684,7 @@ struct xhci_request {
     struct xhci_command *command;
 
     volatile uint8_t port_reset;
+    volatile uint8_t slot_reset;
     struct xhci_trb *last_trb;
     uint64_t trb_phys;
     uint8_t port; /* What port is this for? Used to match

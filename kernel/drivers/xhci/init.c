@@ -46,8 +46,8 @@ void xhci_setup_command_ring(struct xhci_device *dev) {
 }
 
 void xhci_nop(struct xhci_device *dev) {
-    struct xhci_request request;
-    struct xhci_command cmd;
+    struct xhci_request request = {0};
+    struct xhci_command cmd = {0};
     xhci_request_init_blocking(&request, &cmd, /* port = */ 0);
 
     struct xhci_trb outgoing = {
@@ -71,8 +71,8 @@ void xhci_nop(struct xhci_device *dev) {
 }
 
 uint8_t xhci_enable_slot(struct xhci_device *dev) {
-    struct xhci_request request;
-    struct xhci_command cmd;
+    struct xhci_request request = {0};
+    struct xhci_command cmd = {0};
     xhci_request_init_blocking(&request, &cmd, /* port = */ 0);
 
     struct xhci_trb outgoing = {
@@ -98,8 +98,8 @@ uint8_t xhci_enable_slot(struct xhci_device *dev) {
 }
 
 void xhci_disable_slot(struct xhci_device *dev, uint8_t slot_id) {
-    struct xhci_request request;
-    struct xhci_command cmd;
+    struct xhci_request request = {0};
+    struct xhci_command cmd = {0};
 
     xhci_request_init_blocking(&request, &cmd, /* port = */ 0);
 
@@ -121,7 +121,9 @@ void xhci_disable_slot(struct xhci_device *dev, uint8_t slot_id) {
         .num_trbs = 1,
     };
 
+    k_printf("Sending disable slot\n");
     xhci_send_command_and_block(dev, &cmd);
+    k_printf("Disable slot returned\n");
 }
 
 enum usb_status xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
@@ -130,9 +132,8 @@ enum usb_status xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
 
     uint32_t old = mmio_read_32(portsc);
 
-    /* Power on the port */
+    /*
     if (!(old & PORTSC_PP)) {
-        /* Only write the PP bit */
         mmio_write_32(portsc, PORTSC_PP);
         sleep_us(2000);
         old = mmio_read_32(portsc);
@@ -140,7 +141,7 @@ enum usb_status xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
             xhci_warn("port %u: power enable failed", portnum);
             return USB_ERR_IO;
         }
-    }
+    }*/
 
     uint32_t cur = mmio_read_32(portsc);
 
@@ -154,12 +155,16 @@ enum usb_status xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     enum irql lirql = spin_lock_irq_disable(&dev->lock);
 
-    struct xhci_request request;
-    struct xhci_command cmd;
+    struct xhci_request request = {0};
+    struct xhci_command cmd = {0};
+    cmd.slot = NULL;
     xhci_request_init_blocking(&request, &cmd, /* port = */ 0);
     list_add_tail(&request.list, &dev->requests[XHCI_REQUEST_OUTGOING]);
     request.port_reset = true;
     request.port = portnum;
+
+    thread_block(scheduler_get_current_thread(), THREAD_BLOCK_REASON_IO,
+                 THREAD_WAIT_UNINTERRUPTIBLE, dev);
 
     mmio_write_32(portsc, to_write);
 
@@ -178,13 +183,12 @@ enum usb_status xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
 
     mmio_write_32(portsc, write_mask);
 
-    thread_block(scheduler_get_current_thread(), THREAD_BLOCK_REASON_IO,
-                 THREAD_WAIT_UNINTERRUPTIBLE, dev);
-
     spin_unlock(&dev->lock, lirql);
     irql_lower(irql);
 
     thread_wait_for_wake_match();
+
+    k_printf("Port reset returned\n");
 
     if (!xhci_request_ok(&request)) {
         k_printf("Request not ok\n");
@@ -315,6 +319,9 @@ struct xhci_device *xhci_device_create(void *mmio) {
     dev->op_regs = op;
     dev->ports = cap->hcs_params1 & 0xff;
     INIT_LIST_HEAD(&dev->devices);
+    semaphore_init(&dev->port_disconnect, 0, SEMAPHORE_INIT_IRQ_DISABLE);
+    semaphore_init(&dev->port_connect, 0, SEMAPHORE_INIT_IRQ_DISABLE);
+    semaphore_init(&dev->sem, 0, SEMAPHORE_INIT_IRQ_DISABLE);
 
     for (uint32_t i = 0; i < XHCI_PORT_COUNT; i++) {
 
@@ -357,11 +364,13 @@ enum usb_status xhci_port_init(struct xhci_port *p, enum irql *lock_irql) {
         return USB_ERR_OOM;
     }
 
+    k_printf("XHCI: Trying to reset port\n");
     if ((err = xhci_reset_port(dev, port)) != USB_OK) {
         k_printf("XHCI: reset_port failure\n");
         return err;
     }
 
+    k_printf("XHCI: Trying to enable_slot\n");
     if ((slot_id = xhci_enable_slot(dev)) == 0) {
         k_printf("XHCI: enable_slot failure\n");
         return USB_ERR_NO_DEVICE;
@@ -372,14 +381,14 @@ enum usb_status xhci_port_init(struct xhci_port *p, enum irql *lock_irql) {
     temp_slot.slot_id = slot_id;
     temp_slot.dev = dev;
 
-    struct xhci_port *this_port = &dev->port_info[port - 1];
-    if ((err = xhci_address_device(this_port, slot_id, &temp_slot)) != USB_OK) {
+    k_printf("XHCI: Trying to address_device\n");
+    if ((err = xhci_address_device(p, slot_id, &temp_slot)) != USB_OK) {
         k_printf("XHCI: address_device failure\n");
         xhci_disable_slot(dev, slot_id);
         return err;
     }
 
-    usb->speed = this_port->speed;
+    usb->speed = p->speed;
     usb->port = port;
     usb->configured = false;
     usb->host = dev->controller;
@@ -393,10 +402,10 @@ enum usb_status xhci_port_init(struct xhci_port *p, enum irql *lock_irql) {
     struct xhci_slot *this_slot = xhci_get_slot(dev, slot_id);
     memcpy(this_slot, &temp_slot, sizeof(struct xhci_slot));
 
-    xhci_port_set_state(this_port, XHCI_PORT_STATE_CONNECTED);
+    xhci_port_set_state(p, XHCI_PORT_STATE_CONNECTED);
     refcount_init(&this_slot->refcount, 1);
-    this_port->slot = this_slot;
-    this_slot->port = this_port;
+    p->slot = this_slot;
+    this_slot->port = p;
     this_slot->udev = usb;
 
     list_add_tail(&usb->hc_list, &dev->devices);

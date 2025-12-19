@@ -26,7 +26,7 @@ void xhci_emit_singular(struct xhci_command *cmd, struct xhci_ring *ring) {
     cmd->request->last_trb = dst;
 }
 
-void xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd) {
+bool xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd) {
     struct xhci_ring *ring = cmd->ring;
 
     enum irql irql = spin_lock_irq_disable(&dev->lock);
@@ -38,18 +38,28 @@ void xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd) {
         spin_unlock(&dev->lock, irql);
     }
 
+    if (cmd->slot) {
+        if (!xhci_slot_get(cmd->slot)) {
+            spin_unlock(&dev->lock, irql);
+            return false;
+        }
+    }
+
     xhci_ring_reserve(ring, cmd->num_trbs);
 
     /* Emit TRBs */
     cmd->emit(cmd, ring);
     struct xhci_request *rq = cmd->request;
 
-    rq->generation = dev->port_info[rq->port - 1].generation;
+    if (rq->port)
+        rq->generation = dev->port_info[rq->port - 1].generation;
+
     rq->status = XHCI_REQUEST_OUTGOING;
     list_add_tail(&rq->list, &dev->requests[XHCI_REQUEST_OUTGOING]);
 
     xhci_ring_doorbell(dev, cmd->slot ? cmd->slot->slot_id : 0, cmd->ep_id);
     spin_unlock(&dev->lock, irql);
+    return true;
 }
 
 /* Submit a single interrupt IN transfer, blocking until completion */
@@ -120,7 +130,10 @@ enum usb_status xhci_submit_interrupt_transfer(struct usb_request *req) {
         .num_trbs = 1,
     };
 
-    xhci_send_command(xhci, cmd);
+    if (!xhci_send_command(xhci, cmd)) {
+        xhci_slot_put(slot);
+        return USB_ERR_NO_DEVICE;
+    }
 
 out:
     xhci_slot_put(slot);
@@ -170,19 +183,15 @@ void xhci_emit_control(struct xhci_command *cmd, struct xhci_ring *ring) {
 enum usb_status xhci_send_control_transfer(struct xhci_device *dev,
                                            struct xhci_slot *slot,
                                            struct usb_request *req) {
+    if (!req->setup)
+        return USB_ERR_INVALID_ARGUMENT;
+
     if (!usb_device_get(req->dev))
         return USB_ERR_NO_DEVICE;
 
     if (!xhci_slot_get(slot)) {
         usb_device_put(req->dev);
         return USB_ERR_NO_DEVICE;
-    }
-
-    struct xhci_ring *ring = slot->ep_rings[0];
-    if (!ring || !req->setup) {
-        xhci_slot_put(slot);
-        usb_device_put(req->dev);
-        return USB_ERR_INVALID_ARGUMENT;
     }
 
     /* TODO: OOM */
@@ -198,7 +207,7 @@ enum usb_status xhci_send_control_transfer(struct xhci_device *dev,
     xhci_request_init(xreq, cmd, req);
 
     *cmd = (struct xhci_command) {
-        .ring = ring,
+        .ring = slot->ep_rings[0],
         .slot = slot,
         .ep_id = 1,
         .request = xreq,
@@ -207,7 +216,11 @@ enum usb_status xhci_send_control_transfer(struct xhci_device *dev,
         .num_trbs = 2 + (emit->length ? 1 : 0),
     };
 
-    xhci_send_command(dev, cmd);
+    if (!xhci_send_command(dev, cmd)) {
+        xhci_slot_put(slot);
+        return USB_ERR_NO_DEVICE;
+    }
+
     xhci_slot_put(slot);
     return USB_OK;
 }

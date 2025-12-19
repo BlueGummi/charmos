@@ -314,7 +314,6 @@ struct usb_controller_ops {
     enum usb_status (*submit_interrupt_transfer)(struct usb_request *);
     void (*reset_slot)(struct usb_device *dev);
     enum usb_status (*configure_endpoint)(struct usb_device *dev);
-    enum usb_status (*abort)(struct usb_device *dev); /* Abort a failed setup */
     void (*poll_ports)(struct usb_controller *);
 };
 

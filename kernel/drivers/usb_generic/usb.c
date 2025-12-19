@@ -312,21 +312,25 @@ enum usb_status usb_init_device(struct usb_device *dev) {
         return USB_ERR_NO_DEVICE;
 
     enum usb_status err = USB_OK;
+    k_printf("Trying to get_device_descriptor\n");
     if ((err = usb_get_device_descriptor(dev)) != USB_OK) {
         k_printf("USB: get_device_descriptor failed\n");
         goto out;
     }
 
+    k_printf("Trying to parse_config_descriptor\n");
     if ((err = usb_parse_config_descriptor(dev)) != USB_OK) {
         k_printf("USB: parse_config_descriptor failed\n");
         goto out;
     }
 
+    k_printf("Trying to set_configuration\n");
     if ((err = usb_set_configuration(dev)) != USB_OK) {
         k_printf("USB: set_configuration failed\n");
         goto out;
     }
 
+    k_printf("Trying to configure_endpoint\n");
     if ((err = dev->host->ops.configure_endpoint(dev)) != USB_OK) {
         k_printf("USB: configure_endpoint failed\n");
         goto out;
