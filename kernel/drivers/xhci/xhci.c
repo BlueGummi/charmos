@@ -468,7 +468,7 @@ static void xhci_lookup_by_port(struct xhci_device *dev, uint8_t port,
 enum xhci_request_status
 xhci_make_request_status(struct xhci_device *dev,
                          struct xhci_request *request) {
-    if (request->port && !request->port_reset) {
+    if (request->port) {
         struct xhci_port *port = &dev->port_info[request->port - 1];
 
         if (request->generation && request->generation != port->generation) {
@@ -567,24 +567,8 @@ static enum port_event_type xhci_detect_port_event(uint32_t portsc) {
 
 static void xhci_process_port_reset(struct xhci_device *dev,
                                     struct xhci_trb *trb, uint32_t *portsc) {
+    (void) dev, (void) trb, (void) portsc;
     k_printf("port reset occurred\n");
-    mmio_write_32(portsc, mmio_read_32(portsc) | PORTSC_PRC);
-
-    bool got_it = false;
-    struct xhci_request *found, *n;
-    list_for_each_entry_safe(found, n, &dev->requests[XHCI_REQUEST_OUTGOING],
-                             list) {
-        if (found->port_reset) {
-            got_it = true;
-            break;
-        }
-    }
-
-    kassert(got_it);
-
-    list_del_init(&found->list);
-    xhci_process_trb_into_request(dev, found, trb);
-    list_add_tail(&found->list, &dev->requests[XHCI_REQUEST_PROCESSED]);
 }
 
 static struct xhci_port *xhci_port_for_trb(struct xhci_device *dev,

@@ -683,7 +683,6 @@ struct xhci_request {
     struct usb_request *urb;
     struct xhci_command *command;
 
-    volatile uint8_t port_reset;
     volatile uint8_t slot_reset;
     struct xhci_trb *last_trb;
     uint64_t trb_phys;

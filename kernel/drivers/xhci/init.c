@@ -126,87 +126,76 @@ void xhci_disable_slot(struct xhci_device *dev, uint8_t slot_id) {
     k_printf("Disable slot returned\n");
 }
 
+static enum usb_status xhci_spin_wait_port_reset(uint32_t *portsc,
+                                                 bool is_usb3) {
+    const uint64_t timeout_us = 100 * 1000;
+    uint64_t start = time_get_us();
+
+    while (time_get_us() - start < timeout_us) {
+        uint32_t v = mmio_read_32(portsc);
+
+        if (is_usb3) {
+            if (!(v & PORTSC_WPR)) {
+                uint32_t pls = (v >> PORTSC_PLS_SHIFT) & PORTSC_PLS_MASK;
+                if (pls == PORTSC_PLS_RXDETECT)
+                    return USB_ERR_IO;
+                if (pls == PORTSC_PLS_U0)
+                    return USB_OK;
+            }
+        } else {
+            if (!(v & PORTSC_PR)) {
+                if (v & PORTSC_PED)
+                    return USB_OK;
+                return USB_ERR_IO;
+            }
+        }
+
+        cpu_relax();
+        sleep_us(10);
+    }
+
+    return USB_ERR_TIMEOUT;
+}
+
 enum usb_status xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
     uint32_t *portsc = xhci_portsc_ptr(dev, portnum);
     bool is_usb3 = dev->port_info[portnum - 1].usb3;
 
-    uint32_t old = mmio_read_32(portsc);
+    uint32_t v = mmio_read_32(portsc);
 
-    /*
-    if (!(old & PORTSC_PP)) {
-        mmio_write_32(portsc, PORTSC_PP);
+    /* Power on */
+    if (!(v & PORTSC_PP)) {
+        mmio_write_32(portsc, v | PORTSC_PP);
         sleep_us(2000);
-        old = mmio_read_32(portsc);
-        if (!(old & PORTSC_PP)) {
-            xhci_warn("port %u: power enable failed", portnum);
+        v = mmio_read_32(portsc);
+        if (!(v & PORTSC_PP))
             return USB_ERR_IO;
-        }
-    }*/
-
-    uint32_t cur = mmio_read_32(portsc);
-
-    uint32_t clear_mask = PORTSC_PRC | PORTSC_CSC | PORTSC_PEC | PORTSC_WRC;
-
-    uint32_t preserve =
-        cur & (PORTSC_PP | PORTSC_PED | (PORTSC_PLS_MASK << PORTSC_PLS_SHIFT));
-
-    uint32_t to_write = clear_mask | preserve;
-
-    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
-    enum irql lirql = spin_lock_irq_disable(&dev->lock);
-
-    struct xhci_request request = {0};
-    struct xhci_command cmd = {0};
-    cmd.slot = NULL;
-    xhci_request_init_blocking(&request, &cmd, /* port = */ 0);
-    list_add_tail(&request.list, &dev->requests[XHCI_REQUEST_OUTGOING]);
-    request.port_reset = true;
-    request.port = portnum;
-
-    thread_block(scheduler_get_current_thread(), THREAD_BLOCK_REASON_IO,
-                 THREAD_WAIT_UNINTERRUPTIBLE, dev);
-
-    mmio_write_32(portsc, to_write);
-
-    sleep_us(500);
-    old = mmio_read_32(portsc);
-
-    uint32_t write_mask = PORTSC_PR;
-
-    if (old & PORTSC_PED) {
-        write_mask |= PORTSC_PED;
     }
 
+    /* Clear change bits */
+    mmio_write_32(portsc,
+                  v | PORTSC_CSC | PORTSC_PEC | PORTSC_PRC | PORTSC_WRC);
+
+    sleep_us(100);
+
+    /* Initiate reset */
     if (is_usb3) {
-        write_mask |= PORTSC_WPR;
+        mmio_write_32(portsc, PORTSC_WPR);
+    } else {
+        mmio_write_32(portsc, PORTSC_PR);
     }
 
-    mmio_write_32(portsc, write_mask);
+    /* Spin-poll completion */
+    enum usb_status st = xhci_spin_wait_port_reset(portsc, is_usb3);
 
-    spin_unlock(&dev->lock, lirql);
-    irql_lower(irql);
+    if (st != USB_OK)
+        return st;
 
-    thread_wait_for_wake_match();
+    /* Final sanity check */
+    v = mmio_read_32(portsc);
+    if (!(v & PORTSC_PED))
+        return USB_ERR_IO;
 
-    k_printf("Port reset returned\n");
-
-    if (!xhci_request_ok(&request)) {
-        k_printf("Request not ok\n");
-        return xhci_rq_to_usb_status(&request);
-    }
-
-    uint32_t final = mmio_read_32(portsc);
-    uint32_t pls = (final >> PORTSC_PLS_SHIFT) & PORTSC_PLS_MASK;
-    if (is_usb3) {
-        if (pls == PORTSC_PLS_RXDETECT) {
-            xhci_info("port %u: USB3 reset failed (PLS=RXDETECT)", portnum);
-            return USB_ERR_IO;
-        } else {
-            xhci_info("port %u: USB3 reset unknown state pls=%u speed=%u",
-                      portnum, pls, final & PORTSC_SPEED_MASK);
-            return USB_ERR_IO;
-        }
-    }
     return USB_OK;
 }
 
