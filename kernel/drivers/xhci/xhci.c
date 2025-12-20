@@ -19,6 +19,14 @@
 
 struct workqueue *xhci_wq;
 
+static void dump_stack() {
+    k_printf("Thread %s stack begins at 0x%lx and ends at 0x%lx\n",
+             scheduler_get_current_thread()->name,
+             scheduler_get_current_thread()->stack,
+             (uintptr_t) scheduler_get_current_thread()->stack +
+                 scheduler_get_current_thread()->stack_size);
+}
+
 enum usb_status xhci_address_device(struct xhci_port *p, uint8_t slot_id,
                                     struct xhci_slot *publish_to) {
     struct xhci_device *xhci = p->dev;
@@ -117,7 +125,6 @@ static uint8_t xhci_ep_to_input_ctx_idx(struct usb_endpoint *ep) {
     return ep->number * 2 - (ep->in ? 0 : 1);
 }
 
-/* TODO: modify locally and then publish */
 enum usb_status xhci_configure_device_endpoints(struct usb_device *usb) {
     struct xhci_slot *xslot = usb->slot;
     if (!xhci_slot_get(xslot))
@@ -212,6 +219,7 @@ enum usb_status xhci_configure_device_endpoints(struct usb_device *usb) {
 }
 
 static void xhci_work_port_disconnect(void *arg1) {
+    dump_stack();
     struct xhci_device *d = arg1;
     while (true) {
         semaphore_wait(&d->port_disconnect);
@@ -256,6 +264,7 @@ static void xhci_work_port_disconnect(void *arg1) {
 }
 
 static void xhci_work_port_connect(void *arg1) {
+    dump_stack();
     struct xhci_device *d = arg1;
 
     while (true) {
@@ -289,8 +298,6 @@ static void xhci_work_port_connect(void *arg1) {
         k_printf("Trying to init_device\n");
         usb_init_device(dev);
     }
-
-    k_panic("Left?\n");
 }
 
 static struct xhci_request *

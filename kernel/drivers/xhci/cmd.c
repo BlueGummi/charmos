@@ -28,13 +28,13 @@ void xhci_emit_singular(struct xhci_command *cmd, struct xhci_ring *ring) {
 
 bool xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd) {
     struct xhci_ring *ring = cmd->ring;
+    struct xhci_request *rq = cmd->request;
 
     enum irql irql = spin_lock_irq_disable(&dev->lock);
 
     if (!xhci_ring_can_reserve(ring, cmd->num_trbs)) {
         cmd->request->status = XHCI_REQUEST_WAITING;
-        list_add_tail(&cmd->request->list,
-                      &dev->requests[XHCI_REQUEST_WAITING]);
+        list_add_tail(&rq->list, &dev->requests[XHCI_REQUEST_WAITING]);
         spin_unlock(&dev->lock, irql);
     }
 
@@ -49,7 +49,6 @@ bool xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd) {
 
     /* Emit TRBs */
     cmd->emit(cmd, ring);
-    struct xhci_request *rq = cmd->request;
 
     if (rq->port)
         rq->generation = dev->port_info[rq->port - 1].generation;
