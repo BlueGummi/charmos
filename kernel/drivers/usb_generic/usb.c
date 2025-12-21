@@ -341,12 +341,12 @@ enum usb_status usb_init_device(struct usb_device *dev) {
     usb_try_bind_driver(dev);
 
 out:
-    usb_device_put(dev);
     if (err != USB_OK) {
         k_printf(ANSI_RED "USB: error in setup, aborting\n");
-        dev->host->ops.reset_slot(dev);
+       // dev->host->ops.reset_slot(dev);
     }
 
+    usb_device_put(dev);
     return err;
 }
 

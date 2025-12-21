@@ -201,7 +201,7 @@ void irq_enable(uint8_t irq) {
 
 void irq_init() {
     for (size_t i = 0; i < IDT_ENTRIES; i++) {
-        if (i == IRQ_PAGE_FAULT || i == IRQ_DBF || i == IRQ_GPF)
+        if (i == IRQ_PAGE_FAULT || i == IRQ_DBF || i == IRQ_GPF || i == 6)
             continue;
         struct irq_desc *desc = &irq_table[i];
         if (!cpu_mask_init(&desc->masked_cpus, global.core_count))

@@ -775,8 +775,8 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
     ctrl->ops = xhci_ctrl_ops;
     dev->controller = ctrl;
 
-    thread_spawn("xhci_worker", xhci_work_port_disconnect, dev);
-    thread_spawn("xhci_worker", xhci_work_port_connect, dev);
+    thread_spawn("xhci_disconnect_worker", xhci_work_port_disconnect, dev);
+    thread_spawn("xhci_connect_worker", xhci_work_port_connect, dev);
 
     for (uint64_t port = 1; port <= dev->ports; port++) {
         uint32_t portsc = xhci_read_portsc(dev, port);

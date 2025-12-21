@@ -181,7 +181,7 @@ static inline struct thread *thread_spawn_on_core(char *name,
 
 static inline void scheduler_wake_from_io_block(struct thread *t,
                                                 void *wake_src) {
-    scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_IO, THREAD_PRIO_CLASS_URGENT,
+    scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_IO, THREAD_PRIO_CLASS_TIMESHARE,
                    wake_src);
 }
 
