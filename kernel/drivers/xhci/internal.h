@@ -6,6 +6,8 @@
 #include <string.h>
 
 void xhci_nop(struct xhci_device *dev);
+void xhci_request_move(struct xhci_device *dev, struct xhci_request *req,
+                       enum xhci_request_list new_list);
 void xhci_reset_slot(struct usb_device *dev);
 enum usb_status xhci_port_init(struct xhci_port *p, enum irql *lock_irql);
 enum irq_result xhci_isr(void *ctx, uint8_t vector, struct irq_context *rsp);
@@ -140,11 +142,12 @@ static inline enum usb_status xhci_rq_to_usb_status(struct xhci_request *req) {
 static inline void xhci_request_init_blocking(struct xhci_request *req,
                                               struct xhci_command *cmd,
                                               uint8_t port) {
-    req->status = XHCI_REQUEST_MAX;
+    req->status = XHCI_REQUEST_SENDING;
     req->completion_code = 0;
     req->command = cmd;
     req->private = scheduler_get_current_thread();
     req->callback = xhci_wake_waiter;
+    req->list_owner = XHCI_REQ_LIST_NONE;
     req->port = port;
     INIT_LIST_HEAD(&req->list);
 }
@@ -153,7 +156,8 @@ static inline void xhci_request_init(struct xhci_request *req,
                                      struct xhci_command *cmd,
                                      struct usb_request *rq) {
 
-    req->status = XHCI_REQUEST_MAX;
+    req->list_owner = XHCI_REQ_LIST_NONE;
+    req->status = XHCI_REQUEST_SENDING;
     req->completion_code = 0;
     req->command = cmd;
     INIT_LIST_HEAD(&req->list);
@@ -221,7 +225,7 @@ static inline void xhci_slot_set_state(struct xhci_slot *slot,
 /* A request is OK if it is CC_SUCCESS and PROCESSED */
 static inline bool xhci_request_ok(struct xhci_request *rq) {
     return rq->completion_code == CC_SUCCESS &&
-           rq->status == XHCI_REQUEST_PROCESSED;
+           rq->status == XHCI_REQUEST_OK;
 }
 
 REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(

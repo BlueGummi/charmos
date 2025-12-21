@@ -626,13 +626,19 @@ enum xhci_request_status {
      * DISCONNECT requests occur when a port is disconnected and the request
      * no longer goes anywhere (because the port is gone)
      */
-    XHCI_REQUEST_OUTGOING,
-    XHCI_REQUEST_WAITING,
-    XHCI_REQUEST_PROCESSED,
-    XHCI_REQUEST_MAX,
+    XHCI_REQUEST_SENDING,
+    XHCI_REQUEST_OK,
     XHCI_REQUEST_CANCELLED,
     XHCI_REQUEST_DISCONNECT,
     XHCI_REQUEST_ERR,
+};
+
+enum xhci_request_list {
+    XHCI_REQ_LIST_NONE,
+    XHCI_REQ_LIST_OUTGOING,
+    XHCI_REQ_LIST_WAITING,
+    XHCI_REQ_LIST_PROCESSED,
+    XHCI_REQ_LIST_MAX,
 };
 
 struct xhci_device {
@@ -654,7 +660,7 @@ struct xhci_device {
     struct xhci_slot slots[XHCI_SLOT_COUNT];
     struct xhci_port port_info[XHCI_PORT_COUNT];
 
-    struct list_head requests[XHCI_REQUEST_MAX];
+    struct list_head requests[XHCI_REQ_LIST_MAX];
 
     size_t num_devices;
     struct list_head devices;
@@ -680,6 +686,7 @@ struct xhci_command {
 
 struct xhci_request {
     /* Tied back to the USB request */
+    enum xhci_request_list list_owner;
     struct usb_request *urb;
     struct xhci_command *command;
 

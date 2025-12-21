@@ -33,8 +33,7 @@ bool xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd) {
     enum irql irql = spin_lock_irq_disable(&dev->lock);
 
     if (!xhci_ring_can_reserve(ring, cmd->num_trbs)) {
-        cmd->request->status = XHCI_REQUEST_WAITING;
-        list_add_tail(&rq->list, &dev->requests[XHCI_REQUEST_WAITING]);
+        xhci_request_move(dev, rq, XHCI_REQ_LIST_WAITING);
         spin_unlock(&dev->lock, irql);
     }
 
@@ -53,8 +52,7 @@ bool xhci_send_command(struct xhci_device *dev, struct xhci_command *cmd) {
     if (rq->port)
         rq->generation = dev->port_info[rq->port - 1].generation;
 
-    rq->status = XHCI_REQUEST_OUTGOING;
-    list_add_tail(&rq->list, &dev->requests[XHCI_REQUEST_OUTGOING]);
+    xhci_request_move(dev, rq, XHCI_REQ_LIST_OUTGOING);
 
     xhci_ring_doorbell(dev, cmd->slot ? cmd->slot->slot_id : 0, cmd->ep_id);
     spin_unlock(&dev->lock, irql);

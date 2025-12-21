@@ -306,7 +306,7 @@ xhci_finished_requests_pop_front(struct xhci_device *dev) {
 
     struct xhci_request *ret = NULL;
     struct list_head *lh =
-        list_pop_front_init(&dev->requests[XHCI_REQUEST_PROCESSED]);
+        list_pop_front_init(&dev->requests[XHCI_REQ_LIST_PROCESSED]);
     if (!lh)
         goto out;
 
@@ -322,7 +322,7 @@ xhci_waiting_requests_pop_front(struct xhci_device *dev) {
     enum irql irql = spin_lock_irq_disable(&dev->lock);
     struct xhci_request *ret = NULL;
     struct list_head *lh =
-        list_pop_front_init(&dev->requests[XHCI_REQUEST_WAITING]);
+        list_pop_front_init(&dev->requests[XHCI_REQ_LIST_WAITING]);
 
     if (!lh)
         goto out;
@@ -405,10 +405,13 @@ static void xhci_worker(void *arg) {
 
 static struct xhci_request *xhci_lookup_trb(struct xhci_device *dev,
                                             struct xhci_trb *trb) {
+    kassert(TRB_TYPE(trb->control) == TRB_TYPE_TRANSFER_EVENT ||
+            TRB_TYPE(trb->control) == TRB_TYPE_COMMAND_COMPLETION);
+
     paddr_t phys = trb->parameter;
 
     struct xhci_request *req, *tmp, *found = NULL;
-    list_for_each_entry_safe(req, tmp, &dev->requests[XHCI_REQUEST_OUTGOING],
+    list_for_each_entry_safe(req, tmp, &dev->requests[XHCI_REQ_LIST_OUTGOING],
                              list) {
         if (req->trb_phys == phys) {
             found = req;
@@ -419,17 +422,45 @@ static struct xhci_request *xhci_lookup_trb(struct xhci_device *dev,
     return found;
 }
 
-static void xhci_request_list_del(struct xhci_request *req) {
-    if (req->status == XHCI_REQUEST_OUTGOING)
-        req->command->ring->outgoing -= req->command->num_trbs;
+void xhci_request_move(struct xhci_device *dev, struct xhci_request *req,
+                       enum xhci_request_list new_list) {
+    kassert(req->list_owner != new_list);
+    /* remove from old list */
+    if (req->list_owner != XHCI_REQ_LIST_NONE) {
+        list_del_init(&req->list);
 
-    list_del_init(&req->list);
+        if (req->list_owner == XHCI_REQ_LIST_OUTGOING) {
+            req->command->ring->outgoing -= req->command->num_trbs;
+        }
+    }
+
+    req->list_owner = new_list;
+
+    if (new_list == XHCI_REQ_LIST_NONE)
+        return;
+
+    list_add_tail(&req->list, &dev->requests[new_list]);
+}
+
+static void xhci_disconnect_requests_on_port(struct xhci_device *dev,
+                                             uint8_t port) {
+    for (int i = XHCI_REQ_LIST_OUTGOING; i <= XHCI_REQ_LIST_WAITING; i++) {
+        struct xhci_request *req, *tmp;
+        list_for_each_entry_safe(req, tmp, &dev->requests[i], list) {
+            if (req->port != port)
+                continue;
+
+            k_printf("Disconnected a request\n");
+            req->status = XHCI_REQUEST_DISCONNECT;
+            xhci_request_move(dev, req, XHCI_REQ_LIST_PROCESSED);
+        }
+    }
 }
 
 static void catch_stragglers_on_list(struct xhci_device *dev,
-                                     enum xhci_request_status status) {
+                                     enum xhci_request_list l) {
     struct xhci_request *req, *tmp;
-    list_for_each_entry_safe(req, tmp, &dev->requests[status], list) {
+    list_for_each_entry_safe(req, tmp, &dev->requests[l], list) {
         struct xhci_slot *slot = req->command->slot;
         if (!slot)
             continue;
@@ -439,37 +470,16 @@ static void catch_stragglers_on_list(struct xhci_device *dev,
 
         if (!slot_here) {
             k_printf("XHCI: found straggler\n");
-            xhci_request_list_del(req);
             req->status = XHCI_REQUEST_DISCONNECT;
-            list_add_tail(&req->list, &dev->requests[XHCI_REQUEST_PROCESSED]);
+            xhci_request_move(dev, req, XHCI_REQ_LIST_PROCESSED);
         }
     }
 }
 
 /* sends DISCONNECTED to any requests that are not on a valid port */
 static void xhci_catch_stragglers(struct xhci_device *dev) {
-    catch_stragglers_on_list(dev, XHCI_REQUEST_OUTGOING);
-    catch_stragglers_on_list(dev, XHCI_REQUEST_WAITING);
-}
-
-static void xhci_add_matches_to_list(struct list_head *from,
-                                     struct list_head *into, uint8_t port) {
-    struct xhci_request *req, *tmp;
-    list_for_each_entry_safe(req, tmp, from, list) {
-        if (req->port == port) {
-            xhci_request_list_del(req);
-            req->status = XHCI_REQUEST_DISCONNECT;
-            list_add_tail(&req->list, into);
-        }
-    }
-}
-
-/* Find all OUTGOING requests with a matching port, returning them on a list */
-static void xhci_lookup_by_port(struct xhci_device *dev, uint8_t port,
-                                struct list_head *out) {
-    INIT_LIST_HEAD(out);
-    xhci_add_matches_to_list(&dev->requests[XHCI_REQUEST_OUTGOING], out, port);
-    xhci_add_matches_to_list(&dev->requests[XHCI_REQUEST_WAITING], out, port);
+    catch_stragglers_on_list(dev, XHCI_REQ_LIST_OUTGOING);
+    catch_stragglers_on_list(dev, XHCI_REQ_LIST_WAITING);
 }
 
 enum xhci_request_status
@@ -489,7 +499,7 @@ xhci_make_request_status(struct xhci_device *dev,
 
     case CC_SUCCESS:
     case CC_STOPPED_LEN_INVALID:
-    case CC_SHORT_PACKET: return XHCI_REQUEST_PROCESSED;
+    case CC_SHORT_PACKET: return XHCI_REQUEST_OK;
 
     case CC_STALL_ERROR:
     case CC_ENDPOINT_NOT_ENABLED:
@@ -498,7 +508,7 @@ xhci_make_request_status(struct xhci_device *dev,
     case CC_RING_OVERRUN:
     case CC_RING_UNDERRUN:
         xhci_warn("Ring overrun/underrun detected");
-        return XHCI_REQUEST_PROCESSED;
+        return XHCI_REQUEST_OK;
 
     case CC_CONTEXT_STATE_ERROR:
     case CC_NO_SLOTS_AVAILABLE:
@@ -540,21 +550,14 @@ static bool xhci_trb_slot_exists(struct xhci_device *dev, struct xhci_trb *trb,
 static void xhci_process_request(struct xhci_device *dev,
                                  struct xhci_trb *trb) {
     struct xhci_request *found = xhci_lookup_trb(dev, trb);
-    if (!found) {
-        struct xhci_request *rq;
-        list_for_each_entry(rq, &dev->requests[XHCI_REQUEST_OUTGOING], list) {
-            k_printf("Request has TRB addr 0x%lx\n", rq->trb_phys);
-        }
-        return;
-    }
+    kassert(found && "Completion TRB with no matching request");
 
-    xhci_request_list_del(found);
     xhci_process_trb_into_request(dev, found, trb);
 
     if (!xhci_trb_slot_exists(dev, trb, found))
         found->status = XHCI_REQUEST_DISCONNECT;
 
-    list_add_tail(&found->list, &dev->requests[XHCI_REQUEST_PROCESSED]);
+    xhci_request_move(dev, found, XHCI_REQ_LIST_PROCESSED);
 }
 
 enum port_event_type { PORT_DISCONNECT, PORT_RESET, PORT_CONNECT, PORT_NONE };
@@ -608,26 +611,7 @@ static void xhci_process_port_disconnect(struct xhci_device *dev,
     struct xhci_slot *s = xhci_get_slot(dev, slot_id);
     xhci_slot_set_state(s, XHCI_SLOT_STATE_DISCONNECTING);
 
-    uint8_t cc = TRB_CC(mmio_read_32(&trb->status));
-
-    /* We obtained the port number. Now it is our job to signal
-     * all `struct xhci_request`s with matching port numbers
-     * and give them the PORT_DISCONNECT status */
-    struct list_head matching;
-    xhci_lookup_by_port(dev, port->port_id, &matching);
-
-    struct xhci_request *iter, *n;
-    list_for_each_entry(iter, &matching, list) {
-        /* mark everyone as DISCONNECT */
-        iter->status = XHCI_REQUEST_DISCONNECT;
-        iter->completion_code = cc;
-    }
-
-    /* send them over to the completion list */
-    list_for_each_entry_safe(iter, n, &matching, list) {
-        list_del_init(&iter->list);
-        list_add_tail(&iter->list, &dev->requests[XHCI_REQUEST_PROCESSED]);
-    }
+    xhci_disconnect_requests_on_port(dev, port->port_id);
 
 end:
     k_printf("port_disconnect work enqueued\n");

@@ -297,7 +297,7 @@ struct xhci_device *xhci_device_create(void *mmio) {
     struct xhci_interrupter_regs *ir_base =
         (void *) ((uint8_t *) runtime_regs + 0x20);
 
-    for (size_t i = 0; i < XHCI_REQUEST_MAX; i++) {
+    for (size_t i = 0; i < XHCI_REQ_LIST_MAX; i++) {
         INIT_LIST_HEAD(&dev->requests[i]);
     }
 
