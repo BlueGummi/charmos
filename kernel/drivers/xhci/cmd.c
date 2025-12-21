@@ -72,6 +72,7 @@ enum usb_status xhci_submit_interrupt_transfer(struct usb_request *req) {
     }
 
     if (!xhci_slot_get(slot)) {
+        usb_device_put(dev);
         return USB_ERR_NO_DEVICE;
     }
 
@@ -127,10 +128,8 @@ enum usb_status xhci_submit_interrupt_transfer(struct usb_request *req) {
         .num_trbs = 1,
     };
 
-    if (!xhci_send_command(xhci, cmd)) {
-        xhci_slot_put(slot);
-        return USB_ERR_NO_DEVICE;
-    }
+    if (!xhci_send_command(xhci, cmd))
+        return_status = USB_ERR_NO_DEVICE;
 
 out:
     xhci_slot_put(slot);
@@ -183,6 +182,7 @@ enum usb_status xhci_send_control_transfer(struct xhci_device *dev,
     if (!req->setup)
         return USB_ERR_INVALID_ARGUMENT;
 
+    /* request is responsible for dropping this */
     if (!usb_device_get(req->dev))
         return USB_ERR_NO_DEVICE;
 

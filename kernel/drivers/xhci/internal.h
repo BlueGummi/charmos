@@ -180,7 +180,6 @@ static inline bool xhci_send_command_and_block(struct xhci_device *dev,
                  THREAD_WAIT_UNINTERRUPTIBLE, dev);
 
     if (!xhci_send_command(dev, cmd)) {
-        k_printf("blep\n");
         thread_wake(scheduler_get_current_thread(),
                     THREAD_WAKE_REASON_BLOCKING_MANUAL, dev);
         irql_lower(irql);
@@ -218,7 +217,6 @@ static inline enum xhci_slot_state xhci_slot_get_state(struct xhci_slot *slot) {
 
 static inline void xhci_slot_set_state(struct xhci_slot *slot,
                                        enum xhci_slot_state new) {
-    k_printf("slot_set_state %s\n", xhci_slot_state_str(new));
     atomic_store_explicit(&slot->state, new, memory_order_release);
 }
 
@@ -284,8 +282,6 @@ static inline struct xhci_slot *xhci_usb_slot(struct usb_device *dev) {
 
 static inline void xhci_port_set_state(struct xhci_port *port,
                                        enum xhci_port_state state) {
-    k_printf("port_set_state %u to %s on gen %llu\n", port->port_id,
-             xhci_port_state_str(state), port->generation);
     port->state = state;
     port->generation++;
 }

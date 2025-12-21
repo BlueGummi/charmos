@@ -19,14 +19,6 @@
 
 struct workqueue *xhci_wq;
 
-static void dump_stack() {
-    k_printf("Thread %s stack begins at 0x%lx and ends at 0x%lx\n",
-             scheduler_get_current_thread()->name,
-             scheduler_get_current_thread()->stack,
-             (uintptr_t) scheduler_get_current_thread()->stack +
-                 scheduler_get_current_thread()->stack_size);
-}
-
 enum usb_status xhci_address_device(struct xhci_port *p, uint8_t slot_id,
                                     struct xhci_slot *publish_to) {
     struct xhci_device *xhci = p->dev;
@@ -219,11 +211,9 @@ enum usb_status xhci_configure_device_endpoints(struct usb_device *usb) {
 }
 
 static void xhci_work_port_disconnect(void *arg1) {
-    dump_stack();
     struct xhci_device *d = arg1;
     while (true) {
         semaphore_wait(&d->port_disconnect);
-        k_printf("port_disconnect work ran\n");
 
         /* Do repeated scans until we don't find a port */
         bool keep_going = true;
@@ -264,13 +254,10 @@ static void xhci_work_port_disconnect(void *arg1) {
 }
 
 static void xhci_work_port_connect(void *arg1) {
-    dump_stack();
     struct xhci_device *d = arg1;
 
     while (true) {
-        k_printf("port_connect on semaphore\n");
         semaphore_wait(&d->port_connect);
-        k_printf("port_connect work ran\n");
         struct xhci_port *port = NULL;
 
         enum irql irql = spin_lock_irq_disable(&d->lock);
@@ -295,7 +282,6 @@ static void xhci_work_port_connect(void *arg1) {
         struct usb_device *dev = port->slot->udev;
         spin_unlock(&d->lock, irql);
 
-        k_printf("Trying to init_device\n");
         usb_init_device(dev);
     }
 }
@@ -450,7 +436,6 @@ static void xhci_disconnect_requests_on_port(struct xhci_device *dev,
             if (req->port != port)
                 continue;
 
-            k_printf("Disconnected a request\n");
             req->status = XHCI_REQUEST_DISCONNECT;
             xhci_request_move(dev, req, XHCI_REQ_LIST_PROCESSED);
         }
@@ -469,7 +454,6 @@ static void catch_stragglers_on_list(struct xhci_device *dev,
         bool slot_here = state == XHCI_SLOT_STATE_ENABLED;
 
         if (!slot_here) {
-            k_printf("XHCI: found straggler\n");
             req->status = XHCI_REQUEST_DISCONNECT;
             xhci_request_move(dev, req, XHCI_REQ_LIST_PROCESSED);
         }
@@ -538,9 +522,9 @@ static bool xhci_trb_slot_exists(struct xhci_device *dev, struct xhci_trb *trb,
                                  struct xhci_request *request) {
     struct xhci_trb *source = request->last_trb;
     uint8_t type = TRB_TYPE(source->control);
-    if (type == TRB_TYPE_ENABLE_SLOT || type == TRB_TYPE_DISABLE_SLOT ||
-        type == TRB_TYPE_NO_OP || type == TRB_TYPE_ADDRESS_DEVICE ||
-        type == TRB_TYPE_DISABLE_SLOT || type == TRB_TYPE_RESET_DEVICE)
+    if (type == TRB_TYPE_ENABLE_SLOT || type == TRB_TYPE_NO_OP ||
+        type == TRB_TYPE_ADDRESS_DEVICE || type == TRB_TYPE_DISABLE_SLOT ||
+        type == TRB_TYPE_RESET_DEVICE)
         return true;
 
     return xhci_slot_get_state(xhci_get_slot(dev, TRB_SLOT(trb->control))) ==
@@ -578,7 +562,6 @@ static enum port_event_type xhci_detect_port_event(uint32_t portsc) {
 static void xhci_process_port_reset(struct xhci_device *dev,
                                     struct xhci_trb *trb, uint32_t *portsc) {
     (void) dev, (void) trb, (void) portsc;
-    k_printf("port reset occurred\n");
 }
 
 static struct xhci_port *xhci_port_for_trb(struct xhci_device *dev,
@@ -593,7 +576,6 @@ static void xhci_process_port_connect(struct xhci_device *dev,
                                       struct xhci_trb *trb) {
     struct xhci_port *port = xhci_port_for_trb(dev, trb);
     xhci_port_set_state(port, XHCI_PORT_STATE_CONNECTING);
-    k_printf("port_connect work enqueued\n");
     semaphore_post(&dev->port_connect);
 }
 
@@ -614,7 +596,6 @@ static void xhci_process_port_disconnect(struct xhci_device *dev,
     xhci_disconnect_requests_on_port(dev, port->port_id);
 
 end:
-    k_printf("port_disconnect work enqueued\n");
     semaphore_post(&dev->port_disconnect);
 }
 

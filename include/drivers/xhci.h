@@ -690,7 +690,7 @@ struct xhci_request {
     struct usb_request *urb;
     struct xhci_command *command;
 
-    volatile uint8_t slot_reset;
+    volatile bool slot_reset;
     struct xhci_trb *last_trb;
     uint64_t trb_phys;
     uint8_t port; /* What port is this for? Used to match

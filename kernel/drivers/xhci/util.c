@@ -143,7 +143,6 @@ void xhci_teardown_slot(struct xhci_slot *me) {
     memset(me->ep_rings, 0, sizeof(struct xhci_ring *) * 32);
     xhci_slot_set_state(me, XHCI_SLOT_STATE_DISCONNECTED);
     spin_unlock(&me->dev->lock, irql);
-    k_printf(ANSI_YELLOW "XHCI: teardown_slot going\n" ANSI_RESET);
 
     /* tear down the rings */
     for (size_t i = 0; i < 32; i++) {
@@ -182,7 +181,5 @@ void xhci_reset_slot(struct usb_device *dev) {
         .num_trbs = 1,
     };
 
-    k_printf("Sending reset slot\n");
     xhci_send_command_and_block(xdev, &cmd);
-    k_printf("Reset slot returned\n");
 }

@@ -312,27 +312,19 @@ enum usb_status usb_init_device(struct usb_device *dev) {
         return USB_ERR_NO_DEVICE;
 
     enum usb_status err = USB_OK;
-    k_printf("Trying to get_device_descriptor\n");
     if ((err = usb_get_device_descriptor(dev)) != USB_OK) {
-        k_printf("USB: get_device_descriptor failed\n");
         goto out;
     }
 
-    k_printf("Trying to parse_config_descriptor\n");
     if ((err = usb_parse_config_descriptor(dev)) != USB_OK) {
-        k_printf("USB: parse_config_descriptor failed\n");
         goto out;
     }
 
-    k_printf("Trying to set_configuration\n");
     if ((err = usb_set_configuration(dev)) != USB_OK) {
-        k_printf("USB: set_configuration failed\n");
         goto out;
     }
 
-    k_printf("Trying to configure_endpoint\n");
     if ((err = dev->host->ops.configure_endpoint(dev)) != USB_OK) {
-        k_printf("USB: configure_endpoint failed\n");
         goto out;
     }
 
@@ -342,7 +334,6 @@ enum usb_status usb_init_device(struct usb_device *dev) {
 
 out:
     if (err != USB_OK) {
-        k_printf(ANSI_RED "USB: error in setup, aborting\n");
         dev->host->ops.reset_slot(dev);
     }
 
@@ -353,7 +344,6 @@ out:
 void usb_teardown_device(struct usb_device *dev) {
     struct usb_driver *driver = dev->driver;
 
-    k_printf("USB: usb_device torndown\n");
     atomic_store_explicit(&dev->status, USB_DEV_DISCONNECTED,
                           memory_order_release);
 
@@ -371,7 +361,6 @@ void usb_free_device(struct usb_device *dev) {
     if (dev->free)
         dev->free(dev);
 
-    k_printf("USB: usb_device last ref gone, freeing\n");
     for (size_t i = 0; i < dev->num_interfaces; i++) {
         struct usb_interface_descriptor *infdr = dev->interfaces[i];
         kfree(infdr, FREE_PARAMS_DEFAULT);
