@@ -101,6 +101,7 @@ static inline void re_enqueue_thread(struct scheduler *sched,
     }
 }
 
+/* TODO: this!!! */
 static inline void migrate_to_destination(struct thread *t) {
     struct scheduler *dst = global.schedulers[t->migrate_to];
 
@@ -276,7 +277,6 @@ static inline void context_switch(struct scheduler *sched, struct thread *curr,
     if (curr == next)
         return;
 
-    /* TODO: fix this, janky strange way to protect thread states */
     if (!just_load) {
         switch_context(&curr->regs, &next->regs);
     } else {
@@ -323,27 +323,7 @@ void scheduler_drop_locks_after_switch_in() {
 }
 
 void scheduler_yield() {
-    /* NOTE: we use this assertion here to also protect against someone
-     * calling this routine whilst a spinlock is held. spinlocks will
-     * always raise the IRQL to at least DISPATCH. this assertion
-     * catches that case, and the assertion in the `irql_raise` catches
-     * the case where the IRQL is higher than DISPATCH (i.e. HIGH) */
     kassert(!scheduler_self_in_resched());
-
-    /* NOTE: the IRQL must be raised first to prevent a race where we
-     * can get swapped out while mark_self_in_resched occurs.
-     *
-     * if we do not disable preemption, the following race is possible
-     *
-     * read smp_core();
-     * <<-- here -->>
-     * write `true` to smp_core()->in_resched;
-     *
-     * where we can get swapped if preemption is enabled.
-     *
-     * thus, this approach of "first raise IRQL outside of
-     * mark_self_in_resched" is taken
-     */
 
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     scheduler_mark_self_in_resched(true);
