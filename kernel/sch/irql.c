@@ -18,7 +18,7 @@ enum irql irql_raise(enum irql new_level) {
 
     cpu->current_irql = new_level;
     if (new_level > old) {
-        if (old < IRQL_DISPATCH_LEVEL && new_level >= IRQL_DISPATCH_LEVEL)
+        if (old < IRQL_APC_LEVEL && new_level >= IRQL_APC_LEVEL)
             scheduler_preemption_disable();
 
         if (new_level >= IRQL_HIGH_LEVEL)
@@ -37,8 +37,7 @@ enum irql irql_raise(enum irql new_level) {
 }
 
 void irql_lower(enum irql new_level) {
-    if (global.current_bootstage < BOOTSTAGE_LATE ||
-        new_level == IRQL_NONE)
+    if (global.current_bootstage < BOOTSTAGE_LATE || new_level == IRQL_NONE)
         return;
 
     struct core *cpu = smp_core();
@@ -57,10 +56,8 @@ void irql_lower(enum irql new_level) {
             dpc_run_local();
 
         bool preempt_re_enabled = false;
-        if (old >= IRQL_DISPATCH_LEVEL && new_level < IRQL_DISPATCH_LEVEL) {
-            scheduler_preemption_enable();
-            preempt_re_enabled = true;
-        }
+        if (old >= IRQL_APC_LEVEL && new_level < IRQL_APC_LEVEL)
+            preempt_re_enabled = (scheduler_preemption_enable() == 0);
 
         if (in_thread && old > IRQL_APC_LEVEL && new_level <= IRQL_APC_LEVEL)
             thread_check_and_deliver_apcs(curr);

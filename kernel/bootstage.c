@@ -4,7 +4,6 @@
 
 static const char *bootstage_str[BOOTSTAGE_COUNT] = {
     [BOOTSTAGE_EARLY_FB] = "Early - Framebuffer",
-    [BOOTSTAGE_EARLY_MP] = "Early - SMP",
     [BOOTSTAGE_EARLY_ALLOCATORS] = "Early - Allocators",
     [BOOTSTAGE_EARLY_DEVICES] = "Early - Devices",
     [BOOTSTAGE_MID_SCHEDULER] = "Mid - Scheduler",

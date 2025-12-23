@@ -79,7 +79,6 @@ struct scheduler {
     /* Idle thread data */
     struct thread *idle_thread;
     struct idle_thread_data idle_thread_data;
-    struct thread *switched_out;
 };
 
 void scheduler_init();
@@ -91,8 +90,6 @@ void scheduler_remove_thread(struct scheduler *sched, struct thread *t,
 void schedule(void);
 void k_sch_main(void *);
 void scheduler_idle_main(void *);
-void scheduler_scheduler_preemption_enable();
-void scheduler_scheduler_preemption_disable();
 void scheduler_yield();
 void scheduler_enqueue(struct thread *t);
 void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id);

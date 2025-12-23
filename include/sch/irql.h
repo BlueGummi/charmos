@@ -29,13 +29,13 @@
  *   There are 5 IRQLs, ordered from the least restrictive to most restrictive:
  *
  *     - PASSIVE (standard code execution, nothing blocked)
- *     - APC (APCs[^1] blocked)
- *     - DISPATCH (DPCs[^2] blocked, preemption blocked)
+ *     - APC (APCs[^1] blocked, preemption blocked)
+ *     - DISPATCH (DPCs[^2] blocked)
  *     - DEVICE (same as DISPATCH, currently reserved for future use)
  *     - HIGH (hardware interrupts blocked)
  *
  *   To change the IRQL, a function call to raise or lower it must be made.
- *   This is because the raise/lower operation must invoke other functions
+ *   This is because the raise/lower operation must invoke otherfunctions
  *   to block other events (such as preemption or interrupts). This means
  *   that you cannot change the current IRQL willy-nilly and expect everything
  *   to work out just fine.
@@ -100,12 +100,7 @@
  *   assembly routines.
  *
  * ## Internals:
- *   Whenever a thread raises the IRQL above PASSIVE, the thread will be pinned
- *   to the current core it is executing on. Then, when the IRQL is lowered
- *   to PASSIVE, the thread is unpinned if it was not pinned prior to raising
- *   the IRQL. This is done to prevent a thread from getting migrated at
- *   an IRQL above PASSIVE and modifying the IRQL of a different logical
- *   processor when it lowers the IRQL.
+ *   None
  *
  * ## Strategy:
  *   To raise the IRQL, the necessary operations are performed depending on 
@@ -142,8 +137,8 @@
 
 enum irql {
     IRQL_PASSIVE_LEVEL = 0,  /* Normal execution */
-    IRQL_APC_LEVEL = 1,      /* Allow only high interrupts */
-    IRQL_DISPATCH_LEVEL = 2, /* Allow higher than DPC interrupts */
+    IRQL_APC_LEVEL = 1,      /* No preemption */ 
+    IRQL_DISPATCH_LEVEL = 2, /* No DPCs */ 
     IRQL_DEVICE_LEVEL = 3,   /* Device interrupts */
     IRQL_HIGH_LEVEL = 4,     /* All interrupts masked */
     IRQL_NONE = -1,

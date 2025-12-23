@@ -8,12 +8,45 @@
 #include <stdint.h>
 #include <thread/dpc.h>
 
+#define CPU_FEAT_SSE2 (1ULL << 0)
+#define CPU_FEAT_AVX (1ULL << 1)
+#define CPU_FEAT_AVX2 (1ULL << 2)
+#define CPU_FEAT_AVX512F (1ULL << 3)
+
+enum cpu_class {
+    CPU_CLASS_UNKNOWN,
+    CPU_CLASS_PERFORMANCE,
+    CPU_CLASS_EFFICIENCY,
+};
+
+enum {
+    UARCH_UNKNOWN,
+    UARCH_GOLDEN_COVE,
+    UARCH_GRACEMONT,
+    UARCH_SKYLAKE,
+};
+
+struct cpu_capability {
+    enum cpu_class class;
+
+    uint32_t uarch_id; /* e.g. golden cove, gracemont */
+
+    uint32_t issue_width;
+    uint32_t retire_width;
+
+    uint32_t perf_score;   /* normalized score (scheduler-facing) */
+    uint32_t energy_score; /* lower is better */
+
+    uint64_t feature_bits; /* ISA features, vector width, etc */
+};
+
 /* Let's put commonly accessed fields up here
  * to make the cache a bit happier */
 struct core {
     struct core *self;
     size_t id;
     struct thread *current_thread;
+    struct cpu_capability cap;
 
     size_t domain_cpu_id; /* what CPU in the domain? */
 

@@ -19,3 +19,6 @@ struct numa_node {
                          * 2nd farthest away node, our rel_dists[3] will be 2.
                          */
 };
+
+void numa_dump(void);
+void numa_construct_relative_distances(struct numa_node *node);

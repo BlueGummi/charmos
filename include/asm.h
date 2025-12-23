@@ -162,14 +162,6 @@ static inline void cpuid_count(uint32_t leaf, uint32_t subleaf, uint32_t *eax,
                  : "a"(leaf), "c"(subleaf));
 }
 
-static inline void cpuid(uint32_t leaf, uint32_t subleaf, uint32_t *eax,
-                         uint32_t *ebx, uint32_t *ecx, uint32_t *edx) {
-    asm volatile("cpuid"
-                 : "=a"(*eax), "=b"(*ebx), "=c"(*ecx), "=d"(*edx)
-                 : "a"(leaf), "c"(subleaf)
-                 :);
-}
-
 static inline uint64_t read_cr4() {
     uint64_t cr4;
     asm volatile("mov %%cr4, %0" : "=r"(cr4));

@@ -5,8 +5,6 @@
 enum bootstage : uint8_t {
     BOOTSTAGE_EARLY_FB, /* Console can be printed to */
 
-    BOOTSTAGE_EARLY_MP, /* APs are brought up and spinning */
-
     BOOTSTAGE_EARLY_ALLOCATORS, /* Early non-topology aware
                                  * allocators available */
 

@@ -58,9 +58,6 @@ __no_sanitize_address void k_main(void) {
     k_printf_init(framebuffer_request.response->framebuffers[0]);
     bootstage_advance(BOOTSTAGE_EARLY_FB);
 
-    smp_wakeup_processors(mp_request.response);
-    bootstage_advance(BOOTSTAGE_EARLY_MP);
-
     pmm_early_init(memmap_request);
     vmm_init(memmap_request.response, xa_request.response);
     pmm_mid_init();
@@ -89,7 +86,7 @@ __no_sanitize_address void k_main(void) {
     cmdline_parse(cmdline_request.response->cmdline);
     lapic_timer_init(/* core_id = */ 0);
     dpc_init_percpu();
-    smp_complete_init();
+    smp_init(mp_request.response);
     percpu_obj_init();
     prng_seed(time_get_us());
 
@@ -100,6 +97,10 @@ __no_sanitize_address void k_main(void) {
     scheduler_domains_init();
     perdomain_obj_init();
     bootstage_advance(BOOTSTAGE_MID_TOPOLOGY);
+    struct core *iter;
+    for_each_cpu_struct(iter) {
+        smp_dump_core(iter);
+    }
 
     pmm_late_init();
     slab_domain_init();

@@ -268,14 +268,8 @@ static inline void context_switch(struct scheduler *sched, struct thread *curr,
         thread_put(curr);
     }
 
-    if (curr && curr->state == THREAD_STATE_IDLE_THREAD) {
+    if (curr && curr->state == THREAD_STATE_IDLE_THREAD)
         just_load = true;
-    }
-
-    sched->switched_out = just_load ? NULL : curr;
-
-    if (curr == next)
-        return;
 
     if (!just_load) {
         switch_context(&curr->regs, &next->regs);
