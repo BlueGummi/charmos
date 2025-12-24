@@ -1,4 +1,5 @@
 /* @title: GDT */
+#include <compiler.h>
 #include <stdalign.h>
 #include <stdint.h>
 
@@ -9,12 +10,12 @@ struct gdt_entry {
     uint8_t access;
     uint8_t granularity;
     uint8_t base_high;
-} __attribute__((packed));
+} __packed;
 
 struct gdt_ptr {
     uint16_t limit;
     uint64_t base;
-} __attribute__((packed));
+} __packed;
 
 struct gdt_entry_tss {
     uint16_t limit_low;
@@ -25,7 +26,7 @@ struct gdt_entry_tss {
     uint8_t base_high;
     uint32_t base_upper;
     uint32_t reserved;
-} __attribute__((packed));
+} __packed;
 
 #define ACCESS_CODE_RING0 0x9A // exec/read, ring 0
 #define ACCESS_DATA_RING0 0x92 // read/write, ring 0

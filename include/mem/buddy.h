@@ -1,5 +1,6 @@
 /* @title: Buddy allocator */
 #pragma once
+#include <mem/alloc.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -15,7 +16,7 @@ struct free_area {
 
 void buddy_add_to_free_area(struct page *page, struct free_area *area);
 struct page *buddy_remove_from_free_area(struct free_area *area);
-paddr_t buddy_alloc_pages_global(size_t count, uint16_t flags);
+paddr_t buddy_alloc_pages_global(size_t count, enum alloc_flags flags);
 void buddy_free_pages_global(paddr_t addr, uint64_t count);
 struct limine_memmap_entry;
 void buddy_add_entry(struct page *page_array, struct limine_memmap_entry *entry,

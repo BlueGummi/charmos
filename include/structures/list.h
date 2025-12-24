@@ -12,8 +12,7 @@ struct list_head {
 
 #define LIST_HEAD(name) struct list_head name = LIST_HEAD_INIT(name)
 
-__no_sanitize_address static inline void
-INIT_LIST_HEAD(struct list_head *list) {
+static inline void INIT_LIST_HEAD(struct list_head *list) {
     list->next = list;
     list->prev = list;
 }

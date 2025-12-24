@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-SLAB_SIZE_REGISTER(bio_request, sizeof(struct bio_request));
+SLAB_SIZE_REGISTER_FOR_STRUCT(bio_request);
 
 static struct bio_request *create(struct generic_disk *d, uint64_t lba,
                                   uint64_t sec, uint64_t size,

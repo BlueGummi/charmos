@@ -1,5 +1,6 @@
 #include <acpi/lapic.h>
 #include <boot/gdt.h>
+#include <crypto/prng.h>
 #include <irq/idt.h>
 #include <limine.h>
 #include <mem/alloc.h>
@@ -210,15 +211,6 @@ static void init_smt_info(struct core *c) {
     c->core_id = (apic_id >> smt_width) & ((1 << (core_width - smt_width)) - 1);
 }
 
-static void compute_perf_score(struct cpu_capability *cap) {
-    cap->perf_score = cap->issue_width * cap->retire_width * cap->max_freq_mhz;
-
-    /* crude energy proxy */
-    cap->energy_score = cap->perf_score ? (1000000 / cap->perf_score) : 0;
-
-    cap->class = CPU_CLASS_UNKNOWN;
-}
-
 static void detect_cpu_capability(struct core *c) {
     struct cpu_capability *cap = &c->cap;
 
@@ -228,8 +220,6 @@ static void detect_cpu_capability(struct core *c) {
 
     detect_cpu_class(cap);
     detect_pipeline_width(cap);
-
-    compute_perf_score(cap);
 }
 
 static struct core *setup_cpu(uint64_t cpu) {
@@ -326,6 +316,7 @@ void smp_setup_bsp() {
     global.cores[0] = c;
     init_smt_info(c);
     detect_llc(&c->llc);
+    detect_cpu_capability(c);
 }
 
 static atomic_uint tick_change_state = 0;

@@ -1,4 +1,5 @@
 /* @title: ELF */
+#include <compiler.h>
 #include <stdint.h>
 #pragma once
 
@@ -10,7 +11,7 @@ struct elf64_ident {
     uint8_t os_abi;
     uint8_t abi_version;
     uint8_t pad[7];
-} __attribute__((packed));
+} __packed;
 
 struct elf64_ehdr {
     struct elf64_ident ident;
@@ -27,7 +28,7 @@ struct elf64_ehdr {
     uint16_t shentsize;
     uint16_t shnum;
     uint16_t shstrndx;
-} __attribute__((packed));
+} __packed;
 
 struct elf64_phdr {
     uint32_t type;
@@ -38,7 +39,7 @@ struct elf64_phdr {
     uint64_t filesz;
     uint64_t memsz;
     uint64_t align;
-} __attribute__((packed));
+} __packed;
 
 /* returns entry point */
 uint64_t elf_load(const void *elf_data);

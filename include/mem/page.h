@@ -1,5 +1,6 @@
 /* @title: Page */
 #pragma once
+#include <compiler.h>
 #include <math/align.h>
 #include <stdint.h>
 #include <sync/spinlock.h>
@@ -45,7 +46,7 @@ struct page {
 
 struct page_table {
     pte_t entries[512];
-} __attribute__((packed));
+} __packed;
 _Static_assert(sizeof(struct page_table) == PAGE_SIZE, "");
 
 static inline bool page_pfn_free(uint64_t pfn) {

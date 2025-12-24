@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <thread/dpc.h>
+#include <types/types.h>
 
 #define CPU_FEAT_SSE2 (1ULL << 0)
 #define CPU_FEAT_AVX (1ULL << 1)
@@ -34,7 +35,13 @@ struct cpu_capability {
     uint32_t issue_width;
     uint32_t retire_width;
 
-    uint32_t perf_score;   /* normalized score (scheduler-facing) */
+    cpu_perf_t perf_score; /* Relative to everyone else on a 0-255
+                            * scale, how performant are we? The
+                            * higher this number is, the more "performant"
+                            * this CPU currently is, and the more likely
+                            * the scheduler will decide to migrate a
+                            * thread that needs such perf scores onto here. */
+
     uint32_t energy_score; /* lower is better */
 
     uint64_t feature_bits; /* ISA features, vector width, etc */
@@ -44,7 +51,7 @@ struct cpu_capability {
  * to make the cache a bit happier */
 struct core {
     struct core *self;
-    size_t id;
+    cpu_id_t id;
     struct thread *current_thread;
     struct cpu_capability cap;
 

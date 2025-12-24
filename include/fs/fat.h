@@ -1,6 +1,7 @@
 /* @title: FAT */
 #include <block/bcache.h>
 #include <block/generic.h>
+#include <compiler.h>
 #include <stdint.h>
 
 // TODO: errno :boom:
@@ -53,7 +54,7 @@ struct fat12_16_ext_bpb {
     uint8_t volume_label[11];
     uint8_t fs_type[8];
     uint8_t reserved1[448];
-} __attribute__((packed));
+} __packed;
 
 struct fat32_ext_bpb {
     uint32_t fat_size_32;
@@ -70,7 +71,7 @@ struct fat32_ext_bpb {
     uint8_t volume_label[11];
     uint8_t fs_type[8];
     uint8_t reserved2[420];
-} __attribute__((packed));
+} __packed;
 
 _Static_assert(sizeof(struct fat12_16_ext_bpb) == sizeof(struct fat32_ext_bpb),
                "");
@@ -95,7 +96,7 @@ struct fat_bpb {
         struct fat32_ext_bpb ext_32;
         struct fat12_16_ext_bpb ext_12_16;
     };
-} __attribute__((packed));
+} __packed;
 
 struct fat_date {
     uint16_t day : 5;
@@ -122,7 +123,7 @@ struct fat_dirent {
     struct fat_date moddate;
     uint16_t low_cluster; // Low 16 bits of cluster number
     uint32_t filesize;
-} __attribute__((packed));
+} __packed;
 _Static_assert(sizeof(struct fat_dirent) == 32, "");
 
 struct fat_fs {

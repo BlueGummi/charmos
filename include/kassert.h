@@ -6,3 +6,5 @@
         if (!unlikely(x))                                                      \
             k_panic("Assertion " #x " failed\n");                              \
     } while (0)
+
+#define kassert_unreachable() kassert("unreachable")

@@ -74,7 +74,7 @@ struct pci_msix_cap {
     uint16_t msg_ctl;          // 0x2
     uint32_t table_offset_bir; // 0x4
     uint32_t pba_offset_bir;   // 0x8
-} __attribute__((packed));
+} __packed;
 
 #define PCI_BAR0 0x10
 #define PCI_BAR1 0x14

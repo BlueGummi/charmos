@@ -10,7 +10,7 @@
 #include <stdbool.h>
 
 struct spinlock {
-    atomic_bool state;
+    _Atomic uint8_t state;
 };
 
 #define SPINLOCK_INIT {ATOMIC_VAR_INIT(0)}
@@ -20,7 +20,7 @@ static inline void spinlock_init(struct spinlock *lock) {
 }
 
 static inline bool spin_trylock_raw(struct spinlock *lock) {
-    bool expected = 0;
+    uint8_t expected = 0;
     return atomic_compare_exchange_strong_explicit(
         &lock->state, &expected, 1, memory_order_acquire, memory_order_relaxed);
 }

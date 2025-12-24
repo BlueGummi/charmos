@@ -9,7 +9,9 @@ struct prng_core {
     size_t pos;
 };
 
-void prng_build(struct prng_core *this_one, size_t cpu) {}
+void prng_build(struct prng_core *this_one, size_t cpu) {
+    (void) this_one, (void) cpu;
+}
 
 PERCPU_DECLARE(pcs, struct prng_core, prng_build);
 #define prng_core_state PERCPU_READ(pcs)

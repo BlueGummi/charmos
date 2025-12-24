@@ -6,6 +6,8 @@
 
 #include "mutex_internal.h"
 
+SLAB_SIZE_REGISTER_FOR_STRUCT(turnstile);
+
 /* Implements turnstiles used on synchronization objects
  *
  * This uses a strategy similar to later versions of Solaris

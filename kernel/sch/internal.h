@@ -63,7 +63,7 @@ scheduler_get_this_thread_queue(struct scheduler *sched,
     case THREAD_PRIO_CLASS_TIMESHARE: return NULL; /* Use the tree */
     case THREAD_PRIO_CLASS_BACKGROUND: return &sched->bg_threads;
     }
-    k_panic("unreachable!\n");
+    kassert_unreachable();
 }
 
 static inline void enqueue_to_tree(struct scheduler *sched,
@@ -133,6 +133,7 @@ static inline const char *thread_state_str(const enum thread_state state) {
     case THREAD_STATE_TERMINATED: return "TERMINATED";
     case THREAD_STATE_HALTED: return "HALTED";
     }
+    kassert_unreachable();
 }
 
 static inline const char *
@@ -144,6 +145,7 @@ thread_activity_class_str(enum thread_activity_class c) {
     case THREAD_ACTIVITY_CLASS_SLEEPY: return "SLEEPY";
     case THREAD_ACTIVITY_CLASS_UNKNOWN: return "UNKNOWN";
     }
+    kassert_unreachable();
 }
 
 static inline int64_t thread_virtual_runtime_left(struct thread *t) {

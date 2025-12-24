@@ -18,15 +18,7 @@
 
 #define SCHEDULER_DEFAULT_WORK_STEAL_MIN_DIFF 130
 
-enum idle_thread_state {
-    IDLE_THREAD_WORK_STEAL = 0, /* Attempt to do a thread steal */
-    IDLE_THREAD_SLEEP = 1,      /* Enter sleep state */
-};
-
 struct idle_thread_data {
-    _Atomic enum idle_thread_state state;
-
-    atomic_bool woken_from_timer;
     _Atomic uint64_t last_entry_ms;
     uint64_t last_exit_ms;
 };
@@ -178,8 +170,8 @@ static inline struct thread *thread_spawn_on_core(char *name,
 
 static inline void scheduler_wake_from_io_block(struct thread *t,
                                                 void *wake_src) {
-    scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_IO, THREAD_PRIO_CLASS_TIMESHARE,
-                   wake_src);
+    scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_IO,
+                   THREAD_PRIO_CLASS_TIMESHARE, wake_src);
 }
 
 static inline bool scheduler_self_in_resched() {

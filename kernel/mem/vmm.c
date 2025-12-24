@@ -525,7 +525,7 @@ void vmm_unmap_virt(void *addr, uint64_t len, enum vmm_flags vflags) {
     uintptr_t aligned_virt = PAGE_ALIGN_DOWN(virt_addr);
 
     uint64_t total_len = len + page_offset;
-    uint64_t total_pages = (total_len + PAGE_SIZE - 1) / PAGE_SIZE;
+    uint64_t total_pages = PAGES_NEEDED_FOR(total_len);
 
     for (uint64_t i = 0; i < total_pages; i++) {
         vmm_unmap_page(aligned_virt + i * PAGE_SIZE, vflags);

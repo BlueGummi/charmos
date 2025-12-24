@@ -64,12 +64,14 @@ void serial_puts(struct printf_cursor *csr, const char *str, int len) {
 
 void double_print(struct flanterm_context *f, struct printf_cursor *csr,
                   const char *str, int len) {
+    (void) f;
     serial_puts(csr, str, len);
     /* if (global.current_bootstage >= BOOTSTAGE_EARLY_FB)
      flanterm_write(f, str, len); */
 }
 
 void k_printf_init(struct limine_framebuffer *fb) {
+    (void) fb;
     serial_init();
     /* TODO: get this back up
     ft_ctx = flanterm_fb_init(
@@ -416,7 +418,7 @@ void v_k_printf(struct printf_cursor *csr, const char *format, va_list args) {
 }
 
 void k_printf(const char *format, ...) {
-    bool i = are_interrupts_enabled(); 
+    bool i = are_interrupts_enabled();
     disable_interrupts();
     spin_lock_raw(&k_printf_lock);
     va_list args;

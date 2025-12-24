@@ -88,7 +88,6 @@ __no_sanitize_address void k_main(void) {
     dpc_init_percpu();
     smp_init(mp_request.response);
     percpu_obj_init();
-    prng_seed(time_get_us());
 
     srat_init();
     slit_init();

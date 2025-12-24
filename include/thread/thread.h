@@ -143,40 +143,45 @@ enum wake_reason {
 
 #define THREAD_ACTIVITY_BUCKET_COUNT 4
 #define THREAD_ACTIVITY_BUCKET_DURATION 1000 /* 1 second per bucket */
+
+static_assert(THREAD_ACTIVITY_BUCKET_COUNT < UINT16_MAX,
+              "Thread activity bucket granularity too large for a u16");
+
 #define THREAD_EVENT_RINGBUFFER_CAPACITY THREAD_ACTIVITY_BUCKET_COUNT
 #define TOTAL_BUCKET_DURATION                                                  \
     (THREAD_ACTIVITY_BUCKET_COUNT * THREAD_ACTIVITY_BUCKET_DURATION)
 
 /* Buckets */
 struct thread_runtime_bucket {
-    uint64_t run_time_ms;
+    uint16_t run_time_ms; /* can safely do a u16 since 2^16 > 1000 */
     uint64_t wall_clock_sec;
 };
 
 struct thread_activity_bucket {
     uint64_t cycle;
 
+    /* please do not block/sleep/wake more than 2^32 times a second */
     uint32_t block_count;
     uint32_t sleep_count;
     uint32_t wake_count;
 
-    uint64_t block_duration;
-    uint64_t sleep_duration;
+    uint16_t block_duration;
+    uint16_t sleep_duration;
 };
 
 /* Fine grained, exact activity stats */
 struct thread_activity_stats {
-    struct thread_runtime_bucket rt_buckets[THREAD_EVENT_RINGBUFFER_CAPACITY];
+    struct thread_runtime_bucket rt_buckets[THREAD_ACTIVITY_BUCKET_COUNT];
     struct thread_activity_bucket buckets[THREAD_ACTIVITY_BUCKET_COUNT];
     time_t last_update_ms;
-    size_t last_wake_index;
     uint64_t current_cycle;
-    size_t current_bucket; /* idx of bucket representing 'now' */
+    uint8_t current_bucket; /* idx of bucket representing 'now' */
+    uint8_t last_wake_index;
 };
 
 #define MAKE_THREAD_RINGBUFFER(name)                                           \
     struct thread_event_reason name[THREAD_EVENT_RINGBUFFER_CAPACITY];         \
-    size_t name##_head;
+    uint8_t name##_head;
 
 struct thread_activity_data {
     MAKE_THREAD_RINGBUFFER(wake_reasons);
@@ -194,10 +199,10 @@ enum thread_activity_class {
 };
 
 struct thread_activity_metrics {
-    uint64_t run_ratio;
-    uint64_t block_ratio;
-    uint64_t sleep_ratio;
-    uint64_t wake_freq;
+    uint8_t run_ratio;
+    uint8_t block_ratio;
+    uint8_t sleep_ratio;
+    uint8_t wake_freq;
 };
 
 struct thread {
@@ -238,13 +243,13 @@ struct thread {
     atomic_bool dying;
 
     /* Who is running us? */
-    int64_t curr_core; /* -1 if not being ran */
+    cpu_id_t curr_core; /* -1 if not being ran */
 
-    int64_t core_to_wake_on; /* When I run again, where should I be placed?
-                              * -1 if the scheduler should select the most
-                              * optimal core */
+    cpu_id_t core_to_wake_on; /* When I run again, where should I be placed?
+                               * -1 if the scheduler should select the most
+                               * optimal core */
 
-    _Atomic uint64_t last_ran; /* What core last ran us? */
+    _Atomic cpu_id_t last_ran; /* What core last ran us? */
 
     time_t run_start_time; /* When did we start running */
     size_t owner_domain;   /* What domain created us? */
@@ -263,6 +268,14 @@ struct thread {
     int32_t dynamic_delta; /* Signed delta applied to base */
     size_t weight;
     nice_t niceness; /* -20 .. + 19 */
+
+    cpu_perf_t wanted_perf; /* This is the cpu_perf_t the thread's current
+                             * CPU should try to match or do better than.
+                             *
+                             * If the current CPU's current wanted_perf
+                             * does not satisfy the thread, we will try
+                             * to either increase it for this CPU, or
+                             * migrate the thread to another CPU. */
 
     /* shadow copy
      *
@@ -337,7 +350,7 @@ struct thread {
 
     /* ========== APC data ========== */
     bool executing_apc; /* Executing an APC right now? */
-    bool checking_apcs;
+    bool checking_apcs; /* Just here to prevent funny recursion */
 
     /* Standard APC queues */
     struct list_head apc_head[APC_TYPE_COUNT];
@@ -361,9 +374,7 @@ struct thread {
      * It is suboptimal to hardcode such functions, and thus, a dynamic
      * `on_event_apcs` is chosen to perform these tasks.
      *
-     * All `on_event_apc`s must be allocated with `kmalloc`
-     */
-
+     * All `on_event_apc`s must be allocated with `kmalloc` */
     struct list_head on_event_apcs[APC_EVENT_COUNT];
 
     struct turnstile *born_with;  /* born with - used for debug */
@@ -373,7 +384,7 @@ struct thread {
     /* ========== Profiling data ========== */
     size_t context_switches; /* Total context switches */
 
-    size_t preemptions; /* Manual yields = (context_switches - preemptions) */
+    size_t preemptions;
 
     time_t creation_time_ms; /* When were we created? */
 
@@ -431,11 +442,6 @@ void thread_apply_cpu_penalty(struct thread *t);
 void thread_add_wake_reason(struct thread *t, uint8_t reason);
 void thread_wake_manual(struct thread *t, void *wake_src);
 void thread_calculate_activity_data(struct thread *t);
-
-struct thread_event_reason *
-thread_add_event_reason(struct thread_event_reason *ring, size_t *head,
-                        uint8_t reason, uint64_t time,
-                        struct thread_activity_stats *stats);
 
 void thread_add_block_reason(struct thread *t, uint8_t reason);
 void thread_add_sleep_reason(struct thread *t, uint8_t reason);

@@ -1,6 +1,7 @@
 #include <charmos.h>
 #include <console/panic.h>
 #include <console/printf.h>
+#include <kassert.h>
 #include <math/sort.h>
 #include <mem/alloc.h>
 #include <mem/numa.h>
@@ -40,7 +41,7 @@ static uint8_t idx_of_val(uint8_t *buf, size_t len, size_t search_for) {
         if (buf[i] == search_for)
             return i;
 
-    k_panic("unreachable\n");
+    kassert_unreachable();
     return 0;
 }
 

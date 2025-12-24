@@ -181,8 +181,6 @@ In general, use `bool` for internal functions where the caller doesn’t need de
 
 ## Tooling
 
-There is a `CMakeLists.txt` and `build.sh`, which contain all relevant information for tooling. Always try to resolve warnings on things besides unused variables, and if it is not possible, leave a comment about the warning. **Don't silence warnings**.
-
 The build script should be complete and simple. It is wasteful to spend time on tooling troubles, and complexity is cumbersome.
 
 ## Testing

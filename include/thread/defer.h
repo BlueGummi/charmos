@@ -213,7 +213,7 @@ struct workqueue {
     _Atomic uint32_t num_workers;  /* Current # workers */
     _Atomic uint32_t idle_workers; /* # idle */
 
-    core_t core;
+    cpu_id_t core;
     time_t last_spawn_attempt;
 
     atomic_flag spawner_flag_internal;

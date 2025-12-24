@@ -1,6 +1,7 @@
 /* @title: ATA */
 #pragma once
 #include <block/generic.h>
+#include <compiler.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <sync/spinlock.h>
@@ -189,14 +190,15 @@ struct ata_identify {
     uint16_t inter_seek_delay;
     uint16_t world_wide_name[4];
     uint16_t reserved4[144];
-} __attribute__((packed));
+} __packed;
 
 void ata_ident_print(struct ata_identify *id);
 void ata_select_drive(struct ata_drive *ata_drive);
 void ata_soft_reset(struct ata_drive *ata_drive);
 bool atapi_identify(struct ata_drive *ide);
 void ata_init(struct pci_device *devices, uint64_t count);
-enum irq_result ide_irq_handler(void *ctx, uint8_t irq_num, struct irq_context *ct);
+enum irq_result ide_irq_handler(void *ctx, uint8_t irq_num,
+                                struct irq_context *ct);
 void ide_reorder(struct generic_disk *disk);
 bool ide_submit_bio_async(struct generic_disk *d, struct bio_request *b);
 struct generic_disk *atapi_create_generic(struct ata_drive *d);

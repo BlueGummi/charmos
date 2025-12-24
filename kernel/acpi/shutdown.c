@@ -3,7 +3,6 @@
 #include <uacpi/event.h>
 #include <uacpi/sleep.h>
 
-#include <types/types.h>
 #include "uacpi/status.h"
 #include <types/types.h>
 
@@ -27,6 +26,7 @@ int system_shutdown(void) {
 }
 
 static uacpi_interrupt_ret handle_power_button(uacpi_handle ctx) {
+    (void) ctx;
     system_shutdown();
     return UACPI_INTERRUPT_HANDLED;
 }

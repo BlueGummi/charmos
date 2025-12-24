@@ -1,4 +1,5 @@
 /* @title: GUID Partition Table */
+#include <compiler.h>
 #include <stdint.h>
 #pragma once
 
@@ -18,7 +19,7 @@ struct gpt_header {
     uint32_t size_of_partition_entry;
     uint32_t partition_crc32;
     uint8_t reserved2[420];
-} __attribute__((packed));
+} __packed;
 
 struct gpt_partition_entry {
     uint8_t type_guid[16];
@@ -27,4 +28,4 @@ struct gpt_partition_entry {
     uint64_t last_lba;
     uint64_t attributes;
     uint16_t name[36]; // UTF-16
-} __attribute__((packed));
+} __packed;

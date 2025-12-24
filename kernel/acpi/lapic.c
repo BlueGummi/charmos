@@ -16,7 +16,7 @@ void lapic_init(void) {
         vmm_map_phys(lapic_phys, PAGE_SIZE, PAGING_UNCACHABLE, VMM_FLAG_NONE);
 }
 
-void lapic_timer_init(uint64_t core_id) {
+void lapic_timer_init(cpu_id_t core_id) {
     uint32_t calibration_sleep_ms = 2;
     uint32_t timeslice_ms = 15;
 

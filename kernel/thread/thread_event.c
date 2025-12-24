@@ -251,8 +251,8 @@ static void clear_event_slot(struct thread_event_reason *slot) {
     slot->timestamp = 0;
 }
 
-struct thread_event_reason *
-thread_add_event_reason(struct thread_event_reason *ring, size_t *head,
+static struct thread_event_reason *
+thread_add_event_reason(struct thread_event_reason *ring, uint8_t *head,
                         uint8_t reason, uint64_t time,
                         struct thread_activity_stats *stats) {
 
@@ -517,7 +517,8 @@ static bool set_state_and_update_reason(
           thread_get_state(t) == THREAD_STATE_RUNNING))
         atomic_store(&t->state, state);
 
-    /* NOTE: special case: this is if we are waking ourselves after deciding to not block */
+    /* NOTE: special case: this is if we are waking ourselves after deciding to
+     * not block */
     if (!atomic_load_explicit(&t->yielded_after_wait, memory_order_acquire) &&
         t == scheduler_get_current_thread() && state == THREAD_STATE_READY)
         atomic_store(&t->state, THREAD_STATE_RUNNING);

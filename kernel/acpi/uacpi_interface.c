@@ -40,12 +40,6 @@ void uacpi_init(uint64_t rsdp) {
     panic_if_error(uacpi_finalize_gpe_initialization());
 }
 
-void uacpi_print_devs() {
-    uacpi_namespace_for_each_child(uacpi_namespace_root(), acpi_print_ctx,
-                                   UACPI_NULL, UACPI_OBJECT_DEVICE_BIT,
-                                   UACPI_MAX_DEPTH_ANY, UACPI_NULL);
-}
-
 uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
 
     if (our_rsdp == 0) {
@@ -56,23 +50,22 @@ uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
     return UACPI_STATUS_OK;
 }
 
-extern uintptr_t vmm_map_top;
-
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
     void *ret = vmm_map_phys(addr, len, PAGING_UNCACHABLE, VMM_FLAG_NONE);
     return ret;
 }
 
 void uacpi_kernel_unmap(void *addr, uacpi_size len) {
+    return;
     vmm_unmap_virt(addr, len, VMM_FLAG_NONE);
 }
 
 void uacpi_kernel_log(uacpi_log_level level, const uacpi_char *data) {
     switch (level) {
-    case UACPI_LOG_ERROR: k_printf(">> UACPI ERROR: %s\n", data);
-    case UACPI_LOG_DEBUG:
-    case UACPI_LOG_INFO:
-    case UACPI_LOG_WARN:
+    case UACPI_LOG_ERROR: k_printf(">> UACPI ERROR: %s", data); break;
+    case UACPI_LOG_TRACE: k_printf(">> UACPI TRACE: %s", data); break;
+    case UACPI_LOG_INFO: k_printf(">> UACPI INFO: %s", data); break;
+    case UACPI_LOG_WARN: k_printf(">> UACPI WARN: %s", data); break;
     default: break;
     }
 }

@@ -2,6 +2,7 @@
 #pragma once
 #include <block/generic.h>
 #include <block/sched.h>
+#include <compiler.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <thread/thread.h>
@@ -155,14 +156,14 @@ struct ahci_prdt_entry {
     uint32_t dbc : 22; // Byte count (0-based)
     uint32_t reserved2 : 9;
     uint32_t i : 1; // Interrupt on completion
-} __attribute__((packed));
+} __packed;
 
 struct ahci_cmd_table {
     uint8_t cfis[AHCI_CMD_TABLE_FIS_SIZE];   // Command FIS (host to device)
     uint8_t acmd[AHCI_CMD_TABLE_ATAPI_SIZE]; // ATAPI command
     uint8_t reserved[48];
     struct ahci_prdt_entry prdt_entry[]; // up to 65535
-} __attribute__((packed));
+} __packed;
 
 struct ahci_full_port {
     struct ahci_port *port;
@@ -194,7 +195,7 @@ struct ahci_port {
     uint32_t fbs;       // FIS-based Switching
     uint32_t rsv1[11];  // 0x44 ~ 0x6F, Reserved
     uint32_t vendor[4]; // 0x70 ~ 0x7F, vendor specific
-} __attribute__((packed));
+} __packed;
 
 // one controller
 struct ahci_device {
@@ -262,7 +263,7 @@ struct ahci_cmd_header {
 
     // DW4 - 7
     uint32_t rsv1[4]; // Reserved
-} __attribute__((packed));
+} __packed;
 static_assert_struct_size_eq(ahci_cmd_header, 32);
 
 #define ahci_info(log_level, fmt, ...)                                         \

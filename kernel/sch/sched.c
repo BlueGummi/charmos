@@ -217,9 +217,7 @@ static inline struct thread *load_idle_thread(struct scheduler *sched) {
 
     struct idle_thread_data *idle = smp_core_idle_thread();
 
-    atomic_store(&idle->woken_from_timer, false);
     atomic_store(&idle->last_entry_ms, time_get_ms());
-    atomic_store(&idle->state, IDLE_THREAD_WORK_STEAL);
 
     scheduler_mark_self_idle(true);
 

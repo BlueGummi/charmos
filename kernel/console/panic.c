@@ -11,6 +11,7 @@
 #include <time.h>
 
 void panic_handler(struct panic_regs *regs) {
+    (void) regs;
     disable_interrupts();
 
     /*

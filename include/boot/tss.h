@@ -2,7 +2,7 @@
 #pragma once
 #include <stdint.h>
 
-struct __attribute__((aligned)) __attribute__((packed)) tss {
+struct __attribute__((aligned)) tss {
     uint32_t reserved0;
     uint64_t rsp0; // Stack pointer for ring 0
     uint64_t rsp1; // Stack pointer for ring 1 (optional)
@@ -18,4 +18,4 @@ struct __attribute__((aligned)) __attribute__((packed)) tss {
     uint64_t reserved2;
     uint16_t reserved3;
     uint16_t io_map_base; // Offset to I/O permission bitmap
-};
+} __packed;

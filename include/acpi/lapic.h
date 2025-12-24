@@ -1,6 +1,7 @@
 /* @title: LAPIC */
 #include <asm.h>
 #include <console/printf.h>
+#include <smp/core.h>
 #include <stdbool.h>
 #include <stdint.h>
 #pragma once
@@ -91,14 +92,14 @@ static inline uint32_t lapic_read(uint32_t reg) {
 #define LAPIC_LEVEL_ASSERT (1 << 14)
 
 void lapic_init();
-void lapic_timer_init(uint64_t core_id);
+void lapic_timer_init(cpu_id_t core_id);
 uint64_t lapic_get_id(void);
 uint32_t cpu_get_this_id(void);
 void lapic_timer_disable();
 bool lapic_timer_is_enabled();
 void lapic_timer_enable();
 void lapic_timer_set_ms(uint32_t ms);
-void panic_broadcast(uint64_t exclude_core);
+void panic_broadcast(size_t exclude_core);
 void x2apic_init();
 
 void ipi_send(uint32_t apic_id, uint8_t vector);

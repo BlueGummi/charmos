@@ -41,7 +41,7 @@ union hpet_timer_general_capabilities {
         uint64_t vendor_id : 16;
         uint64_t counter_clock_period : 32;
     };
-} __attribute__((packed));
+} __packed;
 
 union hpet_timer_config {
     uint64_t raw;
@@ -61,7 +61,7 @@ union hpet_timer_config {
         uint64_t reserved2 : 16;
         uint64_t route_cap : 32;
     };
-} __attribute__((packed));
+} __packed;
 
 static inline void hpet_write64(uint64_t offset, uint64_t value) {
     mmio_write_64((void *) ((uintptr_t) hpet_base + offset), value);

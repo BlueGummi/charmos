@@ -1,6 +1,7 @@
 /* @title: Ext2 */
 #include <block/bcache.h>
 #include <block/generic.h>
+#include <compiler.h>
 #include <errno.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
@@ -163,7 +164,7 @@ struct ext2_sblock {
         };
         uint32_t reserved[204];
     };
-} __attribute__((packed));
+} __packed;
 
 struct ext2_group_desc {
     uint32_t block_bitmap;
@@ -197,7 +198,7 @@ struct ext2_inode {
     uint32_t faddr;
     uint8_t frag[16];
     uint8_t osd2[12];
-} __attribute__((packed));
+} __packed;
 
 struct ext2_full_inode {
     struct ext2_inode node;
@@ -211,7 +212,7 @@ struct ext2_dir_entry {
     uint8_t name_len;
     uint8_t file_type;
     char name[EXT2_NAME_LEN + 1];
-} __attribute__((packed));
+} __packed;
 
 struct ext2_fs {
     struct generic_partition *partition;

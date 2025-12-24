@@ -90,7 +90,7 @@ define_flag_group(
     "${TEST_NIGHTMARE_FLAGS}"
 )
 
-set(KERNEL_COMMON_FLAGS "-O3 -pipe -Wall -Wextra -Wpointer-sign -fno-optimize-sibling-calls -Wenum-compare -ffreestanding -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -mno-red-zone -fno-stack-protector -fno-omit-frame-pointer -fno-stack-check -fno-PIC -ffunction-sections -fdata-sections  -m64 -mcmodel=kernel -mgeneral-regs-only -DLIMINE_API_REVISION=2 -Wno-address-of-packed-member -Wno-unused-command-line-argument -ggdb")
+set(KERNEL_COMMON_FLAGS "-O3 -pipe -Wall -Wextra -Wpointer-sign -fno-optimize-sibling-calls -Wenum-compare -ffreestanding -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-3dnow -mno-red-zone -fno-stack-protector -fno-omit-frame-pointer -fno-stack-check -fno-PIC -ffunction-sections -fdata-sections  -m64 -mcmodel=kernel -mgeneral-regs-only -DLIMINE_API_REVISION=2 -Wno-address-of-packed-member -Wno-unused-command-line-argument -ggdb -DUACPI_DEFAULT_LOG_LEVEL=4")
 
 set(CMAKE_C_FLAGS "${KERNEL_COMMON_FLAGS} -std=gnu11")
 
@@ -135,29 +135,49 @@ set(QEMU_COMMON_FLAGS
     -boot d
     #-enable-kvm
     #-cpu host
-    -m 8G
-    -smp sockets=2,cores=2,threads=2
+    -m 4G
+    -smp sockets=1,cores=2,threads=2
     -object memory-backend-ram,size=2G,id=mem0
     -object memory-backend-ram,size=2G,id=mem1
-    -object memory-backend-ram,size=2G,id=mem2
-    -object memory-backend-ram,size=2G,id=mem3
-
+    #-object memory-backend-ram,size=2G,id=mem2
+    #-object memory-backend-ram,size=2G,id=mem3
+    #[[-acpitable file=apic.dat
+    -acpitable file=dmar.dat
+    -acpitable file=dsdt.dat
+    -acpitable file=ecdt.dat
+    -acpitable file=facp.dat
+    -acpitable file=facs.dat
+    -acpitable file=hpet.dat
+    -acpitable file=mcfg.dat
+    -acpitable file=sbst.dat
+    -acpitable file=ssdt1.dat
+    -acpitable file=ssdt2.dat
+    -acpitable file=ssdt3.dat
+    #-acpitable file=ssdt4.dat
+    -acpitable file=ssdt5.dat
+    -acpitable file=ssdt6.dat
+    -acpitable file=ssdt7.dat
+    -acpitable file=ssdt8.dat
+    -acpitable file=ssdt9.dat
+    -acpitable file=ssdt10.dat
+    -acpitable file=ssdt11.dat]]
+    
     -numa node,cpus=0-1,nodeid=0,memdev=mem0
     -numa node,cpus=2-3,nodeid=1,memdev=mem1
-    -numa node,cpus=4-5,nodeid=2,memdev=mem2
-    -numa node,cpus=6-7,nodeid=3,memdev=mem3
+    #-numa node,cpus=4-5,nodeid=2,memdev=mem2
+    #-numa node,cpus=6-7,nodeid=3,memdev=mem3
     -numa dist,src=0,dst=1,val=15
     -numa dist,src=1,dst=0,val=15
-    -numa dist,src=0,dst=2,val=20
-    -numa dist,src=2,dst=0,val=20
-    -numa dist,src=0,dst=3,val=30
-    -numa dist,src=3,dst=0,val=30
-    -numa dist,src=1,dst=2,val=25
-    -numa dist,src=2,dst=1,val=25
-    -numa dist,src=1,dst=3,val=35
-    -numa dist,src=3,dst=1,val=35
-    -numa dist,src=2,dst=3,val=15
-    -numa dist,src=3,dst=2,val=15
+    #-numa dist,src=0,dst=2,val=20
+    #-numa dist,src=2,dst=0,val=20
+    #-numa dist,src=0,dst=3,val=30
+    #-numa dist,src=3,dst=0,val=30
+    #-numa dist,src=1,dst=2,val=25
+    #-numa dist,src=2,dst=1,val=25
+    #-numa dist,src=1,dst=3,val=35
+    #-numa dist,src=3,dst=1,val=35
+    #-numa dist,src=2,dst=3,val=15
+    #-numa dist,src=3,dst=2,val=15
     -qmp unix:/tmp/qmp.sock,server,nowait
     -s
     #-S

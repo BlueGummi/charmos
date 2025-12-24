@@ -156,7 +156,7 @@
 struct slab_size_constant *slab_class_sizes = NULL;
 size_t slab_num_sizes = 0;
 struct vas_space *slab_vas = NULL;
-__no_sanitize_address struct slab_caches slab_caches = {0};
+struct slab_caches slab_caches = {0};
 
 void *slab_map_new_page(struct slab_domain *domain, paddr_t *phys_out,
                         bool pageable) {
@@ -474,7 +474,7 @@ out:
 }
 
 int32_t slab_size_to_index(size_t size) {
-    for (uint64_t i = 0; i < slab_num_sizes; i++)
+    for (size_t i = 0; i < slab_num_sizes; i++)
         if (slab_class_sizes[i].size >= size)
             return i;
 
@@ -500,7 +500,14 @@ static int slab_class_sort_cmp(const void *a, const void *b) {
     return l - r;
 }
 
-__no_sanitize_address void slab_allocator_init() {
+static void log_dupes(const char *keep, const char *discard, size_t size) {
+    k_info("SLAB", K_INFO,
+           "Sizes of slab cache %s and %s are the same (%zu), ignoring %s, "
+           "keeping %s",
+           discard, keep, size, discard, keep);
+}
+
+void slab_allocator_init() {
     /* bootstrap VAS */
     slab_vas = vas_space_bootstrap(SLAB_HEAP_START, SLAB_HEAP_END);
     if (!slab_vas)
@@ -508,21 +515,64 @@ __no_sanitize_address void slab_allocator_init() {
 
     struct slab_size_constant *start = __skernel_slab_sizes;
     struct slab_size_constant *end = __ekernel_slab_sizes;
-    slab_num_sizes = (end - start) + SLAB_CLASS_CONST_COUNT;
+
+    struct list_head sort_list = LIST_HEAD_INIT(sort_list);
+    struct list_head aggregate_list = LIST_HEAD_INIT(aggregate_list);
+
+    for (struct slab_size_constant *ssc = start; ssc < end; ssc++)
+        list_add_tail(&ssc->sort_list, &sort_list);
+
+    /* go through each node on the sort list. if its size does not already
+     * exist in the aggregate list, add it in there */
+
+    /* TODO: if we somehow get to the point of having hundreds of thousands
+     * of slab sizes to the point where this becomes slow (why on earth are we
+     * here to begin with?), then find some way to use, idk, a rbt or something */
+    struct slab_size_constant *iter, *check, *tmp;
+    size_t num_dyn_sizes = 0;
+    list_for_each_entry(iter, &sort_list, sort_list) {
+        bool exists = false;
+        list_for_each_entry_safe(check, tmp, &aggregate_list, list) {
+            if (iter->size == check->size) {
+                log_dupes(check->name, iter->name, iter->size);
+                exists = true;
+                break;
+            }
+        }
+        for (size_t i = 0; i < SLAB_CLASS_CONST_COUNT; i++) {
+            size_t size = slab_class_sizes_const[i];
+            if (size == iter->size) {
+                log_dupes("default slab size", iter->name, size);
+                exists = true;
+                break;
+            }
+        }
+        if (!exists) {
+            list_add_tail(&iter->list, &aggregate_list);
+            num_dyn_sizes++;
+        }
+    }
+
+    slab_num_sizes = num_dyn_sizes + SLAB_CLASS_CONST_COUNT;
     size_t size = slab_num_sizes * sizeof(struct slab_size_constant);
 
     slab_class_sizes = simple_alloc(slab_vas, size);
 
-    /* set it all up */
-    size_t idx = 0;
-    for (struct slab_size_constant *ssc = start; ssc < end; ssc++, idx++) {
-        slab_class_sizes[idx].size = ssc->size;
-        slab_class_sizes[idx].name = ssc->name;
+    /* setup constants */
+    for (size_t i = 0; i < SLAB_CLASS_CONST_COUNT; i++) {
+        slab_class_sizes[i].name = "default slab size";
+        slab_class_sizes[i].size = slab_class_sizes_const[i];
     }
 
-    for (size_t i = idx; i < slab_num_sizes; i++) {
-        slab_class_sizes[i].size = slab_class_sizes_const[i - idx];
-        slab_class_sizes[i].name = "default slab size";
+    /* add dynamic ones */
+    for (size_t i = 0; i < num_dyn_sizes; i++) {
+        size_t scs_idx = i + SLAB_CLASS_CONST_COUNT;
+        struct list_head *pop = list_pop_front(&aggregate_list);
+        kassert(pop);
+        struct slab_size_constant *ssc =
+            container_of(pop, struct slab_size_constant, list);
+        slab_class_sizes[scs_idx].name = ssc->name;
+        slab_class_sizes[scs_idx].size = ssc->size;
     }
 
     qsort(slab_class_sizes, slab_num_sizes, sizeof(struct slab_size_constant),
@@ -1220,13 +1270,20 @@ void *krealloc(void *ptr, size_t size, enum alloc_flags flags,
         return NULL;
     }
 
-    uint64_t old = ksize(ptr);
+    size_t old = ksize(ptr);
+
+    /* Touch nothing. This can still use the same slab allocation */
+    size_t old_idx = slab_size_to_index(old);
+    size_t new_idx = slab_size_to_index(size);
+    if (old_idx == new_idx)
+        return ptr;
+
     void *new_ptr = kmalloc(size, flags, behavior);
 
     if (!new_ptr)
         return NULL;
 
-    uint64_t to_copy = (old < size) ? old : size;
+    size_t to_copy = (old < size) ? old : size;
     memcpy(new_ptr, ptr, to_copy);
     kfree_old(ptr);
     return new_ptr;

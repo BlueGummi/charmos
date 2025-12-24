@@ -44,7 +44,7 @@
 #define SLAB_ALIGN_UP(x, a) ALIGN_UP(x, a)
 #define SLAB_OBJ_ALIGN_UP(x) SLAB_ALIGN_UP(x, SLAB_OBJ_ALIGN)
 
-static const uint64_t slab_class_sizes_const[] = {
+static const size_t slab_class_sizes_const[] = {
     SLAB_MIN_SIZE, 16, 32, 64, 96, 128, 192, 256, 512, SLAB_MAX_SIZE};
 
 #define SLAB_CLASS_CONST_COUNT                                                 \
