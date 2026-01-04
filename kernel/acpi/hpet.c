@@ -150,6 +150,13 @@ void hpet_init(void) {
     k_info("HPET", K_INFO, "HPET initialized - %llu timers", hpet_timer_count);
 }
 
+uint64_t hpet_timestamp_ns(void) {
+    uint64_t ticks = hpet_read64(HPET_MAIN_COUNTER_OFFSET);
+
+    uint64_t fs_total = ticks * hpet_fs_per_tick;
+    return fs_total / 1000000ULL;
+}
+
 uint64_t hpet_timestamp_us(void) {
     uint64_t ticks = hpet_read64(HPET_MAIN_COUNTER_OFFSET);
 

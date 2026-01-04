@@ -128,6 +128,10 @@ uint32_t time_get_unix() {
                             time_get_minute(), time_get_second());
 }
 
+uint64_t time_get_ns() {
+    return hpet_timestamp_ns();
+}
+
 uint64_t time_get_ms(void) {
     return time_get_us() / 1000;
 }

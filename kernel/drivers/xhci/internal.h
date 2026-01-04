@@ -9,7 +9,7 @@ void xhci_nop(struct xhci_device *dev);
 void xhci_request_move(struct xhci_device *dev, struct xhci_request *req,
                        enum xhci_request_list new_list);
 void xhci_reset_slot(struct usb_device *dev);
-enum usb_status xhci_port_init(struct xhci_port *p, enum irql *lock_irql);
+enum usb_status xhci_port_init(struct xhci_port *p);
 enum irq_result xhci_isr(void *ctx, uint8_t vector, struct irq_context *rsp);
 struct xhci_return xhci_wait_for_port_status_change(struct xhci_device *dev,
                                                     uint32_t port_id);
@@ -155,7 +155,6 @@ static inline void xhci_request_init_blocking(struct xhci_request *req,
 static inline void xhci_request_init(struct xhci_request *req,
                                      struct xhci_command *cmd,
                                      struct usb_request *rq) {
-
     req->list_owner = XHCI_REQ_LIST_NONE;
     req->status = XHCI_REQUEST_SENDING;
     req->completion_code = 0;
@@ -222,8 +221,7 @@ static inline void xhci_slot_set_state(struct xhci_slot *slot,
 
 /* A request is OK if it is CC_SUCCESS and PROCESSED */
 static inline bool xhci_request_ok(struct xhci_request *rq) {
-    return rq->completion_code == CC_SUCCESS &&
-           rq->status == XHCI_REQUEST_OK;
+    return rq->completion_code == CC_SUCCESS && rq->status == XHCI_REQUEST_OK;
 }
 
 REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(

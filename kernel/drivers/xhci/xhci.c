@@ -243,8 +243,11 @@ static void xhci_work_port_disconnect(void *arg1) {
 
                 spin_unlock(&d->lock, irql);
 
+                spin_lock_raw(&port->update_lock);
+
                 usb_teardown_device(dev);
                 xhci_slot_put(slot);
+                spin_unlock_raw(&port->update_lock);
             } else {
                 spin_unlock(&d->lock, irql);
                 keep_going = false;
@@ -276,13 +279,17 @@ static void xhci_work_port_connect(void *arg1) {
         if (!(portsc & PORTSC_CCS))
             continue;
 
-        if (xhci_port_init(port, &irql) != USB_OK)
-            continue;
+        spin_lock_raw(&port->update_lock);
+
+        enum usb_status err = xhci_port_init(port);
+        if (err != USB_OK)
+            goto nevermind;
 
         struct usb_device *dev = port->slot->udev;
-        spin_unlock(&d->lock, irql);
-
         usb_init_device(dev);
+
+    nevermind:
+        spin_unlock_raw(&port->update_lock);
     }
 }
 
@@ -473,6 +480,7 @@ xhci_make_request_status(struct xhci_device *dev,
         struct xhci_port *port = &dev->port_info[request->port - 1];
 
         if (request->generation && request->generation != port->generation) {
+            k_log("gen mismatch\n");
             return XHCI_REQUEST_DISCONNECT;
         }
     }
@@ -581,6 +589,7 @@ static void xhci_process_port_connect(struct xhci_device *dev,
 
 static void xhci_process_port_disconnect(struct xhci_device *dev,
                                          struct xhci_trb *trb) {
+    k_log("dsc\n");
     struct xhci_port *port = xhci_port_for_trb(dev, trb);
     xhci_port_set_state(port, XHCI_PORT_STATE_DISCONNECTING);
 
@@ -704,6 +713,8 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
     void *mmio = xhci_map_mmio(bus, slot, func);
 
     struct xhci_device *dev = xhci_device_create(mmio);
+    xhci_info("Device at 0x%lx, offset is %u", dev,
+              offsetof(struct xhci_request, list));
 
     semaphore_init(&dev->sem, 0, SEMAPHORE_INIT_IRQ_DISABLE);
     thread_spawn("xhci_worker", xhci_worker, dev);
@@ -748,9 +759,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
 
         if (portsc & PORTSC_CCS) {
             struct xhci_port *this_port = &dev->port_info[port - 1];
-            enum irql irql;
-            xhci_port_init(this_port, &irql);
-            spin_unlock(&dev->lock, irql);
+            xhci_port_init(this_port);
         }
     }
 

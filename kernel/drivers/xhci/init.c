@@ -311,7 +311,6 @@ struct xhci_device *xhci_device_create(void *mmio) {
     semaphore_init(&dev->sem, 0, SEMAPHORE_INIT_IRQ_DISABLE);
 
     for (uint32_t i = 0; i < XHCI_PORT_COUNT; i++) {
-
         struct xhci_port *p = &dev->port_info[i];
         p->generation = 0;
         p->usb3 = false;
@@ -321,6 +320,7 @@ struct xhci_device *xhci_device_create(void *mmio) {
         p->speed = speed;
         p->dev = dev;
         p->port_id = (i + 1);
+        spinlock_init(&p->update_lock);
     }
 
     for (size_t i = 0; i < XHCI_SLOT_COUNT; i++) {
@@ -340,7 +340,7 @@ void xhci_device_start_interrupts(uint8_t bus, uint8_t slot, uint8_t func,
     pci_program_msix_entry(bus, slot, func, 0, dev->irq, /*core=*/0);
 }
 
-enum usb_status xhci_port_init(struct xhci_port *p, enum irql *lock_irql) {
+enum usb_status xhci_port_init(struct xhci_port *p) {
     struct xhci_device *dev = p->dev;
     uint8_t port = p->port_id;
     enum usb_status err = USB_OK;
@@ -350,23 +350,35 @@ enum usb_status xhci_port_init(struct xhci_port *p, enum irql *lock_irql) {
         return USB_ERR_OOM;
     }
 
+    k_log("reset_port sent\n");
     if ((err = xhci_reset_port(dev, port)) != USB_OK) {
+        k_log("reset_port fail\n");
         return err;
     }
+        
+    k_log("reset_port returned\n");
 
+    k_log("enable_slot sent\n");
     if ((slot_id = xhci_enable_slot(dev)) == 0) {
+        k_log("enable_slot fail\n");
         return USB_ERR_NO_DEVICE;
     }
+    k_log("enable_slot returned\n");
 
     struct xhci_slot temp_slot = {0};
     temp_slot.state = XHCI_SLOT_STATE_ENABLED;
     temp_slot.slot_id = slot_id;
     temp_slot.dev = dev;
 
+    k_log("address_device sent\n");
     if ((err = xhci_address_device(p, slot_id, &temp_slot)) != USB_OK) {
+        k_log("address_device fail\n");
+        k_log("disable_slot sent\n");
         xhci_disable_slot(dev, slot_id);
+        k_log("disable_slot returned\n");
         return err;
     }
+    k_log("address_device returned\n");
 
     usb->speed = p->speed;
     usb->port = port;
@@ -376,8 +388,6 @@ enum usb_status xhci_port_init(struct xhci_port *p, enum irql *lock_irql) {
 
     refcount_init(&usb->refcount, 1);
     INIT_LIST_HEAD(&usb->hc_list);
-
-    *lock_irql = spin_lock_irq_disable(&dev->lock);
 
     struct xhci_slot *this_slot = xhci_get_slot(dev, slot_id);
     memcpy(this_slot, &temp_slot, sizeof(struct xhci_slot));

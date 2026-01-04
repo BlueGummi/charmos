@@ -448,9 +448,9 @@ void thread_add_sleep_reason(struct thread *t, uint8_t reason);
 
 /* these two functions return if the thread had `wake_matched`
  * satisfied on return */
-bool thread_block(struct thread *t, enum thread_block_reason r,
+void thread_block(struct thread *t, enum thread_block_reason r,
                   enum thread_wait_type wait_type, void *expect_wake_src);
-bool thread_sleep(struct thread *t, enum thread_sleep_reason r,
+void thread_sleep(struct thread *t, enum thread_sleep_reason r,
                   enum thread_wait_type wait_type, void *expect_wake_src);
 
 void thread_set_timesharing(struct thread *t);
@@ -537,13 +537,24 @@ static inline bool thread_is_rt(struct thread *t) {
            t->perceived_prio_class == THREAD_PRIO_CLASS_RT;
 }
 
-static inline void thread_clear_wake_data(struct thread *t) {
+static inline void thread_clear_wake_data_raw(struct thread *t) {
     atomic_store_explicit(&t->wake_src, NULL, memory_order_release);
     atomic_store_explicit(&t->wake_matched, false, memory_order_release);
     t->expected_wake_src = NULL;
     t->wait_type = THREAD_WAIT_NONE;
     t->last_action_reason = 0;
     t->last_action = THREAD_STATE_READY;
+    t->wake_token = 0;
+}
+
+static inline void thread_clear_wake_data(struct thread *t) {
+    bool aok;
+    enum irql irql = thread_acquire(t, &aok);
+    kassert(aok);
+
+    thread_clear_wake_data_raw(t);
+
+    thread_release(t, irql);
 }
 
 static inline enum thread_wait_type thread_get_wait_type(struct thread *t) {

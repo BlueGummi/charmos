@@ -1,6 +1,7 @@
 #pragma once
 #include <colors.h>
 #include <stdarg.h>
+#include <time.h>
 
 struct printf_cursor;
 struct limine_framebuffer;
@@ -31,3 +32,6 @@ void k_printf_init(struct limine_framebuffer *fb);
 
 #define k_info(category, level, fmt, ...)                                      \
     k_info_impl(category, level, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+
+#define k_log(fmt, ...)                                                        \
+    k_printf("%s [tsc %zu]: " fmt, __func__, rdtsc(), ##__VA_ARGS__)

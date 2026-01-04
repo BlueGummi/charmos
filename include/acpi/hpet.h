@@ -5,6 +5,7 @@
 #include <stdint.h>
 #pragma once
 void hpet_init(void);
+uint64_t hpet_timestamp_ns(void);
 void hpet_program_oneshot(uint64_t future_ms);
 uint64_t hpet_timestamp_ms(void);
 uint64_t hpet_timestamp_us(void);

@@ -602,8 +602,9 @@ struct xhci_slot {
     struct usb_device *udev;
 };
 
-/* protected by xhci_device->lock */
 struct xhci_port {
+    /* Raw spinlock to protect against concurrent updating */
+    struct spinlock update_lock;
     uint8_t port_id;
     struct xhci_slot *slot;
     uint8_t speed;
