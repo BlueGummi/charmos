@@ -1,6 +1,7 @@
 /* @title: Red black tree */
 #pragma once
 #include <containerof.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -76,9 +77,11 @@ struct rbt *rbt_create(rbt_get_data get);
 struct rbt_node *rbt_find_min(struct rbt_node *node);
 struct rbt_node *rbt_find_max(struct rbt_node *node);
 void rb_delete(struct rbt *tree, struct rbt_node *z);
-struct rbt_node *rbt_search(struct rbt *tree, struct rbt_node *root, uint64_t data);
+struct rbt_node *rbt_search(struct rbt *tree, struct rbt_node *root,
+                            uint64_t data);
 void rbt_remove(struct rbt *tree, uint64_t data);
 void rbt_insert(struct rbt *tree, struct rbt_node *new_node);
 struct rbt_node *rbt_min(struct rbt *tree);
 struct rbt_node *rbt_max(struct rbt *tree);
 struct rbt_node *rbt_next(struct rbt_node *node);
+bool rbt_has_node(struct rbt *tree, struct rbt_node *node);

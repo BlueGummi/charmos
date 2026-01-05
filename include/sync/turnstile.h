@@ -20,7 +20,7 @@ enum turnstile_state {
 };
 
 struct turnstile {
-    struct thread *inheritor; /* who are we inheriting priority from? */
+    struct thread *owner;
     bool applied_pi_boost;
     struct list_head hash_list;
     struct list_head freelist;
@@ -60,11 +60,10 @@ struct turnstile *turnstile_create(void);
 void turnstile_destroy(struct turnstile *ts);
 struct turnstile *turnstile_init(struct turnstile *ts);
 struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
-                                  void *lock_obj, enum irql lock_irql);
+                                  void *lock_obj, enum irql lock_irql, struct thread *owner);
 struct turnstile *turnstile_lookup(void *obj, enum irql *irql_out);
 void turnstile_unlock(void *obj, enum irql irql);
 void turnstile_wake(struct turnstile *ts, size_t queue, size_t num_threads,
                     enum irql lock_irql);
 size_t turnstile_get_waiter_count(void *lock_obj);
 int32_t turnstile_thread_priority(struct thread *t);
-void turnstile_set_inheritor(void *lobj, struct thread *t);

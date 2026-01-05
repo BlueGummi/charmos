@@ -1,20 +1,12 @@
 #include <crypto/prng.h>
 #include <sync/mutex.h>
 
-#define MUTEX_READ_LOCK_WORD(__mtx)                                            \
-    (atomic_load_explicit(&((struct mutex *) (__mtx))->lock_word,              \
-                          memory_order_acquire))
-
 #define MUTEX_BACKOFF_DEFAULT 4
 #define MUTEX_BACKOFF_MAX 32768
 #define MUTEX_BACKOFF_SHIFT 1
 #define MUTEX_BACKOFF_JITTER_PCT 15 /* 15% variation of base backoff */
 #define MUTEX_UNLOCK_WAKE_THREAD_COUNT(__m)                                    \
     1 /* turnstile_get_waiter_count(__m) */
-
-static inline struct thread *mutex_get_owner(struct mutex *mtx) {
-    return (struct thread *) (MUTEX_READ_LOCK_WORD(mtx) & (~MUTEX_META_BITS));
-}
 
 static inline uintptr_t mutex_make_lock_word(struct thread *owner) {
     return ((uintptr_t) owner) | MUTEX_HELD_BIT;

@@ -78,11 +78,10 @@ static inline void retire_thread(struct scheduler *sched,
 
 static inline void dequeue_from_tree(struct scheduler *sched,
                                      struct thread *thread) {
-    if (thread_exhausted_period(sched, thread)) {
-        rb_delete(&sched->completed_rbt, &thread->rq_tree_node);
-    } else {
-        rb_delete(&sched->thread_rbt, &thread->rq_tree_node);
-    }
+    if (rbt_has_node(&sched->completed_rbt, &thread->rq_tree_node))
+        return rb_delete(&sched->completed_rbt, &thread->rq_tree_node);
+
+    rb_delete(&sched->thread_rbt, &thread->rq_tree_node);
 }
 
 /* The `thread_rbt` should be NULL here */

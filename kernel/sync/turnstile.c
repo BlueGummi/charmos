@@ -80,7 +80,7 @@ struct turnstile *turnstile_init(struct turnstile *ts) {
     ts->waiters = 0;
     ts->waiter_max_prio = 0;
     ts->state = TURNSTILE_STATE_UNUSED;
-    ts->inheritor = NULL;
+    ts->owner = NULL;
 
     rbt_init(&ts->queues[TURNSTILE_READER_QUEUE], turnstile_thread_get_data);
     rbt_init(&ts->queues[TURNSTILE_WRITER_QUEUE], turnstile_thread_get_data);
@@ -252,7 +252,7 @@ void turnstile_wake(struct turnstile *ts, size_t queue, size_t num_threads,
                        to_wake->perceived_prio_class, ts);
     }
 
-    ts->inheritor = NULL;
+    ts->owner = NULL;
     turnstile_hash_chain_unlock(chain, lock_irql);
 }
 
@@ -272,7 +272,7 @@ void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
     size_t boost_weight = waiter_weight;
     enum thread_prio_class boost_class = waiter_class;
 
-    struct thread *original = ts->inheritor;
+    struct thread *original = ts->owner;
 
     while (true) {
         enum irql lock_irql;
@@ -288,7 +288,7 @@ void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
         /* A turnstile must exist if we have blocked on something */
         kassert(new_ts);
 
-        struct thread *owner = cur_lock->inheritor;
+        struct thread *owner = cur_lock->owner;
         if (!owner)
             goto done;
 
@@ -306,7 +306,7 @@ void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
 
         /* if owner is blocked on another lock, continue propagation */
         if ((cur_lock = owner->blocked_on)) {
-            /* update boost values as the owner's effective prior`ity */
+            /* update boost values as the owner's effective priority */
             boost_weight = owner->weight;
             boost_class = owner->perceived_prio_class;
 
@@ -341,7 +341,7 @@ static void turnstile_block_on(void *lock_obj, struct turnstile *ts,
 
 /* we already have preemption off when we get in here */
 struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
-                                  void *lock_obj, enum irql lock_irql) {
+                                  void *lock_obj, enum irql lock_irql, struct thread *owner) {
     struct turnstile_hash_chain *chain = turnstile_chain_for(lock_obj);
     struct thread *current_thread = scheduler_get_current_thread();
     struct turnstile *my_turnstile = current_thread->turnstile;
@@ -362,6 +362,7 @@ struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
     }
 
     current_thread->turnstile = NULL;
+    ts->owner = owner;
 
     turnstile_propagate_boost(chain, ts, current_thread->weight,
                               current_thread->perceived_prio_class);
@@ -386,13 +387,4 @@ size_t turnstile_get_waiter_count(void *lock_obj) {
         count = ts->waiters;
 
     return count;
-}
-
-void turnstile_set_inheritor(void *lobj, struct thread *t) {
-    enum irql chain_lock;
-    struct turnstile *ts;
-    if ((ts = turnstile_lookup(lobj, &chain_lock)))
-        ts->inheritor = t;
-
-    turnstile_unlock(lobj, chain_lock);
 }

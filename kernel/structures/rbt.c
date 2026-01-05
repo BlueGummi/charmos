@@ -238,6 +238,15 @@ struct rbt_node *rbt_search(struct rbt *tree, struct rbt_node *root,
     return root;
 }
 
+bool rbt_has_node(struct rbt *tree, struct rbt_node *node) {
+    struct rbt_node *iter;
+    rbt_for_each(iter, tree) {
+        if (iter == node)
+            return true;
+    }
+    return false;
+}
+
 void rbt_remove(struct rbt *tree, uint64_t data) {
     struct rbt_node *node = rbt_search(tree, tree->root, data);
     if (node)

@@ -119,8 +119,9 @@ void mutex_lock(struct mutex *mutex) {
     struct thread *current_thread = scheduler_get_current_thread();
 
     /* easy peasy nothing to do */
-    if (mutex_try_lock(mutex, current_thread))
+    if (mutex_try_lock(mutex, current_thread)) {
         return;
+    }
 
     /* failed to spin_try_acquire... now we must do the funny business... */
     struct thread *last_owner = mutex_get_owner(mutex);
@@ -181,7 +182,8 @@ void mutex_lock(struct mutex *mutex) {
         /* owner unchanged, waiter bit still the same...
          * time to do the slow path */
         if (mutex_get_owner(mutex) == current_owner) {
-            turnstile_block(ts, TURNSTILE_WRITER_QUEUE, mutex, ts_lock_irql);
+            turnstile_block(ts, TURNSTILE_WRITER_QUEUE, mutex, ts_lock_irql,
+                            current_owner);
 
             /* we do the dance all over again */
             backoff = MUTEX_BACKOFF_DEFAULT;
@@ -194,7 +196,6 @@ void mutex_lock(struct mutex *mutex) {
 
     /* hey ho! we got the mutex! */
     kassert(mutex_get_owner(mutex) == current_thread);
-    turnstile_set_inheritor(mutex, current_thread);
 }
 
 void mutex_unlock(struct mutex *mutex) {

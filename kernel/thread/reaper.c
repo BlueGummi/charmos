@@ -32,9 +32,8 @@ void reaper_thread_main(void *unused) {
     while (true) {
         enum irql irql = spin_lock(&reaper.lock);
 
-        enum irql out;
         while (locked_list_empty(&reaper.list))
-            condvar_wait(&reaper.cv, &reaper.lock, irql, &out);
+            condvar_wait(&reaper.cv, &reaper.lock, irql, &irql);
 
         struct list_head local;
         INIT_LIST_HEAD(&local);
@@ -43,7 +42,7 @@ void reaper_thread_main(void *unused) {
         list_splice_init(&reaper.list.list, &local);
         spin_unlock(&reaper.list.lock, tlist);
 
-        spin_unlock(&reaper.lock, out);
+        spin_unlock(&reaper.lock, irql);
 
         struct list_head *lh;
         while ((lh = list_pop_front_init(&local)) != NULL) {

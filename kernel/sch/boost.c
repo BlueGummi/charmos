@@ -47,7 +47,6 @@ bool scheduler_inherit_priority(struct thread *boosted, size_t new_weight,
             scheduler_boost_thread_internal(boosted, new_weight, new_class);
         scheduler_add_thread(sched, boosted, /* lock_held = */ true);
     } else {
-
         /* if the thread is off doing anything else (maybe it's blocking, maybe
          * it's running), we go ahead and just boost it. when it is saved those
          * new values will be read and everything will be all splendid */
@@ -71,8 +70,6 @@ void scheduler_uninherit_priority() {
     current->perceived_prio_class = current->saved_class;
     current->weight = current->saved_weight;
     current->has_pi_boost = false;
-    current->saved_weight = 0;
-    current->saved_class = THREAD_PRIO_CLASS_BACKGROUND;
 
 out:
     irql_lower(irql);

@@ -48,3 +48,10 @@ void mutex_unlock(struct mutex *mutex);
 void mutex_lock(struct mutex *mutex);
 bool mutex_held(struct mutex *mtx);
 #define MUTEX_ASSERT_HELD(m) kassert(mutex_held(m))
+#define MUTEX_READ_LOCK_WORD(__mtx)                                            \
+    (atomic_load_explicit(&((struct mutex *) (__mtx))->lock_word,              \
+                          memory_order_acquire))
+
+static inline struct thread *mutex_get_owner(struct mutex *mtx) {
+    return (struct thread *) (MUTEX_READ_LOCK_WORD(mtx) & (~MUTEX_META_BITS));
+}

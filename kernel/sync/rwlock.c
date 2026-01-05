@@ -155,7 +155,9 @@ void rwlock_lock(struct rwlock *lock, enum rwlock_acquire_type acq_type) {
 
         /* make sure we've set the lock bits */
         kassert(RWLOCK_READ_LOCK_WORD(lock) & wait_bits);
-        turnstile_block(ts, queue, lock, irql_out);
+
+        /* TODO: rwlock PI! */
+        turnstile_block(ts, queue, lock, irql_out, /* owner = */ NULL);
 
         /* when we wake up, we will have the lock handed off to us... */
         break;
