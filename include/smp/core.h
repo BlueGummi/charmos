@@ -88,7 +88,7 @@ struct core {
     struct topology_node *topo_node;
     struct topology_cache_info llc;
 
-    size_t numa_node;
+    numa_node_t numa_node;
     uint32_t package_id;
     uint32_t smt_mask;
     uint32_t smt_id;

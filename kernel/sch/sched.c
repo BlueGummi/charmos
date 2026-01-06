@@ -1,4 +1,5 @@
 #include <acpi/lapic.h>
+#include <sch/periodic_work.h>
 #include <sch/sched.h>
 #include <smp/smp.h>
 #include <sync/rcu.h>
@@ -323,6 +324,7 @@ void scheduler_yield() {
     schedule();
 
     scheduler_drop_locks_after_switch_in();
+    scheduler_periodic_work_execute(PERIODIC_WORK_PERIOD_BASED);
 
     scheduler_mark_self_in_resched(false);
     irql_lower(irql);

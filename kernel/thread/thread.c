@@ -3,6 +3,7 @@
 #include <mem/slab.h>
 #include <mem/vaddr_alloc.h>
 #include <mem/vmm.h>
+#include <sch/periodic_work.h>
 #include <sch/sched.h>
 #include <smp/domain.h>
 #include <stdbool.h>
@@ -69,6 +70,9 @@ void thread_entry_wrapper(void) {
     kassert(irql_get() < IRQL_HIGH_LEVEL);
 
     scheduler_drop_locks_after_switch_in();
+
+    scheduler_periodic_work_execute(PERIODIC_WORK_PERIOD_BASED);
+
     scheduler_mark_self_in_resched(false);
     irql_lower(IRQL_PASSIVE_LEVEL);
 

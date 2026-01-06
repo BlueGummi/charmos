@@ -77,6 +77,12 @@ SECTIONS {
         __ekernel_movealloc_callbacks = .;
     }
     
+    .kernel_sched_periodic_work : {
+        __skernel_sched_periodic_work = .;
+        KEEP(*(.kernel_sched_periodic_work ))
+        __ekernel_sched_periodic_work = .;
+    }
+    
     .kernel_slab_sizes : {
         __skernel_slab_sizes = .;
         KEEP(*(.kernel_slab_sizes))

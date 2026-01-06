@@ -29,6 +29,7 @@
 #include <registry.h>
 #include <requests.h>
 #include <sch/domain.h>
+#include <sch/periodic_work.h>
 #include <sch/sched.h>
 #include <smp/core.h>
 #include <smp/domain.h>
@@ -94,6 +95,7 @@ __no_sanitize_address void k_main(void) {
     topology_init();
     domain_init();
     scheduler_domains_init();
+    scheduler_periodic_work_init();
     perdomain_obj_init();
     bootstage_advance(BOOTSTAGE_MID_TOPOLOGY);
     struct core *iter;

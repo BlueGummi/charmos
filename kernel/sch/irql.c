@@ -1,3 +1,4 @@
+#include <sch/periodic_work.h>
 #include <sch/sched.h>
 #include <smp/core.h>
 #include <thread/dpc.h>
@@ -42,6 +43,11 @@ void irql_lower(enum irql new_level) {
 
     struct core *cpu = smp_core();
     enum irql old = cpu->current_irql;
+
+    /* hook into here */
+    if (old == IRQL_DISPATCH_LEVEL && new_level == IRQL_PASSIVE_LEVEL &&
+        !scheduler_in_periodic_work())
+        scheduler_periodic_work_execute(PERIODIC_WORK_TIME_BASED);
 
     struct thread *curr = cpu->current_thread;
     bool in_thread = !cpu->in_interrupt;
