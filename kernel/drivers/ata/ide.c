@@ -143,6 +143,7 @@ struct generic_disk *ide_create_generic(struct ata_drive *ide) {
 
     ioapic_route_irq(ide->irq, irq, 0, false);
     irq_register("ata", irq, ide_irq_handler, &ide->channel, IRQ_FLAG_NONE);
+    irq_set_chip(irq, lapic_get_chip(), NULL);
     ide->channel.current_drive = ide;
 
     struct generic_disk *d =

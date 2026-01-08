@@ -61,7 +61,6 @@ enum irq_result tlb_shootdown_isr(void *ctx, uint8_t irq, struct irq_context *rs
     (void) rsp;
 
     tlb_shootdown_internal();
-    lapic_write(LAPIC_REG_EOI, 0);
     return IRQ_HANDLED;
 }
 

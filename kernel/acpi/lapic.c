@@ -59,6 +59,11 @@ void lapic_timer_enable() {
     lapic_write(LAPIC_REG_LVT_TIMER, lvt);
 }
 
+void lapic_eoi(struct irq_desc *unused) {
+    (void) unused;
+    lapic_write(LAPIC_REG_EOI, 0);
+}
+
 bool lapic_timer_is_enabled() {
     uint32_t lvt = lapic_read(LAPIC_REG_LVT_TIMER);
     return !(lvt & (1 << 16));
@@ -163,4 +168,17 @@ void ipi_send(uint32_t apic_id, uint8_t vector) {
         return x2apic_send_ipi(apic_id, vector);
 
     lapic_send_ipi(apic_id, vector);
+}
+
+static struct irq_chip lapic_irq_chip = {
+    .eoi = lapic_eoi,
+    .mask = NULL,
+    .unmask = NULL,
+    .set_affinity = NULL,
+    .set_rate_limit = NULL,
+    .name = "lapic",
+};
+
+struct irq_chip *lapic_get_chip() {
+    return &lapic_irq_chip;
 }

@@ -52,7 +52,8 @@ void ahci_process_completions(struct ahci_device *dev, uint32_t port) {
     mmio_write_32(&p->is, p->is);
 }
 
-enum irq_result ahci_isr_handler(void *ctx, uint8_t vector, struct irq_context *rsp) {
+enum irq_result ahci_isr_handler(void *ctx, uint8_t vector,
+                                 struct irq_context *rsp) {
     (void) vector, (void) rsp;
 
     struct ahci_device *dev = ctx;
@@ -63,7 +64,6 @@ enum irq_result ahci_isr_handler(void *ctx, uint8_t vector, struct irq_context *
         ahci_process_completions(dev, port);
     }
 
-    lapic_write(LAPIC_REG_EOI, 0);
     return IRQ_HANDLED;
 }
 

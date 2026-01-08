@@ -116,6 +116,8 @@ void scheduler_periodic_work_execute(enum scheduler_periodic_work_type type) {
 
     kassert(scheduler_preemption_disabled());
     kassert(irql_get() == IRQL_DISPATCH_LEVEL);
+    kassert(!scheduler_in_periodic_work());
+
     struct scheduler_periodic_work_percpu *pcpu = &PERCPU_READ(periodic_percpu);
     pcpu->executing = true;
 

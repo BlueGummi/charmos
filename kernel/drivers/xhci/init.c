@@ -337,6 +337,7 @@ void xhci_device_start_interrupts(uint8_t bus, uint8_t slot, uint8_t func,
                                   struct xhci_device *dev) {
     dev->irq = irq_alloc_entry();
     irq_register("xhci", dev->irq, xhci_isr, dev, IRQ_FLAG_NONE);
+    irq_set_chip(dev->irq, lapic_get_chip(), NULL);
     pci_program_msix_entry(bus, slot, func, 0, dev->irq, /*core=*/0);
 }
 

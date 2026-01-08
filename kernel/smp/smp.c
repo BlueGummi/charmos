@@ -332,7 +332,6 @@ static enum irq_result tick_op_isr(void *ctx, uint8_t vector,
     }
 
     atomic_fetch_add(&tick_change_state, 1);
-    lapic_write(LAPIC_REG_EOI, 0);
     return IRQ_HANDLED;
 }
 
@@ -356,6 +355,7 @@ static void send_em_all_out(bool e) {
 void smp_disable_all_ticks() {
     entry = irq_alloc_entry();
     irq_register("tick_op", entry, tick_op_isr, NULL, IRQ_FLAG_NONE);
+    irq_set_chip(entry, lapic_get_chip(), NULL);
     send_em_all_out(false);
 }
 
@@ -363,4 +363,5 @@ extern void nop_handler(void *, uint8_t, void *);
 void smp_enable_all_ticks() {
     send_em_all_out(true);
     irq_free_entry(entry);
+    irq_set_chip(entry, NULL, NULL);
 }

@@ -676,7 +676,6 @@ enum irq_result xhci_isr(void *ctx, uint8_t vector, struct irq_context *rsp) {
     xhci_clear_usbsts_ei(dev);
     semaphore_post(&dev->sem);
 
-    lapic_write(LAPIC_REG_EOI, 0);
     return IRQ_HANDLED;
 }
 

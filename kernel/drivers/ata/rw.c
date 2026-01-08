@@ -97,7 +97,6 @@ next_request:
 
 out:
     spin_unlock(&chan->lock, irql);
-    lapic_write(LAPIC_REG_EOI, 0);
     return IRQ_HANDLED;
 }
 

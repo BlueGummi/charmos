@@ -139,7 +139,6 @@ enum irq_result nvme_isr_handler(void *ctx, uint8_t vector,
     (void) vector, (void) rsp;
     struct nvme_device *dev = ctx;
     nvme_process_completions(dev, THIS_QID(dev));
-    lapic_write(LAPIC_REG_EOI, 0);
     return IRQ_HANDLED;
 }
 

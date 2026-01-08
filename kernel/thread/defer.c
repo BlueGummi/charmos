@@ -70,7 +70,6 @@ static enum irq_result hpet_irq_handler(void *ctx, uint8_t irq,
     semaphore_post(&defer_queue->semaphore);
 
     hpet_clear_interrupt_status();
-    lapic_write(LAPIC_REG_EOI, 0);
     return IRQ_HANDLED;
 }
 
@@ -152,6 +151,7 @@ void defer_init(void) {
         uint8_t vector = irq_alloc_entry();
 
         irq_register("hpet_irq", vector, hpet_irq_handler, NULL, IRQ_FLAG_NONE);
+        irq_set_chip(vector, lapic_get_chip(), NULL);
         ioapic_route_irq(i + 3, vector, i, false);
 
         hpet_setup_timer(i, i + 3, false, true);

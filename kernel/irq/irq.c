@@ -104,8 +104,8 @@ void irq_register(char *name, uint8_t vector, irq_handler_t handler, void *ctx,
 void irq_set_chip(uint8_t vec, struct irq_chip *chip, void *data) {
     enum irql irql = spin_lock(&irq_table_lock);
 
-    if (irq_table[vec].chip)
-        k_panic("IRQ chip exists\n");
+    if (irq_table[vec].chip && chip)
+        k_panic("IRQ chip %u exists\n", vec);
 
     irq_table[vec].chip = chip;
     irq_table[vec].chip_data = data;
@@ -220,7 +220,7 @@ void irq_init() {
                  IRQ_FLAG_NONE);
 
     irq_register("ssf", IRQ_SSF, ss_handler, NULL, IRQ_FLAG_NONE);
-    
+
     irq_register("gpf", IRQ_GPF, gpf_handler, NULL, IRQ_FLAG_NONE);
     irq_register("double_fault", IRQ_DBF, double_fault_handler, NULL,
                  IRQ_FLAG_NONE);
@@ -228,9 +228,13 @@ void irq_init() {
                  IRQ_FLAG_NONE);
 
     irq_register("timer", IRQ_TIMER, scheduler_timer_isr, NULL, IRQ_FLAG_NONE);
+    irq_set_chip(IRQ_TIMER, lapic_get_chip(), NULL);
+
     irq_register("nmi", IRQ_NMI, nmi_isr, NULL, IRQ_FLAG_NONE);
     irq_register("tlb_shootdown", IRQ_TLB_SHOOTDOWN, tlb_shootdown_isr, NULL,
                  IRQ_FLAG_NONE);
+    irq_set_chip(IRQ_TLB_SHOOTDOWN, lapic_get_chip(), NULL);
+
     irq_register("nop", IRQ_NOP, nop_handler, NULL, IRQ_FLAG_NONE);
     idt_set_gate(0x80, 0x2b, 0xee);
     irq_load();

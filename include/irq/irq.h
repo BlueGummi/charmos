@@ -68,7 +68,7 @@ struct irq_desc {
     struct cpu_mask affinity;
     struct cpu_mask masked_cpus;
 
-    bool present; /* Have we set handlers? */
+    bool present;   /* Have we set handlers? */
     bool allocated; /* Has this been allocated? */
     bool enabled;
 };
