@@ -15,7 +15,8 @@ bool scheduler_can_steal_thread(size_t core, struct thread *target) {
     if (!cpu_mask_test(&target->allowed_cpus, core))
         return false;
 
-    return true;
+    return atomic_load_explicit(&target->migrate_to, memory_order_acquire) ==
+           -1;
 }
 
 /* self->stealing_work should already be set before this is called */

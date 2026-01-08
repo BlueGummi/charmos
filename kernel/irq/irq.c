@@ -5,6 +5,7 @@
 #include <console/printf.h>
 #include <irq/idt.h>
 #include <mem/alloc.h>
+#include <mem/page_fault.h>
 #include <mem/tlb.h>
 #include <mem/vmm.h>
 #include <sch/sched.h>
@@ -15,9 +16,6 @@
 #include <stdint.h>
 #include <sync/rcu.h>
 #include <thread/apc.h>
-
-extern enum irq_result page_fault_handler(void *context, uint8_t vector,
-                                          struct irq_context *rsp);
 
 /* Lock is only used for allocation/free and registering */
 static struct spinlock irq_table_lock = SPINLOCK_INIT;

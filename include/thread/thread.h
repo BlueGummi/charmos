@@ -256,7 +256,7 @@ struct thread {
 
     /* Who is allowed to run us? */
     struct cpu_mask allowed_cpus;
-    int64_t migrate_to; /* -1 if no migration target */
+    _Atomic int64_t migrate_to; /* -1 if no migration target */
 
     /* Flags */
     _Atomic(enum thread_flags) flags;
@@ -462,6 +462,11 @@ void thread_wait_for_wake_match();
 struct thread_queue;
 void thread_block_on(struct thread_queue *q, enum thread_wait_type type,
                      void *wake_src);
+
+static inline int64_t thread_set_migration_target(struct thread *t,
+                                                  int64_t new) {
+    return atomic_exchange(&t->migrate_to, new);
+}
 
 static inline enum thread_state thread_get_state(struct thread *t) {
     return atomic_load(&t->state);

@@ -66,10 +66,6 @@ void scheduler_change_tick_duration(uint64_t new_duration) {
     change_tick_duration(new_duration);
 }
 
-static inline bool needs_migration(struct thread *t) {
-    return t->migrate_to != -1;
-}
-
 static inline void update_thread_before_save(struct thread *thread,
                                              time_t time) {
     thread_set_state(thread, THREAD_STATE_READY);
@@ -102,15 +98,6 @@ static inline void re_enqueue_thread(struct scheduler *sched,
     }
 }
 
-/* TODO: this!!! */
-static inline void migrate_to_destination(struct thread *t) {
-    struct scheduler *dst = global.schedulers[t->migrate_to];
-
-    enum irql irql = scheduler_lock_irq_disable(dst);
-
-    scheduler_unlock(dst, irql);
-}
-
 static inline void update_idle_thread(time_t time) {
     struct idle_thread_data *data = smp_core_idle_thread();
     data->last_exit_ms = time;
@@ -132,6 +119,41 @@ static inline void save_thread(struct scheduler *sched, struct thread *curr,
     } else if (curr && thread_get_state(curr) == THREAD_STATE_IDLE_THREAD) {
         update_idle_thread(time);
     }
+}
+
+/* returns `true` if the current scheduler lock gets acquired
+ * so the caller knows if it needs to acquire it */
+static inline bool migrate_to_destination(struct thread *t, time_t time) {
+    int64_t dst;
+    if (!t)
+        return false;
+
+    if ((dst = thread_set_migration_target(t, -1)) == -1)
+        return false;
+
+    if (dst == (int64_t) smp_core_id())
+        return false;
+
+    /* we must uphold this because other CPUs will expect being_moved
+     * to be `true` as long as the thread could possibly be getting migrated */
+    if (!spinlock_held(&t->being_moved)) {
+        k_panic("being_moved flag not true, migrate_to %zu from %zu\n", dst,
+                smp_core_id());
+    }
+
+    struct scheduler *us = smp_core_scheduler();
+    struct scheduler *other = global.schedulers[dst];
+    scheduler_acquire_two_raw_locks(us, other);
+
+    /* mark our own other_locked as `other` so that
+     * upon the switch-in, the lock is dropped */
+    us->other_locked = other;
+
+    /* save ourselves to the other scheduler */
+    save_thread(other, t, time);
+    thread_set_last_ran(t, dst);
+    spin_unlock_raw(&t->being_moved);
+    return true;
 }
 
 static inline enum thread_prio_class
@@ -199,6 +221,7 @@ static void load_thread(struct scheduler *sched, struct thread *next,
     next->curr_core = smp_core_id();
     next->run_start_time = time;
     spin_unlock_raw(&next->being_moved);
+
     thread_calculate_activity_data(next);
     thread_classify_activity(next, time);
 
@@ -246,8 +269,7 @@ static void change_tick(struct scheduler *sched, struct thread *next) {
     }
 }
 
-static inline void context_switch(struct scheduler *sched, struct thread *curr,
-                                  struct thread *next) {
+static inline void context_switch(struct thread *curr, struct thread *next) {
     if (curr)
         atomic_store_explicit(&curr->yielded_after_wait, true,
                               memory_order_release);
@@ -285,9 +307,17 @@ void schedule(void) {
     struct thread *curr = sched->current;
     struct thread *next = NULL;
 
-    spin_lock_raw(&sched->lock);
-
-    save_thread(sched, curr, time);
+    /* if this returns false, the thread was not migrated
+     * anywhere and we're responsible for acquiring our lock
+     * and also saving it to our runqueues. if it returns true,
+     * both our lock and the other CPU's locks for schedulers
+     * are acquired (ordered by memory address) and we don't
+     * have to acquire it or save the thread to our CPU since
+     * that happened in migrate_to_destination */
+    if (!migrate_to_destination(curr, time)) {
+        spin_lock_raw(&sched->lock);
+        save_thread(sched, curr, time);
+    }
 
     /* Checks if we can steal, finds a victim, and tries to steal.
      * NULL is returned if any step was unsuccessful */
@@ -308,11 +338,20 @@ void schedule(void) {
 
     load_thread(sched, next, time);
 
-    context_switch(sched, curr, next);
+    context_switch(curr, next);
 }
 
 void scheduler_drop_locks_after_switch_in() {
-    spin_unlock_raw(&smp_core_scheduler()->lock);
+    struct scheduler *us = smp_core_scheduler();
+    struct scheduler *other = us->other_locked;
+    us->other_locked = NULL;
+
+    kassert(us != other);
+
+    if (!other)
+        return spin_unlock_raw(&us->lock);
+
+    scheduler_drop_two_raw_locks(us, other);
 }
 
 void scheduler_yield() {

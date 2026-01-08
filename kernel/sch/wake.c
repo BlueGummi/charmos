@@ -53,12 +53,14 @@ bool scheduler_wake(struct thread *t, enum thread_wake_reason reason,
     thread_wake_locked(t, reason, wake_src);
     thread_apply_wake_boost(t);
 
-    /* if the thread has NOT yielded after it set itself blocked it is completely
-     * unsafe to put it back on the runqueues as it is currently running, but is
-     * marked as BLOCKED or SLEEPING. This can happen when an ISR enters this code, 
-     * when the thread we are looking at is on the same CPU and marked as BLOCKED/SLEEPING
-     * when in reality it is actually running but wanting to block/sleep but has not yielded */
-    if (yielded && state != THREAD_STATE_RUNNING && state != THREAD_STATE_READY) {
+    /* if the thread has NOT yielded after it set itself blocked it is
+     * completely unsafe to put it back on the runqueues as it is currently
+     * running, but is marked as BLOCKED or SLEEPING. This can happen when an
+     * ISR enters this code, when the thread we are looking at is on the same
+     * CPU and marked as BLOCKED/SLEEPING when in reality it is actually running
+     * but wanting to block/sleep but has not yielded */
+    if (yielded && state != THREAD_STATE_RUNNING &&
+        state != THREAD_STATE_READY) {
         t->perceived_prio_class = prio;
         scheduler_add_thread(sch, t, /* lock_held = */ true);
         scheduler_force_resched(sch);

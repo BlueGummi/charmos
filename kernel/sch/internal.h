@@ -156,6 +156,60 @@ static inline void thread_scale_back_delta(struct thread *thread) {
     thread->dynamic_delta = (thread->dynamic_delta * 1000) / 1100;
 }
 
+static inline void scheduler_acquire_two_locks(struct scheduler *a,
+                                               struct scheduler *b,
+                                               enum irql *a_irql_out,
+                                               enum irql *b_irql_out) {
+    kassert(a != b);
+    if (a < b) {
+        *a_irql_out = spin_lock(&a->lock);
+        *b_irql_out = spin_lock(&b->lock);
+    } else {
+        *b_irql_out = spin_lock(&b->lock);
+        *a_irql_out = spin_lock(&a->lock);
+    }
+}
+
+static inline void scheduler_drop_two_locks(struct scheduler *a,
+                                            struct scheduler *b,
+                                            enum irql a_irql,
+                                            enum irql b_irql) {
+    kassert(a != b);
+    if (a > b) {
+        spin_unlock(&a->lock, a_irql);
+        spin_unlock(&b->lock, b_irql);
+    } else {
+        spin_unlock(&b->lock, b_irql);
+        spin_unlock(&a->lock, a_irql);
+    }
+}
+
+/* this function and the other drop_two_raw_locks is only to be used
+ * from inside of scheduler_yield() and friends. nowhere else! */
+static inline void scheduler_acquire_two_raw_locks(struct scheduler *a,
+                                                   struct scheduler *b) {
+    kassert(a != b);
+    if (a < b) {
+        spin_lock_raw(&a->lock);
+        spin_lock_raw(&b->lock);
+    } else {
+        spin_lock_raw(&b->lock);
+        spin_lock_raw(&a->lock);
+    }
+}
+
+static inline void scheduler_drop_two_raw_locks(struct scheduler *a,
+                                                struct scheduler *b) {
+    kassert(a != b);
+    if (a > b) {
+        spin_unlock_raw(&a->lock);
+        spin_unlock_raw(&b->lock);
+    } else {
+        spin_unlock_raw(&b->lock);
+        spin_unlock_raw(&a->lock);
+    }
+}
+
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(scheduler, lock);
 
 /* Internal use only */

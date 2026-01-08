@@ -71,6 +71,15 @@ struct scheduler {
     /* Idle thread data */
     struct thread *idle_thread;
     struct idle_thread_data idle_thread_data;
+
+    struct scheduler *other_locked; /* If we acquired the lock of another
+                                     * scheduler in scheduler_yield(),
+                                     * we store a pointer to it here.
+                                     *
+                                     * If this is NULL, we didn't do that,
+                                     * but in the case that it isn't, we must
+                                     * drop the raw lock for this in addition
+                                     * to the lock for our scheduler */
 };
 
 void scheduler_init();

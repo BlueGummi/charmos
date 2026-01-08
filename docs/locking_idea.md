@@ -28,7 +28,7 @@ Similarly, the OS "virtualizes" the processor to split it between different task
 
 This is accomplished through "threads", which are effectively "virtual CPUs" that can be created, started, and stopped
 at almost any time. The ability for threads to be started and stopped is used to give the illusion of
-runnin multiple threads at the same time on one CPU by rapidly starting, stopping, and switching between them.
+running multiple threads at the same time on one CPU by rapidly starting, stopping, and switching between them.
 This is known as "context switching", which is one component of the much larger concept of "scheduling",
 which will be discussed in more detail elsewhere.
 
@@ -146,7 +146,7 @@ form of PI), which will be discussed elsewhere.
 ### Lock Rules
 
 Locks have strict rules. For example, is prohibited for a non-owner thread to release a lock. This means
-that you cannot do funny things like acquire a lock with one thread and then spawn another to release it for you.
+that one cannot do funny things like acquire a lock with one thread and then spawn another to release it..
 
 In addition, per-CPU structures must be protected with locks. Take the following code snippet as an example:
 
@@ -169,7 +169,7 @@ shows a similar instance where threads preempting each other on CPU-local variab
 result in race conditions. Here, the structure can be read on one thread (which is preempted),
 modified by another, and incorrectly operated upon based on an old, now invalid value.
 
-You can also just use IRQLs[^2] to disable preemption during such code segments to protect the structure.
+One may also simply use IRQLs[^2] to disable preemption during such code segments to protect the structure.
 
 ### Memory Usage
 
@@ -190,3 +190,6 @@ struct mutex {
     struct thread *owner; /* 8 bytes */
 };
 ```
+
+[^1]: https://en.wikipedia.org/wiki/With_great_power_comes_great_responsibility
+
