@@ -19,7 +19,7 @@
 #include <types/refcount.h>
 #include <types/types.h>
 
-#define THREAD_DEFAULT_TIMESLICE 25 /* 25 ms */
+#define THREAD_DEFAULT_TIMESLICE 15 /* 15 ms */
 
 #define THREAD_STACK_SIZE (PAGE_SIZE * 4)
 

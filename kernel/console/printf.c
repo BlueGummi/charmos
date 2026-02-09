@@ -9,6 +9,8 @@
 #include <sync/spinlock.h>
 
 #include "console/printf.h"
+#include <flanterm/src/flanterm_backends/fb.h>
+#include "flanterm/src/flanterm.h"
 
 struct flanterm_context;
 
@@ -66,19 +68,18 @@ void double_print(struct flanterm_context *f, struct printf_cursor *csr,
                   const char *str, int len) {
     (void) f;
     serial_puts(csr, str, len);
-    /* if (global.current_bootstage >= BOOTSTAGE_EARLY_FB)
-     flanterm_write(f, str, len); */
+    if (global.current_bootstage >= BOOTSTAGE_EARLY_FB)
+        flanterm_write(f, str, len);
 }
 
 void k_printf_init(struct limine_framebuffer *fb) {
     (void) fb;
     serial_init();
-    /* TODO: get this back up
     ft_ctx = flanterm_fb_init(
         NULL, NULL, fb->address, fb->width, fb->height, fb->pitch,
         fb->red_mask_size, fb->red_mask_shift, fb->green_mask_size,
         fb->green_mask_shift, fb->blue_mask_size, fb->blue_mask_shift, NULL,
-        NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 1, 0, 0, 0); */
+        NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 1, 0, 0, 0);
 
     k_printf("%s", OS_LOGO_SMALL);
 }

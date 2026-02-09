@@ -206,6 +206,7 @@ struct thread *scheduler_try_do_steal(struct scheduler *sched) {
     if (stolen) {
         sched_profiling_record_steal();
         thread_set_recent_apc_event(stolen, APC_EVENT_THREAD_MIGRATE);
+        spin_unlock_raw(&stolen->being_moved);
     } else {
         scheduler_try_push_to_idle_core(sched);
     }

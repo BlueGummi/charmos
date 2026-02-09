@@ -13,7 +13,6 @@
 
 #define rbt_entry(ptr, type, member) container_of(ptr, type, member)
 #define rbt_parent(n) ((n)->parent)
-#define RBTREE_COMPARE(a, b) ((a)->key - (b)->key)
 
 enum rbt_node_color { TREE_NODE_RED, TREE_NODE_BLACK };
 

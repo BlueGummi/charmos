@@ -209,7 +209,7 @@ static void chaos_migrator() {
  * ------------------------------------ */
 TEST_REGISTER(thread_interruptible_chaos_fuzz, SHOULD_NOT_FAIL,
               IS_INTEGRATION_TEST) {
-    ADD_MESSAGE("this test is long. comment me out to skip it.");
+    ADD_MESSAGE("this test is long. comment me out to run it.");
     SET_SKIP();
     return;
 
@@ -232,6 +232,7 @@ TEST_REGISTER(thread_interruptible_chaos_fuzz, SHOULD_NOT_FAIL,
 
     thread_spawn("chaos_wake", chaos_waker, NULL);
     thread_spawn("chaos_migrate", chaos_migrator, NULL);
+    thread_spawn("chaos_apc", chaos_apc_spammer, NULL);
     irql_lower(irql);
 
     uint64_t last_report = time_get_ms();

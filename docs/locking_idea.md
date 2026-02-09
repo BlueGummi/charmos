@@ -2,7 +2,7 @@
 
 ## Credits:
 
-Written 11/20/2025, updated 11/20/2025
+Written 11/20/2025, updated 1/24/2026 
 
 ## Audience:
 
@@ -14,7 +14,7 @@ Everyone
 ## Overview:
 
 Locking is the component of multitasking operating systems and programs that faciliates protection of shared resources.
-This OS allows preemption and is SMP-compatible, which introduces a few more locking problems.
+This OS allows preemption and is SMP (multicore) compatible, which introduces a few more locking problems.
 
 ## Background:
 
@@ -78,7 +78,7 @@ These scenarios in which timing-dependent events can impact the overall behavior
 
 One way to resolve this particular kind of race condition is with a lock.
 
-For example, if we were to rewrite the previous snippet of code (assuming full atomicity of every operation and no memory
+For example, if we were to rewrite the previous snippet of code (assuming full atomicity of every operation and no memory access
 reordering – we'll talk about what those words mean later) with a simple lock, we might write something like this:
 
 > For simplicity's sake, we will define a function `read_lock_and_set_if_not_held` that checks the lock variable, and
@@ -116,16 +116,16 @@ thread is reading or modifying the list at once.
 
 ### Lock Types
 
-There are two primary types of locks: spin locks and blocking locks.
+There are two primary types of exclusive locks: spin locks and blocking locks.
 
-Blocking locks are typically referred to as "mutexes", and spin locks are referred to as "spin locks".
+Blocking locks are typically referred to as "mutexes" (mutual exclusion), and spin locks are referred to as "spin locks".
 
 To avoid confusion, we will refer to them as such from here on out.
 
 The difference between them resides in how contending threads wait on a lock that is held.
 
 In short, threads attempting to acquire a spin lock will spin in a loop, whereas threads attempting
-to acquire a mutex will stop running, or yield, while they wait for the lock to be released.
+to acquire a mutex will stop running, or yield to let other threads run, while they wait for the lock to be released.
 
 Spin locks and mutexes also have different use cases. In general, mutexes are more
 restrictive in when they can be called compared to spin locks.
@@ -146,7 +146,7 @@ form of PI), which will be discussed elsewhere.
 ### Lock Rules
 
 Locks have strict rules. For example, is prohibited for a non-owner thread to release a lock. This means
-that one cannot do funny things like acquire a lock with one thread and then spawn another to release it..
+that you cannot do funny things like acquire a lock with one thread and then spawn another to release it.
 
 In addition, per-CPU structures must be protected with locks. Take the following code snippet as an example:
 
@@ -169,7 +169,13 @@ shows a similar instance where threads preempting each other on CPU-local variab
 result in race conditions. Here, the structure can be read on one thread (which is preempted),
 modified by another, and incorrectly operated upon based on an old, now invalid value.
 
-One may also simply use IRQLs[^2] to disable preemption during such code segments to protect the structure.
+You can also use IRQLs[^2] to disable preemption during such code segments to protect the structure.
+
+Locks also cannot be recursively acquired. Some may argue that recursive mutexes are a nicety and make life 
+easier, and while that may hold true in certain cases, like when you're working on a legacy codebase that 
+uses recursive mutexes and management wants the next release shipped by tomorrow, in our case, it is less than ideal.
+
+This is primarily because recursive mutexes can increase debugging complexity, and also becomes difficult to maintain. 
 
 ### Memory Usage
 
@@ -179,7 +185,7 @@ to handle the thread blocking and waking, there is a distinct memory usage diffe
 Whilst a spin lock can be implemented with just one singular bit of data (though it is actually more like a byte
 or a word because spinning on a single bit is expensive), mutexes require much more.
 
-Mutexes are quite common, but are not always contended. Thus, the >32 bytes of memory they take up
+Mutexes are quite common, but are not always contended. Thus, the multiple bytes of memory they take up
 often go mostly unused if the mutex metadata is embedded directly in the struct.
 
 For example:
@@ -188,8 +194,23 @@ For example:
 struct mutex {
     struct thread_queue waiters; /* 16 bytes */
     struct thread *owner; /* 8 bytes */
+    struct spinlock lock; /* 1 byte - for thread_queue */
 };
 ```
 
-[^1]: https://en.wikipedia.org/wiki/With_great_power_comes_great_responsibility
+This relatively simple mutex that is still *omitting* parts of more featureful mutex (e.g. PI data structures)
+takes up a whole 25 bytes of data. That means that after creating only 170 of these mutexes, an entire 4KB page of
+memory will be used up, compared to the 512 mutexes that you could create if they only took up 8 bytes of memory.
 
+To combat this problem, instead of directly embedding mutex data structures into `struct mutex`'s, we use
+turnstiles. Turnstiles give us the ability to have pointer sized mutexes, whilst still allowing for blocking,
+priority inheritance, and even reader-writer locks (which would have 2 queues, one for readers and one for writers).
+
+#### Turnstiles
+
+A turnstile is effectively a tra
+
+
+
+[^1]: https://en.wikipedia.org/wiki/With_great_power_comes_great_responsibility
+[^2]: https://en.wikipedia.org/wiki/IRQL_(Windows)

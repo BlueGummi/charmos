@@ -1,5 +1,5 @@
 #include <acpi/lapic.h>
-#include <charmos.h>
+#include <global.h>
 #include <console/printf.h>
 #include <irq/idt.h>
 #include <limine.h>

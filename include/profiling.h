@@ -1,6 +1,6 @@
 /* @title: Profiling */
 #pragma once
-#include <charmos.h>
+#include <global.h>
 #include <compiler.h>
 #include <linker/symbols.h>
 #include <stdbool.h>

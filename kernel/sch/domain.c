@@ -1,5 +1,6 @@
-#include <charmos.h>
 #include <console/panic.h>
+#include <global.h>
+#include <kassert.h>
 #include <mem/alloc.h>
 #include <sch/domain.h>
 #include <string.h>
@@ -88,6 +89,7 @@ static void map_cpus_to_groups(void) {
                     break;
                 }
             }
+            kassert(found != -1);
             c->group_index[i] = found;
         }
     }

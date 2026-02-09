@@ -1,6 +1,6 @@
 #pragma once
 #include <asm.h>
-#include <charmos.h>
+#include <global.h>
 #include <console/panic.h>
 #include <irq/irq.h>
 #include <kassert.h>

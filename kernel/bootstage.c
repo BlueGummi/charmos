@@ -1,5 +1,5 @@
 #include <bootstage.h>
-#include <charmos.h>
+#include <global.h>
 #include <console/printf.h>
 
 static const char *bootstage_str[BOOTSTAGE_COUNT] = {

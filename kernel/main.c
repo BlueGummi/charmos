@@ -7,7 +7,7 @@
 #include <asm.h>
 #include <boot/gdt.h>
 #include <bootstage.h>
-#include <charmos.h>
+#include <global.h>
 #include <cmdline.h>
 #include <compiler.h>
 #include <console/printf.h>
@@ -46,7 +46,7 @@
 #include <thread/reaper.h>
 #include <thread/thread.h>
 
-struct charmos_globals global = {0};
+struct globals global = {0};
 
 #define BEHAVIOR /* avoids undefined behavior */
 

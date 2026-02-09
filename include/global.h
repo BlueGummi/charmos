@@ -11,7 +11,7 @@
  *
  * I can clone these per-NUMA node and make backpointers
  * via the per-core 'struct core' in the G segment register */
-struct charmos_globals {
+struct globals {
     volatile atomic_bool panicked;
     volatile enum bootstage current_bootstage;
 
@@ -71,4 +71,4 @@ struct charmos_globals {
 #endif
 };
 
-extern struct charmos_globals global;
+extern struct globals global;

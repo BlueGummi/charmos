@@ -458,7 +458,8 @@ static void catch_stragglers_on_list(struct xhci_device *dev,
             continue;
 
         enum xhci_slot_state state = xhci_slot_get_state(slot);
-        bool slot_here = state == XHCI_SLOT_STATE_ENABLED;
+        bool slot_here = state == XHCI_SLOT_STATE_ENABLED &&
+                         slot->port->generation == req->generation;
 
         if (!slot_here) {
             req->status = XHCI_REQUEST_DISCONNECT;

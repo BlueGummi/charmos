@@ -220,7 +220,6 @@ static void load_thread(struct scheduler *sched, struct thread *next,
     thread_set_last_ran(next, smp_core_id());
     next->curr_core = smp_core_id();
     next->run_start_time = time;
-    spin_unlock_raw(&next->being_moved);
 
     thread_calculate_activity_data(next);
     thread_classify_activity(next, time);

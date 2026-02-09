@@ -1,5 +1,5 @@
 #include <block/generic.h>
-#include <charmos.h>
+#include <global.h>
 #include <console/printf.h>
 #include <drivers/ahci.h>
 #include <drivers/ata.h>

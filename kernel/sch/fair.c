@@ -56,7 +56,7 @@ static void derive_timeshare_prio_range(enum thread_activity_class cls,
 #define WAKE_FREQ_SCALE 5
 
 #define THREAD_SLICE_MIN 1
-#define THREAD_SLICE_MAX 8
+#define THREAD_SLICE_MAX 16
 
 #define THREAD_BASE_WEIGHT 1024
 #define THREAD_WEIGHT_SCALING 100
@@ -307,9 +307,7 @@ static uint64_t map_activity_score(uint64_t score) {
 
 static uint64_t thread_derive_slice_count(struct thread *t) {
     uint64_t base = map_activity_score(t->activity_score);
-    int64_t adjust = 0;
-
-    adjust += 1;
+    int64_t adjust = 1;
 
     if (t->activity_metrics.block_ratio > t->activity_metrics.run_ratio)
         adjust += 1;

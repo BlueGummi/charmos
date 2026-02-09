@@ -1,4 +1,4 @@
-#include <charmos.h>
+#include <global.h>
 #include <console/printf.h>
 #include <mem/alloc.h>
 #include <mem/numa.h>

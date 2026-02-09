@@ -1,4 +1,4 @@
-#include <charmos.h>
+#include <global.h>
 #include <mem/asan.h>
 #include <mem/page.h>
 #include <mem/pmm.h>

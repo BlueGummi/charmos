@@ -1,4 +1,4 @@
-#include <charmos.h>
+#include <global.h>
 #include <mem/alloc.h>
 #include <mem/domain.h>
 #include <mem/movealloc.h>

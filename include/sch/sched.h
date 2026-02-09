@@ -1,7 +1,7 @@
 /* @title: Scheduler */
 #pragma once
 #include <acpi/lapic.h>
-#include <charmos.h>
+#include <global.h>
 #include <sch/domain.h>
 #include <smp/core.h>
 #include <smp/topology.h>

@@ -1,6 +1,6 @@
 #include <acpi/lapic.h>
 #include <asm.h>
-#include <charmos.h>
+#include <global.h>
 #include <compiler.h>
 #include <console/printf.h>
 #include <irq/idt.h>
