@@ -92,7 +92,7 @@ TEST_REGISTER(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
 #define STRESS_NUM_READERS (global.core_count * 8)
 #define STRESS_NUM_WRITERS (global.core_count)
-#define STRESS_DURATION_MS 2000
+#define STRESS_DURATION_MS 600000
 #define STRESS_PRINT_MS 1000
 
 struct rcu_stress_node {

@@ -191,10 +191,19 @@ enum usb_status xhci_send_control_transfer(struct xhci_device *dev,
         return USB_ERR_NO_DEVICE;
     }
 
-    /* TODO: OOM */
     struct xhci_request *xreq = kzalloc(sizeof(*xreq), ALLOC_PARAMS_DEFAULT);
     struct xhci_command *cmd = kzalloc(sizeof(*cmd), ALLOC_PARAMS_DEFAULT);
     struct xhci_ctrl_emit *emit = kzalloc(sizeof(*emit), ALLOC_PARAMS_DEFAULT);
+
+    if (!xreq || !cmd || !emit) {
+        /* drop USB dev ref, drop slot ref, dealloc, bye bye */
+        usb_device_put(req->dev);
+        xhci_slot_put(slot);
+        kfree(xreq, FREE_PARAMS_DEFAULT);
+        kfree(cmd, FREE_PARAMS_DEFAULT);
+        kfree(emit, FREE_PARAMS_DEFAULT);
+        return USB_ERR_OOM;
+    }
 
     emit->setup = req->setup;
     emit->length = req->setup->length;
