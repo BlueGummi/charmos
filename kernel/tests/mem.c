@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <tests.h>
+#include <thread/thread.h>
 
 TEST_REGISTER(pmm_alloc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();

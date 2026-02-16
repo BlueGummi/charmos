@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <thread/thread.h>
 #include <types/types.h>
 
 enum nightmare_role_type {

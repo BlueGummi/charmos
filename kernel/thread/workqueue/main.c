@@ -1,5 +1,8 @@
-#include "internal.h"
+#include <sch/sched.h>
 #include <string.h>
+#include <thread/thread.h>
+
+#include "internal.h"
 
 static enum wake_reason worker_wait(struct workqueue *wq, struct worker *w,
                                     enum irql irql, enum irql *out) {

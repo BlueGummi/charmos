@@ -387,7 +387,6 @@ void slab_free_old(struct slab *slab, void *obj) {
 
     if (slab->used == 0) {
         slab_move(cache, slab, SLAB_FREE);
-        /* TODO: actually put it on a GC list */
         if (slab_should_enqueue_gc(slab)) {
             slab_list_del(slab);
             slab_unlock(slab, irql);
@@ -524,10 +523,6 @@ void slab_allocator_init() {
 
     /* go through each node on the sort list. if its size does not already
      * exist in the aggregate list, add it in there */
-
-    /* TODO: if we somehow get to the point of having hundreds of thousands
-     * of slab sizes to the point where this becomes slow (why on earth are we
-     * here to begin with?), then find some way to use, idk, a rbt or something */
     struct slab_size_constant *iter, *check, *tmp;
     size_t num_dyn_sizes = 0;
     list_for_each_entry(iter, &sort_list, sort_list) {

@@ -3,6 +3,7 @@
 #include <mem/slab.h> /* to get SLAB_OBJ_ALIGN */
 #include <sch/sched.h>
 #include <sync/turnstile.h>
+#include <thread/thread.h>
 
 #include "mutex_internal.h"
 
@@ -208,8 +209,8 @@ struct thread *turnstile_dequeue_first(struct turnstile *ts, size_t queue) {
     void *obj = ts->lock_obj;
     struct turnstile_hash_chain *chain = turnstile_chain_for(obj);
 
-    struct rbt_node *last = rb_last(&ts->queues[queue]);
-    rb_delete(&ts->queues[queue], last);
+    struct rbt_node *last = rbt_last(&ts->queues[queue]);
+    rbt_delete(&ts->queues[queue], last);
     struct thread *thread = thread_from_wq_rbt_node(last);
 
     struct turnstile *got = ts;
@@ -341,7 +342,8 @@ static void turnstile_block_on(void *lock_obj, struct turnstile *ts,
 
 /* we already have preemption off when we get in here */
 struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
-                                  void *lock_obj, enum irql lock_irql, struct thread *owner) {
+                                  void *lock_obj, enum irql lock_irql,
+                                  struct thread *owner) {
     struct turnstile_hash_chain *chain = turnstile_chain_for(lock_obj);
     struct thread *current_thread = scheduler_get_current_thread();
     struct turnstile *my_turnstile = current_thread->turnstile;

@@ -7,6 +7,7 @@
 #include <mem/page.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
+#include <sch/sched.h>
 #include <sleep.h>
 #include <string.h>
 

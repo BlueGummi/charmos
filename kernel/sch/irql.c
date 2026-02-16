@@ -1,6 +1,7 @@
 #include <sch/periodic_work.h>
 #include <sch/sched.h>
 #include <smp/core.h>
+#include <thread/apc.h>
 #include <thread/dpc.h>
 
 enum irql irql_get(void) {
@@ -66,7 +67,7 @@ void irql_lower(enum irql new_level) {
             preempt_re_enabled = (scheduler_preemption_enable() == 0);
 
         if (in_thread && old > IRQL_APC_LEVEL && new_level <= IRQL_APC_LEVEL)
-            thread_check_and_deliver_apcs(curr);
+            apc_check_and_deliver(curr);
 
         if (in_thread && preempt_re_enabled)
             scheduler_resched_if_needed();

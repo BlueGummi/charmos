@@ -11,6 +11,7 @@
 #include <string.h>
 #include <sync/rcu.h>
 #include <sync/turnstile.h>
+#include <thread/apc.h>
 #include <thread/defer.h>
 #include <thread/reaper.h>
 #include <thread/thread.h>
@@ -158,7 +159,6 @@ static struct thread *thread_init(struct thread *thread,
     thread->refcount = 1;
     thread->timeslice_length_raw_ms = THREAD_DEFAULT_TIMESLICE;
     thread->wait_type = THREAD_WAIT_NONE;
-    thread->recent_event = APC_EVENT_NONE;
     thread->activity_class = THREAD_ACTIVITY_CLASS_UNKNOWN;
     spinlock_init(&thread->lock);
     spinlock_init(&thread->being_moved);
@@ -168,8 +168,8 @@ static struct thread *thread_init(struct thread *thread,
 
     thread_update_effective_priority(thread);
 
-    INIT_LIST_HEAD(&thread->on_event_apcs[0]);
-    INIT_LIST_HEAD(&thread->on_event_apcs[1]);
+    INIT_LIST_HEAD(&thread->event_apcs);
+    INIT_LIST_HEAD(&thread->to_exec_event_apcs);
     INIT_LIST_HEAD(&thread->thread_list);
     INIT_LIST_HEAD(&thread->apc_head[0]);
     INIT_LIST_HEAD(&thread->apc_head[1]);
@@ -277,7 +277,7 @@ void thread_free(struct thread *t) {
     kfree(t->name, FREE_PARAMS_DEFAULT);
 
     kfree(t->turnstile, FREE_PARAMS_DEFAULT);
-    thread_free_event_apcs(t);
+    apc_free_on_thread(t);
     thread_free_stack(t);
     kfree(t, FREE_PARAMS_DEFAULT);
 }

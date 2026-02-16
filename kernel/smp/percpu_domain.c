@@ -1,12 +1,10 @@
-#include <global.h>
 #include <console/panic.h>
+#include <global.h>
 #include <mem/alloc.h>
 #include <smp/core.h>
 #include <smp/domain.h>
 #include <smp/percpu.h>
 #include <smp/perdomain.h>
-
-/* TODO: numa awareness */
 
 void percpu_obj_init(void) {
     for (struct percpu_descriptor *d = __skernel_percpu_desc;

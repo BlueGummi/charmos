@@ -4,6 +4,7 @@
 #include <sleep.h>
 #include <string.h>
 #include <tests.h>
+#include <thread/apc.h>
 #include <thread/daemon.h>
 #include <thread/defer.h>
 #include <thread/reaper.h>

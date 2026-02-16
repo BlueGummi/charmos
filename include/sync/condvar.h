@@ -1,5 +1,4 @@
 #pragma once
-#include <sch/sched.h>
 #include <thread/queue.h>
 #include <sync/spinlock.h>
 
@@ -12,6 +11,14 @@ typedef void (*thread_action_callback)(struct thread *woke);
 struct condvar {
     struct thread_queue waiters;
     bool irq_disable;
+};
+
+/* wait object */
+struct condvar_with_cb {
+    struct condvar *cv;
+    condvar_callback cb;
+    void *cb_arg;
+    size_t cookie;
 };
 
 enum wake_reason condvar_wait(struct condvar *cv, struct spinlock *lock,

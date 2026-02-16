@@ -4,6 +4,7 @@
 #include <drivers/xhci.h>
 #include <sch/sched.h>
 #include <string.h>
+#include <thread/thread.h>
 
 void xhci_nop(struct xhci_device *dev);
 void xhci_request_move(struct xhci_device *dev, struct xhci_request *req,

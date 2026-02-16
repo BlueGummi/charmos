@@ -1,5 +1,7 @@
-#include <thread/defer.h>
+#include <sch/sched.h>
 #include <sync/condvar.h>
+#include <thread/defer.h>
+#include <thread/thread.h>
 
 static enum irql condvar_lock_internal(struct condvar *cv,
                                        struct spinlock *lock) {
@@ -75,16 +77,6 @@ void condvar_broadcast(struct condvar *cv) {
     condvar_broadcast_callback(cv, nop_callback);
 }
 
-/* TODO: Move me into `struct thread` to avoid a scenario where the
- * dynamic allocation of this structure fails (we cannot recover from
- * that allocation failure - it should be statically allocated) */
-struct condvar_with_cb {
-    struct condvar *cv;
-    condvar_callback cb;
-    void *cb_arg;
-    size_t cookie;
-};
-
 static void condvar_timeout_wakeup(void *arg, void *arg2) {
     struct thread *t = arg;
     struct condvar_with_cb *ck = arg2;
@@ -100,7 +92,6 @@ static void condvar_timeout_wakeup(void *arg, void *arg2) {
         list_del_init(&t->wq_list_node);
 
     spin_unlock(&ck->cv->waiters.lock, irql);
-    kfree(ck, FREE_PARAMS_DEFAULT);
     set_wake_reason_and_wake(ck->cv, t, WAKE_REASON_TIMEOUT);
     thread_put(t);
 }
@@ -111,9 +102,7 @@ enum wake_reason condvar_wait_timeout(struct condvar *cv, struct spinlock *lock,
     struct thread *curr = scheduler_get_current_thread();
     curr->wake_reason = WAKE_REASON_NONE;
 
-    /* TODO: No allocate */
-    struct condvar_with_cb *cwcb =
-        kmalloc(sizeof(struct condvar_with_cb), ALLOC_PARAMS_DEFAULT);
+    struct condvar_with_cb *cwcb = &curr->cv_cb_object;
     cwcb->cv = cv;
     cwcb->cookie = curr->wait_cookie + 1; /* +1 from condvar */
 

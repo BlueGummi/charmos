@@ -127,7 +127,6 @@ void thread_print(const struct thread *t) {
     k_printf("    executing_apc: %s,\n", t->executing_apc ? "true" : "false");
     k_printf("    special_apc_disable: %u, kernel_apc_disable: %u,\n",
              t->special_apc_disable, t->kernel_apc_disable);
-    k_printf("    recent_event: %s,\n", apc_event_str(t->recent_event));
 
     /* activity ringbuffers */
     if (t->activity_data) {

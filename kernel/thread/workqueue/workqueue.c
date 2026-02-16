@@ -8,6 +8,7 @@
 #include <sync/condvar.h>
 #include <sync/spinlock.h>
 #include <thread/defer.h>
+#include <thread/thread.h>
 
 #include "internal.h"
 

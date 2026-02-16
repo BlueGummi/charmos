@@ -5,6 +5,7 @@
 #include <mem/numa.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
+#include <sch/sched.h>
 #include <smp/domain.h>
 #include <string.h>
 #include <thread/thread.h>
@@ -383,4 +384,4 @@ static void domain_buddy_movealloc(void *a, void *b) {
 }
 
 MOVEALLOC_REGISTER_CALL(domain_move, domain_buddy_movealloc, /*a=*/NULL,
-                            /*b=*/NULL);
+                        /*b=*/NULL);

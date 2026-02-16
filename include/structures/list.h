@@ -175,3 +175,6 @@ static inline void list_splice_tail_init(struct list_head *list,
 
 #define SLIST_FOREACH(var, head, field)                                        \
     for ((var) = (head)->slh_first; (var); (var) = (var)->field.sle_next)
+
+void list_sort(struct list_head *head,
+               int (*cmp)(struct list_head *, struct list_head *));

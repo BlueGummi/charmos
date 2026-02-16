@@ -1,6 +1,8 @@
+#include <sch/sched.h>
 #include <sync/condvar.h>
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
+#include <thread/thread_types.h>
 
 #define get_count(sem) atomic_load(&sem->count)
 #define set_count(sem, val) atomic_store(&sem->count, val)

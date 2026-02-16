@@ -63,7 +63,7 @@ static inline bool cores_in_same_numa_node(struct core *a, struct core *b) {
 
 static void move_ts_thread_raw(struct scheduler *dest, struct scheduler *source,
                                struct rbt *tree, struct thread *thread) {
-    rb_delete(tree, &thread->rq_tree_node);
+    rbt_delete(tree, &thread->rq_tree_node);
     scheduler_decrement_thread_count(source, thread);
 
     rbt_insert(&dest->thread_rbt, &thread->rq_tree_node);

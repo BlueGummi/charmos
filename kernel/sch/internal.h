@@ -1,5 +1,6 @@
 #include <kassert.h>
 #include <sch/sched.h>
+#include <thread/thread.h>
 
 static inline void scheduler_set_queue_bitmap(struct scheduler *sched,
                                               uint8_t prio) {
@@ -79,9 +80,9 @@ static inline void retire_thread(struct scheduler *sched,
 static inline void dequeue_from_tree(struct scheduler *sched,
                                      struct thread *thread) {
     if (rbt_has_node(&sched->completed_rbt, &thread->rq_tree_node))
-        return rb_delete(&sched->completed_rbt, &thread->rq_tree_node);
+        return rbt_delete(&sched->completed_rbt, &thread->rq_tree_node);
 
-    rb_delete(&sched->thread_rbt, &thread->rq_tree_node);
+    rbt_delete(&sched->thread_rbt, &thread->rq_tree_node);
 }
 
 /* The `thread_rbt` should be NULL here */
@@ -100,7 +101,7 @@ static inline struct thread *find_highest_prio(struct scheduler *sched) {
     if (!node)
         return NULL;
 
-    rb_delete(&sched->thread_rbt, node);
+    rbt_delete(&sched->thread_rbt, node);
 
     return thread_from_rq_rbt_node(node);
 }

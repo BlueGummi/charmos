@@ -125,7 +125,7 @@ void vas_free(struct vas_space *vas, vaddr_t addr) {
         } else if (addr > vr->start) {
             node = node->right;
         } else {
-            rb_delete(&vas->tree, &vr->node);
+            rbt_delete(&vas->tree, &vr->node);
             vasrange_free(vas, vr);
             vas_space_unlock(vas, irql);
             return;

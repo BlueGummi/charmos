@@ -188,7 +188,7 @@ static void fix_deletion(struct rbt *tree, struct rbt_node *x) {
         x->color = TREE_NODE_BLACK;
 }
 
-void rb_delete(struct rbt *tree, struct rbt_node *z) {
+void rbt_delete(struct rbt *tree, struct rbt_node *z) {
     struct rbt_node *y = z;
     struct rbt_node *x = NULL;
     enum rbt_node_color y_original_color = y->color;
@@ -250,7 +250,7 @@ bool rbt_has_node(struct rbt *tree, struct rbt_node *node) {
 void rbt_remove(struct rbt *tree, uint64_t data) {
     struct rbt_node *node = rbt_search(tree, tree->root, data);
     if (node)
-        rb_delete(tree, node);
+        rbt_delete(tree, node);
 }
 
 static void fix_insertion(struct rbt *tree, struct rbt_node *node) {

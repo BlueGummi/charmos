@@ -7,8 +7,9 @@
 #include <smp/topology.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <structures/rbt.h>
 #include <sync/spinlock.h>
-#include <thread/thread.h>
+#include <thread/thread_types.h>
 
 #define WORK_STEAL_THRESHOLD                                                   \
     75ULL /* How little work the core needs to be                              \

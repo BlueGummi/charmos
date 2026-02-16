@@ -174,7 +174,7 @@ void slab_gc_recycle(struct slab_domain *domain, struct slab *slab,
 }
 
 static void slab_gc_destroy(struct slab_gc *gc, struct slab *slab) {
-    rb_delete(&gc->rbt, &slab->rb);
+    rbt_delete(&gc->rbt, &slab->rb);
     slab_destroy(slab);
 }
 
@@ -223,7 +223,7 @@ static size_t slab_gc_derive_threshold_score(struct slab_gc *gc,
                                              enum slab_gc_flags flags) {
     enum slab_gc_flags aggressiveness = flags & SLAB_GC_FLAG_AGG_MASK;
     struct rbt_node *min = rbt_min(&gc->rbt);
-    struct rbt_node *max = rb_last(&gc->rbt);
+    struct rbt_node *max = rbt_last(&gc->rbt);
 
     if (!min || !max)
         return 0; /* We have no slabs or just one in GC */
@@ -315,7 +315,7 @@ void slab_gc_dequeue(struct slab_domain *domain, struct slab *slab) {
     struct slab_gc *gc = &domain->slab_gc;
     enum irql irql = slab_gc_lock(gc);
 
-    rb_delete(&domain->slab_gc.rbt, &slab->rb);
+    rbt_delete(&domain->slab_gc.rbt, &slab->rb);
     atomic_fetch_sub(&gc->num_elements, 1);
 
     slab_gc_unlock(gc, irql);
@@ -335,7 +335,7 @@ static struct slab *gc_do_op(struct slab_domain *domain,
     if (!rb)
         goto out;
 
-    rb_delete(&gc->rbt, rb);
+    rbt_delete(&gc->rbt, rb);
     atomic_fetch_sub(&gc->num_elements, 1);
     ret = slab_from_rbt_node(rb);
 
@@ -345,11 +345,11 @@ out:
 }
 
 struct slab *slab_gc_get_newest(struct slab_domain *domain) {
-    return gc_do_op(domain, rb_last);
+    return gc_do_op(domain, rbt_last);
 }
 
 static struct rbt_node *gc_search_for_first_pageable(const struct rbt *rbt) {
-    struct rbt_node *iter = rb_first(rbt);
+    struct rbt_node *iter = rbt_first(rbt);
     while (iter) {
         struct slab *slab = slab_from_rbt_node(iter);
         if (slab->type == SLAB_TYPE_PAGEABLE)
@@ -361,7 +361,7 @@ static struct rbt_node *gc_search_for_first_pageable(const struct rbt *rbt) {
 }
 
 static struct rbt_node *gc_search_for_first_nonpageable(const struct rbt *rbt) {
-    struct rbt_node *iter = rb_first(rbt);
+    struct rbt_node *iter = rbt_first(rbt);
     while (iter) {
         struct slab *slab = slab_from_rbt_node(iter);
         if (slab->type == SLAB_TYPE_NONPAGEABLE)
@@ -381,7 +381,7 @@ struct slab *slab_gc_get_newest_nonpageable(struct slab_domain *domain) {
 }
 
 struct slab *slab_gc_get_oldest(struct slab_domain *domain) {
-    return gc_do_op(domain, rb_first);
+    return gc_do_op(domain, rbt_first);
 }
 
 size_t slab_gc_num_slabs(struct slab_domain *domain) {

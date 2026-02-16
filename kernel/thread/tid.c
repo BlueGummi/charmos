@@ -80,7 +80,7 @@ uint64_t tid_alloc(struct tid_space *ts) {
     uint64_t id = range->start;
 
     if (range->length == 1) {
-        rb_delete(&ts->tree, node);
+        rbt_delete(&ts->tree, node);
         tid_range_free(ts, range);
     } else {
         range->start++;
@@ -121,7 +121,7 @@ void tid_free(struct tid_space *ts, uint64_t id) {
     if (next && next->start == id + 1) {
         if (merged_prev) {
             prev->length += next->length;
-            rb_delete(&ts->tree, &next->node);
+            rbt_delete(&ts->tree, &next->node);
             kfree(next, FREE_PARAMS_DEFAULT);
         } else {
             next->start = id;

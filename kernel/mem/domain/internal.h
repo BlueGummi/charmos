@@ -1,5 +1,6 @@
 #pragma once
 #include <mem/buddy.h>
+#include <mem/page.h>
 #include <mem/vmm.h>
 #include <stdbool.h>
 #include <stdint.h>

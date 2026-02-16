@@ -2,6 +2,7 @@
 #include <irq/irq.h>
 #include <sch/sched.h>
 #include <sync/spinlock.h>
+#include <thread/thread.h>
 
 static struct spinlock pf_lock = SPINLOCK_INIT;
 enum irq_result page_fault_handler(void *context, uint8_t vector,

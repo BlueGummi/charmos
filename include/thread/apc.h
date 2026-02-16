@@ -1,35 +1,19 @@
 /* @title: APCs */
+#pragma once
 #include <irq/irq.h>
-#include <structures/list.h>
+#include <sch/sched.h>
 #include <smp/core.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#pragma once
+#include <structures/list.h>
+#include <thread/apc_types.h>
 
 /* Forward declarations :trl: */
 struct thread;
 struct apc;
-
-enum apc_type { APC_TYPE_SPECIAL_KERNEL, APC_TYPE_KERNEL, APC_TYPE_COUNT };
-
-enum apc_event {
-    APC_EVENT_THREAD_MIGRATE,
-    APC_EVENT_THREAD_EXIT,
-    APC_EVENT_COUNT,
-    APC_EVENT_NONE, /* Nothing happened */
-};
-
-static inline const char *apc_event_str(enum apc_event evt) {
-    switch (evt) {
-    case APC_EVENT_THREAD_MIGRATE: return "THREAD MIGRATE";
-    case APC_EVENT_THREAD_EXIT: return "THREAD EXIT";
-    case APC_EVENT_COUNT:
-    case APC_EVENT_NONE: return "NONE";
-    }
-    return "?";
-}
+struct apc_event_desc;
 
 typedef void (*apc_func_t)(struct apc *apc, void *arg1, void *arg2);
 
@@ -39,30 +23,51 @@ struct apc {
     void *arg2;
     bool enqueued;
     atomic_bool cancelled;
-    struct thread *owner;
+
     struct list_head list;
+
+    struct thread *owner;
+    struct apc_event_desc *desc; /* NULL if this is not an event APC */
+    size_t execute_times;        /* for event apcs. if >= 1 it should
+                                    be on to_exec_event_apcs */
 };
+
+struct apc_event_desc {
+    const char *name; /* TODO: add fields to this structure */
+};
+
+#define APC_EVENT_SYMBOL_PREFIX_INTERNAL __apc_event_
+
+#define APC_EVENT_EXTERN(n)                                                    \
+    extern struct apc_event_desc APC_EVENT_SYMBOL_PREFIX_INTERNAL##n
+
+#define APC_EVENT_CREATE(n, strname)                                           \
+    struct apc_event_desc APC_EVENT_SYMBOL_PREFIX_INTERNAL##n = {.name =       \
+                                                                     strname}
+#define APC_EVENT(n) &(APC_EVENT_SYMBOL_PREFIX_INTERNAL##n)
+
+static inline const char *apc_event_str(struct apc_event_desc *evt) {
+    return evt->name;
+}
 
 struct apc *apc_create(void);
 void apc_init(struct apc *a, apc_func_t fn, void *arg1, void *arg2);
+void apc_event_signal(struct apc_event_desc *desc);
 void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type);
-void apc_enqueue_event_apc(struct thread *t, struct apc *a, enum apc_event evt);
-void apc_enqueue_on_curr(struct apc *a, enum apc_type type);
+void apc_enqueue_event_apc(struct apc *a, struct apc_event_desc *d);
+
+static inline void apc_enqueue_on_curr(struct apc *a, enum apc_type type) {
+    apc_enqueue(scheduler_get_current_thread(), a, type);
+}
+
 bool apc_cancel(struct apc *a);
 
-void thread_set_recent_apc_event(struct thread *t, enum apc_event event);
-void thread_exec_apcs(struct thread *t);
-void thread_exec_event_apcs(struct thread *t);
-void thread_check_and_deliver_apcs(struct thread *t);
+void apc_check_and_deliver(struct thread *t);
 
-void thread_enable_special_apcs(struct thread *t);
-void thread_disable_special_apcs(struct thread *t);
+void apc_enable_special();
+void apc_disable_special();
 
-void thread_enable_kernel_apcs(struct thread *t);
-void thread_disable_kernel_apcs(struct thread *t);
+void apc_enable_kernel();
+void apc_disable_kernel();
 
-void thread_free_event_apcs(struct thread *t);
-
-static inline bool safe_to_exec_apcs(void) {
-    return irql_get() == IRQL_PASSIVE_LEVEL && irq_in_thread_context();
-}
+void apc_free_on_thread(struct thread *t);

@@ -5,6 +5,7 @@
 #include <mem/vmm.h>
 #include <sch/sched.h>
 #include <string.h>
+#include <thread/thread.h>
 
 #include "internal.h"
 

@@ -1,6 +1,7 @@
 #include <console/panic.h>
 #include <sch/sched.h>
 #include <sync/turnstile.h>
+#include <thread/thread.h>
 
 #include "lock_general_internal.h"
 #include "rwlock_internal.h"
@@ -179,8 +180,8 @@ size_t rwlock_get_readers_to_wake(struct turnstile *ts) {
     struct rbt_node *wnode, *rnode, *iter;
     struct thread *writer = NULL;
 
-    wnode = rb_last(&ts->queues[TURNSTILE_WRITER_QUEUE]);
-    rnode = rb_last(&ts->queues[TURNSTILE_READER_QUEUE]);
+    wnode = rbt_last(&ts->queues[TURNSTILE_WRITER_QUEUE]);
+    rnode = rbt_last(&ts->queues[TURNSTILE_READER_QUEUE]);
 
     /* verify that somebody is on the queues */
     kassert(wnode || rnode);
@@ -265,7 +266,7 @@ void rwlock_unlock(struct rwlock *lock) {
         enum irql irql_out;
         struct turnstile *ts = turnstile_lookup(lock, &irql_out);
 
-        struct rbt_node *wnode = rb_last(&ts->queues[TURNSTILE_WRITER_QUEUE]);
+        struct rbt_node *wnode = rbt_last(&ts->queues[TURNSTILE_WRITER_QUEUE]);
 
         struct thread *writer = wnode ? thread_from_wq_rbt_node(wnode) : NULL;
         size_t to_wake = rwlock_get_readers_to_wake(ts);

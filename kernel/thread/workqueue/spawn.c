@@ -1,3 +1,6 @@
+#include <sch/sched.h>
+#include <thread/thread.h>
+
 #include "internal.h"
 
 _Static_assert(WORKQUEUE_DEFAULT_MAX_IDLE_CHECK / 4 >

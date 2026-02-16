@@ -4,6 +4,7 @@
 
 #pragma once
 #include <asm.h>
+#include <compiler.h>
 #include <mem/alloc.h>
 #include <mem/page.h>
 #include <stdarg.h>
@@ -13,15 +14,15 @@
 #include <structures/list.h>
 #include <structures/pairing_heap.h>
 #include <structures/rbt.h>
+#include <sync/condvar.h>
 #include <sync/spinlock.h>
-#include <thread/apc.h>
+#include <thread/apc_types.h>
+#include <thread/thread_types.h>
 #include <time.h>
 #include <types/refcount.h>
 #include <types/types.h>
 
 #define THREAD_DEFAULT_TIMESLICE 15 /* 15 ms */
-
-#define THREAD_STACK_SIZE (PAGE_SIZE * 4)
 
 #define THREAD_CLASS_WIDTH 1024
 #define THREAD_CLASS_HALF (THREAD_CLASS_WIDTH / 2)
@@ -61,58 +62,6 @@ struct cpu_context {
     uint64_t rip;
 };
 
-enum thread_state : uint8_t {
-    THREAD_STATE_IDLE_THREAD, /* Specifically the idle thread */
-    THREAD_STATE_READY,   /* Thread is ready to run but not currently running */
-    THREAD_STATE_RUNNING, /* Thread is currently executing */
-    THREAD_STATE_BLOCKED, /* Waiting on I/O, lock, or condition */
-    THREAD_STATE_SLEEPING, /* Temporarily not runnable */
-    THREAD_STATE_ZOMBIE, /* Finished executing but hasn't been reaped it yet */
-    THREAD_STATE_TERMINATED, /* Fully done, can be cleaned up */
-    THREAD_STATE_HALTED,     /* Thread manually suspended */
-};
-
-enum thread_wait_type : uint8_t {
-    THREAD_WAIT_NONE,
-    THREAD_WAIT_UNINTERRUPTIBLE, /* Cannot be interrupted by anything
-                                    besides the wake source */
-
-    THREAD_WAIT_INTERRUPTIBLE, /* Can be interrupted */
-};
-
-enum thread_flags : uint8_t {
-    THREAD_FLAGS_NO_STEAL = 1, /* Do not migrate between cores */
-};
-
-enum thread_prio_class : uint8_t {
-    THREAD_PRIO_CLASS_URGENT = 0,     /* Urgent thread - ran before RT */
-    THREAD_PRIO_CLASS_RT = 1,         /* Realtime thread */
-    THREAD_PRIO_CLASS_TIMESHARE = 2,  /* Timesharing thread */
-    THREAD_PRIO_CLASS_BACKGROUND = 3, /* Background thread */
-};
-
-#define THREAD_PRIO_CLASS_COUNT (4)
-
-/* Different enums are used for the little
- * bit of type safety since different ringbuffers
- * are used to keep track of different reasons */
-enum thread_wake_reason : uint8_t {
-    THREAD_WAKE_REASON_BLOCKING_IO = 1,
-    THREAD_WAKE_REASON_BLOCKING_MANUAL = 2,
-    THREAD_WAKE_REASON_SLEEP_TIMEOUT = 3,
-    THREAD_WAKE_REASON_SLEEP_MANUAL = 4,
-};
-
-enum thread_block_reason : uint8_t {
-    THREAD_BLOCK_REASON_IO = 5,
-    THREAD_BLOCK_REASON_MANUAL = 6,
-};
-
-enum thread_sleep_reason : uint8_t {
-    THREAD_SLEEP_REASON_MANUAL = 7,
-
-};
-
 #define THREAD_EVENT_REASON_NONE 0xFF
 
 struct thread_event_association {
@@ -126,13 +75,6 @@ struct thread_event_reason {
     struct thread_event_association associated_reason;
     time_t timestamp;
     uint64_t cycle;
-};
-
-/* Used in condvars, totally separate from thread_wake_reason */
-enum wake_reason {
-    WAKE_REASON_NONE = 0,    /* No reason specified */
-    WAKE_REASON_SIGNAL = 1,  /* Signal from something */
-    WAKE_REASON_TIMEOUT = 2, /* Timeout */
 };
 
 #define THREAD_PRIO_IS_TIMESHARING(prio) (prio == THREAD_PRIO_CLASS_TIMESHARE)
@@ -350,7 +292,6 @@ struct thread {
 
     /* ========== APC data ========== */
     bool executing_apc; /* Executing an APC right now? */
-    bool checking_apcs; /* Just here to prevent funny recursion */
 
     /* Standard APC queues */
     struct list_head apc_head[APC_TYPE_COUNT];
@@ -362,20 +303,8 @@ struct thread {
     uint32_t special_apc_disable;
     uint32_t kernel_apc_disable;
 
-    /* The most recent APC event, set to APC_EVENT_NONE if no event
-     * on a thread has happened */
-    enum apc_event recent_event;
-
-    /* These APCs execute when `recent_event` matches the APC_EVENT_type
-     * of an `on_event_apc`. For example, if a thread is migrated across
-     * cores, there might be an APC to record the migration, or change
-     * other internal structures to account for this event.
-     *
-     * It is suboptimal to hardcode such functions, and thus, a dynamic
-     * `on_event_apcs` is chosen to perform these tasks.
-     *
-     * All `on_event_apc`s must be allocated with `kmalloc` */
-    struct list_head on_event_apcs[APC_EVENT_COUNT];
+    struct list_head event_apcs;         /* yet to execute */
+    struct list_head to_exec_event_apcs; /* to be executed */
 
     struct turnstile *born_with;  /* born with - used for debug */
     struct turnstile *turnstile;  /* my turnstile */
@@ -395,6 +324,7 @@ struct thread {
     size_t total_apcs_ran;    /* Total APCs executed on a given thread */
 
     /* TODO: More */
+    struct condvar_with_cb cv_cb_object; /* wait object */
 
     /* Misc. private field for whatever needs it */
     void *private;

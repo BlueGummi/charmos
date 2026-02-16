@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <sync/spinlock.h>
+#include <thread/apc.h>
 
 #include "internal.h"
 #include "sched_profiling.h"
@@ -77,7 +78,7 @@ static struct thread *steal_from_thread_rbt(struct scheduler *victim,
             continue;
         }
 
-        rb_delete(tree, node);
+        rbt_delete(tree, node);
 
         scheduler_decrement_thread_count(victim, target);
         return target;
@@ -185,6 +186,7 @@ static inline void stop_steal(struct scheduler *sched,
     atomic_fetch_sub(&scheduler_data.active_stealers, 1);
 }
 
+APC_EVENT_CREATE(apc_event_thread_migrate, "THREAD_MIGRATE");
 struct thread *scheduler_try_do_steal(struct scheduler *sched) {
     if (!scheduler_can_steal_work(sched))
         return NULL;
@@ -205,7 +207,7 @@ struct thread *scheduler_try_do_steal(struct scheduler *sched) {
 
     if (stolen) {
         sched_profiling_record_steal();
-        thread_set_recent_apc_event(stolen, APC_EVENT_THREAD_MIGRATE);
+        apc_event_signal(APC_EVENT(apc_event_thread_migrate));
         spin_unlock_raw(&stolen->being_moved);
     } else {
         scheduler_try_push_to_idle_core(sched);

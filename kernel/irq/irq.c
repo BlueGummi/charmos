@@ -1,8 +1,8 @@
 #include <acpi/lapic.h>
 #include <asm.h>
-#include <global.h>
 #include <compiler.h>
 #include <console/printf.h>
+#include <global.h>
 #include <irq/idt.h>
 #include <mem/alloc.h>
 #include <mem/page_fault.h>
@@ -16,6 +16,7 @@
 #include <stdint.h>
 #include <sync/rcu.h>
 #include <thread/apc.h>
+#include <thread/thread.h>
 
 /* Lock is only used for allocation/free and registering */
 static struct spinlock irq_table_lock = SPINLOCK_INIT;
