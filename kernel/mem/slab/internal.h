@@ -42,7 +42,6 @@
 #define SLAB_BITMAP_UNSET(bm, mask) (bm &= (uint8_t) ~mask)
 
 #define SLAB_ALIGN_UP(x, a) ALIGN_UP(x, a)
-#define SLAB_OBJ_ALIGN_UP(x) SLAB_ALIGN_UP(x, SLAB_OBJ_ALIGN)
 
 static const size_t slab_class_sizes_const[] = {
     SLAB_MIN_SIZE, 16, 32, 64, 96, 128, 192, 256, 512, SLAB_MAX_SIZE};
@@ -218,6 +217,8 @@ struct slab_cache {
     struct slab_caches *parent;
     uint64_t obj_size;
     uint64_t objs_per_slab;
+    uint64_t obj_align;
+    uint64_t obj_stride;
     size_t pages_per_slab;
     size_t order;
 
@@ -435,7 +436,8 @@ void slab_free_page_hdr(struct slab_page_hdr *hdr);
 size_t slab_allocation_size(vaddr_t addr);
 void slab_free(struct slab_domain *domain, void *obj);
 void *slab_cache_try_alloc_from_lists(struct slab_cache *c);
-void slab_cache_init(size_t order, struct slab_cache *cache, uint64_t obj_size);
+void slab_cache_init(size_t order, struct slab_cache *cache, uint64_t obj_size,
+                     uint64_t obj_align);
 void slab_cache_insert(struct slab_cache *cache, struct slab *slab);
 struct slab *slab_create(struct slab_cache *cache, enum alloc_behavior behavior,
                          bool allow_create_new);
@@ -589,7 +591,7 @@ static inline void slab_byte_idx_and_mask_from_idx(uint64_t index,
 static inline void slab_index_and_mask_from_ptr(struct slab *slab, void *obj,
                                                 uint64_t *byte_idx_out,
                                                 uint8_t *bitmask_out) {
-    uint64_t index = ((vaddr_t) obj - slab->mem) / slab->parent_cache->obj_size;
+    uint64_t index = ((vaddr_t) obj - slab->mem) / slab->parent_cache->obj_stride;
     slab_byte_idx_and_mask_from_idx(index, byte_idx_out, bitmask_out);
 }
 

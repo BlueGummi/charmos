@@ -213,10 +213,12 @@ static void slab_free_virt_and_phys(vaddr_t virt, paddr_t phys) {
     vas_free(slab_vas, virt);
 }
 
-void slab_cache_init(size_t order, struct slab_cache *cache,
-                     uint64_t obj_size) {
+void slab_cache_init(size_t order, struct slab_cache *cache, uint64_t obj_size,
+                     uint64_t align) {
     cache->order = order;
     cache->obj_size = obj_size;
+    cache->obj_align = align;
+    cache->obj_stride = ALIGN_UP(obj_size, align);
     cache->pages_per_slab = 1;
     uint64_t available = PAGE_NON_SLAB_SPACE;
 
@@ -229,8 +231,8 @@ void slab_cache_init(size_t order, struct slab_cache *cache,
     for (n = PAGE_NON_SLAB_SPACE / obj_size; n > 0; n--) {
         uint64_t bitmap_bytes = SLAB_BITMAP_BYTES_FOR(n);
         uintptr_t data_start = sizeof(struct slab) + bitmap_bytes;
-        data_start = SLAB_OBJ_ALIGN_UP(data_start);
-        uintptr_t data_end = data_start + n * obj_size;
+        data_start = SLAB_ALIGN_UP(data_start, align);
+        uintptr_t data_end = data_start + n * cache->obj_stride;
 
         if (data_end <= PAGE_SIZE)
             break;
@@ -254,7 +256,7 @@ struct slab *slab_init(struct slab *slab, struct slab_cache *parent) {
     slab->bitmap = (uint8_t *) ((uint8_t *) page + sizeof(struct slab));
     size_t bitmap_bytes = SLAB_BITMAP_BYTES_FOR(parent->objs_per_slab);
     vaddr_t data_start = (vaddr_t) page + sizeof(struct slab) + bitmap_bytes;
-    data_start = SLAB_OBJ_ALIGN_UP(data_start);
+    data_start = SLAB_ALIGN_UP(data_start, parent->obj_align);
     slab->mem = data_start;
 
     spinlock_init(&slab->lock);
@@ -343,7 +345,7 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
             } /* No need to move it if the used count is in between
                * 0 and the max -- it will be in the partial list */
 
-            vaddr_t ret = slab->mem + i * cache->obj_size;
+            vaddr_t ret = slab->mem + i * cache->obj_stride;
             kassert(ret > (vaddr_t) slab && ret < (vaddr_t) slab + PAGE_SIZE);
             slab_check_assert(slab);
             slab_unlock(slab, irql);
@@ -557,6 +559,7 @@ void slab_allocator_init() {
     for (size_t i = 0; i < SLAB_CLASS_CONST_COUNT; i++) {
         slab_class_sizes[i].name = "default slab size";
         slab_class_sizes[i].size = slab_class_sizes_const[i];
+        slab_class_sizes[i].align = SLAB_OBJ_ALIGN_DEFAULT;
     }
 
     /* add dynamic ones */
@@ -568,6 +571,7 @@ void slab_allocator_init() {
             container_of(pop, struct slab_size_constant, list);
         slab_class_sizes[scs_idx].name = ssc->name;
         slab_class_sizes[scs_idx].size = ssc->size;
+        slab_class_sizes[scs_idx].align = ssc->align;
     }
 
     qsort(slab_class_sizes, slab_num_sizes, sizeof(struct slab_size_constant),
@@ -576,13 +580,14 @@ void slab_allocator_init() {
     slab_caches.caches = slab_caches_alloc();
 
     for (uint64_t i = 0; i < slab_num_sizes; i++) {
-        slab_cache_init(i, &slab_caches.caches[i], slab_class_sizes[i].size);
+        slab_cache_init(i, &slab_caches.caches[i], slab_class_sizes[i].size,
+                        slab_class_sizes[i].align);
         slab_caches.caches[i].parent = &slab_caches;
-        k_info("SLAB", K_INFO,
-               "Initialized slab cache of size %u with name %s with %u objects "
-               "per slab",
-               slab_class_sizes[i].size, slab_class_sizes[i].name,
-               slab_caches.caches[i].objs_per_slab);
+        k_info(
+            "SLAB", K_INFO,
+            "Init slab cache of size %u align %u \"%s\", %u objects per slab",
+            slab_class_sizes[i].size, slab_class_sizes[i].align,
+            slab_class_sizes[i].name, slab_caches.caches[i].objs_per_slab);
     }
 }
 

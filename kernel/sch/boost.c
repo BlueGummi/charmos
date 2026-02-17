@@ -12,8 +12,7 @@ static bool scheduler_boost_thread_internal(struct thread *boosted,
         boosted->has_pi_boost = true;
     }
 
-    /* higher number - lower priority */
-    if (boosted->perceived_prio_class > new_class) {
+    if (boosted->perceived_prio_class < new_class) {
         did_boost = true;
         boosted->perceived_prio_class = new_class;
     }

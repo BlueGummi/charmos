@@ -8,7 +8,7 @@
 static void scheduler_percpu_work_ctor(struct scheduler_periodic_work_percpu *,
                                        cpu_id_t);
 
-SLAB_SIZE_REGISTER_FOR_STRUCT(scheduler_periodic_work);
+SLAB_SIZE_REGISTER_FOR_STRUCT(scheduler_periodic_work, SLAB_OBJ_ALIGN_DEFAULT);
 PERCPU_DECLARE(periodic_percpu, struct scheduler_periodic_work_percpu,
                scheduler_percpu_work_ctor);
 

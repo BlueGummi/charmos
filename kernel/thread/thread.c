@@ -19,7 +19,7 @@
 
 #include "sch/internal.h"
 
-SLAB_SIZE_REGISTER_FOR_STRUCT(thread);
+SLAB_SIZE_REGISTER_FOR_STRUCT(thread, /*alignment*/ 32);
 
 #define THREAD_STACKS_HEAP_START 0xFFFFF10000000000ULL
 #define THREAD_STACKS_HEAP_END 0xFFFFF20000000000ULL
@@ -36,6 +36,7 @@ void thread_init_thread_ids(void) {
     locked_list_init(&thread_list);
 }
 
+APC_EVENT_CREATE(thread_exit_apc_event, "THREAD_EXIT");
 void thread_exit() {
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
 

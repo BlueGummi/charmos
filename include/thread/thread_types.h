@@ -33,10 +33,10 @@ enum thread_flags : uint8_t {
 };
 
 enum thread_prio_class : uint8_t {
-    THREAD_PRIO_CLASS_URGENT = 0,     /* Urgent thread - ran before RT */
-    THREAD_PRIO_CLASS_RT = 1,         /* Realtime thread */
-    THREAD_PRIO_CLASS_TIMESHARE = 2,  /* Timesharing thread */
-    THREAD_PRIO_CLASS_BACKGROUND = 3, /* Background thread */
+    THREAD_PRIO_CLASS_BACKGROUND = 0, /* Background thread */
+    THREAD_PRIO_CLASS_TIMESHARE = 1,  /* Timesharing thread */
+    THREAD_PRIO_CLASS_RT = 2,         /* Realtime thread */
+    THREAD_PRIO_CLASS_URGENT = 3,     /* Urgent thread - ran before RT */
 };
 #define THREAD_PRIO_CLASS_COUNT (4)
 

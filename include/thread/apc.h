@@ -11,11 +11,6 @@
 #include <thread/apc_types.h>
 
 /* Forward declarations :trl: */
-struct thread;
-struct apc;
-struct apc_event_desc;
-
-typedef void (*apc_func_t)(struct apc *apc, void *arg1, void *arg2);
 
 struct apc {
     apc_func_t func;

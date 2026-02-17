@@ -7,7 +7,7 @@
 
 #include "mutex_internal.h"
 
-SLAB_SIZE_REGISTER_FOR_STRUCT(turnstile);
+SLAB_SIZE_REGISTER_FOR_STRUCT(turnstile, SLAB_OBJ_ALIGN_DEFAULT);
 
 /* Implements turnstiles used on synchronization objects
  *
@@ -298,7 +298,7 @@ void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
 
         /* if owner already has equal-or-higher effective inputs, stop */
         if (owner->weight >= boost_weight &&
-            owner->perceived_prio_class <= boost_class)
+            owner->perceived_prio_class >= boost_class)
             goto done;
 
         /* apply boost to owner */

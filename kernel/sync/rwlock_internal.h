@@ -14,8 +14,8 @@ struct thread; /* forward def */
     atomic_store_explicit(&rw->lock_word, w, memory_order_release)
 
 #define RWLOCK_GET_OWNER(rw)                                                   \
-    (RWLOCK_READ_LOCK_WORD(rw) & ~7ULL) /* mask out metadata */
-#define RWLOCK_GET_OWNER_FROM_WORD(word) ((word) & ~7ULL)
+    (RWLOCK_READ_LOCK_WORD(rw) & RWLOCK_OWNER_MASK) /* mask out metadata */
+#define RWLOCK_GET_OWNER_FROM_WORD(word) ((word) & RWLOCK_OWNER_MASK)
 #define RWLOCK_BUSY(lock_word, mask) (((lock_word) & (mask)))
 
 static inline uintptr_t rwlock_make_write_word(struct thread *thread) {

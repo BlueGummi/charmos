@@ -213,8 +213,9 @@ static uintptr_t rwlock_unlock_get_val_to_sub(struct rwlock *lock) {
     struct thread *current_thread = scheduler_get_current_thread();
     uintptr_t lock_word = RWLOCK_READ_LOCK_WORD(lock);
     if (lock_word & RWLOCK_WRITER_HELD_BIT) {
-        if (RWLOCK_GET_OWNER_FROM_WORD(lock_word) != (uintptr_t) current_thread)
+        if (RWLOCK_GET_OWNER_FROM_WORD(lock_word) != (uintptr_t) current_thread) {
             rwlock_panic("non-owner thread unlocked as exclusive waiter", lock);
+        }
 
         return ((uintptr_t) current_thread) | RWLOCK_WRITER_HELD_BIT;
     } else {

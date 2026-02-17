@@ -208,7 +208,8 @@ priority inheritance, and even reader-writer locks (which would have 2 queues, o
 
 #### Turnstiles
 
-A turnstile is effectively a tra
+A turnstile is effectively a structure that tracks metadata regarding a lock, including waiter threads,
+priority information, and other data.
 
 
 
