@@ -1,6 +1,15 @@
 #include <crypto/prng.h>
 #include <sync/mutex.h>
 
+enum mutex_bits : uintptr_t {
+    MUTEX_HELD_BIT = 1,
+};
+
+#define MUTEX_META_BITS (MUTEX_HELD_BIT)
+
+#define MUTEX_READ_LOCK_WORD(__mtx)                                            \
+    (atomic_load_explicit(&((struct mutex *) (__mtx))->lock_word,              \
+                          memory_order_acquire))
 #define MUTEX_BACKOFF_DEFAULT 4
 #define MUTEX_BACKOFF_MAX 32768
 #define MUTEX_BACKOFF_SHIFT 1

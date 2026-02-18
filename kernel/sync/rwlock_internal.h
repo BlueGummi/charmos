@@ -3,10 +3,23 @@
 
 struct thread; /* forward def */
 
+enum rwlock_bits : uintptr_t {
+    RWLOCK_WRITER_HELD_BIT = 1ULL << 0,
+    RWLOCK_WAITER_BIT = 1ULL << 3ULL,
+    RWLOCK_WRITER_WANT_BIT = 1ULL << 4ULL,
+};
+
 #define RWLOCK_BACKOFF_DEFAULT 8
 #define RWLOCK_BACKOFF_MAX 16384
 #define RWLOCK_BACKOFF_SHIFT 1
 #define RWLOCK_BACKOFF_JITTER_PCT 10 /* 10% variation of base backoff */
+
+#define RWLOCK_PRIO_CEIL_MASK (0x6)
+#define RWLOCK_GET_PRIO_CEIL(lword)                                            \
+    (((lword) & RWLOCK_PRIO_CEIL_MASK) >> RWLOCK_PRIO_CEIL_SHIFT)
+#define RWLOCK_READER_COUNT_MASK (~0ULL << 5)
+#define RWLOCK_OWNER_MASK (~0x1FULL)
+#define RWLOCK_READER_COUNT_ONE (1 << 5)
 
 #define RWLOCK_READ_LOCK_WORD(rw)                                              \
     (atomic_load_explicit(&rw->lock_word, memory_order_acquire))
@@ -18,8 +31,10 @@ struct thread; /* forward def */
 #define RWLOCK_GET_OWNER_FROM_WORD(word) ((word) & RWLOCK_OWNER_MASK)
 #define RWLOCK_BUSY(lock_word, mask) (((lock_word) & (mask)))
 
-static inline uintptr_t rwlock_make_write_word(struct thread *thread) {
-    return (uintptr_t) RWLOCK_WRITER_HELD_BIT | (uintptr_t) thread;
+static inline uintptr_t rwlock_make_write_word(struct rwlock *lock,
+                                               struct thread *thread) {
+    return (uintptr_t) (RWLOCK_READ_LOCK_WORD(lock) & RWLOCK_PRIO_CEIL_MASK) |
+           (uintptr_t) RWLOCK_WRITER_HELD_BIT | (uintptr_t) thread;
 }
 
 static inline bool rwlock_try_lock_read(struct rwlock *lock) {
@@ -39,7 +54,7 @@ static inline bool rwlock_try_lock_read(struct rwlock *lock) {
 
 static inline bool rwlock_try_lock_write(struct rwlock *lock,
                                          struct thread *thread) {
-    uintptr_t desired = rwlock_make_write_word(thread);
+    uintptr_t desired = rwlock_make_write_word(lock, thread);
     uintptr_t old =
         atomic_load_explicit(&lock->lock_word, memory_order_acquire);
 

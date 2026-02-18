@@ -13,7 +13,7 @@
     SET_SKIP();                                                                \
     return;
 
-static struct rwlock rw_basic = {0};
+static struct rwlock rw_basic = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 
 TEST_REGISTER(rwlock_basic_read, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     rwlock_lock(&rw_basic, RWLOCK_ACQUIRE_READ);
@@ -23,7 +23,7 @@ TEST_REGISTER(rwlock_basic_read, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
 }
 
-static struct rwlock rw_basic_w = {0};
+static struct rwlock rw_basic_w = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 
 TEST_REGISTER(rwlock_basic_write, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
@@ -34,7 +34,7 @@ TEST_REGISTER(rwlock_basic_write, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
 }
 
-static struct rwlock rw_two_writers = {0};
+static struct rwlock rw_two_writers = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 static atomic_bool rw_two_done = false;
 
 static void rw_two_writer_thread(void *) {
@@ -64,7 +64,7 @@ TEST_REGISTER(rwlock_two_writer_basic, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 #define RWLOCK_READER_COUNT_LOOPS 500
 #define RWLOCK_READER_PRINT_INTERVAL 10000
 
-static struct rwlock rw_readers = {0};
+static struct rwlock rw_readers = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 static _Atomic uint32_t rw_readers_left = RWLOCK_READER_COUNT_TEST_N;
 
 static void rw_reader_worker(void *) {
@@ -99,7 +99,7 @@ TEST_REGISTER(rwlock_many_readers, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 #define RWLOCK_MIXED_THREADS 24
 #define RWLOCK_MIXED_LOOPS 500
 volatile struct thread *mixed_threads[RWLOCK_MIXED_THREADS];
-static struct rwlock rw_mixed = {0};
+static struct rwlock rw_mixed = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 static _Atomic uint32_t rw_mixed_left = RWLOCK_MIXED_THREADS;
 
 static void rw_mixed_worker(void *) {
@@ -138,7 +138,7 @@ TEST_REGISTER(rwlock_mixed_stress, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 #define RWLOCK_CHAOS_THREADS 24
 #define RWLOCK_CHAOS_LOOPS 500
 
-static struct rwlock rw_chaos = {0};
+static struct rwlock rw_chaos = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 static _Atomic uint32_t rw_chaos_left = RWLOCK_CHAOS_THREADS;
 
 static void rw_chaos_worker(void *) {
@@ -174,7 +174,7 @@ TEST_REGISTER(rwlock_chaos, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     SET_SUCCESS();
 }
 
-static struct rwlock rw_correct = {0};
+static struct rwlock rw_correct = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 static _Atomic uint32_t active_readers = 0;
 
 static _Atomic uint32_t active_writers = 0;

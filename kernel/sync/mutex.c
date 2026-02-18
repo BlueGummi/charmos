@@ -84,6 +84,14 @@ void mutex_simple_init(struct mutex_simple *m) {
     thread_queue_init(&m->waiters);
 }
 
+void mutex_init(struct mutex *mtx) {
+    mtx->lock_word = 0;
+}
+
+struct thread *mutex_get_owner(struct mutex *mtx) {
+    return (struct thread *) (MUTEX_READ_LOCK_WORD(mtx) & (~MUTEX_META_BITS));
+}
+
 size_t mutex_lock_get_backoff(size_t current_backoff) {
     if (!current_backoff)
         return MUTEX_BACKOFF_DEFAULT;

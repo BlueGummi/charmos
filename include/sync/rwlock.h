@@ -2,6 +2,7 @@
 #include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <thread/thread_types.h>
 
 /* rwlock: pointer sized shared reader writer lock
  *
@@ -28,16 +29,6 @@ struct rwlock {
     _Atomic(uintptr_t) lock_word;
 };
 
-enum rwlock_bits : uintptr_t {
-    RWLOCK_WRITER_HELD_BIT = 1ULL << 0,
-    RWLOCK_WAITER_BIT = 1ULL << 3ULL,
-    RWLOCK_WRITER_WANT_BIT = 1ULL << 4ULL,
-};
-
-#define RWLOCK_READER_COUNT_MASK (~0ULL << 5)
-#define RWLOCK_OWNER_MASK (~0x1FULL)
-#define RWLOCK_READER_COUNT_ONE (1 << 5)
-
 enum rwlock_acquire_type {
     RWLOCK_ACQUIRE_READ = 0,
     RWLOCK_ACQUIRE_WRITE = 1,
@@ -45,3 +36,7 @@ enum rwlock_acquire_type {
 
 void rwlock_lock(struct rwlock *lock, enum rwlock_acquire_type type);
 void rwlock_unlock(struct rwlock *lock);
+void rwlock_init(struct rwlock *lock, enum thread_prio_class ceiling);
+
+#define RWLOCK_PRIO_CEIL_SHIFT (1)
+#define RWLOCK_INIT(ceil) {((ceil) << RWLOCK_PRIO_CEIL_SHIFT)}

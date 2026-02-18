@@ -171,33 +171,6 @@ out:
     return ts;
 }
 
-static struct turnstile *turnstile_lookup_no_lock_for_hash_chain_internal(
-    struct turnstile_hash_chain *except, void *obj, enum irql *irql_out,
-    struct turnstile_hash_chain **thc_out) {
-    struct turnstile_hash_chain *chain = turnstile_chain_for(obj);
-
-    enum irql irql;
-
-    if (chain != except)
-        irql = turnstile_hash_chain_lock(chain);
-
-    struct list_head *pos;
-    struct turnstile *ts = NULL;
-
-    list_for_each(pos, &chain->list) {
-        if ((ts = turnstile_from_hash_list_node(pos))->lock_obj == obj)
-            goto out;
-    }
-
-out:
-    if (chain != except)
-        *irql_out = irql;
-
-    *thc_out = chain;
-
-    return ts;
-}
-
 void turnstile_pi_remove(struct turnstile *ts) {
     if (ts->applied_pi_boost)
         scheduler_uninherit_priority();
@@ -262,6 +235,33 @@ void turnstile_unlock(void *obj, enum irql irql) {
     turnstile_hash_chain_unlock(chain, irql);
 }
 
+static struct turnstile *turnstile_lookup_no_lock_for_hash_chain_internal(
+    struct turnstile_hash_chain *except, void *obj, enum irql *irql_out,
+    struct turnstile_hash_chain **thc_out) {
+    struct turnstile_hash_chain *chain = turnstile_chain_for(obj);
+
+    enum irql irql;
+
+    if (chain != except)
+        irql = turnstile_hash_chain_lock(chain);
+
+    struct list_head *pos;
+    struct turnstile *ts = NULL;
+
+    list_for_each(pos, &chain->list) {
+        if ((ts = turnstile_from_hash_list_node(pos))->lock_obj == obj)
+            goto out;
+    }
+
+out:
+    if (chain != except)
+        *irql_out = irql;
+
+    *thc_out = chain;
+
+    return ts;
+}
+
 void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
                                struct turnstile *ts, size_t waiter_weight,
                                enum thread_prio_class waiter_class) {
@@ -269,7 +269,7 @@ void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
 
     /* iterate and propagate upward */
-    struct turnstile *cur_lock = ts;
+    struct turnstile *cur_ts = ts;
     size_t boost_weight = waiter_weight;
     enum thread_prio_class boost_class = waiter_class;
 
@@ -284,16 +284,16 @@ void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
          * the lock is already held by the caller of this function. */
         struct turnstile *new_ts =
             turnstile_lookup_no_lock_for_hash_chain_internal(
-                locked_chain, cur_lock->lock_obj, &lock_irql, &this_chain);
+                locked_chain, cur_ts->lock_obj, &lock_irql, &this_chain);
 
         /* A turnstile must exist if we have blocked on something */
         kassert(new_ts);
 
-        struct thread *owner = cur_lock->owner;
+        struct thread *owner = cur_ts->owner;
         if (!owner)
             goto done;
 
-        if (original == owner && ts != cur_lock)
+        if (original == owner && ts != cur_ts)
             k_panic("Turnstile waiter cycle deadlock\n");
 
         /* if owner already has equal-or-higher effective inputs, stop */
@@ -303,23 +303,23 @@ void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
 
         /* apply boost to owner */
         scheduler_inherit_priority(owner, boost_weight, boost_class);
-        ts->applied_pi_boost = true; /* we gave you a boost */
+        cur_ts->applied_pi_boost = true; /* we gave you a boost */
 
         /* if owner is blocked on another lock, continue propagation */
-        if ((cur_lock = owner->blocked_on)) {
+        if ((cur_ts = owner->blocked_on)) {
             /* update boost values as the owner's effective priority */
             boost_weight = owner->weight;
             boost_class = owner->perceived_prio_class;
 
             if (locked_chain != this_chain)
-                turnstile_unlock(ts->lock_obj, lock_irql);
+                turnstile_unlock(cur_ts->lock_obj, lock_irql);
 
             continue;
         }
 
     done:
         if (locked_chain != this_chain)
-            turnstile_unlock(ts->lock_obj, lock_irql);
+            turnstile_unlock(cur_ts->lock_obj, lock_irql);
 
         break;
     }

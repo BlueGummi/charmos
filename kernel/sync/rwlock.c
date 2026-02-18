@@ -25,8 +25,8 @@ static void rwlock_panic(char *msg, struct rwlock *offending_lock) {
 }
 
 /* make sure no funny business happened after acquiring a lock */
-static inline bool rwlock_locked(struct rwlock *lock,
-                                 enum rwlock_acquire_type type) {
+static inline bool rwlock_locked_with_type(struct rwlock *lock,
+                                           enum rwlock_acquire_type type) {
     uintptr_t word = RWLOCK_READ_LOCK_WORD(lock);
 
     if (type == RWLOCK_ACQUIRE_WRITE)
@@ -75,11 +75,17 @@ size_t rwlock_get_backoff(size_t current_backoff) {
     return new_backoff > RWLOCK_BACKOFF_MAX ? RWLOCK_BACKOFF_MAX : new_backoff;
 }
 
-void rwlock_init(struct rwlock *lock) {
+void rwlock_init(struct rwlock *lock, enum thread_prio_class class) {
     lock->lock_word = 0;
+    lock->lock_word |=
+        ((class & RWLOCK_PRIO_CEIL_MASK) << RWLOCK_PRIO_CEIL_SHIFT);
 }
 
 void rwlock_lock(struct rwlock *lock, enum rwlock_acquire_type acq_type) {
+    uintptr_t lword = RWLOCK_READ_LOCK_WORD(lock);
+    kassert(RWLOCK_GET_PRIO_CEIL(lword) &&
+            "rwlock prio ceiling cannot be 0 (background)");
+
     kassert(acq_type == RWLOCK_ACQUIRE_READ ||
             acq_type == RWLOCK_ACQUIRE_WRITE);
     struct thread *curr = scheduler_get_current_thread();
@@ -131,7 +137,7 @@ void rwlock_lock(struct rwlock *lock, enum rwlock_acquire_type acq_type) {
 
         /* try to set our wait bits, stop if lock becomes available */
         while (true) {
-            old = atomic_load_explicit(&lock->lock_word, memory_order_acquire);
+            old = RWLOCK_READ_LOCK_WORD(lock);
 
             if (!RWLOCK_BUSY(old, busy_mask))
                 break;
@@ -156,8 +162,9 @@ void rwlock_lock(struct rwlock *lock, enum rwlock_acquire_type acq_type) {
 
         /* make sure we've set the lock bits */
         kassert(RWLOCK_READ_LOCK_WORD(lock) & wait_bits);
+        kassert(RWLOCK_GET_PRIO_CEIL(lword) &&
+                "rwlock prio ceiling cannot be 0 (background)");
 
-        /* TODO: rwlock PI! */
         turnstile_block(ts, queue, lock, irql_out, /* owner = */ NULL);
 
         /* when we wake up, we will have the lock handed off to us... */
@@ -165,7 +172,7 @@ void rwlock_lock(struct rwlock *lock, enum rwlock_acquire_type acq_type) {
     }
 
     /* make sure nothing funny happened */
-    kassert(rwlock_locked(lock, acq_type));
+    kassert(rwlock_locked_with_type(lock, acq_type));
 }
 
 /* return the number of readers we want to wake,
@@ -213,7 +220,8 @@ static uintptr_t rwlock_unlock_get_val_to_sub(struct rwlock *lock) {
     struct thread *current_thread = scheduler_get_current_thread();
     uintptr_t lock_word = RWLOCK_READ_LOCK_WORD(lock);
     if (lock_word & RWLOCK_WRITER_HELD_BIT) {
-        if (RWLOCK_GET_OWNER_FROM_WORD(lock_word) != (uintptr_t) current_thread) {
+        if (RWLOCK_GET_OWNER_FROM_WORD(lock_word) !=
+            (uintptr_t) current_thread) {
             rwlock_panic("non-owner thread unlocked as exclusive waiter", lock);
         }
 
@@ -274,7 +282,7 @@ void rwlock_unlock(struct rwlock *lock) {
 
         if (writer && to_wake == 0) {
             /* directly transfer ownership to the very next writer */
-            new = rwlock_make_write_word(writer);
+            new = rwlock_make_write_word(lock, writer);
 
             if (ts->waiters > 1)
                 new |= RWLOCK_WAITER_BIT;
@@ -293,6 +301,8 @@ void rwlock_unlock(struct rwlock *lock) {
 
             if (writer)
                 new |= RWLOCK_WRITER_WANT_BIT;
+
+            new |= (RWLOCK_READ_LOCK_WORD(lock) & RWLOCK_PRIO_CEIL_MASK);
 
             RWLOCK_WRITE_LOCK_WORD(lock, new);
             turnstile_wake(ts, TURNSTILE_READER_QUEUE, to_wake, irql_out);

@@ -194,7 +194,6 @@ struct thread {
     _Atomic cpu_id_t last_ran; /* What core last ran us? */
 
     time_t run_start_time; /* When did we start running */
-    size_t owner_domain;   /* What domain created us? */
 
     /* Who is allowed to run us? */
     struct cpu_mask allowed_cpus;
@@ -281,6 +280,7 @@ struct thread {
     uint64_t wait_token;
 
     uint8_t last_action_reason;
+
     /* used in wait_for_wake */
     enum thread_state last_action;
 
@@ -306,7 +306,6 @@ struct thread {
     struct list_head event_apcs;         /* yet to execute */
     struct list_head to_exec_event_apcs; /* to be executed */
 
-    struct turnstile *born_with;  /* born with - used for debug */
     struct turnstile *turnstile;  /* my turnstile */
     struct turnstile *blocked_on; /* what am I blocked on */
 

@@ -165,7 +165,7 @@ static struct thread *thread_init(struct thread *thread,
     spinlock_init(&thread->being_moved);
     pairing_node_init(&thread->wq_pairing_node);
 
-    thread->born_with = turnstile_init(thread->turnstile);
+    turnstile_init(thread->turnstile);
 
     thread_update_effective_priority(thread);
 
@@ -193,9 +193,6 @@ struct thread *thread_create_internal(char *name, void (*entry_point)(void *),
         kzalloc(sizeof(struct thread), ALLOC_PARAMS_DEFAULT);
     if (unlikely(!new_thread))
         goto err;
-
-    if (global.current_bootstage >= BOOTSTAGE_MID_TOPOLOGY)
-        new_thread->owner_domain = domain_local_id();
 
     void *stack = thread_allocate_stack(stack_size / PAGE_SIZE);
     if (unlikely(!stack))

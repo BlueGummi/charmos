@@ -28,30 +28,15 @@ void mutex_simple_unlock(struct mutex_simple *m);
  *
  */
 
-enum mutex_bits : uintptr_t {
-    MUTEX_HELD_BIT = 1,
-};
-
-#define MUTEX_META_BITS (MUTEX_HELD_BIT)
-
+#define MUTEX_INIT {ATOMIC_VAR_INIT(0)}
 struct mutex {
     _Atomic(uintptr_t) lock_word;
 };
-static_assert_struct_size_eq(mutex, sizeof(uintptr_t));
 
-#define MUTEX_INIT {ATOMIC_VAR_INIT(0)}
-static inline void mutex_init(struct mutex *mtx) {
-    mtx->lock_word = 0;
-}
-
+void mutex_init(struct mutex *mtx);
 void mutex_unlock(struct mutex *mutex);
 void mutex_lock(struct mutex *mutex);
 bool mutex_held(struct mutex *mtx);
-#define MUTEX_ASSERT_HELD(m) kassert(mutex_held(m))
-#define MUTEX_READ_LOCK_WORD(__mtx)                                            \
-    (atomic_load_explicit(&((struct mutex *) (__mtx))->lock_word,              \
-                          memory_order_acquire))
+struct thread *mutex_get_owner(struct mutex *mtx);
 
-static inline struct thread *mutex_get_owner(struct mutex *mtx) {
-    return (struct thread *) (MUTEX_READ_LOCK_WORD(mtx) & (~MUTEX_META_BITS));
-}
+#define MUTEX_ASSERT_HELD(m) kassert(mutex_held(m))
