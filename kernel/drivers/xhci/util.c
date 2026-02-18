@@ -161,7 +161,7 @@ void xhci_reset_slot(struct usb_device *dev) {
     struct xhci_command cmd = {0};
 
     xhci_request_init_blocking(&request, &cmd, /* port = */ 0);
-    
+
     request.slot_reset = true;
 
     struct xhci_trb outgoing = {
@@ -182,6 +182,7 @@ void xhci_reset_slot(struct usb_device *dev) {
         .num_trbs = 1,
     };
 
-    xhci_send_command_and_block(xdev, &cmd);
+    xhci_send_command_and_block(xdev, &cmd, NULL);
+
     k_log("our status was %u\n", request.status);
 }

@@ -5,29 +5,49 @@
 #include <mem/vmm.h>
 #include <sch/sched.h>
 #include <string.h>
+#include <thread/io_wait.h>
 #include <thread/thread.h>
 
 #include "internal.h"
 
 enum usb_status usb_transfer_sync(enum usb_status (*fn)(struct usb_request *),
-                                  struct usb_request *request) {
+                                  struct usb_request *request,
+                                  struct io_wait_token *tok) {
     struct thread *curr = scheduler_get_current_thread();
     request->complete = usb_wake_waiter;
     request->context = curr;
 
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
-    thread_block(curr, THREAD_BLOCK_REASON_IO, THREAD_WAIT_UNINTERRUPTIBLE,
-                 request->dev);
+
+    struct io_wait_token iowt;
+
+    if (tok) {
+        io_wait_begin(tok, request->dev);
+    } else {
+        io_wait_begin(&iowt, request->dev);
+    }
 
     enum usb_status ret = fn(request);
     if (ret != USB_OK) {
         thread_wake(curr, THREAD_WAKE_REASON_BLOCKING_MANUAL, request->dev);
+
+        if (tok) {
+            io_wait_end(tok, IO_WAIT_END_NO_OP);
+        } else {
+            io_wait_end(&iowt, IO_WAIT_END_NO_OP);
+        }
+
         irql_lower(irql);
         return ret;
     }
 
     irql_lower(irql);
+
     thread_wait_for_wake_match();
+
+    if (!tok)
+        io_wait_end(&iowt, IO_WAIT_END_YIELD);
+
     return request->status;
 }
 
@@ -77,13 +97,16 @@ enum usb_status usb_get_string_descriptor(struct usb_device *dev,
         .dev = dev,
     };
 
-    if ((err = usb_transfer_sync(ctrl->ops.submit_control_transfer, &req)) !=
-        USB_OK)
+    struct io_wait_token tok = IO_WAIT_TOKEN_EMPTY;
+    if ((err = usb_transfer_sync(ctrl->ops.submit_control_transfer, &req,
+                                 &tok)) != USB_OK)
         return err;
 
     uint8_t bLength = desc[0];
-    if (bLength < 2)
+    if (bLength < 2) {
+        io_wait_end(&tok, IO_WAIT_END_YIELD);
         return USB_ERR_INVALID_ARGUMENT;
+    }
 
     size_t out_idx = 0;
     for (size_t i = 2; i < bLength && out_idx < (max_len - 1); i += 2) {
@@ -92,6 +115,7 @@ enum usb_status usb_get_string_descriptor(struct usb_device *dev,
     out[out_idx] = '\0';
 
     kfree_aligned(desc, FREE_PARAMS_DEFAULT);
+    io_wait_end(&tok, IO_WAIT_END_YIELD);
     return err;
 }
 
@@ -115,8 +139,8 @@ enum usb_status usb_get_device_descriptor(struct usb_device *dev) {
     };
 
     enum usb_status err;
-    if ((err = usb_transfer_sync(ctrl->ops.submit_control_transfer,
-                                 &request)) != USB_OK) {
+    if ((err = usb_transfer_sync(ctrl->ops.submit_control_transfer, &request,
+                                 NULL)) != USB_OK) {
         return err;
     }
 
@@ -234,9 +258,11 @@ enum usb_status usb_parse_config_descriptor(struct usb_device *dev) {
     };
 
     enum usb_status err;
-    if ((err = usb_transfer_sync(ctrl->ops.submit_control_transfer,
-                                 &request)) != USB_OK) {
+    struct io_wait_token iowt = IO_WAIT_TOKEN_EMPTY;
+    if ((err = usb_transfer_sync(ctrl->ops.submit_control_transfer, &request,
+                                 &iowt)) != USB_OK) {
         kfree_aligned(desc, FREE_PARAMS_DEFAULT);
+        io_wait_end(&iowt, IO_WAIT_END_YIELD);
         return err;
     }
 
@@ -246,9 +272,10 @@ enum usb_status usb_parse_config_descriptor(struct usb_device *dev) {
     uint16_t total_len = cdesc->total_length;
     setup.length = total_len;
 
-    if ((err = usb_transfer_sync(ctrl->ops.submit_control_transfer,
-                                 &request)) != USB_OK) {
+    if ((err = usb_transfer_sync(ctrl->ops.submit_control_transfer, &request,
+                                 NULL)) != USB_OK) {
         kfree_aligned(desc, FREE_PARAMS_DEFAULT);
+        io_wait_end(&iowt, IO_WAIT_END_YIELD);
         return err;
     }
 
@@ -257,6 +284,7 @@ enum usb_status usb_parse_config_descriptor(struct usb_device *dev) {
 
     setup_config_descriptor(dev, desc, desc + total_len);
     kfree_aligned(desc, FREE_PARAMS_DEFAULT);
+    io_wait_end(&iowt, IO_WAIT_END_YIELD);
     return USB_OK;
 }
 
@@ -282,8 +310,8 @@ enum usb_status usb_set_configuration(struct usb_device *dev) {
     };
 
     enum usb_status err;
-    if ((err = usb_transfer_sync(ctrl->ops.submit_control_transfer,
-                                 &request)) != USB_OK) {
+    if ((err = usb_transfer_sync(ctrl->ops.submit_control_transfer, &request,
+                                 NULL)) != USB_OK) {
         return err;
     }
 

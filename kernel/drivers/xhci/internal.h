@@ -4,6 +4,7 @@
 #include <drivers/xhci.h>
 #include <sch/sched.h>
 #include <string.h>
+#include <thread/io_wait.h>
 #include <thread/thread.h>
 
 void xhci_nop(struct xhci_device *dev);
@@ -173,15 +174,31 @@ static inline void xhci_clear_usbsts_ei(struct xhci_device *dev) {
 }
 
 static inline bool xhci_send_command_and_block(struct xhci_device *dev,
-                                               struct xhci_command *cmd) {
+                                               struct xhci_command *cmd,
+                                               struct io_wait_token *iot) {
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
 
-    thread_block(scheduler_get_current_thread(), THREAD_BLOCK_REASON_IO,
-                 THREAD_WAIT_UNINTERRUPTIBLE, dev);
+    struct io_wait_token tok;
+
+    if (iot) {
+        io_wait_begin(iot, dev);
+    } else {
+        io_wait_begin(&tok, dev);
+    }
+
+    if (iot)
+        *iot = tok;
 
     if (!xhci_send_command(dev, cmd)) {
         thread_wake(scheduler_get_current_thread(),
                     THREAD_WAKE_REASON_BLOCKING_MANUAL, dev);
+
+        if (iot) {
+            io_wait_end(iot, IO_WAIT_END_NO_OP);
+        } else {
+            io_wait_end(&tok, IO_WAIT_END_NO_OP);
+        }
+
         irql_lower(irql);
         return false;
     }
@@ -190,7 +207,8 @@ static inline bool xhci_send_command_and_block(struct xhci_device *dev,
 
     thread_wait_for_wake_match();
 
-    thread_unboost_self();
+    if (!iot)
+        io_wait_end(&tok, IO_WAIT_END_YIELD);
 
     return true;
 }

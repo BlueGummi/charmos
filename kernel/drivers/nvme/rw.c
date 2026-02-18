@@ -9,10 +9,12 @@
 #include <stdint.h>
 #include <structures/sll.h>
 #include <thread/defer.h>
+#include <thread/io_wait.h>
 
 #include "internal.h"
 
-typedef bool (*sync_fn)(struct generic_disk *, uint64_t, uint8_t *, uint16_t);
+typedef bool (*sync_fn)(struct generic_disk *, uint64_t, uint8_t *, uint16_t,
+                        struct io_wait_token *iowt);
 typedef bool (*async_fn)(struct generic_disk *, struct nvme_request *);
 
 static void enqueue_request(struct nvme_device *dev, struct nvme_request *req) {
@@ -121,7 +123,8 @@ static bool rw_send_command(struct generic_disk *disk, struct nvme_request *req,
 }
 
 static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
-                    uint16_t count, async_fn function) {
+                    uint16_t count, async_fn function,
+                    struct io_wait_token *iowt) {
     struct nvme_request req = {0};
     req.lba = lba;
     req.buffer = buffer;
@@ -133,8 +136,11 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
 
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     req.waiter = curr;
-    thread_block(curr, THREAD_BLOCK_REASON_IO, THREAD_WAIT_UNINTERRUPTIBLE,
-                 disk->driver_data);
+
+    if (io_wait_token_active(iowt))
+        io_wait_end(iowt, IO_WAIT_END_NO_OP);
+
+    io_wait_begin(iowt, disk->driver_data);
 
     function(disk, &req);
     irql_lower(irql);
@@ -149,10 +155,14 @@ static bool rw_wrapper(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
                        uint64_t cnt, sync_fn function) {
     struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
     uint16_t max_sectors = nvme->max_transfer_size / disk->sector_size;
+    struct io_wait_token iowt = IO_WAIT_TOKEN_EMPTY;
+
     while (cnt > 0) {
         uint16_t chunk = (cnt > max_sectors) ? max_sectors : (uint16_t) cnt;
-        if (!function(disk, lba, buf, chunk))
+        if (!function(disk, lba, buf, chunk, &iowt)) {
+            io_wait_end(&iowt, IO_WAIT_END_YIELD);
             return false;
+        }
 
         lba += chunk;
         buf += chunk * disk->sector_size;
@@ -160,7 +170,7 @@ static bool rw_wrapper(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
     }
 
     /* Reset priority after boost */
-    scheduler_yield();
+    io_wait_end(&iowt, IO_WAIT_END_YIELD);
     return true;
 }
 
@@ -194,13 +204,13 @@ static bool rw_async_wrapper(struct generic_disk *disk,
 }
 
 bool nvme_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
-                      uint16_t count) {
-    return rw_sync(disk, lba, buffer, count, nvme_read_sector_async);
+                      uint16_t count, struct io_wait_token *i) {
+    return rw_sync(disk, lba, buffer, count, nvme_read_sector_async, i);
 }
 
 bool nvme_write_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
-                       uint16_t count) {
-    return rw_sync(disk, lba, buffer, count, nvme_write_sector_async);
+                       uint16_t count, struct io_wait_token *i) {
+    return rw_sync(disk, lba, buffer, count, nvme_write_sector_async, i);
 }
 
 bool nvme_read_sector_wrapper(struct generic_disk *disk, uint64_t lba,

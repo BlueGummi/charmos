@@ -1,10 +1,11 @@
 #include <block/generic.h>
 #include <drivers/ahci.h>
 #include <sch/sched.h>
-#include <thread/thread.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <thread/io_wait.h>
+#include <thread/thread.h>
 
 static void ahci_set_lba_cmd(struct ahci_fis_reg_h2d *fis, uint64_t lba,
                              uint16_t sector_count) {
@@ -24,7 +25,8 @@ static void ahci_set_lba_cmd(struct ahci_fis_reg_h2d *fis, uint64_t lba,
 typedef bool (*async_fn)(struct generic_disk *, uint64_t, uint8_t *, uint16_t,
                          struct ahci_request *);
 
-typedef bool (*sync_fn)(struct generic_disk *, uint64_t, uint8_t *, uint16_t);
+typedef bool (*sync_fn)(struct generic_disk *, uint64_t, uint8_t *, uint16_t,
+                        struct io_wait_token *tok);
 
 static bool rw_async(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
                      uint16_t count, struct ahci_request *req, bool write) {
@@ -55,7 +57,8 @@ static bool rw_async(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
 }
 
 static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
-                    uint16_t count, async_fn function) {
+                    uint16_t count, async_fn function,
+                    struct io_wait_token *io_wait_tok) {
     struct ahci_request req = {0};
     struct ahci_disk *ahci_disk = (struct ahci_disk *) disk->driver_data;
     struct ahci_device *dev = ahci_disk->device;
@@ -68,7 +71,12 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
     req.trigger_completion = true;
 
     struct thread *curr = scheduler_get_current_thread();
-    thread_block(curr, THREAD_BLOCK_REASON_IO, THREAD_WAIT_UNINTERRUPTIBLE, dev);
+
+    if (io_wait_token_active(io_wait_tok))
+        io_wait_end(io_wait_tok, IO_WAIT_END_NO_OP);
+
+    io_wait_begin(io_wait_tok, dev);
+
     dev->io_waiters[ahci_disk->port][req.slot] = curr;
 
     if (!function(disk, lba, buf, count, &req)) {
@@ -86,19 +94,22 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
 
 static bool rw_sync_wrapper(struct generic_disk *disk, uint64_t lba,
                             uint8_t *buf, uint64_t cnt, sync_fn function) {
+    struct io_wait_token wt = IO_WAIT_TOKEN_EMPTY;
     while (cnt > 0) {
         uint16_t chunk = (cnt > 65535) ? 0 : (uint16_t) cnt;
         uint64_t sectors = (chunk == 0) ? 65536 : chunk;
 
-        if (!function(disk, lba, buf, chunk))
+        if (!function(disk, lba, buf, chunk, &wt)) {
+            io_wait_end(&wt, IO_WAIT_END_YIELD);
             return false;
+        }
 
         lba += sectors;
         buf += sectors * disk->sector_size;
         cnt -= sectors;
     }
 
-    thread_unboost_self();
+    io_wait_end(&wt, IO_WAIT_END_YIELD);
     return true;
 }
 
@@ -134,13 +145,15 @@ bool ahci_write_sector_async(struct generic_disk *disk, uint64_t lba,
 }
 
 bool ahci_read_sector_blocking(struct generic_disk *disk, uint64_t lba,
-                               uint8_t *buf, uint16_t count) {
-    return rw_sync(disk, lba, buf, count, ahci_read_sector_async);
+                               uint8_t *buf, uint16_t count,
+                               struct io_wait_token *tok) {
+    return rw_sync(disk, lba, buf, count, ahci_read_sector_async, tok);
 }
 
 bool ahci_write_sector_blocking(struct generic_disk *disk, uint64_t lba,
-                                uint8_t *buf, uint16_t count) {
-    return rw_sync(disk, lba, buf, count, ahci_write_sector_async);
+                                uint8_t *buf, uint16_t count,
+                                struct io_wait_token *tok) {
+    return rw_sync(disk, lba, buf, count, ahci_write_sector_async, tok);
 }
 
 bool ahci_read_sector_wrapper(struct generic_disk *disk, uint64_t lba,

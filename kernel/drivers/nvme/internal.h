@@ -34,14 +34,8 @@ SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(nvme_queue, lock);
 bool nvme_read_sector_async(struct generic_disk *disk,
                             struct nvme_request *req);
 
-bool nvme_read_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
-                      uint16_t cnt);
-
 bool nvme_write_sector_async(struct generic_disk *disk,
                              struct nvme_request *req);
-
-bool nvme_write_sector(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
-                       uint16_t cnt);
 
 static inline enum workqueue_error nvme_work_enqueue(struct nvme_device *dev,
                                                      struct work *work) {

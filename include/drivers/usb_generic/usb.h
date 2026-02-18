@@ -10,6 +10,7 @@
 struct usb_controller;
 struct usb_device;
 struct usb_request;
+struct io_wait_token;
 
 /* Defines generic USB constants, functions, and structures */
 
@@ -416,7 +417,8 @@ enum usb_status usb_init_device(struct usb_device *dev);
 void usb_try_bind_driver(struct usb_device *dev);
 uint8_t usb_construct_rq_bitmap(uint8_t transfer, uint8_t type, uint8_t recip);
 enum usb_status usb_transfer_sync(enum usb_status (*fn)(struct usb_request *),
-                                  struct usb_request *request);
+                                  struct usb_request *request,
+                                  struct io_wait_token *tok);
 void usb_print_device(struct usb_device *dev);
 struct usb_interface_descriptor *usb_find_interface(struct usb_device *dev,
                                                     uint8_t class,

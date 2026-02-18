@@ -76,7 +76,6 @@ end:
 }
 
 void scheduler_wake_from_io_block(struct thread *t, void *wake_src) {
-//    kassert(t->io_blocked_on == wake_src);
     scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_IO,
                    THREAD_PRIO_CLASS_TIMESHARE, wake_src);
 }

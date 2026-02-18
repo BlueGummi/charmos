@@ -168,6 +168,7 @@ static struct thread *thread_init(struct thread *thread,
 
     thread_update_effective_priority(thread);
 
+    INIT_LIST_HEAD(&thread->io_wait_tokens);
     INIT_LIST_HEAD(&thread->event_apcs);
     INIT_LIST_HEAD(&thread->to_exec_event_apcs);
     INIT_LIST_HEAD(&thread->thread_list);
@@ -354,19 +355,4 @@ void thread_wake_manual(struct thread *t, void *wake_src) {
     else if (s == THREAD_STATE_SLEEPING)
         scheduler_wake(t, THREAD_WAKE_REASON_SLEEP_MANUAL,
                        t->perceived_prio_class, wake_src);
-}
-
-void thread_begin_io_wait(void *io_ptr) {
-    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
-    struct thread *t = scheduler_get_current_thread();
-    t->io_blocked_on = io_ptr;
-    irql_lower(irql);
-}
-
-void thread_end_io_wait() {
-    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
-    struct thread *t = scheduler_get_current_thread();
-    t->io_blocked_on = NULL;
-    irql_lower(irql);
-    thread_unboost_self();
 }

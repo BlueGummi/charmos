@@ -83,7 +83,6 @@ enum thread_prio_class thread_unboost_self() {
     enum thread_prio_class boosted = curr->perceived_prio_class;
     curr->perceived_prio_class = curr->base_prio_class;
     irql_lower(irql);
-    scheduler_yield();
     return boosted;
 }
 

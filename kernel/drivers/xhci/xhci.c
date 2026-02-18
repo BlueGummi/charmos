@@ -100,7 +100,7 @@ enum usb_status xhci_address_device(struct xhci_port *p, uint8_t slot_id,
     };
 
     spin_unlock(&xhci->lock, irql);
-    bool ret = xhci_send_command_and_block(xhci, &cmd);
+    bool ret = xhci_send_command_and_block(xhci, &cmd, NULL);
 
     kfree_aligned(input_ctx, FREE_PARAMS_DEFAULT);
     if (!ret)
@@ -189,7 +189,8 @@ enum usb_status xhci_configure_device_endpoints(struct usb_device *usb) {
         .num_trbs = 1,
     };
 
-    bool ret = xhci_send_command_and_block(xhci, &cmd);
+    bool ret = xhci_send_command_and_block(xhci, &cmd, NULL);
+
     kfree_aligned(input_ctx, FREE_PARAMS_DEFAULT);
     if (!ret)
         return USB_ERR_NO_DEVICE;

@@ -67,7 +67,7 @@ void xhci_nop(struct xhci_device *dev) {
         .num_trbs = 1,
     };
 
-    xhci_send_command_and_block(dev, &cmd);
+    xhci_send_command_and_block(dev, &cmd, NULL);
 }
 
 uint8_t xhci_enable_slot(struct xhci_device *dev) {
@@ -92,7 +92,7 @@ uint8_t xhci_enable_slot(struct xhci_device *dev) {
         .num_trbs = 1,
     };
 
-    xhci_send_command_and_block(dev, &cmd);
+    xhci_send_command_and_block(dev, &cmd, NULL);
 
     return TRB_SLOT(request.return_control);
 }
@@ -121,7 +121,7 @@ void xhci_disable_slot(struct xhci_device *dev, uint8_t slot_id) {
         .num_trbs = 1,
     };
 
-    xhci_send_command_and_block(dev, &cmd);
+    xhci_send_command_and_block(dev, &cmd, NULL);
 }
 
 static enum usb_status xhci_spin_wait_port_reset(uint32_t *portsc,
@@ -356,7 +356,7 @@ enum usb_status xhci_port_init(struct xhci_port *p) {
         k_log("reset_port fail\n");
         return err;
     }
-        
+
     k_log("reset_port returned\n");
 
     k_log("enable_slot sent\n");

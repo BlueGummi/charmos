@@ -8,9 +8,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <structures/sll.h>
+#include <thread/io_wait.h>
 
 static void ide_start_next(struct ide_channel *chan, bool locked);
-typedef bool (*sync_fn)(struct ata_drive *, uint64_t, uint8_t *, uint8_t);
+typedef bool (*sync_fn)(struct ata_drive *, uint64_t, uint8_t *, uint8_t,
+                        struct io_wait_token *);
 
 static enum bio_request_status translate_status(uint8_t status, uint8_t error) {
     if ((status & STATUS_ERR) == 0) {
@@ -31,7 +33,8 @@ static enum bio_request_status translate_status(uint8_t status, uint8_t error) {
     return BIO_STATUS_UNKNOWN_ERR;
 }
 
-enum irq_result ide_irq_handler(void *ctx, uint8_t irq_num, struct irq_context *rsp) {
+enum irq_result ide_irq_handler(void *ctx, uint8_t irq_num,
+                                struct irq_context *rsp) {
     (void) irq_num, (void) rsp;
 
     struct ide_channel *chan = ctx;
@@ -172,12 +175,16 @@ static void submit_async(struct ata_drive *d, struct ide_request *req) {
     spin_unlock(&d->channel.lock, irql);
 }
 
-static inline void submit_and_wait(struct ata_drive *d,
-                                   struct ide_request *req) {
+static inline void submit_and_wait(struct ata_drive *d, struct ide_request *req,
+                                   struct io_wait_token *token) {
     enum irql irql = spin_lock(&req->lock);
-    struct thread *t = scheduler_get_current_thread();
-    thread_block(t, THREAD_BLOCK_REASON_IO, THREAD_WAIT_UNINTERRUPTIBLE, d);
-    req->waiter = t;
+
+    if (io_wait_token_active(token))
+        io_wait_end(token, IO_WAIT_END_NO_OP);
+
+    io_wait_begin(token, d);
+
+    req->waiter = scheduler_get_current_thread();
     submit_async(d, req);
     spin_unlock(&req->lock, irql);
 }
@@ -230,10 +237,10 @@ bool ide_submit_bio_async(struct generic_disk *disk, struct bio_request *bio) {
 }
 
 static bool rw_sync(struct ata_drive *d, uint64_t lba, uint8_t *b, uint8_t cnt,
-                    bool write) {
+                    bool write, struct io_wait_token *tk) {
     struct ide_request *req = request_init(lba, b, cnt, write);
 
-    submit_and_wait(d, req);
+    submit_and_wait(d, req, tk);
     thread_wait_for_wake_match();
 
     bool ret = !req->status;
@@ -246,9 +253,11 @@ static bool rw_sync_wrapper(struct generic_disk *d, uint64_t lba, uint8_t *buf,
                             uint64_t cnt, sync_fn function) {
     struct ata_drive *ide = d->driver_data;
 
+    struct io_wait_token tok = IO_WAIT_TOKEN_EMPTY;
+
     while (cnt > 0) {
         uint8_t chunk = (cnt >= 256) ? 0 : (uint8_t) cnt;
-        function(ide, lba, buf, chunk);
+        function(ide, lba, buf, chunk, &tok);
 
         uint64_t sectors = (chunk == 0) ? 256 : chunk;
         lba += sectors;
@@ -256,20 +265,18 @@ static bool rw_sync_wrapper(struct generic_disk *d, uint64_t lba, uint8_t *buf,
         cnt -= sectors;
     }
 
-    /* We have to yield to decay our priority and run something else
-     * since the interrupt sets our prio to URGENT */
-    scheduler_yield();
+    io_wait_end(&tok, IO_WAIT_END_YIELD);
     return true;
 }
 
-bool ide_read_sector(struct ata_drive *d, uint64_t lba, uint8_t *b,
-                     uint8_t count) {
-    return rw_sync(d, lba, b, count, false);
+static bool ide_read_sector(struct ata_drive *d, uint64_t lba, uint8_t *b,
+                            uint8_t count, struct io_wait_token *tok) {
+    return rw_sync(d, lba, b, count, false, tok);
 }
 
-bool ide_write_sector(struct ata_drive *d, uint64_t lba, uint8_t *b,
-                      uint8_t count) {
-    return rw_sync(d, lba, b, count, true);
+static bool ide_write_sector(struct ata_drive *d, uint64_t lba, uint8_t *b,
+                             uint8_t count, struct io_wait_token *tok) {
+    return rw_sync(d, lba, b, count, true, tok);
 }
 
 bool ide_read_sector_wrapper(struct generic_disk *d, uint64_t lba, uint8_t *buf,
