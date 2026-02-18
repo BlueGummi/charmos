@@ -114,8 +114,10 @@ struct scheduler *scheduler_pick_victim(struct scheduler *self);
 struct thread *scheduler_steal_work(struct scheduler *victim);
 size_t scheduler_try_push_to_idle_core(struct scheduler *sched);
 bool scheduler_inherit_priority(struct thread *boosted, size_t new_weight,
-                                enum thread_prio_class new_class);
-void scheduler_uninherit_priority();
+                                enum thread_prio_class new_class,
+                                size_t *old_weight_out,
+                                enum thread_prio_class *old_class_out);
+void scheduler_uninherit_priority(size_t weight, enum thread_prio_class class);
 void scheduler_tick_enable();
 void scheduler_tick_disable();
 enum irq_result scheduler_timer_isr(void *ctx, uint8_t vector,

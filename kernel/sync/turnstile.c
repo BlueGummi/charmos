@@ -173,8 +173,10 @@ out:
 
 void turnstile_pi_remove(struct turnstile *ts) {
     if (ts->applied_pi_boost)
-        scheduler_uninherit_priority();
+        scheduler_uninherit_priority(ts->weight, ts->prio_class);
 
+    ts->weight = 0;
+    ts->prio_class = 0;
     ts->applied_pi_boost = false;
 }
 
@@ -302,8 +304,15 @@ void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
             goto done;
 
         /* apply boost to owner */
-        scheduler_inherit_priority(owner, boost_weight, boost_class);
-        cur_ts->applied_pi_boost = true; /* we gave you a boost */
+
+        size_t old_weight;
+        enum thread_prio_class old_class;
+        if (scheduler_inherit_priority(owner, boost_weight, boost_class,
+                                       &old_weight, &old_class)) {
+            cur_ts->applied_pi_boost = true; /* we gave you a boost */
+            cur_ts->weight = old_weight;
+            cur_ts->prio_class = old_class;
+        }
 
         /* if owner is blocked on another lock, continue propagation */
         if ((cur_ts = owner->blocked_on)) {

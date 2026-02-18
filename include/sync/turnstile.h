@@ -1,7 +1,8 @@
-#include <thread/queue.h>
 #include <stdatomic.h>
 #include <structures/pairing_heap.h>
 #include <structures/rbt.h>
+#include <thread/queue.h>
+#include <thread/thread_types.h>
 
 #define TURNSTILE_WRITER_QUEUE 0
 #define TURNSTILE_READER_QUEUE 1
@@ -21,7 +22,11 @@ enum turnstile_state {
 
 struct turnstile {
     struct thread *owner;
+
+    /* If a boost occurs, what did we give it? */
     bool applied_pi_boost;
+    size_t weight;
+    enum thread_prio_class prio_class;
     struct list_head hash_list;
     struct list_head freelist;
     size_t waiters; /* how many goobers are blocking on me? */
@@ -60,7 +65,8 @@ struct turnstile *turnstile_create(void);
 void turnstile_destroy(struct turnstile *ts);
 struct turnstile *turnstile_init(struct turnstile *ts);
 struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
-                                  void *lock_obj, enum irql lock_irql, struct thread *owner);
+                                  void *lock_obj, enum irql lock_irql,
+                                  struct thread *owner);
 struct turnstile *turnstile_lookup(void *obj, enum irql *irql_out);
 void turnstile_unlock(void *obj, enum irql irql);
 void turnstile_wake(struct turnstile *ts, size_t queue, size_t num_threads,

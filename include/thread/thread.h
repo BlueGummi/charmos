@@ -218,13 +218,6 @@ struct thread {
                              * to either increase it for this CPU, or
                              * migrate the thread to another CPU. */
 
-    /* shadow copy
-     *
-     * this is for PI so when we un-boost we know where to go back to */
-    bool has_pi_boost;
-    size_t saved_weight;
-    enum thread_prio_class saved_class;
-
     struct spinlock being_moved; /* only to be spin_raw, spinlock_raw,
                                   * and spin_unlock_raw */
 
