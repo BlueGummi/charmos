@@ -1,3 +1,5 @@
+#include <thread/io_wait.h>
+
 #include "internal.h"
 
 bool scheduler_wake(struct thread *t, enum thread_wake_reason reason,
@@ -76,6 +78,16 @@ end:
 }
 
 void scheduler_wake_from_io_block(struct thread *t, void *wake_src) {
-    scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_IO,
-                   THREAD_PRIO_CLASS_TIMESHARE, wake_src);
+    /* we are just inspecting the thread to see if this structure exists, no
+     * synchronization needed */
+    struct io_wait_token *iter;
+    bool found = false;
+    list_for_each_entry(iter, &t->io_wait_tokens, list) {
+        if (iter->wait_object == wake_src)
+            found = true;
+    }
+    kassert(found);
+
+    scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_IO, THREAD_PRIO_CLASS_URGENT,
+                   wake_src);
 }
