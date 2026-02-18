@@ -55,6 +55,9 @@ static void dpc_execute_all_in_queue(struct dpc_queue *dq, struct dpc_cpu *dc) {
 
 void dpc_run_local(void) {
     struct core *me = smp_core();
+    if (me->in_resched)
+        return;
+
     if (atomic_exchange(&me->executing_dpcs, true))
         return;
 

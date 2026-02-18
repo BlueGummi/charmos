@@ -76,3 +76,22 @@ void scheduler_uninherit_priority(size_t weight, enum thread_prio_class class) {
 out:
     irql_lower(irql);
 }
+
+enum thread_prio_class thread_unboost_self() {
+    struct thread *curr = scheduler_get_current_thread();
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
+    enum thread_prio_class boosted = curr->perceived_prio_class;
+    curr->perceived_prio_class = curr->base_prio_class;
+    irql_lower(irql);
+    scheduler_yield();
+    return boosted;
+}
+
+enum thread_prio_class thread_boost_self(enum thread_prio_class new) {
+    struct thread *curr = scheduler_get_current_thread();
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
+    enum thread_prio_class old = curr->perceived_prio_class;
+    curr->perceived_prio_class = new;
+    irql_lower(irql);
+    return old;
+}

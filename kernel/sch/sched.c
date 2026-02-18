@@ -82,10 +82,6 @@ static inline bool thread_done_for_period(struct thread *thread) {
 
 static inline void re_enqueue_thread(struct scheduler *sched,
                                      struct thread *thread) {
-    /* Thread just finished an URGENT boost */
-    if (thread->perceived_prio_class == THREAD_PRIO_CLASS_URGENT)
-        thread->perceived_prio_class = thread->base_prio_class;
-
     /* Scheduler is locked - called from `schedule()` */
     if (thread_done_for_period(thread)) {
         thread->virtual_runtime_left = thread->virtual_budget;

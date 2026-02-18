@@ -240,8 +240,7 @@ struct thread {
 
     enum thread_activity_class activity_class;
 
-    enum thread_prio_class base_prio_class; /* priority class
-                                             * at creation time */
+    enum thread_prio_class base_prio_class; /* for class boosts */
     enum thread_prio_class perceived_prio_class;
 
     /* Activity data */
@@ -315,8 +314,8 @@ struct thread {
     size_t total_sleep_count; /* Aggregate count of all sleep events */
     size_t total_apcs_ran;    /* Total APCs executed on a given thread */
 
-    /* TODO: More */
     struct condvar_with_cb cv_cb_object; /* wait object */
+    void *io_blocked_on; /* blocked on what IO ptr? */
 
     /* Misc. private field for whatever needs it */
     void *private;
@@ -380,6 +379,10 @@ void thread_set_background(struct thread *t);
 void thread_wake(struct thread *t, enum thread_wake_reason r, void *wake_src);
 void thread_migrate(struct thread *t, size_t dest_core);
 void thread_wait_for_wake_match();
+enum thread_prio_class thread_unboost_self();
+enum thread_prio_class thread_boost_self(enum thread_prio_class new);
+void thread_begin_io_wait(void *io_ptr);
+void thread_end_io_wait();
 
 struct thread_queue;
 void thread_block_on(struct thread_queue *q, enum thread_wait_type type,

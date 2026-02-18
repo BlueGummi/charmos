@@ -80,6 +80,7 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
     thread_wait_for_wake_match();
 
     dev->io_waiters[ahci_disk->port][req.slot] = NULL;
+
     return req.status == 0;
 }
 
@@ -97,8 +98,7 @@ static bool rw_sync_wrapper(struct generic_disk *disk, uint64_t lba,
         cnt -= sectors;
     }
 
-    /* Yield decays the priority since the wake up will make us URGENT */
-    scheduler_yield();
+    thread_unboost_self();
     return true;
 }
 

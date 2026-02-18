@@ -189,6 +189,9 @@ static inline bool xhci_send_command_and_block(struct xhci_device *dev,
     irql_lower(irql);
 
     thread_wait_for_wake_match();
+
+    thread_unboost_self();
+
     return true;
 }
 

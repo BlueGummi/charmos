@@ -129,6 +129,9 @@ void idt_set_gate(uint8_t num, uint16_t sel, uint8_t flags) {
         idt[num].ist = 0;
     }
 
+    /* debug */
+    idt[num].ist = 0;
+
     idt[num].flags = flags;
     idt[num].reserved = 0;
 }

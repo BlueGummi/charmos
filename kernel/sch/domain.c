@@ -6,9 +6,14 @@
 #include <string.h>
 
 static void sched_mask_clone(struct cpu_mask *dst, const struct cpu_mask *src) {
-    if (!cpu_mask_init(dst, src->nbits))
-        k_panic("Could not clone CPU MASK\n");
-    cpu_mask_or(dst, src);
+    cpu_mask_init(dst, src->nbits);
+
+    if (src->uses_large) {
+        size_t words = CPU_MASK_WORDS(src->nbits);
+        memcpy(dst->large, src->large, words * sizeof(uint64_t));
+    } else {
+        dst->small = src->small;
+    }
 }
 
 static bool cpu_mask_intersects(const struct cpu_mask *a,
@@ -188,6 +193,8 @@ void scheduler_domain_mark_self_idle(bool idle) {
     for (size_t lvl = 0; lvl < TOPOLOGY_LEVEL_MAX; lvl++) {
         struct scheduler_domain *d = c->domains[lvl];
         size_t g = c->group_index[lvl];
+        kassert(c->group_index[lvl] >= 0);
+        kassert((size_t)c->group_index[lvl] < d->ngroups);
 
         if (idle)
             cpu_mask_set(&d->groups[g].idle, cpu);

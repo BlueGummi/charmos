@@ -26,6 +26,9 @@ struct cpu_mask {
     };
     size_t nbits;
 };
+#define CPU_MASK_WORD_BITS 64
+#define CPU_MASK_WORDS(nbits) \
+    (((nbits) + CPU_MASK_WORD_BITS - 1) / CPU_MASK_WORD_BITS)
 
 struct topology_cache_info {
     uint8_t level; /* 1, 2, 3 */
