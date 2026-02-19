@@ -1,4 +1,5 @@
 #include <kassert.h>
+#include <math/min_max.h>
 #include <mem/alloc.h>
 #include <mem/slab.h> /* to get SLAB_OBJ_ALIGN */
 #include <sch/sched.h>
@@ -6,6 +7,8 @@
 #include <thread/thread.h>
 
 #include "mutex_internal.h"
+
+/* LOCK ORDERING: TS -> THREAD */
 
 SLAB_SIZE_REGISTER_FOR_STRUCT(turnstile, SLAB_OBJ_ALIGN_DEFAULT);
 
@@ -59,6 +62,17 @@ void turnstiles_init() {
 #define TURNSTILE_TS_PRIO_MAX 100000
 #define TURNSTILE_RT_PRIO 100001
 #define TURNSTILE_URGENT_PRIO 100002
+
+static inline enum irql
+turnstile_hash_chain_lock(struct turnstile_hash_chain *chain) {
+    return spin_lock_irq_disable(&chain->lock);
+}
+
+static inline void
+turnstile_hash_chain_unlock(struct turnstile_hash_chain *chain,
+                            enum irql irql) {
+    spin_unlock(&chain->lock, irql);
+}
 
 int32_t turnstile_thread_priority(struct thread *t) {
     switch (t->perceived_prio_class) {
@@ -204,7 +218,7 @@ struct thread *turnstile_dequeue_first(struct turnstile *ts, size_t queue) {
     thread->turnstile = got;
 
     /* you are no longer blocked on a lock */
-    thread->blocked_on = NULL;
+    atomic_store(&thread->blocked_ts, NULL);
 
     /* you are also no longer a waiter */
     ts->waiters--;
@@ -237,113 +251,80 @@ void turnstile_unlock(void *obj, enum irql irql) {
     turnstile_hash_chain_unlock(chain, irql);
 }
 
-static struct turnstile *turnstile_lookup_no_lock_for_hash_chain_internal(
-    struct turnstile_hash_chain *except, void *obj, enum irql *irql_out,
-    struct turnstile_hash_chain **thc_out) {
-    struct turnstile_hash_chain *chain = turnstile_chain_for(obj);
-
-    enum irql irql;
-
-    if (chain != except)
-        irql = turnstile_hash_chain_lock(chain);
-
-    struct list_head *pos;
-    struct turnstile *ts = NULL;
-
-    list_for_each(pos, &chain->list) {
-        if ((ts = turnstile_from_hash_list_node(pos))->lock_obj == obj)
-            goto out;
-    }
-
-out:
-    if (chain != except)
-        *irql_out = irql;
-
-    *thc_out = chain;
-
-    return ts;
-}
-
 void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
                                struct turnstile *ts, size_t waiter_weight,
                                enum thread_prio_class waiter_class) {
-    /* again, do not swap me out while I do this dance */
-    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
-
-    /* iterate and propagate upward */
     struct turnstile *cur_ts = ts;
     size_t boost_weight = waiter_weight;
     enum thread_prio_class boost_class = waiter_class;
 
-    struct thread *original = ts->owner;
+    while (cur_ts) {
+        struct turnstile_hash_chain *chain =
+            turnstile_chain_for(cur_ts->lock_obj);
 
-    while (true) {
-        enum irql lock_irql;
+        enum irql irql = IRQL_PASSIVE_LEVEL;
+        bool unlock = false;
 
-        struct turnstile_hash_chain *this_chain = NULL;
-
-        /* for that specific chain we do not attempt to acquire the lock, for
-         * the lock is already held by the caller of this function. */
-        struct turnstile *new_ts =
-            turnstile_lookup_no_lock_for_hash_chain_internal(
-                locked_chain, cur_ts->lock_obj, &lock_irql, &this_chain);
-
-        /* A turnstile must exist if we have blocked on something */
-        kassert(new_ts);
+        if (chain != locked_chain) {
+            irql = turnstile_hash_chain_lock(chain);
+            unlock = true;
+        }
 
         struct thread *owner = cur_ts->owner;
-        if (!owner)
-            goto done;
-
-        if (original == owner && ts != cur_ts)
-            k_panic("Turnstile waiter cycle deadlock\n");
-
-        /* if owner already has equal-or-higher effective inputs, stop */
-        if (owner->weight >= boost_weight &&
-            owner->perceived_prio_class >= boost_class)
-            goto done;
-
-        /* apply boost to owner */
-
-        size_t old_weight;
-        enum thread_prio_class old_class;
-        if (scheduler_inherit_priority(owner, boost_weight, boost_class,
-                                       &old_weight, &old_class)) {
-            cur_ts->applied_pi_boost = true; /* we gave you a boost */
-            cur_ts->weight = old_weight;
-            cur_ts->prio_class = old_class;
+        if (!owner) {
+            if (unlock)
+                turnstile_hash_chain_unlock(chain, irql);
+            break;
         }
 
-        /* if owner is blocked on another lock, continue propagation */
-        if ((cur_ts = owner->blocked_on)) {
-            /* update boost values as the owner's effective priority */
-            boost_weight = owner->weight;
-            boost_class = owner->perceived_prio_class;
-
-            if (locked_chain != this_chain)
-                turnstile_unlock(cur_ts->lock_obj, lock_irql);
-
-            continue;
+        /* Apply inheritance */
+        if (!scheduler_inherit_priority(owner, boost_weight, boost_class, NULL,
+                                        NULL)) {
+            if (unlock)
+                turnstile_hash_chain_unlock(chain, irql);
+            break;
         }
 
-    done:
-        if (locked_chain != this_chain)
-            turnstile_unlock(cur_ts->lock_obj, lock_irql);
+        cur_ts->applied_pi_boost = true;
 
-        break;
+        /* Speculative next hop */
+        struct turnstile *next = atomic_load(&owner->blocked_ts);
+
+        if (unlock)
+            turnstile_hash_chain_unlock(chain, irql);
+
+        /* Revalidation step */
+        if (!next)
+            break;
+
+        struct turnstile_hash_chain *next_chain =
+            turnstile_chain_for(next->lock_obj);
+
+        enum irql nirql = turnstile_hash_chain_lock(next_chain);
+
+        if (owner->blocked_ts != next || next->owner != owner) {
+            turnstile_hash_chain_unlock(next_chain, nirql);
+            break;
+        }
+
+        /* Prepare next iteration */
+        boost_weight = owner->weight;
+        boost_class = owner->perceived_prio_class;
+
+        turnstile_hash_chain_unlock(next_chain, nirql);
+        cur_ts = next;
     }
-
-    irql_lower(irql);
 }
 
-static void turnstile_block_on(void *lock_obj, struct turnstile *ts,
-                               size_t queue_num) {
+static void turnstile_block_on(struct turnstile *ts, size_t queue_num) {
     struct thread *curr = scheduler_get_current_thread();
+
+    atomic_store(&curr->blocked_ts, ts);
 
     thread_block(curr, THREAD_BLOCK_REASON_MANUAL, THREAD_WAIT_UNINTERRUPTIBLE,
                  ts);
+
     rbt_insert(&ts->queues[queue_num], &curr->wq_tree_node);
-    curr->blocked_on = lock_obj;
 }
 
 /* ok... the we first assign a turnstile to the lock object,
@@ -355,6 +336,7 @@ struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
                                   struct thread *owner) {
     struct turnstile_hash_chain *chain = turnstile_chain_for(lock_obj);
     struct thread *current_thread = scheduler_get_current_thread();
+
     struct turnstile *my_turnstile = current_thread->turnstile;
 
     kassert(my_turnstile);
@@ -380,7 +362,7 @@ struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
 
     ts->waiters++;
 
-    turnstile_block_on(lock_obj, ts, queue_num);
+    turnstile_block_on(ts, queue_num);
 
     turnstile_hash_chain_unlock(chain, lock_irql);
 

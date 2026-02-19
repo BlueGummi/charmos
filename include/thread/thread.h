@@ -232,9 +232,9 @@ struct thread {
     time_t budget_time_raw_ms;    /* Raw MS time of budget */
     time_t timeslice_length_raw_ms;
 
-    size_t virtual_period_runtime;
-    size_t virtual_budget;
-    size_t virtual_runtime_left;
+    uint32_t virtual_period_runtime;
+    uint32_t virtual_budget;
+    uint32_t virtual_runtime_left;
 
     /* ========== Thread activity stats ========== */
 
@@ -298,8 +298,8 @@ struct thread {
     struct list_head event_apcs;         /* yet to execute */
     struct list_head to_exec_event_apcs; /* to be executed */
 
-    struct turnstile *turnstile;  /* my turnstile */
-    struct turnstile *blocked_on; /* what am I blocked on */
+    struct turnstile *turnstile;            /* my turnstile */
+    _Atomic(struct turnstile *) blocked_ts; /* what am I blocked on */
 
     /* ========== Profiling data ========== */
     size_t context_switches; /* Total context switches */
@@ -374,6 +374,10 @@ void thread_block(struct thread *t, enum thread_block_reason r,
 void thread_sleep(struct thread *t, enum thread_sleep_reason r,
                   enum thread_wait_type wait_type, void *expect_wake_src);
 
+/* Turnstile wants this */
+void thread_block_locked(struct thread *t, enum thread_block_reason r,
+                         enum thread_wait_type type, void *expect_wake_src);
+
 void thread_set_timesharing(struct thread *t);
 void thread_set_background(struct thread *t);
 void thread_wake(struct thread *t, enum thread_wake_reason r, void *wake_src);
@@ -447,11 +451,13 @@ static inline void thread_put(struct thread *t) {
 
 static inline enum irql thread_acquire(struct thread *t, bool *success) {
     if (!thread_get(t)) {
-        *success = false;
+        if (success)
+            *success = false;
         return IRQL_NONE;
     }
 
-    *success = true;
+    if (success)
+        *success = true;
     return spin_lock_irq_disable(&t->lock);
 }
 

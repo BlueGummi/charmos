@@ -7,29 +7,28 @@ static bool scheduler_boost_thread_internal(struct thread *boosted,
                                             enum thread_prio_class new_class,
                                             size_t *old_weight,
                                             enum thread_prio_class *old_class) {
-    bool did_boost = false;
+    if (old_class)
+        *old_class = boosted->perceived_prio_class;
+
+    if (old_weight)
+        *old_weight = boosted->weight;
+
+    /* If we only change the prio class, we can just return early */
     if (boosted->perceived_prio_class < new_class) {
-        did_boost = true;
-
-        if (old_class)
-            *old_class = boosted->perceived_prio_class;
-
         boosted->perceived_prio_class = new_class;
+        goto ok;
     }
 
     if (boosted->weight < new_weight) {
-        did_boost = true;
-
-        if (old_weight)
-            *old_weight = boosted->weight;
-
         boosted->weight = new_weight;
+        goto ok;
     }
 
-    if (did_boost)
-        boosted->boost_count++;
+    return false;
 
-    return did_boost;
+ok:
+    boosted->boost_count++;
+    return true;
 }
 
 bool scheduler_inherit_priority(struct thread *boosted, size_t new_weight,
@@ -65,16 +64,14 @@ bool scheduler_inherit_priority(struct thread *boosted, size_t new_weight,
 }
 
 void scheduler_uninherit_priority(size_t weight, enum thread_prio_class class) {
-    /* do not swap me out while I do this dance */
-    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
-    goto out;
-
     struct thread *current = scheduler_get_current_thread();
+
+    enum irql tirql = thread_acquire(current, NULL);
+
     current->perceived_prio_class = class;
     current->weight = weight;
 
-out:
-    irql_lower(irql);
+    thread_release(current, tirql);
 }
 
 enum thread_prio_class thread_unboost_self() {

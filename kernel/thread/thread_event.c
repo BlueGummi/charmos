@@ -560,6 +560,13 @@ void thread_block(struct thread *t, enum thread_block_reason r,
         /*already_locked=*/false, type, /* exit_if_match = */ false);
 }
 
+void thread_block_locked(struct thread *t, enum thread_block_reason r,
+                         enum thread_wait_type type, void *expect_wake_src) {
+    set_state_and_update_reason(
+        t, r, THREAD_STATE_BLOCKED, thread_add_block_reason, expect_wake_src,
+        /*already_locked=*/true, type, /* exit_if_match = */ false);
+}
+
 void thread_sleep(struct thread *t, enum thread_sleep_reason r,
                   enum thread_wait_type type, void *expect_wake_src) {
     set_state_and_update_reason(

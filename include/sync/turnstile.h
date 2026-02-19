@@ -46,7 +46,6 @@ struct turnstile_hash_chain {
     struct list_head list;
     struct spinlock lock;
 };
-SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(turnstile_hash_chain, lock);
 
 #define TURNSTILE_HASH_SIZE 128
 #define TURNSTILE_HASH_MASK (TURNSTILE_HASH_SIZE - 1)

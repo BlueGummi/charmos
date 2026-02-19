@@ -4,6 +4,7 @@
 #include <irq/idt.h>
 #include <math/clamp.h>
 #include <math/fixed.h>
+#include <math/min_max.h>
 #include <registry.h>
 #include <sch/sched.h>
 #include <smp/smp.h>
@@ -16,7 +17,6 @@
 
 static void derive_timeshare_prio_range(enum thread_activity_class cls,
                                         uint32_t *min, uint32_t *max);
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 #define THREAD_DELTA_UNIT (1ULL << 3)
 

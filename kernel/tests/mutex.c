@@ -167,4 +167,200 @@ TEST_REGISTER(mutex_pi_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
 }
 
+static struct mutex pi_mtx_a = MUTEX_INIT;
+static struct mutex pi_mtx_b = MUTEX_INIT;
+
+static struct thread *pi_ts1, *pi_ts2, *pi_rt2;
+static atomic_uint pi_chain_done = 0;
+static atomic_bool ts1_grabbed_a = false;
+static atomic_bool ts2_grabbed_b = false;
+
+static void pi_chain_ts2(void *arg) {
+    (void) arg;
+    mutex_lock(&pi_mtx_b);
+    k_log("ts2 lock b\n");
+    atomic_store(&ts2_grabbed_b, true);
+
+    /* wait until boosted */
+    while (scheduler_get_current_thread()->perceived_prio_class !=
+           THREAD_PRIO_CLASS_RT)
+        cpu_relax();
+
+    k_log("ts2 boosted\n");
+    mutex_unlock(&pi_mtx_b);
+    atomic_fetch_add(&pi_chain_done, 1);
+}
+
+static void pi_chain_ts1(void *arg) {
+    (void) arg;
+    mutex_lock(&pi_mtx_a);
+    k_log("ts1 lock a\n");
+    atomic_store(&ts1_grabbed_a, true);
+    
+    /* wait until boosted */
+    while (scheduler_get_current_thread()->perceived_prio_class !=
+           THREAD_PRIO_CLASS_RT)
+        cpu_relax();
+
+    mutex_lock(&pi_mtx_b);
+    k_log("ts1 lock b\n");
+
+    mutex_unlock(&pi_mtx_b);
+    mutex_unlock(&pi_mtx_a);
+    atomic_fetch_add(&pi_chain_done, 1);
+}
+
+static void pi_chain_rt(void *arg) {
+    (void) arg;
+    k_log("rt lock\n");
+    mutex_lock(&pi_mtx_a);
+    k_log("rt lock got\n");
+    
+    mutex_unlock(&pi_mtx_a);
+    atomic_fetch_add(&pi_chain_done, 1);
+}
+
+TEST_REGISTER(mutex_pi_chain, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    if (global.core_count < 2) {
+        SET_SKIP();
+        return;
+    }
+
+    cpu_id_t cpu = 1;
+
+    pi_ts2 = thread_create("pi_ts2", pi_chain_ts2, NULL);
+    pi_ts1 = thread_create("pi_ts1", pi_chain_ts1, NULL);
+    pi_rt2 = thread_create("pi_rt2", pi_chain_rt, NULL);
+
+    pi_rt2->perceived_prio_class = THREAD_PRIO_CLASS_RT;
+
+    thread_set_flags(pi_ts1, THREAD_FLAGS_NO_STEAL);
+    thread_set_flags(pi_ts2, THREAD_FLAGS_NO_STEAL);
+    thread_set_flags(pi_rt2, THREAD_FLAGS_NO_STEAL);
+
+    scheduler_enqueue_on_core(pi_ts2, cpu);
+    while (!atomic_load(&ts2_grabbed_b))
+        scheduler_yield();
+
+    scheduler_enqueue_on_core(pi_ts1, cpu);
+
+    /* let ts1 grab A and block on B */
+    while (!atomic_load(&ts1_grabbed_a))
+        scheduler_yield();
+
+    scheduler_enqueue_on_core(pi_rt2, cpu);
+
+    while (atomic_load(&pi_chain_done) < 3)
+        scheduler_yield();
+
+    SET_SUCCESS();
+}
+
+static struct mutex pi_multi_mtx = MUTEX_INIT;
+static atomic_uint pi_multi_done = 0;
+static atomic_bool ts_got = false;
+
+static void pi_multi_ts(void *arg) {
+    (void) arg;
+    mutex_lock(&pi_multi_mtx);
+    k_log("multi_ts running\n");
+    atomic_store(&ts_got, true);
+
+    while (scheduler_get_current_thread()->perceived_prio_class !=
+           THREAD_PRIO_CLASS_RT)
+        cpu_relax();
+
+    k_log("ts boosted\n");
+    mutex_unlock(&pi_multi_mtx);
+    atomic_fetch_add(&pi_multi_done, 1);
+}
+
+static void pi_multi_rt(void *arg) {
+    (void) arg;
+    k_log("multi_rt running\n");
+    mutex_lock(&pi_multi_mtx);
+    mutex_unlock(&pi_multi_mtx);
+    atomic_fetch_add(&pi_multi_done, 1);
+}
+
+TEST_REGISTER(mutex_pi_multi_waiters, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    cpu_id_t cpu = 1;
+
+    struct thread *ts = thread_create("pi_ts", pi_multi_ts, NULL);
+    struct thread *rt1 = thread_create("pi_rt1", pi_multi_rt, NULL);
+    struct thread *rt2 = thread_create("pi_rt2", pi_multi_rt, NULL);
+
+    rt1->perceived_prio_class = THREAD_PRIO_CLASS_RT;
+    rt2->perceived_prio_class = THREAD_PRIO_CLASS_RT;
+
+    thread_set_flags(ts, THREAD_FLAGS_NO_STEAL);
+    thread_set_flags(rt1, THREAD_FLAGS_NO_STEAL);
+    thread_set_flags(rt2, THREAD_FLAGS_NO_STEAL);
+
+    scheduler_enqueue_on_core(ts, cpu);
+    while (!atomic_load(&ts_got))
+        scheduler_yield();
+
+    scheduler_enqueue_on_core(rt1, cpu);
+    scheduler_enqueue_on_core(rt2, cpu);
+
+    while (atomic_load(&pi_multi_done) < 3)
+        scheduler_yield();
+
+    SET_SUCCESS();
+}
+
+static struct mutex pi_revert_mtx = MUTEX_INIT;
+static atomic_bool pi_reverted = false;
+static atomic_bool pi_revert_got = false;
+
+static void pi_revert_ts(void *arg) {
+    (void) arg;
+    mutex_lock(&pi_revert_mtx);
+
+    atomic_store(&pi_revert_got, true);
+
+    while (scheduler_get_current_thread()->perceived_prio_class !=
+           THREAD_PRIO_CLASS_RT)
+        cpu_relax();
+
+    mutex_unlock(&pi_revert_mtx);
+
+    while (scheduler_get_current_thread()->perceived_prio_class ==
+           THREAD_PRIO_CLASS_RT)
+        cpu_relax();
+
+    atomic_store(&pi_reverted, true);
+}
+
+static void pi_revert_rt(void *arg) {
+    (void) arg;
+    mutex_lock(&pi_revert_mtx);
+    mutex_unlock(&pi_revert_mtx);
+}
+
+TEST_REGISTER(mutex_pi_revert, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    cpu_id_t cpu = 1;
+
+    struct thread *ts = thread_create("pi_ts", pi_revert_ts, NULL);
+    struct thread *rt = thread_create("pi_rt", pi_revert_rt, NULL);
+
+    rt->perceived_prio_class = THREAD_PRIO_CLASS_RT;
+
+    thread_set_flags(ts, THREAD_FLAGS_NO_STEAL);
+    thread_set_flags(rt, THREAD_FLAGS_NO_STEAL);
+
+    scheduler_enqueue_on_core(ts, cpu);
+
+    while (!atomic_load(&pi_revert_got))
+        scheduler_yield();
+
+    scheduler_enqueue_on_core(rt, cpu);
+
+    while (!atomic_load(&pi_reverted))
+        scheduler_yield();
+
+    SET_SUCCESS();
+}
+
 #endif
