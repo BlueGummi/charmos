@@ -173,6 +173,7 @@ void rwlock_lock(struct rwlock *lock, enum rwlock_acquire_type acq_type) {
 
     /* make sure nothing funny happened */
     kassert(rwlock_locked_with_type(lock, acq_type));
+    thread_boost_self(RWLOCK_GET_PRIO_CEIL(lword));
 }
 
 /* return the number of readers we want to wake,
@@ -311,4 +312,6 @@ void rwlock_unlock(struct rwlock *lock) {
         /* all done */
         break;
     }
+
+    thread_unboost_self();
 }

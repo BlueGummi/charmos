@@ -14,6 +14,7 @@ struct tlb_shootdown_cpu {
     atomic_bool ipi_pending;
     atomic_bool in_tlb_shootdown;
     _Atomic uint64_t ack_gen;
+    _Atomic uint64_t target_gen;
     _Atomic uint8_t flush_all;
     _Atomic uint8_t dpc_queued;
 };
