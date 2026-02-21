@@ -7,6 +7,7 @@
 #include <compiler.h>
 #include <mem/alloc.h>
 #include <mem/page.h>
+#include <sch/climb.h>
 #include <stdarg.h>
 #include <stdatomic.h>
 #include <stddef.h>
@@ -163,7 +164,7 @@ struct thread {
     /* Registers */
     struct cpu_context regs;
 
-    /* ========== Structure nodes ========== */
+    /* ========== Transparent structure nodes ========== */
     struct list_head reaper_list; /* reaper list */
     struct list_head thread_list; /* global list of threads */
 
@@ -282,6 +283,14 @@ struct thread {
 
     uint64_t token_ctr;
 
+    struct condvar_with_cb cv_cb_object; /* wait object */
+    struct list_head io_wait_tokens;     /* list of tokens */
+
+    struct turnstile *turnstile;            /* my turnstile */
+    _Atomic(struct turnstile *) blocked_ts; /* what am I blocked on */
+
+    struct climb_thread_state climb_state;
+
     /* ========== APC data ========== */
     bool executing_apc; /* Executing an APC right now? */
 
@@ -298,9 +307,6 @@ struct thread {
     struct list_head event_apcs;         /* yet to execute */
     struct list_head to_exec_event_apcs; /* to be executed */
 
-    struct turnstile *turnstile;            /* my turnstile */
-    _Atomic(struct turnstile *) blocked_ts; /* what am I blocked on */
-
     /* ========== Profiling data ========== */
     size_t context_switches; /* Total context switches */
 
@@ -313,9 +319,6 @@ struct thread {
     size_t total_block_count; /* Aggregate count of all block events */
     size_t total_sleep_count; /* Aggregate count of all sleep events */
     size_t total_apcs_ran;    /* Total APCs executed on a given thread */
-
-    struct condvar_with_cb cv_cb_object; /* wait object */
-    struct list_head io_wait_tokens;
 
     /* Misc. private field for whatever needs it */
     void *private;
@@ -411,6 +414,11 @@ static inline void thread_set_flags(struct thread *t, enum thread_flags flags) {
     atomic_store(&t->flags, flags);
 }
 
+static inline void thread_restore_flags(struct thread *t,
+                                        enum thread_flags flags) {
+    thread_set_flags(t, flags);
+}
+
 static inline enum thread_flags thread_or_flags(struct thread *t,
                                                 enum thread_flags flags) {
     return atomic_fetch_or(&t->flags, flags);
@@ -421,8 +429,8 @@ static inline enum thread_flags thread_and_flags(struct thread *t,
     return atomic_fetch_and(&t->flags, flags);
 }
 
-static inline uint64_t thread_get_last_ran(struct thread *t,
-                                           enum thread_flags *out_flags) {
+static inline struct scheduler *
+thread_get_last_ran(struct thread *t, enum thread_flags *out_flags) {
     enum thread_flags old = thread_or_flags(t, THREAD_FLAGS_NO_STEAL);
 
     /* we pin the thread so that it doesn't get migrated and we
@@ -430,7 +438,8 @@ static inline uint64_t thread_get_last_ran(struct thread *t,
     spin_raw(&t->being_moved);
 
     *out_flags = old;
-    return atomic_load_explicit(&t->last_ran, memory_order_acquire);
+    return global
+        .schedulers[atomic_load_explicit(&t->last_ran, memory_order_acquire)];
 }
 
 static inline uint64_t thread_set_last_ran(struct thread *t, uint64_t new) {

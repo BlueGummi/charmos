@@ -132,7 +132,8 @@ static struct thread *steal_from_special_threads(struct scheduler *victim,
     return NULL;
 }
 
-struct thread *scheduler_steal_work(struct scheduler *victim) {
+struct thread *scheduler_steal_work(struct scheduler *new,
+                                    struct scheduler *victim) {
     /* do not wait in a loop */
     if (!spin_trylock_raw(&victim->lock))
         return NULL;
@@ -157,6 +158,9 @@ struct thread *scheduler_steal_work(struct scheduler *victim) {
                 break;
         }
     }
+
+    if (stolen)
+        thread_post_migrate(stolen, victim->core_id, new->core_id);
 
     spin_unlock_raw(&victim->lock);
     return stolen;
@@ -186,7 +190,6 @@ static inline void stop_steal(struct scheduler *sched,
     atomic_fetch_sub(&scheduler_data.active_stealers, 1);
 }
 
-APC_EVENT_CREATE(apc_event_thread_migrate, "THREAD_MIGRATE");
 struct thread *scheduler_try_do_steal(struct scheduler *sched) {
     if (!scheduler_can_steal_work(sched))
         return NULL;
@@ -202,12 +205,11 @@ struct thread *scheduler_try_do_steal(struct scheduler *sched) {
         return NULL;
     }
 
-    struct thread *stolen = scheduler_steal_work(victim);
+    struct thread *stolen = scheduler_steal_work(sched, victim);
     stop_steal(sched, victim);
 
     if (stolen) {
         sched_profiling_record_steal();
-        apc_event_signal(APC_EVENT(apc_event_thread_migrate));
         spin_unlock_raw(&stolen->being_moved);
     } else {
         scheduler_try_push_to_idle_core(sched);

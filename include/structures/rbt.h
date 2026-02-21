@@ -74,6 +74,10 @@ static inline struct rbt_node *rbt_first(const struct rbt *root) {
     return node;
 }
 
+static inline bool rbt_node_empty(struct rbt_node *node) {
+    return !node->left && !node->right && !node->parent;
+}
+
 struct rbt *rbt_init(struct rbt *t, rbt_get_data get_data);
 struct rbt *rbt_create(rbt_get_data get);
 struct rbt_node *rbt_find_min(struct rbt_node *node);

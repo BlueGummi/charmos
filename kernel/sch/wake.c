@@ -8,7 +8,7 @@ bool scheduler_wake(struct thread *t, enum thread_wake_reason reason,
     enum irql outer = irql_raise(IRQL_HIGH_LEVEL);
 
     enum thread_flags old;
-    struct scheduler *sch = global.schedulers[thread_get_last_ran(t, &old)];
+    struct scheduler *sch = thread_get_last_ran(t, &old);
 
     if (sch->core_id != smp_core_id())
         while (!atomic_load(&t->yielded_after_wait))
@@ -30,7 +30,7 @@ bool scheduler_wake(struct thread *t, enum thread_wake_reason reason,
     bool woke = false;
     bool yielded = atomic_load(&t->yielded_after_wait);
     bool ok;
-    enum irql irql = scheduler_lock_irq_disable(sch);
+    enum irql irql = spin_lock_irq_disable(&sch->lock);
     enum irql tirql = thread_acquire(t, &ok);
     if (!ok)
         goto end;
@@ -69,10 +69,10 @@ bool scheduler_wake(struct thread *t, enum thread_wake_reason reason,
     }
 
 out:
-    thread_set_flags(t, old);
+    thread_restore_flags(t, old);
     thread_release(t, tirql);
 end:
-    scheduler_unlock(sch, irql);
+    spin_unlock(&sch->lock, irql);
     irql_lower(outer);
     return woke;
 }

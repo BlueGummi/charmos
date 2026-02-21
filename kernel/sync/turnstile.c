@@ -93,7 +93,6 @@ static size_t turnstile_thread_get_data(struct rbt_node *n) {
 struct turnstile *turnstile_init(struct turnstile *ts) {
     ts->lock_obj = NULL;
     ts->waiters = 0;
-    ts->waiter_max_prio = 0;
     ts->state = TURNSTILE_STATE_UNUSED;
     ts->owner = NULL;
 

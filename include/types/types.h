@@ -14,7 +14,7 @@ typedef uint32_t uid_t;
 typedef _Atomic uint32_t refcount_t;
 typedef uintptr_t paddr_t;
 typedef uintptr_t vaddr_t;
-typedef size_t cpu_id_t; /* -1 represents "no CPU" */
+typedef size_t cpu_id_t;
 typedef size_t numa_node_t;
 typedef uint64_t pte_t;
 typedef uint64_t page_flags_t;

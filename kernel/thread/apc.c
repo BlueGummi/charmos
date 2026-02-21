@@ -135,13 +135,13 @@ static void maybe_force_resched(struct thread *t) {
      * the schedule() routine about to disable it, meaning that
      * if it does get disabled, it'll still have a chance to check
      * and run the APCs of the only thread active */
-    struct scheduler *sched = global.schedulers[thread_get_last_ran(t, &old)];
+    struct scheduler *sched = thread_get_last_ran(t, &old);
 
     bool needs_resched = !sched->tick_enabled;
     if (needs_resched)
         scheduler_force_resched(sched);
 
-    thread_set_flags(t, old);
+    thread_restore_flags(t, old);
 }
 
 static void wake_if_waiting(struct thread *t) {

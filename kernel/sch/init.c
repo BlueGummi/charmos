@@ -1,15 +1,16 @@
 #include <console/printf.h>
 #include <mem/alloc.h>
-#include <thread/defer.h>
-#include <thread/reaper.h>
 #include <sch/sched.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <thread/defer.h>
+#include <thread/reaper.h>
 
 static size_t scheduler_thread_get_data(struct rbt_node *n) {
     return thread_from_rq_rbt_node(n)->virtual_runtime_left;
 }
+
 
 void scheduler_init(void) {
     scheduler_data.max_concurrent_stealers = global.core_count / 4;
@@ -31,10 +32,9 @@ void scheduler_init(void) {
         if (!s)
             k_panic("Could not allocate scheduler %lu\n", i);
 
-        s->thread_rbt.root = NULL;
-        s->thread_rbt.get_data = scheduler_thread_get_data;
-        s->completed_rbt.root = NULL;
-        s->completed_rbt.get_data = scheduler_thread_get_data;
+        rbt_init(&s->thread_rbt, scheduler_thread_get_data);
+        rbt_init(&s->completed_rbt, scheduler_thread_get_data);
+        rbt_init(&s->climb_threads, climb_get_thread_data);
         s->tick_enabled = false;
         s->current_period = 1; /* Start at period 1 to avoid
                                 * starting at 0 because

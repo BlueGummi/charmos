@@ -1,4 +1,5 @@
 #include "internal.h"
+#include <thread/apc.h>
 
 /* file implements `thread_migrate`.
  *
@@ -46,12 +47,20 @@
  *
  */
 
+void thread_post_migrate(struct thread *t, size_t old_cpu, size_t new_cpu) {
+    /* assert that both scheduler/runqueue locks are held,
+     * migrate relevant things */
+    SPINLOCK_ASSERT_HELD(&global.schedulers[old_cpu]->lock);
+    SPINLOCK_ASSERT_HELD(&global.schedulers[new_cpu]->lock);
+    climb_post_migrate_hook(t, old_cpu, new_cpu);
+}
+
 void thread_migrate(struct thread *t, size_t dest_core) {
     /* first acquire both the lock of the thread's scheduler
      * and the destination core's scheduler */
 
     enum thread_flags flags;
-    struct scheduler *src = global.schedulers[thread_get_last_ran(t, &flags)];
+    struct scheduler *src = thread_get_last_ran(t, &flags);
     struct scheduler *dst = global.schedulers[dest_core];
 
     enum irql sirql, dirql, tirql;
@@ -64,7 +73,7 @@ void thread_migrate(struct thread *t, size_t dest_core) {
     /* now that we have acquired both scheduler locks,
      * we have control over the thread and can
      * unmark it as NO_STEAL */
-    thread_set_flags(t, flags);
+    thread_restore_flags(t, flags);
 
     bool ok;
     tirql = thread_acquire(t, &ok);
@@ -89,6 +98,8 @@ void thread_migrate(struct thread *t, size_t dest_core) {
         scheduler_remove_thread(src, t, /* lock_held = */ true);
         scheduler_add_thread(dst, t, /* lock_held = */ true);
     }
+
+    thread_post_migrate(t, src->core_id, dst->core_id);
 
 out:
     if (unlock)

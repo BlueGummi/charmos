@@ -38,6 +38,8 @@ struct scheduler {
     struct list_head rt_threads;
     struct list_head bg_threads;
 
+    struct rbt climb_threads; /* threads on this CPU participating in CLIMB */
+
     _Atomic uint8_t queue_bitmap;
 
     struct thread *current;
@@ -111,7 +113,9 @@ uint64_t scheduler_compute_steal_threshold();
 struct thread *scheduler_try_do_steal(struct scheduler *sched);
 
 struct scheduler *scheduler_pick_victim(struct scheduler *self);
-struct thread *scheduler_steal_work(struct scheduler *victim);
+struct thread *scheduler_steal_work(struct scheduler *new,
+                                    struct scheduler *victim);
+
 size_t scheduler_try_push_to_idle_core(struct scheduler *sched);
 bool scheduler_inherit_priority(struct thread *boosted, size_t new_weight,
                                 enum thread_prio_class new_class,
@@ -180,8 +184,6 @@ static inline struct thread *thread_spawn_on_core(char *name,
     scheduler_enqueue_on_core(t, core_id);
     return t;
 }
-
-
 
 static inline bool scheduler_self_in_resched() {
     return atomic_load(&smp_core()->in_resched);

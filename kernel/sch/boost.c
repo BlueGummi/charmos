@@ -36,11 +36,10 @@ bool scheduler_inherit_priority(struct thread *boosted, size_t new_weight,
                                 size_t *old_weight,
                                 enum thread_prio_class *old_class) {
     enum thread_flags old;
-    struct scheduler *sched =
-        global.schedulers[thread_get_last_ran(boosted, &old)];
+    struct scheduler *sched = thread_get_last_ran(boosted, &old);
 
     /* acquire this lock */
-    enum irql irql = scheduler_lock_irq_disable(sched);
+    enum irql irql = spin_lock_irq_disable(&sched->lock);
 
     bool did_boost = false;
     if (thread_get_state(boosted) == THREAD_STATE_READY) {
@@ -58,8 +57,8 @@ bool scheduler_inherit_priority(struct thread *boosted, size_t new_weight,
             boosted, new_weight, new_class, old_weight, old_class);
     }
 
-    scheduler_unlock(sched, irql);
-    thread_set_flags(boosted, old);
+    spin_unlock(&sched->lock, irql);
+    thread_restore_flags(boosted, old);
     return did_boost;
 }
 

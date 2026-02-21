@@ -30,7 +30,6 @@ struct turnstile {
     struct list_head hash_list;
     struct list_head freelist;
     size_t waiters; /* how many goobers are blocking on me? */
-    thread_prio_t waiter_max_prio;
     void *lock_obj; /* lock we are for */
     struct rbt queues[TURNSTILE_NUM_QUEUES];
     enum turnstile_state state;

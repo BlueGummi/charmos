@@ -16,7 +16,7 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
 
     enum irql irql;
     if (!lock_held)
-        irql = scheduler_lock_irq_disable(sched);
+        irql = spin_lock_irq_disable(&sched->lock);
 
     enum thread_prio_class prio = task->perceived_prio_class;
 
@@ -43,14 +43,14 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
     }
 
     if (!lock_held)
-        scheduler_unlock(sched, irql);
+        spin_unlock(&sched->lock, irql);
 }
 
 void scheduler_remove_thread(struct scheduler *sched, struct thread *t,
                              bool lock_held) {
     enum irql irql;
     if (!lock_held)
-        irql = scheduler_lock_irq_disable(sched);
+        irql = spin_lock_irq_disable(&sched->lock);
     else
         SPINLOCK_ASSERT_HELD(&sched->lock);
 
@@ -64,7 +64,7 @@ void scheduler_remove_thread(struct scheduler *sched, struct thread *t,
 
     scheduler_decrement_thread_count(sched, t);
     if (!lock_held)
-        scheduler_unlock(sched, irql);
+        spin_unlock(&sched->lock, irql);
 }
 
 void scheduler_enqueue(struct thread *t) {
@@ -93,12 +93,12 @@ void scheduler_enqueue(struct thread *t) {
 
     /* hold the lock to prevent that thread from being ran
      * while we are going to signal the other core */
-    enum irql irql = scheduler_lock_irq_disable(s);
+    enum irql irql = spin_lock_irq_disable(&s->lock);
 
     scheduler_add_thread(s, t, /* lock_held = */ true);
     scheduler_force_resched(s);
 
-    scheduler_unlock(s, irql);
+    spin_unlock(&s->lock, irql);
 }
 
 /* TODO: Make scheduler_add_thread an internal function so I don't need to

@@ -69,6 +69,7 @@ static void move_ts_thread_raw(struct scheduler *dest, struct scheduler *source,
     rbt_insert(&dest->thread_rbt, &thread->rq_tree_node);
     scheduler_increment_thread_count(dest, thread);
     thread_set_last_ran(thread, dest->core_id);
+    thread_post_migrate(thread, source->core_id, dest->core_id);
 }
 
 static size_t migrate_from_tree(struct scheduler *to,
@@ -142,6 +143,7 @@ static size_t migrate_from_prio_class(struct scheduler *to,
 
                 migrated++;
                 thread_set_last_ran(t, to->core_id);
+                thread_post_migrate(t, from->core_id, to->core_id);
             }
             spin_unlock_raw(&t->being_moved);
         }

@@ -99,6 +99,9 @@ extern struct scheduler_periodic_work_linker_object
             .interval = _interval,                                             \
             .prio = _prio}
 
+#define SCHEDULER_PERIODIC_WORK_REGISTER_PER_PERIOD(_fn, _prio)                \
+    SCHEDULER_PERIODIC_WORK_REGISTER(_fn, PERIODIC_WORK_PERIOD_BASED, _prio, 1)
+
 void scheduler_periodic_work_init(void);
 void scheduler_periodic_work_execute(enum scheduler_periodic_work_type type);
 

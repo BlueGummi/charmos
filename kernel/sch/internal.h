@@ -1,5 +1,6 @@
 #include <kassert.h>
 #include <sch/sched.h>
+#include <thread/apc.h>
 #include <thread/thread.h>
 
 static inline void scheduler_set_queue_bitmap(struct scheduler *sched,
@@ -211,9 +212,8 @@ static inline void scheduler_drop_two_raw_locks(struct scheduler *a,
     }
 }
 
-SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(scheduler, lock);
-
 /* Internal use only */
 void thread_wake_locked(struct thread *t, enum thread_wake_reason r,
                         void *wake_src);
 void scheduler_drop_locks_after_switch_in();
+void thread_post_migrate(struct thread *t, size_t old_cpu, size_t new_cpu);

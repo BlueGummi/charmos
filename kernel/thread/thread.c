@@ -168,12 +168,15 @@ static struct thread *thread_init(struct thread *thread,
 
     thread_update_effective_priority(thread);
 
+    climb_thread_init(thread);
     INIT_LIST_HEAD(&thread->io_wait_tokens);
     INIT_LIST_HEAD(&thread->event_apcs);
     INIT_LIST_HEAD(&thread->to_exec_event_apcs);
     INIT_LIST_HEAD(&thread->thread_list);
-    INIT_LIST_HEAD(&thread->apc_head[0]);
-    INIT_LIST_HEAD(&thread->apc_head[1]);
+
+    for (size_t i = 0; i < APC_TYPE_COUNT; i++)
+        INIT_LIST_HEAD(&thread->apc_head[i]);
+
     INIT_LIST_HEAD(&thread->rq_list_node);
     INIT_LIST_HEAD(&thread->wq_list_node);
     INIT_LIST_HEAD(&thread->rcu_list_node);
