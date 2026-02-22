@@ -4,6 +4,7 @@
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/slab.h>
+#include <mem/tlb.h>
 #include <mem/vmm.h>
 #include <sch/sched.h>
 #include <stdbool.h>
@@ -429,6 +430,156 @@ TEST_REGISTER(kmalloc_new_alloc_free_sequence_test, SHOULD_NOT_FAIL,
         kfree_new(blocks[i], ALLOC_BEHAVIOR_NORMAL);
 
     ADD_MESSAGE("alloc/free sequence test passed");
+    SET_SUCCESS();
+}
+
+TEST_REGISTER(tlb_shootdown_single_cpu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    ABORT_IF_RAM_LOW();
+
+    paddr_t p1 = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+    paddr_t p2 = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+    TEST_ASSERT(p1 && p2);
+
+    void *va = vmm_map_phys(p1, PAGE_SIZE, 0, VMM_FLAG_NONE);
+    TEST_ASSERT(va);
+
+    *(volatile uint64_t *) va = 0x11111111;
+
+    vmm_unmap_virt(va, PAGE_SIZE, VMM_FLAG_NONE);
+    va = vmm_map_phys(p2, PAGE_SIZE, 0, VMM_FLAG_NONE);
+
+    tlb_shootdown((uintptr_t) va, true);
+
+    *(volatile uint64_t *) va = 0x22222222;
+    TEST_ASSERT(*(volatile uint64_t *) va == 0x22222222);
+
+    SET_SUCCESS();
+}
+
+#define TLB_TEST_THREADS 4
+
+static volatile uint64_t tlb_seen[TLB_TEST_THREADS];
+static atomic_bool tlb_go = false;
+static atomic_uint tlb_threads_done = 0;
+
+static void tlb_reader(void *arg) {
+    size_t id = (size_t) arg;
+
+    while (!atomic_load(&tlb_go))
+        cpu_relax();
+
+    volatile uint64_t *va = scheduler_get_current_thread()->private;
+    tlb_seen[id] = *va;
+    atomic_fetch_add(&tlb_threads_done, 1);
+}
+
+TEST_REGISTER(tlb_shootdown_synchronous_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    ABORT_IF_RAM_LOW();
+
+    paddr_t p1 = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+    paddr_t p2 = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+    TEST_ASSERT(p1 && p2);
+
+    void *va = vmm_map_phys(p1, PAGE_SIZE, 0, VMM_FLAG_NONE);
+    TEST_ASSERT(va);
+
+    *(volatile uint64_t *) va = 0xAAAAAAAA;
+
+    struct thread *t[TLB_TEST_THREADS];
+    for (size_t i = 0; i < TLB_TEST_THREADS; i++) {
+        t[i] = thread_spawn("tlb_reader", tlb_reader, (void *) i);
+        t[i]->private = va;
+    }
+
+    vmm_unmap_virt(va, PAGE_SIZE, VMM_FLAG_NONE);
+    vmm_map_page((vaddr_t) va, p2, PAGING_WRITE, VMM_FLAG_NONE);
+    *(volatile uint64_t *) va = 0xBBBBBBBB;
+
+    atomic_store(&tlb_go, true);
+    tlb_shootdown((uintptr_t) va, true);
+
+    while (atomic_load(&tlb_threads_done) < TLB_TEST_THREADS)
+        cpu_relax();
+
+    for (size_t i = 0; i < TLB_TEST_THREADS; i++) {
+        TEST_ASSERT(tlb_seen[i] == 0xBBBBBBBB);
+    }
+
+    SET_SUCCESS();
+}
+
+TEST_REGISTER(tlb_shootdown_async_eventual_test, SHOULD_NOT_FAIL,
+              IS_UNIT_TEST) {
+    ABORT_IF_RAM_LOW();
+
+    paddr_t p1 = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+    paddr_t p2 = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+    TEST_ASSERT(p1 && p2);
+
+    void *va = vmm_map_phys(p1, PAGE_SIZE, 0, VMM_FLAG_NONE);
+    *(volatile uint64_t *) va = 0x1234;
+
+    vmm_unmap_virt(va, PAGE_SIZE, VMM_FLAG_NONE);
+    va = vmm_map_phys(p2, PAGE_SIZE, 0, VMM_FLAG_NONE);
+    *(volatile uint64_t *) va = 0x5678;
+
+    tlb_shootdown((uintptr_t) va, false);
+
+    /* Wait for IPIs to land */
+    time_t start = time_get_ms();
+    while (time_get_ms() - start < 100) {
+        if (*(volatile uint64_t *) va == 0x5678)
+            SET_SUCCESS();
+        scheduler_yield();
+    }
+
+    ADD_MESSAGE("async TLB shootdown did not converge");
+    SET_SUCCESS();
+}
+
+TEST_REGISTER(tlb_shootdown_flush_all_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    ABORT_IF_RAM_LOW();
+
+    paddr_t p = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+    TEST_ASSERT(p);
+
+    void *va = vmm_map_phys(p, PAGE_SIZE, 0, VMM_FLAG_NONE);
+
+    /* Flood shootdown queue */
+    for (size_t i = 0; i < TLB_QUEUE_SIZE * 4; i++) {
+        tlb_shootdown((uintptr_t) va, false);
+    }
+
+    /* Now do a real remap */
+    paddr_t p2 = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+    vmm_unmap_virt(va, PAGE_SIZE, VMM_FLAG_NONE);
+    va = vmm_map_phys(p2, PAGE_SIZE, 0, VMM_FLAG_NONE);
+    *(volatile uint64_t *) va = 0xDEADBEEF;
+
+    tlb_shootdown((uintptr_t) va, true);
+
+    TEST_ASSERT(*(volatile uint64_t *) va == 0xDEADBEEF);
+    SET_SUCCESS();
+}
+
+static void tlb_spammer(void *) {
+    paddr_t p = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+    void *va = vmm_map_phys(p, PAGE_SIZE, 0, VMM_FLAG_NONE);
+
+    for (int i = 0; i < 1000; i++) {
+        tlb_shootdown((uintptr_t) va, false);
+    }
+}
+
+TEST_REGISTER(tlb_shootdown_contention_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    for (int i = 0; i < 4; i++)
+        thread_spawn("tlb_spammer", tlb_spammer, NULL);
+
+    time_t start = time_get_ms();
+    while (time_get_ms() - start < 200)
+        scheduler_yield();
+
+    ADD_MESSAGE("concurrent shootdown stress completed");
     SET_SUCCESS();
 }
 

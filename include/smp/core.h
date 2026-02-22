@@ -97,6 +97,9 @@ struct core {
     uint64_t tsc_hz;
     uint64_t last_us;
     uint64_t last_tsc; /* For time.c */
+
+    uint64_t pt_seen_epoch;
+    bool reclaiming_page_tables;
 };
 
 static inline uint64_t smp_core_id() {

@@ -35,6 +35,10 @@
 
 #define VMM_MAP_BASE 0xFFFFA00000200000
 #define VMM_MAP_LIMIT 0xFFFFA00010000000
+enum page_flags : uint16_t {
+    PAGE_FLAG_PAGE_TABLE = 1,
+    PAGE_FLAG_PAGE_TABLE_FREED = 1 << 1,
+};
 
 struct page {
     uint8_t phys_usable : 1;
@@ -42,6 +46,7 @@ struct page {
     uint8_t order : 6;
     struct page *next;
     struct spinlock lock;
+    enum page_flags flags;
 };
 
 struct page_table {

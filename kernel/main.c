@@ -7,13 +7,13 @@
 #include <asm.h>
 #include <boot/gdt.h>
 #include <bootstage.h>
-#include <global.h>
 #include <cmdline.h>
 #include <compiler.h>
 #include <console/printf.h>
 #include <crypto/prng.h>
 #include <elf.h>
 #include <fs/vfs.h>
+#include <global.h>
 #include <irq/idt.h>
 #include <limine.h>
 #include <logo.h>
@@ -51,10 +51,10 @@ struct globals global = {0};
 #define BEHAVIOR /* avoids undefined behavior */
 
 __no_sanitize_address void k_main(void) {
+    disable_interrupts();
     global.core_count = mp_request.response->cpu_count;
     global.hhdm_offset = hhdm_request.response->offset;
-
-    disable_interrupts();
+    global.pt_epoch = 1;
 
     k_printf_init(framebuffer_request.response->framebuffers[0]);
     bootstage_advance(BOOTSTAGE_EARLY_FB);

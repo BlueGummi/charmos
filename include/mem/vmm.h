@@ -26,4 +26,5 @@ uintptr_t vmm_make_user_pml4(void);
 void vmm_map_page_user(uintptr_t pml4_phys, uintptr_t virt, uintptr_t phys,
                        uint64_t flags, enum vmm_flags vflags);
 uintptr_t vmm_get_phys_unsafe(uintptr_t virt);
+void vmm_reclaim_page_tables(void);
 #pragma once

@@ -1,6 +1,6 @@
 #include <acpi/lapic.h>
-#include <global.h>
 #include <console/printf.h>
+#include <global.h>
 #include <irq/idt.h>
 #include <limine.h>
 #include <linker/symbols.h>
@@ -17,23 +17,103 @@
 #define KERNEL_PML4_START_INDEX 256
 #define ENTRY_PRESENT(entry) (entry & PAGING_PRESENT)
 
+struct pt_deferred_free {
+    paddr_t phys;
+    uint64_t epoch;
+    struct pt_deferred_free *next;
+};
+
+static struct pt_deferred_free *pt_free_list;
+static struct spinlock pt_free_lock = SPINLOCK_INIT;
 static struct spinlock vmm_lock = SPINLOCK_INIT;
 static struct page_table *kernel_pml4 = NULL;
 static uintptr_t kernel_pml4_phys = 0;
 static uintptr_t vmm_map_top = VMM_MAP_BASE;
+
+static void barrier_and_shootdown(vaddr_t virt) {
+    memory_barrier();
+    invlpg(virt);
+    tlb_shootdown(virt, true);
+}
+
+/* TODO: */
+static void enqueue_pt_free(paddr_t phys) {
+    if (global.current_bootstage < BOOTSTAGE_MID_MP)
+        return pmm_free_page(phys);
+
+    struct pt_deferred_free *n = kmalloc(sizeof(*n), ALLOC_PARAMS_DEFAULT);
+    if (!n)
+        k_panic("OOM freeing page table");
+
+    n->phys = phys;
+    n->epoch = atomic_load_explicit(&global.pt_epoch, memory_order_relaxed);
+
+    enum irql irql = spin_lock(&pt_free_lock);
+    n->next = pt_free_list;
+    pt_free_list = n;
+    spin_unlock(&pt_free_lock, irql);
+}
+
+void vmm_reclaim_page_tables(void) {
+    kassert(irql_get() == IRQL_DISPATCH_LEVEL);
+    /* recursion prevention */
+    if (smp_core()->reclaiming_page_tables)
+        return;
+
+    smp_core()->reclaiming_page_tables = true;
+
+    uint64_t min_epoch = UINT64_MAX;
+
+    struct core *cpu;
+    for_each_cpu_struct(cpu) {
+        uint64_t seen = cpu->pt_seen_epoch;
+        if (seen < min_epoch)
+            min_epoch = seen;
+    }
+
+    enum irql irql = spin_lock(&pt_free_lock);
+
+    struct pt_deferred_free **pp = &pt_free_list;
+    while (*pp) {
+        struct pt_deferred_free *n = *pp;
+
+        if (n->epoch >= min_epoch) {
+            pp = &n->next;
+            continue;
+        }
+
+        *pp = n->next;
+        spin_unlock(&pt_free_lock, irql);
+
+        pmm_free_pages(n->phys, 1);
+        kfree(n, FREE_PARAMS_DEFAULT);
+
+        irql = spin_lock(&pt_free_lock);
+    }
+
+    spin_unlock(&pt_free_lock, irql);
+
+    smp_core()->reclaiming_page_tables = false;
+}
 
 uint64_t sub_offset(uint64_t a) {
     return a - global.hhdm_offset;
 }
 
 static inline struct page_table *alloc_pt(void) {
-    struct page_table *ret =
-        (void *) (pmm_alloc_page(ALLOC_FLAGS_DEFAULT) + global.hhdm_offset);
-    if (!ret)
+    paddr_t phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+    if (!phys)
         return NULL;
 
-    memset(ret, 0, PAGE_SIZE);
-    return ret;
+    if (global.page_array) {
+        struct page *pg = page_for_pfn(PAGE_TO_PFN(phys));
+        pg->flags |= PAGE_FLAG_PAGE_TABLE;
+        kassert(!(pg->flags & PAGE_FLAG_PAGE_TABLE_FREED));
+    }
+
+    void *virt = (void *) (phys + global.hhdm_offset);
+    memset(virt, 0, PAGE_SIZE);
+    return virt;
 }
 
 uintptr_t vmm_make_user_pml4(void) {
@@ -190,12 +270,10 @@ enum errno vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags,
 
     uint64_t L2 = (virt >> 21) & 0x1FF;
     pte_t *entry = &tables[2]->entries[L2];
-    if (ENTRY_PRESENT(*entry)) {
-        if (!(vflags & VMM_FLAG_NO_TLB_SHOOTDOWN)) {
-            invlpg(virt);
-            tlb_shootdown(virt, true);
-        }
-    }
+    if (ENTRY_PRESENT(*entry))
+        if (!(vflags & VMM_FLAG_NO_TLB_SHOOTDOWN))
+            barrier_and_shootdown(virt);
+
     *entry =
         (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT | PAGING_2MB_page;
 
@@ -242,17 +320,15 @@ void vmm_unmap_2mb_page(uintptr_t virt, enum vmm_flags vflags) {
     entries[2] = &tables[2]->entries[L2];
     *entries[2] &= ~PAGING_PRESENT;
 
-    if (!(vflags & VMM_FLAG_NO_TLB_SHOOTDOWN)) {
-        invlpg(virt);
-        tlb_shootdown(virt, true);
-    }
+    if (!(vflags & VMM_FLAG_NO_TLB_SHOOTDOWN))
+        barrier_and_shootdown(virt);
 
     for (int level_inner = 2; level_inner > 0; level_inner--) {
         if (vmm_is_table_empty(tables[level_inner])) {
             uintptr_t phys =
                 (uintptr_t) tables[level_inner] - global.hhdm_offset;
             *entries[level_inner - 1] = 0;
-            pmm_free_pages(phys, 1);
+            enqueue_pt_free(phys);
         } else {
             break;
         }
@@ -298,12 +374,10 @@ enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags,
 
     uint64_t L1 = (virt >> 12) & 0x1FF;
     pte_t *entry = &tables[3]->entries[L1];
-    if (ENTRY_PRESENT(*entry)) {
-        if (!(vflags & VMM_FLAG_NO_TLB_SHOOTDOWN)) {
-            invlpg(virt);
-            tlb_shootdown(virt, true);
-        }
-    }
+    if (ENTRY_PRESENT(*entry))
+        if (!(vflags & VMM_FLAG_NO_TLB_SHOOTDOWN))
+            barrier_and_shootdown(virt);
+
     *entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
 
 out:
@@ -371,17 +445,15 @@ void vmm_unmap_page(uintptr_t virt, enum vmm_flags vflags) {
 
     *entries[3] &= ~PAGING_PRESENT;
 
-    if (!(vflags & VMM_FLAG_NO_TLB_SHOOTDOWN)) {
-        invlpg(virt);
-        tlb_shootdown(virt, true);
-    }
+    if (!(vflags & VMM_FLAG_NO_TLB_SHOOTDOWN))
+        barrier_and_shootdown(virt);
 
     for (int level_inner = 3; level_inner > 0; level_inner--) {
         if (vmm_is_table_empty(tables[level_inner])) {
             uintptr_t phys =
                 (uintptr_t) tables[level_inner] - global.hhdm_offset;
             *entries[level_inner - 1] = 0;
-            pmm_free_pages(phys, 1);
+            enqueue_pt_free(phys);
         } else {
             break;
         }

@@ -33,7 +33,7 @@ struct globals {
     struct tlb_shootdown_cpu *shootdown_data;
     struct scheduler **schedulers;
     struct dpc_cpu *dpc_data;
-    
+
     atomic_size_t thread_count;
 
     size_t domain_count;
@@ -46,7 +46,7 @@ struct globals {
     struct scheduler_domain *scheduler_domains[TOPOLOGY_LEVEL_MAX];
 
     vaddr_t hhdm_offset;
-
+    _Atomic uint64_t pt_epoch;
     uint64_t total_pages;
     paddr_t last_pfn;
 

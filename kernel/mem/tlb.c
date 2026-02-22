@@ -10,14 +10,6 @@
 /* TODO: I have applied bandaid fixes to make this "work", however
  * scalability and performance will perform badly here, please fix */
 
-#define TLB_SHOOTDOWN_INITIAL_SPIN 2000u /* tight CPU_relax loop first */
-#define TLB_SHOOTDOWN_MAX_RETRIES 6u     /* total times we try sending IPIs */
-#define TLB_SHOOTDOWN_BACKOFF_MULT                                             \
-    4u /* multiply spin by this on each retry                                  \
-        */
-#define TLB_SHOOTDOWN_RESEND_PERIOD                                            \
-    1u /* we will try to resend once per retry */
-
 struct spinlock tlb_shootdown_lock = SPINLOCK_INIT;
 
 static void tlb_shootdown_internal(void) {
@@ -75,8 +67,6 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
     if (global.current_bootstage < BOOTSTAGE_MID_MP)
         return;
 
-    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
-
     enum irql lirql = spin_lock(&tlb_shootdown_lock);
 
     uint64_t gen = atomic_fetch_add(&global.next_tlb_gen, 1);
@@ -118,32 +108,14 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
             if (i == this_cpu)
                 continue;
             struct tlb_shootdown_cpu *other = &global.shootdown_data[i];
-            uint64_t target_gen = gen;
-            size_t spin = TLB_SHOOTDOWN_INITIAL_SPIN;
 
             while (atomic_load_explicit(&other->ack_gen, memory_order_acquire) <
-                   target_gen) {
-                for (size_t s = 0; s < spin; ++s) {
-                    if (atomic_load_explicit(&other->ack_gen,
-                                             memory_order_acquire) >=
-                        target_gen)
-                        break;
-                    cpu_relax();
-                }
-
-                if (atomic_load_explicit(&other->ack_gen,
-                                         memory_order_acquire) < target_gen) {
-                    ipi_send(i, IRQ_TLB_SHOOTDOWN);
-                }
-
-                if ((uint64_t) spin * TLB_SHOOTDOWN_BACKOFF_MULT > (1u << 20))
-                    spin = (1u << 20);
-                else
-                    spin *= TLB_SHOOTDOWN_BACKOFF_MULT;
-            }
+                   gen)
+                cpu_relax();
         }
+
+        atomic_fetch_add_explicit(&global.pt_epoch, 1, memory_order_release);
     }
 
     spin_unlock(&tlb_shootdown_lock, lirql);
-    irql_lower(irql);
 }

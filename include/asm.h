@@ -231,7 +231,6 @@ static inline void invlpg(uint64_t virt) {
     asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
 }
 
-
 static inline uint64_t read_cr3() {
     uint64_t cr3;
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
@@ -261,4 +260,8 @@ static inline void hcf(void) {
 
 static inline int clz(uint8_t a) {
     return __builtin_clz(a);
+}
+
+static inline void memory_barrier() {
+    asm volatile("mfence" ::: "memory");
 }

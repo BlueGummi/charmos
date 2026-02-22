@@ -1,4 +1,5 @@
 #include <acpi/lapic.h>
+#include <mem/vmm.h>
 #include <sch/periodic_work.h>
 #include <sch/sched.h>
 #include <smp/smp.h>
@@ -359,5 +360,9 @@ void scheduler_yield() {
     scheduler_periodic_work_execute(PERIODIC_WORK_PERIOD_BASED);
 
     scheduler_mark_self_in_resched(false);
+    
+    vmm_reclaim_page_tables();
+    smp_core()->pt_seen_epoch = atomic_load(&global.pt_epoch);
+    
     irql_lower(irql);
 }
