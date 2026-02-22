@@ -18,21 +18,15 @@ static void tlb_shootdown_internal(void) {
 
     atomic_store_explicit(&c->in_tlb_shootdown, true, memory_order_release);
 
+    uint32_t tail = atomic_load_explicit(&c->tail, memory_order_relaxed);
     while (true) {
-        uint32_t tail = atomic_load_explicit(&c->tail, memory_order_relaxed);
         uint32_t head = atomic_load_explicit(&c->head, memory_order_acquire);
-
-        if (tail == head &&
-            !atomic_load_explicit(&c->flush_all, memory_order_acquire))
-            break;
 
         while (tail != head) {
             uintptr_t addr = atomic_load_explicit(
                 &c->queue[tail & (TLB_QUEUE_SIZE - 1)], memory_order_acquire);
-
             if (addr)
                 invlpg(addr);
-
             tail++;
         }
 
@@ -45,12 +39,16 @@ static void tlb_shootdown_internal(void) {
             uint32_t h = atomic_load_explicit(&c->head, memory_order_acquire);
             atomic_store_explicit(&c->tail, h, memory_order_release);
         }
+
+        uint32_t new_head =
+            atomic_load_explicit(&c->head, memory_order_acquire);
+        if (new_head == tail)
+            break;
     }
 
     uint64_t gen = atomic_load_explicit(&c->target_gen, memory_order_acquire);
     atomic_store_explicit(&c->ack_gen, gen, memory_order_release);
 
-    // Reset flags
     atomic_store_explicit(&c->ipi_pending, false, memory_order_release);
     atomic_store_explicit(&c->in_tlb_shootdown, false, memory_order_release);
 }
@@ -69,10 +67,13 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
     if (global.current_bootstage < BOOTSTAGE_MID_MP)
         return;
 
-    uint64_t gen = atomic_fetch_add(&global.next_tlb_gen, 1);
-    size_t this_cpu = smp_core_id();
+    enum irql lirql = spin_lock(&tlb_shootdown_lock);
 
+    uint64_t gen = atomic_fetch_add(&global.next_tlb_gen, 1);
+
+    size_t this_cpu = smp_core_id();
     size_t i;
+
     for_each_cpu_id(i) {
         if (i == this_cpu) {
             invlpg(addr);
@@ -80,28 +81,18 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
         }
 
         struct tlb_shootdown_cpu *t = &global.shootdown_data[i];
+
         atomic_store_explicit(&t->target_gen, gen, memory_order_release);
 
-        while (true) {
-            uint32_t slot =
-                atomic_load_explicit(&t->head, memory_order_relaxed);
-            uint32_t tail =
-                atomic_load_explicit(&t->tail, memory_order_acquire);
+        uint32_t head = atomic_load_explicit(&t->head, memory_order_relaxed);
+        uint32_t tail = atomic_load_explicit(&t->tail, memory_order_acquire);
 
-            if ((slot - tail) >= TLB_QUEUE_SIZE) {
-                atomic_store_explicit(&t->flush_all, true,
-                                      memory_order_release);
-                break;
-            }
-
-            if (atomic_compare_exchange_weak_explicit(&t->head, &slot, slot + 1,
-                                                      memory_order_acq_rel,
-                                                      memory_order_relaxed)) {
-
-                atomic_store_explicit(&t->queue[slot & (TLB_QUEUE_SIZE - 1)],
-                                      addr, memory_order_release);
-                break;
-            }
+        if ((head - tail) >= TLB_QUEUE_SIZE) {
+            atomic_store_explicit(&t->flush_all, true, memory_order_release);
+        } else {
+            atomic_store_explicit(&t->queue[head & (TLB_QUEUE_SIZE - 1)], addr,
+                                  memory_order_release);
+            atomic_store_explicit(&t->head, head + 1, memory_order_release);
         }
 
         bool old_pending = atomic_exchange_explicit(&t->ipi_pending, true,
@@ -117,6 +108,7 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
             if (i == this_cpu)
                 continue;
             struct tlb_shootdown_cpu *other = &global.shootdown_data[i];
+
             while (atomic_load_explicit(&other->ack_gen, memory_order_acquire) <
                    gen)
                 cpu_relax();
@@ -124,4 +116,6 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
 
         atomic_fetch_add_explicit(&global.pt_epoch, 1, memory_order_release);
     }
+
+    spin_unlock(&tlb_shootdown_lock, lirql);
 }
