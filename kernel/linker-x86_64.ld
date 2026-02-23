@@ -101,6 +101,12 @@ SECTIONS {
         __ekernel_perdomain_desc = .;
     }
 
+    .kernel_log_sites : {
+        __skernel_log_sites = .;
+        KEEP(*(.kernel_log_sites))
+        __ekernel_log_sites = .;
+    }
+
     .bss : ALIGN(4K) {
         __sbss = .;
         *(.bss .bss.*)

@@ -260,6 +260,11 @@ static void change_tick(struct scheduler *sched, struct thread *next) {
         thread_get_state(next) != THREAD_STATE_IDLE_THREAD) {
         /* Timesharing threads need timeslices */
         change_tick_duration(next->timeslice_length_raw_ms);
+    } else if (next->perceived_prio_class == THREAD_PRIO_CLASS_RT) {
+        /* Realtime threads get the tick disabled. Only RT though.
+         * URGENT still needs it so that it can switch out and 
+         * run another thread when the boost leaves */
+        tick_disable();
     }
 }
 

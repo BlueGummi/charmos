@@ -1,7 +1,6 @@
 #ifdef TEST_TIMER_DEFER
 
 #include <mem/alloc.h>
-#include <thread/defer.h>
 #include <sch/sched.h>
 #include <sleep.h>
 #include <stdbool.h>
@@ -9,6 +8,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <tests.h>
+#include <thread/defer.h>
+#include <time.h>
 
 static bool defer_worked = false;
 static uint64_t enqueue_ms;

@@ -1,3 +1,4 @@
+#include <log.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/slab.h>
@@ -215,6 +216,7 @@ struct thread *thread_create_internal(char *name, void (*entry_point)(void *),
     if (unlikely(!new_thread->activity_stats))
         goto err;
 
+
     if (unlikely(!cpu_mask_init(&new_thread->allowed_cpus, global.core_count)))
         goto err;
 
@@ -227,6 +229,10 @@ struct thread *thread_create_internal(char *name, void (*entry_point)(void *),
 
     new_thread->name = kzalloc(needed, ALLOC_PARAMS_DEFAULT);
     if (!new_thread->name)
+        goto err;
+    
+    new_thread->log_site = log_site_create(new_thread->name, LOG_SITE_DROP_OLD, 16);
+    if (!new_thread->log_site)
         goto err;
 
     va_copy(args_copy, args);
@@ -276,7 +282,7 @@ void thread_free(struct thread *t) {
     kfree(t->activity_data, FREE_PARAMS_DEFAULT);
     kfree(t->activity_stats, FREE_PARAMS_DEFAULT);
     kfree(t->name, FREE_PARAMS_DEFAULT);
-
+    log_site_destroy(t->log_site);
     kfree(t->turnstile, FREE_PARAMS_DEFAULT);
     apc_free_on_thread(t);
     thread_free_stack(t);

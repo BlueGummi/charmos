@@ -16,6 +16,7 @@
 #include <global.h>
 #include <irq/idt.h>
 #include <limine.h>
+#include <log.h>
 #include <logo.h>
 #include <mem/alloc.h>
 #include <mem/asan.h>
@@ -65,6 +66,8 @@ __no_sanitize_address void k_main(void) {
 
     slab_allocator_init();
     asan_init();
+
+    log_sites_init();
     bootstage_advance(BOOTSTAGE_EARLY_ALLOCATORS);
     gdt_install();
     syscall_setup(syscall_entry);

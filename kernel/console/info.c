@@ -9,7 +9,7 @@ void k_info_impl(const char *category, int level, const char *file, int line,
 
     /* Print message */
     va_start(args, fmt);
-    v_k_printf(NULL, fmt, args);
+    k_vprintf(NULL, fmt, args);
     va_end(args);
 
     if (level != K_TEST)

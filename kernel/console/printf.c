@@ -402,7 +402,7 @@ static void handle_format_specifier(struct printf_cursor *csr,
     *format_ptr = format;
 }
 
-void v_k_printf(struct printf_cursor *csr, const char *format, va_list args) {
+void k_vprintf(struct printf_cursor *csr, const char *format, va_list args) {
     while (*format) {
         if (*format == '%') {
             format++;
@@ -424,7 +424,7 @@ void k_printf(const char *format, ...) {
     spin_lock_raw(&k_printf_lock);
     va_list args;
     va_start(args, format);
-    v_k_printf(NULL, format, args);
+    k_vprintf(NULL, format, args);
     va_end(args);
     spin_unlock_raw(&k_printf_lock);
 
@@ -443,7 +443,7 @@ int vsnprintf(char *buffer, int buffer_len, const char *format, va_list args) {
         .cursor = 0,
     };
 
-    v_k_printf(&csr, format, args);
+    k_vprintf(&csr, format, args);
 
     if (buffer)
         csr.buffer[csr.cursor] = '\0';
@@ -464,7 +464,7 @@ int snprintf(char *buffer, int buffer_len, const char *format, ...) {
         .cursor = 0,
     };
 
-    v_k_printf(&csr, format, args);
+    k_vprintf(&csr, format, args);
     va_end(args);
 
     if (buffer)
@@ -476,7 +476,7 @@ int snprintf(char *buffer, int buffer_len, const char *format, ...) {
 void panic(const char *format, ...) {
     va_list args;
     va_start(args, format);
-    v_k_printf(NULL, format, args);
+    k_vprintf(NULL, format, args);
     va_end(args);
 
     while (true) {

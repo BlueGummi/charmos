@@ -12,6 +12,7 @@
 #include <string.h>
 #include <sync/spinlock.h>
 #include <thread/dpc.h>
+#include <time.h>
 
 static volatile uint64_t cr3 = 0;
 static _Atomic uint32_t cores_awake = 0;

@@ -31,7 +31,7 @@ static inline struct rbt *climb_tree_local() {
 }
 
 /*
- * shaped = p^CLIMB_PRESSURE_EXPONENT
+ * shaped = p ^ CLIMB_PRESSURE_EXPONENT
  * level = floor(shaped * CLIMB_BOOST_LEVEL_MAX)
  * boost_clamp(level)
  */
@@ -65,7 +65,7 @@ climb_thread_total_pressure(struct climb_thread_state *cts) {
  */
 static void update_fields(struct climb_thread_state *cts) {
     climb_pressure_t p = climb_thread_total_pressure(cts);
-    int target = climb_pressure_to_boost_target(p);
+    int32_t target = climb_pressure_to_boost_target(p);
 
     /* EWMA */
     cts->boost_ewma = CLIMB_EWMA(cts->boost_ewma, target);
@@ -81,7 +81,7 @@ climb_pressure_t climb_thread_get_pressure(struct thread *t) {
 /*
  * new_pressure = p + delta * (max - p)
  */
-climb_pressure_t climb_accumulate(climb_pressure_t p, climb_pressure_t delta,
+static inline climb_pressure_t climb_accumulate(climb_pressure_t p, climb_pressure_t delta,
                                   climb_pressure_t max) {
     return p + fx_mul(delta, (max - p));
 }
@@ -123,6 +123,7 @@ static void apply_handle_pressures(struct thread *t, struct climb_handle *ch) {
         cts->direct_pressure = newp;
         return;
     }
+
     kassert(ch->kind == CLIMB_PRESSURE_INDIRECT);
 
     /* indirect pressure */
@@ -146,7 +147,6 @@ static void apply_handle(struct thread *t, struct climb_handle *ch) {
     list_add_tail(&ch->list, &t->climb_state.handles);
     apply_handle_pressures(t, ch);
     struct climb_thread_state *cts = &t->climb_state;
-    cpu_id_t cpu = t->curr_core;
 
     ch->given_by = scheduler_get_current_thread();
 
@@ -155,9 +155,12 @@ static void apply_handle(struct thread *t, struct climb_handle *ch) {
         cts->pressure_periods = 1;
         kassert(!cts->on_climb_tree);
         kassert(rbt_node_empty(&cts->climb_node));
-        struct rbt *tree = &global.schedulers[cpu]->climb_threads;
+        enum thread_flags out;
+        struct scheduler *sched = thread_get_last_ran(t, &out);
+        struct rbt *tree = &sched->climb_threads;
         rbt_insert(tree, &cts->climb_node);
         cts->on_climb_tree = true;
+        thread_restore_flags(t, out);
     }
 }
 
@@ -177,6 +180,15 @@ static void remove_handle(struct thread *t, struct climb_handle *ch) {
 
     ch->applied_pressure_internal = 0;
     list_del_init(&ch->list);
+
+    enum thread_flags out;
+    struct scheduler *sched = thread_get_last_ran(t, &out);
+    kassert(rbt_has_node(&sched->climb_threads, &cts->climb_node));
+
+    if (list_empty(&cts->handles)) {
+        /* This thread is done. Let it decay now */
+        cts->pressure_periods = -1;
+    }
 }
 
 static void climb_handle_act_self(struct thread *t, struct climb_handle *h,
@@ -200,8 +212,7 @@ static void climb_handle_act_other(struct thread *t, struct climb_handle *ch,
                                    void (*act)(struct thread *,
                                                struct climb_handle *)) {
     /* try and get a ref */
-    if (!thread_get(t))
-        return;
+    kassert(thread_get(t));
 
     /* thread cannot disappear under us */
     enum thread_flags out_flags;
@@ -238,6 +249,16 @@ static void climb_handle_act(struct thread *t, struct climb_handle *h,
 }
 
 void climb_handle_remove(struct thread *t, struct climb_handle *h) {
+    /* We might not always have a ref to the thread here.
+     * If the handle we are given is completely unused, this is because
+     * the thread we are removing from is NOT a timesharing thread.
+     *
+     * This means we can safely leave and no-op */
+    if (h->applied_pressure_internal == 0) {
+        kassert(list_empty(&h->list));
+        return;
+    }
+
     climb_handle_act(t, h, remove_handle);
     climb_drop_ref(t);
 }
@@ -245,6 +266,9 @@ void climb_handle_remove(struct thread *t, struct climb_handle *h) {
 void climb_handle_apply(struct thread *t, struct climb_handle *h) {
     if (!climb_get_ref(t))
         return;
+
+    if (t->perceived_prio_class != THREAD_PRIO_CLASS_TIMESHARE)
+        return climb_drop_ref(t);
 
     climb_handle_act(t, h, apply_handle);
 }
@@ -333,7 +357,7 @@ void climb_post_migrate_hook(struct thread *t, size_t old_cpu, size_t new_cpu) {
         kassert(t->climb_state.pressure_periods == 0);
         return;
     }
-    
+
     /* Locks are already held */
     struct scheduler *old = global.schedulers[old_cpu];
     struct scheduler *new = global.schedulers[new_cpu];
@@ -343,8 +367,34 @@ void climb_post_migrate_hook(struct thread *t, size_t old_cpu, size_t new_cpu) {
     rbt_insert(&new->climb_threads, &t->climb_state.climb_node);
 }
 
+/* This is how we key our red black tree.
+ *
+ * 31.. .... .... .... .... .... .... ...0
+ *
+ *
+ * Our 32 bit fixed point representation uses the upper word as the "integer"
+ * part and the lower word as the "decimal" part. This is how climb_pressure_t
+ * is represented. However, we want to sort our threads in this tree as not
+ * just a climb_pressure_t, but also with their amount of elapsed periods.
+ *
+ * This is because sorting based on just climb_pressure_t will favor high
+ * pressure threads, which can potentially starve lower pressure threads
+ * that have been waiting for longer periods of time from a boost.
+ *
+ * climb_pressure_t is only ever a value between 0 and 1 in fixed point,
+ * thus we take the approach of shifting in the pressure_periods by
+ * a certain shift so that it contributes to the ordering of the tree.
+ *
+ * 31.. .... .... .... .... .... .... ...0
+ *                     S
+ *
+ * The "S" represents where the lowest bit of the pressure periods would be
+ * placed. This effectively means that every period of elapsed pressure
+ * is equal to 0.5 climb_pressure_t points, and means that two periods
+ * would result in a single maximum climb_pressure_t of pressure.
+ */
 size_t climb_get_thread_data(struct rbt_node *n) {
     struct climb_thread_state *cts = climb_thread_state_from_tree_node(n);
-    return cts->pressure_periods << CLIMB_PRESSURE_KEY_SHIFT |
+    return cts->pressure_periods * (1 << CLIMB_PRESSURE_KEY_SHIFT) +
            climb_thread_total_pressure(cts);
 }

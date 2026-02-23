@@ -62,7 +62,7 @@ void k_panic_impl(const char *file, int line, const char *func, const char *fmt,
 
     va_list args;
     va_start(args, fmt);
-    v_k_printf(NULL, fmt, args);
+    k_vprintf(NULL, fmt, args);
     va_end(args);
 
     debug_print_stack();

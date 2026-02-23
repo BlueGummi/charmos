@@ -9,6 +9,7 @@
 #include <structures/list.h>
 #include <sync/condvar.h>
 #include <sync/spinlock.h>
+#include <time.h>
 #include <types/refcount.h>
 #include <types/types.h>
 

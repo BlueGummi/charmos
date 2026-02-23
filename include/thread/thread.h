@@ -308,6 +308,7 @@ struct thread {
     struct list_head to_exec_event_apcs; /* to be executed */
 
     /* ========== Profiling data ========== */
+    struct log_site *log_site;
     size_t context_switches; /* Total context switches */
 
     size_t preemptions;
