@@ -12,9 +12,9 @@ struct tlb_shootdown_cpu {
     _Atomic uint32_t head;
     _Atomic uint32_t tail;
     atomic_bool in_tlb_shootdown;
-    _Atomic uint64_t ack_gen;
-    _Atomic uint64_t target_gen;
     _Atomic uint8_t flush_all;
+    _Atomic uint64_t req_gen;  /* last requested generation */
+    _Atomic uint64_t done_gen; /* last completed generation */
 };
 
 void tlb_init(void);
