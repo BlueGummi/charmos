@@ -13,6 +13,7 @@ while ($i < $max_cores)
   p/x *global.cores[$i]
   p/x *global.cores[$i].current_thread
   p/x *global.schedulers[$i]
+  p/x global.shootdown_data[$i]
   set $i = $i + 1
 end
 

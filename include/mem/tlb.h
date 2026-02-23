@@ -11,7 +11,6 @@ struct tlb_shootdown_cpu {
     _Atomic uintptr_t queue[TLB_QUEUE_SIZE];
     _Atomic uint32_t head;
     _Atomic uint32_t tail;
-    atomic_bool ipi_pending;
     atomic_bool in_tlb_shootdown;
     _Atomic uint64_t ack_gen;
     _Atomic uint64_t target_gen;
@@ -20,5 +19,6 @@ struct tlb_shootdown_cpu {
 };
 
 void tlb_init(void);
-enum irq_result tlb_shootdown_isr(void *ctx, uint8_t irq, struct irq_context *rsp);
+enum irq_result tlb_shootdown_isr(void *ctx, uint8_t irq,
+                                  struct irq_context *rsp);
 void tlb_shootdown(uintptr_t addr, bool synchronous);
