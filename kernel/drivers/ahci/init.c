@@ -97,14 +97,14 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
             continue;
 
         uint32_t sig = mmio_read_32(&port->sig);
-        ahci_info(K_INFO, "Controller port %u has signature 0x%lx", i, sig);
+        ahci_log(LOG_INFO, "Controller port %u has signature 0x%lx", i, sig);
 
         if (sig == 0xFFFFFFFF)
             continue;
 
         if (sig != 0x00000101) {
-            ahci_info(K_WARN, "Controller port %u is not an HDD, skipping...",
-                      i, sig);
+            ahci_log(LOG_WARN, "Controller port %u is not an HDD, skipping...",
+                     i, sig);
             continue;
         }
 
@@ -157,7 +157,7 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
             mmio_write_32(&port->cmd, cmd);
 
             setup_port_slots(dev, i);
-            ahci_info(K_INFO, "Port %u slots set up", i);
+            ahci_log(LOG_INFO, "Port %u slots set up", i);
         }
     }
     return disks;
@@ -167,7 +167,7 @@ struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
                                         uint32_t *d_cnt) {
     bool s64a = mmio_read_32(&ctrl->cap) & (1U << 31);
     if (!s64a) {
-        ahci_info(K_WARN, "controller does not support 64-bit addressing\n");
+        ahci_log(LOG_WARN, "controller does not support 64-bit addressing\n");
         return NULL;
     }
 
@@ -188,9 +188,9 @@ struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
     uint32_t disk_count = 0;
     struct ahci_disk *d = device_setup(dev, ctrl, &disk_count);
     *d_cnt = disk_count;
-    ahci_info(K_INFO,
-              "Device initialized successfully, %u usable port(s) present",
-              disk_count);
+    ahci_log(LOG_INFO,
+             "Device initialized successfully, %u usable port(s) present",
+             disk_count);
 
     return d;
 }

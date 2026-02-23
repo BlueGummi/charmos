@@ -1,6 +1,7 @@
 #include <acpi/hpet.h>
 #include <asm.h>
 #include <console/printf.h>
+#include <log.h>
 #include <mem/page.h>
 #include <mem/vmm.h>
 #include <smp/core.h>
@@ -8,6 +9,8 @@
 
 #include "uacpi/acpi.h"
 #include "uacpi/status.h"
+
+LOG_HANDLE_DECLARE_DEFAULT(hpet);
 
 uint64_t *hpet_base;
 uint64_t hpet_timer_count;
@@ -94,8 +97,9 @@ void hpet_setup_timer(uint8_t timer_index, uint8_t irq_line, bool periodic,
     uint8_t confirmed_irq = confirmed_config.ioapic_route;
 
     if (confirmed_irq != irq_line) {
-        k_info("HPET", K_WARN, "Timer %u: IRQ %u not accepted (got %u)",
-               timer_index, irq_line, confirmed_irq);
+        log_warn_global(LOG_HANDLE(hpet),
+                        "Timer %u: IRQ %u not accepted (got %u)", timer_index,
+                        irq_line, confirmed_irq);
         hpet_write64(cfg_addr, old_config);
         return;
     }
@@ -123,7 +127,7 @@ void hpet_setup_timer(uint8_t timer_index, uint8_t irq_line, bool periodic,
 void hpet_init(void) {
     struct uacpi_table hpet_table;
     if (uacpi_table_find_by_signature("HPET", &hpet_table) != UACPI_STATUS_OK) {
-        k_info("HPET", K_ERROR, "Did not find HPET ACPI entry");
+        log_err_global(LOG_HANDLE(hpet), "Did not find HPET ACPI entry");
     }
 
     struct acpi_hpet *hpet = hpet_table.ptr;
@@ -147,7 +151,8 @@ void hpet_init(void) {
     hpet_enable();
     hpet_timestamp_us();
 
-    k_info("HPET", K_INFO, "HPET initialized - %llu timers", hpet_timer_count);
+    log_info_global(LOG_HANDLE(hpet), "HPET initialized - %lu timers",
+                    hpet_timer_count);
 }
 
 uint64_t hpet_timestamp_ns(void) {

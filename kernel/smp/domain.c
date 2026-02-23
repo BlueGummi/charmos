@@ -1,11 +1,24 @@
-#include <global.h>
 #include <console/printf.h>
+#include <global.h>
+#include <log.h>
 #include <mem/alloc.h>
 #include <mem/numa.h>
 #include <sch/sched.h>
 #include <smp/domain.h>
 #include <stdbool.h>
 #include <sync/spinlock.h>
+
+LOG_SITE_DECLARE_DEFAULT(domain);
+LOG_HANDLE_DECLARE_DEFAULT(domain);
+
+#define domain_log(lvl, fmt, ...)                                              \
+    log(LOG_SITE(domain), LOG_HANDLE(domain), lvl, fmt, ##__VA_ARGS__)
+
+#define domain_err(fmt, ...) domain_log(LOG_ERROR, fmt, ##__VA_ARGS__)
+#define domain_warn(fmt, ...) domain_log(LOG_WARN, fmt, ##__VA_ARGS__)
+#define domain_info(fmt, ...) domain_log(LOG_INFO, fmt, ##__VA_ARGS__)
+#define domain_debug(fmt, ...) domain_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
+#define domain_trace(fmt, ...) domain_log(LOG_TRACE, fmt, ##__VA_ARGS__)
 
 static void init_global_domain(uint64_t domain_count) {
     global.domain_count = domain_count;
@@ -80,8 +93,6 @@ static void construct_domains_from_cores(void) {
         }
     }
 }
-
-#define domain_info(fmt, ...) k_info("DOMAIN", K_INFO, fmt, ##__VA_ARGS__)
 
 void domain_dump(void) {
     domain_info("Domains (%zu total)", global.domain_count);
@@ -169,4 +180,4 @@ bool domain_idle(struct domain *domain) {
 }
 
 MOVEALLOC_REGISTER_CALL(domain_move, domains_move, /* a = */ NULL,
-                            /* b = */ NULL);
+                        /* b = */ NULL);

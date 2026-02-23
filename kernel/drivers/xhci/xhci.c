@@ -18,6 +18,8 @@
 #include "internal.h"
 
 struct workqueue *xhci_wq;
+LOG_HANDLE_DECLARE_DEFAULT(xhci);
+LOG_SITE_DECLARE_DEFAULT(xhci);
 
 enum usb_status xhci_address_device(struct xhci_port *p, uint8_t slot_id,
                                     struct xhci_slot *publish_to) {
@@ -482,7 +484,7 @@ xhci_make_request_status(struct xhci_device *dev,
         struct xhci_port *port = &dev->port_info[request->port - 1];
 
         if (request->generation && request->generation != port->generation) {
-            k_log("gen mismatch\n");
+            xhci_warn("gen mismatch\n");
             return XHCI_REQUEST_DISCONNECT;
         }
     }
@@ -591,7 +593,7 @@ static void xhci_process_port_connect(struct xhci_device *dev,
 
 static void xhci_process_port_disconnect(struct xhci_device *dev,
                                          struct xhci_trb *trb) {
-    k_log("dsc\n");
+    xhci_warn("dsc\n");
     struct xhci_port *port = xhci_port_for_trb(dev, trb);
     xhci_port_set_state(port, XHCI_PORT_STATE_DISCONNECTING);
 

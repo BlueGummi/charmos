@@ -1,9 +1,13 @@
 /* @title: Allocator API */
 #pragma once
 #include <console/printf.h>
+#include <log.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+
+LOG_SITE_EXTERN(slab);
+LOG_HANDLE_EXTERN(slab_flags);
 
 /*
  * TL;DR: ALLOCATION FLAGS TELL THE ALLOCATOR WHAT KIND OF MEMORY
@@ -236,7 +240,8 @@ static inline void alloc_request_sanitize(enum alloc_flags *f,
                                           enum alloc_behavior *b) {
     if (!alloc_flag_behavior_verify(*f, *b)) {
         /* Force safety first */
-        k_info("ALLOC", K_WARN, "Allocation flag discrepancy");
+        log(LOG_SITE(slab), LOG_HANDLE(slab_flags), LOG_WARN,
+            "Allocation flag discrepancy");
         if (alloc_behavior_is_isr_safe(*b) || !alloc_behavior_may_fault(*b)) {
             *f &= ~(ALLOC_FLAG_PAGEABLE | ALLOC_FLAG_MOVABLE);
             *f |= ALLOC_FLAG_NONPAGEABLE;

@@ -1,5 +1,4 @@
 #include <block/generic.h>
-#include <global.h>
 #include <console/printf.h>
 #include <drivers/ahci.h>
 #include <drivers/ata.h>
@@ -8,6 +7,7 @@
 #include <drivers/pci.h>
 #include <fs/detect.h>
 #include <fs/vfs.h>
+#include <global.h>
 #include <mem/alloc.h>
 #include <registry.h>
 #include <stdbool.h>
@@ -94,18 +94,20 @@ void registry_mkname(struct generic_disk *disk, const char *prefix,
     device_mkname(disk, prefix, counter);
 }
 
+LOG_HANDLE_EXTERN(pci);
+LOG_HANDLE_EXTERN(vfs);
 void registry_setup() {
     struct pci_device *devices;
     uint64_t count;
 
     pci_scan_devices(&devices, &count);
-    k_info("PCI", K_INFO, "Found %u devices", count);
+    log_info_global(LOG_HANDLE(pci), "Found %u devices", count);
 
     pci_init_devices(devices, count);
     ata_init(devices, count);
 
-    k_info("VFS", K_INFO, "Attempting to find and mount root '%s'",
-           global.root_partition);
+    log_info_global(LOG_HANDLE(vfs), "Attempting to find and mount root '%s'",
+                    global.root_partition);
 
     bool found_root = false;
     for (uint64_t i = 0; i < disk_count; i++) {
@@ -130,6 +132,7 @@ void registry_setup() {
         k_panic("VFS failed to mount root '%s' - could not find root\n",
                 global.root_partition);
 
-    k_info("VFS", K_INFO, "Root '%s' mounted - is a(n) %s filesystem",
-           global.root_partition, detect_fstr(global.root_node->fs_type));
+    log_info_global(
+        LOG_HANDLE(vfs), "Root '%s' mounted - is a(n) %s filesystem",
+        global.root_partition, detect_fstr(global.root_node->fs_type));
 }

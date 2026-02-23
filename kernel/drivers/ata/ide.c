@@ -12,6 +12,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+LOG_SITE_DECLARE_DEFAULT(ide);
+LOG_HANDLE_DECLARE_DEFAULT(ide);
+
 void ide_print_info(struct generic_disk *d) {
     struct ata_drive *drive = (struct ata_drive *) d->driver_data;
     if (!drive->actually_exists)
@@ -138,8 +141,8 @@ struct generic_disk *ide_create_generic(struct ata_drive *ide) {
         return NULL;
 
     uint8_t irq = irq_alloc_entry();
-    k_info("IDE", K_INFO, "IDE drive IRQ on line %u, allocated entry %u",
-           ide->irq, irq);
+    ide_log(LOG_INFO, "IDE drive IRQ on line %u, allocated entry %u", ide->irq,
+            irq);
 
     ioapic_route_irq(ide->irq, irq, 0, false);
     irq_register("ata", irq, ide_irq_handler, &ide->channel, IRQ_FLAG_NONE);

@@ -31,15 +31,11 @@ struct apc_event_desc {
     const char *name; /* TODO: add fields to this structure */
 };
 
-#define APC_EVENT_SYMBOL_PREFIX_INTERNAL __apc_event_
-
-#define APC_EVENT_EXTERN(n)                                                    \
-    extern struct apc_event_desc APC_EVENT_SYMBOL_PREFIX_INTERNAL##n
+#define APC_EVENT_EXTERN(n) extern struct apc_event_desc __apc_event_##n
 
 #define APC_EVENT_CREATE(n, strname)                                           \
-    struct apc_event_desc APC_EVENT_SYMBOL_PREFIX_INTERNAL##n = {.name =       \
-                                                                     strname}
-#define APC_EVENT(n) &(APC_EVENT_SYMBOL_PREFIX_INTERNAL##n)
+    struct apc_event_desc __apc_event_##n = {.name = strname}
+#define APC_EVENT(n) &(__apc_event_##n)
 
 static inline const char *apc_event_str(struct apc_event_desc *evt) {
     return evt->name;

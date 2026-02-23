@@ -88,7 +88,9 @@ static inline uint8_t usb_to_xhci_ep_type(bool in, uint8_t type) {
         case USB_ENDPOINT_ATTR_TRANS_TYPE_ISOCHRONOUS:
             return XHCI_ENDPOINT_TYPE_ISOCH_IN;
 
-        default: xhci_error("Invalid type detected: %u\n", type); return 0;
+        default:
+            xhci_log(LOG_ERROR, "Invalid type detected: %u\n", type);
+            return 0;
         }
     }
     switch (type) {
@@ -103,7 +105,7 @@ static inline uint8_t usb_to_xhci_ep_type(bool in, uint8_t type) {
     case USB_ENDPOINT_ATTR_TRANS_TYPE_ISOCHRONOUS:
         return XHCI_ENDPOINT_TYPE_ISOCH_OUT;
 
-    default: xhci_error("Invalid type detected: %u\n", type); return 0;
+    default: xhci_log(LOG_ERROR, "Invalid type detected: %u\n", type); return 0;
     }
 }
 

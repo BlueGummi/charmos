@@ -10,6 +10,7 @@
 #include "uacpi/status.h"
 
 static struct ioapic_info ioapic;
+static LOG_HANDLE_DECLARE_DEFAULT(ioapic);
 
 void ioapic_write(uint8_t reg, uint32_t val) {
     mmio_write_32(&ioapic.mmio_base[0], reg); // IOREGSEL
@@ -61,7 +62,7 @@ void ioapic_init(void) {
     struct uacpi_table apic_table;
 
     if (uacpi_table_find_by_signature("APIC", &apic_table) != UACPI_STATUS_OK) {
-        k_info("I/O APIC", K_ERROR, "MADT not found");
+        log_err_global(LOG_HANDLE(ioapic), "MADT not found");
         return;
     }
 
@@ -82,8 +83,9 @@ void ioapic_init(void) {
             ioapic.mmio_base = vmm_map_phys(ioapic_entry->address, 0x20,
                                             PAGING_UNCACHABLE, VMM_FLAG_NONE);
 
-            k_info("I/O APIC", K_INFO, "ID: %u, GSI Base: %u, MMIO: 0x%lx",
-                   ioapic.id, ioapic.gsi_base, ioapic.mmio_base);
+            log_info_global(LOG_HANDLE(ioapic),
+                            "ID: %u, GSI Base: %u, MMIO: 0x%lx", ioapic.id,
+                            ioapic.gsi_base, ioapic.mmio_base);
 
             return;
         }

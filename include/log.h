@@ -5,17 +5,16 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <structures/locked_list.h>
-#include <sync/spinlock.h>
+#include <structures/list.h>
 #include <types/types.h>
 
-enum log_event_flags : uint32_t {
-    LOG_EVENT_PRINT = 1 << 0,     /* emit to console immediately */
-    LOG_EVENT_IMPORTANT = 1 << 1, /* never drop / elevated visibility */
-    LOG_EVENT_RATELIMIT = 1 << 2, /* suppress floods */
-    LOG_EVENT_ONCE = 1 << 3,      /* print only first occurrence */
-    LOG_EVENT_TRACE = 1 << 4,     /* eligible for tracing backend */
-    LOG_EVENT_PANIC = 1 << 5,     /* fatal if level >= ERROR */
+enum log_flags : uint32_t {
+    LOG_PRINT = 1 << 0,     /* emit to console immediately */
+    LOG_IMPORTANT = 1 << 1, /* never drop / elevated visibility */
+    LOG_RATELIMIT = 1 << 2, /* suppress floods */
+    LOG_ONCE = 1 << 3,      /* print only first occurrence */
+    LOG_PANIC = 1 << 5,     /* fatal if level >= ERROR */
+    LOG_DEFAULT = LOG_PRINT,
 };
 
 enum log_level : uint8_t {
@@ -27,11 +26,12 @@ enum log_level : uint8_t {
 };
 
 enum log_site_flags : uint32_t {
-    LOG_SITE_PRINT = 1 << 0, /* print all events in site */
-    LOG_SITE_PERSIST = 1 << 1,
-    LOG_SITE_DROP_OLD = 1 << 2, /* overwrite oldest on overflow */
-    LOG_SITE_NO_IRQ = 1 << 3,   /* suppress in IRQ context */
+    LOG_SITE_PRINT = 1 << 0,    /* print all logs in site */
+    LOG_SITE_DROP_OLD = 1 << 1, /* overwrite oldest on overflow */
+    LOG_SITE_NO_IRQ = 1 << 2,   /* suppress in IRQ context */
+    LOG_SITE_PANIC_VISIBLE = 1 << 3,
     LOG_SITE_NONE = 0,
+    LOG_SITE_DEFAULT = LOG_SITE_DROP_OLD,
 };
 
 enum log_record_flags : uint16_t {
@@ -39,33 +39,20 @@ enum log_record_flags : uint16_t {
     LOG_REC_TRUNCATED = 1 << 1,
 };
 
-enum log_site_type {
-    LOG_SITE_TYPE_STATIC,
-    LOG_SITE_TYPE_DYNAMIC,
-    LOG_SITE_TYPE_EPHEMERAL,
-};
-
-struct log_subsystem {
-    const char *name;
-    uint32_t enabled_mask;
-};
-
-struct log_event_handle {
+struct log_handle {
     const char *msg;
-    struct log_subsystem *subsystem;
-    enum log_level level;
-    enum log_event_flags flags;
+    enum log_flags flags;
     _Atomic uint32_t seen;
     _Atomic uint64_t last_ts;
     void *src;
 };
 
-struct log_event_record {
+struct log_record {
     time_t timestamp;
     cpu_id_t cpu;
     uint32_t tid;
 
-    const struct log_event_handle *handle;
+    const struct log_handle *handle;
     enum log_level level;
 
     uint16_t msg_len;
@@ -81,7 +68,7 @@ struct log_event_record {
 
 struct log_ring_slot {
     _Atomic uint64_t seq;
-    struct log_event_record rec;
+    struct log_record rec;
 };
 
 struct log_ringbuf {
@@ -96,6 +83,7 @@ struct log_site {
     struct list_head list;
     char *name;
     struct log_ringbuf rb;
+    uint32_t enabled_mask;
 
     /* Only relevant for dynamic log sites */
     refcount_t refcount;
@@ -104,10 +92,6 @@ struct log_site {
     uint32_t dropped; /* Accumulation of all missed logs */
     enum log_site_flags flags;
 } __linker_aligned;
-
-struct log_globals {
-    struct locked_list list;
-};
 
 struct log_dump_opts {
     uint8_t min_level;
@@ -131,20 +115,16 @@ static inline const char *log_level_color(enum log_level l) {
     }
 }
 
-static inline uint8_t log_event_level(const struct log_event_handle *h) {
-    return h->level;
-}
-
-static inline bool log_event_should_print(const struct log_event_handle *h,
-                                          const struct log_site *s,
-                                          uint8_t level) {
-    if (h->flags & LOG_EVENT_PRINT)
+static inline bool log_handle_should_print(const struct log_handle *h,
+                                           const struct log_site *s,
+                                           uint8_t level) {
+    if (h->flags & LOG_PRINT)
         return true;
 
     if (s && (s->flags & LOG_SITE_PRINT))
         return true;
 
-    if ((h->flags & LOG_EVENT_PANIC) && level >= LOG_ERROR)
+    if ((h->flags & LOG_PANIC) && level >= LOG_ERROR)
         return true;
 
     return false;
@@ -162,8 +142,7 @@ static inline uint64_t log_arg_ptr(const void *p) {
     return (uintptr_t) p;
 }
 
-static inline bool log_subsystem_enabled(const struct log_subsystem *ss,
-                                         uint8_t level) {
+static inline bool log_site_enabled(const struct log_site *ss, uint8_t level) {
     if (!ss)
         return true;
 
@@ -174,40 +153,83 @@ static inline uint64_t log_arg_i64(int64_t v) {
     return (uint64_t) v;
 }
 
-void log_emit(struct log_site *, struct log_event_handle *, uint8_t nargs,
-              char *fmt, ...);
-
+void log_emit_internal(struct log_site *, struct log_handle *, enum log_level,
+                       uintptr_t ip, uint8_t nargs, char *fmt, ...);
 void log_dump_site(struct log_site *, struct log_dump_opts *opts);
 void log_dump_site_default(struct log_site *);
 void log_dump_all(void);
 void log_sites_init(void);
-void log_set_subsystem_level(struct log_subsystem *, uint8_t mask);
 struct log_site *log_site_create(char *name, enum log_site_flags flags,
                                  size_t capacity);
 void log_site_destroy(struct log_site *site);
 
-#define k_log(site, handle, fmt, ...)                                          \
-    log_emit(site, handle, PP_NARG(__VA_ARGS__), fmt, ##__VA_ARGS__)
+#define log_msg(lvl, fmt, ...)                                                 \
+    log_emit_internal(LOG_SITE(global), LOG_HANDLE(global), lvl,               \
+                      (uintptr_t) __builtin_return_address(0),                 \
+                      PP_NARG(__VA_ARGS__), fmt, ##__VA_ARGS__)
 
-#define k_log_lvl(site, handle, lvl, fmt, ...)                                 \
-    log_emit_lvl(site, handle, lvl, PP_NARG(__VA_ARGS__), fmt, ##__VA_ARGS__)
+#define log_global(handle, lvl, fmt, ...)                                      \
+    log_emit_internal(LOG_SITE(global), handle, lvl,                           \
+                      (uintptr_t) __builtin_return_address(0),                 \
+                      PP_NARG(__VA_ARGS__), fmt, ##__VA_ARGS__)
 
-#define k_log_err(site, handle, fmt, ...)                                      \
-    k_log_lvl(site, handle, LOG_ERROR, fmt, ##__VA_ARGS__)
+#define log(site, handle, lvl, fmt, ...)                                       \
+    log_emit_internal(site, handle, lvl,                                       \
+                      (uintptr_t) __builtin_return_address(0),                 \
+                      PP_NARG(__VA_ARGS__), fmt, ##__VA_ARGS__)
 
-#define LOG_SITE_DECLARE(name)                                                 \
-    __attribute__((section(".kernel_log_sites"))) struct log_site name
+#define log_err(site, handle, fmt, ...)                                        \
+    log(site, handle, LOG_ERROR, fmt, ##__VA_ARGS__)
+#define log_warn(site, handle, fmt, ...)                                       \
+    log(site, handle, LOG_WARN, fmt, ##__VA_ARGS__)
+#define log_info(site, handle, fmt, ...)                                       \
+    log(site, handle, LOG_INFO, fmt, ##__VA_ARGS__)
+#define log_debug(site, handle, fmt, ...)                                      \
+    log(site, handle, LOG_DEBUG, fmt, ##__VA_ARGS__)
+#define log_trace(site, handle, fmt, ...)                                      \
+    log(site, handle, LOG_TRACE, fmt, ##__VA_ARGS__)
+
+#define log_err_global(handle, fmt, ...)                                       \
+    log_global(handle, LOG_ERROR, fmt, ##__VA_ARGS__)
+#define log_warn_global(handle, fmt, ...)                                      \
+    log_global(handle, LOG_WARN, fmt, ##__VA_ARGS__)
+#define log_info_global(handle, fmt, ...)                                      \
+    log_global(handle, LOG_INFO, fmt, ##__VA_ARGS__)
+#define log_debug_global(handle, fmt, ...)                                     \
+    log_global(handle, LOG_DEBUG, fmt, ##__VA_ARGS__)
+#define log_trace_global(handle, fmt, ...)                                     \
+    log_global(handle, LOG_TRACE, fmt, ##__VA_ARGS__)
+
+#define LOG_SITE_CAPACITY_DEFAULT 128 /* good enough for most purposes */
+#define LOG_SITE_EXTERN(name) extern struct log_site __log_site_##name
+
+/* For static ones */
+#define LOG_SITE_LEVEL(l) (1u << l)
+#define LOG_SITE_ALL UINT32_MAX /* TODO: More */
+#define LOG_SITE_DECLARE(n, f, size, mask)                                     \
+    __attribute__((                                                            \
+        section(".kernel_log_sites"))) struct log_site __log_site_##n =        \
+        (struct log_site) {                                                    \
+        .name = #n, .flags = f, .rb.capacity = size, .enabled_mask = mask      \
+    } /* Rest will get initialized at boot */
+#define LOG_SITE_DECLARE_DEFAULT(n)                                            \
+    LOG_SITE_DECLARE(n, LOG_SITE_DEFAULT, LOG_SITE_CAPACITY_DEFAULT,           \
+                     LOG_SITE_ALL)
+
+#define LOG_SITE(name) &(__log_site_##name)
+
+#define LOG_HANDLE_SUBSYSTEM_NONE NULL
+#define LOG_HANDLE_EXTERN(name) extern struct log_handle __log_handle_##name
+#define LOG_HANDLE_DECLARE(na, f)                                              \
+    struct log_handle __log_handle_##na =                                      \
+        (struct log_handle) {.msg = #na, .flags = f, .seen = 0, .last_ts = 0}
+
+#define LOG_HANDLE_DECLARE_DEFAULT(n) LOG_HANDLE_DECLARE(n, LOG_PRINT)
+
+#define LOG_HANDLE(name) &(__log_handle_##name)
 
 extern struct log_site __skernel_log_sites[];
 extern struct log_site __ekernel_log_sites[];
 
-static struct log_dump_opts log_dump_default = {
-    .min_level = LOG_TRACE,
-    .show_args = true,
-    .show_cpu = true,
-    .show_tid = true,
-    .show_irql = true,
-    .show_caller = true,
-    .resolve_symbols = true,
-    .clear_after_dump = false,
-};
+LOG_HANDLE_EXTERN(global);
+LOG_SITE_EXTERN(global);

@@ -1,3 +1,4 @@
+#include <log.h>
 #include <console/printf.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
@@ -10,6 +11,9 @@
 static struct vfs_mount **mount_table = NULL;
 static uint64_t mount_table_count = 0;
 static uint64_t mount_table_capacity = 0;
+
+LOG_SITE_DECLARE_DEFAULT(vfs);
+LOG_HANDLE_DECLARE_DEFAULT(vfs);
 
 static void mount_table_add(struct vfs_mount *mnt) {
     if (mount_table_count == mount_table_capacity) {

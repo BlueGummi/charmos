@@ -2,13 +2,16 @@
 #include <asm.h>
 #include <global.h>
 #include <irq/idt.h>
+#include <log.h>
 #include <mem/alloc.h>
 #include <mem/page.h>
 #include <mem/vmm.h>
 #include <sleep.h>
 #include <smp/core.h>
+
 uint32_t *lapic;
 bool x2apic_enabled = false;
+static LOG_HANDLE_DECLARE_DEFAULT(lapic);
 
 void lapic_init(void) {
     uintptr_t lapic_phys = rdmsr(IA32_APIC_BASE_MSR) & IA32_APIC_BASE_MASK;
@@ -146,7 +149,7 @@ void x2apic_init(void) {
     apic_base = rdmsr(IA32_APIC_BASE);
     apic_base |= APIC_X2APIC_ENABLE;
     wrmsr(IA32_APIC_BASE, apic_base);
-    k_info("X2APIC", K_INFO, "X2APIC enabled");
+    log_info_global(LOG_HANDLE(lapic), "X2APIC enabled");
 }
 
 uint32_t x2apic_get_id(void) {

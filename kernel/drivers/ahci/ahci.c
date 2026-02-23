@@ -9,10 +9,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
+LOG_SITE_DECLARE_DEFAULT(ahci);
+LOG_HANDLE_DECLARE_DEFAULT(ahci);
+
 struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
                                        uint8_t function,
                                        uint32_t *out_disk_count) {
-    ahci_info(K_INFO, "Found device at %02x:%02x.%x", bus, device, function);
+    ahci_log(LOG_INFO, "Found device at %02x:%02x.%x", bus, device, function);
     uint32_t abar = pci_read(bus, device, function, PCI_BAR5);
     uint32_t abar_base = abar & ~0xFU;
 
@@ -21,7 +24,7 @@ struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
     pci_write(bus, device, function, PCI_BAR5, abar);
 
     if (size_mask == 0 || size_mask == 0xFFFFFFFF) {
-        ahci_info(K_WARN, "invalid BAR size");
+        ahci_log(LOG_WARN, "invalid BAR size");
         return NULL;
     }
 
@@ -31,23 +34,24 @@ struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
     void *abar_virt =
         vmm_map_phys(abar_base, map_size, PAGING_UNCACHABLE, VMM_FLAG_NONE);
     if (!abar_virt) {
-        ahci_info(K_ERROR, "failed to map BAR - likely OOM error");
+        ahci_log(LOG_ERROR, "failed to map BAR - likely OOM error");
         return NULL;
     }
     uint8_t irq_line = pci_read(bus, device, function, PCI_INTERRUPT_LINE);
 
-    ahci_info(K_INFO, "AHCI device uses IRQ %u ", irq_line);
+    ahci_log(LOG_INFO, "AHCI device uses IRQ %u ", irq_line);
 
     struct ahci_controller *ctrl = (struct ahci_controller *) abar_virt;
 
     struct ahci_disk *disk = ahci_setup_controller(ctrl, out_disk_count);
     if (!disk) {
-        ahci_info(K_WARN, "AHCI device unsupported");
+        ahci_log(LOG_WARN, "AHCI device unsupported");
         return NULL;
     }
 
     uint64_t core = smp_core_id();
-    irq_register("ahci", disk->device->irq_num, ahci_isr_handler, disk->device, IRQ_FLAG_NONE);
+    irq_register("ahci", disk->device->irq_num, ahci_isr_handler, disk->device,
+                 IRQ_FLAG_NONE);
     irq_set_chip(disk->device->irq_num, lapic_get_chip(), NULL);
     ioapic_route_irq(irq_line, disk->device->irq_num, core, false);
     return disk;
@@ -87,7 +91,7 @@ struct generic_disk *ahci_create_generic(struct ahci_disk *disk) {
     struct generic_disk *d =
         kzalloc(sizeof(struct generic_disk), ALLOC_PARAMS_DEFAULT);
     if (!d)
-        ahci_info(K_ERROR, "could not allocate space for device");
+        ahci_log(LOG_ERROR, "could not allocate space for device");
 
     ahci_identify(disk);
 

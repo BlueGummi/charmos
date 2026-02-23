@@ -1,6 +1,7 @@
 #include <console/panic.h>
 #include <global.h>
 #include <kassert.h>
+#include <log.h>
 #include <mem/alloc.h>
 #include <sch/domain.h>
 #include <string.h>
@@ -125,9 +126,8 @@ void scheduler_domains_dump(void) {
     for (size_t lvl = 0; lvl < TOPOLOGY_LEVEL_MAX; lvl++) {
         struct scheduler_domain *d = global.scheduler_domains[lvl];
 
-        k_info("SCHEDULER DOMAIN", K_INFO,
-               "SCHEDULER DOMAIN %zu (%s), %zu groups", lvl,
-               topology_level_name(lvl), d->ngroups);
+        log_msg(LOG_INFO, "SCHEDULER DOMAIN %zu (%s), %zu groups", lvl,
+                topology_level_name(lvl), d->ngroups);
 
         for (size_t g = 0; g < d->ngroups; g++) {
             struct scheduler_group *grp = &d->groups[g];
@@ -194,7 +194,7 @@ void scheduler_domain_mark_self_idle(bool idle) {
         struct scheduler_domain *d = c->domains[lvl];
         size_t g = c->group_index[lvl];
         kassert(c->group_index[lvl] >= 0);
-        kassert((size_t)c->group_index[lvl] < d->ngroups);
+        kassert((size_t) c->group_index[lvl] < d->ngroups);
 
         if (idle)
             cpu_mask_set(&d->groups[g].idle, cpu);

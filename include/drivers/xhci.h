@@ -1,6 +1,7 @@
 /* @title: xHCI */
 #pragma once
 #include <compiler.h>
+#include <log.h>
 #include <math/bit_range.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -183,9 +184,15 @@ struct pci_device;
 #define CC_STOPPED_SHORT_PACKET 28
 #define CC_MAX_EXIT_LATENCY_TOO_LARGE 29
 
-#define xhci_info(string, ...) k_info("XHCI", K_INFO, string, ##__VA_ARGS__)
-#define xhci_warn(string, ...) k_info("XHCI", K_WARN, string, ##__VA_ARGS__)
-#define xhci_error(string, ...) k_info("XHCI", K_ERROR, string, ##__VA_ARGS__)
+LOG_HANDLE_EXTERN(xhci);
+LOG_SITE_EXTERN(xhci);
+#define xhci_log(log_level, fmt, ...)                                          \
+    log(LOG_SITE(xhci), LOG_HANDLE(xhci), log_level, fmt, ##__VA_ARGS__)
+#define xhci_warn(fmt, ...) xhci_log(LOG_WARN, fmt, ##__VA_ARGS__)
+#define xhci_error(fmt, ...) xhci_log(LOG_ERROR, fmt, ##__VA_ARGS__)
+#define xhci_info(fmt, ...) xhci_log(LOG_INFO, fmt, ##__VA_ARGS__)
+#define xhci_debug(fmt, ...) xhci_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
+#define xhci_trace(fmt, ...) xhci_log(LOG_TRACE, fmt, ##__VA_ARGS__)
 
 /*
  * Lifetime invariant:

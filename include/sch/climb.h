@@ -94,15 +94,10 @@ struct climb_source {
 /* Pressure to boost shaping */
 #define CLIMB_PRESSURE_EXPONENT 2 /* quadratic */
 
-#define CLIMB_SOURCE_PREFIX_INTERNAL __climb_src_
-#define CLIMB_SOURCE_EXTERN(name)                                              \
-    extern struct climb_source CLIMB_SOURCE_PREFIX_INTERNAL##name
-
+#define CLIMB_SOURCE_EXTERN(name) extern struct climb_source __climb_src_##name
 #define CLIMB_SOURCE_CREATE(n, strname, b)                                     \
-    struct climb_source CLIMB_SOURCE_PREFIX_INTERNAL##n = {.name = strname,    \
-                                                           .base = b}
-
-#define CLIMB_SOURCE(name) &(CLIMB_SOURCE_PREFIX_INTERNAL##name)
+    struct climb_source __climb_src_##n = {.name = strname, .base = b}
+#define CLIMB_SOURCE(name) &(__climb_src_##name)
 
 static inline struct climb_handle *
 climb_handle_init(struct climb_handle *ch, struct climb_source *cs,

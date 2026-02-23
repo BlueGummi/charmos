@@ -1,5 +1,18 @@
+#include <log.h>
 #include <nightmare_test.h>
 #include <string.h>
+
+LOG_SITE_DECLARE_DEFAULT(nightmare);
+LOG_HANDLE_DECLARE_DEFAULT(nightmare);
+
+#define nightmare_log(lvl, fmt, ...)                                           \
+    log(LOG_SITE(nightmare), LOG_HANDLE(nightmare), lvl, fmt, ##__VA_ARGS__)
+
+#define nightmare_err(fmt, ...) nightmare_log(LOG_ERROR, fmt, ##__VA_ARGS__)
+#define nightmare_warn(fmt, ...) nightmare_log(LOG_WARN, fmt, ##__VA_ARGS__)
+#define nightmare_info(fmt, ...) nightmare_log(LOG_INFO, fmt, ##__VA_ARGS__)
+#define nightmare_debug(fmt, ...) nightmare_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
+#define nightmare_trace(fmt, ...) nightmare_log(LOG_TRACE, fmt, ##__VA_ARGS__)
 
 void nightmare_default_report_writer(struct nightmare_report *r, const char *c,
                                      size_t s) {
@@ -57,7 +70,7 @@ void nightmare_tests_start(void) {
         if (t->report)
             t->report(t, &rpt);
 
-        k_info("NIGHTMARE TEST", K_INFO, "test %-20s => %d\n", t->name, err);
+        nightmare_info("test %-20s => %d\n", t->name, err);
     }
 }
 

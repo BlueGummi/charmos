@@ -12,6 +12,9 @@
 #include <stdint.h>
 #include <string.h>
 
+LOG_HANDLE_DECLARE_DEFAULT(fs_detect);
+LOG_SITE_DECLARE_DEFAULT(fs_detect);
+
 /* there is no point in using the bcache for these operations */
 const char *detect_fstr(enum fs_type type) {
     switch (type) {
@@ -203,16 +206,16 @@ enum fs_type detect_fs(struct generic_disk *disk) {
     if (!sector)
         return FS_UNKNOWN;
 
-    k_info("FS", K_INFO, "attempting to detect %s's filesystem(s)", disk->name);
+    fs_detect_info("attempting to detect %s's filesystem(s)", disk->name);
 
     if (!disk->read_sector(disk, 0, sector, 1)) {
-        k_info("FS", K_WARN, "%s has an unknown filesystem - read failed",
-               disk->name);
+        fs_detect_info("%s has an unknown filesystem - read failed",
+                       disk->name);
         kfree_aligned(sector, FREE_PARAMS_DEFAULT);
         return FS_UNKNOWN;
     }
 
-    k_info("FS", K_INFO, "read sector 0 of %s", disk->name);
+    fs_detect_info("read sector 0 of %s", disk->name);
 
     bool found_partitions = false;
     struct mbr *mbr = (struct mbr *) sector;
@@ -242,8 +245,8 @@ enum fs_type detect_fs(struct generic_disk *disk) {
         part->disk = disk;
         part->fs_type = detect_partition_fs(disk, part, sector);
         assign_fs_ops(part);
-        k_info("FS", K_INFO, "%s has a(n) %s filesystem", part->name,
-               detect_fstr(part->fs_type));
+        fs_detect_info("%s has a(n) %s filesystem", part->name,
+                       detect_fstr(part->fs_type));
     }
 
     kfree_aligned(sector, FREE_PARAMS_DEFAULT);

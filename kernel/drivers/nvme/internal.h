@@ -1,4 +1,5 @@
 #include <drivers/nvme.h>
+#include <log.h>
 
 #define NVME_CMD_TIMEOUT_MS 2000    // Normal command timeout
 #define NVME_ADMIN_TIMEOUT_MS 5000  // Admin commands
@@ -7,9 +8,13 @@ SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(nvme_queue, lock);
 #define DIV_ROUND_UP(x, y) (((x) + (y) - 1) / (y))
 #define THIS_QID(nvme) (1 + (smp_core_id() % (nvme->queue_count)))
 
+LOG_SITE_EXTERN(nvme);
+LOG_HANDLE_EXTERN(nvme);
+#define nvme_log(log_level, fmt, ...)                                          \
+    log(LOG_SITE(nvme), LOG_HANDLE(nvme), log_level, fmt, ##__VA_ARGS__)
+
 #define NVME_COMPLETION_PHASE(cpl) ((cpl)->status & 0x1)
 #define NVME_COMPLETION_STATUS(cpl) (((cpl)->status >> 1) & 0x7FFF)
-#define nvme_info(lvl, fmt, ...) k_info("NVMe", lvl, fmt, ##__VA_ARGS__)
 
 #define NVME_DOORBELL_BASE 0x1000
 

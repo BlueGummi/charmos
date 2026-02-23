@@ -156,8 +156,7 @@ void defer_init(void) {
 
         hpet_setup_timer(i, i + 3, false, true);
 
-        k_info("DEFER", K_INFO,
-               "Timer %llu routed to IRQ %u (vector %u on core %u)", i,
-               i + HPET_IRQ_BASE, vector, i);
+        log_msg(LOG_INFO, "Timer %llu routed to IRQ %u (vector %u on core %u)",
+                i, i + HPET_IRQ_BASE, vector, i);
     }
 }

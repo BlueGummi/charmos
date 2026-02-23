@@ -1,6 +1,6 @@
-#include <global.h>
 #include <console/panic.h>
 #include <console/printf.h>
+#include <global.h>
 #include <kassert.h>
 #include <math/sort.h>
 #include <mem/alloc.h>
@@ -10,12 +10,12 @@
 void numa_dump(void) {
     size_t n = global.numa_node_count;
     if (!n) {
-        k_info("NUMA", K_WARN, "No NUMA nodes detected");
+        log_msg(LOG_WARN, "No NUMA nodes detected");
         return;
     }
 
-    k_info("NUMA", K_INFO, "NUMA distance matrix (%zu nodes):", n);
-    k_info("NUMA", K_INFO, "Displayed as distance (relative distance):", n);
+    log_msg(LOG_INFO, "NUMA distance matrix (%zu nodes):", n);
+    log_msg(LOG_INFO, "Displayed as distance (relative distance):", n);
 
     k_printf("     ");
     for (size_t j = 0; j < n; j++)

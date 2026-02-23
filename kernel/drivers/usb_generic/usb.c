@@ -1,4 +1,5 @@
 #include <drivers/usb_generic/usb.h>
+#include <log.h>
 #include <mem/alloc.h>
 #include <mem/page.h>
 #include <mem/pmm.h>
@@ -9,6 +10,9 @@
 #include <thread/thread.h>
 
 #include "internal.h"
+
+LOG_SITE_DECLARE_DEFAULT(usb);
+LOG_HANDLE_DECLARE_DEFAULT(usb);
 
 enum usb_status usb_transfer_sync(enum usb_status (*fn)(struct usb_request *),
                                   struct usb_request *request,
@@ -332,8 +336,8 @@ struct usb_interface_descriptor *usb_find_interface(struct usb_device *dev,
 }
 
 void usb_print_device(struct usb_device *dev) {
-    usb_info("Found device '%s' manufactured by '%s' of type '%s'",
-             dev->product, dev->manufacturer, dev->config_str);
+    usb_log(LOG_INFO, "Found device '%s' manufactured by '%s' of type '%s'",
+            dev->product, dev->manufacturer, dev->config_str);
 }
 
 enum usb_status usb_init_device(struct usb_device *dev) {
@@ -341,22 +345,22 @@ enum usb_status usb_init_device(struct usb_device *dev) {
         return USB_ERR_NO_DEVICE;
 
     enum usb_status err = USB_OK;
-    k_log("get_device_descriptor\n");
+    usb_log(LOG_TRACE, "get_device_descriptor\n");
     if ((err = usb_get_device_descriptor(dev)) != USB_OK) {
         goto out;
     }
 
-    k_log("parse_config\n");
+    usb_log(LOG_TRACE, "parse_config\n");
     if ((err = usb_parse_config_descriptor(dev)) != USB_OK) {
         goto out;
     }
 
-    k_log("set_config\n");
+    usb_log(LOG_TRACE, "set_config\n");
     if ((err = usb_set_configuration(dev)) != USB_OK) {
         goto out;
     }
 
-    k_log("configure_endpoint\n");
+    usb_log(LOG_TRACE, "configure_endpoint\n");
     if ((err = dev->host->ops.configure_endpoint(dev)) != USB_OK) {
         goto out;
     }
@@ -367,12 +371,12 @@ enum usb_status usb_init_device(struct usb_device *dev) {
 
 out:
     if (err != USB_OK) {
-        k_log("reset_slot\n");
+        usb_log(LOG_TRACE, "reset_slot\n");
         dev->host->ops.reset_slot(dev);
     }
 
     usb_device_put(dev);
-    k_log("ok\n");
+    usb_log(LOG_TRACE, "ok\n");
     return err;
 }
 

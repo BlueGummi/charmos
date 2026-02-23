@@ -225,7 +225,7 @@ uint8_t *nvme_identify_controller(struct nvme_device *nvme) {
     uint16_t status = nvme_submit_admin_cmd(nvme, &cmd, NULL);
 
     if (status) {
-        nvme_info(K_ERROR, "IDENTIFY failed! Status: 0x%04X\n", status);
+        nvme_log(LOG_ERROR, "IDENTIFY failed! Status: 0x%04X\n", status);
         return NULL;
     }
 
@@ -245,9 +245,9 @@ uint32_t nvme_set_num_queues(struct nvme_device *nvme, uint16_t desired_sq,
     uint16_t status = nvme_submit_admin_cmd(nvme, &cmd, &cdw0);
 
     if (status) {
-        nvme_info(K_ERROR,
-                  "SET FEATURES (Number of Queues) failed! Status: 0x%04X",
-                  status);
+        nvme_log(LOG_ERROR,
+                 "SET FEATURES (Number of Queues) failed! Status: 0x%04X",
+                 status);
         return 0;
     }
 
@@ -275,7 +275,8 @@ uint8_t *nvme_identify_namespace(struct nvme_device *nvme, uint32_t nsid) {
     uint16_t status = nvme_submit_admin_cmd(nvme, &cmd, NULL);
 
     if (status) {
-        nvme_info(K_ERROR, "IDENTIFY namespace failed! Status: 0x%04X", status);
+        nvme_log(LOG_ERROR, "IDENTIFY namespace failed! Status: 0x%04X",
+                 status);
         return NULL;
     }
 
@@ -283,7 +284,7 @@ uint8_t *nvme_identify_namespace(struct nvme_device *nvme, uint32_t nsid) {
     uint8_t flbas_index = ns->flbas & 0xF; // lower 4 bits = selected format
     uint8_t lbads = ns->lbaf[flbas_index].lbads;
     uint32_t sector_size = 1U << lbads;
-    nvme_info(K_INFO, "Device sector size is %u bytes", sector_size);
+    nvme_log(LOG_INFO, "Device sector size is %u bytes", sector_size);
 
     nvme->sector_size = sector_size;
     return (uint8_t *) buffer;

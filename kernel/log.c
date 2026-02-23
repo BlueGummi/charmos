@@ -8,10 +8,30 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <structures/locked_list.h>
 #include <thread/thread.h>
 #include <time.h>
 
 #define LOG_IMPORTANT_RETRY 32
+
+struct log_dump_opts log_dump_default = {
+    .min_level = LOG_TRACE,
+    .show_args = true,
+    .show_cpu = true,
+    .show_tid = true,
+    .show_irql = true,
+    .show_caller = true,
+    .resolve_symbols = true,
+    .clear_after_dump = false,
+};
+
+LOG_SITE_DECLARE(global, LOG_SITE_DEFAULT, LOG_SITE_CAPACITY_DEFAULT,
+                 LOG_SITE_ALL);
+LOG_HANDLE_DECLARE(global, LOG_DEFAULT);
+
+struct log_globals {
+    struct locked_list list;
+};
 
 static void log_site_free(struct log_site *site);
 static const char *log_level_str[] = {"TRACE", "DEBUG", "INFO", "WARN",
@@ -84,7 +104,7 @@ static void k_printf_from_log(const char *fmt, const uint64_t *args,
     }
 }
 
-static void log_dump_record(const struct log_event_record *rec,
+static void log_dump_record(const struct log_record *rec,
                             const struct log_dump_opts *opts) {
     size_t sec = MS_TO_SECONDS(rec->timestamp);
     size_t msec = rec->timestamp % 1000;
@@ -99,9 +119,6 @@ static void log_dump_record(const struct log_event_record *rec,
 
     if (opts->show_irql)
         k_printf("irql=%d ", rec->logged_at_irql);
-
-    if (rec->handle && rec->handle->subsystem)
-        k_printf("[%s] ", rec->handle->subsystem->name);
 
     /* message */
     if (opts->show_args && rec->fmt) {
@@ -124,7 +141,7 @@ static void log_dump_record(const struct log_event_record *rec,
 }
 
 static inline bool log_ringbuf_try_enqueue(struct log_ringbuf *rb,
-                                           const struct log_event_record *rec) {
+                                           const struct log_record *rec) {
     uint64_t pos;
     struct log_ring_slot *slot;
 
@@ -153,7 +170,7 @@ static inline bool log_ringbuf_try_enqueue(struct log_ringbuf *rb,
 }
 
 static inline bool log_ringbuf_try_dequeue(struct log_ringbuf *rb,
-                                           struct log_event_record *out) {
+                                           struct log_record *out) {
     uint64_t pos;
     struct log_ring_slot *slot;
 
@@ -182,14 +199,14 @@ static inline bool log_ringbuf_try_dequeue(struct log_ringbuf *rb,
 }
 
 static bool log_ringbuf_force_enqueue(struct log_ringbuf *rb,
-                                      const struct log_event_record *rec) {
-    struct log_event_record dummy;
+                                      const struct log_record *rec) {
+    struct log_record dummy;
     log_ringbuf_try_dequeue(rb, &dummy);
     return log_ringbuf_try_enqueue(rb, rec);
 }
 
 void log_dump_site(struct log_site *site, struct log_dump_opts *opts) {
-    struct log_event_record rec;
+    struct log_record rec;
     if (!site || !log_site_get(site))
         return;
 
@@ -215,55 +232,22 @@ void log_dump_site_default(struct log_site *site) {
     log_site_put(site);
 }
 
-void log_console_emit(const struct log_event_record *rec) {
+void log_console_emit(const struct log_record *rec) {
     log_dump_record(rec, &log_dump_console);
 }
 
-__noinline void log_emit(struct log_site *site, struct log_event_handle *handle,
-                         uint8_t narg, char *fmt, ...) {
+void log_emit_internal(struct log_site *site, struct log_handle *handle,
+                       enum log_level ll, uintptr_t ip, uint8_t narg, char *fmt,
+                       ...) {
     if (!site || !log_site_get(site))
         return;
 
-    enum log_level level = handle->level;
-    struct log_event_record rec = {0};
+    enum log_level level = ll;
+    struct log_record rec = {0};
     rec.handle = handle;
     rec.level = level;
     rec.fmt = fmt;
-    rec.caller_ip = (vaddr_t) __builtin_return_address(0);
-
-    if (global.current_bootstage < BOOTSTAGE_LATE)
-        if (log_event_should_print(handle, site, level))
-            return log_console_emit(&rec);
-
-    if (!log_site_accepts(site) ||
-        (site->flags & LOG_SITE_NO_IRQ && irq_in_interrupt()))
-        return;
-
-    if (!log_subsystem_enabled(handle->subsystem, level))
-        return;
-
-    rec.timestamp = time_get_ms();
-    rec.cpu = smp_core_id();
-    rec.tid = scheduler_get_current_thread()->id;
-    rec.logged_at_irql = irql_get();
-
-    if (irq_in_interrupt())
-        rec.flags |= LOG_REC_FROM_IRQ;
-
-    if (handle->flags & LOG_EVENT_ONCE) {
-        if (atomic_fetch_add(&handle->seen, 1) != 0)
-            return;
-    }
-
-    if (handle->flags & LOG_EVENT_RATELIMIT) {
-        uint64_t now = rec.timestamp;
-        uint64_t last = atomic_load(&handle->last_ts);
-
-        if (now - last < 100)
-            return;
-
-        atomic_store(&handle->last_ts, now);
-    }
+    rec.caller_ip = ip;
 
     /* pack args */
     va_list ap;
@@ -274,10 +258,44 @@ __noinline void log_emit(struct log_site *site, struct log_event_handle *handle,
     }
     va_end(ap);
 
+    if (global.current_bootstage < BOOTSTAGE_LATE)
+        if (log_handle_should_print(handle, site, level))
+            return log_console_emit(&rec);
+
+    if (!log_site_accepts(site) ||
+        (site->flags & LOG_SITE_NO_IRQ && irq_in_interrupt()))
+        return;
+
+    if (!log_site_enabled(site, level))
+        return;
+
+    rec.timestamp = time_get_ms();
+    rec.cpu = smp_core_id();
+    rec.tid = scheduler_get_current_thread()->id;
+    rec.logged_at_irql = irql_get();
+
+    if (irq_in_interrupt())
+        rec.flags |= LOG_REC_FROM_IRQ;
+
+    if (handle->flags & LOG_ONCE) {
+        if (atomic_fetch_add(&handle->seen, 1) != 0)
+            return;
+    }
+
+    if (handle->flags & LOG_RATELIMIT) {
+        uint64_t now = rec.timestamp;
+        uint64_t last = atomic_load(&handle->last_ts);
+
+        if (now - last < 100)
+            return;
+
+        atomic_store(&handle->last_ts, now);
+    }
+
     bool queued = log_ringbuf_try_enqueue(&site->rb, &rec);
 
     if (!queued) {
-        if (handle->flags & LOG_EVENT_IMPORTANT) {
+        if (handle->flags & LOG_IMPORTANT) {
 
             if (site->flags & LOG_SITE_DROP_OLD) {
                 queued = log_ringbuf_force_enqueue(&site->rb, &rec);
@@ -301,11 +319,11 @@ __noinline void log_emit(struct log_site *site, struct log_event_handle *handle,
         }
     }
 
-    if (log_event_should_print(handle, site, level)) {
+    if (log_handle_should_print(handle, site, level)) {
         log_console_emit(&rec);
     }
 
-    if ((handle->flags & LOG_EVENT_PANIC) && level >= LOG_ERROR) {
+    if ((ll & LOG_PANIC) && level >= LOG_ERROR) {
         log_dump_all();
         debug_print_stack();
         k_panic("fatal log event");

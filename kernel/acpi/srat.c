@@ -1,7 +1,8 @@
 #include <asm.h>
-#include <global.h>
 #include <console/panic.h>
 #include <console/printf.h>
+#include <global.h>
+#include <log.h>
 #include <math/sort.h>
 #include <mem/alloc.h>
 #include <mem/numa.h>
@@ -14,11 +15,13 @@
 #include "uacpi/acpi.h"
 #include "uacpi/status.h"
 
+static LOG_HANDLE_DECLARE_DEFAULT(srat);
+
 void srat_init(void) {
     struct uacpi_table srat_table;
     if (uacpi_table_find_by_signature("SRAT", &srat_table) != UACPI_STATUS_OK) {
-        k_info("SRAT", K_WARN,
-               "SRAT table not found, assuming single NUMA node");
+        log_warn_global(LOG_HANDLE(srat),
+                        "SRAT table not found, assuming single NUMA node");
 
         global.numa_nodes =
             kzalloc(sizeof(struct numa_node), ALLOC_PARAMS_DEFAULT);

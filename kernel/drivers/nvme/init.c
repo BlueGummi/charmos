@@ -153,10 +153,10 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
 
     irq_register("nvme", this_isr, nvme_isr_handler, nvme, IRQ_FLAG_NONE);
     irq_set_chip(this_isr, lapic_get_chip(), NULL);
-        
+
     if (nvme_submit_admin_cmd(nvme, &cq_cmd, NULL) != 0) {
-        nvme_info(K_ERROR, "failed to create IOCQ %u, code 0x%x, ISR %u", qid,
-                  cq_cmd.opc, this_isr);
+        nvme_log(LOG_ERROR, "failed to create IOCQ %u, code 0x%x, ISR %u", qid,
+                 cq_cmd.opc, this_isr);
         return;
     }
 
@@ -169,9 +169,9 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
     sq_cmd.cdw11 = qid << 16 | 1;
 
     if (nvme_submit_admin_cmd(nvme, &sq_cmd, NULL) != 0) {
-        nvme_info(K_ERROR, "failed to create IOSQ %u, code 0x%x, ISR %u", qid,
-                  sq_cmd.opc, this_isr);
+        nvme_log(LOG_ERROR, "failed to create IOSQ %u, code 0x%x, ISR %u", qid,
+                 sq_cmd.opc, this_isr);
         return;
     }
-    nvme_info(K_INFO, "NVMe QID %u created - ISR %u", qid, this_isr);
+    nvme_log(LOG_INFO, "NVMe QID %u created - ISR %u", qid, this_isr);
 }

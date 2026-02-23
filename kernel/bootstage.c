@@ -1,6 +1,7 @@
 #include <bootstage.h>
-#include <global.h>
 #include <console/printf.h>
+#include <global.h>
+#include <log.h>
 
 static const char *bootstage_str[BOOTSTAGE_COUNT] = {
     [BOOTSTAGE_EARLY_FB] = "Early - Framebuffer",
@@ -14,7 +15,9 @@ static const char *bootstage_str[BOOTSTAGE_COUNT] = {
     [BOOTSTAGE_COMPLETE] = "Complete",
 };
 
+static LOG_HANDLE_DECLARE_DEFAULT(bootstage);
 void bootstage_advance(enum bootstage new) {
     global.current_bootstage = new;
-    k_info("BOOTSTAGE", K_INFO, "Reached bootstage \'%s\'", bootstage_str[new]);
+    log_info_global(LOG_HANDLE(bootstage), "Reached bootstage \'%s\'",
+                    bootstage_str[new]);
 }

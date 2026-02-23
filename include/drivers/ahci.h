@@ -3,6 +3,7 @@
 #include <block/generic.h>
 #include <block/sched.h>
 #include <compiler.h>
+#include <log.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <thread/thread.h>
@@ -266,8 +267,11 @@ struct ahci_cmd_header {
 } __packed;
 static_assert_struct_size_eq(ahci_cmd_header, 32);
 
-#define ahci_info(log_level, fmt, ...)                                         \
-    k_info("AHCI", log_level, fmt, ##__VA_ARGS__)
+LOG_HANDLE_EXTERN(ahci);
+LOG_SITE_EXTERN(ahci);
+
+#define ahci_log(log_level, fmt, ...)                                         \
+    log(LOG_SITE(ahci), LOG_HANDLE(ahci), log_level, fmt, ##__VA_ARGS__)
 
 struct ahci_request {
     uint32_t port;

@@ -126,34 +126,33 @@ static void dump_cpu_features(uint64_t f) {
     if (buf[0] == '\0')
         strcpy(buf, " (none)");
 
-    k_info("CPU", K_INFO, "    Features:%s", buf);
+    log_msg(LOG_INFO, "    Features:%s", buf);
 }
 
 void smp_dump_core(struct core *c) {
-    k_info("CPU", K_INFO,
-           "CPU%zu: pkg=%u core=%u smt=%u numa=%zu domain_cpu=%zu", c->id,
-           c->package_id, c->core_id, c->smt_id, c->numa_node,
-           c->domain_cpu_id);
+    log_msg(LOG_INFO, "CPU%zu: pkg=%u core=%u smt=%u numa=%zu domain_cpu=%zu",
+            c->id, c->package_id, c->core_id, c->smt_id, c->numa_node,
+            c->domain_cpu_id);
 
     /* SMT / topology */
-    k_info("CPU", K_INFO, "  Topology: smt_mask=0x%x llc_shared=%u",
-           c->smt_mask, c->llc.cores_sharing);
+    log_msg(LOG_INFO, "  Topology: smt_mask=0x%x llc_shared=%u", c->smt_mask,
+            c->llc.cores_sharing);
 
     /* Cache */
-    k_info("CPU", K_INFO, "  LLC: L%u size=%uKB line=%uB type=%u", c->llc.level,
-           c->llc.size_kb, c->llc.line_size, c->llc.type);
+    log_msg(LOG_INFO, "  LLC: L%u size=%uKB line=%uB type=%u", c->llc.level,
+            c->llc.size_kb, c->llc.line_size, c->llc.type);
 
     /* CPU capability block */
     struct cpu_capability *cap = &c->cap;
 
-    k_info("CPU", K_INFO, "  Class: %s (%s)", cpu_class_str(cap->class),
-           uarch_str(cap->uarch_id));
+    log_msg(LOG_INFO, "  Class: %s (%s)", cpu_class_str(cap->class),
+            uarch_str(cap->uarch_id));
 
-    k_info("CPU", K_INFO, "  Widths: issue=%u retire=%u", cap->issue_width,
-           cap->retire_width);
+    log_msg(LOG_INFO, "  Widths: issue=%u retire=%u", cap->issue_width,
+            cap->retire_width);
 
-    k_info("CPU", K_INFO, "  Scores: perf=%u energy=%u", cap->perf_score,
-           cap->energy_score);
+    log_msg(LOG_INFO, "  Scores: perf=%u energy=%u", cap->perf_score,
+            cap->energy_score);
 
     dump_cpu_features(cap->feature_bits);
 }

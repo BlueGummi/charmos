@@ -197,7 +197,7 @@ void ahci_identify(struct ahci_disk *disk) {
 
     disk->sector_size = logical_sector_size;
 
-    ahci_info(K_INFO, "Sector size is %u bytes", disk->sector_size);
+    ahci_log(LOG_INFO, "Sector size is %u bytes", disk->sector_size);
 
     kfree_aligned(buffer, FREE_PARAMS_DEFAULT);
 }

@@ -1,6 +1,7 @@
 /* @title: e1000 */
 #include <compiler.h>
 #include <drivers/pci.h>
+#include <log.h>
 #include <stdbool.h>
 #include <stdint.h>
 #pragma once
@@ -150,3 +151,8 @@ struct icmp_hdr {
 
 bool e1000_init(struct pci_device *dev, struct e1000_device *out);
 #define E1000_MAX_TX_PACKET_SIZE 1518 // Standard Ethernet frame
+
+LOG_SITE_EXTERN(e1000);
+LOG_HANDLE_EXTERN(e1000);
+#define e1000_log(log_level, fmt, ...)                                         \
+    log(LOG_SITE(e1000), LOG_HANDLE(e1000), log_level, fmt, ##__VA_ARGS__)

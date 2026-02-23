@@ -179,7 +179,7 @@ bool cpu_mask_empty(const struct cpu_mask *mask) {
 }
 
 void topology_dump(void) {
-    k_info("TOPOLOGY", K_INFO, "Processor topology:");
+    log_msg(LOG_INFO, "Processor topology:");
     print_topology_node(&machine_node, 0);
 }
 

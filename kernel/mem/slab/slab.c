@@ -157,6 +157,8 @@ struct slab_size_constant *slab_class_sizes = NULL;
 size_t slab_num_sizes = 0;
 struct vas_space *slab_vas = NULL;
 struct slab_caches slab_caches = {0};
+LOG_HANDLE_DECLARE_DEFAULT(slab);
+LOG_SITE_DECLARE_DEFAULT(slab);
 
 void *slab_map_new_page(struct slab_domain *domain, paddr_t *phys_out,
                         bool pageable) {
@@ -502,10 +504,9 @@ static int slab_class_sort_cmp(const void *a, const void *b) {
 }
 
 static void log_dupes(const char *keep, const char *discard, size_t size) {
-    k_info("SLAB", K_INFO,
-           "Sizes of slab cache %s and %s are the same (%zu), ignoring %s, "
-           "keeping %s",
-           discard, keep, size, discard, keep);
+    slab_info("Sizes of slab cache %s and %s are the same (%zu), ignoring %s, "
+              "keeping %s",
+              discard, keep, size, discard, keep);
 }
 
 void slab_allocator_init() {
@@ -583,8 +584,7 @@ void slab_allocator_init() {
         slab_cache_init(i, &slab_caches.caches[i], slab_class_sizes[i].size,
                         slab_class_sizes[i].align);
         slab_caches.caches[i].parent = &slab_caches;
-        k_info(
-            "SLAB", K_INFO,
+        slab_info(
             "Init slab cache of size %u align %u \"%s\", %u objects per slab",
             slab_class_sizes[i].size, slab_class_sizes[i].align,
             slab_class_sizes[i].name, slab_caches.caches[i].objs_per_slab);
@@ -1245,8 +1245,7 @@ void *kmalloc(size_t size, enum alloc_flags flags,
 
 void kfree(void *p, enum alloc_behavior behavior) {
     if ((uint16_t) behavior == (uint16_t) ALLOC_FLAGS_DEFAULT)
-        k_info("SLAB", K_WARN,
-               "Likely incorrect arguments passed into `kfree`");
+        slab_warn("Likely incorrect arguments passed into `kfree`");
 
     memset(p, 0x67, ksize(p));
     free(p, behavior);

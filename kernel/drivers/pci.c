@@ -2,6 +2,7 @@
 #include <console/printf.h>
 #include <drivers/pci.h>
 #include <drivers/xhci.h>
+#include <log.h>
 #include <mem/alloc.h>
 #include <mem/page.h>
 #include <mem/vmm.h>
@@ -10,6 +11,8 @@
 
 static struct pci_device *pci_devices = NULL;
 static uint64_t pci_device_count;
+LOG_HANDLE_DECLARE_DEFAULT(pci);
+LOG_SITE_DECLARE_DEFAULT(pci);
 
 const char *pci_class_name(uint8_t class_code, uint8_t subclass) {
     switch (class_code) {
@@ -59,7 +62,7 @@ void pci_init_devices(struct pci_device *devices, uint64_t count) {
     struct pci_driver *start = __skernel_pci_devices;
     struct pci_driver *end = __ekernel_pci_devices;
 
-    k_info("PCI", K_INFO, "There are %u PCI drivers", end - start);
+    pci_log(LOG_INFO, "There are %u PCI drivers", end - start);
 
     for (uint64_t i = 0; i < count; i++) {
         struct pci_device *dev = &devices[i];
@@ -130,9 +133,9 @@ void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
                                          .prog_if = prog_if,
                                          .revision = revision};
 
-                k_info("PCI", K_INFO, "Found device '%s' at %02x:%02x.%x",
-                       pci_class_name(class_code, subclass), bus, device,
-                       function);
+                pci_log(LOG_INFO, "Found device '%s' at %02x:%02x.%x",
+                        pci_class_name(class_code, subclass), bus, device,
+                        function);
 
                 if (function == 0) {
                     uint8_t header_type =
@@ -186,7 +189,7 @@ void pci_program_msix_entry(uint8_t bus, uint8_t slot, uint8_t func,
                             uint8_t apic_id) {
     uint8_t cap = pci_find_capability(bus, slot, func, PCI_CAP_ID_MSIX);
     if (!cap) {
-        k_info("PCI", K_ERROR, "MSI-X capability not found");
+        pci_log(LOG_ERROR, "MSI-X capability not found");
         return;
     }
 
@@ -195,13 +198,13 @@ void pci_program_msix_entry(uint8_t bus, uint8_t slot, uint8_t func,
     uint32_t table_offset = table_offset_bir & ~0x7;
 
     if (bir > 5) {
-        k_info("PCI", K_ERROR, "MSIX BIR out of range");
+        pci_log(LOG_ERROR, "MSIX BIR out of range");
         return;
     }
 
     uint64_t bar_addr = pci_read_bar64(bus, slot, func, bir);
     if (bar_addr == 0) {
-        k_info("PCI", K_ERROR, "PCI BAR%u is zero/unassigned", bir);
+        pci_log(LOG_ERROR, "PCI BAR%u is zero/unassigned", bir);
         return;
     }
 
@@ -216,7 +219,7 @@ void pci_program_msix_entry(uint8_t bus, uint8_t slot, uint8_t func,
     void *map =
         vmm_map_phys(map_base, map_size, PAGING_UNCACHABLE, VMM_FLAG_NONE);
     if (!map) {
-        k_info("PCI", K_ERROR, "vmm_map_phys failed for MSI-X table");
+        pci_log(LOG_ERROR, "vmm_map_phys failed for MSI-X table");
         return;
     }
 
@@ -238,7 +241,7 @@ void pci_enable_msix_on_core(uint8_t bus, uint8_t slot, uint8_t func,
                              uint8_t vector_index, uint8_t apic_id) {
     uint8_t cap = pci_find_capability(bus, slot, func, PCI_CAP_ID_MSIX);
     if (cap == 0) {
-        k_info("PCI", K_ERROR, "MSI-X capability not found");
+        pci_log(LOG_ERROR, "MSI-X capability not found");
         return;
     }
     uint32_t table_offset_bir = pci_read(bus, slot, func, cap + 4);
@@ -254,7 +257,7 @@ void pci_enable_msix_on_core(uint8_t bus, uint8_t slot, uint8_t func,
     if (bir == 0) {
         bar_addr = ((uint64_t) bar_high << 32) | (bar_low & ~0xFU);
     } else if (bir == 1) {
-        k_info("PCI", K_ERROR, "unsupported BIR");
+        pci_log(LOG_ERROR, "unsupported BIR");
     }
 
     uint64_t map_size =
@@ -296,13 +299,13 @@ void pci_enable_msix(uint8_t bus, uint8_t slot, uint8_t func) {
             uint16_t verify = pci_read_word(bus, slot, func, cap_ptr + 2);
 
             if ((verify & (1 << 15)) && !(verify & (1 << 14))) {
-                k_info("PCI", K_INFO, "MSI-X enabled");
+                pci_log(LOG_INFO, "MSI-X enabled");
             } else {
-                k_info("PCI", K_ERROR, "Failed to enable MSI-X");
+                pci_log(LOG_ERROR, "Failed to enable MSI-X");
             }
             return;
         }
         cap_ptr = pci_read_byte(bus, slot, func, cap_ptr + 1);
     }
-    k_info("PCI", K_ERROR, "MSI-X capability not found");
+    pci_log(LOG_ERROR, "MSI-X capability not found");
 }

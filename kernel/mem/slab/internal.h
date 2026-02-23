@@ -15,6 +15,18 @@
 #include <sync/spinlock.h>
 #include <time.h>
 
+LOG_SITE_EXTERN(slab);
+LOG_HANDLE_EXTERN(slab);
+
+#define slab_log(lvl, fmt, ...)                                                \
+    log(LOG_SITE(slab), LOG_HANDLE(slab), lvl, fmt, ##__VA_ARGS__)
+
+#define slab_err(fmt, ...) slab_log(LOG_ERROR, fmt, ##__VA_ARGS__)
+#define slab_warn(fmt, ...) slab_log(LOG_WARN, fmt, ##__VA_ARGS__)
+#define slab_info(fmt, ...) slab_log(LOG_INFO, fmt, ##__VA_ARGS__)
+#define slab_debug(fmt, ...) slab_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
+#define slab_trace(fmt, ...) slab_log(LOG_TRACE, fmt, ##__VA_ARGS__)
+
 /* Lock ordering:
  *
  * Slab GC -> Slab cache -> Freequeue -> Slab -> Mag
@@ -172,7 +184,7 @@ SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab, lock);
 #define slab_from_rbt_node(n) (container_of(n, struct slab, rb))
 #define slab_from_list_node(ln) (container_of(ln, struct slab, list))
 #define PAGE_NON_SLAB_SPACE (PAGE_SIZE - sizeof(struct slab))
-#define slab_error(fmt, ...) k_info("SLAB", K_ERROR, fmt, ##__VA_ARGS__)
+#define slab_error(fmt, ...) k_info("SLAB", LOG_ERROR, fmt, ##__VA_ARGS__)
 
 _Static_assert(offsetof(struct slab, self) == 0,
                "self pointer not at start of struct");
@@ -591,7 +603,8 @@ static inline void slab_byte_idx_and_mask_from_idx(uint64_t index,
 static inline void slab_index_and_mask_from_ptr(struct slab *slab, void *obj,
                                                 uint64_t *byte_idx_out,
                                                 uint8_t *bitmask_out) {
-    uint64_t index = ((vaddr_t) obj - slab->mem) / slab->parent_cache->obj_stride;
+    uint64_t index =
+        ((vaddr_t) obj - slab->mem) / slab->parent_cache->obj_stride;
     slab_byte_idx_and_mask_from_idx(index, byte_idx_out, bitmask_out);
 }
 

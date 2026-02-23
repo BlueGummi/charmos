@@ -7,6 +7,8 @@
 #include <string.h>
 #include <sync/spinlock.h>
 
+LOG_SITE_DECLARE_DEFAULT(asan);
+LOG_HANDLE_DECLARE_DEFAULT(asan);
 static bool asan_ready = false;
 static uint8_t *asan_shadow_base;
 static size_t asan_shadow_size;
@@ -35,7 +37,8 @@ void asan_unpoison(void *addr, size_t size) {
 
 void asan_init(void) {
     return;
-    k_info("ASAN", K_INFO, "Bringing up ASAN... this will take time...");
+
+    asan_info("Bringing up ASAN... this will take time...");
     asan_shadow_size = (global.total_pages * PAGE_SIZE) >> ASAN_SHADOW_SCALE;
 
     paddr_t shadow_phys = pmm_alloc_pages(
@@ -69,12 +72,11 @@ void asan_init(void) {
         remaining = remaining > PAGE_SIZE ? remaining - PAGE_SIZE : 0;
     }
 
-    k_info("ASAN", K_INFO, "ASAN mapped up and brought up... memsetting..");
+    asan_info("ASAN mapped up and brought up... memsetting..");
     /* Initialize shadow memory to poisoned */
     memset(asan_shadow_base, 0xFF, asan_shadow_size);
 
-    k_info("ASAN", K_INFO, "shadow memory initialized at 0x%lx",
-           asan_shadow_base);
+    asan_info("shadow memory initialized at 0x%lx", asan_shadow_base);
 
     asan_ready = true;
 }
@@ -479,8 +481,7 @@ void __asan_free_hook(void *ptr) {
 /* --- Init/fini stubs --- */
 
 void __asan_init(void) {
-    /* Your kernel’s asan_init() should be called early in boot. */
-    k_info("ASAN", K_INFO, "__asan_init runtime stub called");
+    asan_info("__asan_init runtime stub called");
 }
 
 void __asan_before_dynamic_init(const char *module_name) {

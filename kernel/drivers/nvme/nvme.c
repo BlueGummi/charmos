@@ -15,6 +15,8 @@
 #include <stdint.h>
 
 #include "internal.h"
+LOG_HANDLE_DECLARE_DEFAULT(nvme);
+LOG_SITE_DECLARE_DEFAULT(nvme);
 
 struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
                                          uint8_t func) {
@@ -93,16 +95,16 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     uint32_t actual = nvme_set_num_queues(nvme, core_count, core_count);
     uint32_t total_sq = actual & 0xffff;
     uint32_t total_cq = actual >> 16;
-    nvme_info(K_INFO, "Controller supports %u SQs and %u CQs", total_sq,
-              total_cq);
+    nvme_log(LOG_INFO, "Controller supports %u SQs and %u CQs", total_sq,
+             total_cq);
 
     nvme_set_num_queues(nvme, total_sq, total_cq);
 
     uint32_t sqs_to_make = core_count > total_sq ? total_sq : core_count;
 
     nvme->max_transfer_size = (1 << c->mdts) * PAGE_SIZE;
-    nvme_info(K_INFO, "Controller max transfer size is %u bytes",
-              nvme->max_transfer_size);
+    nvme_log(LOG_INFO, "Controller max transfer size is %u bytes",
+             nvme->max_transfer_size);
 
     nvme->isr_index =
         kzalloc(sizeof(uint8_t) * sqs_to_make, ALLOC_PARAMS_DEFAULT);

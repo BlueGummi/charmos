@@ -1,6 +1,6 @@
-#include <global.h>
 #include <console/panic.h>
 #include <console/printf.h>
+#include <global.h>
 #include <irq/irq.h>
 #include <sleep.h>
 #include <smp/core.h>
@@ -11,6 +11,18 @@
 #include <time.h>
 
 #include <colors.h>
+
+LOG_SITE_DECLARE_DEFAULT(test);
+LOG_HANDLE_DECLARE_DEFAULT(test);
+
+#define test_log(lvl, fmt, ...)                                                \
+    log(LOG_SITE(test), LOG_HANDLE(test), lvl, fmt, ##__VA_ARGS__)
+
+#define test_err(fmt, ...) test_log(LOG_ERROR, fmt, ##__VA_ARGS__)
+#define test_warn(fmt, ...) test_log(LOG_WARN, fmt, ##__VA_ARGS__)
+#define test_info(fmt, ...) test_log(LOG_INFO, fmt, ##__VA_ARGS__)
+#define test_debug(fmt, ...) test_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
+#define test_trace(fmt, ...) test_log(LOG_TRACE, fmt, ##__VA_ARGS__)
 
 extern struct kernel_test __skernel_tests[];
 extern struct kernel_test __ekernel_tests[];
@@ -86,15 +98,14 @@ void tests_run(void) {
     }
     uint64_t total_test_count = unit_test_count + integration_test_count;
 
-    k_info("TEST", K_TEST,
-           "running %llu " ANSI_CYAN "unit" ANSI_RESET " tests...\n",
-           unit_test_count);
+    test_info("running %llu " ANSI_CYAN "unit" ANSI_RESET " tests...\n",
+              unit_test_count);
 
     run(true, start, end);
 
-    k_info("TEST", K_TEST,
-           "running %llu " ANSI_MAGENTA "integration" ANSI_RESET " tests...\n",
-           integration_test_count);
+    test_info("running %llu " ANSI_MAGENTA "integration" ANSI_RESET
+              " tests...\n",
+              integration_test_count);
 
     run(false, start, end);
 
@@ -104,16 +115,14 @@ void tests_run(void) {
     char *fail_color = all_ok ? ANSI_GREEN : ANSI_RED;
     char *skip_color = all_ok ? ANSI_GREEN : ANSI_GRAY;
 
-    k_info("TEST", K_TEST,
-           "%llu " ANSI_CYAN "total" ANSI_RESET " tests, %llu " ANSI_GREEN
-           "passed" ANSI_RESET ", %llu %sfailed" ANSI_RESET
-           ", %llu %sskipped\n" ANSI_RESET,
-           total_test_count, pass_count, fail_count, fail_color, skip_count,
-           skip_color);
+    test_info("%llu " ANSI_CYAN "total" ANSI_RESET " tests, %llu " ANSI_GREEN
+              "passed" ANSI_RESET ", %llu %sfailed" ANSI_RESET
+              ", %llu %sskipped\n" ANSI_RESET,
+              total_test_count, pass_count, fail_count, fail_color, skip_count,
+              skip_color);
 
 end:
-    k_info("TEST", K_TEST, "%s%s" ANSI_RESET " (%llu ms)\n", color, msg,
-           total_time);
+    test_info("%s%s" ANSI_RESET " (%llu ms)\n", color, msg, total_time);
 
 #endif
 }

@@ -3,6 +3,7 @@
 #include <drivers/usb_generic/kb.h>
 #include <drivers/usb_generic/usb.h>
 #include <drivers/xhci.h>
+#include <log.h>
 #include <mem/alloc.h>
 #include <mem/page.h>
 #include <mem/pmm.h>
@@ -183,6 +184,11 @@ struct usb_hid_keyboard *usb_keyboard_create(struct usb_device *dev,
     return kbd;
 }
 
+LOG_HANDLE_DECLARE_DEFAULT(usbkb);
+LOG_SITE_DECLARE_DEFAULT(usbkb);
+#define usbkb_log(log_level, fmt, ...)                                         \
+    log(LOG_SITE(usbkb), LOG_HANDLE(usbkb), log_level, fmt, ##__VA_ARGS__)
+
 enum usb_status usb_keyboard_bringup(struct usb_device *dev) {
     struct usb_interface_descriptor *intf =
         usb_find_interface(dev, USB_CLASS_HID, USB_SUBCLASS_HID_BOOT_INTERFACE,
@@ -190,7 +196,7 @@ enum usb_status usb_keyboard_bringup(struct usb_device *dev) {
     if (!intf)
         return USB_ERR_NO_DEVICE;
 
-    k_info("USBKB", K_INFO, "Keyboard connected");
+    usbkb_log(LOG_INFO, "Keyboard connected");
 
     uint8_t iface_num = intf->interface_number;
 
@@ -215,7 +221,7 @@ enum usb_status usb_keyboard_bringup(struct usb_device *dev) {
         }
     }
 
-    k_info("USBKB", K_WARN, "No interrupt IN endpoint found");
+    usbkb_log(LOG_WARN, "No interrupt IN endpoint found");
     return USB_ERR_NO_ENDPOINT;
 }
 
@@ -229,7 +235,7 @@ void usb_keyboard_teardown(struct usb_device *dev) {
 
 void usb_keyboard_free(struct usb_device *dev) {
     kfree(dev->driver_private, FREE_PARAMS_DEFAULT);
-    k_info("USBKB", K_INFO, "Keyboard disconnected");
+    usbkb_log(LOG_INFO, "Keyboard disconnected");
 }
 
 USB_DRIVER_REGISTER(keyboard, USB_CLASS_HID, USB_SUBCLASS_HID_BOOT_INTERFACE,

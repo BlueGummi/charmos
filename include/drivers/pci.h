@@ -1,7 +1,8 @@
 /* @title: PCI */
 #pragma once
-#include <compiler.h>
 #include <asm.h>
+#include <compiler.h>
+#include <log.h>
 #include <stdint.h>
 
 #define PCI_CLASS_MASS_STORAGE 0x01
@@ -29,7 +30,7 @@ struct pci_driver {
     uint8_t prog_if;
     uint16_t vendor_id;
     void (*initialize)(uint8_t, uint8_t, uint8_t, struct pci_device *);
-} __linker_aligned; 
+} __linker_aligned;
 
 extern struct pci_driver __skernel_pci_devices[];
 extern struct pci_driver __ekernel_pci_devices[];
@@ -180,6 +181,11 @@ static inline void pci_write_byte(uint8_t bus, uint8_t slot, uint8_t func,
     tmp = (tmp & ~(0xFF << shift)) | ((uint32_t) value << shift);
     pci_write(bus, slot, func, offset & 0xFC, tmp);
 }
+
+LOG_HANDLE_EXTERN(pci);
+LOG_SITE_EXTERN(pci);
+#define pci_log(log_level, fmt, ...)                                          \
+    log(LOG_SITE(pci), LOG_HANDLE(pci), log_level, fmt, ##__VA_ARGS__)
 
 const char *pci_class_name(uint8_t class_code, uint8_t subclass);
 

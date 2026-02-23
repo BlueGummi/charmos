@@ -12,6 +12,9 @@
 #include <stdint.h>
 #include <string.h>
 
+LOG_HANDLE_DECLARE_DEFAULT(e1000);
+LOG_SITE_DECLARE_DEFAULT(e1000);
+
 #define E1000_MAX_TX_PACKET_SIZE 1518
 #define REG32(dev, offset) (&(dev->regs[(offset) / 4U]))
 
@@ -178,8 +181,9 @@ bool e1000_init(struct pci_device *pci, struct e1000_device *dev) {
     dev->bus = pci->bus;
     dev->device = pci->device;
     dev->function = pci->function;
-    k_info("e1000", K_INFO, "Found device at %02x:%02x.%02x", pci->bus,
-           pci->device, pci->function);
+
+    e1000_log(LOG_INFO, "Found device at %02x:%02x.%02x", pci->bus, pci->device,
+              pci->function);
 
     uint32_t bar = pci_read(dev->bus, dev->device, dev->function, PCI_BAR0);
     if (bar & 0x1)
@@ -206,7 +210,7 @@ bool e1000_init(struct pci_device *pci, struct e1000_device *dev) {
     e1000_setup_tx_ring(dev);
     e1000_setup_rx_ring(dev);
     send_hardcoded_ping(dev);
-    k_info("e1000", K_INFO, "Device initialized successfully");
+    e1000_log(LOG_INFO, "Device initialized successfully");
     return true;
 }
 

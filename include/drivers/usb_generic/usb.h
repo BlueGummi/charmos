@@ -1,6 +1,7 @@
 /* @title: USB */
 #pragma once
 #include <compiler.h>
+#include <log.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -134,9 +135,11 @@ struct io_wait_token;
 #define USB_CLASS_APPLICATION_SPECIFIC 0xFE
 #define USB_CLASS_VENDOR_SPECIFIC 0xFF
 
-#define usb_info(string, ...) k_info("USB", K_INFO, string, ##__VA_ARGS__)
-#define usb_warn(string, ...) k_info("USB", K_WARN, string, ##__VA_ARGS__)
-#define usb_error(string, ...) k_info("USB", K_ERROR, string, ##__VA_ARGS__)
+LOG_HANDLE_EXTERN(usb);
+LOG_SITE_EXTERN(usb);
+
+#define usb_log(log_level, fmt, ...)                                           \
+    log(LOG_SITE(usb), LOG_HANDLE(usb), log_level, fmt, ##__VA_ARGS__)
 
 #define USB_DRIVER_REGISTER(n, cc, sc, proto, bringup_fn, teardown_fn,         \
                             free_fn)                                           \

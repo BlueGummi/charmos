@@ -2,6 +2,7 @@
 #pragma once
 #include <block/generic.h>
 #include <compiler.h>
+#include <log.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <sync/spinlock.h>
@@ -191,6 +192,12 @@ struct ata_identify {
     uint16_t world_wide_name[4];
     uint16_t reserved4[144];
 } __packed;
+
+LOG_SITE_EXTERN(ide);
+LOG_HANDLE_EXTERN(ide);
+
+#define ide_log(log_level, fmt, ...)                                           \
+    log(LOG_SITE(ide), LOG_HANDLE(ide), log_level, fmt, ##__VA_ARGS__)
 
 void ata_ident_print(struct ata_identify *id);
 void ata_select_drive(struct ata_drive *ata_drive);
