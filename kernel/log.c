@@ -14,20 +14,9 @@
 
 #define LOG_IMPORTANT_RETRY 32
 
-struct log_dump_opts log_dump_default = {
-    .min_level = LOG_TRACE,
-    .show_args = true,
-    .show_cpu = true,
-    .show_tid = true,
-    .show_irql = true,
-    .show_caller = true,
-    .resolve_symbols = true,
-    .clear_after_dump = false,
-};
-
 LOG_SITE_DECLARE(global, LOG_SITE_DEFAULT, LOG_SITE_CAPACITY_DEFAULT,
-                 LOG_SITE_ALL);
-LOG_HANDLE_DECLARE(global, LOG_DEFAULT);
+                 LOG_SITE_ALL, LOG_DUMP_CONSOLE);
+LOG_HANDLE_DECLARE(global, LOG_DEFAULT, LOG_DUMP_CONSOLE);
 
 struct log_globals {
     struct locked_list list;
@@ -38,17 +27,6 @@ static const char *log_level_str[] = {"TRACE", "DEBUG", "INFO", "WARN",
                                       "ERROR"};
 
 struct log_globals log_global = {0};
-
-static struct log_dump_opts log_dump_console = {
-    .min_level = LOG_TRACE,
-    .show_args = true,
-    .show_cpu = false,
-    .show_tid = false,
-    .show_irql = false,
-    .show_caller = false,
-    .resolve_symbols = false,
-    .clear_after_dump = false,
-};
 
 static bool log_site_get(struct log_site *site) {
     return refcount_inc(&site->refcount);
@@ -105,39 +83,33 @@ static void k_printf_from_log(const char *fmt, const uint64_t *args,
 }
 
 static void log_dump_record(const struct log_record *rec,
-                            const struct log_dump_opts *opts) {
+                            const struct log_dump_opts opts) {
     size_t sec = MS_TO_SECONDS(rec->timestamp);
     size_t msec = rec->timestamp % 1000;
     k_printf("[%llu.%03llu] %s%-5s%s ", sec, msec, log_level_color(rec->level),
              log_level_str[rec->level], ANSI_RESET);
 
-    if (opts->show_cpu)
+    if (opts.show_cpu)
         k_printf("cpu=%u ", rec->cpu);
 
-    if (opts->show_tid)
+    if (opts.show_tid)
         k_printf("tid=%u ", rec->tid);
 
-    if (opts->show_irql)
+    if (opts.show_irql)
         k_printf("irql=%d ", rec->logged_at_irql);
 
     /* message */
-    if (opts->show_args && rec->fmt) {
+    if (opts.show_args && rec->fmt) {
         k_printf_from_log(rec->fmt, rec->args, rec->nargs);
     } else if (rec->handle && rec->handle->msg) {
         k_printf("%s", rec->handle->msg);
     }
 
-    k_printf("\n");
-
-    if (opts->show_caller) {
-        uint64_t sym_addr;
-        const char *sym = find_symbol(rec->caller_ip, &sym_addr);
-        if (sym) {
-            k_printf("    at %s+0x%lx\n", sym, rec->caller_ip - sym_addr);
-        } else {
-            k_printf("    at 0x%lx\n", rec->caller_ip);
-        }
+    if (opts.show_caller) {
+        k_printf(" <+ at %s()", rec->caller_fn);
     }
+
+    k_printf("\n");
 }
 
 static inline bool log_ringbuf_try_enqueue(struct log_ringbuf *rb,
@@ -205,13 +177,13 @@ static bool log_ringbuf_force_enqueue(struct log_ringbuf *rb,
     return log_ringbuf_try_enqueue(rb, rec);
 }
 
-void log_dump_site(struct log_site *site, struct log_dump_opts *opts) {
+void log_dump_site(struct log_site *site, struct log_dump_opts opts) {
     struct log_record rec;
     if (!site || !log_site_get(site))
         return;
 
     while (log_ringbuf_try_dequeue(&site->rb, &rec)) {
-        if (rec.level < opts->min_level)
+        if (rec.level < opts.min_level)
             continue;
 
         if (site->dropped) {
@@ -228,16 +200,17 @@ void log_dump_site_default(struct log_site *site) {
     if (!site || !log_site_get(site))
         return;
 
-    log_dump_site(site, &log_dump_default);
+    log_dump_site(site, LOG_DUMP_DEFAULT);
     log_site_put(site);
 }
 
 void log_console_emit(const struct log_record *rec) {
-    log_dump_record(rec, &log_dump_console);
+    log_dump_record(rec, LOG_DUMP_CONSOLE);
 }
 
 void log_emit_internal(struct log_site *site, struct log_handle *handle,
-                       enum log_level ll, uintptr_t ip, uint8_t narg, char *fmt,
+                       enum log_level ll, const char *func, const char *file,
+                       int32_t line, uintptr_t ip, uint8_t narg, char *fmt,
                        ...) {
     if (!site || !log_site_get(site))
         return;
@@ -247,7 +220,10 @@ void log_emit_internal(struct log_site *site, struct log_handle *handle,
     rec.handle = handle;
     rec.level = level;
     rec.fmt = fmt;
-    rec.caller_ip = ip;
+    rec.caller_pc = ip;
+    rec.caller_fn = (char *) func;
+    rec.caller_file = (char *) file;
+    rec.caller_line = line;
 
     /* pack args */
     va_list ap;
@@ -258,9 +234,12 @@ void log_emit_internal(struct log_site *site, struct log_handle *handle,
     }
     va_end(ap);
 
+    bool sopts = site->flags & LOG_SITE_PRINT;
+    struct log_dump_opts dopts = sopts ? site->dump_opts : handle->dump_opts;
+
     if (global.current_bootstage < BOOTSTAGE_LATE)
         if (log_handle_should_print(handle, site, level))
-            return log_console_emit(&rec);
+            return log_dump_record(&rec, dopts);
 
     if (!log_site_accepts(site) ||
         (site->flags & LOG_SITE_NO_IRQ && irq_in_interrupt()))
@@ -311,7 +290,7 @@ void log_emit_internal(struct log_site *site, struct log_handle *handle,
 
             if (!queued) {
                 /* last-resort visibility */
-                log_console_emit(&rec);
+                log_dump_record(&rec, dopts);
             }
         } else {
             site->dropped++;
@@ -320,7 +299,7 @@ void log_emit_internal(struct log_site *site, struct log_handle *handle,
     }
 
     if (log_handle_should_print(handle, site, level)) {
-        log_console_emit(&rec);
+        log_dump_record(&rec, dopts);
     }
 
     if ((ll & LOG_PANIC) && level >= LOG_ERROR) {
@@ -359,7 +338,7 @@ void log_dump_all(void) {
 
     struct log_site *site;
     list_for_each_entry(site, &log_global.list.list, list) {
-        log_dump_site(site, &log_dump_default);
+        log_dump_site(site, LOG_DUMP_DEFAULT);
     }
 
     spin_unlock(&log_global.list.lock, irql);

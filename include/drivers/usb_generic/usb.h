@@ -135,11 +135,17 @@ struct io_wait_token;
 #define USB_CLASS_APPLICATION_SPECIFIC 0xFE
 #define USB_CLASS_VENDOR_SPECIFIC 0xFF
 
-LOG_HANDLE_EXTERN(usb);
 LOG_SITE_EXTERN(usb);
+LOG_HANDLE_EXTERN(usb);
 
-#define usb_log(log_level, fmt, ...)                                           \
-    log(LOG_SITE(usb), LOG_HANDLE(usb), log_level, fmt, ##__VA_ARGS__)
+#define usb_log(lvl, fmt, ...)                                                 \
+    log(LOG_SITE(usb), LOG_HANDLE(usb), lvl, fmt, ##__VA_ARGS__)
+
+#define usb_err(fmt, ...) usb_log(LOG_ERROR, fmt, ##__VA_ARGS__)
+#define usb_warn(fmt, ...) usb_log(LOG_WARN, fmt, ##__VA_ARGS__)
+#define usb_info(fmt, ...) usb_log(LOG_INFO, fmt, ##__VA_ARGS__)
+#define usb_debug(fmt, ...) usb_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
+#define usb_trace(fmt, ...) usb_log(LOG_TRACE, fmt, ##__VA_ARGS__)
 
 #define USB_DRIVER_REGISTER(n, cc, sc, proto, bringup_fn, teardown_fn,         \
                             free_fn)                                           \

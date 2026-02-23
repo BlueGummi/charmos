@@ -39,12 +39,23 @@ enum log_record_flags : uint16_t {
     LOG_REC_TRUNCATED = 1 << 1,
 };
 
+struct log_dump_opts {
+    uint8_t min_level;
+    bool show_args : 1;
+    bool show_cpu : 1;
+    bool show_tid : 1;
+    bool show_irql : 1;
+    bool show_caller : 1;
+    bool resolve_symbols : 1;
+    bool clear_after_dump : 1;
+};
+
 struct log_handle {
     const char *msg;
     enum log_flags flags;
     _Atomic uint32_t seen;
     _Atomic uint64_t last_ts;
-    void *src;
+    struct log_dump_opts dump_opts; /* If LOG_PRINT, use these opts */
 };
 
 struct log_record {
@@ -61,7 +72,10 @@ struct log_record {
     uint8_t nargs;
     uint64_t args[8];
 
-    vaddr_t caller_ip;
+    char *caller_fn;
+    char *caller_file;
+    int32_t caller_line;
+    uintptr_t caller_pc;
     enum log_record_flags flags;
     enum irql logged_at_irql;
 };
@@ -91,18 +105,8 @@ struct log_site {
 
     uint32_t dropped; /* Accumulation of all missed logs */
     enum log_site_flags flags;
+    struct log_dump_opts dump_opts; /* If LOG_SITE_PRINT, use this */
 } __linker_aligned;
-
-struct log_dump_opts {
-    uint8_t min_level;
-    bool show_args : 1;
-    bool show_cpu : 1;
-    bool show_tid : 1;
-    bool show_irql : 1;
-    bool show_caller : 1;
-    bool resolve_symbols : 1;
-    bool clear_after_dump : 1;
-};
 
 static inline const char *log_level_color(enum log_level l) {
     switch (l) {
@@ -154,8 +158,9 @@ static inline uint64_t log_arg_i64(int64_t v) {
 }
 
 void log_emit_internal(struct log_site *, struct log_handle *, enum log_level,
+                       const char *func, const char *fname, int32_t line,
                        uintptr_t ip, uint8_t nargs, char *fmt, ...);
-void log_dump_site(struct log_site *, struct log_dump_opts *opts);
+void log_dump_site(struct log_site *, struct log_dump_opts opts);
 void log_dump_site_default(struct log_site *);
 void log_dump_all(void);
 void log_sites_init(void);
@@ -163,18 +168,33 @@ struct log_site *log_site_create(char *name, enum log_site_flags flags,
                                  size_t capacity);
 void log_site_destroy(struct log_site *site);
 
+#define LOG_DUMP_DEFAULT                                                       \
+    (struct log_dump_opts) {                                                   \
+        .min_level = LOG_TRACE, .show_args = true, .show_cpu = true,           \
+        .show_tid = true, .show_irql = true, .show_caller = true,              \
+        .resolve_symbols = true, .clear_after_dump = false,                    \
+    }
+
+#define LOG_DUMP_CONSOLE                                                       \
+    (struct log_dump_opts) {                                                   \
+        .min_level = LOG_TRACE, .show_args = true, .show_cpu = false,          \
+        .show_tid = false, .show_irql = false, .show_caller = false,           \
+        .resolve_symbols = false, .clear_after_dump = false,                   \
+    }
+
 #define log_msg(lvl, fmt, ...)                                                 \
-    log_emit_internal(LOG_SITE(global), LOG_HANDLE(global), lvl,               \
+    log_emit_internal(LOG_SITE(global), LOG_HANDLE(global), lvl, __func__,     \
+                      __FILE__, __LINE__,                                      \
                       (uintptr_t) __builtin_return_address(0),                 \
                       PP_NARG(__VA_ARGS__), fmt, ##__VA_ARGS__)
 
 #define log_global(handle, lvl, fmt, ...)                                      \
-    log_emit_internal(LOG_SITE(global), handle, lvl,                           \
-                      (uintptr_t) __builtin_return_address(0),                 \
+    log_emit_internal(LOG_SITE(global), handle, lvl, __func__, __FILE__,       \
+                      __LINE__, (uintptr_t) __builtin_return_address(0),       \
                       PP_NARG(__VA_ARGS__), fmt, ##__VA_ARGS__)
 
 #define log(site, handle, lvl, fmt, ...)                                       \
-    log_emit_internal(site, handle, lvl,                                       \
+    log_emit_internal(site, handle, lvl, __func__, __FILE__, __LINE__,         \
                       (uintptr_t) __builtin_return_address(0),                 \
                       PP_NARG(__VA_ARGS__), fmt, ##__VA_ARGS__)
 
@@ -206,25 +226,28 @@ void log_site_destroy(struct log_site *site);
 /* For static ones */
 #define LOG_SITE_LEVEL(l) (1u << l)
 #define LOG_SITE_ALL UINT32_MAX /* TODO: More */
-#define LOG_SITE_DECLARE(n, f, size, mask)                                     \
+#define LOG_SITE_DECLARE(n, f, size, mask, dopts)                              \
     __attribute__((                                                            \
         section(".kernel_log_sites"))) struct log_site __log_site_##n =        \
         (struct log_site) {                                                    \
-        .name = #n, .flags = f, .rb.capacity = size, .enabled_mask = mask      \
+        .name = #n, .flags = f, .rb.capacity = size, .enabled_mask = mask,     \
+        .dump_opts = dopts                                                     \
     } /* Rest will get initialized at boot */
 #define LOG_SITE_DECLARE_DEFAULT(n)                                            \
     LOG_SITE_DECLARE(n, LOG_SITE_DEFAULT, LOG_SITE_CAPACITY_DEFAULT,           \
-                     LOG_SITE_ALL)
+                     LOG_SITE_ALL, LOG_DUMP_CONSOLE)
 
 #define LOG_SITE(name) &(__log_site_##name)
 
 #define LOG_HANDLE_SUBSYSTEM_NONE NULL
 #define LOG_HANDLE_EXTERN(name) extern struct log_handle __log_handle_##name
-#define LOG_HANDLE_DECLARE(na, f)                                              \
-    struct log_handle __log_handle_##na =                                      \
-        (struct log_handle) {.msg = #na, .flags = f, .seen = 0, .last_ts = 0}
+#define LOG_HANDLE_DECLARE(na, f, dopts)                                       \
+    struct log_handle __log_handle_##na = (struct log_handle) {                \
+        .msg = #na, .flags = f, .seen = 0, .last_ts = 0, .dump_opts = dopts    \
+    }
 
-#define LOG_HANDLE_DECLARE_DEFAULT(n) LOG_HANDLE_DECLARE(n, LOG_PRINT)
+#define LOG_HANDLE_DECLARE_DEFAULT(n)                                          \
+    LOG_HANDLE_DECLARE(n, LOG_PRINT, LOG_DUMP_CONSOLE)
 
 #define LOG_HANDLE(name) &(__log_handle_##name)
 

@@ -345,22 +345,22 @@ enum usb_status usb_init_device(struct usb_device *dev) {
         return USB_ERR_NO_DEVICE;
 
     enum usb_status err = USB_OK;
-    usb_log(LOG_TRACE, "get_device_descriptor\n");
+    usb_trace("get_device_descriptor");
     if ((err = usb_get_device_descriptor(dev)) != USB_OK) {
         goto out;
     }
 
-    usb_log(LOG_TRACE, "parse_config\n");
+    usb_trace("parse_config");
     if ((err = usb_parse_config_descriptor(dev)) != USB_OK) {
         goto out;
     }
 
-    usb_log(LOG_TRACE, "set_config\n");
+    usb_trace("set_config");
     if ((err = usb_set_configuration(dev)) != USB_OK) {
         goto out;
     }
 
-    usb_log(LOG_TRACE, "configure_endpoint\n");
+    usb_trace("configure_endpoint");
     if ((err = dev->host->ops.configure_endpoint(dev)) != USB_OK) {
         goto out;
     }
@@ -371,12 +371,12 @@ enum usb_status usb_init_device(struct usb_device *dev) {
 
 out:
     if (err != USB_OK) {
-        usb_log(LOG_TRACE, "reset_slot\n");
+        usb_log(LOG_TRACE, "reset_slot");
         dev->host->ops.reset_slot(dev);
     }
 
     usb_device_put(dev);
-    usb_log(LOG_TRACE, "ok\n");
+    usb_trace("ok");
     return err;
 }
 

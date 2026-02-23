@@ -96,7 +96,9 @@ static struct mutex pi_mutex = MUTEX_INIT;
 static struct thread *pi_ts, *pi_rt, *pi_dum;
 static atomic_bool pi_ts_got = false;
 static atomic_uint pi_done = 0;
-LOG_SITE_DECLARE_DEFAULT(test_mutex);
+
+LOG_SITE_DECLARE(test_mutex, LOG_SITE_PRINT | LOG_SITE_DROP_OLD,
+                 LOG_SITE_CAPACITY_DEFAULT, LOG_SITE_ALL, LOG_DUMP_DEFAULT);
 LOG_HANDLE_DECLARE_DEFAULT(test_mutex);
 
 #define test_mutex_log(lvl, fmt, ...)                                          \
@@ -110,29 +112,29 @@ LOG_HANDLE_DECLARE_DEFAULT(test_mutex);
 
 static void pi_dummy(void *nothing) {
     (void) nothing;
-    test_mutex_info("dummy\n");
+    test_mutex_info("dummy");
     while (atomic_load(&pi_done) < 1)
         scheduler_yield();
 
     atomic_fetch_add(&pi_done, 1);
-    test_mutex_info("exiting\n");
+    test_mutex_info("exiting");
 }
 
 static void pi_rt_thread(void *nothing) {
     (void) nothing;
     mutex_lock(&pi_mutex);
-    test_mutex_info("lock\n");
+    test_mutex_info("lock");
     kassert(mutex_get_owner(&pi_mutex) == scheduler_get_current_thread());
     mutex_unlock(&pi_mutex);
-    test_mutex_info("unlock\n");
+    test_mutex_info("unlock");
     atomic_fetch_add(&pi_done, 1);
-    test_mutex_info("exiting\n");
+    test_mutex_info("exiting");
 }
 
 static void pi_ts_thread(void *nothing) {
     (void) nothing;
     mutex_lock(&pi_mutex);
-    test_mutex_info("lock\n");
+    test_mutex_info("lock");
     atomic_store(&pi_ts_got, true);
 
     while (scheduler_get_current_thread()->perceived_prio_class !=
@@ -140,13 +142,13 @@ static void pi_ts_thread(void *nothing) {
         cpu_relax();
 
     kassert(mutex_get_owner(&pi_mutex) == scheduler_get_current_thread());
-    test_mutex_info("boosted\n");
+    test_mutex_info("boosted");
 
-    test_mutex_info("unlock\n");
+    test_mutex_info("unlock");
     mutex_unlock(&pi_mutex);
 
     atomic_fetch_add(&pi_done, 1);
-    test_mutex_info("exiting\n");
+    test_mutex_info("exiting");
 }
 
 TEST_REGISTER(mutex_pi_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
@@ -190,7 +192,7 @@ static atomic_bool ts2_grabbed_b = false;
 static void pi_chain_ts2(void *arg) {
     (void) arg;
     mutex_lock(&pi_mtx_b);
-    test_mutex_info("ts2 lock b\n");
+    test_mutex_info("ts2 lock b");
     atomic_store(&ts2_grabbed_b, true);
 
     /* wait until boosted */
@@ -198,7 +200,7 @@ static void pi_chain_ts2(void *arg) {
            THREAD_PRIO_CLASS_RT)
         cpu_relax();
 
-    test_mutex_info("ts2 boosted\n");
+    test_mutex_info("ts2 boosted");
     mutex_unlock(&pi_mtx_b);
     atomic_fetch_add(&pi_chain_done, 1);
 }
@@ -206,7 +208,7 @@ static void pi_chain_ts2(void *arg) {
 static void pi_chain_ts1(void *arg) {
     (void) arg;
     mutex_lock(&pi_mtx_a);
-    test_mutex_info("ts1 lock a\n");
+    test_mutex_info("ts1 lock a");
     atomic_store(&ts1_grabbed_a, true);
 
     /* wait until boosted */
@@ -215,7 +217,7 @@ static void pi_chain_ts1(void *arg) {
         cpu_relax();
 
     mutex_lock(&pi_mtx_b);
-    test_mutex_info("ts1 lock b\n");
+    test_mutex_info("ts1 lock b");
 
     mutex_unlock(&pi_mtx_b);
     mutex_unlock(&pi_mtx_a);
@@ -224,9 +226,9 @@ static void pi_chain_ts1(void *arg) {
 
 static void pi_chain_rt(void *arg) {
     (void) arg;
-    test_mutex_info("rt lock\n");
+    test_mutex_info("rt lock");
     mutex_lock(&pi_mtx_a);
-    test_mutex_info("rt lock got\n");
+    test_mutex_info("rt lock got");
 
     mutex_unlock(&pi_mtx_a);
     atomic_fetch_add(&pi_chain_done, 1);
@@ -275,21 +277,21 @@ static atomic_bool ts_got = false;
 static void pi_multi_ts(void *arg) {
     (void) arg;
     mutex_lock(&pi_multi_mtx);
-    test_mutex_info("multi_ts running\n");
+    test_mutex_info("multi_ts running");
     atomic_store(&ts_got, true);
 
     while (scheduler_get_current_thread()->perceived_prio_class !=
            THREAD_PRIO_CLASS_RT)
         cpu_relax();
 
-    test_mutex_info("ts boosted\n");
+    test_mutex_info("ts boosted");
     mutex_unlock(&pi_multi_mtx);
     atomic_fetch_add(&pi_multi_done, 1);
 }
 
 static void pi_multi_rt(void *arg) {
     (void) arg;
-    test_mutex_info("multi_rt running\n");
+    test_mutex_info("multi_rt running");
     mutex_lock(&pi_multi_mtx);
     mutex_unlock(&pi_multi_mtx);
     atomic_fetch_add(&pi_multi_done, 1);

@@ -150,7 +150,7 @@ void xhci_teardown_slot(struct xhci_slot *me) {
         xhci_free_ring(ring);
     }
 
-    xhci_trace(ANSI_RED "teardown\n" ANSI_RESET);
+    xhci_trace(ANSI_RED "teardown" ANSI_RESET);
     xhci_disable_slot(me->dev, me->slot_id);
 }
 
@@ -184,5 +184,5 @@ void xhci_reset_slot(struct usb_device *dev) {
 
     xhci_send_command_and_block(xdev, &cmd, NULL);
 
-    xhci_trace("our status was %u\n", request.status);
+    xhci_trace("our status was %u", request.status);
 }

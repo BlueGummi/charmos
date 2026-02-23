@@ -116,9 +116,12 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
 
             struct tlb_shootdown_cpu *other = &global.shootdown_data[i];
 
+            /* TODO: IPI storm! */
             while (atomic_load_explicit(&other->ack_gen, memory_order_acquire) <
-                   gen)
+                   gen) {
+                ipi_send(i, IRQ_TLB_SHOOTDOWN);
                 cpu_relax();
+            }
         }
 
         atomic_fetch_add_explicit(&global.pt_epoch, 1, memory_order_release);

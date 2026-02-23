@@ -351,35 +351,35 @@ enum usb_status xhci_port_init(struct xhci_port *p) {
         return USB_ERR_OOM;
     }
 
-    xhci_trace("reset_port sent\n");
+    xhci_trace("reset_port sent");
     if ((err = xhci_reset_port(dev, port)) != USB_OK) {
-        xhci_trace("reset_port fail\n");
+        xhci_trace("reset_port fail");
         return err;
     }
 
-    xhci_trace("reset_port returned\n");
+    xhci_trace("reset_port returned");
 
-    xhci_trace("enable_slot sent\n");
+    xhci_trace("enable_slot sent");
     if ((slot_id = xhci_enable_slot(dev)) == 0) {
-        xhci_trace("enable_slot fail\n");
+        xhci_trace("enable_slot fail");
         return USB_ERR_NO_DEVICE;
     }
-    xhci_trace("enable_slot returned\n");
+    xhci_trace("enable_slot returned");
 
     struct xhci_slot temp_slot = {0};
     temp_slot.state = XHCI_SLOT_STATE_ENABLED;
     temp_slot.slot_id = slot_id;
     temp_slot.dev = dev;
 
-    xhci_trace("address_device sent\n");
+    xhci_trace("address_device sent");
     if ((err = xhci_address_device(p, slot_id, &temp_slot)) != USB_OK) {
-        xhci_trace("address_device fail\n");
-        xhci_trace("disable_slot sent\n");
+        xhci_trace("address_device fail");
+        xhci_trace("disable_slot sent");
         xhci_disable_slot(dev, slot_id);
-        xhci_trace("disable_slot returned\n");
+        xhci_trace("disable_slot returned");
         return err;
     }
-    xhci_trace("address_device returned\n");
+    xhci_trace("address_device returned");
 
     usb->speed = p->speed;
     usb->port = port;
