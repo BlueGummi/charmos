@@ -112,7 +112,7 @@ static void apply_handle_pressures(struct thread *t, struct climb_handle *ch) {
 
     climb_pressure_t delta = ch->pressure;
 
-    if (t == scheduler_get_current_thread()) {
+    if (t == thread_get_current()) {
         kassert(ch->kind == CLIMB_PRESSURE_DIRECT);
         climb_pressure_t old = cts->direct_pressure;
 
@@ -148,7 +148,7 @@ static void apply_handle(struct thread *t, struct climb_handle *ch) {
     apply_handle_pressures(t, ch);
     struct climb_thread_state *cts = &t->climb_state;
 
-    ch->given_by = scheduler_get_current_thread();
+    ch->given_by = thread_get_current();
 
     /* Was previously not on tree */
     if (cts->pressure_periods == 0) {
@@ -158,6 +158,9 @@ static void apply_handle(struct thread *t, struct climb_handle *ch) {
         enum thread_flags out;
         struct scheduler *sched = thread_get_last_ran(t, &out);
         struct rbt *tree = &sched->climb_threads;
+
+        /* Get a reference for the tree */
+        kassert(thread_get(t));
         rbt_insert(tree, &cts->climb_node);
         cts->on_climb_tree = true;
         thread_restore_flags(t, out);
@@ -166,7 +169,7 @@ static void apply_handle(struct thread *t, struct climb_handle *ch) {
 
 static void remove_handle(struct thread *t, struct climb_handle *ch) {
     struct climb_thread_state *cts = &t->climb_state;
-    kassert(ch->given_by == scheduler_get_current_thread());
+    kassert(ch->given_by == thread_get_current());
 
     if (ch->applied_pressure_internal == 0)
         return;
@@ -201,7 +204,7 @@ static void climb_handle_act_self(struct thread *t, struct climb_handle *h,
         irql_change = true;
     }
 
-    kassert(t == scheduler_get_current_thread());
+    kassert(t == thread_get_current());
     act(t, h);
 
     if (irql_change)
@@ -227,21 +230,21 @@ static void climb_handle_act_other(struct thread *t, struct climb_handle *ch,
 }
 
 static bool climb_get_ref(struct thread *t) {
-    if (t != scheduler_get_current_thread())
+    if (t != thread_get_current())
         return thread_get(t);
 
     return true;
 }
 
 static void climb_drop_ref(struct thread *t) {
-    if (t != scheduler_get_current_thread())
+    if (t != thread_get_current())
         thread_put(t);
 }
 
 static void climb_handle_act(struct thread *t, struct climb_handle *h,
                              void (*act)(struct thread *,
                                          struct climb_handle *)) {
-    if (t == scheduler_get_current_thread()) {
+    if (t == thread_get_current()) {
         climb_handle_act_self(t, h, act);
     } else {
         climb_handle_act_other(t, h, act);

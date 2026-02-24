@@ -61,7 +61,7 @@ static void nvme_process_one(struct nvme_device *dev,
     }
 
     if (t)
-        scheduler_wake_from_io_block(t, dev);
+        thread_wake_from_io_block(t, dev);
 }
 
 static struct nvme_request *nvme_finished_pop_front(struct nvme_device *dev) {

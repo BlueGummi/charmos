@@ -132,7 +132,7 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buffer,
     req.remaining_parts = 1;
     INIT_LIST_HEAD(&req.list_node);
 
-    struct thread *curr = scheduler_get_current_thread();
+    struct thread *curr = thread_get_current();
 
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     req.waiter = curr;

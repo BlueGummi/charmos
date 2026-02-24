@@ -68,7 +68,7 @@ void xhci_controller_enable_ints(struct xhci_device *dev) {
 }
 
 void xhci_wake_waiter(struct xhci_device *dev, struct xhci_request *req) {
-    scheduler_wake_from_io_block(req->private, dev);
+    thread_wake_from_io_block(req->private, dev);
 }
 
 void xhci_cleanup(struct xhci_device *dev, struct xhci_request *req) {

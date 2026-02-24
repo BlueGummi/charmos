@@ -289,7 +289,7 @@ static volatile bool all_ready = false;
 static void stress_worker(void *) {
     struct stress_arg *a = NULL;
     /* wait until private field is visible */
-    while (!(a = scheduler_get_current_thread()->private))
+    while (!(a = thread_get_current()->private))
         ;
 
     while (!all_ready)
@@ -468,7 +468,7 @@ static void tlb_reader(void *arg) {
     while (!atomic_load(&tlb_go))
         cpu_relax();
 
-    volatile uint64_t *va = scheduler_get_current_thread()->private;
+    volatile uint64_t *va = thread_get_current()->private;
     tlb_seen[id] = *va;
     atomic_fetch_add(&tlb_threads_done, 1);
 }

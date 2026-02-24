@@ -31,7 +31,7 @@ ok:
     return true;
 }
 
-bool scheduler_inherit_priority(struct thread *boosted, size_t new_weight,
+bool thread_inherit_priority(struct thread *boosted, size_t new_weight,
                                 enum thread_prio_class new_class,
                                 size_t *old_weight,
                                 enum thread_prio_class *old_class) {
@@ -62,8 +62,8 @@ bool scheduler_inherit_priority(struct thread *boosted, size_t new_weight,
     return did_boost;
 }
 
-void scheduler_uninherit_priority(size_t weight, enum thread_prio_class class) {
-    struct thread *current = scheduler_get_current_thread();
+void thread_uninherit_priority(size_t weight, enum thread_prio_class class) {
+    struct thread *current = thread_get_current();
 
     enum irql tirql = thread_acquire(current, NULL);
 
@@ -74,7 +74,7 @@ void scheduler_uninherit_priority(size_t weight, enum thread_prio_class class) {
 }
 
 enum thread_prio_class thread_unboost_self() {
-    struct thread *curr = scheduler_get_current_thread();
+    struct thread *curr = thread_get_current();
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     enum thread_prio_class boosted = curr->perceived_prio_class;
     curr->perceived_prio_class = curr->base_prio_class;
@@ -83,7 +83,7 @@ enum thread_prio_class thread_unboost_self() {
 }
 
 enum thread_prio_class thread_boost_self(enum thread_prio_class new) {
-    struct thread *curr = scheduler_get_current_thread();
+    struct thread *curr = thread_get_current();
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     enum thread_prio_class old = curr->perceived_prio_class;
     curr->perceived_prio_class = new;

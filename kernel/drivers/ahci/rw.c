@@ -70,7 +70,7 @@ static bool rw_sync(struct generic_disk *disk, uint64_t lba, uint8_t *buf,
     /* tells ISR handler to mark status properly */
     req.trigger_completion = true;
 
-    struct thread *curr = scheduler_get_current_thread();
+    struct thread *curr = thread_get_current();
 
     if (io_wait_token_active(io_wait_tok))
         io_wait_end(io_wait_tok, IO_WAIT_END_NO_OP);

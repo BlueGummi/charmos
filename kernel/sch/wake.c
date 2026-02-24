@@ -2,7 +2,7 @@
 
 #include "internal.h"
 
-bool scheduler_wake(struct thread *t, enum thread_wake_reason reason,
+bool thread_wake(struct thread *t, enum thread_wake_reason reason,
                     enum thread_prio_class prio, void *wake_src) {
     kassert(t);
     enum irql outer = irql_raise(IRQL_HIGH_LEVEL);
@@ -77,7 +77,7 @@ end:
     return woke;
 }
 
-void scheduler_wake_from_io_block(struct thread *t, void *wake_src) {
+void thread_wake_from_io_block(struct thread *t, void *wake_src) {
     /* we are just inspecting the thread to see if this structure exists, no
      * synchronization needed */
     struct io_wait_token *iter;
@@ -88,6 +88,6 @@ void scheduler_wake_from_io_block(struct thread *t, void *wake_src) {
     }
     kassert(found);
 
-    scheduler_wake(t, THREAD_WAKE_REASON_BLOCKING_IO, THREAD_PRIO_CLASS_URGENT,
+    thread_wake(t, THREAD_WAKE_REASON_BLOCKING_IO, THREAD_PRIO_CLASS_URGENT,
                    wake_src);
 }

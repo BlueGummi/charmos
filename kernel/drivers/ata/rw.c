@@ -86,7 +86,7 @@ enum irq_result ide_irq_handler(void *ctx, uint8_t irq_num,
     }
 
     if (req->waiter)
-        scheduler_wake_from_io_block(req->waiter, d);
+        thread_wake_from_io_block(req->waiter, d);
 
 next_request:
 
@@ -184,7 +184,7 @@ static inline void submit_and_wait(struct ata_drive *d, struct ide_request *req,
 
     io_wait_begin(token, d);
 
-    req->waiter = scheduler_get_current_thread();
+    req->waiter = thread_get_current();
     submit_async(d, req);
     spin_unlock(&req->lock, irql);
 }

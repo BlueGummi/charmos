@@ -5,6 +5,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define rbt_for_each_safe(pos, tmp, root)                                      \
+    for (pos = rbt_first(root), tmp = rbt_next(pos); pos != NULL;              \
+         pos = tmp, tmp = rbt_next(pos))
+
 #define rbt_for_each(pos, root)                                                \
     for (pos = rbt_first(root); pos != NULL; pos = rbt_next(pos))
 
@@ -24,7 +28,7 @@ struct rbt_node {
 };
 
 typedef size_t (*rbt_get_data)(struct rbt_node *);
-struct rbt { /* TODO: stop using get_data. for now it works 
+struct rbt { /* TODO: stop using get_data. for now it works
               * but in the future we may want to allow for rb-trees
               * that are "backwards" or sorted by some other rule
               * beyond integer field comparison */

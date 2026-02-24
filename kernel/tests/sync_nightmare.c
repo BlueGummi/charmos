@@ -86,7 +86,7 @@ static void chaos_sleeper(void *arg) {
 
         CHAOS_LOG("sleeper[%zu] sleep iter=%d cookie=0x%lx", id, i,
                   (void *) cookie);
-        thread_sleep(scheduler_get_current_thread(), THREAD_SLEEP_REASON_MANUAL,
+        thread_sleep(thread_get_current(), THREAD_SLEEP_REASON_MANUAL,
                      THREAD_WAIT_INTERRUPTIBLE, (void *) cookie);
 
         thread_wait_for_wake_match();
@@ -125,7 +125,7 @@ static void chaos_waker(void *a) {
         uintptr_t cookie = correct ? s->last_cookie : prng_next();
 
         CHAOS_LOG("waker wake 0x%lx", s->t);
-        scheduler_wake(s->t, THREAD_WAKE_REASON_SLEEP_MANUAL,
+        thread_wake(s->t, THREAD_WAKE_REASON_SLEEP_MANUAL,
                        s->t->perceived_prio_class, (void *) cookie);
         CHAOS_LOG("waker wake done");
 

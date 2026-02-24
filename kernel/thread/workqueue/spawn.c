@@ -64,9 +64,9 @@ static struct thread *workqueue_worker_thread_create(struct workqueue *queue) {
 static void workqueue_enqueue_thread(struct workqueue *queue,
                                      struct thread *t) {
     if (WORKQUEUE_FLAG_TEST(queue, WORKQUEUE_FLAG_PERMANENT)) {
-        scheduler_enqueue_on_core(t, queue->core);
+        thread_enqueue_on_core(t, queue->core);
     } else {
-        scheduler_enqueue(t);
+        thread_enqueue(t);
     }
 }
 

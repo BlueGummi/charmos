@@ -5,7 +5,7 @@
 #include <string.h>
 
 static struct daemon_thread *current_daemon_thread(void) {
-    return scheduler_get_current_thread()->private;
+    return thread_get_current()->private;
 }
 
 static bool mark_daemon_thread_executing(struct daemon_thread *thread,
@@ -178,7 +178,7 @@ daemon_thread_spawn(struct daemon *daemon,
         return NULL;
 
     t->thread->allowed_cpus = daemon->attrs.thread_cpu_mask;
-    scheduler_enqueue(t->thread);
+    thread_enqueue(t->thread);
 
     return t;
 }

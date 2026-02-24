@@ -38,6 +38,9 @@ struct rbt_node *rbt_min(struct rbt *tree) {
 }
 
 struct rbt_node *rbt_next(struct rbt_node *node) {
+    if (!node)
+        return NULL;
+
     if (node->right)
         return rbt_find_min(node->right);
 

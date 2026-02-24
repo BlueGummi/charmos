@@ -95,11 +95,6 @@ void schedule(void);
 void k_sch_main(void *);
 void scheduler_idle_main(void *);
 void scheduler_yield();
-void scheduler_enqueue(struct thread *t);
-void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id);
-
-bool scheduler_wake(struct thread *t, enum thread_wake_reason reason,
-                    enum thread_prio_class prio, void *wake_src);
 
 void scheduler_period_start(struct scheduler *s, uint64_t now_ms);
 
@@ -117,16 +112,11 @@ struct thread *scheduler_steal_work(struct scheduler *new,
                                     struct scheduler *victim);
 
 size_t scheduler_try_push_to_idle_core(struct scheduler *sched);
-bool scheduler_inherit_priority(struct thread *boosted, size_t new_weight,
-                                enum thread_prio_class new_class,
-                                size_t *old_weight_out,
-                                enum thread_prio_class *old_class_out);
-void scheduler_uninherit_priority(size_t weight, enum thread_prio_class class);
+
 void scheduler_tick_enable();
 void scheduler_tick_disable();
 enum irq_result scheduler_timer_isr(void *ctx, uint8_t vector,
                                     struct irq_context *rsp);
-void scheduler_wake_from_io_block(struct thread *t, void *wake_src);
 
 /* For a global structure containing central scheduler data */
 struct scheduler_data {
@@ -137,53 +127,6 @@ struct scheduler_data {
 };
 
 extern struct scheduler_data scheduler_data;
-
-static inline struct thread *scheduler_get_current_thread() {
-    uintptr_t thread;
-    asm volatile("movq %%gs:%c1, %0"
-                 : "=r"(thread)
-                 : "i"(offsetof(struct core, current_thread)));
-    return (struct thread *) thread;
-}
-
-static inline struct thread *thread_spawn(char *name, void (*entry)(void *),
-                                          void *arg, ...) {
-    va_list args;
-    va_start(args, arg);
-    struct thread *t =
-        thread_create_internal(name, entry, arg, THREAD_STACK_SIZE, args);
-    va_end(args);
-    scheduler_enqueue(t);
-    return t;
-}
-
-static inline struct thread *thread_spawn_custom_stack(char *name,
-                                                       void (*entry)(void *),
-                                                       void *arg,
-                                                       size_t stack_size, ...) {
-    va_list args;
-    va_start(args, stack_size);
-    struct thread *t =
-        thread_create_internal(name, entry, arg, stack_size, args);
-    va_end(args);
-
-    scheduler_enqueue(t);
-    return t;
-}
-
-static inline struct thread *thread_spawn_on_core(char *name,
-                                                  void (*entry)(void *),
-                                                  void *arg, uint64_t core_id,
-                                                  ...) {
-    va_list args;
-    va_start(args, core_id);
-    struct thread *t =
-        thread_create_internal(name, entry, arg, THREAD_STACK_SIZE, args);
-    va_end(args);
-
-    scheduler_enqueue_on_core(t, core_id);
-    return t;
-}
 
 static inline bool scheduler_self_in_resched() {
     return atomic_load(&smp_core()->in_resched);

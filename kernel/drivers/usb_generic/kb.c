@@ -11,6 +11,7 @@
 #include <sch/sched.h>
 #include <sleep.h>
 #include <string.h>
+#include <thread/thread.h>
 
 static const char keycode_to_ascii[256] = {
     [0x04] = 'a',  [0x05] = 'b',  [0x06] = 'c',  [0x07] = 'd', [0x08] = 'e',

@@ -99,7 +99,7 @@ void nightmare_spawn_roles(struct nightmare_test *test,
             nt->th = thread_create((char *) nr->name, nr->worker, nr->arg);
             nt->th->private = nt;
 
-            scheduler_enqueue(nt->th);
+            thread_enqueue(nt->th);
 
             g_idx++;
         }

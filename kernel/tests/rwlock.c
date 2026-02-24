@@ -76,7 +76,7 @@ static void rw_reader_worker(void *) {
         time_t now = time_get_ms();
         if ((now - last_print) > RWLOCK_READER_PRINT_INTERVAL) {
             k_printf("RWlock reader %s on iteration %zu\n",
-                     scheduler_get_current_thread()->name, i);
+                     thread_get_current()->name, i);
         }
         last_print = now;
     }
@@ -167,7 +167,7 @@ TEST_REGISTER(rwlock_chaos, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     irql_lower(irql);
 
     while (atomic_load(&rw_chaos_left)) {
-        thread_apply_cpu_penalty(scheduler_get_current_thread());
+        thread_apply_cpu_penalty(thread_get_current());
         scheduler_yield();
     }
 

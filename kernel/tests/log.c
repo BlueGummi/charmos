@@ -13,7 +13,7 @@ static struct log_handle log_event = {
 };
 
 TEST_REGISTER(log_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    struct log_site *ls = scheduler_get_current_thread()->log_site;
+    struct log_site *ls = thread_get_current()->log_site;
     log(ls, &log_event, LOG_INFO, "bluh %s", "pickle");
     SET_SUCCESS();
 }

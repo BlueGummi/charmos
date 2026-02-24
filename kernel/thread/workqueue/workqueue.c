@@ -213,7 +213,7 @@ void workqueue_destroy(struct workqueue *queue) {
     WORKQUEUE_STATE_SET(queue, WORKQUEUE_STATE_DESTROYING);
     atomic_store(&queue->ignore_timeouts, true);
 
-    thread_apply_cpu_penalty(scheduler_get_current_thread());
+    thread_apply_cpu_penalty(thread_get_current());
     while (workqueue_workers(queue) > workqueue_idlers(queue)) {
         scheduler_yield();
     }
@@ -222,7 +222,7 @@ void workqueue_destroy(struct workqueue *queue) {
     condvar_broadcast_callback(&queue->queue_cv, mark_worker_exit);
 
     while (workqueue_workers(queue) > 0) {
-        thread_apply_cpu_penalty(scheduler_get_current_thread());
+        thread_apply_cpu_penalty(thread_get_current());
         scheduler_yield();
         condvar_broadcast_callback(&queue->queue_cv, mark_worker_exit);
     }
@@ -256,9 +256,9 @@ struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue,
     workqueue_link_thread_and_worker(worker, thread);
 
     if (core != -1) {
-        scheduler_enqueue_on_core(thread, core);
+        thread_enqueue_on_core(thread, core);
     } else {
-        scheduler_enqueue(thread);
+        thread_enqueue(thread);
     }
 
     workqueue_add_worker(queue, worker);

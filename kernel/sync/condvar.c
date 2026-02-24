@@ -20,7 +20,7 @@ static void do_block_on_queue(struct thread_queue *q, struct spinlock *lock,
 
 enum wake_reason condvar_wait(struct condvar *cv, struct spinlock *lock,
                               enum irql irql, enum irql *out) {
-    struct thread *curr = scheduler_get_current_thread();
+    struct thread *curr = thread_get_current();
     curr->wake_reason = WAKE_REASON_NONE;
     curr->wait_cookie++;
 
@@ -45,7 +45,7 @@ static void set_wake_reason_and_wake(struct condvar *cv, struct thread *t,
                                     ? THREAD_WAKE_REASON_SLEEP_TIMEOUT
                                     : THREAD_WAKE_REASON_SLEEP_MANUAL;
 
-    scheduler_wake(t, r, t->perceived_prio_class, cv);
+    thread_wake(t, r, t->perceived_prio_class, cv);
 }
 
 static void nop_callback(struct thread *unused) {
@@ -99,7 +99,7 @@ static void condvar_timeout_wakeup(void *arg, void *arg2) {
 enum wake_reason condvar_wait_timeout(struct condvar *cv, struct spinlock *lock,
                                       time_t timeout_ms, enum irql irql,
                                       enum irql *out) {
-    struct thread *curr = scheduler_get_current_thread();
+    struct thread *curr = thread_get_current();
     curr->wake_reason = WAKE_REASON_NONE;
 
     struct condvar_with_cb *cwcb = &curr->cv_cb_object;

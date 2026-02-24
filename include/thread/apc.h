@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <structures/list.h>
 #include <thread/apc_types.h>
+#include <thread/thread.h>
 
 /* Forward declarations :trl: */
 
@@ -48,7 +49,7 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type);
 void apc_enqueue_event_apc(struct apc *a, struct apc_event_desc *d);
 
 static inline void apc_enqueue_on_curr(struct apc *a, enum apc_type type) {
-    apc_enqueue(scheduler_get_current_thread(), a, type);
+    apc_enqueue(thread_get_current(), a, type);
 }
 
 bool apc_cancel(struct apc *a);

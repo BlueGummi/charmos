@@ -511,7 +511,7 @@ static bool set_state_and_update_reason(
     /* NOTE: special case: this is if we are waking ourselves after deciding to
      * not block */
     if (!atomic_load_explicit(&t->yielded_after_wait, memory_order_acquire) &&
-        t == scheduler_get_current_thread() && state == THREAD_STATE_READY)
+        t == thread_get_current() && state == THREAD_STATE_READY)
         atomic_store(&t->state, THREAD_STATE_RUNNING);
 
     callback(t, reason);
@@ -528,7 +528,7 @@ out:
     return ok;
 }
 
-void thread_wake(struct thread *t, enum thread_wake_reason r, void *wake_src) {
+void thread_wake_internal(struct thread *t, enum thread_wake_reason r, void *wake_src) {
     set_state_and_update_reason(
         t, r, THREAD_STATE_READY, thread_add_wake_reason, wake_src,
         /*already_locked=*/false,
@@ -593,7 +593,7 @@ static bool sleep_interruptible(struct thread *t, enum thread_block_reason r,
 void thread_wait_for_wake_match() {
     scheduler_yield();
 
-    struct thread *curr = scheduler_get_current_thread();
+    struct thread *curr = thread_get_current();
     if (curr->last_action != THREAD_STATE_BLOCKED &&
         curr->last_action != THREAD_STATE_SLEEPING)
         return;

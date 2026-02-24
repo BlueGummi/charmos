@@ -186,7 +186,7 @@ out:
 
 void turnstile_pi_remove(struct turnstile *ts) {
     if (ts->applied_pi_boost)
-        scheduler_uninherit_priority(ts->weight, ts->prio_class);
+        thread_uninherit_priority(ts->weight, ts->prio_class);
 
     ts->weight = 0;
     ts->prio_class = 0;
@@ -237,7 +237,7 @@ void turnstile_wake(struct turnstile *ts, size_t queue, size_t num_threads,
     while (num_threads-- > 0) {
         /* wake the one of highest priority */
         struct thread *to_wake = turnstile_dequeue_first(ts, queue);
-        scheduler_wake(to_wake, THREAD_WAKE_REASON_BLOCKING_MANUAL,
+        thread_wake(to_wake, THREAD_WAKE_REASON_BLOCKING_MANUAL,
                        to_wake->perceived_prio_class, ts);
     }
 
@@ -277,7 +277,7 @@ void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
         }
 
         /* Apply inheritance */
-        if (!scheduler_inherit_priority(owner, boost_weight, boost_class, NULL,
+        if (!thread_inherit_priority(owner, boost_weight, boost_class, NULL,
                                         NULL)) {
             if (unlock)
                 turnstile_hash_chain_unlock(chain, irql);
@@ -316,7 +316,7 @@ void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
 }
 
 static void turnstile_block_on(struct turnstile *ts, size_t queue_num) {
-    struct thread *curr = scheduler_get_current_thread();
+    struct thread *curr = thread_get_current();
 
     atomic_store(&curr->blocked_ts, ts);
 
@@ -334,7 +334,7 @@ struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
                                   void *lock_obj, enum irql lock_irql,
                                   struct thread *owner) {
     struct turnstile_hash_chain *chain = turnstile_chain_for(lock_obj);
-    struct thread *current_thread = scheduler_get_current_thread();
+    struct thread *current_thread = thread_get_current();
 
     struct turnstile *my_turnstile = current_thread->turnstile;
 

@@ -250,7 +250,7 @@ static void domain_spawn(struct domain_buddy *domain) {
     worker->curr_core = id;
     worker->flags = THREAD_FLAGS_NO_STEAL;
     thread_set_background(worker);
-    scheduler_enqueue_on_core(worker, id);
+    thread_enqueue_on_core(worker, id);
 }
 
 static void link_domain_cores_to_buddy(struct domain *cd,

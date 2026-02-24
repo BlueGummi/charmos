@@ -41,7 +41,7 @@ TEST_REGISTER(mutex_many_waiters, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     for (int i = 0; i < MUTEX_MANY_WAITER_TEST_WAITER_COUNT; i++) {
         struct thread *t = thread_create("mw", many_worker, NULL);
         t->flags = THREAD_FLAGS_NO_STEAL;
-        scheduler_enqueue(t);
+        thread_enqueue(t);
     }
 
     while (atomic_load(&many_waiter_done))
@@ -76,7 +76,7 @@ volatile struct thread *main_thread = NULL;
 volatile struct thread *other_threads[CHAOS_THREAD_COUNT] = {0};
 
 TEST_REGISTER(mutex_chaos, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
-    main_thread = scheduler_get_current_thread();
+    main_thread = thread_get_current();
     for (int i = 0; i < CHAOS_THREAD_COUNT; i++)
         other_threads[i] = thread_spawn("ch", chaos, NULL);
 
@@ -124,7 +124,7 @@ static void pi_rt_thread(void *nothing) {
     (void) nothing;
     mutex_lock(&pi_mutex);
     test_mutex_info("lock");
-    kassert(mutex_get_owner(&pi_mutex) == scheduler_get_current_thread());
+    kassert(mutex_get_owner(&pi_mutex) == thread_get_current());
     mutex_unlock(&pi_mutex);
     test_mutex_info("unlock");
     atomic_fetch_add(&pi_done, 1);
@@ -137,11 +137,11 @@ static void pi_ts_thread(void *nothing) {
     test_mutex_info("lock");
     atomic_store(&pi_ts_got, true);
 
-    while (scheduler_get_current_thread()->perceived_prio_class !=
+    while (thread_get_current()->perceived_prio_class !=
            THREAD_PRIO_CLASS_RT)
         cpu_relax();
 
-    kassert(mutex_get_owner(&pi_mutex) == scheduler_get_current_thread());
+    kassert(mutex_get_owner(&pi_mutex) == thread_get_current());
     test_mutex_info("boosted");
 
     test_mutex_info("unlock");
@@ -168,12 +168,12 @@ TEST_REGISTER(mutex_pi_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     thread_set_flags(pi_ts, THREAD_FLAGS_NO_STEAL);
     thread_set_flags(pi_rt, THREAD_FLAGS_NO_STEAL);
 
-    scheduler_enqueue_on_core(pi_ts, cpu);
+    thread_enqueue_on_core(pi_ts, cpu);
     while (!atomic_load(&pi_ts_got))
         scheduler_yield();
 
-    scheduler_enqueue_on_core(pi_dum, cpu);
-    scheduler_enqueue_on_core(pi_rt, cpu);
+    thread_enqueue_on_core(pi_dum, cpu);
+    thread_enqueue_on_core(pi_rt, cpu);
 
     while (atomic_load(&pi_done) < 3)
         scheduler_yield();
@@ -196,7 +196,7 @@ static void pi_chain_ts2(void *arg) {
     atomic_store(&ts2_grabbed_b, true);
 
     /* wait until boosted */
-    while (scheduler_get_current_thread()->perceived_prio_class !=
+    while (thread_get_current()->perceived_prio_class !=
            THREAD_PRIO_CLASS_RT)
         cpu_relax();
 
@@ -212,7 +212,7 @@ static void pi_chain_ts1(void *arg) {
     atomic_store(&ts1_grabbed_a, true);
 
     /* wait until boosted */
-    while (scheduler_get_current_thread()->perceived_prio_class !=
+    while (thread_get_current()->perceived_prio_class !=
            THREAD_PRIO_CLASS_RT)
         cpu_relax();
 
@@ -252,17 +252,17 @@ TEST_REGISTER(mutex_pi_chain, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     thread_set_flags(pi_ts2, THREAD_FLAGS_NO_STEAL);
     thread_set_flags(pi_rt2, THREAD_FLAGS_NO_STEAL);
 
-    scheduler_enqueue_on_core(pi_ts2, cpu);
+    thread_enqueue_on_core(pi_ts2, cpu);
     while (!atomic_load(&ts2_grabbed_b))
         scheduler_yield();
 
-    scheduler_enqueue_on_core(pi_ts1, cpu);
+    thread_enqueue_on_core(pi_ts1, cpu);
 
     /* let ts1 grab A and block on B */
     while (!atomic_load(&ts1_grabbed_a))
         scheduler_yield();
 
-    scheduler_enqueue_on_core(pi_rt2, cpu);
+    thread_enqueue_on_core(pi_rt2, cpu);
 
     while (atomic_load(&pi_chain_done) < 3)
         scheduler_yield();
@@ -280,7 +280,7 @@ static void pi_multi_ts(void *arg) {
     test_mutex_info("multi_ts running");
     atomic_store(&ts_got, true);
 
-    while (scheduler_get_current_thread()->perceived_prio_class !=
+    while (thread_get_current()->perceived_prio_class !=
            THREAD_PRIO_CLASS_RT)
         cpu_relax();
 
@@ -311,12 +311,12 @@ TEST_REGISTER(mutex_pi_multi_waiters, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     thread_set_flags(rt1, THREAD_FLAGS_NO_STEAL);
     thread_set_flags(rt2, THREAD_FLAGS_NO_STEAL);
 
-    scheduler_enqueue_on_core(ts, cpu);
+    thread_enqueue_on_core(ts, cpu);
     while (!atomic_load(&ts_got))
         scheduler_yield();
 
-    scheduler_enqueue_on_core(rt1, cpu);
-    scheduler_enqueue_on_core(rt2, cpu);
+    thread_enqueue_on_core(rt1, cpu);
+    thread_enqueue_on_core(rt2, cpu);
 
     while (atomic_load(&pi_multi_done) < 3)
         scheduler_yield();
@@ -334,13 +334,13 @@ static void pi_revert_ts(void *arg) {
 
     atomic_store(&pi_revert_got, true);
 
-    while (scheduler_get_current_thread()->perceived_prio_class !=
+    while (thread_get_current()->perceived_prio_class !=
            THREAD_PRIO_CLASS_RT)
         cpu_relax();
 
     mutex_unlock(&pi_revert_mtx);
 
-    while (scheduler_get_current_thread()->perceived_prio_class ==
+    while (thread_get_current()->perceived_prio_class ==
            THREAD_PRIO_CLASS_RT)
         cpu_relax();
 
@@ -364,12 +364,12 @@ TEST_REGISTER(mutex_pi_revert, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     thread_set_flags(ts, THREAD_FLAGS_NO_STEAL);
     thread_set_flags(rt, THREAD_FLAGS_NO_STEAL);
 
-    scheduler_enqueue_on_core(ts, cpu);
+    thread_enqueue_on_core(ts, cpu);
 
     while (!atomic_load(&pi_revert_got))
         scheduler_yield();
 
-    scheduler_enqueue_on_core(rt, cpu);
+    thread_enqueue_on_core(rt, cpu);
 
     while (!atomic_load(&pi_reverted))
         scheduler_yield();

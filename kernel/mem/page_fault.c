@@ -8,7 +8,7 @@ static struct spinlock pf_lock = SPINLOCK_INIT;
 enum irq_result page_fault_handler(void *context, uint8_t vector,
                                    struct irq_context *rsp) {
     (void) context, (void) vector, (void) rsp;
-    struct thread *curr = scheduler_get_current_thread();
+    struct thread *curr = thread_get_current();
 
     uint64_t error_code = UINT64_MAX;
     paddr_t rsp_phys = vmm_get_phys_unsafe((vaddr_t) rsp);
@@ -50,7 +50,7 @@ enum irq_result page_fault_handler(void *context, uint8_t vector,
     if (!(error_code & 0x04)) {
         spin_unlock_raw(&pf_lock);
         k_panic("KERNEL PAGE FAULT ON CORE %llu under thread %s\n",
-                smp_core_id(), scheduler_get_current_thread()->name);
+                smp_core_id(), thread_get_current()->name);
         while (true) {
             disable_interrupts();
             wait_for_interrupt();

@@ -144,7 +144,7 @@ void k_sch_main(void *nop) {
     tests_run();
     bootstage_advance(BOOTSTAGE_COMPLETE);
 
-    thread_print(scheduler_get_current_thread());
+    thread_print(thread_get_current());
 
     domain_buddy_dump();
 }

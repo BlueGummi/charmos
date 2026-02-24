@@ -5,7 +5,7 @@
 static atomic_size_t io_wait_magic = ATOMIC_VAR_INIT(0);
 
 void io_wait_begin(struct io_wait_token *out, void *io_object) {
-    struct thread *t = scheduler_get_current_thread();
+    struct thread *t = thread_get_current();
 
     *out = (struct io_wait_token) {.wait_object = io_object,
                                    .active = true,
@@ -19,7 +19,7 @@ void io_wait_begin(struct io_wait_token *out, void *io_object) {
 }
 
 void io_wait_end(struct io_wait_token *t, enum io_wait_end_action act) {
-    struct thread *c = scheduler_get_current_thread();
+    struct thread *c = thread_get_current();
     bool found = false;
 
     /* double check */

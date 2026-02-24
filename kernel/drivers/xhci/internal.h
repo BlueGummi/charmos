@@ -149,7 +149,7 @@ static inline void xhci_request_init_blocking(struct xhci_request *req,
     req->status = XHCI_REQUEST_SENDING;
     req->completion_code = 0;
     req->command = cmd;
-    req->private = scheduler_get_current_thread();
+    req->private = thread_get_current();
     req->callback = xhci_wake_waiter;
     req->list_owner = XHCI_REQ_LIST_NONE;
     req->port = port;
@@ -192,7 +192,7 @@ static inline bool xhci_send_command_and_block(struct xhci_device *dev,
         *iot = tok;
 
     if (!xhci_send_command(dev, cmd)) {
-        thread_wake(scheduler_get_current_thread(),
+        thread_wake_internal(thread_get_current(),
                     THREAD_WAKE_REASON_BLOCKING_MANUAL, dev);
 
         if (iot) {

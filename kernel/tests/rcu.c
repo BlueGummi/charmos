@@ -144,9 +144,9 @@ static void rcu_stress_reader(void *arg) {
                          "started gen %zu quiescent for gen %zu\nat a nesting "
                          "depth of %zu\n",
                          v, p->freed_gen, p->enqueued_on,
-                         scheduler_get_current_thread()->rcu_start_gen,
-                         scheduler_get_current_thread()->rcu_quiescent_gen,
-                         scheduler_get_current_thread()->rcu_nesting);
+                         thread_get_current()->rcu_start_gen,
+                         thread_get_current()->rcu_quiescent_gen,
+                         thread_get_current()->rcu_nesting);
                 break;
             }
             volatile uint64_t seq = p->seq;
@@ -159,7 +159,7 @@ static void rcu_stress_reader(void *arg) {
             last_print = time_get_ms();
             k_printf(
                 "\'%-20s\' on iteration %7zu w/ %7zu replacements and %7zu frees\n",
-                scheduler_get_current_thread()->name, iter, stress_replacements,
+                thread_get_current()->name, iter, stress_replacements,
                 stress_deferred_freed);
         }
 
@@ -169,7 +169,7 @@ static void rcu_stress_reader(void *arg) {
     }
 
     k_printf("RCU stress reader %s left, %u remaining\n",
-             scheduler_get_current_thread()->name,
+             thread_get_current()->name,
              STRESS_NUM_READERS - stress_readers_done - 1);
 
     atomic_fetch_add(&stress_readers_done, 1);

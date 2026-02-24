@@ -250,7 +250,7 @@ void log_emit_internal(struct log_site *site, struct log_handle *handle,
 
     rec.timestamp = time_get_ms();
     rec.cpu = smp_core_id();
-    rec.tid = scheduler_get_current_thread()->id;
+    rec.tid = thread_get_current()->id;
     rec.logged_at_irql = irql_get();
 
     if (irq_in_interrupt())

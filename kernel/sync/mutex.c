@@ -47,7 +47,7 @@ static void block_on_simple_mutex(struct mutex_simple *m) {
 }
 
 void mutex_simple_lock(struct mutex_simple *m) {
-    struct thread *curr = scheduler_get_current_thread();
+    struct thread *curr = thread_get_current();
 
     while (true) {
         if (try_acquire_simple_mutex(m, curr))
@@ -62,7 +62,7 @@ void mutex_simple_lock(struct mutex_simple *m) {
 }
 
 void mutex_simple_unlock(struct mutex_simple *m) {
-    struct thread *curr = scheduler_get_current_thread();
+    struct thread *curr = thread_get_current();
 
     enum irql irql = spin_lock(&m->lock);
 
@@ -74,7 +74,7 @@ void mutex_simple_unlock(struct mutex_simple *m) {
 
     struct thread *next = thread_queue_pop_front(&m->waiters);
     if (next != NULL)
-        scheduler_wake(next, THREAD_WAKE_REASON_BLOCKING_MANUAL,
+        thread_wake(next, THREAD_WAKE_REASON_BLOCKING_MANUAL,
                        next->perceived_prio_class, m);
 
     spin_unlock(&m->lock, irql);
@@ -124,7 +124,7 @@ static void mutex_sanity_check() {
 void mutex_lock(struct mutex *mutex) {
     mutex_sanity_check();
 
-    struct thread *current_thread = scheduler_get_current_thread();
+    struct thread *current_thread = thread_get_current();
 
     /* easy peasy nothing to do */
     if (mutex_try_lock(mutex, current_thread)) {
@@ -209,7 +209,7 @@ void mutex_lock(struct mutex *mutex) {
 void mutex_unlock(struct mutex *mutex) {
     mutex_sanity_check();
 
-    struct thread *current_thread = scheduler_get_current_thread();
+    struct thread *current_thread = thread_get_current();
 
     if (mutex_get_owner(mutex) != current_thread)
         k_panic("non-owner thread tried to unlock mutex. mutex owner is 0x%lx, "

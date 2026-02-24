@@ -59,7 +59,7 @@ void isr_common_entry(uint8_t vector, struct irq_context *rsp) {
 
     if (!scheduler_preemption_disabled() &&
         scheduler_mark_self_needs_resched(false)) {
-        struct thread *curr = scheduler_get_current_thread();
+        struct thread *curr = thread_get_current();
         if (curr)
             curr->preemptions++;
 

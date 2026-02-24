@@ -50,7 +50,7 @@ TEST_REGISTER(workqueue_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
 static void sleepy_entry(void *) {
     thread_sleep_for_ms(9000);
-    thread_print(scheduler_get_current_thread());
+    thread_print(thread_get_current());
 }
 
 TEST_REGISTER(sched_sleepy_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
@@ -110,7 +110,7 @@ TEST_REGISTER(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     }
 
     k_printf("yielding\n");
-    thread_apply_cpu_penalty(scheduler_get_current_thread());
+    thread_apply_cpu_penalty(thread_get_current());
     while (atomic_load(&threads_left) > 0) {
         scheduler_yield();
     }
@@ -185,7 +185,7 @@ static void apc_enqueue_thread(void *) {
 static void sleeping_thread(void *) {
     atomic_store(&si_started, true);
 
-    thread_sleep(scheduler_get_current_thread(), THREAD_SLEEP_REASON_MANUAL,
+    thread_sleep(thread_get_current(), THREAD_SLEEP_REASON_MANUAL,
                  THREAD_WAIT_INTERRUPTIBLE, (void *) 4);
 
     thread_wait_for_wake_match();
@@ -197,7 +197,7 @@ static void waking_thread(void *) {
     while (!atomic_load(&si_apc_ran))
         scheduler_yield();
 
-    scheduler_wake(si_t, THREAD_WAKE_REASON_SLEEP_MANUAL,
+    thread_wake(si_t, THREAD_WAKE_REASON_SLEEP_MANUAL,
                    si_t->perceived_prio_class, (void *) 4);
 }
 
@@ -261,7 +261,7 @@ TEST_REGISTER(dpc_on_event_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct thread *t =
         thread_create("dpc_dummy", dpc_on_event_dummy_thread, NULL);
     t->flags = THREAD_FLAGS_NO_STEAL;
-    scheduler_enqueue_on_core(t, found);
+    thread_enqueue_on_core(t, found);
 
     /* we now know the other processor is in the thread */
     struct dpc *dp = dpc_create(dpc_idle, NULL);

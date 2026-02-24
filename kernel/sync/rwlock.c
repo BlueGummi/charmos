@@ -21,7 +21,7 @@ static void rwlock_panic(char *msg, struct rwlock *offending_lock) {
     uintptr_t v =
         atomic_load_explicit(&offending_lock->lock_word, memory_order_relaxed);
     k_panic("%s, lock = 0x%lx, contents = 0x%lx, thread = 0x%lx\n", msg,
-            offending_lock, v, scheduler_get_current_thread());
+            offending_lock, v, thread_get_current());
 }
 
 /* make sure no funny business happened after acquiring a lock */
@@ -31,7 +31,7 @@ static inline bool rwlock_locked_with_type(struct rwlock *lock,
 
     if (type == RWLOCK_ACQUIRE_WRITE)
         return RWLOCK_GET_OWNER_FROM_WORD(word) ==
-               (uintptr_t) scheduler_get_current_thread();
+               (uintptr_t) thread_get_current();
 
     if (type == RWLOCK_ACQUIRE_READ)
         return ((word & RWLOCK_READER_COUNT_MASK) &&
@@ -88,7 +88,7 @@ void rwlock_lock(struct rwlock *lock, enum rwlock_acquire_type acq_type) {
 
     kassert(acq_type == RWLOCK_ACQUIRE_READ ||
             acq_type == RWLOCK_ACQUIRE_WRITE);
-    struct thread *curr = scheduler_get_current_thread();
+    struct thread *curr = thread_get_current();
 
     /* fastpath */
     if (rwlock_try_lock(lock, curr, acq_type))
@@ -218,7 +218,7 @@ size_t rwlock_get_readers_to_wake(struct turnstile *ts) {
 }
 
 static uintptr_t rwlock_unlock_get_val_to_sub(struct rwlock *lock) {
-    struct thread *current_thread = scheduler_get_current_thread();
+    struct thread *current_thread = thread_get_current();
     uintptr_t lock_word = RWLOCK_READ_LOCK_WORD(lock);
     if (lock_word & RWLOCK_WRITER_HELD_BIT) {
         if (RWLOCK_GET_OWNER_FROM_WORD(lock_word) !=

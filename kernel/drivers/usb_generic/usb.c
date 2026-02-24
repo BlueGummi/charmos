@@ -17,7 +17,7 @@ LOG_HANDLE_DECLARE_DEFAULT(usb);
 enum usb_status usb_transfer_sync(enum usb_status (*fn)(struct usb_request *),
                                   struct usb_request *request,
                                   struct io_wait_token *tok) {
-    struct thread *curr = scheduler_get_current_thread();
+    struct thread *curr = thread_get_current();
     request->complete = usb_wake_waiter;
     request->context = curr;
 
@@ -33,7 +33,8 @@ enum usb_status usb_transfer_sync(enum usb_status (*fn)(struct usb_request *),
 
     enum usb_status ret = fn(request);
     if (ret != USB_OK) {
-        thread_wake(curr, THREAD_WAKE_REASON_BLOCKING_MANUAL, request->dev);
+        thread_wake_internal(curr, THREAD_WAKE_REASON_BLOCKING_MANUAL,
+                             request->dev);
 
         if (tok) {
             io_wait_end(tok, IO_WAIT_END_NO_OP);
@@ -56,7 +57,7 @@ enum usb_status usb_transfer_sync(enum usb_status (*fn)(struct usb_request *),
 }
 
 void usb_wake_waiter(struct usb_request *rq) {
-    scheduler_wake_from_io_block(rq->context, rq->dev);
+    thread_wake_from_io_block(rq->context, rq->dev);
 }
 
 void usb_destroy(struct usb_request *rq) {

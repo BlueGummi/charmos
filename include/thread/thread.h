@@ -384,7 +384,8 @@ void thread_block_locked(struct thread *t, enum thread_block_reason r,
 
 void thread_set_timesharing(struct thread *t);
 void thread_set_background(struct thread *t);
-void thread_wake(struct thread *t, enum thread_wake_reason r, void *wake_src);
+void thread_wake_internal(struct thread *t, enum thread_wake_reason r,
+                          void *wake_src);
 void thread_migrate(struct thread *t, size_t dest_core);
 void thread_wait_for_wake_match();
 enum thread_prio_class thread_unboost_self();
@@ -393,6 +394,26 @@ enum thread_prio_class thread_boost_self(enum thread_prio_class new);
 struct thread_queue;
 void thread_block_on(struct thread_queue *q, enum thread_wait_type type,
                      void *wake_src);
+
+void thread_enqueue(struct thread *t);
+void thread_enqueue_on_core(struct thread *t, uint64_t core_id);
+
+bool thread_wake(struct thread *t, enum thread_wake_reason reason,
+                 enum thread_prio_class prio, void *wake_src);
+void thread_wake_from_io_block(struct thread *t, void *wake_src);
+bool thread_inherit_priority(struct thread *boosted, size_t new_weight,
+                             enum thread_prio_class new_class,
+                             size_t *old_weight_out,
+                             enum thread_prio_class *old_class_out);
+void thread_uninherit_priority(size_t weight, enum thread_prio_class class);
+
+static inline struct thread *thread_get_current() {
+    uintptr_t thread;
+    asm volatile("movq %%gs:%c1, %0"
+                 : "=r"(thread)
+                 : "i"(offsetof(struct core, current_thread)));
+    return (struct thread *) thread;
+}
 
 static inline int64_t thread_set_migration_target(struct thread *t,
                                                   int64_t new) {
@@ -503,4 +524,43 @@ static inline void thread_clear_wake_data(struct thread *t) {
 
 static inline enum thread_wait_type thread_get_wait_type(struct thread *t) {
     return atomic_load_explicit(&t->wait_type, memory_order_acquire);
+}
+
+static inline struct thread *thread_spawn(char *name, void (*entry)(void *),
+                                          void *arg, ...) {
+    va_list args;
+    va_start(args, arg);
+    struct thread *t =
+        thread_create_internal(name, entry, arg, THREAD_STACK_SIZE, args);
+    va_end(args);
+    thread_enqueue(t);
+    return t;
+}
+
+static inline struct thread *thread_spawn_custom_stack(char *name,
+                                                       void (*entry)(void *),
+                                                       void *arg,
+                                                       size_t stack_size, ...) {
+    va_list args;
+    va_start(args, stack_size);
+    struct thread *t =
+        thread_create_internal(name, entry, arg, stack_size, args);
+    va_end(args);
+
+    thread_enqueue(t);
+    return t;
+}
+
+static inline struct thread *thread_spawn_on_core(char *name,
+                                                  void (*entry)(void *),
+                                                  void *arg, uint64_t core_id,
+                                                  ...) {
+    va_list args;
+    va_start(args, core_id);
+    struct thread *t =
+        thread_create_internal(name, entry, arg, THREAD_STACK_SIZE, args);
+    va_end(args);
+
+    thread_enqueue_on_core(t, core_id);
+    return t;
 }

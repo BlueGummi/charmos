@@ -78,7 +78,7 @@ static bool thread_apc_sanity_check(struct thread *t) {
 static void apc_execute(struct apc *a) {
     kassert(irql_get() == IRQL_APC_LEVEL);
 
-    struct thread *curr = scheduler_get_current_thread();
+    struct thread *curr = thread_get_current();
 
     curr->executing_apc = true;
 
@@ -174,7 +174,7 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
     thread_release(t, irql);
 
     /* Let's go and execute em */
-    if (t == scheduler_get_current_thread()) {
+    if (t == thread_get_current()) {
         apc_check_and_deliver(t);
     } else {
         /* Not us, go wake up the other guy */
@@ -190,7 +190,7 @@ void apc_enqueue_event_apc(struct apc *a, struct apc_event_desc *desc) {
                                          * placed on multiple threads */
 
     a->desc = desc;
-    struct thread *t = scheduler_get_current_thread();
+    struct thread *t = thread_get_current();
     if (!thread_apc_sanity_check(t))
         return;
 
@@ -302,7 +302,7 @@ void apc_event_signal(struct apc_event_desc *desc) {
      * in there. if it is not safe to execute APCs, we will check
      * the to_execute tree, increment counters for all relevant APCs, and then
      * check the event_apcs tree, and move anything necessary over */
-    struct thread *curr = scheduler_get_current_thread();
+    struct thread *curr = thread_get_current();
 
     if (safe_to_exec_apcs() && curr->kernel_apc_disable == 0) {
         kassert(list_empty(&curr->to_exec_event_apcs));
@@ -345,11 +345,11 @@ void thread_exec_event_apcs(struct thread *t) {
 }
 
 void apc_disable_special() {
-    scheduler_get_current_thread()->special_apc_disable++;
+    thread_get_current()->special_apc_disable++;
 }
 
 void apc_enable_special() {
-    struct thread *t = scheduler_get_current_thread();
+    struct thread *t = thread_get_current();
     kassert(t->special_apc_disable > 0);
 
     if (--t->special_apc_disable == 0)
@@ -357,11 +357,11 @@ void apc_enable_special() {
 }
 
 void apc_disable_kernel() {
-    scheduler_get_current_thread()->kernel_apc_disable++;
+    thread_get_current()->kernel_apc_disable++;
 }
 
 void apc_enable_kernel() {
-    struct thread *t = scheduler_get_current_thread();
+    struct thread *t = thread_get_current();
     kassert(t->kernel_apc_disable > 0);
 
     if (--t->kernel_apc_disable == 0)

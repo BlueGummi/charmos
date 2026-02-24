@@ -164,13 +164,13 @@ static inline void nightmare_watchdog_init(struct nightmare_watchdog *w) {
 }
 
 static inline void nightmare_set_local(void *d, size_t l) {
-    struct nightmare_local *lcl = scheduler_get_current_thread()->private;
+    struct nightmare_local *lcl = thread_get_current()->private;
     lcl->data = d;
     lcl->len = l;
 }
 
 static inline struct nightmare_local *nightmare_get_local() {
-    return scheduler_get_current_thread()->private;
+    return thread_get_current()->private;
 }
 
 static inline struct nightmare_thread *nightmare_get_thread() {

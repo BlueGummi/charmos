@@ -67,7 +67,7 @@ void scheduler_remove_thread(struct scheduler *sched, struct thread *t,
         spin_unlock(&sched->lock, irql);
 }
 
-void scheduler_enqueue(struct thread *t) {
+void thread_enqueue(struct thread *t) {
     kassert(t->allowed_cpus.nbits);
 
     struct scheduler *s = global.schedulers[0];
@@ -103,7 +103,7 @@ void scheduler_enqueue(struct thread *t) {
 
 /* TODO: Make scheduler_add_thread an internal function so I don't need to
  * pass in the 'false false true' here and all over the place */
-void scheduler_enqueue_on_core(struct thread *t, uint64_t core_id) {
+void thread_enqueue_on_core(struct thread *t, uint64_t core_id) {
     scheduler_add_thread(global.schedulers[core_id], t, false);
     scheduler_force_resched(global.schedulers[core_id]);
 }

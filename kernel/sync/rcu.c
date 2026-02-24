@@ -92,7 +92,7 @@ void rcu_defer(struct rcu_cb *cb, rcu_fn func, void *arg) {
 }
 
 void rcu_read_lock(void) {
-    struct thread *t = scheduler_get_current_thread();
+    struct thread *t = thread_get_current();
     uint32_t old =
         atomic_fetch_add_explicit(&t->rcu_nesting, 1, memory_order_relaxed);
     if (old == 0) {
@@ -105,7 +105,7 @@ void rcu_read_lock(void) {
 }
 
 void rcu_read_unlock(void) {
-    struct thread *t = scheduler_get_current_thread();
+    struct thread *t = thread_get_current();
     uint32_t old =
         atomic_fetch_sub_explicit(&t->rcu_nesting, 1, memory_order_acq_rel);
     if (old == 0)

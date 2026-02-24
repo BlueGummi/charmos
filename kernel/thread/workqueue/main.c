@@ -104,7 +104,7 @@ static void worker_exit(struct workqueue *queue, struct worker *worker,
 void worker_main(void *unused) {
     (void) unused;
 
-    struct worker *w = scheduler_get_current_thread()->private;
+    struct worker *w = thread_get_current()->private;
     struct workqueue *queue = w->workqueue;
     kassert(w);
 
