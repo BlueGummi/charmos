@@ -3,26 +3,31 @@
 #include <thread/thread.h>
 
 static bool scheduler_boost_thread_internal(struct thread *boosted,
-                                            size_t new_weight,
-                                            enum thread_prio_class new_class,
-                                            size_t *old_weight,
+                                            struct thread *from,
                                             enum thread_prio_class *old_class) {
     if (old_class)
         *old_class = boosted->perceived_prio_class;
 
-    if (old_weight)
-        *old_weight = boosted->weight;
-
     /* If we only change the prio class, we can just return early */
-    if (boosted->perceived_prio_class < new_class) {
-        boosted->perceived_prio_class = new_class;
+    if (boosted->perceived_prio_class < from->perceived_prio_class) {
+        boosted->perceived_prio_class = from->perceived_prio_class;
         goto ok;
     }
 
-    if (boosted->weight < new_weight) {
-        boosted->weight = new_weight;
+    /* Here comes the fun part. We always assume that `from` is a thread that
+     * can be safely modified, and we use the runqueue lock to protected
+     * `boosted`'s CLIMB structures. We first assert that `from`'s CLIMB
+     * handle has either not been used or was used on `boosted`, and then
+     * we perform our boost. We initialize `from`'s CLIMB handle, and then
+     * attach it to `boosted` and apply relevant boosts */
+
+    struct climb_handle *h = &from->climb_state.handle;
+    kassert(!h->given_to || h->given_to == boosted);
+    if (h->given_to == boosted)
         goto ok;
-    }
+
+    h->pressure = climb_thread_compute_pressure_to_apply(from);
+    climb_handle_apply_locked(boosted, h);
 
     return false;
 
@@ -31,10 +36,8 @@ ok:
     return true;
 }
 
-bool thread_inherit_priority(struct thread *boosted, size_t new_weight,
-                                enum thread_prio_class new_class,
-                                size_t *old_weight,
-                                enum thread_prio_class *old_class) {
+bool thread_inherit_priority(struct thread *boosted, struct thread *from,
+                             enum thread_prio_class *old_class) {
     enum thread_flags old;
     struct scheduler *sched = thread_get_last_ran(boosted, &old);
 
@@ -46,15 +49,13 @@ bool thread_inherit_priority(struct thread *boosted, size_t new_weight,
         /* thread is READY - we remove it from the runqueue and then we
          * re-insert it */
         scheduler_remove_thread(sched, boosted, /* lock_held = */ true);
-        did_boost = scheduler_boost_thread_internal(
-            boosted, new_weight, new_class, old_weight, old_class);
+        did_boost = scheduler_boost_thread_internal(boosted, from, old_class);
         scheduler_add_thread(sched, boosted, /* lock_held = */ true);
     } else {
         /* if the thread is off doing anything else (maybe it's blocking, maybe
          * it's running), we go ahead and just boost it. when it is saved those
          * new values will be read and everything will be all splendid */
-        did_boost = scheduler_boost_thread_internal(
-            boosted, new_weight, new_class, old_weight, old_class);
+        did_boost = scheduler_boost_thread_internal(boosted, from, old_class);
     }
 
     spin_unlock(&sched->lock, irql);
@@ -62,13 +63,12 @@ bool thread_inherit_priority(struct thread *boosted, size_t new_weight,
     return did_boost;
 }
 
-void thread_uninherit_priority(size_t weight, enum thread_prio_class class) {
+void thread_uninherit_priority(enum thread_prio_class class) {
     struct thread *current = thread_get_current();
 
     enum irql tirql = thread_acquire(current, NULL);
 
     current->perceived_prio_class = class;
-    current->weight = weight;
 
     thread_release(current, tirql);
 }
@@ -89,4 +89,8 @@ enum thread_prio_class thread_boost_self(enum thread_prio_class new) {
     curr->perceived_prio_class = new;
     irql_lower(irql);
     return old;
+}
+
+void thread_remove_boost() {
+    climb_handle_remove(&thread_get_current()->climb_state.handle);
 }

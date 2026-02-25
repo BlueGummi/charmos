@@ -1,3 +1,4 @@
+#include <log.h>
 #include <math/clamp.h>
 #include <math/min_max.h>
 #include <sch/climb.h>
@@ -10,6 +11,20 @@
 void climb_per_period_hook();
 SCHEDULER_PERIODIC_WORK_REGISTER_PER_PERIOD(climb_per_period_hook,
                                             PERIODIC_WORK_MID);
+
+LOG_SITE_DECLARE(climb, LOG_SITE_PRINT | LOG_SITE_DEFAULT,
+                 LOG_SITE_CAPACITY_DEFAULT, LOG_SITE_ALL,
+                 ((struct log_dump_opts) {.show_tid = true,
+                                          .show_args = true}));
+LOG_HANDLE_DECLARE_DEFAULT(climb);
+#define climb_log(lvl, fmt, ...)                                               \
+    log(LOG_SITE(climb), LOG_HANDLE(climb), lvl, fmt, ##__VA_ARGS__)
+
+#define climb_err(fmt, ...) climb_log(LOG_ERROR, fmt, ##__VA_ARGS__)
+#define climb_warn(fmt, ...) climb_log(LOG_WARN, fmt, ##__VA_ARGS__)
+#define climb_info(fmt, ...) climb_log(LOG_INFO, fmt, ##__VA_ARGS__)
+#define climb_debug(fmt, ...) climb_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
+#define climb_trace(fmt, ...) climb_log(LOG_TRACE, fmt, ##__VA_ARGS__)
 
 struct climb_summary {
     climb_pressure_t total_pressure_ewma;
@@ -39,12 +54,7 @@ static inline int32_t climb_pressure_to_boost_target(climb_pressure_t p) {
     climb_pressure_t shaped = fx_pow_i32(p, CLIMB_PRESSURE_EXPONENT);
 
     int32_t level = fx_to_int(fx_mul(shaped, FX(CLIMB_BOOST_LEVEL_MAX)));
-
-    if (level < 0)
-        level = 0;
-
-    if (level > CLIMB_BOOST_LEVEL_MAX)
-        level = CLIMB_BOOST_LEVEL_MAX;
+    CLAMP(level, 0, CLIMB_BOOST_LEVEL_MAX);
 
     return level;
 }
@@ -64,25 +74,32 @@ climb_thread_total_pressure(struct climb_thread_state *cts) {
  * boost_ewma = alpha * old + (1 − alpha) * target
  */
 static void update_fields(struct climb_thread_state *cts) {
+    climb_info("Update fields on 0x%lx", cts);
     climb_pressure_t p = climb_thread_total_pressure(cts);
     int32_t target = climb_pressure_to_boost_target(p);
 
     /* EWMA */
     cts->boost_ewma = CLIMB_EWMA(cts->boost_ewma, target);
-    cts->wanted_boost_level = fx_to_int(cts->boost_ewma);
+    cts->wanted_boost = fx_to_int(cts->boost_ewma);
     cts->pressure_ewma = CLIMB_EWMA(
         cts->pressure_ewma, cts->indirect_pressure + cts->direct_pressure);
 }
 
-climb_pressure_t climb_thread_get_pressure(struct thread *t) {
+climb_pressure_t climb_thread_applied_pressure(struct thread *t) {
     return climb_thread_total_pressure(&t->climb_state);
+}
+
+climb_pressure_t climb_thread_compute_pressure_to_apply(struct thread *t) {
+    return CLIMB_PRESSURE_THREAD_BASE + climb_thread_applied_pressure(t);
+    ;
 }
 
 /*
  * new_pressure = p + delta * (max - p)
  */
-static inline climb_pressure_t climb_accumulate(climb_pressure_t p, climb_pressure_t delta,
-                                  climb_pressure_t max) {
+static inline climb_pressure_t climb_accumulate(climb_pressure_t p,
+                                                climb_pressure_t delta,
+                                                climb_pressure_t max) {
     return p + fx_mul(delta, (max - p));
 }
 
@@ -93,6 +110,13 @@ static inline climb_pressure_t
 climb_pressure_scale_indirect(climb_pressure_t direct) {
     climb_pressure_t scale = FX_ONE - direct;
     return fx_max(scale, CLIMB_INDIRECT_MIN_SCALE);
+}
+
+static size_t climb_count_handles(struct climb_thread_state *cts) {
+    size_t agg = 0;
+    struct list_head *iter;
+    list_for_each(iter, &cts->handles) agg++;
+    return agg;
 }
 
 /*
@@ -120,6 +144,8 @@ static void apply_handle_pressures(struct thread *t, struct climb_handle *ch) {
             climb_accumulate(old, delta, CLIMB_DIRECT_PRESSURE_MAX);
 
         ch->applied_pressure_internal = newp - old;
+        kassert(newp - old);
+        climb_info("Applying pressure %u to 0x%lx", newp - old, cts);
         cts->direct_pressure = newp;
         return;
     }
@@ -137,6 +163,8 @@ static void apply_handle_pressures(struct thread *t, struct climb_handle *ch) {
         climb_accumulate(old, scaled_delta, CLIMB_INDIRECT_PRESSURE_MAX);
 
     ch->applied_pressure_internal = newp - old;
+    kassert(newp - old);
+    climb_info("Applying pressure %u to 0x%lx", newp - old, cts);
     cts->indirect_pressure = newp;
 }
 
@@ -148,19 +176,23 @@ static void apply_handle(struct thread *t, struct climb_handle *ch) {
     apply_handle_pressures(t, ch);
     struct climb_thread_state *cts = &t->climb_state;
 
-    ch->given_by = thread_get_current();
+    climb_info("Apply handle on 0x%lx, %u", cts, climb_count_handles(cts));
+
+    /* If there was already a giver, like with indirect boosts, we don't
+     * change it. Otherwise, we do, and say we are the giver */
+    ch->given_by = ch->given_by ? ch->given_by : thread_get_current();
 
     /* Was previously not on tree */
     if (cts->pressure_periods == 0) {
         cts->pressure_periods = 1;
         kassert(!cts->on_climb_tree);
-        kassert(rbt_node_empty(&cts->climb_node));
         enum thread_flags out;
         struct scheduler *sched = thread_get_last_ran(t, &out);
         struct rbt *tree = &sched->climb_threads;
 
         /* Get a reference for the tree */
         kassert(thread_get(t));
+        climb_info("Insert 0x%lx to tree", cts);
         rbt_insert(tree, &cts->climb_node);
         cts->on_climb_tree = true;
         thread_restore_flags(t, out);
@@ -171,8 +203,10 @@ static void remove_handle(struct thread *t, struct climb_handle *ch) {
     struct climb_thread_state *cts = &t->climb_state;
     kassert(ch->given_by == thread_get_current());
 
-    if (ch->applied_pressure_internal == 0)
+    if (ch->applied_pressure_internal == 0) {
+        climb_warn("No-op handle removed from 0x%lx", cts);
         return;
+    }
 
     if (ch->kind == CLIMB_PRESSURE_DIRECT) {
         cts->direct_pressure -= ch->applied_pressure_internal;
@@ -183,14 +217,13 @@ static void remove_handle(struct thread *t, struct climb_handle *ch) {
 
     ch->applied_pressure_internal = 0;
     list_del_init(&ch->list);
-
-    enum thread_flags out;
-    struct scheduler *sched = thread_get_last_ran(t, &out);
-    kassert(rbt_has_node(&sched->climb_threads, &cts->climb_node));
+    climb_info("Remove handle on 0x%lx (thread 0x%lx), %u left", cts, t,
+               climb_count_handles(cts));
 
     if (list_empty(&cts->handles)) {
         /* This thread is done. Let it decay now */
         cts->pressure_periods = -1;
+        climb_info("Begin decay on 0x%lx", cts);
     }
 }
 
@@ -213,20 +246,23 @@ static void climb_handle_act_self(struct thread *t, struct climb_handle *h,
 
 static void climb_handle_act_other(struct thread *t, struct climb_handle *ch,
                                    void (*act)(struct thread *,
-                                               struct climb_handle *)) {
-    /* try and get a ref */
-    kassert(thread_get(t));
+                                               struct climb_handle *),
+                                   bool lock) {
 
     /* thread cannot disappear under us */
     enum thread_flags out_flags;
     struct scheduler *sch = thread_get_last_ran(t, &out_flags);
-    enum irql irql = spin_lock_irq_disable(&sch->lock);
+    enum irql irql;
+
+    if (!lock)
+        irql = spin_lock_irq_disable(&sch->lock);
 
     act(t, ch);
 
-    spin_unlock(&sch->lock, irql);
+    if (!lock)
+        spin_unlock(&sch->lock, irql);
+
     thread_restore_flags(t, out_flags);
-    thread_put(t);
 }
 
 static bool climb_get_ref(struct thread *t) {
@@ -243,15 +279,16 @@ static void climb_drop_ref(struct thread *t) {
 
 static void climb_handle_act(struct thread *t, struct climb_handle *h,
                              void (*act)(struct thread *,
-                                         struct climb_handle *)) {
+                                         struct climb_handle *),
+                             bool lock) {
     if (t == thread_get_current()) {
         climb_handle_act_self(t, h, act);
     } else {
-        climb_handle_act_other(t, h, act);
+        climb_handle_act_other(t, h, act, lock);
     }
 }
 
-void climb_handle_remove(struct thread *t, struct climb_handle *h) {
+static void climb_handle_remove_internal(struct climb_handle *h, bool lock) {
     /* We might not always have a ref to the thread here.
      * If the handle we are given is completely unused, this is because
      * the thread we are removing from is NOT a timesharing thread.
@@ -262,18 +299,36 @@ void climb_handle_remove(struct thread *t, struct climb_handle *h) {
         return;
     }
 
-    climb_handle_act(t, h, remove_handle);
+    struct thread *t = h->given_to;
+    climb_handle_act(t, h, remove_handle, lock);
+    h->given_to = NULL;
     climb_drop_ref(t);
 }
 
-void climb_handle_apply(struct thread *t, struct climb_handle *h) {
+static void climb_handle_apply_internal(struct thread *t,
+                                        struct climb_handle *h, bool lock) {
     if (!climb_get_ref(t))
         return;
 
-    if (t->perceived_prio_class != THREAD_PRIO_CLASS_TIMESHARE)
-        return climb_drop_ref(t);
+    climb_handle_act(t, h, apply_handle, lock);
+    h->given_to = t;
+    climb_info("Assign given_to 0x%lx", t);
+}
 
-    climb_handle_act(t, h, apply_handle);
+void climb_handle_apply(struct thread *t, struct climb_handle *h) {
+    climb_handle_apply_internal(t, h, false);
+}
+
+void climb_handle_apply_locked(struct thread *t, struct climb_handle *h) {
+    climb_handle_apply_internal(t, h, true);
+}
+
+void climb_handle_remove(struct climb_handle *h) {
+    climb_handle_remove_internal(h, false);
+}
+
+void climb_handle_remove_locked(struct climb_handle *h) {
+    climb_handle_remove_internal(h, true);
 }
 
 static struct climb_budget climb_budget_from_summary(struct climb_summary *s) {
@@ -301,7 +356,13 @@ static void climb_apply_budget(struct scheduler *sched,
         struct climb_thread_state *cts =
             climb_thread_state_from_tree_node(node);
 
-        int32_t desired = cts->wanted_boost_level;
+        /* NOTE: threads can get boosted around but we keep them in CLIMB.
+         * This is to allow them to still maintain their boosts after they
+         * return to TS, however, we still boost any threads within CLIMB,
+         * and treat them as if they are all TS threads to allow for a smooth
+         * return once a boosted thread comes back to being TS */
+
+        int32_t desired = cts->wanted_boost;
         int32_t granted = MIN(desired, b->remaining);
 
         cts->effective_boost = granted;
@@ -309,25 +370,74 @@ static void climb_apply_budget(struct scheduler *sched,
     }
 }
 
+/* This is our decay policy after a thread is removed from CLIMB.
+ *
+ * Because the boost is represented in part by an EWMA, it doesn't
+ * sharply drop when all pressure is released, but rather, gradually
+ * decays. This allows us to have smoother boost periods of threads,
+ * to prevent threads from switching between priority zones and
+ * inflicting costs on latency and consistency.
+ *
+ * Our policy for boost decay is as follows:
+ *     When a thread has all of its pressure sources removed,
+ *     it sets `pressure_periods` to -1.
+ *
+ *     Upon subsequent passes within CLIMB's per-period work,
+ *     this number decays by one. For example, if a thread has
+ *     spent two periods in decay, it would be -2.
+ *
+ *     Eventually, a thread will lose all of its boost, and
+ *     when this happens (i.e. when `wanted_boost` drops to 0),
+ *     the thread is removed from CLIMB accounting.
+ *
+ *     However, there will come a time where too many periods have
+ *     elapsed under decay. When this happens, the thread is forcibly
+ *     removed. (CLIMB_MAX_DECAY_PERIODS)
+ *
+ */
+static void maybe_remove_node(struct rbt *tree,
+                              struct climb_thread_state *cts) {
+    struct rbt_node *node = &cts->climb_node;
+    bool remove = false;
+
+    if (cts->pressure_periods < -CLIMB_MAX_DECAY_PERIODS)
+        remove = true;
+
+    if (cts->wanted_boost == 0)
+        remove = true;
+
+    if (remove) {
+        climb_info("Removing from tree 0x%lx", cts);
+        rbt_delete(tree, node);
+        cts->pressure_periods = 0;
+        cts->on_climb_tree = false;
+        thread_put(container_of(cts, struct thread, climb_state));
+    }
+}
+
 static struct climb_summary summarize_and_advance(struct rbt *tree) {
     struct climb_summary ret = {0};
     struct climb_thread_state *iter;
-    struct rbt_node *node;
+    struct rbt_node *node, *tmp;
 
     /* Sum it all up */
-    rbt_for_each(node, tree) {
+    rbt_for_each_safe(node, tmp, tree) {
         iter = climb_thread_state_from_tree_node(node);
         update_fields(iter);
         ret.nthreads++;
 
         ret.total_pressure_ewma += iter->pressure_ewma;
 
-        if (iter->pressure_periods > 0)
+        if (iter->pressure_periods > 0) {
             ret.total_periods_spent += iter->pressure_periods;
+        } else {
+            maybe_remove_node(tree, iter);
+        }
     }
 
     return ret;
 }
+
 void climb_per_period_hook() {
     if (rbt_empty(climb_tree_local()))
         return;
@@ -341,7 +451,7 @@ void climb_thread_init(struct thread *t) {
     struct climb_thread_state *cts = &t->climb_state;
     cts->on_climb_tree = false;
     cts->boost_ewma = FX(0);
-    cts->wanted_boost_level = 0;
+    cts->wanted_boost = 0;
     cts->pressure_periods = 0;
     INIT_LIST_HEAD(&cts->handles);
     cts->direct_pressure = 0;
@@ -351,19 +461,25 @@ void climb_thread_init(struct thread *t) {
     ch->name = t->name;
     ch->applied_pressure_internal = 0;
     ch->kind = CLIMB_PRESSURE_INDIRECT;
+    ch->given_by = t;
+    ch->given_to = NULL;
+    ch->pressure_source = NULL;
     INIT_LIST_HEAD(&ch->list);
 }
 
 void climb_post_migrate_hook(struct thread *t, size_t old_cpu, size_t new_cpu) {
-    if (rbt_node_empty(&t->climb_state.climb_node)) {
+    /* Locks are already held */
+    struct scheduler *old = global.schedulers[old_cpu];
+    struct scheduler *new = global.schedulers[new_cpu];
+    climb_warn("Maybe 0x%lx", &t->climb_state);
+
+    if (!rbt_has_node(&old->climb_threads, &t->climb_state.climb_node)) {
         kassert(t->climb_state.on_climb_tree == false);
         kassert(t->climb_state.pressure_periods == 0);
         return;
     }
 
-    /* Locks are already held */
-    struct scheduler *old = global.schedulers[old_cpu];
-    struct scheduler *new = global.schedulers[new_cpu];
+    climb_warn("Migrating 0x%lx", &t->climb_state);
 
     /* Migrate and recompute */
     rbt_delete(&old->climb_threads, &t->climb_state.climb_node);

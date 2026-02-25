@@ -186,9 +186,8 @@ out:
 
 void turnstile_pi_remove(struct turnstile *ts) {
     if (ts->applied_pi_boost)
-        thread_uninherit_priority(ts->weight, ts->prio_class);
+        thread_uninherit_priority(ts->prio_class);
 
-    ts->weight = 0;
     ts->prio_class = 0;
     ts->applied_pi_boost = false;
 }
@@ -238,7 +237,7 @@ void turnstile_wake(struct turnstile *ts, size_t queue, size_t num_threads,
         /* wake the one of highest priority */
         struct thread *to_wake = turnstile_dequeue_first(ts, queue);
         thread_wake(to_wake, THREAD_WAKE_REASON_BLOCKING_MANUAL,
-                       to_wake->perceived_prio_class, ts);
+                    to_wake->perceived_prio_class, ts);
     }
 
     ts->owner = NULL;
@@ -251,11 +250,9 @@ void turnstile_unlock(void *obj, enum irql irql) {
 }
 
 void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
-                               struct turnstile *ts, size_t waiter_weight,
-                               enum thread_prio_class waiter_class) {
+                               struct turnstile *ts) {
     struct turnstile *cur_ts = ts;
-    size_t boost_weight = waiter_weight;
-    enum thread_prio_class boost_class = waiter_class;
+    struct thread *owner = NULL, *boosting_from = thread_get_current();
 
     while (cur_ts) {
         struct turnstile_hash_chain *chain =
@@ -269,7 +266,7 @@ void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
             unlock = true;
         }
 
-        struct thread *owner = cur_ts->owner;
+        owner = cur_ts->owner;
         if (!owner) {
             if (unlock)
                 turnstile_hash_chain_unlock(chain, irql);
@@ -277,8 +274,7 @@ void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
         }
 
         /* Apply inheritance */
-        if (!thread_inherit_priority(owner, boost_weight, boost_class, NULL,
-                                        NULL)) {
+        if (!thread_inherit_priority(owner, boosting_from, NULL)) {
             if (unlock)
                 turnstile_hash_chain_unlock(chain, irql);
             break;
@@ -307,8 +303,7 @@ void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
         }
 
         /* Prepare next iteration */
-        boost_weight = owner->weight;
-        boost_class = owner->perceived_prio_class;
+        boosting_from = owner;
 
         turnstile_hash_chain_unlock(next_chain, nirql);
         cur_ts = next;
@@ -356,8 +351,7 @@ struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
     current_thread->turnstile = NULL;
     ts->owner = owner;
 
-    turnstile_propagate_boost(chain, ts, current_thread->weight,
-                              current_thread->perceived_prio_class);
+    turnstile_propagate_boost(chain, ts);
 
     ts->waiters++;
 
@@ -368,6 +362,8 @@ struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
     /* it is the waking thread's job to decrement waiters and
      * mark me as no longer being blocked on the lock object */
     thread_wait_for_wake_match();
+
+    thread_remove_boost();
 
     return ts;
 }

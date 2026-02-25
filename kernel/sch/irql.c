@@ -8,6 +8,33 @@ enum irql irql_get(void) {
     return smp_core()->current_irql;
 }
 
+static inline uint32_t scheduler_preemption_disable(void) {
+    kassert(!are_interrupts_enabled());
+    struct core *cpu = smp_core();
+
+    uint32_t old =
+        atomic_fetch_add(&cpu->scheduler_preemption_disable_depth, 1);
+
+    if (old == UINT32_MAX) {
+        k_panic("overflow\n");
+    }
+
+    return old + 1;
+}
+
+static inline uint32_t scheduler_preemption_enable(void) {
+    struct core *cpu = smp_core();
+
+    uint32_t old =
+        atomic_fetch_sub(&cpu->scheduler_preemption_disable_depth, 1);
+
+    if (old == 0) {
+        k_panic("underflow\n");
+    }
+
+    return old - 1;
+}
+
 enum irql irql_raise(enum irql new_level) {
     if (global.current_bootstage < BOOTSTAGE_LATE)
         return IRQL_NONE;

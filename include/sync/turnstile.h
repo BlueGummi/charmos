@@ -25,7 +25,6 @@ struct turnstile {
 
     /* If a boost occurs, what did we give it? */
     bool applied_pi_boost;
-    size_t weight;
     enum thread_prio_class prio_class;
     struct list_head hash_list;
     struct list_head freelist;

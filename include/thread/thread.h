@@ -401,11 +401,11 @@ void thread_enqueue_on_core(struct thread *t, uint64_t core_id);
 bool thread_wake(struct thread *t, enum thread_wake_reason reason,
                  enum thread_prio_class prio, void *wake_src);
 void thread_wake_from_io_block(struct thread *t, void *wake_src);
-bool thread_inherit_priority(struct thread *boosted, size_t new_weight,
-                             enum thread_prio_class new_class,
-                             size_t *old_weight_out,
+bool thread_inherit_priority(struct thread *boosted, struct thread *from,
                              enum thread_prio_class *old_class_out);
-void thread_uninherit_priority(size_t weight, enum thread_prio_class class);
+
+void thread_uninherit_priority(enum thread_prio_class class);
+void thread_remove_boost();
 
 static inline struct thread *thread_get_current() {
     uintptr_t thread;

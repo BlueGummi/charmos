@@ -17,6 +17,7 @@ struct climb_handle;
 #define CLIMB_REINSERT_THRESHOLD 2
 #define CLIMB_GLOBAL_BOOST_SCALE(nthread) (CLIMB_BOOST_LEVELS / nthread)
 #define CLIMB_PRESSURE_KEY_SHIFT 15
+#define CLIMB_MAX_DECAY_PERIODS 10
 
 enum climb_pressure_kind {
     CLIMB_PRESSURE_DIRECT,
@@ -33,28 +34,33 @@ struct climb_handle {
 
     char *name;
     struct climb_source *pressure_source;
-    struct thread *given_by;
+    struct thread *given_by; /* Debugging */
+    struct thread *given_to;
 };
 
 struct climb_thread_state {
     /* pressure */
-    climb_pressure_t direct_pressure;
-    climb_pressure_t indirect_pressure;
-    climb_pressure_t pressure_ewma;
+    climb_pressure_t direct_pressure;   /* Contributed direct pressure */
+    climb_pressure_t indirect_pressure; /* Indirect pressure from others */
+    climb_pressure_t pressure_ewma;     /* EWMA of pressure over time */
 
     /* boost */
-    int32_t wanted_boost_level; /* 0..20 */
-    fx16_16_t boost_ewma;
-    int32_t effective_boost;
+    int32_t wanted_boost;    /* 0..20, how much this thread "wants" */
+    fx16_16_t boost_ewma;    /* EWMA of the wanted_boost_raw */
+    int32_t effective_boost; /* How much boosted (derived from wanted_boost_raw)
+                              * this thread "gets". This exists because CLIMB
+                              * will take into account the existence of other
+                              * threads and their boosts and periods spent
+                              * to compute the boost of one thread */
 
     /* time */
-    int32_t pressure_periods; /* >=1 active, -1 decaying, 0 inactive */
+    int32_t pressure_periods; /* >=1 active, < 0 decaying, 0 inactive */
 
     /* accounting */
     struct list_head handles; /* active pressure handles */
 
     /* scheduler integration */
-    bool on_climb_tree;
+    bool on_climb_tree; /* Used to logically verify things */
     struct rbt_node climb_node;
 
     /* if this thread becomes a CLIMB source,
@@ -99,6 +105,22 @@ struct climb_source {
     struct climb_source __climb_src_##n = {.name = strname, .base = b}
 #define CLIMB_SOURCE(name) &(__climb_src_##name)
 
+climb_pressure_t climb_thread_applied_pressure(struct thread *t);
+climb_pressure_t climb_thread_compute_pressure_to_apply(struct thread *t);
+
+void climb_handle_apply(struct thread *t, struct climb_handle *h);
+void climb_handle_update(struct thread *t, struct climb_handle *h,
+                         climb_pressure_t new_pressure);
+void climb_handle_remove(struct climb_handle *h);
+
+void climb_handle_apply_locked(struct thread *t, struct climb_handle *h);
+void climb_handle_remove_locked(struct climb_handle *h);
+
+void climb_recompute_pressure(struct thread *t);
+void climb_thread_init(struct thread *t);
+void climb_post_migrate_hook(struct thread *t, size_t old_cpu, size_t new_cpu);
+size_t climb_get_thread_data(struct rbt_node *n);
+
 static inline struct climb_handle *
 climb_handle_init(struct climb_handle *ch, struct climb_source *cs,
                   enum climb_pressure_kind k) {
@@ -113,13 +135,3 @@ climb_handle_init(struct climb_handle *ch, struct climb_source *cs,
     ch->applied_pressure_internal = 0;
     return ch;
 }
-
-climb_pressure_t climb_thread_get_pressure(struct thread *t);
-void climb_handle_apply(struct thread *t, struct climb_handle *h);
-void climb_handle_update(struct thread *t, struct climb_handle *h,
-                         climb_pressure_t new_pressure);
-void climb_handle_remove(struct thread *t, struct climb_handle *h);
-void climb_recompute_pressure(struct thread *t);
-void climb_thread_init(struct thread *t);
-void climb_post_migrate_hook(struct thread *t, size_t old_cpu, size_t new_cpu);
-size_t climb_get_thread_data(struct rbt_node *n);
