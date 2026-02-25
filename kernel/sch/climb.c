@@ -431,6 +431,8 @@ static void maybe_remove_node(struct rbt *tree,
         cts->pressure_periods = 0;
         cts->on_climb_tree = false;
         thread_put(container_of(cts, struct thread, climb_state));
+    } else {
+        cts->pressure_periods--;
     }
 }
 

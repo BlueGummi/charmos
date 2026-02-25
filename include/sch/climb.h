@@ -17,7 +17,7 @@ struct climb_handle;
 #define CLIMB_REINSERT_THRESHOLD 2
 #define CLIMB_GLOBAL_BOOST_SCALE(nthread) (CLIMB_BOOST_LEVELS / nthread)
 #define CLIMB_PRESSURE_KEY_SHIFT 15
-#define CLIMB_MAX_DECAY_PERIODS 10
+#define CLIMB_MAX_DECAY_PERIODS 20
 
 enum climb_pressure_kind {
     CLIMB_PRESSURE_DIRECT,
