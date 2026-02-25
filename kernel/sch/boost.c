@@ -21,6 +21,7 @@ static bool scheduler_boost_thread_internal(struct thread *boosted,
      * we perform our boost. We initialize `from`'s CLIMB handle, and then
      * attach it to `boosted` and apply relevant boosts */
 
+    /* TODO
     struct climb_handle *h = &from->climb_state.handle;
     kassert(!h->given_to || h->given_to == boosted);
     if (h->given_to == boosted)
@@ -28,6 +29,7 @@ static bool scheduler_boost_thread_internal(struct thread *boosted,
 
     h->pressure = climb_thread_compute_pressure_to_apply(from);
     climb_handle_apply_locked(boosted, h);
+    */
 
     return false;
 
@@ -92,5 +94,6 @@ enum thread_prio_class thread_boost_self(enum thread_prio_class new) {
 }
 
 void thread_remove_boost() {
+    return; /* TODO */
     climb_handle_remove(&thread_get_current()->climb_state.handle);
 }
