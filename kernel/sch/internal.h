@@ -164,11 +164,11 @@ static inline void scheduler_acquire_two_locks(struct scheduler *a,
                                                enum irql *b_irql_out) {
     kassert(a != b);
     if (a < b) {
-        *a_irql_out = spin_lock(&a->lock);
-        *b_irql_out = spin_lock(&b->lock);
+        *a_irql_out = spin_lock_irq_disable(&a->lock);
+        *b_irql_out = spin_lock_irq_disable(&b->lock);
     } else {
-        *b_irql_out = spin_lock(&b->lock);
-        *a_irql_out = spin_lock(&a->lock);
+        *b_irql_out = spin_lock_irq_disable(&b->lock);
+        *a_irql_out = spin_lock_irq_disable(&a->lock);
     }
 }
 

@@ -21,7 +21,6 @@ static bool scheduler_boost_thread_internal(struct thread *boosted,
      * we perform our boost. We initialize `from`'s CLIMB handle, and then
      * attach it to `boosted` and apply relevant boosts */
 
-    /* TODO
     struct climb_handle *h = &from->climb_state.handle;
     kassert(!h->given_to || h->given_to == boosted);
     if (h->given_to == boosted)
@@ -29,7 +28,6 @@ static bool scheduler_boost_thread_internal(struct thread *boosted,
 
     h->pressure = climb_thread_compute_pressure_to_apply(from);
     climb_handle_apply_locked(boosted, h);
-    */
 
     return false;
 
@@ -40,11 +38,17 @@ ok:
 
 bool thread_inherit_priority(struct thread *boosted, struct thread *from,
                              enum thread_prio_class *old_class) {
-    enum thread_flags old;
+    enum thread_flags old, old2;
     struct scheduler *sched = thread_get_last_ran(boosted, &old);
+    struct scheduler *sched2 = thread_get_last_ran(from, &old2);
 
     /* acquire this lock */
-    enum irql irql = spin_lock_irq_disable(&sched->lock);
+    enum irql irql, irql2;
+    if (sched == sched2) {
+        irql = spin_lock_irq_disable(&sched->lock);
+    } else {
+        scheduler_acquire_two_locks(sched, sched2, &irql, &irql2);
+    }
 
     bool did_boost = false;
     if (thread_get_state(boosted) == THREAD_STATE_READY) {
@@ -60,8 +64,14 @@ bool thread_inherit_priority(struct thread *boosted, struct thread *from,
         did_boost = scheduler_boost_thread_internal(boosted, from, old_class);
     }
 
-    spin_unlock(&sched->lock, irql);
+    if (sched == sched2) {
+        spin_unlock(&sched->lock, irql);
+    } else {
+        scheduler_drop_two_locks(sched, sched2, irql, irql2);
+    }
+
     thread_restore_flags(boosted, old);
+    thread_restore_flags(from, old2);
     return did_boost;
 }
 
@@ -94,6 +104,5 @@ enum thread_prio_class thread_boost_self(enum thread_prio_class new) {
 }
 
 void thread_remove_boost() {
-    return; /* TODO */
     climb_handle_remove(&thread_get_current()->climb_state.handle);
 }

@@ -149,6 +149,9 @@ static inline bool migrate_to_destination(struct thread *t, time_t time) {
     /* save ourselves to the other scheduler */
     save_thread(other, t, time);
     thread_set_last_ran(t, dst);
+
+    thread_post_migrate(t, us->core_id, dst);
+
     spin_unlock_raw(&t->being_moved);
     return true;
 }

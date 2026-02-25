@@ -7,6 +7,19 @@
 #include <tests.h>
 #include <thread/thread.h>
 
+LOG_SITE_DECLARE(test_mutex, LOG_SITE_PRINT | LOG_SITE_DROP_OLD,
+                 LOG_SITE_CAPACITY_DEFAULT, LOG_SITE_ALL, LOG_DUMP_DEFAULT);
+LOG_HANDLE_DECLARE_DEFAULT(test_mutex);
+
+#define test_mutex_log(lvl, fmt, ...)                                          \
+    log(LOG_SITE(test_mutex), LOG_HANDLE(test_mutex), lvl, fmt, ##__VA_ARGS__)
+
+#define test_mutex_err(fmt, ...) test_mutex_log(LOG_ERROR, fmt, ##__VA_ARGS__)
+#define test_mutex_warn(fmt, ...) test_mutex_log(LOG_WARN, fmt, ##__VA_ARGS__)
+#define test_mutex_info(fmt, ...) test_mutex_log(LOG_INFO, fmt, ##__VA_ARGS__)
+#define test_mutex_debug(fmt, ...) test_mutex_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
+#define test_mutex_trace(fmt, ...) test_mutex_log(LOG_TRACE, fmt, ##__VA_ARGS__)
+
 #define MUTEX_REPORT_PROBLEMS()                                                \
     ADD_MESSAGE("Mutex tests are encountering problems and will be skipped");  \
     SET_SKIP();                                                                \
@@ -97,19 +110,6 @@ static struct thread *pi_ts, *pi_rt, *pi_dum;
 static atomic_bool pi_ts_got = false;
 static atomic_uint pi_done = 0;
 
-LOG_SITE_DECLARE(test_mutex, LOG_SITE_PRINT | LOG_SITE_DROP_OLD,
-                 LOG_SITE_CAPACITY_DEFAULT, LOG_SITE_ALL, LOG_DUMP_DEFAULT);
-LOG_HANDLE_DECLARE_DEFAULT(test_mutex);
-
-#define test_mutex_log(lvl, fmt, ...)                                          \
-    log(LOG_SITE(test_mutex), LOG_HANDLE(test_mutex), lvl, fmt, ##__VA_ARGS__)
-
-#define test_mutex_err(fmt, ...) test_mutex_log(LOG_ERROR, fmt, ##__VA_ARGS__)
-#define test_mutex_warn(fmt, ...) test_mutex_log(LOG_WARN, fmt, ##__VA_ARGS__)
-#define test_mutex_info(fmt, ...) test_mutex_log(LOG_INFO, fmt, ##__VA_ARGS__)
-#define test_mutex_debug(fmt, ...) test_mutex_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
-#define test_mutex_trace(fmt, ...) test_mutex_log(LOG_TRACE, fmt, ##__VA_ARGS__)
-
 static void pi_dummy(void *nothing) {
     (void) nothing;
     test_mutex_info("dummy");
@@ -137,8 +137,7 @@ static void pi_ts_thread(void *nothing) {
     test_mutex_info("lock");
     atomic_store(&pi_ts_got, true);
 
-    while (thread_get_current()->perceived_prio_class !=
-           THREAD_PRIO_CLASS_RT)
+    while (thread_get_current()->perceived_prio_class != THREAD_PRIO_CLASS_RT)
         cpu_relax();
 
     kassert(mutex_get_owner(&pi_mutex) == thread_get_current());
@@ -196,8 +195,7 @@ static void pi_chain_ts2(void *arg) {
     atomic_store(&ts2_grabbed_b, true);
 
     /* wait until boosted */
-    while (thread_get_current()->perceived_prio_class !=
-           THREAD_PRIO_CLASS_RT)
+    while (thread_get_current()->perceived_prio_class != THREAD_PRIO_CLASS_RT)
         cpu_relax();
 
     test_mutex_info("ts2 boosted");
@@ -212,8 +210,7 @@ static void pi_chain_ts1(void *arg) {
     atomic_store(&ts1_grabbed_a, true);
 
     /* wait until boosted */
-    while (thread_get_current()->perceived_prio_class !=
-           THREAD_PRIO_CLASS_RT)
+    while (thread_get_current()->perceived_prio_class != THREAD_PRIO_CLASS_RT)
         cpu_relax();
 
     mutex_lock(&pi_mtx_b);
@@ -280,8 +277,7 @@ static void pi_multi_ts(void *arg) {
     test_mutex_info("multi_ts running");
     atomic_store(&ts_got, true);
 
-    while (thread_get_current()->perceived_prio_class !=
-           THREAD_PRIO_CLASS_RT)
+    while (thread_get_current()->perceived_prio_class != THREAD_PRIO_CLASS_RT)
         cpu_relax();
 
     test_mutex_info("ts boosted");
@@ -327,6 +323,7 @@ TEST_REGISTER(mutex_pi_multi_waiters, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 static struct mutex pi_revert_mtx = MUTEX_INIT;
 static atomic_bool pi_reverted = false;
 static atomic_bool pi_revert_got = false;
+static atomic_uint pi_reverted_done = 0;
 
 static void pi_revert_ts(void *arg) {
     (void) arg;
@@ -334,23 +331,23 @@ static void pi_revert_ts(void *arg) {
 
     atomic_store(&pi_revert_got, true);
 
-    while (thread_get_current()->perceived_prio_class !=
-           THREAD_PRIO_CLASS_RT)
+    while (thread_get_current()->perceived_prio_class != THREAD_PRIO_CLASS_RT)
         cpu_relax();
 
     mutex_unlock(&pi_revert_mtx);
 
-    while (thread_get_current()->perceived_prio_class ==
-           THREAD_PRIO_CLASS_RT)
+    while (thread_get_current()->perceived_prio_class == THREAD_PRIO_CLASS_RT)
         cpu_relax();
 
     atomic_store(&pi_reverted, true);
+    atomic_fetch_add(&pi_reverted_done, 1);
 }
 
 static void pi_revert_rt(void *arg) {
     (void) arg;
     mutex_lock(&pi_revert_mtx);
     mutex_unlock(&pi_revert_mtx);
+    atomic_fetch_add(&pi_reverted_done, 1);
 }
 
 TEST_REGISTER(mutex_pi_revert, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
@@ -371,7 +368,7 @@ TEST_REGISTER(mutex_pi_revert, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     thread_enqueue_on_core(rt, cpu);
 
-    while (!atomic_load(&pi_reverted))
+    while (!atomic_load(&pi_reverted) || atomic_load(&pi_reverted_done) < 2)
         scheduler_yield();
 
     SET_SUCCESS();

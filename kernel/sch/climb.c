@@ -196,6 +196,11 @@ static void apply_handle(struct thread *t, struct climb_handle *ch) {
         rbt_insert(tree, &cts->climb_node);
         cts->on_climb_tree = true;
         thread_restore_flags(t, out);
+    } else if (cts->pressure_periods < 0) {
+        /* It was previously on decay... all we need to do
+         * is tell the thread to start pressure again,
+         * and set pressure_periods to 1 */
+        cts->pressure_periods = 1;
     }
 }
 
@@ -217,8 +222,23 @@ static void remove_handle(struct thread *t, struct climb_handle *ch) {
 
     ch->applied_pressure_internal = 0;
     list_del_init(&ch->list);
+
     climb_info("Remove handle on 0x%lx (thread 0x%lx), %u left", cts, t,
                climb_count_handles(cts));
+
+    struct scheduler *sched = global.schedulers[t->last_ran];
+
+    if (!rbt_has_node(&sched->climb_threads, &cts->climb_node)) {
+        k_printf("Tree:\n");
+        struct rbt_node *node;
+        rbt_for_each(node, &sched->climb_threads) {
+            k_printf("node 0x%lx\n", node);
+        }
+
+        k_panic("0x%lx, (thread 0x%lx) is not on tree when handle "
+                "was removed by 0x%lx\n",
+                cts, t, thread_get_current());
+    }
 
     if (list_empty(&cts->handles)) {
         /* This thread is done. Let it decay now */
@@ -312,7 +332,6 @@ static void climb_handle_apply_internal(struct thread *t,
 
     climb_handle_act(t, h, apply_handle, lock);
     h->given_to = t;
-    climb_info("Assign given_to 0x%lx", t);
 }
 
 void climb_handle_apply(struct thread *t, struct climb_handle *h) {
@@ -442,9 +461,14 @@ void climb_per_period_hook() {
     if (rbt_empty(climb_tree_local()))
         return;
 
+    struct scheduler *sched = smp_core_scheduler();
+    enum irql irql = spin_lock_irq_disable(&sched->lock);
+
     struct climb_summary summary = summarize_and_advance(climb_tree_local());
     struct climb_budget budget = climb_budget_from_summary(&summary);
     climb_apply_budget(smp_core_scheduler(), &budget);
+
+    spin_unlock(&sched->lock, irql);
 }
 
 void climb_thread_init(struct thread *t) {
