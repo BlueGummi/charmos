@@ -116,7 +116,6 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
             struct tlb_shootdown_cpu *o = &global.shootdown_data[i];
 
             int spins = 0;
-            bool forced = false;
 
             while (atomic_load_explicit(&o->done_gen, memory_order_acquire) <
                    gen) {
@@ -126,13 +125,7 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
                     continue;
                 }
 
-                if (!forced) {
-                    atomic_store_explicit(&o->flush_all, true,
-                                          memory_order_release);
-                    ipi_send(i, IRQ_TLB_SHOOTDOWN);
-                    forced = true;
-                    continue;
-                }
+                ipi_send(i, IRQ_TLB_SHOOTDOWN);
             }
         }
 
