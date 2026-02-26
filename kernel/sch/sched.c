@@ -217,18 +217,18 @@ static void load_thread(struct scheduler *sched, struct thread *next,
 
     kassert(next);
 
+    /* Do not mark the idle thread as RUNNING because this causes
+     * it to enter the runqueues, which is Very Bad™ (it gets enqueued,
+     * and becomes treated like a regular thread)! */
+    if (next->state != THREAD_STATE_IDLE_THREAD)
+        thread_set_state(next, THREAD_STATE_RUNNING);
+
     thread_set_last_ran(next, smp_core_id());
     next->curr_core = smp_core_id();
     next->run_start_time = time;
 
     thread_calculate_activity_data(next);
     thread_classify_activity(next, time);
-
-    /* Do not mark the idle thread as RUNNING because this causes
-     * it to enter the runqueues, which is Very Bad™ (it gets enqueued,
-     * and becomes treated like a regular thread)! */
-    if (next->state != THREAD_STATE_IDLE_THREAD)
-        thread_set_state(next, THREAD_STATE_RUNNING);
 }
 
 static inline struct thread *load_idle_thread(struct scheduler *sched) {

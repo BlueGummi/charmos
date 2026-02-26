@@ -132,7 +132,6 @@
  */
 
 #include <console/printf.h>
-#include <console/warn.h>
 #include <kassert.h>
 #include <math/sort.h>
 #include <mem/alloc.h>
