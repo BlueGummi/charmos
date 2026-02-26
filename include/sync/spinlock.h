@@ -1,7 +1,7 @@
 #pragma once
 #include <asm.h>
-#include <global.h>
 #include <console/panic.h>
+#include <global.h>
 #include <irq/irq.h>
 #include <kassert.h>
 #include <sch/irql.h>

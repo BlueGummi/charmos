@@ -172,7 +172,7 @@ void xhci_reset_slot(struct usb_device *dev) {
                    TRB_SET_SLOT_ID(slot_id),
     };
 
-    cmd = (struct xhci_command) {
+    cmd = (struct xhci_command){
         .private = &outgoing,
         .emit = xhci_emit_singular,
         .ep_id = 0,

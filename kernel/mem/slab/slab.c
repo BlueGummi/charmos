@@ -226,8 +226,8 @@ void slab_cache_init(size_t order, struct slab_cache *cache, uint64_t obj_size,
 
     if (cache->obj_size > available)
         panic("Slab class too large, object size is %u with %u available "
-                "bytes -- insufficient\n",
-                cache->obj_size, available);
+              "bytes -- insufficient\n",
+              cache->obj_size, available);
 
     uint64_t n;
     for (n = PAGE_NON_SLAB_SPACE / obj_size; n > 0; n--) {
@@ -420,7 +420,7 @@ static void *slab_try_alloc_from_slab_list(struct slab_cache *cache,
         slab = slab_from_list_node(node);
         if (slab->parent_cache != cache)
             printf("slab 0x%lx parent 0x%lx we are 0x%lx\n", slab,
-                     slab->parent_cache, cache);
+                   slab->parent_cache, cache);
 
         if (slab->state == SLAB_FULL)
             printf("slab 0x%lx full\n", slab);
@@ -498,7 +498,7 @@ static int slab_class_sort_cmp(const void *a, const void *b) {
 
     if (l == r)
         panic("slab size %u from %s is the same as slab size %u from %s\n", l,
-                sca->name, r, scb->name);
+              sca->name, r, scb->name);
 
     return l - r;
 }

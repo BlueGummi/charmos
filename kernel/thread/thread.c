@@ -216,7 +216,6 @@ struct thread *thread_create_internal(char *name, void (*entry_point)(void *),
     if (unlikely(!new_thread->activity_stats))
         goto err;
 
-
     if (unlikely(!cpu_mask_init(&new_thread->allowed_cpus, global.core_count)))
         goto err;
 
@@ -230,8 +229,9 @@ struct thread *thread_create_internal(char *name, void (*entry_point)(void *),
     new_thread->name = kzalloc(needed, ALLOC_PARAMS_DEFAULT);
     if (!new_thread->name)
         goto err;
-    
-    new_thread->log_site = log_site_create(new_thread->name, LOG_SITE_DROP_OLD, 16);
+
+    new_thread->log_site =
+        log_site_create(new_thread->name, LOG_SITE_DROP_OLD, 16);
     if (!new_thread->log_site)
         goto err;
 
@@ -343,7 +343,7 @@ static void wake_thread(void *a, void *unused) {
     (void) unused;
     struct thread *t = a;
     thread_wake(t, THREAD_WAKE_REASON_SLEEP_TIMEOUT, t->perceived_prio_class,
-                   t);
+                t);
 }
 
 void thread_sleep_for_ms(uint64_t ms) {
@@ -360,8 +360,8 @@ void thread_wake_manual(struct thread *t, void *wake_src) {
 
     if (s == THREAD_STATE_BLOCKED)
         thread_wake(t, THREAD_WAKE_REASON_BLOCKING_MANUAL,
-                       t->perceived_prio_class, wake_src);
+                    t->perceived_prio_class, wake_src);
     else if (s == THREAD_STATE_SLEEPING)
-        thread_wake(t, THREAD_WAKE_REASON_SLEEP_MANUAL,
-                       t->perceived_prio_class, wake_src);
+        thread_wake(t, THREAD_WAKE_REASON_SLEEP_MANUAL, t->perceived_prio_class,
+                    wake_src);
 }

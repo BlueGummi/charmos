@@ -2,9 +2,9 @@
 #include <block/sched.h>
 #include <console/printf.h>
 #include <mem/alloc.h>
-#include <thread/defer.h>
 #include <stdint.h>
 #include <sync/spinlock.h>
+#include <thread/defer.h>
 #include <time.h>
 
 static inline uint64_t get_boost_depth(struct bio_request *req) {
@@ -26,7 +26,7 @@ static bool should_boost(struct bio_request *req) {
     uint64_t curr_timestamp = time_get_ms();
 
     kassert(req->disk);
-    
+
     struct bio_scheduler_ops *ops = req->disk->ops;
     uint64_t base_wait = ops->max_wait_time[req->priority];
 

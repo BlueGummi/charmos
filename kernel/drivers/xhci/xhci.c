@@ -91,7 +91,7 @@ enum usb_status xhci_address_device(struct xhci_port *p, uint8_t slot_id,
         .status = 0,
     };
 
-    cmd = (struct xhci_command) {
+    cmd = (struct xhci_command){
         .ring = xhci->cmd_ring,
         .private = &outgoing,
         .emit = xhci_emit_singular,
@@ -181,7 +181,7 @@ enum usb_status xhci_configure_device_endpoints(struct usb_device *usb) {
         .status = 0,
     };
 
-    cmd = (struct xhci_command) {
+    cmd = (struct xhci_command){
         .slot = NULL,
         .ep_id = 0,
         .private = &outgoing,

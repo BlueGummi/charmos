@@ -1,7 +1,7 @@
 #include <kassert.h>
 #include <mem/alloc.h>
-#include <thread/tid.h>
 #include <string.h>
+#include <thread/tid.h>
 
 static size_t tid_space_get_data(struct rbt_node *node) {
     return container_of(node, struct tid_range, node)->start;

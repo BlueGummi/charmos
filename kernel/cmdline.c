@@ -1,7 +1,7 @@
-#include <global.h>
 #include <console/panic.h>
 #include <console/printf.h>
 #include <fs/vfs.h>
+#include <global.h>
 #include <mem/alloc.h>
 #include <string.h>
 

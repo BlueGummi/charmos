@@ -1,8 +1,8 @@
 /* @title: Virtual address allocator */
 #pragma once
-#include <structures/rbt.h>
 #include <stdatomic.h>
 #include <stdint.h>
+#include <structures/rbt.h>
 #include <sync/spinlock.h>
 #include <types/types.h>
 

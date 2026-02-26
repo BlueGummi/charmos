@@ -131,7 +131,7 @@ void daemon_main(void *a) {
         case DAEMON_THREAD_COMMAND_EXIT: daemon_thread_exit(daemon, self);
         default:
             panic("Unknown daemon thread command with value %u\n",
-                    self->command);
+                  self->command);
         }
     }
 
@@ -364,15 +364,14 @@ void daemon_wake_timesharing_worker(struct daemon *daemon) {
 
 void daemon_print(struct daemon *daemon) {
     struct daemon_attributes *attrs = &daemon->attrs;
-    printf("struct daemon \"%s\" = {\n",
-             daemon->name ? daemon->name : "NULL");
+    printf("struct daemon \"%s\" = {\n", daemon->name ? daemon->name : "NULL");
     printf("    .attrs = {\n");
     printf("                  .max_timesharing_threads = %u\n",
-             attrs->max_timesharing_threads);
+           attrs->max_timesharing_threads);
     printf("                  .idle_timesharing_threads = %u\n",
-             attrs->idle_timesharing_threads);
+           attrs->idle_timesharing_threads);
     printf("                  .timesharing_threads = %u\n",
-             attrs->timesharing_threads);
+           attrs->timesharing_threads);
     printf("                  .flags = 0b%b\n", attrs->flags);
     printf("             }\n");
     printf("    .state = %s\n", daemon_state_str(daemon->state));

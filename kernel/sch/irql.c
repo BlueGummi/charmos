@@ -55,7 +55,7 @@ enum irql irql_raise(enum irql new_level) {
 
     } else if (new_level < old) {
         panic("Raising to lower IRQL, from %s to %s\n", irql_to_str(old),
-                irql_to_str(new_level));
+              irql_to_str(new_level));
     }
 
     /* ok now we re-enable interrupts if we had disabled them prior */
@@ -101,6 +101,6 @@ void irql_lower(enum irql new_level) {
 
     } else if (new_level > old) {
         panic("Lowering to higher IRQL, from %s to %s\n", irql_to_str(old),
-                irql_to_str(new_level));
+              irql_to_str(new_level));
     }
 }

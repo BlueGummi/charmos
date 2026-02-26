@@ -1,6 +1,6 @@
 /* @title: Thread IDs */
-#include <structures/rbt.h>
 #include <stdint.h>
+#include <structures/rbt.h>
 #include <sync/spinlock.h>
 
 #define TID_RANGE_RESERVE_COUNT 128

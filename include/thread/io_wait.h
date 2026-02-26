@@ -1,7 +1,7 @@
 /* @title: IO waiting primitives */
 #include <stdbool.h>
-#include <thread/thread_types.h>
 #include <structures/list.h>
+#include <thread/thread_types.h>
 
 struct io_wait_token {
     struct list_head list;

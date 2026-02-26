@@ -6,12 +6,12 @@
 #include <stdint.h>
 
 enum topology_level {
-    TOPOLOGY_LEVEL_SMT,  /* Symmetric multiprocessing threads */
-    TOPOLOGY_LEVEL_CORE, /* SMTs under a core */
+    TOPOLOGY_LEVEL_SMT,     /* Symmetric multiprocessing threads */
+    TOPOLOGY_LEVEL_CORE,    /* SMTs under a core */
     TOPOLOGY_LEVEL_NUMA,    /* NUMA node */
-    TOPOLOGY_LEVEL_LLC,  /* Last level cache (some processors
-                          * have multiple L3 caches for a given
-                          * physical processor) */
+    TOPOLOGY_LEVEL_LLC,     /* Last level cache (some processors
+                             * have multiple L3 caches for a given
+                             * physical processor) */
     TOPOLOGY_LEVEL_PACKAGE, /* Physical processor in a socket */
     TOPOLOGY_LEVEL_MACHINE, /* All processors in a machine */
     TOPOLOGY_LEVEL_MAX,     /* count */
@@ -27,7 +27,7 @@ struct cpu_mask {
     size_t nbits;
 };
 #define CPU_MASK_WORD_BITS 64
-#define CPU_MASK_WORDS(nbits) \
+#define CPU_MASK_WORDS(nbits)                                                  \
     (((nbits) + CPU_MASK_WORD_BITS - 1) / CPU_MASK_WORD_BITS)
 
 struct topology_cache_info {

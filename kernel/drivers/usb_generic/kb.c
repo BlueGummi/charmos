@@ -173,7 +173,7 @@ struct usb_hid_keyboard *usb_keyboard_create(struct usb_device *dev,
     kbd->gkbd.emit = tty_keyboard_emit;
     kbd->gkbd.priv = kbd;
 
-    kbd->req = (struct usb_request) {
+    kbd->req = (struct usb_request){
         .buffer = &kbd->cur,
         .length = sizeof(kbd->cur),
         .ep = kbd->ep,

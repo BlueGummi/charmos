@@ -198,7 +198,7 @@ static void waking_thread(void *) {
         scheduler_yield();
 
     thread_wake(si_t, THREAD_WAKE_REASON_SLEEP_MANUAL,
-                   si_t->perceived_prio_class, (void *) 4);
+                si_t->perceived_prio_class, (void *) 4);
 }
 
 TEST_REGISTER(thread_sleep_interruptible_test, SHOULD_NOT_FAIL,

@@ -72,8 +72,8 @@ static void worker_destroy(struct workqueue *queue, struct worker *worker) {
 
         if (!found)
             panic("Potential corrupted worker 0x%lx in STATIC_WORKERS "
-                    "workqueue\n",
-                    worker);
+                  "workqueue\n",
+                  worker);
 
         spin_unlock(&queue->worker_array_lock, irql);
     } else {

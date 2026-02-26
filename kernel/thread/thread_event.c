@@ -48,8 +48,8 @@ static void print_ringbuffer(const struct thread *t, bool wake_reasons,
             continue;
 
         printf("        { reason: %s, ts: %lld, cycle: %llu",
-                 reason_str(e->reason), (long long) e->timestamp,
-                 (unsigned long long) e->cycle);
+               reason_str(e->reason), (long long) e->timestamp,
+               (unsigned long long) e->cycle);
 
         if (e->associated_reason.reason != THREAD_ASSOCIATED_REASON_NONE) {
             if (!wake_reasons)
@@ -81,49 +81,48 @@ void thread_print(const struct thread *t) {
     /* priorities */
     printf("    base_prio: %s,\n", thread_prio_class_str(t->base_prio_class));
     printf("    perceived_prio: %s,\n",
-             thread_prio_class_str(t->perceived_prio_class));
+           thread_prio_class_str(t->perceived_prio_class));
     printf("    effective_priority: %llu,\n",
-             (unsigned long long) t->effective_priority);
+           (unsigned long long) t->effective_priority);
     printf("    activity_score: %u, dynamic_delta: %d, weight: %llu,\n",
-             t->activity_score, t->dynamic_delta,
-             (unsigned long long) t->weight);
+           t->activity_score, t->dynamic_delta, (unsigned long long) t->weight);
     printf("    boost_count: %u\n", t->boost_count);
 
     printf("    activity_class: %s,\n",
-             thread_activity_class_str(t->activity_class));
+           thread_activity_class_str(t->activity_class));
 
     /* time / slice info */
     printf("    run: %llu ms / budget: %llu ms,\n",
-             (unsigned long long) t->period_runtime_raw_ms,
-             (unsigned long long) t->budget_time_raw_ms);
+           (unsigned long long) t->period_runtime_raw_ms,
+           (unsigned long long) t->budget_time_raw_ms);
     printf("    timeslice_length: %llu ms,\n",
-             (unsigned long long) t->timeslice_length_raw_ms);
+           (unsigned long long) t->timeslice_length_raw_ms);
     printf("    completed_period: %llu,\n",
-             (unsigned long long) t->completed_period);
+           (unsigned long long) t->completed_period);
     printf("    virtual_runtime: %llu / virtual_budget: %llu,\n",
-             (unsigned long long) t->virtual_period_runtime,
-             (unsigned long long) t->virtual_budget);
+           (unsigned long long) t->virtual_period_runtime,
+           (unsigned long long) t->virtual_budget);
 
     /* metrics overview */
     printf("    activity_metrics: { run_ratio: %llu, block_ratio: %llu, "
-             "sleep_ratio: %llu, wake_freq: %llu },\n",
-             (unsigned long long) t->activity_metrics.run_ratio,
-             (unsigned long long) t->activity_metrics.block_ratio,
-             (unsigned long long) t->activity_metrics.sleep_ratio,
-             (unsigned long long) t->activity_metrics.wake_freq);
+           "sleep_ratio: %llu, wake_freq: %llu },\n",
+           (unsigned long long) t->activity_metrics.run_ratio,
+           (unsigned long long) t->activity_metrics.block_ratio,
+           (unsigned long long) t->activity_metrics.sleep_ratio,
+           (unsigned long long) t->activity_metrics.wake_freq);
 
     /* profiling */
     printf("    context_switches: %zu,\n", t->context_switches);
     printf("    preemptions: %zu,\n", t->preemptions);
     printf("    wakes: %zu, blocks: %zu, sleeps: %zu,\n", t->total_wake_count,
-             t->total_block_count, t->total_sleep_count);
+           t->total_block_count, t->total_sleep_count);
     printf("    apcs: %zu,\n", t->total_apcs_ran);
     printf("    creation_time: %lld ms,\n", (long long) t->creation_time_ms);
 
     /* APC state */
     printf("    executing_apc: %s,\n", t->executing_apc ? "true" : "false");
     printf("    special_apc_disable: %u, kernel_apc_disable: %u,\n",
-             t->special_apc_disable, t->kernel_apc_disable);
+           t->special_apc_disable, t->kernel_apc_disable);
 
     /* activity ringbuffers */
     if (t->activity_data) {
@@ -528,7 +527,8 @@ out:
     return ok;
 }
 
-void thread_wake_internal(struct thread *t, enum thread_wake_reason r, void *wake_src) {
+void thread_wake_internal(struct thread *t, enum thread_wake_reason r,
+                          void *wake_src) {
     set_state_and_update_reason(
         t, r, THREAD_STATE_READY, thread_add_wake_reason, wake_src,
         /*already_locked=*/false,

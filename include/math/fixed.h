@@ -5,15 +5,14 @@
 #define FX_ONE ((fx16_16_t) (1 << 16))
 #define FX_HALF ((fx16_16_t) (1 << 15))
 #define FX(x) ((fx16_16_t) ((x) * 65536.0 + 0.5))
-#define FX_FROM_RATIO(n, d) \
-    ((fx16_16_t)(((int64_t)(n) << 16) / (d)))
+#define FX_FROM_RATIO(n, d) ((fx16_16_t) (((int64_t) (n) << 16) / (d)))
 
 static inline fx16_16_t fx_add(fx16_16_t a, fx16_16_t b) {
-    return (fx16_16_t)(a + b);
+    return (fx16_16_t) (a + b);
 }
 
 static inline fx16_16_t fx_sub(fx16_16_t a, fx16_16_t b) {
-    return (fx16_16_t)(a - b);
+    return (fx16_16_t) (a - b);
 }
 
 static inline fx16_16_t fx_mul(fx16_16_t a, fx16_16_t b) {

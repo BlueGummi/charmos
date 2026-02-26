@@ -1,9 +1,9 @@
 #include <console/printf.h>
+#include <math/align.h>
 #include <mem/alloc.h>
 #include <mem/bitmap.h>
 #include <mem/buddy.h>
 #include <mem/pmm.h>
-#include <math/align.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -67,8 +67,7 @@ struct page *buddy_remove_from_free_area(struct free_area *area) {
     return page;
 }
 
-void buddy_add_entry(struct page *page_array,
-                     struct limine_memmap_entry *entry,
+void buddy_add_entry(struct page *page_array, struct limine_memmap_entry *entry,
                      struct free_area *farea) {
     if (entry->type != LIMINE_MEMMAP_USABLE)
         return;
@@ -167,8 +166,7 @@ static void mid_init_buddy(size_t pages_needed) {
 
 void buddy_init(void) {
     size_t pages_needed =
-        (sizeof(struct page) * global.last_pfn + PAGE_SIZE - 1) /
-        PAGE_SIZE;
+        (sizeof(struct page) * global.last_pfn + PAGE_SIZE - 1) / PAGE_SIZE;
 
     mid_init_buddy(pages_needed);
 
@@ -178,7 +176,8 @@ void buddy_init(void) {
     }
 
     for (uint64_t i = 0; i < memmap->entry_count; i++)
-        buddy_add_entry(global.page_array, memmap->entries[i], global.buddy_free_area);
+        buddy_add_entry(global.page_array, memmap->entries[i],
+                        global.buddy_free_area);
 
     for (uint64_t i = 0; i < memmap->entry_count; i++) {
         struct limine_memmap_entry *e = memmap->entries[i];

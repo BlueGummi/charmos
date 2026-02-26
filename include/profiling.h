@@ -1,7 +1,7 @@
 /* @title: Profiling */
 #pragma once
-#include <global.h>
 #include <compiler.h>
+#include <global.h>
 #include <linker/symbols.h>
 #include <stdbool.h>
 #include <stdint.h>

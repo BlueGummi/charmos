@@ -11,7 +11,6 @@ static size_t scheduler_thread_get_data(struct rbt_node *n) {
     return thread_from_rq_rbt_node(n)->virtual_runtime_left;
 }
 
-
 void scheduler_init(void) {
     scheduler_data.max_concurrent_stealers = global.core_count / 4;
 

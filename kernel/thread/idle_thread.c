@@ -1,10 +1,10 @@
 #include <asm.h>
 #include <irq/idt.h>
 #include <kassert.h>
-#include <thread/defer.h>
-#include <thread/dpc.h>
 #include <sch/sched.h>
 #include <sync/rcu.h>
+#include <thread/defer.h>
+#include <thread/dpc.h>
 
 void scheduler_idle_main(void *nop) {
     (void) nop;

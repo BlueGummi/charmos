@@ -60,7 +60,7 @@ TEST_REGISTER(bio_sched_coalesce_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct generic_disk *d = fs->drive;
 
     struct bio_request *bio = kmalloc(sizeof(*bio), ALLOC_PARAMS_DEFAULT);
-    *bio = (struct bio_request) {
+    *bio = (struct bio_request){
         .lba = 0,
         .disk = d,
         .buffer = kmalloc_aligned(512, 4096, ALLOC_PARAMS_DEFAULT),
@@ -75,7 +75,7 @@ TEST_REGISTER(bio_sched_coalesce_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     };
 
     struct bio_request *bio2 = kmalloc(sizeof(*bio2), ALLOC_PARAMS_DEFAULT);
-    *bio2 = (struct bio_request) {
+    *bio2 = (struct bio_request){
         .lba = 1,
         .disk = d,
         .buffer = kmalloc_aligned(512, 4096, ALLOC_PARAMS_DEFAULT),

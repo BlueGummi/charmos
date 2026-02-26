@@ -10,7 +10,6 @@
 
 #include "internal.h"
 
-
 paddr_t buddy_alloc_pages(struct free_area *free_area, size_t count) {
     if (count == 0)
         panic("Tried to allocate zero pages\n");

@@ -52,7 +52,7 @@ static void print_topology_node(struct topology_node *node, int depth) {
     const char *level_str = topo_node_str[node->level];
 
     printf("[%s] ID = " ANSI_BOLD "%d" ANSI_RESET ", CPUs = ", level_str,
-             node->id);
+           node->id);
     cpu_mask_print(&node->cpus);
     printf("\n");
 
@@ -186,7 +186,7 @@ void topology_dump(void) {
 #define PANIC_IF_CPU_MASK_FAILED(op)                                           \
     do {                                                                       \
         if (unlikely(!op))                                                     \
-            panic("CPU mask allocation failed!\n");                          \
+            panic("CPU mask allocation failed!\n");                            \
                                                                                \
     } while (0);
 

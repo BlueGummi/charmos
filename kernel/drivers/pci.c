@@ -123,15 +123,15 @@ void pci_scan_devices(struct pci_device **devices_out, uint64_t *count_out) {
                 uint8_t revision = class_info & 0xFF;
 
                 pci_devices[pci_device_count++] =
-                    (struct pci_device) {.bus = bus,
-                                         .device = device,
-                                         .function = function,
-                                         .vendor_id = vendor_id,
-                                         .device_id = device_id,
-                                         .class_code = class_code,
-                                         .subclass = subclass,
-                                         .prog_if = prog_if,
-                                         .revision = revision};
+                    (struct pci_device){.bus = bus,
+                                        .device = device,
+                                        .function = function,
+                                        .vendor_id = vendor_id,
+                                        .device_id = device_id,
+                                        .class_code = class_code,
+                                        .subclass = subclass,
+                                        .prog_if = prog_if,
+                                        .revision = revision};
 
                 pci_log(LOG_INFO, "Found device '%s' at %02x:%02x.%x",
                         pci_class_name(class_code, subclass), bus, device,

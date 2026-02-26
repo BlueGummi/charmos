@@ -7,10 +7,10 @@ static atomic_size_t io_wait_magic = ATOMIC_VAR_INIT(0);
 void io_wait_begin(struct io_wait_token *out, void *io_object) {
     struct thread *t = thread_get_current();
 
-    *out = (struct io_wait_token) {.wait_object = io_object,
-                                   .active = true,
-                                   .magic = atomic_fetch_add(&io_wait_magic, 1),
-                                   .owner = t};
+    *out = (struct io_wait_token){.wait_object = io_object,
+                                  .active = true,
+                                  .magic = atomic_fetch_add(&io_wait_magic, 1),
+                                  .owner = t};
     INIT_LIST_HEAD(&out->list);
     list_add_tail(&out->list, &t->io_wait_tokens);
 

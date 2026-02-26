@@ -25,13 +25,13 @@ struct stat_bucket {
 typedef size_t (*stat_series_callback)(struct stat_bucket *bucket);
 
 struct stat_series {
-    stat_series_callback bucket_reset;   /* to call upon bucket reset */
-    struct stat_bucket *buckets;         /* ringbuffer */
-    uint32_t nbuckets;                   /* how many buckets */
-    _Atomic uint32_t current;        /* current bucket idx */
-    time_t bucket_us;                    /* duration for each bucket */
-    _Atomic uint64_t last_update_us; /* last time we advanced */
-    void *private;                       /* private, per subsystem */
+    stat_series_callback bucket_reset; /* to call upon bucket reset */
+    struct stat_bucket *buckets;       /* ringbuffer */
+    uint32_t nbuckets;                 /* how many buckets */
+    _Atomic uint32_t current;          /* current bucket idx */
+    time_t bucket_us;                  /* duration for each bucket */
+    _Atomic uint64_t last_update_us;   /* last time we advanced */
+    void *private;                     /* private, per subsystem */
     struct spinlock lock;
 };
 SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(stat_series, lock);

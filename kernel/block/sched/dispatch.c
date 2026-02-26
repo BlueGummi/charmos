@@ -2,10 +2,10 @@
 #include <block/sched.h>
 #include <console/printf.h>
 #include <mem/alloc.h>
-#include <thread/defer.h>
 #include <stdint.h>
 #include <structures/dll.h>
 #include <sync/spinlock.h>
+#include <thread/defer.h>
 
 /* enqueuing skips enqueuing if the req is URGENT */
 

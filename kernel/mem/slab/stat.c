@@ -7,8 +7,7 @@ void slab_domain_bucket_print(const struct slab_domain_bucket *bucket) {
     printf("    alloc_page_hits: %zu,\n", bucket->alloc_page_hits);
     printf("    alloc_local_hits: %zu,\n", bucket->alloc_local_hits);
     printf("    alloc_remote_hits: %zu,\n", bucket->alloc_remote_hits);
-    printf("    alloc_gc_recycle_hits: %zu,\n",
-             bucket->alloc_gc_recycle_hits);
+    printf("    alloc_gc_recycle_hits: %zu,\n", bucket->alloc_gc_recycle_hits);
     printf("    alloc_new_slab: %zu,\n", bucket->alloc_new_slab);
     printf("    alloc_new_remote_slab: %u\n", bucket->alloc_new_remote_slab);
     printf("    alloc_failures: %zu,\n", bucket->alloc_failures);
@@ -16,8 +15,7 @@ void slab_domain_bucket_print(const struct slab_domain_bucket *bucket) {
     printf("    free_calls: %zu,\n", bucket->free_calls);
     printf("    free_to_ring: %zu,\n", bucket->free_to_ring);
     printf("    free_to_local_slab: %zu,\n", bucket->free_to_local_slab);
-    printf("    free_to_remote_domain: %zu,\n",
-             bucket->free_to_remote_domain);
+    printf("    free_to_remote_domain: %zu,\n", bucket->free_to_remote_domain);
     printf("    free_to_percpu: %zu\n", bucket->free_to_percpu);
     printf("\n");
     printf("    freequeue_enqueues: %zu,\n", bucket->freequeue_enqueues);

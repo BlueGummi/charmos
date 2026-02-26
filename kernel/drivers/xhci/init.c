@@ -57,7 +57,7 @@ void xhci_nop(struct xhci_device *dev) {
         .status = 0,
     };
 
-    cmd = (struct xhci_command) {
+    cmd = (struct xhci_command){
         .private = &outgoing,
         .emit = xhci_emit_singular,
         .ep_id = 0,
@@ -82,7 +82,7 @@ uint8_t xhci_enable_slot(struct xhci_device *dev) {
         .status = 0,
     };
 
-    cmd = (struct xhci_command) {
+    cmd = (struct xhci_command){
         .private = &outgoing,
         .emit = xhci_emit_singular,
         .ep_id = 0,
@@ -111,7 +111,7 @@ void xhci_disable_slot(struct xhci_device *dev, uint8_t slot_id) {
                    TRB_SET_SLOT_ID(slot_id),
     };
 
-    cmd = (struct xhci_command) {
+    cmd = (struct xhci_command){
         .private = &outgoing,
         .emit = xhci_emit_singular,
         .ep_id = 0,

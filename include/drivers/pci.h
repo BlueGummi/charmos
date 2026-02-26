@@ -184,7 +184,7 @@ static inline void pci_write_byte(uint8_t bus, uint8_t slot, uint8_t func,
 
 LOG_HANDLE_EXTERN(pci);
 LOG_SITE_EXTERN(pci);
-#define pci_log(log_level, fmt, ...)                                          \
+#define pci_log(log_level, fmt, ...)                                           \
     log(LOG_SITE(pci), LOG_HANDLE(pci), log_level, fmt, ##__VA_ARGS__)
 
 const char *pci_class_name(uint8_t class_code, uint8_t subclass);

@@ -3,11 +3,11 @@
 #include <block/bcache.h>
 #include <fs/detect.h>
 #include <sch/sched.h>
-#include <thread/thread.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <sync/spinlock.h>
+#include <thread/thread.h>
 
 struct generic_disk;
 struct bio_request;

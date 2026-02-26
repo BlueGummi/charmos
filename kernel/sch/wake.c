@@ -3,7 +3,7 @@
 #include "internal.h"
 
 bool thread_wake(struct thread *t, enum thread_wake_reason reason,
-                    enum thread_prio_class prio, void *wake_src) {
+                 enum thread_prio_class prio, void *wake_src) {
     kassert(t);
     enum irql outer = irql_raise(IRQL_HIGH_LEVEL);
 
@@ -89,5 +89,5 @@ void thread_wake_from_io_block(struct thread *t, void *wake_src) {
     kassert(found);
 
     thread_wake(t, THREAD_WAKE_REASON_BLOCKING_IO, THREAD_PRIO_CLASS_URGENT,
-                   wake_src);
+                wake_src);
 }

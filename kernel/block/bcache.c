@@ -4,10 +4,10 @@
 #include <console/panic.h>
 #include <math/align.h>
 #include <mem/alloc.h>
-#include <thread/defer.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <thread/defer.h>
 
 static bool remove(struct bcache *cache, uint64_t key, uint64_t spb);
 

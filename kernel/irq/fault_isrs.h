@@ -5,7 +5,7 @@
         uint64_t core = smp_core_id();                                         \
         printf("\n=== " #handler_name " fault! ===\n");                        \
         printf("Message -> %s\n", message);                                    \
-        panic("Core %u faulted\n", core);                                    \
+        panic("Core %u faulted\n", core);                                      \
         while (true) {                                                         \
             wait_for_interrupt();                                              \
         }                                                                      \

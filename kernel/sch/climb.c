@@ -14,8 +14,7 @@ SCHEDULER_PERIODIC_WORK_REGISTER_PER_PERIOD(climb_per_period_hook,
 
 LOG_SITE_DECLARE(climb, LOG_SITE_PRINT | LOG_SITE_DEFAULT,
                  LOG_SITE_CAPACITY_DEFAULT, LOG_SITE_ALL,
-                 ((struct log_dump_opts) {.show_tid = true,
-                                          .show_args = true}));
+                 ((struct log_dump_opts){.show_tid = true, .show_args = true}));
 LOG_HANDLE_DECLARE_DEFAULT(climb);
 #define climb_log(lvl, fmt, ...)                                               \
     log(LOG_SITE(climb), LOG_HANDLE(climb), lvl, fmt, ##__VA_ARGS__)
@@ -239,8 +238,8 @@ static void remove_handle(struct thread *t, struct climb_handle *ch) {
         }
 
         panic("0x%lx, (thread 0x%lx) is not on tree when handle "
-                "was removed by 0x%lx\n",
-                cts, t, thread_get_current());
+              "was removed by 0x%lx\n",
+              cts, t, thread_get_current());
     }
 
     if (list_empty(&cts->handles)) {

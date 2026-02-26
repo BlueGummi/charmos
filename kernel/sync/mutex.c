@@ -75,7 +75,7 @@ void mutex_simple_unlock(struct mutex_simple *m) {
     struct thread *next = thread_queue_pop_front(&m->waiters);
     if (next != NULL)
         thread_wake(next, THREAD_WAKE_REASON_BLOCKING_MANUAL,
-                       next->perceived_prio_class, m);
+                    next->perceived_prio_class, m);
 
     spin_unlock(&m->lock, irql);
 }
@@ -213,8 +213,8 @@ void mutex_unlock(struct mutex *mutex) {
 
     if (mutex_get_owner(mutex) != current_thread)
         panic("non-owner thread tried to unlock mutex. mutex owner is 0x%lx, "
-                "current thread is 0x%lx\n",
-                mutex_get_owner(mutex), current_thread);
+              "current thread is 0x%lx\n",
+              mutex_get_owner(mutex), current_thread);
 
     enum irql ts_lock_irql;
     struct turnstile *ts = turnstile_lookup(mutex, &ts_lock_irql);

@@ -73,7 +73,7 @@ static inline bool refcount_dec_and_test(refcount_t *rc) {
                                                                                \
             /* panic if refcount is zero (possible UAF) */                     \
             if (!old) {                                                        \
-                panic("possible UAF\n");                                     \
+                panic("possible UAF\n");                                       \
             }                                                                  \
                                                                                \
             /* check failure before attempting to increment */                 \

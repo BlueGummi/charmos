@@ -1,6 +1,6 @@
 #pragma once
-#include <thread/queue.h>
 #include <sync/spinlock.h>
+#include <thread/queue.h>
 
 #define CONDVAR_INIT_IRQ_DISABLE true
 #define CONDVAR_INIT_NORMAL false

@@ -118,7 +118,7 @@ enum usb_status xhci_submit_interrupt_transfer(struct usb_request *req) {
         .status = status,
     };
 
-    *cmd = (struct xhci_command) {
+    *cmd = (struct xhci_command){
         .ring = ring,
         .private = &outgoing,
         .ep_id = ep_id,
@@ -212,7 +212,7 @@ enum usb_status xhci_send_control_transfer(struct xhci_device *dev,
 
     xhci_request_init(xreq, cmd, req);
 
-    *cmd = (struct xhci_command) {
+    *cmd = (struct xhci_command){
         .ring = slot->ep_rings[0],
         .slot = slot,
         .ep_id = 1,

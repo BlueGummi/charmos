@@ -76,7 +76,7 @@ static void rw_reader_worker(void *) {
         time_t now = time_get_ms();
         if ((now - last_print) > RWLOCK_READER_PRINT_INTERVAL) {
             printf("RWlock reader %s on iteration %zu\n",
-                     thread_get_current()->name, i);
+                   thread_get_current()->name, i);
         }
         last_print = now;
     }

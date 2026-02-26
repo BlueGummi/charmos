@@ -72,11 +72,11 @@ static void k_printf_from_log(const char *fmt, const uint64_t *args,
         break;
     case 7:
         printf(fmt, args[0], args[1], args[2], args[3], args[4], args[5],
-                 args[6]);
+               args[6]);
         break;
     case 8:
         printf(fmt, args[0], args[1], args[2], args[3], args[4], args[5],
-                 args[6], args[7]);
+               args[6], args[7]);
         break;
     default: printf("<invalid nargs>");
     }
@@ -87,7 +87,7 @@ static void log_dump_record(const struct log_record *rec,
     size_t sec = MS_TO_SECONDS(rec->timestamp);
     size_t msec = rec->timestamp % 1000;
     printf("[%llu.%03llu] %s%-5s%s ", sec, msec, log_level_color(rec->level),
-             log_level_str[rec->level], ANSI_RESET);
+           log_level_str[rec->level], ANSI_RESET);
 
     if (opts.show_cpu)
         printf("cpu=%u ", rec->cpu);
@@ -421,7 +421,7 @@ void debug_print_stack(void) {
             const char *sym = find_symbol(val, &sym_addr);
             if (sym) {
                 printf("    [0x%016lx] %s+0x%lx (sp=0x%016lx)\n", val, sym,
-                         val - sym_addr, (uint64_t) addr);
+                       val - sym_addr, (uint64_t) addr);
                 hits++;
             }
         }

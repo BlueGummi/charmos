@@ -120,7 +120,7 @@ void registry_setup() {
                 struct vfs_node *root = p->mount(p);
                 if (!root)
                     panic("VFS failed to mount root '%s' - mount failure\n",
-                            global.root_partition);
+                          global.root_partition);
                 global.root_node = root;
                 global.root_node_disk = disk;
                 found_root = true;
@@ -130,7 +130,7 @@ void registry_setup() {
 
     if (!found_root)
         panic("VFS failed to mount root '%s' - could not find root\n",
-                global.root_partition);
+              global.root_partition);
 
     log_info_global(
         LOG_HANDLE(vfs), "Root '%s' mounted - is a(n) %s filesystem",

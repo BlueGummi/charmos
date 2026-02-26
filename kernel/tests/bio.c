@@ -1,9 +1,9 @@
 #ifdef TEST_BIO
 #include <block/bio.h>
 #include <block/generic.h>
-#include <global.h>
 #include <fs/ext2.h>
 #include <fs/vfs.h>
+#include <global.h>
 #include <mem/alloc.h>
 #include <sleep.h>
 #include <stdbool.h>
@@ -39,7 +39,7 @@ TEST_REGISTER(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     for (uint64_t i = 0; i < run_times; i++) {
         struct bio_request *bio =
             kmalloc(sizeof(struct bio_request), ALLOC_PARAMS_DEFAULT);
-        *bio = (struct bio_request) {
+        *bio = (struct bio_request){
             .lba = 0,
             .buffer = kmalloc_aligned(64 * PAGE_SIZE, PAGE_SIZE,
                                       ALLOC_PARAMS_DEFAULT),

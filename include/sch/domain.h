@@ -17,10 +17,11 @@ struct scheduler_group {
 
 /* per-domain: list of groups at same level */
 struct scheduler_domain {
-    enum topology_level level;  /* which topology level this domain maps to */
+    enum topology_level level; /* which topology level this domain maps to */
     struct scheduler_group *groups; /* array */
     size_t ngroups;
-    struct scheduler_domain *parent; /* pointer to parent domain (higher level) */
+    struct scheduler_domain
+        *parent; /* pointer to parent domain (higher level) */
 };
 
 void scheduler_domains_init(void);

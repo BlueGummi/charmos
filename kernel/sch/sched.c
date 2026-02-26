@@ -135,7 +135,7 @@ static inline bool migrate_to_destination(struct thread *t, time_t time) {
      * to be `true` as long as the thread could possibly be getting migrated */
     if (!spinlock_held(&t->being_moved)) {
         panic("being_moved flag not true, migrate_to %zu from %zu\n", dst,
-                smp_core_id());
+              smp_core_id());
     }
 
     struct scheduler *us = smp_core_scheduler();
@@ -265,7 +265,7 @@ static void change_tick(struct scheduler *sched, struct thread *next) {
         change_tick_duration(next->timeslice_length_raw_ms);
     } else if (next->perceived_prio_class == THREAD_PRIO_CLASS_RT) {
         /* Realtime threads get the tick disabled. Only RT though.
-         * URGENT still needs it so that it can switch out and 
+         * URGENT still needs it so that it can switch out and
          * run another thread when the boost leaves */
         tick_disable();
     }
@@ -368,9 +368,9 @@ void scheduler_yield() {
     scheduler_periodic_work_execute(PERIODIC_WORK_PERIOD_BASED);
 
     scheduler_mark_self_in_resched(false);
-    
+
     vmm_reclaim_page_tables();
     smp_core()->pt_seen_epoch = atomic_load(&global.pt_epoch);
-    
+
     irql_lower(irql);
 }

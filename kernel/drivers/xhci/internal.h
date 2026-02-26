@@ -193,7 +193,7 @@ static inline bool xhci_send_command_and_block(struct xhci_device *dev,
 
     if (!xhci_send_command(dev, cmd)) {
         thread_wake_internal(thread_get_current(),
-                    THREAD_WAKE_REASON_BLOCKING_MANUAL, dev);
+                             THREAD_WAKE_REASON_BLOCKING_MANUAL, dev);
 
         if (iot) {
             io_wait_end(iot, IO_WAIT_END_NO_OP);

@@ -1,9 +1,9 @@
 #pragma once
 #include <kassert.h>
-#include <structures/list.h>
-#include <structures/minheap.h>
 #include <stdatomic.h>
 #include <stdint.h>
+#include <structures/list.h>
+#include <structures/minheap.h>
 #include <sync/spinlock.h>
 #include <types/types.h>
 

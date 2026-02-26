@@ -75,10 +75,10 @@ void iso9660_pvd_print(const struct iso9660_pvd *pvd) {
 
     printf("L Path Table Location: 0x%08X\n", pvd->l_path_table_loc);
     printf("Optional L Path Table Location: 0x%08X\n",
-             pvd->opt_l_path_table_loc);
+           pvd->opt_l_path_table_loc);
     printf("M Path Table Location: 0x%08X\n", pvd->m_path_table_loc);
     printf("Optional M Path Table Location: 0x%08X\n",
-             pvd->opt_m_path_table_loc);
+           pvd->opt_m_path_table_loc);
 }
 
 struct vfs_node *iso9660_mount(struct generic_partition *p) {
@@ -139,8 +139,8 @@ void iso9660_ls(struct iso9660_fs *fs, uint32_t lba, uint32_t size) {
         name[rec->name_len] = '\0';
 
         printf("  %s  (LBA: %u, Size: %u bytes, %s)\n", name,
-                 rec->extent_lba_le, rec->size_le,
-                 (rec->flags & 0x02) ? "Directory" : "File");
+               rec->extent_lba_le, rec->size_le,
+               (rec->flags & 0x02) ? "Directory" : "File");
         if (rec->flags & 0x02) {
             printf("--Listing %s--\n", name);
             iso9660_ls(fs, rec->extent_lba_le, rec->size_le);

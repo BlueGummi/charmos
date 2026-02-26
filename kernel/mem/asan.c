@@ -94,7 +94,7 @@ static inline uint8_t *asan_shadow_for(const void *addr) {
 static void __asan_report_and_panic(const char *what, const void *addr,
                                     size_t size, bool is_write) {
     printf("[ASAN] %s at %p size=%zu %s\n", what, addr, size,
-             is_write ? "store" : "load");
+           is_write ? "store" : "load");
     panic("ASAN: aborting due to memory error\n");
 }
 

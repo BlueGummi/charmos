@@ -103,7 +103,7 @@
  *   None
  *
  * ## Strategy:
- *   To raise the IRQL, the necessary operations are performed depending on 
+ *   To raise the IRQL, the necessary operations are performed depending on
  *   the IRQL being raised to. (disable preemption, interrupts, etc.).
  *
  *   To lower the IRQL, we simply re-enable the blocked event types, and
@@ -137,8 +137,8 @@
 
 enum irql {
     IRQL_PASSIVE_LEVEL = 0,  /* Normal execution */
-    IRQL_APC_LEVEL = 1,      /* No preemption */ 
-    IRQL_DISPATCH_LEVEL = 2, /* No DPCs */ 
+    IRQL_APC_LEVEL = 1,      /* No preemption */
+    IRQL_DISPATCH_LEVEL = 2, /* No DPCs */
     IRQL_DEVICE_LEVEL = 3,   /* Device interrupts */
     IRQL_HIGH_LEVEL = 4,     /* All interrupts masked */
     IRQL_NONE = -1,

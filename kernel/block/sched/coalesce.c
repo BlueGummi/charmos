@@ -2,9 +2,9 @@
 #include <block/sched.h>
 #include <console/printf.h>
 #include <mem/alloc.h>
-#include <thread/defer.h>
 #include <stdint.h>
 #include <sync/spinlock.h>
+#include <thread/defer.h>
 #include <time.h>
 
 static inline void set_coalesced(struct bio_request *into,

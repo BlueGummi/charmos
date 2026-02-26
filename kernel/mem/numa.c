@@ -26,7 +26,7 @@ void numa_dump(void) {
         printf("%4zu: ", i);
         for (size_t j = 0; j < n; j++) {
             printf("%4u (%4u)", global.numa_nodes[i].distance[j],
-                     global.numa_nodes[i].rel_dists[j]);
+                   global.numa_nodes[i].rel_dists[j]);
         }
         printf("\n");
     }

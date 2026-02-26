@@ -1,8 +1,8 @@
+#include <math/align.h>
 #include <mem/alloc.h>
 #include <mem/buddy.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <math/align.h>
 #include <string.h>
 
 #include "internal.h"

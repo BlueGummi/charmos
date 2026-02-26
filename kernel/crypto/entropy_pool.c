@@ -56,7 +56,7 @@ uint64_t entropy_pool_extract(struct entropy_pool *pool, uint8_t *out,
 
     spin_unlock(&pool->lock, irql);
 
-    chacha20_encrypt(seed, chacha_nonce, 0, (uint8_t[64]) {0}, out, len);
+    chacha20_encrypt(seed, chacha_nonce, 0, (uint8_t[64]){0}, out, len);
     return len;
 }
 

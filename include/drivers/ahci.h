@@ -270,7 +270,7 @@ static_assert_struct_size_eq(ahci_cmd_header, 32);
 LOG_HANDLE_EXTERN(ahci);
 LOG_SITE_EXTERN(ahci);
 
-#define ahci_log(log_level, fmt, ...)                                         \
+#define ahci_log(log_level, fmt, ...)                                          \
     log(LOG_SITE(ahci), LOG_HANDLE(ahci), log_level, fmt, ##__VA_ARGS__)
 
 struct ahci_request {

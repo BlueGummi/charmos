@@ -357,10 +357,10 @@ void domain_buddy_dump(void) {
         struct domain_buddy *dom = &global.domain_buddies[i];
         struct domain_buddy_stats *stat = &dom->stats;
         printf("Domain %u stats: %u allocs, %u failed, %u interleaved, %u "
-                 "remote, %u frees, %u pages used, %u total pages\n",
-                 i, stat->alloc_count, stat->failed_alloc_count,
-                 stat->interleaved_alloc_count, stat->remote_alloc_count,
-                 stat->free_count, dom->pages_used, dom->total_pages);
+               "remote, %u frees, %u pages used, %u total pages\n",
+               i, stat->alloc_count, stat->failed_alloc_count,
+               stat->interleaved_alloc_count, stat->remote_alloc_count,
+               stat->free_count, dom->pages_used, dom->total_pages);
     }
 }
 

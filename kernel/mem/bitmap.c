@@ -80,7 +80,7 @@ void bitmap_free_pages(paddr_t addr, uint64_t count) {
     if (start_index >= bitmap_size * 8 ||
         start_index + count > bitmap_size * 8) {
         printf("Invalid address range to free: 0x%zx with count %zu\n",
-                 (uint64_t) addr, count);
+               (uint64_t) addr, count);
         return;
     }
 
@@ -90,7 +90,7 @@ void bitmap_free_pages(paddr_t addr, uint64_t count) {
             clear_bit(index);
         } else {
             printf("Page at 0x%zx was already free\n",
-                     global.hhdm_offset + (index * PAGE_SIZE));
+                   global.hhdm_offset + (index * PAGE_SIZE));
         }
     }
 }

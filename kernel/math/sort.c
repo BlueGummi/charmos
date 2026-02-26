@@ -110,7 +110,7 @@
             par = base + par_i * size;                                         \
             COPY(par, child, count, size, tmp1, tmp2);                         \
         }                                                                      \
-        while (true) {                                                             \
+        while (true) {                                                         \
             child_i = par_i;                                                   \
             par_i = child_i / 2;                                               \
             child = base + child_i * size;                                     \

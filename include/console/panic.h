@@ -23,5 +23,5 @@ struct panic_regs {
 void panic_impl(const char *file, int line, const char *func, const char *fmt,
                 ...);
 
-#define panic(fmt, ...)                                                      \
+#define panic(fmt, ...)                                                        \
     panic_impl(__FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)

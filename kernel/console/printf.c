@@ -9,8 +9,8 @@
 #include <sync/spinlock.h>
 
 #include "console/printf.h"
-#include <flanterm/src/flanterm_backends/fb.h>
 #include "flanterm/src/flanterm.h"
+#include <flanterm/src/flanterm_backends/fb.h>
 
 struct flanterm_context;
 

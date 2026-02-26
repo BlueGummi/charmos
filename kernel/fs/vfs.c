@@ -1,6 +1,6 @@
-#include <log.h>
 #include <console/printf.h>
 #include <fs/vfs.h>
+#include <log.h>
 #include <mem/alloc.h>
 #include <stdint.h>
 #include <string.h>
