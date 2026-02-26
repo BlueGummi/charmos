@@ -23,7 +23,7 @@ static struct daemon_work bg =
 void slab_domain_init_daemon(struct slab_domain *domain) {
     struct cpu_mask cmask;
     if (!cpu_mask_init(&cmask, global.core_count))
-        k_panic("OOM\n");
+        panic("OOM\n");
 
     domain_set_cpu_mask(&cmask, domain->domain);
     struct daemon_attributes attrs = {
@@ -44,7 +44,7 @@ void slab_domain_init_daemon(struct slab_domain *domain) {
 void slab_domain_init_workqueue(struct slab_domain *domain) {
     struct cpu_mask mask = {0};
     if (!cpu_mask_init(&mask, global.core_count))
-        k_panic("CPU mask initialization failed\n");
+        panic("CPU mask initialization failed\n");
 
     domain_set_cpu_mask(&mask, domain->domain);
 

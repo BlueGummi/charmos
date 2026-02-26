@@ -24,32 +24,32 @@ enum irq_result page_fault_handler(void *context, uint8_t vector,
     asm volatile("mov %%cr2, %0" : "=r"(fault_addr));
 
     spin_lock_raw(&pf_lock);
-    k_printf("\n=== PAGE FAULT ===\n");
-    k_printf("Faulting Address (CR2): 0x%lx\n", fault_addr);
-    k_printf("Error Code: 0x%lx\n", error_code);
-    k_printf("  - Page not Present (P): %s\n",
+    printf("\n=== PAGE FAULT ===\n");
+    printf("Faulting Address (CR2): 0x%lx\n", fault_addr);
+    printf("Error Code: 0x%lx\n", error_code);
+    printf("  - Page not Present (P): %s\n",
              (error_code & 0x01) ? "Yes" : "No");
-    k_printf("  - Write Access (W/R): %s\n",
+    printf("  - Write Access (W/R): %s\n",
              (error_code & 0x02) ? "Write" : "Read");
-    k_printf("  - User Mode (U/S): %s\n",
+    printf("  - User Mode (U/S): %s\n",
              (error_code & 0x04) ? "User" : "Supervisor");
-    k_printf("  - Reserved Bit Set (RSVD): %s\n",
+    printf("  - Reserved Bit Set (RSVD): %s\n",
              (error_code & 0x08) ? "Yes" : "No");
-    k_printf("  - Instruction Fetch (I/D): %s\n",
+    printf("  - Instruction Fetch (I/D): %s\n",
              (error_code & 0x10) ? "Yes" : "No");
-    k_printf("  - Protection Key Violation (PK): %s\n",
+    printf("  - Protection Key Violation (PK): %s\n",
              (error_code & 0x20) ? "Yes" : "No");
-    k_printf("  - Kernel stack 0x%lx -> 0x%lx\n", curr->stack,
+    printf("  - Kernel stack 0x%lx -> 0x%lx\n", curr->stack,
              (uintptr_t) curr->stack + curr->stack_size);
     vaddr_t protector_base = (uintptr_t) curr->stack - PAGE_SIZE;
     vaddr_t protector_top = (uintptr_t) curr->stack;
     if (fault_addr >= protector_base && fault_addr <= protector_top)
-        k_printf(
+        printf(
             "Likely stack overflow!! Fault occurred in protector page!!!\n");
 
     if (!(error_code & 0x04)) {
         spin_unlock_raw(&pf_lock);
-        k_panic("KERNEL PAGE FAULT ON CORE %llu under thread %s\n",
+        panic("KERNEL PAGE FAULT ON CORE %llu under thread %s\n",
                 smp_core_id(), thread_get_current()->name);
         while (true) {
             disable_interrupts();

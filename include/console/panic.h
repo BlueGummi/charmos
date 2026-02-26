@@ -20,8 +20,8 @@ struct panic_regs {
     TEN_LINES TEN_LINES TEN_LINES TEN_LINES TEN_LINES TEN_LINES TEN_LINES      \
         TEN_LINES
 
-void k_panic_impl(const char *file, int line, const char *func, const char *fmt,
-                  ...);
+void panic_impl(const char *file, int line, const char *func, const char *fmt,
+                ...);
 
-#define k_panic(fmt, ...)                                                      \
-    k_panic_impl(__FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
+#define panic(fmt, ...)                                                      \
+    panic_impl(__FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)

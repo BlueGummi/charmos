@@ -225,7 +225,7 @@ void slab_cache_init(size_t order, struct slab_cache *cache, uint64_t obj_size,
     uint64_t available = PAGE_NON_SLAB_SPACE;
 
     if (cache->obj_size > available)
-        k_panic("Slab class too large, object size is %u with %u available "
+        panic("Slab class too large, object size is %u with %u available "
                 "bytes -- insufficient\n",
                 cache->obj_size, available);
 
@@ -244,7 +244,7 @@ void slab_cache_init(size_t order, struct slab_cache *cache, uint64_t obj_size,
     cache->objs_per_slab = n;
 
     if (cache->objs_per_slab == 0)
-        k_panic("Slab cache cannot hold any objects per slab!\n");
+        panic("Slab cache cannot hold any objects per slab!\n");
 
     INIT_LIST_HEAD(&cache->slabs[SLAB_FREE]);
     INIT_LIST_HEAD(&cache->slabs[SLAB_PARTIAL]);
@@ -419,11 +419,11 @@ static void *slab_try_alloc_from_slab_list(struct slab_cache *cache,
     list_for_each_safe(node, temp, list) {
         slab = slab_from_list_node(node);
         if (slab->parent_cache != cache)
-            k_printf("slab 0x%lx parent 0x%lx we are 0x%lx\n", slab,
+            printf("slab 0x%lx parent 0x%lx we are 0x%lx\n", slab,
                      slab->parent_cache, cache);
 
         if (slab->state == SLAB_FULL)
-            k_printf("slab 0x%lx full\n", slab);
+            printf("slab 0x%lx full\n", slab);
 
         ret = slab_alloc_from(cache, slab);
         if (ret)
@@ -497,7 +497,7 @@ static int slab_class_sort_cmp(const void *a, const void *b) {
     size_t r = scb->size;
 
     if (l == r)
-        k_panic("slab size %u from %s is the same as slab size %u from %s\n", l,
+        panic("slab size %u from %s is the same as slab size %u from %s\n", l,
                 sca->name, r, scb->name);
 
     return l - r;
@@ -513,7 +513,7 @@ void slab_allocator_init() {
     /* bootstrap VAS */
     slab_vas = vas_space_bootstrap(SLAB_HEAP_START, SLAB_HEAP_END);
     if (!slab_vas)
-        k_panic("Could not initialize slab VAS\n");
+        panic("Could not initialize slab VAS\n");
 
     struct slab_size_constant *start = __skernel_slab_sizes;
     struct slab_size_constant *end = __ekernel_slab_sizes;
@@ -598,7 +598,7 @@ size_t ksize(void *ptr) {
     vaddr_t vp = (vaddr_t) ptr;
 
     if (!(vp >= SLAB_HEAP_START && vp <= SLAB_HEAP_END))
-        k_panic("0x%lx out of bounds\n", vp);
+        panic("0x%lx out of bounds\n", vp);
 
     struct slab_page_hdr *hdr = slab_page_hdr_for_addr(ptr);
 
@@ -697,7 +697,7 @@ void slab_free_addr_to_cache(void *addr) {
 
     struct slab *slab = slab_for_ptr(addr);
     if (!slab)
-        k_panic("Likely double free of address 0x%lx\n", addr);
+        panic("Likely double free of address 0x%lx\n", addr);
 
     slab_free_old(slab, addr);
 }
@@ -866,7 +866,7 @@ void *slab_alloc(struct slab_cache *cache, enum alloc_behavior behavior,
 
     if (!alloc_behavior_may_fault(behavior) &&
         cache->type == SLAB_TYPE_PAGEABLE)
-        k_panic("picked pageable cache with non-fault tolerant behavior\n");
+        panic("picked pageable cache with non-fault tolerant behavior\n");
 
     enum irql irql = slab_cache_lock(cache);
 

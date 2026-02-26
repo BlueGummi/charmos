@@ -30,7 +30,7 @@ bool iso9660_parse_pvd(struct generic_partition *p,
 
     if (!disk->read_sector(disk, ISO9660_PVD_SECTOR + p->start_lba, buffer,
                            1)) {
-        k_printf("Failed to read ISO9660 PVD sector\n");
+        printf("Failed to read ISO9660 PVD sector\n");
         kfree(buffer, FREE_PARAMS_DEFAULT);
         return false;
     }
@@ -39,7 +39,7 @@ bool iso9660_parse_pvd(struct generic_partition *p,
 
     if (pvd->type != 1 || strncmp(pvd->id, "CD001", 5) != 0 ||
         pvd->version != 1) {
-        k_printf("Not a valid Primary Volume Descriptor\n");
+        printf("Not a valid Primary Volume Descriptor\n");
         kfree(buffer, FREE_PARAMS_DEFAULT);
         return false;
     }
@@ -54,30 +54,30 @@ static void print_str(const char *label, const char *src, uint64_t len) {
     char buf[65] = {0};
     memcpy(buf, src, len);
     buf[len] = '\0';
-    k_printf("%s: \"%s\"\n", label, buf);
+    printf("%s: \"%s\"\n", label, buf);
 }
 
 void iso9660_pvd_print(const struct iso9660_pvd *pvd) {
-    k_printf("=== ISO9660 Primary Volume Descriptor ===\n");
-    k_printf("Descriptor Type: %u\n", pvd->type);
-    k_printf("Identifier: %-5s\n", pvd->id);
-    k_printf("Version: %u\n", pvd->version);
+    printf("=== ISO9660 Primary Volume Descriptor ===\n");
+    printf("Descriptor Type: %u\n", pvd->type);
+    printf("Identifier: %-5s\n", pvd->id);
+    printf("Version: %u\n", pvd->version);
 
     print_str("System Identifier", pvd->system_id, 32);
     print_str("Volume Identifier", pvd->volume_id, 32);
 
-    k_printf("Volume Space Size: %u blocks\n", pvd->volume_space_le);
-    k_printf("Logical Block Size: %u bytes\n", pvd->logical_block_size_le);
+    printf("Volume Space Size: %u blocks\n", pvd->volume_space_le);
+    printf("Logical Block Size: %u bytes\n", pvd->logical_block_size_le);
 
-    k_printf("Volume Set Size: %u\n", pvd->vol_set_size_le);
-    k_printf("Volume Sequence Number: %u\n", pvd->vol_seq_num_le);
-    k_printf("Path Table Size: %u bytes\n", pvd->path_table_size_le);
+    printf("Volume Set Size: %u\n", pvd->vol_set_size_le);
+    printf("Volume Sequence Number: %u\n", pvd->vol_seq_num_le);
+    printf("Path Table Size: %u bytes\n", pvd->path_table_size_le);
 
-    k_printf("L Path Table Location: 0x%08X\n", pvd->l_path_table_loc);
-    k_printf("Optional L Path Table Location: 0x%08X\n",
+    printf("L Path Table Location: 0x%08X\n", pvd->l_path_table_loc);
+    printf("Optional L Path Table Location: 0x%08X\n",
              pvd->opt_l_path_table_loc);
-    k_printf("M Path Table Location: 0x%08X\n", pvd->m_path_table_loc);
-    k_printf("Optional M Path Table Location: 0x%08X\n",
+    printf("M Path Table Location: 0x%08X\n", pvd->m_path_table_loc);
+    printf("Optional M Path Table Location: 0x%08X\n",
              pvd->opt_m_path_table_loc);
 }
 
@@ -138,11 +138,11 @@ void iso9660_ls(struct iso9660_fs *fs, uint32_t lba, uint32_t size) {
         memcpy(name, rec->name, rec->name_len);
         name[rec->name_len] = '\0';
 
-        k_printf("  %s  (LBA: %u, Size: %u bytes, %s)\n", name,
+        printf("  %s  (LBA: %u, Size: %u bytes, %s)\n", name,
                  rec->extent_lba_le, rec->size_le,
                  (rec->flags & 0x02) ? "Directory" : "File");
         if (rec->flags & 0x02) {
-            k_printf("--Listing %s--\n", name);
+            printf("--Listing %s--\n", name);
             iso9660_ls(fs, rec->extent_lba_le, rec->size_le);
         }
 
@@ -215,12 +215,12 @@ void iso9660_read_and_print_file(struct iso9660_fs *fs, const char *name) {
     struct iso9660_dir_record *rec =
         iso9660_find(fs, name, fs->root_lba, fs->root_size);
     if (!rec) {
-        k_printf("File '%s' not found\n", name);
+        printf("File '%s' not found\n", name);
         return;
     }
 
     if (rec->flags & 0x02) {
-        k_printf("'%s' is a directory, not a file\n", name);
+        printf("'%s' is a directory, not a file\n", name);
         kfree(rec, FREE_PARAMS_DEFAULT);
         return;
     }
@@ -230,13 +230,13 @@ void iso9660_read_and_print_file(struct iso9660_fs *fs, const char *name) {
         return;
 
     if (!iso9660_read_file(fs, rec->extent_lba_le, rec->size_le, buf)) {
-        k_printf("Failed to read file contents\n");
+        printf("Failed to read file contents\n");
         kfree(buf, FREE_PARAMS_DEFAULT);
         kfree(rec, FREE_PARAMS_DEFAULT);
         return;
     }
 
-    k_printf("Contents of '%s':\n%.*s\n", name, rec->size_le, (char *) buf);
+    printf("Contents of '%s':\n%.*s\n", name, rec->size_le, (char *) buf);
 
     kfree(buf, FREE_PARAMS_DEFAULT);
     kfree(rec, FREE_PARAMS_DEFAULT);

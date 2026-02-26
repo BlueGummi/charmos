@@ -17,7 +17,7 @@ uint64_t elf_load(const void *elf_data) {
     struct elf64_ehdr *ehdr = (struct elf64_ehdr *) elf_data;
 
     if (ehdr->ident.magic != ELF_MAGIC || ehdr->ident.class != 2) {
-        k_printf("Invalid ELF64\n");
+        printf("Invalid ELF64\n");
         return 0;
     }
 
@@ -69,7 +69,7 @@ void elf_map(uintptr_t user_pml4_phys, void *elf_data) {
 
             uintptr_t phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
             if (!phys)
-                k_panic("Failed to allocate page for user ELF segment\n");
+                panic("Failed to allocate page for user ELF segment\n");
 
             void *phys_mapped = vmm_map_phys(phys, PAGE_SIZE, 0, VMM_FLAG_NONE);
             memset(phys_mapped, 0, PAGE_SIZE);
@@ -106,7 +106,7 @@ uintptr_t map_user_stack(uintptr_t user_pml4_phys) {
     for (uintptr_t v = stack_bottom; v < USER_STACK_TOP; v += PAGE_SIZE) {
         uintptr_t phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
         if (!phys)
-            k_panic("Failed to alloc user stack\n");
+            panic("Failed to alloc user stack\n");
 
         vmm_map_page_user(user_pml4_phys, v, phys,
                           PAGING_WRITE | PAGING_USER_ALLOWED | PAGING_PRESENT,

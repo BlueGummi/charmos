@@ -94,5 +94,5 @@ void ioapic_init(void) {
         remaining -= entry->length;
     }
 
-    k_panic("no I/O APIC entry found in MADT");
+    panic("no I/O APIC entry found in MADT");
 }

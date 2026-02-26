@@ -55,7 +55,7 @@ attach_work_to_cpus(struct scheduler_periodic_work_linker_object *spwlo) {
         struct scheduler_periodic_work *w = kzalloc(
             sizeof(struct scheduler_periodic_work), ALLOC_PARAMS_DEFAULT);
         if (!w)
-            k_panic("OOM\n");
+            panic("OOM\n");
 
         pairing_node_init(&w->pnode);
         linker_object_work_to_work(spwlo, w);

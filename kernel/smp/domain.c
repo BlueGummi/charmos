@@ -25,7 +25,7 @@ static void init_global_domain(uint64_t domain_count) {
     global.domains =
         kzalloc(sizeof(struct domain *) * domain_count, ALLOC_PARAMS_DEFAULT);
     if (!global.domains)
-        k_panic("Cannot allocate core domains\n");
+        panic("Cannot allocate core domains\n");
 
     for (size_t i = 0; i < domain_count; i++) {
 
@@ -34,7 +34,7 @@ static void init_global_domain(uint64_t domain_count) {
         global.domains[i] =
             kzalloc(PAGE_ALIGN_UP(sizeof(struct domain)), ALLOC_PARAMS_DEFAULT);
         if (!global.domains[i])
-            k_panic("Cannot allocate core domain %u\n");
+            panic("Cannot allocate core domain %u\n");
 
         global.domains[i]->id = i;
     }
@@ -85,7 +85,7 @@ static void construct_domains_from_cores(void) {
                             ALLOC_PARAMS_DEFAULT);
 
         if (!cd->cores)
-            k_panic("Cannot allocate core array for domain %zu\n", i);
+            panic("Cannot allocate core array for domain %zu\n", i);
 
         for (size_t j = 0; j < cores_this_domain; j++) {
             global.cores[core_index]->domain = cd;

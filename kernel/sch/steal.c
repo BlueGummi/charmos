@@ -9,7 +9,7 @@
 #include "internal.h"
 #include "sched_profiling.h"
 
-bool scheduler_can_steal_thread(size_t core, struct thread *target) {
+bool scheduler_can_take_thread(size_t core, struct thread *target) {
     if (thread_get_flags(target) & THREAD_FLAGS_NO_STEAL)
         return false;
 
@@ -73,7 +73,7 @@ static struct thread *steal_from_thread_rbt(struct scheduler *victim,
         /* we must first set the thread as `being_moved` before we
          * check if we can steal the thread... */
         spin_lock_raw(&target->being_moved);
-        if (!scheduler_can_steal_thread(smp_core_id(), target)) {
+        if (!scheduler_can_take_thread(smp_core_id(), target)) {
             spin_unlock_raw(&target->being_moved);
             continue;
         }
@@ -116,7 +116,7 @@ static struct thread *steal_from_special_threads(struct scheduler *victim,
         struct thread *t = thread_from_rq_list_node(pos);
 
         spin_lock_raw(&t->being_moved);
-        if (!scheduler_can_steal_thread(core, t)) {
+        if (!scheduler_can_take_thread(core, t)) {
             spin_unlock_raw(&t->being_moved);
             continue;
         }

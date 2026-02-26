@@ -121,9 +121,6 @@ Headers should use the `#pragma once` guard, as this is widely supported and eas
 
 ### Prefix functions by group
 
-Kernel-specific implementations of functions typically present in userspace C-stdlibs should have the `k_` or `k` prefix.
-This may avoid collisions once userspace functions are introduced, and also clarifies that it is a kernel implementation.
-
 For symbols used in macros, prefer the `__` prefix to avoid clashes, and for symbols provided externally, such as from the linker, prefer the `__` prefix as well. 
 
 Larger, more specific names are acceptable in cases where they provide information and reduce collisions, such as with `ps2_kb_` and `usb_kb_`, as opposed to just `kb_`.

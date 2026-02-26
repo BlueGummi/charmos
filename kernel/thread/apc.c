@@ -67,7 +67,7 @@ static inline bool thread_is_dying(struct thread *t) {
 
 static bool thread_apc_sanity_check(struct thread *t) {
     if (unlikely(thread_get_state(t) == THREAD_STATE_IDLE_THREAD))
-        k_panic("Attempted to put an APC on the idle thread");
+        panic("Attempted to put an APC on the idle thread");
 
     if (unlikely(thread_is_dying(t)))
         return false;

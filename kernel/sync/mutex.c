@@ -67,7 +67,7 @@ void mutex_simple_unlock(struct mutex_simple *m) {
     enum irql irql = spin_lock(&m->lock);
 
     if (m->owner != curr) {
-        k_panic("mutex unlock by non-owner thread");
+        panic("mutex unlock by non-owner thread");
     }
 
     m->owner = NULL;
@@ -212,7 +212,7 @@ void mutex_unlock(struct mutex *mutex) {
     struct thread *current_thread = thread_get_current();
 
     if (mutex_get_owner(mutex) != current_thread)
-        k_panic("non-owner thread tried to unlock mutex. mutex owner is 0x%lx, "
+        panic("non-owner thread tried to unlock mutex. mutex owner is 0x%lx, "
                 "current thread is 0x%lx\n",
                 mutex_get_owner(mutex), current_thread);
 

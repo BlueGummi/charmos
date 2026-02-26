@@ -4,7 +4,7 @@
 #define slab_check_assert_return_false(statement)                              \
     do {                                                                       \
         if (!(statement)) {                                                    \
-            k_printf("%s is false\n", #statement);                             \
+            printf("%s is false\n", #statement);                               \
             return false;                                                      \
         }                                                                      \
     } while (0)

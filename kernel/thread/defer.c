@@ -115,11 +115,11 @@ void defer_init(void) {
         kzalloc(sizeof(struct deferred_event_queue) * hpet_timer_count,
                 ALLOC_PARAMS_DEFAULT);
     if (!defer_queues)
-        k_panic("Defer queue allocation failed!\n");
+        panic("Defer queue allocation failed!\n");
 
     struct cpu_mask mask;
     if (!cpu_mask_init(&mask, global.core_count))
-        k_panic("workqueue creation failed\n");
+        panic("workqueue creation failed\n");
 
     cpu_mask_set_all(&mask);
     struct workqueue_attributes attrs = {

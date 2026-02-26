@@ -85,7 +85,7 @@ void thread_migrate(struct thread *t, size_t dest_core) {
     bool unlock = true;
 
     /* bro cannot be migrated */
-    if (!scheduler_can_steal_thread(dest_core, t)) {
+    if (!scheduler_can_take_thread(dest_core, t)) {
         goto out;
     }
 

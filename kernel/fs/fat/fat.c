@@ -257,9 +257,9 @@ void fat_g_print(struct generic_partition *d) {
     success = fat_write_dirent(fs, fs->root_cluster, &new_file_ent, ind);
 
     if (success) {
-        k_printf("yay\n");
+        printf("yay\n");
     } else {
-        k_printf("that not right...\n");
+        printf("that not right...\n");
     }
     fat_list_root(fs);
 }

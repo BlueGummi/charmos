@@ -35,7 +35,7 @@ void isr_common_entry(uint8_t vector, struct irq_context *rsp) {
 
     struct irq_desc *desc = &irq_table[vector];
     if (!desc->present || list_empty(&irq_table[vector].actions))
-        k_panic("Unhandled ISR vector: %u\n", vector);
+        panic("Unhandled ISR vector: %u\n", vector);
 
     bool handled = false;
     struct list_head *lh;
@@ -79,13 +79,13 @@ void irq_register(char *name, uint8_t vector, irq_handler_t handler, void *ctx,
     me->enabled = true;
 
     if (was && !(flags & IRQ_FLAG_SHARED))
-        k_panic("need to be shared to have many, registered by %s\n", me->name);
+        panic("need to be shared to have many, registered by %s\n", me->name);
 
     struct irq_action *act =
         kzalloc(sizeof(struct irq_action), ALLOC_PARAMS_DEFAULT);
 
     if (!act)
-        k_panic("OOM - TODO: make this dynamic\n");
+        panic("OOM - TODO: make this dynamic\n");
 
     act->handler = handler;
     INIT_LIST_HEAD(&act->list);
@@ -104,7 +104,7 @@ void irq_set_chip(uint8_t vec, struct irq_chip *chip, void *data) {
     enum irql irql = spin_lock(&irq_table_lock);
 
     if (irq_table[vec].chip && chip)
-        k_panic("IRQ chip %u exists\n", vec);
+        panic("IRQ chip %u exists\n", vec);
 
     irq_table[vec].chip = chip;
     irq_table[vec].chip_data = data;
@@ -205,10 +205,10 @@ void irq_init() {
     for (size_t i = 0; i < IDT_ENTRIES; i++) {
         struct irq_desc *desc = &irq_table[i];
         if (!cpu_mask_init(&desc->masked_cpus, global.core_count))
-            k_panic("OOM\n");
+            panic("OOM\n");
 
         if (!cpu_mask_init(&desc->affinity, global.core_count))
-            k_panic("OOM\n");
+            panic("OOM\n");
 
         desc->vector = i;
         irq_desc_clear(desc);

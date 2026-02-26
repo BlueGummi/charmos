@@ -45,7 +45,7 @@ void thread_exit() {
 
     /* acquire the ref - yield will drop it once it's done */
     if (!thread_get(self))
-        k_panic("What? Thread is already dying but has not exited\n");
+        panic("What? Thread is already dying but has not exited\n");
 
     atomic_store(&self->state, THREAD_STATE_ZOMBIE);
     atomic_store_explicit(&self->dying, true, memory_order_release);

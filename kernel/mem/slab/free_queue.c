@@ -16,7 +16,7 @@ void slab_free_queue_init(struct slab_domain *domain, struct slab_free_queue *q,
     q->slots =
         kzalloc(sizeof(struct slab_free_slot) * capacity, ALLOC_PARAMS_DEFAULT);
     if (!q->slots)
-        k_panic("Could not allocate slab free queue slots!\n");
+        panic("Could not allocate slab free queue slots!\n");
 
     atomic_store(&q->head, 0);
     atomic_store(&q->tail, 0);

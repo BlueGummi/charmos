@@ -12,7 +12,6 @@ typedef fx16_16_t climb_pressure_t;
 struct climb_handle;
 
 #define CLIMB_BOOST_LEVELS 20
-#define CLIMB_BOOST_BUDGET_MAX CLIMB_BOOST_LEVELS
 #define CLIMB_MIN_GLOBAL_BOOST 1
 #define CLIMB_REINSERT_THRESHOLD 2
 #define CLIMB_GLOBAL_BOOST_SCALE(nthread) (CLIMB_BOOST_LEVELS / nthread)
@@ -89,7 +88,7 @@ struct climb_source {
 
 /* Indirect pressure scaling */
 #define CLIMB_INDIRECT_MIN_SCALE FX(0.10)
-#define CLIMB_INDIRECT_WEIGHT FX(0.50)
+#define CLIMB_INDIRECT_WEIGHT FX(0.85)
 
 /* Boost space */
 #define CLIMB_BOOST_LEVEL_MAX 20
@@ -98,7 +97,8 @@ struct climb_source {
 #define CLIMB_BOOST_EWMA_ALPHA FX(0.75)
 
 /* Pressure to boost shaping */
-#define CLIMB_PRESSURE_EXPONENT 2 /* quadratic */
+#define CLIMB_PRESSURE_EXPONENT 3 /* cubic */
+#define CLIMB_PRESSURE_TO_BOOST_SCALE FX(8.0)
 
 #define CLIMB_SOURCE_EXTERN(name) extern struct climb_source __climb_src_##name
 #define CLIMB_SOURCE_CREATE(n, strname, b)                                     \

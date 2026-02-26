@@ -3,9 +3,9 @@
                                            struct irq_context *rsp) {          \
         (void) ctx, (void) vector, (void) rsp;                                 \
         uint64_t core = smp_core_id();                                         \
-        k_printf("\n=== " #handler_name " fault! ===\n");                      \
-        k_printf("Message -> %s\n", message);                                  \
-        k_panic("Core %u faulted\n", core);                                    \
+        printf("\n=== " #handler_name " fault! ===\n");                        \
+        printf("Message -> %s\n", message);                                    \
+        panic("Core %u faulted\n", core);                                    \
         while (true) {                                                         \
             wait_for_interrupt();                                              \
         }                                                                      \

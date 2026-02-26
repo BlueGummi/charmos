@@ -39,7 +39,7 @@ struct vfs_node *dummy_mount(struct generic_partition *p) {
 }
 
 void dummy_print(struct generic_partition *p) {
-    k_printf("error: filesystem \"%s\" not implemented\n",
+    printf("error: filesystem \"%s\" not implemented\n",
              detect_fstr(p->disk->fs_type));
 }
 

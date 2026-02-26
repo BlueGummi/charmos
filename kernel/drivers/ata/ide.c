@@ -39,7 +39,7 @@ static void swap_str(char *dst, const uint16_t *src, uint64_t word_len) {
 void ide_identify(struct ata_drive *drive) {
     uint16_t *buf = kmalloc(256 * sizeof(uint16_t), ALLOC_PARAMS_DEFAULT);
     if (unlikely(!buf))
-        k_panic("IDE identify buffer allocation failed\n");
+        panic("IDE identify buffer allocation failed\n");
 
     uint16_t io = drive->io_base;
 
@@ -152,7 +152,7 @@ struct generic_disk *ide_create_generic(struct ata_drive *ide) {
     struct generic_disk *d =
         kmalloc(sizeof(struct generic_disk), ALLOC_PARAMS_DEFAULT);
     if (unlikely(!d))
-        k_panic("IDE drive allocation failed!\n");
+        panic("IDE drive allocation failed!\n");
 
     d->driver_data = ide;
     d->sector_size = ide->sector_size;
@@ -164,7 +164,7 @@ struct generic_disk *ide_create_generic(struct ata_drive *ide) {
 
     d->cache = kzalloc(sizeof(struct bcache), ALLOC_PARAMS_DEFAULT);
     if (!d->cache)
-        k_panic("Could not allocate space for IDE drive block cache\n");
+        panic("Could not allocate space for IDE drive block cache\n");
 
     d->scheduler = bio_sched_create(d, &ide_bio_ops);
 

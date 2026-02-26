@@ -148,11 +148,11 @@ TEST_REGISTER(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
     for (size_t i = 0; i < BIO_SCHED_TEST_RUNS; i++)
         for (size_t j = 0; j < BIO_SCHED_TEST_RUNS; j++)
             if (i != j && rqs[i] == rqs[j])
-                k_printf("duplicate at %u and %u\n", i, j);
+                printf("duplicate at %u and %u\n", i, j);
 
     for (size_t i = 0; i < BIO_SCHED_TEST_RUNS; i++) {
         if (!rqs[i]->disk) {
-            k_printf("rq 0x%lx %u\n", rqs[i], i);
+            printf("rq 0x%lx %u\n", rqs[i], i);
             SET_SUCCESS();
             return;
         }

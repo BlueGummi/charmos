@@ -1,11 +1,24 @@
 /* @title: Real-time scheduling */
 #pragma once
+#include <log.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <structures/list.h>
 #include <thread/thread_types.h>
+
+LOG_SITE_EXTERN(rt_sched);
+LOG_HANDLE_EXTERN(rt_sched);
+
+#define rt_sched_log(lvl, fmt, ...)                                            \
+    log(LOG_SITE(rt_sched), LOG_HANDLE(rt_sched), lvl, fmt, ##__VA_ARGS__)
+
+#define rt_sched_err(fmt, ...) rt_sched_log(LOG_ERROR, fmt, ##__VA_ARGS__)
+#define rt_sched_warn(fmt, ...) rt_sched_log(LOG_WARN, fmt, ##__VA_ARGS__)
+#define rt_sched_info(fmt, ...) rt_sched_log(LOG_INFO, fmt, ##__VA_ARGS__)
+#define rt_sched_debug(fmt, ...) rt_sched_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
+#define rt_sched_trace(fmt, ...) rt_sched_log(LOG_TRACE, fmt, ##__VA_ARGS__)
 
 /* We'll want to define a structure that contains the operations
  * that real-time schedulers are meant to implement, and then
@@ -18,6 +31,23 @@ struct rt_scheduler_percpu;
 typedef void (*rt_scheduler_fn)(struct rt_scheduler_percpu *);
 typedef void (*rt_scheduler_thread_fn)(struct rt_scheduler_percpu *,
                                        struct thread *);
+
+/* This enum defines *what* the realtime scheduler will tell you from
+ * functions. For example, when it summarizes itself and produces a
+ * `struct rt_thread_summary` it will also send along an error
+ * with it, denoting any internal happening, e.g. not being able
+ * to migrate threads because of deadline reasons... */
+enum rt_scheduler_error {
+    /* Negative: Failure w/ message */
+
+    RT_SCHEDULER_OK = 0,
+
+    /* Positive: Success w/ message */
+};
+
+struct rt_thread_summary_core {};
+
+struct rt_thread_summary_ext {};
 
 struct rt_scheduler_ops {
     rt_scheduler_fn init;          /* Called at boot time */

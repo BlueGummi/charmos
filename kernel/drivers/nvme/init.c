@@ -95,12 +95,12 @@ void nvme_alloc_admin_queues(struct nvme_device *nvme) {
 
 void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
     if (!qid)
-        k_panic("Can't allocate IO queue zero!\n");
+        panic("Can't allocate IO queue zero!\n");
 
     nvme->io_queues[qid] =
         kzalloc(sizeof(struct nvme_queue), ALLOC_PARAMS_DEFAULT);
     if (unlikely(!nvme->io_queues[qid]))
-        k_panic("NVMe IO queue allocation failed!\n");
+        panic("NVMe IO queue allocation failed!\n");
 
     struct nvme_queue *this_queue = nvme->io_queues[qid];
 
@@ -139,7 +139,7 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
         kzalloc(sizeof(struct nvme_request *) * this_queue->sq_depth,
                 ALLOC_PARAMS_DEFAULT);
     if (!this_queue->sq_requests)
-        k_panic("OOM\n");
+        panic("OOM\n");
 
     // complete queue
     struct nvme_command cq_cmd = {0};

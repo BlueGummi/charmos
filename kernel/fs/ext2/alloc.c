@@ -146,7 +146,7 @@ bool ext2_free_inode(struct ext2_fs *fs, uint32_t inode_num) {
     uint8_t bit = 1 << (index % 8);
     if (!(bitmap[byte] & bit)) {
         bcache_ent_release(ent);
-        k_printf("ext2: Inode %u already free\n", inode_num + 1);
+        printf("ext2: Inode %u already free\n", inode_num + 1);
         return false;
     }
 

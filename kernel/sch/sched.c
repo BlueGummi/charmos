@@ -134,7 +134,7 @@ static inline bool migrate_to_destination(struct thread *t, time_t time) {
     /* we must uphold this because other CPUs will expect being_moved
      * to be `true` as long as the thread could possibly be getting migrated */
     if (!spinlock_held(&t->being_moved)) {
-        k_panic("being_moved flag not true, migrate_to %zu from %zu\n", dst,
+        panic("being_moved flag not true, migrate_to %zu from %zu\n", dst,
                 smp_core_id());
     }
 

@@ -18,7 +18,7 @@ paddr_t bitmap_alloc_page() {
 paddr_t bitmap_alloc_pages(uint64_t count, enum alloc_flags flags) {
     (void) flags;
     if (count == 0)
-        k_panic("Zero pages requested\n");
+        panic("Zero pages requested\n");
 
     uint64_t consecutive = 0;
     uint64_t start_index = 0;
@@ -72,14 +72,14 @@ paddr_t bitmap_alloc_pages(uint64_t count, enum alloc_flags flags) {
 
 void bitmap_free_pages(paddr_t addr, uint64_t count) {
     if (addr == 0 || count == 0) {
-        k_panic("Possible UAF\n");
+        panic("Possible UAF\n");
     }
 
     uint64_t start_index = (uint64_t) addr / PAGE_SIZE;
 
     if (start_index >= bitmap_size * 8 ||
         start_index + count > bitmap_size * 8) {
-        k_printf("Invalid address range to free: 0x%zx with count %zu\n",
+        printf("Invalid address range to free: 0x%zx with count %zu\n",
                  (uint64_t) addr, count);
         return;
     }
@@ -89,7 +89,7 @@ void bitmap_free_pages(paddr_t addr, uint64_t count) {
         if (test_bit(index)) {
             clear_bit(index);
         } else {
-            k_printf("Page at 0x%zx was already free\n",
+            printf("Page at 0x%zx was already free\n",
                      global.hhdm_offset + (index * PAGE_SIZE));
         }
     }

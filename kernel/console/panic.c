@@ -35,26 +35,26 @@ void panic_handler(struct panic_regs *regs) {
 
 static struct spinlock panic_lock = SPINLOCK_INIT;
 
-void k_panic_impl(const char *file, int line, const char *func, const char *fmt,
+void panic_impl(const char *file, int line, const char *func, const char *fmt,
                   ...) {
     disable_interrupts();
 
     spin_lock_raw(&panic_lock);
     atomic_store(&global.panicked, true);
 
-    k_printf("\n" EIGHTY_LINES "\n");
-    k_printf("\n                                [" ANSI_BG_RED
+    printf("\n" EIGHTY_LINES "\n");
+    printf("\n                                [" ANSI_BG_RED
              "KERNEL PANIC" ANSI_RESET "] @ time %llu\n",
              time_get_ms());
-    k_printf(ANSI_RED "%s\n" ANSI_RESET, OS_LOGO_PANIC_CENTERED);
+    printf(ANSI_RED "%s\n" ANSI_RESET, OS_LOGO_PANIC_CENTERED);
 
     panic_entry();
 
-    k_printf("    [" ANSI_BRIGHT_BLUE "AT" ANSI_RESET " ");
+    printf("    [" ANSI_BRIGHT_BLUE "AT" ANSI_RESET " ");
     time_print_current();
-    k_printf("]\n");
+    printf("]\n");
 
-    k_printf("    [" ANSI_BRIGHT_GREEN "FROM" ANSI_RESET "] " ANSI_GREEN
+    printf("    [" ANSI_BRIGHT_GREEN "FROM" ANSI_RESET "] " ANSI_GREEN
              "%s" ANSI_RESET ":" ANSI_GREEN "%d" ANSI_RESET ":" ANSI_CYAN
              "%s()" ANSI_RESET "\n"
              "    [" ANSI_YELLOW "MESSAGE" ANSI_RESET "] ",
@@ -62,12 +62,12 @@ void k_panic_impl(const char *file, int line, const char *func, const char *fmt,
 
     va_list args;
     va_start(args, fmt);
-    k_vprintf(NULL, fmt, args);
+    vprintf(NULL, fmt, args);
     va_end(args);
 
     debug_print_stack();
 
-    k_printf("\n" EIGHTY_LINES "\n");
+    printf("\n" EIGHTY_LINES "\n");
 
     spin_unlock_raw(&panic_lock);
     while (true)

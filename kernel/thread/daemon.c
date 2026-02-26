@@ -130,12 +130,12 @@ void daemon_main(void *a) {
         case DAEMON_THREAD_COMMAND_RESTART: goto start_execute;
         case DAEMON_THREAD_COMMAND_EXIT: daemon_thread_exit(daemon, self);
         default:
-            k_panic("Unknown daemon thread command with value %u\n",
+            panic("Unknown daemon thread command with value %u\n",
                     self->command);
         }
     }
 
-    k_panic("Daemon thread should not be able to exit the loop\n");
+    panic("Daemon thread should not be able to exit the loop\n");
 }
 
 struct daemon_thread *daemon_thread_create(struct daemon *daemon) {
@@ -203,7 +203,7 @@ struct daemon *daemon_create(const char *fmt, struct daemon_attributes *attrs,
         goto err;
 
     if (attrs->thread_cpu_mask.nbits == 0)
-        k_panic("please set a valid CPU mask\n");
+        panic("please set a valid CPU mask\n");
 
     daemon->attrs = *attrs;
 
@@ -364,17 +364,17 @@ void daemon_wake_timesharing_worker(struct daemon *daemon) {
 
 void daemon_print(struct daemon *daemon) {
     struct daemon_attributes *attrs = &daemon->attrs;
-    k_printf("struct daemon \"%s\" = {\n",
+    printf("struct daemon \"%s\" = {\n",
              daemon->name ? daemon->name : "NULL");
-    k_printf("    .attrs = {\n");
-    k_printf("                  .max_timesharing_threads = %u\n",
+    printf("    .attrs = {\n");
+    printf("                  .max_timesharing_threads = %u\n",
              attrs->max_timesharing_threads);
-    k_printf("                  .idle_timesharing_threads = %u\n",
+    printf("                  .idle_timesharing_threads = %u\n",
              attrs->idle_timesharing_threads);
-    k_printf("                  .timesharing_threads = %u\n",
+    printf("                  .timesharing_threads = %u\n",
              attrs->timesharing_threads);
-    k_printf("                  .flags = 0b%b\n", attrs->flags);
-    k_printf("             }\n");
-    k_printf("    .state = %s\n", daemon_state_str(daemon->state));
-    k_printf("}\n");
+    printf("                  .flags = 0b%b\n", attrs->flags);
+    printf("             }\n");
+    printf("    .state = %s\n", daemon_state_str(daemon->state));
+    printf("}\n");
 }

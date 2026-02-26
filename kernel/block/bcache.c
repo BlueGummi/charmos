@@ -419,5 +419,5 @@ void bcache_init(struct bcache *cache, uint64_t capacity) {
     cache->entries = kzalloc(sizeof(struct bcache_wrapper *) * capacity,
                              ALLOC_PARAMS_DEFAULT);
     if (!cache->entries)
-        k_panic("Block cache initialization allocation failed\n");
+        panic("Block cache initialization allocation failed\n");
 }

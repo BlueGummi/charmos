@@ -47,8 +47,7 @@ struct kernel_test {
 #define TEST_ASSERT(x)                                                         \
     do {                                                                       \
         if (!(x)) {                                                            \
-            k_printf(" assert \"%s\" failed at %s:%d ", #x, __FILE__,          \
-                     __LINE__);                                                \
+            printf(" assert \"%s\" failed at %s:%d ", #x, __FILE__, __LINE__); \
             return;                                                            \
         }                                                                      \
     } while (0)

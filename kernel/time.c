@@ -47,7 +47,7 @@ void time_print_unix(uint32_t timestamp) {
     uint32_t minute = timestamp / 60;
     uint32_t second = timestamp % 60;
 
-    k_printf("%04d-%02d-%02d %02d:%02d:%02d", year, month + 1, day, hour,
+    printf("%04d-%02d-%02d %02d:%02d:%02d", year, month + 1, day, hour,
              minute, second);
 }
 void time_print_current() {

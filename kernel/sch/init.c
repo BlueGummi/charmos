@@ -23,14 +23,14 @@ void scheduler_init(void) {
     global.schedulers = kmalloc(sizeof(struct scheduler *) * global.core_count,
                                 ALLOC_PARAMS_DEFAULT);
     if (!global.schedulers)
-        k_panic("Could not allocate scheduler pointer array\n");
+        panic("Could not allocate scheduler pointer array\n");
 
     size_t i;
     for_each_cpu_id(i) {
         struct scheduler *s =
             kzalloc(sizeof(struct scheduler), ALLOC_PARAMS_DEFAULT);
         if (!s)
-            k_panic("Could not allocate scheduler %lu\n", i);
+            panic("Could not allocate scheduler %lu\n", i);
 
         rbt_init(&s->thread_rbt, scheduler_thread_get_data);
         rbt_init(&s->completed_rbt, scheduler_thread_get_data);

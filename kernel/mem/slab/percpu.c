@@ -170,7 +170,7 @@ void slab_domain_percpu_init(struct slab_domain *domain) {
     domain->percpu_caches = kzalloc(sizeof(struct slab_percpu_cache *) * cpus,
                                     ALLOC_PARAMS_DEFAULT);
     if (!domain->percpu_caches)
-        k_panic("Could not allocate domain's percpu caches\n");
+        panic("Could not allocate domain's percpu caches\n");
 
     for (size_t i = 0; i < cpus; i++) {
         domain->percpu_caches[i] =
@@ -180,7 +180,7 @@ void slab_domain_percpu_init(struct slab_domain *domain) {
                     ALLOC_PARAMS_DEFAULT);
 
         if (!domain->percpu_caches[i] || !domain->percpu_caches[i]->mag)
-            k_panic("Could not allocate domain's percpu caches\n");
+            panic("Could not allocate domain's percpu caches\n");
 
         domain->percpu_caches[i]->domain = domain;
         for (size_t j = 0; j < slab_num_sizes; j++) {

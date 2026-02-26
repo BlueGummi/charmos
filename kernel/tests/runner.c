@@ -46,8 +46,8 @@ static void run(bool run_units, struct kernel_test *start,
             continue;
 
         current_test = t;
-        k_printf("[%-4d]: ", i);
-        k_printf("%s... ", t->name);
+        printf("[%-4d]: ", i);
+        printf("%s... ", t->name);
 
         uint64_t start_ms = time_get_ms();
         /* supa important */
@@ -55,25 +55,25 @@ static void run(bool run_units, struct kernel_test *start,
         uint64_t end_ms = time_get_ms();
 
         if (t->skipped) {
-            k_printf(ANSI_GRAY " skipped  " ANSI_RESET);
+            printf(ANSI_GRAY " skipped  " ANSI_RESET);
             skip_count++;
         } else if (t->success != t->should_fail) {
-            k_printf(ANSI_GREEN " ok  " ANSI_RESET);
+            printf(ANSI_GREEN " ok  " ANSI_RESET);
             pass_count++;
         } else {
-            k_printf(ANSI_RED " error  " ANSI_RESET);
+            printf(ANSI_RED " error  " ANSI_RESET);
             fail_count++;
         }
 
         total_time += (end_ms - start_ms);
-        k_printf("(%llu ms)\n", end_ms - start_ms);
+        printf("(%llu ms)\n", end_ms - start_ms);
 
         if (t->message_count > 0) {
             for (uint64_t i = 0; i < t->message_count; i++) {
-                k_printf("        +-> ");
-                k_printf(ANSI_YELLOW "%s" ANSI_RESET "\n", t->messages[i]);
+                printf("        +-> ");
+                printf(ANSI_YELLOW "%s" ANSI_RESET "\n", t->messages[i]);
             }
-            k_printf("\n");
+            printf("\n");
         }
         i++;
     }

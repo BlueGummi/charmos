@@ -33,7 +33,7 @@ static void rcu_reader_thread(void *) {
             if (v != 42 && v != 43) {
                 atomic_store(&rcu_test_failed, true);
                 ADD_MESSAGE("RCU reader saw invalid value");
-                k_printf("%d\n", v);
+                printf("%d\n", v);
             }
         }
 
@@ -139,7 +139,7 @@ static void rcu_stress_reader(void *arg) {
             if (v != 42 && v != 43) {
                 atomic_store(&stress_failed, true);
                 ADD_MESSAGE("RCU stress reader saw invalid value");
-                k_printf("RCU stress reader observed invalid value %d, "
+                printf("RCU stress reader observed invalid value %d, "
                          "freed during gen %zu enqueued_on %zu currently "
                          "started gen %zu quiescent for gen %zu\nat a nesting "
                          "depth of %zu\n",
@@ -157,7 +157,7 @@ static void rcu_stress_reader(void *arg) {
 
         if (time_get_ms() - last_print > STRESS_PRINT_MS) {
             last_print = time_get_ms();
-            k_printf(
+            printf(
                 "\'%-20s\' on iteration %7zu w/ %7zu replacements and %7zu frees\n",
                 thread_get_current()->name, iter, stress_replacements,
                 stress_deferred_freed);
@@ -168,7 +168,7 @@ static void rcu_stress_reader(void *arg) {
         iter++;
     }
 
-    k_printf("RCU stress reader %s left, %u remaining\n",
+    printf("RCU stress reader %s left, %u remaining\n",
              thread_get_current()->name,
              STRESS_NUM_READERS - stress_readers_done - 1);
 
@@ -282,7 +282,7 @@ TEST_REGISTER(rcu_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         sleep_ms(1);
     }
 
-    k_printf("RCU stress test: replacements=%u freed=%u\n",
+    printf("RCU stress test: replacements=%u freed=%u\n",
              (unsigned) atomic_load(&stress_replacements),
              (unsigned) atomic_load(&stress_deferred_freed));
 

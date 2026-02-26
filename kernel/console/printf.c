@@ -72,7 +72,7 @@ void double_print(struct flanterm_context *f, struct printf_cursor *csr,
         flanterm_write(f, str, len);
 }
 
-void k_printf_init(struct limine_framebuffer *fb) {
+void printf_init(struct limine_framebuffer *fb) {
     (void) fb;
     serial_init();
     ft_ctx = flanterm_fb_init(
@@ -81,7 +81,7 @@ void k_printf_init(struct limine_framebuffer *fb) {
         fb->green_mask_shift, fb->blue_mask_size, fb->blue_mask_shift, NULL,
         NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 1, 0, 0, 0);
 
-    k_printf("%s", OS_LOGO_SMALL);
+    printf("%s", OS_LOGO_SMALL);
 }
 
 static int print_signed(char *buffer, int64_t num) {
@@ -402,7 +402,7 @@ static void handle_format_specifier(struct printf_cursor *csr,
     *format_ptr = format;
 }
 
-void k_vprintf(struct printf_cursor *csr, const char *format, va_list args) {
+void vprintf(struct printf_cursor *csr, const char *format, va_list args) {
     while (*format) {
         if (*format == '%') {
             format++;
@@ -418,13 +418,13 @@ void k_vprintf(struct printf_cursor *csr, const char *format, va_list args) {
     }
 }
 
-void k_printf(const char *format, ...) {
+void printf(const char *format, ...) {
     bool i = are_interrupts_enabled();
     disable_interrupts();
     spin_lock_raw(&k_printf_lock);
     va_list args;
     va_start(args, format);
-    k_vprintf(NULL, format, args);
+    vprintf(NULL, format, args);
     va_end(args);
     spin_unlock_raw(&k_printf_lock);
 
@@ -443,7 +443,7 @@ int vsnprintf(char *buffer, int buffer_len, const char *format, va_list args) {
         .cursor = 0,
     };
 
-    k_vprintf(&csr, format, args);
+    vprintf(&csr, format, args);
 
     if (buffer)
         csr.buffer[csr.cursor] = '\0';
@@ -464,23 +464,11 @@ int snprintf(char *buffer, int buffer_len, const char *format, ...) {
         .cursor = 0,
     };
 
-    k_vprintf(&csr, format, args);
+    vprintf(&csr, format, args);
     va_end(args);
 
     if (buffer)
         csr.buffer[csr.cursor] = '\0';
 
     return csr.cursor;
-}
-
-void panic(const char *format, ...) {
-    va_list args;
-    va_start(args, format);
-    k_vprintf(NULL, format, args);
-    va_end(args);
-
-    while (true) {
-        disable_interrupts();
-        wait_for_interrupt();
-    }
 }

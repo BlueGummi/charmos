@@ -46,7 +46,7 @@ static inline bool refcount_dec_and_test(refcount_t *rc) {
     while (true) {
         unsigned int old = atomic_load(rc);
         if (old == 0) {
-            k_panic("possible UAF\n");
+            panic("possible UAF\n");
             return false;
         }
 
@@ -73,7 +73,7 @@ static inline bool refcount_dec_and_test(refcount_t *rc) {
                                                                                \
             /* panic if refcount is zero (possible UAF) */                     \
             if (!old) {                                                        \
-                k_panic("possible UAF\n");                                     \
+                panic("possible UAF\n");                                     \
             }                                                                  \
                                                                                \
             /* check failure before attempting to increment */                 \

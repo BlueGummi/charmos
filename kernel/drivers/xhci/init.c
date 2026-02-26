@@ -287,7 +287,7 @@ struct xhci_device *xhci_device_create(void *mmio) {
     struct xhci_device *dev =
         kzalloc(sizeof(struct xhci_device), ALLOC_PARAMS_DEFAULT);
     if (unlikely(!dev))
-        k_panic("Could not allocate space for XHCI device");
+        panic("Could not allocate space for XHCI device");
 
     struct xhci_cap_regs *cap = mmio;
     struct xhci_op_regs *op = mmio + cap->cap_length;

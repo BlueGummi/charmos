@@ -51,11 +51,15 @@ static inline struct rbt *climb_tree_local() {
  * boost_clamp(level)
  */
 static inline int32_t climb_pressure_to_boost_target(climb_pressure_t p) {
+    /* The pressure is between 0..1, so this doesn't do much
+     * with minor boosts. We have the BOOST_SCALE for config. purposes */
+
+    p = fx_mul(p, CLIMB_PRESSURE_TO_BOOST_SCALE);
     climb_pressure_t shaped = fx_pow_i32(p, CLIMB_PRESSURE_EXPONENT);
 
     int32_t level = fx_to_int(fx_mul(shaped, FX(CLIMB_BOOST_LEVEL_MAX)));
-    CLAMP(level, 0, CLIMB_BOOST_LEVEL_MAX);
 
+    CLAMP(level, 0, CLIMB_BOOST_LEVEL_MAX);
     return level;
 }
 
@@ -81,8 +85,7 @@ static void update_fields(struct climb_thread_state *cts) {
     /* EWMA */
     cts->boost_ewma = CLIMB_EWMA(cts->boost_ewma, target);
     cts->wanted_boost = fx_to_int(cts->boost_ewma);
-    cts->pressure_ewma = CLIMB_EWMA(
-        cts->pressure_ewma, cts->indirect_pressure + cts->direct_pressure);
+    cts->pressure_ewma = CLIMB_EWMA(cts->pressure_ewma, p);
 }
 
 climb_pressure_t climb_thread_applied_pressure(struct thread *t) {
@@ -229,13 +232,13 @@ static void remove_handle(struct thread *t, struct climb_handle *ch) {
     struct scheduler *sched = global.schedulers[t->last_ran];
 
     if (!rbt_has_node(&sched->climb_threads, &cts->climb_node)) {
-        k_printf("Tree:\n");
+        printf("Tree:\n");
         struct rbt_node *node;
         rbt_for_each(node, &sched->climb_threads) {
-            k_printf("node 0x%lx\n", node);
+            printf("node 0x%lx\n", node);
         }
 
-        k_panic("0x%lx, (thread 0x%lx) is not on tree when handle "
+        panic("0x%lx, (thread 0x%lx) is not on tree when handle "
                 "was removed by 0x%lx\n",
                 cts, t, thread_get_current());
     }
@@ -451,6 +454,7 @@ static struct climb_summary summarize_and_advance(struct rbt *tree) {
 
         if (iter->pressure_periods > 0) {
             ret.total_periods_spent += iter->pressure_periods;
+            iter->pressure_periods++;
         } else {
             maybe_remove_node(tree, iter);
         }

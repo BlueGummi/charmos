@@ -165,6 +165,11 @@ struct thread {
     struct cpu_context regs;
 
     /* ========== Transparent structure nodes ========== */
+
+    /* TODO: Use unions and combine these. Do make sure to keep
+     * in mind that all nodes get need to get
+     * reset if unions are to be used */
+
     struct list_head reaper_list; /* reaper list */
     struct list_head thread_list; /* global list of threads */
 
@@ -474,7 +479,7 @@ REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(thread, refcount, dying,
 static inline void thread_put(struct thread *t) {
     if (refcount_dec_and_test(&t->refcount)) {
         if (thread_get_state(t) != THREAD_STATE_TERMINATED)
-            k_panic("final ref dropped while thread not terminated\n");
+            panic("final ref dropped while thread not terminated\n");
 
         thread_free(t);
     }

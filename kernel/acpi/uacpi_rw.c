@@ -18,7 +18,7 @@ uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
     }
 
     if (address.segment != 0) {
-        k_printf("PCI segment %u not supported\n", address.segment);
+        printf("PCI segment %u not supported\n", address.segment);
         return UACPI_STATUS_INVALID_ARGUMENT;
     }
 

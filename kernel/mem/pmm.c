@@ -23,7 +23,7 @@ __no_sanitize_address void pmm_early_init(struct limine_memmap_request m) {
     memmap = m.response;
 
     if (memmap == NULL || memmap->entries == NULL) {
-        k_panic("Failed to retrieve Limine memory map\n");
+        panic("Failed to retrieve Limine memory map\n");
         return;
     }
 

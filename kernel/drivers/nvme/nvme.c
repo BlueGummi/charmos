@@ -27,7 +27,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     bool is_io = original_bar0 & 1;
 
     if (is_io) {
-        k_panic("doesnt look like mmio to me");
+        panic("doesnt look like mmio to me");
     }
 
     pci_write(bus, slot, func, 0x10, 0xFFFFFFFF);
@@ -36,7 +36,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     uint32_t size = ~(size_mask & ~0xFU) + 1;
 
     if (size == 0) {
-        k_panic("bar0 reports zero size ?");
+        panic("bar0 reports zero size ?");
     }
 
     uint64_t phys_addr =
@@ -54,7 +54,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     struct nvme_device *nvme =
         kzalloc(sizeof(struct nvme_device), ALLOC_PARAMS_DEFAULT);
     if (!nvme)
-        k_panic("Could not allocate space for NVMe drive\n");
+        panic("Could not allocate space for NVMe drive\n");
 
     nvme->doorbell_stride = 4U << dstrd;
     nvme->page_size = PAGE_SIZE;
@@ -66,7 +66,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme->io_queues =
         kzalloc(sizeof(struct nvme_queue *), ALLOC_PARAMS_DEFAULT);
     if (!nvme->io_queues)
-        k_panic("Could not allocate space for NVMe IO queues\n");
+        panic("Could not allocate space for NVMe IO queues\n");
 
     nvme->admin_sq_db =
         (uint32_t *) ((uint8_t *) nvme->regs + NVME_DOORBELL_BASE);
@@ -111,7 +111,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme->io_queues = kzalloc(sizeof(struct nvme_queue *) * sqs_to_make,
                               ALLOC_PARAMS_DEFAULT);
     if (unlikely(!nvme->isr_index || !nvme->io_queues))
-        k_panic("Could not allocate space for NVMe structures");
+        panic("Could not allocate space for NVMe structures");
 
     nvme->queue_count = sqs_to_make;
 
@@ -133,7 +133,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
 
     struct cpu_mask mask;
     if (!cpu_mask_init(&mask, global.core_count))
-        k_panic("Could not initialize CPU mask\n");
+        panic("Could not initialize CPU mask\n");
 
     cpu_mask_set_all(&mask);
 
@@ -152,7 +152,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
 
     nvme->workqueue = workqueue_create("nvme_wq", &attrs);
     if (!nvme->workqueue)
-        k_panic("Could not allocate workqueue\n");
+        panic("Could not allocate workqueue\n");
 
     semaphore_init(&nvme->sem, 0, SEMAPHORE_INIT_IRQ_DISABLE);
     nvme_work_enqueue(nvme, &nvme->work);
@@ -198,7 +198,7 @@ struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {
     struct generic_disk *d =
         kzalloc(sizeof(struct generic_disk), ALLOC_PARAMS_DEFAULT);
     if (!d)
-        k_panic("Could not allocate space for NVMe device\n");
+        panic("Could not allocate space for NVMe device\n");
 
     d->driver_data = nvme;
     d->sector_size = nvme->sector_size;
@@ -208,7 +208,7 @@ struct generic_disk *nvme_create_generic(struct nvme_device *nvme) {
     d->flags = DISK_FLAG_NO_REORDER | DISK_FLAG_NO_COALESCE;
     d->cache = kzalloc(sizeof(struct bcache), ALLOC_PARAMS_DEFAULT);
     if (unlikely(!d->cache))
-        k_panic("Could not allocate space for NVMe block cache\n");
+        panic("Could not allocate space for NVMe block cache\n");
 
     d->scheduler = bio_sched_create(d, &nvme_bio_sched_ops);
 

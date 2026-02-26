@@ -28,7 +28,7 @@ uint64_t tsc_freq = 0;
 
 #define panic_if_error(x)                                                      \
     if (uacpi_unlikely_error(x))                                               \
-        k_panic("uACPI initialization failed!\n");
+        panic("uACPI initialization failed!\n");
 
 static uint64_t our_rsdp = 0;
 void uacpi_init(uint64_t rsdp) {
@@ -44,7 +44,7 @@ void uacpi_init(uint64_t rsdp) {
 uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
 
     if (our_rsdp == 0) {
-        k_printf("no rsdp set\n");
+        printf("no rsdp set\n");
         return UACPI_STATUS_INTERNAL_ERROR;
     }
     *out_rsdp_address = our_rsdp;
@@ -63,10 +63,10 @@ void uacpi_kernel_unmap(void *addr, uacpi_size len) {
 
 void uacpi_kernel_log(uacpi_log_level level, const uacpi_char *data) {
     switch (level) {
-    case UACPI_LOG_ERROR: k_printf(">> UACPI ERROR: %s", data); break;
-    case UACPI_LOG_TRACE: k_printf(">> UACPI TRACE: %s", data); break;
-    case UACPI_LOG_INFO: k_printf(">> UACPI INFO: %s", data); break;
-    case UACPI_LOG_WARN: k_printf(">> UACPI WARN: %s", data); break;
+    case UACPI_LOG_ERROR: printf(">> UACPI ERROR: %s", data); break;
+    case UACPI_LOG_TRACE: printf(">> UACPI TRACE: %s", data); break;
+    case UACPI_LOG_INFO: printf(">> UACPI INFO: %s", data); break;
+    case UACPI_LOG_WARN: printf(">> UACPI WARN: %s", data); break;
     default: break;
     }
 }

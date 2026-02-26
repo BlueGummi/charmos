@@ -43,7 +43,7 @@ static void enqueue_pt_free(paddr_t phys) {
 
     struct pt_deferred_free *n = kmalloc(sizeof(*n), ALLOC_PARAMS_DEFAULT);
     if (!n)
-        k_panic("OOM freeing page table");
+        panic("OOM freeing page table");
 
     n->phys = phys;
     n->epoch = atomic_load_explicit(&global.pt_epoch, memory_order_relaxed);
@@ -119,7 +119,7 @@ static inline struct page_table *alloc_pt(void) {
 uintptr_t vmm_make_user_pml4(void) {
     struct page_table *user_pml4 = alloc_pt();
     if (!user_pml4) {
-        k_panic("Failed to allocate user pml4");
+        panic("Failed to allocate user pml4");
     }
     memset(user_pml4, 0, PAGE_SIZE);
 
@@ -134,7 +134,7 @@ void vmm_init(struct limine_memmap_response *memmap,
               struct limine_executable_address_response *xa) {
     kernel_pml4 = alloc_pt();
     if (!kernel_pml4)
-        k_panic("Could not allocate space for kernel PML4\n");
+        panic("Could not allocate space for kernel PML4\n");
 
     kernel_pml4_phys = (uintptr_t) kernel_pml4 - global.hhdm_offset;
     memset(kernel_pml4, 0, PAGE_SIZE);
@@ -154,7 +154,7 @@ void vmm_init(struct limine_memmap_response *memmap,
         e = vmm_map_page(kernel_virt_start + i, kernel_phys_start + i,
                          PAGING_WRITE | PAGING_PRESENT, VMM_FLAG_NONE);
         if (e < 0)
-            k_panic("Error %s whilst mapping kernel\n", errno_to_str(e));
+            panic("Error %s whilst mapping kernel\n", errno_to_str(e));
     }
 
     for (uint64_t addr = kernel_virt_start; addr < kernel_virt_end;
@@ -198,7 +198,7 @@ void vmm_init(struct limine_memmap_response *memmap,
                 phys += PAGE_SIZE;
             }
             if (e < 0)
-                k_panic("Error %s whilst mapping kernel\n", errno_to_str(e));
+                panic("Error %s whilst mapping kernel\n", errno_to_str(e));
         }
     }
 
@@ -239,7 +239,7 @@ void page_table_unlock(struct page_table *pt, enum irql irql) {
 enum errno vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags,
                             enum vmm_flags vflags) {
     if (virt == 0 || (virt & 0x1FFFFF) || (phys & 0x1FFFFF))
-        k_panic(
+        panic(
             "vmm_map_2mb_page: addresses must be 2MiB aligned and non-zero\n");
 
     struct page_table *tables[3];
@@ -289,7 +289,7 @@ out:
 
 void vmm_unmap_2mb_page(uintptr_t virt, enum vmm_flags vflags) {
     if (virt & (PAGE_2MB - 1))
-        k_panic("vmm_unmap_2mb_page: virtual address not 2MiB aligned!\n");
+        panic("vmm_unmap_2mb_page: virtual address not 2MiB aligned!\n");
 
     struct page_table *tables[3];
     pte_t *entries[3];
@@ -345,7 +345,7 @@ out:
 enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags,
                         enum vmm_flags vflags) {
     if (virt == 0)
-        k_panic("CANNOT MAP PAGE 0x0!!!\n");
+        panic("CANNOT MAP PAGE 0x0!!!\n");
 
     enum errno ret = ERR_OK;
     struct page_table *tables[4]; // PML4, PDPT, PD, PT
@@ -393,7 +393,7 @@ out:
 void vmm_map_page_user(uintptr_t pml4_phys, uintptr_t virt, uintptr_t phys,
                        uint64_t flags, enum vmm_flags vflags) {
     if (virt == 0) {
-        k_panic("CANNOT MAP PAGE 0x0!!!\n");
+        panic("CANNOT MAP PAGE 0x0!!!\n");
     }
 
     struct page_table *current_table =

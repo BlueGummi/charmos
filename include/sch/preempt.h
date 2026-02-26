@@ -9,7 +9,7 @@ static inline uint32_t scheduler_preemption_disable(void) {
         atomic_fetch_add(&cpu->scheduler_preemption_disable_depth, 1);
 
     if (old == UINT32_MAX) {
-        k_panic("overflow\n");
+        panic("overflow\n");
     }
 
     return old + 1;

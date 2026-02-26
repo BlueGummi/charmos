@@ -137,12 +137,12 @@ void scheduler_domains_dump(void) {
 
             cpu_mask_print(&grp->idle, buf2, sizeof(buf2));
 
-            k_printf(
+            printf(
                 "  Group %zu: CPUs = %s Idle = %s Parent = %d Capacity = %d\n",
                 g, buf1, buf2, grp->parent_index, grp->capacity);
         }
 
-        k_printf("\n");
+        printf("\n");
     }
 }
 

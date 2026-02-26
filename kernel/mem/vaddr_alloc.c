@@ -17,7 +17,7 @@ static void vasrange_refill(struct vas_space *space) {
     SPINLOCK_ASSERT_HELD(&space->lock);
     uintptr_t phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
     if (!phys)
-        k_panic("OOM allocating vas_range page");
+        panic("OOM allocating vas_range page");
 
     uintptr_t virt = phys + global.hhdm_offset;
     struct vas_range *ranges = (struct vas_range *) virt;
@@ -48,7 +48,7 @@ __no_sanitize_address struct vas_space *vas_space_bootstrap(vaddr_t base,
                                                             vaddr_t limit) {
     uintptr_t phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
     if (!phys)
-        k_panic("OOM creating vas_space");
+        panic("OOM creating vas_space");
 
     uintptr_t virt = phys + global.hhdm_offset;
 
@@ -132,5 +132,5 @@ void vas_free(struct vas_space *vas, vaddr_t addr) {
         }
     }
 
-    k_panic("invalid free of 0x%lx\n", addr);
+    panic("invalid free of 0x%lx\n", addr);
 }

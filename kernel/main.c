@@ -57,7 +57,7 @@ __no_sanitize_address void k_main(void) {
     global.hhdm_offset = hhdm_request.response->offset;
     global.pt_epoch = 1;
 
-    k_printf_init(framebuffer_request.response->framebuffers[0]);
+    printf_init(framebuffer_request.response->framebuffers[0]);
     bootstage_advance(BOOTSTAGE_EARLY_FB);
 
     pmm_early_init(memmap_request);

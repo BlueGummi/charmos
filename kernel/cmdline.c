@@ -52,12 +52,12 @@ void cmdline_parse(const char *input) {
 
         if (strcmp(var_buf, "root") == 0) {
             if (global.root_partition)
-                k_panic(
+                panic(
                     "Cannot have multiple root entries in the command line\n");
 
             char *val = kmalloc(strlen(val_buf) + 1, ALLOC_PARAMS_DEFAULT);
             if (!val)
-                k_panic("Could not allocate space for command line parsing\n");
+                panic("Could not allocate space for command line parsing\n");
 
             memcpy(val, val_buf, strlen(val_buf) + 1);
             global.root_partition = val;

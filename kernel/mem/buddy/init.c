@@ -162,7 +162,7 @@ static void mid_init_buddy(size_t pages_needed) {
     }
 
     if (!global.page_array)
-        k_panic("Failed to allocate buddy metadata");
+        panic("Failed to allocate buddy metadata");
 }
 
 void buddy_init(void) {

@@ -15,7 +15,7 @@ void *simple_alloc(struct vas_space *space, size_t size) {
         paddr_t phys = phys_base + (i * PAGE_SIZE);
         if (vmm_map_page(virt, phys, PAGING_PRESENT | PAGING_WRITE,
                          VMM_FLAG_NONE) < 0)
-            k_panic("Could not do simple_alloc!\n");
+            panic("Could not do simple_alloc!\n");
     }
 
     memset((void *) area, 0, size);

@@ -26,7 +26,7 @@ void srat_init(void) {
         global.numa_nodes =
             kzalloc(sizeof(struct numa_node), ALLOC_PARAMS_DEFAULT);
         if (!global.numa_nodes)
-            k_panic("OOM Whilst allocating NUMA node array");
+            panic("OOM Whilst allocating NUMA node array");
 
         global.numa_nodes[0].topo = NULL;
         global.numa_nodes[0].mem_base = 0;
@@ -71,7 +71,7 @@ void srat_init(void) {
     global.numa_nodes = kzalloc(numa_node_count * sizeof(struct numa_node),
                                 ALLOC_PARAMS_DEFAULT);
     if (!global.numa_nodes)
-        k_panic("OOM Whilst allocating NUMA node array");
+        panic("OOM Whilst allocating NUMA node array");
 
     for (size_t i = 0; i < numa_node_count; i++) {
         global.numa_nodes[i].topo = NULL;
@@ -82,7 +82,7 @@ void srat_init(void) {
             kzalloc(numa_node_count * sizeof(uint8_t), ALLOC_PARAMS_DEFAULT);
 
         if (!global.numa_nodes[i].distance)
-            k_panic("OOM whilst allocating NUMA node array");
+            panic("OOM whilst allocating NUMA node array");
     }
 
     ptr = (uint8_t *) srat + sizeof(struct acpi_srat);

@@ -61,24 +61,24 @@ static const char *find_symbol(uint64_t addr, uint64_t *out_sym_addr) {
 static void k_printf_from_log(const char *fmt, const uint64_t *args,
                               uint8_t nargs) {
     switch (nargs) {
-    case 0: k_printf(fmt); break;
-    case 1: k_printf(fmt, args[0]); break;
-    case 2: k_printf(fmt, args[0], args[1]); break;
-    case 3: k_printf(fmt, args[0], args[1], args[2]); break;
-    case 4: k_printf(fmt, args[0], args[1], args[2], args[3]); break;
-    case 5: k_printf(fmt, args[0], args[1], args[2], args[3], args[4]); break;
+    case 0: printf(fmt); break;
+    case 1: printf(fmt, args[0]); break;
+    case 2: printf(fmt, args[0], args[1]); break;
+    case 3: printf(fmt, args[0], args[1], args[2]); break;
+    case 4: printf(fmt, args[0], args[1], args[2], args[3]); break;
+    case 5: printf(fmt, args[0], args[1], args[2], args[3], args[4]); break;
     case 6:
-        k_printf(fmt, args[0], args[1], args[2], args[3], args[4], args[5]);
+        printf(fmt, args[0], args[1], args[2], args[3], args[4], args[5]);
         break;
     case 7:
-        k_printf(fmt, args[0], args[1], args[2], args[3], args[4], args[5],
+        printf(fmt, args[0], args[1], args[2], args[3], args[4], args[5],
                  args[6]);
         break;
     case 8:
-        k_printf(fmt, args[0], args[1], args[2], args[3], args[4], args[5],
+        printf(fmt, args[0], args[1], args[2], args[3], args[4], args[5],
                  args[6], args[7]);
         break;
-    default: k_printf("<invalid nargs>");
+    default: printf("<invalid nargs>");
     }
 }
 
@@ -86,30 +86,30 @@ static void log_dump_record(const struct log_record *rec,
                             const struct log_dump_opts opts) {
     size_t sec = MS_TO_SECONDS(rec->timestamp);
     size_t msec = rec->timestamp % 1000;
-    k_printf("[%llu.%03llu] %s%-5s%s ", sec, msec, log_level_color(rec->level),
+    printf("[%llu.%03llu] %s%-5s%s ", sec, msec, log_level_color(rec->level),
              log_level_str[rec->level], ANSI_RESET);
 
     if (opts.show_cpu)
-        k_printf("cpu=%u ", rec->cpu);
+        printf("cpu=%u ", rec->cpu);
 
     if (opts.show_tid)
-        k_printf("tid=%u ", rec->tid);
+        printf("tid=%u ", rec->tid);
 
     if (opts.show_irql)
-        k_printf("irql=%d ", rec->logged_at_irql);
+        printf("irql=%d ", rec->logged_at_irql);
 
     /* message */
     if (opts.show_args && rec->fmt) {
         k_printf_from_log(rec->fmt, rec->args, rec->nargs);
     } else if (rec->handle && rec->handle->msg) {
-        k_printf("%s", rec->handle->msg);
+        printf("%s", rec->handle->msg);
     }
 
     if (opts.show_caller) {
-        k_printf(" <+ at %s()", rec->caller_fn);
+        printf(" <+ at %s()", rec->caller_fn);
     }
 
-    k_printf("\n");
+    printf("\n");
 }
 
 static inline bool log_ringbuf_try_enqueue(struct log_ringbuf *rb,
@@ -187,7 +187,7 @@ void log_dump_site(struct log_site *site, struct log_dump_opts opts) {
             continue;
 
         if (site->dropped) {
-            k_printf("!! dropped %u log records !!\n", site->dropped);
+            printf("!! dropped %u log records !!\n", site->dropped);
         }
 
         log_dump_record(&rec, opts);
@@ -305,7 +305,7 @@ void log_emit_internal(struct log_site *site, struct log_handle *handle,
     if ((ll & LOG_PANIC) && level >= LOG_ERROR) {
         log_dump_all();
         debug_print_stack();
-        k_panic("fatal log event");
+        panic("fatal log event");
     }
 
     log_site_put(site);
@@ -323,7 +323,7 @@ void log_sites_init(void) {
         lrb->slots = kzalloc(sizeof(struct log_ring_slot) * lrb->capacity,
                              ALLOC_PARAMS_DEFAULT);
         if (!lrb->slots)
-            k_panic("OOM\n");
+            panic("OOM\n");
 
         for (size_t i = 0; i < lrb->capacity; i++) {
             atomic_store_explicit(&lrb->slots[i].seq, i, memory_order_release);
@@ -420,7 +420,7 @@ void debug_print_stack(void) {
             uint64_t sym_addr;
             const char *sym = find_symbol(val, &sym_addr);
             if (sym) {
-                k_printf("    [0x%016lx] %s+0x%lx (sp=0x%016lx)\n", val, sym,
+                printf("    [0x%016lx] %s+0x%lx (sp=0x%016lx)\n", val, sym,
                          val - sym_addr, (uint64_t) addr);
                 hits++;
             }
@@ -428,19 +428,19 @@ void debug_print_stack(void) {
     }
 
     if (hits == 0)
-        k_printf("  <no kernel symbols found>\n");
+        printf("  <no kernel symbols found>\n");
 }
 
 void debug_print_memory(void *addr, uint64_t size) {
     uint8_t *ptr = (uint8_t *) addr;
-    k_printf("Memory at 0x%lx:\n", (uint64_t) addr);
+    printf("Memory at 0x%lx:\n", (uint64_t) addr);
     for (uint64_t i = 0; i < size; i++) {
         if (i % 16 == 0) {
             if (i != 0)
-                k_printf("\n");
-            k_printf("0x%lx: ", (uint64_t) (ptr + i));
+                printf("\n");
+            printf("0x%lx: ", (uint64_t) (ptr + i));
         }
-        k_printf("%02x ", ptr[i]);
+        printf("%02x ", ptr[i]);
     }
-    k_printf("\n");
+    printf("\n");
 }

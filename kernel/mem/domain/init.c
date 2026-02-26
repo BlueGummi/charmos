@@ -178,26 +178,26 @@ static void domain_structs_init(struct domain_buddy *dom, size_t arena_capacity,
                                 struct domain *core_domain) {
     dom->free_area = alloc_up(sizeof(struct free_area) * MAX_ORDER);
     if (!dom->free_area)
-        k_panic("Failed to allocate domain free area\n");
+        panic("Failed to allocate domain free area\n");
 
     dom->zonelist.entries =
         alloc_up(sizeof(struct domain_zonelist_entry) * global.domain_count);
     if (!dom->zonelist.entries)
-        k_panic("Failed to allocate domain zonelist entries\n");
+        panic("Failed to allocate domain zonelist entries\n");
 
     dom->arenas = alloc_up(sizeof(struct domain_arena *) * dom->core_count);
     if (!dom->arenas)
-        k_panic("Failed to allocate domain arena\n");
+        panic("Failed to allocate domain arena\n");
 
     for (size_t i = 0; i < dom->core_count; i++) {
         dom->arenas[i] = alloc_up(sizeof(struct domain_arena));
         if (!dom->arenas[i])
-            k_panic("Failed to allocate domain arena\n");
+            panic("Failed to allocate domain arena\n");
 
         struct domain_arena *this = dom->arenas[i];
         this->pages = alloc_up(sizeof(struct page *) * arena_capacity);
         if (!this->pages)
-            k_panic("Failed to allocate domain arena pages\n");
+            panic("Failed to allocate domain arena pages\n");
 
         this->head = 0;
         this->tail = 0;
@@ -211,12 +211,12 @@ static void domain_structs_init(struct domain_buddy *dom, size_t arena_capacity,
 
     dom->free_queue = alloc_up(sizeof(struct domain_free_queue));
     if (!dom->free_queue)
-        k_panic("Failed to allocate domain free queue\n");
+        panic("Failed to allocate domain free queue\n");
 
     size_t fq_size = sizeof(*dom->free_queue->queue) * fq_capacity;
     dom->free_queue->queue = alloc_up(fq_size);
     if (!dom->free_queue->queue)
-        k_panic("Failed to allocate domain free queue array\n");
+        panic("Failed to allocate domain free queue array\n");
 
     dom->free_queue->head = 0;
     dom->free_queue->tail = 0;
@@ -356,7 +356,7 @@ void domain_buddy_dump(void) {
     for (size_t i = 0; i < global.domain_count; i++) {
         struct domain_buddy *dom = &global.domain_buddies[i];
         struct domain_buddy_stats *stat = &dom->stats;
-        k_printf("Domain %u stats: %u allocs, %u failed, %u interleaved, %u "
+        printf("Domain %u stats: %u allocs, %u failed, %u interleaved, %u "
                  "remote, %u frees, %u pages used, %u total pages\n",
                  i, stat->alloc_count, stat->failed_alloc_count,
                  stat->interleaved_alloc_count, stat->remote_alloc_count,

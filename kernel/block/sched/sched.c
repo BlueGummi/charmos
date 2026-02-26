@@ -91,7 +91,7 @@ struct bio_scheduler *bio_sched_create(struct generic_disk *disk,
     struct bio_scheduler *sched =
         kzalloc(sizeof(struct bio_scheduler), ALLOC_PARAMS_DEFAULT);
     if (!sched)
-        k_panic("Could not allocate space for block device IO scheduler\n");
+        panic("Could not allocate space for block device IO scheduler\n");
 
     for (size_t i = 0; i < BIO_SCHED_LEVELS; i++) {
         INIT_LIST_HEAD(&sched->queues[i].list);

@@ -16,7 +16,7 @@ static inline uint32_t scheduler_preemption_disable(void) {
         atomic_fetch_add(&cpu->scheduler_preemption_disable_depth, 1);
 
     if (old == UINT32_MAX) {
-        k_panic("overflow\n");
+        panic("overflow\n");
     }
 
     return old + 1;
@@ -29,7 +29,7 @@ static inline uint32_t scheduler_preemption_enable(void) {
         atomic_fetch_sub(&cpu->scheduler_preemption_disable_depth, 1);
 
     if (old == 0) {
-        k_panic("underflow\n");
+        panic("underflow\n");
     }
 
     return old - 1;
@@ -54,7 +54,7 @@ enum irql irql_raise(enum irql new_level) {
             disable_interrupts();
 
     } else if (new_level < old) {
-        k_panic("Raising to lower IRQL, from %s to %s\n", irql_to_str(old),
+        panic("Raising to lower IRQL, from %s to %s\n", irql_to_str(old),
                 irql_to_str(new_level));
     }
 
@@ -100,7 +100,7 @@ void irql_lower(enum irql new_level) {
             scheduler_resched_if_needed();
 
     } else if (new_level > old) {
-        k_panic("Lowering to higher IRQL, from %s to %s\n", irql_to_str(old),
+        panic("Lowering to higher IRQL, from %s to %s\n", irql_to_str(old),
                 irql_to_str(new_level));
     }
 }

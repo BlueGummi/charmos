@@ -87,7 +87,7 @@ static void enqueue_thread(void *) {
 TEST_REGISTER(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct cpu_mask mask;
     if (!cpu_mask_init(&mask, global.core_count))
-        k_panic("OOM\n");
+        panic("OOM\n");
 
     cpu_mask_set_all(&mask);
 
@@ -105,11 +105,11 @@ TEST_REGISTER(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     wq = workqueue_create(NULL, &attrs);
 
     for (size_t i = 0; i < WQ_2_THREADS; i++) {
-        k_printf("spawning workqueue enqueue threads\n");
+        printf("spawning workqueue enqueue threads\n");
         thread_spawn("workqueue_enqueue_thread", enqueue_thread, NULL);
     }
 
-    k_printf("yielding\n");
+    printf("yielding\n");
     thread_apply_cpu_penalty(thread_get_current());
     while (atomic_load(&threads_left) > 0) {
         scheduler_yield();
@@ -121,7 +121,7 @@ TEST_REGISTER(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     snprintf(msg, 100, "There are %d workers", workers);
     ADD_MESSAGE(msg);
 
-    k_printf("destroy\n");
+    printf("destroy\n");
     workqueue_destroy(wq);
     SET_SUCCESS();
 }

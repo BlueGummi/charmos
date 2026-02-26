@@ -75,7 +75,7 @@ static void tty_keyboard_emit(struct generic_keyboard *kbd, uint32_t keycode,
     char ch =
         shift ? keycode_to_ascii_shifted[keycode] : keycode_to_ascii[keycode];
 
-    k_printf("%c", ch);
+    printf("%c", ch);
 }
 
 static bool key_in_report(uint8_t key, const struct usb_kbd_report *r) {

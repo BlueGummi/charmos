@@ -103,7 +103,7 @@ void load_context(struct cpu_context *new);
 void save_context(struct cpu_context *new);
 
 bool scheduler_can_steal_work(struct scheduler *sched);
-bool scheduler_can_steal_thread(size_t core, struct thread *target);
+bool scheduler_can_take_thread(size_t core, struct thread *target);
 uint64_t scheduler_compute_steal_threshold();
 struct thread *scheduler_try_do_steal(struct scheduler *sched);
 

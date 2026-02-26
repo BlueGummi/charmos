@@ -52,8 +52,7 @@ static inline bool chaos_log_allow(uint64_t *last_ns, uint32_t *burst) {
         static uint64_t _last_ns;                                              \
         static uint32_t _burst;                                                \
         if (chaos_log_allow(&_last_ns, &_burst))                               \
-            k_printf("[chaos %llu ms] " fmt "\n", time_get_ms(),               \
-                     ##__VA_ARGS__);                                           \
+            printf("[chaos %llu ms] " fmt "\n", time_get_ms(), ##__VA_ARGS__); \
     } while (0)
 
 /* ------------------------------------
@@ -126,7 +125,7 @@ static void chaos_waker(void *a) {
 
         CHAOS_LOG("waker wake 0x%lx", s->t);
         thread_wake(s->t, THREAD_WAKE_REASON_SLEEP_MANUAL,
-                       s->t->perceived_prio_class, (void *) cookie);
+                    s->t->perceived_prio_class, (void *) cookie);
         CHAOS_LOG("waker wake done");
 
         thread_put(s->t);

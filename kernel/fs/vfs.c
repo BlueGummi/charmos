@@ -44,20 +44,20 @@ static void mount_table_remove(struct vfs_mount *mnt) {
 
 void vfs_node_print(const struct vfs_node *node) {
     if (!node) {
-        k_printf("vfs_node: (null)\n");
+        printf("vfs_node: (null)\n");
         return;
     }
 
-    k_printf("=== VFS Node ===\n");
-    k_printf("Type     : %s (%d)\n", detect_fstr(node->fs_type), node->fs_type);
-    k_printf("Open     : %s\n", node->open_handles ? "Yes" : "No");
-    k_printf("Flags    : 0x%08X\n", node->flags);
-    k_printf("Mode     : 0%o\n", node->mode);
-    k_printf("Size     : %llu bytes\n", (unsigned long long) node->size);
-    k_printf("FS Data  : 0x%llx\n", node->fs_data);
-    k_printf("FS Node  : 0x%llx\n", node->fs_node_data);
-    k_printf("Ops Table: 0x%llx\n", (void *) node->ops);
-    k_printf("=================\n");
+    printf("=== VFS Node ===\n");
+    printf("Type     : %s (%d)\n", detect_fstr(node->fs_type), node->fs_type);
+    printf("Open     : %s\n", node->open_handles ? "Yes" : "No");
+    printf("Flags    : 0x%08X\n", node->flags);
+    printf("Mode     : 0%o\n", node->mode);
+    printf("Size     : %llu bytes\n", (unsigned long long) node->size);
+    printf("FS Data  : 0x%llx\n", node->fs_data);
+    printf("FS Node  : 0x%llx\n", node->fs_node_data);
+    printf("Ops Table: 0x%llx\n", (void *) node->ops);
+    printf("=================\n");
 }
 
 static struct vfs_mount *find_mount_for_node(struct vfs_node *node) {

@@ -40,12 +40,12 @@ static void change_slab_backing_page(void *ptr) {
     if (slab_size_to_index(ksize(ptr)) == -1)
         return;
 
-    k_panic("Moved allocations cannot come from slab\n");
+    panic("Moved allocations cannot come from slab\n");
 }
 
 void movealloc(size_t new_domain, void *ptr, enum vmm_flags flags) {
     if (global.current_bootstage >= BOOTSTAGE_COMPLETE)
-        k_panic("movealloc cannot be called after boot completes\n");
+        panic("movealloc cannot be called after boot completes\n");
 
     struct domain *d = global.domains[new_domain];
     size_t size = ksize(ptr);
@@ -58,7 +58,7 @@ void movealloc(size_t new_domain, void *ptr, enum vmm_flags flags) {
         paddr_t paddr = vmm_get_phys(vaddr, flags);
         paddr_t new_phys = domain_alloc_from_domain(d, 1);
         if (!new_phys)
-            k_panic("movealloc failed!\n");
+            panic("movealloc failed!\n");
 
         vaddr_t new_virt = phys_get_virt(new_phys);
         void *pvaddr = (void *) vaddr;

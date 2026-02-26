@@ -17,18 +17,18 @@ void numa_dump(void) {
     log_msg(LOG_INFO, "NUMA distance matrix (%zu nodes):", n);
     log_msg(LOG_INFO, "Displayed as distance (relative distance):", n);
 
-    k_printf("     ");
+    printf("     ");
     for (size_t j = 0; j < n; j++)
-        k_printf("%11zu", j);
-    k_printf("\n");
+        printf("%11zu", j);
+    printf("\n");
 
     for (size_t i = 0; i < n; i++) {
-        k_printf("%4zu: ", i);
+        printf("%4zu: ", i);
         for (size_t j = 0; j < n; j++) {
-            k_printf("%4u (%4u)", global.numa_nodes[i].distance[j],
+            printf("%4u (%4u)", global.numa_nodes[i].distance[j],
                      global.numa_nodes[i].rel_dists[j]);
         }
-        k_printf("\n");
+        printf("\n");
     }
 }
 
@@ -49,7 +49,7 @@ void numa_construct_relative_distances(struct numa_node *node) {
     node->rel_dists = kzalloc(node->distances_cnt, ALLOC_PARAMS_DEFAULT);
     uint8_t *tmp = kzalloc(node->distances_cnt, ALLOC_PARAMS_DEFAULT);
     if (!node->rel_dists || !tmp)
-        k_panic("could not allocate numa relative distances\n");
+        panic("could not allocate numa relative distances\n");
 
     /* we copy the distance array into the temporary array and
      * sort it. then, for each distance in the distance array,

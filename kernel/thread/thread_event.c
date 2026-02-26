@@ -41,19 +41,19 @@ static const char *reason_str(uint8_t reason) {
 static void print_ringbuffer(const struct thread *t, bool wake_reasons,
                              const char *label, struct thread_event_reason *buf,
                              size_t head) {
-    k_printf("    %s: [\n", label);
+    printf("    %s: [\n", label);
     for (size_t i = 0; i < THREAD_EVENT_RINGBUFFER_CAPACITY; i++) {
         struct thread_event_reason *e = &buf[i];
         if (e->reason == THREAD_ASSOCIATED_REASON_NONE)
             continue;
 
-        k_printf("        { reason: %s, ts: %lld, cycle: %llu",
+        printf("        { reason: %s, ts: %lld, cycle: %llu",
                  reason_str(e->reason), (long long) e->timestamp,
                  (unsigned long long) e->cycle);
 
         if (e->associated_reason.reason != THREAD_ASSOCIATED_REASON_NONE) {
             if (!wake_reasons)
-                k_printf(
+                printf(
                     ", assoc: { reason: %s, ts: %lld, cycle: %llu }",
                     reason_str(t->activity_data
                                    ->wake_reasons[e->associated_reason.reason]
@@ -64,48 +64,48 @@ static void print_ringbuffer(const struct thread *t, bool wake_reasons,
         }
 
         if (i == head % THREAD_EVENT_RINGBUFFER_CAPACITY)
-            k_printf(" <-- head");
+            printf(" <-- head");
 
-        k_printf(" },\n");
+        printf(" },\n");
     }
-    k_printf("    ],\n");
+    printf("    ],\n");
 }
 
 void thread_print(const struct thread *t) {
-    k_printf("Thread %s {\n", t->name);
-    k_printf("    id: %llu,\n", (unsigned long long) t->id);
-    k_printf("    state: %s,\n", thread_state_str(atomic_load(&t->state)));
-    k_printf("    core: %lld,\n", (long long) t->curr_core);
-    k_printf("    stack_size: %zu,\n", t->stack_size);
+    printf("Thread %s {\n", t->name);
+    printf("    id: %llu,\n", (unsigned long long) t->id);
+    printf("    state: %s,\n", thread_state_str(atomic_load(&t->state)));
+    printf("    core: %lld,\n", (long long) t->curr_core);
+    printf("    stack_size: %zu,\n", t->stack_size);
 
     /* priorities */
-    k_printf("    base_prio: %s,\n", thread_prio_class_str(t->base_prio_class));
-    k_printf("    perceived_prio: %s,\n",
+    printf("    base_prio: %s,\n", thread_prio_class_str(t->base_prio_class));
+    printf("    perceived_prio: %s,\n",
              thread_prio_class_str(t->perceived_prio_class));
-    k_printf("    effective_priority: %llu,\n",
+    printf("    effective_priority: %llu,\n",
              (unsigned long long) t->effective_priority);
-    k_printf("    activity_score: %u, dynamic_delta: %d, weight: %llu,\n",
+    printf("    activity_score: %u, dynamic_delta: %d, weight: %llu,\n",
              t->activity_score, t->dynamic_delta,
              (unsigned long long) t->weight);
-    k_printf("    boost_count: %u\n", t->boost_count);
+    printf("    boost_count: %u\n", t->boost_count);
 
-    k_printf("    activity_class: %s,\n",
+    printf("    activity_class: %s,\n",
              thread_activity_class_str(t->activity_class));
 
     /* time / slice info */
-    k_printf("    run: %llu ms / budget: %llu ms,\n",
+    printf("    run: %llu ms / budget: %llu ms,\n",
              (unsigned long long) t->period_runtime_raw_ms,
              (unsigned long long) t->budget_time_raw_ms);
-    k_printf("    timeslice_length: %llu ms,\n",
+    printf("    timeslice_length: %llu ms,\n",
              (unsigned long long) t->timeslice_length_raw_ms);
-    k_printf("    completed_period: %llu,\n",
+    printf("    completed_period: %llu,\n",
              (unsigned long long) t->completed_period);
-    k_printf("    virtual_runtime: %llu / virtual_budget: %llu,\n",
+    printf("    virtual_runtime: %llu / virtual_budget: %llu,\n",
              (unsigned long long) t->virtual_period_runtime,
              (unsigned long long) t->virtual_budget);
 
     /* metrics overview */
-    k_printf("    activity_metrics: { run_ratio: %llu, block_ratio: %llu, "
+    printf("    activity_metrics: { run_ratio: %llu, block_ratio: %llu, "
              "sleep_ratio: %llu, wake_freq: %llu },\n",
              (unsigned long long) t->activity_metrics.run_ratio,
              (unsigned long long) t->activity_metrics.block_ratio,
@@ -113,16 +113,16 @@ void thread_print(const struct thread *t) {
              (unsigned long long) t->activity_metrics.wake_freq);
 
     /* profiling */
-    k_printf("    context_switches: %zu,\n", t->context_switches);
-    k_printf("    preemptions: %zu,\n", t->preemptions);
-    k_printf("    wakes: %zu, blocks: %zu, sleeps: %zu,\n", t->total_wake_count,
+    printf("    context_switches: %zu,\n", t->context_switches);
+    printf("    preemptions: %zu,\n", t->preemptions);
+    printf("    wakes: %zu, blocks: %zu, sleeps: %zu,\n", t->total_wake_count,
              t->total_block_count, t->total_sleep_count);
-    k_printf("    apcs: %zu,\n", t->total_apcs_ran);
-    k_printf("    creation_time: %lld ms,\n", (long long) t->creation_time_ms);
+    printf("    apcs: %zu,\n", t->total_apcs_ran);
+    printf("    creation_time: %lld ms,\n", (long long) t->creation_time_ms);
 
     /* APC state */
-    k_printf("    executing_apc: %s,\n", t->executing_apc ? "true" : "false");
-    k_printf("    special_apc_disable: %u, kernel_apc_disable: %u,\n",
+    printf("    executing_apc: %s,\n", t->executing_apc ? "true" : "false");
+    printf("    special_apc_disable: %u, kernel_apc_disable: %u,\n",
              t->special_apc_disable, t->kernel_apc_disable);
 
     /* activity ringbuffers */
@@ -138,7 +138,7 @@ void thread_print(const struct thread *t) {
                          t->activity_data->sleep_reasons_head);
     }
 
-    k_printf("}\n");
+    printf("}\n");
 }
 
 static struct thread_event_reason *
@@ -603,7 +603,7 @@ void thread_wait_for_wake_match() {
     while (!atomic_load_explicit(&curr->wake_matched, memory_order_acquire)) {
         if (curr->last_action != THREAD_STATE_BLOCKED &&
             curr->last_action != THREAD_STATE_SLEEPING)
-            k_panic("uh oh\n");
+            panic("uh oh\n");
 
         if (curr->last_action == THREAD_STATE_BLOCKED) {
             if (block_interruptible(curr, curr->last_action_reason,

@@ -22,11 +22,11 @@ static struct topology_node machine_node;
 
 static void cpu_mask_print(const struct cpu_mask *m) {
     if (!m->uses_large) {
-        k_printf(BOLD_STR("0x%llx"), (uint64_t) m->small);
+        printf(BOLD_STR("0x%llx"), (uint64_t) m->small);
     } else {
         size_t nwords = (m->nbits + 63) / 64;
         for (size_t i = 0; i < nwords; i++)
-            k_printf(BOLD_STR("%016llx"), (uint64_t) m->large[nwords - 1 - i]);
+            printf(BOLD_STR("%016llx"), (uint64_t) m->large[nwords - 1 - i]);
     }
 }
 
@@ -47,14 +47,14 @@ const char *topology_level_name(enum topology_level l) {
 
 static void print_topology_node(struct topology_node *node, int depth) {
     for (int i = 0; i < depth; i++)
-        k_printf("  ");
+        printf("  ");
 
     const char *level_str = topo_node_str[node->level];
 
-    k_printf("[%s] ID = " ANSI_BOLD "%d" ANSI_RESET ", CPUs = ", level_str,
+    printf("[%s] ID = " ANSI_BOLD "%d" ANSI_RESET ", CPUs = ", level_str,
              node->id);
     cpu_mask_print(&node->cpus);
-    k_printf("\n");
+    printf("\n");
 
     switch (node->level) {
     case TOPOLOGY_LEVEL_MACHINE:
@@ -186,7 +186,7 @@ void topology_dump(void) {
 #define PANIC_IF_CPU_MASK_FAILED(op)                                           \
     do {                                                                       \
         if (unlikely(!op))                                                     \
-            k_panic("CPU mask allocation failed!\n");                          \
+            panic("CPU mask allocation failed!\n");                          \
                                                                                \
     } while (0);
 
@@ -583,7 +583,7 @@ struct core **topology_get_smts_under_numa(struct topology_node *numa,
 
     smts = kmalloc(sizeof(struct core *) * total, ALLOC_PARAMS_DEFAULT);
     if (!smts)
-        k_panic("Could not allocate array for NUMA SMTs\n");
+        panic("Could not allocate array for NUMA SMTs\n");
 
     size_t idx = 0;
     for (int32_t i = 0; i < numa->nr_children; i++) {
