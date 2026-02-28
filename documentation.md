@@ -4,6 +4,10 @@ Similar to the **style guide**, this is a documentation *guide*, not a set of do
 instances where documentation may deviate from this guide, and that is expected and allowed, but try to follow these
 guidelines with most things.
 
+
+[I've already read this](#how-should-i-write-ideas)
+
+
 # File titling and other naming
 
 To title a file such that it shows up with a name other than its file name in documentation, simply write
@@ -158,6 +162,22 @@ Some **Ideas** will be removed, which will be discussed [later on](#how-do-i-dep
 
 **Small Ideas** should be given names of functions or behaviors, such as "Turnstile Blocking".
 
+## How big should **Ideas** be?
+
+**Small Ideas** should be the smallest **Ideas**, whereas **Huge Ideas** should be the second smallest, and **Big
+Ideas** should be the largest in length.
+
+**Small Ideas** should be under 20 lines.
+
+**Huge Ideas** should be between 50-150 lines.
+
+**Big Ideas** should be between 100-300 lines.
+
+## What about diagrams?
+
+Diagrams are useful, but do not overuse them. Diagrams can be used to describe the parts of a large structure and
+interactions between them, but only when necessary to show connections between parts.
+
 ## How should I write **Ideas**?
 
 ### **Ideas** should be written in standard markdown in code comments
@@ -189,172 +209,6 @@ while condition is not true
     check stuff
 ```
 
-## How big should **Ideas** be?
-
-**Small Ideas** should be the smallest **Ideas**, whereas **Huge Ideas** should be the second smallest, and **Big
-Ideas** should be the largest in length.
-
-**Small Ideas** should be under 20 lines.
-
-**Huge Ideas** should be between 50-150 lines.
-
-**Big Ideas** should be between 100-300 lines.
-
-## What about diagrams?
-
-Diagrams are useful, but do not overuse them. Diagrams can be used to describe the parts of a large structure and
-interactions between them, but only when necessary to show connections between parts.
-
-## Are there any examples of **Ideas**?
-
-Below are mock examples of **Ideas**. The text in **Sections** are meant to give an overview of how the Sections should be written.
-
-You can find more **Ideas** throughout code to give you a better sense of how they are integrated into the codebase.
-
-**Huge Ideas** belong in separate `.md` files, and do not have a Signature.
-
-```c
-/*
- * # Huge Idea: Locking Philosophy
- *
- * ## Credits: Sally Mutex
- *
- * ## Audience: Everyone
- *
- * ## Overview: Locking allows for safe access of shared objects on multitasking kernels...
- *
- * ## Background: This is how other operating systems use locks and a bit of history...
- *
- * ## Summary: Locking is not a magic wand for instant scalability. A few main types of locks and uses (see struct mutex)...
- *
- * ## Interactions: Locking is used almost everywhere that requires shared ownership[^1]...
- *
- * ## Constraints: Locking on an SMP preemptible kernel introduces a few problems...
- *
- * ## Errors: Deadlocks are a problem and we don't attempt to recover, just report them...
- *
- * ## Rationale: We use turnstiles to have pointer sized adaptive mutexes...
- *
- * ## Changelog:
- *   09/05/2005 - Sally Mutex: Added information about rwlocks (commit 3a5b9)
- *   09/01/2005 - Sally Mutex: Created Idea
- *
- * ## Notes: <Link to Solaris internals book> you can read more about Solaris, which has similar locking philosophy, here.
- *
- * [^1]: "Name of Idea" `./optional/path` 
- *
- */
-```
-
-```c
-/* @idea:big Turnstiles */
-/*
- * # Big Idea: Turnstiles (EXPERIMENTAL)
- *
- * ## Alerts: This is still EXPERIMENTAL. Be wary of bugs that may be from this component.
- *
- * ## Credits: Eleanor Semaphore
- *
- * ## Audience: Synchronization subsystem authors and others interested. not necessary to read.
- *
- * ## Overview: Turnstiles give us pointer sized adaptive mutexes (see "Locking Philosophy" [^1])...
- *
- * ## Background: Turnstiles were invented by Solaris, and are used in FreeBSD and XNU...
- *
- * ## Summary: Turnstiles give us a unified structure with functionalities... this functionality is provided by turnstile_block()...
- *
- * ## API: Turnstiles expose these functions, use them like such...
- *
- * ## Interactions: Turnstiles are used in our mutex implementation and are not to be used on their own outside of tests...
- *
- * ## Constraints: Turnstiles must be efficient and avoid taking the slow blocking path too frequently...
- *
- * ## Internals: Turnstiles internally use x, y, and z...
- *
- * ## Errors: Turnstiles don't "fail", but these things can...
- *
- * ## Rationale: Turnstiles spin when the owner is running because it avoids a slowpath...
- *
- * ## Diagrams:
- *
- * -- note: diagrams should have the 3 grave stones preceding and following them. this is omitted
- * here because this document is also in markdown and that would interfere with this.
- *
- *                  Diagram A: Turnstile Donation
- *
- *              turnstile       ┌────────────┐      no existing
- *              ┌─exists────────│   Block    │───────turnstile┐
- *              │               └────────────┘                │
- *              │                                             │
- *              │                                             │
- *              │                                             │
- *              ▼                                             ▼
- *  ┌─────────────────────────┐                      ┌──────────────────┐
- *  │Add Turnstile to freelist│                      │ Donate Turnstile │
- *  └─────────────────────────┘                      └──────────────────┘
- *
- * ## Bugs:
- *   #44 "missed wakeup"
- *
- *
- * ## Tests:
- *   `./kernel/tests/turnstile.c` - general turnstile tests
- *   `./kernel/tests/mutex.c` - general mutex tests that use turnstiles
- *
- * ## Changelog:
- *   09/02/2005 - Eleanor Semaphore: Added second queue for rwlocks (commit 0b4e)
- *   09/01/2005 - Eleanor Semaphore: Created Idea (commit 62ef)
- *
- * ## Notes:
- *   Here is some stuff you might be interested in reading regarding the history of turnstiles
- *
- * [^1] "Locking Philosophy" `./docs/locking_idea.md`
- *
- */
-```
-
-```c
-/* @idea:small Turnstile Blocking */
-/*
- * # Small Idea: Turnstile Blocking
- *
- * ## Credits: Eleanor Semaphore
- *
- * ## Context: This is the blocking portion of the Turnstile implementation. See "Turnstiles" [^1]...
- *
- * ## Problem: We aim to solve the issue regarding how threads block on the turnstile and orderings for that...
- *
- * ## Strategy: We increment the waiter count in the block path, but decrement it from the owner unblocking a thread...
- *
- * ## Changelog:
- *    09/01/2005 - Eleanor Semaphore: Created Idea (commit 62ef)
- *
- * // notes section not present
- *
- * [^1] "Turnstiles" `./kernel/sync/turnstile.c`
- *
- *
- */
-```
-
-## How do I refer to other **Ideas**?
-
-Referring to other **Ideas** can be done in a format like this:
-
-In text, make references such as
-
-```c
-/*
- * Text [^1].
- */
-```
-
-Then, provide a source.
-```c
-/*
- * [^1]: "Name"  `./optional/relative/path/to/idea/from/project/root`
- */
-```
 
 ### Section 1: "**The Huge Idea**"
 
@@ -541,6 +395,158 @@ The layout for a **Small Idea** is as follows:
  */
 ```
 
+
+## Are there any examples of **Ideas**?
+
+Below are mock examples of **Ideas**. The text in **Sections** are meant to give an overview of how the Sections should be written.
+
+You can find more **Ideas** throughout code to give you a better sense of how they are integrated into the codebase.
+
+**Huge Ideas** belong in separate `.md` files, and do not have a Signature.
+
+```c
+/*
+ * # Huge Idea: Locking Philosophy
+ *
+ * ## Credits: Sally Mutex
+ *
+ * ## Audience: Everyone
+ *
+ * ## Overview: Locking allows for safe access of shared objects on multitasking kernels...
+ *
+ * ## Background: This is how other operating systems use locks and a bit of history...
+ *
+ * ## Summary: Locking is not a magic wand for instant scalability. A few main types of locks and uses (see struct mutex)...
+ *
+ * ## Interactions: Locking is used almost everywhere that requires shared ownership[^1]...
+ *
+ * ## Constraints: Locking on an SMP preemptible kernel introduces a few problems...
+ *
+ * ## Errors: Deadlocks are a problem and we don't attempt to recover, just report them...
+ *
+ * ## Rationale: We use turnstiles to have pointer sized adaptive mutexes...
+ *
+ * ## Changelog:
+ *   09/05/2005 - Sally Mutex: Added information about rwlocks (commit 3a5b9)
+ *   09/01/2005 - Sally Mutex: Created Idea
+ *
+ * ## Notes: <Link to Solaris internals book> you can read more about Solaris, which has similar locking philosophy, here.
+ *
+ * [^1]: "Name of Idea" `./optional/path` 
+ *
+ */
+```
+
+```c
+/* @idea:big Turnstiles */
+/*
+ * # Big Idea: Turnstiles (EXPERIMENTAL)
+ *
+ * ## Alerts: This is still EXPERIMENTAL. Be wary of bugs that may be from this component.
+ *
+ * ## Credits: Eleanor Semaphore
+ *
+ * ## Audience: Synchronization subsystem authors and others interested. not necessary to read.
+ *
+ * ## Overview: Turnstiles give us pointer sized adaptive mutexes (see "Locking Philosophy" [^1])...
+ *
+ * ## Background: Turnstiles were invented by Solaris, and are used in FreeBSD and XNU...
+ *
+ * ## Summary: Turnstiles give us a unified structure with functionalities... this functionality is provided by turnstile_block()...
+ *
+ * ## API: Turnstiles expose these functions, use them like such...
+ *
+ * ## Interactions: Turnstiles are used in our mutex implementation and are not to be used on their own outside of tests...
+ *
+ * ## Constraints: Turnstiles must be efficient and avoid taking the slow blocking path too frequently...
+ *
+ * ## Internals: Turnstiles internally use x, y, and z...
+ *
+ * ## Errors: Turnstiles don't "fail", but these things can...
+ *
+ * ## Rationale: Turnstiles spin when the owner is running because it avoids a slowpath...
+ *
+ * ## Diagrams:
+ *
+ * -- note: diagrams should have the 3 grave stones preceding and following them. this is omitted
+ * here because this document is also in markdown and that would interfere with this.
+ *
+ *                  Diagram A: Turnstile Donation
+ *
+ *              turnstile       ┌────────────┐      no existing
+ *              ┌─exists────────│   Block    │───────turnstile┐
+ *              │               └────────────┘                │
+ *              │                                             │
+ *              │                                             │
+ *              │                                             │
+ *              ▼                                             ▼
+ *  ┌─────────────────────────┐                      ┌──────────────────┐
+ *  │Add Turnstile to freelist│                      │ Donate Turnstile │
+ *  └─────────────────────────┘                      └──────────────────┘
+ *
+ * ## Bugs:
+ *   #44 "missed wakeup"
+ *
+ *
+ * ## Tests:
+ *   `./kernel/tests/turnstile.c` - general turnstile tests
+ *   `./kernel/tests/mutex.c` - general mutex tests that use turnstiles
+ *
+ * ## Changelog:
+ *   09/02/2005 - Eleanor Semaphore: Added second queue for rwlocks (commit 0b4e)
+ *   09/01/2005 - Eleanor Semaphore: Created Idea (commit 62ef)
+ *
+ * ## Notes:
+ *   Here is some stuff you might be interested in reading regarding the history of turnstiles
+ *
+ * [^1] "Locking Philosophy" `./docs/locking_idea.md`
+ *
+ */
+```
+
+```c
+/* @idea:small Turnstile Blocking */
+/*
+ * # Small Idea: Turnstile Blocking
+ *
+ * ## Credits: Eleanor Semaphore
+ *
+ * ## Context: This is the blocking portion of the Turnstile implementation. See "Turnstiles" [^1]...
+ *
+ * ## Problem: We aim to solve the issue regarding how threads block on the turnstile and orderings for that...
+ *
+ * ## Strategy: We increment the waiter count in the block path, but decrement it from the owner unblocking a thread...
+ *
+ * ## Changelog:
+ *    09/01/2005 - Eleanor Semaphore: Created Idea (commit 62ef)
+ *
+ * // notes section not present
+ *
+ * [^1] "Turnstiles" `./kernel/sync/turnstile.c`
+ *
+ *
+ */
+```
+
+## How do I refer to other **Ideas**?
+
+Referring to other **Ideas** can be done in a format like this:
+
+In text, make references such as
+
+```c
+/*
+ * Text [^1].
+ */
+```
+
+Then, provide a source.
+```c
+/*
+ * [^1]: "Name"  `./optional/relative/path/to/idea/from/project/root`
+ */
+```
+
 # How do I update things?
 
 ## How often and how should I update **Ideas**?
@@ -575,4 +581,4 @@ DEPRECATED, its code will still be present, but will issue a warning whenever it
 has a piece of DEPRECATED code, it will be removed. 
 
 If an **Idea** should still be supported (e.g., things like Linux's semaphores), then mark the **Idea** as LEGACY, but
-include a note that an **Idea** has better alternatives in newer code. 
+include a note that an **Idea** has better alternatives in newer code.
