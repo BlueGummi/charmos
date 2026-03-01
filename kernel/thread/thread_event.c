@@ -120,7 +120,8 @@ void thread_print(const struct thread *t) {
     printf("    creation_time: %lld ms,\n", (long long) t->creation_time_ms);
 
     /* APC state */
-    printf("    executing_apc: %s,\n", t->executing_apc ? "true" : "false");
+    printf("    executing_apc: %s,\n",
+           (t->flags & THREAD_FLAG_EXECUTING_APC) ? "true" : "false");
     printf("    special_apc_disable: %u, kernel_apc_disable: %u,\n",
            t->special_apc_disable, t->kernel_apc_disable);
 
@@ -478,7 +479,7 @@ static bool set_state_and_update_reason(
 
     bool ok = false;
     if (exit_if_match) {
-        if (atomic_load_explicit(&t->wake_matched, memory_order_acquire) &&
+        if ((thread_get_flags(t) & THREAD_FLAG_WAKE_MATCHED) &&
             t->wake_token == t->wait_token) {
             ok = true;
             goto out;
@@ -489,11 +490,10 @@ static bool set_state_and_update_reason(
         atomic_store_explicit(&t->wake_src, wake_src, memory_order_release);
         if (wake_src == t->expected_wake_src) {
             t->wake_token = t->wait_token;
-            atomic_store_explicit(&t->wake_matched, true, memory_order_release);
+            thread_or_flags(t, THREAD_FLAG_WAKE_MATCHED);
         }
     } else {
-        atomic_store_explicit(&t->yielded_after_wait, false,
-                              memory_order_release);
+        thread_and_flags(t, ~THREAD_FLAG_YIELDED_AFTER_WAKE);
         atomic_store_explicit(&t->wait_type, type, memory_order_release);
         t->last_action_reason = reason;
         t->last_action = state;
@@ -509,7 +509,7 @@ static bool set_state_and_update_reason(
 
     /* NOTE: special case: this is if we are waking ourselves after deciding to
      * not block */
-    if (!atomic_load_explicit(&t->yielded_after_wait, memory_order_acquire) &&
+    if ((!(thread_get_flags(t) & THREAD_FLAG_YIELDED_AFTER_WAKE)) &&
         t == thread_get_current() && state == THREAD_STATE_READY)
         atomic_store(&t->state, THREAD_STATE_RUNNING);
 
@@ -600,7 +600,7 @@ void thread_wait_for_wake_match() {
 
     /* we can safely avoid checking the token in the loop because that will
      * become set if wake_matched is set... */
-    while (!atomic_load_explicit(&curr->wake_matched, memory_order_acquire)) {
+    while (!(thread_get_flags(curr) & THREAD_FLAG_WAKE_MATCHED)) {
         if (curr->last_action != THREAD_STATE_BLOCKED &&
             curr->last_action != THREAD_STATE_SLEEPING)
             panic("uh oh\n");

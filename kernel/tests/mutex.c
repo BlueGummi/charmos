@@ -53,7 +53,7 @@ static void many_worker(void *) {
 TEST_REGISTER(mutex_many_waiters, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     for (int i = 0; i < MUTEX_MANY_WAITER_TEST_WAITER_COUNT; i++) {
         struct thread *t = thread_create("mw", many_worker, NULL);
-        t->flags = THREAD_FLAGS_NO_STEAL;
+        t->pinned = 1;
         thread_enqueue(t);
     }
 
@@ -163,9 +163,9 @@ TEST_REGISTER(mutex_pi_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     pi_rt->perceived_prio_class = THREAD_PRIO_CLASS_RT;
     pi_dum->perceived_prio_class = THREAD_PRIO_CLASS_RT;
 
-    thread_set_flags(pi_dum, THREAD_FLAGS_NO_STEAL);
-    thread_set_flags(pi_ts, THREAD_FLAGS_NO_STEAL);
-    thread_set_flags(pi_rt, THREAD_FLAGS_NO_STEAL);
+    pi_dum->pinned = 1;
+    pi_ts->pinned = 1;
+    pi_rt->pinned = 1;
 
     thread_enqueue_on_core(pi_ts, cpu);
     while (!atomic_load(&pi_ts_got))
@@ -245,9 +245,9 @@ TEST_REGISTER(mutex_pi_chain, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     pi_rt2->perceived_prio_class = THREAD_PRIO_CLASS_RT;
 
-    thread_set_flags(pi_ts1, THREAD_FLAGS_NO_STEAL);
-    thread_set_flags(pi_ts2, THREAD_FLAGS_NO_STEAL);
-    thread_set_flags(pi_rt2, THREAD_FLAGS_NO_STEAL);
+    pi_ts1->pinned = 1;
+    pi_ts2->pinned = 1;
+    pi_rt2->pinned = 1;
 
     thread_enqueue_on_core(pi_ts2, cpu);
     while (!atomic_load(&ts2_grabbed_b))
@@ -303,9 +303,9 @@ TEST_REGISTER(mutex_pi_multi_waiters, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     rt1->perceived_prio_class = THREAD_PRIO_CLASS_RT;
     rt2->perceived_prio_class = THREAD_PRIO_CLASS_RT;
 
-    thread_set_flags(ts, THREAD_FLAGS_NO_STEAL);
-    thread_set_flags(rt1, THREAD_FLAGS_NO_STEAL);
-    thread_set_flags(rt2, THREAD_FLAGS_NO_STEAL);
+    ts->pinned = 1;
+    rt1->pinned = 1;
+    rt2->pinned = 1;
 
     thread_enqueue_on_core(ts, cpu);
     while (!atomic_load(&ts_got))
@@ -358,8 +358,8 @@ TEST_REGISTER(mutex_pi_revert, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     rt->perceived_prio_class = THREAD_PRIO_CLASS_RT;
 
-    thread_set_flags(ts, THREAD_FLAGS_NO_STEAL);
-    thread_set_flags(rt, THREAD_FLAGS_NO_STEAL);
+    ts->pinned = 1;
+    rt->pinned = 1;
 
     thread_enqueue_on_core(ts, cpu);
 

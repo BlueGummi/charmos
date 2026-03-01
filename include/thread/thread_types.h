@@ -28,8 +28,12 @@ enum thread_wait_type : uint8_t {
     THREAD_WAIT_INTERRUPTIBLE, /* Can be interrupted */
 };
 
-enum thread_flags : uint8_t {
-    THREAD_FLAGS_NO_STEAL = 1, /* Do not migrate between cores */
+enum thread_flags : uint32_t {
+    THREAD_FLAG_FLEXIBLE_RT = 1 << 1,
+    THREAD_FLAG_EXECUTING_APC = 1 << 2,
+    THREAD_FLAG_DYING = 1 << 3,
+    THREAD_FLAG_YIELDED_AFTER_WAKE = 1 << 4,
+    THREAD_FLAG_WAKE_MATCHED = 1 << 5,
 };
 
 enum thread_prio_class : uint8_t {

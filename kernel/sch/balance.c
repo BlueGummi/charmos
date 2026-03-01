@@ -68,7 +68,7 @@ static void move_ts_thread_raw(struct scheduler *dest, struct scheduler *source,
 
     rbt_insert(&dest->thread_rbt, &thread->rq_tree_node);
     scheduler_increment_thread_count(dest, thread);
-    thread_set_last_ran(thread, dest->core_id);
+    thread_set_runqueue(thread, dest);
     thread_post_migrate(thread, source->core_id, dest->core_id);
 }
 
@@ -92,14 +92,12 @@ static size_t migrate_from_tree(struct scheduler *to,
 
         /* we are on a thread we will give priority to migrating */
         if (!prev_migrated) {
-            spin_lock_raw(&t->being_moved);
             if (scheduler_can_take_thread(to->core_id, t)) {
                 move_ts_thread_raw(to, from_sched, from, t);
                 prev_migrated = true;
                 migrated++;
             }
 
-            spin_unlock_raw(&t->being_moved);
         } else {
             prev_migrated = false;
         }
@@ -132,7 +130,6 @@ static size_t migrate_from_prio_class(struct scheduler *to,
                 break;
 
             struct thread *t = thread_from_rq_list_node(ln);
-            spin_lock_raw(&t->being_moved);
             if (scheduler_can_take_thread(to->core_id, t)) {
 
                 list_del_init(ln);
@@ -142,10 +139,9 @@ static size_t migrate_from_prio_class(struct scheduler *to,
                 scheduler_increment_thread_count(to, t);
 
                 migrated++;
-                thread_set_last_ran(t, to->core_id);
+                thread_set_runqueue(t, to);
                 thread_post_migrate(t, from->core_id, to->core_id);
             }
-            spin_unlock_raw(&t->being_moved);
         }
     } else {
         /* migrating timesharing threads. first try to migrate threads that have

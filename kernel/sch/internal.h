@@ -176,7 +176,9 @@ static inline void scheduler_drop_two_locks(struct scheduler *a,
                                             struct scheduler *b,
                                             enum irql a_irql,
                                             enum irql b_irql) {
-    kassert(a != b);
+    if (a == b)
+        return spin_unlock(&a->lock, a_irql);
+
     if (a > b) {
         spin_unlock(&a->lock, a_irql);
         spin_unlock(&b->lock, b_irql);

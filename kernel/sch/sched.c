@@ -131,13 +131,6 @@ static inline bool migrate_to_destination(struct thread *t, time_t time) {
     if (dst == (int64_t) smp_core_id())
         return false;
 
-    /* we must uphold this because other CPUs will expect being_moved
-     * to be `true` as long as the thread could possibly be getting migrated */
-    if (!spinlock_held(&t->being_moved)) {
-        panic("being_moved flag not true, migrate_to %zu from %zu\n", dst,
-              smp_core_id());
-    }
-
     struct scheduler *us = smp_core_scheduler();
     struct scheduler *other = global.schedulers[dst];
     scheduler_acquire_two_raw_locks(us, other);
@@ -148,11 +141,9 @@ static inline bool migrate_to_destination(struct thread *t, time_t time) {
 
     /* save ourselves to the other scheduler */
     save_thread(other, t, time);
-    thread_set_last_ran(t, dst);
+    thread_set_runqueue(t, other);
 
     thread_post_migrate(t, us->core_id, dst);
-
-    spin_unlock_raw(&t->being_moved);
     return true;
 }
 
@@ -223,7 +214,7 @@ static void load_thread(struct scheduler *sched, struct thread *next,
     if (next->state != THREAD_STATE_IDLE_THREAD)
         thread_set_state(next, THREAD_STATE_RUNNING);
 
-    thread_set_last_ran(next, smp_core_id());
+    thread_set_runqueue(next, sched);
     next->curr_core = smp_core_id();
     next->run_start_time = time;
 
@@ -273,8 +264,7 @@ static void change_tick(struct scheduler *sched, struct thread *next) {
 
 static inline void context_switch(struct thread *curr, struct thread *next) {
     if (curr)
-        atomic_store_explicit(&curr->yielded_after_wait, true,
-                              memory_order_release);
+        thread_or_flags(curr, THREAD_FLAG_YIELDED_AFTER_WAKE);
 
     if (curr != next)
         next->context_switches++;
@@ -286,18 +276,18 @@ static inline void context_switch(struct thread *curr, struct thread *next) {
     if (!curr)
         just_load = true;
 
+    if (curr && curr->state == THREAD_STATE_IDLE_THREAD)
+        just_load = true;
+
     if (unlikely(curr && curr->state == THREAD_STATE_ZOMBIE)) {
         just_load = true;
         thread_put(curr);
     }
 
-    if (curr && curr->state == THREAD_STATE_IDLE_THREAD)
-        just_load = true;
-
-    if (!just_load) {
-        switch_context(&curr->regs, &next->regs);
-    } else {
+    if (just_load) {
         load_context(&next->regs);
+    } else {
+        switch_context(&curr->regs, &next->regs);
     }
 }
 

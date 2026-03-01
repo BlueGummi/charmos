@@ -48,7 +48,7 @@ void thread_exit() {
         panic("What? Thread is already dying but has not exited\n");
 
     atomic_store(&self->state, THREAD_STATE_ZOMBIE);
-    atomic_store_explicit(&self->dying, true, memory_order_release);
+    thread_or_flags(self, THREAD_FLAG_DYING);
     reaper_enqueue(self);
 
     locked_list_del(&thread_list, &self->thread_list);
@@ -143,7 +143,6 @@ static struct thread *thread_init(struct thread *thread,
     thread->entry = entry_point;
     thread->creation_time_ms = time_get_ms();
     thread->stack_size = stack_size;
-    thread->dying = false;
     thread->regs.rsp = stack_top;
     thread->migrate_to = -1;
     thread->base_prio_class = THREAD_PRIO_CLASS_TIMESHARE;
@@ -154,6 +153,7 @@ static struct thread *thread_init(struct thread *thread,
     thread->regs.r13 = (uint64_t) arg;
     thread->regs.rip = (uint64_t) thread_entry_wrapper;
     thread->stack = (void *) stack;
+    thread->flags = 0;
     thread->curr_core = -1;
     thread->rcu_quiescent_gen = UINT64_MAX;
     thread->id = tid_alloc(global_tid_space);
@@ -162,7 +162,6 @@ static struct thread *thread_init(struct thread *thread,
     thread->wait_type = THREAD_WAIT_NONE;
     thread->activity_class = THREAD_ACTIVITY_CLASS_UNKNOWN;
     spinlock_init(&thread->lock);
-    spinlock_init(&thread->being_moved);
     pairing_node_init(&thread->wq_pairing_node);
 
     turnstile_init(thread->turnstile);
@@ -364,4 +363,132 @@ void thread_wake_manual(struct thread *t, void *wake_src) {
     else if (s == THREAD_STATE_SLEEPING)
         thread_wake(t, THREAD_WAKE_REASON_SLEEP_MANUAL, t->perceived_prio_class,
                     wake_src);
+}
+
+struct scheduler *thread_get_scheduler(struct thread *t, enum irql *sirql_out) {
+    do {
+        size_t gen1 = thread_get_migration_generation(t);
+        struct scheduler *sched = thread_get_scheduler_unsafe(t);
+        *sirql_out = spin_lock_irq_disable(&sched->lock);
+        size_t gen2 = thread_get_migration_generation(t);
+
+        if (gen1 == gen2 && !(gen1 & 1))
+            return sched;
+
+        spin_unlock(&sched->lock, *sirql_out);
+    } while (1);
+
+    panic("unreachable\n");
+}
+
+void thread_lock_two_runqueues(struct thread *a, struct thread *b,
+                               struct scheduler **out_rq_a,
+                               struct scheduler **out_rq_b, enum irql *irq_a,
+                               enum irql *irq_b) {
+    size_t gen_a1 = 0;
+    size_t gen_a2 = 0;
+    size_t gen_b1 = 0;
+    size_t gen_b2 = 0;
+
+retry:
+    gen_a1 = thread_get_migration_generation(a);
+    gen_b1 = thread_get_migration_generation(b);
+
+    if ((gen_a1 | gen_b1) & 1)
+        goto retry;
+
+    struct scheduler *rq_a = thread_get_scheduler_unsafe(a);
+    struct scheduler *rq_b = thread_get_scheduler_unsafe(b);
+
+    gen_a2 = thread_get_migration_generation(a);
+    gen_b2 = thread_get_migration_generation(b);
+
+    /* Snapshot must be stable */
+    if (gen_a1 != gen_a2 || gen_b1 != gen_b2)
+        goto retry;
+
+    struct scheduler *first;
+    struct scheduler *second;
+
+    if (rq_a == rq_b) {
+        first = rq_a;
+        second = NULL;
+    } else if (rq_a < rq_b) {
+        first = rq_a;
+        second = rq_b;
+    } else {
+        first = rq_b;
+        second = rq_a;
+    }
+
+    *irq_a = spin_lock_irq_disable(&first->lock);
+
+    if (second)
+        *irq_b = spin_lock_irq_disable(&second->lock);
+
+    if (thread_get_migration_generation(a) != gen_a1 ||
+        thread_get_migration_generation(b) != gen_b1 ||
+        thread_get_scheduler_unsafe(a) != rq_a ||
+        thread_get_scheduler_unsafe(b) != rq_b) {
+
+        if (second)
+            spin_unlock(&second->lock, *irq_b);
+
+        spin_unlock(&first->lock, *irq_a);
+
+        goto retry;
+    }
+
+    *out_rq_a = rq_a;
+    *out_rq_b = rq_b;
+}
+
+void thread_lock_thread_and_rq(struct thread *t, struct scheduler *other_rq,
+                               struct scheduler **out_thread_rq,
+                               enum irql *irq_first, enum irql *irq_second) {
+    size_t gen1, gen2;
+
+retry:
+    gen1 = thread_get_migration_generation(t);
+
+    if (gen1 & 1)
+        goto retry;
+
+    struct scheduler *thread_rq = thread_get_scheduler_unsafe(t);
+
+    gen2 = thread_get_migration_generation(t);
+
+    if (gen1 != gen2)
+        goto retry;
+
+    struct scheduler *first;
+    struct scheduler *second;
+
+    if (thread_rq == other_rq) {
+        first = thread_rq;
+        second = NULL;
+    } else if (thread_rq < other_rq) {
+        first = thread_rq;
+        second = other_rq;
+    } else {
+        first = other_rq;
+        second = thread_rq;
+    }
+
+    *irq_first = spin_lock_irq_disable(&first->lock);
+
+    if (second)
+        *irq_second = spin_lock_irq_disable(&second->lock);
+
+    if (thread_get_migration_generation(t) != gen1 ||
+        thread_get_scheduler_unsafe(t) != thread_rq) {
+
+        if (second)
+            spin_unlock(&second->lock, *irq_second);
+
+        spin_unlock(&first->lock, *irq_first);
+        goto retry;
+    }
+
+    *out_thread_rq = thread_rq;
 }

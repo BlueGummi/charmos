@@ -30,7 +30,7 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
         list_add_tail(&task->rq_list_node, q);
     }
 
-    thread_set_last_ran(task, sched->core_id);
+    thread_set_runqueue(task, sched);
     scheduler_increment_thread_count(sched, task);
 
     bool is_local = sched == smp_core_scheduler();

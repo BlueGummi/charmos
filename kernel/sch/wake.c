@@ -7,12 +7,23 @@ bool thread_wake(struct thread *t, enum thread_wake_reason reason,
     kassert(t);
     enum irql outer = irql_raise(IRQL_HIGH_LEVEL);
 
-    enum thread_flags old;
-    struct scheduler *sch = thread_get_last_ran(t, &old);
+    enum irql lirql;
+    struct scheduler *sch = thread_get_scheduler(t, &lirql);
 
-    if (sch->core_id != smp_core_id())
-        while (!atomic_load(&t->yielded_after_wait))
-            cpu_relax();
+    while (sch != smp_core_scheduler()) {
+        bool entered = false;
+        while (!(thread_get_flags(t) & THREAD_FLAG_YIELDED_AFTER_WAKE)) {
+            entered = true;
+            break;
+        }
+
+        if (!entered)
+            break;
+
+        /* Drop the lock, spin again */
+        spin_unlock(&sch->lock, lirql);
+        sch = thread_get_scheduler(t, &lirql);
+    }
 
     /* this is a fun one. because threads can sleep/block in modes
      * that aren't just wakeable in one way, we must take care here.
@@ -28,9 +39,8 @@ bool thread_wake(struct thread *t, enum thread_wake_reason reason,
      */
 
     bool woke = false;
-    bool yielded = atomic_load(&t->yielded_after_wait);
+    bool yielded = thread_get_flags(t) & THREAD_FLAG_YIELDED_AFTER_WAKE;
     bool ok;
-    enum irql irql = spin_lock_irq_disable(&sch->lock);
     enum irql tirql = thread_acquire(t, &ok);
     if (!ok)
         goto end;
@@ -69,10 +79,9 @@ bool thread_wake(struct thread *t, enum thread_wake_reason reason,
     }
 
 out:
-    thread_restore_flags(t, old);
     thread_release(t, tirql);
 end:
-    spin_unlock(&sch->lock, irql);
+    spin_unlock(&sch->lock, lirql);
     irql_lower(outer);
     return woke;
 }

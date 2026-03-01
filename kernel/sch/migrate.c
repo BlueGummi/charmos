@@ -59,30 +59,27 @@ void thread_migrate(struct thread *t, size_t dest_core) {
     /* first acquire both the lock of the thread's scheduler
      * and the destination core's scheduler */
 
-    enum thread_flags flags;
-    struct scheduler *src = thread_get_last_ran(t, &flags);
-    struct scheduler *dst = global.schedulers[dest_core];
-
     enum irql sirql, dirql, tirql;
 
-    if (src == dst)
-        return;
+    struct scheduler *src;
+    struct scheduler *dst = global.schedulers[dest_core];
 
-    scheduler_acquire_two_locks(src, dst, &sirql, &dirql);
+    thread_lock_thread_and_rq(t, dst, &src, &sirql, &dirql);
+
+    if (src == dst) {
+        scheduler_drop_two_locks(src, dst, sirql, dirql);
+        return;
+    }
 
     /* now that we have acquired both scheduler locks,
      * we have control over the thread and can
      * unmark it as NO_STEAL */
-    thread_restore_flags(t, flags);
 
     bool ok;
     tirql = thread_acquire(t, &ok);
     if (!ok) {
         goto end;
     }
-
-    spin_lock_raw(&t->being_moved);
-    bool unlock = true;
 
     /* bro cannot be migrated */
     if (!scheduler_can_take_thread(dest_core, t)) {
@@ -91,19 +88,17 @@ void thread_migrate(struct thread *t, size_t dest_core) {
 
     /* finally, we can do something here. */
     if (thread_get_state(t) == THREAD_STATE_RUNNING) {
-        unlock = false;
         thread_set_migration_target(t, dest_core);
         scheduler_force_resched(dst);
     } else if (thread_get_state(t) == THREAD_STATE_READY) {
         scheduler_remove_thread(src, t, /* lock_held = */ true);
         scheduler_add_thread(dst, t, /* lock_held = */ true);
+        thread_set_runqueue(t, dst);
     }
 
     thread_post_migrate(t, src->core_id, dst->core_id);
 
 out:
-    if (unlock)
-        spin_unlock_raw(&t->being_moved);
 
     thread_release(t, tirql);
 

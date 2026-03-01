@@ -24,6 +24,7 @@ enum climb_pressure_kind {
 };
 
 struct climb_handle {
+    char *name;
     struct list_head list;
     climb_pressure_t pressure;
     climb_pressure_t applied_pressure_internal; /* If 0, this has not
@@ -31,7 +32,6 @@ struct climb_handle {
 
     enum climb_pressure_kind kind;
 
-    char *name;
     struct climb_source *pressure_source;
     struct thread *given_by; /* Debugging */
     struct thread *given_to;

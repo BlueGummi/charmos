@@ -188,8 +188,7 @@ static void apply_handle(struct thread *t, struct climb_handle *ch) {
     if (cts->pressure_periods == 0) {
         cts->pressure_periods = 1;
         kassert(!cts->on_climb_tree);
-        enum thread_flags out;
-        struct scheduler *sched = thread_get_last_ran(t, &out);
+        struct scheduler *sched = thread_get_scheduler_unsafe(t);
         struct rbt *tree = &sched->climb_threads;
 
         /* Get a reference for the tree */
@@ -197,7 +196,6 @@ static void apply_handle(struct thread *t, struct climb_handle *ch) {
         climb_info("Insert 0x%lx to tree", cts);
         rbt_insert(tree, &cts->climb_node);
         cts->on_climb_tree = true;
-        thread_restore_flags(t, out);
     } else if (cts->pressure_periods < 0) {
         /* It was previously on decay... all we need to do
          * is tell the thread to start pressure again,
@@ -228,7 +226,7 @@ static void remove_handle(struct thread *t, struct climb_handle *ch) {
     climb_info("Remove handle on 0x%lx (thread 0x%lx), %u left", cts, t,
                climb_count_handles(cts));
 
-    struct scheduler *sched = global.schedulers[t->last_ran];
+    struct scheduler *sched = thread_get_scheduler_unsafe(t);
 
     if (!rbt_has_node(&sched->climb_threads, &cts->climb_node)) {
         printf("Tree:\n");
@@ -272,19 +270,17 @@ static void climb_handle_act_other(struct thread *t, struct climb_handle *ch,
                                    bool lock) {
 
     /* thread cannot disappear under us */
-    enum thread_flags out_flags;
-    struct scheduler *sch = thread_get_last_ran(t, &out_flags);
-    enum irql irql;
+    enum irql irql = IRQL_PASSIVE_LEVEL;
+
+    struct scheduler *sch = NULL;
 
     if (!lock)
-        irql = spin_lock_irq_disable(&sch->lock);
+        sch = thread_get_scheduler(t, &irql);
 
     act(t, ch);
 
     if (!lock)
         spin_unlock(&sch->lock, irql);
-
-    thread_restore_flags(t, out_flags);
 }
 
 static bool climb_get_ref(struct thread *t) {

@@ -10,7 +10,7 @@
 #include "sched_profiling.h"
 
 bool scheduler_can_take_thread(size_t core, struct thread *target) {
-    if (thread_get_flags(target) & THREAD_FLAGS_NO_STEAL)
+    if (atomic_load_explicit(&target->pinned, memory_order_acquire))
         return false;
 
     if (!cpu_mask_test(&target->allowed_cpus, core))
@@ -72,11 +72,8 @@ static struct thread *steal_from_thread_rbt(struct scheduler *victim,
 
         /* we must first set the thread as `being_moved` before we
          * check if we can steal the thread... */
-        spin_lock_raw(&target->being_moved);
-        if (!scheduler_can_take_thread(smp_core_id(), target)) {
-            spin_unlock_raw(&target->being_moved);
+        if (!scheduler_can_take_thread(smp_core_id(), target))
             continue;
-        }
 
         rbt_delete(tree, node);
 
@@ -115,9 +112,7 @@ static struct thread *steal_from_special_threads(struct scheduler *victim,
     list_for_each_safe(pos, n, q) {
         struct thread *t = thread_from_rq_list_node(pos);
 
-        spin_lock_raw(&t->being_moved);
         if (!scheduler_can_take_thread(core, t)) {
-            spin_unlock_raw(&t->being_moved);
             continue;
         }
 
@@ -159,8 +154,10 @@ struct thread *scheduler_steal_work(struct scheduler *new,
         }
     }
 
-    if (stolen)
+    if (stolen) {
+        thread_set_runqueue(stolen, new);
         thread_post_migrate(stolen, victim->core_id, new->core_id);
+    }
 
     spin_unlock_raw(&victim->lock);
     return stolen;
@@ -210,7 +207,6 @@ struct thread *scheduler_try_do_steal(struct scheduler *sched) {
 
     if (stolen) {
         sched_profiling_record_steal();
-        spin_unlock_raw(&stolen->being_moved);
     } else {
         scheduler_try_push_to_idle_core(sched);
     }

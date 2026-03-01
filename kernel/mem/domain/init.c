@@ -248,7 +248,7 @@ static void domain_spawn(struct domain_buddy *domain) {
     uint64_t id = domain->cores[0]->id;
 
     worker->curr_core = id;
-    worker->flags = THREAD_FLAGS_NO_STEAL;
+    worker->pinned= 1;
     thread_set_background(worker);
     thread_enqueue_on_core(worker, id);
 }

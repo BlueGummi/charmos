@@ -260,7 +260,7 @@ TEST_REGISTER(dpc_on_event_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     struct thread *t =
         thread_create("dpc_dummy", dpc_on_event_dummy_thread, NULL);
-    t->flags = THREAD_FLAGS_NO_STEAL;
+    t->pinned= 1;
     thread_enqueue_on_core(t, found);
 
     /* we now know the other processor is in the thread */

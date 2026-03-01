@@ -38,17 +38,10 @@ ok:
 
 bool thread_inherit_priority(struct thread *boosted, struct thread *from,
                              enum thread_prio_class *old_class) {
-    enum thread_flags old, old2;
-    struct scheduler *sched = thread_get_last_ran(boosted, &old);
-    struct scheduler *sched2 = thread_get_last_ran(from, &old2);
-
-    /* acquire this lock */
+    struct scheduler *sched, *sched2;
     enum irql irql, irql2;
-    if (sched == sched2) {
-        irql = spin_lock_irq_disable(&sched->lock);
-    } else {
-        scheduler_acquire_two_locks(sched, sched2, &irql, &irql2);
-    }
+
+    thread_lock_two_runqueues(boosted, from, &sched, &sched2, &irql, &irql2);
 
     bool did_boost = false;
     if (thread_get_state(boosted) == THREAD_STATE_READY) {
@@ -64,14 +57,8 @@ bool thread_inherit_priority(struct thread *boosted, struct thread *from,
         did_boost = scheduler_boost_thread_internal(boosted, from, old_class);
     }
 
-    if (sched == sched2) {
-        spin_unlock(&sched->lock, irql);
-    } else {
-        scheduler_drop_two_locks(sched, sched2, irql, irql2);
-    }
+    scheduler_drop_two_locks(sched, sched2, irql, irql2);
 
-    thread_restore_flags(boosted, old);
-    thread_restore_flags(from, old2);
     return did_boost;
 }
 

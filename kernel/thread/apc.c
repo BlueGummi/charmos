@@ -80,11 +80,11 @@ static void apc_execute(struct apc *a) {
 
     struct thread *curr = thread_get_current();
 
-    curr->executing_apc = true;
+    thread_or_flags(curr, THREAD_FLAG_EXECUTING_APC);
 
     a->func(a, a->arg1, a->arg2);
 
-    curr->executing_apc = false;
+    thread_and_flags(curr, ~THREAD_FLAG_EXECUTING_APC);
     curr->total_apcs_ran++;
 }
 
@@ -128,20 +128,19 @@ static inline bool thread_is_active(struct thread *t) {
 }
 
 static void maybe_force_resched(struct thread *t) {
-    enum thread_flags old;
-
     /* it's ok if the read of tick_enabled races here. if we read it as
      * `enabled`, it means that it is either truly enabled or is in
      * the schedule() routine about to disable it, meaning that
      * if it does get disabled, it'll still have a chance to check
      * and run the APCs of the only thread active */
-    struct scheduler *sched = thread_get_last_ran(t, &old);
+    enum irql irql;
+    struct scheduler *sched = thread_get_scheduler(t, &irql);
 
     bool needs_resched = !sched->tick_enabled;
     if (needs_resched)
         scheduler_force_resched(sched);
 
-    thread_restore_flags(t, old);
+    spin_unlock(&sched->lock, irql);
 }
 
 static void wake_if_waiting(struct thread *t) {

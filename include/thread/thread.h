@@ -174,8 +174,16 @@ struct thread {
     struct list_head thread_list; /* global list of threads */
 
     /* Runqueue nodes */
-    struct rbt_node rq_tree_node;  /* runqueue tree node */
-    struct list_head rq_list_node; /* runqueue list node */
+
+    union {
+        struct rbt_node rq_tree_node; /* runqueue tree node */
+        struct rbt_node rt_tree_node; /* alias for rt scheduling */
+    };
+
+    union {
+        struct list_head rq_list_node; /* runqueue list node */
+        struct list_head rt_list_node; /* alias for rt scheduling */
+    };
 
     /* Waitqueue nodes */
     struct rbt_node wq_tree_node;        /* waitqueue tree node */
@@ -188,7 +196,6 @@ struct thread {
 
     /* State */
     _Atomic enum thread_state state;
-    atomic_bool dying;
 
     /* Who is running us? */
     cpu_id_t curr_core; /* -1 if not being ran */
@@ -197,7 +204,7 @@ struct thread {
                                * -1 if the scheduler should select the most
                                * optimal core */
 
-    _Atomic cpu_id_t last_ran; /* What core last ran us? */
+    _Atomic(struct scheduler *) scheduler;
 
     time_t run_start_time; /* When did we start running */
 
@@ -207,6 +214,8 @@ struct thread {
 
     /* Flags */
     _Atomic(enum thread_flags) flags;
+    _Atomic uint32_t pinned;
+    _Atomic size_t migration_generation;
 
     /* ======== Raw priority + timeslice data ======== */
 
@@ -223,9 +232,6 @@ struct thread {
                              * does not satisfy the thread, we will try
                              * to either increase it for this CPU, or
                              * migrate the thread to another CPU. */
-
-    struct spinlock being_moved; /* only to be spin_raw, spinlock_raw,
-                                  * and spin_unlock_raw */
 
     /* Class changes */
     time_t last_class_change_ms;
@@ -272,7 +278,6 @@ struct thread {
     _Atomic uint64_t rcu_quiescent_gen;
 
     /* Block/sleep and wake sync. */
-    atomic_bool yielded_after_wait;
     _Atomic enum thread_wait_type wait_type;
     void *expected_wake_src;
     uint64_t wait_token;
@@ -283,7 +288,6 @@ struct thread {
     enum thread_state last_action;
 
     _Atomic(void *) wake_src;
-    atomic_bool wake_matched;
     uint64_t wake_token;
 
     uint64_t token_ctr;
@@ -297,13 +301,11 @@ struct thread {
     struct climb_thread_state climb_state;
 
     /* ========== APC data ========== */
-    bool executing_apc; /* Executing an APC right now? */
-
     /* Standard APC queues */
     struct list_head apc_head[APC_TYPE_COUNT];
 
     /* Any APC pending */
-    _Atomic uintptr_t apc_pending_mask; /* bitmask of APC_TYPE_* pending */
+    _Atomic uint8_t apc_pending_mask; /* bitmask of APC_TYPE_* pending */
 
     /* APC disable counts */
     uint32_t special_apc_disable;
@@ -320,11 +322,11 @@ struct thread {
 
     time_t creation_time_ms; /* When were we created? */
 
-    size_t boost_count;
-    size_t total_wake_count;  /* Aggregate count of all wake events */
-    size_t total_block_count; /* Aggregate count of all block events */
-    size_t total_sleep_count; /* Aggregate count of all sleep events */
-    size_t total_apcs_ran;    /* Total APCs executed on a given thread */
+    uint32_t boost_count;
+    uint32_t total_wake_count;  /* Aggregate count of all wake events */
+    uint32_t total_block_count; /* Aggregate count of all block events */
+    uint32_t total_sleep_count; /* Aggregate count of all sleep events */
+    uint32_t total_apcs_ran;    /* Total APCs executed on a given thread */
 
     /* Misc. private field for whatever needs it */
     void *private;
@@ -395,6 +397,7 @@ void thread_migrate(struct thread *t, size_t dest_core);
 void thread_wait_for_wake_match();
 enum thread_prio_class thread_unboost_self();
 enum thread_prio_class thread_boost_self(enum thread_prio_class new);
+struct scheduler *thread_get_scheduler(struct thread *t, enum irql *sirql_out);
 
 struct thread_queue;
 void thread_block_on(struct thread_queue *q, enum thread_wait_type type,
@@ -411,6 +414,15 @@ bool thread_inherit_priority(struct thread *boosted, struct thread *from,
 
 void thread_uninherit_priority(enum thread_prio_class class);
 void thread_remove_boost();
+
+void thread_lock_two_runqueues(struct thread *a, struct thread *b,
+                               struct scheduler **out_rq_a,
+                               struct scheduler **out_rq_b, enum irql *irq_a,
+                               enum irql *irq_b);
+
+void thread_lock_thread_and_rq(struct thread *t, struct scheduler *other_rq,
+                               struct scheduler **out_thread_rq,
+                               enum irql *irq_first, enum irql *irq_second);
 
 static inline struct thread *thread_get_current() {
     uintptr_t thread;
@@ -437,13 +449,8 @@ static inline enum thread_flags thread_get_flags(struct thread *t) {
     return atomic_load(&t->flags);
 }
 
-static inline void thread_set_flags(struct thread *t, enum thread_flags flags) {
-    atomic_store(&t->flags, flags);
-}
-
-static inline void thread_restore_flags(struct thread *t,
-                                        enum thread_flags flags) {
-    thread_set_flags(t, flags);
+static inline void thread_set_flags(struct thread *t, enum thread_flags new) {
+    atomic_store(&t->flags, new);
 }
 
 static inline enum thread_flags thread_or_flags(struct thread *t,
@@ -456,25 +463,24 @@ static inline enum thread_flags thread_and_flags(struct thread *t,
     return atomic_fetch_and(&t->flags, flags);
 }
 
-static inline struct scheduler *
-thread_get_last_ran(struct thread *t, enum thread_flags *out_flags) {
-    enum thread_flags old = thread_or_flags(t, THREAD_FLAGS_NO_STEAL);
-
-    /* we pin the thread so that it doesn't get migrated and we
-     * properly read the last_ran field in a non-racy way */
-    spin_raw(&t->being_moved);
-
-    *out_flags = old;
-    return global
-        .schedulers[atomic_load_explicit(&t->last_ran, memory_order_acquire)];
+static inline size_t thread_get_migration_generation(struct thread *t) {
+    return atomic_load_explicit(&t->migration_generation, memory_order_acquire);
 }
 
-static inline uint64_t thread_set_last_ran(struct thread *t, uint64_t new) {
-    return atomic_exchange(&t->last_ran, new);
+static inline struct scheduler *thread_get_scheduler_unsafe(struct thread *t) {
+    return atomic_load_explicit(&t->scheduler, memory_order_acquire);
 }
 
-REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(thread, refcount, dying,
-                                                   == true);
+static inline void thread_set_runqueue(struct thread *t, struct scheduler *s) {
+    atomic_fetch_add_explicit(&t->migration_generation, 1,
+                              memory_order_release);
+    atomic_store_explicit(&t->scheduler, s, memory_order_release);
+    atomic_fetch_add_explicit(&t->migration_generation, 1,
+                              memory_order_release);
+}
+
+REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(thread, refcount, flags,
+                                                   &THREAD_FLAG_DYING);
 
 static inline void thread_put(struct thread *t) {
     if (refcount_dec_and_test(&t->refcount)) {
@@ -509,7 +515,7 @@ static inline bool thread_is_rt(struct thread *t) {
 
 static inline void thread_clear_wake_data_raw(struct thread *t) {
     atomic_store_explicit(&t->wake_src, NULL, memory_order_release);
-    atomic_store_explicit(&t->wake_matched, false, memory_order_release);
+    thread_and_flags(t, ~THREAD_FLAG_WAKE_MATCHED);
     t->expected_wake_src = NULL;
     t->wait_type = THREAD_WAIT_NONE;
     t->last_action_reason = 0;
