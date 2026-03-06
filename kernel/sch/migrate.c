@@ -67,7 +67,7 @@ void thread_migrate(struct thread *t, size_t dest_core) {
     thread_lock_thread_and_rq(t, dst, &src, &sirql, &dirql);
 
     if (src == dst) {
-        scheduler_drop_two_locks(src, dst, sirql, dirql);
+        scheduler_release_two_locks(src, dst, sirql, dirql);
         return;
     }
 
@@ -103,5 +103,5 @@ out:
     thread_release(t, tirql);
 
 end:
-    scheduler_drop_two_locks(src, dst, sirql, dirql);
+    scheduler_release_two_locks(src, dst, sirql, dirql);
 }

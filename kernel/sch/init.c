@@ -11,6 +11,13 @@ static size_t scheduler_thread_get_data(struct rbt_node *n) {
     return thread_from_rq_rbt_node(n)->virtual_runtime_left;
 }
 
+static int32_t scheduler_cmp_threads(const struct rbt_node *a,
+                                     const struct rbt_node *b) {
+    int32_t vrla = thread_from_rq_rbt_node(a)->virtual_runtime_left;
+    int32_t vrlb = thread_from_rq_rbt_node(b)->virtual_runtime_left;
+    return vrla - vrlb;
+}
+
 void scheduler_init(void) {
     scheduler_data.max_concurrent_stealers = global.core_count / 4;
 
@@ -31,9 +38,12 @@ void scheduler_init(void) {
         if (!s)
             panic("Could not allocate scheduler %lu\n", i);
 
-        rbt_init(&s->thread_rbt, scheduler_thread_get_data);
-        rbt_init(&s->completed_rbt, scheduler_thread_get_data);
-        rbt_init(&s->climb_threads, climb_get_thread_data);
+        rbt_init(&s->thread_rbt, scheduler_thread_get_data,
+                 scheduler_cmp_threads);
+        rbt_init(&s->completed_rbt, scheduler_thread_get_data,
+                 scheduler_cmp_threads);
+        rbt_init(&s->climb_threads, climb_get_thread_data,
+                 scheduler_cmp_threads);
         s->tick_enabled = false;
         s->current_period = 1; /* Start at period 1 to avoid
                                 * starting at 0 because

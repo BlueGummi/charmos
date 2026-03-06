@@ -392,12 +392,18 @@ static size_t slab_get_data(struct rbt_node *node) {
     return slab_from_rbt_node(node)->gc_enqueue_time_ms;
 }
 
+static int32_t slab_cmp_slabs(const struct rbt_node *a,
+                              const struct rbt_node *b) {
+    int32_t sa = slab_get_data((void *) a);
+    int32_t sb = slab_get_data((void *) b);
+    return sa - sb;
+}
+
 void slab_gc_init(struct slab_domain *dom) {
     struct slab_gc *gc = &dom->slab_gc;
     gc->num_elements = 0;
     spinlock_init(&gc->lock);
-    gc->rbt.get_data = slab_get_data;
-    gc->rbt.root = NULL;
+    rbt_init(&gc->rbt, slab_get_data, slab_cmp_slabs);
     gc->parent = dom;
 }
 

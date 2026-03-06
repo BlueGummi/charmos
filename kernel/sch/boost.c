@@ -57,7 +57,7 @@ bool thread_inherit_priority(struct thread *boosted, struct thread *from,
         did_boost = scheduler_boost_thread_internal(boosted, from, old_class);
     }
 
-    scheduler_drop_two_locks(sched, sched2, irql, irql2);
+    scheduler_release_two_locks(sched, sched2, irql, irql2);
 
     return did_boost;
 }

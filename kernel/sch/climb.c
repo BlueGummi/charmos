@@ -12,9 +12,12 @@ void climb_per_period_hook();
 SCHEDULER_PERIODIC_WORK_REGISTER_PER_PERIOD(climb_per_period_hook,
                                             PERIODIC_WORK_MID);
 
-LOG_SITE_DECLARE(climb, LOG_SITE_PRINT | LOG_SITE_DEFAULT,
-                 LOG_SITE_CAPACITY_DEFAULT, LOG_SITE_ALL,
-                 ((struct log_dump_opts){.show_tid = true, .show_args = true}));
+LOG_SITE_DECLARE(climb, .flags = LOG_SITE_PRINT | LOG_SITE_DEFAULT,
+                 .capacity = LOG_SITE_CAPACITY_DEFAULT,
+                 .enabled_mask = LOG_SITE_ALL,
+                 .dump_opts = ((struct log_dump_options){.show_tid = true,
+                                                         .show_args = true}));
+
 LOG_HANDLE_DECLARE_DEFAULT(climb);
 #define climb_log(lvl, fmt, ...)                                               \
     log(LOG_SITE(climb), LOG_HANDLE(climb), lvl, fmt, ##__VA_ARGS__)
@@ -47,6 +50,31 @@ static inline struct rbt *climb_tree_local() {
 /*
  * shaped = p ^ CLIMB_PRESSURE_EXPONENT
  * level = floor(shaped * CLIMB_BOOST_LEVEL_MAX)
+ *
+ *
+ *  2000 +-------------------------------------------------------------------+
+ *       |*               +                +                +               *|
+ *       |**                                    floor((x ** 2) * 20) ********|
+ *       |  *                                                             *  |
+ *       |  *                                                             *  |
+ *  1500 |-+ **                                                         ** +-|
+ *       |    *                                                         *    |
+ *       |     **                                                     **     |
+ *       |       *                                                   *       |
+ *       |       **                                                 **       |
+ *  1000 |-+       *                                               *       +-|
+ *       |          **                                           **          |
+ *       |           **                                         **           |
+ *       |             *                                       *             |
+ *       |              **                                   **              |
+ *   500 |-+             ***                               ***             +-|
+ *       |                  *                             *                  |
+ *       |                   **                         **                   |
+ *       |                     ***                   ***                     |
+ *       |                +       ****     +     ****       +                |
+ *     0 +-------------------------------------------------------------------+
+ *      -10              -5                0                5                10
+ *
  * boost_clamp(level)
  */
 static inline int32_t climb_pressure_to_boost_target(climb_pressure_t p) {
@@ -226,20 +254,6 @@ static void remove_handle(struct thread *t, struct climb_handle *ch) {
     climb_info("Remove handle on 0x%lx (thread 0x%lx), %u left", cts, t,
                climb_count_handles(cts));
 
-    struct scheduler *sched = thread_get_scheduler_unsafe(t);
-
-    if (!rbt_has_node(&sched->climb_threads, &cts->climb_node)) {
-        printf("Tree:\n");
-        struct rbt_node *node;
-        rbt_for_each(node, &sched->climb_threads) {
-            printf("node 0x%lx\n", node);
-        }
-
-        panic("0x%lx, (thread 0x%lx) is not on tree when handle "
-              "was removed by 0x%lx\n",
-              cts, t, thread_get_current());
-    }
-
     if (list_empty(&cts->handles)) {
         /* This thread is done. Let it decay now */
         cts->pressure_periods = -1;
@@ -346,6 +360,29 @@ void climb_handle_remove(struct climb_handle *h) {
 
 void climb_handle_remove_locked(struct climb_handle *h) {
     climb_handle_remove_internal(h, true);
+}
+
+void climb_thread_remove(struct thread *t) {
+
+    enum irql irql_out;
+    struct scheduler *sched = thread_get_scheduler(t, &irql_out);
+
+    struct climb_thread_state *cts = &t->climb_state;
+    struct rbt *tree = &sched->climb_threads;
+    struct rbt_node *node = &cts->climb_node;
+
+    bool put = false;
+    if (rbt_has_node(tree, node)) {
+        climb_info("Removing from tree 0x%lx", cts);
+        rbt_delete(tree, node);
+        cts->pressure_periods = 0;
+        cts->on_climb_tree = false;
+        put = true;
+    }
+
+    spin_unlock(&sched->lock, irql_out);
+    if (put)
+        thread_put(t);
 }
 
 static struct climb_budget climb_budget_from_summary(struct climb_summary *s) {

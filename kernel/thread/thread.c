@@ -49,6 +49,9 @@ void thread_exit() {
 
     atomic_store(&self->state, THREAD_STATE_ZOMBIE);
     thread_or_flags(self, THREAD_FLAG_DYING);
+
+    climb_thread_remove(self);
+
     reaper_enqueue(self);
 
     locked_list_del(&thread_list, &self->thread_list);
@@ -229,8 +232,15 @@ struct thread *thread_create_internal(char *name, void (*entry_point)(void *),
     if (!new_thread->name)
         goto err;
 
-    new_thread->log_site =
-        log_site_create(new_thread->name, LOG_SITE_DROP_OLD, 16);
+    struct log_site_options opts = {
+        .name = new_thread->name,
+        .dump_opts = LOG_DUMP_DEFAULT,
+        .capacity = 16,
+        .flags = LOG_SITE_DEFAULT,
+        .enabled_mask = LOG_SITE_ALL,
+    };
+
+    new_thread->log_site = log_site_create(opts);
     if (!new_thread->log_site)
         goto err;
 

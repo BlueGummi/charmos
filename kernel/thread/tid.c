@@ -7,13 +7,19 @@ static size_t tid_space_get_data(struct rbt_node *node) {
     return container_of(node, struct tid_range, node)->start;
 }
 
+static int32_t tid_space_cmp(const struct rbt_node *a,
+                             const struct rbt_node *b) {
+    int32_t l = tid_space_get_data((void *) a);
+    int32_t r = tid_space_get_data((void *) b);
+    return l - r;
+}
+
 struct tid_space *tid_space_init(uint64_t max_id) {
     struct tid_space *ts = kzalloc(sizeof(*ts), ALLOC_PARAMS_DEFAULT);
     if (!ts)
         return NULL;
 
-    ts->tree.root = NULL;
-    ts->tree.get_data = tid_space_get_data;
+    rbt_init(&ts->tree, tid_space_get_data, tid_space_cmp);
     spinlock_init(&ts->lock);
 
     // Initialize reserve pool

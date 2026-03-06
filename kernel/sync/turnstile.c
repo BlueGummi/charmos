@@ -90,14 +90,23 @@ static size_t turnstile_thread_get_data(struct rbt_node *n) {
     return turnstile_thread_priority(thread_from_wq_rbt_node(n));
 }
 
+static int32_t turnstile_thread_cmp(const struct rbt_node *a,
+                                    const struct rbt_node *b) {
+    int32_t ta = turnstile_thread_get_data((void *) a);
+    int32_t tb = turnstile_thread_get_data((void *) b);
+    return ta - tb;
+}
+
 struct turnstile *turnstile_init(struct turnstile *ts) {
     ts->lock_obj = NULL;
     ts->waiters = 0;
     ts->state = TURNSTILE_STATE_UNUSED;
     ts->owner = NULL;
 
-    rbt_init(&ts->queues[TURNSTILE_READER_QUEUE], turnstile_thread_get_data);
-    rbt_init(&ts->queues[TURNSTILE_WRITER_QUEUE], turnstile_thread_get_data);
+    rbt_init(&ts->queues[TURNSTILE_READER_QUEUE], turnstile_thread_get_data,
+             turnstile_thread_cmp);
+    rbt_init(&ts->queues[TURNSTILE_WRITER_QUEUE], turnstile_thread_get_data,
+             turnstile_thread_cmp);
     INIT_LIST_HEAD(&ts->freelist);
     INIT_LIST_HEAD(&ts->hash_list);
 

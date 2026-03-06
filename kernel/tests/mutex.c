@@ -7,8 +7,9 @@
 #include <tests.h>
 #include <thread/thread.h>
 
-LOG_SITE_DECLARE(test_mutex, LOG_SITE_PRINT | LOG_SITE_DROP_OLD,
-                 LOG_SITE_CAPACITY_DEFAULT, LOG_SITE_ALL, LOG_DUMP_DEFAULT);
+LOG_SITE_DECLARE(test_mutex, .flags = LOG_SITE_PRINT | LOG_SITE_DROP_OLD,
+                 .capacity = LOG_SITE_CAPACITY_DEFAULT,
+                 .enabled_mask = LOG_SITE_ALL, .dump_opts = LOG_DUMP_DEFAULT);
 LOG_HANDLE_DECLARE_DEFAULT(test_mutex);
 
 #define test_mutex_log(lvl, fmt, ...)                                          \

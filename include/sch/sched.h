@@ -65,6 +65,8 @@ struct scheduler {
 
     uint64_t core_id;
 
+    /* TODO: Rework time load balancing away from this foolery */
+
     /* Work steal/migration */
     atomic_bool being_robbed;
     atomic_bool stealing_work;
@@ -83,6 +85,8 @@ struct scheduler {
                                      * but in the case that it isn't, we must
                                      * drop the raw lock for this in addition
                                      * to the lock for our scheduler */
+
+    struct rt_scheduler_percpu *rt;
 };
 
 void scheduler_init();

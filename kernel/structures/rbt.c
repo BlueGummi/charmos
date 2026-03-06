@@ -5,11 +5,12 @@
 #include <stdint.h>
 #include <structures/rbt.h>
 
-struct rbt *rbt_create(rbt_get_data get) {
+struct rbt *rbt_create(rbt_get_data get, rbt_compare cmp) {
     struct rbt *tree = kmalloc(sizeof(struct rbt), ALLOC_PARAMS_DEFAULT);
     if (!tree)
         return NULL;
 
+    tree->compare = cmp;
     tree->get_data = get;
     tree->root = NULL;
     return tree;
@@ -230,8 +231,8 @@ void rbt_delete(struct rbt *tree, struct rbt_node *z) {
     z->parent = NULL;
 }
 
-struct rbt_node *rbt_search(struct rbt *tree, struct rbt_node *root,
-                            uint64_t data) {
+static struct rbt_node *
+rbt_search_internal(struct rbt *tree, struct rbt_node *root, uint64_t data) {
     while (root && tree->get_data(root) != data) {
         if (data < tree->get_data(root))
             root = root->left;
@@ -239,6 +240,19 @@ struct rbt_node *rbt_search(struct rbt *tree, struct rbt_node *root,
             root = root->right;
     }
     return root;
+}
+
+struct rbt_node *rbt_search(struct rbt *tree, uint64_t data) {
+    struct rbt_node *root = tree->root;
+
+    while (root && tree->get_data(root) != data) {
+        if (data < tree->get_data(root))
+            root = root->left;
+        else
+            root = root->right;
+    }
+
+    return (root && tree->get_data(root) == data) ? root : NULL;
 }
 
 bool rbt_has_node(struct rbt *tree, struct rbt_node *node) {
@@ -251,7 +265,7 @@ bool rbt_has_node(struct rbt *tree, struct rbt_node *node) {
 }
 
 void rbt_remove(struct rbt *tree, uint64_t data) {
-    struct rbt_node *node = rbt_search(tree, tree->root, data);
+    struct rbt_node *node = rbt_search_internal(tree, tree->root, data);
     if (node)
         rbt_delete(tree, node);
 }
@@ -316,14 +330,14 @@ void rbt_insert(struct rbt *tree, struct rbt_node *new_node) {
     struct rbt_node *parent = NULL;
     while (current != NULL) {
         parent = current;
-        if (tree->get_data(new_node) < tree->get_data(current))
+        if (tree->compare(new_node, current) < 0)
             current = current->left;
         else
             current = current->right;
     }
 
     new_node->parent = parent;
-    if (tree->get_data(new_node) < tree->get_data(parent))
+    if (tree->compare(new_node, parent) < 0)
         parent->left = new_node;
     else
         parent->right = new_node;
@@ -335,8 +349,9 @@ void rbt_insert(struct rbt *tree, struct rbt_node *new_node) {
                   new_node->color == TREE_NODE_RED));
 }
 
-struct rbt *rbt_init(struct rbt *tree, rbt_get_data get_data) {
+struct rbt *rbt_init(struct rbt *tree, rbt_get_data get_data, rbt_compare cmp) {
     tree->root = NULL;
+    tree->compare = cmp;
     tree->get_data = get_data;
     return tree;
 }

@@ -1,11 +1,13 @@
 /* @title: Real-time scheduling */
 #pragma once
 #include <log.h>
+#include <smp/topology.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <structures/list.h>
+#include <structures/rbt.h>
 #include <thread/dpc.h>
 #include <thread/thread_types.h>
 #include <types/refcount.h>
@@ -44,7 +46,12 @@
  *
  * ## Background:
  *
- * Realtime scheduler load balancing has long
+ * Realtime scheduler load balancing has long been a topic of great contention
+ * in realtime scheduling. Although EDF is a provably optimal algorithm on
+ * uniprocessor systems, its performance and optimality is varied on
+ * multiprocessor machines.
+ *
+ * ## Summary:
  *
  * Load balancing in a realtime operating system that supports timesharing
  * scheduling is inherently non-deterministic. The outcome of a load
@@ -119,6 +126,32 @@
  * call to yield the processor must be made for work to be added, as opposed
  * to work pushing where the negative party can randomly get work added.
  *
+ * ## API:
+ * TODO
+ *
+ * ## Errors:
+ *
+ * The modular realtime scheduler system of this kernel *allows realtime
+ * schedulers to fail*, and *fails upwards*. TODO
+ *
+ * ## Context:
+ *
+ * The realtime scheduler exists under the broader scheduling and multitasking
+ * capabilities of this kernel, and exists in contrast to the primary
+ * timesharing scheduler which is detailed to a greater extent elsewhere.
+ *
+ * ## Constraints:
+ * TODO
+ *
+ * ## Internals:
+ * TODO
+ *
+ * ## Strategy:
+ * TODO
+ *
+ * ## Rationale:
+ * TODO
+ *
  */
 
 LOG_SITE_EXTERN(rt_sched);   /* For generic logging */
@@ -133,7 +166,42 @@ LOG_HANDLE_EXTERN(rt_sched); /* For generic logging */
 #define rt_sched_debug(fmt, ...) rt_sched_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
 #define rt_sched_trace(fmt, ...) rt_sched_log(LOG_TRACE, fmt, ##__VA_ARGS__)
 
+/* Realtime schedulers are allowed to reserve a certain amount of pointer-sized
+ * fields in each thread to use for whatever they would like. This is ideally
+ * not meant to point to dynamically allocated memory, and should be used
+ * to embed additional data per thread. */
+
+/* We refer to these as "slots". I could call them "reservations", but much
+ * RT scheduling related work uses "reservation" to refer to time "slices"
+ * in static scheduling of tasks, and I don't want to deal with odd name
+ * conflicts */
+#define RT_SCHEDULER_SLOTS_PER_THREAD 8
+
+typedef size_t rt_domain_id_t;
+typedef int32_t rt_weight_t;
+
+/* This is a range from [-1, 1], where
+ * -1 means "Not urgent at all", and
+ *  1 means "absolutely urgent, things
+ *  keep missing, problems keep
+ *  happening"... */
+typedef fx16_16_t rt_urgency_t;
+
 struct rt_scheduler;
+
+/* This enum exists for debug/info reasons. No actual operations are
+ * performed based on the topology level */
+enum rt_scheduler_topo_level {
+    RT_SCHEDULER_TOPO_SMT,     /* Symmetric multiprocessing threads */
+    RT_SCHEDULER_TOPO_CORE,    /* SMTs under a core */
+    RT_SCHEDULER_TOPO_NUMA,    /* NUMA node */
+    RT_SCHEDULER_TOPO_LLC,     /* Last level cache (some processors
+                                * have multiple L3 caches for a given
+                                * physical processor) */
+    RT_SCHEDULER_TOPO_PACKAGE, /* Physical processor in a socket */
+    RT_SCHEDULER_TOPO_MACHINE, /* Whole machine */
+    RT_SCHEDULER_TOPO_CUSTOM,  /* Custom topology */
+};
 
 /* This enum defines *what* the realtime scheduler will tell you from
  * functions. For example, when it summarizes itself and produces a
@@ -161,6 +229,10 @@ enum rt_scheduler_error {
     RT_SCHEDULER_ERR_SWITCH_IMPOSSIBLE = -18, /* Switching the scheduler would
                                                * lead to unhoused threads */
 
+    RT_SCHEDULER_ERR_OOM = -17, /* Specifically ran out of memory */
+
+    RT_SCHEDULER_ERR_OOR = -16, /* Generic "Out of resources" */
+
     RT_SCHEDULER_ERR_POLICY = -3,
     RT_SCHEDULER_ERR_DEADLINE = -2, /* Deadline-related error */
 
@@ -180,7 +252,7 @@ enum rt_scheduler_error {
  *      └───────────────────────────┘
  *
  *
- * D - Deadline misses observed
+ * D - Degraded performance observed
  * T - Throttled
  * I - CPU isolation
  * * - Unused
@@ -249,7 +321,36 @@ enum rt_scheduler_state : uint8_t {
     RT_SCHEDULER_FAILURE,
 };
 
+enum rt_slot_priority {
+    RT_SLOT_REQUIRED, /* Scheduler load will fail if this fails */
+    RT_SLOT_OPTIONAL, /* Scheduler load will continue as normal */
+};
+
+struct rt_slot_request {
+    char *name; /* Debug */
+    enum rt_slot_priority prio;
+    int32_t mapped_to; /* -1 = none */
+};
+
 struct rt_thread_summary {
+    /* This field exists as a "Summary of the summary". It gives us a
+     * high level, obvious and simple (but somewhat inaccurate) indicator
+     * to motivate the core scheduler to read the other fields inside
+     * this structure. Its main role is for performance/quick summaries */
+
+    enum rt_scheduler_status status;
+
+    rt_weight_t
+        total_weight; /* A "weight" of the load on the scheduler. A thread
+                       * provides a base weight, and then this can be added
+                       * or removed depending on properties of the thread */
+
+    /* Urgency is separate from the weight of a thread. There can be
+     * a lot of threads on an RT scheduler, but they could all just be
+     * hitting their deadlines fine and doing a-OK, indicating that
+     * there is less of a need for migrations to happen away */
+    rt_urgency_t urgency;
+
     /* Each rt_scheduler contains one of these */
 };
 
@@ -269,17 +370,47 @@ struct rt_thread_summary_ext {
     /* Each rt_scheduler can be polled for this */
 };
 
+/* Because we adopt a "Pull only" philosophy within load balancing, we
+ * use "shed requests" to allow RT schedulers to say "I have work, take it away
+ * from me". These exist separate from summaries, as these will set a bit
+ * in a per-domain bitmap regarding the RT scheduler request statuses */
+struct rt_thread_shed_request {
+    bool on;              /* Not always on */
+    rt_urgency_t urgency; /* How much do we need to have things moved? */
+
+    size_t threads_available; /* How many can we take away? */
+
+    /* This is a "suggestion" list of threads to take.
+     * Notably, the amount of threads on this list does NOT
+     * HAVE TO match the `threads_available`. This gives
+     * us the ability to potentially say "Hey, we have X
+     * threads available, however, we do not know
+     * specifically which of these you might want to take.
+     *
+     * (e.g. RR might just see that there are too many
+     * threads, and simply say "we have N too many") */
+
+    /* Rule behind this: before anything is ever taken
+     * from `threads`, it MUST be verified that it *can* be taken.
+     *
+     * Ideally, no pinned threads should end up here, however, if
+     * any do, (or if any incompatible cpu masks are here), they
+     * should absolutely not get pulled onto another domain */
+    struct list_head threads;
+};
+
 typedef enum rt_scheduler_error (*rt_scheduler_fn)(struct rt_scheduler *);
+typedef enum rt_scheduler_error (*rt_scheduler_static_fn)(
+    struct rt_scheduler *);
 typedef void (*rt_scheduler_thread_fn)(struct rt_scheduler *, struct thread *);
 
 /* The rt_scheduler lock is held prior to calling these
  * functions unless explicitly stated otherwise */
 struct rt_scheduler_ops {
+    rt_scheduler_static_fn on_load;
+    rt_scheduler_static_fn on_unload;
     /* RT scheduler initialization happens once at load/boot */
 
-    /* This creates one struct rt_scheduler for each CPU, and returns
-     * them in an array. On unload() we pass this back in and the
-     * RT scheduler destroys its own internal status */
     rt_scheduler_fn init; /* RT scheduler lock not held */
 
     rt_scheduler_fn destroy; /* Must be called AFTER the
@@ -296,7 +427,7 @@ struct rt_scheduler_ops {
     /* Two RT schedulers are deemed "twins" if they belong to the same
      * rt_scheduler_static. This allows rt schedulers of the same
      * type to make migration decisions, and make them better
-     * than what the core scheduler might be able to "guess"
+     * than what the core scheduler might be able to "guess/estimate"
      *
      * Both locks are acquired */
     enum rt_scheduler_error (*migrate_twin)(struct rt_scheduler *us,
@@ -312,21 +443,65 @@ struct rt_scheduler_ops {
     rt_scheduler_fn on_tick;
 
     /* This is called to tell the RT scheduler "Give me all your threads back,
-     * and put them onto this list. The reason we have this is because at
+     * and put them onto this list". The reason we have this is because at
      * failure points/swap out points, we need to get all our threads back,
      * so that we can hold them for a bit before letting another scheduler
      * get back at it and schedule them */
     void (*return_all_threads)(struct rt_scheduler *, struct list_head *);
+
+    rt_domain_id_t (*domain_id_for_cpu)(struct core *);
+};
+
+struct rt_scheduler_ext_fn {
+    struct list_head list;
+    const char *name;
+    uint32_t id;
+    /* TODO: flags */
+    uintptr_t (*fn)(uintptr_t, uintptr_t);
+};
+
+/* Here is how we bind CPUs together within the realtime scheduler:
+ *
+ * Basically, every realtime scheduler is expected to return
+ * a rt_domain_id_t for each struct core. Each rt_domain_id_t has
+ * exactly ONE mapping for which rt_scheduler it is bound to.
+ *
+ * Whenever a thread wants to migrate to a given CPU, it doesn't
+ * JUST check if the cpu mask is compatible with that CPU, but rather,
+ * with the mask of the rt_scheduler_mapping that that CPU is using
+ * for its rt_scheduler structure.
+ *
+ * This gives us the ability to choose the granularity which we have
+ * our rt_schedulers operate at. We can make them global, we can make
+ * them per-node, per-socket, per-cpu, etc...
+ */
+struct rt_scheduler_mapping {
+    struct rt_scheduler_static *static_backpointer;
+    struct rbt_node tree_node;
+    rt_domain_id_t id;
+    struct cpu_mask members;
+    struct rt_scheduler *rt_scheduler;
+    struct spinlock lock;
+    void *data;
 };
 
 /* This is statically allocated (in a linker section if it's a part
  * of the main kernel), and meant to represent "What can this scheduler
  * do" instead of a running state of a scheduler */
 struct rt_scheduler_static {
-    struct list_head list; /* For list of global RT schedulers */
+    /* For list of global RT schedulers */
+    struct list_head list_internal;
+
+    enum rt_scheduler_topo_level topo_level;
     const char *name;
     struct rt_scheduler_ops ops;
     enum rt_scheduler_capability capabilities;
+    struct rbt mappings_internal; /* "dynamic" object.
+                                   * nodes are dynamic, this is static */
+    struct list_head ext_fns;
+    struct spinlock lock_internal;
+    size_t num_slot_requests;
+    struct rt_slot_request slot_requests[];
 };
 
 /* This is a structure that is allocated per-CPU at boot time.
@@ -336,14 +511,17 @@ struct rt_scheduler_static {
  * allowed to perform allocations and such, so it must take place inside of a
  * DPC. Similarly, destruction happens in a DPC */
 struct rt_scheduler {
+    struct core *owner;           /* We make one per-CPU. Who owns this one? */
     struct list_head thread_list; /* Threads are placed here when the scheduler
                                      gets switched out/fails */
+
+    struct rt_scheduler_mapping *mapping_source; /* Used to look at what other
+                                                  * CPUs can access this one */
 
     struct scheduler *core_scheduler; /* backpointer to
                                        * `struct scheduler` */
 
     _Atomic enum rt_scheduler_state state;
-    _Atomic enum rt_scheduler_status status;
 
     bool failed_internal; /* Used to temporarily indicate that the scheduler has
                            * FAIL_ASAP'd a function, but it just isn't safe to
@@ -351,6 +529,7 @@ struct rt_scheduler {
                            * (checked later) */
 
     struct rt_thread_summary summary; /* Summary of "What's goin on?" */
+    struct rt_thread_shed_request shed_request;
 
     struct rt_scheduler_static *rt_static;
 
@@ -365,8 +544,6 @@ struct rt_scheduler {
                                     * and whatnot. Usable by the rt_scheduler
                                     * itself, but the rt_scheduler can go
                                     * and do what it likes */
-
-    void *data; /* Internal to the rt scheduler */
 
     /* Keeping track of the rt_thread count is not done by the rt_scheduler.
      * `struct scheduler` will handle this responsibility, and will count
@@ -385,8 +562,13 @@ struct rt_scheduler {
                            * internal locking they'd like (if that somehow
                            * becomes a thing they want to do?) */
 
-    struct dpc destroy_dpc_internal; /* We call destroy() from here, since it's
-                                      * unsafe to call in the free path. */
-
-    struct dpc create_dpc_internal; /* create() is called from here */
+    void *data; /* Internal to the rt scheduler */
 };
+
+struct rt_scheduler_percpu {
+    struct scheduler *scheduler; /* Backpointer for this CPU */
+    struct rt_scheduler *active;
+    struct rt_scheduler *born_with;
+};
+
+void rt_scheduler_boot_init();

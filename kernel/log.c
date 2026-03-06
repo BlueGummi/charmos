@@ -13,10 +13,11 @@
 #include <time.h>
 
 #define LOG_IMPORTANT_RETRY 32
+LOG_SITE_DECLARE(global, .flags = LOG_SITE_DEFAULT,
+                 .capacity = LOG_SITE_CAPACITY_DEFAULT,
+                 .dump_opts = LOG_DUMP_CONSOLE, .enabled_mask = LOG_SITE_ALL);
 
-LOG_SITE_DECLARE(global, LOG_SITE_DEFAULT, LOG_SITE_CAPACITY_DEFAULT,
-                 LOG_SITE_ALL, LOG_DUMP_CONSOLE);
-LOG_HANDLE_DECLARE(global, LOG_DEFAULT, LOG_DUMP_CONSOLE);
+LOG_HANDLE_DECLARE(global, .flags = LOG_DEFAULT, .dump_opts = LOG_DUMP_CONSOLE);
 
 struct log_globals {
     struct locked_list list;
@@ -83,7 +84,7 @@ static void k_printf_from_log(const char *fmt, const uint64_t *args,
 }
 
 static void log_dump_record(const struct log_record *rec,
-                            const struct log_dump_opts opts) {
+                            const struct log_dump_options opts) {
     size_t sec = MS_TO_SECONDS(rec->timestamp);
     size_t msec = rec->timestamp % 1000;
     printf("[%llu.%03llu] %s%-5s%s ", sec, msec, log_level_color(rec->level),
@@ -112,14 +113,15 @@ static void log_dump_record(const struct log_record *rec,
     printf("\n");
 }
 
-static inline bool log_ringbuf_try_enqueue(struct log_ringbuf *rb,
+static inline bool log_ringbuf_try_enqueue(struct log_site *site,
+                                           struct log_ringbuf *rb,
                                            const struct log_record *rec) {
     uint64_t pos;
     struct log_ring_slot *slot;
 
     while (true) {
         pos = atomic_load_explicit(&rb->head, memory_order_relaxed);
-        slot = &rb->slots[pos % rb->capacity];
+        slot = &rb->slots[pos % site->capacity];
 
         uint64_t seq = atomic_load_explicit(&slot->seq, memory_order_acquire);
         int64_t diff = (int64_t) seq - (int64_t) pos;
@@ -141,14 +143,15 @@ static inline bool log_ringbuf_try_enqueue(struct log_ringbuf *rb,
     }
 }
 
-static inline bool log_ringbuf_try_dequeue(struct log_ringbuf *rb,
+static inline bool log_ringbuf_try_dequeue(struct log_site *site,
+                                           struct log_ringbuf *rb,
                                            struct log_record *out) {
     uint64_t pos;
     struct log_ring_slot *slot;
 
     while (true) {
         pos = atomic_load_explicit(&rb->tail, memory_order_relaxed);
-        slot = &rb->slots[pos % rb->capacity];
+        slot = &rb->slots[pos % site->capacity];
 
         uint64_t seq = atomic_load_explicit(&slot->seq, memory_order_acquire);
         int64_t diff = (int64_t) seq - (int64_t) (pos + 1);
@@ -160,7 +163,7 @@ static inline bool log_ringbuf_try_dequeue(struct log_ringbuf *rb,
 
                 *out = slot->rec;
 
-                atomic_store_explicit(&slot->seq, pos + rb->capacity,
+                atomic_store_explicit(&slot->seq, pos + site->capacity,
                                       memory_order_release);
                 return true;
             }
@@ -170,19 +173,20 @@ static inline bool log_ringbuf_try_dequeue(struct log_ringbuf *rb,
     }
 }
 
-static bool log_ringbuf_force_enqueue(struct log_ringbuf *rb,
+static bool log_ringbuf_force_enqueue(struct log_site *site,
+                                      struct log_ringbuf *rb,
                                       const struct log_record *rec) {
     struct log_record dummy;
-    log_ringbuf_try_dequeue(rb, &dummy);
-    return log_ringbuf_try_enqueue(rb, rec);
+    log_ringbuf_try_dequeue(site, rb, &dummy);
+    return log_ringbuf_try_enqueue(site, rb, rec);
 }
 
-void log_dump_site(struct log_site *site, struct log_dump_opts opts) {
+void log_dump_site(struct log_site *site, struct log_dump_options opts) {
     struct log_record rec;
     if (!site || !log_site_get(site))
         return;
 
-    while (log_ringbuf_try_dequeue(&site->rb, &rec)) {
+    while (log_ringbuf_try_dequeue(site, &site->rb, &rec)) {
         if (rec.level < opts.min_level)
             continue;
 
@@ -235,7 +239,7 @@ void log_emit_internal(struct log_site *site, struct log_handle *handle,
     va_end(ap);
 
     bool sopts = site->flags & LOG_SITE_PRINT;
-    struct log_dump_opts dopts = sopts ? site->dump_opts : handle->dump_opts;
+    struct log_dump_options dopts = sopts ? site->dump_opts : handle->dump_opts;
 
     if (global.current_bootstage < BOOTSTAGE_LATE)
         if (log_handle_should_print(handle, site, level))
@@ -271,16 +275,16 @@ void log_emit_internal(struct log_site *site, struct log_handle *handle,
         atomic_store(&handle->last_ts, now);
     }
 
-    bool queued = log_ringbuf_try_enqueue(&site->rb, &rec);
+    bool queued = log_ringbuf_try_enqueue(site, &site->rb, &rec);
 
     if (!queued) {
         if (handle->flags & LOG_IMPORTANT) {
 
             if (site->flags & LOG_SITE_DROP_OLD) {
-                queued = log_ringbuf_force_enqueue(&site->rb, &rec);
+                queued = log_ringbuf_force_enqueue(site, &site->rb, &rec);
             } else if (!irq_in_interrupt()) {
                 for (int i = 0; i < LOG_IMPORTANT_RETRY; i++) {
-                    if (log_ringbuf_try_enqueue(&site->rb, &rec)) {
+                    if (log_ringbuf_try_enqueue(site, &site->rb, &rec)) {
                         queued = true;
                         break;
                     }
@@ -320,12 +324,12 @@ void log_sites_init(void) {
         s->enabled = true;
         refcount_init(&s->refcount, 1);
         struct log_ringbuf *lrb = &s->rb;
-        lrb->slots = kzalloc(sizeof(struct log_ring_slot) * lrb->capacity,
+        lrb->slots = kzalloc(sizeof(struct log_ring_slot) * s->capacity,
                              ALLOC_PARAMS_DEFAULT);
         if (!lrb->slots)
             panic("OOM\n");
 
-        for (size_t i = 0; i < lrb->capacity; i++) {
+        for (size_t i = 0; i < s->capacity; i++) {
             atomic_store_explicit(&lrb->slots[i].seq, i, memory_order_release);
         }
 
@@ -351,30 +355,31 @@ static void log_site_free(struct log_site *site) {
     kfree(site, FREE_PARAMS_DEFAULT);
 }
 
-struct log_site *log_site_create(char *name, enum log_site_flags flags,
-                                 size_t capacity) {
+struct log_site *log_site_create(struct log_site_options opts) {
     struct log_site *ret =
         kzalloc(sizeof(struct log_site), ALLOC_PARAMS_DEFAULT);
     if (!ret)
         return NULL;
 
-    ret->name = strdup(name);
+    ret->name = strdup(opts.name);
     if (!ret->name)
         goto err;
 
-    struct log_ring_slot *slots =
-        kzalloc(sizeof(struct log_ring_slot) * capacity, ALLOC_PARAMS_DEFAULT);
+    struct log_ring_slot *slots = kzalloc(
+        sizeof(struct log_ring_slot) * opts.capacity, ALLOC_PARAMS_DEFAULT);
     if (!slots)
         goto err;
 
-    ret->rb.capacity = capacity;
+    ret->dump_opts = opts.dump_opts;
+    ret->enabled_mask = opts.enabled_mask;
+    ret->capacity = opts.capacity;
     ret->rb.slots = slots;
     refcount_init(&ret->refcount, 1);
     ret->dropped = 0;
-    ret->flags = flags;
+    ret->flags = opts.flags;
     INIT_LIST_HEAD(&ret->list);
     ret->enabled = true;
-    for (size_t i = 0; i < capacity; i++) {
+    for (size_t i = 0; i < opts.capacity; i++) {
         atomic_store_explicit(&slots[i].seq, i, memory_order_release);
     }
 

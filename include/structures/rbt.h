@@ -27,12 +27,16 @@ struct rbt_node {
     struct rbt_node *parent;
 };
 
+typedef int32_t (*rbt_compare)(const struct rbt_node *a,
+                               const struct rbt_node *b);
 typedef size_t (*rbt_get_data)(struct rbt_node *);
+
 struct rbt { /* TODO: stop using get_data. for now it works
               * but in the future we may want to allow for rb-trees
               * that are "backwards" or sorted by some other rule
               * beyond integer field comparison */
     rbt_get_data get_data;
+    rbt_compare compare;
     struct rbt_node *root;
 };
 
@@ -78,13 +82,12 @@ static inline struct rbt_node *rbt_first(const struct rbt *root) {
     return node;
 }
 
-struct rbt *rbt_init(struct rbt *t, rbt_get_data get_data);
-struct rbt *rbt_create(rbt_get_data get);
+struct rbt *rbt_init(struct rbt *t, rbt_get_data get_data, rbt_compare compare);
+struct rbt *rbt_create(rbt_get_data get, rbt_compare compare);
 struct rbt_node *rbt_find_min(struct rbt_node *node);
 struct rbt_node *rbt_find_max(struct rbt_node *node);
 void rbt_delete(struct rbt *tree, struct rbt_node *z);
-struct rbt_node *rbt_search(struct rbt *tree, struct rbt_node *root,
-                            uint64_t data);
+struct rbt_node *rbt_search(struct rbt *tree, uint64_t data);
 void rbt_remove(struct rbt *tree, uint64_t data);
 void rbt_insert(struct rbt *tree, struct rbt_node *new_node);
 struct rbt_node *rbt_min(struct rbt *tree);

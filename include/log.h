@@ -39,7 +39,7 @@ enum log_record_flags : uint16_t {
     LOG_REC_TRUNCATED = 1 << 1,
 };
 
-struct log_dump_opts {
+struct log_dump_options {
     uint8_t min_level;
     bool show_args : 1;
     bool show_cpu : 1;
@@ -55,7 +55,7 @@ struct log_handle {
     enum log_flags flags;
     _Atomic uint32_t seen;
     _Atomic uint64_t last_ts;
-    struct log_dump_opts dump_opts; /* If LOG_PRINT, use these opts */
+    struct log_dump_options dump_opts; /* If LOG_PRINT, use these opts */
 };
 
 struct log_record {
@@ -86,11 +86,18 @@ struct log_ring_slot {
 };
 
 struct log_ringbuf {
-    size_t capacity;
     struct log_ring_slot *slots;
 
     _Atomic uint64_t head;
     _Atomic uint64_t tail;
+};
+
+struct log_site_options {
+    char *name;
+    enum log_site_flags flags;
+    size_t capacity;
+    uint32_t enabled_mask;
+    struct log_dump_options dump_opts;
 };
 
 struct log_site {
@@ -98,6 +105,7 @@ struct log_site {
     char *name;
     struct log_ringbuf rb;
     uint32_t enabled_mask;
+    size_t capacity;
 
     /* Only relevant for dynamic log sites */
     refcount_t refcount;
@@ -105,7 +113,7 @@ struct log_site {
 
     uint32_t dropped; /* Accumulation of all missed logs */
     enum log_site_flags flags;
-    struct log_dump_opts dump_opts; /* If LOG_SITE_PRINT, use this */
+    struct log_dump_options dump_opts; /* If LOG_SITE_PRINT, use this */
 } __linker_aligned;
 
 static inline const char *log_level_color(enum log_level l) {
@@ -160,23 +168,22 @@ static inline uint64_t log_arg_i64(int64_t v) {
 void log_emit_internal(struct log_site *, struct log_handle *, enum log_level,
                        const char *func, const char *fname, int32_t line,
                        uintptr_t ip, uint8_t nargs, char *fmt, ...);
-void log_dump_site(struct log_site *, struct log_dump_opts opts);
+void log_dump_site(struct log_site *, struct log_dump_options opts);
 void log_dump_site_default(struct log_site *);
 void log_dump_all(void);
 void log_sites_init(void);
-struct log_site *log_site_create(char *name, enum log_site_flags flags,
-                                 size_t capacity);
+struct log_site *log_site_create(struct log_site_options opts);
 void log_site_destroy(struct log_site *site);
 
 #define LOG_DUMP_DEFAULT                                                       \
-    (struct log_dump_opts) {                                                   \
+    (struct log_dump_options) {                                                \
         .min_level = LOG_TRACE, .show_args = true, .show_cpu = true,           \
         .show_tid = true, .show_irql = true, .show_caller = true,              \
         .resolve_symbols = true, .clear_after_dump = false,                    \
     }
 
 #define LOG_DUMP_CONSOLE                                                       \
-    (struct log_dump_opts) {                                                   \
+    (struct log_dump_options) {                                                \
         .min_level = LOG_TRACE, .show_args = true, .show_cpu = false,          \
         .show_tid = false, .show_irql = false, .show_caller = false,           \
         .resolve_symbols = false, .clear_after_dump = false,                   \
@@ -225,29 +232,36 @@ void log_site_destroy(struct log_site *site);
 
 /* For static ones */
 #define LOG_SITE_LEVEL(l) (1u << l)
-#define LOG_SITE_ALL UINT32_MAX /* TODO: More */
-#define LOG_SITE_DECLARE(n, f, size, mask, dopts)                              \
+#define LOG_SITE_ALL UINT32_MAX
+#define LOG_SITE_DECLARE(_name, ...)                                           \
     __attribute__((                                                            \
-        section(".kernel_log_sites"))) struct log_site __log_site_##n =        \
-        (struct log_site) {                                                    \
-        .name = #n, .flags = f, .rb.capacity = size, .enabled_mask = mask,     \
-        .dump_opts = dopts                                                     \
-    } /* Rest will get initialized at boot */
-#define LOG_SITE_DECLARE_DEFAULT(n)                                            \
-    LOG_SITE_DECLARE(n, LOG_SITE_DEFAULT, LOG_SITE_CAPACITY_DEFAULT,           \
-                     LOG_SITE_ALL, LOG_DUMP_CONSOLE)
+        section(".kernel_log_sites"))) struct log_site __log_site_##_name = {  \
+        .name = #_name, __VA_ARGS__}
+
+#define LOG_SITE_DECLARE_DEFAULT(_name)                                        \
+    __attribute__((                                                            \
+        section(".kernel_log_sites"))) struct log_site __log_site_##_name = {  \
+        .name = #_name,                                                        \
+        .flags = LOG_SITE_DEFAULT,                                             \
+        .capacity = LOG_SITE_CAPACITY_DEFAULT,                                 \
+        .enabled_mask = LOG_SITE_ALL,                                          \
+        .dump_opts = LOG_DUMP_CONSOLE} /* Rest will get initialized at boot */
 
 #define LOG_SITE(name) &(__log_site_##name)
 
 #define LOG_HANDLE_SUBSYSTEM_NONE NULL
 #define LOG_HANDLE_EXTERN(name) extern struct log_handle __log_handle_##name
-#define LOG_HANDLE_DECLARE(na, f, dopts)                                       \
-    struct log_handle __log_handle_##na = (struct log_handle) {                \
-        .msg = #na, .flags = f, .seen = 0, .last_ts = 0, .dump_opts = dopts    \
-    }
+
+#define LOG_HANDLE_DECLARE(_name, ...)                                         \
+    struct log_handle __log_handle_##_name = {                                 \
+        .msg = #_name, .seen = 0, .last_ts = 0, __VA_ARGS__}
 
 #define LOG_HANDLE_DECLARE_DEFAULT(n)                                          \
-    LOG_HANDLE_DECLARE(n, LOG_PRINT, LOG_DUMP_CONSOLE)
+    struct log_handle __log_handle_##n = {.msg = #n,                           \
+                                          .flags = LOG_PRINT,                  \
+                                          .seen = 0,                           \
+                                          .last_ts = 0,                        \
+                                          .dump_opts = LOG_DUMP_CONSOLE}
 
 #define LOG_HANDLE(name) &(__log_handle_##name)
 

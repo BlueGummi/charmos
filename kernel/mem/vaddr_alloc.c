@@ -11,6 +11,13 @@ static size_t vas_range_get_data(struct rbt_node *n) {
     return container_of(n, struct vas_range, node)->start;
 }
 
+static int32_t vas_range_cmp(const struct rbt_node *a,
+                             const struct rbt_node *b) {
+    int32_t l = vas_range_get_data((void *) a);
+    int32_t r = vas_range_get_data((void *) b);
+    return l - r;
+}
+
 #define VASRANGE_PER_PAGE (PAGE_SIZE / sizeof(struct vas_range))
 
 static void vasrange_refill(struct vas_space *space) {
@@ -57,8 +64,7 @@ __no_sanitize_address struct vas_space *vas_space_bootstrap(vaddr_t base,
     memset(vas, 0, sizeof(*vas));
     vas->base = base;
     vas->limit = limit;
-    vas->tree.root = NULL;
-    vas->tree.get_data = vas_range_get_data;
+    rbt_init(&vas->tree, vas_range_get_data, vas_range_cmp);
     spinlock_init(&vas->lock);
 
     return vas;
@@ -72,8 +78,7 @@ struct vas_space *vas_space_init(vaddr_t base, vaddr_t limit) {
 
     vas->base = base;
     vas->limit = limit;
-    vas->tree.root = NULL;
-    vas->tree.get_data = vas_range_get_data;
+    rbt_init(&vas->tree, vas_range_get_data, vas_range_cmp);
     spinlock_init(&vas->lock);
     return vas;
 }

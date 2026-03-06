@@ -343,7 +343,7 @@ void scheduler_drop_locks_after_switch_in() {
     if (!other)
         return spin_unlock_raw(&us->lock);
 
-    scheduler_drop_two_raw_locks(us, other);
+    scheduler_release_two_raw_locks(us, other);
 }
 
 void scheduler_yield() {
