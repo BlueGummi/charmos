@@ -12,6 +12,7 @@ struct domain {
     struct core **cores;
     struct numa_node *associated_node;
     struct slab_domain *slab_domain;
+    struct cpu_mask cpu_mask;
 };
 
 static inline struct domain *domain_local(void) {

@@ -18,6 +18,8 @@ struct numa_node {
                          * for example, if we are node 0, and node 3 is the
                          * 2nd farthest away node, our rel_dists[3] will be 2.
                          */
+
+    struct cpu_mask cpus;
 };
 
 void numa_dump(void);

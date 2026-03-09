@@ -42,10 +42,10 @@
 #include <sync/turnstile.h>
 #include <syscall.h>
 #include <tests.h>
-#include <thread/defer.h>
 #include <thread/dpc.h>
 #include <thread/reaper.h>
 #include <thread/thread.h>
+#include <thread/workqueue.h>
 
 struct globals global = {0};
 
@@ -85,21 +85,17 @@ __no_sanitize_address void k_main(void) {
     thread_init_thread_ids();
     scheduler_init();
     turnstiles_init();
-    bootstage_advance(BOOTSTAGE_MID_SCHEDULER);
 
     cmdline_parse(cmdline_request.response->cmdline);
     lapic_timer_init(/* core_id = */ 0);
     dpc_init_percpu();
     smp_init(mp_request.response);
-    percpu_obj_init();
 
     srat_init();
     slit_init();
     topology_init();
     domain_init();
     scheduler_domains_init();
-    scheduler_periodic_work_init();
-    perdomain_obj_init();
     bootstage_advance(BOOTSTAGE_MID_TOPOLOGY);
     struct core *iter;
     for_each_cpu_struct(iter) {
@@ -108,6 +104,9 @@ __no_sanitize_address void k_main(void) {
 
     pmm_late_init();
     slab_domain_init();
+    percpu_obj_init();
+    perdomain_obj_init();
+    scheduler_periodic_work_init();
     movealloc_exec_all();
     bootstage_advance(BOOTSTAGE_MID_ALLOCATORS);
 
@@ -130,6 +129,8 @@ void k_sch_main(void *nop) {
     smp_disable_all_ticks();
 
     bootstage_advance(BOOTSTAGE_LATE);
+
+    smp_move_everyone();
 
     smp_enable_all_ticks();
 

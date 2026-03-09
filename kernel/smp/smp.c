@@ -4,6 +4,7 @@
 #include <irq/idt.h>
 #include <limine.h>
 #include <mem/alloc.h>
+#include <mem/domain.h>
 #include <mem/tlb.h>
 #include <sch/sched.h>
 #include <smp/domain.h>
@@ -364,4 +365,61 @@ void smp_enable_all_ticks() {
     send_em_all_out(true);
     irq_free_entry(entry);
     irq_set_chip(entry, NULL, NULL);
+}
+
+struct smp_move_struct_cores {
+    paddr_t new_phys;
+};
+
+void smp_move_ctor(struct smp_move_struct_cores *doohickey, size_t id) {
+    doohickey->new_phys = domain_alloc_from_domain(
+        global.cores[id]->domain,
+        PAGES_NEEDED_FOR(PAGE_ALIGN_UP(sizeof(struct core))));
+    if (!doohickey->new_phys)
+        panic("OOM\n");
+}
+
+PERCPU_DECLARE(smp_move, struct smp_move_struct_cores, smp_move_ctor);
+
+static atomic_uint moved = 0;
+
+static enum irq_result smp_move_isr(void *ctx, uint8_t vector,
+                                    struct irq_context *rsp) {
+    struct smp_move_struct_cores *mine = &PERCPU_READ(smp_move);
+    void *new_vaddr = (void *) (mine->new_phys + global.hhdm_offset);
+    void *old_vaddr = (void *) PAGE_ALIGN_DOWN(smp_core());
+    size_t needed = PAGES_NEEDED_FOR(PAGE_ALIGN_UP(sizeof(struct core)));
+    memcpy(new_vaddr, old_vaddr, PAGE_SIZE * needed);
+
+    for (size_t i = 0; i < needed; i++) {
+        vmm_map_page((vaddr_t) old_vaddr + i * PAGE_SIZE,
+                     mine->new_phys + i * PAGE_SIZE,
+                     PAGING_WRITE | PAGING_PRESENT,
+                     VMM_FLAG_NO_LOCKS | VMM_FLAG_NO_TLB_SHOOTDOWN);
+    }
+
+    tlb_flush();
+    atomic_fetch_add(&moved, 1);
+    return IRQ_HANDLED;
+}
+
+void smp_move_everyone() {
+    uint8_t move_entry = irq_alloc_entry();
+    irq_register("move_isr", move_entry, smp_move_isr, NULL, IRQ_FLAG_NONE);
+    irq_set_chip(move_entry, lapic_get_chip(), NULL);
+
+    size_t i;
+    for_each_cpu_id(i) {
+        if (i == 0)
+            continue;
+
+        size_t start = atomic_load(&moved);
+        ipi_send(i, move_entry);
+
+        while (atomic_load(&moved) < start + 1)
+            cpu_relax();
+    }
+
+    irq_free_entry(move_entry);
+    irq_set_chip(move_entry, NULL, NULL);
 }

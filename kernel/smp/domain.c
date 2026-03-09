@@ -131,8 +131,12 @@ void domain_init(void) {
 
     for (size_t i = 0; i < global.domain_count; i++) {
         struct domain *domain = global.domains[i];
+        if (!cpu_mask_init(&domain->cpu_mask, global.core_count))
+            panic("OOM\n");
+
         for (size_t j = 0; j < domain->num_cores; j++) {
             domain->cores[j]->domain_cpu_id = j;
+            cpu_mask_set(&domain->cpu_mask, domain->cores[j]->id);
         }
     }
 

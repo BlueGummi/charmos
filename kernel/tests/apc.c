@@ -3,7 +3,7 @@
 #include <sleep.h>
 #include <tests.h>
 #include <thread/apc.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 #include <thread/reaper.h>
 #include <thread/thread.h>
 

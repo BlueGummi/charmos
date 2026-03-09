@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 
 static bool remove(struct bcache *cache, uint64_t key, uint64_t spb);
 

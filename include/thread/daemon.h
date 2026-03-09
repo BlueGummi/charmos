@@ -2,7 +2,7 @@
 #pragma once
 #include <structures/list.h>
 #include <sync/semaphore.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 #include <thread/thread.h>
 
 /* These commands are sent back up to the daemon

@@ -69,6 +69,7 @@ static void init_scheduler_boot(struct scheduler *sched) {
 }
 
 void rt_scheduler_boot_init() {
+    locked_list_init(&rt_scheduler_global.list);
     struct core *c;
     for_each_cpu_struct(c) {
         struct scheduler *s = global.schedulers[c->id];

@@ -1,6 +1,6 @@
 #include <sch/sched.h>
 #include <thread/daemon.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 #include <thread/reaper.h>
 
 static struct daemon *reaper_daemon = NULL;

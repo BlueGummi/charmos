@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 
 struct nvme_command {
     uint8_t opc;

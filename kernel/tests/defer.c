@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <tests.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 #include <time.h>
 
 static bool defer_worked = false;

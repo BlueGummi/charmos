@@ -146,7 +146,8 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
             },
         .max_workers = 1,
         .spawn_delay = WORKQUEUE_DEFAULT_SPAWN_DELAY,
-        .flags = WORKQUEUE_FLAG_DEFAULTS | WORKQUEUE_FLAG_NO_WORKER_GC,
+        .flags = WORKQUEUE_FLAG_DEFAULTS | WORKQUEUE_FLAG_NO_WORKER_GC |
+                 WORKQUEUE_FLAG_ISR_SAFE,
         .worker_cpu_mask = mask,
     };
 

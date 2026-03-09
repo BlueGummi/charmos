@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <structures/list.h>
+#include <structures/locked_list.h>
 #include <structures/rbt.h>
 #include <thread/dpc.h>
 #include <thread/thread_types.h>
@@ -232,6 +233,7 @@ enum rt_scheduler_error {
     RT_SCHEDULER_ERR_OOM = -17, /* Specifically ran out of memory */
 
     RT_SCHEDULER_ERR_OOR = -16, /* Generic "Out of resources" */
+    RT_SCHEDULER_ERR_NOT_FOUND = -15,
 
     RT_SCHEDULER_ERR_POLICY = -3,
     RT_SCHEDULER_ERR_DEADLINE = -2, /* Deadline-related error */
@@ -264,6 +266,38 @@ enum rt_scheduler_status : uint16_t {
     RT_SCHEDULER_STATUS_DEGRADED = 1 << 3,
     RT_SCHEDULER_STATUS_THROTTLED = 1 << 4,
     RT_SCHEDULER_STATUS_ISOLATED = 1 << 5,
+};
+
+/* This structure exists so that whenever the
+ * realtime scheduler wants to perform an operation,
+ * we can track what that operation is allowed
+ * to do, and assert that it is not doing something
+ * besides what its behavior has explicitly permitted */
+
+/* rt_ext_fn_flags: 16 bit bitflags:
+ *
+ *      ┌───────────────────────────┐
+ * Bits │ 15..12  11..8  7..4  3..0 │
+ * Use  │  ****    ****  ****  **** │
+ *      └───────────────────────────┘
+ *
+ * * - Unused
+ *
+ */
+enum rt_ext_fn_flags {
+    RT_EXT_FN_RQ_LOCAL = 1 << 0,
+    RT_EXT_FN_RQ_REMOTE = 1 << 1,
+
+    RT_EXT_FN_THREAD_LOCAL = 1 << 2,
+    RT_EXT_FN_THREAD_ANY = 1 << 3,
+
+    RT_EXT_FN_MIGRATE = 1 << 4,
+
+    RT_EXT_FN_TIMERS = 1 << 5,
+
+    RT_EXT_FN_DOMAIN = 1 << 6,
+
+    RT_EXT_FN_ALL = 1 << 15,
 };
 
 /* rt_scheduler_capability: 16 bit bitflags:
@@ -319,6 +353,22 @@ enum rt_scheduler_state : uint8_t {
      * This gives the core scheduler a chance to move all the
      * threads off of the scheduler and clear other data */
     RT_SCHEDULER_FAILURE,
+};
+
+/* These are the primary instances of an RT scheduler module...
+ *
+ * It can either be unloaded (inactive, default), or loaded
+ * (_static data structures allocated), or active (there exists
+ * an active instance of this rt_scheduler_static on some CPU */
+enum rt_scheduler_static_state {
+    RT_SCHEDULER_STATIC_UNLOADED,  /* No structures allocated */
+    RT_SCHEDULER_STATIC_LOADED,    /* Structures allocated, unused (this state
+                                    * doesn't strictly need to exist for
+                                    * correctness purposes, but is very helpful
+                                    * in debugging and to allow one to unload
+                                    * unused rt_scheduler_statics */
+    RT_SCHEDULER_STATIC_ACTIVE,    /* In use */
+    RT_SCHEDULER_STATE_DESTROYING, /* Taking down. No one can "Grab a ref" */
 };
 
 enum rt_slot_priority {
@@ -401,15 +451,15 @@ struct rt_thread_shed_request {
 
 typedef enum rt_scheduler_error (*rt_scheduler_fn)(struct rt_scheduler *);
 typedef enum rt_scheduler_error (*rt_scheduler_static_fn)(
-    struct rt_scheduler *);
+    struct rt_scheduler_static *);
 typedef void (*rt_scheduler_thread_fn)(struct rt_scheduler *, struct thread *);
 
 /* The rt_scheduler lock is held prior to calling these
  * functions unless explicitly stated otherwise */
 struct rt_scheduler_ops {
+    /* RT scheduler initialization happens once at load/boot */
     rt_scheduler_static_fn on_load;
     rt_scheduler_static_fn on_unload;
-    /* RT scheduler initialization happens once at load/boot */
 
     rt_scheduler_fn init; /* RT scheduler lock not held */
 
@@ -430,7 +480,7 @@ struct rt_scheduler_ops {
      * than what the core scheduler might be able to "guess/estimate"
      *
      * Both locks are acquired */
-    enum rt_scheduler_error (*migrate_twin)(struct rt_scheduler *us,
+    enum rt_scheduler_error (*migrate_twin)(struct rt_scheduler *self,
                                             struct rt_scheduler *other);
 
     struct thread *(*pick_thread)(
@@ -452,11 +502,10 @@ struct rt_scheduler_ops {
     rt_domain_id_t (*domain_id_for_cpu)(struct core *);
 };
 
-struct rt_scheduler_ext_fn {
-    struct list_head list;
+struct rt_ext_fn {
     const char *name;
     uint32_t id;
-    /* TODO: flags */
+    enum rt_ext_fn_flags flags;
     uintptr_t (*fn)(uintptr_t, uintptr_t);
 };
 
@@ -476,8 +525,8 @@ struct rt_scheduler_ext_fn {
  * them per-node, per-socket, per-cpu, etc...
  */
 struct rt_scheduler_mapping {
-    struct rt_scheduler_static *static_backpointer;
     struct rbt_node tree_node;
+    struct rt_scheduler_static *static_backpointer;
     rt_domain_id_t id;
     struct cpu_mask members;
     struct rt_scheduler *rt_scheduler;
@@ -488,20 +537,28 @@ struct rt_scheduler_mapping {
 /* This is statically allocated (in a linker section if it's a part
  * of the main kernel), and meant to represent "What can this scheduler
  * do" instead of a running state of a scheduler */
-struct rt_scheduler_static {
-    /* For list of global RT schedulers */
-    struct list_head list_internal;
 
-    enum rt_scheduler_topo_level topo_level;
+struct rt_scheduler_static {
+
+    /* ---------- INTERNAL ---------- */
+    struct list_head list_internal;
+    struct rbt mappings_internal;          /* "dynamic" object.
+                                            * nodes are dynamic, this is static */
+    struct cpu_mask *active_mask_internal; /* Who is using us? */
+    refcount_t refcount;
+    _Atomic enum rt_scheduler_static_state state;
+    struct spinlock lock_internal;
+
+    /* ---------- EXTERNAL ---------- */
     const char *name;
     struct rt_scheduler_ops ops;
+    enum rt_scheduler_topo_level topo_level;
     enum rt_scheduler_capability capabilities;
-    struct rbt mappings_internal; /* "dynamic" object.
-                                   * nodes are dynamic, this is static */
-    struct list_head ext_fns;
-    struct spinlock lock_internal;
-    size_t num_slot_requests;
-    struct rt_slot_request slot_requests[];
+    size_t num_slot_requests; /* We use this to determine how many slot requests
+                               * we should *actually* go through and fill */
+    struct rt_slot_request slot_requests[RT_SCHEDULER_SLOTS_PER_THREAD];
+    size_t num_ext_fns;
+    struct rt_ext_fn ext_fns[];
 };
 
 /* This is a structure that is allocated per-CPU at boot time.
@@ -511,7 +568,8 @@ struct rt_scheduler_static {
  * allowed to perform allocations and such, so it must take place inside of a
  * DPC. Similarly, destruction happens in a DPC */
 struct rt_scheduler {
-    struct core *owner;           /* We make one per-CPU. Who owns this one? */
+    struct core *owner; /* We make one per-CPU. Who owns this one? */
+
     struct list_head thread_list; /* Threads are placed here when the scheduler
                                      gets switched out/fails */
 
@@ -569,6 +627,15 @@ struct rt_scheduler_percpu {
     struct scheduler *scheduler; /* Backpointer for this CPU */
     struct rt_scheduler *active;
     struct rt_scheduler *born_with;
+    enum rt_ext_fn_flags active_flags;
+    struct dpc switch_dpc; /* Enqueue it to tell us to switch */
 };
+
+struct rt_scheduler_global {
+    struct locked_list list;
+};
+
+extern struct workqueue *rt_wq;
+extern struct rt_scheduler_global rt_scheduler_global;
 
 void rt_scheduler_boot_init();

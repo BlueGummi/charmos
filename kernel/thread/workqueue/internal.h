@@ -1,5 +1,5 @@
 #include <stdarg.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 
 #define DEQUEUE_FROM_ONESHOT_CODE 2
 #define DEQUEUE_FROM_REGULAR_CODE 1
@@ -13,8 +13,6 @@ static inline enum irql workqueue_lock(struct workqueue *workqueue) {
         return spin_lock(&workqueue->lock);
     }
 }
-
-#define WORKQUEUE_CORE_UNBOUND (-1)
 
 #define WORKQUEUE_NUM_WORKS(wq) (atomic_load(&wq->num_tasks))
 
@@ -101,8 +99,7 @@ bool workqueue_spawn_worker_internal(struct workqueue *queue);
 struct workqueue *workqueue_least_loaded_queue_except(int64_t except_core_num);
 struct workqueue *workqueue_get_least_loaded(void);
 struct workqueue *workqueue_get_least_loaded_remote(void);
-struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue,
-                                                int64_t core);
+struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue);
 struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
                                             const char *fmt, va_list args);
 enum thread_request_decision workqueue_request_callback(struct thread *t,

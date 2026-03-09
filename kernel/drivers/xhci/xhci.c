@@ -13,7 +13,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 
 #include "internal.h"
 
@@ -707,7 +707,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
         .spawn_delay = WORKQUEUE_DEFAULT_SPAWN_DELAY,
         .worker_cpu_mask = cmask,
         .worker_niceness = 0,
-        .flags = WORKQUEUE_FLAG_DEFAULTS,
+        .flags = WORKQUEUE_FLAG_DEFAULTS | WORKQUEUE_FLAG_ISR_SAFE,
     };
 
     xhci_wq = workqueue_create("xhci_wq", &attrs);

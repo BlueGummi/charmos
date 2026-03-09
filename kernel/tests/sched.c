@@ -6,7 +6,7 @@
 #include <tests.h>
 #include <thread/apc.h>
 #include <thread/daemon.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 #include <thread/reaper.h>
 #include <thread/thread.h>
 

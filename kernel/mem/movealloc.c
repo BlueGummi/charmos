@@ -37,10 +37,8 @@ static vaddr_t phys_get_virt(paddr_t phys) {
 }
 
 static void change_slab_backing_page(void *ptr) {
-    if (slab_size_to_index(ksize(ptr)) == -1)
-        return;
-
-    panic("Moved allocations cannot come from slab\n");
+    if (slab_size_to_index(ksize(ptr)) != -1)
+        panic("Moved allocations cannot come from slab\n");
 }
 
 void movealloc(size_t new_domain, void *ptr, enum vmm_flags flags) {

@@ -7,7 +7,7 @@
 #include <string.h>
 #include <sync/rcu.h>
 #include <tests.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 #include <thread/thread.h>
 
 #define NUM_RCU_READERS (global.core_count)

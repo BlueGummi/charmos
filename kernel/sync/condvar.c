@@ -1,6 +1,6 @@
 #include <sch/sched.h>
 #include <sync/condvar.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 #include <thread/thread.h>
 
 static enum irql condvar_lock_internal(struct condvar *cv,

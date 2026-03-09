@@ -13,3 +13,4 @@ void topology_init(void);
 void smp_disable_all_ticks();
 void smp_enable_all_ticks();
 void smp_dump_core(struct core *c);
+void smp_move_everyone();

@@ -7,7 +7,7 @@
 #include <sync/rcu.h>
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 #include <thread/thread.h>
 
 #include "sch/internal.h" /* for tick_enabled */

@@ -6,7 +6,7 @@
 #include <sch/sched.h>
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 
 struct deferred_event_queue {
     struct deferred_event *head;

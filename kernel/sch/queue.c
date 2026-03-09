@@ -70,6 +70,8 @@ void scheduler_remove_thread(struct scheduler *sched, struct thread *t,
 void thread_enqueue(struct thread *t) {
     kassert(t->allowed_cpus.nbits);
 
+    kassert(!cpu_mask_empty(&t->allowed_cpus));
+
     struct scheduler *s = global.schedulers[0];
     uint64_t min_load = UINT64_MAX;
 

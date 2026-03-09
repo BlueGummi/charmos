@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <structures/dll.h>
 #include <sync/spinlock.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 #include <time.h>
 
 /* enqueuing skips enqueuing if the req is URGENT */

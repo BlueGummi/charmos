@@ -8,7 +8,7 @@
 #include <structures/list.h>
 #include <structures/locked_list.h>
 #include <sync/semaphore.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 struct usb_controller;
 struct usb_packet;
 struct xhci_request;

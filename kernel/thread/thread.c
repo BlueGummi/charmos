@@ -13,7 +13,7 @@
 #include <sync/rcu.h>
 #include <sync/turnstile.h>
 #include <thread/apc.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 #include <thread/reaper.h>
 #include <thread/thread.h>
 #include <thread/tid.h>

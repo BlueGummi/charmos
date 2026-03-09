@@ -10,8 +10,6 @@ enum bootstage : uint8_t {
 
     BOOTSTAGE_EARLY_DEVICES, /* Early devices (ACPI, LAPIC, HPET) brought up */
 
-    BOOTSTAGE_MID_SCHEDULER, /* Scheduler and threads brought up */
-
     BOOTSTAGE_MID_MP, /* APs exit busy-spin and enter idle thread */
 
     BOOTSTAGE_MID_TOPOLOGY, /* Topology parsed */

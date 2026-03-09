@@ -83,6 +83,9 @@ void srat_init(void) {
 
         if (!global.numa_nodes[i].distance)
             panic("OOM whilst allocating NUMA node array");
+
+        if (!cpu_mask_init(&global.numa_nodes[i].cpus, global.core_count))
+            panic("OOM\n");
     }
 
     ptr = (uint8_t *) srat + sizeof(struct acpi_srat);
@@ -101,6 +104,7 @@ void srat_init(void) {
                     (uint64_t) cpu->proximity_domain_high[1] << 16 |
                     (uint64_t) cpu->proximity_domain_high[2] << 24;
 
+                cpu_mask_set(&global.numa_nodes[prox_domain].cpus, cpu->id);
                 struct core *c = global.cores[cpu->id];
                 if (c)
                     c->numa_node = prox_domain;

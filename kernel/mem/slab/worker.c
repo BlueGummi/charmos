@@ -2,7 +2,7 @@
 
 #include <smp/domain.h>
 #include <thread/daemon.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 
 #include "gc_internal.h"
 

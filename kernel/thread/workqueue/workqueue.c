@@ -7,8 +7,8 @@
 #include <string.h>
 #include <sync/condvar.h>
 #include <sync/spinlock.h>
-#include <thread/defer.h>
 #include <thread/thread.h>
+#include <thread/workqueue.h>
 
 #include "internal.h"
 
@@ -155,26 +155,23 @@ struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
     return wq;
 
 err:
-    if (wq && wq->worker_array)
+    if (wq) {
         kfree(wq->worker_array, FREE_PARAMS_DEFAULT);
-
-    if (wq && wq->request)
         kfree(wq->request, FREE_PARAMS_DEFAULT);
-
-    if (wq && wq->name)
         kfree(wq->name, FREE_PARAMS_DEFAULT);
-
-    if (wq && wq->oneshot_works)
         kfree(wq->oneshot_works, FREE_PARAMS_DEFAULT);
+    }
 
-    if (wq)
-        kfree(wq, FREE_PARAMS_DEFAULT);
+    kfree(wq, FREE_PARAMS_DEFAULT);
 
     return NULL;
 }
 
 struct workqueue *workqueue_create(const char *fmt,
                                    struct workqueue_attributes *attrs, ...) {
+    if (attrs->min_workers == 0)
+        attrs->min_workers = 1;
+
     va_list args;
     va_start(args, attrs);
 
@@ -182,11 +179,39 @@ struct workqueue *workqueue_create(const char *fmt,
 
     va_end(args);
 
-    if (attrs->min_workers == 0)
-        attrs->min_workers = 1;
+    if (ret)
+        for (size_t i = 0; i < attrs->min_workers; i++)
+            workqueue_spawn_permanent_worker(ret);
 
-    for (size_t i = 0; i < attrs->min_workers; i++)
-        workqueue_spawn_permanent_worker(ret, WORKQUEUE_CORE_UNBOUND);
+    return ret;
+}
+
+struct workqueue *workqueue_create_default(const char *fmt, ...) {
+    struct cpu_mask cmask;
+    if (!cpu_mask_init(&cmask, global.core_count))
+        return NULL;
+
+    cpu_mask_set_all(&cmask);
+    struct workqueue_attributes attrs = {
+        .capacity = WORKQUEUE_DEFAULT_CAPACITY,
+        .idle_check.max = WORKQUEUE_DEFAULT_MAX_IDLE_CHECK,
+        .idle_check.min = WORKQUEUE_DEFAULT_MIN_IDLE_CHECK,
+        .max_workers = WORKQUEUE_DEFAULT_MAX_WORKERS,
+        .min_workers = 1,
+        .spawn_delay = WORKQUEUE_DEFAULT_SPAWN_DELAY,
+        .worker_cpu_mask = cmask,
+        .worker_niceness = 0,
+        .flags = WORKQUEUE_FLAG_DEFAULTS,
+    };
+
+    va_list args;
+    va_start(args, fmt);
+
+    struct workqueue *ret = workqueue_create_internal(&attrs, fmt, args);
+
+    va_end(args);
+    if (ret)
+        workqueue_spawn_permanent_worker(ret);
 
     return ret;
 }
@@ -234,8 +259,7 @@ void workqueue_kick(struct workqueue *queue) {
     condvar_signal(&queue->queue_cv);
 }
 
-struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue,
-                                                int64_t core) {
+struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue) {
     struct thread *thread = worker_create(queue->attrs.worker_cpu_mask,
                                           queue->attrs.worker_niceness);
 
@@ -255,11 +279,7 @@ struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue,
 
     workqueue_link_thread_and_worker(worker, thread);
 
-    if (core != -1) {
-        thread_enqueue_on_core(thread, core);
-    } else {
-        thread_enqueue(thread);
-    }
+    thread_enqueue(thread);
 
     workqueue_add_worker(queue, worker);
     queue->num_workers++;
@@ -303,7 +323,7 @@ void workqueues_permanent_init(void) {
         if (!global.workqueues[i])
             panic("Failed to spawn permanent workqueue\n");
 
-        if (!workqueue_spawn_permanent_worker(global.workqueues[i], i))
+        if (!workqueue_spawn_permanent_worker(global.workqueues[i]))
             panic("Failed to spawn initial worker on workqueue %u\n", i);
     }
 }

@@ -3,7 +3,7 @@
 #include <console/printf.h>
 #include <mem/alloc.h>
 #include <sync/spinlock.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 
 static void try_rq_reorder(struct bio_scheduler *sched) {
     struct generic_disk *disk = sched->disk;

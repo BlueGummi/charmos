@@ -8,7 +8,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <structures/sll.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 #include <thread/io_wait.h>
 
 #include "internal.h"

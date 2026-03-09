@@ -4,7 +4,7 @@
 #include <mem/alloc.h>
 #include <stdint.h>
 #include <sync/spinlock.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 #include <time.h>
 
 static inline uint64_t get_boost_depth(struct bio_request *req) {

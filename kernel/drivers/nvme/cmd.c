@@ -14,7 +14,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <thread/defer.h>
+#include <thread/workqueue.h>
 
 #include "internal.h"
 

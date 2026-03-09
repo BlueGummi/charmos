@@ -4,8 +4,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <thread/defer.h>
 #include <thread/reaper.h>
+#include <thread/workqueue.h>
 
 static size_t scheduler_thread_get_data(struct rbt_node *n) {
     return thread_from_rq_rbt_node(n)->virtual_runtime_left;

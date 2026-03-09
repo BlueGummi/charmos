@@ -15,9 +15,14 @@ struct rt_slot_db {
     struct rt_slot *slots;
 };
 
-void rt_scheduler_acquire_two_locks(struct rt_scheduler *a,
-                                    struct rt_scheduler *b, enum irql *oa,
-                                    enum irql *ob) {
+void rt_scheduler_static_destroy_work_enqueue(struct rt_scheduler_static *rts);
+enum rt_scheduler_error
+rt_slots_init_for_scheduler(struct rt_scheduler_static *rts);
+
+static inline void rt_scheduler_acquire_two_locks(struct rt_scheduler *a,
+                                                  struct rt_scheduler *b,
+                                                  enum irql *oa,
+                                                  enum irql *ob) {
     if (a == b) {
         *oa = spin_lock_irq_disable(&a->lock);
         return;
@@ -29,5 +34,21 @@ void rt_scheduler_acquire_two_locks(struct rt_scheduler *a,
     } else {
         *ob = spin_lock_irq_disable(&b->lock);
         *oa = spin_lock_irq_disable(&a->lock);
+    }
+}
+
+static inline enum rt_scheduler_static_state
+rt_scheduler_static_get_state(struct rt_scheduler_static *rts) {
+    return atomic_load_explicit(&rts->state, memory_order_acquire);
+}
+
+REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(
+    rt_scheduler_static, refcount, state, == RT_SCHEDULER_STATE_DESTROYING);
+
+static inline void rt_scheduler_static_put(struct rt_scheduler_static *rts) {
+    if (refcount_dec_and_test(&rts->refcount)) {
+        kassert(rt_scheduler_static_get_state(rts) ==
+                RT_SCHEDULER_STATE_DESTROYING);
+        rt_scheduler_static_destroy_work_enqueue(rts);
     }
 }

@@ -255,6 +255,7 @@ void workqueues_permanent_init(void);
 
 struct workqueue *workqueue_create(const char *fmt,
                                    struct workqueue_attributes *attrs, ...);
+struct workqueue *workqueue_create_default(const char *fmt, ...);
 struct work *work_create(work_function func, struct work_args args);
 struct work *work_init(struct work *work, work_function fn,
                        struct work_args args);
