@@ -229,7 +229,7 @@ struct domain *domain_alloc_pick_best_domain(struct domain *local, size_t pages,
                                              bool flexible_locality) {
     struct domain_buddy *best = NULL;
     int32_t best_score = INT32_MAX;
-    struct domain_buddy *buddy = local->cores[0]->domain_buddy;
+    struct domain_buddy *buddy = local->domain_buddy;
     struct domain_zonelist *zl = &buddy->zonelist;
 
     for (size_t i = 0; i < max_scan; i++) {
@@ -253,7 +253,7 @@ struct domain *domain_alloc_pick_best_domain(struct domain *local, size_t pages,
     }
 
     kassert(best);
-    return best->cores[0]->domain;
+    return best->domain;
 }
 
 static paddr_t alloc_with_locality(size_t pages, bool flexible_locality,
@@ -345,7 +345,7 @@ paddr_t domain_alloc_from_domain(struct domain *cd, size_t pages) {
     if ((ret = try_alloc_from_arenas(pages)))
         return ret;
 
-    return alloc_from_remote_domain(cd->cores[0]->domain_buddy, pages);
+    return alloc_from_remote_domain(cd->domain_buddy, pages);
 }
 
 struct domain *domain_for_addr(paddr_t addr) {
@@ -353,5 +353,5 @@ struct domain *domain_for_addr(paddr_t addr) {
     if (!dbd)
         return NULL;
 
-    return dbd->cores[0]->domain;
+    return dbd->domain;
 }

@@ -176,6 +176,7 @@ static void *alloc_up(size_t size) {
 static void domain_structs_init(struct domain_buddy *dom, size_t arena_capacity,
                                 size_t fq_capacity,
                                 struct domain *core_domain) {
+    dom->domain = core_domain;
     dom->free_area = alloc_up(sizeof(struct free_area) * MAX_ORDER);
     if (!dom->free_area)
         panic("Failed to allocate domain free area\n");
@@ -189,6 +190,7 @@ static void domain_structs_init(struct domain_buddy *dom, size_t arena_capacity,
     if (!dom->arenas)
         panic("Failed to allocate domain arena\n");
 
+    core_domain->domain_buddy = dom;
     for (size_t i = 0; i < dom->core_count; i++) {
         dom->arenas[i] = alloc_up(sizeof(struct domain_arena));
         if (!dom->arenas[i])
@@ -202,11 +204,13 @@ static void domain_structs_init(struct domain_buddy *dom, size_t arena_capacity,
         this->head = 0;
         this->tail = 0;
         this->capacity = arena_capacity;
-        dom->cores = core_domain->cores;
         spinlock_init(&this->lock);
 
-        core_domain->cores[i]->domain_buddy = dom;
-        core_domain->cores[i]->domain_arena = this;
+        /* NOTE: Special case because CPU0 will call allocations
+         * later on after this is initialized and needs to be
+         * able to figure out what domain arena it has */
+        if (core_domain->id == 0 && i == 0)
+            global.cores[i]->domain_arena = this;
     }
 
     dom->free_queue = alloc_up(sizeof(struct domain_free_queue));
@@ -222,6 +226,16 @@ static void domain_structs_init(struct domain_buddy *dom, size_t arena_capacity,
     dom->free_queue->tail = 0;
     dom->free_queue->capacity = fq_capacity;
     spinlock_init(&dom->free_queue->lock);
+}
+
+static void init_after_smp() {
+    for (size_t i = 0; i < global.domain_count; i++) {
+        struct domain_buddy *dom = global.domains[i]->domain_buddy;
+        struct domain *core_domain = global.domains[i];
+        dom->cores = core_domain->cores;
+        for (size_t j = 0; j < dom->core_count; j++)
+            dom->cores[j]->domain_arena = dom->arenas[j];
+    }
 }
 
 static size_t compute_arena_max(size_t domain_total_pages) {
@@ -243,21 +257,14 @@ static size_t compute_freequeue_max(size_t system_total_pages) {
 static void domain_spawn(struct domain_buddy *domain) {
     domain->worker.thread =
         thread_create("domain_flush_thread%zu", domain_flush_thread, NULL,
-                      domain->cores[0]->domain->id);
+                      domain->domain->id);
     struct thread *worker = domain->worker.thread;
-    uint64_t id = domain->cores[0]->id;
+    uint64_t id = domain->domain->id;
 
     worker->curr_core = id;
-    worker->pinned= 1;
+    worker->pinned = 1;
     thread_set_background(worker);
     thread_enqueue_on_core(worker, id);
-}
-
-static void link_domain_cores_to_buddy(struct domain *cd,
-                                       struct domain_buddy *bd) {
-    for (size_t i = 0; i < cd->num_cores; i++) {
-        cd->cores[i]->domain_buddy = bd;
-    }
 }
 
 static inline uint64_t pages_to_bytes(size_t pages) {
@@ -274,7 +281,8 @@ static void late_init_from_numa(size_t domain_count) {
             node->mem_base + node->mem_size;              /* bytes */
         global.domain_buddies[i].length = node->mem_size; /* bytes */
         global.domain_buddies[i].core_count = cd->num_cores;
-        link_domain_cores_to_buddy(cd, &global.domain_buddies[i]);
+
+        cd->domain_buddy = &global.domain_buddies[i];
 
         /* Slice of global buddy_page_array corresponding to this PFN range */
         size_t page_offset = node->mem_base / PAGE_SIZE; /* PFN index */
@@ -309,7 +317,7 @@ static void late_init_non_numa(size_t domain_count) {
 
         global.domain_buddies[i].buddy = &global.page_array[page_cursor];
 
-        link_domain_cores_to_buddy(cd, &global.domain_buddies[i]);
+        cd->domain_buddy = &global.domain_buddies[i];
 
         page_cursor += this_pages;
     }
@@ -347,6 +355,10 @@ void domain_buddies_init(void) {
     }
 }
 
+void domain_buddies_init_after_smp() {
+    init_after_smp();
+}
+
 void domain_buddies_init_late() {
     for (size_t i = 0; i < global.domain_count; i++)
         domain_spawn(&global.domain_buddies[i]);
@@ -365,7 +377,7 @@ void domain_buddy_dump(void) {
 }
 
 static void move_buddy(struct domain_buddy *buddy) {
-    size_t domain = buddy->cores[0]->domain->id;
+    size_t domain = buddy->domain->id;
     movealloc(domain, buddy->free_queue, VMM_FLAG_NONE);
     movealloc(domain, buddy->free_area, VMM_FLAG_NONE);
     movealloc(domain, buddy->free_queue->queue, VMM_FLAG_NONE);
@@ -380,7 +392,7 @@ static void move_buddy(struct domain_buddy *buddy) {
 static void domain_buddy_movealloc(void *a, void *b) {
     (void) a, (void) b;
     for (size_t i = 0; i < global.domain_count; i++)
-        move_buddy(global.domains[i]->cores[0]->domain_buddy);
+        move_buddy(global.domains[i]->domain_buddy);
 }
 
 MOVEALLOC_REGISTER_CALL(domain_move, domain_buddy_movealloc, /*a=*/NULL,

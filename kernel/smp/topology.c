@@ -3,9 +3,11 @@
 #include <irq/idt.h>
 #include <kassert.h>
 #include <limine.h>
+#include <math/popcount.h>
 #include <mem/alloc.h>
 #include <mem/numa.h>
 #include <smp/core.h>
+#include <smp/domain.h>
 #include <smp/smp.h>
 #include <smp/topology.h>
 #include <stdatomic.h>
@@ -111,6 +113,19 @@ bool cpu_mask_init(struct cpu_mask *m, size_t nbits) {
         return false;
 
     return true;
+}
+
+size_t cpu_mask_popcount(struct cpu_mask *m) {
+    if (!m->uses_large) {
+        return popcount(atomic_load(&m->small));
+    } else {
+        size_t nwords = (m->nbits + 63) / 64;
+        size_t acc = 0;
+        for (size_t i = 0; i < nwords; i++)
+            acc += popcount(atomic_load(&m->large[i]));
+
+        return acc;
+    }
 }
 
 void cpu_mask_set(struct cpu_mask *m, size_t cpu) {
@@ -565,40 +580,7 @@ void topology_init(void) {
     global.topology.count[TOPOLOGY_LEVEL_MACHINE] = 1;
 
     topology_dump();
-}
-
-struct core **topology_get_smts_under_numa(struct topology_node *numa,
-                                           size_t *count) {
-    size_t total = 0;
-    struct core **smts = NULL;
-    if (!numa || numa->level != TOPOLOGY_LEVEL_NUMA)
-        goto out;
-
-    for (int32_t i = 0; i < numa->nr_children; i++) {
-        struct topology_node *core_node = &core_nodes[numa->first_child + i];
-        total += core_node->nr_children;
-    }
-
-    if (total == 0)
-        goto out;
-
-    smts = kmalloc(sizeof(struct core *) * total, ALLOC_PARAMS_DEFAULT);
-    if (!smts)
-        panic("Could not allocate array for NUMA SMTs\n");
-
-    size_t idx = 0;
-    for (int32_t i = 0; i < numa->nr_children; i++) {
-        struct topology_node *core_node = &core_nodes[numa->first_child + i];
-        for (int32_t j = 0; j < core_node->nr_children; j++) {
-            struct topology_node *smt_node =
-                &smt_nodes[core_node->first_child + j];
-            smts[idx++] = smt_node->core;
-        }
-    }
-
-out:
-    *count = total;
-    return smts;
+    domain_dump();
 }
 
 void topology_mark_core_idle(size_t cpu_id, bool idle) {

@@ -160,12 +160,10 @@ uint64_t time_get_us(void) {
 }
 
 uint64_t tsc_calibrate(void) {
-    (void) hpet_timestamp_us();
-
     uint64_t start_tsc = rdtsc();
     uint64_t start_us = hpet_timestamp_us();
 
-    uint64_t target_us = start_us + 50000; // 50 ms
+    uint64_t target_us = start_us + MS_TO_US(50);
 
     while (hpet_timestamp_us() < target_us)
         ;

@@ -35,8 +35,8 @@ void panic_handler(struct panic_regs *regs) {
 
 static struct spinlock panic_lock = SPINLOCK_INIT;
 
-void panic_impl(const char *file, int line, const char *func, const char *fmt,
-                ...) {
+__noreturn void panic_impl(const char *file, int line, const char *func,
+                           const char *fmt, ...) {
     disable_interrupts();
 
     spin_lock_raw(&panic_lock);

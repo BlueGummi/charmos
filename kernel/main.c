@@ -82,19 +82,28 @@ __no_sanitize_address void k_main(void) {
     acpi_find_cst();
     bootstage_advance(BOOTSTAGE_EARLY_DEVICES);
 
+    srat_init();
+    slit_init();
+
+    domain_init();
+    pmm_late_init();
+    slab_domain_init();
+
+    smp_init();
+
+    domain_init_after_smp();
+    domain_buddies_init_after_smp();
     thread_init_thread_ids();
+
     scheduler_init();
     turnstiles_init();
 
     cmdline_parse(cmdline_request.response->cmdline);
     lapic_timer_init(/* core_id = */ 0);
     dpc_init_percpu();
-    smp_init(mp_request.response);
+    smp_wake(mp_request.response);
 
-    srat_init();
-    slit_init();
     topology_init();
-    domain_init();
     scheduler_domains_init();
     bootstage_advance(BOOTSTAGE_MID_TOPOLOGY);
     struct core *iter;
@@ -102,8 +111,6 @@ __no_sanitize_address void k_main(void) {
         smp_dump_core(iter);
     }
 
-    pmm_late_init();
-    slab_domain_init();
     percpu_obj_init();
     perdomain_obj_init();
     scheduler_periodic_work_init();
@@ -129,8 +136,6 @@ void k_sch_main(void *nop) {
     smp_disable_all_ticks();
 
     bootstage_advance(BOOTSTAGE_LATE);
-
-    smp_move_everyone();
 
     smp_enable_all_ticks();
 

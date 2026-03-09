@@ -35,10 +35,15 @@ build_domain_for_level(enum topology_level lvl) {
     struct topology_node *nodes = t->level[lvl];
 
     struct scheduler_domain *d = kzalloc(sizeof(*d), ALLOC_PARAMS_DEFAULT);
+    if (!d)
+        panic("OOM\n");
+
     d->level = lvl;
     d->ngroups = n;
     d->groups =
         kzalloc(sizeof(struct scheduler_group) * n, ALLOC_PARAMS_DEFAULT);
+    if (!d->groups)
+        panic("OOM\n");
 
     for (size_t i = 0; i < n; i++) {
         struct topology_node *node = &nodes[i];
@@ -52,7 +57,6 @@ build_domain_for_level(enum topology_level lvl) {
         d->groups[i].parent_index = -1;
 
         /* dummy capacity for now */
-
         d->groups[i].capacity = 1;
     }
 
@@ -82,9 +86,11 @@ static void map_cpus_to_groups(void) {
     struct core *c;
     for_each_cpu_struct(c) {
         struct core *c = global.cores[__id];
+        printf("setting %u\n", __id);
 
         for (size_t i = 0; i < TOPOLOGY_LEVEL_MAX; i++) {
             struct scheduler_domain *d = global.scheduler_domains[i];
+            printf("setting index %u to 0x%lx\n", i, d);
             c->domains[i] = d;
 
             /* find group for this CPU */

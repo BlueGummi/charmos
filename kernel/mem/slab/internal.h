@@ -428,7 +428,7 @@ struct slab_domain {
 
 static inline struct domain_buddy *
 slab_domain_buddy(struct slab_domain *domain) {
-    return domain->domain->cores[0]->domain_buddy;
+    return domain->domain->domain_buddy;
 }
 
 struct slab_page_hdr {
@@ -548,7 +548,7 @@ static inline struct slab *slab_for_ptr(void *ptr) {
 }
 
 static inline struct slab_domain *slab_domain_local(void) {
-    return smp_core()->slab_domain;
+    return smp_core()->domain->slab_domain;
 }
 
 static inline struct slab_percpu_cache *slab_percpu_cache_local(void) {

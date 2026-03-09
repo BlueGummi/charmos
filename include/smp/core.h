@@ -76,9 +76,7 @@ struct core {
     atomic_uint scheduler_preemption_disable_depth;
 
     struct domain *domain;
-    struct domain_buddy *domain_buddy;
     struct domain_arena *domain_arena;
-    struct slab_domain *slab_domain;
     size_t rr_current_domain;
 
     struct tss *tss;

@@ -1001,6 +1001,14 @@ exit:
     return ret;
 }
 
+void *kmalloc_from_domain(size_t domain, size_t size) {
+    size_t index = slab_size_to_index(size);
+    struct slab_caches *cs =
+        global.domains[domain]->slab_domain->local_nonpageable_cache;
+    struct slab_cache *c = &cs->caches[index];
+    return slab_alloc(c, ALLOC_BEHAVIOR_NORMAL, true, true);
+}
+
 /* okay, our free policy (in terms of freequeue usage) is:
  *
  * If the freequeue is the local freequeue, we immediately drain

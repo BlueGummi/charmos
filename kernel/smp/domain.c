@@ -46,16 +46,34 @@ static void construct_domains_from_numa_nodes(void) {
     for (size_t i = 0; i < global.numa_node_count; i++) {
         struct numa_node *nn = &global.numa_nodes[i];
         struct domain *cd = global.domains[i];
-        struct topology_node *tpn = nn->topo;
-        size_t num_cores;
-        struct core **arr = topology_get_smts_under_numa(tpn, &num_cores);
-
+        cd->num_cores = cpu_mask_popcount(&nn->cpus);
         cd->associated_node = nn;
-        cd->num_cores = num_cores;
-        cd->cores = arr;
+        cd->cores = kzalloc(sizeof(struct core *) * cd->num_cores,
+                            ALLOC_PARAMS_DEFAULT);
+    }
+}
 
-        for (size_t i = 0; i < num_cores; i++) {
-            arr[i]->domain = cd;
+static void construct_domains_after_smp() {
+    if (global.numa_node_count > 1) {
+        for (size_t i = 0; i < global.domain_count; i++) {
+            struct domain *cd = global.domains[i];
+            struct numa_node *nn = &global.numa_nodes[i];
+            struct cpu_mask nm = nn->cpus;
+            size_t j;
+            size_t k = 0;
+            cpu_mask_for_each(j, nm) {
+                cd->cores[k++] = global.cores[j];
+            }
+        }
+    } else {
+        size_t core_index = 0;
+        for (size_t i = 0; i < global.domain_count; i++) {
+            struct domain *cd = global.domains[i];
+
+            for (size_t j = 0; j < cd->num_cores; j++) {
+                global.cores[core_index]->domain = cd;
+                cd->cores[j] = global.cores[core_index++];
+            }
         }
     }
 }
@@ -69,7 +87,6 @@ static void construct_domains_from_cores(void) {
 
     init_global_domain(n_domains);
 
-    size_t core_index = 0;
     for (size_t i = 0; i < n_domains; i++) {
         struct domain *cd = global.domains[i];
 
@@ -86,11 +103,6 @@ static void construct_domains_from_cores(void) {
 
         if (!cd->cores)
             panic("Cannot allocate core array for domain %zu\n", i);
-
-        for (size_t j = 0; j < cores_this_domain; j++) {
-            global.cores[core_index]->domain = cd;
-            cd->cores[j] = global.cores[core_index++];
-        }
     }
 }
 
@@ -129,6 +141,12 @@ void domain_init(void) {
         construct_domains_from_cores();
     }
 
+    /* NOTE: This is THE exception that we make */
+    global.cores[0]->domain = global.domains[0];
+}
+
+void domain_init_after_smp() {
+    construct_domains_after_smp();
     for (size_t i = 0; i < global.domain_count; i++) {
         struct domain *domain = global.domains[i];
         if (!cpu_mask_init(&domain->cpu_mask, global.core_count))
@@ -136,11 +154,10 @@ void domain_init(void) {
 
         for (size_t j = 0; j < domain->num_cores; j++) {
             domain->cores[j]->domain_cpu_id = j;
+            domain->cores[j]->domain = domain;
             cpu_mask_set(&domain->cpu_mask, domain->cores[j]->id);
         }
     }
-
-    domain_dump();
 }
 
 void domain_set_cpu_mask(struct cpu_mask *mask, struct domain *domain) {
@@ -181,6 +198,16 @@ bool domain_idle(struct domain *domain) {
             return false;
 
     return true;
+}
+
+size_t domain_for_core(size_t cpu) {
+    for (size_t i = 0; i < global.numa_node_count; i++) {
+        struct numa_node *nn = &global.numa_nodes[i];
+        if (cpu_mask_test(&nn->cpus, cpu))
+            return i;
+    }
+
+    panic("unreachable!\n");
 }
 
 MOVEALLOC_REGISTER_CALL(domain_move, domains_move, /* a = */ NULL,

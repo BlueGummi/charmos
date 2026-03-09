@@ -2,6 +2,7 @@
 #include <mem/buddy.h>
 #include <mem/page.h>
 #include <mem/vmm.h>
+#include <smp/domain.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <sync/semaphore.h>
@@ -100,6 +101,7 @@ struct domain_buddy {
 
     struct spinlock lock;
     struct domain_flush_worker worker;
+    struct domain *domain;
 };
 
 void domain_buddies_init(void);
@@ -138,7 +140,7 @@ static inline struct domain_buddy *domain_buddy_for_addr(paddr_t addr) {
 }
 
 static inline struct domain_buddy *domain_buddy_on_this_core(void) {
-    return smp_core()->domain_buddy;
+    return smp_core()->domain->domain_buddy;
 }
 
 static inline struct domain_arena *domain_arena_on_this_core(void) {

@@ -224,11 +224,8 @@ static void detect_cpu_capability(struct core *c) {
 }
 
 static struct core *setup_cpu(uint64_t cpu) {
-    struct core *c =
-        kzalloc(PAGE_ALIGN_UP(sizeof(struct core)), ALLOC_PARAMS_DEFAULT);
-    if (!c)
-        panic("Core %d could not allocate space for struct\n", cpu);
-    c->id = cpu;
+    struct core *c = global.cores[cpu];
+    kassert(c->id == cpu);
     c->self = c;
     c->current_irql = IRQL_PASSIVE_LEVEL;
     c->tsc_hz = tsc_calibrate();
@@ -237,7 +234,6 @@ static struct core *setup_cpu(uint64_t cpu) {
     detect_cpu_capability(c);
 
     wrmsr(MSR_GS_BASE, (uint64_t) c);
-    global.cores[cpu] = c;
     return c;
 }
 
@@ -254,18 +250,34 @@ void smp_wakeup() {
 
     asm volatile("mov %0, %%cr3" ::"r"(cr3));
 
+    uint64_t cpu = cpu_get_this_id();
+    setup_cpu(cpu);
     x2apic_init();
 
-    uint64_t cpu = cpu_get_this_id();
-
     gdt_install();
+    wrmsr(MSR_GS_BASE, (uint64_t) global.cores[cpu]);
     irq_load();
 
-    setup_cpu(cpu);
     lapic_timer_init(cpu);
     set_core_awake();
 
     scheduler_yield();
+}
+
+void smp_init() {
+    for (size_t i = 0; i < global.core_count; i++) {
+        size_t d = domain_for_core(i);
+
+        if (i != 0) {
+            global.cores[i] = kmalloc_from_domain(d, sizeof(struct core));
+            if (!global.cores[i])
+                panic("OOM\n");
+        }
+
+        global.cores[i]->id = i;
+        global.cores[i]->numa_node = domain_for_core(i);
+        global.cores[i]->domain = global.domains[d];
+    }
 }
 
 void smp_wait_for_others_to_idle() {
@@ -276,9 +288,9 @@ void smp_wait_for_others_to_idle() {
     }
 }
 
-void smp_init(struct limine_mp_response *mpr) {
+void smp_wake(struct limine_mp_response *mpr) {
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
-    for (uint64_t i = 0; i < mpr->cpu_count; i++)
+    for (uint64_t i = 1; i < mpr->cpu_count; i++)
         mpr->cpus[i]->goto_address = smp_wakeup;
 
     smp_core()->tsc_hz = tsc_calibrate();
@@ -293,8 +305,7 @@ void smp_init(struct limine_mp_response *mpr) {
 }
 
 void smp_setup_bsp() {
-    struct core *c =
-        kzalloc(PAGE_ALIGN_UP(sizeof(struct core)), ALLOC_PARAMS_DEFAULT);
+    struct core *c = kzalloc(sizeof(struct core), ALLOC_PARAMS_DEFAULT);
     if (!c)
         panic("Could not allocate space for core structure on BSP");
 
@@ -365,61 +376,4 @@ void smp_enable_all_ticks() {
     send_em_all_out(true);
     irq_free_entry(entry);
     irq_set_chip(entry, NULL, NULL);
-}
-
-struct smp_move_struct_cores {
-    paddr_t new_phys;
-};
-
-void smp_move_ctor(struct smp_move_struct_cores *doohickey, size_t id) {
-    doohickey->new_phys = domain_alloc_from_domain(
-        global.cores[id]->domain,
-        PAGES_NEEDED_FOR(PAGE_ALIGN_UP(sizeof(struct core))));
-    if (!doohickey->new_phys)
-        panic("OOM\n");
-}
-
-PERCPU_DECLARE(smp_move, struct smp_move_struct_cores, smp_move_ctor);
-
-static atomic_uint moved = 0;
-
-static enum irq_result smp_move_isr(void *ctx, uint8_t vector,
-                                    struct irq_context *rsp) {
-    struct smp_move_struct_cores *mine = &PERCPU_READ(smp_move);
-    void *new_vaddr = (void *) (mine->new_phys + global.hhdm_offset);
-    void *old_vaddr = (void *) PAGE_ALIGN_DOWN(smp_core());
-    size_t needed = PAGES_NEEDED_FOR(PAGE_ALIGN_UP(sizeof(struct core)));
-    memcpy(new_vaddr, old_vaddr, PAGE_SIZE * needed);
-
-    for (size_t i = 0; i < needed; i++) {
-        vmm_map_page((vaddr_t) old_vaddr + i * PAGE_SIZE,
-                     mine->new_phys + i * PAGE_SIZE,
-                     PAGING_WRITE | PAGING_PRESENT,
-                     VMM_FLAG_NO_LOCKS | VMM_FLAG_NO_TLB_SHOOTDOWN);
-    }
-
-    tlb_flush();
-    atomic_fetch_add(&moved, 1);
-    return IRQ_HANDLED;
-}
-
-void smp_move_everyone() {
-    uint8_t move_entry = irq_alloc_entry();
-    irq_register("move_isr", move_entry, smp_move_isr, NULL, IRQ_FLAG_NONE);
-    irq_set_chip(move_entry, lapic_get_chip(), NULL);
-
-    size_t i;
-    for_each_cpu_id(i) {
-        if (i == 0)
-            continue;
-
-        size_t start = atomic_load(&moved);
-        ipi_send(i, move_entry);
-
-        while (atomic_load(&moved) < start + 1)
-            cpu_relax();
-    }
-
-    irq_free_entry(move_entry);
-    irq_set_chip(move_entry, NULL, NULL);
 }

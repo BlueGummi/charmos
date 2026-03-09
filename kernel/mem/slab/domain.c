@@ -7,7 +7,7 @@
 #include "mem/domain/internal.h"
 
 void slab_domain_build_locality_lists(struct slab_domain *sdom) {
-    struct domain_buddy *buddy = sdom->domain->cores[0]->domain_buddy;
+    struct domain_buddy *buddy = sdom->domain->domain_buddy;
     struct domain_zonelist *zl = &buddy->zonelist;
 
     sdom->pageable_zonelist.count = zl->count;
@@ -78,11 +78,6 @@ void slab_domain_init_caches(struct slab_domain *dom) {
     slab_init_caches(dom->local_pageable_cache, /* pageable = */ true);
     slab_domain_link_caches(dom, dom->local_pageable_cache);
     slab_domain_link_caches(dom, dom->local_nonpageable_cache);
-
-    for (size_t j = 0; j < dom->domain->num_cores; j++)
-        dom->domain->cores[j]->slab_domain = dom;
-
-    global.domains[dom->domain->id]->slab_domain = dom;
 }
 
 static size_t slab_bucket_reset(struct stat_bucket *bucket) {
@@ -167,6 +162,8 @@ void slab_domain_init(void) {
             panic("Failed to allocate slab domain!\n");
 
         sdomain->domain = domain;
+        domain->slab_domain = sdomain;
+
         slab_gc_init(sdomain);
         slab_free_queue_init(sdomain, &sdomain->free_queue,
                              SLAB_FREE_QUEUE_CAPACITY);

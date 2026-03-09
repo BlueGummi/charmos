@@ -11,3 +11,4 @@ paddr_t domain_alloc_from_domain(struct domain *cd, size_t pages);
 void domain_buddy_dump(void);
 void domain_buddies_init_late();
 struct domain *domain_for_addr(paddr_t addr);
+void domain_buddies_init_after_smp();

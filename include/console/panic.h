@@ -1,5 +1,6 @@
 #pragma once
 #include <asm.h>
+#include <compiler.h>
 #include <limine.h>
 
 void debug_print_stack();
@@ -20,8 +21,8 @@ struct panic_regs {
     TEN_LINES TEN_LINES TEN_LINES TEN_LINES TEN_LINES TEN_LINES TEN_LINES      \
         TEN_LINES
 
-void panic_impl(const char *file, int line, const char *func, const char *fmt,
-                ...);
+__noreturn void panic_impl(const char *file, int line, const char *func,
+                           const char *fmt, ...);
 
 #define panic(fmt, ...)                                                        \
     panic_impl(__FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)

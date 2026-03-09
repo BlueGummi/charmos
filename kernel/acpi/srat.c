@@ -105,9 +105,6 @@ void srat_init(void) {
                     (uint64_t) cpu->proximity_domain_high[2] << 24;
 
                 cpu_mask_set(&global.numa_nodes[prox_domain].cpus, cpu->id);
-                struct core *c = global.cores[cpu->id];
-                if (c)
-                    c->numa_node = prox_domain;
             }
             break;
         }

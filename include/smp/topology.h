@@ -82,6 +82,13 @@ bool cpu_mask_test(const struct cpu_mask *m, size_t cpu);
 void cpu_mask_or(struct cpu_mask *dst, const struct cpu_mask *b);
 bool cpu_mask_empty(const struct cpu_mask *mask);
 void cpu_mask_clear_all(struct cpu_mask *m);
+size_t cpu_mask_popcount(struct cpu_mask *m);
+#define cpu_mask_for_each(iter, mask)                                          \
+    for (iter = 0; iter < (mask).nbits; ++iter)                                \
+        if ((mask).uses_large                                                  \
+                ? atomic_load(&(mask).large[iter / CPU_MASK_WORD_BITS]) &      \
+                      (1ULL << (iter % CPU_MASK_WORD_BITS))                    \
+                : atomic_load(&(mask).small) & (1ULL << iter))
 
 void topology_mark_core_idle(size_t cpu_id, bool idle);
 struct core *topology_find_idle_core(struct core *local_core,

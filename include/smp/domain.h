@@ -12,6 +12,7 @@ struct domain {
     struct core **cores;
     struct numa_node *associated_node;
     struct slab_domain *slab_domain;
+    struct domain_buddy *domain_buddy;
     struct cpu_mask cpu_mask;
 };
 
@@ -27,6 +28,9 @@ void domain_init(void);
 struct cpu_mask *domain_create_cpu_mask(struct domain *domain);
 void domain_set_cpu_mask(struct cpu_mask *mask, struct domain *domain);
 bool domain_idle(struct domain *domain);
+size_t domain_for_core(size_t cpu);
+void domain_init_after_smp();
+void domain_dump(void);
 
 #define domain_for_each_domain(__dom)                                          \
     for (size_t __i = 0;                                                       \
