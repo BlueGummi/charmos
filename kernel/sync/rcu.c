@@ -7,8 +7,8 @@
 #include <sync/rcu.h>
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
-#include <thread/workqueue.h>
 #include <thread/thread.h>
+#include <thread/workqueue.h>
 
 #include "sch/internal.h" /* for tick_enabled */
 
@@ -22,7 +22,7 @@ static uint64_t rcu_advance_gp() {
 static inline bool thread_rcu_not_reached_target(struct thread *t,
                                                  uint64_t target) {
     uint32_t nesting =
-        atomic_load_explicit(&t->rcu_nesting, memory_order_acquire);
+        atomic_load_explicit(&t->rcu_nesting, memory_order_seq_cst);
 
     if (nesting != 0) {
         uint64_t start_gen =
@@ -101,6 +101,7 @@ void rcu_read_lock(void) {
             gen = rcu_read_global_gen();
             atomic_store_explicit(&t->rcu_start_gen, gen, memory_order_release);
         } while (gen != rcu_read_global_gen());
+        atomic_thread_fence(memory_order_seq_cst);
     }
 }
 
@@ -112,6 +113,7 @@ void rcu_read_unlock(void) {
         panic("RCU nesting underflow\n");
 
     if (old == 1) {
+        atomic_thread_fence(memory_order_seq_cst);
         uint64_t start_gen =
             atomic_load_explicit(&t->rcu_start_gen, memory_order_acquire);
         atomic_store_explicit(&t->rcu_quiescent_gen, start_gen - 1,
