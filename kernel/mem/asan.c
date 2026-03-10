@@ -76,7 +76,7 @@ void asan_init(void) {
     /* Initialize shadow memory to poisoned */
     memset(asan_shadow_base, 0xFF, asan_shadow_size);
 
-    asan_info("shadow memory initialized at 0x%lx", asan_shadow_base);
+    asan_info("shadow memory initialized at %p", asan_shadow_base);
 
     asan_ready = true;
 }

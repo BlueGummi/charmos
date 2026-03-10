@@ -71,7 +71,7 @@ static void worker_destroy(struct workqueue *queue, struct worker *worker) {
         }
 
         if (!found)
-            panic("Potential corrupted worker 0x%lx in STATIC_WORKERS "
+            panic("Potential corrupted worker %p in STATIC_WORKERS "
                   "workqueue\n",
                   worker);
 
@@ -108,7 +108,7 @@ void worker_main(void *unused) {
     struct workqueue *queue = w->workqueue;
     kassert(w);
 
-    workqueue_get(queue);
+    kassert(workqueue_get(queue));
 
     while (true) {
 

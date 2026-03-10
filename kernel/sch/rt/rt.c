@@ -94,10 +94,13 @@ enum rt_scheduler_error rt_build_mapping(struct rt_scheduler_static *rts) {
 
 enum rt_scheduler_error
 rt_load_scheduler_static(struct rt_scheduler_static *rts) {
-    enum rt_scheduler_error err;
+    enum rt_scheduler_error err = RT_SCHEDULER_ERR_INVALID;
     enum irql irql = spin_lock(&rts->lock_internal);
 
+    if (rt_scheduler_static_get_state(rts) != RT_SCHEDULER_STATIC_UNLOADED)
+        goto done;
 
+    refcount_init(&rts->refcount, 1);
     INIT_LIST_HEAD(&rts->list_internal);
     locked_list_add(&rt_scheduler_global.list, &rts->list_internal);
 
@@ -121,7 +124,7 @@ rt_load_scheduler_static(struct rt_scheduler_static *rts) {
 
 done:
     if (err == RT_SCHEDULER_ERR_OK)
-        rts->state = RT_SCHEDULER_STATIC_LOADED;
+        rt_scheduler_static_set_state(rts, RT_SCHEDULER_STATIC_LOADED);
 
     spin_unlock(&rts->lock_internal, irql);
     return err;
@@ -129,6 +132,30 @@ done:
 
 enum rt_scheduler_error
 rt_unload_scheduler_static(struct rt_scheduler_static *rts) {
+    /* In here, we want to validate that we are looking at a loaded
+     * scheduler_static, and if we are, we can safely drop the initial
+     * ref. Otherwise, return the error (unloading an unloaded scheduler) */
+    enum rt_scheduler_error err = RT_SCHEDULER_ERR_INVALID;
+    enum irql irql = spin_lock(&rts->lock_internal);
 
+    if (rts->state != RT_SCHEDULER_STATIC_LOADED)
+        goto done;
 
+    rt_scheduler_static_set_state(rts, RT_SCHEDULER_STATIC_DESTROYING);
+    rt_scheduler_static_put(rts);
+
+done:
+
+    spin_unlock(&rts->lock_internal, irql);
+    return err;
 }
+
+void rt_scheduler_destroy_internal(struct rt_scheduler_static *rts) {
+    /* Assert that the refs are gone, lock, unload, teardown */
+    enum irql irql = spin_lock(&rts->lock_internal);
+    kassert(refcount_read(&rts->refcount) == 0);
+    rt_scheduler_static_set_state(rts, RT_SCHEDULER_STATIC_UNLOADED);
+
+    spin_unlock(&rts->lock_internal, irql);
+
+}   

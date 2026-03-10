@@ -57,7 +57,7 @@ static void free_all_slots(struct rt_scheduler_static *rts) {
 
 enum rt_scheduler_error
 rt_slots_init_for_scheduler(struct rt_scheduler_static *rts) {
-    rt_sched_trace("Initializing slots for %s (0x%lx)", rts->name, rts);
+    rt_sched_trace("Initializing slots for %s (%p)", rts->name, rts);
     size_t need = rts->num_slot_requests;
     for (size_t i = 0; i < need; i++) {
         struct rt_slot_request *rq = &rts->slot_requests[i];

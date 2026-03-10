@@ -425,7 +425,7 @@ void debug_print_stack(void) {
             uint64_t sym_addr;
             const char *sym = find_symbol(val, &sym_addr);
             if (sym) {
-                printf("    [0x%016lx] %s+0x%lx (sp=0x%016lx)\n", val, sym,
+                printf("    [0x%016lx] %s+%p (sp=0x%016lx)\n", val, sym,
                        val - sym_addr, (uint64_t) addr);
                 hits++;
             }
@@ -438,12 +438,12 @@ void debug_print_stack(void) {
 
 void debug_print_memory(void *addr, uint64_t size) {
     uint8_t *ptr = (uint8_t *) addr;
-    printf("Memory at 0x%lx:\n", (uint64_t) addr);
+    printf("Memory at %p:\n", (uint64_t) addr);
     for (uint64_t i = 0; i < size; i++) {
         if (i % 16 == 0) {
             if (i != 0)
                 printf("\n");
-            printf("0x%lx: ", (uint64_t) (ptr + i));
+            printf("%p: ", (uint64_t) (ptr + i));
         }
         printf("%02x ", ptr[i]);
     }

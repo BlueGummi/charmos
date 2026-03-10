@@ -83,7 +83,7 @@ static void chaos_sleeper(void *arg) {
         s->last_cookie = cookie;
         atomic_store(&s->ready, false);
 
-        CHAOS_LOG("sleeper[%zu] sleep iter=%d cookie=0x%lx", id, i,
+        CHAOS_LOG("sleeper[%zu] sleep iter=%d cookie=%p", id, i,
                   (void *) cookie);
         thread_sleep(thread_get_current(), THREAD_SLEEP_REASON_MANUAL,
                      THREAD_WAIT_INTERRUPTIBLE, (void *) cookie);
@@ -123,7 +123,7 @@ static void chaos_waker(void *a) {
         bool correct = (prng_next() % 3 == 0);
         uintptr_t cookie = correct ? s->last_cookie : prng_next();
 
-        CHAOS_LOG("waker wake 0x%lx", s->t);
+        CHAOS_LOG("waker wake %p", s->t);
         thread_wake(s->t, THREAD_WAKE_REASON_SLEEP_MANUAL,
                     s->t->perceived_prio_class, (void *) cookie);
         CHAOS_LOG("waker wake done");
@@ -192,9 +192,9 @@ static void chaos_migrator() {
         if (!thread_get(states[id].t))
             continue;
 
-        CHAOS_LOG("migrate 0x%lx to %u", states[id].t, core);
+        CHAOS_LOG("migrate %p to %u", states[id].t, core);
         thread_migrate(states[id].t, core);
-        CHAOS_LOG("migrate 0x%lx ok", states[id].t);
+        CHAOS_LOG("migrate %p ok", states[id].t);
         thread_put(states[id].t);
 
         scheduler_yield();

@@ -97,7 +97,7 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
             continue;
 
         uint32_t sig = mmio_read_32(&port->sig);
-        ahci_log(LOG_INFO, "Controller port %u has signature 0x%lx", i, sig);
+        ahci_log(LOG_INFO, "Controller port %u has signature %p", i, sig);
 
         if (sig == 0xFFFFFFFF)
             continue;

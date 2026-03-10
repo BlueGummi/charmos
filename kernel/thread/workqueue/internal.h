@@ -49,15 +49,6 @@ static inline void workqueue_put(struct workqueue *queue) {
         return workqueue_free(queue);
 }
 
-static inline bool worklist_get(struct worklist *wlist) {
-    return refcount_inc(&wlist->refcount);
-}
-
-static inline void worklist_put(struct worklist *wlist) {
-    if (refcount_dec_and_test(&wlist->refcount))
-        worklist_free(wlist);
-}
-
 /* Regardless of if we use static workers or not this will
  * always be the list of workers we have */
 static inline void workqueue_add_worker(struct workqueue *wq,

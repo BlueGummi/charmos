@@ -626,7 +626,7 @@ static void xhci_process_port_status_change(struct xhci_device *dev,
     case PORT_NONE:
     case PORT_CONNECT: xhci_process_port_connect(dev, evt); break;
     default:
-        xhci_warn("Unknown port %u status change, PORTSC state 0x%lx\n",
+        xhci_warn("Unknown port %u status change, PORTSC state %p\n",
                   port_id, portsc);
         break;
     }
@@ -716,7 +716,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
     void *mmio = xhci_map_mmio(bus, slot, func);
 
     struct xhci_device *dev = xhci_device_create(mmio);
-    xhci_info("Device at 0x%lx, offset is %u", dev,
+    xhci_info("Device at %p, offset is %u", dev,
               offsetof(struct xhci_request, list));
 
     semaphore_init(&dev->sem, 0, SEMAPHORE_INIT_IRQ_DISABLE);

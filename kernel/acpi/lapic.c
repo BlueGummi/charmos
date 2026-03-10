@@ -117,8 +117,7 @@ void nmi_send(uint32_t apic_id) {
 
     lo |= LAPIC_DELIVERY_NMI;
     lo |= LAPIC_DEST_PHYSICAL;
-    lo |= LAPIC_LEVEL_ASSERT; /* irrelevant but harmless; most OSes set it */
-    /* Vector is irrelevant for NMI; set to zero */
+    lo |= LAPIC_LEVEL_ASSERT;
 
     /* High must be written before low */
     lapic_write(LAPIC_ICR_HIGH, hi);

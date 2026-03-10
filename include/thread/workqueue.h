@@ -71,30 +71,6 @@ struct worker {
     struct list_head list_node;
 };
 
-enum worklist_state {
-    WORKLIST_STATE_EMPTY = 0,      /* No works */
-    WORKLIST_STATE_READY = 1,      /* Works available */
-    WORKLIST_STATE_RUNNING = 2,    /* Executing works */
-    WORKLIST_STATE_DESTROYING = 3, /* Destroying */
-    WORKLIST_STATE_DEAD = 4,       /* Gone */
-};
-
-enum worklist_flags {
-    WORKLIST_FLAG_UNBOUND = 1,
-};
-
-struct worklist {
-    _Atomic enum worklist_state state;
-    struct list_head list; /* List of individual works */
-    time_t creation_time;
-    struct spinlock lock; /* Lock for the list */
-
-    enum worklist_flags flags;
-    refcount_t refcount;
-};
-#define WORKLIST_GET_STATE(wlist) (atomic_load(&wlist->state))
-#define WORKLIST_SET_STATE(wlist, state) (atomic_store(&wlist->state, state))
-
 /* TODO: Get in profiling.h and put these under there */
 #ifdef TESTS
 struct workqueue_stats {
@@ -293,8 +269,6 @@ __warn_unused_result enum workqueue_error workqueue_add_fast(struct work *work);
 
 void work_execute(struct work *task);
 bool workqueue_should_spawn_worker(struct workqueue *queue);
-struct worklist *worklist_create(enum worklist_flags);
-void worklist_free(struct worklist *wlist);
 
 void workqueue_kick(struct workqueue *queue);
 void workqueue_destroy(struct workqueue *queue);

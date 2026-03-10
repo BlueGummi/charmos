@@ -90,7 +90,7 @@ static void map_cpus_to_groups(void) {
 
         for (size_t i = 0; i < TOPOLOGY_LEVEL_MAX; i++) {
             struct scheduler_domain *d = global.scheduler_domains[i];
-            printf("setting index %u to 0x%lx\n", i, d);
+            printf("setting index %u to %p\n", i, d);
             c->domains[i] = d;
 
             /* find group for this CPU */

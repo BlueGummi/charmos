@@ -152,7 +152,7 @@ TEST_REGISTER(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
 
     for (size_t i = 0; i < BIO_SCHED_TEST_RUNS; i++) {
         if (!rqs[i]->disk) {
-            printf("rq 0x%lx %u\n", rqs[i], i);
+            printf("rq %p %u\n", rqs[i], i);
             SET_SUCCESS();
             return;
         }

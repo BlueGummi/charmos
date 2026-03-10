@@ -11,6 +11,7 @@
 #include <structures/rbt.h>
 #include <thread/dpc.h>
 #include <thread/thread_types.h>
+#include <thread/workqueue.h>
 #include <types/refcount.h>
 
 /* @idea:big Real-time scheduler load balancing */
@@ -233,7 +234,8 @@ enum rt_scheduler_error {
     RT_SCHEDULER_ERR_OOM = -17, /* Specifically ran out of memory */
 
     RT_SCHEDULER_ERR_OOR = -16, /* Generic "Out of resources" */
-    RT_SCHEDULER_ERR_NOT_FOUND = -15,
+    RT_SCHEDULER_ERR_NOT_FOUND = -15, /* Searched for something, cannot find it */
+    RT_SCHEDULER_ERR_INVALID = -14, /* Invalid operation */
 
     RT_SCHEDULER_ERR_POLICY = -3,
     RT_SCHEDULER_ERR_DEADLINE = -2, /* Deadline-related error */
@@ -367,8 +369,7 @@ enum rt_scheduler_static_state {
                                     * correctness purposes, but is very helpful
                                     * in debugging and to allow one to unload
                                     * unused rt_scheduler_statics */
-    RT_SCHEDULER_STATIC_ACTIVE,    /* In use */
-    RT_SCHEDULER_STATE_DESTROYING, /* Taking down. No one can "Grab a ref" */
+    RT_SCHEDULER_STATIC_DESTROYING, /* Taking down. No one can "Grab a ref" */
 };
 
 enum rt_slot_priority {
@@ -546,6 +547,7 @@ struct rt_scheduler_static {
                                             * nodes are dynamic, this is static */
     struct cpu_mask *active_mask_internal; /* Who is using us? */
     refcount_t refcount;
+    struct work teardown_work;
     _Atomic enum rt_scheduler_static_state state;
     struct spinlock lock_internal;
 

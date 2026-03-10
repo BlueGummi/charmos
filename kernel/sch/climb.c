@@ -105,7 +105,7 @@ climb_thread_total_pressure(struct climb_thread_state *cts) {
  * boost_ewma = alpha * old + (1 − alpha) * target
  */
 static void update_fields(struct climb_thread_state *cts) {
-    climb_info("Update fields on 0x%lx", cts);
+    climb_info("Update fields on %p", cts);
     climb_pressure_t p = climb_thread_total_pressure(cts);
     int32_t target = climb_pressure_to_boost_target(p);
 
@@ -175,7 +175,7 @@ static void apply_handle_pressures(struct thread *t, struct climb_handle *ch) {
 
         ch->applied_pressure_internal = newp - old;
         kassert(newp - old);
-        climb_info("Applying pressure %u to 0x%lx", newp - old, cts);
+        climb_info("Applying pressure %u to %p", newp - old, cts);
         cts->direct_pressure = newp;
         return;
     }
@@ -194,7 +194,7 @@ static void apply_handle_pressures(struct thread *t, struct climb_handle *ch) {
 
     ch->applied_pressure_internal = newp - old;
     kassert(newp - old);
-    climb_info("Applying pressure %u to 0x%lx", newp - old, cts);
+    climb_info("Applying pressure %u to %p", newp - old, cts);
     cts->indirect_pressure = newp;
 }
 
@@ -206,7 +206,7 @@ static void apply_handle(struct thread *t, struct climb_handle *ch) {
     apply_handle_pressures(t, ch);
     struct climb_thread_state *cts = &t->climb_state;
 
-    climb_info("Apply handle on 0x%lx, %u", cts, climb_count_handles(cts));
+    climb_info("Apply handle on %p, %u", cts, climb_count_handles(cts));
 
     /* If there was already a giver, like with indirect boosts, we don't
      * change it. Otherwise, we do, and say we are the giver */
@@ -221,7 +221,7 @@ static void apply_handle(struct thread *t, struct climb_handle *ch) {
 
         /* Get a reference for the tree */
         kassert(thread_get(t));
-        climb_info("Insert 0x%lx to tree", cts);
+        climb_info("Insert %p to tree", cts);
         rbt_insert(tree, &cts->climb_node);
         cts->on_climb_tree = true;
     } else if (cts->pressure_periods < 0) {
@@ -237,7 +237,7 @@ static void remove_handle(struct thread *t, struct climb_handle *ch) {
     kassert(ch->given_by == thread_get_current());
 
     if (ch->applied_pressure_internal == 0) {
-        climb_warn("No-op handle removed from 0x%lx", cts);
+        climb_warn("No-op handle removed from %p", cts);
         return;
     }
 
@@ -251,13 +251,13 @@ static void remove_handle(struct thread *t, struct climb_handle *ch) {
     ch->applied_pressure_internal = 0;
     list_del_init(&ch->list);
 
-    climb_info("Remove handle on 0x%lx (thread 0x%lx), %u left", cts, t,
+    climb_info("Remove handle on %p (thread %p), %u left", cts, t,
                climb_count_handles(cts));
 
     if (list_empty(&cts->handles)) {
         /* This thread is done. Let it decay now */
         cts->pressure_periods = -1;
-        climb_info("Begin decay on 0x%lx", cts);
+        climb_info("Begin decay on %p", cts);
     }
 }
 
@@ -373,7 +373,7 @@ void climb_thread_remove(struct thread *t) {
 
     bool put = false;
     if (rbt_has_node(tree, node)) {
-        climb_info("Removing from tree 0x%lx", cts);
+        climb_info("Removing from tree %p", cts);
         rbt_delete(tree, node);
         cts->pressure_periods = 0;
         cts->on_climb_tree = false;
@@ -461,7 +461,7 @@ static void maybe_remove_node(struct rbt *tree,
         remove = true;
 
     if (remove) {
-        climb_info("Removing from tree 0x%lx", cts);
+        climb_info("Removing from tree %p", cts);
         rbt_delete(tree, node);
         cts->pressure_periods = 0;
         cts->on_climb_tree = false;
@@ -533,7 +533,7 @@ void climb_post_migrate_hook(struct thread *t, size_t old_cpu, size_t new_cpu) {
     /* Locks are already held */
     struct scheduler *old = global.schedulers[old_cpu];
     struct scheduler *new = global.schedulers[new_cpu];
-    climb_warn("Maybe 0x%lx", &t->climb_state);
+    climb_warn("Maybe %p", &t->climb_state);
 
     if (!rbt_has_node(&old->climb_threads, &t->climb_state.climb_node)) {
         kassert(t->climb_state.on_climb_tree == false);
@@ -541,7 +541,7 @@ void climb_post_migrate_hook(struct thread *t, size_t old_cpu, size_t new_cpu) {
         return;
     }
 
-    climb_warn("Migrating 0x%lx", &t->climb_state);
+    climb_warn("Migrating %p", &t->climb_state);
 
     /* Migrate and recompute */
     rbt_delete(&old->climb_threads, &t->climb_state.climb_node);

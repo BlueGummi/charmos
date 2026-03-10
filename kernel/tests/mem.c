@@ -171,7 +171,7 @@ TEST_REGISTER(kmalloc_new_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     kfree_new(p, ALLOC_BEHAVIOR_NORMAL);
     ms = time_get_ms() - ms;
 
-    snprintf(hooray, 128, "allocated 0x%lx and free took %u ms", p, ms);
+    snprintf(hooray, 128, "allocated %p and free took %u ms", p, ms);
 
     ADD_MESSAGE(hooray);
     SET_SUCCESS();

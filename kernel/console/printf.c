@@ -370,6 +370,19 @@ static void handle_format_specifier(struct printf_cursor *csr,
         len = print_octal(buffer, num);
         break;
     }
+    case 'p': {
+        uintptr_t num = (uintptr_t) va_arg(args, void *);
+        if (num == 0) {
+            apply_padding("(nil)", 5, width, left_align, false, csr);
+            *format_ptr = format;
+            return;
+        }
+        buffer[0] = '0';
+        buffer[1] = 'x';
+        len = 2 + print_hex(buffer + 2, num);
+        zero_pad = false;
+        break;
+    }
     case 's': {
         char *str = va_arg(args, char *);
         len = strlen(str);

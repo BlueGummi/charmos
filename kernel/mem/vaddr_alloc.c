@@ -137,5 +137,5 @@ void vas_free(struct vas_space *vas, vaddr_t addr) {
         }
     }
 
-    panic("invalid free of 0x%lx\n", addr);
+    panic("invalid free of %p\n", addr);
 }

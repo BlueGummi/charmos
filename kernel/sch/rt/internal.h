@@ -42,13 +42,19 @@ rt_scheduler_static_get_state(struct rt_scheduler_static *rts) {
     return atomic_load_explicit(&rts->state, memory_order_acquire);
 }
 
+static inline void
+rt_scheduler_static_set_state(struct rt_scheduler_static *rts,
+                              enum rt_scheduler_static_state new) {
+    atomic_store_explicit(&rts->state, new, memory_order_release);
+}
+
 REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(
-    rt_scheduler_static, refcount, state, == RT_SCHEDULER_STATE_DESTROYING);
+    rt_scheduler_static, refcount, state, == RT_SCHEDULER_STATIC_DESTROYING);
 
 static inline void rt_scheduler_static_put(struct rt_scheduler_static *rts) {
     if (refcount_dec_and_test(&rts->refcount)) {
         kassert(rt_scheduler_static_get_state(rts) ==
-                RT_SCHEDULER_STATE_DESTROYING);
+                RT_SCHEDULER_STATIC_DESTROYING);
         rt_scheduler_static_destroy_work_enqueue(rts);
     }
 }

@@ -25,8 +25,8 @@ enum irq_result page_fault_handler(void *context, uint8_t vector,
 
     spin_lock_raw(&pf_lock);
     printf("\n=== PAGE FAULT ===\n");
-    printf("Faulting Address (CR2): 0x%lx\n", fault_addr);
-    printf("Error Code: 0x%lx\n", error_code);
+    printf("Faulting Address (CR2): %p\n", fault_addr);
+    printf("Error Code: %p\n", error_code);
     printf("  - Page not Present (P): %s\n",
            (error_code & 0x01) ? "Yes" : "No");
     printf("  - Write Access (W/R): %s\n",
@@ -39,7 +39,7 @@ enum irq_result page_fault_handler(void *context, uint8_t vector,
            (error_code & 0x10) ? "Yes" : "No");
     printf("  - Protection Key Violation (PK): %s\n",
            (error_code & 0x20) ? "Yes" : "No");
-    printf("  - Kernel stack 0x%lx -> 0x%lx\n", curr->stack,
+    printf("  - Kernel stack %p -> %p\n", curr->stack,
            (uintptr_t) curr->stack + curr->stack_size);
     vaddr_t protector_base = (uintptr_t) curr->stack - PAGE_SIZE;
     vaddr_t protector_top = (uintptr_t) curr->stack;

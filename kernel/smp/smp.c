@@ -250,9 +250,9 @@ void smp_wakeup() {
 
     asm volatile("mov %0, %%cr3" ::"r"(cr3));
 
+    x2apic_init();
     uint64_t cpu = cpu_get_this_id();
     setup_cpu(cpu);
-    x2apic_init();
 
     gdt_install();
     wrmsr(MSR_GS_BASE, (uint64_t) global.cores[cpu]);

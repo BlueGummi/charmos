@@ -418,11 +418,11 @@ static void *slab_try_alloc_from_slab_list(struct slab_cache *cache,
     list_for_each_safe(node, temp, list) {
         slab = slab_from_list_node(node);
         if (slab->parent_cache != cache)
-            printf("slab 0x%lx parent 0x%lx we are 0x%lx\n", slab,
+            printf("slab %p parent %p we are %p\n", slab,
                    slab->parent_cache, cache);
 
         if (slab->state == SLAB_FULL)
-            printf("slab 0x%lx full\n", slab);
+            printf("slab %p full\n", slab);
 
         ret = slab_alloc_from(cache, slab);
         if (ret)
@@ -597,7 +597,7 @@ size_t ksize(void *ptr) {
     vaddr_t vp = (vaddr_t) ptr;
 
     if (!(vp >= SLAB_HEAP_START && vp <= SLAB_HEAP_END))
-        panic("0x%lx out of bounds\n", vp);
+        panic("%p out of bounds\n", vp);
 
     struct slab_page_hdr *hdr = slab_page_hdr_for_addr(ptr);
 
@@ -696,7 +696,7 @@ void slab_free_addr_to_cache(void *addr) {
 
     struct slab *slab = slab_for_ptr(addr);
     if (!slab)
-        panic("Likely double free of address 0x%lx\n", addr);
+        panic("Likely double free of address %p\n", addr);
 
     slab_free_old(slab, addr);
 }

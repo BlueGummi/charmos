@@ -84,7 +84,7 @@ void ioapic_init(void) {
                                             PAGING_UNCACHABLE, VMM_FLAG_NONE);
 
             log_info_global(LOG_HANDLE(ioapic),
-                            "ID: %u, GSI Base: %u, MMIO: 0x%lx", ioapic.id,
+                            "ID: %u, GSI Base: %u, MMIO: %p", ioapic.id,
                             ioapic.gsi_base, ioapic.mmio_base);
 
             return;
