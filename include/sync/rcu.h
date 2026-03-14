@@ -10,6 +10,15 @@
 
 #define RCU_BUCKETS 2
 
+struct rcu_cpu {
+    _Atomic uint32_t nesting;  /* lock depth                        */
+    _Atomic uint64_t read_gen; /* generation at outermost lock      */
+    _Atomic uint64_t qs_gen;   /* last confirmed quiescent gen      */
+
+    /* TODO: #define CACHE LINE SIZE somewhere */
+    uint8_t _pad[64 - (sizeof(uint32_t) + 2 * sizeof(uint64_t)) % 64];
+} __cache_aligned;
+
 struct rcu_cb;
 typedef void (*rcu_fn)(struct rcu_cb *, void *);
 
@@ -31,6 +40,11 @@ struct rcu_bucket {
 struct rcu_buckets {
     struct semaphore sem;
     struct rcu_bucket buckets[RCU_BUCKETS];
+};
+
+struct rcu_gp {
+    _Atomic uint64_t current_gen;
+    struct rcu_cpu *cpus;
 };
 
 void rcu_synchronize(void);

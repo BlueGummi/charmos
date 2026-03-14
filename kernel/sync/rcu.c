@@ -108,12 +108,11 @@ void rcu_read_lock(void) {
 void rcu_read_unlock(void) {
     struct thread *t = thread_get_current();
     uint32_t old =
-        atomic_fetch_sub_explicit(&t->rcu_nesting, 1, memory_order_acq_rel);
+        atomic_fetch_sub_explicit(&t->rcu_nesting, 1, memory_order_seq_cst);
     if (old == 0)
         panic("RCU nesting underflow\n");
 
     if (old == 1) {
-        atomic_thread_fence(memory_order_seq_cst);
         uint64_t start_gen =
             atomic_load_explicit(&t->rcu_start_gen, memory_order_acquire);
         atomic_store_explicit(&t->rcu_quiescent_gen, start_gen - 1,

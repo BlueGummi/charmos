@@ -6,49 +6,36 @@
 #include <stdint.h>
 #include <thread/dpc.h>
 
-static struct dpc *dpc_steal_queue(struct dpc_queue *dq, struct dpc_cpu *dc) {
-    while (true) {
-        struct dpc *list =
-            atomic_exchange_explicit(&dq->head, NULL, memory_order_acquire);
+static struct dpc *dpc_steal_queue(struct dpc_queue *dq) {
+    struct dpc *list =
+        atomic_exchange_explicit(&dq->head, NULL, memory_order_acquire);
 
-        if (!list) {
-            if (!atomic_load_explicit(&dc->ipi_queued, memory_order_acquire))
-                return NULL;
+    if (!list)
+        return NULL;
 
-            bool expected = true;
-            if (atomic_compare_exchange_strong_explicit(
-                    &dc->ipi_queued, &expected, false, memory_order_acq_rel,
-                    memory_order_acquire))
-                return NULL;
+    struct dpc *rev = NULL;
 
-            continue;
-        }
-
-        struct dpc *rev = NULL;
-        while (list) {
-            struct dpc *next =
-                atomic_load_explicit(&list->next, memory_order_relaxed);
-            atomic_store_explicit(&list->next, rev, memory_order_relaxed);
-            rev = list;
-            list = next;
-        }
-
-        return rev;
+    while (list) {
+        struct dpc *next =
+            atomic_load_explicit(&list->next, memory_order_relaxed);
+        atomic_store_explicit(&list->next, rev, memory_order_relaxed);
+        rev = list;
+        list = next;
     }
+
+    return rev;
 }
 
-static void dpc_execute_all_in_queue(struct dpc_queue *dq, struct dpc_cpu *dc) {
+static void dpc_execute_all_in_queue(struct dpc_queue *dq) {
     while (true) {
-        struct dpc *it = dpc_steal_queue(dq, dc);
+        struct dpc *it = dpc_steal_queue(dq);
         if (!it)
             break;
 
         while (it) {
             atomic_store_explicit(&it->enqueued, false, memory_order_release);
             it->func(it, it->ctx);
-            struct dpc *prev = it;
             it = atomic_load_explicit(&it->next, memory_order_relaxed);
-            atomic_store_explicit(&prev->executed, true, memory_order_relaxed);
         }
     }
 }
@@ -65,10 +52,10 @@ void dpc_run_local(void) {
     enum dpc_event recent = me->dpc_event;
     struct dpc_cpu *dc = &global.dpc_data[cpu];
 
-    dpc_execute_all_in_queue(&dc->queues[recent], dc);
+    dpc_execute_all_in_queue(&dc->queues[recent]);
 
     if (recent != DPC_NONE)
-        dpc_execute_all_in_queue(&dc->queues[DPC_NONE], dc);
+        dpc_execute_all_in_queue(&dc->queues[DPC_NONE]);
 
     /* all clear */
     me->dpc_event = DPC_NONE;
@@ -103,13 +90,7 @@ bool dpc_enqueue_on_cpu(size_t cpu, struct dpc *d, enum dpc_event e) {
     struct dpc_queue *dq = &dc->queues[e];
     dpc_queue_enqueue(dq, d);
 
-    if (!atomic_exchange_explicit(&dc->ipi_queued, true,
-                                  memory_order_acq_rel) &&
-        cpu != smp_core_id()) {
-        ipi_send(cpu, IRQ_SCHEDULER);
-    } else {
-        scheduler_mark_self_needs_resched(true);
-    }
+    scheduler_force_resched(global.schedulers[cpu]);
 
     return true;
 }
@@ -129,8 +110,6 @@ void dpc_init_percpu(void) {
             atomic_store_explicit(&global.dpc_data[i].queues[j].head, NULL,
                                   memory_order_relaxed);
         }
-        atomic_store_explicit(&global.dpc_data[i].ipi_queued, 0,
-                              memory_order_relaxed);
     }
 }
 
@@ -139,7 +118,6 @@ struct dpc *dpc_init(struct dpc *d, dpc_func_t fn, void *ctx) {
     d->ctx = ctx;
     atomic_store_explicit(&d->next, NULL, memory_order_relaxed);
     atomic_store_explicit(&d->enqueued, false, memory_order_relaxed);
-    atomic_store_explicit(&d->executed, false, memory_order_relaxed);
     return d;
 }
 

@@ -20,7 +20,6 @@ struct dpc {
     void *ctx;
     _Atomic(struct dpc *) next; /* for MPSC push */
     _Atomic(bool) enqueued;     /* prevents double-enqueue */
-    _Atomic(bool) executed;
 };
 
 struct dpc_queue {

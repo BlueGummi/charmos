@@ -86,11 +86,9 @@ static void map_cpus_to_groups(void) {
     struct core *c;
     for_each_cpu_struct(c) {
         struct core *c = global.cores[__id];
-        printf("setting %u\n", __id);
 
         for (size_t i = 0; i < TOPOLOGY_LEVEL_MAX; i++) {
             struct scheduler_domain *d = global.scheduler_domains[i];
-            printf("setting index %u to %p\n", i, d);
             c->domains[i] = d;
 
             /* find group for this CPU */

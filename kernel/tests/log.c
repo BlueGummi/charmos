@@ -6,8 +6,8 @@
 
 static struct log_handle log_event = {
     .flags = LOG_PRINT,
-    .seen = 0,
-    .last_ts = 0,
+    .seen_internal = 0,
+    .last_ts_internal = 0,
     .msg = "bluh",
 
 };

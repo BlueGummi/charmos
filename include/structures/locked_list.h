@@ -10,15 +10,29 @@ struct locked_list {
     struct list_head list;
     struct spinlock lock;
     atomic_size_t num_elems;
+    bool lock_irq_disable;
 };
-SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(locked_list, lock);
 
+static inline enum irql locked_list_lock(struct locked_list *ll) {
+    if (ll->lock_irq_disable) {
+        return spin_lock_irq_disable(&ll->lock);
+    } else {
+        return spin_lock(&ll->lock);
+    }
+}
+
+static inline void locked_list_unlock(struct locked_list *ll, enum irql irql) {
+    spin_unlock(&ll->lock, irql);
+}
+
+#define LOCKED_LIST_INIT_IRQ_DISABLE true
+#define LOCKED_LIST_INIT_NORMAL false
 #define LOCKED_LIST_SET_NUM_ELEMS(ll, c) atomic_store(&ll->num_elems, c)
 #define LOCKED_LIST_GET_NUM_ELEMS(ll) atomic_load(&ll->num_elems)
 #define LOCKED_LIST_INC_NUM_ELEMS(ll) atomic_fetch_add(&ll->num_elems, 1)
 #define LOCKED_LIST_DEC_NUM_ELEMS(ll) atomic_fetch_sub(&ll->num_elems, 1)
 #define LOCKED_LIST_DO(ll, action)                                             \
-    enum irql __macro_irql = locked_list_lock_irq_disable(ll);                 \
+    enum irql __macro_irql = locked_list_lock(ll);                             \
     action;                                                                    \
     locked_list_unlock(ll, __macro_irql);
 
@@ -56,8 +70,9 @@ static inline size_t locked_list_num_elems(struct locked_list *ll) {
     return ret;
 }
 
-static inline void locked_list_init(struct locked_list *ll) {
+static inline void locked_list_init(struct locked_list *ll, bool irq_disable) {
     INIT_LIST_HEAD(&ll->list);
     spinlock_init(&ll->lock);
     LOCKED_LIST_SET_NUM_ELEMS(ll, 0);
+    ll->lock_irq_disable = irq_disable;
 }

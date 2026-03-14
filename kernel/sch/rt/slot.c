@@ -24,6 +24,19 @@ struct rt_slot *rt_slot_allocate(struct rt_scheduler_static *for_whom) {
     return got;
 }
 
+size_t rt_slot_get_num_available(void) {
+    size_t count = 0;
+    enum irql irql = spin_lock_irq_disable(&slot_db.lock);
+
+    for (size_t i = 0; i < slot_db.num_slots; i++) {
+        if (!slot_db.slots[i].in_use)
+            count++;
+    }
+
+    spin_unlock(&slot_db.lock, irql);
+    return count;
+}
+
 void rt_slot_free(size_t slot) {
     enum irql irql = spin_lock_irq_disable(&slot_db.lock);
 
@@ -58,8 +71,7 @@ static void free_all_slots(struct rt_scheduler_static *rts) {
 enum rt_scheduler_error
 rt_slots_init_for_scheduler(struct rt_scheduler_static *rts) {
     rt_sched_trace("Initializing slots for %s (%p)", rts->name, rts);
-    size_t need = rts->num_slot_requests;
-    for (size_t i = 0; i < need; i++) {
+    for (size_t i = 0; i < rts->num_slot_requests; i++) {
         struct rt_slot_request *rq = &rts->slot_requests[i];
         struct rt_slot *got = rt_slot_allocate(rts);
 
@@ -72,4 +84,14 @@ rt_slots_init_for_scheduler(struct rt_scheduler_static *rts) {
     }
 
     return RT_SCHEDULER_ERR_OK;
+}
+
+void rt_slots_dealloc_for_scheduler(struct rt_scheduler_static *rts) {
+    rt_sched_trace("Deallocating slots for %s (%p)", rts->name, rts);
+    for (size_t i = 0; i < rts->num_slot_requests; i++) {
+        if (rts->slot_requests[i].mapped_to != -1)
+            rt_slot_free(rts->slot_requests[i].mapped_to);
+
+        rts->slot_requests[i].mapped_to = -1;
+    }
 }

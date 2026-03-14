@@ -18,7 +18,7 @@ void reaper_enqueue(struct thread *t) {
 }
 
 void reaper_init(void) {
-    locked_list_init(&reaper.list);
+    locked_list_init(&reaper.list, LOCKED_LIST_INIT_NORMAL);
     condvar_init(&reaper.cv, CONDVAR_INIT_NORMAL);
     reaper_thread = thread_spawn("reaper_thread", reaper_thread_main, NULL);
 }

@@ -18,6 +18,38 @@ struct rt_slot_db {
 void rt_scheduler_static_destroy_work_enqueue(struct rt_scheduler_static *rts);
 enum rt_scheduler_error
 rt_slots_init_for_scheduler(struct rt_scheduler_static *rts);
+void rt_slots_dealloc_for_scheduler(struct rt_scheduler_static *rts);
+size_t rt_slot_get_num_available(void);
+
+static inline void
+rt_scheduler_acquire_two_mappings(struct rt_scheduler_mapping *a,
+                                  struct rt_scheduler_mapping *b,
+                                  enum irql *out_a, enum irql *out_b) {
+    if (a < b) {
+        *out_a = spin_lock_irq_disable(&a->lock);
+        *out_b = spin_lock_irq_disable(&b->lock);
+    } else if (b < a) {
+        *out_b = spin_lock_irq_disable(&b->lock);
+        *out_a = spin_lock_irq_disable(&a->lock);
+    } else {
+        panic("Trying to acquire two locks on the same mapping");
+    }
+}
+
+static inline void
+rt_scheduler_release_two_mappings(struct rt_scheduler_mapping *a,
+                                  struct rt_scheduler_mapping *b,
+                                  enum irql out_a, enum irql out_b) {
+    if (a < b) {
+        spin_unlock(&b->lock, out_b);
+        spin_unlock(&a->lock, out_a);
+    } else if (b < a) {
+        spin_unlock(&a->lock, out_a);
+        spin_unlock(&b->lock, out_b);
+    } else {
+        panic("Trying to release two locks on the same mapping");
+    }
+}
 
 static inline void rt_scheduler_acquire_two_locks(struct rt_scheduler *a,
                                                   struct rt_scheduler *b,
@@ -34,6 +66,23 @@ static inline void rt_scheduler_acquire_two_locks(struct rt_scheduler *a,
     } else {
         *ob = spin_lock_irq_disable(&b->lock);
         *oa = spin_lock_irq_disable(&a->lock);
+    }
+}
+
+static inline void rt_scheduler_release_two_locks(struct rt_scheduler *a,
+                                                  struct rt_scheduler *b,
+                                                  enum irql oa, enum irql ob) {
+    if (a == b) {
+        spin_unlock(&a->lock, oa);
+        return;
+    }
+
+    if (a < b) {
+        spin_unlock(&b->lock, ob);
+        spin_unlock(&a->lock, oa);
+    } else {
+        spin_unlock(&a->lock, oa);
+        spin_unlock(&b->lock, ob);
     }
 }
 
@@ -57,4 +106,14 @@ static inline void rt_scheduler_static_put(struct rt_scheduler_static *rts) {
                 RT_SCHEDULER_STATIC_DESTROYING);
         rt_scheduler_static_destroy_work_enqueue(rts);
     }
+}
+
+static inline void rt_scheduler_set_state(struct rt_scheduler *rts,
+                                          enum rt_scheduler_state new) {
+    atomic_store_explicit(&rts->state, new, memory_order_release);
+}
+
+static inline enum rt_scheduler_state
+rt_scheduler_get_state(struct rt_scheduler *rts) {
+    return atomic_load_explicit(&rts->state, memory_order_acquire);
 }

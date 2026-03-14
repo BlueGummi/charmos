@@ -57,6 +57,7 @@ struct topology_node {
 
     struct cpu_mask cpus;
     struct cpu_mask idle;
+    struct cpu_mask rt_shed_rq_active; /* For RT scheduler */
 
     struct core *core; /* Pointer to this node's `core` struct */
 
@@ -83,6 +84,8 @@ void cpu_mask_or(struct cpu_mask *dst, const struct cpu_mask *b);
 bool cpu_mask_empty(const struct cpu_mask *mask);
 void cpu_mask_clear_all(struct cpu_mask *m);
 size_t cpu_mask_popcount(struct cpu_mask *m);
+void cpu_mask_free(struct cpu_mask *m);
+void cpu_mask_deinit(struct cpu_mask *m);
 #define cpu_mask_for_each(iter, mask)                                          \
     for (iter = 0; iter < (mask).nbits; ++iter)                                \
         if ((mask).uses_large                                                  \

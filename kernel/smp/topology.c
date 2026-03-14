@@ -93,6 +93,19 @@ static void print_topology_node(struct topology_node *node, int depth) {
     }
 }
 
+void cpu_mask_deinit(struct cpu_mask *m) {
+    if (m->uses_large)
+        kfree(m->large, FREE_PARAMS_DEFAULT);
+
+    m->uses_large = false;
+    m->nbits = 0;
+    atomic_store_explicit(&m->small, 0, memory_order_release);
+}
+
+void cpu_mask_free(struct cpu_mask *m) {
+    kfree(m, FREE_PARAMS_DEFAULT);
+}
+
 struct cpu_mask *cpu_mask_create(void) {
     return kzalloc(sizeof(struct cpu_mask), ALLOC_PARAMS_DEFAULT);
 }

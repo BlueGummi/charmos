@@ -8,6 +8,7 @@
 #include <mem/alloc.h>
 #include <mem/page.h>
 #include <sch/climb.h>
+#include <sch/rt_sched_types.h>
 #include <stdarg.h>
 #include <stdatomic.h>
 #include <stddef.h>
@@ -213,6 +214,7 @@ struct thread {
     _Atomic int64_t migrate_to; /* -1 if no migration target */
 
     /* Flags */
+    enum rt_scheduler_capability accepted_rt_caps;
     _Atomic(enum thread_flags) flags;
     _Atomic uint32_t pinned;
     _Atomic size_t migration_generation;

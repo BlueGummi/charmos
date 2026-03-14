@@ -34,7 +34,7 @@ void thread_init_thread_ids(void) {
     stacks_space =
         vas_space_init(THREAD_STACKS_HEAP_START, THREAD_STACKS_HEAP_END);
     global_tid_space = tid_space_init(UINT64_MAX);
-    locked_list_init(&thread_list);
+    locked_list_init(&thread_list, LOCKED_LIST_INIT_IRQ_DISABLE);
 }
 
 APC_EVENT_CREATE(thread_exit_apc_event, "THREAD_EXIT");

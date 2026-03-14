@@ -56,6 +56,11 @@ static inline void scheduler_increment_thread_count(struct scheduler *sched,
     atomic_fetch_add(&scheduler_data.total_threads, 1);
 }
 
+static inline size_t scheduler_get_thread_count(struct scheduler *sched,
+                                                enum thread_prio_class prio) {
+    return sched->thread_count[prio];
+}
+
 static inline struct list_head *
 scheduler_get_this_thread_queue(struct scheduler *sched,
                                 enum thread_prio_class prio) {
@@ -173,9 +178,9 @@ static inline void scheduler_acquire_two_locks(struct scheduler *a,
 }
 
 static inline void scheduler_release_two_locks(struct scheduler *a,
-                                            struct scheduler *b,
-                                            enum irql a_irql,
-                                            enum irql b_irql) {
+                                               struct scheduler *b,
+                                               enum irql a_irql,
+                                               enum irql b_irql) {
     if (a == b)
         return spin_unlock(&a->lock, a_irql);
 
@@ -203,7 +208,7 @@ static inline void scheduler_acquire_two_raw_locks(struct scheduler *a,
 }
 
 static inline void scheduler_release_two_raw_locks(struct scheduler *a,
-                                                struct scheduler *b) {
+                                                   struct scheduler *b) {
     kassert(a != b);
     if (a > b) {
         spin_unlock_raw(&a->lock);

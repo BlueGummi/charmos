@@ -17,7 +17,7 @@ LOG_SITE_DECLARE(global, .flags = LOG_SITE_DEFAULT,
                  .capacity = LOG_SITE_CAPACITY_DEFAULT,
                  .dump_opts = LOG_DUMP_CONSOLE, .enabled_mask = LOG_SITE_ALL);
 
-LOG_HANDLE_DECLARE(global, .flags = LOG_DEFAULT, .dump_opts = LOG_DUMP_CONSOLE);
+LOG_HANDLE_DECLARE(global, .flags = LOG_PRINT);
 
 struct log_globals {
     struct locked_list list;
@@ -238,8 +238,7 @@ void log_emit_internal(struct log_site *site, struct log_handle *handle,
     }
     va_end(ap);
 
-    bool sopts = site->flags & LOG_SITE_PRINT;
-    struct log_dump_options dopts = sopts ? site->dump_opts : handle->dump_opts;
+    struct log_dump_options dopts = site->dump_opts;
 
     if (global.current_bootstage < BOOTSTAGE_LATE)
         if (log_handle_should_print(handle, site, level))
@@ -261,18 +260,18 @@ void log_emit_internal(struct log_site *site, struct log_handle *handle,
         rec.flags |= LOG_REC_FROM_IRQ;
 
     if (handle->flags & LOG_ONCE) {
-        if (atomic_fetch_add(&handle->seen, 1) != 0)
+        if (atomic_fetch_add(&handle->seen_internal, 1) != 0)
             return;
     }
 
     if (handle->flags & LOG_RATELIMIT) {
         uint64_t now = rec.timestamp;
-        uint64_t last = atomic_load(&handle->last_ts);
+        uint64_t last = atomic_load(&handle->last_ts_internal);
 
         if (now - last < 100)
             return;
 
-        atomic_store(&handle->last_ts, now);
+        atomic_store(&handle->last_ts_internal, now);
     }
 
     bool queued = log_ringbuf_try_enqueue(site, &site->rb, &rec);
@@ -316,7 +315,7 @@ void log_emit_internal(struct log_site *site, struct log_handle *handle,
 }
 
 void log_sites_init(void) {
-    locked_list_init(&log_global.list);
+    locked_list_init(&log_global.list, LOCKED_LIST_INIT_NORMAL);
 
     for (struct log_site *s = __skernel_log_sites; s < __ekernel_log_sites;
          s++) {
