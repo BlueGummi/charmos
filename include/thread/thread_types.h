@@ -34,6 +34,7 @@ enum thread_flags : uint32_t {
     THREAD_FLAG_DYING = 1 << 3,
     THREAD_FLAG_YIELDED_AFTER_WAKE = 1 << 4,
     THREAD_FLAG_WAKE_MATCHED = 1 << 5,
+    THREAD_FLAG_RT_FAULT_TOLERANCE = 1 << 6,
 };
 
 enum thread_prio_class : uint8_t {

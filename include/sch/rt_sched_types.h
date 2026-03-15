@@ -49,7 +49,7 @@ enum rt_scheduler_error {
  *
  *      ┌───────────────────────────┐
  * Bits │ 15..12  11..8  7..4  3..0 │
- * Use  │  ****    ****  ***M  DERF │
+ * Use  │  X***    ****  ***M  DERF │
  *      └───────────────────────────┘
  *
  * F - First In, First Out
@@ -57,6 +57,8 @@ enum rt_scheduler_error {
  * E - Earliest Deadline First
  * D - Deadline Capable
  * M - Migration Capable
+ * X - !!! FAULT TOLERANT !!! ALL THREADS UNDER THIS SCHEDULER
+ *     MUST ALSO BE FAULT TOLERANT, ELSE THEY WILL NOT RUN!!!
  * * - Unused, but not reserved
  *
  */
@@ -66,4 +68,5 @@ enum rt_scheduler_capability : uint16_t {
     RT_CAP_EDF = 1 << 2,
     RT_CAP_DEADLINE = 1 << 3,
     RT_CAP_MIGRATABLE = 1 << 4,
+    RT_CAP_FAULT_TOLERANT = 1 << 15,
 };

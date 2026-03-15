@@ -548,7 +548,7 @@ void rt_scheduler_switch() {
     /* Drop the old ref, only reachable via success path */
     rt_scheduler_static_put(from);
 out:
-    /* Post to the thread that sent us the DPC */
+    /* Post to the thread that sent us this */
     clear_switch_and_post(pcpu, err);
     rt_scheduler_release_two_mappings(curr, next, irql_curr, irql_next);
     spin_unlock(&rt_global.switch_lock, girql);
