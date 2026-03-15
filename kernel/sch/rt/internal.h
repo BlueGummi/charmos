@@ -107,13 +107,3 @@ static inline void rt_scheduler_static_put(struct rt_scheduler_static *rts) {
         rt_scheduler_static_destroy_work_enqueue(rts);
     }
 }
-
-static inline void rt_scheduler_set_state(struct rt_scheduler *rts,
-                                          enum rt_scheduler_state new) {
-    atomic_store_explicit(&rts->state, new, memory_order_release);
-}
-
-static inline enum rt_scheduler_state
-rt_scheduler_get_state(struct rt_scheduler *rts) {
-    return atomic_load_explicit(&rts->state, memory_order_acquire);
-}

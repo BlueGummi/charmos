@@ -19,6 +19,9 @@ struct numa_node {
                          * 2nd farthest away node, our rel_dists[3] will be 2.
                          */
 
+    /* The opposite of rel_dists. Index is the "closeness", value
+     * is the node at that distance. Basically just zonelists */
+    uint8_t *nodes_by_distance;
     struct cpu_mask cpus;
 };
 

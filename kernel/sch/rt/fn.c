@@ -21,9 +21,7 @@ enum rt_scheduler_error rt_ext_fn_exec(struct rt_scheduler_static *rts,
     /* Got it */
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
 
-    smp_core_scheduler()->rt->active_flags = found->flags;
     found->fn(a, b);
-    smp_core_scheduler()->rt->active_flags = 0;
 
     irql_lower(irql);
     return RT_SCHEDULER_ERR_OK;

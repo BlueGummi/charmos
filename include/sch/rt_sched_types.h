@@ -32,6 +32,7 @@ enum rt_scheduler_error {
     RT_SCHEDULER_ERR_OOR = -16,       /* Generic "Out of resources" */
     RT_SCHEDULER_ERR_NOT_FOUND = -15, /* cannot find it */
     RT_SCHEDULER_ERR_INVALID = -14,   /* Invalid operation */
+    RT_SCHEDULER_ERR_UNKNOWN = -13,
 
     RT_SCHEDULER_ERR_POLICY = -3,
     RT_SCHEDULER_ERR_DEADLINE = -2, /* Deadline-related error */

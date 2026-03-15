@@ -1,5 +1,6 @@
 #include <math/fixed.h>
 #include <mem/alloc.h>
+#include <mem/numa.h>
 #include <sch/rt_sched.h>
 #include <sch/sched.h>
 #include <smp/topology.h>
@@ -41,7 +42,7 @@ create_mapping(struct rt_scheduler_static *rts, rt_domain_id_t id) {
     }
 
     ret->id = id;
-    ret->static_backpointer = rts;
+    ret->static_bptr = rts;
     rbt_init_node(&ret->tree_node);
     rbt_insert(&rts->mappings_internal, &ret->tree_node);
     spinlock_init(&ret->lock);
@@ -141,10 +142,17 @@ static void reset_shed_request(struct rt_thread_shed_request *rtsr) {
     rtsr->on = false;
 }
 
+static void reset_scheduler(struct rt_scheduler *rts) {
+    kassert(rts->thread_count == 0);
+    rts->mapping_source = NULL;
+    reset_summary(&rts->summary);
+    reset_shed_request(&rts->shed_request);
+}
+
 enum rt_scheduler_error
 rt_load_scheduler_static(struct rt_scheduler_static *rts) {
     enum rt_scheduler_error err = RT_SCHEDULER_ERR_INVALID;
-    enum irql outer = spin_lock(&rt_global.rt_static_list.lock);
+    enum irql outer = spin_lock(&rt_global.static_list.lock);
     enum irql irql = spin_lock(&rts->state_change_lock);
 
     if (rt_scheduler_static_get_state(rts) != RT_SCHEDULER_STATIC_UNLOADED)
@@ -153,8 +161,8 @@ rt_load_scheduler_static(struct rt_scheduler_static *rts) {
     rbt_init(&rts->mappings_internal, rt_mapping_get_data, rt_mapping_cmp);
     refcount_init(&rts->refcount, 1);
     INIT_LIST_HEAD(&rts->list_internal);
-    list_add_tail(&rts->list_internal, &rt_global.rt_static_list.list);
-    rt_global.rt_static_list.num_elems++;
+    list_add_tail(&rts->list_internal, &rt_global.static_list.list);
+    rt_global.static_list.num_elems++;
 
     if (!(rts->active_mask_internal = cpu_mask_create())) {
         err = RT_SCHEDULER_ERR_OOM;
@@ -180,7 +188,7 @@ done:
         rt_scheduler_static_set_state(rts, RT_SCHEDULER_STATIC_LOADED);
 
     spin_unlock(&rts->state_change_lock, irql);
-    spin_unlock(&rt_global.rt_static_list.lock, outer);
+    spin_unlock(&rt_global.static_list.lock, outer);
     return err;
 }
 
@@ -207,7 +215,7 @@ done:
 
 static void rt_scheduler_destroy_internal(struct rt_scheduler_static *rts) {
     /* Assert that the refs are gone, lock, unload, teardown */
-    enum irql outer = spin_lock(&rt_global.rt_static_list.lock);
+    enum irql outer = spin_lock(&rt_global.static_list.lock);
     enum irql irql = spin_lock(&rts->state_change_lock);
     kassert(refcount_read(&rts->refcount) == 0);
     rt_scheduler_static_set_state(rts, RT_SCHEDULER_STATIC_UNLOADED);
@@ -215,7 +223,7 @@ static void rt_scheduler_destroy_internal(struct rt_scheduler_static *rts) {
     rts->ops.on_unload(rts);
 
     list_del_init(&rts->list_internal);
-    rt_global.rt_static_list.num_elems--;
+    rt_global.static_list.num_elems--;
     rt_slots_dealloc_for_scheduler(rts);
     cpu_mask_deinit(rts->active_mask_internal);
     cpu_mask_free(rts->active_mask_internal);
@@ -223,7 +231,7 @@ static void rt_scheduler_destroy_internal(struct rt_scheduler_static *rts) {
     destroy_rt_mappings(rts);
 
     spin_unlock(&rts->state_change_lock, irql);
-    spin_unlock(&rt_global.rt_static_list.lock, outer);
+    spin_unlock(&rt_global.static_list.lock, outer);
 }
 
 static void destroy_work(void *a, void *b) {
@@ -250,8 +258,7 @@ static size_t find_migration_target(struct thread *t) {
     kassert(cpu_mask_popcount(&t->allowed_cpus));
     cpu_mask_for_each(iter, t->allowed_cpus) {
         struct rt_scheduler_percpu *pcpu = global.schedulers[iter]->rt;
-        struct rt_scheduler_static *rts =
-            pcpu->active_mapping->static_backpointer;
+        struct rt_scheduler_static *rts = pcpu->active_mapping->static_bptr;
         if (is_compatible(rts, t))
             return iter;
     }
@@ -273,8 +280,8 @@ static void send_to_compatible_cpu(struct thread *t) {
      * stuff.
      *
      * THIS IS TEMPORARY */
-    kassert(is_compatible(next->mapping_source->static_backpointer, t));
-    next->mapping_source->static_backpointer->ops.add_thread(next, t);
+    kassert(is_compatible(next->mapping_source->static_bptr, t));
+    next->mapping_source->static_bptr->ops.add_thread(next, t);
 
     spin_unlock(&next->lock, irql);
 }
@@ -340,8 +347,67 @@ static bool try_migrate_all_before_switch(struct rt_scheduler *rts,
     return true;
 }
 
+static void re_enqueue_threads(struct rt_scheduler *rts,
+                               struct list_head *threads) {
+    struct thread *iter, *tmp;
+
+    list_for_each_entry_safe(iter, tmp, threads, rt_list_node) {
+        list_del_init(&iter->rt_list_node);
+        enum irql irql = spin_lock_irq_disable(&rts->lock);
+
+        /* TODO: remember to wrap these! */
+        rts->mapping_source->static_bptr->ops.add_thread(rts, iter);
+
+        spin_unlock(&rts->lock, irql);
+    }
+}
+
+static void setup_new_rt_scheduler(struct rt_scheduler *rts,
+                                   struct rt_scheduler_mapping *rtm) {
+    kassert(rts->thread_count == 0);
+    kassert(!rts->failed_internal);
+    rts->mapping_source = rtm;
+    log_trace(rts->log_site, &rts->log_handle, "rts %p setting up by %zu", rts,
+              smp_core_id());
+}
+
+/* On NUMA systems, we'll iterate to the next closest node
+ * if we can't find a struct rt_scheduler for our system.
+ *
+ * Otherwise, we just scan from 0 to max
+ *
+ * If we fail to find a struct rt_scheduler, something
+ * has gone very very very wrong... */
 static struct rt_scheduler *get_new_rt_scheduler(size_t domain) {
-    
+    struct list_head *got = NULL;
+    if ((got = locked_list_pop_front(&rt_global.sch_pool[domain])))
+        goto out;
+
+    if (global.numa_node_count > 1) {
+        struct numa_node *node = &global.numa_nodes[domain];
+        for (size_t i = 0; i < global.numa_node_count; i++) {
+            uint8_t next = node->nodes_by_distance[i];
+            if ((got = locked_list_pop_front(&rt_global.sch_pool[next])))
+                goto out;
+        }
+    } else {
+        for (size_t i = 0; i < global.domain_count; i++) {
+            if ((got = locked_list_pop_front(&rt_global.sch_pool[i])))
+                goto out;
+        }
+    }
+
+out:
+    kassert(got);
+    return container_of(got, struct rt_scheduler, list);
+}
+
+static inline bool check_active(struct rt_scheduler_mapping *rtm) {
+    return cpu_mask_test(&rtm->active, smp_core_id());
+}
+
+static inline void mark_active(struct rt_scheduler_mapping *rtm) {
+    cpu_mask_set(&rtm->active, smp_core_id());
 }
 
 static inline void unmark_active(struct rt_scheduler_mapping *rtm) {
@@ -367,7 +433,7 @@ void rt_scheduler_switch() {
     if (!rt_scheduler_static_get(into))
         return clear_switch_and_post(pcpu, RT_SCHEDULER_ERR_NOT_FOUND);
 
-    struct rt_scheduler_static *from = pcpu->active_mapping->static_backpointer;
+    struct rt_scheduler_static *from = pcpu->active_mapping->static_bptr;
     enum irql girql = spin_lock_irq_disable(&rt_global.switch_lock);
     enum rt_scheduler_error err = RT_SCHEDULER_ERR_OK;
     bool put_into = false;
@@ -375,6 +441,9 @@ void rt_scheduler_switch() {
     struct rt_scheduler_mapping *curr = pcpu->active_mapping;
     struct rt_scheduler_mapping *next = rt_lookup_mapping(into, smp_core());
     bool next_exists = next->rts;
+    rt_sched_trace(
+        "CPU %zu wants to switch from mapping %zu to mapping %zu (exists: %d)",
+        smp_core_id(), curr->id, next->id, next_exists);
 
     if (curr == next) {
         /* No switch needed, just signal the waiting thread and return */
@@ -433,13 +502,11 @@ void rt_scheduler_switch() {
      *
      */
 
-    if (only_cpu) {
+    kassert(check_active(curr));
+    unmark_active(curr);
+    if (only_cpu)
+        reset_scheduler(curr->rts);
 
-    } else {
-        unmark_active(curr);
-    }
-
-    /* TODO: masks, swap, add thread_list back... */
     /* The logic for deciding whether or not we need a new rt_scheduler is...
      *
      * If nothing exists for the next mapping (we need to provide an
@@ -450,14 +517,35 @@ void rt_scheduler_switch() {
     /* We are the only CPU and the next mapping has an owner already */
     bool donate = only_cpu && next_exists;
     bool need_new = !only_cpu && !next_exists;
-    if (donate) {
-        locked_list_add(&rt_global.rt_scheduler_pool[domain_local_id()],
+    struct rt_scheduler *next_rts = NULL;
+
+    if (donate)
+        locked_list_add(&rt_global.sch_pool[domain_local_id()],
                         &curr->rts->list);
-        rt_scheduler_set_state(curr->rts, RT_SCHEDULER_STOPPED);
+
+    /* Switch out is completed */
+    if (need_new) {
+        /* Get a new one, nothing exists for this mapping */
+        next_rts = get_new_rt_scheduler(domain_local_id());
+    } else {
+        next_rts = next->rts;
     }
 
-    if (need_new) {}
+    /* We are now using the new rt_scheduler */
+    pcpu->active_mapping = next;
 
+    if (need_new) {
+        /* This list should not have anything because we should
+         * not have taken anything from our rt_scheduler. need_new
+         * requires us to NOT be the only CPU, so we do not drain
+         * the runqueue of our mapping here */
+        kassert(list_empty(&thread_list));
+        setup_new_rt_scheduler(next_rts, next);
+    } else {
+        re_enqueue_threads(next_rts, &thread_list);
+    }
+
+    /* Drop the old ref, only reachable via success path */
     rt_scheduler_static_put(from);
 out:
     /* Post to the thread that sent us the DPC */

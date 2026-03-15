@@ -202,6 +202,7 @@ size_t scheduler_try_push_to_idle_core(struct scheduler *sched) {
         if (dist == 0)
             dist = 1; /* shouldn't happen here */
 
+        /* TODO: tune */
         const size_t remote_scale_num = 1; /* numerator of scale, tuneable */
         const size_t remote_scale_den = 5; /* denominator of scale, tuneable */
 

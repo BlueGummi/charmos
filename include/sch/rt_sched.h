@@ -228,78 +228,6 @@ enum rt_scheduler_status : uint16_t {
     RT_SCHEDULER_STATUS_ISOLATED = 1 << 5,
 };
 
-/* This structure exists so that whenever the
- * realtime scheduler wants to perform an operation,
- * we can track what that operation is allowed
- * to do, and assert that it is not doing something
- * besides what its behavior has explicitly permitted */
-
-/* rt_ext_fn_flags: 16 bit bitflags:
- *
- *      ┌───────────────────────────┐
- * Bits │ 15..12  11..8  7..4  3..0 │
- * Use  │  X***    ****  *DIM  ATRL │
- *      └───────────────────────────┘
- *
- * L - Modifies local runqueue
- * R - Modifies remote runqueue
- * T - Modifies local thread
- * A - Modifies any thread
- * M - Migrates things
- * I - Modifies timers
- * D - Modifies domains
- * X - Allow all
- * * - Unused
- *
- */
-enum rt_ext_fn_flags {
-    RT_EXT_FN_RQ_LOCAL = 1 << 0,
-    RT_EXT_FN_RQ_REMOTE = 1 << 1,
-
-    RT_EXT_FN_THREAD_LOCAL = 1 << 2,
-    RT_EXT_FN_THREAD_ANY = 1 << 3,
-
-    RT_EXT_FN_MIGRATE = 1 << 4,
-
-    RT_EXT_FN_TIMERS = 1 << 5,
-
-    RT_EXT_FN_DOMAIN = 1 << 6,
-
-    RT_EXT_FN_ALL = 1 << 15,
-};
-
-/* <<<< ALL STATE TRANSITIONS HAPPEN FROM THE CORE SCHEDULER >>>> */
-enum rt_scheduler_state : uint8_t {
-    RT_SCHEDULER_UNINIT, /* Structures are not allocated,
-                          * fields are cleared, the scheduler
-                          * is functionally unusable */
-
-    RT_SCHEDULER_STOPPED, /* Structures are allocated,
-                           * fields are initialized, but
-                           * there are no threads */
-
-    RT_SCHEDULER_STARTING, /* RT scheduler is starting, internal
-                            * structures are being initialized,
-                            * and it is ready to take threads
-                            * after this transition finishes */
-
-    RT_SCHEDULER_STOPPING, /* RT scheduler is stopping, threads
-                            * have been moved off beforehand,
-                            * and it is going to be STOPPED */
-
-    /* THIS IS THE ONLY STATE IN WHICH ANY THREADS SHOULD EXIST
-     * ON A RT_SCHEDULER RUNQUEUE! */
-    RT_SCHEDULER_RUNNING, /* Actively being used */
-
-    /* This state is only invoked from the outside world, i.e.
-     * the core scheduler. For this state to be reached,
-     * any RT scheduler operation must return FAIL_ASAP.
-     *
-     * This gives the core scheduler a chance to move all the
-     * threads off of the scheduler and clear other data */
-    RT_SCHEDULER_FAILURE,
-};
-
 /* These are the primary instances of an RT scheduler module...
  *
  * It can either be unloaded (inactive, default), or loaded
@@ -462,7 +390,6 @@ struct rt_scheduler_ops {
 struct rt_ext_fn {
     const char *name;
     uint32_t id;
-    enum rt_ext_fn_flags flags;
     uintptr_t (*fn)(uintptr_t, uintptr_t);
 };
 
@@ -483,12 +410,11 @@ struct rt_ext_fn {
  */
 struct rt_scheduler_mapping {
     struct rbt_node tree_node;
-    struct rt_scheduler_static *static_backpointer;
+    struct rt_scheduler_static *static_bptr;
     rt_domain_id_t id;
     struct cpu_mask members;
     struct cpu_mask active; /* Subset of `members` */
     struct rt_scheduler *rts;
-    struct core *rts_donated_by;
     struct spinlock lock;
     void *data;
 };
@@ -541,8 +467,6 @@ struct rt_scheduler {
     struct rt_scheduler_mapping *mapping_source; /* Used to look at what other
                                                   * CPUs can access this one */
 
-    _Atomic enum rt_scheduler_state state;
-
     bool failed_internal; /* Used to temporarily indicate that the scheduler has
                            * FAIL_ASAP'd a function, but it just isn't safe to
                            * fail the scheduler at the current moment
@@ -577,7 +501,6 @@ struct rt_scheduler_percpu {
     struct scheduler *scheduler; /* Backpointer for this CPU */
     struct rt_scheduler *born_with;
     struct rt_scheduler_mapping *active_mapping;
-    enum rt_ext_fn_flags active_flags;
     struct rt_scheduler_percpu_permitted perms;
 
     /* This is how we synchronize switching the rt scheduler.
@@ -595,8 +518,8 @@ struct rt_scheduler_percpu {
 };
 
 struct rt_global {
-    struct locked_list rt_static_list;
-    struct locked_list *rt_scheduler_pool; /* one per domain */
+    struct locked_list static_list;
+    struct locked_list *sch_pool; /* one per domain */
 
     /* TODO: If someone can come up with a better solution, tell me */
     struct spinlock switch_lock;

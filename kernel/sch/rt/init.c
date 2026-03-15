@@ -13,12 +13,6 @@ LOG_SITE_DECLARE(rt_sched, .flags = LOG_SITE_DEFAULT,
                  .enabled_mask = LOG_SITE_ALL,
                  .dump_opts = (struct log_dump_options){});
 
-static void reset_scheduler(struct rt_scheduler *rts) {
-    rts->failed_internal = false;
-    rt_scheduler_set_state(rts, RT_SCHEDULER_UNINIT);
-    rts->mapping_source = NULL;
-    rts->mapping_source = NULL;
-}
 
 static void init_scheduler_boot(struct scheduler *sched) {
     struct rt_scheduler_percpu *pcpu =
@@ -59,23 +53,25 @@ static void init_scheduler_boot(struct scheduler *sched) {
     spinlock_init(&rts->lock);
     pcpu->born_with = rts;
     sched->rt = pcpu;
-    reset_scheduler(rts);
+    rts->failed_internal = false;
+    rts->mapping_source = NULL;
+    rts->mapping_source = NULL;
 }
 
 void rt_scheduler_boot_init() {
     if (!(rt_wq = workqueue_create_default("rt_wq")))
         panic("OOM\n");
 
-    locked_list_init(&rt_global.rt_static_list, LOCKED_LIST_INIT_IRQ_DISABLE);
+    locked_list_init(&rt_global.static_list, LOCKED_LIST_INIT_IRQ_DISABLE);
     spinlock_init(&rt_global.switch_lock);
-    rt_global.rt_scheduler_pool = kzalloc(
+    rt_global.sch_pool = kzalloc(
         sizeof(struct locked_list) * global.domain_count, ALLOC_PARAMS_DEFAULT);
-    if (!rt_global.rt_scheduler_pool)
+    if (!rt_global.sch_pool)
         panic("OOM\n");
 
     struct domain *d;
     domain_for_each_domain(d) {
-        locked_list_init(&rt_global.rt_scheduler_pool[d->id],
+        locked_list_init(&rt_global.sch_pool[d->id],
                          LOCKED_LIST_INIT_IRQ_DISABLE);
     }
 

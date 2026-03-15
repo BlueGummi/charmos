@@ -48,7 +48,8 @@ static uint8_t idx_of_val(uint8_t *buf, size_t len, size_t search_for) {
 void numa_construct_relative_distances(struct numa_node *node) {
     node->rel_dists = kzalloc(node->distances_cnt, ALLOC_PARAMS_DEFAULT);
     uint8_t *tmp = kzalloc(node->distances_cnt, ALLOC_PARAMS_DEFAULT);
-    if (!node->rel_dists || !tmp)
+    node->nodes_by_distance = kzalloc(node->distances_cnt, ALLOC_PARAMS_DEFAULT);
+    if (!node->rel_dists || !tmp || !node->nodes_by_distance)
         panic("could not allocate numa relative distances\n");
 
     /* we copy the distance array into the temporary array and
@@ -59,8 +60,9 @@ void numa_construct_relative_distances(struct numa_node *node) {
     qsort(tmp, node->distances_cnt, sizeof(uint8_t), cmp);
 
     for (size_t i = 0; i < node->distances_cnt; i++) {
-        node->rel_dists[i] =
-            idx_of_val(tmp, node->distances_cnt, node->distance[i]);
+        uint8_t idx = idx_of_val(tmp, node->distances_cnt, node->distance[i]);
+        node->rel_dists[i] = idx;
+        node->nodes_by_distance[idx] = i;
     }
 
     kfree(tmp, FREE_PARAMS_DEFAULT);
