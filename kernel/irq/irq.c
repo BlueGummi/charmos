@@ -212,10 +212,6 @@ void irq_init() {
 
         desc->vector = i;
         irq_desc_clear(desc);
-
-        if (i == IRQ_DBF || i == IRQ_PAGE_FAULT)
-            continue;
-
         idt_set_gate(i, 0x08, 0x8e);
     }
 

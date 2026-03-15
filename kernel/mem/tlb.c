@@ -102,10 +102,7 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
         }
 
         atomic_store_explicit(&t->req_gen, gen, memory_order_release);
-
-        if (atomic_load_explicit(&t->done_gen, memory_order_acquire) < gen) {
-            ipi_send(i, IRQ_TLB_SHOOTDOWN);
-        }
+        ipi_send(i, IRQ_TLB_SHOOTDOWN);
     }
 
     if (synchronous) {
@@ -119,12 +116,13 @@ void tlb_shootdown(uintptr_t addr, bool synchronous) {
 
             while (atomic_load_explicit(&o->done_gen, memory_order_acquire) <
                    gen) {
-                if (spins < 1000) {
+                if (spins < 100) {
                     cpu_relax();
                     spins++;
                     continue;
                 }
 
+                spins = 0;
                 ipi_send(i, IRQ_TLB_SHOOTDOWN);
             }
         }
