@@ -405,30 +405,6 @@ out:
     return ret;
 }
 
-void vmm_map_page_user(uintptr_t pml4_phys, uintptr_t virt, uintptr_t phys,
-                       uint64_t flags, enum vmm_flags vflags) {
-    if (virt == 0) {
-        panic("CANNOT MAP PAGE 0x0!!!\n");
-    }
-
-    struct page_table *current_table =
-        (struct page_table *) (pml4_phys + global.hhdm_offset);
-
-    for (uint64_t i = 0; i < 3; i++) {
-        uint64_t level = virt >> (39 - (i * 9)) & 0x1FF;
-        pte_t *entry = &current_table->entries[level];
-        if (!ENTRY_PRESENT(*entry))
-            pte_init(entry, PAGING_USER_ALLOWED);
-
-        current_table = (struct page_table *) ((*entry & PAGING_PHYS_MASK) +
-                                               global.hhdm_offset);
-    }
-
-    uint64_t L1 = (virt >> 12) & 0x1FF;
-    pte_t *entry = &current_table->entries[L1];
-    *entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
-}
-
 void vmm_unmap_page(uintptr_t virt, enum vmm_flags vflags) {
     struct page_table *tables[4];
     pte_t *entries[4];

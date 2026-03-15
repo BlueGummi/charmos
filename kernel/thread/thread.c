@@ -13,10 +13,10 @@
 #include <sync/rcu.h>
 #include <sync/turnstile.h>
 #include <thread/apc.h>
-#include <thread/workqueue.h>
 #include <thread/reaper.h>
 #include <thread/thread.h>
 #include <thread/tid.h>
+#include <thread/workqueue.h>
 
 #include "sch/internal.h"
 
@@ -501,4 +501,27 @@ retry:
     }
 
     *out_thread_rq = thread_rq;
+}
+
+void thread_unlock_thread_and_rq(struct scheduler *thread_rq,
+                                 struct scheduler *other_rq,
+                                 enum irql irq_first, enum irql irq_second) {
+    struct scheduler *first;
+    struct scheduler *second;
+
+    if (thread_rq == other_rq) {
+        first = thread_rq;
+        second = NULL;
+    } else if (thread_rq < other_rq) {
+        first = thread_rq;
+        second = other_rq;
+    } else {
+        first = other_rq;
+        second = thread_rq;
+    }
+
+    if (second)
+        spin_unlock(&second->lock, irq_second);
+
+    spin_unlock(&first->lock, irq_first);
 }

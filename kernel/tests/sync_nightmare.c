@@ -14,7 +14,7 @@ struct chaos_thread_state {
     struct thread *t;
     atomic_bool alive;
     atomic_bool ready;
-    uintptr_t last_cookie;
+   _Atomic uintptr_t last_cookie;
     enum thread_wake_reason last_reason;
 };
 
@@ -80,7 +80,7 @@ static void chaos_sleeper(void *arg) {
 
     for (int i = 0; i < CHAOS_ITERS && !atomic_load(&chaos_stop); i++) {
         uintptr_t cookie = prng_next();
-        s->last_cookie = cookie;
+        atomic_store(&s->last_cookie, cookie);
         atomic_store(&s->ready, false);
 
         CHAOS_LOG("sleeper[%zu] sleep iter=%d cookie=%p", id, i,
@@ -121,7 +121,7 @@ static void chaos_waker(void *a) {
             continue;
 
         bool correct = (prng_next() % 3 == 0);
-        uintptr_t cookie = correct ? s->last_cookie : prng_next();
+        uintptr_t cookie = correct ? atomic_load(&s->last_cookie) : prng_next();
 
         CHAOS_LOG("waker wake %p", s->t);
         thread_wake(s->t, THREAD_WAKE_REASON_SLEEP_MANUAL,
@@ -210,7 +210,7 @@ TEST_REGISTER(thread_interruptible_chaos_fuzz, SHOULD_NOT_FAIL,
               IS_INTEGRATION_TEST) {
     ADD_MESSAGE("this test is long. comment me out to run it.");
     SET_SKIP();
-    return;
+    return; 
 
     CHAOS_LOG("chaos test start");
 

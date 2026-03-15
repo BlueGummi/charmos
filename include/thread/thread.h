@@ -425,6 +425,9 @@ void thread_lock_two_runqueues(struct thread *a, struct thread *b,
 void thread_lock_thread_and_rq(struct thread *t, struct scheduler *other_rq,
                                struct scheduler **out_thread_rq,
                                enum irql *irq_first, enum irql *irq_second);
+void thread_unlock_thread_and_rq(struct scheduler *thread_rq,
+                                 struct scheduler *other_rq,
+                                 enum irql irq_first, enum irql irq_second);
 
 static inline struct thread *thread_get_current() {
     uintptr_t thread;

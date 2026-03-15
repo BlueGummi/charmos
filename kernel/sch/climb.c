@@ -533,7 +533,6 @@ void climb_post_migrate_hook(struct thread *t, size_t old_cpu, size_t new_cpu) {
     /* Locks are already held */
     struct scheduler *old = global.schedulers[old_cpu];
     struct scheduler *new = global.schedulers[new_cpu];
-    climb_warn("Maybe %p", &t->climb_state);
 
     if (!rbt_has_node(&old->climb_threads, &t->climb_state.climb_node)) {
         kassert(t->climb_state.on_climb_tree == false);
