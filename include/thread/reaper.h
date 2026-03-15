@@ -2,14 +2,14 @@
 #pragma once
 #include <structures/locked_list.h>
 #include <sync/condvar.h>
+#include <sync/semaphore.h>
 #include <sync/spinlock.h>
 #include <thread/queue.h>
 #include <thread/thread.h>
 
 struct thread_reaper {
     struct locked_list list;
-    struct spinlock lock;
-    struct condvar cv;
+    struct semaphore sem;
     uint64_t reaped_threads;
 };
 

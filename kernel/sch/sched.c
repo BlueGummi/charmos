@@ -5,6 +5,7 @@
 #include <smp/smp.h>
 #include <sync/rcu.h>
 #include <thread/apc.h>
+#include <thread/reaper.h>
 
 #include "internal.h"
 
@@ -350,7 +351,7 @@ void scheduler_switch_in() {
     struct thread *drop = us->drop_last_ref;
     us->drop_last_ref = NULL;
     if (drop)
-        thread_put(drop);
+        reaper_enqueue(drop);
 }
 
 void scheduler_yield() {

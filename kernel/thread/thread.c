@@ -43,16 +43,10 @@ void thread_exit() {
 
     struct thread *self = thread_get_current();
 
-    /* acquire the ref - yield will drop it once it's done */
-    if (!thread_get(self))
-        panic("What? Thread is already dying but has not exited\n");
-
-    atomic_store(&self->state, THREAD_STATE_ZOMBIE);
+    thread_set_state(self, THREAD_STATE_ZOMBIE);
     thread_or_flags(self, THREAD_FLAG_DYING);
 
     climb_thread_remove(self);
-
-    reaper_enqueue(self);
 
     locked_list_del(&thread_list, &self->thread_list);
 
