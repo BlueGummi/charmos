@@ -75,7 +75,7 @@ void thread_entry_wrapper(void) {
 
     kassert(irql_get() < IRQL_HIGH_LEVEL);
 
-    scheduler_drop_locks_after_switch_in();
+    scheduler_switch_in();
 
     scheduler_periodic_work_execute(PERIODIC_WORK_PERIOD_BASED);
 

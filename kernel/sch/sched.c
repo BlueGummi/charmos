@@ -281,7 +281,8 @@ static inline void context_switch(struct thread *curr, struct thread *next) {
 
     if (unlikely(curr && curr->state == THREAD_STATE_ZOMBIE)) {
         just_load = true;
-        thread_put(curr);
+        kassert(!smp_core_scheduler()->drop_last_ref);
+        smp_core_scheduler()->drop_last_ref = curr;
     }
 
     if (just_load) {
@@ -333,28 +334,35 @@ void schedule(void) {
     context_switch(curr, next);
 }
 
-void scheduler_drop_locks_after_switch_in() {
+void scheduler_switch_in() {
     struct scheduler *us = smp_core_scheduler();
     struct scheduler *other = us->other_locked;
     us->other_locked = NULL;
 
     kassert(us != other);
 
-    if (!other)
-        return spin_unlock_raw(&us->lock);
+    if (!other) {
+        spin_unlock_raw(&us->lock);
+    } else {
+        scheduler_release_two_raw_locks(us, other);
+    }
 
-    scheduler_release_two_raw_locks(us, other);
+    struct thread *drop = us->drop_last_ref;
+    us->drop_last_ref = NULL;
+    if (drop)
+        thread_put(drop);
 }
 
 void scheduler_yield() {
     kassert(!scheduler_self_in_resched());
+    kassert(!scheduler_preemption_disabled());
 
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     scheduler_mark_self_in_resched(true);
 
     schedule();
 
-    scheduler_drop_locks_after_switch_in();
+    scheduler_switch_in();
     scheduler_periodic_work_execute(PERIODIC_WORK_PERIOD_BASED);
 
     scheduler_mark_self_in_resched(false);

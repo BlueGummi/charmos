@@ -43,6 +43,7 @@ struct scheduler {
     _Atomic uint8_t queue_bitmap;
 
     struct thread *current;
+    struct thread *drop_last_ref;
 
     /* Thread count at each prio */
     size_t thread_count[THREAD_PRIO_CLASS_COUNT];
