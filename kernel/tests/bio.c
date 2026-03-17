@@ -37,12 +37,10 @@ TEST_REGISTER(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     enable_interrupts();
 
     for (uint64_t i = 0; i < run_times; i++) {
-        struct bio_request *bio =
-            kmalloc(sizeof(struct bio_request), ALLOC_PARAMS_DEFAULT);
+        struct bio_request *bio = kmalloc(sizeof(struct bio_request));
         *bio = (struct bio_request){
             .lba = 0,
-            .buffer = kmalloc_aligned(64 * PAGE_SIZE, PAGE_SIZE,
-                                      ALLOC_PARAMS_DEFAULT),
+            .buffer = kmalloc_aligned(64 * PAGE_SIZE, PAGE_SIZE),
             .size = 512 * 512,
             .sector_count = 512,
             .write = false,

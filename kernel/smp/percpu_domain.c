@@ -9,15 +9,13 @@
 void percpu_obj_init(void) {
     for (struct percpu_descriptor *d = __skernel_percpu_desc;
          d < __ekernel_percpu_desc; d++) {
-        d->percpu_ptrs =
-            kmalloc(sizeof(void *) * global.core_count, ALLOC_PARAMS_DEFAULT);
+        d->percpu_ptrs = kmalloc(sizeof(void *) * global.core_count);
         if (!d->percpu_ptrs)
             panic("OOM\n");
 
         size_t cpu;
         for_each_cpu_id(cpu) {
-            d->percpu_ptrs[cpu] =
-                kzalloc_aligned(d->size, d->align, ALLOC_PARAMS_DEFAULT);
+            d->percpu_ptrs[cpu] = kzalloc_aligned(d->size, d->align);
 
             if (!d->percpu_ptrs[cpu])
                 panic("OOM\n");
@@ -31,16 +29,14 @@ void percpu_obj_init(void) {
 void perdomain_obj_init(void) {
     for (struct perdomain_descriptor *d = __skernel_perdomain_desc;
          d < __ekernel_perdomain_desc; d++) {
-        d->perdomain_ptrs =
-            kmalloc(sizeof(void *) * global.domain_count, ALLOC_PARAMS_DEFAULT);
+        d->perdomain_ptrs = kmalloc(sizeof(void *) * global.domain_count);
         if (!d->perdomain_ptrs)
             panic("OOM\n");
 
         struct domain *dom;
         domain_for_each_domain(dom) {
             size_t id = dom->id;
-            d->perdomain_ptrs[id] =
-                kzalloc_aligned(d->size, d->align, ALLOC_PARAMS_DEFAULT);
+            d->perdomain_ptrs[id] = kzalloc_aligned(d->size, d->align);
 
             if (!d->perdomain_ptrs[id])
                 panic("OOM\n");

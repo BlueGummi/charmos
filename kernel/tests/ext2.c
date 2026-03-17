@@ -138,7 +138,7 @@ TEST_REGISTER(ext2_symlink_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     node = ent.node;
     TEST_ASSERT(node != NULL);
 
-    char *buf = kzalloc(5, ALLOC_PARAMS_DEFAULT);
+    char *buf = kzalloc(5);
     TEST_ASSERT(buf != NULL);
 
     FAIL_IF_FATAL(node->ops->readlink(node, buf, 4));
@@ -187,7 +187,7 @@ TEST_REGISTER(ext2_integration_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     FAIL_IF_FATAL(node->ops->write(node, lstr, len, 0));
     TEST_ASSERT(node->size == len);
 
-    char *out_buf = kzalloc(len, ALLOC_PARAMS_DEFAULT);
+    char *out_buf = kzalloc(len);
     TEST_ASSERT(out_buf != NULL);
 
     FAIL_IF_FATAL(node->ops->read(node, out_buf, len, 0));

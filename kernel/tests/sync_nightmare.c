@@ -14,7 +14,7 @@ struct chaos_thread_state {
     struct thread *t;
     atomic_bool alive;
     atomic_bool ready;
-   _Atomic uintptr_t last_cookie;
+    _Atomic uintptr_t last_cookie;
     enum thread_wake_reason last_reason;
 };
 
@@ -210,7 +210,7 @@ TEST_REGISTER(thread_interruptible_chaos_fuzz, SHOULD_NOT_FAIL,
               IS_INTEGRATION_TEST) {
     ADD_MESSAGE("this test is long. comment me out to run it.");
     SET_SKIP();
-    return; 
+    return;
 
     CHAOS_LOG("chaos test start");
 

@@ -27,8 +27,7 @@ enum usb_status xhci_address_device(struct xhci_port *p, uint8_t slot_id,
     uint8_t speed = p->speed;
     uint8_t port = p->port_id;
 
-    struct xhci_input_ctx *input_ctx =
-        kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
+    struct xhci_input_ctx *input_ctx = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
     if (!input_ctx)
         return USB_ERR_OOM;
 
@@ -37,15 +36,14 @@ enum usb_status xhci_address_device(struct xhci_port *p, uint8_t slot_id,
 
     struct xhci_ring *ring = xhci_allocate_ring();
     if (!ring) {
-        kfree_aligned(input_ctx, FREE_PARAMS_DEFAULT);
+        kfree_aligned(input_ctx);
         return USB_ERR_OOM;
     }
 
-    struct xhci_device_ctx *dev_ctx =
-        kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
+    struct xhci_device_ctx *dev_ctx = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
     if (!dev_ctx) {
         xhci_free_ring(ring);
-        kfree_aligned(input_ctx, FREE_PARAMS_DEFAULT);
+        kfree_aligned(input_ctx);
         return USB_ERR_OOM;
     }
 
@@ -104,7 +102,7 @@ enum usb_status xhci_address_device(struct xhci_port *p, uint8_t slot_id,
     spin_unlock(&xhci->lock, irql);
     bool ret = xhci_send_command_and_block(xhci, &cmd, NULL);
 
-    kfree_aligned(input_ctx, FREE_PARAMS_DEFAULT);
+    kfree_aligned(input_ctx);
     if (!ret)
         return USB_ERR_NO_DEVICE;
 
@@ -125,8 +123,7 @@ enum usb_status xhci_configure_device_endpoints(struct usb_device *usb) {
         return USB_ERR_NO_DEVICE;
 
     struct xhci_device *xhci = usb->driver_private;
-    struct xhci_input_ctx *input_ctx =
-        kzalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
+    struct xhci_input_ctx *input_ctx = kzalloc_aligned(PAGE_SIZE, PAGE_SIZE);
 
     uintptr_t input_ctx_phys =
         vmm_get_phys((uintptr_t) input_ctx, VMM_FLAG_NONE);
@@ -193,7 +190,7 @@ enum usb_status xhci_configure_device_endpoints(struct usb_device *usb) {
 
     bool ret = xhci_send_command_and_block(xhci, &cmd, NULL);
 
-    kfree_aligned(input_ctx, FREE_PARAMS_DEFAULT);
+    kfree_aligned(input_ctx);
     if (!ret)
         return USB_ERR_NO_DEVICE;
 
@@ -626,8 +623,8 @@ static void xhci_process_port_status_change(struct xhci_device *dev,
     case PORT_NONE:
     case PORT_CONNECT: xhci_process_port_connect(dev, evt); break;
     default:
-        xhci_warn("Unknown port %u status change, PORTSC state %p\n",
-                  port_id, portsc);
+        xhci_warn("Unknown port %u status change, PORTSC state %p\n", port_id,
+                  portsc);
         break;
     }
 }
@@ -747,8 +744,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
     xhci_controller_enable_ints(dev);
     xhci_interrupt_enable_ints(dev);
 
-    struct usb_controller *ctrl =
-        kzalloc(sizeof(struct usb_controller), ALLOC_PARAMS_DEFAULT);
+    struct usb_controller *ctrl = kzalloc(sizeof(struct usb_controller));
     ctrl->driver_data = dev;
     ctrl->type = USB_CONTROLLER_XHCI;
     ctrl->ops = xhci_ctrl_ops;

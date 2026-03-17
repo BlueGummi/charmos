@@ -8,8 +8,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <structures/sll.h>
-#include <thread/workqueue.h>
 #include <thread/io_wait.h>
+#include <thread/workqueue.h>
 
 #include "internal.h"
 
@@ -32,7 +32,7 @@ static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
     uint64_t offset = (uintptr_t) buffer & (PAGE_SIZE - 1);
     uint64_t num_pages = PAGES_NEEDED_FOR(offset + size);
 
-    data->prps = kmalloc(sizeof(uint64_t) * num_pages, ALLOC_PARAMS_DEFAULT);
+    data->prps = kmalloc(sizeof(uint64_t) * num_pages);
     if (!data->prps)
         return false;
 
@@ -68,7 +68,7 @@ static void nvme_setup_prps(struct nvme_command *cmd,
 
     /* For when there is no need for multiple PRPs */
 free_prps:
-    kfree(data->prps, FREE_PARAMS_DEFAULT);
+    kfree(data->prps);
     data->prps = NULL;
     return;
 }
@@ -90,13 +90,12 @@ static bool rw_send_command(struct generic_disk *disk, struct nvme_request *req,
         return true;
     }
 
-    struct nvme_bio_data *data =
-        kzalloc(sizeof(struct nvme_bio_data), ALLOC_PARAMS_DEFAULT);
+    struct nvme_bio_data *data = kzalloc(sizeof(struct nvme_bio_data));
     if (!data)
         return false;
 
     if (!nvme_bio_fill_prps(data, buffer, count * disk->sector_size)) {
-        kfree(data, FREE_PARAMS_DEFAULT);
+        kfree(data);
         return false;
     }
 

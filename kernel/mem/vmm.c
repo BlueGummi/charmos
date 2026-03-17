@@ -43,7 +43,7 @@ static void enqueue_pt_free(paddr_t phys) {
     if (global.current_bootstage < BOOTSTAGE_MID_MP)
         return pmm_free_page(phys);
 
-    struct pt_deferred_free *n = kmalloc(sizeof(*n), ALLOC_PARAMS_DEFAULT);
+    struct pt_deferred_free *n = kmalloc(sizeof(*n));
     if (!n)
         panic("OOM freeing page table");
 
@@ -88,7 +88,7 @@ void vmm_reclaim_page_tables(void) {
         spin_unlock(&pt_free_lock, irql);
 
         pmm_free_pages(n->phys, 1);
-        kfree(n, FREE_PARAMS_DEFAULT);
+        kfree(n);
 
         irql = spin_lock(&pt_free_lock);
     }

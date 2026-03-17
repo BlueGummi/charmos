@@ -323,8 +323,7 @@ void log_sites_init(void) {
         s->enabled = true;
         refcount_init(&s->refcount, 1);
         struct log_ringbuf *lrb = &s->rb;
-        lrb->slots = kzalloc(sizeof(struct log_ring_slot) * s->capacity,
-                             ALLOC_PARAMS_DEFAULT);
+        lrb->slots = kzalloc(sizeof(struct log_ring_slot) * s->capacity);
         if (!lrb->slots)
             panic("OOM\n");
 
@@ -349,14 +348,13 @@ void log_dump_all(void) {
 
 static void log_site_free(struct log_site *site) {
     locked_list_del(&log_global.list, &site->list);
-    kfree(site->rb.slots, FREE_PARAMS_DEFAULT);
-    kfree(site->name, FREE_PARAMS_DEFAULT);
-    kfree(site, FREE_PARAMS_DEFAULT);
+    kfree(site->rb.slots);
+    kfree(site->name);
+    kfree(site);
 }
 
 struct log_site *log_site_create(struct log_site_options opts) {
-    struct log_site *ret =
-        kzalloc(sizeof(struct log_site), ALLOC_PARAMS_DEFAULT);
+    struct log_site *ret = kzalloc(sizeof(struct log_site));
     if (!ret)
         return NULL;
 
@@ -364,8 +362,8 @@ struct log_site *log_site_create(struct log_site_options opts) {
     if (!ret->name)
         goto err;
 
-    struct log_ring_slot *slots = kzalloc(
-        sizeof(struct log_ring_slot) * opts.capacity, ALLOC_PARAMS_DEFAULT);
+    struct log_ring_slot *slots =
+        kzalloc(sizeof(struct log_ring_slot) * opts.capacity);
     if (!slots)
         goto err;
 
@@ -389,11 +387,11 @@ struct log_site *log_site_create(struct log_site_options opts) {
 err:
 
     if (ret) {
-        kfree(ret->rb.slots, FREE_PARAMS_DEFAULT);
-        kfree(ret->name, FREE_PARAMS_DEFAULT);
+        kfree(ret->rb.slots);
+        kfree(ret->name);
     }
 
-    kfree(ret, FREE_PARAMS_DEFAULT);
+    kfree(ret);
     return NULL;
 }
 

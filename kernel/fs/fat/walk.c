@@ -8,10 +8,9 @@
 
 static bool fat32_walk_cluster(struct fat_fs *fs, uint32_t cluster,
                                fat_walk_callback callback, void *ctx) {
-    uint8_t *cluster_buf = kmalloc(fs->cluster_size, ALLOC_PARAMS_DEFAULT);
+    uint8_t *cluster_buf = kmalloc(fs->cluster_size);
 
-    struct fat_dirent *ret =
-        kmalloc(sizeof(struct fat_dirent), ALLOC_PARAMS_DEFAULT);
+    struct fat_dirent *ret = kmalloc(sizeof(struct fat_dirent));
     if (!cluster_buf || !ret)
         return false;
 
@@ -21,13 +20,13 @@ static bool fat32_walk_cluster(struct fat_fs *fs, uint32_t cluster,
             struct fat_dirent *entry = (struct fat_dirent *) (cluster_buf + i);
             memcpy(ret, entry, sizeof(struct fat_dirent));
             if (callback(ret, i / sizeof(struct fat_dirent), ctx)) {
-                kfree(cluster_buf, FREE_PARAMS_DEFAULT);
+                kfree(cluster_buf);
                 return true;
             }
         }
     }
-    kfree(ret, FREE_PARAMS_DEFAULT);
-    kfree(cluster_buf, FREE_PARAMS_DEFAULT);
+    kfree(ret);
+    kfree(cluster_buf);
     return false;
 }
 
@@ -49,19 +48,18 @@ static bool fat12_16_walk_cluster(struct fat_fs *fs, uint32_t cluster,
 
     uint64_t sector_buf_size = sectors_to_read * fs->disk->sector_size;
 
-    uint8_t *sector_buf = kmalloc(sector_buf_size, ALLOC_PARAMS_DEFAULT);
+    uint8_t *sector_buf = kmalloc(sector_buf_size);
     if (!sector_buf)
         return false;
 
     if (!fs->disk->read_sector(fs->disk, lba, sector_buf, sectors_to_read)) {
-        kfree(sector_buf, FREE_PARAMS_DEFAULT);
+        kfree(sector_buf);
         return false;
     }
 
-    struct fat_dirent *ret =
-        kmalloc(sizeof(struct fat_dirent), ALLOC_PARAMS_DEFAULT);
+    struct fat_dirent *ret = kmalloc(sizeof(struct fat_dirent));
     if (!ret) {
-        kfree(sector_buf, FREE_PARAMS_DEFAULT);
+        kfree(sector_buf);
         return false;
     }
 
@@ -79,13 +77,13 @@ static bool fat12_16_walk_cluster(struct fat_fs *fs, uint32_t cluster,
 
         memcpy(ret, entry, sizeof(struct fat_dirent));
         if (callback(ret, i, ctx)) {
-            kfree(sector_buf, FREE_PARAMS_DEFAULT);
+            kfree(sector_buf);
             return true;
         }
     }
 
-    kfree(ret, FREE_PARAMS_DEFAULT);
-    kfree(sector_buf, FREE_PARAMS_DEFAULT);
+    kfree(ret);
+    kfree(sector_buf);
     return false;
 }
 

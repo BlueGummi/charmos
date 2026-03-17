@@ -49,12 +49,10 @@ static void minheap_sift_down(struct minheap *heap, uint32_t idx) {
 }
 
 struct minheap *minheap_create(void) {
-    struct minheap *heap =
-        kmalloc(sizeof(struct minheap), ALLOC_PARAMS_DEFAULT);
+    struct minheap *heap = kmalloc(sizeof(struct minheap));
     heap->capacity = MINHEAP_INIT_CAP;
     heap->size = 0;
-    heap->nodes = kzalloc(sizeof(struct minheap_node *) * heap->capacity,
-                          ALLOC_PARAMS_DEFAULT);
+    heap->nodes = kzalloc(sizeof(struct minheap_node *) * heap->capacity);
     return heap;
 }
 
@@ -63,7 +61,7 @@ void minheap_expand(struct minheap *heap, uint32_t new_size) {
         return;
 
     struct minheap_node **new_nodes =
-        kmalloc(sizeof(struct minheap_node *) * new_size, ALLOC_PARAMS_DEFAULT);
+        kmalloc(sizeof(struct minheap_node *) * new_size);
 
     if (!new_nodes)
         return;
@@ -71,7 +69,7 @@ void minheap_expand(struct minheap *heap, uint32_t new_size) {
     memcpy(new_nodes, heap->nodes,
            sizeof(struct minheap_node *) * heap->capacity);
 
-    kfree(heap->nodes, FREE_PARAMS_DEFAULT);
+    kfree(heap->nodes);
     heap->nodes = new_nodes;
     MINHEAP_SET_CAPACITY(heap, new_size);
 }
@@ -81,15 +79,15 @@ void minheap_insert(struct minheap *heap, struct minheap_node *node,
     enum irql irql = minheap_node_lock(node);
     if (heap->size >= heap->capacity) {
         uint32_t new_cap = heap->capacity * 2;
-        struct minheap_node **new_nodes = kmalloc(
-            sizeof(struct minheap_node *) * new_cap, ALLOC_PARAMS_DEFAULT);
+        struct minheap_node **new_nodes =
+            kmalloc(sizeof(struct minheap_node *) * new_cap);
 
         if (!new_nodes)
             return;
 
         memcpy(new_nodes, heap->nodes,
                sizeof(struct minheap_node *) * heap->capacity);
-        kfree(heap->nodes, FREE_PARAMS_DEFAULT);
+        kfree(heap->nodes);
         heap->nodes = new_nodes;
         heap->capacity = new_cap;
     }

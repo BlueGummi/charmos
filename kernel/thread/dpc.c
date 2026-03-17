@@ -102,8 +102,7 @@ bool dpc_enqueue_local(struct dpc *d, enum dpc_event e) {
 }
 
 void dpc_init_percpu(void) {
-    global.dpc_data = kzalloc(sizeof(struct dpc_cpu) * global.core_count,
-                              ALLOC_PARAMS_DEFAULT);
+    global.dpc_data = kzalloc(sizeof(struct dpc_cpu) * global.core_count);
     size_t i;
     for_each_cpu_id(i) {
         for (size_t j = 0; j < DPC_EVENT_MAX; j++) {
@@ -123,7 +122,7 @@ struct dpc *dpc_init(struct dpc *d, dpc_func_t fn, void *ctx) {
 
 /* DPC creation helpers */
 struct dpc *dpc_create(dpc_func_t fn, void *ctx) {
-    struct dpc *d = kmalloc(sizeof(*d), ALLOC_PARAMS_DEFAULT);
+    struct dpc *d = kmalloc(sizeof(*d));
     if (!d)
         return NULL;
 

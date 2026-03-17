@@ -15,7 +15,7 @@ static int32_t tid_space_cmp(const struct rbt_node *a,
 }
 
 struct tid_space *tid_space_init(uint64_t max_id) {
-    struct tid_space *ts = kzalloc(sizeof(*ts), ALLOC_PARAMS_DEFAULT);
+    struct tid_space *ts = kzalloc(sizeof(*ts));
     if (!ts)
         return NULL;
 
@@ -34,7 +34,7 @@ struct tid_space *tid_space_init(uint64_t max_id) {
         ts->reserve_free = &ts->reserve_pool[i];
     }
 
-    struct tid_range *r = kzalloc(sizeof(*r), ALLOC_PARAMS_DEFAULT);
+    struct tid_range *r = kzalloc(sizeof(*r));
     if (!r)
         return ts;
 
@@ -47,7 +47,7 @@ struct tid_space *tid_space_init(uint64_t max_id) {
 
 static struct tid_range *tid_range_alloc(struct tid_space *ts) {
     SPINLOCK_ASSERT_HELD(&ts->lock);
-    struct tid_range *r = kzalloc(sizeof(*r), ALLOC_PARAMS_DEFAULT);
+    struct tid_range *r = kzalloc(sizeof(*r));
     if (r)
         return r;
 
@@ -69,7 +69,7 @@ static void tid_range_free(struct tid_space *ts, struct tid_range *r) {
         r->next = ts->reserve_free;
         ts->reserve_free = r;
     } else {
-        kfree(r, FREE_PARAMS_DEFAULT);
+        kfree(r);
     }
 }
 
@@ -128,7 +128,7 @@ void tid_free(struct tid_space *ts, uint64_t id) {
         if (merged_prev) {
             prev->length += next->length;
             rbt_delete(&ts->tree, &next->node);
-            kfree(next, FREE_PARAMS_DEFAULT);
+            kfree(next);
         } else {
             next->start = id;
             next->length++;

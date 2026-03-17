@@ -81,8 +81,7 @@ void irq_register(char *name, uint8_t vector, irq_handler_t handler, void *ctx,
     if (was && !(flags & IRQ_FLAG_SHARED))
         panic("need to be shared to have many, registered by %s\n", me->name);
 
-    struct irq_action *act =
-        kzalloc(sizeof(struct irq_action), ALLOC_PARAMS_DEFAULT);
+    struct irq_action *act = kzalloc(sizeof(struct irq_action));
 
     if (!act)
         panic("OOM - TODO: make this dynamic\n");
@@ -179,7 +178,7 @@ void irq_free_entry(int32_t entry) {
     struct irq_action *iter, *tmp;
     list_for_each_entry_safe(iter, tmp, &desc->actions, list) {
         list_del_init(&iter->list);
-        kfree(iter, FREE_PARAMS_DEFAULT);
+        kfree(iter);
     }
 
     irq_desc_clear(desc);

@@ -48,8 +48,7 @@ void rt_slot_free(size_t slot) {
 void rt_slot_init(size_t num_slots) {
     slot_db.num_slots = num_slots;
     spinlock_init(&slot_db.lock);
-    slot_db.slots =
-        kzalloc(sizeof(struct rt_slot) * num_slots, ALLOC_PARAMS_DEFAULT);
+    slot_db.slots = kzalloc(sizeof(struct rt_slot) * num_slots);
 
     if (!slot_db.slots)
         panic("OOM\n");

@@ -85,7 +85,7 @@ struct worker *workqueue_worker_create(struct workqueue *queue) {
         spin_unlock(&queue->worker_array_lock, irql);
         return ret;
     } else {
-        return kzalloc(sizeof(struct worker), ALLOC_PARAMS_DEFAULT);
+        return kzalloc(sizeof(struct worker));
     }
 }
 
@@ -118,7 +118,7 @@ bool workqueue_spawn_worker_internal(struct workqueue *queue) {
 
 fail:
     if (w && !(queue->attrs.flags & WORKQUEUE_FLAG_STATIC_WORKERS))
-        kfree(w, FREE_PARAMS_DEFAULT);
+        kfree(w);
 
     release_spawner(queue);
     return false;

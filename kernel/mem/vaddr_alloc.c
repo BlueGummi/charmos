@@ -71,8 +71,7 @@ __no_sanitize_address struct vas_space *vas_space_bootstrap(vaddr_t base,
 }
 
 struct vas_space *vas_space_init(vaddr_t base, vaddr_t limit) {
-    struct vas_space *vas =
-        kzalloc(sizeof(struct vas_space), ALLOC_PARAMS_DEFAULT);
+    struct vas_space *vas = kzalloc(sizeof(struct vas_space));
     if (!vas)
         return NULL;
 

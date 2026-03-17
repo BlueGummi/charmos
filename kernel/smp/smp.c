@@ -305,7 +305,7 @@ void smp_wake(struct limine_mp_response *mpr) {
 }
 
 void smp_setup_bsp() {
-    struct core *c = kzalloc(sizeof(struct core), ALLOC_PARAMS_DEFAULT);
+    struct core *c = kzalloc(sizeof(struct core));
     if (!c)
         panic("Could not allocate space for core structure on BSP");
 
@@ -313,15 +313,13 @@ void smp_setup_bsp() {
     c->self = c;
     c->current_irql = IRQL_PASSIVE_LEVEL;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
-    global.cores = kzalloc(sizeof(struct core *) * global.core_count,
-                           ALLOC_PARAMS_DEFAULT);
+    global.cores = kzalloc(sizeof(struct core *) * global.core_count);
 
     if (unlikely(!global.cores))
         panic("Could not allocate space for global core structures");
 
     global.shootdown_data =
-        kzalloc(sizeof(struct tlb_shootdown_cpu) * global.core_count,
-                ALLOC_PARAMS_DEFAULT);
+        kzalloc(sizeof(struct tlb_shootdown_cpu) * global.core_count);
     if (!global.shootdown_data)
         panic("Could not allocate global shootdown data\n");
 

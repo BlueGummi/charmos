@@ -26,15 +26,13 @@ void scheduler_init(void) {
     if (scheduler_data.max_concurrent_stealers == 0)
         scheduler_data.max_concurrent_stealers = 1;
 
-    global.schedulers = kmalloc(sizeof(struct scheduler *) * global.core_count,
-                                ALLOC_PARAMS_DEFAULT);
+    global.schedulers = kmalloc(sizeof(struct scheduler *) * global.core_count);
     if (!global.schedulers)
         panic("Could not allocate scheduler pointer array\n");
 
     size_t i;
     for_each_cpu_id(i) {
-        struct scheduler *s =
-            kzalloc(sizeof(struct scheduler), ALLOC_PARAMS_DEFAULT);
+        struct scheduler *s = kzalloc(sizeof(struct scheduler));
         if (!s)
             panic("Could not allocate scheduler %lu\n", i);
 

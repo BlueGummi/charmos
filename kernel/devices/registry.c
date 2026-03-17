@@ -23,8 +23,7 @@ static struct disk_node *disk_list = NULL;
 static uint64_t disk_count = 0;
 
 void registry_register(struct generic_disk *disk) {
-    struct disk_node *node =
-        kmalloc(sizeof(struct disk_node), ALLOC_PARAMS_DEFAULT);
+    struct disk_node *node = kmalloc(sizeof(struct disk_node));
     if (!node)
         return;
 
@@ -40,8 +39,8 @@ void registry_unregister(struct generic_disk *disk) {
         if ((*indirect)->disk == disk) {
             struct disk_node *old = *indirect;
             *indirect = old->next;
-            kfree(old->disk, FREE_PARAMS_DEFAULT);
-            kfree(old, FREE_PARAMS_DEFAULT);
+            kfree(old->disk);
+            kfree(old);
             disk_count--;
             return;
         }

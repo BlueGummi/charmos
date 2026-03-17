@@ -253,7 +253,7 @@ bool apc_cancel(struct apc *a) {
 }
 
 struct apc *apc_create(void) {
-    return kmalloc(sizeof(struct apc), ALLOC_PARAMS_DEFAULT);
+    return kmalloc(sizeof(struct apc));
 }
 
 void apc_init(struct apc *a, apc_func_t fn, void *arg1, void *arg2) {
@@ -272,7 +272,7 @@ void apc_free_on_thread(struct thread *t) {
 
     list_for_each_entry_safe(a, tmp, &t->event_apcs, list) {
         list_del(&a->list);
-        kfree(a, FREE_PARAMS_DEFAULT);
+        kfree(a);
     }
 }
 

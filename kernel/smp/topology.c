@@ -95,7 +95,7 @@ static void print_topology_node(struct topology_node *node, int depth) {
 
 void cpu_mask_deinit(struct cpu_mask *m) {
     if (m->uses_large)
-        kfree(m->large, FREE_PARAMS_DEFAULT);
+        kfree(m->large);
 
     m->uses_large = false;
     m->nbits = 0;
@@ -103,11 +103,11 @@ void cpu_mask_deinit(struct cpu_mask *m) {
 }
 
 void cpu_mask_free(struct cpu_mask *m) {
-    kfree(m, FREE_PARAMS_DEFAULT);
+    kfree(m);
 }
 
 struct cpu_mask *cpu_mask_create(void) {
-    return kzalloc(sizeof(struct cpu_mask), ALLOC_PARAMS_DEFAULT);
+    return kzalloc(sizeof(struct cpu_mask));
 }
 
 bool cpu_mask_init(struct cpu_mask *m, size_t nbits) {
@@ -120,7 +120,7 @@ bool cpu_mask_init(struct cpu_mask *m, size_t nbits) {
 
     m->uses_large = true;
     size_t nwords = (nbits + 63) / 64;
-    m->large = kzalloc(sizeof(uint64_t) * nwords, ALLOC_PARAMS_DEFAULT);
+    m->large = kzalloc(sizeof(uint64_t) * nwords);
 
     if (!m->large)
         return false;
@@ -220,8 +220,7 @@ void topology_dump(void) {
     } while (0);
 
 static size_t build_smt_nodes(size_t n_cpus) {
-    smt_nodes =
-        kzalloc(n_cpus * sizeof(struct topology_node), ALLOC_PARAMS_DEFAULT);
+    smt_nodes = kzalloc(n_cpus * sizeof(struct topology_node));
 
     for (size_t i = 0; i < n_cpus; i++) {
         struct core *c = global.cores[i];
@@ -267,8 +266,7 @@ static size_t build_smt_nodes(size_t n_cpus) {
 
 static size_t build_core_nodes(size_t n_cpus) {
     size_t core_count = 0;
-    core_nodes =
-        kzalloc(n_cpus * sizeof(struct topology_node), ALLOC_PARAMS_DEFAULT);
+    core_nodes = kzalloc(n_cpus * sizeof(struct topology_node));
 
     for (size_t i = 0; i < n_cpus; i++) {
         struct core *c = global.cores[i];
@@ -348,8 +346,7 @@ static size_t build_numa_nodes(size_t n_cores, size_t n_llc) {
             max_numa = core_nodes[i].core->numa_node;
 
     size_t n_numa_nodes = max_numa + 1;
-    numa_nodes = kzalloc(n_numa_nodes * sizeof(struct topology_node),
-                         ALLOC_PARAMS_DEFAULT);
+    numa_nodes = kzalloc(n_numa_nodes * sizeof(struct topology_node));
 
     for (size_t i = 0; i < n_numa_nodes; i++) {
         struct topology_node *numa = &numa_nodes[i];
@@ -413,8 +410,7 @@ static size_t build_numa_nodes(size_t n_cores, size_t n_llc) {
 }
 
 static size_t build_llc_nodes(size_t n_cores) {
-    llc_nodes =
-        kzalloc(n_cores * sizeof(struct topology_node), ALLOC_PARAMS_DEFAULT);
+    llc_nodes = kzalloc(n_cores * sizeof(struct topology_node));
     size_t llc_count = 0;
 
     for (size_t i = 0; i < n_cores; i++) {
@@ -508,8 +504,7 @@ static size_t build_package_nodes(size_t n_cores, size_t n_llc) {
             max_pkg_id = core_nodes[i].core->package_id;
 
     size_t n_packages = max_pkg_id + 1;
-    package_nodes = kzalloc(n_packages * sizeof(struct topology_node),
-                            ALLOC_PARAMS_DEFAULT);
+    package_nodes = kzalloc(n_packages * sizeof(struct topology_node));
 
     for (size_t i = 0; i < n_packages; i++) {
         struct topology_node *pkg = &package_nodes[i];

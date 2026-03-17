@@ -55,7 +55,7 @@ void cmdline_parse(const char *input) {
                 panic(
                     "Cannot have multiple root entries in the command line\n");
 
-            char *val = kmalloc(strlen(val_buf) + 1, ALLOC_PARAMS_DEFAULT);
+            char *val = kmalloc(strlen(val_buf) + 1);
             if (!val)
                 panic("Could not allocate space for command line parsing\n");
 

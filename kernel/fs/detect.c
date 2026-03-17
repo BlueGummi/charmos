@@ -75,8 +75,7 @@ static enum errno detect_mbr_partitions(struct generic_disk *disk,
         return ERR_FS_CORRUPT;
 
     disk->partition_count = count;
-    disk->partitions =
-        kzalloc(sizeof(struct generic_partition) * count, ALLOC_PARAMS_DEFAULT);
+    disk->partitions = kzalloc(sizeof(struct generic_partition) * count);
     if (unlikely(!disk->partitions))
         return ERR_NO_MEM;
 
@@ -122,8 +121,7 @@ static bool detect_gpt_partitions(struct generic_disk *disk, uint8_t *sector) {
         return false;
 
     disk->partition_count = valid_count;
-    disk->partitions = kzalloc(sizeof(struct generic_partition) * valid_count,
-                               ALLOC_PARAMS_DEFAULT);
+    disk->partitions = kzalloc(sizeof(struct generic_partition) * valid_count);
 
     int idx = 0;
     for (uint32_t i = 0; i < count; i++) {
@@ -201,8 +199,7 @@ static void assign_fs_ops(struct generic_partition *part) {
 }
 
 enum fs_type detect_fs(struct generic_disk *disk) {
-    uint8_t *sector =
-        kmalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_PARAMS_DEFAULT);
+    uint8_t *sector = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
     if (!sector)
         return FS_UNKNOWN;
 
@@ -211,7 +208,7 @@ enum fs_type detect_fs(struct generic_disk *disk) {
     if (!disk->read_sector(disk, 0, sector, 1)) {
         fs_detect_info("%s has an unknown filesystem - read failed",
                        disk->name);
-        kfree_aligned(sector, FREE_PARAMS_DEFAULT);
+        kfree_aligned(sector);
         return FS_UNKNOWN;
     }
 
@@ -231,8 +228,7 @@ enum fs_type detect_fs(struct generic_disk *disk) {
     if (!found_partitions) {
         /* No partition table - create one big partition spanning the disk */
         disk->partition_count = 1;
-        disk->partitions =
-            kzalloc(sizeof(struct generic_partition), ALLOC_PARAMS_DEFAULT);
+        disk->partitions = kzalloc(sizeof(struct generic_partition));
         if (!disk->partitions)
             return FS_UNKNOWN;
 
@@ -249,7 +245,7 @@ enum fs_type detect_fs(struct generic_disk *disk) {
                        detect_fstr(part->fs_type));
     }
 
-    kfree_aligned(sector, FREE_PARAMS_DEFAULT);
+    kfree_aligned(sector);
 
     return disk->partition_count > 0 ? disk->partitions[0].fs_type : FS_UNKNOWN;
 }

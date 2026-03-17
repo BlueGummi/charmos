@@ -265,8 +265,7 @@ extern struct nightmare_test __ekernel_nightmare_tests[];
 
 #define NIGHTMARE_ADD_MESSAGE(msg)                                             \
     do {                                                                       \
-        SELF->messages =                                                       \
-            krealloc(SELF->messages, sizeof(char *) * ++SELF->message_count,   \
-                     ALLOC_PARAMS_DEFAULT);                                    \
+        SELF->messages = krealloc(SELF->messages,                              \
+                                  sizeof(char *) * ++SELF->message_count, );   \
         SELF->messages[SELF->message_count - 1] = msg;                         \
     } while (0)

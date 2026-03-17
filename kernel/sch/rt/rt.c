@@ -26,18 +26,18 @@ void rt_scheduler_static_work_init(struct rt_scheduler_static *rts) {
 static struct rt_scheduler_mapping *
 create_mapping(struct rt_scheduler_static *rts, rt_domain_id_t id) {
     struct rt_scheduler_mapping *ret =
-        kzalloc(sizeof(struct rt_scheduler_mapping), ALLOC_PARAMS_DEFAULT);
+        kzalloc(sizeof(struct rt_scheduler_mapping));
     if (!ret)
         return NULL;
 
     if (!cpu_mask_init(&ret->members, global.core_count)) {
-        kfree(ret, FREE_PARAMS_DEFAULT);
+        kfree(ret);
         return NULL;
     }
 
     if (!cpu_mask_init(&ret->active, global.core_count)) {
         cpu_mask_deinit(&ret->members);
-        kfree(ret, FREE_PARAMS_DEFAULT);
+        kfree(ret);
         return NULL;
     }
 
@@ -76,7 +76,7 @@ static void destroy_rt_mappings(struct rt_scheduler_static *rts) {
         struct rt_scheduler_mapping *m =
             container_of(iter, struct rt_scheduler_mapping, tree_node);
 
-        kfree(m, FREE_PARAMS_DEFAULT);
+        kfree(m);
     }
 }
 

@@ -6,7 +6,7 @@
 #include <structures/rbt.h>
 
 struct rbt *rbt_create(rbt_get_data get, rbt_compare cmp) {
-    struct rbt *tree = kmalloc(sizeof(struct rbt), ALLOC_PARAMS_DEFAULT);
+    struct rbt *tree = kmalloc(sizeof(struct rbt));
     if (!tree)
         return NULL;
 

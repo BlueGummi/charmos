@@ -6,9 +6,9 @@
 #include <tests.h>
 #include <thread/apc.h>
 #include <thread/daemon.h>
-#include <thread/workqueue.h>
 #include <thread/reaper.h>
 #include <thread/thread.h>
+#include <thread/workqueue.h>
 
 static atomic_bool workqueue_ran = false;
 static _Atomic uint32_t workqueue_times = 0;
@@ -31,7 +31,7 @@ TEST_REGISTER(workqueue_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     while (!atomic_load(&workqueue_ran))
         cpu_relax();
 
-    char *msg = kzalloc(100, ALLOC_PARAMS_DEFAULT);
+    char *msg = kzalloc(100);
     TEST_ASSERT(msg);
     snprintf(msg, 100, "Took %d clock cycles to add to event pool %d times",
              total, times);
@@ -39,7 +39,7 @@ TEST_REGISTER(workqueue_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     TEST_ASSERT(atomic_load(&workqueue_ran));
 
-    msg = kzalloc(100, ALLOC_PARAMS_DEFAULT);
+    msg = kzalloc(100);
     snprintf(msg, 100,
              "Event pool ran %d times, tests should've had it run %d times",
              workqueue_times, times);
@@ -117,7 +117,7 @@ TEST_REGISTER(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     uint64_t workers = wq->num_workers;
 
-    char *msg = kmalloc(100, ALLOC_PARAMS_DEFAULT);
+    char *msg = kmalloc(100);
     snprintf(msg, 100, "There are %d workers", workers);
     ADD_MESSAGE(msg);
 
@@ -260,7 +260,7 @@ TEST_REGISTER(dpc_on_event_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     struct thread *t =
         thread_create("dpc_dummy", dpc_on_event_dummy_thread, NULL);
-    t->pinned= 1;
+    t->pinned = 1;
     thread_enqueue_on_core(t, found);
 
     /* we now know the other processor is in the thread */

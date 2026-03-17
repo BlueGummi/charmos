@@ -20,8 +20,8 @@ static void rwlocpanic(char *msg, struct rwlock *offending_lock) {
 
     uintptr_t v =
         atomic_load_explicit(&offending_lock->lock_word, memory_order_relaxed);
-    panic("%s, lock = %p, contents = %p, thread = %p\n", msg,
-          offending_lock, v, thread_get_current());
+    panic("%s, lock = %p, contents = %p, thread = %p\n", msg, offending_lock, v,
+          thread_get_current());
 }
 
 /* make sure no funny business happened after acquiring a lock */

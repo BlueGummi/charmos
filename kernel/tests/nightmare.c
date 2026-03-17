@@ -18,7 +18,7 @@ void nightmare_default_report_writer(struct nightmare_report *r, const char *c,
                                      size_t s) {
     size_t where_to_start = r->buffer_len;
     r->buffer_len += s;
-    r->buffer = krealloc(r->buffer, r->buffer_len, ALLOC_PARAMS_DEFAULT);
+    r->buffer = krealloc(r->buffer, r->buffer_len);
     memcpy(r->buffer + where_to_start, c, s);
 }
 
@@ -84,9 +84,8 @@ static size_t nightmare_count_threads(struct nightmare_test *nt) {
 
 void nightmare_spawn_roles(struct nightmare_test *test,
                            struct nightmare_thread_group *group) {
-    group->threads =
-        kmalloc(nightmare_count_threads(test) * sizeof(struct nightmare_thread),
-                ALLOC_PARAMS_DEFAULT);
+    group->threads = kmalloc(nightmare_count_threads(test) *
+                             sizeof(struct nightmare_thread));
 
     size_t g_idx = 0;
     for (size_t i = 0; i < test->role_count; i++) {

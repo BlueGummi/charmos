@@ -418,8 +418,8 @@ static void *slab_try_alloc_from_slab_list(struct slab_cache *cache,
     list_for_each_safe(node, temp, list) {
         slab = slab_from_list_node(node);
         if (slab->parent_cache != cache)
-            printf("slab %p parent %p we are %p\n", slab,
-                   slab->parent_cache, cache);
+            printf("slab %p parent %p we are %p\n", slab, slab->parent_cache,
+                   cache);
 
         if (slab->state == SLAB_FULL)
             printf("slab %p full\n", slab);
@@ -1245,12 +1245,12 @@ void slab_switch_to_domain_allocations(void) {
     free = kfree_new;
 }
 
-void *kmalloc(size_t size, enum alloc_flags flags,
-              enum alloc_behavior behavior) {
+void *kmalloc_internal(size_t size, enum alloc_flags flags,
+                       enum alloc_behavior behavior) {
     return alloc(size, flags, behavior);
 }
 
-void kfree(void *p, enum alloc_behavior behavior) {
+void kfree_internal(void *p, enum alloc_behavior behavior) {
     if ((uint16_t) behavior == (uint16_t) ALLOC_FLAGS_DEFAULT)
         slab_warn("Likely incorrect arguments passed into `kfree`");
 
@@ -1258,7 +1258,8 @@ void kfree(void *p, enum alloc_behavior behavior) {
     free(p, behavior);
 }
 
-void *kzalloc(uint64_t size, enum alloc_flags f, enum alloc_behavior b) {
+void *kzalloc_internal(uint64_t size, enum alloc_flags f,
+                       enum alloc_behavior b) {
     void *ptr = kmalloc(size, f, b);
     if (!ptr)
         return NULL;
@@ -1266,8 +1267,8 @@ void *kzalloc(uint64_t size, enum alloc_flags f, enum alloc_behavior b) {
     return memset(ptr, 0, size);
 }
 
-void *krealloc(void *ptr, size_t size, enum alloc_flags flags,
-               enum alloc_behavior behavior) {
+void *krealloc_internal(void *ptr, size_t size, enum alloc_flags flags,
+                        enum alloc_behavior behavior) {
     if (!ptr)
         return kmalloc(size, flags, behavior);
 

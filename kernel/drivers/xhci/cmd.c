@@ -95,15 +95,13 @@ enum usb_status xhci_submit_interrupt_transfer(struct usb_request *req) {
     control |= TRB_IOC_BIT;
     control |= TRB_SET_CYCLE(ring->cycle);
 
-    struct xhci_request *xreq =
-        kzalloc(sizeof(struct xhci_request), ALLOC_PARAMS_DEFAULT);
+    struct xhci_request *xreq = kzalloc(sizeof(struct xhci_request));
     if (!xreq) {
         return_status = USB_ERR_OOM;
         goto out;
     }
 
-    struct xhci_command *cmd =
-        kzalloc(sizeof(struct xhci_command), ALLOC_PARAMS_DEFAULT);
+    struct xhci_command *cmd = kzalloc(sizeof(struct xhci_command));
 
     if (!cmd) {
         return_status = USB_ERR_OOM;
@@ -191,17 +189,17 @@ enum usb_status xhci_send_control_transfer(struct xhci_device *dev,
         return USB_ERR_NO_DEVICE;
     }
 
-    struct xhci_request *xreq = kzalloc(sizeof(*xreq), ALLOC_PARAMS_DEFAULT);
-    struct xhci_command *cmd = kzalloc(sizeof(*cmd), ALLOC_PARAMS_DEFAULT);
-    struct xhci_ctrl_emit *emit = kzalloc(sizeof(*emit), ALLOC_PARAMS_DEFAULT);
+    struct xhci_request *xreq = kzalloc(sizeof(*xreq));
+    struct xhci_command *cmd = kzalloc(sizeof(*cmd));
+    struct xhci_ctrl_emit *emit = kzalloc(sizeof(*emit));
 
     if (!xreq || !cmd || !emit) {
         /* drop USB dev ref, drop slot ref, dealloc, bye bye */
         usb_device_put(req->dev);
         xhci_slot_put(slot);
-        kfree(xreq, FREE_PARAMS_DEFAULT);
-        kfree(cmd, FREE_PARAMS_DEFAULT);
-        kfree(emit, FREE_PARAMS_DEFAULT);
+        kfree(xreq);
+        kfree(cmd);
+        kfree(emit);
         return USB_ERR_OOM;
     }
 

@@ -3,8 +3,8 @@
 #include <kassert.h>
 #include <sch/sched.h>
 #include <sync/rcu.h>
-#include <thread/workqueue.h>
 #include <thread/dpc.h>
+#include <thread/workqueue.h>
 
 void scheduler_idle_main(void *nop) {
     (void) nop;

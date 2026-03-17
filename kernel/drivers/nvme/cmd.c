@@ -52,8 +52,8 @@ static void nvme_process_one(struct nvme_device *dev,
     struct thread *t = req->waiter;
 
     if (--req->remaining_parts == 0) {
-        kfree(req->bio_data->prps, FREE_PARAMS_DEFAULT);
-        kfree(req->bio_data, FREE_PARAMS_DEFAULT);
+        kfree(req->bio_data->prps);
+        kfree(req->bio_data);
         req->done = true;
         req->status = nvme_to_bio_status(req->status);
         if (req->on_complete)

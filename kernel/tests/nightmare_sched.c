@@ -34,7 +34,7 @@ NIGHTMARE_IMPL_INIT(thread_spawn_smoke) {
 NIGHTMARE_IMPL_START(thread_spawn_smoke) {
     const size_t nthreads = SELF->default_threads;
 
-    atomic_uint *counter = kmalloc(sizeof(*counter), ALLOC_PARAMS_DEFAULT);
+    atomic_uint *counter = kmalloc(sizeof(*counter));
     *counter = 0;
 
     /* share through thread-local */

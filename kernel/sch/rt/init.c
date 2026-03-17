@@ -13,10 +13,9 @@ LOG_SITE_DECLARE(rt_sched, .flags = LOG_SITE_DEFAULT,
                  .enabled_mask = LOG_SITE_ALL,
                  .dump_opts = (struct log_dump_options){});
 
-
 static void init_scheduler_boot(struct scheduler *sched) {
     struct rt_scheduler_percpu *pcpu =
-        kzalloc(sizeof(struct rt_scheduler_percpu), ALLOC_PARAMS_DEFAULT);
+        kzalloc(sizeof(struct rt_scheduler_percpu));
     if (!pcpu)
         panic("OOM\n");
 
@@ -40,8 +39,7 @@ static void init_scheduler_boot(struct scheduler *sched) {
     pcpu->active_mapping = NULL;
     semaphore_init(&pcpu->switch_semaphore, 1, SEMAPHORE_INIT_IRQ_DISABLE);
 
-    struct rt_scheduler *rts =
-        kzalloc(sizeof(struct rt_scheduler), ALLOC_PARAMS_DEFAULT);
+    struct rt_scheduler *rts = kzalloc(sizeof(struct rt_scheduler));
     if (!rts)
         panic("OOM\n");
 
@@ -64,8 +62,8 @@ void rt_scheduler_boot_init() {
 
     locked_list_init(&rt_global.static_list, LOCKED_LIST_INIT_IRQ_DISABLE);
     spinlock_init(&rt_global.switch_lock);
-    rt_global.sch_pool = kzalloc(
-        sizeof(struct locked_list) * global.domain_count, ALLOC_PARAMS_DEFAULT);
+    rt_global.sch_pool =
+        kzalloc(sizeof(struct locked_list) * global.domain_count);
     if (!rt_global.sch_pool)
         panic("OOM\n");
 

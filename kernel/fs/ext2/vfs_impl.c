@@ -252,8 +252,7 @@ static struct vfs_node *make_vfs_node(struct ext2_fs *fs,
     if (!node || !fname || !fs)
         return NULL;
 
-    struct vfs_node *ret =
-        kzalloc(sizeof(struct vfs_node), ALLOC_PARAMS_DEFAULT);
+    struct vfs_node *ret = kzalloc(sizeof(struct vfs_node));
     if (!ret)
         return NULL;
 
@@ -274,8 +273,7 @@ static struct vfs_node *make_vfs_node(struct ext2_fs *fs,
 }
 
 static struct vfs_dirent *ext2_to_vfs_dirent(struct ext2_dir_entry *ext2) {
-    struct vfs_dirent *dirent =
-        kzalloc(sizeof(struct vfs_dirent), ALLOC_PARAMS_DEFAULT);
+    struct vfs_dirent *dirent = kzalloc(sizeof(struct vfs_dirent));
     if (!dirent)
         return NULL;
 
@@ -369,10 +367,8 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     fs->group_desc =
         (void *) ext2_block_read(fs, gdt_block, &fs->gdesc_cache_ent);
 
-    struct ext2_inode *inode =
-        kzalloc(sizeof(struct ext2_inode), ALLOC_PARAMS_DEFAULT);
-    struct ext2_full_inode *f =
-        kzalloc(sizeof(struct ext2_full_inode), ALLOC_PARAMS_DEFAULT);
+    struct ext2_inode *inode = kzalloc(sizeof(struct ext2_inode));
+    struct ext2_full_inode *f = kzalloc(sizeof(struct ext2_full_inode));
     if (!f || !inode)
         return ERR_NO_MEM;
 
@@ -384,7 +380,7 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
         return ERR_IO;
 
     if (!out_node) {
-        kfree(f, FREE_PARAMS_DEFAULT);
+        kfree(f);
         bcache_ent_release(root_ent);
         return ERR_OK;
     }
@@ -392,7 +388,7 @@ enum errno ext2_mount(struct generic_partition *p, struct ext2_fs *fs,
     memcpy(&f->node, inode, sizeof(struct ext2_inode));
 
     f->inode_num = EXT2_ROOT_INODE;
-    kfree(inode, FREE_PARAMS_DEFAULT);
+    kfree(inode);
 
     out_node->open_handles += 1;
     out_node->flags = ext2_to_vfs_flags(f->node.flags);
@@ -446,8 +442,7 @@ enum errno ext2_vfs_readdir(struct vfs_node *node, struct vfs_dirent *out,
 
     struct ext2_fs *fs = node->fs_data;
 
-    struct ext2_dir_entry *ext2_out =
-        kzalloc(sizeof(struct ext2_dir_entry), ALLOC_PARAMS_DEFAULT);
+    struct ext2_dir_entry *ext2_out = kzalloc(sizeof(struct ext2_dir_entry));
     if (unlikely(!ext2_out))
         return ERR_NO_MEM;
 

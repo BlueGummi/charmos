@@ -1,7 +1,7 @@
 #include <sch/sched.h>
 #include <sync/condvar.h>
-#include <thread/workqueue.h>
 #include <thread/thread.h>
+#include <thread/workqueue.h>
 
 static enum irql condvar_lock_internal(struct condvar *cv,
                                        struct spinlock *lock) {

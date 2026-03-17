@@ -88,8 +88,7 @@ static struct bio_scheduler_ops ahci_sata_ssd_ops = {
 };
 
 struct generic_disk *ahci_create_generic(struct ahci_disk *disk) {
-    struct generic_disk *d =
-        kzalloc(sizeof(struct generic_disk), ALLOC_PARAMS_DEFAULT);
+    struct generic_disk *d = kzalloc(sizeof(struct generic_disk));
     if (!d)
         ahci_log(LOG_ERROR, "could not allocate space for device");
 
@@ -101,7 +100,7 @@ struct generic_disk *ahci_create_generic(struct ahci_disk *disk) {
     d->read_sector = ahci_read_sector_wrapper;
     d->write_sector = ahci_write_sector_wrapper;
     d->submit_bio_async = ahci_submit_bio_request;
-    d->cache = kzalloc(sizeof(struct bcache), ALLOC_PARAMS_DEFAULT);
+    d->cache = kzalloc(sizeof(struct bcache));
     if (!d->cache)
         panic("Could not allocate space for AHCI device block cache\n");
 

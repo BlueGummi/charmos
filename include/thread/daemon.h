@@ -2,8 +2,8 @@
 #pragma once
 #include <structures/list.h>
 #include <sync/semaphore.h>
-#include <thread/workqueue.h>
 #include <thread/thread.h>
+#include <thread/workqueue.h>
 
 /* These commands are sent back up to the daemon
  * thread executing a daemon work and are operated

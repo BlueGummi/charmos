@@ -161,7 +161,7 @@ char *strdup(const char *str) {
     while (str[len] != '\0')
         len++;
 
-    char *copy = (char *) kmalloc(len + 1, ALLOC_PARAMS_DEFAULT);
+    char *copy = (char *) kmalloc(len + 1);
     if (!copy)
         return NULL;
 

@@ -45,7 +45,7 @@ static void hpet_work(void *a, void *b) {
             if (ev->callback)
                 ev->callback(ev->args.arg1, ev->args.arg2);
 
-            kfree(ev, FREE_PARAMS_DEFAULT);
+            kfree(ev);
             irql = spin_lock_irq_disable(&defer_queue->lock);
         }
 
@@ -75,8 +75,7 @@ static enum irq_result hpet_irq_handler(void *ctx, uint8_t irq,
 
 bool defer_enqueue(work_function func, struct work_args args,
                    uint64_t delay_ms) {
-    struct deferred_event *ev =
-        kzalloc(sizeof(struct deferred_event), ALLOC_PARAMS_DEFAULT);
+    struct deferred_event *ev = kzalloc(sizeof(struct deferred_event));
     if (!ev)
         return false;
 
@@ -112,8 +111,7 @@ bool defer_enqueue(work_function func, struct work_args args,
 
 void defer_init(void) {
     defer_queues =
-        kzalloc(sizeof(struct deferred_event_queue) * hpet_timer_count,
-                ALLOC_PARAMS_DEFAULT);
+        kzalloc(sizeof(struct deferred_event_queue) * hpet_timer_count);
     if (!defer_queues)
         panic("Defer queue allocation failed!\n");
 

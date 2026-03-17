@@ -189,8 +189,7 @@ static struct thread *thread_init(struct thread *thread,
 struct thread *thread_create_internal(char *name, void (*entry_point)(void *),
                                       void *arg, size_t stack_size,
                                       va_list args) {
-    struct thread *new_thread =
-        kzalloc(sizeof(struct thread), ALLOC_PARAMS_DEFAULT);
+    struct thread *new_thread = kzalloc(sizeof(struct thread));
     if (unlikely(!new_thread))
         goto err;
 
@@ -198,8 +197,7 @@ struct thread *thread_create_internal(char *name, void (*entry_point)(void *),
     if (unlikely(!stack))
         goto err;
 
-    new_thread->activity_data =
-        kzalloc(sizeof(struct thread_activity_data), ALLOC_PARAMS_DEFAULT);
+    new_thread->activity_data = kzalloc(sizeof(struct thread_activity_data));
     if (unlikely(!new_thread->activity_data))
         goto err;
 
@@ -207,8 +205,7 @@ struct thread *thread_create_internal(char *name, void (*entry_point)(void *),
     if (unlikely(!new_thread->turnstile))
         goto err;
 
-    new_thread->activity_stats =
-        kzalloc(sizeof(struct thread_activity_stats), ALLOC_PARAMS_DEFAULT);
+    new_thread->activity_stats = kzalloc(sizeof(struct thread_activity_stats));
     if (unlikely(!new_thread->activity_stats))
         goto err;
 
@@ -222,7 +219,7 @@ struct thread *thread_create_internal(char *name, void (*entry_point)(void *),
     size_t needed = vsnprintf(NULL, 0, name, args_copy) + 1;
     va_end(args_copy);
 
-    new_thread->name = kzalloc(needed, ALLOC_PARAMS_DEFAULT);
+    new_thread->name = kzalloc(needed);
     if (!new_thread->name)
         goto err;
 
@@ -248,13 +245,13 @@ err:
     if (!new_thread)
         return NULL;
 
-    kfree(new_thread->turnstile, FREE_PARAMS_DEFAULT);
-    kfree(new_thread->name, FREE_PARAMS_DEFAULT);
-    kfree(new_thread->activity_data, FREE_PARAMS_DEFAULT);
-    kfree(new_thread->activity_stats, FREE_PARAMS_DEFAULT);
+    kfree(new_thread->turnstile);
+    kfree(new_thread->name);
+    kfree(new_thread->activity_data);
+    kfree(new_thread->activity_stats);
     thread_free_stack(new_thread);
     tid_free(global_tid_space, new_thread->id);
-    kfree(new_thread, FREE_PARAMS_DEFAULT);
+    kfree(new_thread);
 
     return NULL;
 }
@@ -282,14 +279,14 @@ struct thread *thread_create_custom_stack(char *name,
 
 void thread_free(struct thread *t) {
     tid_free(global_tid_space, t->id);
-    kfree(t->activity_data, FREE_PARAMS_DEFAULT);
-    kfree(t->activity_stats, FREE_PARAMS_DEFAULT);
-    kfree(t->name, FREE_PARAMS_DEFAULT);
+    kfree(t->activity_data);
+    kfree(t->activity_stats);
+    kfree(t->name);
     log_site_destroy(t->log_site);
-    kfree(t->turnstile, FREE_PARAMS_DEFAULT);
+    kfree(t->turnstile);
     apc_free_on_thread(t);
     thread_free_stack(t);
-    kfree(t, FREE_PARAMS_DEFAULT);
+    kfree(t);
 }
 
 void thread_queue_init(struct thread_queue *q) {

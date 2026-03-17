@@ -34,14 +34,13 @@ build_domain_for_level(enum topology_level lvl) {
     size_t n = t->count[lvl];
     struct topology_node *nodes = t->level[lvl];
 
-    struct scheduler_domain *d = kzalloc(sizeof(*d), ALLOC_PARAMS_DEFAULT);
+    struct scheduler_domain *d = kzalloc(sizeof(*d));
     if (!d)
         panic("OOM\n");
 
     d->level = lvl;
     d->ngroups = n;
-    d->groups =
-        kzalloc(sizeof(struct scheduler_group) * n, ALLOC_PARAMS_DEFAULT);
+    d->groups = kzalloc(sizeof(struct scheduler_group) * n);
     if (!d->groups)
         panic("OOM\n");
 

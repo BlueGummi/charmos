@@ -7,8 +7,8 @@
 #include <string.h>
 #include <sync/rcu.h>
 #include <tests.h>
-#include <thread/workqueue.h>
 #include <thread/thread.h>
+#include <thread/workqueue.h>
 
 #define NUM_RCU_READERS (global.core_count)
 #define RCU_TEST_DURATION_MS 50
@@ -48,9 +48,9 @@ static void rcu_reader_thread(void *) {
 static atomic_bool volatile rcu_deferred_freed = false;
 
 static void rcu_free_fn(struct rcu_cb *cb, void *ptr) {
-    kfree(ptr, FREE_PARAMS_DEFAULT);
+    kfree(ptr);
     atomic_store(&rcu_deferred_freed, true);
-    kfree(cb, FREE_PARAMS_DEFAULT);
+    kfree(cb);
 }
 
 static void rcu_writer_thread(void *) {
@@ -58,18 +58,16 @@ static void rcu_writer_thread(void *) {
 
     struct rcu_test_data *old = shared_ptr;
 
-    struct rcu_test_data *new = kmalloc(sizeof(*new), ALLOC_PARAMS_DEFAULT);
+    struct rcu_test_data *new = kmalloc(sizeof(*new));
     new->value = 43;
     rcu_assign_pointer(shared_ptr, new);
 
     rcu_synchronize();
-    rcu_defer(kmalloc(sizeof(struct rcu_cb), ALLOC_PARAMS_DEFAULT), rcu_free_fn,
-              old);
+    rcu_defer(kmalloc(sizeof(struct rcu_cb)), rcu_free_fn, old);
 }
 
 TEST_REGISTER(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    struct rcu_test_data *initial =
-        kmalloc(sizeof(*initial), ALLOC_PARAMS_DEFAULT);
+    struct rcu_test_data *initial = kmalloc(sizeof(*initial));
     initial->value = 42;
     shared_ptr = initial;
 
@@ -120,8 +118,8 @@ static void stress_free_cb(struct rcu_cb *cb, void *ptr) {
     n->freed_gen = cb->gen_when_called;
     n->enqueued_on = cb->enqueued_waiting_on_gen;
     atomic_fetch_add(&stress_deferred_freed, 1);
-    kfree(cb, FREE_PARAMS_DEFAULT);
-    kfree(n, FREE_PARAMS_DEFAULT);
+    kfree(cb);
+    kfree(n);
 }
 
 /* reader thread: very tight loop, yields frequently */
@@ -181,8 +179,7 @@ static void rcu_stress_writer(void *arg) {
     uint64_t local_iter = 0;
 
     while (!atomic_load(&stress_stop)) {
-        struct rcu_stress_node *new =
-            kmalloc(sizeof(*new), ALLOC_PARAMS_DEFAULT);
+        struct rcu_stress_node *new = kmalloc(sizeof(*new));
         if (!new) {
             /* allocation failure — mark as failure and exit */
             atomic_store(&stress_failed, true);
@@ -205,8 +202,7 @@ static void rcu_stress_writer(void *arg) {
          * freed to assert correctness.
          */
         if (old)
-            rcu_defer(kmalloc(sizeof(struct rcu_cb), ALLOC_PARAMS_DEFAULT),
-                      stress_free_cb, old);
+            rcu_defer(kmalloc(sizeof(struct rcu_cb)), stress_free_cb, old);
 
         /*
          * Occasionally force a synchronize call to exercise explicit grace
@@ -234,8 +230,7 @@ static void rcu_stress_reclaimer(void *arg) {
 /* Test registration */
 TEST_REGISTER(rcu_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     /* initial object */
-    struct rcu_stress_node *initial =
-        kmalloc(sizeof(*initial), ALLOC_PARAMS_DEFAULT);
+    struct rcu_stress_node *initial = kmalloc(sizeof(*initial));
     TEST_ASSERT(initial != NULL);
     initial->seq = 1;
     initial->value = 42;
@@ -302,7 +297,7 @@ TEST_REGISTER(rcu_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     if (last) {
         /* old-style: synchronize then free directly */
         rcu_synchronize();
-        kfree(last, FREE_PARAMS_DEFAULT);
+        kfree(last);
         atomic_fetch_add(&stress_deferred_freed, 1);
     }
 

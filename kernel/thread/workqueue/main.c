@@ -77,7 +77,7 @@ static void worker_destroy(struct workqueue *queue, struct worker *worker) {
 
         spin_unlock(&queue->worker_array_lock, irql);
     } else {
-        kfree(worker, FREE_PARAMS_DEFAULT);
+        kfree(worker);
     }
 }
 

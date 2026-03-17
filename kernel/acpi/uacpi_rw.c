@@ -26,7 +26,7 @@ uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
     uint8_t slot = address.device;
     uint8_t func = address.function;
 
-    uacpi_pci_device *dev = kzalloc(sizeof(*dev), ALLOC_PARAMS_DEFAULT);
+    uacpi_pci_device *dev = kzalloc(sizeof(*dev));
 
     if (!dev) {
         return UACPI_STATUS_OUT_OF_MEMORY;
@@ -47,7 +47,7 @@ void uacpi_kernel_pci_device_close(uacpi_handle handle) {
         return;
     }
     dev->is_open = false;
-    kfree(dev, FREE_PARAMS_DEFAULT);
+    kfree(dev);
 }
 
 uacpi_status uacpi_kernel_pci_read8(uacpi_handle device, uacpi_size offset,

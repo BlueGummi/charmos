@@ -3,9 +3,9 @@
 #include <sleep.h>
 #include <tests.h>
 #include <thread/apc.h>
-#include <thread/workqueue.h>
 #include <thread/reaper.h>
 #include <thread/thread.h>
+#include <thread/workqueue.h>
 
 static atomic_bool apc_ran = false;
 static void the_apc(struct apc *a, void *arg1, void *arg2) {
@@ -21,7 +21,7 @@ static void apc_thread(void *) {
 static struct thread *ted = NULL;
 TEST_REGISTER(apc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ted = thread_spawn("apc_test_thread", apc_thread, NULL);
-    struct apc *a = kzalloc(sizeof(struct apc), ALLOC_PARAMS_DEFAULT);
+    struct apc *a = kzalloc(sizeof(struct apc));
     if (!a || !ted)
         goto pluh;
 

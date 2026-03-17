@@ -23,8 +23,7 @@ void srat_init(void) {
         log_warn_global(LOG_HANDLE(srat),
                         "SRAT table not found, assuming single NUMA node");
 
-        global.numa_nodes =
-            kzalloc(sizeof(struct numa_node), ALLOC_PARAMS_DEFAULT);
+        global.numa_nodes = kzalloc(sizeof(struct numa_node));
         if (!global.numa_nodes)
             panic("OOM Whilst allocating NUMA node array");
 
@@ -68,8 +67,7 @@ void srat_init(void) {
 
     global.numa_node_count = max_prox_domain + 1;
     size_t numa_node_count = global.numa_node_count;
-    global.numa_nodes = kzalloc(numa_node_count * sizeof(struct numa_node),
-                                ALLOC_PARAMS_DEFAULT);
+    global.numa_nodes = kzalloc(numa_node_count * sizeof(struct numa_node));
     if (!global.numa_nodes)
         panic("OOM Whilst allocating NUMA node array");
 
@@ -79,7 +77,7 @@ void srat_init(void) {
         global.numa_nodes[i].mem_size = 0;
         global.numa_nodes[i].distances_cnt = numa_node_count;
         global.numa_nodes[i].distance =
-            kzalloc(numa_node_count * sizeof(uint8_t), ALLOC_PARAMS_DEFAULT);
+            kzalloc(numa_node_count * sizeof(uint8_t));
 
         if (!global.numa_nodes[i].distance)
             panic("OOM whilst allocating NUMA node array");

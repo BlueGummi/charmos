@@ -31,7 +31,7 @@ static void e1000_setup_tx_ring(struct e1000_device *dev) {
     memset(dev->tx_descs, 0, space);
 
     for (int i = 0; i < E1000_NUM_TX_DESC; i++) {
-        dev->tx_buffers[i] = kmalloc(2048, ALLOC_PARAMS_DEFAULT);
+        dev->tx_buffers[i] = kmalloc(2048);
         if (!dev->tx_buffers[i])
             panic("e1000 ring setup allocation failed!\n");
 
@@ -64,7 +64,7 @@ static void e1000_setup_rx_ring(struct e1000_device *dev) {
     memset(dev->rx_descs, 0, space);
 
     for (int i = 0; i < E1000_NUM_RX_DESC; i++) {
-        dev->rx_buffers[i] = kmalloc(E1000_RX_BUF_SIZE, ALLOC_PARAMS_DEFAULT);
+        dev->rx_buffers[i] = kmalloc(E1000_RX_BUF_SIZE);
         if (!dev->rx_buffers[i])
             panic("e1000 ring allocation failed\n");
 
@@ -220,8 +220,7 @@ static void e1000_pci_init(uint8_t bus, uint8_t d, uint8_t func,
     if (did == 0x1000 || did == 0x100E || did == 0x1010 || did == 0x1026 ||
         did == 0x10D3 || did == 0x10F5) {
         struct pci_device dev = {.bus = bus, .device = d, .function = func};
-        struct e1000_device *device =
-            kmalloc(sizeof(struct e1000_device), ALLOC_PARAMS_DEFAULT);
+        struct e1000_device *device = kmalloc(sizeof(struct e1000_device));
         if (unlikely(!device))
             panic("e1000 device allocation failed!\n");
 
