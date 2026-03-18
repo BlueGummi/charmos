@@ -20,17 +20,41 @@ static inline size_t apc_type_bit(enum apc_type t) {
     return (size_t) 1ULL << (size_t) t;
 }
 
-static inline bool apc_list_empty(struct thread *t, enum apc_type type) {
-    return list_empty(&t->apc_head[type]);
+static inline bool apc_queue_empty(struct apc_queue *q) {
+    return q->head == NULL;
 }
 
-static inline void apc_list_del(struct apc *a) {
-    list_del_init(&a->list);
+static inline void apc_enqueue_tail(struct apc_queue *q, struct apc *a) {
+    a->next = NULL;
+
+    if (!q->head) {
+        q->head = q->tail = a;
+    } else {
+        q->tail->next = a;
+        q->tail = a;
+    }
+}
+
+static inline struct apc *apc_dequeue_head(struct apc_queue *q) {
+    struct apc *a = q->head;
+    if (!a)
+        return NULL;
+
+    q->head = a->next;
+    if (!q->head)
+        q->tail = NULL;
+
+    a->next = NULL;
+    return a;
 }
 
 static inline void apc_add_tail(struct thread *t, struct apc *a,
                                 enum apc_type type) {
-    list_add_tail(&a->list, &t->apc_head[type]);
+    apc_enqueue_tail(&t->apc_head[type], a);
+}
+
+static inline bool apc_list_empty(struct thread *t, enum apc_type type) {
+    return apc_queue_empty(&t->apc_head[type]);
 }
 
 static inline void apc_unset_bitmask(struct thread *t, enum apc_type type) {
@@ -39,14 +63,6 @@ static inline void apc_unset_bitmask(struct thread *t, enum apc_type type) {
 
 static inline void apc_set_bitmask(struct thread *t, enum apc_type type) {
     atomic_fetch_or(&t->apc_pending_mask, apc_type_bit(type));
-}
-
-static inline void apc_set_cancelled(struct apc *a, bool new) {
-    atomic_store(&a->cancelled, new);
-}
-
-static inline bool apc_is_cancelled(struct apc *a) {
-    return atomic_load(&a->cancelled);
 }
 
 static inline bool thread_can_exec_special_apcs(struct thread *t) {
@@ -82,41 +98,38 @@ static void apc_execute(struct apc *a) {
 
     thread_or_flags(curr, THREAD_FLAG_EXECUTING_APC);
 
-    a->func(a, a->arg1, a->arg2);
+    a->func(a);
 
     thread_and_flags(curr, ~THREAD_FLAG_EXECUTING_APC);
     curr->total_apcs_ran++;
 }
 
 static void deliver_apc_type(struct thread *t, enum apc_type type) {
-    struct apc *apc;
-
     while (true) {
         bool ok;
         enum irql irql = thread_acquire(t, &ok);
-        kassert(ok); /* should not fail */
+        kassert(ok);
 
-        if (apc_list_empty(t, type)) {
+        struct apc *apc = apc_dequeue_head(&t->apc_head[type]);
+
+        if (!apc) {
             apc_unset_bitmask(t, type);
             thread_release(t, irql);
             return;
         }
 
-        apc = list_first_entry(&t->apc_head[type], struct apc, list);
-        apc_list_del(apc);
         apc->enqueued = false;
+        apc->owner = NULL;
 
         thread_release(t, irql);
 
-        if (!apc_is_cancelled(apc))
-            apc_execute(apc);
+        apc_execute(apc);
     }
 }
 
 static void add_apc_to_thread(struct thread *t, struct apc *a,
                               enum apc_type type) {
     a->owner = t;
-    apc_set_cancelled(a, false);
     apc_add_tail(t, a, type);
     a->enqueued = true;
     apc_set_bitmask(t, type);
@@ -182,39 +195,51 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
 }
 
 /* We can only enqueue and run from ourselves, no sync needed */
-void apc_enqueue_event_apc(struct apc *a, struct apc_event_desc *desc) {
-    kassert(desc && "cannot have a NULL APC event descriptor");
-    kassert(list_empty(&a->list));
-    kassert(!a->enqueued && !a->owner); /* Panic - this might be accidentally
-                                         * placed on multiple threads */
+void apc_enqueue_event_apc(struct event_apc *a, struct apc_event_desc *desc) {
+    kassert(desc);
+    kassert(!a->apc.enqueued && !a->apc.owner);
 
     a->desc = desc;
+
     struct thread *t = thread_get_current();
     if (!thread_apc_sanity_check(t))
         return;
 
-    list_add_tail(&a->list, &t->event_apcs);
+    apc_enqueue_tail(&t->event_apcs, &a->apc);
 
-    a->enqueued = true;
-    a->owner = t;
+    a->apc.enqueued = true;
+    a->apc.owner = t;
+    apc_set_bitmask(t, APC_TYPE_KERNEL);
 }
 
-static inline void apc_unlink(struct apc *apc) {
-    apc_list_del(apc);
-    apc->enqueued = false;
-    apc->owner = NULL;
-}
+static bool try_cancel_from_queue(struct thread *t, struct apc *a,
+                                  enum apc_type type) {
+    struct apc_queue *q = &t->apc_head[type];
 
-static bool try_cancel_from_list(struct thread *t, struct apc *a,
-                                 enum apc_type type) {
-    struct list_head *pos, *n;
+    struct apc *prev = NULL;
+    struct apc *curr = q->head;
 
-    list_for_each_safe(pos, n, &t->apc_head[type]) {
-        struct apc *apc = apc_from_list_node(pos);
-        if (apc == a) {
-            apc_unlink(apc);
+    while (curr) {
+        struct apc *next = curr->next;
+
+        if (curr == a) {
+            if (prev)
+                prev->next = next;
+            else
+                q->head = next;
+
+            if (q->tail == curr)
+                q->tail = prev;
+
+            curr->next = NULL;
+            curr->enqueued = false;
+            curr->owner = NULL;
+
             return true;
         }
+
+        prev = curr;
+        curr = next;
     }
 
     return false;
@@ -237,10 +262,8 @@ bool apc_cancel(struct apc *a) {
     if (!ok)
         return false;
 
-    apc_set_cancelled(a, true);
-
     for (int type = 0; type < APC_TYPE_COUNT; type++) {
-        removed = try_cancel_from_list(t, a, type);
+        removed = try_cancel_from_queue(t, a, type);
 
         if (removed) {
             update_pending_mask(t, type);
@@ -256,39 +279,65 @@ struct apc *apc_create(void) {
     return kmalloc(sizeof(struct apc));
 }
 
-void apc_init(struct apc *a, apc_func_t fn, void *arg1, void *arg2) {
+struct event_apc *apc_event_apc_create(void) {
+    return kmalloc(sizeof(struct event_apc));
+}
+
+void apc_init(struct apc *a, apc_func_t fn, void *arg1) {
     a->func = fn;
-    a->arg1 = arg1;
-    a->arg2 = arg2;
-    INIT_LIST_HEAD(&a->list);
-    a->cancelled = false;
+    a->ctx = arg1;
+    a->next = NULL;
     a->owner = NULL;
     a->enqueued = false;
 }
 
-void apc_free_on_thread(struct thread *t) {
-    struct apc *a, *tmp;
-    kassert(list_empty(&t->to_exec_event_apcs));
+void apc_event_apc_init(struct event_apc *a, apc_func_t fn, void *arg1) {
+    apc_init(&a->apc, fn, arg1);
+    a->execute_times = 0;
+}
 
-    list_for_each_entry_safe(a, tmp, &t->event_apcs, list) {
-        list_del(&a->list);
+void apc_free_on_thread(struct thread *t) {
+    struct apc *a;
+
+    while ((a = apc_dequeue_head(&t->event_apcs))) {
         kfree(a);
     }
 }
 
-static void bump_counters_on_list(struct list_head *from,
-                                  struct apc_event_desc *desc,
-                                  struct list_head *to) {
-    struct apc *a, *tmp;
-    list_for_each_entry_safe(a, tmp, from, list) {
-        if (a->desc != desc)
-            continue;
+static void bump_counters_on_queue(struct apc_queue *from,
+                                   struct apc_event_desc *desc,
+                                   struct apc_queue *to) {
+    struct apc *prev = NULL;
+    struct apc *curr = from->head;
 
-        a->execute_times++;
-        if (to) {
-            list_del_init(&a->list);
-            list_add_tail(&a->list, to);
+    while (curr) {
+        struct apc *next = curr->next;
+        struct event_apc *eapc = container_of(curr, struct event_apc, apc);
+
+        if (eapc->desc == desc) {
+            eapc->execute_times++;
+
+            if (to) {
+                /* unlink */
+                if (prev)
+                    prev->next = next;
+                else
+                    from->head = next;
+
+                if (from->tail == curr)
+                    from->tail = prev;
+
+                /* enqueue into target */
+                curr->next = NULL;
+                apc_enqueue_tail(to, curr);
+
+                curr = next;
+                continue;
+            }
         }
+
+        prev = curr;
+        curr = next;
     }
 }
 
@@ -304,39 +353,46 @@ void apc_event_signal(struct apc_event_desc *desc) {
     struct thread *curr = thread_get_current();
 
     if (safe_to_exec_apcs() && curr->kernel_apc_disable == 0) {
-        kassert(list_empty(&curr->to_exec_event_apcs));
+        kassert(apc_queue_empty(&curr->to_exec_event_apcs));
+
         enum irql irql = irql_raise(IRQL_APC_LEVEL);
+
+        struct apc *a = curr->event_apcs.head;
 
         /* This will give us the "first node in a list" that matches our `desc`
          * value. We can keep going this->right->right to find everyone else to
          * execute */
-        struct apc *a;
-        list_for_each_entry(a, &curr->event_apcs, list) {
-            if (a->desc == desc)
+        while (a) {
+            if (container_of(a, struct event_apc, apc)->desc == desc)
                 apc_execute(a);
+
+            a = a->next;
         }
 
         irql_lower(irql);
     } else {
         /* Cannot execute APCs right now. Search both trees, bump counters. */
-        bump_counters_on_list(&curr->to_exec_event_apcs, desc, NULL);
-        bump_counters_on_list(&curr->event_apcs, desc,
-                              &curr->to_exec_event_apcs);
+        bump_counters_on_queue(&curr->to_exec_event_apcs, desc, NULL);
+        bump_counters_on_queue(&curr->event_apcs, desc,
+                               &curr->to_exec_event_apcs);
 
         apc_set_bitmask(curr, APC_TYPE_KERNEL);
     }
 }
 
 void thread_exec_event_apcs(struct thread *t) {
-    struct apc *a, *tmp;
-    list_for_each_entry_safe(a, tmp, &t->to_exec_event_apcs, list) {
-        kassert(a->execute_times);
-        for (size_t i = 0; i < a->execute_times; i++)
+    struct apc *a;
+
+    while ((a = apc_dequeue_head(&t->to_exec_event_apcs))) {
+        struct event_apc *eapc = container_of(a, struct event_apc, apc);
+        kassert(eapc->execute_times);
+
+        for (size_t i = 0; i < eapc->execute_times; i++)
             apc_execute(a);
 
-        a->execute_times = 0;
-        list_del_init(&a->list);
-        list_add_tail(&a->list, &t->event_apcs);
+        eapc->execute_times = 0;
+
+        apc_enqueue_tail(&t->event_apcs, a);
     }
 
     /* Just in case */

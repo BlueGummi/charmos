@@ -167,14 +167,13 @@ static struct thread *si_t;
 static atomic_bool si_ok = false;
 static atomic_bool si_started = false;
 
-static void apc_si(struct apc *apc, void *a, void *b) {
-    (void) a, (void) b, (void) apc;
+static void apc_si(struct apc *apc) {
     atomic_store(&si_apc_ran, true);
 }
 
 static void apc_enqueue_thread(void *) {
     struct apc *apc = apc_create();
-    apc_init(apc, apc_si, NULL, NULL);
+    apc_init(apc, apc_si, NULL);
 
     while (!atomic_load(&si_started))
         cpu_relax();

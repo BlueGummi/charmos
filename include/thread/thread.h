@@ -304,7 +304,7 @@ struct thread {
 
     /* ========== APC data ========== */
     /* Standard APC queues */
-    struct list_head apc_head[APC_TYPE_COUNT];
+    struct apc_queue apc_head[APC_TYPE_COUNT];
 
     /* Any APC pending */
     _Atomic uint8_t apc_pending_mask; /* bitmask of APC_TYPE_* pending */
@@ -313,8 +313,8 @@ struct thread {
     uint32_t special_apc_disable;
     uint32_t kernel_apc_disable;
 
-    struct list_head event_apcs;         /* yet to execute */
-    struct list_head to_exec_event_apcs; /* to be executed */
+    struct apc_queue event_apcs;         /* yet to execute */
+    struct apc_queue to_exec_event_apcs; /* to be executed */
 
     /* ========== Profiling data ========== */
     struct log_site *log_site;

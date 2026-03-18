@@ -58,10 +58,8 @@ static inline bool chaos_log_allow(uint64_t *last_ns, uint32_t *burst) {
 /* ------------------------------------
  * APC spammer callback
  * ------------------------------------ */
-static void chaos_apc_fn(struct apc *apc, void *a, void *b) {
+static void chaos_apc_fn(struct apc *apc) {
     (void) apc;
-    (void) a;
-    (void) b;
     /* No signal needed; the wake logic handles APC ordering. */
 }
 
@@ -158,7 +156,7 @@ static void chaos_apc_spammer(void *arg) {
             continue;
 
         struct apc *apc = apc_create();
-        apc_init(apc, chaos_apc_fn, NULL, NULL);
+        apc_init(apc, chaos_apc_fn, NULL);
         apc_enqueue(s->t, apc, APC_TYPE_KERNEL);
 
         uint32_t n = atomic_fetch_add(&apc_count, 1) + 1;

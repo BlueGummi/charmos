@@ -8,8 +8,7 @@
 #include <thread/workqueue.h>
 
 static atomic_bool apc_ran = false;
-static void the_apc(struct apc *a, void *arg1, void *arg2) {
-    (void) arg1, (void) a, (void) arg2;
+static void the_apc(struct apc *a) {
     atomic_store(&apc_ran, true);
 }
 
@@ -25,7 +24,7 @@ TEST_REGISTER(apc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     if (!a || !ted)
         goto pluh;
 
-    apc_init(a, the_apc, NULL, NULL);
+    apc_init(a, the_apc, NULL);
 
     apc_enqueue(ted, a, APC_TYPE_KERNEL);
 
@@ -38,8 +37,7 @@ pluh:
 
 static atomic_uint the_event_apc_ran_times = 0;
 static atomic_bool event_apc_test_ok = false;
-static void the_event_apc(struct apc *pc, void *a, void *b) {
-    (void) pc, (void) a, (void) b;
+static void the_event_apc(struct apc *pc) {
     atomic_fetch_add(&the_event_apc_ran_times, 1);
 }
 
@@ -49,8 +47,8 @@ static void apc_event_test_thread(void *) {
     /* We want to enqueue an event APC, then raise to DISPATCH, trigger it a
      * few times, check that no APCs got triggered, and then lower from there,
      * and then check that APCs got triggered, and then test masking, etc. */
-    struct apc *evtapc = apc_create();
-    apc_init(evtapc, the_event_apc, NULL, NULL);
+    struct event_apc *evtapc = apc_event_apc_create();
+    apc_event_apc_init(evtapc, the_event_apc, NULL);
     apc_enqueue_event_apc(evtapc, APC_EVENT(apc_event_test));
 
     enum irql old = irql_raise(IRQL_DISPATCH_LEVEL);
