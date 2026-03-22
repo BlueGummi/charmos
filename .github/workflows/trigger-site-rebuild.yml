@@ -15,5 +15,5 @@ jobs:
           curl -X POST \
             -H "Authorization: token ${{ secrets.CHARMOS_SITE_SECRET }}" \
             -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/bluegummi/charmos-site/dispatches \
+            https://api.github.com/repos/axvonx/charmos-site/dispatches \
             -d '{"event_type": "remote-trigger"}'

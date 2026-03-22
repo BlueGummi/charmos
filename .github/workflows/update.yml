@@ -23,9 +23,9 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t ghcr.io/bluegummi/charmos-x86-env:latest .
+          docker build -t ghcr.io/axvonx/charmos-x86-env:latest .
 
       - name: Push Docker image
         run: |
-          docker push ghcr.io/bluegummi/charmos-x86-env:latest
+          docker push ghcr.io/axvonx/charmos-x86-env:latest
 
