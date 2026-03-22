@@ -27,7 +27,7 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/bluegummi/charmos-x86-env:latest
+      image: ghcr.io/axvonx/charmos-x86-env:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GHCR_KEY }}
