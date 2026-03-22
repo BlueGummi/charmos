@@ -545,6 +545,8 @@ void rt_scheduler_switch() {
         re_enqueue_threads(next_rts, &thread_list);
     }
 
+    mark_active(next);
+
     /* Drop the old ref, only reachable via success path */
     rt_scheduler_static_put(from);
 out:

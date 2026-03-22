@@ -17,4 +17,4 @@ struct apc_queue {
 struct apc;
 struct apc_event_desc;
 
-typedef void (*apc_func_t)(struct apc *apc);
+typedef void (*apc_func_t)(void *);

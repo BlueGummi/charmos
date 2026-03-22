@@ -13,12 +13,9 @@
 
 struct apc {
     apc_func_t func;
-    bool enqueued;
-
-    struct apc *next;
-
-    struct thread *owner;
     void *ctx;
+    struct thread *owner;
+    struct apc *next;
 };
 
 struct event_apc {

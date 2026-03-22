@@ -98,7 +98,7 @@ static void apc_execute(struct apc *a) {
 
     thread_or_flags(curr, THREAD_FLAG_EXECUTING_APC);
 
-    a->func(a);
+    a->func(a->ctx);
 
     thread_and_flags(curr, ~THREAD_FLAG_EXECUTING_APC);
     curr->total_apcs_ran++;
@@ -118,7 +118,6 @@ static void deliver_apc_type(struct thread *t, enum apc_type type) {
             return;
         }
 
-        apc->enqueued = false;
         apc->owner = NULL;
 
         thread_release(t, irql);
@@ -131,7 +130,6 @@ static void add_apc_to_thread(struct thread *t, struct apc *a,
                               enum apc_type type) {
     a->owner = t;
     apc_add_tail(t, a, type);
-    a->enqueued = true;
     apc_set_bitmask(t, type);
 }
 
@@ -177,7 +175,7 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
     if (!ok)
         return;
 
-    if (a->enqueued) {
+    if (a->owner) {
         thread_release(t, irql);
         return;
     }
@@ -197,7 +195,7 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
 /* We can only enqueue and run from ourselves, no sync needed */
 void apc_enqueue_event_apc(struct event_apc *a, struct apc_event_desc *desc) {
     kassert(desc);
-    kassert(!a->apc.enqueued && !a->apc.owner);
+    kassert(!a->apc.owner);
 
     a->desc = desc;
 
@@ -207,7 +205,6 @@ void apc_enqueue_event_apc(struct event_apc *a, struct apc_event_desc *desc) {
 
     apc_enqueue_tail(&t->event_apcs, &a->apc);
 
-    a->apc.enqueued = true;
     a->apc.owner = t;
     apc_set_bitmask(t, APC_TYPE_KERNEL);
 }
@@ -232,7 +229,6 @@ static bool try_cancel_from_queue(struct thread *t, struct apc *a,
                 q->tail = prev;
 
             curr->next = NULL;
-            curr->enqueued = false;
             curr->owner = NULL;
 
             return true;
@@ -288,7 +284,6 @@ void apc_init(struct apc *a, apc_func_t fn, void *arg1) {
     a->ctx = arg1;
     a->next = NULL;
     a->owner = NULL;
-    a->enqueued = false;
 }
 
 void apc_event_apc_init(struct event_apc *a, apc_func_t fn, void *arg1) {
