@@ -167,7 +167,7 @@ static struct thread *si_t;
 static atomic_bool si_ok = false;
 static atomic_bool si_started = false;
 
-static void apc_si(struct apc *apc) {
+static void apc_si(void *apc) {
     atomic_store(&si_apc_ran, true);
 }
 

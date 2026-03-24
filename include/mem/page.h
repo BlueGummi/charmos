@@ -35,18 +35,11 @@
 
 #define VMM_MAP_BASE 0xFFFFA00000200000
 #define VMM_MAP_LIMIT 0xFFFFA00010000000
-enum page_flags : uint16_t {
-    PAGE_FLAG_PAGE_TABLE = 1,
-    PAGE_FLAG_PAGE_TABLE_FREED = 1 << 1,
-};
 
 struct page {
-    uint8_t phys_usable : 1;
     uint8_t is_free : 1;
-    uint8_t order : 6;
+    uint8_t order : 7;
     struct page *next;
-    struct spinlock lock;
-    enum page_flags flags;
 };
 
 struct page_table {
@@ -71,10 +64,4 @@ static inline struct page *page_for_pfn(uint64_t pfn) {
 
 static inline uint64_t page_get_pfn(struct page *bp) {
     return (uint64_t) (bp - global.page_array);
-}
-
-static inline bool page_pfn_phys_usable(uint64_t pfn) {
-    if (pfn >= global.last_pfn)
-        return false;
-    return global.page_array[pfn].phys_usable;
 }

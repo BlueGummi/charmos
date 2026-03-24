@@ -8,7 +8,7 @@
 #include <thread/workqueue.h>
 
 static atomic_bool apc_ran = false;
-static void the_apc(struct apc *a) {
+static void the_apc(void *a) {
     atomic_store(&apc_ran, true);
 }
 
@@ -37,7 +37,7 @@ pluh:
 
 static atomic_uint the_event_apc_ran_times = 0;
 static atomic_bool event_apc_test_ok = false;
-static void the_event_apc(struct apc *pc) {
+static void the_event_apc(void *pc) {
     atomic_fetch_add(&the_event_apc_ran_times, 1);
 }
 

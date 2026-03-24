@@ -25,7 +25,7 @@ static inline bool pte_trylock_bit(pte_atomic_t *pte) {
     return true;
 }
 
-static inline void pte_unlock_bit(pte_atomic_t *pte) {
+static inline void pte_unlock_bit_internal(pte_atomic_t *pte) {
     atomic_fetch_and_explicit(pte, ~PTE_LOCK_BIT, memory_order_release);
 }
 
@@ -40,15 +40,17 @@ enum pte_lock_result {
     PTE_LOCK_DEAD, /* Child table is being freed; caller must retry or abort */
 };
 
-static inline enum pte_lock_result pte_lock(pte_atomic_t *pte) {
+static inline enum pte_lock_result pte_lock_internal(pte_atomic_t *pte) {
     for (;;) {
         uint64_t old = atomic_load_explicit(pte, memory_order_relaxed);
 
         if (!(old & PAGING_PRESENT))
             return PTE_LOCK_NOT_PRESENT;
 
-        if (old & PTE_DEAD_BIT)
+        if (old & PTE_DEAD_BIT) {
+            kassert("impossible");
             return PTE_LOCK_DEAD;
+        }
 
         if (old & PTE_LOCK_BIT) {
             cpu_relax();
@@ -68,7 +70,7 @@ static inline enum pte_lock_result pte_lock(pte_atomic_t *pte) {
 static inline enum irql pte_lock_irql(pte_atomic_t *pte,
                                       enum pte_lock_result *result_out) {
     enum irql old_irql = irql_raise(IRQL_DISPATCH_LEVEL);
-    enum pte_lock_result r = pte_lock(pte);
+    enum pte_lock_result r = pte_lock_internal(pte);
 
     if (r != PTE_LOCK_OK) {
         irql_lower(old_irql);
@@ -81,6 +83,6 @@ static inline enum irql pte_lock_irql(pte_atomic_t *pte,
 }
 
 static inline void pte_unlock_irql(pte_atomic_t *pte, enum irql old_irql) {
-    pte_unlock_bit(pte);
+    pte_unlock_bit_internal(pte);
     irql_lower(old_irql);
 }
