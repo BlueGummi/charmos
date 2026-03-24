@@ -11,10 +11,6 @@ static inline bool page_pfn_allocated_in_boot_bitmap(uint64_t pfn) {
     return test_bit(pfn);
 }
 
-static inline bool page_pfn_available(uint64_t pfn) {
-    return page_pfn_phys_usable(pfn) && !page_pfn_allocated_in_boot_bitmap(pfn);
-}
-
 void buddy_add_to_free_area(struct page *page, struct free_area *area);
 struct page *buddy_remove_from_free_area(struct free_area *area);
 paddr_t buddy_alloc_pages_global(size_t count, enum alloc_flags f);

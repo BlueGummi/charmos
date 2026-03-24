@@ -178,15 +178,4 @@ void buddy_init(void) {
     for (uint64_t i = 0; i < memmap->entry_count; i++)
         buddy_add_entry(global.page_array, memmap->entries[i],
                         global.buddy_free_area);
-
-    for (uint64_t i = 0; i < memmap->entry_count; i++) {
-        struct limine_memmap_entry *e = memmap->entries[i];
-        uint64_t start = ALIGN_UP(e->base, PAGE_SIZE) / PAGE_SIZE;
-        uint64_t end = ALIGN_DOWN(e->base + e->length, PAGE_SIZE) / PAGE_SIZE;
-
-        if (e->type == LIMINE_MEMMAP_USABLE) {
-            for (uint64_t p = start; p < end; p++)
-                global.page_array[p].phys_usable = 1;
-        }
-    }
 }

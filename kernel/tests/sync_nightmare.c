@@ -58,7 +58,7 @@ static inline bool chaos_log_allow(uint64_t *last_ns, uint32_t *burst) {
 /* ------------------------------------
  * APC spammer callback
  * ------------------------------------ */
-static void chaos_apc_fn(struct apc *apc) {
+static void chaos_apc_fn(void *apc) {
     (void) apc;
     /* No signal needed; the wake logic handles APC ordering. */
 }

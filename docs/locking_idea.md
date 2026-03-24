@@ -81,10 +81,10 @@ One way to resolve this particular kind of race condition is with a lock.
 For example, if we were to rewrite the previous snippet of code (assuming full atomicity of every operation and no memory access
 reordering – we'll talk about what those words mean later) with a simple lock, we might write something like this:
 
-> For simplicity's sake, we will define a function `read_lock_and_set_if_not_held` that checks the lock variable, and
+> For simplicity's sake, we will define a function `set_if_false` that checks a boolean variable, and
 > if it is `false`, sets it to `true`, returning `true` if it is successful in this operation, or `false` if not.
 
-> We will also say that the `read_lock_and_set_if_not_held` function happens all at once,
+> We will also say that the `set_if_false` function happens all at once,
 > or atomically, meaning that in the function there exists no window of time in between the
 > lock value being read, checked, and set where the lock can change state.
 
@@ -93,7 +93,7 @@ reordering – we'll talk about what those words mean later) with a simple lock,
 bool lock = false;
 
 /* Thread 1: */
-while (read_lock_and_set_if_not_held(lock) == false) { /* retry */ }
+while (set_if_false(lock) == false) { /* retry */ }
 
 struct list_node *first = NULL;
 if (list)
@@ -104,7 +104,7 @@ lock = false;
 
 
 /* Thread 2: */
-while (read_lock_and_set_if_not_held(lock) == false) { /* retry */ }
+while (set_if_false(lock) == false) { /* retry */ }
 
 list = NULL;
 
@@ -125,7 +125,7 @@ To avoid confusion, we will refer to them as such from here on out.
 The difference between them resides in how contending threads wait on a lock that is held.
 
 In short, threads attempting to acquire a spin lock will spin in a loop, whereas threads attempting
-to acquire a mutex will stop running, or yield to let other threads run, while they wait for the lock to be released.
+to acquire a mutex will stop running, or yield, to let other threads run, while they wait for the lock to be released.
 
 Spin locks and mutexes also have different use cases. In general, mutexes are more
 restrictive in when they can be called compared to spin locks.
@@ -172,10 +172,10 @@ modified by another, and incorrectly operated upon based on an old, now invalid 
 You can also use IRQLs[^2] to disable preemption during such code segments to protect the structure.
 
 Locks also cannot be recursively acquired. Some may argue that recursive mutexes are a nicety and make life 
-easier, and while that may hold true in certain cases, like when you're working on a legacy codebase that 
+easier, and while that may hold true in certain cases, such as when you're working on a legacy codebase that 
 uses recursive mutexes and management wants the next release shipped by tomorrow, in our case, it is less than ideal.
 
-This is primarily because recursive mutexes can increase debugging complexity, and also becomes difficult to maintain. 
+This is primarily because recursive mutexes increase debugging complexity, and also becomes difficult to maintain. 
 
 ### Memory Usage
 

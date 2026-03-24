@@ -7,8 +7,6 @@
 enum vmm_flags {
     VMM_FLAG_NONE = 0,
     VMM_FLAG_NO_TLB_SHOOTDOWN = 1 << 0,
-    VMM_FLAG_NO_LOCKS = 1 << 1, /* Super duper unsafe!
-                                 * This is only used in one place */
 };
 
 void vmm_init(struct limine_memmap_response *memmap,
