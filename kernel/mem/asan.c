@@ -55,7 +55,7 @@ void asan_init(void) {
 
     while (remaining >= PAGE_2MB && (phys % PAGE_2MB) == 0 &&
            (virt % PAGE_2MB) == 0) {
-        if (vmm_map_2mb_page(virt, phys, PAGING_PRESENT | PAGING_WRITE,
+        if (vmm_map_2mb_page(virt, phys, PAGE_PRESENT | PAGE_WRITE,
                              VMM_FLAG_NONE) < 0)
             panic("ASAN: failed to map 2MB page at %lx\n", virt);
         phys += PAGE_2MB;
@@ -64,8 +64,8 @@ void asan_init(void) {
     }
 
     while (remaining > 0) {
-        if (vmm_map_page(virt, phys, PAGING_PRESENT | PAGING_WRITE,
-                         VMM_FLAG_NONE) < 0)
+        if (vmm_map_page(virt, phys, PAGE_PRESENT | PAGE_WRITE, VMM_FLAG_NONE) <
+            0)
             panic("ASAN: failed to map 4KB page at %lx\n", virt);
         phys += PAGE_SIZE;
         virt += PAGE_SIZE;

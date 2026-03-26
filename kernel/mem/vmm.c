@@ -5,8 +5,8 @@
 #include <limine.h>
 #include <linker/symbols.h>
 #include <mem/asan.h>
+#include <mem/page_table.h>
 #include <mem/pmm.h>
-#include <mem/pte_lock.h>
 #include <mem/tlb.h>
 #include <mem/vmm.h>
 #include <sch/sched.h>
@@ -16,7 +16,14 @@
 #include <string.h>
 #include <sync/spinlock.h>
 #define KERNEL_PML4_START_INDEX 256
-#define ENTRY_PRESENT(entry) (entry & PAGING_PRESENT)
+#define ENTRY_PRESENT(entry) (entry & PAGE_PRESENT)
+
+enum pt_level {
+    PT_LEVEL_PML4 = 0,
+    PT_LEVEL_PDPT = 1,
+    PT_LEVEL_PD = 2,
+    PT_LEVEL_PT = 3,
+};
 
 struct pt_deferred_free {
     paddr_t phys;
@@ -24,11 +31,47 @@ struct pt_deferred_free {
     struct pt_deferred_free *next;
 };
 
+struct pt_walk {
+    struct page_table *tables[PT_LEVELS];
+    pte_t *entries[PT_LEVELS - 1];
+    enum irql irqls[PT_LEVELS - 1];
+    int depth;
+};
+
 static struct pt_deferred_free *pt_free_list;
 static struct spinlock pt_free_lock = SPINLOCK_INIT;
 static struct page_table *kernel_pml4 = NULL;
-static uintptr_t kernel_pml4_phys = 0;
 static uintptr_t vmm_map_top = VMM_MAP_BASE;
+
+static inline struct page_table *alloc_pt(void) {
+    paddr_t phys = pmm_alloc_page();
+    if (!phys)
+        return NULL;
+
+    void *virt = (void *) (phys + global.hhdm_offset);
+    memset(virt, 0, PAGE_SIZE);
+    return virt;
+}
+
+static enum errno pte_init(pte_t *entry, uint64_t flags) {
+    struct page_table *new_table = alloc_pt();
+    if (!new_table)
+        return ERR_NO_MEM;
+
+    uintptr_t new_table_phys = (uintptr_t) new_table - global.hhdm_offset;
+    memset(new_table, 0, PAGE_SIZE);
+    *entry = new_table_phys | PAGE_PRESENT | PAGE_WRITE | flags;
+    return ERR_OK;
+}
+
+enum irql pte_lock(pte_t *pt) {
+    enum pte_lock_result out;
+    return pte_lock_irql((void *) pt, &out);
+}
+
+void pte_unlock(pte_t *pt, enum irql irql) {
+    pte_unlock_irql((void *) pt, irql);
+}
 
 static void barrier_and_shootdown(enum vmm_flags flags, vaddr_t virt) {
     memory_barrier();
@@ -36,6 +79,53 @@ static void barrier_and_shootdown(enum vmm_flags flags, vaddr_t virt) {
 
     if (!(flags & VMM_FLAG_NO_TLB_SHOOTDOWN))
         tlb_shootdown(virt, true);
+}
+
+static inline uint64_t pt_index(uintptr_t virt, int level) {
+    return (virt >> (PT_SHIFT_L4 - level * PT_STRIDE)) & PT_INDEX_MASK;
+}
+
+static inline struct page_table *pt_next_table(pte_t entry) {
+    return (struct page_table *) ((entry & PAGE_PHYS_MASK) +
+                                  global.hhdm_offset);
+}
+
+static inline pte_t pt_make_table(paddr_t phys, uint64_t flags) {
+    return phys | PAGE_PRESENT | PAGE_WRITE | flags;
+}
+
+static inline pte_t pt_make_page(paddr_t phys, uint64_t flags) {
+    return (phys & PAGE_PHYS_MASK) | flags | PAGE_PRESENT;
+}
+
+static inline pte_t pt_make_2mb(paddr_t phys, uint64_t flags) {
+    return (phys & PAGE_PHYS_MASK) | flags | PAGE_PRESENT | PAGE_2MB_page;
+}
+
+static bool pt_walk_to_level(struct pt_walk *w, uintptr_t virt,
+                             int target_level, bool create) {
+    w->tables[0] = kernel_pml4;
+
+    for (int level = 0; level < target_level; level++) {
+        uint64_t index = pt_index(virt, level);
+        pte_t *entry = &w->tables[level]->entries[index];
+
+        w->irqls[level] = pte_lock(entry);
+        w->entries[level] = entry;
+
+        if (!ENTRY_PRESENT(*entry)) {
+            if (!create)
+                return false;
+
+            if (pte_init(entry, 0) < 0)
+                return false;
+        }
+
+        w->tables[level + 1] = pt_next_table(*entry);
+        w->depth = level + 1;
+    }
+
+    return true;
 }
 
 /* TODO: */
@@ -102,16 +192,6 @@ uint64_t sub_offset(uint64_t a) {
     return a - global.hhdm_offset;
 }
 
-static inline struct page_table *alloc_pt(void) {
-    paddr_t phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
-    if (!phys)
-        return NULL;
-
-    void *virt = (void *) (phys + global.hhdm_offset);
-    memset(virt, 0, PAGE_SIZE);
-    return virt;
-}
-
 uintptr_t vmm_make_user_pml4(void) {
     struct page_table *user_pml4 = alloc_pt();
     if (!user_pml4) {
@@ -119,7 +199,7 @@ uintptr_t vmm_make_user_pml4(void) {
     }
     memset(user_pml4, 0, PAGE_SIZE);
 
-    for (int i = KERNEL_PML4_START_INDEX; i < 512; i++) {
+    for (int i = KERNEL_PML4_START_INDEX; i < PT_ENTRIES; i++) {
         user_pml4->entries[i] = kernel_pml4->entries[i];
     }
 
@@ -132,7 +212,7 @@ void vmm_init(struct limine_memmap_response *memmap,
     if (!kernel_pml4)
         panic("Could not allocate space for kernel PML4\n");
 
-    kernel_pml4_phys = (uintptr_t) kernel_pml4 - global.hhdm_offset;
+    uintptr_t kernel_pml4_phys = (uintptr_t) kernel_pml4 - global.hhdm_offset;
     memset(kernel_pml4, 0, PAGE_SIZE);
 
     uint64_t kernel_phys_start = xa->physical_base;
@@ -140,7 +220,7 @@ void vmm_init(struct limine_memmap_response *memmap,
     uint64_t kernel_virt_end = (uint64_t) &__kernel_virt_end;
     uint64_t kernel_size = kernel_virt_end - kernel_virt_start;
 
-    paddr_t dummy_phys = pmm_alloc_pages(1, ALLOC_FLAGS_DEFAULT);
+    paddr_t dummy_phys = pmm_alloc_page();
     uint8_t *dummy_virt = (uint8_t *) (dummy_phys + global.hhdm_offset);
     memset(dummy_virt, 0xFF, PAGE_SIZE);
 
@@ -148,7 +228,7 @@ void vmm_init(struct limine_memmap_response *memmap,
 
     for (uint64_t i = 0; i < kernel_size; i += PAGE_SIZE) {
         e = vmm_map_page(kernel_virt_start + i, kernel_phys_start + i,
-                         PAGING_WRITE | PAGING_PRESENT, VMM_FLAG_NONE);
+                         PAGE_WRITE | PAGE_PRESENT, VMM_FLAG_NONE);
         if (e < 0)
             panic("Error %s whilst mapping kernel\n", errno_to_str(e));
     }
@@ -157,7 +237,7 @@ void vmm_init(struct limine_memmap_response *memmap,
          addr += PAGE_SIZE) {
         uint64_t shadow_addr = ASAN_SHADOW_OFFSET + (addr >> ASAN_SHADOW_SCALE);
         shadow_addr = PAGE_ALIGN_DOWN(shadow_addr);
-        vmm_map_page(shadow_addr, dummy_phys, PAGING_PRESENT | PAGING_WRITE,
+        vmm_map_page(shadow_addr, dummy_phys, PAGE_PRESENT | PAGE_WRITE,
                      VMM_FLAG_NONE);
     }
 
@@ -172,10 +252,10 @@ void vmm_init(struct limine_memmap_response *memmap,
         uint64_t base = entry->base;
         uint64_t len = entry->length;
         uint64_t end = base + len;
-        uint64_t flags = PAGING_PRESENT | PAGING_WRITE;
+        uint64_t flags = PAGE_PRESENT | PAGE_WRITE;
 
         if (entry->type == LIMINE_MEMMAP_FRAMEBUFFER) {
-            flags |= PAGING_WRITETHROUGH;
+            flags |= PAGE_WRITETHROUGH;
         }
 
         uint64_t phys = base;
@@ -202,36 +282,16 @@ void vmm_init(struct limine_memmap_response *memmap,
 }
 
 static inline bool vmm_is_table_empty(struct page_table *table) {
-    for (int i = 0; i < 512; i++) {
-        if (table->entries[i] & PAGING_PRESENT)
+    for (int i = 0; i < PT_ENTRIES; i++) {
+        if (ENTRY_PRESENT(table->entries[i]))
             return false;
     }
     return true;
 }
 
-static enum errno pte_init(pte_t *entry, uint64_t flags) {
-    struct page_table *new_table = alloc_pt();
-    if (!new_table)
-        return ERR_NO_MEM;
-
-    uintptr_t new_table_phys = (uintptr_t) new_table - global.hhdm_offset;
-    memset(new_table, 0, PAGE_SIZE);
-    *entry = new_table_phys | PAGING_PRESENT | PAGING_WRITE | flags;
-    return ERR_OK;
-}
-
-enum irql pte_lock(pte_t *pt) {
-    enum pte_lock_result out;
-    return pte_lock_irql((void *) pt, &out);
-}
-
-void pte_unlock(pte_t *pt, enum irql irql) {
-    pte_unlock_irql((void *) pt, irql);
-}
-
 enum errno vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags,
                             enum vmm_flags vflags) {
-    if (virt == 0 || (virt & 0x1FFFFF) || (phys & 0x1FFFFF))
+    if (virt == 0 || !IS_ALIGNED(virt, PAGE_2MB) || !IS_ALIGNED(phys, PAGE_2MB))
         panic(
             "vmm_map_2mb_page: addresses must be 2MiB aligned and non-zero\n");
 
@@ -253,7 +313,7 @@ enum errno vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags,
             if ((ret = pte_init(entry, 0)) < 0)
                 goto out;
 
-        tables[level + 1] = (struct page_table *) ((*entry & PAGING_PHYS_MASK) +
+        tables[level + 1] = (struct page_table *) ((*entry & PAGE_PHYS_MASK) +
                                                    global.hhdm_offset);
     }
 
@@ -265,7 +325,7 @@ enum errno vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags,
         barrier_and_shootdown(vflags, virt);
 
     *last_entry =
-        (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT | PAGING_2MB_page;
+        (phys & PAGE_PHYS_MASK) | flags | PAGE_PRESENT | PAGE_2MB_page;
 
     pte_unlock(last_entry, last_irql);
 
@@ -297,7 +357,7 @@ void vmm_unmap_2mb_page(uintptr_t virt, enum vmm_flags vflags) {
             goto out;
 
         tables[level + 1] =
-            (struct page_table *) ((*entries[level] & PAGING_PHYS_MASK) +
+            (struct page_table *) ((*entries[level] & PAGE_PHYS_MASK) +
                                    global.hhdm_offset);
     }
 
@@ -307,7 +367,7 @@ void vmm_unmap_2mb_page(uintptr_t virt, enum vmm_flags vflags) {
 
     enum irql last_irql = pte_lock(last_entry);
 
-    *last_entry &= ~PAGING_PRESENT;
+    *last_entry &= ~PAGE_PRESENT;
 
     barrier_and_shootdown(vflags, virt);
 
@@ -352,7 +412,7 @@ enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags,
             if ((ret = pte_init(entry, 0)) < 0)
                 goto out;
 
-        tables[level + 1] = (struct page_table *) ((*entry & PAGING_PHYS_MASK) +
+        tables[level + 1] = (struct page_table *) ((*entry & PAGE_PHYS_MASK) +
                                                    global.hhdm_offset);
     }
 
@@ -364,7 +424,7 @@ enum errno vmm_map_page(uintptr_t virt, uintptr_t phys, uint64_t flags,
     if (ENTRY_PRESENT(*last_entry))
         barrier_and_shootdown(vflags, virt);
 
-    *last_entry = (phys & PAGING_PHYS_MASK) | flags | PAGING_PRESENT;
+    *last_entry = (phys & PAGE_PHYS_MASK) | flags | PAGE_PRESENT;
 
     pte_unlock(last_entry, last_irql);
 
@@ -393,7 +453,7 @@ void vmm_unmap_page(uintptr_t virt, enum vmm_flags vflags) {
             goto out;
 
         tables[level + 1] =
-            (struct page_table *) ((*entries[level] & PAGING_PHYS_MASK) +
+            (struct page_table *) ((*entries[level] & PAGE_PHYS_MASK) +
                                    global.hhdm_offset);
     }
 
@@ -403,7 +463,7 @@ void vmm_unmap_page(uintptr_t virt, enum vmm_flags vflags) {
 
     enum irql last_irql = pte_lock(last_entry);
 
-    *last_entry &= ~PAGING_PRESENT;
+    *last_entry &= ~PAGE_PRESENT;
 
     barrier_and_shootdown(vflags, virt);
 
@@ -446,14 +506,14 @@ uintptr_t vmm_get_phys(uintptr_t virt, enum vmm_flags vflags) {
             goto cleanup;
         }
 
-        if (level == 2 && (*entry & PAGING_2MB_page)) {
-            uintptr_t phys_base = *entry & PAGING_2MB_PHYS_MASK;
+        if (level == 2 && (*entry & PAGE_2MB_page)) {
+            uintptr_t phys_base = *entry & PAGE_2MB_PHYS_MASK;
             uintptr_t offset = virt & (PAGE_2MB - 1);
             phys = phys_base + offset;
             goto cleanup;
         }
 
-        tables[level + 1] = (struct page_table *) ((*entry & PAGING_PHYS_MASK) +
+        tables[level + 1] = (struct page_table *) ((*entry & PAGE_PHYS_MASK) +
                                                    global.hhdm_offset);
     }
 
@@ -466,7 +526,7 @@ uintptr_t vmm_get_phys(uintptr_t virt, enum vmm_flags vflags) {
         goto cleanup;
     }
 
-    uintptr_t phys_base = *entry & PAGING_PHYS_MASK;
+    uintptr_t phys_base = *entry & PAGE_PHYS_MASK;
     uintptr_t offset = virt & 0xFFF;
     phys = phys_base + offset;
     pte_unlock(entry, last_irql);
@@ -489,7 +549,7 @@ uintptr_t vmm_get_phys_unsafe(uintptr_t virt) {
         if (!ENTRY_PRESENT(*entry))
             goto err;
 
-        current_table = (struct page_table *) ((*entry & PAGING_PHYS_MASK) +
+        current_table = (struct page_table *) ((*entry & PAGE_PHYS_MASK) +
                                                global.hhdm_offset);
     }
 
@@ -499,14 +559,14 @@ uintptr_t vmm_get_phys_unsafe(uintptr_t virt) {
     if (!ENTRY_PRESENT(*entry))
         goto err;
 
-    if (*entry & PAGING_2MB_page) {
-        uintptr_t phys_base = *entry & PAGING_2MB_PHYS_MASK;
+    if (*entry & PAGE_2MB_page) {
+        uintptr_t phys_base = *entry & PAGE_2MB_PHYS_MASK;
         uintptr_t offset = virt & (PAGE_2MB - 1);
         return phys_base + offset;
     }
 
-    current_table = (struct page_table *) ((*entry & PAGING_PHYS_MASK) +
-                                           global.hhdm_offset);
+    current_table =
+        (struct page_table *) ((*entry & PAGE_PHYS_MASK) + global.hhdm_offset);
 
     uint64_t L1 = (virt >> 12) & 0x1FF;
     entry = &current_table->entries[L1];
@@ -514,7 +574,7 @@ uintptr_t vmm_get_phys_unsafe(uintptr_t virt) {
     if (!ENTRY_PRESENT(*entry))
         goto err;
 
-    return (*entry & PAGING_PHYS_MASK) + (virt & 0xFFF);
+    return (*entry & PAGE_PHYS_MASK) + (virt & 0xFFF);
 
 err:
     return (uintptr_t) -1;
@@ -538,7 +598,7 @@ void *vmm_map_phys(uint64_t addr, uint64_t len, uint64_t flags,
 
     for (uint64_t i = 0; i < total_pages; i++) {
         vmm_map_page(virt_start + i * PAGE_SIZE, phys_start + i * PAGE_SIZE,
-                     PAGING_PRESENT | PAGING_WRITE | flags, vflags);
+                     PAGE_PRESENT | PAGE_WRITE | flags, vflags);
     }
 
     return (void *) (virt_start + offset);

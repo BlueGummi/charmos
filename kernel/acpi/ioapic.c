@@ -81,7 +81,7 @@ void ioapic_init(void) {
             ioapic.id = ioapic_entry->id;
             ioapic.gsi_base = ioapic_entry->gsi_base;
             ioapic.mmio_base = vmm_map_phys(ioapic_entry->address, 0x20,
-                                            PAGING_UNCACHABLE, VMM_FLAG_NONE);
+                                            PAGE_UNCACHABLE, VMM_FLAG_NONE);
 
             log_info_global(LOG_HANDLE(ioapic),
                             "ID: %u, GSI Base: %u, MMIO: %p", ioapic.id,

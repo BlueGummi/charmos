@@ -278,7 +278,7 @@ void *xhci_map_mmio(uint8_t bus, uint8_t slot, uint8_t func) {
     uint32_t size = ~(size_mask & ~0xF) + 1;
 
     uint32_t phys_addr = original_bar0 & ~0xF;
-    return vmm_map_phys(phys_addr, size, PAGING_UNCACHABLE, VMM_FLAG_NONE);
+    return vmm_map_phys(phys_addr, size, PAGE_UNCACHABLE, VMM_FLAG_NONE);
 }
 
 struct xhci_device *xhci_device_create(void *mmio) {

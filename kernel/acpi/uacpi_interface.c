@@ -52,7 +52,7 @@ uacpi_status uacpi_kernel_get_rsdp(uacpi_phys_addr *out_rsdp_address) {
 }
 
 void *uacpi_kernel_map(uacpi_phys_addr addr, uacpi_size len) {
-    void *ret = vmm_map_phys(addr, len, PAGING_UNCACHABLE, VMM_FLAG_NONE);
+    void *ret = vmm_map_phys(addr, len, PAGE_UNCACHABLE, VMM_FLAG_NONE);
     return ret;
 }
 

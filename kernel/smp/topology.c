@@ -3,6 +3,8 @@
 #include <irq/idt.h>
 #include <kassert.h>
 #include <limine.h>
+#include <math/div.h>
+#include <math/min_max.h>
 #include <math/popcount.h>
 #include <mem/alloc.h>
 #include <mem/numa.h>
@@ -26,7 +28,7 @@ static void cpu_mask_print(const struct cpu_mask *m) {
     if (!m->uses_large) {
         printf(BOLD_STR("0x%llx"), (uint64_t) m->small);
     } else {
-        size_t nwords = (m->nbits + 63) / 64;
+        size_t nwords = DIV_ROUND_UP(m->nbits, 64);
         for (size_t i = 0; i < nwords; i++)
             printf(BOLD_STR("%016llx"), (uint64_t) m->large[nwords - 1 - i]);
     }
@@ -119,7 +121,7 @@ bool cpu_mask_init(struct cpu_mask *m, size_t nbits) {
     }
 
     m->uses_large = true;
-    size_t nwords = (nbits + 63) / 64;
+    size_t nwords = DIV_ROUND_UP(nbits, 64);
     m->large = kzalloc(sizeof(uint64_t) * nwords);
 
     if (!m->large)
@@ -132,7 +134,7 @@ size_t cpu_mask_popcount(struct cpu_mask *m) {
     if (!m->uses_large) {
         return popcount(atomic_load(&m->small));
     } else {
-        size_t nwords = (m->nbits + 63) / 64;
+        size_t nwords = DIV_ROUND_UP(m->nbits, 64);
         size_t acc = 0;
         for (size_t i = 0; i < nwords; i++)
             acc += popcount(atomic_load(&m->large[i]));
@@ -169,7 +171,7 @@ void cpu_mask_or(struct cpu_mask *dst, const struct cpu_mask *b) {
     if (!dst->uses_large) {
         atomic_fetch_or(&dst->small, atomic_load(&b->small));
     } else {
-        size_t nwords = (dst->nbits + 63) / 64;
+        size_t nwords = DIV_ROUND_UP(dst->nbits, 64);
         for (size_t i = 0; i < nwords; i++)
             atomic_fetch_or(&dst->large[i], atomic_load(&b->large[i]));
     }
@@ -179,7 +181,7 @@ void cpu_mask_set_all(struct cpu_mask *m) {
     if (!m->uses_large) {
         atomic_store(&m->small, UINT64_MAX);
     } else {
-        size_t nwords = (m->nbits + 63) / 64;
+        size_t nwords = DIV_ROUND_UP(m->nbits, 64);
         for (size_t i = 0; i < nwords; i++)
             atomic_store(&m->large[i], UINT64_MAX);
     }
@@ -189,7 +191,7 @@ void cpu_mask_clear_all(struct cpu_mask *m) {
     if (!m->uses_large) {
         atomic_store(&m->small, 0);
     } else {
-        size_t nwords = (m->nbits + 63) / 64;
+        size_t nwords = DIV_ROUND_UP(m->nbits, 64);
         for (size_t i = 0; i < nwords; i++)
             atomic_store(&m->large[i], 0);
     }
@@ -199,7 +201,7 @@ bool cpu_mask_empty(const struct cpu_mask *mask) {
     if (!mask->uses_large)
         return atomic_load(&mask->small) == 0;
 
-    size_t nwords = (mask->nbits + 63) / 64;
+    size_t nwords = DIV_ROUND_UP(mask->nbits, 64);
     for (size_t i = 0; i < nwords; i++)
         if (atomic_load(&mask->large[i]) != 0)
             return false;
@@ -316,7 +318,7 @@ static bool cpu_mask_intersects(const struct cpu_mask *a,
         return (a->small & b->small) != 0;
     }
 
-    size_t nwords = ((a->nbits > b->nbits ? a->nbits : b->nbits) + 63) / 64;
+    size_t nwords = DIV_ROUND_UP(MAX(a->nbits, b->nbits), 64);
     for (size_t i = 0; i < nwords; i++) {
         uint64_t wa = 0, wb = 0;
 

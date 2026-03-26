@@ -3,6 +3,7 @@
 #define SLAB_STAT_SERIES_GENERATE(name, field)                                 \
     static inline size_t slab_stat_##name##_callback(                          \
         struct stat_bucket *bucket) {                                          \
+        return 0;                                                              \
         struct slab_domain_bucket *sdb = bucket->private;                      \
         atomic_fetch_add(&sdb->field, 1);                                      \
         struct slab_domain *dom = bucket->parent->private;                     \
@@ -11,6 +12,7 @@
     }                                                                          \
                                                                                \
     static inline void slab_stat_##name(struct slab_domain *domain) {          \
+        return;                                                                \
         stat_series_record(domain->stats, /* value = */ 1,                     \
                            slab_stat_##name##_callback);                       \
     }

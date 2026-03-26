@@ -134,7 +134,7 @@ void hpet_init(void) {
     uint64_t hpet_addr = hpet->address.address;
 
     hpet_base =
-        vmm_map_phys(hpet_addr, PAGE_SIZE, PAGING_UNCACHABLE, VMM_FLAG_NONE);
+        vmm_map_phys(hpet_addr, PAGE_SIZE, PAGE_UNCACHABLE, VMM_FLAG_NONE);
 
     hpet_disable();
     hpet_write64(HPET_MAIN_COUNTER_OFFSET, 0);

@@ -1,3 +1,5 @@
+/* @title: Page Table */
+#pragma once
 #pragma once
 #include <asm.h>
 #include <irq/irq.h>
@@ -5,6 +7,15 @@
 #include <sch/irql.h>
 #include <stdatomic.h>
 #include <stdint.h>
+
+#define PT_LEVELS 4
+
+#define PT_SHIFT_L1 12
+#define PT_SHIFT_L2 21
+#define PT_SHIFT_L3 30
+#define PT_SHIFT_L4 39
+
+#define PT_STRIDE 9
 
 #define PTE_LOCK_BIT ((uint64_t) 1 << 9)
 #define PTE_DEAD_BIT ((uint64_t) 1 << 10)
@@ -44,7 +55,7 @@ static inline enum pte_lock_result pte_lock_internal(pte_atomic_t *pte) {
     for (;;) {
         uint64_t old = atomic_load_explicit(pte, memory_order_relaxed);
 
-        if (!(old & PAGING_PRESENT))
+        if (!(old & PAGE_PRESENT))
             return PTE_LOCK_NOT_PRESENT;
 
         if (old & PTE_DEAD_BIT) {

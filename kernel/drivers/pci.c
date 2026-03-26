@@ -216,7 +216,7 @@ void pci_program_msix_entry(uint8_t bus, uint8_t slot, uint8_t func,
     map_size = (map_size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
 
     void *map =
-        vmm_map_phys(map_base, map_size, PAGING_UNCACHABLE, VMM_FLAG_NONE);
+        vmm_map_phys(map_base, map_size, PAGE_UNCACHABLE, VMM_FLAG_NONE);
     if (!map) {
         pci_log(LOG_ERROR, "vmm_map_phys failed for MSI-X table");
         return;
@@ -265,7 +265,7 @@ void pci_enable_msix_on_core(uint8_t bus, uint8_t slot, uint8_t func,
         map_size = PAGE_SIZE;
     }
     void *msix_table = vmm_map_phys(bar_addr + table_offset, map_size,
-                                    PAGING_UNCACHABLE, VMM_FLAG_NONE);
+                                    PAGE_UNCACHABLE, VMM_FLAG_NONE);
 
     struct pci_msix_table_entry *entry_addr =
         (void *) msix_table +

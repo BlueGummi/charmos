@@ -133,6 +133,7 @@
 
 #include <console/printf.h>
 #include <kassert.h>
+#include <math/div.h>
 #include <math/sort.h>
 #include <mem/alloc.h>
 #include <mem/domain.h>
@@ -167,7 +168,7 @@ void *slab_map_new_page(struct slab_domain *domain, paddr_t *phys_out,
     if (domain) {
         phys = domain_alloc_from_domain(domain->domain, 1);
     } else {
-        phys = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+        phys = pmm_alloc_page();
     }
 
     *phys_out = phys;
@@ -176,6 +177,7 @@ void *slab_map_new_page(struct slab_domain *domain, paddr_t *phys_out,
         goto err;
 
     /* map three pages for the slab so that OOB writes are caught */
+    /* TODO: three pages change... */
     virt = vas_alloc(slab_vas, PAGE_SIZE * 3, PAGE_SIZE);
     if (unlikely(!virt))
         goto err;
@@ -185,9 +187,9 @@ void *slab_map_new_page(struct slab_domain *domain, paddr_t *phys_out,
      * [unmapped] [mapped] [unmapped] */
     virt += PAGE_SIZE;
 
-    uint64_t pflags = PAGING_PRESENT | PAGING_WRITE;
+    uint64_t pflags = PAGE_PRESENT | PAGE_WRITE;
     if (pageable)
-        pflags |= PAGING_PAGEABLE;
+        pflags |= PAGE_PAGEABLE;
 
     enum errno e = vmm_map_page(virt, phys, pflags, VMM_FLAG_NONE);
     if (unlikely(e < 0))
@@ -200,7 +202,7 @@ err:
         pmm_free_page(phys);
 
     if (virt)
-        vas_free(slab_vas, virt);
+        vas_free(slab_vas, virt, PAGE_SIZE * 3);
 
     return NULL;
 }
@@ -211,7 +213,7 @@ static void slab_free_virt_and_phys(vaddr_t virt, paddr_t phys) {
 
     /* go back down a PAGE_SIZE for our virt allocation */
     virt -= PAGE_SIZE;
-    vas_free(slab_vas, virt);
+    vas_free(slab_vas, virt, PAGE_SIZE * 3);
 }
 
 void slab_cache_init(size_t order, struct slab_cache *cache, uint64_t obj_size,
@@ -219,7 +221,7 @@ void slab_cache_init(size_t order, struct slab_cache *cache, uint64_t obj_size,
     cache->order = order;
     cache->obj_size = obj_size;
     cache->obj_align = align;
-    cache->obj_stride = ALIGN_UP(obj_size, align);
+    cache->obj_stride = SLAB_ALIGN_UP(obj_size, align);
     cache->pages_per_slab = 1;
     uint64_t available = PAGE_NON_SLAB_SPACE;
 
@@ -245,6 +247,9 @@ void slab_cache_init(size_t order, struct slab_cache *cache, uint64_t obj_size,
     if (cache->objs_per_slab == 0)
         panic("Slab cache cannot hold any objects per slab!\n");
 
+    cache->bitmap_bytes = SLAB_BITMAP_BYTES_FOR(cache->objs_per_slab);
+    cache->slab_metadata_size = sizeof(struct slab) + cache->bitmap_bytes;
+
     INIT_LIST_HEAD(&cache->slabs[SLAB_FREE]);
     INIT_LIST_HEAD(&cache->slabs[SLAB_PARTIAL]);
     INIT_LIST_HEAD(&cache->slabs[SLAB_FULL]);
@@ -254,9 +259,9 @@ struct slab *slab_init(struct slab *slab, struct slab_cache *parent) {
     void *page = slab;
     slab->parent_cache = parent;
     slab->pages = parent->pages_per_slab;
-    slab->bitmap = (uint8_t *) ((uint8_t *) page + sizeof(struct slab));
-    size_t bitmap_bytes = SLAB_BITMAP_BYTES_FOR(parent->objs_per_slab);
-    vaddr_t data_start = (vaddr_t) page + sizeof(struct slab) + bitmap_bytes;
+    slab->bitmap = slab_get_bitmap_location(slab);
+
+    vaddr_t data_start = (vaddr_t) page + parent->slab_metadata_size;
     data_start = SLAB_ALIGN_UP(data_start, parent->obj_align);
     slab->mem = data_start;
 
@@ -269,7 +274,7 @@ struct slab *slab_init(struct slab *slab, struct slab_cache *parent) {
     rbt_init_node(&slab->rb);
     INIT_LIST_HEAD(&slab->list);
 
-    memset(slab->bitmap, 0, bitmap_bytes);
+    memset(slab->bitmap, 0, parent->bitmap_bytes);
 
     return slab;
 }
@@ -329,25 +334,30 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
     SPINLOCK_ASSERT_HELD(&cache->lock);
     kassert(slab->state != SLAB_FULL);
 
-    for (uint64_t i = 0; i < cache->objs_per_slab; i++) {
-        uint64_t byte_idx;
-        uint8_t bit_mask;
-        slab_byte_idx_and_mask_from_idx(i, &byte_idx, &bit_mask);
+    uint64_t *bm = (uint64_t *) slab->bitmap;
+    size_t nwords = DIV_ROUND_UP(cache->objs_per_slab, 64);
 
-        kassert(byte_idx < SLAB_BITMAP_BYTES_FOR(cache->objs_per_slab));
-        if (!SLAB_BITMAP_TEST(slab->bitmap[byte_idx], bit_mask)) {
-            SLAB_BITMAP_SET(slab->bitmap[byte_idx], bit_mask);
-            slab->used += 1;
+    for (size_t w = 0; w < nwords; w++) {
+        if (bm[w] != UINT64_MAX) {
+            uint64_t free_bits = ~bm[w];
+            uint64_t bit = __builtin_ctzll(free_bits);
+            uint64_t i = w * 64 + bit;
+
+            if (i >= cache->objs_per_slab)
+                break;
+
+            SLAB_BITMAP_SET(bm[w], 1ULL << bit);
+            slab->used++;
 
             if (slab->used == cache->objs_per_slab) {
                 slab_move(cache, slab, SLAB_FULL);
             } else if (slab->used == 1) {
                 slab_move(cache, slab, SLAB_PARTIAL);
-            } /* No need to move it if the used count is in between
-               * 0 and the max -- it will be in the partial list */
+            }
 
             vaddr_t ret = slab->mem + i * cache->obj_stride;
             kassert(ret > (vaddr_t) slab && ret < (vaddr_t) slab + PAGE_SIZE);
+
             slab_check_assert(slab);
             slab_unlock(slab, irql);
             return (void *) ret;
@@ -371,7 +381,7 @@ static void slab_bitmap_free(struct slab *slab, void *obj) {
 
     uint64_t byte_idx;
     uint8_t bit_mask;
-    slab_index_and_mask_from_ptr(slab, obj, &byte_idx, &bit_mask);
+    slab_index_and_mask(slab, obj, &byte_idx, &bit_mask);
 
     if (!SLAB_BITMAP_TEST(slab->bitmap[byte_idx], bit_mask))
         return;
@@ -394,6 +404,7 @@ void slab_free_old(struct slab *slab, void *obj) {
             slab_list_del(slab);
             slab_unlock(slab, irql);
             slab_cache_unlock(cache, slab_cache_irql);
+
             uintptr_t virt = (uintptr_t) slab;
             paddr_t phys = PFN_TO_PAGE(page_get_pfn(slab->backing_page));
             slab_free_virt_and_phys(virt, phys);
@@ -415,15 +426,9 @@ static void *slab_try_alloc_from_slab_list(struct slab_cache *cache,
     struct slab *slab;
     void *ret = NULL;
 
+    /* This should never iterate more than once */
     list_for_each_safe(node, temp, list) {
         slab = slab_from_list_node(node);
-        if (slab->parent_cache != cache)
-            printf("slab %p parent %p we are %p\n", slab, slab->parent_cache,
-                   cache);
-
-        if (slab->state == SLAB_FULL)
-            printf("slab %p full\n", slab);
-
         ret = slab_alloc_from(cache, slab);
         if (ret)
             goto out;
@@ -583,10 +588,10 @@ void slab_allocator_init() {
         slab_cache_init(i, &slab_caches.caches[i], slab_class_sizes[i].size,
                         slab_class_sizes[i].align);
         slab_caches.caches[i].parent = &slab_caches;
-        slab_info(
-            "Init slab cache of size %u align %u \"%s\", %u objects per slab",
-            slab_class_sizes[i].size, slab_class_sizes[i].align,
-            slab_class_sizes[i].name, slab_caches.caches[i].objs_per_slab);
+        slab_info("Slab cache s=%u a=%u \"%s\", o=%u, w=%u",
+                  slab_class_sizes[i].size, slab_class_sizes[i].align,
+                  slab_class_sizes[i].name, slab_caches.caches[i].objs_per_slab,
+                  slab_cache_wasted_space_per_slab(&slab_caches.caches[i]));
     }
 }
 
@@ -620,9 +625,9 @@ void *kmalloc_pages_raw(struct slab_domain *parent, size_t size,
     uintptr_t phys_pages[pages];
     uint64_t allocated = 0;
 
-    page_flags_t page_flags = PAGING_PRESENT | PAGING_WRITE;
+    page_flags_t page_flags = PAGE_PRESENT | PAGE_WRITE;
     if (flags & ALLOC_FLAG_PAGEABLE)
-        page_flags |= PAGING_PAGEABLE;
+        page_flags |= PAGE_PAGEABLE;
 
     for (uint64_t i = 0; i < pages; i++) {
         uintptr_t phys = pmm_alloc_page(flags);
@@ -683,7 +688,7 @@ void slab_free_page_hdr(struct slab_page_hdr *hdr) {
         pmm_free_page(phys);
     }
 
-    vas_free(slab_vas, virt);
+    vas_free(slab_vas, virt, pages * PAGE_SIZE);
 }
 
 void slab_free_addr_to_cache(void *addr) {
@@ -877,7 +882,13 @@ void *slab_alloc(struct slab_cache *cache, enum alloc_behavior behavior,
         goto out;
     }
 
+    /* Drop the lock since we are going to do the expensive thing */
+    slab_cache_unlock(cache, irql);
+
     struct slab *slab = slab_create(cache, behavior, allow_create_new);
+
+    irql = slab_cache_lock(cache);
+
     if (!slab)
         goto out;
 

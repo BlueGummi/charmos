@@ -75,15 +75,15 @@ void pmm_late_init(void) {
     current_free_fn = domain_free;
 }
 
-paddr_t pmm_alloc_page(enum alloc_flags f) {
-    return pmm_alloc_pages(1, f);
+paddr_t pmm_alloc_page_internal(enum alloc_flags f) {
+    return pmm_alloc_pages_internal(1, f);
 }
 
 void pmm_free_page(paddr_t addr) {
     pmm_free_pages(addr, 1);
 }
 
-paddr_t pmm_alloc_pages(uint64_t count, enum alloc_flags f) {
+paddr_t pmm_alloc_pages_internal(uint64_t count, enum alloc_flags f) {
     return current_alloc_fn(count, f);
 }
 

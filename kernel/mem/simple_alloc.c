@@ -6,15 +6,15 @@
 /* simple alloc used for bootstrapping systems */
 void *simple_alloc(struct vas_space *space, size_t size) {
     size_t pages = PAGES_NEEDED_FOR(size);
-    paddr_t phys_base = pmm_alloc_pages(pages, ALLOC_FLAGS_DEFAULT);
+    paddr_t phys_base = pmm_alloc_pages(pages);
 
     vaddr_t area = vas_alloc(space, size, PAGE_SIZE);
 
     for (size_t i = 0; i < pages; i++) {
         vaddr_t virt = area + (i * PAGE_SIZE);
         paddr_t phys = phys_base + (i * PAGE_SIZE);
-        if (vmm_map_page(virt, phys, PAGING_PRESENT | PAGING_WRITE,
-                         VMM_FLAG_NONE) < 0)
+        if (vmm_map_page(virt, phys, PAGE_PRESENT | PAGE_WRITE, VMM_FLAG_NONE) <
+            0)
             panic("Could not do simple_alloc!\n");
     }
 

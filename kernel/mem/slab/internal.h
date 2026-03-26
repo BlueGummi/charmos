@@ -50,8 +50,8 @@ LOG_HANDLE_EXTERN(slab);
 
 /* Bitmap */
 #define SLAB_BITMAP_BYTES_FOR(x) ((x + 7ull) / 8ull)
-#define SLAB_BITMAP_SET(bm, mask) (bm |= (uint8_t) mask)
-#define SLAB_BITMAP_UNSET(bm, mask) (bm &= (uint8_t) ~mask)
+#define SLAB_BITMAP_SET(bm, mask) (bm |= mask)
+#define SLAB_BITMAP_UNSET(bm, mask) (bm &= ~mask)
 
 #define SLAB_ALIGN_UP(x, a) ALIGN_UP(x, a)
 
@@ -159,7 +159,7 @@ struct slab {
 
     /* Put commonly accessed fields up here to make cache happier */
     uint8_t *bitmap;
-    vaddr_t mem;
+    vaddr_t mem; /* Where does the slab data start */
     size_t used;
     struct slab_cache *parent_cache;
 
@@ -233,6 +233,8 @@ struct slab_cache {
     uint64_t obj_stride;
     size_t pages_per_slab;
     size_t order;
+    size_t slab_metadata_size;
+    size_t bitmap_bytes;
 
     struct list_head slabs[SLAB_STANDARD_STATE_COUNT];
     atomic_size_t slabs_count[SLAB_STANDARD_STATE_COUNT];
@@ -501,6 +503,11 @@ bool slab_should_enqueue_gc(struct slab *slab);
 
 void slab_switch_to_domain_allocations(void);
 
+extern struct vas_space *slab_vas;
+extern struct slab_caches slab_caches;
+extern struct slab_size_constant *slab_class_sizes;
+extern size_t slab_num_sizes;
+
 /* Recall that the EWMA formula is
  *
  * ewma_t = (ewma_(t - 1) * (1 - alpha)) + (alpha * r)
@@ -593,26 +600,40 @@ static inline void slab_move(struct slab_cache *c, struct slab *slab,
     slab_list_add(c, slab);
 }
 
-static inline void slab_byte_idx_and_mask_from_idx(uint64_t index,
-                                                   uint64_t *byte_idx_out,
-                                                   uint8_t *bitmask_out) {
+static inline void slab_byte_index_and_mask(uint64_t index,
+                                            uint64_t *byte_idx_out,
+                                            uint8_t *bitmask_out) {
     *byte_idx_out = index / 8ULL;
     *bitmask_out = (uint8_t) (1ULL << (index % 8ULL));
 }
 
-static inline void slab_index_and_mask_from_ptr(struct slab *slab, void *obj,
-                                                uint64_t *byte_idx_out,
-                                                uint8_t *bitmask_out) {
+static inline void slab_index_and_mask(struct slab *slab, void *obj,
+                                       uint64_t *byte_idx_out,
+                                       uint8_t *bitmask_out) {
     uint64_t index =
         ((vaddr_t) obj - slab->mem) / slab->parent_cache->obj_stride;
-    slab_byte_idx_and_mask_from_idx(index, byte_idx_out, bitmask_out);
+    slab_byte_index_and_mask(index, byte_idx_out, bitmask_out);
 }
-
-extern struct vas_space *slab_vas;
-extern struct slab_caches slab_caches;
-extern struct slab_size_constant *slab_class_sizes;
-extern size_t slab_num_sizes;
 
 static inline struct slab_cache *slab_caches_alloc() {
     return simple_alloc(slab_vas, sizeof(struct slab_cache) * slab_num_sizes);
+}
+
+static inline uint8_t *slab_get_bitmap_location(struct slab *s) {
+    return (uint8_t *) s + sizeof(struct slab);
+}
+
+static inline size_t
+slab_cache_wasted_space_per_slab(struct slab_cache *cache) {
+    size_t raw = PAGE_SIZE * cache->pages_per_slab;
+    size_t metadata = cache->slab_metadata_size;
+
+    /* Backpointers on non-base pages: */
+    metadata += (cache->pages_per_slab - 1) * sizeof(struct slab *);
+    metadata = SLAB_ALIGN_UP(metadata, cache->obj_align);
+
+    size_t usable = raw - metadata;
+    size_t used = cache->obj_stride * cache->objs_per_slab;
+
+    return usable - used;
 }

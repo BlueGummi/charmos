@@ -17,7 +17,7 @@
 TEST_REGISTER(pmm_alloc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
-    paddr_t p = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+    paddr_t p = pmm_alloc_page();
     TEST_ASSERT(p);
     SET_SUCCESS();
 }
@@ -25,7 +25,7 @@ TEST_REGISTER(pmm_alloc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 TEST_REGISTER(vmm_map_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
-    uint64_t p = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+    uint64_t p = pmm_alloc_page();
     TEST_ASSERT(p != 0);
     void *ptr = vmm_map_phys(p, PAGE_SIZE, 0, VMM_FLAG_NONE);
     TEST_ASSERT(ptr != NULL);
@@ -64,7 +64,7 @@ TEST_REGISTER(pmm_stress_alloc_free_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
-        pmm_stress_test_ptrs[i] = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+        pmm_stress_test_ptrs[i] = pmm_alloc_page();
         TEST_ASSERT(pmm_stress_test_ptrs[i] != 0);
     }
 
@@ -276,8 +276,9 @@ TEST_REGISTER(kmalloc_new_behavior_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 /* -------------------- Multithreaded stress test -------------------- */
 
 #define STRESS_THREADS 3
-#define STRESS_ITERS 30000
-#define MAX_LIVE_ALLOCS 64
+#define STRESS_ITERS 50000
+#define MAX_LIVE_ALLOCS 4096
+#define SHOULD_FREE true 
 
 struct stress_arg {
     int id;
@@ -329,7 +330,7 @@ static void stress_worker(void *) {
                                            ? ALLOC_BEHAVIOR_NORMAL
                                            : ALLOC_BEHAVIOR_NO_RECLAIM;
 
-        void *p = kmalloc_new(sz, flags, behavior);
+        void *p = kmalloc(sz, flags, behavior);
         if (!p)
             continue;
 
@@ -339,8 +340,9 @@ static void stress_worker(void *) {
 
         /* randomly decide where to place it */
         int idx = prng_next() % MAX_LIVE_ALLOCS;
-        if (live_ptrs[idx])
-            kfree_new(live_ptrs[idx], ALLOC_BEHAVIOR_NORMAL);
+
+        if (live_ptrs[idx] && SHOULD_FREE)
+            kfree(live_ptrs[idx], ALLOC_BEHAVIOR_NORMAL);
         live_ptrs[idx] = p;
     }
 
@@ -366,8 +368,10 @@ TEST_REGISTER(kmalloc_new_concurrency_stress_test, SHOULD_NOT_FAIL,
     for (int i = 0; i < STRESS_THREADS; ++i) {
         args[i].id = i;
         args[i].done_flag = &done[i];
-        thread_spawn("kmalloc_new_stress_worker", stress_worker, NULL)
-            ->private = &args[i];
+        struct thread *goofy =
+            thread_spawn("kmalloc_new_stress_worker", stress_worker, NULL);
+
+        goofy->private = &args[i];
     }
     irql_lower(irql);
 
@@ -435,8 +439,8 @@ TEST_REGISTER(kmalloc_new_alloc_free_sequence_test, SHOULD_NOT_FAIL,
 TEST_REGISTER(tlb_shootdown_single_cpu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
-    paddr_t p1 = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
-    paddr_t p2 = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+    paddr_t p1 = pmm_alloc_page();
+    paddr_t p2 = pmm_alloc_page();
     TEST_ASSERT(p1 && p2);
 
     void *va = vmm_map_phys(p1, PAGE_SIZE, 0, VMM_FLAG_NONE);
@@ -475,8 +479,8 @@ static void tlb_reader(void *arg) {
 TEST_REGISTER(tlb_shootdown_synchronous_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
-    paddr_t p1 = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
-    paddr_t p2 = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+    paddr_t p1 = pmm_alloc_page();
+    paddr_t p2 = pmm_alloc_page();
     TEST_ASSERT(p1 && p2);
 
     void *va = vmm_map_phys(p1, PAGE_SIZE, 0, VMM_FLAG_NONE);
@@ -491,7 +495,7 @@ TEST_REGISTER(tlb_shootdown_synchronous_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     }
 
     vmm_unmap_virt(va, PAGE_SIZE, VMM_FLAG_NONE);
-    vmm_map_page((vaddr_t) va, p2, PAGING_WRITE, VMM_FLAG_NONE);
+    vmm_map_page((vaddr_t) va, p2, PAGE_WRITE, VMM_FLAG_NONE);
     *(volatile uint64_t *) va = 0xBBBBBBBB;
 
     atomic_store(&tlb_go, true);
@@ -511,8 +515,8 @@ TEST_REGISTER(tlb_shootdown_async_eventual_test, SHOULD_NOT_FAIL,
               IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
-    paddr_t p1 = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
-    paddr_t p2 = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+    paddr_t p1 = pmm_alloc_page();
+    paddr_t p2 = pmm_alloc_page();
     TEST_ASSERT(p1 && p2);
 
     void *va = vmm_map_phys(p1, PAGE_SIZE, 0, VMM_FLAG_NONE);
@@ -539,7 +543,7 @@ TEST_REGISTER(tlb_shootdown_async_eventual_test, SHOULD_NOT_FAIL,
 TEST_REGISTER(tlb_shootdown_flush_all_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     ABORT_IF_RAM_LOW();
 
-    paddr_t p = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+    paddr_t p = pmm_alloc_page();
     TEST_ASSERT(p);
 
     void *va = vmm_map_phys(p, PAGE_SIZE, 0, VMM_FLAG_NONE);
@@ -550,7 +554,7 @@ TEST_REGISTER(tlb_shootdown_flush_all_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     }
 
     /* Now do a real remap */
-    paddr_t p2 = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+    paddr_t p2 = pmm_alloc_page();
     vmm_unmap_virt(va, PAGE_SIZE, VMM_FLAG_NONE);
     va = vmm_map_phys(p2, PAGE_SIZE, 0, VMM_FLAG_NONE);
     *(volatile uint64_t *) va = 0xDEADBEEF;
@@ -562,7 +566,7 @@ TEST_REGISTER(tlb_shootdown_flush_all_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 }
 
 static void tlb_spammer(void *) {
-    paddr_t p = pmm_alloc_page(ALLOC_FLAGS_DEFAULT);
+    paddr_t p = pmm_alloc_page();
     void *va = vmm_map_phys(p, PAGE_SIZE, 0, VMM_FLAG_NONE);
 
     for (int i = 0; i < 1000; i++) {

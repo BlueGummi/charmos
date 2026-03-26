@@ -15,8 +15,7 @@ static LOG_HANDLE_DECLARE_DEFAULT(lapic);
 
 void lapic_init(void) {
     uintptr_t lapic_phys = rdmsr(IA32_APIC_BASE_MSR) & IA32_APIC_BASE_MASK;
-    lapic =
-        vmm_map_phys(lapic_phys, PAGE_SIZE, PAGING_UNCACHABLE, VMM_FLAG_NONE);
+    lapic = vmm_map_phys(lapic_phys, PAGE_SIZE, PAGE_UNCACHABLE, VMM_FLAG_NONE);
 }
 
 void lapic_timer_init(cpu_id_t core_id) {

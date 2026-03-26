@@ -182,6 +182,15 @@ void log_site_destroy(struct log_site *site);
                       (uintptr_t) __builtin_return_address(0),                 \
                       PP_NARG(__VA_ARGS__), fmt, ##__VA_ARGS__)
 
+#define log_warn_once(fmt, ...)                                                \
+    do {                                                                       \
+        static bool done_internal_log = false;                                 \
+        if (!done_internal_log) {                                              \
+            log_msg(LOG_WARN, fmt, ##__VA_ARGS__);                             \
+            done_internal_log = true;                                          \
+        }                                                                      \
+    } while (0)
+
 #define log_global(handle, lvl, fmt, ...)                                      \
     log_emit_internal(LOG_SITE(global), handle, lvl, __func__, __FILE__,       \
                       __LINE__, (uintptr_t) __builtin_return_address(0),       \

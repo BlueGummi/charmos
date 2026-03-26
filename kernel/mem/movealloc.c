@@ -62,7 +62,7 @@ void movealloc(size_t new_domain, void *ptr, enum vmm_flags flags) {
         void *pvaddr = (void *) vaddr;
         void *pnew_virt = (void *) new_virt;
         memcpy(pnew_virt, pvaddr, PAGE_SIZE);
-        vmm_map_page(vaddr, new_phys, PAGING_WRITE | PAGING_PRESENT, flags);
+        vmm_map_page(vaddr, new_phys, PAGE_WRITE | PAGE_PRESENT, flags);
         kassert(vmm_get_phys(vaddr, flags) == new_phys);
 
         phys_addrs[i] = paddr;

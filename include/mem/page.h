@@ -8,23 +8,23 @@
 #define PAGE_SIZE 4096ULL
 #define PAGE_2MB 0x200000
 
-#define PAGING_PRESENT (0x1UL)
-#define PAGING_WRITE (0x2UL)
-#define PAGING_USER_ALLOWED (0x4UL)
-#define PAGING_ALL 0xFFFUL
-#define PAGING_XD (1UL << 63) // E(x)ecute (D)isable
-#define PAGING_PHYS_MASK (0x00FFFFFFF000UL)
-#define PAGING_PAGE_SIZE (1UL << 7)
-#define PAGING_UNCACHABLE ((1UL << 4) | PAGING_WRITE)
-#define PAGING_NO_FLAGS (0)
-#define PAGING_WRITETHROUGH (1UL << 3)
-#define PAGING_2MB_page (1ULL << 7)
+#define PAGE_PRESENT (0x1UL)
+#define PAGE_WRITE (0x2UL)
+#define PAGE_USER_ALLOWED (0x4UL)
+#define PAGE_ALL 0xFFFUL
+#define PAGE_XD (1UL << 63) // E(x)ecute (D)isable
+#define PAGE_PHYS_MASK (0x00FFFFFFF000UL)
+#define PAGE_PAGE_SIZE (1UL << 7)
+#define PAGE_UNCACHABLE ((1UL << 4) | PAGE_WRITE)
+#define PAGE_NO_FLAGS (0)
+#define PAGE_WRITETHROUGH (1UL << 3)
+#define PAGE_2MB_page (1ULL << 7)
 
 /* TODO: */
-#define PAGING_PAGEABLE (0)
-#define PAGING_MOVABLE (0)
+#define PAGE_PAGEABLE (0)
+#define PAGE_MOVABLE (0)
 
-#define PAGING_2MB_PHYS_MASK (~((uintptr_t) PAGE_2MB - 1))
+#define PAGE_2MB_PHYS_MASK (~((uintptr_t) PAGE_2MB - 1))
 #define PAGE_ALIGN_DOWN(x) ALIGN_DOWN((uintptr_t) (x), PAGE_SIZE)
 #define PAGE_ALIGN_UP(x) ALIGN_UP((uintptr_t) (x), PAGE_SIZE)
 
@@ -35,6 +35,14 @@
 
 #define VMM_MAP_BASE 0xFFFFA00000200000
 #define VMM_MAP_LIMIT 0xFFFFA00010000000
+#define PT_ENTRIES 512
+#define PT_INDEX_MASK 0x1FFULL
+
+#define PAGE_4K_SHIFT 12
+#define PAGE_2M_SHIFT 21
+#define PAGE_1G_SHIFT 30
+#define PAGE_4K_MASK ((1ULL << PAGE_4K_SHIFT) - 1)
+#define PAGE_2M_MASK ((1ULL << PAGE_2M_SHIFT) - 1)
 
 struct page {
     uint8_t is_free : 1;
