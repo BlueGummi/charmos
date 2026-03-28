@@ -188,7 +188,7 @@ typedef int32_t rt_weight_t;
  *  1 means "absolutely urgent, things
  *  keep missing, problems keep
  *  happening"... */
-typedef fx16_16_t rt_urgency_t;
+typedef fx32_32_t rt_urgency_t;
 
 struct rt_scheduler;
 

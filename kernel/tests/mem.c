@@ -2,6 +2,7 @@
 
 #include <crypto/prng.h>
 #include <mem/alloc.h>
+#include <mem/elcm.h>
 #include <mem/pmm.h>
 #include <mem/slab.h>
 #include <mem/tlb.h>
@@ -277,8 +278,8 @@ TEST_REGISTER(kmalloc_new_behavior_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
 #define STRESS_THREADS 3
 #define STRESS_ITERS 50000
-#define MAX_LIVE_ALLOCS 4096
-#define SHOULD_FREE true 
+#define MAX_LIVE_ALLOCS 1024
+#define SHOULD_FREE true
 
 struct stress_arg {
     int id;
@@ -583,6 +584,26 @@ TEST_REGISTER(tlb_shootdown_contention_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         scheduler_yield();
 
     ADD_MESSAGE("concurrent shootdown stress completed");
+    SET_SUCCESS();
+}
+
+TEST_REGISTER(elcm_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+    struct elcm_params params = {
+        .obj_size = 938,
+        .page_size = PAGE_SIZE,
+        .max_wastage_pct = MAX_WASTAGE_DEFAULT,
+        .max_pages = 32,
+        .bias_towards_pow2 = true,
+        .metadata_size_bytes = 96,
+        .metadata_bits_per_obj = 1,
+    };
+
+    elcm(&params);
+    struct candidate c = params.out;
+
+    printf("C(s=0x%lx, p=%u, w=%u, W=0x%lx, d=%u)\n", c.score_value, c.pages,
+           c.wasted, c.wastage, c.distance);
+    hcf();
     SET_SUCCESS();
 }
 

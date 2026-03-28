@@ -8,7 +8,7 @@
 #include <structures/rbt.h>
 #include <thread/thread_types.h>
 
-typedef fx16_16_t climb_pressure_t;
+typedef fx32_32_t climb_pressure_t;
 struct climb_handle;
 
 #define CLIMB_BOOST_LEVELS 20
@@ -45,7 +45,7 @@ struct climb_thread_state {
 
     /* boost */
     int32_t wanted_boost;    /* 0..20, how much this thread "wants" */
-    fx16_16_t boost_ewma;    /* EWMA of the wanted_boost_raw */
+    fx32_32_t boost_ewma;    /* EWMA of the wanted_boost_raw */
     int32_t effective_boost; /* How much boosted (derived from wanted_boost_raw)
                               * this thread "gets". This exists because CLIMB
                               * will take into account the existence of other

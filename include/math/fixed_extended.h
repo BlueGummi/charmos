@@ -2,9 +2,9 @@
 #pragma once
 #include <math/fixed.h>
 
-fx16_16_t fx_poly_eval(fx16_16_t x, const fx16_16_t *c, int n);
-fx16_16_t fx_exp(fx16_16_t x);
-fx16_16_t fx_log(fx16_16_t x);
-fx16_16_t fx_sin(fx16_16_t angle);
-fx16_16_t fx_cos(fx16_16_t angle);
-void fx_sincos(fx16_16_t angle, fx16_16_t *sin_out, fx16_16_t *cos_out);
+fx32_32_t fx_poly_eval(fx32_32_t x, const fx32_32_t *c, int n);
+fx32_32_t fx_exp(fx32_32_t x);
+fx32_32_t fx_log(fx32_32_t x);
+fx32_32_t fx_sin(fx32_32_t angle);
+fx32_32_t fx_cos(fx32_32_t angle);
+void fx_sincos(fx32_32_t angle, fx32_32_t *sin_out, fx32_32_t *cos_out);

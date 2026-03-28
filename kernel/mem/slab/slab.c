@@ -945,8 +945,6 @@ void *kmalloc_new(size_t size, enum alloc_flags flags,
     kmalloc_validate_params(size, flags, behavior);
     void *ret = NULL;
 
-    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
-
     struct slab_domain *local_dom = slab_domain_local();
     struct slab_percpu_cache *pcpu = slab_percpu_cache_local();
     struct slab_domain *selected_dom = local_dom;
@@ -1008,7 +1006,6 @@ exit:
     if (unlikely(!ret))
         slab_stat_alloc_failure(local_dom);
 
-    irql_lower(irql);
     return ret;
 }
 
@@ -1186,8 +1183,6 @@ void kfree_new(void *ptr, enum alloc_behavior behavior) {
     if (!ptr)
         return;
 
-    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
-
     size_t size = ksize(ptr);
     int32_t idx = slab_size_to_index(size);
     struct slab_domain *local_domain = slab_domain_local();
@@ -1203,7 +1198,7 @@ void kfree_new(void *ptr, enum alloc_behavior behavior) {
     /* nice, we freed it to the magazine and we are all good now -- fastpath,
      * so we don't try GC or any funny business */
     if (kfree_try_free_to_magazine(pcpu, ptr, size))
-        goto exit;
+        return;
 
     /* did not free to magazine - this is an alloc from a slab */
     struct slab *slab = slab_for_ptr(ptr);
@@ -1212,10 +1207,10 @@ void kfree_new(void *ptr, enum alloc_behavior behavior) {
     /* did not enqueue into the freequeue... try putting it on
      * any magazine... we acquire the trylock() here... */
     if (kfree_try_put_on_percpu_caches(owner, ptr, size))
-        goto exit;
+        return;
 
     if (kfree_free_queue_enqueue(owner, ptr))
-        goto exit;
+        return;
 
     /* could not put on percpu cache or freequeue, now we free to
      * the slab cache that owns this data */
@@ -1231,9 +1226,6 @@ void kfree_new(void *ptr, enum alloc_behavior behavior) {
 garbage_collect:
 
     slab_free_queue_drain_on_free(local_domain, pcpu, behavior);
-
-exit:
-    irql_lower(irql);
 }
 
 static void *kmalloc_init(size_t size, enum alloc_flags f,

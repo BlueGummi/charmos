@@ -54,8 +54,8 @@ static inline struct rbt *climb_tree_local() {
  *
  *  2000 +-------------------------------------------------------------------+
  *       |*               +                +                +               *|
- *       |**                                    floor((x ** 2) * 20) ********|
- *       |  *                                                             *  |
+ *       |** floor((p ** CLIMB_PRESSURE_EXPONENT) * CLIMB_BOOST_LEVEL_MAX) * |
+ *       |  *                                                             ** |
  *       |  *                                                             *  |
  *  1500 |-+ **                                                         ** +-|
  *       |    *                                                         *    |
