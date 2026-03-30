@@ -93,7 +93,7 @@ enum alloc_flags : uint16_t {
 
 /* TODO: Think about updating this... We used to use two different bits
  * to represent ON/OFF for debug... this is no longer the case */
-static inline bool alloc_flags_valid(uint16_t flags) {
+static inline bool alloc_flags_valid(enum alloc_flags flags) {
     if ((flags & ALLOC_FLAG_FLEXIBLE_LOCALITY) &&
         (flags & ALLOC_FLAG_STRICT_LOCALITY))
         return false;
@@ -116,12 +116,12 @@ static inline bool alloc_flags_valid(uint16_t flags) {
 #define ALLOC_BEHAVIOR_FLAG_SHIFT 4
 #define ALLOC_BEHAVIOR_MASK (0xF)
 
-/* alloc_behavior: 8 bits for a behavior and flags
+/* alloc_behavior: 16 bits for a behavior and flags
  *
- *      ┌────────────┐
- * Bits │ 7..4  3..0 │
- * Use  │ ***F  %%%% │
- *      └────────────┘
+ *      ┌───────────────────────────┐
+ * Bits │ 15..12  11..8  7..4  3..0 │
+ * Use  │  ****    ****  ***F  %%%% │
+ *      └───────────────────────────┘
  *
  * %%%% - Allocation behavior bits
  *
@@ -135,7 +135,7 @@ static inline bool alloc_flags_valid(uint16_t flags) {
 
 /* Allocation behavior restricts flags. If non-faulting behaviors
  * are selected, then the allocator cannot allocate pageable memory */
-enum alloc_behavior : uint8_t {
+enum alloc_behavior : uint16_t {
     ALLOC_BEHAVIOR_NORMAL,
     ALLOC_BEHAVIOR_ATOMIC,
     ALLOC_BEHAVIOR_NO_WAIT,

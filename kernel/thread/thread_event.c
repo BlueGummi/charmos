@@ -467,7 +467,7 @@ static bool set_state_and_update_reason(
     bool already_locked, enum thread_wait_type type, bool exit_if_match) {
     /* do not preempt us. this is raised to HIGH because it is sometimes
      * called from HIGH and we can't "raise from HIGH to DISPATCH" */
-    enum irql irql;
+    enum irql irql = IRQL_NONE;
     bool aok = true;
 
     if (!already_locked)

@@ -522,72 +522,61 @@ void slab_allocator_init() {
     struct slab_size_constant *start = __skernel_slab_sizes;
     struct slab_size_constant *end = __ekernel_slab_sizes;
 
-    struct list_head sort_list = LIST_HEAD_INIT(sort_list);
-    struct list_head aggregate_list = LIST_HEAD_INIT(aggregate_list);
+    size_t dyn_count = end - start;
+    size_t total_input = dyn_count + SLAB_CLASS_CONST_COUNT;
 
-    for (struct slab_size_constant *ssc = start; ssc < end; ssc++)
-        list_add_tail(&ssc->sort_list, &sort_list);
+    struct slab_size_constant *tmp =
+        simple_alloc(slab_vas, total_input * sizeof(*tmp));
+    kassert(tmp);
 
-    /* go through each node on the sort list. if its size does not already
-     * exist in the aggregate list, add it in there */
-    struct slab_size_constant *iter, *check, *tmp;
-    size_t num_dyn_sizes = 0;
-    list_for_each_entry(iter, &sort_list, sort_list) {
-        bool exists = false;
-        list_for_each_entry_safe(check, tmp, &aggregate_list, list) {
-            if (iter->size == check->size) {
-                log_dupes(check->name, iter->name, iter->size);
-                exists = true;
-                break;
-            }
-        }
-        for (size_t i = 0; i < SLAB_CLASS_CONST_COUNT; i++) {
-            size_t size = slab_class_sizes_const[i];
-            if (size == iter->size) {
-                log_dupes("default slab size", iter->name, size);
-                exists = true;
-                break;
-            }
-        }
-        if (!exists) {
-            list_add_tail(&iter->list, &aggregate_list);
-            num_dyn_sizes++;
-        }
-    }
+    size_t idx = 0;
 
-    slab_num_sizes = num_dyn_sizes + SLAB_CLASS_CONST_COUNT;
-    size_t size = slab_num_sizes * sizeof(struct slab_size_constant);
-
-    slab_class_sizes = simple_alloc(slab_vas, size);
-
-    /* setup constants */
     for (size_t i = 0; i < SLAB_CLASS_CONST_COUNT; i++) {
-        slab_class_sizes[i].name = "default slab size";
-        slab_class_sizes[i].size = slab_class_sizes_const[i];
-        slab_class_sizes[i].align = SLAB_OBJ_ALIGN_DEFAULT;
+        tmp[idx++] = (struct slab_size_constant){
+            .name = "default slab size",
+            .size = slab_class_sizes_const[i],
+            .align = SLAB_OBJ_ALIGN_DEFAULT,
+        };
     }
 
-    /* add dynamic ones */
-    for (size_t i = 0; i < num_dyn_sizes; i++) {
-        size_t scs_idx = i + SLAB_CLASS_CONST_COUNT;
-        struct list_head *pop = list_pop_front(&aggregate_list);
-        kassert(pop);
-        struct slab_size_constant *ssc =
-            container_of(pop, struct slab_size_constant, list);
-        slab_class_sizes[scs_idx].name = ssc->name;
-        slab_class_sizes[scs_idx].size = ssc->size;
-        slab_class_sizes[scs_idx].align = ssc->align;
+    for (struct slab_size_constant *ssc = start; ssc < end; ssc++) {
+        tmp[idx++] = (struct slab_size_constant){
+            .name = ssc->name,
+            .size = ssc->size,
+            .align = ssc->align,
+        };
     }
 
-    qsort(slab_class_sizes, slab_num_sizes, sizeof(struct slab_size_constant),
-          slab_class_sort_cmp);
+    kassert(idx == total_input);
+
+    qsort(tmp, total_input, sizeof(*tmp), slab_class_sort_cmp);
+
+    size_t out = 0;
+
+    for (size_t i = 0; i < total_input; i++) {
+        if (out == 0 || tmp[i].size != tmp[out - 1].size) {
+            tmp[out++] = tmp[i];
+        } else {
+            log_dupes(tmp[out - 1].name, tmp[i].name, tmp[i].size);
+        }
+    }
+
+    slab_num_sizes = out;
+
+    slab_class_sizes =
+        simple_alloc(slab_vas, slab_num_sizes * sizeof(*slab_class_sizes));
+    kassert(slab_class_sizes);
+
+    memcpy(slab_class_sizes, tmp, slab_num_sizes * sizeof(*slab_class_sizes));
 
     slab_caches.caches = slab_caches_alloc();
 
     for (uint64_t i = 0; i < slab_num_sizes; i++) {
         slab_cache_init(i, &slab_caches.caches[i], slab_class_sizes[i].size,
                         slab_class_sizes[i].align);
+
         slab_caches.caches[i].parent = &slab_caches;
+
         slab_info("Slab cache s=%u a=%u \"%s\", o=%u, w=%u",
                   slab_class_sizes[i].size, slab_class_sizes[i].align,
                   slab_class_sizes[i].name, slab_caches.caches[i].objs_per_slab,

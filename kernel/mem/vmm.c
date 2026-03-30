@@ -330,7 +330,7 @@ enum errno vmm_map_2mb_page(uintptr_t virt, uintptr_t phys, uint64_t flags,
     pte_unlock(last_entry, last_irql);
 
 out:
-    for (int i = level; i >= 0; i--)
+    for (int i = level - 1; i >= 0; i--)
         pte_unlock(ptes[i], irqls[i]);
 
     return ret;

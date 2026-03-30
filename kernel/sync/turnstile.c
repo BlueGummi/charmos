@@ -83,6 +83,7 @@ int32_t turnstile_thread_priority(struct thread *t) {
     case THREAD_PRIO_CLASS_RT: return TURNSTILE_RT_PRIO;
     case THREAD_PRIO_CLASS_URGENT: return TURNSTILE_URGENT_PRIO;
     }
+    kassert_unreachable();
 }
 
 static size_t turnstile_thread_get_data(struct rbt_node *n) {

@@ -21,7 +21,7 @@ extern struct perdomain_descriptor __ekernel_perdomain_desc[];
 #define PERDOMAIN_DECLARE(__n, __type, __ctor)                                 \
     extern __type __perdomain_##__n;                                           \
     static void __perdomain_ctor_##__n(void *inst, size_t cpu) {               \
-        if (__ctor)                                                            \
+        if ((__ctor) != NULL)                                                  \
             __ctor((__type *) inst, cpu);                                      \
     }                                                                          \
     static volatile struct perdomain_descriptor __perdomain_desc_##__n         \

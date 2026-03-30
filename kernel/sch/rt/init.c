@@ -32,7 +32,7 @@ static void init_scheduler_boot(struct scheduler *sched) {
         panic("OOM\n");
 
     pcpu->log_handle = LOG_HANDLE_DEFAULT;
-    pcpu->perms.allowed_capabilities = INT_MAX;
+    pcpu->perms.allowed_capabilities = UINT16_MAX;
     spinlock_init(&pcpu->perms.lock);
     INIT_LIST_HEAD(&pcpu->perms.blocklist);
     pcpu->scheduler = sched;

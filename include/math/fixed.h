@@ -47,7 +47,7 @@ static inline fx32_32_t fx_div(fx32_32_t a, fx32_32_t b) {
     uint64_t num_lo = ua << 32;
     uint64_t q = 0;
 
-    for (size_t i = 63; i >= 0; i--) {
+    for (int i = 63; i >= 0; i--) {
         uint64_t bit = num_hi >> 63;
         num_hi = (num_hi << 1) | (num_lo >> 63);
         num_lo <<= 1;

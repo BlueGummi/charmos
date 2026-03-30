@@ -84,8 +84,6 @@ static void link_parent_groups(struct scheduler_domain *child,
 static void map_cpus_to_groups(void) {
     struct core *c;
     for_each_cpu_struct(c) {
-        struct core *c = global.cores[__id];
-
         for (size_t i = 0; i < TOPOLOGY_LEVEL_MAX; i++) {
             struct scheduler_domain *d = global.scheduler_domains[i];
             c->domains[i] = d;

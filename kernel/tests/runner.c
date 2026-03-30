@@ -121,7 +121,6 @@ void tests_run(void) {
               total_test_count, pass_count, fail_count, fail_color, skip_count,
               skip_color);
 
-end:
     test_info("%s%s" ANSI_RESET " (%llu ms)\n", color, msg, total_time);
 
 #endif

@@ -253,7 +253,7 @@ extern struct nightmare_test __ekernel_nightmare_tests[];
             .default_threads = __threads,                                      \
             .state = NIGHTMARE_UNINIT,                                         \
             .error = NIGHTMARE_ERR_OK,                                         \
-            .roles = {0},                                                      \
+            .roles = {{0}},                                                    \
             .role_count = 0,                                                   \
             .reset = NIGHTMARE_RESET_FN_NAME(__name),                          \
             .init = NIGHTMARE_INIT_FN_NAME(__name),                            \

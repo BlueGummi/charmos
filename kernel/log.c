@@ -350,11 +350,11 @@ static void log_site_free(struct log_site *site) {
     locked_list_del(&log_global.list, &site->list);
     kfree(site->rb.slots);
     kfree(site->name);
-    kfree(site);
+    kfree_aligned(site, 64);
 }
 
 struct log_site *log_site_create(struct log_site_options opts) {
-    struct log_site *ret = kzalloc(sizeof(struct log_site));
+    struct log_site *ret = kzalloc_aligned(sizeof(struct log_site), 64);
     if (!ret)
         return NULL;
 

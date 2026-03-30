@@ -55,7 +55,7 @@ void stat_series_reset(struct stat_series *s) {
 
 void stat_series_advance_internal(struct stat_series *s, time_t now_us,
                                   bool already_locked) {
-    enum irql irql;
+    enum irql irql = IRQL_NONE; 
 
     if (!already_locked) {
         /* Fast-path: check without taking lock */

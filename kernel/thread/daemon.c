@@ -128,7 +128,7 @@ void daemon_main(void *a) {
         switch (self->command) {
         case DAEMON_THREAD_COMMAND_SLEEP: break; /* Go wait on the semaphore */
         case DAEMON_THREAD_COMMAND_RESTART: goto start_execute;
-        case DAEMON_THREAD_COMMAND_EXIT: daemon_thread_exit(daemon, self);
+        case DAEMON_THREAD_COMMAND_EXIT: daemon_thread_exit(daemon, self); break;
         default:
             panic("Unknown daemon thread command with value %u\n",
                   self->command);

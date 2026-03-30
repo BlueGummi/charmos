@@ -21,7 +21,7 @@ extern struct percpu_descriptor __ekernel_percpu_desc[];
 #define PERCPU_DECLARE(__n, __type, __ctor)                                    \
     extern __type __percpu_##__n;                                              \
     static void __percpu_ctor_##__n(void *inst, size_t cpu) {                  \
-        if (__ctor)                                                            \
+        if ((__ctor) != NULL)                                                  \
             __ctor((__type *) inst, cpu);                                      \
     }                                                                          \
     static volatile struct percpu_descriptor __percpu_desc_##__n               \

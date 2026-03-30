@@ -603,7 +603,6 @@ TEST_REGISTER(elcm_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     printf("C(s=0x%lx, p=%u, w=%u, W=0x%lx, d=%u)\n", c.score_value, c.pages,
            c.wasted, c.wastage, c.distance);
-    hcf();
     SET_SUCCESS();
 }
 
