@@ -262,7 +262,7 @@ static void domain_spawn(struct domain_buddy *domain) {
     uint64_t id = domain->domain->id;
 
     worker->curr_core = id;
-    worker->pinned = 1;
+    worker->flags |= THREAD_FLAG_PINNED;
     thread_set_background(worker);
     thread_enqueue_on_core(worker, id);
 }

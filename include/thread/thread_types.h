@@ -28,7 +28,19 @@ enum thread_wait_type : uint8_t {
     THREAD_WAIT_INTERRUPTIBLE, /* Can be interrupted */
 };
 
+/* thread_flags: 32 bit bitflags:
+ *
+ *      ┌───────────────────────────────────────────────────────────┐
+ * Bits │ 31..28  27..24  23..20  19..16  15..12  11..8  7..4  3..0 │
+ * Use  │  ****    ****    ****    ****    ****    ****  ****  **** │
+ *      └───────────────────────────────────────────────────────────┘
+ *
+ * A - Unused (Available)
+ * * - Unused (Unavailable)
+ *
+ */
 enum thread_flags : uint32_t {
+    THREAD_FLAG_PINNED = 1,
     THREAD_FLAG_FLEXIBLE_RT = 1 << 1,
     THREAD_FLAG_EXECUTING_APC = 1 << 2,
     THREAD_FLAG_DYING = 1 << 3,

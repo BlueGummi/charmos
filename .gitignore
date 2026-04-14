@@ -1,6 +1,8 @@
+kernel/uACPI
+limine
 build/
 syms/fullsyms.c
-kernel/limine.h
+kernel/flanterm
 *.log
 compile_commands.json
 kernel/rust/target/

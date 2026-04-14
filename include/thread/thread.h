@@ -216,7 +216,6 @@ struct thread {
     /* Flags */
     enum rt_scheduler_capability accepted_rt_caps;
     _Atomic(enum thread_flags) flags;
-    _Atomic uint32_t pinned;
     _Atomic size_t migration_generation;
 
     /* ======== Raw priority + timeslice data ======== */

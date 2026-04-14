@@ -587,22 +587,28 @@ TEST_REGISTER(tlb_shootdown_contention_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
 }
 
+static void print_cand(struct elcm_candidate c) {
+    printf("C(s=%F, p=%u, w=%u, W=%F, d=%u, b=%u, o=%u)\n", c.score_value,
+           c.pages, c.wasted, c.wastage, c.distance, c.bitmap_bytes,
+           c.obj_count);
+}
+
 TEST_REGISTER(elcm_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     struct elcm_params params = {
         .obj_size = 938,
-        .page_size = PAGE_SIZE,
-        .max_wastage_pct = MAX_WASTAGE_DEFAULT,
-        .max_pages = 32,
+        .max_wastage_pct = ELCM_MAX_WASTAGE_DEFAULT,
+        .max_pages = SIZE_MAX,
         .bias_towards_pow2 = true,
         .metadata_size_bytes = 96,
         .metadata_bits_per_obj = 1,
     };
 
     elcm(&params);
-    struct candidate c = params.out;
+    print_cand(params.out);
+    params.bias_towards_pow2 = false;
+    elcm(&params);
+    print_cand(params.out);
 
-    printf("C(s=0x%lx, p=%u, w=%u, W=0x%lx, d=%u)\n", c.score_value, c.pages,
-           c.wasted, c.wastage, c.distance);
     SET_SUCCESS();
 }
 

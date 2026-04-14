@@ -34,6 +34,8 @@ LOG_HANDLE_EXTERN(slab);
  */
 
 #define KMALLOC_PAGE_MAGIC 0xC0FFEE42
+#define SLAB_ALLOC_BEHAVIOR_FROM_ALLOC (1 << ALLOC_BEHAVIOR_AVAILABLE_SHIFT)
+#define SLAB_ELCM_DEFAULT_MAX_PAGES 64
 
 #define SLAB_HEAP_START 0xFFFFF00000000000ULL
 #define SLAB_HEAP_END 0xFFFFF10000000000ULL
@@ -144,6 +146,7 @@ enum slab_state {
 };
 
 enum slab_type {
+    SLAB_TYPE_NONE, /* Sentinel value */
     SLAB_TYPE_NONPAGEABLE,
     SLAB_TYPE_PAGEABLE,
 };
@@ -184,7 +187,6 @@ SPINLOCK_GENERATE_LOCK_UNLOCK_FOR_STRUCT(slab, lock);
 #define slab_from_rbt_node(n) (container_of(n, struct slab, rb))
 #define slab_from_list_node(ln) (container_of(ln, struct slab, list))
 #define PAGE_NON_SLAB_SPACE (PAGE_SIZE - sizeof(struct slab))
-#define slab_error(fmt, ...) k_info("SLAB", LOG_ERROR, fmt, ##__VA_ARGS__)
 
 _Static_assert(offsetof(struct slab, self) == 0,
                "self pointer not at start of struct");
@@ -440,6 +442,16 @@ struct slab_page_hdr {
     struct slab_domain *domain;
 };
 
+struct slab_elcm_params {
+    size_t max_wastage_pct;
+    size_t max_pages;
+};
+
+struct slab_elcm_candidate {
+    size_t pages;
+    size_t bitmap_size_bytes;
+};
+
 struct slab *slab_init(struct slab *slab, struct slab_cache *parent);
 void slab_destroy(struct slab *slab);
 void slab_domain_init_daemon(struct slab_domain *domain);
@@ -453,10 +465,8 @@ void *slab_cache_try_alloc_from_lists(struct slab_cache *c);
 void slab_cache_init(size_t order, struct slab_cache *cache, uint64_t obj_size,
                      uint64_t obj_align);
 void slab_cache_insert(struct slab_cache *cache, struct slab *slab);
-struct slab *slab_create(struct slab_cache *cache, enum alloc_behavior behavior,
-                         bool allow_create_new);
-void *slab_alloc(struct slab_cache *cache, enum alloc_behavior behavior,
-                 bool allow_create_new, bool called_from_alloc);
+struct slab *slab_create(struct slab_cache *cache, enum alloc_behavior behavior);
+void *slab_alloc(struct slab_cache *cache, enum alloc_behavior behavior);
 
 /* Magazine + percpu */
 bool slab_magazine_push(struct slab_magazine *mag, vaddr_t obj);
@@ -494,14 +504,16 @@ struct slab *slab_reset(struct slab *slab);
 void slab_gc_init(struct slab_domain *dom);
 void slab_gc_enqueue(struct slab_domain *domain, struct slab *slab);
 void slab_gc_dequeue(struct slab_domain *domain, struct slab *slab);
-struct slab *slab_gc_get_newest(struct slab_domain *domain);
-struct slab *slab_gc_get_newest_nonpageable(struct slab_domain *domain);
-struct slab *slab_gc_get_newest_pageable(struct slab_domain *domain);
+struct slab *slab_gc_get_newest(struct slab_domain *domain,
+                                enum slab_type type);
 struct slab *slab_gc_get_oldest(struct slab_domain *domain);
 size_t slab_gc_num_slabs(struct slab_domain *domain);
 bool slab_should_enqueue_gc(struct slab *slab);
 
 void slab_switch_to_domain_allocations(void);
+
+/* ELCM for slab allocator */
+struct slab_elcm_candidate slab_elcm(size_t object_size, struct slab_elcm_params sep);
 
 extern struct vas_space *slab_vas;
 extern struct slab_caches slab_caches;

@@ -98,7 +98,7 @@ void tests_run(void) {
     }
     uint64_t total_test_count = unit_test_count + integration_test_count;
 
-    test_info("running %llu " ANSI_CYAN "unit" ANSI_RESET " tests...\n",
+    test_info("running %llu " ANSI_CYAN "unit" ANSI_RESET " tests...",
               unit_test_count);
 
     run(true, start, end);
@@ -117,11 +117,11 @@ void tests_run(void) {
 
     test_info("%llu " ANSI_CYAN "total" ANSI_RESET " tests, %llu " ANSI_GREEN
               "passed" ANSI_RESET ", %llu %sfailed" ANSI_RESET
-              ", %llu %sskipped\n" ANSI_RESET,
+              ", %llu %sskipped" ANSI_RESET,
               total_test_count, pass_count, fail_count, fail_color, skip_count,
               skip_color);
 
-    test_info("%s%s" ANSI_RESET " (%llu ms)\n", color, msg, total_time);
+    test_info("%s%s" ANSI_RESET " (%llu ms)", color, msg, total_time);
 
 #endif
 }

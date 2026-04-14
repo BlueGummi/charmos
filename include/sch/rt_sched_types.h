@@ -49,7 +49,7 @@ enum rt_scheduler_error {
  *
  *      ┌───────────────────────────┐
  * Bits │ 15..12  11..8  7..4  3..0 │
- * Use  │  X***    ****  ***M  DERF │
+ * Use  │  XAAA    ****  ***M  DERF │
  *      └───────────────────────────┘
  *
  * F - First In, First Out
@@ -59,7 +59,9 @@ enum rt_scheduler_error {
  * M - Migration Capable
  * X - !!! FAULT TOLERANT !!! ALL THREADS UNDER THIS SCHEDULER
  *     MUST ALSO BE FAULT TOLERANT, ELSE THEY WILL NOT RUN!!!
- * * - Unused, but not reserved
+ *
+ * A - Unused (Available)
+ * * - Unused (Unavailable)
  *
  */
 enum rt_scheduler_capability : uint16_t {

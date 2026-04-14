@@ -2,6 +2,7 @@
 #pragma once
 #include <console/printf.h>
 #include <log.h>
+#include <mem/alloc_api_internal.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -17,7 +18,7 @@ LOG_HANDLE_EXTERN(slab_flags);
 
 /* ─────────────────────────── ALLOC FLAGS ─────────────────────────── */
 
-#define ALLOC_LOCALITY_SHIFT 4
+#define ALLOC_LOCALITY_SHIFT 9
 #define ALLOC_CLASS_SHIFT 12
 #define ALLOC_CLASS_MASK 0xF
 
@@ -40,7 +41,7 @@ LOG_HANDLE_EXTERN(slab_flags);
  *
  *      ┌───────────────────────────┐
  * Bits │ 15..12  11..8  7..4  3..0 │
- * Use  │  %%%%    ****  *###  MPFC │
+ * Use  │  %%%%    ###A  A***  MPFC │
  *      └───────────────────────────┘
  *
  * C - "Prefer cache alignment"
@@ -52,7 +53,9 @@ LOG_HANDLE_EXTERN(slab_flags);
  * M - "Allow memory to be movable"
  *
  * ### - Locality bits
- * * - Unused
+ *
+ * A - Unused (available)
+ * * - Unused (unavailable)
  * %%%% - Allocation class bits
  *
  */
@@ -82,6 +85,7 @@ enum alloc_flags : uint16_t {
     ALLOC_FLAG_CLASS_HIGH_BANDWIDTH = (3 << ALLOC_CLASS_SHIFT),
 };
 
+#define ALLOC_FLAGS_UNAVAILABLE_BITS 0x70
 #define ALLOC_FLAGS_DEFAULT                                                    \
     (ALLOC_FLAG_CLASS_DEFAULT | ALLOC_FLAG_FLEXIBLE_LOCALITY |                 \
      ALLOC_FLAG_NONMOVABLE | ALLOC_FLAG_NONPAGEABLE |                          \
@@ -91,42 +95,29 @@ enum alloc_flags : uint16_t {
     ALLOC_FLAG_PAGEABLE | ALLOC_FLAG_CLASS_DEFAULT |                           \
         ALLOC_FLAG_FLEXIBLE_LOCALITY
 
-/* TODO: Think about updating this... We used to use two different bits
- * to represent ON/OFF for debug... this is no longer the case */
 static inline bool alloc_flags_valid(enum alloc_flags flags) {
-    if ((flags & ALLOC_FLAG_FLEXIBLE_LOCALITY) &&
-        (flags & ALLOC_FLAG_STRICT_LOCALITY))
-        return false;
-
-    if ((flags & ALLOC_FLAG_PAGEABLE) && (flags & ALLOC_FLAG_NONPAGEABLE))
-        return false;
-
-    if ((flags & ALLOC_FLAG_MOVABLE) && (flags & ALLOC_FLAG_NONMOVABLE))
-        return false;
-
-    if ((flags & ALLOC_FLAG_PREFER_CACHE_ALIGNED) &&
-        (flags & ALLOC_FLAG_NO_CACHE_ALIGN))
-        return false;
-
-    return true;
+    /* If an unavailable bit is set, it is not valid */
+    return !(flags & ALLOC_FLAGS_UNAVAILABLE_BITS);
 }
 
 /* ─────────────────────────── ALLOC BEHAVIORS ─────────────────────────── */
 
 #define ALLOC_BEHAVIOR_FLAG_SHIFT 4
 #define ALLOC_BEHAVIOR_MASK (0xF)
+#define ALLOC_BEHAVIOR_AVAILABLE_SHIFT 12
 
 /* alloc_behavior: 16 bits for a behavior and flags
  *
  *      ┌───────────────────────────┐
  * Bits │ 15..12  11..8  7..4  3..0 │
- * Use  │  ****    ****  ***F  %%%% │
+ * Use  │  AAAA    ****  ***F  %%%% │
  *      └───────────────────────────┘
  *
  * %%%% - Allocation behavior bits
  *
  * F - "Prefer fast allocation" -- may fail fast/early
- * * - Unused
+ * A - Unused (Available)
+ * * - Unused (Unavailable)
  *
  */
 
@@ -267,55 +258,3 @@ void *kzalloc_aligned_internal(size_t size, size_t align,
                                enum alloc_flags flags,
                                enum alloc_behavior behavior);
 void kfree_aligned_internal(void *ptr, enum alloc_behavior behavior);
-
-#define kfree_1(ptr) kfree_internal((ptr), ALLOC_BEHAVIOR_DEFAULT)
-#define kfree_2(ptr, bh) kfree_internal((ptr), (bh))
-
-#define kfree(...) _DISPATCH(kfree, PP_NARG(__VA_ARGS__))(__VA_ARGS__)
-
-#define kmalloc_1(sz)                                                          \
-    kmalloc_internal((sz), ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_DEFAULT)
-#define kmalloc_2(sz, fl) kmalloc_internal((sz), (fl), ALLOC_BEHAVIOR_DEFAULT)
-#define kmalloc_3(sz, fl, bh) kmalloc_internal((sz), (fl), (bh))
-#define kmalloc(...) _DISPATCH(kmalloc, PP_NARG(__VA_ARGS__))(__VA_ARGS__)
-
-#define kzalloc_1(sz)                                                          \
-    kzalloc_internal((sz), ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_DEFAULT)
-#define kzalloc_2(sz, fl) kzalloc_internal((sz), (fl), ALLOC_BEHAVIOR_DEFAULT)
-#define kzalloc_3(sz, fl, bh) kzalloc_internal((sz), (fl), (bh))
-#define kzalloc(...) _DISPATCH(kzalloc, PP_NARG(__VA_ARGS__))(__VA_ARGS__)
-
-#define kmalloc_aligned_2(sz, al)                                              \
-    kmalloc_aligned_internal((sz), (al), ALLOC_FLAGS_DEFAULT,                  \
-                             ALLOC_BEHAVIOR_DEFAULT)
-#define kmalloc_aligned_3(sz, al, fl)                                          \
-    kmalloc_aligned_internal((sz), (al), (fl), ALLOC_BEHAVIOR_DEFAULT)
-#define kmalloc_aligned_4(sz, al, fl, bh)                                      \
-    kmalloc_aligned_internal((sz), (al), (fl), (bh))
-#define kmalloc_aligned(...)                                                   \
-    _DISPATCH(kmalloc_aligned, PP_NARG(__VA_ARGS__))(__VA_ARGS__)
-
-#define kzalloc_aligned_2(sz, al)                                              \
-    kzalloc_aligned_internal((sz), (al), ALLOC_FLAGS_DEFAULT,                  \
-                             ALLOC_BEHAVIOR_DEFAULT)
-#define kzalloc_aligned_3(sz, al, fl)                                          \
-    kzalloc_aligned_internal((sz), (al), (fl), ALLOC_BEHAVIOR_DEFAULT)
-#define kzalloc_aligned_4(sz, al, fl, bh)                                      \
-    kzalloc_aligned_internal((sz), (al), (fl), (bh))
-#define kzalloc_aligned(...)                                                   \
-    _DISPATCH(kzalloc_aligned, PP_NARG(__VA_ARGS__))(__VA_ARGS__)
-
-#define kfree_aligned_1(ptr)                                                   \
-    kfree_aligned_internal((ptr), ALLOC_BEHAVIOR_DEFAULT)
-#define kfree_aligned_2(ptr, bh) kfree_aligned_internal((ptr), (bh))
-#define kfree_aligned(...)                                                     \
-    _DISPATCH(kfree_aligned, PP_NARG(__VA_ARGS__))(__VA_ARGS__)
-
-#define krealloc_2(ptr, sz)                                                    \
-    krealloc_internal((ptr), (sz), ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_DEFAULT)
-#define krealloc_3(ptr, sz, fl)                                                \
-    krealloc_internal((ptr), (sz), (fl), ALLOC_BEHAVIOR_DEFAULT)
-#define krealloc_4(ptr, sz, fl, bh) krealloc_internal((ptr), (sz), (fl), (bh))
-#define krealloc(...) _DISPATCH(krealloc, PP_NARG(__VA_ARGS__))(__VA_ARGS__)
-
-#define knew(ptr, ...) ((ptr) = kmalloc(sizeof(*(ptr)), ##__VA_ARGS__))

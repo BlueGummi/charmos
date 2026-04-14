@@ -325,13 +325,15 @@ void slab_gc_dequeue(struct slab_domain *domain, struct slab *slab) {
 }
 
 static struct slab *gc_do_op(struct slab_domain *domain,
-                             struct rbt_node *(*op)(const struct rbt *tree)) {
+                             struct rbt_node *(*op)(const struct rbt *tree,
+                                                    enum slab_type),
+                             enum slab_type t) {
     struct slab *ret = NULL;
 
     struct slab_gc *gc = &domain->slab_gc;
     enum irql irql = slab_gc_lock(gc);
 
-    struct rbt_node *rb = op(&gc->rbt);
+    struct rbt_node *rb = op(&gc->rbt, t);
     if (!rb)
         goto out;
 
@@ -344,15 +346,12 @@ out:
     return ret;
 }
 
-struct slab *slab_gc_get_newest(struct slab_domain *domain) {
-    return gc_do_op(domain, rbt_last);
-}
-
-static struct rbt_node *gc_search_for_first_pageable(const struct rbt *rbt) {
+static struct rbt_node *gc_search_for_first(const struct rbt *rbt,
+                                            enum slab_type type) {
     struct rbt_node *iter = rbt_first(rbt);
     while (iter) {
         struct slab *slab = slab_from_rbt_node(iter);
-        if (slab->type == SLAB_TYPE_PAGEABLE)
+        if (slab->type == type)
             break;
 
         iter = rbt_next(iter);
@@ -360,28 +359,19 @@ static struct rbt_node *gc_search_for_first_pageable(const struct rbt *rbt) {
     return iter;
 }
 
-static struct rbt_node *gc_search_for_first_nonpageable(const struct rbt *rbt) {
-    struct rbt_node *iter = rbt_first(rbt);
-    while (iter) {
-        struct slab *slab = slab_from_rbt_node(iter);
-        if (slab->type == SLAB_TYPE_NONPAGEABLE)
-            break;
-
-        iter = rbt_next(iter);
-    }
-    return iter;
+static struct rbt_node *rbt_first_wrapper(const struct rbt *rbt,
+                                          enum slab_type type) {
+    (void) type;
+    return rbt_first(rbt);
 }
 
-struct slab *slab_gc_get_newest_pageable(struct slab_domain *domain) {
-    return gc_do_op(domain, gc_search_for_first_pageable);
-}
-
-struct slab *slab_gc_get_newest_nonpageable(struct slab_domain *domain) {
-    return gc_do_op(domain, gc_search_for_first_nonpageable);
+struct slab *slab_gc_get_newest(struct slab_domain *domain,
+                                enum slab_type type) {
+    return gc_do_op(domain, gc_search_for_first, type);
 }
 
 struct slab *slab_gc_get_oldest(struct slab_domain *domain) {
-    return gc_do_op(domain, rbt_first);
+    return gc_do_op(domain, rbt_first_wrapper, SLAB_TYPE_NONE);
 }
 
 size_t slab_gc_num_slabs(struct slab_domain *domain) {

@@ -210,14 +210,15 @@ enum rt_scheduler_topo_level {
  *
  *      ┌───────────────────────────┐
  * Bits │ 15..12  11..8  7..4  3..0 │
- * Use  │  ****    ****  **IT  D%%% │
+ * Use  │  AAAA    ****  **IT  D%%% │
  *      └───────────────────────────┘
  *
  *
  * D - Degraded performance observed
  * T - Throttled
  * I - CPU isolation
- * * - Unused
+ * A - Unused (Available)
+ * * - Unused (Unavailable)
  * %%% - Overloaded amount bits
  *
  */

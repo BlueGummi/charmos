@@ -2,7 +2,7 @@
 #include <math/fixed_extended.h>
 
 fx32_32_t fx_exp(fx32_32_t x) {
-    int64_t k = fx_to_int(fx_mul(x, FX(1.44269504089))); // 1/ln(2)
+    int64_t k = fx_to_int(fx_mul(x, FX(1.44269504089)));
     fx32_32_t k_ln2 = fx_mul(fx_from_int(k), FX(0.69314718056));
     fx32_32_t r = x - k_ln2;
     static const fx32_32_t coeffs[] = {FX(1.0), FX(1.0), FX(0.5), FX(1.0 / 6.0),
@@ -24,7 +24,7 @@ fx32_32_t fx_poly_eval(fx32_32_t x, const fx32_32_t *c, int n) {
 
 static const fx32_32_t FX_LN2 = FX(0.69314718056);
 
-fx32_32_t fx_log(fx32_32_t x) {
+fx32_32_t fx_ln(fx32_32_t x) {
     if (x <= 0)
         return INT64_MIN;
     int64_t k = 0;
@@ -94,11 +94,13 @@ fx32_32_t fx_sin(fx32_32_t angle) {
     fx_cordic(angle, &s, &c);
     return s;
 }
+
 fx32_32_t fx_cos(fx32_32_t angle) {
     fx32_32_t s, c;
     fx_cordic(angle, &s, &c);
     return c;
 }
+
 void fx_sincos(fx32_32_t angle, fx32_32_t *sin_out, fx32_32_t *cos_out) {
     fx_cordic(angle, sin_out, cos_out);
 }

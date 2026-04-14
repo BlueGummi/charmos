@@ -10,7 +10,7 @@
 #include "sched_profiling.h"
 
 bool scheduler_can_take_thread(size_t core, struct thread *target) {
-    if (atomic_load_explicit(&target->pinned, memory_order_acquire))
+    if (thread_get_flags(target) & THREAD_FLAG_PINNED)
         return false;
 
     if (!cpu_mask_test(&target->allowed_cpus, core))

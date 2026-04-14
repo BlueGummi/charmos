@@ -53,7 +53,7 @@ void scheduler_init(void) {
 
         struct thread *idle_thread =
             thread_create("idle_thread_%u", scheduler_idle_main, NULL, i);
-        idle_thread->pinned = 1;
+        idle_thread->flags |= THREAD_FLAG_PINNED;
         idle_thread->state = THREAD_STATE_IDLE_THREAD;
         s->idle_thread = idle_thread;
 
@@ -63,7 +63,7 @@ void scheduler_init(void) {
 
         if (!i) {
             struct thread *t = thread_create("main_thread", k_sch_main, NULL);
-            t->pinned = 1;
+            t->flags |= THREAD_FLAG_PINNED;
             scheduler_add_thread(s, t, false);
         }
 

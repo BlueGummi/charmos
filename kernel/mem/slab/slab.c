@@ -160,8 +160,8 @@ struct slab_caches slab_caches = {0};
 LOG_HANDLE_DECLARE_DEFAULT(slab);
 LOG_SITE_DECLARE_DEFAULT(slab);
 
-void *slab_map_new_page(struct slab_domain *domain, paddr_t *phys_out,
-                        bool pageable) {
+static void *slab_map_new_page(struct slab_domain *domain, paddr_t *phys_out,
+                               enum slab_type type) {
     paddr_t phys = 0x0;
     vaddr_t virt = 0x0;
 
@@ -188,7 +188,9 @@ void *slab_map_new_page(struct slab_domain *domain, paddr_t *phys_out,
     virt += PAGE_SIZE;
 
     uint64_t pflags = PAGE_PRESENT | PAGE_WRITE;
-    if (pageable)
+
+    kassert(type != SLAB_TYPE_NONE);
+    if (type == SLAB_TYPE_PAGEABLE)
         pflags |= PAGE_PAGEABLE;
 
     enum errno e = vmm_map_page(virt, phys, pflags, VMM_FLAG_NONE);
@@ -279,10 +281,10 @@ struct slab *slab_init(struct slab *slab, struct slab_cache *parent) {
     return slab;
 }
 
-struct slab *slab_create_new(struct slab_domain *domain,
-                             struct slab_cache *cache, bool pageable) {
+static struct slab *slab_create_new(struct slab_domain *domain,
+                                    struct slab_cache *cache) {
     paddr_t phys;
-    void *page = slab_map_new_page(domain, &phys, pageable);
+    void *page = slab_map_new_page(domain, &phys, cache->type);
     if (!page)
         return NULL;
 
@@ -293,33 +295,29 @@ struct slab *slab_create_new(struct slab_domain *domain,
 
 /* First we try and steal a slab from the GC list.
  * If this does not work, we will map a new one. */
-struct slab *slab_create(struct slab_cache *cache, enum alloc_behavior behavior,
-                         bool allow_create_new) {
+struct slab *slab_create(struct slab_cache *cache,
+                         enum alloc_behavior behavior) {
     struct slab *slab = NULL;
     struct slab_domain *local = slab_domain_local();
+    kassert(cache->type != SLAB_TYPE_NONE);
 
     /* This is only searched if we are allowed to fault -
      * iteration through GC slabs may touch pageable slabs and
      * trigger a page fault, so we must be careful here */
-    if (alloc_behavior_may_fault(behavior)) {
-        if (cache->type == SLAB_TYPE_PAGEABLE) {
-            slab = slab_gc_get_newest_pageable(cache->parent_domain);
-        } else {
-            slab = slab_gc_get_newest_nonpageable(cache->parent_domain);
-        }
-    }
+    if (alloc_behavior_may_fault(behavior))
+        slab = slab_gc_get_newest(cache->parent_domain, cache->type);
 
     if (slab) {
         slab_stat_gc_object_reclaimed(local);
         return slab_init(slab, cache);
     }
 
-    if (allow_create_new) {
-        slab = slab_create_new(cache->parent_domain, cache,
-                               cache->type == SLAB_TYPE_PAGEABLE);
+    if (behavior & SLAB_ALLOC_BEHAVIOR_FROM_ALLOC) {
+        slab = slab_create_new(cache->parent_domain, cache);
 
         if (slab && cache->parent_domain == local)
             slab_stat_alloc_new_slab(local);
+
         if (slab && cache->parent_domain != local)
             slab_stat_alloc_new_remote_slab(local);
     }
@@ -467,7 +465,7 @@ void *slab_alloc_old(struct slab_cache *cache) {
         goto out;
 
     struct slab *slab;
-    slab = slab_create_new(/* domain = */ NULL, cache, /*pageable=*/false);
+    slab = slab_create_new(/* domain = */ NULL, cache);
     if (!slab)
         goto out;
 
@@ -575,6 +573,7 @@ void slab_allocator_init() {
         slab_cache_init(i, &slab_caches.caches[i], slab_class_sizes[i].size,
                         slab_class_sizes[i].align);
 
+        slab_caches.caches[i].type = SLAB_TYPE_NONPAGEABLE;
         slab_caches.caches[i].parent = &slab_caches;
 
         slab_info("Slab cache s=%u a=%u \"%s\", o=%u, w=%u",
@@ -853,9 +852,9 @@ void slab_stat_alloc_from_cache(struct slab_cache *cache) {
     }
 }
 
-void *slab_alloc(struct slab_cache *cache, enum alloc_behavior behavior,
-                 bool allow_create_new, bool called_from_alloc) {
+void *slab_alloc(struct slab_cache *cache, enum alloc_behavior behavior) {
     void *ret = NULL;
+    bool from_alloc = behavior & SLAB_ALLOC_BEHAVIOR_FROM_ALLOC;
 
     if (!alloc_behavior_may_fault(behavior) &&
         cache->type == SLAB_TYPE_PAGEABLE)
@@ -866,7 +865,7 @@ void *slab_alloc(struct slab_cache *cache, enum alloc_behavior behavior,
     /* First try from lists */
     ret = slab_cache_try_alloc_from_lists(cache);
     if (ret) {
-        if (called_from_alloc)
+        if (from_alloc)
             slab_stat_alloc_from_cache(cache);
         goto out;
     }
@@ -874,7 +873,7 @@ void *slab_alloc(struct slab_cache *cache, enum alloc_behavior behavior,
     /* Drop the lock since we are going to do the expensive thing */
     slab_cache_unlock(cache, irql);
 
-    struct slab *slab = slab_create(cache, behavior, allow_create_new);
+    struct slab *slab = slab_create(cache, behavior);
 
     irql = slab_cache_lock(cache);
 
@@ -923,9 +922,7 @@ void *slab_alloc_retry(struct slab_domain *domain, size_t size,
 
         struct slab_cache *cache = &cs->caches[slab_size_to_index(size)];
 
-        bool allow_new = true;
-        return slab_alloc(cache, behavior, allow_new,
-                          /*called_from_alloc=*/true);
+        return slab_alloc(cache, behavior | SLAB_ALLOC_BEHAVIOR_FROM_ALLOC);
     }
 }
 
@@ -969,16 +966,13 @@ void *kmalloc_new(size_t size, enum alloc_flags flags,
      * slab caches to allocate from a slab that may or may not be local */
     struct slab_cache *cache = slab_search_for_cache(local_dom, flags, size);
 
-    selected_dom = cache->parent_domain;
-
     /* now we have picked a slab cache - it may or may not have free slabs but
      * we definitely know where we want to get memory from now */
-    bool allow_new_slabs = true;
+    selected_dom = cache->parent_domain;
 
     /* allocate from an existing slab or pull from the GC lists
      * or call into the physical memory allocator to get a new slab */
-    ret = slab_alloc(cache, behavior, allow_new_slabs,
-                     /*called_from_alloc=*/true);
+    ret = slab_alloc(cache, behavior | SLAB_ALLOC_BEHAVIOR_FROM_ALLOC);
 
     /* slowpath - let's try and fill up our percpu caches so we don't
      * end up in this slowpath over and over again... */
@@ -1003,7 +997,8 @@ void *kmalloc_from_domain(size_t domain, size_t size) {
     struct slab_caches *cs =
         global.domains[domain]->slab_domain->local_nonpageable_cache;
     struct slab_cache *c = &cs->caches[index];
-    return slab_alloc(c, ALLOC_BEHAVIOR_NORMAL, true, true);
+    return slab_alloc(c,
+                      ALLOC_BEHAVIOR_NORMAL | SLAB_ALLOC_BEHAVIOR_FROM_ALLOC);
 }
 
 /* okay, our free policy (in terms of freequeue usage) is:
@@ -1092,6 +1087,7 @@ static bool kfree_try_free_to_magazine(struct slab_percpu_cache *pcpu,
     if (slab->parent_cache->parent_domain != pcpu->domain)
         return false;
 
+    kassert(slab->type != SLAB_TYPE_NONE);
     if (slab->type == SLAB_TYPE_PAGEABLE)
         return false;
 
@@ -1284,6 +1280,6 @@ void *krealloc_internal(void *ptr, size_t size, enum alloc_flags flags,
 
     size_t to_copy = (old < size) ? old : size;
     memcpy(new_ptr, ptr, to_copy);
-    kfree_old(ptr);
+    kfree(ptr);
     return new_ptr;
 }
