@@ -49,10 +49,10 @@ void domain_buddy_track_pages(struct domain_buddy *dom) {
     size_t used_pages = 0;
 
     for (size_t order = 0; order < MAX_ORDER; order++) {
-        struct page *page = dom->free_area[order].next;
+        struct buddy_page *page = dom->free_area[order].next;
         while (page) {
             used_pages += (1ULL << page->order);
-            page = page->next;
+            page = buddy_page_get_next(page);
         }
     }
 
@@ -61,29 +61,43 @@ void domain_buddy_track_pages(struct domain_buddy *dom) {
 }
 
 static void remove_block_from_global(size_t start_pfn, int order) {
-    struct page **prev = &global.buddy_free_area[order].next;
-    struct page *page = global.buddy_free_area[order].next;
+    struct free_area *fa = &global.buddy_free_area[order];
 
-    while (page) {
-        if (page_get_pfn(page) == start_pfn) {
-            *prev = page->next;
-            global.buddy_free_area[order].nr_free--;
-            page->next = NULL;
+    struct buddy_page *cur = fa->next;
+
+    struct buddy_page *prev = NULL;
+
+    while (cur) {
+        if (buddy_page_get_pfn(cur) == start_pfn) {
+            struct buddy_page *nxt = buddy_page_get_next(cur);
+
+            if (prev) {
+                prev->next_pfn = (nxt ? buddy_page_get_pfn(nxt) : 0);
+            } else {
+                fa->next = (struct buddy_page *) nxt;
+            }
+
+            fa->nr_free--;
+            cur->next_pfn = 0;
             return;
         }
-        prev = &page->next;
-        page = page->next;
+
+        prev = cur;
+        cur = buddy_page_get_next(cur);
     }
 }
 
 static void buddy_add_block_to_global(size_t start_pfn, int order) {
-    struct page *page = page_for_pfn(start_pfn);
+    struct buddy_page *page = buddy_page_for_pfn(start_pfn);
+
     memset(page, 0, sizeof(*page));
-    page->order = order;
+    page->order = (uint64_t) order;
     page->is_free = true;
 
-    buddy_add_to_free_area(page, &global.buddy_free_area[order]);
-    global.buddy_free_area[order].nr_free++;
+    struct free_area *fa = &global.buddy_free_area[order];
+
+    page->next_pfn = fa->next ? buddy_page_get_pfn(fa->next) : 0;
+    fa->next = page;
 }
 
 static void domain_buddy_split_for_domain(struct domain_buddy *dom,
@@ -101,7 +115,7 @@ static void domain_buddy_split_for_domain(struct domain_buddy *dom,
 
     if (start_pfn >= domain_start && block_end <= domain_end) {
         size_t idx = start_pfn - dom->start / PAGE_SIZE;
-        struct page *page = &dom->buddy[idx];
+        struct buddy_page *page = &dom->buddy[idx];
         memset(page, 0, sizeof(*page));
         page->order = order;
         page->is_free = true;
@@ -149,11 +163,11 @@ static void domain_buddy_init(struct domain_buddy *dom) {
     size_t dom_end = dom->end / PAGE_SIZE;
 
     for (int order = MAX_ORDER - 1; order >= 0; order--) {
-        struct page *page = global.buddy_free_area[order].next;
+        struct buddy_page *page = global.buddy_free_area[order].next;
 
         while (page) {
-            struct page *next_page = page->next;
-            size_t block_start = page_get_pfn(page);
+            struct buddy_page *next_page = buddy_page_get_next(page);
+            size_t block_start = buddy_page_get_pfn(page);
             size_t block_end = block_start + (1ULL << page->order);
 
             if (block_end <= dom_start || block_start >= dom_end) {
@@ -161,8 +175,8 @@ static void domain_buddy_init(struct domain_buddy *dom) {
                 continue;
             }
 
-            domain_buddy_split_for_domain(dom, page_get_pfn(page), page->order,
-                                          dom_start, dom_end);
+            domain_buddy_split_for_domain(dom, buddy_page_get_pfn(page),
+                                          page->order, dom_start, dom_end);
 
             page = next_page;
         }
@@ -286,7 +300,8 @@ static void late_init_from_numa(size_t domain_count) {
 
         /* Slice of global buddy_page_array corresponding to this PFN range */
         size_t page_offset = node->mem_base / PAGE_SIZE; /* PFN index */
-        global.domain_buddies[i].buddy = &global.page_array[page_offset];
+        global.domain_buddies[i].buddy =
+            (struct buddy_page *) &global.page_array[page_offset];
     }
 }
 
@@ -315,7 +330,8 @@ static void late_init_non_numa(size_t domain_count) {
         global.domain_buddies[i].length = domain_length_bytes; /* bytes */
         global.domain_buddies[i].core_count = cd->num_cores;
 
-        global.domain_buddies[i].buddy = &global.page_array[page_cursor];
+        global.domain_buddies[i].buddy =
+            (struct buddy_page *) &global.page_array[page_cursor];
 
         cd->domain_buddy = &global.domain_buddies[i];
 

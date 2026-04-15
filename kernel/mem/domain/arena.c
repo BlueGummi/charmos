@@ -7,7 +7,7 @@
 
 #include "internal.h"
 
-bool domain_arena_push(struct domain_arena *arena, struct page *page) {
+bool domain_arena_push(struct domain_arena *arena, struct buddy_page *page) {
     bool success = false;
     enum irql irql = domain_arena_lock(arena);
 
@@ -25,8 +25,8 @@ bool domain_arena_push(struct domain_arena *arena, struct page *page) {
     return success;
 }
 
-struct page *domain_arena_pop(struct domain_arena *arena) {
-    struct page *page = NULL;
+struct buddy_page *domain_arena_pop(struct domain_arena *arena) {
+    struct buddy_page *page = NULL;
     enum irql irql = domain_arena_lock(arena);
 
     if (arena->head != arena->tail) {

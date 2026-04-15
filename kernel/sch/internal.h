@@ -102,6 +102,11 @@ static inline bool scheduler_ts_empty(struct scheduler *sched) {
     return sched->thread_rbt.root == NULL && sched->completed_rbt.root == NULL;
 }
 
+static inline enum thread_prio_class
+available_prio_level_from_bitmap(uint8_t bitmap) {
+    return 31 - __builtin_clz((uint32_t) bitmap);
+}
+
 static inline struct thread *find_highest_prio(struct scheduler *sched) {
     struct rbt_node *node = rbt_max(&sched->thread_rbt);
     if (!node)

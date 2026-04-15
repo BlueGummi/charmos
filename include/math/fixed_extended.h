@@ -2,6 +2,7 @@
 #pragma once
 #include <math/fixed.h>
 
+#define FP_PI 3.14159265358979323846
 #define FX_PI FX(3.14159265358979323846)
 #define FX_E FX(2.71828182845045235360)
 

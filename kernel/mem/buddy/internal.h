@@ -1,4 +1,6 @@
 #pragma once
+#include <compiler.h>
+#include <math/min_max.h>
 #include <mem/bitmap.h>
 #include <mem/buddy.h>
 #include <stdbool.h>
@@ -6,16 +8,44 @@
 #include <sync/spinlock.h>
 #include <types/types.h>
 
-#define MIN(x, y) ((x) > (y) ? (y) : (x))
+#define PAGE_TO_BUDDY_PAGE(p) ((struct buddy_page *) (p))
+#define BUDDY_PAGE_TO_PAGE(p) ((struct page *) (p))
+
+/* This must be 8 bytes, since struct page is 8 bytes */
+struct buddy_page {
+    uint64_t next_pfn : (64 - PAGE_4K_SHIFT); /* 52 bits... */
+    uint64_t order : 8;                           /* 8 bits */
+    uint64_t is_free : 1;                         /* 1 bit */
+    uint64_t available : 3;                       /* leftover */
+};
+static_assert_struct_size_eq(buddy_page, 8);
+
 static inline bool page_pfn_allocated_in_boot_bitmap(uint64_t pfn) {
     return test_bit(pfn);
 }
 
-void buddy_add_to_free_area(struct page *page, struct free_area *area);
-struct page *buddy_remove_from_free_area(struct free_area *area);
-paddr_t buddy_alloc_pages_global(size_t count, enum alloc_flags f);
-void buddy_free_pages_global(paddr_t addr, uint64_t count);
-struct limine_memmap_entry;
-void buddy_add_entry(struct page *page_array, struct limine_memmap_entry *entry,
-                     struct free_area *farea);
-void buddy_reserve_range(uint64_t pfn, uint64_t pages);
+static inline bool buddy_page_pfn_free(uint64_t pfn) {
+    if (pfn >= global.last_pfn) {
+        return false;
+    }
+
+    struct page *p = &global.page_array[pfn];
+
+    return ((struct buddy_page *) p)->is_free;
+}
+
+static inline struct buddy_page *buddy_page_for_pfn(uint64_t pfn) {
+    return PAGE_TO_BUDDY_PAGE(page_for_pfn(pfn));
+}
+
+static inline uint64_t buddy_page_get_pfn(struct buddy_page *bp) {
+    return page_get_pfn((struct page *) bp);
+}
+
+static inline struct buddy_page *buddy_page_get_next(struct buddy_page *bp) {
+    if (bp->next_pfn == 0)
+        return NULL;
+
+    uint64_t pfn = bp->next_pfn;
+    return buddy_page_for_pfn(pfn);
+}

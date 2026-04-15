@@ -148,11 +148,6 @@ static inline bool migrate_to_destination(struct thread *t, time_t time) {
     return true;
 }
 
-static inline enum thread_prio_class
-available_prio_level_from_bitmap(uint8_t bitmap) {
-    return 31 - __builtin_clz((uint32_t) bitmap);
-}
-
 static struct thread *pick_from_special_queues(struct scheduler *sched,
                                                enum thread_prio_class prio) {
     struct list_head *q = scheduler_get_this_thread_queue(sched, prio);

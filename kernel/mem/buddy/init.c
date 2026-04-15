@@ -49,19 +49,19 @@ static inline int order_base_2(uint64_t x) {
     return 64 - __builtin_clzll(x) - 1;
 }
 
-void buddy_add_to_free_area(struct page *page, struct free_area *area) {
-    page->next = area->next;
+void buddy_add_to_free_area(struct buddy_page *page, struct free_area *area) {
+    page->next_pfn = buddy_page_get_pfn(area->next);
     area->next = page;
     area->nr_free++;
     page->is_free = true;
 }
 
-struct page *buddy_remove_from_free_area(struct free_area *area) {
+struct buddy_page *buddy_remove_from_free_area(struct free_area *area) {
     if (area->nr_free == 0 || area->next == NULL)
         return NULL;
 
-    struct page *page = area->next;
-    area->next = page->next;
+    struct buddy_page *page = area->next;
+    area->next = buddy_page_get_next(page);
     area->nr_free--;
     page->is_free = false;
     return page;
@@ -93,7 +93,7 @@ void buddy_add_entry(struct page *page_array, struct limine_memmap_entry *entry,
             block_size = region_size;
 
         if (is_block_free(region_start, order)) {
-            struct page *page = &page_array[region_start];
+            struct buddy_page *page = buddy_page_for_pfn(region_start);
             memset(page, 0, sizeof(*page));
 
             page->order = order;

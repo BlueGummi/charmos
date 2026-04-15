@@ -11,6 +11,13 @@
 #include <mem/elcm.h>
 #include <mem/page.h>
 
+/*
+ * L = Lower a^2
+ * U = Upper b^2
+ *
+ * pp(n) = { 1, if popcount(n) == 1
+ *         { 1 - ((U - n) / (U - L)), otherwise
+ */
 static fx32_32_t pow2_proximity(size_t n) {
     if (n == 0)
         return 0.0;
@@ -31,7 +38,12 @@ static fx32_32_t pow2_proximity(size_t n) {
     return FX_ONE - fx_div(dist_fx, span_fx);
 }
 
-/* The closer to `min`, the closer to 1 the output will be */
+/* The closer to `min`, the closer to 1 the output will be 
+ *
+ * m = min, M = max
+ * r = M - m
+ * lcsf(m, M, n) = ln(e - { [ (e - 1)  * (n - m) ] / r})
+ */
 static fx32_32_t log_clamped_scale_factor(size_t min, size_t max, size_t n) {
     kassert(max > min);
     kassert(n >= min && n <= max);
@@ -49,6 +61,9 @@ static fx32_32_t log_clamped_scale_factor(size_t min, size_t max, size_t n) {
     return fx_ln(FX_E - n_scaled);
 }
 
+/*
+ * pps(m, M, n) = pp(n) * lcsf(m, M, n)
+ */
 static fx32_32_t pow2_proximity_scaled(size_t min, size_t max, size_t n) {
     fx32_32_t prox = pow2_proximity(n);
 
@@ -56,12 +71,15 @@ static fx32_32_t pow2_proximity_scaled(size_t min, size_t max, size_t n) {
     return fx_mul(prox, log_clamped_scale_factor(min, max, n));
 }
 
+/*
+ * cs(w, d, m, M, W) = [ 1 - (w / W) ] * lcsf(m, M, m + M - d)
+ */
 static fx32_32_t candidate_score(const struct elcm_candidate *c, size_t mind,
                                  size_t maxd, fx32_32_t max_wastage) {
     kassert(c->wasted);
     fx32_32_t wastage_scaled = fx_div(c->wastage, max_wastage);
 
-    size_t n = mind + (maxd - c->distance);
+    size_t n = mind + maxd - c->distance;
     fx32_32_t scale = log_clamped_scale_factor(mind, maxd, n);
 
     return fx_mul(FX_ONE - wastage_scaled, scale);

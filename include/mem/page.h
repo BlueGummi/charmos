@@ -45,23 +45,13 @@
 #define PAGE_2M_MASK ((1ULL << PAGE_2M_SHIFT) - 1)
 
 struct page {
-    uint8_t is_free : 1;
-    uint8_t order : 7;
-    struct page *next;
+    uint64_t meta;
 };
 
 struct page_table {
     pte_t entries[512];
 } __packed;
 _Static_assert(sizeof(struct page_table) == PAGE_SIZE, "");
-
-static inline bool page_pfn_free(uint64_t pfn) {
-    if (pfn >= global.last_pfn) {
-        return false;
-    }
-
-    return global.page_array[pfn].is_free;
-}
 
 static inline struct page *page_for_pfn(uint64_t pfn) {
     if (pfn >= global.last_pfn)

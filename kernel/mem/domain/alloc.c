@@ -4,6 +4,7 @@
 #include <smp/domain.h>
 
 #include "internal.h"
+#include "mem/buddy/internal.h"
 
 static inline bool domain_free_queue_available(struct domain_free_queue *fq,
                                                struct domain_buddy *domain) {
@@ -37,7 +38,7 @@ static void flush_freequeue_into_local_arena(struct domain_buddy *domain,
             continue;
         }
 
-        struct page *bp = buddy_page_for_addr(addr);
+        struct buddy_page *bp = buddy_page_for_addr(addr);
 
         if (!domain_arena_push(local_arena, bp)) {
             /* arena is full, fall back */
@@ -71,11 +72,11 @@ static paddr_t try_alloc_from_remote_arenas(struct domain_buddy *owner,
 
     struct domain_arena *try_from;
     domain_for_each_arena(owner, try_from) {
-        struct page *bp = domain_arena_pop(try_from);
+        struct buddy_page *bp = domain_arena_pop(try_from);
         if (bp) {
             struct domain_buddy *local = domain_buddy_on_this_core();
             domain_stat_alloc(local, /*remote*/ remote, /*interleaved*/ false);
-            return PFN_TO_PAGE(page_get_pfn(bp));
+            return PFN_TO_PAGE(buddy_page_get_pfn(bp));
         }
     }
 
@@ -109,10 +110,10 @@ static paddr_t try_alloc_from_free_queue(struct domain_free_queue *fq,
         flush_freequeue_into_local_arena(this, fq, quota);
 
         /* retry after flush */
-        struct page *bp = domain_arena_pop(this_arena);
+        struct buddy_page *bp = domain_arena_pop(this_arena);
         if (bp) {
             domain_stat_alloc(this, /*remote*/ false, /*interleaved*/ false);
-            return PFN_TO_PAGE(page_get_pfn(bp));
+            return PFN_TO_PAGE(buddy_page_get_pfn(bp));
         }
     }
 
@@ -124,12 +125,12 @@ static paddr_t try_alloc_from_arenas(size_t pages) {
         return 0x0;
 
     struct domain_arena *this_arena = domain_arena_on_this_core();
-    struct page *bp = domain_arena_pop(this_arena);
+    struct buddy_page *bp = domain_arena_pop(this_arena);
 
     if (bp) {
         struct domain_buddy *local = domain_buddy_on_this_core();
         domain_stat_alloc(local, /*remote*/ false, /*interleaved*/ false);
-        return PFN_TO_PAGE(page_get_pfn(bp));
+        return PFN_TO_PAGE(buddy_page_get_pfn(bp));
     }
 
     struct domain_buddy *this = domain_buddy_on_this_core();
