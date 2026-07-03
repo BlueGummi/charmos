@@ -2,7 +2,6 @@
 
 #include <mem/alloc_or_die.h>
 #include <sch/sched.h>
-#include <sleep.h>
 #include <string.h>
 #include <tests.h>
 #include <thread/apc.h>
@@ -10,6 +9,7 @@
 #include <thread/reaper.h>
 #include <thread/thread.h>
 #include <thread/workqueue.h>
+#include <time/spin_sleep.h>
 
 static atomic_bool workqueue_ran = false;
 static _Atomic uint32_t workqueue_times = 0;
@@ -30,7 +30,7 @@ TEST_REGISTER(workqueue_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     }
 
     uint64_t total = rdtsc() - tsc;
-    sleep_ms(50);
+    sleep_spin_ms(50);
 
     while (!atomic_load(&workqueue_ran))
         cpu_relax();

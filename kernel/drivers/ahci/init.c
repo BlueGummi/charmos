@@ -6,10 +6,10 @@
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <time/spin_sleep.h>
 
 // TODO: Hand this off to IDE if the GHC bit 31 is OFF
 // It won't be AHCI - Sometimes we are in IDE emul mode
@@ -79,10 +79,10 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
         struct ahci_port *port = ahci_get_port(dev, i);
 
         mmio_write_32(&port->cmd, mmio_read_32(&port->cmd) & ~AHCI_CMD_ST);
-        mmio_wait(&port->cmd, AHCI_CMD_CR, AHCI_CMD_TIMEOUT_MS);
+        mmio_spin_wait(&port->cmd, AHCI_CMD_CR, AHCI_CMD_TIMEOUT_MS);
 
         mmio_write_32(&port->cmd, mmio_read_32(&port->cmd) & ~AHCI_CMD_FRE);
-        mmio_wait(&port->cmd, AHCI_CMD_FR, AHCI_CMD_TIMEOUT_MS);
+        mmio_spin_wait(&port->cmd, AHCI_CMD_FR, AHCI_CMD_TIMEOUT_MS);
 
         uint32_t cmd = mmio_read_32(&port->cmd);
         cmd |= AHCI_CMD_FRE | AHCI_CMD_ST;
@@ -144,8 +144,8 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
             mmio_write_32(&port->ie, 0xFFFFFFFF);
             mmio_write_32(&port->cmd, cmd & ~(AHCI_CMD_ST | AHCI_CMD_FRE));
 
-            mmio_wait(&port->cmd, AHCI_CMD_CR | AHCI_CMD_FR,
-                      AHCI_CMD_TIMEOUT_MS);
+            mmio_spin_wait(&port->cmd, AHCI_CMD_CR | AHCI_CMD_FR,
+                           AHCI_CMD_TIMEOUT_MS);
 
             allocate_port(dev, port, i);
 
@@ -171,7 +171,7 @@ struct ahci_disk *ahci_setup_controller(struct ahci_controller *ctrl,
 
     mmio_write_32(&ctrl->ghc, AHCI_GHC_HR);
 
-    mmio_wait(&ctrl->ghc, AHCI_GHC_HR, AHCI_CMD_TIMEOUT_MS);
+    mmio_spin_wait(&ctrl->ghc, AHCI_GHC_HR, AHCI_CMD_TIMEOUT_MS);
 
     mmio_write_32(&ctrl->ghc, mmio_read_32(&ctrl->ghc) | AHCI_GHC_AE);
 

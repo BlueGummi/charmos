@@ -8,10 +8,10 @@
 #include <mem/alloc_or_die.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <time/spin_sleep.h>
 
 #include "internal.h"
 
@@ -34,7 +34,7 @@ void nvme_enable_controller(struct nvme_device *nvme) {
 
     mmio_write_32(&nvme->regs->cc, *(uint32_t *) &cc);
 
-    mmio_wait(&nvme->regs->csts, 1, NVME_CMD_TIMEOUT_MS);
+    mmio_spin_wait(&nvme->regs->csts, 1, NVME_CMD_TIMEOUT_MS);
 
     cc.en = 1;
 
@@ -42,7 +42,7 @@ void nvme_enable_controller(struct nvme_device *nvme) {
 
     uint64_t timeout = NVME_CMD_TIMEOUT_MS * 1000;
     while ((mmio_read_32(&nvme->regs->csts) & 1) == 0) {
-        sleep_us(10);
+        sleep_spin_us(10);
         timeout--;
         if (timeout == 0)
             return;

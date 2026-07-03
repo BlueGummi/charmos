@@ -38,7 +38,7 @@ static void init_dot_ents(struct ext2_fs *fs, uint8_t *block,
 }
 
 enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
-                      const char *name, uint16_t mode) {
+                      const char *name, mode_t mode) {
     if (!(mode & EXT2_S_IFDIR))
         mode |= EXT2_S_IFDIR;
 

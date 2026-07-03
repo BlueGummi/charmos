@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <types/types.h>
 
 enum topology_level {
     TOPOLOGY_LEVEL_SMT,     /* Symmetric multiprocessing threads */
@@ -93,7 +94,7 @@ void cpu_mask_deinit(struct cpu_mask *m);
                       (1ULL << (iter % CPU_MASK_WORD_BITS))                    \
                 : atomic_load(&(mask).small) & (1ULL << iter))
 
-void topology_mark_core_idle(size_t cpu_id, bool idle);
+void topology_mark_core_idle(cpu_id_t cpu_id, bool idle);
 struct core *topology_find_idle_core(struct core *local_core,
                                      enum topology_level max_search);
 struct core **topology_get_smts_under_numa(struct topology_node *numa,

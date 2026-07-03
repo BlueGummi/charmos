@@ -4,12 +4,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <time.h>
+#include <time/time.h>
 
 struct unlink_ctx {
     const char *name;
     bool found;
-    uint32_t inode_num;
+    inode_t inode_num;
     uint32_t block_num;
     uint32_t entry_offset;
     uint32_t prev_offset;
@@ -74,7 +74,7 @@ static inline void unlink_target_update(struct ext2_inode *target_inode) {
 
 static inline void unlink_free_blocks(struct ext2_fs *fs,
                                       struct ext2_inode *target_inode,
-                                      uint32_t inode_num) {
+                                      inode_t inode_num) {
     ext2_traverse_inode_blocks(fs, target_inode, free_block_visitor, NULL,
                                false);
     ext2_free_inode(fs, inode_num);

@@ -599,7 +599,7 @@ void topology_init(void) {
     domain_dump();
 }
 
-void topology_mark_core_idle(size_t cpu_id, bool idle) {
+void topology_mark_core_idle(cpu_id_t cpu_id, bool idle) {
     if (!global.topology.level[TOPOLOGY_LEVEL_MACHINE])
         return;
 

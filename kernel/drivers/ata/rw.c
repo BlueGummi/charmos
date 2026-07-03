@@ -4,11 +4,11 @@
 #include <console/printf.h>
 #include <drivers/ata.h>
 #include <mem/alloc.h>
-#include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <structures/sll.h>
 #include <thread/io_wait.h>
+#include <time/spin_sleep.h>
 
 static void ide_start_next(struct ide_channel *chan, bool locked);
 typedef bool (*sync_fn)(struct ata_drive *, uint64_t, uint8_t *, uint8_t,
@@ -33,7 +33,7 @@ static enum bio_request_status translate_status(uint8_t status, uint8_t error) {
     return BIO_STATUS_UNKNOWN_ERR;
 }
 
-enum irq_result ide_irq_handler(void *ctx, uint8_t irq_num,
+enum irq_result ide_irq_handler(void *ctx, irq_t irq_num,
                                 struct irq_context *rsp) {
     (void) irq_num, (void) rsp;
 
@@ -52,7 +52,7 @@ enum irq_result ide_irq_handler(void *ctx, uint8_t irq_num,
         if ((status & STATUS_BSY) == 0 &&
             (status & STATUS_DRQ || status & STATUS_ERR))
             break;
-        sleep_us(1);
+        sleep_spin_us(1);
     }
 
     uint8_t status = inb(REG_STATUS(d->io_base));

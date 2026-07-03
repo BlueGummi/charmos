@@ -20,7 +20,7 @@
 #include <structures/rbt.h>
 #include <sync/spinlock.h>
 #include <thread/workqueue.h>
-#include <time.h>
+#include <time/time.h>
 
 LOG_SITE_EXTERN(slab);
 LOG_HANDLE_EXTERN(slab);

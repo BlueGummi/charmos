@@ -5,8 +5,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+typedef uint8_t irq_t;
 typedef int8_t cpu_perf_t;
 typedef uint64_t time_t;
+typedef uint64_t timestamp_t;
 typedef uint32_t inode_t;
 typedef uint16_t mode_t;
 typedef uint32_t gid_t;
@@ -26,6 +28,8 @@ typedef uint32_t thread_prio_t;
 typedef int64_t fx32_32_t;
 typedef int32_t nice_t;
 typedef ptrdiff_t ssize_t;
+typedef __int128_t int128_t;
+typedef __uint128_t uint128_t;
 
 #define CPU_PERF_MAX INT8_MAX
 #define CPU_PERF_MIN INT8_MIN
@@ -80,3 +84,8 @@ typedef ptrdiff_t ssize_t;
 
 #define SSIZE_MAX ((ssize_t) (SIZE_MAX >> 1))
 #define SSIZE_MIN ((ssize_t) (-SSIZE_MAX - 1))
+
+#define INT128_MAX ((int128_t) (int128_t) (~((uint128_t) 0ULL >> 1)))
+#define INT128_MIN ((int128_t) (-INT128_MAX - 1))
+#define UINT128_MAX ((uint128_t) (~((uint128_t) 0ULL)))
+#define UINT128_MIN ((uint128_t) 0ULL)

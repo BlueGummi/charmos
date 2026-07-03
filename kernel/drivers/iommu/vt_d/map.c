@@ -88,7 +88,7 @@ fail:
 }
 
 static bool vtd_sl_unmap_page(uint64_t *sl_pgd, iova_t iova) {
-    uint64_t pte;
+    pte_t pte;
 
     pte = sl_pgd[SL_PML4_INDEX(iova)];
     if (!(pte & SL_PTE_READ))
@@ -113,7 +113,7 @@ static bool vtd_sl_unmap_page(uint64_t *sl_pgd, iova_t iova) {
 }
 
 static paddr_t vtd_sl_translate(uint64_t *sl_pgd, iova_t iova) {
-    uint64_t pte;
+    pte_t pte;
 
     pte = sl_pgd[SL_PML4_INDEX(iova)];
     if (!(pte & SL_PTE_READ))

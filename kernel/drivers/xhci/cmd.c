@@ -6,9 +6,9 @@
 #include <mem/page.h>
 #include <mem/vmm.h>
 #include <sch/sched.h>
-#include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <time/spin_sleep.h>
 
 #include "internal.h"
 

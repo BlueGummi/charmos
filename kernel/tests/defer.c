@@ -2,14 +2,14 @@
 
 #include <mem/alloc.h>
 #include <sch/sched.h>
-#include <sleep.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 #include <tests.h>
 #include <thread/workqueue.h>
-#include <time.h>
+#include <time/spin_sleep.h>
+#include <time/time.h>
 
 static bool defer_worked = false;
 static uint64_t enqueue_ms;
@@ -32,7 +32,7 @@ TEST_REGISTER(defer_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     SET_SUCCESS();
     defer_enqueue(defer_func, WORK_ARGS(NULL, NULL), 5);
     enqueue_ms = time_get_ms();
-    sleep_ms(100);
+    sleep_spin_ms(100);
 }
 
 #endif

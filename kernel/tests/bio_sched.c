@@ -5,12 +5,12 @@
 #include <fs/ext2.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
-#include <sleep.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 #include <tests.h>
+#include <time/spin_sleep.h>
 
 #include "fs/detect.h"
 #define EXT2_INIT                                                              \
@@ -33,7 +33,7 @@ static void bio_sch_callback(struct bio_request *req) {
     done2 = true;
     uint64_t q_ms = (uint64_t) req->user_data >> 12;
     uint64_t q_lvl = (uint64_t) req->user_data & 7;
-    uint64_t time = time_get_ms() - q_ms;
+    time_t time = time_get_ms() - q_ms;
     total_complete_time[q_lvl] += time;
     req->user_data = NULL;
     atomic_fetch_add(&runs, 1);

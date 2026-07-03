@@ -4,13 +4,13 @@
 #include <global.h>
 #include <irq/irq.h>
 #include <mem/vas.h>
-#include <sleep.h>
 #include <smp/core.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <tests.h>
-#include <time.h>
+#include <time/spin_sleep.h>
+#include <time/time.h>
 
 #include "mem/slab/internal.h"
 

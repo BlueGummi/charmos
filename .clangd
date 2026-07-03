@@ -1,4 +1,5 @@
 CompileFlags:
   Add: [-std=gnu11]
+  Remove: [-malign-data*]
 Index:
   Background: Build

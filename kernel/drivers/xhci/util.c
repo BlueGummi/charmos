@@ -5,10 +5,10 @@
 #include <mem/alloc.h>
 #include <mem/page.h>
 #include <mem/vmm.h>
-#include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <time/spin_sleep.h>
 
 #include "internal.h"
 
@@ -20,7 +20,7 @@ bool xhci_controller_stop(struct xhci_device *dev) {
     mmio_write_32(&op->usbcmd, usbcmd.raw);
     uint64_t timeout = XHCI_DEVICE_TIMEOUT * 1000;
     while ((mmio_read_32(&op->usbsts) & 1) == 0 && timeout--) {
-        sleep_us(10);
+        sleep_spin_us(10);
         if (timeout == 0)
             return false;
     }
@@ -36,7 +36,7 @@ bool xhci_controller_reset(struct xhci_device *dev) {
     uint64_t timeout = XHCI_DEVICE_TIMEOUT * 1000;
 
     while (mmio_read_32(&op->usbcmd) & (1 << 1) && timeout--) {
-        sleep_us(10);
+        sleep_spin_us(10);
         if (timeout == 0)
             return false;
     }
@@ -51,7 +51,7 @@ bool xhci_controller_start(struct xhci_device *dev) {
     mmio_write_32(&op->usbcmd, usbcmd.raw);
     uint64_t timeout = XHCI_DEVICE_TIMEOUT * 1000;
     while (mmio_read_32(&op->usbsts) & 1 && timeout--) {
-        sleep_us(10);
+        sleep_spin_us(10);
         if (timeout == 0)
             return false;
     }

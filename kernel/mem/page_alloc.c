@@ -128,7 +128,7 @@ void page_free_internal(void *ptr, size_t n_pages, enum alloc_behavior b) {
     } else {
         vaddr_t virt = (vaddr_t) ptr;
         for (uint32_t i = 0; i < n_pages; i++) {
-            uintptr_t vaddr = virt + i * PAGE_SIZE;
+            vaddr_t vaddr = virt + i * PAGE_SIZE;
             paddr_t phys = (paddr_t) vmm_get_phys(vaddr, VMM_FLAG_NONE);
             vmm_unmap_page(vaddr);
 

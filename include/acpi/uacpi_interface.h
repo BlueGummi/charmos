@@ -2,6 +2,7 @@
 #pragma once
 #include <stdbool.h>
 #include <stdint.h>
+#include <types/types.h>
 #include <uacpi/types.h>
 
 typedef struct { // typedefing it because of consistency with uacpi naming
@@ -21,6 +22,6 @@ typedef struct {
     bool installed;
 } irq_entry_t;
 
-void uacpi_mark_irq_installed(uint8_t irq);
+void uacpi_mark_irq_installed(irq_t irq);
 void uacpi_init(uint64_t rsdp);
 void uacpi_print_devs();

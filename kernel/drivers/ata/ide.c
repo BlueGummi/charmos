@@ -9,9 +9,9 @@
 #include <irq/idt.h>
 #include <mem/alloc.h>
 #include <mem/alloc_or_die.h>
-#include <sleep.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <time/spin_sleep.h>
 
 LOG_SITE_DECLARE_DEFAULT(ide);
 LOG_HANDLE_DECLARE_DEFAULT(ide);
@@ -50,7 +50,7 @@ void ide_identify(struct ata_drive *drive) {
 
     uint64_t timeout = IDE_IDENT_TIMEOUT_MS * 1000;
     while ((status = inb(REG_STATUS(io))) & STATUS_BSY) {
-        sleep_us(10);
+        sleep_spin_us(10);
         timeout--;
         if (timeout == 0)
             goto out;
@@ -62,7 +62,7 @@ void ide_identify(struct ata_drive *drive) {
 
     timeout = IDE_IDENT_TIMEOUT_MS * 1000;
     while (!((status = inb(REG_STATUS(io))) & STATUS_DRQ)) {
-        sleep_us(10);
+        sleep_spin_us(10);
         timeout--;
         if (timeout == 0)
             goto out;
@@ -139,7 +139,7 @@ struct block_device *ide_create_generic(struct ata_drive *ide) {
     if (!ide->actually_exists)
         return NULL;
 
-    uint8_t irq = irq_alloc_entry();
+    irq_t irq = irq_alloc_entry();
     ide_log(LOG_INFO, "IDE drive IRQ on line %u, allocated entry %u", ide->irq,
             irq);
 

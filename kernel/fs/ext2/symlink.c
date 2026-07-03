@@ -3,12 +3,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <time.h>
+#include <time/time.h>
 
 enum errno ext2_symlink_file(struct ext2_fs *fs,
                              struct ext2_full_inode *dir_inode,
                              const char *name, const char *target) {
-    uint32_t inode_num = ext2_alloc_inode(fs);
+    inode_t inode_num = ext2_alloc_inode(fs);
     if (inode_num == 0)
         return ERR_FS_NO_INODE;
 

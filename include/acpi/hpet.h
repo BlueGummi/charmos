@@ -5,6 +5,7 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <types/types.h>
 
 void hpet_init(void);
 uint64_t hpet_timestamp_ns(void);
@@ -15,7 +16,7 @@ uint64_t hpet_timestamp_us(void);
 void hpet_disable(void);
 void hpet_enable(void);
 void hpet_clear_interrupt_status(void);
-void hpet_setup_timer(uint8_t timer_index, uint8_t irq_line, bool periodic,
+void hpet_setup_timer(uint8_t timer_index, irq_t irq_line, bool periodic,
                       bool edge_triggered);
 
 #define HPET_GEN_CAP_ID_OFFSET 0x0

@@ -166,7 +166,7 @@ static enum errno tmpfs_add_child(struct tmpfs_node *parent,
 }
 
 static enum errno tmpfs_create_common(struct vfs_node *parent, const char *name,
-                                      uint16_t mode, enum tmpfs_type type,
+                                      mode_t mode, enum tmpfs_type type,
                                       struct tmpfs_node **out) {
     struct tmpfs_node *pt = parent->fs_node_data;
     if (pt->type != TMPFS_DIR)
@@ -196,14 +196,14 @@ static enum errno tmpfs_create_common(struct vfs_node *parent, const char *name,
 }
 
 static enum errno tmpfs_create(struct vfs_node *parent, const char *name,
-                               uint16_t mode) {
+                               mode_t mode) {
     struct tmpfs_node *node;
     enum tmpfs_type type = (mode & VFS_MODE_DIR) ? TMPFS_DIR : TMPFS_FILE;
     return tmpfs_create_common(parent, name, mode, type, &node);
 }
 
 static enum errno tmpfs_mknod(struct vfs_node *parent, const char *name,
-                              uint16_t mode, uint32_t dev) {
+                              mode_t mode, uint32_t dev) {
     (void) parent, (void) name, (void) mode, (void) dev;
     return ERR_NOT_IMPL;
 }
@@ -250,7 +250,7 @@ static enum errno tmpfs_readdir(struct vfs_node *node, struct vfs_dirent *out,
 }
 
 static enum errno tmpfs_mkdir(struct vfs_node *parent, const char *name,
-                              uint16_t mode) {
+                              mode_t mode) {
     return tmpfs_create_common(parent, name, mode, TMPFS_DIR, NULL);
 }
 
@@ -399,15 +399,14 @@ static enum errno tmpfs_link(struct vfs_node *parent, struct vfs_node *target,
     return ERR_NOT_IMPL;
 }
 
-static enum errno tmpfs_chmod(struct vfs_node *node, uint16_t mode) {
+static enum errno tmpfs_chmod(struct vfs_node *node, mode_t mode) {
     struct tmpfs_node *tn = node->fs_node_data;
     tn->mode = mode;
     node->mode = mode;
     return ERR_OK;
 }
 
-static enum errno tmpfs_chown(struct vfs_node *node, uint32_t uid,
-                              uint32_t gid) {
+static enum errno tmpfs_chown(struct vfs_node *node, uid_t uid, gid_t gid) {
     struct tmpfs_node *n = node->fs_node_data;
     node->uid = uid;
     node->gid = gid;

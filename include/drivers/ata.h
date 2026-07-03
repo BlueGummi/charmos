@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <sync/spinlock.h>
+#include <types/types.h>
 
 #define IDE_CMD_TIMEOUT_MS 5000    // Read/write sector
 #define IDE_IDENT_TIMEOUT_MS 10000 // Identify or cache flush
@@ -109,7 +110,7 @@ struct ata_drive {
     uint8_t supports_dma;
     uint8_t udma_mode;
     uint8_t pio_mode;
-    uint8_t irq;
+    irq_t irq;
     struct ide_channel channel;
 };
 
@@ -204,7 +205,7 @@ void ata_select_drive(struct ata_drive *ata_drive);
 void ata_soft_reset(struct ata_drive *ata_drive);
 bool atapi_identify(struct ata_drive *ide);
 void ata_init(struct pci_device *devices, uint64_t count);
-enum irq_result ide_irq_handler(void *ctx, uint8_t irq_num,
+enum irq_result ide_irq_handler(void *ctx, irq_t irq_num,
                                 struct irq_context *ct);
 void ide_reorder(struct block_device *disk);
 bool ide_submit_bio_async(struct block_device *d, struct bio_request *b);

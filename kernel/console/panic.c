@@ -4,11 +4,11 @@
 #include <console/printf.h>
 #include <global.h>
 #include <logo.h>
-#include <sleep.h>
 #include <smp/core.h>
 #include <stdarg.h>
 #include <sync/spinlock.h>
-#include <time.h>
+#include <time/spin_sleep.h>
+#include <time/time.h>
 
 void panic_broadcast_nmi() {
     panic_broadcast(smp_core_id());
@@ -33,7 +33,7 @@ void panic_handler(struct panic_regs *regs) {
 
     if (global.current_bootstage >= BOOTSTAGE_MID_MP) {
         panic_broadcast(smp_core_id());
-        sleep_ms(50);
+        sleep_spin_ms(50);
     }
 }
 

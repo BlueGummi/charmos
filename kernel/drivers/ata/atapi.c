@@ -4,9 +4,9 @@
 #include <console/printf.h>
 #include <drivers/ata.h>
 #include <mem/alloc.h>
-#include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <time/spin_sleep.h>
 
 #define ATAPI_SECTOR_SIZE 2048
 
@@ -23,7 +23,7 @@ bool atapi_identify(struct ata_drive *ide) {
     uint64_t timeout = ATAPI_CMD_TIMEOUT_MS * 1000;
     while ((status & STATUS_BSY)) {
         status = inb(REG_STATUS(ide->io_base));
-        sleep_us(10);
+        sleep_spin_us(10);
         timeout--;
         if (timeout == 0)
             return false;
@@ -56,7 +56,7 @@ bool atapi_read_sector(struct block_device *disk, uint64_t lba, uint8_t *buffer,
 
     uint64_t timeout = ATAPI_CMD_TIMEOUT_MS * 1000;
     while (inb(REG_STATUS(io)) & STATUS_BSY) {
-        sleep_us(10);
+        sleep_spin_us(10);
         timeout--;
         if (timeout == 0)
             return false;
@@ -90,7 +90,7 @@ bool atapi_read_sector(struct block_device *disk, uint64_t lba, uint8_t *buffer,
             return false;
         if (status & STATUS_DRQ)
             break;
-        sleep_us(10);
+        sleep_spin_us(10);
         timeout--;
         if (timeout == 0)
             return false;

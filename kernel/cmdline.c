@@ -1,3 +1,4 @@
+#include <asm.h>
 #include <cmdline.h>
 #include <console/panic.h>
 #include <console/printf.h>
@@ -11,7 +12,9 @@
 #define MAX_VAR_LEN 128
 #define MAX_VAL_LEN 256
 
-CMDLINE_ENTRY_DECLARE(root, .default_val = NULL,
+CMDLINE_ENTRY_DECLARE(root,
+                      .desc = "Root filesystem partition to mount at boot",
+                      .arg = "<device>", .default_val = NULL,
                       .value = &global.root_partition, .required = true);
 
 static void cmdline_check_for_unfilled(void) {
@@ -66,6 +69,48 @@ static void cmdline_dispatch(const char *var, const char *val) {
         return;
     }
     log_msg(LOG_WARN, "unknown key '%s', ignoring\n", var);
+}
+
+bool cmdline_wants_help(const char *input) {
+    if (!input)
+        return false;
+
+    while (*input) {
+        while (*input == ' ')
+            input++;
+
+        const char *tok = input;
+        while (*input && *input != ' ' && *input != '=')
+            input++;
+
+        size_t len = (size_t) (input - tok);
+        if (len == 4 && memcmp(tok, "help", 4) == 0 && *input != '=')
+            return true;
+
+        /* skip the rest of this token (any =value and trailing chars) */
+        while (*input && *input != ' ')
+            input++;
+    }
+    return false;
+}
+
+__noreturn void cmdline_dump_help(void) {
+    printf("charmos kernel command-line options:\n\n");
+    for (struct cmdline_entry *e = __skernel_cmdline_entries;
+         e < __ekernel_cmdline_entries; e++) {
+        printf("  %s%s%s\n", e->name, e->arg ? "=" : "", e->arg ? e->arg : "");
+        if (e->desc)
+            printf("      %s\n", e->desc);
+        printf("      %s", e->required ? "required" : "optional");
+        if (e->default_val)
+            printf(", default: %s", e->default_val);
+        printf("\n\n");
+    }
+    printf("(kernel halted after `help`)\n");
+
+    disable_interrupts();
+    for (;;)
+        hcf();
 }
 
 void cmdline_parse(const char *input) {

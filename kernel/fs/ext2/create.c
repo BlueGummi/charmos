@@ -7,8 +7,8 @@
 
 struct link_ctx {
     const char *name;
-    uint32_t inode;
-    uint32_t dir_inode;
+    inode_t inode;
+    inode_t dir_inode;
     uint8_t type;
     bool success;
 };
@@ -99,8 +99,8 @@ done:
 
 enum errno ext2_create_file(struct ext2_fs *fs,
                             struct ext2_full_inode *parent_dir,
-                            const char *name, uint16_t mode, bool increment) {
-    uint32_t new_inode_num = ext2_alloc_inode(fs);
+                            const char *name, mode_t mode, bool increment) {
+    inode_t new_inode_num = ext2_alloc_inode(fs);
     if (new_inode_num == 0)
         return ERR_NOSPC;
 

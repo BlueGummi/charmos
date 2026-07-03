@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <sync/mutex.h>
+#include <types/types.h>
 
 enum tmpfs_type {
     TMPFS_FILE,
@@ -21,9 +22,9 @@ struct tmpfs_node {
     uint64_t size;      // total file size
 
     char *symlink_target;
-    uint16_t mode;
-    uint32_t uid;
-    uint32_t gid;
+    mode_t mode;
+    uid_t uid;
+    gid_t gid;
     uint64_t mtime;
     uint64_t atime;
 

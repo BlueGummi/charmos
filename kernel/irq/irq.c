@@ -227,14 +227,14 @@ void irq_free_entry(int32_t entry) {
     spin_unlock(&irq_table_lock, irql);
 }
 
-void irq_disable(uint8_t irq) {
+void irq_disable(irq_t irq) {
     struct irq_desc *desc = &irq_table[irq];
     desc->enabled = false;
     if (desc->chip && desc->chip->mask)
         desc->chip->mask(desc);
 }
 
-void irq_enable(uint8_t irq) {
+void irq_enable(irq_t irq) {
     struct irq_desc *desc = &irq_table[irq];
     desc->enabled = true;
     if (desc->chip && desc->chip->unmask)

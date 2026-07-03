@@ -9,6 +9,7 @@
 #include <structures/locked_list.h>
 #include <sync/semaphore.h>
 #include <thread/workqueue.h>
+#include <types/types.h>
 struct usb_controller;
 struct usb_packet;
 struct xhci_request;
@@ -651,25 +652,25 @@ enum xhci_request_list {
 };
 
 enum xhci_request_command_type { /* Abstract command types, not 1:1 */
-    XHCI_CMD_TYPE_NONE,
-    XHCI_CMD_TYPE_ENABLE_SLOT,
-    XHCI_CMD_TYPE_DISABLE_SLOT,
-    XHCI_CMD_TYPE_ADDRESS_DEVICE,
-    XHCI_CMD_TYPE_CONFIGURE_ENDPOINT,
-    XHCI_CMD_TYPE_EVALUATE_CONTEXT,
-    XHCI_CMD_TYPE_RESET_ENDPOINT,
-    XHCI_CMD_TYPE_STOP_ENDPOINT,
-    XHCI_CMD_TYPE_SET_TR_DEQUEUE_POINTER,
-    XHCI_CMD_TYPE_RESET_DEVICE,
-    XHCI_CMD_TYPE_FORCE_EVENT,
-    XHCI_CMD_TYPE_INTERRUPT_TRANSFER,
-    XHCI_CMD_TYPE_CONTROL_TRANSFER,
-    XHCI_CMD_TYPE_NO_OP,
-    XHCI_CMD_TYPE_NORMAL, /* 'misc.' */
+                                 XHCI_CMD_TYPE_NONE,
+                                 XHCI_CMD_TYPE_ENABLE_SLOT,
+                                 XHCI_CMD_TYPE_DISABLE_SLOT,
+                                 XHCI_CMD_TYPE_ADDRESS_DEVICE,
+                                 XHCI_CMD_TYPE_CONFIGURE_ENDPOINT,
+                                 XHCI_CMD_TYPE_EVALUATE_CONTEXT,
+                                 XHCI_CMD_TYPE_RESET_ENDPOINT,
+                                 XHCI_CMD_TYPE_STOP_ENDPOINT,
+                                 XHCI_CMD_TYPE_SET_TR_DEQUEUE_POINTER,
+                                 XHCI_CMD_TYPE_RESET_DEVICE,
+                                 XHCI_CMD_TYPE_FORCE_EVENT,
+                                 XHCI_CMD_TYPE_INTERRUPT_TRANSFER,
+                                 XHCI_CMD_TYPE_CONTROL_TRANSFER,
+                                 XHCI_CMD_TYPE_NO_OP,
+                                 XHCI_CMD_TYPE_NORMAL, /* 'misc.' */
 };
 
 struct xhci_device {
-    uint8_t irq; /* What IRQ line have we routed to this? */
+    irq_t irq; /* What IRQ line have we routed to this? */
     struct pci_device *pci;
     struct xhci_input_ctx *input_ctx;
     struct xhci_cap_regs *cap_regs;          /* Capability registers */

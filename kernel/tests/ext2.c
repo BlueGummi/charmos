@@ -4,10 +4,10 @@
 #include <fs/ext2.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
-#include <sleep.h>
 #include <stdint.h>
 #include <string.h>
 #include <tests.h>
+#include <time/spin_sleep.h>
 
 #define EXT2_INIT                                                              \
     if (global.root_node->fs_type != FS_EXT2) {                                \

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$REPO_ROOT"
+
 if [[ -t 1 ]] && [[ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]]; then
     GREEN=$'\033[0;32m'
     YELLOW=$'\033[0;33m'
@@ -100,6 +104,7 @@ log()    { $QUIET || echo -e "${GREEN}==>${NC} $*"; }
 warn()   { $QUIET || echo -e "${YELLOW}==>${NC} $*"; }
 err()    { echo -e "${RED}error:${NC} $*" >&2; }
 note()   { $QUIET || echo -e "${BLUE}    $*${NC}"; }
+die()    { err "$*"; exit 1; }
 
 run_cmd() {
     if $QUIET; then
@@ -147,7 +152,7 @@ check_required_tools() {
         fi
     fi
 
-    [[ $failed -eq 0 ]] || { err "fix missing tools and rerun"; exit 1; }
+    [[ $failed -eq 0 ]] || die "fix missing tools and rerun"
 }
 
 find_kasan_clang() {
@@ -197,7 +202,29 @@ check_compiler_toolchain() {
         fi
     fi
 
-    [[ $failed -eq 0 ]] || { err "fix the ${COMPILER} toolchain and rerun"; exit 1; }
+    [[ $failed -eq 0 ]] || die "fix the ${COMPILER} toolchain and rerun"
+}
+
+select_toolchain() {
+    TOOLCHAIN_ARGS=()
+    if [[ "$COMPILER" == "clang" ]]; then
+        note "using clang toolchain (clang_toolchain.cmake)"
+        TOOLCHAIN_ARGS=(-DCMAKE_TOOLCHAIN_FILE="$REPO_ROOT/scripts/clang_toolchain.cmake")
+    elif [[ "$(uname -s)" == "Darwin" ]]; then
+        note "detected macOS — using macos_toolchain.cmake"
+        TOOLCHAIN_ARGS=(-DCMAKE_TOOLCHAIN_FILE="$REPO_ROOT/scripts/macos_toolchain.cmake")
+    elif [[ "$(uname -m)" == "aarch64" ]]; then
+        note "detected aarch64 host — using cross toolchain"
+        TOOLCHAIN_ARGS=(-DCMAKE_TOOLCHAIN_FILE="$REPO_ROOT/scripts/toolchain.cmake")
+    fi
+}
+
+configure_cmake() {
+    run_cmd cmake \
+        -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+        "${TOOLCHAIN_ARGS[@]}" \
+        "${CMAKE_EXTRA_ARGS[@]}" \
+        "$REPO_ROOT"
 }
 
 check_required_tools
@@ -221,43 +248,25 @@ fi
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
-TOOLCHAIN_ARGS=()
-if [[ "$COMPILER" == "clang" ]]; then
-    note "using clang toolchain (clang_toolchain.cmake)"
-    TOOLCHAIN_ARGS=(-DCMAKE_TOOLCHAIN_FILE=../scripts/clang_toolchain.cmake)
-elif [[ "$(uname -s)" == "Darwin" ]]; then
-    note "detected macOS — using macos_toolchain.cmake"
-    TOOLCHAIN_ARGS=(-DCMAKE_TOOLCHAIN_FILE=../scripts/macos_toolchain.cmake)
-elif [[ "$(uname -m)" == "aarch64" ]]; then
-    note "detected aarch64 host — using cross toolchain"
-    TOOLCHAIN_ARGS=(-DCMAKE_TOOLCHAIN_FILE=../scripts/toolchain.cmake)
-fi
+select_toolchain
 
 log "configuring cmake (${BUILD_TYPE})"
-run_cmd cmake \
-    -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-    "${TOOLCHAIN_ARGS[@]}" \
-    "${CMAKE_EXTRA_ARGS[@]}" \
-    ..
+configure_cmake
 
 if $COMPDB; then
     log "generating compile_commands.json"
-    run_cmd cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
-    cp compile_commands.json ..
+    run_cmd cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON "$REPO_ROOT"
+    cp compile_commands.json "$REPO_ROOT"
 fi
 
-SYMS_FILE="../syms/fullsyms.c"
+SYMS_FILE="$REPO_ROOT/kernel/syms/fullsyms.c"
 
 if [[ ! -f "$SYMS_FILE" ]]; then
     warn "first build: bootstrapping symbol table"
     run_cmd make -j"$JOBS" kernel
     run_cmd make regen-syms
     log "reconfiguring with real symbols"
-    run_cmd cmake \
-        -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-        "${TOOLCHAIN_ARGS[@]}" \
-        "${CMAKE_EXTRA_ARGS[@]}" \
-        ..
+    configure_cmake
 fi
 
 log "building targets: ${TARGETS[*]}"

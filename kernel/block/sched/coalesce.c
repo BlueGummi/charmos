@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <sync/spinlock.h>
 #include <thread/workqueue.h>
-#include <time.h>
+#include <time/time.h>
 
 static inline void set_coalesced(struct bio_request *into,
                                  struct bio_request *from) {

@@ -62,7 +62,7 @@ static void hpet_work(void *a, void *b) {
     }
 }
 
-static enum irq_result hpet_irq_handler(void *ctx, uint8_t irq,
+static enum irq_result hpet_irq_handler(void *ctx, irq_t irq,
                                         struct irq_context *rsp) {
     (void) irq, (void) ctx, (void) rsp;
 

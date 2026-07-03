@@ -5,11 +5,11 @@
 #include <fs/vfs.h>
 #include <global.h>
 #include <mem/alloc.h>
-#include <sleep.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <tests.h>
+#include <time/spin_sleep.h>
 
 #include "fs/detect.h"
 
@@ -64,7 +64,7 @@ TEST_REGISTER(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
             return;
         }
 
-        sleep_ms(100);
+        sleep_spin_ms(100);
 
         TEST_ASSERT(bio->status == 0);
     }

@@ -620,7 +620,7 @@ TEST_REGISTER(elcm_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 static void *kfree_irq_allocs[KFREE_IRQ_TEST_ALLOC_COUNT] = {0};
 static atomic_size_t kfree_irq_test_consumed = 0;
 
-static enum irq_result kfree_irq_test_irq(void *arg, uint8_t irq,
+static enum irq_result kfree_irq_test_irq(void *arg, irq_t irq,
                                           struct irq_context *irqc) {
     /* Non-ordered load here is OK, we are the only modifier (this CPU) */
     uint8_t seed = prng_next() & 0xF;
@@ -653,7 +653,7 @@ TEST_REGISTER(kfree_defer_irq_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         return;
     }
 
-    uint8_t irq = irq_alloc_entry();
+    irq_t irq = irq_alloc_entry();
     irq_register("kfree_defer_irq_test", irq, kfree_irq_test_irq, NULL,
                  IRQ_FLAG_NONE);
     irq_set_chip(irq, lapic_get_chip(), NULL);

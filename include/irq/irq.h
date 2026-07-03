@@ -127,5 +127,5 @@ int32_t irq_alloc_entry(void);
 void irq_free_entry(int32_t entry);
 bool irq_is_installed(int32_t entry);
 void irq_free_entry(int32_t entry);
-void irq_disable(uint8_t irq);
-void irq_enable(uint8_t irq);
+void irq_disable(irq_t irq);
+void irq_enable(irq_t irq);

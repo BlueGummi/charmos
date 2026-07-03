@@ -1,5 +1,6 @@
 /* @title: Command Line */
 #pragma once
+#include <compiler.h>
 #include <linker/symbols.h>
 #include <stdbool.h>
 
@@ -13,6 +14,8 @@ typedef void (*cmdline_callback)(const char *value);
 
 struct cmdline_entry {
     const char *name;
+    const char *desc; /* human-readable description, for docs & help */
+    const char *arg;  /* value format hint, e.g. "<hex bytes>", "<device>" */
     cmdline_callback callback;
     char **value;
     const char *default_val;
@@ -27,3 +30,5 @@ struct cmdline_entry {
 LINKER_SECTION_DEFINE(struct cmdline_entry, cmdline_entries);
 
 void cmdline_parse(const char *input);
+bool cmdline_wants_help(const char *input);
+__noreturn void cmdline_dump_help(void);

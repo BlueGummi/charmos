@@ -3,12 +3,12 @@
 #include <crypto/prng.h>
 #include <mem/alloc.h>
 #include <sch/sched.h>
-#include <sleep.h>
 #include <string.h>
 #include <sync/rcu.h>
 #include <tests.h>
 #include <thread/thread.h>
 #include <thread/workqueue.h>
+#include <time/spin_sleep.h>
 
 #define NUM_RCU_READERS (global.core_count)
 #define RCU_TEST_DURATION_MS 50
@@ -54,7 +54,7 @@ static void rcu_free_fn(struct rcu_cb *cb, void *ptr) {
 }
 
 static void rcu_writer_thread(void *) {
-    sleep_ms(30);
+    sleep_spin_ms(30);
 
     struct rcu_test_data *old = shared_ptr;
 
@@ -82,7 +82,7 @@ TEST_REGISTER(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     }
 
     for (int i = 0; i < 100 && !atomic_load(&rcu_deferred_freed); i++)
-        sleep_ms(1);
+        sleep_spin_ms(1);
 
     TEST_ASSERT(!atomic_load(&rcu_test_failed));
 
@@ -227,7 +227,7 @@ static void rcu_stress_reclaimer(void *arg) {
         /* attempt to shrink deferred backlog by forcing grace periods */
         rcu_synchronize();
         /* small backoff between synchronizations */
-        sleep_ms(5);
+        sleep_spin_ms(5);
     }
 }
 
@@ -290,7 +290,7 @@ TEST_REGISTER(rcu_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
          i++) {
         /* call synchronize here to help force callbacks */
         rcu_synchronize();
-        sleep_ms(1);
+        sleep_spin_ms(1);
     }
 
     printf("RCU stress test: replacements=%u freed=%u\n",

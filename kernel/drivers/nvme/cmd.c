@@ -11,11 +11,11 @@
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 #include <thread/workqueue.h>
+#include <time/spin_sleep.h>
 
 #include "internal.h"
 
@@ -199,7 +199,7 @@ uint16_t nvme_submit_admin_cmd(struct nvme_device *nvme,
                 return status;
             }
         }
-        sleep_us(10);
+        sleep_spin_us(10);
         timeout--;
         if (timeout == 0)
             return 0xFFFF;

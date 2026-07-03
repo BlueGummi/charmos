@@ -9,7 +9,7 @@
 #include <structures/list.h>
 #include <sync/condvar.h>
 #include <sync/spinlock.h>
-#include <time.h>
+#include <time/time.h>
 #include <types/refcount.h>
 #include <types/types.h>
 
@@ -24,7 +24,7 @@ struct work_args {
 /* TODO: Merge this with standard workqueue infra */
 struct deferred_event {
     size_t timer;
-    uint64_t timestamp_ms;
+    timestamp_t timestamp_ms;
     work_function callback;
     struct work_args args;
     struct deferred_event *next;

@@ -7,6 +7,7 @@
 #include <mem/alloc.h>
 #include <stdint.h>
 #include <sync/spinlock.h>
+#include <types/types.h>
 
 extern uint64_t PTRS_PER_BLOCK;
 
@@ -178,7 +179,7 @@ struct ext2_group_desc {
 } __attribute__((__packed__));
 
 struct ext2_inode {
-    uint16_t mode;
+    mode_t mode;
     uint16_t uid;
     uint32_t size;
     uint32_t atime;
@@ -202,12 +203,12 @@ struct ext2_inode {
 
 struct ext2_full_inode {
     struct ext2_inode node;
-    uint32_t inode_num;
+    inode_t inode_num;
     struct bcache_entry *ent;
 };
 
 struct ext2_dir_entry {
-    uint32_t inode;
+    inode_t inode;
     uint16_t rec_len;
     uint8_t name_len;
     uint8_t file_type;
@@ -264,10 +265,10 @@ enum errno ext2_mount(struct partition *, struct ext2_fs *fs,
 
 struct vfs_node *ext2_g_mount(struct partition *);
 
-struct ext2_inode *ext2_inode_read(struct ext2_fs *fs, uint32_t inode_idx,
+struct ext2_inode *ext2_inode_read(struct ext2_fs *fs, inode_t inode_idx,
                                    struct bcache_entry **out_ent);
 
-bool ext2_inode_write(struct ext2_fs *fs, uint32_t inode_num,
+bool ext2_inode_write(struct ext2_fs *fs, inode_t inode_num,
                       const struct ext2_inode *inode);
 
 uint32_t ext2_get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
@@ -282,12 +283,12 @@ uint32_t ext2_get_or_set_block(struct ext2_fs *fs, struct ext2_inode *inode,
 
 uint32_t ext2_block_to_lba(struct ext2_fs *fs, uint32_t block_num);
 bool ext2_dirent_valid(struct ext2_dir_entry *entry);
-void ext2_init_inode(struct ext2_inode *new_inode, uint16_t mode);
+void ext2_init_inode(struct ext2_inode *new_inode, mode_t mode);
 
 void ext2_init_dirent(struct ext2_fs *fs, struct ext2_dir_entry *new_entry,
-                      uint32_t inode_num, const char *name, uint8_t type);
+                      inode_t inode_num, const char *name, uint8_t type);
 
-uint8_t ext2_extract_ftype(uint16_t mode);
+uint8_t ext2_extract_ftype(mode_t mode);
 
 bool ext2_walk_dir(struct ext2_fs *fs, struct ext2_full_inode *dir,
                    dir_entry_callback cb, void *ctx);
@@ -301,8 +302,7 @@ static inline uint32_t ext2_get_block_group(struct ext2_fs *fs,
     return (block - 1) / fs->sblock->blocks_per_group;
 }
 
-static inline uint32_t ext2_get_inode_group(struct ext2_fs *fs,
-                                            uint32_t inode) {
+static inline uint32_t ext2_get_inode_group(struct ext2_fs *fs, inode_t inode) {
     return (inode - 1) / fs->inodes_per_group;
 }
 
@@ -351,7 +351,7 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
 
 enum errno ext2_create_file(struct ext2_fs *fs,
                             struct ext2_full_inode *parent_dir,
-                            const char *name, uint16_t mode,
+                            const char *name, mode_t mode,
                             bool increment_links);
 
 enum errno ext2_symlink_file(struct ext2_fs *fs,
@@ -368,10 +368,10 @@ enum errno ext2_truncate_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
                               uint32_t new_size);
 
 enum errno ext2_chmod(struct ext2_fs *fs, struct ext2_full_inode *node,
-                      uint16_t new_mode);
+                      mode_t new_mode);
 
 enum errno ext2_chown(struct ext2_fs *fs, struct ext2_full_inode *node,
-                      uint32_t new_uid, uint32_t new_gid);
+                      uid_t new_uid, gid_t new_gid);
 
 enum errno ext2_readlink(struct ext2_fs *fs, struct ext2_full_inode *node,
                          char *buf, uint64_t size);
@@ -386,7 +386,7 @@ bool ext2_dir_contains_file(struct ext2_fs *fs,
                             const char *fname);
 
 enum errno ext2_mkdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
-                      const char *name, uint16_t mode);
+                      const char *name, mode_t mode);
 
 enum errno ext2_rmdir(struct ext2_fs *fs, struct ext2_full_inode *parent_dir,
                       const char *name);
@@ -403,8 +403,8 @@ enum errno ext2_readdir(struct ext2_fs *fs, struct ext2_full_inode *dir_inode,
 
 uint32_t ext2_alloc_block(struct ext2_fs *fs);
 bool ext2_free_block(struct ext2_fs *fs, uint32_t block_num);
-uint32_t ext2_alloc_inode(struct ext2_fs *fs);
-bool ext2_free_inode(struct ext2_fs *fs, uint32_t inode_num);
+inode_t ext2_alloc_inode(struct ext2_fs *fs);
+bool ext2_free_inode(struct ext2_fs *fs, inode_t inode_num);
 
 bool ext2_find_first_available(struct ext2_fs *fs, struct ext2_full_inode *dir,
                                uint32_t *new_block);

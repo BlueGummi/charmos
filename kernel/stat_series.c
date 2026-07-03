@@ -1,7 +1,7 @@
 #include <kassert.h>
 #include <mem/alloc.h>
 #include <stat_series.h>
-#include <time.h>
+#include <time/time.h>
 
 void stat_series_init(struct stat_series *s, struct stat_bucket *buckets,
                       uint32_t nbuckets, time_t bucket_us,

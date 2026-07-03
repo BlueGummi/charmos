@@ -80,7 +80,7 @@ static inline void pit_disable(void) {
     outb(0x40, 0xFF);
 }
 
-void hpet_setup_timer(uint8_t timer_index, uint8_t irq_line, bool periodic,
+void hpet_setup_timer(uint8_t timer_index, irq_t irq_line, bool periodic,
                       bool edge_triggered) {
     uint64_t cfg_addr = HPET_TIMER_CONF_OFFSET(timer_index);
 

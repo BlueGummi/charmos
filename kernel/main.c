@@ -65,6 +65,9 @@ __no_sanitize_address void k_main(void) {
     printf_init(framebuffer_request.response->framebuffers[0]);
     bootstage_advance(BOOTSTAGE_EARLY_FB);
 
+    if (cmdline_wants_help(cmdline_request.response->cmdline))
+        cmdline_dump_help();
+
     pmm_early_init(memmap_request);
     vmm_init(memmap_request.response, xa_request.response);
     pmm_mid_init();

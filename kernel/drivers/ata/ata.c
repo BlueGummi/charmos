@@ -5,9 +5,9 @@
 #include <drivers/pci.h>
 #include <mem/alloc.h>
 #include <registry.h>
-#include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <time/spin_sleep.h>
 
 void ata_select_drive(struct ata_drive *ata_drive) {
     uint16_t base = ata_drive->io_base;
@@ -29,7 +29,7 @@ void ata_soft_reset(struct ata_drive *ata_drive) {
     uint64_t timeout = IDE_CMD_TIMEOUT_MS * 1000;
 
     while (inb(REG_STATUS(base)) & STATUS_BSY) {
-        sleep_us(10);
+        sleep_spin_us(10);
         timeout--;
         if (timeout == 0)
             return;
@@ -49,7 +49,7 @@ bool ata_identify(struct ata_drive *ata_drive) {
     uint64_t timeout = IDE_IDENT_TIMEOUT_MS * 1000;
     while ((status & STATUS_BSY)) {
         status = inb(REG_STATUS(ata_drive->io_base));
-        sleep_us(1);
+        sleep_spin_us(1);
         timeout--;
         if (timeout == 0)
             return false;

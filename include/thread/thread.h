@@ -20,7 +20,7 @@
 #include <sync/spinlock.h>
 #include <thread/apc_types.h>
 #include <thread/thread_types.h>
-#include <time.h>
+#include <time/time.h>
 #include <types/refcount.h>
 #include <types/types.h>
 
@@ -365,9 +365,9 @@ void thread_sleep_for_ms(uint64_t ms);
 void thread_exit(void);
 void thread_print(const struct thread *t);
 
-void thread_update_activity_stats(struct thread *t, uint64_t time);
+void thread_update_activity_stats(struct thread *t, time_t time);
 void thread_classify_activity(struct thread *t, uint64_t now_ms);
-void thread_update_runtime_buckets(struct thread *thread, uint64_t time);
+void thread_update_runtime_buckets(struct thread *thread, time_t time);
 void thread_apply_wake_boost(struct thread *t);
 void thread_update_effective_priority(struct thread *t);
 void thread_apply_cpu_penalty(struct thread *t);

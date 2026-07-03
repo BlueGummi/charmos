@@ -40,6 +40,6 @@ void address_ranges_print();
 struct address_range *address_range_for_addr(vaddr_t vaddr);
 
 static inline bool address_range_addr_in_range(struct address_range *ar,
-                                               uintptr_t vaddr) {
+                                               vaddr_t vaddr) {
     return vaddr >= ar->base && vaddr < ar->base + ar->size;
 }

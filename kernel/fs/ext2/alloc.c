@@ -112,22 +112,22 @@ bool ext2_free_block(struct ext2_fs *fs, uint32_t block_num) {
     return true;
 }
 
-uint32_t ext2_alloc_inode(struct ext2_fs *fs) {
+inode_t ext2_alloc_inode(struct ext2_fs *fs) {
     if (!fs)
         return -1;
 
     for (uint32_t group = 0; group < fs->num_groups; ++group) {
-        uint32_t inode_num =
+        inode_t inode_num =
             alloc_from_bitmap(fs, fs->group_desc[group].inode_bitmap,
                               fs->inodes_per_group, group, update_inode_counts);
-        if (inode_num != (uint32_t) -1) {
+        if (inode_num != (inode_t) -1) {
             return inode_num + 1;
         }
     }
     return -1;
 }
 
-bool ext2_free_inode(struct ext2_fs *fs, uint32_t inode_num) {
+bool ext2_free_inode(struct ext2_fs *fs, inode_t inode_num) {
     if (!fs || inode_num == 0)
         return false;
 

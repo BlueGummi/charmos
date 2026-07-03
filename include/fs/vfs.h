@@ -3,6 +3,7 @@
 #include <fs/detect.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <types/types.h>
 #pragma once
 
 // TODO: flags on file creation
@@ -77,7 +78,7 @@ enum vfs_open_opts : uint32_t {
 };
 
 struct vfs_stat {
-    uint16_t mode;
+    mode_t mode;
     uint64_t size;
 
     uint64_t inode; // inode number
@@ -98,7 +99,7 @@ struct vfs_stat {
 
 struct vfs_dirent {
     char name[VFS_NAME_MAX];
-    uint16_t mode;
+    mode_t mode;
     struct vfs_node *node;
     void *dirent_data;
 };
@@ -122,11 +123,11 @@ struct vfs_ops {
 
     /* create file with given name */
     enum errno (*create)(struct vfs_node *parent, const char *name,
-                         uint16_t mode);
+                         mode_t mode);
 
     /* make node - special devices */
-    enum errno (*mknod)(struct vfs_node *parent, const char *name,
-                        uint16_t mode, uint32_t dev);
+    enum errno (*mknod)(struct vfs_node *parent, const char *name, mode_t mode,
+                        uint32_t dev);
 
     /* create symbolic link */
     enum errno (*symlink)(struct vfs_node *parent, const char *target,
@@ -147,8 +148,7 @@ struct vfs_ops {
                           uint64_t index);
 
     /* create directory */
-    enum errno (*mkdir)(struct vfs_node *parent, const char *name,
-                        uint16_t mode);
+    enum errno (*mkdir)(struct vfs_node *parent, const char *name, mode_t mode);
 
     /* remove directory */
     enum errno (*rmdir)(struct vfs_node *parent, const char *name);
@@ -171,10 +171,10 @@ struct vfs_ops {
                        const char *link_name);
 
     /* change file permissions */
-    enum errno (*chmod)(struct vfs_node *node, uint16_t mode);
+    enum errno (*chmod)(struct vfs_node *node, mode_t mode);
 
     /* change file ownership */
-    enum errno (*chown)(struct vfs_node *node, uint32_t uid, uint32_t gid);
+    enum errno (*chown)(struct vfs_node *node, uid_t uid, gid_t gid);
 
     /* update access times, unix time */
     enum errno (*utime)(struct vfs_node *node, uint64_t atime, uint64_t mtime);
@@ -201,10 +201,10 @@ struct vfs_node {
     uint64_t open_handles; /* how many things have this open */
     uint64_t unique_id;    /* exclusively unique ID - one per node */
     uint32_t flags;
-    uint16_t mode;
+    mode_t mode;
     uint64_t size;
-    uint32_t uid;
-    uint32_t gid;
+    uid_t uid;
+    gid_t gid;
     uint64_t mtime;
     uint64_t atime;
 

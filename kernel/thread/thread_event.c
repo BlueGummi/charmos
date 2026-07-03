@@ -249,7 +249,7 @@ static void clear_event_slot(struct thread_event_reason *slot) {
 
 static struct thread_event_reason *
 thread_add_event_reason(struct thread_event_reason *ring, uint8_t *head,
-                        uint8_t reason, uint64_t time,
+                        uint8_t reason, time_t time,
                         struct thread_activity_stats *stats) {
 
     struct thread_event_reason *slot =
@@ -335,7 +335,7 @@ static void update_bucket(struct thread_activity_stats *stats,
     }
 }
 
-void thread_update_activity_stats(struct thread *t, uint64_t time) {
+void thread_update_activity_stats(struct thread *t, time_t time) {
     struct thread_activity_stats *stats = t->activity_stats;
     struct thread_activity_data *data = t->activity_data;
 
@@ -411,7 +411,7 @@ void thread_add_wake_reason(struct thread *t, uint8_t reason) {
     t->total_wake_count++;
 }
 
-void thread_update_runtime_buckets(struct thread *thread, uint64_t time) {
+void thread_update_runtime_buckets(struct thread *thread, time_t time) {
     uint64_t now = time;
 
     /* Which seconds does this delta span? */
@@ -514,7 +514,7 @@ static bool set_state_and_update_reason(
 
     callback(t, reason);
 
-    uint64_t time = time_get_ms();
+    time_t time = time_get_ms();
 
     if (state != THREAD_STATE_READY)
         thread_update_runtime_buckets(t, time);

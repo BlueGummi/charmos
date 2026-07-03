@@ -1,10 +1,10 @@
 #include <sch/sched.h>
-#include <sleep.h>
 #include <stddef.h>
 #include <sync/mutex.h>
 #include <sync/spinlock.h>
 #include <sync/turnstile.h>
 #include <thread/thread.h>
+#include <time/spin_sleep.h>
 
 #include "console/printf.h"
 #include "lock_general_internal.h"

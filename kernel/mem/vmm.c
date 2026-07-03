@@ -50,7 +50,10 @@ struct pt_walk {
     int depth;
 };
 
-CMDLINE_ENTRY_DECLARE(mem, .callback = vmm_mem_cmdline_callback,
+CMDLINE_ENTRY_DECLARE(mem,
+                      .desc = "Cap on physical memory the allocator will use",
+                      .arg = "<hex bytes>",
+                      .callback = vmm_mem_cmdline_callback,
                       .default_val = "0x700000000000", .required = false,
                       .value = NULL);
 

@@ -64,7 +64,7 @@ void elf_map(uintptr_t user_pml4_phys, void *elf_data) {
         if (!(ph->flags & PF_X))
             flags |= PAGE_XD;
 
-        for (uintptr_t vaddr = seg_vaddr_start; vaddr < seg_vaddr_end;
+        for (vaddr_t vaddr = seg_vaddr_start; vaddr < seg_vaddr_end;
              vaddr += PAGE_SIZE) {
 
             uintptr_t phys = pmm_alloc_page();

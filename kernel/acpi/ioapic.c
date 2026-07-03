@@ -40,19 +40,19 @@ void ioapic_set_redirection_entry(int irq, uint64_t entry) {
     ioapic_write(0x10 + irq * 2 + 1, (uint32_t) (entry >> 32));
 }
 
-void ioapic_route_irq(uint8_t irq, uint8_t vector, uint8_t dest_apic_id,
+void ioapic_route_irq(irq_t irq, uint8_t vector, uint8_t dest_apic_id,
                       bool masked) {
     uint64_t redir_entry = make_redirection_entry(vector, dest_apic_id, masked);
     ioapic_set_redirection_entry(irq, redir_entry);
 }
 
-void ioapic_mask_irq(uint8_t irq) {
+void ioapic_mask_irq(irq_t irq) {
     uint32_t low = ioapic_read(0x10 + irq * 2);
     low |= (1 << 16);
     ioapic_write(0x10 + irq * 2, low);
 }
 
-void ioapic_unmask_irq(uint8_t irq) {
+void ioapic_unmask_irq(irq_t irq) {
     uint32_t low = ioapic_read(0x10 + irq * 2);
     low &= ~(1 << 16);
     ioapic_write(0x10 + irq * 2, low);

@@ -1,11 +1,11 @@
 #ifdef TEST_APC
 #include <sch/sched.h>
-#include <sleep.h>
 #include <tests.h>
 #include <thread/apc.h>
 #include <thread/reaper.h>
 #include <thread/thread.h>
 #include <thread/workqueue.h>
+#include <time/spin_sleep.h>
 
 static atomic_bool apc_ran = false;
 static void the_apc(void *a) {

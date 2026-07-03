@@ -11,7 +11,7 @@
 #include <string.h>
 #include <structures/locked_list.h>
 #include <thread/thread.h>
-#include <time.h>
+#include <time/time.h>
 
 #define LOG_IMPORTANT_RETRY 32
 LOG_SITE_DECLARE(global, .flags = LOG_SITE_DEFAULT,

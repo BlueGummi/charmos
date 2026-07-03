@@ -4,7 +4,7 @@
 #include <sch/sched.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <time.h>
+#include <time/time.h>
 
 #define TIME_REFRESH_CYCLES (smp_core()->tsc_hz / 100)
 #define CMOS_ADDRESS 0x70

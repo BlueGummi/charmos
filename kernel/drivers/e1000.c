@@ -8,10 +8,10 @@
 #include <mem/page.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
-#include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <time/spin_sleep.h>
 
 LOG_HANDLE_DECLARE_DEFAULT(e1000);
 LOG_SITE_DECLARE_DEFAULT(e1000);
@@ -21,7 +21,7 @@ LOG_SITE_DECLARE_DEFAULT(e1000);
 
 static void e1000_reset(struct e1000_device *dev) {
     mmio_write_32(REG32(dev, E1000_REG_CTRL), E1000_CTRL_RST);
-    sleep_ms(1);
+    sleep_spin_ms(1);
 }
 
 static void e1000_setup_tx_ring(struct e1000_device *dev) {

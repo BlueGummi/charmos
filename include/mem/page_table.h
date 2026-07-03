@@ -83,7 +83,7 @@ static inline uint64_t pte_tagged_pack(struct pte_tagged *pt) {
            (high << PTE_TAGGED_PAYLOAD_HIGH_SHIFT);
 }
 
-static inline struct pte_tagged pte_tagged_unpack(uint64_t pte) {
+static inline struct pte_tagged pte_tagged_unpack(pte_t pte) {
     struct pte_tagged pt;
     pt.type = PTE_TAGGED_GET_TYPE(pte);
 

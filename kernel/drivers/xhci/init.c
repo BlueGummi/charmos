@@ -6,9 +6,9 @@
 #include <mem/alloc.h>
 #include <mem/page.h>
 #include <mem/vmm.h>
-#include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <time/spin_sleep.h>
 
 #include "internal.h"
 
@@ -180,7 +180,7 @@ static enum usb_error xhci_spin_wait_port_reset(uint32_t *portsc,
         }
 
         cpu_relax();
-        sleep_us(10);
+        sleep_spin_us(10);
     }
 
     return USB_ERR_TIMEOUT;
@@ -195,7 +195,7 @@ enum usb_error xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
     /* Power on */
     if (!(v & PORTSC_PP)) {
         mmio_write_32(portsc, v | PORTSC_PP);
-        sleep_us(2000);
+        sleep_spin_us(2000);
         v = mmio_read_32(portsc);
         if (!(v & PORTSC_PP))
             return USB_ERR_IO;
@@ -205,7 +205,7 @@ enum usb_error xhci_reset_port(struct xhci_device *dev, uint32_t portnum) {
     mmio_write_32(portsc,
                   v | PORTSC_CSC | PORTSC_PEC | PORTSC_PRC | PORTSC_WRC);
 
-    sleep_us(100);
+    sleep_spin_us(100);
 
     /* Initiate reset */
     if (is_usb3) {
@@ -251,7 +251,7 @@ void xhci_parse_ext_caps(struct xhci_device *dev) {
 
         uint64_t timeout = 1000 * 1000;
         while ((mmio_read_32(bios_owns_addr) & 1) && timeout--) {
-            sleep_us(1);
+            sleep_spin_us(1);
         }
 
         uint32_t own_data = mmio_read_32(bios_owns_addr);

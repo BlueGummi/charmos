@@ -7,8 +7,8 @@
 #include <mem/alloc.h>
 #include <mem/page.h>
 #include <mem/vmm.h>
-#include <sleep.h>
 #include <smp/core.h>
+#include <time/spin_sleep.h>
 
 uint32_t *lapic;
 bool x2apic_enabled = false;
@@ -28,7 +28,7 @@ void lapic_timer_init(cpu_id_t core_id) {
     lapic_write(LAPIC_REG_LVT_TIMER, TIMER_VECTOR | LAPIC_LVT_MASK);
     lapic_write(LAPIC_REG_TIMER_INIT, 0xFFFFFFFF);
 
-    sleep_ms(calibration_sleep_ms);
+    sleep_spin_ms(calibration_sleep_ms);
 
     uint32_t curr = lapic_read((LAPIC_REG_TIMER_CUR));
     uint32_t elapsed = 0xFFFFFFFF - curr;

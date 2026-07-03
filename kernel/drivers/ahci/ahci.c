@@ -37,7 +37,7 @@ struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
         ahci_log(LOG_ERROR, "failed to map BAR - likely OOM error");
         return NULL;
     }
-    uint8_t irq_line = pci_read(bus, device, function, PCI_INTERRUPT_LINE);
+    irq_t irq_line = pci_read(bus, device, function, PCI_INTERRUPT_LINE);
 
     ahci_log(LOG_INFO, "AHCI device uses IRQ %u ", irq_line);
 

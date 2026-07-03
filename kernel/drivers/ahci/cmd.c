@@ -8,11 +8,11 @@
 #include <mem/alloc.h>
 #include <mem/vmm.h>
 #include <sch/sched.h>
-#include <sleep.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 #include <thread/thread.h>
+#include <time/spin_sleep.h>
 
 #define MAX_PRDT_ENTRY_SIZE (4 * 1024 * 1024) // 4MB
 
