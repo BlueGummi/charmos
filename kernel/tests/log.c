@@ -1,7 +1,7 @@
 #ifdef TEST_LOG
 #include <log.h>
 #include <sch/sched.h>
-#include <tests.h>
+#include <test.h>
 #include <thread/thread.h>
 
 static struct log_handle log_event = {
@@ -12,10 +12,10 @@ static struct log_handle log_event = {
 
 };
 
-TEST_REGISTER(log_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(log_test, .tier = TEST_TIER_UNIT) {
     struct log_site *ls = thread_get_current()->log_site;
     log(ls, &log_event, LOG_INFO, "bluh %s", "pickle");
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #endif

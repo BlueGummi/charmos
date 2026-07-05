@@ -3,7 +3,7 @@
 #include <crypto/prng.h>
 #include <mem/alloc.h>
 #include <structures/rbit.h>
-#include <tests.h>
+#include <test.h>
 
 #define RBIT_N 256
 #define RBIT_OPS 4000
@@ -19,7 +19,7 @@ static int overlaps(struct interval a, struct interval b) {
     return a.low <= b.high && b.low <= a.high;
 }
 
-TEST_REGISTER(rbit_order_search, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(rbit_order_search, .tier = TEST_TIER_UNIT) {
     prng_seed(RBIT_SEED);
     struct rbit tree;
     rbit_init(&tree);
@@ -61,10 +61,10 @@ TEST_REGISTER(rbit_order_search, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         rbit_delete(&tree, &nodes[i]);
     TEST_ASSERT(rbit_empty(&tree));
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
-TEST_REGISTER(rbit_overlap, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(rbit_overlap, .tier = TEST_TIER_UNIT) {
     prng_seed(RBIT_SEED + 1);
     struct rbit tree;
     rbit_init(&tree);
@@ -99,7 +99,7 @@ TEST_REGISTER(rbit_overlap, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
             TEST_ASSERT(overlaps(res->interval, iv));
     }
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 struct count_node {
@@ -126,7 +126,7 @@ static bool count_augment(struct rbit_node *n) {
     return n->max != old_max || c->subtree_count != old_cnt;
 }
 
-TEST_REGISTER(rbit_augment_hook, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(rbit_augment_hook, .tier = TEST_TIER_UNIT) {
     prng_seed(RBIT_SEED + 2);
     struct rbit tree;
     rbit_init(&tree);
@@ -161,7 +161,7 @@ TEST_REGISTER(rbit_augment_hook, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         }
     }
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #endif

@@ -3,7 +3,7 @@
 #include <fs/tmpfs.h>
 #include <fs/vfs.h>
 #include <mem/alloc.h>
-#include <tests.h>
+#include <test.h>
 
 #include "errno.h"
 #include "string.h"
@@ -18,7 +18,7 @@
     node = ent.node;                                                           \
     TEST_ASSERT(node != NULL);
 
-TEST_REGISTER(tmpfs_rw_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_DECLARE(tmpfs_rw_test, .tier = TEST_TIER_INTEGRATION) {
     TMPFS_SETUP_NODE(root, node, "place", e);
     TEST_ASSERT(node->size == 0);
 
@@ -48,10 +48,10 @@ TEST_REGISTER(tmpfs_rw_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     TEST_ASSERT(e == ERR_NO_ENT);
 
     TEST_ASSERT(strlen(out_buf) == len / 2);
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
-TEST_REGISTER(tmpfs_dir_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_DECLARE(tmpfs_dir_test, .tier = TEST_TIER_INTEGRATION) {
     struct vfs_node *root = tmpfs_mkroot("tmp");
     const char *lstr = large_test_string;
     uint64_t len = strlen(lstr);
@@ -80,10 +80,10 @@ TEST_REGISTER(tmpfs_dir_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     e = root->ops->finddir(root, "place", &ent);
     TEST_ASSERT(e == ERR_NO_ENT);
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
-TEST_REGISTER(tmpfs_general_tests, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_DECLARE(tmpfs_general_tests, .tier = TEST_TIER_INTEGRATION) {
     TMPFS_SETUP_NODE(root, node, "place", e);
 
     FAIL_IF_FATAL(node->ops->chmod(node, VFS_MODE_EXEC));
@@ -115,7 +115,7 @@ TEST_REGISTER(tmpfs_general_tests, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 
     TEST_ASSERT(strcmp(buf, "/tmp") == 0);
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #endif

@@ -13,18 +13,18 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-#include <tests.h>
+#include <test.h>
 #include <thread/thread.h>
 
-TEST_REGISTER(pmm_alloc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(pmm_alloc_test, .tier = TEST_TIER_UNIT) {
     ABORT_IF_RAM_LOW();
 
     paddr_t p = pmm_alloc_page();
     TEST_ASSERT(p);
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
-TEST_REGISTER(vmm_map_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(vmm_map_test, .tier = TEST_TIER_UNIT) {
     ABORT_IF_RAM_LOW();
 
     uint64_t p = pmm_alloc_page();
@@ -33,7 +33,7 @@ TEST_REGISTER(vmm_map_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(ptr != NULL);
     vmm_unmap_virt(ptr, PAGE_SIZE, VMM_FLAG_NONE);
     TEST_ASSERT(vmm_get_phys((uint64_t) ptr, VMM_FLAG_NONE) == (uint64_t) -1);
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 /* probably don't need these at all but I'll keep
@@ -44,14 +44,14 @@ TEST_REGISTER(vmm_map_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(((uintptr_t) (ptr) & ((alignment) - 1)) == 0)
 
 #define KMALLOC_ALIGNMENT_TEST(name, align)                                    \
-    TEST_REGISTER(kmalloc_aligned_##name##_test, false, false) {               \
+    TEST_DECLARE(kmalloc_aligned_##name##_test, .tier = TEST_TIER_UNIT) {      \
         ABORT_IF_RAM_LOW();                                                    \
         for (uint64_t i = 0; i < ALIGNED_ALLOC_TIMES; i++) {                   \
             void *ptr = kmalloc_aligned(align, align);                         \
             TEST_ASSERT(ptr != NULL);                                          \
             ASSERT_ALIGNED(ptr, align);                                        \
         }                                                                      \
-        SET_SUCCESS();                                                         \
+        return TEST_SUCCESS;                                                   \
     }
 
 KMALLOC_ALIGNMENT_TEST(32, 32)
@@ -62,7 +62,7 @@ KMALLOC_ALIGNMENT_TEST(256, 256)
 #define STRESS_ALLOC_TIMES 2048
 
 static paddr_t pmm_stress_test_ptrs[STRESS_ALLOC_TIMES];
-TEST_REGISTER(pmm_stress_alloc_free_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(pmm_stress_alloc_free_test, .tier = TEST_TIER_UNIT) {
     ABORT_IF_RAM_LOW();
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
@@ -74,11 +74,11 @@ TEST_REGISTER(pmm_stress_alloc_free_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         pmm_free_page(pmm_stress_test_ptrs[i]);
     }
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 static void *stress_alloc_free_ptrs[STRESS_ALLOC_TIMES] = {0};
-TEST_REGISTER(kmalloc_stress_alloc_free_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(kmalloc_stress_alloc_free_test, .tier = TEST_TIER_UNIT) {
     ABORT_IF_RAM_LOW();
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
@@ -100,12 +100,12 @@ TEST_REGISTER(kmalloc_stress_alloc_free_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         }
     }
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 /* Put it here to avoid it eating things up */
 static void *mixed_stress_test_ptrs[STRESS_ALLOC_TIMES] = {0};
-TEST_REGISTER(kmalloc_mixed_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(kmalloc_mixed_stress_test, .tier = TEST_TIER_UNIT) {
     ABORT_IF_RAM_LOW();
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
@@ -117,7 +117,7 @@ TEST_REGISTER(kmalloc_mixed_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         kfree(mixed_stress_test_ptrs[i]);
     }
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #define MT_THREAD_COUNT 8
@@ -130,7 +130,7 @@ static void mt_kmalloc_worker(void *) {
 
     for (uint64_t i = 0; i < MT_ALLOC_TIMES; i++) {
         ptrs[i] = kmalloc(64);
-        TEST_ASSERT(ptrs[i] != NULL);
+        TEST_ASSERT_VOID(ptrs[i] != NULL);
     }
 
     for (uint64_t i = 0; i < MT_ALLOC_TIMES; i++) {
@@ -147,7 +147,7 @@ static void mt_kmalloc_worker(void *) {
     kmalloc_done++;
 }
 
-TEST_REGISTER(kmalloc_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(kmalloc_multithreaded_test, .tier = TEST_TIER_UNIT) {
     ABORT_IF_RAM_LOW();
 
     struct thread *threads[MT_THREAD_COUNT];
@@ -161,11 +161,11 @@ TEST_REGISTER(kmalloc_multithreaded_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     while (kmalloc_done < MT_THREAD_COUNT)
         scheduler_yield();
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 static char hooray[128] = {0};
-TEST_REGISTER(kmalloc_new_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(kmalloc_new_test, .tier = TEST_TIER_UNIT) {
 
     void *p = kmalloc_new(67, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
 
@@ -176,7 +176,7 @@ TEST_REGISTER(kmalloc_new_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     snprintf(hooray, 128, "allocated %p and free took %u ms", p, ms);
 
     ADD_MESSAGE(hooray);
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #ifndef CACHE_LINE_SIZE
@@ -184,7 +184,7 @@ TEST_REGISTER(kmalloc_new_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 #endif
 
 static char a_msg[128];
-TEST_REGISTER(kmalloc_new_basic_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(kmalloc_new_basic_test, .tier = TEST_TIER_UNIT) {
 
     void *p1 = kmalloc_new(1, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
     void *p2 = kmalloc_new(64, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
@@ -192,7 +192,7 @@ TEST_REGISTER(kmalloc_new_basic_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     if (!p1 || !p2 || !p3) {
         ADD_MESSAGE("kmalloc_new returned NULL for a valid request");
-        return;
+        return TEST_FAIL(NULL);
     }
 
     /* Write/read back small pattern to verify memory usable */
@@ -203,7 +203,7 @@ TEST_REGISTER(kmalloc_new_basic_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     if (((uint8_t *) p1)[0] != 0xA5 || ((uint8_t *) p2)[0] != 0x5A ||
         ((uint8_t *) p3)[0] != 0xFF) {
         ADD_MESSAGE("Memory pattern check failed");
-        return;
+        return TEST_FAIL(NULL);
     }
 
     /* timed free to check that kfree_new returns quickly */
@@ -216,20 +216,20 @@ TEST_REGISTER(kmalloc_new_basic_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     snprintf(a_msg, sizeof(a_msg), "basic alloc/free OK (free took %u ms)",
              (unsigned) elapsed);
     ADD_MESSAGE(a_msg);
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 /*
 -------------------- Alignment preference test --------------------
 
-TEST_REGISTER(kmalloc_new_cache_align_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(kmalloc_new_cache_align_test, .tier = TEST_TIER_UNIT) {
      Request cache-aligned memory
     uint16_t flags = ALLOC_FLAG_PREFER_CACHE_ALIGNED | ALLOC_FLAG_NONMOVABLE |
                      ALLOC_FLAG_NONPAGEABLE | ALLOC_FLAG_CLASS_DEFAULT;
     void *p = kmalloc_new(128, flags, ALLOC_BEHAVIOR_NORMAL);
     if (!p) {
         ADD_MESSAGE("kmalloc_new returned NULL for cache-aligned request");
-        return;
+        return TEST_FAIL(NULL);
     }
 
     if (((uintptr_t) p % CACHE_LINE_SIZE) != 0) {
@@ -237,30 +237,29 @@ TEST_REGISTER(kmalloc_new_cache_align_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         snprintf(msg, sizeof(msg), "pointer %p is not cache-line aligned", p);
         ADD_MESSAGE(msg);
         kfree_new(p, ALLOC_BEHAVIOR_NORMAL);
-        return;
+        return TEST_FAIL(NULL);
     }
 
     kfree_new(p, ALLOC_BEHAVIOR_NORMAL);
     ADD_MESSAGE("cache alignment check passed");
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 */
 
 /* -------------------- Behavior flag verification test -------------------- */
 
-TEST_REGISTER(kmalloc_new_behavior_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(kmalloc_new_behavior_test, .tier = TEST_TIER_UNIT) {
     /* ALLOC_BEHAVIOR_ATOMIC should require nonpageable/nonmovable - allocator
        or sanitizers might coerce flags. This test ensures allocation doesn't
        return NULL for such a request. */
-    SET_SUCCESS();
-    return;
+    return TEST_SUCCESS;
 
     uint16_t f = ALLOC_FLAG_NONPAGEABLE | ALLOC_FLAG_NONMOVABLE |
                  ALLOC_FLAG_NO_CACHE_ALIGN;
     void *p = kmalloc_new(256, f, ALLOC_BEHAVIOR_ATOMIC);
     if (!p) {
         ADD_MESSAGE("kmalloc_new failed for ATOMIC nonpageable request");
-        return;
+        return TEST_FAIL(NULL);
     }
     /* Do a quick write */
     volatile uint8_t *b = p;
@@ -268,11 +267,11 @@ TEST_REGISTER(kmalloc_new_behavior_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     if (b[0] != 0x7E) {
         ADD_MESSAGE("atomic allocation memory check failed");
         kfree_new(p, ALLOC_BEHAVIOR_NORMAL);
-        return;
+        return TEST_FAIL(NULL);
     }
     kfree_new(p, ALLOC_BEHAVIOR_NORMAL);
     ADD_MESSAGE("behavior (ATOMIC) allocation passed");
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 /* -------------------- Multithreaded stress test -------------------- */
@@ -362,8 +361,7 @@ volatile int done[STRESS_THREADS];
 struct stress_arg args[STRESS_THREADS];
 static char msg[128];
 
-TEST_REGISTER(kmalloc_new_concurrency_stress_test, SHOULD_NOT_FAIL,
-              IS_UNIT_TEST) {
+TEST_DECLARE(kmalloc_new_concurrency_stress_test, .tier = TEST_TIER_UNIT) {
     memset((void *) done, 0, sizeof(done));
 
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
@@ -397,21 +395,19 @@ TEST_REGISTER(kmalloc_new_concurrency_stress_test, SHOULD_NOT_FAIL,
         if (!done[i]) {
             snprintf(msg, sizeof(msg), "thread %d did not complete in time", i);
             ADD_MESSAGE(msg);
-            SET_SUCCESS();
-            return;
+            return TEST_SUCCESS;
         }
     }
 
     slab_domains_print();
     ADD_MESSAGE("aggressive concurrency stress test completed");
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 /* -------------------- Small reallocation-like smoke test --------------------
  */
 
-TEST_REGISTER(kmalloc_new_alloc_free_sequence_test, SHOULD_NOT_FAIL,
-              IS_UNIT_TEST) {
+TEST_DECLARE(kmalloc_new_alloc_free_sequence_test, .tier = TEST_TIER_UNIT) {
 
     void *blocks[16];
     for (size_t i = 0; i < sizeof(blocks) / sizeof(blocks[0]); ++i) {
@@ -422,7 +418,7 @@ TEST_REGISTER(kmalloc_new_alloc_free_sequence_test, SHOULD_NOT_FAIL,
             /* free what we did get */
             for (size_t j = 0; j < i; ++j)
                 kfree_new(blocks[j], ALLOC_BEHAVIOR_NORMAL);
-            return;
+            return TEST_FAIL(NULL);
         }
     }
 
@@ -435,10 +431,10 @@ TEST_REGISTER(kmalloc_new_alloc_free_sequence_test, SHOULD_NOT_FAIL,
         kfree_new(blocks[i], ALLOC_BEHAVIOR_NORMAL);
 
     ADD_MESSAGE("alloc/free sequence test passed");
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
-TEST_REGISTER(tlb_shootdown_single_cpu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(tlb_shootdown_single_cpu_test, .tier = TEST_TIER_UNIT) {
     ABORT_IF_RAM_LOW();
 
     paddr_t p1 = pmm_alloc_page();
@@ -458,7 +454,7 @@ TEST_REGISTER(tlb_shootdown_single_cpu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     *(volatile uint64_t *) va = 0x22222222;
     TEST_ASSERT(*(volatile uint64_t *) va == 0x22222222);
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #define TLB_TEST_THREADS 4
@@ -478,7 +474,7 @@ static void tlb_reader(void *arg) {
     atomic_fetch_add(&tlb_threads_done, 1);
 }
 
-TEST_REGISTER(tlb_shootdown_synchronous_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(tlb_shootdown_synchronous_test, .tier = TEST_TIER_UNIT) {
     ABORT_IF_RAM_LOW();
 
     paddr_t p1 = pmm_alloc_page();
@@ -510,11 +506,10 @@ TEST_REGISTER(tlb_shootdown_synchronous_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         TEST_ASSERT(tlb_seen[i] == 0xBBBBBBBB);
     }
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
-TEST_REGISTER(tlb_shootdown_async_eventual_test, SHOULD_NOT_FAIL,
-              IS_UNIT_TEST) {
+TEST_DECLARE(tlb_shootdown_async_eventual_test, .tier = TEST_TIER_UNIT) {
     ABORT_IF_RAM_LOW();
 
     paddr_t p1 = pmm_alloc_page();
@@ -534,15 +529,15 @@ TEST_REGISTER(tlb_shootdown_async_eventual_test, SHOULD_NOT_FAIL,
     time_t start = time_get_ms();
     while (time_get_ms() - start < 100) {
         if (*(volatile uint64_t *) va == 0x5678)
-            SET_SUCCESS();
+            return TEST_SUCCESS;
         scheduler_yield();
     }
 
     ADD_MESSAGE("async TLB shootdown did not converge");
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
-TEST_REGISTER(tlb_shootdown_flush_all_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(tlb_shootdown_flush_all_test, .tier = TEST_TIER_UNIT) {
     ABORT_IF_RAM_LOW();
 
     paddr_t p = pmm_alloc_page();
@@ -564,7 +559,7 @@ TEST_REGISTER(tlb_shootdown_flush_all_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     tlb_shootdown((uintptr_t) va, true);
 
     TEST_ASSERT(*(volatile uint64_t *) va == 0xDEADBEEF);
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 static void tlb_spammer(void *) {
@@ -576,7 +571,7 @@ static void tlb_spammer(void *) {
     }
 }
 
-TEST_REGISTER(tlb_shootdown_contention_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(tlb_shootdown_contention_test, .tier = TEST_TIER_UNIT) {
     for (int i = 0; i < 4; i++)
         thread_spawn("tlb_spammer", tlb_spammer, NULL);
 
@@ -585,7 +580,7 @@ TEST_REGISTER(tlb_shootdown_contention_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         scheduler_yield();
 
     ADD_MESSAGE("concurrent shootdown stress completed");
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 static void print_cand(struct elcm_candidate c) {
@@ -594,7 +589,7 @@ static void print_cand(struct elcm_candidate c) {
            c.obj_count);
 }
 
-TEST_REGISTER(elcm_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(elcm_test, .tier = TEST_TIER_UNIT) {
     struct elcm_params params = {
         .obj_size = 938,
         .max_wastage_pct = ELCM_MAX_WASTAGE_DEFAULT,
@@ -610,7 +605,7 @@ TEST_REGISTER(elcm_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     elcm(&params);
     print_cand(params.out);
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #define KFREE_IRQ_TEST_ALLOC_COUNT 2048
@@ -647,10 +642,9 @@ static enum irq_result kfree_irq_test_irq(void *arg, irq_t irq,
     return IRQ_HANDLED;
 }
 
-TEST_REGISTER(kfree_defer_irq_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(kfree_defer_irq_test, .tier = TEST_TIER_UNIT) {
     if (global.core_count < 4) {
-        SET_SKIP();
-        return;
+        return TEST_SKIP(TEST_SKIP_NONE);
     }
 
     irq_t irq = irq_alloc_entry();
@@ -671,14 +665,14 @@ TEST_REGISTER(kfree_defer_irq_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
             spins--;
         }
     }
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
-TEST_REGISTER(page_alloc_demand_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(page_alloc_demand_test, .tier = TEST_TIER_UNIT) {
     void *ptr = page_alloc_demand(8, ALLOC_FLAGS_ZERO);
     memset(ptr, 67, PAGE_SIZE);
     ADD_MESSAGE("successfully demand allocated and memsetted memory");
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #define DP_PAGES 16
@@ -748,7 +742,7 @@ static void dp_spawn(struct thread **t, size_t nthreads, struct dp_worker *w,
 }
 
 /* 1 buffer, N threads, 1 CPU: serialized faults + preemption mid-handler */
-TEST_REGISTER(demand_1buf_Nthreads_1cpu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(demand_1buf_Nthreads_1cpu_test, .tier = TEST_TIER_UNIT) {
     ABORT_IF_RAM_LOW();
 
     const size_t pages = DP_PAGES, nthreads = 8, nbuf = 1;
@@ -765,16 +759,15 @@ TEST_REGISTER(demand_1buf_Nthreads_1cpu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     TEST_ASSERT(dp_verify(bufs, nbuf, pages, nthreads));
     dp_free_bufs(bufs, nbuf, pages);
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 /* 1 buffer, N threads, N CPUs: many CPUs racing the same demand PTEs */
-TEST_REGISTER(demand_1buf_Nthreads_Ncpu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(demand_1buf_Nthreads_Ncpu_test, .tier = TEST_TIER_UNIT) {
     ABORT_IF_RAM_LOW();
 
     if (global.core_count < 2) {
-        SET_SKIP();
-        return;
+        return TEST_SKIP(TEST_SKIP_NONE);
     }
 
     const size_t pages = DP_PAGES, nbuf = 1;
@@ -795,16 +788,15 @@ TEST_REGISTER(demand_1buf_Nthreads_Ncpu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     TEST_ASSERT(dp_verify(bufs, nbuf, pages, nthreads));
     dp_free_bufs(bufs, nbuf, pages);
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 /* N buffers, M threads (M > N), N CPUs: contention spread over many regions */
-TEST_REGISTER(demand_Nbuf_Mthreads_Ncpu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(demand_Nbuf_Mthreads_Ncpu_test, .tier = TEST_TIER_UNIT) {
     ABORT_IF_RAM_LOW();
 
     if (global.core_count < 2) {
-        SET_SKIP();
-        return;
+        return TEST_SKIP(TEST_SKIP_NONE);
     }
 
     const size_t pages = DP_PAGES;
@@ -828,17 +820,17 @@ TEST_REGISTER(demand_Nbuf_Mthreads_Ncpu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     TEST_ASSERT(dp_verify(bufs, nbuf, pages, nthreads));
     dp_free_bufs(bufs, nbuf, pages);
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
-TEST_REGISTER(slab_demand_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(slab_demand_test, .tier = TEST_TIER_UNIT) {
     /* One of these should eventually touch the demand page */
     for (size_t i = 0; i < 5000; i++) {
         void *p = kmalloc(500, ALLOC_FLAGS_ZERO | ALLOC_FLAG_PAGEABLE);
         memset(p, 0, 500);
     }
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #endif

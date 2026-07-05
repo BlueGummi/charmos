@@ -1,6 +1,6 @@
 #ifdef TEST_APC
 #include <sch/sched.h>
-#include <tests.h>
+#include <test.h>
 #include <thread/apc.h>
 #include <thread/reaper.h>
 #include <thread/thread.h>
@@ -18,7 +18,7 @@ static void apc_thread(void *) {
 }
 
 static struct thread *ted = NULL;
-TEST_REGISTER(apc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(apc_test, .tier = TEST_TIER_UNIT) {
     ted = thread_spawn("apc_test_thread", apc_thread, NULL);
     struct apc *a = kmalloc(sizeof(struct apc), ALLOC_FLAGS_ZERO);
     if (!a || !ted)
@@ -32,7 +32,7 @@ TEST_REGISTER(apc_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         scheduler_yield();
 
 pluh:
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 static atomic_uint the_event_apc_ran_times = 0;
@@ -53,29 +53,29 @@ static void apc_event_test_thread(void *) {
 
     enum irql old = irql_raise(IRQL_DISPATCH_LEVEL);
     apc_event_signal(APC_EVENT(apc_event_test));
-    TEST_ASSERT(atomic_load(&the_event_apc_ran_times) == 0);
+    TEST_ASSERT_VOID(atomic_load(&the_event_apc_ran_times) == 0);
     irql_lower(old);
 
-    TEST_ASSERT(atomic_load(&the_event_apc_ran_times) == 1);
+    TEST_ASSERT_VOID(atomic_load(&the_event_apc_ran_times) == 1);
 
     apc_disable_kernel();
     apc_event_signal(APC_EVENT(apc_event_test));
-    TEST_ASSERT(atomic_load(&the_event_apc_ran_times) == 1);
+    TEST_ASSERT_VOID(atomic_load(&the_event_apc_ran_times) == 1);
     apc_enable_kernel();
 
-    TEST_ASSERT(atomic_load(&the_event_apc_ran_times) == 2);
+    TEST_ASSERT_VOID(atomic_load(&the_event_apc_ran_times) == 2);
     apc_event_signal(APC_EVENT(apc_event_test));
-    TEST_ASSERT(atomic_load(&the_event_apc_ran_times) == 3);
+    TEST_ASSERT_VOID(atomic_load(&the_event_apc_ran_times) == 3);
     atomic_store(&event_apc_test_ok, true);
 }
 
 static struct thread *ated = NULL;
-TEST_REGISTER(apc_event_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(apc_event_test, .tier = TEST_TIER_UNIT) {
     ated = thread_spawn("apc_event_test_thread", apc_event_test_thread, NULL);
     while (!atomic_load(&event_apc_test_ok))
         scheduler_yield();
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #endif

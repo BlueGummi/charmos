@@ -2,7 +2,7 @@
 
 #include <mem/alloc.h>
 #include <structures/minheap.h>
-#include <tests.h>
+#include <test.h>
 
 #define MINHEAP_TEST_TIMES 50
 
@@ -18,7 +18,7 @@ static void mhtest_do_inserts(struct minheap *mh) {
     }
 }
 
-TEST_REGISTER(minheap_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(minheap_test, .tier = TEST_TIER_UNIT) {
     struct minheap *mh = minheap_create();
     mhtest_do_inserts(mh);
     TEST_ASSERT(mh->size == MINHEAP_TEST_TIMES);
@@ -36,7 +36,7 @@ TEST_REGISTER(minheap_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(minheap_peek(mh)->key == 1);
     TEST_ASSERT(minheap_pop(mh)->key == 1);
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #endif

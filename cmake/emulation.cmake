@@ -34,7 +34,7 @@ add_custom_target(iso
         --efi-boot boot/limine/limine-uefi-cd.bin
         -efi-boot-part --efi-boot-image --protective-msdos-label
         iso_root -o ${IMAGE_NAME}.iso > /dev/null 2>&1
-    COMMAND $(MAKE) -C ${CMAKE_SOURCE_DIR}/limine
+    COMMAND make -C ${CMAKE_SOURCE_DIR}/limine
     COMMAND ${CMAKE_SOURCE_DIR}/limine/limine bios-install ${IMAGE_NAME}.iso > /dev/null 2>&1
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMENT "Building bootable ISO: ${IMAGE_NAME}.iso"

@@ -9,8 +9,8 @@
 struct locked_list {
     struct list_head list;
     struct spinlock lock;
-    atomic_size_t num_elems;
-    bool lock_irq_disable;
+    size_t num_elems : 63;
+    bool lock_irq_disable : 1;
 };
 
 static inline enum irql locked_list_lock(struct locked_list *ll) {
@@ -36,10 +36,6 @@ static inline void locked_list_unlock(struct locked_list *ll, enum irql irql) {
 
 #define LOCKED_LIST_INIT_IRQ_DISABLE true
 #define LOCKED_LIST_INIT_NORMAL false
-#define LOCKED_LIST_SET_NUM_ELEMS(ll, c) atomic_store(&ll->num_elems, c)
-#define LOCKED_LIST_GET_NUM_ELEMS(ll) atomic_load(&ll->num_elems)
-#define LOCKED_LIST_INC_NUM_ELEMS(ll) atomic_fetch_add(&ll->num_elems, 1)
-#define LOCKED_LIST_DEC_NUM_ELEMS(ll) atomic_fetch_sub(&ll->num_elems, 1)
 #define LOCKED_LIST_DO(ll, action)                                             \
     enum irql __macro_irql = locked_list_lock(ll);                             \
     action;                                                                    \
@@ -52,21 +48,19 @@ static inline bool locked_list_empty(struct locked_list *ll) {
 
 static inline void locked_list_add(struct locked_list *ll,
                                    struct list_head *lh) {
-    LOCKED_LIST_DO(ll, list_add(lh, &ll->list));
-    LOCKED_LIST_INC_NUM_ELEMS(ll);
+    LOCKED_LIST_DO(ll, list_add(lh, &ll->list); ll->num_elems++;);
 }
 
 static inline void locked_list_del(struct locked_list *ll,
                                    struct list_head *lh) {
-    LOCKED_LIST_DO(ll, list_del_init(lh));
-    LOCKED_LIST_DEC_NUM_ELEMS(ll);
+    LOCKED_LIST_DO(ll, list_del_init(lh); ll->num_elems--;);
 }
 
 static inline void locked_list_del_locked(struct locked_list *ll,
                                           struct list_head *lh) {
     kassert(spinlock_held(&ll->lock));
     list_del_init(lh);
-    LOCKED_LIST_DEC_NUM_ELEMS(ll);
+    ll->num_elems--;
 }
 
 static inline struct list_head *locked_list_pop_front(struct locked_list *ll) {
@@ -75,13 +69,13 @@ static inline struct list_head *locked_list_pop_front(struct locked_list *ll) {
 }
 
 static inline size_t locked_list_num_elems(struct locked_list *ll) {
-    LOCKED_LIST_DO(ll, size_t ret = LOCKED_LIST_GET_NUM_ELEMS(ll));
+    LOCKED_LIST_DO(ll, size_t ret = ll->num_elems);
     return ret;
 }
 
 static inline void locked_list_init(struct locked_list *ll, bool irq_disable) {
     INIT_LIST_HEAD(&ll->list);
     spinlock_init(&ll->lock);
-    LOCKED_LIST_SET_NUM_ELEMS(ll, 0);
+    ll->num_elems = 0;
     ll->lock_irq_disable = irq_disable;
 }

@@ -63,6 +63,7 @@ typedef __uint128_t uint128_t;
 
 #define CPU_ID_MAX SIZE_MAX
 #define CPU_ID_MIN 0
+#define CPU_ID_NONE CPU_ID_MAX
 
 #define NUMA_NODE_MAX SIZE_MAX
 #define NUMA_NODE_MIN 0

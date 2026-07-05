@@ -6,7 +6,7 @@
 
 ## Build
 
-Prerequisites: `nasm` and `xorriso`
+Prerequisites: `nasm`, `xorriso`, and either `ninja` or `make`.
 
 ```bash
 ./scripts/build.sh
@@ -16,7 +16,8 @@ Prerequisites: `nasm` and `xorriso`
 ## Run
 
 ```bash
-make run # run this in the build directory
+./scripts/build.sh run       # generator agnostic
+
 ```
 
 ## More

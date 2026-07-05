@@ -17,13 +17,45 @@ CMDLINE_ENTRY_DECLARE(root,
                       .arg = "<device>", .default_val = NULL,
                       .value = &global.root_partition, .required = true);
 
+static void get_functional_name(struct cmdline_entry *ent,
+                                char name_out[CMDLINE_ENTRY_NAME_LEN_MAX]) {
+    /* Find the root, then the next one down,
+     * then the next, until we get to this */
+    struct cmdline_entry *stop_at = NULL;
+    size_t idx = 0;
+
+    while (true) {
+        struct cmdline_entry *curr = ent;
+        struct cmdline_entry *prev = curr;
+        while ((curr = prev->parent) != stop_at)
+            prev = curr;
+
+        const char *name = prev->name;
+        size_t len = strlen(name);
+        memcpy(name_out + idx, name, len);
+        idx += len;
+
+        if (prev == ent) {
+            /* prev == ent, we are at the root, break */
+            name_out[idx] = '\0';
+            return;
+        } else {
+            /* append a period */
+            name_out[idx++] = '.';
+            stop_at = prev;
+        }
+    }
+}
+
 static void cmdline_check_for_unfilled(void) {
     size_t found = 0;
     for (struct cmdline_entry *e = __skernel_cmdline_entries;
          e < __ekernel_cmdline_entries; e++) {
         if (e->required && e->status == CMDLINE_NOT_FOUND) {
+            char name[CMDLINE_ENTRY_NAME_LEN_MAX];
+            get_functional_name(e, name);
             log_msg(LOG_ERROR, "Required command line entry %s not present",
-                    e->name);
+                    name);
             found++;
         }
     }
@@ -40,8 +72,10 @@ static void cmdline_apply_defaults(void) {
             else if (e->callback)
                 e->callback(e->default_val);
             e->status = CMDLINE_DEFAULTED;
-            log_msg(LOG_INFO, "command line entry '%s' defauled to '%s'",
-                    e->name, e->default_val);
+            char name[CMDLINE_ENTRY_NAME_LEN_MAX];
+            get_functional_name(e, name);
+            log_msg(LOG_INFO, "command line entry '%s' defaulted to '%s'", name,
+                    e->default_val);
         }
     }
 }
@@ -50,7 +84,9 @@ static void cmdline_dispatch(const char *var, const char *val) {
     for (struct cmdline_entry *e = __skernel_cmdline_entries;
          e < __ekernel_cmdline_entries; e++) {
         kassert(e->name);
-        if (strcmp(e->name, var) != 0)
+        char name[CMDLINE_ENTRY_NAME_LEN_MAX];
+        get_functional_name(e, name);
+        if (strcmp(name, var) != 0)
             continue;
 
         if (e->status == CMDLINE_FOUND)
@@ -63,7 +99,7 @@ static void cmdline_dispatch(const char *var, const char *val) {
             char *copy = alloc_or_die(kmalloc(strlen(val) + 1));
             memcpy(copy, val, strlen(val) + 1);
             *e->value = copy;
-            log_msg(LOG_INFO, "command line entry '%s' set to '%s'", e->name,
+            log_msg(LOG_INFO, "command line entry '%s' set to '%s'", name,
                     copy);
         }
         return;
@@ -98,7 +134,9 @@ __noreturn void cmdline_dump_help(void) {
     printf("charmos kernel command-line options:\n\n");
     for (struct cmdline_entry *e = __skernel_cmdline_entries;
          e < __ekernel_cmdline_entries; e++) {
-        printf("  %s%s%s\n", e->name, e->arg ? "=" : "", e->arg ? e->arg : "");
+        char name[CMDLINE_ENTRY_NAME_LEN_MAX];
+        get_functional_name(e, name);
+        printf("  %s%s%s\n", name, e->arg ? "=" : "", e->arg ? e->arg : "");
         if (e->desc)
             printf("      %s\n", e->desc);
         printf("      %s", e->required ? "required" : "optional");

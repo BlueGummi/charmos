@@ -1,4 +1,4 @@
 #ifdef TEST_MISC
-#include <tests.h>
+#include <test.h>
 
 #endif

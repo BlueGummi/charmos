@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <tests.h>
+#include <test.h>
 #include <time/spin_sleep.h>
 
 #include "fs/detect.h"
@@ -16,8 +16,7 @@
 #define EXT2_INIT                                                              \
     if (global.root_node->fs_type != FS_EXT2) {                                \
         ADD_MESSAGE("the mounted root is not ext2");                           \
-        SET_SKIP();                                                            \
-        return;                                                                \
+        return TEST_SKIP(TEST_SKIP_NONE);                                      \
     }                                                                          \
     struct vfs_node *root = global.root_node;
 
@@ -29,7 +28,7 @@ static void bio_callback(struct bio_request *req) {
     ADD_MESSAGE("blkdev_bio callback succeeded");
 }
 
-TEST_REGISTER(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(blkdev_bio_test, .tier = TEST_TIER_UNIT) {
     EXT2_INIT;
     struct ext2_fs *fs = root->fs_data;
     struct block_device *d = fs->drive;
@@ -53,15 +52,13 @@ TEST_REGISTER(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         INIT_LIST_HEAD(&bio->list);
 
         if (!d->submit_bio_async) {
-            SET_SKIP();
             ADD_MESSAGE("BIO function is NULL");
-            return;
+            return TEST_SKIP(TEST_SKIP_NONE);
         }
 
         bool submitted = d->submit_bio_async(d, bio);
         if (!submitted) {
-            SET_FAIL();
-            return;
+            return TEST_FAIL("submit_bio_async rejected the request");
         }
 
         sleep_spin_ms(100);
@@ -70,6 +67,6 @@ TEST_REGISTER(blkdev_bio_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     }
     TEST_ASSERT(done == true);
     TEST_ASSERT(current_test->message_count == run_times);
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 #endif

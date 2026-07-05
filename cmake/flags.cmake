@@ -9,10 +9,14 @@ endif()
 
 set(KERNEL_WARNINGS
     -Wall -Wextra
-    -Wno-initializer-overrides
-    -Wno-override-init
     -Wpointer-sign -Wenum-compare
 )
+
+if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
+    list(APPEND KERNEL_WARNINGS -Wno-initializer-overrides)
+else()
+    list(APPEND KERNEL_WARNINGS -Wno-override-init)
+endif()
 
 set(KERNEL_FREESTANDING
     -ffreestanding
@@ -76,7 +80,7 @@ if(APPLE)
         "-nostdlib -static -Wl,--gc-sections -z max-page-size=0x1000 -T ${CMAKE_SOURCE_DIR}/kernel/linker-${ARCH}.ld")
 else()
     set(CMAKE_EXE_LINKER_FLAGS
-        "${CMAKE_EXE_LINKER_FLAGS} -Wl,--build-id=none -nostdlib -static -z max-page-size=0x1000 -Wl,--gc-sections -T ../../kernel/linker-${ARCH}.ld")
+        "${CMAKE_EXE_LINKER_FLAGS} -Wl,--build-id=none -nostdlib -static -z max-page-size=0x1000 -Wl,--gc-sections -T ${CMAKE_SOURCE_DIR}/kernel/linker-${ARCH}.ld")
 endif()
 
 if(CMAKE_C_COMPILER_ID STREQUAL "Clang")

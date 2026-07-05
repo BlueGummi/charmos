@@ -13,6 +13,7 @@
 #include "flanterm/src/flanterm.h"
 #include <flanterm/src/flanterm_backends/fb.h>
 
+void vprintf(struct printf_cursor *csr, const char *format, va_list args);
 struct flanterm_context;
 
 struct spinlock k_printf_lock = SPINLOCK_INIT;

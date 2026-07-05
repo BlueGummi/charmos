@@ -8,7 +8,7 @@
 #include <mem/vma_range.h>
 #include <stdint.h>
 #include <structures/rbit.h>
-#include <tests.h>
+#include <test.h>
 
 #define MM_TEST_VMAS 100
 #define MM_TEST_QUERIES 3000
@@ -139,7 +139,7 @@ static size_t build_random_vma_ranges(struct mm *mm) {
     return placed;
 }
 
-TEST_REGISTER(mm_gap_differential, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(mm_gap_differential, .tier = TEST_TIER_UNIT) {
     prng_seed(MM_TEST_SEED);
     struct mm *mm = mm_alloc();
     TEST_ASSERT(mm);
@@ -171,10 +171,10 @@ TEST_REGISTER(mm_gap_differential, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         }
     }
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
-TEST_REGISTER(mm_map_consistency, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(mm_map_consistency, .tier = TEST_TIER_UNIT) {
     prng_seed(MM_TEST_SEED + 1);
     struct mm *mm = mm_alloc();
     TEST_ASSERT(mm);
@@ -193,10 +193,10 @@ TEST_REGISTER(mm_map_consistency, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(tree_consistent(mm));
     TEST_ASSERT(augment_ok(mm));
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
-TEST_REGISTER(mm_vma_range_split, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(mm_vma_range_split, .tier = TEST_TIER_UNIT) {
     struct mm *mm = mm_alloc();
     TEST_ASSERT(mm);
 
@@ -238,7 +238,7 @@ TEST_REGISTER(mm_vma_range_split, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(vma_range_split(orig, base + 1) == NULL); /* unaligned */
     TEST_ASSERT(tree_consistent(mm));
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #endif

@@ -21,6 +21,7 @@ CLEAN=false
 COMPDB=false
 BUILD_TYPE="Debug"
 COMPILER="gcc"
+GENERATOR="auto"
 BUILD_DIR="build"
 JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
 CMAKE_EXTRA_ARGS=()
@@ -43,6 +44,10 @@ ${BOLD}Options:${NC}
   -k, --compiler COMP     Compiler toolchain: gcc or clang (default: gcc)
                           clang is required for DEBUG_ASAN (KASAN)
       --clang             Shorthand for --compiler clang
+  -G, --generator GEN     Build generator: ninja, make, or auto (default: auto)
+                          auto prefers ninja when available, else make
+      --ninja             Shorthand for --generator ninja
+      --make              Shorthand for --generator make
   -j, --jobs N            Parallel jobs (default: detected CPU count = ${JOBS})
   -B, --build-dir DIR     Build directory (default: build)
   --                      End of script options; remaining args go to cmake
@@ -78,6 +83,9 @@ while [[ $# -gt 0 ]]; do
         -t|--type)             BUILD_TYPE="$2"; shift 2 ;;
         -k|--compiler)         COMPILER="$2"; shift 2 ;;
         --clang)               COMPILER="clang"; shift ;;
+        -G|--generator)        GENERATOR="$2"; shift 2 ;;
+        --ninja)               GENERATOR="ninja"; shift ;;
+        --make)                GENERATOR="make"; shift ;;
         -j|--jobs)             JOBS="$2"; shift 2 ;;
         -B|--build-dir)        BUILD_DIR="$2"; shift 2 ;;
         --)                    PASSTHROUGH=true; shift ;;
@@ -99,6 +107,21 @@ case "$COMPILER" in
     gcc|clang) ;;
     *) echo "${RED}Invalid compiler: $COMPILER (expected gcc or clang)${NC}" >&2; exit 1 ;;
 esac
+
+# Resolve generator: auto prefers ninja, falls back to make.
+case "$GENERATOR" in
+    auto)
+        if command -v ninja >/dev/null 2>&1; then GEN_KIND="ninja"; else GEN_KIND="make"; fi ;;
+    ninja) GEN_KIND="ninja" ;;
+    make)  GEN_KIND="make" ;;
+    *) echo "${RED}Invalid generator: $GENERATOR (expected ninja, make, or auto)${NC}" >&2; exit 1 ;;
+esac
+
+if [[ "$GEN_KIND" == "ninja" ]]; then
+    CMAKE_GENERATOR="Ninja"
+else
+    CMAKE_GENERATOR="Unix Makefiles"
+fi
 
 log()    { $QUIET || echo -e "${GREEN}==>${NC} $*"; }
 warn()   { $QUIET || echo -e "${YELLOW}==>${NC} $*"; }
@@ -129,6 +152,9 @@ check_required_tools() {
     local failed=0
     check_tool cmake    "install via your package manager (apt/dnf/brew install cmake)"   || failed=1
     check_tool make     "install build-essential / xcode-select --install"                || failed=1
+    if [[ "$GEN_KIND" == "ninja" ]]; then
+        check_tool ninja "install ninja (apt/dnf/brew install ninja) or use --make"        || failed=1
+    fi
     check_tool nasm     "install via your package manager (apt/dnf/brew install nasm)"    || failed=1
     check_tool nm       "binutils package"                                                || failed=1
     check_tool awk      "install gawk or mawk"                                            || failed=1
@@ -221,10 +247,16 @@ select_toolchain() {
 
 configure_cmake() {
     run_cmd cmake \
+        -G "$CMAKE_GENERATOR" \
         -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
         "${TOOLCHAIN_ARGS[@]}" \
         "${CMAKE_EXTRA_ARGS[@]}" \
         "$REPO_ROOT"
+}
+
+# Generator-agnostic build wrapper; ninja auto-parallelizes but honors -j too.
+build_targets() {
+    run_cmd cmake --build . -j"$JOBS" --target "$@"
 }
 
 check_required_tools
@@ -245,12 +277,21 @@ if $CLEAN && [[ -d "$BUILD_DIR" ]]; then
     rm -rf "$BUILD_DIR"
 fi
 
+# CMake refuses to switch generators in an existing build dir; wipe on mismatch.
+if [[ -f "$BUILD_DIR/CMakeCache.txt" ]]; then
+    cached_gen="$(sed -n 's/^CMAKE_GENERATOR:INTERNAL=//p' "$BUILD_DIR/CMakeCache.txt")"
+    if [[ -n "$cached_gen" && "$cached_gen" != "$CMAKE_GENERATOR" ]]; then
+        warn "generator changed ($cached_gen -> $CMAKE_GENERATOR); wiping $BUILD_DIR/"
+        rm -rf "$BUILD_DIR"
+    fi
+fi
+
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
 select_toolchain
 
-log "configuring cmake (${BUILD_TYPE})"
+log "configuring cmake (${BUILD_TYPE}, ${CMAKE_GENERATOR})"
 configure_cmake
 
 if $COMPDB; then
@@ -263,13 +304,13 @@ SYMS_FILE="$REPO_ROOT/kernel/syms/fullsyms.c"
 
 if [[ ! -f "$SYMS_FILE" ]]; then
     warn "first build: bootstrapping symbol table"
-    run_cmd make -j"$JOBS" kernel
-    run_cmd make regen-syms
+    build_targets kernel
+    build_targets regen-syms
     log "reconfiguring with real symbols"
     configure_cmake
 fi
 
 log "building targets: ${TARGETS[*]}"
-run_cmd make -j"$JOBS" "${TARGETS[@]}"
+build_targets "${TARGETS[@]}"
 
 log "${BOLD}done${NC}"

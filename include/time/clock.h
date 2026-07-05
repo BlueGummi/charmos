@@ -50,6 +50,7 @@ struct clock {
     enum clock_rating rating;
     struct clock_base *base;
 
+    /* these expect state changes from OFF/ON */
     enum errno (*enable)(struct clock *);
     void (*disable)(struct clock *);
     void (*suspend)(struct clock *);
@@ -57,6 +58,9 @@ struct clock {
 
     void *private;
 };
+
+struct clock *clock_create(const char *fmt, ...);
+void clock_register(struct clock *c);
 
 static inline fx32_32_t clock_frequency_to_mult(struct clock *clock) {
     return fx_div(fx_from_int(1000000), fx_from_int(clock->frequency_khz));

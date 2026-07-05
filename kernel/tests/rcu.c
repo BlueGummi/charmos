@@ -5,7 +5,7 @@
 #include <sch/sched.h>
 #include <string.h>
 #include <sync/rcu.h>
-#include <tests.h>
+#include <test.h>
 #include <thread/thread.h>
 #include <thread/workqueue.h>
 #include <time/spin_sleep.h>
@@ -67,7 +67,7 @@ static void rcu_writer_thread(void *) {
               old);
 }
 
-TEST_REGISTER(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(rcu_test, .tier = TEST_TIER_UNIT) {
     struct rcu_test_data *initial = kmalloc(sizeof(*initial), ALLOC_FLAGS_ZERO);
     initial->value = 42;
     shared_ptr = initial;
@@ -86,7 +86,7 @@ TEST_REGISTER(rcu_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     TEST_ASSERT(!atomic_load(&rcu_test_failed));
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #define STRESS_NUM_READERS (global.core_count * 8)
@@ -232,7 +232,7 @@ static void rcu_stress_reclaimer(void *arg) {
 }
 
 /* Test registration */
-TEST_REGISTER(rcu_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(rcu_stress_test, .tier = TEST_TIER_UNIT) {
     /* initial object */
     struct rcu_stress_node *initial =
         kmalloc(sizeof(*initial), ALLOC_FLAGS_ZERO);
@@ -317,7 +317,7 @@ TEST_REGISTER(rcu_stress_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         atomic_fetch_add(&stress_deferred_freed, 1);
     }
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #endif

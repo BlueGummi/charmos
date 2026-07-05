@@ -5,9 +5,9 @@
 #include <mem/page.h>
 #include <stdatomic.h>
 #include <string.h>
-#include <tests.h>
+#include <test.h>
 
-TEST_REGISTER(folio_backpointers, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(folio_backpointers, .tier = TEST_TIER_UNIT) {
     for (uint8_t order = 0; order <= 3; order++) {
         struct folio *f = folio_alloc(order);
         TEST_ASSERT(f);
@@ -24,10 +24,10 @@ TEST_REGISTER(folio_backpointers, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
             TEST_ASSERT(page_is_folio_head(p) == (n == 0));
         }
     }
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
-TEST_REGISTER(folio_zero_copy, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(folio_zero_copy, .tier = TEST_TIER_UNIT) {
     struct folio *src = folio_alloc(1); /* 2 pages */
     struct folio *dst = folio_alloc(1);
     TEST_ASSERT(src && dst);
@@ -60,10 +60,10 @@ TEST_REGISTER(folio_zero_copy, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         TEST_ASSERT(memcmp(s, d, PAGE_SIZE) == 0);
     }
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
-TEST_REGISTER(folio_anon_tag_mapcount, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(folio_anon_tag_mapcount, .tier = TEST_TIER_UNIT) {
     struct folio *f = folio_alloc(0);
     TEST_ASSERT(f);
 
@@ -87,7 +87,7 @@ TEST_REGISTER(folio_anon_tag_mapcount, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(folio_mapcount_dec(f) == true);  /* 1 -> 0 */
     TEST_ASSERT(!folio_mapped(f));
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #endif

@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <tests.h>
+#include <test.h>
 #include <time/spin_sleep.h>
 #include <time/time.h>
 
@@ -26,40 +26,42 @@ LOG_HANDLE_DECLARE_DEFAULT(test);
 #define test_debug(fmt, ...) test_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
 #define test_trace(fmt, ...) test_log(LOG_TRACE, fmt, ##__VA_ARGS__)
 
-extern struct kernel_test __skernel_tests[];
-extern struct kernel_test __ekernel_tests[];
+extern struct test __skernel_tests[];
+extern struct test __ekernel_tests[];
 
 /* no need to clean up allocations in these tests, we are supposed to
  * reboot/poweroff after all tests complete, and the userland should
  * not be in a state where we can boot it when running tests */
 
-struct kernel_test *current_test = NULL;
+struct test_context *current_test = NULL;
 static uint64_t pass_count = 0, skip_count = 0, fail_count = 0;
 static uint64_t total_time = 0;
 
-static void run(bool run_units, struct kernel_test *start,
-                struct kernel_test *end) {
+static void run(bool run_units, struct test *start, struct test *end) {
     uint64_t i = 1;
-    for (struct kernel_test *t = start; t < end; t++) {
-        if (t->is_integration && run_units)
+    for (struct test *t = start; t < end; t++) {
+        bool is_integration = (t->tier == TEST_TIER_INTEGRATION);
+        if (is_integration && run_units)
             continue;
 
-        if (!t->is_integration && !run_units)
+        if (!is_integration && !run_units)
             continue;
 
-        current_test = t;
+        struct test_context ctx = {0};
+        current_test = &ctx;
+
         printf("[%-4d]: ", i);
         printf("%s... ", t->name);
 
         uint64_t start_ms = time_get_ms();
         /* supa important */
-        t->func();
+        struct test_verdict v = t->func(&ctx);
         uint64_t end_ms = time_get_ms();
 
-        if (t->skipped) {
+        if (v.result == TEST_SKIPPED) {
             printf(ANSI_GRAY " skipped  " ANSI_RESET);
             skip_count++;
-        } else if (t->success != t->should_fail) {
+        } else if (v.result == TEST_OK) {
             printf(ANSI_GREEN " ok  " ANSI_RESET);
             pass_count++;
         } else {
@@ -70,10 +72,10 @@ static void run(bool run_units, struct kernel_test *start,
         total_time += (end_ms - start_ms);
         printf("(%llu ms)\n", end_ms - start_ms);
 
-        if (t->message_count > 0) {
-            for (uint64_t i = 0; i < t->message_count; i++) {
+        if (ctx.message_count > 0) {
+            for (uint64_t j = 0; j < ctx.message_count; j++) {
                 printf("        +-> ");
-                printf(ANSI_YELLOW "%s" ANSI_RESET "\n", t->messages[i]);
+                printf(ANSI_YELLOW "%s" ANSI_RESET "\n", ctx.messages[j].msg);
             }
             printf("\n");
         }
@@ -83,8 +85,8 @@ static void run(bool run_units, struct kernel_test *start,
 
 void tests_run(void) {
 #ifdef TEST_ENABLED
-    struct kernel_test *start = __skernel_tests;
-    struct kernel_test *end = __ekernel_tests;
+    struct test *start = __skernel_tests;
+    struct test *end = __ekernel_tests;
 
     bool all_ok = true;
     char *msg = all_ok ? "all tests pass 🎉!" : "some errors occurred";
@@ -92,8 +94,8 @@ void tests_run(void) {
 
     uint64_t unit_test_count = 0;
     uint64_t integration_test_count = 0;
-    for (struct kernel_test *t = start; t < end; t++) {
-        if (!t->is_integration)
+    for (struct test *t = start; t < end; t++) {
+        if (t->tier != TEST_TIER_INTEGRATION)
             unit_test_count++;
         else
             integration_test_count++;

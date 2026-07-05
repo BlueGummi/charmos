@@ -4,7 +4,7 @@
 #include <log.h>
 #include <sch/sched.h>
 #include <sync/mutex.h>
-#include <tests.h>
+#include <test.h>
 #include <thread/thread.h>
 
 LOG_SITE_DECLARE(test_mutex, .flags = LOG_SITE_PRINT | LOG_SITE_DROP_OLD,
@@ -23,16 +23,15 @@ LOG_HANDLE_DECLARE_DEFAULT(test_mutex);
 
 #define MUTEX_REPORT_PROBLEMS()                                                \
     ADD_MESSAGE("Mutex tests are encountering problems and will be skipped");  \
-    SET_SKIP();                                                                \
-    return;
+    return TEST_SKIP(TEST_SKIP_NONE);
 
 static struct mutex basic_test_mtx = MUTEX_INIT;
 
-TEST_REGISTER(mutex_test_basic, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(mutex_test_basic, .tier = TEST_TIER_UNIT) {
     mutex_lock(&basic_test_mtx);
     scheduler_yield();
     mutex_unlock(&basic_test_mtx);
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #define MUTEX_MANY_WAITER_TEST_WAITER_COUNT 10
@@ -51,7 +50,7 @@ static void many_worker(void *) {
     atomic_fetch_sub(&many_waiter_done, 1);
 }
 
-TEST_REGISTER(mutex_many_waiters, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_DECLARE(mutex_many_waiters, .tier = TEST_TIER_INTEGRATION) {
     for (int i = 0; i < MUTEX_MANY_WAITER_TEST_WAITER_COUNT; i++) {
         struct thread *t = thread_create("mw", many_worker, NULL);
         t->flags |= THREAD_FLAG_PINNED;
@@ -61,7 +60,7 @@ TEST_REGISTER(mutex_many_waiters, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     while (atomic_load(&many_waiter_done))
         scheduler_yield();
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #define CHAOS_THREAD_COUNT 24
@@ -89,7 +88,7 @@ static void chaos(void *) {
 volatile struct thread *main_thread = NULL;
 volatile struct thread *other_threads[CHAOS_THREAD_COUNT] = {0};
 
-TEST_REGISTER(mutex_chaos, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_DECLARE(mutex_chaos, .tier = TEST_TIER_INTEGRATION) {
     main_thread = thread_get_current();
     for (int i = 0; i < CHAOS_THREAD_COUNT; i++)
         other_threads[i] = thread_spawn("ch", chaos, NULL);
@@ -97,7 +96,7 @@ TEST_REGISTER(mutex_chaos, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     while (atomic_load(&chaos_left))
         scheduler_yield();
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 /* we want to spawn a timesharing thread on another core, and
@@ -151,10 +150,9 @@ static void pi_ts_thread(void *nothing) {
     test_mutex_info("exiting");
 }
 
-TEST_REGISTER(mutex_pi_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(mutex_pi_test, .tier = TEST_TIER_UNIT) {
     if (global.core_count == 1) {
-        SET_SKIP();
-        return;
+        return TEST_SKIP(TEST_SKIP_NONE);
     }
 
     cpu_id_t cpu = 1;
@@ -178,7 +176,7 @@ TEST_REGISTER(mutex_pi_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     while (atomic_load(&pi_done) < 3)
         scheduler_yield();
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 static struct mutex pi_mtx_a = MUTEX_INIT;
@@ -232,10 +230,9 @@ static void pi_chain_rt(void *arg) {
     atomic_fetch_add(&pi_chain_done, 1);
 }
 
-TEST_REGISTER(mutex_pi_chain, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(mutex_pi_chain, .tier = TEST_TIER_UNIT) {
     if (global.core_count < 2) {
-        SET_SKIP();
-        return;
+        return TEST_SKIP(TEST_SKIP_NONE);
     }
 
     cpu_id_t cpu = 1;
@@ -265,7 +262,7 @@ TEST_REGISTER(mutex_pi_chain, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     while (atomic_load(&pi_chain_done) < 3)
         scheduler_yield();
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 static struct mutex pi_multi_mtx = MUTEX_INIT;
@@ -294,7 +291,7 @@ static void pi_multi_rt(void *arg) {
     atomic_fetch_add(&pi_multi_done, 1);
 }
 
-TEST_REGISTER(mutex_pi_multi_waiters, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(mutex_pi_multi_waiters, .tier = TEST_TIER_UNIT) {
     cpu_id_t cpu = 1;
 
     struct thread *ts = thread_create("pi_ts", pi_multi_ts, NULL);
@@ -318,7 +315,7 @@ TEST_REGISTER(mutex_pi_multi_waiters, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     while (atomic_load(&pi_multi_done) < 3)
         scheduler_yield();
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 static struct mutex pi_revert_mtx = MUTEX_INIT;
@@ -351,7 +348,7 @@ static void pi_revert_rt(void *arg) {
     atomic_fetch_add(&pi_reverted_done, 1);
 }
 
-TEST_REGISTER(mutex_pi_revert, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(mutex_pi_revert, .tier = TEST_TIER_UNIT) {
     cpu_id_t cpu = 1;
 
     struct thread *ts = thread_create("pi_ts", pi_revert_ts, NULL);
@@ -372,7 +369,7 @@ TEST_REGISTER(mutex_pi_revert, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     while (!atomic_load(&pi_reverted) || atomic_load(&pi_reverted_done) < 2)
         scheduler_yield();
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #endif

@@ -199,7 +199,7 @@ struct ext2_inode {
     uint32_t faddr;
     uint8_t frag[16];
     uint8_t osd2[12];
-} __packed;
+};
 
 struct ext2_full_inode {
     struct ext2_inode node;

@@ -196,7 +196,7 @@ struct ahci_port {
     uint32_t fbs;       // FIS-based Switching
     uint32_t rsv1[11];  // 0x44 ~ 0x6F, Reserved
     uint32_t vendor[4]; // 0x70 ~ 0x7F, vendor specific
-} __packed;
+};
 
 // one controller
 struct ahci_device {

@@ -514,7 +514,7 @@ struct xhci_op_regs {
     uint32_t config;
     uint32_t reserved3[241];
     struct xhci_port_regs regs[];
-} __packed;
+};
 
 struct xhci_trb {
     uint64_t parameter;

@@ -9,15 +9,14 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-#include <tests.h>
+#include <test.h>
 #include <time/spin_sleep.h>
 
 #include "fs/detect.h"
 #define EXT2_INIT                                                              \
     if (global.root_node->fs_type != FS_EXT2) {                                \
         ADD_MESSAGE("the mounted root is not ext2");                           \
-        SET_SKIP();                                                            \
-        return;                                                                \
+        return TEST_SKIP(TEST_SKIP_NONE);                                      \
     }                                                                          \
     struct vfs_node *root = global.root_node;
 
@@ -37,7 +36,7 @@ static void bio_sch_callback(struct bio_request *req) {
     total_complete_time[q_lvl] += time;
     req->user_data = NULL;
     atomic_fetch_add(&runs, 1);
-    TEST_ASSERT(req->status == BIO_STATUS_OK);
+    TEST_ASSERT_VOID(req->status == BIO_STATUS_OK);
 }
 
 static void bio_sch_callback1(struct bio_request *req) {
@@ -54,7 +53,7 @@ static void bio_sch_callback2(struct bio_request *req) {
     ADD_MESSAGE("cb 2 success");
 }
 
-TEST_REGISTER(bio_sched_coalesce_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(bio_sched_coalesce_test, .tier = TEST_TIER_UNIT) {
     EXT2_INIT;
     struct ext2_fs *fs = root->fs_data;
     struct block_device *d = fs->drive;
@@ -103,7 +102,7 @@ TEST_REGISTER(bio_sched_coalesce_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     for (int i = 0; i < 5000; i++)
         scheduler_yield();
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #define BIO_SCHED_TEST_RUNS 1024
@@ -112,8 +111,7 @@ static struct bio_request *rqs[BIO_SCHED_TEST_RUNS] = {0};
 static uint8_t *buffers[BIO_SCHED_TEST_RUNS] = {0};
 static volatile int send_dispatch = 0;
 
-TEST_REGISTER(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
-              IS_INTEGRATION_TEST) {
+TEST_DECLARE(bio_sched_delay_enqueue_test, .tier = TEST_TIER_INTEGRATION) {
     EXT2_INIT;
     ABORT_IF_RAM_LOW();
 
@@ -152,8 +150,7 @@ TEST_REGISTER(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
     for (size_t i = 0; i < BIO_SCHED_TEST_RUNS; i++) {
         if (!rqs[i]->disk) {
             printf("rq %p %u\n", rqs[i], i);
-            SET_SUCCESS();
-            return;
+            return TEST_SUCCESS;
         }
 
         kassert(rqs[i]->disk);
@@ -195,6 +192,6 @@ TEST_REGISTER(bio_sched_delay_enqueue_test, SHOULD_NOT_FAIL,
     ADD_MESSAGE(m2);
     TEST_ASSERT(atomic_load(&runs) <= BIO_SCHED_TEST_RUNS);
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 #endif

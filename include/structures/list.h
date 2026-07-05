@@ -54,6 +54,20 @@ static inline int list_empty(const struct list_head *head) {
     return head->next == head;
 }
 
+static inline struct list_head *list_peek_front(struct list_head *head) {
+    if (list_empty(head))
+        return NULL;
+
+    return head->next;
+}
+
+static inline struct list_head *list_peek_tail(struct list_head *head) {
+    if (list_empty(head))
+        return NULL;
+
+    return head->prev;
+}
+
 static inline struct list_head *list_pop_front(struct list_head *head) {
     if (list_empty(head))
         return NULL;

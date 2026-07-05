@@ -3,7 +3,7 @@
 #include <mem/alloc_or_die.h>
 #include <sch/sched.h>
 #include <string.h>
-#include <tests.h>
+#include <test.h>
 #include <thread/apc.h>
 #include <thread/daemon.h>
 #include <thread/reaper.h>
@@ -19,7 +19,7 @@ static void workqueue_fn(void *arg, void *unused) {
     atomic_fetch_add(&workqueue_times, 1);
 }
 
-TEST_REGISTER(workqueue_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(workqueue_test, .tier = TEST_TIER_UNIT) {
     uint64_t tsc = rdtsc();
     uint64_t times = 256;
 
@@ -49,7 +49,7 @@ TEST_REGISTER(workqueue_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
              workqueue_times, times);
     ADD_MESSAGE(msg);
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 static void sleepy_entry(void *) {
@@ -57,9 +57,9 @@ static void sleepy_entry(void *) {
     thread_print(thread_get_current());
 }
 
-TEST_REGISTER(sched_sleepy_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(sched_sleepy_test, .tier = TEST_TIER_UNIT) {
     thread_spawn("sched_sleepy_test", sleepy_entry, NULL);
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #define WQ_2_TIMES 4096
@@ -88,7 +88,7 @@ static void enqueue_thread(void *) {
     atomic_fetch_sub(&threads_left, 1);
 }
 
-TEST_REGISTER(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(workqueue_test_2, .tier = TEST_TIER_UNIT) {
     struct cpu_mask mask;
     alloc_or_die(cpu_mask_init(&mask, global.core_count));
 
@@ -126,7 +126,7 @@ TEST_REGISTER(workqueue_test_2, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     printf("destroy\n");
     workqueue_destroy(wq);
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 static atomic_bool daemon_work_run = false;
@@ -138,7 +138,7 @@ static enum daemon_thread_command daemon_work(void *a, void *b) {
 static struct daemon_work dwork =
     DAEMON_WORK_FROM(daemon_work, WORK_ARGS(NULL, NULL));
 
-TEST_REGISTER(daemon_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(daemon_test, .tier = TEST_TIER_UNIT) {
     struct cpu_mask cmask;
     cpu_mask_init(&cmask, global.core_count);
     cpu_mask_set_all(&cmask);
@@ -160,7 +160,7 @@ TEST_REGISTER(daemon_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         scheduler_yield();
 
     daemon_destroy(daemon);
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 static atomic_bool si_apc_ran = false;
@@ -201,12 +201,10 @@ static void waking_thread(void *) {
                 si_t->perceived_prio_class, (void *) 4);
 }
 
-TEST_REGISTER(thread_sleep_interruptible_test, SHOULD_NOT_FAIL,
-              IS_INTEGRATION_TEST) {
+TEST_DECLARE(thread_sleep_interruptible_test, .tier = TEST_TIER_INTEGRATION) {
     if (global.core_count < 4) {
         ADD_MESSAGE("too few cores");
-        SET_SKIP();
-        return;
+        return TEST_SKIP(TEST_SKIP_NONE);
     }
 
     si_t = thread_spawn_on_core("si_thread", sleeping_thread, NULL, 1);
@@ -215,7 +213,7 @@ TEST_REGISTER(thread_sleep_interruptible_test, SHOULD_NOT_FAIL,
     while (!atomic_load(&si_ok))
         scheduler_yield();
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 static atomic_bool gogo = false;
@@ -242,7 +240,7 @@ static void dpc_on_event_dummy_thread(void *a) {
 /* we put a thread on a core that is not idle, enqueue a DPC over
  * there, trigger some reschedules, and then verify that the DPC
  * only ever runs once the core actually goes idle */
-TEST_REGISTER(dpc_on_event_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(dpc_on_event_test, .tier = TEST_TIER_UNIT) {
     size_t i;
     size_t found = SIZE_MAX;
     for_each_cpu_id(i) {
@@ -254,8 +252,7 @@ TEST_REGISTER(dpc_on_event_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
 
     if (found == SIZE_MAX) {
         ADD_MESSAGE("Could not find idle CPU");
-        SET_SKIP();
-        return;
+        return TEST_SKIP(TEST_SKIP_NONE);
     }
 
     struct thread *t =
@@ -270,7 +267,7 @@ TEST_REGISTER(dpc_on_event_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     while (!atomic_load(&gogo))
         cpu_relax();
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #define SCHED_PUSH_TEST_THREADS 256
@@ -286,10 +283,9 @@ static void sched_push_try(void *) {
     atomic_store(&at_least_one_migrated, true);
 }
 
-TEST_REGISTER(sched_push_target_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_DECLARE(sched_push_target_test, .tier = TEST_TIER_INTEGRATION) {
     ADD_MESSAGE("This test takes a bit. uncomment me to run it");
-    SET_SKIP();
-    return;
+    return TEST_SKIP(TEST_SKIP_NONE);
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     for (size_t i = 0; i < SCHED_PUSH_TEST_THREADS; i++) {
         thread_spawn_on_core("push_test_%zu", sched_push_try, NULL, 0, i);
@@ -299,7 +295,7 @@ TEST_REGISTER(sched_push_target_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     while (!atomic_load(&left))
         scheduler_yield();
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #endif

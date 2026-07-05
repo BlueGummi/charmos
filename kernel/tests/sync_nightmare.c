@@ -3,7 +3,7 @@
 #include <sch/sched.h>
 #include <smp/core.h>
 #include <stdatomic.h>
-#include <tests.h>
+#include <test.h>
 #include <thread/apc.h>
 #include <thread/thread.h>
 
@@ -205,18 +205,15 @@ static void chaos_migrator() {
 /* ------------------------------------
  * Main Test
  * ------------------------------------ */
-TEST_REGISTER(thread_interruptible_chaos_fuzz, SHOULD_NOT_FAIL,
-              IS_INTEGRATION_TEST) {
+TEST_DECLARE(thread_interruptible_chaos_fuzz, .tier = TEST_TIER_INTEGRATION) {
     ADD_MESSAGE("this test is long. comment me out to run it.");
-    SET_SKIP();
-    return;
+    return TEST_SKIP(TEST_SKIP_NONE);
 
     CHAOS_LOG("chaos test start");
 
     if (global.core_count < 6) {
         ADD_MESSAGE("needs 6+ cores for chaos fuzz");
-        SET_SKIP();
-        return;
+        return TEST_SKIP(TEST_SKIP_NONE);
     }
 
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
@@ -247,5 +244,5 @@ TEST_REGISTER(thread_interruptible_chaos_fuzz, SHOULD_NOT_FAIL,
     atomic_store(&chaos_stop, true);
 
     CHAOS_LOG("chaos test complete");
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }

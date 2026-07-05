@@ -9,7 +9,7 @@
 #include <mem/rmap.h>
 #include <mem/vma_range.h>
 #include <stdint.h>
-#include <tests.h>
+#include <test.h>
 
 /* rmap is the dangerous direction: folio -> every (mm, va) that maps it
  *
@@ -51,7 +51,7 @@ static void record_visit(struct mm *mm, vaddr_t va, struct folio *f,
     v->n++;
 }
 
-TEST_REGISTER(rmap_fork_visibility, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(rmap_fork_visibility, .tier = TEST_TIER_UNIT) {
     vaddr_t base = WIN_BASE_PG << PAGE_4K_SHIFT;
     vaddr_t end = base + 16 * PAGE_SIZE;
     vaddr_t va = base + 4 * PAGE_SIZE; /* the page we fault */
@@ -95,10 +95,10 @@ TEST_REGISTER(rmap_fork_visibility, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(v2.n == 1);
     TEST_ASSERT(v2.mm[0] == cmm && v2.va[0] == va);
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
-TEST_REGISTER(rmap_itree_differential, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(rmap_itree_differential, .tier = TEST_TIER_UNIT) {
     prng_seed(RMAP_SEED);
 
     struct range_rec *r =
@@ -168,7 +168,7 @@ TEST_REGISTER(rmap_itree_differential, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
         TEST_ASSERT(v.n == expected);
     }
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #endif

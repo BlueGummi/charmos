@@ -6,7 +6,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-#include <tests.h>
+#include <test.h>
 #include <thread/workqueue.h>
 #include <time/spin_sleep.h>
 #include <time/time.h>
@@ -28,8 +28,8 @@ static void defer_func(void *boo, void *unused) {
     defer_worked = true;
 }
 
-TEST_REGISTER(defer_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
-    SET_SUCCESS();
+TEST_DECLARE(defer_test, .tier = TEST_TIER_UNIT) {
+    return TEST_SUCCESS;
     defer_enqueue(defer_func, WORK_ARGS(NULL, NULL), 5);
     enqueue_ms = time_get_ms();
     sleep_spin_ms(100);

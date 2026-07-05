@@ -6,14 +6,13 @@
 #include <mem/alloc.h>
 #include <stdint.h>
 #include <string.h>
-#include <tests.h>
+#include <test.h>
 #include <time/spin_sleep.h>
 
 #define EXT2_INIT                                                              \
     if (global.root_node->fs_type != FS_EXT2) {                                \
         ADD_MESSAGE("the mounted root is not ext2");                           \
-        SET_SKIP();                                                            \
-        return;                                                                \
+        return TEST_SKIP(TEST_SKIP_NONE);                                      \
     }                                                                          \
     struct vfs_node *root = global.root_node;
 
@@ -47,7 +46,7 @@ static void flush() {
     check_bcache();*/
 }
 
-TEST_REGISTER(ext2_stat_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(ext2_stat_test, .tier = TEST_TIER_UNIT) {
     EXT2_INIT;
 
     FAIL_IF_FATAL(root->ops->create(root, "ext2_stat_test", VFS_MODE_FILE));
@@ -68,10 +67,10 @@ TEST_REGISTER(ext2_stat_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(memcmp(&stat_out, &empty_stat, sizeof(struct vfs_stat)) != 0);
 
     flush();
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
-TEST_REGISTER(ext2_rename_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(ext2_rename_test, .tier = TEST_TIER_UNIT) {
     EXT2_INIT;
 
     FAIL_IF_FATAL(root->ops->create(root, "ext2_rename_test", VFS_MODE_FILE));
@@ -96,10 +95,10 @@ TEST_REGISTER(ext2_rename_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(node != NULL);
 
     flush();
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
-TEST_REGISTER(ext2_chmod_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(ext2_chmod_test, .tier = TEST_TIER_UNIT) {
     EXT2_INIT;
 
     FAIL_IF_FATAL(root->ops->create(root, "ext2_chmod_test", VFS_MODE_FILE));
@@ -122,10 +121,10 @@ TEST_REGISTER(ext2_chmod_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(node->mode & VFS_MODE_O_EXEC);
 
     flush();
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
-TEST_REGISTER(ext2_symlink_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(ext2_symlink_test, .tier = TEST_TIER_UNIT) {
     EXT2_INIT;
 
     FAIL_IF_FATAL(root->ops->symlink(root, "/tmp", "ext2_symlink_test"));
@@ -146,10 +145,10 @@ TEST_REGISTER(ext2_symlink_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     TEST_ASSERT(strcmp(buf, "/tmp") == 0);
 
     flush();
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
-TEST_REGISTER(ext2_dir_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(ext2_dir_test, .tier = TEST_TIER_UNIT) {
     EXT2_INIT;
 
     FAIL_IF_FATAL(root->ops->mkdir(root, "ext2_dir_test", VFS_MODE_DIR));
@@ -165,10 +164,10 @@ TEST_REGISTER(ext2_dir_test, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     FAIL_IF_FATAL(root->ops->rmdir(root, "ext2_dir_test"));
 
     flush();
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
-TEST_REGISTER(ext2_integration_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_DECLARE(ext2_integration_test, .tier = TEST_TIER_INTEGRATION) {
     EXT2_INIT;
 
     FAIL_IF_FATAL(
@@ -209,7 +208,7 @@ TEST_REGISTER(ext2_integration_test, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
 
     flush();
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #endif

@@ -6,32 +6,31 @@
 
 #include <stdatomic.h>
 #include <sync/rwlock.h>
-#include <tests.h>
+#include <test.h>
 
 #define RWLOCK_REPORT_PROBLEMS()                                               \
     ADD_MESSAGE("rwlock tests are encountering problems and will be skipped"); \
-    SET_SKIP();                                                                \
-    return;
+    return TEST_SKIP(TEST_SKIP_NONE);
 
 static struct rwlock rw_basic = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 
-TEST_REGISTER(rwlock_basic_read, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(rwlock_basic_read, .tier = TEST_TIER_UNIT) {
     rwlock_lock(&rw_basic, RWLOCK_ACQUIRE_READ);
     scheduler_yield();
     rwlock_unlock(&rw_basic);
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 static struct rwlock rw_basic_w = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 
-TEST_REGISTER(rwlock_basic_write, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(rwlock_basic_write, .tier = TEST_TIER_UNIT) {
 
     rwlock_lock(&rw_basic_w, RWLOCK_ACQUIRE_WRITE);
     scheduler_yield();
     rwlock_unlock(&rw_basic_w);
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 static struct rwlock rw_two_writers = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
@@ -44,7 +43,7 @@ static void rw_two_writer_thread(void *) {
     atomic_store(&rw_two_done, true);
 }
 
-TEST_REGISTER(rwlock_two_writer_basic, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
+TEST_DECLARE(rwlock_two_writer_basic, .tier = TEST_TIER_UNIT) {
 
     rwlock_lock(&rw_two_writers, RWLOCK_ACQUIRE_WRITE);
 
@@ -57,7 +56,7 @@ TEST_REGISTER(rwlock_two_writer_basic, SHOULD_NOT_FAIL, IS_UNIT_TEST) {
     while (!atomic_load(&rw_two_done))
         scheduler_yield();
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #define RWLOCK_READER_COUNT_TEST_N 20
@@ -84,7 +83,7 @@ static void rw_reader_worker(void *) {
     atomic_fetch_sub(&rw_readers_left, 1);
 }
 
-TEST_REGISTER(rwlock_many_readers, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_DECLARE(rwlock_many_readers, .tier = TEST_TIER_INTEGRATION) {
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     for (int i = 0; i < RWLOCK_READER_COUNT_TEST_N; i++)
         thread_spawn("rr_%zu", rw_reader_worker, NULL, i);
@@ -93,7 +92,7 @@ TEST_REGISTER(rwlock_many_readers, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     while (atomic_load(&rw_readers_left))
         scheduler_yield();
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #define RWLOCK_MIXED_THREADS 24
@@ -124,7 +123,7 @@ static void rw_mixed_worker(void *) {
     atomic_fetch_sub(&rw_mixed_left, 1);
 }
 
-TEST_REGISTER(rwlock_mixed_stress, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_DECLARE(rwlock_mixed_stress, .tier = TEST_TIER_INTEGRATION) {
 
     for (int i = 0; i < RWLOCK_MIXED_THREADS; i++)
         mixed_threads[i] = thread_spawn("rm", rw_mixed_worker, NULL);
@@ -132,7 +131,7 @@ TEST_REGISTER(rwlock_mixed_stress, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     while (atomic_load(&rw_mixed_left))
         scheduler_yield();
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #define RWLOCK_CHAOS_THREADS 24
@@ -160,7 +159,7 @@ static void rw_chaos_worker(void *) {
     printf("%u threads left\n", atomic_fetch_sub(&rw_chaos_left, 1) - 1);
 }
 
-TEST_REGISTER(rwlock_chaos, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_DECLARE(rwlock_chaos, .tier = TEST_TIER_INTEGRATION) {
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     for (int i = 0; i < RWLOCK_CHAOS_THREADS; i++)
         thread_spawn("rch", rw_chaos_worker, NULL);
@@ -171,7 +170,7 @@ TEST_REGISTER(rwlock_chaos, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
         scheduler_yield();
     }
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 static struct rwlock rw_correct = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
@@ -218,7 +217,7 @@ static void rw_correct_worker(void *) {
     atomic_fetch_sub(&correctness_left, 1);
 }
 
-TEST_REGISTER(rwlock_correctness, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
+TEST_DECLARE(rwlock_correctness, .tier = TEST_TIER_INTEGRATION) {
 
     for (int i = 0; i < RWLOCK_CORRECT_THREADS; i++)
         thread_spawn("rwc", rw_correct_worker, NULL);
@@ -229,7 +228,7 @@ TEST_REGISTER(rwlock_correctness, SHOULD_NOT_FAIL, IS_INTEGRATION_TEST) {
     while (!atomic_load(&correctness_ok))
         scheduler_yield();
 
-    SET_SUCCESS();
+    return TEST_SUCCESS;
 }
 
 #endif

@@ -37,6 +37,15 @@ set(TEST_NIGHTMARE_FLAGS
     TEST_NIGHTMARE_WAKE
 )
 
+set(INJECT_FLAGS INJECT_RCU INJECT_SCHED INJECT_ALLOC INJECT_LOCK)
+
+set(TEST_INJECT_MAP
+    TEST_RCU:INJECT_RCU
+    TEST_SCHED:INJECT_SCHED
+    TEST_MEM:INJECT_ALLOC
+    TEST_MUTEX:INJECT_LOCK
+)
+
 function(define_flag_group GROUP_NAME ENABLE_ALL DEFAULT_ALL FLAGS)
     option(${ENABLE_ALL} "Enable all ${GROUP_NAME} flags" ${DEFAULT_ALL})
     foreach(flag ${FLAGS})
@@ -71,6 +80,7 @@ define_flag_group(PROFILING       PROFILING_ALL       OFF "${PROFILING_FLAGS}")
 define_flag_group(TEST            TEST_ALL            ON  "${TEST_FLAGS}")
 define_flag_group(TEST_NIGHTMARE  TEST_NIGHTMARE_ALL  ON  "${TEST_NIGHTMARE_FLAGS}")
 define_flag_group(DEBUG           DEBUG_ALL           OFF "${DEBUG_FLAGS}")
+define_flag_group(INJECT INJECT_ALL OFF "${INJECT_FLAGS}")   # OFF by default → zero cost in Release
 
 # A *_DEEP flag implies its shallow parent: enabling DEBUG_SLAB_DEEP should also
 # turn on DEBUG_SLAB. Walk the enabled deep flags and pull their parents on.
@@ -84,5 +94,21 @@ foreach(flag ${DEBUG_FLAGS})
             set(${trimmed} ON CACHE BOOL "" FORCE)
             add_compile_definitions(${trimmed})
         endif()
+    endif()
+endforeach()
+
+foreach(pair ${TEST_INJECT_MAP})
+    string(REPLACE ":" ";" _kv "${pair}")
+    list(GET _kv 0 _test)
+    list(GET _kv 1 _inject)
+    if(${_inject})
+        set(${_test} ON CACHE BOOL "" FORCE)
+        add_compile_definitions(${_test} TEST_ENABLED)
+    endif()
+endforeach()
+
+foreach(iflag ${INJECT_FLAGS})
+    if(NOT ";${TEST_INJECT_MAP};" MATCHES ":${iflag}(;|$)")
+        message(WARNING "${iflag} has no TEST_INJECT_MAP entry; won't pull in a test harness")
     endif()
 endforeach()
