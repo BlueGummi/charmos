@@ -25,7 +25,7 @@ struct folio *folio_alloc_internal(uint8_t order, enum alloc_flags f,
     if (!folio)
         return NULL;
 
-    paddr_t phys = pmm_alloc_pages(pages);
+    paddr_t phys = pmm_alloc_pages(pages, f);
     if (!phys) {
         folio_free_folio_struct(folio);
         return NULL;
@@ -37,6 +37,7 @@ struct folio *folio_alloc_internal(uint8_t order, enum alloc_flags f,
     folio->mapcount = 0;
     refcount_init(&folio->refcount, 1);
     folio->mapping = NULL;
+    folio->flags = 0;
     folio_bind_pages(folio);
 
     return folio;

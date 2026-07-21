@@ -138,7 +138,7 @@ static void test_group_run(struct test_group *tg) {
 
             enum test_result singular_result = TEST_RESULT_MAX;
 
-            test_info("    test '%s'", t->name);
+            test_info("    '%s'", t->name);
 
             time_t start_ms = time_get_ms();
             for (; run_times < t->run_times; run_times++) {
@@ -210,9 +210,9 @@ static void test_group_run(struct test_group *tg) {
                     break;
                 default: kassert_unreachable();
                 }
-                test_info(" %s%s" ANSI_RESET " in " ANSI_GREEN "%zu" ANSI_RESET
-                          " ms\n",
-                          color, status, took);
+                printf(" %s%s" ANSI_RESET " in " ANSI_GREEN "%zu" ANSI_RESET
+                       " ms\n",
+                       color, status, took);
             }
 
             if (tctx.message_count) {
