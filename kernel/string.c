@@ -576,3 +576,127 @@ long strtol(const char *nptr, char **endptr, int base) {
         return (long) acc;
     }
 }
+
+unsigned long long strtoull(const char *nptr, char **endptr, int base) {
+    const char *s = nptr;
+
+    while (*s && isspace((unsigned char) *s))
+        s++;
+
+    int neg = 0;
+    if (*s == '+' || *s == '-') {
+        neg = (*s == '-');
+        s++;
+    }
+
+    if (base != 0 && (base < 2 || base > 36)) {
+        if (endptr)
+            *endptr = (char *) nptr;
+        return 0;
+    }
+
+    if (base == 0) {
+        if (*s == '0' && (s[1] == 'x' || s[1] == 'X')) {
+            base = 16;
+            s += 2;
+        } else if (*s == '0') {
+            base = 8;
+        } else {
+            base = 10;
+        }
+    } else if (base == 16 && *s == '0' && (s[1] == 'x' || s[1] == 'X')) {
+        s += 2;
+    }
+
+    const char *start_digits = s;
+    unsigned long long acc = 0;
+    int overflow = 0;
+
+    for (;;) {
+        int digit;
+        char c = *s;
+        if (c >= '0' && c <= '9')
+            digit = c - '0';
+        else if (c >= 'a' && c <= 'z')
+            digit = 10 + (c - 'a');
+        else if (c >= 'A' && c <= 'Z')
+            digit = 10 + (c - 'A');
+        else
+            break;
+
+        if (digit >= base)
+            break;
+
+        if (overflow || acc > (ULLONG_MAX - (unsigned long long) digit) /
+                                  (unsigned long long) base)
+            overflow = 1; /* keep consuming digits so endptr stays correct */
+        else
+            acc = acc * (unsigned long long) base + (unsigned long long) digit;
+
+        s++;
+    }
+
+    if (endptr)
+        *endptr = (char *) (s == start_digits ? nptr : s);
+
+    if (s == start_digits)
+        return 0;
+
+    if (overflow)
+        return ULLONG_MAX;
+
+    return neg ? (0ULL - acc) : acc;
+}
+
+unsigned long strtoul(const char *nptr, char **endptr, int base) {
+    return (unsigned long) strtoull(nptr, endptr, base);
+}
+
+long long strtoll(const char *nptr, char **endptr, int base) {
+    return (long long) strtol(nptr, endptr, base);
+}
+
+size_t strlcpy(char *dst, const char *src, size_t size) {
+    size_t srclen = strlen(src);
+    if (size) {
+        size_t n = (srclen < size - 1) ? srclen : size - 1;
+        memcpy(dst, src, n);
+        dst[n] = '\0';
+    }
+    return srclen;
+}
+
+size_t strlcat(char *dst, const char *src, size_t size) {
+    size_t dstlen = strnlen(dst, size);
+    size_t srclen = strlen(src);
+
+    if (dstlen == size)
+        return size + srclen;
+
+    size_t avail = size - dstlen;
+    size_t n = (srclen < avail - 1) ? srclen : avail - 1;
+    memcpy(dst + dstlen, src, n);
+    dst[dstlen + n] = '\0';
+    return dstlen + srclen;
+}
+
+char *strsep(char **stringp, const char *delim) {
+    char *start = *stringp;
+    if (!start)
+        return NULL;
+
+    char *p = strpbrk(start, delim);
+    if (p) {
+        *p = '\0';
+        *stringp = p + 1;
+    } else {
+        *stringp = NULL;
+    }
+    return start;
+}
+
+char *strchrnul(const char *s, int c) {
+    while (*s && *s != (char) c)
+        s++;
+    return (char *) s;
+}

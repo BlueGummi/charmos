@@ -66,7 +66,7 @@ TEST_DECLARE(blkdev_bio_test, .tier = TEST_TIER_UNIT) {
         TEST_ASSERT(bio->status == 0);
     }
     TEST_ASSERT(done == true);
-    TEST_ASSERT(current_test->message_count == run_times);
+    TEST_ASSERT(test_global.current_test->message_count == run_times);
     return TEST_SUCCESS;
 }
 #endif

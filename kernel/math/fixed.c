@@ -298,3 +298,56 @@ fx32_32_t fx_exp_t(fx32_32_t x) {
     else
         return poly >> -k;
 }
+
+fx32_32_t fx_parse(const char *str, char **endptr) {
+    const char *s = str;
+
+    while (*s == ' ' || *s == '\t')
+        s++;
+
+    bool neg = false;
+    if (*s == '+' || *s == '-') {
+        neg = (*s == '-');
+        s++;
+    }
+
+    bool any_digit = false;
+
+    uint64_t ipart = 0;
+    while (*s >= '0' && *s <= '9') {
+        ipart = ipart * 10 + (uint64_t) (*s - '0');
+        any_digit = true;
+        s++;
+    }
+
+    uint64_t frac_num = 0; /* accumulated fractional digits          */
+    uint64_t frac_den = 1; /* 10^(fractional digit count), <= 10^18  */
+    if (*s == '.') {
+        s++;
+        int frac_digits = 0;
+        while (*s >= '0' && *s <= '9') {
+            if (frac_digits < 18) {
+                frac_num = frac_num * 10 + (uint64_t) (*s - '0');
+                frac_den *= 10;
+                frac_digits++;
+            }
+            any_digit = true;
+            s++;
+        }
+    }
+
+    if (!any_digit) {
+        if (endptr)
+            *endptr = (char *) str;
+        return 0;
+    }
+
+    fx32_32_t result = (fx32_32_t) (ipart << 32);
+    if (frac_den > 1)
+        result += (fx32_32_t) (((uint128_t) frac_num << 32) / frac_den);
+
+    if (endptr)
+        *endptr = (char *) s;
+
+    return neg ? -result : result;
+}

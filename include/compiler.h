@@ -42,6 +42,28 @@
 
 #define __nullable __attribute__((nullable))
 
+#define __naked __attribute__((naked))
+
+#define __returns_nonnull __attribute__((returns_nonnull))
+
+#define __returns_twice __attribute__((returns_twice))
+
+#define __may_alias __attribute__((__may_alias__))
+
+#define __weak __attribute__((weak))
+
+#define __weakref(sym) __attribute__((weakref(#sym)))
+
+#define __alias(sym) __attribute__((alias(#sym)))
+
+#define __no_sanitize_undefined __attribute__((no_sanitize("undefined")))
+
+#define __no_sanitize_thread __attribute__((no_sanitize("thread")))
+
+#define __no_sanitize_memory __attribute__((no_sanitize("memory")))
+
+#define __no_sanitize_coverage __attribute__((no_sanitize("coverage")))
+
 #define __printf_like(fmt_idx, arg_idx)                                        \
     __attribute__((format(printf, fmt_idx, arg_idx)))
 

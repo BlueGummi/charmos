@@ -14,3 +14,5 @@
                   bootstage_str[global.current_bootstage]);                    \
         _p_;                                                                   \
     })
+
+#define kmalloc_or_die(...) alloc_or_die(kmalloc(__VA_ARGS__))

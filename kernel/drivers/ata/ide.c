@@ -38,7 +38,7 @@ static void swap_str(char *dst, const uint16_t *src, uint64_t word_len) {
 }
 
 void ide_identify(struct ata_drive *drive) {
-    uint16_t *buf = alloc_or_die(kmalloc(256 * sizeof(uint16_t)));
+    uint16_t *buf = kmalloc_or_die(256 * sizeof(uint16_t));
 
     uint16_t io = drive->io_base;
 
@@ -148,7 +148,7 @@ struct block_device *ide_create_generic(struct ata_drive *ide) {
     irq_set_chip(irq, lapic_get_chip(), NULL);
     ide->channel.current_drive = ide;
 
-    struct block_device *d = alloc_or_die(kmalloc(sizeof(struct block_device)));
+    struct block_device *d = kmalloc_or_die(sizeof(struct block_device));
 
     d->driver_data = ide;
     d->sector_size = ide->sector_size;

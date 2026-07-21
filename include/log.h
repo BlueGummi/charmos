@@ -17,6 +17,7 @@ enum log_flags : uint32_t {
     LOG_RATELIMIT = 1 << 2, /* suppress floods */
     LOG_ONCE = 1 << 3,      /* print only first occurrence */
     LOG_PANIC = 1 << 5,     /* fatal if level >= ERROR */
+    LOG_NO_NEWLINE = 1 << 6,
     LOG_DEFAULT = 0,
 };
 

@@ -112,6 +112,14 @@ char *itoa(int64_t value, char *buf, int base);
 char *utoa(size_t value, char *buf, int base);
 
 long strtol(const char *nptr, char **endptr, int base);
+long long strtoll(const char *nptr, char **endptr, int base);
+unsigned long strtoul(const char *nptr, char **endptr, int base);
+unsigned long long strtoull(const char *nptr, char **endptr, int base);
+
+size_t strlcpy(char *dst, const char *src, size_t size);
+size_t strlcat(char *dst, const char *src, size_t size);
+char *strsep(char **stringp, const char *delim);
+char *strchrnul(const char *s, int c);
 
 int vsnprintf(char *buffer, int buffer_len, const char *format, va_list args);
 int snprintf(char *buffer, int buffer_len, const char *format, ...);

@@ -10,6 +10,11 @@
 #include <time/spin_sleep.h>
 #include <time/time.h>
 
+#define TEN_LINES "=========="
+#define EIGHTY_LINES                                                           \
+    TEN_LINES TEN_LINES TEN_LINES TEN_LINES TEN_LINES TEN_LINES TEN_LINES      \
+        TEN_LINES
+
 void panic_broadcast_nmi() {
     panic_broadcast(smp_core_id());
 }
@@ -39,8 +44,8 @@ void panic_handler(struct panic_regs *regs) {
 
 static struct spinlock panic_lock = SPINLOCK_INIT;
 
-__noreturn void panic_impl(const char *file, int line, const char *func,
-                           const char *fmt, ...) {
+__noreturn void panic_impl_default(const char *file, int line, const char *func,
+                                   const char *fmt, ...) {
     disable_interrupts();
 
     spin_lock_raw(&panic_lock);

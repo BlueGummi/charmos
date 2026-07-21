@@ -1,5 +1,8 @@
 CompileFlags:
   Add: [-std=gnu11]
-  Remove: [-malign-data*]
+  Remove:
+    - -Wno-reloc-rel-dword
+    - -malign-data*
+    - -f elf64
 Index:
   Background: Build

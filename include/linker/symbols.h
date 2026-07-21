@@ -16,7 +16,7 @@ extern uint64_t __kernel_virt_end;
     __attribute__((section(".kernel_" #n), used))
 
 #define LINKER_SECTION_OBJECT(type, section)                                   \
-    LINKER_SECTION_ATTRIBUTE(section) static type
+    LINKER_SECTION_ATTRIBUTE(section) type
 
 #define LINKER_SECTION_DEFINE(type, name)                                      \
     extern type __skernel_##name[];                                            \

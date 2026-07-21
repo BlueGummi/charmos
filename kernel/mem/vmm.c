@@ -28,7 +28,8 @@ static inline bool in_use(pte_t pte) {
     return pte_in_use((pte_atomic_t *) &pte);
 }
 
-static void vmm_mem_cmdline_callback(const char *str);
+static void vmm_mem_cmdline_callback(const char *str,
+                                     struct cmdline_entry *ent);
 
 enum pt_level {
     PT_LEVEL_PML4 = 0,
@@ -54,8 +55,8 @@ CMDLINE_ENTRY_DECLARE(mem,
                       .desc = "Cap on physical memory the allocator will use",
                       .arg = "<hex bytes>",
                       .callback = vmm_mem_cmdline_callback,
-                      .default_val = "0x700000000000", .required = false,
-                      .value = NULL);
+                      .default_val = "0x700000000000",
+                      .flags = CMDLINE_ENTRY_FLAGS_NONE, .value = NULL);
 
 ADDRESS_RANGE_DECLARE(hhdm, .base = 0xFFFF800000000000ULL,
                       /* default size: from the base up to the slab heap */
@@ -91,7 +92,8 @@ static long string_to_int(const char *str) {
     return strtol(str, &endptr, 0);
 }
 
-static void vmm_mem_cmdline_callback(const char *str) {
+static void vmm_mem_cmdline_callback(const char *str,
+                                     struct cmdline_entry *ent) {
     ADDRESS_RANGE(hhdm).size = string_to_int(str);
 }
 

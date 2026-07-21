@@ -18,6 +18,31 @@ else()
     list(APPEND KERNEL_WARNINGS -Wno-override-init)
 endif()
 
+set(KERNEL_WARNINGS_RELEASE
+    -Wunused
+    -Wno-unused-parameter
+    -Wvla
+    -Wnull-dereference
+)
+
+if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    list(APPEND KERNEL_WARNINGS_RELEASE
+        -Wshadow=local
+        -Wlogical-op
+        -Wduplicated-cond
+        -Wduplicated-branches
+    )
+endif()
+
+string(REPLACE ";" " " KERNEL_WARNINGS_RELEASE_STR "${KERNEL_WARNINGS_RELEASE}")
+
+set(KERNEL_WARNINGS_DEBUG
+    -Wno-unused-parameter
+    -Wno-unused-function
+)
+
+string(REPLACE ";" " " KERNEL_WARNINGS_DEBUG_STR "${KERNEL_WARNINGS_DEBUG}")
+
 set(KERNEL_FREESTANDING
     -ffreestanding
     -fno-stack-protector -fno-stack-check
@@ -38,9 +63,9 @@ set(KERNEL_DEFINES
     -DUACPI_DEFAULT_LOG_LEVEL=4
 )
 
-set(CMAKE_C_FLAGS_DEBUG          "-O0 -ggdb -g3 -Wno-unused-function -Wno-unused-parameter")
-set(CMAKE_C_FLAGS_RELEASE        "-O3")
-set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -ggdb -g3 -Wno-unused-function -Wno-unused-parameter")
+set(CMAKE_C_FLAGS_DEBUG          "-O0 -ggdb -g3 ${KERNEL_WARNINGS_DEBUG_STR}")
+set(CMAKE_C_FLAGS_RELEASE        "-O3 ${KERNEL_WARNINGS_RELEASE_STR}")
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -ggdb -g3")
 set(CMAKE_C_FLAGS_MINSIZEREL     "-Os")
 
 option(KERNEL_STACK_USAGE "Emit .su files with -fstack-usage" ON)
@@ -48,10 +73,6 @@ if(KERNEL_STACK_USAGE)
     list(APPEND KERNEL_FREESTANDING -fstack-usage)
 endif()
 
-#[[
-GCC defaults to -malign-data=compat, which messes up the static objects size >= 32
-bytes, breaking natural alignment and causing big sad in the linker section objs
-]]
 if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
     list(APPEND KERNEL_FREESTANDING -malign-data=abi)
 endif()
@@ -150,4 +171,4 @@ if(KERNEL_RANDCONFIG)
 endif()
 
 enable_language(ASM_NASM)
-set(CMAKE_ASM_NASM_FLAGS "-F dwarf -g -Wall -f elf64 -wno-reloc-rel-dword")
+set(CMAKE_ASM_NASM_FLAGS "-F dwarf -g -Wall -f elf64 -Wno-reloc-rel-dword")

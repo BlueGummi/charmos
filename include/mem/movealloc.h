@@ -37,7 +37,8 @@ struct movealloc_callback_chain {
     (container_of(ln, struct movealloc_callback_node, list))
 
 #define MOVEALLOC_REGISTER_CALL(name, callback, param1, param2)                \
-    LINKER_SECTION_OBJECT(struct movealloc_callback_node, movealloc_callbacks) \
-    movealloc_##name = {callback, param1, param2, .list = {0}};
+    static LINKER_SECTION_OBJECT(struct movealloc_callback_node,               \
+                                 movealloc_callbacks)                          \
+        movealloc_##name = {callback, param1, param2, .list = {0}};
 
 void movealloc_exec_all(void);

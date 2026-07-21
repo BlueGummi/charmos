@@ -25,7 +25,7 @@ void srat_init(void) {
                         "SRAT table not found, assuming single NUMA node");
 
         global.numa_nodes =
-            alloc_or_die(kmalloc(sizeof(struct numa_node), ALLOC_FLAGS_ZERO));
+            kmalloc_or_die(sizeof(struct numa_node), ALLOC_FLAGS_ZERO);
 
         global.numa_nodes[0].topo = NULL;
         global.numa_nodes[0].mem_base = 0;

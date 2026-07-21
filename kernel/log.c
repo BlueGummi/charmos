@@ -101,7 +101,8 @@ static void log_dump_record(const struct log_site *site,
         print(" <+ at %s()", rec->caller_fn);
     }
 
-    print("\n");
+    if (!(rec->handle->flags & LOG_NO_NEWLINE))
+        print("\n");
 }
 
 static inline bool log_ringbuf_try_enqueue(struct log_site *site,
@@ -311,8 +312,8 @@ void log_sites_init(void) {
         refcount_init(&s->refcount, 1);
         struct log_ringbuf *lrb = &s->rb;
         kassert(s->capacity);
-        lrb->slots = alloc_or_die(kmalloc(
-            sizeof(struct log_ring_slot) * s->capacity, ALLOC_FLAGS_ZERO));
+        lrb->slots = kmalloc_or_die(sizeof(struct log_ring_slot) * s->capacity,
+                                    ALLOC_FLAGS_ZERO);
 
         for (size_t i = 0; i < s->capacity; i++) {
             atomic_store_explicit(&lrb->slots[i].seq, i, memory_order_release);

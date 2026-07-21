@@ -35,8 +35,7 @@ build_domain_for_level(enum topology_level lvl) {
     size_t n = t->count[lvl];
     struct topology_node *nodes = t->level[lvl];
 
-    struct scheduler_domain *d =
-        alloc_or_die(kmalloc(sizeof(*d), ALLOC_FLAGS_ZERO));
+    struct scheduler_domain *d = kmalloc_or_die(sizeof(*d), ALLOC_FLAGS_ZERO);
 
     d->level = lvl;
     d->ngroups = n;

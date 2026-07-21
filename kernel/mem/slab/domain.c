@@ -13,8 +13,8 @@ void slab_domain_build_locality_lists(struct slab_domain *sdom) {
 
     for (int i = 0; i < SLAB_TYPE_COUNT; i++) {
         sdom->zonelists[i].count = zl->count;
-        sdom->zonelists[i].entries = alloc_or_die(kmalloc(
-            sizeof(struct slab_cache_ref) * zl->count, ALLOC_FLAGS_ZERO));
+        sdom->zonelists[i].entries = kmalloc_or_die(
+            sizeof(struct slab_cache_ref) * zl->count, ALLOC_FLAGS_ZERO);
         for (size_t j = 0; j < zl->count; j++) {
             struct domain_zonelist_entry *zent = &zl->entries[j];
             struct domain_buddy *bd = zent->domain;
@@ -51,7 +51,7 @@ void slab_domain_link_caches(struct slab_domain *domain,
 static void slab_domain_init_cache(struct slab_domain *dom,
                                    enum slab_type type) {
     struct slab_caches *caches =
-        alloc_or_die(kmalloc(sizeof(struct slab_caches), ALLOC_FLAGS_ZERO));
+        kmalloc_or_die(sizeof(struct slab_caches), ALLOC_FLAGS_ZERO);
 
     dom->caches[type] = caches;
     dom->caches[type]->caches = alloc_or_die(slab_caches_alloc());
@@ -142,7 +142,7 @@ void slab_domain_init(void) {
     for (size_t i = 0; i < global.domain_count; i++) {
         struct domain *domain = global.domains[i];
         struct slab_domain *sdomain =
-            alloc_or_die(kmalloc(sizeof(struct slab_domain), ALLOC_FLAGS_ZERO));
+            kmalloc_or_die(sizeof(struct slab_domain), ALLOC_FLAGS_ZERO);
 
         sdomain->domain = domain;
         domain->slab_domain = sdomain;

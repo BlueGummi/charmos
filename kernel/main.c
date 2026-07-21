@@ -113,6 +113,7 @@ __no_sanitize_address void k_main(void) {
     scheduler_init();
     turnstiles_init();
 
+    tests_hook_boot();
     cmdline_parse(cmdline_request.response->cmdline);
     lapic_timer_init(/* core_id = */ 0);
     dpc_init_percpu();

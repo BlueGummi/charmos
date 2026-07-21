@@ -297,7 +297,10 @@ configure_cmake
 if $COMPDB; then
     log "generating compile_commands.json"
     run_cmd cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON "$REPO_ROOT"
-    cp compile_commands.json "$REPO_ROOT"
+
+    if [[ ! -f "$REPO_ROOT/compile_commands.json" ]] || ! cmp -s "compile_commands.json" "$REPO_ROOT/compile_commands.json"; then
+        cp compile_commands.json "$REPO_ROOT"
+    fi
 fi
 
 SYMS_FILE="$REPO_ROOT/kernel/syms/fullsyms.c"

@@ -95,8 +95,8 @@ static void construct_domains_from_cores(void) {
             cores_this_domain = remainder; /* last one gets leftovers */
 
         cd->num_cores = cores_this_domain;
-        cd->cores = alloc_or_die(kmalloc(
-            sizeof(struct core *) * cores_this_domain, ALLOC_FLAGS_ZERO));
+        cd->cores = kmalloc_or_die(sizeof(struct core *) * cores_this_domain,
+                                   ALLOC_FLAGS_ZERO);
     }
 }
 

@@ -11,8 +11,7 @@
 void percpu_obj_init(void) {
     for (struct percpu_descriptor *d = __skernel_percpu_desc;
          d < __ekernel_percpu_desc; d++) {
-        d->percpu_ptrs =
-            alloc_or_die(kmalloc(sizeof(void *) * global.core_count));
+        d->percpu_ptrs = kmalloc_or_die(sizeof(void *) * global.core_count);
 
         size_t cpu;
         for_each_cpu_id(cpu) {
@@ -29,7 +28,7 @@ void perdomain_obj_init(void) {
     for (struct perdomain_descriptor *d = __skernel_perdomain_desc;
          d < __ekernel_perdomain_desc; d++) {
         d->perdomain_ptrs =
-            alloc_or_die(kmalloc(sizeof(void *) * global.domain_count));
+            kmalloc_or_die(sizeof(void *) * global.domain_count);
 
         struct domain *dom;
         domain_for_each_domain(dom) {
@@ -47,7 +46,7 @@ void pernode_obj_init(void) {
     for (struct pernode_descriptor *d = __skernel_pernode_desc;
          d < __ekernel_pernode_desc; d++) {
         d->pernode_ptrs =
-            alloc_or_die(kmalloc(sizeof(void *) * global.numa_node_count));
+            kmalloc_or_die(sizeof(void *) * global.numa_node_count);
 
         for (size_t i = 0; i < global.numa_node_count; i++) {
             d->pernode_ptrs[i] = alloc_or_die(

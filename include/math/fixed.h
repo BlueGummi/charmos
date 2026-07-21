@@ -7,6 +7,11 @@
 #define FX(x) ((fx32_32_t) ((x) * 4294967296.0 + 0.5))
 #define FX_FROM_RATIO(n, d) ((fx32_32_t) (((__int128) (n) << 32) / (d)))
 
+/* Parse a decimal fixed-point string ("3", "-0.5", ".25", ...) into Q32.32.
+ * strtol-style endptr: set past the last consumed char, or to str if nothing
+ * valid was parsed (endptr may be NULL). Defined in kernel/math/fixed.c. */
+fx32_32_t fx_parse(const char *str, char **endptr);
+
 static inline fx32_32_t fx_add(fx32_32_t a, fx32_32_t b) {
     return (fx32_32_t) (a + b);
 }

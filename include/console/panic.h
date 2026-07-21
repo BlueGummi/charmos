@@ -6,10 +6,18 @@
 void debug_print_stack();
 extern void panic_entry();
 void panic_broadcast_nmi();
+typedef __noreturn void (*panic_handler_t)(const char *file, int line,
+                                           const char *func, const char *fmt,
+                                           ...);
 
 static inline void qemu_exit(int code) {
     outb(0xf4, ((code << 1) | 1) & 0xFF);
 }
+
+struct panic_hook {
+    _Atomic panic_handler_t impl;
+    bool enabled;
+};
 
 struct panic_regs {
     uint64_t rsp;
@@ -17,13 +25,13 @@ struct panic_regs {
     uint64_t rsi, rdi, rbp, rdx, rcx, rbx, rax;
 };
 
-#define TEN_LINES "=========="
-#define EIGHTY_LINES                                                           \
-    TEN_LINES TEN_LINES TEN_LINES TEN_LINES TEN_LINES TEN_LINES TEN_LINES      \
-        TEN_LINES
-
-__noreturn void panic_impl(const char *file, int line, const char *func,
-                           const char *fmt, ...);
+__noreturn void panic_impl_default(const char *file, int line, const char *func,
+                                   const char *fmt, ...);
 
 #define panic(fmt, ...)                                                        \
-    panic_impl(__FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
+    panic_impl_default(__FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
+
+#define panic_with_impl(hook, fmt, ...)                                        \
+    hook.impl(__FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
+
+#define oops(fmt, ...)
