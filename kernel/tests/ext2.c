@@ -11,7 +11,7 @@
 
 #define EXT2_INIT                                                              \
     if (global.root_node->fs_type != FS_EXT2) {                                \
-        ADD_MESSAGE("the mounted root is not ext2");                           \
+        test_info("the mounted root is not ext2");                             \
         return TEST_SKIP(TEST_SKIP_NONE);                                      \
     }                                                                          \
     struct vfs_node *root = global.root_node;
@@ -30,7 +30,7 @@ static void check_bcache(void) {
     snprintf(msg, 100, "Block cache has %d dirty entries and %d total entries",
              bcache_total_dirty, bcache_total_present);
 
-    ADD_MESSAGE(msg);
+    test_info(msg);
 
     TEST_ASSERT(bcache_total_dirty == 0);
 }*/

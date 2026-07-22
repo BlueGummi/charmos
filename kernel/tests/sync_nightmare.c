@@ -206,13 +206,13 @@ static void chaos_migrator() {
  * Main Test
  * ------------------------------------ */
 TEST_DECLARE(thread_interruptible_chaos_fuzz, .tier = TEST_TIER_INTEGRATION) {
-    ADD_MESSAGE("this test is long. comment me out to run it.");
+    test_info("this test is long. comment me out to run it.");
     return TEST_SKIP(TEST_SKIP_NONE);
 
     CHAOS_LOG("chaos test start");
 
     if (global.core_count < 6) {
-        ADD_MESSAGE("needs 6+ cores for chaos fuzz");
+        test_info("needs 6+ cores for chaos fuzz");
         return TEST_SKIP(TEST_SKIP_NONE);
     }
 

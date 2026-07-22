@@ -1,3 +1,4 @@
+#include <bootstage_condition.h>
 #include <console/printf.h>
 #include <linker/symbol_table.h>
 #include <log.h>
@@ -105,6 +106,14 @@ static void log_dump_record(const struct log_site *site,
         print("\n");
 }
 
+static void log_dump_record_locked(const struct log_site *site,
+                                   const struct log_record *rec,
+                                   const struct log_dump_options opts) {
+    enum irql irql = printf_lock();
+    log_dump_record(site, rec, opts, printf_unlocked);
+    printf_unlock(irql);
+}
+
 static inline bool log_ringbuf_try_enqueue(struct log_site *site,
                                            struct log_ringbuf *rb,
                                            const struct log_record *rec) {
@@ -173,7 +182,8 @@ static bool log_ringbuf_force_enqueue(struct log_site *site,
     return log_ringbuf_try_enqueue(site, rb, rec);
 }
 
-void log_dump_site(struct log_site *site, struct log_dump_options opts) {
+void log_dump_site_with_opts(struct log_site *site,
+                             struct log_dump_options opts) {
     struct log_record rec;
     if (!site || !log_site_get(site))
         return;
@@ -198,8 +208,12 @@ void log_dump_site_default(struct log_site *site) {
     if (!site || !log_site_get(site))
         return;
 
-    log_dump_site(site, LOG_DUMP_DEFAULT);
+    log_dump_site_with_opts(site, LOG_DUMP_DEFAULT);
     log_site_put(site);
+}
+
+void log_dump_site(struct log_site *site) {
+    log_dump_site_with_opts(site, site->dump_opts);
 }
 
 void log_emit_internal(struct log_site *site, struct log_handle *handle,
@@ -230,9 +244,10 @@ void log_emit_internal(struct log_site *site, struct log_handle *handle,
 
     struct log_dump_options dopts = site->dump_opts;
 
-    if (global.current_bootstage < BOOTSTAGE_LATE)
+    BOOTSTAGE_IF_LT(BOOTSTAGE_LATE) {
         if (log_handle_should_print(handle, site, level))
             return log_dump_record(site, &rec, dopts, printf);
+    }
 
     if (!log_site_accepts(site) ||
         (site->flags & LOG_SITE_NO_IRQ && irq_in_interrupt()))
@@ -282,7 +297,7 @@ void log_emit_internal(struct log_site *site, struct log_handle *handle,
 
             if (!queued) {
                 /* last-resort visibility */
-                log_dump_record(site, &rec, dopts, printf);
+                log_dump_record_locked(site, &rec, dopts);
             }
         } else {
             site->dropped++;
@@ -290,7 +305,7 @@ void log_emit_internal(struct log_site *site, struct log_handle *handle,
     }
 
     if (log_handle_should_print(handle, site, level)) {
-        log_dump_record(site, &rec, dopts, printf);
+        log_dump_record_locked(site, &rec, dopts);
     }
 
     if ((ll & LOG_PANIC) && level >= LOG_ERROR) {
@@ -328,7 +343,7 @@ void log_dump_all(void) {
 
     struct log_site *site;
     list_for_each_entry(site, &log_global.list.list, list) {
-        log_dump_site(site, LOG_DUMP_DEFAULT);
+        log_dump_site_default(site);
     }
 
     spin_unlock(&log_global.list.lock, irql);

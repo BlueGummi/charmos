@@ -43,6 +43,7 @@ enum log_record_flags : uint16_t {
     LOG_REC_TRUNCATED = 1 << 1,
 };
 
+/* Governs what to print */
 struct log_dump_options {
     uint8_t min_level;
     bool show_args : 1;
@@ -108,7 +109,7 @@ struct log_site {
     struct list_head list;
     char *name;
     struct log_ringbuf rb;
-    uint32_t enabled_mask;
+    uint32_t enabled_mask; /* Governs what actually goes in the site */
     size_t capacity;
 
     /* Only relevant for dynamic log sites */
@@ -160,7 +161,8 @@ static inline bool log_site_enabled(const struct log_site *ss, uint8_t level) {
 void log_emit_internal(struct log_site *, struct log_handle *, enum log_level,
                        const char *func, const char *fname, int32_t line,
                        uintptr_t ip, uint8_t nargs, char *fmt, ...);
-void log_dump_site(struct log_site *, struct log_dump_options opts);
+void log_dump_site_with_opts(struct log_site *, struct log_dump_options opts);
+void log_dump_site(struct log_site *site);
 void log_dump_site_default(struct log_site *);
 void log_dump_all(void);
 void log_sites_init(void);
@@ -174,6 +176,14 @@ static inline bool log_site_get(struct log_site *site) {
 static inline void log_site_put(struct log_site *site) {
     if (refcount_dec_and_test(&site->refcount))
         log_site_free(site);
+}
+
+/* NOTE: RACY */
+static inline size_t log_site_message_count(struct log_site *site) {
+    uint64_t head = atomic_load_explicit(&site->rb.head, memory_order_acquire);
+    uint64_t tail = atomic_load_explicit(&site->rb.tail, memory_order_acquire);
+
+    return head - tail;
 }
 
 #define LOG_DUMP_DEFAULT                                                       \

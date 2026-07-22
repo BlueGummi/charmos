@@ -39,7 +39,7 @@ TEST_DECLARE(workqueue_test, .tier = TEST_TIER_UNIT) {
     TEST_ASSERT(msg);
     snprintf(msg, 100, "Took %d clock cycles to add to event pool %d times",
              total, times);
-    ADD_MESSAGE(msg);
+    test_info(msg);
 
     TEST_ASSERT(atomic_load(&workqueue_ran));
 
@@ -47,7 +47,7 @@ TEST_DECLARE(workqueue_test, .tier = TEST_TIER_UNIT) {
     snprintf(msg, 100,
              "Event pool ran %d times, tests should've had it run %d times",
              workqueue_times, times);
-    ADD_MESSAGE(msg);
+    test_info(msg);
 
     return TEST_SUCCESS;
 }
@@ -108,11 +108,11 @@ TEST_DECLARE(workqueue_test_2, .tier = TEST_TIER_UNIT) {
     wq = workqueue_create(NULL, &attrs);
 
     for (size_t i = 0; i < WQ_2_THREADS; i++) {
-        printf("spawning workqueue enqueue threads\n");
+        test_info("spawning workqueue enqueue threads");
         thread_spawn("workqueue_enqueue_thread", enqueue_thread, NULL);
     }
 
-    printf("yielding\n");
+    test_info("yielding");
     thread_apply_cpu_penalty(thread_get_current());
     while (atomic_load(&threads_left) > 0) {
         scheduler_yield();
@@ -122,9 +122,9 @@ TEST_DECLARE(workqueue_test_2, .tier = TEST_TIER_UNIT) {
 
     char *msg = kmalloc(100);
     snprintf(msg, 100, "There are %d workers", workers);
-    ADD_MESSAGE(msg);
+    test_info(msg);
 
-    printf("destroy\n");
+    test_info("destroy");
     workqueue_destroy(wq);
     return TEST_SUCCESS;
 }
@@ -203,7 +203,7 @@ static void waking_thread(void *) {
 
 TEST_DECLARE(thread_sleep_interruptible_test, .tier = TEST_TIER_INTEGRATION) {
     if (global.core_count < 4) {
-        ADD_MESSAGE("too few cores");
+        test_info("too few cores");
         return TEST_SKIP(TEST_SKIP_NONE);
     }
 
@@ -251,7 +251,7 @@ TEST_DECLARE(dpc_on_event_test, .tier = TEST_TIER_UNIT) {
     }
 
     if (found == SIZE_MAX) {
-        ADD_MESSAGE("Could not find idle CPU");
+        test_info("Could not find idle CPU");
         return TEST_SKIP(TEST_SKIP_NONE);
     }
 
@@ -284,7 +284,7 @@ static void sched_push_try(void *) {
 }
 
 TEST_DECLARE(sched_push_target_test, .tier = TEST_TIER_INTEGRATION) {
-    ADD_MESSAGE("This test takes a bit. uncomment me to run it");
+    test_info("This test takes a bit. uncomment me to run it");
     return TEST_SKIP(TEST_SKIP_NONE);
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     for (size_t i = 0; i < SCHED_PUSH_TEST_THREADS; i++) {

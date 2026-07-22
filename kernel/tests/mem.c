@@ -175,7 +175,7 @@ TEST_DECLARE(kmalloc_new_test, .tier = TEST_TIER_UNIT) {
 
     snprintf(hooray, 128, "allocated %p and free took %u ms", p, ms);
 
-    ADD_MESSAGE(hooray);
+    test_info(hooray);
     return TEST_SUCCESS;
 }
 
@@ -191,7 +191,7 @@ TEST_DECLARE(kmalloc_new_basic_test, .tier = TEST_TIER_UNIT) {
     void *p3 = kmalloc_new(4096, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
 
     if (!p1 || !p2 || !p3) {
-        ADD_MESSAGE("kmalloc_new returned NULL for a valid request");
+        test_info("kmalloc_new returned NULL for a valid request");
         return TEST_FAIL(NULL);
     }
 
@@ -202,7 +202,7 @@ TEST_DECLARE(kmalloc_new_basic_test, .tier = TEST_TIER_UNIT) {
 
     if (((uint8_t *) p1)[0] != 0xA5 || ((uint8_t *) p2)[0] != 0x5A ||
         ((uint8_t *) p3)[0] != 0xFF) {
-        ADD_MESSAGE("Memory pattern check failed");
+        test_info("Memory pattern check failed");
         return TEST_FAIL(NULL);
     }
 
@@ -215,7 +215,7 @@ TEST_DECLARE(kmalloc_new_basic_test, .tier = TEST_TIER_UNIT) {
 
     snprintf(a_msg, sizeof(a_msg), "basic alloc/free OK (free took %u ms)",
              (unsigned) elapsed);
-    ADD_MESSAGE(a_msg);
+    test_info(a_msg);
     return TEST_SUCCESS;
 }
 
@@ -228,20 +228,20 @@ TEST_DECLARE(kmalloc_new_cache_align_test, .tier = TEST_TIER_UNIT) {
                      ALLOC_FLAG_NONPAGEABLE | ALLOC_FLAG_CLASS_DEFAULT;
     void *p = kmalloc_new(128, flags, ALLOC_BEHAVIOR_NORMAL);
     if (!p) {
-        ADD_MESSAGE("kmalloc_new returned NULL for cache-aligned request");
+        test_info("kmalloc_new returned NULL for cache-aligned request");
         return TEST_FAIL(NULL);
     }
 
     if (((uintptr_t) p % CACHE_LINE_SIZE) != 0) {
         char msg[128];
         snprintf(msg, sizeof(msg), "pointer %p is not cache-line aligned", p);
-        ADD_MESSAGE(msg);
+        test_info(msg);
         kfree_new(p, ALLOC_BEHAVIOR_NORMAL);
         return TEST_FAIL(NULL);
     }
 
     kfree_new(p, ALLOC_BEHAVIOR_NORMAL);
-    ADD_MESSAGE("cache alignment check passed");
+    test_info("cache alignment check passed");
     return TEST_SUCCESS;
 }
 */
@@ -258,19 +258,19 @@ TEST_DECLARE(kmalloc_new_behavior_test, .tier = TEST_TIER_UNIT) {
                  ALLOC_FLAG_NO_CACHE_ALIGN;
     void *p = kmalloc_new(256, f, ALLOC_BEHAVIOR_ATOMIC);
     if (!p) {
-        ADD_MESSAGE("kmalloc_new failed for ATOMIC nonpageable request");
+        test_info("kmalloc_new failed for ATOMIC nonpageable request");
         return TEST_FAIL(NULL);
     }
     /* Do a quick write */
     volatile uint8_t *b = p;
     b[0] = 0x7E;
     if (b[0] != 0x7E) {
-        ADD_MESSAGE("atomic allocation memory check failed");
+        test_info("atomic allocation memory check failed");
         kfree_new(p, ALLOC_BEHAVIOR_NORMAL);
         return TEST_FAIL(NULL);
     }
     kfree_new(p, ALLOC_BEHAVIOR_NORMAL);
-    ADD_MESSAGE("behavior (ATOMIC) allocation passed");
+    test_info("behavior (ATOMIC) allocation passed");
     return TEST_SUCCESS;
 }
 
@@ -394,13 +394,12 @@ TEST_DECLARE(kmalloc_new_concurrency_stress_test, .tier = TEST_TIER_UNIT) {
     for (int i = 0; i < STRESS_THREADS; ++i) {
         if (!done[i]) {
             snprintf(msg, sizeof(msg), "thread %d did not complete in time", i);
-            ADD_MESSAGE(msg);
+            test_info(msg);
             return TEST_SUCCESS;
         }
     }
 
-    slab_domains_print();
-    ADD_MESSAGE("aggressive concurrency stress test completed");
+    test_info("aggressive concurrency stress test completed");
     return TEST_SUCCESS;
 }
 
@@ -414,7 +413,7 @@ TEST_DECLARE(kmalloc_new_alloc_free_sequence_test, .tier = TEST_TIER_UNIT) {
         blocks[i] = kmalloc_new(64 + (i * 8), ALLOC_FLAGS_DEFAULT,
                                 ALLOC_BEHAVIOR_NORMAL);
         if (!blocks[i]) {
-            ADD_MESSAGE("failed to allocate block in sequence");
+            test_info("failed to allocate block in sequence");
             /* free what we did get */
             for (size_t j = 0; j < i; ++j)
                 kfree_new(blocks[j], ALLOC_BEHAVIOR_NORMAL);
@@ -430,7 +429,7 @@ TEST_DECLARE(kmalloc_new_alloc_free_sequence_test, .tier = TEST_TIER_UNIT) {
     for (size_t i = 1; i < sizeof(blocks) / sizeof(blocks[0]); i += 2)
         kfree_new(blocks[i], ALLOC_BEHAVIOR_NORMAL);
 
-    ADD_MESSAGE("alloc/free sequence test passed");
+    test_info("alloc/free sequence test passed");
     return TEST_SUCCESS;
 }
 
@@ -533,7 +532,7 @@ TEST_DECLARE(tlb_shootdown_async_eventual_test, .tier = TEST_TIER_UNIT) {
         scheduler_yield();
     }
 
-    ADD_MESSAGE("async TLB shootdown did not converge");
+    test_info("async TLB shootdown did not converge");
     return TEST_SUCCESS;
 }
 
@@ -579,14 +578,14 @@ TEST_DECLARE(tlb_shootdown_contention_test, .tier = TEST_TIER_UNIT) {
     while (time_get_ms() - start < 200)
         scheduler_yield();
 
-    ADD_MESSAGE("concurrent shootdown stress completed");
+    test_info("concurrent shootdown stress completed");
     return TEST_SUCCESS;
 }
 
 static void print_cand(struct elcm_candidate c) {
-    printf("C(s=%F, p=%u, w=%u, W=%F, d=%u, b=%u, o=%u)\n", c.score_value,
-           c.pages, c.wasted, c.wastage, c.distance, c.bitmap_bytes,
-           c.obj_count);
+    test_info("C(s=%F, p=%u, w=%u, W=%F, d=%u, b=%u, o=%u)", c.score_value,
+              c.pages, c.wasted, c.wastage, c.distance, c.bitmap_bytes,
+              c.obj_count);
 }
 
 TEST_DECLARE(elcm_test, .tier = TEST_TIER_UNIT) {
@@ -671,7 +670,7 @@ TEST_DECLARE(kfree_defer_irq_test, .tier = TEST_TIER_UNIT) {
 TEST_DECLARE(page_alloc_demand_test, .tier = TEST_TIER_UNIT) {
     void *ptr = page_alloc_demand(8, ALLOC_FLAGS_ZERO);
     memset(ptr, 67, PAGE_SIZE);
-    ADD_MESSAGE("successfully demand allocated and memsetted memory");
+    test_info("successfully demand allocated and memsetted memory");
     return TEST_SUCCESS;
 }
 

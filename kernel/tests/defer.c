@@ -23,8 +23,8 @@ static void defer_func(void *boo, void *unused) {
     snprintf(msg, 100, "Start ms was %d, end ms was %d, took %d ms", enqueue_ms,
              finish_ms, finish_ms - enqueue_ms);
 
-    ADD_MESSAGE("Defer complete");
-    ADD_MESSAGE(msg);
+    test_info("Defer complete");
+    test_info(msg);
     defer_worked = true;
 }
 

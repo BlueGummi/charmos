@@ -25,17 +25,23 @@ test_group_orphan_parent = {.name = "test_group_orphan_parent",
                             .exit_on_fail = false,
                             .ent = CMDLINE_ENTRY(test_root)};
 
-LOG_SITE_DECLARE_DEFAULT(test);
-LOG_HANDLE_DECLARE_DEFAULT(test, .flags = LOG_PRINT | LOG_NO_NEWLINE);
+LOG_SITE_DECLARE_DEFAULT(test_harness);
+LOG_HANDLE_DECLARE_DEFAULT(test_harness, .flags = LOG_PRINT | LOG_NO_NEWLINE);
 
-#define test_log(lvl, fmt, ...)                                                \
-    log(LOG_SITE(test), LOG_HANDLE(test), lvl, fmt, ##__VA_ARGS__)
+#define test_harness_log(lvl, fmt, ...)                                        \
+    log(LOG_SITE(test_harness), LOG_HANDLE(test_harness), lvl, fmt,            \
+        ##__VA_ARGS__)
 
-#define test_err(fmt, ...) test_log(LOG_ERROR, fmt, ##__VA_ARGS__)
-#define test_warn(fmt, ...) test_log(LOG_WARN, fmt, ##__VA_ARGS__)
-#define test_info(fmt, ...) test_log(LOG_INFO, fmt, ##__VA_ARGS__)
-#define test_debug(fmt, ...) test_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
-#define test_trace(fmt, ...) test_log(LOG_TRACE, fmt, ##__VA_ARGS__)
+#define test_harness_err(fmt, ...)                                             \
+    test_harness_log(LOG_ERROR, fmt, ##__VA_ARGS__)
+#define test_harness_warn(fmt, ...)                                            \
+    test_harness_log(LOG_WARN, fmt, ##__VA_ARGS__)
+#define test_harness_info(fmt, ...)                                            \
+    test_harness_log(LOG_INFO, fmt, ##__VA_ARGS__)
+#define test_harness_debug(fmt, ...)                                           \
+    test_harness_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
+#define test_harness_trace(fmt, ...)                                           \
+    test_harness_log(LOG_TRACE, fmt, ##__VA_ARGS__)
 
 LINKER_SECTION_DEFINE(struct test, tests);
 LINKER_SECTION_DEFINE(struct test_group, test_groups);
@@ -105,10 +111,13 @@ static void test_group_run(struct test_group *tg) {
     for (int i = 0; i < TEST_TIER_MAX; i++)
         total_tests += tg->num_tests[i];
 
-    test_info("Running test group '%s' (%zu tests):\n", tg->name, total_tests);
-    test_info("  incremental: %s\n", tg->incremental ? "true" : "false");
-    test_info("  exit_on_fail: %s\n", tg->exit_on_fail ? "true" : "false");
-    test_info("  default intensity: %F\n", tg->default_intensity);
+    test_harness_info("Running test group '%s' (%zu tests):\n", tg->name,
+                      total_tests);
+    test_harness_info("  incremental: %s\n",
+                      tg->incremental ? "true" : "false");
+    test_harness_info("  exit_on_fail: %s\n",
+                      tg->exit_on_fail ? "true" : "false");
+    test_harness_info("  default intensity: %F\n", tg->default_intensity);
 
     bool stop_outer = false;
 
@@ -117,28 +126,45 @@ static void test_group_run(struct test_group *tg) {
         if (stop_outer)
             break;
 
-        test_info("  %zu %s tests:\n", tg->num_tests[i], test_tier_to_str(i));
+        test_harness_info("%zu %s tests:\n", tg->num_tests[i],
+                          test_tier_to_str(i));
         if (!tg->num_tests[i])
             continue;
 
         for (size_t test_num = 0; test_num < tg->num_tests[i]; test_num++) {
             struct test *t = tg->tests[i][test_num];
             struct test_context tctx = {0};
+
+            /* Modifiable by the test */
+            struct log_dump_options dopts = {
+                .min_level = LOG_TRACE,
+                .show_args = true,
+            };
+
+            enum log_site_flags flags = LOG_SITE_NONE;
+            if (t->print_logs)
+                flags |= LOG_SITE_PRINT;
+
+            struct log_site_options opts = {
+                .capacity =
+                    t->msg_cap == 0 ? LOG_SITE_CAPACITY_DEFAULT : t->msg_cap,
+                .name = "test",
+                .enabled_mask = LOG_SITE_ALL,
+                .dump_opts = dopts,
+                .flags = flags,
+            };
+            alloc_or_die(tctx.site = log_site_create(opts));
             test_global.current_test = &tctx;
+            tctx.handle.msg = "test_handle";
             tctx.intensity = t->intensity;
             tctx.seed = !t->seed ? prng_next() : t->seed;
-            tctx.message_cap = t->msg_cap;
-            if (t->msg_cap) {
-                tctx.messages =
-                    kmalloc_or_die(sizeof(struct test_message) * t->msg_cap);
-            }
 
             size_t result_times[TEST_RESULT_MAX] = {0}, run_times = 0;
             struct test_verdict verdicts[t->run_times];
 
             enum test_result singular_result = TEST_RESULT_MAX;
 
-            test_info("    '%s'", t->name);
+            test_harness_info("'%s'", t->name);
 
             time_t start_ms = time_get_ms();
             for (; run_times < t->run_times; run_times++) {
@@ -185,7 +211,7 @@ static void test_group_run(struct test_group *tg) {
                 for (size_t i = 0; i < run_times; i++) {
                     struct test_verdict v = verdicts[i];
                     if (v.result != TEST_RESULT_OK) {
-                        test_info("    |-> run %zu %s", i, v.result);
+                        test_harness_info("  |-> run %zu %s", i, v.result);
                         if (v.result == TEST_RESULT_SKIPPED) {
                             printf(ANSI_GRAY " (%s)" ANSI_RESET, v.skip_reason);
                         }
@@ -215,21 +241,9 @@ static void test_group_run(struct test_group *tg) {
                        color, status, took);
             }
 
-            if (tctx.message_count) {
-                test_info("      messages:\n");
-                for (size_t i = 0; i < tctx.message_count; i++) {
-                    struct test_message *msg = &tctx.messages[i];
-                    test_info("        [%zu.%03zu] %s\n",
-                              MS_TO_SECONDS(msg->time_ms), msg->time_ms % 1000,
-                              msg->msg);
-                }
-                /* TODO: Legacy  */
-                for (uint64_t j = 0; j < tctx.message_count; j++) {
-                    printf("        +-> ");
-                    printf(ANSI_YELLOW "%s" ANSI_RESET "\n",
-                           tctx.messages[j].msg);
-                }
-                printf("\n");
+            if (log_site_message_count(tctx.site) && !t->print_logs) {
+                test_harness_info("messages:\n");
+                log_dump_site(tctx.site);
             }
 
             for (int j = 0; j < TEST_RESULT_MAX; j++)
@@ -250,24 +264,25 @@ static void test_group_run(struct test_group *tg) {
         }
     }
 
-    test_info("Test group '%s' complete in %zu ms: \n", tg->name, total_time);
+    test_harness_info("Test group '%s' complete in %zu ms: \n", tg->name,
+                      total_time);
     if (stop_outer) {
         for (int i = 0; i < TEST_TIER_MAX; i++) {
             size_t fails = result_totals.totals[i][TEST_RESULT_FAILED];
             size_t skips = result_totals.totals[i][TEST_RESULT_SKIPPED];
             if (skips && !fails) {
-                test_info("  Tier '%s' had %zu skips\n", test_tier_to_str(i),
-                          skips);
+                test_harness_info("  Tier '%s' had %zu skips\n",
+                                  test_tier_to_str(i), skips);
             } else if (fails && !skips) {
-                test_info("  Tier '%s' had %zu fails\n", test_tier_to_str(i),
-                          fails);
+                test_harness_info("  Tier '%s' had %zu fails\n",
+                                  test_tier_to_str(i), fails);
             } else {
-                test_info("  Tier '%s' had %zu skips, %zu fails\n",
-                          test_tier_to_str(i), skips, fails);
+                test_harness_info("  Tier '%s' had %zu skips, %zu fails\n",
+                                  test_tier_to_str(i), skips, fails);
             }
         }
     } else {
-        test_info("  All successful\n");
+        test_harness_info("  All successful\n");
     }
 }
 
@@ -287,7 +302,8 @@ void tests_run(void) {
     char *msg = all_ok ? "all tests pass 🎉!" : "some errors occurred";
     char *color = all_ok ? ANSI_GREEN : ANSI_RED;
 
-    test_info("Running %zu tests:\n", __ekernel_tests - __skernel_tests);
+    test_harness_info("Running %zu tests:\n",
+                      __ekernel_tests - __skernel_tests);
 
     for (struct test_group *tg = __skernel_test_groups;
          tg < __ekernel_test_groups; tg++) {
@@ -305,13 +321,14 @@ void tests_run(void) {
     char *fail_color = all_ok ? ANSI_GREEN : ANSI_RED;
     char *skip_color = all_ok ? ANSI_GREEN : ANSI_GRAY;
 
-    test_info("%llu " ANSI_CYAN "total" ANSI_RESET " tests, %llu " ANSI_GREEN
-              "passed" ANSI_RESET ", %llu %sfailed" ANSI_RESET
-              ", %llu %sskipped" ANSI_RESET "\n",
-              __ekernel_tests - __skernel_tests, pass_count, fail_count,
-              fail_color, skip_count, skip_color);
+    test_harness_info("%llu " ANSI_CYAN "total" ANSI_RESET
+                      " tests, %llu " ANSI_GREEN "passed" ANSI_RESET
+                      ", %llu %sfailed" ANSI_RESET ", %llu %sskipped" ANSI_RESET
+                      "\n",
+                      __ekernel_tests - __skernel_tests, pass_count, fail_count,
+                      fail_color, skip_count, skip_color);
 
-    test_info("%s%s" ANSI_RESET " (%llu ms)\n", color, msg, total_time);
+    test_harness_info("%s%s" ANSI_RESET " (%llu ms)\n", color, msg, total_time);
 
     vas_space_dump(slab_global.vas);
 

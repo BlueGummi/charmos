@@ -4,6 +4,7 @@
 #include <compiler.h>
 #include <console/printf.h>
 #include <errno.h>
+#include <log.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
 #include <stdbool.h>
@@ -83,14 +84,13 @@ struct test {
     const struct test_group *group;
     enum test_tier tier;
 
+    size_t msg_cap;
     enum test_flags flags;
-    size_t msg_cap; /* per-test message array sizing */
 
     time_t duration_ms;
-    uint64_t message_count;
-    char **messages;
 
     /* A lot of these have to be full bools for the cmdline parse */
+    bool print_logs; /* Prints logs *as* they are logged */
     bool enabled;
     bool keep_going; /* This basically means that with run_times,
                       * if it fails once, don't bother, and keep going
@@ -121,11 +121,6 @@ struct test {
 };
 #define TEST_SEED_SENTINEL 0
 
-struct test_message {
-    time_t time_ms;
-    char *msg;
-};
-
 /* The reason this exists is because the actual structures in struct
  * test are not meant to be accessed from inside the test's func,
  * and this is the way the test interacts with the variables.
@@ -135,8 +130,8 @@ struct test_message {
  * and allows a test to get run numerous different times with varied
  * contexts, seeds, etc. without having to fiddle around with struct test */
 struct test_context {
-    struct test_message *messages;
-    size_t message_count, message_cap;
+    struct log_site *site;
+    struct log_handle handle;
 
     uint32_t soft_fails;
     fx32_32_t intensity; /* [0, 1] */
@@ -177,14 +172,17 @@ struct test_globals {
         test_##id##_seed, __test_##id.seed, .name = "seed",                    \
         .parent = CMDLINE_ENTRY(test_##id), .private = &__test_##id);          \
     CMDLINE_ENTRY_DECLARE_TYPED(                                               \
-        test_##id##_msg_cap, __test_##id.msg_cap, .name = "msg_cap",           \
-        .parent = CMDLINE_ENTRY(test_##id), .private = &__test_##id);          \
-    CMDLINE_ENTRY_DECLARE_TYPED(                                               \
         test_##id##_duration_ms, __test_##id.duration_ms,                      \
         .name = "duration_ms", .parent = CMDLINE_ENTRY(test_##id),             \
         .private = &__test_##id);                                              \
     CMDLINE_ENTRY_DECLARE_TYPED(                                               \
+        test_##id##_msg_cap, __test_##id.msg_cap, .name = "msg_cap",           \
+        .parent = CMDLINE_ENTRY(test_##id), .private = &__test_##id);          \
+    CMDLINE_ENTRY_DECLARE_TYPED(                                               \
         test_##id##_keep_going, __test_##id.keep_going, .name = "keep_going",  \
+        .parent = CMDLINE_ENTRY(test_##id), .private = &__test_##id);          \
+    CMDLINE_ENTRY_DECLARE_TYPED(                                               \
+        test_##id##_print_logs, __test_##id.print_logs, .name = "print_logs",  \
         .parent = CMDLINE_ENTRY(test_##id), .private = &__test_##id);          \
     LINKER_SECTION_OBJECT(struct test, tests)                                  \
     __test_##id = {.name = #id,                                                \
@@ -194,13 +192,15 @@ struct test_globals {
                    .enabled = true,                                            \
                    .base_entry = CMDLINE_ENTRY(test_##id),                     \
                    .inject_count = 0,                                          \
+                   .msg_cap = 0,                                               \
                    .seed = 0,                                                  \
+                   .print_logs = false,                                        \
                    .tier = TEST_TIER_UNIT,                                     \
                    .cmdline_entries[TEST_CMDLINE_ENTRY_ENABLED] =              \
                        CMDLINE_ENTRY(test_##id##_enabled),                     \
                    __VA_ARGS__};                                               \
                                                                                \
-    static struct test_verdict id(struct test_context *ctx)
+    static struct test_verdict id(struct test_context *ctx __unused)
 
 #define TEST_CMDLINE_ENTRY_DECLARE(id, var, n)                                 \
     CMDLINE_ENTRY_DECLARE_TYPED(test_##id##_##n, var, .name = #n,              \
@@ -239,17 +239,6 @@ struct test_globals {
 #define TEST_SKIP(r)                                                           \
     ((struct test_verdict) {.result = TEST_RESULT_SKIPPED, .skip_reason = (r)})
 
-#define ADD_MESSAGE(m)                                                         \
-    do {                                                                       \
-        test_global.current_test->messages =                                   \
-            krealloc(test_global.current_test->messages,                       \
-                     sizeof(struct test_message) *                             \
-                         ++test_global.current_test->message_count);           \
-        test_global.current_test                                               \
-            ->messages[test_global.current_test->message_count - 1] =          \
-            (struct test_message) {.msg = (m)};                                \
-    } while (0)
-
 #define TEST_ASSERT(x)                                                         \
     do {                                                                       \
         if (!(x)) {                                                            \
@@ -266,11 +255,21 @@ struct test_globals {
         }                                                                      \
     } while (0)
 
+#define test_log(lvl, fmt, ...)                                                \
+    log(test_global.current_test->site, &test_global.current_test->handle,     \
+        lvl, fmt, ##__VA_ARGS__)
+
+#define test_err(fmt, ...) test_log(LOG_ERROR, fmt, ##__VA_ARGS__)
+#define test_warn(fmt, ...) test_log(LOG_WARN, fmt, ##__VA_ARGS__)
+#define test_info(fmt, ...) test_log(LOG_INFO, fmt, ##__VA_ARGS__)
+#define test_debug(fmt, ...) test_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
+#define test_trace(fmt, ...) test_log(LOG_TRACE, fmt, ##__VA_ARGS__)
+
 #define FAIL_IF_FATAL(op) TEST_ASSERT(!ERR_IS_FATAL(op))
 
 #define ABORT_IF_RAM_LOW()                                                     \
     if (pmm_get_usable_ram() < 1024 * 1024 * 8) {                              \
-        ADD_MESSAGE("RAM too low for test to continue!\n");                    \
+        test_info("RAM too low for test to continue!\n");                      \
         return TEST_SKIP(TEST_SKIP_RAM_LOW);                                   \
     }
 
@@ -282,6 +281,10 @@ extern struct test_globals test_global;
 extern const char *large_test_string;
 extern struct test_group test_group_orphan_parent;
 extern struct cmdline_entry test_cmdline_default;
+
+static inline size_t test_current_message_count(void) {
+    return log_site_message_count(test_global.current_test->site);
+}
 
 static inline const char *test_tier_to_str(enum test_tier tier) {
     switch (tier) {

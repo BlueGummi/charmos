@@ -22,7 +22,7 @@ LOG_HANDLE_DECLARE_DEFAULT(test_mutex);
 #define test_mutex_trace(fmt, ...) test_mutex_log(LOG_TRACE, fmt, ##__VA_ARGS__)
 
 #define MUTEX_REPORT_PROBLEMS()                                                \
-    ADD_MESSAGE("Mutex tests are encountering problems and will be skipped");  \
+    test_info("Mutex tests are encountering problems and will be skipped");    \
     return TEST_SKIP(TEST_SKIP_NONE);
 
 static struct mutex basic_test_mtx = MUTEX_INIT;

@@ -15,7 +15,7 @@
 
 #define EXT2_INIT                                                              \
     if (global.root_node->fs_type != FS_EXT2) {                                \
-        ADD_MESSAGE("the mounted root is not ext2");                           \
+        test_info("the mounted root is not ext2");                             \
         return TEST_SKIP(TEST_SKIP_NONE);                                      \
     }                                                                          \
     struct vfs_node *root = global.root_node;
@@ -25,7 +25,7 @@ static bool done = false;
 static void bio_callback(struct bio_request *req) {
     (void) req;
     done = true;
-    ADD_MESSAGE("blkdev_bio callback succeeded");
+    test_info("blkdev_bio callback succeeded");
 }
 
 TEST_DECLARE(blkdev_bio_test, .tier = TEST_TIER_UNIT) {
@@ -52,7 +52,7 @@ TEST_DECLARE(blkdev_bio_test, .tier = TEST_TIER_UNIT) {
         INIT_LIST_HEAD(&bio->list);
 
         if (!d->submit_bio_async) {
-            ADD_MESSAGE("BIO function is NULL");
+            test_info("BIO function is NULL");
             return TEST_SKIP(TEST_SKIP_NONE);
         }
 
@@ -66,7 +66,7 @@ TEST_DECLARE(blkdev_bio_test, .tier = TEST_TIER_UNIT) {
         TEST_ASSERT(bio->status == 0);
     }
     TEST_ASSERT(done == true);
-    TEST_ASSERT(test_global.current_test->message_count == run_times);
+    TEST_ASSERT(test_current_message_count() == run_times);
     return TEST_SUCCESS;
 }
 #endif

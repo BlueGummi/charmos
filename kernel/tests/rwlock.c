@@ -9,7 +9,7 @@
 #include <test.h>
 
 #define RWLOCK_REPORT_PROBLEMS()                                               \
-    ADD_MESSAGE("rwlock tests are encountering problems and will be skipped"); \
+    test_info("rwlock tests are encountering problems and will be skipped");   \
     return TEST_SKIP(TEST_SKIP_NONE);
 
 static struct rwlock rw_basic = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
@@ -74,8 +74,8 @@ static void rw_reader_worker(void *) {
         rwlock_unlock(&rw_readers);
         time_t now = time_get_ms();
         if ((now - last_print) > RWLOCK_READER_PRINT_INTERVAL) {
-            printf("RWlock reader %s on iteration %zu\n",
-                   thread_get_current()->name, i);
+            test_info("RWlock reader %s on iteration %zu",
+                      thread_get_current()->name, i);
         }
         last_print = now;
     }
@@ -83,7 +83,8 @@ static void rw_reader_worker(void *) {
     atomic_fetch_sub(&rw_readers_left, 1);
 }
 
-TEST_DECLARE(rwlock_many_readers, .tier = TEST_TIER_INTEGRATION) {
+TEST_DECLARE(rwlock_many_readers, .tier = TEST_TIER_INTEGRATION,
+             .print_logs = true) {
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     for (int i = 0; i < RWLOCK_READER_COUNT_TEST_N; i++)
         thread_spawn("rr_%zu", rw_reader_worker, NULL, i);
@@ -156,10 +157,10 @@ static void rw_chaos_worker(void *) {
             scheduler_yield();
     }
 
-    printf("%u threads left\n", atomic_fetch_sub(&rw_chaos_left, 1) - 1);
+    test_info("%u threads left", atomic_fetch_sub(&rw_chaos_left, 1) - 1);
 }
 
-TEST_DECLARE(rwlock_chaos, .tier = TEST_TIER_INTEGRATION) {
+TEST_DECLARE(rwlock_chaos, .tier = TEST_TIER_INTEGRATION, .print_logs = true) {
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     for (int i = 0; i < RWLOCK_CHAOS_THREADS; i++)
         thread_spawn("rch", rw_chaos_worker, NULL);

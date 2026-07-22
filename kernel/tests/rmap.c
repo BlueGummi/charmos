@@ -73,7 +73,6 @@ TEST_DECLARE(rmap_fork_visibility, .tier = TEST_TIER_UNIT) {
     /* a page faulted into the parent BEFORE fork is reachable from BOTH */
     struct folio *shared = folio_alloc(0);
     TEST_ASSERT(shared);
-    printf("GOT\n");
     folio_add_anon_rmap_new(shared, pvr, va);
 
     struct visit_rec v = {0};
@@ -89,7 +88,6 @@ TEST_DECLARE(rmap_fork_visibility, .tier = TEST_TIER_UNIT) {
 
     struct folio *priv = folio_alloc(0);
     TEST_ASSERT(priv);
-    printf("GOT\n");
     folio_add_anon_rmap_new(priv, cvr, va);
 
     struct visit_rec v2 = {0};

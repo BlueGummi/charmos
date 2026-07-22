@@ -32,8 +32,8 @@ static void rcu_reader_thread(void *) {
             int v = p->value;
             if (v != 42 && v != 43) {
                 atomic_store(&rcu_test_failed, true);
-                ADD_MESSAGE("RCU reader saw invalid value");
-                printf("%d\n", v);
+                test_info("RCU reader saw invalid value");
+                test_info("%d", v);
             }
         }
 
@@ -138,15 +138,15 @@ static void rcu_stress_reader(void *arg) {
             int v = p->value;
             if (v != 42 && v != 43) {
                 atomic_store(&stress_failed, true);
-                ADD_MESSAGE("RCU stress reader saw invalid value");
-                printf("RCU stress reader observed invalid value %d, "
-                       "freed during gen %zu enqueued_on %zu currently "
-                       "started gen %zu quiescent for gen %zu\nat a nesting "
-                       "depth of %zu\n",
-                       v, p->freed_gen, p->enqueued_on,
-                       thread_get_current()->rcu_start_gen,
-                       thread_get_current()->rcu_quiescent_gen,
-                       thread_get_current()->rcu_nesting);
+                test_err("RCU stress reader saw invalid value");
+                test_err("RCU stress reader observed invalid value %d, "
+                         "freed during gen %zu enqueued_on %zu currently "
+                         "started gen %zu quiescent for gen %zu\nat a nesting "
+                         "depth of %zu",
+                         v, p->freed_gen, p->enqueued_on,
+                         thread_get_current()->rcu_start_gen,
+                         thread_get_current()->rcu_quiescent_gen,
+                         thread_get_current()->rcu_nesting);
                 break;
             }
             volatile uint64_t seq = p->seq;
@@ -157,10 +157,11 @@ static void rcu_stress_reader(void *arg) {
 
         if (time_get_ms() - last_print > STRESS_PRINT_MS) {
             last_print = time_get_ms();
-            printf("\'%-20s\' on iteration %7zu w/ %7zu replacements and %7zu "
-                   "frees\n",
-                   thread_get_current()->name, iter, stress_replacements,
-                   stress_deferred_freed);
+            test_info(
+                "\'%-20s\' on iteration %7zu w/ %7zu replacements and %7zu "
+                "frees",
+                thread_get_current()->name, iter, stress_replacements,
+                stress_deferred_freed);
         }
 
         /* yield to exercise scheduler preemption and context switching */
@@ -168,9 +169,9 @@ static void rcu_stress_reader(void *arg) {
         iter++;
     }
 
-    printf("RCU stress reader %s left, %u remaining\n",
-           thread_get_current()->name,
-           STRESS_NUM_READERS - stress_readers_done - 1);
+    test_info("RCU stress reader %s left, %u remaining",
+              thread_get_current()->name,
+              STRESS_NUM_READERS - stress_readers_done - 1);
 
     atomic_fetch_add(&stress_readers_done, 1);
 }
@@ -185,7 +186,7 @@ static void rcu_stress_writer(void *arg) {
         if (!new) {
             /* allocation failure — mark as failure and exit */
             atomic_store(&stress_failed, true);
-            ADD_MESSAGE("RCU stress writer kmalloc failed");
+            test_info("RCU stress writer kmalloc failed");
             break;
         }
 
@@ -232,7 +233,7 @@ static void rcu_stress_reclaimer(void *arg) {
 }
 
 /* Test registration */
-TEST_DECLARE(rcu_stress_test, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(rcu_stress_test, .tier = TEST_TIER_UNIT, .print_logs = true, ) {
     /* initial object */
     struct rcu_stress_node *initial =
         kmalloc(sizeof(*initial), ALLOC_FLAGS_ZERO);
@@ -265,7 +266,7 @@ TEST_DECLARE(rcu_stress_test, .tier = TEST_TIER_UNIT) {
     uint64_t stop_at = time_get_ms() + STRESS_DURATION_MS;
     while (time_get_ms() < stop_at) {
         if (atomic_load(&stress_failed)) {
-            ADD_MESSAGE("RCU stress test failed early due to detection");
+            test_info("RCU stress test failed early due to detection");
             break;
         }
         /* let other threads run */
@@ -293,9 +294,9 @@ TEST_DECLARE(rcu_stress_test, .tier = TEST_TIER_UNIT) {
         sleep_spin_ms(1);
     }
 
-    printf("RCU stress test: replacements=%u freed=%u\n",
-           (unsigned) atomic_load(&stress_replacements),
-           (unsigned) atomic_load(&stress_deferred_freed));
+    test_info("RCU stress test: replacements=%u freed=%u",
+              (unsigned) atomic_load(&stress_replacements),
+              (unsigned) atomic_load(&stress_deferred_freed));
 
     /* checks */
     TEST_ASSERT(!atomic_load(&stress_failed));

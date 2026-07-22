@@ -15,7 +15,7 @@
 #include "fs/detect.h"
 #define EXT2_INIT                                                              \
     if (global.root_node->fs_type != FS_EXT2) {                                \
-        ADD_MESSAGE("the mounted root is not ext2");                           \
+        test_info("the mounted root is not ext2");                             \
         return TEST_SKIP(TEST_SKIP_NONE);                                      \
     }                                                                          \
     struct vfs_node *root = global.root_node;
@@ -43,14 +43,14 @@ static void bio_sch_callback1(struct bio_request *req) {
     (void) req;
 
     atomic_store(&cb1d, true);
-    ADD_MESSAGE("cb 1 success");
+    test_info("cb 1 success");
 }
 
 static void bio_sch_callback2(struct bio_request *req) {
     (void) req;
 
     atomic_store(&cb2d, true);
-    ADD_MESSAGE("cb 2 success");
+    test_info("cb 2 success");
 }
 
 TEST_DECLARE(bio_sched_coalesce_test, .tier = TEST_TIER_UNIT) {
@@ -96,7 +96,7 @@ TEST_DECLARE(bio_sched_coalesce_test, .tier = TEST_TIER_UNIT) {
     bio_sched_enqueue(d, bio);
     bio_sched_enqueue(d, bio2);
     snprintf(name, 100, "enqueues took %d us", time_get_us() - t);
-    ADD_MESSAGE(name);
+    test_info(name);
 
     bio_sched_dispatch_all(d);
 
@@ -145,11 +145,11 @@ TEST_DECLARE(bio_sched_delay_enqueue_test, .tier = TEST_TIER_INTEGRATION) {
     for (size_t i = 0; i < BIO_SCHED_TEST_RUNS; i++)
         for (size_t j = 0; j < BIO_SCHED_TEST_RUNS; j++)
             if (i != j && rqs[i] == rqs[j])
-                printf("duplicate at %u and %u\n", i, j);
+                test_err("duplicate at %u and %u\n", i, j);
 
     for (size_t i = 0; i < BIO_SCHED_TEST_RUNS; i++) {
         if (!rqs[i]->disk) {
-            printf("rq %p %u\n", rqs[i], i);
+            test_err("rq %p %u\n", rqs[i], i);
             return TEST_SUCCESS;
         }
 
@@ -168,7 +168,7 @@ TEST_DECLARE(bio_sched_delay_enqueue_test, .tier = TEST_TIER_INTEGRATION) {
     char *msg = kmalloc(100);
     TEST_ASSERT(msg);
     snprintf(msg, 100, "Total time spent enqueuing is %d ms", ms);
-    ADD_MESSAGE(msg);
+    test_info(msg);
     send_dispatch = 1;
     bio_sched_dispatch_all(d);
     send_dispatch = 2;
@@ -182,14 +182,14 @@ TEST_DECLARE(bio_sched_delay_enqueue_test, .tier = TEST_TIER_INTEGRATION) {
         TEST_ASSERT(msg);
         snprintf(msg, 100, "Average completion time of level %d is %d ms", i,
                  avg_complete_time[i]);
-        ADD_MESSAGE(msg);
+        test_info(msg);
     }
 
     char *m2 = kmalloc(100);
     TEST_ASSERT(m2);
     snprintf(m2, 100, "Runs is %d, test_runs is %d", atomic_load(&runs),
              BIO_SCHED_TEST_RUNS);
-    ADD_MESSAGE(m2);
+    test_info(m2);
     TEST_ASSERT(atomic_load(&runs) <= BIO_SCHED_TEST_RUNS);
 
     return TEST_SUCCESS;
