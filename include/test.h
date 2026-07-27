@@ -53,11 +53,19 @@ enum test_skip_reason {
     TEST_SKIP_RAM_LOW,
     TEST_SKIP_UPSTREAM_FAILED, /* a prior tier in this group
                                   failed */
-    TEST_SKIP_DISABLED,        /* test.x=off */
+    TEST_SKIP_DISABLED,        /* not the same as .enabled, just that the test
+                                * won't be getting run for some reason */
+};
+
+enum test_state : uint8_t {
+    TEST_STATE_DISABLED = 0,
+    TEST_STATE_ENABLED = 1,
+    TEST_STATE_SENTINEL = 0xFF,
 };
 
 struct test_group {
     const char *name;
+    const char *fname;
     const enum test_group_flags flags;
     struct cmdline_entry *ent;
     struct test_verdict (*setup)(struct test_context *);
@@ -66,7 +74,7 @@ struct test_group {
     fx32_32_t default_intensity;
 
     /* These all have to be bool for cmdline QOL */
-    bool enabled;      /* Does anything run at all? */
+    enum test_state enabled;
     bool incremental;  /* First run smoke, then unit, then integration */
     bool exit_on_fail; /* Different from incremental: exits after one failure,
                         * whereas incremental still completes the tier */
@@ -90,12 +98,13 @@ struct test {
     time_t duration_ms;
 
     /* A lot of these have to be full bools for the cmdline parse */
-    bool print_logs; /* Prints logs *as* they are logged */
-    bool enabled;
-    bool keep_going; /* This basically means that with run_times,
-                      * if it fails once, don't bother, and keep going
-                      * until it runs run_times, however, it is overridden
-                      * by exit_on_fail from the test_group */
+    bool print_logs;         /* Prints logs *as* they are logged */
+    enum test_state enabled; /* If this is set to TEST_SENTINEL,
+                              * it means we default */
+    bool keep_going;         /* This basically means that with run_times,
+                              * if it fails once, don't bother, and keep going
+                              * until it runs run_times, however, it is overridden
+                              * by exit_on_fail from the test_group */
 
     fx32_32_t intensity; /* also [0, 1]. the point of this one is that
                           * it can be set by the command line, and the
@@ -119,7 +128,6 @@ struct test {
     struct cmdline_entry *cmdline_entries[TEST_CMDLINE_ENTRY_MAX];
     struct inject_site *inject[];
 };
-#define TEST_SEED_SENTINEL 0
 
 /* The reason this exists is because the actual structures in struct
  * test are not meant to be accessed from inside the test's func,
@@ -151,6 +159,9 @@ struct test_globals {
     size_t results_agg[TEST_RESULT_MAX];
     struct test_context *current_test;
     time_t total_time;
+    bool show_output;
+    bool group_opt_in;
+    bool test_opt_in;
 };
 
 #define TEST(id) __test_##id
@@ -189,7 +200,7 @@ struct test_globals {
                    .func = id,                                                 \
                    .run_times = 1,                                             \
                    .group = &test_group_orphan_parent,                         \
-                   .enabled = true,                                            \
+                   .enabled = TEST_STATE_SENTINEL,                             \
                    .base_entry = CMDLINE_ENTRY(test_##id),                     \
                    .inject_count = 0,                                          \
                    .msg_cap = 0,                                               \
@@ -211,7 +222,7 @@ struct test_globals {
     extern struct test_group __test_group_##n;                                 \
     CMDLINE_ENTRY_DECLARE(test_group_##n, .name = #n,                          \
                           .parent = CMDLINE_ENTRY(test_root),                  \
-                          .flags = CMDLINE_ENTRY_SYMBOLIC)                     \
+                          .flags = CMDLINE_ENTRY_SYMBOLIC);                    \
     CMDLINE_ENTRY_DECLARE_TYPED(test_group_##n##_enabled,                      \
                                 __test_group_##n.enabled, .name = "enabled",   \
                                 .parent = CMDLINE_ENTRY(test_group_##n),       \
@@ -228,10 +239,11 @@ struct test_globals {
     __test_group_##n = {.name = #n,                                            \
                         .incremental = false,                                  \
                         .exit_on_fail = false,                                 \
-                        .enabled = true,                                       \
+                        .fname = __RELFILE__,                                  \
+                        .enabled = TEST_STATE_SENTINEL,                        \
                         __VA_ARGS__}
 
-#define TEST_GROUP(name) __test_group_##name
+#define TEST_GROUP(name) &(__test_group_##name)
 
 #define TEST_SUCCESS ((struct test_verdict) {.result = TEST_RESULT_OK})
 #define TEST_FAIL(m)                                                           \
@@ -242,7 +254,8 @@ struct test_globals {
 #define TEST_ASSERT(x)                                                         \
     do {                                                                       \
         if (!(x)) {                                                            \
-            printf(" assert \"%s\" failed at %s:%d ", #x, __FILE__, __LINE__); \
+            printf(" assert \"%s\" failed at %s:%d ", #x, __RELFILE__,         \
+                   __LINE__);                                                  \
             return TEST_FAIL(#x);                                              \
         }                                                                      \
     } while (0)
@@ -250,7 +263,8 @@ struct test_globals {
 #define TEST_ASSERT_VOID(x)                                                    \
     do {                                                                       \
         if (!(x)) {                                                            \
-            printf(" assert \"%s\" failed at %s:%d ", #x, __FILE__, __LINE__); \
+            printf(" assert \"%s\" failed at %s:%d ", #x, __RELFILE__,         \
+                   __LINE__);                                                  \
             return;                                                            \
         }                                                                      \
     } while (0)

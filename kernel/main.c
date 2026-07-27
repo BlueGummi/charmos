@@ -115,6 +115,7 @@ __no_sanitize_address void k_main(void) {
 
     tests_hook_boot();
     cmdline_parse(cmdline_request.response->cmdline);
+
     lapic_timer_init(/* core_id = */ 0);
     dpc_init_percpu();
     smp_wake(mp_request.response);
@@ -166,6 +167,10 @@ void k_sch_main(void *nop) {
     registry_setup();
     tests_run();
     bootstage_advance(BOOTSTAGE_COMPLETE);
+
+#ifdef TEST_ENABLED
+    return;
+#endif
 
     thread_print(thread_get_current());
 

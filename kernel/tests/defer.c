@@ -11,6 +11,8 @@
 #include <time/spin_sleep.h>
 #include <time/time.h>
 
+TEST_GROUP_DECLARE(defer);
+
 static bool defer_worked = false;
 static uint64_t enqueue_ms;
 static uint64_t finish_ms;
@@ -28,7 +30,7 @@ static void defer_func(void *boo, void *unused) {
     defer_worked = true;
 }
 
-TEST_DECLARE(defer_test, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(defer_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(defer)) {
     return TEST_SUCCESS;
     defer_enqueue(defer_func, WORK_ARGS(NULL, NULL), 5);
     enqueue_ms = time_get_ms();

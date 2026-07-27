@@ -50,5 +50,3 @@ enum color {
 #define ANSI_BRIGHT_MAGENTA "\033[95m"
 #define ANSI_BRIGHT_CYAN "\033[96m"
 #define ANSI_BRIGHT_WHITE "\033[97m"
-#define ANSI_RED_CONST "\033[31m"
-#define ANSI_BOLD_CONST "\033[1m"

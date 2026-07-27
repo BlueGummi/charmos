@@ -78,8 +78,12 @@ static void log_dump_record(const struct log_site *site,
         print("[X.XXX] %s%s%s: ", log_level_color(rec->level), site->name,
               ANSI_RESET);
     } else {
-        print("[%llu.%03llu] %s%s%s: ", sec, msec, log_level_color(rec->level),
-              site->name, ANSI_RESET);
+        if (!rec->handle->print) {
+            print("[%llu.%03llu] %s%s%s: ", sec, msec,
+                  log_level_color(rec->level), site->name, ANSI_RESET);
+        } else {
+            rec->handle->print(site, rec, print);
+        }
     }
 
     if (opts.show_cpu)

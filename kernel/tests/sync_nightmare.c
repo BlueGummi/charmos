@@ -7,6 +7,8 @@
 #include <thread/apc.h>
 #include <thread/thread.h>
 
+TEST_GROUP_DECLARE(sync_nightmare);
+
 #define CHAOS_THREADS 16
 #define CHAOS_ITERS 50000
 
@@ -205,7 +207,8 @@ static void chaos_migrator() {
 /* ------------------------------------
  * Main Test
  * ------------------------------------ */
-TEST_DECLARE(thread_interruptible_chaos_fuzz, .tier = TEST_TIER_INTEGRATION) {
+TEST_DECLARE(thread_interruptible_chaos_fuzz, .tier = TEST_TIER_INTEGRATION,
+             .group = TEST_GROUP(sync_nightmare)) {
     test_info("this test is long. comment me out to run it.");
     return TEST_SKIP(TEST_SKIP_NONE);
 

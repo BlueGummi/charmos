@@ -8,13 +8,16 @@
 #include <sync/rwlock.h>
 #include <test.h>
 
+TEST_GROUP_DECLARE(rwlock);
+
 #define RWLOCK_REPORT_PROBLEMS()                                               \
     test_info("rwlock tests are encountering problems and will be skipped");   \
     return TEST_SKIP(TEST_SKIP_NONE);
 
 static struct rwlock rw_basic = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 
-TEST_DECLARE(rwlock_basic_read, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(rwlock_basic_read, .tier = TEST_TIER_UNIT,
+             .group = TEST_GROUP(rwlock)) {
     rwlock_lock(&rw_basic, RWLOCK_ACQUIRE_READ);
     scheduler_yield();
     rwlock_unlock(&rw_basic);
@@ -24,7 +27,8 @@ TEST_DECLARE(rwlock_basic_read, .tier = TEST_TIER_UNIT) {
 
 static struct rwlock rw_basic_w = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 
-TEST_DECLARE(rwlock_basic_write, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(rwlock_basic_write, .tier = TEST_TIER_UNIT,
+             .group = TEST_GROUP(rwlock)) {
 
     rwlock_lock(&rw_basic_w, RWLOCK_ACQUIRE_WRITE);
     scheduler_yield();
@@ -43,7 +47,8 @@ static void rw_two_writer_thread(void *) {
     atomic_store(&rw_two_done, true);
 }
 
-TEST_DECLARE(rwlock_two_writer_basic, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(rwlock_two_writer_basic, .tier = TEST_TIER_UNIT,
+             .group = TEST_GROUP(rwlock)) {
 
     rwlock_lock(&rw_two_writers, RWLOCK_ACQUIRE_WRITE);
 
@@ -84,7 +89,7 @@ static void rw_reader_worker(void *) {
 }
 
 TEST_DECLARE(rwlock_many_readers, .tier = TEST_TIER_INTEGRATION,
-             .print_logs = true) {
+             .group = TEST_GROUP(rwlock), .print_logs = true) {
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     for (int i = 0; i < RWLOCK_READER_COUNT_TEST_N; i++)
         thread_spawn("rr_%zu", rw_reader_worker, NULL, i);
@@ -124,7 +129,8 @@ static void rw_mixed_worker(void *) {
     atomic_fetch_sub(&rw_mixed_left, 1);
 }
 
-TEST_DECLARE(rwlock_mixed_stress, .tier = TEST_TIER_INTEGRATION) {
+TEST_DECLARE(rwlock_mixed_stress, .tier = TEST_TIER_INTEGRATION,
+             .group = TEST_GROUP(rwlock)) {
 
     for (int i = 0; i < RWLOCK_MIXED_THREADS; i++)
         mixed_threads[i] = thread_spawn("rm", rw_mixed_worker, NULL);
@@ -160,7 +166,8 @@ static void rw_chaos_worker(void *) {
     test_info("%u threads left", atomic_fetch_sub(&rw_chaos_left, 1) - 1);
 }
 
-TEST_DECLARE(rwlock_chaos, .tier = TEST_TIER_INTEGRATION, .print_logs = true) {
+TEST_DECLARE(rwlock_chaos, .tier = TEST_TIER_INTEGRATION,
+             .group = TEST_GROUP(rwlock), .print_logs = true) {
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     for (int i = 0; i < RWLOCK_CHAOS_THREADS; i++)
         thread_spawn("rch", rw_chaos_worker, NULL);
@@ -218,7 +225,8 @@ static void rw_correct_worker(void *) {
     atomic_fetch_sub(&correctness_left, 1);
 }
 
-TEST_DECLARE(rwlock_correctness, .tier = TEST_TIER_INTEGRATION) {
+TEST_DECLARE(rwlock_correctness, .tier = TEST_TIER_INTEGRATION,
+             .group = TEST_GROUP(rwlock)) {
 
     for (int i = 0; i < RWLOCK_CORRECT_THREADS; i++)
         thread_spawn("rwc", rw_correct_worker, NULL);

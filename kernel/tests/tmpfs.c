@@ -8,6 +8,8 @@
 #include "errno.h"
 #include "string.h"
 
+TEST_GROUP_DECLARE(tmpfs);
+
 #define TMPFS_SETUP_NODE(root, node, name, e)                                  \
     struct vfs_node *root = tmpfs_mkroot("tmp");                               \
     TEST_ASSERT(root != NULL);                                                 \
@@ -18,7 +20,8 @@
     node = ent.node;                                                           \
     TEST_ASSERT(node != NULL);
 
-TEST_DECLARE(tmpfs_rw_test, .tier = TEST_TIER_INTEGRATION) {
+TEST_DECLARE(tmpfs_rw_test, .tier = TEST_TIER_INTEGRATION,
+             .group = TEST_GROUP(tmpfs)) {
     TMPFS_SETUP_NODE(root, node, "place", e);
     TEST_ASSERT(node->size == 0);
 
@@ -51,7 +54,8 @@ TEST_DECLARE(tmpfs_rw_test, .tier = TEST_TIER_INTEGRATION) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(tmpfs_dir_test, .tier = TEST_TIER_INTEGRATION) {
+TEST_DECLARE(tmpfs_dir_test, .tier = TEST_TIER_INTEGRATION,
+             .group = TEST_GROUP(tmpfs)) {
     struct vfs_node *root = tmpfs_mkroot("tmp");
     const char *lstr = large_test_string;
     uint64_t len = strlen(lstr);
@@ -83,7 +87,8 @@ TEST_DECLARE(tmpfs_dir_test, .tier = TEST_TIER_INTEGRATION) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(tmpfs_general_tests, .tier = TEST_TIER_INTEGRATION) {
+TEST_DECLARE(tmpfs_general_tests, .tier = TEST_TIER_INTEGRATION,
+             .group = TEST_GROUP(tmpfs)) {
     TMPFS_SETUP_NODE(root, node, "place", e);
 
     FAIL_IF_FATAL(node->ops->chmod(node, VFS_MODE_EXEC));

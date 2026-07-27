@@ -60,3 +60,22 @@ static inline size_t type_enum_width(enum type_enum type) {
     default: return 0;
     }
 }
+
+static inline const char *type_enum_str(enum type_enum type) {
+    switch (type) {
+    case TYPE_NONE: return "none";
+    case TYPE_INT8: return "int8";
+    case TYPE_UINT8: return "uint8";
+    case TYPE_INT16: return "int16";
+    case TYPE_UINT16: return "uint16";
+    case TYPE_INT32: return "int32";
+    case TYPE_UINT32: return "uint32";
+    case TYPE_INT64: return "int64";
+    case TYPE_UINT64: return "uint64";
+    case TYPE_FLOAT32: return "float32";
+    case TYPE_FLOAT64: return "float64";
+    case TYPE_BOOL: return "bool";
+    case TYPE_POINTER: return "ptr";
+    default: return "unknown";
+    }
+}

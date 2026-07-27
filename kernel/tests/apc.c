@@ -7,6 +7,7 @@
 #include <thread/workqueue.h>
 #include <time/spin_sleep.h>
 
+TEST_GROUP_DECLARE(apc);
 static atomic_bool apc_ran = false;
 static void the_apc(void *a) {
     atomic_store(&apc_ran, true);
@@ -18,7 +19,7 @@ static void apc_thread(void *) {
 }
 
 static struct thread *ted = NULL;
-TEST_DECLARE(apc_test, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(apc_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(apc)) {
     ted = thread_spawn("apc_test_thread", apc_thread, NULL);
     struct apc *a = kmalloc(sizeof(struct apc), ALLOC_FLAGS_ZERO);
     if (!a || !ted)
@@ -70,7 +71,7 @@ static void apc_event_test_thread(void *) {
 }
 
 static struct thread *ated = NULL;
-TEST_DECLARE(apc_event_test, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(apc_event_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(apc)) {
     ated = thread_spawn("apc_event_test_thread", apc_event_test_thread, NULL);
     while (!atomic_load(&event_apc_test_ok))
         scheduler_yield();

@@ -7,19 +7,7 @@
 #include <test.h>
 #include <thread/thread.h>
 
-LOG_SITE_DECLARE(test_mutex, .flags = LOG_SITE_PRINT | LOG_SITE_DROP_OLD,
-                 .capacity = LOG_SITE_CAPACITY_DEFAULT,
-                 .enabled_mask = LOG_SITE_ALL, .dump_opts = LOG_DUMP_DEFAULT);
-LOG_HANDLE_DECLARE_DEFAULT(test_mutex);
-
-#define test_mutex_log(lvl, fmt, ...)                                          \
-    log(LOG_SITE(test_mutex), LOG_HANDLE(test_mutex), lvl, fmt, ##__VA_ARGS__)
-
-#define test_mutex_err(fmt, ...) test_mutex_log(LOG_ERROR, fmt, ##__VA_ARGS__)
-#define test_mutex_warn(fmt, ...) test_mutex_log(LOG_WARN, fmt, ##__VA_ARGS__)
-#define test_mutex_info(fmt, ...) test_mutex_log(LOG_INFO, fmt, ##__VA_ARGS__)
-#define test_mutex_debug(fmt, ...) test_mutex_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
-#define test_mutex_trace(fmt, ...) test_mutex_log(LOG_TRACE, fmt, ##__VA_ARGS__)
+TEST_GROUP_DECLARE(mutex);
 
 #define MUTEX_REPORT_PROBLEMS()                                                \
     test_info("Mutex tests are encountering problems and will be skipped");    \
@@ -27,7 +15,8 @@ LOG_HANDLE_DECLARE_DEFAULT(test_mutex);
 
 static struct mutex basic_test_mtx = MUTEX_INIT;
 
-TEST_DECLARE(mutex_test_basic, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(mutex_test_basic, .tier = TEST_TIER_UNIT,
+             .group = TEST_GROUP(mutex)) {
     mutex_lock(&basic_test_mtx);
     scheduler_yield();
     mutex_unlock(&basic_test_mtx);
@@ -50,7 +39,8 @@ static void many_worker(void *) {
     atomic_fetch_sub(&many_waiter_done, 1);
 }
 
-TEST_DECLARE(mutex_many_waiters, .tier = TEST_TIER_INTEGRATION) {
+TEST_DECLARE(mutex_many_waiters, .tier = TEST_TIER_INTEGRATION,
+             .group = TEST_GROUP(mutex)) {
     for (int i = 0; i < MUTEX_MANY_WAITER_TEST_WAITER_COUNT; i++) {
         struct thread *t = thread_create("mw", many_worker, NULL);
         t->flags |= THREAD_FLAG_PINNED;
@@ -88,7 +78,8 @@ static void chaos(void *) {
 volatile struct thread *main_thread = NULL;
 volatile struct thread *other_threads[CHAOS_THREAD_COUNT] = {0};
 
-TEST_DECLARE(mutex_chaos, .tier = TEST_TIER_INTEGRATION) {
+TEST_DECLARE(mutex_chaos, .tier = TEST_TIER_INTEGRATION,
+             .group = TEST_GROUP(mutex)) {
     main_thread = thread_get_current();
     for (int i = 0; i < CHAOS_THREAD_COUNT; i++)
         other_threads[i] = thread_spawn("ch", chaos, NULL);
@@ -112,45 +103,46 @@ static atomic_uint pi_done = 0;
 
 static void pi_dummy(void *nothing) {
     (void) nothing;
-    test_mutex_info("dummy");
+    test_info("dummy");
     while (atomic_load(&pi_done) < 1)
         scheduler_yield();
 
     atomic_fetch_add(&pi_done, 1);
-    test_mutex_info("exiting");
+    test_info("exiting");
 }
 
 static void pi_rt_thread(void *nothing) {
     (void) nothing;
     mutex_lock(&pi_mutex);
-    test_mutex_info("lock");
+    test_info("lock");
     kassert(mutex_get_owner(&pi_mutex) == thread_get_current());
     mutex_unlock(&pi_mutex);
-    test_mutex_info("unlock");
+    test_info("unlock");
     atomic_fetch_add(&pi_done, 1);
-    test_mutex_info("exiting");
+    test_info("exiting");
 }
 
 static void pi_ts_thread(void *nothing) {
     (void) nothing;
     mutex_lock(&pi_mutex);
-    test_mutex_info("lock");
+    test_info("lock");
     atomic_store(&pi_ts_got, true);
 
     while (thread_get_current()->perceived_prio_class != THREAD_PRIO_CLASS_RT)
         cpu_relax();
 
     kassert(mutex_get_owner(&pi_mutex) == thread_get_current());
-    test_mutex_info("boosted");
+    test_info("boosted");
 
-    test_mutex_info("unlock");
+    test_info("unlock");
     mutex_unlock(&pi_mutex);
 
     atomic_fetch_add(&pi_done, 1);
-    test_mutex_info("exiting");
+    test_info("exiting");
 }
 
-TEST_DECLARE(mutex_pi_test, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(mutex_pi_test, .tier = TEST_TIER_UNIT,
+             .group = TEST_GROUP(mutex)) {
     if (global.core_count == 1) {
         return TEST_SKIP(TEST_SKIP_NONE);
     }
@@ -190,14 +182,14 @@ static atomic_bool ts2_grabbed_b = false;
 static void pi_chain_ts2(void *arg) {
     (void) arg;
     mutex_lock(&pi_mtx_b);
-    test_mutex_info("ts2 lock b");
+    test_info("ts2 lock b");
     atomic_store(&ts2_grabbed_b, true);
 
     /* wait until boosted */
     while (thread_get_current()->perceived_prio_class != THREAD_PRIO_CLASS_RT)
         cpu_relax();
 
-    test_mutex_info("ts2 boosted");
+    test_info("ts2 boosted");
     mutex_unlock(&pi_mtx_b);
     atomic_fetch_add(&pi_chain_done, 1);
 }
@@ -205,7 +197,7 @@ static void pi_chain_ts2(void *arg) {
 static void pi_chain_ts1(void *arg) {
     (void) arg;
     mutex_lock(&pi_mtx_a);
-    test_mutex_info("ts1 lock a");
+    test_info("ts1 lock a");
     atomic_store(&ts1_grabbed_a, true);
 
     /* wait until boosted */
@@ -213,7 +205,7 @@ static void pi_chain_ts1(void *arg) {
         cpu_relax();
 
     mutex_lock(&pi_mtx_b);
-    test_mutex_info("ts1 lock b");
+    test_info("ts1 lock b");
 
     mutex_unlock(&pi_mtx_b);
     mutex_unlock(&pi_mtx_a);
@@ -222,15 +214,16 @@ static void pi_chain_ts1(void *arg) {
 
 static void pi_chain_rt(void *arg) {
     (void) arg;
-    test_mutex_info("rt lock");
+    test_info("rt lock");
     mutex_lock(&pi_mtx_a);
-    test_mutex_info("rt lock got");
+    test_info("rt lock got");
 
     mutex_unlock(&pi_mtx_a);
     atomic_fetch_add(&pi_chain_done, 1);
 }
 
-TEST_DECLARE(mutex_pi_chain, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(mutex_pi_chain, .tier = TEST_TIER_UNIT,
+             .group = TEST_GROUP(mutex)) {
     if (global.core_count < 2) {
         return TEST_SKIP(TEST_SKIP_NONE);
     }
@@ -272,26 +265,27 @@ static atomic_bool ts_got = false;
 static void pi_multi_ts(void *arg) {
     (void) arg;
     mutex_lock(&pi_multi_mtx);
-    test_mutex_info("multi_ts running");
+    test_info("multi_ts running");
     atomic_store(&ts_got, true);
 
     while (thread_get_current()->perceived_prio_class != THREAD_PRIO_CLASS_RT)
         cpu_relax();
 
-    test_mutex_info("ts boosted");
+    test_info("ts boosted");
     mutex_unlock(&pi_multi_mtx);
     atomic_fetch_add(&pi_multi_done, 1);
 }
 
 static void pi_multi_rt(void *arg) {
     (void) arg;
-    test_mutex_info("multi_rt running");
+    test_info("multi_rt running");
     mutex_lock(&pi_multi_mtx);
     mutex_unlock(&pi_multi_mtx);
     atomic_fetch_add(&pi_multi_done, 1);
 }
 
-TEST_DECLARE(mutex_pi_multi_waiters, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(mutex_pi_multi_waiters, .tier = TEST_TIER_UNIT,
+             .group = TEST_GROUP(mutex)) {
     cpu_id_t cpu = 1;
 
     struct thread *ts = thread_create("pi_ts", pi_multi_ts, NULL);
@@ -348,7 +342,8 @@ static void pi_revert_rt(void *arg) {
     atomic_fetch_add(&pi_reverted_done, 1);
 }
 
-TEST_DECLARE(mutex_pi_revert, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(mutex_pi_revert, .tier = TEST_TIER_UNIT,
+             .group = TEST_GROUP(mutex)) {
     cpu_id_t cpu = 1;
 
     struct thread *ts = thread_create("pi_ts", pi_revert_ts, NULL);

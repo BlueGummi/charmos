@@ -13,6 +13,9 @@
 #include <time/spin_sleep.h>
 
 #include "fs/detect.h"
+
+TEST_GROUP_DECLARE(bio_sched);
+
 #define EXT2_INIT                                                              \
     if (global.root_node->fs_type != FS_EXT2) {                                \
         test_info("the mounted root is not ext2");                             \
@@ -53,7 +56,8 @@ static void bio_sch_callback2(struct bio_request *req) {
     test_info("cb 2 success");
 }
 
-TEST_DECLARE(bio_sched_coalesce_test, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(bio_sched_coalesce_test, .tier = TEST_TIER_UNIT,
+             .group = TEST_GROUP(bio_sched)) {
     EXT2_INIT;
     struct ext2_fs *fs = root->fs_data;
     struct block_device *d = fs->drive;
@@ -111,7 +115,8 @@ static struct bio_request *rqs[BIO_SCHED_TEST_RUNS] = {0};
 static uint8_t *buffers[BIO_SCHED_TEST_RUNS] = {0};
 static volatile int send_dispatch = 0;
 
-TEST_DECLARE(bio_sched_delay_enqueue_test, .tier = TEST_TIER_INTEGRATION) {
+TEST_DECLARE(bio_sched_delay_enqueue_test, .tier = TEST_TIER_INTEGRATION,
+             .group = TEST_GROUP(bio_sched)) {
     EXT2_INIT;
     ABORT_IF_RAM_LOW();
 

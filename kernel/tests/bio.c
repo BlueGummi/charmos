@@ -13,6 +13,8 @@
 
 #include "fs/detect.h"
 
+TEST_GROUP_DECLARE(bio);
+
 #define EXT2_INIT                                                              \
     if (global.root_node->fs_type != FS_EXT2) {                                \
         test_info("the mounted root is not ext2");                             \
@@ -28,7 +30,8 @@ static void bio_callback(struct bio_request *req) {
     test_info("blkdev_bio callback succeeded");
 }
 
-TEST_DECLARE(blkdev_bio_test, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(blkdev_bio_test, .tier = TEST_TIER_UNIT,
+             .group = TEST_GROUP(bio)) {
     EXT2_INIT;
     struct ext2_fs *fs = root->fs_data;
     struct block_device *d = fs->drive;

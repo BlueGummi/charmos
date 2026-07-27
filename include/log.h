@@ -11,6 +11,9 @@
 #include <types/refcount.h>
 #include <types/types.h>
 
+struct log_site;
+struct log_record;
+
 enum log_flags : uint32_t {
     LOG_PRINT = 1 << 0,     /* emit to console immediately */
     LOG_IMPORTANT = 1 << 1, /* never drop / elevated visibility */
@@ -56,7 +59,9 @@ struct log_dump_options {
 };
 
 struct log_handle {
-    const char *msg;
+    void (*print)(const struct log_site *site, const struct log_record *rec,
+                  void (*print)(const char *fmt, ...));
+    char *msg;
     enum log_flags flags;
     _Atomic uint32_t seen_internal;
     _Atomic uint64_t last_ts_internal;

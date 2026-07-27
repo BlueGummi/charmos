@@ -10,6 +10,8 @@
 #include <thread/workqueue.h>
 #include <time/spin_sleep.h>
 
+TEST_GROUP_DECLARE(rcu);
+
 #define NUM_RCU_READERS (global.core_count)
 #define RCU_TEST_DURATION_MS 50
 
@@ -67,7 +69,7 @@ static void rcu_writer_thread(void *) {
               old);
 }
 
-TEST_DECLARE(rcu_test, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(rcu_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(rcu)) {
     struct rcu_test_data *initial = kmalloc(sizeof(*initial), ALLOC_FLAGS_ZERO);
     initial->value = 42;
     shared_ptr = initial;
@@ -157,11 +159,10 @@ static void rcu_stress_reader(void *arg) {
 
         if (time_get_ms() - last_print > STRESS_PRINT_MS) {
             last_print = time_get_ms();
-            test_info(
-                "\'%-20s\' on iteration %7zu w/ %7zu replacements and %7zu "
-                "frees",
-                thread_get_current()->name, iter, stress_replacements,
-                stress_deferred_freed);
+            test_info("\'%-17s\' iter %7zu w/ %7zu rplace and %7zu "
+                      "free",
+                      thread_get_current()->name, iter, stress_replacements,
+                      stress_deferred_freed);
         }
 
         /* yield to exercise scheduler preemption and context switching */
@@ -233,7 +234,8 @@ static void rcu_stress_reclaimer(void *arg) {
 }
 
 /* Test registration */
-TEST_DECLARE(rcu_stress_test, .tier = TEST_TIER_UNIT, .print_logs = true, ) {
+TEST_DECLARE(rcu_stress_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(rcu),
+             .print_logs = true, ) {
     /* initial object */
     struct rcu_stress_node *initial =
         kmalloc(sizeof(*initial), ALLOC_FLAGS_ZERO);
@@ -251,16 +253,16 @@ TEST_DECLARE(rcu_stress_test, .tier = TEST_TIER_UNIT, .print_logs = true, ) {
 
     /* spawn readers (more than cores) */
     for (uint32_t i = 0; i < STRESS_NUM_READERS; ++i) {
-        thread_spawn("rcu_str_reader_%u", rcu_stress_reader, NULL, i);
+        thread_spawn("rcu_stread_%u", rcu_stress_reader, NULL, i);
     }
 
     /* spawn writers */
     for (uint32_t i = 0; i < STRESS_NUM_WRITERS; ++i) {
-        thread_spawn("rcu_str_writer_%u", rcu_stress_writer, NULL, i);
+        thread_spawn("rcu_strite_%u", rcu_stress_writer, NULL, i);
     }
 
     /* spawn one reclaimer to periodically call synchronize */
-    thread_spawn("rcu_str_reclaimer", rcu_stress_reclaimer, NULL);
+    thread_spawn("rcu_streclaim", rcu_stress_reclaimer, NULL);
 
     /* run for the configured duration */
     uint64_t stop_at = time_get_ms() + STRESS_DURATION_MS;

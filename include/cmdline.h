@@ -19,6 +19,8 @@ enum cmdline_entry_flags {
     CMDLINE_ENTRY_SYMBOLIC = 1, /* This entry serves parenting purposes,
                                  * however itself cannot be set to a value */
     CMDLINE_ENTRY_REQUIRED = 1 << 1,
+    CMDLINE_ENTRY_DOCUMENTED = 1
+                               << 2, /* If this is set, we print/document it */
 };
 
 typedef void (*cmdline_callback)(const char *value, struct cmdline_entry *ent);
@@ -65,6 +67,8 @@ struct cmdline_entry {
     __cmdline_##n = {.name = #n,                                               \
                      .status = CMDLINE_ENTRY_NOT_FOUND,                        \
                      .type = TYPE_NONE,                                        \
+                     .parse = NULL,                                            \
+                     .flags = CMDLINE_ENTRY_FLAGS_NONE,                        \
                      __VA_ARGS__}
 
 #define CMDLINE_ENTRY_DECLARE_TYPED(n, var, ...)                               \
@@ -73,6 +77,7 @@ struct cmdline_entry {
                      .status = CMDLINE_ENTRY_NOT_FOUND,                        \
                      .write_to = &var,                                         \
                      .type = TYPE_TO_ENUM((var)),                              \
+                     .flags = CMDLINE_ENTRY_FLAGS_NONE,                        \
                      __VA_ARGS__}
 
 #define CMDLINE_ENTRY_DECLARE_TYPED_CUSTOM(n, var, pars, ...)                  \
@@ -82,6 +87,7 @@ struct cmdline_entry {
                      .write_to = &var,                                         \
                      .parse = pars,                                            \
                      .type = TYPE_NONE,                                        \
+                     .flags = CMDLINE_ENTRY_FLAGS_NONE,                        \
                      __VA_ARGS__}
 
 #define CMDLINE_ENTRY_DEFINE(n) extern struct cmdline_entry __cmdline_##n
@@ -89,6 +95,9 @@ struct cmdline_entry {
 #define CMDLINE_ENTRY(n, ...) &__cmdline_##n
 
 #define CMDLINE_ENTRY_NAME_LEN_MAX 256
+
+#define CMDLINE_ENTRY_TYPE_TO_ARG(type)                                        \
+    _Generic((type) 0, int: "<integer>", bool: "<on/off>")
 
 LINKER_SECTION_DEFINE(struct cmdline_entry, cmdline_entries);
 

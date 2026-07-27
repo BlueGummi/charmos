@@ -10,6 +10,8 @@
 #include <structures/rbit.h>
 #include <test.h>
 
+TEST_GROUP_DECLARE(mm);
+
 #define MM_TEST_VMAS 100
 #define MM_TEST_QUERIES 3000
 #define MM_TEST_SEED 0x5EED1234ULL
@@ -139,7 +141,8 @@ static size_t build_random_vma_ranges(struct mm *mm) {
     return placed;
 }
 
-TEST_DECLARE(mm_gap_differential, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(mm_gap_differential, .tier = TEST_TIER_UNIT,
+             .group = TEST_GROUP(mm)) {
     prng_seed(MM_TEST_SEED);
     struct mm *mm = mm_alloc();
     TEST_ASSERT(mm);
@@ -174,7 +177,8 @@ TEST_DECLARE(mm_gap_differential, .tier = TEST_TIER_UNIT) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(mm_map_consistency, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(mm_map_consistency, .tier = TEST_TIER_UNIT,
+             .group = TEST_GROUP(mm)) {
     prng_seed(MM_TEST_SEED + 1);
     struct mm *mm = mm_alloc();
     TEST_ASSERT(mm);
@@ -196,7 +200,8 @@ TEST_DECLARE(mm_map_consistency, .tier = TEST_TIER_UNIT) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(mm_vma_range_split, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(mm_vma_range_split, .tier = TEST_TIER_UNIT,
+             .group = TEST_GROUP(mm)) {
     struct mm *mm = mm_alloc();
     TEST_ASSERT(mm);
 

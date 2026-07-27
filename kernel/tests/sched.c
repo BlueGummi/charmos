@@ -11,6 +11,8 @@
 #include <thread/workqueue.h>
 #include <time/spin_sleep.h>
 
+TEST_GROUP_DECLARE(sched);
+
 static atomic_bool workqueue_ran = false;
 static _Atomic uint32_t workqueue_times = 0;
 static void workqueue_fn(void *arg, void *unused) {
@@ -19,7 +21,8 @@ static void workqueue_fn(void *arg, void *unused) {
     atomic_fetch_add(&workqueue_times, 1);
 }
 
-TEST_DECLARE(workqueue_test, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(workqueue_test, .tier = TEST_TIER_UNIT,
+             .group = TEST_GROUP(sched)) {
     uint64_t tsc = rdtsc();
     uint64_t times = 256;
 
@@ -57,7 +60,8 @@ static void sleepy_entry(void *) {
     thread_print(thread_get_current());
 }
 
-TEST_DECLARE(sched_sleepy_test, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(sched_sleepy_test, .tier = TEST_TIER_UNIT,
+             .group = TEST_GROUP(sched)) {
     thread_spawn("sched_sleepy_test", sleepy_entry, NULL);
     return TEST_SUCCESS;
 }
@@ -88,7 +92,8 @@ static void enqueue_thread(void *) {
     atomic_fetch_sub(&threads_left, 1);
 }
 
-TEST_DECLARE(workqueue_test_2, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(workqueue_test_2, .tier = TEST_TIER_UNIT,
+             .group = TEST_GROUP(sched)) {
     struct cpu_mask mask;
     alloc_or_die(cpu_mask_init(&mask, global.core_count));
 
@@ -138,7 +143,7 @@ static enum daemon_thread_command daemon_work(void *a, void *b) {
 static struct daemon_work dwork =
     DAEMON_WORK_FROM(daemon_work, WORK_ARGS(NULL, NULL));
 
-TEST_DECLARE(daemon_test, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(daemon_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(sched)) {
     struct cpu_mask cmask;
     cpu_mask_init(&cmask, global.core_count);
     cpu_mask_set_all(&cmask);
@@ -201,7 +206,8 @@ static void waking_thread(void *) {
                 si_t->perceived_prio_class, (void *) 4);
 }
 
-TEST_DECLARE(thread_sleep_interruptible_test, .tier = TEST_TIER_INTEGRATION) {
+TEST_DECLARE(thread_sleep_interruptible_test, .tier = TEST_TIER_INTEGRATION,
+             .group = TEST_GROUP(sched)) {
     if (global.core_count < 4) {
         test_info("too few cores");
         return TEST_SKIP(TEST_SKIP_NONE);
@@ -240,7 +246,8 @@ static void dpc_on_event_dummy_thread(void *a) {
 /* we put a thread on a core that is not idle, enqueue a DPC over
  * there, trigger some reschedules, and then verify that the DPC
  * only ever runs once the core actually goes idle */
-TEST_DECLARE(dpc_on_event_test, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(dpc_on_event_test, .tier = TEST_TIER_UNIT,
+             .group = TEST_GROUP(sched)) {
     size_t i;
     size_t found = SIZE_MAX;
     for_each_cpu_id(i) {
@@ -283,7 +290,8 @@ static void sched_push_try(void *) {
     atomic_store(&at_least_one_migrated, true);
 }
 
-TEST_DECLARE(sched_push_target_test, .tier = TEST_TIER_INTEGRATION) {
+TEST_DECLARE(sched_push_target_test, .tier = TEST_TIER_INTEGRATION,
+             .group = TEST_GROUP(sched)) {
     test_info("This test takes a bit. uncomment me to run it");
     return TEST_SKIP(TEST_SKIP_NONE);
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);

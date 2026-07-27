@@ -82,6 +82,7 @@ static enum errno cmdline_parse_u64(void *write_to, const char *text) {
 
 static enum errno cmdline_parse_bool(void *write_to, const char *text) {
     *(bool *) write_to = cmdline_is_enabled(text);
+
     return ERR_OK;
 }
 
@@ -233,6 +234,10 @@ static void cmdline_dispatch(const char *var, const char *val) {
             panic("duplicate cmdline entry: %s", var);
 
         e->status = CMDLINE_ENTRY_FOUND;
+        if (e->parse) {
+            e->parse(e->write_to, val);
+        }
+
         if (e->callback) {
             e->callback(val, e);
         } else if (e->value) {
@@ -339,6 +344,9 @@ __noreturn void cmdline_dump_help(void) {
     printf("charmos kernel command-line options:\n\n");
     for (struct cmdline_entry *e = __skernel_cmdline_entries;
          e < __ekernel_cmdline_entries; e++) {
+        if (!(e->flags & CMDLINE_ENTRY_DOCUMENTED))
+            continue;
+
         char name[CMDLINE_ENTRY_NAME_LEN_MAX];
         get_functional_name(e, name);
         printf("  %s%s%s\n", name, e->arg ? "=" : "", e->arg ? e->arg : "");

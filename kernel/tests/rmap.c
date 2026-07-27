@@ -11,6 +11,8 @@
 #include <stdint.h>
 #include <test.h>
 
+TEST_GROUP_DECLARE(rmap);
+
 /* rmap is the dangerous direction: folio -> every (mm, va) that maps it
  *
  * A miss here means a swapped/COWed/unmapped page leaves a live PTE behind
@@ -51,7 +53,8 @@ static void record_visit(struct mm *mm, vaddr_t va, struct folio *f,
     v->n++;
 }
 
-TEST_DECLARE(rmap_fork_visibility, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(rmap_fork_visibility, .tier = TEST_TIER_UNIT,
+             .group = TEST_GROUP(rmap)) {
     vaddr_t base = WIN_BASE_PG << PAGE_4K_SHIFT;
     vaddr_t end = base + 16 * PAGE_SIZE;
     vaddr_t va = base + 4 * PAGE_SIZE; /* the page we fault */
@@ -98,7 +101,8 @@ TEST_DECLARE(rmap_fork_visibility, .tier = TEST_TIER_UNIT) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(rmap_itree_differential, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(rmap_itree_differential, .tier = TEST_TIER_UNIT,
+             .group = TEST_GROUP(rmap)) {
     prng_seed(RMAP_SEED);
 
     struct range_rec *r =

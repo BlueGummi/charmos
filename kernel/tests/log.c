@@ -4,6 +4,8 @@
 #include <test.h>
 #include <thread/thread.h>
 
+TEST_GROUP_DECLARE(log);
+
 static struct log_handle log_event = {
     .flags = LOG_PRINT,
     .seen_internal = 0,
@@ -12,9 +14,10 @@ static struct log_handle log_event = {
 
 };
 
-TEST_DECLARE(log_test, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE(log_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(log)) {
     struct log_site *ls = thread_get_current()->log_site;
-    log(ls, &log_event, LOG_INFO, "bluh %s", "pickle");
+    if (test_global.show_output)
+        log(ls, &log_event, LOG_INFO, "bluh %s", "pickle");
     return TEST_SUCCESS;
 }
 
