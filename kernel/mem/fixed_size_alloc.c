@@ -143,7 +143,7 @@ void fixed_size_free(struct fixed_size_range *fsr, void *obj) {
     }
 
     kassert(fsr->perdomain_fsrs[domain]->domain == domain);
-    return fixed_size_free(fsr->perdomain_fsrs[domain], obj);
+    return fixed_size_free_internal(fsr->perdomain_fsrs[domain], obj);
 }
 
 void fixed_size_reclaim_freelist_pages(struct fixed_size_range *fsr) {

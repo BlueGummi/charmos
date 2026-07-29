@@ -18,7 +18,7 @@
 
 TEST_GROUP_DECLARE(mem);
 
-TEST_DECLARE(pmm_alloc_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(pmm_alloc_test, .group = TEST_GROUP(mem)) {
     ABORT_IF_RAM_LOW();
 
     paddr_t p = pmm_alloc_page();
@@ -26,7 +26,7 @@ TEST_DECLARE(pmm_alloc_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(mem)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(vmm_map_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(vmm_map_test, .group = TEST_GROUP(mem)) {
     ABORT_IF_RAM_LOW();
 
     uint64_t p = pmm_alloc_page();
@@ -46,8 +46,8 @@ TEST_DECLARE(vmm_map_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(mem)) {
     TEST_ASSERT(((uintptr_t) (ptr) & ((alignment) - 1)) == 0)
 
 #define KMALLOC_ALIGNMENT_TEST(name, align)                                    \
-    TEST_DECLARE(kmalloc_aligned_##name##_test, .tier = TEST_TIER_UNIT,        \
-                 .group = TEST_GROUP(mem)) {                                   \
+    TEST_DECLARE_UNIT(kmalloc_aligned_##name##_test,                           \
+                      .group = TEST_GROUP(mem)) {                              \
         ABORT_IF_RAM_LOW();                                                    \
         for (uint64_t i = 0; i < ALIGNED_ALLOC_TIMES; i++) {                   \
             void *ptr = kmalloc_aligned(align, align);                         \
@@ -65,8 +65,7 @@ KMALLOC_ALIGNMENT_TEST(256, 256)
 #define STRESS_ALLOC_TIMES 2048
 
 static paddr_t pmm_stress_test_ptrs[STRESS_ALLOC_TIMES];
-TEST_DECLARE(pmm_stress_alloc_free_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(pmm_stress_alloc_free_test, .group = TEST_GROUP(mem)) {
     ABORT_IF_RAM_LOW();
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
@@ -82,8 +81,7 @@ TEST_DECLARE(pmm_stress_alloc_free_test, .tier = TEST_TIER_UNIT,
 }
 
 static void *stress_alloc_free_ptrs[STRESS_ALLOC_TIMES] = {0};
-TEST_DECLARE(kmalloc_stress_alloc_free_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(kmalloc_stress_alloc_free_test, .group = TEST_GROUP(mem)) {
     ABORT_IF_RAM_LOW();
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
@@ -110,8 +108,7 @@ TEST_DECLARE(kmalloc_stress_alloc_free_test, .tier = TEST_TIER_UNIT,
 
 /* Put it here to avoid it eating things up */
 static void *mixed_stress_test_ptrs[STRESS_ALLOC_TIMES] = {0};
-TEST_DECLARE(kmalloc_mixed_stress_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(kmalloc_mixed_stress_test, .group = TEST_GROUP(mem)) {
     ABORT_IF_RAM_LOW();
 
     for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
@@ -129,7 +126,7 @@ TEST_DECLARE(kmalloc_mixed_stress_test, .tier = TEST_TIER_UNIT,
 #define MT_THREAD_COUNT 8
 #define MT_ALLOC_TIMES 1024
 
-static volatile int kmalloc_done = 0;
+static atomic_int kmalloc_done = 0;
 
 static void mt_kmalloc_worker(void *) {
     void *ptrs[MT_ALLOC_TIMES] = {0};
@@ -150,30 +147,31 @@ static void mt_kmalloc_worker(void *) {
         kfree(ptrs[i]);
     }
 
-    kmalloc_done++;
+    atomic_fetch_add(&kmalloc_done, 1);
 }
 
-TEST_DECLARE(kmalloc_multithreaded_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(kmalloc_multithreaded_test, .group = TEST_GROUP(mem)) {
     ABORT_IF_RAM_LOW();
 
     struct thread *threads[MT_THREAD_COUNT];
+    atomic_store(&kmalloc_done, 0);
 
     for (int i = 0; i < MT_THREAD_COUNT; i++) {
-        threads[i] = thread_spawn_custom_stack(
+        threads[i] = thread_spawn_joinable_custom_stack(
             "mt_kmalloc_thread", mt_kmalloc_worker, NULL, PAGE_SIZE * 16);
         TEST_ASSERT(threads[i] != NULL);
     }
 
-    while (kmalloc_done < MT_THREAD_COUNT)
-        scheduler_yield();
+    for (int i = 0; i < MT_THREAD_COUNT; i++)
+        thread_join(threads[i]);
+
+    TEST_ASSERT(atomic_load(&kmalloc_done) == MT_THREAD_COUNT);
 
     return TEST_SUCCESS;
 }
 
 static char hooray[128] = {0};
-TEST_DECLARE(kmalloc_new_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(kmalloc_new_test, .group = TEST_GROUP(mem)) {
 
     void *p = kmalloc_new(67, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
 
@@ -192,8 +190,7 @@ TEST_DECLARE(kmalloc_new_test, .tier = TEST_TIER_UNIT,
 #endif
 
 static char a_msg[128];
-TEST_DECLARE(kmalloc_new_basic_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(kmalloc_new_basic_test, .group = TEST_GROUP(mem)) {
 
     void *p1 = kmalloc_new(1, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
     void *p2 = kmalloc_new(64, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
@@ -231,7 +228,7 @@ TEST_DECLARE(kmalloc_new_basic_test, .tier = TEST_TIER_UNIT,
 /*
 -------------------- Alignment preference test --------------------
 
-TEST_DECLARE(kmalloc_new_cache_align_test, .tier = TEST_TIER_UNIT) {
+TEST_DECLARE_UNIT(kmalloc_new_cache_align_test) {
      Request cache-aligned memory
     uint16_t flags = ALLOC_FLAG_PREFER_CACHE_ALIGNED | ALLOC_FLAG_NONMOVABLE |
                      ALLOC_FLAG_NONPAGEABLE | ALLOC_FLAG_CLASS_DEFAULT;
@@ -257,8 +254,7 @@ TEST_DECLARE(kmalloc_new_cache_align_test, .tier = TEST_TIER_UNIT) {
 
 /* -------------------- Behavior flag verification test -------------------- */
 
-TEST_DECLARE(kmalloc_new_behavior_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(kmalloc_new_behavior_test, .group = TEST_GROUP(mem)) {
     /* ALLOC_BEHAVIOR_ATOMIC should require nonpageable/nonmovable - allocator
        or sanitizers might coerce flags. This test ensures allocation doesn't
        return NULL for such a request. */
@@ -371,41 +367,51 @@ volatile int done[STRESS_THREADS];
 struct stress_arg args[STRESS_THREADS];
 static char msg[128];
 
-TEST_DECLARE(kmalloc_new_concurrency_stress_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(kmalloc_new_concurrency_stress_test,
+                  .group = TEST_GROUP(mem)) {
     memset((void *) done, 0, sizeof(done));
+
+    struct thread *workers[STRESS_THREADS];
 
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     for (int i = 0; i < STRESS_THREADS; ++i) {
         args[i].id = i;
         args[i].done_flag = &done[i];
-        struct thread *goofy =
-            thread_spawn("kmalloc_new_stress_worker", stress_worker, NULL);
+        workers[i] = thread_spawn_joinable("kmalloc_new_stress_worker",
+                                           stress_worker, NULL);
 
-        goofy->private = &args[i];
+        workers[i]->private = &args[i];
     }
     irql_lower(irql);
 
     all_ready = true;
 
-    time_t start = time_get_ms();
+    /* the whole worker set shares one deadline */
     const time_t timeout_ms = 30 * 1000;
-    while (time_get_ms() - start < timeout_ms) {
-        int all = 1;
-        for (int i = 0; i < STRESS_THREADS; ++i) {
-            if (!done[i]) {
-                all = 0;
-                break;
-            }
-        }
-        if (all)
-            break;
-    }
+    time_t start = time_get_ms();
 
     for (int i = 0; i < STRESS_THREADS; ++i) {
-        if (!done[i]) {
+        time_t elapsed = time_get_ms() - start;
+        time_t left = elapsed >= timeout_ms ? 1 : timeout_ms - elapsed;
+
+        if (!thread_join_timeout(workers[i], left, NULL)) {
             snprintf(msg, sizeof(msg), "thread %d did not complete in time", i);
             test_info(msg);
+
+            /* still running, and we are done waiting on it */
+            for (int j = i; j < STRESS_THREADS; ++j)
+                thread_detach(workers[j]);
+
+            return TEST_SUCCESS;
+        }
+
+        if (!done[i]) {
+            snprintf(msg, sizeof(msg), "thread %d exited without finishing", i);
+            test_info(msg);
+
+            for (int j = i + 1; j < STRESS_THREADS; ++j)
+                thread_detach(workers[j]);
+
             return TEST_SUCCESS;
         }
     }
@@ -417,8 +423,8 @@ TEST_DECLARE(kmalloc_new_concurrency_stress_test, .tier = TEST_TIER_UNIT,
 /* -------------------- Small reallocation-like smoke test --------------------
  */
 
-TEST_DECLARE(kmalloc_new_alloc_free_sequence_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(kmalloc_new_alloc_free_sequence_test,
+                  .group = TEST_GROUP(mem)) {
 
     void *blocks[16];
     for (size_t i = 0; i < sizeof(blocks) / sizeof(blocks[0]); ++i) {
@@ -445,8 +451,7 @@ TEST_DECLARE(kmalloc_new_alloc_free_sequence_test, .tier = TEST_TIER_UNIT,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(tlb_shootdown_single_cpu_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(tlb_shootdown_single_cpu_test, .group = TEST_GROUP(mem)) {
     ABORT_IF_RAM_LOW();
 
     paddr_t p1 = pmm_alloc_page();
@@ -486,8 +491,7 @@ static void tlb_reader(void *arg) {
     atomic_fetch_add(&tlb_threads_done, 1);
 }
 
-TEST_DECLARE(tlb_shootdown_synchronous_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(tlb_shootdown_synchronous_test, .group = TEST_GROUP(mem)) {
     ABORT_IF_RAM_LOW();
 
     paddr_t p1 = pmm_alloc_page();
@@ -501,7 +505,8 @@ TEST_DECLARE(tlb_shootdown_synchronous_test, .tier = TEST_TIER_UNIT,
 
     struct thread *t[TLB_TEST_THREADS];
     for (size_t i = 0; i < TLB_TEST_THREADS; i++) {
-        t[i] = thread_spawn("tlb_reader", tlb_reader, (void *) i);
+        t[i] = thread_spawn_joinable("tlb_reader", tlb_reader, (void *) i);
+        TEST_ASSERT(t[i]);
         t[i]->private = va;
     }
 
@@ -512,8 +517,8 @@ TEST_DECLARE(tlb_shootdown_synchronous_test, .tier = TEST_TIER_UNIT,
     atomic_store(&tlb_go, true);
     tlb_shootdown((uintptr_t) va, true);
 
-    while (atomic_load(&tlb_threads_done) < TLB_TEST_THREADS)
-        cpu_relax();
+    for (size_t i = 0; i < TLB_TEST_THREADS; i++)
+        thread_join(t[i]);
 
     for (size_t i = 0; i < TLB_TEST_THREADS; i++) {
         TEST_ASSERT(tlb_seen[i] == 0xBBBBBBBB);
@@ -522,8 +527,7 @@ TEST_DECLARE(tlb_shootdown_synchronous_test, .tier = TEST_TIER_UNIT,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(tlb_shootdown_async_eventual_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(tlb_shootdown_async_eventual_test, .group = TEST_GROUP(mem)) {
     ABORT_IF_RAM_LOW();
 
     paddr_t p1 = pmm_alloc_page();
@@ -551,8 +555,7 @@ TEST_DECLARE(tlb_shootdown_async_eventual_test, .tier = TEST_TIER_UNIT,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(tlb_shootdown_flush_all_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(tlb_shootdown_flush_all_test, .group = TEST_GROUP(mem)) {
     ABORT_IF_RAM_LOW();
 
     paddr_t p = pmm_alloc_page();
@@ -586,14 +589,15 @@ static void tlb_spammer(void *) {
     }
 }
 
-TEST_DECLARE(tlb_shootdown_contention_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mem)) {
-    for (int i = 0; i < 4; i++)
-        thread_spawn("tlb_spammer", tlb_spammer, NULL);
+TEST_DECLARE_UNIT(tlb_shootdown_contention_test, .group = TEST_GROUP(mem)) {
+    struct thread *t[4];
+    for (int i = 0; i < 4; i++) {
+        t[i] = thread_spawn_joinable("tlb_spammer", tlb_spammer, NULL);
+        TEST_ASSERT(t[i]);
+    }
 
-    time_t start = time_get_ms();
-    while (time_get_ms() - start < 200)
-        scheduler_yield();
+    for (int i = 0; i < 4; i++)
+        thread_join(t[i]);
 
     test_info("concurrent shootdown stress completed");
     return TEST_SUCCESS;
@@ -605,7 +609,7 @@ static void print_cand(struct elcm_candidate c) {
               c.obj_count);
 }
 
-TEST_DECLARE(elcm_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(elcm_test, .group = TEST_GROUP(mem)) {
     struct elcm_params params = {
         .obj_size = 938,
         .max_wastage_pct = ELCM_MAX_WASTAGE_DEFAULT,
@@ -658,8 +662,7 @@ static enum irq_result kfree_irq_test_irq(void *arg, irq_t irq,
     return IRQ_HANDLED;
 }
 
-TEST_DECLARE(kfree_defer_irq_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(kfree_defer_irq_test, .group = TEST_GROUP(mem)) {
     if (global.core_count < 4) {
         return TEST_SKIP(TEST_SKIP_NONE);
     }
@@ -685,8 +688,7 @@ TEST_DECLARE(kfree_defer_irq_test, .tier = TEST_TIER_UNIT,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(page_alloc_demand_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(page_alloc_demand_test, .group = TEST_GROUP(mem)) {
     void *ptr = page_alloc_demand(8, ALLOC_FLAGS_ZERO);
     memset(ptr, 67, PAGE_SIZE);
     test_info("successfully demand allocated and memsetted memory");
@@ -753,15 +755,22 @@ static void dp_spawn(struct thread **t, size_t nthreads, struct dp_worker *w,
                      bool single_core) {
     for (size_t i = 0; i < nthreads; i++) {
         uint64_t core = single_core ? 0 : (i % global.core_count);
-        t[i] = thread_spawn_on_core("dp_hammer", dp_hammer, w, core);
+        /* joinable: the join reference is also what makes the thread_pin()
+         * below safe, the worker may already have exited by then */
+        t[i] = thread_spawn_joinable_on_core("dp_hammer", dp_hammer, w, core);
+        kassert(t[i]);
         if (single_core)
             thread_pin(t[i]);
     }
 }
 
+static void dp_join(struct thread **t, size_t nthreads) {
+    for (size_t i = 0; i < nthreads; i++)
+        thread_join(t[i]);
+}
+
 /* 1 buffer, N threads, 1 CPU: serialized faults + preemption mid-handler */
-TEST_DECLARE(demand_1buf_Nthreads_1cpu_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(demand_1buf_Nthreads_1cpu_test, .group = TEST_GROUP(mem)) {
     ABORT_IF_RAM_LOW();
 
     const size_t pages = DP_PAGES, nthreads = 8, nbuf = 1;
@@ -773,17 +782,16 @@ TEST_DECLARE(demand_1buf_Nthreads_1cpu_test, .tier = TEST_TIER_UNIT,
     struct thread *t[DP_MAX_THREADS];
     dp_spawn(t, nthreads, &w, /*single_core=*/true);
 
-    while (atomic_load(&done) < nthreads)
-        scheduler_yield();
+    dp_join(t, nthreads);
 
+    TEST_ASSERT(atomic_load(&done) == nthreads);
     TEST_ASSERT(dp_verify(bufs, nbuf, pages, nthreads));
     dp_free_bufs(bufs, nbuf, pages);
     return TEST_SUCCESS;
 }
 
 /* 1 buffer, N threads, N CPUs: many CPUs racing the same demand PTEs */
-TEST_DECLARE(demand_1buf_Nthreads_Ncpu_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(demand_1buf_Nthreads_Ncpu_test, .group = TEST_GROUP(mem)) {
     ABORT_IF_RAM_LOW();
 
     if (global.core_count < 2) {
@@ -803,17 +811,16 @@ TEST_DECLARE(demand_1buf_Nthreads_Ncpu_test, .tier = TEST_TIER_UNIT,
     struct thread *t[DP_MAX_THREADS];
     dp_spawn(t, nthreads, &w, /*single_core=*/false);
 
-    while (atomic_load(&done) < nthreads)
-        scheduler_yield();
+    dp_join(t, nthreads);
 
+    TEST_ASSERT(atomic_load(&done) == nthreads);
     TEST_ASSERT(dp_verify(bufs, nbuf, pages, nthreads));
     dp_free_bufs(bufs, nbuf, pages);
     return TEST_SUCCESS;
 }
 
 /* N buffers, M threads (M > N), N CPUs: contention spread over many regions */
-TEST_DECLARE(demand_Nbuf_Mthreads_Ncpu_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(demand_Nbuf_Mthreads_Ncpu_test, .group = TEST_GROUP(mem)) {
     ABORT_IF_RAM_LOW();
 
     if (global.core_count < 2) {
@@ -836,16 +843,15 @@ TEST_DECLARE(demand_Nbuf_Mthreads_Ncpu_test, .tier = TEST_TIER_UNIT,
     struct thread *t[DP_MAX_THREADS];
     dp_spawn(t, nthreads, &w, /*single_core=*/false);
 
-    while (atomic_load(&done) < nthreads)
-        scheduler_yield();
+    dp_join(t, nthreads);
 
+    TEST_ASSERT(atomic_load(&done) == nthreads);
     TEST_ASSERT(dp_verify(bufs, nbuf, pages, nthreads));
     dp_free_bufs(bufs, nbuf, pages);
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(slab_demand_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mem)) {
+TEST_DECLARE_UNIT(slab_demand_test, .group = TEST_GROUP(mem)) {
     /* One of these should eventually touch the demand page */
     for (size_t i = 0; i < 5000; i++) {
         void *p = kmalloc(500, ALLOC_FLAGS_ZERO | ALLOC_FLAG_PAGEABLE);

@@ -11,7 +11,7 @@ typedef __noreturn void (*panic_handler_t)(const char *file, int line,
                                            ...);
 
 static inline void qemu_exit(int code) {
-    outb(0xf4, ((code << 1) | 1) & 0xFF);
+    outb(0xf4, (uint8_t) code);
 }
 
 struct panic_hook {

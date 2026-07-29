@@ -305,10 +305,19 @@ fi
 
 SYMS_FILE="$REPO_ROOT/kernel/syms/fullsyms.c"
 
-if [[ ! -f "$SYMS_FILE" ]]; then
+# Extra pass to keep symbol table up to date
+BOOTSTRAP=false
+if [[ ! -f "$SYMS_FILE" ]] || ! grep -q syms_etext "$SYMS_FILE"; then
+    BOOTSTRAP=true
     warn "first build: bootstrapping symbol table"
-    build_targets kernel
-    build_targets regen-syms
+else
+    log "refreshing symbol table"
+fi
+
+build_targets kernel
+build_targets regen-syms
+
+if $BOOTSTRAP; then
     log "reconfiguring with real symbols"
     configure_cmake
 fi

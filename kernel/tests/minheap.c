@@ -20,8 +20,7 @@ static void mhtest_do_inserts(struct minheap *mh) {
     }
 }
 
-TEST_DECLARE(minheap_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(minheap)) {
+TEST_DECLARE_UNIT(minheap_test, .group = TEST_GROUP(minheap)) {
     struct minheap *mh = minheap_create();
     mhtest_do_inserts(mh);
     TEST_ASSERT(mh->size == MINHEAP_TEST_TIMES);

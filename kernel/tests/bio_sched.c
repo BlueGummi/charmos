@@ -56,8 +56,7 @@ static void bio_sch_callback2(struct bio_request *req) {
     test_info("cb 2 success");
 }
 
-TEST_DECLARE(bio_sched_coalesce_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(bio_sched)) {
+TEST_DECLARE_UNIT(bio_sched_coalesce_test, .group = TEST_GROUP(bio_sched)) {
     EXT2_INIT;
     struct ext2_fs *fs = root->fs_data;
     struct block_device *d = fs->drive;
@@ -115,8 +114,8 @@ static struct bio_request *rqs[BIO_SCHED_TEST_RUNS] = {0};
 static uint8_t *buffers[BIO_SCHED_TEST_RUNS] = {0};
 static volatile int send_dispatch = 0;
 
-TEST_DECLARE(bio_sched_delay_enqueue_test, .tier = TEST_TIER_INTEGRATION,
-             .group = TEST_GROUP(bio_sched)) {
+TEST_DECLARE_INTEGRATION(bio_sched_delay_enqueue_test,
+                         .group = TEST_GROUP(bio_sched)) {
     EXT2_INIT;
     ABORT_IF_RAM_LOW();
 

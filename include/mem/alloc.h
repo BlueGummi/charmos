@@ -18,8 +18,8 @@ LOG_HANDLE_EXTERN(slab_flags);
 
 /* ─────────────────────────── ALLOC FLAGS ─────────────────────────── */
 
-#define ALLOC_LOCALITY_SHIFT 9
-#define ALLOC_CLASS_SHIFT 12
+#define ALLOC_LOCALITY_SHIFT 25
+#define ALLOC_CLASS_SHIFT 28
 #define ALLOC_CLASS_MASK 0xF
 
 /* The larger the locality, the closer it must be */
@@ -37,12 +37,15 @@ LOG_HANDLE_EXTERN(slab_flags);
 #define ALLOC_FLAG_CLASS(flags)                                                \
     ((flags >> ALLOC_CLASS_SHIFT) & ALLOC_CLASS_MASK)
 
-/* alloc_flags: 16 bit bitflags
+/* Bits 16..23 are available, this gives the 0-indexed Nth available bit */
+#define ALLOC_FLAG_AVAIL_BIT(n) (1 << (ALLOC_CLASS_SHIFT - 4 + n));
+
+/* alloc_flags: 32 bit bitflags
  *
- *      ┌───────────────────────────┐
- * Bits │ 15..12  11..8  7..4  3..0 │
- * Use  │  %%%%    ###A  A*Zc  MPFC │
- *      └───────────────────────────┘
+ *      ┌───────────────────────────────────────────────────────┐
+ * Bits │ 31..28 27..24 23..20 19..16 15..12  11..8  7..4  3..0 │
+ * Use  │  %%%%   ###*   AAAA   AAAA   ****    ****  **Zc  MPFC │
+ *      └───────────────────────────────────────────────────────┘
  *
  * C - "Prefer cache alignment"
  *
@@ -66,7 +69,7 @@ LOG_HANDLE_EXTERN(slab_flags);
 
 /* Flags define properties regarding
  * the memory the allocator will return */
-enum alloc_flags : uint16_t {
+enum alloc_flags : uint32_t {
     /* Cache alignment */
     ALLOC_FLAG_PREFER_CACHE_ALIGNED = (1 << 0),
     ALLOC_FLAG_NO_CACHE_ALIGN = 0,
@@ -98,7 +101,10 @@ enum alloc_flags : uint16_t {
 };
 
 #define ALLOC_FLAGS_NONE 0
-#define ALLOC_FLAGS_UNAVAILABLE_BITS 0x40
+
+/* Bits 6..15 and 24 */
+#define ALLOC_FLAGS_UNAVAILABLE_BITS ((1 << 24) | (0x3FF << 16))
+
 #define ALLOC_FLAGS_DEFAULT                                                    \
     (ALLOC_FLAG_CLASS_DEFAULT | ALLOC_FLAG_FLEXIBLE_LOCALITY |                 \
      ALLOC_FLAG_NONMOVABLE | ALLOC_FLAG_NONPAGEABLE |                          \
@@ -119,6 +125,7 @@ static inline bool alloc_flags_valid(enum alloc_flags flags) {
 #define ALLOC_BEHAVIOR_FLAG_SHIFT 4
 #define ALLOC_BEHAVIOR_MASK (0xF)
 #define ALLOC_BEHAVIOR_AVAILABLE_SHIFT 12
+#define ALLOC_BEHAVIOR_AVAIL_BIT(n) (1 << (ALLOC_BEHAVIOR_AVAILABLE_SHIFT + n))
 
 /* alloc_behavior: 16 bits for a behavior and flags
  *

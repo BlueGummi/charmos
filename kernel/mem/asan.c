@@ -23,14 +23,21 @@ static inline uint8_t *asan_shadow_for_internal(void *addr) {
 /* Poison/unpoison helpers */
 void asan_poison(void *addr, size_t size) {
     ASAN_ABORT_IF_NOT_READY();
+    uintptr_t a = (uintptr_t) addr;
+    size_t idx = a >> ASAN_SHADOW_SCALE;
+    kassert(idx < asan_shadow_size);
     uint8_t *shadow_start = asan_shadow_for_internal(addr);
     uint8_t *shadow_end = asan_shadow_for_internal((uint8_t *) addr + size - 1);
+
     for (uint8_t *s = shadow_start; s <= shadow_end; s++)
         *s = 0xFF;
 }
 
 void asan_unpoison(void *addr, size_t size) {
     ASAN_ABORT_IF_NOT_READY();
+    uintptr_t a = (uintptr_t) addr;
+    size_t idx = a >> ASAN_SHADOW_SCALE;
+    kassert(idx < asan_shadow_size);
     uint8_t *shadow_start = asan_shadow_for_internal(addr);
     uint8_t *shadow_end = asan_shadow_for_internal((uint8_t *) addr + size - 1);
     for (uint8_t *s = shadow_start; s <= shadow_end; s++)
@@ -177,7 +184,6 @@ void __asan_loadN(const void *addr, size_t size) {
     asan_check_access_core(addr, size, false);
 }
 void __asan_storeN(const void *addr, size_t size) {
-    wait_for_interrupt();
     asan_check_access_core(addr, size, true);
 }
 

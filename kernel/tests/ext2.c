@@ -48,8 +48,7 @@ static void flush() {
     check_bcache();*/
 }
 
-TEST_DECLARE(ext2_stat_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(ext2)) {
+TEST_DECLARE_UNIT(ext2_stat_test, .group = TEST_GROUP(ext2)) {
     EXT2_INIT;
 
     FAIL_IF_FATAL(root->ops->create(root, "ext2_stat_test", VFS_MODE_FILE));
@@ -73,8 +72,7 @@ TEST_DECLARE(ext2_stat_test, .tier = TEST_TIER_UNIT,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(ext2_rename_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(ext2)) {
+TEST_DECLARE_UNIT(ext2_rename_test, .group = TEST_GROUP(ext2)) {
     EXT2_INIT;
 
     FAIL_IF_FATAL(root->ops->create(root, "ext2_rename_test", VFS_MODE_FILE));
@@ -102,8 +100,7 @@ TEST_DECLARE(ext2_rename_test, .tier = TEST_TIER_UNIT,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(ext2_chmod_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(ext2)) {
+TEST_DECLARE_UNIT(ext2_chmod_test, .group = TEST_GROUP(ext2)) {
     EXT2_INIT;
 
     FAIL_IF_FATAL(root->ops->create(root, "ext2_chmod_test", VFS_MODE_FILE));
@@ -129,8 +126,7 @@ TEST_DECLARE(ext2_chmod_test, .tier = TEST_TIER_UNIT,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(ext2_symlink_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(ext2)) {
+TEST_DECLARE_UNIT(ext2_symlink_test, .group = TEST_GROUP(ext2)) {
     EXT2_INIT;
 
     FAIL_IF_FATAL(root->ops->symlink(root, "/tmp", "ext2_symlink_test"));
@@ -154,7 +150,7 @@ TEST_DECLARE(ext2_symlink_test, .tier = TEST_TIER_UNIT,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(ext2_dir_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(ext2)) {
+TEST_DECLARE_UNIT(ext2_dir_test, .group = TEST_GROUP(ext2)) {
     EXT2_INIT;
 
     FAIL_IF_FATAL(root->ops->mkdir(root, "ext2_dir_test", VFS_MODE_DIR));
@@ -173,8 +169,7 @@ TEST_DECLARE(ext2_dir_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(ext2)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(ext2_integration_test, .tier = TEST_TIER_INTEGRATION,
-             .group = TEST_GROUP(ext2)) {
+TEST_DECLARE_INTEGRATION(ext2_integration_test, .group = TEST_GROUP(ext2)) {
     EXT2_INIT;
 
     FAIL_IF_FATAL(

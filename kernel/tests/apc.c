@@ -19,20 +19,27 @@ static void apc_thread(void *) {
 }
 
 static struct thread *ted = NULL;
-TEST_DECLARE(apc_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(apc)) {
-    ted = thread_spawn("apc_test_thread", apc_thread, NULL);
+TEST_DECLARE_UNIT(apc_test, .group = TEST_GROUP(apc)) {
+    ted = thread_spawn_joinable("apc_test_thread", apc_thread, NULL);
     struct apc *a = kmalloc(sizeof(struct apc), ALLOC_FLAGS_ZERO);
-    if (!a || !ted)
-        goto pluh;
+    if (!a || !ted) {
+        /* the thread spins until the APC runs, so there is nothing to
+         * join on if we never get to enqueue it */
+        if (ted)
+            thread_detach(ted);
+
+        kfree(a);
+        return TEST_FAIL("allocation failed");
+    }
 
     apc_init(a, the_apc, NULL);
 
     apc_enqueue(ted, a, APC_TYPE_KERNEL);
 
-    while (!atomic_load(&apc_ran))
-        scheduler_yield();
+    /* the thread only returns once it has seen the APC run */
+    thread_join(ted);
+    TEST_ASSERT(atomic_load(&apc_ran));
 
-pluh:
     return TEST_SUCCESS;
 }
 
@@ -71,10 +78,15 @@ static void apc_event_test_thread(void *) {
 }
 
 static struct thread *ated = NULL;
-TEST_DECLARE(apc_event_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(apc)) {
-    ated = thread_spawn("apc_event_test_thread", apc_event_test_thread, NULL);
-    while (!atomic_load(&event_apc_test_ok))
-        scheduler_yield();
+TEST_DECLARE_UNIT(apc_event_test, .group = TEST_GROUP(apc)) {
+    ated = thread_spawn_joinable("apc_event_test_thread", apc_event_test_thread,
+                                 NULL);
+    TEST_ASSERT(ated);
+
+    /* joining rather than spinning on the ok flag means a failed
+     * TEST_ASSERT_VOID inside the thread reports instead of hanging */
+    thread_join(ated);
+    TEST_ASSERT(atomic_load(&event_apc_test_ok));
 
     return TEST_SUCCESS;
 }

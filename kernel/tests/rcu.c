@@ -69,19 +69,28 @@ static void rcu_writer_thread(void *) {
               old);
 }
 
-TEST_DECLARE(rcu_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(rcu)) {
+TEST_DECLARE_UNIT(rcu_test, .group = TEST_GROUP(rcu)) {
     struct rcu_test_data *initial = kmalloc(sizeof(*initial), ALLOC_FLAGS_ZERO);
     initial->value = 42;
     shared_ptr = initial;
 
+    struct thread *readers[NUM_RCU_READERS];
     for (uint64_t i = 0; i < NUM_RCU_READERS; i++)
-        thread_spawn("rcu_reader_test", rcu_reader_thread, NULL);
+        readers[i] =
+            thread_spawn_joinable("rcu_reader_test", rcu_reader_thread, NULL);
 
-    thread_spawn("rcu_writer_test", rcu_writer_thread, NULL);
+    struct thread *writer =
+        thread_spawn_joinable("rcu_writer_test", rcu_writer_thread, NULL);
 
-    while (atomic_load(&rcu_reads_done) < NUM_RCU_READERS) {
-        scheduler_yield();
+    for (uint64_t i = 0; i < NUM_RCU_READERS; i++) {
+        if (readers[i])
+            thread_join(readers[i]);
     }
+
+    if (writer)
+        thread_join(writer);
+
+    TEST_ASSERT(atomic_load(&rcu_reads_done) == NUM_RCU_READERS);
 
     for (int i = 0; i < 100 && !atomic_load(&rcu_deferred_freed); i++)
         sleep_spin_ms(1);
@@ -234,8 +243,8 @@ static void rcu_stress_reclaimer(void *arg) {
 }
 
 /* Test registration */
-TEST_DECLARE(rcu_stress_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(rcu),
-             .print_logs = true, ) {
+TEST_DECLARE_UNIT(rcu_stress_test, .group = TEST_GROUP(rcu),
+                  .print_logs = true, ) {
     /* initial object */
     struct rcu_stress_node *initial =
         kmalloc(sizeof(*initial), ALLOC_FLAGS_ZERO);
@@ -251,18 +260,24 @@ TEST_DECLARE(rcu_stress_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(rcu),
     atomic_store(&stress_replacements, 0);
     stress_shared = initial;
 
+    struct thread *readers[STRESS_NUM_READERS];
+    struct thread *writers[STRESS_NUM_WRITERS];
+
     /* spawn readers (more than cores) */
     for (uint32_t i = 0; i < STRESS_NUM_READERS; ++i) {
-        thread_spawn("rcu_stread_%u", rcu_stress_reader, NULL, i);
+        readers[i] =
+            thread_spawn_joinable("rcu_stread_%u", rcu_stress_reader, NULL, i);
     }
 
     /* spawn writers */
     for (uint32_t i = 0; i < STRESS_NUM_WRITERS; ++i) {
-        thread_spawn("rcu_strite_%u", rcu_stress_writer, NULL, i);
+        writers[i] =
+            thread_spawn_joinable("rcu_strite_%u", rcu_stress_writer, NULL, i);
     }
 
     /* spawn one reclaimer to periodically call synchronize */
-    thread_spawn("rcu_streclaim", rcu_stress_reclaimer, NULL);
+    struct thread *reclaimer =
+        thread_spawn_joinable("rcu_streclaim", rcu_stress_reclaimer, NULL);
 
     /* run for the configured duration */
     uint64_t stop_at = time_get_ms() + STRESS_DURATION_MS;
@@ -278,14 +293,19 @@ TEST_DECLARE(rcu_stress_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(rcu),
     /* signal stop to all readers/writers/reclaimer */
     atomic_store(&stress_stop, true);
 
-    /* wait for readers to finish */
-    while (atomic_load(&stress_readers_done) < STRESS_NUM_READERS) {
-        scheduler_yield();
+    /* wait for readers, writers and the reclaimer to finish */
+    for (uint32_t i = 0; i < STRESS_NUM_READERS; ++i) {
+        if (readers[i])
+            thread_join(readers[i]);
     }
 
-    while (atomic_load(&stress_writers_done) < STRESS_NUM_WRITERS) {
-        scheduler_yield();
+    for (uint32_t i = 0; i < STRESS_NUM_WRITERS; ++i) {
+        if (writers[i])
+            thread_join(writers[i]);
     }
+
+    if (reclaimer)
+        thread_join(reclaimer);
 
     /* wait up to a reasonable timeout for deferred frees to run */
     for (int i = 0; i < 100 && atomic_load(&stress_deferred_freed) <

@@ -21,7 +21,6 @@ static void slab_shrink(struct slab *slab, size_t start, size_t end,
         if (!page)
             return;
 
-        printf("SHRINK!\n");
         paddr_t phys = page_get_paddr(page);
         vaddr_t virt = (vaddr_t) slab + i * PAGE_SIZE;
         vmm_unmap_page(virt);

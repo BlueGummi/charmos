@@ -154,6 +154,9 @@ struct test_verdict {
     const char *msg; /* optional, e.g. the failed assertion  */
 };
 
+#define TEST_EXIT_OK 0
+#define TEST_EXIT_FAIL 1
+
 struct test_globals {
     size_t results[TEST_TIER_MAX][TEST_RESULT_MAX];
     size_t results_agg[TEST_RESULT_MAX];
@@ -162,6 +165,7 @@ struct test_globals {
     bool show_output;
     bool group_opt_in;
     bool test_opt_in;
+    bool no_exit;
 };
 
 #define TEST(id) __test_##id
@@ -170,9 +174,10 @@ struct test_globals {
     extern struct test __test_##id;                                            \
     CMDLINE_ENTRY_DECLARE(test_##id, .name = #id,                              \
                           .flags = CMDLINE_ENTRY_SYMBOLIC);                    \
-    CMDLINE_ENTRY_DECLARE_TYPED(                                               \
-        test_##id##_enabled, __test_##id.enabled, .name = "enabled",           \
-        .parent = CMDLINE_ENTRY(test_##id), .private = &__test_##id);          \
+    CMDLINE_ENTRY_DECLARE_TYPED_CUSTOM(                                        \
+        test_##id##_enabled, __test_##id.enabled, cmdline_parse_bool,          \
+        .name = "enabled", .parent = CMDLINE_ENTRY(test_##id),                 \
+        .private = &__test_##id);                                              \
     CMDLINE_ENTRY_DECLARE_TYPED(                                               \
         test_##id##_intensity, __test_##id.intensity, .name = "intensity",     \
         .parent = CMDLINE_ENTRY(test_##id), .private = &__test_##id);          \
@@ -213,6 +218,13 @@ struct test_globals {
                                                                                \
     static struct test_verdict id(struct test_context *ctx __unused)
 
+#define TEST_DECLARE_SMOKE(id, ...)                                            \
+    TEST_DECLARE(id, .tier = TEST_TIER_SMOKE, ##__VA_ARGS__)
+#define TEST_DECLARE_UNIT(id, ...)                                             \
+    TEST_DECLARE(id, .tier = TEST_TIER_UNIT, ##__VA_ARGS__)
+#define TEST_DECLARE_INTEGRATION(id, ...)                                      \
+    TEST_DECLARE(id, .tier = TEST_TIER_INTEGRATION, ##__VA_ARGS__)
+
 #define TEST_CMDLINE_ENTRY_DECLARE(id, var, n)                                 \
     CMDLINE_ENTRY_DECLARE_TYPED(test_##id##_##n, var, .name = #n,              \
                                 .parent = CMDLINE_ENTRY(test_##id),            \
@@ -223,10 +235,11 @@ struct test_globals {
     CMDLINE_ENTRY_DECLARE(test_group_##n, .name = #n,                          \
                           .parent = CMDLINE_ENTRY(test_root),                  \
                           .flags = CMDLINE_ENTRY_SYMBOLIC);                    \
-    CMDLINE_ENTRY_DECLARE_TYPED(test_group_##n##_enabled,                      \
-                                __test_group_##n.enabled, .name = "enabled",   \
-                                .parent = CMDLINE_ENTRY(test_group_##n),       \
-                                .private = &__test_group_##n);                 \
+    CMDLINE_ENTRY_DECLARE_TYPED_CUSTOM(                                        \
+        test_group_##n##_enabled, __test_group_##n.enabled,                    \
+        cmdline_parse_bool, .name = "enabled",                                 \
+        .parent = CMDLINE_ENTRY(test_group_##n),                               \
+        .private = &__test_group_##n);                                         \
     CMDLINE_ENTRY_DECLARE_TYPED(                                               \
         test_group_##n##_incremental, __test_group_##n.incremental,            \
         .name = "incremental", .parent = CMDLINE_ENTRY(test_group_##n),        \
@@ -305,6 +318,15 @@ static inline const char *test_tier_to_str(enum test_tier tier) {
     case TEST_TIER_SMOKE: return "smoke";
     case TEST_TIER_UNIT: return "unit";
     case TEST_TIER_INTEGRATION: return "integration";
+    default: kassert_unreachable();
+    }
+}
+
+static inline const char *test_tier_to_str_color(enum test_tier tier) {
+    switch (tier) {
+    case TEST_TIER_SMOKE: return ANSI_GRAY "smoke";
+    case TEST_TIER_UNIT: return ANSI_MAGENTA "unit";
+    case TEST_TIER_INTEGRATION: return ANSI_YELLOW "integration";
     default: kassert_unreachable();
     }
 }

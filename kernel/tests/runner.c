@@ -43,6 +43,12 @@ CMDLINE_ENTRY_DECLARE_TYPED(test_show_output, test_global.show_output,
                             .name = "show_output",
                             .parent = CMDLINE_ENTRY(test_root));
 
+CMDLINE_ENTRY_DECLARE_TYPED(
+    test_no_exit, test_global.no_exit, .name = "no_exit",
+    .parent = CMDLINE_ENTRY(test_root), .arg = CMDLINE_ENTRY_TYPE_TO_ARG(bool),
+    .desc = "Idle after the suite completes instead of asking QEMU to exit",
+    .flags = CMDLINE_ENTRY_DOCUMENTED);
+
 LOG_SITE_DECLARE_DEFAULT(test_harness);
 LOG_HANDLE_DECLARE_DEFAULT(test_harness, .flags = LOG_PRINT | LOG_NO_NEWLINE);
 
@@ -196,7 +202,7 @@ static void test_group_run(struct test_group *tg) {
         if (!tg->num_tests[i])
             continue;
 
-        const char *tier_name = test_tier_to_str(i);
+        const char *tier_name = test_tier_to_str_color(i);
         size_t len = snprintf(NULL, 0,
                               "%s " ANSI_RESET "(" ANSI_BOLD ANSI_MAGENTA
                               "%s" ANSI_RESET ")" ANSI_GREEN,
@@ -297,6 +303,8 @@ static void test_group_run(struct test_group *tg) {
                         if (v.result == TEST_RESULT_SKIPPED) {
                             printf(ANSI_GRAY " (%s)" ANSI_RESET,
                                    test_skip_reason_to_str(v.skip_reason));
+                        } else if (v.msg) {
+                            printf(ANSI_RED " (%s)" ANSI_RESET, v.msg);
                         }
                         printf("\n");
                     }
@@ -324,8 +332,12 @@ static void test_group_run(struct test_group *tg) {
                        color, status, took);
                 if (singular_verdict.result == TEST_RESULT_SKIPPED)
                     printf(
-                        " (reason: " ANSI_YELLOW "%s" ANSI_RESET ")",
+                        " (reason: " ANSI_GRAY "%s" ANSI_RESET ")",
                         test_skip_reason_to_str(singular_verdict.skip_reason));
+                else if (singular_verdict.result == TEST_RESULT_FAILED &&
+                         singular_verdict.msg)
+                    printf(" (" ANSI_RED "%s" ANSI_RESET ")",
+                           singular_verdict.msg);
 
                 printf("\n");
             }
@@ -430,5 +442,8 @@ void tests_run(void) {
 
     test_harness_info("%s%s" ANSI_RESET " (%llu ms)\n", color, msg, total_time);
 
+    /* Give it the return address */
+    if (!test_global.no_exit)
+        qemu_exit(all_ok ? TEST_EXIT_OK : TEST_EXIT_FAIL);
 #endif
 }

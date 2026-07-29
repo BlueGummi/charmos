@@ -32,7 +32,7 @@ enum thread_wait_type : uint8_t {
  *
  *      ┌───────────────────────────────────────────────────────────┐
  * Bits │ 31..28  27..24  23..20  19..16  15..12  11..8  7..4  3..0 │
- * Use  │  AAAA    ****    ****    ****    ****    ****  *RWY  DEFP │
+ * Use  │  AAAA    ****    ****    ****    ****    ***J  jRWY  DEFP │
  *      └───────────────────────────────────────────────────────────┘
  * P - Pinned - Thread is pinned to current CPU
  * F - Flexible RT - realtime scheduler related stuff
@@ -41,6 +41,8 @@ enum thread_wait_type : uint8_t {
  * Y - Yielded after a wait (block, sleep)
  * W - Wake matched
  * r - Realtime fault tolerance
+ * j - Joinable - someone holds a join reference on this thread
+ * J - Joined - a join is in progress or consumed the join reference
  * A - Unused (Available)
  * * - Unused (Unavailable)
  *
@@ -53,6 +55,8 @@ enum thread_flags : uint32_t {
     THREAD_FLAG_YIELDED = 1 << 4,
     THREAD_FLAG_WAKE_MATCHED = 1 << 5,
     THREAD_FLAG_RT_FAULT_TOLERANCE = 1 << 6,
+    THREAD_FLAG_JOINABLE = 1 << 7,
+    THREAD_FLAG_JOINED = 1 << 8,
 };
 
 enum thread_prio_class : uint8_t {

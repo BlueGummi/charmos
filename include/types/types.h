@@ -13,6 +13,7 @@ typedef uint32_t inode_t;
 typedef uint16_t mode_t;
 typedef uint32_t gid_t;
 typedef uint32_t uid_t;
+typedef struct stack_depot_record *stack_handle_t;
 typedef _Atomic uint32_t refcount_t;
 typedef _Atomic uint32_t mapcount_t;
 typedef uintptr_t paddr_t;
@@ -48,6 +49,9 @@ typedef __uint128_t uint128_t;
 
 #define UID_MAX UINT32_MAX
 #define UID_MIN 0
+
+#define STACK_HANDLE_MAX UINT32_MAX
+#define STACK_HANDLE_MIN 0
 
 #define REFCOUNT_MAX UINT32_MAX
 #define REFCOUNT_MIN 0
@@ -88,5 +92,6 @@ typedef __uint128_t uint128_t;
 
 #define INT128_MAX ((int128_t) (int128_t) (~((uint128_t) 0ULL >> 1)))
 #define INT128_MIN ((int128_t) (-INT128_MAX - 1))
+
 #define UINT128_MAX ((uint128_t) (~((uint128_t) 0ULL)))
 #define UINT128_MIN ((uint128_t) 0ULL)

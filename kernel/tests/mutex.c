@@ -15,8 +15,7 @@ TEST_GROUP_DECLARE(mutex);
 
 static struct mutex basic_test_mtx = MUTEX_INIT;
 
-TEST_DECLARE(mutex_test_basic, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mutex)) {
+TEST_DECLARE_UNIT(mutex_test_basic, .group = TEST_GROUP(mutex)) {
     mutex_lock(&basic_test_mtx);
     scheduler_yield();
     mutex_unlock(&basic_test_mtx);
@@ -39,16 +38,23 @@ static void many_worker(void *) {
     atomic_fetch_sub(&many_waiter_done, 1);
 }
 
-TEST_DECLARE(mutex_many_waiters, .tier = TEST_TIER_INTEGRATION,
-             .group = TEST_GROUP(mutex)) {
+TEST_DECLARE_INTEGRATION(mutex_many_waiters, .group = TEST_GROUP(mutex)) {
+    struct thread *workers[MUTEX_MANY_WAITER_TEST_WAITER_COUNT];
+
     for (int i = 0; i < MUTEX_MANY_WAITER_TEST_WAITER_COUNT; i++) {
         struct thread *t = thread_create("mw", many_worker, NULL);
+        TEST_ASSERT(t);
+
         t->flags |= THREAD_FLAG_PINNED;
+        thread_set_joinable(t);
         thread_enqueue(t);
+        workers[i] = t;
     }
 
-    while (atomic_load(&many_waiter_done))
-        scheduler_yield();
+    for (int i = 0; i < MUTEX_MANY_WAITER_TEST_WAITER_COUNT; i++)
+        thread_join(workers[i]);
+
+    TEST_ASSERT(atomic_load(&many_waiter_done) == 0);
 
     return TEST_SUCCESS;
 }
@@ -76,16 +82,19 @@ static void chaos(void *) {
 }
 
 volatile struct thread *main_thread = NULL;
-volatile struct thread *other_threads[CHAOS_THREAD_COUNT] = {0};
+struct thread *other_threads[CHAOS_THREAD_COUNT] = {0};
 
-TEST_DECLARE(mutex_chaos, .tier = TEST_TIER_INTEGRATION,
-             .group = TEST_GROUP(mutex)) {
+TEST_DECLARE_INTEGRATION(mutex_chaos, .group = TEST_GROUP(mutex)) {
     main_thread = thread_get_current();
-    for (int i = 0; i < CHAOS_THREAD_COUNT; i++)
-        other_threads[i] = thread_spawn("ch", chaos, NULL);
+    for (int i = 0; i < CHAOS_THREAD_COUNT; i++) {
+        other_threads[i] = thread_spawn_joinable("ch", chaos, NULL);
+        TEST_ASSERT(other_threads[i]);
+    }
 
-    while (atomic_load(&chaos_left))
-        scheduler_yield();
+    for (int i = 0; i < CHAOS_THREAD_COUNT; i++)
+        thread_join(other_threads[i]);
+
+    TEST_ASSERT(atomic_load(&chaos_left) == 0);
 
     return TEST_SUCCESS;
 }
@@ -141,8 +150,7 @@ static void pi_ts_thread(void *nothing) {
     test_info("exiting");
 }
 
-TEST_DECLARE(mutex_pi_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mutex)) {
+TEST_DECLARE_UNIT(mutex_pi_test, .group = TEST_GROUP(mutex)) {
     if (global.core_count == 1) {
         return TEST_SKIP(TEST_SKIP_NONE);
     }
@@ -158,15 +166,25 @@ TEST_DECLARE(mutex_pi_test, .tier = TEST_TIER_UNIT,
     pi_ts->flags |= THREAD_FLAG_PINNED;
     pi_rt->flags |= THREAD_FLAG_PINNED;
 
+    thread_set_joinable(pi_ts);
+    thread_set_joinable(pi_rt);
+    thread_set_joinable(pi_dum);
+
     thread_enqueue_on_core(pi_ts, cpu);
+
+    /* rendezvous, not a join: ts has to own the mutex before rt asks for it */
     while (!atomic_load(&pi_ts_got))
         scheduler_yield();
 
     thread_enqueue_on_core(pi_dum, cpu);
     thread_enqueue_on_core(pi_rt, cpu);
 
-    while (atomic_load(&pi_done) < 3)
-        scheduler_yield();
+    /* pi_done is still what pi_dummy waits on, so it stays */
+    thread_join(pi_ts);
+    thread_join(pi_rt);
+    thread_join(pi_dum);
+
+    TEST_ASSERT(atomic_load(&pi_done) == 3);
 
     return TEST_SUCCESS;
 }
@@ -222,8 +240,7 @@ static void pi_chain_rt(void *arg) {
     atomic_fetch_add(&pi_chain_done, 1);
 }
 
-TEST_DECLARE(mutex_pi_chain, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mutex)) {
+TEST_DECLARE_UNIT(mutex_pi_chain, .group = TEST_GROUP(mutex)) {
     if (global.core_count < 2) {
         return TEST_SKIP(TEST_SKIP_NONE);
     }
@@ -240,6 +257,10 @@ TEST_DECLARE(mutex_pi_chain, .tier = TEST_TIER_UNIT,
     pi_ts2->flags |= THREAD_FLAG_PINNED;
     pi_rt2->flags |= THREAD_FLAG_PINNED;
 
+    thread_set_joinable(pi_ts2);
+    thread_set_joinable(pi_ts1);
+    thread_set_joinable(pi_rt2);
+
     thread_enqueue_on_core(pi_ts2, cpu);
     while (!atomic_load(&ts2_grabbed_b))
         scheduler_yield();
@@ -252,8 +273,11 @@ TEST_DECLARE(mutex_pi_chain, .tier = TEST_TIER_UNIT,
 
     thread_enqueue_on_core(pi_rt2, cpu);
 
-    while (atomic_load(&pi_chain_done) < 3)
-        scheduler_yield();
+    thread_join(pi_ts2);
+    thread_join(pi_ts1);
+    thread_join(pi_rt2);
+
+    TEST_ASSERT(atomic_load(&pi_chain_done) == 3);
 
     return TEST_SUCCESS;
 }
@@ -284,8 +308,7 @@ static void pi_multi_rt(void *arg) {
     atomic_fetch_add(&pi_multi_done, 1);
 }
 
-TEST_DECLARE(mutex_pi_multi_waiters, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mutex)) {
+TEST_DECLARE_UNIT(mutex_pi_multi_waiters, .group = TEST_GROUP(mutex)) {
     cpu_id_t cpu = 1;
 
     struct thread *ts = thread_create("pi_ts", pi_multi_ts, NULL);
@@ -299,6 +322,10 @@ TEST_DECLARE(mutex_pi_multi_waiters, .tier = TEST_TIER_UNIT,
     rt1->flags |= THREAD_FLAG_PINNED;
     rt2->flags |= THREAD_FLAG_PINNED;
 
+    thread_set_joinable(ts);
+    thread_set_joinable(rt1);
+    thread_set_joinable(rt2);
+
     thread_enqueue_on_core(ts, cpu);
     while (!atomic_load(&ts_got))
         scheduler_yield();
@@ -306,8 +333,11 @@ TEST_DECLARE(mutex_pi_multi_waiters, .tier = TEST_TIER_UNIT,
     thread_enqueue_on_core(rt1, cpu);
     thread_enqueue_on_core(rt2, cpu);
 
-    while (atomic_load(&pi_multi_done) < 3)
-        scheduler_yield();
+    thread_join(ts);
+    thread_join(rt1);
+    thread_join(rt2);
+
+    TEST_ASSERT(atomic_load(&pi_multi_done) == 3);
 
     return TEST_SUCCESS;
 }
@@ -342,8 +372,7 @@ static void pi_revert_rt(void *arg) {
     atomic_fetch_add(&pi_reverted_done, 1);
 }
 
-TEST_DECLARE(mutex_pi_revert, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mutex)) {
+TEST_DECLARE_UNIT(mutex_pi_revert, .group = TEST_GROUP(mutex)) {
     cpu_id_t cpu = 1;
 
     struct thread *ts = thread_create("pi_ts", pi_revert_ts, NULL);
@@ -354,6 +383,9 @@ TEST_DECLARE(mutex_pi_revert, .tier = TEST_TIER_UNIT,
     ts->flags |= THREAD_FLAG_PINNED;
     rt->flags |= THREAD_FLAG_PINNED;
 
+    thread_set_joinable(ts);
+    thread_set_joinable(rt);
+
     thread_enqueue_on_core(ts, cpu);
 
     while (!atomic_load(&pi_revert_got))
@@ -361,8 +393,12 @@ TEST_DECLARE(mutex_pi_revert, .tier = TEST_TIER_UNIT,
 
     thread_enqueue_on_core(rt, cpu);
 
-    while (!atomic_load(&pi_reverted) || atomic_load(&pi_reverted_done) < 2)
-        scheduler_yield();
+    thread_join(ts);
+    thread_join(rt);
+
+    /* ts only exits after it has observed the boost drop back off */
+    TEST_ASSERT(atomic_load(&pi_reverted));
+    TEST_ASSERT(atomic_load(&pi_reverted_done) == 2);
 
     return TEST_SUCCESS;
 }

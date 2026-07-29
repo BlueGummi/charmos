@@ -269,6 +269,11 @@ struct thread {
     struct spinlock lock;
     refcount_t refcount;
 
+    /* Join */
+    struct spinlock join_lock; /* guards exit_status + the ZOMBIE publish */
+    struct condvar join_cv;    /* joiners wait here */
+    int exit_status;
+
     /* For condvar */
     volatile enum wake_reason wake_reason;
     size_t wait_cookie;
@@ -419,6 +424,12 @@ bool thread_inherit_priority(struct thread *boosted, struct thread *from,
 
 void thread_uninherit_priority(enum thread_prio_class class);
 void thread_remove_boost();
+
+void thread_exit_with_status(int status);
+
+int thread_join(struct thread *t);
+bool thread_join_timeout(struct thread *t, time_t timeout_ms, int *status_out);
+void thread_detach(struct thread *t);
 
 void thread_lock_two_runqueues(struct thread *a, struct thread *b,
                                struct scheduler **out_rq_a,
@@ -588,6 +599,64 @@ static inline struct thread *thread_spawn_on_core(char *name,
         thread_create_internal(name, entry, arg, THREAD_STACK_SIZE, args);
     va_end(args);
 
+    thread_enqueue_on_core(t, core_id);
+    return t;
+}
+
+/* Must be called before the thread can run: taking the join reference
+ * relies on THREAD_FLAG_DYING not being observable yet. */
+static inline void thread_set_joinable(struct thread *t) {
+    kassert(!(thread_get_flags(t) & THREAD_FLAG_JOINABLE));
+    kassert(refcount_inc(&t->refcount));
+    thread_or_flags(t, THREAD_FLAG_JOINABLE);
+}
+
+static inline struct thread *
+thread_spawn_joinable(char *name, void (*entry)(void *), void *arg, ...) {
+    va_list args;
+    va_start(args, arg);
+    struct thread *t =
+        thread_create_internal(name, entry, arg, THREAD_STACK_SIZE, args);
+    va_end(args);
+
+    if (unlikely(!t))
+        return NULL;
+
+    thread_set_joinable(t);
+    thread_enqueue(t);
+    return t;
+}
+
+static inline struct thread *
+thread_spawn_joinable_custom_stack(char *name, void (*entry)(void *), void *arg,
+                                   size_t stack_size, ...) {
+    va_list args;
+    va_start(args, stack_size);
+    struct thread *t =
+        thread_create_internal(name, entry, arg, stack_size, args);
+    va_end(args);
+
+    if (unlikely(!t))
+        return NULL;
+
+    thread_set_joinable(t);
+    thread_enqueue(t);
+    return t;
+}
+
+static inline struct thread *
+thread_spawn_joinable_on_core(char *name, void (*entry)(void *), void *arg,
+                              uint64_t core_id, ...) {
+    va_list args;
+    va_start(args, core_id);
+    struct thread *t =
+        thread_create_internal(name, entry, arg, THREAD_STACK_SIZE, args);
+    va_end(args);
+
+    if (unlikely(!t))
+        return NULL;
+
+    thread_set_joinable(t);
     thread_enqueue_on_core(t, core_id);
     return t;
 }

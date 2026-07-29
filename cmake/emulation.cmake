@@ -3,7 +3,7 @@ option(QEMU_IOMMU       "Attach intel-iommu device with intremap"         ON)
 option(QEMU_NUMA        "Configure 4-node NUMA topology"                  ON)
 option(QEMU_USB         "Attach xHCI controller with USB kbd/mouse"       ON)
 option(QEMU_NVME        "Attach NVMe drive backed by disk.img"            ON)
-option(QEMU_DEBUG_EXIT  "Attach isa-debug-exit for test harness"          ON)
+option(QEMU_DEBUG_EXIT  "Attach isa-debug-exit to the tests target"       ON)
 option(QEMU_GDB_WAIT    "Halt at startup waiting for gdb (-S)"            OFF)
 option(QEMU_TRACE       "Trace events into trace.log"                      ON)
 option(QEMU_LOAD_ACPI   "Load custom ACPI tables from build/acpi/"        OFF)
@@ -103,8 +103,9 @@ if(QEMU_NVME)
     )
 endif()
 
+set(QEMU_DEBUG_EXIT_FLAGS)
 if(QEMU_DEBUG_EXIT)
-    list(APPEND QEMU_FLAGS -device isa-debug-exit,iobase=0xf4,iosize=0x04)
+    set(QEMU_DEBUG_EXIT_FLAGS -device isa-debug-exit,iobase=0xf4,iosize=0x04)
 endif()
 
 if(QEMU_TRACE)
@@ -147,11 +148,19 @@ add_custom_target(pristine-disk DEPENDS ${DISK_PRISTINE})
 
 function(register_run_target tgt)
     set(extra_args ${ARGN})
+    set(debug_exit 0)
+    if("DEBUG_EXIT" IN_LIST extra_args)
+        list(REMOVE_ITEM extra_args DEBUG_EXIT)
+        set(debug_exit 1)
+        list(APPEND extra_args ${QEMU_DEBUG_EXIT_FLAGS})
+    endif()
+
     add_custom_target(${tgt}
         DEPENDS iso pristine-disk
         COMMAND ${CMAKE_COMMAND} -E copy ${DISK_PRISTINE} ${DISK_RUNTIME}
-        COMMAND qemu-system-${ARCH} ${QEMU_FLAGS} ${extra_args}
-                2>&1 | tee ${CMAKE_BINARY_DIR}/output.log
+        COMMAND ${CMAKE_SOURCE_DIR}/scripts/run_qemu.sh
+                ${CMAKE_BINARY_DIR}/output.log ${debug_exit}
+                qemu-system-${ARCH} ${QEMU_FLAGS} ${extra_args}
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         USES_TERMINAL
     )
@@ -159,5 +168,5 @@ endfunction()
 
 register_run_target(run      -serial stdio -no-shutdown -no-reboot)
 register_run_target(headless -nographic    -no-shutdown -no-reboot)
-register_run_target(tests    -nographic)
+register_run_target(tests    DEBUG_EXIT -nographic)
 register_run_target(debug    -S -serial stdio -no-shutdown -no-reboot)

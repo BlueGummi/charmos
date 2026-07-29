@@ -30,8 +30,7 @@ static void bio_callback(struct bio_request *req) {
     test_info("blkdev_bio callback succeeded");
 }
 
-TEST_DECLARE(blkdev_bio_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(bio)) {
+TEST_DECLARE_UNIT(blkdev_bio_test, .group = TEST_GROUP(bio)) {
     EXT2_INIT;
     struct ext2_fs *fs = root->fs_data;
     struct block_device *d = fs->drive;

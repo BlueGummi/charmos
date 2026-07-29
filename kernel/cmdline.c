@@ -40,7 +40,7 @@ static enum errno cmdline_parse_ulong(const char *text, uint64_t *out) {
 }
 
 #define CMDLINE_DEFINE_UINT_PARSER(fn, ctype, cmax)                            \
-    static enum errno fn(void *write_to, const char *text) {                   \
+    enum errno fn(void *write_to, const char *text) {                          \
         uint64_t v;                                                            \
         enum errno err = cmdline_parse_ulong(text, &v);                        \
         if (err != ERR_OK)                                                     \
@@ -52,7 +52,7 @@ static enum errno cmdline_parse_ulong(const char *text, uint64_t *out) {
     }
 
 #define CMDLINE_DEFINE_INT_PARSER(fn, ctype, cmin, cmax)                       \
-    static enum errno fn(void *write_to, const char *text) {                   \
+    enum errno fn(void *write_to, const char *text) {                          \
         long v;                                                                \
         enum errno err = cmdline_parse_long(text, &v);                         \
         if (err != ERR_OK)                                                     \
@@ -70,30 +70,30 @@ CMDLINE_DEFINE_INT_PARSER(cmdline_parse_i8, int8_t, INT8_MIN, INT8_MAX)
 CMDLINE_DEFINE_INT_PARSER(cmdline_parse_i16, int16_t, INT16_MIN, INT16_MAX)
 CMDLINE_DEFINE_INT_PARSER(cmdline_parse_i32, int32_t, INT32_MIN, INT32_MAX)
 
-static enum errno cmdline_parse_i64(void *write_to, const char *text) {
+enum errno cmdline_parse_i64(void *write_to, const char *text) {
     return cmdline_parse_long(text, (long *) write_to);
 }
 
 /* u64 uses strtoull, so a full 64-bit value (e.g. a hex seed above INT64_MAX)
  * round-trips correctly. */
-static enum errno cmdline_parse_u64(void *write_to, const char *text) {
+enum errno cmdline_parse_u64(void *write_to, const char *text) {
     return cmdline_parse_ulong(text, (uint64_t *) write_to);
 }
 
-static enum errno cmdline_parse_bool(void *write_to, const char *text) {
+enum errno cmdline_parse_bool(void *write_to, const char *text) {
     *(bool *) write_to = cmdline_is_enabled(text);
 
     return ERR_OK;
 }
 
-static enum errno cmdline_parse_float(void *write_to, const char *text) {
+enum errno cmdline_parse_float(void *write_to, const char *text) {
     (void) write_to;
     panic("cmdline: floating-point values are unsupported (kernel builds "
           "without FP), got '%s'",
           text);
 }
 
-static enum errno cmdline_parse_unsupported(void *write_to, const char *text) {
+enum errno cmdline_parse_unsupported(void *write_to, const char *text) {
     (void) write_to;
     panic("cmdline: no parser for the requested type (value '%s')", text);
 }

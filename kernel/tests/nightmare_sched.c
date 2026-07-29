@@ -48,20 +48,15 @@ NIGHTMARE_IMPL_START(thread_spawn_smoke) {
     struct nightmare_thread_group grp;
     nightmare_spawn_roles(SELF, &grp);
 
-    /* Wait until every worker has incremented once */
     time_t timeout = SELF->default_runtime_ms;
 
-    while (atomic_load(counter) < nthreads) {
-        NIGHTMARE_PROGRESS();
+    /* Join worker threads. Each one increments the counter before it
+     * returns, so the join is also the wait for the counter */
+    if (!nightmare_join_roles(&grp, timeout))
+        NIGHTMARE_RETURN_ERROR(NIGHTMARE_ERR_FAIL);
 
-        if (nightmare_watchdog_expired(SELF->watchdog, timeout))
-            NIGHTMARE_RETURN_ERROR(NIGHTMARE_ERR_FAIL);
-
-        scheduler_yield();
-    }
-
-    /* Join worker threads */
-    nightmare_join_roles(&grp);
+    if (atomic_load(counter) < nthreads)
+        NIGHTMARE_RETURN_ERROR(NIGHTMARE_ERR_FAIL);
 
     NIGHTMARE_RETURN_ERROR(NIGHTMARE_ERR_OK);
 }

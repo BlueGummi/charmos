@@ -21,8 +21,7 @@ static void workqueue_fn(void *arg, void *unused) {
     atomic_fetch_add(&workqueue_times, 1);
 }
 
-TEST_DECLARE(workqueue_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(sched)) {
+TEST_DECLARE_UNIT(workqueue_test, .group = TEST_GROUP(sched)) {
     uint64_t tsc = rdtsc();
     uint64_t times = 256;
 
@@ -60,8 +59,7 @@ static void sleepy_entry(void *) {
     thread_print(thread_get_current());
 }
 
-TEST_DECLARE(sched_sleepy_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(sched)) {
+TEST_DECLARE_UNIT(sched_sleepy_test, .group = TEST_GROUP(sched)) {
     thread_spawn("sched_sleepy_test", sleepy_entry, NULL);
     return TEST_SUCCESS;
 }
@@ -92,8 +90,7 @@ static void enqueue_thread(void *) {
     atomic_fetch_sub(&threads_left, 1);
 }
 
-TEST_DECLARE(workqueue_test_2, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(sched)) {
+TEST_DECLARE_UNIT(workqueue_test_2, .group = TEST_GROUP(sched)) {
     struct cpu_mask mask;
     alloc_or_die(cpu_mask_init(&mask, global.core_count));
 
@@ -112,16 +109,20 @@ TEST_DECLARE(workqueue_test_2, .tier = TEST_TIER_UNIT,
 
     wq = workqueue_create(NULL, &attrs);
 
+    struct thread *enqueuers[WQ_2_THREADS];
     for (size_t i = 0; i < WQ_2_THREADS; i++) {
         test_info("spawning workqueue enqueue threads");
-        thread_spawn("workqueue_enqueue_thread", enqueue_thread, NULL);
+        enqueuers[i] = thread_spawn_joinable("workqueue_enqueue_thread",
+                                             enqueue_thread, NULL);
     }
 
-    test_info("yielding");
-    thread_apply_cpu_penalty(thread_get_current());
-    while (atomic_load(&threads_left) > 0) {
-        scheduler_yield();
+    test_info("waiting for enqueue threads");
+    for (size_t i = 0; i < WQ_2_THREADS; i++) {
+        if (enqueuers[i])
+            thread_join(enqueuers[i]);
     }
+
+    TEST_ASSERT(atomic_load(&threads_left) == 0);
 
     uint64_t workers = wq->num_workers;
 
@@ -143,7 +144,7 @@ static enum daemon_thread_command daemon_work(void *a, void *b) {
 static struct daemon_work dwork =
     DAEMON_WORK_FROM(daemon_work, WORK_ARGS(NULL, NULL));
 
-TEST_DECLARE(daemon_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(sched)) {
+TEST_DECLARE_UNIT(daemon_test, .group = TEST_GROUP(sched)) {
     struct cpu_mask cmask;
     cpu_mask_init(&cmask, global.core_count);
     cpu_mask_set_all(&cmask);
@@ -206,18 +207,26 @@ static void waking_thread(void *) {
                 si_t->perceived_prio_class, (void *) 4);
 }
 
-TEST_DECLARE(thread_sleep_interruptible_test, .tier = TEST_TIER_INTEGRATION,
-             .group = TEST_GROUP(sched)) {
+TEST_DECLARE_INTEGRATION(thread_sleep_interruptible_test,
+                         .group = TEST_GROUP(sched)) {
     if (global.core_count < 4) {
         test_info("too few cores");
         return TEST_SKIP(TEST_SKIP_NONE);
     }
 
-    si_t = thread_spawn_on_core("si_thread", sleeping_thread, NULL, 1);
-    thread_spawn_on_core("si_wake", waking_thread, NULL, 2);
-    thread_spawn_on_core("si_apc_e", apc_enqueue_thread, NULL, 3);
-    while (!atomic_load(&si_ok))
-        scheduler_yield();
+    si_t = thread_spawn_joinable_on_core("si_thread", sleeping_thread, NULL, 1);
+    struct thread *waker =
+        thread_spawn_joinable_on_core("si_wake", waking_thread, NULL, 2);
+    struct thread *enq =
+        thread_spawn_joinable_on_core("si_apc_e", apc_enqueue_thread, NULL, 3);
+
+    TEST_ASSERT(si_t && waker && enq);
+
+    thread_join(si_t);
+    thread_join(waker);
+    thread_join(enq);
+
+    TEST_ASSERT(atomic_load(&si_ok));
 
     return TEST_SUCCESS;
 }
@@ -246,8 +255,7 @@ static void dpc_on_event_dummy_thread(void *a) {
 /* we put a thread on a core that is not idle, enqueue a DPC over
  * there, trigger some reschedules, and then verify that the DPC
  * only ever runs once the core actually goes idle */
-TEST_DECLARE(dpc_on_event_test, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(sched)) {
+TEST_DECLARE_UNIT(dpc_on_event_test, .group = TEST_GROUP(sched)) {
     size_t i;
     size_t found = SIZE_MAX;
     for_each_cpu_id(i) {
@@ -264,7 +272,10 @@ TEST_DECLARE(dpc_on_event_test, .tier = TEST_TIER_UNIT,
 
     struct thread *t =
         thread_create("dpc_dummy", dpc_on_event_dummy_thread, NULL);
+    TEST_ASSERT(t);
+
     t->flags |= THREAD_FLAG_PINNED;
+    thread_set_joinable(t);
     thread_enqueue_on_core(t, found);
 
     /* we now know the other processor is in the thread */
@@ -273,6 +284,10 @@ TEST_DECLARE(dpc_on_event_test, .tier = TEST_TIER_UNIT,
     atomic_store(&eq, true);
     while (!atomic_load(&gogo))
         cpu_relax();
+
+    /* the core only went idle because the dummy finished, so this
+     * returns immediately and keeps it from outliving the test */
+    thread_join(t);
 
     return TEST_SUCCESS;
 }
@@ -290,18 +305,24 @@ static void sched_push_try(void *) {
     atomic_store(&at_least_one_migrated, true);
 }
 
-TEST_DECLARE(sched_push_target_test, .tier = TEST_TIER_INTEGRATION,
-             .group = TEST_GROUP(sched)) {
+TEST_DECLARE_INTEGRATION(sched_push_target_test, .group = TEST_GROUP(sched)) {
     test_info("This test takes a bit. uncomment me to run it");
     return TEST_SKIP(TEST_SKIP_NONE);
+    static struct thread *pushed[SCHED_PUSH_TEST_THREADS];
+
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     for (size_t i = 0; i < SCHED_PUSH_TEST_THREADS; i++) {
-        thread_spawn_on_core("push_test_%zu", sched_push_try, NULL, 0, i);
+        pushed[i] = thread_spawn_joinable_on_core("push_test_%zu",
+                                                  sched_push_try, NULL, 0, i);
     }
     irql_lower(irql);
 
-    while (!atomic_load(&left))
-        scheduler_yield();
+    for (size_t i = 0; i < SCHED_PUSH_TEST_THREADS; i++) {
+        if (pushed[i])
+            thread_join(pushed[i]);
+    }
+
+    TEST_ASSERT(atomic_load(&left) == 0);
 
     return TEST_SUCCESS;
 }

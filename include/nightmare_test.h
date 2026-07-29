@@ -145,7 +145,7 @@ static inline void nightmare_kick(struct nightmare_watchdog *w) {
 
 void nightmare_spawn_roles(struct nightmare_test *,
                            struct nightmare_thread_group *);
-void nightmare_join_roles(struct nightmare_thread_group *);
+bool nightmare_join_roles(struct nightmare_thread_group *, time_t timeout_ms);
 enum nightmare_test_error nightmare_run(struct nightmare_test *t);
 
 static inline bool nightmare_watchdog_expired(struct nightmare_watchdog *w,
@@ -193,8 +193,7 @@ LINKER_SECTION_DEFINE(struct nightmare_test, nightmare_tests);
     struct nightmare_test *SELF = nightmare_get_thread()->test;                \
     (void) SELF;
 
-#define NIGHTMARE_THREAD_ENTRY_EXIT()                                          \
-    atomic_store(&nightmare_get_thread()->th, NULL)
+#define NIGHTMARE_THREAD_ENTRY_EXIT() ((void) 0)
 
 #define NIGHTMARE_FN_INIT() (void) SELF;
 

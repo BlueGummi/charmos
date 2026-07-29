@@ -30,7 +30,7 @@ static void defer_func(void *boo, void *unused) {
     defer_worked = true;
 }
 
-TEST_DECLARE(defer_test, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(defer)) {
+TEST_DECLARE_UNIT(defer_test, .group = TEST_GROUP(defer)) {
     return TEST_SUCCESS;
     defer_enqueue(defer_func, WORK_ARGS(NULL, NULL), 5);
     enqueue_ms = time_get_ms();

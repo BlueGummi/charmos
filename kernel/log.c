@@ -1,6 +1,8 @@
 #include <bootstage_condition.h>
 #include <console/printf.h>
+#include <dbg.h>
 #include <linker/symbol_table.h>
+#include <linker/symbols.h>
 #include <log.h>
 #include <mem/alloc_or_die.h>
 #include <mem/vmm.h>
@@ -27,9 +29,29 @@ struct log_globals {
 
 struct log_globals log_global = {0};
 
+/* Stale symbol tables attribute each address to the wrong symbol */
+static bool syms_table_stale(void) {
+    return syms_len && syms_etext != (uint64_t) &__etext;
+}
+
+static void syms_warn_if_stale(void) {
+    if (!syms_table_stale())
+        return;
+
+    printf("  <symbol table is stale: generated against __etext 0x%016lx, "
+           "kernel has 0x%016lx - rebuild to resymbolize>\n",
+           syms_etext, (uint64_t) &__etext);
+}
+
 static const char *find_symbol(uint64_t addr, uint64_t *out_sym_addr) {
     const char *result = NULL;
     uint64_t best = 0;
+
+    if (syms_table_stale()) {
+        if (out_sym_addr)
+            *out_sym_addr = 0;
+        return NULL;
+    }
 
     for (uint64_t i = 0; i < syms_len; i++) {
         if (syms[i].addr <= addr && syms[i].addr > best) {
@@ -403,43 +425,83 @@ err:
     return NULL;
 }
 
-void debug_print_stack(void) {
-    uint64_t *rsp;
-    asm volatile("mov %%rsp, %0" : "=r"(rsp));
+static bool stack_addr_readable(uint64_t addr) {
+    return vmm_get_phys(PAGE_ALIGN_DOWN(addr), VMM_FLAG_NONE) != (uintptr_t) -1;
+}
 
-    uint64_t *p = rsp;
-    int hits = 0;
+/* Frame holds caller's saved rbp at [0] and ret addr at [1], so both
+ * qwords have to be there */
+static bool stack_frame_readable(uint64_t frame) {
+    if (!frame || (frame & (sizeof(uint64_t) - 1)))
+        return false;
 
-    const size_t MAX_SCAN = 64 * 1024;
+    return stack_addr_readable(frame) &&
+           stack_addr_readable(frame + sizeof(uint64_t));
+}
 
-    uint8_t *last_checked_page = NULL;
+static bool stack_addr_is_text(uint64_t addr) {
+    return addr >= (uint64_t) &__stext && addr < (uint64_t) &__etext;
+}
 
-    for (size_t offset = 0; offset < MAX_SCAN; offset += sizeof(uint64_t)) {
-        uint8_t *addr = (uint8_t *) p + offset;
+/* Use the rbp chain that -fno-omit-frame-pointer builds, and collect
+ * them all into `entries`, returning the number of entries found */
+size_t stack_unwind(uint64_t frame, uint64_t *entries, size_t max) {
+    size_t nr = 0;
 
-        uint8_t *page_base = (uint8_t *) PAGE_ALIGN_DOWN(addr);
-        if (page_base != last_checked_page) {
-            if (vmm_get_phys((vaddr_t) page_base, VMM_FLAG_NONE) ==
-                (uintptr_t) -1) {
-                break;
-            }
-            last_checked_page = page_base;
-        }
+    if (max > STACK_TRACE_MAX_DEPTH)
+        max = STACK_TRACE_MAX_DEPTH;
 
-        uint64_t val = *(uint64_t *) addr;
-        if (val >= 0xffffffff80000000ULL && val <= 0xffffffffffffffffULL) {
-            uint64_t sym_addr;
-            const char *sym = find_symbol(val, &sym_addr);
-            if (sym) {
-                printf("    [0x%016lx] %s+%p (sp=0x%016lx)\n", val, sym,
-                       val - sym_addr, (uint64_t) addr);
-                hits++;
-            }
-        }
+    while (nr < max) {
+        if (!stack_frame_readable(frame))
+            break;
+
+        uint64_t next = ((const uint64_t *) frame)[0];
+        uint64_t ret = ((const uint64_t *) frame)[1];
+
+        if (!stack_addr_is_text(ret))
+            break;
+
+        if (entries)
+            entries[nr] = ret;
+
+        nr++;
+        if (next <= frame)
+            break;
+
+        frame = next;
     }
 
-    if (hits == 0)
-        printf("  <no kernel symbols found>\n");
+    return nr;
+}
+
+void debug_print_stack_trace(const uint64_t *entries, size_t nr) {
+    if (!nr) {
+        printf("  <no kernel frames found>\n");
+        return;
+    }
+
+    syms_warn_if_stale();
+
+    for (size_t i = 0; i < nr; i++) {
+        uint64_t sym_addr;
+        const char *sym = find_symbol(entries[i], &sym_addr);
+
+        if (sym) {
+            printf("    #%-2zu [0x%016lx] %s+0x%lx\n", i, entries[i], sym,
+                   entries[i] - sym_addr);
+        } else {
+            printf("    #%-2zu [0x%016lx] <unknown>\n", i, entries[i]);
+        }
+    }
+}
+
+void debug_print_stack(void) {
+    uint64_t entries[STACK_TRACE_MAX_DEPTH];
+
+    size_t nr = stack_unwind((uint64_t) __builtin_frame_address(0), entries,
+                             sizeof(entries) / sizeof(*entries));
+
+    debug_print_stack_trace(entries, nr);
 }
 
 void debug_print_memory(void *addr, uint64_t size) {
@@ -462,6 +524,8 @@ void debug_print_stack_from(uint64_t *start, size_t max_scan) {
 
     if (!max_scan)
         max_scan = 64 * 1024;
+
+    syms_warn_if_stale();
 
     printf("Stack unwind from %p:\n", (uint64_t) start);
 

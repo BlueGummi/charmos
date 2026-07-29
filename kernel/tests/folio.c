@@ -9,8 +9,7 @@
 
 TEST_GROUP_DECLARE(folio);
 
-TEST_DECLARE(folio_backpointers, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(folio)) {
+TEST_DECLARE_UNIT(folio_backpointers, .group = TEST_GROUP(folio)) {
     for (uint8_t order = 0; order <= 3; order++) {
         struct folio *f = folio_alloc(order);
         TEST_ASSERT(f);
@@ -30,8 +29,7 @@ TEST_DECLARE(folio_backpointers, .tier = TEST_TIER_UNIT,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(folio_zero_copy, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(folio)) {
+TEST_DECLARE_UNIT(folio_zero_copy, .group = TEST_GROUP(folio)) {
     struct folio *src = folio_alloc(1); /* 2 pages */
     struct folio *dst = folio_alloc(1);
     TEST_ASSERT(src && dst);
@@ -67,8 +65,7 @@ TEST_DECLARE(folio_zero_copy, .tier = TEST_TIER_UNIT,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(folio_anon_tag_mapcount, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(folio)) {
+TEST_DECLARE_UNIT(folio_anon_tag_mapcount, .group = TEST_GROUP(folio)) {
     struct folio *f = folio_alloc(0);
     TEST_ASSERT(f);
 

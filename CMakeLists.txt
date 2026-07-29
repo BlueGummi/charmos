@@ -26,9 +26,12 @@ set(SYMS_OUTPUT  "${CMAKE_SOURCE_DIR}/kernel/syms/fullsyms.c")
 set(SYMS_AWK     "${CMAKE_SOURCE_DIR}/scripts/syms.awk")
 set(SYMS_STAMP   "${CMAKE_BINARY_DIR}/syms.stamp")
 
+# Only copy if different to avoid changing mtime and causing re-link
 add_custom_command(
     OUTPUT ${SYMS_STAMP}
-    COMMAND nm $<TARGET_FILE:kernel> | awk -f ${SYMS_AWK} > ${SYMS_OUTPUT}
+    COMMAND nm $<TARGET_FILE:kernel> | awk -f ${SYMS_AWK} > ${SYMS_OUTPUT}.tmp
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SYMS_OUTPUT}.tmp ${SYMS_OUTPUT}
+    COMMAND ${CMAKE_COMMAND} -E rm -f ${SYMS_OUTPUT}.tmp
     COMMAND ${CMAKE_COMMAND} -E touch ${SYMS_STAMP}
     DEPENDS kernel ${SYMS_AWK}
     COMMENT "Regenerating symbol table from built kernel"

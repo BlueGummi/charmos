@@ -42,6 +42,7 @@
 #include <smp/perdomain.h>
 #include <smp/pernode.h>
 #include <smp/smp.h>
+#include <stack_depot.h>
 #include <stdint.h>
 #include <sync/rcu.h>
 #include <sync/turnstile.h>
@@ -80,6 +81,7 @@ __no_sanitize_address void k_main(void) {
     asan_init();
 #endif
 
+    stack_depot_init();
     log_sites_init();
     bootstage_advance(BOOTSTAGE_EARLY_ALLOCATORS);
     gdt_install();

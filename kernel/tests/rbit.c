@@ -21,8 +21,7 @@ static int overlaps(struct interval a, struct interval b) {
     return a.low <= b.high && b.low <= a.high;
 }
 
-TEST_DECLARE(rbit_order_search, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(rbit)) {
+TEST_DECLARE_UNIT(rbit_order_search, .group = TEST_GROUP(rbit)) {
     prng_seed(RBIT_SEED);
     struct rbit tree;
     rbit_init(&tree);
@@ -67,7 +66,7 @@ TEST_DECLARE(rbit_order_search, .tier = TEST_TIER_UNIT,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(rbit_overlap, .tier = TEST_TIER_UNIT, .group = TEST_GROUP(rbit)) {
+TEST_DECLARE_UNIT(rbit_overlap, .group = TEST_GROUP(rbit)) {
     prng_seed(RBIT_SEED + 1);
     struct rbit tree;
     rbit_init(&tree);
@@ -129,8 +128,7 @@ static bool count_augment(struct rbit_node *n) {
     return n->max != old_max || c->subtree_count != old_cnt;
 }
 
-TEST_DECLARE(rbit_augment_hook, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(rbit)) {
+TEST_DECLARE_UNIT(rbit_augment_hook, .group = TEST_GROUP(rbit)) {
     prng_seed(RBIT_SEED + 2);
     struct rbit tree;
     rbit_init(&tree);

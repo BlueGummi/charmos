@@ -42,18 +42,32 @@ void thread_init_thread_ids(void) {
 }
 
 APC_EVENT_CREATE(thread_exit_apc_event, "THREAD_EXIT");
-void thread_exit() {
+
+void thread_exit(void) {
+    thread_exit_with_status(0);
+}
+
+void thread_exit_with_status(int status) {
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
 
     struct thread *self = thread_get_current();
 
+    /* Public status and the ZOMBIE state under join_lock...
+     *
+     * Joiners either see ZOMBIE here are don't block, or are already
+     * parked on join_cv and gets the broadcast, no third outcome */
+    enum irql jirql = spin_lock(&self->join_lock);
+    self->exit_status = status;
     thread_set_state(self, THREAD_STATE_ZOMBIE);
     thread_or_flags(self, THREAD_FLAG_DYING);
+    spin_unlock(&self->join_lock, jirql);
+
+    /* Walk into thread_wake() and take runqueue locks, woken joiners
+     * can't free us, because our reference lives until the next thread drops */
+    condvar_broadcast(&self->join_cv);
 
     climb_thread_remove(self);
-
     locked_list_del(&global.thread_list, &self->thread_list);
-
     atomic_fetch_sub(&global.thread_count, 1);
 
     irql_lower(irql);
@@ -161,7 +175,14 @@ static struct thread *thread_init(struct thread *thread,
     thread->timeslice_length_raw_ms = THREAD_DEFAULT_TIMESLICE;
     thread->wait_type = THREAD_WAIT_NONE;
     thread->activity_class = THREAD_ACTIVITY_CLASS_UNKNOWN;
+    thread->exit_status = 0;
     spinlock_init(&thread->lock);
+    spinlock_init(&thread->join_lock);
+
+    /* join_lock/join_cv are only ever touched from thread context, and
+     * thread_join_timeout() has to allocate a timer while holding the
+     * lock, which it could not do at IRQL_HIGH_LEVEL */
+    condvar_init(&thread->join_cv, CONDVAR_INIT_NORMAL);
     pairing_node_init(&thread->wq_pairing_node);
 
     turnstile_init(thread->turnstile);

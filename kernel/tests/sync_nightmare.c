@@ -99,8 +99,13 @@ static void chaos_sleeper(void *arg) {
 
     CHAOS_LOG("sleeper[%zu] exit", id);
 
-    atomic_fetch_sub(&sync_chaos_left, 1);
     atomic_store(&s->alive, false);
+
+    /* the last sleeper out winds the chaos threads down. that ordering is
+     * what lets the test join them before it drops its references to the
+     * sleepers, which they poke at through states[].t */
+    if (atomic_fetch_sub(&sync_chaos_left, 1) == 1)
+        atomic_store(&chaos_stop, true);
 }
 
 /* ------------------------------------
@@ -207,8 +212,8 @@ static void chaos_migrator() {
 /* ------------------------------------
  * Main Test
  * ------------------------------------ */
-TEST_DECLARE(thread_interruptible_chaos_fuzz, .tier = TEST_TIER_INTEGRATION,
-             .group = TEST_GROUP(sync_nightmare)) {
+TEST_DECLARE_INTEGRATION(thread_interruptible_chaos_fuzz,
+                         .group = TEST_GROUP(sync_nightmare)) {
     test_info("this test is long. comment me out to run it.");
     return TEST_SKIP(TEST_SKIP_NONE);
 
@@ -222,29 +227,43 @@ TEST_DECLARE(thread_interruptible_chaos_fuzz, .tier = TEST_TIER_INTEGRATION,
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     for (size_t i = 0; i < CHAOS_THREADS; i++) {
         atomic_store(&states[i].alive, true);
-        states[i].t = thread_spawn_on_core("chaos_sleeper", chaos_sleeper,
-                                           (void *) i, i % global.core_count);
+        states[i].t = thread_spawn_joinable_on_core(
+            "chaos_sleeper", chaos_sleeper, (void *) i, i % global.core_count);
+
+        /* a sleeper that never ran still has to be accounted for, or
+         * nothing ever sets chaos_stop and the joins below hang */
+        if (!states[i].t && atomic_fetch_sub(&sync_chaos_left, 1) == 1)
+            atomic_store(&chaos_stop, true);
     }
 
     atomic_store(&starter_ok, true);
 
-    thread_spawn("chaos_wake", chaos_waker, NULL);
-    thread_spawn("chaos_migrate", chaos_migrator, NULL);
-    thread_spawn("chaos_apc", chaos_apc_spammer, NULL);
+    struct thread *waker =
+        thread_spawn_joinable("chaos_wake", chaos_waker, NULL);
+    struct thread *migrator =
+        thread_spawn_joinable("chaos_migrate", chaos_migrator, NULL);
+    struct thread *spammer =
+        thread_spawn_joinable("chaos_apc", chaos_apc_spammer, NULL);
     irql_lower(irql);
 
-    uint64_t last_report = time_get_ms();
+    /* chaos threads first: they exit once the last sleeper has set
+     * chaos_stop, and they must be gone before we drop the sleeper
+     * references they are dereferencing */
+    if (waker)
+        thread_join(waker);
 
-    while (atomic_load(&sync_chaos_left)) {
-        if (time_get_ms() - last_report > 1000) {
-            last_report = time_get_ms();
-            CHAOS_LOG("waiting: %u sleepers left",
-                      atomic_load(&sync_chaos_left));
-        }
-        scheduler_yield();
+    if (migrator)
+        thread_join(migrator);
+
+    if (spammer)
+        thread_join(spammer);
+
+    for (size_t i = 0; i < CHAOS_THREADS; i++) {
+        if (states[i].t)
+            thread_join(states[i].t);
     }
 
-    atomic_store(&chaos_stop, true);
+    TEST_ASSERT(atomic_load(&sync_chaos_left) == 0);
 
     CHAOS_LOG("chaos test complete");
     return TEST_SUCCESS;

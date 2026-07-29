@@ -104,6 +104,19 @@ LINKER_SECTION_DEFINE(struct cmdline_entry, cmdline_entries);
 extern enum errno (*cmdline_parse_table[TYPE_MAX])(void *write_to,
                                                    const char *text);
 
+enum errno cmdline_parse_i8(void *write_to, const char *text);
+enum errno cmdline_parse_u8(void *write_to, const char *text);
+enum errno cmdline_parse_i16(void *write_to, const char *text);
+enum errno cmdline_parse_u16(void *write_to, const char *text);
+enum errno cmdline_parse_i32(void *write_to, const char *text);
+enum errno cmdline_parse_u32(void *write_to, const char *text);
+enum errno cmdline_parse_i64(void *write_to, const char *text);
+enum errno cmdline_parse_u64(void *write_to, const char *text);
+enum errno cmdline_parse_bool(void *write_to, const char *text);
+
+enum errno cmdline_parse_float(void *write_to, const char *text);
+enum errno cmdline_parse_unsupported(void *write_to, const char *text);
+
 enum errno cmdline_parse_fx(void *write_to, const char *text);
 
 /* Returns true if the str matches a 'yes' string, and false if it is a 'no',

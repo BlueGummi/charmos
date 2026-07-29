@@ -43,7 +43,18 @@ set(EARLY_INIT_FILES
     ${CMAKE_SOURCE_DIR}/kernel/mem/slab/free_queue.c
 )
 
+set(SYMS_USABLE FALSE)
 if(EXISTS "${CMAKE_SOURCE_DIR}/kernel/syms/fullsyms.c")
+    # Regenerate to make sure the symbol table is up to date
+    file(READ "${CMAKE_SOURCE_DIR}/kernel/syms/fullsyms.c" SYMS_CONTENTS)
+    if(SYMS_CONTENTS MATCHES "syms_etext")
+        set(SYMS_USABLE TRUE)
+    else()
+        message(STATUS "fullsyms.c predates syms_etext; regenerating")
+    endif()
+endif()
+
+if(SYMS_USABLE)
     set(SYMS_SOURCE "${CMAKE_SOURCE_DIR}/kernel/syms/fullsyms.c")
     message(STATUS "Symbol source: fullsyms.c (resolved)")
 else()

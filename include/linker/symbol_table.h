@@ -8,3 +8,5 @@ struct sym {
 
 extern const struct sym syms[];
 extern const uint64_t syms_len;
+
+extern const uint64_t syms_etext;

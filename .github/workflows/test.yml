@@ -55,24 +55,43 @@ jobs:
           retention-days: 7
 
       - name: Run tests
+        env:
+          TERM: dumb
+          TEST_TIMEOUT: 300
         run: |
           cd build
-          export TERM=dumb
           for i in $(seq 1 4); do
             echo "[INFO] (${{ matrix.compiler }}) Test iteration $i/4"
 
             set +e
-            make tests | tee qemu.log &
+            cmake --build . --target tests > qemu.log 2>&1 &
+            make_pid=$!
 
-            sleep 60
+            # Watchdog: on a hang, grab a backtrace off QEMU's gdbstub while the
+            # VM is still alive, then tear it down.
+            waited=0
+            while kill -0 "$make_pid" 2>/dev/null; do
+              if [ "$waited" -ge "$TEST_TIMEOUT" ]; then
+                echo "[FAIL] Iteration $i timed out after ${TEST_TIMEOUT}s, collecting GDB backtrace..."
+                gdb -batch -x "../scripts/gdb_script" kernel/kernel || true
+                pkill -f qemu-system-x86_64
+                wait "$make_pid"
+                cat qemu.log
+                exit 1
+              fi
+              sleep 1
+              waited=$((waited + 1))
+            done
 
-            if grep -q "all tests pass" qemu.log; then
-              echo "[PASS] Iteration $i passed!"
-              pkill -f qemu-system-x86_64
-            else
-              echo "[FAIL] Iteration $i failed, collecting GDB backtrace..."
-              gdb -batch -x "../scripts/gdb_script" kernel/kernel || true
-              pkill -f qemu-system-x86_64
+            wait "$make_pid"
+            rc=$?
+            set -e
+
+            cat qemu.log
+
+            if [ "$rc" -ne 0 ]; then
+              echo "[FAIL] Iteration $i failed (exit $rc)"
               exit 1
             fi
+            echo "[PASS] Iteration $i passed!"
           done

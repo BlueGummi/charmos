@@ -84,29 +84,65 @@ static size_t nightmare_count_threads(struct nightmare_test *nt) {
 
 void nightmare_spawn_roles(struct nightmare_test *test,
                            struct nightmare_thread_group *group) {
-    group->threads = kmalloc(nightmare_count_threads(test) *
-                             sizeof(struct nightmare_thread));
+    size_t total = nightmare_count_threads(test);
+
+    group->threads = kmalloc(total * sizeof(struct nightmare_thread));
+    group->count = 0;
+
+    if (!group->threads)
+        return;
 
     size_t g_idx = 0;
     for (size_t i = 0; i < test->role_count; i++) {
         struct nightmare_role *nr = &test->roles[i];
-        struct nightmare_thread *nt = &group->threads[g_idx];
 
         for (size_t j = 0; j < nr->count; j++) {
+            struct nightmare_thread *nt = &group->threads[g_idx];
+
             nt->role = nr->type;
             nt->test = test;
-            nt->th = thread_create((char *) nr->name, nr->worker, nr->arg);
-            nt->th->private = nt;
 
-            thread_enqueue(nt->th);
+            struct thread *th =
+                thread_create((char *) nr->name, nr->worker, nr->arg);
+            if (!th)
+                return;
 
-            g_idx++;
+            th->private = nt;
+            nt->th = th;
+
+            /* held joinable so nightmare_join_roles() can wait on it */
+            thread_set_joinable(th);
+            thread_enqueue(th);
+
+            group->count = ++g_idx;
         }
     }
 }
 
-void nightmare_join_roles(struct nightmare_thread_group *ntg) {
-    for (size_t i = 0; i < ntg->count; i++)
-        if (atomic_load(&ntg->threads[i].th))
-            scheduler_yield();
+bool nightmare_join_roles(struct nightmare_thread_group *ntg,
+                          time_t timeout_ms) {
+    time_t deadline = time_get_ms() + timeout_ms;
+    bool ok = true;
+
+    for (size_t i = 0; i < ntg->count; i++) {
+        struct thread *th = atomic_exchange(&ntg->threads[i].th, NULL);
+        if (!th)
+            continue;
+
+        time_t now = time_get_ms();
+        time_t left = now >= deadline ? 1 : deadline - now;
+
+        /* the group shares one deadline, so once it is blown we stop
+         * waiting on the remainder as well */
+        if (!ok || !thread_join_timeout(th, left, NULL)) {
+            thread_detach(th);
+            ok = false;
+        }
+    }
+
+    ntg->count = 0;
+    kfree(ntg->threads);
+    ntg->threads = NULL;
+
+    return ok;
 }

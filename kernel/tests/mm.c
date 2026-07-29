@@ -141,8 +141,7 @@ static size_t build_random_vma_ranges(struct mm *mm) {
     return placed;
 }
 
-TEST_DECLARE(mm_gap_differential, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mm)) {
+TEST_DECLARE_UNIT(mm_gap_differential, .group = TEST_GROUP(mm)) {
     prng_seed(MM_TEST_SEED);
     struct mm *mm = mm_alloc();
     TEST_ASSERT(mm);
@@ -177,8 +176,7 @@ TEST_DECLARE(mm_gap_differential, .tier = TEST_TIER_UNIT,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(mm_map_consistency, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mm)) {
+TEST_DECLARE_UNIT(mm_map_consistency, .group = TEST_GROUP(mm)) {
     prng_seed(MM_TEST_SEED + 1);
     struct mm *mm = mm_alloc();
     TEST_ASSERT(mm);
@@ -200,8 +198,7 @@ TEST_DECLARE(mm_map_consistency, .tier = TEST_TIER_UNIT,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(mm_vma_range_split, .tier = TEST_TIER_UNIT,
-             .group = TEST_GROUP(mm)) {
+TEST_DECLARE_UNIT(mm_vma_range_split, .group = TEST_GROUP(mm)) {
     struct mm *mm = mm_alloc();
     TEST_ASSERT(mm);
 

@@ -148,7 +148,10 @@ if(DEBUG_ASAN)
         -fsanitize=kernel-address
         -mllvm -asan-instrumentation-with-call-threshold=0
         -mllvm -asan-globals=0
-        -mllvm -asan-stack=0
+        -mllvm -asan-stack=0 
+        -fsanitize-recover=kernel-address                   
+        -mllvm -asan-mapping-scale=3
+        -mllvm -asan-mapping-offset=0xDFFFFE0000000000      
     )
     string(REPLACE ";" " " KERNEL_KASAN_FLAGS_STR "${KERNEL_KASAN_FLAGS}")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${KERNEL_KASAN_FLAGS_STR}")

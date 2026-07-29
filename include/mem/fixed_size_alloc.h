@@ -47,8 +47,8 @@ struct fixed_size_range_attributes {
 struct fixed_size_range {
     struct fixed_size_range_attributes attrs;
     struct spinlock lock;
-    struct list_head freelist;
-    struct list_head fl_pages;
+    struct list_head freelist; /* fixed_size_node list_node */
+    struct list_head fl_pages; /* fixed_size_page_hdr page_list */
     size_t empty_pages;
     size_t full_node_size; /* node size + object size */
     struct fixed_size_range **perdomain_fsrs;

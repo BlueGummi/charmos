@@ -3,9 +3,8 @@
 #include <stddef.h>
 
 #define ASAN_SHADOW_SCALE 3ULL /* 1 shadow byte per 8 real bytes */
-#define ASAN_SHADOW_OFFSET                                                     \
-    0xfffffc0000000000ULL /* fixed virtual base for shadow memory */
-#define ASAN_REDZONE 16   /* optional redzone per allocation */
+#define ASAN_SHADOW_OFFSET 0xDFFFFE0000000000
+#define ASAN_REDZONE 16 /* optional redzone per allocation */
 #define ASAN_POISON_VALUE 0xFF
 #define ASAN_ABORT_IF_NOT_READY()                                              \
     do {                                                                       \
