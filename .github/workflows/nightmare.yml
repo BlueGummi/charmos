@@ -1,0 +1,204 @@
+name: Nightmare
+
+# This hunts for bugs that should be filed, and it never blocks a push.
+#
+# Long single runs instead of many short ones, because that finds lifetime-shaped
+# bugs, TODO: we could improve this in the future with wide vs deep hunts
+
+on:
+  schedule:
+    # NOTE: GitHub cron routinely runs late at peak usage times
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      duration_minutes:
+        description: "Wall clock budget per scenario"
+        required: false
+        default: "60"
+      compiler:
+        description: "gcc or clang"
+        required: false
+        default: "clang"
+
+permissions:
+  contents: read
+
+# Never cancel a torture run in progress, a shard
+# 50 minutes into 60 has nearly delivered its value
+concurrency:
+  group: nightmare
+  cancel-in-progress: false
+
+env:
+  DURATION_MINUTES: ${{ github.event.inputs.duration_minutes || '60' }}
+  COMPILER: ${{ github.event.inputs.compiler || 'clang' }}
+
+jobs:
+  torture:
+    name: ${{ matrix.scenario.name }}
+    runs-on: ubuntu-latest
+    # 20-job cap is account wide, so we have to cap here for the gate
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        scenario:
+          - name: NIGHTMARE_LOCKS_SMP8
+            flags: -DTEST_NIGHTMARE_ALL=OFF -DTEST_NIGHTMARE_LOCKS=ON
+            smp: "sockets=2,cores=2,threads=2"
+          - name: NIGHTMARE_LOCKS_UP
+            flags: -DTEST_NIGHTMARE_ALL=OFF -DTEST_NIGHTMARE_LOCKS=ON
+            smp: "sockets=1,cores=1,threads=1"
+          - name: NIGHTMARE_WAKE_SMP8
+            flags: -DTEST_NIGHTMARE_ALL=OFF -DTEST_NIGHTMARE_WAKE=ON
+            smp: "sockets=2,cores=2,threads=2"
+          - name: NIGHTMARE_WAKE_UP
+            flags: -DTEST_NIGHTMARE_ALL=OFF -DTEST_NIGHTMARE_WAKE=ON
+            smp: "sockets=1,cores=1,threads=1"
+          # Bugs live at boundaries and strictly per-subsystem miss those
+          - name: NIGHTMARE_ALL_SMP8
+            flags: -DTEST_NIGHTMARE_ALL=ON
+            smp: "sockets=2,cores=2,threads=2"
+          # KASAN can find silent corruption issues
+          - name: NIGHTMARE_ALL_KASAN
+            flags: -DTEST_NIGHTMARE_ALL=ON -DDEBUG_ASAN=ON
+            smp: "sockets=2,cores=2,threads=2"
+            compiler: clang
+
+    container:
+      image: ghcr.io/axvonx/charmos-x86-env:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_KEY }}
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Resolve scenario settings
+        id: cfg
+        run: |
+          set -euo pipefail
+          compiler="${{ matrix.scenario.compiler || '' }}"
+          [ -n "$compiler" ] || compiler="$COMPILER"
+          echo "compiler=$compiler" >> "$GITHUB_OUTPUT"
+          # Seed is derived from the run and attempt so it is recorded 
+          echo "seed=0x${{ github.run_id }}${{ github.run_attempt }}" \
+              >> "$GITHUB_OUTPUT"
+
+      - name: Install clang toolchain
+        if: steps.cfg.outputs.compiler == 'clang'
+        run: apt-get update && apt-get install -y clang lld
+
+      - name: Compile
+        run: |
+          ./scripts/build.sh -t RelWithDebInfo \
+            --compiler "${{ steps.cfg.outputs.compiler }}" \
+            -- ${{ matrix.scenario.flags }} \
+               -DQEMU_SMP_TOPO="${{ matrix.scenario.smp }}"
+
+      - name: Torture
+        env:
+          TERM: dumb
+        run: |
+          set -uo pipefail
+          # GitHub runs under bash -e, capturing a non-zero return code
+          # from timeout/QEMU requires errexit off
+          set +e
+          mkdir -p results
+          budget=$(( DURATION_MINUTES * 60 ))
+          start=$(date +%s)
+
+          timeout --foreground -k 30 "$budget" \
+              cmake --build build --target tests
+          rc=$?
+          pkill -f qemu-system-x86_64 2>/dev/null || true
+          end=$(date +%s)
+
+          cp build/output.log results/run.log 2>/dev/null || \
+              echo "(no serial log produced)" > results/run.log
+          # stderr (QEMU), kept out of the guest log but worth
+          # having when a shard dies
+          cp build/output.stderr.log results/run.stderr.log 2>/dev/null || true
+
+          {
+            echo "SHARD=${{ matrix.scenario.name }}"
+            echo "COMPILER=${{ steps.cfg.outputs.compiler }}"
+            echo "SCENARIO=${{ matrix.scenario.name }}"
+            echo "SEED=${{ steps.cfg.outputs.seed }}"
+            echo "EXIT_CODE=$rc"
+            echo "DURATION_S=$((end - start))"
+            echo "SHA=${{ github.sha }}"
+            echo "CONFIG=smp=${{ matrix.scenario.smp }}"
+          } > results/run.env
+
+          tail -60 results/run.log || true
+          gzip -9 results/*.log
+
+          # Reporting is the report job's work, so we don't fail for the 
+          # rest of the runners in this fleet
+          exit 0
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightmare-${{ matrix.scenario.name }}
+          path: results/
+          retention-days: 30
+
+  report:
+    name: Report
+    needs: torture
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Download all results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: nightmare-*
+          path: artifacts
+
+      - name: Parse and aggregate
+        run: |
+          set -euo pipefail
+          mkdir -p ndjson
+          shopt -s nullglob globstar
+
+          for env_file in artifacts/**/*.env; do
+            unset SHARD COMPILER SCENARIO SEED EXIT_CODE DURATION_S SHA CONFIG
+            # shellcheck disable=SC1090
+            . "$env_file"
+            base="$(dirname "$env_file")/run"
+            if [ -f "$base.log.gz" ]; then gunzip -f "$base.log.gz"; fi
+            [ -f "$base.log" ] || continue
+
+            python3 scripts/ci/parse_log.py "$base.log" \
+              --shard "$SHARD" \
+              --scenario "$SCENARIO" \
+              --seed "$SEED" \
+              --sha "$SHA" \
+              --compiler "$COMPILER" \
+              --config "${CONFIG:-}" \
+              --exit-code "$EXIT_CODE" \
+              --duration-s "$DURATION_S" \
+              --out "ndjson/$SHARD.ndjson"
+          done
+
+          # No --fail-on-error, meaning findings should be read and turned
+          # into seeds used elsewhere
+          python3 scripts/ci/aggregate.py 'ndjson/*.ndjson' \
+            --summary "$GITHUB_STEP_SUMMARY" \
+            --json report.json \
+            --repro-template './scripts/build.sh -t RelWithDebInfo --compiler clang tests -- -DTEST_NIGHTMARE_ALL=OFF -D{scenario}=ON'
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightmare-report
+          path: report.json
+          retention-days: 90

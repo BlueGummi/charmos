@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 
-# Usage: run_qemu.sh <logfile> <map-debug-exit:0|1> <qemu-binary> [qemu args...]
 
 set -uo pipefail
 
 LOGFILE="$1"; shift
 MAP_DEBUG_EXIT="$1"; shift
 
-"$@" 2>&1 | tee "$LOGFILE"
+# QEMU's diagnostics end up in stderr
+ERRLOG="${LOGFILE%.*}.stderr.log"
+
+# Still shown live on the terminal, 
+# host and guest are never confused for one another
+"$@" 2> >(tee "$ERRLOG" | sed 's/^/[qemu] /' >&2) | tee "$LOGFILE"
 status="${PIPESTATUS[0]}"
 
 if [[ "$MAP_DEBUG_EXIT" == "1" ]]; then

@@ -1,5 +1,7 @@
 name: Test
 
+# This tests the 'gate', which just sees if any immediate regressions/issues happened 
+
 on:
   push:
     branches:
@@ -11,7 +13,7 @@ on:
     paths:
       - 'kernel/**'
       - 'include/**'
-  workflow_dispatch: # manual trigger
+  workflow_dispatch:
   workflow_run:
     workflows: ["Update CI Container"]
     types:
@@ -19,8 +21,19 @@ on:
 
 permissions:
   contents: read
-  issues: read
-  pull-requests: read
+
+# Superseded pushes stop burning runners immediately
+#
+# The account's concurrency cap is shared with the 
+# nightly torture runner, so releasing slots keeps this responsive 
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Per-run wall clock. Exceeding it exits 124
+  TEST_TIMEOUT: 300
+  ITERATIONS: 4
 
 jobs:
   test:
@@ -38,7 +51,7 @@ jobs:
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Install clang toolchain
         if: matrix.compiler == 'clang'
@@ -47,7 +60,7 @@ jobs:
       - name: Compile
         run: ./scripts/build.sh -t RelWithDebInfo --compiler ${{ matrix.compiler }} -C
 
-      - name: Upload build artifacts
+      - name: Upload ISO
         uses: actions/upload-artifact@v4
         with:
           name: iso-${{ matrix.compiler }}
@@ -57,41 +70,118 @@ jobs:
       - name: Run tests
         env:
           TERM: dumb
-          TEST_TIMEOUT: 300
         run: |
-          cd build
-          for i in $(seq 1 4); do
-            echo "[INFO] (${{ matrix.compiler }}) Test iteration $i/4"
+          set -uo pipefail
+          # GitHub runs under bash -e, capturing a non-zero return code
+          # from timeout/QEMU requires errexit off
+          set +e
+          mkdir -p results
+          overall=0
 
-            set +e
-            cmake --build . --target tests > qemu.log 2>&1 &
-            make_pid=$!
+          for i in $(seq 1 "$ITERATIONS"); do
+            echo "::group::iteration $i/$ITERATIONS (${{ matrix.compiler }})"
+            start=$(date +%s)
 
-            # Watchdog: on a hang, grab a backtrace off QEMU's gdbstub while the
-            # VM is still alive, then tear it down.
-            waited=0
-            while kill -0 "$make_pid" 2>/dev/null; do
-              if [ "$waited" -ge "$TEST_TIMEOUT" ]; then
-                echo "[FAIL] Iteration $i timed out after ${TEST_TIMEOUT}s, collecting GDB backtrace..."
-                gdb -batch -x "../scripts/gdb_script" kernel/kernel || true
-                pkill -f qemu-system-x86_64
-                wait "$make_pid"
-                cat qemu.log
-                exit 1
-              fi
-              sleep 1
-              waited=$((waited + 1))
-            done
-
-            wait "$make_pid"
+            # --foreground lets timeout signal the whole pipeline
+            # and pkill is u sed upon real problems when it outlives parent
+            timeout --foreground -k 10 "$TEST_TIMEOUT" \
+                cmake --build build --target tests
             rc=$?
-            set -e
+            pkill -f qemu-system-x86_64 2>/dev/null || true
 
-            cat qemu.log
+            end=$(date +%s)
+            cp build/output.log "results/iter-$i.log" 2>/dev/null || \
+                echo "(no serial log produced)" > "results/iter-$i.log"
+            # QEMU's own diagnostics, kept out of the guest log but worth
+            # having when a shard dies for host-side reasons
+            cp build/output.stderr.log "results/iter-$i.stderr.log" 2>/dev/null || true
+
+            # This container has no python3, so parsing
+            # happens in the report job
+            {
+              echo "SHARD=${{ matrix.compiler }}-iter$i"
+              echo "COMPILER=${{ matrix.compiler }}"
+              echo "SCENARIO=gate"
+              echo "SEED="
+              echo "EXIT_CODE=$rc"
+              echo "DURATION_S=$((end - start))"
+              echo "SHA=${{ github.sha }}"
+            } > "results/iter-$i.env"
+
+            tail -40 "results/iter-$i.log" || true
+            echo "::endgroup::"
 
             if [ "$rc" -ne 0 ]; then
-              echo "[FAIL] Iteration $i failed (exit $rc)"
-              exit 1
+              echo "::error::iteration $i failed (exit $rc)"
+              overall=$rc
+              break
             fi
-            echo "[PASS] Iteration $i passed!"
           done
+
+          gzip -9 results/*.log
+          exit "$overall"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.compiler }}
+          path: results/
+          retention-days: 14
+
+  report:
+    name: Report
+    needs: test
+    if: always()
+    # The bare runner image has python3,
+    # and the parsing scripts need nothing else
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Download all results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: results-*
+          path: artifacts
+
+      - name: Parse and aggregate
+        run: |
+          set -euo pipefail
+          mkdir -p ndjson
+          shopt -s nullglob globstar
+
+          for env_file in artifacts/**/*.env; do
+            # Cleared first so a key missing from one sidecar can't inherit
+            # the previous shard's value
+            unset SHARD COMPILER SCENARIO SEED EXIT_CODE DURATION_S SHA
+            # shellcheck disable=SC1090
+            . "$env_file"
+            base="${env_file%.env}"
+            if [ -f "$base.log.gz" ]; then gunzip -f "$base.log.gz"; fi
+            [ -f "$base.log" ] || continue
+
+            python3 scripts/ci/parse_log.py "$base.log" \
+              --shard "$SHARD" \
+              --scenario "$SCENARIO" \
+              --seed "${SEED:-}" \
+              --sha "$SHA" \
+              --compiler "$COMPILER" \
+              --exit-code "$EXIT_CODE" \
+              --duration-s "$DURATION_S" \
+              --out "ndjson/$SHARD.ndjson"
+          done
+
+          python3 scripts/ci/aggregate.py 'ndjson/*.ndjson' \
+            --summary "$GITHUB_STEP_SUMMARY" \
+            --json report.json \
+            --fail-on-error
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report
+          path: report.json
+          retention-days: 30
