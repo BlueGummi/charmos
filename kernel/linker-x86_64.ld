@@ -153,6 +153,15 @@ SECTIONS {
         . = ALIGN(64);
     } :data
 
+    /* Reserved for the symbol table, stamped in after the link by
+     * scripts/syms.awk. Fixed size, so patching it never moves an address */
+    .kernel_syms : ALIGN(4K) {
+        __skernel_syms = .;
+        KEEP(*(.kernel_syms))
+        . = ALIGN(4K);
+        __ekernel_syms = .;
+    } :data
+
     /* BSS */
     .bss : ALIGN(4K) {
         __sbss = .;

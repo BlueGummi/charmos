@@ -73,13 +73,13 @@ __no_sanitize_address void k_main(void) {
     vmm_init(memmap_request.response, xa_request.response);
     pmm_mid_init();
 
-    address_ranges_init();
-    slab_allocator_init();
-    page_alloc_init();
-
 #ifdef DEBUG_ASAN
     asan_init();
 #endif
+
+    address_ranges_init();
+    slab_allocator_init();
+    page_alloc_init();
 
     stack_depot_init();
     log_sites_init();

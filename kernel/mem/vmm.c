@@ -141,6 +141,13 @@ static inline struct page_table *pt_next_table(pte_t entry) {
     return hhdm_paddr_to_ptr(entry & PAGE_PHYS_MASK);
 }
 
+/* Bytes of address space covered by an entry at `level`
+ *
+ * PML4 entries span 512GB, PDPT 1GB, PD 2MB, PT 4KB */
+static inline uint64_t pt_level_granule(int level) {
+    return 1ULL << (PT_SHIFT_L4 - level * PT_STRIDE);
+}
+
 static inline void pt_walk_enter(void) {
     if (global.current_bootstage >= BOOTSTAGE_MID_MP) {
         uint64_t e =
@@ -454,6 +461,11 @@ static enum errno vmm_pt_apply(struct vmm_map_request *rq) {
          *
          * only meaningful when present as non-present can have payload there */
         kassert(!((*entry & PAGE_PRESENT) && (*entry & PAGE_2MB_page)));
+
+        /* We can't descend through a shared table to modify a leaf, since that
+         * would edit every other range aliasing with this table */
+        kassert(!pte_is_shared(*entry));
+
         tables[level + 1] = pt_next_table(*entry);
     }
 
@@ -503,6 +515,12 @@ static enum errno vmm_pt_apply(struct vmm_map_request *rq) {
         for (int up = leaf_level; up > 0; up--) {
             if (!vmm_is_table_empty(tables[up]))
                 break;
+
+            /* A shared table is referenced by entries this walk can't see,
+             * so freeing it here would pull the rug from every other range */
+            if (pte_is_shared(*entries[up - 1]))
+                break;
+
             to_free[free_count++] = hhdm_ptr_to_paddr(tables[up]);
             *entries[up - 1] = PTE_LOCK_BIT;
         }
@@ -514,6 +532,298 @@ out:
 
     for (int i = 0; i < free_count; i++)
         enqueue_pt_free(to_free[i]);
+
+    pt_walk_exit();
+    return err;
+}
+
+static struct page_table *alloc_uniform_pt(uint64_t entry) {
+    struct page_table *t = alloc_pt();
+    if (!t)
+        return NULL;
+
+    for (int i = 0; i < PT_ENTRIES; i++)
+        t->entries[i] = entry;
+
+    return t;
+}
+
+/* Point an entry at an already built subtree */
+static enum errno alias_install_one(struct page_table *pml4, vaddr_t virt,
+                                    int parent_level, uint64_t install) {
+    struct page_table *tables[PT_LEVELS];
+    pte_t *entries[PT_LEVELS - 1];
+    enum irql irqls[PT_LEVELS - 1];
+    enum errno err = ERR_OK;
+    int level = 0;
+
+    tables[0] = pml4;
+
+    for (level = 0; level < parent_level; level++) {
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
+
+        pte_t *entry = &tables[level]->entries[pt_index(virt, level)];
+
+#pragma GCC diagnostic pop
+
+        entries[level] = entry;
+        irqls[level] = pte_lock(entry);
+
+        if (!in_use(*entry)) {
+            if ((err = pte_init(entry, 0)) < 0) {
+                level++;
+                goto out;
+            }
+        }
+
+        kassert(!((*entry & PAGE_PRESENT) && (*entry & PAGE_2MB_page)));
+        tables[level + 1] = pt_next_table(*entry);
+    }
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
+
+    pte_t *target =
+        &tables[parent_level]->entries[pt_index(virt, parent_level)];
+
+#pragma GCC diagnostic pop
+
+    enum irql tirql = pte_lock(target);
+
+    if (in_use(*target))
+        err = ERR_EXIST;
+    else
+        *target = install | PTE_LOCK_BIT;
+
+    pte_unlock(target, tirql);
+
+out:
+    for (int i = level - 1; i >= 0; i--)
+        pte_unlock(entries[i], irqls[i]);
+
+    return err;
+}
+
+/* Use shared subtrees to map every page in the len to one physical page */
+enum errno vmm_map_aliased(vaddr_t virt, size_t len, paddr_t phys,
+                           page_flags_t leaf_flags, enum vmm_flags vflags) {
+    if (!len)
+        return ERR_OK;
+
+    if (!IS_PAGE_ALIGNED(phys))
+        return ERR_INVAL;
+
+    int parent_level = -1;
+    for (int lvl = PT_LEVEL_PML4; lvl <= PT_LEVEL_PD; lvl++) {
+        uint64_t granule = pt_level_granule(lvl);
+        if (IS_ALIGNED(virt, granule) && IS_ALIGNED(len, granule)) {
+            parent_level = lvl;
+            break;
+        }
+    }
+
+    if (parent_level < 0)
+        return ERR_INVAL;
+
+    struct page_table *child =
+        alloc_uniform_pt((phys & PAGE_PHYS_MASK) | leaf_flags | PAGE_PRESENT);
+    if (!child)
+        return ERR_NO_MEM;
+
+    struct page_table *built[PT_LEVELS];
+    int built_count = 0;
+    built[built_count++] = child;
+
+    for (int lvl = PT_LEVELS - 2; lvl > parent_level; lvl--) {
+        /* SHARED marks every entry on the aliased path, not just the one we
+         * install below: each of these points at a table reachable from every
+         * other entry in the alias, so descending through one to edit a leaf
+         * would rewrite the whole aliased range at once */
+        struct page_table *up =
+            alloc_uniform_pt(hhdm_ptr_to_paddr(child) | PAGE_PRESENT |
+                             PAGE_WRITE | PTE_SHARED_BIT);
+        if (!up) {
+            for (int i = 0; i < built_count; i++)
+                pmm_free_page(hhdm_ptr_to_paddr(built[i]));
+            return ERR_NO_MEM;
+        }
+        built[built_count++] = up;
+        child = up;
+    }
+
+    uint64_t install =
+        hhdm_ptr_to_paddr(child) | PAGE_PRESENT | PAGE_WRITE | PTE_SHARED_BIT;
+    uint64_t granule = pt_level_granule(parent_level);
+    struct page_table *pml4 = kernel_pml4;
+
+    pt_walk_enter();
+
+    enum errno err = ERR_OK;
+    vaddr_t v = virt;
+    for (; v < virt + len; v += granule) {
+        if ((err = alias_install_one(pml4, v, parent_level, install)) < 0)
+            break;
+    }
+
+    pt_walk_exit();
+
+    if (err < 0) {
+        /* Rollback entries that landed, since shared table stay allocated only
+         * if some entry still references them */
+        for (vaddr_t u = virt; u < v; u += granule)
+            vmm_unmap_aliased(u, granule, vflags);
+
+        for (int i = 0; i < built_count; i++)
+            pmm_free_page(hhdm_ptr_to_paddr(built[i]));
+
+        return err;
+    }
+
+    /* Fresh mappings over non-present entries, so no stale translation can
+     * exist, although previously speculative walks may have cached */
+    memory_barrier();
+    if (!(vflags & VMM_FLAG_NO_TLB_SHOOTDOWN))
+        tlb_shootdown(virt, true);
+
+    return ERR_OK;
+}
+
+/* Drop aliased entries without modifying the shared subtree they point at
+ *
+ * Tables are leaked to caller's bookkeeping, they may still be referenced
+ * by other ranges, and this layer can't know */
+void vmm_unmap_aliased(vaddr_t virt, size_t len, enum vmm_flags vflags) {
+    if (!len)
+        return;
+
+    pt_walk_enter();
+
+    for (vaddr_t v = virt; v < virt + len;) {
+        struct page_table *table = kernel_pml4;
+        int level = 0;
+        uint64_t granule = pt_level_granule(PT_LEVEL_PD);
+
+        for (; level <= PT_LEVEL_PD; level++) {
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
+
+            pte_t *entry = &table->entries[pt_index(v, level)];
+
+#pragma GCC diagnostic pop
+
+            enum irql irql = pte_lock(entry);
+            pte_t val = *entry;
+
+            if (pte_is_shared(val)) {
+                *entry = PTE_LOCK_BIT;
+                pte_unlock(entry, irql);
+                granule = pt_level_granule(level);
+                barrier_and_shootdown(vflags, v);
+                goto next;
+            }
+
+            pte_unlock(entry, irql);
+
+            if (!(val & PAGE_PRESENT) || (val & PAGE_2MB_page))
+                break;
+
+            table = pt_next_table(val);
+        }
+
+    next:
+        v += granule;
+    }
+
+    pt_walk_exit();
+}
+
+/* Private copy of a shared table
+ *
+ * The source is immutable when vmm_map_aliased builds it: each path into
+ * it becomes SHARED and nothing descends through a SHARED entry to edit
+ * leaves, so plain copies can't cause races with writes. The lock bit
+ * is masked anyways, since a lock copied into a table no one else can
+ * see would never get released */
+static struct page_table *pt_clone_shared(struct page_table *src) {
+    struct page_table *dst = alloc_pt();
+    if (!dst)
+        return NULL;
+
+    for (int i = 0; i < PT_ENTRIES; i++)
+        dst->entries[i] = src->entries[i] & ~PTE_LOCK_BIT;
+
+    return dst;
+}
+
+/* Give `virt` a private walk down to the parent of a `leaf_size` leaf,
+ * allowing following maps to write that leaf without touching every other
+ * range that aliases the same tables
+ *
+ * Every SHARED entry on the path is replaced by a private copy of its child,
+ * so the other 511 entries in the copy still point into the alias,
+ * meaning unrelated addresses resolve through the shared tables */
+enum errno vmm_unshare_path(vaddr_t virt, enum vmm_map_page_size leaf_size,
+                            enum vmm_flags vflags) {
+    int leaf_level = map_leaf_level(leaf_size);
+
+    struct page_table *tables[PT_LEVELS];
+    pte_t *entries[PT_LEVELS - 1];
+    enum irql irqls[PT_LEVELS - 1];
+    enum errno err = ERR_OK;
+    bool unshared = false;
+    int level = 0;
+
+    tables[0] = kernel_pml4;
+
+    pt_walk_enter();
+
+    for (level = 0; level < leaf_level; level++) {
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
+
+        pte_t *entry = &tables[level]->entries[pt_index(virt, level)];
+
+#pragma GCC diagnostic pop
+
+        entries[level] = entry;
+        irqls[level] = pte_lock(entry);
+
+        if (!in_use(*entry)) {
+            level++;
+            goto out;
+        }
+
+        kassert(!((*entry & PAGE_PRESENT) && (*entry & PAGE_2MB_page)));
+
+        if (pte_is_shared(*entry)) {
+            struct page_table *priv = pt_clone_shared(pt_next_table(*entry));
+            if (!priv) {
+                err = ERR_NO_MEM;
+                level++;
+                goto out;
+            }
+
+            /* Swap the target, keep flags, drop SHARED */
+            *entry = (hhdm_ptr_to_paddr(priv) & PAGE_PHYS_MASK) |
+                     (*entry & ~(PAGE_PHYS_MASK | PTE_SHARED_BIT));
+            unshared = true;
+        }
+
+        tables[level + 1] = pt_next_table(*entry);
+    }
+
+out:
+    for (int i = level - 1; i >= 0; i--)
+        pte_unlock(entries[i], irqls[i]);
+
+    /* After locks, IPI cores that may be spinning, since they can't answer
+     * until we let go */
+    if (unshared)
+        barrier_and_shootdown(vflags, virt);
 
     pt_walk_exit();
     return err;

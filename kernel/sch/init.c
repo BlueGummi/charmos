@@ -42,8 +42,7 @@ void scheduler_init(void) {
                  scheduler_cmp_threads);
         rbt_init(&s->completed_rbt, scheduler_thread_get_data,
                  scheduler_cmp_threads);
-        rbt_init(&s->climb_threads, climb_get_thread_data,
-                 scheduler_cmp_threads);
+        rbt_init(&s->climb_threads, climb_get_thread_data, climb_cmp_threads);
         s->tick_enabled = false;
         s->current_period = 1; /* Start at period 1 to avoid
                                 * starting at 0 because

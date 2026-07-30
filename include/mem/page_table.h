@@ -21,6 +21,17 @@
 #define PTE_LOCK_BIT ((uint64_t) 1 << PTE_LOCK_SHIFT)
 #define PTE_AVAIL2_BIT ((uint64_t) 1 << PTE_AVAIL2_SHIFT)
 
+/* Mark an entry whose child table is shared with other entries, this is what
+ * we use in aliasing. The subtree should never be freed through this entry,
+ * since every other entry pointing at it would see the change too. This
+ * should only ever be set on present entries */
+#define PTE_SHARED_SHIFT 11
+#define PTE_SHARED_BIT ((uint64_t) 1 << PTE_SHARED_SHIFT)
+
+static inline bool pte_is_shared(uint64_t pte) {
+    return (pte & PAGE_PRESENT) && (pte & PTE_SHARED_BIT);
+}
+
 /* Packed layout:
  *
  *   bit  0       P = 0
@@ -29,6 +40,9 @@
  *   bit  9       LOCK    (not payload)
  *   bit  10      AVAIL2  (not payload)
  *   bits 11-63   payload high (53 bits)
+ *
+ *   Do note that SHARED is not accounted for here, because
+ *   that bit is only ever set on PRESENT entries
  */
 #define PTE_TAGGED_TYPE_SHIFT (PAGE_PRESENT_SHIFT + 1)
 #define PTE_TAGGED_TYPE_MASK 0x3ULL

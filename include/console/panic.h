@@ -10,6 +10,11 @@ typedef __noreturn void (*panic_handler_t)(const char *file, int line,
                                            const char *func, const char *fmt,
                                            ...);
 
+enum panic_type {
+    PANIC_LOCK,
+    PANIC_IRQ,
+};
+
 static inline void qemu_exit(int code) {
     outb(0xf4, (uint8_t) code);
 }

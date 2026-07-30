@@ -1,4 +1,6 @@
 #include <global.h>
+#include <kassert.h>
+#include <math/align.h>
 #include <mem/asan.h>
 #include <mem/hhdm.h>
 #include <mem/page.h>
@@ -8,95 +10,226 @@
 #include <string.h>
 #include <sync/spinlock.h>
 
+#include "mem/slab/internal.h"
+
 #ifdef DEBUG_ASAN
 LOG_SITE_DECLARE_DEFAULT(asan);
 LOG_HANDLE_DECLARE_DEFAULT(asan);
-static bool asan_ready = false;
-static uint8_t *asan_shadow_base;
-static size_t asan_shadow_size;
 
-/* Compute the shadow byte for a given real address */
-static inline uint8_t *asan_shadow_for_internal(void *addr) {
-    return asan_shadow_base + ((uintptr_t) addr >> ASAN_SHADOW_SCALE);
+/* If we widen this, ASAN_SHADOW_OFFSET must be recomputed, because right now
+ * it maps exactly this window into the shadow region */
+#define ASAN_COVERED_START SLAB_HEAP_START
+#define ASAN_COVERED_END SLAB_HEAP_END
+
+static bool asan_ready = false;
+
+/* Two pages that everything aliases to for pages that are fully OK/not OK to
+ * read/modify */
+static paddr_t asan_zero_shadow_phys;  /* never had a chunk: reads accessible */
+static paddr_t asan_freed_shadow_phys; /* had one, gave it back: reads freed */
+
+static inline bool asan_addr_covered(uintptr_t a, size_t size) {
+    return a >= ASAN_COVERED_START && (a + size) <= ASAN_COVERED_END;
 }
 
-/* Poison/unpoison helpers */
+static inline uint8_t *asan_shadow_for_internal(const void *addr) {
+    return (uint8_t *) ASAN_SHADOW_ADDR(addr);
+}
+
+/* Number of shadow bytes covering [addr, addr + size) */
+static inline size_t asan_shadow_span(const void *addr, size_t size) {
+    const uint8_t *end = (const uint8_t *) addr + size - 1;
+    return (size_t) (asan_shadow_for_internal(end) -
+                     asan_shadow_for_internal(addr)) +
+           1;
+}
+
+static void asan_mark_valid(void *addr, size_t size) {
+    kassert(IS_ALIGNED((uintptr_t) addr, ASAN_GRANULE));
+
+    uint8_t *shadow = asan_shadow_for_internal(addr);
+    size_t full = size >> ASAN_SHADOW_SCALE;
+    size_t tail = size & (ASAN_GRANULE - 1);
+
+    memset(shadow, 0, full);
+    if (tail)
+        shadow[full] = (uint8_t) tail;
+}
+
+static void asan_mark_poisoned(void *addr, size_t size, uint8_t value) {
+    kassert(IS_ALIGNED((uintptr_t) addr, ASAN_GRANULE));
+
+    memset(asan_shadow_for_internal(addr), value, asan_shadow_span(addr, size));
+}
+
+void asan_alloc(void *addr, size_t requested, size_t slot) {
+    ASAN_ABORT_IF_NOT_READY();
+
+    if (!slot || !asan_addr_covered((uintptr_t) addr, slot))
+        return;
+
+    kassert(requested && requested <= slot);
+
+    asan_mark_valid(addr, requested);
+
+    size_t redzone = ALIGN_UP(requested, ASAN_GRANULE);
+    if (redzone < slot)
+        asan_mark_poisoned((uint8_t *) addr + redzone, slot - redzone,
+                           ASAN_POISON_HEAP_REDZONE);
+}
+
+void asan_free(void *addr, size_t slot) {
+    ASAN_ABORT_IF_NOT_READY();
+
+    if (!slot || !asan_addr_covered((uintptr_t) addr, slot))
+        return;
+
+    asan_mark_poisoned(addr, slot, ASAN_POISON_HEAP_FREED);
+}
+
 void asan_poison(void *addr, size_t size) {
     ASAN_ABORT_IF_NOT_READY();
-    uintptr_t a = (uintptr_t) addr;
-    size_t idx = a >> ASAN_SHADOW_SCALE;
-    kassert(idx < asan_shadow_size);
-    uint8_t *shadow_start = asan_shadow_for_internal(addr);
-    uint8_t *shadow_end = asan_shadow_for_internal((uint8_t *) addr + size - 1);
 
-    for (uint8_t *s = shadow_start; s <= shadow_end; s++)
-        *s = 0xFF;
+    if (!size || !asan_addr_covered((uintptr_t) addr, size))
+        return;
+
+    asan_mark_poisoned(addr, size, ASAN_POISON_VALUE);
 }
 
 void asan_unpoison(void *addr, size_t size) {
     ASAN_ABORT_IF_NOT_READY();
-    uintptr_t a = (uintptr_t) addr;
-    size_t idx = a >> ASAN_SHADOW_SCALE;
-    kassert(idx < asan_shadow_size);
-    uint8_t *shadow_start = asan_shadow_for_internal(addr);
-    uint8_t *shadow_end = asan_shadow_for_internal((uint8_t *) addr + size - 1);
-    for (uint8_t *s = shadow_start; s <= shadow_end; s++)
-        *s = 0;
+
+    if (!size || !asan_addr_covered((uintptr_t) addr, size))
+        return;
+
+    asan_mark_valid(addr, size);
+}
+
+static inline bool asan_shadow_is_shared(vaddr_t shadow_page) {
+    paddr_t p = vmm_get_phys(shadow_page);
+    return p == asan_zero_shadow_phys || p == asan_freed_shadow_phys;
+}
+
+static bool asan_page_is_uniform(const void *addr, uint8_t value) {
+    const uint64_t *p = addr;
+    uint64_t want = value * 0x0101010101010101ULL;
+
+    for (size_t i = 0; i < PAGE_SIZE / sizeof(uint64_t); i++) {
+        if (p[i] != want)
+            return false;
+    }
+
+    return true;
+}
+
+static inline vaddr_t asan_shadow_page_first(vaddr_t base) {
+    return ALIGN_DOWN(ASAN_SHADOW_ADDR(base), PAGE_SIZE);
+}
+
+static inline vaddr_t asan_shadow_page_limit(vaddr_t base, size_t len) {
+    return ALIGN_UP(ASAN_SHADOW_ADDR(base + len - 1) + 1, PAGE_SIZE);
+}
+
+enum errno asan_shadow_install(vaddr_t base, size_t len) {
+    if (!asan_ready)
+        return ERR_OK;
+
+    if (!len || !asan_addr_covered(base, len))
+        return ERR_OK;
+
+    vaddr_t limit = asan_shadow_page_limit(base, len);
+
+    for (vaddr_t v = asan_shadow_page_first(base); v < limit; v += PAGE_SIZE) {
+        if (!asan_shadow_is_shared(v))
+            continue;
+
+        /* Per page rather than once up front, so a range of any length works:
+         * the walk is cheap and only happens for a page we are about to back */
+        enum errno err =
+            vmm_unshare_path(v, VMM_MAP_PAGE_SIZE_4KB, VMM_FLAG_NONE);
+        if (err < 0)
+            return err;
+
+        paddr_t phys = pmm_alloc_page();
+        if (!phys)
+            return ERR_NO_MEM;
+
+        err =
+            vmm_map_page_internal(v, phys, PAGE_PRESENT | PAGE_WRITE | PAGE_XD,
+                                  VMM_FLAG_MODIFY_LEAF, VMM_MAP_PAGE_SIZE_4KB);
+        if (err < 0) {
+            pmm_free_page(phys);
+            return err;
+        }
+
+        memset((void *) v, ASAN_POISON_VALUE, PAGE_SIZE);
+    }
+
+    return ERR_OK;
+}
+
+void asan_shadow_release(vaddr_t base, size_t len) {
+    if (!asan_ready)
+        return;
+
+    if (!len || !asan_addr_covered(base, len))
+        return;
+
+    vaddr_t limit = asan_shadow_page_limit(base, len);
+
+    for (vaddr_t v = asan_shadow_page_first(base); v < limit; v += PAGE_SIZE) {
+        if (asan_shadow_is_shared(v))
+            continue;
+
+        if (!asan_page_is_uniform((void *) v, ASAN_POISON_HEAP_FREED))
+            continue;
+
+        paddr_t phys = vmm_get_phys(v);
+
+        if (vmm_map_page_internal(v, asan_freed_shadow_phys,
+                                  PAGE_PRESENT | PAGE_XD, VMM_FLAG_MODIFY_LEAF,
+                                  VMM_MAP_PAGE_SIZE_4KB) < 0)
+            continue;
+
+        pmm_free_page(phys);
+    }
+}
+
+static void asan_map_early_shadow(void) {
+    vaddr_t start = ASAN_SHADOW_ADDR(ASAN_COVERED_START);
+    vaddr_t end = ASAN_SHADOW_ADDR(ASAN_COVERED_END);
+
+    asan_zero_shadow_phys = pmm_alloc_page(ALLOC_FLAGS_ZERO);
+    if (!asan_zero_shadow_phys)
+        panic("ASAN: could not allocate the shared shadow page");
+
+    asan_freed_shadow_phys = pmm_alloc_page();
+    if (!asan_freed_shadow_phys)
+        panic("ASAN: could not allocate the shared freed shadow page");
+
+    memset(hhdm_paddr_to_ptr(asan_freed_shadow_phys), ASAN_POISON_HEAP_FREED,
+           PAGE_SIZE);
+
+    /* Deliberately RO and aliased */
+    enum errno err = vmm_map_aliased(start, end - start, asan_zero_shadow_phys,
+                                     PAGE_PRESENT | PAGE_XD, VMM_FLAG_NONE);
+    if (err < 0)
+        panic("ASAN: could not map the shared shadow window: %d", err);
+
+    asan_info("shared shadow: [%lx, %lx), %zu GiB of window on one zero page "
+              "at %lx\n",
+              start, end, (size_t) ((end - start) / GB(1)),
+              asan_zero_shadow_phys);
 }
 
 void asan_init(void) {
-    asan_info("Bringing up ASAN... this will take time...");
-    asan_shadow_size = (global.total_pages * PAGE_SIZE) >> ASAN_SHADOW_SCALE;
+    asan_info("bringing ASAN up...");
 
-    paddr_t shadow_phys = pmm_alloc_pages(
-        (asan_shadow_size + PAGE_SIZE - 1) / PAGE_SIZE, ALLOC_FLAGS_DEFAULT);
-
-    if (!shadow_phys)
-        panic("ASAN: could not allocate shadow memory");
-
-    asan_shadow_base = hhdm_paddr_to_ptr(shadow_phys);
-
-    size_t remaining = asan_shadow_size;
-    uint64_t phys = shadow_phys;
-    uint64_t virt = ASAN_SHADOW_OFFSET;
-
-    while (remaining >= PAGE_2MB && (phys % PAGE_2MB) == 0 &&
-           (virt % PAGE_2MB) == 0) {
-        if (vmm_map_page(virt, phys, PAGE_PRESENT | PAGE_WRITE, VMM_FLAG_NONE,
-                         VMM_MAP_PAGE_SIZE_2MB) < 0)
-            panic("ASAN: failed to map 2MB page at %lx", virt);
-        phys += PAGE_2MB;
-        virt += PAGE_2MB;
-        remaining -= PAGE_2MB;
-    }
-
-    while (remaining > 0) {
-        if (vmm_map_page(virt, phys, PAGE_PRESENT | PAGE_WRITE) < 0)
-            panic("ASAN: failed to map 4KB page at %lx", virt);
-        phys += PAGE_SIZE;
-        virt += PAGE_SIZE;
-        remaining = remaining > PAGE_SIZE ? remaining - PAGE_SIZE : 0;
-    }
-
-    asan_info("ASAN mapped up and brought up... memsetting..");
-    /* Initialize shadow memory to poisoned */
-    memset(asan_shadow_base, 0xFF, asan_shadow_size);
-
-    asan_info("shadow memory initialized at %p", asan_shadow_base);
+    asan_map_early_shadow();
 
     asan_ready = true;
 }
 
-static inline uint8_t *asan_shadow_for(const void *addr) {
-    uintptr_t a = (uintptr_t) addr;
-    size_t idx = a >> ASAN_SHADOW_SCALE;
-    if (idx >= asan_shadow_size) {
-        return NULL;
-    }
-    return asan_shadow_base + idx;
-}
-
-/* Report function called on violation. Prints info and panics. */
 static void __asan_report_and_panic(const char *what, const void *addr,
                                     size_t size, bool is_write) {
     printf("[ASAN] %s at %p size=%zu %s", what, addr, size,
@@ -104,48 +237,49 @@ static void __asan_report_and_panic(const char *what, const void *addr,
     panic("ASAN: aborting due to memory error");
 }
 
-/* Core access check: conservative: checks every shadow byte spanned by access.
- * If any shadow byte != 0, treat as violation.
- */
-#include "mem/slab/internal.h"
+static const char *asan_poison_reason(uint8_t shadow) {
+    switch (shadow) {
+    case ASAN_POISON_HEAP_FREED: return "use-after-free";
+    case ASAN_POISON_HEAP_REDZONE: return "heap redzone (out of bounds)";
+    case ASAN_POISON_VALUE: return "poisoned (unallocated)";
+    default:
+        return asan_shadow_is_poison(shadow)
+                   ? "poisoned"
+                   : "heap overflow (partial granule)";
+    }
+}
+
 static inline void asan_check_access_core(const void *addr, size_t size,
                                           bool is_write) {
     ASAN_ABORT_IF_NOT_READY();
-    vaddr_t v = (vaddr_t) addr;
-    if (v < SLAB_HEAP_START || v > SLAB_HEAP_END)
-        return;
 
     if (size == 0)
         return;
 
-    const uint8_t *start = (const uint8_t *) addr;
-    const uint8_t *end = start + (size - 1);
+    if (!asan_addr_covered((uintptr_t) addr, size))
+        return;
 
-    uintptr_t start_idx = (uintptr_t) start >> ASAN_SHADOW_SCALE;
-    uintptr_t end_idx = (uintptr_t) end >> ASAN_SHADOW_SCALE;
+    uintptr_t start = (uintptr_t) addr;
+    uintptr_t last = start + (size - 1);
 
-    /* bounds-check shadow index to avoid accessing past shadow table */
-    if (end_idx >= asan_shadow_size) {
-        __asan_report_and_panic("ASAN: access out-of-shadow-range", addr, size,
-                                is_write);
+    for (uintptr_t g = start & ~(ASAN_GRANULE - 1); g <= last;
+         g += ASAN_GRANULE) {
+        uint8_t s = *asan_shadow_for_internal((const void *) g);
+        if (s == 0)
+            continue;
+
+        /* Bytes of this granule the access actually touches: [lo, hi) */
+        uintptr_t hi =
+            (last - g < ASAN_GRANULE - 1) ? (last - g) + 1 : ASAN_GRANULE;
+
+        /* A partial granule keeps its first `s` bytes accessible */
+        if (!asan_shadow_is_poison(s) && hi <= s)
+            continue;
+
+        __asan_report_and_panic(asan_poison_reason(s), addr, size, is_write);
         return;
     }
-
-    uint8_t *s = asan_shadow_base + start_idx;
-    size_t count = (end_idx - start_idx) + 1;
-
-    /* If any shadow byte is non-zero => poisoned. */
-    for (size_t i = 0; i < count; i++) {
-        if (s[i] != 0) {
-            __asan_report_and_panic("ASAN: invalid memory access (poisoned)",
-                                    addr, size, is_write);
-            return;
-        }
-    }
 }
-
-/* Public runtime functions used by compiler instrumentation.
-   We'll implement 1/2/4/8 byte variants for loads and stores. */
 
 void __asan_load1(const void *addr) {
     asan_check_access_core(addr, 1, false);
@@ -187,60 +321,15 @@ void __asan_storeN(const void *addr, size_t size) {
     asan_check_access_core(addr, size, true);
 }
 
+/* The compiler's spelling of the same two operations */
 void __asan_poison_memory_region(void *addr, size_t size) {
-    ASAN_ABORT_IF_NOT_READY();
-    if (size == 0)
-        return;
-
-    uint8_t *start_shadow = asan_shadow_for(addr);
-    if (!start_shadow)
-        return; /* out-of-range: ignore conservatively */
-
-    uint8_t *end_shadow = asan_shadow_for((uint8_t *) addr + size - 1);
-    if (!end_shadow) {
-        /* If end is out-of-range, compute up to last valid shadow byte. */
-        size_t start_idx = (uintptr_t) addr >> ASAN_SHADOW_SCALE;
-        if (start_idx >= asan_shadow_size)
-            return;
-        end_shadow = asan_shadow_base + (asan_shadow_size - 1);
-    }
-
-    for (uint8_t *p = start_shadow; p <= end_shadow; p++)
-        *p = ASAN_POISON_VALUE;
+    asan_poison(addr, size);
 }
 
 void __asan_unpoison_memory_region(void *addr, size_t size) {
-    ASAN_ABORT_IF_NOT_READY();
-    if (size == 0)
-        return;
-
-    uint8_t *start_shadow = asan_shadow_for(addr);
-    if (!start_shadow)
-        return;
-
-    uint8_t *end_shadow = asan_shadow_for((uint8_t *) addr + size - 1);
-    if (!end_shadow) {
-        size_t start_idx = (uintptr_t) addr >> ASAN_SHADOW_SCALE;
-        if (start_idx >= asan_shadow_size)
-            return;
-        end_shadow = asan_shadow_base + (asan_shadow_size - 1);
-    }
-
-    for (uint8_t *p = start_shadow; p <= end_shadow; p++)
-        *p = 0;
+    asan_unpoison(addr, size);
 }
 
-/* Minimal global registration support:
- * The compiler emits calls to __asan_register_globals() for static globals;
- * the runtime gets an array of descriptors with address+size. We'll unpoison
- * each global and poison small redzones around it (simple fixed redzone).
- *
- * This structure layout is what Clang typically expects; compilers may vary.
- * For a minimal build, the compiler-provided descriptors should be compatible.
- *
- * We provide a conservative implementation: unpoison the region and poison
- * a fixed small left/right redzone.
- */
 struct __asan_global {
     void *addr;
     size_t size;
@@ -265,7 +354,6 @@ void __asan_register_globals(struct __asan_global *globals, size_t n) {
     }
 }
 
-/* Minimal unregister (no-op) */
 void __asan_unregister_globals(void *globals, size_t n) {
     (void) globals;
     (void) n;
@@ -284,8 +372,6 @@ void __asan_stack_malloc(void *addr, size_t size) {
     ASAN_ABORT_IF_NOT_READY();
     if (!addr || size == 0)
         return;
-    /* Poison entire region, then unpoison the real payload so redzones are left
-       poisoned. For simplicity pick small redzones here. */
     const size_t rz = 16;
     __asan_poison_memory_region((uint8_t *) addr - rz, size + rz * 2);
     __asan_unpoison_memory_region(addr, size);
@@ -299,7 +385,6 @@ void __asan_stack_malloc(void *addr, size_t size) {
 
 void __asan_stack_free(void *addr) {
     ASAN_ABORT_IF_NOT_READY();
-    /* Unpoison and remove record. */
     for (size_t i = 0; i < stack_records_count; i++) {
         if (stack_records[i].addr == addr) {
             size_t size = stack_records[i].size;
@@ -312,9 +397,6 @@ void __asan_stack_free(void *addr) {
         }
     }
 }
-
-/* Optional report helpers (compiler may call __asan_report_*); implement a
-   minimal mapping to the same panic/report routine so user sees a message. */
 
 void __asan_report_load1(void *addr) {
     __asan_report_and_panic("ASAN: load1", addr, 1, false);
@@ -374,14 +456,7 @@ void __asan_report_store_n(void *addr, size_t size) {
                             true);
 }
 
-/* --- Stack-use-after-return configuration --- */
-
-/* Compiler checks this flag to see if it should try to detect
- * stack-use-after-return. We can just say "false" (0).
- */
 int __asan_option_detect_stack_use_after_return = 0;
-
-/* Stack alloc/free variants, indexed by small number suffix (0–9) */
 
 void *__asan_stack_malloc_0(size_t size) {
     (void) size;
@@ -483,8 +558,6 @@ void __asan_free_hook(void *ptr) {
     (void) ptr;
 }
 
-/* --- Init/fini stubs --- */
-
 void __asan_init(void) {
     asan_info("__asan_init runtime stub called");
 }
@@ -493,8 +566,6 @@ void __asan_before_dynamic_init(const char *module_name) {
     (void) module_name;
 }
 void __asan_after_dynamic_init(void) {}
-
-/* --- Miscellaneous runtime entrypoints --- */
 
 /* Compiler sometimes emits these for non-instrumented copies. */
 void *__asan_memcpy(void *dst, const void *src, size_t n) {
@@ -522,8 +593,6 @@ void __asan_alloca_poison(void *addr, size_t size) {
     ASAN_ABORT_IF_NOT_READY();
     if (!addr || size == 0)
         return;
-    /* Conservative: poison the whole region. The compiler expects
-       later an unpoison to unmark the payload itself. */
     __asan_poison_memory_region(addr, size);
 }
 

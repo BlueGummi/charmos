@@ -76,6 +76,7 @@ struct topology {
 
 /* TODO: move CPUmask into its own header */
 struct cpu_mask *cpu_mask_create(void);
+void cpu_mask_copy(struct cpu_mask *dst, const struct cpu_mask *src);
 bool cpu_mask_init(struct cpu_mask *m, size_t nbits);
 void cpu_mask_set(struct cpu_mask *m, size_t cpu);
 void cpu_mask_set_all(struct cpu_mask *m);

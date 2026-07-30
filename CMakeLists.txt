@@ -22,31 +22,12 @@ include(flags)      # compiler / linker / codegen
 add_subdirectory(kernel)
 target_include_directories(kernel PRIVATE include)
 
-set(SYMS_OUTPUT  "${CMAKE_SOURCE_DIR}/kernel/syms/fullsyms.c")
-set(SYMS_AWK     "${CMAKE_SOURCE_DIR}/scripts/syms.awk")
-set(SYMS_STAMP   "${CMAKE_BINARY_DIR}/syms.stamp")
-
-# Only copy if different to avoid changing mtime and causing re-link
-add_custom_command(
-    OUTPUT ${SYMS_STAMP}
-    COMMAND nm $<TARGET_FILE:kernel> | awk -f ${SYMS_AWK} > ${SYMS_OUTPUT}.tmp
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SYMS_OUTPUT}.tmp ${SYMS_OUTPUT}
-    COMMAND ${CMAKE_COMMAND} -E rm -f ${SYMS_OUTPUT}.tmp
-    COMMAND ${CMAKE_COMMAND} -E touch ${SYMS_STAMP}
-    DEPENDS kernel ${SYMS_AWK}
-    COMMENT "Regenerating symbol table from built kernel"
-    VERBATIM
-)
-
-add_custom_target(regen-syms DEPENDS ${SYMS_STAMP})
-
 include(emulation)
 
 add_custom_target(clean-full
     COMMAND ${CMAKE_COMMAND} -E rm -rf
         iso_root ${IMAGE_NAME}.iso ${IMAGE_NAME}.hdd
-        kernel-deps limine ovmf ${SYMS_STAMP}
-    COMMAND ${CMAKE_COMMAND} -E rm -f ${SYMS_OUTPUT}
+        kernel-deps limine ovmf
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 

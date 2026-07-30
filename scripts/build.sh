@@ -20,6 +20,7 @@ QUIET=false
 CLEAN=false
 COMPDB=false
 BUILD_TYPE="Debug"
+BUILD_TYPE_EXPLICIT=false
 COMPILER="gcc"
 GENERATOR="auto"
 BUILD_DIR="build"
@@ -58,7 +59,6 @@ ${BOLD}Targets:${NC} (passed to make)
   headless    Build and run in QEMU without graphics
   tests       Build and run test suite
   debug       Build and run QEMU paused for gdb
-  regen-syms  Regenerate symbol table from built kernel
   clean-full  Wipe ISO, limine, ovmf, syms, etc.
 
 ${BOLD}Examples:${NC}
@@ -80,7 +80,7 @@ while [[ $# -gt 0 ]]; do
         -q|-s|--quiet)         QUIET=true; shift ;;
         -c|--clean)            CLEAN=true; shift ;;
         -C|--compdb)           COMPDB=true; shift ;;
-        -t|--type)             BUILD_TYPE="$2"; shift 2 ;;
+        -t|--type)             BUILD_TYPE="$2"; BUILD_TYPE_EXPLICIT=true; shift 2 ;;
         -k|--compiler)         COMPILER="$2"; shift 2 ;;
         --clang)               COMPILER="clang"; shift ;;
         -G|--generator)        GENERATOR="$2"; shift 2 ;;
@@ -158,6 +158,9 @@ check_required_tools() {
     check_tool nasm     "install via your package manager (apt/dnf/brew install nasm)"    || failed=1
     check_tool nm       "binutils package"                                                || failed=1
     check_tool awk      "install gawk or mawk"                                            || failed=1
+    if ! command -v x86_64-elf-objcopy >/dev/null 2>&1; then
+        check_tool objcopy "binutils package, or x86_64-elf-objcopy for a cross build"    || failed=1
+    fi
     check_tool xorriso  "install xorriso (apt/dnf/brew install xorriso)"                  || failed=1
     check_tool git      "git is required for fetching submodules and limine"              || failed=1
 
@@ -245,16 +248,33 @@ select_toolchain() {
     fi
 }
 
+# The build type is sticky: -D on the command line overwrites the cache every
+# time, so passing our Debug default unconditionally would silently undo an
+# earlier -t RelWithDebInfo. That is how an ASAN build ends up back at -O0 --
+# -DDEBUG_ASAN=ON persists in the cache, the build type it was paired with does
+# not. Only send one when the caller actually asked, or the dir is fresh
 configure_cmake() {
+    local type_args=()
+    if $BUILD_TYPE_EXPLICIT || [[ ! -f "CMakeCache.txt" ]]; then
+        type_args=(-DCMAKE_BUILD_TYPE="$BUILD_TYPE")
+    fi
+
     run_cmd cmake \
         -G "$CMAKE_GENERATOR" \
-        -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+        "${type_args[@]}" \
         "${TOOLCHAIN_ARGS[@]}" \
         "${CMAKE_EXTRA_ARGS[@]}" \
         "$REPO_ROOT"
 }
 
-# Generator-agnostic build wrapper; ninja auto-parallelizes but honors -j too.
+# What the cache holds, which is not $BUILD_TYPE once the above declines to set
+# it. Empty for a fresh dir, where $BUILD_TYPE is about to become the truth
+cached_build_type() {
+    [[ -f "CMakeCache.txt" ]] &&
+        sed -n 's/^CMAKE_BUILD_TYPE:STRING=//p' "CMakeCache.txt"
+    return 0
+}
+
 build_targets() {
     run_cmd cmake --build . -j"$JOBS" --target "$@"
 }
@@ -277,7 +297,7 @@ if $CLEAN && [[ -d "$BUILD_DIR" ]]; then
     rm -rf "$BUILD_DIR"
 fi
 
-# CMake refuses to switch generators in an existing build dir; wipe on mismatch.
+# CMake refuses to switch generators in an existing build dir; wipe on mismatch
 if [[ -f "$BUILD_DIR/CMakeCache.txt" ]]; then
     cached_gen="$(sed -n 's/^CMAKE_GENERATOR:INTERNAL=//p' "$BUILD_DIR/CMakeCache.txt")"
     if [[ -n "$cached_gen" && "$cached_gen" != "$CMAKE_GENERATOR" ]]; then
@@ -291,8 +311,21 @@ cd "$BUILD_DIR"
 
 select_toolchain
 
-log "configuring cmake (${BUILD_TYPE}, ${CMAKE_GENERATOR})"
+effective_type="$(cached_build_type)"
+if $BUILD_TYPE_EXPLICIT || [[ -z "$effective_type" ]]; then
+    effective_type="$BUILD_TYPE"
+else
+    note "keeping cached build type ${effective_type} (no -t given)"
+fi
+
+log "configuring cmake (${effective_type}, ${CMAKE_GENERATOR})"
 configure_cmake
+
+# Report the -O the compiler will actually see, rather than the build type it
+# was meant to imply. Anything reconfiguring this dir behind us -- an editor's
+# cmake integration, most often -- shows up here and nowhere else
+opt_level="$(grep -m1 -oE '(^| )-O[0-3sgz]' build.ninja 2>/dev/null | tr -d ' ')"
+log "build type ${effective_type}${opt_level:+, compiling at ${opt_level}}"
 
 if $COMPDB; then
     log "generating compile_commands.json"
@@ -303,24 +336,6 @@ if $COMPDB; then
     fi
 fi
 
-SYMS_FILE="$REPO_ROOT/kernel/syms/fullsyms.c"
-
-# Extra pass to keep symbol table up to date
-BOOTSTRAP=false
-if [[ ! -f "$SYMS_FILE" ]] || ! grep -q syms_etext "$SYMS_FILE"; then
-    BOOTSTRAP=true
-    warn "first build: bootstrapping symbol table"
-else
-    log "refreshing symbol table"
-fi
-
-build_targets kernel
-build_targets regen-syms
-
-if $BOOTSTRAP; then
-    log "reconfiguring with real symbols"
-    configure_cmake
-fi
 
 log "building targets: ${TARGETS[*]}"
 build_targets "${TARGETS[@]}"

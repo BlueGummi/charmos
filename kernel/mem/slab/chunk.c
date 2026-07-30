@@ -2,6 +2,7 @@
 #include <math/div.h>
 #include <math/ilog2.h>
 #include <math/to_bits_bytes.h>
+#include <mem/asan.h>
 #include <mem/hhdm.h>
 #include <mem/pmm.h>
 #include <mem/vas.h>
@@ -37,22 +38,27 @@ static void destroy_chunk(struct slab_chunks *sc, struct slab_chunk *c) {
     uint8_t curr = slab_order_map_get(vaddr);
     kassert(curr != SLAB_POW2_ORDER_EMPTY);
 
+#ifdef DEBUG_ASAN
+    asan_free((void *) vaddr, SLAB_CHUNK_SIZE);
+#endif
+
     vas_free(slab_global.vas, vaddr, PAGE_2MB);
     slab_order_map_set(vaddr, SLAB_POW2_ORDER_EMPTY);
 
     fixed_size_free(&sc->fsr, c);
 }
 
-static void move_to(struct slab_chunks *sc, struct slab_chunk *c,
+static bool move_to(struct slab_chunks *sc, struct slab_chunk *c,
                     enum slab_chunk_state s) {
     kassert(c->state != s);
     list_del_init(&c->list);
     if (s == SLAB_CHUNK_FREE) {
         destroy_chunk(sc, c);
-        return;
+        return true;
     }
     c->state = s;
     list_add_tail(&c->list, chunk_list_for(sc, s));
+    return false;
 }
 
 static struct slab_chunk *alloc_chunk(struct slab_chunks *sc,
@@ -68,6 +74,15 @@ static struct slab_chunk *alloc_chunk(struct slab_chunks *sc,
 
     spin_unlock(&sc->lock, *lirql);
     struct slab_chunk *ret = fixed_size_alloc(&sc->fsr);
+
+#ifdef DEBUG_ASAN
+    /* We have to do this here as the shadow must exist before alloc */
+    if (ret && asan_shadow_install(base, SLAB_CHUNK_SIZE) < 0) {
+        fixed_size_free(&sc->fsr, ret);
+        ret = NULL;
+    }
+#endif
+
     *lirql = spin_lock(&sc->lock);
 
     if (!ret) {
@@ -139,7 +154,7 @@ static vaddr_t chunk_alloc(struct slab_chunks *chunks,
     return ret;
 }
 
-static void chunk_free(struct slab_chunks *chunks, struct slab_chunk *chunk,
+static bool chunk_free(struct slab_chunks *chunks, struct slab_chunk *chunk,
                        vaddr_t v) {
     enum slab_chunk_state last = chunk->state;
     kassert(last != SLAB_CHUNK_FREE);
@@ -148,8 +163,10 @@ static void chunk_free(struct slab_chunks *chunks, struct slab_chunk *chunk,
     if (last == SLAB_CHUNK_USED) {
         move_to(chunks, chunk, SLAB_CHUNK_PARTIAL);
     } else if (chunk->used == 0) {
-        move_to(chunks, chunk, SLAB_CHUNK_FREE);
+        return move_to(chunks, chunk, SLAB_CHUNK_FREE);
     }
+
+    return false;
 }
 
 static struct slab_chunk *try_pop(struct list_head *lh) {
@@ -179,11 +196,19 @@ out:
 
 void slab_chunks_free(struct slab_chunks *sc, struct slab_chunk *chunk,
                       vaddr_t addr) {
+    /* Read before the chunk can be destroyed under the lock */
+    vaddr_t base = base_addr_to_vaddr(chunk->base_addr);
+
     enum irql irql = spin_lock(&sc->lock);
 
-    chunk_free(sc, chunk, addr);
+    bool destroyed = chunk_free(sc, chunk, addr);
 
     spin_unlock(&sc->lock, irql);
+
+#ifdef DEBUG_ASAN
+    if (destroyed)
+        asan_shadow_release(base, SLAB_CHUNK_SIZE);
+#endif
 }
 
 void slab_chunks_init(struct slab_chunks *sc, struct slab_cache *parent) {

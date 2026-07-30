@@ -370,6 +370,11 @@ static struct slab *slab_create_new(struct slab_cache *cache) {
     if (!page)
         return NULL;
 
+#ifdef DEBUG_ASAN
+    /* Make sure we can touch the metadata */
+    asan_unpoison(page, cache->slab_metadata_size);
+#endif
+
     struct slab *slab = (struct slab *) page;
     slab->parent_chunk = out;
     slab->page_count = cache->pages_per_slab;
@@ -1174,6 +1179,9 @@ exit:
     if (unlikely(!ret))
         slab_stat_alloc_failure(local_dom);
 
+    if (ret)
+        asan_alloc(ret, size, ksize(ret));
+
     irql_lower(outer);
     return ret;
 }
@@ -1183,8 +1191,15 @@ void *kmalloc_from_domain(size_t domain, size_t size) {
     struct slab_caches *cs =
         global.domains[domain]->slab_domain->caches[SLAB_TYPE_NONPAGEABLE_ZERO];
     struct slab_cache *c = &cs->caches[index];
-    return slab_alloc(c,
-                      ALLOC_BEHAVIOR_NORMAL | SLAB_ALLOC_BEHAVIOR_FROM_ALLOC);
+    void *ret =
+        slab_alloc(c, ALLOC_BEHAVIOR_NORMAL | SLAB_ALLOC_BEHAVIOR_FROM_ALLOC);
+
+#ifdef DEBUG_ASAN
+    if (ret)
+        asan_alloc(ret, size, ksize(ret));
+#endif
+
+    return ret;
 }
 
 /* okay, our free policy (in terms of freequeue usage) is:
@@ -1377,6 +1392,7 @@ garbage_collect:
     slab_free_queue_drain_on_free(local_domain, pcpu, behavior);
 
 done:
+    asan_free(ptr, size);
     irql_lower(outer);
 }
 
@@ -1403,10 +1419,8 @@ void *kmalloc_internal(size_t size, enum alloc_flags flags,
     void *p = static_call(alloc)(size, flags, behavior);
 
 #ifdef DEBUG_ASAN
-    /* Object is now live: make its full slot accessible to instrumented code.
-     */
     if (p)
-        asan_unpoison(p, ksize(p));
+        asan_alloc(p, size, ksize(p));
 #endif
 
 #ifdef DEBUG_SLAB
@@ -1446,7 +1460,7 @@ void kfree_internal(void *p, enum alloc_behavior behavior) {
 #endif
 
 #ifdef DEBUG_ASAN
-    asan_poison(p, ksize(p));
+    asan_free(p, ksize(p));
 #endif
 
     static_call(free)(p, behavior);
@@ -1467,8 +1481,12 @@ void *krealloc_internal(void *ptr, size_t size, enum alloc_flags flags,
     /* Touch nothing. This can still use the same slab allocation */
     size_t old_idx = slab_size_to_index(old);
     size_t new_idx = slab_size_to_index(size);
-    if (old_idx == new_idx)
+    if (old_idx == new_idx) {
+#ifdef DEBUG_ASAN
+        asan_alloc(ptr, size, old);
+#endif
         return ptr;
+    }
 
     void *new_ptr = kmalloc(size, flags, behavior);
 

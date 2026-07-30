@@ -44,34 +44,11 @@ static void construct_domains_from_numa_nodes(void) {
         struct numa_node *nn = &global.numa_nodes[i];
         struct domain *cd = global.domains[i];
         cd->num_cores = cpu_mask_popcount(&nn->cpus);
+        alloc_or_die(cpu_mask_init(&cd->cpu_mask, cd->num_cores));
+        cpu_mask_copy(&cd->cpu_mask, &nn->cpus);
         cd->associated_node = nn;
         cd->cores =
             kmalloc(sizeof(struct core *) * cd->num_cores, ALLOC_FLAGS_ZERO);
-    }
-}
-
-static void construct_domains_after_smp() {
-    if (global.numa_node_count > 1) {
-        for (size_t i = 0; i < global.domain_count; i++) {
-            struct domain *cd = global.domains[i];
-            struct numa_node *nn = &global.numa_nodes[i];
-            struct cpu_mask nm = nn->cpus;
-            size_t j;
-            size_t k = 0;
-            cpu_mask_for_each(j, nm) {
-                cd->cores[k++] = global.cores[j];
-            }
-        }
-    } else {
-        size_t core_index = 0;
-        for (size_t i = 0; i < global.domain_count; i++) {
-            struct domain *cd = global.domains[i];
-
-            for (size_t j = 0; j < cd->num_cores; j++) {
-                global.cores[core_index]->domain = cd;
-                cd->cores[j] = global.cores[core_index++];
-            }
-        }
     }
 }
 
@@ -95,6 +72,17 @@ static void construct_domains_from_cores(void) {
             cores_this_domain = remainder; /* last one gets leftovers */
 
         cd->num_cores = cores_this_domain;
+        alloc_or_die(cpu_mask_init(&cd->cpu_mask, cores_this_domain));
+
+        /* Set the CPU mask */
+        for (size_t j = 0; j < cores_this_domain; j++) {
+            size_t core_index = i * CORES_PER_DOMAIN + j;
+            if (core_index >= global.core_count)
+                break;
+
+            struct core *c = global.cores[core_index];
+            cpu_mask_set(&cd->cpu_mask, c->id);
+        }
         cd->cores = kmalloc_or_die(sizeof(struct core *) * cores_this_domain,
                                    ALLOC_FLAGS_ZERO);
     }
@@ -139,16 +127,39 @@ void domain_init(void) {
     global.cores[0]->domain = global.domains[0];
 }
 
+static void construct_domains_after_smp() {
+    if (global.numa_node_count > 1) {
+        for (size_t i = 0; i < global.domain_count; i++) {
+            struct domain *cd = global.domains[i];
+            struct numa_node *nn = &global.numa_nodes[i];
+            struct cpu_mask nm = nn->cpus;
+            size_t j;
+            size_t k = 0;
+            cpu_mask_for_each(j, nm) {
+                cd->cores[k++] = global.cores[j];
+            }
+        }
+    } else {
+        size_t core_index = 0;
+        for (size_t i = 0; i < global.domain_count; i++) {
+            struct domain *cd = global.domains[i];
+
+            for (size_t j = 0; j < cd->num_cores; j++) {
+                global.cores[core_index]->domain = cd;
+                cd->cores[j] = global.cores[core_index++];
+            }
+        }
+    }
+}
+
 void domain_init_after_smp() {
     construct_domains_after_smp();
     for (size_t i = 0; i < global.domain_count; i++) {
         struct domain *domain = global.domains[i];
-        alloc_or_die(cpu_mask_init(&domain->cpu_mask, global.core_count));
 
         for (size_t j = 0; j < domain->num_cores; j++) {
             domain->cores[j]->domain_cpu_id = j;
             domain->cores[j]->domain = domain;
-            cpu_mask_set(&domain->cpu_mask, domain->cores[j]->id);
         }
     }
 }
@@ -200,7 +211,7 @@ size_t domain_for_core(size_t cpu) {
             return i;
     }
 
-    panic("unreachable!");
+    kassert_unreachable();
 }
 
 MOVEALLOC_REGISTER_CALL(domain_move, domains_move, /* a = */ NULL,

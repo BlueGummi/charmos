@@ -130,6 +130,7 @@ void climb_thread_remove(struct thread *t);
 void climb_thread_init(struct thread *t);
 void climb_post_migrate_hook(struct thread *t, size_t old_cpu, size_t new_cpu);
 size_t climb_get_thread_data(struct rbt_node *n);
+int32_t climb_cmp_threads(const struct rbt_node *a, const struct rbt_node *b);
 
 static inline struct climb_handle *
 climb_handle_init(struct climb_handle *ch, struct climb_source *cs,

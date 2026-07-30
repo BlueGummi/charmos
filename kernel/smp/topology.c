@@ -105,6 +105,16 @@ void cpu_mask_deinit(struct cpu_mask *m) {
     atomic_store_explicit(&m->small, 0, memory_order_release);
 }
 
+void cpu_mask_copy(struct cpu_mask *dst, const struct cpu_mask *src) {
+    if (src->uses_large) {
+        size_t nwords = DIV_ROUND_UP(src->nbits, 64);
+        for (size_t i = 0; i < nwords; i++)
+            atomic_store(&dst->large[i], atomic_load(&src->large[i]));
+    } else {
+        atomic_store(&dst->small, atomic_load(&src->small));
+    }
+}
+
 void cpu_mask_free(struct cpu_mask *m) {
     kfree(m);
 }

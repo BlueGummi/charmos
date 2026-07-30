@@ -13,7 +13,7 @@ set(QEMU_SMP_TOPO  "sockets=2,cores=2,threads=2"
     CACHE STRING "QEMU -smp topology string")
 
 add_custom_target(iso
-    DEPENDS kernel regen-syms
+    DEPENDS kernel
     COMMAND ${CMAKE_COMMAND} -E rm -rf iso_root
     COMMAND ${CMAKE_COMMAND} -E make_directory iso_root/boot
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:kernel> iso_root/boot/

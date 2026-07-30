@@ -43,29 +43,31 @@ set(EARLY_INIT_FILES
     ${CMAKE_SOURCE_DIR}/kernel/mem/slab/free_queue.c
 )
 
-set(SYMS_USABLE FALSE)
-if(EXISTS "${CMAKE_SOURCE_DIR}/kernel/syms/fullsyms.c")
-    # Regenerate to make sure the symbol table is up to date
-    file(READ "${CMAKE_SOURCE_DIR}/kernel/syms/fullsyms.c" SYMS_CONTENTS)
-    if(SYMS_CONTENTS MATCHES "syms_etext")
-        set(SYMS_USABLE TRUE)
-    else()
-        message(STATUS "fullsyms.c predates syms_etext; regenerating")
-    endif()
-endif()
+set(SYMS_SOURCE "${CMAKE_SOURCE_DIR}/kernel/syms/syms_reserve.c")
 
-if(SYMS_USABLE)
-    set(SYMS_SOURCE "${CMAKE_SOURCE_DIR}/kernel/syms/fullsyms.c")
-    message(STATUS "Symbol source: fullsyms.c (resolved)")
-else()
-    set(SYMS_SOURCE "${CMAKE_SOURCE_DIR}/kernel/syms/syms_dummy.c")
-    message(STATUS "Symbol source: syms_dummy.c (run `make regen-syms` after first build)")
+# We need to make sure the versions are right on macOS
+find_program(KERNEL_NM      NAMES x86_64-elf-nm      nm      llvm-nm      REQUIRED)
+find_program(KERNEL_OBJCOPY NAMES x86_64-elf-objcopy objcopy llvm-objcopy REQUIRED)
+
+set(SYMS_HEADER "${CMAKE_SOURCE_DIR}/include/linker/symbol_table.h")
+file(STRINGS "${SYMS_HEADER}" SYMS_RESERVE_LINE
+     REGEX "^#define[ \t]+KERNEL_SYMS_RESERVE[ \t]+[0-9]+")
+if(NOT SYMS_RESERVE_LINE)
+    message(FATAL_ERROR "could not read KERNEL_SYMS_RESERVE from ${SYMS_HEADER}")
 endif()
+string(REGEX REPLACE "^#define[ \t]+KERNEL_SYMS_RESERVE[ \t]+([0-9]+).*" "\\1"
+       KERNEL_SYMS_RESERVE "${SYMS_RESERVE_LINE}")
+
+message(STATUS "Symbol table  : stamped post-link, ${KERNEL_SYMS_RESERVE} bytes reserved")
 
 add_executable(kernel ${C_SOURCES} ${ASM_SOURCES} ${NASM_SOURCES})
 
 if(DEBUG_ASAN)
+    file(GLOB_RECURSE FLANTERM_SOURCES CONFIGURE_DEPENDS
+         ${CMAKE_SOURCE_DIR}/kernel/flanterm/*.c)
+
     set_source_files_properties(${EARLY_INIT_FILES} ${UACPI_SOURCES}
+        ${FLANTERM_SOURCES}
         PROPERTIES COMPILE_OPTIONS "-fno-sanitize=kernel-address")
 endif()
 
@@ -78,4 +80,15 @@ target_sources(kernel
 target_include_directories(kernel
     PRIVATE
         ${UACPI_INCLUDES}
+)
+
+# We stamp it here because it has to run every link
+add_custom_command(TARGET kernel POST_BUILD
+    COMMAND ${CMAKE_SOURCE_DIR}/scripts/stamp_syms.sh
+            ${KERNEL_NM} ${KERNEL_OBJCOPY}
+            ${CMAKE_SOURCE_DIR}/scripts/syms.awk
+            ${KERNEL_SYMS_RESERVE}
+            $<TARGET_FILE:kernel>
+    COMMENT "Stamping symbol table into .kernel_syms"
+    VERBATIM
 )

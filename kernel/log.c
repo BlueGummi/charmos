@@ -29,41 +29,59 @@ struct log_globals {
 
 struct log_globals log_global = {0};
 
-/* Stale symbol tables attribute each address to the wrong symbol */
-static bool syms_table_stale(void) {
-    return syms_len && syms_etext != (uint64_t) &__etext;
+/* NULL until the blob has been stamped, which only an unpatched image should
+ * ever hit. The table cannot go stale any more: it is written into the linked
+ * kernel after the fact, so it always describes this exact image */
+static const struct kernel_syms_hdr *syms_header(void) {
+    const struct kernel_syms_hdr *hdr = (const void *) kernel_syms_blob;
+
+    if (hdr->magic != KERNEL_SYMS_MAGIC || !hdr->count)
+        return NULL;
+
+    return hdr;
 }
 
-static void syms_warn_if_stale(void) {
-    if (!syms_table_stale())
+static void syms_warn_if_missing(void) {
+    if (syms_header())
         return;
 
-    printf("  <symbol table is stale: generated against __etext 0x%016lx, "
-           "kernel has 0x%016lx - rebuild to resymbolize>\n",
-           syms_etext, (uint64_t) &__etext);
+    printf("  <no symbol table: .kernel_syms was never stamped, "
+           "rebuild to symbolize>\n");
 }
 
 static const char *find_symbol(uint64_t addr, uint64_t *out_sym_addr) {
-    const char *result = NULL;
-    uint64_t best = 0;
-
-    if (syms_table_stale()) {
-        if (out_sym_addr)
-            *out_sym_addr = 0;
-        return NULL;
-    }
-
-    for (uint64_t i = 0; i < syms_len; i++) {
-        if (syms[i].addr <= addr && syms[i].addr > best) {
-            best = syms[i].addr;
-            result = syms[i].name;
-        }
-    }
+    const struct kernel_syms_hdr *hdr = syms_header();
 
     if (out_sym_addr)
-        *out_sym_addr = best;
+        *out_sym_addr = 0;
 
-    return result;
+    if (!hdr)
+        return NULL;
+
+    const struct kernel_sym *tab = (const void *) (hdr + 1);
+    const char *strtab = kernel_syms_blob + hdr->strtab_off;
+
+    /* Sorted by address, so bisect for the last entry at or below addr. Worth
+     * it here: this runs from panic paths where a scan of every symbol is the
+     * last thing we want */
+    uint32_t lo = 0, hi = hdr->count;
+    while (lo < hi) {
+        uint32_t mid = lo + (hi - lo) / 2;
+        if (tab[mid].addr <= addr)
+            lo = mid + 1;
+        else
+            hi = mid;
+    }
+
+    if (!lo)
+        return NULL;
+
+    const struct kernel_sym *best = &tab[lo - 1];
+
+    if (out_sym_addr)
+        *out_sym_addr = best->addr;
+
+    return strtab + best->name_off;
 }
 
 static void k_printf_from_log(const char *fmt, const uint64_t *args,
@@ -480,7 +498,7 @@ void debug_print_stack_trace(const uint64_t *entries, size_t nr) {
         return;
     }
 
-    syms_warn_if_stale();
+    syms_warn_if_missing();
 
     for (size_t i = 0; i < nr; i++) {
         uint64_t sym_addr;
@@ -525,7 +543,7 @@ void debug_print_stack_from(uint64_t *start, size_t max_scan) {
     if (!max_scan)
         max_scan = 64 * 1024;
 
-    syms_warn_if_stale();
+    syms_warn_if_missing();
 
     printf("Stack unwind from %p:\n", (uint64_t) start);
 

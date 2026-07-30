@@ -142,6 +142,16 @@ if(DEBUG_ASAN)
             "DEBUG_ASAN (KASAN) requires the clang toolchain. Reconfigure with:\n"
             "    scripts/build.sh --compiler clang -- -DDEBUG_ASAN=ON")
     endif()
+    # KASAN with -O2 should work
+    option(ASAN_ALLOW_O0 "Permit a KASAN build at -O0" OFF)
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT ASAN_ALLOW_O0)
+        message(FATAL_ERROR
+            "DEBUG_ASAN at -O0 (CMAKE_BUILD_TYPE=Debug) is punishingly slow.\n"
+            "Reconfigure with:\n"
+            "    scripts/build.sh -t RelWithDebInfo --compiler clang -- -DDEBUG_ASAN=ON\n"
+            "or pass -DASAN_ALLOW_O0=ON to build at -O0 anyway.")
+    endif()
+
     message(STATUS "charmOS: KASAN enabled (DEBUG_ASAN, outline instrumentation)")
     add_compile_definitions(DEBUG_ASAN)
     set(KERNEL_KASAN_FLAGS

@@ -7,7 +7,11 @@
 struct thread;
 struct cpu_context;
 
+#ifdef DEBUG_ASAN
+#define THREAD_STACK_SIZE (PAGE_SIZE * 16)
+#else
 #define THREAD_STACK_SIZE (PAGE_SIZE * 4)
+#endif
 
 enum thread_state : uint8_t {
     THREAD_STATE_IDLE_THREAD, /* Specifically the idle thread */

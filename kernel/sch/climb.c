@@ -606,3 +606,9 @@ size_t climb_get_thread_data(struct rbt_node *n) {
     return cts->pressure_periods * (1 << CLIMB_PRESSURE_KEY_SHIFT) +
            climb_thread_total_pressure(cts);
 }
+
+int32_t climb_cmp_threads(const struct rbt_node *a, const struct rbt_node *b) {
+    int32_t ca = climb_get_thread_data((struct rbt_node *) a);
+    int32_t cb = climb_get_thread_data((struct rbt_node *) b);
+    return ca - cb;
+}
