@@ -321,10 +321,19 @@ fi
 log "configuring cmake (${effective_type}, ${CMAKE_GENERATOR})"
 configure_cmake
 
-# Report the -O the compiler will actually see, rather than the build type it
-# was meant to imply. Anything reconfiguring this dir behind us -- an editor's
-# cmake integration, most often -- shows up here and nowhere else
-opt_level="$(grep -m1 -oE '(^| )-O[0-3sgz]' build.ninja 2>/dev/null | tr -d ' ')"
+if [[ "$GEN_KIND" == "ninja" ]]; then
+    flag_files=(build.ninja)
+else
+    shopt -s nullglob globstar
+    flag_files=(CMakeFiles/**/flags.make)
+    shopt -u nullglob globstar
+fi
+
+# Never fatal: grep exits 1 on no match and 2 on a missing file
+opt_level=""
+if [[ ${#flag_files[@]} -gt 0 ]]; then
+    opt_level="$(grep -h -m1 -oE '(^| )-O[0-3sgz]' "${flag_files[@]}" 2>/dev/null | head -n1 | tr -d ' ' || true)"
+fi
 log "build type ${effective_type}${opt_level:+, compiling at ${opt_level}}"
 
 if $COMPDB; then
