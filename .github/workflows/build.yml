@@ -37,6 +37,10 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GHCR_KEY }}
 
+    defaults:
+      run:
+        shell: bash
+
     steps:
       - name: Check out code
         uses: actions/checkout@v2
@@ -67,6 +71,10 @@ jobs:
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GHCR_KEY }}
+
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Check out code

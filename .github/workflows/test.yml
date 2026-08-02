@@ -49,6 +49,10 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GHCR_KEY }}
 
+    defaults:
+      run:
+        shell: bash
+
     steps:
       - name: Check out code
         uses: actions/checkout@v4
