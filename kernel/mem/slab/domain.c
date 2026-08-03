@@ -160,6 +160,7 @@ void slab_domain_init(void) {
 
     slab_domain_move_slabs();
     slab_switch_to_domain_allocations();
+    slab_global.domains_enabled = true;
 }
 
 void slab_domain_init_late() {

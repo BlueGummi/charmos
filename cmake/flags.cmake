@@ -135,7 +135,8 @@ if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
     endif()
 endif()
 
-option(DEBUG_ASAN "Enable KASAN address sanitizer (clang only)" OFF)
+# DEBUG_ASAN itself is declared in features.cmake (included before this file)
+# so the implication pass there can see it; only its validation lives here.
 if(DEBUG_ASAN)
     if(NOT CMAKE_C_COMPILER_ID STREQUAL "Clang")
         message(FATAL_ERROR

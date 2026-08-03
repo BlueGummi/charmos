@@ -188,3 +188,7 @@ static struct irq_chip lapic_irq_chip = {
 struct irq_chip *lapic_get_chip() {
     return &lapic_irq_chip;
 }
+
+void lapic_timer_init_bsp(void) {
+    lapic_timer_init(0);
+}

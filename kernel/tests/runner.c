@@ -1,6 +1,9 @@
 #include <colors.h>
 #include <console/panic.h>
 #include <console/printf.h>
+#include <console/report.h>
+#include <console/statusbar.h>
+#include <console/term.h>
 #include <crypto/prng.h>
 #include <global.h>
 #include <irq/irq.h>
@@ -8,6 +11,7 @@
 #include <mem/alloc_or_die.h>
 #include <mem/vas.h>
 #include <smp/core.h>
+#include <stack_depot.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -47,6 +51,13 @@ CMDLINE_ENTRY_DECLARE_TYPED(
     test_no_exit, test_global.no_exit, .name = "no_exit",
     .parent = CMDLINE_ENTRY(test_root), .arg = CMDLINE_ENTRY_TYPE_TO_ARG(bool),
     .desc = "Idle after the suite completes instead of asking QEMU to exit",
+    .flags = CMDLINE_ENTRY_DOCUMENTED);
+
+CMDLINE_ENTRY_DECLARE_TYPED(
+    test_no_progress, test_global.no_progress, .name = "no_progress",
+    .parent = CMDLINE_ENTRY(test_root), .arg = CMDLINE_ENTRY_TYPE_TO_ARG(bool),
+    .desc = "Never pin a progress bar to the bottom of the serial terminal, "
+            "even when one answers the size probe",
     .flags = CMDLINE_ENTRY_DOCUMENTED);
 
 LOG_SITE_DECLARE_DEFAULT(test_harness);
@@ -117,6 +128,9 @@ static void tests_set_enabled_states() {
              tg < __ekernel_test_groups; tg++) {
             if (tg->enabled == TEST_STATE_SENTINEL) {
                 tg->enabled = TEST_STATE_DISABLED;
+                tg->smoke_enabled = TEST_STATE_DISABLED;
+                tg->unit_enabled = TEST_STATE_DISABLED;
+                tg->integration_enabled = TEST_STATE_DISABLED;
             }
         }
     } else {
@@ -124,6 +138,9 @@ static void tests_set_enabled_states() {
              tg < __ekernel_test_groups; tg++) {
             if (tg->enabled == TEST_STATE_SENTINEL) {
                 tg->enabled = TEST_STATE_ENABLED;
+                tg->smoke_enabled = TEST_STATE_ENABLED;
+                tg->unit_enabled = TEST_STATE_ENABLED;
+                tg->integration_enabled = TEST_STATE_ENABLED;
             }
         }
     }
@@ -162,6 +179,50 @@ struct test_group_result {
     size_t totals[TEST_TIER_MAX][TEST_RESULT_MAX];
 };
 
+static struct {
+    size_t total;
+    size_t done;
+    size_t failed;
+    size_t skipped;
+} test_progress = {0};
+
+static size_t tests_count_planned(void) {
+    size_t n = 0;
+
+    for (struct test_group *tg = __skernel_test_groups;
+         tg < __ekernel_test_groups; tg++) {
+        if (!tg->enabled)
+            continue;
+
+        for (int i = 0; i < TEST_TIER_MAX; i++) {
+            if (tg->tier_enabled[i])
+                n += tg->num_tests[i];
+        }
+    }
+
+    return n;
+}
+
+static void test_progress_paint(const struct test_group *tg,
+                                enum test_tier tier, const char *test_name) {
+    char tail[96] = "";
+
+    if (!test_progress.total)
+        return;
+
+    if (test_progress.failed || test_progress.skipped)
+        snprintf(tail, (int) sizeof(tail),
+                 "  " ANSI_RED "%zu failed" ANSI_RESET " " ANSI_GRAY
+                 "%zu skipped" ANSI_RESET,
+                 test_progress.failed, test_progress.skipped);
+
+    status_bar_progress(test_progress.done, test_progress.total,
+                        ANSI_BLUE "%s" ANSI_RESET " (%s" ANSI_RESET
+                                  ") " ANSI_BOLD "%s" ANSI_RESET "%s",
+                        tg->name, test_tier_to_str_color(tier), test_name,
+                        tail);
+}
+
 static void test_handle_print(const struct log_site *site,
                               const struct log_record *rec,
                               void (*print)(const char *fmt, ...)) {
@@ -172,6 +233,28 @@ static void test_handle_print(const struct log_site *site,
 
 static void test_group_run(struct test_group *tg) {
     if (!tg->enabled)
+        return;
+
+    bool all_disabled = true;
+    for (int i = 0; i < TEST_TIER_MAX; i++) {
+        if (tg->tier_enabled[i]) {
+            all_disabled = false;
+            break;
+        }
+    }
+
+    if (all_disabled)
+        return;
+
+    bool no_tests = true;
+    for (int i = 0; i < TEST_TIER_MAX; i++) {
+        if (tg->num_tests[i]) {
+            no_tests = false;
+            break;
+        }
+    }
+
+    if (no_tests)
         return;
 
     /* TODO: A little hacky */
@@ -185,10 +268,26 @@ static void test_group_run(struct test_group *tg) {
                       "%s" ANSI_RESET " - %zu tests in (" ANSI_BOLD
                       "%s" ANSI_RESET ")\n",
                       tg->name, total_tests, tg->fname);
-    printf("%*s  |-> ", 20, "");
+    printf("%*s  | ", 20, "");
     printf(tg->incremental ? "incremental, " : "non_incremental, ");
     printf(tg->exit_on_fail ? "exit_on_fail" : "continue_on_fail");
-    printf("\n\n");
+    printf("\n");
+    printf("%*s  | ", 20, "");
+    printf(ANSI_UNDERLINE ANSI_BOLD "enabled" ANSI_RESET ": ");
+    for (int i = 0; i < TEST_TIER_MAX; i++) {
+        if (!tg->num_tests[i])
+            continue;
+
+        if (tg->tier_enabled[i])
+            printf(ANSI_BOLD "%s" ANSI_RESET, test_tier_to_str_color(i));
+
+        /* Check if the next one exists to print a comma */
+        if (i + 1 < TEST_TIER_MAX && tg->tier_enabled[i + 1] &&
+            tg->num_tests[i + 1])
+            printf(", ");
+    }
+
+    printf("\n");
 
     bool stop_outer = false;
     *LOG_SITE(test_harness).name = (char *) tg->name;
@@ -199,7 +298,7 @@ static void test_group_run(struct test_group *tg) {
         if (stop_outer)
             break;
 
-        if (!tg->num_tests[i])
+        if (!tg->num_tests[i] || !tg->tier_enabled[i])
             continue;
 
         const char *tier_name = test_tier_to_str_color(i);
@@ -251,6 +350,7 @@ static void test_group_run(struct test_group *tg) {
             struct test_verdict singular_verdict = {0};
 
             test_harness_info(ANSI_BOLD ANSI_BLUE "%s" ANSI_RESET, t->name);
+            test_progress_paint(tg, i, t->name);
 
             time_t start_ms = time_get_ms();
             for (; run_times < t->run_times; run_times++) {
@@ -350,6 +450,14 @@ static void test_group_run(struct test_group *tg) {
                 log_dump_site(tctx.site);
             }
 
+            test_progress.done++;
+            if (result_times[TEST_RESULT_FAILED])
+                test_progress.failed++;
+            else if (result_times[TEST_RESULT_SKIPPED] == run_times)
+                test_progress.skipped++;
+
+            test_progress_paint(tg, i, t->name);
+
             for (int j = 0; j < TEST_RESULT_MAX; j++)
                 result_totals.totals[i][j] += result_times[j];
 
@@ -377,7 +485,7 @@ static void test_group_run(struct test_group *tg) {
         !result_aggregates[TEST_RESULT_FAILED]) {
         test_harness_info("Test group " ANSI_BLUE ANSI_BOLD "%s" ANSI_RESET
                           " " ANSI_GREEN ANSI_BOLD "successful" ANSI_RESET
-                          " in " ANSI_BOLD "%zu" ANSI_RESET " ms\n\n",
+                          " in " ANSI_BOLD "%zu" ANSI_RESET " ms\n\n\n",
                           tg->name, total_time);
         *LOG_SITE(test_harness).name = "test_harness";
     } else {
@@ -393,7 +501,7 @@ static void test_group_run(struct test_group *tg) {
             printf(", %zu " ANSI_RED ANSI_BOLD "failed" ANSI_RESET,
                    result_aggregates[TEST_RESULT_FAILED]);
 
-        printf("\n\n");
+        printf("\n\n\n");
     }
 }
 
@@ -417,10 +525,18 @@ void tests_run(void) {
     test_harness_info("Running %zu tests:\n",
                       __ekernel_tests - __skernel_tests);
 
+    if (!test_global.no_progress && term_probe()) {
+        test_progress.total = tests_count_planned();
+        status_bar_open();
+        status_bar_progress(0, test_progress.total, "starting");
+    }
+
     for (struct test_group *tg = __skernel_test_groups;
          tg < __ekernel_test_groups; tg++) {
         test_group_run(tg);
     }
+
+    status_bar_close();
     test_global_aggregate_results();
 
     size_t fail_count = test_global.results_agg[TEST_RESULT_FAILED];
@@ -442,7 +558,7 @@ void tests_run(void) {
 
     test_harness_info("%s%s" ANSI_RESET " (%llu ms)\n", color, msg, total_time);
 
-    /* Give it the return address */
+    /* Give it the return code */
     if (!test_global.no_exit)
         qemu_exit(all_ok ? TEST_EXIT_OK : TEST_EXIT_FAIL);
 #endif

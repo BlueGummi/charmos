@@ -15,15 +15,18 @@ struct percpu_descriptor {
     size_t align;
     void **percpu_ptrs;
     percpu_descriptor_constructor constructor;
+    bool ready;
 };
 
 LINKER_SECTION_DEFINE(struct percpu_descriptor, percpu_desc);
 
 #define PERCPU_DECLARE(__n, __type, __ctor)                                    \
     extern __type __percpu_##__n;                                              \
+    extern struct percpu_descriptor __percpu_desc_##__n;                       \
     static void __percpu_ctor_##__n(void *inst, size_t cpu) {                  \
+        __percpu_desc_##__n.ready = true;                                      \
         if ((__ctor) != NULL)                                                  \
-            __ctor((__type *) inst, cpu);                                      \
+            ((void (*)(__type *, size_t)) __ctor)((__type *) inst, cpu);       \
     }                                                                          \
     LINKER_SECTION_OBJECT(struct percpu_descriptor, percpu_desc)               \
     __percpu_desc_##__n = {                                                    \
@@ -32,11 +35,14 @@ LINKER_SECTION_DEFINE(struct percpu_descriptor, percpu_desc);
         .align = _Alignof(__type),                                             \
         .percpu_ptrs = NULL,                                                   \
         .constructor = __percpu_ctor_##__n,                                    \
+        .ready = false,                                                        \
     };                                                                         \
     __type __percpu_##__n
 
 void percpu_obj_init(void);
 
+#define PERCPU(name) &(__percpu_##name)
+#define PERCPU_READY(name) __percpu_desc_##name.ready
 #define PERCPU_PTR_FOR_CPU(name, cpu)                                          \
     ((typeof(__percpu_##name) *) __percpu_desc_##name.percpu_ptrs[cpu])
 #define PERCPU_READ_FOR_CPU(name, cpu)                                         \

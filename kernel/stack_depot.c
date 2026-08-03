@@ -6,6 +6,7 @@ struct stack_depot_globals stack_depot_global = {0};
 FIXED_SIZE_RANGE_PERDOMAIN_DECLARE(
     stack_depot, .obj_size = sizeof(struct stack_depot_record),
     .obj_align = _Alignof(struct stack_depot_record));
+static struct fixed_size_range boot_fsr;
 
 void stack_depot_init() {
     stack_depot_global.starting_seed = 1234;
@@ -13,11 +14,20 @@ void stack_depot_init() {
         INIT_LIST_HEAD(&stack_depot_global.chains[i].list);
         spinlock_init(&stack_depot_global.chains[i].lock);
     }
+
+    struct fixed_size_range_attributes attrs = {
+        .obj_size = sizeof(struct stack_depot_record),
+        .obj_align = _Alignof(struct stack_depot_record),
+        .bootstrap_mode = false,
+    };
+
+    fixed_size_range_init(&boot_fsr, &attrs);
 }
 
 static struct stack_depot_record *
 record_chain_get(struct stack_depot_record_chain *this_chain,
-                 uintptr_t *entries, size_t num_entries, bool locked) {
+                 uintptr_t *entries, size_t num_entries, uint32_t hash,
+                 bool locked) {
     enum irql irql = IRQL_PASSIVE_LEVEL;
 
     if (!locked)
@@ -25,7 +35,7 @@ record_chain_get(struct stack_depot_record_chain *this_chain,
 
     struct stack_depot_record *pos;
     list_for_each_entry(pos, &this_chain->list, hash_list) {
-        if (pos->num_entries == num_entries) {
+        if (pos->num_entries == num_entries && pos->hash == hash) {
             if (!memcmp(pos->entries, entries,
                         num_entries * sizeof(uintptr_t))) {
                 /* This MUST NOT fail. If it does, that means some invariant
@@ -53,11 +63,21 @@ static stack_handle_t record_to_handle(struct stack_depot_record *rec) {
     return rec;
 }
 
+static struct stack_depot_record *handle_to_record(stack_handle_t handle) {
+    return handle;
+}
+
 static struct stack_depot_record *record_alloc() {
+    if (!FSR_PERDOMAIN_ENABLED(stack_depot))
+        return fixed_size_alloc(&boot_fsr);
+
     return FSR_PERDOMAIN_ALLOC(stack_depot);
 }
 
 static void record_free(struct stack_depot_record *rec) {
+    if (fixed_size_page_of(rec)->domain == -1)
+        return fixed_size_free(&boot_fsr, rec);
+
     FSR_PERDOMAIN_FREE(stack_depot, rec);
 }
 
@@ -71,11 +91,11 @@ stack_handle_t stack_depot_save(uintptr_t *entries, size_t num_entries,
 
     uint32_t hash = stack_depot_hash(entries, num_entries);
     struct stack_depot_record_chain *this_chain =
-        &stack_depot_global.chains[hash];
+        &stack_depot_global.chains[hash % STACK_DEPOT_HASH_SIZE];
 
     struct stack_depot_record *rec = NULL;
 
-    if ((rec = record_chain_get(this_chain, entries, num_entries,
+    if ((rec = record_chain_get(this_chain, entries, num_entries, hash,
                                 /*locked=*/false)))
         goto out;
 
@@ -84,8 +104,8 @@ stack_handle_t stack_depot_save(uintptr_t *entries, size_t num_entries,
 
     enum irql irql = spin_lock(&this_chain->lock);
 
-    struct stack_depot_record *winner =
-        record_chain_get(this_chain, entries, num_entries, /*locked=*/true);
+    struct stack_depot_record *winner = record_chain_get(
+        this_chain, entries, num_entries, hash, /*locked=*/true);
     if (winner) {
         spin_unlock(&this_chain->lock, irql);
         record_free(rec);
@@ -99,6 +119,8 @@ stack_handle_t stack_depot_save(uintptr_t *entries, size_t num_entries,
     memcpy(rec->entries, entries, num_entries * sizeof(uintptr_t));
     list_add_tail(&rec->hash_list, &this_chain->list);
     spin_unlock(&this_chain->lock, irql);
+
+    atomic_fetch_add(&stack_depot_global.num_records, 1);
 
 out:
 
@@ -126,9 +148,9 @@ void stack_depot_print(stack_handle_t key) {
 }
 
 void stack_depot_put(stack_handle_t key) {
-    struct stack_depot_record *rec = key;
+    struct stack_depot_record *rec = handle_to_record(key);
     struct stack_depot_record_chain *chain =
-        &stack_depot_global.chains[rec->hash];
+        &stack_depot_global.chains[rec->hash % STACK_DEPOT_HASH_SIZE];
     bool free_it = false;
 
     enum irql irql = spin_lock(&chain->lock);
@@ -140,8 +162,10 @@ void stack_depot_put(stack_handle_t key) {
 
     spin_unlock(&chain->lock, irql);
 
-    if (free_it)
+    if (free_it) {
         record_free(rec);
+        atomic_fetch_sub(&stack_depot_global.num_records, 1);
+    }
 }
 
 stack_handle_t stack_depot_save_current() {

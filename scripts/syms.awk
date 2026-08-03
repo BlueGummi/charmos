@@ -48,9 +48,13 @@ END {
     }
 
     total = strtab_off + off
-    if (total > RESERVE) {
+
+    pad = (8 - total % 8) % 8
+    lines_off = (LINES_LEN + 0) ? total + pad : 0
+
+    if (total + pad + (LINES_LEN + 0) > RESERVE) {
         printf "syms.awk: table needs %d bytes, .kernel_syms reserves %d\n", \
-               total, RESERVE > "/dev/stderr"
+               total + pad + (LINES_LEN + 0), RESERVE > "/dev/stderr"
         print "          raise KERNEL_SYMS_RESERVE in" \
               " include/linker/symbol_table.h" > "/dev/stderr"
         exit 1
@@ -60,7 +64,7 @@ END {
     printf "%c%c%c%c", 83, 89, 77, 83
     put32(n)
     put32(strtab_off)
-    put32(0)
+    put32(lines_off)
 
     for (i = 0; i < n; i++) {
         put_addr(addr[i])
@@ -71,6 +75,6 @@ END {
     for (i = 0; i < n; i++)
         printf "%s%c", name[i], 0
 
-    for (i = total; i < RESERVE; i++)
+    for (i = 0; i < pad; i++)
         printf "%c", 0
 }

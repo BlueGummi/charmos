@@ -66,6 +66,7 @@ void fixed_size_range_init(struct fixed_size_range *fsr,
                            struct fixed_size_range_attributes *attrs);
 
 #define FIXED_SIZE_RANGE_PERDOMAIN_DECLARE(name, ...)                          \
+    static bool __fsr_##name##_enabled = false;                                \
     static void __##name##_fsr_init(struct fixed_size_range *__fsr,            \
                                     size_t __domain) {                         \
         (void) __domain;                                                       \
@@ -79,11 +80,19 @@ void fixed_size_range_init(struct fixed_size_range *fsr,
         __perdomain_fsrs_##name[__domain] = __fsr;                             \
         __fsr->perdomain_fsrs = __perdomain_fsrs_##name;                       \
         __fsr->domain = __domain;                                              \
+        if (__domain == global.domain_count - 1)                               \
+            __fsr_##name##_enabled = true;                                     \
     }                                                                          \
     PERDOMAIN_DECLARE(__##name##_fsr, struct fixed_size_range,                 \
                       __##name##_fsr_init)
 
+#define FSR_PERDOMAIN_ENABLED(name) __fsr_##name##_enabled
+#define FSR_PERDOMAIN(name) PERDOMAIN(__##name##_fsr)
 #define FSR_PERDOMAIN_THIS(name) PERDOMAIN_PTR(__##name##_fsr)
 #define FSR_PERDOMAIN_ALLOC(name) fixed_size_alloc(FSR_PERDOMAIN_THIS(name))
 #define FSR_PERDOMAIN_FREE(name, obj)                                          \
     fixed_size_free(FSR_PERDOMAIN_THIS(name), (obj))
+
+static inline struct fixed_size_page_hdr *fixed_size_page_of(void *o) {
+    return (struct fixed_size_page_hdr *) ALIGN_DOWN((uintptr_t) o, PAGE_SIZE);
+}

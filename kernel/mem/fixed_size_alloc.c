@@ -15,10 +15,6 @@ static inline size_t fixed_size_per_page(struct fixed_size_range *fsr) {
     return (PAGE_SIZE - fixed_size_header_size(fsr)) / fsr->full_node_size;
 }
 
-static inline struct fixed_size_page_hdr *fixed_size_page_of(void *o) {
-    return (struct fixed_size_page_hdr *) ALIGN_DOWN((uintptr_t) o, PAGE_SIZE);
-}
-
 static inline struct fixed_size_node *fsn_for_obj(struct fixed_size_range *fsr,
                                                   void *obj) {
     return (struct fixed_size_node *) (obj + fsr->full_node_size -

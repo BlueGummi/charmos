@@ -1,6 +1,8 @@
 /* @title: Compiler Functions */
 #pragma once
 
+#define __init /* Nothing for now, TODO: */
+
 #define __noinline __attribute__((noinline))
 
 #define __always_inline __attribute__((always_inline))

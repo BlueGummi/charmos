@@ -49,6 +49,13 @@ set(SYMS_SOURCE "${CMAKE_SOURCE_DIR}/kernel/syms/syms_reserve.c")
 find_program(KERNEL_NM      NAMES x86_64-elf-nm      nm      llvm-nm      REQUIRED)
 find_program(KERNEL_OBJCOPY NAMES x86_64-elf-objcopy objcopy llvm-objcopy REQUIRED)
 
+find_program(KERNEL_OBJDUMP NAMES x86_64-elf-objdump objdump llvm-objdump)
+if(NOT KERNEL_OBJDUMP)
+    set(KERNEL_OBJDUMP "objdump")
+    message(WARNING
+        "no objdump found: panic backtraces will have no file:line")
+endif()
+
 set(SYMS_HEADER "${CMAKE_SOURCE_DIR}/include/linker/symbol_table.h")
 file(STRINGS "${SYMS_HEADER}" SYMS_RESERVE_LINE
      REGEX "^#define[ \t]+KERNEL_SYMS_RESERVE[ \t]+[0-9]+")
@@ -85,10 +92,9 @@ target_include_directories(kernel
 # We stamp it here because it has to run every link
 add_custom_command(TARGET kernel POST_BUILD
     COMMAND ${CMAKE_SOURCE_DIR}/scripts/stamp_syms.sh
-            ${KERNEL_NM} ${KERNEL_OBJCOPY}
-            ${CMAKE_SOURCE_DIR}/scripts/syms.awk
+            ${KERNEL_NM} ${KERNEL_OBJCOPY} ${KERNEL_OBJDUMP}
             ${KERNEL_SYMS_RESERVE}
             $<TARGET_FILE:kernel>
-    COMMENT "Stamping symbol table into .kernel_syms"
+    COMMENT "Stamping symbol and line tables into .kernel_syms"
     VERBATIM
 )

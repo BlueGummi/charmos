@@ -9,6 +9,7 @@
 #include <mem/tlb.h>
 #include <mem/vmm.h>
 #include <sch/sched.h>
+#include <stack_depot.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

@@ -73,8 +73,16 @@ struct test_group {
 
     fx32_32_t default_intensity;
 
-    /* These all have to be bool for cmdline QOL */
     enum test_state enabled;
+    union {
+        enum test_state tier_enabled[TEST_TIER_MAX];
+        struct {
+            enum test_state smoke_enabled;
+            enum test_state unit_enabled;
+            enum test_state integration_enabled;
+        };
+    };
+
     bool incremental;  /* First run smoke, then unit, then integration */
     bool exit_on_fail; /* Different from incremental: exits after one failure,
                         * whereas incremental still completes the tier */
@@ -166,6 +174,7 @@ struct test_globals {
     bool group_opt_in;
     bool test_opt_in;
     bool no_exit;
+    bool no_progress;
 };
 
 #define TEST(id) __test_##id
@@ -240,6 +249,22 @@ struct test_globals {
         cmdline_parse_bool, .name = "enabled",                                 \
         .parent = CMDLINE_ENTRY(test_group_##n),                               \
         .private = &__test_group_##n);                                         \
+    CMDLINE_ENTRY_DECLARE_TYPED_CUSTOM(                                        \
+        test_group_##n##_smoke_enabled, __test_group_##n.smoke_enabled,        \
+        cmdline_parse_bool, .name = "smoke_enabled",                           \
+        .parent = CMDLINE_ENTRY(test_group_##n),                               \
+        .private = &__test_group_##n);                                         \
+    CMDLINE_ENTRY_DECLARE_TYPED_CUSTOM(                                        \
+        test_group_##n##_unit_enabled, __test_group_##n.unit_enabled,          \
+        cmdline_parse_bool, .name = "unit_enabled",                            \
+        .parent = CMDLINE_ENTRY(test_group_##n),                               \
+        .private = &__test_group_##n);                                         \
+    CMDLINE_ENTRY_DECLARE_TYPED_CUSTOM(                                        \
+        test_group_##n##_integration_enabled,                                  \
+        __test_group_##n.integration_enabled, cmdline_parse_bool,              \
+        .name = "integration_enabled",                                         \
+        .parent = CMDLINE_ENTRY(test_group_##n),                               \
+        .private = &__test_group_##n);                                         \
     CMDLINE_ENTRY_DECLARE_TYPED(                                               \
         test_group_##n##_incremental, __test_group_##n.incremental,            \
         .name = "incremental", .parent = CMDLINE_ENTRY(test_group_##n),        \
@@ -254,6 +279,9 @@ struct test_globals {
                         .exit_on_fail = false,                                 \
                         .fname = __RELFILE__,                                  \
                         .enabled = TEST_STATE_SENTINEL,                        \
+                        .smoke_enabled = TEST_STATE_SENTINEL,                  \
+                        .unit_enabled = TEST_STATE_SENTINEL,                   \
+                        .integration_enabled = TEST_STATE_SENTINEL,            \
                         __VA_ARGS__}
 
 #define TEST_GROUP(name) &(__test_group_##name)

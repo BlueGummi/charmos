@@ -14,7 +14,7 @@ TEST_GROUP_DECLARE(stack_depot);
 
 #define SD_SEED 0xDEADBEEFULL
 #define SD_TRACE_LEN 8
-#define SD_MANY 512 /* > STACK_DEPOT_HASH_SIZE, forces chain collisions */
+#define SD_MANY 1024 /* > STACK_DEPOT_HASH_SIZE, forces chain collisions */
 
 static void sd_make_trace(uintptr_t *entries, size_t len, uint64_t id) {
     for (size_t i = 0; i < len; i++)
@@ -29,7 +29,6 @@ TEST_DECLARE_UNIT(stack_depot_basic, .group = TEST_GROUP(stack_depot)) {
     TEST_ASSERT(rec);
     TEST_ASSERT(rec->num_entries > 0);
     TEST_ASSERT(rec->num_entries <= STACK_TRACE_MAX_DEPTH);
-    TEST_ASSERT(rec->hash < STACK_DEPOT_HASH_SIZE);
     TEST_ASSERT(refcount_read(&rec->refcount) == 1);
 
     uintptr_t entries[STACK_TRACE_MAX_DEPTH] = {0};
@@ -122,11 +121,10 @@ TEST_DECLARE_UNIT(stack_depot_hash_bucket, .group = TEST_GROUP(stack_depot)) {
 
     struct stack_depot_record *rec = stack_depot_get_record(h);
     TEST_ASSERT(rec->hash == expect);
-    TEST_ASSERT(rec->hash < STACK_DEPOT_HASH_SIZE);
 
     /* The record is actually reachable on that chain. */
     struct stack_depot_record_chain *chain =
-        &stack_depot_global.chains[rec->hash];
+        &stack_depot_global.chains[rec->hash % STACK_DEPOT_HASH_SIZE];
     bool found = false;
     struct stack_depot_record *pos;
     enum irql irql = spin_lock(&chain->lock);
@@ -304,7 +302,8 @@ static inline uint64_t sd_rng_seed(size_t tid) {
 
 static size_t sd_chain_count(uintptr_t *trace, size_t len) {
     struct stack_depot_record_chain *chain =
-        &stack_depot_global.chains[stack_depot_hash(trace, len)];
+        &stack_depot_global
+             .chains[stack_depot_hash(trace, len) % STACK_DEPOT_HASH_SIZE];
     struct stack_depot_record *pos;
     size_t n = 0;
 

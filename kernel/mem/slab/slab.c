@@ -140,6 +140,7 @@
 #include <mem/vmm.h>
 #include <sch/sched.h>
 #include <smp/core.h>
+#include <stack_depot.h>
 #include <static_call.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -254,6 +255,17 @@ err:
 }
 
 static void slab_free_virt_and_phys(struct slab *slab) {
+
+#ifdef DEBUG_SLAB_DEEP
+    /* First drop references to all stack_handle_t's */
+    for (size_t i = 0; i < slab->parent_cache->objs_per_slab; i++) {
+
+        /* Might not necessarily exist */
+        if (slab->traces[i])
+            stack_depot_put(slab->traces[i]);
+    }
+#endif
+
     vaddr_t virt_base = (vaddr_t) slab;
     struct slab_chunk *chunk = slab->parent_chunk;
     /* Free through chunk's owner, as a GC reused slab's parent_cache may
@@ -292,8 +304,8 @@ void slab_cache_init(size_t order, struct slab_cache *cache,
     uint64_t n;
     for (n = NON_SLAB_SPACE(cache) / ssc->size; n > 0; n--) {
         uint64_t bitmap_bytes = SLAB_BITMAP_BYTES_FOR(n);
-        uintptr_t data_start =
-            sizeof(struct slab) + bitmap_bytes + page_ptr_size;
+        uintptr_t data_start = sizeof(struct slab) + bitmap_bytes +
+                               page_ptr_size + sizeof(stack_handle_t) * n;
         data_start = SLAB_ALIGN_UP(data_start, ssc->align);
         uintptr_t data_end = data_start + n * cache->obj_stride;
 
@@ -308,10 +320,18 @@ void slab_cache_init(size_t order, struct slab_cache *cache,
         panic("Slab cache cannot hold any objects per slab!");
 
     cache->bitmap_bytes = SLAB_BITMAP_BYTES_FOR(cache->objs_per_slab);
-    cache->slab_metadata_size =
-        sizeof(struct slab) + cache->bitmap_bytes + page_ptr_size;
 
-    kassert(cache->objs_per_slab * cache->obj_size + cache->slab_metadata_size <
+#ifdef DEBUG_SLAB_DEEP
+    size_t traces_size = sizeof(stack_handle_t) * cache->objs_per_slab;
+#else
+    size_t traces_size = 0;
+#endif
+
+    cache->slab_metadata_size =
+        sizeof(struct slab) + cache->bitmap_bytes + page_ptr_size + traces_size;
+
+    kassert(cache->objs_per_slab * cache->obj_stride +
+                cache->slab_metadata_size <
             cache->pages_per_slab * PAGE_SIZE);
 
     /* We must hold this true because right now we only handle
@@ -340,6 +360,10 @@ struct slab *slab_init(struct slab *slab, struct slab_cache *parent) {
     slab->parent_cache = parent;
     slab->bitmap = slab_get_bitmap_location(slab);
 
+#ifdef DEBUG_SLAB_DEEP
+    slab->traces = slab_get_traces_location(slab);
+#endif
+
     vaddr_t data_start = (vaddr_t) page + parent->slab_metadata_size;
     data_start = SLAB_ALIGN_UP(data_start, parent->obj_align);
     slab->mem = data_start;
@@ -351,6 +375,10 @@ struct slab *slab_init(struct slab *slab, struct slab_cache *parent) {
     rbt_init_node(&slab->rb);
     INIT_LIST_HEAD(&slab->list);
     memset(slab->bitmap, 0, parent->bitmap_bytes);
+
+#ifdef DEBUG_SLAB_DEEP
+    memset(slab->traces, 0, parent->objs_per_slab * sizeof(stack_handle_t));
+#endif
 
     if (slab->type == SLAB_TYPE_NONPAGEABLE_ZERO) {
         slab_zero_out(slab, parent->pages_per_slab);
@@ -426,8 +454,8 @@ struct slab *slab_create(struct slab_cache *cache,
 
     return slab;
 }
-
-static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
+static void *slab_alloc_from(struct slab_cache *cache, stack_handle_t handle,
+                             struct slab *slab) {
     slab_check_assert(slab);
 
     SPINLOCK_ASSERT_HELD(&cache->lock);
@@ -447,6 +475,14 @@ static void *slab_alloc_from(struct slab_cache *cache, struct slab *slab) {
 
             SLAB_BITMAP_SET(bm[w], 1ULL << bit);
             slab->used++;
+
+#ifdef DEBUG_SLAB_DEEP
+            kassert(&slab->traces[i] < (stack_handle_t *) slab->mem);
+            if (slab->traces[i])
+                stack_depot_put(slab->traces[i]);
+
+            slab->traces[i] = handle;
+#endif
 
             if (slab->used == cache->objs_per_slab) {
                 slab_move(cache, slab, SLAB_FULL);
@@ -513,6 +549,7 @@ void slab_free_old(struct slab *slab, void *obj) {
 }
 
 static void *slab_try_alloc_from_slab_list(struct slab_cache *cache,
+                                           stack_handle_t handle,
                                            struct list_head *list) {
     SPINLOCK_ASSERT_HELD(&cache->lock);
     struct list_head *node, *temp;
@@ -522,7 +559,7 @@ static void *slab_try_alloc_from_slab_list(struct slab_cache *cache,
     /* This should never iterate more than once */
     list_for_each_safe(node, temp, list) {
         slab = slab_from_list_node(node);
-        ret = slab_alloc_from(cache, slab);
+        ret = slab_alloc_from(cache, handle, slab);
         if (ret)
             goto out;
     }
@@ -540,21 +577,23 @@ void slab_cache_insert(struct slab_cache *cache, struct slab *slab) {
     spin_unlock(&cache->lock, irql);
 }
 
-void *slab_cache_try_alloc_from_lists(struct slab_cache *c) {
+void *slab_cache_try_alloc_from_lists(struct slab_cache *c,
+                                      stack_handle_t handle) {
     SPINLOCK_ASSERT_HELD(&c->lock);
 
-    void *ret = slab_try_alloc_from_slab_list(c, &c->slabs[SLAB_PARTIAL]);
+    void *ret =
+        slab_try_alloc_from_slab_list(c, handle, &c->slabs[SLAB_PARTIAL]);
     if (ret)
         return ret;
 
-    return slab_try_alloc_from_slab_list(c, &c->slabs[SLAB_FREE]);
+    return slab_try_alloc_from_slab_list(c, handle, &c->slabs[SLAB_FREE]);
 }
 
 void *slab_alloc_old(struct slab_cache *cache) {
     void *ret = NULL;
 
     enum irql irql = spin_lock(&cache->lock);
-    ret = slab_cache_try_alloc_from_lists(cache);
+    ret = slab_cache_try_alloc_from_lists(cache, /*handle=*/NULL);
     spin_unlock(&cache->lock, irql);
     if (ret)
         goto out;
@@ -566,7 +605,7 @@ void *slab_alloc_old(struct slab_cache *cache) {
 
     irql = spin_lock(&cache->lock);
     slab_list_add(cache, slab);
-    ret = slab_alloc_from(cache, slab);
+    ret = slab_alloc_from(cache, /*handle=*/NULL, slab);
     spin_unlock(&cache->lock, irql);
 
 out:
@@ -700,7 +739,7 @@ void slab_allocator_init() {
 }
 
 struct slab *slab_for_ptr(void *ptr) {
-    kassert(kmalloc_ptr_in_slab_validate(ptr));
+    kassert(slab_ptr_in_slab(ptr));
     vaddr_t vp = (vaddr_t) ptr;
     uint8_t pow2_order = slab_order_map_get(vp);
     kassert(pow2_order != SLAB_POW2_ORDER_EMPTY);
@@ -728,8 +767,9 @@ size_t slab_allocation_size(vaddr_t addr) {
     return ksize((void *) addr);
 }
 
-void *kmalloc_pages_raw(struct slab_domain *parent, size_t size,
-                        enum alloc_flags flags, enum alloc_behavior behavior) {
+void *kmalloc_pages_raw(struct slab_domain *parent, stack_handle_t handle,
+                        size_t size, enum alloc_flags flags,
+                        enum alloc_behavior behavior) {
     uint64_t total_size = size + sizeof(struct slab_page_hdr);
     uint64_t pages = PAGES_NEEDED_FOR(total_size);
 
@@ -750,6 +790,7 @@ void *kmalloc_pages_raw(struct slab_domain *parent, size_t size,
     hdr->pages = pages;
     hdr->domain = parent;
     hdr->pageable = (flags & ALLOC_FLAG_PAGEABLE);
+    hdr->handle = handle;
 
     return (void *) (hdr + 1);
 }
@@ -766,7 +807,7 @@ static void *kmalloc_old(size_t size, enum alloc_flags flags) {
         ptr = slab_alloc_old(&slab_global.caches.caches[idx]);
     } else {
         /* we say NULL and just free these to domain 0 */
-        ptr = kmalloc_pages_raw(NULL, size, ALLOC_FLAGS_DEFAULT,
+        ptr = kmalloc_pages_raw(NULL, NULL, size, ALLOC_FLAGS_DEFAULT,
                                 ALLOC_BEHAVIOR_NORMAL);
     }
 
@@ -778,6 +819,9 @@ static void *kmalloc_old(size_t size, enum alloc_flags flags) {
 
 void slab_free_page_hdr(struct slab_page_hdr *hdr, enum alloc_behavior bh) {
     uint32_t pages = hdr->pages;
+    if (hdr->handle)
+        stack_depot_put(hdr->handle);
+
     page_free(hdr, pages, bh);
 }
 
@@ -799,9 +843,10 @@ void kfree_old(void *ptr) {
     slab_free_addr_to_cache(ptr, ALLOC_BEHAVIOR_NORMAL);
 }
 
-void *kmalloc_pages(struct slab_domain *domain, size_t size,
-                    enum alloc_flags flags, enum alloc_behavior behavior) {
-    void *ret = kmalloc_pages_raw(domain, size, flags, behavior);
+void *kmalloc_pages(struct slab_domain *domain, stack_handle_t handle,
+                    size_t size, enum alloc_flags flags,
+                    enum alloc_behavior behavior) {
+    void *ret = kmalloc_pages_raw(domain, handle, size, flags, behavior);
 
     if (alloc_behavior_may_fault(behavior) &&
         !alloc_behavior_is_fast(behavior)) {
@@ -822,8 +867,14 @@ void *kmalloc_pages(struct slab_domain *domain, size_t size,
     return ret;
 }
 
+static size_t slab_allocation_idx(struct slab *slab, void *ptr) {
+    size_t delta = (size_t) ((uint8_t *) ptr - (uint8_t *) slab->mem);
+    return delta / slab->parent_cache->obj_stride;
+}
+
 void *kmalloc_try_from_magazine(struct slab_domain *domain,
-                                struct slab_percpu_cache *pcpu, size_t size,
+                                struct slab_percpu_cache *pcpu,
+                                stack_handle_t handle, size_t size,
                                 enum alloc_flags flags) {
     enum slab_magazine_type mtype = (flags & ALLOC_FLAG_ZERO_ON_ALLOC)
                                         ? SLAB_MAGAZINE_ZERO
@@ -837,12 +888,22 @@ void *kmalloc_try_from_magazine(struct slab_domain *domain,
 
     void *ret = (void *) slab_magazine_pop(mag);
     if (ret) {
+        struct slab *slab = slab_for_ptr(ret);
         slab_stat_alloc_magazine_hit(domain);
         uint64_t byte_idx;
         uint8_t bit_mask;
-        slab_index_and_mask(slab_for_ptr(ret), ret, &byte_idx, &bit_mask);
+        slab_index_and_mask(slab, ret, &byte_idx, &bit_mask);
         kassert(
             SLAB_BITMAP_TEST(slab_for_ptr(ret)->bitmap[byte_idx], bit_mask));
+
+#ifdef DEBUG_SLAB_DEEP
+        size_t idx = slab_allocation_idx(slab, ret);
+        if (slab->traces[idx])
+            stack_depot_put(slab->traces[idx]);
+
+        slab->traces[idx] = handle;
+#endif
+
 #ifdef DEBUG_SLAB
         if (mtype == SLAB_MAGAZINE_ZERO &&
             !is_buffer_uniform(ret, mag->obj_size, 0)) {
@@ -977,7 +1038,8 @@ void slab_stat_alloc_from_cache(struct slab_cache *cache) {
     }
 }
 
-void *slab_alloc(struct slab_cache *cache, enum alloc_behavior behavior) {
+void *slab_alloc(struct slab_cache *cache, stack_handle_t handle,
+                 enum alloc_behavior behavior) {
     void *ret = NULL;
     bool from_alloc = behavior & SLAB_ALLOC_BEHAVIOR_FROM_ALLOC;
 
@@ -987,7 +1049,7 @@ void *slab_alloc(struct slab_cache *cache, enum alloc_behavior behavior) {
     enum irql irql = spin_lock(&cache->lock);
 
     /* First try from lists */
-    ret = slab_cache_try_alloc_from_lists(cache);
+    ret = slab_cache_try_alloc_from_lists(cache, handle);
     if (ret) {
         if (from_alloc)
             slab_stat_alloc_from_cache(cache);
@@ -1005,7 +1067,7 @@ void *slab_alloc(struct slab_cache *cache, enum alloc_behavior behavior) {
         goto out;
 
     slab_list_add(cache, slab);
-    ret = slab_alloc_from(cache, slab);
+    ret = slab_alloc_from(cache, handle, slab);
 
 out:
     spin_unlock(&cache->lock, irql);
@@ -1070,8 +1132,9 @@ out:
     return ret;
 }
 
-void *slab_alloc_retry(struct slab_domain *domain, size_t size,
-                       enum alloc_flags flags, enum alloc_behavior behavior) {
+void *slab_alloc_retry(struct slab_domain *domain, stack_handle_t handle,
+                       size_t size, enum alloc_flags flags,
+                       enum alloc_behavior behavior) {
     /* here we run emergency GC to try and reclaim a little memory */
     enum slab_gc_flags gc_flags = SLAB_GC_FLAG_AGG_EMERGENCY;
 
@@ -1095,7 +1158,7 @@ void *slab_alloc_retry(struct slab_domain *domain, size_t size,
     /* ok now we have ran the emergency GC, let's try again... */
     if (!kmalloc_size_fits_in_slab(size)) {
         /* here, `domain` should be the local domain... */
-        return kmalloc_pages(domain, size, flags, behavior);
+        return kmalloc_pages(domain, handle, size, flags, behavior);
     } else {
         /* here, `domain` might be another domain */
 
@@ -1111,7 +1174,8 @@ void *slab_alloc_retry(struct slab_domain *domain, size_t size,
 
         struct slab_cache *cache = &cs->caches[slab_size_to_index(size)];
 
-        return slab_alloc(cache, behavior | SLAB_ALLOC_BEHAVIOR_FROM_ALLOC);
+        return slab_alloc(cache, handle,
+                          behavior | SLAB_ALLOC_BEHAVIOR_FROM_ALLOC);
     }
 }
 
@@ -1125,16 +1189,23 @@ void *kmalloc_new(size_t size, enum alloc_flags flags,
     struct slab_percpu_cache *pcpu = slab_percpu_cache_local();
     struct slab_domain *selected_dom = local_dom;
 
+#ifdef DEBUG_SLAB_DEEP
+    stack_handle_t handle = stack_depot_save_current();
+    kassert(handle);
+#else
+    stack_handle_t handle = NULL;
+#endif
+
     slab_stat_alloc_call(local_dom);
 
     /* this has its own path */
     if (!kmalloc_size_fits_in_slab(size)) {
-        ret = kmalloc_pages(local_dom, size, flags, behavior);
+        ret = kmalloc_pages(local_dom, handle, size, flags, behavior);
         goto exit;
     }
 
     /* alloc fits in slab - TODO: scale size if cache alignment is requested */
-    ret = kmalloc_try_from_magazine(local_dom, pcpu, size, flags);
+    ret = kmalloc_try_from_magazine(local_dom, pcpu, handle, size, flags);
 
     /* if the mag alloc fails, drain our full portion of the freequeue */
     size_t pct = ret ? SLAB_FREE_QUEUE_ALLOC_PCT : 100;
@@ -1143,7 +1214,7 @@ void *kmalloc_new(size_t size, enum alloc_flags flags,
 
     /* did the initial allocation fail but we drained something? go again... */
     if (!ret && drained) {
-        ret = kmalloc_try_from_magazine(local_dom, pcpu, size, flags);
+        ret = kmalloc_try_from_magazine(local_dom, pcpu, handle, size, flags);
     }
 
     /* found something -- all done, this is the fastpath.
@@ -1162,7 +1233,7 @@ void *kmalloc_new(size_t size, enum alloc_flags flags,
 
     /* allocate from an existing slab or pull from the GC lists
      * or call into the physical memory allocator to get a new slab */
-    ret = slab_alloc(cache, behavior | SLAB_ALLOC_BEHAVIOR_FROM_ALLOC);
+    ret = slab_alloc(cache, handle, behavior | SLAB_ALLOC_BEHAVIOR_FROM_ALLOC);
 
     /* slowpath - let's try and fill up our percpu caches so we don't
      * end up in this slowpath over and over again... */
@@ -1171,7 +1242,7 @@ void *kmalloc_new(size_t size, enum alloc_flags flags,
     /* uh oh... we found NOTHING...
      * try one last time - this will run emergency GC */
     if (unlikely(!ret) && !alloc_behavior_is_fast(behavior))
-        ret = slab_alloc_retry(selected_dom, size, flags, behavior);
+        ret = slab_alloc_retry(selected_dom, handle, size, flags, behavior);
 
 exit:
 
@@ -1192,7 +1263,8 @@ void *kmalloc_from_domain(size_t domain, size_t size) {
         global.domains[domain]->slab_domain->caches[SLAB_TYPE_NONPAGEABLE_ZERO];
     struct slab_cache *c = &cs->caches[index];
     void *ret =
-        slab_alloc(c, ALLOC_BEHAVIOR_NORMAL | SLAB_ALLOC_BEHAVIOR_FROM_ALLOC);
+        slab_alloc(c, /*handle=*/NULL,
+                   ALLOC_BEHAVIOR_NORMAL | SLAB_ALLOC_BEHAVIOR_FROM_ALLOC);
 
 #ifdef DEBUG_ASAN
     if (ret)
@@ -1245,7 +1317,7 @@ bool kfree_free_queue_enqueue(struct slab_domain *domain, void *ptr) {
     return false;
 }
 
-void kfree_pages(void *ptr, size_t size, enum alloc_behavior behavior) {
+void kfree_pages(void *ptr, enum alloc_behavior behavior) {
     struct slab_page_hdr *header = slab_page_hdr_for_addr(ptr);
 
     /* early allocations do not have topology data and set their
@@ -1360,7 +1432,7 @@ void kfree_new(void *ptr, enum alloc_behavior behavior) {
     slab_stat_free_call(local_domain);
 
     if (idx < 0) {
-        kfree_pages(ptr, size, behavior);
+        kfree_pages(ptr, behavior);
         goto garbage_collect;
     }
 

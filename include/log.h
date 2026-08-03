@@ -170,6 +170,7 @@ void log_dump_site_with_opts(struct log_site *, struct log_dump_options opts);
 void log_dump_site(struct log_site *site);
 void log_dump_site_default(struct log_site *);
 void log_dump_all(void);
+void log_dump_panic(void);
 void log_sites_init(void);
 void log_site_free(struct log_site *site);
 struct log_site *log_site_create(struct log_site_options opts);

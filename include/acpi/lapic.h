@@ -95,6 +95,7 @@ static inline uint32_t lapic_read(uint32_t reg) {
 
 void lapic_init();
 void lapic_timer_init(cpu_id_t core_id);
+void lapic_timer_init_bsp(void);
 uint64_t lapic_get_id(void);
 uint32_t cpu_get_this_id(void);
 void lapic_timer_disable();

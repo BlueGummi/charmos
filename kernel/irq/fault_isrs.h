@@ -1,3 +1,4 @@
+#include <console/panic.h>
 #define MAKE_HANDLER(handler_name, message)                                    \
     enum irq_result handler_name##_handler(void *ctx, uint8_t vector,          \
                                            struct irq_context *rsp) {          \
@@ -84,11 +85,9 @@ MAKE_HANDLER(double_fault, "DOUBLE FAULT");
 
 enum irq_result nmi_isr(void *ctx, uint8_t vector, struct irq_context *rsp) {
     (void) ctx, (void) vector, (void) rsp;
-    if (atomic_load(&global.panicked)) {
-        disable_interrupts();
-        while (true)
-            wait_for_interrupt();
-    }
+    if (atomic_load(&global.panicked))
+        panic_nmi_handoff(ctx, rsp);
+
     return IRQ_HANDLED;
 }
 

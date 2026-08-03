@@ -9,11 +9,7 @@ struct prng_core {
     size_t pos;
 };
 
-void prng_build(struct prng_core *this_one, size_t cpu) {
-    (void) this_one, (void) cpu;
-}
-
-PERCPU_DECLARE(pcs, struct prng_core, prng_build);
+PERCPU_DECLARE(pcs, struct prng_core, NULL);
 #define prng_core_state PERCPU_READ(pcs)
 
 static void prng_seed_core(uint64_t seed) {

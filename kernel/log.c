@@ -24,6 +24,7 @@ LOG_SITE_DECLARE(global, .flags = LOG_SITE_DEFAULT,
 LOG_HANDLE_DECLARE(global, .flags = LOG_PRINT);
 
 struct log_globals {
+    bool initialized;
     struct locked_list list;
 };
 
@@ -82,6 +83,109 @@ static const char *find_symbol(uint64_t addr, uint64_t *out_sym_addr) {
         *out_sym_addr = best->addr;
 
     return strtab + best->name_off;
+}
+
+static const struct kernel_lines_hdr *lines_header(void) {
+    const struct kernel_syms_hdr *hdr = syms_header();
+
+    if (!hdr || !hdr->lines_off)
+        return NULL;
+
+    const struct kernel_lines_hdr *lines =
+        (const void *) (kernel_syms_blob + hdr->lines_off);
+
+    if (lines->magic != KERNEL_LINES_MAGIC || !lines->count)
+        return NULL;
+
+    return lines;
+}
+
+static uint64_t uleb_next(const uint8_t **p, const uint8_t *end) {
+    uint64_t v = 0;
+    unsigned shift = 0;
+
+    while (*p < end) {
+        uint8_t byte = *(*p)++;
+
+        v |= (uint64_t) (byte & 0x7f) << shift;
+        if (!(byte & 0x80))
+            break;
+
+        shift += 7;
+        if (shift >= 64)
+            break;
+    }
+
+    return v;
+}
+
+static int64_t unzigzag(uint64_t v) {
+    return (v & 1) ? -(int64_t) (v >> 1) - 1 : (int64_t) (v >> 1);
+}
+
+/* Name of the file'th entry in the table, or NULL if it runs off the end */
+static const char *lines_file_name(const struct kernel_lines_hdr *lines,
+                                   int64_t want) {
+    if (want < 0)
+        return NULL;
+
+    const char *base = (const char *) lines + lines->files_off;
+    const char *end = base + lines->files_len;
+
+    for (int64_t i = 0; i < want; i++) {
+        while (base < end && *base)
+            base++;
+
+        if (base >= end)
+            return NULL;
+
+        base++; /* past the NUL */
+    }
+
+    return (base < end) ? base : NULL;
+}
+
+static const char *find_line(uint64_t addr, uint32_t *out_line) {
+    const struct kernel_lines_hdr *lines = lines_header();
+
+    if (out_line)
+        *out_line = 0;
+
+    if (!lines)
+        return NULL;
+
+    const uint8_t *p = (const uint8_t *) lines + lines->stream_off;
+    const uint8_t *end = p + lines->stream_len;
+
+    uint64_t cur = lines->base_addr;
+    int64_t file = 0, line = 0;
+    int64_t best_file = -1, best_line = 0;
+    bool found = false;
+
+    for (uint32_t i = 0; i < lines->count && p < end; i++) {
+        cur += uleb_next(&p, end);
+        file += unzigzag(uleb_next(&p, end));
+        line += unzigzag(uleb_next(&p, end));
+
+        if (cur > addr)
+            break;
+
+        best_file = file;
+        best_line = line;
+        found = true;
+    }
+
+    if (!found || best_line <= 0)
+        return NULL;
+
+    const char *name = lines_file_name(lines, best_file);
+    if (!name)
+        return NULL;
+
+    if (out_line)
+        *out_line = (uint32_t) best_line;
+
+    return name;
 }
 
 static void k_printf_from_log(const char *fmt, const uint64_t *args,
@@ -362,6 +466,7 @@ void log_emit_internal(struct log_site *site, struct log_handle *handle,
 }
 
 void log_sites_init(void) {
+    log_global.initialized = true;
     locked_list_init(&log_global.list, LOCKED_LIST_INIT_NORMAL);
 
     for (struct log_site *s = __skernel_log_sites; s < __ekernel_log_sites;
@@ -387,10 +492,19 @@ void log_dump_all(void) {
 
     struct log_site *site;
     list_for_each_entry(site, &log_global.list.list, list) {
-        log_dump_site_default(site);
+        log_dump_site(site);
     }
 
     spin_unlock(&log_global.list.lock, irql);
+}
+
+void log_dump_panic(void) {
+
+    struct log_site *site;
+    list_for_each_entry(site, &log_global.list.list, list) {
+        if (site->flags & LOG_SITE_PANIC_VISIBLE)
+            log_dump_site(site);
+    }
 }
 
 void log_site_free(struct log_site *site) {
@@ -492,6 +606,24 @@ size_t stack_unwind(uint64_t frame, uint64_t *entries, size_t max) {
     return nr;
 }
 
+const char *debug_symbolize(uint64_t addr, uint64_t *out_off) {
+    uint64_t base = 0;
+    const char *sym = find_symbol(addr, &base);
+
+    if (out_off)
+        *out_off = sym ? addr - base : 0;
+
+    return sym;
+}
+
+const char *debug_line_for(uint64_t addr, uint32_t *out_line) {
+    return find_line(addr, out_line);
+}
+
+bool debug_syms_present(void) {
+    return syms_header() != NULL;
+}
+
 void debug_print_stack_trace(const uint64_t *entries, size_t nr) {
     if (!nr) {
         printf("  <no kernel frames found>\n");
@@ -510,6 +642,12 @@ void debug_print_stack_trace(const uint64_t *entries, size_t nr) {
         } else {
             printf("    #%-2zu [0x%016lx] <unknown>\n", i, entries[i]);
         }
+
+        uint32_t line;
+        const char *file = find_line(entries[i] - 1, &line);
+
+        if (file)
+            printf("            at %s:%u\n", file, line);
     }
 }
 

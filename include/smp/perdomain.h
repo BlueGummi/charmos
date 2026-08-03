@@ -15,13 +15,16 @@ struct perdomain_descriptor {
     size_t align;
     void **perdomain_ptrs;
     perdomain_descriptor_constructor constructor;
+    bool ready;
 };
 
 LINKER_SECTION_DEFINE(struct perdomain_descriptor, perdomain_desc);
 
 #define PERDOMAIN_DECLARE(__n, __type, __ctor)                                 \
     extern __type __perdomain_##__n;                                           \
+    extern struct perdomain_descriptor __perdomain_desc_##__n;                 \
     static void __perdomain_ctor_##__n(void *inst, size_t cpu) {               \
+        __perdomain_desc_##__n.ready = true;                                   \
         if ((__ctor) != NULL)                                                  \
             __ctor((__type *) inst, cpu);                                      \
     }                                                                          \
@@ -32,11 +35,14 @@ LINKER_SECTION_DEFINE(struct perdomain_descriptor, perdomain_desc);
         .align = _Alignof(__type),                                             \
         .perdomain_ptrs = NULL,                                                \
         .constructor = __perdomain_ctor_##__n,                                 \
+        .ready = false,                                                        \
     };                                                                         \
     __type __perdomain_##__n
 
 void perdomain_obj_init(void);
 
+#define PERDOMAIN(name) &(__perdomain_##name)
+#define PERDOMAIN_READY(name) __perdomain_desc_##name.ready
 #define PERDOMAIN_PTR_FOR_DOMAIN(name, d)                                      \
     ((typeof(__perdomain_##name) *) __perdomain_desc_##name.perdomain_ptrs[d])
 #define PERDOMAIN_READ_FOR_DOMAIN(name, d)                                     \

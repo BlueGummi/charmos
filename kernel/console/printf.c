@@ -47,6 +47,19 @@ static void serial_putc(char c) {
     outb(0x3F8, (uint8_t) c);
 }
 
+void serial_write(const char *str, size_t len) {
+    for (size_t i = 0; i < len; i++)
+        serial_putc(str[i]);
+}
+
+bool serial_try_getc(char *out) {
+    if (!(inb(0x3F8 + 5) & 1))
+        return false;
+
+    *out = (char) inb(0x3F8);
+    return true;
+}
+
 void serial_puts(struct printf_cursor *csr, const char *str, int len) {
     for (int i = 0; i < len; i++) {
         if (!csr)
@@ -63,7 +76,8 @@ void double_print(struct flanterm_context *f, struct printf_cursor *csr,
                   const char *str, int len) {
     (void) f;
     serial_puts(csr, str, len);
-    if (global.current_bootstage >= BOOTSTAGE_EARLY_FB)
+
+    if (!csr && global.current_bootstage >= BOOTSTAGE_EARLY_FB)
         flanterm_write(f, str, len);
 }
 
@@ -490,12 +504,24 @@ void printf_unlocked(const char *format, ...) {
 void printf(const char *format, ...) {
     bool i = are_interrupts_enabled();
     disable_interrupts();
-    spin_lock_raw(&k_printf_lock);
+
+    /* Once somebody has panicked the console lock is not worth waiting on: the
+     * CPU holding it may be the one that died, or may be us one frame further
+     * down. The other CPUs are being NMI'd into a halt anyway, so the
+     * interleaving this risks costs less than a deadlocked panic screen */
+    bool lock = !atomic_load_explicit(&global.panicked, memory_order_relaxed);
+
+    if (lock)
+        spin_lock_raw(&k_printf_lock);
+
     va_list args;
     va_start(args, format);
     vprintf(NULL, format, args);
     va_end(args);
-    spin_unlock_raw(&k_printf_lock);
+
+    if (lock)
+        spin_unlock_raw(&k_printf_lock);
+
     if (i)
         enable_interrupts();
 }

@@ -195,20 +195,23 @@ enum slab_magazine_type {
  * │        slab metadata         ││ data │
  * └──────────────────────────────┘└──────┘
  *      │          │         │
- *      └──┐       └───────┐ └─────────┐
- *         │               │           │
- *         ▼               ▼           ▼
- * ┌───────────────┐┌─────────────┐┌──────┐
- * │static metadata││page pointers││bitmap│
- * └───────────────┘└─────────────┘└──────┘
+ *      └──┐       └───────┐ └─────────────┐
+ *         │               │               │
+ *         ▼               ▼               ▼
+ * ┌───────────────┐┌─────────────┐┌───────────────┐
+ * │static metadata││page pointers││bitmap + traces│
+ * └───────────────┘└─────────────┘└───────────────┘
  */
 
 /* Some notes on demand paged slabs: the slab itself must
  * always be less than PAGE_SIZE, for now, as that page
  * will have to be mapped regardless */
 struct slab {
-    /* Put commonly accessed fields up here to make cache happier */
     uint8_t *bitmap;
+#ifdef DEBUG_SLAB_DEEP
+    stack_handle_t *traces; /* This is used to keep stack traces of the
+                             * individual allocations when in DEBUG_DEEP */
+#endif
     vaddr_t mem; /* Where does the slab data start */
     size_t used;
     struct slab_chunk *parent_chunk;
@@ -247,6 +250,8 @@ struct slab_magazine {
     size_t obj_size;
 };
 
+/* NOTE: This is *why* we disable preemption when entering the slab allocator,
+ * in both the alloc and free paths: shadow_objs and entry_handle */
 struct slab_percpu_cache {
     struct mpsc_slist defer_frees;
     struct dpc defer_dpc;
@@ -511,6 +516,7 @@ struct slab_domain {
 };
 
 struct slab_globals {
+    bool domains_enabled;
     struct vas *vas;
     struct slab_caches caches;
     struct slab_size_constant *class_sizes;
@@ -525,9 +531,10 @@ slab_domain_buddy(struct slab_domain *domain) {
 
 struct slab_page_hdr {
     uint32_t magic;
-    bool pageable : 1; /* Pack it in here to keep this at 2 qwords in size */
+    bool pageable : 1;
     uint32_t pages : 31;
     struct slab_domain *domain;
+    stack_handle_t handle;
 };
 
 struct slab *slab_init(struct slab *slab, struct slab_cache *parent);
@@ -539,13 +546,15 @@ void *slab_alloc_old(struct slab_cache *cache);
 void slab_free_page_hdr(struct slab_page_hdr *hdr, enum alloc_behavior bh);
 size_t slab_allocation_size(vaddr_t addr);
 void slab_free(struct slab_domain *domain, void *obj);
-void *slab_cache_try_alloc_from_lists(struct slab_cache *c);
+void *slab_cache_try_alloc_from_lists(struct slab_cache *c,
+                                      stack_handle_t handle);
 void slab_cache_init(size_t order, struct slab_cache *cache,
                      struct slab_size_constant *ssc);
 void slab_cache_insert(struct slab_cache *cache, struct slab *slab);
 struct slab *slab_create(struct slab_cache *cache,
                          enum alloc_behavior behavior);
-void *slab_alloc(struct slab_cache *cache, enum alloc_behavior behavior);
+void *slab_alloc(struct slab_cache *cache, stack_handle_t handle,
+                 enum alloc_behavior behavior);
 struct slab *slab_for_ptr(void *ptr);
 
 /* Magazine + percpu */
@@ -620,6 +629,7 @@ void slab_dump_corruption(void *obj, struct slab_magazine *popped_mag,
 #endif
 
 extern struct slab_globals slab_global;
+extern struct page_fault_handler slab_page_fault_handler;
 
 /* Recall that the EWMA formula is
  *
@@ -727,10 +737,27 @@ static inline struct slab_cache *slab_caches_alloc() {
                         sizeof(struct slab_cache) * slab_global.num_sizes);
 }
 
+static inline stack_handle_t *slab_get_traces_location(struct slab *s) {
+    uint8_t *base = (uint8_t *) s + sizeof(struct slab);
+    return (stack_handle_t *) (base + sizeof(struct page *) *
+                                          s->parent_cache->pages_per_slab);
+}
+
+#ifdef DEBUG_SLAB_DEEP
+
+static inline uint8_t *slab_get_bitmap_location(struct slab *s) {
+    uint8_t *base = (uint8_t *) slab_get_traces_location(s);
+    return base + sizeof(stack_handle_t) * s->parent_cache->objs_per_slab;
+}
+
+#else
+
 static inline uint8_t *slab_get_bitmap_location(struct slab *s) {
     uint8_t *base = (uint8_t *) s + sizeof(struct slab);
     return base + sizeof(struct page *) * s->parent_cache->pages_per_slab;
 }
+
+#endif
 
 static inline uint64_t slab_page_flags(enum slab_type type) {
     uint64_t pflags = PAGE_PRESENT | PAGE_WRITE | PAGE_XD;
@@ -739,6 +766,11 @@ static inline uint64_t slab_page_flags(enum slab_type type) {
         pflags |= PAGE_PAGEABLE;
 
     return pflags;
+}
+
+static inline bool slab_ptr_in_slab(void *ptr) {
+    vaddr_t vaddr = (vaddr_t) ptr;
+    return vaddr >= SLAB_HEAP_START && vaddr <= SLAB_HEAP_END;
 }
 
 static inline bool kmalloc_ptr_in_slab_validate(void *ptr) {
@@ -781,5 +813,3 @@ static inline bool is_buffer_uniform(const void *ptr, size_t len,
 
     return true;
 }
-
-extern struct page_fault_handler slab_page_fault_handler;

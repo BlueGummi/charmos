@@ -218,4 +218,6 @@ void slab_dump_corruption(void *obj, struct slab_magazine *popped_mag,
     }
     slab_err("total duplicate locations found (excl. nothing): %zu", found);
 }
+
+stack_handle_t slab_stack_handle_for(void *ptr) {}
 #endif

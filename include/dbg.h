@@ -1,4 +1,5 @@
 /* @title: Debugging */
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -14,6 +15,10 @@ void debug_print_stack_from(uint64_t *start, size_t max_scan);
 
 size_t stack_unwind(uint64_t frame, uint64_t *entries, size_t max);
 void debug_print_stack_trace(const uint64_t *entries, size_t nr);
+
+const char *debug_symbolize(uint64_t addr, uint64_t *out_off);
+const char *debug_line_for(uint64_t addr, uint32_t *out_line);
+bool debug_syms_present(void);
 
 /* Unwinds from the caller's own frame */
 #define stack_trace_save(entries, max)                                         \

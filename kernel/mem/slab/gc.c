@@ -1,6 +1,7 @@
 #include <math/bit_ops.h>
 #include <math/ilog2.h>
 #include <sch/sched.h>
+#include <stack_depot.h>
 
 #include "gc_internal.h"
 
@@ -319,6 +320,16 @@ static void slab_gc_dequeue(struct slab_gc *gc, struct slab *slab) {
 
     rbt_delete(&gc->rbt, &slab->rb);
     atomic_fetch_sub(&gc->num_elements, 1);
+
+    /* We need to drop all the traces here */
+#ifdef DEBUG_SLAB_DEEP
+    for (size_t i = 0; i < slab->parent_cache->objs_per_slab; i++) {
+        if (slab->traces[i])
+            stack_depot_put(slab->traces[i]);
+
+        slab->traces[i] = NULL;
+    }
+#endif
 
     slab->gc_enqueue_time_ms = 0;
     slab->state = SLAB_FREE;

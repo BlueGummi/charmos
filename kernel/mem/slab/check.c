@@ -9,6 +9,22 @@
         }                                                                      \
     } while (0)
 
+#ifdef DEBUG_SLAB_DEEP
+bool slab_check_traces(struct slab *s) {
+    /* Verify that it begins at the end of the page array */
+    slab_check_assert_return_false(
+        s->bitmap == ((uint8_t *) s->traces +
+                      sizeof(stack_handle_t) * s->parent_cache->objs_per_slab));
+
+    return true;
+}
+#else
+bool slab_check_traces(struct slab *s) {
+    (void) s;
+    return true;
+}
+#endif
+
 bool slab_check_reset_slab(struct slab *slab) {
     slab_check_assert_return_false(slab->state == SLAB_FREE);
     slab_check_assert_return_false(slab->bitmap == NULL);
@@ -52,6 +68,7 @@ bool slab_check(struct slab *slab) {
     if (!cache)
         return slab_check_reset_slab(slab);
 
+    slab_check_assert_return_false(slab_check_traces(slab));
     slab_check_assert_return_false(slab_check_bitmap(slab));
     slab_check_assert_return_false(slab_check_meta(slab));
     return true;

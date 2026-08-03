@@ -92,7 +92,7 @@ static size_t slab_cache_bulk_alloc(struct slab_cache *cache,
         /* We don't allow allocations of new slabs - that
          * is not the point of our percpu caches */
         kassert(!(behavior & SLAB_ALLOC_BEHAVIOR_FROM_ALLOC));
-        void *obj = slab_alloc(cache, behavior);
+        void *obj = slab_alloc(cache, /*handle=*/NULL, behavior);
         if (!obj)
             break;
 

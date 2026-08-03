@@ -118,17 +118,13 @@ __no_sanitize_address void k_main(void) {
     tests_hook_boot();
     cmdline_parse(cmdline_request.response->cmdline);
 
-    lapic_timer_init(/* core_id = */ 0);
+    lapic_timer_init_bsp();
     dpc_init_percpu();
     smp_wake(mp_request.response);
 
     topology_init();
     scheduler_domains_init();
     bootstage_advance(BOOTSTAGE_MID_TOPOLOGY);
-    struct core *iter;
-    for_each_cpu_struct(iter) {
-        smp_dump_core(iter);
-    }
 
     percpu_obj_init();
     perdomain_obj_init();

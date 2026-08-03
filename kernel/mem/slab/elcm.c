@@ -17,7 +17,11 @@ struct slab_elcm_candidate slab_elcm(size_t obj_size, size_t obj_alignment) {
     kassert(obj_size && obj_alignment);
     struct elcm_params params = {
         .metadata_size_bytes = sizeof(struct slab),
+#ifdef DEBUG_SLAB_DEEP
+        .metadata_bits_per_obj = 1 + sizeof(stack_handle_t) * 8,
+#else
         .metadata_bits_per_obj = 1,
+#endif
         .obj_size = obj_size,
         .obj_alignment = obj_alignment,
         .bias_towards_pow2 = true,
@@ -32,9 +36,11 @@ struct slab_elcm_candidate slab_elcm(size_t obj_size, size_t obj_alignment) {
         return (struct slab_elcm_candidate){.pages = 0, .bitmap_size_bytes = 0};
 
     struct elcm_candidate elc = params.out;
-    return (struct slab_elcm_candidate){.pages = elc.pages,
-                                        .bitmap_size_bytes = elc.bitmap_bytes,
-                                        .obj_count = elc.obj_count};
+
+    return (struct slab_elcm_candidate){
+        .pages = elc.pages,
+        .bitmap_size_bytes = SLAB_BITMAP_BYTES_FOR(elc.obj_count),
+        .obj_count = elc.obj_count};
 }
 
 void slab_elcm_initialize() {

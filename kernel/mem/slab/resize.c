@@ -31,6 +31,7 @@ static void slab_shrink(struct slab *slab, size_t start, size_t end,
     slab->page_count = start;
 }
 
+/* returns if the resize was successful or not needed */
 bool slab_resize(struct slab *slab, size_t new_size_pages) {
     kassert(slab_can_resize_to(slab, new_size_pages));
     size_t old = slab->page_count;

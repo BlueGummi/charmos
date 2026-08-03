@@ -24,7 +24,7 @@ struct stack_depot_record_chain {
     struct spinlock lock;
 };
 
-#define STACK_DEPOT_HASH_SIZE 128
+#define STACK_DEPOT_HASH_SIZE 2048
 
 /* TODO: Someday we'll implement fixed_size_range support for this */
 #define STACK_DEPOT_ALLOW_ALLOC_FLAG ALLOC_FLAG_AVAIL_BIT(0)
@@ -32,6 +32,7 @@ struct stack_depot_record_chain {
 struct stack_depot_globals {
     uint32_t starting_seed;
     struct stack_depot_record_chain chains[STACK_DEPOT_HASH_SIZE];
+    _Atomic size_t num_records;
 };
 
 extern struct stack_depot_globals stack_depot_global;
@@ -44,8 +45,7 @@ static inline uint32_t stack_depot_hash(uintptr_t *entries,
 
     size_t len = entries_to_trace * 8;
 
-    return hash_murmur3_32(entries, len, stack_depot_global.starting_seed) %
-           STACK_DEPOT_HASH_SIZE;
+    return hash_murmur3_32(entries, len, stack_depot_global.starting_seed);
 }
 
 void stack_depot_init();
@@ -56,3 +56,7 @@ size_t stack_depot_read(stack_handle_t key, uintptr_t *entries);
 void stack_depot_print(stack_handle_t key);
 void stack_depot_put(stack_handle_t key);
 stack_handle_t stack_depot_save_current();
+
+static inline size_t stack_depot_get_record_count() {
+    return atomic_load(&stack_depot_global.num_records);
+}
