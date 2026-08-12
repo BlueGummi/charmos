@@ -4,6 +4,26 @@
 
 #include <string.h>
 
+static void daemon_put(struct daemon *d) {
+    if (refcount_dec_and_test(&d->refcount)) {
+        atomic_store(&d->state, DAEMON_STATE_DEAD);
+
+        if (d->workqueue) {
+            kassert(DAEMON_FLAG_TEST(d, DAEMON_FLAG_HAS_WORKQUEUE));
+            workqueue_destroy(d->workqueue);
+        }
+
+        if (d->name)
+            kfree(d->name);
+
+        kfree(d);
+    }
+}
+
+static void daemon_get(struct daemon *d) {
+    kassert(refcount_inc_not_zero(&d->refcount));
+}
+
 static struct daemon_thread *current_daemon_thread(void) {
     return thread_get_current()->private;
 }
@@ -65,6 +85,8 @@ static void daemon_thread_exit(struct daemon *daemon,
     }
 
     kfree(self);
+
+    daemon_put(daemon);
     thread_exit();
 }
 
@@ -111,6 +133,7 @@ void daemon_main(void *a) {
 
     struct daemon_thread *self = current_daemon_thread();
     struct daemon *daemon = self->daemon;
+    daemon_get(daemon);
     bool timesharing = !self->background;
 
     if (timesharing)
@@ -231,6 +254,7 @@ struct daemon *daemon_create(const char *fmt, struct daemon_attributes *attrs,
     daemon->attrs.idle_timesharing_threads = 0;
     daemon->attrs.timesharing_threads = 0;
 
+    refcount_init(&daemon->refcount, 1);
     spinlock_init(&daemon->lock);
     semaphore_init(&daemon->bg_sem, 0, SEMAPHORE_INIT_NORMAL);
     semaphore_init(&daemon->ts_sem, 0, SEMAPHORE_INIT_NORMAL);
@@ -296,9 +320,11 @@ static void boost_bg_thread_to_ts(struct daemon *daemon) {
 
 /* Assume that all daemons must have daemon works
  * finish executing before they can be safely destroyed */
+
+/* TODO: Actually use a refcount here */
 void daemon_destroy(struct daemon *daemon) {
     /* Make all the threads go sleep on the semaphore */
-    daemon->state = DAEMON_STATE_DESTROYING;
+    atomic_store(&daemon->state, DAEMON_STATE_DESTROYING);
 
     boost_bg_thread_to_ts(daemon);
 
@@ -306,32 +332,15 @@ void daemon_destroy(struct daemon *daemon) {
     while (total_ts_workers(daemon) > idle_ts_workers(daemon))
         scheduler_yield();
 
-    /* Great, now we send the signal and wake everyone */
-    while (total_ts_workers(daemon) > 0) {
-        semaphore_post(&daemon->ts_sem);
-        scheduler_yield();
-    }
+    /* Wakes up everyone, and they'll read daemon->state == DESTROYING */
+    semaphore_postn(&daemon->ts_sem, total_ts_workers(daemon));
 
-    kassert(!total_ts_workers(daemon));
-    /* All timesharing threads should be gone now.
-     * Time to handle the background thread. */
-    while (bg_present(daemon)) {
+    /* handle if existing, post once */
+    if (bg_present(daemon))
         semaphore_post(&daemon->bg_sem);
-        scheduler_yield();
-    }
 
-    daemon->state = DAEMON_STATE_DEAD;
-
-    /* Ok now all threads are gone */
-    if (daemon->workqueue) {
-        kassert(DAEMON_FLAG_TEST(daemon, DAEMON_FLAG_HAS_WORKQUEUE));
-        workqueue_destroy(daemon->workqueue);
-    }
-
-    if (daemon->name)
-        kfree(daemon->name);
-
-    kfree(daemon);
+    /* Initial reference gone */
+    daemon_put(daemon);
 }
 
 struct daemon_thread *daemon_spawn_worker(struct daemon *daemon) {

@@ -96,7 +96,9 @@ struct daemon {
     struct daemon_attributes attrs;
 
     struct spinlock lock;
-    enum daemon_state state;
+
+    refcount_t refcount;
+    _Atomic enum daemon_state state;
 };
 
 #define daemon_thread_from_list_node(ln)                                       \
