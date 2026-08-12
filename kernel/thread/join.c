@@ -25,7 +25,8 @@ int thread_join(struct thread *t) {
     return status;
 }
 
-bool thread_join_timeout(struct thread *t, time_t timeout_ms, int *status_out) {
+bool thread_join_timeout(struct thread *t, time_ms_t timeout_ms,
+                         int *status_out) {
     join_check(t);
 
     enum irql irql = spin_lock(&t->join_lock);
@@ -36,7 +37,7 @@ bool thread_join_timeout(struct thread *t, time_t timeout_ms, int *status_out) {
         if (r == WAKE_REASON_TIMEOUT &&
             thread_get_state(t) != THREAD_STATE_ZOMBIE) {
             spin_unlock(&t->join_lock, irql);
-            /* caller must retry the join or detach. */
+            /* caller must retry the join or detach */
             thread_and_flags(t, ~THREAD_FLAG_JOINED);
             return false;
         }

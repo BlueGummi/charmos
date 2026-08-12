@@ -18,8 +18,7 @@ struct scheduler *scheduler_select_best_for_thread(struct thread *t) {
         }
     }
 
-    kassert(sched);
-    return sched;
+    return kassert(sched);
 }
 
 bool thread_wake(struct thread *t, enum thread_wake_reason reason,

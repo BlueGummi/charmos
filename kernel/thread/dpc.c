@@ -34,13 +34,14 @@ static void dpc_execute_all_in_queue(struct dpc_queue *dq) {
 
         while (it) {
             atomic_store_explicit(&it->enqueued, false, memory_order_release);
-            it->func(it, it->ctx);
+            it->func(it->ctx);
             it = atomic_load_explicit(&it->next, memory_order_relaxed);
         }
     }
 }
 
 void dpc_run_local(void) {
+    kassert(are_interrupts_enabled());
     struct core *me = smp_core();
     if (me->in_resched)
         return;
@@ -60,6 +61,15 @@ void dpc_run_local(void) {
     /* all clear */
     me->dpc_event = DPC_NONE;
     atomic_store(&me->executing_dpcs, false);
+}
+
+void dpc_run_dpcs_from_irq(void) {
+    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
+
+    /* Should come out to be false due to IRQ specific IRQL invariants */
+    kassert(!are_interrupts_enabled());
+
+    irql_lower(irql); /* Would trigger DPCs */
 }
 
 static void dpc_queue_enqueue(struct dpc_queue *dq, struct dpc *d) {
@@ -90,7 +100,7 @@ bool dpc_enqueue_on_cpu(size_t cpu, struct dpc *d, enum dpc_event e) {
     struct dpc_queue *dq = &dc->queues[e];
     dpc_queue_enqueue(dq, d);
 
-    scheduler_force_resched(global.schedulers[cpu]);
+    scheduler_force_run_dpcs(global.schedulers[cpu]);
 
     return true;
 }

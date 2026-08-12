@@ -204,8 +204,8 @@ bool domain_idle(struct domain *domain) {
     return true;
 }
 
-size_t domain_for_core(size_t cpu) {
-    for (size_t i = 0; i < global.numa_node_count; i++) {
+domain_id_t domain_for_core(size_t cpu) {
+    for (numa_node_t i = 0; i < global.numa_node_count; i++) {
         struct numa_node *nn = &global.numa_nodes[i];
         if (cpu_mask_test(&nn->cpus, cpu))
             return i;

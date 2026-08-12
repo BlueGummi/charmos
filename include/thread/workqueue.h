@@ -50,14 +50,14 @@ struct worker {
     struct thread *thread;       /* Assoc. thread. */
     struct workqueue *workqueue; /* Assoc. wq */
 
-    time_t last_active; /* Monotonic starting time of most
-                         * recent work execution */
+    time_ms_t last_active; /* Monotonic starting time of most
+                            * recent work execution */
 
-    time_t inactivity_check_period; /* How much time in between
-                                     * timeout GC events */
+    time_ms_t inactivity_check_period; /* How much time in between
+                                        * timeout GC events */
 
-    time_t start_idle; /* Monotonic starting time of
-                        * most recent idle */
+    time_ms_t start_idle; /* Monotonic starting time of
+                           * most recent idle */
 
     /* Internal flags */
     bool timeout_ran : 1;
@@ -147,7 +147,7 @@ struct workqueue_attributes {
     size_t min_workers; /* If set to 0, this field will be treated as a "1" */
     size_t max_workers;
     size_t capacity;
-    time_t spawn_delay;
+    time_ms_t spawn_delay;
     nice_t worker_niceness;
     struct {
         uint64_t min;
@@ -194,7 +194,7 @@ struct workqueue {
     _Atomic uint32_t idle_workers; /* # idle */
 
     cpu_id_t core;
-    time_t last_spawn_attempt;
+    time_ms_t last_spawn_attempt;
 
     atomic_flag spawner_flag_internal;
 

@@ -27,7 +27,7 @@ struct idle_thread_data {
 struct scheduler {
     /* Current tick data */
     atomic_bool tick_enabled;
-    time_t tick_duration_ms;
+    time_ms_t tick_duration_ms;
 
     /* Structures */
     struct list_head urgent_threads;
@@ -54,8 +54,8 @@ struct scheduler {
     bool period_enabled;
     uint64_t current_period;
 
-    time_t period_ms;
-    time_t period_start_ms; /* Timestamp */
+    time_ms_t period_ms;
+    time_ms_t period_start_ms; /* Timestamp */
 
 #ifdef PROFILING_SCHED
     size_t periods_started; /* How many have we started?
@@ -142,14 +142,21 @@ static inline bool scheduler_mark_self_in_resched(bool new) {
     return atomic_exchange(&smp_core()->in_resched, new);
 }
 
-#define TICKS_FOR_PRIO(level) (level == THREAD_PRIO_LOW ? 64 : 1ULL << level)
-
 static inline bool scheduler_mark_core_needs_resched(struct core *c, bool new) {
     return atomic_exchange(&c->needs_resched, new);
 }
 
 static inline bool scheduler_mark_self_needs_resched(bool new) {
     return scheduler_mark_core_needs_resched(smp_core(), new);
+}
+
+static inline bool scheduler_mark_core_needs_run_dpcs(struct core *c,
+                                                      bool new) {
+    return atomic_exchange(&c->needs_run_dpcs, new);
+}
+
+static inline bool scheduler_mark_self_needs_run_dpcs(bool new) {
+    return scheduler_mark_core_needs_run_dpcs(smp_core(), new);
 }
 
 static inline bool scheduler_self_needs_resched(void) {
@@ -184,9 +191,8 @@ static inline void scheduler_resched_if_needed(void) {
     if (scheduler_self_in_resched())
         return;
 
-    if (scheduler_mark_self_needs_resched(false)) {
+    if (scheduler_mark_self_needs_resched(false))
         scheduler_yield();
-    }
 }
 
 static inline bool scheduler_core_idle(struct core *c) {
@@ -205,6 +211,21 @@ static inline void scheduler_force_resched(struct scheduler *sched) {
 
         scheduler_mark_core_needs_resched(other, true);
         ipi_send(sched->core_id, IRQ_SCHEDULER);
+    }
+}
+
+static inline void scheduler_force_run_dpcs(struct scheduler *sched) {
+    if (sched->core_id == smp_core_id()) {
+        scheduler_mark_self_needs_run_dpcs(true);
+    } else {
+        struct core *other = global.cores[sched->core_id];
+        if (!other) {
+            ipi_send(sched->core_id, IRQ_DPC);
+            return;
+        }
+
+        scheduler_mark_core_needs_run_dpcs(other, true);
+        ipi_send(sched->core_id, IRQ_DPC);
     }
 }
 

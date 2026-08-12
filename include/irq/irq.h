@@ -18,6 +18,7 @@
 #define IRQ_SCHEDULER IRQ_TIMER
 #define IRQ_TLB_SHOOTDOWN 0x22
 #define IRQ_NOP 0x24
+#define IRQ_DPC 0x25
 #define IRQ_EXCEPTION_COUNT 32
 
 struct irq_context;
@@ -52,7 +53,7 @@ struct irq_chip {
     void (*eoi)(struct irq_desc *);
 
     void (*set_affinity)(struct irq_desc *, struct cpu_mask *);
-    int (*set_rate_limit)(struct irq_desc *, time_t interval);
+    int (*set_rate_limit)(struct irq_desc *, time_us_t interval);
 };
 
 struct irq_desc {

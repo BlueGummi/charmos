@@ -4,13 +4,14 @@
 #include <sch/sched.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <time/date_time.h>
 #include <time/time.h>
 
 #define TIME_REFRESH_CYCLES (smp_core()->tsc_hz / 100)
 #define CMOS_ADDRESS 0x70
 #define CMOS_DATA 0x71
 
-void time_print_unix(uint32_t timestamp) {
+void time_print_unix(time_s_t timestamp) {
     uint32_t days_in_month[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
     uint32_t year = 1970;
@@ -54,23 +55,12 @@ void time_print_current() {
     time_print_unix(time_get_unix());
 }
 
-static uint32_t is_leap(int year) {
-    return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
-}
-
-static uint32_t days_in_month(int year, int month) {
-    if (month == 2) {
-        return is_leap(year) ? 29 : 28;
-    }
-    return (month == 4 || month == 6 || month == 9 || month == 11) ? 30 : 31;
-}
-
 static uint32_t datetime_to_unix(int year, int month, int day, int hour,
                                  int minute, int second) {
     unsigned int timestamp = 0;
 
     for (int y = 1970; y < year; y++) {
-        timestamp += is_leap(y) ? 366 * 24 * 3600 : 365 * 24 * 3600;
+        timestamp += is_leap_year(y) ? 366 * 24 * 3600 : 365 * 24 * 3600;
     }
 
     for (int m = 1; m < month; m++) {

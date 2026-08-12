@@ -1,15 +1,15 @@
 /* @title: Bitmap */
 #pragma once
+#include <math/div.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-typedef unsigned long bitmap_word_t;
+typedef uint64_t bitmap_word_t;
 
 #define BITMAP_BITS_PER_WORD (sizeof(bitmap_word_t) * 8)
 
-#define BITMAP_WORDS(nbits)                                                    \
-    (((nbits) + BITMAP_BITS_PER_WORD - 1) / BITMAP_BITS_PER_WORD)
+#define BITMAP_WORDS(nbits) DIV_ROUND_UP(nbits, BITMAP_BITS_PER_WORD)
 
 #define BITMAP_DECLARE(name, nbits) bitmap_word_t name[BITMAP_WORDS(nbits)]
 
@@ -125,5 +125,31 @@ static inline size_t bitmap_find_first_zero(const bitmap_word_t *map,
             return bit < nbits ? bit : nbits;
         }
     }
+    return nbits;
+}
+
+static inline size_t bitmap_find_next_bit(const bitmap_word_t *map,
+                                          size_t nbits, size_t start) {
+    if (start >= nbits)
+        return nbits;
+
+    size_t word_index = BITMAP_WORD_INDEX(start);
+    size_t bit_offset = BITMAP_BIT_OFFSET(start);
+
+    bitmap_word_t word = map[word_index] & (~((bitmap_word_t) 0) << bit_offset);
+    if (word) {
+        size_t bit =
+            word_index * BITMAP_BITS_PER_WORD + (size_t) __builtin_ctzl(word);
+        return bit < nbits ? bit : nbits;
+    }
+
+    for (size_t i = word_index + 1; i < BITMAP_WORDS(nbits); i++) {
+        if (map[i]) {
+            size_t bit =
+                i * BITMAP_BITS_PER_WORD + (size_t) __builtin_ctzl(map[i]);
+            return bit < nbits ? bit : nbits;
+        }
+    }
+
     return nbits;
 }

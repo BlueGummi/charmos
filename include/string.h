@@ -123,3 +123,5 @@ char *strchrnul(const char *s, int c);
 
 int vsnprintf(char *buffer, int buffer_len, const char *format, va_list args);
 int snprintf(char *buffer, int buffer_len, const char *format, ...);
+int vasprintf(char **strp, const char *fmt, va_list args);
+int asprintf(char **strp, const char *fmt, ...);

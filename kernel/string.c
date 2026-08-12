@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <limits.h>
 #include <mem/alloc.h>
 #include <stdarg.h>
@@ -29,9 +30,8 @@ int memcmp(const void *s1, const void *s2, size_t n) {
 size_t strlen(const char *str) {
     size_t length = 0;
 
-    while (str[length] != '\0') {
+    while (str[length] != '\0')
         length++;
-    }
 
     return length;
 }
@@ -45,9 +45,9 @@ char *strcpy(char *dest, const char *src) {
 
 char *strcat(char *dest, const char *src) {
     char *original_dest = dest;
-    while (*dest) {
+    while (*dest)
         dest++;
-    }
+
     while ((*dest++ = *src++))
         ;
 
@@ -56,9 +56,8 @@ char *strcat(char *dest, const char *src) {
 
 int strncmp(const char *s1, const char *s2, size_t n) {
     for (size_t i = 0; i < n; i++) {
-        if (s1[i] != s2[i] || s1[i] == '\0') {
+        if (s1[i] != s2[i] || s1[i] == '\0')
             return s1[i] < s2[i] ? -1 : 1;
-        }
     }
     return 0;
 }
@@ -66,21 +65,20 @@ int strncmp(const char *s1, const char *s2, size_t n) {
 char *strncpy(char *dest, const char *src, size_t n) {
     char *original_dest = dest;
     size_t i;
-    for (i = 0; i < n && src[i] != '\0'; i++) {
+    for (i = 0; i < n && src[i] != '\0'; i++)
         dest[i] = src[i];
-    }
-    for (; i < n; i++) {
+
+    for (; i < n; i++)
         dest[i] = '\0';
-    }
+
     return original_dest;
 }
 
 void *memchr(const void *s, int c, size_t n) {
     const uint8_t *p = (const uint8_t *) s;
     for (size_t i = 0; i < n; i++) {
-        if (p[i] == (uint8_t) c) {
+        if (p[i] == (uint8_t) c)
             return (void *) (p + i);
-        }
     }
     return NULL;
 }
@@ -88,18 +86,17 @@ void *memchr(const void *s, int c, size_t n) {
 void *memrchr(const void *s, int c, size_t n) {
     const uint8_t *p = (const uint8_t *) s;
     for (size_t i = n; i > 0; i--) {
-        if (p[i - 1] == (uint8_t) c) {
+        if (p[i - 1] == (uint8_t) c)
             return (void *) (p + (i - 1));
-        }
     }
     return NULL;
 }
 
 int strcmp(const char *str1, const char *str2) {
     while (*str1 != '\0' && *str2 != '\0') {
-        if (*str1 != *str2) {
+        if (*str1 != *str2)
             return (unsigned char) (*str1) - (unsigned char) (*str2);
-        }
+
         str1++;
         str2++;
     }
@@ -108,9 +105,9 @@ int strcmp(const char *str1, const char *str2) {
 
 char *strchr(const char *s, int c) {
     do {
-        if (*s == c) {
+        if (*s == c)
             return (char *) s;
-        }
+
     } while (*s++);
     return (0);
 }
@@ -235,7 +232,7 @@ char *strstr(const char *haystack, const char *needle) {
     if (nlen > hlen)
         return NULL;
 
-    // Build KMP failure table
+    /* KMP failure table */
     int64_t table[nlen];
     table[0] = -1;
     int64_t k = -1;
@@ -482,9 +479,8 @@ char *strndup(const char *str, size_t n) {
 long strtol(const char *nptr, char **endptr, int base) {
     const char *s = nptr;
 
-    while (*s && isspace((unsigned char) *s)) {
+    while (*s && isspace((unsigned char) *s))
         s++;
-    }
 
     int neg = 0;
     if (*s == '+' || *s == '-') {
@@ -511,9 +507,8 @@ long strtol(const char *nptr, char **endptr, int base) {
             base = 10;
         }
     } else {
-        if (base == 16 && *s == '0' && (s[1] == 'x' || s[1] == 'X')) {
+        if (base == 16 && *s == '0' && (s[1] == 'x' || s[1] == 'X'))
             s += 2;
-        }
     }
 
     const char *start_digits = s;
@@ -564,9 +559,8 @@ long strtol(const char *nptr, char **endptr, int base) {
     if (endptr)
         *endptr = (char *) s;
 
-    if (s == start_digits) {
+    if (s == start_digits)
         return 0;
-    }
 
     if (neg) {
         if (acc == (unsigned long) LONG_MAX + 1UL)
@@ -699,4 +693,48 @@ char *strchrnul(const char *s, int c) {
     while (*s && *s != (char) c)
         s++;
     return (char *) s;
+}
+
+int vasprintf(char **strp, const char *fmt, va_list args) {
+    if (!strp || !fmt)
+        return ERR_INVAL;
+
+    va_list args_copy;
+    va_copy(args_copy, args);
+
+    int needed = vsnprintf(NULL, 0, fmt, args_copy);
+    va_end(args_copy);
+
+    if (needed < 0)
+        return ERR_INVAL;
+
+    size_t size = (size_t) needed + 1;
+
+    char *buf = (char *) kmalloc(size, ALLOC_FLAGS_ZERO);
+    if (!buf)
+        return ERR_NO_MEM;
+
+    va_copy(args_copy, args);
+    int written = vsnprintf(buf, size, fmt, args_copy);
+    va_end(args_copy);
+
+    if (written < 0) {
+        kfree(buf);
+        return ERR_INVAL;
+    }
+
+    *strp = buf;
+    return written;
+}
+
+int asprintf(char **strp, const char *fmt, ...) {
+    if (!strp || !fmt)
+        return ERR_INVAL;
+
+    va_list args;
+    va_start(args, fmt);
+    int ret = vasprintf(strp, fmt, args);
+    va_end(args);
+
+    return ret;
 }

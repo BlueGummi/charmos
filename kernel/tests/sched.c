@@ -234,8 +234,8 @@ TEST_DECLARE_INTEGRATION(thread_sleep_interruptible_test,
 static atomic_bool gogo = false;
 static atomic_bool eq = false;
 
-static void dpc_idle(struct dpc *dpc, void *ctx) {
-    (void) dpc, (void) ctx;
+static void dpc_idle(void *ctx) {
+    (void) ctx;
 
     atomic_store(&gogo, true);
     kassert(scheduler_core_idle(smp_core()));

@@ -105,8 +105,7 @@ void *thread_allocate_stack(size_t pages) {
     virt_base += PAGE_SIZE;
     for (size_t i = 0; i < pages; i++) {
         vaddr_t virt = virt_base + (i * PAGE_SIZE);
-        paddr_t phys = pmm_alloc_page();
-        kassert(phys);
+        paddr_t phys = kassert(pmm_alloc_page());
         vmm_map_page(virt, phys, PAGE_PRESENT | PAGE_WRITE | PAGE_XD,
                      VMM_FLAG_NONE);
     }

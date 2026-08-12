@@ -96,3 +96,10 @@ enum irq_result nop_handler(void *ctx, uint8_t vector,
     (void) ctx, (void) vector, (void) rsp;
     return IRQ_HANDLED;
 }
+
+enum irq_result dpc_handler(void *ctx, uint8_t vector,
+                            struct irq_context *rsp) {
+    scheduler_mark_self_needs_run_dpcs(true);
+    (void) ctx, (void) vector, (void) rsp;
+    return IRQ_HANDLED;
+}

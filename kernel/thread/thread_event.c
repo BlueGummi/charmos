@@ -176,7 +176,7 @@ static bool is_sleep(uint8_t reason) {
     return reason == THREAD_SLEEP_REASON_MANUAL;
 }
 
-static size_t get_bucket_index(time_t timestamp_ms) {
+static size_t get_bucket_index(time_ms_t timestamp_ms) {
     return (timestamp_ms / THREAD_ACTIVITY_BUCKET_DURATION) %
            THREAD_ACTIVITY_BUCKET_COUNT;
 }
@@ -196,7 +196,7 @@ static void clear_bucket_set_cycle(struct thread_activity_bucket *b,
 }
 
 static void advance_to_next_bucket(struct thread_activity_stats *stats,
-                                   size_t steps, time_t now) {
+                                   size_t steps, time_ms_t now) {
     for (size_t i = 1; i <= steps && i <= THREAD_ACTIVITY_BUCKET_COUNT; i++) {
         size_t next_bucket = stats->current_bucket + i;
         size_t index = next_bucket % THREAD_ACTIVITY_BUCKET_COUNT;
@@ -217,11 +217,11 @@ static void advance_to_next_bucket(struct thread_activity_stats *stats,
 }
 
 static void advance_buckets_to_time(struct thread_activity_stats *stats,
-                                    time_t ts) {
+                                    time_ms_t ts) {
     if (ts <= stats->last_update_ms)
         return;
 
-    time_t elapsed = ts - stats->last_update_ms;
+    time_ms_t elapsed = ts - stats->last_update_ms;
 
     if (elapsed >= TOTAL_BUCKET_DURATION) {
         /* Jumped past everything, reset it */
@@ -249,7 +249,7 @@ static void clear_event_slot(struct thread_event_reason *slot) {
 
 static struct thread_event_reason *
 thread_add_event_reason(struct thread_event_reason *ring, uint8_t *head,
-                        uint8_t reason, time_t time,
+                        uint8_t reason, time_ms_t time,
                         struct thread_activity_stats *stats) {
 
     struct thread_event_reason *slot =
@@ -303,27 +303,27 @@ static void update_bucket_data(struct thread_event_reason *wake,
     }
 }
 
-static inline uint64_t find_overlap(time_t effective_start,
-                                    time_t effective_end) {
+static inline uint64_t find_overlap(time_ms_t effective_start,
+                                    time_ms_t effective_end) {
     uint64_t diff = effective_end - effective_start;
     return effective_end > effective_start ? diff : 0;
 }
 
 static void update_bucket(struct thread_activity_stats *stats,
-                          struct thread_event_reason *wake, time_t start,
-                          time_t end) {
-    time_t bucket_start = start - (start % THREAD_ACTIVITY_BUCKET_DURATION);
+                          struct thread_event_reason *wake, time_ms_t start,
+                          time_ms_t end) {
+    time_ms_t bucket_start = start - (start % THREAD_ACTIVITY_BUCKET_DURATION);
     uint32_t current_cycle = stats->current_cycle;
 
     size_t max_buckets = THREAD_ACTIVITY_BUCKET_COUNT;
     size_t buckets_updated = 0;
 
     while (bucket_start < end && buckets_updated < max_buckets) {
-        time_t bucket_end = bucket_start + THREAD_ACTIVITY_BUCKET_DURATION;
+        time_ms_t bucket_end = bucket_start + THREAD_ACTIVITY_BUCKET_DURATION;
         size_t bucket_index = get_bucket_index(bucket_start);
 
-        time_t effective_start = start > bucket_start ? start : bucket_start;
-        time_t effective_end = end < bucket_end ? end : bucket_end;
+        time_ms_t effective_start = start > bucket_start ? start : bucket_start;
+        time_ms_t effective_end = end < bucket_end ? end : bucket_end;
         uint64_t overlap = find_overlap(effective_start, effective_end);
 
         struct thread_activity_bucket *bucket = &stats->buckets[bucket_index];
@@ -335,14 +335,14 @@ static void update_bucket(struct thread_activity_stats *stats,
     }
 }
 
-void thread_update_activity_stats(struct thread *t, time_t time) {
+void thread_update_activity_stats(struct thread *t, time_ms_t time) {
     struct thread_activity_stats *stats = t->activity_stats;
     struct thread_activity_data *data = t->activity_data;
 
-    time_t now = time;
+    time_ms_t now = time;
 
     /* Advance to next bucket if a new time window has happened */
-    time_t elapsed = now - stats->last_update_ms;
+    time_ms_t elapsed = now - stats->last_update_ms;
     size_t steps = elapsed / THREAD_ACTIVITY_BUCKET_DURATION;
 
     if (steps > 0)
@@ -366,8 +366,8 @@ void thread_update_activity_stats(struct thread *t, time_t time) {
         if (!start_evt || !start_evt_is_valid)
             continue;
 
-        time_t start = start_evt->timestamp;
-        time_t end = wake->timestamp;
+        time_ms_t start = start_evt->timestamp;
+        time_ms_t end = wake->timestamp;
 
         if (start > end)
             start = end;
@@ -380,7 +380,7 @@ void thread_update_activity_stats(struct thread *t, time_t time) {
 
 void thread_add_wake_reason(struct thread *t, uint8_t reason) {
     struct thread_activity_data *d = t->activity_data;
-    time_t now = time_get_ms();
+    time_ms_t now = time_get_ms();
 
     struct thread_event_reason *curr = thread_add_event_reason(
         d->wake_reasons, &d->wake_reasons_head, reason, now, t->activity_stats);
@@ -411,7 +411,7 @@ void thread_add_wake_reason(struct thread *t, uint8_t reason) {
     t->total_wake_count++;
 }
 
-void thread_update_runtime_buckets(struct thread *thread, time_t time) {
+void thread_update_runtime_buckets(struct thread *thread, time_ms_t time) {
     uint64_t now = time;
 
     /* Which seconds does this delta span? */
@@ -514,7 +514,7 @@ static bool set_state_and_update_reason(
 
     callback(t, reason);
 
-    time_t time = time_get_ms();
+    time_ms_t time = time_get_ms();
 
     if (state != THREAD_STATE_READY)
         thread_update_runtime_buckets(t, time);

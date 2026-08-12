@@ -31,7 +31,7 @@ static inline struct deferred_event_queue *this_defer_queue(void) {
 
 static void hpet_work(void *a, void *b) {
     while (true) {
-        time_t now = hpet_timestamp_ms();
+        time_ms_t now = hpet_timestamp_ms();
         struct deferred_event_queue *defer_queue = a;
         struct deferred_event *head = defer_queue->head;
 

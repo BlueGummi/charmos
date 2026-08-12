@@ -35,7 +35,7 @@ scheduler_percpu_work_ctor(struct scheduler_periodic_work_percpu *pcpu,
     for (size_t i = 0; i < PERIODIC_WORK_MAX; i++) {
         pairing_heap_init(&pcpu->period_based_works[i], work_cmp);
         pairing_heap_init(&pcpu->time_based_works[i], work_cmp);
-        pcpu->limits.max_duration_per_call_ns = TIME_MAX;
+        pcpu->limits.max_duration_per_call_ns = TIME_NS_MAX;
         pcpu->limits.max_execs_per_call = SIZE_MAX;
     }
 }
@@ -100,7 +100,7 @@ static bool periodic_work_exec(uint64_t current,
     return false;
 }
 
-static bool passed_limit(time_t initial_time, size_t executed,
+static bool passed_limit(time_ns_t initial_time, size_t executed,
                          struct scheduler_periodic_work_percpu *percpu) {
     return !(time_get_us() * 1000 - initial_time <
                  percpu->limits.max_duration_per_call_ns &&
@@ -121,7 +121,7 @@ void scheduler_periodic_work_execute(enum scheduler_periodic_work_type type) {
     pcpu->executing = true;
 
     bool time_based = type == PERIODIC_WORK_TIME_BASED;
-    time_t initial_time = time_get_us() * 1000;
+    time_ns_t initial_time = time_get_us() * 1000;
     size_t executed = 0;
     size_t current_period = smp_core_scheduler()->current_period;
     size_t starting_point = time_based ? initial_time : current_period;

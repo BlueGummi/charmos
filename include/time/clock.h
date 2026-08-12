@@ -61,11 +61,16 @@ struct clock {
 
 struct clock *clock_create(const char *fmt, ...);
 void clock_register(struct clock *c);
+void clock_unregister(struct clock *c);
+void clock_suspend_all();
+void clock_resume_all();
+void clocks_init();
 
 static inline fx32_32_t clock_frequency_to_mult(struct clock *clock) {
     return fx_div(fx_from_int(1000000), fx_from_int(clock->frequency_khz));
 }
 
-static inline time_t clock_cycles_to_ns(struct clock *clock, uint64_t cycles) {
+static inline time_ns_t clock_cycles_to_ns(struct clock *clock,
+                                           uint64_t cycles) {
     return fx_to_int(fx_mul(fx_from_int(cycles), clock->mult));
 }

@@ -48,7 +48,7 @@ NIGHTMARE_IMPL_START(thread_spawn_smoke) {
     struct nightmare_thread_group grp;
     nightmare_spawn_roles(SELF, &grp);
 
-    time_t timeout = SELF->default_runtime_ms;
+    time_ms_t timeout = SELF->default_runtime_ms;
 
     /* Join worker threads. Each one increments the counter before it
      * returns, so the join is also the wait for the counter */

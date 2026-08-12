@@ -20,7 +20,7 @@ static inline struct domain *domain_local(void) {
     return smp_core()->domain;
 }
 
-static inline size_t domain_local_id(void) {
+static inline domain_id_t domain_local_id(void) {
     return domain_local()->id;
 }
 
@@ -33,11 +33,11 @@ void domain_init_after_smp();
 void domain_dump(void);
 
 #define domain_for_each_domain(__dom)                                          \
-    for (size_t __i = 0;                                                       \
+    for (domain_id_t __i = 0;                                                  \
          (__dom = global.domains[__i]), (__i < global.domain_count); __i++)
 
 #define domain_for_each_core(__dom, __pos)                                     \
-    for (size_t __i = 0;                                                       \
+    for (domain_id_t __i = 0;                                                  \
          (__pos = __dom->cores[__i]), (__i < __dom->num_cores); __i++)
 
 #define domain_for_each_core_local(__pos)                                      \

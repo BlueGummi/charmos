@@ -8,6 +8,10 @@
 #include <mem/page.h>
 #include <mem/vmm.h>
 #include <smp/core.h>
+#include <smp/percpu.h>
+#include <string.h>
+#include <time/clock_evdev.h>
+#include <time/names.h>
 #include <time/spin_sleep.h>
 
 uint32_t *lapic;
@@ -191,4 +195,96 @@ struct irq_chip *lapic_get_chip() {
 
 void lapic_timer_init_bsp(void) {
     lapic_timer_init(0);
+}
+
+static enum errno lapic_evdev_set_next_event(struct clock_evdev *ced,
+                                             time_ns_t delta_ns) {
+    (void) ced;
+
+    uint64_t freq = smp_core()->lapic_freq;
+    uint64_t ticks = (freq * (uint64_t) delta_ns) / 1000000000ULL;
+
+    if (ticks == 0)
+        ticks = 1;
+
+    if (ticks > 0xFFFFFFFFULL)
+        ticks = 0xFFFFFFFFULL;
+
+    /* Oneshot countdown */
+    lapic_write(LAPIC_REG_TIMER_INIT, (uint32_t) ticks);
+
+    return 0;
+}
+
+static enum errno lapic_evdev_change_state(struct clock_evdev *ced,
+                                           enum clock_evdev_state state) {
+    (void) ced;
+    uint32_t lvt = lapic_read(LAPIC_REG_LVT_TIMER);
+
+    switch (state) {
+    case CLOCK_EVDEV_STATE_ONESHOT:
+        lvt &= ~(TIMER_MODE_PERIODIC | LAPIC_LVT_MASK);
+        lvt |= (TIMER_VECTOR | TIMER_MODE_ONESHOT);
+        lapic_write(LAPIC_REG_LVT_TIMER, lvt);
+        break;
+
+    case CLOCK_EVDEV_STATE_PERIODIC:
+        lvt &= ~LAPIC_LVT_MASK;
+        lvt |= (TIMER_VECTOR | TIMER_MODE_PERIODIC);
+        lapic_write(LAPIC_REG_LVT_TIMER, lvt);
+        break;
+
+    case CLOCK_EVDEV_STATE_OFF:
+    case CLOCK_EVDEV_STATE_ONESHOT_STOPPED:
+        lapic_write(LAPIC_REG_TIMER_INIT, 0);
+        lvt |= LAPIC_LVT_MASK;
+        lapic_write(LAPIC_REG_LVT_TIMER, lvt);
+        break;
+    }
+
+    ced->state = state;
+    return 0;
+}
+
+static struct clock_evdev *lapic_clock_evdev_create(cpu_id_t core_id) {
+    struct clock_evdev *ced = clock_evdev_create("lapic_timer_%zu", core_id);
+
+    ced->set_next_event = lapic_evdev_set_next_event;
+    ced->change_state = lapic_evdev_change_state;
+
+    /* bounds based on LAPIC frequency */
+    uint64_t freq = global.cores[core_id]->lapic_freq;
+
+    ced->min_delta_ns = (1000000000ULL + freq - 1) / freq;
+    ced->max_delta_ns = (0xFFFFFFFFULL * 1000000000ULL) / freq;
+
+    ced->min_delta_ticks = 1;
+    ced->max_delta_ticks = 0xFFFFFFFF;
+
+    ced->flags =
+        CLOCK_EVDEV_ONESHOT | CLOCK_EVDEV_PERCPU | CLOCK_EVDEV_TICK_SUITABLE;
+    ced->rating = CLOCK_RATING_BEST;
+    ced->bound_to_cpu = core_id;
+    ced->irq = TIMER_VECTOR;
+
+    /* ready LAPIC divider and vector */
+    lapic_write(LAPIC_REG_TIMER_DIV, 0b0011);
+
+    lapic_evdev_change_state(ced, CLOCK_EVDEV_STATE_ONESHOT_STOPPED);
+    return ced;
+}
+
+void lapic_clock_evdev_group_init(void) {
+    struct clock_evdev_group *cedg =
+        alloc_or_die(clock_evdev_group_create(CLOCK_NAME_LAPIC));
+
+    /* No need to set evdev_for_cpu if CLOCK_EVDEV_GROUP_PERCPU set */
+    cedg->flags = CLOCK_EVDEV_GROUP_PERCPU;
+
+    size_t i;
+    for_each_cpu_id(i) {
+        clock_evdev_group_add(cedg, lapic_clock_evdev_create(i));
+    }
+
+    clock_evdev_group_register(cedg);
 }

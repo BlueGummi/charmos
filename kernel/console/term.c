@@ -106,7 +106,7 @@ bool term_probe(void) {
      * it ended up, mildly hacky */
     TERM_ESC("\0337\033[999;999H\033[6n");
 
-    time_t deadline = time_get_ms() + TERM_PROBE_TIMEOUT_MS;
+    time_ms_t deadline = time_get_ms() + TERM_PROBE_TIMEOUT_MS;
 
     while (!done && time_get_ms() < deadline) {
         if (++spins > TERM_PROBE_SPIN_CAP)

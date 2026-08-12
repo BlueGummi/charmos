@@ -87,6 +87,7 @@ static inline uint32_t lapic_read(uint32_t reg) {
 
 #define TIMER_VECTOR 0x20
 #define TIMER_MODE_PERIODIC (1 << 17)
+#define TIMER_MODE_ONESHOT (0 << 17)
 #define IA32_APIC_BASE 0x1B
 #define APIC_X2APIC_ENABLE (1 << 10)
 
@@ -107,6 +108,7 @@ void x2apic_init();
 
 void ipi_send(uint32_t apic_id, uint8_t vector);
 void nmi_send(uint32_t apic_id);
+void lapic_clock_evdev_group_init(void);
 struct irq_chip *lapic_get_chip();
 #define IA32_APIC_BASE_MSR 0x1B
 #define IA32_APIC_BASE_MASK 0xFFFFF000UL

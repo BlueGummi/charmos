@@ -362,7 +362,7 @@ static void panic_cpu_box(struct report_target *tgt, uint64_t id,
                           uint16_t inner) {
     const struct panic_regs *r = PERCPU_PTR_FOR_CPU(panic_regs, id);
     _Atomic uint32_t *quiesced = PERCPU_PTR_FOR_CPU(panic_quiesced, id);
-    time_t end = time_get_us() + PANIC_WAIT_US;
+    time_us_t end = time_get_us() + PANIC_WAIT_US;
     uint64_t entries[PANIC_PEER_FRAMES];
     char line[REPORT_PANE_LINE_MAX];
     char title[24];

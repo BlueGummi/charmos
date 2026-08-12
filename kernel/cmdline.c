@@ -9,6 +9,7 @@
 #include <math/fixed.h>
 #include <mem/alloc.h>
 #include <mem/alloc_or_die.h>
+#include <parse.h>
 #include <string.h>
 
 #define MAX_VAR_LEN 128
@@ -17,10 +18,18 @@
 static enum errno cmdline_parse_long(const char *text, long *out) {
     char *end;
     long v = strtol(text, &end, 0);
-    if (end == text || *end != '\0')
-        return ERR_INVAL;
-    *out = v;
-    return ERR_OK;
+    if (end != text && *end == '\0') {
+        *out = v;
+        return ERR_OK;
+    }
+
+    ssize_t size = parse_data_size(text);
+    if (size >= 0) {
+        *out = (long) size;
+        return ERR_OK;
+    }
+
+    return ERR_INVAL;
 }
 
 static enum errno cmdline_parse_ulong(const char *text, uint64_t *out) {
@@ -33,10 +42,18 @@ static enum errno cmdline_parse_ulong(const char *text, uint64_t *out) {
 
     char *end;
     unsigned long long v = strtoull(text, &end, 0);
-    if (end == text || *end != '\0')
-        return ERR_INVAL;
-    *out = (uint64_t) v;
-    return ERR_OK;
+    if (end != text && *end == '\0') {
+        *out = (uint64_t) v;
+        return ERR_OK;
+    }
+
+    ssize_t size = parse_data_size(text);
+    if (size >= 0) {
+        *out = (uint64_t) size;
+        return ERR_OK;
+    }
+
+    return ERR_INVAL;
 }
 
 #define CMDLINE_DEFINE_UINT_PARSER(fn, ctype, cmax)                            \
@@ -81,7 +98,7 @@ enum errno cmdline_parse_u64(void *write_to, const char *text) {
 }
 
 enum errno cmdline_parse_bool(void *write_to, const char *text) {
-    *(bool *) write_to = cmdline_is_enabled(text);
+    *(bool *) write_to = parse_bool(text);
 
     return ERR_OK;
 }
@@ -269,45 +286,6 @@ static void cmdline_print_all() {
 #endif
 }
 
-bool cmdline_is_enabled(const char *str) {
-    kassert(str);
-
-    size_t len = strlen(str);
-    char *lower_str = kmalloc_or_die(len + 1);
-
-    for (size_t i = 0; i < len; i++)
-        lower_str[i] = tolower((unsigned char) str[i]);
-
-    lower_str[len] = '\0';
-
-    const char *enabled_terms[] = {
-        "true",     "enabled", "y",      "yes",   "yeah", "yup", "on",
-        "positive", "1",       "active", "allow", "ok",   "open"};
-
-    int num_enabled = sizeof(enabled_terms) / sizeof(enabled_terms[0]);
-
-    const char *disabled_terms[] = {
-        "false",    "disabled", "n",        "no",   "nope",    "off",
-        "negative", "0",        "inactive", "deny", "blocked", "closed"};
-    int num_disabled = sizeof(disabled_terms) / sizeof(disabled_terms[0]);
-
-    for (int i = 0; i < num_enabled; i++) {
-        if (strcmp(lower_str, enabled_terms[i]) == 0) {
-            kfree(lower_str);
-            return true;
-        }
-    }
-
-    for (int i = 0; i < num_disabled; i++) {
-        if (strcmp(lower_str, disabled_terms[i]) == 0) {
-            kfree(lower_str);
-            return false;
-        }
-    }
-
-    panic("invalid value '%s'", str);
-}
-
 static void cmdline_assign_all_parsers() {
     for (struct cmdline_entry *ent = __skernel_cmdline_entries;
          ent < __ekernel_cmdline_entries; ent++) {
@@ -322,20 +300,31 @@ bool cmdline_wants_help(const char *input) {
         return false;
 
     while (*input) {
-        while (*input == ' ')
+        while (*input == ' ' || *input == '\t')
             input++;
 
+        if (*input == '\0')
+            break;
+
         const char *tok = input;
-        while (*input && *input != ' ' && *input != '=')
+        while (*input && *input != ' ' && *input != '\t' && *input != '=')
             input++;
 
         size_t len = (size_t) (input - tok);
         if (len == 4 && memcmp(tok, "help", 4) == 0 && *input != '=')
             return true;
 
-        /* skip the rest of this token (any =value and trailing chars) */
-        while (*input && *input != ' ')
+        /* skip the rest of this token */
+        bool in_quote = false;
+        while (*input && (in_quote || (*input != ' ' && *input != '\t'))) {
+            if (*input == '\\' && *(input + 1) != '\0') {
+                input += 2;
+                continue;
+            }
+            if (*input == '"')
+                in_quote = !in_quote;
             input++;
+        }
     }
     return false;
 }
@@ -373,48 +362,93 @@ void cmdline_parse(const char *input) {
     cmdline_assign_all_parsers();
 
     while (*input) {
-        while (*input == ' ')
+        while (*input == ' ' || *input == '\t')
             input++;
 
+        if (*input == '\0')
+            break;
+
         const char *var_start = input;
-        while (*input && *input != '=' && *input != ' ')
+        while (*input && *input != '=' && *input != ' ' && *input != '\t')
             input++;
 
         const char *var_end = input;
 
-        while (var_end > var_start && *(var_end - 1) == ' ')
+        while (var_end > var_start &&
+               (*(var_end - 1) == ' ' || *(var_end - 1) == '\t'))
             var_end--;
 
-        while (*input && *input != '=')
+        while (*input && *input != '=' && *input != ' ' && *input != '\t')
             input++;
 
-        if (*input != '=')
-            break;
+        if (*input != '=') {
+            /* Skip tok without '=' */
+            while (*input && *input != ' ' && *input != '\t')
+                input++;
+            continue;
+        }
 
-        input++;
+        input++; /* Skip '=' */
 
-        while (*input == ' ')
+        while (*input == ' ' || *input == '\t')
             input++;
 
-        const char *val_start = input;
-        while (*input && *input != ' ')
-            input++;
+        size_t val_idx = 0;
 
-        const char *val_end = input;
+        /* double quoted values (e.g. key="value with spaces and \"quotes\"") */
+        if (*input == '"') {
+            input++; /* Skip opening quote */
+            while (*input) {
+                if (*input == '\\' && *(input + 1) != '\0') {
+                    input++; /* Skip backslash */
+                    char escaped = *input;
+                    switch (escaped) {
+                    case 'n': escaped = '\n'; break;
+                    case 't': escaped = '\t'; break;
+                    case 'r': escaped = '\r'; break;
+                    default: break;
+                    }
+                    if (val_idx < MAX_VAL_LEN - 1)
+                        val_buf[val_idx++] = escaped;
+                    input++;
+                } else if (*input == '"') {
+                    input++; /* Skip closing quote */
+                    break;
+                } else {
+                    if (val_idx < MAX_VAL_LEN - 1)
+                        val_buf[val_idx++] = *input;
+                    input++;
+                }
+            }
+        } else {
+            while (*input && *input != ' ' && *input != '\t') {
+                if (*input == '\\' && *(input + 1) != '\0') {
+                    input++; /* Skip backslash */
+                    char escaped = *input;
+                    switch (escaped) {
+                    case 'n': escaped = '\n'; break;
+                    case 't': escaped = '\t'; break;
+                    case 'r': escaped = '\r'; break;
+                    default: break;
+                    }
+                    if (val_idx < MAX_VAL_LEN - 1)
+                        val_buf[val_idx++] = escaped;
+                    input++;
+                } else {
+                    if (val_idx < MAX_VAL_LEN - 1)
+                        val_buf[val_idx++] = *input;
+                    input++;
+                }
+            }
+        }
+        val_buf[val_idx] = '\0';
 
-        uint64_t var_len = var_end - var_start;
+        size_t var_len = (size_t) (var_end - var_start);
         if (var_len >= MAX_VAR_LEN)
             var_len = MAX_VAR_LEN - 1;
 
         memcpy(var_buf, var_start, var_len);
         var_buf[var_len] = '\0';
-
-        uint64_t val_len = val_end - val_start;
-        if (val_len >= MAX_VAL_LEN)
-            val_len = MAX_VAL_LEN - 1;
-
-        memcpy(val_buf, val_start, val_len);
-        val_buf[val_len] = '\0';
 
         cmdline_dispatch(var_buf, val_buf);
     }

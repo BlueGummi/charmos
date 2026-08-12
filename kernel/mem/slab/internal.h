@@ -224,7 +224,7 @@ struct slab {
     struct rbt_node rb;
     struct list_head list;
 
-    time_t gc_enqueue_time_ms; /* When were we put on the GC list? */
+    time_ms_t gc_enqueue_time_ms; /* When were we put on the GC list? */
 
     size_t recycle_count; /* How many times has this been
                            * recycled from the GC list? */
@@ -542,6 +542,7 @@ void slab_destroy(struct slab *slab);
 void slab_domain_init_daemon(struct slab_domain *domain);
 void slab_domain_init_workqueue(struct slab_domain *domain);
 int32_t slab_size_to_index(size_t size);
+size_t slab_allocation_index(struct slab *slab, void *ptr);
 void *slab_alloc_old(struct slab_cache *cache);
 void slab_free_page_hdr(struct slab_page_hdr *hdr, enum alloc_behavior bh);
 size_t slab_allocation_size(vaddr_t addr);

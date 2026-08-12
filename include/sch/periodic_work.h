@@ -23,7 +23,7 @@ struct scheduler_periodic_work_linker_object {
     void (*fn)();
 
     union {
-        time_t time_interval;
+        time_ns_t time_interval;
         size_t period_interval; /* overloaded */
         size_t interval;
     };
@@ -47,9 +47,9 @@ struct scheduler_periodic_work {
         };
 
         struct {
-            time_t last_time_ran;
-            time_t time_interval;
-            time_t expected_next_time;
+            time_ns_t last_time_ran;
+            time_ns_t time_interval;
+            time_ns_t expected_next_time;
         };
 
         /* generic struct - do not reorder members */
@@ -63,8 +63,8 @@ struct scheduler_periodic_work {
     size_t executed_times;
 
     /* irrelevant for non-time based work */
-    time_t interval_total_loss; /* all time lost from misses */
-    size_t interval_latency;    /* total_loss / executed_times */
+    time_ns_t interval_total_loss; /* all time lost from misses */
+    size_t interval_latency;       /* total_loss / executed_times */
 
     struct pairing_node pnode; /* ordered by expected_next */
 };
@@ -72,7 +72,7 @@ struct scheduler_periodic_work {
 struct scheduler_periodic_work_limits {
     /* per_call here is each time the works are invoked (together) */
     size_t max_execs_per_call;
-    time_t max_duration_per_call_ns;
+    time_ns_t max_duration_per_call_ns;
 };
 
 struct scheduler_periodic_work_percpu {

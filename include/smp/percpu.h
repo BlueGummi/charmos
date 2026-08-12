@@ -1,6 +1,7 @@
 /* @title: Per-CPU dynamic objects */
 #pragma once
 #include <compiler.h>
+#include <global.h>
 #include <linker/symbols.h>
 #include <smp/core.h>
 #include <stddef.h>
@@ -52,3 +53,15 @@ void percpu_obj_init(void);
 #define PERCPU_READ(name) (*((typeof(__percpu_##name) *) PERCPU_PTR(name)))
 
 #define PERCPU_WRITE(name, val) (PERCPU_READ(name) = (val))
+
+#define percpu_for_each_internal(name, var, cpu)                               \
+    for (cpu_id_t cpu = 0; cpu < global.core_count; cpu++)                     \
+        for (var = PERCPU_PTR_FOR_CPU(name, cpu); var != NULL; var = NULL)
+
+#define percpu_for_each_internal_3(name, var, cpu)                             \
+    percpu_for_each_internal(name, var, cpu)
+#define percpu_for_each_internal_2(name, var)                                  \
+    percpu_for_each_internal(name, var, __cpu)
+
+#define percpu_for_each(...)                                                   \
+    _DISPATCH(percpu_for_each_internal, PP_NARG(__VA_ARGS__))(__VA_ARGS__)

@@ -139,7 +139,7 @@ static void stress_free_cb(struct rcu_cb *cb, void *ptr) {
 static void rcu_stress_reader(void *arg) {
     (void) arg;
 
-    time_t last_print = time_get_ms();
+    time_ms_t last_print = time_get_ms();
     size_t iter = 0;
     while (!atomic_load(&stress_stop)) {
         rcu_read_lock();

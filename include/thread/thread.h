@@ -75,7 +75,7 @@ struct thread_event_association {
 struct thread_event_reason {
     uint8_t reason;
     struct thread_event_association associated_reason;
-    time_t timestamp;
+    time_ms_t timestamp;
     uint64_t cycle;
 };
 
@@ -117,7 +117,7 @@ struct thread_activity_bucket {
 struct thread_activity_stats {
     struct thread_runtime_bucket rt_buckets[THREAD_ACTIVITY_BUCKET_COUNT];
     struct thread_activity_bucket buckets[THREAD_ACTIVITY_BUCKET_COUNT];
-    time_t last_update_ms;
+    time_ms_t last_update_ms;
     uint64_t current_cycle;
     uint8_t current_bucket; /* idx of bucket representing 'now' */
     uint8_t last_wake_index;
@@ -152,7 +152,7 @@ struct thread_activity_metrics {
 struct thread {
     /* ========== Metadata ========== */
     /* Unique ID allocated from global thread ID tree */
-    uint64_t id;
+    thread_id_t id;
     char *name;
     void (*entry)(void *); /* For debug */
 
@@ -207,7 +207,7 @@ struct thread {
 
     _Atomic(struct scheduler *) scheduler;
 
-    time_t run_start_time; /* When did we start running */
+    time_ms_t run_start_time; /* When did we start running */
 
     /* Who is allowed to run us? */
     struct cpu_mask allowed_cpus;
@@ -235,15 +235,15 @@ struct thread {
                              * migrate the thread to another CPU. */
 
     /* Class changes */
-    time_t last_class_change_ms;
+    time_ms_t last_class_change_ms;
 
     size_t effective_priority;
 
     /* Timeslice info and periods */
     uint64_t completed_period;
-    time_t period_runtime_raw_ms; /* Raw MS time of runtime this period */
-    time_t budget_time_raw_ms;    /* Raw MS time of budget */
-    time_t timeslice_length_raw_ms;
+    time_ms_t period_runtime_raw_ms; /* Raw MS time of runtime this period */
+    time_ms_t budget_time_raw_ms;    /* Raw MS time of budget */
+    time_ms_t timeslice_length_raw_ms;
 
     uint32_t virtual_period_runtime;
     uint32_t virtual_budget;
@@ -326,7 +326,7 @@ struct thread {
 
     size_t preemptions;
 
-    time_t creation_time_ms; /* When were we created? */
+    time_ms_t creation_time_ms; /* When were we created? */
 
     uint32_t boost_count;
     uint32_t total_wake_count;  /* Aggregate count of all wake events */
@@ -370,9 +370,9 @@ void thread_sleep_for_ms(uint64_t ms);
 void thread_exit(void);
 void thread_print(const struct thread *t);
 
-void thread_update_activity_stats(struct thread *t, time_t time);
+void thread_update_activity_stats(struct thread *t, time_ms_t time);
 void thread_classify_activity(struct thread *t, uint64_t now_ms);
-void thread_update_runtime_buckets(struct thread *thread, time_t time);
+void thread_update_runtime_buckets(struct thread *thread, time_ms_t time);
 void thread_apply_wake_boost(struct thread *t);
 void thread_update_effective_priority(struct thread *t);
 void thread_apply_cpu_penalty(struct thread *t);
@@ -428,7 +428,8 @@ void thread_remove_boost();
 void thread_exit_with_status(int status);
 
 int thread_join(struct thread *t);
-bool thread_join_timeout(struct thread *t, time_t timeout_ms, int *status_out);
+bool thread_join_timeout(struct thread *t, time_ms_t timeout_ms,
+                         int *status_out);
 void thread_detach(struct thread *t);
 
 void thread_lock_two_runqueues(struct thread *a, struct thread *b,

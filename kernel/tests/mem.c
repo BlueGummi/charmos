@@ -176,7 +176,7 @@ TEST_DECLARE_UNIT(kmalloc_new_test, .group = TEST_GROUP(mem)) {
 
     void *p = kmalloc_new(67, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
 
-    time_t ms = time_get_ms();
+    time_ms_t ms = time_get_ms();
     kfree_new(p, ALLOC_BEHAVIOR_NORMAL);
     ms = time_get_ms() - ms;
 
@@ -214,11 +214,11 @@ TEST_DECLARE_UNIT(kmalloc_new_basic_test, .group = TEST_GROUP(mem)) {
     }
 
     /* timed free to check that kfree_new returns quickly */
-    time_t start = time_get_ms();
+    time_ms_t start = time_get_ms();
     kfree_new(p1, ALLOC_BEHAVIOR_NORMAL);
     kfree_new(p2, ALLOC_BEHAVIOR_NORMAL);
     kfree_new(p3, ALLOC_BEHAVIOR_NORMAL);
-    time_t elapsed = time_get_ms() - start;
+    time_ms_t elapsed = time_get_ms() - start;
 
     snprintf(a_msg, sizeof(a_msg), "basic alloc/free OK (free took %u ms)",
              (unsigned) elapsed);
@@ -388,12 +388,12 @@ TEST_DECLARE_UNIT(kmalloc_new_concurrency_stress_test,
     all_ready = true;
 
     /* the whole worker set shares one deadline */
-    const time_t timeout_ms = 30 * 1000;
-    time_t start = time_get_ms();
+    const time_ms_t timeout_ms = 30 * 1000;
+    time_ms_t start = time_get_ms();
 
     for (int i = 0; i < STRESS_THREADS; ++i) {
-        time_t elapsed = time_get_ms() - start;
-        time_t left = elapsed >= timeout_ms ? 1 : timeout_ms - elapsed;
+        time_ms_t elapsed = time_get_ms() - start;
+        time_ms_t left = elapsed >= timeout_ms ? 1 : timeout_ms - elapsed;
 
         if (!thread_join_timeout(workers[i], left, NULL)) {
             snprintf(msg, sizeof(msg), "thread %d did not complete in time", i);
@@ -545,7 +545,7 @@ TEST_DECLARE_UNIT(tlb_shootdown_async_eventual_test, .group = TEST_GROUP(mem)) {
     tlb_shootdown((uintptr_t) va, false);
 
     /* Wait for IPIs to land */
-    time_t start = time_get_ms();
+    time_ms_t start = time_get_ms();
     while (time_get_ms() - start < 100) {
         if (*(volatile uint64_t *) va == 0x5678)
             return TEST_SUCCESS;
@@ -758,8 +758,8 @@ static void dp_spawn(struct thread **t, size_t nthreads, struct dp_worker *w,
         uint64_t core = single_core ? 0 : (i % global.core_count);
         /* joinable: the join reference is also what makes the thread_pin()
          * below safe, the worker may already have exited by then */
-        t[i] = thread_spawn_joinable_on_core("dp_hammer", dp_hammer, w, core);
-        kassert(t[i]);
+        t[i] = kassert(
+            thread_spawn_joinable_on_core("dp_hammer", dp_hammer, w, core));
         if (single_core)
             thread_pin(t[i]);
     }

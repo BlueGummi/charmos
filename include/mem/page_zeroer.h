@@ -76,7 +76,7 @@ struct page_zeroer_quota {
     struct page_zeroer_watermark wm;
     struct page_zeroer_rate rate;
     struct page_zeroer_demand demand;
-    time_t zero_block_time_ns;
+    time_ns_t zero_block_time_ns;
     atomic_size_t num_zero_blocks;
 };
 

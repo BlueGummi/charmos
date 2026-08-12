@@ -259,7 +259,7 @@ static void test_group_run(struct test_group *tg) {
 
     /* TODO: A little hacky */
     size_t total_tests = 0;
-    time_t total_time = 0;
+    time_ms_t total_time = 0;
     for (int i = 0; i < TEST_TIER_MAX; i++)
         total_tests += tg->num_tests[i];
 
@@ -352,7 +352,7 @@ static void test_group_run(struct test_group *tg) {
             test_harness_info(ANSI_BOLD ANSI_BLUE "%s" ANSI_RESET, t->name);
             test_progress_paint(tg, i, t->name);
 
-            time_t start_ms = time_get_ms();
+            time_ms_t start_ms = time_get_ms();
             for (; run_times < t->run_times; run_times++) {
                 struct test_verdict verdict = t->func(&tctx);
                 singular_verdict = verdict;
@@ -371,8 +371,8 @@ static void test_group_run(struct test_group *tg) {
 
                 tctx.seed = !t->seed ? prng_next() : t->seed;
             }
-            time_t end_ms = time_get_ms();
-            time_t took = end_ms - start_ms;
+            time_ms_t end_ms = time_get_ms();
+            time_ms_t took = end_ms - start_ms;
             total_time += took;
             test_global.total_time += took;
 
@@ -542,7 +542,7 @@ void tests_run(void) {
     size_t fail_count = test_global.results_agg[TEST_RESULT_FAILED];
     size_t skip_count = test_global.results_agg[TEST_RESULT_SKIPPED];
     size_t pass_count = test_global.results_agg[TEST_RESULT_OK];
-    time_t total_time = test_global.total_time;
+    time_ms_t total_time = test_global.total_time;
     all_ok = fail_count == 0;
     color = all_ok ? ANSI_GREEN : ANSI_RED;
     msg = all_ok ? "all tests pass 🎉!" : "some errors occurred";

@@ -69,7 +69,7 @@ void scheduler_change_tick_duration(uint64_t new_duration) {
 }
 
 static inline void update_thread_before_save(struct thread *thread,
-                                             time_t time) {
+                                             time_ms_t time) {
     thread_set_state(thread, THREAD_STATE_READY);
     thread_scale_back_delta(thread);
     thread->curr_core = -1;
@@ -96,7 +96,7 @@ static inline void re_enqueue_thread(struct scheduler *sched,
     }
 }
 
-static inline void update_idle_thread(time_t time) {
+static inline void update_idle_thread(time_ms_t time) {
     struct idle_thread_data *data = smp_core_idle_thread();
     data->last_exit_ms = time;
 }
@@ -107,7 +107,7 @@ static inline void update_min_steal_diff(void) {
 }
 
 static inline void save_thread(struct scheduler *sched, struct thread *curr,
-                               time_t time) {
+                               time_ms_t time) {
     update_min_steal_diff();
 
     /* Only save a running thread that exists */
@@ -121,7 +121,7 @@ static inline void save_thread(struct scheduler *sched, struct thread *curr,
 
 /* returns `true` if the current scheduler lock gets acquired
  * so the caller knows if it needs to acquire it */
-static inline bool migrate_to_destination(struct thread *t, time_t time) {
+static inline bool migrate_to_destination(struct thread *t, time_ms_t time) {
     int64_t dst;
     if (!t || (dst = thread_set_migration_target(t, -1)) == -1)
         return false;
@@ -158,7 +158,7 @@ static struct thread *pick_from_special_queues(struct scheduler *sched,
 }
 
 static struct thread *pick_from_regular_queues(struct scheduler *sched,
-                                               time_t now_ms) {
+                                               time_ms_t now_ms) {
     struct thread *next = find_highest_prio(sched);
     if (next)
         return next;
@@ -172,7 +172,7 @@ static struct thread *pick_from_regular_queues(struct scheduler *sched,
     return find_highest_prio(sched);
 }
 
-static struct thread *pick_thread(struct scheduler *sched, time_t now_ms) {
+static struct thread *pick_thread(struct scheduler *sched, time_ms_t now_ms) {
     uint8_t bitmap = scheduler_get_bitmap(sched);
     /* Nothing in queues */
     if (!bitmap)
@@ -198,7 +198,7 @@ static struct thread *pick_thread(struct scheduler *sched, time_t now_ms) {
 }
 
 static void load_thread(struct scheduler *sched, struct thread *next,
-                        time_t time) {
+                        time_ms_t time) {
     sched->current = next;
     smp_core()->current_thread = next;
 
@@ -289,7 +289,7 @@ static inline void context_switch(struct thread *curr, struct thread *next) {
 }
 
 void schedule(void) {
-    time_t time = time_get_ms();
+    time_ms_t time = time_get_ms();
 
     struct scheduler *sched = smp_core_scheduler();
 

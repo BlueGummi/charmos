@@ -42,10 +42,10 @@ LOG_HANDLE_EXTERN(slab_flags);
 
 /* alloc_flags: 32 bit bitflags
  *
- *      ┌───────────────────────────────────────────────────────┐
- * Bits │ 31..28 27..24 23..20 19..16 15..12  11..8  7..4  3..0 │
- * Use  │  %%%%   ###*   AAAA   AAAA   ****    ****  **Zc  MPFC │
- *      └───────────────────────────────────────────────────────┘
+ *      ┌──────────────────────────────────────────────────────┐
+ * Bits │ 31..28 27..24 23..20 19..16 15..12 11..8  7..4  3..0 │
+ * Use  │  %%%%   ###*   AAAA   AAAA   ****   ****  **Zc  MPFC │
+ *      └──────────────────────────────────────────────────────┘
  *
  * C - "Prefer cache alignment"
  *
@@ -61,9 +61,10 @@ LOG_HANDLE_EXTERN(slab_flags);
  *
  * ### - Locality bits
  *
+ * %%%% - Allocation class bits
+ *
  * A - Unused (available)
  * * - Unused (unavailable)
- * %%%% - Allocation class bits
  *
  */
 
@@ -266,7 +267,7 @@ static inline void alloc_request_sanitize(enum alloc_flags *f,
 void *kmalloc_new(size_t size, enum alloc_flags flags,
                   enum alloc_behavior behavior);
 void kfree_new(void *ptr, enum alloc_behavior behavior);
-void *kmalloc_from_domain(size_t domain, size_t size);
+void *kmalloc_from_domain(domain_id_t domain, size_t size);
 
 void *kmalloc_internal(size_t size, enum alloc_flags flags,
                        enum alloc_behavior behavior);

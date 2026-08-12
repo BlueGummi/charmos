@@ -378,7 +378,7 @@ static void setup_new_rt_scheduler(struct rt_scheduler *rts,
  *
  * If we fail to find a struct rt_scheduler, something
  * has gone very very very wrong... */
-static struct rt_scheduler *get_new_rt_scheduler(size_t domain) {
+static struct rt_scheduler *get_new_rt_scheduler(domain_id_t domain) {
     struct list_head *got = NULL;
     if ((got = locked_list_pop_front(&rt_global.sch_pool[domain])))
         goto out;

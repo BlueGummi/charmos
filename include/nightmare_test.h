@@ -51,7 +51,7 @@ struct nightmare_role {
 
 struct nightmare_watchdog {
     atomic_uint last_progress;
-    time_t last_kick_ms;
+    time_ms_t last_kick_ms;
 };
 
 struct nightmare_report {
@@ -66,7 +66,7 @@ struct nightmare_report {
 struct nightmare_test {
     const char *name;
     struct nightmare_watchdog *watchdog;
-    time_t default_runtime_ms;
+    time_ms_t default_runtime_ms;
     size_t default_threads;
 
     _Atomic enum nightmare_state state;
@@ -145,13 +145,14 @@ static inline void nightmare_kick(struct nightmare_watchdog *w) {
 
 void nightmare_spawn_roles(struct nightmare_test *,
                            struct nightmare_thread_group *);
-bool nightmare_join_roles(struct nightmare_thread_group *, time_t timeout_ms);
+bool nightmare_join_roles(struct nightmare_thread_group *,
+                          time_ms_t timeout_ms);
 enum nightmare_test_error nightmare_run(struct nightmare_test *t);
 
 static inline bool nightmare_watchdog_expired(struct nightmare_watchdog *w,
-                                              time_t timeout_ms) {
-    time_t now = time_get_ms();
-    time_t last = atomic_load(&w->last_progress);
+                                              time_ms_t timeout_ms) {
+    time_ms_t now = time_get_ms();
+    time_ms_t last = atomic_load(&w->last_progress);
 
     if (now - last > timeout_ms)
         return true;
@@ -159,7 +160,7 @@ static inline bool nightmare_watchdog_expired(struct nightmare_watchdog *w,
 }
 
 static inline void nightmare_watchdog_init(struct nightmare_watchdog *w) {
-    time_t now = time_get_ms();
+    time_ms_t now = time_get_ms();
     atomic_store(&w->last_progress, now);
     w->last_kick_ms = now;
 }

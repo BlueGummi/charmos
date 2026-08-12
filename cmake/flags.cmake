@@ -48,7 +48,7 @@ set(KERNEL_FREESTANDING
     -fno-stack-protector -fno-stack-check
     -fno-PIC -fno-omit-frame-pointer
     -fno-optimize-sibling-calls
-    -ffunction-sections -fdata-sections
+    -ffunction-sections -fdata-sections -fno-inline-functions
 )
 
 set(KERNEL_TARGET_ARCH

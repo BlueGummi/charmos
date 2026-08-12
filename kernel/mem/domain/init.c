@@ -338,7 +338,7 @@ void domain_buddy_dump(void) {
 }
 
 static void move_buddy(struct domain_buddy *buddy) {
-    size_t domain = buddy->domain->id;
+    domain_id_t domain = buddy->domain->id;
     movealloc(domain, buddy->free_queue);
     movealloc(domain, buddy->free_area);
     movealloc(domain, buddy->free_queue->queue);

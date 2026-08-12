@@ -7,7 +7,7 @@ _Static_assert(WORKQUEUE_DEFAULT_MAX_IDLE_CHECK / 4 >
                    WORKQUEUE_DEFAULT_MIN_IDLE_CHECK,
                "");
 
-static time_t get_inactivity_timeout(struct workqueue *queue) {
+static time_ms_t get_inactivity_timeout(struct workqueue *queue) {
     uint32_t num_workers = atomic_load(&queue->num_workers);
     size_t min = queue->attrs.idle_check.min;
     size_t max = queue->attrs.idle_check.max;
@@ -125,7 +125,7 @@ fail:
 }
 
 bool workqueue_should_spawn_worker(struct workqueue *queue) {
-    time_t now = time_get_ms();
+    time_ms_t now = time_get_ms();
     if (now - queue->last_spawn_attempt <= queue->attrs.spawn_delay)
         return false;
 

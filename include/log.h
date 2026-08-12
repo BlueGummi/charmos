@@ -68,7 +68,7 @@ struct log_handle {
 };
 
 struct log_record {
-    time_t timestamp;
+    time_ms_t timestamp;
     cpu_id_t cpu;
     uint32_t tid;
 

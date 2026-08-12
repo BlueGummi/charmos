@@ -27,6 +27,12 @@ struct cpu_mask {
     };
     size_t nbits;
 };
+
+/* Used to overload cpu_mask to carry an error at times */
+#define CPU_MASK_ERR(e)                                                        \
+    (struct cpu_mask) {                                                        \
+        .nbits = 0, .small = e                                                 \
+    }
 #define CPU_MASK_WORD_BITS 64
 #define CPU_MASK_WORDS(nbits)                                                  \
     (((nbits) + CPU_MASK_WORD_BITS - 1) / CPU_MASK_WORD_BITS)

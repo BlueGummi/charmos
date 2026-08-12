@@ -30,7 +30,7 @@ struct fixed_size_node {
 static_assert(offsetof(struct fixed_size_node, list_node) == 0);
 
 struct fixed_size_page_hdr {
-    ssize_t domain; /* -1 means it isn't perdomain */
+    domain_id_t domain; /* -1 means it isn't perdomain */
     size_t free_count;
     size_t total;
     struct list_head page_list;
@@ -52,7 +52,7 @@ struct fixed_size_range {
     size_t empty_pages;
     size_t full_node_size; /* node size + object size */
     struct fixed_size_range **perdomain_fsrs;
-    ssize_t domain;
+    domain_id_t domain;
 };
 
 static_assert(sizeof(struct fixed_size_range) < PAGE_SIZE);

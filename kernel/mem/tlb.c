@@ -51,7 +51,11 @@ static void tlb_shootdown_internal(void) {
             atomic_store_explicit(&c->tail, h, memory_order_release);
         }
 
-        done++;
+        /* A drain satisfies each gen up to the `req` we read before
+         * draining. Stepping one at a time makes cost of ack ~ prop to
+         * how many shootdowns the rest of the machine had done, which
+         * causes some larger slowdowns */
+        done = req;
         atomic_store_explicit(&c->done_gen, done, memory_order_release);
     }
 }

@@ -217,8 +217,7 @@ struct thread *turnstile_dequeue_first(struct turnstile *ts, size_t queue) {
     } else {
         /* not the last waiter, take one from the freelist */
         kassert(!list_empty(&ts->freelist));
-        got = turnstile_freelist_pop(ts);
-        kassert(got);
+        got = kassert(turnstile_freelist_pop(ts));
     }
 
     /* you take this turnstile with you as you wake up please */
@@ -237,6 +236,7 @@ void turnstile_wake(struct turnstile *ts, size_t queue, size_t num_threads,
     /* remove from hash */
     void *obj = ts->lock_obj;
     struct turnstile_hash_chain *chain = turnstile_chain_for(obj);
+    SPINLOCK_ASSERT_HELD(&chain->lock);
 
     /* un-inherit the priority we inherited */
     turnstile_pi_remove(ts);
@@ -378,10 +378,9 @@ struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
 }
 
 size_t turnstile_get_waiter_count(void *lock_obj) {
-    size_t count = 0;
     struct turnstile *ts = turnstile_lookup_internal(lock_obj);
     if (ts)
-        count = ts->waiters;
+        return ts->waiters;
 
-    return count;
+    return 0;
 }

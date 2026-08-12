@@ -120,8 +120,8 @@ void nightmare_spawn_roles(struct nightmare_test *test,
 }
 
 bool nightmare_join_roles(struct nightmare_thread_group *ntg,
-                          time_t timeout_ms) {
-    time_t deadline = time_get_ms() + timeout_ms;
+                          time_ms_t timeout_ms) {
+    time_ms_t deadline = time_get_ms() + timeout_ms;
     bool ok = true;
 
     for (size_t i = 0; i < ntg->count; i++) {
@@ -129,8 +129,8 @@ bool nightmare_join_roles(struct nightmare_thread_group *ntg,
         if (!th)
             continue;
 
-        time_t now = time_get_ms();
-        time_t left = now >= deadline ? 1 : deadline - now;
+        time_ms_t now = time_get_ms();
+        time_ms_t left = now >= deadline ? 1 : deadline - now;
 
         /* the group shares one deadline, so once it is blown we stop
          * waiting on the remainder as well */

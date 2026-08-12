@@ -38,6 +38,11 @@ void isr_common_entry(uint8_t vector, struct irq_context *irq_ctx) {
 
     enum irql old = irql_raise(IRQL_HIGH_LEVEL);
 
+    /* This can never happen, if so, somehow an IRQ fired at IRQL_HIGH_LEVEL,
+     * besides which is not possible UNLESS it's the NMI */
+    if (vector != IRQ_NMI)
+        kassert(old != IRQL_HIGH_LEVEL);
+
     bool is_exception = irq_vector_is_exception(vector);
     uint8_t scratch_buf[EXCEPTION_SYNC_CB_SCRATCH_BUFFER_SIZE] = {0};
 
@@ -95,6 +100,11 @@ void isr_common_entry(uint8_t vector, struct irq_context *irq_ctx) {
         irql_lower(old);
         irq_mark_self_in_interrupt(false);
     }
+
+    /* This function just raises and lowers the IRQL, because
+     * now we're irq_mark_self_in_interrupt == false */
+    if (scheduler_mark_self_needs_run_dpcs(false))
+        dpc_run_dpcs_from_irq();
 
     /* in reschedule, don't check if we need to preempt */
     if (scheduler_self_in_resched())
@@ -203,7 +213,7 @@ static void irq_desc_clear(struct irq_desc *desc) {
     desc->allocated = false;
     desc->enabled = false;
     desc->flags = 0;
-    desc->name = "none";
+    desc->name = NULL;
 }
 
 void irq_free_entry(int32_t entry) {
@@ -286,6 +296,9 @@ void irq_init() {
     irq_set_chip(IRQ_TLB_SHOOTDOWN, lapic_get_chip(), NULL);
 
     irq_register("nop", IRQ_NOP, nop_handler, NULL, IRQ_FLAG_NONE);
+    irq_register("dpc", IRQ_DPC, dpc_handler, NULL, IRQ_FLAG_NONE);
+    irq_set_chip(IRQ_DPC, lapic_get_chip(), NULL);
+
     idt_set_gate(0x80, 0x2b, 0xee);
     irq_load();
 }

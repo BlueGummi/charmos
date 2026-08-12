@@ -34,7 +34,7 @@ void semaphore_wait(struct semaphore *s) {
     spin_unlock(&s->lock, irql);
 }
 
-bool semaphore_timedwait(struct semaphore *s, time_t timeout_ms) {
+bool semaphore_timedwait(struct semaphore *s, time_ms_t timeout_ms) {
     enum irql irql = semaphore_lock_internal(s);
 
     while (get_count(s) == 0) {

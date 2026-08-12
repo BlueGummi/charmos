@@ -130,9 +130,9 @@ static void fixed_size_free_internal(struct fixed_size_range *fsr, void *obj) {
 /* Wrapper around internal for domain FSRs, finds the right fsr */
 void fixed_size_free(struct fixed_size_range *fsr, void *obj) {
     struct fixed_size_page_hdr *hdr = fixed_size_page_of(obj);
-    ssize_t domain = hdr->domain;
+    domain_id_t domain = hdr->domain;
     if (!fsr->perdomain_fsrs) {
-        kassert(domain == -1);
+        kassert(domain == DOMAIN_ID_NONE);
 
         /* Just one */
         return fixed_size_free_internal(fsr, obj);
@@ -172,7 +172,7 @@ void fixed_size_range_init(struct fixed_size_range *fsr,
 
     /* These are instantiated after init in the macro for perdomain */
     fsr->perdomain_fsrs = NULL;
-    fsr->domain = -1;
+    fsr->domain = DOMAIN_ID_NONE;
 }
 
 struct fixed_size_range *

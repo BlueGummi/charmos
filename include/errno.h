@@ -1,8 +1,25 @@
 /* @title: Error Codes */
 #pragma once
+#include <compiler.h>
+#include <console/panic.h>
+#include <stdarg.h>
 #include <stdint.h>
 
 #define ERR_IS_FATAL(e) (e != ERR_OK && e != ERR_AGAIN)
+#define ERR_HANDLE_UNLESS(e, ...)                                              \
+    if (({                                                                     \
+            if (unlikely(e < 0 &&                                              \
+                         err_in_list((e), PP_NARG(__VA_ARGS__), __VA_ARGS__))) \
+                panic("unhandled/unexpected error: %s", errno_to_str((e)));    \
+            e < 0;                                                             \
+        }))
+#define ERR_HANDLE(e, ...)                                                     \
+    if (({                                                                     \
+            if (unlikely(e < 0 && !err_in_list((e), PP_NARG(__VA_ARGS__),      \
+                                               __VA_ARGS__)))                  \
+                panic("unhandled/unexpected error: %s", errno_to_str((e)));    \
+            e < 0;                                                             \
+        }))
 
 enum errno {
     ERR_OK = 0,          // Success
@@ -30,6 +47,22 @@ enum errno {
     ERR_FS_INTERNAL = -103,     // Internal filesystem error
 
 };
+
+static inline bool err_in_list(int e, size_t n, ...) {
+    va_list ap;
+    va_start(ap, n);
+
+    for (size_t i = 0; i < n; i++) {
+        int x = va_arg(ap, int);
+        if (e == x) {
+            va_end(ap);
+            return true;
+        }
+    }
+
+    va_end(ap);
+    return false;
+}
 
 static inline const char *errno_to_str(enum errno err) {
     switch (err) {

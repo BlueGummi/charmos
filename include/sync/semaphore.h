@@ -16,6 +16,6 @@ struct semaphore {
 
 void semaphore_init(struct semaphore *s, int value, bool irq_disable);
 void semaphore_wait(struct semaphore *s);
-bool semaphore_timedwait(struct semaphore *s, time_t timeout_ms);
+bool semaphore_timedwait(struct semaphore *s, time_ms_t timeout_ms);
 void semaphore_post(struct semaphore *s);
 void semaphore_postn(struct semaphore *s, int n);

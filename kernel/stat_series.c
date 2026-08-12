@@ -4,7 +4,7 @@
 #include <time/time.h>
 
 void stat_series_init(struct stat_series *s, struct stat_bucket *buckets,
-                      uint32_t nbuckets, time_t bucket_us,
+                      uint32_t nbuckets, time_us_t bucket_us,
                       stat_series_callback bucket_reset, void *private) {
     memset(buckets, 0, nbuckets * sizeof(struct stat_bucket));
     s->buckets = buckets;
@@ -20,7 +20,7 @@ void stat_series_init(struct stat_series *s, struct stat_bucket *buckets,
         s->buckets[i].parent = s;
 }
 
-struct stat_series *stat_series_create(uint32_t nbuckets, time_t bucket_us,
+struct stat_series *stat_series_create(uint32_t nbuckets, time_us_t bucket_us,
                                        stat_series_callback bucket_reset,
                                        void *private) {
     struct stat_bucket *buckets =
@@ -54,13 +54,13 @@ void stat_series_reset(struct stat_series *s) {
     spin_unlock(&s->lock, irql);
 }
 
-void stat_series_advance_internal(struct stat_series *s, time_t now_us,
+void stat_series_advance_internal(struct stat_series *s, time_us_t now_us,
                                   bool already_locked) {
     enum irql irql = IRQL_NONE;
 
     if (!already_locked) {
         /* Fast-path: check without taking lock */
-        time_t last = atomic_load(&s->last_update_us);
+        time_us_t last = atomic_load(&s->last_update_us);
         size_t delta = now_us - last;
         uint32_t steps = delta / s->bucket_us;
         if (steps == 0)
@@ -106,13 +106,13 @@ out:
         spin_unlock(&s->lock, irql);
 }
 
-void stat_series_advance(struct stat_series *s, time_t now_us) {
+void stat_series_advance(struct stat_series *s, time_us_t now_us) {
     stat_series_advance_internal(s, now_us, /* already_locked = */ false);
 }
 
 void stat_series_record(struct stat_series *s, size_t value,
                         stat_series_callback callback) {
-    time_t now_us = time_get_us();
+    time_us_t now_us = time_get_us();
 
     /* attempt to advance if needed */
     stat_series_advance_internal(s, now_us, /* already_locked = */ false);

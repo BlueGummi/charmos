@@ -103,7 +103,7 @@ struct test {
     size_t msg_cap;
     enum test_flags flags;
 
-    time_t duration_ms;
+    time_ms_t duration_ms;
 
     /* A lot of these have to be full bools for the cmdline parse */
     bool print_logs;         /* Prints logs *as* they are logged */
@@ -151,7 +151,7 @@ struct test_context {
 
     uint32_t soft_fails;
     fx32_32_t intensity; /* [0, 1] */
-    time_t duration_ms;
+    time_ms_t duration_ms;
 
     uint64_t seed;
 };
@@ -169,7 +169,7 @@ struct test_globals {
     size_t results[TEST_TIER_MAX][TEST_RESULT_MAX];
     size_t results_agg[TEST_RESULT_MAX];
     struct test_context *current_test;
-    time_t total_time;
+    time_ms_t total_time;
     bool show_output;
     bool group_opt_in;
     bool test_opt_in;

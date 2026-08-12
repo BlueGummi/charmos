@@ -13,13 +13,13 @@ enum dpc_event {
 };
 
 struct dpc;
-typedef void (*dpc_func_t)(struct dpc *, void *ctx);
+typedef void (*dpc_func_t)(void *ctx);
 
 struct dpc {
     dpc_func_t func;
     void *ctx;
     _Atomic(struct dpc *) next; /* for MPSC push */
-    _Atomic(bool) enqueued;     /* prevents double-enqueue */
+    _Atomic bool enqueued;      /* prevents double-enqueue */
 };
 
 struct dpc_queue {
@@ -29,11 +29,12 @@ struct dpc_queue {
 
 /* Per-cpu DPC data */
 struct dpc_cpu {
-    _Atomic(bool) ipi_queued;
+    _Atomic bool ipi_queued;
     struct dpc_queue queues[DPC_EVENT_MAX];
 };
 
 void dpc_run_local(void);
+void dpc_run_dpcs_from_irq(void);
 struct dpc *dpc_create(dpc_func_t fn, void *ctx);
 struct dpc *dpc_init(struct dpc *d, dpc_func_t fn, void *ctx);
 void dpc_init_percpu(void);

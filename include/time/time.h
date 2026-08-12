@@ -2,20 +2,6 @@
 #pragma once
 #include <stdint.h>
 #include <types/types.h>
-void time_print_unix(uint32_t timestamp);
-void time_print_current();
-uint32_t time_get_unix();
-uint8_t time_get_second();
-uint8_t time_get_minute();
-uint8_t time_get_hour();
-uint8_t time_get_day();
-uint8_t time_get_month();
-uint8_t time_get_year();
-uint8_t time_get_century();
-time_t time_get_ms(void);
-time_t time_get_ns();
-time_t time_get_us(void);
-uint64_t tsc_calibrate(void);
 
 #define NS_PER_US 1000LL
 #define NS_PER_MS 1000000LL
@@ -92,3 +78,18 @@ uint64_t tsc_calibrate(void);
 #define DAYS_TO_SECONDS(d) ((d) * S_PER_DAY)
 #define DAYS_TO_MINUTES(d) ((d) * MIN_PER_DAY)
 #define DAYS_TO_HOURS(d) ((d) * HOURS_PER_DAY)
+
+void time_print_unix(time_s_t timestamp);
+void time_print_current();
+uint32_t time_get_unix();
+uint8_t time_get_second();
+uint8_t time_get_minute();
+uint8_t time_get_hour();
+uint8_t time_get_day();
+uint8_t time_get_month();
+uint8_t time_get_year();
+uint8_t time_get_century();
+time_ms_t time_get_ms(void);
+time_ns_t time_get_ns();
+time_us_t time_get_us(void);
+uint64_t tsc_calibrate(void);

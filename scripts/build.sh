@@ -27,6 +27,7 @@ BUILD_DIR="build"
 JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
 CMAKE_EXTRA_ARGS=()
 TARGETS=()
+FILTER=""
 
 print_help() {
     local self="$1"
@@ -46,12 +47,11 @@ ${BOLD}Options:${NC}
                           clang is required for DEBUG_ASAN (KASAN)
       --clang             Shorthand for --compiler clang
   -G, --generator GEN     Build generator: ninja, make, or auto (default: auto)
-                          auto prefers ninja when available, else make
       --ninja             Shorthand for --generator ninja
       --make              Shorthand for --generator make
   -j, --jobs N            Parallel jobs (default: detected CPU count = ${JOBS})
   -B, --build-dir DIR     Build directory (default: build)
-  --                      End of script options; remaining args go to cmake
+  -f, --filter LIST       Restrict the tests target to LIST, space/comma separated 
 
 ${BOLD}Targets:${NC} (passed to make)
   iso         Build bootable ISO (default if no targets given)
@@ -66,6 +66,7 @@ ${BOLD}Examples:${NC}
   ${self} -t Release run                   # Release build, run in QEMU
   ${self} -- -DQEMU_KVM=ON -DQEMU_NUMA=OFF run
   ${self} --clean -t RelWithDebInfo tests
+  ${self} -f "apc dpc" tests               # run only the apc and dpc tests
 EOF
     exit 0
 }
@@ -87,6 +88,7 @@ while [[ $# -gt 0 ]]; do
         --ninja)               GENERATOR="ninja"; shift ;;
         --make)                GENERATOR="make"; shift ;;
         -j|--jobs)             JOBS="$2"; shift 2 ;;
+        -f|--filter)           FILTER="$2"; shift 2 ;;
         -B|--build-dir)        BUILD_DIR="$2"; shift 2 ;;
         --)                    PASSTHROUGH=true; shift ;;
         -*)                    echo "${RED}Unknown option: $1${NC}" >&2; exit 1 ;;
@@ -345,6 +347,15 @@ if $COMPDB; then
     fi
 fi
 
+
+if [[ -n "$FILTER" ]]; then
+    export TESTS="$FILTER"
+    note "test filter: ${FILTER}"
+    case " ${TARGETS[*]} " in
+        *" tests "*) ;;
+        *) warn "--filter set but 'tests' is not among the targets; it will have no effect" ;;
+    esac
+fi
 
 log "building targets: ${TARGETS[*]}"
 build_targets "${TARGETS[@]}"

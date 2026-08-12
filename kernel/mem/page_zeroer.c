@@ -17,7 +17,8 @@ static struct daemon_work pz_ts_work =
 static struct daemon_work pz_bg_work =
     DAEMON_WORK_FROM(page_zeroer_bg_thread, WORK_ARGS(NULL, NULL));
 
-static void page_zeroer_perdomain_init(struct page_zeroer *pz, size_t domain) {
+static void page_zeroer_perdomain_init(struct page_zeroer *pz,
+                                       domain_id_t domain) {
     struct cpu_mask cmask;
     alloc_or_die(cpu_mask_init(&cmask, global.core_count));
     size_t threads = global.domains[domain]->num_cores / 4;

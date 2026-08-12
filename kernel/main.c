@@ -52,6 +52,8 @@
 #include <thread/reaper.h>
 #include <thread/thread.h>
 #include <thread/workqueue.h>
+#include <time/clock.h>
+#include <time/timer.h>
 
 struct globals global = {0};
 
@@ -87,6 +89,8 @@ __no_sanitize_address void k_main(void) {
     gdt_install();
     syscall_setup(syscall_entry);
     smp_setup_bsp();
+
+    clocks_init();
 
     mmio_init();
     irq_init();
@@ -129,6 +133,10 @@ __no_sanitize_address void k_main(void) {
     percpu_obj_init();
     perdomain_obj_init();
     pernode_obj_init();
+
+    lapic_clock_evdev_group_init();
+    timers_init();
+
     scheduler_periodic_work_init();
     movealloc_exec_all();
     bootstage_advance(BOOTSTAGE_MID_ALLOCATORS);

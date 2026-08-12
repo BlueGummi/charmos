@@ -1,6 +1,4 @@
-/* Alrighty, this will be a doozy.
- *
- * This slab allocator takes in a size, alloc_flags, and behavior.
+/* This slab allocator takes in a size, alloc_flags, and behavior.
  *
  * Depending on behavior, we are(n't) allowed to do certain things.
  *
@@ -867,7 +865,7 @@ void *kmalloc_pages(struct slab_domain *domain, stack_handle_t handle,
     return ret;
 }
 
-static size_t slab_allocation_idx(struct slab *slab, void *ptr) {
+size_t slab_allocation_index(struct slab *slab, void *ptr) {
     size_t delta = (size_t) ((uint8_t *) ptr - (uint8_t *) slab->mem);
     return delta / slab->parent_cache->obj_stride;
 }
@@ -897,7 +895,7 @@ void *kmalloc_try_from_magazine(struct slab_domain *domain,
             SLAB_BITMAP_TEST(slab_for_ptr(ret)->bitmap[byte_idx], bit_mask));
 
 #ifdef DEBUG_SLAB_DEEP
-        size_t idx = slab_allocation_idx(slab, ret);
+        size_t idx = slab_allocation_index(slab, ret);
         if (slab->traces[idx])
             stack_depot_put(slab->traces[idx]);
 
@@ -1190,8 +1188,7 @@ void *kmalloc_new(size_t size, enum alloc_flags flags,
     struct slab_domain *selected_dom = local_dom;
 
 #ifdef DEBUG_SLAB_DEEP
-    stack_handle_t handle = stack_depot_save_current();
-    kassert(handle);
+    stack_handle_t handle = kassert(stack_depot_save_current());
 #else
     stack_handle_t handle = NULL;
 #endif
@@ -1257,7 +1254,7 @@ exit:
     return ret;
 }
 
-void *kmalloc_from_domain(size_t domain, size_t size) {
+void *kmalloc_from_domain(domain_id_t domain, size_t size) {
     size_t index = slab_size_to_index(size);
     struct slab_caches *cs =
         global.domains[domain]->slab_domain->caches[SLAB_TYPE_NONPAGEABLE_ZERO];

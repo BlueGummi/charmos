@@ -29,24 +29,24 @@ struct stat_series {
     struct stat_bucket *buckets;       /* ringbuffer */
     uint32_t nbuckets;                 /* how many buckets */
     _Atomic uint32_t current;          /* current bucket idx */
-    time_t bucket_us;                  /* duration for each bucket */
+    time_us_t bucket_us;               /* duration for each bucket */
     _Atomic uint64_t last_update_us;   /* last time we advanced */
     void *private;                     /* private, per subsystem */
     struct spinlock lock;
 };
 
-struct stat_series *stat_series_create(uint32_t nbuckets, time_t bucket_us,
+struct stat_series *stat_series_create(uint32_t nbuckets, time_us_t bucket_us,
                                        stat_series_callback bucket_reset,
                                        void *private);
 
 void stat_series_init(struct stat_series *s, struct stat_bucket *buckets,
-                      uint32_t nbuckets, time_t bucket_us,
+                      uint32_t nbuckets, time_us_t bucket_us,
                       stat_series_callback bucket_reset, void *private);
 void stat_series_reset(struct stat_series *s);
 void stat_series_record(struct stat_series *s, size_t value,
                         stat_series_callback callback);
 
-void stat_series_advance(struct stat_series *s, time_t now_us);
+void stat_series_advance(struct stat_series *s, time_us_t now_us);
 
 #define stat_series_for_each(series, iter)                                     \
     for (uint32_t __i = 0;                                                     \

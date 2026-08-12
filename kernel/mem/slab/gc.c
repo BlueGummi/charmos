@@ -25,7 +25,7 @@ size_t slab_gc_score(struct slab *slab, enum slab_gc_flags flags) {
     size_t recycle_penalty_pct = gc_agg_recycle_penalty_pct[aggressiveness];
 
     size_t size_part_raw = SLAB_GC_SIZE_FACTOR * slab->page_count;
-    time_t age_seconds = time_get_ms() - slab->gc_enqueue_time_ms;
+    time_ms_t age_seconds = time_get_ms() - slab->gc_enqueue_time_ms;
     size_t recycle_part_raw = SLAB_GC_RECYCLE_PENALTY * slab->recycle_count;
 
     size_t size_part = size_part_raw * size_factor_pct / 100;

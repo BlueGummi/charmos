@@ -318,7 +318,7 @@ static size_t sd_chain_count(uintptr_t *trace, size_t len) {
 }
 
 static bool sd_mt_wait_for(atomic_uint *counter, unsigned target) {
-    time_t deadline = time_get_ms() + SD_MT_TIMEOUT_MS;
+    time_ms_t deadline = time_get_ms() + SD_MT_TIMEOUT_MS;
 
     while (atomic_load(counter) != target) {
         if (time_get_ms() > deadline)
@@ -342,7 +342,7 @@ static void sd_mt_abandon(void) {
 
 /* Joins the workers and folds their verdict into ours. */
 static struct test_verdict sd_mt_join(void) {
-    time_t deadline = time_get_ms() + SD_MT_TIMEOUT_MS;
+    time_ms_t deadline = time_get_ms() + SD_MT_TIMEOUT_MS;
     bool timed_out = false;
 
     for (size_t i = 0; i < sd_mt.nthreads; i++) {
@@ -352,8 +352,8 @@ static struct test_verdict sd_mt_join(void) {
 
         sd_mt.threads[i] = NULL;
 
-        time_t now = time_get_ms();
-        time_t left = now >= deadline ? 1 : deadline - now;
+        time_ms_t now = time_get_ms();
+        time_ms_t left = now >= deadline ? 1 : deadline - now;
 
         /* one straggler burns the whole budget, so once we give up on it
          * we stop waiting on the rest too */

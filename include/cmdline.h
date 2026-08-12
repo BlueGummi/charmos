@@ -123,7 +123,6 @@ enum errno cmdline_parse_fx(void *write_to, const char *text);
  * although it's a bit more nuanced than that and matches a lot of things.
  *
  * panics if neither match */
-bool cmdline_is_enabled(const char *str);
 void cmdline_parse(const char *input);
 bool cmdline_wants_help(const char *input);
 __noreturn void cmdline_dump_help(void);

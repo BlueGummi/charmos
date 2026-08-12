@@ -82,6 +82,9 @@ struct core {
 
     enum dpc_event dpc_event;
 
+    atomic_bool needs_run_dpcs; /* Set before sending IRQ_NOP, which is then
+                                 * checked in the isr_common_entry */
+
     atomic_bool needs_resched;
     atomic_bool in_resched; /* in scheduler_yield() */
     uint32_t preempt_disable_depth;

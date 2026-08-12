@@ -35,7 +35,7 @@ static void bio_sch_callback(struct bio_request *req) {
     done2 = true;
     uint64_t q_ms = (uint64_t) req->user_data >> 12;
     uint64_t q_lvl = (uint64_t) req->user_data & 7;
-    time_t time = time_get_ms() - q_ms;
+    time_ms_t time = time_get_ms() - q_ms;
     total_complete_time[q_lvl] += time;
     req->user_data = NULL;
     atomic_fetch_add(&runs, 1);

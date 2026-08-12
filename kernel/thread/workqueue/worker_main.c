@@ -41,7 +41,7 @@ static inline bool worker_should_exit(const struct worker *worker,
     if (worker->next_action == WORKER_NEXT_ACTION_EXIT)
         return true;
 
-    const time_t timeout = worker->inactivity_check_period;
+    const time_ms_t timeout = worker->inactivity_check_period;
 
     /* We don't mark `idle` if timeouts are to be ignored */
     if (!worker->is_permanent && worker->idle && signal == WAKE_REASON_TIMEOUT)

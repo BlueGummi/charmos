@@ -71,12 +71,12 @@ static struct rwlock rw_readers = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 static _Atomic uint32_t rw_readers_left = RWLOCK_READER_COUNT_TEST_N;
 
 static void rw_reader_worker(void *) {
-    time_t last_print = time_get_ms();
+    time_ms_t last_print = time_get_ms();
     for (size_t i = 0; i < RWLOCK_READER_COUNT_LOOPS; i++) {
         rwlock_lock(&rw_readers, RWLOCK_ACQUIRE_READ);
         scheduler_yield();
         rwlock_unlock(&rw_readers);
-        time_t now = time_get_ms();
+        time_ms_t now = time_get_ms();
         if ((now - last_print) > RWLOCK_READER_PRINT_INTERVAL) {
             test_info("RWlock reader %s on iteration %zu",
                       thread_get_current()->name, i);

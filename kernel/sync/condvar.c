@@ -97,7 +97,7 @@ static void condvar_timeout_wakeup(void *arg, void *arg2) {
 }
 
 enum wake_reason condvar_wait_timeout(struct condvar *cv, struct spinlock *lock,
-                                      time_t timeout_ms, enum irql irql,
+                                      time_ms_t timeout_ms, enum irql irql,
                                       enum irql *out) {
     struct thread *curr = thread_get_current();
     curr->wake_reason = WAKE_REASON_NONE;

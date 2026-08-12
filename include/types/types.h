@@ -7,7 +7,10 @@
 
 typedef uint8_t irq_t;
 typedef int8_t cpu_perf_t;
-typedef uint64_t time_t;
+typedef uint64_t time_ns_t;
+typedef uint64_t time_us_t;
+typedef uint64_t time_ms_t;
+typedef uint64_t time_s_t;
 typedef uint64_t timestamp_t;
 typedef uint32_t inode_t;
 typedef uint16_t mode_t;
@@ -22,7 +25,9 @@ typedef uintptr_t pfn_t;
 typedef uintptr_t pgoff_t;
 typedef uintptr_t iova_t;
 typedef size_t cpu_id_t;
+typedef size_t domain_id_t;
 typedef size_t numa_node_t;
+typedef size_t thread_id_t;
 typedef uint64_t pte_t;
 typedef uint64_t page_flags_t;
 typedef uint32_t thread_prio_t;
@@ -35,8 +40,17 @@ typedef __uint128_t uint128_t;
 #define CPU_PERF_MAX INT8_MAX
 #define CPU_PERF_MIN INT8_MIN
 
-#define TIME_MAX UINT64_MAX
-#define TIME_MIN 0
+#define TIME_NS_MAX UINT64_MAX
+#define TIME_NS_MIN 0
+
+#define TIME_US_MAX UINT64_MAX
+#define TIME_US_MIN 0
+
+#define TIME_MS_MAX UINT64_MAX
+#define TIME_MS_MIN 0
+
+#define TIME_S_MAX UINT64_MAX
+#define TIME_S_MIN 0
 
 #define INODE_MAX UINT32_MAX
 #define INODE_MIN 0
@@ -68,6 +82,14 @@ typedef __uint128_t uint128_t;
 #define CPU_ID_MAX SIZE_MAX
 #define CPU_ID_MIN 0
 #define CPU_ID_NONE CPU_ID_MAX
+
+#define DOMAIN_ID_MAX SIZE_MAX
+#define DOMAIN_ID_MIN 0
+#define DOMAIN_ID_NONE DOMAIN_ID_MAX
+
+#define THREAD_ID_MAX SIZE_MAX
+#define THREAD_ID_MIN 0
+#define THREAD_ID_NONE THREAD_ID_MAX
 
 #define NUMA_NODE_MAX SIZE_MAX
 #define NUMA_NODE_MIN 0
