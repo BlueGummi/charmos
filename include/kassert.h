@@ -14,63 +14,50 @@
 #define _kassert_pick(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, NAME, ...) \
     NAME
 
-#define _kassert_1(prefix, x)                                                  \
-    do {                                                                       \
-        if (unlikely(!(x))) {                                                  \
-            panic(prefix "Assertion \"" #x "\" failed");                       \
-            __builtin_unreachable();                                           \
-        }                                                                      \
-    } while (0)
-
-#define _kassert_n(prefix, x, fmt, ...)                                        \
-    do {                                                                       \
-        if (unlikely(!(x))) {                                                  \
-            panic(prefix "Assertion \"" #x "\" failed with message: " fmt,     \
-                  ##__VA_ARGS__);                                              \
-            __builtin_unreachable();                                           \
-        }                                                                      \
-    } while (0)
-
-#define _kassert_oops_1(prefix, x)                                             \
-    do {                                                                       \
-        if (unlikely(!(x))) {                                                  \
-            panic(prefix "Oops, assertion \"" #x "\" failed");                 \
-            __builtin_unreachable();                                           \
-        }                                                                      \
-    } while (0)
-
-#define _kassert_oops_n(prefix, x, fmt, ...)                                   \
-    do {                                                                       \
-        if (unlikely(!(x))) {                                                  \
-            panic(prefix "Oops, assertion \"" #x                               \
-                         "\" failed with message: " fmt,                       \
-                  ##__VA_ARGS__);                                              \
-            __builtin_unreachable();                                           \
-        }                                                                      \
-    } while (0)
-
-#define _kassert_debug_1(prefix, x)                                            \
-    do {                                                                       \
-        if (unlikely(!(x))) {                                                  \
-            panic(prefix "Debug assertion \"" #x "\" failed");                 \
-            __builtin_unreachable();                                           \
-        }                                                                      \
-    } while (0)
-
-#define _kassert_debug_n(prefix, x, fmt, ...)                                  \
-    do {                                                                       \
-        if (unlikely(!(x))) {                                                  \
-            panic(prefix "Debug assertion \"" #x                               \
-                         "\" failed with message: " fmt,                       \
-                  ##__VA_ARGS__);                                              \
-            __builtin_unreachable();                                           \
-        }                                                                      \
-    } while (0)
-
 #define _kassert_dispatch(name, prefix, ...)                                   \
     _kassert_pick(__VA_ARGS__, name##_n, name##_n, name##_n, name##_n,         \
                   name##_n, name##_n, name##_n, name##_n, name##_n, name##_n,  \
                   name##_1)(prefix, __VA_ARGS__)
+
+#define _kassert_debug_off_dispatch(first, ...) ({ first; })
+
+#define _kassert_eval(prefix, x, msg_stmt)                                     \
+    __builtin_choose_expr(__builtin_types_compatible_p(__typeof__(x), void),   \
+                          ({ (x); }), ({                                       \
+                              __typeof__(x) _kassert_res = (x);                \
+                              if (unlikely(!(_kassert_res))) {                 \
+                                  msg_stmt;                                    \
+                                  __builtin_unreachable();                     \
+                              }                                                \
+                              _kassert_res;                                    \
+                          }))
+
+#define _kassert_1(prefix, x)                                                  \
+    _kassert_eval(prefix, x, panic(prefix "Assertion \"" #x "\" failed"))
+
+#define _kassert_n(prefix, x, fmt, ...)                                        \
+    _kassert_eval(prefix, x,                                                   \
+                  panic(prefix "Assertion \"" #x                               \
+                               "\" failed with message: " fmt,                 \
+                        ##__VA_ARGS__))
+
+#define _kassert_oops_1(prefix, x)                                             \
+    _kassert_eval(prefix, x, panic(prefix "Oops, assertion \"" #x "\" failed"))
+
+#define _kassert_oops_n(prefix, x, fmt, ...)                                   \
+    _kassert_eval(prefix, x,                                                   \
+                  panic(prefix "Oops, assertion \"" #x                         \
+                               "\" failed with message: " fmt,                 \
+                        ##__VA_ARGS__))
+
+#define _kassert_debug_1(prefix, x)                                            \
+    _kassert_eval(prefix, x, panic(prefix "Debug assertion \"" #x "\" failed"))
+
+#define _kassert_debug_n(prefix, x, fmt, ...)                                  \
+    _kassert_eval(prefix, x,                                                   \
+                  panic(prefix "Debug assertion \"" #x                         \
+                               "\" failed with message: " fmt,                 \
+                        ##__VA_ARGS__))
 
 #define _kassert_fail(prefix, ...)                                             \
     do {                                                                       \
@@ -98,9 +85,10 @@
 
 #else
 
-#define kassert_debug(...) ((void) 0)
-#define kassert_debug_unreachable(...) ((void) 0)
-#define kassert_debug_unimplemented(...) ((void) 0)
-#define kassert_debug_todo(...) ((void) 0)
+#define kassert_debug(...) _kassert_debug_off_dispatch(__VA_ARGS__)
+#define kassert_debug_unreachable(...) _kassert_debug_off_dispatch(__VA_ARGS__)
+#define kassert_debug_unimplemented(...)                                       \
+    _kassert_debug_off_dispatch(__VA_ARGS__)
+#define kassert_debug_todo(...) _kassert_debug_off_dispatch(__VA_ARGS__)
 
 #endif

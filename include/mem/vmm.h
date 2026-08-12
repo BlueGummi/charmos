@@ -64,7 +64,6 @@ void vmm_unmap_page_full(struct vmm_map_request *rq);
 
 enum errno vmm_map_aliased(vaddr_t virt, size_t len, paddr_t phys,
                            page_flags_t leaf_flags, enum vmm_flags vflags);
-void vmm_unmap_aliased(vaddr_t virt, size_t len, enum vmm_flags vflags);
 enum errno vmm_unshare_path(vaddr_t virt, enum vmm_map_page_size leaf_size,
                             enum vmm_flags vflags);
 

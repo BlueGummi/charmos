@@ -40,6 +40,7 @@ static void destroy_chunk(struct slab_chunks *sc, struct slab_chunk *c) {
 
 #ifdef DEBUG_ASAN
     asan_free((void *) vaddr, SLAB_CHUNK_SIZE);
+    asan_shadow_release(vaddr, SLAB_CHUNK_SIZE);
 #endif
 
     vas_free(slab_global.vas, vaddr, PAGE_2MB);
@@ -196,19 +197,11 @@ out:
 
 void slab_chunks_free(struct slab_chunks *sc, struct slab_chunk *chunk,
                       vaddr_t addr) {
-    /* Read before the chunk can be destroyed under the lock */
-    vaddr_t base = base_addr_to_vaddr(chunk->base_addr);
-
     enum irql irql = spin_lock(&sc->lock);
 
-    bool destroyed = chunk_free(sc, chunk, addr);
+    chunk_free(sc, chunk, addr);
 
     spin_unlock(&sc->lock, irql);
-
-#ifdef DEBUG_ASAN
-    if (destroyed)
-        asan_shadow_release(base, SLAB_CHUNK_SIZE);
-#endif
 }
 
 void slab_chunks_init(struct slab_chunks *sc, struct slab_cache *parent) {

@@ -81,6 +81,7 @@ static struct pt_deferred_free *pt_free_list;
 static struct spinlock pt_free_lock = SPINLOCK_INIT;
 static struct page_table *kernel_pml4 = NULL;
 static uintptr_t vmm_map_top = VMM_MAP_BASE;
+static void vmm_unmap_aliased(vaddr_t virt, size_t len, enum vmm_flags vflags);
 
 static long string_to_int(const char *str) {
     char *endptr;
@@ -422,6 +423,11 @@ static enum errno vmm_pt_apply(struct vmm_map_request *rq) {
     if (!IS_ALIGNED(virt, bytes) || (!clear && !IS_ALIGNED(rq->phys, bytes)))
         panic("vmm_pt_apply: huge mapping not naturally aligned");
 
+    /* Walk stays on one core from start to finish: pt_walk_enter/exit
+     * stamp per-core epoch, and shootdown at `out` runs
+     * after all pte_lock's are dropped */
+    enum irql walk_irql = irql_raise(IRQL_DISPATCH_LEVEL);
+
     pt_walk_enter();
     enum errno err = ERR_OK;
     struct page_table *tables[PT_LEVELS];
@@ -429,6 +435,7 @@ static enum errno vmm_pt_apply(struct vmm_map_request *rq) {
     pte_t *entries[PT_LEVELS - 1];
     paddr_t to_free[PT_LEVELS - 1] = {0};
     int free_count = 0;
+    bool shootdown = false;
 
     tables[0] = pml4;
 
@@ -484,7 +491,7 @@ static enum errno vmm_pt_apply(struct vmm_map_request *rq) {
     /* page tables must match the caller's claims, PS bit is only meaningful
      * for present bits as tagged non-present PTEs use bit 7 */
     if (was_present) {
-        kassert((bool) (*last_entry & PAGE_2MB_page) == want_huge);
+        kassert((*last_entry & PAGE_2MB_page) == want_huge);
         if (handle_exist) {
             err = ERR_EXIST;
             pte_unlock(last_entry, last_irql);
@@ -493,20 +500,21 @@ static enum errno vmm_pt_apply(struct vmm_map_request *rq) {
     }
 
     if (clear) {
-        if (was_present)
-            barrier_and_shootdown(vflags, virt);
-        *last_entry = PTE_LOCK_BIT; /* zero all but the held lock bit */
+        atomic_store_explicit((pte_atomic_t *) last_entry, PTE_LOCK_BIT,
+                              memory_order_release);
     } else {
         if (in_use(*last_entry) && !modify)
             panic(
                 "vmm_pt_apply: leaf in use without MODIFY_LEAF (double map?)");
 
-        if (was_present)
-            barrier_and_shootdown(vflags, virt);
-
-        *last_entry =
-            build_leaf_pte(rq->phys, flags, sz, vflags) | PTE_LOCK_BIT;
+        atomic_store_explicit((pte_atomic_t *) last_entry,
+                              build_leaf_pte(rq->phys, flags, sz, vflags) |
+                                  PTE_LOCK_BIT,
+                              memory_order_release);
     }
+
+    /* Publish new PTE first */
+    shootdown = was_present;
 
     pte_unlock(last_entry, last_irql);
 
@@ -524,16 +532,25 @@ static enum errno vmm_pt_apply(struct vmm_map_request *rq) {
             to_free[free_count++] = hhdm_ptr_to_paddr(tables[up]);
             *entries[up - 1] = PTE_LOCK_BIT;
         }
+
+        /* Detaching table retries a present upper entry */
+        if (free_count)
+            shootdown = true;
     }
 
 out:
     for (int i = level - 1; i >= 0; i--)
         pte_unlock(entries[i], irqls[i]);
 
+    /* Shootdown after all locks dropped, ASAN causes issues otherwise */
+    if (shootdown)
+        barrier_and_shootdown(vflags, virt);
+
     for (int i = 0; i < free_count; i++)
         enqueue_pt_free(to_free[i]);
 
     pt_walk_exit();
+    irql_lower(walk_irql);
     return err;
 }
 
@@ -670,8 +687,6 @@ enum errno vmm_map_aliased(vaddr_t virt, size_t len, paddr_t phys,
     pt_walk_exit();
 
     if (err < 0) {
-        /* Rollback entries that landed, since shared table stay allocated only
-         * if some entry still references them */
         for (vaddr_t u = virt; u < v; u += granule)
             vmm_unmap_aliased(u, granule, vflags);
 
@@ -694,7 +709,7 @@ enum errno vmm_map_aliased(vaddr_t virt, size_t len, paddr_t phys,
  *
  * Tables are leaked to caller's bookkeeping, they may still be referenced
  * by other ranges, and this layer can't know */
-void vmm_unmap_aliased(vaddr_t virt, size_t len, enum vmm_flags vflags) {
+static void vmm_unmap_aliased(vaddr_t virt, size_t len, enum vmm_flags vflags) {
     if (!len)
         return;
 
@@ -765,6 +780,7 @@ static struct page_table *pt_clone_shared(struct page_table *src) {
  * Every SHARED entry on the path is replaced by a private copy of its child,
  * so the other 511 entries in the copy still point into the alias,
  * meaning unrelated addresses resolve through the shared tables */
+vaddr_t debug_virt;
 enum errno vmm_unshare_path(vaddr_t virt, enum vmm_map_page_size leaf_size,
                             enum vmm_flags vflags) {
     int leaf_level = map_leaf_level(leaf_size);
@@ -808,8 +824,13 @@ enum errno vmm_unshare_path(vaddr_t virt, enum vmm_map_page_size leaf_size,
             }
 
             /* Swap the target, keep flags, drop SHARED */
-            *entry = (hhdm_ptr_to_paddr(priv) & PAGE_PHYS_MASK) |
-                     (*entry & ~(PAGE_PHYS_MASK | PTE_SHARED_BIT));
+            pte_t cur = atomic_load_explicit((pte_atomic_t *) entry,
+                                             memory_order_acquire);
+            atomic_store_explicit(
+                (pte_atomic_t *) entry,
+                (hhdm_ptr_to_paddr(priv) & PAGE_PHYS_MASK) |
+                    (cur & ~(PAGE_PHYS_MASK | PTE_SHARED_BIT)),
+                memory_order_release);
             unshared = true;
         }
 
@@ -817,6 +838,7 @@ enum errno vmm_unshare_path(vaddr_t virt, enum vmm_map_page_size leaf_size,
     }
 
 out:
+    debug_virt = virt;
     for (int i = level - 1; i >= 0; i--)
         pte_unlock(entries[i], irqls[i]);
 
