@@ -10,6 +10,7 @@ bool parse_bool(const char *str);
 /* Like 2M, 5G */
 ssize_t parse_data_size(const char *str);
 time_ns_t parse_duration(const char *str);
+/* Returns CPU_MASK_ERR(ERR_INVAL) for malformed input or a CPU >= n_cpus. */
 struct cpu_mask parse_cpu_mask(const char *str, size_t n_cpus);
 
 #define MAC_INVALID 0xFFFFFFFFFFFFFFFFULL

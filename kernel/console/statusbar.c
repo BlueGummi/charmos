@@ -47,7 +47,8 @@ void status_bar_close(void) {
     char buf[64];
     int n =
         snprintf(buf, (int) sizeof(buf), "\033[%u;1H\033[2K\033[r\033[%u;1H",
-                 (uint32_t) term_size().rows, (uint32_t) term_size().rows);
+                 (uint32_t) term_size().rows,
+                 (uint32_t) /* avoid extra newline */ term_size().rows - 1);
     if (n > 0)
         serial_write(buf, (size_t) n);
 

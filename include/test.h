@@ -90,6 +90,7 @@ struct test_group {
     /* [tier][num] */
     struct test **tests[TEST_TIER_MAX];
     size_t num_tests[TEST_TIER_MAX];
+    size_t num_tests_enabled[TEST_TIER_MAX];
 };
 
 struct test {
@@ -166,6 +167,7 @@ struct test_verdict {
 #define TEST_EXIT_FAIL 1
 
 struct test_globals {
+    size_t total_tests_enabled;
     size_t results[TEST_TIER_MAX][TEST_RESULT_MAX];
     size_t results_agg[TEST_RESULT_MAX];
     struct test_context *current_test;

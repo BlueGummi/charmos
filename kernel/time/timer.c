@@ -18,7 +18,7 @@ CMDLINE_ENTRY_DECLARE(timer_evdev, .name = "clock_evdev",
                       .flags = CMDLINE_ENTRY_DOCUMENTED,
                       .desc = "Timer subsystem clock event device",
                       .arg = "<string>", .default_val = CLOCK_NAME_LAPIC,
-                      .value = &clock_global.timer_clock_evdev);
+                      .raw = &clock_global.timer_clock_evdev);
 
 static void timer_dpc(void *ctx);
 static void timer_percpu_ctor(struct timer_percpu *p, cpu_id_t cpu) {

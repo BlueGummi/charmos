@@ -780,7 +780,6 @@ static struct page_table *pt_clone_shared(struct page_table *src) {
  * Every SHARED entry on the path is replaced by a private copy of its child,
  * so the other 511 entries in the copy still point into the alias,
  * meaning unrelated addresses resolve through the shared tables */
-vaddr_t debug_virt;
 enum errno vmm_unshare_path(vaddr_t virt, enum vmm_map_page_size leaf_size,
                             enum vmm_flags vflags) {
     int leaf_level = map_leaf_level(leaf_size);
@@ -838,7 +837,6 @@ enum errno vmm_unshare_path(vaddr_t virt, enum vmm_map_page_size leaf_size,
     }
 
 out:
-    debug_virt = virt;
     for (int i = level - 1; i >= 0; i--)
         pte_unlock(entries[i], irqls[i]);
 

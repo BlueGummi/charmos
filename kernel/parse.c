@@ -266,6 +266,9 @@ struct cpu_mask parse_cpu_mask(const char *str, size_t n_cpus) {
         if (start > end)
             goto err;
 
+        if (end >= n_cpus)
+            goto err;
+
         for (size_t i = start; i <= end; i++)
             cpu_mask_set(&mask, i);
 

@@ -121,14 +121,10 @@ static inline uint64_t pte_or(pte_atomic_t *pte, uint64_t val) {
     return atomic_fetch_or_explicit(pte, val, memory_order_acq_rel);
 }
 
-extern vaddr_t debug_virt;
 static inline void pte_unlock_internal(pte_atomic_t *pte) {
-    pte_t old =
-        atomic_fetch_and_explicit(pte, ~PTE_LOCK_BIT, memory_order_release);
-    if (!(old & PTE_LOCK_BIT)) {
-        printf("virt was %p\n", debug_virt);
-        kassert(old & PTE_LOCK_BIT);
-    }
+    kassert(
+        atomic_fetch_and_explicit(pte, ~PTE_LOCK_BIT, memory_order_release) &
+        PTE_LOCK_BIT);
 }
 
 static inline void pte_lock_internal(pte_atomic_t *pte) {

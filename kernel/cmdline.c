@@ -15,6 +15,18 @@
 #define MAX_VAR_LEN 128
 #define MAX_VAL_LEN 256
 
+static struct cmdline_value cmdline_parse_value_for(const char *value,
+                                                    uint64_t accepted);
+
+static inline bool cmdline_type_is_cmdline_value(int type) {
+    kassert(type <= CMDLINE_VAL_MAX);
+    return type >= CMDLINE_VAL_NONE;
+}
+
+static inline bool cmdline_type_is_type_enum(int type) {
+    return !cmdline_type_is_cmdline_value(type);
+}
+
 static enum errno cmdline_parse_long(const char *text, long *out) {
     char *end;
     long v = strtol(text, &end, 0);
@@ -145,7 +157,7 @@ enum errno (*cmdline_parse_table[TYPE_MAX])(void *write_to,
 CMDLINE_ENTRY_DECLARE(root,
                       .desc = "Root filesystem partition to mount at boot",
                       .arg = "<device>", .default_val = NULL,
-                      .value = &global.root_partition,
+                      .raw = &global.root_partition,
                       .flags = CMDLINE_ENTRY_REQUIRED);
 
 static void get_functional_name(struct cmdline_entry *ent,
@@ -220,8 +232,8 @@ static void cmdline_apply_defaults(void) {
     for (struct cmdline_entry *e = __skernel_cmdline_entries;
          e < __ekernel_cmdline_entries; e++) {
         if (e->status == CMDLINE_ENTRY_NOT_FOUND && e->default_val) {
-            if (e->value)
-                *e->value = (char *) e->default_val;
+            if (e->raw)
+                *e->raw = (char *) e->default_val;
             else if (e->callback)
                 e->callback(e->default_val, e);
             e->status = CMDLINE_ENTRY_DEFAULTED;
@@ -251,16 +263,23 @@ static void cmdline_dispatch(const char *var, const char *val) {
             panic("duplicate cmdline entry: %s", var);
 
         e->status = CMDLINE_ENTRY_FOUND;
-        if (e->parse) {
-            e->parse(e->write_to, val);
+        if (cmdline_type_is_type_enum(e->value.type) && e->value.parse) {
+            e->value.parse(e->value.write_to, val);
+        } else {
+            struct cmdline_value vtmp =
+                cmdline_parse_value_for(val, e->value.accepted);
+            kassert(e->value.accepted & CMDLINE_VALUE_TYPE_BIT(vtmp.type),
+                    "cmdline variable %s received incompatible type %s", var,
+                    cmdline_value_type_to_str(vtmp.type));
+            e->value = vtmp;
         }
 
         if (e->callback) {
             e->callback(val, e);
-        } else if (e->value) {
+        } else if (e->raw) {
             char *copy = kmalloc_or_die(strlen(val) + 1);
             memcpy(copy, val, strlen(val) + 1);
-            *e->value = copy;
+            *e->raw = copy;
             log_msg(LOG_INFO, "command line entry '%s' set to '%s'", name,
                     copy);
         }
@@ -289,8 +308,9 @@ static void cmdline_print_all() {
 static void cmdline_assign_all_parsers() {
     for (struct cmdline_entry *ent = __skernel_cmdline_entries;
          ent < __ekernel_cmdline_entries; ent++) {
-        if (ent->type != TYPE_NONE) {
-            ent->parse = cmdline_parse_table[ent->type];
+        if (ent->value.type != TYPE_NONE &&
+            ent->value.type != CMDLINE_VAL_NONE) {
+            ent->value.parse = cmdline_parse_table[ent->value.type];
         }
     }
 }
@@ -456,4 +476,423 @@ void cmdline_parse(const char *input) {
     cmdline_apply_defaults();
     cmdline_check_for_unfilled();
     cmdline_print_all();
+}
+
+static bool cmdline_detect_bool(const char *value, bool *out_bool) {
+    if (!value)
+        return false;
+
+    const char *bool_true[] = {"true",   "enabled", "y",  "yes",
+                               "yeah",   "yup",     "on", "positive",
+                               "active", "allow",   "ok", "open"};
+    const char *bool_false[] = {"false", "disabled", "n",        "no",
+                                "nope",  "off",      "negative", "inactive",
+                                "deny",  "blocked",  "closed"};
+
+    for (size_t i = 0; i < sizeof(bool_true) / sizeof(bool_true[0]); i++) {
+        if (strcasecmp(value, bool_true[i]) == 0) {
+            if (out_bool)
+                *out_bool = true;
+            return true;
+        }
+    }
+    for (size_t i = 0; i < sizeof(bool_false) / sizeof(bool_false[0]); i++) {
+        if (strcasecmp(value, bool_false[i]) == 0) {
+            if (out_bool)
+                *out_bool = false;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool cmdline_detect_data_size(const char *value, uint64_t *out_size) {
+    if (!value)
+        return false;
+
+    bool has_size_suffix = false;
+    const char *p = value;
+    while (*p == ' ' || *p == '\t')
+        p++;
+    if (*p == '+' || *p == '-')
+        p++;
+    while (*p >= '0' && *p <= '9')
+        p++;
+    while (*p == ' ' || *p == '\t')
+        p++;
+    if (*p != '\0')
+        has_size_suffix = true;
+
+    if (!has_size_suffix)
+        return false;
+
+    ssize_t size = parse_data_size(value);
+    if (size < 0)
+        return false;
+
+    if (out_size)
+        *out_size = (uint64_t) size;
+    return true;
+}
+
+static bool cmdline_detect_int(const char *value, uint64_t *out_int) {
+    if (!value || *value == '\0')
+        return false;
+
+    char *end = NULL;
+    uint64_t uval = strtoull(value, &end, 0);
+    if (end == value || *end != '\0')
+        return false;
+
+    if (out_int)
+        *out_int = uval;
+    return true;
+}
+
+static bool cmdline_parse_range(const char *value, struct cmdline_range *out) {
+    char *end;
+    uint64_t start = strtoull(value, &end, 0);
+    if (end == value || *end != '-')
+        return false;
+
+    const char *end_text = end + 1;
+    if (*end_text == '\0')
+        return false;
+    uint64_t finish = strtoull(end_text, &end, 0);
+    if (end == end_text || *end != '\0' || start > finish)
+        return false;
+
+    out->start = start;
+    out->end = finish;
+    return true;
+}
+
+static bool cmdline_has_list_separator(const char *value) {
+    bool quoted = false;
+    for (const char *p = value; *p; p++) {
+        if (*p == '\\' && p[1]) {
+            p++;
+            continue;
+        }
+        if (*p == '"')
+            quoted = !quoted;
+        else if (*p == ',' && !quoted)
+            return true;
+    }
+    return false;
+}
+
+static void cmdline_copy_escaped(char *out, const char *begin,
+                                 const char *end) {
+    while (begin < end) {
+        if (*begin == '\\' && begin + 1 < end) {
+            begin++;
+            switch (*begin) {
+            case 'n': *out++ = '\n'; break;
+            case 't': *out++ = '\t'; break;
+            case 'r': *out++ = '\r'; break;
+            default: *out++ = *begin; break;
+            }
+            begin++;
+        } else {
+            *out++ = *begin++;
+        }
+    }
+    *out = '\0';
+}
+
+static struct cmdline_value cmdline_parse_list(const char *value,
+                                               uint64_t accepted) {
+    size_t count = 1;
+    bool quoted = false;
+    for (const char *p = value; *p; p++) {
+        if (*p == '\\' && p[1]) {
+            p++;
+            continue;
+        }
+        if (*p == '"')
+            quoted = !quoted;
+        else if (*p == ',' && !quoted)
+            count++;
+    }
+    if (quoted)
+        panic("cmdline: unterminated quote in list '%s'", value);
+
+    struct cmdline_list *list = kmalloc_or_die(sizeof(*list));
+    list->count = count;
+    list->items = kmalloc_or_die(count * sizeof(*list->items));
+
+    const char *item_start = value;
+    size_t item = 0;
+    quoted = false;
+    for (const char *p = value;; p++) {
+        if (*p == '\\' && p[1]) {
+            p++;
+            continue;
+        }
+        if (*p == '"')
+            quoted = !quoted;
+        if ((*p == ',' && !quoted) || *p == '\0') {
+            const char *begin = item_start;
+            const char *end = p;
+            while (begin < end && (*begin == ' ' || *begin == '\t'))
+                begin++;
+            while (end > begin && (end[-1] == ' ' || end[-1] == '\t'))
+                end--;
+            if (begin == end)
+                panic("cmdline: empty item in list '%s'", value);
+            if (*begin == '"') {
+                if (end - begin < 2 || end[-1] != '"')
+                    panic("cmdline: malformed quoted list item in '%s'", value);
+                begin++;
+                end--;
+            }
+            char *text = kmalloc_or_die((size_t) (end - begin) + 1);
+            cmdline_copy_escaped(text, begin, end);
+            list->items[item] = cmdline_parse_value_for(text, accepted);
+            item++;
+            kfree(text);
+            if (*p == '\0')
+                break;
+            item_start = p + 1;
+        }
+    }
+
+    return (struct cmdline_value){.type = CMDLINE_VAL_LIST, .data = list};
+}
+
+static enum cmdline_value_type cmdline_detect_value_type(const char *value,
+                                                         void **out_data) {
+    enum cmdline_value_type type = CMDLINE_VAL_NONE;
+    void *allocated_data = NULL;
+    size_t alloc_size = 0;
+    const void *src_ptr = NULL;
+
+    if (!value)
+        goto out;
+
+    bool b_val;
+    if (cmdline_detect_bool(value, &b_val)) {
+        type = CMDLINE_VAL_BOOL;
+        alloc_size = sizeof(bool);
+        src_ptr = &b_val;
+        goto out;
+    }
+
+    uint64_t size_val;
+    if (cmdline_detect_data_size(value, &size_val)) {
+        type = CMDLINE_VAL_DATA_SIZE;
+        alloc_size = sizeof(uint64_t);
+        src_ptr = &size_val;
+        goto out;
+    }
+
+    uint64_t int_val;
+    if (cmdline_detect_int(value, &int_val)) {
+        type = CMDLINE_VAL_INT;
+        alloc_size = sizeof(uint64_t);
+        src_ptr = &int_val;
+        goto out;
+    }
+
+    /* Fallback to string */
+    type = CMDLINE_VAL_STRING;
+    alloc_size = strlen(value) + 1;
+    src_ptr = value;
+
+out:
+    if (out_data) {
+        if (alloc_size > 0 && src_ptr) {
+            allocated_data = kmalloc_or_die(alloc_size);
+            memcpy(allocated_data, src_ptr, alloc_size);
+        }
+        *out_data = allocated_data;
+    }
+
+    return type;
+}
+
+static struct cmdline_value cmdline_parse_value_for(const char *value,
+                                                    uint64_t accepted) {
+    struct cmdline_value val = {
+        .entry = NULL,
+        .type = CMDLINE_VAL_NONE,
+        .data = NULL,
+    };
+
+    if (!value)
+        return val;
+
+    bool wants_range = accepted & CMDLINE_VALUE_TYPE_BIT(CMDLINE_VAL_RANGE);
+    bool wants_cpu_mask =
+        accepted & CMDLINE_VALUE_TYPE_BIT(CMDLINE_VAL_CPU_MASK);
+    if (wants_range && wants_cpu_mask && accepted != UINT64_MAX)
+        panic("cmdline: RANGE and CPU_MASK cannot both be accepted");
+
+    if ((accepted & CMDLINE_VALUE_TYPE_BIT(CMDLINE_VAL_LIST)) &&
+        cmdline_has_list_separator(value))
+        return cmdline_parse_list(value, accepted);
+
+    if (wants_range) {
+        struct cmdline_range *range = kmalloc_or_die(sizeof(*range));
+        if (!cmdline_parse_range(value, range)) {
+            kfree(range);
+            return (struct cmdline_value){.type = CMDLINE_VAL_ERR};
+        }
+        return (struct cmdline_value){.type = CMDLINE_VAL_RANGE, .data = range};
+    }
+
+    if (wants_cpu_mask) {
+        struct cpu_mask mask = parse_cpu_mask(value, global.core_count);
+        if (mask.nbits == 0)
+            panic("cmdline: invalid CPU mask '%s' (CPUs must be below %zu)",
+                  value, global.core_count);
+        struct cpu_mask *data = kmalloc_or_die(sizeof(*data));
+        *data = mask;
+        return (struct cmdline_value){.type = CMDLINE_VAL_CPU_MASK,
+                                      .data = data};
+    }
+
+    val.type = cmdline_detect_value_type(value, &val.data);
+    return val;
+}
+
+struct cmdline_value cmdline_parse_value(struct cmdline_entry *ent,
+                                         const char *value) {
+    return cmdline_parse_value_for(value, ent->value.accepted);
+}
+
+enum errno cmdline_extract_bool(struct cmdline_value *val, bool *out) {
+    if (!val || !out)
+        return ERR_INVAL;
+
+    if (val->type == CMDLINE_VAL_BOOL) {
+        if (val->data)
+            *out = *(bool *) val->data;
+        return ERR_OK;
+    }
+
+    return ERR_INVAL;
+}
+
+enum errno cmdline_extract_u64(struct cmdline_value *val, uint64_t *out) {
+    if (!val || !out)
+        return ERR_INVAL;
+
+    if (val->type == CMDLINE_VAL_INT || val->type == CMDLINE_VAL_DATA_SIZE) {
+        if (val->data)
+            *out = *(uint64_t *) val->data;
+        return ERR_OK;
+    }
+
+    return ERR_INVAL;
+}
+
+enum errno cmdline_extract_i64(struct cmdline_value *val, int64_t *out) {
+    if (!val || !out)
+        return ERR_INVAL;
+
+    if (val->type == CMDLINE_VAL_INT || val->type == CMDLINE_VAL_DATA_SIZE) {
+        if (val->data)
+            *out = (int64_t) *(uint64_t *) val->data;
+        return ERR_OK;
+    }
+
+    return ERR_INVAL;
+}
+
+enum errno cmdline_extract_u32(struct cmdline_value *val, uint32_t *out) {
+    if (!val || !out)
+        return ERR_INVAL;
+
+    if (val->type == CMDLINE_VAL_INT || val->type == CMDLINE_VAL_DATA_SIZE) {
+        if (val->data) {
+            uint64_t v = *(uint64_t *) val->data;
+            if (v > UINT32_MAX)
+                return ERR_OVERFLOW;
+            *out = (uint32_t) v;
+        }
+        return ERR_OK;
+    }
+
+    return ERR_INVAL;
+}
+
+enum errno cmdline_extract_i32(struct cmdline_value *val, int32_t *out) {
+    if (!val || !out)
+        return ERR_INVAL;
+
+    if (val->type == CMDLINE_VAL_INT || val->type == CMDLINE_VAL_DATA_SIZE) {
+        if (val->data) {
+            uint64_t v = *(uint64_t *) val->data;
+            if (v > INT32_MAX)
+                return ERR_OVERFLOW;
+            *out = (int32_t) v;
+        }
+        return ERR_OK;
+    }
+
+    return ERR_INVAL;
+}
+
+enum errno cmdline_extract_range(struct cmdline_value *val,
+                                 struct cmdline_range *out) {
+    if (!val || !out || val->type != CMDLINE_VAL_RANGE || !val->data)
+        return ERR_INVAL;
+    *out = *(struct cmdline_range *) val->data;
+    return ERR_OK;
+}
+
+enum errno cmdline_extract_cpu_mask(struct cmdline_value *val,
+                                    struct cpu_mask *out) {
+    if (!val || !out)
+        return ERR_INVAL;
+
+    if (val->type == CMDLINE_VAL_CPU_MASK) {
+        if (val->data)
+            *out = *(struct cpu_mask *) val->data;
+        return ERR_OK;
+    }
+
+    return ERR_INVAL;
+}
+
+enum errno cmdline_extract_string(struct cmdline_value *val, char **out) {
+    if (!val || !out)
+        return ERR_INVAL;
+
+    if (val->type == CMDLINE_VAL_STRING) {
+        *out = (char *) val->data;
+        return ERR_OK;
+    }
+
+    return ERR_INVAL;
+}
+
+enum errno cmdline_extract_const_string(struct cmdline_value *val,
+                                        const char **out) {
+    if (!val || !out)
+        return ERR_INVAL;
+
+    if (val->type == CMDLINE_VAL_STRING) {
+        *out = (const char *) val->data;
+        return ERR_OK;
+    }
+
+    return ERR_INVAL;
+}
+
+enum errno cmdline_extract_list(struct cmdline_value *val,
+                                struct cmdline_list *out) {
+    if (!val || !out)
+        return ERR_INVAL;
+
+    if (val->type == CMDLINE_VAL_LIST) {
+        if (val->data)
+            *out = *(struct cmdline_list *) val->data;
+        return ERR_OK;
+    }
+
+    return ERR_INVAL;
 }

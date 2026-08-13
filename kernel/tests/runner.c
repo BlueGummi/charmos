@@ -8,6 +8,7 @@
 #include <global.h>
 #include <irq/irq.h>
 #include <math/div.h>
+#include <math/sort.h>
 #include <mem/alloc_or_die.h>
 #include <mem/vas.h>
 #include <smp/core.h>
@@ -32,6 +33,23 @@ test_group_orphan_parent = {.name = "test_group_orphan_parent",
                             .incremental = false,
                             .flags = TEST_GROUP_FLAG_DEFAULT,
                             .ent = CMDLINE_ENTRY(test_root)};
+
+static void test_filter_callback(const char *val, struct cmdline_entry *ent) {
+    (void) ent, (void) val;
+    test_global.test_opt_in = true;
+    test_global.group_opt_in = true;
+}
+
+CMDLINE_ENTRY_DECLARE(
+    test_filter, .name = "filter",
+    .value.accepted = CMDLINE_VALUE_TYPE_BIT(CMDLINE_VAL_STRING) |
+                      CMDLINE_VALUE_TYPE_BIT(CMDLINE_VAL_LIST),
+    .parent = CMDLINE_ENTRY(test_root), .arg = "<list>",
+    .callback = test_filter_callback,
+    .desc = "this makes tests and groups opt-in and enables whatever tests "
+            "and/or groups are passed in, WITHOUT namespaces, i.e. only "
+            "\"test_name\" or \"test_group_name\"",
+    .flags = CMDLINE_ENTRY_DOCUMENTED);
 
 CMDLINE_ENTRY_DECLARE_TYPED(
     test_group_opt_in, test_global.group_opt_in, .name = "group_opt_in",
@@ -108,6 +126,7 @@ void tests_hook_boot() {
 
 static void tests_set_enabled_states() {
 #ifdef TEST_ENABLED
+
     /* Here we just apply the globals */
     if (test_global.test_opt_in) {
         for (struct test *t = __skernel_tests; t < __ekernel_tests; t++) {
@@ -128,24 +147,140 @@ static void tests_set_enabled_states() {
              tg < __ekernel_test_groups; tg++) {
             if (tg->enabled == TEST_STATE_SENTINEL) {
                 tg->enabled = TEST_STATE_DISABLED;
-                tg->smoke_enabled = TEST_STATE_DISABLED;
-                tg->unit_enabled = TEST_STATE_DISABLED;
-                tg->integration_enabled = TEST_STATE_DISABLED;
+                for (int i = 0; i < TEST_TIER_MAX; i++)
+                    tg->tier_enabled[i] = TEST_STATE_DISABLED;
             }
         }
+
     } else {
         for (struct test_group *tg = __skernel_test_groups;
              tg < __ekernel_test_groups; tg++) {
             if (tg->enabled == TEST_STATE_SENTINEL) {
                 tg->enabled = TEST_STATE_ENABLED;
-                tg->smoke_enabled = TEST_STATE_ENABLED;
-                tg->unit_enabled = TEST_STATE_ENABLED;
-                tg->integration_enabled = TEST_STATE_ENABLED;
+                for (int i = 0; i < TEST_TIER_MAX; i++)
+                    tg->tier_enabled[i] = TEST_STATE_ENABLED;
             }
         }
     }
 
+    for (struct test_group *tg = __skernel_test_groups;
+         tg < __ekernel_test_groups; tg++) {
+        for (int i = 0; i < TEST_TIER_MAX; i++) {
+            tg->num_tests_enabled[i] = 0;
+            for (size_t j = 0; j < tg->num_tests[i]; j++) {
+                struct test *t = tg->tests[i][j];
+                if (t->enabled)
+                    tg->num_tests_enabled[i]++;
+            }
+        }
+    }
+
+    for (struct test *t = __skernel_tests; t < __ekernel_tests; t++) {
+        if (t->enabled)
+            test_global.total_tests_enabled++;
+    }
+
 #endif
+}
+
+struct test_dup_item {
+    char *name;    /* Points to the test or test_group->name */
+    uint32_t hash; /* hash_murmur3_32() */
+};
+
+static int test_dup_item_cmp(const void *a, const void *b) {
+    const struct test_dup_item *ta = a;
+    const struct test_dup_item *tb = b;
+
+    if (ta->hash < tb->hash)
+        return -1;
+    else if (ta->hash > tb->hash)
+        return 1;
+    else
+        return strcmp(ta->name, tb->name);
+}
+
+/* NOTE:
+ * Rule: no test_group or test may share a name with any test or test_group,
+ * this is because the --filter build flag can enable tests or test groups,
+ * and we can't have that be ambiguous
+ */
+static void tests_check_duplicate_names() {
+    size_t num_tests = __ekernel_tests - __skernel_tests;
+    size_t num_test_groups = __ekernel_test_groups - __skernel_test_groups;
+    size_t num_items = num_tests + num_test_groups;
+
+    struct test_dup_item *items = kmalloc_or_die(
+        sizeof(struct test_dup_item) * num_items, ALLOC_FLAGS_ZERO);
+
+    for (size_t i = 0; i < num_tests; i++) {
+        items[i].name = (char *) __skernel_tests[i].name;
+        items[i].hash =
+            hash_murmur3_32(items[i].name, strlen(items[i].name), 0);
+    }
+
+    for (size_t i = 0; i < num_test_groups; i++) {
+        items[num_tests + i].name = (char *) __skernel_test_groups[i].name;
+        items[num_tests + i].hash = hash_murmur3_32(
+            items[num_tests + i].name, strlen(items[num_tests + i].name), 0);
+    }
+
+    qsort(items, num_items, sizeof(struct test_dup_item), test_dup_item_cmp);
+
+    for (size_t i = 1; i < num_items; i++) {
+        if (items[i].hash == items[i - 1].hash &&
+            strcmp(items[i].name, items[i - 1].name) == 0) {
+            panic("Duplicate test/test_group name: %s", items[i].name);
+        }
+    }
+
+    kfree(items);
+}
+
+static void test_filter_enable(char *name) {
+    /* Duplicate name presence will panic the kernel */
+    for (struct test_group *tg = __skernel_test_groups;
+         tg < __ekernel_test_groups; tg++) {
+        if (strcmp(tg->name, name) == 0) {
+            tg->enabled = TEST_STATE_ENABLED;
+            return;
+        }
+    }
+
+    for (struct test *t = __skernel_tests; t < __ekernel_tests; t++) {
+        if (strcmp(t->name, name) == 0) {
+            t->enabled = TEST_STATE_ENABLED;
+
+            struct test_group *g = (struct test_group *) t->group;
+            g->enabled = TEST_STATE_ENABLED;
+            return;
+        }
+    }
+
+    panic("%s in the filter is not a valid test group or test name", name);
+}
+
+static void tests_apply_filters() {
+    struct cmdline_entry *filter = CMDLINE_ENTRY(test_filter);
+    if (filter->status != CMDLINE_ENTRY_FOUND)
+        return;
+
+    if (filter->value.type == CMDLINE_VAL_STRING) {
+        char *filter_one;
+        CMDLINE_EXTRACT(&filter->value, filter_one);
+        test_filter_enable(filter_one);
+    } else {
+        kassert(filter->value.type == CMDLINE_VAL_LIST);
+        struct cmdline_list list;
+        CMDLINE_EXTRACT(&filter->value, list);
+        struct cmdline_value val;
+        cmdline_list_for_each(val, &list) {
+            kassert(val.type == CMDLINE_VAL_STRING);
+            char *filter_one;
+            CMDLINE_EXTRACT(&val, filter_one);
+            test_filter_enable(filter_one);
+        }
+    }
 }
 
 static void tests_setup_groups() {
@@ -248,7 +383,7 @@ static void test_group_run(struct test_group *tg) {
 
     bool no_tests = true;
     for (int i = 0; i < TEST_TIER_MAX; i++) {
-        if (tg->num_tests[i]) {
+        if (tg->num_tests_enabled[i]) {
             no_tests = false;
             break;
         }
@@ -261,7 +396,7 @@ static void test_group_run(struct test_group *tg) {
     size_t total_tests = 0;
     time_ms_t total_time = 0;
     for (int i = 0; i < TEST_TIER_MAX; i++)
-        total_tests += tg->num_tests[i];
+        total_tests += tg->num_tests_enabled[i];
 
     test_harness_info(ANSI_GREEN ANSI_BOLD
                       "Running" ANSI_RESET " group " ANSI_BLUE ANSI_BOLD
@@ -275,7 +410,7 @@ static void test_group_run(struct test_group *tg) {
     printf("%*s  | ", 20, "");
     printf(ANSI_UNDERLINE ANSI_BOLD "enabled" ANSI_RESET ": ");
     for (int i = 0; i < TEST_TIER_MAX; i++) {
-        if (!tg->num_tests[i])
+        if (!tg->num_tests_enabled[i])
             continue;
 
         if (tg->tier_enabled[i])
@@ -283,7 +418,7 @@ static void test_group_run(struct test_group *tg) {
 
         /* Check if the next one exists to print a comma */
         if (i + 1 < TEST_TIER_MAX && tg->tier_enabled[i + 1] &&
-            tg->num_tests[i + 1])
+            tg->num_tests_enabled[i + 1])
             printf(", ");
     }
 
@@ -298,7 +433,7 @@ static void test_group_run(struct test_group *tg) {
         if (stop_outer)
             break;
 
-        if (!tg->num_tests[i] || !tg->tier_enabled[i])
+        if (!tg->num_tests_enabled[i] || !tg->tier_enabled[i])
             continue;
 
         const char *tier_name = test_tier_to_str_color(i);
@@ -317,6 +452,8 @@ static void test_group_run(struct test_group *tg) {
         for (size_t test_num = 0; test_num < tg->num_tests[i]; test_num++) {
             struct test *t = tg->tests[i][test_num];
             struct test_context tctx = {0};
+            if (!t->enabled)
+                continue;
 
             /* Modifiable by the test */
             struct log_dump_options dopts = {
@@ -515,15 +652,17 @@ static void test_global_aggregate_results() {
 
 void tests_run(void) {
 #ifdef TEST_ENABLED
+    tests_check_duplicate_names();
     tests_setup_groups();
+    tests_apply_filters();
     tests_set_enabled_states();
 
     bool all_ok = true;
     char *msg = all_ok ? "all tests pass 🎉!" : "some errors occurred";
     char *color = all_ok ? ANSI_GREEN : ANSI_RED;
 
-    test_harness_info("Running %zu tests:\n",
-                      __ekernel_tests - __skernel_tests);
+    test_harness_info("Running " ANSI_BOLD "%zu" ANSI_RESET " tests:\n",
+                      test_global.total_tests_enabled);
 
     if (!test_global.no_progress && term_probe()) {
         test_progress.total = tests_count_planned();
@@ -532,9 +671,8 @@ void tests_run(void) {
     }
 
     for (struct test_group *tg = __skernel_test_groups;
-         tg < __ekernel_test_groups; tg++) {
+         tg < __ekernel_test_groups; tg++)
         test_group_run(tg);
-    }
 
     status_bar_close();
     test_global_aggregate_results();
@@ -553,7 +691,7 @@ void tests_run(void) {
                       " tests, %llu " ANSI_GREEN "passed" ANSI_RESET
                       ", %llu %sfailed" ANSI_RESET ", %llu %sskipped" ANSI_RESET
                       "\n",
-                      __ekernel_tests - __skernel_tests, pass_count, fail_count,
+                      test_global.total_tests_enabled, pass_count, fail_count,
                       fail_color, skip_count, skip_color);
 
     test_harness_info("%s%s" ANSI_RESET " (%llu ms)\n", color, msg, total_time);

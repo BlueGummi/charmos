@@ -7,29 +7,27 @@ set(IMAGE_NAME "charmos-${ARCH}")
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
-if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-    set(CMAKE_BUILD_TYPE "Debug" CACHE STRING
-        "Build type: Debug, Release, RelWithDebInfo, MinSizeRel" FORCE)
-    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
-        Debug Release RelWithDebInfo MinSizeRel)
-endif()
+if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE
+        "Debug"
+        CACHE STRING "Build type: Debug, Release, RelWithDebInfo, MinSizeRel" FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release RelWithDebInfo MinSizeRel)
+endif ()
 
 message(STATUS "charmOS build type: ${CMAKE_BUILD_TYPE}")
 
-include(features)   # compile-time feature toggles
-include(flags)      # compiler / linker / codegen
+include(features) # compile-time feature toggles
+include(flags) # compiler / linker / codegen
 
 add_subdirectory(kernel)
 target_include_directories(kernel PRIVATE include)
 
 include(emulation)
 
-add_custom_target(clean-full
-    COMMAND ${CMAKE_COMMAND} -E rm -rf
-        iso_root ${IMAGE_NAME}.iso ${IMAGE_NAME}.hdd
-        kernel-deps limine ovmf
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-)
+add_custom_target(
+    clean-full
+    COMMAND ${CMAKE_COMMAND} -E rm -rf iso_root ${IMAGE_NAME}.iso ${IMAGE_NAME}.hdd kernel-deps limine ovmf
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 message(STATUS "")
 message(STATUS "charmOS configuration:")
