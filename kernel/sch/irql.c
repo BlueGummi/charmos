@@ -78,35 +78,42 @@ void irql_lower(enum irql new_level) {
 
     enum irql old = irql_get();
 
-    /* hook into here */
-    if (old == IRQL_DISPATCH_LEVEL && new_level == IRQL_PASSIVE_LEVEL &&
-        !scheduler_in_periodic_work())
-        scheduler_periodic_work_execute(PERIODIC_WORK_TIME_BASED);
-
-    struct thread *curr = thread_get_current();
-    bool in_thread = irq_in_thread_context();
-
-    irql_set(new_level);
-    if (new_level < old) {
-        if (in_thread && old >= IRQL_HIGH_LEVEL && new_level < IRQL_HIGH_LEVEL)
-            enable_interrupts();
-
-        if (in_thread && old >= IRQL_DISPATCH_LEVEL &&
-            new_level < IRQL_DISPATCH_LEVEL)
-            dpc_run_local();
-
-        bool preempt_re_enabled = false;
-        if (old >= IRQL_APC_LEVEL && new_level < IRQL_APC_LEVEL)
-            preempt_re_enabled = (scheduler_preemption_enable() == 0);
-
-        if (in_thread && old > IRQL_APC_LEVEL && new_level <= IRQL_APC_LEVEL)
-            apc_check_and_deliver(curr);
-
-        if (in_thread && preempt_re_enabled)
-            scheduler_resched_if_needed();
-
-    } else if (new_level > old) {
+    if (new_level > old)
         panic("Lowering to higher IRQL, from %s to %s", irql_to_str(old),
               irql_to_str(new_level));
+
+    if (new_level == old)
+        return;
+
+    bool in_thread = irq_in_thread_context();
+    struct thread *curr = thread_get_current();
+
+    if (old >= IRQL_HIGH_LEVEL && new_level < IRQL_HIGH_LEVEL) {
+        enum irql intermediate =
+            (new_level < IRQL_DISPATCH_LEVEL) ? IRQL_DISPATCH_LEVEL : new_level;
+        irql_set(intermediate);
+        if (in_thread)
+            enable_interrupts();
+    }
+
+    if (old >= IRQL_DISPATCH_LEVEL && new_level < IRQL_DISPATCH_LEVEL) {
+        irql_set(IRQL_DISPATCH_LEVEL);
+        if (in_thread)
+            dpc_drain_local();
+    }
+
+    /* Step down first so current_irql matches before preemption re enables */
+    irql_set(new_level);
+
+    bool preempt_re_enabled = false;
+    if (old >= IRQL_APC_LEVEL && new_level < IRQL_APC_LEVEL)
+        preempt_re_enabled = (scheduler_preemption_enable() == 0);
+
+    if (in_thread && new_level == IRQL_PASSIVE_LEVEL) {
+        if (old >= IRQL_APC_LEVEL)
+            apc_check_and_deliver(curr);
+
+        if (preempt_re_enabled)
+            scheduler_resched_if_needed();
     }
 }

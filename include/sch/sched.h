@@ -179,11 +179,6 @@ static inline void scheduler_mark_self_idle(bool new) {
             atomic_fetch_sub_explicit(&global.idle_core_count, 1,
                                       memory_order_acq_rel);
         }
-
-        /* set the DPC event. once we exit the yield(),
-         * we will run DPCs that correspond to the status of
-         * IDLE/WOKE, and then unset the status */
-        c->dpc_event = new ? DPC_CPU_IDLE : DPC_CPU_WOKE;
     }
 }
 

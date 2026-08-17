@@ -92,4 +92,4 @@ uint8_t time_get_century();
 time_ms_t time_get_ms(void);
 time_ns_t time_get_ns();
 time_us_t time_get_us(void);
-uint64_t tsc_calibrate(void);
+freq_hz_t tsc_calibrate(void);

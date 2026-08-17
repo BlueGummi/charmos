@@ -96,3 +96,13 @@ struct clock_globals {
 
 extern struct clock_globals clock_global;
 void timer_base_reprogram_hardware(cpu_id_t cpu);
+
+struct clock *hpet_clock_init(void);
+
+void timekeeper_init(void);
+void timekeeper_update(void);
+time_ns_t timekeeper_get_ns(void);
+time_us_t timekeeper_get_us(void);
+
+struct clock *clock_get_best(void);
+struct clock *clock_get_by_name(const char *name);

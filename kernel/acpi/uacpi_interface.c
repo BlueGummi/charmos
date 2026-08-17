@@ -22,10 +22,13 @@
 #include <uacpi/uacpi.h>
 
 #include "uacpi/kernel_api.h"
+#include <types/freq.h>
+#include <types/types.h>
+
 #include "uacpi/log.h"
 #include "uacpi/namespace.h"
 
-uint64_t tsc_freq = 0;
+freq_hz_t tsc_freq = 0;
 
 #define panic_if_error(x)                                                      \
     if (uacpi_unlikely_error(x))                                               \
@@ -111,14 +114,15 @@ void uacpi_kernel_io_unmap(uacpi_handle h) {
 }
 
 uacpi_u64 uacpi_kernel_get_nanoseconds_since_boot(void) {
+    if (tsc_freq == 0)
+        return 0;
 
     return (rdtsc() * 1000000000ull) / tsc_freq;
 }
 
 void uacpi_kernel_stall(uacpi_u8 usec) {
-
     uint64_t start = rdtsc();
-    uint64_t target = start + ((tsc_freq / 1000000ull) * usec);
+    uint64_t target = start + (HZ_TO_MHZ(tsc_freq) * usec);
 
     while (rdtsc() < target)
         cpu_relax();

@@ -88,7 +88,7 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
 
     struct unlink_ctx ctx = {name, false, 0, 0, 0, 0};
     if (!ext2_walk_dir(fs, dir_inode, unlink_callback, &ctx))
-        return ERR_FS_INTERNAL;
+        return ERR_IO;
 
     struct bcache_entry *ent;
     uint8_t *block = ext2_block_read(fs, ctx.block_num, &ent);
@@ -109,7 +109,7 @@ enum errno ext2_unlink_file(struct ext2_fs *fs,
 
     if (target_inode->links_count == 0) {
         bcache_ent_release(ent);
-        return ERR_FS_NO_INODE;
+        return ERR(ext2, EXT2_ERR_NO_INODE);
     }
 
     unlink_target_update(target_inode);

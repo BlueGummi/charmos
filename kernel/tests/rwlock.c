@@ -17,9 +17,9 @@ TEST_GROUP_DECLARE(rwlock);
 static struct rwlock rw_basic = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 
 TEST_DECLARE_UNIT(rwlock_basic_read, .group = TEST_GROUP(rwlock)) {
-    rwlock_lock(&rw_basic, RWLOCK_ACQUIRE_READ);
+    rw_lock(&rw_basic, RWLOCK_ACQUIRE_READ);
     scheduler_yield();
-    rwlock_unlock(&rw_basic);
+    rw_unlock(&rw_basic);
 
     return TEST_SUCCESS;
 }
@@ -28,9 +28,9 @@ static struct rwlock rw_basic_w = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 
 TEST_DECLARE_UNIT(rwlock_basic_write, .group = TEST_GROUP(rwlock)) {
 
-    rwlock_lock(&rw_basic_w, RWLOCK_ACQUIRE_WRITE);
+    rw_lock(&rw_basic_w, RWLOCK_ACQUIRE_WRITE);
     scheduler_yield();
-    rwlock_unlock(&rw_basic_w);
+    rw_unlock(&rw_basic_w);
 
     return TEST_SUCCESS;
 }
@@ -39,15 +39,15 @@ static struct rwlock rw_two_writers = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 static atomic_bool rw_two_done = false;
 
 static void rw_two_writer_thread(void *) {
-    rwlock_lock(&rw_two_writers, RWLOCK_ACQUIRE_WRITE);
-    rwlock_unlock(&rw_two_writers);
+    rw_lock(&rw_two_writers, RWLOCK_ACQUIRE_WRITE);
+    rw_unlock(&rw_two_writers);
 
     atomic_store(&rw_two_done, true);
 }
 
 TEST_DECLARE_UNIT(rwlock_two_writer_basic, .group = TEST_GROUP(rwlock)) {
 
-    rwlock_lock(&rw_two_writers, RWLOCK_ACQUIRE_WRITE);
+    rw_lock(&rw_two_writers, RWLOCK_ACQUIRE_WRITE);
 
     struct thread *w = thread_spawn_joinable_on_core(
         "rw_two_writer", rw_two_writer_thread, NULL, 0);
@@ -55,7 +55,7 @@ TEST_DECLARE_UNIT(rwlock_two_writer_basic, .group = TEST_GROUP(rwlock)) {
 
     scheduler_yield(); // let second writer block
 
-    rwlock_unlock(&rw_two_writers);
+    rw_unlock(&rw_two_writers);
 
     thread_join(w);
     TEST_ASSERT(atomic_load(&rw_two_done));
@@ -73,9 +73,9 @@ static _Atomic uint32_t rw_readers_left = RWLOCK_READER_COUNT_TEST_N;
 static void rw_reader_worker(void *) {
     time_ms_t last_print = time_get_ms();
     for (size_t i = 0; i < RWLOCK_READER_COUNT_LOOPS; i++) {
-        rwlock_lock(&rw_readers, RWLOCK_ACQUIRE_READ);
+        rw_lock(&rw_readers, RWLOCK_ACQUIRE_READ);
         scheduler_yield();
-        rwlock_unlock(&rw_readers);
+        rw_unlock(&rw_readers);
         time_ms_t now = time_get_ms();
         if ((now - last_print) > RWLOCK_READER_PRINT_INTERVAL) {
             test_info("RWlock reader %s on iteration %zu",
@@ -117,16 +117,16 @@ static void rw_mixed_worker(void *) {
     for (int i = 0; i < RWLOCK_MIXED_LOOPS; i++) {
         if (prng_next() & 1) {
             // Reader
-            rwlock_lock(&rw_mixed, RWLOCK_ACQUIRE_READ);
+            rw_lock(&rw_mixed, RWLOCK_ACQUIRE_READ);
         } else {
             // Writer
-            rwlock_lock(&rw_mixed, RWLOCK_ACQUIRE_WRITE);
+            rw_lock(&rw_mixed, RWLOCK_ACQUIRE_WRITE);
         }
 
         for (volatile size_t j = 0; j < (prng_next() & 0x1f); j++)
             cpu_relax();
 
-        rwlock_unlock(&rw_mixed);
+        rw_unlock(&rw_mixed);
 
         if (prng_next() & 1)
             scheduler_yield();
@@ -159,14 +159,14 @@ static _Atomic uint32_t rw_chaos_left = RWLOCK_CHAOS_THREADS;
 static void rw_chaos_worker(void *) {
     for (int i = 0; i < RWLOCK_CHAOS_LOOPS; i++) {
         if (prng_next() & 1)
-            rwlock_lock(&rw_chaos, RWLOCK_ACQUIRE_READ);
+            rw_lock(&rw_chaos, RWLOCK_ACQUIRE_READ);
         else
-            rwlock_lock(&rw_chaos, RWLOCK_ACQUIRE_WRITE);
+            rw_lock(&rw_chaos, RWLOCK_ACQUIRE_WRITE);
 
         for (volatile size_t j = 0; j < (prng_next() & 0x1F); j++)
             cpu_relax();
 
-        rwlock_unlock(&rw_chaos);
+        rw_unlock(&rw_chaos);
 
         if (prng_next() & 1)
             scheduler_yield();
@@ -211,7 +211,7 @@ static void rw_correct_worker(void *) {
     for (int i = 0; i < RWLOCK_CORRECT_LOOPS; i++) {
         if (prng_next() & 1) {
             // Reader
-            rwlock_lock(&rw_correct, RWLOCK_ACQUIRE_READ);
+            rw_lock(&rw_correct, RWLOCK_ACQUIRE_READ);
 
             atomic_fetch_add(&active_readers, 1);
             if (atomic_load(&active_writers) != 0)
@@ -220,11 +220,11 @@ static void rw_correct_worker(void *) {
             scheduler_yield();
             atomic_fetch_sub(&active_readers, 1);
 
-            rwlock_unlock(&rw_correct);
+            rw_unlock(&rw_correct);
         } else {
             // Writer
 
-            rwlock_lock(&rw_correct, RWLOCK_ACQUIRE_WRITE);
+            rw_lock(&rw_correct, RWLOCK_ACQUIRE_WRITE);
 
             atomic_fetch_add(&active_writers, 1);
             if (atomic_load(&active_readers) != 0 ||
@@ -234,7 +234,7 @@ static void rw_correct_worker(void *) {
             scheduler_yield();
             atomic_fetch_sub(&active_writers, 1);
 
-            rwlock_unlock(&rw_correct);
+            rw_unlock(&rw_correct);
         }
     }
     atomic_fetch_sub(&correctness_left, 1);

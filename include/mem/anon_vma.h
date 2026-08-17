@@ -29,15 +29,15 @@ enum errno anon_vma_fork(struct vma_range *child, struct vma_range *parent);
 
 /* root->lock */
 static inline void anon_vma_read_lock(struct anon_vma *av) {
-    rwlock_read_lock(&av->root->lock);
+    rw_read_lock(&av->root->lock);
 }
 
 static inline void anon_vma_unlock(struct anon_vma *av) {
-    rwlock_unlock(&av->root->lock);
+    rw_unlock(&av->root->lock);
 }
 
 static inline void anon_vma_write_lock(struct anon_vma *av) {
-    rwlock_write_lock(&av->root->lock);
+    rw_write_lock(&av->root->lock);
 }
 
 enum errno anon_vma_clone(struct vma_range *dst, struct vma_range *src);

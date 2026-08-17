@@ -21,8 +21,8 @@ enum cmdline_entry_flags {
     CMDLINE_ENTRY_SYMBOLIC = 1, /* This entry serves parenting purposes,
                                  * however itself cannot be set to a value */
     CMDLINE_ENTRY_REQUIRED = 1 << 1,
-    CMDLINE_ENTRY_DOCUMENTED = 1
-                               << 2, /* If this is set, we print/document it */
+    CMDLINE_ENTRY_DOCUMENTED = 1 << 2, /* If this is set,
+                                        * we print/document it */
 };
 
 /* The way this works:

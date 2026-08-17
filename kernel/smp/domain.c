@@ -44,7 +44,7 @@ static void construct_domains_from_numa_nodes(void) {
         struct numa_node *nn = &global.numa_nodes[i];
         struct domain *cd = global.domains[i];
         cd->num_cores = cpu_mask_popcount(&nn->cpus);
-        alloc_or_die(cpu_mask_init(&cd->cpu_mask, cd->num_cores));
+        alloc_or_die(cpu_mask_init(&cd->cpu_mask, global.core_count));
         cpu_mask_copy(&cd->cpu_mask, &nn->cpus);
         cd->associated_node = nn;
         cd->cores =
@@ -204,11 +204,21 @@ bool domain_idle(struct domain *domain) {
     return true;
 }
 
-domain_id_t domain_for_core(size_t cpu) {
+numa_node_t numa_node_for_cpu(cpu_id_t cpu) {
     for (numa_node_t i = 0; i < global.numa_node_count; i++) {
         struct numa_node *nn = &global.numa_nodes[i];
         if (cpu_mask_test(&nn->cpus, cpu))
             return i;
+    }
+
+    return 0;
+}
+
+domain_id_t domain_for_cpu(cpu_id_t cpu) {
+    struct domain *d;
+    domain_for_each_domain(d) {
+        if (cpu_mask_test(&d->cpu_mask, cpu))
+            return d->id;
     }
 
     kassert_unreachable();

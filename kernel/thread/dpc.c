@@ -40,36 +40,46 @@ static void dpc_execute_all_in_queue(struct dpc_queue *dq) {
     }
 }
 
-void dpc_run_local(void) {
-    kassert(are_interrupts_enabled());
+void dpc_drain_local(void) {
     struct core *me = smp_core();
     if (me->in_resched)
         return;
 
+    /* Recursion guard */
     if (atomic_exchange(&me->executing_dpcs, true))
         return;
 
+    kassert(irql_get() == IRQL_DISPATCH_LEVEL);
+
     size_t cpu = me->id;
-    enum dpc_event recent = me->dpc_event;
     struct dpc_cpu *dc = &global.dpc_data[cpu];
 
-    dpc_execute_all_in_queue(&dc->queues[recent]);
+    while (true) {
 
-    if (recent != DPC_NONE)
-        dpc_execute_all_in_queue(&dc->queues[DPC_NONE]);
+        dpc_execute_all_in_queue(&dc->queue);
 
-    /* all clear */
-    me->dpc_event = DPC_NONE;
+        /* Any more? go run */
+        bool any = false;
+        if (atomic_load_explicit(&dc->queue.head, memory_order_relaxed) !=
+            NULL) {
+            any = true;
+            break;
+        }
+        if (!any)
+            break;
+    }
+
     atomic_store(&me->executing_dpcs, false);
 }
 
-void dpc_run_dpcs_from_irq(void) {
+void dpc_run_local(void) {
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
+    dpc_drain_local();
+    irql_lower(irql);
+}
 
-    /* Should come out to be false due to IRQ specific IRQL invariants */
-    kassert(!are_interrupts_enabled());
-
-    irql_lower(irql); /* Would trigger DPCs */
+void dpc_run_dpcs_from_irq(void) {
+    dpc_run_local();
 }
 
 static void dpc_queue_enqueue(struct dpc_queue *dq, struct dpc *d) {
@@ -86,7 +96,7 @@ static void dpc_queue_enqueue(struct dpc_queue *dq, struct dpc *d) {
     }
 }
 
-bool dpc_enqueue_on_cpu(size_t cpu, struct dpc *d, enum dpc_event e) {
+bool dpc_enqueue_on_cpu(size_t cpu, struct dpc *d) {
     kassert(d);
 
     if (atomic_exchange_explicit(&d->enqueued, true, memory_order_acq_rel))
@@ -97,7 +107,7 @@ bool dpc_enqueue_on_cpu(size_t cpu, struct dpc *d, enum dpc_event e) {
     /* Clear next pointer then push via CAS loop */
     atomic_store_explicit(&d->next, NULL, memory_order_relaxed);
 
-    struct dpc_queue *dq = &dc->queues[e];
+    struct dpc_queue *dq = &dc->queue;
     dpc_queue_enqueue(dq, d);
 
     scheduler_force_run_dpcs(global.schedulers[cpu]);
@@ -106,8 +116,8 @@ bool dpc_enqueue_on_cpu(size_t cpu, struct dpc *d, enum dpc_event e) {
 }
 
 /* Convenience: enqueue on current cpu */
-bool dpc_enqueue_local(struct dpc *d, enum dpc_event e) {
-    bool ret = dpc_enqueue_on_cpu(smp_core_id(), d, e);
+bool dpc_enqueue_local(struct dpc *d) {
+    bool ret = dpc_enqueue_on_cpu(smp_core_id(), d);
     return ret;
 }
 
@@ -116,10 +126,8 @@ void dpc_init_percpu(void) {
         kmalloc(sizeof(struct dpc_cpu) * global.core_count, ALLOC_FLAGS_ZERO);
     size_t i;
     for_each_cpu_id(i) {
-        for (size_t j = 0; j < DPC_EVENT_MAX; j++) {
-            atomic_store_explicit(&global.dpc_data[i].queues[j].head, NULL,
-                                  memory_order_relaxed);
-        }
+        atomic_store_explicit(&global.dpc_data[i].queue.head, NULL,
+                              memory_order_relaxed);
     }
 }
 

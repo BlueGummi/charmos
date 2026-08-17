@@ -652,6 +652,7 @@ static void test_global_aggregate_results() {
 
 void tests_run(void) {
 #ifdef TEST_ENABLED
+    term_probe();
     tests_check_duplicate_names();
     tests_setup_groups();
     tests_apply_filters();
@@ -664,7 +665,7 @@ void tests_run(void) {
     test_harness_info("Running " ANSI_BOLD "%zu" ANSI_RESET " tests:\n",
                       test_global.total_tests_enabled);
 
-    if (!test_global.no_progress && term_probe()) {
+    if (!test_global.no_progress) {
         test_progress.total = tests_count_planned();
         status_bar_open();
         status_bar_progress(0, test_progress.total, "starting");

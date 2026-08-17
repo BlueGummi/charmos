@@ -22,23 +22,24 @@ struct perdomain_descriptor {
 LINKER_SECTION_DEFINE(struct perdomain_descriptor, perdomain_desc);
 
 #define PERDOMAIN_DECLARE(__n, __type, __ctor)                                 \
-    extern __type __perdomain_##__n;                                           \
+    extern typeof(__type) __perdomain_##__n;                                   \
     extern struct perdomain_descriptor __perdomain_desc_##__n;                 \
-    static void __perdomain_ctor_##__n(void *inst, size_t cpu) {               \
+    static void __perdomain_ctor_##__n(void *inst, size_t domain) {            \
         __perdomain_desc_##__n.ready = true;                                   \
         if ((__ctor) != NULL)                                                  \
-            __ctor((__type *) inst, cpu);                                      \
+            ((void (*)(typeof(__type) *, size_t)) __ctor)(                     \
+                (typeof(__type) *) inst, domain);                              \
     }                                                                          \
     LINKER_SECTION_OBJECT(struct perdomain_descriptor, perdomain_desc)         \
     __perdomain_desc_##__n = {                                                 \
         .name = #__n,                                                          \
-        .size = sizeof(__type),                                                \
-        .align = _Alignof(__type),                                             \
+        .size = sizeof(typeof(__type)),                                        \
+        .align = _Alignof(typeof(__type)),                                     \
         .perdomain_ptrs = NULL,                                                \
         .constructor = __perdomain_ctor_##__n,                                 \
         .ready = false,                                                        \
     };                                                                         \
-    __type __perdomain_##__n
+    typeof(__type) __perdomain_##__n
 
 void perdomain_obj_init(void);
 

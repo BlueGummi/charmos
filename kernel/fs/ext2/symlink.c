@@ -10,7 +10,7 @@ enum errno ext2_symlink_file(struct ext2_fs *fs,
                              const char *name, const char *target) {
     inode_t inode_num = ext2_alloc_inode(fs);
     if (inode_num == 0)
-        return ERR_FS_NO_INODE;
+        return ERR(ext2, EXT2_ERR_NO_INODE);
 
     struct ext2_inode new_inode = {0};
     new_inode.ctime = time_get_unix();
@@ -27,7 +27,7 @@ enum errno ext2_symlink_file(struct ext2_fs *fs,
     } else {
         uint32_t block = ext2_alloc_block(fs);
         if (block == 0)
-            return ERR_FS_NO_INODE;
+            return ERR(ext2, EXT2_ERR_NO_INODE);
 
         struct bcache_entry *ent;
         uint8_t *buffer = ext2_create_bcache_ent(fs, block, &ent);
@@ -45,7 +45,7 @@ enum errno ext2_symlink_file(struct ext2_fs *fs,
     }
 
     if (!ext2_inode_write(fs, inode_num, &new_inode))
-        return ERR_FS_INTERNAL;
+        return ERR_IO;
 
     struct ext2_full_inode wrapped_inode = {
         .inode_num = inode_num,

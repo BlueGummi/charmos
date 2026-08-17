@@ -5,13 +5,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-enum dpc_event {
-    DPC_NONE,     /* No event */
-    DPC_CPU_IDLE, /* CPU went idle */
-    DPC_CPU_WOKE, /* CPU went un-idle */
-    DPC_EVENT_MAX,
-};
-
 struct dpc;
 typedef void (*dpc_func_t)(void *ctx);
 
@@ -30,13 +23,14 @@ struct dpc_queue {
 /* Per-cpu DPC data */
 struct dpc_cpu {
     _Atomic bool ipi_queued;
-    struct dpc_queue queues[DPC_EVENT_MAX];
+    struct dpc_queue queue;
 };
 
+void dpc_drain_local(void);
 void dpc_run_local(void);
 void dpc_run_dpcs_from_irq(void);
 struct dpc *dpc_create(dpc_func_t fn, void *ctx);
 struct dpc *dpc_init(struct dpc *d, dpc_func_t fn, void *ctx);
 void dpc_init_percpu(void);
-bool dpc_enqueue_local(struct dpc *d, enum dpc_event e);
-bool dpc_enqueue_on_cpu(size_t cpu, struct dpc *d, enum dpc_event e);
+bool dpc_enqueue_local(struct dpc *d);
+bool dpc_enqueue_on_cpu(size_t cpu, struct dpc *d);

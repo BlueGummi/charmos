@@ -106,5 +106,5 @@ void kfree_defer_irq(void *ptr) {
     struct slab_percpu_cache *pc = slab_percpu_cache_local();
     struct mpsc_slist_node *n = ptr;
     mpsc_slist_push(&pc->defer_frees, n);
-    dpc_enqueue_local(&pc->defer_dpc, DPC_NONE);
+    dpc_enqueue_local(&pc->defer_dpc);
 }

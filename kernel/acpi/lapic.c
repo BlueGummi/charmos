@@ -37,11 +37,11 @@ void lapic_timer_init(cpu_id_t core_id) {
     uint32_t curr = lapic_read((LAPIC_REG_TIMER_CUR));
     uint32_t elapsed = 0xFFFFFFFF - curr;
 
-    uint64_t lapic_calibrated_freq = elapsed * (1000 / calibration_sleep_ms);
+    freq_khz_t lapic_calibrated_khz = elapsed / calibration_sleep_ms;
 
-    uint32_t timeslice_ticks = (lapic_calibrated_freq * timeslice_ms) / 1000;
+    uint32_t timeslice_ticks = lapic_calibrated_khz * timeslice_ms;
 
-    global.cores[core_id]->lapic_freq = lapic_calibrated_freq;
+    global.cores[core_id]->lapic_khz = lapic_calibrated_khz;
     lapic_write(LAPIC_REG_LVT_TIMER, TIMER_VECTOR | TIMER_MODE_PERIODIC);
 
     lapic_write(LAPIC_REG_TIMER_INIT, timeslice_ticks);
@@ -49,7 +49,7 @@ void lapic_timer_init(cpu_id_t core_id) {
 }
 
 void lapic_timer_set_ms(uint32_t ms) {
-    uint32_t ticks = (smp_core()->lapic_freq * ms) / 1000;
+    uint32_t ticks = smp_core()->lapic_khz * ms;
 
     lapic_write(LAPIC_REG_TIMER_INIT, ticks);
 }
@@ -201,8 +201,8 @@ static enum errno lapic_evdev_set_next_event(struct clock_evdev *ced,
                                              time_ns_t delta_ns) {
     (void) ced;
 
-    uint64_t freq = smp_core()->lapic_freq;
-    uint64_t ticks = (freq * (uint64_t) delta_ns) / 1000000000ULL;
+    freq_khz_t freq_khz = smp_core()->lapic_khz;
+    uint64_t ticks = (freq_khz * (uint64_t) delta_ns) / 1000000ULL;
 
     if (ticks == 0)
         ticks = 1;
@@ -253,10 +253,10 @@ static struct clock_evdev *lapic_clock_evdev_create(cpu_id_t core_id) {
     ced->change_state = lapic_evdev_change_state;
 
     /* bounds based on LAPIC frequency */
-    uint64_t freq = global.cores[core_id]->lapic_freq;
+    freq_khz_t freq_khz = global.cores[core_id]->lapic_khz;
 
-    ced->min_delta_ns = (1000000000ULL + freq - 1) / freq;
-    ced->max_delta_ns = (0xFFFFFFFFULL * 1000000000ULL) / freq;
+    ced->min_delta_ns = (1000000ULL + freq_khz - 1) / freq_khz;
+    ced->max_delta_ns = (0xFFFFFFFFULL * 1000000ULL) / freq_khz;
 
     ced->min_delta_ticks = 1;
     ced->max_delta_ticks = 0xFFFFFFFF;

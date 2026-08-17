@@ -81,7 +81,7 @@ void rwlock_init(struct rwlock *lock, enum thread_prio_class class) {
         ((class & RWLOCK_PRIO_CEIL_MASK) << RWLOCK_PRIO_CEIL_SHIFT);
 }
 
-void rwlock_lock(struct rwlock *lock, enum rwlock_acquire_type acq_type) {
+void rw_lock(struct rwlock *lock, enum rwlock_acquire_type acq_type) {
     uintptr_t lword = RWLOCK_READ_LOCK_WORD(lock);
     kassert(RWLOCK_GET_PRIO_CEIL(lword) &&
             "rwlock prio ceiling cannot be 0 (background)");
@@ -235,7 +235,7 @@ static uintptr_t rwlock_unlock_get_val_to_sub(struct rwlock *lock) {
     }
 }
 
-void rwlock_unlock(struct rwlock *lock) {
+void rw_unlock(struct rwlock *lock) {
     /* once again, we raise the IRQL to DISPATCH to prevent
      * us from being switched out while we unlock */
     size_t backoff = RWLOCK_BACKOFF_DEFAULT;

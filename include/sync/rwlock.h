@@ -35,8 +35,8 @@ enum rwlock_acquire_type {
     RWLOCK_ACQUIRE_WRITE = 1,
 };
 
-void rwlock_lock(struct rwlock *lock, enum rwlock_acquire_type type);
-void rwlock_unlock(struct rwlock *lock);
+void rw_lock(struct rwlock *lock, enum rwlock_acquire_type type);
+void rw_unlock(struct rwlock *lock);
 void rwlock_init(struct rwlock *lock, enum thread_prio_class ceiling);
 bool rwlock_held(struct rwlock *lock, enum rwlock_acquire_type type);
 
@@ -49,10 +49,10 @@ bool rwlock_held(struct rwlock *lock, enum rwlock_acquire_type type);
 #define RWLOCK_PRIO_CEIL_SHIFT (1)
 #define RWLOCK_INIT(ceil) {((ceil) << RWLOCK_PRIO_CEIL_SHIFT)}
 
-static inline void rwlock_read_lock(struct rwlock *lock) {
-    rwlock_lock(lock, RWLOCK_ACQUIRE_READ);
+static inline void rw_read_lock(struct rwlock *lock) {
+    rw_lock(lock, RWLOCK_ACQUIRE_READ);
 }
 
-static inline void rwlock_write_lock(struct rwlock *lock) {
-    rwlock_lock(lock, RWLOCK_ACQUIRE_WRITE);
+static inline void rw_write_lock(struct rwlock *lock) {
+    rw_lock(lock, RWLOCK_ACQUIRE_WRITE);
 }

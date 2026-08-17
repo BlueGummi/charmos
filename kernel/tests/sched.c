@@ -231,67 +231,6 @@ TEST_DECLARE_INTEGRATION(thread_sleep_interruptible_test,
     return TEST_SUCCESS;
 }
 
-static atomic_bool gogo = false;
-static atomic_bool eq = false;
-
-static void dpc_idle(void *ctx) {
-    (void) ctx;
-
-    atomic_store(&gogo, true);
-    kassert(scheduler_core_idle(smp_core()));
-}
-
-static void dpc_on_event_dummy_thread(void *a) {
-    (void) a;
-    while (!atomic_load(&eq))
-        cpu_relax();
-
-    for (size_t i = 0; i < 5000; i++)
-        scheduler_yield();
-
-    kassert(!atomic_load(&gogo));
-}
-
-/* we put a thread on a core that is not idle, enqueue a DPC over
- * there, trigger some reschedules, and then verify that the DPC
- * only ever runs once the core actually goes idle */
-TEST_DECLARE_UNIT(dpc_on_event_test, .group = TEST_GROUP(sched)) {
-    size_t i;
-    size_t found = SIZE_MAX;
-    for_each_cpu_id(i) {
-        if (scheduler_core_idle(global.cores[i])) {
-            found = i;
-            break;
-        }
-    }
-
-    if (found == SIZE_MAX) {
-        test_info("Could not find idle CPU");
-        return TEST_SKIP(TEST_SKIP_NONE);
-    }
-
-    struct thread *t =
-        thread_create("dpc_dummy", dpc_on_event_dummy_thread, NULL);
-    TEST_ASSERT(t);
-
-    t->flags |= THREAD_FLAG_PINNED;
-    thread_set_joinable(t);
-    thread_enqueue_on_core(t, found);
-
-    /* we now know the other processor is in the thread */
-    struct dpc *dp = dpc_create(dpc_idle, NULL);
-    dpc_enqueue_on_cpu(found, dp, DPC_CPU_IDLE);
-    atomic_store(&eq, true);
-    while (!atomic_load(&gogo))
-        cpu_relax();
-
-    /* the core only went idle because the dummy finished, so this
-     * returns immediately and keeps it from outliving the test */
-    thread_join(t);
-
-    return TEST_SUCCESS;
-}
-
 #define SCHED_PUSH_TEST_THREADS 256
 
 static atomic_uint left = SCHED_PUSH_TEST_THREADS;

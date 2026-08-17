@@ -256,7 +256,7 @@ vaddr_t mm_map(struct mm *mm, vaddr_t hint, size_t len,
     if (len == 0)
         return 0;
 
-    rwlock_write_lock(&mm->lock);
+    rw_write_lock(&mm->lock);
 
     vaddr_t addr;
     if (flags & MM_MAP_FIXED) {
@@ -266,7 +266,7 @@ vaddr_t mm_map(struct mm *mm, vaddr_t hint, size_t len,
              * once it can tear down PTEs */
 
             /* FIXED map on busy range fails */
-            rwlock_unlock(&mm->lock);
+            rw_unlock(&mm->lock);
             return 0;
         }
     } else {
@@ -277,7 +277,7 @@ vaddr_t mm_map(struct mm *mm, vaddr_t hint, size_t len,
                                          MM_USER_MAX);
 
         if (!addr) {
-            rwlock_unlock(&mm->lock);
+            rw_unlock(&mm->lock);
             return 0;
         }
         if (!hint) /* advance the cursor past what we just handed out */
@@ -287,11 +287,11 @@ vaddr_t mm_map(struct mm *mm, vaddr_t hint, size_t len,
     /* anon reservation only, pages fault in lazily, so no PTEs */
     struct vma_range *vma_range = vma_range_alloc(mm, addr, addr + len, prot);
     if (!vma_range) {
-        rwlock_unlock(&mm->lock);
+        rw_unlock(&mm->lock);
         return 0;
     }
     mm_vma_range_insert(mm, vma_range);
 
-    rwlock_unlock(&mm->lock);
+    rw_unlock(&mm->lock);
     return addr;
 }

@@ -323,7 +323,7 @@ static enum errno dir_entry_rename(struct ext2_fs *fs,
         .old_name = old, .new_name = new, .success = false};
 
     if (!ext2_walk_dir(fs, node, dir_entry_rename_callback, &ctx))
-        return ERR_FS_INTERNAL;
+        return ERR_IO;
 
     return ERR_OK;
 }
@@ -597,7 +597,7 @@ enum errno ext2_vfs_utime(struct vfs_node *n, uint64_t atime, uint64_t mtime) {
     inode->atime = atime;
     inode->mtime = mtime;
     if (!ext2_inode_write(fs, node->inode_num, inode))
-        return ERR_FS_INTERNAL;
+        return ERR_IO;
 
     n->atime = atime;
     n->mtime = mtime;

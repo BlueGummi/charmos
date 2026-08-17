@@ -5,7 +5,7 @@
 #include <string.h>
 
 // TODO: flags - maybe?
-
+ERR_FACILITY_DECLARE(ext2, .desc = "Ext2 Filesystem");
 uint64_t PTRS_PER_BLOCK;
 
 bool ext2_read_superblock(struct partition *p, struct ext2_sblock *sblock) {

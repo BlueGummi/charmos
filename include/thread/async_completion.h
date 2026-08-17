@@ -8,6 +8,9 @@ enum async_completion_type {
     ASYNC_COMPLETION_WORKER = 1,
 };
 
+/* TODO: I wrote this all out and never used it. this is a nice
+ * wrapper around using APCs vs callbacks via worker for async
+ * callbacks, and it would be great if I could start using the pattern */
 struct async_completion {
     union {
         struct apc apc;
@@ -43,6 +46,9 @@ struct async_completion {
 
     void (*callback)(struct async_completion *);
 };
+
+static_assert(offsetof(struct apc, owner) ==
+              offsetof(struct async_completion, type));
 
 static inline void async_complete(struct async_completion *ac, void *ctx) {
     if (ac->type == ASYNC_COMPLETION_APC) {

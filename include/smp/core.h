@@ -80,8 +80,6 @@ struct core {
                                  * entering an ISR (if !in_interrupt,
                                  * this should be IRQL_NONE */
 
-    enum dpc_event dpc_event;
-
     atomic_bool needs_run_dpcs; /* Set before sending IRQ_NOP, which is then
                                  * checked in the isr_common_entry */
 
@@ -95,7 +93,7 @@ struct core {
 
     struct tss *tss;
 
-    uint32_t lapic_freq;
+    freq_khz_t lapic_khz;
 
     struct topology_node *topo_node;
     struct topology_cache_info llc;
@@ -106,15 +104,15 @@ struct core {
     uint32_t smt_id;
     uint32_t core_id;
 
-    uint64_t tsc_hz;
-    uint64_t last_us;
+    freq_hz_t tsc_hz;
+    time_us_t last_us;
     uint64_t last_tsc; /* For time.c */
 
     _Atomic uint64_t pt_seen_epoch;
     bool reclaiming_page_tables;
 };
 
-static inline uint64_t smp_core_id() {
+static inline uint64_t smp_core_id(void) {
     uint64_t id;
     asm volatile("movq %%gs:%c1, %0"
                  : "=r"(id)
@@ -130,6 +128,7 @@ static inline struct core *smp_core(void) {
     return (struct core *) core;
 }
 
+struct core *smp_bsp(void);
 #define for_each_cpu_struct(__iter)                                            \
     for (size_t __id = 0;                                                      \
          ((__iter = global.cores[__id]), __id < global.core_count); __id++)

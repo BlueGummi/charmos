@@ -63,7 +63,7 @@ static enum errno detect_mbr_partitions(struct block_device *disk,
 
     /* no idea what to return here */
     if (mbr->signature != 0xAA55)
-        return ERR_FS_CORRUPT;
+        return ERR_IO;
 
     int count = 0;
     for (int i = 0; i < 4; i++) {
@@ -72,7 +72,7 @@ static enum errno detect_mbr_partitions(struct block_device *disk,
     }
 
     if (count == 0)
-        return ERR_FS_CORRUPT;
+        return ERR_IO;
 
     disk->partition_count = count;
     disk->partitions =

@@ -6,8 +6,10 @@
 #include <stdint.h>
 #include <time/date_time.h>
 #include <time/time.h>
+#include <time/tsc.h>
 
-#define TIME_REFRESH_CYCLES (smp_core()->tsc_hz / 100)
+#include "internal.h"
+
 #define CMOS_ADDRESS 0x70
 #define CMOS_DATA 0x71
 
@@ -118,52 +120,24 @@ uint32_t time_get_unix() {
                             time_get_minute(), time_get_second());
 }
 
-uint64_t time_get_ns() {
-    return hpet_timestamp_ns();
+time_ns_t time_get_ns() {
+    if (global.current_bootstage < BOOTSTAGE_MID_MP)
+        return hpet_timestamp_ns();
+
+    return timekeeper_get_ns();
 }
 
-uint64_t time_get_ms(void) {
-    return time_get_us() / 1000;
+time_ms_t time_get_ms(void) {
+    return US_TO_MS(time_get_us());
 }
 
-uint64_t time_get_us(void) {
+time_us_t time_get_us(void) {
     if (global.current_bootstage < BOOTSTAGE_MID_MP)
         return hpet_timestamp_us();
 
-    enum irql irql = irql_raise(IRQL_HIGH_LEVEL);
-
-    uint64_t now_tsc = rdtsc();
-    uint64_t delta = now_tsc - smp_core()->last_tsc;
-
-    if (delta < TIME_REFRESH_CYCLES && smp_core()->last_us != 0) {
-        uint64_t elapsed_us = (delta * 1000000ULL) / smp_core()->tsc_hz;
-        uint64_t ret = smp_core()->last_us + elapsed_us;
-        irql_lower(irql);
-        return ret;
-    }
-
-    uint64_t now_us = hpet_timestamp_us();
-    smp_core()->last_us = now_us;
-    smp_core()->last_tsc = now_tsc;
-    irql_lower(irql);
-    return now_us;
+    return timekeeper_get_us();
 }
 
-uint64_t tsc_calibrate(void) {
-    uint64_t start_tsc = rdtsc();
-    uint64_t start_us = hpet_timestamp_us();
-
-    uint64_t target_us = start_us + MS_TO_US(50);
-
-    while (hpet_timestamp_us() < target_us)
-        ;
-
-    uint64_t end_tsc = rdtsc();
-    uint64_t end_us = hpet_timestamp_us();
-
-    uint64_t delta_tsc = end_tsc - start_tsc;
-    uint64_t delta_us = end_us - start_us;
-
-    uint64_t tsc_hz = (delta_tsc * 1000000ULL) / delta_us;
-    return tsc_hz;
+freq_hz_t tsc_calibrate(void) {
+    return tsc_calibrate_hpet();
 }

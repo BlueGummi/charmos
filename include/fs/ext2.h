@@ -9,6 +9,10 @@
 #include <sync/spinlock.h>
 #include <types/types.h>
 
+/* TODO: move this flaming disaster into internal.h, and also, this file
+ * is going to all get modified BIG TIME when we get actual page cache stuff.
+ *
+ * If you are reading this for the sake of education, DON'T! */
 extern uint64_t PTRS_PER_BLOCK;
 
 #define EXT2_PRIO_DIRENT BIO_RQ_MEDIUM
@@ -232,6 +236,14 @@ struct ext2_fs {
 
     /* lock the fs struct */
     struct spinlock lock;
+};
+
+ERR_FACILITY_EXTERN(ext2);
+
+enum ext2_errno {
+    EXT2_ERR_FS_INVALID = ERR_DELTA_START,
+    EXT2_ERR_NO_INODE,
+
 };
 
 typedef bool (*dir_entry_callback)(struct ext2_fs *fs,

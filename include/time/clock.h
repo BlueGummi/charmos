@@ -6,10 +6,11 @@
 #include <stdint.h>
 #include <structures/list.h>
 #include <time/time.h>
+#include <types/types.h>
 
 struct clock_base {
-    size_t freq_khz;
-    fx32_32_t clock_mult;
+    freq_khz_t freq_khz;
+    uint64_t clock_mult;
 };
 
 enum clock_rating {
@@ -40,9 +41,9 @@ struct clock {
     /* gives cycles */
     uint64_t (*read)(struct clock *);
     char *name;
-    fx32_32_t mult;               /* cycle to ns */
+    uint64_t mult;                /* cycle to ns */
     fx32_32_t uncertainty_margin; /* ns per s */
-    size_t frequency_khz;
+    freq_khz_t frequency_khz;
     struct list_head list_internal;
 
     enum clock_state state;
@@ -66,11 +67,14 @@ void clock_suspend_all();
 void clock_resume_all();
 void clocks_init();
 
-static inline fx32_32_t clock_frequency_to_mult(struct clock *clock) {
-    return fx_div(fx_from_int(1000000), fx_from_int(clock->frequency_khz));
+static inline uint64_t clock_frequency_to_mult(struct clock *clock) {
+    if (unlikely(clock->frequency_khz == 0))
+        return 0;
+    return ((1000000ULL << 32) + (clock->frequency_khz / 2)) /
+           clock->frequency_khz;
 }
 
 static inline time_ns_t clock_cycles_to_ns(struct clock *clock,
                                            uint64_t cycles) {
-    return fx_to_int(fx_mul(fx_from_int(cycles), clock->mult));
+    return (time_ns_t) (((uint128_t) cycles * clock->mult) >> 32);
 }

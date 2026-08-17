@@ -28,7 +28,7 @@ enum errno ext2_write_file(struct ext2_fs *fs, struct ext2_full_inode *inode,
             new_block_counter += 1;
 
         if (block_num == 0 && allocate)
-            return ERR_FS_NO_INODE;
+            return ERR(ext2, EXT2_ERR_NO_INODE);
 
         if (block_num == 0) {
             bytes_written +=
@@ -143,7 +143,7 @@ enum errno ext2_chmod(struct ext2_fs *fs, struct ext2_full_inode *node,
     node->node.mode = ftype | (new_mode & EXT2_S_PERMS);
 
     if (!ext2_inode_write(fs, node->inode_num, &node->node))
-        return ERR_FS_INTERNAL;
+        return ERR_IO;
 
     return ERR_OK;
 }
@@ -160,7 +160,7 @@ enum errno ext2_chown(struct ext2_fs *fs, struct ext2_full_inode *node,
         node->node.gid = new_gid;
 
     if (!ext2_inode_write(fs, node->inode_num, &node->node))
-        return ERR_FS_INTERNAL;
+        return ERR_IO;
 
     return ERR_OK;
 }

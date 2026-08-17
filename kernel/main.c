@@ -53,6 +53,7 @@
 #include <thread/thread.h>
 #include <thread/workqueue.h>
 #include <time/clock.h>
+#include <time/timekeeper.h>
 #include <time/timer.h>
 
 struct globals global = {0};
@@ -65,6 +66,7 @@ __no_sanitize_address void k_main(void) {
     global.hhdm_offset = hhdm_request.response->offset;
     global.pt_epoch = 1;
 
+    err_facilities_init();
     printf_init(framebuffer_request.response->framebuffers[0]);
     bootstage_advance(BOOTSTAGE_EARLY_FB);
 
@@ -125,6 +127,7 @@ __no_sanitize_address void k_main(void) {
     lapic_timer_init_bsp();
     dpc_init_percpu();
     smp_wake(mp_request.response);
+    timekeeper_init();
 
     topology_init();
     scheduler_domains_init();

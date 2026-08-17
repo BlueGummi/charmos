@@ -3,6 +3,7 @@
 #include <sync/condvar.h>
 #include <sync/spinlock.h>
 
+/* These are for the underlying spinlock */
 #define SEMAPHORE_INIT_IRQ_DISABLE true
 #define SEMAPHORE_INIT_NORMAL false
 

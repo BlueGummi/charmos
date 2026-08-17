@@ -432,6 +432,9 @@ void apc_check_and_deliver(struct thread *t) {
     if (!t || !thread_has_apcs(t) || !safe_to_exec_apcs())
         return;
 
+    if (thread_get_flags(t) & THREAD_FLAG_EXECUTING_APC)
+        return;
+
     enum irql irql = irql_raise(IRQL_APC_LEVEL);
 
     thread_exec_apcs(t);

@@ -152,9 +152,14 @@ SECTIONS {
         __ekernel_bootstage_condition_entries = .;
         . = ALIGN(64);
     } :data
+    
+    .kernel_err_facilities : ALIGN(64) {
+        __skernel_err_facilities = .;
+        KEEP(*(.kernel_err_facilities))
+        __ekernel_err_facilities = .;
+        . = ALIGN(64);
+    } :data
 
-    /* Reserved for the symbol table, stamped in after the link by
-     * scripts/syms.awk. Fixed size, so patching it never moves an address */
     .kernel_syms : ALIGN(4K) {
         __skernel_syms = .;
         KEEP(*(.kernel_syms))

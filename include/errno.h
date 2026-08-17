@@ -2,25 +2,39 @@
 #pragma once
 #include <compiler.h>
 #include <console/panic.h>
+#include <kassert.h>
+#include <linker/symbols.h>
 #include <stdarg.h>
 #include <stdint.h>
 
 #define ERR_IS_FATAL(e) (e != ERR_OK && e != ERR_AGAIN)
-#define ERR_HANDLE_UNLESS(e, ...)                                              \
-    if (({                                                                     \
-            if (unlikely(e < 0 &&                                              \
-                         err_in_list((e), PP_NARG(__VA_ARGS__), __VA_ARGS__))) \
-                panic("unhandled/unexpected error: %s", errno_to_str((e)));    \
-            e < 0;                                                             \
-        }))
-#define ERR_HANDLE(e, ...)                                                     \
-    if (({                                                                     \
-            if (unlikely(e < 0 && !err_in_list((e), PP_NARG(__VA_ARGS__),      \
-                                               __VA_ARGS__)))                  \
-                panic("unhandled/unexpected error: %s", errno_to_str((e)));    \
-            e < 0;                                                             \
-        }))
 
+#define ERR_IS_MATCH_1(v, a) ((v) == (a))
+#define ERR_IS_MATCH_2(v, a, b) (ERR_IS_MATCH_1(v, a) || ((v) == (b)))
+#define ERR_IS_MATCH_3(v, a, b, c) (ERR_IS_MATCH_2(v, a, b) || ((v) == (c)))
+#define ERR_IS_MATCH_4(v, a, b, c, d)                                          \
+    (ERR_IS_MATCH_3(v, a, b, c) || ((v) == (d)))
+#define ERR_IS_MATCH_5(v, a, b, c, d, e)                                       \
+    (ERR_IS_MATCH_4(v, a, b, c, d) || ((v) == (e)))
+#define ERR_IS_MATCH_6(v, a, b, c, d, e, f)                                    \
+    (ERR_IS_MATCH_5(v, a, b, c, d, e) || ((v) == (f)))
+#define ERR_IS_MATCH_7(v, a, b, c, d, e, f, g)                                 \
+    (ERR_IS_MATCH_6(v, a, b, c, d, e, f) || ((v) == (g)))
+#define ERR_IS_MATCH_8(v, a, b, c, d, e, f, g, h)                              \
+    (ERR_IS_MATCH_7(v, a, b, c, d, e, f, g) || ((v) == (h)))
+
+#define ERR_GUARD(val, ...)                                                    \
+    ({                                                                         \
+        __auto_type _v = (val);                                                \
+        if (unlikely(_v < 0 && !_DISPATCH(ERR_IS_MATCH, PP_NARG(__VA_ARGS__))( \
+                                   _v, __VA_ARGS__)))                          \
+            panic("unhandled error: %s", errno_to_str(_v));                    \
+        _v;                                                                    \
+    })
+
+/* When this enum errno is negated, i.e. becomes positive, the upper 16 bits
+ * indicate the *facility*. With 0, it's just one of these, but if it's > 0,
+ * it came from a specific subsystem that defined a struct err_facility */
 enum errno {
     ERR_OK = 0,          // Success
     ERR_UNKNOWN = -1,    // Unknown or unspecified error
@@ -41,28 +55,49 @@ enum errno {
     ERR_OVERFLOW = -16,  // Value too large
     ERR_NOT_EMPTY = -17, // Directory not empty
 
-    ERR_FS_NO_INODE = -100,     // Inode not found
-    ERR_FS_CORRUPT = -101,      // Filesystem corruption
-    ERR_FS_SYMLINK_LOOP = -102, // Too many symlink levels
-    ERR_FS_INTERNAL = -103,     // Internal filesystem error
-
 };
 
-static inline bool err_in_list(int e, size_t n, ...) {
-    va_list ap;
-    va_start(ap, n);
+struct err_facility {
+    uint16_t prefix;
+    const char *name;
+    const char *desc;
+    const char *(*const to_str)(uint16_t delta);
+};
 
-    for (size_t i = 0; i < n; i++) {
-        int x = va_arg(ap, int);
-        if (e == x) {
-            va_end(ap);
-            return true;
-        }
-    }
+/* Deltas must always be positive */
+#define ERR_CREATE(pre, del)                                                   \
+    ({                                                                         \
+        kassert((del & 0xFFFF) == del);                                        \
+        kassert(del > 0);                                                      \
+        -((((int) (pre)) << 16) | (((int) (del)) & 0xFFFF));                   \
+    })
 
-    va_end(ap);
-    return false;
-}
+#define ERR_GET_FACILITY(e)                                                    \
+    ({                                                                         \
+        kassert(e < 0);                                                        \
+        ((-(e)) >> 16) & 0xFFFF;                                               \
+    })
+
+#define ERR_GET_DELTA(e)                                                       \
+    ({                                                                         \
+        kassert(e < 0);                                                        \
+        ((-(e)) & 0xFFFF);                                                     \
+    })
+
+#define ERR_PREFIX(n) ((__err_facility_##n).prefix)
+#define ERR_DELTA_START (1)
+#define ERR(n, d) ERR_CREATE(ERR_PREFIX(n), d)
+
+#define ERR_FACILITY(n) __err_facility_##n
+#define ERR_FACILITY_EXTERN(n) extern struct err_facility __err_facility_##n
+#define ERR_FACILITY_DECLARE(n, ...)                                           \
+    LINKER_SECTION_OBJECT(struct err_facility, err_facilities)                 \
+    __err_facility_##n = {.name = #n, __VA_ARGS__}
+
+LINKER_SECTION_DEFINE(struct err_facility, err_facilities);
+
+const char *errno_facility_to_str(enum errno err);
+void err_facilities_init();
 
 static inline const char *errno_to_str(enum errno err) {
     switch (err) {
@@ -83,11 +118,8 @@ static inline const char *errno_to_str(enum errno err) {
     case ERR_NOT_IMPL: return "Not implemented";
     case ERR_NOSPC: return "No space left";
     case ERR_OVERFLOW: return "Value too large";
+    case ERR_NOT_EMPTY: return "Directory not empty";
 
-    case ERR_FS_NO_INODE: return "Inode not found";
-    case ERR_FS_CORRUPT: return "Filesystem corruption";
-    case ERR_FS_SYMLINK_LOOP: return "Symlink loop";
-
-    default: return "Unrecognized error code";
+    default: return errno_facility_to_str(err);
     }
 }

@@ -23,7 +23,7 @@ static void pit_wait_until_zero() {
     }
 }
 
-uint64_t measure_tsc_freq_pit(void) {
+freq_hz_t measure_tsc_freq_pit(void) {
     outb(0x43, 0x30);
 
     uint16_t pit_count = 0xFFFF;

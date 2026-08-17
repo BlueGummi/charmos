@@ -16,10 +16,10 @@ struct clock_evdev_group *clock_evdev_group_create(const char *name, ...) {
     INIT_LIST_HEAD(&cedg->clock_evdevs);
     va_list args;
     va_start(args, name);
-    int ret = vasprintf(&cedg->name, name, args);
+    int ret = ERR_GUARD(vasprintf(&cedg->name, name, args), ERR_NO_MEM);
     va_end(args);
 
-    ERR_HANDLE(ret, ERR_NO_MEM) {
+    if (ret == ERR_NO_MEM) {
         kfree(cedg);
         return NULL;
     }
@@ -40,10 +40,10 @@ struct clock_evdev *clock_evdev_create(const char *name, ...) {
 
     va_list args;
     va_start(args, name);
-    int ret = vasprintf(&ced->name, name, args);
+    int ret = ERR_GUARD(vasprintf(&ced->name, name, args), ERR_NO_MEM);
     va_end(args);
 
-    ERR_HANDLE(ret, ERR_NO_MEM) {
+    if (ret == ERR_NO_MEM) {
         cpu_mask_deinit(&ced->cpu_mask);
         kfree(ced);
         return NULL;

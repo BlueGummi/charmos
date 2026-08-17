@@ -15,6 +15,11 @@
 #include <sync/spinlock.h>
 #include <thread/dpc.h>
 #include <time/time.h>
+#include <time/tsc.h>
+
+/* TODO: This file is one that I had thought would stay small back when
+ * I first got SMP working, but day by day it grows and grows. Might
+ * want to refactor and clean this up into state machines */
 
 static volatile uint64_t cr3 = 0;
 static _Atomic uint32_t cores_awake = 0;
@@ -260,6 +265,7 @@ void smp_wakeup() {
     irq_load();
 
     lapic_timer_init(cpu);
+    tsc_sync_check_ap(cpu);
     set_core_awake();
 
     scheduler_yield();
@@ -267,7 +273,7 @@ void smp_wakeup() {
 
 void smp_init() {
     for (size_t i = 0; i < global.core_count; i++) {
-        size_t d = domain_for_core(i);
+        size_t d = domain_for_cpu(i);
 
         if (i != 0) {
             global.cores[i] =
@@ -278,7 +284,7 @@ void smp_init() {
 
         global.cores[i]->irq_entered_irql = IRQL_NONE;
         global.cores[i]->id = i;
-        global.cores[i]->numa_node = domain_for_core(i);
+        global.cores[i]->numa_node = numa_node_for_cpu(i);
         global.cores[i]->domain = global.domains[d];
     }
 }
@@ -300,14 +306,17 @@ void smp_wake(struct limine_mp_response *mpr) {
     if (global.core_count == 1)
         return;
 
-    /* wait for bootstage to progress */
+    tsc_sync_check_all_aps();
+    /* wait for bootstage to progress, TODO: Find a better
+     * way to do this, reading a volatile and NOT using
+     * atomics here is problematic */
     while (global.current_bootstage != BOOTSTAGE_MID_MP)
         cpu_relax();
 
     smp_wait_for_others_to_idle();
 }
 
-void smp_setup_bsp() {
+void smp_setup_bsp(void) {
     struct core *c = kmalloc(sizeof(struct core), ALLOC_FLAGS_ZERO);
     if (!c)
         panic("Could not allocate space for core structure on BSP");
@@ -332,6 +341,7 @@ void smp_setup_bsp() {
     init_smt_info(c);
     detect_llc(&c->llc);
     detect_cpu_capability(c);
+    tsc_mailboxes_init();
 }
 
 static atomic_uint tick_change_state = 0;
@@ -379,4 +389,8 @@ void smp_enable_all_ticks() {
     send_em_all_out(true);
     irq_free_entry(entry);
     irq_set_chip(entry, NULL, NULL);
+}
+
+struct core *smp_bsp(void) {
+    return global.cores[0];
 }

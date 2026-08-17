@@ -12,6 +12,10 @@ typedef uint64_t time_us_t;
 typedef uint64_t time_ms_t;
 typedef uint64_t time_s_t;
 typedef uint64_t timestamp_t;
+typedef uint64_t freq_hz_t;
+typedef uint64_t freq_khz_t;
+typedef uint64_t freq_mhz_t;
+typedef uint64_t freq_ghz_t;
 typedef uint32_t inode_t;
 typedef uint16_t mode_t;
 typedef uint32_t gid_t;
@@ -51,6 +55,18 @@ typedef __uint128_t uint128_t;
 
 #define TIME_S_MAX UINT64_MAX
 #define TIME_S_MIN 0
+
+#define FREQ_HZ_MAX UINT64_MAX
+#define FREQ_HZ_MIN 0
+
+#define FREQ_KHZ_MAX UINT64_MAX
+#define FREQ_KHZ_MIN 0
+
+#define FREQ_MHZ_MAX UINT64_MAX
+#define FREQ_MHZ_MIN 0
+
+#define FREQ_GHZ_MAX UINT64_MAX
+#define FREQ_GHZ_MIN 0
 
 #define INODE_MAX UINT32_MAX
 #define INODE_MIN 0

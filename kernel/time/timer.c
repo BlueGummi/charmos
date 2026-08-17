@@ -181,7 +181,7 @@ static void timer_expire_bucket(struct timer_base *base,
             enum irql pirql = spin_lock_irq_disable(&base->percpu->lock);
 
             hlist_add_head(&timer->hlist_node, &base->percpu->dpc_timers);
-            dpc_enqueue_local(&base->percpu->timer_dpc, DPC_NONE);
+            dpc_enqueue_local(&base->percpu->timer_dpc);
 
             spin_unlock(&base->percpu->lock, pirql);
         }

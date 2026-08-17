@@ -94,7 +94,7 @@ done:
         dir->node.links_count += 1;
 
     bool status = ext2_inode_write(fs, dir->inode_num, &dir->node);
-    return status ? ERR_OK : ERR_FS_INTERNAL;
+    return status ? ERR_OK : ERR_IO;
 }
 
 enum errno ext2_create_file(struct ext2_fs *fs,
