@@ -85,7 +85,6 @@ static inline uint32_t lapic_read(uint32_t reg) {
     }
 }
 
-#define TIMER_VECTOR 0x20
 #define TIMER_MODE_PERIODIC (1 << 17)
 #define TIMER_MODE_ONESHOT (0 << 17)
 #define IA32_APIC_BASE 0x1B

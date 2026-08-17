@@ -21,6 +21,7 @@
 #include <sync/rcu.h>
 #include <thread/apc.h>
 #include <thread/thread.h>
+#include <time/timer.h>
 
 /* Lock is only used for allocation/free and registering */
 static struct spinlock irq_table_lock = SPINLOCK_INIT;
@@ -287,7 +288,7 @@ void irq_init() {
     irq_register("page_fault", IRQ_PAGE_FAULT, page_fault_isr, NULL,
                  IRQ_FLAG_NONE);
 
-    irq_register("timer", IRQ_TIMER, scheduler_timer_isr, NULL, IRQ_FLAG_NONE);
+    irq_register("timer", IRQ_TIMER, timer_isr, NULL, IRQ_FLAG_NONE);
     irq_set_chip(IRQ_TIMER, lapic_get_chip(), NULL);
 
     irq_register("nmi", IRQ_NMI, nmi_isr, NULL, IRQ_FLAG_NONE);

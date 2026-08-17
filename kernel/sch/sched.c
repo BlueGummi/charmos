@@ -1,4 +1,3 @@
-#include <acpi/lapic.h>
 #include <mem/vmm.h>
 #include <sch/periodic_work.h>
 #include <sch/sched.h>
@@ -28,10 +27,10 @@ struct scheduler_data scheduler_data = {
     .steal_min_diff = SCHEDULER_DEFAULT_WORK_STEAL_MIN_DIFF,
 };
 
-static inline void tick_disable() {
+static inline void tick_disable(void) {
     struct scheduler *self = smp_core_scheduler();
     if (scheduler_tick_enabled(self)) {
-        lapic_timer_disable();
+        timer_delete(&self->tick);
         scheduler_set_tick_enabled(self, false);
     }
 }
@@ -39,7 +38,8 @@ static inline void tick_disable() {
 static inline void tick_enable() {
     struct scheduler *self = smp_core_scheduler();
     if (!scheduler_tick_enabled(self)) {
-        lapic_timer_enable();
+        timer_modify(&self->tick,
+                     timer_delta_us(MS_TO_US(self->tick_duration_ms)));
         scheduler_set_tick_enabled(self, true);
     }
 }
@@ -52,7 +52,7 @@ void scheduler_tick_disable() {
     tick_disable();
 }
 
-static inline void change_tick_duration(uint64_t new_duration) {
+static inline void change_tick_duration(time_ms_t new_duration) {
     struct scheduler *self = smp_core_scheduler();
 
     /* Tick duration is the same */
@@ -60,8 +60,7 @@ static inline void change_tick_duration(uint64_t new_duration) {
         return;
 
     self->tick_duration_ms = new_duration;
-    lapic_timer_set_ms(new_duration);
-    tick_enable();
+    timer_modify(&self->tick, timer_delta_us(MS_TO_US(new_duration)));
 }
 
 void scheduler_change_tick_duration(uint64_t new_duration) {

@@ -25,11 +25,10 @@ void lapic_init(void) {
 
 void lapic_timer_init(cpu_id_t core_id) {
     uint32_t calibration_sleep_ms = 2;
-    uint32_t timeslice_ms = 15;
 
     lapic_write(LAPIC_REG_SVR, LAPIC_ENABLE | 0xFF);
     lapic_write(LAPIC_REG_TIMER_DIV, 0b0011);
-    lapic_write(LAPIC_REG_LVT_TIMER, TIMER_VECTOR | LAPIC_LVT_MASK);
+    lapic_write(LAPIC_REG_LVT_TIMER, IRQ_TIMER | LAPIC_LVT_MASK);
     lapic_write(LAPIC_REG_TIMER_INIT, 0xFFFFFFFF);
 
     sleep_spin_ms(calibration_sleep_ms);
@@ -39,12 +38,7 @@ void lapic_timer_init(cpu_id_t core_id) {
 
     freq_khz_t lapic_calibrated_khz = elapsed / calibration_sleep_ms;
 
-    uint32_t timeslice_ticks = lapic_calibrated_khz * timeslice_ms;
-
     global.cores[core_id]->lapic_khz = lapic_calibrated_khz;
-    lapic_write(LAPIC_REG_LVT_TIMER, TIMER_VECTOR | TIMER_MODE_PERIODIC);
-
-    lapic_write(LAPIC_REG_TIMER_INIT, timeslice_ticks);
     lapic_timer_disable();
 }
 
@@ -224,13 +218,13 @@ static enum errno lapic_evdev_change_state(struct clock_evdev *ced,
     switch (state) {
     case CLOCK_EVDEV_STATE_ONESHOT:
         lvt &= ~(TIMER_MODE_PERIODIC | LAPIC_LVT_MASK);
-        lvt |= (TIMER_VECTOR | TIMER_MODE_ONESHOT);
+        lvt |= (IRQ_TIMER | TIMER_MODE_ONESHOT);
         lapic_write(LAPIC_REG_LVT_TIMER, lvt);
         break;
 
     case CLOCK_EVDEV_STATE_PERIODIC:
         lvt &= ~LAPIC_LVT_MASK;
-        lvt |= (TIMER_VECTOR | TIMER_MODE_PERIODIC);
+        lvt |= (IRQ_TIMER | TIMER_MODE_PERIODIC);
         lapic_write(LAPIC_REG_LVT_TIMER, lvt);
         break;
 
@@ -265,7 +259,7 @@ static struct clock_evdev *lapic_clock_evdev_create(cpu_id_t core_id) {
         CLOCK_EVDEV_ONESHOT | CLOCK_EVDEV_PERCPU | CLOCK_EVDEV_TICK_SUITABLE;
     ced->rating = CLOCK_RATING_BEST;
     ced->bound_to_cpu = core_id;
-    ced->irq = TIMER_VECTOR;
+    ced->irq = IRQ_TIMER;
 
     /* ready LAPIC divider and vector */
     lapic_write(LAPIC_REG_TIMER_DIV, 0b0011);

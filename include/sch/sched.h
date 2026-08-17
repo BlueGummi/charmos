@@ -10,6 +10,7 @@
 #include <structures/rbt.h>
 #include <sync/spinlock.h>
 #include <thread/thread_types.h>
+#include <time/timer.h>
 
 #define WORK_STEAL_THRESHOLD                                                   \
     75ULL /* How little work the core needs to be                              \
@@ -44,6 +45,7 @@ struct scheduler {
 
     struct thread *current;
     struct thread *drop_last_ref;
+    struct timer tick;
 
     /* Thread count at each prio */
     size_t thread_count[THREAD_PRIO_CLASS_COUNT];
@@ -64,7 +66,7 @@ struct scheduler {
     size_t idle_thread_loads;
 #endif
 
-    uint64_t core_id;
+    cpu_id_t core_id;
 
     /* TODO: Rework time load balancing away from this foolery */
 

@@ -63,9 +63,9 @@ struct clock {
 struct clock *clock_create(const char *fmt, ...);
 void clock_register(struct clock *c);
 void clock_unregister(struct clock *c);
-void clock_suspend_all();
-void clock_resume_all();
-void clocks_init();
+void clock_suspend_all(void);
+void clock_resume_all(void);
+void clocks_init(void);
 
 static inline uint64_t clock_frequency_to_mult(struct clock *clock) {
     if (unlikely(clock->frequency_khz == 0))

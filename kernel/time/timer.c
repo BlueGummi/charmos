@@ -457,14 +457,18 @@ void timer_base_reprogram_hardware(cpu_id_t cpu) {
 
     time_us_t now_us = time_get_us();
     time_ns_t delta_ns =
-        (next_us > now_us) ? MS_TO_NS(next_us - now_us) : ced->min_delta_ns;
+        (next_us > now_us) ? US_TO_NS(next_us - now_us) : ced->min_delta_ns;
 
     CLAMP(delta_ns, ced->min_delta_ns, ced->max_delta_ns);
     ced->set_next_event(ced, delta_ns);
 }
 
-void clock_evdev_irq_handler() {
+enum irq_result timer_isr(void *ctx, uint8_t vec, struct irq_context *rsp) {
+    (void) ctx, (void) vec, (void) rsp;
     cpu_id_t cpu = smp_core_id();
+    if (!PERCPU_READY(timer_percpu))
+        return IRQ_HANDLED;
+
     struct timer_percpu *pcpu = PERCPU_PTR(timer_percpu);
 
     for (int i = 0; i < TIMER_BASE_MAX; i++) {
@@ -474,6 +478,7 @@ void clock_evdev_irq_handler() {
     }
 
     timer_base_reprogram_hardware(cpu);
+    return IRQ_HANDLED;
 }
 
 void timers_init() {

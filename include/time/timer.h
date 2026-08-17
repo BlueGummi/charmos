@@ -74,7 +74,9 @@ bool timer_delete_sync(struct timer *timer);
 bool timer_shutdown(struct timer *timer);
 bool timer_shutdown_sync(struct timer *timer);
 
-void timers_init();
+struct irq_context;
+enum irq_result timer_isr(void *ctx, irq_t vec, struct irq_context *);
+void timers_init(void);
 
 static inline time_us_t timer_delta_us(time_us_t delta_us) {
     return time_get_us() + delta_us;
