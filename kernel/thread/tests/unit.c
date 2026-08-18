@@ -1,0 +1,128 @@
+#include "test_internal.h"
+
+#ifdef TEST_APC
+TEST_GROUP_DECLARE(apc);
+
+static atomic_bool apc_ran = false;
+
+static void the_apc(void *a) {
+    atomic_store(&apc_ran, true);
+}
+
+static void apc_thread(void *) {
+    while (!atomic_load(&apc_ran))
+        scheduler_yield();
+}
+
+static struct thread *ted = NULL;
+TEST_DECLARE_UNIT(apc_test, .group = TEST_GROUP(apc)) {
+    ted = thread_spawn_joinable("apc_test_thread", apc_thread, NULL);
+    struct apc *a = kmalloc(sizeof(struct apc), ALLOC_FLAGS_ZERO);
+    if (!a || !ted) {
+        /* the thread spins until the APC runs, so there is nothing to
+         * join on if we never get to enqueue it */
+        if (ted)
+            thread_detach(ted);
+
+        kfree(a);
+        return TEST_FAIL("allocation failed");
+    }
+
+    apc_init(a, the_apc, NULL);
+
+    apc_enqueue(ted, a, APC_TYPE_KERNEL);
+
+    /* the thread only returns once it has seen the APC run */
+    thread_join(ted);
+    TEST_ASSERT(atomic_load(&apc_ran));
+
+    return TEST_SUCCESS;
+}
+
+static atomic_uint the_event_apc_ran_times = 0;
+static atomic_bool event_apc_test_ok = false;
+static void the_event_apc(void *pc) {
+    atomic_fetch_add(&the_event_apc_ran_times, 1);
+}
+
+APC_EVENT_CREATE(apc_event_test, "TEST_EVENT");
+
+static void apc_event_test_thread(void *) {
+    /* We want to enqueue an event APC, then raise to DISPATCH, trigger it a
+     * few times, check that no APCs got triggered, and then lower from there,
+     * and then check that APCs got triggered, and then test masking, etc. */
+    struct event_apc *evtapc = apc_event_apc_create();
+    apc_event_apc_init(evtapc, the_event_apc, NULL);
+    apc_enqueue_event_apc(evtapc, APC_EVENT(apc_event_test));
+
+    enum irql old = irql_raise(IRQL_DISPATCH_LEVEL);
+    apc_event_signal(APC_EVENT(apc_event_test));
+    TEST_ASSERT_VOID(atomic_load(&the_event_apc_ran_times) == 0);
+    irql_lower(old);
+
+    TEST_ASSERT_VOID(atomic_load(&the_event_apc_ran_times) == 1);
+
+    apc_disable_kernel();
+    apc_event_signal(APC_EVENT(apc_event_test));
+    TEST_ASSERT_VOID(atomic_load(&the_event_apc_ran_times) == 1);
+    apc_enable_kernel();
+
+    TEST_ASSERT_VOID(atomic_load(&the_event_apc_ran_times) == 2);
+    apc_event_signal(APC_EVENT(apc_event_test));
+    TEST_ASSERT_VOID(atomic_load(&the_event_apc_ran_times) == 3);
+    atomic_store(&event_apc_test_ok, true);
+}
+
+static struct thread *ated = NULL;
+TEST_DECLARE_UNIT(apc_event_test, .group = TEST_GROUP(apc)) {
+    ated = thread_spawn_joinable("apc_event_test_thread", apc_event_test_thread,
+                                 NULL);
+    TEST_ASSERT(ated);
+
+    /* joining rather than spinning on the ok flag means a failed
+     * TEST_ASSERT_VOID inside the thread reports instead of hanging */
+    thread_join(ated);
+    TEST_ASSERT(atomic_load(&event_apc_test_ok));
+
+    return TEST_SUCCESS;
+}
+#endif
+
+#ifdef TEST_SCHED
+TEST_GROUP_DECLARE(daemon);
+
+
+static atomic_bool daemon_work_run = false;
+static enum daemon_thread_command daemon_work(void *a, void *b) {
+    atomic_store(&daemon_work_run, true);
+    return DAEMON_THREAD_COMMAND_SLEEP;
+}
+
+static struct daemon_work dwork =
+    DAEMON_WORK_FROM(daemon_work, WORK_ARGS(NULL, NULL));
+
+TEST_DECLARE_UNIT(daemon_test, .group = TEST_GROUP(daemon)) {
+    struct cpu_mask cmask;
+    cpu_mask_init(&cmask, global.core_count);
+    cpu_mask_set_all(&cmask);
+
+    struct daemon_attributes attrs = {
+        .max_timesharing_threads = 67,
+        .flags = DAEMON_FLAG_AUTO_SPAWN | DAEMON_FLAG_HAS_NAME,
+        .thread_cpu_mask = cmask,
+        .min_timesharing_threads = 4,
+    };
+
+    struct daemon *daemon =
+        daemon_create("daemon_test", &attrs, &dwork, NULL, NULL);
+
+    kassert(daemon);
+
+    daemon_wake_timesharing_worker(daemon);
+    while (!atomic_load(&daemon_work_run))
+        scheduler_yield();
+
+    daemon_destroy(daemon);
+    return TEST_SUCCESS;
+}
+#endif

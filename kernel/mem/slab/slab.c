@@ -1567,3 +1567,7 @@ void *krealloc_internal(void *ptr, size_t size, enum alloc_flags flags,
     kfree(ptr);
     return new_ptr;
 }
+
+#ifdef TEST_MEM
+TEST_EXPORT(slab_map_new);
+#endif

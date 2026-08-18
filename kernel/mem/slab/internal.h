@@ -814,3 +814,7 @@ static inline bool is_buffer_uniform(const void *ptr, size_t len,
 
     return true;
 }
+
+#ifdef TEST_MEM
+#include "tests/import.h"
+#endif
