@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+"""seed commit message with the tags delta of this commit 
+
+counts and kinds only, since line numbers change
+
+git config charmos.tagmsg uncommented | commented | off
+"""
+
+import os
+import subprocess
+import sys
+
+MARKER = "Tags:"
+
+
+def cfg(key, default):
+    r = subprocess.run(["git", "config", "--get", key], capture_output=True, text=True)
+    return r.stdout.strip() or default
+
+
+def main():
+    msg_file = sys.argv[1] if len(sys.argv) > 1 else None
+    source = sys.argv[2] if len(sys.argv) > 2 else ""
+
+    mode = cfg("charmos.tagmsg", "uncommented")
+    # "message" == -m/-F used: don't do a thing
+    if not msg_file or mode == "off" or source in ("message", "merge", "squash"):
+        return 0
+
+    root = subprocess.run(["git", "rev-parse", "--show-toplevel"],
+                          capture_output=True, text=True).stdout.strip()
+    out = subprocess.run(
+        [sys.executable, os.path.join(root, "scripts", "tagscan.py"),
+         "--staged", "--json"], capture_output=True, text=True)
+    if out.returncode != 0:
+        return 0
+
+    import json
+    try:
+        data = json.loads(out.stdout)
+    except json.JSONDecodeError:
+        return 0
+
+    def tally(rows):
+        c = {}
+        for r in rows:
+            c[r["kind"]] = c.get(r["kind"], 0) + 1
+        return ", ".join(f"{n} {k}" for k, n in
+                         sorted(c.items(), key=lambda kv: (-kv[1], kv[0])))
+
+    parts = []
+    if data["added"]:
+        parts.append(f"adds {tally(data['added'])}")
+    if data["removed"]:
+        parts.append(f"resolves {tally(data['removed'])}")
+    if not parts:
+        return 0
+
+    line = f"{MARKER} {'; '.join(parts)}"
+    if mode == "commented":
+        line = "# " + line
+
+    with open(msg_file, encoding="utf-8") as f:
+        body = f.read()
+
+    # Drop a previously injected line so --amend does not stack them up
+    kept = [l for l in body.split("\n")
+            if l.strip() not in (line, MARKER) and not l.lstrip("# ").startswith(MARKER)]
+    body = "\n".join(kept)
+
+    # Split at git comment block so injected line lands in msg body, L1 for the subject
+    idx = next((i for i, l in enumerate(kept) if l.startswith("#")), len(kept))
+    head = "\n".join(kept[:idx]).rstrip("\n")
+    tail = "\n".join(kept[idx:])
+
+    with open(msg_file, "w", encoding="utf-8") as f:
+        f.write(f"{head}\n\n{line}\n\n{tail}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

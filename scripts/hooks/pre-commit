@@ -1,0 +1,80 @@
+#!/bin/bash
+#
+# 1. clang-format 
+# 2. tag review
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+GIT_DIR=$(git rev-parse --git-dir)
+
+have_tty() {
+    [ -t 0 ] || [ -r /dev/tty ]
+}
+
+ask() {
+    REPLY=""
+    if [ -r /dev/tty ] && read -r REPLY < /dev/tty 2>/dev/null; then
+        return 0
+    fi
+    read -r REPLY 2>/dev/null || REPLY=""
+}
+
+sequencing() {
+    [ -d "$GIT_DIR/rebase-merge" ] || [ -d "$GIT_DIR/rebase-apply" ] ||
+    [ -f "$GIT_DIR/MERGE_HEAD" ] || [ -f "$GIT_DIR/CHERRY_PICK_HEAD" ] ||
+    [ -f "$GIT_DIR/BISECT_LOG" ]
+}
+
+check_file() {
+    local FILE="$1"
+    if [ -f "$FILE" ]; then
+        if ! clang-format --style=file "$FILE" | diff -q "$FILE" - > /dev/null 2>&1; then
+            printf '%s\n' "$FILE"
+        fi
+    fi
+}
+export -f check_file
+
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(c|cc|cpp|cxx|h|hh|hpp|hxx)$')
+
+if [ -n "$STAGED_FILES" ]; then
+    JOBS=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
+    UNFORMATTED=$(printf '%s\n' $STAGED_FILES | xargs -P "$JOBS" -I {} bash -c 'check_file "$@"' _ {})
+
+    if [ -n "$UNFORMATTED" ]; then
+        echo -e "\033[31mOops, these files are not formatted properly:\033[0m"
+        printf ' - %s\n' $UNFORMATTED
+
+        have_tty || exit 1
+
+        printf "\033[33mFormat them? [Y/n] \033[0m"
+        ask
+        case "$REPLY" in
+            ""|y|Y|yes|Yes|YES)
+                printf '%s\n' $UNFORMATTED | xargs -P "$JOBS" -I {} clang-format --style=file -i {}
+                printf '%s\n' $UNFORMATTED | xargs git add
+                echo -e "\033[32mAll formatted and re-staged.\033[0m"
+                ;;
+            *)
+                exit 1
+                ;;
+        esac
+    fi
+fi
+
+sequencing && exit 0
+have_tty || exit 0
+
+python3 "$REPO_ROOT/scripts/tagscan.py" --staged
+[ $? -eq 10 ] || exit 0
+
+printf "\033[33mDoes this look good? [y/N] \033[0m"
+ask
+case "$REPLY" in
+    y|Y|yes|Yes|YES)
+        exit 0
+        ;;
+    *)
+        echo -e "\033[31mCommit aborted. Nothing was unstaged.\033[0m"
+        exit 1
+        ;;
+esac

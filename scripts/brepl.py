@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-brepl.py - Interactive C BIT_RANGE macro definition generator.
+brepl.py - Interactive C BIT_RANGE macro definition generator
 
 Usage:
     python3 brepl.py                  # interactive REPL
