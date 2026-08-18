@@ -243,6 +243,18 @@ static void test_filter_enable(char *name) {
          tg < __ekernel_test_groups; tg++) {
         if (strcmp(tg->name, name) == 0) {
             tg->enabled = TEST_STATE_ENABLED;
+
+            /* Enable all children if the group is on */
+            for (int i = 0; i < TEST_TIER_MAX; i++) {
+                if (tg->tier_enabled[i] == TEST_STATE_SENTINEL)
+                    tg->tier_enabled[i] = TEST_STATE_ENABLED;
+            }
+
+            for (struct test *t = __skernel_tests; t < __ekernel_tests; t++) {
+                if (t->group == tg && t->enabled == TEST_STATE_SENTINEL)
+                    t->enabled = TEST_STATE_ENABLED;
+            }
+
             return;
         }
     }

@@ -3,6 +3,10 @@
 #include "internal.h"
 
 struct scheduler *scheduler_select_best_for_thread(struct thread *t) {
+    /* Pinned threads are already placed, don't bother here */
+    if ((thread_get_flags(t) & THREAD_FLAG_PINNED) && t->scheduler)
+        return t->scheduler;
+
     struct scheduler *sched = NULL;
     size_t i, min_load = SIZE_MAX;
     cpu_mask_for_each(i, t->allowed_cpus) {
