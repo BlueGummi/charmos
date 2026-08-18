@@ -204,6 +204,11 @@ static enum errno lapic_evdev_set_next_event(struct clock_evdev *ced,
     if (ticks > 0xFFFFFFFFULL)
         ticks = 0xFFFFFFFFULL;
 
+    uint32_t lvt = lapic_read(LAPIC_REG_LVT_TIMER);
+    lvt &= ~(TIMER_MODE_PERIODIC | LAPIC_LVT_MASK);
+    lvt |= (IRQ_TIMER | TIMER_MODE_ONESHOT);
+    lapic_write(LAPIC_REG_LVT_TIMER, lvt);
+
     /* Oneshot countdown */
     lapic_write(LAPIC_REG_TIMER_INIT, (uint32_t) ticks);
 

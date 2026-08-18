@@ -33,9 +33,11 @@ static void dpc_execute_all_in_queue(struct dpc_queue *dq) {
             break;
 
         while (it) {
+            struct dpc *next =
+                atomic_load_explicit(&it->next, memory_order_relaxed);
             atomic_store_explicit(&it->enqueued, false, memory_order_release);
             it->func(it->ctx);
-            it = atomic_load_explicit(&it->next, memory_order_relaxed);
+            it = next;
         }
     }
 }

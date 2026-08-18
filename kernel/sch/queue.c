@@ -24,6 +24,10 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
     if (prio == THREAD_PRIO_CLASS_TIMESHARE) {
         /* This will be a new thread this period */
         task->completed_period = sched->current_period - 1;
+        if (task->virtual_budget == 0) {
+            task->virtual_budget = sched->period_ms ? sched->period_ms : 50;
+            task->virtual_runtime_left = task->virtual_budget;
+        }
         enqueue_to_tree(sched, task);
     } else {
         struct list_head *q = scheduler_get_this_thread_queue(sched, prio);
@@ -84,9 +88,10 @@ void thread_enqueue(struct thread *t) {
     spin_unlock(&s->lock, irql);
 }
 
-/* TODO: Make scheduler_add_thread an internal function so I don't need to
- * pass in the 'false false true' here and all over the place */
 void thread_enqueue_on_core(struct thread *t, uint64_t core_id) {
-    scheduler_add_thread(global.schedulers[core_id], t, false);
-    scheduler_force_resched(global.schedulers[core_id]);
+    struct scheduler *s = global.schedulers[core_id];
+    enum irql irql = spin_lock_irq_disable(&s->lock);
+    scheduler_add_thread(s, t, /* lock_held = */ true);
+    scheduler_force_resched(s);
+    spin_unlock(&s->lock, irql);
 }

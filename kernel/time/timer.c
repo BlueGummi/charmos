@@ -1,4 +1,5 @@
 #include <cmdline.h>
+#include <irq/irq.h>
 #include <math/clamp.h>
 #include <math/min_max.h>
 #include <mem/alloc.h>
@@ -21,12 +22,14 @@ CMDLINE_ENTRY_DECLARE(timer_evdev, .name = "clock_evdev",
                       .raw = &clock_global.timer_clock_evdev);
 
 static void timer_dpc(void *ctx);
+void timer_base_reprogram_hardware(cpu_id_t cpu);
 static void timer_percpu_ctor(struct timer_percpu *p, cpu_id_t cpu) {
     for (int i = 0; i < TIMER_BASE_MAX; i++) {
         struct timer_base *pcpu = &p->bases[i];
         pcpu->percpu = p;
         pcpu->cpu = cpu;
         pcpu->type = i;
+        pcpu->next_expiration_us = TIME_US_MAX;
         spinlock_init(&pcpu->lock);
     }
 
@@ -87,7 +90,9 @@ static void timer_enqueue_internal(struct timer_base *base, struct timer *timer,
     bitmap_set(base->pending_map, idx);
     timer_bucket_set(timer, idx);
 
-    if (bucket_expiration < base->next_expiration_us) {
+    time_us_t now = time_get_us();
+    if (!base->pending || base->next_expiration_us <= now ||
+        bucket_expiration < base->next_expiration_us) {
         base->next_expiration_us = bucket_expiration;
         base->pending = true;
         base->next_expiration_recalc = false;
@@ -97,6 +102,10 @@ static void timer_enqueue_internal(struct timer_base *base, struct timer *timer,
 }
 
 static void timer_add_internal(struct timer_base *base, struct timer *timer) {
+    time_us_t now = time_get_us();
+    if (!base->pending || base->next_expiration_us > now)
+        base->clock = now;
+
     time_us_t bucket_expiration;
     uint32_t idx =
         wheel_index_for(timer->expiration_us, base->clock, &bucket_expiration);
@@ -153,6 +162,10 @@ static void timer_dpc(void *ctx) {
 
         kassert(!(timer->flags & TIMER_FLAG_IRQ));
         timer_fn_call(timer);
+
+        birql = spin_lock_irq_disable(&base->lock);
+        base->running = NULL;
+        spin_unlock(&base->lock, birql);
 
         irql = spin_lock_irq_disable(&pcpu->lock);
     }
@@ -275,22 +288,20 @@ static struct timer_base *timer_lock_base(struct timer *timer,
     }
 }
 
-static void timer_base_run(struct timer_base *base) {
+static void timer_base_run(struct timer_base *base, enum irql *irql) {
     struct hlist_head heads[TIMER_LEVELS];
     SPINLOCK_ASSERT_HELD(&base->lock);
 
     time_us_t time = time_get_us();
-    enum irql irql;
 
     while (time >= base->clock && base->pending &&
            time >= base->next_expiration_us) {
         size_t levels = timer_collect_expired(base, heads);
 
         for (size_t i = 0; i < levels; i++)
-            timer_expire_bucket(base, &heads[i], &irql);
+            timer_expire_bucket(base, &heads[i], irql);
 
-        if (base->next_expiration_recalc)
-            timer_recalc_next_expiration(base);
+        timer_recalc_next_expiration(base);
     }
 }
 
@@ -332,13 +343,18 @@ static bool timer_delete_internal(struct timer *timer, bool shutdown) {
         if (hlist_empty(&base->buckets[idx]))
             bitmap_clear(base->pending_map, idx);
 
-        base->next_expiration_recalc = true;
+        timer_recalc_next_expiration(base);
     }
 
     if (shutdown)
         timer->func = NULL;
 
+    cpu_id_t cpu = base->cpu;
     spin_unlock(&base->lock, irql);
+
+    if (pending)
+        timer_base_reprogram_hardware(cpu);
+
     return pending;
 }
 
@@ -387,12 +403,20 @@ bool timer_modify(struct timer *timer, time_us_t new_exp) {
         if (hlist_empty(&base->buckets[idx])) {
             bitmap_clear(base->pending_map, idx);
         }
+    } else if (!(timer->flags & TIMER_FLAG_PINNED) &&
+               timer_cpu_get(timer) != smp_core_id()) {
+        spin_unlock(&base->lock, irql);
+        timer_cpu_set(timer, smp_core_id());
+        base = timer_lock_base(timer, &irql);
     }
 
     timer->expiration_us = new_exp;
     timer_add_internal(base, timer);
 
+    cpu_id_t cpu = base->cpu;
     spin_unlock(&base->lock, irql);
+
+    timer_base_reprogram_hardware(cpu);
     return pending;
 }
 
@@ -412,7 +436,11 @@ bool timer_modify_pending(struct timer *timer, time_us_t new_exp) {
         timer_add_internal(base, timer);
     }
 
+    cpu_id_t cpu = base->cpu;
     spin_unlock(&base->lock, irql);
+
+    if (pending)
+        timer_base_reprogram_hardware(cpu);
     return pending;
 }
 
@@ -432,27 +460,46 @@ bool timer_modify_reduce(struct timer *timer, time_us_t new_exp) {
         if (hlist_empty(&base->buckets[idx])) {
             bitmap_clear(base->pending_map, idx);
         }
+    } else if (!(timer->flags & TIMER_FLAG_PINNED) &&
+               timer_cpu_get(timer) != smp_core_id()) {
+        spin_unlock(&base->lock, irql);
+        timer_cpu_set(timer, smp_core_id());
+        base = timer_lock_base(timer, &irql);
     }
 
     timer->expiration_us = new_exp;
     timer_add_internal(base, timer);
 
+    cpu_id_t cpu = base->cpu;
     spin_unlock(&base->lock, irql);
+
+    timer_base_reprogram_hardware(cpu);
     return pending;
 }
 
 void timer_base_reprogram_hardware(cpu_id_t cpu) {
+    if (cpu != smp_core_id()) {
+        ipi_send(cpu, IRQ_TIMER);
+        return;
+    }
+
     struct timer_percpu *pcpu = PERCPU_PTR_FOR_CPU(timer_percpu, cpu);
     struct clock_evdev *ced = pcpu->active_evdev;
 
     if (!ced || ced->state != CLOCK_EVDEV_STATE_ONESHOT)
         return;
 
-    time_us_t next_us = MIN(pcpu->bases[TIMER_BASE_LOCAL].next_expiration_us,
-                            pcpu->bases[TIMER_BASE_GLOBAL].next_expiration_us);
+    time_us_t next_us = TIME_US_MAX;
+
+    if (pcpu->bases[TIMER_BASE_LOCAL].pending)
+        next_us =
+            MIN(next_us, pcpu->bases[TIMER_BASE_LOCAL].next_expiration_us);
+    if (pcpu->bases[TIMER_BASE_GLOBAL].pending)
+        next_us =
+            MIN(next_us, pcpu->bases[TIMER_BASE_GLOBAL].next_expiration_us);
 
     /* TODO: _DEFERRED handling */
-    if (next_us == (time_us_t) -1)
+    if (next_us == TIME_US_MAX || next_us == (time_us_t) -1)
         return;
 
     time_us_t now_us = time_get_us();
@@ -473,7 +520,7 @@ enum irq_result timer_isr(void *ctx, uint8_t vec, struct irq_context *rsp) {
 
     for (int i = 0; i < TIMER_BASE_MAX; i++) {
         enum irql irql = spin_lock_irq_disable(&pcpu->bases[i].lock);
-        timer_base_run(&pcpu->bases[i]);
+        timer_base_run(&pcpu->bases[i], &irql);
         spin_unlock(&pcpu->bases[i].lock, irql);
     }
 
@@ -489,5 +536,7 @@ void timers_init() {
     percpu_for_each(timer_percpu, iter, cpu) {
         struct clock_evdev *ced = clock_evdev_for_cpu(cedg, cpu);
         iter->active_evdev = ced;
+        if (ced->change_state)
+            ced->change_state(ced, CLOCK_EVDEV_STATE_ONESHOT);
     }
 }

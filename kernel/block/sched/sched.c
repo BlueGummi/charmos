@@ -25,8 +25,7 @@ static void bio_sched_tick(void *ctx, void *unused) {
 
     if (!sched_is_empty(sched)) {
         mutex_unlock(&sched->lock);
-        defer_enqueue(bio_sched_tick, WORK_ARGS(sched, NULL),
-                      sched->disk->ops->tick_ms);
+        delayed_work_schedule(&sched->tick_work, sched->disk->ops->tick_ms);
     } else {
         sched->defer_pending = false;
         mutex_unlock(&sched->lock);
@@ -67,8 +66,7 @@ void bio_sched_enqueue(struct block_device *disk, struct bio_request *req) {
     if (!sched->defer_pending) {
         sched->defer_pending = true;
         mutex_unlock(&sched->lock);
-        defer_enqueue(bio_sched_tick, WORK_ARGS(sched, NULL),
-                      disk->ops->tick_ms);
+        delayed_work_schedule(&sched->tick_work, disk->ops->tick_ms);
     } else {
         mutex_unlock(&sched->lock);
     }
@@ -99,5 +97,7 @@ struct bio_scheduler *bio_sched_create(struct block_device *disk,
     sched->disk = disk;
     disk->ops = ops;
     mutex_init(&sched->lock);
+    delayed_work_init(&sched->tick_work, bio_sched_tick,
+                      WORK_ARGS(sched, NULL));
     return sched;
 }

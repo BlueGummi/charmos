@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <sync/mutex.h>
 #include <thread/thread.h>
+#include <thread/workqueue.h>
 
 /*
  * This is the asynchronous block device
@@ -134,6 +135,7 @@ struct bio_scheduler {
     struct mutex lock;
     uint64_t total_requests;
     struct bio_rqueue queues[BIO_SCHED_LEVELS];
+    struct delayed_work tick_work;
     bool defer_pending;
 };
 

@@ -168,7 +168,6 @@ void k_sch_main(void *nop) {
 
     rcu_init();
     workqueues_permanent_init();
-    defer_init();
     slab_domain_init_late();
     domain_buddies_init_late();
     reaper_init();

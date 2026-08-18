@@ -54,6 +54,34 @@ struct timer {
         .func = fn                                                             \
     }
 
+static inline void timer_bucket_set(struct timer *timer, uint32_t bucket) {
+    timer->flags =
+        (timer->flags & ~(TIMER_FLAG_BUCKET_MASK << TIMER_FLAG_BUCKET_SHIFT)) |
+        TIMER_FLAG_BUCKET(bucket);
+}
+
+static inline uint32_t timer_bucket_get(struct timer *timer) {
+    return (timer->flags >> TIMER_FLAG_BUCKET_SHIFT) & TIMER_FLAG_BUCKET_MASK;
+}
+
+static inline void timer_cpu_set(struct timer *timer, cpu_id_t cpu) {
+    timer->flags = (timer->flags & ~TIMER_FLAG_CPU_MASK) | TIMER_FLAG_CPU(cpu);
+}
+
+static inline cpu_id_t timer_cpu_get(struct timer *timer) {
+    return timer->flags & TIMER_FLAG_CPU_MASK;
+}
+
+static inline void timer_init(struct timer *timer, void (*func)(struct timer *),
+                              void *data) {
+    timer->hlist_node.next = NULL;
+    timer->hlist_node.pprev = NULL;
+    timer->expiration_us = 0;
+    timer->func = func;
+    timer->flags = TIMER_FLAG_NONE;
+    timer->data = data;
+}
+
 void timer_add(struct timer *timer);
 void timer_add_on(struct timer *timer, cpu_id_t cpu);
 
@@ -80,21 +108,4 @@ void timers_init(void);
 
 static inline time_us_t timer_delta_us(time_us_t delta_us) {
     return time_get_us() + delta_us;
-}
-
-static inline void timer_bucket_set(struct timer *timer, uint32_t bucket) {
-    timer->flags =
-        (timer->flags & ~TIMER_FLAG_BUCKET_MASK) | TIMER_FLAG_BUCKET(bucket);
-}
-
-static inline uint32_t timer_bucket_get(struct timer *timer) {
-    return (timer->flags >> TIMER_FLAG_BUCKET_SHIFT) & TIMER_FLAG_BUCKET_MASK;
-}
-
-static inline void timer_cpu_set(struct timer *timer, cpu_id_t cpu) {
-    timer->flags = (timer->flags & ~TIMER_FLAG_CPU_MASK) | TIMER_FLAG_CPU(cpu);
-}
-
-static inline cpu_id_t timer_cpu_get(struct timer *timer) {
-    return timer->flags & TIMER_FLAG_CPU_MASK;
 }

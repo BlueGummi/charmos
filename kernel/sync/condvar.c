@@ -77,14 +77,12 @@ void condvar_broadcast(struct condvar *cv) {
     condvar_broadcast_callback(cv, nop_callback);
 }
 
-static void condvar_timeout_wakeup(void *arg, void *arg2) {
-    struct thread *t = arg;
-    struct condvar_with_cb *ck = arg2;
+static void condvar_timeout_wakeup(struct timer *timer) {
+    struct condvar_with_cb *ck = timer->data;
+    struct thread *t = ck->thread;
 
-    if (t->wait_cookie != ck->cookie) {
-        thread_put(t);
+    if (t->wait_cookie != ck->cookie)
         return;
-    }
 
     enum irql irql = spin_lock_irq_disable(&ck->cv->waiters.lock);
 
@@ -93,7 +91,6 @@ static void condvar_timeout_wakeup(void *arg, void *arg2) {
 
     spin_unlock(&ck->cv->waiters.lock, irql);
     set_wake_reason_and_wake(ck->cv, t, WAKE_REASON_TIMEOUT);
-    thread_put(t);
 }
 
 enum wake_reason condvar_wait_timeout(struct condvar *cv, struct spinlock *lock,
@@ -105,12 +102,14 @@ enum wake_reason condvar_wait_timeout(struct condvar *cv, struct spinlock *lock,
     struct condvar_with_cb *cwcb = &curr->cv_cb_object;
     cwcb->cv = cv;
     cwcb->cookie = curr->wait_cookie + 1; /* +1 from condvar */
+    cwcb->thread = curr;
 
-    if (!thread_get(curr))
-        panic("What? Someone has pulled the rug out from under me!");
+    timer_init(&cwcb->timer, condvar_timeout_wakeup, cwcb);
+    timer_modify(&cwcb->timer, timer_delta_us(MS_TO_US(timeout_ms)));
 
-    defer_enqueue(condvar_timeout_wakeup, WORK_ARGS(curr, cwcb), timeout_ms);
     condvar_wait(cv, lock, irql, out);
+
+    timer_delete(&cwcb->timer);
 
     return curr->wake_reason;
 }

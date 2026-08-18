@@ -55,12 +55,12 @@ void scheduler_tick_disable() {
 static inline void change_tick_duration(time_ms_t new_duration) {
     struct scheduler *self = smp_core_scheduler();
 
-    /* Tick duration is the same */
-    if (self->tick_duration_ms == new_duration && scheduler_tick_enabled(self))
-        return;
+    if (new_duration < 1)
+        new_duration = 3;
 
     self->tick_duration_ms = new_duration;
     timer_modify(&self->tick, timer_delta_us(MS_TO_US(new_duration)));
+    scheduler_set_tick_enabled(self, true);
 }
 
 void scheduler_change_tick_duration(uint64_t new_duration) {
@@ -78,6 +78,7 @@ static inline void update_thread_before_save(struct thread *thread,
 
 static inline bool thread_done_for_period(struct thread *thread) {
     return THREAD_PRIO_IS_TIMESHARING(thread->perceived_prio_class) &&
+           thread->virtual_budget > 0 &&
            thread->virtual_period_runtime >= thread->virtual_budget;
 }
 
@@ -235,7 +236,7 @@ static inline struct thread *load_idle_thread(struct scheduler *sched) {
 
 static void change_tick(struct scheduler *sched, struct thread *next) {
     /* Only one thread is running - no timeslice needed */
-    if (sched->total_thread_count == 0) {
+    if (sched->total_thread_count == 0 && sched->completed_rbt.root == NULL) {
         /* Disable the scheduling period because
          * there is no need for period
          * tracking when we have

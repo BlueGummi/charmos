@@ -18,6 +18,7 @@
 #include <thread/thread.h>
 #include <thread/tid.h>
 #include <thread/workqueue.h>
+#include <time/timer.h>
 
 #include "sch/internal.h"
 
@@ -366,20 +367,23 @@ void thread_block_on(struct thread_queue *q, enum thread_wait_type type,
     spin_unlock(&q->lock, irql);
 }
 
-static void wake_thread(void *a, void *unused) {
-    (void) unused;
-    struct thread *t = a;
+static void wake_thread_timer_cb(struct timer *timer) {
+    struct thread *t = timer->data;
     thread_wake(t, THREAD_WAKE_REASON_SLEEP_TIMEOUT, t->perceived_prio_class,
                 t);
 }
 
 void thread_sleep_for_ms(uint64_t ms) {
     struct thread *curr = thread_get_current();
-    defer_enqueue(wake_thread, WORK_ARGS(curr, NULL), ms);
+    struct timer sleep_timer;
+    timer_init(&sleep_timer, wake_thread_timer_cb, curr);
+    timer_modify(&sleep_timer, timer_delta_us(MS_TO_US(ms)));
+
     thread_prepare_to_sleep(curr, THREAD_SLEEP_REASON_MANUAL,
                             THREAD_WAIT_UNINTERRUPTIBLE, curr);
 
     thread_yield_until_wake_match();
+    timer_delete(&sleep_timer);
 }
 
 void scheduler_wake_manual(struct thread *t, void *wake_src) {

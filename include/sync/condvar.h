@@ -1,6 +1,7 @@
 #pragma once
 #include <sync/spinlock.h>
 #include <thread/queue.h>
+#include <time/timer.h>
 
 #define CONDVAR_INIT_IRQ_DISABLE true
 #define CONDVAR_INIT_NORMAL false
@@ -19,6 +20,8 @@ struct condvar_with_cb {
     condvar_callback cb;
     void *cb_arg;
     size_t cookie;
+    struct timer timer;
+    struct thread *thread;
 };
 
 enum wake_reason condvar_wait(struct condvar *cv, struct spinlock *lock,

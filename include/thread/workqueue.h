@@ -1,6 +1,5 @@
 /* @title: Workqueues */
 #pragma once
-
 #include <mem/alloc.h>
 #include <smp/topology.h>
 #include <stdatomic.h>
@@ -9,7 +8,7 @@
 #include <structures/list.h>
 #include <sync/condvar.h>
 #include <sync/spinlock.h>
-#include <time/time.h>
+#include <time/timer.h>
 #include <types/refcount.h>
 #include <types/types.h>
 
@@ -21,15 +20,6 @@ struct work_args {
 };
 #define WORK_ARGS(a, b) ((struct work_args) {.arg1 = a, .arg2 = b})
 
-/* TODO: Merge this with standard workqueue infra */
-struct deferred_event {
-    size_t timer;
-    timestamp_t timestamp_ms;
-    work_function callback;
-    struct work_args args;
-    struct deferred_event *next;
-};
-
 struct work {
     work_function func;
     struct work_args args;
@@ -39,6 +29,12 @@ struct work {
     atomic_bool enqueued;
     atomic_bool active;
     _Atomic uint64_t seq;
+};
+
+struct delayed_work {
+    struct work work;
+    struct timer timer;
+    struct workqueue *wq;
 };
 
 enum worker_next_action {
@@ -225,11 +221,14 @@ enum workqueue_error : int32_t {
     WORKQUEUE_ERROR_WORK_EXECUTING = -4,
 };
 
-void defer_init(void);
+void delayed_work_init(struct delayed_work *dwork, work_function fn,
+                       struct work_args args);
+bool delayed_work_schedule(struct delayed_work *dwork, time_ms_t delay_ms);
+bool delayed_work_schedule_on(struct workqueue *wq, struct delayed_work *dwork,
+                              time_ms_t delay_ms);
+bool delayed_work_cancel(struct delayed_work *dwork);
+bool delayed_work_cancel_sync(struct delayed_work *dwork);
 
-/* can only fail from allocation fail */
-bool defer_enqueue(work_function func, struct work_args args,
-                   uint64_t delay_ms);
 void workqueues_permanent_init(void);
 
 struct workqueue *workqueue_create(const char *fmt,

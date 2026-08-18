@@ -283,12 +283,14 @@ void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
         }
 
         /* Apply inheritance */
-        if (!thread_inherit_priority(owner, boosting_from, NULL)) {
+        enum thread_prio_class old_class;
+        if (!thread_inherit_priority(owner, boosting_from, &old_class)) {
             if (unlock)
                 turnstile_hash_chain_unlock(chain, irql);
             break;
         }
 
+        cur_ts->prio_class = old_class;
         cur_ts->applied_pi_boost = true;
 
         /* Speculative next hop */
@@ -306,7 +308,7 @@ void turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
 
         enum irql nirql = turnstile_hash_chain_lock(next_chain);
 
-        if (owner->blocked_ts != next || next->owner != owner) {
+        if (owner->blocked_ts != next || !next->owner) {
             turnstile_hash_chain_unlock(next_chain, nirql);
             break;
         }
