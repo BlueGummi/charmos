@@ -57,6 +57,30 @@ SECTIONS {
         __ekernel_nightmare_tests = .;
         . = ALIGN(64);
     } :data
+    .kernel_test_imports : ALIGN(64) {
+        __skernel_test_imports = .;
+        KEEP(*(.kernel_test_imports))
+        __ekernel_test_imports = .;
+        . = ALIGN(64);
+    } :data
+    .kernel_test_exports : ALIGN(64) {
+        __skernel_test_exports = .;
+        KEEP(*(.kernel_test_exports))
+        __ekernel_test_exports = .;
+        . = ALIGN(64);
+    } :data
+    .kernel_test_canonical_signatures : ALIGN(64) {
+        __skernel_test_canonical_signatures = .;
+        KEEP(*(.kernel_test_canonical_signatures))
+        __ekernel_test_canonical_signatures = .;
+        . = ALIGN(64);
+    } :data
+    .kernel_test_unsafe_signatures : ALIGN(64) {
+        __skernel_test_unsafe_signatures = .;
+        KEEP(*(.kernel_test_unsafe_signatures))
+        __ekernel_test_unsafe_signatures = .;
+        . = ALIGN(64);
+    } :data
 
     .kernel_pci_devices : ALIGN(64) {
         __skernel_pci_devices = .;

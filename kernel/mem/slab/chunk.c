@@ -105,7 +105,7 @@ static struct slab_chunk *alloc_chunk(struct slab_chunks *sc,
 static vaddr_t alloc_from(struct slab_chunks *chunks,
                           struct slab_chunk *chunk) {
     uint64_t *bm = (uint64_t *) chunk->bitmap;
-    size_t nwords = DIV_ROUND_UP(chunks->bitmap_bytes * 8, 64);
+    size_t nwords = DIV_ROUND_UP(chunks->bitmap_bits, 64);
 
     for (size_t w = 0; w < nwords; w++) {
         if (bm[w] != UINT64_MAX) {
@@ -113,7 +113,7 @@ static vaddr_t alloc_from(struct slab_chunks *chunks,
             uint64_t bit = __builtin_ctzll(free_bits);
             uint64_t i = w * 64 + bit;
 
-            if (i >= chunks->bitmap_bytes * 8)
+            if (i >= chunks->bitmap_bits)
                 break;
 
             SLAB_BITMAP_SET(bm[w], 1ULL << bit);
@@ -131,12 +131,11 @@ static void free_to(struct slab_chunks *chunks, struct slab_chunk *chunk,
                     vaddr_t v) {
     validate_ptr_in_chunk(chunk, (void *) v);
     uint64_t offset = v - base_addr_to_vaddr(chunk->base_addr);
-    kassert(offset % chunks->page_stride == 0);
-    uint64_t i = offset / chunks->page_stride;
+    kassert(offset % (PAGE_SIZE * chunks->page_stride) == 0);
+    uint64_t i = offset / (PAGE_SIZE * chunks->page_stride);
 
     uint64_t *bm = (uint64_t *) chunk->bitmap;
-    size_t nwords = DIV_ROUND_UP(chunks->bitmap_bytes * 8, 64);
-    kassert(i < nwords * 64);
+    kassert(i < chunks->bitmap_bits);
 
     size_t w = i / 64;
     size_t b = i % 64;
@@ -147,7 +146,7 @@ static void free_to(struct slab_chunks *chunks, struct slab_chunk *chunk,
 
 static vaddr_t chunk_alloc(struct slab_chunks *chunks,
                            struct slab_chunk *chunk) {
-    size_t max = chunks->bitmap_bytes * 8;
+    size_t max = chunks->bitmap_bits;
     vaddr_t ret = alloc_from(chunks, chunk);
     if (chunk->used == max)
         move_to(chunks, chunk, SLAB_CHUNK_USED);
@@ -170,19 +169,20 @@ static bool chunk_free(struct slab_chunks *chunks, struct slab_chunk *chunk,
     return false;
 }
 
-static struct slab_chunk *try_pop(struct list_head *lh) {
-    struct list_head *pop = list_pop_front_init(lh);
-    if (!pop)
+/* Peek but do not pop, since chunk_alloc will re-link a chunk when it fills */
+static struct slab_chunk *try_peek(struct list_head *lh) {
+    struct list_head *peek = list_peek_front(lh);
+    if (!peek)
         return NULL;
 
-    return container_of(pop, struct slab_chunk, list);
+    return container_of(peek, struct slab_chunk, list);
 }
 
 vaddr_t slab_chunks_alloc(struct slab_chunks *sc, struct slab_chunk **out) {
     vaddr_t ret = 0x0;
     enum irql irql = spin_lock(&sc->lock);
 
-    *out = try_pop(&sc->partial_list);
+    *out = try_peek(&sc->partial_list);
     if (!*out) {
         if (!(*out = alloc_chunk(sc, &irql)))
             goto out;
@@ -208,8 +208,11 @@ void slab_chunks_init(struct slab_chunks *sc, struct slab_cache *parent) {
     sc->parent = parent;
     sc->page_stride = next_pow2(parent->pages_per_slab);
     size_t page_count = 1 << (PAGE_2M_SHIFT - PAGE_4K_SHIFT);
-    size_t bitmap_bits = DIV_ROUND_UP(page_count, sc->page_stride);
-    sc->bitmap_bytes = to_bytes(bitmap_bits);
+
+    /* Bytes rounded up to whole 64 bit words since bitmap is that width,
+     * bits stay the real slot count, because that is different */
+    sc->bitmap_bits = DIV_ROUND_UP(page_count, sc->page_stride);
+    sc->bitmap_bytes = SLAB_BITMAP_BYTES_FOR(sc->bitmap_bits);
     INIT_LIST_HEAD(&sc->partial_list);
     INIT_LIST_HEAD(&sc->used_list);
 

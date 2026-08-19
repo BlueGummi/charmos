@@ -193,6 +193,43 @@ static size_t find_best(struct elcm_params *params) {
     return params->max_pages;
 }
 
+static struct elcm_candidate
+create_candidate_for_pages(struct elcm_params *params, size_t pages) {
+    size_t obj_size = params->obj_size;
+    size_t obj_alignment = params->obj_alignment ? params->obj_alignment : 1;
+    size_t metadata_bits_per_obj = params->metadata_bits_per_obj;
+    size_t page_size = PAGE_SIZE;
+    size_t metadata_size_bytes = params->metadata_size_bytes;
+    size_t metadata_bytes_per_page = params->metadata_bytes_per_page;
+    size_t aligned_obj_size = get_aligned_obj_size(obj_size, obj_alignment);
+
+    size_t mdata_bytes = metadata_size_bytes + metadata_bytes_per_page * pages;
+    size_t obj_count =
+        max_objects_fit(pages, page_size, mdata_bytes, metadata_bits_per_obj,
+                        obj_size, obj_alignment);
+    size_t bmap_bytes = bitmap_bytes_for(obj_count, metadata_bits_per_obj);
+    size_t data_start = mdata_bytes + bmap_bytes;
+    size_t aligned_start = ALIGN_UP(data_start, obj_alignment);
+    size_t used_bytes = aligned_start + obj_count * aligned_obj_size;
+    size_t total_bytes = pages * page_size;
+    size_t wasted = total_bytes > used_bytes ? total_bytes - used_bytes : 0;
+    fx32_32_t wastage =
+        total_bytes ? fx_div(fx_from_int(wasted), fx_from_int(total_bytes)) : 0;
+
+    return (struct elcm_candidate){
+        .pages = pages,
+        .wasted = wasted,
+        .wastage = wastage,
+        .obj_count = obj_count,
+        .bitmap_bytes = bmap_bytes,
+        .metadata_bytes = mdata_bytes,
+        .obj_size = obj_size,
+        .obj_alignment = obj_alignment,
+        .distance = 0,
+        .score_value = 0,
+    };
+}
+
 enum errno elcm(struct elcm_params *params) {
     const struct elcm_candidate degenerate = {0};
     params->out = degenerate;
@@ -216,9 +253,7 @@ enum errno elcm(struct elcm_params *params) {
     size_t best_possible = find_best(params);
 
     if (best_possible == 1) {
-        struct elcm_candidate c = degenerate;
-        c.pages = 1;
-        params->out = c;
+        params->out = create_candidate_for_pages(params, 1);
         return ERR_OK;
     }
 
@@ -285,11 +320,16 @@ enum errno elcm(struct elcm_params *params) {
         }
     }
 
-    if (n_cands <= 1) {
+    if (n_cands == 0) {
         params->free_fn ? params->free_fn(candidates, size) : kfree(candidates);
-        struct elcm_candidate c = degenerate;
-        c.pages = best_possible;
-        params->out = c;
+        params->out = create_candidate_for_pages(params, best_possible);
+        return ERR_OK;
+    }
+
+    if (n_cands == 1) {
+        struct elcm_candidate single = candidates[0];
+        params->free_fn ? params->free_fn(candidates, size) : kfree(candidates);
+        params->out = single;
         return ERR_OK;
     }
 

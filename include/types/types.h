@@ -128,7 +128,9 @@ typedef __uint128_t uint128_t;
 #define SSIZE_MAX ((ssize_t) (SIZE_MAX >> 1))
 #define SSIZE_MIN ((ssize_t) (-SSIZE_MAX - 1))
 
-#define INT128_MAX ((int128_t) (int128_t) (~((uint128_t) 0ULL >> 1)))
+/* Shift has to come after the complement, because complementing the
+ * shifted zero yields all ones, turning it into `-1` */
+#define INT128_MAX ((int128_t) (~((uint128_t) 0ULL) >> 1))
 #define INT128_MIN ((int128_t) (-INT128_MAX - 1))
 
 #define UINT128_MAX ((uint128_t) (~((uint128_t) 0ULL)))

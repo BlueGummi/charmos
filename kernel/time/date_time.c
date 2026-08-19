@@ -22,8 +22,9 @@ struct date_time_expanded date_time_expand(const struct date_time *dt) {
     uint16_t remaining_days = dt->day; /* 0 indexed */
     uint8_t m = 0;
 
-    while (m < 12 && remaining_days >= days_in_month(dt->year, m)) {
-        remaining_days -= days_in_month(dt->year, m);
+    /* m is a 0-11 month, days_in_month takes 1-12 */
+    while (m < 12 && remaining_days >= days_in_month(dt->year, m + 1)) {
+        remaining_days -= days_in_month(dt->year, m + 1);
         m++;
     }
 
@@ -42,7 +43,7 @@ void date_time_compact(const struct date_time_expanded *expanded,
     uint16_t day_of_year = 0;
 
     for (uint8_t m = 0; m < expanded->month; m++)
-        day_of_year += days_in_month(expanded->year, m);
+        day_of_year += days_in_month(expanded->year, m + 1);
 
     day_of_year += (expanded->day_of_month - 1);
 

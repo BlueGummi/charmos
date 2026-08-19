@@ -1,5 +1,5 @@
 #pragma once
-#include <test.h>
+#include <test/test.h>
 
 #include <block/sched.h>
 #include <fs/ext2.h>
@@ -9,4 +9,7 @@
 #include <string.h>
 #include <time/spin_sleep.h>
 
-extern struct test_group __test_group_ext2;
+#include "import.h"
+
+TEST_GROUP_DEFINE(ext2);
+TEST_GROUP_DEFINE(ext2_mode);

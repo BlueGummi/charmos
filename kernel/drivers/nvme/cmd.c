@@ -14,20 +14,24 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <test/export.h>
 #include <thread/workqueue.h>
 #include <time/spin_sleep.h>
 
 #include "internal.h"
 
-static enum bio_request_status nvme_to_bio_status(uint16_t status) {
-    if (status == NVME_STATUS_CONFLICTING_ATTRIBUTES) {
+static enum bio_request_status nvme_to_bio_status(uint16_t status_word) {
+    uint16_t status = (status_word >> 1) & 0x7FFF;
+    if (status == 0)
+        return BIO_STATUS_OK;
+    if (status == NVME_STATUS_CONFLICTING_ATTRIBUTES)
         return BIO_STATUS_INVAL_ARG;
-    } else if (status == NVME_STATUS_INVALID_PROT_INFO) {
+    if (status == NVME_STATUS_INVALID_PROT_INFO)
         return BIO_STATUS_INVAL_INTERNAL;
-    }
 
-    return BIO_STATUS_OK;
+    return BIO_STATUS_UNKNOWN_ERR;
 }
+TEST_EXPORT(nvme_to_bio_status);
 
 static void nvme_send_waiters(struct nvme_device *dev) {
     struct nvme_waiting_requests *waiters = &dev->waiting_requests;

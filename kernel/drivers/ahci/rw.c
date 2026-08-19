@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <test/export.h>
 #include <thread/io_wait.h>
 #include <thread/thread.h>
 
@@ -21,6 +22,7 @@ static void ahci_set_lba_cmd(struct ahci_fis_reg_h2d *fis, uint64_t lba,
     fis->countl = (uint8_t) (sector_count & 0xFF);
     fis->counth = (uint8_t) ((sector_count >> 8) & 0xFF);
 }
+TEST_EXPORT(ahci_set_lba_cmd);
 
 typedef bool (*async_fn)(struct block_device *, uint64_t, uint8_t *, uint16_t,
                          struct ahci_request *);

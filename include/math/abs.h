@@ -1,1 +1,1 @@
-#define abs(N) ((N < 0) ? (-N) : (N))
+#define abs(N) (((N) < 0) ? (-(N)) : (N))

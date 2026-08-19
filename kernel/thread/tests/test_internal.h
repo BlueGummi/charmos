@@ -1,5 +1,5 @@
 #pragma once
-#include <test.h>
+#include <test/test.h>
 
 #include <mem/alloc_or_die.h>
 #include <sch/sched.h>
@@ -11,5 +11,5 @@
 #include <thread/workqueue.h>
 #include <time/spin_sleep.h>
 
-extern struct test_group __test_group_apc;
-extern struct test_group __test_group_daemon;
+TEST_GROUP_DEFINE(apc);
+TEST_GROUP_DEFINE(daemon);

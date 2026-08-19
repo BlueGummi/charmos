@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <test/export.h>
 #include <time/time.h>
 
 // TODO: With all VFS impls, make sure to check these are on the same disk and
@@ -109,6 +110,7 @@ static uint32_t ext2_to_vfs_flags(uint32_t ext2_flags) {
 
     return vfs_flags;
 }
+TEST_EXPORT(ext2_to_vfs_flags);
 
 static uint32_t vfs_to_ext2_flags(uint32_t vfs_flags) {
     uint32_t ext2_flags = 0;
@@ -130,6 +132,7 @@ static uint32_t vfs_to_ext2_flags(uint32_t vfs_flags) {
 
     return ext2_flags;
 }
+TEST_EXPORT(vfs_to_ext2_flags);
 
 static uint16_t ext2_to_vfs_mode(uint16_t ext2_mode) {
     uint16_t vfs_mode = 0;
@@ -178,6 +181,7 @@ static uint16_t ext2_to_vfs_mode(uint16_t ext2_mode) {
 
     return vfs_mode;
 }
+TEST_EXPORT(ext2_to_vfs_mode);
 
 static uint16_t vfs_to_ext2_mode(uint16_t vfs_mode) {
     uint16_t ext2_mode = 0;
@@ -226,6 +230,7 @@ static uint16_t vfs_to_ext2_mode(uint16_t vfs_mode) {
 
     return ext2_mode;
 }
+TEST_EXPORT(vfs_to_ext2_mode);
 
 static enum errno ext2_to_vfs_stat(struct ext2_full_inode *node,
                                    struct vfs_stat *out) {

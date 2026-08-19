@@ -2,7 +2,7 @@
 #define queue_pop_front(q, var)                                                \
     typeof(q->head) var = q->head;                                             \
     if (var) {                                                                 \
-        q->head = t->next;                                                     \
+        q->head = var->next;                                                   \
         if (q->head == NULL) {                                                 \
             q->tail = NULL;                                                    \
         }                                                                      \

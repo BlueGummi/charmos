@@ -73,7 +73,7 @@ void bio_sched_try_early_dispatch(struct bio_scheduler *sched) {
 void bio_sched_dispatch_partial(struct block_device *d,
                                 enum bio_request_priority p) {
     /* no one in urgent queue */
-    for (uint32_t i = BIO_RQ_HIGH; i > p; i--) {
+    for (int32_t i = BIO_RQ_HIGH; i >= (int32_t) p; i--) {
         dispatch_queue(d, &d->scheduler->queues[i]);
     }
 }

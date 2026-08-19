@@ -38,7 +38,7 @@ LOG_HANDLE_EXTERN(slab_flags);
     ((flags >> ALLOC_CLASS_SHIFT) & ALLOC_CLASS_MASK)
 
 /* Bits 16..23 are available, this gives the 0-indexed Nth available bit */
-#define ALLOC_FLAG_AVAIL_BIT(n) (1 << (ALLOC_CLASS_SHIFT - 4 + n));
+#define ALLOC_FLAG_AVAIL_BIT(n) (1 << (ALLOC_CLASS_SHIFT - 4 + (n)))
 
 /* alloc_flags: 32 bit bitflags
  *
@@ -237,7 +237,7 @@ static inline bool alloc_behavior_is_fast(enum alloc_behavior raw) {
 static inline bool alloc_flag_behavior_verify(enum alloc_flags f,
                                               enum alloc_behavior behavior) {
     bool may_fault = alloc_behavior_may_fault(behavior);
-    bool flag_requires_residency = (f & ALLOC_FLAG_NONPAGEABLE);
+    bool flag_requires_residency = !(f & ALLOC_FLAG_PAGEABLE);
     bool flag_can_fault = (f & ALLOC_FLAG_MOVABLE) || (f & ALLOC_FLAG_PAGEABLE);
 
     /* Non-faulting behavior cannot tolerate pageable or movable allocations */

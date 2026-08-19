@@ -74,6 +74,11 @@ static char *mkname(char *prefix, uint64_t counter) {
         counter_str[n++] = '0' + (counter % 10);
         counter /= 10;
     } while (counter > 0);
+    for (uint32_t i = 0; i < n / 2; i++) {
+        char tmp = counter_str[i];
+        counter_str[i] = counter_str[n - 1 - i];
+        counter_str[n - 1 - i] = tmp;
+    }
     char *cat = strcat(prefix, counter_str);
     return cat;
 }

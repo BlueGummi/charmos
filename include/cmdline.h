@@ -168,8 +168,8 @@ struct cmdline_entry {
     _Generic((type) 0, int: "<integer>", bool: "<on/off>")
 
 #define cmdline_list_for_each(val, list)                                       \
-    for (size_t __i = 0; ((val = (list)->items[__i]), __i < (list)->count);    \
-         __i++)
+    for (size_t __i = 0;                                                       \
+         __i < (list)->count && ((val = (list)->items[__i]), true); __i++)
 
 LINKER_SECTION_DEFINE(struct cmdline_entry, cmdline_entries);
 

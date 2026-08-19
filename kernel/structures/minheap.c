@@ -84,8 +84,10 @@ void minheap_insert(struct minheap *heap, struct minheap_node *node,
         struct minheap_node **new_nodes =
             kmalloc(sizeof(struct minheap_node *) * new_cap);
 
-        if (!new_nodes)
+        if (!new_nodes) {
+            spin_unlock(&heap->lock, irql);
             return;
+        }
 
         memcpy(new_nodes, heap->nodes,
                sizeof(struct minheap_node *) * heap->capacity);

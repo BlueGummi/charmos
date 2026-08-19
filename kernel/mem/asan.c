@@ -1,3 +1,4 @@
+#include <dbg.h>
 #include <global.h>
 #include <kassert.h>
 #include <math/align.h>
@@ -6,6 +7,7 @@
 #include <mem/page.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
+#include <stack_depot.h>
 #include <stdint.h>
 #include <string.h>
 #include <sync/spinlock.h>
@@ -230,10 +232,102 @@ void asan_init(void) {
     asan_ready = true;
 }
 
+/* Shadow bytes alone don't tell why accesses are bad, so dump */
+static void asan_report_shadow(const void *addr) {
+    const uint8_t *sh = asan_shadow_for_internal(addr);
+
+    printf("[ASAN] shadow near %p, one byte per %u bytes, fault at column 0:\n",
+           addr, (unsigned) ASAN_GRANULE);
+    for (int row = -1; row <= 1; row++) {
+        printf("[ASAN]  %+6d ", row * 16 * (int) ASAN_GRANULE);
+        for (int i = 0; i < 16; i++)
+            printf("%02x ", sh[row * 16 + i]);
+        printf("\n");
+    }
+}
+
+/* stack_depot_print is bare addresses, so we debug_symbolize */
+static void asan_report_stack(stack_handle_t h) {
+    struct stack_depot_record *rec = stack_depot_get_record(h);
+
+    if (!rec) {
+        printf("[ASAN]   <trace no longer in the depot>\n");
+        return;
+    }
+
+    for (size_t i = 0; i < rec->num_entries; i++) {
+        uint64_t off = 0;
+        const char *sym = debug_symbolize(rec->entries[i], &off);
+
+        if (sym)
+            printf("[ASAN]   #%-2lu %p %s+0x%lx\n", (unsigned long) i,
+                   (void *) rec->entries[i], sym, (unsigned long) off);
+        else
+            printf("[ASAN]   #%-2lu %p\n", (unsigned long) i,
+                   (void *) rec->entries[i]);
+    }
+}
+
+/* Slabs keep a stack depot handle per object when DEBUG_SLAB_DEEP, so
+ * we must tread carefully when retrieving the backtrace, lest we
+ * dereference an unmapped page or cause other problems */
+static void asan_report_owner(const void *addr) {
+#ifdef DEBUG_SLAB_DEEP
+    static bool reporting;
+
+    if (reporting || !slab_ptr_in_slab((void *) addr))
+        return;
+    reporting = true;
+
+    if (slab_order_map_get((vaddr_t) addr) == SLAB_POW2_ORDER_EMPTY) {
+        printf("[ASAN] %p is in the slab heap but no chunk is mapped there\n",
+               addr);
+        goto out;
+    }
+
+    struct slab *s = slab_for_ptr((void *) addr);
+    struct slab_cache *cache = s->parent_cache;
+
+    /* Metadata may be what went wrong, so sanity check before trusting it */
+    if ((uintptr_t) cache < SLAB_HEAP_START || !cache->obj_stride ||
+        !cache->objs_per_slab || s->mem < (vaddr_t) s ||
+        (vaddr_t) addr < s->mem) {
+        printf("[ASAN] slab metadata at %p is not usable (cache=%p)\n",
+               (void *) s, (void *) cache);
+        goto out;
+    }
+
+    size_t idx = slab_allocation_index(s, (void *) addr);
+    if (idx >= cache->objs_per_slab) {
+        printf("[ASAN] object index %lu out of range for this slab\n",
+               (unsigned long) idx);
+        goto out;
+    }
+
+    stack_handle_t h = s->traces[idx];
+    if (!h) {
+        printf("[ASAN] object %lu of slab %p has no recorded allocation\n",
+               (unsigned long) idx, (void *) s);
+        goto out;
+    }
+
+    printf("[ASAN] object %lu of slab %p was last allocated at:\n",
+           (unsigned long) idx, (void *) s);
+    asan_report_stack(h);
+
+out:
+    reporting = false;
+#else
+    (void) addr;
+#endif
+}
+
 static void __asan_report_and_panic(const char *what, const void *addr,
                                     size_t size, bool is_write) {
-    printf("[ASAN] %s at %p size=%zu %s", what, addr, size,
+    printf("[ASAN] %s at %p size=%zu %s\n", what, addr, size,
            is_write ? "store" : "load");
+    asan_report_shadow(addr);
+    asan_report_owner(addr);
     panic("ASAN: aborting due to memory error");
 }
 

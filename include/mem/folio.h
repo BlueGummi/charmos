@@ -43,8 +43,8 @@ enum folio_flags : uint32_t {
 };
 
 enum folio_tag : uintptr_t {
-    FOLIO_TAG_ADDRESS_SPACE = 0,
-    FOLIO_TAG_ANON = 1,
+    FOLIO_TAG_ADDRESS_SPACE = 1,
+    FOLIO_TAG_ANON = 2,
 };
 
 #define FOLIO_TAG_BITS 0x7

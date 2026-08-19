@@ -47,7 +47,7 @@
 #include <sync/rcu.h>
 #include <sync/turnstile.h>
 #include <syscall.h>
-#include <test.h>
+#include <test/test.h>
 #include <thread/dpc.h>
 #include <thread/reaper.h>
 #include <thread/thread.h>

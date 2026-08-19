@@ -9,9 +9,13 @@ static size_t tid_space_get_data(struct rbt_node *node) {
 
 static int32_t tid_space_cmp(const struct rbt_node *a,
                              const struct rbt_node *b) {
-    int32_t l = tid_space_get_data((void *) a);
-    int32_t r = tid_space_get_data((void *) b);
-    return l - r;
+    size_t l = tid_space_get_data((void *) a);
+    size_t r = tid_space_get_data((void *) b);
+    if (l < r)
+        return -1;
+    if (l > r)
+        return 1;
+    return 0;
 }
 
 struct tid_space *tid_space_init(uint64_t max_id) {

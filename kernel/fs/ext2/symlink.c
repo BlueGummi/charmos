@@ -23,7 +23,7 @@ enum errno ext2_symlink_file(struct ext2_fs *fs,
 
     if (strlen(target) <= sizeof(new_inode.block)) {
         memcpy(new_inode.block, target, strlen(target));
-        new_inode.block[strlen(target)] = '\0';
+        ((char *) new_inode.block)[strlen(target)] = '\0';
     } else {
         uint32_t block = ext2_alloc_block(fs);
         if (block == 0)

@@ -274,7 +274,7 @@ static inline size_t log_site_message_count(struct log_site *site) {
         .dump_opts = LOG_DUMP_CONSOLE,                                         \
         __VA_ARGS__} /* Rest will get initialized at boot */
 
-#define LOG_SITE(name) &(__log_site_##name)
+#define LOG_SITE(name) (&(__log_site_##name))
 
 #define LOG_HANDLE_DEFAULT                                                     \
     (struct log_handle){.msg = "",                                             \

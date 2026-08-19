@@ -1,7 +1,8 @@
 #pragma once
-#include <test.h>
+#include <test/test.h>
 
 #include "../internal.h"
+#include "import.h"
 #include <mem/alloc_or_die.h>
 #include <sch/sched.h>
 #include <string.h>
@@ -10,6 +11,6 @@
 #include <thread/reaper.h>
 #include <thread/thread.h>
 #include <thread/workqueue.h>
-#include <time/spin_sleep.h>
 
-extern struct test_group __test_group_sched;
+TEST_GROUP_DEFINE(sched);
+TEST_GROUP_DEFINE(climb);

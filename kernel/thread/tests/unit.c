@@ -1,30 +1,33 @@
 #include "test_internal.h"
 
 #ifdef TEST_APC
-TEST_GROUP_DECLARE(apc);
+TEST_GROUP_DECLARE(apc, .intensity_desc = {
+                            .curve = TEST_SCALE_PIECEWISE_LOG,
+                            .unit = "iters",
+                        });
 
 static atomic_bool apc_ran = false;
 
-static void the_apc(void *a) {
+static void the_apc(void *) {
     atomic_store(&apc_ran, true);
 }
 
 static void apc_thread(void *) {
     while (!atomic_load(&apc_ran))
-        scheduler_yield();
+        cpu_relax();
 }
 
 static struct thread *ted = NULL;
-TEST_DECLARE_UNIT(apc_test, .group = TEST_GROUP(apc)) {
+TEST_DECLARE_INTEGRATION(apc_test, .group = TEST_GROUP(apc)) {
+    atomic_store(&apc_ran, false);
     ted = thread_spawn_joinable("apc_test_thread", apc_thread, NULL);
     struct apc *a = kmalloc(sizeof(struct apc), ALLOC_FLAGS_ZERO);
     if (!a || !ted) {
-        /* the thread spins until the APC runs, so there is nothing to
-         * join on if we never get to enqueue it */
+        if (a)
+            kfree(a);
         if (ted)
             thread_detach(ted);
 
-        kfree(a);
         return TEST_FAIL("allocation failed");
     }
 
@@ -74,7 +77,10 @@ static void apc_event_test_thread(void *) {
 }
 
 static struct thread *ated = NULL;
-TEST_DECLARE_UNIT(apc_event_test, .group = TEST_GROUP(apc)) {
+TEST_DECLARE_INTEGRATION(apc_event_test, .group = TEST_GROUP(apc)) {
+    atomic_store(&the_event_apc_ran_times, 0);
+    atomic_store(&event_apc_test_ok, false);
+
     ated = thread_spawn_joinable("apc_event_test_thread", apc_event_test_thread,
                                  NULL);
     TEST_ASSERT(ated);
@@ -89,8 +95,10 @@ TEST_DECLARE_UNIT(apc_event_test, .group = TEST_GROUP(apc)) {
 #endif
 
 #ifdef TEST_SCHED
-TEST_GROUP_DECLARE(daemon);
-
+TEST_GROUP_DECLARE(daemon, .intensity_desc = {
+                               .curve = TEST_SCALE_PIECEWISE_LOG,
+                               .unit = "iters",
+                           });
 
 static atomic_bool daemon_work_run = false;
 static enum daemon_thread_command daemon_work(void *a, void *b) {
@@ -101,7 +109,9 @@ static enum daemon_thread_command daemon_work(void *a, void *b) {
 static struct daemon_work dwork =
     DAEMON_WORK_FROM(daemon_work, WORK_ARGS(NULL, NULL));
 
-TEST_DECLARE_UNIT(daemon_test, .group = TEST_GROUP(daemon)) {
+TEST_DECLARE_INTEGRATION(daemon_test, .group = TEST_GROUP(daemon)) {
+    atomic_store(&daemon_work_run, false);
+
     struct cpu_mask cmask;
     cpu_mask_init(&cmask, global.core_count);
     cpu_mask_set_all(&cmask);

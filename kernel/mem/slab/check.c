@@ -39,10 +39,12 @@ bool slab_check_bitmap(struct slab *slab) {
     size_t expected_set_bits = slab->used;
     size_t set_bits_accumulator = 0;
 
-    for (size_t i = 0; i < bitmap_bytes; i++) {
-        uint8_t byte = slab->bitmap[i];
-        set_bits_accumulator += popcount((size_t) byte);
+    /* Bitmap is rounded up to 64 bit words, ones past objs_per_slab are set */
+    for (size_t i = 0; i < cache->objs_per_slab; i++) {
+        if (slab->bitmap[i / 8] & (uint8_t) (1U << (i % 8)))
+            set_bits_accumulator++;
     }
+    (void) bitmap_bytes;
 
     slab_check_assert_return_false(expected_set_bits == set_bits_accumulator);
 

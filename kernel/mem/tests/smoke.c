@@ -1,7 +1,10 @@
 #include "test_internal.h"
 
 #ifdef TEST_MEM
-TEST_GROUP_DECLARE(mem);
+TEST_GROUP_DECLARE(mem, .intensity_desc = {
+                            .curve = TEST_SCALE_PIECEWISE_LOG,
+                            .unit = "iters",
+                        });
 
 TEST_DECLARE_SMOKE(pmm_alloc_test, .group = TEST_GROUP(mem)) {
     ABORT_IF_RAM_LOW();

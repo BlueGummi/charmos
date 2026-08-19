@@ -11,7 +11,7 @@ struct ioapic_info {
 
 union ioapic_redirection_entry {
     uint64_t raw;
-    struct {
+    struct __attribute__((packed)) {
         uint8_t vector;              // bits 0-7
         uint8_t delivery_mode : 3;   // bits 8-10
         uint8_t dest_mode : 1;       // bit 11
@@ -20,10 +20,7 @@ union ioapic_redirection_entry {
         uint8_t remote_irr : 1;      // bit 14 (read-only)
         uint8_t trigger_mode : 1;    // bit 15
         uint8_t mask : 1;            // bit 16
-        uint16_t reserved : 15;      // bits 17-31
-        uint8_t reserved2;           // bits 32-39 (lower part of 64-bit)
-        uint8_t reserved3;           // bits 40-47
-        uint8_t reserved4;           // bits 48-55
+        uint64_t reserved : 39;      // bits 17-55
         uint8_t dest_apic_id;        // bits 56-63
     };
 };

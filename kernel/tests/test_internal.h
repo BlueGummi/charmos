@@ -1,5 +1,5 @@
 #pragma once
-#include <test.h>
+#include <test/test.h>
 
 #include <crypto/prng.h>
 #include <log.h>
@@ -11,5 +11,9 @@
 #include <string.h>
 #include <thread/thread.h>
 
-extern struct test_group __test_group_log;
-extern struct test_group __test_group_stack_depot;
+#include <parse.h>
+
+TEST_GROUP_DEFINE(log);
+TEST_GROUP_DEFINE(stack_depot);
+TEST_GROUP_DEFINE(parse);
+TEST_GROUP_DEFINE(string);

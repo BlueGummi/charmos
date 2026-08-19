@@ -1,5 +1,5 @@
 #pragma once
-#include <test.h>
+#include <test/test.h>
 
 #include "fs/detect.h"
 #include <block/block.h>
@@ -14,4 +14,4 @@
 #include <string.h>
 #include <time/spin_sleep.h>
 
-extern struct test_group __test_group_bio_sched;
+TEST_GROUP_DEFINE(bio_sched);

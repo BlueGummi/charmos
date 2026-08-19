@@ -142,15 +142,14 @@ void ext2_init_dirent(struct ext2_fs *fs, struct ext2_dir_entry *new_entry,
 }
 
 uint8_t ext2_extract_ftype(mode_t mode) {
-    uint8_t file_type;
-    if (mode & EXT2_S_IFDIR)
-        file_type = EXT2_FT_DIR;
-    else if (mode & EXT2_S_IFREG)
-        file_type = EXT2_FT_REG_FILE;
-    else if (mode & EXT2_S_IFLNK)
-        file_type = EXT2_FT_SYMLINK;
-    else
-        file_type = EXT2_FT_UNKNOWN;
-
-    return file_type;
+    switch (mode & EXT2_S_IFMT) {
+    case EXT2_S_IFREG: return EXT2_FT_REG_FILE;
+    case EXT2_S_IFDIR: return EXT2_FT_DIR;
+    case EXT2_S_IFCHR: return EXT2_FT_CHRDEV;
+    case EXT2_S_IFBLK: return EXT2_FT_BLKDEV;
+    case EXT2_S_IFIFO: return EXT2_FT_FIFO;
+    case EXT2_S_IFSOCK: return EXT2_FT_SOCK;
+    case EXT2_S_IFLNK: return EXT2_FT_SYMLINK;
+    default: return EXT2_FT_UNKNOWN;
+    }
 }

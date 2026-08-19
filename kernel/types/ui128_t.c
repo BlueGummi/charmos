@@ -198,6 +198,16 @@ int __ffsti2(int128_t a) {
     return 0;
 }
 
+/* GCC lowers __builtin_popcount* to these when it can't inline the expansion,
+ * so we'll need to implement these to use it */
+int __popcountsi2(uint32_t a) {
+    return popcount64(a);
+}
+
+int __popcountdi2(uint64_t a) {
+    return popcount64(a);
+}
+
 int __popcountti2(uint128_t a) {
     u128_parts p = {.all = a};
     return popcount64(p.s.lo) + popcount64(p.s.hi);

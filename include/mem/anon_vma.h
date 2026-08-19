@@ -60,7 +60,7 @@ static inline bool anon_vma_get(struct anon_vma *av) {
 
 /* Drop ref: When forked anon_vma dies it releases its root pin, allowing
  * the put to go up the hierarchy, but it's bounded, as root is its own root */
-static inline void anon_vm_area_put(struct anon_vma *av) {
+static inline void anon_vma_put(struct anon_vma *av) {
     while (av) {
         struct anon_vma *root = av->root;
         if (!refcount_dec_and_test(&av->refcount))

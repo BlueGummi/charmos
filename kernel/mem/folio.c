@@ -1,4 +1,5 @@
 #include <math/pow.h>
+#include <mem/anon_vma.h>
 #include <mem/fixed_size_alloc.h>
 #include <mem/folio.h>
 #include <mem/pmm.h>
@@ -17,6 +18,20 @@ void folio_free_folio_struct(struct folio *f) {
     folio_unbind_pages(f);
     return FSR_PERDOMAIN_FREE(folio, f);
 }
+
+/* TODO: implement later
+void folio_free(struct folio *folio) {
+    if (folio_is_anon(folio)) {
+        anon_vma_put(folio_get_anon_vma(folio));
+    } else if (folio_is_file_vma_range(folio)) {
+        // TODO: When we get file VMA
+    }
+
+    size_t pages = pow2(folio->order);
+
+    pmm_free_pages(page_get_paddr(folio->base_page), pages);
+    folio_free_folio_struct(folio);
+} */
 
 struct folio *folio_alloc_internal(uint8_t order, enum alloc_flags f,
                                    enum alloc_behavior b) {

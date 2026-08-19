@@ -3,6 +3,7 @@
 #include <kassert.h>
 #include <math/align.h>
 #include <math/bit_ops.h>
+#include <math/div.h>
 #include <math/ilog2.h>
 #include <mem/alloc.h>
 #include <mem/fixed_size_alloc.h>
@@ -59,7 +60,7 @@ LOG_HANDLE_EXTERN(slab);
 #define SLAB_POW2_ORDER_EMPTY 0xE /* Sentinel value, "Nothing here" */
 
 /* Bitmap */
-#define SLAB_BITMAP_BYTES_FOR(x) ((x + 7ull) / 8ull)
+#define SLAB_BITMAP_BYTES_FOR(x) (DIV_ROUND_UP((x), 64) * sizeof(uint64_t))
 #define SLAB_BITMAP_SET(bm, mask) (bm |= mask)
 #define SLAB_BITMAP_TEST(__bitmap, __idx) (__bitmap & __idx)
 #define SLAB_BITMAP_UNSET(bm, mask) (bm &= ~mask)
@@ -299,13 +300,18 @@ struct slab_chunk {
     struct slab_chunks *owner;
     vaddr_t base_addr : 64 - PAGE_4K_SHIFT;
     enum slab_chunk_state state : 2;
-    size_t used : 9;
+
+    /* 10 bits because stride-1 chunks hold 512 slabs, and 512 needs 10 bits.
+     * Using less bits causes this to wrap to 0 so chunk->used == max
+     * never was true, so chunks didn't get freed at larger orders */
+    size_t used : 10;
     uint8_t bitmap[];
 };
 
 struct slab_chunks {
     struct slab_cache *parent;
-    size_t bitmap_bytes;
+    size_t bitmap_bytes; /* allocation size: whole 64-bit words */
+    size_t bitmap_bits;  /* real slot count */
     size_t page_stride;
     size_t pow2_order;
     struct list_head partial_list;
@@ -804,8 +810,8 @@ static inline bool slab_cache_is_pageable(struct slab_cache *c) {
     return c->type == SLAB_TYPE_PAGEABLE || c->type == SLAB_TYPE_PAGEABLE_ZERO;
 }
 
-static inline bool is_buffer_uniform(const void *ptr, size_t len,
-                                     uint8_t value) {
+__no_sanitize_address static inline bool
+is_buffer_uniform(const void *ptr, size_t len, uint8_t value) {
     const uint8_t *byte_ptr = (const uint8_t *) ptr;
 
     for (size_t i = 0; i < len; i++)

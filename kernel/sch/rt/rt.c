@@ -46,8 +46,7 @@ create_mapping(struct rt_scheduler_static *rts, rt_domain_id_t id) {
     rbt_init_node(&ret->tree_node);
     rbt_insert(&rts->mappings_internal, &ret->tree_node);
     spinlock_init(&ret->lock);
-
-    return NULL;
+    return ret;
 }
 
 /* Fails only on OOM */

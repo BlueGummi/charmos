@@ -2,13 +2,12 @@
 
 /* Free_queue function naming semantics:
  *
- * "Draining" is when the free_queue elements are removed one by one,
- * and each element first tries to get put on a given per-core
- * cache's magazines. The free_queue elements that do not fit in the
- * magazine are then optionally freed from the slab cache or re-enqueued.
+ * "Draining" is removing elements one by one, and each element
+ * tries to get put on a per-core cache's mags. The free queue elements
+ * that don't fit are freed from the slab cache or re-enqueued
  *
- * "Flushing" is when the free_queue elements are all freed from the
- * slab cache. The per-core magazines are not touched */
+ * "Flushing" is when the elements are all freed
+ * to the slab cache/page allocator */
 
 void slab_free_queue_init(struct slab_domain *domain, struct slab_free_queue *q,
                           size_t capacity) {
@@ -163,7 +162,8 @@ size_t slab_free_queue_drain(struct slab_percpu_cache *cache,
 }
 
 size_t slab_free_queue_flush(struct slab_domain *domain,
-                             struct slab_free_queue *queue) {
+                             struct slab_free_queue *queue,
+                             enum alloc_behavior bh) {
     size_t total_freed = 0;
 
     /* Drain the ringbuffer one element at a time */
@@ -172,7 +172,10 @@ size_t slab_free_queue_flush(struct slab_domain *domain,
         if (addr == 0x0)
             break;
 
-        slab_free(domain, (void *) addr);
+        /* kfree_pages will put page backed allocations in here too,
+         * so we send them to THIS free function, which sorts by class */
+        slab_free_queue_free(domain, (void *) addr, bh);
+        total_freed++;
     }
     return total_freed;
 }

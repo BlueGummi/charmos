@@ -86,7 +86,7 @@ static int32_t slab_gc_get_inv_free(size_t total_free, uint32_t bias_bitmap,
     } else {
         size_t other_free_slabs = total_free - free_per_order[order];
         size_t scaled_bias = other_free_slabs * SLAB_GC_SCORE_SCALE;
-        if (bias_bitmap & order)
+        if (bias_bitmap & (1ULL << order))
             scaled_bias *= SLAB_GC_ORDER_BIAS_SCALE;
 
         inv_free = scaled_bias / (1 + total_free);
@@ -127,6 +127,8 @@ static int64_t score_order(size_t total_free, uint32_t bias_map, size_t order,
     return score;
 }
 
+static void slab_gc_dequeue(struct slab_gc *gc, struct slab *slab);
+
 static struct slab_caches *slab_gc_pick_caches(struct slab_domain *domain,
                                                struct slab *slab) {
     return domain->caches[slab->type];
@@ -147,7 +149,8 @@ static void slab_recycle(struct slab_cache *best, struct slab *slab,
  * to prevent overly aggressive draining to one order */
 void slab_gc_recycle(struct slab_domain *domain, struct slab *slab,
                      size_t *slabs_recycled, uint32_t bias_bitmap) {
-
+    /* Precondition: caller has taken this slab out of GC and dropped gc->lock,
+     * slab_cache_insert takes the cache lock, so we can't hold gc->lock */
     struct slab_caches *caches = slab_gc_pick_caches(domain, slab);
 
     /* Gather totals */
@@ -174,6 +177,8 @@ void slab_gc_recycle(struct slab_domain *domain, struct slab *slab,
 
 static void slab_gc_destroy(struct slab_gc *gc, struct slab *slab) {
     rbt_delete(&gc->rbt, &slab->rb);
+    atomic_fetch_sub(&gc->num_elements, 1);
+    /* List unlink happens in slab_destroy -> slab_list_del */
     slab_destroy(slab);
 }
 
@@ -191,11 +196,10 @@ slab_flags_get_order_bias_bitmap(enum slab_gc_flags flags) {
 }
 
 static bool slab_do_gc(struct slab_gc *gc, struct slab *slab,
-                       enum slab_gc_flags flags, size_t *slabs_recycled,
-                       size_t *destroyed, size_t destroy_target) {
+                       enum slab_gc_flags flags, size_t *destroyed,
+                       size_t destroy_target, struct list_head *pending) {
 
     uint8_t bias = slab_flags_get_bias(flags);
-    uint32_t order_bias_bitmap = slab_flags_get_order_bias_bitmap(flags);
 
     if (flags & SLAB_GC_FLAG_FORCE_DESTROY || *destroyed < destroy_target) {
         slab_gc_destroy(gc, slab);
@@ -205,9 +209,10 @@ static bool slab_do_gc(struct slab_gc *gc, struct slab *slab,
 
     bool recycle = slab_gc_should_recycle(slab, bias);
 
-    struct slab_domain *parent = slab->parent_cache->parent_domain;
     if (recycle) {
-        slab_gc_recycle(parent, slab, slabs_recycled, order_bias_bitmap);
+        list_del_init(&slab->list);
+        slab_gc_dequeue(gc, slab);
+        list_add_tail(&slab->list, pending);
     } else if (flags & SLAB_GC_FLAG_SKIP_DESTROY) {
         return false;
     } else {
@@ -268,6 +273,9 @@ size_t slab_gc_run(struct slab_gc *gc, enum slab_gc_flags flags) {
     size_t unfit = 0;
     size_t destroyed = 0;
 
+    struct list_head pending;
+    INIT_LIST_HEAD(&pending);
+
     struct rbt_node *node = rbt_min(&gc->rbt);
     while (node && reclaimed < target) {
         struct rbt_node *next = rbt_next(node);
@@ -281,8 +289,7 @@ size_t slab_gc_run(struct slab_gc *gc, enum slab_gc_flags flags) {
         }
 
         unfit = 0;
-        if (slab_do_gc(gc, slab, flags, slabs_recycled, &destroyed,
-                       destroy_target))
+        if (slab_do_gc(gc, slab, flags, &destroyed, destroy_target, &pending))
             reclaimed++;
 
     next_slab:
@@ -290,12 +297,20 @@ size_t slab_gc_run(struct slab_gc *gc, enum slab_gc_flags flags) {
     }
 
     spin_unlock(&gc->lock, irql);
+
+    uint32_t order_bias_bitmap = slab_flags_get_order_bias_bitmap(flags);
+    struct list_head *pnode, *ptemp;
+    list_for_each_safe(pnode, ptemp, &pending) {
+        struct slab *s = slab_from_list_node(pnode);
+        list_del_init(pnode);
+        slab_gc_recycle(s->parent_cache->parent_domain, s, slabs_recycled,
+                        order_bias_bitmap);
+    }
+
     return reclaimed;
 }
 
 void slab_gc_enqueue(struct slab_domain *domain, struct slab *slab) {
-    slab_list_del(slab);
-
     /* We do NOT reset the slab here in case we recycle it back
      * to the same order it was pulled from */
     slab->state = SLAB_IN_GC;

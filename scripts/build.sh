@@ -342,8 +342,15 @@ if $COMPDB; then
     log "generating compile_commands.json"
     run_cmd cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON "$REPO_ROOT"
 
-    if [[ ! -f "$REPO_ROOT/compile_commands.json" ]] || ! cmp -s "compile_commands.json" "$REPO_ROOT/compile_commands.json"; then
-        cp compile_commands.json "$REPO_ROOT"
+    compdb_link="$REPO_ROOT/compile_commands.json"
+    compdb_target="$PWD/compile_commands.json"
+    case "$PWD" in
+        "$REPO_ROOT"/*) compdb_target="${PWD#"$REPO_ROOT"/}/compile_commands.json" ;;
+    esac
+
+    if [[ ! -L "$compdb_link" ]] ||
+       [[ "$(readlink "$compdb_link")" != "$compdb_target" ]]; then
+        ln -sfn "$compdb_target" "$compdb_link"
     fi
 fi
 

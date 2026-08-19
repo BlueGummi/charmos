@@ -4,6 +4,7 @@
 #include <sch/climb.h>
 #include <sch/periodic_work.h>
 #include <sch/sched.h>
+#include <test/export.h>
 #include <thread/thread.h>
 
 #include "internal.h"
@@ -83,7 +84,7 @@ static inline struct rbt *climb_tree_local() {
  *
  * boost_clamp(level)
  */
-static inline int32_t climb_pressure_to_boost_target(climb_pressure_t p) {
+static int32_t climb_pressure_to_boost_target(climb_pressure_t p) {
     /* The pressure is between 0..1, so this doesn't do much
      * with minor boosts. We have the BOOST_SCALE for config. purposes */
 
@@ -95,6 +96,7 @@ static inline int32_t climb_pressure_to_boost_target(climb_pressure_t p) {
     CLAMP(level, 0, CLIMB_BOOST_LEVEL_MAX);
     return level;
 }
+TEST_EXPORT(climb_pressure_to_boost_target);
 
 /*
  * total_pressure =

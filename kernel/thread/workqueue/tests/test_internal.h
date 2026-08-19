@@ -1,5 +1,5 @@
 #pragma once
-#include <test.h>
+#include <test/test.h>
 
 #include "../internal.h"
 #include <mem/alloc.h>
@@ -17,5 +17,5 @@
 #include <time/spin_sleep.h>
 #include <time/time.h>
 
-extern struct test_group __test_group_workqueue;
-extern struct test_group __test_group_defer;
+TEST_GROUP_DEFINE(workqueue);
+TEST_GROUP_DEFINE(defer);

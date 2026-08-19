@@ -1,5 +1,5 @@
 #pragma once
-#include <test.h>
+#include <test/test.h>
 
 #include <crypto/prng.h>
 #include <errno.h>
@@ -11,6 +11,7 @@
 #include <mem/mm.h>
 #include <mem/page.h>
 #include <mem/page_alloc.h>
+#include <mem/page_table.h>
 #include <mem/pmm.h>
 #include <mem/rmap.h>
 #include <mem/slab.h>
@@ -27,7 +28,9 @@
 #include <structures/rbit.h>
 #include <thread/thread.h>
 
-extern struct test_group __test_group_mem;
-extern struct test_group __test_group_folio;
-extern struct test_group __test_group_mm;
-extern struct test_group __test_group_rmap;
+TEST_GROUP_DEFINE(mem);
+TEST_GROUP_DEFINE(folio);
+TEST_GROUP_DEFINE(mm);
+TEST_GROUP_DEFINE(rmap);
+TEST_GROUP_DEFINE(page_table);
+TEST_GROUP_DEFINE(elcm);

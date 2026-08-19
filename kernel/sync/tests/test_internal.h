@@ -1,5 +1,5 @@
 #pragma once
-#include <test.h>
+#include <test/test.h>
 
 #include <crypto/prng.h>
 #include <log.h>
@@ -16,7 +16,12 @@
 #include <thread/workqueue.h>
 #include <time/spin_sleep.h>
 
-extern struct test_group __test_group_mutex;
-extern struct test_group __test_group_rcu;
-extern struct test_group __test_group_rwlock;
-extern struct test_group __test_group_sync_nightmare;
+#include <sync/qspinlock.h>
+#include <sync/turnstile.h>
+
+TEST_GROUP_DEFINE(mutex);
+TEST_GROUP_DEFINE(rcu);
+TEST_GROUP_DEFINE(rwlock);
+TEST_GROUP_DEFINE(sync_nightmare);
+TEST_GROUP_DEFINE(qspinlock);
+TEST_GROUP_DEFINE(turnstile);

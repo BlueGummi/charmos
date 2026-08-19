@@ -1,53 +1,59 @@
 #include "test_internal.h"
 
 #ifdef TEST_MEM
-#define STRESS_ALLOC_TIMES 2048
-
-
-static void *stress_alloc_free_ptrs[STRESS_ALLOC_TIMES] = {0};
-TEST_DECLARE_UNIT(kmalloc_stress_alloc_free_test, .group = TEST_GROUP(slab)) {
+TEST_DECLARE_UNIT(kmalloc_stress_alloc_free_test, .group = TEST_GROUP(slab),
+                  TEST_INTENSITY(256, 2048, 32768)) {
     ABORT_IF_RAM_LOW();
 
-    for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
+    size_t n = ctx->intensity_val ? ctx->intensity_val : 2048;
+    void **stress_alloc_free_ptrs =
+        kmalloc(sizeof(void *) * n, ALLOC_FLAGS_ZERO);
+    TEST_ASSERT(stress_alloc_free_ptrs != NULL);
+
+    for (size_t i = 0; i < n; i++) {
         stress_alloc_free_ptrs[i] = kmalloc(64);
         TEST_ASSERT(stress_alloc_free_ptrs[i] != NULL);
     }
 
-    for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
-        uint64_t idx = prng_next() % STRESS_ALLOC_TIMES;
+    for (size_t i = 0; i < n; i++) {
+        uint64_t idx = prng_next() % n;
         if (stress_alloc_free_ptrs[idx]) {
             kfree(stress_alloc_free_ptrs[idx]);
             stress_alloc_free_ptrs[idx] = NULL;
         }
     }
 
-    for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
+    for (size_t i = 0; i < n; i++) {
         if (stress_alloc_free_ptrs[i]) {
             kfree(stress_alloc_free_ptrs[i]);
         }
     }
 
+    kfree(stress_alloc_free_ptrs);
     return TEST_SUCCESS;
 }
 
-/* Put it here to avoid it eating things up */
-static void *mixed_stress_test_ptrs[STRESS_ALLOC_TIMES] = {0};
-TEST_DECLARE_UNIT(kmalloc_mixed_stress_test, .group = TEST_GROUP(slab)) {
+TEST_DECLARE_UNIT(kmalloc_mixed_stress_test, .group = TEST_GROUP(slab),
+                  TEST_INTENSITY(256, 2048, 16384)) {
     ABORT_IF_RAM_LOW();
 
-    for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
+    size_t n = ctx->intensity_val ? ctx->intensity_val : 2048;
+    void **mixed_stress_test_ptrs = kmalloc(sizeof(void *) * n);
+    TEST_ASSERT(mixed_stress_test_ptrs != NULL);
+
+    for (size_t i = 0; i < n; i++) {
         mixed_stress_test_ptrs[i] = kmalloc(128);
         TEST_ASSERT(mixed_stress_test_ptrs[i] != NULL);
     }
 
-    for (uint64_t i = 0; i < STRESS_ALLOC_TIMES; i++) {
+    for (size_t i = 0; i < n; i++) {
         kfree(mixed_stress_test_ptrs[i]);
     }
 
+    kfree(mixed_stress_test_ptrs);
     return TEST_SUCCESS;
 }
 
-#define MT_THREAD_COUNT 8
 #define MT_ALLOC_TIMES 1024
 
 static atomic_int kmalloc_done = 0;
@@ -63,39 +69,46 @@ static void mt_kmalloc_worker(void *) {
     for (uint64_t i = 0; i < MT_ALLOC_TIMES; i++) {
         uint64_t idx = prng_next() % MT_ALLOC_TIMES;
 
-        kfree(ptrs[idx]);
-        ptrs[idx] = NULL;
+        if (ptrs[idx]) {
+            kfree(ptrs[idx]);
+            ptrs[idx] = NULL;
+        }
     }
 
     for (uint64_t i = 0; i < MT_ALLOC_TIMES; i++) {
-        kfree(ptrs[i]);
+        if (ptrs[i]) {
+            kfree(ptrs[i]);
+        }
     }
 
     atomic_fetch_add(&kmalloc_done, 1);
 }
 
-TEST_DECLARE_UNIT(kmalloc_multithreaded_test, .group = TEST_GROUP(slab)) {
+TEST_DECLARE_INTEGRATION(kmalloc_multithreaded_test, .group = TEST_GROUP(slab),
+                         TEST_INTENSITY_CORES(1, 2, 4, "threads/core")) {
     ABORT_IF_RAM_LOW();
 
-    struct thread *threads[MT_THREAD_COUNT];
+    size_t nthreads = ctx->intensity_val ? ctx->intensity_val : 8;
+    struct thread **threads = kmalloc(sizeof(struct thread *) * nthreads);
+    TEST_ASSERT(threads != NULL);
     atomic_store(&kmalloc_done, 0);
 
-    for (int i = 0; i < MT_THREAD_COUNT; i++) {
+    for (size_t i = 0; i < nthreads; i++) {
         threads[i] = thread_spawn_joinable_custom_stack(
             "mt_kmalloc_thread", mt_kmalloc_worker, NULL, PAGE_SIZE * 16);
         TEST_ASSERT(threads[i] != NULL);
     }
 
-    for (int i = 0; i < MT_THREAD_COUNT; i++)
+    for (size_t i = 0; i < nthreads; i++)
         thread_join(threads[i]);
 
-    TEST_ASSERT(atomic_load(&kmalloc_done) == MT_THREAD_COUNT);
-
+    TEST_ASSERT(atomic_load(&kmalloc_done) == (int) nthreads);
+    kfree(threads);
     return TEST_SUCCESS;
 }
 
 static char hooray[128] = {0};
-TEST_DECLARE_UNIT(kmalloc_new_test, .group = TEST_GROUP(slab)) {
+TEST_DECLARE_SMOKE(kmalloc_new_test, .group = TEST_GROUP(slab)) {
 
     void *p = kmalloc_new(67, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
 
@@ -114,7 +127,7 @@ TEST_DECLARE_UNIT(kmalloc_new_test, .group = TEST_GROUP(slab)) {
 #endif
 
 static char a_msg[128];
-TEST_DECLARE_UNIT(kmalloc_new_basic_test, .group = TEST_GROUP(slab)) {
+TEST_DECLARE_SMOKE(kmalloc_new_basic_test, .group = TEST_GROUP(slab)) {
 
     void *p1 = kmalloc_new(1, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
     void *p2 = kmalloc_new(64, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
@@ -182,8 +195,6 @@ TEST_DECLARE_UNIT(kmalloc_new_behavior_test, .group = TEST_GROUP(slab)) {
     /* ALLOC_BEHAVIOR_ATOMIC should require nonpageable/nonmovable - allocator
        or sanitizers might coerce flags. This test ensures allocation doesn't
        return NULL for such a request. */
-    return TEST_SUCCESS;
-
     uint16_t f = ALLOC_FLAG_NONPAGEABLE | ALLOC_FLAG_NONMOVABLE |
                  ALLOC_FLAG_NO_CACHE_ALIGN;
     void *p = kmalloc_new(256, f, ALLOC_BEHAVIOR_ATOMIC);
@@ -216,6 +227,7 @@ static atomic_bool all_ready = false;
 struct stress_arg {
     int id;
     volatile int *done_flag;
+    size_t iters;
 };
 
 static void stress_worker(void *) {
@@ -231,7 +243,7 @@ static void stress_worker(void *) {
     void **live_ptrs = kmalloc(sizeof(void *) * MAX_LIVE_ALLOCS);
     memset(live_ptrs, 0, sizeof(void *) * MAX_LIVE_ALLOCS);
 
-    for (int iter = 0; iter < STRESS_ITERS; ++iter) {
+    for (size_t iter = 0; iter < a->iters; ++iter) {
         /* 1 in 8 chance to free something early (chaotic order) */
         if ((prng_next() & 7) == 0) {
             int idx = prng_next() % MAX_LIVE_ALLOCS;
@@ -243,7 +255,7 @@ static void stress_worker(void *) {
 
         /* Allocate with randomized size and flags */
         size_t sz = 8 + (prng_next() % 512); /* small to moderate allocations */
-        uint16_t flags = ALLOC_FLAGS_DEFAULT;
+        enum alloc_flags flags = ALLOC_FLAGS_DEFAULT;
 
         if (prng_next() & 1) {
             flags |= ALLOC_FLAG_PREFER_CACHE_ALIGNED;
@@ -261,7 +273,7 @@ static void stress_worker(void *) {
                                            ? ALLOC_BEHAVIOR_NORMAL
                                            : ALLOC_BEHAVIOR_NO_RECLAIM;
 
-        void *p = kmalloc(sz, flags, behavior);
+        void *p = kmalloc_new(sz, flags, behavior);
         if (!p)
             continue;
 
@@ -273,7 +285,7 @@ static void stress_worker(void *) {
         int idx = prng_next() % MAX_LIVE_ALLOCS;
 
         if (live_ptrs[idx] && SHOULD_FREE)
-            kfree(live_ptrs[idx], ALLOC_BEHAVIOR_NORMAL);
+            kfree_new(live_ptrs[idx], ALLOC_BEHAVIOR_NORMAL);
         live_ptrs[idx] = p;
     }
 
@@ -291,16 +303,20 @@ volatile int done[STRESS_THREADS];
 struct stress_arg args[STRESS_THREADS];
 static char msg[128];
 
-TEST_DECLARE_UNIT(kmalloc_new_concurrency_stress_test,
-                  .group = TEST_GROUP(slab)) {
+TEST_DECLARE_INTEGRATION(kmalloc_new_concurrency_stress_test,
+                         .group = TEST_GROUP(slab),
+                         TEST_INTENSITY(5000, 50000, 200000)) {
     memset((void *) done, 0, sizeof(done));
+    all_ready = false;
 
     struct thread *workers[STRESS_THREADS];
+    size_t iters = ctx->intensity_val ? ctx->intensity_val : 50000;
 
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     for (int i = 0; i < STRESS_THREADS; ++i) {
         args[i].id = i;
         args[i].done_flag = &done[i];
+        args[i].iters = iters;
         workers[i] = thread_spawn_joinable("kmalloc_new_stress_worker",
                                            stress_worker, NULL);
 
@@ -326,7 +342,7 @@ TEST_DECLARE_UNIT(kmalloc_new_concurrency_stress_test,
             for (int j = i; j < STRESS_THREADS; ++j)
                 thread_detach(workers[j]);
 
-            return TEST_SUCCESS;
+            return TEST_FAIL(msg);
         }
 
         if (!done[i]) {
@@ -336,7 +352,7 @@ TEST_DECLARE_UNIT(kmalloc_new_concurrency_stress_test,
             for (int j = i + 1; j < STRESS_THREADS; ++j)
                 thread_detach(workers[j]);
 
-            return TEST_SUCCESS;
+            return TEST_FAIL(msg);
         }
     }
 
@@ -381,7 +397,7 @@ static void print_cand(struct elcm_candidate c) {
               c.obj_count);
 }
 
-TEST_DECLARE_UNIT(elcm_test, .group = TEST_GROUP(slab)) {
+TEST_DECLARE_SMOKE(elcm_test, .group = TEST_GROUP(slab)) {
     struct elcm_params params = {
         .obj_size = 938,
         .max_wastage_pct = ELCM_MAX_WASTAGE_DEFAULT,
@@ -400,55 +416,71 @@ TEST_DECLARE_UNIT(elcm_test, .group = TEST_GROUP(slab)) {
     return TEST_SUCCESS;
 }
 
-#define KFREE_IRQ_TEST_ALLOC_COUNT 2048
-#define KFREE_IRQ_TEST_FREES_PER_IRQ_MIDRANGE (KFREE_IRQ_TEST_ALLOC_COUNT / 128)
 #define KFREE_IRQ_TEST_SPIN_MASK UINT8_MAX
 
-static void *kfree_irq_allocs[KFREE_IRQ_TEST_ALLOC_COUNT] = {0};
+static void **kfree_irq_allocs = NULL;
+static size_t kfree_irq_total_allocs = 0;
 static atomic_size_t kfree_irq_test_consumed = 0;
 
 static enum irq_result kfree_irq_test_irq(void *arg, irq_t irq,
                                           struct irq_context *irqc) {
+    (void) arg;
+    (void) irq;
+    (void) irqc;
+    size_t total = kfree_irq_total_allocs;
+    int midrange = (int) (total / 128);
+    if (midrange < 1)
+        midrange = 1;
     /* Non-ordered load here is OK, we are the only modifier (this CPU) */
     uint8_t seed = prng_next() & 0xF;
     int delta = seed > 0x7 ? -(seed & 0x7) : (seed & 0x7);
-    int possible = KFREE_IRQ_TEST_FREES_PER_IRQ_MIDRANGE + delta;
-    if (possible < 0)
-        possible = KFREE_IRQ_TEST_FREES_PER_IRQ_MIDRANGE;
+    int possible = midrange + delta;
+    if (possible < 1)
+        possible = 1;
 
-    if (possible + kfree_irq_test_consumed > KFREE_IRQ_TEST_ALLOC_COUNT)
-        possible = KFREE_IRQ_TEST_ALLOC_COUNT - kfree_irq_test_consumed;
+    if (possible + atomic_load(&kfree_irq_test_consumed) > total)
+        possible = total - atomic_load(&kfree_irq_test_consumed);
 
     for (int i = 0; i < possible; i++) {
-        kassert(kfree_irq_test_consumed < KFREE_IRQ_TEST_ALLOC_COUNT);
-        int idx = atomic_fetch_add(&kfree_irq_test_consumed, 1);
-        kfree_defer_irq(kfree_irq_allocs[idx]);
-        int spins = prng_next() & KFREE_IRQ_TEST_SPIN_MASK;
+        size_t idx = atomic_fetch_add(&kfree_irq_test_consumed, 1);
+        if (idx < total) {
+            kfree_defer_irq(kfree_irq_allocs[idx]);
+            int spins = prng_next() & KFREE_IRQ_TEST_SPIN_MASK;
 
-        while (spins) {
-            cpu_relax();
-            spins--;
+            while (spins) {
+                cpu_relax();
+                spins--;
+            }
         }
     }
 
     return IRQ_HANDLED;
 }
 
-TEST_DECLARE_UNIT(kfree_defer_irq_test, .group = TEST_GROUP(slab)) {
+TEST_DECLARE_INTEGRATION(kfree_defer_irq_test, .group = TEST_GROUP(slab),
+                         TEST_INTENSITY(256, 2048, 16384)) {
     if (global.core_count < 4) {
         return TEST_SKIP(TEST_SKIP_NONE);
     }
+
+    size_t total = ctx->intensity_val ? ctx->intensity_val : 2048;
+    kfree_irq_total_allocs = total;
+    kfree_irq_allocs = kmalloc(sizeof(void *) * total);
+    TEST_ASSERT(kfree_irq_allocs != NULL);
+
+    atomic_store(&kfree_irq_test_consumed, 0);
 
     irq_t irq = irq_alloc_entry();
     irq_register("kfree_defer_irq_test", irq, kfree_irq_test_irq, NULL,
                  IRQ_FLAG_NONE);
     irq_set_chip(irq, lapic_get_chip(), NULL);
 
-    for (int i = 0; i < KFREE_IRQ_TEST_ALLOC_COUNT; i++) {
+    for (size_t i = 0; i < total; i++) {
         kfree_irq_allocs[i] = kmalloc(64);
+        TEST_ASSERT(kfree_irq_allocs[i] != NULL);
     }
 
-    while (atomic_load(&kfree_irq_test_consumed) < KFREE_IRQ_TEST_ALLOC_COUNT) {
+    while (atomic_load(&kfree_irq_test_consumed) < total) {
         ipi_send(3, irq);
         int spins = prng_next() & KFREE_IRQ_TEST_SPIN_MASK;
 
@@ -457,14 +489,22 @@ TEST_DECLARE_UNIT(kfree_defer_irq_test, .group = TEST_GROUP(slab)) {
             spins--;
         }
     }
+
+    kfree(kfree_irq_allocs);
+    kfree_irq_allocs = NULL;
+
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(slab_demand_test, .group = TEST_GROUP(slab)) {
+TEST_DECLARE_SMOKE(slab_demand_test, .group = TEST_GROUP(slab),
+                   TEST_INTENSITY(500, 5000, 20000)) {
+    size_t iters = ctx->intensity_val ? ctx->intensity_val : 5000;
     /* One of these should eventually touch the demand page */
-    for (size_t i = 0; i < 5000; i++) {
+    for (size_t i = 0; i < iters; i++) {
         void *p = kmalloc(500, ALLOC_FLAGS_ZERO | ALLOC_FLAG_PAGEABLE);
+        TEST_ASSERT(p != NULL);
         memset(p, 0, 500);
+        kfree(p);
     }
 
     return TEST_SUCCESS;

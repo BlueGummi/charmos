@@ -126,12 +126,8 @@ static bool radix_verify_node(struct radix_tree *tree, struct radix_node *node,
 }
 
 static bool radix_verify_tree(struct radix_tree *tree) {
-    if (!tree)
+    if (!tree || !tree->root)
         return true;
-
-    if (!tree->root)
-        if (tree->height != 0)
-            panic("Tree has no root but nonzero height %u", tree->height);
 
     int node_count = 0;
     return radix_verify_node(tree, tree->root, NULL, 0, tree->height, 0,

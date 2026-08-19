@@ -16,7 +16,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <test.h>
+#include <test/export.h>
+#include <test/test.h>
 #include <time/spin_sleep.h>
 #include <time/time.h>
 
@@ -39,6 +40,12 @@ static void test_filter_callback(const char *val, struct cmdline_entry *ent) {
     test_global.test_opt_in = true;
     test_global.group_opt_in = true;
 }
+
+CMDLINE_ENTRY_DECLARE_TYPED_CUSTOM(
+    test_global_intensity, test_global.global_intensity, cmdline_parse_fx,
+    .parent = CMDLINE_ENTRY(test_root), .arg = "<float>",
+    .desc = "global intensity override for all tests",
+    .flags = CMDLINE_ENTRY_DOCUMENTED);
 
 CMDLINE_ENTRY_DECLARE(
     test_filter, .name = "filter",
@@ -101,7 +108,7 @@ LINKER_SECTION_DEFINE(struct test_group, test_groups);
 /* no need to clean up allocations in these tests, we are supposed to
  * reboot/poweroff after all tests complete, and the userland should
  * not be in a state where we can boot it when running tests */
-struct test_globals test_global = {0};
+struct test_globals test_global = {.global_intensity = TEST_INTENSITY_SENTINEL};
 
 static bool is_keyword(const char *check, const char **against,
                        size_t num_keywords) {
@@ -404,7 +411,7 @@ static void test_group_run(struct test_group *tg) {
     if (no_tests)
         return;
 
-    /* TODO: A little hacky */
+    /* HACK: find a cleaner way to represent this */
     size_t total_tests = 0;
     time_ms_t total_time = 0;
     for (int i = 0; i < TEST_TIER_MAX; i++)
@@ -437,7 +444,7 @@ static void test_group_run(struct test_group *tg) {
     printf("\n");
 
     bool stop_outer = false;
-    *LOG_SITE(test_harness).name = (char *) tg->name;
+    LOG_SITE(test_harness)->name = (char *) tg->name;
 
     struct test_group_result result_totals = {0};
     size_t result_aggregates[TEST_RESULT_MAX] = {0};
@@ -449,6 +456,7 @@ static void test_group_run(struct test_group *tg) {
             continue;
 
         const char *tier_name = test_tier_to_str_color(i);
+
         size_t len = snprintf(NULL, 0,
                               "%s " ANSI_RESET "(" ANSI_BOLD ANSI_MAGENTA
                               "%s" ANSI_RESET ")" ANSI_GREEN,
@@ -459,7 +467,8 @@ static void test_group_run(struct test_group *tg) {
                  "%s " ANSI_RESET "(" ANSI_BOLD ANSI_MAGENTA "%s" ANSI_RESET
                  ")" ANSI_GREEN,
                  tg->name, tier_name);
-        *LOG_SITE(test_harness).name = (char *) name;
+
+        LOG_SITE(test_harness)->name = (char *) name;
 
         for (size_t test_num = 0; test_num < tg->num_tests[i]; test_num++) {
             struct test *t = tg->tests[i][test_num];
@@ -492,6 +501,13 @@ static void test_group_run(struct test_group *tg) {
             tctx.intensity = t->intensity;
             tctx.seed = !t->seed ? prng_next() : t->seed;
 
+            if (t->flags & TEST_FLAG_HONORS_INTENSITY) {
+                tctx.intensity_val =
+                    test_intensity_eval(&t->intensity_desc, tctx.intensity);
+            } else {
+                tctx.intensity_val = 0;
+            }
+
             size_t result_times[TEST_RESULT_MAX] = {0}, run_times = 0;
 
             struct test_verdict *verdicts = kmalloc_or_die(
@@ -499,6 +515,13 @@ static void test_group_run(struct test_group *tg) {
             struct test_verdict singular_verdict = {0};
 
             test_harness_info(ANSI_BOLD ANSI_BLUE "%s" ANSI_RESET, t->name);
+            if (t->flags & TEST_FLAG_HONORS_INTENSITY) {
+                char intst_str[512] = {0};
+                test_intensity_format(&t->intensity_desc, tctx.intensity,
+                                      tctx.intensity_val, intst_str,
+                                      sizeof(intst_str));
+                printf(" [" ANSI_CYAN "%s" ANSI_RESET "]", intst_str);
+            }
             test_progress_paint(tg, i, t->name);
 
             time_ms_t start_ms = time_get_ms();
@@ -622,7 +645,7 @@ static void test_group_run(struct test_group *tg) {
         kfree(name);
     }
 
-    *LOG_SITE(test_harness).name = "test_harness";
+    LOG_SITE(test_harness)->name = "test_harness";
     for (int i = 0; i < TEST_TIER_MAX; i++) {
         for (int j = 0; j < TEST_RESULT_MAX; j++) {
             test_global.results[i][j] += result_totals.totals[i][j];
@@ -636,7 +659,7 @@ static void test_group_run(struct test_group *tg) {
                           " " ANSI_GREEN ANSI_BOLD "successful" ANSI_RESET
                           " in " ANSI_BOLD "%zu" ANSI_RESET " ms\n\n\n",
                           tg->name, total_time);
-        *LOG_SITE(test_harness).name = "test_harness";
+        LOG_SITE(test_harness)->name = "test_harness";
     } else {
         test_harness_info("Test group " ANSI_BLUE ANSI_BOLD "%s" ANSI_RESET
                           " completed in " ANSI_BOLD "%zu" ANSI_RESET " ms, ",
@@ -662,12 +685,142 @@ static void test_global_aggregate_results() {
     }
 }
 
+static bool sig_str_equal(const char *s1, const char *s2) {
+    while (*s1 && *s2) {
+        while (*s1 == ' ' || *s1 == '\t')
+            s1++;
+        while (*s2 == ' ' || *s2 == '\t')
+            s2++;
+        if (*s1 != *s2)
+            return false;
+        if (*s1) {
+            s1++;
+            s2++;
+        }
+    }
+    while (*s1 == ' ' || *s1 == '\t')
+        s1++;
+    while (*s2 == ' ' || *s2 == '\t')
+        s2++;
+    return *s1 == *s2;
+}
+
+void test_verify_signatures(void) {
+    for (const struct test_signature_record *u =
+             __skernel_test_unsafe_signatures;
+         u < __ekernel_test_unsafe_signatures; u++) {
+
+        for (const struct test_signature_record *c =
+                 __skernel_test_canonical_signatures;
+             c < __ekernel_test_canonical_signatures; c++) {
+
+            if (strcmp(u->name, c->name) == 0) {
+                bool ret_match = sig_str_equal(u->ret_str, c->ret_str);
+                bool args_match = sig_str_equal(u->args_str, c->args_str);
+
+                if (!ret_match || !args_match) {
+                    test_harness_warn(
+                        "Unsafe import '%s' signature mismatch "
+                        "at %s:%u\n"
+                        "  canonical: %s %s(%s) (defined at %s:%u)\n"
+                        "  imported : %s %s(%s)\n",
+                        u->name, u->file, u->line, c->ret_str, c->name,
+                        c->args_str, c->file, c->line, u->ret_str, u->name,
+                        u->args_str);
+                }
+                break;
+            }
+        }
+    }
+}
+
+static void tests_resolve_imports(void) {
+    for (const struct test_export_entry *a = __skernel_test_exports;
+         a < __ekernel_test_exports; a++) {
+        for (const struct test_export_entry *b = a + 1;
+             b < __ekernel_test_exports; b++) {
+            if (strcmp(a->name, b->name) == 0) {
+                panic("duplicate '%s' exported, use TEST_EXPORT_AS", a->name);
+            }
+        }
+    }
+
+    for (const struct test_import_entry *imp = __skernel_test_imports;
+         imp < __ekernel_test_imports; imp++) {
+        void *resolved = NULL;
+
+        for (const struct test_export_entry *exp = __skernel_test_exports;
+             exp < __ekernel_test_exports; exp++) {
+            if (strcmp(imp->name, exp->name) == 0) {
+                resolved = exp->fn_ptr;
+                break;
+            }
+        }
+
+        if (!resolved) {
+            panic("unresolved symbol '%s' imported at %s:%u!", imp->name,
+                  imp->import_file, imp->import_line);
+        }
+
+        *(imp->target_fn_ptr) = resolved;
+    }
+}
+
+static void tests_set_intensities() {
+    for (struct test_group *tg = __skernel_test_groups;
+         tg < __ekernel_test_groups; tg++) {
+        if (tg->default_intensity == TEST_INTENSITY_SENTINEL)
+            tg->default_intensity = TEST_INTENSITY_DEFAULT;
+
+        if (test_global.global_intensity != TEST_INTENSITY_SENTINEL)
+            tg->default_intensity = test_global.global_intensity;
+    }
+
+    for (struct test *t = __skernel_tests; t < __ekernel_tests; t++) {
+        if (t->flags & TEST_FLAG_INHERITS_INTENSITY) {
+            t->flags |= TEST_FLAG_HONORS_INTENSITY;
+            if (t->intensity_desc.curve == TEST_SCALE_NONE) {
+                t->intensity_desc.curve = t->group->intensity_desc.curve;
+                t->intensity_desc.custom_scale =
+                    t->group->intensity_desc.custom_scale;
+                t->intensity_desc.custom_print =
+                    t->group->intensity_desc.custom_print;
+
+                if (t->intensity_desc.min_val == SIZE_MAX)
+                    t->intensity_desc.min_val =
+                        t->group->intensity_desc.min_val;
+
+                if (t->intensity_desc.max_val == SIZE_MAX)
+                    t->intensity_desc.max_val =
+                        t->group->intensity_desc.max_val;
+
+                if (t->intensity_desc.def_val == SIZE_MAX)
+                    t->intensity_desc.def_val =
+                        t->group->intensity_desc.def_val;
+            }
+        }
+
+        if (t->intensity == TEST_INTENSITY_SENTINEL) {
+            if (t->flags & TEST_FLAG_INHERITS_INTENSITY) {
+                t->intensity = t->group->default_intensity;
+            } else {
+                t->intensity = TEST_INTENSITY_DEFAULT;
+            }
+        }
+
+        if (test_global.global_intensity != TEST_INTENSITY_SENTINEL)
+            t->intensity = test_global.global_intensity;
+    }
+}
+
 void tests_run(void) {
 #ifdef TEST_ENABLED
     term_probe();
+    tests_resolve_imports();
     tests_check_duplicate_names();
     tests_setup_groups();
     tests_apply_filters();
+    tests_set_intensities();
     tests_set_enabled_states();
 
     bool all_ok = true;

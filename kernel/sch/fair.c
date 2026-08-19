@@ -264,8 +264,8 @@ static int64_t base_weight_of(struct thread *t) {
     int32_t effective_boost = t->niceness + t->climb_state.effective_boost;
 
     if (effective_boost) {
-        int32_t nf = fx_pow_i32(NICE_BASE_FP, effective_boost);
-        w = (w * nf) >> 16;
+        fx32_32_t nf = fx_pow_i32(NICE_BASE_FP, effective_boost);
+        w = fx_to_int(fx_mul(fx_from_int(w), nf));
     }
 
     if (w < 1)

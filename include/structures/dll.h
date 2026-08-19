@@ -40,11 +40,13 @@
     thing->prev = NULL;
 
 #define dll_clear(q)                                                           \
-    typeof(q->head) start = q->head;                                           \
-    typeof(start) iter = start;                                                \
-    do {                                                                       \
-        typeof(iter->next) next = iter->next;                                  \
-        iter->next = iter->prev = NULL;                                        \
-        iter = next;                                                           \
-    } while (iter != start);                                                   \
-    q->head = NULL;
+    if (q->head) {                                                             \
+        typeof(q->head) start = q->head;                                       \
+        typeof(start) iter = start;                                            \
+        do {                                                                   \
+            typeof(iter->next) next = iter->next;                              \
+            iter->next = iter->prev = NULL;                                    \
+            iter = next;                                                       \
+        } while (iter != start);                                               \
+        q->head = NULL;                                                        \
+    }

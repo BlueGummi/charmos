@@ -23,3 +23,9 @@ struct radix_tree {
     uint32_t height;
     radix_key_fn key_fn;
 };
+
+int32_t radix_insert(struct radix_tree *tree, void *item);
+void *radix_lookup(struct radix_tree *tree, uint64_t key);
+void *radix_delete(struct radix_tree *tree, uint64_t key);
+struct radix_tree *radix_tree_init(struct radix_tree *r, radix_key_fn kfn,
+                                   int height);

@@ -327,9 +327,11 @@ void slab_cache_init(size_t order, struct slab_cache *cache,
 
     cache->slab_metadata_size =
         sizeof(struct slab) + cache->bitmap_bytes + page_ptr_size + traces_size;
+    cache->slab_metadata_size =
+        ALIGN_UP(cache->slab_metadata_size, sizeof(uint64_t));
 
     kassert(cache->objs_per_slab * cache->obj_stride +
-                cache->slab_metadata_size <
+                cache->slab_metadata_size <=
             cache->pages_per_slab * PAGE_SIZE);
 
     /* We must hold this true because right now we only handle
@@ -355,6 +357,15 @@ static void slab_zero_out(struct slab *slab, size_t n_pages) {
 
 struct slab *slab_init(struct slab *slab, struct slab_cache *parent) {
     void *page = slab;
+
+#ifdef DEBUG_ASAN
+    /* We must unpoison the slab because if it's taken off GC,
+     * the slab might still be poisoned according to the previous
+     * use, which means previously bitmap bytes would be different metadata
+     * and we could touch it and cause ASAN to trip */
+    asan_unpoison(page, parent->slab_metadata_size);
+#endif
+
     slab->parent_cache = parent;
     slab->bitmap = slab_get_bitmap_location(slab);
 
@@ -373,6 +384,13 @@ struct slab *slab_init(struct slab *slab, struct slab_cache *parent) {
     rbt_init_node(&slab->rb);
     INIT_LIST_HEAD(&slab->list);
     memset(slab->bitmap, 0, parent->bitmap_bytes);
+
+    /* Pre-set unused trailing bits */
+    size_t total_bits = parent->bitmap_bytes * 8;
+    for (size_t b = parent->objs_per_slab; b < total_bits; b++) {
+        size_t byte_idx = b / 8;
+        slab->bitmap[byte_idx] |= (uint8_t) (1U << (b % 8));
+    }
 
 #ifdef DEBUG_SLAB_DEEP
     memset(slab->traces, 0, parent->objs_per_slab * sizeof(stack_handle_t));
@@ -435,7 +453,8 @@ struct slab *slab_create(struct slab_cache *cache,
             slab_stat_gc_object_reclaimed(local);
             return slab_init(slab, cache);
         } else {
-            slab_gc_enqueue(local, slab);
+            /* Came out of cache's domain GC, so must go back to it */
+            slab_gc_enqueue(cache->parent_domain, slab);
             slab = NULL;
         }
     }
@@ -754,7 +773,8 @@ size_t ksize(void *ptr) {
 
     if (!in_slab) {
         struct slab_page_hdr *hdr = slab_page_hdr_for_addr(ptr);
-        kassert(hdr->magic == KMALLOC_PAGE_MAGIC);
+        kassert(hdr->magic == KMALLOC_PAGE_MAGIC, "header is 0x%lx",
+                hdr->magic);
         return hdr->pages * PAGE_SIZE - sizeof(struct slab_page_hdr);
     }
 
@@ -1428,6 +1448,10 @@ void kfree_new(void *ptr, enum alloc_behavior behavior) {
 
     slab_stat_free_call(local_domain);
 
+    /* Free from ASAN first so we don't get a
+     * window in between this and slab_free */
+    asan_free(ptr, size);
+
     if (idx < 0) {
         kfree_pages(ptr, behavior);
         goto garbage_collect;
@@ -1461,7 +1485,6 @@ garbage_collect:
     slab_free_queue_drain_on_free(local_domain, pcpu, behavior);
 
 done:
-    asan_free(ptr, size);
     irql_lower(outer);
 }
 

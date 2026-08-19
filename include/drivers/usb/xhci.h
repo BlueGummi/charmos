@@ -100,7 +100,7 @@ struct pci_device;
 
 #define TRB_SET_TYPE(val) (((val) & 0x3F) << 10)
 #define TRB_SET_CYCLE(val) (((val) & 1))
-#define TRB_SET_INTERRUPTER_TARGET(target) ((target) >> 21)
+#define TRB_SET_INTERRUPTER_TARGET(target) (((uint32_t) (target) & 0x3FF) << 22)
 
 #define TRB_CYCLE_BIT (1 << 0)
 #define TRB_ENT_BIT (1 << 1) // Evaluate Next TRB

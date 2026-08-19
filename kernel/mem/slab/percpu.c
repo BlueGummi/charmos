@@ -5,7 +5,8 @@
 
 #include "internal.h"
 
-static void slab_magazine_zero_check(struct slab_magazine *mag) {
+__no_sanitize_address static void
+slab_magazine_zero_check(struct slab_magazine *mag) {
 #ifdef DEBUG_SLAB_DEEP
     if (mag->type != SLAB_MAGAZINE_ZERO)
         return;

@@ -1,5 +1,5 @@
 #pragma once
-#include <test.h>
+#include <test/test.h>
 
 #include "../internal.h"
 #include <crypto/prng.h>
@@ -18,4 +18,5 @@
 #include <string.h>
 #include <thread/thread.h>
 
+TEST_GROUP_DEFINE(slab);
 extern struct test_group __test_group_slab;

@@ -1,23 +1,25 @@
 #include "test_internal.h"
 
 #ifdef TEST_MEM
-TEST_GROUP_DECLARE(slab);
-
-/* probably don't need these at all but I'll keep
- * them in case something decides to be funny */
-#define ALIGNED_ALLOC_TIMES 512
+TEST_GROUP_DECLARE(slab, .intensity_desc = {
+                             .curve = TEST_SCALE_PIECEWISE_LOG,
+                             .unit = "allocs",
+                         });
 
 #define ASSERT_ALIGNED(ptr, alignment)                                         \
     TEST_ASSERT(((uintptr_t) (ptr) & ((alignment) - 1)) == 0)
 
 #define KMALLOC_ALIGNMENT_TEST(name, align)                                    \
     TEST_DECLARE_SMOKE(kmalloc_aligned_##name##_test,                          \
-                       .group = TEST_GROUP(slab)) {                            \
+                       .group = TEST_GROUP(slab),                              \
+                       TEST_INTENSITY(32, 512, 2048)) {                        \
         ABORT_IF_RAM_LOW();                                                    \
-        for (uint64_t i = 0; i < ALIGNED_ALLOC_TIMES; i++) {                   \
+        size_t alloc_times = ctx->intensity_val ? ctx->intensity_val : 512;    \
+        for (uint64_t i = 0; i < alloc_times; i++) {                           \
             void *ptr = kmalloc_aligned(align, align);                         \
             TEST_ASSERT(ptr != NULL);                                          \
             ASSERT_ALIGNED(ptr, align);                                        \
+            kfree_aligned(ptr);                                                \
         }                                                                      \
         return TEST_SUCCESS;                                                   \
     }
