@@ -27,11 +27,9 @@ static inline bool thread_rcu_not_reached_target(struct thread *t,
         uint64_t start_gen =
             atomic_load_explicit(&t->rcu_start_gen, memory_order_acquire);
         return start_gen != 0 && start_gen < target;
-    } else {
-        uint64_t qgen =
-            atomic_load_explicit(&t->rcu_quiescent_gen, memory_order_acquire);
-        return qgen != UINT64_MAX && qgen < target;
     }
+
+    return false;
 }
 
 static uint64_t rcu_read_global_gen(void) {
@@ -54,6 +52,8 @@ void rcu_synchronize(void) {
         struct thread *t, *tmp;
         list_for_each_entry_safe(t, tmp, &global.thread_list.list,
                                  thread_list) {
+            if (t == thread_get_current())
+                continue;
             if (thread_rcu_not_reached_target(t, target)) {
                 all_done = false;
                 break;
@@ -96,11 +96,8 @@ void rcu_read_lock(void) {
     uint32_t old =
         atomic_fetch_add_explicit(&t->rcu_nesting, 1, memory_order_relaxed);
     if (old == 0) {
-        uint64_t gen;
-        do {
-            gen = rcu_read_global_gen();
-            atomic_store_explicit(&t->rcu_start_gen, gen, memory_order_release);
-        } while (gen != rcu_read_global_gen());
+        uint64_t gen = rcu_read_global_gen();
+        atomic_store_explicit(&t->rcu_start_gen, gen, memory_order_release);
         atomic_thread_fence(memory_order_seq_cst);
     }
 }
@@ -113,11 +110,6 @@ void rcu_read_unlock(void) {
         panic("RCU nesting underflow");
 
     if (old == 1) {
-        uint64_t start_gen =
-            atomic_load_explicit(&t->rcu_start_gen, memory_order_acquire);
-        atomic_store_explicit(&t->rcu_quiescent_gen, start_gen - 1,
-                              memory_order_release);
-
         atomic_store_explicit(&t->rcu_start_gen, 0, memory_order_release);
     }
 }
@@ -141,6 +133,8 @@ static bool thread_list_has_pending_readers(uint64_t gen) {
     enum irql irql = spin_lock_irq_disable(&global.thread_list.lock);
     struct thread *t, *tmp;
     list_for_each_entry_safe(t, tmp, &global.thread_list.list, thread_list) {
+        if (t == thread_get_current())
+            continue;
         if (thread_rcu_not_reached_target(t, gen)) {
             pending = true;
             break;
@@ -209,6 +203,8 @@ static void rcu_gp_worker(void *unused) {
             struct thread *t, *tmp;
             list_for_each_entry_safe(t, tmp, &global.thread_list.list,
                                      thread_list) {
+                if (t == thread_get_current())
+                    continue;
                 if (thread_rcu_not_reached_target(t, target)) {
                     everybody_ok = false;
                     break;

@@ -3,7 +3,8 @@
 	url = https://github.com/uACPI/uACPI
 [submodule "kernel/flanterm"]
 	path = kernel/flanterm
-	url = https://codeberg.org/mintsuki/flanterm
+	url = https://github.com/Mintsuki/Flanterm
+	branch = trunk
 [submodule "limine"]
 	path = limine
 	url = https://github.com/limine-bootloader/limine.git
