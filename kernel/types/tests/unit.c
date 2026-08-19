@@ -205,6 +205,13 @@ TEST_DECLARE_UNIT(ui128_divmod_edges, .group = TEST_GROUP(ui128)) {
 TEST_DECLARE_UNIT(ui128_signed_divmod, .group = TEST_GROUP(ui128),
                   TEST_INTENSITY(10, 40, 512)) {
     size_t bound = ctx->intensity_val ? ctx->intensity_val : 40;
+    int128_t rem;
+
+    TEST_ASSERT(__divmodti4(7, 2, &rem) == 3 && rem == 1);
+    TEST_ASSERT(__divmodti4(-7, 2, &rem) == -3 && rem == -1);
+    TEST_ASSERT(__divmodti4(7, -2, &rem) == -3 && rem == 1);
+    TEST_ASSERT(__divmodti4(-7, -2, &rem) == 3 && rem == -1);
+
     TEST_ASSERT(__divti3(7, 2) == 3);
     TEST_ASSERT(__divti3(-7, 2) == -3);
     TEST_ASSERT(__divti3(7, -2) == -3);
@@ -219,9 +226,13 @@ TEST_DECLARE_UNIT(ui128_signed_divmod, .group = TEST_GROUP(ui128),
         for (int128_t b = -7; b <= 7; b++) {
             if (b == 0)
                 continue;
+            int128_t r;
+            int128_t q = __divmodti4(a, b, &r);
+            TEST_ASSERT(q == a / b);
+            TEST_ASSERT(r == a % b);
             TEST_ASSERT(__divti3(a, b) == a / b);
             TEST_ASSERT(__modti3(a, b) == a % b);
-            TEST_ASSERT(__divti3(a, b) * b + __modti3(a, b) == a);
+            TEST_ASSERT(q * b + r == a);
         }
 
     return TEST_SUCCESS;

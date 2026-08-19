@@ -143,20 +143,28 @@ uint128_t __umodti3(uint128_t a, uint128_t b) {
     return r;
 }
 
-int128_t __divti3(int128_t a, int128_t b) {
-    int neg = (a < 0) ^ (b < 0);
+int128_t __divmodti4(int128_t a, int128_t b, int128_t *rem) {
+    int neg_q = (a < 0) ^ (b < 0);
+    int neg_r = (a < 0);
     uint128_t ua = (a < 0) ? -(uint128_t) a : (uint128_t) a;
     uint128_t ub = (b < 0) ? -(uint128_t) b : (uint128_t) b;
-    uint128_t q = __udivmodti4(ua, ub, (uint128_t *) 0);
-    return neg ? -(int128_t) q : (int128_t) q;
+    uint128_t ur;
+    uint128_t uq = __udivmodti4(ua, ub, &ur);
+
+    if (rem)
+        *rem = neg_r ? -(int128_t) ur : (int128_t) ur;
+
+    return neg_q ? -(int128_t) uq : (int128_t) uq;
+}
+
+int128_t __divti3(int128_t a, int128_t b) {
+    return __divmodti4(a, b, (int128_t *) 0);
 }
 
 int128_t __modti3(int128_t a, int128_t b) {
-    uint128_t ua = (a < 0) ? -(uint128_t) a : (uint128_t) a;
-    uint128_t ub = (b < 0) ? -(uint128_t) b : (uint128_t) b;
-    uint128_t r;
-    __udivmodti4(ua, ub, &r);
-    return (a < 0) ? -(int128_t) r : (int128_t) r;
+    int128_t r;
+    __divmodti4(a, b, &r);
+    return r;
 }
 
 int __cmpti2(int128_t a, int128_t b) {
