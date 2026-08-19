@@ -1,4 +1,4 @@
-#include "test_internal.h"
+#include "../test_internal.h"
 
 #ifdef TEST_BIO_SCHED
 #define EXT2_INIT                                                              \
@@ -9,7 +9,6 @@
     struct vfs_node *root = global.root_node;
 
 static bool done2 = false;
-static atomic_bool cb1d = false, cb2d = false;
 static uint64_t avg_complete_time[BIO_SCHED_LEVELS] = {0};
 static uint64_t total_complete_time[BIO_SCHED_LEVELS] = {0};
 static _Atomic uint32_t runs = 0;
@@ -27,25 +26,10 @@ static void bio_sch_callback(struct bio_request *req) {
     TEST_ASSERT_VOID(req->status == BIO_STATUS_OK);
 }
 
-static void bio_sch_callback1(struct bio_request *req) {
-    (void) req;
-
-    atomic_store(&cb1d, true);
-    test_info("cb 1 success");
-}
-
-static void bio_sch_callback2(struct bio_request *req) {
-    (void) req;
-
-    atomic_store(&cb2d, true);
-    test_info("cb 2 success");
-}
-
 #define BIO_SCHED_TEST_RUNS_MAX 4096
 static uint64_t runs_per_lvl[BIO_SCHED_LEVELS] = {0};
 static struct bio_request *rqs[BIO_SCHED_TEST_RUNS_MAX] = {0};
 static uint8_t *buffers[BIO_SCHED_TEST_RUNS_MAX] = {0};
-static volatile int send_dispatch = 0;
 
 TEST_DECLARE_INTEGRATION(bio_sched_delay_enqueue_test,
                          .group = TEST_GROUP(bio_sched),
@@ -65,7 +49,6 @@ TEST_DECLARE_INTEGRATION(bio_sched_delay_enqueue_test,
     memset(total_complete_time, 0, sizeof(total_complete_time));
     memset(avg_complete_time, 0, sizeof(avg_complete_time));
     atomic_store(&runs, 0);
-    send_dispatch = 0;
 
     prng_seed(ctx->seed ? ctx->seed : time_get_us());
 
@@ -117,10 +100,8 @@ TEST_DECLARE_INTEGRATION(bio_sched_delay_enqueue_test,
     TEST_ASSERT(msg);
     snprintf(msg, 100, "Total time spent enqueuing is %d ms", ms);
     test_info(msg);
-    kfree(msg);
-    send_dispatch = 1;
+
     bio_sched_dispatch_all(d);
-    send_dispatch = 2;
 
     for (uint64_t i = 0; i < 150000; i++)
         cpu_relax();
@@ -135,7 +116,6 @@ TEST_DECLARE_INTEGRATION(bio_sched_delay_enqueue_test,
         snprintf(lvl_msg, 100, "Average completion time of level %d is %d ms",
                  i, avg_complete_time[i]);
         test_info(lvl_msg);
-        kfree(lvl_msg);
     }
 
     char *m2 = kmalloc(100);
@@ -143,7 +123,6 @@ TEST_DECLARE_INTEGRATION(bio_sched_delay_enqueue_test,
     snprintf(m2, 100, "Runs is %d, test_runs is %zu", atomic_load(&runs),
              test_runs);
     test_info(m2);
-    kfree(m2);
     TEST_ASSERT(atomic_load(&runs) <= test_runs);
 
     return TEST_SUCCESS;

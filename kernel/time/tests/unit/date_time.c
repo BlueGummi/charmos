@@ -1,4 +1,4 @@
-#include "test_internal.h"
+#include "../test_internal.h"
 
 #ifdef TEST_DATE_TIME
 TEST_GROUP_DECLARE(date_time, .intensity_desc = {

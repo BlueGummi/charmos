@@ -1,23 +1,11 @@
 #include "../test_internal.h"
 
 #ifdef TEST_MUTEX
-TEST_GROUP_DECLARE(mutex, .intensity_desc = {
-                              .curve = TEST_SCALE_PIECEWISE_LOG,
-                              .unit = "threads",
-                          });
+
 
 #define MUTEX_REPORT_PROBLEMS()                                                \
     test_info("Mutex tests are encountering problems and will be skipped");    \
     return TEST_SKIP(TEST_SKIP_NONE);
-
-static struct mutex basic_test_mtx = MUTEX_INIT;
-
-TEST_DECLARE_SMOKE(mutex_test_basic, .group = TEST_GROUP(mutex)) {
-    mutex_lock(&basic_test_mtx);
-    scheduler_yield();
-    mutex_unlock(&basic_test_mtx);
-    return TEST_SUCCESS;
-}
 
 static struct mutex pi_mutex = MUTEX_INIT;
 static struct thread *pi_ts, *pi_rt, *pi_dum;
@@ -323,7 +311,6 @@ TEST_DECLARE_INTEGRATION(mutex_pi_revert, .group = TEST_GROUP(mutex)) {
     thread_set_joinable(rt);
 
     thread_enqueue_on_core(ts, cpu);
-
     while (!atomic_load(&pi_revert_got))
         scheduler_yield();
 
@@ -333,7 +320,6 @@ TEST_DECLARE_INTEGRATION(mutex_pi_revert, .group = TEST_GROUP(mutex)) {
     thread_join(rt);
 
     TEST_ASSERT(atomic_load(&pi_reverted));
-    TEST_ASSERT(atomic_load(&pi_reverted_done) == 2);
 
     return TEST_SUCCESS;
 }

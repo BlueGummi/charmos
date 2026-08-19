@@ -6,7 +6,6 @@ TEST_GROUP_DECLARE(ext2, .intensity_desc = {
                             .unit = "ops",
                         });
 
-
 #define EXT2_INIT                                                              \
     if (global.root_node->fs_type != FS_EXT2) {                                \
         test_info("the mounted root is not ext2");                             \
@@ -14,34 +13,11 @@ TEST_GROUP_DECLARE(ext2, .intensity_desc = {
     }                                                                          \
     struct vfs_node *root = global.root_node;
 
-/*
-static void check_bcache(void) {
-    struct ext2_fs *fs = g_root_node->fs_data;
-    struct generic_disk *d = fs->drive;
-
-    uint64_t bcache_total_dirty = 42;
-    uint64_t bcache_total_present = 37;
-
-    bcache_stat(d, &bcache_total_dirty, &bcache_total_present);
-
-    char *msg = kmalloc(100);
-    snprintf(msg, 100, "Block cache has %d dirty entries and %d total entries",
-             bcache_total_dirty, bcache_total_present);
-
-    test_info(msg);
-
-    TEST_ASSERT(bcache_total_dirty == 0);
-}*/
-
 static void flush() {
     struct ext2_fs *fs = global.root_node->fs_data;
     struct block_device *d = fs->drive;
 
     bio_sched_dispatch_all(d);
-
-    /*
-    sleep_ms(500);
-    check_bcache();*/
 }
 
 TEST_DECLARE_INTEGRATION(ext2_stat_test, .group = TEST_GROUP(ext2),
@@ -68,6 +44,7 @@ TEST_DECLARE_INTEGRATION(ext2_stat_test, .group = TEST_GROUP(ext2),
     flush();
     return TEST_SUCCESS;
 }
+
 TEST_DECLARE_INTEGRATION(ext2_rename_test, .group = TEST_GROUP(ext2),
                          TEST_INTENSITY(1, 1, 16)) {
     EXT2_INIT;
@@ -96,6 +73,7 @@ TEST_DECLARE_INTEGRATION(ext2_rename_test, .group = TEST_GROUP(ext2),
     flush();
     return TEST_SUCCESS;
 }
+
 TEST_DECLARE_INTEGRATION(ext2_chmod_test, .group = TEST_GROUP(ext2),
                          TEST_INTENSITY(1, 1, 16)) {
     EXT2_INIT;
@@ -122,6 +100,7 @@ TEST_DECLARE_INTEGRATION(ext2_chmod_test, .group = TEST_GROUP(ext2),
     flush();
     return TEST_SUCCESS;
 }
+
 TEST_DECLARE_INTEGRATION(ext2_symlink_test, .group = TEST_GROUP(ext2),
                          TEST_INTENSITY(1, 1, 16)) {
     EXT2_INIT;
@@ -146,6 +125,7 @@ TEST_DECLARE_INTEGRATION(ext2_symlink_test, .group = TEST_GROUP(ext2),
     flush();
     return TEST_SUCCESS;
 }
+
 TEST_DECLARE_INTEGRATION(ext2_dir_test, .group = TEST_GROUP(ext2),
                          TEST_INTENSITY(1, 1, 16)) {
     EXT2_INIT;

@@ -280,10 +280,11 @@ TEST_DECLARE_INTEGRATION(rcu_stress_test, .group = TEST_GROUP(rcu),
     test_info("RCU stress test: replacements=%u freed=%u",
               (unsigned) atomic_load(&stress_replacements),
               (unsigned) atomic_load(&stress_deferred_freed));
-    printf(" [RCU STATS] Completed %u replacements, %u deferred frees across "
-           "64 readers & 8 writers\n",
-           (unsigned) atomic_load(&stress_replacements),
-           (unsigned) atomic_load(&stress_deferred_freed));
+    test_info(
+        " [RCU STATS] Completed %u replacements, %u deferred frees across "
+        "64 readers & 8 writers\n",
+        (unsigned) atomic_load(&stress_replacements),
+        (unsigned) atomic_load(&stress_deferred_freed));
 
     TEST_ASSERT(!atomic_load(&stress_failed));
     TEST_ASSERT(atomic_load(&stress_deferred_freed) > 0);

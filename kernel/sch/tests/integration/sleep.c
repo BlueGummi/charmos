@@ -1,6 +1,22 @@
 #include "../test_internal.h"
 
 #ifdef TEST_SCHED
+TEST_GROUP_DECLARE(sched, .intensity_desc = {
+                              .curve = TEST_SCALE_PIECEWISE_LOG,
+                              .unit = "iters",
+                          });
+
+static void sleepy_entry(void *) {
+    thread_sleep_for_ms(50);
+}
+
+TEST_DECLARE_INTEGRATION(sched_sleepy_test, .group = TEST_GROUP(sched)) {
+    struct thread *t =
+        thread_spawn_joinable("sched_sleepy_test", sleepy_entry, NULL);
+    TEST_ASSERT(t);
+    thread_join(t);
+    return TEST_SUCCESS;
+}
 
 static atomic_bool si_apc_ran = false;
 static struct thread *si_t;
@@ -66,58 +82,6 @@ TEST_DECLARE_INTEGRATION(thread_sleep_interruptible_test,
 
     TEST_ASSERT(atomic_load(&si_ok));
 
-    return TEST_SUCCESS;
-}
-
-#define SCHED_PUSH_TEST_THREADS_MAX 1024
-
-static atomic_uint left = 0;
-static atomic_bool at_least_one_migrated = false;
-
-static void sched_push_try(void *) {
-    while (smp_core_id() == 0 && !atomic_load(&at_least_one_migrated))
-        scheduler_yield();
-
-    atomic_fetch_sub(&left, 1);
-    atomic_store(&at_least_one_migrated, true);
-}
-
-TEST_DECLARE_INTEGRATION(sched_push_target_test, .group = TEST_GROUP(sched),
-                         TEST_INTENSITY(32, 256, 1024)) {
-    test_info("This test takes a bit. uncomment me to run it");
-    return TEST_SKIP(TEST_SKIP_NONE);
-
-    if (global.core_count < 2) {
-        return TEST_SKIP(TEST_SKIP_NONE);
-    }
-
-    size_t count = ctx->intensity_val ? ctx->intensity_val : 256;
-    if (count > SCHED_PUSH_TEST_THREADS_MAX)
-        count = SCHED_PUSH_TEST_THREADS_MAX;
-
-    atomic_store(&left, (unsigned) count);
-    atomic_store(&at_least_one_migrated, false);
-
-    struct thread **pushed =
-        kmalloc(sizeof(struct thread *) * count, ALLOC_FLAGS_ZERO);
-    TEST_ASSERT(pushed != NULL);
-
-    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
-    for (size_t i = 0; i < count; i++) {
-        pushed[i] = thread_spawn_joinable_on_core("push_test_%zu",
-                                                  sched_push_try, NULL, 0, i);
-    }
-    irql_lower(irql);
-
-    for (size_t i = 0; i < count; i++) {
-        if (pushed[i]) {
-            thread_join(pushed[i]);
-        }
-    }
-
-    TEST_ASSERT(atomic_load(&left) == 0);
-
-    kfree(pushed);
     return TEST_SUCCESS;
 }
 #endif

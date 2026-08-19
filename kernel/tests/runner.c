@@ -436,9 +436,12 @@ static void test_group_run(struct test_group *tg) {
             printf(ANSI_BOLD "%s" ANSI_RESET, test_tier_to_str_color(i));
 
         /* Check if the next one exists to print a comma */
-        if (i + 1 < TEST_TIER_MAX && tg->tier_enabled[i + 1] &&
-            tg->num_tests_enabled[i + 1])
-            printf(", ");
+        for (int j = i + 1; j < TEST_TIER_MAX; j++) {
+            if (tg->tier_enabled[j] && tg->num_tests_enabled[j]) {
+                printf(", ");
+                break;
+            }
+        }
     }
 
     printf("\n");
@@ -494,7 +497,7 @@ static void test_group_run(struct test_group *tg) {
                 .dump_opts = dopts,
                 .flags = flags,
             };
-            alloc_or_die(tctx.site = log_site_create(opts));
+            tctx.site = alloc_or_die(log_site_create(opts));
             test_global.current_test = &tctx;
             tctx.handle.msg = "test_handle";
             tctx.handle.print = test_handle_print;
@@ -614,10 +617,10 @@ static void test_group_run(struct test_group *tg) {
                 printf("\n");
             }
 
-            if ((log_site_message_count(tctx.site) &&
-                 (result_times[TEST_RESULT_FAILED] ||
-                  (result_times[TEST_RESULT_SKIPPED] && t->run_times > 1))) ||
-                test_global.show_output) {
+            if (log_site_message_count(tctx.site) &&
+                ((result_times[TEST_RESULT_FAILED] ||
+                  (result_times[TEST_RESULT_SKIPPED] && t->run_times > 1)) ||
+                 test_global.show_output)) {
                 test_harness_info("messages:\n");
                 log_dump_site(tctx.site);
             }

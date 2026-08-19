@@ -1,4 +1,4 @@
-#include "test_internal.h"
+#include "../test_internal.h"
 
 #ifdef TEST_UI128
 TEST_GROUP_DECLARE(ui128, .intensity_desc = {

@@ -1,4 +1,4 @@
-#include "test_internal.h"
+#include "../test_internal.h"
 
 #ifdef TEST_BIO_SCHED
 TEST_GROUP_DECLARE(bio_sched, .intensity_desc = {
@@ -13,37 +13,13 @@ TEST_GROUP_DECLARE(bio_sched, .intensity_desc = {
     }                                                                          \
     struct vfs_node *root = global.root_node;
 
-static bool done2 = false;
-static atomic_bool cb1d = false, cb2d = false;
-static uint64_t avg_complete_time[BIO_SCHED_LEVELS] = {0};
-static uint64_t total_complete_time[BIO_SCHED_LEVELS] = {0};
-static _Atomic uint32_t runs = 0;
-
-static void bio_sch_callback(struct bio_request *req) {
-    (void) req;
-
-    done2 = true;
-    uint64_t q_ms = (uint64_t) req->user_data >> 12;
-    uint64_t q_lvl = (uint64_t) req->user_data & 7;
-    time_ms_t time = time_get_ms() - q_ms;
-    total_complete_time[q_lvl] += time;
-    req->user_data = NULL;
-    atomic_fetch_add(&runs, 1);
-    TEST_ASSERT_VOID(req->status == BIO_STATUS_OK);
-}
+static atomic_bool cb1d = false;
 
 static void bio_sch_callback1(struct bio_request *req) {
     (void) req;
 
     atomic_store(&cb1d, true);
     test_info("cb 1 success");
-}
-
-static void bio_sch_callback2(struct bio_request *req) {
-    (void) req;
-
-    atomic_store(&cb2d, true);
-    test_info("cb 2 success");
 }
 
 TEST_DECLARE_INTEGRATION(bio_sched_coalesce_test,
@@ -76,7 +52,6 @@ TEST_DECLARE_INTEGRATION(bio_sched_coalesce_test,
     uint64_t t = time_get_us();
     snprintf(name, 100, "enqueues took %d us", time_get_us() - t);
     test_info(name);
-    kfree(name);
 
     bio_sched_dispatch_all(d);
 

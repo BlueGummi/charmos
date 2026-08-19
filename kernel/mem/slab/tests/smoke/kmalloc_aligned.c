@@ -1,10 +1,7 @@
-#include "test_internal.h"
+#include "../test_internal.h"
 
 #ifdef TEST_MEM
-TEST_GROUP_DECLARE(slab, .intensity_desc = {
-                             .curve = TEST_SCALE_PIECEWISE_LOG,
-                             .unit = "allocs",
-                         });
+
 
 #define ASSERT_ALIGNED(ptr, alignment)                                         \
     TEST_ASSERT(((uintptr_t) (ptr) & ((alignment) - 1)) == 0)

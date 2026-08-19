@@ -1,4 +1,4 @@
-#include "test_internal.h"
+#include "../test_internal.h"
 
 #ifdef TEST_TMPFS
 TEST_GROUP_DECLARE(tmpfs, .intensity_desc = {
@@ -137,6 +137,7 @@ TEST_DECLARE_INTEGRATION(tmpfs_general_tests, .group = TEST_GROUP(tmpfs)) {
 
     TEST_ASSERT(strcmp(buf, "/tmp") == 0);
 
+    kfree(buf);
     return TEST_SUCCESS;
 }
 #endif

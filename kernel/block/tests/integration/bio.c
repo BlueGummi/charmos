@@ -1,4 +1,4 @@
-#include "test_internal.h"
+#include "../test_internal.h"
 
 #ifdef TEST_BIO
 TEST_GROUP_DECLARE(bio, .intensity_desc = {
@@ -13,8 +13,7 @@ TEST_GROUP_DECLARE(bio, .intensity_desc = {
     }                                                                          \
     struct vfs_node *root = global.root_node;
 
-static bool done = false;
-
+static atomic_bool done = false;
 static void bio_callback(struct bio_request *req) {
     (void) req;
     done = true;
@@ -31,7 +30,7 @@ TEST_DECLARE_INTEGRATION(blkdev_bio_test, .group = TEST_GROUP(bio),
     enable_interrupts();
 
     for (uint64_t i = 0; i < run_times; i++) {
-        struct bio_request *bio = kmalloc(sizeof(struct bio_request));
+        struct bio_request *bio = kmalloc(sizeof(struct bio_request), 0);
         uint8_t *buf = kmalloc_aligned(64 * PAGE_SIZE, PAGE_SIZE);
         *bio = (struct bio_request){
             .lba = 0,
@@ -42,14 +41,13 @@ TEST_DECLARE_INTEGRATION(blkdev_bio_test, .group = TEST_GROUP(bio),
             .done = false,
             .status = -1,
             .on_complete = bio_callback,
-            .user_data = NULL,
-            .disk = d,
+            .priority = BIO_RQ_MEDIUM,
+            .user_data = (void *) BIO_RQ_MEDIUM,
         };
-        INIT_LIST_HEAD(&bio->list);
 
-        if (!d->submit_bio_async) {
-            test_info("BIO function is NULL");
-            return TEST_SKIP(TEST_SKIP_NONE);
+        if (i % 2 == 0) {
+            bio->priority = BIO_RQ_HIGH;
+            bio->user_data = (void *) BIO_RQ_HIGH;
         }
 
         bool submitted = d->submit_bio_async(d, bio);
