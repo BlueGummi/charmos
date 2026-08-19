@@ -58,9 +58,11 @@ static inline void change_tick_duration(time_ms_t new_duration) {
     if (new_duration < 1)
         new_duration = 3;
 
-    self->tick_duration_ms = new_duration;
-    timer_modify(&self->tick, timer_delta_us(MS_TO_US(new_duration)));
-    scheduler_set_tick_enabled(self, true);
+    if (self->tick_duration_ms != new_duration || !self->tick_enabled) {
+        self->tick_duration_ms = new_duration;
+        timer_modify(&self->tick, timer_delta_us(MS_TO_US(new_duration)));
+        scheduler_set_tick_enabled(self, true);
+    }
 }
 
 void scheduler_change_tick_duration(uint64_t new_duration) {
@@ -364,8 +366,8 @@ void scheduler_switch_in() {
 }
 
 void scheduler_yield() {
-    kassert(!scheduler_self_in_resched());
-    kassert(!scheduler_preemption_disabled());
+    if (scheduler_self_in_resched() || scheduler_preemption_disabled())
+        return;
 
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     scheduler_mark_self_in_resched(true);

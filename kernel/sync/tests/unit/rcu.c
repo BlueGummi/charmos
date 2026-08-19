@@ -149,14 +149,6 @@ static void rcu_stress_reader(void *arg) {
             if (v != 42 && v != 43) {
                 atomic_store(&stress_failed, true);
                 test_err("RCU stress reader saw invalid value");
-                test_err("RCU stress reader observed invalid value %d, "
-                         "freed during gen %zu enqueued_on %zu currently "
-                         "started gen %zu quiescent for gen %zu\nat a nesting "
-                         "depth of %zu",
-                         v, p->freed_gen, p->enqueued_on,
-                         thread_get_current()->rcu_start_gen,
-                         thread_get_current()->rcu_quiescent_gen,
-                         thread_get_current()->rcu_nesting);
                 break;
             }
             volatile uint64_t seq = p->seq;
@@ -167,19 +159,15 @@ static void rcu_stress_reader(void *arg) {
 
         if (time_get_ms() - last_print > STRESS_PRINT_MS) {
             last_print = time_get_ms();
-            test_info("\'%-17s\' iter %7zu w/ %7zu rplace and %7zu "
-                      "free",
-                      thread_get_current()->name, iter, stress_replacements,
-                      stress_deferred_freed);
+            test_info("\'%-17s\' iter %7zu w/ %7zu rplace and %7zu free",
+                      thread_get_current()->name, iter,
+                      (size_t) atomic_load(&stress_replacements),
+                      (size_t) atomic_load(&stress_deferred_freed));
         }
 
         scheduler_yield();
         iter++;
     }
-
-    test_info("RCU stress reader %s left, %u remaining",
-              thread_get_current()->name,
-              STRESS_NUM_READERS - stress_readers_done - 1);
 
     atomic_fetch_add(&stress_readers_done, 1);
 }
@@ -292,9 +280,15 @@ TEST_DECLARE_INTEGRATION(rcu_stress_test, .group = TEST_GROUP(rcu),
     test_info("RCU stress test: replacements=%u freed=%u",
               (unsigned) atomic_load(&stress_replacements),
               (unsigned) atomic_load(&stress_deferred_freed));
+    printf(" [RCU STATS] Completed %u replacements, %u deferred frees across "
+           "64 readers & 8 writers\n",
+           (unsigned) atomic_load(&stress_replacements),
+           (unsigned) atomic_load(&stress_deferred_freed));
 
     TEST_ASSERT(!atomic_load(&stress_failed));
     TEST_ASSERT(atomic_load(&stress_deferred_freed) > 0);
+    TEST_ASSERT(atomic_load(&stress_deferred_freed) ==
+                atomic_load(&stress_replacements));
 
     struct rcu_stress_node *last = stress_shared;
     if (last) {

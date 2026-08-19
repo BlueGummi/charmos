@@ -220,6 +220,10 @@ static inline void hcf(void) {
     asm volatile("cli; hlt");
 }
 
+static inline void do_idle_insn() {
+    asm volatile("sti\n\thlt" ::: "memory");
+}
+
 static inline int clz(uint8_t a) {
     return __builtin_clz(a);
 }

@@ -74,7 +74,8 @@ void irql_lower(enum irql new_level) {
         return;
     }
 
-    kassert(new_level != IRQL_NONE);
+    if (new_level == IRQL_NONE)
+        return;
 
     enum irql old = irql_get();
 

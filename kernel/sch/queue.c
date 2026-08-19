@@ -37,11 +37,9 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task,
     thread_set_runqueue(task, sched);
     scheduler_increment_thread_count(sched, task);
 
-    bool is_local = sched == smp_core_scheduler();
     bool period_disabled = !sched->period_enabled;
 
-    if (period_disabled && (is_local ? sched->total_thread_count >= 1
-                                     : sched->total_thread_count > 1)) {
+    if (period_disabled && sched->total_thread_count >= 1) {
         sched->period_enabled = true;
         scheduler_period_start(sched, time_get_ms());
     }

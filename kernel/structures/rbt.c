@@ -5,44 +5,6 @@
 #include <stdint.h>
 #include <structures/rbt.h>
 
-static void rbt_check_cycle(struct rbt_node *node, const char *caller) {
-    struct rbt_node *tortoise = node;
-    struct rbt_node *hare = node;
-
-    while (hare && hare->left != NULL) {
-        tortoise = tortoise ? tortoise->left : NULL;
-        hare = hare->left->left;
-
-        if (tortoise == NULL || hare == NULL)
-            break;
-
-        if (tortoise == hare) {
-            panic("Cycle detected in %s (left spine): tortoise == hare at "
-                  "node=%p",
-                  caller, (void *) tortoise);
-            break;
-        }
-    }
-
-    tortoise = node;
-    hare = node;
-
-    while (hare && hare->right != NULL) {
-        tortoise = tortoise ? tortoise->right : NULL;
-        hare = hare->right->right;
-
-        if (tortoise == NULL || hare == NULL)
-            break;
-
-        if (tortoise == hare) {
-            panic("Cycle detected in %s (right spine): tortoise == hare at "
-                  "node=%p",
-                  caller, (void *) tortoise);
-            break;
-        }
-    }
-}
-
 struct rbt *rbt_create(rbt_get_data get, rbt_compare cmp) {
     struct rbt *tree = kmalloc(sizeof(struct rbt));
     if (!tree)
@@ -55,8 +17,6 @@ struct rbt *rbt_create(rbt_get_data get, rbt_compare cmp) {
 }
 
 struct rbt_node *rbt_find_min(struct rbt_node *node) {
-    rbt_check_cycle(node, __func__);
-
     while (node && node->left != NULL)
         node = node->left;
 
@@ -64,8 +24,6 @@ struct rbt_node *rbt_find_min(struct rbt_node *node) {
 }
 
 struct rbt_node *rbt_find_max(struct rbt_node *node) {
-    rbt_check_cycle(node, __func__);
-
     while (node && node->right != NULL) {
         node = node->right;
     }
@@ -74,18 +32,14 @@ struct rbt_node *rbt_find_max(struct rbt_node *node) {
 }
 
 struct rbt_node *rbt_max(struct rbt *tree) {
-    rbt_check_cycle(tree->root, __func__);
     return rbt_find_max(tree->root);
 }
 
 struct rbt_node *rbt_min(struct rbt *tree) {
-    rbt_check_cycle(tree->root, __func__);
     return rbt_find_min(tree->root);
 }
 
 struct rbt_node *rbt_next(struct rbt_node *node) {
-    rbt_check_cycle(node, __func__);
-
     if (!node)
         return NULL;
 
@@ -101,7 +55,6 @@ struct rbt_node *rbt_next(struct rbt_node *node) {
 }
 
 struct rbt_node *rbt_find_predecessor(struct rbt *tree, uint64_t data) {
-    rbt_check_cycle(tree->root, __func__);
     struct rbt_node *curr = tree->root;
     struct rbt_node *pred = NULL;
 
@@ -118,7 +71,6 @@ struct rbt_node *rbt_find_predecessor(struct rbt *tree, uint64_t data) {
 }
 
 struct rbt_node *rbt_find_successor(struct rbt *tree, uint64_t data) {
-    rbt_check_cycle(tree->root, __func__);
     struct rbt_node *curr = tree->root;
     struct rbt_node *succ = NULL;
 
@@ -274,8 +226,6 @@ static void fix_deletion(struct rbt *tree, struct rbt_node *x) {
 }
 
 void rbt_delete(struct rbt *tree, struct rbt_node *z) {
-    kassert(rbt_has_node(tree, z));
-    rbt_check_cycle(tree->root, __func__);
     struct rbt_node *y = z;
     struct rbt_node *x = NULL;
     enum rbt_node_color y_original_color = y->color;
@@ -326,7 +276,6 @@ rbt_search_internal(struct rbt *tree, struct rbt_node *root, uint64_t data) {
 }
 
 struct rbt_node *rbt_search(struct rbt *tree, uint64_t data) {
-    rbt_check_cycle(tree->root, __func__);
     struct rbt_node *root = tree->root;
 
     while (root && tree->get_data(root) != data) {
@@ -340,7 +289,6 @@ struct rbt_node *rbt_search(struct rbt *tree, uint64_t data) {
 }
 
 bool rbt_has_node(struct rbt *tree, struct rbt_node *node) {
-    rbt_check_cycle(tree->root, __func__);
     struct rbt_node *iter;
     rbt_for_each(iter, tree) {
         if (iter == node)
@@ -350,7 +298,6 @@ bool rbt_has_node(struct rbt *tree, struct rbt_node *node) {
 }
 
 void rbt_remove(struct rbt *tree, uint64_t data) {
-    rbt_check_cycle(tree->root, __func__);
     struct rbt_node *node = rbt_search_internal(tree, tree->root, data);
     if (node)
         rbt_delete(tree, node);
@@ -401,8 +348,6 @@ static void fix_insertion(struct rbt *tree, struct rbt_node *node) {
 }
 
 void rbt_insert(struct rbt *tree, struct rbt_node *new_node) {
-    kassert(!rbt_has_node(tree, new_node));
-    rbt_check_cycle(tree->root, __func__);
     new_node->left = NULL;
     new_node->right = NULL;
     new_node->color = TREE_NODE_RED;
