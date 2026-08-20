@@ -133,12 +133,6 @@ void daemon_main(void *a) {
 
     struct daemon_thread *self = current_daemon_thread();
     struct daemon *daemon = self->daemon;
-    daemon_get(daemon);
-    bool timesharing = !self->background;
-
-    if (timesharing)
-        atomic_fetch_add(&daemon->attrs.timesharing_threads, 1);
-
     struct daemon_work *work = work_on_thread(self);
 
     while (true) {
@@ -197,9 +191,15 @@ static struct daemon_thread *daemon_thread_create_bg(struct daemon *daemon) {
 static struct daemon_thread *
 daemon_thread_spawn(struct daemon *daemon,
                     struct daemon_thread *(*create)(struct daemon *) ) {
+    daemon_get(daemon);
     struct daemon_thread *t = create(daemon);
-    if (!t)
+    if (!t) {
+        daemon_put(daemon);
         return NULL;
+    }
+
+    if (!t->background)
+        atomic_fetch_add(&daemon->attrs.timesharing_threads, 1);
 
     t->thread->allowed_cpus = daemon->attrs.thread_cpu_mask;
     thread_enqueue(t->thread);
@@ -346,6 +346,8 @@ void daemon_destroy(struct daemon *daemon) {
 struct daemon_thread *daemon_spawn_worker(struct daemon *daemon) {
     struct daemon_thread *dt =
         daemon_thread_spawn(daemon, daemon_thread_create);
+    if (!dt)
+        return NULL;
 
     daemon_list_add(daemon, dt);
     return dt;
