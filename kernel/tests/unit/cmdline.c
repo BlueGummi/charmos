@@ -131,7 +131,7 @@ TEST_DECLARE_UNIT(cmdline_extraction_helpers, .group = TEST_GROUP(cmdline)) {
 }
 
 TEST_DECLARE_UNIT(cmdline_choices_and_mappings, .group = TEST_GROUP(cmdline)) {
-    const char *const choices[] = CMDLINE_CHOICES("alpha", "beta", "gamma");
+    const char *const *choices = CMDLINE_CHOICES("alpha", "beta", "gamma");
     TEST_ASSERT(cmdline_has_choice(choices, "alpha"));
     TEST_ASSERT(cmdline_has_choice(choices, "beta"));
     TEST_ASSERT(cmdline_has_choice(choices, "gamma"));
