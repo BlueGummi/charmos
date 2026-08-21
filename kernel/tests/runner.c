@@ -24,66 +24,37 @@
 #include "mem/slab/internal.h"
 
 /* Basically, every test and test setting wires back here */
-CMDLINE_ENTRY_DECLARE(test_root, .name = "test",
-                      .flags = CMDLINE_ENTRY_SYMBOLIC);
+CMDLINE_DECLARE(test_root, .name = "test", .flags = CMDLINE_ENTRY_SYMBOLIC);
 
 LINKER_SECTION_OBJECT(struct test_group, test_groups)
 test_group_orphan_parent = {.name = "test_group_orphan_parent",
                             .enabled = TEST_STATE_SENTINEL,
                             .exit_on_fail = false,
                             .incremental = false,
-                            .flags = TEST_GROUP_FLAG_DEFAULT,
-                            .ent = CMDLINE_ENTRY(test_root)};
+                            .flags = TEST_GROUP_FLAG_DEFAULT};
 
-static void test_filter_callback(const char *val, struct cmdline_entry *ent) {
-    (void) ent, (void) val;
-    test_global.test_opt_in = true;
-    test_global.group_opt_in = true;
-}
-
-CMDLINE_ENTRY_DECLARE_TYPED_CUSTOM(
-    test_global_intensity, test_global.global_intensity, cmdline_parse_fx,
-    .parent = CMDLINE_ENTRY(test_root), .arg = "<float>",
-    .desc = "global intensity override for all tests",
-    .flags = CMDLINE_ENTRY_DOCUMENTED);
-
-CMDLINE_ENTRY_DECLARE(
-    test_filter, .name = "filter",
-    .value.accepted = CMDLINE_VALUE_TYPE_BIT(CMDLINE_VAL_STRING) |
-                      CMDLINE_VALUE_TYPE_BIT(CMDLINE_VAL_LIST),
-    .parent = CMDLINE_ENTRY(test_root), .arg = "<list>",
-    .callback = test_filter_callback,
-    .desc = "this makes tests and groups opt-in and enables whatever tests "
-            "and/or groups are passed in, WITHOUT namespaces, i.e. only "
-            "\"test_name\" or \"test_group_name\"",
-    .flags = CMDLINE_ENTRY_DOCUMENTED);
-
-CMDLINE_ENTRY_DECLARE_TYPED(
-    test_group_opt_in, test_global.group_opt_in, .name = "group_opt_in",
-    .parent = CMDLINE_ENTRY(test_root), .arg = CMDLINE_ENTRY_TYPE_TO_ARG(bool),
-    .desc = "By default, tests are opt-out, and compiled tests will run, and "
-            "this inverts that",
-    .flags = CMDLINE_ENTRY_DOCUMENTED);
-CMDLINE_ENTRY_DECLARE_TYPED(test_test_opt_in, test_global.test_opt_in,
-                            .name = "test_opt_in",
-                            .parent = CMDLINE_ENTRY(test_root));
-
-CMDLINE_ENTRY_DECLARE_TYPED(test_show_output, test_global.show_output,
-                            .name = "show_output",
-                            .parent = CMDLINE_ENTRY(test_root));
-
-CMDLINE_ENTRY_DECLARE_TYPED(
-    test_no_exit, test_global.no_exit, .name = "no_exit",
-    .parent = CMDLINE_ENTRY(test_root), .arg = CMDLINE_ENTRY_TYPE_TO_ARG(bool),
-    .desc = "Idle after the suite completes instead of asking QEMU to exit",
-    .flags = CMDLINE_ENTRY_DOCUMENTED);
-
-CMDLINE_ENTRY_DECLARE_TYPED(
-    test_no_progress, test_global.no_progress, .name = "no_progress",
-    .parent = CMDLINE_ENTRY(test_root), .arg = CMDLINE_ENTRY_TYPE_TO_ARG(bool),
-    .desc = "Never pin a progress bar to the bottom of the serial terminal, "
-            "even when one answers the size probe",
-    .flags = CMDLINE_ENTRY_DOCUMENTED);
+CMDLINE_CHILDREN_DECLARE(
+    test_root,
+    CMDLINE_INNER(
+        filter, .types = CMDLINE_TYPES(CMDLINE_TYPE_STRING, CMDLINE_TYPE_LIST),
+        .desc = "this makes tests and groups opt-in and enables whatever tests "
+                "and/or groups are passed in, WITHOUT namespaces, i.e. only "
+                "\"test_name\" or \"test_group_name\""),
+    CMDLINE_INNER_FX(global_intensity, test_global.global_intensity,
+                     .desc = "global intensity override for all tests",
+                     .range = RANGE(0, FX_ONE)),
+    CMDLINE_INNER_VAR(
+        group_opt_in, test_global.group_opt_in,
+        .desc = "By default, tests are opt-out, and compiled tests will run, "
+                "and this inverts that"),
+    CMDLINE_INNER_VAR(test_opt_in, test_global.test_opt_in,
+                      .flags = CMDLINE_ENTRY_HIDDEN),
+    CMDLINE_INNER_VAR(show_output, test_global.show_output,
+                      .flags = CMDLINE_ENTRY_HIDDEN),
+    CMDLINE_INNER_VAR(no_exit, test_global.no_exit,
+                      .desc = "Idle after the suite completes"),
+    CMDLINE_INNER_VAR(no_progress, test_global.no_progress,
+                      .desc = "Do not show progress bar"));
 
 LOG_SITE_DECLARE_DEFAULT(test_harness);
 LOG_HANDLE_DECLARE_DEFAULT(test_harness, .flags = LOG_PRINT | LOG_NO_NEWLINE);
@@ -110,26 +81,81 @@ LINKER_SECTION_DEFINE(struct test_group, test_groups);
  * not be in a state where we can boot it when running tests */
 struct test_globals test_global = {.global_intensity = TEST_INTENSITY_SENTINEL};
 
-static bool is_keyword(const char *check, const char **against,
-                       size_t num_keywords) {
-    for (size_t i = 0; i < num_keywords; i++) {
-        if (strcmp(check, against[i]) == 0)
-            return true;
+static void *test_instance_resolver(const char *path, size_t path_len) {
+    char name_buf[CMDLINE_ENTRY_NAME_LEN_MAX];
+    if (path_len >= sizeof(name_buf))
+        return NULL;
+    memcpy(name_buf, path, path_len);
+    name_buf[path_len] = '\0';
+
+    char *last_dot = strrchr(name_buf, '.');
+    const char *test_name = NULL;
+    const char *group_name = NULL;
+
+    if (last_dot) {
+        *last_dot = '\0';
+        group_name = name_buf;
+        test_name = last_dot + 1;
+    } else {
+        test_name = name_buf;
     }
 
-    return false;
-}
-
-void tests_hook_boot() {
-#ifdef TEST_ENABLED
-    /* In here, we go through all tests, and assign their command line parents
-     */
     for (struct test *t = __skernel_tests; t < __ekernel_tests; t++) {
-        kassert(t->group);
-        t->base_entry->parent = t->group->ent;
+        if (strcmp(t->name, test_name) == 0) {
+            if (!group_name ||
+                (t->group && strcmp(t->group->name, group_name) == 0))
+                return t;
+        }
     }
-#endif
+    return NULL;
 }
+
+static void *test_group_instance_resolver(const char *path, size_t path_len) {
+    char name_buf[CMDLINE_ENTRY_NAME_LEN_MAX];
+    if (path_len >= sizeof(name_buf))
+        return NULL;
+    memcpy(name_buf, path, path_len);
+    name_buf[path_len] = '\0';
+
+    for (struct test_group *g = __skernel_test_groups;
+         g < __ekernel_test_groups; g++) {
+        if (strcmp(g->name, name_buf) == 0)
+            return g;
+    }
+    return NULL;
+}
+
+CMDLINE_SCHEMA_DECLARE(
+    test_props, "test", "<group>.<name>", "Test parameters",
+    test_instance_resolver, CMDLINE_SCHEMA_PROP(struct test, enabled),
+    CMDLINE_SCHEMA_PROP_FX(struct test, intensity,
+                           .desc = "Execution intensity",
+                           .range = RANGE(0, FX_ONE)),
+    CMDLINE_SCHEMA_PROP(struct test, run_times, .desc = "Times to run the test",
+                        .range = RANGE(1, 100000)),
+    CMDLINE_SCHEMA_PROP(struct test, seed, .desc = "PRNG seed (TODO:)"),
+    CMDLINE_SCHEMA_PROP(
+        struct test, duration_ms,
+        .desc = "Maximum runtime limit in milliseconds (TODO: DURATION)"),
+    CMDLINE_SCHEMA_PROP(struct test, msg_cap, .desc = "Log limit"),
+    CMDLINE_SCHEMA_PROP(
+        struct test, keep_going,
+        .desc = "If one test fails when run_times > 1, keep going"),
+    CMDLINE_SCHEMA_PROP(struct test, print_logs,
+                        .desc = "Print logs in real time"));
+
+CMDLINE_SCHEMA_DECLARE(
+    test_group_props, "test_group", "<group>", "Test group parameters",
+    test_group_instance_resolver,
+    CMDLINE_SCHEMA_PROP(struct test_group, enabled),
+    CMDLINE_SCHEMA_PROP(struct test_group, smoke_enabled),
+    CMDLINE_SCHEMA_PROP(struct test_group, unit_enabled),
+    CMDLINE_SCHEMA_PROP(struct test_group, integration_enabled),
+    CMDLINE_SCHEMA_PROP(
+        struct test_group, incremental,
+        .desc = "Run tiers incrementally (smoke -> unit -> integration)"),
+    CMDLINE_SCHEMA_PROP(struct test_group, exit_on_fail,
+                        .desc = "Exit after first test fails"));
 
 static void tests_set_enabled_states() {
 #ifdef TEST_ENABLED
@@ -280,21 +306,21 @@ static void test_filter_enable(char *name) {
 }
 
 static void tests_apply_filters() {
-    struct cmdline_entry *filter = CMDLINE_ENTRY(test_filter);
+    struct cmdline_entry *filter = CMDLINE_CHILD(test_root, filter);
     if (filter->status != CMDLINE_ENTRY_FOUND)
         return;
 
-    if (filter->value.type == CMDLINE_VAL_STRING) {
+    if (filter->value.type == CMDLINE_TYPE_STRING) {
         char *filter_one;
         CMDLINE_EXTRACT(&filter->value, filter_one);
         test_filter_enable(filter_one);
     } else {
-        kassert(filter->value.type == CMDLINE_VAL_LIST);
+        kassert(filter->value.type == CMDLINE_TYPE_LIST);
         struct cmdline_list list;
         CMDLINE_EXTRACT(&filter->value, list);
         struct cmdline_value val;
         cmdline_list_for_each(val, &list) {
-            kassert(val.type == CMDLINE_VAL_STRING);
+            kassert(val.type == CMDLINE_TYPE_STRING);
             char *filter_one;
             CMDLINE_EXTRACT(&val, filter_one);
             test_filter_enable(filter_one);

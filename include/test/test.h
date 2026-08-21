@@ -13,11 +13,6 @@
 typedef void (*test_fn_t)(void);
 struct test_context;
 
-enum test_cmdline_entry {
-    TEST_CMDLINE_ENTRY_ENABLED,
-    TEST_CMDLINE_ENTRY_MAX,
-};
-
 enum test_tier {
     TEST_TIER_SMOKE,
     TEST_TIER_UNIT,
@@ -105,7 +100,6 @@ struct test_group {
     const char *name;
     const char *fname;
     const enum test_group_flags flags;
-    struct cmdline_entry *ent;
     struct test_verdict (*setup)(struct test_context *);
     struct test_verdict (*teardown)(struct test_context *);
 
@@ -176,8 +170,6 @@ struct test {
     size_t run_times;
 
     size_t inject_count;
-    struct cmdline_entry *base_entry;
-    struct cmdline_entry *cmdline_entries[TEST_CMDLINE_ENTRY_MAX];
     struct inject_site *inject[];
 };
 
@@ -241,41 +233,12 @@ struct test_globals {
 #define TEST_DECLARE(id, ...)                                                  \
     static struct test_verdict id(struct test_context *ctx);                   \
     extern struct test __test_##id;                                            \
-    CMDLINE_ENTRY_DECLARE(test_##id, .name = #id,                              \
-                          .flags = CMDLINE_ENTRY_SYMBOLIC);                    \
-    CMDLINE_ENTRY_DECLARE_TYPED_CUSTOM(                                        \
-        test_##id##_enabled, __test_##id.enabled, cmdline_parse_bool,          \
-        .name = "enabled", .parent = CMDLINE_ENTRY(test_##id),                 \
-        .private = &__test_##id);                                              \
-    CMDLINE_ENTRY_DECLARE_TYPED(                                               \
-        test_##id##_intensity, __test_##id.intensity, .name = "intensity",     \
-        .parent = CMDLINE_ENTRY(test_##id), .private = &__test_##id);          \
-    CMDLINE_ENTRY_DECLARE_TYPED(                                               \
-        test_##id##_run_times, __test_##id.run_times, .name = "run_times",     \
-        .parent = CMDLINE_ENTRY(test_##id), .private = &__test_##id);          \
-    CMDLINE_ENTRY_DECLARE_TYPED(                                               \
-        test_##id##_seed, __test_##id.seed, .name = "seed",                    \
-        .parent = CMDLINE_ENTRY(test_##id), .private = &__test_##id);          \
-    CMDLINE_ENTRY_DECLARE_TYPED(                                               \
-        test_##id##_duration_ms, __test_##id.duration_ms,                      \
-        .name = "duration_ms", .parent = CMDLINE_ENTRY(test_##id),             \
-        .private = &__test_##id);                                              \
-    CMDLINE_ENTRY_DECLARE_TYPED(                                               \
-        test_##id##_msg_cap, __test_##id.msg_cap, .name = "msg_cap",           \
-        .parent = CMDLINE_ENTRY(test_##id), .private = &__test_##id);          \
-    CMDLINE_ENTRY_DECLARE_TYPED(                                               \
-        test_##id##_keep_going, __test_##id.keep_going, .name = "keep_going",  \
-        .parent = CMDLINE_ENTRY(test_##id), .private = &__test_##id);          \
-    CMDLINE_ENTRY_DECLARE_TYPED(                                               \
-        test_##id##_print_logs, __test_##id.print_logs, .name = "print_logs",  \
-        .parent = CMDLINE_ENTRY(test_##id), .private = &__test_##id);          \
     LINKER_SECTION_OBJECT(struct test, tests)                                  \
     __test_##id = {.name = #id,                                                \
                    .func = id,                                                 \
                    .run_times = 1,                                             \
                    .group = &test_group_orphan_parent,                         \
                    .enabled = TEST_STATE_SENTINEL,                             \
-                   .base_entry = CMDLINE_ENTRY(test_##id),                     \
                    .inject_count = 0,                                          \
                    .msg_cap = 0,                                               \
                    .seed = 0,                                                  \
@@ -283,8 +246,6 @@ struct test_globals {
                    .tier = TEST_TIER_UNIT,                                     \
                    .intensity = TEST_INTENSITY_SENTINEL,                       \
                    .intensity_desc = TEST_INTENSITY_DESC_SENTINEL,             \
-                   .cmdline_entries[TEST_CMDLINE_ENTRY_ENABLED] =              \
-                       CMDLINE_ENTRY(test_##id##_enabled),                     \
                    __VA_ARGS__};                                               \
                                                                                \
     static struct test_verdict id(struct test_context *ctx __unused)
@@ -296,45 +257,8 @@ struct test_globals {
 #define TEST_DECLARE_INTEGRATION(id, ...)                                      \
     TEST_DECLARE(id, .tier = TEST_TIER_INTEGRATION, ##__VA_ARGS__)
 
-#define TEST_CMDLINE_ENTRY_DECLARE(id, var, n)                                 \
-    CMDLINE_ENTRY_DECLARE_TYPED(test_##id##_##n, var, .name = #n,              \
-                                .parent = CMDLINE_ENTRY(test_##id),            \
-                                .private = &__test_##id)
-
 #define TEST_GROUP_DECLARE(n, ...)                                             \
     extern struct test_group __test_group_##n;                                 \
-    CMDLINE_ENTRY_DECLARE(test_group_##n, .name = #n,                          \
-                          .parent = CMDLINE_ENTRY(test_root),                  \
-                          .flags = CMDLINE_ENTRY_SYMBOLIC);                    \
-    CMDLINE_ENTRY_DECLARE_TYPED_CUSTOM(                                        \
-        test_group_##n##_enabled, __test_group_##n.enabled,                    \
-        cmdline_parse_bool, .name = "enabled",                                 \
-        .parent = CMDLINE_ENTRY(test_group_##n),                               \
-        .private = &__test_group_##n);                                         \
-    CMDLINE_ENTRY_DECLARE_TYPED_CUSTOM(                                        \
-        test_group_##n##_smoke_enabled, __test_group_##n.smoke_enabled,        \
-        cmdline_parse_bool, .name = "smoke_enabled",                           \
-        .parent = CMDLINE_ENTRY(test_group_##n),                               \
-        .private = &__test_group_##n);                                         \
-    CMDLINE_ENTRY_DECLARE_TYPED_CUSTOM(                                        \
-        test_group_##n##_unit_enabled, __test_group_##n.unit_enabled,          \
-        cmdline_parse_bool, .name = "unit_enabled",                            \
-        .parent = CMDLINE_ENTRY(test_group_##n),                               \
-        .private = &__test_group_##n);                                         \
-    CMDLINE_ENTRY_DECLARE_TYPED_CUSTOM(                                        \
-        test_group_##n##_integration_enabled,                                  \
-        __test_group_##n.integration_enabled, cmdline_parse_bool,              \
-        .name = "integration_enabled",                                         \
-        .parent = CMDLINE_ENTRY(test_group_##n),                               \
-        .private = &__test_group_##n);                                         \
-    CMDLINE_ENTRY_DECLARE_TYPED(                                               \
-        test_group_##n##_incremental, __test_group_##n.incremental,            \
-        .name = "incremental", .parent = CMDLINE_ENTRY(test_group_##n),        \
-        .private = &__test_group_##n);                                         \
-    CMDLINE_ENTRY_DECLARE_TYPED(                                               \
-        test_group_##n##_exit_on_fail, __test_group_##n.exit_on_fail,          \
-        .name = "exit_on_fail", .parent = CMDLINE_ENTRY(test_group_##n),       \
-        .private = &__test_group_##n);                                         \
     LINKER_SECTION_OBJECT(struct test_group, test_groups)                      \
     __test_group_##n = {.name = #n,                                            \
                         .incremental = false,                                  \
@@ -449,19 +373,17 @@ struct test_globals {
     }
 
 void tests_run(void);
-void tests_hook_boot();
 size_t test_intensity_format(const struct test_intensity *desc,
                              fx32_32_t intensity, size_t scaled_val, char *buf,
                              size_t cap);
 
 size_t test_intensity_eval(const struct test_intensity *desc,
                            fx32_32_t intensity);
-CMDLINE_ENTRY_DEFINE(test_root);
+CMDLINE_DEFINE(test_root);
 
 extern struct test_globals test_global;
 extern const char *large_test_string;
 extern struct test_group test_group_orphan_parent;
-extern struct cmdline_entry test_cmdline_default;
 
 static inline size_t test_current_message_count(void) {
     return log_site_message_count(test_global.current_test->site);

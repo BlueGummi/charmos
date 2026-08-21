@@ -163,6 +163,13 @@ SECTIONS {
         . = ALIGN(64);
     } :data
 
+    .kernel_cmdline_schemas : ALIGN(64) {
+        __skernel_cmdline_schemas = .;
+        KEEP(*(.kernel_cmdline_schemas))
+        __ekernel_cmdline_schemas = .;
+        . = ALIGN(64);
+    } :data
+
     .kernel_exception_sync_cbs : ALIGN(64) {
         __skernel_exception_sync_cbs = .;
         KEEP(*(.kernel_exception_sync_cbs))

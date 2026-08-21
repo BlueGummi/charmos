@@ -22,7 +22,7 @@ LOG_HANDLE_DECLARE_DEFAULT(xhci);
 #ifdef DEBUG_USB_XHCI
 LOG_SITE_DECLARE_DEFAULT(xhci);
 #else
-LOG_SITE_DECLARE_DEFAULT(xhci, .flags = LOG_SITE_LEVEL(LOG_ERROR));
+LOG_SITE_DECLARE_DEFAULT(xhci, .enabled_mask = LOG_SITE_LEVEL(LOG_ERROR));
 #endif
 
 enum usb_error xhci_address_device(struct xhci_port *p, uint8_t slot_id,

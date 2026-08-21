@@ -54,7 +54,7 @@ void qspin_lock_slowpath(struct qspinlock *lock, uint32_t val) {
 
     cpu_id_t cpu = smp_core_id();
 
-    /* Fallback if not ready: probably not going to be a used path */
+    /* Fallback if not ready */
     if (unlikely(!PERCPU_READY(qnodes))) {
         while (!qspin_trylock_raw(lock))
             cpu_relax();

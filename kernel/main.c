@@ -70,7 +70,10 @@ __no_sanitize_address void k_main(void) {
     printf_init(framebuffer_request.response->framebuffers[0]);
     bootstage_advance(BOOTSTAGE_EARLY_FB);
 
-    if (cmdline_wants_help(cmdline_request.response->cmdline))
+    const char *cmdline =
+        cmdline_request.response ? cmdline_request.response->cmdline : "";
+
+    if (cmdline_wants_help(cmdline))
         cmdline_dump_help();
 
     pmm_early_init(memmap_request);
@@ -121,8 +124,8 @@ __no_sanitize_address void k_main(void) {
     scheduler_init();
     turnstiles_init();
 
-    tests_hook_boot();
-    cmdline_parse(cmdline_request.response->cmdline);
+    cmdline_parse(cmdline);
+    cmdline_debug_hook();
 
     lapic_timer_init_bsp();
     dpc_init_percpu();

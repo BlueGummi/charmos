@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/* TODO: I would really like to use CNA lock cohorting as an extension to
+/* TODO: I would really like to use a CNA lock/cohorting as an extension to
  * qspinlock, possibly also with a boot-time flag to enable/disable it
  * for testing. Could be super interesting! */
 
@@ -97,9 +97,6 @@ static inline bool qspin_held(const struct qspinlock *lock) {
     return qspin_is_locked(lock);
 }
 
-/*
- * IRQL-aware QSpinlock APIs
- */
 static inline enum irql __warn_unused_result
 qspin_lock(struct qspinlock *lock) {
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);

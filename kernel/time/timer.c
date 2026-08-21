@@ -9,17 +9,17 @@
 
 #include "internal.h"
 
-CMDLINE_ENTRY_DECLARE(timer,
-                      .flags = CMDLINE_ENTRY_SYMBOLIC |
-                               CMDLINE_ENTRY_DOCUMENTED,
-                      .desc = "Timer subsystem cmdline entries");
+static CMDLINE_DECLARE(timer, .flags = CMDLINE_ENTRY_SYMBOLIC,
+                       .desc = "Timer subsystem cmdline entries");
 
-CMDLINE_ENTRY_DECLARE(timer_evdev, .name = "clock_evdev",
-                      .parent = CMDLINE_ENTRY(timer),
-                      .flags = CMDLINE_ENTRY_DOCUMENTED,
-                      .desc = "Timer subsystem clock event device",
-                      .arg = "<string>", .default_val = CLOCK_NAME_LAPIC,
-                      .raw = &clock_global.timer_clock_evdev);
+CMDLINE_CHILDREN_DECLARE(
+    timer,
+    CMDLINE_INNER_STRING(clock_evdev, clock_global.timer_clock_evdev,
+                         .desc = "Timer subsystem clock event device",
+                         .arg = "<device>", .default_val = CLOCK_NAME_LAPIC,
+                         .choices = CMDLINE_CHOICES(CLOCK_NAME_LAPIC,
+                                                    CLOCK_NAME_HPET,
+                                                    CLOCK_NAME_TSC)));
 
 static void timer_dpc(void *ctx);
 void timer_base_reprogram_hardware(cpu_id_t cpu);

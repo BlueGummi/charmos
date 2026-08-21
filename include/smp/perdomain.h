@@ -16,7 +16,7 @@ struct perdomain_descriptor {
     size_t align;
     void **perdomain_ptrs;
     perdomain_descriptor_constructor constructor;
-    bool ready;
+    atomic_bool ready;
 };
 
 LINKER_SECTION_DEFINE(struct perdomain_descriptor, perdomain_desc);
@@ -25,10 +25,11 @@ LINKER_SECTION_DEFINE(struct perdomain_descriptor, perdomain_desc);
     extern typeof(__type) __perdomain_##__n;                                   \
     extern struct perdomain_descriptor __perdomain_desc_##__n;                 \
     static void __perdomain_ctor_##__n(void *inst, size_t domain) {            \
-        __perdomain_desc_##__n.ready = true;                                   \
         if ((__ctor) != NULL)                                                  \
             ((void (*)(typeof(__type) *, size_t)) __ctor)(                     \
                 (typeof(__type) *) inst, domain);                              \
+        if (domain == global.domain_count - 1)                                 \
+            atomic_store(&__perdomain_desc_##__n.ready, true);                 \
     }                                                                          \
     LINKER_SECTION_OBJECT(struct perdomain_descriptor, perdomain_desc)         \
     __perdomain_desc_##__n = {                                                 \
@@ -44,7 +45,7 @@ LINKER_SECTION_DEFINE(struct perdomain_descriptor, perdomain_desc);
 void perdomain_obj_init(void);
 
 #define PERDOMAIN(name) &(__perdomain_##name)
-#define PERDOMAIN_READY(name) __perdomain_desc_##name.ready
+#define PERDOMAIN_READY(name) (atomic_load(&__perdomain_desc_##name.ready))
 #define PERDOMAIN_PTR_FOR_DOMAIN(name, d)                                      \
     ((typeof(__perdomain_##name) *) __perdomain_desc_##name.perdomain_ptrs[d])
 #define PERDOMAIN_READ_FOR_DOMAIN(name, d)                                     \

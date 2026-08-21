@@ -4,6 +4,7 @@
 #include <global.h>
 #include <linker/symbols.h>
 #include <smp/core.h>
+#include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -16,7 +17,7 @@ struct percpu_descriptor {
     size_t align;
     void **percpu_ptrs;
     percpu_descriptor_constructor constructor;
-    bool ready;
+    atomic_bool ready;
 };
 
 LINKER_SECTION_DEFINE(struct percpu_descriptor, percpu_desc);
@@ -25,10 +26,11 @@ LINKER_SECTION_DEFINE(struct percpu_descriptor, percpu_desc);
     extern typeof(__type) __percpu_##__n;                                      \
     extern struct percpu_descriptor __percpu_desc_##__n;                       \
     static void __percpu_ctor_##__n(void *inst, size_t cpu) {                  \
-        __percpu_desc_##__n.ready = true;                                      \
         if ((__ctor) != NULL)                                                  \
             ((void (*)(typeof(__type) *, size_t)) __ctor)(                     \
                 (typeof(__type) *) inst, cpu);                                 \
+        if (cpu == global.core_count - 1)                                      \
+            atomic_store(&__percpu_desc_##__n.ready, true);                    \
     }                                                                          \
     LINKER_SECTION_OBJECT(struct percpu_descriptor, percpu_desc)               \
     __percpu_desc_##__n = {                                                    \
@@ -44,7 +46,7 @@ LINKER_SECTION_DEFINE(struct percpu_descriptor, percpu_desc);
 void percpu_obj_init(void);
 
 #define PERCPU(name) &(__percpu_##name)
-#define PERCPU_READY(name) __percpu_desc_##name.ready
+#define PERCPU_READY(name) atomic_load(&__percpu_desc_##name.ready)
 #define PERCPU_PTR_FOR_CPU(name, cpu)                                          \
     ((typeof(__percpu_##name) *) __percpu_desc_##name.percpu_ptrs[cpu])
 #define PERCPU_READ_FOR_CPU(name, cpu)                                         \

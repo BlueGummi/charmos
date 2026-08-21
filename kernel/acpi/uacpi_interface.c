@@ -37,7 +37,7 @@ freq_hz_t tsc_freq = 0;
 static uint64_t our_rsdp = 0;
 void uacpi_init(uint64_t rsdp) {
     our_rsdp = rsdp;
-    tsc_freq = measure_tsc_freq_pit();
+    tsc_freq = pit_measure_tsc_freq();
 
     panic_if_error(uacpi_initialize(0));
     panic_if_error(uacpi_namespace_load());

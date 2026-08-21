@@ -28,9 +28,6 @@ static inline bool in_use(pte_t pte) {
     return pte_in_use((pte_atomic_t *) &pte);
 }
 
-static void vmm_mem_cmdline_callback(const char *str,
-                                     struct cmdline_entry *ent);
-
 enum pt_level {
     PT_LEVEL_PML4 = 0,
     PT_LEVEL_PDPT = 1,
@@ -51,19 +48,16 @@ struct pt_walk {
     int depth;
 };
 
-CMDLINE_ENTRY_DECLARE(mem,
-                      .desc = "Cap on physical memory the allocator will use",
-                      .arg = "<hex bytes>",
-                      .callback = vmm_mem_cmdline_callback,
-                      .default_val = "0x700000000000",
-                      .flags = CMDLINE_ENTRY_FLAGS_NONE, .value = NULL);
-
 ADDRESS_RANGE_DECLARE(hhdm, .base = 0xFFFF800000000000ULL,
                       /* default size: from the base up to the slab heap */
                       .size = SLAB_HEAP_START - 0xFFFF800000000000ULL);
 
 ADDRESS_RANGE_DECLARE(kernel, .base = 0xffffffff80000000,
                       .size = 0); /* Filled in at boot */
+
+CMDLINE_DECLARE_VAR(mem, ADDRESS_RANGE(hhdm).size,
+                    .desc = "Cap on physical memory the allocator will use",
+                    .arg = "<hex bytes>", .default_val = "0x700000000000");
 
 bool hhdm_vaddr_in_range(vaddr_t vaddr) {
     return address_range_addr_in_range(&ADDRESS_RANGE(hhdm), vaddr);
@@ -82,21 +76,6 @@ static struct spinlock pt_free_lock = SPINLOCK_INIT;
 static struct page_table *kernel_pml4 = NULL;
 static uintptr_t vmm_map_top = VMM_MAP_BASE;
 static void vmm_unmap_aliased(vaddr_t virt, size_t len, enum vmm_flags vflags);
-
-static long string_to_int(const char *str) {
-    char *endptr;
-
-    if (str[0] == '0' && (str[1] == 'b' || str[1] == 'B')) {
-        return strtol(str + 2, &endptr, 2);
-    }
-
-    return strtol(str, &endptr, 0);
-}
-
-static void vmm_mem_cmdline_callback(const char *str,
-                                     struct cmdline_entry *ent) {
-    ADDRESS_RANGE(hhdm).size = string_to_int(str);
-}
 
 static inline struct page_table *alloc_pt(void) {
     paddr_t phys = pmm_alloc_page();

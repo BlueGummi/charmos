@@ -37,6 +37,13 @@ enum log_site_flags : uint32_t {
     LOG_SITE_DROP_OLD = 1 << 1, /* overwrite oldest on overflow */
     LOG_SITE_NO_IRQ = 1 << 2,   /* suppress in IRQ context */
     LOG_SITE_PANIC_VISIBLE = 1 << 3,
+
+    /* All messages are internally copied, so the passed in pointer
+     * is not what ends up getting used, this is for pointer reuse/freeing
+     * after the pointer is passed into log() */
+    LOG_SITE_DUP_MESSAGES = 1 << 4, /* If this is set, we also expect the
+                                     * msg_max_len of log_site_options
+                                     * to be set, else panic */
     LOG_SITE_NONE = 0,
     LOG_SITE_DEFAULT = LOG_SITE_DROP_OLD,
 };
@@ -78,7 +85,8 @@ struct log_record {
 
     uint16_t msg_len;
 
-    const char *fmt;
+    const char *fmt; /* Becomes a pointer to the shadow_buf in cases where
+                      * LOG_SITE_DUP_MESSAGES is set */
     uint8_t nargs;
     uint64_t args[8];
 
@@ -93,6 +101,7 @@ struct log_record {
 struct log_ring_slot {
     _Atomic uint64_t seq;
     struct log_record rec;
+    char *shadow_buf; /* With a len of msg_max_len */
 };
 
 struct log_ringbuf {
@@ -106,6 +115,10 @@ struct log_site_options {
     char *name;
     enum log_site_flags flags;
     size_t capacity;
+    size_t msg_max_len; /* only if LOG_SITE_DUP_MESSAGES on,
+                         * will truncate trailing characters if strlen
+                         * of the input fmt str is too long */
+
     uint32_t enabled_mask;
     struct log_dump_options dump_opts;
 };
@@ -121,6 +134,7 @@ struct log_site {
     refcount_t refcount;
     atomic_bool enabled;
 
+    size_t msg_max_len;
     uint32_t dropped; /* Accumulation of all missed logs */
     enum log_site_flags flags;
     struct log_dump_options dump_opts; /* If LOG_SITE_PRINT, use this */

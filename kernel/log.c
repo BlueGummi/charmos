@@ -375,7 +375,13 @@ void log_emit_internal(struct log_site *site, struct log_handle *handle,
     struct log_record rec = {0};
     rec.handle = handle;
     rec.level = level;
-    rec.fmt = fmt;
+
+    if (site->flags & LOG_SITE_DUP_MESSAGES) {
+        strncpy((char *) rec.fmt, fmt, site->msg_max_len - 1);
+    } else {
+        rec.fmt = fmt;
+    }
+
     rec.caller_pc = ip;
     rec.caller_fn = (char *) func;
     rec.caller_file = (char *) file;
@@ -529,6 +535,23 @@ struct log_site *log_site_create(struct log_site_options opts) {
     if (!slots)
         goto err;
 
+    if (opts.flags & LOG_SITE_DUP_MESSAGES) {
+        size_t len = kassert(opts.msg_max_len);
+        for (size_t i = 0; i < opts.capacity; i++) {
+            slots[i].shadow_buf = kmalloc(len, ALLOC_FLAGS_ZERO);
+            if (!slots->shadow_buf) {
+                for (size_t j = 0; j < i; j++) {
+                    kfree(slots[j].shadow_buf);
+                }
+
+                goto err;
+            }
+
+            slots[i].rec.fmt = slots[i].shadow_buf;
+        }
+    }
+
+    ret->msg_max_len = opts.msg_max_len;
     ret->dump_opts = opts.dump_opts;
     ret->enabled_mask = opts.enabled_mask;
     ret->capacity = opts.capacity;

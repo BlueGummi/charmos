@@ -22,10 +22,8 @@ on:
 permissions:
   contents: read
 
-# Superseded pushes stop burning runners immediately
-#
 # The account's concurrency cap is shared with the 
-# nightly torture runner, so releasing slots keeps this responsive 
+# nightly runner, so releasing slots keeps this responsive 
 concurrency:
   group: test-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

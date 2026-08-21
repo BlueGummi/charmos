@@ -76,6 +76,11 @@ static inline bool seqcount_read_retry(const struct seqcount *s,
     return unlikely(seqcount_read_raw(s) != start);
 }
 
+/*
+ * NOTE: the separate relaxed load and store here is intentional:
+ * atomic_fetch_add is RMW, and unneeded when there is only one writer
+ */
+
 /* even to odd with wmb */
 static inline void seqcount_begin_write(struct seqcount *s) {
     uint32_t seq = seqcount_read_raw(s);
@@ -88,14 +93,6 @@ static inline void seqcount_end_write(struct seqcount *s) {
     smp_wmb();
     uint32_t seq = seqcount_read_raw(s);
     atomic_store_explicit(&s->sequence, seq + 1, memory_order_relaxed);
-}
-
-static inline void seqcount_begin_write_raw(struct seqcount *s) {
-    seqcount_begin_write(s);
-}
-
-static inline void seqcount_end_write_raw(struct seqcount *s) {
-    seqcount_end_write(s);
 }
 
 /*
@@ -186,7 +183,7 @@ seq_try_write_lock_irq_disable(struct seqlock *sl, enum irql *out) {
 }
 
 static inline bool __warn_unused_result
-seq_try_lock_write_raw(struct seqlock *sl) {
+seq_try_write_lock_raw(struct seqlock *sl) {
     if (spin_trylock_raw(&sl->lock)) {
         seqcount_begin_write(&sl->seqcount);
         return true;

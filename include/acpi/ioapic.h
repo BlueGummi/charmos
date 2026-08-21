@@ -3,6 +3,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <types/types.h>
+
+#define IOAPIC_DELIVERY_NMI 4
+
 struct ioapic_info {
     uint8_t id;
     uint32_t gsi_base;

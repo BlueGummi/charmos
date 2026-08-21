@@ -3,12 +3,15 @@
 #include <compiler.h>
 #include <errno.h>
 #include <linker/symbols.h>
-#include <smp/topology.h>
+#include <math/bit.h>
+#include <math/fixed.h>
+#include <math/range.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <types/type_enum.h>
 
 struct cmdline_entry;
+struct cpu_mask;
 
 enum cmdline_entry_status {
     CMDLINE_ENTRY_NOT_FOUND = 0,
@@ -18,35 +21,39 @@ enum cmdline_entry_status {
 
 enum cmdline_entry_flags {
     CMDLINE_ENTRY_FLAGS_NONE = 0,
-    CMDLINE_ENTRY_SYMBOLIC = 1, /* This entry serves parenting purposes,
-                                 * however itself cannot be set to a value */
+    CMDLINE_ENTRY_SYMBOLIC = 1, /* for namespace parenting purposes */
     CMDLINE_ENTRY_REQUIRED = 1 << 1,
-    CMDLINE_ENTRY_DOCUMENTED = 1 << 2, /* If this is set,
-                                        * we print/document it */
+    CMDLINE_ENTRY_HIDDEN = 1 << 2, /* exclude from help message */
 };
 
-/* The way this works:
- *
- * A cmdline_value can *either* emit to *write_to OR *data, depending on
- * if it is in type_enum's range or cmdline_value_type's range.
- *
- * If type is already set by the declaration macro, then no cmdline_parse_value
- * will ever run, and the standard parsing will be applied instead.
- *
- */
-enum cmdline_value_type {
-    CMDLINE_VAL_NONE = TYPE_MAX + 1,
-    CMDLINE_VAL_INT,       /* int64_t / uint64_t */
-    CMDLINE_VAL_DATA_SIZE, /* Data size in bytes (e.g. 5G) */
-    CMDLINE_VAL_BOOL,      /* Boolean */
-    CMDLINE_VAL_STRING,    /* Quoted or unquoted string */
-    CMDLINE_VAL_RANGE,     /* struct { uint64_t start, end; } */
-    CMDLINE_VAL_CPU_MASK,  /* struct cpu_mask */
-    CMDLINE_VAL_LIST,      /* Container of sub-values */
-    CMDLINE_VAL_ERR,       /* Explicit parse error node */
-    CMDLINE_VAL_MAX
+enum cmdline_value_mode {
+    CMDLINE_MODE_POLYMORPHIC = 0,
+    CMDLINE_MODE_VAR,
+    CMDLINE_MODE_TYPED = CMDLINE_MODE_VAR,
+    CMDLINE_MODE_CUSTOM = CMDLINE_MODE_VAR,
 };
-#define CMDLINE_VALUE_TYPE_BIT(t) (1ULL << (t))
+
+#define CMDLINE_TYPE_OFFSET 6
+
+enum cmdline_type {
+    CMDLINE_TYPE_FIRST_ = CMDLINE_TYPE_OFFSET - 1,
+    CMDLINE_TYPE_BOOL = CMDLINE_TYPE_OFFSET,
+    CMDLINE_TYPE_INT,
+    CMDLINE_TYPE_UINT,
+    CMDLINE_TYPE_FX,
+    CMDLINE_TYPE_DURATION,
+    CMDLINE_TYPE_DATA_SIZE,
+    CMDLINE_TYPE_RANGE,
+    CMDLINE_TYPE_CPU_MASK,
+    CMDLINE_TYPE_MAC,
+    CMDLINE_TYPE_STRING,
+    CMDLINE_TYPE_LIST,
+    CMDLINE_TYPE_ERR,
+    CMDLINE_TYPE_NONE,
+};
+
+#define CMDLINE_TYPES(...)                                                     \
+    _DISPATCH(CMDLINE_IMPL_TYPE_BIT, PP_NARG(__VA_ARGS__))(__VA_ARGS__)
 
 struct cmdline_range {
     uint64_t start;
@@ -59,24 +66,26 @@ struct cmdline_list {
 };
 
 struct cmdline_value {
-    struct cmdline_entry *entry;
+    enum cmdline_value_mode mode;
 
-    int type; /* polymorphic */
+    union {
+        enum type_enum c_type;
+        enum cmdline_type type;
+    };
+
     union {
         void *write_to;
         void *data;
+        uint64_t u64;
+        int64_t i64;
+        bool b;
+        fx32_32_t fx;
+        time_ns_t duration;
     };
 
-    union {
-        /* this is used when this is in cmdline_parse_value mode */
-        uint64_t accepted; /* cmdline_value_type */
-
-        /* this is used when in type_enum mode */
-        enum errno (*parse)(void *write_to, const char *text);
-    };
+    /* this is used when mode == CMDLINE_MODE_TYPED or CMDLINE_MODE_CUSTOM */
+    enum errno (*parse)(void *write_to, const char *text);
 };
-
-typedef void (*cmdline_callback)(const char *value, struct cmdline_entry *ent);
 
 /* The idea with parent-child relationships:
  *
@@ -92,12 +101,10 @@ typedef void (*cmdline_callback)(const char *value, struct cmdline_entry *ent);
  * the "functional name" of apple is
  *
  * pineapple.orange.apple */
-struct cmdline_entry {
+struct __attribute__((aligned(8))) cmdline_entry {
     const char *name;
     const char *desc; /* human readable description */
     const char *arg;  /* value format hint e.g. "<hex bytes>", "<device>" */
-    cmdline_callback callback;
-    char **raw;
     const char *default_val;
 
     enum cmdline_entry_flags flags;
@@ -105,41 +112,87 @@ struct cmdline_entry {
 
     struct cmdline_entry *parent;
 
+    uint64_t types;
+
+    struct range range;
+
     /* Regarding the variable to write to */
     struct cmdline_value value;
 
-    void *private;
-
-    /* NOTE: we could keep track of children, but that's not at all mandatory */
+    const char *const *choices;
+    const struct cmdline_map *mappings;
+    const struct cmdline_flag *flags_table;
 };
 
-#define CMDLINE_ENTRY_DECLARE(n, ...)                                          \
+struct cmdline_map {
+    const char *name;
+    uint64_t value;
+};
+
+struct cmdline_flag {
+    const char *name;
+    uint64_t value;
+};
+
+#define CMDLINE_MAP(str, enum_val)                                             \
+    {.name = (str), .value = (uint64_t) (enum_val)}
+#define CMDLINE_MAPPINGS(...)                                                  \
+    ((const struct cmdline_map[]) {__VA_ARGS__, {NULL, 0}})
+
+#define CMDLINE_FLAG(str, bit_val)                                             \
+    {.name = (str), .value = (uint64_t) (bit_val)}
+#define CMDLINE_FLAGS(...)                                                     \
+    ((const struct cmdline_flag[]) {__VA_ARGS__, {NULL, 0}})
+
+#define CMDLINE_CHOICES(...) ((const char *const[]) {__VA_ARGS__, NULL})
+#define CMDLINE_PARSER(fn) .value.parse = (fn)
+
+#define CMDLINE_DECLARE(n, ...)                                                \
     LINKER_SECTION_OBJECT(struct cmdline_entry, cmdline_entries)               \
     __cmdline_##n = {.name = #n,                                               \
                      .status = CMDLINE_ENTRY_NOT_FOUND,                        \
-                     .value.type = CMDLINE_VAL_NONE,                           \
-                     .value.accepted = UINT64_MAX,                             \
+                     .types = 0,                                               \
+                     .range = RANGE(1, 0),                                     \
+                     .choices = NULL,                                          \
+                     .mappings = NULL,                                         \
+                     .flags_table = NULL,                                      \
+                     .value.mode = CMDLINE_MODE_POLYMORPHIC,                   \
+                     .value.type = CMDLINE_TYPE_NONE,                          \
                      .flags = CMDLINE_ENTRY_FLAGS_NONE,                        \
                      __VA_ARGS__}
 
-#define CMDLINE_ENTRY_DECLARE_TYPED(n, var, ...)                               \
+#define CMDLINE_DECLARE_VAR(n, var, ...)                                       \
     LINKER_SECTION_OBJECT(struct cmdline_entry, cmdline_entries)               \
     __cmdline_##n = {.name = #n,                                               \
                      .status = CMDLINE_ENTRY_NOT_FOUND,                        \
-                     .value.write_to = &var,                                   \
-                     .value.type = TYPE_TO_ENUM((var)),                        \
+                     .types = 0,                                               \
+                     .range = RANGE(1, 0),                                     \
+                     .choices = NULL,                                          \
+                     .mappings = NULL,                                         \
+                     .flags_table = NULL,                                      \
+                     .value.mode = CMDLINE_MODE_VAR,                           \
+                     .value.write_to = &(var),                                 \
+                     .value.c_type = TYPE_TO_ENUM((var)),                      \
+                     .value.parse = NULL,                                      \
                      .flags = CMDLINE_ENTRY_FLAGS_NONE,                        \
                      __VA_ARGS__}
 
-#define CMDLINE_ENTRY_DECLARE_TYPED_CUSTOM(n, var, pars, ...)                  \
-    LINKER_SECTION_OBJECT(struct cmdline_entry, cmdline_entries)               \
-    __cmdline_##n = {.name = #n,                                               \
-                     .status = CMDLINE_ENTRY_NOT_FOUND,                        \
-                     .value.write_to = &var,                                   \
-                     .value.parse = pars,                                      \
-                     .value.type = TYPE_NONE,                                  \
-                     .flags = CMDLINE_ENTRY_FLAGS_NONE,                        \
-                     __VA_ARGS__}
+#define CMDLINE_CHILD_DECLARE(parent_n, n, ...)                                \
+    CMDLINE_DECLARE(parent_n##_##n, .name = #n, .parent = CMDLINE(parent_n),   \
+                    __VA_ARGS__)
+
+#define CMDLINE_CHILD_DECLARE_VAR(parent_n, n, var, ...)                       \
+    CMDLINE_DECLARE_VAR(parent_n##_##n, var, .name = #n,                       \
+                        .parent = CMDLINE(parent_n), __VA_ARGS__)
+
+#define CMDLINE_INNER(n, ...) (_CMDLINE_CHILD_KIND_POLY, n, 0, ##__VA_ARGS__)
+
+#define CMDLINE_INNER_VAR(n, var, ...)                                         \
+    (_CMDLINE_CHILD_KIND_VAR, n, var, ##__VA_ARGS__)
+
+#define CMDLINE_CHILDREN_DECLARE(parent_n, ...)                                \
+    _DISPATCH(_CMDLINE_CHILDREN_MAP, PP_NARG(__VA_ARGS__))(parent_n,           \
+                                                           __VA_ARGS__)
 
 #define CMDLINE_EXTRACT(val, var)                                              \
     _Generic(&(var),                                                           \
@@ -148,6 +201,10 @@ struct cmdline_entry {
         int64_t *: cmdline_extract_i64((val), (int64_t *) &(var)),             \
         uint32_t *: cmdline_extract_u32((val), (uint32_t *) &(var)),           \
         int32_t *: cmdline_extract_i32((val), (int32_t *) &(var)),             \
+        uint16_t *: cmdline_extract_u16((val), (uint16_t *) &(var)),           \
+        int16_t *: cmdline_extract_i16((val), (int16_t *) &(var)),             \
+        uint8_t *: cmdline_extract_u8((val), (uint8_t *) &(var)),              \
+        int8_t *: cmdline_extract_i8((val), (int8_t *) &(var)),                \
         struct cmdline_range *: cmdline_extract_range(                         \
             (val), (struct cmdline_range *) &(var)),                           \
         char **: cmdline_extract_string((val), (char **) &(var)),              \
@@ -158,77 +215,127 @@ struct cmdline_entry {
         const char **: cmdline_extract_const_string((val),                     \
                                                     (const char **) &(var)))
 
-#define CMDLINE_ENTRY_DEFINE(n) extern struct cmdline_entry __cmdline_##n
+#define CMDLINE_EXTRACT_LIST(list, type, out_buf, max_count, parse_fn)         \
+    ({                                                                         \
+        size_t __n = 0;                                                        \
+        const struct cmdline_list *__l = (list);                               \
+        const size_t __max = (max_count);                                      \
+        for (size_t __i = 0; __i < __l->count && __n < __max; __i++) {         \
+            type __v = (type) {0};                                             \
+            if ((parse_fn) (&__l->items[__i], &__v) == ERR_OK)                 \
+                (out_buf)[__n++] = __v;                                        \
+        }                                                                      \
+        __n;                                                                   \
+    })
 
-#define CMDLINE_ENTRY(n, ...) &__cmdline_##n
+#define CMDLINE_NODE_1(a) a
+#define CMDLINE_NODE_2(a, b) a##_##b
+#define CMDLINE_NODE_3(a, b, c) a##_##b##_##c
+#define CMDLINE_NODE_4(a, b, c, d) a##_##b##_##c##_##d
+#define CMDLINE_NODE(...)                                                      \
+    _DISPATCH(CMDLINE_NODE, PP_NARG(__VA_ARGS__))(__VA_ARGS__)
+
+#define CMDLINE_DEFINE(n) extern struct cmdline_entry CONCAT(__cmdline_, n)
+#define CMDLINE(n) (&CONCAT(__cmdline_, n))
+#define CMDLINE_VALUE(n) cmdline_entry_value_u64(CMDLINE(n))
+
+#define CMDLINE_CHILD_DEFINE(...) CMDLINE_DEFINE(CMDLINE_NODE(__VA_ARGS__))
+#define CMDLINE_CHILD(...) CMDLINE(CMDLINE_NODE(__VA_ARGS__))
+#define CMDLINE_CHILD_VALUE(...)                                               \
+    cmdline_entry_value_u64(CMDLINE_CHILD(__VA_ARGS__))
 
 #define CMDLINE_ENTRY_NAME_LEN_MAX 256
 
-#define CMDLINE_ENTRY_TYPE_TO_ARG(type)                                        \
-    _Generic((type) 0, int: "<integer>", bool: "<on/off>")
-
 #define cmdline_list_for_each(val, list)                                       \
-    for (size_t __i = 0;                                                       \
-         __i < (list)->count && ((val = (list)->items[__i]), true); __i++)
+    for (size_t __i = 0, __count = (list)->count;                              \
+         __i < __count && (((val) = (list)->items[__i]), true); __i++)
 
-LINKER_SECTION_DEFINE(struct cmdline_entry, cmdline_entries);
+/* Schema-Driven Subsystem Definitions */
+struct cmdline_schema_prop {
+    const char *name;
+    const char *desc;
+    size_t offset;
+    enum type_enum c_type;
+    uint64_t types;
+    enum errno (*parse)(void *dst, const char *text);
 
-extern enum errno (*cmdline_parse_table[TYPE_MAX])(void *write_to,
-                                                   const char *text);
+    struct range range;
 
-enum errno cmdline_parse_i8(void *write_to, const char *text);
-enum errno cmdline_parse_u8(void *write_to, const char *text);
-enum errno cmdline_parse_i16(void *write_to, const char *text);
-enum errno cmdline_parse_u16(void *write_to, const char *text);
-enum errno cmdline_parse_i32(void *write_to, const char *text);
-enum errno cmdline_parse_u32(void *write_to, const char *text);
-enum errno cmdline_parse_i64(void *write_to, const char *text);
-enum errno cmdline_parse_u64(void *write_to, const char *text);
-enum errno cmdline_parse_bool(void *write_to, const char *text);
+    const char *const *choices;
+    const struct cmdline_map *mappings;
+    const struct cmdline_flag *flags_table;
+};
 
-enum errno cmdline_parse_float(void *write_to, const char *text);
-enum errno cmdline_parse_unsupported(void *write_to, const char *text);
+typedef void *(*cmdline_instance_resolver_t)(const char *path, size_t path_len);
 
-enum errno cmdline_parse_fx(void *write_to, const char *text);
+struct __attribute__((aligned(8))) cmdline_schema {
+    const char *prefix;
+    const char *path_hint;
+    const char *desc;
+    cmdline_instance_resolver_t resolve;
+    const struct cmdline_schema_prop *props;
+    size_t prop_count;
+};
 
-enum errno cmdline_extract_bool(struct cmdline_value *val, bool *out);
-enum errno cmdline_extract_u64(struct cmdline_value *val, uint64_t *out);
-enum errno cmdline_extract_i64(struct cmdline_value *val, int64_t *out);
-enum errno cmdline_extract_u32(struct cmdline_value *val, uint32_t *out);
-enum errno cmdline_extract_i32(struct cmdline_value *val, int32_t *out);
-enum errno cmdline_extract_range(struct cmdline_value *val,
-                                 struct cmdline_range *out);
-enum errno cmdline_extract_cpu_mask(struct cmdline_value *val,
-                                    struct cpu_mask *out);
-enum errno cmdline_extract_string(struct cmdline_value *val, char **out);
-enum errno cmdline_extract_const_string(struct cmdline_value *val,
-                                        const char **out);
-enum errno cmdline_extract_list(struct cmdline_value *val,
-                                struct cmdline_list *out);
+#define CMDLINE_SCHEMA_PROP_PARSER(fn) .parse = (fn)
 
-/* Returns true if the str matches a 'yes' string, and false if it is a 'no',
- * although it's a bit more nuanced than that and matches a lot of things.
- *
- * panics if neither match */
+#define CMDLINE_SCHEMA_PROP(struct_type, member, ...)                          \
+    {.name = #member,                                                          \
+     .offset = offsetof(struct_type, member),                                  \
+     .c_type = TYPE_TO_ENUM(((struct_type *) 0)->member),                      \
+     .types = 0,                                                               \
+     .parse = NULL,                                                            \
+     .range = RANGE(1, 0),                                                     \
+     .choices = NULL,                                                          \
+     .mappings = NULL,                                                         \
+     .flags_table = NULL,                                                      \
+     __VA_ARGS__}
+
+#define CMDLINE_SCHEMA_DECLARE(n, prefix_str, path_hint_str, desc_str,         \
+                               resolver_fn, ...)                               \
+    static const struct cmdline_schema_prop __cmdline_schema_props_##n[] = {   \
+        __VA_ARGS__};                                                          \
+    LINKER_SECTION_OBJECT(struct cmdline_schema, cmdline_schemas)              \
+    __cmdline_schema_##n = {                                                   \
+        .prefix = (prefix_str),                                                \
+        .path_hint = (path_hint_str),                                          \
+        .desc = (desc_str),                                                    \
+        .resolve = (resolver_fn),                                              \
+        .props = __cmdline_schema_props_##n,                                   \
+        .prop_count = sizeof(__cmdline_schema_props_##n) /                     \
+                      sizeof(__cmdline_schema_props_##n[0]),                   \
+    }
+
+#define CMDLINE_GET(key, type, fallback)                                       \
+    ({                                                                         \
+        type __out = (fallback);                                               \
+        struct cmdline_entry *__e = cmdline_lookup(key);                       \
+        if (__e && (__e->status == CMDLINE_ENTRY_FOUND ||                      \
+                    __e->status == CMDLINE_ENTRY_DEFAULTED)) {                 \
+            CMDLINE_EXTRACT(&__e->value, __out);                               \
+        }                                                                      \
+        __out;                                                                 \
+    })
+
+#define cmdline_read_or(key, target_var, fallback)                             \
+    ({                                                                         \
+        bool __overridden = false;                                             \
+        struct cmdline_entry *__e = cmdline_lookup(key);                       \
+        if (__e && __e->status == CMDLINE_ENTRY_FOUND &&                       \
+            CMDLINE_EXTRACT(&__e->value, target_var) == ERR_OK) {              \
+            __overridden = true;                                               \
+        } else {                                                               \
+            (target_var) = (fallback);                                         \
+        }                                                                      \
+        __overridden;                                                          \
+    })
+
 void cmdline_parse(const char *input);
 bool cmdline_wants_help(const char *input);
 __noreturn void cmdline_dump_help(void);
+void cmdline_debug_hook(void);
 
-struct cmdline_value cmdline_parse_value(struct cmdline_entry *ent,
-                                         const char *value);
+struct cmdline_entry *cmdline_lookup(const char *key);
+uint64_t cmdline_entry_value_u64(const struct cmdline_entry *e);
 
-static inline const char *
-cmdline_value_type_to_str(enum cmdline_value_type type) {
-    switch (type) {
-    case CMDLINE_VAL_NONE: return "none";
-    case CMDLINE_VAL_INT: return "int";
-    case CMDLINE_VAL_DATA_SIZE: return "data_size";
-    case CMDLINE_VAL_BOOL: return "bool";
-    case CMDLINE_VAL_STRING: return "string";
-    case CMDLINE_VAL_RANGE: return "range";
-    case CMDLINE_VAL_CPU_MASK: return "cpu_mask";
-    case CMDLINE_VAL_LIST: return "list";
-    case CMDLINE_VAL_ERR: return "err";
-    default: return "<unknown>";
-    }
-}
+#include "cmdline_api_internal.h"
