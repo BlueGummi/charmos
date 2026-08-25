@@ -7,14 +7,10 @@
 # no lookup index: the reader is a panic path where a walk
 # of a couple hundred KB is free, and one less thing to get wrong
 
-function hexdigit(c) {
-    return index("0123456789abcdef", tolower(c)) - 1
-}
-
 function hexnum(h,    i, v) {
     v = 0
     for (i = 1; i <= length(h); i++)
-        v = v * 16 + hexdigit(substr(h, i, 1))
+        v = v * 16 + hex_val[substr(h, i, 1)]
     return v
 }
 
@@ -23,8 +19,8 @@ function put_addr(h,    i) {
         h = "0" h
 
     for (i = 15; i >= 1; i -= 2)
-        printf "%c", hexdigit(substr(h, i, 1)) * 16 + \
-                     hexdigit(substr(h, i + 1, 1))
+        printf "%c", hex_val[substr(h, i, 1)] * 16 + \
+                     hex_val[substr(h, i + 1, 1)]
 }
 
 function put32(v,    i) {
@@ -65,6 +61,12 @@ BEGIN {
     HDR = 32
     n = 0
     nfiles = 0
+    for (i = 0; i < 10; i++)
+        hex_val[sprintf("%d", i)] = i
+    hex_val["a"] = 10; hex_val["b"] = 11; hex_val["c"] = 12
+    hex_val["d"] = 13; hex_val["e"] = 14; hex_val["f"] = 15
+    hex_val["A"] = 10; hex_val["B"] = 11; hex_val["C"] = 12
+    hex_val["D"] = 13; hex_val["E"] = 14; hex_val["F"] = 15
 }
 
 {

@@ -12,8 +12,8 @@
 #include "uacpi/acpi.h"
 #include "uacpi/status.h"
 
-LOG_HANDLE_DECLARE_DEFAULT(dmar);
-LOG_SITE_DECLARE_DEFAULT(dmar);
+LOG_HANDLE_DECLARE_PRINT(dmar);
+LOG_SITE_DECLARE_PRINT(dmar);
 
 static void print_device_scopes(const uint8_t *ptr, const uint8_t *end) {
     while (ptr < end) {

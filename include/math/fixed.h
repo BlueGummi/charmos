@@ -1,5 +1,6 @@
 /* @title: Fixed Point Arithmetic */
 #pragma once
+#include <kassert.h>
 #include <types/types.h>
 
 #define FX_ONE ((fx32_32_t) (1LL << 32))
@@ -9,8 +10,7 @@
 #define FX(x) ((fx32_32_t) ((x) * 4294967296.0 + ((x) < 0 ? -0.5 : 0.5)))
 #define FX_FROM_RATIO(n, d) ((fx32_32_t) (((__int128) (n) << 32) / (d)))
 
-/* Parse decimal fixed point string, strtol-style endptr, which is set past
- * the last consumed char or str if nothing valid was parsed */
+/* strtol style */
 fx32_32_t fx_parse(const char *str, char **endptr);
 
 static inline fx32_32_t fx_add(fx32_32_t a, fx32_32_t b) {
@@ -45,6 +45,7 @@ static inline fx32_32_t fx_mul(fx32_32_t a, fx32_32_t b) {
 }
 
 static inline fx32_32_t fx_div(fx32_32_t a, fx32_32_t b) {
+    kassert(b);
     bool neg = (a ^ b) < 0;
     uint64_t ua = (uint64_t) (a < 0 ? -a : a);
     uint64_t ub = (uint64_t) (b < 0 ? -b : b);
@@ -73,11 +74,6 @@ static inline fx32_32_t fx_from_int(int64_t x) {
 
 static inline int64_t fx_to_int(fx32_32_t x) {
     return x >> 32;
-}
-
-/* NOTE: COMPILE TIME ONLY! */
-static inline fx32_32_t fx_from_float(double v) {
-    return FX(v);
 }
 
 static inline fx32_32_t fx_min(fx32_32_t a, fx32_32_t b) {
@@ -124,4 +120,26 @@ static inline fx32_32_t fx_ceil(fx32_32_t x) {
 
 static inline fx32_32_t fx_floor(fx32_32_t x) {
     return x & ~(FX_ONE - 1);
+}
+
+static inline fx32_32_t fx_map(fx32_32_t value, fx32_32_t from_low,
+                               fx32_32_t from_high, fx32_32_t to_low,
+                               fx32_32_t to_high) {
+    fx32_32_t dist = value - from_low;
+    fx32_32_t to_range = to_high - to_low;
+    fx32_32_t from_range = from_high - from_low;
+    fx32_32_t num = to_low + fx_mul(dist, to_range);
+    return fx_div(num, from_range);
+}
+
+static inline fx32_32_t fx_lerp(fx32_32_t a, fx32_32_t b, fx32_32_t t) {
+    return a + fx_mul(t, b - a);
+}
+
+static inline fx32_32_t fx_round_up(fx32_32_t x, fx32_32_t multiple) {
+    return fx_mul(fx_div(x + multiple - FX_ONE, multiple), multiple);
+}
+
+static inline fx32_32_t fx_round_down(fx32_32_t x, fx32_32_t multiple) {
+    return fx_mul(fx_div(x, multiple), multiple);
 }

@@ -16,7 +16,7 @@
 
 uint32_t *lapic;
 bool x2apic_enabled = false;
-static LOG_HANDLE_DECLARE_DEFAULT(lapic);
+static LOG_HANDLE_DECLARE_PRINT(lapic);
 
 void lapic_init(void) {
     uintptr_t lapic_phys = rdmsr(IA32_APIC_BASE_MSR) & IA32_APIC_BASE_MASK;
@@ -103,6 +103,9 @@ void panic_broadcast(uint64_t exclude_core) {
 }
 
 void nmi_send(uint32_t apic_id) {
+    kassert(apic_id != smp_core_id()); /* NMI'ing ourselves is a MASSIVE risk,
+                                        * likely buggy code, panic */
+
     if (x2apic_enabled) {
         uint64_t icr = 0;
 

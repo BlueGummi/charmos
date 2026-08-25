@@ -10,8 +10,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-LOG_SITE_DECLARE_DEFAULT(ahci);
-LOG_HANDLE_DECLARE_DEFAULT(ahci);
+LOG_SITE_DECLARE_PRINT(ahci);
+LOG_HANDLE_DECLARE_PRINT(ahci);
 
 struct ahci_disk *ahci_discover_device(uint8_t bus, uint8_t device,
                                        uint8_t function,

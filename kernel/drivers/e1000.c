@@ -13,8 +13,8 @@
 #include <string.h>
 #include <time/spin_sleep.h>
 
-LOG_HANDLE_DECLARE_DEFAULT(e1000);
-LOG_SITE_DECLARE_DEFAULT(e1000);
+LOG_HANDLE_DECLARE_PRINT(e1000);
+LOG_SITE_DECLARE_PRINT(e1000);
 
 #define E1000_MAX_TX_PACKET_SIZE 1518
 #define REG32(dev, offset) (&(dev->regs[(offset) / 4U]))

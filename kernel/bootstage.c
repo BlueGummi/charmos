@@ -8,7 +8,7 @@
 
 /* The standard bootstage.h API and the fancy condition stuff are both here */
 
-static LOG_HANDLE_DECLARE_DEFAULT(bootstage);
+static LOG_HANDLE_DECLARE_PRINT(bootstage);
 const char *bootstage_str[BOOTSTAGE_COUNT] = {
     [BOOTSTAGE_NONE] = "None",
     [BOOTSTAGE_EARLY_FB] = "Early - Framebuffer",

@@ -22,32 +22,49 @@ struct perdomain_descriptor {
 LINKER_SECTION_DEFINE(struct perdomain_descriptor, perdomain_desc);
 
 #define PERDOMAIN_DECLARE(__n, __type, __ctor)                                 \
-    extern typeof(__type) __perdomain_##__n;                                   \
-    extern struct perdomain_descriptor __perdomain_desc_##__n;                 \
+    static typeof(__type) __perdomain_##__n __unused;                          \
+    static struct perdomain_descriptor __perdomain_desc_##__n;                 \
     static void __perdomain_ctor_##__n(void *inst, size_t domain) {            \
-        if ((__ctor) != NULL)                                                  \
-            ((void (*)(typeof(__type) *, size_t)) __ctor)(                     \
-                (typeof(__type) *) inst, domain);                              \
+        void (*const __typed_ctor)(typeof(__type) *, size_t) = (__ctor);       \
+        if (__typed_ctor != NULL)                                              \
+            __typed_ctor((typeof(__type) *) inst, domain);                     \
         if (domain == global.domain_count - 1)                                 \
             atomic_store(&__perdomain_desc_##__n.ready, true);                 \
     }                                                                          \
-    LINKER_SECTION_OBJECT(struct perdomain_descriptor, perdomain_desc)         \
-    __perdomain_desc_##__n = {                                                 \
-        .name = #__n,                                                          \
-        .size = sizeof(typeof(__type)),                                        \
-        .align = _Alignof(typeof(__type)),                                     \
-        .perdomain_ptrs = NULL,                                                \
-        .constructor = __perdomain_ctor_##__n,                                 \
-        .ready = false,                                                        \
+    static LINKER_SECTION_OBJECT(struct perdomain_descriptor, perdomain_desc)  \
+        __perdomain_desc_##__n = {                                             \
+            .name = #__n,                                                      \
+            .size = sizeof(typeof(__type)),                                    \
+            .align = _Alignof(typeof(__type)),                                 \
+            .perdomain_ptrs = NULL,                                            \
+            .constructor = __perdomain_ctor_##__n,                             \
+            .ready = false,                                                    \
     };                                                                         \
-    typeof(__type) __perdomain_##__n
+    static struct perdomain_descriptor *const __perdomain_desc_ref_##__n       \
+        __unused = &__perdomain_desc_##__n
+
+#define PERDOMAIN_EXPORT_AS(sym_name, name)                                    \
+    extern struct perdomain_descriptor __perdomain_desc_sym_##sym_name         \
+        __attribute__((alias("__perdomain_desc_" #name), used))
+
+#define PERDOMAIN_EXPORT(name) PERDOMAIN_EXPORT_AS(name, name)
+
+#define PERDOMAIN_DEFINE_AS(name, sym_name, type)                              \
+    extern struct perdomain_descriptor __perdomain_desc_sym_##sym_name;        \
+    static typeof(type) __perdomain_##name __unused;                           \
+    static struct perdomain_descriptor *const __perdomain_desc_ref_##name      \
+        __unused = &__perdomain_desc_sym_##sym_name
+
+#define PERDOMAIN_DEFINE(name, type) PERDOMAIN_DEFINE_AS(name, name, type)
 
 void perdomain_obj_init(void);
 
 #define PERDOMAIN(name) &(__perdomain_##name)
-#define PERDOMAIN_READY(name) (atomic_load(&__perdomain_desc_##name.ready))
+#define PERDOMAIN_READY(name)                                                  \
+    (atomic_load(&(__perdomain_desc_ref_##name)->ready))
 #define PERDOMAIN_PTR_FOR_DOMAIN(name, d)                                      \
-    ((typeof(__perdomain_##name) *) __perdomain_desc_##name.perdomain_ptrs[d])
+    ((typeof(__perdomain_##name) *) (__perdomain_desc_ref_##name)              \
+         ->perdomain_ptrs[d])
 #define PERDOMAIN_READ_FOR_DOMAIN(name, d)                                     \
     (*((typeof(__perdomain_##name) *) PERDOMAIN_PTR_FOR_DOMAIN(name, d)))
 

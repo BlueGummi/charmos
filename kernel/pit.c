@@ -8,7 +8,7 @@
 #include <time/time.h>
 #include <types/types.h>
 
-LOG_HANDLE_DECLARE_DEFAULT(pit);
+LOG_HANDLE_DECLARE_PRINT(pit);
 
 static inline void pit_write_command(uint8_t cmd) {
     outb(PIT_PORT_COMMAND, cmd);
@@ -20,7 +20,7 @@ static inline void pit_write_count16(uint8_t channel, uint16_t count) {
     outb(port, (uint8_t) ((count >> 8) & 0xFF));
 }
 
-uint16_t pit_read_counter(uint8_t channel) {
+static uint16_t pit_read_counter(uint8_t channel) {
     pit_write_command(PIT_CMD_CHANNEL(channel) | PIT_CMD_ACCESS_LATCH);
 
     uint16_t port = PIT_PORT_CHANNEL(channel);
@@ -94,23 +94,9 @@ void pit_set_interval_ns(time_ns_t interval_ns) {
     pit_set_divisor((uint16_t) divisor);
 }
 
-void pit_wire_irq(irq_t vector, irq_handler_t handler, void *ctx) {
-    irq_register("pit_timer", vector, handler, ctx, IRQ_FLAG_NONE);
-    irq_enable(vector);
-}
-
 void pit_wire_periodic_nmi(time_ns_t interval_ns) {
     pit_set_interval_ns(interval_ns);
-
-    union ioapic_redirection_entry entry = {0};
-    entry.vector = IRQ_NMI;
-    entry.delivery_mode = IOAPIC_DELIVERY_NMI;
-
-    /* PIT is IOAPIC IRQ 0 */
-
-    /* TODO: ACPI MADT ISO IRQ 0 override if
-     * PIT GSI goes to Pin 2 instead of 0 */
-    ioapic_set_redirection_entry(0, entry.raw);
+    ioapic_route_isa_nmi(0, 0);
 }
 
 void pit_init(void) {

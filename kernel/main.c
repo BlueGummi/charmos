@@ -55,6 +55,7 @@
 #include <time/clock.h>
 #include <time/timekeeper.h>
 #include <time/timer.h>
+#include <watchdog.h>
 
 struct globals global = {0};
 
@@ -115,6 +116,8 @@ __no_sanitize_address void k_main(void) {
     pmm_late_init();
     slab_domain_init();
 
+    percpu_obj_init();
+    watchdog_init();
     smp_init();
 
     domain_init_after_smp();
@@ -136,12 +139,12 @@ __no_sanitize_address void k_main(void) {
     scheduler_domains_init();
     bootstage_advance(BOOTSTAGE_MID_TOPOLOGY);
 
-    percpu_obj_init();
     perdomain_obj_init();
     pernode_obj_init();
 
     lapic_clock_evdev_group_init();
     timers_init();
+    watchdog_start();
 
     scheduler_periodic_work_init();
     movealloc_exec_all();

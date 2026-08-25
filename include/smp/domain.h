@@ -54,9 +54,17 @@ void domain_dump(void);
     for (domain_id_t __i = 0;                                                  \
          (__dom = global.domains[__i]), (__i < global.domain_count); __i++)
 
-#define domain_for_each_core(__dom, __pos)                                     \
+#define domain_for_each_domain_id(__id)                                        \
+    for (domain_id_t __i = 0;                                                  \
+         (__id = global.domains[__i]->id), (__i < global.domain_count); __i++)
+
+#define domain_for_each_core(__pos, __dom)                                     \
     for (domain_id_t __i = 0;                                                  \
          (__pos = __dom->cores[__i]), (__i < __dom->num_cores); __i++)
 
+#define domain_for_each_core_id(__pos, __dom)                                  \
+    for (domain_id_t __i = 0;                                                  \
+         (__pos = __dom->cores[__i]->id), (__i < __dom->num_cores); __i++)
+
 #define domain_for_each_core_local(__pos)                                      \
-    domain_for_each_core(smp_core()->domain, __pos)
+    domain_for_each_core(__pos, smp_core()->domain)

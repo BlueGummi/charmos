@@ -16,8 +16,8 @@
 #include <stdint.h>
 
 #include "internal.h"
-LOG_HANDLE_DECLARE_DEFAULT(nvme);
-LOG_SITE_DECLARE_DEFAULT(nvme);
+LOG_HANDLE_DECLARE_PRINT(nvme);
+LOG_SITE_DECLARE_PRINT(nvme);
 
 struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
                                          uint8_t func) {

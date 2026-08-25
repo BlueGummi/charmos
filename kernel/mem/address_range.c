@@ -3,8 +3,8 @@
 #include <mem/page.h>
 #include <string.h>
 
-LOG_SITE_DECLARE_DEFAULT(address_range);
-LOG_HANDLE_DECLARE_DEFAULT(address_range);
+LOG_SITE_DECLARE_PRINT(address_range);
+LOG_HANDLE_DECLARE_PRINT(address_range);
 
 #define ar_log(lvl, fmt, ...)                                                  \
     log(LOG_SITE(address_range), LOG_HANDLE(address_range), lvl, fmt,          \

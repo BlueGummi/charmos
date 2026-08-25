@@ -8,8 +8,8 @@
 #include <mem/vmm.h>
 #include <string.h>
 
-LOG_HANDLE_DECLARE_DEFAULT(vtd);
-LOG_SITE_DECLARE_DEFAULT(vtd);
+LOG_HANDLE_DECLARE_PRINT(vtd);
+LOG_SITE_DECLARE_PRINT(vtd);
 
 const struct iommu_ops vtd_iommu_ops = {};
 

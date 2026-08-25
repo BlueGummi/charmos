@@ -1,10 +1,5 @@
 name: Nightmare
 
-# This hunts for bugs that should be filed, and it never blocks a push.
-#
-# Long single runs instead of many short ones, because that finds lifetime-shaped
-# bugs, TODO: we could improve this in the future with wide vs deep hunts
-
 on:
   schedule:
     # NOTE: GitHub cron routinely runs late at peak usage times
@@ -23,8 +18,6 @@ on:
 permissions:
   contents: read
 
-# Never cancel a torture run in progress, a shard
-# 50 minutes into 60 has nearly delivered its value
 concurrency:
   group: nightmare
   cancel-in-progress: false
@@ -37,7 +30,6 @@ jobs:
   torture:
     name: ${{ matrix.scenario.name }}
     runs-on: ubuntu-latest
-    # 20-job cap is account wide, so we have to cap here for the gate
     strategy:
       fail-fast: false
       max-parallel: 12
@@ -55,11 +47,9 @@ jobs:
           - name: NIGHTMARE_WAKE_UP
             flags: -DTEST_NIGHTMARE_ALL=OFF -DTEST_NIGHTMARE_WAKE=ON
             smp: "sockets=1,cores=1,threads=1"
-          # Bugs live at boundaries and strictly per-subsystem miss those
           - name: NIGHTMARE_ALL_SMP8
             flags: -DTEST_NIGHTMARE_ALL=ON
             smp: "sockets=2,cores=2,threads=2"
-          # KASAN can find silent corruption issues
           - name: NIGHTMARE_ALL_KASAN
             flags: -DTEST_NIGHTMARE_ALL=ON -DDEBUG_ASAN=ON
             smp: "sockets=2,cores=2,threads=2"
@@ -121,8 +111,7 @@ jobs:
 
           cp build/output.log results/run.log 2>/dev/null || \
               echo "(no serial log produced)" > results/run.log
-          # stderr (QEMU), kept out of the guest log but worth
-          # having when a shard dies
+          # stderr (QEMU), kept out of the guest log 
           cp build/output.stderr.log results/run.stderr.log 2>/dev/null || true
 
           {
@@ -139,8 +128,6 @@ jobs:
           tail -60 results/run.log || true
           gzip -9 results/*.log
 
-          # Reporting is the report job's work, so we don't fail for the 
-          # rest of the runners in this fleet
           exit 0
 
       - name: Upload results
@@ -192,8 +179,6 @@ jobs:
               --out "ndjson/$SHARD.ndjson"
           done
 
-          # No --fail-on-error, meaning findings should be read and turned
-          # into seeds used elsewhere
           python3 scripts/ci/aggregate.py 'ndjson/*.ndjson' \
             --summary "$GITHUB_STEP_SUMMARY" \
             --json report.json \

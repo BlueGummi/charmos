@@ -1,5 +1,6 @@
 /* @title: IRQs */
 #pragma once
+#include <kassert.h>
 #include <smp/core.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -104,16 +105,41 @@ void irq_register(char *name, uint8_t vector, irq_handler_t handler, void *ctx,
 void irq_register_full(struct irq_desc *d);
 void irq_set_chip(uint8_t vector, struct irq_chip *chip, void *data);
 
-static inline void irq_mark_self_in_interrupt(bool new) {
-    smp_core()->in_interrupt = new;
+static inline uint32_t irq_mark_self_in_interrupt(bool new) {
+    uint32_t old = smp_core()->interrupt_depth;
+    if (new) {
+        kassert(old != UINT32_MAX);
+        smp_core()->interrupt_depth++;
+    } else {
+        kassert(old);
+        smp_core()->interrupt_depth--;
+    }
+    return old;
+}
+
+static inline uint32_t irq_mark_self_in_nmi(bool new) {
+    uint32_t old = smp_core()->nmi_depth;
+    if (new) {
+        kassert(old != UINT32_MAX);
+        smp_core()->nmi_depth++;
+    } else {
+        kassert(old);
+        smp_core()->nmi_depth--;
+    }
+    return old;
+}
+
+static inline bool irq_in_nmi(void) {
+    return smp_core()->nmi_depth > 0;
 }
 
 static inline bool irq_in_interrupt(void) {
-    return smp_core()->in_interrupt;
+    return smp_core()->interrupt_depth > 0;
 }
 
 static inline bool irq_in_thread_context(void) {
-    return !irq_in_interrupt();
+    struct core *cpu = smp_core();
+    return cpu->interrupt_depth == 0 && cpu->nmi_depth == 0;
 }
 
 static inline bool irq_vector_is_exception(uint8_t vector) {

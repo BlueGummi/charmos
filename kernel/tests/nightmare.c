@@ -2,8 +2,8 @@
 #include <nightmare_test.h>
 #include <string.h>
 
-LOG_SITE_DECLARE_DEFAULT(nightmare);
-LOG_HANDLE_DECLARE_DEFAULT(nightmare);
+LOG_SITE_DECLARE_PRINT(nightmare);
+LOG_HANDLE_DECLARE_PRINT(nightmare);
 
 #define nightmare_log(lvl, fmt, ...)                                           \
     log(LOG_SITE(nightmare), LOG_HANDLE(nightmare), lvl, fmt, ##__VA_ARGS__)

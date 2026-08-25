@@ -11,8 +11,8 @@
 
 static struct pci_device *pci_devices = NULL;
 static uint64_t pci_device_count;
-LOG_HANDLE_DECLARE_DEFAULT(pci);
-LOG_SITE_DECLARE_DEFAULT(pci);
+LOG_HANDLE_DECLARE_PRINT(pci);
+LOG_SITE_DECLARE_PRINT(pci);
 
 const char *pci_class_name(uint8_t class_code, uint8_t subclass) {
     switch (class_code) {

@@ -9,39 +9,46 @@ function endswith(s, suf) {
            substr(s, length(s) - length(suf) + 1) == suf
 }
 
-function resolve_file(col,    f, hit, nhit) {
-    if (col in resolved)
-        return resolved[col]
+function resolve_file(col,    f, i, hit, nhit, res) {
+    if ((cur, col) in resolved)
+        return resolved[cur, col]
 
     # Fits the column, so it came through whole
     if (col in full) {
-        resolved[col] = full[col]
+        resolved[cur, col] = full[col]
         return full[col]
     }
 
+    # Matches the current compilation unit
+    if (cur != "" && endswith(cur, col)) {
+        resolved[cur, col] = cur
+        return cur
+    }
+
     nhit = 0
-    for (f in full) {
+    for (i = 0; i < n_unique; i++) {
+        f = unique_files[i]
         if (endswith(f, col)) {
-            hit = full[f]
+            hit = f
             nhit++
         }
     }
 
     if (nhit == 1) {
-        resolved[col] = hit
+        resolved[cur, col] = hit
         return hit
     }
 
-    if (nhit > 1 && cur != "" && endswith(cur, col))
-        return cur
-
-    return col
+    res = col
+    resolved[cur, col] = res
+    return res
 }
 
 BEGIN {
     if (HIGH == "")
         HIGH = "ffffffff"
     cur = ""
+    n_unique = 0
 }
 
 /:[ \t]*$/ && !/0x[0-9a-fA-F]/ {
@@ -55,6 +62,10 @@ BEGIN {
 
     full[raw] = cur
     full[cur] = cur
+    if (!(cur in seen_file)) {
+        seen_file[cur] = 1
+        unique_files[n_unique++] = cur
+    }
     next
 }
 

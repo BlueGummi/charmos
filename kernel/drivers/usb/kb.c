@@ -185,8 +185,8 @@ struct usb_hid_keyboard *usb_keyboard_create(struct usb_device *dev,
     return kbd;
 }
 
-LOG_HANDLE_DECLARE_DEFAULT(usbkb);
-LOG_SITE_DECLARE_DEFAULT(usbkb);
+LOG_HANDLE_DECLARE_PRINT(usbkb);
+LOG_SITE_DECLARE_PRINT(usbkb);
 #define usbkb_log(log_level, fmt, ...)                                         \
     log(LOG_SITE(usbkb), LOG_HANDLE(usbkb), log_level, fmt, ##__VA_ARGS__)
 

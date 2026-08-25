@@ -167,8 +167,8 @@ ADDRESS_RANGE_DECLARE(
     /* alignment does not need to be provided for static entries */);
 
 struct slab_globals slab_global = {0};
-LOG_HANDLE_DECLARE_DEFAULT(slab);
-LOG_SITE_DECLARE_DEFAULT(slab);
+LOG_HANDLE_DECLARE_PRINT(slab);
+LOG_SITE_DECLARE_PRINT(slab);
 
 /* If our cache is PAGEABLE_ZERO, we can demand page it in
  *

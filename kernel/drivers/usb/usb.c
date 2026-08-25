@@ -12,12 +12,12 @@
 #include "internal.h"
 
 #ifdef DEBUG_USB
-LOG_SITE_DECLARE_DEFAULT(usb);
+LOG_SITE_DECLARE_PRINT(usb);
 #else
-LOG_SITE_DECLARE_DEFAULT(usb, .enabled_mask = LOG_SITE_LEVEL(LOG_ERROR));
+LOG_SITE_DECLARE_PRINT(usb, .enabled_mask = LOG_SITE_LEVEL(LOG_ERROR));
 #endif
 
-LOG_HANDLE_DECLARE_DEFAULT(usb);
+LOG_HANDLE_DECLARE_PRINT(usb);
 
 enum usb_error usb_transfer_sync(enum usb_error (*fn)(struct usb_request *),
                                  struct usb_request *request,

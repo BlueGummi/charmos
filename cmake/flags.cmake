@@ -92,6 +92,7 @@ if (CCACHE_PROGRAM)
     set(CMAKE_ASM_NASM_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
     set(ENV{CCACHE_COLOR} "always")
 endif ()
+set(CMAKE_COLOR_DIAGNOSTICS ON CACHE BOOL "colored diagnostics")
 
 if (APPLE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -target x86_64-unknown-unknown")

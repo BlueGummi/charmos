@@ -34,7 +34,38 @@ static struct idt_ptr idtps = {0};
 #include "isr_stubs.h"
 #include "isr_vectors_array.h"
 
-void isr_common_entry(uint8_t vector, struct irq_context *irq_ctx) {
+static void irq_execute_vector_handlers(irq_t vector,
+                                        struct irq_context *irq_ctx) {
+    struct irq_desc *desc = &irq_table[vector];
+    if (!desc->present || list_empty(&irq_table[vector].actions))
+        panic("Unhandled ISR vector: %u", vector);
+
+    bool handled = false;
+    struct list_head *lh;
+    list_for_each(lh, &desc->actions) {
+        struct irq_action *act = container_of(lh, struct irq_action, list);
+        if (act->handler(act->data, vector, irq_ctx) == IRQ_HANDLED) {
+            handled = true;
+            break;
+        }
+    }
+
+    if (handled && desc->chip && desc->chip->eoi)
+        desc->chip->eoi(desc);
+}
+
+/* TODO: Someday we will need to handle nmi_depth > 1 and do a fancy asm
+ * trampoline to handle cases where IRQs fire in NMIs due to the IRET issue */
+void isr_nmi_entry(struct irq_context *irq_ctx) {
+    /* vector == IRQ_NMI, of course */
+    kassert(!irq_mark_self_in_nmi(true));
+
+    irq_execute_vector_handlers(IRQ_NMI, irq_ctx);
+
+    kassert(irq_mark_self_in_nmi(false) == 1);
+}
+
+void isr_standard_entry(irq_t vector, struct irq_context *irq_ctx) {
     irq_mark_self_in_interrupt(true);
 
     enum irql old = irql_raise(IRQL_HIGH_LEVEL);
@@ -53,22 +84,7 @@ void isr_common_entry(uint8_t vector, struct irq_context *irq_ctx) {
     smp_core()->irq_entered_irql = old;
     smp_core()->irq_stack_scratch_buf = scratch_buf;
 
-    struct irq_desc *desc = &irq_table[vector];
-    if (!desc->present || list_empty(&irq_table[vector].actions))
-        panic("Unhandled ISR vector: %u", vector);
-
-    bool handled = false;
-    struct list_head *lh;
-    list_for_each(lh, &desc->actions) {
-        struct irq_action *act = container_of(lh, struct irq_action, list);
-        if (act->handler(act->data, vector, irq_ctx) == IRQ_HANDLED) {
-            handled = true;
-            break;
-        }
-    }
-
-    if (handled && desc->chip && desc->chip->eoi)
-        desc->chip->eoi(desc);
+    irq_execute_vector_handlers(vector, irq_ctx);
 
     smp_core()->irq_entered_irql = IRQL_NONE;
     smp_core()->irq_stack_scratch_buf = NULL;
@@ -119,6 +135,14 @@ void isr_common_entry(uint8_t vector, struct irq_context *irq_ctx) {
 
         kassert(old != IRQL_DISPATCH_LEVEL);
         scheduler_yield();
+    }
+}
+
+void isr_common_entry(irq_t vector, struct irq_context *irq_ctx) {
+    if (vector != IRQ_NMI) {
+        isr_standard_entry(vector, irq_ctx);
+    } else {
+        isr_nmi_entry(irq_ctx);
     }
 }
 
@@ -173,7 +197,7 @@ void idt_set_gate(uint8_t num, uint16_t sel, uint8_t flags) {
     idt[num].base_high = (base >> 32) & 0xFFFFFFFF;
     idt[num].selector = sel;
 
-    /* TODO: maybe don't hardcode this */
+    /* TODO: maybe don't hardcode this (?) */
     if (num == IRQ_NMI || num == IRQ_DBF || num == IRQ_PAGE_FAULT) {
         idt[num].ist = 1;
     } else {
@@ -291,7 +315,20 @@ void irq_init() {
     irq_register("timer", IRQ_TIMER, timer_isr, NULL, IRQ_FLAG_NONE);
     irq_set_chip(IRQ_TIMER, lapic_get_chip(), NULL);
 
-    irq_register("nmi", IRQ_NMI, nmi_isr, NULL, IRQ_FLAG_NONE);
+    /* NOTE: Ordering MATTERS here. We have to register this first, because
+     * this means that the panic check fires *before* any other NMI check,
+     * which is probably one of the biggest debug correctness parts
+     * of this interrupt subsystem. This MUST stay here, or its registration
+     * must guarantee that it is at the head of the NMI ISR list */
+    irq_register("nmi", IRQ_NMI, panic_nmi_isr, NULL, IRQ_FLAG_SHARED);
+
+    /* HACK: secondary names are not added onto additional registrations,
+     * they just disappear. It's not at all important for correctness,
+     * and there are no consumers of name anyways, but it's something we'll
+     * need to implement some time down the line */
+    irq_register("hardware_nmi", IRQ_NMI, hw_error_nmi_isr, NULL,
+                 IRQ_FLAG_SHARED);
+
     irq_register("tlb_shootdown", IRQ_TLB_SHOOTDOWN, tlb_shootdown_isr, NULL,
                  IRQ_FLAG_NONE);
     irq_set_chip(IRQ_TLB_SHOOTDOWN, lapic_get_chip(), NULL);

@@ -13,7 +13,7 @@
 #include "uacpi/acpi.h"
 #include "uacpi/status.h"
 
-LOG_HANDLE_DECLARE_DEFAULT(slit);
+LOG_HANDLE_DECLARE_PRINT(slit);
 
 void slit_init(void) {
     struct uacpi_table slit_table;

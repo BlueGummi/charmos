@@ -16,7 +16,7 @@
 #include "uacpi/acpi.h"
 #include "uacpi/status.h"
 
-static LOG_HANDLE_DECLARE_DEFAULT(srat);
+static LOG_HANDLE_DECLARE_PRINT(srat);
 
 void srat_init(void) {
     struct uacpi_table srat_table;

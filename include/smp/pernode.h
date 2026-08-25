@@ -22,32 +22,47 @@ struct pernode_descriptor {
 LINKER_SECTION_DEFINE(struct pernode_descriptor, pernode_desc);
 
 #define PERNODE_DECLARE(__n, __type, __ctor)                                   \
-    extern typeof(__type) __pernode_##__n;                                     \
-    extern struct pernode_descriptor __pernode_desc_##__n;                     \
+    static typeof(__type) __pernode_##__n __unused;                            \
+    static struct pernode_descriptor __pernode_desc_##__n;                     \
     static void __pernode_ctor_##__n(void *inst, size_t node) {                \
-        if ((__ctor) != NULL)                                                  \
-            ((void (*)(typeof(__type) *, size_t)) __ctor)(                     \
-                (typeof(__type) *) inst, node);                                \
+        void (*const __typed_ctor)(typeof(__type) *, size_t) = (__ctor);       \
+        if (__typed_ctor != NULL)                                              \
+            __typed_ctor((typeof(__type) *) inst, node);                       \
         if (node == global.node_count - 1)                                     \
             atomic_store(&__pernode_desc_##__n.ready, true);                   \
     }                                                                          \
-    LINKER_SECTION_OBJECT(struct pernode_descriptor, pernode_desc)             \
-    __pernode_desc_##__n = {                                                   \
-        .name = #__n,                                                          \
-        .size = sizeof(typeof(__type)),                                        \
-        .align = _Alignof(typeof(__type)),                                     \
-        .pernode_ptrs = NULL,                                                  \
-        .constructor = __pernode_ctor_##__n,                                   \
-        .ready = false,                                                        \
+    static LINKER_SECTION_OBJECT(struct pernode_descriptor, pernode_desc)      \
+        __pernode_desc_##__n = {                                               \
+            .name = #__n,                                                      \
+            .size = sizeof(typeof(__type)),                                    \
+            .align = _Alignof(typeof(__type)),                                 \
+            .pernode_ptrs = NULL,                                              \
+            .constructor = __pernode_ctor_##__n,                               \
+            .ready = false,                                                    \
     };                                                                         \
-    typeof(__type) __pernode_##__n
+    static struct pernode_descriptor *const __pernode_desc_ref_##__n           \
+        __unused = &__pernode_desc_##__n
+
+#define PERNODE_EXPORT_AS(sym_name, name)                                      \
+    extern struct pernode_descriptor __pernode_desc_sym_##sym_name             \
+        __attribute__((alias("__pernode_desc_" #name), used))
+
+#define PERNODE_EXPORT(name) PERNODE_EXPORT_AS(name, name)
+
+#define PERNODE_DEFINE_AS(name, sym_name, type)                                \
+    extern struct pernode_descriptor __pernode_desc_sym_##sym_name;            \
+    static typeof(type) __pernode_##name __unused;                             \
+    static struct pernode_descriptor *const __pernode_desc_ref_##name          \
+        __unused = &__pernode_desc_sym_##sym_name
+
+#define PERNODE_DEFINE(name, type) PERNODE_DEFINE_AS(name, name, type)
 
 void pernode_obj_init(void);
 
 #define PERNODE(name) &(__pernode_##name)
-#define PERNODE_READY(name) (atomic_load(&__pernode_desc_##name.ready))
+#define PERNODE_READY(name) (atomic_load(&(__pernode_desc_ref_##name)->ready))
 #define PERNODE_PTR_FOR_NODE(name, d)                                          \
-    ((typeof(__pernode_##name) *) __pernode_desc_##name.pernode_ptrs[d])
+    ((typeof(__pernode_##name) *) (__pernode_desc_ref_##name)->pernode_ptrs[d])
 #define PERNODE_READ_FOR_NODE(name, d)                                         \
     (*((typeof(__pernode_##name) *) PERNODE_PTR_FOR_NODE(name, d)))
 

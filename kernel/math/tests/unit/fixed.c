@@ -97,13 +97,6 @@ TEST_DECLARE_UNIT(fx_div_standard, .group = TEST_GROUP(fixed),
     return TEST_SUCCESS;
 }
 
-/* _div does not guard the divisor, TODO: maybe we will make it panic one day */
-TEST_DECLARE_UNIT(fx_div_by_zero_is_unguarded, .group = TEST_GROUP(fixed)) {
-    TEST_ASSERT(fx_div(FX_ONE, 0) != FX_ONE);
-
-    return TEST_SUCCESS;
-}
-
 /* Masking fractional bits rounds toward -inf both +/- */
 TEST_DECLARE_UNIT(fx_floor_ceil_standard, .group = TEST_GROUP(fixed)) {
     TEST_ASSERT(fx_floor(0) == 0);

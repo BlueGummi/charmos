@@ -15,8 +15,8 @@
 #include "mem/slab/internal.h"
 
 #ifdef DEBUG_ASAN
-LOG_SITE_DECLARE_DEFAULT(asan);
-LOG_HANDLE_DECLARE_DEFAULT(asan);
+LOG_SITE_DECLARE_PRINT(asan);
+LOG_HANDLE_DECLARE_PRINT(asan);
 
 /* If we widen this, ASAN_SHADOW_OFFSET must be recomputed, because right now
  * it maps exactly this window into the shadow region */

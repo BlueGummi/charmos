@@ -71,7 +71,8 @@ struct core {
      *
      * For exception_sync_cb, it is passed into the callback as a parameter */
     uint8_t *irq_stack_scratch_buf;
-    bool in_interrupt;
+    uint32_t interrupt_depth;
+    uint32_t nmi_depth;
     enum irql current_irql;
 
     /* Remains valid in the top half, once the bottom half is

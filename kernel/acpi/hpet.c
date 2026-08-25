@@ -11,7 +11,7 @@
 #include "uacpi/acpi.h"
 #include "uacpi/status.h"
 
-LOG_HANDLE_DECLARE_DEFAULT(hpet);
+LOG_HANDLE_DECLARE_PRINT(hpet);
 
 uint64_t *hpet_base;
 uint64_t hpet_timer_count;

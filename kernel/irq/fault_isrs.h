@@ -83,12 +83,24 @@ MAKE_HANDLER(breakpoint, "Breakpoint");
 MAKE_HANDLER(ss, "STACK SEGMENT FAULT");
 MAKE_HANDLER(double_fault, "DOUBLE FAULT");
 
-enum irq_result nmi_isr(void *ctx, uint8_t vector, struct irq_context *rsp) {
+enum irq_result panic_nmi_isr(void *ctx, uint8_t vector,
+                              struct irq_context *rsp) {
     (void) ctx, (void) vector, (void) rsp;
     if (atomic_load(&global.panicked))
         panic_nmi_handoff(ctx, rsp);
 
-    return IRQ_HANDLED;
+    return IRQ_NONE;
+}
+
+enum irq_result hw_error_nmi_isr(void *ctx, uint8_t vector,
+                                 struct irq_context *ictx) {
+    uint8_t port61 = inb(0x61);
+    if (port61 & 0xC0) /* bit 7 = RAM Parity, bit 6 = IOCHK, TODO: make a
+                        * separate, clean hardware error/MCE subsystem */
+        panic("Hardware / Memory Parity NMI Error (Port 0x61 = 0x%02x)",
+              port61);
+
+    return IRQ_NONE;
 }
 
 enum irq_result nop_handler(void *ctx, uint8_t vector,

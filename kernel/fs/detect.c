@@ -12,8 +12,8 @@
 #include <stdint.h>
 #include <string.h>
 
-LOG_HANDLE_DECLARE_DEFAULT(fs_detect);
-LOG_SITE_DECLARE_DEFAULT(fs_detect);
+LOG_HANDLE_DECLARE_PRINT(fs_detect);
+LOG_SITE_DECLARE_PRINT(fs_detect);
 
 /* there is no point in using the bcache for these operations */
 const char *detect_fstr(enum fs_type type) {

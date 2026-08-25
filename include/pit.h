@@ -1,5 +1,6 @@
 /* @title: Programmable Interval Timer */
 #pragma once
+#include <acpi/ioapic.h>
 #include <irq/irq.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -67,15 +68,5 @@ void pit_set_frequency(freq_hz_t freq_hz);
 void pit_set_interval_ns(time_ns_t interval_ns);
 void pit_set_periodic_mode(uint16_t divisor);
 void pit_set_oneshot_mode(uint16_t divisor);
-uint16_t pit_read_counter(uint8_t channel);
-void pit_wire_irq(irq_t vector, irq_handler_t handler, void *ctx);
 void pit_wire_periodic_nmi(time_ns_t interval_ns);
 freq_hz_t pit_measure_tsc_freq(void);
-
-static inline void pit_set_interval_us(time_us_t interval_us) {
-    pit_set_interval_ns(interval_us * NS_PER_US);
-}
-
-static inline void pit_set_interval_ms(time_ms_t interval_ms) {
-    pit_set_interval_ns(interval_ms * NS_PER_MS);
-}

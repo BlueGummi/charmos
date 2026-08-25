@@ -9,8 +9,8 @@
 #include <stdbool.h>
 #include <sync/spinlock.h>
 
-LOG_SITE_DECLARE_DEFAULT(domain);
-LOG_HANDLE_DECLARE_DEFAULT(domain);
+LOG_SITE_DECLARE_PRINT(domain);
+LOG_HANDLE_DECLARE_PRINT(domain);
 
 #define domain_log(lvl, fmt, ...)                                              \
     log(LOG_SITE(domain), LOG_HANDLE(domain), lvl, fmt, ##__VA_ARGS__)

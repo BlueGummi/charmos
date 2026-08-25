@@ -276,9 +276,14 @@ static inline size_t log_site_message_count(struct log_site *site) {
 
 #define LOG_SITE_DECLARE(_name, ...)                                           \
     LINKER_SECTION_ATTRIBUTE(log_sites)                                        \
-    struct log_site __log_site_##_name = {.name = #_name, __VA_ARGS__}
+    struct log_site __log_site_##_name = {.capacity =                          \
+                                              LOG_SITE_CAPACITY_DEFAULT,       \
+                                          .enabled_mask = LOG_SITE_ALL,        \
+                                          .dump_opts = LOG_DUMP_CONSOLE,       \
+                                          .name = #_name,                      \
+                                          __VA_ARGS__}
 
-#define LOG_SITE_DECLARE_DEFAULT(_name, ...)                                   \
+#define LOG_SITE_DECLARE_PRINT(_name, ...)                                     \
     LINKER_SECTION_ATTRIBUTE(log_sites)                                        \
     struct log_site __log_site_##_name = {                                     \
         .name = #_name,                                                        \
@@ -303,7 +308,7 @@ static inline size_t log_site_message_count(struct log_site *site) {
     struct log_handle __log_handle_##_name = {                                 \
         .msg = #_name, .seen_internal = 0, .last_ts_internal = 0, __VA_ARGS__}
 
-#define LOG_HANDLE_DECLARE_DEFAULT(n, ...)                                     \
+#define LOG_HANDLE_DECLARE_PRINT(n, ...)                                       \
     struct log_handle __log_handle_##n = {.msg = #n,                           \
                                           .flags = LOG_PRINT,                  \
                                           .seen_internal = 0,                  \

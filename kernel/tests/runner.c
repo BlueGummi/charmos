@@ -56,8 +56,8 @@ CMDLINE_CHILDREN_DECLARE(
     CMDLINE_INNER_VAR(no_progress, test_global.no_progress,
                       .desc = "Do not show progress bar"));
 
-LOG_SITE_DECLARE_DEFAULT(test_harness);
-LOG_HANDLE_DECLARE_DEFAULT(test_harness, .flags = LOG_PRINT | LOG_NO_NEWLINE);
+LOG_SITE_DECLARE_PRINT(test_harness);
+LOG_HANDLE_DECLARE_PRINT(test_harness, .flags = LOG_PRINT | LOG_NO_NEWLINE);
 
 #define test_harness_log(lvl, fmt, ...)                                        \
     log(LOG_SITE(test_harness), LOG_HANDLE(test_harness), lvl, fmt,            \

@@ -23,32 +23,47 @@ struct percpu_descriptor {
 LINKER_SECTION_DEFINE(struct percpu_descriptor, percpu_desc);
 
 #define PERCPU_DECLARE(__n, __type, __ctor)                                    \
-    extern typeof(__type) __percpu_##__n;                                      \
-    extern struct percpu_descriptor __percpu_desc_##__n;                       \
+    static typeof(__type) __percpu_##__n __unused;                             \
+    static struct percpu_descriptor __percpu_desc_##__n;                       \
     static void __percpu_ctor_##__n(void *inst, size_t cpu) {                  \
-        if ((__ctor) != NULL)                                                  \
-            ((void (*)(typeof(__type) *, size_t)) __ctor)(                     \
-                (typeof(__type) *) inst, cpu);                                 \
+        void (*const __typed_ctor)(typeof(__type) *, size_t) = (__ctor);       \
+        if (__typed_ctor != NULL)                                              \
+            __typed_ctor((typeof(__type) *) inst, cpu);                        \
         if (cpu == global.core_count - 1)                                      \
             atomic_store(&__percpu_desc_##__n.ready, true);                    \
     }                                                                          \
-    LINKER_SECTION_OBJECT(struct percpu_descriptor, percpu_desc)               \
-    __percpu_desc_##__n = {                                                    \
-        .name = #__n,                                                          \
-        .size = sizeof(typeof(__type)),                                        \
-        .align = _Alignof(typeof(__type)),                                     \
-        .percpu_ptrs = NULL,                                                   \
-        .constructor = __percpu_ctor_##__n,                                    \
-        .ready = false,                                                        \
+    static LINKER_SECTION_OBJECT(struct percpu_descriptor, percpu_desc)        \
+        __percpu_desc_##__n = {                                                \
+            .name = #__n,                                                      \
+            .size = sizeof(typeof(__type)),                                    \
+            .align = _Alignof(typeof(__type)),                                 \
+            .percpu_ptrs = NULL,                                               \
+            .constructor = __percpu_ctor_##__n,                                \
+            .ready = false,                                                    \
     };                                                                         \
-    typeof(__type) __percpu_##__n
+    static struct percpu_descriptor *const __percpu_desc_ref_##__n __unused =  \
+        &__percpu_desc_##__n
+
+#define PERCPU_EXPORT_AS(sym_name, name)                                       \
+    extern struct percpu_descriptor __percpu_desc_sym_##sym_name               \
+        __attribute__((alias("__percpu_desc_" #name), used))
+
+#define PERCPU_EXPORT(name) PERCPU_EXPORT_AS(name, name)
+
+#define PERCPU_DEFINE_AS(name, sym_name, type)                                 \
+    extern struct percpu_descriptor __percpu_desc_sym_##sym_name;              \
+    static typeof(type) __percpu_##name __unused;                              \
+    static struct percpu_descriptor *const __percpu_desc_ref_##name __unused = \
+        &__percpu_desc_sym_##sym_name
+
+#define PERCPU_DEFINE(name, type) PERCPU_DEFINE_AS(name, name, type)
 
 void percpu_obj_init(void);
 
 #define PERCPU(name) &(__percpu_##name)
-#define PERCPU_READY(name) atomic_load(&__percpu_desc_##name.ready)
+#define PERCPU_READY(name) (atomic_load(&(__percpu_desc_ref_##name)->ready))
 #define PERCPU_PTR_FOR_CPU(name, cpu)                                          \
-    ((typeof(__percpu_##name) *) __percpu_desc_##name.percpu_ptrs[cpu])
+    ((typeof(__percpu_##name) *) (__percpu_desc_ref_##name)->percpu_ptrs[cpu])
 #define PERCPU_READ_FOR_CPU(name, cpu)                                         \
     (*((typeof(__percpu_##name) *) PERCPU_PTR_FOR_CPU(name, cpu)))
 

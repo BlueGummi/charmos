@@ -25,7 +25,7 @@ LOG_SITE_DECLARE(climb, .flags = LOG_SITE_PRINT | LOG_SITE_DEFAULT,
                  .dump_opts = ((struct log_dump_options){.show_tid = true,
                                                          .show_args = true}));
 
-LOG_HANDLE_DECLARE_DEFAULT(climb);
+LOG_HANDLE_DECLARE_PRINT(climb);
 #define climb_log(lvl, fmt, ...)                                               \
     log(LOG_SITE(climb), LOG_HANDLE(climb), lvl, fmt, ##__VA_ARGS__)
 
