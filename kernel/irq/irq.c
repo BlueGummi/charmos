@@ -22,6 +22,7 @@
 #include <thread/apc.h>
 #include <thread/thread.h>
 #include <time/timer.h>
+#include <watchdog.h>
 
 /* Lock is only used for allocation/free and registering */
 static struct spinlock irq_table_lock = SPINLOCK_INIT;
@@ -45,6 +46,8 @@ static void irq_execute_vector_handlers(irq_t vector,
     list_for_each(lh, &desc->actions) {
         struct irq_action *act = container_of(lh, struct irq_action, list);
         if (act->handler(act->data, vector, irq_ctx) == IRQ_HANDLED) {
+            if (vector != IRQ_NMI)
+                watchdog_pet();
             handled = true;
             break;
         }

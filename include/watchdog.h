@@ -127,7 +127,7 @@ enum watchdog_master_state {
 /* NOTE: By default, not tunable by cmdline */
 
 /* TODO: Tune these and test around */
-#define WATCHDOG_WINDOW_BUCKETS 4
+#define WATCHDOG_WINDOW_BUCKETS 8
 #define WATCHDOG_MASTER_SEQCOUNT_SPINS 3
 #define WATCHDOG_NUM_BUCKETS 64
 #define WATCHDOG_MSG_LEN_MAX 512
@@ -152,7 +152,7 @@ enum watchdog_master_state {
 /* if latency <= threshold, we pass */
 #define WATCHDOG_CRITICAL_PASS_THRESHOLD_MS 250
 #define WATCHDOG_CRITICAL_PANIC_THRESHOLD_MS                                   \
-    2500 /* If we delay this long, panic */
+    10000 /* If we delay this long, panic */
 
 #define WATCHDOG_CRITICAL_TESTS_FACTOR FX(0.4)
 #define WATCHDOG_CRITICAL_PETS_FACTOR FX(0.6)
@@ -368,5 +368,7 @@ struct watchdog_globals {
 
 void watchdog_init(void);
 void watchdog_start(void);
+void watchdog_anti_pet(void);
+void watchdog_pet(void);
 #define watchdog_cpu_for_each(__i, state)                                      \
     cpu_mask_for_each(__i, watchdog_master.cpu_masks[state])

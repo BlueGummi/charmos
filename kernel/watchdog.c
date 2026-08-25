@@ -31,7 +31,7 @@ static void watchdog_percpu_ctor(struct watchdog_percpu *pcpu, cpu_id_t cpu);
 static struct watchdog_config config = {
     .bucket_interval = SECONDS_TO_NS(1),
     .master_tick_interval = MS_TO_NS(100),
-    .worker_heartbeat_interval = MS_TO_NS(100),
+    .worker_heartbeat_interval = MS_TO_NS(50),
     .master_print_interval = MS_TO_NS(250),
 
     .master_panic_score = FX(0.9), /* We missed 60% of heartbeats for a while,
@@ -359,13 +359,17 @@ static time_ms_t watchdog_spin_for_response(struct watchdog_master_cpu *cpu) {
     struct watchdog_percpu_response *resp = &cpu->pcpu->response;
 
     do {
-        if ((seq = seqcount_begin_read_raw(&resp->seqcount)) & 1)
+        seq = seqcount_begin_read_raw(&resp->seqcount);
+        if (seq & 1) {
+            cpu_relax();
             continue;
+        }
 
         kassert(resp->finished_ms >= cpu->critical_test_start);
         return resp->finished_ms - cpu->critical_test_start;
 
-    } while (seqcount_read_retry(&resp->seqcount, seq) && --retries > 0);
+    } while ((seqcount_read_retry(&resp->seqcount, seq) || (seq & 1)) &&
+             --retries > 0);
 
     return TIME_MS_MAX;
 }
@@ -659,6 +663,7 @@ void watchdog_init(void) {
     watchdog_global.critical_test_irq = irq_alloc_entry();
     irq_register("watchdog_test", watchdog_global.critical_test_irq,
                  watchdog_test_handler, NULL, IRQ_FLAG_NONE);
+    irq_set_chip(watchdog_global.critical_test_irq, lapic_get_chip(), NULL);
     irq_register("watchdog_master", IRQ_NMI, watchdog_master_nmi_handler, NULL,
                  IRQ_FLAG_SHARED);
 
@@ -689,4 +694,26 @@ void watchdog_start(void) {
     pit_init();
     pit_wire_periodic_nmi(config.master_tick_interval);
     ioapic_route_isa_nmi(0, /* cpu id */ 0);
+}
+
+void watchdog_pet(void) {
+    if (PERCPU_READY(watchdog_percpu)) {
+        struct watchdog_percpu *this = PERCPU_PTR(watchdog_percpu);
+        /* The caller must make sure we cannot be preempted */
+        if (this->pets_enabled) {
+            kassert(irql_get() >= IRQL_DISPATCH_LEVEL);
+            this->pets++;
+        }
+    }
+}
+
+void watchdog_anti_pet(void) {
+    if (PERCPU_READY(watchdog_percpu)) {
+        struct watchdog_percpu *this = PERCPU_PTR(watchdog_percpu);
+        /* The caller must make sure we cannot be preempted */
+        if (this->pets_enabled) {
+            kassert(irql_get() >= IRQL_DISPATCH_LEVEL);
+            this->anti_pets++;
+        }
+    }
 }

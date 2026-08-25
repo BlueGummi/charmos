@@ -4,6 +4,7 @@
 #include <smp/core.h>
 #include <thread/apc.h>
 #include <thread/dpc.h>
+#include <watchdog.h>
 
 enum irql irql_get(void) {
     return smp_core()->current_irql;
@@ -51,7 +52,7 @@ enum irql irql_raise(enum irql new_level) {
 
     irql_set(new_level);
     if (new_level > old) {
-        if (old < IRQL_APC_LEVEL && new_level >= IRQL_APC_LEVEL)
+        if (old < IRQL_DISPATCH_LEVEL && new_level >= IRQL_DISPATCH_LEVEL)
             scheduler_preemption_disable();
 
         if (new_level >= IRQL_HIGH_LEVEL)
@@ -101,13 +102,15 @@ void irql_lower(enum irql new_level) {
         irql_set(IRQL_DISPATCH_LEVEL);
         if (in_thread)
             dpc_drain_local();
+
+        watchdog_pet();
     }
 
     /* Step down first so current_irql matches before preemption re enables */
     irql_set(new_level);
 
     bool preempt_re_enabled = false;
-    if (old >= IRQL_APC_LEVEL && new_level < IRQL_APC_LEVEL)
+    if (old >= IRQL_DISPATCH_LEVEL && new_level < IRQL_DISPATCH_LEVEL)
         preempt_re_enabled = (scheduler_preemption_enable() == 0);
 
     if (in_thread && new_level == IRQL_PASSIVE_LEVEL) {

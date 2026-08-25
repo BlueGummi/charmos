@@ -5,6 +5,7 @@
 #include <sync/rcu.h>
 #include <thread/apc.h>
 #include <thread/reaper.h>
+#include <watchdog.h>
 
 #include "internal.h"
 
@@ -363,6 +364,7 @@ void scheduler_switch_in() {
     scheduler_periodic_work_execute(PERIODIC_WORK_PERIOD_BASED);
     vmm_reclaim_page_tables();
     atomic_store(&smp_core()->pt_seen_epoch, atomic_load(&global.pt_epoch));
+    watchdog_pet();
 }
 
 void scheduler_yield() {

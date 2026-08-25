@@ -137,8 +137,8 @@
 
 enum irql {
     IRQL_PASSIVE_LEVEL = 0,  /* Normal execution */
-    IRQL_APC_LEVEL = 1,      /* No preemption */
-    IRQL_DISPATCH_LEVEL = 2, /* No DPCs */
+    IRQL_APC_LEVEL = 1,      /* No APCs */
+    IRQL_DISPATCH_LEVEL = 2, /* No DPCs, no preemption */
     IRQL_DEVICE_LEVEL = 3,   /* Device interrupts */
     IRQL_HIGH_LEVEL = 4,     /* All interrupts masked */
     IRQL_NONE = -1,
