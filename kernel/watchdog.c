@@ -4,7 +4,6 @@
 #include <mem/alloc_or_die.h>
 #include <pit.h>
 #include <smp/percpu.h>
-#include <smp/perdomain.h>
 #include <string.h>
 #include <sync/seqlock.h>
 #include <time/time.h>
@@ -28,8 +27,6 @@
 static void watchdog_worker_timer_func(struct timer *t);
 static void watchdog_buckets_init(struct watchdog_buckets *b);
 static void watchdog_percpu_ctor(struct watchdog_percpu *pcpu, cpu_id_t cpu);
-static void watchdog_perdomain_ctor(struct watchdog_perdomain *pd,
-                                    domain_id_t d);
 
 static struct watchdog_config config = {
     .bucket_interval = SECONDS_TO_NS(1),
@@ -51,8 +48,6 @@ static struct watchdog_globals watchdog_global = {0};
 LOG_SITE_DECLARE(watchdog_master);
 LOG_HANDLE_DECLARE(watchdog_master);
 
-PERDOMAIN_DECLARE(watchdog_perdomain, struct watchdog_perdomain,
-                  watchdog_perdomain_ctor);
 PERCPU_DECLARE(watchdog_percpu, struct watchdog_percpu, watchdog_percpu_ctor);
 static CMDLINE_DECLARE(watchdog, .flags = CMDLINE_ENTRY_SYMBOLIC,
                        .desc = "Watchdog command line namespace");
@@ -82,11 +77,6 @@ static void watchdog_percpu_ctor(struct watchdog_percpu *pcpu, cpu_id_t cpu) {
     pcpu->timer.func = watchdog_worker_timer_func;
     pcpu->timer.flags =
         TIMER_FLAG_PINNED | TIMER_FLAG_CPU(cpu) | TIMER_FLAG_IRQ;
-}
-
-static void watchdog_perdomain_ctor(struct watchdog_perdomain *pd,
-                                    domain_id_t d) {
-    pd->id = d;
 }
 
 static inline size_t time_to_bucket(time_ms_t time) {
@@ -178,8 +168,6 @@ static void watchdog_do_percpu_heartbeat(time_ms_t now) {
     kassert(PERCPU_READY(watchdog_percpu));
 
     watchdog_buckets_inc_heartbeat(&PERCPU_READ(watchdog_percpu).buckets, now);
-    watchdog_buckets_inc_heartbeat(&PERDOMAIN_READ(watchdog_perdomain).buckets,
-                                   now);
 }
 
 /* Non blocking snapshot */
@@ -265,6 +253,7 @@ static bool watchdog_count_heartbeats(const struct watchdog_buckets *buckets,
 
     if (out_heartbeats)
         *out_heartbeats = total;
+
     return true;
 
 not_ready:
@@ -539,28 +528,6 @@ static void watchdog_enter_normal(struct watchdog_master_cpu *mcpu) {
     ewma_init(&mcpu->lockup_ewma, WATCHDOG_EWMA_ALPHA);
     watchdog_cpu_demote(mcpu->id, WATCHDOG_STATE_NORMAL);
     mcpu->lockup_score = 0;
-
-    /* NOTE:
-     *
-     * This is the only place where we need to set bits in the
-     * domain mask, since we can effectively check the status
-     * of the CPUs in the domain mask */
-    struct domain *domain = global.cores[mcpu->id]->domain;
-
-    kassert(!cpu_mask_test(&watchdog_master.normal_domains, domain->id));
-    cpu_id_t i;
-    bool all_normal = true;
-    domain_for_each_core_id(i, domain) {
-        if (!cpu_mask_test(&watchdog_master.cpu_masks[WATCHDOG_STATE_NORMAL],
-                           i)) {
-            all_normal = false;
-            break;
-        }
-    }
-
-    /* keep the cpu_masks bit set, set domain */
-    if (all_normal)
-        cpu_mask_set(&watchdog_master.normal_domains, domain->id);
 }
 
 static void watchdog_master_process_suspect(time_ms_t now) {
@@ -596,75 +563,17 @@ static void watchdog_master_process_suspect(time_ms_t now) {
     }
 }
 
-static void watchdog_enter_suspect_for_domain(domain_id_t id) {
+static void watchdog_master_process_normal(void) {
     cpu_id_t i;
-    bool needs_clear = false;
-    domain_for_each_core_id(i, global.domains[id]) {
+    watchdog_cpu_for_each(i, WATCHDOG_STATE_NORMAL) {
         struct watchdog_percpu *pcpu = PERCPU_PTR_FOR_CPU(watchdog_percpu, i);
-        kassert(cpu_mask_test(&watchdog_master.cpu_masks[WATCHDOG_STATE_NORMAL],
-                              i));
-        size_t out_beats, out_expect;
         fx32_32_t score;
         if (!watchdog_count_heartbeats(&pcpu->buckets, WATCHDOG_WINDOW_BUCKETS,
-                                       &out_beats, &out_expect, &score))
+                                       NULL, NULL, &score))
             continue;
 
-        if (score >= config.master_suspect_score) {
-            needs_clear = true;
+        if (score >= config.master_suspect_score)
             watchdog_enter_suspect(i);
-        }
-    }
-
-    if (needs_clear)
-        cpu_mask_clear(&watchdog_master.normal_domains, id);
-}
-
-static void watchdog_master_process_normal(void) {
-    domain_id_t i;
-    cpu_mask_for_all(i, watchdog_master.normal_domains) {
-        struct watchdog_perdomain *pd =
-            PERDOMAIN_PTR_FOR_DOMAIN(watchdog_perdomain, i);
-
-        if (cpu_mask_test(&watchdog_master.normal_domains, i)) {
-            size_t out_beats;
-            if (!watchdog_count_heartbeats(&pd->buckets,
-                                           WATCHDOG_WINDOW_BUCKETS, &out_beats,
-                                           NULL, NULL))
-                continue;
-
-            size_t expected = watchdog_global.expected_heartbeats_per_bucket *
-                              global.domains[i]->num_cores;
-
-            fx32_32_t score =
-                fx_div(fx_from_int(out_beats), fx_from_int(expected));
-
-            if (score >= config.master_suspect_score)
-                watchdog_enter_suspect_for_domain(i);
-
-        } else {
-            bool all_set = true; /* Should never be true at the end */
-
-            cpu_id_t j;
-            domain_for_each_core_id(j, global.domains[i]) {
-                if (!cpu_mask_test(
-                        &watchdog_master.cpu_masks[WATCHDOG_STATE_NORMAL], j)) {
-                    all_set = false;
-                } else {
-                    fx32_32_t score;
-                    struct watchdog_percpu *pcpu =
-                        PERCPU_PTR_FOR_CPU(watchdog_percpu, j);
-                    if (!watchdog_count_heartbeats(&pcpu->buckets,
-                                                   WATCHDOG_WINDOW_BUCKETS,
-                                                   NULL, NULL, &score))
-                        continue;
-
-                    if (score >= config.master_suspect_score)
-                        watchdog_enter_suspect(j);
-                }
-            }
-
-            kassert(!all_set);
-        }
     }
 }
 
@@ -709,6 +618,7 @@ static enum irq_result watchdog_pet_nmi_handler(void *ctx, irq_t irq,
 
     /* Must be set, if it doesn't, something happened */
     if (seqcount_read_raw(&pcpu->pets_seq) & 1) {
+        pcpu->pets_enabled = true;
         seqcount_end_write(&pcpu->pets_seq);
         return IRQ_HANDLED;
     }
@@ -732,10 +642,6 @@ static enum irq_result watchdog_test_handler(void *ctx, irq_t irq,
 /* We'll want to set up the master and all the workers */
 void watchdog_init(void) {
     kassert(PERCPU_READY(watchdog_percpu));
-    watchdog_global.bucket_interval_ms = NS_TO_MS(config.bucket_interval);
-    watchdog_global.expected_heartbeats_per_bucket =
-        watchdog_global.bucket_interval_ms /
-        NS_TO_MS(config.worker_heartbeat_interval);
 
     for (int i = 0; i < WATCHDOG_STATE_MAX; i++) {
         alloc_or_die(
@@ -745,9 +651,6 @@ void watchdog_init(void) {
     alloc_or_die(
         cpu_mask_init(&watchdog_master.scratch_mask, global.core_count));
 
-    alloc_or_die(
-        cpu_mask_init(&watchdog_master.normal_domains, global.domain_count));
-    cpu_mask_set_all(&watchdog_master.normal_domains);
     cpu_mask_set_all(&watchdog_master.cpu_masks[WATCHDOG_STATE_NORMAL]);
     watchdog_master.cpus =
         kmalloc_or_die(sizeof(struct watchdog_master_cpu) * global.core_count,
@@ -772,14 +675,18 @@ void watchdog_init(void) {
 }
 
 void watchdog_start(void) {
+    watchdog_global.bucket_interval_ms = NS_TO_MS(config.bucket_interval);
+    watchdog_global.expected_heartbeats_per_bucket =
+        watchdog_global.bucket_interval_ms /
+        NS_TO_MS(config.worker_heartbeat_interval);
+
     struct watchdog_percpu *pcpu;
     percpu_for_each(watchdog_percpu, pcpu, cpu) {
         timer_modify(&pcpu->timer,
                      timer_delta_us(NS_TO_US(config.master_tick_interval)));
     }
 
-    /* TODO: Enable */
-    //    pit_init();
-    //    pit_wire_periodic_nmi(config.master_tick_interval);
-    //    ioapic_route_isa_nmi(0, /* cpu id */ 0);
+    pit_init();
+    pit_wire_periodic_nmi(config.master_tick_interval);
+    ioapic_route_isa_nmi(0, /* cpu id */ 0);
 }

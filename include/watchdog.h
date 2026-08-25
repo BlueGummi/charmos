@@ -176,19 +176,6 @@ struct watchdog_bucket_snapshot {
     struct watchdog_bucket buckets[WATCHDOG_NUM_BUCKETS];
 };
 
-/* Why this needs to exist:
- *
- * Under NORMAL operations, we run into a scalability hazard if we need to
- * go read ticks from every watchdog. 16 CPUs is 16 loads and checks per run,
- * but 32, 64, 128+ and it scales to be something that could impact performance.
- *
- * Thus, as a heuristic, we scan at the domain
- * level to look at an aggregate heartbeat count */
-struct watchdog_perdomain {
-    domain_id_t id;
-    struct watchdog_buckets buckets;
-};
-
 struct watchdog_percpu_response {
     /* This structure holds everything that a CPU responds with when IPI'd
      * in CRITICAL state so we can examine what's going on, protected by
@@ -312,27 +299,6 @@ struct watchdog_master {
      *
      * we need panic_cpus so we can batch a panic */
     struct cpu_mask cpu_masks[WATCHDOG_STATE_MAX];
-
-    /* NOTE: The reason why this exists at all is so that for the standard, OK
-     * fast path, we simply check the smaller bitmap of all domains
-     *
-     * In the case that a domain is split between normal and non-normal CPUs,
-     * the bit is cleared from this map, and we "fracture" the domain
-     * into the cpu_masks[WATCHDOG_STATE_NORMAL] and whatever other state
-     * exists, and we check this normal_domains mask FIRST in software
-     *
-     * so in the master, we (1) fracture the bitmask in case of suspect CPUs,
-     * and (2) iterate through all clear bits in normal_domains,
-     * and (3) for each clear bit that was NOT recently set, check
-     * on its status in cpu_masks[WATCHDOG_STATE_NORMAL], and at the same
-     * time, in the case of not all NORMAL (where all normal means we
-     * coalesce into normal_domains), check on the individual CPUs
-     * in cpu_masks[WATCHDOG_STATE_NORMAL]
-     *
-     * Do note that the invariant here is if a domain bit is set here,
-     * all children CPUs must also be set in the WATCHDOG_STATE_NORMAL mask
-     */
-    struct cpu_mask normal_domains;
 
     /* Because the watchdog is NOT allowed to allocate, and struct cpu_mask
      * allocates memory on systems with > 64 CPUs, we need to keep
