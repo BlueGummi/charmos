@@ -1,0 +1,18 @@
+#! expect: tasks[1].name
+#! because: task names must be unique
+[suite]
+name = "dupes"
+runners = 1
+budget_hours = 1.0
+
+[build]
+
+[[tasks]]
+name = "t"
+  [tasks.boot]
+  duration_ms = 10000
+
+[[tasks]]
+name = "t"
+  [tasks.boot]
+  duration_ms = 10000

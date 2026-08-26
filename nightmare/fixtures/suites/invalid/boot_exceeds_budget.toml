@@ -1,0 +1,13 @@
+#! expect: tasks[0].boot.duration_ms
+#! because: no boot could ever finish inside the budget
+[suite]
+name = "too_big"
+runners = 1
+budget_hours = 0.01
+
+[build]
+
+[[tasks]]
+name = "t"
+  [tasks.boot]
+  duration_ms = 600000

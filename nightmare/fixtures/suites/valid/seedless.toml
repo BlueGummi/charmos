@@ -1,0 +1,21 @@
+[suite]
+name         = "seedless_hunt"
+runners      = 2
+budget_hours = 2.0
+
+[build]
+compiler = "gcc"
+
+[[tasks]]
+name = "wide_open"
+mode = "vertical"
+
+  [tasks.boot]
+  duration_ms    = 60000
+  drain_grace_ms = 5000
+  gate_first     = false
+
+  [tasks.nightmare]
+  intensity = 1.0
+  seed_mode = "seedless"
+  perturb   = ["alloc_pressure"]

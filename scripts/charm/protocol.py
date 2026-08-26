@@ -1,13 +1,10 @@
-#!/usr/bin/env python3
-"""Read NDJSON names from ``include/ndjson.h``.
-"""
-
 import re
 import sys
-from pathlib import Path
 from typing import Final
 
-HEADER: Final = Path(__file__).resolve().parents[2] / "include" / "ndjson.h"
+from .paths import repo_root
+
+HEADER: Final = repo_root() / "include" / "ndjson.h"
 
 DEFINE_RE = re.compile(
     r'^#define\s+(NDJSON_(?:KEY|DOMAIN|KIND|TYPE_NAME)_\w+)\s+"([^"]*)"\s*$',
@@ -19,12 +16,12 @@ def _load() -> dict[str, str]:
     try:
         text = HEADER.read_text(encoding="utf-8", errors="replace")
     except OSError as e:
-        raise SystemExit(f"ndjson_protocol: cannot read {HEADER}: {e}") from e
+        raise SystemExit(f"charm.protocol: cannot read {HEADER}: {e}") from e
 
     found = dict(DEFINE_RE.findall(text))
     if not found:
         raise SystemExit(
-            f"ndjson_protocol: {HEADER} defines no NDJSON_* wire names; "
+            f"charm.protocol: {HEADER} defines no NDJSON_* wire names; "
             "has the header moved or the naming changed?"
         )
     return found
@@ -37,9 +34,7 @@ def _c(name: str) -> str:
     try:
         return _CONSTS[name]
     except KeyError:
-        raise SystemExit(
-            f"ndjson_protocol: {name} is not defined in {HEADER}"
-        ) from None
+        raise SystemExit(f"charm.protocol: {name} is not defined in {HEADER}") from None
 
 
 def _group(prefix: str) -> dict[str, str]:
@@ -90,14 +85,15 @@ KINDS = _group("NDJSON_KIND_")
 TYPES = _group("NDJSON_TYPE_NAME_")
 
 
-if __name__ == "__main__":
+def dump(out=sys.stdout) -> None:
+    """Print every wire name this build of the header declares."""
+    print(f"header: {HEADER}", file=out)
     for title, group in (
         ("keys", _group("NDJSON_KEY_")),
         ("domains", DOMAINS),
         ("kinds", KINDS),
         ("types", TYPES),
     ):
-        print(f"{title}:")
+        print(f"{title}:", file=out)
         for short, wire in sorted(group.items()):
-            print(f"  {short:<14} {wire}")
-    sys.exit(0)
+            print(f"  {short:<14} {wire}", file=out)

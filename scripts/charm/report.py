@@ -1,15 +1,5 @@
-#!/usr/bin/env python3
-"""Merge NDJSON results into a report
+"""Merge per-run result records into markdown and JSON reports."""
 
-Writes GitHub-flavored markdown to --summary
-and a merged JSON document to --json
-
-Usage:
-    aggregate.py results/*.ndjson --summary "$GITHUB_STEP_SUMMARY"
-"""
-
-import argparse
-import glob
 import html
 import json
 import re
@@ -27,14 +17,9 @@ OUTCOME_ICON = {
     "incomplete": "⚠️",
 }
 
-# Outcomes that prevent a clean aggregate.
 BAD_OUTCOMES = {"fail", "crash", "timeout", "incomplete"}
-
 TOP_FRAMES_SHOWN = 6
-
-# ``parse_log.py`` stamps every record; reject other versions explicitly.
 RESULT_VERSION = 1
-
 
 Record = dict[str, Any]
 
@@ -42,7 +27,7 @@ Record = dict[str, Any]
 def load(
     paths: Iterable[Path],
 ) -> tuple[list[Record], list[Record], list[Record], list[Path]]:
-    runs, tests, crashes, stale = [], [], [], set()
+    runs, tests, crashes, stale = [], [], [], set[Path]()
     for path in paths:
         with path.open(encoding="utf-8", errors="replace") as fh:
             for lineno, line in enumerate(fh, 1):
@@ -82,16 +67,16 @@ def load(
 
 
 def shard_of(rec: Record, runs_by_source: dict[str, Record]) -> Record:
-    run = runs_by_source.get(rec.get("_source"))
-    if not run:
+    source = rec.get("_source")
+    if not isinstance(source, str):
         return {}
-    return run
+    return runs_by_source.get(source) or {}
 
 
 def md_escape(text: object) -> str:
     """Escape text embedded in a Markdown table cell."""
     return (
-        str(text or "")
+        str("" if text is None else text)
         .replace("\\", "\\\\")
         .replace("|", "\\|")
         .replace("\r", " ")
@@ -132,7 +117,9 @@ def build_report(
 ) -> Record:
     runs_by_source = {r["_source"]: r for r in runs}
 
-    by_sig = defaultdict(lambda: {"count": 0, "occurrences": [], "example": None})
+    by_sig: defaultdict[str, dict[str, Any]] = defaultdict(
+        lambda: {"count": 0, "occurrences": [], "example": None}
+    )
     for c in crashes:
         entry = by_sig[c.get("signature", "unknown")]
         entry["count"] += 1
@@ -187,7 +174,7 @@ def build_report(
 
 def render_markdown(rep: Record) -> str:
     runs = rep["runs"]
-    out = []
+    out: list[str] = []
     add = out.append
 
     total = len(runs)
@@ -266,8 +253,8 @@ def render_markdown(rep: Record) -> str:
             add("\n</details>\n")
 
     add("### Shards\n")
-    rows = []
-    for r in sorted(runs, key=lambda r: str(r.get("shard"))):
+    rows: list[tuple[str, ...]] = []
+    for r in sorted(runs, key=lambda run_rec: str(run_rec.get("shard") or "")):
         t = r.get("totals") or {}
         dur = r.get("duration_s")
         rows.append(
@@ -280,7 +267,6 @@ def render_markdown(rep: Record) -> str:
                 md_cell(t.get("passed")),
                 md_cell(t.get("failed")),
                 md_cell(t.get("skipped")),
-                # Preserve sub-second durations even though display rounds them.
                 f"{dur:.0f}s" if dur is not None else "-",
             )
         )
@@ -314,92 +300,24 @@ def render_markdown(rep: Record) -> str:
     return "\n".join(out) + "\n"
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("inputs", nargs="+", help="NDJSON files or globs")
-    ap.add_argument("--summary", help="write markdown here (append if exists)")
-    ap.add_argument("--json", help="write merged JSON report here")
-    ap.add_argument(
-        "--repro-template",
-        default="",
-        help="shell snippet shown for reproducing a crash, with {seed} and "
-        "{scenario} substituted",
-    )
-    ap.add_argument(
-        "--fail-on-error",
-        action="store_true",
-        help="exit 1 if any shard failed (gate jobs want this; hunt jobs "
-        "generally do not, since a finding is an issue and not a red X)",
-    )
-    args = ap.parse_args()
-
-    paths: list[Path] = []
-    unmatched: list[str] = []
-    for pattern in args.inputs:
-        expanded = [Path(path) for path in sorted(glob.glob(pattern))]
-        if expanded:
-            paths.extend(path for path in expanded if path.is_file())
-        else:
-            unmatched.append(pattern)
-
-    if unmatched:
-        print(f"error: no files matched: {', '.join(unmatched)}", file=sys.stderr)
-        return 2
-
-    if not paths:
-        print("error: no result files matched", file=sys.stderr)
-        return 2
-
-    runs, tests, crashes, stale = load(paths)
-    if not runs:
-        print(f"error: no run records found in {len(paths)} file(s)", file=sys.stderr)
-        return 2
-
-    rep = build_report(runs, tests, crashes, args.repro_template)
-    for path in stale:
-        rep["warnings"].insert(
-            0, f"{md_code(path)} was written by a different parse_log.py version"
-        )
-    markdown = render_markdown(rep)
-
-    if args.summary:
-        with Path(args.summary).open("a", encoding="utf-8") as fh:
-            fh.write(markdown)
-    else:
-        sys.stdout.write(markdown)
-
-    if args.json:
-        report_json = {
-            "ok": rep["ok"],
-            "shards": len(runs),
-            "failed_shards": len(rep["failed_runs"]),
-            "unique_crashes": [
-                {
-                    "signature": sig,
-                    "count": e["count"],
-                    "kind": e["example"].get("kind"),
-                    "site": e["example"].get("site"),
-                    "message": e["example"].get("message"),
-                    "frames": e["example"].get("frames", []),
-                    "occurrences": e["occurrences"],
-                }
-                for sig, e in rep["unique_crashes"]
-            ],
-            "notable_tests": rep["notable"],
-            "warnings": rep["warnings"],
-        }
-        Path(args.json).write_text(
-            f"{json.dumps(report_json, indent=2, sort_keys=True)}\n", encoding="utf-8"
-        )
-
-    print(
-        f"{len(runs)} shard(s), {len(rep['failed_runs'])} failed, "
-        f"{len(rep['unique_crashes'])} unique crash(es)",
-        file=sys.stderr,
-    )
-
-    return 1 if (args.fail_on_error and not rep["ok"]) else 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+def render_json(rep: Record) -> str:
+    report_json = {
+        "ok": rep["ok"],
+        "shards": len(rep["runs"]),
+        "failed_shards": len(rep["failed_runs"]),
+        "unique_crashes": [
+            {
+                "signature": sig,
+                "count": e["count"],
+                "kind": e["example"].get("kind"),
+                "site": e["example"].get("site"),
+                "message": e["example"].get("message"),
+                "frames": e["example"].get("frames", []),
+                "occurrences": e["occurrences"],
+            }
+            for sig, e in rep["unique_crashes"]
+        ],
+        "notable_tests": rep["notable"],
+        "warnings": rep["warnings"],
+    }
+    return f"{json.dumps(report_json, indent=2, sort_keys=True)}\n"

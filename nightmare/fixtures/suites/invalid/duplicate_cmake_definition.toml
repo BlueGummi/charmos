@@ -1,0 +1,14 @@
+#! expect: build.cmake_definitions[1]
+#! because: the last definition is used 
+[suite]
+name = "dupe_defs"
+runners = 1
+budget_hours = 1.0
+
+[build]
+cmake_definitions = ["TEST_NIGHTMARE_ALL=ON", "TEST_NIGHTMARE_ALL=OFF"]
+
+[[tasks]]
+name = "t"
+  [tasks.boot]
+  duration_ms = 10000

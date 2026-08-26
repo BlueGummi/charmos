@@ -1,0 +1,17 @@
+#! expect: tasks[0].nightmare.perturb[1]
+#! because: a service the harness does not implement would be ignored
+[suite]
+name = "bad_service"
+runners = 1
+budget_hours = 1.0
+
+[build]
+
+[[tasks]]
+name = "t"
+
+  [tasks.boot]
+  duration_ms = 10000
+
+  [tasks.nightmare]
+  perturb = ["migrator", "teleporter"]

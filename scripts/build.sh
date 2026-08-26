@@ -28,6 +28,8 @@ JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
 CMAKE_EXTRA_ARGS=()
 TARGETS=()
 FILTER=""
+CMDLINE_FILE=""
+NIGHTMARE=""
 
 print_help() {
     local self="$1"
@@ -51,7 +53,11 @@ ${BOLD}Options:${NC}
       --make              Shorthand for --generator make
   -j, --jobs N            Parallel jobs (default: detected CPU count = ${JOBS})
   -B, --build-dir DIR     Build directory (default: build)
-  -f, --filter LIST       Restrict the tests target to LIST, space/comma separated 
+  -f, --filter LIST       Restrict the tests target to LIST, space/comma separated
+      --cmdline FILE      Boot with FILE's contents as the kernel command line.
+      --nightmare NAME    Shorthand for a command line of "nightmare=NAME"
+
+  --filter, --cmdline, and --nightmare are mutually exclusive
 
 ${BOLD}Targets:${NC} (passed to make)
   iso         Build bootable ISO (default if no targets given)
@@ -67,6 +73,7 @@ ${BOLD}Examples:${NC}
   ${self} -- -DQEMU_KVM=ON -DQEMU_NUMA=OFF run
   ${self} --clean -t RelWithDebInfo tests
   ${self} -f "apc dpc" tests               # run only the apc and dpc tests
+  ${self} --cmdline n.txt iso              # boot the command line in n.txt
 EOF
     exit 0
 }
@@ -89,6 +96,8 @@ while [[ $# -gt 0 ]]; do
         --make)                GENERATOR="make"; shift ;;
         -j|--jobs)             JOBS="$2"; shift 2 ;;
         -f|--filter)           FILTER="$2"; shift 2 ;;
+        --cmdline)             CMDLINE_FILE="$2"; shift 2 ;;
+        --nightmare)           NIGHTMARE="$2"; shift 2 ;;
         -B|--build-dir)        BUILD_DIR="$2"; shift 2 ;;
         --)                    PASSTHROUGH=true; shift ;;
         -*)                    echo "${RED}Unknown option: $1${NC}" >&2; exit 1 ;;
@@ -98,6 +107,20 @@ done
 
 if [[ ${#TARGETS[@]} -eq 0 ]]; then
     TARGETS=("iso")
+fi
+
+cmdline_sources=()
+[[ -n "$FILTER" ]]       && cmdline_sources+=("--filter")
+[[ -n "$CMDLINE_FILE" ]] && cmdline_sources+=("--cmdline")
+[[ -n "$NIGHTMARE" ]]    && cmdline_sources+=("--nightmare")
+if [[ ${#cmdline_sources[@]} -gt 1 ]]; then
+    echo "${RED}${cmdline_sources[*]} are mutually exclusive${NC}" >&2
+    exit 1
+fi
+
+if [[ -n "$CMDLINE_FILE" && ! -r "$CMDLINE_FILE" ]]; then
+    echo "${RED}cannot read command line file: $CMDLINE_FILE${NC}" >&2
+    exit 1
 fi
 
 case "$BUILD_TYPE" in
@@ -239,22 +262,17 @@ check_compiler_toolchain() {
 select_toolchain() {
     TOOLCHAIN_ARGS=()
     if [[ "$COMPILER" == "clang" ]]; then
-        note "using clang toolchain (clang_toolchain.cmake)"
-        TOOLCHAIN_ARGS=(-DCMAKE_TOOLCHAIN_FILE="$REPO_ROOT/scripts/clang_toolchain.cmake")
+        note "using clang toolchain (cmake/toolchains/clang.cmake)"
+        TOOLCHAIN_ARGS=(-DCMAKE_TOOLCHAIN_FILE="$REPO_ROOT/cmake/toolchains/clang.cmake")
     elif [[ "$(uname -s)" == "Darwin" ]]; then
-        note "detected macOS — using macos_toolchain.cmake"
-        TOOLCHAIN_ARGS=(-DCMAKE_TOOLCHAIN_FILE="$REPO_ROOT/scripts/macos_toolchain.cmake")
+        note "detected macOS — using cmake/toolchains/cross-elf.cmake"
+        TOOLCHAIN_ARGS=(-DCMAKE_TOOLCHAIN_FILE="$REPO_ROOT/cmake/toolchains/cross-elf.cmake")
     elif [[ "$(uname -m)" == "aarch64" ]]; then
         note "detected aarch64 host — using cross toolchain"
-        TOOLCHAIN_ARGS=(-DCMAKE_TOOLCHAIN_FILE="$REPO_ROOT/scripts/toolchain.cmake")
+        TOOLCHAIN_ARGS=(-DCMAKE_TOOLCHAIN_FILE="$REPO_ROOT/cmake/toolchains/cross-linux-gnu.cmake")
     fi
 }
 
-# The build type is sticky: -D on the command line overwrites the cache every
-# time, so passing our Debug default unconditionally would silently undo an
-# earlier -t RelWithDebInfo. That is how an ASAN build ends up back at -O0 --
-# -DDEBUG_ASAN=ON persists in the cache, the build type it was paired with does
-# not. Only send one when the caller actually asked, or the dir is fresh
 configure_cmake() {
     local type_args=()
     if $BUILD_TYPE_EXPLICIT || [[ ! -f "CMakeCache.txt" ]]; then
@@ -269,8 +287,6 @@ configure_cmake() {
         "$REPO_ROOT"
 }
 
-# What the cache holds, which is not $BUILD_TYPE once the above declines to set
-# it. Empty for a fresh dir, where $BUILD_TYPE is about to become the truth
 cached_build_type() {
     [[ -f "CMakeCache.txt" ]] &&
         sed -n 's/^CMAKE_BUILD_TYPE:STRING=//p' "CMakeCache.txt"
@@ -308,6 +324,30 @@ if [[ -f "$BUILD_DIR/CMakeCache.txt" ]]; then
     fi
 fi
 
+stale_toolchain=""
+if [[ -f "$BUILD_DIR/CMakeCache.txt" ]]; then
+    cached_tc="$(sed -n 's/^CMAKE_TOOLCHAIN_FILE:[^=]*=//p' "$BUILD_DIR/CMakeCache.txt")"
+    if [[ -n "$cached_tc" && ! -f "$cached_tc" ]]; then
+        stale_toolchain="$cached_tc"
+    fi
+fi
+if [[ -z "$stale_toolchain" ]]; then
+    shopt -s nullglob
+    for sysfile in "$BUILD_DIR"/CMakeFiles/*/CMakeSystem.cmake; do
+        while IFS= read -r included; do
+            [[ -n "$included" && ! -f "$included" ]] || continue
+            stale_toolchain="$included"
+            break
+        done < <(sed -n 's/^include("\(.*\)")$/\1/p' "$sysfile")
+        [[ -n "$stale_toolchain" ]] && break
+    done
+    shopt -u nullglob
+fi
+if [[ -n "$stale_toolchain" ]]; then
+    warn "toolchain file is gone ($stale_toolchain); wiping $BUILD_DIR/"
+    rm -rf "$BUILD_DIR"
+fi
+
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
@@ -331,7 +371,7 @@ else
     shopt -u nullglob globstar
 fi
 
-# Never fatal: grep exits 1 on no match and 2 on a missing file
+# grep exits 1 on no match and 2 on a missing file
 opt_level=""
 if [[ ${#flag_files[@]} -gt 0 ]]; then
     opt_level="$(grep -h -m1 -oE '(^| )-O[0-3sgz]' "${flag_files[@]}" 2>/dev/null | head -n1 | tr -d ' ' || true)"
@@ -355,7 +395,15 @@ if $COMPDB; then
 fi
 
 
-if [[ -n "$FILTER" ]]; then
+if [[ -n "$CMDLINE_FILE" ]]; then
+    # cmake reads it, hand over a path it can resolve from any directory
+    CMDLINE_FILE="$(cd "$(dirname "$CMDLINE_FILE")" && pwd)/$(basename "$CMDLINE_FILE")"
+    export CMDLINE="$CMDLINE_FILE"
+    note "cmdline file: ${CMDLINE_FILE}"
+elif [[ -n "$NIGHTMARE" ]]; then
+    export NIGHTMARE_TESTS="$NIGHTMARE"
+    note "nightmare test: ${NIGHTMARE}"
+elif [[ -n "$FILTER" ]]; then
     export TESTS="$FILTER"
     note "test filter: ${FILTER}"
     case " ${TARGETS[*]} " in

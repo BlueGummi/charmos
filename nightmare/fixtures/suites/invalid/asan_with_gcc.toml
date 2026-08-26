@@ -1,0 +1,15 @@
+#! expect: build.compiler
+#! because: gcc has no KASAN
+[suite]
+name = "asan_gcc"
+runners = 1
+budget_hours = 1.0
+
+[build]
+compiler = "gcc"
+cmake_definitions = ["DEBUG_ASAN=ON"]
+
+[[tasks]]
+name = "t"
+  [tasks.boot]
+  duration_ms = 10000

@@ -1,0 +1,276 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://charmos.dev/schemas/nightmare/suite-v1.schema.json",
+  "title": "CharmOS nightmare suite",
+  "description": "Schema for CharmOS nightmare stress-test suite configuration files. A suite definition contains three sections: 'suite' specifies orchestrator scheduling parameters, 'build' specifies the kernel build configuration used by all tasks, and 'tasks' defines the individual test campaigns executed by runners.",
+  "type": "object",
+  "required": ["suite", "build", "tasks"],
+  "additionalProperties": false,
+  "properties": {
+    "suite": { "$ref": "#/$defs/suite" },
+    "build": { "$ref": "#/$defs/build" },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/task" }
+    }
+  },
+
+  "$defs": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "maxLength": 64,
+      "description": "Lowercase identifier (starts with a letter, contains only lowercase letters, digits, and underscores, max 64 characters) compatible with kernel command-line arguments without quoting."
+    },
+
+    "service": {
+      "enum": [
+        "migrator",
+        "waker",
+        "apc_spammer",
+        "idle_forcer",
+        "stutter",
+        "alloc_pressure",
+        "inject_armer"
+      ],
+      "description": "Name of a harness perturbation service."
+    },
+
+    "suite": {
+      "type": "object",
+      "required": ["name", "runners", "budget_hours"],
+      "additionalProperties": false,
+      "description": "Suite-level orchestrator scheduling and budget parameters.",
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "runners": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256,
+          "description": "Maximum number of concurrent runners the orchestrator may allocate to this suite."
+        },
+        "budget_hours": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 168,
+          "description": "Total wall-clock execution budget for the suite, in hours."
+        },
+        "overlap_ratio": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 1,
+          "default": 0.0,
+          "description": "Fraction of the total suite budget reserved for overlapping runner handoffs during campaign transitions."
+        }
+      }
+    },
+
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Kernel build configuration shared across all tasks in the suite, including compiler, build type, CMake definitions, SMP topology, and memory size.",
+      "properties": {
+        "compiler": {
+          "enum": ["gcc", "clang"],
+          "default": "gcc",
+          "description": "C compiler toolchain used for the build ('gcc' or 'clang'). 'clang' is required when enabling DEBUG_ASAN (KASAN)."
+        },
+        "type": {
+          "enum": ["Debug", "Release", "RelWithDebInfo", "MinSizeRel"],
+          "default": "RelWithDebInfo",
+          "description": "CMake build type."
+        },
+        "cmake_definitions": {
+          "type": "array",
+          "default": [],
+          "description": "List of CMake cache variable definitions to pass to the build.",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*=[^\\s]*$",
+            "description": "CMake cache variable definition in KEY=VALUE format, passed to CMake as -DKEY=VALUE."
+          }
+        },
+        "smp": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "SMP (symmetric multiprocessing) CPU topology for QEMU.",
+          "properties": {
+            "sockets": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64,
+              "default": 1,
+              "description": "Number of CPU sockets."
+            },
+            "cores": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64,
+              "default": 1,
+              "description": "Number of CPU cores per socket."
+            },
+            "threads": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8,
+              "default": 1,
+              "description": "Number of hardware threads per core."
+            }
+          },
+          "default": { "sockets": 1, "cores": 1, "threads": 1 }
+        },
+        "memory_mib": {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 262144,
+          "default": 2048,
+          "description": "Guest RAM size in megabytes (MiB) allocated to QEMU."
+        }
+      }
+    },
+
+    "task": {
+      "type": "object",
+      "required": ["name", "boot"],
+      "additionalProperties": false,
+      "description": "Individual test campaign task specification.",
+      "properties": {
+        "name": {
+          "allOf": [{ "$ref": "#/$defs/name" }],
+          "description": "Name of the nightmare test subject to execute. Passed to the guest kernel command line as 'nightmare=<name>'."
+        },
+        "mode": {
+          "enum": ["horizontal", "vertical"],
+          "default": "horizontal",
+          "description": "Execution mode for the task campaign: 'horizontal' distributes distinct PRNG seeds across concurrent runners; 'vertical' executes a single extended sequence of boots on one runner."
+        },
+        "weight": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 1.0,
+          "description": "Relative weight used by the scheduler to allocate the suite's time budget among tasks."
+        },
+        "priority": {
+          "type": "number",
+          "minimum": 0,
+          "default": 1.0,
+          "description": "Scheduling priority for task admission when runner capacity is constrained (higher values are scheduled first)."
+        },
+        "max_runners": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of concurrent runners allocated to this task. Defaults to the suite-level runner limit."
+        },
+        "boot": { "$ref": "#/$defs/boot" },
+        "nightmare": { "$ref": "#/$defs/nightmare" }
+      }
+    },
+
+    "boot": {
+      "type": "object",
+      "required": ["duration_ms"],
+      "additionalProperties": false,
+      "description": "Execution and timeout parameters for individual VM boot cycles. Deadlines are hierarchical: duration_ms is the guest soft run duration, drain_grace_ms is the additional time allowed for graceful quiescence before the guest hard deadline, and timeout_ms is the host watchdog kill deadline.",
+      "properties": {
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 86400000,
+          "description": "Soft run duration per boot in milliseconds. When this duration expires, the test harness signals NM_STOP_BUDGET, initiates quiescence, and collects test results."
+        },
+        "drain_grace_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 600000,
+          "default": 20000,
+          "description": "Grace period in milliseconds allowed for services to quiesce after the soft duration expires. If the guest fails to finish within this window, the harness emits a stall verdict ('result=stall reason=drain_timeout') and terminates the VM."
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "description": "Host-enforced hard timeout per boot in milliseconds, after which the host process terminates the QEMU instance. Must exceed the guest hard deadline (duration_ms + drain_grace_ms) by at least the serial flush margin. Defaults to duration_ms + drain_grace_ms + 15000ms."
+        },
+        "gate_first": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to run standard kernel sanity/gate tests before starting the stress campaign. If true, gate test failures abort the run immediately without proceeding to perturbation."
+        },
+        "max_boots": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000,
+          "default": 500,
+          "description": "Maximum number of VM boot cycles permitted for this task, preventing repeated early crashes from consuming the entire time budget in a reboot loop."
+        },
+        "min_interval_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3600000,
+          "default": 0,
+          "description": "Minimum elapsed time in milliseconds required between consecutive boot starts to throttle reboot loops after rapid crashes."
+        },
+        "stat_interval_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 600000,
+          "default": 5000,
+          "description": "Interval in milliseconds between guest heartbeat and statistics log emissions."
+        },
+        "on_stall": {
+          "enum": ["report", "snapshot", "terminal"],
+          "default": "report",
+          "description": "Action taken by the guest kernel watchdog when a watchdog stall is detected ('report' emits a diagnostic record, 'snapshot' captures system state, 'terminal' halts or reboots)."
+        }
+      }
+    },
+
+    "nightmare": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Nightmare harness configuration, controlling perturbation intensity, PRNG seeding strategy, and active perturbation services.",
+      "properties": {
+        "intensity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.5,
+          "description": "Overall perturbation intensity scale from 0.0 (minimal/no perturbation) to 1.0 (maximum perturbation), passed to the kernel as a fixed-point value."
+        },
+        "seed_mode": {
+          "enum": ["split", "seedful", "seedless"],
+          "default": "split",
+          "description": "PRNG seed distribution strategy: 'split' seeds perturbation services deterministically while allowing the test subject to run unseeded; 'seedful' deterministically seeds both perturbation services and the test subject; 'seedless' seeds neither. The kernel validates that this setting satisfies the test subject's declared seed_policy."
+        },
+        "perturb": {
+          "type": "array",
+          "default": [],
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/service" },
+          "description": "List of harness perturbation services to enable for this task. Each named service will be activated during the run."
+        },
+        "perturb_opts": {
+          "type": "object",
+          "default": {},
+          "description": "Configuration options for individual perturbation services, keyed by service name. Each configured service must also be listed in 'perturb'.",
+          "propertyNames": { "$ref": "#/$defs/service" },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": ["integer", "number", "boolean", "string"]
+            }
+          }
+        },
+        "opts": {
+          "type": "object",
+          "default": {},
+          "description": "Subject-specific test configuration parameters, passed to the kernel command line as 'nightmare.<task_name>.<key>=<value>'.",
+          "propertyNames": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "additionalProperties": {
+            "type": ["integer", "number", "boolean", "string"]
+          }
+        }
+      }
+    }
+  }
+}

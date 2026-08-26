@@ -23,6 +23,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  PYTHONPATH: scripts
   DURATION_MINUTES: ${{ github.event.inputs.duration_minutes || '60' }}
   COMPILER: ${{ github.event.inputs.compiler || 'clang' }}
 
@@ -76,13 +77,13 @@ jobs:
           compiler="${{ matrix.scenario.compiler || '' }}"
           [ -n "$compiler" ] || compiler="$COMPILER"
           echo "compiler=$compiler" >> "$GITHUB_OUTPUT"
-          # Seed is derived from the run and attempt so it is recorded 
+          # Seed is derived from the run and attempt so it is recorded
           echo "seed=0x${{ github.run_id }}${{ github.run_attempt }}" \
               >> "$GITHUB_OUTPUT"
 
       - name: Install clang toolchain
         if: steps.cfg.outputs.compiler == 'clang'
-        run: apt-get update && apt-get install -y clang lld
+        run: apt-get update && apt-get install -y clang lld llvm
 
       - name: Compile
         run: |
@@ -111,7 +112,7 @@ jobs:
 
           cp build/output.log results/run.log 2>/dev/null || \
               echo "(no serial log produced)" > results/run.log
-          # stderr (QEMU), kept out of the guest log 
+          # stderr (QEMU), kept out of the guest log
           cp build/output.stderr.log results/run.stderr.log 2>/dev/null || true
           cp build/ndjson.log results/run.nd.log 2>/dev/null || true
 
@@ -156,37 +157,7 @@ jobs:
 
       - name: Parse and aggregate
         run: |
-          set -euo pipefail
-          mkdir -p ndjson
-          shopt -s nullglob globstar
-
-          for env_file in artifacts/**/*.env; do
-            unset SHARD COMPILER SCENARIO SEED EXIT_CODE DURATION_S SHA CONFIG
-            # shellcheck disable=SC1090
-            . "$env_file"
-            base="$(dirname "$env_file")/run"
-            if [ -f "$base.log.gz" ]; then gunzip -f "$base.log.gz"; fi
-            if [ -f "$base.nd.log.gz" ]; then gunzip -f "$base.nd.log.gz"; fi
-            [ -f "$base.log" ] || continue
-            if [ ! -f "$base.nd.log" ]; then
-              echo "::error::$SHARD produced no NDJSON channel"
-              : > "$base.nd.log"
-            fi
-
-            python3 scripts/ci/parse_log.py "$base.log" \
-              --ndjson "$base.nd.log" \
-              --shard "$SHARD" \
-              --scenario "$SCENARIO" \
-              --seed "$SEED" \
-              --sha "$SHA" \
-              --compiler "$COMPILER" \
-              --config "${CONFIG:-}" \
-              --exit-code "$EXIT_CODE" \
-              --duration-s "$DURATION_S" \
-              --out "ndjson/$SHARD.ndjson"
-          done
-
-          python3 scripts/ci/aggregate.py 'ndjson/*.ndjson' \
+          python3 -m charm ci ingest artifacts \
             --summary "$GITHUB_STEP_SUMMARY" \
             --json report.json \
             --repro-template './scripts/build.sh -t RelWithDebInfo --compiler clang tests -- -DTEST_NIGHTMARE_ALL=OFF -D{scenario}=ON'

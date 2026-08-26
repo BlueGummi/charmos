@@ -29,6 +29,7 @@ concurrency:
 env:
   TEST_TIMEOUT: 300
   ITERATIONS: 4
+  PYTHONPATH: scripts
 
 jobs:
   test:
@@ -54,7 +55,7 @@ jobs:
 
       - name: Install clang toolchain
         if: matrix.compiler == 'clang'
-        run: apt-get update && apt-get install -y clang lld
+        run: apt-get update && apt-get install -y clang lld llvm
 
       - name: Compile
         run: ./scripts/build.sh -t RelWithDebInfo --compiler ${{ matrix.compiler }} -C
@@ -81,7 +82,7 @@ jobs:
             echo "::group::iteration $i/$ITERATIONS (${{ matrix.compiler }})"
             start=$(date +%s)
 
-            # --foreground lets timeout signal the whole thing 
+            # --foreground lets timeout signal the whole thing
             timeout --foreground -k 10 "$TEST_TIMEOUT" \
                 cmake --build build --target tests
             rc=$?
@@ -93,8 +94,8 @@ jobs:
             cp build/output.stderr.log "results/iter-$i.stderr.log" 2>/dev/null || true
             cp build/ndjson.log "results/iter-$i.nd.log" 2>/dev/null || true
 
-            # This container has no python3, so parsing
-            # happens in the report job
+            # Parsing happens in the report job, where every shard's
+            # artifacts are visible at once
             {
               echo "SHARD=${{ matrix.compiler }}-iter$i"
               echo "COMPILER=${{ matrix.compiler }}"
@@ -143,36 +144,7 @@ jobs:
 
       - name: Parse and aggregate
         run: |
-          set -euo pipefail
-          mkdir -p ndjson
-          shopt -s nullglob globstar
-
-          for env_file in artifacts/**/*.env; do
-            unset SHARD COMPILER SCENARIO SEED EXIT_CODE DURATION_S SHA
-            # shellcheck disable=SC1090
-            . "$env_file"
-            base="${env_file%.env}"
-            if [ -f "$base.log.gz" ]; then gunzip -f "$base.log.gz"; fi
-            if [ -f "$base.nd.log.gz" ]; then gunzip -f "$base.nd.log.gz"; fi
-            [ -f "$base.log" ] || continue
-            if [ ! -f "$base.nd.log" ]; then
-              echo "::error::$SHARD produced no NDJSON"
-              : > "$base.nd.log"
-            fi
-
-            python3 scripts/ci/parse_log.py "$base.log" \
-              --ndjson "$base.nd.log" \
-              --shard "$SHARD" \
-              --scenario "$SCENARIO" \
-              --seed "${SEED:-}" \
-              --sha "$SHA" \
-              --compiler "$COMPILER" \
-              --exit-code "$EXIT_CODE" \
-              --duration-s "$DURATION_S" \
-              --out "ndjson/$SHARD.ndjson"
-          done
-
-          python3 scripts/ci/aggregate.py 'ndjson/*.ndjson' \
+          python3 -m charm ci ingest artifacts \
             --summary "$GITHUB_STEP_SUMMARY" \
             --json report.json \
             --fail-on-error

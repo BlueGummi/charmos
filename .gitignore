@@ -1,9 +1,29 @@
-kernel/uACPI
-limine
+# Build trees
 build/
-kernel/syms/fullsyms.c
-kernel/flanterm
-*.log
+build-*/
 compile_commands.json
+
+# Fetched at build time
+kernel/uACPI
+kernel/flanterm
+limine
 kernel/rust/target/
+
+# Generated sources
+kernel/syms/fullsyms.c
+
+# Logs
+*.log
+
+# Python tooling
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+*.egg-info/
+
+# Editor
 .vscode/
+.DS_Store

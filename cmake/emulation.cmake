@@ -25,7 +25,7 @@ add_custom_target(
     COMMAND ${CMAKE_COMMAND} -E make_directory iso_root/boot/limine
     COMMAND
         ${CMAKE_COMMAND} -DIN=${CMAKE_SOURCE_DIR}/kernel/limine.conf
-        -DOUT=${CMAKE_BINARY_DIR}/iso_root/boot/limine/limine.conf -P ${CMAKE_SOURCE_DIR}/scripts/gen_limine_conf.cmake
+        -DOUT=${CMAKE_BINARY_DIR}/iso_root/boot/limine/limine.conf -P ${CMAKE_SOURCE_DIR}/cmake/gen_limine_conf.cmake
     COMMAND ${CMAKE_COMMAND} -E make_directory iso_root/EFI/BOOT
     COMMAND
         ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/limine/limine-bios.sys

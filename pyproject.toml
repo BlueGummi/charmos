@@ -1,0 +1,65 @@
+# Host-side tooling for charmOS. The kernel does not build from here; this
+# packages the Python that reads what the kernel emits, so CI, the campaign
+# runner, and a developer at a terminal all run the same code.
+#
+# Nothing outside the standard library, deliberately: the CI container has to
+# be able to run `python3 -m charm` with nothing installed.
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "charmos-tools"
+version = "0.1.0"
+description = "Host-side tooling for the charmOS kernel"
+requires-python = ">=3.11"
+dependencies = []
+
+# jsonschema checks the published suite contract. It is optional on purpose:
+# `charm` has to run inside a container with python3 and no pip, and the
+# semantic rules that actually catch incoherent suites need no dependency.
+# CI installs it and passes --require-schema so the contract is never skipped
+# where it matters.
+[project.optional-dependencies]
+schema = ["jsonschema>=4"]
+
+[project.scripts]
+charm = "charm.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "scripts" }
+
+[tool.setuptools.packages.find]
+where = ["scripts"]
+include = ["charm*"]
+
+[tool.pytest.ini_options]
+testpaths = ["scripts/tests"]
+pythonpath = ["scripts"]
+
+[tool.ruff]
+src = ["scripts"]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = [
+    # Long lines in message strings read better than a wrapped f-string.
+    "E501",
+    # Flags typographically correct dashes in user-facing prose.
+    "RUF001",
+]
+
+[tool.ruff.format]
+# brepl.py and tagscan.py predate this config and are not reformatted here;
+# `ruff format` is gated on the package in .github/workflows/tools.yml rather
+# than excluded, so they are lint-clean without a 300-line reflow.
+exclude = ["scripts/brepl.py", "scripts/tagscan.py"]
+
+[tool.mypy]
+files = ["scripts/charm"]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = true

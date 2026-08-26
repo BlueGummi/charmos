@@ -43,11 +43,11 @@ jobs:
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Install clang toolchain
         if: matrix.compiler == 'clang'
-        run: apt-get update && apt-get install -y clang lld
+        run: apt-get update && apt-get install -y clang lld llvm
 
       - name: Compile
         run: ./scripts/build.sh -t ${{ matrix.build_type }} --compiler ${{ matrix.compiler }}
@@ -78,11 +78,11 @@ jobs:
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Install clang toolchain
         if: matrix.compiler == 'clang'
-        run: apt-get update && apt-get install -y clang lld
+        run: apt-get update && apt-get install -y clang lld llvm
 
       - name: Compile with random compiler flags
         run: >

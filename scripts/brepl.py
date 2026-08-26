@@ -19,13 +19,12 @@ Prefix a name with ! to emit a plain constant instead of a function-like macro:
     !MY_MASK 4 7    -> #define MY_MASK 0xf0
 """
 
-import re
-import sys
 import argparse
-import textwrap
+import re
+import readline  # noqa: F401
 import subprocess
-import readline 
-from typing import Optional
+import sys
+import textwrap
 
 USE_COLOR = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
 
@@ -84,7 +83,7 @@ def make_macro(name: str, lo: int, hi: int, prefix: str = "", constant: bool = F
     return f"#define {full_name}(arg) {body}"
 
 class Entry:
-    __slots__ = ("section", "name", "lo", "hi", "prefix", "constant")
+    __slots__ = ("constant", "hi", "lo", "name", "prefix", "section")
     def __init__(self, section: str, name: str, lo: int, hi: int, prefix: str, constant: bool = False):
         self.section  = section
         self.name     = name
@@ -111,7 +110,7 @@ class Session:
         self._entries.append(e)
         return e
 
-    def delete(self, idx: int) -> Optional[Entry]:
+    def delete(self, idx: int) -> Entry | None:
         if 1 <= idx <= len(self._entries):
             return self._entries.pop(idx - 1)
         return None
@@ -125,14 +124,14 @@ class Session:
         del self._entries[lo - 1 : hi]
         return removed
 
-    def undo(self) -> Optional[Entry]:
+    def undo(self) -> Entry | None:
         return self._entries.pop() if self._entries else None
 
     def all_macros(self) -> str:
         if not self._entries:
             return ""
         lines: list[str] = []
-        last_section: Optional[str] = None
+        last_section: str | None = None
         for e in self._entries:
             if e.section != last_section:
                 if lines:
@@ -154,7 +153,7 @@ class Session:
     def entries(self) -> list[Entry]:
         return self._entries
 
-def parse_definition_line(line: str) -> Optional[tuple[str, int, int, bool]]:
+def parse_definition_line(line: str) -> tuple[str, int, int, bool] | None:
     """Return (name, lo, hi, constant) or None."""
     line = line.strip()
     if not line or line.startswith("#"):
@@ -215,7 +214,7 @@ def print_numbered_list(session: Session):
         return
     entries = session.entries
     w = len(str(len(entries)))
-    last_section: Optional[str] = None
+    last_section: str | None = None
     for i, e in enumerate(entries, 1):
         if e.section != last_section:
             if last_section is not None:

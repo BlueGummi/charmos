@@ -1,37 +1,21 @@
-#!/usr/bin/env python3
-"""Turn a QEMU run into NDJSON result records
+"""Read the kernel's machine channel into result records."""
 
-
-Why NDJSON? So truncated lines only affect that line 
-
-The console log is read, but only for size so empty logs mean
-QEMU didn't even reach the guest
-
-Usage:
-    parse_log.py output.log --ndjson ndjson.log --shard 3 --out results.ndjson
-"""
-
-import argparse
 import hashlib
 import json
 import re
-import sys
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Callable, Final, Iterable
+from typing import Any, Final
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import ndjson_protocol as P
+from . import protocol as P
 
 RESULT_FORMAT_VERSION: Final = 1
 
-# Host statuses from ``run_qemu.sh``
-EXIT_PANIC = 3
-EXIT_TIMEOUT = 124  # by convention, from timeout(1)
+EXIT_PANIC: Final = 3
+EXIT_TIMEOUT: Final = 124
 
-SIGNATURE_FRAMES = 5
+SIGNATURE_FRAMES: Final = 5
 
-# Ignore addresses and counters
 HEX_RE = re.compile(r"0x[0-9a-fA-F]+")
 NUM_RE = re.compile(r"\b\d+\b")
 
@@ -44,7 +28,6 @@ SCHEMA_RECORD_FIELDS = frozenset({"domain", "kind", "rec_version", "field", "typ
 
 @dataclass
 class ParseStats:
-
     declared_total: int | None = None
     totals: Record | None = None
     verdict: Record | None = None
@@ -64,10 +47,23 @@ class ParseStats:
 
 @dataclass
 class ParseResult:
-
     records: list[Record]
     stats: ParseStats
     supplied: set[RecordKey]
+
+
+@dataclass(frozen=True)
+class RunMeta:
+    """Identity the host knows and the guest does not."""
+
+    shard: str | None = None
+    scenario: str | None = None
+    seed: str | None = None
+    sha: str | None = None
+    compiler: str | None = None
+    config: str | None = None
+    exit_code: int | None = None
+    duration_s: float | None = None
 
 
 def normalize_for_signature(text: str) -> str:
@@ -83,9 +79,6 @@ def crash_signature(
     digest = hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
     return digest[:12]
 
-
-# ``include/ndjson.h`` via ``ndjson_protocol`` gives us the literals,
-# so we can handle discrepancies
 
 @dataclass(frozen=True)
 class Handler:
@@ -118,7 +111,7 @@ def ndjson_frame(rec: Record) -> Record:
 
 
 def ndjson_test_record(rec: Record) -> Record:
-    out = {
+    out: Record = {
         "type": "test",
         "group": rec.get("group"),
         "tier": rec.get("tier"),
@@ -147,7 +140,7 @@ def ndjson_crash_record(rec: Record) -> Record:
     if rec.get("file") is not None and rec.get("line") is not None:
         site = f"{rec['file']}:{rec['line']}"
 
-    out = {
+    out: Record = {
         "type": "crash",
         "kind": kind,
         "site": site,
@@ -262,7 +255,7 @@ def ndjson_schema_check(
 
 
 def parse_ndjson(lines: Iterable[str]) -> ParseResult:
-    """Parse an NDJSON line """
+    """Parse an NDJSON line stream."""
     records: list[Record] = []
     schema: Schema = {}
     stats = ParseStats()
@@ -378,91 +371,36 @@ def parse_ndjson(lines: Iterable[str]) -> ParseResult:
     return ParseResult(records, stats, supplied)
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("log", help="QEMU serial log, kept for its size only")
-    ap.add_argument(
-        "--ndjson",
-        required=True,
-        help="the kernel's machine channel NDJSON",
-    )
-    ap.add_argument(
-        "--strict-schema",
-        action="store_true",
-        help="exit non-zero when a handler disagrees with the emitted schema",
-    )
-    ap.add_argument("--out", help="NDJSON output (default: stdout)")
-    ap.add_argument("--shard", default=None)
-    ap.add_argument("--scenario", default=None)
-    ap.add_argument("--seed", default=None)
-    ap.add_argument("--sha", default=None)
-    ap.add_argument("--compiler", default=None)
-    ap.add_argument("--config", default=None, help="free-form guest config label")
-    ap.add_argument("--duration-s", type=float, default=None)
-    ap.add_argument(
-        "--exit-code",
-        type=int,
-        default=None,
-        help="exit status of the QEMU wrapper (0 pass, 1 test failure, "
-        "3 panic, 124 timeout by convention)",
-    )
-    args = ap.parse_args()
+def classify(stats: ParseStats, exit_code: int | None) -> str:
+    """Classify the outcome, most severe first."""
+    if exit_code == EXIT_PANIC or stats.crashes:
+        return "crash"
+    if exit_code == EXIT_TIMEOUT:
+        return "timeout"
+    if not stats.ended or not stats.reached_summary:
+        return "incomplete"
+    if stats.totals and stats.totals["failed"]:
+        return "fail"
+    if exit_code:
+        return "fail"
+    return "pass"
 
-    try:
-        log_bytes = Path(args.log).stat().st_size
-    except FileNotFoundError:
-        log_bytes = 0
 
-    try:
-        with Path(args.ndjson).open(encoding="utf-8", errors="replace") as fh:
-            result = parse_ndjson(fh)
-    except FileNotFoundError:
-        print(
-            f"error: {args.ndjson} not found",
-            file=sys.stderr,
-        )
-        return 2
+def build_run_record(result: ParseResult, meta: RunMeta, log_bytes: int) -> Record:
+    """Build run record from parsed results and host metadata."""
+    stats, supplied = result.stats, result.supplied
 
-    records, stats, supplied = result.records, result.stats, result.supplied
-
-    for err in stats.schema_errors:
-        print(f"schema drift: {err}", file=sys.stderr)
-        records.append({"type": "schema_error", "detail": err})
-
-    if not stats.schema_seen:
-        print(
-            f"warning: {args.ndjson} carries no schema records, so handlers went "
-            "unchecked. Boot with ndjson.schema=true",
-            file=sys.stderr,
-        )
-
-    outcome = "pass"
-    if args.exit_code == EXIT_PANIC:
-        outcome = "crash"
-    elif stats.crashes:
-        outcome = "crash"
-    elif args.exit_code == EXIT_TIMEOUT:
-        outcome = "timeout"
-    elif not stats.ended:
-        outcome = "incomplete"
-    elif not stats.reached_summary:
-        outcome = "incomplete"
-    elif stats.totals and stats.totals["failed"]:
-        outcome = "fail"
-    elif args.exit_code:
-        outcome = "fail"
-
-    run = {
+    run: Record = {
         "type": "run",
-        "shard": args.shard,
-        "scenario": args.scenario,
-        "seed": args.seed,
-        "sha": args.sha,
-        "compiler": args.compiler,
-        "config": args.config,
-        "exit_code": args.exit_code,
-        "duration_s": args.duration_s,
-        "outcome": outcome,
+        "shard": meta.shard,
+        "scenario": meta.scenario,
+        "seed": meta.seed,
+        "sha": meta.sha,
+        "compiler": meta.compiler,
+        "config": meta.config,
+        "exit_code": meta.exit_code,
+        "duration_s": meta.duration_s,
+        "outcome": classify(stats, meta.exit_code),
         "tests_seen": stats.tests_seen,
         "declared_total": stats.declared_total,
         "reached_summary": stats.reached_summary,
@@ -488,40 +426,13 @@ def main():
     else:
         run["last_record"] = stats.last_record
 
-    output = []
-    for rec in [run, *records]:
+    return run
+
+
+def render(records: Iterable[Record]) -> str:
+    """Stamp the format version and serialize, one record per line."""
+    out = []
+    for rec in records:
         rec.setdefault("v", RESULT_FORMAT_VERSION)
-        output.append(f"{json.dumps(rec, sort_keys=True)}\n")
-    if args.out:
-        Path(args.out).write_text("".join(output), encoding="utf-8")
-    else:
-        sys.stdout.write("".join(output))
-
-    if not stats.ended:
-        last_record = (
-            f", last record was {stats.last_record}" if stats.last_record else ""
-        )
-        print(
-            f"guest never said goodbye: it stopped rather than finished{last_record}",
-            file=sys.stderr,
-        )
-
-    print(
-        f"parsed {args.ndjson}: {stats.records_seen} records, "
-        f"{stats.tests_seen} tests, {stats.crashes} crashes, outcome={outcome}",
-        file=sys.stderr,
-    )
-
-    if stats.schema_errors:
-        print(
-            f"{len(stats.schema_errors)} handler(s) disagree with the kernel's declared schema",
-            file=sys.stderr,
-        )
-        if args.strict_schema:
-            return 2
-
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+        out.append(f"{json.dumps(rec, sort_keys=True)}\n")
+    return "".join(out)

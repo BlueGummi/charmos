@@ -1,0 +1,16 @@
+#! expect: tasks[0].boot.timeout_ms
+#! because: the host would boot before the kernel could print a bug 
+[suite]
+name = "bad_budget"
+runners = 1
+budget_hours = 4.0
+
+[build]
+
+[[tasks]]
+name = "t"
+
+  [tasks.boot]
+  duration_ms    = 300000
+  drain_grace_ms = 20000
+  timeout_ms     = 310000

@@ -1,0 +1,14 @@
+#! expect: tasks[0].max_runners
+#! because: too many runners
+[suite]
+name = "over_admit"
+runners = 2
+budget_hours = 1.0
+
+[build]
+
+[[tasks]]
+name = "t"
+max_runners = 8
+  [tasks.boot]
+  duration_ms = 10000

@@ -46,10 +46,10 @@ set(EARLY_INIT_FILES
 set(SYMS_SOURCE "${CMAKE_SOURCE_DIR}/kernel/syms/syms_reserve.c")
 
 # We need to make sure the versions are right on macOS
-find_program(KERNEL_NM      NAMES x86_64-elf-nm      nm      llvm-nm      REQUIRED)
-find_program(KERNEL_OBJCOPY NAMES x86_64-elf-objcopy objcopy llvm-objcopy REQUIRED)
+find_program(KERNEL_NM      NAMES x86_64-linux-gnu-nm      x86_64-elf-nm      llvm-nm      llvm-nm-19 llvm-nm-18 llvm-nm-17 llvm-nm-16      nm      PATH_SUFFIXES llvm-19/bin llvm-18/bin llvm-17/bin llvm-16/bin REQUIRED)
+find_program(KERNEL_OBJCOPY NAMES x86_64-linux-gnu-objcopy x86_64-elf-objcopy llvm-objcopy llvm-objcopy-19 llvm-objcopy-18 llvm-objcopy-17 llvm-objcopy-16 objcopy PATH_SUFFIXES llvm-19/bin llvm-18/bin llvm-17/bin llvm-16/bin REQUIRED)
 
-find_program(KERNEL_OBJDUMP NAMES x86_64-elf-objdump objdump llvm-objdump)
+find_program(KERNEL_OBJDUMP NAMES x86_64-linux-gnu-objdump x86_64-elf-objdump llvm-objdump llvm-objdump-19 llvm-objdump-18 llvm-objdump-17 llvm-objdump-16 objdump PATH_SUFFIXES llvm-19/bin llvm-18/bin llvm-17/bin llvm-16/bin)
 if(NOT KERNEL_OBJDUMP)
     set(KERNEL_OBJDUMP "objdump")
     message(WARNING

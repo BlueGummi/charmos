@@ -328,12 +328,12 @@ def main():
         json.dump(
             {
                 "added": [
-                    {"file": f, "line": l, "kind": k, "subclass": s, "body": b}
-                    for f, l, k, s, b in added
+                    {"file": f, "line": n, "kind": k, "subclass": s, "body": b}
+                    for f, n, k, s, b in added
                 ],
                 "removed": [
-                    {"file": f, "line": l, "kind": k, "subclass": s, "body": b}
-                    for f, l, k, s, b in removed
+                    {"file": f, "line": n, "kind": k, "subclass": s, "body": b}
+                    for f, n, k, s, b in removed
                 ],
             },
             sys.stdout,

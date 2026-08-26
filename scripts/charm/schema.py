@@ -1,20 +1,10 @@
-#!/usr/bin/env python3
-"""
+"""Convert boot-time schema dumps into JSON Schema."""
 
-Parse the boot time schema dump
-
-Usage:
-    ndjson_schema.py ndjson.log --out record-v1.schema.json
-"""
-
-import argparse
 import json
 import sys
-from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import ndjson_protocol as P
+from . import protocol as P
 
 SCHEMA_URL = "https://json-schema.org/draft/2020-12/schema"
 
@@ -26,7 +16,6 @@ TYPE_MAP = {
     P.TYPE_HEX: {"type": "string", "pattern": "^0x[0-9a-f]+$"},
 }
 
-# ``ndjson_emit()`` adds these to every record
 ENVELOPE = {
     P.KEY_DOMAIN: {"type": "string"},
     P.KEY_KIND: {"type": "string"},
@@ -44,7 +33,7 @@ SCHEMA_RECORD_FIELDS = frozenset(
 
 def collect(text: str) -> dict[tuple[str, str], dict[str, Any]]:
     """(domain, kind) -> {version, fields[]}, in declaration order"""
-    records = {}
+    records: dict[tuple[str, str], dict[str, Any]] = {}
     for line in text.splitlines():
         line = line.strip()
         if not line:
@@ -108,39 +97,3 @@ def build(records: dict[tuple[str, str], dict[str, Any]]) -> dict[str, Any]:
         "Do not edit by hand",
         "oneOf": variants,
     }
-
-
-def main():
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("log", help="an ndjson log from a run with ndjson.schema=true")
-    ap.add_argument("--out", help="output path (default: stdout)")
-    args = ap.parse_args()
-
-    log_path = Path(args.log)
-    records = collect(log_path.read_text(encoding="utf-8", errors="replace"))
-
-    if not records:
-        print(
-            f"error: {log_path} carries no schema records; was it booted with "
-            "ndjson.schema=true?",
-            file=sys.stderr,
-        )
-        return 1
-
-    schema = build(records)
-    text = json.dumps(schema, indent=2, sort_keys=True) + "\n"
-
-    if args.out:
-        Path(args.out).write_text(text, encoding="utf-8")
-    else:
-        sys.stdout.write(text)
-
-    print(
-        f"described {len(records)} record types from {log_path}",
-        file=sys.stderr,
-    )
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

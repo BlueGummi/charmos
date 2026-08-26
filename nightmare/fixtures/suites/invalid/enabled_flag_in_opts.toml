@@ -1,0 +1,19 @@
+#! expect: tasks[0].nightmare.perturb_opts.migrator.enabled
+#! because: membership in perturb already enables, and a flag here contradicts it
+[suite]
+name = "contradiction"
+runners = 1
+budget_hours = 1.0
+
+[build]
+
+[[tasks]]
+name = "t"
+  [tasks.boot]
+  duration_ms = 10000
+
+  [tasks.nightmare]
+  perturb = ["migrator"]
+
+    [tasks.nightmare.perturb_opts.migrator]
+    enabled = false

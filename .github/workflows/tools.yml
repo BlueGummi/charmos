@@ -1,0 +1,100 @@
+name: Tools
+
+# Test tooling
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/**'
+      - 'nightmare/**'
+      - 'include/ndjson.h'
+      - 'include/cmdline.h'
+      - 'kernel/cmdline/**'
+      - 'kernel/parse.c'
+      - 'pyproject.toml'
+      - '.github/workflows/tools.yml'
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'nightmare/**'
+      - 'include/ndjson.h'
+      - 'include/cmdline.h'
+      - 'kernel/cmdline/**'
+      - 'kernel/parse.c'
+      - 'pyproject.toml'
+      - '.github/workflows/tools.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tools-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Symlink node for act
+        run: ln -sf $(which node) /usr/local/bin/node || true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install linters
+        run: pip install ruff mypy pytest jsonschema
+
+      - name: Lint
+        run: ruff check scripts
+
+      - name: Format check
+        run: ruff format --check scripts
+
+      - name: Types
+        run: mypy
+
+      - name: Tests
+        run: pytest -q
+
+      - name: Runs uninstalled
+        run: PYTHONPATH=scripts python3 -m charm ci protocol > /dev/null
+
+      - name: Validate nightmare suites
+        run: |
+          PYTHONPATH=scripts python3 -m charm nightmare validate \
+            --require-schema \
+            nightmare/suites/*.toml \
+            nightmare/fixtures/suites/valid/*.toml
+
+  shell:
+    name: Shell
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+
+      # Install shellcheck TODO: maybe find a better way to do this
+      - name: Install shellcheck
+        env:
+          SHELLCHECK_VERSION: v0.10.0
+        run: |
+          set -euo pipefail
+          url="https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          curl -fsSL "$url" | tar -xJ --strip-components=1 -C /usr/local/bin \
+              "shellcheck-${SHELLCHECK_VERSION}/shellcheck"
+          shellcheck --version
+
+      - name: shellcheck
+        run: |
+          shellcheck --severity=warning \
+            scripts/build.sh \
+            scripts/run_qemu.sh \
+            scripts/stamp_syms.sh \
+            scripts/symbolize.sh \
+            scripts/generate_log.sh

@@ -1,0 +1,48 @@
+# overnight lock nightmare test 
+#
+# [suite] is what the orchestrator schedules, [build] is what the build job
+# produces, and each [[tasks]] entry is what one runner executes
+
+[suite]
+name          = "overnight_locks"
+runners       = 8
+budget_hours  = 6.0
+overlap_ratio = 0.15
+
+[build]
+compiler = "clang"
+type     = "RelWithDebInfo"
+cmake_definitions = [
+  "TEST_NIGHTMARE_ALL=OFF",
+  "TEST_NIGHTMARE_LOCKS=ON",
+  "DEBUG_ASAN=ON",
+  "INJECT_LOCK=ON",
+]
+smp        = { sockets = 2, cores = 2, threads = 2 }
+memory_mib = 8192
+
+[[tasks]]
+name        = "locks_storm"
+mode        = "horizontal"
+weight      = 1.5
+priority    = 2.0
+max_runners = 3
+
+  [tasks.boot]
+  duration_ms     = 300000    # five minutes
+  drain_grace_ms  = 20000     # twenty seconds to quiesce
+  gate_first      = true
+  max_boots       = 500       
+  min_interval_ms = 2000     
+
+  [tasks.nightmare]
+  intensity = 0.75
+  seed_mode = "split"         # seeded pressure, free-running subject
+  perturb   = ["migrator", "waker", "idle_forcer", "stutter"]
+
+    [tasks.nightmare.perturb_opts.migrator]
+    interval_us = 500
+
+    [tasks.nightmare.perturb_opts.stutter]
+    period_ms = 3000
+    gap_ms    = 500

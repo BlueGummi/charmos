@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Turn a charmOS panic backtrace into file:line
+# charmOS panic backtrace into file:line
 
 set -euo pipefail
 
@@ -36,6 +36,7 @@ fi
 [[ -f "$KERNEL" ]] || { echo "symbolize: no kernel image at $KERNEL" >&2; exit 1; }
 
 SYMBOLIZER=""
+# shellcheck disable=SC2043
 for cand in llvm-symbolizer; do
     if command -v "$cand" >/dev/null 2>&1; then SYMBOLIZER="$cand"; break; fi
 done
@@ -67,7 +68,7 @@ else
     : > "$TMP/syms"
 fi
 
-# One address in, "func<TAB>file:line" per frame out, innermost inline first
+# One address in, "func<TAB>file:line" per frame out
 resolve() {
     local addr="$1"
     if [[ -n "$SYMBOLIZER" ]]; then
