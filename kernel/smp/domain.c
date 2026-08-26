@@ -72,6 +72,7 @@ static void construct_domains_from_cores(void) {
             cores_this_domain = remainder; /* last one gets leftovers */
 
         cd->num_cores = cores_this_domain;
+        alloc_or_die(cpu_mask_init(&cd->cpu_mask, global.core_count));
 
         for (size_t j = 0; j < cores_this_domain; j++) {
             size_t core_index = i * CORES_PER_DOMAIN + j;

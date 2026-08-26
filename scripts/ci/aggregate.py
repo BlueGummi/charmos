@@ -336,7 +336,7 @@ def main():
     paths: list[Path] = []
     unmatched: list[str] = []
     for pattern in args.inputs:
-        expanded = [Path(path) for path in sorted(glob.glob.glob(pattern))]
+        expanded = [Path(path) for path in sorted(glob.glob(pattern))]
         if expanded:
             paths.extend(path for path in expanded if path.is_file())
         else:

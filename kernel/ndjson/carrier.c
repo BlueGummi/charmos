@@ -17,6 +17,8 @@
 #define UART_LCR_8N1 0x03
 #define UART_DIVISOR 0x03 /* 38400 baud */
 
+#define NDJSON_PANIC_LOCK_SPINS 1000000
+
 static struct spinlock carrier_lock = SPINLOCK_INIT;
 static uint16_t carrier_port;
 static atomic_bool carrier_up;
@@ -43,7 +45,6 @@ bool ndjson_carrier_online(void) {
     return atomic_load_explicit(&carrier_up, memory_order_acquire);
 }
 
-/* Abandon lock */
 void ndjson_enter_panic(void) {
     atomic_store_explicit(&carrier_panicked, true, memory_order_release);
     spin_unlock_raw(&carrier_lock);
@@ -57,19 +58,23 @@ bool ndjson_carrier_begin(bool *irqs_were_on) {
     if (!ndjson_carrier_online())
         return false;
 
-    if (atomic_load_explicit(&carrier_panicked, memory_order_acquire))
-        return true;
-
     *irqs_were_on = are_interrupts_enabled();
     disable_interrupts();
+
+    if (atomic_load_explicit(&carrier_panicked, memory_order_acquire)) {
+        for (uint64_t i = 0; i < NDJSON_PANIC_LOCK_SPINS; i++) {
+            if (spin_trylock_raw(&carrier_lock))
+                break;
+            cpu_relax();
+        }
+        return true;
+    }
+
     spin_lock_raw(&carrier_lock);
     return true;
 }
 
 void ndjson_carrier_end(bool irqs_were_on) {
-    if (atomic_load_explicit(&carrier_panicked, memory_order_acquire))
-        return;
-
     spin_unlock_raw(&carrier_lock);
 
     if (irqs_were_on)
