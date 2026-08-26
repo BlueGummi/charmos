@@ -17,36 +17,43 @@ LOG_HANDLE_DECLARE_PRINT(slit);
 
 void slit_init(void) {
     struct uacpi_table slit_table;
+    size_t nodes = global.numa_node_count;
+
     if (uacpi_table_find_by_signature("SLIT", &slit_table) != UACPI_STATUS_OK) {
         log_warn_global(LOG_HANDLE(slit),
                         "SLIT table not found, assuming uniform distances");
-        size_t n = global.numa_node_count;
-        for (size_t i = 0; i < n; i++)
-            for (size_t j = 0; j < n; j++)
-                global.numa_nodes[i].distance[j] = (i == j) ? 10 : 20;
 
-        return;
-    }
+        /* distances_cnt is 0 with no SRAT, and `distance` is NULL there */
+        for (size_t i = 0; i < nodes; i++) {
+            struct numa_node *node = &global.numa_nodes[i];
+            for (size_t j = 0; j < node->distances_cnt; j++)
+                node->distance[j] = (i == j) ? 10 : 20;
+        }
+    } else {
+        struct acpi_slit *slit = slit_table.ptr;
+        size_t localities = slit->num_localities;
 
-    struct acpi_slit *slit = slit_table.ptr;
-    size_t n = slit->num_localities;
+        if (localities != nodes) {
+            log_warn_global(LOG_HANDLE(slit),
+                            "Mismatch in SLIT nodes vs detected NUMA nodes");
+        }
 
-    if (n != global.numa_node_count) {
-        log_warn_global(LOG_HANDLE(slit),
-                        "Mismatch in SLIT nodes vs detected NUMA nodes");
-    }
+        /* The matrix is localities x localities, only detected nodes get rows
+         */
+        uint8_t *entry = slit->matrix;
 
-    uint8_t *entry = slit->matrix;
-
-    for (size_t i = 0; i < n; i++) {
-        struct numa_node *node = &global.numa_nodes[i];
-        for (size_t j = 0; j < n; j++) {
-            node->distance[j] = entry[i * n + j];
+        for (size_t i = 0; i < nodes && i < localities; i++) {
+            struct numa_node *node = &global.numa_nodes[i];
+            for (size_t j = 0; j < node->distances_cnt && j < localities; j++)
+                node->distance[j] = entry[i * localities + j];
         }
     }
 
-    for (size_t i = 0; i < global.numa_node_count; i++) {
-        numa_construct_relative_distances(&global.numa_nodes[i]);
+    /* Every consumer of rel_dists treats it as present,
+     * and missing SLIT can happen */
+    for (size_t i = 0; i < nodes; i++) {
+        if (global.numa_nodes[i].distances_cnt)
+            numa_construct_relative_distances(&global.numa_nodes[i]);
     }
 
     numa_dump();
