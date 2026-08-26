@@ -11,6 +11,7 @@
 #include <math/sort.h>
 #include <mem/alloc_or_die.h>
 #include <mem/vas.h>
+#include <ndjson.h>
 #include <smp/core.h>
 #include <stack_depot.h>
 #include <stdbool.h>
@@ -55,6 +56,48 @@ CMDLINE_CHILDREN_DECLARE(
                       .desc = "Idle after the suite completes"),
     CMDLINE_INNER_VAR(no_progress, test_global.no_progress,
                       .desc = "Do not show progress bar"));
+
+NDJSON_DECLARE(test_begin, NDJSON_DOMAIN_TEST, NDJSON_KIND_BEGIN, 1,
+               NDJSON_U64(declared_total));
+
+NDJSON_DECLARE(test_group_start, NDJSON_DOMAIN_TEST, NDJSON_KIND_GROUP_START, 1,
+               NDJSON_STR(group), NDJSON_U64(test_count), NDJSON_STR(file));
+
+NDJSON_DECLARE(test_result, NDJSON_DOMAIN_TEST, NDJSON_KIND_RESULT, 1,
+               NDJSON_STR(group), NDJSON_STR(tier), NDJSON_STR(name),
+               NDJSON_STR(status), NDJSON_U64(duration_ms), NDJSON_STR(reason),
+               NDJSON_STR(msg), NDJSON_U64(runs_requested),
+               NDJSON_U64(runs_attempted), NDJSON_U64(runs_failed),
+               NDJSON_U64(runs_skipped));
+
+NDJSON_DECLARE(test_group_end, NDJSON_DOMAIN_TEST, NDJSON_KIND_GROUP_END, 1,
+               NDJSON_STR(group), NDJSON_U64(duration_ms), NDJSON_U64(failed),
+               NDJSON_U64(skipped));
+
+NDJSON_DECLARE(test_totals, NDJSON_DOMAIN_TEST, NDJSON_KIND_TOTALS, 1,
+               NDJSON_U64(total), NDJSON_U64(passed), NDJSON_U64(failed),
+               NDJSON_U64(skipped));
+
+NDJSON_DECLARE(test_verdict, NDJSON_DOMAIN_TEST, NDJSON_KIND_VERDICT, 1,
+               NDJSON_BOOL(ok), NDJSON_U64(duration_ms));
+
+static const char *test_status_plain(enum test_result r) {
+    switch (r) {
+    case TEST_RESULT_OK: return "pass";
+    case TEST_RESULT_FAILED: return "fail";
+    case TEST_RESULT_SKIPPED: return "skip";
+    default: return "unknown";
+    }
+}
+
+static const char *test_tier_plain(enum test_tier t) {
+    switch (t) {
+    case TEST_TIER_SMOKE: return "smoke";
+    case TEST_TIER_UNIT: return "unit";
+    case TEST_TIER_INTEGRATION: return "integration";
+    default: return "unknown";
+    }
+}
 
 LOG_SITE_DECLARE_PRINT(test_harness);
 LOG_HANDLE_DECLARE_PRINT(test_harness, .flags = LOG_PRINT | LOG_NO_NEWLINE);
@@ -310,6 +353,12 @@ static void tests_apply_filters() {
     if (filter->status != CMDLINE_ENTRY_FOUND)
         return;
 
+    /* A filter is the opt-in switch, as the option's own description says.
+     * Without this everything still sentinel stays enabled and the filter only
+     * ever adds, which makes test.filter= silently run the whole suite */
+    test_global.test_opt_in = true;
+    test_global.group_opt_in = true;
+
     if (filter->value.type == CMDLINE_TYPE_STRING) {
         char *filter_one;
         CMDLINE_EXTRACT(&filter->value, filter_one);
@@ -448,6 +497,9 @@ static void test_group_run(struct test_group *tg) {
                       "%s" ANSI_RESET " - %zu tests in (" ANSI_BOLD
                       "%s" ANSI_RESET ")\n",
                       tg->name, total_tests, tg->fname);
+
+    ndjson_emit(test_group_start, .group = tg->name, .test_count = total_tests,
+                .file = tg->fname);
     printf("%*s  | ", 20, "");
     printf(tg->incremental ? "incremental, " : "non_incremental, ");
     printf(tg->exit_on_fail ? "exit_on_fail" : "continue_on_fail");
@@ -643,6 +695,34 @@ static void test_group_run(struct test_group *tg) {
                 printf("\n");
             }
 
+            {
+                struct test_verdict *worst = &singular_verdict;
+                for (size_t k = 0; k < run_times; k++) {
+                    if (verdicts[k].result == TEST_RESULT_FAILED) {
+                        worst = &verdicts[k];
+                        break;
+                    }
+                }
+
+                const char *status = test_status_plain(worst->result);
+                if (t->run_times > 1 && result_times[TEST_RESULT_FAILED] &&
+                    result_times[TEST_RESULT_FAILED] < run_times)
+                    status = "flaky";
+
+                ndjson_emit(
+                    test_result, .group = tg->name,
+                    .tier = test_tier_plain(t->tier), .name = t->name,
+                    .status = status, .duration_ms = took,
+                    .reason = worst->result == TEST_RESULT_SKIPPED
+                                  ? test_skip_reason_to_str(worst->skip_reason)
+                                  : NULL,
+                    .msg = worst->msg,
+                    .runs_requested = t->run_times > 1 ? t->run_times : 0,
+                    .runs_attempted = t->run_times > 1 ? run_times : 0,
+                    .runs_failed = result_times[TEST_RESULT_FAILED],
+                    .runs_skipped = result_times[TEST_RESULT_SKIPPED]);
+            }
+
             if (log_site_message_count(tctx.site) &&
                 ((result_times[TEST_RESULT_FAILED] ||
                   (result_times[TEST_RESULT_SKIPPED] && t->run_times > 1)) ||
@@ -681,6 +761,10 @@ static void test_group_run(struct test_group *tg) {
             result_aggregates[j] += result_totals.totals[i][j];
         }
     }
+
+    ndjson_emit(test_group_end, .group = tg->name, .duration_ms = total_time,
+                .failed = result_aggregates[TEST_RESULT_FAILED],
+                .skipped = result_aggregates[TEST_RESULT_SKIPPED]);
 
     if (!result_aggregates[TEST_RESULT_SKIPPED] &&
         !result_aggregates[TEST_RESULT_FAILED]) {
@@ -859,6 +943,8 @@ void tests_run(void) {
     test_harness_info("Running " ANSI_BOLD "%zu" ANSI_RESET " tests:\n",
                       test_global.total_tests_enabled);
 
+    ndjson_emit(test_begin, .declared_total = test_global.total_tests_enabled);
+
     if (!test_global.no_progress) {
         test_progress.total = tests_count_planned();
         status_bar_open();
@@ -891,8 +977,16 @@ void tests_run(void) {
 
     test_harness_info("%s%s" ANSI_RESET " (%llu ms)\n", color, msg, total_time);
 
+    ndjson_emit(test_totals, .total = test_global.total_tests_enabled,
+                .passed = pass_count, .failed = fail_count,
+                .skipped = skip_count);
+    ndjson_emit(test_verdict, .ok = all_ok, .duration_ms = total_time);
+
     /* Give it the return code */
-    if (!test_global.no_exit)
-        qemu_exit(all_ok ? TEST_EXIT_OK : TEST_EXIT_FAIL);
+    if (!test_global.no_exit) {
+        int code = all_ok ? TEST_EXIT_OK : TEST_EXIT_FAIL;
+        ndjson_bye(code, all_ok ? "tests passed" : "tests failed");
+        qemu_exit(code);
+    }
 #endif
 }

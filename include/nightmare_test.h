@@ -11,6 +11,14 @@
 #include <thread/thread.h>
 #include <types/types.h>
 
+/* Nightmare tests are conceptually similar to what linux calls
+ * "torture tests", however, we have slightly different semantics,
+ * and I don't want to conflate the two and imply they
+ * are identical by naming them torture tests.
+ *
+ *
+ *
+ */
 enum nightmare_role_type {
     NIGHTMARE_ROLE_GENERIC,
     NIGHTMARE_ROLE_SLEEPER,

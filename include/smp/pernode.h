@@ -61,8 +61,14 @@ void pernode_obj_init(void);
 
 #define PERNODE(name) &(__pernode_##name)
 #define PERNODE_READY(name) (atomic_load(&(__pernode_desc_ref_##name)->ready))
+
 #define PERNODE_PTR_FOR_NODE(name, d)                                          \
-    ((typeof(__pernode_##name) *) (__pernode_desc_ref_##name)->pernode_ptrs[d])
+    ({                                                                         \
+        (void) kassert_oops(PERNODE_READY(name));                              \
+        ((typeof(__pernode_##name) *) (__pernode_desc_ref_##name)              \
+             ->pernode_ptrs[d]);                                               \
+    })
+
 #define PERNODE_READ_FOR_NODE(name, d)                                         \
     (*((typeof(__pernode_##name) *) PERNODE_PTR_FOR_NODE(name, d)))
 

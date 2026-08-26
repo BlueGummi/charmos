@@ -155,6 +155,12 @@ SECTIONS {
         __ekernel_log_sites = .;
         . = ALIGN(64);
     } :data
+    .kernel_ndjson_records : ALIGN(64) {
+        __skernel_ndjson_records = .;
+        KEEP(*(.kernel_ndjson_records))
+        __ekernel_ndjson_records = .;
+        . = ALIGN(64);
+    } :data
 
     .kernel_cmdline_entries : ALIGN(64) {
         __skernel_cmdline_entries = .;

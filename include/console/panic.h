@@ -9,6 +9,7 @@ void debug_print_stack();
 extern void panic_entry();
 void panic_broadcast_nmi();
 __noreturn void panic_nmi_handoff(void *p, struct irq_context *ctx);
+bool panic_cpu_is_owner(uint64_t id);
 typedef __noreturn void (*panic_handler_t)(const char *file, int line,
                                            const char *func, const char *fmt,
                                            ...);
@@ -17,6 +18,10 @@ enum panic_type {
     PANIC_LOCK,
     PANIC_IRQ,
 };
+
+#define QEMU_EXIT_OK 0
+#define QEMU_EXIT_FAIL 1
+#define QEMU_EXIT_PANIC 2
 
 static inline void qemu_exit(int code) {
     outb(0xf4, (uint8_t) code);

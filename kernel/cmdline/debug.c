@@ -1,3 +1,5 @@
+#include <ndjson.h>
+
 #include "internal.h"
 
 static bool cmdline_test_exit_flag = false;
@@ -30,6 +32,7 @@ void cmdline_debug_hook(void) {
 
     if (cmdline_test_exit_flag) {
         log_msg(LOG_INFO, "cmdline_test_exit active: exiting QEMU now");
-        qemu_exit(0);
+        ndjson_bye(QEMU_EXIT_OK, "cmdline test exit");
+        qemu_exit(QEMU_EXIT_OK);
     }
 }

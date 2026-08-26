@@ -31,6 +31,7 @@
 #include <mem/slab.h>
 #include <mem/tlb.h>
 #include <mem/vmm.h>
+#include <ndjson.h>
 #include <registry.h>
 #include <requests.h>
 #include <sch/domain.h>
@@ -69,6 +70,7 @@ __no_sanitize_address void k_main(void) {
 
     err_facilities_init();
     printf_init(framebuffer_request.response->framebuffers[0]);
+    ndjson_early_init();
     bootstage_advance(BOOTSTAGE_EARLY_FB);
 
     const char *cmdline =
@@ -128,6 +130,7 @@ __no_sanitize_address void k_main(void) {
     turnstiles_init();
 
     cmdline_parse(cmdline);
+    ndjson_init();
     cmdline_debug_hook();
 
     lapic_timer_init_bsp();

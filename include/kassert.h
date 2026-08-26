@@ -66,6 +66,7 @@
     } while (0)
 
 #define kassert(...) _kassert_dispatch(_kassert, "", __VA_ARGS__)
+#define kassert_oops(...) _kassert_dispatch(_kassert_oops, "", __VA_ARGS__)
 
 #define kassert_unreachable(...) _kassert_fail("unreachable! ", ##__VA_ARGS__)
 #define kassert_unimplemented(...)                                             \

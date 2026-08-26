@@ -1,7 +1,6 @@
 name: Test
 
-# This tests the 'gate', which just sees if any immediate regressions/issues happened 
-
+# Runs every push
 on:
   push:
     branches:
@@ -22,14 +21,12 @@ on:
 permissions:
   contents: read
 
-# The account's concurrency cap is shared with the 
-# nightly runner, so releasing slots keeps this responsive 
+# Runs often, release runners
 concurrency:
   group: test-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
-  # Per-run wall clock. Exceeding it exits 124
   TEST_TIMEOUT: 300
   ITERATIONS: 4
 
@@ -84,8 +81,7 @@ jobs:
             echo "::group::iteration $i/$ITERATIONS (${{ matrix.compiler }})"
             start=$(date +%s)
 
-            # --foreground lets timeout signal the whole pipeline
-            # and pkill is u sed upon real problems when it outlives parent
+            # --foreground lets timeout signal the whole thing 
             timeout --foreground -k 10 "$TEST_TIMEOUT" \
                 cmake --build build --target tests
             rc=$?
@@ -94,9 +90,8 @@ jobs:
             end=$(date +%s)
             cp build/output.log "results/iter-$i.log" 2>/dev/null || \
                 echo "(no serial log produced)" > "results/iter-$i.log"
-            # QEMU's own diagnostics, kept out of the guest log but worth
-            # having when a shard dies for host-side reasons
             cp build/output.stderr.log "results/iter-$i.stderr.log" 2>/dev/null || true
+            cp build/ndjson.log "results/iter-$i.nd.log" 2>/dev/null || true
 
             # This container has no python3, so parsing
             # happens in the report job
@@ -135,8 +130,6 @@ jobs:
     name: Report
     needs: test
     if: always()
-    # The bare runner image has python3,
-    # and the parsing scripts need nothing else
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -155,16 +148,20 @@ jobs:
           shopt -s nullglob globstar
 
           for env_file in artifacts/**/*.env; do
-            # Cleared first so a key missing from one sidecar can't inherit
-            # the previous shard's value
             unset SHARD COMPILER SCENARIO SEED EXIT_CODE DURATION_S SHA
             # shellcheck disable=SC1090
             . "$env_file"
             base="${env_file%.env}"
             if [ -f "$base.log.gz" ]; then gunzip -f "$base.log.gz"; fi
+            if [ -f "$base.nd.log.gz" ]; then gunzip -f "$base.nd.log.gz"; fi
             [ -f "$base.log" ] || continue
+            if [ ! -f "$base.nd.log" ]; then
+              echo "::error::$SHARD produced no NDJSON"
+              : > "$base.nd.log"
+            fi
 
             python3 scripts/ci/parse_log.py "$base.log" \
+              --ndjson "$base.nd.log" \
               --shard "$SHARD" \
               --scenario "$SCENARIO" \
               --seed "${SEED:-}" \

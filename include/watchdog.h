@@ -4,10 +4,16 @@
 #include <math/ewma.h>
 #include <math/fixed.h>
 #include <structures/list.h>
+#include <structures/locked_list.h>
 #include <sync/seqlock.h>
 #include <sync/spinlock.h>
 #include <time/timer.h>
 #include <types/types.h>
+
+/* TODO: This watchdog implementation is the "minimal correct fallback",
+ * in the future we will abstract + scale this up, however, what we have
+ * right now is enough for a first iteration and avoid bikeshedding
+ * before we get any real consumers */
 
 /*
  * Watchdog architecture diagram
@@ -186,6 +192,23 @@ struct watchdog_percpu_response {
     struct seqcount seqcount;
 };
 
+/* Rules for master callbacks:
+ *
+ * 1. No locks of any kind may be acquired
+ * 2. No waiting may happen, and no faults may be taken
+ * 3. No recursion is permitted in callbacks
+ *
+ * Rules for worker callbacks:
+ * 1. Only IRQ safe locks may be taken
+ * 2. No waiting, no faults
+ * 3. Recursion discouraged
+ */
+struct watchdog_callback {
+    struct list_head list;
+    void (*fn)(struct watchdog_callback *);
+    void *private;
+};
+
 /* Updated by `cpu`, read by the master */
 struct watchdog_percpu {
     cpu_id_t id;
@@ -201,6 +224,7 @@ struct watchdog_percpu {
     struct watchdog_percpu_response response;
     struct watchdog_buckets buckets;
     struct timer timer;
+    struct locked_list callback_list;
 };
 
 /* NOTE: This is NOT just for CPU 0 (the host of the master), the master
@@ -311,27 +335,6 @@ struct watchdog_master {
     char msg_buf[WATCHDOG_MSG_LEN_MAX];
 };
 
-/* TODO: Rig up workers, one for each CPU */
-struct watchdog_worker {
-    struct spinlock callback_lock;
-};
-
-/* Rules for master callbacks:
- *
- * 1. No locks of any kind may be acquired
- * 2. No waiting may happen, and no faults may be taken
- * 3. No recursion is permitted in callbacks
- *
- * Rules for worker callbacks:
- * 1. Only IRQ safe locks may be taken
- * 2. No waiting, no faults
- * 3. Recursion discouraged
- */
-struct watchdog_callback {
-    void (*callback)(struct watchdog_callback *self);
-    struct list_head list_internal;
-};
-
 /* Just as a means of aggregating cmdline options */
 struct watchdog_config {
     /* ========== These are cmdline/config values ========== */
@@ -370,5 +373,8 @@ void watchdog_init(void);
 void watchdog_start(void);
 void watchdog_anti_pet(void);
 void watchdog_pet(void);
+void watchdog_callback_add(cpu_id_t cpu, struct watchdog_callback *cb);
+void watchdog_callback_remove(cpu_id_t cpu, struct watchdog_callback *cb);
+
 #define watchdog_cpu_for_each(__i, state)                                      \
     cpu_mask_for_each(__i, watchdog_master.cpu_masks[state])

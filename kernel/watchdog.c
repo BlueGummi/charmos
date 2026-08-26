@@ -272,6 +272,16 @@ not_ready:
 static void watchdog_worker_timer_func(struct timer *t) {
     kassert(irq_in_interrupt());
 
+    struct watchdog_percpu *pcpu = PERCPU_PTR(watchdog_percpu);
+    enum irql irql = spin_lock_irq_disable(&pcpu->callback_list.lock);
+
+    struct watchdog_callback *cb;
+    list_for_each_entry(cb, &pcpu->callback_list.list, list) {
+        cb->fn(cb);
+    }
+
+    spin_unlock(&pcpu->callback_list.lock, irql);
+
     time_ms_t now = time_get_ms();
     watchdog_do_percpu_heartbeat(now);
 
@@ -676,6 +686,8 @@ void watchdog_init(void) {
         ewma_init(&watchdog_master.cpus[i].lockup_ewma, WATCHDOG_EWMA_ALPHA);
         watchdog_master.cpus[i].lockup_score = FX(0.0);
         watchdog_master.cpus[i].pcpu = PERCPU_PTR_FOR_CPU(watchdog_percpu, i);
+        locked_list_init(&PERCPU_PTR_FOR_CPU(watchdog_percpu, i)->callback_list,
+                         LOCKED_LIST_INIT_IRQ_DISABLE);
     }
 }
 
@@ -716,4 +728,14 @@ void watchdog_anti_pet(void) {
             this->anti_pets++;
         }
     }
+}
+
+void watchdog_callback_add(cpu_id_t id, struct watchdog_callback *cb) {
+    struct watchdog_percpu *percpu = PERCPU_PTR_FOR_CPU(watchdog_percpu, id);
+    locked_list_add(&percpu->callback_list, &cb->list);
+}
+
+void watchdog_callback_remove(cpu_id_t id, struct watchdog_callback *cb) {
+    struct watchdog_percpu *percpu = PERCPU_PTR_FOR_CPU(watchdog_percpu, id);
+    locked_list_del(&percpu->callback_list, &cb->list);
 }

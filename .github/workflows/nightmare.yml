@@ -113,6 +113,7 @@ jobs:
               echo "(no serial log produced)" > results/run.log
           # stderr (QEMU), kept out of the guest log 
           cp build/output.stderr.log results/run.stderr.log 2>/dev/null || true
+          cp build/ndjson.log results/run.nd.log 2>/dev/null || true
 
           {
             echo "SHARD=${{ matrix.scenario.name }}"
@@ -165,9 +166,15 @@ jobs:
             . "$env_file"
             base="$(dirname "$env_file")/run"
             if [ -f "$base.log.gz" ]; then gunzip -f "$base.log.gz"; fi
+            if [ -f "$base.nd.log.gz" ]; then gunzip -f "$base.nd.log.gz"; fi
             [ -f "$base.log" ] || continue
+            if [ ! -f "$base.nd.log" ]; then
+              echo "::error::$SHARD produced no NDJSON channel"
+              : > "$base.nd.log"
+            fi
 
             python3 scripts/ci/parse_log.py "$base.log" \
+              --ndjson "$base.nd.log" \
               --shard "$SHARD" \
               --scenario "$SCENARIO" \
               --seed "$SEED" \

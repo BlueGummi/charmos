@@ -7,6 +7,7 @@
 #include <mem/page.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
+#include <ndjson.h>
 #include <stack_depot.h>
 #include <stdint.h>
 #include <string.h>
@@ -232,7 +233,14 @@ void asan_init(void) {
     asan_ready = true;
 }
 
-/* Shadow bytes alone don't tell why accesses are bad, so dump */
+NDJSON_DECLARE(asan_fault, NDJSON_DOMAIN_ASAN, NDJSON_KIND_FAULT, 1,
+               NDJSON_STR(what), NDJSON_HEX(addr), NDJSON_U64(size),
+               NDJSON_STR(access));
+
+NDJSON_DECLARE(asan_frame, NDJSON_DOMAIN_ASAN, NDJSON_KIND_FRAME, 1,
+               NDJSON_U64(idx), NDJSON_HEX(addr), NDJSON_STR(sym),
+               NDJSON_U64(off));
+
 static void asan_report_shadow(const void *addr) {
     const uint8_t *sh = asan_shadow_for_internal(addr);
 
@@ -265,6 +273,9 @@ static void asan_report_stack(stack_handle_t h) {
         else
             printf("[ASAN]   #%-2lu %p\n", (unsigned long) i,
                    (void *) rec->entries[i]);
+
+        ndjson_emit(asan_frame, .idx = i, .addr = rec->entries[i], .sym = sym,
+                    .off = off);
     }
 }
 
@@ -326,6 +337,9 @@ static void __asan_report_and_panic(const char *what, const void *addr,
                                     size_t size, bool is_write) {
     printf("[ASAN] %s at %p size=%zu %s\n", what, addr, size,
            is_write ? "store" : "load");
+
+    ndjson_emit(asan_fault, .what = what, .addr = (uint64_t) (uintptr_t) addr,
+                .size = size, .access = is_write ? "store" : "load");
     asan_report_shadow(addr);
     asan_report_owner(addr);
     panic("ASAN: aborting due to memory error");

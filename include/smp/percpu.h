@@ -58,12 +58,16 @@ LINKER_SECTION_DEFINE(struct percpu_descriptor, percpu_desc);
 
 #define PERCPU_DEFINE(name, type) PERCPU_DEFINE_AS(name, name, type)
 
-void percpu_obj_init(void);
-
 #define PERCPU(name) &(__percpu_##name)
 #define PERCPU_READY(name) (atomic_load(&(__percpu_desc_ref_##name)->ready))
+
 #define PERCPU_PTR_FOR_CPU(name, cpu)                                          \
-    ((typeof(__percpu_##name) *) (__percpu_desc_ref_##name)->percpu_ptrs[cpu])
+    ({                                                                         \
+        (void) kassert_oops(PERCPU_READY(name));                               \
+        ((typeof(__percpu_##name) *) (__percpu_desc_ref_##name)                \
+             ->percpu_ptrs[cpu]);                                              \
+    })
+
 #define PERCPU_READ_FOR_CPU(name, cpu)                                         \
     (*((typeof(__percpu_##name) *) PERCPU_PTR_FOR_CPU(name, cpu)))
 
@@ -83,3 +87,5 @@ void percpu_obj_init(void);
 
 #define percpu_for_each(...)                                                   \
     _DISPATCH(percpu_for_each_internal, PP_NARG(__VA_ARGS__))(__VA_ARGS__)
+
+void percpu_obj_init(void);

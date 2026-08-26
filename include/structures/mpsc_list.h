@@ -1,20 +1,10 @@
-/* @title: Lock-free MPSC singly-linked list */
+/* @title: Lockless MPSC singly linked list */
 #pragma once
 #include <compiler.h>
 #include <container_of.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
-
-/*
- * Producers call mpsc_slist_push()
- * A single consumer calls mpsc_slist_drain() or mpsc_slist_pop_one()
- *
- * Producers are lock-free, batch drain is wait-free for the consumer
- *
- * No ABA: the consumer never CAS-unlinks individual nodes,
- * it swaps the whole chain
- */
 
 struct mpsc_slist_node {
     struct mpsc_slist_node *next;

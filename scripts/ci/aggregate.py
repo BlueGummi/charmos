@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Merge NDJSON results into one report
+"""Merge NDJSON results into a report
 
-Writes GitHub-flavoured markdown to --summary 
+Writes GitHub-flavored markdown to --summary
 and a merged JSON document to --json
 
 Usage:
@@ -10,10 +10,14 @@ Usage:
 
 import argparse
 import glob
+import html
 import json
-import os
+import re
 import sys
 from collections import defaultdict
+from collections.abc import Callable, Iterable, Sequence
+from pathlib import Path
+from typing import Any
 
 OUTCOME_ICON = {
     "pass": "✅",
@@ -23,16 +27,24 @@ OUTCOME_ICON = {
     "incomplete": "⚠️",
 }
 
-# "this shard did not produce a trustworthy clean result"
+# Outcomes that prevent a clean aggregate.
 BAD_OUTCOMES = {"fail", "crash", "timeout", "incomplete"}
 
 TOP_FRAMES_SHOWN = 6
 
+# ``parse_log.py`` stamps every record; reject other versions explicitly.
+RESULT_VERSION = 1
 
-def load(paths):
-    runs, tests, crashes = [], [], []
+
+Record = dict[str, Any]
+
+
+def load(
+    paths: Iterable[Path],
+) -> tuple[list[Record], list[Record], list[Record], list[Path]]:
+    runs, tests, crashes, stale = [], [], [], set()
     for path in paths:
-        with open(path) as fh:
+        with path.open(encoding="utf-8", errors="replace") as fh:
             for lineno, line in enumerate(fh, 1):
                 line = line.strip()
                 if not line:
@@ -41,11 +53,24 @@ def load(paths):
                     rec = json.loads(line)
                 except json.JSONDecodeError:
                     print(
-                        "warning: %s:%d is not valid JSON, skipping" % (path, lineno),
+                        f"warning: {path}:{lineno} is not valid JSON; skipping",
                         file=sys.stderr,
                     )
                     continue
-                rec["_source"] = os.path.basename(path)
+                if not isinstance(rec, dict):
+                    print(
+                        f"warning: {path}:{lineno} is not a JSON object; skipping",
+                        file=sys.stderr,
+                    )
+                    continue
+                rec["_source"] = path.name
+                version = rec.get("v")
+                if version != RESULT_VERSION and path not in stale:
+                    print(
+                        f"warning: {path} is v{version}, this reads v{RESULT_VERSION}",
+                        file=sys.stderr,
+                    )
+                    stale.add(path)
                 kind = rec.get("type")
                 if kind == "run":
                     runs.append(rec)
@@ -53,21 +78,58 @@ def load(paths):
                     tests.append(rec)
                 elif kind == "crash":
                     crashes.append(rec)
-    return runs, tests, crashes
+    return runs, tests, crashes, sorted(stale)
 
 
-def shard_of(rec, runs_by_source):
+def shard_of(rec: Record, runs_by_source: dict[str, Record]) -> Record:
     run = runs_by_source.get(rec.get("_source"))
     if not run:
         return {}
     return run
 
 
-def md_escape(text):
-    return (text or "").replace("|", "\\|").replace("\n", " ")
+def md_escape(text: object) -> str:
+    """Escape text embedded in a Markdown table cell."""
+    return (
+        str(text or "")
+        .replace("\\", "\\\\")
+        .replace("|", "\\|")
+        .replace("\r", " ")
+        .replace("\n", " ")
+    )
 
 
-def build_report(runs, tests, crashes, repro_template):
+def md_code(value: object) -> str:
+    text = md_escape(value)
+    delimiter = "`" * (
+        max((len(match) for match in re.findall(r"`+", text)), default=0) + 1
+    )
+    return f"{delimiter}{text}{delimiter}"
+
+
+def md_cell(value: object, *, code: bool = False) -> str:
+    """Render a non-empty Markdown table cell that cannot end its row."""
+    if value is None or value == "":
+        return "-"
+    return md_code(value) if code else md_escape(value)
+
+
+def md_table(
+    add: Callable[[str], None], headers: Sequence[str], rows: Iterable[Sequence[str]]
+) -> None:
+    add(f"| {' | '.join(headers)} |")
+    add(f"| {' | '.join('---' for _ in headers)} |")
+    for row in rows:
+        if len(row) != len(headers):
+            raise ValueError(
+                f"row {row!r} has {len(row)} cells; the table has {len(headers)} columns"
+            )
+        add(f"| {' | '.join(row)} |")
+
+
+def build_report(
+    runs: list[Record], tests: list[Record], crashes: list[Record], repro_template: str
+) -> Record:
     runs_by_source = {r["_source"]: r for r in runs}
 
     by_sig = defaultdict(lambda: {"count": 0, "occurrences": [], "example": None})
@@ -94,18 +156,20 @@ def build_report(runs, tests, crashes, repro_template):
     for r in runs:
         label = r.get("shard") or r["_source"]
         if not r.get("reached_summary"):
-            warnings.append(
-                "shard `%s` never reached the harness summary line "
-                "(died early, or the log format moved and the parser "
-                "stopped matching)" % label
-            )
+            warnings.append(f"shard {md_code(label)} never reached the summary line")
         seen, declared = r.get("tests_seen"), r.get("declared_total")
-        if declared and seen is not None and seen != declared:
+        if (
+            r.get("reached_summary")
+            and declared
+            and seen is not None
+            and seen != declared
+        ):
             warnings.append(
-                "shard `%s` parsed %d test results but the harness declared "
-                "%d - the parser is likely out of date with the output format"
-                % (label, seen, declared)
+                f"shard {md_code(label)} reported {seen} test results but the "
+                f"harness declared {declared}"
             )
+        for detail in r.get("schema_errors", []):
+            warnings.append(f"shard {md_code(label)} schema drift: {detail}")
 
     failed_runs = [r for r in runs if r.get("outcome") in BAD_OUTCOMES]
     ok = not failed_runs and not unique_crashes
@@ -121,7 +185,7 @@ def build_report(runs, tests, crashes, repro_template):
     }
 
 
-def render_markdown(rep):
+def render_markdown(rep: Record) -> str:
     runs = rep["runs"]
     out = []
     add = out.append
@@ -129,23 +193,18 @@ def render_markdown(rep):
     total = len(runs)
     bad = len(rep["failed_runs"])
     if rep["ok"]:
-        add("## ✅ All %d shard%s clean\n" % (total, "" if total == 1 else "s"))
+        add(f"## ✅ All {total} shard{'s' if total != 1 else ''} clean\n")
     else:
         add(
-            "## ❌ %d/%d shard%s failed, %d unique crash%s\n"
-            % (
-                bad,
-                total,
-                "" if total == 1 else "s",
-                len(rep["unique_crashes"]),
-                "" if len(rep["unique_crashes"]) == 1 else "es",
-            )
+            f"## ❌ {bad}/{total} shard{'s' if total != 1 else ''} failed, "
+            f"{len(rep['unique_crashes'])} unique crash"
+            f"{'es' if len(rep['unique_crashes']) != 1 else ''}\n"
         )
 
     if rep["warnings"]:
         add("### ⚠️ Warnings\n")
         for w in rep["warnings"]:
-            add("- %s" % w)
+            add(f"- {w}")
         add("")
 
     if rep["unique_crashes"]:
@@ -154,50 +213,41 @@ def render_markdown(rep):
             ex = entry["example"]
             hits = entry["count"]
             add(
-                "<details><summary><code>%s</code> &mdash; %s: %s "
-                "(%d occurrence%s)</summary>\n"
-                % (
-                    sig,
-                    ex.get("kind", "?"),
-                    md_escape(ex.get("message") or "(no message)"),
-                    hits,
-                    "" if hits == 1 else "s",
-                )
+                f"<details><summary><code>{html.escape(str(sig))}</code> &mdash; "
+                f"{html.escape(str(ex.get('kind', '?')))}: "
+                f"{html.escape(str(ex.get('message') or '(no message)'))} "
+                f"({hits} occurrence{'s' if hits != 1 else ''})</summary>\n"
             )
             if ex.get("site"):
-                add("**Site:** `%s`" % ex["site"])
+                add(f"**Site:** {md_code(ex['site'])}")
             if ex.get("function"):
-                add("**Function:** `%s`" % ex["function"])
+                add(f"**Function:** {md_code(ex['function'])}")
             frames = ex.get("frames") or []
             if frames:
                 add("\n```")
                 for f in frames[:TOP_FRAMES_SHOWN]:
                     add(
-                        "#%-2d %s  %s+0x%x"
-                        % (
-                            f.get("index", 0),
-                            f.get("address", "?"),
-                            f.get("symbol", "?"),
-                            f.get("offset", 0),
-                        )
+                        f"#{f.get('index', 0):<2} {f.get('address', '?')}  "
+                        f"{f.get('symbol', '?')}+0x{f.get('offset', 0):x}"
                     )
                 if len(frames) > TOP_FRAMES_SHOWN:
-                    add("... %d more frames" % (len(frames) - TOP_FRAMES_SHOWN))
+                    add(f"... {len(frames) - TOP_FRAMES_SHOWN} more frames")
                 add("```\n")
 
             add("**Seen in:**\n")
-            add("| shard | scenario | seed | compiler |")
-            add("| --- | --- | --- | --- |")
-            for occ in entry["occurrences"]:
-                add(
-                    "| %s | %s | `%s` | %s |"
-                    % (
-                        occ.get("shard") or "-",
-                        occ.get("scenario") or "-",
-                        occ.get("seed") or "-",
-                        occ.get("compiler") or "-",
+            md_table(
+                add,
+                ("shard", "scenario", "seed", "compiler"),
+                [
+                    (
+                        md_cell(occ.get("shard")),
+                        md_cell(occ.get("scenario")),
+                        md_cell(occ.get("seed"), code=True),
+                        md_cell(occ.get("compiler")),
                     )
-                )
+                    for occ in entry["occurrences"]
+                ],
+            )
             first_seed = next(
                 (o["seed"] for o in entry["occurrences"] if o.get("seed")), None
             )
@@ -216,49 +266,49 @@ def render_markdown(rep):
             add("\n</details>\n")
 
     add("### Shards\n")
-    add("| | shard | scenario | outcome | tests | pass | fail | skip | time |")
-    add("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+    rows = []
     for r in sorted(runs, key=lambda r: str(r.get("shard"))):
         t = r.get("totals") or {}
         dur = r.get("duration_s")
-        add(
-            "| %s | %s | %s | %s | %s | %s | %s | %s | %s |"
-            % (
+        rows.append(
+            (
                 OUTCOME_ICON.get(r.get("outcome"), "❔"),
-                r.get("shard") or "-",
-                r.get("scenario") or "-",
-                r.get("outcome") or "-",
-                r.get("tests_seen", "-"),
-                t.get("passed", "-"),
-                t.get("failed", "-"),
-                t.get("skipped", "-"),
-                "%.0fs" % dur if dur else "-",
+                md_cell(r.get("shard")),
+                md_cell(r.get("scenario")),
+                md_cell(r.get("outcome")),
+                md_cell(r.get("tests_seen")),
+                md_cell(t.get("passed")),
+                md_cell(t.get("failed")),
+                md_cell(t.get("skipped")),
+                # Preserve sub-second durations even though display rounds them.
+                f"{dur:.0f}s" if dur is not None else "-",
             )
         )
+    md_table(
+        add,
+        ("", "shard", "scenario", "outcome", "tests", "pass", "fail", "skip", "time"),
+        rows,
+    )
     add("")
 
     if rep["notable"]:
-        add("### Failed and flaky tests\n")
-        add("| test | group | tier | status | detail |")
-        add("| --- | --- | --- | --- | --- |")
+        add("### Failed + flaky tests\n")
+        rows = []
         for t in rep["notable"]:
             runs_info = t.get("runs")
-            detail = md_escape(t.get("message") or "")
+            detail = t.get("message") or ""
             if runs_info:
-                detail = "%d/%d runs failed" % (
-                    runs_info.get("failed", 0),
-                    runs_info.get("requested", 0),
-                )
-            add(
-                "| `%s` | %s | %s | %s | %s |"
-                % (
-                    t.get("name"),
-                    t.get("group"),
-                    t.get("tier"),
-                    t.get("status"),
-                    detail or "-",
+                detail = f"{runs_info.get('failed', 0)}/{runs_info.get('requested', 0)} runs failed"
+            rows.append(
+                (
+                    md_cell(t.get("name"), code=True),
+                    md_cell(t.get("group")),
+                    md_cell(t.get("tier")),
+                    md_cell(t.get("status")),
+                    md_cell(detail),
                 )
             )
+        md_table(add, ("test", "group", "tier", "status", "detail"), rows)
         add("")
 
     return "\n".join(out) + "\n"
@@ -271,10 +321,9 @@ def main():
     ap.add_argument("--json", help="write merged JSON report here")
     ap.add_argument(
         "--repro-template",
-        default="./scripts/build.sh -t RelWithDebInfo tests -- "
-        '-DKERNEL_CMDLINE="test.seed={seed}"',
-        help="shell snippet shown for reproducing a crash; {seed} and "
-        "{scenario} are substituted",
+        default="",
+        help="shell snippet shown for reproducing a crash, with {seed} and "
+        "{scenario} substituted",
     )
     ap.add_argument(
         "--fail-on-error",
@@ -284,60 +333,68 @@ def main():
     )
     args = ap.parse_args()
 
-    paths = []
+    paths: list[Path] = []
+    unmatched: list[str] = []
     for pattern in args.inputs:
-        expanded = sorted(glob.glob(pattern))
-        paths.extend(expanded if expanded else [pattern])
-    paths = [p for p in paths if os.path.isfile(p)]
+        expanded = [Path(path) for path in sorted(glob.glob.glob(pattern))]
+        if expanded:
+            paths.extend(path for path in expanded if path.is_file())
+        else:
+            unmatched.append(pattern)
+
+    if unmatched:
+        print(f"error: no files matched: {', '.join(unmatched)}", file=sys.stderr)
+        return 2
 
     if not paths:
         print("error: no result files matched", file=sys.stderr)
         return 2
 
-    runs, tests, crashes = load(paths)
+    runs, tests, crashes, stale = load(paths)
     if not runs:
-        print("error: no run records found in %d file(s)" % len(paths), file=sys.stderr)
+        print(f"error: no run records found in {len(paths)} file(s)", file=sys.stderr)
         return 2
 
     rep = build_report(runs, tests, crashes, args.repro_template)
+    for path in stale:
+        rep["warnings"].insert(
+            0, f"{md_code(path)} was written by a different parse_log.py version"
+        )
     markdown = render_markdown(rep)
 
     if args.summary:
-        with open(args.summary, "a") as fh:
+        with Path(args.summary).open("a", encoding="utf-8") as fh:
             fh.write(markdown)
     else:
         sys.stdout.write(markdown)
 
     if args.json:
-        with open(args.json, "w") as fh:
-            json.dump(
+        report_json = {
+            "ok": rep["ok"],
+            "shards": len(runs),
+            "failed_shards": len(rep["failed_runs"]),
+            "unique_crashes": [
                 {
-                    "ok": rep["ok"],
-                    "shards": len(runs),
-                    "failed_shards": len(rep["failed_runs"]),
-                    "unique_crashes": [
-                        {
-                            "signature": sig,
-                            "count": e["count"],
-                            "kind": e["example"].get("kind"),
-                            "site": e["example"].get("site"),
-                            "message": e["example"].get("message"),
-                            "frames": e["example"].get("frames", []),
-                            "occurrences": e["occurrences"],
-                        }
-                        for sig, e in rep["unique_crashes"]
-                    ],
-                    "notable_tests": rep["notable"],
-                    "warnings": rep["warnings"],
-                },
-                fh,
-                indent=2,
-                sort_keys=True,
-            )
+                    "signature": sig,
+                    "count": e["count"],
+                    "kind": e["example"].get("kind"),
+                    "site": e["example"].get("site"),
+                    "message": e["example"].get("message"),
+                    "frames": e["example"].get("frames", []),
+                    "occurrences": e["occurrences"],
+                }
+                for sig, e in rep["unique_crashes"]
+            ],
+            "notable_tests": rep["notable"],
+            "warnings": rep["warnings"],
+        }
+        Path(args.json).write_text(
+            f"{json.dumps(report_json, indent=2, sort_keys=True)}\n", encoding="utf-8"
+        )
 
     print(
-        "%d shard(s), %d failed, %d unique crash(es)"
-        % (len(runs), len(rep["failed_runs"]), len(rep["unique_crashes"])),
+        f"{len(runs)} shard(s), {len(rep['failed_runs'])} failed, "
+        f"{len(rep['unique_crashes'])} unique crash(es)",
         file=sys.stderr,
     )
 

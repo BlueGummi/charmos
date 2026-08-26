@@ -16,8 +16,9 @@ status="${PIPESTATUS[0]}"
 
 if [[ "$MAP_DEBUG_EXIT" == "1" ]]; then
     case "$status" in
-        1) exit 0 ;;   # TEST_EXIT_OK
-        3) exit 1 ;;   # TEST_EXIT_FAIL
+        1) exit 0 ;;   # QEMU_EXIT_OK
+        3) exit 1 ;;   # QEMU_EXIT_FAIL
+        5) exit 3 ;;   # QEMU_EXIT_PANIC
     esac
 fi
 

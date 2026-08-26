@@ -4,6 +4,7 @@ option(QEMU_NUMA "Configure 4-node NUMA topology" ON)
 option(QEMU_USB "Attach xHCI controller with USB kbd/mouse" ON)
 option(QEMU_NVME "Attach NVMe drive backed by disk.img" ON)
 option(QEMU_DEBUG_EXIT "Attach isa-debug-exit to the tests target" ON)
+option(QEMU_NDJSON "Attach a second serial device for the NDJSON" ON)
 option(QEMU_GDB_WAIT "Halt at startup waiting for gdb (-S)" OFF)
 option(QEMU_TRACE "Trace events into trace.log" ON)
 option(QEMU_LOAD_ACPI "Load custom ACPI tables from build/acpi/" OFF)
@@ -137,6 +138,13 @@ if (QEMU_DEBUG_EXIT)
     set(QEMU_DEBUG_EXIT_FLAGS -device isa-debug-exit,iobase=0xf4,iosize=0x04)
 endif ()
 
+# The console is serial0 and the machine channel is serial1
+set(NDJSON_LOG "${CMAKE_BINARY_DIR}/ndjson.log")
+set(QEMU_NDJSON_FLAGS)
+if (QEMU_NDJSON)
+    set(QEMU_NDJSON_FLAGS -serial file:${NDJSON_LOG})
+endif ()
+
 if (QEMU_TRACE)
     list(APPEND QEMU_FLAGS -d "trace:*xhci*" -trace file=trace.log)
 endif ()
@@ -201,6 +209,11 @@ function (register_run_target tgt)
         list(APPEND extra_args ${QEMU_DEBUG_EXIT_FLAGS})
     endif ()
 
+    if ("NDJSON" IN_LIST extra_args)
+        list(REMOVE_ITEM extra_args NDJSON)
+        list(APPEND extra_args ${QEMU_NDJSON_FLAGS})
+    endif ()
+
     add_custom_target(
         ${tgt}
         DEPENDS iso pristine-disk
@@ -211,7 +224,7 @@ function (register_run_target tgt)
         USES_TERMINAL)
 endfunction ()
 
-register_run_target(run -serial stdio -no-shutdown -no-reboot)
-register_run_target(headless -nographic -no-shutdown -no-reboot)
-register_run_target(tests DEBUG_EXIT -nographic)
-register_run_target(debug -S -serial stdio -no-shutdown -no-reboot)
+register_run_target(run NDJSON -serial stdio -no-shutdown -no-reboot)
+register_run_target(headless NDJSON -nographic -serial mon:stdio -no-shutdown -no-reboot)
+register_run_target(tests DEBUG_EXIT NDJSON -nographic -serial mon:stdio)
+register_run_target(debug NDJSON -S -serial stdio -no-shutdown -no-reboot)

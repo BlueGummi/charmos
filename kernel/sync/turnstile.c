@@ -1,6 +1,7 @@
 #include <kassert.h>
 #include <math/min_max.h>
 #include <mem/alloc.h>
+#include <mem/alloc_or_die.h>
 #include <mem/slab.h> /* to get SLAB_OBJ_ALIGN */
 #include <sch/sched.h>
 #include <sync/turnstile.h>
@@ -42,15 +43,13 @@ SLAB_SIZE_REGISTER_FOR_STRUCT(turnstile, SLAB_OBJ_ALIGN_DEFAULT);
  * blocked threads and taking our current thread's priority and boosting
  * threads that need the boost.
  *
- * The hash table per-head locks protect the hash tables adn contents of all
+ * The hash table per-head locks protect the hash tables and contents of all
  * turnstiles residing in the hash table.
  */
 
-void turnstiles_init() {
+void turnstiles_init(void) {
     global.turnstiles =
-        kmalloc(sizeof(struct turnstile_hash_table), ALLOC_FLAGS_ZERO);
-    if (!global.turnstiles)
-        panic("Could not allocate turnstile hash table");
+        kmalloc_or_die(sizeof(struct turnstile_hash_table), ALLOC_FLAGS_ZERO);
     for (size_t i = 0; i < TURNSTILE_HASH_SIZE; i++) {
         spinlock_init(&global.turnstiles->heads[i].lock);
         INIT_LIST_HEAD(&global.turnstiles->heads[i].list);

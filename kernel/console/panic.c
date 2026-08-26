@@ -11,6 +11,7 @@
 #include <linker/symbols.h>
 #include <log.h>
 #include <logo.h>
+#include <ndjson.h>
 #include <smp/core.h>
 #include <smp/percpu.h>
 #include <stdarg.h>
@@ -19,6 +20,13 @@
 #include <thread/thread.h>
 #include <time/spin_sleep.h>
 #include <time/time.h>
+
+static _Atomic int64_t panic_owner = -1;
+
+bool panic_cpu_is_owner(uint64_t id) {
+    return atomic_load_explicit(&panic_owner, memory_order_relaxed) ==
+           (int64_t) id;
+}
 
 PERCPU_DECLARE(panic_quiesced, _Atomic uint32_t, NULL);
 PERCPU_DECLARE(panic_regs, struct panic_regs, NULL);
@@ -757,6 +765,45 @@ static void panic_where_box(struct report_target *tgt, const char *file,
     report_box_close(&box);
 }
 
+NDJSON_DECLARE(panic_at, NDJSON_DOMAIN_PANIC, NDJSON_KIND_AT, 1,
+               NDJSON_STR(file), NDJSON_U64(line), NDJSON_STR(func),
+               NDJSON_STR(msg), NDJSON_STR(bootstage), NDJSON_STR(thread),
+               NDJSON_U64(depth));
+
+NDJSON_DECLARE(panic_frame, NDJSON_DOMAIN_PANIC, NDJSON_KIND_FRAME, 1,
+               NDJSON_U64(idx), NDJSON_HEX(addr), NDJSON_STR(sym),
+               NDJSON_U64(off), NDJSON_STR(file), NDJSON_U64(line));
+
+static void panic_emit_records(const char *file, int line, const char *func,
+                               const char *fmt, va_list args, uint32_t depth) {
+    static char msg[REPORT_LINE_MAX];
+
+    vsnprintf(msg, (int) sizeof(msg), fmt, args);
+
+    const char *thread = global.current_bootstage >= BOOTSTAGE_LATE
+                             ? thread_get_current()->name
+                             : NULL;
+
+    ndjson_emit(panic_at, .file = file, .line = (uint64_t) line, .func = func,
+                .msg = msg,
+                .bootstage = bootstage_str[global.current_bootstage],
+                .thread = thread, .depth = depth);
+
+    uint64_t entries[STACK_TRACE_MAX_DEPTH];
+    size_t nr = stack_unwind((uint64_t) __builtin_frame_address(0), entries,
+                             STACK_TRACE_MAX_DEPTH);
+
+    for (size_t i = 0; i < nr; i++) {
+        uint64_t off = 0;
+        uint32_t srcline = 0;
+        const char *sym = debug_symbolize(entries[i], &off);
+        const char *srcfile = debug_line_for(entries[i] - 1, &srcline);
+
+        ndjson_emit(panic_frame, .idx = i, .addr = entries[i], .sym = sym,
+                    .off = off, .file = srcfile, .line = srcline);
+    }
+}
+
 /* The left side is for what people read, the right is machine output,
  * with one divider running down the middle */
 static void panic_report(const char *file, int line, const char *func,
@@ -847,13 +894,22 @@ __noreturn void panic_impl_default(const char *file, int line, const char *func,
         spin_lock_raw(&panic_lock);
 
     if (depth < PANIC_MAX_DEPTH) {
+        int64_t unowned = -1;
+        atomic_compare_exchange_strong(&panic_owner, &unowned,
+                                       (int64_t) smp_core_id());
         atomic_store(&global.panicked, true);
 
         /* Hand the whole screen back, drop the status bar, lock-free writes */
         report_enter_panic();
+        ndjson_enter_panic();
         printf("\033[H\033[2J");
 
         va_list args;
+
+        va_start(args, fmt);
+        panic_emit_records(file, line, func, fmt, args, depth);
+        va_end(args);
+
         va_start(args, fmt);
         panic_report(file, line, func, fmt, args);
         va_end(args);
@@ -863,6 +919,11 @@ __noreturn void panic_impl_default(const char *file, int line, const char *func,
     } else {
         printf_unlocked("\n[panic depth %u, giving up on the report]\n", depth);
     }
+
+#ifdef TEST_ENABLED
+    ndjson_bye(QEMU_EXIT_PANIC, "panic");
+    qemu_exit(QEMU_EXIT_PANIC);
+#endif
 
     while (true)
         wait_for_interrupt();

@@ -10,24 +10,16 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 
-#ifdef DEBUG_LOCK
-#define SPINLOCK_COOKIE_MAGIC 0xBEEB00
-#endif
-
 struct spinlock {
     _Atomic uint8_t state;
 
 #ifdef DEBUG_LOCK
     bool acquired_high;
-    uint32_t initialized_magic;
 #endif
 };
 
 #ifdef DEBUG_LOCK
-#define SPINLOCK_INIT                                                          \
-    {.state = ATOMIC_VAR_INIT(0),                                              \
-     .acquired_high = false,                                                   \
-     .initialized_magic = SPINLOCK_COOKIE_MAGIC}
+#define SPINLOCK_INIT {.state = ATOMIC_VAR_INIT(0), .acquired_high = false}
 #else
 #define SPINLOCK_INIT {ATOMIC_VAR_INIT(0)}
 #endif
@@ -35,7 +27,6 @@ struct spinlock {
 static inline void spinlock_init(struct spinlock *lock) {
 
 #ifdef DEBUG_LOCK
-    lock->initialized_magic = SPINLOCK_COOKIE_MAGIC;
     lock->acquired_high = false;
 #endif
 
@@ -44,10 +35,6 @@ static inline void spinlock_init(struct spinlock *lock) {
 
 static inline bool __warn_unused_result
 spin_trylock_raw(struct spinlock *lock) {
-
-#ifdef DEBUG_LOCK
-    kassert(lock->initialized_magic == SPINLOCK_COOKIE_MAGIC);
-#endif
 
     uint8_t expected = 0;
     return atomic_compare_exchange_strong_explicit(

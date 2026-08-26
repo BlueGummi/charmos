@@ -47,8 +47,8 @@ static void construct_domains_from_numa_nodes(void) {
         alloc_or_die(cpu_mask_init(&cd->cpu_mask, global.core_count));
         cpu_mask_copy(&cd->cpu_mask, &nn->cpus);
         cd->associated_node = nn;
-        cd->cores =
-            kmalloc(sizeof(struct core *) * cd->num_cores, ALLOC_FLAGS_ZERO);
+        cd->cores = kmalloc_or_die(sizeof(struct core *) * cd->num_cores,
+                                   ALLOC_FLAGS_ZERO);
     }
 }
 
@@ -72,16 +72,13 @@ static void construct_domains_from_cores(void) {
             cores_this_domain = remainder; /* last one gets leftovers */
 
         cd->num_cores = cores_this_domain;
-        alloc_or_die(cpu_mask_init(&cd->cpu_mask, cores_this_domain));
 
-        /* Set the CPU mask */
         for (size_t j = 0; j < cores_this_domain; j++) {
             size_t core_index = i * CORES_PER_DOMAIN + j;
             if (core_index >= global.core_count)
                 break;
 
-            struct core *c = global.cores[core_index];
-            cpu_mask_set(&cd->cpu_mask, c->id);
+            cpu_mask_set(&cd->cpu_mask, core_index);
         }
         cd->cores = kmalloc_or_die(sizeof(struct core *) * cores_this_domain,
                                    ALLOC_FLAGS_ZERO);
