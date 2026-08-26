@@ -2,9 +2,9 @@
 
 #ifdef TEST_RBIT
 TEST_GROUP_DECLARE(rbit, .intensity_desc = {
-                            .curve = TEST_SCALE_PIECEWISE_LOG,
-                            .unit = "ops",
-                        });
+                             .curve = SCALE_PIECEWISE_LOG,
+                             .unit = "ops",
+                         });
 
 #define RBIT_N 256
 #define RBIT_OPS 4000

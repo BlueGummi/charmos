@@ -1,0 +1,50 @@
+#include <asm.h>
+#include <nightmare/nightmare.h>
+#include <sch/sched.h>
+
+struct harness_smoke_options {
+    bool stall;
+};
+
+static struct harness_smoke_options harness_smoke_options;
+
+NIGHTMARE_OPTIONS_DECLARE(harness_smoke, struct harness_smoke_options,
+                          harness_smoke_options,
+                          CMDLINE_SCHEMA_PROP(struct harness_smoke_options,
+                                              stall));
+
+#ifdef TEST_NIGHTMARE_SMOKE
+NIGHTMARE_WORKER(harness_smoke_worker) {
+    if (harness_smoke_options.stall) {
+        while (true) {
+            NIGHTMARE_PROGRESS();
+            cpu_relax();
+        }
+    }
+
+    while (!nightmare_must_stop()) {
+        if (nightmare_must_park())
+            nightmare_park(NM_SELF);
+        NIGHTMARE_PROGRESS();
+        scheduler_yield();
+    }
+}
+
+static struct nightmare_verdict
+harness_smoke_quiesce(struct nightmare_ctx *ctx) {
+    (void) ctx;
+    return NIGHTMARE_OK;
+}
+
+static const struct nightmare_ops harness_smoke_ops = {
+    .worker = harness_smoke_worker,
+    .quiesce_check = harness_smoke_quiesce,
+};
+
+NIGHTMARE_DECLARE(harness_smoke,
+                  .desc = "Temporary P4 harness lifecycle smoke subject",
+                  .ops = &harness_smoke_ops,
+                  .seed_policy = NIGHTMARE_SEED_IGNORED,
+                  NIGHTMARE_INTENSITY_CORES(1, 1, 1, "workers/core"),
+                  .default_duration_ms = 1000);
+#endif

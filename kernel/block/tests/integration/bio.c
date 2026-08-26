@@ -2,7 +2,7 @@
 
 #ifdef TEST_BIO
 TEST_GROUP_DECLARE(bio, .intensity_desc = {
-                            .curve = TEST_SCALE_PIECEWISE_LINEAR,
+                            .curve = SCALE_PIECEWISE_LINEAR,
                             .unit = "ios",
                         });
 

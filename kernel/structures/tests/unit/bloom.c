@@ -2,7 +2,7 @@
 
 #ifdef TEST_BLOOM
 TEST_GROUP_DECLARE(bloom, .intensity_desc = {
-                              .curve = TEST_SCALE_PIECEWISE_LOG,
+                              .curve = SCALE_PIECEWISE_LOG,
                               .unit = "iters",
                           });
 

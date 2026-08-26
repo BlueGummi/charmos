@@ -2,7 +2,7 @@
 
 #ifdef TEST_BIT_OPS
 TEST_GROUP_DECLARE(bit_ops, .intensity_desc = {
-                                .curve = TEST_SCALE_PIECEWISE_LOG,
+                                .curve = SCALE_PIECEWISE_LOG,
                                 .unit = "iters",
                             });
 

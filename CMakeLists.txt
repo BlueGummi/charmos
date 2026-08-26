@@ -22,6 +22,20 @@ include(flags) # compiler / linker / codegen
 add_subdirectory(kernel)
 target_include_directories(kernel PRIVATE include)
 
+set(CHARMOS_COMMIT "" CACHE STRING "Commit identity for the kernel")
+if (CHARMOS_COMMIT STREQUAL "")
+    execute_process(
+        COMMAND git rev-parse --short=12 HEAD
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE CHARMOS_COMMIT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET)
+endif ()
+if (CHARMOS_COMMIT STREQUAL "")
+    set(CHARMOS_COMMIT "unknown")
+endif ()
+target_compile_definitions(kernel PRIVATE CHARMOS_COMMIT="${CHARMOS_COMMIT}")
+
 include(emulation)
 
 add_custom_target(

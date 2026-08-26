@@ -2,7 +2,7 @@
 
 #ifdef TEST_CLIMB
 TEST_GROUP_DECLARE(climb, .intensity_desc = {
-                              .curve = TEST_SCALE_PIECEWISE_LOG,
+                              .curve = SCALE_PIECEWISE_LOG,
                               .unit = "steps",
                           });
 

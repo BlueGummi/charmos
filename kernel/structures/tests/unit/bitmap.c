@@ -2,7 +2,7 @@
 
 #ifdef TEST_BITMAP
 TEST_GROUP_DECLARE(bitmap, .intensity_desc = {
-                               .curve = TEST_SCALE_PIECEWISE_LOG,
+                               .curve = SCALE_PIECEWISE_LOG,
                                .unit = "bits",
                            });
 

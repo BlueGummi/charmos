@@ -2,7 +2,7 @@
 
 #ifdef TEST_CHACHA20
 TEST_GROUP_DECLARE(chacha20, .intensity_desc = {
-                                 .curve = TEST_SCALE_PIECEWISE_LOG,
+                                 .curve = SCALE_PIECEWISE_LOG,
                                  .unit = "bytes",
                              });
 

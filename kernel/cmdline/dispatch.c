@@ -398,7 +398,10 @@ static void schema_validate_range(const struct cmdline_schema_prop *p,
     validate_scalar_range(p->c_type, ptr, p->range.low, p->range.hi, var, val);
 }
 
-static bool schema_dispatch(const char *var, const char *val) {
+static bool schema_dispatch(const char *var, const char *val,
+                            const struct cmdline_schema **near_miss_out) {
+    const struct cmdline_schema *near_miss = NULL;
+
     for (struct cmdline_schema *s = __skernel_cmdline_schemas;
          s < __ekernel_cmdline_schemas; s++) {
         size_t prefix_len = strlen(s->prefix);
@@ -425,9 +428,10 @@ static bool schema_dispatch(const char *var, const char *val) {
 
         void *instance =
             s->resolve ? s->resolve(subpath, instance_path_len) : NULL;
-        if (!instance)
-            panic("cmdline schema '%s': unknown instance '%.*s'", s->prefix,
-                  (int) instance_path_len, subpath);
+        if (!instance) {
+            near_miss = s;
+            continue;
+        }
 
         void *target_ptr = ((uint8_t *) instance) + matched_prop->offset;
 
@@ -503,6 +507,7 @@ static bool schema_dispatch(const char *var, const char *val) {
         log_msg(LOG_INFO, "command line entry '%s' set to '%s'", var, val);
         return true;
     }
+    *near_miss_out = near_miss;
     return false;
 }
 
@@ -532,8 +537,15 @@ void cmdline_dispatch(const char *var, const char *val) {
         return;
     }
 
-    if (schema_dispatch(var, val))
+    const struct cmdline_schema *near_miss = NULL;
+    if (schema_dispatch(var, val, &near_miss))
         return;
+
+    if (near_miss) {
+        panic("unknown command line key '%s' (schema '%s' <%s> has the "
+              "property but no matching instance)",
+              var, near_miss->prefix, near_miss->path_hint);
+    }
 
     panic("unknown command line key '%s'", var);
 }

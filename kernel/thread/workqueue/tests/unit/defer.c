@@ -2,7 +2,7 @@
 
 #ifdef TEST_TIMER_DEFER
 TEST_GROUP_DECLARE(defer, .intensity_desc = {
-                              .curve = TEST_SCALE_PIECEWISE_LOG,
+                              .curve = SCALE_PIECEWISE_LOG,
                               .unit = "iters",
                           });
 

@@ -35,6 +35,7 @@
 #define NDJSON_DOMAIN_PANIC "panic"
 #define NDJSON_DOMAIN_ASAN "asan"
 #define NDJSON_DOMAIN_SELFTEST "selftest"
+#define NDJSON_DOMAIN_NIGHTMARE "nightmare"
 
 #define NDJSON_KIND_SCHEMA "schema"
 #define NDJSON_KIND_BYE "bye"
@@ -50,6 +51,10 @@
 #define NDJSON_KIND_FRAME "frame"
 #define NDJSON_KIND_PEER "peer"
 #define NDJSON_KIND_OWNER "owner"
+#define NDJSON_KIND_BOOT "boot"
+#define NDJSON_KIND_STAT "stat"
+#define NDJSON_KIND_QUIESCE "quiesce"
+#define NDJSON_KIND_FINDING "finding"
 
 #define NDJSON_TYPE_NAME_U64 "u64"
 #define NDJSON_TYPE_NAME_I64 "i64"

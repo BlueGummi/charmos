@@ -2,7 +2,7 @@
 
 #ifdef TEST_PRNG
 TEST_GROUP_DECLARE(prng, .intensity_desc = {
-                             .curve = TEST_SCALE_PIECEWISE_LOG,
+                             .curve = SCALE_PIECEWISE_LOG,
                              .unit = "samples",
                          });
 

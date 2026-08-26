@@ -9,6 +9,8 @@
 #include <time/time.h>
 #include <watchdog.h>
 
+#include "watchdog/internal.h"
+
 #define watchdog_master_log(lvl, fmt, ...)                                     \
     log(LOG_SITE(watchdog_master), LOG_HANDLE(watchdog_master), lvl, fmt,      \
         ##__VA_ARGS__)
@@ -202,39 +204,48 @@ static bool watchdog_buckets_snapshot(const struct watchdog_buckets *b,
     return retries > 0;
 }
 
-static bool watchdog_count_heartbeats(const struct watchdog_buckets *buckets,
-                                      size_t window_buckets,
-                                      size_t *out_heartbeats,
-                                      size_t *out_expected,
-                                      fx32_32_t *out_score) {
+bool watchdog_count_heartbeats_at(const struct watchdog_buckets *buckets,
+                                  size_t window_buckets, time_ms_t now,
+                                  time_ms_t bucket_interval_ms,
+                                  size_t expected_per_bucket,
+                                  size_t *out_heartbeats, size_t *out_expected,
+                                  fx32_32_t *out_score) {
     struct watchdog_bucket_snapshot snap;
     if (!watchdog_buckets_snapshot(buckets, &snap))
         return false;
 
     kassert(window_buckets && window_buckets <= WATCHDOG_NUM_BUCKETS);
+    kassert(bucket_interval_ms);
+    kassert(expected_per_bucket);
 
     if (snap.last_heartbeat_ms == 0)
         goto not_ready;
 
+    if (unlikely(now < snap.last_heartbeat_ms))
+        now = snap.last_heartbeat_ms;
+
+    size_t cursor = snap.curr_epoch * WATCHDOG_NUM_BUCKETS + snap.idx;
+    size_t last_bucket = snap.last_heartbeat_ms / bucket_interval_ms;
+    size_t now_bucket = now / bucket_interval_ms;
+    kassert(last_bucket >= cursor);
+
+    size_t first_bucket = last_bucket - cursor;
+    size_t completed = now_bucket - first_bucket;
+    if (completed > window_buckets)
+        completed = window_buckets;
+    if (!completed)
+        goto not_ready;
+
+    size_t virtual_cursor = cursor + now_bucket - last_bucket;
     size_t total = 0, total_expect = 0;
-    for (size_t i = 1; i <= window_buckets; i++) {
-        size_t idx =
-            (snap.idx + WATCHDOG_NUM_BUCKETS - (i % WATCHDOG_NUM_BUCKETS)) %
-            WATCHDOG_NUM_BUCKETS;
-        size_t expected_epoch = snap.curr_epoch;
+    for (size_t i = 1; i <= completed; i++) {
+        size_t absolute = virtual_cursor - i;
+        size_t idx = absolute % WATCHDOG_NUM_BUCKETS;
+        size_t expected_epoch = absolute / WATCHDOG_NUM_BUCKETS;
 
-        /* Only give the completed buckets */
-        if (idx >= snap.idx) {
-            if (snap.curr_epoch == 0)
-                break;
-
-            expected_epoch = snap.curr_epoch - 1;
-        }
-
-        if (snap.buckets[idx].epoch == expected_epoch) {
+        if (snap.buckets[idx].epoch == expected_epoch)
             total += snap.buckets[idx].heartbeats;
-            total_expect += watchdog_global.expected_heartbeats_per_bucket;
-        }
+        total_expect += expected_per_bucket;
     }
 
     if (!total_expect)
@@ -557,8 +568,11 @@ static void watchdog_master_process_suspect(time_ms_t now) {
         struct watchdog_master_cpu *mcpu = &watchdog_master.cpus[i];
 
         fx32_32_t new;
-        if (!watchdog_count_heartbeats(&pcpu->buckets, WATCHDOG_WINDOW_BUCKETS,
-                                       NULL, NULL, &new))
+        if (!watchdog_count_heartbeats_at(
+                &pcpu->buckets, WATCHDOG_WINDOW_BUCKETS, now,
+                watchdog_global.bucket_interval_ms,
+                watchdog_global.expected_heartbeats_per_bucket, NULL, NULL,
+                &new))
             continue;
 
         ewma_update(&mcpu->lockup_ewma, new);
@@ -582,8 +596,11 @@ static void watchdog_master_process_normal(void) {
     watchdog_cpu_for_each(i, WATCHDOG_STATE_NORMAL) {
         struct watchdog_percpu *pcpu = PERCPU_PTR_FOR_CPU(watchdog_percpu, i);
         fx32_32_t score;
-        if (!watchdog_count_heartbeats(&pcpu->buckets, WATCHDOG_WINDOW_BUCKETS,
-                                       NULL, NULL, &score))
+        if (!watchdog_count_heartbeats_at(
+                &pcpu->buckets, WATCHDOG_WINDOW_BUCKETS, time_get_ms(),
+                watchdog_global.bucket_interval_ms,
+                watchdog_global.expected_heartbeats_per_bucket, NULL, NULL,
+                &score))
             continue;
 
         if (score >= config.master_suspect_score)

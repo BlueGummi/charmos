@@ -2,7 +2,7 @@
 
 #ifdef TEST_FIXED
 TEST_GROUP_DECLARE(fixed, .intensity_desc = {
-                              .curve = TEST_SCALE_PIECEWISE_LOG,
+                              .curve = SCALE_PIECEWISE_LOG,
                               .unit = "iters",
                           });
 

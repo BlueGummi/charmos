@@ -584,7 +584,7 @@ static void test_group_run(struct test_group *tg) {
 
             if (t->flags & TEST_FLAG_HONORS_INTENSITY) {
                 tctx.intensity_val =
-                    test_intensity_eval(&t->intensity_desc, tctx.intensity);
+                    scaled_param_eval(&t->intensity_desc, tctx.intensity);
             } else {
                 tctx.intensity_val = 0;
             }
@@ -598,9 +598,9 @@ static void test_group_run(struct test_group *tg) {
             test_harness_info(ANSI_BOLD ANSI_BLUE "%s" ANSI_RESET, t->name);
             if (t->flags & TEST_FLAG_HONORS_INTENSITY) {
                 char intst_str[512] = {0};
-                test_intensity_format(&t->intensity_desc, tctx.intensity,
-                                      tctx.intensity_val, intst_str,
-                                      sizeof(intst_str));
+                scaled_param_format(&t->intensity_desc, tctx.intensity,
+                                    tctx.intensity_val, intst_str,
+                                    sizeof(intst_str));
                 printf(" [" ANSI_CYAN "%s" ANSI_RESET "]", intst_str);
             }
             test_progress_paint(tg, i, t->name);
@@ -892,7 +892,7 @@ static void tests_set_intensities() {
     for (struct test *t = __skernel_tests; t < __ekernel_tests; t++) {
         if (t->flags & TEST_FLAG_INHERITS_INTENSITY) {
             t->flags |= TEST_FLAG_HONORS_INTENSITY;
-            if (t->intensity_desc.curve == TEST_SCALE_NONE) {
+            if (t->intensity_desc.curve == SCALE_NONE) {
                 t->intensity_desc.curve = t->group->intensity_desc.curve;
                 t->intensity_desc.custom_scale =
                     t->group->intensity_desc.custom_scale;

@@ -32,6 +32,7 @@
 #include <mem/tlb.h>
 #include <mem/vmm.h>
 #include <ndjson.h>
+#include <nightmare/nightmare.h>
 #include <registry.h>
 #include <requests.h>
 #include <sch/domain.h>
@@ -182,6 +183,7 @@ void k_sch_main(void *nop) {
     reaper_init();
 
     registry_setup();
+    nightmare_run();
     tests_run();
     bootstage_advance(BOOTSTAGE_COMPLETE);
 

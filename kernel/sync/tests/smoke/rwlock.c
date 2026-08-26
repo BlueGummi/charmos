@@ -2,7 +2,7 @@
 
 #ifdef TEST_RWLOCK
 TEST_GROUP_DECLARE(rwlock, .intensity_desc = {
-                               .curve = TEST_SCALE_PIECEWISE_LOG,
+                               .curve = SCALE_PIECEWISE_LOG,
                                .unit = "threads",
                            });
 

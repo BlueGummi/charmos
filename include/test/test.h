@@ -8,6 +8,7 @@
 #include <math/fixed.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>
+#include <scaled_param.h>
 #include <stdbool.h>
 
 typedef void (*test_fn_t)(void);
@@ -62,40 +63,6 @@ enum test_state : uint8_t {
     TEST_STATE_SENTINEL = 0xFF,
 };
 
-enum test_scale_curve : uint8_t {
-    TEST_SCALE_NONE = 0,
-    TEST_SCALE_PIECEWISE_LOG, /* Bilinear in log space: [min, def] on [0, 0.5],
-                               * [def, max] on [0.5, 1.0] */
-
-    TEST_SCALE_PIECEWISE_LINEAR, /* Bilinear in linear-space: [min, def] on
-                                  * [0, 0.5], [def, max] on [0.5, 1.0] */
-
-    TEST_SCALE_CORE_MULTIPLIER, /* Piecewise linear per-core base multiplied by
-                                 * global.core_count */
-
-    TEST_SCALE_CUSTOM, /* Uses custom_scale callback */
-    TEST_SCALE_CURVE_MAX,
-};
-
-typedef size_t (*test_scaling_fn_t)(fx32_32_t intensity, size_t min_val,
-                                    size_t def_val, size_t max_val);
-
-typedef size_t (*test_intensity_print_fn_t)(fx32_32_t intensity,
-                                            size_t scaled_val, char *buf,
-                                            size_t cap);
-
-struct test_intensity {
-    enum test_scale_curve curve;
-    size_t min_val;
-    size_t def_val;
-    size_t max_val;
-    const char *unit; /* "iters", "allocs", "threads" */
-
-    test_scaling_fn_t custom_scale; /* curve == SCALE_CUSTOM */
-
-    test_intensity_print_fn_t custom_print; /* Override "%zu %s" formatter */
-};
-
 struct test_group {
     const char *name;
     const char *fname;
@@ -106,7 +73,7 @@ struct test_group {
     fx32_32_t default_intensity;
 
     /* This is given to all children that TEST_FLAG_INHERITS_INTENSITY */
-    struct test_intensity intensity_desc;
+    struct scaled_param intensity_desc;
 
     enum test_state enabled;
     union {
@@ -160,7 +127,7 @@ struct test {
                           * necessarily keep the same .intensity as the
                           * boot time command line option/default */
 
-    struct test_intensity intensity_desc;
+    struct scaled_param intensity_desc;
 
     uint64_t seed; /* Can be passed in through cmdline, NOTE:
                     * if a seed is set through the cmdline, and
@@ -211,7 +178,7 @@ struct test_verdict {
     .flags = TEST_FLAG_INHERITS_INTENSITY,                                     \
     .intensity_desc = {.min_val = (min), .def_val = (def), .max_val = (max)}
 #define TEST_INTENSITY_DESC_SENTINEL                                           \
-    (struct test_intensity) {                                                  \
+    (struct scaled_param) {                                                    \
         .min_val = SIZE_MAX, .def_val = SIZE_MAX, .max_val = SIZE_MAX          \
     }
 
@@ -277,36 +244,33 @@ struct test_globals {
 
 /* 1D piecewise-log */
 #define TEST_INTENSITY_LOG(min, def, max, unit_str)                            \
-    .flags = TEST_FLAG_HONORS_INTENSITY,                                       \
-    .intensity_desc = {                                                        \
-        .curve = TEST_SCALE_PIECEWISE_LOG,                                     \
-        .min_val = (min),                                                      \
-        .def_val = (def),                                                      \
-        .max_val = (max),                                                      \
-        .unit = (unit_str),                                                    \
+    .flags = TEST_FLAG_HONORS_INTENSITY, .intensity_desc = {                   \
+                                             .curve = SCALE_PIECEWISE_LOG,     \
+                                             .min_val = (min),                 \
+                                             .def_val = (def),                 \
+                                             .max_val = (max),                 \
+                                             .unit = (unit_str),               \
     }
 
 /* Linear scaling */
 #define TEST_INTENSITY_LINEAR(min, def, max, unit_str)                         \
-    .flags = TEST_FLAG_HONORS_INTENSITY,                                       \
-    .intensity_desc = {                                                        \
-        .curve = TEST_SCALE_PIECEWISE_LINEAR,                                  \
-        .min_val = (min),                                                      \
-        .def_val = (def),                                                      \
-        .max_val = (max),                                                      \
-        .unit = (unit_str),                                                    \
+    .flags = TEST_FLAG_HONORS_INTENSITY, .intensity_desc = {                   \
+                                             .curve = SCALE_PIECEWISE_LINEAR,  \
+                                             .min_val = (min),                 \
+                                             .def_val = (def),                 \
+                                             .max_val = (max),                 \
+                                             .unit = (unit_str),               \
     }
 
 /* Core-scaled thread counts (threads = base * core_count) */
 #define TEST_INTENSITY_CORES(min_per_core, def_per_core, max_per_core,         \
                              unit_str)                                         \
-    .flags = TEST_FLAG_HONORS_INTENSITY,                                       \
-    .intensity_desc = {                                                        \
-        .curve = TEST_SCALE_CORE_MULTIPLIER,                                   \
-        .min_val = (min_per_core),                                             \
-        .def_val = (def_per_core),                                             \
-        .max_val = (max_per_core),                                             \
-        .unit = (unit_str),                                                    \
+    .flags = TEST_FLAG_HONORS_INTENSITY, .intensity_desc = {                   \
+                                             .curve = SCALE_CORE_MULTIPLIER,   \
+                                             .min_val = (min_per_core),        \
+                                             .def_val = (def_per_core),        \
+                                             .max_val = (max_per_core),        \
+                                             .unit = (unit_str),               \
     }
 
 /* set scale with min and max */
@@ -323,7 +287,7 @@ struct test_globals {
 /* Entirely custom */
 #define TEST_INTENSITY_CUSTOM(scale_fn, print_fn)                              \
     .flags = TEST_FLAG_HONORS_INTENSITY, .intensity_desc = {                   \
-                                             .curve = TEST_SCALE_CUSTOM,       \
+                                             .curve = SCALE_CUSTOM,            \
                                              .custom_scale = (scale_fn),       \
                                              .custom_print = (print_fn),       \
     }
@@ -373,12 +337,6 @@ struct test_globals {
     }
 
 void tests_run(void);
-size_t test_intensity_format(const struct test_intensity *desc,
-                             fx32_32_t intensity, size_t scaled_val, char *buf,
-                             size_t cap);
-
-size_t test_intensity_eval(const struct test_intensity *desc,
-                           fx32_32_t intensity);
 CMDLINE_DEFINE(test_root);
 
 extern struct test_globals test_global;

@@ -2,7 +2,7 @@
 
 #ifdef TEST_UI128
 TEST_GROUP_DECLARE(ui128, .intensity_desc = {
-                              .curve = TEST_SCALE_PIECEWISE_LOG,
+                              .curve = SCALE_PIECEWISE_LOG,
                               .unit = "iters",
                           });
 

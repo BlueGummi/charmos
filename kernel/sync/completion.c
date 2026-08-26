@@ -47,7 +47,7 @@ void complete_all(struct completion *c) {
     spin_unlock(&c->lock, irql);
 }
 
-void wait_for_completion(struct completion *c) {
+void completion_wait(struct completion *c) {
     enum irql irql = completion_lock_internal(c);
 
     while (c->done == 0)
@@ -59,7 +59,7 @@ void wait_for_completion(struct completion *c) {
     spin_unlock(&c->lock, irql);
 }
 
-bool wait_for_completion_timeout(struct completion *c, time_ms_t timeout_ms) {
+bool completion_wait_timeout(struct completion *c, time_ms_t timeout_ms) {
     enum irql irql = completion_lock_internal(c);
 
     while (c->done == 0) {
@@ -77,7 +77,7 @@ bool wait_for_completion_timeout(struct completion *c, time_ms_t timeout_ms) {
     return true;
 }
 
-bool try_wait_for_completion(struct completion *c) {
+bool completion_try_wait(struct completion *c) {
     enum irql irql = completion_lock_internal(c);
 
     if (c->done == 0) {

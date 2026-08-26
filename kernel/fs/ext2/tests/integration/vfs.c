@@ -2,9 +2,9 @@
 
 #ifdef TEST_EXT2
 TEST_GROUP_DECLARE(ext2, .intensity_desc = {
-                            .curve = TEST_SCALE_PIECEWISE_LOG,
-                            .unit = "ops",
-                        });
+                             .curve = SCALE_PIECEWISE_LOG,
+                             .unit = "ops",
+                         });
 
 #define EXT2_INIT                                                              \
     if (global.root_node->fs_type != FS_EXT2) {                                \

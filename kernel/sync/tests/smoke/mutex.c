@@ -2,7 +2,7 @@
 
 #ifdef TEST_MUTEX
 TEST_GROUP_DECLARE(mutex, .intensity_desc = {
-                              .curve = TEST_SCALE_PIECEWISE_LOG,
+                              .curve = SCALE_PIECEWISE_LOG,
                               .unit = "threads",
                           });
 

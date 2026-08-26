@@ -2,9 +2,9 @@
 
 #ifdef TEST_STACK_DEPOT
 TEST_GROUP_DECLARE(stack_depot, .intensity_desc = {
-                                  .curve = TEST_SCALE_PIECEWISE_LOG,
-                                  .unit = "records",
-                              });
+                                    .curve = SCALE_PIECEWISE_LOG,
+                                    .unit = "records",
+                                });
 
 #define SD_SEED 0xDEADBEEFULL
 #define SD_TRACE_LEN 8

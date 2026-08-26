@@ -51,10 +51,10 @@ SECTIONS {
         __ekernel_test_groups = .;
         . = ALIGN(64);
     } :data
-    .kernel_nightmare_test_groups : ALIGN(64) {
-        __skernel_nightmare_tests = .;
-        KEEP(*(.kernel_nightmare_tests))
-        __ekernel_nightmare_tests = .;
+    .kernel_nightmares : ALIGN(64) {
+        __skernel_nightmares = .;
+        KEEP(*(.kernel_nightmares))
+        __ekernel_nightmares = .;
         . = ALIGN(64);
     } :data
     .kernel_test_imports : ALIGN(64) {

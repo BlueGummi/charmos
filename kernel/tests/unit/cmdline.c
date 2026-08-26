@@ -5,6 +5,43 @@
 #ifdef TEST_CMDLINE
 TEST_GROUP_DECLARE(cmdline);
 
+struct shared_schema_probe {
+    bool enabled;
+};
+
+static struct shared_schema_probe shared_left;
+static struct shared_schema_probe shared_right;
+
+static void *shared_left_resolve(const char *path, size_t len) {
+    return len == strlen("left") && strncmp(path, "left", len) == 0
+               ? &shared_left
+               : NULL;
+}
+
+static void *shared_right_resolve(const char *path, size_t len) {
+    return len == strlen("right") && strncmp(path, "right", len) == 0
+               ? &shared_right
+               : NULL;
+}
+
+CMDLINE_SCHEMA_DECLARE(shared_left_schema, "schema_probe", "left",
+                       "shared-root resolver probe", shared_left_resolve,
+                       CMDLINE_SCHEMA_PROP(struct shared_schema_probe,
+                                           enabled));
+
+CMDLINE_SCHEMA_DECLARE(shared_right_schema, "schema_probe", "right",
+                       "shared-root resolver probe", shared_right_resolve,
+                       CMDLINE_SCHEMA_PROP(struct shared_schema_probe,
+                                           enabled));
+
+TEST_DECLARE_UNIT(cmdline_shared_schema_root, .group = TEST_GROUP(cmdline)) {
+    cmdline_dispatch("schema_probe.right.enabled", "true");
+    cmdline_dispatch("schema_probe.left.enabled", "true");
+    TEST_ASSERT(shared_left.enabled);
+    TEST_ASSERT(shared_right.enabled);
+    return TEST_SUCCESS;
+}
+
 TEST_DECLARE_UNIT(cmdline_xmacro_descriptors, .group = TEST_GROUP(cmdline)) {
     TEST_ASSERT(strcmp(cmdline_type_to_str(CMDLINE_TYPE_BOOL), "bool") == 0);
     TEST_ASSERT(strcmp(cmdline_type_to_str(CMDLINE_TYPE_INT), "int") == 0);

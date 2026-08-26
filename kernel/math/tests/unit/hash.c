@@ -2,7 +2,7 @@
 
 #ifdef TEST_HASH
 TEST_GROUP_DECLARE(hash, .intensity_desc = {
-                             .curve = TEST_SCALE_PIECEWISE_LOG,
+                             .curve = SCALE_PIECEWISE_LOG,
                              .unit = "seeds",
                          });
 

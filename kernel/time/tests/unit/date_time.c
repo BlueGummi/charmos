@@ -2,7 +2,7 @@
 
 #ifdef TEST_DATE_TIME
 TEST_GROUP_DECLARE(date_time, .intensity_desc = {
-                                  .curve = TEST_SCALE_PIECEWISE_LOG,
+                                  .curve = SCALE_PIECEWISE_LOG,
                                   .unit = "years",
                               });
 

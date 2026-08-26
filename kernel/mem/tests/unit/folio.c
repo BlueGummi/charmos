@@ -2,7 +2,7 @@
 
 #ifdef TEST_FOLIO
 TEST_GROUP_DECLARE(folio, .intensity_desc = {
-                              .curve = TEST_SCALE_PIECEWISE_LOG,
+                              .curve = SCALE_PIECEWISE_LOG,
                               .unit = "iters",
                           });
 

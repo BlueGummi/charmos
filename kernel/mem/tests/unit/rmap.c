@@ -2,7 +2,7 @@
 
 #ifdef TEST_RMAP
 TEST_GROUP_DECLARE(rmap, .intensity_desc = {
-                             .curve = TEST_SCALE_PIECEWISE_LOG,
+                             .curve = SCALE_PIECEWISE_LOG,
                              .unit = "queries",
                          });
 

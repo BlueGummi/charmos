@@ -2,7 +2,7 @@
 
 #ifdef TEST_RCU
 TEST_GROUP_DECLARE(rcu, .intensity_desc = {
-                            .curve = TEST_SCALE_PIECEWISE_LOG,
+                            .curve = SCALE_PIECEWISE_LOG,
                             .unit = "ms",
                         });
 

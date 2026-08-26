@@ -2,7 +2,7 @@
 
 #ifdef TEST_BIO_SCHED
 TEST_GROUP_DECLARE(bio_sched, .intensity_desc = {
-                                  .curve = TEST_SCALE_PIECEWISE_LOG,
+                                  .curve = SCALE_PIECEWISE_LOG,
                                   .unit = "requests",
                               });
 
