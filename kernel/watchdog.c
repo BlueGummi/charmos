@@ -614,7 +614,7 @@ static void watchdog_master_process_panic(void) {
     /* TODO: Aggregate, print other data, for this first version we
      * just print the first CPU that appears hung */
     cpu_mask_for_each(i, watchdog_master.cpu_masks[WATCHDOG_STATE_PANIC]) {
-        panic("CPU %zu lockup", i);
+        watchdog_panic("CPU %zu hard lockup (watchdog missed heartbeats)", i);
     }
 }
 

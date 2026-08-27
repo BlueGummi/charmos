@@ -1,4 +1,5 @@
 global panic_entry
+global crash_capture_regs
 extern panic_handler
 
 ; fill `struct panic_regs` on stack and give to panic_handler()
@@ -40,4 +41,44 @@ panic_entry:
     call panic_handler
 
     add rsp, 160
+    ret
+
+; void crash_capture_regs(struct panic_regs *out);
+; rdi = struct panic_regs*
+crash_capture_regs:
+    mov [rdi + 32], rax
+    mov [rdi + 40], rbx
+    mov [rdi + 48], rcx
+    mov [rdi + 56], rdx
+    mov [rdi + 64], rbp
+    mov [rdi + 72], rdi
+    mov [rdi + 80], rsi
+    mov [rdi + 88], r8
+    mov [rdi + 96], r9
+    mov [rdi + 104], r10
+    mov [rdi + 112], r11
+    mov [rdi + 120], r12
+    mov [rdi + 128], r13
+    mov [rdi + 136], r14
+    mov [rdi + 144], r15
+
+    ; rip is return addr 
+    mov rax, [rsp]
+    mov [rdi + 0], rax
+
+    ; rflags
+    pushfq
+    pop rax
+    mov [rdi + 8], rax
+
+    ; cr2, cr3
+    mov rax, cr2
+    mov [rdi + 16], rax
+    mov rax, cr3
+    mov [rdi + 24], rax
+
+    ; rsp before call
+    lea rax, [rsp + 8]
+    mov [rdi + 152], rax
+
     ret

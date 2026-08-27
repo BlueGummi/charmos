@@ -30,6 +30,8 @@ set(EARLY_INIT_FILES
     ${CMAKE_SOURCE_DIR}/kernel/bootstage.c
     ${CMAKE_SOURCE_DIR}/kernel/string.c
     ${CMAKE_SOURCE_DIR}/kernel/console/printf.c
+    ${CMAKE_SOURCE_DIR}/kernel/console/crash.c
+    ${CMAKE_SOURCE_DIR}/kernel/console/panic.c
     ${CMAKE_SOURCE_DIR}/kernel/mem/asan.c
     ${CMAKE_SOURCE_DIR}/kernel/mem/pmm.c
     ${CMAKE_SOURCE_DIR}/kernel/mem/buddy/init.c

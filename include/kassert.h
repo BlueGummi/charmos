@@ -1,5 +1,6 @@
 /* @title: Assertions */
 #include <compiler.h>
+#include <console/crash.h>
 #include <console/panic.h>
 
 /*
@@ -33,37 +34,45 @@
                           }))
 
 #define _kassert_1(prefix, x)                                                  \
-    _kassert_eval(prefix, x, panic(prefix "Assertion \"" #x "\" failed"))
+    _kassert_eval(prefix, x,                                                   \
+                  assert_impl_default(__FILE__, __LINE__, __func__,            \
+                                      prefix "Assertion \"" #x "\" failed"))
 
 #define _kassert_n(prefix, x, fmt, ...)                                        \
     _kassert_eval(prefix, x,                                                   \
-                  panic(prefix "Assertion \"" #x                               \
-                               "\" failed with message: " fmt,                 \
-                        ##__VA_ARGS__))
+                  assert_impl_default(__FILE__, __LINE__, __func__,            \
+                                      prefix "Assertion \"" #x                 \
+                                             "\" failed with message: " fmt,   \
+                                      ##__VA_ARGS__))
 
 #define _kassert_oops_1(prefix, x)                                             \
-    _kassert_eval(prefix, x, panic(prefix "Oops, assertion \"" #x "\" failed"))
+    _kassert_eval(prefix, x,                                                   \
+                  assert_impl_default(__FILE__, __LINE__, __func__,            \
+                                      prefix "Oops, assertion \"" #x           \
+                                             "\" failed"))
 
 #define _kassert_oops_n(prefix, x, fmt, ...)                                   \
     _kassert_eval(prefix, x,                                                   \
-                  panic(prefix "Oops, assertion \"" #x                         \
-                               "\" failed with message: " fmt,                 \
-                        ##__VA_ARGS__))
+                  assert_impl_default(__FILE__, __LINE__, __func__,            \
+                                      prefix "Oops, assertion \"" #x           \
+                                             "\" failed with message: " fmt,   \
+                                      ##__VA_ARGS__))
 
 #define _kassert_debug_1(prefix, x)                                            \
-    _kassert_eval(prefix, x, panic(prefix "Debug assertion \"" #x "\" failed"))
+    _kassert_eval(prefix, x,                                                   \
+                  assert_impl_default(__FILE__, __LINE__, __func__,            \
+                                      prefix "Debug assertion \"" #x           \
+                                             "\" failed"))
 
 #define _kassert_debug_n(prefix, x, fmt, ...)                                  \
     _kassert_eval(prefix, x,                                                   \
-                  panic(prefix "Debug assertion \"" #x                         \
-                               "\" failed with message: " fmt,                 \
-                        ##__VA_ARGS__))
+                  assert_impl_default(__FILE__, __LINE__, __func__,            \
+                                      prefix "Debug assertion \"" #x           \
+                                             "\" failed with message: " fmt,   \
+                                      ##__VA_ARGS__))
 
 #define _kassert_fail(prefix, ...)                                             \
-    do {                                                                       \
-        panic(prefix __VA_ARGS__);                                             \
-        __builtin_unreachable();                                               \
-    } while (0)
+    assert_impl_default(__FILE__, __LINE__, __func__, prefix __VA_ARGS__)
 
 #define kassert(...) _kassert_dispatch(_kassert, "", __VA_ARGS__)
 #define kassert_oops(...) _kassert_dispatch(_kassert_oops, "", __VA_ARGS__)

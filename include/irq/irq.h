@@ -1,5 +1,6 @@
 /* @title: IRQs */
 #pragma once
+#include <console/crash.h>
 #include <kassert.h>
 #include <smp/core.h>
 #include <stdbool.h>
@@ -99,6 +100,32 @@ struct irq_context {
     uint64_t rsp;
     uint64_t ss;
 };
+
+static inline void irq_context_to_panic_regs(const struct irq_context *ictx,
+                                             struct panic_regs *out) {
+    if (!ictx || !out)
+        return;
+    out->rip = ictx->rip;
+    out->rflags = ictx->rflags;
+    __asm__ volatile("mov %%cr2, %0" : "=r"(out->cr2));
+    __asm__ volatile("mov %%cr3, %0" : "=r"(out->cr3));
+    out->rax = ictx->rax;
+    out->rbx = ictx->rbx;
+    out->rcx = ictx->rcx;
+    out->rdx = ictx->rdx;
+    out->rbp = ictx->rbp;
+    out->rdi = ictx->rdi;
+    out->rsi = ictx->rsi;
+    out->r8 = ictx->r8;
+    out->r9 = ictx->r9;
+    out->r10 = ictx->r10;
+    out->r11 = ictx->r11;
+    out->r12 = ictx->r12;
+    out->r13 = ictx->r13;
+    out->r14 = ictx->r14;
+    out->r15 = ictx->r15;
+    out->rsp = ictx->rsp;
+}
 
 void irq_register(char *name, uint8_t vector, irq_handler_t handler, void *ctx,
                   enum irq_flags flags);

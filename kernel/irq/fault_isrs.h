@@ -1,15 +1,25 @@
+#include <console/crash.h>
 #include <console/panic.h>
+
 #define MAKE_HANDLER(handler_name, message)                                    \
     enum irq_result handler_name##_handler(void *ctx, uint8_t vector,          \
                                            struct irq_context *rsp) {          \
-        (void) ctx, (void) vector, (void) rsp;                                 \
-        uint64_t core = smp_core_id();                                         \
-        printf("\n=== " #handler_name " fault! ===\n");                        \
-        printf("Message -> %s\n", message);                                    \
-        panic("Core %u faulted at %p", core, rsp->rip);                        \
-        while (true) {                                                         \
-            wait_for_interrupt();                                              \
-        }                                                                      \
+        (void) ctx;                                                            \
+        (void) vector;                                                         \
+        struct panic_regs pregs;                                               \
+        irq_context_to_panic_regs(rsp, &pregs);                                \
+        char msg[CRASH_MSG_MAX];                                               \
+        snprintf(msg, sizeof(msg), "CPU %u fault: " message " at %p",          \
+                 (uint32_t) smp_core_id(), (void *) rsp->rip);                 \
+        crash(&(struct crash_context) {                                        \
+            .source = CRASH_SOURCE_CPU_EXCEPTION,                              \
+            .formats = CRASH_FMT_DEFAULT,                                      \
+            .file = __FILE__,                                                  \
+            .line = __LINE__,                                                  \
+            .func = #handler_name "_handler",                                  \
+            .msg = msg,                                                        \
+            .regs = &pregs,                                                    \
+        });                                                                    \
         return IRQ_HANDLED;                                                    \
     }
 
@@ -22,12 +32,12 @@ enum irq_result gpf_handler(void *ctx, uint8_t vector,
     uint64_t ec = rsp->error_code;
 
     printf("\n=== General Protection Fault ===\n");
-    printf("Core:     %u\n", core);
-    printf("RIP:      %p\n", rsp->rip);
-    printf("RSP:      %p\n", rsp->rsp);
-    printf("RBP:      %p\n", rsp->rbp);
-    printf("CS:       0x%04x\n", rsp->cs);
-    printf("SS:       0x%04x\n", rsp->ss);
+    printf("Core:     %u\n", (uint32_t) core);
+    printf("RIP:      %p\n", (void *) rsp->rip);
+    printf("RSP:      %p\n", (void *) rsp->rsp);
+    printf("RBP:      %p\n", (void *) rsp->rbp);
+    printf("CS:       0x%04x\n", (uint16_t) rsp->cs);
+    printf("SS:       0x%04x\n", (uint16_t) rsp->ss);
     printf("RFLAGS:   0x%016lx\n", rsp->rflags);
 
     printf("\nError code: 0x%04lx\n", ec);
@@ -53,26 +63,20 @@ enum irq_result gpf_handler(void *ctx, uint8_t vector,
         printf("  Selector:  %u (0x%x)\n", index, index);
     }
 
-    printf("\nRegister dump:\n");
-    printf("  RAX=%016lx  RBX=%016lx\n", rsp->rax, rsp->rbx);
-    printf("  RCX=%016lx  RDX=%016lx\n", rsp->rcx, rsp->rdx);
-    printf("  RDI=%016lx  RSI=%016lx\n", rsp->rdi, rsp->rsi);
-    printf("  R8 =%016lx  R9 =%016lx\n", rsp->r8, rsp->r9);
-    printf("  R10=%016lx  R11=%016lx\n", rsp->r10, rsp->r11);
-    printf("  R12=%016lx  R13=%016lx\n", rsp->r12, rsp->r13);
-    printf("  R14=%016lx  R15=%016lx\n", rsp->r14, rsp->r15);
-
-    uint64_t cr2, cr3;
-    __asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
-    __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
-    printf("\n  CR2=%016lx  CR3=%016lx\n", cr2, cr3);
-    printf("\n--- Stack at fault RSP ---\n");
-    debug_print_stack_from((uint64_t *) rsp->rsp, 0);
-
-    panic("GPF on core %u at %p (error code 0x%lx)", core, rsp->rip, ec);
-
-    while (true)
-        wait_for_interrupt();
+    struct panic_regs pregs;
+    irq_context_to_panic_regs(rsp, &pregs);
+    char msg[CRASH_MSG_MAX];
+    snprintf(msg, sizeof(msg), "GPF on core %u at %p (error code 0x%lx)",
+             (uint32_t) core, (void *) rsp->rip, ec);
+    crash(&(struct crash_context) {
+        .source = CRASH_SOURCE_CPU_EXCEPTION,
+        .formats = CRASH_FMT_DEFAULT,
+        .file = __FILE__,
+        .line = __LINE__,
+        .func = __func__,
+        .msg = msg,
+        .regs = &pregs,
+    });
 
     return IRQ_HANDLED;
 }
@@ -98,11 +102,24 @@ enum irq_result panic_nmi_isr(void *ctx, uint8_t vector,
 
 enum irq_result hw_error_nmi_isr(void *ctx, uint8_t vector,
                                  struct irq_context *ictx) {
+    (void) ctx;
+    (void) vector;
+    (void) ictx;
     uint8_t port61 = inb(0x61);
-    if (port61 & 0xC0) /* bit 7 = RAM Parity, bit 6 = IOCHK, TODO: make a
-                        * separate, clean hardware error/MCE subsystem */
-        panic("Hardware / Memory Parity NMI Error (Port 0x61 = 0x%02x)",
-              port61);
+    if (port61 & 0xC0) {
+        char msg[CRASH_MSG_MAX];
+        snprintf(msg, sizeof(msg),
+                 "Hardware / Memory Parity NMI Error (Port 0x61 = 0x%02x)",
+                 port61);
+        crash(&(struct crash_context) {
+            .source = CRASH_SOURCE_CPU_EXCEPTION,
+            .formats = CRASH_FMT_DEFAULT,
+            .file = __FILE__,
+            .line = __LINE__,
+            .func = __func__,
+            .msg = msg,
+        });
+    }
 
     return IRQ_NONE;
 }

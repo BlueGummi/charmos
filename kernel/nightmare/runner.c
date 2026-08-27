@@ -124,12 +124,12 @@ static const struct nightmare *nightmare_resolve(const char *name) {
     for (struct nightmare *nm = __skernel_nightmares; nm < __ekernel_nightmares;
          nm++) {
         if (!nm->name)
-            panic("nightmare registry contains an unnamed entry");
+            nightmare_panic("nightmare registry contains an unnamed entry");
         if (strcmp(nm->name, name) != 0)
             continue;
         if (match)
-            panic("duplicate nightmare name '%s' in %s and %s", name,
-                  match->fname, nm->fname);
+            nightmare_panic("duplicate nightmare name '%s' in %s and %s", name,
+                            match->fname, nm->fname);
         match = nm;
     }
     return match;

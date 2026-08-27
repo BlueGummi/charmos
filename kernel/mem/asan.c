@@ -1,3 +1,4 @@
+#include <console/crash.h>
 #include <dbg.h>
 #include <global.h>
 #include <kassert.h>
@@ -14,6 +15,22 @@
 #include <sync/spinlock.h>
 
 #include "mem/slab/internal.h"
+
+#define kasan_panic(what, addr, size, is_write)                                \
+    do {                                                                       \
+        char _kasan_msg[CRASH_MSG_MAX];                                        \
+        snprintf(_kasan_msg, sizeof(_kasan_msg),                               \
+                 "KASAN: %s at %p (size=%zu, %s)", (what), (addr),             \
+                 (size_t) (size), (is_write) ? "store" : "load");              \
+        crash(&(struct crash_context){                                         \
+            .source = CRASH_SOURCE_KASAN,                                      \
+            .formats = CRASH_FMT_DEFAULT,                                      \
+            .file = __FILE__,                                                  \
+            .line = __LINE__,                                                  \
+            .func = __func__,                                                  \
+            .msg = _kasan_msg,                                                 \
+        });                                                                    \
+    } while (0)
 
 #ifdef DEBUG_ASAN
 LOG_SITE_DECLARE_PRINT(asan);
@@ -204,11 +221,13 @@ static void asan_map_early_shadow(void) {
 
     asan_zero_shadow_phys = pmm_alloc_page(ALLOC_FLAGS_ZERO);
     if (!asan_zero_shadow_phys)
-        panic("ASAN: could not allocate the shared shadow page");
+        kasan_panic("could not allocate the shared shadow page", NULL, 0,
+                    false);
 
     asan_freed_shadow_phys = pmm_alloc_page();
     if (!asan_freed_shadow_phys)
-        panic("ASAN: could not allocate the shared freed shadow page");
+        kasan_panic("could not allocate the shared freed shadow page", NULL, 0,
+                    false);
 
     memset(hhdm_paddr_to_ptr(asan_freed_shadow_phys), ASAN_POISON_HEAP_FREED,
            PAGE_SIZE);
@@ -217,7 +236,8 @@ static void asan_map_early_shadow(void) {
     enum errno err = vmm_map_aliased(start, end - start, asan_zero_shadow_phys,
                                      PAGE_PRESENT | PAGE_XD, VMM_FLAG_NONE);
     if (err < 0)
-        panic("ASAN: could not map the shared shadow window: %d", err);
+        kasan_panic("could not map the shared shadow window",
+                    (const void *) start, end - start, false);
 
     asan_info("shared shadow: [%lx, %lx), %zu GiB of window on one zero page "
               "at %lx\n",
@@ -342,7 +362,18 @@ static void __asan_report_and_panic(const char *what, const void *addr,
                 .size = size, .access = is_write ? "store" : "load");
     asan_report_shadow(addr);
     asan_report_owner(addr);
-    panic("ASAN: aborting due to memory error");
+
+    char msg[CRASH_MSG_MAX];
+    snprintf(msg, sizeof(msg), "KASAN: %s at %p (size=%zu, %s)",
+             what ? what : "<fault>", addr, size, is_write ? "store" : "load");
+    crash(&(struct crash_context){
+        .source = CRASH_SOURCE_KASAN,
+        .formats = CRASH_FMT_DEFAULT,
+        .file = __FILE__,
+        .line = __LINE__,
+        .func = __func__,
+        .msg = msg,
+    });
 }
 
 static const char *asan_poison_reason(uint8_t shadow) {

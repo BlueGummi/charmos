@@ -38,7 +38,7 @@ add_custom_target(
         -hfsplus -apm-block-size 2048 --efi-boot boot/limine/limine-uefi-cd.bin -efi-boot-part --efi-boot-image
         --protective-msdos-label iso_root -o ${IMAGE_NAME}.iso > /dev/null 2>&1
     COMMAND make -C ${CMAKE_SOURCE_DIR}/limine
-    COMMAND ${CMAKE_SOURCE_DIR}/limine/limine bios-install ${IMAGE_NAME}.iso > /dev/null 2>&1
+    COMMAND ${CMAKE_SOURCE_DIR}/limine/limine bios-install ${IMAGE_NAME}.iso
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMENT "Building bootable ISO: ${IMAGE_NAME}.iso")
 
@@ -55,9 +55,8 @@ set(QEMU_FLAGS
     q35
     -qmp
     unix:/tmp/qmp.sock,server,nowait
-    -s
     -monitor
-    telnet:127.0.0.1:5555,server,nowait)
+    none)
 
 if (QEMU_KVM)
     list(APPEND QEMU_FLAGS -enable-kvm -cpu host)
@@ -227,4 +226,4 @@ endfunction ()
 register_run_target(run NDJSON -serial stdio -no-shutdown -no-reboot)
 register_run_target(headless NDJSON -nographic -serial mon:stdio -no-shutdown -no-reboot)
 register_run_target(tests DEBUG_EXIT NDJSON -nographic -serial mon:stdio)
-register_run_target(debug NDJSON -S -serial stdio -no-shutdown -no-reboot)
+register_run_target(debug NDJSON -s -S -serial stdio -no-shutdown -no-reboot)

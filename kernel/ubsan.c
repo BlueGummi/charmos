@@ -8,12 +8,11 @@
 //
 //
 
+#include <console/crash.h>
 #include <console/panic.h>
 #include <console/printf.h>
 #include <stdint.h>
 #include <string.h>
-
-#define HALT panic("UBSAN HALT ASSERTED");
 
 #define is_aligned(value, align) (((value) & ((align) - 1)) == 0)
 
@@ -22,6 +21,23 @@ typedef struct {
     uint32_t line;
     uint32_t column;
 } source_location_t;
+
+#define ubsan_panic(loc, fmt, ...)                                             \
+    do {                                                                       \
+        char _ubsan_msg[CRASH_MSG_MAX];                                        \
+        snprintf(_ubsan_msg, sizeof(_ubsan_msg), fmt, ##__VA_ARGS__);          \
+        const source_location_t *_sloc = (const source_location_t *) (loc);    \
+        crash(&(struct crash_context){                                         \
+            .source = CRASH_SOURCE_UBSAN,                                      \
+            .formats = CRASH_FMT_DEFAULT,                                      \
+            .file = (_sloc && _sloc->filename) ? _sloc->filename : __FILE__,   \
+            .line = _sloc ? (int) _sloc->line : __LINE__,                      \
+            .func = __func__,                                                  \
+            .msg = _ubsan_msg,                                                 \
+        });                                                                    \
+    } while (0)
+
+#define HALT ubsan_panic(NULL, "UBSAN violation asserted");
 
 typedef struct {
     uint16_t kind;
@@ -318,11 +334,12 @@ __attribute__((noreturn)) void
 __ubsan_handle_builtin_unreachable(data_only_location_t *data) {
     printf("UBSAN: builtin_unreachable @ %s:%u:%u\n", data->location.filename,
            data->location.line, data->location.column);
-    HALT panic("UBSAN");
+    ubsan_panic(&data->location, "UBSAN: reached __builtin_unreachable()");
 }
 __attribute__((noreturn)) void
 __ubsan_handle_missing_return(data_only_location_t *data) {
     printf("UBSAN: missing_return @ %s:%u:%u\n", data->location.filename,
            data->location.line, data->location.column);
-    HALT panic("UBSAN");
+    ubsan_panic(&data->location,
+                "UBSAN: control reached end of non-void function");
 }

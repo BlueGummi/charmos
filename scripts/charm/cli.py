@@ -1,4 +1,4 @@
-"""``charm`` -- the one entry point for charmOS host tooling.
+"""``charm`` the entry point for charmOS host tooling
 
 Subcommand groups mirror the stage they serve:
 
@@ -49,9 +49,6 @@ def _write_report(rep: dict[str, Any], args: argparse.Namespace, run_count: int)
         file=sys.stderr,
     )
     return 1 if (args.fail_on_error and not rep["ok"]) else 0
-
-
-# ── charm ci parse ──────────────────────────────────────────────────────
 
 
 def cmd_parse(args: argparse.Namespace) -> int:
@@ -123,9 +120,6 @@ def cmd_parse(args: argparse.Namespace) -> int:
     return 0
 
 
-# ── charm ci aggregate ──────────────────────────────────────────────────
-
-
 def cmd_aggregate(args: argparse.Namespace) -> int:
     paths, unmatched = _expand(args.inputs)
     if unmatched:
@@ -146,9 +140,6 @@ def cmd_aggregate(args: argparse.Namespace) -> int:
             0, f"{RP.md_code(path)} was written by a different result version"
         )
     return _write_report(rep, args, len(runs))
-
-
-# ── charm ci ingest ─────────────────────────────────────────────────────
 
 
 def cmd_ingest(args: argparse.Namespace) -> int:
@@ -181,9 +172,6 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     return _write_report(rep, args, len(runs))
 
 
-# ── charm ci schema / protocol ──────────────────────────────────────────
-
-
 def cmd_schema(args: argparse.Namespace) -> int:
     from . import schema as S
 
@@ -213,9 +201,6 @@ def cmd_protocol(_args: argparse.Namespace) -> int:
     return 0
 
 
-# ── charm dev repeat ────────────────────────────────────────────────────
-
-
 def cmd_repeat(args: argparse.Namespace) -> int:
     from . import local as L
 
@@ -235,9 +220,6 @@ def cmd_repeat(args: argparse.Namespace) -> int:
         timeout_s=args.timeout,
         target=args.target,
     )
-
-
-# ── charm nightmare ─────────────────────────────────────────────────────
 
 
 def _load_suite(path_str: str) -> Any | None:
@@ -374,7 +356,62 @@ def cmd_nm_show(args: argparse.Namespace) -> int:
     return 0
 
 
-# ── wiring ──────────────────────────────────────────────────────────────
+def cmd_nm_run(args: argparse.Namespace) -> int:
+    from .nightmare import campaign as NC
+    from .nightmare import grammar as NG
+
+    suite = _load_suite(args.suite)
+    if suite is None:
+        return 2
+
+    base_seed = None
+    if args.seed is not None:
+        try:
+            base_seed = NG.parse_uint(args.seed)
+        except Exception as e:
+            print(f"error: invalid seed {args.seed!r}: {e}", file=sys.stderr)
+            return 2
+
+    out_dir = (
+        Path(args.out_dir)
+        if args.out_dir
+        else Path("campaign-results") / (args.campaign_id or suite.meta.name)
+    )
+    build_dir = Path(args.build_dir)
+
+    manifest = NC.CampaignManifest(
+        suite=suite,
+        runner_index=args.runner,
+        total_runners=args.total_runners or suite.meta.runners,
+        base_seed=base_seed,
+        campaign_id=args.campaign_id or "",
+        budget_ms=int(args.budget_hours * 3600 * 1000) if args.budget_hours else 0,
+        build_dir=build_dir,
+        out_dir=out_dir,
+        gate_first=args.gate_first,
+        dry_run=args.dry_run,
+    )
+
+    result = NC.execute(manifest)
+    json_path, md_path = NC.write_reports(result, out_dir)
+
+    if args.summary:
+        with Path(args.summary).open("a", encoding="utf-8") as fh:
+            fh.write(NC.render_markdown(result))
+    else:
+        sys.stdout.write(NC.render_markdown(result))
+
+    if args.json:
+        Path(args.json).write_text(NC.render_json(result), encoding="utf-8")
+
+    print(
+        f"campaign {result.campaign_id}: {result.status} (ok={result.ok}), "
+        f"{result.total_boots} boot(s), {len(result.findings)} unique finding(s). "
+        f"Reports: {json_path}, {md_path}",
+        file=sys.stderr,
+    )
+
+    return 0 if result.ok else 1
 
 
 def add_report_args(sp: argparse.ArgumentParser) -> None:
@@ -521,6 +558,55 @@ def build_parser() -> argparse.ArgumentParser:
     sh = nmsub.add_parser("show", help="the resolved suite, defaults applied")
     sh.add_argument("suite", help="suite TOML file")
     sh.set_defaults(fn=cmd_nm_show)
+
+    rn = nmsub.add_parser("run", help="execute a nightmare campaign from a suite TOML")
+    rn.add_argument("suite", help="suite TOML file")
+    rn.add_argument("--runner", type=int, default=0, help="runner index (0-based)")
+    rn.add_argument(
+        "--total-runners",
+        type=int,
+        default=None,
+        help="total runners (default: suite.meta.runners)",
+    )
+    rn.add_argument(
+        "--seed",
+        default=None,
+        help="base seed (hex or decimal)",
+    )
+    rn.add_argument(
+        "--campaign-id",
+        default=None,
+        help="campaign identifier (default: <suite>-<timestamp>)",
+    )
+    rn.add_argument(
+        "--budget-hours",
+        type=float,
+        default=None,
+        help="override suite budget in hours",
+    )
+    rn.add_argument(
+        "--out-dir",
+        default=None,
+        help="directory where per-boot logs and reports are saved",
+    )
+    rn.add_argument(
+        "--build-dir",
+        default="build",
+        help="charmOS build directory (default: build)",
+    )
+    rn.add_argument(
+        "--gate-first",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="run gate test first (default: from suite)",
+    )
+    rn.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="plan and simulate without running QEMU",
+    )
+    add_report_args(rn)
+    rn.set_defaults(fn=cmd_nm_run)
 
     return ap
 

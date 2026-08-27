@@ -1,9 +1,24 @@
 #pragma once
+#include <console/crash.h>
 #include <nightmare/nightmare.h>
 #include <stdatomic.h>
 #include <sync/completion.h>
 #include <thread/queue.h>
 #include <time/timer.h>
+
+#define nightmare_panic(fmt, ...)                                              \
+    do {                                                                       \
+        char _nm_msg[CRASH_MSG_MAX];                                           \
+        snprintf(_nm_msg, sizeof(_nm_msg), fmt, ##__VA_ARGS__);                \
+        crash(&(struct crash_context) {                                        \
+            .source = CRASH_SOURCE_NIGHTMARE,                                  \
+            .formats = CRASH_FMT_DEFAULT,                                      \
+            .file = __FILE__,                                                  \
+            .line = __LINE__,                                                  \
+            .func = __func__,                                                  \
+            .msg = _nm_msg,                                                    \
+        });                                                                    \
+    } while (0)
 
 enum nightmare_on_stall : uint8_t {
     NIGHTMARE_ON_STALL_REPORT = 0,

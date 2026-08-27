@@ -1,3 +1,4 @@
+#include <console/crash.h>
 #include <console/printf.h>
 #include <dbg.h>
 #include <irq/exception_sync_cb.h>
@@ -268,16 +269,23 @@ static void __noreturn page_fault_report_crash(vaddr_t fault_addr,
     if (is_slab_exec)
         dump_slab_exec_fault(curr, irqc);
 
-    if (!(error_code & PAGE_FAULT_EC_USER)) {
-        spin_unlock_raw(&pf_lock);
-        panic("KERNEL PAGE FAULT ON CORE %llu under thread %s", smp_core_id(),
-              thread_get_current()->name);
-        while (true) {
-            disable_interrupts();
-            wait_for_interrupt();
-        }
-    }
+    struct panic_regs pregs;
+    irq_context_to_panic_regs(irqc, &pregs);
+    char msg[CRASH_MSG_MAX];
+    snprintf(msg, sizeof(msg),
+             "Kernel Page Fault at %p (CR2: %p, ar: %s, ec: 0x%lx, thread: %s)",
+             (void *) irqc->rip, (void *) fault_addr, name, error_code,
+             curr ? curr->name : "none");
 
     spin_unlock_raw(&pf_lock);
-    panic("?");
+
+    crash(&(struct crash_context){
+        .source = CRASH_SOURCE_CPU_EXCEPTION,
+        .formats = CRASH_FMT_DEFAULT,
+        .file = __FILE__,
+        .line = __LINE__,
+        .func = __func__,
+        .msg = msg,
+        .regs = &pregs,
+    });
 }
