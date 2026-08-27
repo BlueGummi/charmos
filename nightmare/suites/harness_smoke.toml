@@ -32,4 +32,8 @@ weight = 1.0
   [tasks.nightmare]
   intensity = 0.5
   seed_mode = "seedless"
-  perturb   = []
+  perturb   = ["stutter"]
+
+    [tasks.nightmare.perturb_opts.stutter]
+    period_ms = 100
+    gap_ms    = 100

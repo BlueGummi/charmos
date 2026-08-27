@@ -55,9 +55,10 @@ static void chaos_apc_spammer(void *arg) {
 
         struct apc *a = kmalloc(sizeof(struct apc), ALLOC_FLAGS_ZERO);
         if (a) {
-            apc_init(a, chaos_apc_fn, NULL);
+            apc_init(a, chaos_apc_fn, NULL, apc_destroy_free);
             CHAOS_LOG("queue apc to %p", states[id].t);
             apc_enqueue(states[id].t, a, APC_TYPE_KERNEL);
+            apc_put(a);
         }
         thread_put(states[id].t);
 

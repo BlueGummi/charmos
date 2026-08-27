@@ -1,0 +1,19 @@
+#! expect: tasks[0].nightmare.perturb_opts.apc_spammer.aggression
+#! because: P5 exposes only knobs that its service bodies consume
+[suite]
+name = "unknown_perturb_knob"
+runners = 1
+budget_hours = 1.0
+
+[build]
+
+[[tasks]]
+name = "t"
+  [tasks.boot]
+  duration_ms = 10000
+
+  [tasks.nightmare]
+  perturb = ["apc_spammer"]
+
+    [tasks.nightmare.perturb_opts.apc_spammer]
+    aggression = 0.5

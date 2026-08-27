@@ -29,12 +29,37 @@
         "migrator",
         "waker",
         "apc_spammer",
-        "idle_forcer",
         "stutter",
         "alloc_pressure",
         "inject_armer"
       ],
       "description": "Name of a harness perturbation service."
+    },
+
+    "interval_opts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "interval_us": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+
+    "stutter_opts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "period_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "gap_ms": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
     },
 
     "suite": {
@@ -253,12 +278,14 @@
           "type": "object",
           "default": {},
           "description": "Configuration options for individual perturbation services, keyed by service name. Each configured service must also be listed in 'perturb'.",
-          "propertyNames": { "$ref": "#/$defs/service" },
-          "additionalProperties": {
-            "type": "object",
-            "additionalProperties": {
-              "type": ["integer", "number", "boolean", "string"]
-            }
+          "additionalProperties": false,
+          "properties": {
+            "migrator": { "$ref": "#/$defs/interval_opts" },
+            "waker": { "$ref": "#/$defs/interval_opts" },
+            "apc_spammer": { "$ref": "#/$defs/interval_opts" },
+            "stutter": { "$ref": "#/$defs/stutter_opts" },
+            "alloc_pressure": { "$ref": "#/$defs/interval_opts" },
+            "inject_armer": { "$ref": "#/$defs/interval_opts" }
           }
         },
         "opts": {

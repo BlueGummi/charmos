@@ -88,6 +88,8 @@ void thread_exit_with_status(int status) {
     thread_or_flags(self, THREAD_FLAG_DYING);
     spin_unlock(&self->join_lock, jirql);
 
+    apc_rundown_thread(self);
+
     /* Walk into thread_wake() and take runqueue locks, woken joiners
      * can't free us, because our reference lives until the next thread drops */
     condvar_broadcast(&self->join_cv);
@@ -338,7 +340,7 @@ void thread_free(struct thread *t) {
     kfree(t->activity_stats);
     kfree(t->name);
     kfree(t->turnstile);
-    apc_free_on_thread(t);
+    apc_rundown_thread(t);
     thread_free_stack(t);
     log_site_put(t->log_site);
     kfree(t);
@@ -399,17 +401,26 @@ static void wake_thread_timer_cb(struct timer *timer) {
                 t);
 }
 
-void thread_sleep_for_ms(uint64_t ms) {
+void thread_sleep_for_us(uint64_t us) {
+    if (us == 0) {
+        scheduler_yield();
+        return;
+    }
+
     struct thread *curr = thread_get_current();
     struct timer sleep_timer;
     timer_init(&sleep_timer, wake_thread_timer_cb, curr);
-    timer_modify(&sleep_timer, timer_delta_us(MS_TO_US(ms)));
+    timer_modify(&sleep_timer, timer_delta_us(us));
 
     thread_prepare_to_sleep(curr, THREAD_SLEEP_REASON_MANUAL,
                             THREAD_WAIT_UNINTERRUPTIBLE, curr);
 
     thread_yield_until_wake_match();
     timer_delete(&sleep_timer);
+}
+
+void thread_sleep_for_ms(uint64_t ms) {
+    thread_sleep_for_us(MS_TO_US(ms));
 }
 
 void scheduler_wake_manual(struct thread *t, void *wake_src) {

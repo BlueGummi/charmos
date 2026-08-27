@@ -374,6 +374,7 @@ void thread_free(struct thread *t);
 
 void thread_init_thread_ids(void);
 void thread_sleep_for_ms(uint64_t ms);
+void thread_sleep_for_us(uint64_t us);
 void thread_exit(void);
 void thread_print(const struct thread *t);
 

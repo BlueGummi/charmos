@@ -8,6 +8,9 @@
 
 #include "lock_chk_internal.h"
 
+static_assert((LOCK_CHK_HASH_BUCKETS & (LOCK_CHK_HASH_BUCKETS - 1)) == 0,
+              "LOCK_CHK_HASH_BUCKETS must be a power of two");
+
 static size_t lock_chk_class_hash(const struct lock_chk_class *class,
                                   uint8_t subclass) {
     uintptr_t key = (uintptr_t) class;
@@ -358,7 +361,7 @@ lock_chk_calc_canonical_cycle_sig(const struct lock_chk_cycle_hop *hops,
             best_rot = i;
     }
 
-    uint64_t signature = UINT64_C(14695981039346656037);
+    uint64_t signature = HASH_FNV1A_64_OFFSET_BASIS;
     for (uint16_t step = 0; step < cycle_len; step++) {
         const struct lock_chk_cycle_hop *hop =
             &hops[(best_rot + step) % cycle_len];

@@ -13,12 +13,12 @@
 #include <time/time.h>
 
 static struct nightmare_perturb_config perturb_configs[] = {
-    {.name = "migrator"},     {.name = "waker"},   {.name = "apc_spammer"},
-    {.name = "idle_forcer"},  {.name = "stutter"}, {.name = "alloc_pressure"},
-    {.name = "inject_armer"},
+    {.name = "migrator"}, {.name = "waker"},          {.name = "apc_spammer"},
+    {.name = "stutter"},  {.name = "alloc_pressure"}, {.name = "inject_armer"},
 };
 
-static void *perturb_resolve(const char *path, size_t path_len) {
+static struct nightmare_perturb_config *
+perturb_resolve_config(const char *path, size_t path_len) {
     static const char prefix[] = "perturb.";
     if (path_len <= sizeof(prefix) - 1 ||
         strncmp(path, prefix, sizeof(prefix) - 1) != 0)
@@ -35,19 +35,34 @@ static void *perturb_resolve(const char *path, size_t path_len) {
     return NULL;
 }
 
+static void *perturb_interval_resolve(const char *path, size_t path_len) {
+    struct nightmare_perturb_config *config =
+        perturb_resolve_config(path, path_len);
+    return config && strcmp(config->name, "stutter") != 0 ? config : NULL;
+}
+
+static void *perturb_stutter_resolve(const char *path, size_t path_len) {
+    struct nightmare_perturb_config *config =
+        perturb_resolve_config(path, path_len);
+    return config && strcmp(config->name, "stutter") == 0 ? config : NULL;
+}
+
 CMDLINE_SCHEMA_DECLARE(
-    nightmare_perturb, "nightmare", "perturb.<svc>",
-    "Nightmare perturbation options", perturb_resolve,
-    CMDLINE_SCHEMA_PROP(struct nightmare_perturb_config, enabled),
+    nightmare_perturb_interval, "nightmare", "perturb.<interval-svc>",
+    "Nightmare interval perturbation options", perturb_interval_resolve,
     CMDLINE_SCHEMA_PROP(struct nightmare_perturb_config, interval_us,
-                        .types = CMDLINE_TYPES(CMDLINE_TYPE_DURATION)),
+                        .types = CMDLINE_TYPES(CMDLINE_TYPE_DURATION),
+                        .range = RANGE(US_TO_NS(1), TIME_NS_MAX)));
+
+CMDLINE_SCHEMA_DECLARE(
+    nightmare_perturb_stutter, "nightmare", "perturb.stutter",
+    "Nightmare stutter perturbation options", perturb_stutter_resolve,
     CMDLINE_SCHEMA_PROP(struct nightmare_perturb_config, period_ms,
-                        .types = CMDLINE_TYPES(CMDLINE_TYPE_DURATION)),
+                        .types = CMDLINE_TYPES(CMDLINE_TYPE_DURATION),
+                        .range = RANGE(MS_TO_NS(1), TIME_NS_MAX)),
     CMDLINE_SCHEMA_PROP(struct nightmare_perturb_config, gap_ms,
-                        .types = CMDLINE_TYPES(CMDLINE_TYPE_DURATION)),
-    CMDLINE_SCHEMA_PROP(struct nightmare_perturb_config, aggression,
-                        .types = CMDLINE_TYPES(CMDLINE_TYPE_FX),
-                        .range = RANGE(0, FX_ONE)));
+                        .types = CMDLINE_TYPES(CMDLINE_TYPE_DURATION),
+                        .range = RANGE(MS_TO_NS(1), TIME_NS_MAX)));
 
 const struct nightmare_perturb_config *
 nightmare_perturb_config_lookup(const char *name) {
@@ -59,18 +74,16 @@ nightmare_perturb_config_lookup(const char *name) {
     return NULL;
 }
 
-static inline void nightmare_perturb_delay(time_ns_t interval_us) {
-    if (interval_us >= 1000)
-        thread_sleep_for_ms(interval_us / 1000);
-    else
-        scheduler_yield();
+static inline void nightmare_perturb_delay(time_us_t interval_us) {
+    thread_sleep_for_us(interval_us);
 }
 
 void nightmare_perturb_migrator(struct nightmare_ctx *ctx,
                                 struct nightmare_worker *worker) {
     const struct nightmare_perturb_config *cfg =
         nightmare_perturb_config_lookup("migrator");
-    time_ns_t interval_us = (cfg && cfg->interval_us) ? cfg->interval_us : 200;
+    time_us_t interval_us =
+        (cfg && cfg->interval_us) ? NS_TO_US(cfg->interval_us) : 200;
 
     while (!nightmare_must_stop()) {
         if (nightmare_must_park()) {
@@ -99,7 +112,8 @@ void nightmare_perturb_waker(struct nightmare_ctx *ctx,
                              struct nightmare_worker *worker) {
     const struct nightmare_perturb_config *cfg =
         nightmare_perturb_config_lookup("waker");
-    time_ns_t interval_us = (cfg && cfg->interval_us) ? cfg->interval_us : 250;
+    time_us_t interval_us =
+        (cfg && cfg->interval_us) ? NS_TO_US(cfg->interval_us) : 250;
 
     while (!nightmare_must_stop()) {
         if (nightmare_must_park()) {
@@ -131,7 +145,8 @@ void nightmare_perturb_apc_spammer(struct nightmare_ctx *ctx,
                                    struct nightmare_worker *worker) {
     const struct nightmare_perturb_config *cfg =
         nightmare_perturb_config_lookup("apc_spammer");
-    time_ns_t interval_us = (cfg && cfg->interval_us) ? cfg->interval_us : 300;
+    time_us_t interval_us =
+        (cfg && cfg->interval_us) ? NS_TO_US(cfg->interval_us) : 300;
 
     while (!nightmare_must_stop()) {
         if (nightmare_must_park()) {
@@ -145,43 +160,14 @@ void nightmare_perturb_apc_spammer(struct nightmare_ctx *ctx,
                 &nightmare_runtime.workers[idx];
             struct thread *target_th =
                 atomic_load_explicit(&target_worker->th, memory_order_acquire);
-            if (target_th) {
+            if (target_th && thread_get(target_th)) {
                 struct apc *apc = apc_create();
                 if (apc) {
-                    apc_init(apc, nightmare_apc_probe, ctx);
+                    apc_init(apc, nightmare_apc_probe, ctx, apc_destroy_free);
                     apc_enqueue(target_th, apc, APC_TYPE_KERNEL);
+                    apc_put(apc);
                 }
-            }
-        }
-
-        nightmare_perturb_delay(interval_us);
-    }
-}
-
-void nightmare_perturb_idle_forcer(struct nightmare_ctx *ctx,
-                                   struct nightmare_worker *worker) {
-    const struct nightmare_perturb_config *cfg =
-        nightmare_perturb_config_lookup("idle_forcer");
-    time_ns_t interval_us = (cfg && cfg->interval_us) ? cfg->interval_us : 500;
-
-    while (!nightmare_must_stop()) {
-        if (nightmare_must_park()) {
-            nightmare_park(worker);
-            continue;
-        }
-
-        if (ctx->worker_count > 0 && global.core_count > 1) {
-            uint64_t target_cpu =
-                nightmare_rand(&worker->rng) % global.core_count;
-            uint64_t dest_cpu = (target_cpu + 1) % global.core_count;
-
-            for (size_t i = 0; i < ctx->worker_count; i++) {
-                struct nightmare_worker *w = &nightmare_runtime.workers[i];
-                struct thread *t =
-                    atomic_load_explicit(&w->th, memory_order_acquire);
-                if (t) {
-                    thread_set_migration_target(t, (int64_t) dest_cpu);
-                }
+                thread_put(target_th);
             }
         }
 
@@ -194,8 +180,9 @@ void nightmare_perturb_stutter(struct nightmare_ctx *ctx,
     (void) worker;
     const struct nightmare_perturb_config *cfg =
         nightmare_perturb_config_lookup("stutter");
-    time_ns_t period_ms = (cfg && cfg->period_ms) ? cfg->period_ms : 100;
-    time_ns_t gap_ms = (cfg && cfg->gap_ms) ? cfg->gap_ms : 5;
+    time_ms_t period_ms =
+        (cfg && cfg->period_ms) ? NS_TO_MS(cfg->period_ms) : 100;
+    time_ms_t gap_ms = (cfg && cfg->gap_ms) ? NS_TO_MS(cfg->gap_ms) : 5;
 
     while (!nightmare_must_stop()) {
         thread_sleep_for_ms(period_ms);
@@ -206,23 +193,60 @@ void nightmare_perturb_stutter(struct nightmare_ctx *ctx,
         atomic_store_explicit(&nightmare_runtime.quiesce_requested, true,
                               memory_order_release);
 
-        /* Wait for all workers to park */
+        /* Wait for all subject workers to park. */
         time_ms_t deadline = time_get_ms() + (gap_ms ? gap_ms : 10);
+        bool all_subjects_parked = false;
         while (time_get_ms() < deadline && !nightmare_must_stop()) {
-            size_t parked = atomic_load_explicit(
-                &nightmare_runtime.parked_count, memory_order_acquire);
-            if (parked >= ctx->worker_count)
+            all_subjects_parked = true;
+            for (size_t i = 0; i < ctx->worker_count; i++) {
+                if (!atomic_load_explicit(&nightmare_runtime.workers[i].parked,
+                                          memory_order_acquire)) {
+                    all_subjects_parked = false;
+                    break;
+                }
+            }
+            if (all_subjects_parked)
                 break;
             scheduler_yield();
         }
 
-        /* Verify quiesce invariants if provided */
-        if (ctx->nm && ctx->nm->ops && ctx->nm->ops->quiesce_check)
-            ctx->nm->ops->quiesce_check(ctx);
+        if (nightmare_must_stop()) {
+            nightmare_record_quiesce(&(struct nightmare_quiesce_record){
+                .result = "aborted",
+                .checks = 0,
+            });
+            atomic_store_explicit(&nightmare_runtime.quiesce_requested, false,
+                                  memory_order_release);
+            break;
+        }
+
+        struct nightmare_verdict verdict = NIGHTMARE_OK;
+        uint64_t checks = 0;
+        if (!all_subjects_parked) {
+            verdict = NIGHTMARE_FAIL(
+                "quiesce_timeout",
+                "not all subject workers parked before the stutter deadline");
+        } else if (ctx->nm && ctx->nm->ops && ctx->nm->ops->quiesce_check) {
+            verdict = ctx->nm->ops->quiesce_check(ctx);
+            checks = 1;
+        }
+
+        nightmare_record_quiesce(&(struct nightmare_quiesce_record){
+            .result = nightmare_result_string(verdict.result),
+            .checks = checks,
+        });
+
+        if (verdict.result != NIGHTMARE_RESULT_OK)
+            nightmare_publish_perturb_verdict(verdict);
 
         /* Release the herd */
         atomic_store_explicit(&nightmare_runtime.quiesce_requested, false,
                               memory_order_release);
+
+        if (verdict.result != NIGHTMARE_RESULT_OK) {
+            nightmare_publish_stop(NM_STOP_FAIL);
+            break;
+        }
     }
 }
 
@@ -233,7 +257,8 @@ void nightmare_perturb_alloc_pressure(struct nightmare_ctx *ctx,
     (void) ctx;
     const struct nightmare_perturb_config *cfg =
         nightmare_perturb_config_lookup("alloc_pressure");
-    time_ns_t interval_us = (cfg && cfg->interval_us) ? cfg->interval_us : 200;
+    time_us_t interval_us =
+        (cfg && cfg->interval_us) ? NS_TO_US(cfg->interval_us) : 200;
 
     void *slots[ALLOC_PRESSURE_SLOTS] = {0};
     size_t slot_sizes[ALLOC_PRESSURE_SLOTS] = {0};
@@ -293,12 +318,18 @@ void nightmare_perturb_inject_armer(struct nightmare_ctx *ctx,
     (void) ctx;
     const struct nightmare_perturb_config *cfg =
         nightmare_perturb_config_lookup("inject_armer");
-    time_ns_t interval_us = (cfg && cfg->interval_us) ? cfg->interval_us : 500;
+    time_us_t interval_us =
+        (cfg && cfg->interval_us) ? NS_TO_US(cfg->interval_us) : 500;
 
     size_t site_count = __ekernel_inject_sites - __skernel_inject_sites;
     if (site_count == 0) {
-        while (!nightmare_must_stop())
+        while (!nightmare_must_stop()) {
+            if (nightmare_must_park()) {
+                nightmare_park(worker);
+                continue;
+            }
             thread_sleep_for_ms(50);
+        }
         return;
     }
 
@@ -323,7 +354,6 @@ static const struct nightmare_perturb_desc perturb_descs[] = {
     {.name = "migrator", .thread = nightmare_perturb_migrator},
     {.name = "waker", .thread = nightmare_perturb_waker},
     {.name = "apc_spammer", .thread = nightmare_perturb_apc_spammer},
-    {.name = "idle_forcer", .thread = nightmare_perturb_idle_forcer},
     {.name = "stutter", .thread = nightmare_perturb_stutter},
     {.name = "alloc_pressure", .thread = nightmare_perturb_alloc_pressure},
     {.name = "inject_armer", .thread = nightmare_perturb_inject_armer},

@@ -1,5 +1,6 @@
 #include <math/fixed.h>
 #include <math/fixed_extended.h>
+#include <math/hash.h>
 #include <mem/alloc.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -13,15 +14,6 @@ static uint64_t murmur_mix64(uint64_t k) {
     k *= UINT64_C(0xc4ceb9fe1a85ec53);
     k ^= k >> 33;
     return k;
-}
-
-static uint64_t fnv1a_64(const char *data, size_t len) {
-    uint64_t hash = UINT64_C(14695981039346656037);
-    for (size_t i = 0; i < len; i++) {
-        hash ^= (uint8_t) data[i];
-        hash *= UINT64_C(1099511628211);
-    }
-    return hash;
 }
 
 static uint64_t djb2_64(const char *data, size_t len) {
@@ -62,7 +54,7 @@ static void counter_decrement(uint8_t *counters, size_t idx) {
 static void compute_positions(const struct counting_bloom_filter *cbf,
                               const char *element, size_t *positions) {
     size_t len = strlen(element);
-    uint64_t h1 = fnv1a_64(element, len);
+    uint64_t h1 = hash_fnv1a_64(element, len);
     uint64_t h2 = djb2_64(element, len);
 
     for (size_t i = 0; i < cbf->num_hashes; i++) {

@@ -2,6 +2,7 @@
 
 #ifdef DEBUG_LOCK_CHK
 
+#include <math/hash.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -163,12 +164,7 @@ static inline void lock_chk_fail(struct lock_chk_failure *fail, const char *fmt,
 
 static inline uint64_t lock_chk_hash_bytes(uint64_t hash, const void *data,
                                            size_t len) {
-    const uint8_t *bytes = data;
-    for (size_t i = 0; i < len; i++) {
-        hash ^= bytes[i];
-        hash *= UINT64_C(1099511628211);
-    }
-    return hash;
+    return hash_fnv1a_64_update(hash, data, len);
 }
 
 static inline uint64_t lock_chk_hash_string(uint64_t hash, const char *str) {

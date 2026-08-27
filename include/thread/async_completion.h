@@ -55,6 +55,8 @@ static inline void async_complete(struct async_completion *ac, void *ctx) {
         struct thread *t = ac->thread;
         ac->thread = NULL;
         apc_enqueue(t, &ac->apc, APC_TYPE_KERNEL);
+        apc_put(&ac->apc);
+        thread_put(t);
     } else {
         ac->ctx = ctx;
         ac->callback(ac);
@@ -74,8 +76,9 @@ static inline void async_prepare(
                                      * callback to wake up a worker */
     enum async_completion_type type) {
     if (type == ASYNC_COMPLETION_APC) {
-        apc_init(&ac->apc, async_apc_callback_internal, ac);
+        apc_init(&ac->apc, async_apc_callback_internal, ac, NULL);
         ac->thread = thread_get_current();
+        kassert(thread_get(ac->thread));
     }
 
     ac->callback = cb;

@@ -13,7 +13,7 @@ static inline uint32_t hash_djb2(const void *key, size_t len) {
     return hash;
 }
 
-/* SDBM dadtabse */
+/* SDBM database hash */
 static inline uint32_t hash_sdbm(const void *key, size_t len) {
     const uint8_t *data = (const uint8_t *) key;
     uint32_t hash = 0;
@@ -23,7 +23,7 @@ static inline uint32_t hash_sdbm(const void *key, size_t len) {
     return hash;
 }
 
-/* Fowler-Noll-Vo */
+/* 32-bit Fowler-Noll-Vo FNV-1a */
 static inline uint32_t hash_fnv1a(const void *key, size_t len) {
     const uint8_t *data = (const uint8_t *) key;
     uint32_t hash = 2166136261U;
@@ -32,6 +32,23 @@ static inline uint32_t hash_fnv1a(const void *key, size_t len) {
         hash *= 16777619U;
     }
     return hash;
+}
+
+#define HASH_FNV1A_64_OFFSET_BASIS UINT64_C(14695981039346656037)
+#define HASH_FNV1A_64_PRIME UINT64_C(1099511628211)
+
+static inline uint64_t hash_fnv1a_64_update(uint64_t hash, const void *key,
+                                            size_t len) {
+    const uint8_t *data = (const uint8_t *) key;
+    for (size_t i = 0; i < len; i++) {
+        hash ^= data[i];
+        hash *= HASH_FNV1A_64_PRIME;
+    }
+    return hash;
+}
+
+static inline uint64_t hash_fnv1a_64(const void *key, size_t len) {
+    return hash_fnv1a_64_update(HASH_FNV1A_64_OFFSET_BASIS, key, len);
 }
 
 static inline uint32_t hash_jenkins_one_at_a_time(const void *key, size_t len) {

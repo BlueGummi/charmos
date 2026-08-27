@@ -37,7 +37,7 @@ class RenderTests(unittest.TestCase):
     def test_the_perturb_list_is_comma_separated(self) -> None:
         t = self.render()
 
-        self.assertEqual(t["nightmare.perturb"], "migrator,waker,idle_forcer,stutter")
+        self.assertEqual(t["nightmare.perturb"], "migrator,waker,stutter")
 
     def test_identity_is_passed_through_untouched(self) -> None:
         t = self.render(boot_index=12, campaign_id="run-9:2")

@@ -237,7 +237,6 @@ bool nightmare_must_park(void);
 void nightmare_park(struct nightmare_worker *worker);
 uint64_t nightmare_rand(struct nightmare_rng *rng);
 uint64_t nightmare_progress_sum_irq(void);
-struct nightmare_worker *nightmare_worker_current(void);
 void nightmare_finding_at(const struct nightmare_finding_site *site,
                           uint64_t discriminator, const char *fmt, ...)
     __printf_like(3, 4);

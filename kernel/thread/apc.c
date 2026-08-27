@@ -21,6 +21,10 @@ static inline bool thread_has_apcs(struct thread *t) {
     return t->apc_pending_mask != 0;
 }
 
+static inline enum apc_state apc_state_load(struct apc *a) {
+    return atomic_load_explicit(&a->state, memory_order_acquire);
+}
+
 static inline size_t apc_type_bit(enum apc_type t) {
     return (size_t) 1ULL << (size_t) t;
 }
@@ -126,11 +130,18 @@ static void deliver_apc_type(struct thread *t, enum apc_type type) {
             return;
         }
 
+        kassert(apc->owner == t);
+        kassert(apc_state_load(apc) == APC_STATE_QUEUED);
         apc->owner = NULL;
+        atomic_store_explicit(&apc->state, APC_STATE_EXECUTING,
+                              memory_order_release);
 
         thread_release(t, irql);
 
         apc_execute(apc);
+        atomic_store_explicit(&apc->state, APC_STATE_IDLE,
+                              memory_order_release);
+        apc_put(apc);
     }
 }
 
@@ -174,20 +185,30 @@ static void wake_if_waiting(struct thread *t) {
     scheduler_wake_manual(t, /* wake_src = */ t);
 }
 
-void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
-    if (!thread_apc_sanity_check(t))
-        return;
+bool apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
+    if (!t || !a || type >= APC_TYPE_COUNT || !thread_apc_sanity_check(t))
+        return false;
 
     bool ok;
     enum irql irql = thread_acquire(t, &ok);
     if (!ok)
-        return;
+        return false;
 
-    if (a->owner) {
+    if (!apc_get(a)) {
         thread_release(t, irql);
-        return;
+        return false;
     }
 
+    enum apc_state expected = APC_STATE_IDLE;
+    if (!atomic_compare_exchange_strong_explicit(
+            &a->state, &expected, APC_STATE_QUEUED, memory_order_acq_rel,
+            memory_order_acquire)) {
+        thread_release(t, irql);
+        apc_put(a);
+        return false;
+    }
+
+    kassert(a->owner == NULL);
     add_apc_to_thread(t, a, type);
     thread_release(t, irql);
 
@@ -198,23 +219,40 @@ void apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
         /* Not us, go wake up the other guy */
         wake_if_waiting(t);
     }
+    return true;
 }
 
 /* We can only enqueue and run from ourselves, no sync needed */
-void apc_enqueue_event_apc(struct event_apc *a, struct apc_event_desc *desc) {
+bool apc_enqueue_event_apc(struct event_apc *a, struct apc_event_desc *desc) {
     kassert(desc);
+    if (!a || !apc_get(&a->apc))
+        return false;
+
+    enum apc_state expected = APC_STATE_IDLE;
+    if (!atomic_compare_exchange_strong_explicit(
+            &a->apc.state, &expected, APC_STATE_QUEUED, memory_order_acq_rel,
+            memory_order_acquire)) {
+        apc_put(&a->apc);
+        return false;
+    }
+
     kassert(!a->apc.owner);
 
     a->desc = desc;
 
     struct thread *t = thread_get_current();
-    if (!thread_apc_sanity_check(t))
-        return;
+    if (!thread_apc_sanity_check(t)) {
+        atomic_store_explicit(&a->apc.state, APC_STATE_IDLE,
+                              memory_order_release);
+        apc_put(&a->apc);
+        return false;
+    }
 
     apc_enqueue_tail(&t->event_apcs, &a->apc);
 
     a->apc.owner = t;
     apc_set_bitmask(t, APC_TYPE_KERNEL);
+    return true;
 }
 
 static bool try_cancel_from_queue(struct thread *t, struct apc *a,
@@ -228,6 +266,8 @@ static bool try_cancel_from_queue(struct thread *t, struct apc *a,
         struct apc *next = curr->next;
 
         if (curr == a) {
+            kassert(curr->owner == t);
+            kassert(apc_state_load(curr) == APC_STATE_QUEUED);
             if (prev)
                 prev->next = next;
             else
@@ -255,11 +295,10 @@ static inline void update_pending_mask(struct thread *t, enum apc_type type) {
         atomic_fetch_and(&t->apc_pending_mask, ~apc_type_bit(type));
 }
 
-bool apc_cancel(struct apc *a) {
-    if (!a || !a->owner)
+bool apc_cancel(struct thread *t, struct apc *a) {
+    if (!t || !a)
         return false;
 
-    struct thread *t = a->owner;
     bool removed = false;
     bool ok;
     enum irql irql = thread_acquire(t, &ok);
@@ -276,6 +315,10 @@ bool apc_cancel(struct apc *a) {
     }
 
     thread_release(t, irql);
+    if (removed) {
+        atomic_store_explicit(&a->state, APC_STATE_IDLE, memory_order_release);
+        apc_put(a);
+    }
     return removed;
 }
 
@@ -287,24 +330,60 @@ struct event_apc *apc_event_apc_create(void) {
     return kmalloc(sizeof(struct event_apc));
 }
 
-void apc_init(struct apc *a, apc_func_t fn, void *arg1) {
+void apc_init(struct apc *a, apc_func_t fn, void *arg1, apc_destroy_t destroy) {
+    kassert(a);
+    kassert(fn);
     a->func = fn;
     a->ctx = arg1;
     a->next = NULL;
     a->owner = NULL;
+    refcount_init(&a->refcount, 1);
+    atomic_store_explicit(&a->state, APC_STATE_IDLE, memory_order_relaxed);
+    a->destroy = destroy;
 }
 
-void apc_event_apc_init(struct event_apc *a, apc_func_t fn, void *arg1) {
-    apc_init(&a->apc, fn, arg1);
+void apc_event_apc_init(struct event_apc *a, apc_func_t fn, void *arg1,
+                        apc_destroy_t destroy) {
+    apc_init(&a->apc, fn, arg1, destroy);
     a->execute_times = 0;
 }
 
-void apc_free_on_thread(struct thread *t) {
+bool apc_get(struct apc *a) {
+    return a && refcount_inc_not_zero(&a->refcount);
+}
+
+void apc_put(struct apc *a) {
+    kassert(a);
+    if (!refcount_dec_and_test(&a->refcount))
+        return;
+
+    kassert(apc_state_load(a) == APC_STATE_IDLE);
+    kassert(a->owner == NULL);
+    kassert(a->next == NULL);
+    if (a->destroy)
+        a->destroy(a);
+}
+
+void apc_destroy_free(struct apc *a) {
+    kfree(a);
+}
+
+static void apc_rundown_queue(struct apc_queue *queue) {
     struct apc *a;
 
-    while ((a = apc_dequeue_head(&t->event_apcs))) {
-        kfree(a);
+    while ((a = apc_dequeue_head(queue))) {
+        a->owner = NULL;
+        atomic_store_explicit(&a->state, APC_STATE_IDLE, memory_order_release);
+        apc_put(a);
     }
+}
+
+void apc_rundown_thread(struct thread *t) {
+    for (size_t type = 0; type < APC_TYPE_COUNT; type++)
+        apc_rundown_queue(&t->apc_head[type]);
+    apc_rundown_queue(&t->event_apcs);
+    apc_rundown_queue(&t->to_exec_event_apcs);
+    atomic_store_explicit(&t->apc_pending_mask, 0, memory_order_release);
 }
 
 static void bump_counters_on_queue(struct apc_queue *from,
@@ -344,6 +423,13 @@ static void bump_counters_on_queue(struct apc_queue *from,
     }
 }
 
+static void apc_execute_event(struct apc *a) {
+    kassert(apc_state_load(a) == APC_STATE_QUEUED);
+    atomic_store_explicit(&a->state, APC_STATE_EXECUTING, memory_order_release);
+    apc_execute(a);
+    atomic_store_explicit(&a->state, APC_STATE_QUEUED, memory_order_release);
+}
+
 void apc_event_signal(struct apc_event_desc *desc) {
     /* here we want to do two things: first, we identify if it is safe to
      * execute APCs. if it is, it must be guaranteed that the to_execute
@@ -367,7 +453,7 @@ void apc_event_signal(struct apc_event_desc *desc) {
          * execute */
         while (a) {
             if (container_of(a, struct event_apc, apc)->desc == desc)
-                apc_execute(a);
+                apc_execute_event(a);
 
             a = a->next;
         }
@@ -391,7 +477,7 @@ void thread_exec_event_apcs(struct thread *t) {
         kassert(eapc->execute_times);
 
         for (size_t i = 0; i < eapc->execute_times; i++)
-            apc_execute(a);
+            apc_execute_event(a);
 
         eapc->execute_times = 0;
 
@@ -426,6 +512,10 @@ void apc_enable_kernel() {
         apc_check_and_deliver(t);
 }
 
+static inline bool thread_can_exec_any_apcs(struct thread *t) {
+    return thread_can_exec_special_apcs(t) || thread_can_exec_kernel_apcs(t);
+}
+
 void thread_exec_apcs(struct thread *t) {
     if (thread_can_exec_special_apcs(t))
         deliver_apc_type(t, APC_TYPE_SPECIAL_KERNEL);
@@ -437,7 +527,7 @@ void thread_exec_apcs(struct thread *t) {
 }
 
 void apc_check_and_deliver(struct thread *t) {
-    if (!t || !thread_has_apcs(t) || !safe_to_exec_apcs())
+    if (!t || !safe_to_exec_apcs() || !thread_can_exec_any_apcs(t))
         return;
 
     if (thread_get_flags(t) & (THREAD_FLAG_EXECUTING_APC | THREAD_FLAG_DYING))

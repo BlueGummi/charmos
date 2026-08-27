@@ -22,6 +22,12 @@ struct murmur_vector {
     uint32_t expect;
 };
 
+struct hash_vector64 {
+    const char *input;
+    size_t len;
+    uint64_t expect;
+};
+
 static struct test_verdict run_vectors(const struct hash_vector *v, size_t n,
                                        uint32_t (*fn)(const void *, size_t),
                                        const char *name) {
@@ -55,6 +61,17 @@ static const struct hash_vector fnv1a_vectors[] = {
     {"ab", 2, 0x4D2505CAU},    {"abc", 3, 0x1A47E90BU},
     {"abcd", 4, 0xCE3479BDU},  {"abcde", 5, 0x749BCF08U},
     {"hello", 5, 0x4F9F2CABU}, {"hello, world", 12, 0x4D0EA41DU},
+};
+
+static const struct hash_vector64 fnv1a_64_vectors[] = {
+    {"", 0, UINT64_C(0xcbf29ce484222325)},
+    {"a", 1, UINT64_C(0xaf63dc4c8601ec8c)},
+    {"ab", 2, UINT64_C(0x089c4407b545986a)},
+    {"abc", 3, UINT64_C(0xe71fa2190541574b)},
+    {"abcd", 4, UINT64_C(0xfc179f83ee0724dd)},
+    {"abcde", 5, UINT64_C(0x6348c52d762364a8)},
+    {"hello", 5, UINT64_C(0xa430d84680aabd0b)},
+    {"hello, world", 12, UINT64_C(0x17a1a4f267be633d)},
 };
 
 static const struct hash_vector jenkins_vectors[] = {
@@ -94,6 +111,17 @@ TEST_DECLARE_UNIT(hash_known_answers, .group = TEST_GROUP(hash)) {
     RUN(hash_elf, elf_vectors);
     RUN(hash_bkdr, bkdr_vectors);
 #undef RUN
+
+    for (size_t i = 0; i < TEST_ARRAY_LEN(fnv1a_64_vectors); i++) {
+        const struct hash_vector64 *v = &fnv1a_64_vectors[i];
+        TEST_ASSERT(hash_fnv1a_64(v->input, v->len) == v->expect);
+    }
+
+    uint64_t incremental = HASH_FNV1A_64_OFFSET_BASIS;
+    incremental = hash_fnv1a_64_update(incremental, "hello", 5);
+    incremental = hash_fnv1a_64_update(incremental, ", world", 7);
+    TEST_ASSERT(incremental == hash_fnv1a_64("hello, world", 12));
+
     return TEST_SUCCESS;
 }
 

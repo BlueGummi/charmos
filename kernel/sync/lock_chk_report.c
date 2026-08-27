@@ -40,7 +40,7 @@ static const char *lock_chk_mode_name(enum lock_chk_mode mode) {
 
 static uint64_t
 lock_chk_calc_generic_sig(const struct lock_chk_failure *failure) {
-    uint64_t signature = UINT64_C(14695981039346656037);
+    uint64_t signature = HASH_FNV1A_64_OFFSET_BASIS;
     signature =
         lock_chk_hash_string(signature, lock_chk_fail_kind_name(failure->kind));
     if (failure->class != NULL) {

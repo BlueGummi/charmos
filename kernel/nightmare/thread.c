@@ -52,16 +52,6 @@ uint64_t nightmare_rand(struct nightmare_rng *rng) {
     return z ^ (z >> 31);
 }
 
-struct nightmare_worker *nightmare_worker_current(void) {
-    struct thread *current = thread_get_current();
-    for (size_t i = 0; i < nightmare_runtime.total_worker_count; i++) {
-        struct nightmare_worker *worker = &nightmare_runtime.workers[i];
-        if (atomic_load_explicit(&worker->th, memory_order_acquire) == current)
-            return worker;
-    }
-    return NULL;
-}
-
 void nightmare_thread_main(void *arg) {
     struct nightmare_worker *worker = arg;
     completion_wait(&nightmare_runtime.start);

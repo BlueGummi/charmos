@@ -18,6 +18,24 @@ TEST_DECLARE_INTEGRATION(sched_sleepy_test, .group = TEST_GROUP(sched)) {
     return TEST_SUCCESS;
 }
 
+static atomic_bool slept_for_us = false;
+
+static void micro_sleep_entry(void *arg) {
+    (void) arg;
+    thread_sleep_for_us(200);
+    atomic_store(&slept_for_us, true);
+}
+
+TEST_DECLARE_INTEGRATION(sched_micro_sleep_test, .group = TEST_GROUP(sched)) {
+    atomic_store(&slept_for_us, false);
+    struct thread *t = thread_spawn_joinable("sched_micro_sleep_test",
+                                             micro_sleep_entry, NULL);
+    TEST_ASSERT(t);
+    thread_join(t);
+    TEST_ASSERT(atomic_load(&slept_for_us));
+    return TEST_SUCCESS;
+}
+
 static atomic_bool si_apc_ran = false;
 static struct thread *si_t;
 static atomic_bool si_ok = false;
@@ -30,12 +48,16 @@ static void apc_si(void *apc) {
 
 static void apc_enqueue_thread(void *) {
     struct apc *apc = apc_create();
-    apc_init(apc, apc_si, NULL);
+    apc_init(apc, apc_si, NULL, apc_destroy_free);
 
     while (!atomic_load(&si_started))
         cpu_relax();
 
-    apc_enqueue(si_t, apc, APC_TYPE_KERNEL);
+    if (thread_get(si_t)) {
+        apc_enqueue(si_t, apc, APC_TYPE_KERNEL);
+        thread_put(si_t);
+    }
+    apc_put(apc);
 }
 
 static void sleeping_thread(void *) {

@@ -1,7 +1,5 @@
 /* @title: Nightmare perturbation */
 #pragma once
-#include <math/fixed.h>
-#include <stdbool.h>
 #include <types/types.h>
 
 struct nightmare_ctx;
@@ -9,11 +7,9 @@ struct nightmare_worker;
 
 struct nightmare_perturb_config {
     const char *name;
-    bool enabled;
     time_ns_t interval_us;
     time_ns_t period_ms;
     time_ns_t gap_ms;
-    fx32_32_t aggression;
 };
 
 struct nightmare_perturb_desc {
@@ -30,8 +26,6 @@ void nightmare_perturb_migrator(struct nightmare_ctx *ctx,
 void nightmare_perturb_waker(struct nightmare_ctx *ctx,
                              struct nightmare_worker *worker);
 void nightmare_perturb_apc_spammer(struct nightmare_ctx *ctx,
-                                   struct nightmare_worker *worker);
-void nightmare_perturb_idle_forcer(struct nightmare_ctx *ctx,
                                    struct nightmare_worker *worker);
 void nightmare_perturb_stutter(struct nightmare_ctx *ctx,
                                struct nightmare_worker *worker);

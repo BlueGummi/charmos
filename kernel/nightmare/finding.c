@@ -1,21 +1,14 @@
 #include "internal.h"
 
 #include <console/printf.h>
+#include <math/hash.h>
 #include <nightmare/record.h>
 #include <stdarg.h>
 
 #ifdef TEST_NIGHTMARE_ENABLED
-static uint64_t fnv1a_bytes(uint64_t hash, const void *data, size_t len) {
-    const uint8_t *bytes = data;
-    for (size_t i = 0; i < len; i++) {
-        hash ^= bytes[i];
-        hash *= UINT64_C(1099511628211);
-    }
-    return hash;
-}
-
 static uint64_t fnv1a_string(uint64_t hash, const char *str) {
-    return fnv1a_bytes(hash, str ? str : "", strlen(str ? str : ""));
+    const char *value = str ? str : "";
+    return hash_fnv1a_64_update(hash, value, strlen(value));
 }
 
 void nightmare_finding_at(const struct nightmare_finding_site *site,
@@ -26,14 +19,16 @@ void nightmare_finding_at(const struct nightmare_finding_site *site,
     vsnprintf(msg, (int) sizeof(msg), fmt, args);
     va_end(args);
 
-    uint64_t signature = UINT64_C(14695981039346656037);
+    uint64_t signature = HASH_FNV1A_64_OFFSET_BASIS;
     signature = fnv1a_string(signature, nightmare_runtime.ctx.nm
                                             ? nightmare_runtime.ctx.nm->name
                                             : "unknown");
     signature = fnv1a_string(signature, site->kind);
     signature = fnv1a_string(signature, site->file);
-    signature = fnv1a_bytes(signature, &site->line, sizeof(site->line));
-    signature = fnv1a_bytes(signature, &discriminator, sizeof(discriminator));
+    signature =
+        hash_fnv1a_64_update(signature, &site->line, sizeof(site->line));
+    signature =
+        hash_fnv1a_64_update(signature, &discriminator, sizeof(discriminator));
 
     char sig[24];
     char location[192];

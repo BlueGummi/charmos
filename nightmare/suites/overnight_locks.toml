@@ -38,7 +38,7 @@ max_runners = 3
   [tasks.nightmare]
   intensity = 0.75
   seed_mode = "split"         # seeded pressure, free-running subject
-  perturb   = ["migrator", "waker", "idle_forcer", "stutter"]
+  perturb   = ["migrator", "waker", "stutter"]
 
     [tasks.nightmare.perturb_opts.migrator]
     interval_us = 500

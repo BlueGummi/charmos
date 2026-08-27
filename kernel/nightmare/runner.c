@@ -297,8 +297,10 @@ static void nightmare_arm_deadlines(time_ms_t duration_ms,
 
 static uint64_t nightmare_worker_seed(const struct nightmare_ctx *ctx,
                                       size_t index) {
-    uint64_t base =
-        ctx->seed_mode == NIGHTMARE_SEED_SEEDFUL ? ctx->seed : time_get_ns();
+    bool seeded =
+        ctx->seed_mode == NIGHTMARE_SEED_SEEDFUL ||
+        (ctx->seed_mode == NIGHTMARE_SEED_SPLIT && index >= ctx->worker_count);
+    uint64_t base = seeded ? ctx->seed : time_get_ns();
     base ^= UINT64_C(0x9e3779b97f4a7c15) * (index + 1);
     struct nightmare_rng rng = {.state = base};
     return nightmare_rand(&rng);
@@ -334,9 +336,9 @@ static bool nightmare_spawn_threads(void) {
 fail:
     nightmare_publish_stop(NM_STOP_FAIL);
     complete_all(&nightmare_runtime.start);
-    for (size_t i = 0; i < created; i++) {
+    for (size_t i = created; i > 0; i--) {
         struct thread *th = atomic_load_explicit(
-            &nightmare_runtime.workers[i].th, memory_order_acquire);
+            &nightmare_runtime.workers[i - 1].th, memory_order_acquire);
         if (th)
             thread_join(th);
     }
@@ -344,7 +346,14 @@ fail:
 }
 
 static void nightmare_join_threads(void) {
-    for (size_t i = 0; i < nightmare_runtime.total_worker_count; i++) {
+    for (size_t i = nightmare_runtime.ctx.worker_count;
+         i < nightmare_runtime.total_worker_count; i++) {
+        struct thread *thread = atomic_load_explicit(
+            &nightmare_runtime.workers[i].th, memory_order_acquire);
+        if (thread)
+            thread_join(thread);
+    }
+    for (size_t i = 0; i < nightmare_runtime.ctx.worker_count; i++) {
         struct thread *thread = atomic_load_explicit(
             &nightmare_runtime.workers[i].th, memory_order_acquire);
         if (thread)
@@ -352,6 +361,36 @@ static void nightmare_join_threads(void) {
     }
     if (nightmare_runtime.heartbeat)
         thread_join(nightmare_runtime.heartbeat);
+}
+
+void nightmare_publish_perturb_verdict(struct nightmare_verdict verdict) {
+    if (verdict.result == NIGHTMARE_RESULT_OK ||
+        atomic_load_explicit(&nightmare_runtime.perturb_verdict_ready,
+                             memory_order_acquire))
+        return;
+
+    if (verdict.reason) {
+        snprintf(nightmare_runtime.perturb_reason,
+                 sizeof(nightmare_runtime.perturb_reason), "%s",
+                 verdict.reason);
+        verdict.reason = nightmare_runtime.perturb_reason;
+    }
+    if (verdict.msg) {
+        snprintf(nightmare_runtime.perturb_msg,
+                 sizeof(nightmare_runtime.perturb_msg), "%s", verdict.msg);
+        verdict.msg = nightmare_runtime.perturb_msg;
+    }
+    nightmare_runtime.perturb_verdict = verdict;
+    atomic_store_explicit(&nightmare_runtime.perturb_verdict_ready, true,
+                          memory_order_release);
+}
+
+bool nightmare_load_perturb_verdict(struct nightmare_verdict *out) {
+    if (!atomic_load_explicit(&nightmare_runtime.perturb_verdict_ready,
+                              memory_order_acquire))
+        return false;
+    *out = nightmare_runtime.perturb_verdict;
+    return true;
 }
 static void nightmare_add_perturber(const struct nightmare_perturb_desc *desc) {
     if (!desc || nightmare_runtime.perturber_count >= NIGHTMARE_MAX_PERTURBERS)
@@ -385,6 +424,8 @@ nightmare_collect_perturbers(const struct nightmare *nm,
 static struct nightmare_verdict
 nightmare_finalize_verdict(const struct nightmare *nm) {
     struct nightmare_verdict final = NIGHTMARE_OK;
+    struct nightmare_verdict perturb_verdict;
+    bool has_perturb_verdict = nightmare_load_perturb_verdict(&perturb_verdict);
     if (nm->ops && nm->ops->quiesce_check) {
         final = nm->ops->quiesce_check(&nightmare_runtime.ctx);
         nightmare_record_quiesce(&(struct nightmare_quiesce_record){
@@ -392,7 +433,9 @@ nightmare_finalize_verdict(const struct nightmare *nm) {
             .checks = 1,
         });
     }
-    if (final.result == NIGHTMARE_RESULT_OK && nm->ops && nm->ops->finish)
+    if (has_perturb_verdict)
+        final = perturb_verdict;
+    else if (final.result == NIGHTMARE_RESULT_OK && nm->ops && nm->ops->finish)
         final = nm->ops->finish(&nightmare_runtime.ctx);
 
     enum nightmare_stop stop =
@@ -425,6 +468,7 @@ void nightmare_run(void) {
         .parked_count = ATOMIC_VAR_INIT(0),
         .finding_count = ATOMIC_VAR_INIT(0),
         .terminal = ATOMIC_VAR_INIT(false),
+        .perturb_verdict_ready = ATOMIC_VAR_INIT(false),
         .stat_interval_ms = config.stat_interval_ms ? config.stat_interval_ms
                                                     : NIGHTMARE_DEFAULT_STAT_MS,
         .campaign_id = config.campaign_id,

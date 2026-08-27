@@ -16,11 +16,18 @@ SERVICES = (
     "migrator",
     "waker",
     "apc_spammer",
-    "idle_forcer",
     "stutter",
     "alloc_pressure",
     "inject_armer",
 )
+PERTURB_KNOBS = {
+    "migrator": frozenset({"interval_us"}),
+    "waker": frozenset({"interval_us"}),
+    "apc_spammer": frozenset({"interval_us"}),
+    "stutter": frozenset({"period_ms", "gap_ms"}),
+    "alloc_pressure": frozenset({"interval_us"}),
+    "inject_armer": frozenset({"interval_us"}),
+}
 
 COMPILERS = ("gcc", "clang")
 BUILD_TYPES = ("Debug", "Release", "RelWithDebInfo", "MinSizeRel")
@@ -496,6 +503,15 @@ def _nightmare_diagnostics(n: Nightmare, p: str) -> list[Diagnostic]:
                     Diagnostic(
                         f"{p}.perturb_opts.{svc}.enabled",
                         "'enabled' flag is invalid; list service in 'perturb' instead",
+                    )
+                )
+                continue
+            allowed = PERTURB_KNOBS.get(svc, frozenset())
+            if knob not in allowed:
+                d.append(
+                    Diagnostic(
+                        f"{p}.perturb_opts.{svc}.{knob}",
+                        f"unknown knob; expected one of {', '.join(sorted(allowed))}",
                     )
                 )
                 continue
