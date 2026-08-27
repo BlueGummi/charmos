@@ -1,15 +1,11 @@
-"""Nightmare Campaign Runner, execute test suites repeatedly against QEMU"""
-
 import json
 import shutil
 import subprocess
-import sys
 import time
-from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -24,14 +20,15 @@ CONFIDENT_FINDING_CAP = 5
 class CampaignError(ValueError):
     pass
 
-class CampaignStatus(str, Enum):
+
+class CampaignStatus(StrEnum):
     COMPLETED = "completed"
     INFRASTRUCTURE = "infrastructure"
     BUDGET_EXHAUSTED = "budget_exhausted"
     ABORTED = "aborted"
 
 
-class BootStatus(str, Enum):
+class BootStatus(StrEnum):
     OK = "ok"
     FINDING = "finding"
     FAIL = "fail"
@@ -94,7 +91,9 @@ class BootResult:
     reason: str
     progress: int
     findings: list[FindingRecord]
-    stat_samples: list[tuple[int, int]] = field(default_factory=list)  # (rel_time_ms, progress)
+    stat_samples: list[tuple[int, int]] = field(
+        default_factory=list
+    )  # (rel_time_ms, progress)
     raw_records: list[dict[str, Any]] = field(default_factory=list)
     crashed: bool = False
     console_log: Path | None = None
@@ -234,7 +233,9 @@ class BootScheduler:
                     task_accum[name] += task_weights[name]
 
                 chosen_name = max(candidates, key=lambda n: task_accum[n])
-                task_accum[chosen_name] -= sum(task_weights[n] for n in candidates) / len(candidates)
+                task_accum[chosen_name] -= sum(
+                    task_weights[n] for n in candidates
+                ) / len(candidates)
                 task_remaining[chosen_name] -= 1
 
                 t = task_map[chosen_name]
@@ -370,8 +371,7 @@ class BootRunner(Protocol):
         cmdline: str,
         timeout_ms: int,
         out_dir: Path,
-    ) -> BootResult:
-        ...
+    ) -> BootResult: ...
 
 
 class QemuBootRunner:
@@ -411,7 +411,9 @@ class QemuBootRunner:
             "tests",
             "--",
             *codec.build_args(manifest.suite),
-            "-DQEMU_NUMA=OFF" if manifest.suite.build.smp.total < 4 else "-DQEMU_NUMA=ON",
+            "-DQEMU_NUMA=OFF"
+            if manifest.suite.build.smp.total < 4
+            else "-DQEMU_NUMA=ON",
         ]
 
         timeout_s = max(5.0, timeout_ms / 1000.0)
@@ -432,8 +434,16 @@ class QemuBootRunner:
         except subprocess.TimeoutExpired as e:
             timed_out = True
             exit_code = R.EXIT_TIMEOUT
-            out = (e.stdout or "") if isinstance(e.stdout, str) else (e.stdout or b"").decode("utf-8", "replace")
-            err = (e.stderr or "") if isinstance(e.stderr, str) else (e.stderr or b"").decode("utf-8", "replace")
+            out = (
+                (e.stdout or "")
+                if isinstance(e.stdout, str)
+                else (e.stdout or b"").decode("utf-8", "replace")
+            )
+            err = (
+                (e.stderr or "")
+                if isinstance(e.stderr, str)
+                else (e.stderr or b"").decode("utf-8", "replace")
+            )
             console_log_path.write_text(out + err, encoding="utf-8")
         except OSError as e:
             console_log_path.write_text(f"Execution failed: {e}\n", encoding="utf-8")
@@ -456,7 +466,9 @@ class QemuBootRunner:
         crashed = False
 
         if machine_log_path.is_file():
-            for line in machine_log_path.read_text(encoding="utf-8", errors="replace").splitlines():
+            for line in machine_log_path.read_text(
+                encoding="utf-8", errors="replace"
+            ).splitlines():
                 line = line.strip()
                 if not line:
                     continue
@@ -657,15 +669,34 @@ class CampaignRunner:
                 final_progress=b_res.progress,
             )
 
-            self.clock.enforce_min_interval(task.boot.min_interval_ms, boot_start_time_s)
+            self.clock.enforce_min_interval(
+                task.boot.min_interval_ms, boot_start_time_s
+            )
 
-        completed = sum(1 for b in boots if b.status in (BootStatus.OK.value, BootStatus.FINDING.value))
+        completed = sum(
+            1
+            for b in boots
+            if b.status in (BootStatus.OK.value, BootStatus.FINDING.value)
+        )
         finding_count = sum(1 for b in boots if b.status == BootStatus.FINDING.value)
-        failed = sum(1 for b in boots if b.status in (BootStatus.FAIL.value, BootStatus.CRASH.value, BootStatus.TIMEOUT.value, BootStatus.INFRA.value))
+        failed = sum(
+            1
+            for b in boots
+            if b.status
+            in (
+                BootStatus.FAIL.value,
+                BootStatus.CRASH.value,
+                BootStatus.TIMEOUT.value,
+                BootStatus.INFRA.value,
+            )
+        )
         stalled = sum(1 for b in boots if b.status == BootStatus.STALL.value)
         skipped = sum(1 for b in boots if b.status == BootStatus.SKIP.value)
 
-        campaign_ok = (status in (CampaignStatus.COMPLETED.value, CampaignStatus.BUDGET_EXHAUSTED.value)) and (failed == 0 and stalled == 0)
+        campaign_ok = (
+            status
+            in (CampaignStatus.COMPLETED.value, CampaignStatus.BUDGET_EXHAUSTED.value)
+        ) and (failed == 0 and stalled == 0)
 
         return CampaignResult(
             campaign_id=manifest.campaign_id,
@@ -779,12 +810,14 @@ def render_markdown(result: CampaignResult) -> str:
     ]
 
     if result.findings:
-        lines.extend([
-            "## Findings",
-            "",
-            "| Signature | Tier | Kind | Site | Occurrences | Boots | Message |",
-            "|---|---|---|---|---|---|---|",
-        ])
+        lines.extend(
+            [
+                "## Findings",
+                "",
+                "| Signature | Tier | Kind | Site | Occurrences | Boots | Message |",
+                "|---|---|---|---|---|---|---|",
+            ]
+        )
         for f in result.findings:
             boots_str = ", ".join(str(b) for b in f.repro_boots[:10])
             if len(f.repro_boots) > 10:
@@ -796,12 +829,14 @@ def render_markdown(result: CampaignResult) -> str:
     else:
         lines.extend(["## Findings", "", "No findings detected in this campaign.", ""])
 
-    lines.extend([
-        "## Boots",
-        "",
-        "| Boot | Task | Seed | Duration | Exit | Status | Progress | Findings |",
-        "|---|---|---|---|---|---|---|---|",
-    ])
+    lines.extend(
+        [
+            "## Boots",
+            "",
+            "| Boot | Task | Seed | Duration | Exit | Status | Progress | Findings |",
+            "|---|---|---|---|---|---|---|---|",
+        ]
+    )
     for b in result.boots:
         seed_str = f"0x{b.seed:016x}" if b.seed is not None else "-"
         lines.append(

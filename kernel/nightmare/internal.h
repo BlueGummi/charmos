@@ -1,6 +1,7 @@
 #pragma once
 #include <console/crash.h>
 #include <nightmare/nightmare.h>
+#include <nightmare/perturb.h>
 #include <stdatomic.h>
 #include <sync/completion.h>
 #include <thread/queue.h>
@@ -42,6 +43,8 @@ struct nightmare_cmdline_config {
     bool perturb_present;
 };
 
+#define NIGHTMARE_MAX_PERTURBERS 8
+
 struct nightmare_runtime {
     struct nightmare_ctx ctx;
     _Atomic enum nightmare_stop stop;
@@ -49,6 +52,9 @@ struct nightmare_runtime {
     atomic_size_t parked_count;
     atomic_size_t finding_count;
     atomic_bool terminal;
+    size_t total_worker_count;
+    size_t perturber_count;
+    const struct nightmare_perturb_desc *perturbers[NIGHTMARE_MAX_PERTURBERS];
     struct nightmare_worker *workers;
     struct thread *heartbeat;
     struct completion start;

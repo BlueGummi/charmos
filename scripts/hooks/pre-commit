@@ -1,7 +1,8 @@
 #!/bin/bash
 #
-# 1. clang-format 
-# 2. tag review
+# 1. clang-format (C/C++ files)
+# 2. ruff format & check
+# 3. tag review
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
 GIT_DIR=$(git rev-parse --git-dir)
@@ -53,6 +54,56 @@ if [ -n "$STAGED_FILES" ]; then
                 printf '%s\n' $UNFORMATTED | xargs -P "$JOBS" -I {} clang-format --style=file -i {}
                 printf '%s\n' $UNFORMATTED | xargs git add
                 echo -e "\033[32mAll formatted and re-staged.\033[0m"
+                ;;
+            *)
+                exit 1
+                ;;
+        esac
+    fi
+fi
+
+STAGED_PY_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.py$')
+
+if [ -n "$STAGED_PY_FILES" ] && command -v ruff >/dev/null 2>&1; then
+    PY_UNFORMATTED=$(ruff format --check $STAGED_PY_FILES 2>&1 | grep "Would reformat:" | sed 's/Would reformat: //')
+
+    if [ -n "$PY_UNFORMATTED" ]; then
+        echo -e "\033[31mOops, these Python files are not formatted properly:\033[0m"
+        printf ' - %s\n' $PY_UNFORMATTED
+
+        have_tty || exit 1
+
+        printf "\033[33mFormat them with ruff? [Y/n] \033[0m"
+        ask
+        case "$REPLY" in
+            ""|y|Y|yes|Yes|YES)
+                ruff format $PY_UNFORMATTED
+                printf '%s\n' $PY_UNFORMATTED | xargs git add
+                echo -e "\033[32mAll Python files formatted and re-staged.\033[0m"
+                ;;
+            *)
+                exit 1
+                ;;
+        esac
+    fi
+
+    if ! ruff check $STAGED_PY_FILES >/dev/null 2>&1; then
+        echo -e "\033[31mOops, Python lint issues found by ruff:\033[0m"
+        ruff check $STAGED_PY_FILES
+
+        have_tty || exit 1
+
+        printf "\033[33mAttempt auto-fix with ruff? [Y/n] \033[0m"
+        ask
+        case "$REPLY" in
+            ""|y|Y|yes|Yes|YES)
+                ruff check --fix $STAGED_PY_FILES
+                printf '%s\n' $STAGED_PY_FILES | xargs git add
+                if ! ruff check $STAGED_PY_FILES; then
+                    echo -e "\033[31mRemaining lint errors must be resolved before committing.\033[0m"
+                    exit 1
+                fi
+                echo -e "\033[32mPython lint fixed and re-staged.\033[0m"
                 ;;
             *)
                 exit 1

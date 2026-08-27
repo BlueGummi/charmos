@@ -197,6 +197,13 @@ SECTIONS {
         . = ALIGN(64);
     } :data
 
+    .kernel_inject_sites : ALIGN(64) {
+        __skernel_inject_sites = .;
+        KEEP(*(.kernel_inject_sites))
+        __ekernel_inject_sites = .;
+        . = ALIGN(64);
+    } :data
+
     .kernel_syms : ALIGN(4K) {
         __skernel_syms = .;
         KEEP(*(.kernel_syms))

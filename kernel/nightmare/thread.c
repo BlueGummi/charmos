@@ -54,7 +54,7 @@ uint64_t nightmare_rand(struct nightmare_rng *rng) {
 
 struct nightmare_worker *nightmare_worker_current(void) {
     struct thread *current = thread_get_current();
-    for (size_t i = 0; i < nightmare_runtime.ctx.worker_count; i++) {
+    for (size_t i = 0; i < nightmare_runtime.total_worker_count; i++) {
         struct nightmare_worker *worker = &nightmare_runtime.workers[i];
         if (atomic_load_explicit(&worker->th, memory_order_acquire) == current)
             return worker;
@@ -66,9 +66,22 @@ void nightmare_thread_main(void *arg) {
     struct nightmare_worker *worker = arg;
     completion_wait(&nightmare_runtime.start);
 
-    if (!nightmare_must_stop() && nightmare_runtime.ctx.nm &&
-        nightmare_runtime.ctx.nm->ops && nightmare_runtime.ctx.nm->ops->worker)
-        nightmare_runtime.ctx.nm->ops->worker(&nightmare_runtime.ctx, worker);
+    if (!nightmare_must_stop()) {
+        if (worker->index < nightmare_runtime.ctx.worker_count) {
+            if (nightmare_runtime.ctx.nm && nightmare_runtime.ctx.nm->ops &&
+                nightmare_runtime.ctx.nm->ops->worker)
+                nightmare_runtime.ctx.nm->ops->worker(&nightmare_runtime.ctx,
+                                                      worker);
+        } else {
+            size_t pidx = worker->index - nightmare_runtime.ctx.worker_count;
+            if (pidx < nightmare_runtime.perturber_count &&
+                nightmare_runtime.perturbers[pidx] &&
+                nightmare_runtime.perturbers[pidx]->thread) {
+                nightmare_runtime.perturbers[pidx]->thread(
+                    &nightmare_runtime.ctx, worker);
+            }
+        }
+    }
 
     if (atomic_load_explicit(&worker->parked, memory_order_acquire)) {
         atomic_fetch_sub_explicit(&nightmare_runtime.parked_count, 1,

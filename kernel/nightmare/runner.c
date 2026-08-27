@@ -306,14 +306,19 @@ static uint64_t nightmare_worker_seed(const struct nightmare_ctx *ctx,
 
 static bool nightmare_spawn_threads(void) {
     size_t created = 0;
-    for (size_t i = 0; i < nightmare_runtime.ctx.worker_count; i++) {
+    for (size_t i = 0; i < nightmare_runtime.total_worker_count; i++) {
         struct nightmare_worker *worker = &nightmare_runtime.workers[i];
         worker->index = i;
-        worker->role = "worker";
+        if (i < nightmare_runtime.ctx.worker_count) {
+            worker->role = "worker";
+        } else {
+            size_t pidx = i - nightmare_runtime.ctx.worker_count;
+            worker->role = nightmare_runtime.perturbers[pidx]->name;
+        }
         worker->rng.state =
             nightmare_worker_seed(&nightmare_runtime.ctx, worker->index);
         struct thread *thread = thread_spawn_joinable(
-            "nightmare_%zu", nightmare_thread_main, worker, i);
+            "nightmare_%s_%zu", nightmare_thread_main, worker, worker->role, i);
         if (!thread)
             goto fail;
         atomic_store_explicit(&worker->th, thread, memory_order_release);
@@ -329,14 +334,17 @@ static bool nightmare_spawn_threads(void) {
 fail:
     nightmare_publish_stop(NM_STOP_FAIL);
     complete_all(&nightmare_runtime.start);
-    for (size_t i = 0; i < created; i++)
-        thread_join(atomic_load_explicit(&nightmare_runtime.workers[i].th,
-                                         memory_order_acquire));
+    for (size_t i = 0; i < created; i++) {
+        struct thread *th = atomic_load_explicit(
+            &nightmare_runtime.workers[i].th, memory_order_acquire);
+        if (th)
+            thread_join(th);
+    }
     return false;
 }
 
 static void nightmare_join_threads(void) {
-    for (size_t i = 0; i < nightmare_runtime.ctx.worker_count; i++) {
+    for (size_t i = 0; i < nightmare_runtime.total_worker_count; i++) {
         struct thread *thread = atomic_load_explicit(
             &nightmare_runtime.workers[i].th, memory_order_acquire);
         if (thread)
@@ -344,6 +352,60 @@ static void nightmare_join_threads(void) {
     }
     if (nightmare_runtime.heartbeat)
         thread_join(nightmare_runtime.heartbeat);
+}
+static void nightmare_add_perturber(const struct nightmare_perturb_desc *desc) {
+    if (!desc || nightmare_runtime.perturber_count >= NIGHTMARE_MAX_PERTURBERS)
+        return;
+    for (size_t i = 0; i < nightmare_runtime.perturber_count; i++) {
+        if (nightmare_runtime.perturbers[i] == desc)
+            return;
+    }
+    nightmare_runtime.perturbers[nightmare_runtime.perturber_count++] = desc;
+}
+
+static void
+nightmare_collect_perturbers(const struct nightmare *nm,
+                             const struct nightmare_cmdline_config *config) {
+    nightmare_runtime.perturber_count = 0;
+    if (nm->perturb) {
+        for (const char *const *name = nm->perturb; *name; name++)
+            nightmare_add_perturber(nightmare_perturb_lookup(*name));
+    }
+    if (config->perturb_present) {
+        for (size_t i = 0; i < config->perturb.count; i++) {
+            const char *name = NULL;
+            if (cmdline_extract_const_string(&config->perturb.items[i],
+                                             &name) == ERR_OK &&
+                name)
+                nightmare_add_perturber(nightmare_perturb_lookup(name));
+        }
+    }
+}
+
+static struct nightmare_verdict
+nightmare_finalize_verdict(const struct nightmare *nm) {
+    struct nightmare_verdict final = NIGHTMARE_OK;
+    if (nm->ops && nm->ops->quiesce_check) {
+        final = nm->ops->quiesce_check(&nightmare_runtime.ctx);
+        nightmare_record_quiesce(&(struct nightmare_quiesce_record){
+            .result = nightmare_result_string(final.result),
+            .checks = 1,
+        });
+    }
+    if (final.result == NIGHTMARE_RESULT_OK && nm->ops && nm->ops->finish)
+        final = nm->ops->finish(&nightmare_runtime.ctx);
+
+    enum nightmare_stop stop =
+        atomic_load_explicit(&nightmare_runtime.stop, memory_order_acquire);
+    if (stop == NM_STOP_STALL)
+        final = (struct nightmare_verdict){
+            .result = NIGHTMARE_RESULT_STALL,
+            .reason = "liveness",
+        };
+    else if (stop == NM_STOP_FAIL && final.result == NIGHTMARE_RESULT_OK)
+        final = NIGHTMARE_FAIL("harness", "harness requested termination");
+
+    return final;
 }
 #endif
 
@@ -429,7 +491,12 @@ void nightmare_run(void) {
         nightmare_emit_verdict(prepared, "prepare");
     }
 
-    nightmare_runtime.workers = kmalloc(nightmare_runtime.ctx.worker_count *
+    nightmare_collect_perturbers(nm, &config);
+
+    nightmare_runtime.total_worker_count =
+        nightmare_runtime.ctx.worker_count + nightmare_runtime.perturber_count;
+
+    nightmare_runtime.workers = kmalloc(nightmare_runtime.total_worker_count *
                                             sizeof(*nightmare_runtime.workers),
                                         ALLOC_FLAGS_ZERO);
     if (!nightmare_runtime.workers) {
@@ -455,26 +522,7 @@ void nightmare_run(void) {
     timer_shutdown_sync(&nightmare_runtime.soft_timer);
     timer_shutdown_sync(&nightmare_runtime.hard_timer);
 
-    struct nightmare_verdict final = NIGHTMARE_OK;
-    if (nm->ops && nm->ops->quiesce_check) {
-        final = nm->ops->quiesce_check(&nightmare_runtime.ctx);
-        nightmare_record_quiesce(&(struct nightmare_quiesce_record){
-            .result = nightmare_result_string(final.result),
-            .checks = 1,
-        });
-    }
-    if (final.result == NIGHTMARE_RESULT_OK && nm->ops && nm->ops->finish)
-        final = nm->ops->finish(&nightmare_runtime.ctx);
-
-    enum nightmare_stop stop =
-        atomic_load_explicit(&nightmare_runtime.stop, memory_order_acquire);
-    if (stop == NM_STOP_STALL)
-        final = (struct nightmare_verdict){
-            .result = NIGHTMARE_RESULT_STALL,
-            .reason = "liveness",
-        };
-    else if (stop == NM_STOP_FAIL && final.result == NIGHTMARE_RESULT_OK)
-        final = NIGHTMARE_FAIL("harness", "harness requested termination");
+    struct nightmare_verdict final = nightmare_finalize_verdict(nm);
 
     kfree(nightmare_runtime.workers);
     nightmare_runtime.workers = NULL;

@@ -24,3 +24,18 @@ struct nightmare_perturb_desc {
 const struct nightmare_perturb_config *
 nightmare_perturb_config_lookup(const char *name);
 const struct nightmare_perturb_desc *nightmare_perturb_lookup(const char *name);
+
+void nightmare_perturb_migrator(struct nightmare_ctx *ctx,
+                                struct nightmare_worker *worker);
+void nightmare_perturb_waker(struct nightmare_ctx *ctx,
+                             struct nightmare_worker *worker);
+void nightmare_perturb_apc_spammer(struct nightmare_ctx *ctx,
+                                   struct nightmare_worker *worker);
+void nightmare_perturb_idle_forcer(struct nightmare_ctx *ctx,
+                                   struct nightmare_worker *worker);
+void nightmare_perturb_stutter(struct nightmare_ctx *ctx,
+                               struct nightmare_worker *worker);
+void nightmare_perturb_alloc_pressure(struct nightmare_ctx *ctx,
+                                      struct nightmare_worker *worker);
+void nightmare_perturb_inject_armer(struct nightmare_ctx *ctx,
+                                    struct nightmare_worker *worker);
