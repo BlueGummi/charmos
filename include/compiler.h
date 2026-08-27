@@ -115,3 +115,20 @@
 
 #define CONCAT_(a, b) a##b
 #define CONCAT(a, b) CONCAT_(a, b)
+
+#define _UNUSED_1(a) ((void) (a))
+#define _UNUSED_2(a, b) ((void) (a), (void) (b))
+#define _UNUSED_3(a, b, c) ((void) (a), (void) (b), (void) (c))
+#define _UNUSED_4(a, b, c, d) ((void) (a), (void) (b), (void) (c), (void) (d))
+#define _UNUSED_5(a, b, c, d, e)                                               \
+    ((void) (a), (void) (b), (void) (c), (void) (d), (void) (e))
+#define _UNUSED_6(a, b, c, d, e, f)                                            \
+    ((void) (a), (void) (b), (void) (c), (void) (d), (void) (e), (void) (f))
+#define _UNUSED_7(a, b, c, d, e, f, g)                                         \
+    ((void) (a), (void) (b), (void) (c), (void) (d), (void) (e), (void) (f),   \
+     (void) (g))
+#define _UNUSED_8(a, b, c, d, e, f, g, h)                                      \
+    ((void) (a), (void) (b), (void) (c), (void) (d), (void) (e), (void) (f),   \
+     (void) (g), (void) (h))
+
+#define unused(...) _DISPATCH(_UNUSED, PP_NARG(__VA_ARGS__))(__VA_ARGS__)

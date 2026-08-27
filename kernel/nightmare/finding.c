@@ -51,4 +51,32 @@ void nightmare_finding_at(const struct nightmare_finding_site *site,
     atomic_fetch_add_explicit(&nightmare_runtime.finding_count, 1,
                               memory_order_relaxed);
 }
+
+void nightmare_request_external_fail(const char *kind, uint64_t discriminator,
+                                     const char *fmt, ...) {
+    if (!atomic_load_explicit(&nightmare_runtime.active, memory_order_acquire))
+        return;
+
+    char msg[256];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(msg, (int) sizeof(msg), fmt, args);
+    va_end(args);
+
+    nightmare_finding_at(
+        &(const struct nightmare_finding_site){
+            .kind = kind,
+            .tier = NIGHTMARE_TIER_CONFIDENT,
+            .file = __RELFILE__,
+            .line = __LINE__,
+        },
+        discriminator, "%s", msg);
+
+    nightmare_publish_stop(NM_STOP_FAIL);
+}
+#else
+void nightmare_request_external_fail(const char *kind, uint64_t discriminator,
+                                     const char *fmt, ...) {
+    unused(kind, discriminator, fmt);
+}
 #endif

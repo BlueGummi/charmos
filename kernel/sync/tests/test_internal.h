@@ -9,6 +9,7 @@
 #include <stdatomic.h>
 #include <string.h>
 #include <sync/mutex.h>
+#include <sync/mutex_simple.h>
 #include <sync/rcu.h>
 #include <sync/rwlock.h>
 #include <thread/apc.h>

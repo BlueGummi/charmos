@@ -56,20 +56,10 @@ void dpc_drain_local(void) {
     size_t cpu = me->id;
     struct dpc_cpu *dc = &global.dpc_data[cpu];
 
-    while (true) {
-
+    do {
         dpc_execute_all_in_queue(&dc->queue);
-
-        /* Any more? go run */
-        bool any = false;
-        if (atomic_load_explicit(&dc->queue.head, memory_order_relaxed) !=
-            NULL) {
-            any = true;
-            break;
-        }
-        if (!any)
-            break;
-    }
+    } while (atomic_load_explicit(&dc->queue.head, memory_order_relaxed) !=
+             NULL);
 
     atomic_store(&me->executing_dpcs, false);
 }

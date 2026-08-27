@@ -12,9 +12,9 @@
  * single bit within a byte, word, dword, and qword with comptime bounds check
  */
 
-#define BITLOCK_MASK(bit, ptr) ((typeof(*(ptr))) (1ULL << (bit)))
+#define BIT_SPINLOCK_MASK(bit, ptr) ((typeof(*(ptr))) (1ULL << (bit)))
 
-#define BITLOCK_CHECK(bit, ptr)                                                \
+#define BIT_SPINLOCK_CHECK(bit, ptr)                                           \
     do {                                                                       \
         static_assert(__builtin_constant_p(bit)                                \
                           ? ((size_t) (bit) < sizeof(*(ptr)) * 8)              \
@@ -26,8 +26,8 @@
 
 #define bit_spin_is_locked_raw(bit, ptr)                                       \
     ({                                                                         \
-        BITLOCK_CHECK(bit, ptr);                                               \
-        typeof(*(ptr)) __m = BITLOCK_MASK(bit, ptr);                           \
+        BIT_SPINLOCK_CHECK(bit, ptr);                                          \
+        typeof(*(ptr)) __m = BIT_SPINLOCK_MASK(bit, ptr);                      \
         (atomic_load_explicit((_Atomic typeof(*(ptr)) *) (ptr),                \
                               memory_order_relaxed) &                          \
          __m) != 0;                                                            \
@@ -35,8 +35,8 @@
 
 #define bit_spin_trylock_raw(bit, ptr)                                         \
     ({                                                                         \
-        BITLOCK_CHECK(bit, ptr);                                               \
-        typeof(*(ptr)) __m = BITLOCK_MASK(bit, ptr);                           \
+        BIT_SPINLOCK_CHECK(bit, ptr);                                          \
+        typeof(*(ptr)) __m = BIT_SPINLOCK_MASK(bit, ptr);                      \
         typeof(*(ptr)) __old = atomic_load_explicit(                           \
             (_Atomic typeof(*(ptr)) *) (ptr), memory_order_relaxed);           \
         bool __acquired = false;                                               \
@@ -51,8 +51,8 @@
 
 #define bit_spin_lock_raw(bit, ptr)                                            \
     do {                                                                       \
-        BITLOCK_CHECK(bit, ptr);                                               \
-        typeof(*(ptr)) __m = BITLOCK_MASK(bit, ptr);                           \
+        BIT_SPINLOCK_CHECK(bit, ptr);                                          \
+        typeof(*(ptr)) __m = BIT_SPINLOCK_MASK(bit, ptr);                      \
         while (true) {                                                         \
             typeof(*(ptr)) __old = atomic_load_explicit(                       \
                 (_Atomic typeof(*(ptr)) *) (ptr), memory_order_relaxed);       \
@@ -71,8 +71,8 @@
 
 #define bit_spin_unlock_raw(bit, ptr)                                          \
     do {                                                                       \
-        BITLOCK_CHECK(bit, ptr);                                               \
-        typeof(*(ptr)) __m = BITLOCK_MASK(bit, ptr);                           \
+        BIT_SPINLOCK_CHECK(bit, ptr);                                          \
+        typeof(*(ptr)) __m = BIT_SPINLOCK_MASK(bit, ptr);                      \
         typeof(*(ptr)) __not_m = (typeof(*(ptr))) (~__m);                      \
         kassert(atomic_fetch_and_explicit((_Atomic typeof(*(ptr)) *) (ptr),    \
                                           __not_m, memory_order_release) &     \

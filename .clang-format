@@ -1,5 +1,6 @@
 BasedOnStyle: LLVM
 IndentWidth: 4
+IndentPPDirectives: None
 UseTab: Never
 SpaceBeforeParens: ControlStatements
 SpaceAfterCStyleCast: true

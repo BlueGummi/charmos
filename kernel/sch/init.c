@@ -48,7 +48,7 @@ void scheduler_init(void) {
         if (!s)
             panic("Could not allocate scheduler %lu", i);
 
-        spinlock_init(&s->lock);
+        spinlock_init(&s->lock, LOCK_UNCHKD);
         rbt_init(&s->thread_rbt, scheduler_thread_get_data,
                  scheduler_cmp_threads);
         rbt_init(&s->completed_rbt, scheduler_thread_get_data,

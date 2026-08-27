@@ -47,6 +47,7 @@ struct nightmare_cmdline_config {
 
 struct nightmare_runtime {
     struct nightmare_ctx ctx;
+    atomic_bool active;
     _Atomic enum nightmare_stop stop;
     atomic_bool quiesce_requested;
     atomic_size_t parked_count;

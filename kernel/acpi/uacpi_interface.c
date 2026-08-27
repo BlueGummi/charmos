@@ -13,6 +13,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <sync/mutex.h>
+#include <sync/mutex_simple.h>
 #include <sync/spinlock.h>
 #include <thread/thread.h>
 #include <uacpi/event.h>

@@ -47,11 +47,14 @@ SLAB_SIZE_REGISTER_FOR_STRUCT(turnstile, SLAB_OBJ_ALIGN_DEFAULT);
  * turnstiles residing in the hash table.
  */
 
+LOCK_CHK_CLASS_DECLARE_LOCAL(turnstile_chain);
+
 void turnstiles_init(void) {
     global.turnstiles =
         kmalloc_or_die(sizeof(struct turnstile_hash_table), ALLOC_FLAGS_ZERO);
     for (size_t i = 0; i < TURNSTILE_HASH_SIZE; i++) {
-        spinlock_init(&global.turnstiles->heads[i].lock);
+        spinlock_init_chk(&global.turnstiles->heads[i].lock,
+                          LOCK_CHK_CLASS(turnstile_chain), LOCK_CHKD_FULL);
         INIT_LIST_HEAD(&global.turnstiles->heads[i].list);
     }
 }

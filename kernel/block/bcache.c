@@ -390,7 +390,7 @@ void *bcache_create_ent(struct block_device *disk, uint64_t lba,
         if (!ent)
             return NULL;
 
-        mutex_init(&ent->lock);
+        mutex_init(&ent->lock, LOCK_CHKD_THREAD);
 
         ent->buffer = buf;
         ent->lba = base_lba;

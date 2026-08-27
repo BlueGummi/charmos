@@ -9,6 +9,20 @@
 
 #include "internal.h"
 
+#ifdef DEBUG_LOCK_CHK
+
+#include "../sync/lock_chk_internal.h"
+
+static void scheduler_lock_chk_assert(void) {
+    lock_chk_assert_schedulable(LOCK_CHK_SITE_HERE());
+}
+
+#else
+
+static void scheduler_lock_chk_assert(void) {}
+
+#endif
+
 /* We will perform scheduler period operations on thread load */
 
 struct scheduler_data scheduler_data = {
@@ -371,6 +385,7 @@ void scheduler_yield() {
     if (scheduler_self_in_resched() || scheduler_preemption_disabled())
         return;
 
+    scheduler_lock_chk_assert();
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     scheduler_mark_self_in_resched(true);
 

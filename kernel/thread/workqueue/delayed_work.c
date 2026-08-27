@@ -3,10 +3,12 @@
 
 static void delayed_work_timer_cb(struct timer *t) {
     struct delayed_work *dwork = t->data;
-    if (dwork->wq)
+    if (dwork->wq) {
         workqueue_enqueue(dwork->wq, &dwork->work);
-    else
-        (void) workqueue_add(&dwork->work);
+    } else {
+        enum workqueue_error err = workqueue_add(&dwork->work);
+        unused(err);
+    }
 }
 
 void delayed_work_init(struct delayed_work *dwork, work_function fn,

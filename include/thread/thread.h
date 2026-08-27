@@ -17,6 +17,7 @@
 #include <structures/pairing_heap.h>
 #include <structures/rbt.h>
 #include <sync/condvar.h>
+#include <sync/lock_chk_types.h>
 #include <sync/spinlock.h>
 #include <thread/apc_types.h>
 #include <thread/thread_types.h>
@@ -305,6 +306,12 @@ struct thread {
     _Atomic(struct turnstile *) blocked_ts; /* what am I blocked on */
 
     struct climb_thread_state climb_state;
+
+#ifdef DEBUG_LOCK_CHK
+
+    struct lock_chk_thread_data lock_chk;
+
+#endif
 
     /* ========== APC data ========== */
     /* Standard APC queues */

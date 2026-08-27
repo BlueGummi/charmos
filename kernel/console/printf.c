@@ -16,7 +16,8 @@
 void vprintf(struct printf_cursor *csr, const char *format, va_list args);
 struct flanterm_context;
 
-struct spinlock k_printf_lock = SPINLOCK_INIT;
+/* The panic console may deliberately bypass normal ownership and ordering. */
+struct spinlock k_printf_lock = SPINLOCK_INIT_CHK(NULL, LOCK_UNCHKD);
 struct flanterm_context *ft_ctx;
 
 struct printf_cursor {
@@ -512,7 +513,7 @@ void printf(const char *format, ...) {
     bool lock = !atomic_load_explicit(&global.panicked, memory_order_relaxed);
 
     if (lock)
-        spin_lock_raw(&k_printf_lock);
+        raw_spin_lock(&k_printf_lock.raw);
 
     va_list args;
     va_start(args, format);
@@ -520,7 +521,7 @@ void printf(const char *format, ...) {
     va_end(args);
 
     if (lock)
-        spin_unlock_raw(&k_printf_lock);
+        raw_spin_unlock(&k_printf_lock.raw);
 
     if (i)
         enable_interrupts();

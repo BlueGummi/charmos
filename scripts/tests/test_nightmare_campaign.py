@@ -38,6 +38,7 @@ def create_sample_suite(
             "budget_hours": budget_hours,
             "runners": runners,
         },
+        "build": {},
         "tasks": tasks,
     }
     return NS.from_dict(doc, source="inline")

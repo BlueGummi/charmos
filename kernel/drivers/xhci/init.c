@@ -351,7 +351,7 @@ struct xhci_device *xhci_device_create(void *mmio) {
         p->speed = speed;
         p->dev = dev;
         p->port_id = (i + 1);
-        spinlock_init(&p->update_lock);
+        spinlock_init(&p->update_lock, LOCK_UNCHKD);
     }
 
     for (size_t i = 0; i < XHCI_SLOT_COUNT; i++) {

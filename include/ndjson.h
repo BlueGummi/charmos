@@ -36,6 +36,7 @@
 #define NDJSON_DOMAIN_ASAN "asan"
 #define NDJSON_DOMAIN_SELFTEST "selftest"
 #define NDJSON_DOMAIN_NIGHTMARE "nightmare"
+#define NDJSON_DOMAIN_LOCK_CHK "lock_chk"
 
 #define NDJSON_KIND_SCHEMA "schema"
 #define NDJSON_KIND_BYE "bye"

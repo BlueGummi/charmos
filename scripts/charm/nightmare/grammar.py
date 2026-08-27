@@ -63,6 +63,16 @@ def uint(value: int) -> str:
     return str(value)
 
 
+def parse_uint(text: str | int) -> int:
+    try:
+        val = int(text, 0) if isinstance(text, str) else int(text)
+    except ValueError as e:
+        raise GrammarError(f"{text!r} is not an integer") from e
+    if not 0 <= val <= 0xFFFFFFFFFFFFFFFF:
+        raise GrammarError(f"{val} does not fit in u64")
+    return val
+
+
 def hex_u64(value: int) -> str:
     if not 0 <= value <= 0xFFFFFFFFFFFFFFFF:
         raise GrammarError(f"{value} does not fit in u64")

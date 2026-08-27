@@ -1,7 +1,6 @@
 #include <sch/sched.h>
 #include <stddef.h>
 #include <sync/mutex.h>
-#include <sync/spinlock.h>
 #include <sync/turnstile.h>
 #include <thread/thread.h>
 #include <time/spin_sleep.h>
@@ -10,83 +9,127 @@
 #include "lock_general_internal.h"
 #include "mutex_internal.h"
 
-static bool try_acquire_simple_mutex(struct mutex_simple *m,
-                                     struct thread *curr) {
-    enum irql irql = spin_lock(&m->lock);
-    if (m->owner == NULL) {
-        m->owner = curr;
-        spin_unlock(&m->lock, irql);
-        return true;
-    }
-    spin_unlock(&m->lock, irql);
-    return false;
+#ifdef DEBUG_LOCK_CHK
+
+#include "lock_chk_internal.h"
+
+struct mutex_chk_acquire_state {
+    struct lock_chk_acquire_request request;
+    struct lock_chk_acquire_token token;
+};
+
+struct mutex_chk_release_state {
+    struct lock_chk_release_request request;
+    struct lock_chk_release_token token;
+};
+
+static void mutex_chk_before_lock(struct mutex_chk_acquire_state *state,
+                                  struct mutex *mutex, unsigned int subclass,
+                                  const struct lock_chk_site *site) {
+    lock_chk_note_lock_use(mutex->chk_initialized, mutex->chk_flags,
+                           &mutex->chk_used, false, false);
+    state->request = lock_chk_acquire_request_make(
+        &mutex->chk_map, mutex, site, mutex->chk_flags, LOCK_CHK_TYPE_MUTEX,
+        LOCK_CHK_MODE_EXCLUSIVE, LOCK_CHK_WAIT_BLOCKING, subclass, false,
+        false);
+    lock_chk_before_acquire(&state->token, &state->request);
 }
 
-static bool should_spin_on_mutex(struct mutex_simple *m) {
-    enum irql irql = spin_lock(&m->lock);
-    struct thread *owner = m->owner;
-    bool active = owner && atomic_load(&owner->state) == THREAD_STATE_RUNNING;
-    spin_unlock(&m->lock, irql);
-    return active;
+static void mutex_chk_locked(struct mutex_chk_acquire_state *state) {
+    lock_chk_acquired(&state->token);
 }
 
-static bool spin_wait_simple_mutex(struct mutex_simple *m,
-                                   struct thread *curr) {
-    for (int i = 0; i < 500; i++)
-        if (try_acquire_simple_mutex(m, curr))
-            return true;
-
-    return false;
+static void mutex_chk_before_unlock(struct mutex_chk_release_state *state,
+                                    struct mutex *mutex,
+                                    const struct lock_chk_site *site) {
+    state->request = lock_chk_release_request_make(
+        &mutex->chk_map, mutex, site, mutex->chk_flags, LOCK_CHK_TYPE_MUTEX,
+        LOCK_CHK_MODE_EXCLUSIVE);
+    lock_chk_before_release(&state->token, &state->request);
 }
 
-static void block_on_simple_mutex(struct mutex_simple *m) {
-    enum irql irql = spin_lock(&m->lock);
-    thread_block_on(&m->waiters, THREAD_WAIT_UNINTERRUPTIBLE, m);
-    spin_unlock(&m->lock, irql);
-    scheduler_yield();
+static void mutex_chk_unlocked(struct mutex_chk_release_state *state) {
+    lock_chk_released(&state->token);
 }
 
-void mutex_simple_lock(struct mutex_simple *m) {
-    struct thread *curr = thread_get_current();
-
-    while (true) {
-        if (try_acquire_simple_mutex(m, curr))
-            return;
-
-        if (should_spin_on_mutex(m))
-            if (spin_wait_simple_mutex(m, curr))
-                return;
-
-        block_on_simple_mutex(m);
-    }
+static void mutex_chk_state_init(struct mutex *mtx,
+                                 const struct lock_chk_class *class,
+                                 enum lock_chk_flags flags) {
+    kassert((flags & ~LOCK_CHKD_FULL) == 0);
+    kassert(flags == LOCK_UNCHKD || class != NULL);
+    mtx->chk_flags = flags;
+    mtx->chk_initialized = true;
+    atomic_store_explicit(&mtx->chk_used, false, memory_order_relaxed);
+    lock_chk_map_runtime_init(&mtx->chk_map, class);
 }
 
-void mutex_simple_unlock(struct mutex_simple *m) {
-    struct thread *curr = thread_get_current();
-
-    enum irql irql = spin_lock(&m->lock);
-
-    if (m->owner != curr) {
-        panic("mutex unlock by non-owner thread");
-    }
-
-    m->owner = NULL;
-
-    struct thread *next = thread_queue_pop_front(&m->waiters);
-    if (next != NULL)
-        thread_wake(next, THREAD_WAKE_REASON_BLOCKING_MANUAL,
-                    next->perceived_prio_class, m);
-
-    spin_unlock(&m->lock, irql);
+void mutex_set_chk_flags(struct mutex *mtx, enum lock_chk_flags flags) {
+    kassert(mtx->chk_initialized);
+    kassert(!mutex_held(mtx));
+    kassert(!atomic_load_explicit(&mtx->chk_used, memory_order_relaxed));
+    kassert((flags & ~LOCK_CHKD_FULL) == 0);
+    mtx->chk_flags = flags;
 }
 
-void mutex_simple_init(struct mutex_simple *m) {
-    spinlock_init(&m->lock);
-    thread_queue_init(&m->waiters);
+void mutex_reinit_chk(struct mutex *mtx, const struct lock_chk_class *class,
+                      enum lock_chk_flags flags) {
+    kassert(mtx->chk_initialized);
+    kassert(!mutex_held(mtx));
+    mutex_init_chk_internal(mtx, class, flags);
 }
 
-void mutex_init(struct mutex *mtx) {
-    mtx->lock_word = 0;
+#else /* !defined(DEBUG_LOCK_CHK) */
+
+struct mutex_chk_acquire_state {
+    bool unused;
+};
+
+struct mutex_chk_release_state {
+    bool unused;
+};
+
+static void mutex_chk_before_lock(struct mutex_chk_acquire_state *state,
+                                  struct mutex *mutex, unsigned int subclass,
+                                  const struct lock_chk_site *site) {
+    unused(state, mutex, subclass, site);
+}
+
+static void mutex_chk_locked(struct mutex_chk_acquire_state *state) {
+    unused(state);
+}
+
+static void mutex_chk_before_unlock(struct mutex_chk_release_state *state,
+                                    struct mutex *mutex,
+                                    const struct lock_chk_site *site) {
+    unused(state, mutex, site);
+}
+
+static void mutex_chk_unlocked(struct mutex_chk_release_state *state) {
+    unused(state);
+}
+
+static void mutex_chk_state_init(struct mutex *mtx,
+                                 const struct lock_chk_class *class,
+                                 enum lock_chk_flags flags) {
+    unused(mtx, class, flags);
+}
+
+void mutex_set_chk_flags(struct mutex *mtx, enum lock_chk_flags flags) {
+    unused(mtx, flags);
+}
+
+void mutex_reinit_chk(struct mutex *mtx, const struct lock_chk_class *class,
+                      enum lock_chk_flags flags) {
+    mutex_init_chk_internal(mtx, class, flags);
+}
+
+#endif /* DEBUG_LOCK_CHK */
+
+void mutex_init_chk_internal(struct mutex *mtx,
+                             const struct lock_chk_class *class,
+                             enum lock_chk_flags flags) {
+    atomic_store_explicit(&mtx->lock_word, 0, memory_order_relaxed);
+    mutex_chk_state_init(mtx, class, flags);
 }
 
 struct thread *mutex_get_owner(struct mutex *mtx) {
@@ -118,17 +161,22 @@ static bool mutex_owner_running(struct mutex *mutex) {
 
 static void mutex_sanity_check() {
     kassert(irq_in_thread_context());
-    kassert(irql_get() < IRQL_HIGH_LEVEL);
+    kassert(irql_get() <= IRQL_APC_LEVEL);
 }
 
-/* TODO: would be cool to see mutex spin/sleep stats get recorded! */
-void mutex_lock(struct mutex *mutex) {
+void mutex_lock_subclass_internal(struct mutex *mutex, unsigned int subclass,
+                                  const struct lock_chk_site *site) {
+    kassert(subclass < LOCK_CHK_MAX_SUBCLASSES);
     mutex_sanity_check();
+
+    struct mutex_chk_acquire_state chk_state;
+    mutex_chk_before_lock(&chk_state, mutex, subclass, site);
 
     struct thread *current_thread = thread_get_current();
 
     /* easy peasy nothing to do */
     if (mutex_try_lock(mutex, current_thread)) {
+        mutex_chk_locked(&chk_state);
         return;
     }
 
@@ -205,9 +253,16 @@ void mutex_lock(struct mutex *mutex) {
 
     /* hey ho! we got the mutex! */
     kassert(mutex_get_owner(mutex) == current_thread);
+    mutex_chk_locked(&chk_state);
 }
 
-void mutex_unlock(struct mutex *mutex) {
+void mutex_lock_internal(struct mutex *mutex,
+                         const struct lock_chk_site *site) {
+    mutex_lock_subclass_internal(mutex, 0, site);
+}
+
+void mutex_unlock_internal(struct mutex *mutex,
+                           const struct lock_chk_site *site) {
     mutex_sanity_check();
 
     struct thread *current_thread = thread_get_current();
@@ -220,14 +275,16 @@ void mutex_unlock(struct mutex *mutex) {
     enum irql ts_lock_irql;
     struct turnstile *ts = turnstile_lookup(mutex, &ts_lock_irql);
 
+    struct mutex_chk_release_state chk_state;
+    mutex_chk_before_unlock(&chk_state, mutex, site);
     mutex_lock_word_unlock(mutex);
+    mutex_chk_unlocked(&chk_state);
 
     /* no turnstile :) */
     if (!ts) {
         turnstile_unlock(mutex, ts_lock_irql);
     } else {
-        turnstile_wake(ts, TURNSTILE_WRITER_QUEUE,
-                       MUTEX_UNLOCK_WAKE_THREAD_COUNT(mutex), ts_lock_irql);
+        turnstile_wake(ts, TURNSTILE_WRITER_QUEUE, ts->waiters, ts_lock_irql);
     }
 }
 

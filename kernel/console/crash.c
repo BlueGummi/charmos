@@ -19,14 +19,15 @@
 #include <smp/percpu.h>
 #include <stdarg.h>
 #include <string.h>
-#include <sync/spinlock.h>
+#include <sync/raw_spinlock.h>
 #include <thread/thread.h>
 #include <time/spin_sleep.h>
 #include <time/time.h>
 
 static _Atomic int64_t crash_owner = -1;
 static _Atomic uint32_t crash_depth = 0;
-static struct spinlock crash_lock = SPINLOCK_INIT;
+/* Crash reporting cannot depend on instrumented lock state. */
+static struct raw_spinlock crash_lock = RAW_SPINLOCK_INIT;
 
 PERCPU_DECLARE(crash_quiesced, _Atomic uint32_t, NULL);
 PERCPU_DECLARE(crash_regs, struct panic_regs, NULL);
@@ -601,6 +602,7 @@ static const char *crash_source_title(enum crash_source s) {
     case CRASH_SOURCE_NMI_WATCHDOG: return "watchdog lockup";
     case CRASH_SOURCE_CPU_EXCEPTION: return "cpu exception";
     case CRASH_SOURCE_NIGHTMARE: return "nightmare finding";
+    case CRASH_SOURCE_LOCK_CHK: return "lock validator violation";
     default: return "kernel crash";
     }
 }
@@ -614,6 +616,7 @@ static const char *crash_source_name(enum crash_source s) {
     case CRASH_SOURCE_NMI_WATCHDOG: return "WATCHDOG";
     case CRASH_SOURCE_CPU_EXCEPTION: return "CPU EXCEPTION";
     case CRASH_SOURCE_NIGHTMARE: return "NIGHTMARE";
+    case CRASH_SOURCE_LOCK_CHK: return "LOCK_CHK";
     default: return "CRASH";
     }
 }
@@ -720,7 +723,7 @@ __noreturn void crash(const struct crash_context *ctx) {
     }
 
     if (depth == 0)
-        spin_lock_raw(&crash_lock);
+        raw_spin_lock(&crash_lock);
 
     int64_t unowned = -1;
     atomic_compare_exchange_strong(&crash_owner, &unowned,
@@ -766,7 +769,7 @@ __noreturn void crash(const struct crash_context *ctx) {
         log_dump_panic();
 
     if (depth == 0)
-        spin_unlock_raw(&crash_lock);
+        raw_spin_unlock(&crash_lock);
 
 #if defined(TEST_ENABLED) || defined(TEST_NIGHTMARE_ENABLED)
     ndjson_bye(QEMU_EXIT_PANIC, "crash");

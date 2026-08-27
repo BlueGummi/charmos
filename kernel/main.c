@@ -46,6 +46,7 @@
 #include <smp/smp.h>
 #include <stack_depot.h>
 #include <stdint.h>
+#include <sync/lock_chk.h>
 #include <sync/rcu.h>
 #include <sync/turnstile.h>
 #include <syscall.h>
@@ -173,6 +174,7 @@ void k_sch_main(void *nop) {
     smp_disable_all_ticks();
 
     bootstage_advance(BOOTSTAGE_LATE);
+    lock_chk_init();
 
     smp_enable_all_ticks();
 

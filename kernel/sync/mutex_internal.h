@@ -1,3 +1,4 @@
+#pragma once
 #include <crypto/prng.h>
 #include <sync/mutex.h>
 
@@ -14,17 +15,6 @@ enum mutex_bits : uintptr_t {
 #define MUTEX_BACKOFF_MAX 32768
 #define MUTEX_BACKOFF_SHIFT 1
 #define MUTEX_BACKOFF_JITTER_PCT 15 /* 15% variation of base backoff */
-
-/* At a surface level, this seems like it would be a case of the classic
- * thundering herd problem, but because mutexes cause waiters to spin
- * with jittered backoff, that is largely not a problem. There is somewhat
- * of a balance to strike here between a convoy (wake one at a time), and
- * a herd, but because we significantly favor spinning, the herd is less likely
- *
- * NOTE: if this is changed to a constant, MAKE SURE that a read of the waiter
- * count is still performed, passing a non-zero value when there are zero
- * waiters will panic the kernel, we don't allow that here */
-#define MUTEX_UNLOCK_WAKE_THREAD_COUNT(__m) turnstile_get_waiter_count(__m)
 
 static inline uintptr_t mutex_make_lock_word(struct thread *owner) {
     return ((uintptr_t) owner) | MUTEX_HELD_BIT;

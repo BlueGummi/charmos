@@ -106,15 +106,51 @@ struct seqlock {
 };
 typedef struct seqlock seqlock_t;
 
-#define SEQLOCK_INIT                                                           \
+static inline void seqlock_init_chk_internal(struct seqlock *sl,
+                                             const struct lock_chk_class *class,
+                                             enum lock_chk_flags flags) {
+    seqcount_init(&sl->seqcount);
+    spinlock_init_chk(&sl->lock, class, flags);
+}
+
+#define SEQLOCK_INIT_CHK(class_, flags_)                                       \
     (struct seqlock) {                                                         \
-        .seqcount = SEQCOUNT_INIT, .lock = SPINLOCK_INIT                       \
+        .seqcount = SEQCOUNT_INIT,                                             \
+        .lock = SPINLOCK_INIT_CHK((class_), (flags_))                          \
     }
 
-static inline void seqlock_init(struct seqlock *sl) {
-    seqcount_init(&sl->seqcount);
-    spinlock_init(&sl->lock);
-}
+#define SEQLOCK_INIT SEQLOCK_INIT_CHK(NULL, LOCK_CHKD_FULL)
+#define SEQLOCK_DEFINE(id) struct seqlock id = SEQLOCK_INIT
+#define SEQLOCK_DEFINE_CHK(id, class_, flags_)                                 \
+    struct seqlock id = SEQLOCK_INIT_CHK((class_), (flags_))
+
+#ifdef DEBUG_LOCK_CHK
+
+#define seqlock_init_chk(sl_, class_, flags_)                                  \
+    seqlock_init_chk_internal((sl_), (class_), (flags_))
+#define seqlock_init_auto_internal(sl_, flags_)                                \
+    do {                                                                       \
+        static const struct lock_chk_class __auto_class = {                    \
+            .name = #sl_,                                                      \
+            .file = __RELFILE__,                                               \
+            .line = __LINE__,                                                  \
+        };                                                                     \
+        seqlock_init_chk_internal((sl_), &__auto_class, (flags_));             \
+    } while (0)
+
+#else /* !defined(DEBUG_LOCK_CHK) */
+
+#define seqlock_init_chk(sl_, class_, flags_)                                  \
+    seqlock_init_chk_internal((sl_), NULL, LOCK_UNCHKD)
+#define seqlock_init_auto_internal(sl_, flags_)                                \
+    seqlock_init_chk_internal((sl_), NULL, LOCK_UNCHKD)
+
+#endif /* DEBUG_LOCK_CHK */
+
+#define seqlock_init_1(sl_) seqlock_init_auto_internal((sl_), LOCK_CHKD_FULL)
+#define seqlock_init_2(sl_, flags_) seqlock_init_auto_internal((sl_), (flags_))
+#define seqlock_init(...)                                                      \
+    _DISPATCH(seqlock_init, PP_NARG(__VA_ARGS__))(__VA_ARGS__)
 
 static inline uint32_t seq_begin_read(const struct seqlock *sl) {
     return seqcount_begin_read(&sl->seqcount);

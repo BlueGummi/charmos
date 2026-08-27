@@ -13,6 +13,9 @@
 
 #include "internal.h"
 
+LOCK_CHK_CLASS_DECLARE_LOCAL(workqueue_irq);
+LOCK_CHK_CLASS_DECLARE_LOCAL(workqueue_disp);
+
 enum workqueue_error workqueue_add_oneshot(work_function func,
                                            struct work_args args) {
     struct workqueue *queue = workqueue_get_least_loaded();
@@ -100,7 +103,13 @@ struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
     if (!wq)
         goto err;
 
-    spinlock_init(&wq->lock);
+    if (attrs->flags & WORKQUEUE_FLAG_ISR_SAFE) {
+        spinlock_init_chk(&wq->lock, LOCK_CHK_CLASS(workqueue_irq),
+                          LOCK_CHKD_FULL);
+    } else {
+        spinlock_init_chk(&wq->lock, LOCK_CHK_CLASS(workqueue_disp),
+                          LOCK_CHKD_FULL);
+    }
     spinlock_init(&wq->worker_array_lock);
     spinlock_init(&wq->worker_lock);
     spinlock_init(&wq->work_lock);
@@ -284,7 +293,7 @@ struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue) {
     thread_enqueue(thread);
 
     workqueue_add_worker(queue, worker);
-    queue->num_workers++;
+    atomic_fetch_add(&queue->num_workers, 1);
 
     return worker;
 }
@@ -314,10 +323,10 @@ void workqueues_permanent_init(void) {
 
         global.workqueues[i] = workqueue_create_internal(
             &attrs, /* fmt = */ NULL, /* args = */ NULL);
-        global.workqueues[i]->core = i;
-
         if (!global.workqueues[i])
             panic("Failed to spawn permanent workqueue");
+
+        global.workqueues[i]->core = i;
 
         if (!workqueue_spawn_permanent_worker(global.workqueues[i]))
             panic("Failed to spawn initial worker on workqueue %u", i);

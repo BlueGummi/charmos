@@ -1,7 +1,7 @@
 #include <asm.h>
 #include <ndjson.h>
 #include <stdatomic.h>
-#include <sync/spinlock.h>
+#include <sync/raw_spinlock.h>
 
 #include "internal.h"
 
@@ -19,7 +19,8 @@
 
 #define NDJSON_PANIC_LOCK_SPINS 1000000
 
-static struct spinlock carrier_lock = SPINLOCK_INIT;
+/* Panic transport must remain usable when normal lock validation fails. */
+static struct raw_spinlock carrier_lock = RAW_SPINLOCK_INIT;
 static uint16_t carrier_port;
 static atomic_bool carrier_up;
 static atomic_bool carrier_panicked;
@@ -47,7 +48,7 @@ bool ndjson_carrier_online(void) {
 
 void ndjson_enter_panic(void) {
     atomic_store_explicit(&carrier_panicked, true, memory_order_release);
-    spin_unlock_raw(&carrier_lock);
+    raw_spin_unlock(&carrier_lock);
 }
 
 /* Raw spinlocks here, because if something IRQL related panics,
@@ -63,19 +64,19 @@ bool ndjson_carrier_begin(bool *irqs_were_on) {
 
     if (atomic_load_explicit(&carrier_panicked, memory_order_acquire)) {
         for (uint64_t i = 0; i < NDJSON_PANIC_LOCK_SPINS; i++) {
-            if (spin_trylock_raw(&carrier_lock))
+            if (raw_spin_trylock(&carrier_lock))
                 break;
             cpu_relax();
         }
         return true;
     }
 
-    spin_lock_raw(&carrier_lock);
+    raw_spin_lock(&carrier_lock);
     return true;
 }
 
 void ndjson_carrier_end(bool irqs_were_on) {
-    spin_unlock_raw(&carrier_lock);
+    raw_spin_unlock(&carrier_lock);
 
     if (irqs_were_on)
         enable_interrupts();

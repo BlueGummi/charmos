@@ -6,10 +6,15 @@
 
 #include "sch/internal.h"
 
-#define apc_from_list_node(n) container_of(n, struct apc, list)
-
 static inline bool safe_to_exec_apcs(void) {
-    return irql_get() == IRQL_PASSIVE_LEVEL && irq_in_thread_context();
+    if (irql_get() != IRQL_PASSIVE_LEVEL || !irq_in_thread_context())
+        return false;
+
+    struct thread *curr = thread_get_current();
+    if (!curr || thread_get_state(curr) != THREAD_STATE_RUNNING)
+        return false;
+
+    return true;
 }
 
 static inline bool thread_has_apcs(struct thread *t) {
@@ -77,6 +82,8 @@ static inline bool thread_can_exec_kernel_apcs(struct thread *t) {
 }
 
 static inline bool thread_is_dying(struct thread *t) {
+    if (thread_get_flags(t) & THREAD_FLAG_DYING)
+        return true;
     enum thread_state s = thread_get_state(t);
     return s == THREAD_STATE_TERMINATED || s == THREAD_STATE_ZOMBIE;
 }
@@ -108,7 +115,8 @@ static void deliver_apc_type(struct thread *t, enum apc_type type) {
     while (true) {
         bool ok;
         enum irql irql = thread_acquire(t, &ok);
-        kassert(ok);
+        if (!ok)
+            return;
 
         struct apc *apc = apc_dequeue_head(&t->apc_head[type]);
 
@@ -432,7 +440,7 @@ void apc_check_and_deliver(struct thread *t) {
     if (!t || !thread_has_apcs(t) || !safe_to_exec_apcs())
         return;
 
-    if (thread_get_flags(t) & THREAD_FLAG_EXECUTING_APC)
+    if (thread_get_flags(t) & (THREAD_FLAG_EXECUTING_APC | THREAD_FLAG_DYING))
         return;
 
     enum irql irql = irql_raise(IRQL_APC_LEVEL);

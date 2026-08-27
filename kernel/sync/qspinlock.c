@@ -26,6 +26,18 @@ static enum qspinlock_level qspinlock_get_level() {
     return QSPINLOCK_LEVEL_IRQ;
 }
 
+static uint32_t qspinlock_exchange_tail(struct qspinlock *lock, uint32_t tail,
+                                        uint32_t val) {
+    uint32_t next;
+
+    do {
+        next = (val & ~Q_SPIN_TAIL_MASK) | tail;
+    } while (!atomic_compare_exchange_weak_explicit(
+        &lock->val, &val, next, memory_order_acq_rel, memory_order_relaxed));
+
+    return val;
+}
+
 void qspin_lock_slowpath(struct qspinlock *lock, uint32_t val) {
 
     /* No tail? Check the pending bit */
@@ -56,7 +68,7 @@ void qspin_lock_slowpath(struct qspinlock *lock, uint32_t val) {
 
     /* Fallback if not ready */
     if (unlikely(!PERCPU_READY(qnodes))) {
-        while (!qspin_trylock_raw(lock))
+        while (!qspin_trylock_physical(lock))
             cpu_relax();
         return;
     }
@@ -72,10 +84,9 @@ void qspin_lock_slowpath(struct qspinlock *lock, uint32_t val) {
     uint32_t tail =
         ((cpu + 1) << Q_SPIN_TAIL_CPU_OFFSET) | (lvl << Q_SPIN_TAIL_LVL_OFFSET);
 
-    /* Publish, get whoever was there */
-    uint32_t old_val = atomic_exchange_explicit(
-        &lock->val, tail | (val & Q_SPIN_LOCKED_PENDING_MASK),
-        memory_order_acq_rel);
+    /* Publish the tail without overwriting a concurrent locked/pending update.
+     */
+    uint32_t old_val = qspinlock_exchange_tail(lock, tail, val);
 
     uint32_t old_tail = old_val & Q_SPIN_TAIL_MASK;
     if (old_tail) {
@@ -84,8 +95,8 @@ void qspin_lock_slowpath(struct qspinlock *lock, uint32_t val) {
         uint32_t prev_idx =
             (old_tail & Q_SPIN_TAIL_LVL_MASK) >> Q_SPIN_TAIL_LVL_OFFSET;
 
-        struct qnode *prev_node =
-            PERCPU_PTR_FOR_CPU(qnodes, prev_cpu)[prev_idx];
+        struct qnode *prev_nodes = PERCPU_READ_FOR_CPU(qnodes, prev_cpu);
+        struct qnode *prev_node = &prev_nodes[prev_idx];
 
         /* Chain us up */
         atomic_store_explicit(&prev_node->next, node, memory_order_release);

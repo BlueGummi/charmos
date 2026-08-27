@@ -419,6 +419,7 @@ void nightmare_run(void) {
         .ctx = {.seed = config.seed,
                 .seed_present = config.seed_present,
                 .seed_mode = config.seed_mode},
+        .active = ATOMIC_VAR_INIT(false),
         .stop = ATOMIC_VAR_INIT(NM_RUN),
         .quiesce_requested = ATOMIC_VAR_INIT(false),
         .parked_count = ATOMIC_VAR_INIT(0),
@@ -478,6 +479,8 @@ void nightmare_run(void) {
         nightmare_emit_verdict(NIGHTMARE_SKIP(refusal),
                                nightmare_skip_string(refusal));
 
+    atomic_store_explicit(&nightmare_runtime.active, true,
+                          memory_order_release);
     nightmare_arm_deadlines(duration_ms, drain_ms);
 
     struct nightmare_verdict prepared = NIGHTMARE_OK;
@@ -523,6 +526,8 @@ void nightmare_run(void) {
     timer_shutdown_sync(&nightmare_runtime.hard_timer);
 
     struct nightmare_verdict final = nightmare_finalize_verdict(nm);
+    atomic_store_explicit(&nightmare_runtime.active, false,
+                          memory_order_release);
 
     kfree(nightmare_runtime.workers);
     nightmare_runtime.workers = NULL;

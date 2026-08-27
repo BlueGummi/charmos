@@ -33,6 +33,8 @@ static void timer_percpu_ctor(struct timer_percpu *p, cpu_id_t cpu) {
         spinlock_init(&pcpu->lock);
     }
 
+    spinlock_init(&p->lock);
+    INIT_HLIST_HEAD(&p->dpc_timers);
     dpc_init(&p->timer_dpc, timer_dpc, p);
 }
 
@@ -234,7 +236,7 @@ static int32_t timer_next_pending(struct timer_base *base, uint32_t offset,
         return pos - start;
 
     pos = bitmap_find_next_bit(base->pending_map, start, offset);
-    return pos < start ? pos + TIMER_LEVEL_SIZE - start : -1;
+    return pos < start ? (int32_t) (pos + TIMER_LEVEL_SIZE - start) : -1;
 }
 
 static void timer_recalc_next_expiration(struct timer_base *base) {

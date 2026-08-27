@@ -50,4 +50,48 @@ TEST_DECLARE_UNIT(qspinlock_pending_to_locked_math,
 
     return TEST_SUCCESS;
 }
+
+#define QSPINLOCK_CONTENTION_THREADS 12
+#define QSPINLOCK_CONTENTION_ITERS 300
+
+static struct qspinlock qspinlock_contention_lock = QSPINLOCK_INIT;
+static atomic_bool qspinlock_contention_start = false;
+static _Atomic size_t qspinlock_contention_count = 0;
+
+static void qspinlock_contention_worker(void *) {
+    while (!atomic_load(&qspinlock_contention_start))
+        cpu_relax();
+
+    for (size_t i = 0; i < QSPINLOCK_CONTENTION_ITERS; i++) {
+        enum irql irql = qspin_lock(&qspinlock_contention_lock);
+        atomic_fetch_add(&qspinlock_contention_count, 1);
+        qspin_unlock(&qspinlock_contention_lock, irql);
+    }
+}
+
+TEST_DECLARE_INTEGRATION(qspinlock_contended_handoff,
+                         .group = TEST_GROUP(qspinlock)) {
+    if (global.core_count < 2)
+        return TEST_SKIP(TEST_SKIP_NONE);
+
+    atomic_store(&qspinlock_contention_start, false);
+    atomic_store(&qspinlock_contention_count, 0);
+
+    struct thread *workers[QSPINLOCK_CONTENTION_THREADS];
+    for (size_t i = 0; i < QSPINLOCK_CONTENTION_THREADS; i++) {
+        workers[i] = thread_spawn_joinable("qspin_contend",
+                                           qspinlock_contention_worker, NULL);
+        TEST_ASSERT(workers[i]);
+    }
+
+    atomic_store(&qspinlock_contention_start, true);
+
+    for (size_t i = 0; i < QSPINLOCK_CONTENTION_THREADS; i++)
+        thread_join(workers[i]);
+
+    TEST_ASSERT(atomic_load(&qspinlock_contention_count) ==
+                QSPINLOCK_CONTENTION_THREADS * QSPINLOCK_CONTENTION_ITERS);
+
+    return TEST_SUCCESS;
+}
 #endif

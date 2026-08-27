@@ -15,7 +15,7 @@ void entropy_pool_init(struct entropy_pool *pool) {
     memset(pool->buffer, 0, ENTROPY_POOL_SIZE);
     pool->write_pos = 0;
     pool->entropy_bits = 0;
-    memset(&pool->lock, 0, sizeof(struct spinlock));
+    spinlock_init(&pool->lock);
 }
 
 void entropy_pool_add(struct entropy_pool *pool, const uint8_t *data,

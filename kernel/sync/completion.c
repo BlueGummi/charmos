@@ -6,10 +6,19 @@
 
 #define COMPLETION_ALL (UINT32_MAX / 2)
 
+LOCK_CHK_CLASS_DECLARE_LOCAL(completion_irq);
+LOCK_CHK_CLASS_DECLARE_LOCAL(completion_disp);
+
 void completion_init(struct completion *c, bool irq_disable) {
     c->done = 0;
     c->irq_disable = irq_disable;
-    spinlock_init(&c->lock);
+    if (irq_disable) {
+        spinlock_init_chk(&c->lock, LOCK_CHK_CLASS(completion_irq),
+                          LOCK_CHKD_FULL);
+    } else {
+        spinlock_init_chk(&c->lock, LOCK_CHK_CLASS(completion_disp),
+                          LOCK_CHKD_FULL);
+    }
     condvar_init(&c->cv, irq_disable);
 }
 
@@ -63,8 +72,9 @@ bool completion_wait_timeout(struct completion *c, time_ms_t timeout_ms) {
     enum irql irql = completion_lock_internal(c);
 
     while (c->done == 0) {
-        enum irql out;
-        if (!condvar_wait_timeout(&c->cv, &c->lock, timeout_ms, irql, &out)) {
+        enum wake_reason wr =
+            condvar_wait_timeout(&c->cv, &c->lock, timeout_ms, irql, &irql);
+        if (wr == WAKE_REASON_TIMEOUT && c->done == 0) {
             spin_unlock(&c->lock, irql);
             return false;
         }

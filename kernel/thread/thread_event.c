@@ -585,7 +585,7 @@ static bool block_interruptible(struct thread *t, enum thread_block_reason r,
         /*already_locked=*/false, type, /* exit_if_match = */ true);
 }
 
-static bool sleep_interruptible(struct thread *t, enum thread_block_reason r,
+static bool sleep_interruptible(struct thread *t, enum thread_sleep_reason r,
                                 enum thread_wait_type type,
                                 void *expect_wake_src) {
     return set_state_and_update_reason(
@@ -593,7 +593,7 @@ static bool sleep_interruptible(struct thread *t, enum thread_block_reason r,
         /*already_locked=*/false, type, /* exit_if_match = */ true);
 }
 
-void thread_yield_until_wake_match() {
+void thread_yield_until_wake_match(void) {
     struct thread *curr = thread_get_current();
 
     /* If our wake has matched we take the fast path down

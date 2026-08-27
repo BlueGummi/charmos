@@ -2,12 +2,6 @@
 
 #ifdef TEST_RWLOCK
 
-#define RWLOCK_REPORT_PROBLEMS()                                               \
-    test_info("rwlock tests are encountering problems and will be skipped");   \
-    return TEST_SKIP(TEST_SKIP_NONE);
-
-static struct rwlock rw_basic = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
-
 static struct rwlock rw_two_writers = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 static atomic_bool rw_two_done = false;
 

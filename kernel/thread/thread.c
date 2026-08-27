@@ -22,6 +22,30 @@
 
 #include "sch/internal.h"
 
+#ifdef DEBUG_LOCK_CHK
+
+#include "../sync/lock_chk_internal.h"
+
+static void thread_lock_chk_init(struct thread *thread) {
+    lock_chk_thread_init(thread);
+}
+
+static void thread_lock_chk_exit(struct thread *thread) {
+    lock_chk_thread_exit(thread);
+}
+
+#else
+
+static void thread_lock_chk_init(struct thread *thread) {
+    unused(thread);
+}
+
+static void thread_lock_chk_exit(struct thread *thread) {
+    unused(thread);
+}
+
+#endif
+
 SLAB_SIZE_REGISTER_FOR_STRUCT(thread, /*alignment*/ 32);
 
 #define THREAD_STACKS_HEAP_START 0xFFFFF10000000000ULL
@@ -52,6 +76,7 @@ void thread_exit_with_status(int status) {
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
 
     struct thread *self = thread_get_current();
+    thread_lock_chk_exit(self);
 
     /* Public status and the ZOMBIE state under join_lock...
      *
@@ -151,6 +176,7 @@ static struct thread *thread_init(struct thread *thread,
                                   void (*entry_point)(void *), void *arg,
                                   void *stack, size_t stack_size) {
     thread_init_activity_data(thread);
+    thread_lock_chk_init(thread);
     memset(thread->activity_stats, 0, sizeof(struct thread_activity_stats));
 
     uint64_t stack_top = (uint64_t) stack + stack_size;
