@@ -6,6 +6,7 @@
 #include <sync/completion.h>
 #include <thread/queue.h>
 #include <time/timer.h>
+#include <watchdog.h>
 
 #define nightmare_panic(fmt, ...)                                              \
     do {                                                                       \
@@ -23,8 +24,31 @@
 
 enum nightmare_on_stall : uint8_t {
     NIGHTMARE_ON_STALL_REPORT = 0,
-    NIGHTMARE_ON_STALL_SNAPSHOT,
-    NIGHTMARE_ON_STALL_TERMINAL,
+    NIGHTMARE_ON_STALL_CRASH,
+};
+
+enum nightmare_liveness_phase : uint8_t {
+    NM_LIVE_OFF = 0,
+    NM_LIVE_ARMED,
+    NM_LIVE_PENDING,
+    NM_LIVE_REPORTED,
+};
+
+struct nightmare_liveness_state {
+    struct watchdog_callback callback;
+    _Atomic enum nightmare_liveness_phase phase;
+
+    /* coordinator callback owns while armed */
+    uint64_t last_progress;
+    time_ms_t last_change_ms;
+
+    time_ms_t threshold_ms;
+    bool was_quiesced;
+
+    struct nightmare_stall_evidence pending;
+    enum nightmare_on_stall policy;
+    cpu_id_t coordinator_cpu;
+    bool registered;
 };
 
 struct nightmare_cmdline_config {
@@ -36,6 +60,7 @@ struct nightmare_cmdline_config {
     time_ms_t duration_ms;
     time_ms_t drain_grace_ms;
     time_ms_t stat_interval_ms;
+    time_ms_t stall_threshold_ms;
     enum nightmare_on_stall on_stall;
     uint64_t boot_index;
     const char *campaign_id;
@@ -73,6 +98,7 @@ struct nightmare_runtime {
 };
 
 extern struct nightmare_runtime nightmare_runtime;
+extern struct nightmare_liveness_state nightmare_liveness;
 
 void nightmare_publish_stop(enum nightmare_stop reason);
 void nightmare_cmdline_get(struct nightmare_cmdline_config *config);
@@ -84,3 +110,11 @@ const char *nightmare_result_string(enum nightmare_result result);
 const char *nightmare_skip_string(enum nightmare_skip_reason reason);
 const char *nightmare_seed_policy_string(enum nightmare_seed_policy policy);
 const char *nightmare_seed_mode_string(enum nightmare_seed_mode mode);
+bool nightmare_liveness_eval(struct nightmare_liveness_state *state,
+                             uint64_t current_progress, time_ms_t now_ms,
+                             bool quiesce_requested, bool run_active,
+                             enum nightmare_stop stop, cpu_id_t observer_cpu);
+bool nightmare_liveness_start(time_ms_t threshold_ms,
+                              enum nightmare_on_stall policy);
+void nightmare_liveness_stop(void);
+void nightmare_liveness_poll(void);

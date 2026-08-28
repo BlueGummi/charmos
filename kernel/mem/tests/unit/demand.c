@@ -75,7 +75,7 @@ static void dp_join(struct thread **t, size_t nthreads) {
 }
 
 /* 1 buffer, N threads, 1 CPU = serialized faults + preemption mid-handler */
-TEST_DECLARE_UNIT(demand_1buf_Nthreads_1cpu_test, .group = TEST_GROUP(mem),
+TEST_DECLARE_UNIT(mem, demand_1buf_Nthreads_1cpu_test,
                   TEST_INTENSITY(2, 8, 32)) {
     ABORT_IF_RAM_LOW();
 
@@ -93,7 +93,7 @@ TEST_DECLARE_UNIT(demand_1buf_Nthreads_1cpu_test, .group = TEST_GROUP(mem),
 
     dp_join(t, nthreads);
 
-    TEST_ASSERT(atomic_load(&done) == nthreads);
+    TEST_ASSERT_EQ(atomic_load(&done), nthreads);
     TEST_ASSERT(dp_verify(bufs, nbuf, pages, nthreads));
     dp_free_bufs(bufs, nbuf, pages);
     return TEST_SUCCESS;

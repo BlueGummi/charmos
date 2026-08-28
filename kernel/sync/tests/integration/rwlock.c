@@ -12,13 +12,13 @@ static void rw_two_writer_thread(void *) {
     atomic_store(&rw_two_done, true);
 }
 
-TEST_DECLARE_INTEGRATION(rwlock_two_writer_basic, .group = TEST_GROUP(rwlock)) {
+TEST_DECLARE_INTEGRATION(rwlock, rwlock_two_writer_basic) {
     atomic_store(&rw_two_done, false);
     rw_lock(&rw_two_writers, RWLOCK_ACQUIRE_WRITE);
 
     struct thread *w = thread_spawn_joinable_on_core(
         "rw_two_writer", rw_two_writer_thread, NULL, 0);
-    TEST_ASSERT(w);
+    TEST_ASSERT_NONNULL(w);
 
     scheduler_yield(); // let second writer block
 
@@ -54,7 +54,7 @@ static void rw_reader_worker(void *) {
     atomic_fetch_sub(&rw_readers_left, 1);
 }
 
-TEST_DECLARE_INTEGRATION(rwlock_many_readers, .group = TEST_GROUP(rwlock),
+TEST_DECLARE_INTEGRATION(rwlock, rwlock_many_readers,
                          TEST_INTENSITY(4, 20, 64)) {
     size_t num_readers = ctx->intensity_val ? ctx->intensity_val : 20;
     if (num_readers > RWLOCK_READER_MAX)
@@ -74,7 +74,7 @@ TEST_DECLARE_INTEGRATION(rwlock_many_readers, .group = TEST_GROUP(rwlock),
     }
 
     /* a failed spawn leaves the counter short, which this catches */
-    TEST_ASSERT(atomic_load(&rw_readers_left) == 0);
+    TEST_ASSERT_EQ(atomic_load(&rw_readers_left), 0);
 
     return TEST_SUCCESS;
 }
@@ -107,7 +107,7 @@ static void rw_mixed_worker(void *) {
     atomic_fetch_sub(&rw_mixed_left, 1);
 }
 
-TEST_DECLARE_INTEGRATION(rwlock_mixed_stress, .group = TEST_GROUP(rwlock),
+TEST_DECLARE_INTEGRATION(rwlock, rwlock_mixed_stress,
                          TEST_INTENSITY(4, 24, 64)) {
     size_t num_threads = ctx->intensity_val ? ctx->intensity_val : 24;
     if (num_threads > RWLOCK_MIXED_THREADS_MAX)
@@ -123,7 +123,7 @@ TEST_DECLARE_INTEGRATION(rwlock_mixed_stress, .group = TEST_GROUP(rwlock),
             thread_join(mixed_threads[i]);
     }
 
-    TEST_ASSERT(atomic_load(&rw_mixed_left) == 0);
+    TEST_ASSERT_EQ(atomic_load(&rw_mixed_left), 0);
 
     return TEST_SUCCESS;
 }
@@ -153,8 +153,7 @@ static void rw_chaos_worker(void *) {
     test_info("%u threads left", atomic_fetch_sub(&rw_chaos_left, 1) - 1);
 }
 
-TEST_DECLARE_INTEGRATION(rwlock_chaos, .group = TEST_GROUP(rwlock),
-                         TEST_INTENSITY(4, 24, 64)) {
+TEST_DECLARE_INTEGRATION(rwlock, rwlock_chaos, TEST_INTENSITY(4, 24, 64)) {
     size_t num_threads = ctx->intensity_val ? ctx->intensity_val : 24;
     if (num_threads > RWLOCK_CHAOS_THREADS_MAX)
         num_threads = RWLOCK_CHAOS_THREADS_MAX;
@@ -172,7 +171,7 @@ TEST_DECLARE_INTEGRATION(rwlock_chaos, .group = TEST_GROUP(rwlock),
             thread_join(workers[i]);
     }
 
-    TEST_ASSERT(atomic_load(&rw_chaos_left) == 0);
+    TEST_ASSERT_EQ(atomic_load(&rw_chaos_left), 0);
 
     return TEST_SUCCESS;
 }
@@ -226,7 +225,7 @@ static void rw_correct_worker(void *) {
     atomic_fetch_sub(&correctness_left, 1);
 }
 
-TEST_DECLARE_INTEGRATION(rwlock_correctness, .group = TEST_GROUP(rwlock),
+TEST_DECLARE_INTEGRATION(rwlock, rwlock_correctness,
                          TEST_INTENSITY(4, 16, 64)) {
     size_t num_threads = ctx->intensity_val ? ctx->intensity_val : 16;
     if (num_threads > RWLOCK_CORRECT_THREADS_MAX)
@@ -249,7 +248,7 @@ TEST_DECLARE_INTEGRATION(rwlock_correctness, .group = TEST_GROUP(rwlock),
             thread_join(workers[i]);
     }
 
-    TEST_ASSERT(atomic_load(&correctness_left) == 0);
+    TEST_ASSERT_EQ(atomic_load(&correctness_left), 0);
     TEST_ASSERT(atomic_load(&correctness_ok));
 
     return TEST_SUCCESS;

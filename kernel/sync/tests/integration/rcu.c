@@ -63,8 +63,7 @@ static void rcu_writer_thread(void *) {
               old);
 }
 
-TEST_DECLARE_INTEGRATION(rcu_test, .group = TEST_GROUP(rcu),
-                         TEST_INTENSITY(40, 50, 200)) {
+TEST_DECLARE_INTEGRATION(rcu, rcu_test, TEST_INTENSITY(40, 50, 200)) {
     rcu_test_duration_ms = ctx->intensity_val ? ctx->intensity_val : 50;
     if (rcu_test_duration_ms < 40)
         rcu_test_duration_ms = 40;
@@ -93,7 +92,7 @@ TEST_DECLARE_INTEGRATION(rcu_test, .group = TEST_GROUP(rcu),
     if (writer)
         thread_join(writer);
 
-    TEST_ASSERT(atomic_load(&rcu_reads_done) == NUM_RCU_READERS);
+    TEST_ASSERT_EQ(atomic_load(&rcu_reads_done), NUM_RCU_READERS);
 
     for (int i = 0; i < 100 && !atomic_load(&rcu_deferred_freed); i++)
         sleep_spin_ms(1);
@@ -213,7 +212,7 @@ static void rcu_stress_reclaimer(void *arg) {
     }
 }
 
-TEST_DECLARE_INTEGRATION(rcu_stress_test, .group = TEST_GROUP(rcu),
+TEST_DECLARE_INTEGRATION(rcu, rcu_stress_test,
                          TEST_INTENSITY(200, 2000, 10000)) {
     rcu_stress_duration_ms = ctx->intensity_val ? ctx->intensity_val : 2000;
     atomic_store(&stress_stop, false);
@@ -287,9 +286,9 @@ TEST_DECLARE_INTEGRATION(rcu_stress_test, .group = TEST_GROUP(rcu),
         (unsigned) atomic_load(&stress_deferred_freed));
 
     TEST_ASSERT(!atomic_load(&stress_failed));
-    TEST_ASSERT(atomic_load(&stress_deferred_freed) > 0);
-    TEST_ASSERT(atomic_load(&stress_deferred_freed) ==
-                atomic_load(&stress_replacements));
+    TEST_ASSERT_GT(atomic_load(&stress_deferred_freed), 0);
+    TEST_ASSERT_EQ(atomic_load(&stress_deferred_freed),
+                   atomic_load(&stress_replacements));
 
     struct rcu_stress_node *last = stress_shared;
     if (last) {

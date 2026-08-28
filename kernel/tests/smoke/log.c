@@ -10,7 +10,7 @@ static void log_event(const char *msg) {
     (void) msg;
 }
 
-TEST_DECLARE_SMOKE(log_test, .group = TEST_GROUP(log)) {
+TEST_DECLARE_SMOKE(log, log_test) {
     log_event("smoke test message");
     return TEST_SUCCESS;
 }

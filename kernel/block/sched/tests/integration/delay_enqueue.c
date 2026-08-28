@@ -31,8 +31,7 @@ static uint64_t runs_per_lvl[BIO_SCHED_LEVELS] = {0};
 static struct bio_request *rqs[BIO_SCHED_TEST_RUNS_MAX] = {0};
 static uint8_t *buffers[BIO_SCHED_TEST_RUNS_MAX] = {0};
 
-TEST_DECLARE_INTEGRATION(bio_sched_delay_enqueue_test,
-                         .group = TEST_GROUP(bio_sched),
+TEST_DECLARE_INTEGRATION(bio_sched, bio_sched_delay_enqueue_test,
                          TEST_INTENSITY(64, 1024, 4096)) {
     EXT2_INIT;
     ABORT_IF_RAM_LOW();
@@ -56,7 +55,8 @@ TEST_DECLARE_INTEGRATION(bio_sched_delay_enqueue_test,
         uint8_t *buf = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
         struct bio_request *rq =
             kmalloc(sizeof(struct bio_request), ALLOC_FLAGS_ZERO);
-        TEST_ASSERT(rq && buf);
+        TEST_ASSERT_NONNULL(rq);
+        TEST_ASSERT_NONNULL(buf);
         TEST_ASSERT(IS_ALIGNED((vaddr_t) buf, PAGE_SIZE));
 
         rq->disk = d;
@@ -97,7 +97,7 @@ TEST_DECLARE_INTEGRATION(bio_sched_delay_enqueue_test,
     ms = time_get_ms() - ms;
 
     char *msg = kmalloc(100);
-    TEST_ASSERT(msg);
+    TEST_ASSERT_NONNULL(msg);
     snprintf(msg, 100, "Total time spent enqueuing is %d ms", ms);
     test_info(msg);
 
@@ -112,18 +112,18 @@ TEST_DECLARE_INTEGRATION(bio_sched_delay_enqueue_test,
         else
             avg_complete_time[i] = 0;
         char *lvl_msg = kmalloc(100, ALLOC_FLAGS_ZERO);
-        TEST_ASSERT(lvl_msg);
+        TEST_ASSERT_NONNULL(lvl_msg);
         snprintf(lvl_msg, 100, "Average completion time of level %d is %d ms",
                  i, avg_complete_time[i]);
         test_info(lvl_msg);
     }
 
     char *m2 = kmalloc(100);
-    TEST_ASSERT(m2);
+    TEST_ASSERT_NONNULL(m2);
     snprintf(m2, 100, "Runs is %d, test_runs is %zu", atomic_load(&runs),
              test_runs);
     test_info(m2);
-    TEST_ASSERT(atomic_load(&runs) <= test_runs);
+    TEST_ASSERT_LE(atomic_load(&runs), test_runs);
 
     return TEST_SUCCESS;
 }

@@ -22,8 +22,7 @@ static void bio_sch_callback1(struct bio_request *req) {
     test_info("cb 1 success");
 }
 
-TEST_DECLARE_INTEGRATION(bio_sched_coalesce_test,
-                         .group = TEST_GROUP(bio_sched),
+TEST_DECLARE_INTEGRATION(bio_sched, bio_sched_coalesce_test,
                          TEST_INTENSITY(1, 2, 16)) {
     EXT2_INIT;
     struct ext2_fs *fs = root->fs_data;

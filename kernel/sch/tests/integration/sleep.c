@@ -10,10 +10,10 @@ static void sleepy_entry(void *) {
     thread_sleep_for_ms(50);
 }
 
-TEST_DECLARE_INTEGRATION(sched_sleepy_test, .group = TEST_GROUP(sched)) {
+TEST_DECLARE_INTEGRATION(sched, sched_sleepy_test) {
     struct thread *t =
         thread_spawn_joinable("sched_sleepy_test", sleepy_entry, NULL);
-    TEST_ASSERT(t);
+    TEST_ASSERT_NONNULL(t);
     thread_join(t);
     return TEST_SUCCESS;
 }
@@ -26,13 +26,48 @@ static void micro_sleep_entry(void *arg) {
     atomic_store(&slept_for_us, true);
 }
 
-TEST_DECLARE_INTEGRATION(sched_micro_sleep_test, .group = TEST_GROUP(sched)) {
+TEST_DECLARE_INTEGRATION(sched, sched_micro_sleep_test) {
     atomic_store(&slept_for_us, false);
     struct thread *t = thread_spawn_joinable("sched_micro_sleep_test",
                                              micro_sleep_entry, NULL);
-    TEST_ASSERT(t);
+    TEST_ASSERT_NONNULL(t);
     thread_join(t);
     TEST_ASSERT(atomic_load(&slept_for_us));
+    return TEST_SUCCESS;
+}
+
+static atomic_bool short_sleep_stop = false;
+static atomic_size_t short_sleep_count = 0;
+
+static void short_sleep_entry(void *arg) {
+    (void) arg;
+    for (size_t i = 0; i < 200 && !atomic_load(&short_sleep_stop); i++) {
+        thread_sleep_for_us(1);
+        atomic_fetch_add(&short_sleep_count, 1);
+    }
+}
+
+TEST_DECLARE_INTEGRATION(sched, sched_short_sleep_lost_wake_test) {
+    atomic_store(&short_sleep_stop, false);
+    atomic_store(&short_sleep_count, 0);
+
+    struct thread *t = thread_spawn_joinable("sched_short_sleep_lost_wake_test",
+                                             short_sleep_entry, NULL);
+    TEST_ASSERT_NONNULL(t);
+
+    bool joined = thread_join_timeout(t, 1000, NULL);
+    if (!joined) {
+        atomic_store(&short_sleep_stop, true);
+        thread_wake(t, THREAD_WAKE_REASON_SLEEP_TIMEOUT,
+                    t->perceived_prio_class, t);
+        thread_join(t);
+    }
+
+    if (!joined)
+        test_info("short timed sleep lost its wake after %zu cycles",
+                  atomic_load(&short_sleep_count));
+    TEST_ASSERT(joined);
+    TEST_ASSERT_EQ(200, atomic_load(&short_sleep_count));
     return TEST_SUCCESS;
 }
 
@@ -79,8 +114,7 @@ static void waking_thread(void *) {
                 si_t->perceived_prio_class, (void *) 4);
 }
 
-TEST_DECLARE_INTEGRATION(thread_sleep_interruptible_test,
-                         .group = TEST_GROUP(sched)) {
+TEST_DECLARE_INTEGRATION(sched, thread_sleep_interruptible_test) {
     if (global.core_count < 4) {
         test_info("too few cores");
         return TEST_SKIP(TEST_SKIP_NONE);
@@ -96,7 +130,9 @@ TEST_DECLARE_INTEGRATION(thread_sleep_interruptible_test,
     struct thread *enq =
         thread_spawn_joinable_on_core("si_apc_e", apc_enqueue_thread, NULL, 3);
 
-    TEST_ASSERT(si_t && waker && enq);
+    TEST_ASSERT_NONNULL(si_t);
+    TEST_ASSERT_NONNULL(waker);
+    TEST_ASSERT_NONNULL(enq);
 
     thread_join(si_t);
     thread_join(waker);

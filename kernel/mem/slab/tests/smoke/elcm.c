@@ -3,7 +3,7 @@
 
 #ifdef TEST_ELCM
 
-TEST_DECLARE_SMOKE(elcm_test, .group = TEST_GROUP(slab)) {
+TEST_DECLARE_SMOKE(slab, elcm_test) {
     struct elcm_params params = {
         .obj_alignment = 8,
         .obj_size = 938,
@@ -16,7 +16,7 @@ TEST_DECLARE_SMOKE(elcm_test, .group = TEST_GROUP(slab)) {
     };
 
     enum errno err = elcm(&params);
-    TEST_ASSERT(err == 0);
+    TEST_ASSERT_OK(err);
     return TEST_SUCCESS;
 }
 #endif

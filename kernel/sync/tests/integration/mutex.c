@@ -22,8 +22,7 @@ static void many_worker(void *) {
     atomic_fetch_sub(&many_waiter_done, 1);
 }
 
-TEST_DECLARE_INTEGRATION(mutex_many_waiters, .group = TEST_GROUP(mutex),
-                         TEST_INTENSITY(2, 10, 32)) {
+TEST_DECLARE_INTEGRATION(mutex, mutex_many_waiters, TEST_INTENSITY(2, 10, 32)) {
     size_t num_waiters = ctx->intensity_val ? ctx->intensity_val : 10;
     if (num_waiters > MUTEX_MANY_WAITER_MAX)
         num_waiters = MUTEX_MANY_WAITER_MAX;
@@ -33,7 +32,7 @@ TEST_DECLARE_INTEGRATION(mutex_many_waiters, .group = TEST_GROUP(mutex),
 
     for (size_t i = 0; i < num_waiters; i++) {
         struct thread *t = thread_create("mw", many_worker, NULL);
-        TEST_ASSERT(t);
+        TEST_ASSERT_NONNULL(t);
 
         thread_pin(t);
         thread_set_joinable(t);
@@ -44,7 +43,7 @@ TEST_DECLARE_INTEGRATION(mutex_many_waiters, .group = TEST_GROUP(mutex),
     for (size_t i = 0; i < num_waiters; i++)
         thread_join(workers[i]);
 
-    TEST_ASSERT(atomic_load(&many_waiter_done) == 0);
+    TEST_ASSERT_EQ(atomic_load(&many_waiter_done), 0);
 
     return TEST_SUCCESS;
 }
@@ -74,8 +73,7 @@ static void chaos(void *) {
 volatile struct thread *main_thread = NULL;
 struct thread *other_threads[CHAOS_THREAD_MAX] = {0};
 
-TEST_DECLARE_INTEGRATION(mutex_chaos, .group = TEST_GROUP(mutex),
-                         TEST_INTENSITY(4, 24, 64)) {
+TEST_DECLARE_INTEGRATION(mutex, mutex_chaos, TEST_INTENSITY(4, 24, 64)) {
     size_t num_threads = ctx->intensity_val ? ctx->intensity_val : 24;
     if (num_threads > CHAOS_THREAD_MAX)
         num_threads = CHAOS_THREAD_MAX;
@@ -84,13 +82,13 @@ TEST_DECLARE_INTEGRATION(mutex_chaos, .group = TEST_GROUP(mutex),
     main_thread = thread_get_current();
     for (size_t i = 0; i < num_threads; i++) {
         other_threads[i] = thread_spawn_joinable("ch", chaos, NULL);
-        TEST_ASSERT(other_threads[i]);
+        TEST_ASSERT_NONNULL(other_threads[i]);
     }
 
     for (size_t i = 0; i < num_threads; i++)
         thread_join(other_threads[i]);
 
-    TEST_ASSERT(atomic_load(&chaos_left) == 0);
+    TEST_ASSERT_EQ(atomic_load(&chaos_left), 0);
 
     return TEST_SUCCESS;
 }

@@ -75,8 +75,7 @@ static void dp_join(struct thread **t, size_t nthreads) {
 }
 
 /* 1 buffer, N threads, N CPUs = many CPUs racing for same PTEs */
-TEST_DECLARE_INTEGRATION(demand_1buf_Nthreads_Ncpu_test,
-                         .group = TEST_GROUP(mem),
+TEST_DECLARE_INTEGRATION(mem, demand_1buf_Nthreads_Ncpu_test,
                          TEST_INTENSITY_CORES(1, 1, 4, "threads/core")) {
     ABORT_IF_RAM_LOW();
 
@@ -100,7 +99,7 @@ TEST_DECLARE_INTEGRATION(demand_1buf_Nthreads_Ncpu_test,
 
     dp_join(t, nthreads);
 
-    TEST_ASSERT(atomic_load(&done) == nthreads);
+    TEST_ASSERT_EQ(atomic_load(&done), nthreads);
     TEST_ASSERT(dp_verify(bufs, nbuf, pages, nthreads));
     dp_free_bufs(bufs, nbuf, pages);
     return TEST_SUCCESS;
@@ -108,8 +107,7 @@ TEST_DECLARE_INTEGRATION(demand_1buf_Nthreads_Ncpu_test,
 
 /* N buffers, M threads (M > N), N CPUs = contention spread over multiple
  * regions */
-TEST_DECLARE_INTEGRATION(demand_Nbuf_Mthreads_Ncpu_test,
-                         .group = TEST_GROUP(mem),
+TEST_DECLARE_INTEGRATION(mem, demand_Nbuf_Mthreads_Ncpu_test,
                          TEST_INTENSITY_CORES(1, 2, 4, "threads/core")) {
     ABORT_IF_RAM_LOW();
 
@@ -136,7 +134,7 @@ TEST_DECLARE_INTEGRATION(demand_Nbuf_Mthreads_Ncpu_test,
 
     dp_join(t, nthreads);
 
-    TEST_ASSERT(atomic_load(&done) == nthreads);
+    TEST_ASSERT_EQ(atomic_load(&done), nthreads);
     TEST_ASSERT(dp_verify(bufs, nbuf, pages, nthreads));
     dp_free_bufs(bufs, nbuf, pages);
     return TEST_SUCCESS;

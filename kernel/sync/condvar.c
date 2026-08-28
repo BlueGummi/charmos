@@ -11,23 +11,26 @@ static enum irql condvar_lock_internal(struct condvar *cv,
     return spin_lock(lock);
 }
 
-static void do_block_on_queue(struct thread_queue *q, struct spinlock *lock,
-                              enum irql irql, struct condvar *cv) {
-    thread_block_on(q, THREAD_WAIT_UNINTERRUPTIBLE, cv);
+static void condvar_prepare_wait(struct condvar *cv) {
+    struct thread *curr = thread_get_current();
+    curr->wake_reason = WAKE_REASON_NONE;
+    curr->wait_cookie++;
+    thread_block_on(&cv->waiters, THREAD_WAIT_UNINTERRUPTIBLE, cv);
+}
+
+static enum wake_reason condvar_finish_wait(struct condvar *cv,
+                                            struct spinlock *lock,
+                                            enum irql irql, enum irql *out) {
     spin_unlock(lock, irql);
     thread_yield_until_wake_match();
+    *out = condvar_lock_internal(cv, lock);
+    return thread_get_current()->wake_reason;
 }
 
 enum wake_reason condvar_wait(struct condvar *cv, struct spinlock *lock,
                               enum irql irql, enum irql *out) {
-    struct thread *curr = thread_get_current();
-    curr->wake_reason = WAKE_REASON_NONE;
-    curr->wait_cookie++;
-
-    do_block_on_queue(&cv->waiters, lock, irql, cv);
-    *out = condvar_lock_internal(cv, lock);
-
-    return curr->wake_reason;
+    condvar_prepare_wait(cv);
+    return condvar_finish_wait(cv, lock, irql, out);
 }
 
 void condvar_init(struct condvar *cv, bool irq_disable) {
@@ -101,15 +104,16 @@ enum wake_reason condvar_wait_timeout(struct condvar *cv, struct spinlock *lock,
 
     struct condvar_with_cb *cwcb = &curr->cv_cb_object;
     cwcb->cv = cv;
-    cwcb->cookie = curr->wait_cookie + 1; /* +1 from condvar */
     cwcb->thread = curr;
 
+    condvar_prepare_wait(cv);
+    cwcb->cookie = curr->wait_cookie;
     timer_init(&cwcb->timer, condvar_timeout_wakeup, cwcb);
     timer_modify(&cwcb->timer, timer_delta_us(MS_TO_US(timeout_ms)));
 
-    condvar_wait(cv, lock, irql, out);
+    enum wake_reason reason = condvar_finish_wait(cv, lock, irql, out);
 
-    timer_delete(&cwcb->timer);
+    timer_delete_sync(&cwcb->timer);
 
-    return curr->wake_reason;
+    return reason;
 }

@@ -6,7 +6,6 @@ static __noinline void sd_save_n(stack_handle_t *out, size_t n) {
         out[i] = stack_depot_save_current();
 }
 
-
 #define SD_SEED 0xDEADBEEFULL
 #define SD_TRACE_LEN 8
 #define SD_MANY 4096 /* > STACK_DEPOT_HASH_SIZE, forces chain collisions */
@@ -16,7 +15,6 @@ static void sd_make_trace(uintptr_t *entries, size_t len, uint64_t id) {
     for (size_t i = 0; i < len; i++)
         entries[i] = (uintptr_t) (0xffffffff80000000ULL + (id << 20) + i * 16);
 }
-
 
 #define SD_MT_THREADS 8
 #define SD_MT_TIMEOUT_MS 30000
@@ -224,12 +222,11 @@ static void sd_dedup_worker(void *arg) {
     atomic_fetch_sub(&sd_mt.left, 1);
 }
 
-TEST_DECLARE_INTEGRATION(stack_depot_mt_dedup,
-                         .group = TEST_GROUP(stack_depot),
+TEST_DECLARE_INTEGRATION(stack_depot, stack_depot_mt_dedup,
                          TEST_INTENSITY(16, 64, 256)) {
     uintptr_t trace[SD_TRACE_LEN];
     sd_make_trace(trace, SD_TRACE_LEN, SD_MT_DEDUP_ID);
-    TEST_ASSERT(sd_chain_count(trace, SD_TRACE_LEN) == 0);
+    TEST_ASSERT_EQ(sd_chain_count(trace, SD_TRACE_LEN), 0);
 
     sd_dedup_saves_count = ctx->intensity_val ? ctx->intensity_val : 64;
     if (sd_dedup_saves_count > SD_MT_DEDUP_SAVES_MAX)
@@ -274,7 +271,7 @@ TEST_DECLARE_INTEGRATION(stack_depot_mt_dedup,
     SD_MT_JOIN();
 
     /* Last put drops the record off the chain */
-    TEST_ASSERT(sd_chain_count(trace, SD_TRACE_LEN) == 0);
+    TEST_ASSERT_EQ(sd_chain_count(trace, SD_TRACE_LEN), 0);
     return TEST_SUCCESS;
 }
 
@@ -301,7 +298,7 @@ static bool sd_shared_body(size_t tid) {
         }
 
         struct stack_depot_record *rec = stack_depot_get_record(h);
-        /* While we hold a ref the record has to be ours, so 
+        /* While we hold a ref the record has to be ours, so
          * we check the data to make sure */
         SD_WORKER_CHECK(rec->num_entries == SD_TRACE_LEN);
         SD_WORKER_CHECK(rec->hash == stack_depot_hash(want, SD_TRACE_LEN));
@@ -331,8 +328,7 @@ static void sd_shared_worker(void *arg) {
     atomic_fetch_sub(&sd_mt.left, 1);
 }
 
-TEST_DECLARE_INTEGRATION(stack_depot_mt_shared_set,
-                         .group = TEST_GROUP(stack_depot),
+TEST_DECLARE_INTEGRATION(stack_depot, stack_depot_mt_shared_set,
                          TEST_INTENSITY(200, 1500, 8000)) {
     sd_mt_set_iters_count = ctx->intensity_val ? ctx->intensity_val : 1500;
     sd_mt_reset(ctx, SD_MT_THREADS);
@@ -343,7 +339,7 @@ TEST_DECLARE_INTEGRATION(stack_depot_mt_shared_set,
     for (size_t id = 0; id < SD_MT_SET; id++) {
         uintptr_t trace[SD_TRACE_LEN];
         sd_make_trace(trace, SD_TRACE_LEN, SD_MT_SET_ID + id);
-        TEST_ASSERT(sd_chain_count(trace, SD_TRACE_LEN) == 0);
+        TEST_ASSERT_EQ(sd_chain_count(trace, SD_TRACE_LEN), 0);
     }
 
     return TEST_SUCCESS;
@@ -415,8 +411,7 @@ static void sd_disjoint_worker(void *arg) {
     atomic_fetch_sub(&sd_mt.left, 1);
 }
 
-TEST_DECLARE_INTEGRATION(stack_depot_mt_disjoint,
-                         .group = TEST_GROUP(stack_depot),
+TEST_DECLARE_INTEGRATION(stack_depot, stack_depot_mt_disjoint,
                          TEST_INTENSITY(8, 32, 128)) {
     sd_mt_disjoint_per_thread = ctx->intensity_val ? ctx->intensity_val : 32;
     if (sd_mt_disjoint_per_thread > SD_MT_DISJOINT_PER_THREAD_MAX)
@@ -434,7 +429,7 @@ TEST_DECLARE_INTEGRATION(stack_depot_mt_disjoint,
             sd_make_trace(trace, SD_TRACE_LEN,
                           SD_MT_DISJOINT_ID + t * sd_mt_disjoint_per_thread +
                               i);
-            TEST_ASSERT(sd_chain_count(trace, SD_TRACE_LEN) == 0);
+            TEST_ASSERT_EQ(sd_chain_count(trace, SD_TRACE_LEN), 0);
         }
     }
 
@@ -482,8 +477,7 @@ static void sd_churn_worker(void *arg) {
     atomic_fetch_sub(&sd_mt.left, 1);
 }
 
-TEST_DECLARE_INTEGRATION(stack_depot_mt_churn_race,
-                         .group = TEST_GROUP(stack_depot),
+TEST_DECLARE_INTEGRATION(stack_depot, stack_depot_mt_churn_race,
                          TEST_INTENSITY(500, 4000, 20000)) {
     sd_mt_churn_iters_count = ctx->intensity_val ? ctx->intensity_val : 4000;
     sd_mt_reset(ctx, SD_MT_THREADS);
@@ -493,7 +487,7 @@ TEST_DECLARE_INTEGRATION(stack_depot_mt_churn_race,
     for (size_t id = 0; id < SD_MT_CHURN_SET; id++) {
         uintptr_t trace[SD_TRACE_LEN];
         sd_make_trace(trace, SD_TRACE_LEN, SD_MT_CHURN_ID + id);
-        TEST_ASSERT(sd_chain_count(trace, SD_TRACE_LEN) == 0);
+        TEST_ASSERT_EQ(sd_chain_count(trace, SD_TRACE_LEN), 0);
     }
 
     return TEST_SUCCESS;
@@ -504,7 +498,7 @@ static uintptr_t sd_cur_traces[SD_MT_THREADS][STACK_TRACE_MAX_DEPTH];
 static size_t sd_cur_lens[SD_MT_THREADS];
 
 static __noinline bool sd_cur_body(size_t tid) {
-    /* Both saves have to come from a single calls site, that's why we 
+    /* Both saves have to come from a single calls site, that's why we
      * need to loop in sd_save_n(), otherwise it would be two different */
     stack_handle_t h[2] = {0};
     volatile size_t n = 2;
@@ -547,8 +541,7 @@ static void sd_cur_worker(void *arg) {
     atomic_fetch_sub(&sd_mt.left, 1);
 }
 
-TEST_DECLARE_INTEGRATION(stack_depot_mt_save_current,
-                         .group = TEST_GROUP(stack_depot)) {
+TEST_DECLARE_INTEGRATION(stack_depot, stack_depot_mt_save_current) {
     sd_mt_reset(ctx, SD_MT_THREADS);
     memset(sd_cur_handles, 0, sizeof(sd_cur_handles));
     memset(sd_cur_lens, 0, sizeof(sd_cur_lens));
@@ -557,15 +550,16 @@ TEST_DECLARE_INTEGRATION(stack_depot_mt_save_current,
     SD_MT_JOIN();
 
     for (size_t i = 0; i < SD_MT_THREADS; i++) {
-        TEST_ASSERT(sd_cur_handles[i]);
-        TEST_ASSERT(sd_cur_lens[i] > 0);
-        TEST_ASSERT(sd_cur_lens[i] <= STACK_TRACE_MAX_DEPTH);
+        TEST_ASSERT_NONNULL(sd_cur_handles[i]);
+        TEST_ASSERT_GT(sd_cur_lens[i], 0);
+        TEST_ASSERT_LE(sd_cur_lens[i], STACK_TRACE_MAX_DEPTH);
 
         for (size_t j = i + 1; j < SD_MT_THREADS; j++) {
             bool same_trace = sd_cur_lens[i] == sd_cur_lens[j] &&
                               !memcmp(sd_cur_traces[i], sd_cur_traces[j],
                                       sd_cur_lens[i] * sizeof(uintptr_t));
-            TEST_ASSERT(same_trace == (sd_cur_handles[i] == sd_cur_handles[j]));
+            TEST_ASSERT_EQ(same_trace,
+                           (sd_cur_handles[i] == sd_cur_handles[j]));
         }
     }
 

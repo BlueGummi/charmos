@@ -63,8 +63,7 @@ static bool lock_reinit_state_valid(struct spinlock *spin,
 
 #endif /* DEBUG_LOCK_CHK */
 
-TEST_DECLARE_UNIT(lock_initializers_install_policy,
-                  .group = TEST_GROUP(qspinlock)) {
+TEST_DECLARE_UNIT(qspinlock, lock_initializers_install_policy) {
     struct spinlock spin;
     struct qspinlock qspin;
     struct mutex mutex;
@@ -85,8 +84,7 @@ TEST_DECLARE_UNIT(lock_initializers_install_policy,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(lock_policy_mutation_and_reinit,
-                  .group = TEST_GROUP(qspinlock)) {
+TEST_DECLARE_UNIT(qspinlock, lock_policy_mutation_and_reinit) {
     struct spinlock spin;
     struct qspinlock qspin;
     struct mutex mutex;

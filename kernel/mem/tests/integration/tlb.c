@@ -20,8 +20,7 @@ static void tlb_reader(void *arg) {
     atomic_fetch_add(&tlb_threads_done, 1);
 }
 
-TEST_DECLARE_INTEGRATION(tlb_shootdown_synchronous_test,
-                         .group = TEST_GROUP(mem),
+TEST_DECLARE_INTEGRATION(mem, tlb_shootdown_synchronous_test,
                          TEST_INTENSITY_CORES(1, 1, 4, "threads/core")) {
     ABORT_IF_RAM_LOW();
 
@@ -72,14 +71,13 @@ TEST_DECLARE_INTEGRATION(tlb_shootdown_synchronous_test,
 
     /* Every worker must have seen the new value, not old cached translation */
     for (size_t i = 0; i < nthreads; i++) {
-        TEST_ASSERT(tlb_seen[i] == 0xBBBBBBBBBBBBBBBB);
+        TEST_ASSERT_EQ(tlb_seen[i], 0xBBBBBBBBBBBBBBBB);
     }
 
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_INTEGRATION(tlb_shootdown_async_eventual_test,
-                         .group = TEST_GROUP(mem)) {
+TEST_DECLARE_INTEGRATION(mem, tlb_shootdown_async_eventual_test) {
     ABORT_IF_RAM_LOW();
 
     paddr_t p1 = pmm_alloc_page();
@@ -107,7 +105,7 @@ TEST_DECLARE_INTEGRATION(tlb_shootdown_async_eventual_test,
     return TEST_FAIL("async TLB shootdown did not converge within timeout");
 }
 
-TEST_DECLARE_INTEGRATION(tlb_shootdown_flush_all_test, .group = TEST_GROUP(mem),
+TEST_DECLARE_INTEGRATION(mem, tlb_shootdown_flush_all_test,
                          TEST_INTENSITY(64, 256, 4096)) {
     ABORT_IF_RAM_LOW();
 
@@ -132,7 +130,7 @@ TEST_DECLARE_INTEGRATION(tlb_shootdown_flush_all_test, .group = TEST_GROUP(mem),
 
     tlb_shootdown((uintptr_t) va, true);
 
-    TEST_ASSERT(*(volatile uint64_t *) va == 0xDEADBEEF);
+    TEST_ASSERT_EQ(*(volatile uint64_t *) va, 0xDEADBEEF);
     return TEST_SUCCESS;
 }
 
@@ -147,8 +145,7 @@ static void tlb_spammer(void *) {
     }
 }
 
-TEST_DECLARE_INTEGRATION(tlb_shootdown_contention_test,
-                         .group = TEST_GROUP(mem),
+TEST_DECLARE_INTEGRATION(mem, tlb_shootdown_contention_test,
                          TEST_INTENSITY_CORES(1, 1, 2, "threads/core")) {
     size_t nthreads = ctx->intensity_val ? ctx->intensity_val : 4;
     if (nthreads > TLB_CONTENTION_MAX_THREADS)
@@ -157,7 +154,7 @@ TEST_DECLARE_INTEGRATION(tlb_shootdown_contention_test,
     struct thread *t[TLB_CONTENTION_MAX_THREADS];
     for (size_t i = 0; i < nthreads; i++) {
         t[i] = thread_spawn_joinable("tlb_spammer", tlb_spammer, NULL);
-        TEST_ASSERT(t[i]);
+        TEST_ASSERT_NONNULL(t[i]);
     }
 
     for (size_t i = 0; i < nthreads; i++)

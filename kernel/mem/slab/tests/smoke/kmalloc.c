@@ -7,7 +7,7 @@ TEST_GROUP_DECLARE(slab, .intensity_desc = {
                          });
 
 static char hooray[128] = {0};
-TEST_DECLARE_SMOKE(kmalloc_new_test, .group = TEST_GROUP(slab)) {
+TEST_DECLARE_SMOKE(slab, kmalloc_new_test) {
 
     void *p = kmalloc_new(67, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
 
@@ -26,7 +26,7 @@ TEST_DECLARE_SMOKE(kmalloc_new_test, .group = TEST_GROUP(slab)) {
 #endif
 
 static char a_msg[128];
-TEST_DECLARE_SMOKE(kmalloc_new_basic_test, .group = TEST_GROUP(slab)) {
+TEST_DECLARE_SMOKE(slab, kmalloc_new_basic_test) {
 
     void *p1 = kmalloc_new(1, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
     void *p2 = kmalloc_new(64, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);

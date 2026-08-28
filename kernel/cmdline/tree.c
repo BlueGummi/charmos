@@ -104,7 +104,7 @@ void cmdline_print_all(void) {
             continue;
 
         char name[CMDLINE_ENTRY_NAME_LEN_MAX];
-        get_functional_name(e, name);
+        cmdline_functional_name(e, name);
         log_msg(LOG_INFO, "command line entry %s", name);
     }
 #endif

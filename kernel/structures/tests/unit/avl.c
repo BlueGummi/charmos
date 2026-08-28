@@ -55,7 +55,7 @@ static bool verify_avl_invariants(struct avl_tree_node *n) {
     return verify_avl_invariants(n->left) && verify_avl_invariants(n->right);
 }
 
-TEST_DECLARE_UNIT(avl_tree_rotations_and_balance, .group = TEST_GROUP(avl)) {
+TEST_DECLARE_UNIT(avl, avl_tree_rotations_and_balance) {
     struct avl_tree tree;
     avl_tree_init(&tree, &test_avl_ops);
 
@@ -71,13 +71,13 @@ TEST_DECLARE_UNIT(avl_tree_rotations_and_balance, .group = TEST_GROUP(avl)) {
     /* Verify search */
     for (int i = 0; i < 7; i++) {
         struct avl_tree_node *found = avl_tree_find(&tree, &insert_keys[i]);
-        TEST_ASSERT(found != NULL);
-        TEST_ASSERT(avl_entry(found, struct test_avl_node, node)->key ==
-                    insert_keys[i]);
+        TEST_ASSERT_NONNULL(found);
+        TEST_ASSERT_EQ(avl_entry(found, struct test_avl_node, node)->key,
+                       insert_keys[i]);
     }
 
     int missing = 999;
-    TEST_ASSERT(avl_tree_find(&tree, &missing) == NULL);
+    TEST_ASSERT_NULL(avl_tree_find(&tree, &missing));
 
     /* In-order traversal must be ascending */
     struct avl_tree_node *cur = avl_tree_first(&tree);
@@ -85,18 +85,18 @@ TEST_DECLARE_UNIT(avl_tree_rotations_and_balance, .group = TEST_GROUP(avl)) {
     int count = 0;
     while (cur) {
         int k = avl_entry(cur, struct test_avl_node, node)->key;
-        TEST_ASSERT(k > prev_key);
+        TEST_ASSERT_GT_S(k, prev_key);
         prev_key = k;
         count++;
         cur = avl_tree_next(cur);
     }
-    TEST_ASSERT(count == 7);
+    TEST_ASSERT_EQ(count, 7);
 
     /* removal with successor transplant */
     for (int i = 0; i < 7; i++) {
         avl_tree_remove(&tree, &nodes[i].node);
         TEST_ASSERT(verify_avl_invariants(tree.root));
-        TEST_ASSERT(avl_tree_find(&tree, &insert_keys[i]) == NULL);
+        TEST_ASSERT_NULL(avl_tree_find(&tree, &insert_keys[i]));
     }
 
     TEST_ASSERT(avl_tree_empty(&tree));

@@ -18,11 +18,13 @@ struct nightmare_ctx;
 struct nightmare_worker;
 struct thread;
 
-#define NIGHTMARE_EXIT_OK 0
-#define NIGHTMARE_EXIT_FINDING 3
-#define NIGHTMARE_EXIT_FAIL 4
-#define NIGHTMARE_EXIT_STALL 5
-#define NIGHTMARE_EXIT_SKIP 6
+enum nightmare_exit_code {
+    NIGHTMARE_EXIT_OK = 0,
+    NIGHTMARE_EXIT_FINDING = 3,
+    NIGHTMARE_EXIT_FAIL = 4,
+    NIGHTMARE_EXIT_STALL = 5,
+    NIGHTMARE_EXIT_SKIP = 6,
+};
 
 #define NIGHTMARE_INTENSITY_SENTINEL ((fx32_32_t) - 1LL)
 #define NIGHTMARE_INTENSITY_DEFAULT FX(0.5)
@@ -222,12 +224,9 @@ struct nightmare_finding_site {
         (discriminator_), (fmt), ##__VA_ARGS__)
 
 struct nightmare_stall_evidence {
-    cpu_id_t cpu;
-    thread_id_t tid;
-    size_t worker_index;
-    const char *role;
-    time_ms_t last_progress_ms;
+    time_ms_t silent_ms;
     uint64_t progress;
+    cpu_id_t observer_cpu;
 };
 
 void nightmare_run(void);

@@ -86,6 +86,8 @@ void nightmare_heartbeat_main(void *arg) {
 
     time_ms_t next = time_get_ms() + nightmare_runtime.stat_interval_ms;
     do {
+        nightmare_liveness_poll();
+
         time_ms_t now = time_get_ms();
         if (now >= next) {
             nightmare_record_stat(nightmare_progress_sum_irq(),
@@ -94,6 +96,8 @@ void nightmare_heartbeat_main(void *arg) {
         }
         thread_sleep_for_ms(10);
     } while (!nightmare_must_stop());
+
+    nightmare_liveness_poll();
 
     nightmare_record_stat(nightmare_progress_sum_irq(),
                           nightmare_runtime.ctx.worker_count);

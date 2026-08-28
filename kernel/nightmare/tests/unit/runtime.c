@@ -4,8 +4,7 @@
 #if defined(TEST_ENABLED) && defined(TEST_NIGHTMARE_SMOKE)
 TEST_GROUP_DECLARE(nightmare_harness);
 
-TEST_DECLARE_UNIT(nightmare_perturb_verdict_mailbox,
-                  .group = TEST_GROUP(nightmare_harness)) {
+TEST_DECLARE_UNIT(nightmare_harness, nightmare_perturb_verdict_mailbox) {
     char reason[] = "first_reason";
     char msg[] = "first message";
     struct nightmare_verdict first = NIGHTMARE_FAIL(reason, msg);
@@ -22,9 +21,9 @@ TEST_DECLARE_UNIT(nightmare_perturb_verdict_mailbox,
 
     struct nightmare_verdict loaded;
     TEST_ASSERT(nightmare_load_perturb_verdict(&loaded));
-    TEST_ASSERT(loaded.result == NIGHTMARE_RESULT_FAIL);
-    TEST_ASSERT(strcmp(loaded.reason, "first_reason") == 0);
-    TEST_ASSERT(strcmp(loaded.msg, "first message") == 0);
+    TEST_ASSERT_EQ(loaded.result, NIGHTMARE_RESULT_FAIL);
+    TEST_ASSERT_STR_EQ(loaded.reason, "first_reason");
+    TEST_ASSERT_STR_EQ(loaded.msg, "first message");
 
     atomic_store_explicit(&nightmare_runtime.perturb_verdict_ready, false,
                           memory_order_relaxed);

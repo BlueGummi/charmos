@@ -8,7 +8,7 @@ TEST_GROUP_DECLARE(date_time, .intensity_desc = {
 
 /* NOTE: we use two different month conventions, since struct date_time
  * is 0-11, and days_in_month is 1-12, but we probably want to change that */
-TEST_DECLARE_UNIT(leap_year_rule, .group = TEST_GROUP(date_time)) {
+TEST_DECLARE_UNIT(date_time, leap_year_rule) {
     TEST_ASSERT(is_leap_year(2004));  /* divisible by 4 */
     TEST_ASSERT(!is_leap_year(1900)); /* but by 100, so not */
     TEST_ASSERT(is_leap_year(2000));  /* unless also by 400 */
@@ -23,28 +23,28 @@ TEST_DECLARE_UNIT(leap_year_rule, .group = TEST_GROUP(date_time)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(days_in_month_table, .group = TEST_GROUP(date_time)) {
+TEST_DECLARE_UNIT(date_time, days_in_month_table) {
     static const uint32_t common[13] = {0,  31, 28, 31, 30, 31, 30,
                                         31, 31, 30, 31, 30, 31};
 
     for (int m = 1; m <= 12; m++) {
-        TEST_ASSERT(days_in_month(2001, m) == common[m]);
-        TEST_ASSERT(days_in_month(2000, m) == (m == 2 ? 29 : common[m]));
+        TEST_ASSERT_EQ(days_in_month(2001, m), common[m]);
+        TEST_ASSERT_EQ(days_in_month(2000, m), (m == 2 ? 29 : common[m]));
     }
 
-    TEST_ASSERT(days_in_month(1900, 2) == 28);
-    TEST_ASSERT(days_in_month(2024, 2) == 29);
+    TEST_ASSERT_EQ(days_in_month(1900, 2), 28);
+    TEST_ASSERT_EQ(days_in_month(2024, 2), 29);
 
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(days_in_year_sums, .group = TEST_GROUP(date_time)) {
+TEST_DECLARE_UNIT(date_time, days_in_year_sums) {
     for (year_t y = 1998; y <= 2005; y++) {
         uint32_t total = 0;
         for (int m = 1; m <= 12; m++)
             total += days_in_month(y, m);
 
-        TEST_ASSERT(total == (is_leap_year(y) ? 366u : 365u));
+        TEST_ASSERT_EQ(total, (is_leap_year(y) ? 366u : 365u));
     }
 
     return TEST_SUCCESS;
@@ -52,7 +52,7 @@ TEST_DECLARE_UNIT(days_in_year_sums, .group = TEST_GROUP(date_time)) {
 
 /* Day of year 0 is Jan 1, the boundaries here are the first day of
  * each following month*/
-TEST_DECLARE_UNIT(expand_month_boundaries, .group = TEST_GROUP(date_time)) {
+TEST_DECLARE_UNIT(date_time, expand_month_boundaries) {
     struct date_time dt = {.year = 2001, .day = 0, .sec = 0};
 
     struct date_time_expanded e = date_time_expand(&dt);
@@ -82,7 +82,7 @@ TEST_DECLARE_UNIT(expand_month_boundaries, .group = TEST_GROUP(date_time)) {
 }
 
 /* Test months after Feb */
-TEST_DECLARE_UNIT(expand_leap_year_boundaries, .group = TEST_GROUP(date_time)) {
+TEST_DECLARE_UNIT(date_time, expand_leap_year_boundaries) {
     struct date_time dt = {.year = 2000, .day = 59, .sec = 0};
 
     struct date_time_expanded e = date_time_expand(&dt);
@@ -99,7 +99,7 @@ TEST_DECLARE_UNIT(expand_leap_year_boundaries, .group = TEST_GROUP(date_time)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(expand_time_of_day, .group = TEST_GROUP(date_time)) {
+TEST_DECLARE_UNIT(date_time, expand_time_of_day) {
     struct date_time dt = {.year = 2001, .day = 0, .sec = 0};
 
     struct date_time_expanded e = date_time_expand(&dt);
@@ -116,7 +116,7 @@ TEST_DECLARE_UNIT(expand_time_of_day, .group = TEST_GROUP(date_time)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(expand_compact_roundtrip, .group = TEST_GROUP(date_time),
+TEST_DECLARE_UNIT(date_time, expand_compact_roundtrip,
                   TEST_INTENSITY(2, 5, 100)) {
     static const year_t base_years[] = {1999, 2000, 2001, 2024, 2100};
     size_t num_years =
@@ -134,15 +134,15 @@ TEST_DECLARE_UNIT(expand_compact_roundtrip, .group = TEST_GROUP(date_time),
             struct date_time out;
             date_time_compact(&e, &out);
 
-            TEST_ASSERT(out.year == in.year);
-            TEST_ASSERT(out.day == in.day);
-            TEST_ASSERT(out.sec == in.sec);
+            TEST_ASSERT_EQ(out.year, in.year);
+            TEST_ASSERT_EQ(out.day, in.day);
+            TEST_ASSERT_EQ(out.sec, in.sec);
 
             /* Expanded form must be OK too */
-            TEST_ASSERT(e.month < 12);
-            TEST_ASSERT(e.day_of_month >= 1);
-            TEST_ASSERT(e.day_of_month <= days_in_month(y, e.month + 1));
-            TEST_ASSERT(e.day_of_week < 7);
+            TEST_ASSERT_LT(e.month, 12);
+            TEST_ASSERT_GE(e.day_of_month, 1);
+            TEST_ASSERT_LE(e.day_of_month, days_in_month(y, e.month + 1));
+            TEST_ASSERT_LT(e.day_of_week, 7);
         }
     }
 
@@ -150,7 +150,7 @@ TEST_DECLARE_UNIT(expand_compact_roundtrip, .group = TEST_GROUP(date_time),
 }
 
 /* Weekdays advance by one day, and anchoring one date pins the offset */
-TEST_DECLARE_UNIT(weekday_progression, .group = TEST_GROUP(date_time)) {
+TEST_DECLARE_UNIT(date_time, weekday_progression) {
     struct date_time dt = {.year = 2001, .day = 0, .sec = 0};
 
     uint8_t prev = date_time_expand(&dt).day_of_week;
@@ -158,8 +158,8 @@ TEST_DECLARE_UNIT(weekday_progression, .group = TEST_GROUP(date_time)) {
         dt.day = day;
         uint8_t cur = date_time_expand(&dt).day_of_week;
 
-        TEST_ASSERT(cur < 7);
-        TEST_ASSERT(cur == (prev + 1) % 7);
+        TEST_ASSERT_LT(cur, 7);
+        TEST_ASSERT_EQ(cur, (prev + 1) % 7);
         prev = cur;
     }
 
@@ -169,7 +169,7 @@ TEST_DECLARE_UNIT(weekday_progression, .group = TEST_GROUP(date_time)) {
     uint8_t mon = date_time_expand(&y2001).day_of_week;
     uint8_t sat = date_time_expand(&y2000).day_of_week;
 
-    TEST_ASSERT((sat + 2) % 7 == mon);
+    TEST_ASSERT_EQ((sat + 2) % 7, mon);
 
     return TEST_SUCCESS;
 }

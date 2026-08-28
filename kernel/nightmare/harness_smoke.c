@@ -1,20 +1,41 @@
 #include <asm.h>
 #include <nightmare/nightmare.h>
 #include <sch/sched.h>
+#include <thread/thread.h>
 
 struct harness_smoke_options {
     bool stall;
+    bool plateau;
+    bool blocked_drain;
+    bool starve_one;
+    time_ns_t park_delay_ms;
 };
 
 static struct harness_smoke_options harness_smoke_options;
 
-NIGHTMARE_OPTIONS_DECLARE(harness_smoke, struct harness_smoke_options,
-                          harness_smoke_options,
-                          CMDLINE_SCHEMA_PROP(struct harness_smoke_options,
-                                              stall));
+NIGHTMARE_OPTIONS_DECLARE(
+    harness_smoke, struct harness_smoke_options, harness_smoke_options,
+    CMDLINE_SCHEMA_PROP(struct harness_smoke_options, stall),
+    CMDLINE_SCHEMA_PROP(struct harness_smoke_options, plateau),
+    CMDLINE_SCHEMA_PROP(struct harness_smoke_options, blocked_drain),
+    CMDLINE_SCHEMA_PROP(struct harness_smoke_options, starve_one),
+    CMDLINE_SCHEMA_PROP(struct harness_smoke_options, park_delay_ms,
+                        .types = CMDLINE_TYPES(CMDLINE_TYPE_DURATION)));
 
 #ifdef TEST_NIGHTMARE_SMOKE
 NIGHTMARE_WORKER(harness_smoke_worker) {
+    if (harness_smoke_options.blocked_drain) {
+        while (true)
+            cpu_relax();
+    }
+
+    if (harness_smoke_options.plateau ||
+        (harness_smoke_options.starve_one && NM_SELF->index == 0)) {
+        while (!nightmare_must_stop())
+            scheduler_yield();
+        return;
+    }
+
     if (harness_smoke_options.stall) {
         while (true) {
             NIGHTMARE_PROGRESS();
@@ -23,8 +44,12 @@ NIGHTMARE_WORKER(harness_smoke_worker) {
     }
 
     while (!nightmare_must_stop()) {
-        if (nightmare_must_park())
+        if (nightmare_must_park()) {
+            if (harness_smoke_options.park_delay_ms)
+                thread_sleep_for_ms(
+                    NS_TO_MS(harness_smoke_options.park_delay_ms));
             nightmare_park(NM_SELF);
+        }
         NIGHTMARE_PROGRESS();
         scheduler_yield();
     }

@@ -75,6 +75,8 @@ qspinlock_init_chk_internal(struct qspinlock *lock,
                             const struct lock_chk_class *class,
                             enum lock_chk_flags flags);
 
+static inline bool qspin_held(const struct qspinlock *lock);
+
 #ifdef DEBUG_LOCK_CHK
 
 #define __QSPINLOCK_SHALLOW_VALUE_INIT                                         \

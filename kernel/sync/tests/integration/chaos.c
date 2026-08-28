@@ -138,8 +138,7 @@ static void chaos_waker(void *arg) {
     }
 }
 
-TEST_DECLARE_INTEGRATION(thread_interruptible_chaos_fuzz,
-                         .group = TEST_GROUP(mutex)) {
+TEST_DECLARE_INTEGRATION(mutex, thread_interruptible_chaos_fuzz) {
     if (global.core_count < 2) {
         return TEST_SKIP(TEST_SKIP_NONE);
     }
@@ -156,15 +155,17 @@ TEST_DECLARE_INTEGRATION(thread_interruptible_chaos_fuzz,
     struct thread *threads[CHAOS_THREADS];
     for (size_t i = 0; i < CHAOS_THREADS; i++) {
         threads[i] = thread_create("cs", chaos_sleeper, (void *) i);
-        TEST_ASSERT(threads[i]);
+        TEST_ASSERT_NONNULL(threads[i]);
         thread_set_joinable(threads[i]);
         thread_enqueue(threads[i]);
     }
 
     struct thread *spammer =
         thread_spawn_joinable("chaos_apc_spammer", chaos_apc_spammer, NULL);
+    TEST_ASSERT_NONNULL(spammer);
     struct thread *waker =
         thread_spawn_joinable("chaos_waker", chaos_waker, NULL);
+    TEST_ASSERT_NONNULL(waker);
 
     atomic_store(&starter_ok, true);
 
@@ -176,7 +177,7 @@ TEST_DECLARE_INTEGRATION(thread_interruptible_chaos_fuzz,
     thread_join(spammer);
     thread_join(waker);
 
-    TEST_ASSERT(atomic_load(&sync_chaos_left) == 0);
+    TEST_ASSERT_EQ(atomic_load(&sync_chaos_left), 0);
 
     return TEST_SUCCESS;
 }

@@ -95,7 +95,7 @@ static const struct hash_vector bkdr_vectors[] = {
     {"hello", 5, 0x2F372E8EU}, {"hello, world", 12, 0x81692F4CU},
 };
 
-TEST_DECLARE_UNIT(hash_known_answers, .group = TEST_GROUP(hash)) {
+TEST_DECLARE_UNIT(hash, hash_known_answers) {
 #define RUN(fn, vecs)                                                          \
     do {                                                                       \
         struct test_verdict v =                                                \
@@ -114,13 +114,13 @@ TEST_DECLARE_UNIT(hash_known_answers, .group = TEST_GROUP(hash)) {
 
     for (size_t i = 0; i < TEST_ARRAY_LEN(fnv1a_64_vectors); i++) {
         const struct hash_vector64 *v = &fnv1a_64_vectors[i];
-        TEST_ASSERT(hash_fnv1a_64(v->input, v->len) == v->expect);
+        TEST_ASSERT_EQ(hash_fnv1a_64(v->input, v->len), v->expect);
     }
 
     uint64_t incremental = HASH_FNV1A_64_OFFSET_BASIS;
     incremental = hash_fnv1a_64_update(incremental, "hello", 5);
     incremental = hash_fnv1a_64_update(incremental, ", world", 7);
-    TEST_ASSERT(incremental == hash_fnv1a_64("hello, world", 12));
+    TEST_ASSERT_EQ(incremental, hash_fnv1a_64("hello, world", 12));
 
     return TEST_SUCCESS;
 }
@@ -144,7 +144,7 @@ static const struct murmur_vector murmur_vectors[] = {
     {"hello, world", 12, 0x9747B28CU, 0x9A933E00U},
 };
 
-TEST_DECLARE_UNIT(hash_murmur3_known_answers, .group = TEST_GROUP(hash)) {
+TEST_DECLARE_UNIT(hash, hash_murmur3_known_answers) {
     for (size_t i = 0; i < TEST_ARRAY_LEN(murmur_vectors); i++) {
         const struct murmur_vector *v = &murmur_vectors[i];
         uint32_t got = hash_murmur3_32(v->input, v->len, v->seed);
@@ -157,7 +157,7 @@ TEST_DECLARE_UNIT(hash_murmur3_known_answers, .group = TEST_GROUP(hash)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(hash_murmur3_seed_matters, .group = TEST_GROUP(hash),
+TEST_DECLARE_UNIT(hash, hash_murmur3_seed_matters,
                   TEST_INTENSITY(16, 64, 4096)) {
     size_t seeds = ctx->intensity_val ? ctx->intensity_val : 64;
     const char *key = "seed sensitivity";
@@ -165,41 +165,41 @@ TEST_DECLARE_UNIT(hash_murmur3_seed_matters, .group = TEST_GROUP(hash),
 
     uint32_t base = hash_murmur3_32(key, len, 0);
     for (uint32_t seed = 1; seed < (uint32_t) seeds; seed++)
-        TEST_ASSERT(hash_murmur3_32(key, len, seed) != base);
+        TEST_ASSERT_NE(hash_murmur3_32(key, len, seed), base);
 
     return TEST_SUCCESS;
 }
 
 /* Prefix extension bugs */
-TEST_DECLARE_UNIT(hash_respects_length, .group = TEST_GROUP(hash)) {
+TEST_DECLARE_UNIT(hash, hash_respects_length) {
     static const char padded[] = "abcd\xFF\xFF\xFF\xFF";
     static const char clean[] = "abcd";
 
-    TEST_ASSERT(hash_djb2(padded, 4) == hash_djb2(clean, 4));
-    TEST_ASSERT(hash_sdbm(padded, 4) == hash_sdbm(clean, 4));
-    TEST_ASSERT(hash_fnv1a(padded, 4) == hash_fnv1a(clean, 4));
-    TEST_ASSERT(hash_jenkins_one_at_a_time(padded, 4) ==
-                hash_jenkins_one_at_a_time(clean, 4));
-    TEST_ASSERT(hash_elf(padded, 4) == hash_elf(clean, 4));
-    TEST_ASSERT(hash_bkdr(padded, 4) == hash_bkdr(clean, 4));
-    TEST_ASSERT(hash_murmur3_32(padded, 4, 0) == hash_murmur3_32(clean, 4, 0));
+    TEST_ASSERT_EQ(hash_djb2(padded, 4), hash_djb2(clean, 4));
+    TEST_ASSERT_EQ(hash_sdbm(padded, 4), hash_sdbm(clean, 4));
+    TEST_ASSERT_EQ(hash_fnv1a(padded, 4), hash_fnv1a(clean, 4));
+    TEST_ASSERT_EQ(hash_jenkins_one_at_a_time(padded, 4),
+                   hash_jenkins_one_at_a_time(clean, 4));
+    TEST_ASSERT_EQ(hash_elf(padded, 4), hash_elf(clean, 4));
+    TEST_ASSERT_EQ(hash_bkdr(padded, 4), hash_bkdr(clean, 4));
+    TEST_ASSERT_EQ(hash_murmur3_32(padded, 4, 0), hash_murmur3_32(clean, 4, 0));
 
     for (size_t n = 1; n <= 8; n++) {
-        TEST_ASSERT(hash_djb2(padded, n) != hash_djb2(padded, n - 1));
-        TEST_ASSERT(hash_fnv1a(padded, n) != hash_fnv1a(padded, n - 1));
+        TEST_ASSERT_NE(hash_djb2(padded, n), hash_djb2(padded, n - 1));
+        TEST_ASSERT_NE(hash_fnv1a(padded, n), hash_fnv1a(padded, n - 1));
     }
 
     return TEST_SUCCESS;
 }
 
 /* hash_elf masks off the top bit */
-TEST_DECLARE_UNIT(hash_elf_stays_31_bit, .group = TEST_GROUP(hash)) {
+TEST_DECLARE_UNIT(hash, hash_elf_stays_31_bit) {
     uint8_t buf[16];
     for (size_t i = 0; i < sizeof(buf); i++)
         buf[i] = 0xFF;
 
     for (size_t n = 0; n <= sizeof(buf); n++)
-        TEST_ASSERT((hash_elf(buf, n) & 0x80000000U) == 0);
+        TEST_ASSERT_EQ((hash_elf(buf, n) & 0x80000000U), 0);
 
     return TEST_SUCCESS;
 }

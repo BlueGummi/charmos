@@ -562,8 +562,11 @@ void nightmare_run(void) {
             "thread_create");
     }
 
+    if (!nightmare_liveness_start(config.stall_threshold_ms, config.on_stall))
+        nightmare_panic("could not start liveness detector");
     complete_all(&nightmare_runtime.start);
     nightmare_join_threads();
+    nightmare_liveness_stop();
     nightmare_publish_stop(NM_STOP_BUDGET);
 
     timer_shutdown_sync(&nightmare_runtime.soft_timer);

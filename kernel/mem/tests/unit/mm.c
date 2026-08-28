@@ -135,14 +135,13 @@ static size_t build_random_vma_ranges(struct mm *mm) {
     return placed;
 }
 
-TEST_DECLARE_UNIT(mm_gap_differential, .group = TEST_GROUP(mm),
-                  TEST_INTENSITY(200, 3000, 20000)) {
+TEST_DECLARE_UNIT(mm, mm_gap_differential, TEST_INTENSITY(200, 3000, 20000)) {
     prng_seed(ctx->seed ? ctx->seed : MM_TEST_SEED);
     struct mm *mm = mm_alloc();
-    TEST_ASSERT(mm);
+    TEST_ASSERT_NONNULL(mm);
 
     size_t placed = build_random_vma_ranges(mm);
-    TEST_ASSERT(placed > 0);
+    TEST_ASSERT_GT(placed, 0);
     TEST_ASSERT(tree_consistent(mm));
     TEST_ASSERT(augment_ok(mm));
 
@@ -160,7 +159,7 @@ TEST_DECLARE_UNIT(mm_gap_differential, .group = TEST_GROUP(mm),
 
         vaddr_t got = mm_vma_range_find_gap(mm, len, align, low, high);
         vaddr_t want = brute_gap(mm, len, align, low, high);
-        TEST_ASSERT(got == want);
+        TEST_ASSERT_EQ(got, want);
 
         if (got) {
             TEST_ASSERT(IS_ALIGNED(got, align));
@@ -172,11 +171,11 @@ TEST_DECLARE_UNIT(mm_gap_differential, .group = TEST_GROUP(mm),
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(mm_map_consistency, .group = TEST_GROUP(mm),
+TEST_DECLARE_UNIT(mm, mm_map_consistency,
                   TEST_INTENSITY_LINEAR(16, 128, 192, "mappings")) {
     prng_seed(ctx->seed ? ctx->seed : (MM_TEST_SEED + 1));
     struct mm *mm = mm_alloc();
-    TEST_ASSERT(mm);
+    TEST_ASSERT_NONNULL(mm);
 
     size_t count = ctx->intensity_val ? ctx->intensity_val : 128;
     if (count > 192)
@@ -186,9 +185,9 @@ TEST_DECLARE_UNIT(mm_map_consistency, .group = TEST_GROUP(mm),
         size_t len = (1 + (prng_next() % 64)) * PAGE_SIZE;
         vaddr_t a =
             mm_map(mm, 0, len, VMA_PROT_READ | VMA_PROT_WRITE, MM_MAP_ANON);
-        TEST_ASSERT(a != 0);
+        TEST_ASSERT_NE(a, 0);
         TEST_ASSERT(IS_PAGE_ALIGNED(a));
-        TEST_ASSERT(a >= 0x10000UL);
+        TEST_ASSERT_GE(a, 0x10000UL);
         struct vma_range *v = vma_range_find(mm, a);
         TEST_ASSERT(v && vma_range_start(v) == a);
     }
@@ -199,46 +198,46 @@ TEST_DECLARE_UNIT(mm_map_consistency, .group = TEST_GROUP(mm),
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(mm_vma_range_split, .group = TEST_GROUP(mm)) {
+TEST_DECLARE_UNIT(mm, mm_vma_range_split) {
     struct mm *mm = mm_alloc();
-    TEST_ASSERT(mm);
+    TEST_ASSERT_NONNULL(mm);
 
     vaddr_t base = MM_WIN_LOW;
     vaddr_t end = base + 16 * PAGE_SIZE;
     struct vma_range *orig = vma_range_alloc(mm, base, end, VMA_PROT_READ);
-    TEST_ASSERT(orig);
+    TEST_ASSERT_NONNULL(orig);
     mm_vma_range_insert(mm, orig);
 
     vaddr_t mid = base + 6 * PAGE_SIZE;
     struct vma_range *hi = vma_range_split(orig, mid);
-    TEST_ASSERT(hi);
+    TEST_ASSERT_NONNULL(hi);
 
     /* low half kept in orig, high half returned */
     TEST_ASSERT(vma_range_start(orig) == base && vma_range_end(orig) == mid);
     TEST_ASSERT(vma_range_start(hi) == mid && vma_range_end(hi) == end);
     /* pgoff of the high half follows from original's */
-    TEST_ASSERT(hi->pgoff == orig->pgoff + ((mid - base) >> PAGE_4K_SHIFT));
+    TEST_ASSERT_EQ(hi->pgoff, orig->pgoff + ((mid - base) >> PAGE_4K_SHIFT));
 
     /* Lookups land in the right half */
-    TEST_ASSERT(vma_range_find(mm, base) == orig);
-    TEST_ASSERT(vma_range_find(mm, mid - 1) == orig);
-    TEST_ASSERT(vma_range_find(mm, mid) == hi);
-    TEST_ASSERT(vma_range_find(mm, end - 1) == hi);
-    TEST_ASSERT(vma_range_find(mm, end) == NULL);
+    TEST_ASSERT_PTR_EQ(vma_range_find(mm, base), orig);
+    TEST_ASSERT_PTR_EQ(vma_range_find(mm, mid - 1), orig);
+    TEST_ASSERT_PTR_EQ(vma_range_find(mm, mid), hi);
+    TEST_ASSERT_PTR_EQ(vma_range_find(mm, end - 1), hi);
+    TEST_ASSERT_NULL(vma_range_find(mm, end));
 
     /* Navigation links the two halves */
-    TEST_ASSERT(vma_range_next(orig) == hi);
-    TEST_ASSERT(vma_range_prev(hi) == orig);
-    TEST_ASSERT(vma_range_prev(orig) == NULL);
-    TEST_ASSERT(vma_range_next(hi) == NULL);
+    TEST_ASSERT_PTR_EQ(vma_range_next(orig), hi);
+    TEST_ASSERT_PTR_EQ(vma_range_prev(hi), orig);
+    TEST_ASSERT_NULL(vma_range_prev(orig));
+    TEST_ASSERT_NULL(vma_range_next(hi));
 
     TEST_ASSERT(tree_consistent(mm));
     TEST_ASSERT(augment_ok(mm));
 
     /* Bad rejected without disturbing tree */
-    TEST_ASSERT(vma_range_split(orig, base) == NULL);     /* start */
-    TEST_ASSERT(vma_range_split(orig, mid) == NULL);      /* end */
-    TEST_ASSERT(vma_range_split(orig, base + 1) == NULL); /* unaligned */
+    TEST_ASSERT_NULL(vma_range_split(orig, base));     /* start */
+    TEST_ASSERT_NULL(vma_range_split(orig, mid));      /* end */
+    TEST_ASSERT_NULL(vma_range_split(orig, base + 1)); /* unaligned */
     TEST_ASSERT(tree_consistent(mm));
 
     return TEST_SUCCESS;

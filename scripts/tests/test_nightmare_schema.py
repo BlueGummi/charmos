@@ -64,6 +64,9 @@ class VocabularyTests(unittest.TestCase):
         self.assertEqual(boot["max_boots"]["default"], model.max_boots)
         self.assertEqual(boot["min_interval_ms"]["default"], model.min_interval_ms)
         self.assertEqual(boot["stat_interval_ms"]["default"], model.stat_interval_ms)
+        self.assertEqual(
+            boot["stall_threshold_ms"]["default"], model.stall_threshold_ms
+        )
         self.assertEqual(boot["gate_first"]["default"], model.gate_first)
         self.assertEqual(boot["on_stall"]["default"], model.on_stall)
 

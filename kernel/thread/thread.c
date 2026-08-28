@@ -410,13 +410,14 @@ void thread_sleep_for_us(uint64_t us) {
     struct thread *curr = thread_get_current();
     struct timer sleep_timer;
     timer_init(&sleep_timer, wake_thread_timer_cb, curr);
-    timer_modify(&sleep_timer, timer_delta_us(us));
 
+    /* Publish the wait because shorter timers can fire before yield */
     thread_prepare_to_sleep(curr, THREAD_SLEEP_REASON_MANUAL,
                             THREAD_WAIT_UNINTERRUPTIBLE, curr);
+    timer_modify(&sleep_timer, timer_delta_us(us));
 
     thread_yield_until_wake_match();
-    timer_delete(&sleep_timer);
+    timer_delete_sync(&sleep_timer);
 }
 
 void thread_sleep_for_ms(uint64_t ms) {

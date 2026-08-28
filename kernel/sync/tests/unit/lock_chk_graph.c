@@ -13,8 +13,7 @@ LOCK_CHK_CLASS_DECLARE_LOCAL(graph_test_class_a);
 LOCK_CHK_CLASS_DECLARE_LOCAL(graph_test_class_b);
 LOCK_CHK_CLASS_DECLARE_LOCAL(graph_test_class_c);
 
-TEST_DECLARE_UNIT(lock_chk_graph_node_resolution,
-                  .group = TEST_GROUP(qspinlock)) {
+TEST_DECLARE_UNIT(qspinlock, lock_chk_graph_node_resolution) {
     static struct lock_chk_graph graph;
     lock_chk_graph_init(&graph);
 
@@ -28,29 +27,33 @@ TEST_DECLARE_UNIT(lock_chk_graph_node_resolution,
     struct lock_chk_node *node_a1 = NULL;
     struct lock_chk_node *node_b0 = NULL;
 
-    TEST_ASSERT(lock_chk_graph_resolve_node(&graph, &map_a, 0, NULL,
-                                            &node_a0) == LOCK_CHK_RESULT_OK);
-    TEST_ASSERT(node_a0 != NULL);
-
-    TEST_ASSERT(
-        lock_chk_graph_resolve_node(&graph, &map_a, 0, NULL, &node_a0_again) ==
+    TEST_ASSERT_EQ(
+        lock_chk_graph_resolve_node(&graph, &map_a, 0, NULL, &node_a0),
         LOCK_CHK_RESULT_OK);
-    TEST_ASSERT(node_a0 == node_a0_again);
+    TEST_ASSERT_NONNULL(node_a0);
 
-    TEST_ASSERT(lock_chk_graph_resolve_node(&graph, &map_a, 1, NULL,
-                                            &node_a1) == LOCK_CHK_RESULT_OK);
-    TEST_ASSERT(node_a1 != NULL && node_a1 != node_a0);
-    TEST_ASSERT(node_a1->subclass == 1);
+    TEST_ASSERT_EQ(
+        lock_chk_graph_resolve_node(&graph, &map_a, 0, NULL, &node_a0_again),
+        LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_PTR_EQ(node_a0, node_a0_again);
 
-    TEST_ASSERT(lock_chk_graph_resolve_node(&graph, &map_b, 0, NULL,
-                                            &node_b0) == LOCK_CHK_RESULT_OK);
-    TEST_ASSERT(node_b0 != NULL && node_b0 != node_a0);
+    TEST_ASSERT_EQ(
+        lock_chk_graph_resolve_node(&graph, &map_a, 1, NULL, &node_a1),
+        LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_NONNULL(node_a1);
+    TEST_ASSERT_PTR_NE(node_a1, node_a0);
+    TEST_ASSERT_EQ(node_a1->subclass, 1);
+
+    TEST_ASSERT_EQ(
+        lock_chk_graph_resolve_node(&graph, &map_b, 0, NULL, &node_b0),
+        LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_NONNULL(node_b0);
+    TEST_ASSERT_PTR_NE(node_b0, node_a0);
 
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(lock_chk_graph_cycle_detection,
-                  .group = TEST_GROUP(qspinlock)) {
+TEST_DECLARE_UNIT(qspinlock, lock_chk_graph_cycle_detection) {
     static struct lock_chk_graph graph;
     lock_chk_graph_init(&graph);
 
@@ -65,51 +68,56 @@ TEST_DECLARE_UNIT(lock_chk_graph_cycle_detection,
     struct lock_chk_node *node_b = NULL;
     struct lock_chk_node *node_c = NULL;
 
-    TEST_ASSERT(lock_chk_graph_resolve_node(&graph, &map_a, 0, NULL, &node_a) ==
-                LOCK_CHK_RESULT_OK);
-    TEST_ASSERT(lock_chk_graph_resolve_node(&graph, &map_b, 0, NULL, &node_b) ==
-                LOCK_CHK_RESULT_OK);
-    TEST_ASSERT(lock_chk_graph_resolve_node(&graph, &map_c, 0, NULL, &node_c) ==
-                LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_EQ(
+        lock_chk_graph_resolve_node(&graph, &map_a, 0, NULL, &node_a),
+        LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_EQ(
+        lock_chk_graph_resolve_node(&graph, &map_b, 0, NULL, &node_b),
+        LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_EQ(
+        lock_chk_graph_resolve_node(&graph, &map_c, 0, NULL, &node_c),
+        LOCK_CHK_RESULT_OK);
 
     /* A -> B */
-    TEST_ASSERT(lock_chk_graph_add_dependency(
-                    &graph, node_a, LOCK_CHK_MODE_EXCLUSIVE, node_b,
-                    LOCK_CHK_MODE_EXCLUSIVE, NULL, NULL) == LOCK_CHK_RESULT_OK);
-    TEST_ASSERT(graph.edge_count == 1);
+    TEST_ASSERT_EQ(lock_chk_graph_add_dependency(
+                       &graph, node_a, LOCK_CHK_MODE_EXCLUSIVE, node_b,
+                       LOCK_CHK_MODE_EXCLUSIVE, NULL, NULL),
+                   LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_EQ(graph.edge_count, 1);
 
     /* Duplicate A -> B should be dedup without adding edge */
-    TEST_ASSERT(lock_chk_graph_add_dependency(
-                    &graph, node_a, LOCK_CHK_MODE_EXCLUSIVE, node_b,
-                    LOCK_CHK_MODE_EXCLUSIVE, NULL, NULL) == LOCK_CHK_RESULT_OK);
-    TEST_ASSERT(graph.edge_count == 1);
+    TEST_ASSERT_EQ(lock_chk_graph_add_dependency(
+                       &graph, node_a, LOCK_CHK_MODE_EXCLUSIVE, node_b,
+                       LOCK_CHK_MODE_EXCLUSIVE, NULL, NULL),
+                   LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_EQ(graph.edge_count, 1);
 
     /* B -> C */
-    TEST_ASSERT(lock_chk_graph_add_dependency(
-                    &graph, node_b, LOCK_CHK_MODE_EXCLUSIVE, node_c,
-                    LOCK_CHK_MODE_EXCLUSIVE, NULL, NULL) == LOCK_CHK_RESULT_OK);
-    TEST_ASSERT(graph.edge_count == 2);
+    TEST_ASSERT_EQ(lock_chk_graph_add_dependency(
+                       &graph, node_b, LOCK_CHK_MODE_EXCLUSIVE, node_c,
+                       LOCK_CHK_MODE_EXCLUSIVE, NULL, NULL),
+                   LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_EQ(graph.edge_count, 2);
 
     /* C -> A completes cycle A -> B -> C -> A reports CYCLE */
     struct lock_chk_failure fail = {0};
-    TEST_ASSERT(lock_chk_graph_add_dependency(&graph, node_c,
-                                              LOCK_CHK_MODE_EXCLUSIVE, node_a,
-                                              LOCK_CHK_MODE_EXCLUSIVE, NULL,
-                                              &fail) == LOCK_CHK_RESULT_CYCLE);
-    TEST_ASSERT(fail.cycle_len == 3);
-    TEST_ASSERT(fail.signature != 0);
+    TEST_ASSERT_EQ(lock_chk_graph_add_dependency(
+                       &graph, node_c, LOCK_CHK_MODE_EXCLUSIVE, node_a,
+                       LOCK_CHK_MODE_EXCLUSIVE, NULL, &fail),
+                   LOCK_CHK_RESULT_CYCLE);
+    TEST_ASSERT_EQ(fail.cycle_len, 3);
+    TEST_ASSERT_NE(fail.signature, 0);
 
     /* Direct B -> A completes 2-node cycle: must report CYCLE */
-    TEST_ASSERT(lock_chk_graph_add_dependency(&graph, node_b,
-                                              LOCK_CHK_MODE_EXCLUSIVE, node_a,
-                                              LOCK_CHK_MODE_EXCLUSIVE, NULL,
-                                              NULL) == LOCK_CHK_RESULT_CYCLE);
+    TEST_ASSERT_EQ(lock_chk_graph_add_dependency(
+                       &graph, node_b, LOCK_CHK_MODE_EXCLUSIVE, node_a,
+                       LOCK_CHK_MODE_EXCLUSIVE, NULL, NULL),
+                   LOCK_CHK_RESULT_CYCLE);
 
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(lock_chk_irq_safety_conflict,
-                  .group = TEST_GROUP(qspinlock)) {
+TEST_DECLARE_UNIT(qspinlock, lock_chk_irq_safety_conflict) {
     static struct lock_chk_graph graph;
     lock_chk_graph_init(&graph);
 
@@ -139,24 +147,25 @@ TEST_DECLARE_UNIT(lock_chk_irq_safety_conflict,
 
     struct lock_chk_node *node = NULL;
 
-    TEST_ASSERT(lock_chk_graph_resolve_node(&graph, &map_disp, 0, &req_disp,
-                                            &node) == LOCK_CHK_RESULT_OK);
-    TEST_ASSERT(
-        lock_chk_graph_resolve_node(&graph, &map_disp, 0, &req_high, &node) ==
+    TEST_ASSERT_EQ(
+        lock_chk_graph_resolve_node(&graph, &map_disp, 0, &req_disp, &node),
+        LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_EQ(
+        lock_chk_graph_resolve_node(&graph, &map_disp, 0, &req_high, &node),
         LOCK_CHK_RESULT_BAD_CONTEXT);
 
     node = NULL;
-    TEST_ASSERT(lock_chk_graph_resolve_node(&graph, &map_high, 0, &req_high,
-                                            &node) == LOCK_CHK_RESULT_OK);
-    TEST_ASSERT(
-        lock_chk_graph_resolve_node(&graph, &map_high, 0, &req_disp, &node) ==
+    TEST_ASSERT_EQ(
+        lock_chk_graph_resolve_node(&graph, &map_high, 0, &req_high, &node),
+        LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_EQ(
+        lock_chk_graph_resolve_node(&graph, &map_high, 0, &req_disp, &node),
         LOCK_CHK_RESULT_BAD_CONTEXT);
 
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(lock_chk_graph_acquire_batch_deduplicates,
-                  .group = TEST_GROUP(qspinlock)) {
+TEST_DECLARE_UNIT(qspinlock, lock_chk_graph_acquire_batch_deduplicates) {
     static struct lock_chk_graph graph;
     lock_chk_graph_init(&graph);
 
@@ -167,8 +176,9 @@ TEST_DECLARE_UNIT(lock_chk_graph_acquire_batch_deduplicates,
     struct lock_chk_node *node_a = NULL;
     struct lock_chk_node *node_b = NULL;
 
-    TEST_ASSERT(lock_chk_graph_resolve_node(&graph, &map_a, 0, NULL, &node_a) ==
-                LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_EQ(
+        lock_chk_graph_resolve_node(&graph, &map_a, 0, NULL, &node_a),
+        LOCK_CHK_RESULT_OK);
 
     struct lock_chk_thread_data held = {
         .held =
@@ -191,16 +201,15 @@ TEST_DECLARE_UNIT(lock_chk_graph_acquire_batch_deduplicates,
     };
     struct lock_chk_failure failure = {0};
 
-    TEST_ASSERT(lock_chk_graph_prepare_acquire(&graph, &map_b, 0, &request,
-                                               &held, &node_b,
-                                               &failure) == LOCK_CHK_RESULT_OK);
-    TEST_ASSERT(node_b != NULL);
-    TEST_ASSERT(graph.edge_count == 1);
+    TEST_ASSERT_EQ(lock_chk_graph_prepare_acquire(&graph, &map_b, 0, &request,
+                                                  &held, &node_b, &failure),
+                   LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_NONNULL(node_b);
+    TEST_ASSERT_EQ(graph.edge_count, 1);
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(lock_chk_graph_acquire_batch_rolls_back,
-                  .group = TEST_GROUP(qspinlock)) {
+TEST_DECLARE_UNIT(qspinlock, lock_chk_graph_acquire_batch_rolls_back) {
     static struct lock_chk_graph graph;
     lock_chk_graph_init(&graph);
 
@@ -211,8 +220,9 @@ TEST_DECLARE_UNIT(lock_chk_graph_acquire_batch_rolls_back,
     struct lock_chk_node *node_a = NULL;
     struct lock_chk_node *node_b = NULL;
 
-    TEST_ASSERT(lock_chk_graph_resolve_node(&graph, &map_a, 0, NULL, &node_a) ==
-                LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_EQ(
+        lock_chk_graph_resolve_node(&graph, &map_a, 0, NULL, &node_a),
+        LOCK_CHK_RESULT_OK);
 
     struct lock_chk_thread_data held = {
         .held = {{.node = node_a,
@@ -231,19 +241,18 @@ TEST_DECLARE_UNIT(lock_chk_graph_acquire_batch_rolls_back,
     uint16_t nodes_before = graph.node_count;
     graph.edge_count = LOCK_CHK_MAX_EDGES;
 
-    TEST_ASSERT(lock_chk_graph_prepare_acquire(&graph, &map_b, 0, &request,
-                                               &held, &node_b, &failure) ==
-                LOCK_CHK_RESULT_EDGE_CAPACITY);
-    TEST_ASSERT(node_b == NULL);
-    TEST_ASSERT(graph.node_count == nodes_before);
-    TEST_ASSERT(atomic_load_explicit(&map_b.base_node, memory_order_relaxed) ==
-                NULL);
-    TEST_ASSERT(failure.kind == LOCK_CHK_FAIL_CAPACITY);
+    TEST_ASSERT_EQ(lock_chk_graph_prepare_acquire(&graph, &map_b, 0, &request,
+                                                  &held, &node_b, &failure),
+                   LOCK_CHK_RESULT_EDGE_CAPACITY);
+    TEST_ASSERT_NULL(node_b);
+    TEST_ASSERT_EQ(graph.node_count, nodes_before);
+    TEST_ASSERT_NULL(
+        atomic_load_explicit(&map_b.base_node, memory_order_relaxed));
+    TEST_ASSERT_EQ(failure.kind, LOCK_CHK_FAIL_CAPACITY);
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(lock_chk_spin_qspin_deep_lifecycle,
-                  .group = TEST_GROUP(qspinlock)) {
+TEST_DECLARE_UNIT(qspinlock, lock_chk_spin_qspin_deep_lifecycle) {
     struct spinlock spin_disp;
     struct spinlock spin_irq;
     struct spinlock spin_raw;
@@ -298,8 +307,7 @@ TEST_DECLARE_UNIT(lock_chk_spin_qspin_deep_lifecycle,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(lock_chk_mutex_out_of_order_release,
-                  .group = TEST_GROUP(qspinlock)) {
+TEST_DECLARE_UNIT(qspinlock, lock_chk_mutex_out_of_order_release) {
     struct mutex m1;
     struct mutex m2;
 
@@ -315,8 +323,7 @@ TEST_DECLARE_UNIT(lock_chk_mutex_out_of_order_release,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(lock_chk_mutex_simple_lifecycle,
-                  .group = TEST_GROUP(qspinlock)) {
+TEST_DECLARE_UNIT(qspinlock, lock_chk_mutex_simple_lifecycle) {
     struct mutex_simple s1;
     struct mutex_simple s2;
 
@@ -338,8 +345,7 @@ TEST_DECLARE_UNIT(lock_chk_mutex_simple_lifecycle,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(lock_chk_rw_reader_ring_and_conflict,
-                  .group = TEST_GROUP(qspinlock)) {
+TEST_DECLARE_UNIT(qspinlock, lock_chk_rw_reader_ring_and_conflict) {
     static struct lock_chk_graph graph;
     lock_chk_graph_init(&graph);
 
@@ -351,50 +357,60 @@ TEST_DECLARE_UNIT(lock_chk_rw_reader_ring_and_conflict,
     struct lock_chk_node *node_a = NULL;
     struct lock_chk_node *node_b = NULL;
 
-    TEST_ASSERT(lock_chk_graph_resolve_node(&graph, &map_a, 0, NULL, &node_a) ==
-                LOCK_CHK_RESULT_OK);
-    TEST_ASSERT(lock_chk_graph_resolve_node(&graph, &map_b, 0, NULL, &node_b) ==
-                LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_EQ(
+        lock_chk_graph_resolve_node(&graph, &map_a, 0, NULL, &node_a),
+        LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_EQ(
+        lock_chk_graph_resolve_node(&graph, &map_b, 0, NULL, &node_b),
+        LOCK_CHK_RESULT_OK);
 
-    TEST_ASSERT(lock_chk_graph_add_dependency(
-                    &graph, node_a, LOCK_CHK_MODE_SHARED, node_b,
-                    LOCK_CHK_MODE_SHARED, NULL, NULL) == LOCK_CHK_RESULT_OK);
-    TEST_ASSERT(lock_chk_graph_add_dependency(
-                    &graph, node_b, LOCK_CHK_MODE_SHARED, node_a,
-                    LOCK_CHK_MODE_SHARED, NULL, NULL) == LOCK_CHK_RESULT_OK);
-
-    lock_chk_graph_init(&graph);
-    TEST_ASSERT(lock_chk_graph_resolve_node(&graph, &map_a, 0, NULL, &node_a) ==
-                LOCK_CHK_RESULT_OK);
-    TEST_ASSERT(lock_chk_graph_resolve_node(&graph, &map_b, 0, NULL, &node_b) ==
-                LOCK_CHK_RESULT_OK);
-
-    TEST_ASSERT(lock_chk_graph_add_dependency(
-                    &graph, node_a, LOCK_CHK_MODE_SHARED, node_b,
-                    LOCK_CHK_MODE_EXCLUSIVE, NULL, NULL) == LOCK_CHK_RESULT_OK);
-    TEST_ASSERT(lock_chk_graph_add_dependency(&graph, node_b,
-                                              LOCK_CHK_MODE_SHARED, node_a,
-                                              LOCK_CHK_MODE_EXCLUSIVE, NULL,
-                                              NULL) == LOCK_CHK_RESULT_CYCLE);
+    TEST_ASSERT_EQ(
+        lock_chk_graph_add_dependency(&graph, node_a, LOCK_CHK_MODE_SHARED,
+                                      node_b, LOCK_CHK_MODE_SHARED, NULL, NULL),
+        LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_EQ(
+        lock_chk_graph_add_dependency(&graph, node_b, LOCK_CHK_MODE_SHARED,
+                                      node_a, LOCK_CHK_MODE_SHARED, NULL, NULL),
+        LOCK_CHK_RESULT_OK);
 
     lock_chk_graph_init(&graph);
-    TEST_ASSERT(lock_chk_graph_resolve_node(&graph, &map_a, 0, NULL, &node_a) ==
-                LOCK_CHK_RESULT_OK);
-    TEST_ASSERT(lock_chk_graph_resolve_node(&graph, &map_b, 0, NULL, &node_b) ==
-                LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_EQ(
+        lock_chk_graph_resolve_node(&graph, &map_a, 0, NULL, &node_a),
+        LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_EQ(
+        lock_chk_graph_resolve_node(&graph, &map_b, 0, NULL, &node_b),
+        LOCK_CHK_RESULT_OK);
 
-    TEST_ASSERT(lock_chk_graph_add_dependency(
-                    &graph, node_a, LOCK_CHK_MODE_EXCLUSIVE, node_b,
-                    LOCK_CHK_MODE_EXCLUSIVE, NULL, NULL) == LOCK_CHK_RESULT_OK);
-    TEST_ASSERT(lock_chk_graph_add_dependency(&graph, node_b,
-                                              LOCK_CHK_MODE_EXCLUSIVE, node_a,
-                                              LOCK_CHK_MODE_EXCLUSIVE, NULL,
-                                              NULL) == LOCK_CHK_RESULT_CYCLE);
+    TEST_ASSERT_EQ(lock_chk_graph_add_dependency(
+                       &graph, node_a, LOCK_CHK_MODE_SHARED, node_b,
+                       LOCK_CHK_MODE_EXCLUSIVE, NULL, NULL),
+                   LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_EQ(lock_chk_graph_add_dependency(
+                       &graph, node_b, LOCK_CHK_MODE_SHARED, node_a,
+                       LOCK_CHK_MODE_EXCLUSIVE, NULL, NULL),
+                   LOCK_CHK_RESULT_CYCLE);
+
+    lock_chk_graph_init(&graph);
+    TEST_ASSERT_EQ(
+        lock_chk_graph_resolve_node(&graph, &map_a, 0, NULL, &node_a),
+        LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_EQ(
+        lock_chk_graph_resolve_node(&graph, &map_b, 0, NULL, &node_b),
+        LOCK_CHK_RESULT_OK);
+
+    TEST_ASSERT_EQ(lock_chk_graph_add_dependency(
+                       &graph, node_a, LOCK_CHK_MODE_EXCLUSIVE, node_b,
+                       LOCK_CHK_MODE_EXCLUSIVE, NULL, NULL),
+                   LOCK_CHK_RESULT_OK);
+    TEST_ASSERT_EQ(lock_chk_graph_add_dependency(
+                       &graph, node_b, LOCK_CHK_MODE_EXCLUSIVE, node_a,
+                       LOCK_CHK_MODE_EXCLUSIVE, NULL, NULL),
+                   LOCK_CHK_RESULT_CYCLE);
 
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(lock_chk_rwlock_lifecycle, .group = TEST_GROUP(qspinlock)) {
+TEST_DECLARE_UNIT(qspinlock, lock_chk_rwlock_lifecycle) {
     struct rwlock rw;
     rwlock_init(&rw, THREAD_PRIO_CLASS_TIMESHARE);
 
@@ -416,8 +432,7 @@ TEST_DECLARE_UNIT(lock_chk_rwlock_lifecycle, .group = TEST_GROUP(qspinlock)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(lock_chk_subclasses_all_primitives,
-                  .group = TEST_GROUP(qspinlock)) {
+TEST_DECLARE_UNIT(qspinlock, lock_chk_subclasses_all_primitives) {
     struct spinlock spin;
     struct qspinlock qspin;
     struct mutex mtx;

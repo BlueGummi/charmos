@@ -17,16 +17,15 @@ static void mhtest_do_inserts(struct minheap *mh, struct minheap_node **nodes,
     }
 }
 
-TEST_DECLARE_UNIT(minheap_test, .group = TEST_GROUP(minheap),
-                  TEST_INTENSITY(10, 50, 1024)) {
+TEST_DECLARE_UNIT(minheap, minheap_test, TEST_INTENSITY(10, 50, 1024)) {
     size_t count = ctx->intensity_val ? ctx->intensity_val : 50;
     struct minheap_node **nodes =
         kmalloc(sizeof(struct minheap_node *) * count, ALLOC_FLAGS_ZERO);
-    TEST_ASSERT(nodes != NULL);
+    TEST_ASSERT_NONNULL(nodes);
 
     struct minheap *mh = minheap_create();
     mhtest_do_inserts(mh, nodes, count);
-    TEST_ASSERT(mh->size == count);
+    TEST_ASSERT_EQ(mh->size, count);
 
     for (size_t i = 0; i < count; i++) {
         struct minheap_node *mhn = nodes[i];
@@ -35,12 +34,12 @@ TEST_DECLARE_UNIT(minheap_test, .group = TEST_GROUP(minheap),
         nodes[i] = NULL;
     }
 
-    TEST_ASSERT(mh->size == 0);
+    TEST_ASSERT_EQ(mh->size, 0);
     mhtest_do_inserts(mh, nodes, count);
 
-    TEST_ASSERT(minheap_peek(mh)->key == 1);
+    TEST_ASSERT_EQ(minheap_peek(mh)->key, 1);
     struct minheap_node *popped = minheap_pop(mh);
-    TEST_ASSERT(popped->key == 1);
+    TEST_ASSERT_EQ(popped->key, 1);
 
     kfree(nodes);
     return TEST_SUCCESS;

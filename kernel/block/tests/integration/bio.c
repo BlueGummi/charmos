@@ -20,8 +20,7 @@ static void bio_callback(struct bio_request *req) {
     test_info("blkdev_bio callback succeeded");
 }
 
-TEST_DECLARE_INTEGRATION(blkdev_bio_test, .group = TEST_GROUP(bio),
-                         TEST_INTENSITY(1, 1, 16)) {
+TEST_DECLARE_INTEGRATION(bio, blkdev_bio_test, TEST_INTENSITY(1, 1, 16)) {
     EXT2_INIT;
     struct ext2_fs *fs = root->fs_data;
     struct block_device *d = fs->drive;
@@ -56,9 +55,9 @@ TEST_DECLARE_INTEGRATION(blkdev_bio_test, .group = TEST_GROUP(bio),
 
         sleep_spin_ms(100);
 
-        TEST_ASSERT(bio->status == 0);
+        TEST_ASSERT_OK(bio->status);
     }
-    TEST_ASSERT(done == true);
+    TEST_ASSERT_TRUE(done);
     return TEST_SUCCESS;
 }
 #endif

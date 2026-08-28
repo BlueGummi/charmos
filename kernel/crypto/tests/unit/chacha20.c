@@ -7,7 +7,7 @@ TEST_GROUP_DECLARE(chacha20, .intensity_desc = {
                              });
 
 /* RFC 7539 Section 2.4.2 official test vector */
-TEST_DECLARE_UNIT(chacha20_rfc7539_kat, .group = TEST_GROUP(chacha20)) {
+TEST_DECLARE_UNIT(chacha20, chacha20_rfc7539_kat) {
     static const uint8_t key[32] = {
         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
         0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15,
@@ -39,18 +39,18 @@ TEST_DECLARE_UNIT(chacha20_rfc7539_kat, .group = TEST_GROUP(chacha20)) {
     uint8_t out[114] = {0};
     chacha20_encrypt(key, nonce, counter, (const uint8_t *) plaintext, out,
                      len);
-    TEST_ASSERT(memcmp(out, expected_cipher, len) == 0);
+    TEST_ASSERT_MEM_EQ(out, expected_cipher, len);
 
     /* D(E(M)) == M */
     uint8_t decrypted[114] = {0};
     chacha20_encrypt(key, nonce, counter, out, decrypted, len);
-    TEST_ASSERT(memcmp(decrypted, plaintext, len) == 0);
+    TEST_ASSERT_MEM_EQ(decrypted, plaintext, len);
 
     return TEST_SUCCESS;
 }
 
 /* chunking and stream boundaries */
-TEST_DECLARE_UNIT(chacha20_block_seams, .group = TEST_GROUP(chacha20),
+TEST_DECLARE_UNIT(chacha20, chacha20_block_seams,
                   TEST_INTENSITY(128, 512, 65536)) {
     size_t total = ctx->intensity_val ? ctx->intensity_val : 512;
     uint8_t key[32] = {0x42};
@@ -58,7 +58,9 @@ TEST_DECLARE_UNIT(chacha20_block_seams, .group = TEST_GROUP(chacha20),
     uint8_t *src = kmalloc(total, ALLOC_FLAGS_NONE);
     uint8_t *dst = kmalloc(total, ALLOC_FLAGS_NONE);
     uint8_t *roundtrip = kmalloc(total, ALLOC_FLAGS_NONE);
-    TEST_ASSERT(src && dst && roundtrip);
+    TEST_ASSERT_NONNULL(src);
+    TEST_ASSERT_NONNULL(dst);
+    TEST_ASSERT_NONNULL(roundtrip);
 
     for (size_t i = 0; i < total; i++)
         src[i] = (uint8_t) i;
@@ -76,7 +78,7 @@ TEST_DECLARE_UNIT(chacha20_block_seams, .group = TEST_GROUP(chacha20),
         chacha20_encrypt(key, nonce, 1, src, dst, l);
         chacha20_encrypt(key, nonce, 1, dst, roundtrip, l);
 
-        TEST_ASSERT(memcmp(roundtrip, src, l) == 0);
+        TEST_ASSERT_MEM_EQ(roundtrip, src, l);
     }
 
     kfree(src);

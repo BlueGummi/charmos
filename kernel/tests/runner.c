@@ -723,10 +723,14 @@ static void test_group_run(struct test_group *tg) {
                     .runs_skipped = result_times[TEST_RESULT_SKIPPED]);
             }
 
-            if (log_site_message_count(tctx.site) &&
-                ((result_times[TEST_RESULT_FAILED] ||
-                  (result_times[TEST_RESULT_SKIPPED] && t->run_times > 1)) ||
-                 test_global.show_output)) {
+            bool has_msg = log_site_message_count(tctx.site) > 0;
+            bool of_interest =
+                result_times[TEST_RESULT_FAILED] ||
+                (result_times[TEST_RESULT_SKIPPED] && t->run_times > 1) ||
+                tctx.soft_fails;
+            bool show = test_global.show_output;
+
+            if (has_msg && (of_interest || show)) {
                 test_harness_info("messages:\n");
                 log_dump_site(tctx.site);
             }

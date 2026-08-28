@@ -11,7 +11,7 @@ static void mt_kmalloc_worker(void *) {
 
     for (uint64_t i = 0; i < MT_ALLOC_TIMES; i++) {
         ptrs[i] = kmalloc(64);
-        TEST_ASSERT_VOID(ptrs[i] != NULL);
+        TEST_ASSERT_VOID_NONNULL(ptrs[i]);
     }
 
     for (uint64_t i = 0; i < MT_ALLOC_TIMES; i++) {
@@ -32,25 +32,25 @@ static void mt_kmalloc_worker(void *) {
     atomic_fetch_add(&kmalloc_done, 1);
 }
 
-TEST_DECLARE_INTEGRATION(kmalloc_multithreaded_test, .group = TEST_GROUP(slab),
+TEST_DECLARE_INTEGRATION(slab, kmalloc_multithreaded_test,
                          TEST_INTENSITY_CORES(1, 2, 4, "threads/core")) {
     ABORT_IF_RAM_LOW();
 
     size_t nthreads = ctx->intensity_val ? ctx->intensity_val : 8;
     struct thread **threads = kmalloc(sizeof(struct thread *) * nthreads);
-    TEST_ASSERT(threads != NULL);
+    TEST_ASSERT_NONNULL(threads);
     atomic_store(&kmalloc_done, 0);
 
     for (size_t i = 0; i < nthreads; i++) {
         threads[i] = thread_spawn_joinable_custom_stack(
             "mt_kmalloc_thread", mt_kmalloc_worker, NULL, PAGE_SIZE * 16);
-        TEST_ASSERT(threads[i] != NULL);
+        TEST_ASSERT_NONNULL(threads[i]);
     }
 
     for (size_t i = 0; i < nthreads; i++)
         thread_join(threads[i]);
 
-    TEST_ASSERT(atomic_load(&kmalloc_done) == (int) nthreads);
+    TEST_ASSERT_EQ(atomic_load(&kmalloc_done), (int) nthreads);
     kfree(threads);
     return TEST_SUCCESS;
 }
@@ -141,8 +141,7 @@ static volatile int done[STRESS_THREADS];
 static struct stress_arg args[STRESS_THREADS];
 static char msg[128];
 
-TEST_DECLARE_INTEGRATION(kmalloc_new_concurrency_stress_test,
-                         .group = TEST_GROUP(slab),
+TEST_DECLARE_INTEGRATION(slab, kmalloc_new_concurrency_stress_test,
                          TEST_INTENSITY(5000, 50000, 200000)) {
     memset((void *) done, 0, sizeof(done));
     all_ready = false;

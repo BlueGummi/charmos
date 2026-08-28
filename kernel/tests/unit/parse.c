@@ -4,8 +4,7 @@
 #ifdef TEST_PARSE
 TEST_GROUP_DECLARE(parse);
 
-TEST_DECLARE_UNIT(parse_data_size_units_and_overflow,
-                  .group = TEST_GROUP(parse)) {
+TEST_DECLARE_UNIT(parse, parse_data_size_units_and_overflow) {
     uint64_t val = 0;
 
     TEST_ASSERT(parse_is_data_size("1024", &val) && val == 1024);
@@ -30,7 +29,7 @@ TEST_DECLARE_UNIT(parse_data_size_units_and_overflow,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(parse_duration_units, .group = TEST_GROUP(parse)) {
+TEST_DECLARE_UNIT(parse, parse_duration_units) {
     time_ns_t dur = 0;
 
     TEST_ASSERT(parse_is_duration("500ns", &dur) && dur == 500);
@@ -80,27 +79,27 @@ TEST_DECLARE_UNIT(parse_duration_units, .group = TEST_GROUP(parse)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(parse_cpu_mask_ranges, .group = TEST_GROUP(parse)) {
+TEST_DECLARE_UNIT(parse, parse_cpu_mask_ranges) {
     size_t n_cpus = 16;
     struct cpu_mask m1 = {0};
 
     TEST_ASSERT(parse_is_cpu_mask("3", &m1, n_cpus));
-    TEST_ASSERT(m1.nbits == n_cpus);
+    TEST_ASSERT_EQ(m1.nbits, n_cpus);
     TEST_ASSERT(cpu_mask_test(&m1, 3));
     TEST_ASSERT(!cpu_mask_test(&m1, 0));
-    TEST_ASSERT(cpu_mask_popcount(&m1) == 1);
+    TEST_ASSERT_EQ(cpu_mask_popcount(&m1), 1);
     cpu_mask_deinit(&m1);
 
     struct cpu_mask m2 = {0};
     TEST_ASSERT(parse_is_cpu_mask("0-3,7,9-11", &m2, n_cpus));
-    TEST_ASSERT(m2.nbits == n_cpus);
+    TEST_ASSERT_EQ(m2.nbits, n_cpus);
     TEST_ASSERT(cpu_mask_test(&m2, 0) && cpu_mask_test(&m2, 1) &&
                 cpu_mask_test(&m2, 2) && cpu_mask_test(&m2, 3));
     TEST_ASSERT(cpu_mask_test(&m2, 7));
     TEST_ASSERT(cpu_mask_test(&m2, 9) && cpu_mask_test(&m2, 10) &&
                 cpu_mask_test(&m2, 11));
     TEST_ASSERT(!cpu_mask_test(&m2, 4) && !cpu_mask_test(&m2, 8));
-    TEST_ASSERT(cpu_mask_popcount(&m2) == 8);
+    TEST_ASSERT_EQ(cpu_mask_popcount(&m2), 8);
     cpu_mask_deinit(&m2);
 
     TEST_ASSERT(!parse_is_cpu_mask("16", NULL, n_cpus));
@@ -112,7 +111,7 @@ TEST_DECLARE_UNIT(parse_cpu_mask_ranges, .group = TEST_GROUP(parse)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(parse_bool_and_syntax, .group = TEST_GROUP(parse)) {
+TEST_DECLARE_UNIT(parse, parse_bool_and_syntax) {
     bool val = false;
 
     TEST_ASSERT(parse_is_bool("true", &val) && val == true);
@@ -134,7 +133,7 @@ TEST_DECLARE_UNIT(parse_bool_and_syntax, .group = TEST_GROUP(parse)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(parse_range_and_mac, .group = TEST_GROUP(parse)) {
+TEST_DECLARE_UNIT(parse, parse_range_and_mac) {
     uint64_t start = 0, end = 0;
 
     TEST_ASSERT(parse_is_range("0-100", &start, &end) && start == 0 &&
@@ -165,7 +164,7 @@ TEST_DECLARE_UNIT(parse_range_and_mac, .group = TEST_GROUP(parse)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(parse_numbers_and_fx, .group = TEST_GROUP(parse)) {
+TEST_DECLARE_UNIT(parse, parse_numbers_and_fx) {
     fx32_32_t fx = 0;
     TEST_ASSERT(parse_is_fx("0.5", &fx) && fx == FX(0.5));
     TEST_ASSERT(parse_is_fx("1.25", &fx) && fx == FX(1.25));
@@ -185,47 +184,47 @@ TEST_DECLARE_UNIT(parse_numbers_and_fx, .group = TEST_GROUP(parse)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(parse_list_and_escaping, .group = TEST_GROUP(parse)) {
+TEST_DECLARE_UNIT(parse, parse_list_and_escaping) {
     struct parse_list list = {0};
 
     /* comma-separated list */
     TEST_ASSERT(parse_is_list("apple,banana,cherry", &list));
-    TEST_ASSERT(list.count == 3);
-    TEST_ASSERT(strcmp(list.items[0], "apple") == 0);
-    TEST_ASSERT(strcmp(list.items[1], "banana") == 0);
-    TEST_ASSERT(strcmp(list.items[2], "cherry") == 0);
+    TEST_ASSERT_EQ(list.count, 3);
+    TEST_ASSERT_STR_EQ(list.items[0], "apple");
+    TEST_ASSERT_STR_EQ(list.items[1], "banana");
+    TEST_ASSERT_STR_EQ(list.items[2], "cherry");
     parse_list_free(&list);
 
     /* Quoted items */
     TEST_ASSERT(parse_is_list("first,\"second,with,comma\",third", &list));
-    TEST_ASSERT(list.count == 3);
-    TEST_ASSERT(strcmp(list.items[0], "first") == 0);
-    TEST_ASSERT(strcmp(list.items[1], "second,with,comma") == 0);
-    TEST_ASSERT(strcmp(list.items[2], "third") == 0);
+    TEST_ASSERT_EQ(list.count, 3);
+    TEST_ASSERT_STR_EQ(list.items[0], "first");
+    TEST_ASSERT_STR_EQ(list.items[1], "second,with,comma");
+    TEST_ASSERT_STR_EQ(list.items[2], "third");
     parse_list_free(&list);
 
     /* Escape characters */
     TEST_ASSERT(parse_is_list("escaped\\,comma,line\\nbreak", &list));
-    TEST_ASSERT(list.count == 2);
-    TEST_ASSERT(strcmp(list.items[0], "escaped,comma") == 0);
-    TEST_ASSERT(strcmp(list.items[1], "line\nbreak") == 0);
+    TEST_ASSERT_EQ(list.count, 2);
+    TEST_ASSERT_STR_EQ(list.items[0], "escaped,comma");
+    TEST_ASSERT_STR_EQ(list.items[1], "line\nbreak");
     parse_list_free(&list);
 
     /* Whitespace */
     TEST_ASSERT(parse_is_list("  alpha  ,  \" beta \"  ,  gamma  ", &list));
-    TEST_ASSERT(list.count == 3);
-    TEST_ASSERT(strcmp(list.items[0], "alpha") == 0);
-    TEST_ASSERT(strcmp(list.items[1], " beta ") == 0);
-    TEST_ASSERT(strcmp(list.items[2], "gamma") == 0);
+    TEST_ASSERT_EQ(list.count, 3);
+    TEST_ASSERT_STR_EQ(list.items[0], "alpha");
+    TEST_ASSERT_STR_EQ(list.items[1], " beta ");
+    TEST_ASSERT_STR_EQ(list.items[2], "gamma");
 
     /* parse_list_for_each macro */
     size_t count = 0;
     const char *item = NULL;
     parse_list_for_each(item, &list) {
-        TEST_ASSERT(item != NULL);
+        TEST_ASSERT_NONNULL(item);
         count++;
     }
-    TEST_ASSERT(count == 3);
+    TEST_ASSERT_EQ(count, 3);
     parse_list_free(&list);
 
     /* Zero-allocation syntax validation */

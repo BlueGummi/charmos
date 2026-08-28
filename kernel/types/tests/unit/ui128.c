@@ -15,7 +15,7 @@ static uint128_t ref_shl(uint128_t a, int b) {
     return b == 0 ? a : a << b;
 }
 
-TEST_DECLARE_UNIT(ui128_shift_left, .group = TEST_GROUP(ui128)) {
+TEST_DECLARE_UNIT(ui128, ui128_shift_left) {
     static const uint128_t vals[] = {
         0,
         1,
@@ -32,7 +32,7 @@ TEST_DECLARE_UNIT(ui128_shift_left, .group = TEST_GROUP(ui128)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(ui128_shift_left_seam, .group = TEST_GROUP(ui128)) {
+TEST_DECLARE_UNIT(ui128, ui128_shift_left_seam) {
     uint128_t one = 1;
 
     TEST_ASSERT(__ashlti3(one, 0) == one);
@@ -47,7 +47,7 @@ TEST_DECLARE_UNIT(ui128_shift_left_seam, .group = TEST_GROUP(ui128)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(ui128_shift_right_logical, .group = TEST_GROUP(ui128)) {
+TEST_DECLARE_UNIT(ui128, ui128_shift_right_logical) {
     static const uint128_t vals[] = {
         0,
         1,
@@ -66,7 +66,7 @@ TEST_DECLARE_UNIT(ui128_shift_right_logical, .group = TEST_GROUP(ui128)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(ui128_shift_right_logical_seam, .group = TEST_GROUP(ui128)) {
+TEST_DECLARE_UNIT(ui128, ui128_shift_right_logical_seam) {
     uint128_t top = U128(1ULL << 63, 0);
 
     TEST_ASSERT(__lshrti3(top, 0) == top);
@@ -82,7 +82,7 @@ TEST_DECLARE_UNIT(ui128_shift_right_logical_seam, .group = TEST_GROUP(ui128)) {
 
 /* The arithmetic shift is the one with a sign to preserve; a logical shift
  * substituted here would pass every non-negative case in the sweep above. */
-TEST_DECLARE_UNIT(ui128_shift_right_arithmetic, .group = TEST_GROUP(ui128)) {
+TEST_DECLARE_UNIT(ui128, ui128_shift_right_arithmetic) {
     static const int128_t vals[] = {
         0, 1, -1, 12345, -12345, INT128_MAX, INT128_MIN,
     };
@@ -96,8 +96,7 @@ TEST_DECLARE_UNIT(ui128_shift_right_arithmetic, .group = TEST_GROUP(ui128)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(ui128_shift_right_arithmetic_signs,
-                  .group = TEST_GROUP(ui128)) {
+TEST_DECLARE_UNIT(ui128, ui128_shift_right_arithmetic_signs) {
     /* -1 stays -1 at every shift; that is the whole point of sign fill. */
     for (int b = 0; b < 128; b++)
         TEST_ASSERT(__ashrti3((int128_t) -1, b) == (int128_t) -1);
@@ -113,8 +112,7 @@ TEST_DECLARE_UNIT(ui128_shift_right_arithmetic_signs,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(ui128_negate, .group = TEST_GROUP(ui128),
-                  TEST_INTENSITY(16, 64, 1024)) {
+TEST_DECLARE_UNIT(ui128, ui128_negate, TEST_INTENSITY(16, 64, 1024)) {
     size_t iters = ctx->intensity_val ? ctx->intensity_val : 64;
     TEST_ASSERT(__negti2(0) == 0);
     TEST_ASSERT(__negti2(1) == (int128_t) -1);
@@ -133,8 +131,7 @@ TEST_DECLARE_UNIT(ui128_negate, .group = TEST_GROUP(ui128),
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(ui128_multiply, .group = TEST_GROUP(ui128),
-                  TEST_INTENSITY(8, 32, 256)) {
+TEST_DECLARE_UNIT(ui128, ui128_multiply, TEST_INTENSITY(8, 32, 256)) {
     size_t bound = ctx->intensity_val ? ctx->intensity_val : 32;
     TEST_ASSERT(__multi3(0, 12345) == 0);
     TEST_ASSERT(__multi3(1, 12345) == 12345);
@@ -159,7 +156,7 @@ TEST_DECLARE_UNIT(ui128_multiply, .group = TEST_GROUP(ui128),
 
 /* Division is checked through its own contract rather than a table: whatever
  * the quotient is, q*d + r must reproduce n and r must stay below d. */
-TEST_DECLARE_UNIT(ui128_divmod_identity, .group = TEST_GROUP(ui128)) {
+TEST_DECLARE_UNIT(ui128, ui128_divmod_identity) {
     static const uint128_t nums[] = {
         0,           1,
         12345,       U128(0, UINT64_MAX),
@@ -185,7 +182,7 @@ TEST_DECLARE_UNIT(ui128_divmod_identity, .group = TEST_GROUP(ui128)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(ui128_divmod_edges, .group = TEST_GROUP(ui128)) {
+TEST_DECLARE_UNIT(ui128, ui128_divmod_edges) {
     uint128_t rem = 0;
 
     /* A numerator smaller than the divisor is all remainder. */
@@ -202,8 +199,7 @@ TEST_DECLARE_UNIT(ui128_divmod_edges, .group = TEST_GROUP(ui128)) {
 /* C rounds signed division toward zero, which makes the remainder take the
  * sign of the dividend -- not the divisor. Both directions are easy to invert.
  */
-TEST_DECLARE_UNIT(ui128_signed_divmod, .group = TEST_GROUP(ui128),
-                  TEST_INTENSITY(10, 40, 512)) {
+TEST_DECLARE_UNIT(ui128, ui128_signed_divmod, TEST_INTENSITY(10, 40, 512)) {
     size_t bound = ctx->intensity_val ? ctx->intensity_val : 40;
     int128_t rem;
 
@@ -238,41 +234,41 @@ TEST_DECLARE_UNIT(ui128_signed_divmod, .group = TEST_GROUP(ui128),
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(ui128_popcount_parity, .group = TEST_GROUP(ui128)) {
-    TEST_ASSERT(__popcountti2(0) == 0);
-    TEST_ASSERT(__popcountti2(UINT128_MAX) == 128);
-    TEST_ASSERT(__popcountti2(U128(UINT64_MAX, 0)) == 64);
-    TEST_ASSERT(__popcountti2(U128(0, UINT64_MAX)) == 64);
+TEST_DECLARE_UNIT(ui128, ui128_popcount_parity) {
+    TEST_ASSERT_EQ(__popcountti2(0), 0);
+    TEST_ASSERT_EQ(__popcountti2(UINT128_MAX), 128);
+    TEST_ASSERT_EQ(__popcountti2(U128(UINT64_MAX, 0)), 64);
+    TEST_ASSERT_EQ(__popcountti2(U128(0, UINT64_MAX)), 64);
 
     /* Every single bit must be seen exactly once, in both halves. */
     for (int b = 0; b < 128; b++)
-        TEST_ASSERT(__popcountti2(__ashlti3(1, b)) == 1);
+        TEST_ASSERT_EQ(__popcountti2(__ashlti3(1, b)), 1);
 
-    TEST_ASSERT(__parityti2(0) == 0);
-    TEST_ASSERT(__parityti2(1) == 1);
-    TEST_ASSERT(__parityti2(3) == 0);
-    TEST_ASSERT(__parityti2(UINT128_MAX) == 0);
+    TEST_ASSERT_EQ(__parityti2(0), 0);
+    TEST_ASSERT_EQ(__parityti2(1), 1);
+    TEST_ASSERT_EQ(__parityti2(3), 0);
+    TEST_ASSERT_EQ(__parityti2(UINT128_MAX), 0);
 
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(ui128_count_zeros, .group = TEST_GROUP(ui128)) {
+TEST_DECLARE_UNIT(ui128, ui128_count_zeros) {
     for (int b = 0; b < 128; b++) {
         uint128_t v = __ashlti3(1, b);
-        TEST_ASSERT(__clzti2(v) == 127 - b);
-        TEST_ASSERT(__ctzti2(v) == b);
-        TEST_ASSERT(__ffsti2((int128_t) v) == b + 1);
+        TEST_ASSERT_EQ(__clzti2(v), 127 - b);
+        TEST_ASSERT_EQ(__ctzti2(v), b);
+        TEST_ASSERT_EQ(__ffsti2((int128_t) v), b + 1);
     }
 
-    TEST_ASSERT(__ffsti2(0) == 0);
-    TEST_ASSERT(__clzti2(UINT128_MAX) == 0);
-    TEST_ASSERT(__ctzti2(UINT128_MAX) == 0);
+    TEST_ASSERT_EQ(__ffsti2(0), 0);
+    TEST_ASSERT_EQ(__clzti2(UINT128_MAX), 0);
+    TEST_ASSERT_EQ(__ctzti2(UINT128_MAX), 0);
 
     return TEST_SUCCESS;
 }
 
 /* Test the overflow checks in __negvti2 and similar functions */
-TEST_DECLARE_UNIT(ui128_limits, .group = TEST_GROUP(ui128)) {
+TEST_DECLARE_UNIT(ui128, ui128_limits) {
     TEST_ASSERT(INT128_MAX > 0);
     TEST_ASSERT(INT128_MIN < 0);
     TEST_ASSERT(INT128_MAX == (int128_t) (UINT128_MAX >> 1));

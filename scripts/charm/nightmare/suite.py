@@ -33,7 +33,7 @@ COMPILERS = ("gcc", "clang")
 BUILD_TYPES = ("Debug", "Release", "RelWithDebInfo", "MinSizeRel")
 MODES = ("horizontal", "vertical")
 SEED_MODES = ("split", "seedful", "seedless")
-ON_STALL = ("report", "snapshot", "terminal")
+ON_STALL = ("report", "crash")
 
 FLUSH_MARGIN_MS = 15000
 
@@ -89,6 +89,7 @@ class Boot:
     max_boots: int = 500
     min_interval_ms: int = 0
     stat_interval_ms: int = 5000
+    stall_threshold_ms: int = 3000
     on_stall: str = "report"
 
     @property
@@ -277,6 +278,7 @@ def _build_suite(raw: dict, diags: list[Diagnostic]) -> Suite | None:
                     max_boots=_get(boot_raw, "max_boots", 500),
                     min_interval_ms=_get(boot_raw, "min_interval_ms", 0),
                     stat_interval_ms=_get(boot_raw, "stat_interval_ms", 5000),
+                    stall_threshold_ms=_get(boot_raw, "stall_threshold_ms", 3000),
                     on_stall=_get(boot_raw, "on_stall", "report"),
                 ),
                 nightmare=Nightmare(
@@ -430,6 +432,8 @@ def _boot_diagnostics(b: Boot, meta: SuiteMeta, p: str) -> list[Diagnostic]:
         return d
     if b.stat_interval_ms <= 0:
         d.append(Diagnostic(f"{p}.boot.stat_interval_ms", "must be positive"))
+    if b.stall_threshold_ms < 100:
+        d.append(Diagnostic(f"{p}.boot.stall_threshold_ms", "must be at least 100ms"))
 
     if b.timeout_ms and b.timeout_ms <= b.guest_hard_ms:
         d.append(

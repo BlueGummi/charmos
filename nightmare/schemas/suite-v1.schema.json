@@ -242,10 +242,17 @@
           "default": 5000,
           "description": "Interval in milliseconds between guest heartbeat and statistics log emissions."
         },
+        "stall_threshold_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 600000,
+          "default": 3000,
+          "description": "Liveness stall detection threshold in milliseconds."
+        },
         "on_stall": {
-          "enum": ["report", "snapshot", "terminal"],
+          "enum": ["report", "crash"],
           "default": "report",
-          "description": "Action taken by the guest kernel watchdog when a watchdog stall is detected ('report' emits a diagnostic record, 'snapshot' captures system state, 'terminal' halts or reboots)."
+          "description": "Action taken when aggregate Nightmare progress stalls: 'report' emits a finding and attempts bounded cooperative teardown, and 'crash' emits the finding and enters the kernel crash path."
         }
       }
     },

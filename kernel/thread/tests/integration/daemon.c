@@ -15,7 +15,7 @@ static enum daemon_thread_command daemon_work(void *a, void *b) {
 static struct daemon_work dwork =
     DAEMON_WORK_FROM(daemon_work, WORK_ARGS(NULL, NULL));
 
-TEST_DECLARE_INTEGRATION(daemon_test, .group = TEST_GROUP(daemon)) {
+TEST_DECLARE_INTEGRATION(daemon, daemon_test) {
     atomic_store(&daemon_work_run, false);
 
     struct cpu_mask cmask;

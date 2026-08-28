@@ -5,6 +5,12 @@
 #include <string.h>
 #include <time/time.h>
 
+/* This is a necessary evil, as the command line will
+ * pass in nanoseconds, and we map to milliseconds in the config
+ *
+ * It also helps us expand the command line options without
+ * bloating up a config file, if said options are operated
+ * upon to arrive at the final value in the config */
 static const char *nightmare_selector;
 static fx32_32_t nightmare_intensity = NIGHTMARE_INTENSITY_SENTINEL;
 static uint64_t nightmare_seed;
@@ -12,6 +18,7 @@ static enum nightmare_seed_mode nightmare_seed_mode = NIGHTMARE_SEED_SPLIT;
 static time_ns_t nightmare_duration_ns;
 static time_ns_t nightmare_drain_grace_ns = SECONDS_TO_NS(20);
 static time_ns_t nightmare_stat_interval_ns = SECONDS_TO_NS(5);
+static time_ns_t nightmare_stall_threshold_ns = MS_TO_NS(3000);
 static enum nightmare_on_stall nightmare_on_stall = NIGHTMARE_ON_STALL_REPORT;
 static uint64_t nightmare_boot_index;
 static const char *nightmare_campaign_id;
@@ -39,12 +46,15 @@ CMDLINE_CHILDREN_DECLARE(
                            .desc = "Soft-to-hard deadline grace"),
     CMDLINE_INNER_DURATION(stat_interval_ms, nightmare_stat_interval_ns,
                            .desc = "Heartbeat record cadence"),
+    CMDLINE_INNER_DURATION(stall_threshold_ms, nightmare_stall_threshold_ns,
+                           .desc = "Liveness stall threshold duration",
+                           .range = RANGE(MS_TO_NS(100), TIME_NS_MAX)),
     CMDLINE_INNER_VAR(on_stall, nightmare_on_stall, .desc = "Stall response",
                       .mappings = CMDLINE_MAPPINGS(
                           CMDLINE_MAP("report", NIGHTMARE_ON_STALL_REPORT),
-                          CMDLINE_MAP("snapshot", NIGHTMARE_ON_STALL_SNAPSHOT),
-                          CMDLINE_MAP("terminal",
-                                      NIGHTMARE_ON_STALL_TERMINAL))),
+                          CMDLINE_MAP("crash", NIGHTMARE_ON_STALL_CRASH),
+                          CMDLINE_MAP("snapshot", NIGHTMARE_ON_STALL_CRASH),
+                          CMDLINE_MAP("terminal", NIGHTMARE_ON_STALL_CRASH))),
     CMDLINE_INNER_VAR(boot_index, nightmare_boot_index,
                       .desc = "Opaque campaign boot index"),
     CMDLINE_INNER_STRING(campaign_id, nightmare_campaign_id,
@@ -65,6 +75,7 @@ void nightmare_cmdline_get(struct nightmare_cmdline_config *config) {
         .duration_ms = NS_TO_MS(nightmare_duration_ns),
         .drain_grace_ms = NS_TO_MS(nightmare_drain_grace_ns),
         .stat_interval_ms = NS_TO_MS(nightmare_stat_interval_ns),
+        .stall_threshold_ms = NS_TO_MS(nightmare_stall_threshold_ns),
         .on_stall = nightmare_on_stall,
         .boot_index = nightmare_boot_index,
         .campaign_id = nightmare_campaign_id,

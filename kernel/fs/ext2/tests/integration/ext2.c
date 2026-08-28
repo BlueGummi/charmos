@@ -25,7 +25,7 @@ static void check_bcache(void) {
 
     test_info(msg);
 
-    TEST_ASSERT(bcache_total_dirty == 0);
+    TEST_ASSERT_EQ(bcache_total_dirty, 0);
 }*/
 
 static void flush() {
@@ -39,7 +39,7 @@ static void flush() {
     check_bcache();*/
 }
 
-TEST_DECLARE_INTEGRATION(ext2_integration_test, .group = TEST_GROUP(ext2),
+TEST_DECLARE_INTEGRATION(ext2, ext2_integration_test,
                          TEST_INTENSITY(1, 4, 64)) {
     EXT2_INIT;
 
@@ -47,38 +47,39 @@ TEST_DECLARE_INTEGRATION(ext2_integration_test, .group = TEST_GROUP(ext2),
     const char *lstr = large_test_string;
     uint64_t len = strlen(lstr);
     char *out_buf = kmalloc(len + 1, ALLOC_FLAGS_ZERO);
-    TEST_ASSERT(out_buf != NULL);
+    TEST_ASSERT_NONNULL(out_buf);
 
     for (size_t iter = 0; iter < ops; iter++) {
         char fname[32];
         snprintf(fname, sizeof(fname), "ext2_test_%zu", iter);
 
-        FAIL_IF_FATAL(root->ops->create(root, fname, VFS_MODE_FILE));
+        TEST_ASSERT(
+            !ERR_IS_FATAL(root->ops->create(root, fname, VFS_MODE_FILE)));
 
         struct vfs_dirent ent;
         struct vfs_node *node;
-        FAIL_IF_FATAL(root->ops->finddir(root, fname, &ent));
+        TEST_ASSERT(!ERR_IS_FATAL(root->ops->finddir(root, fname, &ent)));
 
         node = ent.node;
-        TEST_ASSERT(node != NULL);
+        TEST_ASSERT_NONNULL(node);
 
-        FAIL_IF_FATAL(node->ops->write(node, lstr, len, 0));
-        TEST_ASSERT(node->size == len);
-
-        memset(out_buf, 0, len + 1);
-        FAIL_IF_FATAL(node->ops->read(node, out_buf, len, 0));
-        TEST_ASSERT(memcmp(out_buf, lstr, len) == 0);
-
-        FAIL_IF_FATAL(node->ops->truncate(node, len / 2));
+        TEST_ASSERT(!ERR_IS_FATAL(node->ops->write(node, lstr, len, 0)));
+        TEST_ASSERT_EQ(node->size, len);
 
         memset(out_buf, 0, len + 1);
-        FAIL_IF_FATAL(node->ops->read(node, out_buf, len, 0));
-        TEST_ASSERT(strlen(out_buf) == len / 2);
+        TEST_ASSERT(!ERR_IS_FATAL(node->ops->read(node, out_buf, len, 0)));
+        TEST_ASSERT_MEM_EQ(out_buf, lstr, len);
 
-        FAIL_IF_FATAL(node->ops->unlink(root, fname));
+        TEST_ASSERT(!ERR_IS_FATAL(node->ops->truncate(node, len / 2)));
+
+        memset(out_buf, 0, len + 1);
+        TEST_ASSERT(!ERR_IS_FATAL(node->ops->read(node, out_buf, len, 0)));
+        TEST_ASSERT_EQ(strlen(out_buf), len / 2);
+
+        TEST_ASSERT(!ERR_IS_FATAL(node->ops->unlink(root, fname)));
 
         enum errno e = root->ops->finddir(root, fname, &ent);
-        TEST_ASSERT(e == ERR_NO_ENT);
+        TEST_ASSERT_EQ_S(e, ERR_NO_ENT);
     }
 
     kfree(out_buf);

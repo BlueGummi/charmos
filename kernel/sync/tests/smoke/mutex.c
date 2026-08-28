@@ -12,7 +12,7 @@ TEST_GROUP_DECLARE(mutex, .intensity_desc = {
 
 static struct mutex basic_test_mtx = MUTEX_INIT;
 
-TEST_DECLARE_SMOKE(mutex_test_basic, .group = TEST_GROUP(mutex)) {
+TEST_DECLARE_SMOKE(mutex, mutex_test_basic) {
     mutex_lock(&basic_test_mtx);
     scheduler_yield();
     mutex_unlock(&basic_test_mtx);

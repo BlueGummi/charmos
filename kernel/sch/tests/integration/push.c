@@ -15,7 +15,7 @@ static void sched_push_try(void *) {
     atomic_store(&at_least_one_migrated, true);
 }
 
-TEST_DECLARE_INTEGRATION(sched_push_target_test, .group = TEST_GROUP(sched),
+TEST_DECLARE_INTEGRATION(sched, sched_push_target_test,
                          TEST_INTENSITY(32, 256, 1024)) {
     test_info("This test takes a bit. uncomment me to run it");
     return TEST_SKIP(TEST_SKIP_NONE);
@@ -33,7 +33,7 @@ TEST_DECLARE_INTEGRATION(sched_push_target_test, .group = TEST_GROUP(sched),
 
     struct thread **pushed =
         kmalloc(sizeof(struct thread *) * count, ALLOC_FLAGS_ZERO);
-    TEST_ASSERT(pushed != NULL);
+    TEST_ASSERT_NONNULL(pushed);
 
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     for (size_t i = 0; i < count; i++) {
@@ -48,7 +48,7 @@ TEST_DECLARE_INTEGRATION(sched_push_target_test, .group = TEST_GROUP(sched),
         }
     }
 
-    TEST_ASSERT(atomic_load(&left) == 0);
+    TEST_ASSERT_EQ(atomic_load(&left), 0);
 
     kfree(pushed);
     return TEST_SUCCESS;

@@ -2,7 +2,6 @@
 
 #ifdef TEST_MUTEX
 
-
 #define MUTEX_REPORT_PROBLEMS()                                                \
     test_info("Mutex tests are encountering problems and will be skipped");    \
     return TEST_SKIP(TEST_SKIP_NONE);
@@ -52,7 +51,7 @@ static void pi_ts_thread(void *nothing) {
     test_info("exiting");
 }
 
-TEST_DECLARE_INTEGRATION(mutex_pi_test, .group = TEST_GROUP(mutex)) {
+TEST_DECLARE_INTEGRATION(mutex, mutex_pi_test) {
     if (global.core_count == 1) {
         return TEST_SKIP(TEST_SKIP_NONE);
     }
@@ -88,7 +87,7 @@ TEST_DECLARE_INTEGRATION(mutex_pi_test, .group = TEST_GROUP(mutex)) {
     thread_join(pi_rt);
     thread_join(pi_dum);
 
-    TEST_ASSERT(atomic_load(&pi_done) == 3);
+    TEST_ASSERT_EQ(atomic_load(&pi_done), 3);
 
     return TEST_SUCCESS;
 }
@@ -142,7 +141,7 @@ static void pi_chain_rt(void *arg) {
     atomic_fetch_add(&pi_chain_done, 1);
 }
 
-TEST_DECLARE_INTEGRATION(mutex_pi_chain, .group = TEST_GROUP(mutex)) {
+TEST_DECLARE_INTEGRATION(mutex, mutex_pi_chain) {
     if (global.core_count < 2) {
         return TEST_SKIP(TEST_SKIP_NONE);
     }
@@ -182,7 +181,7 @@ TEST_DECLARE_INTEGRATION(mutex_pi_chain, .group = TEST_GROUP(mutex)) {
     thread_join(pi_ts1);
     thread_join(pi_rt2);
 
-    TEST_ASSERT(atomic_load(&pi_chain_done) == 3);
+    TEST_ASSERT_EQ(atomic_load(&pi_chain_done), 3);
 
     return TEST_SUCCESS;
 }
@@ -213,7 +212,7 @@ static void pi_multi_rt(void *arg) {
     atomic_fetch_add(&pi_multi_done, 1);
 }
 
-TEST_DECLARE_INTEGRATION(mutex_pi_multi_waiters, .group = TEST_GROUP(mutex),
+TEST_DECLARE_INTEGRATION(mutex, mutex_pi_multi_waiters,
                          TEST_INTENSITY_LINEAR(2, 2, 8, "rt_waiters")) {
     if (global.core_count < 2) {
         return TEST_SKIP(TEST_SKIP_NONE);
@@ -253,7 +252,7 @@ TEST_DECLARE_INTEGRATION(mutex_pi_multi_waiters, .group = TEST_GROUP(mutex),
     for (size_t i = 0; i < num_rt; i++)
         thread_join(rt[i]);
 
-    TEST_ASSERT(atomic_load(&pi_multi_done) == (unsigned) (num_rt + 1));
+    TEST_ASSERT_EQ(atomic_load(&pi_multi_done), (unsigned) (num_rt + 1));
 
     return TEST_SUCCESS;
 }
@@ -288,7 +287,7 @@ static void pi_revert_rt(void *arg) {
     atomic_fetch_add(&pi_reverted_done, 1);
 }
 
-TEST_DECLARE_INTEGRATION(mutex_pi_revert, .group = TEST_GROUP(mutex)) {
+TEST_DECLARE_INTEGRATION(mutex, mutex_pi_revert) {
     if (global.core_count < 2) {
         return TEST_SKIP(TEST_SKIP_NONE);
     }

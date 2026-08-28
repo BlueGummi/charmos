@@ -196,15 +196,27 @@ struct test_globals {
     bool no_progress;
 };
 
+#define TEST_GROUP_NONE test_group_orphan_parent
+
+/* Goofy macros needed for the DECLARE macro */
+#define __test_group_TEST_GROUP_NONE test_group_orphan_parent
+#define __test_group_none test_group_orphan_parent
+#define __test_group_orphan test_group_orphan_parent
+#define __test_group_test_group_orphan_parent test_group_orphan_parent
+
+#define TEST_GROUP(name) &(__test_group_##name)
+#define TEST_GROUP_DEFINE(name) extern struct test_group __test_group_##name
+
 #define TEST(id) __test_##id
-#define TEST_DECLARE(id, ...)                                                  \
+#define TEST_DECLARE(grp, id, ...)                                             \
     static struct test_verdict id(struct test_context *ctx);                   \
+    extern struct test_group __test_group_##grp;                               \
     extern struct test __test_##id;                                            \
     LINKER_SECTION_OBJECT(struct test, tests)                                  \
     __test_##id = {.name = #id,                                                \
                    .func = id,                                                 \
                    .run_times = 1,                                             \
-                   .group = &test_group_orphan_parent,                         \
+                   .group = TEST_GROUP(grp),                                   \
                    .enabled = TEST_STATE_SENTINEL,                             \
                    .inject_count = 0,                                          \
                    .msg_cap = 0,                                               \
@@ -213,16 +225,16 @@ struct test_globals {
                    .tier = TEST_TIER_UNIT,                                     \
                    .intensity = TEST_INTENSITY_SENTINEL,                       \
                    .intensity_desc = TEST_INTENSITY_DESC_SENTINEL,             \
-                   __VA_ARGS__};                                               \
+                   ##__VA_ARGS__};                                             \
                                                                                \
     static struct test_verdict id(struct test_context *ctx __unused)
 
-#define TEST_DECLARE_SMOKE(id, ...)                                            \
-    TEST_DECLARE(id, .tier = TEST_TIER_SMOKE, ##__VA_ARGS__)
-#define TEST_DECLARE_UNIT(id, ...)                                             \
-    TEST_DECLARE(id, .tier = TEST_TIER_UNIT, ##__VA_ARGS__)
-#define TEST_DECLARE_INTEGRATION(id, ...)                                      \
-    TEST_DECLARE(id, .tier = TEST_TIER_INTEGRATION, ##__VA_ARGS__)
+#define TEST_DECLARE_SMOKE(grp, id, ...)                                       \
+    TEST_DECLARE(grp, id, .tier = TEST_TIER_SMOKE, ##__VA_ARGS__)
+#define TEST_DECLARE_UNIT(grp, id, ...)                                        \
+    TEST_DECLARE(grp, id, .tier = TEST_TIER_UNIT, ##__VA_ARGS__)
+#define TEST_DECLARE_INTEGRATION(grp, id, ...)                                 \
+    TEST_DECLARE(grp, id, .tier = TEST_TIER_INTEGRATION, ##__VA_ARGS__)
 
 #define TEST_GROUP_DECLARE(n, ...)                                             \
     extern struct test_group __test_group_##n;                                 \
@@ -237,10 +249,7 @@ struct test_globals {
                         .integration_enabled = TEST_STATE_SENTINEL,            \
                         .default_intensity = TEST_INTENSITY_SENTINEL,          \
                         .intensity_desc = TEST_INTENSITY_DESC_SENTINEL,        \
-                        __VA_ARGS__}
-
-#define TEST_GROUP(name) &(__test_group_##name)
-#define TEST_GROUP_DEFINE(name) extern struct test_group __test_group_##name
+                        ##__VA_ARGS__}
 
 /* 1D piecewise-log */
 #define TEST_INTENSITY_LOG(min, def, max, unit_str)                            \
@@ -300,24 +309,6 @@ struct test_globals {
 
 #define TEST_ARRAY_LEN(a) (sizeof(a) / sizeof((a)[0]))
 
-#define TEST_ASSERT(x)                                                         \
-    do {                                                                       \
-        if (!(x)) {                                                            \
-            printf(" assert \"%s\" failed at %s:%d ", #x, __RELFILE__,         \
-                   __LINE__);                                                  \
-            return TEST_FAIL(#x);                                              \
-        }                                                                      \
-    } while (0)
-
-#define TEST_ASSERT_VOID(x)                                                    \
-    do {                                                                       \
-        if (!(x)) {                                                            \
-            printf(" assert \"%s\" failed at %s:%d ", #x, __RELFILE__,         \
-                   __LINE__);                                                  \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
 #define test_log(lvl, fmt, ...)                                                \
     log(test_global.current_test->site, &test_global.current_test->handle,     \
         lvl, fmt, ##__VA_ARGS__)
@@ -328,7 +319,7 @@ struct test_globals {
 #define test_debug(fmt, ...) test_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
 #define test_trace(fmt, ...) test_log(LOG_TRACE, fmt, ##__VA_ARGS__)
 
-#define FAIL_IF_FATAL(op) TEST_ASSERT(!ERR_IS_FATAL(op))
+#include <test/assert.h>
 
 #define ABORT_IF_RAM_LOW()                                                     \
     if (pmm_get_usable_ram() < 1024 * 1024 * 8) {                              \

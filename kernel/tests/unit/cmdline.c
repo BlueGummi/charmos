@@ -34,7 +34,7 @@ CMDLINE_SCHEMA_DECLARE(shared_right_schema, "schema_probe", "right",
                        CMDLINE_SCHEMA_PROP(struct shared_schema_probe,
                                            enabled));
 
-TEST_DECLARE_UNIT(cmdline_shared_schema_root, .group = TEST_GROUP(cmdline)) {
+TEST_DECLARE_UNIT(cmdline, cmdline_shared_schema_root) {
     cmdline_dispatch("schema_probe.right.enabled", "true");
     cmdline_dispatch("schema_probe.left.enabled", "true");
     TEST_ASSERT(shared_left.enabled);
@@ -42,45 +42,37 @@ TEST_DECLARE_UNIT(cmdline_shared_schema_root, .group = TEST_GROUP(cmdline)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(cmdline_xmacro_descriptors, .group = TEST_GROUP(cmdline)) {
-    TEST_ASSERT(strcmp(cmdline_type_to_str(CMDLINE_TYPE_BOOL), "bool") == 0);
-    TEST_ASSERT(strcmp(cmdline_type_to_str(CMDLINE_TYPE_INT), "int") == 0);
-    TEST_ASSERT(strcmp(cmdline_type_to_str(CMDLINE_TYPE_UINT), "uint") == 0);
-    TEST_ASSERT(strcmp(cmdline_type_to_str(CMDLINE_TYPE_FX), "fx") == 0);
-    TEST_ASSERT(
-        strcmp(cmdline_type_to_str(CMDLINE_TYPE_DURATION), "duration") == 0);
-    TEST_ASSERT(
-        strcmp(cmdline_type_to_str(CMDLINE_TYPE_DATA_SIZE), "data_size") == 0);
-    TEST_ASSERT(strcmp(cmdline_type_to_str(CMDLINE_TYPE_RANGE), "range") == 0);
-    TEST_ASSERT(
-        strcmp(cmdline_type_to_str(CMDLINE_TYPE_CPU_MASK), "cpu_mask") == 0);
-    TEST_ASSERT(strcmp(cmdline_type_to_str(CMDLINE_TYPE_MAC), "mac") == 0);
-    TEST_ASSERT(strcmp(cmdline_type_to_str(CMDLINE_TYPE_STRING), "string") ==
-                0);
-    TEST_ASSERT(strcmp(cmdline_type_to_str(CMDLINE_TYPE_LIST), "list") == 0);
-    TEST_ASSERT(strcmp(cmdline_type_to_str(CMDLINE_TYPE_ERR), "err") == 0);
-    TEST_ASSERT(strcmp(cmdline_type_to_str(CMDLINE_TYPE_NONE), "none") == 0);
+TEST_DECLARE_UNIT(cmdline, cmdline_xmacro_descriptors) {
+    TEST_ASSERT_STR_EQ(cmdline_type_to_str(CMDLINE_TYPE_BOOL), "bool");
+    TEST_ASSERT_STR_EQ(cmdline_type_to_str(CMDLINE_TYPE_INT), "int");
+    TEST_ASSERT_STR_EQ(cmdline_type_to_str(CMDLINE_TYPE_UINT), "uint");
+    TEST_ASSERT_STR_EQ(cmdline_type_to_str(CMDLINE_TYPE_FX), "fx");
+    TEST_ASSERT_STR_EQ(cmdline_type_to_str(CMDLINE_TYPE_DURATION), "duration");
+    TEST_ASSERT_STR_EQ(cmdline_type_to_str(CMDLINE_TYPE_DATA_SIZE),
+                       "data_size");
+    TEST_ASSERT_STR_EQ(cmdline_type_to_str(CMDLINE_TYPE_RANGE), "range");
+    TEST_ASSERT_STR_EQ(cmdline_type_to_str(CMDLINE_TYPE_CPU_MASK), "cpu_mask");
+    TEST_ASSERT_STR_EQ(cmdline_type_to_str(CMDLINE_TYPE_MAC), "mac");
+    TEST_ASSERT_STR_EQ(cmdline_type_to_str(CMDLINE_TYPE_STRING), "string");
+    TEST_ASSERT_STR_EQ(cmdline_type_to_str(CMDLINE_TYPE_LIST), "list");
+    TEST_ASSERT_STR_EQ(cmdline_type_to_str(CMDLINE_TYPE_ERR), "err");
+    TEST_ASSERT_STR_EQ(cmdline_type_to_str(CMDLINE_TYPE_NONE), "none");
 
-    TEST_ASSERT(
-        strcmp(cmdline_expr_type_to_str(CMDLINE_TYPE_BOOL), "<on/off>") == 0);
-    TEST_ASSERT(
-        strcmp(cmdline_expr_type_to_str(CMDLINE_TYPE_DURATION), "<time>") == 0);
-    TEST_ASSERT(strcmp(cmdline_expr_type_to_str(CMDLINE_TYPE_DATA_SIZE),
-                       "<size>") == 0);
-    TEST_ASSERT(strcmp(cmdline_expr_type_to_str(CMDLINE_TYPE_FX), "<float>") ==
-                0);
+    TEST_ASSERT_STR_EQ(cmdline_expr_type_to_str(CMDLINE_TYPE_BOOL), "<on/off>");
+    TEST_ASSERT_STR_EQ(cmdline_expr_type_to_str(CMDLINE_TYPE_DURATION),
+                       "<time>");
+    TEST_ASSERT_STR_EQ(cmdline_expr_type_to_str(CMDLINE_TYPE_DATA_SIZE),
+                       "<size>");
+    TEST_ASSERT_STR_EQ(cmdline_expr_type_to_str(CMDLINE_TYPE_FX), "<float>");
 
-    TEST_ASSERT(strcmp(cmdline_type_raw_hint(CMDLINE_TYPE_BOOL), "on/off") ==
-                0);
-    TEST_ASSERT(strcmp(cmdline_type_raw_hint(CMDLINE_TYPE_DURATION), "time") ==
-                0);
-    TEST_ASSERT(strcmp(cmdline_type_raw_hint(CMDLINE_TYPE_DATA_SIZE), "size") ==
-                0);
+    TEST_ASSERT_STR_EQ(cmdline_type_raw_hint(CMDLINE_TYPE_BOOL), "on/off");
+    TEST_ASSERT_STR_EQ(cmdline_type_raw_hint(CMDLINE_TYPE_DURATION), "time");
+    TEST_ASSERT_STR_EQ(cmdline_type_raw_hint(CMDLINE_TYPE_DATA_SIZE), "size");
 
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(cmdline_polymorphic_parsing, .group = TEST_GROUP(cmdline)) {
+TEST_DECLARE_UNIT(cmdline, cmdline_polymorphic_parsing) {
     uint64_t mask = 0; /* 0 means unconstrained */
 
     struct cmdline_value vb = cmdline_parse_value_for("true", mask);
@@ -110,12 +102,12 @@ TEST_DECLARE_UNIT(cmdline_polymorphic_parsing, .group = TEST_GROUP(cmdline)) {
     uint64_t bool_only_mask = CMDLINE_TYPES(CMDLINE_TYPE_BOOL);
     struct cmdline_value v_err =
         cmdline_parse_value_for("12345", bool_only_mask);
-    TEST_ASSERT(v_err.type == CMDLINE_TYPE_ERR);
+    TEST_ASSERT_EQ(v_err.type, CMDLINE_TYPE_ERR);
 
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(cmdline_extraction_helpers, .group = TEST_GROUP(cmdline)) {
+TEST_DECLARE_UNIT(cmdline, cmdline_extraction_helpers) {
     struct cmdline_value vu = {.type = CMDLINE_TYPE_UINT,
                                .u64 = 0x123456789ABCDEF0ULL};
     uint64_t u64_val = 0;
@@ -167,7 +159,7 @@ TEST_DECLARE_UNIT(cmdline_extraction_helpers, .group = TEST_GROUP(cmdline)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(cmdline_choices_and_mappings, .group = TEST_GROUP(cmdline)) {
+TEST_DECLARE_UNIT(cmdline, cmdline_choices_and_mappings) {
     const char *const *choices = CMDLINE_CHOICES("alpha", "beta", "gamma");
     TEST_ASSERT(cmdline_has_choice(choices, "alpha"));
     TEST_ASSERT(cmdline_has_choice(choices, "beta"));
@@ -187,7 +179,7 @@ TEST_DECLARE_UNIT(cmdline_choices_and_mappings, .group = TEST_GROUP(cmdline)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(cmdline_flags_table, .group = TEST_GROUP(cmdline)) {
+TEST_DECLARE_UNIT(cmdline, cmdline_flags_table) {
     const struct cmdline_flag *flags =
         CMDLINE_FLAGS({"read", BIT(0)}, {"write", BIT(1)}, {"exec", BIT(2)});
     uint64_t mask = 0;
@@ -211,50 +203,51 @@ TEST_DECLARE_UNIT(cmdline_flags_table, .group = TEST_GROUP(cmdline)) {
 CMDLINE_CHILD_DEFINE(test_root, group_opt_in);
 CMDLINE_CHILD_DEFINE(watchdog, master, heartbeat_interval);
 
-TEST_DECLARE_UNIT(cmdline_runtime_query, .group = TEST_GROUP(cmdline)) {
+TEST_DECLARE_UNIT(cmdline, cmdline_runtime_query) {
     struct cmdline_entry *e_root = cmdline_lookup("root");
-    TEST_ASSERT(e_root != NULL);
-    TEST_ASSERT(strcmp(e_root->name, "root") == 0);
+    TEST_ASSERT_NONNULL(e_root);
+    TEST_ASSERT_STR_EQ(e_root->name, "root");
 
     struct cmdline_entry *e_none = cmdline_lookup("non_existent_key_123");
-    TEST_ASSERT(e_none == NULL);
+    TEST_ASSERT_NULL(e_none);
 
     uint64_t fallback_u64 = CMDLINE_GET("non_existent_key_123", uint64_t, 9999);
-    TEST_ASSERT(fallback_u64 == 9999);
+    TEST_ASSERT_EQ(fallback_u64, 9999);
 
     uint64_t out_val = 0;
     bool found = cmdline_read_or("non_existent_key_123", out_val, 42);
     TEST_ASSERT(!found);
-    TEST_ASSERT(out_val == 42);
+    TEST_ASSERT_EQ(out_val, 42);
 
     bool opt_in = CMDLINE_CHILD_VALUE(test_root, group_opt_in);
-    TEST_ASSERT(opt_in == false);
+    TEST_ASSERT_EQ(opt_in, false);
 
     struct cmdline_entry *e_hb1 =
         CMDLINE_CHILD(watchdog, master, heartbeat_interval);
     struct cmdline_entry *e_hb2 =
         CMDLINE_CHILD(CMDLINE_NODE(watchdog, master), heartbeat_interval);
-    TEST_ASSERT(e_hb1 != NULL && e_hb1 == e_hb2);
-    TEST_ASSERT(strcmp(e_hb1->name, "heartbeat_interval") == 0);
+    TEST_ASSERT_NONNULL(e_hb1);
+    TEST_ASSERT_PTR_EQ(e_hb1, e_hb2);
+    TEST_ASSERT_STR_EQ(e_hb1->name, "heartbeat_interval");
 
     /* TODO: Move these two a separate test */
     uint64_t reg = 0;
     reg = BIT_SET_FIELD(reg, 0x5, 4, 7);
-    TEST_ASSERT(BIT_GET_FIELD(reg, 4, 7) == 0x5);
+    TEST_ASSERT_EQ(BIT_GET_FIELD(reg, 4, 7), 0x5);
 
     uint64_t full_mask = BIT_MASK(0, 63);
-    TEST_ASSERT(full_mask == UINT64_MAX);
+    TEST_ASSERT_EQ(full_mask, UINT64_MAX);
 
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(cmdline_list_parsing, .group = TEST_GROUP(cmdline)) {
+TEST_DECLARE_UNIT(cmdline, cmdline_list_parsing) {
     struct cmdline_value vlist = cmdline_parse_list("10,20,30", 0);
-    TEST_ASSERT(vlist.type == CMDLINE_TYPE_LIST);
+    TEST_ASSERT_EQ(vlist.type, CMDLINE_TYPE_LIST);
 
     struct cmdline_list list = {0};
-    TEST_ASSERT(cmdline_extract_list(&vlist, &list) == ERR_OK);
-    TEST_ASSERT(list.count == 3);
+    TEST_ASSERT_OK(cmdline_extract_list(&vlist, &list));
+    TEST_ASSERT_EQ(list.count, 3);
     TEST_ASSERT(list.items[0].type == CMDLINE_TYPE_UINT &&
                 list.items[0].u64 == 10);
     TEST_ASSERT(list.items[1].type == CMDLINE_TYPE_UINT &&

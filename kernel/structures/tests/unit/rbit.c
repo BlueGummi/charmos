@@ -20,8 +20,7 @@ static int overlaps(struct interval a, struct interval b) {
     return a.low <= b.high && b.low <= a.high;
 }
 
-TEST_DECLARE_UNIT(rbit_order_search, .group = TEST_GROUP(rbit),
-                  TEST_INTENSITY(32, 256, 4096)) {
+TEST_DECLARE_UNIT(rbit, rbit_order_search, TEST_INTENSITY(32, 256, 4096)) {
     prng_seed(RBIT_SEED);
     struct rbit tree;
     rbit_init(&tree);
@@ -29,7 +28,7 @@ TEST_DECLARE_UNIT(rbit_order_search, .group = TEST_GROUP(rbit),
     size_t count_n = ctx->intensity_val ? ctx->intensity_val : RBIT_N;
     struct rbit_node *nodes =
         kmalloc(sizeof(*nodes) * count_n, ALLOC_FLAGS_ZERO);
-    TEST_ASSERT(nodes);
+    TEST_ASSERT_NONNULL(nodes);
 
     size_t low = 1;
     for (size_t i = 0; i < count_n; i++) {
@@ -44,14 +43,15 @@ TEST_DECLARE_UNIT(rbit_order_search, .group = TEST_GROUP(rbit),
     size_t count = 0;
     struct rbit_node *it;
     rbit_for_each(it, &tree) {
-        TEST_ASSERT(it->interval.low >= prev);
+        TEST_ASSERT_GE(it->interval.low, prev);
         prev = it->interval.low;
         count++;
     }
-    TEST_ASSERT(count == count_n);
+    TEST_ASSERT_EQ(count, count_n);
 
     for (size_t i = 0; i < count_n; i++)
-        TEST_ASSERT(rbit_search(tree.root, nodes[i].interval) == &nodes[i]);
+        TEST_ASSERT_PTR_EQ(rbit_search(tree.root, nodes[i].interval),
+                           &nodes[i]);
 
     for (size_t i = 0; i < count_n; i += 2)
         rbit_delete(&tree, &nodes[i]);
@@ -68,15 +68,14 @@ TEST_DECLARE_UNIT(rbit_order_search, .group = TEST_GROUP(rbit),
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(rbit_overlap, .group = TEST_GROUP(rbit),
-                  TEST_INTENSITY(200, 4000, 20000)) {
+TEST_DECLARE_UNIT(rbit, rbit_overlap, TEST_INTENSITY(200, 4000, 20000)) {
     prng_seed(RBIT_SEED + 1);
     struct rbit tree;
     rbit_init(&tree);
 
     struct rbit_node *nodes =
         kmalloc(sizeof(*nodes) * RBIT_N, ALLOC_FLAGS_ZERO);
-    TEST_ASSERT(nodes);
+    TEST_ASSERT_NONNULL(nodes);
 
     /* Random (possibly overlapping) intervals in a bounded space. */
     for (size_t i = 0; i < RBIT_N; i++) {
@@ -100,7 +99,7 @@ TEST_DECLARE_UNIT(rbit_overlap, .group = TEST_GROUP(rbit),
             }
 
         struct rbit_node *res = rbit_overlap_search(tree.root, iv);
-        TEST_ASSERT((res != NULL) == brute);
+        TEST_ASSERT_EQ((res != NULL), brute);
         if (res)
             TEST_ASSERT(overlaps(res->interval, iv));
     }
@@ -133,8 +132,7 @@ static bool count_augment(struct rbit_node *n) {
     return n->max != old_max || c->subtree_count != old_cnt;
 }
 
-TEST_DECLARE_UNIT(rbit_augment_hook, .group = TEST_GROUP(rbit),
-                  TEST_INTENSITY(200, 4000, 20000)) {
+TEST_DECLARE_UNIT(rbit, rbit_augment_hook, TEST_INTENSITY(200, 4000, 20000)) {
     prng_seed(RBIT_SEED + 2);
     struct rbit tree;
     rbit_init(&tree);
@@ -142,9 +140,9 @@ TEST_DECLARE_UNIT(rbit_augment_hook, .group = TEST_GROUP(rbit),
 
     struct count_node *nodes =
         kmalloc(sizeof(*nodes) * RBIT_N, ALLOC_FLAGS_ZERO);
-    TEST_ASSERT(nodes);
+    TEST_ASSERT_NONNULL(nodes);
     bool *live = kmalloc(sizeof(bool) * RBIT_N, ALLOC_FLAGS_ZERO);
-    TEST_ASSERT(live);
+    TEST_ASSERT_NONNULL(live);
 
     for (size_t i = 0; i < RBIT_N; i++) {
         rbit_init_node(&nodes[i].node);
@@ -166,7 +164,7 @@ TEST_DECLARE_UNIT(rbit_augment_hook, .group = TEST_GROUP(rbit),
         struct rbit_node *it;
         rbit_for_each(it, &tree) {
             struct count_node *c = rbit_entry(it, struct count_node, node);
-            TEST_ASSERT(c->subtree_count == subtree_nodes(it));
+            TEST_ASSERT_EQ(c->subtree_count, subtree_nodes(it));
         }
     }
 

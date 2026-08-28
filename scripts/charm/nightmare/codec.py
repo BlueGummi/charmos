@@ -60,6 +60,7 @@ def render(task: Task, request: BootRequest | None = None) -> str:
     add(f"{ROOT}.duration_ms", g.duration_ms(b.duration_ms))
     add(f"{ROOT}.drain_grace_ms", g.duration_ms(b.drain_grace_ms))
     add(f"{ROOT}.stat_interval_ms", g.duration_ms(b.stat_interval_ms))
+    add(f"{ROOT}.stall_threshold_ms", g.duration_ms(b.stall_threshold_ms))
     add(f"{ROOT}.on_stall", b.on_stall)
     add(f"{ROOT}.boot_index", g.uint(req.boot_index))
 

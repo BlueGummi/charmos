@@ -158,17 +158,10 @@ static inline bool thread_is_active(struct thread *t) {
 }
 
 static void maybe_force_resched(struct thread *t) {
-    /* it's ok if the read of tick_enabled races here. if we read it as
-     * `enabled`, it means that it is either truly enabled or is in
-     * the schedule() routine about to disable it, meaning that
-     * if it does get disabled, it'll still have a chance to check
-     * and run the APCs of the only thread active */
     enum irql irql;
     struct scheduler *sched = thread_get_scheduler(t, &irql);
 
-    bool needs_resched = !sched->tick_enabled;
-    if (needs_resched)
-        scheduler_force_resched(sched);
+    scheduler_force_resched(sched);
 
     spin_unlock(&sched->lock, irql);
 }

@@ -14,8 +14,7 @@ static void workqueue_fn(void *arg, void *unused) {
     atomic_fetch_add(&workqueue_times, 1);
 }
 
-TEST_DECLARE_UNIT(workqueue_test, .group = TEST_GROUP(workqueue),
-                  TEST_INTENSITY(32, 256, 4096)) {
+TEST_DECLARE_UNIT(workqueue, workqueue_test, TEST_INTENSITY(32, 256, 4096)) {
     atomic_store(&workqueue_ran, false);
     atomic_store(&workqueue_times, 0);
 
@@ -35,7 +34,7 @@ TEST_DECLARE_UNIT(workqueue_test, .group = TEST_GROUP(workqueue),
         cpu_relax();
 
     char *msg = kmalloc(100, ALLOC_FLAGS_ZERO);
-    TEST_ASSERT(msg);
+    TEST_ASSERT_NONNULL(msg);
     snprintf(msg, 100, "Took %lu clock cycles to add to event pool %lu times",
              total, times);
     test_info(msg);
@@ -44,7 +43,7 @@ TEST_DECLARE_UNIT(workqueue_test, .group = TEST_GROUP(workqueue),
     TEST_ASSERT(atomic_load(&workqueue_ran));
 
     msg = kmalloc(100, ALLOC_FLAGS_ZERO);
-    TEST_ASSERT(msg);
+    TEST_ASSERT_NONNULL(msg);
     snprintf(msg, 100,
              "Event pool ran %u times, tests should've had it run %lu times",
              atomic_load(&workqueue_times), times);
@@ -80,7 +79,7 @@ static void enqueue_thread(void *) {
     atomic_fetch_sub(&threads_left, 1);
 }
 
-TEST_DECLARE_UNIT(workqueue_test_2, .group = TEST_GROUP(workqueue),
+TEST_DECLARE_UNIT(workqueue, workqueue_test_2,
                   TEST_INTENSITY(512, 4096, 32768)) {
     size_t total_items = ctx->intensity_val ? ctx->intensity_val : 4096;
     wq_2_items_per_thread = total_items / WQ_2_THREADS;
@@ -118,7 +117,7 @@ TEST_DECLARE_UNIT(workqueue_test_2, .group = TEST_GROUP(workqueue),
             thread_join(enqueuers[i]);
     }
 
-    TEST_ASSERT(atomic_load(&threads_left) == 0);
+    TEST_ASSERT_EQ(atomic_load(&threads_left), 0);
 
     uint64_t workers = wq->num_workers;
 

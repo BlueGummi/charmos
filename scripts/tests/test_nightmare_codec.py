@@ -32,6 +32,7 @@ class RenderTests(unittest.TestCase):
 
         self.assertEqual(t["nightmare.duration_ms"], "300000ms")
         self.assertEqual(t["nightmare.drain_grace_ms"], "20000ms")
+        self.assertEqual(t["nightmare.stall_threshold_ms"], "3000ms")
         self.assertEqual(t["nightmare.perturb.migrator.interval_us"], "500us")
 
     def test_the_perturb_list_is_comma_separated(self) -> None:

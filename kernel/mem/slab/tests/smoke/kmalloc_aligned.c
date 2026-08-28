@@ -2,19 +2,17 @@
 
 #ifdef TEST_MEM
 
-
 #define ASSERT_ALIGNED(ptr, alignment)                                         \
-    TEST_ASSERT(((uintptr_t) (ptr) & ((alignment) - 1)) == 0)
+    TEST_ASSERT_EQ(((uintptr_t) (ptr) & ((alignment) - 1)), 0)
 
 #define KMALLOC_ALIGNMENT_TEST(name, align)                                    \
-    TEST_DECLARE_SMOKE(kmalloc_aligned_##name##_test,                          \
-                       .group = TEST_GROUP(slab),                              \
+    TEST_DECLARE_SMOKE(slab, kmalloc_aligned_##name##_test,                    \
                        TEST_INTENSITY(32, 512, 2048)) {                        \
         ABORT_IF_RAM_LOW();                                                    \
         size_t alloc_times = ctx->intensity_val ? ctx->intensity_val : 512;    \
         for (uint64_t i = 0; i < alloc_times; i++) {                           \
             void *ptr = kmalloc_aligned(align, align);                         \
-            TEST_ASSERT(ptr != NULL);                                          \
+            TEST_ASSERT_NONNULL(ptr);                                          \
             ASSERT_ALIGNED(ptr, align);                                        \
             kfree_aligned(ptr);                                                \
         }                                                                      \

@@ -40,7 +40,7 @@ static enum irq_result kfree_irq_test_irq(void *ctx, uint8_t vector,
     return IRQ_HANDLED;
 }
 
-TEST_DECLARE_INTEGRATION(kfree_defer_irq_test, .group = TEST_GROUP(slab),
+TEST_DECLARE_INTEGRATION(slab, kfree_defer_irq_test,
                          TEST_INTENSITY(256, 2048, 16384)) {
     if (global.core_count < 4) {
         return TEST_SKIP(TEST_SKIP_NONE);
@@ -49,7 +49,7 @@ TEST_DECLARE_INTEGRATION(kfree_defer_irq_test, .group = TEST_GROUP(slab),
     size_t total = ctx->intensity_val ? ctx->intensity_val : 2048;
     kfree_irq_total_allocs = total;
     kfree_irq_allocs = kmalloc(sizeof(void *) * total);
-    TEST_ASSERT(kfree_irq_allocs != NULL);
+    TEST_ASSERT_NONNULL(kfree_irq_allocs);
 
     atomic_store(&kfree_irq_test_consumed, 0);
 
@@ -60,7 +60,7 @@ TEST_DECLARE_INTEGRATION(kfree_defer_irq_test, .group = TEST_GROUP(slab),
 
     for (size_t i = 0; i < total; i++) {
         kfree_irq_allocs[i] = kmalloc(64);
-        TEST_ASSERT(kfree_irq_allocs[i] != NULL);
+        TEST_ASSERT_NONNULL(kfree_irq_allocs[i]);
     }
 
     while (atomic_load(&kfree_irq_test_consumed) < total) {

@@ -12,7 +12,7 @@ TEST_GROUP_DECLARE(rwlock, .intensity_desc = {
 
 static struct rwlock rw_basic = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 
-TEST_DECLARE_SMOKE(rwlock_basic_read, .group = TEST_GROUP(rwlock)) {
+TEST_DECLARE_SMOKE(rwlock, rwlock_basic_read) {
     rw_lock(&rw_basic, RWLOCK_ACQUIRE_READ);
     scheduler_yield();
     rw_unlock(&rw_basic);
@@ -22,7 +22,7 @@ TEST_DECLARE_SMOKE(rwlock_basic_read, .group = TEST_GROUP(rwlock)) {
 
 static struct rwlock rw_basic_w = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 
-TEST_DECLARE_SMOKE(rwlock_basic_write, .group = TEST_GROUP(rwlock)) {
+TEST_DECLARE_SMOKE(rwlock, rwlock_basic_write) {
     rw_lock(&rw_basic_w, RWLOCK_ACQUIRE_WRITE);
     scheduler_yield();
     rw_unlock(&rw_basic_w);

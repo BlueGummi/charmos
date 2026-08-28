@@ -45,9 +45,13 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
-      - name: Install clang toolchain
-        if: matrix.compiler == 'clang'
-        run: apt-get update && apt-get install -y clang lld llvm
+      - name: Install compiler toolchain
+        run: |
+          if [ "${{ matrix.compiler }}" = "clang" ]; then
+            apt-get update && apt-get install -y clang lld llvm
+          elif [ "${{ matrix.compiler }}" = "gcc" ] && [ "$(uname -m)" != "x86_64" ]; then
+            apt-get update && apt-get install -y gcc-x86-64-linux-gnu binutils-x86-64-linux-gnu
+          fi
 
       - name: Compile
         run: ./scripts/build.sh -t ${{ matrix.build_type }} --compiler ${{ matrix.compiler }}
@@ -59,8 +63,8 @@ jobs:
           path: build/charmos-x86_64.iso
           retention-days: 7
 
-  randconfig:
-    name: Randconfig build (${{ matrix.compiler }})
+  all-features:
+    name: All-Features build (${{ matrix.compiler }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -80,13 +84,20 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
-      - name: Install clang toolchain
-        if: matrix.compiler == 'clang'
-        run: apt-get update && apt-get install -y clang lld llvm
+      - name: Install compiler toolchain
+        run: |
+          if [ "${{ matrix.compiler }}" = "clang" ]; then
+            apt-get update && apt-get install -y clang lld llvm
+          elif [ "${{ matrix.compiler }}" = "gcc" ] && [ "$(uname -m)" != "x86_64" ]; then
+            apt-get update && apt-get install -y gcc-x86-64-linux-gnu binutils-x86-64-linux-gnu
+          fi
 
-      - name: Compile with random compiler flags
+      - name: Compile with all features, diagnostics, and tests enabled
         run: >
-          ./scripts/build.sh -t RelWithDebInfo --compiler ${{ matrix.compiler }}
+          ./scripts/build.sh -t Debug --compiler ${{ matrix.compiler }}
           --
-          -DKERNEL_RANDCONFIG=ON
-          -DKERNEL_RANDCONFIG_SEED=${{ github.run_id }}
+          -DDEBUG_ALL=ON
+          -DTEST_ALL=ON
+          -DPROFILING_ALL=ON
+          -DTEST_NIGHTMARE_ALL=ON
+          -DINJECT_ALL=ON

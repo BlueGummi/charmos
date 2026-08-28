@@ -6,7 +6,7 @@ TEST_GROUP_DECLARE(mem, .intensity_desc = {
                             .unit = "iters",
                         });
 
-TEST_DECLARE_SMOKE(pmm_alloc_test, .group = TEST_GROUP(mem)) {
+TEST_DECLARE_SMOKE(mem, pmm_alloc_test) {
     paddr_t p = pmm_alloc_page();
     TEST_ASSERT(p);
     pmm_free_page(p);

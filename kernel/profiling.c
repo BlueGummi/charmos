@@ -18,7 +18,7 @@ void profiling_log_all(void) {
     struct profiling_entry *end = __ekernel_profiling_data;
 
     for (struct profiling_entry *pe = start; pe < end; pe++)
-        pe->log(pe->data);
+        (pe->log)(pe->data);
 }
 #else
 void profiling_init(void) { /* Nothing */ }
