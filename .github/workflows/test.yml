@@ -55,7 +55,10 @@ jobs:
 
       - name: Install clang toolchain
         if: matrix.compiler == 'clang'
-        run: apt-get update && apt-get install -y clang lld llvm
+        run: |
+          if ! command -v clang >/dev/null 2>&1 || ! command -v ld.lld >/dev/null 2>&1; then
+            apt-get update && apt-get install -y clang lld llvm
+          fi
 
       - name: Compile
         run: ./scripts/build.sh -t RelWithDebInfo --compiler ${{ matrix.compiler }} -C

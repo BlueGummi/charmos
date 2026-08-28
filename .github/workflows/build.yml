@@ -22,15 +22,18 @@ permissions:
   issues: read
   pull-requests: read
 
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
-    name: Build (${{ matrix.compiler }} / ${{ matrix.build_type }})
+    name: Build (${{ matrix.compiler }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         compiler: [gcc, clang]
-        build_type: [Debug, Release]
     container:
       image: ghcr.io/axvonx/charmos-x86-env:latest
       credentials:
@@ -48,49 +51,32 @@ jobs:
       - name: Install compiler toolchain
         run: |
           if [ "${{ matrix.compiler }}" = "clang" ]; then
-            apt-get update && apt-get install -y clang lld llvm
+            if ! command -v clang >/dev/null 2>&1 || ! command -v ld.lld >/dev/null 2>&1; then
+              apt-get update && apt-get install -y clang lld llvm
+            fi
           elif [ "${{ matrix.compiler }}" = "gcc" ] && [ "$(uname -m)" != "x86_64" ]; then
             apt-get update && apt-get install -y gcc-x86-64-linux-gnu binutils-x86-64-linux-gnu
           fi
 
-      - name: Compile
-        run: ./scripts/build.sh -t ${{ matrix.build_type }} --compiler ${{ matrix.compiler }}
+      - name: Compile Debug
+        run: ./scripts/build.sh -t Debug --compiler ${{ matrix.compiler }}
 
-      - name: Upload build artifacts
+      - name: Upload Debug artifact
         uses: actions/upload-artifact@v4
         with:
-          name: iso-${{ matrix.compiler }}-${{ matrix.build_type }}
+          name: iso-${{ matrix.compiler }}-Debug
           path: build/charmos-x86_64.iso
           retention-days: 7
 
-  all-features:
-    name: All-Features build (${{ matrix.compiler }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        compiler: [gcc, clang]
-    container:
-      image: ghcr.io/axvonx/charmos-x86-env:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GHCR_KEY }}
+      - name: Compile Release
+        run: ./scripts/build.sh -t Release --compiler ${{ matrix.compiler }}
 
-    defaults:
-      run:
-        shell: bash
-
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-
-      - name: Install compiler toolchain
-        run: |
-          if [ "${{ matrix.compiler }}" = "clang" ]; then
-            apt-get update && apt-get install -y clang lld llvm
-          elif [ "${{ matrix.compiler }}" = "gcc" ] && [ "$(uname -m)" != "x86_64" ]; then
-            apt-get update && apt-get install -y gcc-x86-64-linux-gnu binutils-x86-64-linux-gnu
-          fi
+      - name: Upload Release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: iso-${{ matrix.compiler }}-Release
+          path: build/charmos-x86_64.iso
+          retention-days: 7
 
       - name: Compile with all features, diagnostics, and tests enabled
         run: >
