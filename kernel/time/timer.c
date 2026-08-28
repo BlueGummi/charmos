@@ -92,9 +92,7 @@ static void timer_enqueue_internal(struct timer_base *base, struct timer *timer,
     bitmap_set(base->pending_map, idx);
     timer_bucket_set(timer, idx);
 
-    time_us_t now = time_get_us();
-    if (!base->pending || base->next_expiration_us <= now ||
-        bucket_expiration < base->next_expiration_us) {
+    if (!base->pending || bucket_expiration < base->next_expiration_us) {
         base->next_expiration_us = bucket_expiration;
         base->pending = true;
         base->next_expiration_recalc = false;
