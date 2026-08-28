@@ -149,7 +149,6 @@ __no_sanitize_address void k_main(void) {
 
     lapic_clock_evdev_group_init();
     timers_init();
-    watchdog_start();
 
     scheduler_periodic_work_init();
     movealloc_exec_all();
@@ -177,6 +176,7 @@ void k_sch_main(void *nop) {
     lock_chk_init();
 
     smp_enable_all_ticks();
+    watchdog_start();
 
     rcu_init();
     workqueues_permanent_init();

@@ -1,8 +1,8 @@
-#include "../test_internal.h"
+#include "mem/tests/test_internal.h"
 
 #ifdef TEST_MEM
 
-TEST_DECLARE_UNIT(mem, tlb_shootdown_single_cpu_test) {
+TEST_DECLARE_UNIT(mem, tlb_shootdown_single_cpu) {
     ABORT_IF_RAM_LOW();
 
     paddr_t p1 = pmm_alloc_page();

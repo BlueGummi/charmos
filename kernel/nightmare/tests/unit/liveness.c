@@ -1,11 +1,10 @@
-#include "../../../tests/test_internal.h"
-#include "../../internal.h"
+#include "nightmare/internal.h"
+#include <test/test.h>
 
 #if defined(TEST_ENABLED) && defined(TEST_NIGHTMARE_SMOKE)
 TEST_GROUP_DECLARE(nightmare_liveness);
 
-TEST_DECLARE_UNIT(nightmare_liveness,
-                  liveness_first_sample_arms_without_firing) {
+TEST_DECLARE_UNIT(nightmare_liveness, first_sample_arms) {
     struct nightmare_liveness_state state = {
         .phase = ATOMIC_VAR_INIT(NM_LIVE_ARMED),
         .last_progress = 100,
@@ -22,8 +21,7 @@ TEST_DECLARE_UNIT(nightmare_liveness,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(nightmare_liveness,
-                  liveness_progress_resets_baseline_window) {
+TEST_DECLARE_UNIT(nightmare_liveness, progress_resets_baseline) {
     struct nightmare_liveness_state state = {
         .phase = ATOMIC_VAR_INIT(NM_LIVE_ARMED),
         .last_progress = 100,
@@ -46,8 +44,7 @@ TEST_DECLARE_UNIT(nightmare_liveness,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(nightmare_liveness,
-                  liveness_silence_before_threshold_returns_no_stall) {
+TEST_DECLARE_UNIT(nightmare_liveness, silence_below_threshold) {
     struct nightmare_liveness_state state = {
         .phase = ATOMIC_VAR_INIT(NM_LIVE_ARMED),
         .last_progress = 50,
@@ -63,8 +60,7 @@ TEST_DECLARE_UNIT(nightmare_liveness,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(nightmare_liveness,
-                  liveness_silence_at_or_after_threshold_latches_pending) {
+TEST_DECLARE_UNIT(nightmare_liveness, silence_at_threshold_latches) {
     struct nightmare_liveness_state state = {
         .phase = ATOMIC_VAR_INIT(NM_LIVE_ARMED),
         .last_progress = 50,
@@ -83,8 +79,7 @@ TEST_DECLARE_UNIT(nightmare_liveness,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(nightmare_liveness,
-                  liveness_active_quiescence_rebaselines_continuously) {
+TEST_DECLARE_UNIT(nightmare_liveness, quiescence_rebaselines) {
     struct nightmare_liveness_state state = {
         .phase = ATOMIC_VAR_INIT(NM_LIVE_ARMED),
         .last_progress = 50,
@@ -118,8 +113,7 @@ TEST_DECLARE_UNIT(nightmare_liveness,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(nightmare_liveness,
-                  liveness_inactive_or_stopped_phases_prevent_evaluation) {
+TEST_DECLARE_UNIT(nightmare_liveness, inactive_or_stopped_ignored) {
     struct nightmare_liveness_state state = {
         .phase = ATOMIC_VAR_INIT(NM_LIVE_ARMED),
         .last_progress = 50,
@@ -147,8 +141,7 @@ TEST_DECLARE_UNIT(nightmare_liveness,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(nightmare_liveness,
-                  liveness_counter_wrap_handled_by_equality) {
+TEST_DECLARE_UNIT(nightmare_liveness, counter_wrap_resets) {
     struct nightmare_liveness_state state = {
         .phase = ATOMIC_VAR_INIT(NM_LIVE_ARMED),
         .last_progress = UINT64_MAX,
@@ -166,7 +159,7 @@ TEST_DECLARE_UNIT(nightmare_liveness,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(nightmare_liveness, liveness_at_most_once_pending_guarantee) {
+TEST_DECLARE_UNIT(nightmare_liveness, at_most_once_pending) {
     struct nightmare_liveness_state state = {
         .phase = ATOMIC_VAR_INIT(NM_LIVE_ARMED),
         .last_progress = 50,
@@ -194,7 +187,7 @@ TEST_DECLARE_UNIT(nightmare_liveness, liveness_at_most_once_pending_guarantee) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(nightmare_liveness, liveness_lifecycle_start_and_stop) {
+TEST_DECLARE_UNIT(nightmare_liveness, start_stop_lifecycle) {
     TEST_ASSERT(nightmare_liveness_start(2000, NIGHTMARE_ON_STALL_REPORT));
     TEST_ASSERT_EQ(atomic_load(&nightmare_liveness.phase), NM_LIVE_ARMED);
     TEST_ASSERT_EQ(nightmare_liveness.threshold_ms, 2000);
@@ -203,13 +196,12 @@ TEST_DECLARE_UNIT(nightmare_liveness, liveness_lifecycle_start_and_stop) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(nightmare_liveness, liveness_rejects_zero_threshold) {
+TEST_DECLARE_UNIT(nightmare_liveness, reject_zero_threshold) {
     TEST_ASSERT(!nightmare_liveness_start(0, NIGHTMARE_ON_STALL_REPORT));
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(nightmare_liveness,
-                  liveness_lifecycle_repeated_start_stop_stress) {
+TEST_DECLARE_UNIT(nightmare_liveness, start_stop_stress) {
     for (size_t i = 0; i < 1000; i++) {
         TEST_ASSERT(nightmare_liveness_start(1000, NIGHTMARE_ON_STALL_REPORT));
         nightmare_liveness_stop();
@@ -232,7 +224,7 @@ static struct nightmare mock_probe_nm = {
     .ops = &mock_probe_ops,
 };
 
-TEST_DECLARE_UNIT(nightmare_liveness, liveness_poll_consumes_pending_ticket) {
+TEST_DECLARE_UNIT(nightmare_liveness, poll_consumes_pending) {
     atomic_store(&nightmare_runtime.stop, NM_RUN);
     TEST_ASSERT(nightmare_liveness_start(1000, NIGHTMARE_ON_STALL_REPORT));
 
@@ -254,7 +246,7 @@ TEST_DECLARE_UNIT(nightmare_liveness, liveness_poll_consumes_pending_ticket) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(nightmare_liveness, liveness_poll_calls_subject_probe) {
+TEST_DECLARE_UNIT(nightmare_liveness, poll_invokes_probe) {
     atomic_store(&mock_probe_count, 0);
     const struct nightmare *saved = nightmare_runtime.ctx.nm;
     nightmare_runtime.ctx.nm = &mock_probe_nm;

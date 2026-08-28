@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "fs/ext2/tests/test_internal.h"
 
 #ifdef TEST_EXT2
 TEST_GROUP_DECLARE(ext2_mode);
@@ -20,7 +20,7 @@ static const struct ftype_case ftype_cases[] = {
     {EXT2_S_IFLNK, EXT2_FT_SYMLINK, "symlink"},
 };
 
-TEST_DECLARE_UNIT(ext2_mode, ext2_ftype_all_types) {
+TEST_DECLARE_UNIT(ext2_mode, ftype_all_types) {
     for (size_t i = 0; i < TEST_ARRAY_LEN(ftype_cases); i++) {
         const struct ftype_case *c = &ftype_cases[i];
         uint8_t got = ext2_extract_ftype(c->mode);
@@ -36,7 +36,7 @@ TEST_DECLARE_UNIT(ext2_mode, ext2_ftype_all_types) {
 }
 
 /* Perm bits share word with type */
-TEST_DECLARE_UNIT(ext2_mode, ext2_ftype_ignores_permissions) {
+TEST_DECLARE_UNIT(ext2_mode, ftype_ignores_permissions) {
     const uint16_t perms = 0x0FFF;
 
     for (size_t i = 0; i < TEST_ARRAY_LEN(ftype_cases); i++) {
@@ -48,7 +48,7 @@ TEST_DECLARE_UNIT(ext2_mode, ext2_ftype_ignores_permissions) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(ext2_mode, ext2_ftype_unknown) {
+TEST_DECLARE_UNIT(ext2_mode, ftype_unknown) {
     /* Zero type field is not any of the seven, must not be guessed */
     TEST_ASSERT_EQ(ext2_extract_ftype(0), EXT2_FT_UNKNOWN);
     TEST_ASSERT_EQ(ext2_extract_ftype(0x0FFF), EXT2_FT_UNKNOWN);
@@ -63,7 +63,7 @@ TEST_DECLARE_UNIT(ext2_mode, ext2_ftype_unknown) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(ext2_mode, ext2_mode_type_roundtrip) {
+TEST_DECLARE_UNIT(ext2_mode, mode_type_roundtrip) {
     for (size_t i = 0; i < TEST_ARRAY_LEN(ftype_cases); i++) {
         uint16_t ext2 = ftype_cases[i].mode;
         uint16_t vfs = TEST_CALL(ext2_to_vfs_mode)(ext2);
@@ -75,7 +75,7 @@ TEST_DECLARE_UNIT(ext2_mode, ext2_mode_type_roundtrip) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(ext2_mode, ext2_mode_permission_roundtrip) {
+TEST_DECLARE_UNIT(ext2_mode, mode_permission_roundtrip) {
     static const uint16_t perm_bits[] = {
         EXT2_S_IRUSR, EXT2_S_IWUSR, EXT2_S_IXUSR, EXT2_S_IRGRP, EXT2_S_IWGRP,
         EXT2_S_IXGRP, EXT2_S_IROTH, EXT2_S_IWOTH, EXT2_S_IXOTH,
@@ -102,7 +102,7 @@ TEST_DECLARE_UNIT(ext2_mode, ext2_mode_permission_roundtrip) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(ext2_mode, ext2_flags_roundtrip) {
+TEST_DECLARE_UNIT(ext2_mode, flags_roundtrip) {
     static const uint32_t flags[] = {
         EXT2_APPEND_FL, EXT2_IMMUTABLE_FL, EXT2_NOATIME_FL,
         EXT2_SYNC_FL,   EXT2_DIRSYNC_FL,

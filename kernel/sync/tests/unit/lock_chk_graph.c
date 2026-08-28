@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "sync/tests/test_internal.h"
 
 #ifdef DEBUG_LOCK_CHK
 
@@ -13,7 +13,7 @@ LOCK_CHK_CLASS_DECLARE_LOCAL(graph_test_class_a);
 LOCK_CHK_CLASS_DECLARE_LOCAL(graph_test_class_b);
 LOCK_CHK_CLASS_DECLARE_LOCAL(graph_test_class_c);
 
-TEST_DECLARE_UNIT(qspinlock, lock_chk_graph_node_resolution) {
+TEST_DECLARE_UNIT(lock_chk, graph_node_resolution) {
     static struct lock_chk_graph graph;
     lock_chk_graph_init(&graph);
 
@@ -53,7 +53,7 @@ TEST_DECLARE_UNIT(qspinlock, lock_chk_graph_node_resolution) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(qspinlock, lock_chk_graph_cycle_detection) {
+TEST_DECLARE_UNIT(lock_chk, graph_cycle_detection) {
     static struct lock_chk_graph graph;
     lock_chk_graph_init(&graph);
 
@@ -117,7 +117,7 @@ TEST_DECLARE_UNIT(qspinlock, lock_chk_graph_cycle_detection) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(qspinlock, lock_chk_irq_safety_conflict) {
+TEST_DECLARE_UNIT(lock_chk, irq_safety_conflict) {
     static struct lock_chk_graph graph;
     lock_chk_graph_init(&graph);
 
@@ -165,7 +165,7 @@ TEST_DECLARE_UNIT(qspinlock, lock_chk_irq_safety_conflict) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(qspinlock, lock_chk_graph_acquire_batch_deduplicates) {
+TEST_DECLARE_UNIT(lock_chk, graph_acquire_dedup) {
     static struct lock_chk_graph graph;
     lock_chk_graph_init(&graph);
 
@@ -209,7 +209,7 @@ TEST_DECLARE_UNIT(qspinlock, lock_chk_graph_acquire_batch_deduplicates) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(qspinlock, lock_chk_graph_acquire_batch_rolls_back) {
+TEST_DECLARE_UNIT(lock_chk, graph_acquire_rollback) {
     static struct lock_chk_graph graph;
     lock_chk_graph_init(&graph);
 
@@ -252,7 +252,7 @@ TEST_DECLARE_UNIT(qspinlock, lock_chk_graph_acquire_batch_rolls_back) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(qspinlock, lock_chk_spin_qspin_deep_lifecycle) {
+TEST_DECLARE_UNIT(lock_chk, spin_qspin_lifecycle) {
     struct spinlock spin_disp;
     struct spinlock spin_irq;
     struct spinlock spin_raw;
@@ -307,7 +307,7 @@ TEST_DECLARE_UNIT(qspinlock, lock_chk_spin_qspin_deep_lifecycle) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(qspinlock, lock_chk_mutex_out_of_order_release) {
+TEST_DECLARE_UNIT(lock_chk, mutex_out_of_order_release) {
     struct mutex m1;
     struct mutex m2;
 
@@ -323,7 +323,7 @@ TEST_DECLARE_UNIT(qspinlock, lock_chk_mutex_out_of_order_release) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(qspinlock, lock_chk_mutex_simple_lifecycle) {
+TEST_DECLARE_UNIT(lock_chk, mutex_simple_lifecycle) {
     struct mutex_simple s1;
     struct mutex_simple s2;
 
@@ -345,7 +345,7 @@ TEST_DECLARE_UNIT(qspinlock, lock_chk_mutex_simple_lifecycle) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(qspinlock, lock_chk_rw_reader_ring_and_conflict) {
+TEST_DECLARE_UNIT(lock_chk, rw_reader_ring_and_conflict) {
     static struct lock_chk_graph graph;
     lock_chk_graph_init(&graph);
 
@@ -410,7 +410,7 @@ TEST_DECLARE_UNIT(qspinlock, lock_chk_rw_reader_ring_and_conflict) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(qspinlock, lock_chk_rwlock_lifecycle) {
+TEST_DECLARE_UNIT(lock_chk, rwlock_lifecycle) {
     struct rwlock rw;
     rwlock_init(&rw, THREAD_PRIO_CLASS_TIMESHARE);
 
@@ -432,7 +432,7 @@ TEST_DECLARE_UNIT(qspinlock, lock_chk_rwlock_lifecycle) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(qspinlock, lock_chk_subclasses_all_primitives) {
+TEST_DECLARE_UNIT(lock_chk, subclasses_all_primitives) {
     struct spinlock spin;
     struct qspinlock qspin;
     struct mutex mtx;

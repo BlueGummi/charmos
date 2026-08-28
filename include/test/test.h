@@ -207,27 +207,29 @@ struct test_globals {
 #define TEST_GROUP(name) &(__test_group_##name)
 #define TEST_GROUP_DEFINE(name) extern struct test_group __test_group_##name
 
-#define TEST(id) __test_##id
+#define TEST(grp, id) __test_##grp##_##id
 #define TEST_DECLARE(grp, id, ...)                                             \
-    static struct test_verdict id(struct test_context *ctx);                   \
+    static struct test_verdict __test_fn_##grp##_##id(                         \
+        struct test_context *ctx);                                             \
     extern struct test_group __test_group_##grp;                               \
-    extern struct test __test_##id;                                            \
+    extern struct test __test_##grp##_##id;                                    \
     LINKER_SECTION_OBJECT(struct test, tests)                                  \
-    __test_##id = {.name = #id,                                                \
-                   .func = id,                                                 \
-                   .run_times = 1,                                             \
-                   .group = TEST_GROUP(grp),                                   \
-                   .enabled = TEST_STATE_SENTINEL,                             \
-                   .inject_count = 0,                                          \
-                   .msg_cap = 0,                                               \
-                   .seed = 0,                                                  \
-                   .print_logs = false,                                        \
-                   .tier = TEST_TIER_UNIT,                                     \
-                   .intensity = TEST_INTENSITY_SENTINEL,                       \
-                   .intensity_desc = TEST_INTENSITY_DESC_SENTINEL,             \
-                   ##__VA_ARGS__};                                             \
+    __test_##grp##_##id = {.name = #id,                                        \
+                           .func = __test_fn_##grp##_##id,                     \
+                           .run_times = 1,                                     \
+                           .group = TEST_GROUP(grp),                           \
+                           .enabled = TEST_STATE_SENTINEL,                     \
+                           .inject_count = 0,                                  \
+                           .msg_cap = 0,                                       \
+                           .seed = 0,                                          \
+                           .print_logs = false,                                \
+                           .tier = TEST_TIER_UNIT,                             \
+                           .intensity = TEST_INTENSITY_SENTINEL,               \
+                           .intensity_desc = TEST_INTENSITY_DESC_SENTINEL,     \
+                           ##__VA_ARGS__};                                     \
                                                                                \
-    static struct test_verdict id(struct test_context *ctx __unused)
+    static struct test_verdict __test_fn_##grp##_##id(                         \
+        struct test_context *ctx __unused)
 
 #define TEST_DECLARE_SMOKE(grp, id, ...)                                       \
     TEST_DECLARE(grp, id, .tier = TEST_TIER_SMOKE, ##__VA_ARGS__)
@@ -362,6 +364,15 @@ static inline const char *test_result_to_str(enum test_result result) {
     case TEST_RESULT_FAILED: return ANSI_RED "failed" ANSI_RESET;
     case TEST_RESULT_SKIPPED: return ANSI_GRAY "skipped" ANSI_RESET;
     default: kassert_unreachable();
+    }
+}
+
+static inline const char *test_result_plain(enum test_result result) {
+    switch (result) {
+    case TEST_RESULT_OK: return "ok";
+    case TEST_RESULT_FAILED: return "failed";
+    case TEST_RESULT_SKIPPED: return "skipped";
+    default: return "unknown";
     }
 }
 

@@ -1,8 +1,8 @@
-#include "../test_internal.h"
+#include "mem/tests/test_internal.h"
 
 #ifdef TEST_MEM
 
-TEST_DECLARE_UNIT(mem, pmm_stress_alloc_free_test,
+TEST_DECLARE_UNIT(mem, pmm_alloc_free_stress,
                   TEST_INTENSITY(256, 2048, 32768)) {
     ABORT_IF_RAM_LOW();
 

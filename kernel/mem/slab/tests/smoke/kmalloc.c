@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "mem/slab/tests/test_internal.h"
 
 #ifdef TEST_MEM
 TEST_GROUP_DECLARE(slab, .intensity_desc = {
@@ -7,7 +7,7 @@ TEST_GROUP_DECLARE(slab, .intensity_desc = {
                          });
 
 static char hooray[128] = {0};
-TEST_DECLARE_SMOKE(slab, kmalloc_new_test) {
+TEST_DECLARE_SMOKE(slab, alloc_free_smoke) {
 
     void *p = kmalloc_new(67, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
 
@@ -26,7 +26,7 @@ TEST_DECLARE_SMOKE(slab, kmalloc_new_test) {
 #endif
 
 static char a_msg[128];
-TEST_DECLARE_SMOKE(slab, kmalloc_new_basic_test) {
+TEST_DECLARE_SMOKE(slab, pattern_integrity) {
 
     void *p1 = kmalloc_new(1, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);
     void *p2 = kmalloc_new(64, ALLOC_FLAGS_DEFAULT, ALLOC_BEHAVIOR_NORMAL);

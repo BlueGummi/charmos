@@ -1,10 +1,10 @@
-#include "../../../tests/test_internal.h"
-#include "../../internal.h"
+#include "nightmare/internal.h"
+#include <test/test.h>
 
 #if defined(TEST_ENABLED) && defined(TEST_NIGHTMARE_SMOKE)
 TEST_GROUP_DECLARE(nightmare_harness);
 
-TEST_DECLARE_UNIT(nightmare_harness, nightmare_perturb_verdict_mailbox) {
+TEST_DECLARE_UNIT(nightmare_harness, perturb_verdict_mailbox) {
     char reason[] = "first_reason";
     char msg[] = "first message";
     struct nightmare_verdict first = NIGHTMARE_FAIL(reason, msg);

@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "block/tests/test_internal.h"
 
 #ifdef TEST_BIO
 TEST_GROUP_DECLARE(bio, .intensity_desc = {
@@ -20,7 +20,7 @@ static void bio_callback(struct bio_request *req) {
     test_info("blkdev_bio callback succeeded");
 }
 
-TEST_DECLARE_INTEGRATION(bio, blkdev_bio_test, TEST_INTENSITY(1, 1, 16)) {
+TEST_DECLARE_INTEGRATION(bio, async_submit, TEST_INTENSITY(1, 1, 16)) {
     EXT2_INIT;
     struct ext2_fs *fs = root->fs_data;
     struct block_device *d = fs->drive;

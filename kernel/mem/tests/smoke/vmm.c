@@ -1,8 +1,8 @@
-#include "../test_internal.h"
+#include "mem/tests/test_internal.h"
 
 #ifdef TEST_MEM
 
-TEST_DECLARE_SMOKE(mem, vmm_map_test) {
+TEST_DECLARE_SMOKE(mem, vmm_map_bump) {
     paddr_t p = pmm_alloc_page();
     TEST_ASSERT(p);
 

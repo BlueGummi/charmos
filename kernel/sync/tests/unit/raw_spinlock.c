@@ -1,10 +1,12 @@
-#include "../test_internal.h"
+#include "sync/tests/test_internal.h"
 
 #include <asm.h>
 #include <sync/raw_spinlock.h>
 
 #ifdef TEST_QSPINLOCK
-TEST_DECLARE_UNIT(qspinlock, raw_spinlock_physical_operations) {
+TEST_GROUP_DECLARE(raw_spinlock);
+
+TEST_DECLARE_UNIT(raw_spinlock, physical_operations) {
     struct raw_spinlock lock = RAW_SPINLOCK_INIT;
 
     raw_spin_lock(&lock);
@@ -19,7 +21,7 @@ TEST_DECLARE_UNIT(qspinlock, raw_spinlock_physical_operations) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(qspinlock, raw_spinlock_irq_restore) {
+TEST_DECLARE_UNIT(raw_spinlock, irq_restore) {
     struct raw_spinlock lock = RAW_SPINLOCK_INIT;
     bool entry_irqs_enabled = are_interrupts_enabled();
 

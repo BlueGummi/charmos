@@ -37,6 +37,7 @@
 #define NDJSON_DOMAIN_SELFTEST "selftest"
 #define NDJSON_DOMAIN_NIGHTMARE "nightmare"
 #define NDJSON_DOMAIN_LOCK_CHK "lock_chk"
+#define NDJSON_DOMAIN_LOG "log"
 
 #define NDJSON_KIND_SCHEMA "schema"
 #define NDJSON_KIND_BYE "bye"
@@ -56,6 +57,7 @@
 #define NDJSON_KIND_STAT "stat"
 #define NDJSON_KIND_QUIESCE "quiesce"
 #define NDJSON_KIND_FINDING "finding"
+#define NDJSON_KIND_MESSAGE "msg"
 
 #define NDJSON_TYPE_NAME_U64 "u64"
 #define NDJSON_TYPE_NAME_I64 "i64"

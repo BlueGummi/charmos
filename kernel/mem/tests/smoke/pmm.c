@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "mem/tests/test_internal.h"
 
 #ifdef TEST_MEM
 TEST_GROUP_DECLARE(mem, .intensity_desc = {
@@ -6,7 +6,7 @@ TEST_GROUP_DECLARE(mem, .intensity_desc = {
                             .unit = "iters",
                         });
 
-TEST_DECLARE_SMOKE(mem, pmm_alloc_test) {
+TEST_DECLARE_SMOKE(mem, pmm_alloc_free) {
     paddr_t p = pmm_alloc_page();
     TEST_ASSERT(p);
     pmm_free_page(p);

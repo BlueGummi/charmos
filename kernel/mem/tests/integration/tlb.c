@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "mem/tests/test_internal.h"
 
 #ifdef TEST_MEM
 
@@ -20,7 +20,7 @@ static void tlb_reader(void *arg) {
     atomic_fetch_add(&tlb_threads_done, 1);
 }
 
-TEST_DECLARE_INTEGRATION(mem, tlb_shootdown_synchronous_test,
+TEST_DECLARE_INTEGRATION(mem, tlb_shootdown_sync,
                          TEST_INTENSITY_CORES(1, 1, 4, "threads/core")) {
     ABORT_IF_RAM_LOW();
 
@@ -77,7 +77,7 @@ TEST_DECLARE_INTEGRATION(mem, tlb_shootdown_synchronous_test,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_INTEGRATION(mem, tlb_shootdown_async_eventual_test) {
+TEST_DECLARE_INTEGRATION(mem, tlb_shootdown_async) {
     ABORT_IF_RAM_LOW();
 
     paddr_t p1 = pmm_alloc_page();
@@ -105,7 +105,7 @@ TEST_DECLARE_INTEGRATION(mem, tlb_shootdown_async_eventual_test) {
     return TEST_FAIL("async TLB shootdown did not converge within timeout");
 }
 
-TEST_DECLARE_INTEGRATION(mem, tlb_shootdown_flush_all_test,
+TEST_DECLARE_INTEGRATION(mem, tlb_shootdown_flush_all,
                          TEST_INTENSITY(64, 256, 4096)) {
     ABORT_IF_RAM_LOW();
 
@@ -145,7 +145,7 @@ static void tlb_spammer(void *) {
     }
 }
 
-TEST_DECLARE_INTEGRATION(mem, tlb_shootdown_contention_test,
+TEST_DECLARE_INTEGRATION(mem, tlb_shootdown_contention,
                          TEST_INTENSITY_CORES(1, 1, 2, "threads/core")) {
     size_t nthreads = ctx->intensity_val ? ctx->intensity_val : 4;
     if (nthreads > TLB_CONTENTION_MAX_THREADS)

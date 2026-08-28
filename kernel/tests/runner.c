@@ -102,6 +102,22 @@ static const char *test_tier_plain(enum test_tier t) {
 LOG_SITE_DECLARE_PRINT(test_harness);
 LOG_HANDLE_DECLARE_PRINT(test_harness, .flags = LOG_PRINT | LOG_NO_NEWLINE);
 
+LOG_SITE_DECLARE(test_ndjson, .flags = LOG_SITE_DEFAULT | LOG_SITE_NDJSON,
+                 .capacity = LOG_SITE_CAPACITY_DEFAULT,
+                 .dump_opts = LOG_DUMP_DEFAULT, .enabled_mask = LOG_SITE_ALL);
+LOG_HANDLE_DECLARE(test_ndjson, .flags = LOG_DEFAULT);
+
+#define test_ndjson_log(lvl, fmt, ...)                                         \
+    log(LOG_SITE(test_ndjson), LOG_HANDLE(test_ndjson), lvl, fmt, ##__VA_ARGS__)
+
+#define test_ndjson_err(fmt, ...) test_ndjson_log(LOG_ERROR, fmt, ##__VA_ARGS__)
+#define test_ndjson_warn(fmt, ...) test_ndjson_log(LOG_WARN, fmt, ##__VA_ARGS__)
+#define test_ndjson_info(fmt, ...) test_ndjson_log(LOG_INFO, fmt, ##__VA_ARGS__)
+#define test_ndjson_debug(fmt, ...)                                            \
+    test_ndjson_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
+#define test_ndjson_trace(fmt, ...)                                            \
+    test_ndjson_log(LOG_TRACE, fmt, ##__VA_ARGS__)
+
 #define test_harness_log(lvl, fmt, ...)                                        \
     log(LOG_SITE(test_harness), LOG_HANDLE(test_harness), lvl, fmt,            \
         ##__VA_ARGS__)
@@ -276,45 +292,57 @@ static int test_dup_item_cmp(const void *a, const void *b) {
         return strcmp(ta->name, tb->name);
 }
 
-/* NOTE:
- * Rule: no test_group or test may share a name with any test or test_group,
- * this is because the --filter build flag can enable tests or test groups,
- * and we can't have that be ambiguous
- */
 static void tests_check_duplicate_names() {
-    size_t num_tests = __ekernel_tests - __skernel_tests;
-    size_t num_test_groups = __ekernel_test_groups - __skernel_test_groups;
-    size_t num_items = num_tests + num_test_groups;
-
-    struct test_dup_item *items = kmalloc_or_die(
-        sizeof(struct test_dup_item) * num_items, ALLOC_FLAGS_ZERO);
-
-    for (size_t i = 0; i < num_tests; i++) {
-        items[i].name = (char *) __skernel_tests[i].name;
-        items[i].hash =
-            hash_murmur3_32(items[i].name, strlen(items[i].name), 0);
-    }
-
-    for (size_t i = 0; i < num_test_groups; i++) {
-        items[num_tests + i].name = (char *) __skernel_test_groups[i].name;
-        items[num_tests + i].hash = hash_murmur3_32(
-            items[num_tests + i].name, strlen(items[num_tests + i].name), 0);
-    }
-
-    qsort(items, num_items, sizeof(struct test_dup_item), test_dup_item_cmp);
-
-    for (size_t i = 1; i < num_items; i++) {
-        if (items[i].hash == items[i - 1].hash &&
-            strcmp(items[i].name, items[i - 1].name) == 0) {
-            panic("Duplicate test/test_group name: %s", items[i].name);
+    /* Rule: no two test groups may have the same name */
+    for (struct test_group *tg1 = __skernel_test_groups;
+         tg1 < __ekernel_test_groups; tg1++) {
+        for (struct test_group *tg2 = tg1 + 1; tg2 < __ekernel_test_groups;
+             tg2++) {
+            if (strcmp(tg1->name, tg2->name) == 0) {
+                panic("Duplicate test_group name: %s", tg1->name);
+            }
         }
     }
 
-    kfree(items);
+    /* Rule: no two tests in the same test group may have the same name */
+    for (struct test *t1 = __skernel_tests; t1 < __ekernel_tests; t1++) {
+        for (struct test *t2 = t1 + 1; t2 < __ekernel_tests; t2++) {
+            if (t1->group == t2->group && strcmp(t1->name, t2->name) == 0) {
+                struct test_group *g = (struct test_group *) t1->group;
+                panic("Duplicate test name '%s' in group '%s'", t1->name,
+                      g ? g->name : "<unknown>");
+            }
+        }
+    }
 }
 
 static void test_filter_enable(char *name) {
-    /* Duplicate name presence will panic the kernel */
+    char *sep = strchr(name, '.');
+    if (!sep)
+        sep = strchr(name, ':');
+
+    if (sep) {
+        char grp_buf[64];
+        size_t grp_len = (size_t) (sep - name);
+        if (grp_len < sizeof(grp_buf)) {
+            memcpy(grp_buf, name, grp_len);
+            grp_buf[grp_len] = '\0';
+            const char *t_name = sep + 1;
+            bool found_specific = false;
+            for (struct test *t = __skernel_tests; t < __ekernel_tests; t++) {
+                struct test_group *g = (struct test_group *) t->group;
+                if (g && strcmp(g->name, grp_buf) == 0 &&
+                    strcmp(t->name, t_name) == 0) {
+                    t->enabled = TEST_STATE_ENABLED;
+                    g->enabled = TEST_STATE_ENABLED;
+                    found_specific = true;
+                }
+            }
+            if (found_specific)
+                return;
+        }
+    }
+
     for (struct test_group *tg = __skernel_test_groups;
          tg < __ekernel_test_groups; tg++) {
         if (strcmp(tg->name, name) == 0) {
@@ -335,15 +363,19 @@ static void test_filter_enable(char *name) {
         }
     }
 
+    bool found = false;
     for (struct test *t = __skernel_tests; t < __ekernel_tests; t++) {
         if (strcmp(t->name, name) == 0) {
             t->enabled = TEST_STATE_ENABLED;
 
             struct test_group *g = (struct test_group *) t->group;
-            g->enabled = TEST_STATE_ENABLED;
-            return;
+            if (g)
+                g->enabled = TEST_STATE_ENABLED;
+            found = true;
         }
     }
+    if (found)
+        return;
 
     panic("%s in the filter is not a valid test group or test name", name);
 }
@@ -498,6 +530,8 @@ static void test_group_run(struct test_group *tg) {
                       "%s" ANSI_RESET ")\n",
                       tg->name, total_tests, tg->fname);
 
+    test_ndjson_info("group start: %s (%zu tests)", tg->name, total_tests);
+
     ndjson_emit(test_group_start, .group = tg->name, .test_count = total_tests,
                 .file = tg->fname);
     printf("%*s  | ", 20, "");
@@ -538,18 +572,9 @@ static void test_group_run(struct test_group *tg) {
 
         const char *tier_name = test_tier_to_str_color(i);
 
-        size_t len = snprintf(NULL, 0,
-                              "%s " ANSI_RESET "(" ANSI_BOLD ANSI_MAGENTA
-                              "%s" ANSI_RESET ")" ANSI_GREEN,
-                              tg->name, tier_name) +
-                     1;
-        char *name = kmalloc_or_die(len);
-        snprintf(name, len,
-                 "%s " ANSI_RESET "(" ANSI_BOLD ANSI_MAGENTA "%s" ANSI_RESET
-                 ")" ANSI_GREEN,
-                 tg->name, tier_name);
-
-        LOG_SITE(test_harness)->name = (char *) name;
+        kassert(asprintf(&LOG_SITE(test_harness)->name,
+                         "%s " ANSI_RESET "(%s" ANSI_RESET ")", tg->name,
+                         tier_name));
 
         for (size_t test_num = 0; test_num < tg->num_tests[i]; test_num++) {
             struct test *t = tg->tests[i][test_num];
@@ -604,6 +629,8 @@ static void test_group_run(struct test_group *tg) {
                 printf(" [" ANSI_CYAN "%s" ANSI_RESET "]", intst_str);
             }
             test_progress_paint(tg, i, t->name);
+            test_ndjson_info("test start: %s:%s (%s)", tg->name, t->name,
+                             test_tier_plain(i));
 
             time_ms_t start_ms = time_get_ms();
             for (; run_times < t->run_times; run_times++) {
@@ -628,6 +655,10 @@ static void test_group_run(struct test_group *tg) {
             time_ms_t took = end_ms - start_ms;
             total_time += took;
             test_global.total_time += took;
+
+            test_ndjson_info("test finished: %s:%s -> %s in %zu ms", tg->name,
+                             t->name,
+                             test_result_plain(singular_verdict.result), took);
 
             size_t non_skipped = run_times - result_times[TEST_RESULT_SKIPPED];
 
@@ -695,33 +726,31 @@ static void test_group_run(struct test_group *tg) {
                 printf("\n");
             }
 
-            {
-                struct test_verdict *worst = &singular_verdict;
-                for (size_t k = 0; k < run_times; k++) {
-                    if (verdicts[k].result == TEST_RESULT_FAILED) {
-                        worst = &verdicts[k];
-                        break;
-                    }
+            struct test_verdict *worst = &singular_verdict;
+            for (size_t k = 0; k < run_times; k++) {
+                if (verdicts[k].result == TEST_RESULT_FAILED) {
+                    worst = &verdicts[k];
+                    break;
                 }
-
-                const char *status = test_status_plain(worst->result);
-                if (t->run_times > 1 && result_times[TEST_RESULT_FAILED] &&
-                    result_times[TEST_RESULT_FAILED] < run_times)
-                    status = "flaky";
-
-                ndjson_emit(
-                    test_result, .group = tg->name,
-                    .tier = test_tier_plain(t->tier), .name = t->name,
-                    .status = status, .duration_ms = took,
-                    .reason = worst->result == TEST_RESULT_SKIPPED
-                                  ? test_skip_reason_to_str(worst->skip_reason)
-                                  : NULL,
-                    .msg = worst->msg,
-                    .runs_requested = t->run_times > 1 ? t->run_times : 0,
-                    .runs_attempted = t->run_times > 1 ? run_times : 0,
-                    .runs_failed = result_times[TEST_RESULT_FAILED],
-                    .runs_skipped = result_times[TEST_RESULT_SKIPPED]);
             }
+
+            const char *status = test_status_plain(worst->result);
+            if (t->run_times > 1 && result_times[TEST_RESULT_FAILED] &&
+                result_times[TEST_RESULT_FAILED] < run_times)
+                status = "flaky";
+
+            ndjson_emit(test_result, .group = tg->name,
+                        .tier = test_tier_plain(t->tier), .name = t->name,
+                        .status = status, .duration_ms = took,
+                        .reason =
+                            worst->result == TEST_RESULT_SKIPPED
+                                ? test_skip_reason_to_str(worst->skip_reason)
+                                : NULL,
+                        .msg = worst->msg,
+                        .runs_requested = t->run_times > 1 ? t->run_times : 0,
+                        .runs_attempted = t->run_times > 1 ? run_times : 0,
+                        .runs_failed = result_times[TEST_RESULT_FAILED],
+                        .runs_skipped = result_times[TEST_RESULT_SKIPPED]);
 
             bool has_msg = log_site_message_count(tctx.site) > 0;
             bool of_interest =
@@ -755,7 +784,7 @@ static void test_group_run(struct test_group *tg) {
             }
         }
 
-        kfree(name);
+        kfree((void *) LOG_SITE(test_harness)->name);
     }
 
     LOG_SITE(test_harness)->name = "test_harness";
@@ -765,6 +794,8 @@ static void test_group_run(struct test_group *tg) {
             result_aggregates[j] += result_totals.totals[i][j];
         }
     }
+
+    test_ndjson_info("group end: %s (duration %zu ms)", tg->name, total_time);
 
     ndjson_emit(test_group_end, .group = tg->name, .duration_ms = total_time,
                 .failed = result_aggregates[TEST_RESULT_FAILED],

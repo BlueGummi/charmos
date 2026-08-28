@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "mem/slab/tests/test_internal.h"
 
 #ifdef TEST_MEM
 
@@ -32,7 +32,7 @@ static void mt_kmalloc_worker(void *) {
     atomic_fetch_add(&kmalloc_done, 1);
 }
 
-TEST_DECLARE_INTEGRATION(slab, kmalloc_multithreaded_test,
+TEST_DECLARE_INTEGRATION(slab, multithreaded_alloc_free,
                          TEST_INTENSITY_CORES(1, 2, 4, "threads/core")) {
     ABORT_IF_RAM_LOW();
 
@@ -141,7 +141,7 @@ static volatile int done[STRESS_THREADS];
 static struct stress_arg args[STRESS_THREADS];
 static char msg[128];
 
-TEST_DECLARE_INTEGRATION(slab, kmalloc_new_concurrency_stress_test,
+TEST_DECLARE_INTEGRATION(slab, concurrency_stress,
                          TEST_INTENSITY(5000, 50000, 200000)) {
     memset((void *) done, 0, sizeof(done));
     all_ready = false;

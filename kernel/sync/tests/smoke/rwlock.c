@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "sync/tests/test_internal.h"
 
 #ifdef TEST_RWLOCK
 TEST_GROUP_DECLARE(rwlock, .intensity_desc = {
@@ -12,7 +12,7 @@ TEST_GROUP_DECLARE(rwlock, .intensity_desc = {
 
 static struct rwlock rw_basic = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 
-TEST_DECLARE_SMOKE(rwlock, rwlock_basic_read) {
+TEST_DECLARE_SMOKE(rwlock, basic_read) {
     rw_lock(&rw_basic, RWLOCK_ACQUIRE_READ);
     scheduler_yield();
     rw_unlock(&rw_basic);
@@ -22,7 +22,7 @@ TEST_DECLARE_SMOKE(rwlock, rwlock_basic_read) {
 
 static struct rwlock rw_basic_w = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 
-TEST_DECLARE_SMOKE(rwlock, rwlock_basic_write) {
+TEST_DECLARE_SMOKE(rwlock, basic_write) {
     rw_lock(&rw_basic_w, RWLOCK_ACQUIRE_WRITE);
     scheduler_yield();
     rw_unlock(&rw_basic_w);

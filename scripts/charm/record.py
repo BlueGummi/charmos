@@ -43,6 +43,8 @@ class ParseStats:
     last_record: str | None = None
     tests_seen: int = 0
     crashes: int = 0
+    in_flight_test: Record | None = None
+    recent_logs: list[Record] = field(default_factory=list)
 
 
 @dataclass
@@ -153,7 +155,26 @@ def ndjson_crash_record(rec: Record) -> Record:
     return out
 
 
+def ndjson_log_record(rec: Record) -> Record:
+    return {
+        "type": "log",
+        "site": rec.get("site"),
+        "level": rec.get("level"),
+        "msg": rec.get("msg"),
+        "file": rec.get("file"),
+        "line": rec.get("line"),
+        "func": rec.get("func"),
+        "t_ms": rec.get(P.KEY_TIME),
+        "cpu": rec.get(P.KEY_CPU),
+    }
+
+
 NDJSON_HANDLERS = {
+    (P.DOMAIN_LOG, P.KIND_MESSAGE): handler(
+        1,
+        reads=("site", "level", "msg", "file", "line", "func"),
+        fn=ndjson_log_record,
+    ),
     (P.DOMAIN_TEST, P.KIND_GROUP_START): handler(
         1,
         reads=("group", "test_count", "file"),
@@ -261,6 +282,9 @@ def parse_ndjson(lines: Iterable[str]) -> ParseResult:
     stats = ParseStats()
     supplied: set[RecordKey] = set()
     last_crash = None
+    current_group: str | None = None
+    in_flight_test: Record | None = None
+    recent_logs: list[Record] = []
 
     for line in lines:
         line = line.strip()
@@ -338,11 +362,48 @@ def parse_ndjson(lines: Iterable[str]) -> ParseResult:
 
         last_crash = out if out["type"] == "crash" else None
 
+        if out["type"] == "group_start":
+            current_group = out.get("group")
+        elif out["type"] == "group_end":
+            current_group = None
+        elif out["type"] == "log":
+            recent_logs.append(out)
+            if len(recent_logs) > 50:
+                recent_logs.pop(0)
+            msg = out.get("msg") or ""
+            m = re.match(
+                r"^test start:\s*(?:([a-zA-Z0-9_]+):)?([a-zA-Z0-9_]+)\s*\(([a-zA-Z0-9_]+)\)",
+                msg,
+            )
+            if m:
+                grp = m.group(1) or current_group
+                in_flight_test = {
+                    "type": "test",
+                    "group": grp,
+                    "tier": m.group(3),
+                    "name": m.group(2),
+                    "status": "incomplete",
+                    "duration_ms": 0,
+                    "t_ms": out.get("t_ms"),
+                }
+        elif out["type"] == "test":
+            in_flight_test = None
+
         if out["type"] == "totals":
             stats.reached_summary = True
             stats.totals = {k: out[k] for k in ("total", "passed", "failed", "skipped")}
         elif out["type"] == "verdict":
             stats.verdict = {"ok": out["ok"], "duration_ms": out["duration_ms"]}
+
+    stats.recent_logs = recent_logs
+    if in_flight_test and (not stats.ended or not stats.reached_summary):
+        stats.in_flight_test = in_flight_test
+        in_flight_synth = dict(in_flight_test)
+        in_flight_synth["status"] = classify(stats, stats.exit_code)
+        in_flight_synth["message"] = (
+            f"Halted/timed out during test '{in_flight_test['name']}'"
+        )
+        records.append(in_flight_synth)
 
     for crash in records:
         if crash.get("type") == "crash":
@@ -416,6 +477,11 @@ def build_run_record(result: ParseResult, meta: RunMeta, log_bytes: int) -> Reco
         "schema_ok": (not stats.schema_errors if stats.schema_seen else None),
         "guest_ended": stats.ended,
     }
+
+    if stats.in_flight_test:
+        run["in_flight_test"] = stats.in_flight_test
+    if stats.recent_logs:
+        run["recent_logs"] = stats.recent_logs
 
     if stats.schema_errors:
         run["schema_errors"] = stats.schema_errors

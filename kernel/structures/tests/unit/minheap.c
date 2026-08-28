@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "structures/tests/test_internal.h"
 
 #ifdef TEST_MINHEAP
 TEST_GROUP_DECLARE(minheap, .intensity_desc = {
@@ -17,7 +17,7 @@ static void mhtest_do_inserts(struct minheap *mh, struct minheap_node **nodes,
     }
 }
 
-TEST_DECLARE_UNIT(minheap, minheap_test, TEST_INTENSITY(10, 50, 1024)) {
+TEST_DECLARE_UNIT(minheap, basic_ops, TEST_INTENSITY(10, 50, 1024)) {
     size_t count = ctx->intensity_val ? ctx->intensity_val : 50;
     struct minheap_node **nodes =
         kmalloc(sizeof(struct minheap_node *) * count, ALLOC_FLAGS_ZERO);

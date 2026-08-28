@@ -1,9 +1,9 @@
-#include "../test_internal.h"
+#include "tests/test_internal.h"
 
 #ifdef TEST_STRING
 TEST_GROUP_DECLARE(string);
 
-TEST_DECLARE_UNIT(string, kmp_strstr_patterns) {
+TEST_DECLARE_UNIT(string, strstr_patterns) {
     /* Giving an empty needle returns start of haystack */
     const char *h1 = "abcdef";
     TEST_ASSERT_PTR_EQ(strstr(h1, ""), h1);

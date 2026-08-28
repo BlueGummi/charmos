@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "structures/tests/test_internal.h"
 
 #ifdef TEST_BLOOM
 TEST_GROUP_DECLARE(bloom, .intensity_desc = {
@@ -6,7 +6,7 @@ TEST_GROUP_DECLARE(bloom, .intensity_desc = {
                               .unit = "iters",
                           });
 
-TEST_DECLARE_UNIT(bloom, cbf_add_contains_remove) {
+TEST_DECLARE_UNIT(bloom, add_contains_remove) {
     /* 50 element capacity, 0.05 false positive rate */
     struct counting_bloom_filter *cbf = cbf_create(50, FX(0.05));
     TEST_ASSERT_NONNULL(cbf);
@@ -41,7 +41,7 @@ TEST_DECLARE_UNIT(bloom, cbf_add_contains_remove) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(bloom, cbf_counter_saturation, TEST_INTENSITY(16, 20, 64)) {
+TEST_DECLARE_UNIT(bloom, counter_saturation, TEST_INTENSITY(16, 20, 64)) {
     struct counting_bloom_filter *cbf = cbf_create(10, FX(0.1));
     TEST_ASSERT_NONNULL(cbf);
 

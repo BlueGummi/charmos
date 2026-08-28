@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "drivers/tests/test_internal.h"
 
 #ifdef TEST_VTD_UNIT
 TEST_GROUP_DECLARE(vtd_unit, .intensity_desc = {
@@ -6,7 +6,7 @@ TEST_GROUP_DECLARE(vtd_unit, .intensity_desc = {
                                  .unit = "iov_addrs",
                              });
 
-TEST_DECLARE_UNIT(vtd_unit, vtd_sl_iova_tiling, TEST_INTENSITY(1, 16, 4096)) {
+TEST_DECLARE_UNIT(vtd_unit, sl_iova_tiling, TEST_INTENSITY(1, 16, 4096)) {
     size_t count = ctx->intensity_val ? ctx->intensity_val : 16;
     for (size_t i = 0; i < count; i++) {
         uint64_t iova = (0x00007FEDCBA98765ULL + (i * 0x1000000003ULL)) &

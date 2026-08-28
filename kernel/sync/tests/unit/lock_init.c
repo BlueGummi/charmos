@@ -1,8 +1,10 @@
-#include "../test_internal.h"
+#include "sync/tests/test_internal.h"
 
 #include <sync/seqlock.h>
 
 #ifdef TEST_QSPINLOCK
+
+TEST_GROUP_DECLARE(lock_chk);
 
 LOCK_CHK_CLASS_DECLARE_LOCAL(lock_reinit_class);
 static MUTEX_SIMPLE_DEFINE(static_simple_mutex);
@@ -63,7 +65,7 @@ static bool lock_reinit_state_valid(struct spinlock *spin,
 
 #endif /* DEBUG_LOCK_CHK */
 
-TEST_DECLARE_UNIT(qspinlock, lock_initializers_install_policy) {
+TEST_DECLARE_UNIT(lock_chk, initializers_install_policy) {
     struct spinlock spin;
     struct qspinlock qspin;
     struct mutex mutex;
@@ -84,7 +86,7 @@ TEST_DECLARE_UNIT(qspinlock, lock_initializers_install_policy) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(qspinlock, lock_policy_mutation_and_reinit) {
+TEST_DECLARE_UNIT(lock_chk, policy_mutation_and_reinit) {
     struct spinlock spin;
     struct qspinlock qspin;
     struct mutex mutex;

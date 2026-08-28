@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "mem/tests/test_internal.h"
 
 #ifdef TEST_MM
 
@@ -75,8 +75,7 @@ static void dp_join(struct thread **t, size_t nthreads) {
 }
 
 /* 1 buffer, N threads, 1 CPU = serialized faults + preemption mid-handler */
-TEST_DECLARE_UNIT(mem, demand_1buf_Nthreads_1cpu_test,
-                  TEST_INTENSITY(2, 8, 32)) {
+TEST_DECLARE_UNIT(mem, demand_single_buf_up, TEST_INTENSITY(2, 8, 32)) {
     ABORT_IF_RAM_LOW();
 
     size_t nthreads = ctx->intensity_val ? ctx->intensity_val : 8;

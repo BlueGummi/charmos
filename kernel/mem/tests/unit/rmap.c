@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "mem/tests/test_internal.h"
 
 #ifdef TEST_RMAP
 TEST_GROUP_DECLARE(rmap, .intensity_desc = {
@@ -41,7 +41,7 @@ static void record_visit(struct mm *mm, vaddr_t va, struct folio *f,
     v->n++;
 }
 
-TEST_DECLARE_UNIT(rmap, rmap_fork_visibility) {
+TEST_DECLARE_UNIT(rmap, fork_visibility) {
     vaddr_t base = WIN_BASE_PG << PAGE_4K_SHIFT;
     vaddr_t end = base + 16 * PAGE_SIZE;
     vaddr_t va = base + 4 * PAGE_SIZE; /* page we fault */
@@ -88,8 +88,7 @@ TEST_DECLARE_UNIT(rmap, rmap_fork_visibility) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(rmap, rmap_itree_differential,
-                  TEST_INTENSITY(200, 2000, 10000)) {
+TEST_DECLARE_UNIT(rmap, itree_differential, TEST_INTENSITY(200, 2000, 10000)) {
     prng_seed(ctx->seed ? ctx->seed : RMAP_SEED);
 
     struct range_rec *r =

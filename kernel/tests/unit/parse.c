@@ -1,10 +1,10 @@
-#include "../test_internal.h"
+#include "tests/test_internal.h"
 #include <parse.h>
 
 #ifdef TEST_PARSE
 TEST_GROUP_DECLARE(parse);
 
-TEST_DECLARE_UNIT(parse, parse_data_size_units_and_overflow) {
+TEST_DECLARE_UNIT(parse, data_size_units) {
     uint64_t val = 0;
 
     TEST_ASSERT(parse_is_data_size("1024", &val) && val == 1024);
@@ -29,7 +29,7 @@ TEST_DECLARE_UNIT(parse, parse_data_size_units_and_overflow) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(parse, parse_duration_units) {
+TEST_DECLARE_UNIT(parse, duration_units) {
     time_ns_t dur = 0;
 
     TEST_ASSERT(parse_is_duration("500ns", &dur) && dur == 500);
@@ -79,7 +79,7 @@ TEST_DECLARE_UNIT(parse, parse_duration_units) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(parse, parse_cpu_mask_ranges) {
+TEST_DECLARE_UNIT(parse, cpu_mask_ranges) {
     size_t n_cpus = 16;
     struct cpu_mask m1 = {0};
 
@@ -111,7 +111,7 @@ TEST_DECLARE_UNIT(parse, parse_cpu_mask_ranges) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(parse, parse_bool_and_syntax) {
+TEST_DECLARE_UNIT(parse, bool_syntax) {
     bool val = false;
 
     TEST_ASSERT(parse_is_bool("true", &val) && val == true);
@@ -133,7 +133,7 @@ TEST_DECLARE_UNIT(parse, parse_bool_and_syntax) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(parse, parse_range_and_mac) {
+TEST_DECLARE_UNIT(parse, range_and_mac) {
     uint64_t start = 0, end = 0;
 
     TEST_ASSERT(parse_is_range("0-100", &start, &end) && start == 0 &&
@@ -164,7 +164,7 @@ TEST_DECLARE_UNIT(parse, parse_range_and_mac) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(parse, parse_numbers_and_fx) {
+TEST_DECLARE_UNIT(parse, numbers_and_fx) {
     fx32_32_t fx = 0;
     TEST_ASSERT(parse_is_fx("0.5", &fx) && fx == FX(0.5));
     TEST_ASSERT(parse_is_fx("1.25", &fx) && fx == FX(1.25));
@@ -184,7 +184,7 @@ TEST_DECLARE_UNIT(parse, parse_numbers_and_fx) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(parse, parse_list_and_escaping) {
+TEST_DECLARE_UNIT(parse, list_and_escaping) {
     struct parse_list list = {0};
 
     /* comma-separated list */

@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "fs/ext2/tests/test_internal.h"
 
 #ifdef TEST_EXT2
 
@@ -39,8 +39,7 @@ static void flush() {
     check_bcache();*/
 }
 
-TEST_DECLARE_INTEGRATION(ext2, ext2_integration_test,
-                         TEST_INTENSITY(1, 4, 64)) {
+TEST_DECLARE_INTEGRATION(ext2, file_lifecycle, TEST_INTENSITY(1, 4, 64)) {
     EXT2_INIT;
 
     size_t ops = ctx->intensity_val ? ctx->intensity_val : 4;

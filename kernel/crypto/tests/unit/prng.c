@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "crypto/tests/test_internal.h"
 
 #ifdef TEST_PRNG
 TEST_GROUP_DECLARE(prng, .intensity_desc = {
@@ -6,8 +6,7 @@ TEST_GROUP_DECLARE(prng, .intensity_desc = {
                              .unit = "samples",
                          });
 
-TEST_DECLARE_UNIT(prng, prng_determinism_and_refill,
-                  TEST_INTENSITY(16, 256, 65536)) {
+TEST_DECLARE_UNIT(prng, determinism, TEST_INTENSITY(16, 256, 65536)) {
     size_t samples = ctx->intensity_val ? ctx->intensity_val : 256;
     uint64_t seed_val = 0xDEADBEEFCAFEULL;
     uint64_t *seq1 = kmalloc(samples * sizeof(uint64_t), ALLOC_FLAGS_NONE);

@@ -137,7 +137,11 @@ def build_report(
 
     unique_crashes = sorted(by_sig.items(), key=lambda kv: kv[1]["count"], reverse=True)
 
-    notable = [t for t in tests if t.get("status") in ("fail", "flaky")]
+    notable = [
+        t
+        for t in tests
+        if t.get("status") in ("fail", "flaky", "timeout", "incomplete", "crash")
+    ]
 
     warnings = []
     for r in runs:
@@ -251,6 +255,48 @@ def render_markdown(rep: Record) -> str:
                 )
                 add("```")
             add("\n</details>\n")
+
+    hanging_shards = [
+        r
+        for r in rep["failed_runs"]
+        if r.get("outcome") in ("timeout", "incomplete") or r.get("in_flight_test")
+    ]
+    if hanging_shards:
+        add("### ⏱️ Incomplete / Timed-out Shards\n")
+        for r in hanging_shards:
+            shard_name = r.get("shard") or r.get("_source", "unknown")
+            in_flight = r.get("in_flight_test")
+            outcome = r.get("outcome", "unknown")
+            dur = r.get("duration_s")
+            dur_str = f" after {dur:.0f}s" if dur is not None else ""
+            test_desc = (
+                f" during `{in_flight.get('group', '?')}:{in_flight.get('name', '?')}` ({in_flight.get('tier', '?')})"
+                if in_flight
+                else ""
+            )
+            add(
+                f"<details open><summary><b>{html.escape(str(shard_name))}</b> &mdash; "
+                f"outcome: <code>{html.escape(str(outcome))}</code>{dur_str}{test_desc}</summary>\n"
+            )
+            if in_flight:
+                add(
+                    f"- **In-flight test:** `{in_flight.get('group', '?')}:{in_flight.get('name', '?')}` ({in_flight.get('tier', '?')})"
+                )
+            if r.get("exit_code") is not None:
+                add(f"- **Exit code:** `{r['exit_code']}`")
+            recent = r.get("recent_logs")
+            if recent:
+                add("\n**Recent log messages:**\n")
+                add("```")
+                for log_rec in recent[-15:]:
+                    t_val = log_rec.get("t_ms")
+                    t_str = f"[{t_val / 1000.0:.3f}]" if t_val is not None else ""
+                    site = log_rec.get("site", "log")
+                    lvl = log_rec.get("level", "info")
+                    msg = log_rec.get("msg", "")
+                    add(f"{t_str} {site} ({lvl}): {msg}")
+                add("```\n")
+            add("</details>\n")
 
     add("### Shards\n")
     rows: list[tuple[str, ...]] = []

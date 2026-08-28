@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "sch/tests/test_internal.h"
 
 #ifdef TEST_CLIMB
 TEST_GROUP_DECLARE(climb, .intensity_desc = {
@@ -6,8 +6,7 @@ TEST_GROUP_DECLARE(climb, .intensity_desc = {
                               .unit = "steps",
                           });
 
-TEST_DECLARE_UNIT(climb, climb_pressure_cubic_curve,
-                  TEST_INTENSITY(20, 100, 1000)) {
+TEST_DECLARE_UNIT(climb, pressure_cubic_curve, TEST_INTENSITY(20, 100, 1000)) {
     /* Pressure p = 0 -> boost target = 0 */
     TEST_ASSERT_EQ_S(TEST_CALL(climb_pressure_to_boost_target)(0), 0);
 

@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "mem/tests/test_internal.h"
 
 #ifdef TEST_MM
 TEST_GROUP_DECLARE(mm, .intensity_desc = {
@@ -135,7 +135,7 @@ static size_t build_random_vma_ranges(struct mm *mm) {
     return placed;
 }
 
-TEST_DECLARE_UNIT(mm, mm_gap_differential, TEST_INTENSITY(200, 3000, 20000)) {
+TEST_DECLARE_UNIT(mm, gap_differential, TEST_INTENSITY(200, 3000, 20000)) {
     prng_seed(ctx->seed ? ctx->seed : MM_TEST_SEED);
     struct mm *mm = mm_alloc();
     TEST_ASSERT_NONNULL(mm);
@@ -171,7 +171,7 @@ TEST_DECLARE_UNIT(mm, mm_gap_differential, TEST_INTENSITY(200, 3000, 20000)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(mm, mm_map_consistency,
+TEST_DECLARE_UNIT(mm, map_consistency,
                   TEST_INTENSITY_LINEAR(16, 128, 192, "mappings")) {
     prng_seed(ctx->seed ? ctx->seed : (MM_TEST_SEED + 1));
     struct mm *mm = mm_alloc();
@@ -198,7 +198,7 @@ TEST_DECLARE_UNIT(mm, mm_map_consistency,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(mm, mm_vma_range_split) {
+TEST_DECLARE_UNIT(mm, vma_range_split) {
     struct mm *mm = mm_alloc();
     TEST_ASSERT_NONNULL(mm);
 

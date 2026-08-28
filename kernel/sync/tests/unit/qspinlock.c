@@ -1,9 +1,9 @@
-#include "../test_internal.h"
+#include "sync/tests/test_internal.h"
 
 #ifdef TEST_QSPINLOCK
 TEST_GROUP_DECLARE(qspinlock);
 
-TEST_DECLARE_UNIT(qspinlock, qspinlock_tail_encoding) {
+TEST_DECLARE_UNIT(qspinlock, tail_encoding) {
     /* Test tail encoding across CPUs and context levels */
     cpu_id_t cpus[] = {0, 1, 15, 255, 1024, 65534};
     enum qspinlock_level levels[] = {QSPINLOCK_LEVEL_NORMAL,
@@ -33,7 +33,7 @@ TEST_DECLARE_UNIT(qspinlock, qspinlock_tail_encoding) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(qspinlock, qspinlock_pending_to_locked_math) {
+TEST_DECLARE_UNIT(qspinlock, pending_to_locked_math) {
     /* Test the transition: lock has tail + pending bit, and adding
      * (Q_SPIN_LOCKED_VAL - Q_SPIN_PENDING_VAL) = -255 */
     uint32_t tail = (42 << Q_SPIN_TAIL_CPU_OFFSET) |
@@ -68,7 +68,7 @@ static void qspinlock_contention_worker(void *) {
     }
 }
 
-TEST_DECLARE_INTEGRATION(qspinlock, qspinlock_contended_handoff) {
+TEST_DECLARE_INTEGRATION(qspinlock, contended_handoff) {
     if (global.core_count < 2)
         return TEST_SKIP(TEST_SKIP_NONE);
 

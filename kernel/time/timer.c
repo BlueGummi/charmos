@@ -146,21 +146,23 @@ static inline void timer_sync_wait_spin() {
 static void timer_dpc(void *ctx) {
     struct timer_percpu *pcpu = ctx;
 
-    enum irql irql = spin_lock_irq_disable(&pcpu->lock);
+    while (true) {
+        enum irql irql = spin_lock_irq_disable(&pcpu->lock);
+        if (hlist_empty(&pcpu->dpc_timers)) {
+            spin_unlock(&pcpu->lock, irql);
+            break;
+        }
 
-    while (!hlist_empty(&pcpu->dpc_timers)) {
         struct timer *timer =
             hlist_entry(pcpu->dpc_timers.first, struct timer, hlist_node);
+        timer_list_del(timer);
+        spin_unlock(&pcpu->lock, irql);
+
         struct timer_base *base = timer_base_for_flags(timer->flags);
 
         enum irql birql = spin_lock_irq_disable(&base->lock);
-
         base->running = timer;
-
         spin_unlock(&base->lock, birql);
-
-        timer_list_del(timer);
-        spin_unlock(&pcpu->lock, irql);
 
         kassert(!(timer->flags & TIMER_FLAG_IRQ));
         timer_fn_call(timer);
@@ -168,11 +170,7 @@ static void timer_dpc(void *ctx) {
         birql = spin_lock_irq_disable(&base->lock);
         base->running = NULL;
         spin_unlock(&base->lock, birql);
-
-        irql = spin_lock_irq_disable(&pcpu->lock);
     }
-
-    spin_unlock(&pcpu->lock, irql);
 }
 
 /* Since we have two types of timers, DPC and IRQ ones, we have to construct

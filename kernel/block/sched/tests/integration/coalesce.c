@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "block/sched/tests/test_internal.h"
 
 #ifdef TEST_BIO_SCHED
 TEST_GROUP_DECLARE(bio_sched, .intensity_desc = {
@@ -22,8 +22,7 @@ static void bio_sch_callback1(struct bio_request *req) {
     test_info("cb 1 success");
 }
 
-TEST_DECLARE_INTEGRATION(bio_sched, bio_sched_coalesce_test,
-                         TEST_INTENSITY(1, 2, 16)) {
+TEST_DECLARE_INTEGRATION(bio_sched, coalesce, TEST_INTENSITY(1, 2, 16)) {
     EXT2_INIT;
     struct ext2_fs *fs = root->fs_data;
     struct block_device *d = fs->drive;

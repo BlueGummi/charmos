@@ -1,7 +1,7 @@
 #pragma once
 #include <test/test.h>
 
-#include "../internal.h"
+#include "thread/workqueue/internal.h"
 #include <mem/alloc.h>
 #include <mem/alloc_or_die.h>
 #include <sch/sched.h>

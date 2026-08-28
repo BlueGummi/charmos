@@ -1,7 +1,7 @@
 #pragma once
 #include <test/test.h>
 
-#include "../internal.h"
+#include "mem/slab/internal.h"
 #include <crypto/prng.h>
 #include <mem/alloc.h>
 #include <mem/elcm.h>

@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "sync/tests/test_internal.h"
 
 #ifdef TEST_MUTEX
 
@@ -51,7 +51,7 @@ static void pi_ts_thread(void *nothing) {
     test_info("exiting");
 }
 
-TEST_DECLARE_INTEGRATION(mutex, mutex_pi_test) {
+TEST_DECLARE_INTEGRATION(mutex, pi_boost) {
     if (global.core_count == 1) {
         return TEST_SKIP(TEST_SKIP_NONE);
     }
@@ -141,7 +141,7 @@ static void pi_chain_rt(void *arg) {
     atomic_fetch_add(&pi_chain_done, 1);
 }
 
-TEST_DECLARE_INTEGRATION(mutex, mutex_pi_chain) {
+TEST_DECLARE_INTEGRATION(mutex, pi_chain) {
     if (global.core_count < 2) {
         return TEST_SKIP(TEST_SKIP_NONE);
     }
@@ -212,7 +212,7 @@ static void pi_multi_rt(void *arg) {
     atomic_fetch_add(&pi_multi_done, 1);
 }
 
-TEST_DECLARE_INTEGRATION(mutex, mutex_pi_multi_waiters,
+TEST_DECLARE_INTEGRATION(mutex, pi_multi_waiters,
                          TEST_INTENSITY_LINEAR(2, 2, 8, "rt_waiters")) {
     if (global.core_count < 2) {
         return TEST_SKIP(TEST_SKIP_NONE);
@@ -287,7 +287,7 @@ static void pi_revert_rt(void *arg) {
     atomic_fetch_add(&pi_reverted_done, 1);
 }
 
-TEST_DECLARE_INTEGRATION(mutex, mutex_pi_revert) {
+TEST_DECLARE_INTEGRATION(mutex, pi_revert) {
     if (global.core_count < 2) {
         return TEST_SKIP(TEST_SKIP_NONE);
     }

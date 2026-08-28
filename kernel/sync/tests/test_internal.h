@@ -26,3 +26,8 @@ TEST_GROUP_DEFINE(rwlock);
 TEST_GROUP_DEFINE(sync_nightmare);
 TEST_GROUP_DEFINE(qspinlock);
 TEST_GROUP_DEFINE(turnstile);
+TEST_GROUP_DEFINE(lock_chk);
+TEST_GROUP_DEFINE(raw_spinlock);
+TEST_GROUP_DEFINE(condvar);
+TEST_GROUP_DEFINE(semaphore);
+TEST_GROUP_DEFINE(completion);

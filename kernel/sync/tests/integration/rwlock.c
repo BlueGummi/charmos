@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "sync/tests/test_internal.h"
 
 #ifdef TEST_RWLOCK
 
@@ -12,7 +12,7 @@ static void rw_two_writer_thread(void *) {
     atomic_store(&rw_two_done, true);
 }
 
-TEST_DECLARE_INTEGRATION(rwlock, rwlock_two_writer_basic) {
+TEST_DECLARE_INTEGRATION(rwlock, two_writers) {
     atomic_store(&rw_two_done, false);
     rw_lock(&rw_two_writers, RWLOCK_ACQUIRE_WRITE);
 
@@ -54,8 +54,7 @@ static void rw_reader_worker(void *) {
     atomic_fetch_sub(&rw_readers_left, 1);
 }
 
-TEST_DECLARE_INTEGRATION(rwlock, rwlock_many_readers,
-                         TEST_INTENSITY(4, 20, 64)) {
+TEST_DECLARE_INTEGRATION(rwlock, many_readers, TEST_INTENSITY(4, 20, 64)) {
     size_t num_readers = ctx->intensity_val ? ctx->intensity_val : 20;
     if (num_readers > RWLOCK_READER_MAX)
         num_readers = RWLOCK_READER_MAX;
@@ -107,8 +106,7 @@ static void rw_mixed_worker(void *) {
     atomic_fetch_sub(&rw_mixed_left, 1);
 }
 
-TEST_DECLARE_INTEGRATION(rwlock, rwlock_mixed_stress,
-                         TEST_INTENSITY(4, 24, 64)) {
+TEST_DECLARE_INTEGRATION(rwlock, mixed_stress, TEST_INTENSITY(4, 24, 64)) {
     size_t num_threads = ctx->intensity_val ? ctx->intensity_val : 24;
     if (num_threads > RWLOCK_MIXED_THREADS_MAX)
         num_threads = RWLOCK_MIXED_THREADS_MAX;
@@ -153,7 +151,7 @@ static void rw_chaos_worker(void *) {
     test_info("%u threads left", atomic_fetch_sub(&rw_chaos_left, 1) - 1);
 }
 
-TEST_DECLARE_INTEGRATION(rwlock, rwlock_chaos, TEST_INTENSITY(4, 24, 64)) {
+TEST_DECLARE_INTEGRATION(rwlock, chaos, TEST_INTENSITY(4, 24, 64)) {
     size_t num_threads = ctx->intensity_val ? ctx->intensity_val : 24;
     if (num_threads > RWLOCK_CHAOS_THREADS_MAX)
         num_threads = RWLOCK_CHAOS_THREADS_MAX;
@@ -225,8 +223,7 @@ static void rw_correct_worker(void *) {
     atomic_fetch_sub(&correctness_left, 1);
 }
 
-TEST_DECLARE_INTEGRATION(rwlock, rwlock_correctness,
-                         TEST_INTENSITY(4, 16, 64)) {
+TEST_DECLARE_INTEGRATION(rwlock, mutual_exclusion, TEST_INTENSITY(4, 16, 64)) {
     size_t num_threads = ctx->intensity_val ? ctx->intensity_val : 16;
     if (num_threads > RWLOCK_CORRECT_THREADS_MAX)
         num_threads = RWLOCK_CORRECT_THREADS_MAX;

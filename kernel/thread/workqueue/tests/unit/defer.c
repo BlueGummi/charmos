@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "thread/workqueue/tests/test_internal.h"
 
 #ifdef TEST_TIMER_DEFER
 TEST_GROUP_DECLARE(defer, .intensity_desc = {
@@ -24,7 +24,7 @@ static void defer_func(void *boo, void *unused) {
     defer_worked = true;
 }
 
-TEST_DECLARE_UNIT(defer, defer_test) {
+TEST_DECLARE_UNIT(defer, delayed_work_schedule) {
     atomic_store(&defer_worked, false);
     delayed_work_init(&test_dwork, defer_func, WORK_ARGS(NULL, NULL));
     enqueue_ms = time_get_ms();

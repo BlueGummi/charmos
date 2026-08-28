@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "mem/slab/tests/test_internal.h"
 #include <acpi/lapic.h>
 #include <irq/irq.h>
 
@@ -40,7 +40,7 @@ static enum irq_result kfree_irq_test_irq(void *ctx, uint8_t vector,
     return IRQ_HANDLED;
 }
 
-TEST_DECLARE_INTEGRATION(slab, kfree_defer_irq_test,
+TEST_DECLARE_INTEGRATION(slab, kfree_defer_irq,
                          TEST_INTENSITY(256, 2048, 16384)) {
     if (global.core_count < 4) {
         return TEST_SKIP(TEST_SKIP_NONE);

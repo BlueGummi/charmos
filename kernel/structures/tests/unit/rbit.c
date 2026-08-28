@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "structures/tests/test_internal.h"
 
 #ifdef TEST_RBIT
 TEST_GROUP_DECLARE(rbit, .intensity_desc = {
@@ -20,7 +20,7 @@ static int overlaps(struct interval a, struct interval b) {
     return a.low <= b.high && b.low <= a.high;
 }
 
-TEST_DECLARE_UNIT(rbit, rbit_order_search, TEST_INTENSITY(32, 256, 4096)) {
+TEST_DECLARE_UNIT(rbit, order_and_search, TEST_INTENSITY(32, 256, 4096)) {
     prng_seed(RBIT_SEED);
     struct rbit tree;
     rbit_init(&tree);
@@ -68,7 +68,7 @@ TEST_DECLARE_UNIT(rbit, rbit_order_search, TEST_INTENSITY(32, 256, 4096)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(rbit, rbit_overlap, TEST_INTENSITY(200, 4000, 20000)) {
+TEST_DECLARE_UNIT(rbit, overlap_search, TEST_INTENSITY(200, 4000, 20000)) {
     prng_seed(RBIT_SEED + 1);
     struct rbit tree;
     rbit_init(&tree);
@@ -132,7 +132,7 @@ static bool count_augment(struct rbit_node *n) {
     return n->max != old_max || c->subtree_count != old_cnt;
 }
 
-TEST_DECLARE_UNIT(rbit, rbit_augment_hook, TEST_INTENSITY(200, 4000, 20000)) {
+TEST_DECLARE_UNIT(rbit, augment_hook, TEST_INTENSITY(200, 4000, 20000)) {
     prng_seed(RBIT_SEED + 2);
     struct rbit tree;
     rbit_init(&tree);

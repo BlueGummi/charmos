@@ -44,6 +44,7 @@ enum log_site_flags : uint32_t {
     LOG_SITE_DUP_MESSAGES = 1 << 4, /* If this is set, we also expect the
                                      * msg_max_len of log_site_options
                                      * to be set, else panic */
+    LOG_SITE_NDJSON = 1 << 5,       /* emit records directly to NDJSON wire */
     LOG_SITE_NONE = 0,
     LOG_SITE_DEFAULT = LOG_SITE_DROP_OLD,
 };

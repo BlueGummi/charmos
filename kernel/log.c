@@ -6,6 +6,7 @@
 #include <log.h>
 #include <mem/alloc_or_die.h>
 #include <mem/vmm.h>
+#include <ndjson.h>
 #include <sch/sched.h>
 #include <smp/core.h>
 #include <stdarg.h>
@@ -15,6 +16,10 @@
 #include <structures/locked_list.h>
 #include <thread/thread.h>
 #include <time/time.h>
+
+NDJSON_DECLARE(log_message, NDJSON_DOMAIN_LOG, NDJSON_KIND_MESSAGE, 1,
+               NDJSON_STR(site), NDJSON_STR(level), NDJSON_STR(msg),
+               NDJSON_STR(file), NDJSON_U64(line), NDJSON_STR(func));
 
 #define LOG_IMPORTANT_RETRY 32
 LOG_SITE_DECLARE(global, .flags = LOG_SITE_DEFAULT,
@@ -210,6 +215,70 @@ static void k_printf_from_log(const char *fmt, const uint64_t *args,
         break;
     default: print("<invalid nargs>");
     }
+}
+
+static const char *log_level_to_str(enum log_level l) {
+    switch (l) {
+    case LOG_TRACE: return "trace";
+    case LOG_DEBUG: return "debug";
+    case LOG_INFO: return "info";
+    case LOG_WARN: return "warn";
+    case LOG_ERROR: return "error";
+    default: return "unknown";
+    }
+}
+
+static void snprintf_from_log(char *buf, size_t size, const char *fmt,
+                              const uint64_t *args, uint8_t nargs) {
+    if (!fmt) {
+        buf[0] = '\0';
+        return;
+    }
+    switch (nargs) {
+    case 0: snprintf(buf, size, "%s", fmt); break;
+    case 1: snprintf(buf, size, fmt, args[0]); break;
+    case 2: snprintf(buf, size, fmt, args[0], args[1]); break;
+    case 3: snprintf(buf, size, fmt, args[0], args[1], args[2]); break;
+    case 4: snprintf(buf, size, fmt, args[0], args[1], args[2], args[3]); break;
+    case 5:
+        snprintf(buf, size, fmt, args[0], args[1], args[2], args[3], args[4]);
+        break;
+    case 6:
+        snprintf(buf, size, fmt, args[0], args[1], args[2], args[3], args[4],
+                 args[5]);
+        break;
+    case 7:
+        snprintf(buf, size, fmt, args[0], args[1], args[2], args[3], args[4],
+                 args[5], args[6]);
+        break;
+    case 8:
+        snprintf(buf, size, fmt, args[0], args[1], args[2], args[3], args[4],
+                 args[5], args[6], args[7]);
+        break;
+    default: snprintf(buf, size, "<invalid nargs>"); break;
+    }
+}
+
+static void log_emit_ndjson_record(const struct log_site *site,
+                                   const struct log_record *rec) {
+    if (!ndjson_carrier_online())
+        return;
+
+    char msg_buf[256];
+    if (rec->fmt) {
+        snprintf_from_log(msg_buf, sizeof(msg_buf), rec->fmt, rec->args,
+                          rec->nargs);
+    } else if (rec->handle && rec->handle->msg) {
+        strncpy(msg_buf, rec->handle->msg, sizeof(msg_buf) - 1);
+        msg_buf[sizeof(msg_buf) - 1] = '\0';
+    } else {
+        msg_buf[0] = '\0';
+    }
+
+    ndjson_emit(log_message, .site = site->name ? site->name : "unknown",
+                .level = log_level_to_str(rec->level), .msg = msg_buf,
+                .file = rec->caller_file, .line = (uint64_t) rec->caller_line,
+                .func = rec->caller_fn);
 }
 
 static void log_dump_record(const struct log_site *site,
@@ -460,6 +529,10 @@ void log_emit_internal(struct log_site *site, struct log_handle *handle,
 
     if (log_handle_should_print(handle, site, level)) {
         log_dump_record_locked(site, &rec, dopts);
+    }
+
+    if (site->flags & LOG_SITE_NDJSON) {
+        log_emit_ndjson_record(site, &rec);
     }
 
     if ((ll & LOG_PANIC) && level >= LOG_ERROR) {

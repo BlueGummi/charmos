@@ -1,10 +1,14 @@
-#include "../test_internal.h"
+#include "sync/tests/test_internal.h"
 #include <mem/alloc_or_die.h>
 #include <sync/completion.h>
 #include <sync/condvar.h>
 #include <sync/semaphore.h>
 
 #ifdef TEST_QSPINLOCK
+
+TEST_GROUP_DECLARE(condvar);
+TEST_GROUP_DECLARE(semaphore);
+TEST_GROUP_DECLARE(completion);
 
 struct timed_helper_args {
     struct semaphore *sem;
@@ -53,7 +57,7 @@ static void condvar_timeout_race_worker(void *arg) {
     }
 }
 
-TEST_DECLARE_UNIT(qspinlock, condvar_timeout_does_not_lose_wake) {
+TEST_DECLARE_UNIT(condvar, timeout_no_lost_wake) {
     struct condvar_timeout_race race = {0};
     condvar_init(&race.cv, CONDVAR_INIT_NORMAL);
     spinlock_init(&race.lock);
@@ -79,7 +83,7 @@ TEST_DECLARE_UNIT(qspinlock, condvar_timeout_does_not_lose_wake) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(qspinlock, semaphore_timedwait_success_and_timeout) {
+TEST_DECLARE_UNIT(semaphore, timedwait) {
     struct semaphore s;
     semaphore_init(&s, 1, false);
 
@@ -106,7 +110,7 @@ TEST_DECLARE_UNIT(qspinlock, semaphore_timedwait_success_and_timeout) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(qspinlock, completion_timedwait_success_and_timeout) {
+TEST_DECLARE_UNIT(completion, timedwait) {
     struct completion c;
     completion_init(&c, false);
 

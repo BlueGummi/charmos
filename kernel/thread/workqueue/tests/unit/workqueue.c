@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "thread/workqueue/tests/test_internal.h"
 
 #ifdef TEST_SCHED
 TEST_GROUP_DECLARE(workqueue, .intensity_desc = {
@@ -14,7 +14,7 @@ static void workqueue_fn(void *arg, void *unused) {
     atomic_fetch_add(&workqueue_times, 1);
 }
 
-TEST_DECLARE_UNIT(workqueue, workqueue_test, TEST_INTENSITY(32, 256, 4096)) {
+TEST_DECLARE_UNIT(workqueue, fast_oneshot, TEST_INTENSITY(32, 256, 4096)) {
     atomic_store(&workqueue_ran, false);
     atomic_store(&workqueue_times, 0);
 
@@ -79,7 +79,7 @@ static void enqueue_thread(void *) {
     atomic_fetch_sub(&threads_left, 1);
 }
 
-TEST_DECLARE_UNIT(workqueue, workqueue_test_2,
+TEST_DECLARE_UNIT(workqueue, concurrent_enqueue_scaling,
                   TEST_INTENSITY(512, 4096, 32768)) {
     size_t total_items = ctx->intensity_val ? ctx->intensity_val : 4096;
     wq_2_items_per_thread = total_items / WQ_2_THREADS;

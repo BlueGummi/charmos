@@ -11,7 +11,7 @@
 
 #ifdef DEBUG_LOCK_CHK
 
-#include "../sync/lock_chk_internal.h"
+#include "sync/lock_chk_internal.h"
 
 static void scheduler_lock_chk_assert(void) {
     lock_chk_assert_schedulable(LOCK_CHK_SITE_HERE());

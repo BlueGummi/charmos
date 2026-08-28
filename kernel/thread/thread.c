@@ -24,7 +24,7 @@
 
 #ifdef DEBUG_LOCK_CHK
 
-#include "../sync/lock_chk_internal.h"
+#include "sync/lock_chk_internal.h"
 
 static void thread_lock_chk_init(struct thread *thread) {
     lock_chk_thread_init(thread);

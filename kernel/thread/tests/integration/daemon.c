@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "thread/tests/test_internal.h"
 
 #ifdef TEST_SCHED
 TEST_GROUP_DECLARE(daemon, .intensity_desc = {
@@ -15,7 +15,7 @@ static enum daemon_thread_command daemon_work(void *a, void *b) {
 static struct daemon_work dwork =
     DAEMON_WORK_FROM(daemon_work, WORK_ARGS(NULL, NULL));
 
-TEST_DECLARE_INTEGRATION(daemon, daemon_test) {
+TEST_DECLARE_INTEGRATION(daemon, timesharing_worker) {
     atomic_store(&daemon_work_run, false);
 
     struct cpu_mask cmask;

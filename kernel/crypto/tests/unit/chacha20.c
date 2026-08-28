@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "crypto/tests/test_internal.h"
 
 #ifdef TEST_CHACHA20
 TEST_GROUP_DECLARE(chacha20, .intensity_desc = {
@@ -7,7 +7,7 @@ TEST_GROUP_DECLARE(chacha20, .intensity_desc = {
                              });
 
 /* RFC 7539 Section 2.4.2 official test vector */
-TEST_DECLARE_UNIT(chacha20, chacha20_rfc7539_kat) {
+TEST_DECLARE_UNIT(chacha20, rfc7539_kat) {
     static const uint8_t key[32] = {
         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
         0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15,
@@ -50,8 +50,7 @@ TEST_DECLARE_UNIT(chacha20, chacha20_rfc7539_kat) {
 }
 
 /* chunking and stream boundaries */
-TEST_DECLARE_UNIT(chacha20, chacha20_block_seams,
-                  TEST_INTENSITY(128, 512, 65536)) {
+TEST_DECLARE_UNIT(chacha20, block_seams, TEST_INTENSITY(128, 512, 65536)) {
     size_t total = ctx->intensity_val ? ctx->intensity_val : 512;
     uint8_t key[32] = {0x42};
     uint8_t nonce[12] = {0x24};

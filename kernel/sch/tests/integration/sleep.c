@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "sch/tests/test_internal.h"
 
 #ifdef TEST_SCHED
 TEST_GROUP_DECLARE(sched, .intensity_desc = {
@@ -10,7 +10,7 @@ static void sleepy_entry(void *) {
     thread_sleep_for_ms(50);
 }
 
-TEST_DECLARE_INTEGRATION(sched, sched_sleepy_test) {
+TEST_DECLARE_INTEGRATION(sched, sleep_ms) {
     struct thread *t =
         thread_spawn_joinable("sched_sleepy_test", sleepy_entry, NULL);
     TEST_ASSERT_NONNULL(t);
@@ -26,7 +26,7 @@ static void micro_sleep_entry(void *arg) {
     atomic_store(&slept_for_us, true);
 }
 
-TEST_DECLARE_INTEGRATION(sched, sched_micro_sleep_test) {
+TEST_DECLARE_INTEGRATION(sched, sleep_us) {
     atomic_store(&slept_for_us, false);
     struct thread *t = thread_spawn_joinable("sched_micro_sleep_test",
                                              micro_sleep_entry, NULL);
@@ -47,7 +47,7 @@ static void short_sleep_entry(void *arg) {
     }
 }
 
-TEST_DECLARE_INTEGRATION(sched, sched_short_sleep_lost_wake_test) {
+TEST_DECLARE_INTEGRATION(sched, short_sleep_lost_wake) {
     atomic_store(&short_sleep_stop, false);
     atomic_store(&short_sleep_count, 0);
 
@@ -114,7 +114,7 @@ static void waking_thread(void *) {
                 si_t->perceived_prio_class, (void *) 4);
 }
 
-TEST_DECLARE_INTEGRATION(sched, thread_sleep_interruptible_test) {
+TEST_DECLARE_INTEGRATION(sched, sleep_interruptible_apc) {
     if (global.core_count < 4) {
         test_info("too few cores");
         return TEST_SKIP(TEST_SKIP_NONE);

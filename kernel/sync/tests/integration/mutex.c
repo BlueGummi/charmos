@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "sync/tests/test_internal.h"
 
 #ifdef TEST_MUTEX
 
@@ -22,7 +22,7 @@ static void many_worker(void *) {
     atomic_fetch_sub(&many_waiter_done, 1);
 }
 
-TEST_DECLARE_INTEGRATION(mutex, mutex_many_waiters, TEST_INTENSITY(2, 10, 32)) {
+TEST_DECLARE_INTEGRATION(mutex, many_waiters, TEST_INTENSITY(2, 10, 32)) {
     size_t num_waiters = ctx->intensity_val ? ctx->intensity_val : 10;
     if (num_waiters > MUTEX_MANY_WAITER_MAX)
         num_waiters = MUTEX_MANY_WAITER_MAX;
@@ -73,7 +73,7 @@ static void chaos(void *) {
 volatile struct thread *main_thread = NULL;
 struct thread *other_threads[CHAOS_THREAD_MAX] = {0};
 
-TEST_DECLARE_INTEGRATION(mutex, mutex_chaos, TEST_INTENSITY(4, 24, 64)) {
+TEST_DECLARE_INTEGRATION(mutex, chaos, TEST_INTENSITY(20, 50, 100)) {
     size_t num_threads = ctx->intensity_val ? ctx->intensity_val : 24;
     if (num_threads > CHAOS_THREAD_MAX)
         num_threads = CHAOS_THREAD_MAX;

@@ -1,4 +1,4 @@
-#include "../../watchdog/internal.h"
+#include "watchdog/internal.h"
 
 #include <string.h>
 #include <test/test.h>
@@ -15,7 +15,7 @@ static void watchdog_populate_full_window(struct watchdog_buckets *buckets) {
         buckets->buckets_internal[i].heartbeats = 20;
 }
 
-TEST_DECLARE_UNIT(watchdog, watchdog_frozen_window_counts_missing_heartbeats) {
+TEST_DECLARE_UNIT(watchdog, frozen_window_missing_heartbeats) {
     struct watchdog_buckets buckets;
     watchdog_populate_full_window(&buckets);
 
@@ -32,7 +32,7 @@ TEST_DECLARE_UNIT(watchdog, watchdog_frozen_window_counts_missing_heartbeats) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(watchdog, watchdog_current_window_keeps_recent_heartbeats) {
+TEST_DECLARE_UNIT(watchdog, current_window_recent_heartbeats) {
     struct watchdog_buckets buckets;
     watchdog_populate_full_window(&buckets);
 
@@ -49,7 +49,7 @@ TEST_DECLARE_UNIT(watchdog, watchdog_current_window_keeps_recent_heartbeats) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(watchdog, watchdog_ewma_accepts_fixed_point_sample) {
+TEST_DECLARE_UNIT(watchdog, ewma_fixed_point_sample) {
     struct ewma score;
     ewma_init(&score, FX(0.15));
     score.ewma = FX(0.25);

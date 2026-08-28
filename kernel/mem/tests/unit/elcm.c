@@ -1,9 +1,9 @@
-#include "../test_internal.h"
+#include "mem/tests/test_internal.h"
 
 #ifdef TEST_ELCM
 TEST_GROUP_DECLARE(elcm);
 
-TEST_DECLARE_UNIT(elcm, elcm_slab_geometry_and_bounds) {
+TEST_DECLARE_UNIT(elcm, slab_geometry_and_bounds) {
     size_t sizes[] = {16, 32, 64, 128, 256, 512, 1024, 2048};
 
     for (size_t i = 0; i < sizeof(sizes) / sizeof(sizes[0]); i++) {

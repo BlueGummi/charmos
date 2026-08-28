@@ -7,7 +7,7 @@ static void my_thread(void *) {
         hcf();
 }
 
-TEST_DECLARE(TEST_GROUP_NONE, watchdog_hangup, .enabled = TEST_STATE_DISABLED) {
+TEST_DECLARE(watchdog, hangup, .enabled = TEST_STATE_DISABLED) {
     thread_spawn_on_core("my_thread", my_thread, NULL, 2);
     while (1)
         ;

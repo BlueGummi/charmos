@@ -93,6 +93,46 @@ class SchemaTests(unittest.TestCase):
         self.assertEqual(S.collect(text), {})
 
 
+class HangingShardTests(unittest.TestCase):
+    def test_hanging_shard_renders_in_flight_test_and_logs(self) -> None:
+        runs = [
+            {
+                "_source": "shard1.ndjson",
+                "shard": "clang-iter1",
+                "outcome": "timeout",
+                "reached_summary": False,
+                "duration_s": 45.0,
+                "exit_code": 124,
+                "in_flight_test": {
+                    "group": "condvar",
+                    "tier": "unit",
+                    "name": "timeout_no_lost_wake",
+                },
+                "recent_logs": [
+                    {
+                        "site": "test_ndjson",
+                        "level": "info",
+                        "msg": "group start: condvar (4 tests)",
+                        "t_ms": 1200,
+                    },
+                    {
+                        "site": "test_ndjson",
+                        "level": "info",
+                        "msg": "test start: condvar:timeout_no_lost_wake (unit)",
+                        "t_ms": 1250,
+                    },
+                ],
+            }
+        ]
+        rep = RP.build_report(runs, [], [], "")
+        markdown = RP.render_markdown(rep)
+
+        self.assertIn("Incomplete / Timed-out Shards", markdown)
+        self.assertIn("clang-iter1", markdown)
+        self.assertIn("condvar:timeout_no_lost_wake", markdown)
+        self.assertIn("test start: condvar:timeout_no_lost_wake (unit)", markdown)
+
+
 class ZeroIsNotAbsentTests(unittest.TestCase):
     def test_zero_renders_as_zero(self) -> None:
         self.assertEqual(RP.md_cell(0), "0")

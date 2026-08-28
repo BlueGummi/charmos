@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "structures/tests/test_internal.h"
 
 #ifdef TEST_RADIX
 TEST_GROUP_DECLARE(radix);
@@ -12,7 +12,7 @@ static uint64_t test_item_key(const void *item) {
     return ((const struct test_item *) item)->key;
 }
 
-TEST_DECLARE_UNIT(radix, radix_tree_insert_lookup_delete) {
+TEST_DECLARE_UNIT(radix, insert_lookup_delete) {
     struct radix_tree tree;
     radix_tree_init(&tree, test_item_key, 2);
 
@@ -51,7 +51,7 @@ TEST_DECLARE_UNIT(radix, radix_tree_insert_lookup_delete) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(radix, radix_tree_multi_level_sparse) {
+TEST_DECLARE_UNIT(radix, multilevel_sparse) {
     struct radix_tree tree;
     radix_tree_init(&tree, test_item_key, 3);
 

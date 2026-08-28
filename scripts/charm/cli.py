@@ -37,8 +37,7 @@ def _write_report(rep: dict[str, Any], args: argparse.Namespace, run_count: int)
     if args.summary:
         with Path(args.summary).open("a", encoding="utf-8") as fh:
             fh.write(markdown)
-    else:
-        sys.stdout.write(markdown)
+    sys.stdout.write(markdown)
 
     if args.json:
         Path(args.json).write_text(RP.render_json(rep), encoding="utf-8")

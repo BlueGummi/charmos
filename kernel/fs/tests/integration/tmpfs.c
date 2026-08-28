@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "fs/tests/test_internal.h"
 
 #ifdef TEST_TMPFS
 TEST_GROUP_DECLARE(tmpfs, .intensity_desc = {
@@ -16,7 +16,7 @@ TEST_GROUP_DECLARE(tmpfs, .intensity_desc = {
     node = ent.node;                                                           \
     TEST_ASSERT_NONNULL(node);
 
-TEST_DECLARE_INTEGRATION(tmpfs, tmpfs_rw_test, TEST_INTENSITY(1, 16, 256)) {
+TEST_DECLARE_INTEGRATION(tmpfs, file_lifecycle, TEST_INTENSITY(1, 16, 256)) {
     size_t ops = ctx->intensity_val ? ctx->intensity_val : 16;
     const char *lstr = large_test_string;
     uint64_t len = strlen(lstr);
@@ -63,7 +63,7 @@ TEST_DECLARE_INTEGRATION(tmpfs, tmpfs_rw_test, TEST_INTENSITY(1, 16, 256)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_INTEGRATION(tmpfs, tmpfs_dir_test, TEST_INTENSITY(1, 8, 128)) {
+TEST_DECLARE_INTEGRATION(tmpfs, dir_ops, TEST_INTENSITY(1, 8, 128)) {
     size_t ops = ctx->intensity_val ? ctx->intensity_val : 8;
     const char *lstr = large_test_string;
     uint64_t len = strlen(lstr);
@@ -104,7 +104,7 @@ TEST_DECLARE_INTEGRATION(tmpfs, tmpfs_dir_test, TEST_INTENSITY(1, 8, 128)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_INTEGRATION(tmpfs, tmpfs_general_tests) {
+TEST_DECLARE_INTEGRATION(tmpfs, attributes_and_symlinks) {
     TMPFS_SETUP_NODE(root, node, "place", e);
 
     TEST_ASSERT(!ERR_IS_FATAL(node->ops->chmod(node, VFS_MODE_EXEC)));

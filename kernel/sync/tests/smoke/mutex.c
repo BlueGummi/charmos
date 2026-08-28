@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "sync/tests/test_internal.h"
 
 #ifdef TEST_MUTEX
 TEST_GROUP_DECLARE(mutex, .intensity_desc = {
@@ -12,7 +12,7 @@ TEST_GROUP_DECLARE(mutex, .intensity_desc = {
 
 static struct mutex basic_test_mtx = MUTEX_INIT;
 
-TEST_DECLARE_SMOKE(mutex, mutex_test_basic) {
+TEST_DECLARE_SMOKE(mutex, basic) {
     mutex_lock(&basic_test_mtx);
     scheduler_yield();
     mutex_unlock(&basic_test_mtx);

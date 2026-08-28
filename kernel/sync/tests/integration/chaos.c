@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "sync/tests/test_internal.h"
 
 #if defined(TEST_SYNC_NIGHTMARE) || defined(TEST_MUTEX)
 
@@ -138,7 +138,7 @@ static void chaos_waker(void *arg) {
     }
 }
 
-TEST_DECLARE_INTEGRATION(mutex, thread_interruptible_chaos_fuzz) {
+TEST_DECLARE_INTEGRATION(mutex, interruptible_apc_fuzz) {
     if (global.core_count < 2) {
         return TEST_SKIP(TEST_SKIP_NONE);
     }

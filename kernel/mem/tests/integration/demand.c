@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "mem/tests/test_internal.h"
 
 #ifdef TEST_MM
 
@@ -75,7 +75,7 @@ static void dp_join(struct thread **t, size_t nthreads) {
 }
 
 /* 1 buffer, N threads, N CPUs = many CPUs racing for same PTEs */
-TEST_DECLARE_INTEGRATION(mem, demand_1buf_Nthreads_Ncpu_test,
+TEST_DECLARE_INTEGRATION(mem, demand_single_buf_smp,
                          TEST_INTENSITY_CORES(1, 1, 4, "threads/core")) {
     ABORT_IF_RAM_LOW();
 
@@ -107,7 +107,7 @@ TEST_DECLARE_INTEGRATION(mem, demand_1buf_Nthreads_Ncpu_test,
 
 /* N buffers, M threads (M > N), N CPUs = contention spread over multiple
  * regions */
-TEST_DECLARE_INTEGRATION(mem, demand_Nbuf_Mthreads_Ncpu_test,
+TEST_DECLARE_INTEGRATION(mem, demand_multi_buf_smp,
                          TEST_INTENSITY_CORES(1, 2, 4, "threads/core")) {
     ABORT_IF_RAM_LOW();
 

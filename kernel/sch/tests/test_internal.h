@@ -1,8 +1,8 @@
 #pragma once
 #include <test/test.h>
 
-#include "../internal.h"
 #include "import.h"
+#include "sch/internal.h"
 #include <mem/alloc_or_die.h>
 #include <sch/sched.h>
 #include <string.h>

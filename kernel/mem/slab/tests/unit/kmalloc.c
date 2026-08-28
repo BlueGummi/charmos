@@ -1,9 +1,8 @@
-#include "../test_internal.h"
+#include "mem/slab/tests/test_internal.h"
 
 #ifdef TEST_MEM
 
-TEST_DECLARE_UNIT(slab, kmalloc_stress_alloc_free_test,
-                  TEST_INTENSITY(256, 2048, 32768)) {
+TEST_DECLARE_UNIT(slab, random_free_stress, TEST_INTENSITY(256, 2048, 32768)) {
     ABORT_IF_RAM_LOW();
 
     size_t n = ctx->intensity_val ? ctx->intensity_val : 2048;
@@ -34,7 +33,7 @@ TEST_DECLARE_UNIT(slab, kmalloc_stress_alloc_free_test,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(slab, kmalloc_mixed_stress_test,
+TEST_DECLARE_UNIT(slab, bulk_alloc_free_stress,
                   TEST_INTENSITY(256, 2048, 16384)) {
     ABORT_IF_RAM_LOW();
 
@@ -55,7 +54,7 @@ TEST_DECLARE_UNIT(slab, kmalloc_mixed_stress_test,
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(slab, kmalloc_new_behavior_test) {
+TEST_DECLARE_UNIT(slab, atomic_behavior_flags) {
     /* ALLOC_BEHAVIOR_ATOMIC should require nonpageable/nonmovable - allocator
        or sanitizers might coerce flags. This test ensures allocation doesn't
        return NULL for such a request. */
@@ -79,7 +78,7 @@ TEST_DECLARE_UNIT(slab, kmalloc_new_behavior_test) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE(slab, slab_map_new_test) {
+TEST_DECLARE(slab, map_new) {
     return TEST_SUCCESS;
 }
 #endif

@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "fs/ext2/tests/test_internal.h"
 
 #ifdef TEST_EXT2
 TEST_GROUP_DECLARE(ext2, .intensity_desc = {
@@ -20,7 +20,7 @@ static void flush() {
     bio_sched_dispatch_all(d);
 }
 
-TEST_DECLARE_INTEGRATION(ext2, ext2_stat_test, TEST_INTENSITY(1, 1, 16)) {
+TEST_DECLARE_INTEGRATION(ext2, stat, TEST_INTENSITY(1, 1, 16)) {
     EXT2_INIT;
 
     TEST_ASSERT(!ERR_IS_FATAL(
@@ -46,7 +46,7 @@ TEST_DECLARE_INTEGRATION(ext2, ext2_stat_test, TEST_INTENSITY(1, 1, 16)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_INTEGRATION(ext2, ext2_rename_test, TEST_INTENSITY(1, 1, 16)) {
+TEST_DECLARE_INTEGRATION(ext2, rename, TEST_INTENSITY(1, 1, 16)) {
     EXT2_INIT;
 
     TEST_ASSERT(!ERR_IS_FATAL(
@@ -77,7 +77,7 @@ TEST_DECLARE_INTEGRATION(ext2, ext2_rename_test, TEST_INTENSITY(1, 1, 16)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_INTEGRATION(ext2, ext2_chmod_test, TEST_INTENSITY(1, 1, 16)) {
+TEST_DECLARE_INTEGRATION(ext2, chmod, TEST_INTENSITY(1, 1, 16)) {
     EXT2_INIT;
 
     TEST_ASSERT(!ERR_IS_FATAL(
@@ -107,7 +107,7 @@ TEST_DECLARE_INTEGRATION(ext2, ext2_chmod_test, TEST_INTENSITY(1, 1, 16)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_INTEGRATION(ext2, ext2_symlink_test, TEST_INTENSITY(1, 1, 16)) {
+TEST_DECLARE_INTEGRATION(ext2, symlink, TEST_INTENSITY(1, 1, 16)) {
     EXT2_INIT;
 
     TEST_ASSERT(
@@ -133,7 +133,7 @@ TEST_DECLARE_INTEGRATION(ext2, ext2_symlink_test, TEST_INTENSITY(1, 1, 16)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_INTEGRATION(ext2, ext2_dir_test, TEST_INTENSITY(1, 1, 16)) {
+TEST_DECLARE_INTEGRATION(ext2, mkdir_rmdir, TEST_INTENSITY(1, 1, 16)) {
     EXT2_INIT;
 
     TEST_ASSERT(

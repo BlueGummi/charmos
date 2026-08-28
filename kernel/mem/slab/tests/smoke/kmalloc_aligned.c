@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "mem/slab/tests/test_internal.h"
 
 #ifdef TEST_MEM
 
@@ -6,7 +6,7 @@
     TEST_ASSERT_EQ(((uintptr_t) (ptr) & ((alignment) - 1)), 0)
 
 #define KMALLOC_ALIGNMENT_TEST(name, align)                                    \
-    TEST_DECLARE_SMOKE(slab, kmalloc_aligned_##name##_test,                    \
+    TEST_DECLARE_SMOKE(slab, aligned_alloc##name##_test,                       \
                        TEST_INTENSITY(32, 512, 2048)) {                        \
         ABORT_IF_RAM_LOW();                                                    \
         size_t alloc_times = ctx->intensity_val ? ctx->intensity_val : 512;    \

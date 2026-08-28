@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "mem/tests/test_internal.h"
 
 #ifdef TEST_FOLIO
 TEST_GROUP_DECLARE(folio, .intensity_desc = {
@@ -6,7 +6,7 @@ TEST_GROUP_DECLARE(folio, .intensity_desc = {
                               .unit = "iters",
                           });
 
-TEST_DECLARE_UNIT(folio, folio_backpointers) {
+TEST_DECLARE_UNIT(folio, backpointers) {
     for (uint8_t order = 0; order <= 3; order++) {
         struct folio *f = folio_alloc(order);
         TEST_ASSERT_NONNULL(f);
@@ -26,7 +26,7 @@ TEST_DECLARE_UNIT(folio, folio_backpointers) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(folio, folio_zero_copy, TEST_INTENSITY(16, 128, 1024)) {
+TEST_DECLARE_UNIT(folio, zero_copy, TEST_INTENSITY(16, 128, 1024)) {
     size_t iters = ctx->intensity_val ? ctx->intensity_val : 128;
     for (size_t iter = 0; iter < iters; iter++) {
         struct folio *src = folio_alloc(1); /* 2 pages */
@@ -66,7 +66,7 @@ TEST_DECLARE_UNIT(folio, folio_zero_copy, TEST_INTENSITY(16, 128, 1024)) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(folio, folio_anon_tag_mapcount) {
+TEST_DECLARE_UNIT(folio, anon_tag_mapcount) {
     struct folio *f = folio_alloc(0);
     TEST_ASSERT_NONNULL(f);
 

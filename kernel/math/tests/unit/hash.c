@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "math/tests/test_internal.h"
 
 #ifdef TEST_HASH
 TEST_GROUP_DECLARE(hash, .intensity_desc = {
@@ -95,7 +95,7 @@ static const struct hash_vector bkdr_vectors[] = {
     {"hello", 5, 0x2F372E8EU}, {"hello, world", 12, 0x81692F4CU},
 };
 
-TEST_DECLARE_UNIT(hash, hash_known_answers) {
+TEST_DECLARE_UNIT(hash, known_answers) {
 #define RUN(fn, vecs)                                                          \
     do {                                                                       \
         struct test_verdict v =                                                \
@@ -144,7 +144,7 @@ static const struct murmur_vector murmur_vectors[] = {
     {"hello, world", 12, 0x9747B28CU, 0x9A933E00U},
 };
 
-TEST_DECLARE_UNIT(hash, hash_murmur3_known_answers) {
+TEST_DECLARE_UNIT(hash, murmur3_known_answers) {
     for (size_t i = 0; i < TEST_ARRAY_LEN(murmur_vectors); i++) {
         const struct murmur_vector *v = &murmur_vectors[i];
         uint32_t got = hash_murmur3_32(v->input, v->len, v->seed);
@@ -157,7 +157,7 @@ TEST_DECLARE_UNIT(hash, hash_murmur3_known_answers) {
     return TEST_SUCCESS;
 }
 
-TEST_DECLARE_UNIT(hash, hash_murmur3_seed_matters,
+TEST_DECLARE_UNIT(hash, murmur3_seed_sensitivity,
                   TEST_INTENSITY(16, 64, 4096)) {
     size_t seeds = ctx->intensity_val ? ctx->intensity_val : 64;
     const char *key = "seed sensitivity";
@@ -171,7 +171,7 @@ TEST_DECLARE_UNIT(hash, hash_murmur3_seed_matters,
 }
 
 /* Prefix extension bugs */
-TEST_DECLARE_UNIT(hash, hash_respects_length) {
+TEST_DECLARE_UNIT(hash, respects_length) {
     static const char padded[] = "abcd\xFF\xFF\xFF\xFF";
     static const char clean[] = "abcd";
 
@@ -193,7 +193,7 @@ TEST_DECLARE_UNIT(hash, hash_respects_length) {
 }
 
 /* hash_elf masks off the top bit */
-TEST_DECLARE_UNIT(hash, hash_elf_stays_31_bit) {
+TEST_DECLARE_UNIT(hash, elf_stays_31_bit) {
     uint8_t buf[16];
     for (size_t i = 0; i < sizeof(buf); i++)
         buf[i] = 0xFF;

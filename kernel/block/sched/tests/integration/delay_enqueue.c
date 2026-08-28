@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "block/sched/tests/test_internal.h"
 
 #ifdef TEST_BIO_SCHED
 #define EXT2_INIT                                                              \
@@ -31,7 +31,7 @@ static uint64_t runs_per_lvl[BIO_SCHED_LEVELS] = {0};
 static struct bio_request *rqs[BIO_SCHED_TEST_RUNS_MAX] = {0};
 static uint8_t *buffers[BIO_SCHED_TEST_RUNS_MAX] = {0};
 
-TEST_DECLARE_INTEGRATION(bio_sched, bio_sched_delay_enqueue_test,
+TEST_DECLARE_INTEGRATION(bio_sched, delay_enqueue,
                          TEST_INTENSITY(64, 1024, 4096)) {
     EXT2_INIT;
     ABORT_IF_RAM_LOW();

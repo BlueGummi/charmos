@@ -1,4 +1,4 @@
-#include "../../rwlock_internal.h"
+#include "sync/rwlock_internal.h"
 #include <sync/lock_chk.h>
 #include <sync/mutex.h>
 #include <sync/qspinlock.h>

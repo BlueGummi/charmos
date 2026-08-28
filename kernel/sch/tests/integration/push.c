@@ -1,4 +1,4 @@
-#include "../test_internal.h"
+#include "sch/tests/test_internal.h"
 
 #ifdef TEST_SCHED
 
@@ -15,8 +15,7 @@ static void sched_push_try(void *) {
     atomic_store(&at_least_one_migrated, true);
 }
 
-TEST_DECLARE_INTEGRATION(sched, sched_push_target_test,
-                         TEST_INTENSITY(32, 256, 1024)) {
+TEST_DECLARE_INTEGRATION(sched, push_target, TEST_INTENSITY(32, 256, 1024)) {
     test_info("This test takes a bit. uncomment me to run it");
     return TEST_SKIP(TEST_SKIP_NONE);
 
