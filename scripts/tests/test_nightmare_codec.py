@@ -34,6 +34,7 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(t["nightmare.drain_grace_ms"], "20000ms")
         self.assertEqual(t["nightmare.stall_threshold_ms"], "3000ms")
         self.assertEqual(t["nightmare.perturb.migrator.interval_us"], "500us")
+        self.assertEqual(t["nightmare.locks_storm.worker_stall_ms"], "10000ms")
 
     def test_the_perturb_list_is_comma_separated(self) -> None:
         t = self.render()
@@ -132,6 +133,9 @@ class BuildTests(unittest.TestCase):
 
         for d in self.suite.build.cmake_definitions:
             self.assertIn(f"-D{d}", args)
+
+        self.assertIn("-DDEBUG_LOCK_CHK=ON", args)
+        self.assertNotIn("-DINJECT_LOCK=ON", args)
 
     def test_topology_is_a_build_time_definition_not_a_boot_knob(self) -> None:
         args = C.build_args(self.suite)

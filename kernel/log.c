@@ -17,7 +17,7 @@
 #include <thread/thread.h>
 #include <time/time.h>
 
-NDJSON_DECLARE(log_message, NDJSON_DOMAIN_LOG, NDJSON_KIND_MESSAGE, 1,
+NDJSON_DECLARE(log_message, NDJSON_SECTION_LOG, NDJSON_KIND_MESSAGE, 1,
                NDJSON_STR(site), NDJSON_STR(level), NDJSON_STR(msg),
                NDJSON_STR(file), NDJSON_U64(line), NDJSON_STR(func));
 

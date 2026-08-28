@@ -23,21 +23,21 @@
  * Omitted fields are left as zero
  */
 
-#define NDJSON_KEY_DOMAIN "d"
+#define NDJSON_KEY_SECTION "s"
 #define NDJSON_KEY_KIND "k"
 #define NDJSON_KEY_VERSION "v"
 #define NDJSON_KEY_TIME "t"
 #define NDJSON_KEY_CPU "c"
 #define NDJSON_KEY_TRUNCATED "_trunc"
 
-#define NDJSON_DOMAIN_NDJSON "ndjson"
-#define NDJSON_DOMAIN_TEST "test"
-#define NDJSON_DOMAIN_PANIC "panic"
-#define NDJSON_DOMAIN_ASAN "asan"
-#define NDJSON_DOMAIN_SELFTEST "selftest"
-#define NDJSON_DOMAIN_NIGHTMARE "nightmare"
-#define NDJSON_DOMAIN_LOCK_CHK "lock_chk"
-#define NDJSON_DOMAIN_LOG "log"
+#define NDJSON_SECTION_NDJSON "ndjson"
+#define NDJSON_SECTION_TEST "test"
+#define NDJSON_SECTION_PANIC "panic"
+#define NDJSON_SECTION_ASAN "asan"
+#define NDJSON_SECTION_SELFTEST "selftest"
+#define NDJSON_SECTION_NIGHTMARE "nightmare"
+#define NDJSON_SECTION_LOCK_CHK "lock_chk"
+#define NDJSON_SECTION_LOG "log"
 
 #define NDJSON_KIND_SCHEMA "schema"
 #define NDJSON_KIND_BYE "bye"
@@ -80,7 +80,7 @@ struct ndjson_field {
 };
 
 struct ndjson_record {
-    const char *domain;
+    const char *section;
     const char *kind;
     uint16_t version;
     uint16_t nfields;
@@ -138,14 +138,14 @@ LINKER_SECTION_DEFINE(struct ndjson_record, ndjson_records);
 
 #define NDJSON_MAX_FIELDS 16
 
-#define NDJSON_DECLARE(id, domain_, kind_, version_, ...)                      \
+#define NDJSON_DECLARE(id, section_, kind_, version_, ...)                     \
     struct __ndjson_args_##id {                                                \
         NDJSON_MAP(NDJSON_MEMBER, id, __VA_ARGS__)                             \
     };                                                                         \
     static const struct ndjson_field __ndjson_fields_##id[] = {                \
         NDJSON_MAP(NDJSON_DESC, id, __VA_ARGS__)};                             \
     LINKER_SECTION_OBJECT(struct ndjson_record, ndjson_records)                \
-    __ndjson_rec_##id = {.domain = (domain_),                                  \
+    __ndjson_rec_##id = {.section = (section_),                                \
                          .kind = (kind_),                                      \
                          .version = (version_),                                \
                          .nfields = PP_NARG(__VA_ARGS__),                      \

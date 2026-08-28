@@ -23,7 +23,7 @@ NUM_RE = re.compile(r"\b\d+\b")
 Record = dict[str, Any]
 RecordKey = tuple[str, str]
 Schema = dict[RecordKey, dict[str, Any]]
-SCHEMA_RECORD_FIELDS = frozenset({"domain", "kind", "rec_version", "field", "type"})
+SCHEMA_RECORD_FIELDS = frozenset({"section", "kind", "rec_version", "field", "type"})
 
 
 @dataclass
@@ -137,7 +137,7 @@ def ndjson_test_record(rec: Record) -> Record:
 
 
 def ndjson_crash_record(rec: Record) -> Record:
-    kind = "panic" if rec[P.KEY_DOMAIN] == P.DOMAIN_PANIC else "asan"
+    kind = "panic" if rec[P.KEY_SECTION] == P.SECTION_PANIC else "asan"
     site = None
     if rec.get("file") is not None and rec.get("line") is not None:
         site = f"{rec['file']}:{rec['line']}"
@@ -170,12 +170,12 @@ def ndjson_log_record(rec: Record) -> Record:
 
 
 NDJSON_HANDLERS = {
-    (P.DOMAIN_LOG, P.KIND_MESSAGE): handler(
+    (P.SECTION_LOG, P.KIND_MESSAGE): handler(
         1,
         reads=("site", "level", "msg", "file", "line", "func"),
         fn=ndjson_log_record,
     ),
-    (P.DOMAIN_TEST, P.KIND_GROUP_START): handler(
+    (P.SECTION_TEST, P.KIND_GROUP_START): handler(
         1,
         reads=("group", "test_count", "file"),
         fn=lambda r: {
@@ -185,12 +185,12 @@ NDJSON_HANDLERS = {
             "file": r.get("file"),
         },
     ),
-    (P.DOMAIN_TEST, P.KIND_RESULT): handler(
+    (P.SECTION_TEST, P.KIND_RESULT): handler(
         1,
         reads=("group", "tier", "name", "status", "duration_ms"),
         fn=ndjson_test_record,
     ),
-    (P.DOMAIN_TEST, P.KIND_GROUP_END): handler(
+    (P.SECTION_TEST, P.KIND_GROUP_END): handler(
         1,
         reads=("group", "duration_ms", "failed", "skipped"),
         fn=lambda r: {
@@ -201,7 +201,7 @@ NDJSON_HANDLERS = {
             "skipped": r.get("skipped", 0),
         },
     ),
-    (P.DOMAIN_TEST, P.KIND_TOTALS): handler(
+    (P.SECTION_TEST, P.KIND_TOTALS): handler(
         1,
         reads=("total", "passed", "failed", "skipped"),
         fn=lambda r: {
@@ -212,7 +212,7 @@ NDJSON_HANDLERS = {
             "skipped": r.get("skipped"),
         },
     ),
-    (P.DOMAIN_TEST, P.KIND_VERDICT): handler(
+    (P.SECTION_TEST, P.KIND_VERDICT): handler(
         1,
         reads=("ok", "duration_ms"),
         fn=lambda r: {
@@ -221,23 +221,23 @@ NDJSON_HANDLERS = {
             "duration_ms": r.get("duration_ms"),
         },
     ),
-    (P.DOMAIN_PANIC, P.KIND_AT): handler(
+    (P.SECTION_PANIC, P.KIND_AT): handler(
         1,
         reads=("file", "line", "func", "msg"),
         fn=ndjson_crash_record,
     ),
-    (P.DOMAIN_ASAN, P.KIND_FAULT): handler(
+    (P.SECTION_ASAN, P.KIND_FAULT): handler(
         1,
         reads=("what", "addr", "size", "access"),
         fn=ndjson_crash_record,
     ),
-    (P.DOMAIN_PANIC, P.KIND_FRAME): handler(
+    (P.SECTION_PANIC, P.KIND_FRAME): handler(
         1,
         reads=("idx", "addr", "sym", "off"),
         fn=ndjson_frame,
         attaches="frames",
     ),
-    (P.DOMAIN_ASAN, P.KIND_FRAME): handler(
+    (P.SECTION_ASAN, P.KIND_FRAME): handler(
         1,
         reads=("idx", "addr", "sym", "off"),
         fn=ndjson_frame,
@@ -252,14 +252,14 @@ def ndjson_schema_check(
     handlers = NDJSON_HANDLERS if handlers is None else handlers
     errors = []
 
-    for (domain, kind), h in sorted(handlers.items()):
-        entry = schema.get((domain, kind))
+    for (section, kind), h in sorted(handlers.items()):
+        entry = schema.get((section, kind))
         if entry is None:
             continue
 
         if entry["version"] != h.version:
             errors.append(
-                f"{domain}/{kind}: this parser handles v{h.version}, the kernel "
+                f"{section}/{kind}: this parser handles v{h.version}, the kernel "
                 f"declares v{entry['version']}"
             )
             continue
@@ -268,7 +268,7 @@ def ndjson_schema_check(
         missing = [name for name in h.reads if name not in declared]
         if missing:
             errors.append(
-                f"{domain}/{kind}: parser reads {', '.join(missing)}, which the "
+                f"{section}/{kind}: parser reads {', '.join(missing)}, which the "
                 f"kernel does not declare (it declares {', '.join(sorted(declared)) or 'nothing'})"
             )
 
@@ -276,7 +276,7 @@ def ndjson_schema_check(
 
 
 def parse_ndjson(lines: Iterable[str]) -> ParseResult:
-    """Parse an NDJSON line stream."""
+    """Parse an NDJSON line stream"""
     records: list[Record] = []
     schema: Schema = {}
     stats = ParseStats()
@@ -299,50 +299,49 @@ def parse_ndjson(lines: Iterable[str]) -> ParseResult:
 
         if (
             not isinstance(rec, dict)
-            or P.KEY_DOMAIN not in rec
+            or P.KEY_SECTION not in rec
             or P.KEY_KIND not in rec
         ):
             stats.malformed_lines += 1
             continue
 
         stats.records_seen += 1
-        stats.last_record = f"{rec[P.KEY_DOMAIN]}/{rec[P.KEY_KIND]}"
+        stats.last_record = f"{rec[P.KEY_SECTION]}/{rec[P.KEY_KIND]}"
         if rec.get(P.KEY_TRUNCATED):
             stats.truncated_records += 1
 
-        key = (rec[P.KEY_DOMAIN], rec[P.KEY_KIND])
+        key = (rec[P.KEY_SECTION], rec[P.KEY_KIND])
 
-        if key == (P.DOMAIN_NDJSON, P.KIND_BYE):
+        if key == (P.SECTION_NDJSON, P.KIND_BYE):
             stats.ended = True
             stats.exit_code = rec.get("code")
             stats.end_reason = rec.get("reason")
             supplied.add(key)
             continue
 
-        if key == (P.DOMAIN_NDJSON, P.KIND_SCHEMA):
+        if key == (P.SECTION_NDJSON, P.KIND_SCHEMA):
             if not SCHEMA_RECORD_FIELDS.issubset(rec):
                 stats.malformed_lines += 1
                 continue
             stats.schema_seen = True
             entry = schema.setdefault(
-                (rec["domain"], rec["kind"]),
+                (rec["section"], rec["kind"]),
                 {"version": rec.get("rec_version"), "fields": []},
             )
             entry["fields"].append({"name": rec.get("field"), "type": rec.get("type")})
             continue
 
-        if key == (P.DOMAIN_TEST, P.KIND_BEGIN):
+        if key == (P.SECTION_TEST, P.KIND_BEGIN):
             stats.declared_total = rec.get("declared_total")
             supplied.add(key)
             continue
 
         h = NDJSON_HANDLERS.get(key)
         if h is None:
-            # Preserve declared but not-yet-normalized records in the result stream.
             records.append(
                 {
                     "type": "ndjson",
-                    "domain": rec[P.KEY_DOMAIN],
+                    "section": rec[P.KEY_SECTION],
                     "kind": rec[P.KEY_KIND],
                     "record": ndjson_payload(rec),
                 }
@@ -421,8 +420,8 @@ def parse_ndjson(lines: Iterable[str]) -> ParseResult:
             {
                 "type": "schema",
                 "records": {
-                    f"{domain}/{kind}": entry
-                    for (domain, kind), entry in schema.items()
+                    f"{section}/{kind}": entry
+                    for (section, kind), entry in schema.items()
                 },
             }
         )
@@ -433,7 +432,6 @@ def parse_ndjson(lines: Iterable[str]) -> ParseResult:
 
 
 def classify(stats: ParseStats, exit_code: int | None) -> str:
-    """Classify the outcome, most severe first."""
     if exit_code == EXIT_PANIC or stats.crashes:
         return "crash"
     if exit_code == EXIT_TIMEOUT:
@@ -448,7 +446,6 @@ def classify(stats: ParseStats, exit_code: int | None) -> str:
 
 
 def build_run_record(result: ParseResult, meta: RunMeta, log_bytes: int) -> Record:
-    """Build run record from parsed results and host metadata."""
     stats, supplied = result.stats, result.supplied
 
     run: Record = {
@@ -472,7 +469,7 @@ def build_run_record(result: ParseResult, meta: RunMeta, log_bytes: int) -> Reco
             "records_seen": stats.records_seen,
             "malformed_lines": stats.malformed_lines,
             "truncated_records": stats.truncated_records,
-            "supplied": sorted(f"{domain}/{kind}" for domain, kind in supplied),
+            "supplied": sorted(f"{section}/{kind}" for section, kind in supplied),
         },
         "schema_ok": (not stats.schema_errors if stats.schema_seen else None),
         "guest_ended": stats.ended,
@@ -496,7 +493,6 @@ def build_run_record(result: ParseResult, meta: RunMeta, log_bytes: int) -> Reco
 
 
 def render(records: Iterable[Record]) -> str:
-    """Stamp the format version and serialize, one record per line."""
     out = []
     for rec in records:
         rec.setdefault("v", RESULT_FORMAT_VERSION)

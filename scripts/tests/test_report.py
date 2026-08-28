@@ -84,9 +84,9 @@ class SchemaTests(unittest.TestCase):
 
         text = json.dumps(
             {
-                P.KEY_DOMAIN: P.DOMAIN_NDJSON,
+                P.KEY_SECTION: P.SECTION_NDJSON,
                 P.KEY_KIND: P.KIND_SCHEMA,
-                "domain": "test",
+                "section": "test",
             }
         )
 

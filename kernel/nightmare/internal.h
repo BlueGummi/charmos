@@ -106,6 +106,11 @@ void nightmare_thread_main(void *arg);
 void nightmare_heartbeat_main(void *arg);
 void nightmare_publish_perturb_verdict(struct nightmare_verdict verdict);
 bool nightmare_load_perturb_verdict(struct nightmare_verdict *out);
+enum nightmare_result
+nightmare_result_with_findings(enum nightmare_result result, size_t findings);
+struct nightmare_verdict
+nightmare_verdict_for_stop(struct nightmare_verdict verdict,
+                           enum nightmare_stop stop);
 const char *nightmare_result_string(enum nightmare_result result);
 const char *nightmare_skip_string(enum nightmare_skip_reason reason);
 const char *nightmare_seed_policy_string(enum nightmare_seed_policy policy);

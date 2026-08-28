@@ -118,9 +118,12 @@ if [[ ${#cmdline_sources[@]} -gt 1 ]]; then
     exit 1
 fi
 
-if [[ -n "$CMDLINE_FILE" && ! -r "$CMDLINE_FILE" ]]; then
-    echo "${RED}cannot read command line file: $CMDLINE_FILE${NC}" >&2
-    exit 1
+if [[ -n "$CMDLINE_FILE" ]]; then
+    if [[ ! -r "$CMDLINE_FILE" ]]; then
+        echo "${RED}cannot read command line file: $CMDLINE_FILE${NC}" >&2
+        exit 1
+    fi
+    CMDLINE_FILE="$(cd "$(dirname "$CMDLINE_FILE")" && pwd)/$(basename "$CMDLINE_FILE")"
 fi
 
 case "$BUILD_TYPE" in

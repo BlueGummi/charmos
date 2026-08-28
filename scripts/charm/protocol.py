@@ -7,7 +7,7 @@ from .paths import repo_root
 HEADER: Final = repo_root() / "include" / "ndjson.h"
 
 DEFINE_RE = re.compile(
-    r'^#define\s+(NDJSON_(?:KEY|DOMAIN|KIND|TYPE_NAME)_\w+)\s+"([^"]*)"\s*$',
+    r'^#define\s+(NDJSON_(?:KEY|SECTION|KIND|TYPE_NAME)_\w+)\s+"([^"]*)"\s*$',
     re.MULTILINE,
 )
 
@@ -43,7 +43,7 @@ def _group(prefix: str) -> dict[str, str]:
     }
 
 
-KEY_DOMAIN = _c("NDJSON_KEY_DOMAIN")
+KEY_SECTION = _c("NDJSON_KEY_SECTION")
 KEY_KIND = _c("NDJSON_KEY_KIND")
 KEY_VERSION = _c("NDJSON_KEY_VERSION")
 KEY_TIME = _c("NDJSON_KEY_TIME")
@@ -51,16 +51,17 @@ KEY_CPU = _c("NDJSON_KEY_CPU")
 KEY_TRUNCATED = _c("NDJSON_KEY_TRUNCATED")
 
 ENVELOPE_KEYS = frozenset(
-    (KEY_DOMAIN, KEY_KIND, KEY_VERSION, KEY_TIME, KEY_CPU, KEY_TRUNCATED)
+    (KEY_SECTION, KEY_KIND, KEY_VERSION, KEY_TIME, KEY_CPU, KEY_TRUNCATED)
 )
 
-DOMAIN_NDJSON = _c("NDJSON_DOMAIN_NDJSON")
-DOMAIN_TEST = _c("NDJSON_DOMAIN_TEST")
-DOMAIN_PANIC = _c("NDJSON_DOMAIN_PANIC")
-DOMAIN_ASAN = _c("NDJSON_DOMAIN_ASAN")
-DOMAIN_SELFTEST = _c("NDJSON_DOMAIN_SELFTEST")
-DOMAIN_NIGHTMARE = _c("NDJSON_DOMAIN_NIGHTMARE")
-DOMAIN_LOG = _c("NDJSON_DOMAIN_LOG")
+SECTION_NDJSON = _c("NDJSON_SECTION_NDJSON")
+SECTION_TEST = _c("NDJSON_SECTION_TEST")
+SECTION_PANIC = _c("NDJSON_SECTION_PANIC")
+SECTION_ASAN = _c("NDJSON_SECTION_ASAN")
+SECTION_SELFTEST = _c("NDJSON_SECTION_SELFTEST")
+SECTION_NIGHTMARE = _c("NDJSON_SECTION_NIGHTMARE")
+SECTION_LOCK_CHK = _c("NDJSON_SECTION_LOCK_CHK")
+SECTION_LOG = _c("NDJSON_SECTION_LOG")
 
 KIND_SCHEMA = _c("NDJSON_KIND_SCHEMA")
 KIND_BYE = _c("NDJSON_KIND_BYE")
@@ -88,7 +89,7 @@ TYPE_BOOL = _c("NDJSON_TYPE_NAME_BOOL")
 TYPE_STR = _c("NDJSON_TYPE_NAME_STR")
 TYPE_HEX = _c("NDJSON_TYPE_NAME_HEX")
 
-DOMAINS = _group("NDJSON_DOMAIN_")
+SECTIONS = _group("NDJSON_SECTION_")
 KINDS = _group("NDJSON_KIND_")
 TYPES = _group("NDJSON_TYPE_NAME_")
 
@@ -97,7 +98,7 @@ def dump(out=sys.stdout) -> None:
     print(f"header: {HEADER}", file=out)
     for title, group in (
         ("keys", _group("NDJSON_KEY_")),
-        ("domains", DOMAINS),
+        ("sections", SECTIONS),
         ("kinds", KINDS),
         ("types", TYPES),
     ):

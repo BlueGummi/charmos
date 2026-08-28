@@ -156,8 +156,8 @@ void ndjson_emit_impl(const struct ndjson_record *rec, const void *args) {
     bool trunc = false;
 
     ndjson_carrier_putc('{');
-    trunc |= ndjson_put_first_key(NDJSON_KEY_DOMAIN);
-    trunc |= ndjson_put_string(rec->domain);
+    trunc |= ndjson_put_first_key(NDJSON_KEY_SECTION);
+    trunc |= ndjson_put_string(rec->section);
 
     trunc |= ndjson_put_key(NDJSON_KEY_KIND);
     trunc |= ndjson_put_string(rec->kind);

@@ -28,4 +28,28 @@ TEST_DECLARE_UNIT(prng, determinism, TEST_INTENSITY(16, 256, 65536)) {
     kfree(seq1);
     return TEST_SUCCESS;
 }
+
+TEST_DECLARE_UNIT(prng, splitmix64_determinism,
+                  TEST_INTENSITY(16, 256, 65536)) {
+    size_t samples = ctx->intensity_val ? ctx->intensity_val : 256;
+    uint64_t seed_val = 0x123456789ABCDEF0ULL;
+    uint64_t *seq1 = kmalloc(samples * sizeof(uint64_t), ALLOC_FLAGS_NONE);
+    TEST_ASSERT_NONNULL(seq1);
+
+    uint64_t state1 = seed_val;
+    for (size_t i = 0; i < samples; i++)
+        seq1[i] = prng_splitmix64_next(&state1);
+
+    uint64_t state2 = seed_val;
+    for (size_t i = 0; i < samples; i++) {
+        uint64_t val = prng_splitmix64_next(&state2);
+        TEST_ASSERT_EQ(seq1[i], val);
+    }
+
+    for (size_t i = 1; i < samples; i++)
+        TEST_ASSERT_NE(seq1[i], seq1[i - 1]);
+
+    kfree(seq1);
+    return TEST_SUCCESS;
+}
 #endif

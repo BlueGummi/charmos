@@ -253,11 +253,11 @@ void asan_init(void) {
     asan_ready = true;
 }
 
-NDJSON_DECLARE(asan_fault, NDJSON_DOMAIN_ASAN, NDJSON_KIND_FAULT, 1,
+NDJSON_DECLARE(asan_fault, NDJSON_SECTION_ASAN, NDJSON_KIND_FAULT, 1,
                NDJSON_STR(what), NDJSON_HEX(addr), NDJSON_U64(size),
                NDJSON_STR(access));
 
-NDJSON_DECLARE(asan_frame, NDJSON_DOMAIN_ASAN, NDJSON_KIND_FRAME, 1,
+NDJSON_DECLARE(asan_frame, NDJSON_SECTION_ASAN, NDJSON_KIND_FRAME, 1,
                NDJSON_U64(idx), NDJSON_HEX(addr), NDJSON_STR(sym),
                NDJSON_U64(off));
 

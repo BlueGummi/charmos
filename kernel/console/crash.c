@@ -544,12 +544,12 @@ static void crash_empty_box_panel(struct report_target *tgt) {
         report_puts(tgt, panic_scene[i]);
 }
 
-NDJSON_DECLARE(panic_at, NDJSON_DOMAIN_PANIC, NDJSON_KIND_AT, 1,
+NDJSON_DECLARE(panic_at, NDJSON_SECTION_PANIC, NDJSON_KIND_AT, 1,
                NDJSON_STR(file), NDJSON_U64(line), NDJSON_STR(func),
                NDJSON_STR(msg), NDJSON_STR(bootstage), NDJSON_STR(thread),
                NDJSON_U64(depth));
 
-NDJSON_DECLARE(panic_frame, NDJSON_DOMAIN_PANIC, NDJSON_KIND_FRAME, 1,
+NDJSON_DECLARE(panic_frame, NDJSON_SECTION_PANIC, NDJSON_KIND_FRAME, 1,
                NDJSON_U64(idx), NDJSON_HEX(addr), NDJSON_STR(sym),
                NDJSON_U64(off), NDJSON_STR(file), NDJSON_U64(line));
 

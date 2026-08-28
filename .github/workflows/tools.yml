@@ -72,6 +72,19 @@ jobs:
             nightmare/suites/*.toml \
             nightmare/fixtures/suites/valid/*.toml
 
+      - name: CLI smoke tests
+        run: |
+          set -euo pipefail
+          export PYTHONPATH=scripts
+          python3 -m charm --help > /dev/null
+          python3 -m charm ci --help > /dev/null
+          python3 -m charm ci protocol > /dev/null
+          python3 -m charm nightmare --help > /dev/null
+          python3 -m charm nightmare show nightmare/suites/overnight_locks.toml > /dev/null
+          python3 -m charm nightmare render nightmare/suites/overnight_locks.toml --seed 0x1234 > /dev/null
+          python3 -m charm nightmare build nightmare/suites/overnight_locks.toml > /dev/null
+          python3 -m charm nightmare run nightmare/suites/overnight_locks.toml --dry-run > /dev/null
+
   shell:
     name: Shell
     runs-on: ubuntu-latest

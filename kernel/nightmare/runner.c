@@ -112,6 +112,10 @@ static void nightmare_build_caps(void) {
 #ifdef DEBUG_ASAN
     append_cap(nightmare_runtime.caps, sizeof(nightmare_runtime.caps), "asan");
 #endif
+#ifdef DEBUG_LOCK_CHK
+    append_cap(nightmare_runtime.caps, sizeof(nightmare_runtime.caps),
+               "lock_chk");
+#endif
 #ifdef INJECT_ENABLED
     append_cap(nightmare_runtime.caps, sizeof(nightmare_runtime.caps),
                "inject");
@@ -160,11 +164,10 @@ nightmare_record_resolved_boot(const struct nightmare_cmdline_config *config,
 
 static void nightmare_emit_verdict(struct nightmare_verdict verdict,
                                    const char *fallback_reason) {
-    enum nightmare_result result = verdict.result;
     size_t findings = atomic_load_explicit(&nightmare_runtime.finding_count,
                                            memory_order_acquire);
-    if (result == NIGHTMARE_RESULT_OK && findings)
-        result = NIGHTMARE_RESULT_FINDING;
+    enum nightmare_result result =
+        nightmare_result_with_findings(verdict.result, findings);
 
     const char *reason = verdict.reason;
     if (result == NIGHTMARE_RESULT_SKIP)
@@ -185,6 +188,13 @@ static void nightmare_emit_verdict(struct nightmare_verdict verdict,
     });
     nightmare_exit(nightmare_exit_for_result(result),
                    reason ? reason : nightmare_result_string(result));
+}
+
+enum nightmare_result
+nightmare_result_with_findings(enum nightmare_result result, size_t findings) {
+    if (result == NIGHTMARE_RESULT_OK && findings)
+        return NIGHTMARE_RESULT_FINDING;
+    return result;
 }
 
 #ifdef TEST_NIGHTMARE_ENABLED
@@ -301,7 +311,7 @@ static uint64_t nightmare_worker_seed(const struct nightmare_ctx *ctx,
         ctx->seed_mode == NIGHTMARE_SEED_SEEDFUL ||
         (ctx->seed_mode == NIGHTMARE_SEED_SPLIT && index >= ctx->worker_count);
     uint64_t base = seeded ? ctx->seed : time_get_ns();
-    base ^= UINT64_C(0x9e3779b97f4a7c15) * (index + 1);
+    base ^= PRNG_SPLITMIX64_GAMMA * (index + 1);
     struct nightmare_rng rng = {.state = base};
     return nightmare_rand(&rng);
 }
@@ -440,6 +450,12 @@ nightmare_finalize_verdict(const struct nightmare *nm) {
 
     enum nightmare_stop stop =
         atomic_load_explicit(&nightmare_runtime.stop, memory_order_acquire);
+    return nightmare_verdict_for_stop(final, stop);
+}
+
+struct nightmare_verdict
+nightmare_verdict_for_stop(struct nightmare_verdict final,
+                           enum nightmare_stop stop) {
     if (stop == NM_STOP_STALL)
         final = (struct nightmare_verdict){
             .result = NIGHTMARE_RESULT_STALL,

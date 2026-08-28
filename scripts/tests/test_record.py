@@ -8,14 +8,14 @@ from charm import protocol as P
 from charm import record as R
 
 
-def line(wire_domain: str, wire_kind: str, **fields: object) -> str:
-    return json.dumps({P.KEY_DOMAIN: wire_domain, P.KEY_KIND: wire_kind, **fields})
+def line(wire_section: str, wire_kind: str, **fields: object) -> str:
+    return json.dumps({P.KEY_SECTION: wire_section, P.KEY_KIND: wire_kind, **fields})
 
 
 class ParseNdjsonTests(unittest.TestCase):
     def test_malformed_schema_record_is_counted_not_raised(self) -> None:
         result = R.parse_ndjson(
-            StringIO(line(P.DOMAIN_NDJSON, P.KIND_SCHEMA, domain="test"))
+            StringIO(line(P.SECTION_NDJSON, P.KIND_SCHEMA, section="test"))
         )
 
         self.assertEqual(result.records, [])
@@ -26,7 +26,7 @@ class ParseNdjsonTests(unittest.TestCase):
         stream = "\n".join(
             (
                 line(
-                    P.DOMAIN_PANIC,
+                    P.SECTION_PANIC,
                     P.KIND_AT,
                     file="foo.c",
                     line=12,
@@ -34,7 +34,7 @@ class ParseNdjsonTests(unittest.TestCase):
                     msg="bad",
                 ),
                 line(
-                    P.DOMAIN_PANIC, P.KIND_FRAME, idx=0, addr="0x1", sym="boom", off=0
+                    P.SECTION_PANIC, P.KIND_FRAME, idx=0, addr="0x1", sym="boom", off=0
                 ),
             )
         )
@@ -51,9 +51,9 @@ class ParseNdjsonTests(unittest.TestCase):
     def test_a_truncated_line_costs_one_record_not_the_run(self) -> None:
         stream = "\n".join(
             (
-                line(P.DOMAIN_TEST, P.KIND_RESULT, name="a", status="pass"),
-                '{"d":"test","k":"resu',
-                line(P.DOMAIN_TEST, P.KIND_RESULT, name="b", status="pass"),
+                line(P.SECTION_TEST, P.KIND_RESULT, name="a", status="pass"),
+                '{"s":"test","k":"resu',
+                line(P.SECTION_TEST, P.KIND_RESULT, name="b", status="pass"),
             )
         )
 
@@ -110,13 +110,13 @@ class RunRecordTests(unittest.TestCase):
         self.assertEqual(run["log_bytes"], 42)
 
     def test_an_unended_run_records_where_it_stopped(self) -> None:
-        stream = line(P.DOMAIN_TEST, P.KIND_RESULT, name="a", status="pass")
+        stream = line(P.SECTION_TEST, P.KIND_RESULT, name="a", status="pass")
         result = R.parse_ndjson(StringIO(stream))
 
         run = R.build_run_record(result, R.RunMeta(), 0)
 
         self.assertFalse(run["guest_ended"])
-        self.assertEqual(run["last_record"], f"{P.DOMAIN_TEST}/{P.KIND_RESULT}")
+        self.assertEqual(run["last_record"], f"{P.SECTION_TEST}/{P.KIND_RESULT}")
         self.assertNotIn("guest_exit_code", run)
 
     def test_render_stamps_the_format_version(self) -> None:
@@ -128,7 +128,7 @@ class RunRecordTests(unittest.TestCase):
 class SchemaDriftTests(unittest.TestCase):
     def test_a_field_the_kernel_stopped_declaring_is_reported(self) -> None:
         schema = {
-            (P.DOMAIN_TEST, P.KIND_TOTALS): {
+            (P.SECTION_TEST, P.KIND_TOTALS): {
                 "version": 1,
                 "fields": [{"name": "total"}, {"name": "passed"}],
             }
@@ -141,7 +141,7 @@ class SchemaDriftTests(unittest.TestCase):
 
     def test_a_version_bump_is_reported_before_fields(self) -> None:
         schema = {
-            (P.DOMAIN_TEST, P.KIND_TOTALS): {"version": 2, "fields": []},
+            (P.SECTION_TEST, P.KIND_TOTALS): {"version": 2, "fields": []},
         }
 
         errors = R.ndjson_schema_check(schema)

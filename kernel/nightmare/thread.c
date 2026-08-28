@@ -8,10 +8,32 @@
 void nightmare_publish_stop(enum nightmare_stop reason) {
     enum nightmare_stop observed =
         atomic_load_explicit(&nightmare_runtime.stop, memory_order_acquire);
-    while (observed < reason && !atomic_compare_exchange_weak_explicit(
-                                    &nightmare_runtime.stop, &observed, reason,
-                                    memory_order_release, memory_order_acquire))
-        ;
+    bool advanced = false;
+    while (observed < reason) {
+        if (atomic_compare_exchange_weak_explicit(
+                &nightmare_runtime.stop, &observed, reason,
+                memory_order_release, memory_order_acquire)) {
+            advanced = true;
+            break;
+        }
+    }
+
+    /* Workers and heartbeat may be between polls in timed sleeps, so
+     * we need to wake them here so teardown doesn't depend on their timers */
+
+    /* Threads blocked on other stuff don't care because the expected
+     * wake source won't match what we give them here */
+    if (advanced && observed == NM_RUN) {
+        for (size_t i = 0; i < nightmare_runtime.total_worker_count; i++) {
+            struct thread *thread = atomic_load_explicit(
+                &nightmare_runtime.workers[i].th, memory_order_acquire);
+            if (thread)
+                scheduler_wake_manual(thread, thread);
+        }
+        if (nightmare_runtime.heartbeat)
+            scheduler_wake_manual(nightmare_runtime.heartbeat,
+                                  nightmare_runtime.heartbeat);
+    }
 }
 
 bool nightmare_must_stop_irq(void) {
@@ -21,6 +43,10 @@ bool nightmare_must_stop_irq(void) {
 
 bool nightmare_must_stop(void) {
     return nightmare_must_stop_irq();
+}
+
+void nightmare_stop_after_finding(void) {
+    nightmare_publish_stop(NM_STOP_FINDING);
 }
 
 bool nightmare_must_park(void) {
@@ -43,13 +69,6 @@ void nightmare_park(struct nightmare_worker *worker) {
                                   memory_order_release);
         atomic_store_explicit(&worker->parked, false, memory_order_release);
     }
-}
-
-uint64_t nightmare_rand(struct nightmare_rng *rng) {
-    uint64_t z = (rng->state += UINT64_C(0x9e3779b97f4a7c15));
-    z = (z ^ (z >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
-    z = (z ^ (z >> 27)) * UINT64_C(0x94d049bb133111eb);
-    return z ^ (z >> 31);
 }
 
 void nightmare_thread_main(void *arg) {

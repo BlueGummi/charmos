@@ -1,0 +1,39 @@
+[suite]
+name          = "p7_m3_short"
+runners       = 1
+budget_hours  = 0.01
+overlap_ratio = 0.0
+
+[build]
+compiler = "gcc"
+type     = "Debug"
+cmake_definitions = [
+  "TEST_ALL=ON",
+  "TEST_NIGHTMARE_ALL=OFF",
+  "TEST_NIGHTMARE_LOCKS=ON",
+  "DEBUG_LOCK_CHK=ON",
+]
+smp        = { sockets = 1, cores = 2, threads = 1 }
+memory_mib = 512
+
+[[tasks]]
+name   = "locks_storm"
+mode   = "horizontal"
+weight = 1.0
+
+  [tasks.boot]
+  duration_ms      = 1000
+  drain_grace_ms   = 1000
+  timeout_ms       = 30000
+  gate_first       = false
+  max_boots        = 3
+  min_interval_ms  = 0
+  stat_interval_ms = 100
+
+  [tasks.nightmare]
+  intensity = 0.5
+  seed_mode = "seedless"
+
+    [tasks.nightmare.opts]
+    corrupt_after_ops = 100
+    worker_stall_ms   = 1000

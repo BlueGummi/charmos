@@ -2,6 +2,7 @@
 #pragma once
 #include <cmdline.h>
 #include <compiler.h>
+#include <crypto/prng.h>
 #include <kassert.h>
 #include <linker/symbols.h>
 #include <math/fixed.h>
@@ -75,6 +76,7 @@ enum nightmare_skip_reason : uint8_t {
 enum nightmare_stop : uint8_t {
     NM_RUN = 0,
     NM_STOP_BUDGET,
+    NM_STOP_FINDING,
     NM_STOP_FAIL,
     NM_STOP_STALL,
 };
@@ -232,9 +234,12 @@ struct nightmare_stall_evidence {
 void nightmare_run(void);
 bool nightmare_must_stop(void);
 bool nightmare_must_stop_irq(void);
+void nightmare_stop_after_finding(void);
 bool nightmare_must_park(void);
 void nightmare_park(struct nightmare_worker *worker);
-uint64_t nightmare_rand(struct nightmare_rng *rng);
+static inline uint64_t nightmare_rand(struct nightmare_rng *rng) {
+    return prng_splitmix64_next(&rng->state);
+}
 uint64_t nightmare_progress_sum_irq(void);
 void nightmare_finding_at(const struct nightmare_finding_site *site,
                           uint64_t discriminator, const char *fmt, ...)

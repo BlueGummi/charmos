@@ -2,19 +2,19 @@
 
 #include "internal.h"
 
-NDJSON_DECLARE(selftest_types, NDJSON_DOMAIN_SELFTEST, "types", 1,
+NDJSON_DECLARE(selftest_types, NDJSON_SECTION_SELFTEST, "types", 1,
                NDJSON_U64(u), NDJSON_I64(i), NDJSON_I64(i_min), NDJSON_BOOL(b),
                NDJSON_STR(s), NDJSON_HEX(h));
 
-NDJSON_DECLARE(selftest_omitted, NDJSON_DOMAIN_SELFTEST, "omitted", 1,
+NDJSON_DECLARE(selftest_omitted, NDJSON_SECTION_SELFTEST, "omitted", 1,
                NDJSON_U64(u), NDJSON_I64(i), NDJSON_BOOL(b), NDJSON_STR(s),
                NDJSON_HEX(h));
 
-NDJSON_DECLARE(selftest_escapes, NDJSON_DOMAIN_SELFTEST, "escapes", 1,
+NDJSON_DECLARE(selftest_escapes, NDJSON_SECTION_SELFTEST, "escapes", 1,
                NDJSON_STR(quote), NDJSON_STR(backslash), NDJSON_STR(control),
                NDJSON_STR(ansi), NDJSON_STR(high));
 
-NDJSON_DECLARE(selftest_truncation, NDJSON_DOMAIN_SELFTEST, "truncation", 1,
+NDJSON_DECLARE(selftest_truncation, NDJSON_SECTION_SELFTEST, "truncation", 1,
                NDJSON_STR(long_string), NDJSON_U64(sent));
 
 static char selftest_long[NDJSON_STR_MAX + 64];

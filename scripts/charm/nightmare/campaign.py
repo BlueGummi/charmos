@@ -402,12 +402,14 @@ class QemuBootRunner:
 
         cmd = [
             "./scripts/build.sh",
+            "-B",
+            str(manifest.build_dir),
             "-t",
             manifest.suite.build.type,
             "--compiler",
             manifest.suite.build.compiler,
             "--cmdline",
-            str(cmdline_file),
+            str(cmdline_file.resolve()),
             "tests",
             "--",
             *codec.build_args(manifest.suite),
@@ -478,14 +480,14 @@ class QemuBootRunner:
                 except json.JSONDecodeError:
                     continue
 
-                d = rec.get(P.KEY_DOMAIN)
+                s = rec.get(P.KEY_SECTION)
                 k = rec.get(P.KEY_KIND)
 
-                if d == P.DOMAIN_NIGHTMARE and k == P.KIND_STAT:
+                if s == P.SECTION_NIGHTMARE and k == P.KIND_STAT:
                     t_ms = rec.get(P.KEY_TIME, 0)
                     p_val = rec.get("progress", 0)
                     stat_samples.append((t_ms, p_val))
-                elif d == P.DOMAIN_NIGHTMARE and k == P.KIND_FINDING:
+                elif s == P.SECTION_NIGHTMARE and k == P.KIND_FINDING:
                     findings.append(
                         FindingRecord(
                             sig=rec.get("sig", "unknown"),
@@ -498,11 +500,11 @@ class QemuBootRunner:
                             raw=rec,
                         )
                     )
-                elif d == P.DOMAIN_NIGHTMARE and k == P.KIND_VERDICT:
+                elif s == P.SECTION_NIGHTMARE and k == P.KIND_VERDICT:
                     verdict_result = rec.get("result", "")
                     verdict_reason = rec.get("reason", "")
                     final_progress = rec.get("progress", 0)
-                elif d in (P.DOMAIN_PANIC, P.DOMAIN_ASAN):
+                elif s in (P.SECTION_PANIC, P.SECTION_ASAN):
                     crashed = True
 
         if timed_out:
@@ -559,8 +561,6 @@ class QemuBootRunner:
 
 
 class CampaignRunner:
-    """Executes a campaign against a runner backend."""
-
     def __init__(
         self,
         manifest: CampaignManifest,
@@ -569,7 +569,25 @@ class CampaignRunner:
     ):
         self.manifest = manifest
         self.boot_runner = boot_runner or QemuBootRunner()
-        self.clock = clock or CampaignClock(manifest.budget_ms)
+        if clock is not None:
+            self.clock = clock
+        elif manifest.dry_run:
+            sim_time = 0.0
+
+            def sim_now() -> float:
+                return sim_time
+
+            def sim_sleep(s: float) -> None:
+                nonlocal sim_time
+                sim_time += s
+
+            self.clock = CampaignClock(
+                manifest.budget_ms,
+                time_fn=sim_now,
+                sleep_fn=sim_sleep,
+            )
+        else:
+            self.clock = CampaignClock(manifest.budget_ms)
         self.ledger = SignatureLedger()
         self.accumulator = ProgressAccumulator()
 
@@ -630,7 +648,7 @@ class CampaignRunner:
             cmdline = codec.render(task, boot_req)
 
             boot_start_at_ms = self.clock.elapsed_ms()
-            boot_start_time_s = time.monotonic()
+            boot_start_time_s = self.clock._time_fn()
 
             if manifest.dry_run:
                 b_res = BootResult(
@@ -645,6 +663,7 @@ class CampaignRunner:
                     progress=1000,
                     findings=[],
                 )
+                self.clock._sleep_fn(task.boot.duration_ms / 1000.0)
             else:
                 b_res = self.boot_runner.run_boot(
                     manifest=manifest,

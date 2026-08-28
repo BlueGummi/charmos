@@ -17,7 +17,7 @@ TYPE_MAP = {
 }
 
 ENVELOPE = {
-    P.KEY_DOMAIN: {"type": "string"},
+    P.KEY_SECTION: {"type": "string"},
     P.KEY_KIND: {"type": "string"},
     P.KEY_VERSION: {"type": "integer", "minimum": 0},
     P.KEY_TIME: {"type": ["integer", "null"], "minimum": 0},
@@ -27,12 +27,12 @@ ENVELOPE = {
 
 
 SCHEMA_RECORD_FIELDS = frozenset(
-    {"domain", "kind", "rec_version", "index", "field", "type"}
+    {"section", "kind", "rec_version", "index", "field", "type"}
 )
 
 
 def collect(text: str) -> dict[tuple[str, str], dict[str, Any]]:
-    """(domain, kind) -> {version, fields[]}, in declaration order"""
+    """(section, kind) -> {version, fields[]}, in declaration order"""
     records: dict[tuple[str, str], dict[str, Any]] = {}
     for line in text.splitlines():
         line = line.strip()
@@ -43,7 +43,7 @@ def collect(text: str) -> dict[tuple[str, str], dict[str, Any]]:
         except json.JSONDecodeError:
             continue
         if (
-            rec.get(P.KEY_DOMAIN) != P.DOMAIN_NDJSON
+            rec.get(P.KEY_SECTION) != P.SECTION_NDJSON
             or rec.get(P.KEY_KIND) != P.KIND_SCHEMA
         ):
             continue
@@ -52,7 +52,7 @@ def collect(text: str) -> dict[tuple[str, str], dict[str, Any]]:
             continue
 
         entry = records.setdefault(
-            (rec["domain"], rec["kind"]),
+            (rec["section"], rec["kind"]),
             {"version": rec["rec_version"], "fields": {}},
         )
         entry["fields"][rec["index"]] = (rec["field"], rec["type"])
@@ -61,18 +61,18 @@ def collect(text: str) -> dict[tuple[str, str], dict[str, Any]]:
 
 def build(records: dict[tuple[str, str], dict[str, Any]]) -> dict[str, Any]:
     variants = []
-    for (domain, kind), entry in sorted(records.items()):
+    for (section, kind), entry in sorted(records.items()):
         props = dict(ENVELOPE)
-        props[P.KEY_DOMAIN] = {"const": domain}
+        props[P.KEY_SECTION] = {"const": section}
         props[P.KEY_KIND] = {"const": kind}
         props[P.KEY_VERSION] = {"const": entry["version"]}
 
-        required = [P.KEY_DOMAIN, P.KEY_KIND, P.KEY_VERSION, P.KEY_TIME, P.KEY_CPU]
+        required = [P.KEY_SECTION, P.KEY_KIND, P.KEY_VERSION, P.KEY_TIME, P.KEY_CPU]
         for index in sorted(entry["fields"]):
             name, type_name = entry["fields"][index]
             if type_name not in TYPE_MAP:
                 print(
-                    f"warning: {domain}/{kind} field {name} has unknown type "
+                    f"warning: {section}/{kind} field {name} has unknown type "
                     f"{type_name!r}",
                     file=sys.stderr,
                 )
@@ -82,7 +82,7 @@ def build(records: dict[tuple[str, str], dict[str, Any]]) -> dict[str, Any]:
 
         variants.append(
             {
-                "title": f"{domain}/{kind}",
+                "title": f"{section}/{kind}",
                 "type": "object",
                 "properties": props,
                 "required": required,
@@ -93,7 +93,7 @@ def build(records: dict[tuple[str, str], dict[str, Any]]) -> dict[str, Any]:
     return {
         "$schema": SCHEMA_URL,
         "title": "CharmOS ndjson record",
-        "description": "Generated from a boot with ndjson.schema=true. "
+        "description": "Generated from a boot with ndjson.schema=true "
         "Do not edit by hand",
         "oneOf": variants,
     }

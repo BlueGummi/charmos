@@ -57,28 +57,28 @@ CMDLINE_CHILDREN_DECLARE(
     CMDLINE_INNER_VAR(no_progress, test_global.no_progress,
                       .desc = "Do not show progress bar"));
 
-NDJSON_DECLARE(test_begin, NDJSON_DOMAIN_TEST, NDJSON_KIND_BEGIN, 1,
+NDJSON_DECLARE(test_begin, NDJSON_SECTION_TEST, NDJSON_KIND_BEGIN, 1,
                NDJSON_U64(declared_total));
 
-NDJSON_DECLARE(test_group_start, NDJSON_DOMAIN_TEST, NDJSON_KIND_GROUP_START, 1,
-               NDJSON_STR(group), NDJSON_U64(test_count), NDJSON_STR(file));
+NDJSON_DECLARE(test_group_start, NDJSON_SECTION_TEST, NDJSON_KIND_GROUP_START,
+               1, NDJSON_STR(group), NDJSON_U64(test_count), NDJSON_STR(file));
 
-NDJSON_DECLARE(test_result, NDJSON_DOMAIN_TEST, NDJSON_KIND_RESULT, 1,
+NDJSON_DECLARE(test_result, NDJSON_SECTION_TEST, NDJSON_KIND_RESULT, 1,
                NDJSON_STR(group), NDJSON_STR(tier), NDJSON_STR(name),
                NDJSON_STR(status), NDJSON_U64(duration_ms), NDJSON_STR(reason),
                NDJSON_STR(msg), NDJSON_U64(runs_requested),
                NDJSON_U64(runs_attempted), NDJSON_U64(runs_failed),
                NDJSON_U64(runs_skipped));
 
-NDJSON_DECLARE(test_group_end, NDJSON_DOMAIN_TEST, NDJSON_KIND_GROUP_END, 1,
+NDJSON_DECLARE(test_group_end, NDJSON_SECTION_TEST, NDJSON_KIND_GROUP_END, 1,
                NDJSON_STR(group), NDJSON_U64(duration_ms), NDJSON_U64(failed),
                NDJSON_U64(skipped));
 
-NDJSON_DECLARE(test_totals, NDJSON_DOMAIN_TEST, NDJSON_KIND_TOTALS, 1,
+NDJSON_DECLARE(test_totals, NDJSON_SECTION_TEST, NDJSON_KIND_TOTALS, 1,
                NDJSON_U64(total), NDJSON_U64(passed), NDJSON_U64(failed),
                NDJSON_U64(skipped));
 
-NDJSON_DECLARE(test_verdict, NDJSON_DOMAIN_TEST, NDJSON_KIND_VERDICT, 1,
+NDJSON_DECLARE(test_verdict, NDJSON_SECTION_TEST, NDJSON_KIND_VERDICT, 1,
                NDJSON_BOOL(ok), NDJSON_U64(duration_ms));
 
 static const char *test_status_plain(enum test_result r) {

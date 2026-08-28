@@ -49,7 +49,7 @@ void ndjson_init(void) {
         ndjson_selftest();
 }
 
-NDJSON_DECLARE(ndjson_bye, NDJSON_DOMAIN_NDJSON, NDJSON_KIND_BYE, 1,
+NDJSON_DECLARE(ndjson_bye, NDJSON_SECTION_NDJSON, NDJSON_KIND_BYE, 1,
                NDJSON_U64(code), NDJSON_STR(reason));
 
 /* Signal the end of kernel execution */

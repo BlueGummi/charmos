@@ -9,18 +9,23 @@ from charm import protocol as P
 
 
 def ndjson_stream() -> str:
-    def line(d, k, **f):
-        return json.dumps({P.KEY_DOMAIN: d, P.KEY_KIND: k, **f})
+    def line(s, k, **f):
+        return json.dumps({P.KEY_SECTION: s, P.KEY_KIND: k, **f})
 
     return (
         "\n".join(
             (
-                line(P.DOMAIN_TEST, P.KIND_BEGIN, declared_total=1),
-                line(P.DOMAIN_TEST, P.KIND_RESULT, name="a", status="pass"),
+                line(P.SECTION_TEST, P.KIND_BEGIN, declared_total=1),
+                line(P.SECTION_TEST, P.KIND_RESULT, name="a", status="pass"),
                 line(
-                    P.DOMAIN_TEST, P.KIND_TOTALS, total=1, passed=1, failed=0, skipped=0
+                    P.SECTION_TEST,
+                    P.KIND_TOTALS,
+                    total=1,
+                    passed=1,
+                    failed=0,
+                    skipped=0,
                 ),
-                line(P.DOMAIN_NDJSON, P.KIND_BYE, code=0, reason="done"),
+                line(P.SECTION_NDJSON, P.KIND_BYE, code=0, reason="done"),
             )
         )
         + "\n"

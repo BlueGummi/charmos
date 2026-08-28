@@ -15,8 +15,8 @@ type     = "RelWithDebInfo"
 cmake_definitions = [
   "TEST_NIGHTMARE_ALL=OFF",
   "TEST_NIGHTMARE_LOCKS=ON",
+  "DEBUG_LOCK_CHK=ON",
   "DEBUG_ASAN=ON",
-  "INJECT_LOCK=ON",
 ]
 smp        = { sockets = 2, cores = 2, threads = 2 }
 memory_mib = 8192
@@ -39,6 +39,9 @@ max_runners = 3
   intensity = 0.75
   seed_mode = "split"         # seeded pressure, free-running subject
   perturb   = ["migrator", "waker", "stutter"]
+
+    [tasks.nightmare.opts]
+    worker_stall_ms = 10000
 
     [tasks.nightmare.perturb_opts.migrator]
     interval_us = 500
