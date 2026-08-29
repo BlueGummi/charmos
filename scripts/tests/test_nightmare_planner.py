@@ -6,10 +6,10 @@ import pytest
 
 from charm.cli import build_parser
 from charm.nightmare import contracts
-from charm.orchestrator import domain as D
-from charm.orchestrator import materialize as M
-from charm.orchestrator import planner as P
-from charm.orchestrator import workflow as W
+from charm.nightmare import domain as D
+from charm.nightmare import materialize as M
+from charm.nightmare import planner as P
+from charm.nightmare import workflow as W
 from charm.paths import nightmare_dir
 
 NOW = datetime(2026, 8, 29, 0, 0, tzinfo=UTC)

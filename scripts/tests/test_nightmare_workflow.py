@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from charm.orchestrator import workflow as OW
+from charm.nightmare import workflow as OW
 
 
 def test_repository_command_builds_valid_inputs() -> None:

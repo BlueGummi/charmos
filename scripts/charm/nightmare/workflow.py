@@ -5,8 +5,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from ..nightmare import contracts
-from ..nightmare import suite as suite_model
+from . import contracts
+from . import suite as suite_model
 
 
 def _instant(value: datetime) -> str:

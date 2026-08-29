@@ -4,8 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from ..nightmare import contracts
-from . import domain
+from . import contracts, domain
 
 
 class MaterializationError(ValueError):

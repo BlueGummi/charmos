@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..nightmare import suite as suite_model
+from . import suite as suite_model
 
 
 @dataclass(frozen=True)

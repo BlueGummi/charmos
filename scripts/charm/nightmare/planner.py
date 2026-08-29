@@ -9,9 +9,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from ..nightmare import contracts
-from ..nightmare import suite as suite_model
-from . import domain
+from . import contracts, domain
+from . import suite as suite_model
 
 PLAN_TTL = timedelta(minutes=10)
 MAX_MANIFESTS = 64

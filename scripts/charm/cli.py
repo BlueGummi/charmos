@@ -502,8 +502,8 @@ def cmd_nm_plan(args: argparse.Namespace) -> int:
     import json
     from datetime import UTC, datetime
 
-    from .orchestrator import domain as OD
-    from .orchestrator import planner as OP
+    from .nightmare import domain as OD
+    from .nightmare import planner as OP
 
     try:
         command = _read_json_object(Path(args.command))
@@ -568,7 +568,7 @@ def cmd_nm_build_bundle(args: argparse.Namespace) -> int:
 
 
 def cmd_nm_materialize(args: argparse.Namespace) -> int:
-    from .orchestrator import materialize as OM
+    from .nightmare import materialize as OM
 
     try:
         plan = OM.load_plan(Path(args.plan))
@@ -618,7 +618,7 @@ def cmd_nm_repository_command(args: argparse.Namespace) -> int:
     import json
     from datetime import UTC, datetime
 
-    from .orchestrator import workflow as OW
+    from .nightmare import workflow as OW
 
     try:
         at = (
@@ -653,7 +653,7 @@ def cmd_nm_inline_command(args: argparse.Namespace) -> int:
     import json
     from datetime import UTC, datetime
 
-    from .orchestrator import workflow as OW
+    from .nightmare import workflow as OW
 
     try:
         at = (
@@ -686,7 +686,7 @@ def cmd_nm_inline_command(args: argparse.Namespace) -> int:
 def cmd_nm_matrix(args: argparse.Namespace) -> int:
     import json
 
-    from .orchestrator import workflow as OW
+    from .nightmare import workflow as OW
 
     try:
         document = _read_json_object(Path(args.document))
@@ -734,7 +734,7 @@ def cmd_nm_aggregate(args: argparse.Namespace) -> int:
 def cmd_nm_wait_until(args: argparse.Namespace) -> int:
     from datetime import datetime
 
-    from .orchestrator import workflow as OW
+    from .nightmare import workflow as OW
 
     try:
         target = datetime.fromisoformat(args.at.replace("Z", "+00:00"))
