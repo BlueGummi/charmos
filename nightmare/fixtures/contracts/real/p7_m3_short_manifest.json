@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "manifest_id": "manifest_p7_m3_short_local",
+  "plan_id": "plan_p8_phase2_local",
+  "batch_id": "batch_p8_phase2_local",
+  "task_id": "task_p7_m3_short_local",
+  "attempt": 1,
+  "source": {
+    "repository": "axvonx/charmos",
+    "commit": "56bc1dfdd14a0b3e03ff1d166e7af98bec8cbb6f"
+  },
+  "suite": {
+    "id": "p7_m3_short",
+    "sha256": "dd5584642e2c1d34d8572ef2697ca762b087d5f3116e92e66c4550fb0242c4c6",
+    "resolved": {
+      "suite": {
+        "name": "p7_m3_short",
+        "runners": 1,
+        "budget_hours": 0.01,
+        "overlap_ratio": 0.0
+      },
+      "build": {
+        "compiler": "gcc",
+        "type": "Debug",
+        "cmake_definitions": [
+          "TEST_ALL=ON",
+          "TEST_NIGHTMARE_ALL=OFF",
+          "TEST_NIGHTMARE_LOCKS=ON",
+          "DEBUG_LOCK_CHK=ON"
+        ],
+        "smp": { "sockets": 1, "cores": 2, "threads": 1 },
+        "memory_mib": 512
+      },
+      "tasks": [
+        {
+          "name": "locks_storm",
+          "mode": "horizontal",
+          "weight": 1.0,
+          "priority": 1.0,
+          "boot": {
+            "duration_ms": 1000,
+            "drain_grace_ms": 1000,
+            "timeout_ms": 30000,
+            "gate_first": false,
+            "max_boots": 3,
+            "min_interval_ms": 0,
+            "stat_interval_ms": 100,
+            "stall_threshold_ms": 3000,
+            "on_stall": "report"
+          },
+          "nightmare": {
+            "intensity": 0.5,
+            "seed_mode": "seedless",
+            "perturb": [],
+            "perturb_opts": {},
+            "opts": {
+              "corrupt_after_ops": 100,
+              "worker_stall_ms": 1000
+            }
+          }
+        }
+      ]
+    }
+  },
+  "build": {
+    "bundle_id": "build_p7_m3_short_source",
+    "sha256": "509abc52a8395e7661fae1a14ae8c77b50ae34908b184d59933c6ba2389485ed",
+    "runner_image": "ghcr.io/axvonx/charmos-x86-env@sha256:2f77dec0b8a479bdfb8f9237ceb0c10320e418c5725592033cd9451e63fced87"
+  },
+  "campaign": {
+    "campaign_id": "campaign_p7_m3_short_local",
+    "runner_index": 0,
+    "total_runners": 1,
+    "base_seed": null,
+    "soft_budget_ms": 36000,
+    "hard_budget_ms": 42000,
+    "actions_job_budget_ms": 60000,
+    "gate_first": false,
+    "dry_run": false
+  },
+  "result": {
+    "schema_version": 1,
+    "artifact_name": "nightmare-result-p7-m3-short-local"
+  }
+}

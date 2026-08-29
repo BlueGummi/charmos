@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://charmos.dev/schemas/nightmare/runner-result-v1.schema.json",
+  "title": "CharmOS Nightmare runner result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "result_id", "manifest_id", "manifest_sha256",
+    "lifecycle", "discovery", "execution", "started_at", "ended_at",
+    "campaign", "artifacts", "replay"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "result_id": { "$ref": "#/$defs/id" },
+    "manifest_id": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/id" }]
+    },
+    "manifest_sha256": { "$ref": "#/$defs/sha256" },
+    "lifecycle": { "enum": ["completed", "failed", "cancelled"] },
+    "discovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "finding_count"],
+      "properties": {
+        "kind": { "enum": ["none", "finding", "crash", "stall", "mixed"] },
+        "finding_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["health", "code", "message"],
+      "properties": {
+        "health": { "enum": ["healthy", "infrastructure", "partial"] },
+        "code": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "message": { "type": "string", "maxLength": 2048 }
+      }
+    },
+    "started_at": { "$ref": "#/$defs/instant" },
+    "ended_at": { "$ref": "#/$defs/instant" },
+    "campaign": { "type": ["object", "null"] },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity", "manifest", "campaign_json", "campaign_markdown"],
+      "properties": {
+        "identity": { "$ref": "#/$defs/path" },
+        "manifest": { "$ref": "#/$defs/path" },
+        "campaign_json": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/path" }] },
+        "campaign_markdown": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/path" }] }
+      }
+    },
+    "replay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["argv"],
+      "properties": {
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "maxLength": 1024 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_:-]{0,127}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "instant": { "type": "string", "format": "date-time" },
+    "path": { "type": "string", "minLength": 1, "maxLength": 1024 }
+  }
+}

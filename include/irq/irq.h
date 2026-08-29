@@ -5,6 +5,7 @@
 #include <smp/core.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <structures/cpu_mask.h>
 #include <structures/list.h>
 #include <types/types.h>
 

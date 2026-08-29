@@ -41,6 +41,16 @@ static inline int avl_tree_empty(const struct avl_tree *tree) {
     return tree->root == NULL;
 }
 
+#define AVL_NODE_INIT                                                          \
+    (struct avl_tree_node) {                                                   \
+        .height = 1, .left = NULL, .right = NULL, .parent = NULL               \
+    }
+
+static inline void avl_init_node(struct avl_tree_node *n) {
+    n->height = 1;
+    n->left = n->right = n->parent = NULL;
+}
+
 #define avl_entry(ptr, type, member) container_of(ptr, type, member)
 
 #define avl_tree_for_each(pos, tree)                                           \
@@ -50,3 +60,36 @@ static inline int avl_tree_empty(const struct avl_tree *tree) {
     for ((pos) = avl_tree_first(tree),                                         \
         (n) = (pos) ? avl_tree_next(pos) : NULL;                               \
          (pos); (pos) = (n), (n) = (pos) ? avl_tree_next(pos) : NULL)
+
+#define avl_tree_for_each_entry(pos, type, member, tree)                       \
+    for (pos = avl_entry(avl_tree_first(tree), type, member);                  \
+         (pos) != NULL && &pos->member != NULL;                                \
+         pos = avl_entry(avl_tree_next(&pos->member), type, member))
+
+#define avl_tree_for_each_entry_safe(pos, tmp, type, member, tree)             \
+    for (pos = avl_entry(avl_tree_first(tree), type, member),                  \
+        tmp = (pos) ? avl_entry(avl_tree_next(&pos->member), type, member)     \
+                    : NULL;                                                    \
+         (pos) != NULL && &pos->member != NULL; pos = tmp,                     \
+        tmp = (pos) ? avl_entry(avl_tree_next(&pos->member), type, member)     \
+                    : NULL)
+
+#define avl_tree_for_each_reverse(pos, tree)                                   \
+    for ((pos) = avl_tree_last(tree); (pos); (pos) = avl_tree_prev(pos))
+
+#define avl_tree_for_each_safe_reverse(pos, n, tree)                           \
+    for ((pos) = avl_tree_last(tree), (n) = (pos) ? avl_tree_prev(pos) : NULL; \
+         (pos); (pos) = (n), (n) = (pos) ? avl_tree_prev(pos) : NULL)
+
+#define avl_tree_for_each_entry_reverse(pos, type, member, tree)               \
+    for (pos = avl_entry(avl_tree_last(tree), type, member);                   \
+         (pos) != NULL && &pos->member != NULL;                                \
+         pos = avl_entry(avl_tree_prev(&pos->member), type, member))
+
+#define avl_tree_for_each_entry_safe_reverse(pos, tmp, type, member, tree)     \
+    for (pos = avl_entry(avl_tree_last(tree), type, member),                   \
+        tmp = (pos) ? avl_entry(avl_tree_prev(&pos->member), type, member)     \
+                    : NULL;                                                    \
+         (pos) != NULL && &pos->member != NULL; pos = tmp,                     \
+        tmp = (pos) ? avl_entry(avl_tree_prev(&pos->member), type, member)     \
+                    : NULL)

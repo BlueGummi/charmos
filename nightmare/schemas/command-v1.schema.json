@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://charmos.dev/schemas/nightmare/command-v1.schema.json",
+  "title": "CharmOS Nightmare mutation command v1",
+  "oneOf": [
+    { "$ref": "#/$defs/validate" },
+    { "$ref": "#/$defs/submit" },
+    { "$ref": "#/$defs/draft_tail" },
+    { "$ref": "#/$defs/commit_tail" }
+  ],
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_:-]{0,127}$" },
+    "instant": { "type": "string", "format": "date-time" },
+    "common": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "command_id", "operation", "idempotency_key",
+        "actor", "repository", "payload"
+      ],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "command_id": { "$ref": "#/$defs/id" },
+        "operation": {
+          "enum": [
+            "validate_batch", "submit_batch", "draft_tail_update",
+            "commit_tail_update"
+          ]
+        },
+        "idempotency_key": { "type": "string", "minLength": 8, "maxLength": 128 },
+        "actor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "login"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "login": { "type": "string", "minLength": 1, "maxLength": 128 }
+          }
+        },
+        "repository": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "ref"],
+          "properties": {
+            "id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+            "ref": { "type": "string", "minLength": 1, "maxLength": 255 }
+          }
+        },
+        "payload": { "type": "object" }
+      }
+    },
+    "batch_definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "start_utc", "window_hours", "runners", "color", "tests"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "start_utc": { "$ref": "#/$defs/instant" },
+        "window_hours": { "type": "number", "exclusiveMinimum": 0, "maximum": 168 },
+        "runners": { "type": "integer", "minimum": 1, "maximum": 256 },
+        "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+        "tests": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": false,
+          "items": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+    "validate": {
+      "allOf": [
+        { "$ref": "#/$defs/common" },
+        {
+          "type": "object",
+          "properties": {
+            "operation": { "const": "validate_batch" },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["definition", "definition_toml", "base_snapshot_version"],
+              "properties": {
+                "definition": { "$ref": "#/$defs/batch_definition" },
+                "definition_toml": { "type": "string", "minLength": 1, "maxLength": 65535 },
+                "base_snapshot_version": { "$ref": "#/$defs/id" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "submit": {
+      "allOf": [
+        { "$ref": "#/$defs/common" },
+        {
+          "type": "object",
+          "properties": {
+            "operation": { "const": "submit_batch" },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["plan_id", "plan_version", "base_snapshot_version"],
+              "properties": {
+                "plan_id": { "$ref": "#/$defs/id" },
+                "plan_version": { "$ref": "#/$defs/id" },
+                "base_snapshot_version": { "$ref": "#/$defs/id" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "draft_tail": {
+      "allOf": [
+        { "$ref": "#/$defs/common" },
+        {
+          "type": "object",
+          "properties": {
+            "operation": { "const": "draft_tail_update" },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["batch_id", "base_batch_version", "cancelled_task_ids"],
+              "properties": {
+                "batch_id": { "$ref": "#/$defs/id" },
+                "base_batch_version": { "$ref": "#/$defs/id" },
+                "cancelled_task_ids": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": { "$ref": "#/$defs/id" }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "commit_tail": {
+      "allOf": [
+        { "$ref": "#/$defs/common" },
+        {
+          "type": "object",
+          "properties": {
+            "operation": { "const": "commit_tail_update" },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["plan_id", "plan_version", "base_batch_version"],
+              "properties": {
+                "plan_id": { "$ref": "#/$defs/id" },
+                "plan_version": { "$ref": "#/$defs/id" },
+                "base_batch_version": { "$ref": "#/$defs/id" }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

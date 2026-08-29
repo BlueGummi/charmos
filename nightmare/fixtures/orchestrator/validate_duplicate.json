@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "command_id": "command_planner_duplicate",
+  "operation": "validate_batch",
+  "idempotency_key": "planner-duplicate-001",
+  "actor": { "id": "1", "login": "fixture-operator" },
+  "repository": { "id": "axvonx/charmos", "ref": "main" },
+  "payload": {
+    "definition": {
+      "name": "Duplicate Names",
+      "start_utc": "2026-08-29T01:00:00Z",
+      "window_hours": 1,
+      "runners": 2,
+      "color": "#83c092",
+      "tests": ["harness_smoke", "harness_smoke"]
+    },
+    "definition_toml": "[batch]\nname = \"Duplicate Names\"\nstart_utc = \"2026-08-29T01:00:00Z\"\nwindow_hours = 1\nrunners = 2\ncolor = \"#83c092\"\ntests = [\"harness_smoke\", \"harness_smoke\"]\n",
+    "base_snapshot_version": "fleet_planner_v1"
+  }
+}

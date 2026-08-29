@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "command_id": "command_planner_capacity",
+  "operation": "validate_batch",
+  "idempotency_key": "planner-capacity-001",
+  "actor": { "id": "1", "login": "fixture-operator" },
+  "repository": { "id": "axvonx/charmos", "ref": "main" },
+  "payload": {
+    "definition": {
+      "name": "Capacity Rejection",
+      "start_utc": "2026-08-29T01:00:00Z",
+      "window_hours": 1,
+      "runners": 3,
+      "color": "#a7c080",
+      "tests": ["harness_smoke"]
+    },
+    "definition_toml": "[batch]\nname = \"Capacity Rejection\"\nstart_utc = \"2026-08-29T01:00:00Z\"\nwindow_hours = 1\nrunners = 3\ncolor = \"#a7c080\"\ntests = [\"harness_smoke\"]\n",
+    "base_snapshot_version": "fleet_planner_v1"
+  }
+}

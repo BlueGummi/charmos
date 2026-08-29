@@ -213,8 +213,8 @@
         },
         "timeout_ms": {
           "type": "integer",
-          "minimum": 1000,
-          "description": "Host-enforced hard timeout per boot in milliseconds, after which the host process terminates the QEMU instance. Must exceed the guest hard deadline (duration_ms + drain_grace_ms) by at least the serial flush margin. Defaults to duration_ms + drain_grace_ms + 15000ms."
+          "minimum": 0,
+          "description": "Host-enforced hard timeout per boot in milliseconds, after which the host process terminates the QEMU instance. Zero selects the derived default: duration_ms + drain_grace_ms + 15000ms. Any explicit non-zero value must exceed the guest hard deadline (duration_ms + drain_grace_ms) by at least the serial flush margin."
         },
         "gate_first": {
           "type": "boolean",

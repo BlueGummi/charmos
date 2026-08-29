@@ -12,14 +12,11 @@ on:
       - 'kernel/**'
       - 'include/**'
   workflow_dispatch: # manual trigger
-  workflow_run:
-    workflows: ["Update CI Container"]
-    types:
-      - completed
 
 permissions:
   contents: read
   issues: read
+  packages: read
   pull-requests: read
 
 concurrency:
@@ -35,10 +32,10 @@ jobs:
       matrix:
         compiler: [gcc, clang]
     container:
-      image: ghcr.io/axvonx/charmos-x86-env:latest
+      image: ghcr.io/axvonx/charmos-x86-env@sha256:2f77dec0b8a479bdfb8f9237ceb0c10320e418c5725592033cd9451e63fced87
       credentials:
         username: ${{ github.actor }}
-        password: ${{ secrets.GHCR_KEY }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     defaults:
       run:

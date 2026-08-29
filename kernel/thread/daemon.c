@@ -227,7 +227,8 @@ struct daemon *daemon_create(const char *fmt, struct daemon_attributes *attrs,
 
     daemon->attrs = *attrs;
 
-    kassert(attrs->thread_cpu_mask.nbits != 0, "please set a valid CPU mask");
+    kassert(!cpu_mask_empty(&attrs->thread_cpu_mask),
+            "please set a valid CPU mask");
     kassert(attrs->min_timesharing_threads <= attrs->max_timesharing_threads);
 
     if (!DAEMON_FLAG_TEST(daemon, DAEMON_FLAG_NO_TS_THREADS))

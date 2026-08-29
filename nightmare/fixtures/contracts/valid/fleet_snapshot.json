@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "version": "fleet_v1",
+  "evaluatedAt": "2026-08-28T22:00:00Z",
+  "window": {
+    "startsAt": "2026-08-28T22:00:00Z",
+    "endsAt": "2026-08-29T04:00:00Z"
+  },
+  "repository": {
+    "id": "charmos",
+    "owner": "axvonx",
+    "name": "charmos",
+    "ref": "main",
+    "refs": ["main"]
+  },
+  "runners": [
+    { "id": "runner_1", "number": 1, "state": "idle", "label": "Runner 1" }
+  ],
+  "batches": [
+    {
+      "id": "batch_contract_smoke",
+      "version": "batch_contract_smoke_v1",
+      "name": "Contract Smoke",
+      "color": "#a7c080",
+      "lifecycle": "queued",
+      "health": "healthy",
+      "ownership": "repository",
+      "template": "Repository schedule",
+      "definitionToml": "[batch]\nname = \"Contract Smoke\"\n",
+      "lease": {
+        "runnerIds": ["runner_1"],
+        "startsAt": "2026-08-28T22:00:00Z",
+        "endsAt": "2026-08-28T23:00:00Z",
+        "policyReserveMinutes": 5
+      },
+      "tasks": [
+        {
+          "id": "task_contract_smoke",
+          "name": "contract_smoke",
+          "family": "contract",
+          "instance": null,
+          "runnerId": "runner_1",
+          "state": "idle",
+          "health": "healthy",
+          "color": "#a7c080",
+          "started": false,
+          "cancelled": false,
+          "slice": {
+            "id": "slice_contract_smoke",
+            "taskId": "task_contract_smoke",
+            "runnerId": "runner_1",
+            "startsAt": "2026-08-28T22:00:00Z",
+            "endsAt": "2026-08-28T23:00:00Z",
+            "nominalEndsAt": "2026-08-28T22:51:00Z",
+            "immutable": false,
+            "trace": []
+          },
+          "elasticBuffer": {
+            "startsAt": "2026-08-28T22:51:00Z",
+            "endsAt": "2026-08-28T23:00:00Z",
+            "ratio": 0.15,
+            "immutable": true
+          }
+        }
+      ],
+      "startedPrefixTaskIds": [],
+      "residualTail": {
+        "startsAt": "2026-08-28T22:00:00Z",
+        "endsAt": "2026-08-28T23:00:00Z",
+        "mutableTaskIds": ["task_contract_smoke"]
+      },
+      "updatedAt": "2026-08-28T22:00:00Z"
+    }
+  ],
+  "partial": false
+}

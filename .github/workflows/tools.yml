@@ -62,6 +62,9 @@ jobs:
       - name: Tests
         run: pytest -q
 
+      - name: Workflow policy
+        run: PYTHONPATH=scripts python3 -m charm ci workflow-policy
+
       - name: Runs uninstalled
         run: PYTHONPATH=scripts python3 -m charm ci protocol > /dev/null
 

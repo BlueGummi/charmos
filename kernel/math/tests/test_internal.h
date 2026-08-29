@@ -10,6 +10,9 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <math/sort.h>
+
 TEST_GROUP_DEFINE(fixed);
 TEST_GROUP_DEFINE(hash);
 TEST_GROUP_DEFINE(bit_ops);
+TEST_GROUP_DEFINE(sort);

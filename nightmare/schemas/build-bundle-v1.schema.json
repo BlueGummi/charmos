@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://charmos.dev/schemas/nightmare/build-bundle-v1.schema.json",
+  "title": "CharmOS Nightmare build bundle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "bundle_id", "request_sha256", "sha256", "source", "runner_image",
+    "configuration", "provenance", "artifacts", "created_at"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "bundle_id": { "$ref": "#/$defs/id" },
+    "request_sha256": { "$ref": "#/$defs/sha256" },
+    "sha256": { "$ref": "#/$defs/sha256" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit"],
+      "properties": {
+        "repository": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+      }
+    },
+    "runner_image": {
+      "type": "string",
+      "pattern": "^ghcr\\.io/[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@sha256:[0-9a-f]{64}$"
+    },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["compiler", "type", "cmake_definitions", "smp", "memory_mib"],
+      "properties": {
+        "compiler": { "enum": ["gcc", "clang"] },
+        "type": { "enum": ["Debug", "Release", "RelWithDebInfo", "MinSizeRel"] },
+        "cmake_definitions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*=[^\\s]*$" }
+        },
+        "smp": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sockets", "cores", "threads"],
+          "properties": {
+            "sockets": { "type": "integer", "minimum": 1 },
+            "cores": { "type": "integer", "minimum": 1 },
+            "threads": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "memory_mib": { "type": "integer", "minimum": 64 }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": { "enum": ["compiled_clean", "prebuilt_development"] }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "path", "sha256"],
+        "properties": {
+          "name": { "$ref": "#/$defs/id" },
+          "path": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "sha256": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    },
+    "created_at": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_:-]{0,127}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

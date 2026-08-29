@@ -26,13 +26,12 @@ static struct topology_node machine_node;
 #define BOLD_STR(__str) ANSI_BOLD __str ANSI_RESET
 
 static void cpu_mask_print(const struct cpu_mask *m) {
-    if (!m->uses_large) {
-        printf(BOLD_STR("0x%llx"), (uint64_t) m->small);
-    } else {
-        size_t nwords = DIV_ROUND_UP(m->nbits, 64);
-        for (size_t i = 0; i < nwords; i++)
-            printf(BOLD_STR("%016llx"), (uint64_t) m->large[nwords - 1 - i]);
-    }
+#if CPU_MASK_WORDS == 1
+    printf(BOLD_STR("0x%llx"), (uint64_t) m->bits[0]);
+#else
+    for (size_t i = 0; i < CPU_MASK_WORDS; i++)
+        printf(BOLD_STR("%016llx"), (uint64_t) m->bits[CPU_MASK_WORDS - 1 - i]);
+#endif
 }
 
 #define TOPO_MAKE_STR(__color, __str) (__color __str ANSI_RESET)
@@ -94,130 +93,6 @@ static void print_topology_node(struct topology_node *node, int depth) {
 
     default: break;
     }
-}
-
-void cpu_mask_deinit(struct cpu_mask *m) {
-    if (m->uses_large)
-        kfree(m->large);
-
-    m->uses_large = false;
-    m->nbits = 0;
-    atomic_store_explicit(&m->small, 0, memory_order_release);
-}
-
-void cpu_mask_copy(struct cpu_mask *dst, const struct cpu_mask *src) {
-    if (src->uses_large) {
-        size_t nwords = DIV_ROUND_UP(src->nbits, 64);
-        for (size_t i = 0; i < nwords; i++)
-            atomic_store(&dst->large[i], atomic_load(&src->large[i]));
-    } else {
-        atomic_store(&dst->small, atomic_load(&src->small));
-    }
-}
-
-void cpu_mask_free(struct cpu_mask *m) {
-    kfree(m);
-}
-
-struct cpu_mask *cpu_mask_create(void) {
-    return kmalloc(sizeof(struct cpu_mask), ALLOC_FLAGS_ZERO);
-}
-
-bool cpu_mask_init(struct cpu_mask *m, size_t nbits) {
-    m->nbits = nbits;
-    if (nbits <= 64) {
-        m->small = 0;
-        m->uses_large = false;
-        return true;
-    }
-
-    m->uses_large = true;
-    size_t nwords = DIV_ROUND_UP(nbits, 64);
-    m->large = kmalloc(sizeof(uint64_t) * nwords, ALLOC_FLAGS_ZERO);
-
-    if (!m->large)
-        return false;
-
-    return true;
-}
-
-size_t cpu_mask_popcount(struct cpu_mask *m) {
-    if (!m->uses_large) {
-        return popcount(atomic_load(&m->small));
-    } else {
-        size_t nwords = DIV_ROUND_UP(m->nbits, 64);
-        size_t acc = 0;
-        for (size_t i = 0; i < nwords; i++)
-            acc += popcount(atomic_load(&m->large[i]));
-
-        return acc;
-    }
-}
-
-void cpu_mask_set(struct cpu_mask *m, size_t cpu) {
-    if (!m->uses_large) {
-        atomic_fetch_or(&m->small, 1ULL << cpu);
-    } else {
-        atomic_fetch_or(&m->large[cpu / 64], 1ULL << (cpu % 64));
-    }
-}
-
-void cpu_mask_clear(struct cpu_mask *m, size_t cpu) {
-    if (!m->uses_large) {
-        atomic_fetch_and(&m->small, ~(1ULL << cpu));
-    } else {
-        atomic_fetch_and(&m->large[cpu / 64], ~(1ULL << (cpu % 64)));
-    }
-}
-
-bool cpu_mask_test(const struct cpu_mask *m, size_t cpu) {
-    if (!m->uses_large) {
-        return (atomic_load(&m->small) >> cpu) & 1ULL;
-    } else {
-        return (atomic_load(&m->large[cpu / 64]) >> (cpu % 64)) & 1ULL;
-    }
-}
-
-void cpu_mask_or(struct cpu_mask *dst, const struct cpu_mask *b) {
-    if (!dst->uses_large) {
-        atomic_fetch_or(&dst->small, atomic_load(&b->small));
-    } else {
-        size_t nwords = DIV_ROUND_UP(dst->nbits, 64);
-        for (size_t i = 0; i < nwords; i++)
-            atomic_fetch_or(&dst->large[i], atomic_load(&b->large[i]));
-    }
-}
-
-void cpu_mask_set_all(struct cpu_mask *m) {
-    if (!m->uses_large) {
-        atomic_store(&m->small, UINT64_MAX);
-    } else {
-        size_t nwords = DIV_ROUND_UP(m->nbits, 64);
-        for (size_t i = 0; i < nwords; i++)
-            atomic_store(&m->large[i], UINT64_MAX);
-    }
-}
-
-void cpu_mask_clear_all(struct cpu_mask *m) {
-    if (!m->uses_large) {
-        atomic_store(&m->small, 0);
-    } else {
-        size_t nwords = DIV_ROUND_UP(m->nbits, 64);
-        for (size_t i = 0; i < nwords; i++)
-            atomic_store(&m->large[i], 0);
-    }
-}
-
-bool cpu_mask_empty(const struct cpu_mask *mask) {
-    if (!mask->uses_large)
-        return atomic_load(&mask->small) == 0;
-
-    size_t nwords = DIV_ROUND_UP(mask->nbits, 64);
-    for (size_t i = 0; i < nwords; i++)
-        if (atomic_load(&mask->large[i]) != 0)
-            return false;
-
-    return true;
 }
 
 void topology_dump(void) {
@@ -323,35 +198,6 @@ static size_t build_core_nodes(size_t n_cpus) {
     }
 
     return core_count;
-}
-
-static bool cpu_mask_intersects(const struct cpu_mask *a,
-                                const struct cpu_mask *b) {
-    if (!a->uses_large && !b->uses_large) {
-        return (a->small & b->small) != 0;
-    }
-
-    size_t nwords = DIV_ROUND_UP(MAX(a->nbits, b->nbits), 64);
-    for (size_t i = 0; i < nwords; i++) {
-        uint64_t wa = 0, wb = 0;
-
-        if (a->uses_large) {
-            if (i < (a->nbits + 63) / 64)
-                wa = a->large[i];
-        } else if (i == 0) {
-            wa = a->small;
-        }
-        if (b->uses_large) {
-            if (i < (b->nbits + 63) / 64)
-                wb = b->large[i];
-        } else if (i == 0) {
-            wb = b->small;
-        }
-
-        if ((wa & wb) != 0)
-            return true;
-    }
-    return false;
 }
 
 static size_t build_numa_nodes(size_t n_cores, size_t n_llc) {
@@ -618,9 +464,9 @@ void topology_mark_core_idle(cpu_id_t cpu_id, bool idle) {
     struct topology_node *node = smt;
     while (node) {
         if (idle)
-            cpu_mask_set(&node->idle, cpu_id);
+            cpu_mask_set_atomic(&node->idle, cpu_id);
         else
-            cpu_mask_clear(&node->idle, cpu_id);
+            cpu_mask_clear_atomic(&node->idle, cpu_id);
 
         node = node->parent_node;
     }

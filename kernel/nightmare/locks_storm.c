@@ -60,6 +60,16 @@ enum locks_storm_check : uint8_t {
     LOCKS_CHECK_QUIESCENT,
 };
 
+enum locks_storm_lane : uint8_t {
+    LOCKS_LANE_WORKER = 1,
+    LOCKS_LANE_MUTEX,
+    LOCKS_LANE_MUTEX_SIMPLE,
+    LOCKS_LANE_RW,
+    LOCKS_LANE_SPIN,
+    LOCKS_LANE_QSPIN,
+    LOCKS_LANE_SEQ,
+};
+
 enum locks_storm_failure_phase : uint8_t {
     LOCKS_FAILURE_EMPTY = 0,
     LOCKS_FAILURE_WRITING,
@@ -88,6 +98,7 @@ struct locks_storm_pair {
 
 struct locks_storm_failure {
     _Atomic enum locks_storm_failure_phase phase;
+    enum locks_storm_lane lane;
     enum locks_storm_check check;
     enum locks_storm_op op;
     size_t worker;
@@ -156,6 +167,19 @@ static const char *locks_op_name(enum locks_storm_op op) {
     return "unknown";
 }
 
+static const char *locks_lane_name(enum locks_storm_lane lane) {
+    switch (lane) {
+    case LOCKS_LANE_WORKER: return "worker";
+    case LOCKS_LANE_MUTEX: return "mutex";
+    case LOCKS_LANE_MUTEX_SIMPLE: return "mutex_simple";
+    case LOCKS_LANE_RW: return "rw";
+    case LOCKS_LANE_SPIN: return "spin";
+    case LOCKS_LANE_QSPIN: return "qspin";
+    case LOCKS_LANE_SEQ: return "seq";
+    }
+    return "unknown";
+}
+
 static void locks_pair_init(struct locks_storm_pair *pair) {
     atomic_store_explicit(&pair->value, 0, memory_order_relaxed);
     atomic_store_explicit(&pair->complement, UINT64_MAX, memory_order_relaxed);
@@ -175,6 +199,7 @@ static void locks_pair_advance(struct locks_storm_pair *pair, uint64_t value) {
 }
 
 static bool locks_record_failure(struct locks_storm_state *state,
+                                 enum locks_storm_lane lane,
                                  enum locks_storm_check check,
                                  enum locks_storm_op op, size_t worker,
                                  uint64_t observed_a, uint64_t observed_b) {
@@ -184,6 +209,7 @@ static bool locks_record_failure(struct locks_storm_state *state,
             memory_order_acq_rel, memory_order_acquire))
         return false;
 
+    state->failure.lane = lane;
     state->failure.check = check;
     state->failure.op = op;
     state->failure.worker = worker;
@@ -202,11 +228,12 @@ static void locks_report_failure(struct locks_storm_state *state) {
         return;
 
     uint64_t discriminator =
-        ((uint64_t) state->failure.op << 8) | (uint64_t) state->failure.check;
+        ((uint64_t) state->failure.lane << 8) | (uint64_t) state->failure.check;
     NIGHTMARE_FINDING_TIER(
         "lock_invariant", NIGHTMARE_TIER_CONFIDENT, discriminator,
-        "op=%s check=%u worker=%lu observed_a=%lu observed_b=%lu",
-        locks_op_name(state->failure.op), (unsigned int) state->failure.check,
+        "lane=%s op=%s check=%u worker=%lu observed_a=%lu observed_b=%lu",
+        locks_lane_name(state->failure.lane), locks_op_name(state->failure.op),
+        (unsigned int) state->failure.check,
         (unsigned long) state->failure.worker,
         (unsigned long) state->failure.observed_a,
         (unsigned long) state->failure.observed_b);
@@ -215,12 +242,13 @@ static void locks_report_failure(struct locks_storm_state *state) {
 
 static bool locks_enter_exclusive(struct locks_storm_state *state,
                                   _Atomic uint32_t *holders,
+                                  enum locks_storm_lane lane,
                                   enum locks_storm_op op, size_t worker) {
     uint32_t prior =
         atomic_fetch_add_explicit(holders, 1, memory_order_acq_rel);
     if (prior == 0)
         return true;
-    locks_record_failure(state, LOCKS_CHECK_EXCLUSIVE, op, worker, prior,
+    locks_record_failure(state, lane, LOCKS_CHECK_EXCLUSIVE, op, worker, prior,
                          prior + 1);
     return false;
 }
@@ -231,11 +259,12 @@ static void locks_leave_exclusive(_Atomic uint32_t *holders) {
 
 static bool locks_check_and_advance(struct locks_storm_state *state,
                                     struct locks_storm_pair *pair,
+                                    enum locks_storm_lane lane,
                                     enum locks_storm_op op, size_t worker) {
     uint64_t value;
     uint64_t complement;
     if (!locks_pair_load(pair, &value, &complement)) {
-        locks_record_failure(state, LOCKS_CHECK_PAIR, op, worker, value,
+        locks_record_failure(state, lane, LOCKS_CHECK_PAIR, op, worker, value,
                              complement);
         return false;
     }
@@ -245,12 +274,13 @@ static bool locks_check_and_advance(struct locks_storm_state *state,
 
 static bool locks_check_pair(struct locks_storm_state *state,
                              struct locks_storm_pair *pair,
-                             enum locks_storm_op op, size_t worker) {
+                             enum locks_storm_lane lane, enum locks_storm_op op,
+                             size_t worker) {
     uint64_t value;
     uint64_t complement;
     if (locks_pair_load(pair, &value, &complement))
         return true;
-    locks_record_failure(state, LOCKS_CHECK_PAIR, op, worker, value,
+    locks_record_failure(state, lane, LOCKS_CHECK_PAIR, op, worker, value,
                          complement);
     return false;
 }
@@ -269,13 +299,13 @@ locks_run_mutex(struct locks_storm_state *state, size_t worker) {
     enum locks_storm_op_result result = LOCKS_OP_COMPLETED;
     mutex_lock(&state->mutex);
 
-    bool valid = locks_enter_exclusive(state, &state->mutex_holders,
-                                       LOCKS_OP_MUTEX, worker);
+    bool valid = locks_enter_exclusive(
+        state, &state->mutex_holders, LOCKS_LANE_MUTEX, LOCKS_OP_MUTEX, worker);
     uint64_t value;
     uint64_t complement;
     if (!locks_pair_load(&state->mutex_pair, &value, &complement)) {
-        locks_record_failure(state, LOCKS_CHECK_PAIR, LOCKS_OP_MUTEX, worker,
-                             value, complement);
+        locks_record_failure(state, LOCKS_LANE_MUTEX, LOCKS_CHECK_PAIR,
+                             LOCKS_OP_MUTEX, worker, value, complement);
         valid = false;
     }
 
@@ -305,9 +335,11 @@ static enum locks_storm_op_result
 locks_run_mutex_simple(struct locks_storm_state *state, size_t worker) {
     mutex_simple_lock(&state->mutex_simple);
     bool valid = locks_enter_exclusive(state, &state->mutex_simple_holders,
+                                       LOCKS_LANE_MUTEX_SIMPLE,
                                        LOCKS_OP_MUTEX_SIMPLE, worker);
     if (!locks_check_and_advance(state, &state->mutex_simple_pair,
-                                 LOCKS_OP_MUTEX_SIMPLE, worker))
+                                 LOCKS_LANE_MUTEX_SIMPLE, LOCKS_OP_MUTEX_SIMPLE,
+                                 worker))
         valid = false;
     locks_leave_exclusive(&state->mutex_simple_holders);
     mutex_simple_unlock(&state->mutex_simple);
@@ -321,9 +353,10 @@ locks_run_rw_read(struct locks_storm_state *state, size_t worker) {
                                                memory_order_acq_rel);
     bool valid = (prior & LOCKS_STORM_RW_WRITER_BIT) == 0;
     if (!valid)
-        locks_record_failure(state, LOCKS_CHECK_RW_READ, LOCKS_OP_RW_READ,
-                             worker, prior, prior + 1);
-    if (!locks_check_pair(state, &state->rw_pair, LOCKS_OP_RW_READ, worker))
+        locks_record_failure(state, LOCKS_LANE_RW, LOCKS_CHECK_RW_READ,
+                             LOCKS_OP_RW_READ, worker, prior, prior + 1);
+    if (!locks_check_pair(state, &state->rw_pair, LOCKS_LANE_RW,
+                          LOCKS_OP_RW_READ, worker))
         valid = false;
     atomic_fetch_sub_explicit(&state->rw_occupancy, 1, memory_order_acq_rel);
     rw_unlock(&state->rwlock);
@@ -337,10 +370,11 @@ locks_run_rw_write(struct locks_storm_state *state, size_t worker) {
         &state->rw_occupancy, LOCKS_STORM_RW_WRITER_BIT, memory_order_acq_rel);
     bool valid = prior == 0;
     if (!valid)
-        locks_record_failure(state, LOCKS_CHECK_RW_WRITE, LOCKS_OP_RW_WRITE,
-                             worker, prior, LOCKS_STORM_RW_WRITER_BIT);
-    if (!locks_check_and_advance(state, &state->rw_pair, LOCKS_OP_RW_WRITE,
-                                 worker))
+        locks_record_failure(state, LOCKS_LANE_RW, LOCKS_CHECK_RW_WRITE,
+                             LOCKS_OP_RW_WRITE, worker, prior,
+                             LOCKS_STORM_RW_WRITER_BIT);
+    if (!locks_check_and_advance(state, &state->rw_pair, LOCKS_LANE_RW,
+                                 LOCKS_OP_RW_WRITE, worker))
         valid = false;
     atomic_fetch_and_explicit(&state->rw_occupancy, ~LOCKS_STORM_RW_WRITER_BIT,
                               memory_order_acq_rel);
@@ -359,10 +393,11 @@ locks_run_spin(struct locks_storm_state *state,
         old = spin_lock(&state->spin);
     }
 
-    bool valid = locks_enter_exclusive(state, &state->spin_holders,
-                                       LOCKS_OP_SPIN, worker->index);
-    if (!locks_check_and_advance(state, &state->spin_pair, LOCKS_OP_SPIN,
-                                 worker->index))
+    bool valid =
+        locks_enter_exclusive(state, &state->spin_holders, LOCKS_LANE_SPIN,
+                              LOCKS_OP_SPIN, worker->index);
+    if (!locks_check_and_advance(state, &state->spin_pair, LOCKS_LANE_SPIN,
+                                 LOCKS_OP_SPIN, worker->index))
         valid = false;
     locks_leave_exclusive(&state->spin_holders);
     spin_unlock(&state->spin, old);
@@ -380,10 +415,11 @@ locks_run_qspin(struct locks_storm_state *state,
         old = qspin_lock(&state->qspin);
     }
 
-    bool valid = locks_enter_exclusive(state, &state->qspin_holders,
-                                       LOCKS_OP_QSPIN, worker->index);
-    if (!locks_check_and_advance(state, &state->qspin_pair, LOCKS_OP_QSPIN,
-                                 worker->index))
+    bool valid =
+        locks_enter_exclusive(state, &state->qspin_holders, LOCKS_LANE_QSPIN,
+                              LOCKS_OP_QSPIN, worker->index);
+    if (!locks_check_and_advance(state, &state->qspin_pair, LOCKS_LANE_QSPIN,
+                                 LOCKS_OP_QSPIN, worker->index))
         valid = false;
     locks_leave_exclusive(&state->qspin_holders);
     qspin_unlock(&state->qspin, old);
@@ -405,16 +441,16 @@ locks_run_seq_read(struct locks_storm_state *state, size_t worker) {
 
     if (complement == ~value)
         return LOCKS_OP_COMPLETED;
-    locks_record_failure(state, LOCKS_CHECK_PAIR, LOCKS_OP_SEQ_READ, worker,
-                         value, complement);
+    locks_record_failure(state, LOCKS_LANE_SEQ, LOCKS_CHECK_PAIR,
+                         LOCKS_OP_SEQ_READ, worker, value, complement);
     return LOCKS_OP_FAILED;
 }
 
 static enum locks_storm_op_result
 locks_run_seq_write(struct locks_storm_state *state, size_t worker) {
     enum irql old = seq_write_lock(&state->seqlock);
-    bool valid = locks_check_and_advance(state, &state->seq_pair,
-                                         LOCKS_OP_SEQ_WRITE, worker);
+    bool valid = locks_check_and_advance(
+        state, &state->seq_pair, LOCKS_LANE_SEQ, LOCKS_OP_SEQ_WRITE, worker);
     seq_write_unlock(&state->seqlock, old);
     return valid ? LOCKS_OP_COMPLETED : LOCKS_OP_FAILED;
 }
@@ -423,30 +459,31 @@ static enum locks_storm_op_result
 locks_run_nested(struct locks_storm_state *state, size_t worker) {
     bool valid = true;
     mutex_lock(&state->mutex);
-    if (!locks_enter_exclusive(state, &state->mutex_holders, LOCKS_OP_NESTED,
-                               worker))
+    if (!locks_enter_exclusive(state, &state->mutex_holders, LOCKS_LANE_MUTEX,
+                               LOCKS_OP_NESTED, worker))
         valid = false;
 
     rw_lock(&state->rwlock, RWLOCK_ACQUIRE_WRITE);
     uint32_t rw_prior = atomic_fetch_or_explicit(
         &state->rw_occupancy, LOCKS_STORM_RW_WRITER_BIT, memory_order_acq_rel);
     if (rw_prior != 0) {
-        locks_record_failure(state, LOCKS_CHECK_RW_WRITE, LOCKS_OP_NESTED,
-                             worker, rw_prior, LOCKS_STORM_RW_WRITER_BIT);
+        locks_record_failure(state, LOCKS_LANE_RW, LOCKS_CHECK_RW_WRITE,
+                             LOCKS_OP_NESTED, worker, rw_prior,
+                             LOCKS_STORM_RW_WRITER_BIT);
         valid = false;
     }
 
     enum irql old = spin_lock(&state->spin);
-    if (!locks_enter_exclusive(state, &state->spin_holders, LOCKS_OP_NESTED,
-                               worker))
+    if (!locks_enter_exclusive(state, &state->spin_holders, LOCKS_LANE_SPIN,
+                               LOCKS_OP_NESTED, worker))
         valid = false;
 
-    if (!locks_check_and_advance(state, &state->mutex_pair, LOCKS_OP_NESTED,
-                                 worker) ||
-        !locks_check_and_advance(state, &state->rw_pair, LOCKS_OP_NESTED,
-                                 worker) ||
-        !locks_check_and_advance(state, &state->spin_pair, LOCKS_OP_NESTED,
-                                 worker))
+    if (!locks_check_and_advance(state, &state->mutex_pair, LOCKS_LANE_MUTEX,
+                                 LOCKS_OP_NESTED, worker) ||
+        !locks_check_and_advance(state, &state->rw_pair, LOCKS_LANE_RW,
+                                 LOCKS_OP_NESTED, worker) ||
+        !locks_check_and_advance(state, &state->spin_pair, LOCKS_LANE_SPIN,
+                                 LOCKS_OP_NESTED, worker))
         valid = false;
 
     locks_leave_exclusive(&state->spin_holders);
@@ -613,9 +650,10 @@ static void locks_storm_probe(struct nightmare_ctx *ctx) {
 }
 
 static void locks_quiescent_failure(struct locks_storm_state *state,
+                                    enum locks_storm_lane lane,
                                     uint64_t observed_a, uint64_t observed_b) {
-    locks_record_failure(state, LOCKS_CHECK_QUIESCENT, LOCKS_OP_IDLE, SIZE_MAX,
-                         observed_a, observed_b);
+    locks_record_failure(state, lane, LOCKS_CHECK_QUIESCENT, LOCKS_OP_IDLE,
+                         SIZE_MAX, observed_a, observed_b);
 }
 
 static struct nightmare_verdict
@@ -626,31 +664,52 @@ locks_storm_quiesce_check(struct nightmare_ctx *ctx) {
         enum locks_storm_op op = atomic_load_explicit(
             &state->workers[i].current_op, memory_order_acquire);
         if (op != LOCKS_OP_IDLE) {
-            locks_quiescent_failure(state, i, op);
+            locks_quiescent_failure(state, LOCKS_LANE_WORKER, i, op);
             break;
         }
     }
 
     uint32_t occupancy =
         atomic_load_explicit(&state->rw_occupancy, memory_order_acquire);
-    uint64_t holders =
-        atomic_load_explicit(&state->mutex_holders, memory_order_acquire) |
-        atomic_load_explicit(&state->mutex_simple_holders,
-                             memory_order_acquire) |
-        atomic_load_explicit(&state->spin_holders, memory_order_acquire) |
-        atomic_load_explicit(&state->qspin_holders, memory_order_acquire);
-    if (occupancy != 0 || holders != 0)
-        locks_quiescent_failure(state, occupancy, holders);
+    if (occupancy != 0)
+        locks_quiescent_failure(state, LOCKS_LANE_RW, occupancy, 0);
 
-    struct locks_storm_pair *pairs[] = {
-        &state->mutex_pair, &state->mutex_simple_pair, &state->rw_pair,
-        &state->spin_pair,  &state->qspin_pair,        &state->seq_pair,
+    struct {
+        enum locks_storm_lane lane;
+        _Atomic uint32_t *holders;
+    } holder_lanes[] = {
+        {LOCKS_LANE_MUTEX, &state->mutex_holders},
+        {LOCKS_LANE_MUTEX_SIMPLE, &state->mutex_simple_holders},
+        {LOCKS_LANE_SPIN, &state->spin_holders},
+        {LOCKS_LANE_QSPIN, &state->qspin_holders},
     };
-    for (size_t i = 0; i < sizeof(pairs) / sizeof(pairs[0]); i++) {
+    for (size_t i = 0; i < sizeof(holder_lanes) / sizeof(holder_lanes[0]);
+         i++) {
+        uint32_t holders =
+            atomic_load_explicit(holder_lanes[i].holders, memory_order_acquire);
+        if (holders != 0) {
+            locks_quiescent_failure(state, holder_lanes[i].lane, holders, 0);
+            break;
+        }
+    }
+
+    struct {
+        enum locks_storm_lane lane;
+        struct locks_storm_pair *pair;
+    } pair_lanes[] = {
+        {LOCKS_LANE_MUTEX, &state->mutex_pair},
+        {LOCKS_LANE_MUTEX_SIMPLE, &state->mutex_simple_pair},
+        {LOCKS_LANE_RW, &state->rw_pair},
+        {LOCKS_LANE_SPIN, &state->spin_pair},
+        {LOCKS_LANE_QSPIN, &state->qspin_pair},
+        {LOCKS_LANE_SEQ, &state->seq_pair},
+    };
+    for (size_t i = 0; i < sizeof(pair_lanes) / sizeof(pair_lanes[0]); i++) {
         uint64_t value;
         uint64_t complement;
-        if (!locks_pair_load(pairs[i], &value, &complement)) {
-            locks_quiescent_failure(state, value, complement);
+        if (!locks_pair_load(pair_lanes[i].pair, &value, &complement)) {
+            locks_quiescent_failure(state, pair_lanes[i].lane, value,
+                                    complement);
             break;
         }
     }

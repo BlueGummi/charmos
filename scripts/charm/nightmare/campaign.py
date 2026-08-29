@@ -7,11 +7,12 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, ClassVar, Protocol
 
 from .. import protocol as P
 from .. import record as R
 from . import codec
+from .contracts import DiscoveryKind, ExecutionHealth
 from .suite import FLUSH_MARGIN_MS, Suite, Task
 
 CONFIDENT_FINDING_CAP = 5
@@ -147,6 +148,38 @@ class CampaignResult:
     boots: list[BootResult]
     findings: list[FindingSummary]
     trace: list[TraceSample]
+
+    @property
+    def discovery_kind(self) -> DiscoveryKind:
+        kinds: set[DiscoveryKind] = set()
+        if self.findings:
+            kinds.add(DiscoveryKind.FINDING)
+        if any(boot.status == BootStatus.CRASH.value for boot in self.boots):
+            kinds.add(DiscoveryKind.CRASH)
+        if any(boot.status == BootStatus.STALL.value for boot in self.boots):
+            kinds.add(DiscoveryKind.STALL)
+        if not kinds:
+            return DiscoveryKind.NONE
+        if len(kinds) > 1:
+            return DiscoveryKind.MIXED
+        return next(iter(kinds))
+
+    @property
+    def execution_health(self) -> ExecutionHealth:
+        if self.status == CampaignStatus.ABORTED.value:
+            return ExecutionHealth.PARTIAL
+        if self.status == CampaignStatus.INFRASTRUCTURE.value:
+            return ExecutionHealth.INFRASTRUCTURE
+        infrastructure_statuses = {
+            BootStatus.FAIL.value,
+            BootStatus.TIMEOUT.value,
+            BootStatus.INFRA.value,
+            BootStatus.UNKNOWN.value,
+            BootStatus.SKIP.value,
+        }
+        if any(boot.status in infrastructure_statuses for boot in self.boots):
+            return ExecutionHealth.INFRASTRUCTURE
+        return ExecutionHealth.HEALTHY
 
 
 class CampaignClock:
@@ -374,6 +407,115 @@ class BootRunner(Protocol):
     ) -> BootResult: ...
 
 
+def _result_from_logs(
+    *,
+    boot_index: int,
+    task_name: str,
+    cmdline: str,
+    duration_ms: int,
+    exit_code: int,
+    timed_out: bool,
+    console_log_path: Path,
+    machine_log_path: Path,
+) -> BootResult:
+    raw_records = []
+    stat_samples = []
+    findings = []
+    verdict_result = ""
+    verdict_reason = ""
+    final_progress = 0
+    crashed = False
+
+    if machine_log_path.is_file():
+        for line in machine_log_path.read_text(
+            encoding="utf-8", errors="replace"
+        ).splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+                raw_records.append(rec)
+            except json.JSONDecodeError:
+                continue
+
+            section = rec.get(P.KEY_SECTION)
+            kind = rec.get(P.KEY_KIND)
+            if section == P.SECTION_NIGHTMARE and kind == P.KIND_STAT:
+                stat_samples.append((rec.get(P.KEY_TIME, 0), rec.get("progress", 0)))
+            elif section == P.SECTION_NIGHTMARE and kind == P.KIND_FINDING:
+                findings.append(
+                    FindingRecord(
+                        sig=rec.get("sig", "unknown"),
+                        tier=rec.get("tier", "ambiguous"),
+                        kind=rec.get("kind", "unknown"),
+                        site=rec.get("site", ""),
+                        msg=rec.get("msg", ""),
+                        boot_index=boot_index,
+                        time_ms=rec.get(P.KEY_TIME, 0),
+                        raw=rec,
+                    )
+                )
+            elif section == P.SECTION_NIGHTMARE and kind == P.KIND_VERDICT:
+                verdict_result = rec.get("result", "")
+                verdict_reason = rec.get("reason", "")
+                final_progress = rec.get("progress", 0)
+            elif section in (P.SECTION_PANIC, P.SECTION_ASAN):
+                crashed = True
+
+    if timed_out:
+        status = BootStatus.TIMEOUT.value
+        reason = "host_timeout"
+    elif verdict_result:
+        if verdict_result == "ok":
+            status = BootStatus.FINDING.value if findings else BootStatus.OK.value
+        elif verdict_result == "stall":
+            status = BootStatus.STALL.value
+        elif verdict_result == "skip":
+            status = BootStatus.SKIP.value
+        elif verdict_result == "fail":
+            status = BootStatus.FAIL.value
+        else:
+            status = verdict_result
+        reason = verdict_reason
+    elif crashed or exit_code == R.EXIT_PANIC:
+        status = BootStatus.CRASH.value
+        reason = "kernel_crash"
+    elif exit_code == 6:
+        status = BootStatus.SKIP.value
+        reason = "refusal"
+    elif exit_code == 5:
+        status = BootStatus.STALL.value
+        reason = "stall"
+    elif exit_code == 4:
+        status = BootStatus.FAIL.value
+        reason = "harness_fail"
+    elif exit_code != 0:
+        status = BootStatus.FAIL.value
+        reason = f"exit_code_{exit_code}"
+    else:
+        status = BootStatus.OK.value
+        reason = "exit_ok"
+
+    return BootResult(
+        boot_index=boot_index,
+        task_name=task_name,
+        cmdline=cmdline,
+        seed=None,
+        duration_ms=duration_ms,
+        exit_code=exit_code,
+        status=status,
+        reason=reason,
+        progress=final_progress,
+        findings=findings,
+        stat_samples=stat_samples,
+        raw_records=raw_records,
+        crashed=crashed,
+        console_log=console_log_path,
+        machine_log=machine_log_path,
+    )
+
+
 class QemuBootRunner:
     """Executes QEMU boots"""
 
@@ -459,104 +601,117 @@ class QemuBootRunner:
         else:
             machine_log_path.write_text("", encoding="utf-8")
 
-        raw_records = []
-        stat_samples = []
-        findings = []
-        verdict_result = ""
-        verdict_reason = ""
-        final_progress = 0
-        crashed = False
-
-        if machine_log_path.is_file():
-            for line in machine_log_path.read_text(
-                encoding="utf-8", errors="replace"
-            ).splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    rec = json.loads(line)
-                    raw_records.append(rec)
-                except json.JSONDecodeError:
-                    continue
-
-                s = rec.get(P.KEY_SECTION)
-                k = rec.get(P.KEY_KIND)
-
-                if s == P.SECTION_NIGHTMARE and k == P.KIND_STAT:
-                    t_ms = rec.get(P.KEY_TIME, 0)
-                    p_val = rec.get("progress", 0)
-                    stat_samples.append((t_ms, p_val))
-                elif s == P.SECTION_NIGHTMARE and k == P.KIND_FINDING:
-                    findings.append(
-                        FindingRecord(
-                            sig=rec.get("sig", "unknown"),
-                            tier=rec.get("tier", "ambiguous"),
-                            kind=rec.get("kind", "unknown"),
-                            site=rec.get("site", ""),
-                            msg=rec.get("msg", ""),
-                            boot_index=boot_index,
-                            time_ms=rec.get(P.KEY_TIME, 0),
-                            raw=rec,
-                        )
-                    )
-                elif s == P.SECTION_NIGHTMARE and k == P.KIND_VERDICT:
-                    verdict_result = rec.get("result", "")
-                    verdict_reason = rec.get("reason", "")
-                    final_progress = rec.get("progress", 0)
-                elif s in (P.SECTION_PANIC, P.SECTION_ASAN):
-                    crashed = True
-
-        if timed_out:
-            status = BootStatus.TIMEOUT.value
-            reason = "host_timeout"
-        elif verdict_result:
-            if verdict_result == "ok":
-                status = BootStatus.FINDING.value if findings else BootStatus.OK.value
-            elif verdict_result == "stall":
-                status = BootStatus.STALL.value
-            elif verdict_result == "skip":
-                status = BootStatus.SKIP.value
-            elif verdict_result == "fail":
-                status = BootStatus.FAIL.value
-            else:
-                status = verdict_result
-            reason = verdict_reason
-        elif crashed or exit_code == R.EXIT_PANIC:
-            status = BootStatus.CRASH.value
-            reason = "kernel_crash"
-        elif exit_code == 6:
-            status = BootStatus.SKIP.value
-            reason = "refusal"
-        elif exit_code == 5:
-            status = BootStatus.STALL.value
-            reason = "stall"
-        elif exit_code == 4:
-            status = BootStatus.FAIL.value
-            reason = "harness_fail"
-        elif exit_code != 0:
-            status = BootStatus.FAIL.value
-            reason = f"exit_code_{exit_code}"
-        else:
-            status = BootStatus.OK.value
-            reason = "exit_ok"
-
-        return BootResult(
+        return _result_from_logs(
             boot_index=boot_index,
             task_name=task.name,
             cmdline=cmdline,
-            seed=None,
             duration_ms=duration_ms,
             exit_code=exit_code,
-            status=status,
-            reason=reason,
-            progress=final_progress,
-            findings=findings,
-            stat_samples=stat_samples,
-            raw_records=raw_records,
-            crashed=crashed,
-            console_log=console_log_path,
+            timed_out=timed_out,
+            console_log_path=console_log_path,
+            machine_log_path=machine_log_path,
+        )
+
+
+class BundleBootRunner:
+    """Repack and boot a verified compile-once bundle."""
+
+    _DEBUG_EXIT: ClassVar[dict[int, int]] = {
+        1: 0,
+        3: 1,
+        5: 3,
+        7: 3,
+        9: 4,
+        11: 5,
+        13: 6,
+    }
+
+    def __init__(self, bundle: Any, repo_root: Path):
+        self.bundle = bundle
+        self.repo_root = repo_root
+
+    def run_boot(
+        self,
+        manifest: CampaignManifest,
+        task: Task,
+        boot_index: int,
+        cmdline: str,
+        timeout_ms: int,
+        out_dir: Path,
+    ) -> BootResult:
+        from . import build_bundle as bundle_model
+
+        boot_dir = out_dir / f"boot-{boot_index:04d}"
+        boot_dir.mkdir(parents=True, exist_ok=True)
+        cmdline_path = boot_dir / "cmdline.txt"
+        codec.write(cmdline_path, cmdline)
+        repacked = bundle_model.repack(
+            self.bundle,
+            cmdline=cmdline_path,
+            out_dir=boot_dir,
+            repo_root=self.repo_root,
+        )
+        disk_path = boot_dir / "disk.img"
+        shutil.copy2(self.bundle.pristine_disk, disk_path)
+        console_log_path = boot_dir / "console.log"
+        machine_log_path = boot_dir / "machine.nd.log"
+        machine_log_path.unlink(missing_ok=True)
+        qmp_socket = boot_dir / "qmp.sock"
+        qmp_socket.unlink(missing_ok=True)
+        command = bundle_model.qemu_command(
+            self.bundle,
+            iso_path=repacked.iso_path,
+            disk_path=disk_path,
             machine_log=machine_log_path,
+            trace_log=boot_dir / "trace.log",
+            qmp_socket=qmp_socket,
+        )
+
+        started = time.monotonic()
+        timed_out = False
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=boot_dir,
+                capture_output=True,
+                text=True,
+                timeout=max(5.0, timeout_ms / 1000.0),
+            )
+            exit_code = self._DEBUG_EXIT.get(completed.returncode, completed.returncode)
+            console_log_path.write_text(
+                completed.stdout + completed.stderr, encoding="utf-8"
+            )
+        except subprocess.TimeoutExpired as error:
+            timed_out = True
+            exit_code = R.EXIT_TIMEOUT
+            stdout = (
+                error.stdout
+                if isinstance(error.stdout, str)
+                else (error.stdout or b"").decode("utf-8", "replace")
+            )
+            stderr = (
+                error.stderr
+                if isinstance(error.stderr, str)
+                else (error.stderr or b"").decode("utf-8", "replace")
+            )
+            console_log_path.write_text(stdout + stderr, encoding="utf-8")
+        except OSError as error:
+            exit_code = 127
+            console_log_path.write_text(
+                f"Execution failed: {error}\n", encoding="utf-8"
+            )
+        duration_ms = int((time.monotonic() - started) * 1000)
+        if not machine_log_path.exists():
+            machine_log_path.write_text("", encoding="utf-8")
+        return _result_from_logs(
+            boot_index=boot_index,
+            task_name=task.name,
+            cmdline=cmdline,
+            duration_ms=duration_ms,
+            exit_code=exit_code,
+            timed_out=timed_out,
+            console_log_path=console_log_path,
+            machine_log_path=machine_log_path,
         )
 
 
@@ -759,6 +914,11 @@ def render_json(result: CampaignResult) -> str:
         "total_runners": result.total_runners,
         "status": result.status,
         "ok": result.ok,
+        "discovery": {
+            "kind": result.discovery_kind.value,
+            "finding_count": sum(f.occurrences for f in result.findings),
+        },
+        "execution": {"health": result.execution_health.value},
         "summary": {
             "total_boots": result.total_boots,
             "completed_boots": result.completed_boots,

@@ -1,24 +1,20 @@
 /* @title: Thread IDs */
+#pragma once
 #include <stdint.h>
-#include <structures/rbt.h>
-#include <sync/spinlock.h>
+#include <structures/id_space.h>
 
-#define TID_RANGE_RESERVE_COUNT 128
+#define TID_RANGE_RESERVE_COUNT ID_RANGE_RESERVE_COUNT
+#define tid_range id_range
+#define tid_space id_space
 
-struct tid_range {
-    struct rbt_node node;
-    uint64_t start;
-    uint64_t length;
-    struct tid_range *next;
-};
+static inline uint64_t tid_alloc(struct tid_space *ts) {
+    return id_space_alloc(ts);
+}
 
-struct tid_space {
-    struct rbt tree;
-    struct spinlock lock;
-    struct tid_range reserve_pool[TID_RANGE_RESERVE_COUNT];
-    struct tid_range *reserve_free;
-};
+static inline void tid_free(struct tid_space *ts, uint64_t id) {
+    id_space_free(ts, id);
+}
 
-uint64_t tid_alloc(struct tid_space *ts);
-void tid_free(struct tid_space *ts, uint64_t id);
-struct tid_space *tid_space_init(uint64_t max_id);
+static inline struct tid_space *tid_space_init(uint64_t max_id) {
+    return id_space_init(max_id);
+}

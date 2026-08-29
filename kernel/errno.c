@@ -1,27 +1,17 @@
 #include <errno.h>
+#include <math/sort.h>
+
+static int cmp_facility_prefix(const void *key, const void *elem) {
+    uint16_t pref = *(const uint16_t *) key;
+    const struct err_facility *f = elem;
+    return (pref > f->prefix) - (pref < f->prefix);
+}
 
 /* bsearch __skernel_err_facilities to __ekernel_err_facilities */
 static struct err_facility *facility_for(uint16_t pref) {
-    struct err_facility *facilities = __ekernel_err_facilities;
     size_t count = __ekernel_err_facilities - __skernel_err_facilities;
-
-    size_t left = 0;
-    size_t right = count - 1;
-
-    while (left <= right) {
-        size_t mid = left + (right - left) / 2;
-        uint16_t mid_fac = facilities[mid].prefix;
-
-        if (mid_fac == pref) {
-            return &facilities[mid];
-        } else if (mid_fac < pref) {
-            left = mid + 1;
-        } else {
-            right = mid - 1;
-        }
-    }
-
-    return NULL;
+    return bsearch(&pref, __skernel_err_facilities, count,
+                   sizeof(struct err_facility), cmp_facility_prefix);
 }
 
 const char *errno_facility_to_str(enum errno e) {

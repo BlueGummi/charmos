@@ -41,8 +41,8 @@ static void domain_build_zonelist(struct domain_buddy *dom) {
             global.domain_buddies[i].pages_used;
     }
 
-    qsort(dom->zonelist.entries, dom->zonelist.count,
-          sizeof(struct domain_zonelist_entry), compare_zonelist_entries);
+    heapsort(dom->zonelist.entries, dom->zonelist.count,
+             sizeof(struct domain_zonelist_entry), compare_zonelist_entries);
 }
 
 void domain_buddy_track_pages(struct domain_buddy *dom) {

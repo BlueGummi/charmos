@@ -359,6 +359,8 @@ def test_campaign_runner_happy_path(tmp_path):
     assert result.total_boots == 3
     assert result.completed_boots == 3
     assert result.finding_boots == 1
+    assert result.discovery_kind == NC.DiscoveryKind.FINDING
+    assert result.execution_health == NC.ExecutionHealth.HEALTHY
     assert len(result.findings) == 1
     assert result.findings[0].sig == "0xdeadbeef"
 
@@ -413,6 +415,8 @@ def test_campaign_runner_gate_first_failure(tmp_path):
     assert result.ok is False
     # infra failures emit ZERO findings
     assert len(result.findings) == 0
+    assert result.discovery_kind == NC.DiscoveryKind.NONE
+    assert result.execution_health == NC.ExecutionHealth.INFRASTRUCTURE
     assert result.total_boots == 1
     assert result.failed_boots == 1
     assert mock_runner.call_count == 1

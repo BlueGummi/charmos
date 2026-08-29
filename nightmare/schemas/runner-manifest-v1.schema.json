@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://charmos.dev/schemas/nightmare/runner-manifest-v1.schema.json",
+  "title": "CharmOS Nightmare runner manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "manifest_id", "plan_id", "batch_id", "task_id",
+    "attempt", "source", "suite", "build", "campaign", "result"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "manifest_id": { "$ref": "#/$defs/id" },
+    "plan_id": { "$ref": "#/$defs/id" },
+    "batch_id": { "$ref": "#/$defs/id" },
+    "task_id": { "$ref": "#/$defs/id" },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit"],
+      "properties": {
+        "repository": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+        "commit": { "$ref": "#/$defs/commit" }
+      }
+    },
+    "suite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sha256", "resolved"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "resolved": { "type": "object" }
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bundle_id", "sha256", "runner_image"],
+      "properties": {
+        "bundle_id": { "$ref": "#/$defs/id" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "runner_image": {
+          "type": "string",
+          "pattern": "^ghcr\\.io/[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "campaign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "campaign_id", "runner_index", "total_runners", "base_seed",
+        "soft_budget_ms", "hard_budget_ms", "actions_job_budget_ms",
+        "gate_first", "dry_run"
+      ],
+      "properties": {
+        "campaign_id": { "$ref": "#/$defs/id" },
+        "runner_index": { "type": "integer", "minimum": 0 },
+        "total_runners": { "type": "integer", "minimum": 1, "maximum": 256 },
+        "base_seed": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "pattern": "^(?:0x[0-9A-Fa-f]+|[0-9]+)$" }
+          ]
+        },
+        "soft_budget_ms": { "type": "integer", "minimum": 1 },
+        "hard_budget_ms": { "type": "integer", "minimum": 1 },
+        "actions_job_budget_ms": { "type": "integer", "minimum": 1 },
+        "gate_first": { "type": "boolean" },
+        "dry_run": { "type": "boolean" }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "artifact_name"],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "artifact_name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_:-]{0,127}$" },
+    "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

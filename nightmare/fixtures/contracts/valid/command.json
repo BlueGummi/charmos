@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "command_id": "command_contract_smoke",
+  "operation": "validate_batch",
+  "idempotency_key": "fixture-contract-smoke-001",
+  "actor": { "id": "1001", "login": "fixture-operator" },
+  "repository": { "id": "axvonx/charmos", "ref": "main" },
+  "payload": {
+    "definition": {
+      "name": "Contract Smoke",
+      "start_utc": "2026-08-29T03:00:00Z",
+      "window_hours": 1,
+      "runners": 1,
+      "color": "#42c542",
+      "tests": ["contract_smoke"]
+    },
+    "definition_toml": "[batch]\nname = \"Contract Smoke\"\n",
+    "base_snapshot_version": "fleet_v1"
+  }
+}

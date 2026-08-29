@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "result_id": "result_contract_smoke",
+  "manifest_id": "manifest_contract_smoke",
+  "manifest_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "lifecycle": "completed",
+  "discovery": { "kind": "none", "finding_count": 0 },
+  "execution": { "health": "healthy", "code": "completed", "message": "campaign completed" },
+  "started_at": "2026-08-28T22:00:00Z",
+  "ended_at": "2026-08-28T22:00:01Z",
+  "campaign": { "campaign_id": "campaign_contract_smoke", "status": "completed" },
+  "artifacts": {
+    "identity": "identity.json",
+    "manifest": "manifest.json",
+    "campaign_json": "campaign_report.json",
+    "campaign_markdown": "campaign_summary.md"
+  },
+  "replay": {
+    "argv": ["python3", "-m", "charm", "nightmare", "replay", "manifest.json"]
+  }
+}

@@ -333,7 +333,8 @@ enum errno elcm(struct elcm_params *params) {
         return ERR_OK;
     }
 
-    qsort(candidates, n_cands, sizeof(struct elcm_candidate), cmp_wastage_desc);
+    heapsort(candidates, n_cands, sizeof(struct elcm_candidate),
+             cmp_wastage_desc);
 
     size_t max_distance = 0, min_distance = SIZE_MAX;
     for (size_t i = 0; i < n_cands; i++) {
@@ -366,7 +367,7 @@ enum errno elcm(struct elcm_params *params) {
         }
     }
 
-    qsort(candidates, n_cands, sizeof(struct elcm_candidate), cmp_score_asc);
+    heapsort(candidates, n_cands, sizeof(struct elcm_candidate), cmp_score_asc);
 
     fx32_32_t best_score = candidates[n_cands - 1].score_value;
     struct elcm_candidate best = candidates[n_cands - 1];

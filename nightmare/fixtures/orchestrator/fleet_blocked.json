@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "version": "fleet_planner_v1",
+  "evaluatedAt": "2026-08-29T00:00:00Z",
+  "window": { "startsAt": "2026-08-29T00:00:00Z", "endsAt": "2026-08-30T00:00:00Z" },
+  "repository": { "id": "charmos", "owner": "axvonx", "name": "charmos", "ref": "main", "refs": ["main"] },
+  "runners": [
+    { "id": "runner_1", "number": 1, "state": "idle", "label": "Runner 1" },
+    { "id": "runner_2", "number": 2, "state": "idle", "label": "Runner 2" },
+    { "id": "runner_3", "number": 3, "state": "idle", "label": "Runner 3" },
+    { "id": "runner_4", "number": 4, "state": "idle", "label": "Runner 4" }
+  ],
+  "batches": [
+    {
+      "lease": {
+        "runnerIds": ["runner_2"],
+        "startsAt": "2026-08-29T00:30:00Z",
+        "endsAt": "2026-08-29T03:00:00Z"
+      }
+    }
+  ],
+  "partial": false
+}

@@ -11,17 +11,9 @@
 
 void slab_free_queue_init(struct slab_domain *domain, struct slab_free_queue *q,
                           size_t capacity) {
-    q->capacity = capacity;
-    q->slots =
-        kmalloc(sizeof(struct slab_free_slot) * capacity, ALLOC_FLAGS_ZERO);
-    if (!q->slots)
+    if (!mpmc_queue_init(&q->mpmc, capacity)) {
         panic("Could not allocate slab free queue slots!");
-
-    atomic_store(&q->head, 0);
-    atomic_store(&q->tail, 0);
-
-    for (size_t i = 0; i < capacity; i++)
-        atomic_store(&q->slots[i].seq, i);
+    }
 
     q->parent = domain;
     q->count = 0;
@@ -29,66 +21,20 @@ void slab_free_queue_init(struct slab_domain *domain, struct slab_free_queue *q,
 
 bool slab_free_queue_ringbuffer_enqueue(struct slab_free_queue *q,
                                         vaddr_t addr) {
-    uint64_t pos;
-    struct slab_free_slot *slot;
-    uint64_t seq;
-    int64_t diff;
-
-    while (true) {
-        pos = atomic_load_explicit(&q->head, memory_order_relaxed);
-        slot = &q->slots[pos % q->capacity];
-        seq = atomic_load_explicit(&slot->seq, memory_order_acquire);
-        diff = (int64_t) seq - (int64_t) pos;
-
-        if (diff == 0) {
-            if (atomic_compare_exchange_weak_explicit(&q->head, &pos, pos + 1,
-                                                      memory_order_acq_rel,
-                                                      memory_order_relaxed)) {
-
-                slot->addr = addr;
-
-                atomic_store_explicit(&slot->seq, pos + 1,
-                                      memory_order_release);
-
-                SLAB_FREE_QUEUE_INC_COUNT(q);
-                return true;
-            }
-        } else if (diff < 0) {
-            return false;
-        }
+    if (mpmc_queue_enqueue_uintptr(&q->mpmc, addr)) {
+        SLAB_FREE_QUEUE_INC_COUNT(q);
+        return true;
     }
+    return false;
 }
 
 vaddr_t slab_free_queue_ringbuffer_dequeue(struct slab_free_queue *q) {
-    uint64_t pos;
-    struct slab_free_slot *slot;
-    uint64_t seq;
-    int64_t diff;
-
-    while (true) {
-        pos = atomic_load_explicit(&q->tail, memory_order_relaxed);
-        slot = &q->slots[pos % q->capacity];
-        seq = atomic_load_explicit(&slot->seq, memory_order_acquire);
-        diff = (int64_t) seq - (int64_t) (pos + 1);
-
-        if (diff == 0) {
-            if (atomic_compare_exchange_weak_explicit(&q->tail, &pos, pos + 1,
-                                                      memory_order_acq_rel,
-                                                      memory_order_relaxed)) {
-
-                vaddr_t ret = slot->addr;
-                slot->addr = 0;
-
-                atomic_store_explicit(&slot->seq, pos + q->capacity,
-                                      memory_order_release);
-
-                SLAB_FREE_QUEUE_DEC_COUNT(q);
-                return ret;
-            }
-        } else if (diff < 0) {
-            return 0x0;
-        }
+    uintptr_t addr = 0;
+    if (mpmc_queue_dequeue_uintptr(&q->mpmc, &addr)) {
+        SLAB_FREE_QUEUE_DEC_COUNT(q);
+        return (vaddr_t) addr;
     }
+    return 0x0;
 }
 
 bool slab_free_queue_enqueue(struct slab_free_queue *q, vaddr_t addr) {

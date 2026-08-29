@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "command_id": "command_planner_unknown",
+  "operation": "validate_batch",
+  "idempotency_key": "planner-unknown-001",
+  "actor": { "id": "1", "login": "fixture-operator" },
+  "repository": { "id": "axvonx/charmos", "ref": "main" },
+  "payload": {
+    "definition": {
+      "name": "Unknown Suite",
+      "start_utc": "2026-08-29T01:00:00Z",
+      "window_hours": 1,
+      "runners": 2,
+      "color": "#dbbc7f",
+      "tests": ["not_registered"]
+    },
+    "definition_toml": "[batch]\nname = \"Unknown Suite\"\nstart_utc = \"2026-08-29T01:00:00Z\"\nwindow_hours = 1\nrunners = 2\ncolor = \"#dbbc7f\"\ntests = [\"not_registered\"]\n",
+    "base_snapshot_version": "fleet_planner_v1"
+  }
+}

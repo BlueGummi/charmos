@@ -710,7 +710,7 @@ void slab_allocator_init() {
     }
     kassert(sidx == total_input);
 
-    qsort(staging, total_input, sizeof(*staging), slab_class_sort_cmp);
+    heapsort(staging, total_input, sizeof(*staging), slab_class_sort_cmp);
 
     struct slab_size_constant *tmp =
         simple_alloc(slab_global.vas, total_input * sizeof(*tmp));

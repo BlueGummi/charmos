@@ -1,9 +1,9 @@
 /* @title: Topology */
 #pragma once
-#include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <structures/cpu_mask.h>
 #include <types/types.h>
 
 enum topology_level {
@@ -18,24 +18,6 @@ enum topology_level {
     TOPOLOGY_LEVEL_MAX,     /* count */
     TOPOLOGY_LEVEL_COUNT = TOPOLOGY_LEVEL_MAX
 };
-
-struct cpu_mask {
-    bool uses_large;
-    union {
-        _Atomic uint64_t small;
-        _Atomic uint64_t *large;
-    };
-    size_t nbits;
-};
-
-/* Used to overload cpu_mask to carry an error at times */
-#define CPU_MASK_ERR(e)                                                        \
-    (struct cpu_mask) {                                                        \
-        .nbits = 0, .small = e                                                 \
-    }
-#define CPU_MASK_WORD_BITS 64
-#define CPU_MASK_WORDS(nbits)                                                  \
-    (((nbits) + CPU_MASK_WORD_BITS - 1) / CPU_MASK_WORD_BITS)
 
 struct topology_cache_info {
     uint8_t level; /* 1, 2, 3 */
@@ -64,7 +46,7 @@ struct topology_node {
 
     struct cpu_mask cpus;
     struct cpu_mask idle;
-    struct cpu_mask rt_shed_rq_active; /* For RT scheduler */
+    struct cpu_mask rt_sched_rq_active; /* For RT scheduler */
 
     struct core *core; /* Pointer to this node's `core` struct */
 
@@ -79,52 +61,6 @@ struct topology {
     struct topology_node *level[TOPOLOGY_LEVEL_MAX];
     uint16_t count[TOPOLOGY_LEVEL_MAX];
 };
-
-/* TODO: move CPUmask into its own header */
-struct cpu_mask *cpu_mask_create(void);
-void cpu_mask_copy(struct cpu_mask *dst, const struct cpu_mask *src);
-bool cpu_mask_init(struct cpu_mask *m, size_t nbits);
-void cpu_mask_set(struct cpu_mask *m, size_t cpu);
-void cpu_mask_set_all(struct cpu_mask *m);
-void cpu_mask_clear(struct cpu_mask *m, size_t cpu);
-bool cpu_mask_test(const struct cpu_mask *m, size_t cpu);
-void cpu_mask_or(struct cpu_mask *dst, const struct cpu_mask *b);
-bool cpu_mask_empty(const struct cpu_mask *mask);
-void cpu_mask_clear_all(struct cpu_mask *m);
-size_t cpu_mask_popcount(struct cpu_mask *m);
-void cpu_mask_free(struct cpu_mask *m);
-void cpu_mask_deinit(struct cpu_mask *m);
-#define cpu_mask_for_each(iter, mask)                                          \
-    for (iter = 0; iter < (mask).nbits; iter++)                                \
-        if ((mask).uses_large                                                  \
-                ? atomic_load(&(mask).large[iter / CPU_MASK_WORD_BITS]) &      \
-                      (1ULL << (iter % CPU_MASK_WORD_BITS))                    \
-                : atomic_load(&(mask).small) & (1ULL << iter))
-
-/* like cpu_mask_for_each but for clear bits */
-#define cpu_mask_for_each_clear(iter, mask)                                    \
-    for (iter = 0; iter < (mask).nbits; iter++)                                \
-        if ((mask).uses_large                                                  \
-                ? !(atomic_load(&(mask).large[iter / CPU_MASK_WORD_BITS]) &    \
-                    (1ULL << (iter % CPU_MASK_WORD_BITS)))                     \
-                : !(atomic_load(&(mask).small) & (1ULL << iter)))
-
-/* Iterate over all bits, regardless of set status */
-#define cpu_mask_for_all(iter, mask) for (iter = 0; iter < (mask).nbits; iter++)
-
-#define cpu_mask_for_each_in(iter, mask, start, end)                           \
-    for (iter = start; iter < (mask).nbits && iter <= end; iter++)             \
-        if ((mask).uses_large                                                  \
-                ? atomic_load(&(mask).large[iter / CPU_MASK_WORD_BITS]) &      \
-                      (1ULL << (iter % CPU_MASK_WORD_BITS))                    \
-                : atomic_load(&(mask).small) & (1ULL << iter))
-
-#define cpu_mask_for_each_clear_in(iter, mask, start, end)                     \
-    for (iter = start; iter < (mask).nbits && iter <= end; iter++)             \
-        if ((mask).uses_large                                                  \
-                ? !(atomic_load(&(mask).large[iter / CPU_MASK_WORD_BITS]) &    \
-                    (1ULL << (iter % CPU_MASK_WORD_BITS)))                     \
-                : !(atomic_load(&(mask).small) & (1ULL << iter)))
 
 void topology_mark_core_idle(cpu_id_t cpu_id, bool idle);
 struct core *topology_find_idle_core(struct core *local_core,

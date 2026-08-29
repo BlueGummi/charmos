@@ -1,5 +1,8 @@
 name: Nightmare
 
+# P8 fallback evidence. This static matrix is frozen while the manifest-driven
+# workflow is built beside it. Add new scenarios to suite TOML, not here.
+
 on:
   schedule:
     # NOTE: GitHub cron routinely runs late at peak usage times
@@ -17,6 +20,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: nightmare
@@ -57,10 +61,10 @@ jobs:
             compiler: clang
 
     container:
-      image: ghcr.io/axvonx/charmos-x86-env:latest
+      image: ghcr.io/axvonx/charmos-x86-env@sha256:2f77dec0b8a479bdfb8f9237ceb0c10320e418c5725592033cd9451e63fced87
       credentials:
         username: ${{ github.actor }}
-        password: ${{ secrets.GHCR_KEY }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     defaults:
       run:

@@ -402,15 +402,15 @@ out:
 }
 
 static inline bool check_active(struct rt_scheduler_mapping *rtm) {
-    return cpu_mask_test(&rtm->active, smp_core_id());
+    return cpu_mask_test_atomic(&rtm->active, smp_core_id());
 }
 
 static inline void mark_active(struct rt_scheduler_mapping *rtm) {
-    cpu_mask_set(&rtm->active, smp_core_id());
+    cpu_mask_set_atomic(&rtm->active, smp_core_id());
 }
 
 static inline void unmark_active(struct rt_scheduler_mapping *rtm) {
-    cpu_mask_clear(&rtm->active, smp_core_id());
+    cpu_mask_clear_atomic(&rtm->active, smp_core_id());
 }
 
 static inline void clear_switch_and_post(struct rt_scheduler_percpu *rts,

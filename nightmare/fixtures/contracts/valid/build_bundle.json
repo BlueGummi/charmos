@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "bundle_id": "build_contract_smoke",
+  "request_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "source": {
+    "repository": "axvonx/charmos",
+    "commit": "56bc1dfd71f48a879a3570ba514b1df3934e15c1"
+  },
+  "runner_image": "ghcr.io/axvonx/charmos-x86-env@sha256:2f77dec0b8a479bdfb8f9237ceb0c10320e418c5725592033cd9451e63fced87",
+  "configuration": {
+    "compiler": "gcc",
+    "type": "Debug",
+    "cmake_definitions": ["TEST_NIGHTMARE_SMOKE=ON"],
+    "smp": { "sockets": 1, "cores": 2, "threads": 1 },
+    "memory_mib": 512
+  },
+  "provenance": { "mode": "compiled_clean" },
+  "artifacts": [
+    {
+      "name": "kernel",
+      "path": "boot/charmos",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ],
+  "created_at": "2026-08-28T22:00:00Z"
+}

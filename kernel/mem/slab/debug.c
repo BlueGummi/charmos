@@ -77,16 +77,16 @@ void slab_debug_assert_not_already_free(vaddr_t v, int32_t class) {
         }
 
         struct slab_free_queue *fq = &sd->free_queue;
-        if (fq->slots) {
+        if (fq->mpmc.slots) {
             uint64_t tail =
-                atomic_load_explicit(&fq->tail, memory_order_acquire);
+                atomic_load_explicit(&fq->mpmc.tail, memory_order_acquire);
             uint64_t head =
-                atomic_load_explicit(&fq->head, memory_order_acquire);
+                atomic_load_explicit(&fq->mpmc.head, memory_order_acquire);
             for (uint64_t pos = tail; pos != head; pos++)
-                if (fq->slots[pos % fq->capacity].addr == v)
+                if (fq->mpmc.slots[pos % fq->mpmc.capacity].data == v)
                     panic(
                         "DOUBLE FREE: %p already in d=%zu free_queue slot=%zu",
-                        (void *) v, d, (size_t) (pos % fq->capacity));
+                        (void *) v, d, (size_t) (pos % fq->mpmc.capacity));
         }
     }
 }
@@ -195,17 +195,17 @@ slab_dump_corruption(void *obj, struct slab_magazine *popped_mag,
         }
 
         struct slab_free_queue *fq = &sd->free_queue;
-        if (fq->slots) {
+        if (fq->mpmc.slots) {
             uint64_t tail =
-                atomic_load_explicit(&fq->tail, memory_order_acquire);
+                atomic_load_explicit(&fq->mpmc.tail, memory_order_acquire);
             uint64_t head =
-                atomic_load_explicit(&fq->head, memory_order_acquire);
-            for (size_t i = 0; i < fq->capacity; i++) {
-                if (fq->slots[i].addr != v)
+                atomic_load_explicit(&fq->mpmc.head, memory_order_acquire);
+            for (size_t i = 0; i < fq->mpmc.capacity; i++) {
+                if (fq->mpmc.slots[i].data != v)
                     continue;
                 bool occupied = false;
                 for (uint64_t pos = tail; pos != head; pos++) {
-                    if (pos % fq->capacity == i) {
+                    if (pos % fq->mpmc.capacity == i) {
                         occupied = true;
                         break;
                     }

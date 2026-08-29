@@ -290,14 +290,7 @@ enum errno cmdline_extract_cpu_mask(struct cmdline_value *val,
         return ERR_INVAL;
 
     if (val->type == CMDLINE_TYPE_CPU_MASK && val->data) {
-        struct cpu_mask *src = (struct cpu_mask *) val->data;
-        if (src->uses_large) {
-            if (!cpu_mask_init(out, src->nbits))
-                return ERR_NO_MEM;
-            cpu_mask_copy(out, src);
-        } else {
-            *out = *src;
-        }
+        *out = *(struct cpu_mask *) val->data;
         return ERR_OK;
     }
 

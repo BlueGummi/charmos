@@ -20,6 +20,7 @@ class Scenario:
     required: tuple[str, ...]
     forbidden: tuple[str, ...] = ()
     canary: bool = False
+    repetitions: int = 1
 
 
 BASE = (
@@ -45,6 +46,7 @@ SCENARIOS = (
         0,
         NORMAL_REQUIRED,
         NO_FINDING,
+        repetitions=3,
     ),
     Scenario(
         "migration_wake",
@@ -90,6 +92,7 @@ SCENARIOS = (
         0,
         NORMAL_REQUIRED,
         NO_FINDING,
+        repetitions=3,
     ),
     Scenario(
         "canary_1",
@@ -251,19 +254,28 @@ def main() -> int:
     canary_sigs: list[str] = []
     with tempfile.TemporaryDirectory(prefix="charmos-locks-") as tmp:
         cmdline_dir = Path(tmp)
-        for index, scenario in enumerate(SCENARIOS):
-            errors, canary_sig = run_scenario(
-                scenario, build_dir, cmdline_dir, index == 0
-            )
-            if canary_sig is not None:
-                canary_sigs.append(canary_sig)
-            if errors:
-                failed = True
-                print(f"FAIL {scenario.name}")
-                for error in errors:
-                    print(f"  {error}")
-            else:
-                print(f"PASS {scenario.name}")
+        invocation = 0
+        for scenario in SCENARIOS:
+            for repetition in range(scenario.repetitions):
+                errors, canary_sig = run_scenario(
+                    scenario, build_dir, cmdline_dir, invocation == 0
+                )
+                invocation += 1
+                if canary_sig is not None:
+                    canary_sigs.append(canary_sig)
+                suffix = (
+                    f"[{repetition + 1}/{scenario.repetitions}]"
+                    if scenario.repetitions > 1
+                    else ""
+                )
+                label = f"{scenario.name}{suffix}"
+                if errors:
+                    failed = True
+                    print(f"FAIL {label}")
+                    for error in errors:
+                        print(f"  {error}")
+                else:
+                    print(f"PASS {label}")
 
     if len(canary_sigs) != 3 or len(set(canary_sigs)) != 1:
         failed = True

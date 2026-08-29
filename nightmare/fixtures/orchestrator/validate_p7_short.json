@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "command_id": "command_planner_p7_short",
+  "operation": "validate_batch",
+  "idempotency_key": "planner-p7-short-001",
+  "actor": { "id": "1", "login": "fixture-operator" },
+  "repository": { "id": "axvonx/charmos", "ref": "main" },
+  "payload": {
+    "definition": {
+      "name": "P7 Short Bundle Proof",
+      "start_utc": "2026-08-29T01:00:00Z",
+      "window_hours": 0.02,
+      "runners": 1,
+      "color": "#e69875",
+      "tests": ["p7_m3_short"]
+    },
+    "definition_toml": "[batch]\nname = \"P7 Short Bundle Proof\"\nstart_utc = \"2026-08-29T01:00:00Z\"\nwindow_hours = 0.02\nrunners = 1\ncolor = \"#e69875\"\ntests = [\"p7_m3_short\"]\n",
+    "base_snapshot_version": "fleet_planner_v1"
+  }
+}

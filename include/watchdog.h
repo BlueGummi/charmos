@@ -3,6 +3,7 @@
 #include <linker/symbol_table.h>
 #include <math/ewma.h>
 #include <math/fixed.h>
+#include <structures/cpu_mask.h>
 #include <structures/list.h>
 #include <structures/locked_list.h>
 #include <sync/seqlock.h>

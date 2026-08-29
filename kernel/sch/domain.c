@@ -7,27 +7,6 @@
 #include <sch/domain.h>
 #include <string.h>
 
-static void sched_mask_clone(struct cpu_mask *dst, const struct cpu_mask *src) {
-    cpu_mask_init(dst, src->nbits);
-
-    if (src->uses_large) {
-        size_t words = CPU_MASK_WORDS(src->nbits);
-        memcpy(dst->large, src->large, words * sizeof(uint64_t));
-    } else {
-        dst->small = src->small;
-    }
-}
-
-static bool cpu_mask_intersects(const struct cpu_mask *a,
-                                const struct cpu_mask *b) {
-    size_t nbits = a->nbits;
-    for (size_t i = 0; i < nbits; ++i)
-        if (cpu_mask_test(a, i) && cpu_mask_test(b, i))
-            return true;
-
-    return false;
-}
-
 static struct scheduler_domain *
 build_domain_for_level(enum topology_level lvl) {
     struct topology *t = &global.topology;
@@ -46,8 +25,8 @@ build_domain_for_level(enum topology_level lvl) {
         struct topology_node *node = &nodes[i];
 
         /* clone cpu masks into group */
-        sched_mask_clone(&d->groups[i].cpus, &node->cpus);
-        sched_mask_clone(&d->groups[i].idle, &node->idle);
+        cpu_mask_copy(&d->groups[i].cpus, &node->cpus);
+        cpu_mask_copy(&d->groups[i].idle, &node->idle);
 
         d->groups[i].topo_index = i;
 
@@ -102,12 +81,12 @@ void cpu_mask_print(const struct cpu_mask *m, char *buf, size_t buflen) {
     pos += snprintf(buf + pos, buflen - pos, "{");
 
     size_t last = 0;
-    for (size_t cpu = 0; cpu < m->nbits; cpu++)
+    for (size_t cpu = 0; cpu < global.core_count; cpu++)
         if (cpu_mask_test(m, cpu))
             if (last < cpu)
                 last = cpu;
 
-    for (size_t cpu = 0; cpu < m->nbits; cpu++) {
+    for (size_t cpu = 0; cpu < global.core_count; cpu++) {
         if (cpu_mask_test(m, cpu)) {
             if (cpu == last)
                 pos += snprintf(buf + pos, buflen - pos, "%zu", cpu);
@@ -173,7 +152,7 @@ struct scheduler_group *scheduler_domain_find_sibling_group(struct core *c,
 }
 
 int32_t scheduler_group_find_idle_cpu(struct scheduler_group *g) {
-    for (size_t cpu = 0; cpu < g->cpus.nbits; cpu++)
+    for (size_t cpu = 0; cpu < global.core_count; cpu++)
         if (cpu_mask_test(&g->cpus, cpu) && cpu_mask_test(&g->idle, cpu))
             return cpu;
 
@@ -195,13 +174,13 @@ void scheduler_domain_mark_self_idle(bool idle) {
 
         struct scheduler_group *grp = &d->groups[g];
 
-        kassert(cpu < grp->idle.nbits);
+        kassert(cpu < global.core_count);
         kassert(cpu_mask_test(&grp->cpus, cpu));
 
         if (idle)
-            cpu_mask_set(&grp->idle, cpu);
+            cpu_mask_set_atomic(&grp->idle, cpu);
         else
-            cpu_mask_clear(&grp->idle, cpu);
+            cpu_mask_clear_atomic(&grp->idle, cpu);
     }
 }
 

@@ -56,7 +56,7 @@ void numa_construct_relative_distances(struct numa_node *node) {
      * we iterate through the temporary array and find its
      * position. this position is then set as the distance's rel_dist */
     memcpy(tmp, node->distance, node->distances_cnt);
-    qsort(tmp, node->distances_cnt, sizeof(uint8_t), cmp);
+    heapsort(tmp, node->distances_cnt, sizeof(uint8_t), cmp);
 
     for (size_t i = 0; i < node->distances_cnt; i++) {
         uint8_t idx = idx_of_val(tmp, node->distances_cnt, node->distance[i]);

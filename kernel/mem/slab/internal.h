@@ -17,6 +17,7 @@
 #include <stdatomic.h>
 #include <stdint.h>
 #include <structures/list.h>
+#include <structures/mpmc_queue.h>
 #include <structures/mpsc_list.h>
 #include <structures/rbt.h>
 #include <sync/spinlock.h>
@@ -265,19 +266,9 @@ struct slab_percpu_cache {
                                                 * stack allocations */
 };
 
-struct slab_free_slot {
-    _Atomic uint64_t seq;
-    vaddr_t addr;
-};
-
 struct slab_free_queue {
-    _Atomic uint64_t head;
-    _Atomic uint64_t tail;
-    size_t capacity;
-    struct slab_free_slot *slots;
-
+    struct mpmc_queue mpmc;
     atomic_size_t count;
-
     struct slab_domain *parent;
 };
 #define SLAB_FREE_QUEUE_CAPACITY 256

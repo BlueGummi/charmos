@@ -84,7 +84,6 @@ TEST_DECLARE_UNIT(parse, cpu_mask_ranges) {
     struct cpu_mask m1 = {0};
 
     TEST_ASSERT(parse_is_cpu_mask("3", &m1, n_cpus));
-    TEST_ASSERT_EQ(m1.nbits, n_cpus);
     TEST_ASSERT(cpu_mask_test(&m1, 3));
     TEST_ASSERT(!cpu_mask_test(&m1, 0));
     TEST_ASSERT_EQ(cpu_mask_popcount(&m1), 1);
@@ -92,7 +91,6 @@ TEST_DECLARE_UNIT(parse, cpu_mask_ranges) {
 
     struct cpu_mask m2 = {0};
     TEST_ASSERT(parse_is_cpu_mask("0-3,7,9-11", &m2, n_cpus));
-    TEST_ASSERT_EQ(m2.nbits, n_cpus);
     TEST_ASSERT(cpu_mask_test(&m2, 0) && cpu_mask_test(&m2, 1) &&
                 cpu_mask_test(&m2, 2) && cpu_mask_test(&m2, 3));
     TEST_ASSERT(cpu_mask_test(&m2, 7));

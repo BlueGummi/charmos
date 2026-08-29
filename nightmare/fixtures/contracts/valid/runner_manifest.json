@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "manifest_id": "manifest_contract_smoke",
+  "plan_id": "plan_contract_smoke",
+  "batch_id": "batch_contract_smoke",
+  "task_id": "task_contract_smoke",
+  "attempt": 1,
+  "source": {
+    "repository": "axvonx/charmos",
+    "commit": "56bc1dfd71f48a879a3570ba514b1df3934e15c1"
+  },
+  "suite": {
+    "id": "contract_smoke",
+    "sha256": "280ffff2fa38406ec0eb8a2b1f442d49bff6aade16d5f1f761f0cea92cee5698",
+    "resolved": {
+      "suite": {
+        "name": "contract_smoke",
+        "runners": 1,
+        "budget_hours": 0.01,
+        "overlap_ratio": 0.0
+      },
+      "build": {
+        "compiler": "gcc",
+        "type": "Debug",
+        "cmake_definitions": [
+          "TEST_ALL=OFF",
+          "TEST_NIGHTMARE_ALL=OFF",
+          "TEST_NIGHTMARE_SMOKE=ON"
+        ],
+        "smp": { "sockets": 1, "cores": 2, "threads": 1 },
+        "memory_mib": 512
+      },
+      "tasks": [
+        {
+          "name": "harness_smoke",
+          "mode": "horizontal",
+          "weight": 1.0,
+          "priority": 1.0,
+          "boot": {
+            "duration_ms": 1000,
+            "drain_grace_ms": 2000,
+            "timeout_ms": 0,
+            "gate_first": false,
+            "max_boots": 1,
+            "min_interval_ms": 0,
+            "stat_interval_ms": 100,
+            "stall_threshold_ms": 3000,
+            "on_stall": "report"
+          },
+          "nightmare": {
+            "intensity": 0.5,
+            "seed_mode": "seedless",
+            "perturb": [],
+            "perturb_opts": {},
+            "opts": {}
+          }
+        }
+      ]
+    }
+  },
+  "build": {
+    "bundle_id": "build_contract_smoke",
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "runner_image": "ghcr.io/axvonx/charmos-x86-env@sha256:2f77dec0b8a479bdfb8f9237ceb0c10320e418c5725592033cd9451e63fced87"
+  },
+  "campaign": {
+    "campaign_id": "campaign_contract_smoke",
+    "runner_index": 0,
+    "total_runners": 1,
+    "base_seed": null,
+    "soft_budget_ms": 30000,
+    "hard_budget_ms": 35000,
+    "actions_job_budget_ms": 45000,
+    "gate_first": false,
+    "dry_run": true
+  },
+  "result": {
+    "schema_version": 1,
+    "artifact_name": "nightmare-result-contract-smoke"
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://charmos.dev/schemas/nightmare/accepted-plan-v1.schema.json",
+  "title": "CharmOS Nightmare accepted plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "id", "version", "baseSnapshotVersion",
+    "expiresAt", "batch"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "$ref": "#/$defs/id" },
+    "version": { "$ref": "#/$defs/id" },
+    "baseSnapshotVersion": { "$ref": "#/$defs/id" },
+    "evaluatedAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit"],
+      "properties": {
+        "repository": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+      }
+    },
+    "runnerImage": {
+      "type": "string",
+      "pattern": "^ghcr\\.io/[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@sha256:[0-9a-f]{64}$"
+    },
+    "definition": { "$ref": "#/$defs/definition" },
+    "suites": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/suite" }
+    },
+    "buildGroups": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/buildGroup" }
+    },
+    "manifests": {
+      "type": "array",
+      "maxItems": 64,
+      "items": { "$ref": "#/$defs/manifestRequest" }
+    },
+    "batch": {
+      "$ref": "fleet-snapshot-v1.schema.json#/$defs/batch"
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_:-]{0,127}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ownership", "toml", "sha256", "normalized"],
+      "properties": {
+        "ownership": { "enum": ["ad-hoc", "repository"] },
+        "toml": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "normalized": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "startUtc", "windowHours", "runners", "color", "tests"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "startUtc": { "type": "string", "format": "date-time" },
+            "windowHours": { "type": "number", "exclusiveMinimum": 0 },
+            "runners": { "type": "integer", "minimum": 1 },
+            "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+            "tests": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/id" } }
+          }
+        }
+      }
+    },
+    "suite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sha256", "resolved"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "resolved": { "type": "object" }
+      }
+    },
+    "buildGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "requestSha256", "configuration", "taskIds"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "requestSha256": { "$ref": "#/$defs/sha256" },
+        "configuration": { "type": "object" },
+        "taskIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+      }
+    },
+    "manifestRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifestId", "taskId", "suiteId", "buildGroupId", "runnerId",
+        "runnerIndex", "totalRunners", "campaignId", "baseSeed",
+        "softBudgetMs", "hardBudgetMs", "actionsJobBudgetMs"
+      ],
+      "properties": {
+        "manifestId": { "$ref": "#/$defs/id" },
+        "taskId": { "$ref": "#/$defs/id" },
+        "suiteId": { "$ref": "#/$defs/id" },
+        "buildGroupId": { "$ref": "#/$defs/id" },
+        "runnerId": { "$ref": "#/$defs/id" },
+        "runnerIndex": { "type": "integer", "minimum": 0 },
+        "totalRunners": { "type": "integer", "minimum": 1 },
+        "campaignId": { "$ref": "#/$defs/id" },
+        "baseSeed": { "type": ["string", "null"] },
+        "softBudgetMs": { "type": "integer", "minimum": 1 },
+        "hardBudgetMs": { "type": "integer", "minimum": 1 },
+        "actionsJobBudgetMs": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

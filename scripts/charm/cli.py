@@ -200,6 +200,22 @@ def cmd_protocol(_args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_workflow_policy(_args: argparse.Namespace) -> int:
+    from . import workflow_policy as WP
+
+    violations = WP.check()
+    for violation in violations:
+        print(violation, file=sys.stderr)
+    if violations:
+        print(
+            f"error: {len(violations)} workflow policy violation(s)",
+            file=sys.stderr,
+        )
+        return 1
+    print(f"ok: {len(WP.PROTECTED_WORKFLOWS)} protected workflows")
+    return 0
+
+
 def cmd_repeat(args: argparse.Namespace) -> int:
     from . import local as L
 
@@ -413,6 +429,389 @@ def cmd_nm_run(args: argparse.Namespace) -> int:
     return 0 if result.ok else 1
 
 
+def _execute_runner_manifest(
+    manifest_path: Path,
+    *,
+    build_dir: Path,
+    out_dir: Path,
+    bundle_path: Path | None = None,
+    allow_development_bundle: bool = False,
+) -> int:
+    import json
+
+    from .nightmare import executor as NE
+
+    execution = NE.execute_manifest(
+        manifest_path,
+        build_dir=build_dir,
+        out_dir=out_dir,
+        bundle_path=bundle_path,
+        allow_development_bundle=allow_development_bundle,
+    )
+    print(json.dumps(execution.document, indent=2))
+    print(
+        f"runner result: {execution.result_path} "
+        f"({execution.document['execution']['health']})",
+        file=sys.stderr,
+    )
+    return execution.exit_code
+
+
+def cmd_nm_run_manifest(args: argparse.Namespace) -> int:
+    manifest_path = Path(args.manifest)
+    out_dir = Path(args.out_dir or Path("runner-results") / manifest_path.stem)
+    return _execute_runner_manifest(
+        manifest_path,
+        build_dir=Path(args.build_dir),
+        out_dir=out_dir,
+        bundle_path=Path(args.bundle) if args.bundle else None,
+        allow_development_bundle=args.allow_development_bundle,
+    )
+
+
+def cmd_nm_replay(args: argparse.Namespace) -> int:
+    from .nightmare import contracts as NCT
+    from .nightmare import executor as NE
+
+    try:
+        manifest_path = NE.resolve_replay_manifest(Path(args.source))
+    except NCT.ContractError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+
+    out_dir = Path(args.out_dir or Path("replay-results") / manifest_path.stem)
+    return _execute_runner_manifest(
+        manifest_path,
+        build_dir=Path(args.build_dir),
+        out_dir=out_dir,
+        bundle_path=Path(args.bundle) if args.bundle else None,
+        allow_development_bundle=args.allow_development_bundle,
+    )
+
+
+def _read_json_object(path: Path) -> dict[str, Any]:
+    import json
+
+    document = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(document, dict):
+        raise ValueError(f"{path}: expected a JSON object")
+    return document
+
+
+def cmd_nm_plan(args: argparse.Namespace) -> int:
+    import json
+    from datetime import UTC, datetime
+
+    from .orchestrator import domain as OD
+    from .orchestrator import planner as OP
+
+    try:
+        command = _read_json_object(Path(args.command))
+        snapshot = _read_json_object(Path(args.snapshot))
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+    source = OD.Source(command.get("repository", {}).get("id", ""), args.source_commit)
+    result = OP.Planner(Path(args.suite_dir)).plan(
+        command,
+        snapshot,
+        source=source,
+        runner_image=args.runner_image,
+        now=datetime.now(UTC),
+        ownership=args.ownership,
+    )
+    document = OP.render_result(result)
+    text = json.dumps(document, indent=2) + "\n"
+    if args.out:
+        Path(args.out).write_text(text, encoding="utf-8")
+    else:
+        sys.stdout.write(text)
+    if isinstance(result, OD.Accepted):
+        print(
+            f"accepted {result.plan.id}: {len(result.plan.tasks)} manifest(s), "
+            f"{len(result.plan.build_groups)} build group(s)",
+            file=sys.stderr,
+        )
+        return 0
+    if isinstance(result, OD.Stale):
+        print(f"stale: current snapshot is {result.current_version}", file=sys.stderr)
+    else:
+        for diagnostic in result.diagnostics:
+            print(f"{diagnostic['field']}: {diagnostic['message']}", file=sys.stderr)
+    return 2
+
+
+def cmd_nm_build_bundle(args: argparse.Namespace) -> int:
+    import json
+
+    from .nightmare import build_bundle as NB
+
+    try:
+        plan = _read_json_object(Path(args.plan))
+        request = NB.request_from_plan(plan, args.group)
+        bundle = NB.create_bundle(
+            request,
+            build_dir=Path(args.build_dir),
+            out_dir=Path(args.out_dir),
+            compile_kernel=not args.prebuilt,
+        )
+    except (OSError, ValueError, json.JSONDecodeError, NB.BundleError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+    receipt = NB.receipt(bundle)
+    if args.receipt:
+        Path(args.receipt).write_text(
+            json.dumps(receipt, indent=2) + "\n", encoding="utf-8"
+        )
+    print(json.dumps(receipt, indent=2))
+    return 0
+
+
+def cmd_nm_materialize(args: argparse.Namespace) -> int:
+    from .orchestrator import materialize as OM
+
+    try:
+        plan = OM.load_plan(Path(args.plan))
+        receipts = tuple(OM.load_receipt(Path(path)) for path in args.receipts)
+        bundle = OM.materialize(
+            plan, receipts, attempt=args.attempt, dry_run=args.dry_run
+        )
+        index = OM.write_bundle(bundle, Path(args.out_dir))
+    except OM.MaterializationError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+    print(index)
+    return 0
+
+
+def cmd_nm_repack_bundle(args: argparse.Namespace) -> int:
+    import json
+
+    from .nightmare import build_bundle as NB
+
+    try:
+        bundle = NB.verify_bundle(Path(args.bundle))
+        measurement = NB.repack(
+            bundle,
+            cmdline=Path(args.cmdline),
+            out_dir=Path(args.out_dir),
+        )
+        transport = NB.measure_transport(bundle, Path(args.out_dir) / "measurement")
+    except NB.BundleError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                **transport,
+                "repack_ms": round(measurement.repack_ms, 3),
+                "iso_size_bytes": measurement.iso_size_bytes,
+                "iso": str(measurement.iso_path),
+            },
+            indent=2,
+        )
+    )
+    return 0
+
+
+def cmd_nm_repository_command(args: argparse.Namespace) -> int:
+    import json
+    from datetime import UTC, datetime
+
+    from .orchestrator import workflow as OW
+
+    try:
+        at = (
+            datetime.fromisoformat(args.at.replace("Z", "+00:00"))
+            if args.at
+            else datetime.now(UTC)
+        )
+        if at.tzinfo is None:
+            raise ValueError("--at must include a UTC offset")
+        command, snapshot = OW.repository_command(
+            suite_id=args.suite,
+            suite_dir=Path(args.suite_dir),
+            repository=args.repository,
+            ref=args.ref,
+            now=at,
+            runner_capacity=args.runner_capacity,
+        )
+        Path(args.command_out).write_text(
+            json.dumps(command, indent=2) + "\n", encoding="utf-8"
+        )
+        Path(args.snapshot_out).write_text(
+            json.dumps(snapshot, indent=2) + "\n", encoding="utf-8"
+        )
+    except (OSError, ValueError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+    print(f"{command['command_id']} {snapshot['version']}")
+    return 0
+
+
+def cmd_nm_matrix(args: argparse.Namespace) -> int:
+    import json
+
+    from .orchestrator import workflow as OW
+
+    try:
+        document = _read_json_object(Path(args.document))
+        rows = (
+            OW.build_matrix(document, args.limit)
+            if args.kind == "build"
+            else OW.runner_matrix(document, args.limit)
+        )
+    except (OSError, ValueError, json.JSONDecodeError, KeyError, TypeError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+    print(json.dumps({"include": rows}, separators=(",", ":")))
+    return 0
+
+
+def cmd_nm_aggregate(args: argparse.Namespace) -> int:
+    import json
+
+    from .nightmare import aggregate as NA
+
+    try:
+        accepted_plan = _read_json_object(Path(args.plan))
+        report = NA.aggregate(
+            accepted_plan,
+            results_dir=Path(args.results_dir),
+            plan_bundle_path=Path(args.plan_bundle) if args.plan_bundle else None,
+            builds_dir=Path(args.builds_dir) if args.builds_dir else None,
+        )
+        NA.write(
+            report,
+            json_path=Path(args.json),
+            markdown_path=Path(args.markdown),
+        )
+        markdown = NA.render_markdown(report)
+        if args.summary:
+            with Path(args.summary).open("a", encoding="utf-8") as handle:
+                handle.write(markdown)
+        sys.stdout.write(markdown)
+    except (OSError, ValueError, json.JSONDecodeError, NA.AggregateError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+    return 0 if report.ok else 1
+
+
+def cmd_nm_recover(args: argparse.Namespace) -> int:
+    import json
+    import os
+
+    from .orchestrator import reconciler as OR
+    from .orchestrator.coordinator import Coordinator
+    from .orchestrator.store import PostgresStore
+    from .orchestrator.transport import GitHubActionsTransport
+
+    dsn = os.environ.get(args.dsn_env, "")
+    token = os.environ.get(args.token_env, "")
+    if not dsn or not token:
+        print(
+            f"error: {args.dsn_env} and {args.token_env} must be set",
+            file=sys.stderr,
+        )
+        return 2
+    try:
+        store = PostgresStore.from_dsn(dsn)
+        store.migrate()
+        transport = GitHubActionsTransport(
+            repository=args.repository,
+            workflow=args.workflow,
+            ref=args.ref,
+            token=token,
+        )
+        coordinator = Coordinator(store, transport)
+        coordinator.deliver()
+        result = coordinator.apply(OR.Tick(idle_grace_ms=args.idle_grace_ms))
+    except (RuntimeError, ValueError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+    print(json.dumps(result.result, indent=2))
+    return 0
+
+
+def cmd_nm_prepare_execution(args: argparse.Namespace) -> int:
+    import json
+
+    from .orchestrator.http import create_operator_from_env
+    from .orchestrator.runtime import ExecutionRuntime, RuntimeError
+
+    try:
+        prepared = ExecutionRuntime(create_operator_from_env()).prepare(
+            wake_id=args.wake_id,
+            command_ref=args.command_ref,
+            owner=args.owner,
+            lease_ms=args.lease_ms,
+        )
+        outputs = {
+            Path(args.command_out): prepared.command,
+            Path(args.snapshot_out): prepared.snapshot,
+            Path(args.plan_out): prepared.plan,
+            Path(args.attempt_out): {
+                "attempt_id": prepared.attempt_id,
+                "owner": args.owner,
+            },
+        }
+        for path, document in outputs.items():
+            path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    except (OSError, ValueError, RuntimeError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+    print(prepared.attempt_id)
+    return 0
+
+
+def cmd_nm_finish_execution(args: argparse.Namespace) -> int:
+    import json
+
+    from .nightmare import contracts
+    from .orchestrator.http import create_operator_from_env
+    from .orchestrator.runtime import ExecutionRuntime, RuntimeError
+
+    try:
+        attempt = _read_json_object(Path(args.attempt))
+        report = _read_json_object(Path(args.report))
+        digests: dict[str, str] = {}
+        for path in sorted(Path(args.results_dir).rglob("runner_result.json")):
+            result = _read_json_object(path)
+            manifest_id = result.get("manifest_id")
+            if isinstance(manifest_id, str):
+                digest = contracts.sha256_file(path)
+                prior = digests.setdefault(manifest_id, digest)
+                if prior != digest:
+                    raise ValueError(f"multiple result digests exist for {manifest_id}")
+        result = ExecutionRuntime(create_operator_from_env()).finish(
+            attempt_id=str(attempt["attempt_id"]),
+            report=report,
+            result_digests=digests,
+            owner=str(attempt["owner"]),
+        )
+    except (KeyError, OSError, ValueError, RuntimeError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+def cmd_nm_serve(args: argparse.Namespace) -> int:
+    from wsgiref.simple_server import make_server
+
+    from .orchestrator.http import create_application_from_env
+
+    try:
+        application = create_application_from_env()
+    except (RuntimeError, ValueError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+    print(f"serving Nightmare orchestrator on http://{args.host}:{args.port}")
+    with make_server(args.host, args.port, application) as server:
+        server.serve_forever()
+    return 0
+
+
 def add_report_args(sp: argparse.ArgumentParser) -> None:
     sp.add_argument("--summary", help="write markdown here (append if exists)")
     sp.add_argument("--json", help="write merged JSON report here")
@@ -489,6 +888,12 @@ def build_parser() -> argparse.ArgumentParser:
         "protocol", help="print the wire names include/ndjson.h declares"
     )
     n.set_defaults(fn=cmd_protocol)
+
+    wp = sub.add_parser(
+        "workflow-policy",
+        help="enforce read-only Git and immutable images in execution workflows",
+    )
+    wp.set_defaults(fn=cmd_workflow_policy)
 
     dev = groups.add_parser("dev", help="loops against a local build")
     devsub = dev.add_subparsers(dest="command", required=True)
@@ -606,6 +1011,180 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_report_args(rn)
     rn.set_defaults(fn=cmd_nm_run)
+
+    pl = nmsub.add_parser(
+        "plan", help="validate and place one batch against a fleet snapshot"
+    )
+    pl.add_argument("command", help="normalized validate_batch command JSON")
+    pl.add_argument("snapshot", help="authoritative fleet snapshot JSON")
+    pl.add_argument("--source-commit", required=True, help="exact 40-hex source commit")
+    pl.add_argument("--runner-image", required=True, help="immutable GHCR image digest")
+    pl.add_argument("--suite-dir", default="nightmare/suites")
+    pl.add_argument("--ownership", choices=("ad-hoc", "repository"), default="ad-hoc")
+    pl.add_argument("--out", default=None, help="accepted/rejected result JSON")
+    pl.set_defaults(fn=cmd_nm_plan)
+
+    bb = nmsub.add_parser(
+        "build-bundle", help="compile one accepted build group into a bundle"
+    )
+    bb.add_argument("plan", help="accepted plan JSON")
+    bb.add_argument("--group", required=True, help="accepted build group ID")
+    bb.add_argument("--build-dir", required=True)
+    bb.add_argument("--out-dir", required=True)
+    bb.add_argument(
+        "--receipt", default=None, help="write the verified receipt JSON here"
+    )
+    bb.add_argument(
+        "--prebuilt",
+        action="store_true",
+        help="package an existing build directory without compiling (development only)",
+    )
+    bb.set_defaults(fn=cmd_nm_build_bundle)
+
+    mt = nmsub.add_parser(
+        "materialize", help="accepted plan plus build receipts to runner manifests"
+    )
+    mt.add_argument("plan", help="accepted plan JSON")
+    mt.add_argument("receipts", nargs="+", help="verified bundle.json receipts")
+    mt.add_argument("--out-dir", required=True)
+    mt.add_argument("--attempt", type=int, default=1)
+    mt.add_argument("--dry-run", action="store_true")
+    mt.set_defaults(fn=cmd_nm_materialize)
+
+    rb = nmsub.add_parser(
+        "repack-bundle", help="repack a verified bundle with one kernel command line"
+    )
+    rb.add_argument("bundle", help="build bundle directory")
+    rb.add_argument("cmdline", help="kernel command-line file")
+    rb.add_argument("--out-dir", required=True)
+    rb.set_defaults(fn=cmd_nm_repack_bundle)
+
+    rc = nmsub.add_parser(
+        "repository-command",
+        help="create trusted planner inputs for one committed repository suite",
+    )
+    rc.add_argument("--suite", required=True)
+    rc.add_argument("--repository", required=True)
+    rc.add_argument("--ref", default="main")
+    rc.add_argument("--suite-dir", default="nightmare/suites")
+    rc.add_argument("--runner-capacity", type=int, default=12)
+    rc.add_argument("--at", default=None, help="injected ISO-8601 clock")
+    rc.add_argument("--command-out", required=True)
+    rc.add_argument("--snapshot-out", required=True)
+    rc.set_defaults(fn=cmd_nm_repository_command)
+
+    mx = nmsub.add_parser("matrix", help="emit a bounded trusted Actions matrix")
+    mx.add_argument("kind", choices=("build", "runner"))
+    mx.add_argument("document")
+    mx.add_argument("--limit", type=int, default=64)
+    mx.set_defaults(fn=cmd_nm_matrix)
+
+    ag = nmsub.add_parser(
+        "aggregate", help="verify completeness, identity, discovery, and infrastructure"
+    )
+    ag.add_argument("plan", help="accepted plan result JSON")
+    ag.add_argument("results_dir")
+    ag.add_argument("--plan-bundle", default=None)
+    ag.add_argument("--builds-dir", default=None)
+    ag.add_argument("--json", required=True)
+    ag.add_argument("--markdown", required=True)
+    ag.add_argument("--summary", default=None)
+    ag.set_defaults(fn=cmd_nm_aggregate)
+
+    rv = nmsub.add_parser(
+        "recover", help="repair expired coordinator leases and undelivered wakes"
+    )
+    rv.add_argument("--repository", required=True)
+    rv.add_argument("--workflow", default="nightmare-orchestrator.yml")
+    rv.add_argument("--ref", default="main")
+    rv.add_argument("--dsn-env", default="NIGHTMARE_DATABASE_DSN")
+    rv.add_argument("--token-env", default="GITHUB_TOKEN")
+    rv.add_argument("--idle-grace-ms", type=int, default=30_000)
+    rv.set_defaults(fn=cmd_nm_recover)
+
+    pe = nmsub.add_parser(
+        "prepare-execution",
+        help="acquire one durable wake and export its accepted execution plan",
+    )
+    pe.add_argument("--wake-id", required=True)
+    pe.add_argument("--command-ref", required=True)
+    pe.add_argument("--owner", required=True)
+    pe.add_argument("--lease-ms", type=int, default=30 * 60 * 1000)
+    pe.add_argument("--command-out", required=True)
+    pe.add_argument("--snapshot-out", required=True)
+    pe.add_argument("--plan-out", required=True)
+    pe.add_argument("--attempt-out", required=True)
+    pe.set_defaults(fn=cmd_nm_prepare_execution)
+
+    fe = nmsub.add_parser(
+        "finish-execution",
+        help="retain aggregate lifecycle and release one durable coordinator",
+    )
+    fe.add_argument("--attempt", required=True)
+    fe.add_argument("--report", required=True)
+    fe.add_argument("--results-dir", required=True)
+    fe.set_defaults(fn=cmd_nm_finish_execution)
+
+    sv = nmsub.add_parser(
+        "serve", help="serve the authenticated six-operation HTTP interface"
+    )
+    sv.add_argument("--host", default="127.0.0.1")
+    sv.add_argument("--port", type=int, default=8080)
+    sv.set_defaults(fn=cmd_nm_serve)
+
+    rm = nmsub.add_parser(
+        "run-manifest",
+        help="execute one accepted runner manifest and always emit a result",
+    )
+    rm.add_argument("manifest", help="accepted runner manifest JSON")
+    rm.add_argument(
+        "--bundle",
+        default=None,
+        help="verified compile-once build bundle (required for real boots)",
+    )
+    rm.add_argument(
+        "--allow-development-bundle",
+        action="store_true",
+        help="allow a prebuilt development bundle for local proof only",
+    )
+    rm.add_argument(
+        "--build-dir",
+        default="build",
+        help="charmOS build directory (default: build)",
+    )
+    rm.add_argument(
+        "--out-dir",
+        default=None,
+        help="identity, copied manifest, boot evidence, and result directory",
+    )
+    rm.set_defaults(fn=cmd_nm_run_manifest)
+
+    rp = nmsub.add_parser(
+        "replay",
+        help="re-execute a manifest, prior runner result, or result directory",
+    )
+    rp.add_argument("source", help="manifest, runner_result.json, or result directory")
+    rp.add_argument(
+        "--bundle",
+        default=None,
+        help="verified compile-once build bundle (required for real boots)",
+    )
+    rp.add_argument(
+        "--allow-development-bundle",
+        action="store_true",
+        help="allow a prebuilt development bundle for local proof only",
+    )
+    rp.add_argument(
+        "--build-dir",
+        default="build",
+        help="charmOS build directory (default: build)",
+    )
+    rp.add_argument(
+        "--out-dir",
+        default=None,
+        help="new result directory (default: replay-results/<manifest>)",
+    )
+    rp.set_defaults(fn=cmd_nm_replay)
 
     return ap
 
