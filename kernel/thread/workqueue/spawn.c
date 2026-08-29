@@ -155,9 +155,8 @@ bool workqueue_try_spawn_worker(struct workqueue *queue) {
 }
 
 struct thread *worker_create(struct cpu_mask mask, nice_t niceness) {
-    uint64_t stack_size = PAGE_SIZE;
     struct thread *ret = thread_create_custom_stack(
-        "workqueue_worker", worker_main, NULL, stack_size);
+        "workqueue_worker", worker_main, NULL, THREAD_STACK_SIZE);
     if (!ret)
         return NULL;
 

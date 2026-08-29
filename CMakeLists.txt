@@ -23,6 +23,8 @@ add_subdirectory(kernel)
 target_include_directories(kernel PRIVATE include)
 
 set(CHARMOS_COMMIT "" CACHE STRING "Commit identity for the kernel")
+set(CHARMOS_SOURCE_ROOT "${CMAKE_SOURCE_DIR}" CACHE PATH
+    "Local source root used in terminal hyperlinks emitted by kernel tests")
 if (CHARMOS_COMMIT STREQUAL "")
     execute_process(
         COMMAND git rev-parse --short=12 HEAD
@@ -34,7 +36,10 @@ endif ()
 if (CHARMOS_COMMIT STREQUAL "")
     set(CHARMOS_COMMIT "unknown")
 endif ()
-target_compile_definitions(kernel PRIVATE CHARMOS_COMMIT="${CHARMOS_COMMIT}")
+target_compile_definitions(
+    kernel
+    PRIVATE CHARMOS_COMMIT="${CHARMOS_COMMIT}"
+            CHARMOS_SOURCE_ROOT="${CHARMOS_SOURCE_ROOT}")
 
 include(emulation)
 

@@ -97,6 +97,8 @@ struct test_group {
 
 struct test {
     const char *name;
+    const char *fname;
+    uint32_t line;
 
     struct test_verdict (*func)(struct test_context *ctx);
 
@@ -208,27 +210,16 @@ struct test_globals {
 #define TEST_GROUP_DEFINE(name) extern struct test_group __test_group_##name
 
 #define TEST(grp, id) __test_##grp##_##id
-#define TEST_DECLARE(grp, id, ...)                                             \
-    static struct test_verdict __test_fn_##grp##_##id(                         \
-        struct test_context *ctx);                                             \
-    extern struct test_group __test_group_##grp;                               \
-    extern struct test __test_##grp##_##id;                                    \
-    LINKER_SECTION_OBJECT(struct test, tests)                                  \
-    __test_##grp##_##id = {.name = #id,                                        \
-                           .func = __test_fn_##grp##_##id,                     \
-                           .run_times = 1,                                     \
-                           .group = TEST_GROUP(grp),                           \
-                           .enabled = TEST_STATE_SENTINEL,                     \
-                           .inject_count = 0,                                  \
-                           .msg_cap = 0,                                       \
-                           .seed = 0,                                          \
-                           .print_logs = false,                                \
-                           .tier = TEST_TIER_UNIT,                             \
-                           .intensity = TEST_INTENSITY_SENTINEL,               \
-                           .intensity_desc = TEST_INTENSITY_DESC_SENTINEL,     \
-                           ##__VA_ARGS__};                                     \
-                                                                               \
-    static struct test_verdict __test_fn_##grp##_##id(                         \
+#define TEST_DECLARE(grp, id, ...)                                                                                                                                                                                                                                                                                                                                    \
+    static struct test_verdict __test_fn_##grp##_##id(                                                                                                                                                                                                                                                                                                                \
+        struct test_context *ctx);                                                                                                                                                                                                                                                                                                                                    \
+    extern struct test_group __test_group_##grp;                                                                                                                                                                                                                                                                                                                      \
+    extern struct test __test_##grp##_##id;                                                                                                                                                                                                                                                                                                                           \
+    LINKER_SECTION_OBJECT(struct test, tests)                                                                                                                                                                                                                                                                                                                         \
+    __test_##grp##_##id = {                                                                                                                                                                                                                                                                                                                                           \
+        .name = #id, .fname = __RELFILE__, .line = __LINE__, .func = __test_fn_##grp##_##id, .run_times = 1, .group = TEST_GROUP(grp), .enabled = TEST_STATE_SENTINEL, .inject_count = 0, .msg_cap = 0, .seed = 0, .print_logs = false, .tier = TEST_TIER_UNIT, .intensity = TEST_INTENSITY_SENTINEL, .intensity_desc = TEST_INTENSITY_DESC_SENTINEL, ##__VA_ARGS__}; \
+                                                                                                                                                                                                                                                                                                                                                                      \
+    static struct test_verdict __test_fn_##grp##_##id(                                                                                                                                                                                                                                                                                                                \
         struct test_context *ctx __unused)
 
 #define TEST_DECLARE_SMOKE(grp, id, ...)                                       \
@@ -241,17 +232,9 @@ struct test_globals {
 #define TEST_GROUP_DECLARE(n, ...)                                             \
     extern struct test_group __test_group_##n;                                 \
     LINKER_SECTION_OBJECT(struct test_group, test_groups)                      \
-    __test_group_##n = {.name = #n,                                            \
-                        .incremental = false,                                  \
-                        .exit_on_fail = false,                                 \
-                        .fname = __RELFILE__,                                  \
-                        .enabled = TEST_STATE_SENTINEL,                        \
-                        .smoke_enabled = TEST_STATE_SENTINEL,                  \
-                        .unit_enabled = TEST_STATE_SENTINEL,                   \
-                        .integration_enabled = TEST_STATE_SENTINEL,            \
-                        .default_intensity = TEST_INTENSITY_SENTINEL,          \
-                        .intensity_desc = TEST_INTENSITY_DESC_SENTINEL,        \
-                        ##__VA_ARGS__}
+    __test_group_##n =                                                         \
+        {                                                                      \
+            .name = #n, .incremental = false, .exit_on_fail = false, .fname = __RELFILE__, .enabled = TEST_STATE_SENTINEL, .smoke_enabled = TEST_STATE_SENTINEL, .unit_enabled = TEST_STATE_SENTINEL, .integration_enabled = TEST_STATE_SENTINEL, .default_intensity = TEST_INTENSITY_SENTINEL, .intensity_desc = TEST_INTENSITY_DESC_SENTINEL, ##__VA_ARGS__}
 
 /* 1D piecewise-log */
 #define TEST_INTENSITY_LOG(min, def, max, unit_str)                            \
@@ -261,7 +244,7 @@ struct test_globals {
                                              .def_val = (def),                 \
                                              .max_val = (max),                 \
                                              .unit = (unit_str),               \
-    }
+                                         }
 
 /* Linear scaling */
 #define TEST_INTENSITY_LINEAR(min, def, max, unit_str)                         \
@@ -271,7 +254,7 @@ struct test_globals {
                                              .def_val = (def),                 \
                                              .max_val = (max),                 \
                                              .unit = (unit_str),               \
-    }
+                                         }
 
 /* Core-scaled thread counts (threads = base * core_count) */
 #define TEST_INTENSITY_CORES(min_per_core, def_per_core, max_per_core,         \
@@ -282,7 +265,7 @@ struct test_globals {
                                              .def_val = (def_per_core),        \
                                              .max_val = (max_per_core),        \
                                              .unit = (unit_str),               \
-    }
+                                         }
 
 /* set scale with min and max */
 #define TEST_INTENSITY_CUSTOM_PRINT(scale, min, def, max, unit_str, print_fn)  \
@@ -293,7 +276,7 @@ struct test_globals {
                                              .max_val = (max),                 \
                                              .unit = (unit_str),               \
                                              .custom_print = (print_fn),       \
-    }
+                                         }
 
 /* Entirely custom */
 #define TEST_INTENSITY_CUSTOM(scale_fn, print_fn)                              \
@@ -301,7 +284,7 @@ struct test_globals {
                                              .curve = SCALE_CUSTOM,            \
                                              .custom_scale = (scale_fn),       \
                                              .custom_print = (print_fn),       \
-    }
+                                         }
 
 #define TEST_SUCCESS ((struct test_verdict) {.result = TEST_RESULT_OK})
 #define TEST_FAIL(m)                                                           \

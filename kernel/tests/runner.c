@@ -119,8 +119,8 @@ LOG_HANDLE_DECLARE(test_ndjson, .flags = LOG_DEFAULT);
     test_ndjson_log(LOG_TRACE, fmt, ##__VA_ARGS__)
 
 #define test_harness_log(lvl, fmt, ...)                                        \
-    log(LOG_SITE(test_harness), LOG_HANDLE(test_harness), lvl, fmt,            \
-        ##__VA_ARGS__)
+    log(LOG_SITE(test_harness), LOG_HANDLE(test_harness), lvl,                 \
+        fmt, ##__VA_ARGS__)
 
 #define test_harness_err(fmt, ...)                                             \
     test_harness_log(LOG_ERROR, fmt, ##__VA_ARGS__)
@@ -132,6 +132,12 @@ LOG_HANDLE_DECLARE(test_ndjson, .flags = LOG_DEFAULT);
     test_harness_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
 #define test_harness_trace(fmt, ...)                                           \
     test_harness_log(LOG_TRACE, fmt, ##__VA_ARGS__)
+
+#define OSC "\033]"
+#define OSC_ST "\033\\"
+#define OSC8_FILE_LINK(path, line)                                             \
+    OSC "8;;file://" CHARMOS_SOURCE_ROOT "/" path "#" line OSC_ST
+#define OSC8_LINK_END OSC "8;;" OSC_ST
 
 LINKER_SECTION_DEFINE(struct test, tests);
 LINKER_SECTION_DEFINE(struct test_group, test_groups);
@@ -445,6 +451,7 @@ static struct {
     size_t done;
     size_t failed;
     size_t skipped;
+    time_ms_t started_ms;
 } test_progress = {0};
 
 static size_t tests_count_planned(void) {
@@ -465,7 +472,8 @@ static size_t tests_count_planned(void) {
 }
 
 static void test_progress_paint(const struct test_group *tg,
-                                enum test_tier tier, const char *test_name) {
+                                enum test_tier tier, const char *test_name,
+                                const char *intensity) {
     char tail[96] = "";
 
     if (!test_progress.total)
@@ -477,11 +485,13 @@ static void test_progress_paint(const struct test_group *tg,
                  "%zu skipped" ANSI_RESET,
                  test_progress.failed, test_progress.skipped);
 
-    status_bar_progress(test_progress.done, test_progress.total,
-                        ANSI_BLUE "%s" ANSI_RESET " (%s" ANSI_RESET
-                                  ") " ANSI_BOLD "%s" ANSI_RESET "%s",
-                        tg->name, test_tier_to_str_color(tier), test_name,
-                        tail);
+    status_bar_progress_timed(
+        test_progress.done, test_progress.total, test_progress.started_ms,
+        ANSI_BLUE "%s" ANSI_RESET " (%s" ANSI_RESET ") " ANSI_BOLD
+                  "%s" ANSI_RESET "%s%s%s%s",
+        tg->name, test_tier_to_str_color(tier), test_name,
+        intensity ? " [" ANSI_CYAN : "", intensity ? intensity : "",
+        intensity ? ANSI_RESET "]" : "", tail);
 }
 
 static void test_handle_print(const struct log_site *site,
@@ -490,6 +500,12 @@ static void test_handle_print(const struct log_site *site,
     (void) site;
     print("[%s%zu.%03zu" ANSI_RESET "] ", log_level_color(rec->level),
           MS_TO_SECONDS(rec->timestamp), rec->timestamp % 1000);
+}
+
+static void test_print_link(const struct test *t) {
+    test_harness_info(ANSI_GREEN ANSI_BOLD ANSI_UNDERLINE OSC8_FILE_LINK(
+                          "%s", "%u") "%s" OSC8_LINK_END ANSI_RESET,
+                      t->fname, t->line, t->name);
 }
 
 static void test_group_run(struct test_group *tg) {
@@ -620,15 +636,14 @@ static void test_group_run(struct test_group *tg) {
                 sizeof(struct test_verdict) * t->run_times, ALLOC_FLAGS_ZERO);
             struct test_verdict singular_verdict = {0};
 
-            test_harness_info(ANSI_BOLD ANSI_BLUE "%s" ANSI_RESET, t->name);
+            char intst_str[512] = {0};
             if (t->flags & TEST_FLAG_HONORS_INTENSITY) {
-                char intst_str[512] = {0};
                 scaled_param_format(&t->intensity_desc, tctx.intensity,
                                     tctx.intensity_val, intst_str,
                                     sizeof(intst_str));
-                printf(" [" ANSI_CYAN "%s" ANSI_RESET "]", intst_str);
             }
-            test_progress_paint(tg, i, t->name);
+            test_progress_paint(tg, i, t->name,
+                                intst_str[0] ? intst_str : NULL);
             test_ndjson_info("test start: %s:%s (%s)", tg->name, t->name,
                              test_tier_plain(i));
 
@@ -662,6 +677,10 @@ static void test_group_run(struct test_group *tg) {
 
             size_t non_skipped = run_times - result_times[TEST_RESULT_SKIPPED];
 
+            test_print_link(t);
+            if (intst_str[0])
+                printf(" [" ANSI_CYAN "%s" ANSI_RESET "]", intst_str);
+
             if (t->run_times > 1) {
                 char *color = non_skipped < run_times ? ANSI_RED : ANSI_BLUE;
                 printf(" ran (%s%zu" ANSI_RESET "/" ANSI_BLUE "%zu" ANSI_RESET
@@ -675,9 +694,11 @@ static void test_group_run(struct test_group *tg) {
                 }
 
                 if (result_times[TEST_RESULT_FAILED]) {
-                    printf(ANSI_RED " %zu failed" ANSI_RESET "\n",
+                    printf(ANSI_RED " %zu failed" ANSI_RESET,
                            result_times[TEST_RESULT_FAILED]);
                 }
+
+                printf("\n");
 
                 for (size_t i = 0; i < run_times; i++) {
                     struct test_verdict v = verdicts[i];
@@ -770,7 +791,7 @@ static void test_group_run(struct test_group *tg) {
             else if (result_times[TEST_RESULT_SKIPPED] == run_times)
                 test_progress.skipped++;
 
-            test_progress_paint(tg, i, t->name);
+            test_progress_paint(tg, i, t->name, NULL);
 
             for (int j = 0; j < TEST_RESULT_MAX; j++)
                 result_totals.totals[i][j] += result_times[j];
@@ -982,8 +1003,10 @@ void tests_run(void) {
 
     if (!test_global.no_progress) {
         test_progress.total = tests_count_planned();
+        test_progress.started_ms = time_get_ms();
         status_bar_open();
-        status_bar_progress(0, test_progress.total, "starting");
+        status_bar_progress_timed(0, test_progress.total,
+                                  test_progress.started_ms, "starting");
     }
 
     for (struct test_group *tg = __skernel_test_groups;
