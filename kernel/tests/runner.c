@@ -119,8 +119,8 @@ LOG_HANDLE_DECLARE(test_ndjson, .flags = LOG_DEFAULT);
     test_ndjson_log(LOG_TRACE, fmt, ##__VA_ARGS__)
 
 #define test_harness_log(lvl, fmt, ...)                                        \
-    log(LOG_SITE(test_harness), LOG_HANDLE(test_harness), lvl,                 \
-        fmt, ##__VA_ARGS__)
+    log(LOG_SITE(test_harness), LOG_HANDLE(test_harness), lvl, fmt,            \
+        ##__VA_ARGS__)
 
 #define test_harness_err(fmt, ...)                                             \
     test_harness_log(LOG_ERROR, fmt, ##__VA_ARGS__)
@@ -137,6 +137,8 @@ LOG_HANDLE_DECLARE(test_ndjson, .flags = LOG_DEFAULT);
 #define OSC_ST "\033\\"
 #define OSC8_FILE_LINK(path, line)                                             \
     OSC "8;;file://" CHARMOS_SOURCE_ROOT "/" path "#" line OSC_ST
+#define OSC8_FILE_LINK_NOLINE(path)                                            \
+    OSC "8;;file://" CHARMOS_SOURCE_ROOT "/" path OSC_ST
 #define OSC8_LINK_END OSC "8;;" OSC_ST
 
 LINKER_SECTION_DEFINE(struct test, tests);
@@ -452,6 +454,7 @@ static struct {
     size_t failed;
     size_t skipped;
     time_ms_t started_ms;
+    time_ms_t test_started_ms;
 } test_progress = {0};
 
 static size_t tests_count_planned(void) {
@@ -486,7 +489,8 @@ static void test_progress_paint(const struct test_group *tg,
                  test_progress.failed, test_progress.skipped);
 
     status_bar_progress_timed(
-        test_progress.done, test_progress.total, test_progress.started_ms,
+        test_progress.done, test_progress.total, test_progress.test_started_ms,
+        test_progress.started_ms,
         ANSI_BLUE "%s" ANSI_RESET " (%s" ANSI_RESET ") " ANSI_BOLD
                   "%s" ANSI_RESET "%s%s%s%s",
         tg->name, test_tier_to_str_color(tier), test_name,
@@ -503,7 +507,7 @@ static void test_handle_print(const struct log_site *site,
 }
 
 static void test_print_link(const struct test *t) {
-    test_harness_info(ANSI_GREEN ANSI_BOLD ANSI_UNDERLINE OSC8_FILE_LINK(
+    test_harness_info(ANSI_GREEN ANSI_BOLD OSC8_FILE_LINK(
                           "%s", "%u") "%s" OSC8_LINK_END ANSI_RESET,
                       t->fname, t->line, t->name);
 }
@@ -540,11 +544,11 @@ static void test_group_run(struct test_group *tg) {
     for (int i = 0; i < TEST_TIER_MAX; i++)
         total_tests += tg->num_tests_enabled[i];
 
-    test_harness_info(ANSI_GREEN ANSI_BOLD
-                      "Running" ANSI_RESET " group " ANSI_BLUE ANSI_BOLD
-                      "%s" ANSI_RESET " - %zu tests in (" ANSI_BOLD
-                      "%s" ANSI_RESET ")\n",
-                      tg->name, total_tests, tg->fname);
+    test_harness_info(
+        ANSI_GREEN ANSI_BOLD
+        "Running" ANSI_RESET " group " ANSI_BLUE ANSI_BOLD OSC8_FILE_LINK(
+            "%s", "%u") "%s" OSC8_LINK_END ANSI_RESET " - %zu tests\n",
+        tg->fname, tg->line, tg->name, total_tests);
 
     test_ndjson_info("group start: %s (%zu tests)", tg->name, total_tests);
 
@@ -642,12 +646,13 @@ static void test_group_run(struct test_group *tg) {
                                     tctx.intensity_val, intst_str,
                                     sizeof(intst_str));
             }
+            time_ms_t start_ms = time_get_ms();
+            test_progress.test_started_ms = start_ms;
             test_progress_paint(tg, i, t->name,
                                 intst_str[0] ? intst_str : NULL);
             test_ndjson_info("test start: %s:%s (%s)", tg->name, t->name,
                              test_tier_plain(i));
 
-            time_ms_t start_ms = time_get_ms();
             for (; run_times < t->run_times; run_times++) {
                 struct test_verdict verdict = t->func(&tctx);
                 singular_verdict = verdict;
@@ -791,6 +796,7 @@ static void test_group_run(struct test_group *tg) {
             else if (result_times[TEST_RESULT_SKIPPED] == run_times)
                 test_progress.skipped++;
 
+            test_progress.test_started_ms = 0;
             test_progress_paint(tg, i, t->name, NULL);
 
             for (int j = 0; j < TEST_RESULT_MAX; j++)
@@ -1005,7 +1011,7 @@ void tests_run(void) {
         test_progress.total = tests_count_planned();
         test_progress.started_ms = time_get_ms();
         status_bar_open();
-        status_bar_progress_timed(0, test_progress.total,
+        status_bar_progress_timed(0, test_progress.total, 0,
                                   test_progress.started_ms, "starting");
     }
 

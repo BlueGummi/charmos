@@ -20,8 +20,9 @@ __printf_like(1, 2) void status_bar_set(const char *fmt, ...);
 __printf_like(3, 4) void status_bar_progress(size_t done, size_t total,
                                              const char *detail_fmt, ...);
 
-__printf_like(4, 5) void status_bar_progress_timed(size_t done, size_t total,
-                                                   time_ms_t started_ms,
+__printf_like(5, 6) void status_bar_progress_timed(size_t done, size_t total,
+                                                   time_ms_t test_started_ms,
+                                                   time_ms_t total_started_ms,
                                                    const char *detail_fmt, ...);
 
 /* Hand the whole screen back: drop the scroll region, forget the bar */

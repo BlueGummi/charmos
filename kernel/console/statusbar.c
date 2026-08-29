@@ -11,6 +11,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <sync/raw_spinlock.h>
 #include <time/time.h>
 #include <time/timer.h>
 
@@ -19,12 +20,11 @@
 
 #define BAR_ESC(s) serial_write((s), sizeof(s) - 1)
 
-static bool bar_open;
-
 struct bar_progress {
     size_t done;
     size_t total;
-    time_ms_t started_ms;
+    time_ms_t test_started_ms;
+    time_ms_t total_started_ms;
     bool timed;
     bool active;
     char detail[REPORT_LINE_MAX];
@@ -32,6 +32,8 @@ struct bar_progress {
     char progress_storage[REPORT_LINE_MAX];
 };
 
+static struct raw_spinlock bar_lock = RAW_SPINLOCK_INIT;
+static bool bar_open;
 static struct bar_progress bar_progress;
 
 static void bar_timer_fn(struct timer *timer);
@@ -42,11 +44,19 @@ static void bar_timer_arm(void) {
 }
 
 void status_bar_open(void) {
-    if (!term_available() || bar_open || term_in_panic())
+    if (!term_available() || term_in_panic())
         return;
 
     if (term_size().rows < 3)
         return;
+
+    bool irqs_were_enabled = raw_spin_lock_irq_disable(&bar_lock);
+    if (bar_open) {
+        raw_spin_unlock_irq_restore(&bar_lock, irqs_were_enabled);
+        return;
+    }
+    bar_open = true;
+    raw_spin_unlock_irq_restore(&bar_lock, irqs_were_enabled);
 
     enum irql irql = printf_lock();
 
@@ -59,7 +69,6 @@ void status_bar_open(void) {
     if (n > 0)
         serial_write(buf, (size_t) n);
 
-    bar_open = true;
     printf_unlock(irql);
 
     timer_init(&bar_timer, bar_timer_fn, NULL);
@@ -67,17 +76,21 @@ void status_bar_open(void) {
 }
 
 void status_bar_close(void) {
-    if (!term_available() || !bar_open)
+    if (!term_available())
         return;
 
-    enum irql irql = printf_lock();
+    bool irqs_were_enabled = raw_spin_lock_irq_disable(&bar_lock);
+    if (!bar_open) {
+        raw_spin_unlock_irq_restore(&bar_lock, irqs_were_enabled);
+        return;
+    }
     bar_open = false;
     bar_progress.active = false;
-    printf_unlock(irql);
+    raw_spin_unlock_irq_restore(&bar_lock, irqs_were_enabled);
 
     timer_shutdown_sync(&bar_timer);
 
-    irql = printf_lock();
+    enum irql irql = printf_lock();
 
     char buf[64];
     int n =
@@ -114,7 +127,7 @@ static void bar_end(const struct report_line *metadata,
 void status_bar_set(const char *fmt, ...) {
     va_list ap;
 
-    if (!term_available() || !bar_open || term_in_panic())
+    if (!term_available() || term_in_panic())
         return;
 
     REPORT_LINE(l, term_size().cols);
@@ -124,10 +137,34 @@ void status_bar_set(const char *fmt, ...) {
     va_end(ap);
 
     enum irql irql = printf_lock();
-    bar_begin();
-    REPORT_LINE(empty, term_size().cols);
-    bar_end(&empty, &l);
+    bool irqs_were_enabled = raw_spin_lock_irq_disable(&bar_lock);
+    bool open = bar_open;
+    raw_spin_unlock_irq_restore(&bar_lock, irqs_were_enabled);
+    if (open) {
+        bar_begin();
+        REPORT_LINE(empty, term_size().cols);
+        bar_end(&empty, &l);
+    }
     printf_unlock(irql);
+}
+
+static void bar_format_duration(time_ms_t elapsed, char *buf, size_t cap) {
+    uint64_t seconds = MS_TO_SECONDS(elapsed);
+    uint64_t minutes = seconds / 60;
+    uint64_t hours = minutes / 60;
+    minutes %= 60;
+    seconds %= 60;
+
+    if (hours) {
+        snprintf(buf, (int) cap, "%lluh %llum %llus",
+                 (unsigned long long) hours, (unsigned long long) minutes,
+                 (unsigned long long) seconds);
+    } else if (minutes) {
+        snprintf(buf, (int) cap, "%llum %llus", (unsigned long long) minutes,
+                 (unsigned long long) seconds);
+    } else {
+        snprintf(buf, (int) cap, "%llus", (unsigned long long) seconds);
+    }
 }
 
 static void bar_progress_render(struct bar_progress *progress) {
@@ -181,16 +218,23 @@ static void bar_progress_render(struct bar_progress *progress) {
     report_line_puts(&metadata, progress->detail);
 
     if (progress->timed) {
-        time_ms_t elapsed = time_get_ms() - progress->started_ms;
-        uint64_t elapsed_s = MS_TO_SECONDS(elapsed);
-        uint64_t hours = elapsed_s / 3600;
-        uint64_t minutes = (elapsed_s / 60) % 60;
-        uint64_t seconds = elapsed_s % 60;
-        snprintf(formatted, (int) sizeof(formatted),
-                 "  " ANSI_GRAY "%02llu:%02llu:%02llu" ANSI_RESET,
-                 (unsigned long long) hours, (unsigned long long) minutes,
-                 (unsigned long long) seconds);
+        time_ms_t now = time_get_ms();
+        time_ms_t total_elapsed = now - progress->total_started_ms;
+
+        report_line_puts(&metadata, "  " ANSI_GRAY);
+        if (progress->test_started_ms) {
+            time_ms_t test_elapsed = now - progress->test_started_ms;
+            bar_format_duration(test_elapsed, formatted, sizeof(formatted));
+            report_line_puts(&metadata, formatted);
+            report_line_puts(&metadata, " (total elapsed: ");
+        } else {
+            report_line_puts(&metadata, "total elapsed: ");
+        }
+        bar_format_duration(total_elapsed, formatted, sizeof(formatted));
         report_line_puts(&metadata, formatted);
+        if (progress->test_started_ms)
+            report_line_puts(&metadata, ")");
+        report_line_puts(&metadata, ANSI_RESET);
     }
 
     bar_begin();
@@ -198,19 +242,28 @@ static void bar_progress_render(struct bar_progress *progress) {
 }
 
 static void status_bar_progress_v(size_t done, size_t total,
-                                  time_ms_t started_ms, const char *detail_fmt,
-                                  va_list ap) {
-    if (!term_available() || !bar_open || term_in_panic())
+                                  time_ms_t test_started_ms,
+                                  time_ms_t total_started_ms,
+                                  const char *detail_fmt, va_list ap) {
+    if (!term_available() || term_in_panic())
         return;
 
     enum irql irql = printf_lock();
+    bool irqs_were_enabled = raw_spin_lock_irq_disable(&bar_lock);
+    if (!bar_open) {
+        raw_spin_unlock_irq_restore(&bar_lock, irqs_were_enabled);
+        printf_unlock(irql);
+        return;
+    }
     bar_progress.done = done;
     bar_progress.total = total;
-    bar_progress.started_ms = started_ms;
-    bar_progress.timed = started_ms != 0;
+    bar_progress.test_started_ms = test_started_ms;
+    bar_progress.total_started_ms = total_started_ms;
+    bar_progress.timed = total_started_ms != 0;
     bar_progress.active = true;
     vsnprintf(bar_progress.detail, (int) sizeof(bar_progress.detail),
               detail_fmt, ap);
+    raw_spin_unlock_irq_restore(&bar_lock, irqs_were_enabled);
     bar_progress_render(&bar_progress);
     printf_unlock(irql);
 }
@@ -220,16 +273,19 @@ void status_bar_progress(size_t done, size_t total, const char *detail_fmt,
     va_list ap;
 
     va_start(ap, detail_fmt);
-    status_bar_progress_v(done, total, 0, detail_fmt, ap);
+    status_bar_progress_v(done, total, 0, 0, detail_fmt, ap);
     va_end(ap);
 }
 
-void status_bar_progress_timed(size_t done, size_t total, time_ms_t started_ms,
+void status_bar_progress_timed(size_t done, size_t total,
+                               time_ms_t test_started_ms,
+                               time_ms_t total_started_ms,
                                const char *detail_fmt, ...) {
     va_list ap;
 
     va_start(ap, detail_fmt);
-    status_bar_progress_v(done, total, started_ms, detail_fmt, ap);
+    status_bar_progress_v(done, total, test_started_ms, total_started_ms,
+                          detail_fmt, ap);
     va_end(ap);
 }
 
@@ -240,10 +296,14 @@ static void bar_timer_fn(struct timer *timer) {
         return;
 
     enum irql irql = printf_lock();
+    bool irqs_were_enabled = raw_spin_lock_irq_disable(&bar_lock);
     bool repaint = bar_open && bar_progress.active && bar_progress.timed;
-    if (repaint)
+    bool open = bar_open;
+    raw_spin_unlock_irq_restore(&bar_lock, irqs_were_enabled);
+    if (repaint) {
         bar_progress_render(&bar_progress);
-    if (bar_open)
+    }
+    if (open)
         bar_timer_arm();
     printf_unlock(irql);
 }
@@ -252,8 +312,10 @@ void status_bar_reset(void) {
     if (!term_available())
         return;
 
+    bool irqs_were_enabled = raw_spin_lock_irq_disable(&bar_lock);
     bar_open = false;
     bar_progress.active = false;
+    raw_spin_unlock_irq_restore(&bar_lock, irqs_were_enabled);
 
     char buf[64];
     int n = snprintf(buf, (int) sizeof(buf), "\033[r\033[?25h\033[%u;1H\r\n",
