@@ -1,0 +1,414 @@
+name: Nightmare orchestrator
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      protocol_version:
+        description: Doorbell protocol version
+        required: false
+        default: '1'
+      wake_id:
+        description: Durable wake identity
+        required: false
+        default: manual
+      reason:
+        description: commands_available, reconcile, recovery, or manual
+        required: false
+        default: manual
+      command_ref:
+        description: Durable command reference; blank uses repository compatibility mode
+        required: false
+        default: ''
+      suite:
+        description: Committed suite for compatibility mode
+        required: false
+        default: overnight_locks
+      source_sha:
+        description: Exact repository commit; blank uses the triggering commit
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  packages: read
+  id-token: write
+
+concurrency:
+  group: nightmare-orchestrator-${{ inputs.wake_id || github.run_id }}
+  cancel-in-progress: false
+
+env:
+  PYTHONPATH: scripts
+  RUNNER_IMAGE: ghcr.io/axvonx/charmos-x86-env@sha256:2f77dec0b8a479bdfb8f9237ceb0c10320e418c5725592033cd9451e63fced87
+  SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+  SUITE_ID: ${{ inputs.suite || 'overnight_locks' }}
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      accepted: ${{ steps.result.outputs.accepted }}
+      build_matrix: ${{ steps.result.outputs.build_matrix }}
+      source_sha: ${{ steps.result.outputs.source_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Require the narrow doorbell protocol
+        env:
+          PROTOCOL_VERSION: ${{ inputs.protocol_version || '1' }}
+          REASON: ${{ inputs.reason || 'manual' }}
+        run: |
+          test "$PROTOCOL_VERSION" = 1
+          case "$REASON" in
+            commands_available|reconcile|recovery|manual) ;;
+            *) exit 2 ;;
+          esac
+
+      - uses: actions/setup-python@v5
+        if: inputs.command_ref != ''
+        with:
+          python-version: '3.11'
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: inputs.command_ref != ''
+        with:
+          role-to-assume: ${{ vars.NIGHTMARE_AWS_ROLE }}
+          aws-region: ${{ vars.NIGHTMARE_AWS_REGION }}
+
+      - name: Generate short-lived PostgreSQL credential
+        if: inputs.command_ref != ''
+        env:
+          DATABASE_HOST: ${{ vars.NIGHTMARE_DATABASE_HOST }}
+          DATABASE_PORT: ${{ vars.NIGHTMARE_DATABASE_PORT }}
+          DATABASE_USER: ${{ vars.NIGHTMARE_DATABASE_USER }}
+        run: |
+          token=$(aws rds generate-db-auth-token \
+            --hostname "$DATABASE_HOST" \
+            --port "$DATABASE_PORT" \
+            --username "$DATABASE_USER")
+          echo "::add-mask::$token"
+          echo "PGPASSWORD=$token" >> "$GITHUB_ENV"
+
+      - name: Install production store adapter
+        if: inputs.command_ref != ''
+        run: python3 -m pip install '.[orchestrator]'
+
+      - name: Prepare one durable accepted execution
+        if: inputs.command_ref != ''
+        env:
+          NIGHTMARE_DATABASE_DSN: ${{ vars.NIGHTMARE_DATABASE_DSN }}
+          NIGHTMARE_SOURCE_COMMIT: ${{ github.sha }}
+          NIGHTMARE_RUNNER_IMAGE: ${{ env.RUNNER_IMAGE }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 -m charm nightmare prepare-execution \
+            --wake-id "${{ inputs.wake_id }}" \
+            --command-ref "${{ inputs.command_ref }}" \
+            --owner "github:${{ github.run_id }}:${{ github.run_attempt }}" \
+            --command-out command.json \
+            --snapshot-out snapshot.json \
+            --plan-out plan.json \
+            --attempt-out attempt.json
+
+      - name: Prepare repository-owned planner inputs
+        if: inputs.command_ref == ''
+        run: |
+          python3 -m charm nightmare repository-command \
+            --suite "$SUITE_ID" \
+            --repository "${{ github.repository }}" \
+            --ref "${{ github.ref_name }}" \
+            --command-out command.json \
+            --snapshot-out snapshot.json
+
+      - name: Validate and place
+        if: inputs.command_ref == ''
+        run: |
+          set +e
+          python3 -m charm nightmare plan command.json snapshot.json \
+            --source-commit "$SOURCE_SHA" \
+            --runner-image "$RUNNER_IMAGE" \
+            --ownership repository \
+            --out plan.json
+          plan_rc=$?
+          set -e
+          test "$(jq -r '.kind' plan.json)" = accepted
+          test "$plan_rc" -eq 0
+
+      - name: Export the bounded accepted plan
+        id: result
+        run: |
+          kind=$(jq -r '.kind' plan.json)
+          if [ "$kind" = accepted ]; then
+            echo 'accepted=true' >> "$GITHUB_OUTPUT"
+            matrix=$(python3 -m charm nightmare matrix build plan.json)
+            echo "build_matrix=$matrix" >> "$GITHUB_OUTPUT"
+            echo "source_sha=$(jq -r '.plan.source.commit' plan.json)" >> "$GITHUB_OUTPUT"
+          else
+            echo 'accepted=false' >> "$GITHUB_OUTPUT"
+            echo 'build_matrix={"include":[]}' >> "$GITHUB_OUTPUT"
+            echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+            {
+              echo '## Nightmare plan was not accepted'
+              echo
+              echo '```json'
+              jq . plan.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+            exit 1
+          fi
+
+      - name: Upload authoritative plan
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightmare-plan
+          path: |
+            command.json
+            snapshot.json
+            plan.json
+            attempt.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.accepted == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.plan.outputs.build_matrix) }}
+    container:
+      image: ghcr.io/axvonx/charmos-x86-env@sha256:2f77dec0b8a479bdfb8f9237ceb0c10320e418c5725592033cd9451e63fced87
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.source_sha }}
+          submodules: recursive
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: nightmare-plan
+          path: plan-download
+
+      - name: Compile exactly one accepted build group
+        run: |
+          python3 -m charm nightmare build-bundle plan-download/plan.json \
+            --group "${{ matrix.bundle_id }}" \
+            --build-dir build-orchestrator \
+            --out-dir bundle \
+            --receipt receipt.json
+
+      - name: Upload immutable build bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            bundle/
+            receipt.json
+          retention-days: 7
+
+  materialize:
+    needs: [plan, build]
+    if: always() && needs.plan.outputs.accepted == 'true' && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      runner_matrix: ${{ steps.matrix.outputs.runner_matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: nightmare-plan
+          path: plan-download
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nightmare-build-*
+          path: builds
+
+      - name: Materialize only from accepted receipts
+        run: |
+          receipts=(builds/*/receipt.json)
+          python3 -m charm nightmare materialize \
+            plan-download/plan.json "${receipts[@]}" \
+            --out-dir materialized
+
+      - name: Export bounded runner matrix
+        id: matrix
+        run: |
+          matrix=$(python3 -m charm nightmare matrix runner materialized/plan_bundle.json)
+          echo "runner_matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightmare-plan-bundle
+          path: materialized/
+          retention-days: 30
+
+  runner:
+    needs: [plan, materialize]
+    if: needs.materialize.result == 'success'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix: ${{ fromJSON(needs.materialize.outputs.runner_matrix) }}
+    container:
+      image: ghcr.io/axvonx/charmos-x86-env@sha256:2f77dec0b8a479bdfb8f9237ceb0c10320e418c5725592033cd9451e63fced87
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.source_sha }}
+          submodules: recursive
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: nightmare-plan-bundle
+          path: plan-bundle
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.bundle_artifact }}
+          path: build-download
+
+      - name: Execute one immutable manifest
+        run: |
+          python3 -m charm nightmare run-manifest \
+            "plan-bundle/manifests/${{ matrix.manifest_id }}.json" \
+            --bundle build-download/bundle \
+            --build-dir unused-build-dir \
+            --out-dir runner-result
+
+      - name: Retain result even when infrastructure failed
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.manifest_artifact }}
+          path: runner-result/
+          if-no-files-found: warn
+          retention-days: 30
+
+  aggregate:
+    needs: [plan, build, materialize, runner]
+    if: always() && needs.plan.outputs.accepted == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: nightmare-plan
+          path: plan-download
+
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: nightmare-plan-bundle
+          path: plan-bundle
+
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: nightmare-build-*
+          path: builds
+
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: nightmare-result-*
+          path: results
+
+      - name: Verify completeness and render findings
+        run: |
+          extra=()
+          [ ! -f plan-bundle/plan_bundle.json ] || extra+=(--plan-bundle plan-bundle/plan_bundle.json)
+          [ ! -d builds ] || extra+=(--builds-dir builds)
+          python3 -m charm nightmare aggregate \
+            plan-download/plan.json results \
+            "${extra[@]}" \
+            --json nightmare-report.json \
+            --markdown nightmare-summary.md \
+            --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload aggregate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightmare-report
+          path: |
+            nightmare-report.json
+            nightmare-summary.md
+          if-no-files-found: warn
+          retention-days: 90
+
+  finalize:
+    needs: [plan, aggregate]
+    if: always() && inputs.command_ref != '' && needs.plan.outputs.accepted == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.NIGHTMARE_AWS_ROLE }}
+          aws-region: ${{ vars.NIGHTMARE_AWS_REGION }}
+
+      - name: Generate short-lived PostgreSQL credential
+        env:
+          DATABASE_HOST: ${{ vars.NIGHTMARE_DATABASE_HOST }}
+          DATABASE_PORT: ${{ vars.NIGHTMARE_DATABASE_PORT }}
+          DATABASE_USER: ${{ vars.NIGHTMARE_DATABASE_USER }}
+        run: |
+          token=$(aws rds generate-db-auth-token \
+            --hostname "$DATABASE_HOST" \
+            --port "$DATABASE_PORT" \
+            --username "$DATABASE_USER")
+          echo "::add-mask::$token"
+          echo "PGPASSWORD=$token" >> "$GITHUB_ENV"
+
+      - name: Install production store adapter
+        run: python3 -m pip install '.[orchestrator]'
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: nightmare-plan
+          path: plan-download
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: nightmare-report
+          path: report-download
+
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: nightmare-result-*
+          path: results
+
+      - name: Retain lifecycle and release the coordinator
+        env:
+          NIGHTMARE_DATABASE_DSN: ${{ vars.NIGHTMARE_DATABASE_DSN }}
+          NIGHTMARE_SOURCE_COMMIT: ${{ github.sha }}
+          NIGHTMARE_RUNNER_IMAGE: ${{ env.RUNNER_IMAGE }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 -m charm nightmare finish-execution \
+            --attempt plan-download/attempt.json \
+            --report report-download/nightmare-report.json \
+            --results-dir results

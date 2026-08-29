@@ -1,0 +1,72 @@
+name: Nightmare contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/charm/nightmare/**'
+      - 'scripts/charm/orchestrator/**'
+      - 'scripts/tests/**'
+      - 'nightmare/**'
+      - '.github/workflows/nightmare-contract.yml'
+      - '.github/workflows/nightmare-orchestrator.yml'
+      - '.github/workflows/nightmare-recovery.yml'
+  pull_request:
+    paths:
+      - 'scripts/charm/nightmare/**'
+      - 'scripts/charm/orchestrator/**'
+      - 'scripts/tests/**'
+      - 'nightmare/**'
+      - '.github/workflows/nightmare-contract.yml'
+      - '.github/workflows/nightmare-orchestrator.yml'
+      - '.github/workflows/nightmare-recovery.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightmare-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install contract tools
+        run: python3 -m pip install ruff mypy pytest jsonschema
+
+      - name: Validate contracts and orchestration
+        run: |
+          ruff check scripts
+          ruff format --check scripts
+          mypy
+          pytest -q
+          PYTHONPATH=scripts python3 -m charm ci workflow-policy
+
+      - name: Planner and matrix smoke
+        env:
+          RUNNER_IMAGE: ghcr.io/axvonx/charmos-x86-env@sha256:2f77dec0b8a479bdfb8f9237ceb0c10320e418c5725592033cd9451e63fced87
+        run: |
+          export PYTHONPATH=scripts
+          python3 -m charm nightmare repository-command \
+            --suite harness_smoke \
+            --repository axvonx/charmos \
+            --ref main \
+            --at 2026-08-29T00:00:00Z \
+            --command-out command.json \
+            --snapshot-out snapshot.json
+          python3 -m charm nightmare plan command.json snapshot.json \
+            --source-commit 56bc1dfdd14a0b3e03ff1d166e7af98bec8cbb6f \
+            --runner-image "$RUNNER_IMAGE" \
+            --ownership repository \
+            --out plan.json
+          python3 -m charm nightmare matrix build plan.json
