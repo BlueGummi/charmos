@@ -649,6 +649,40 @@ def cmd_nm_repository_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_nm_inline_command(args: argparse.Namespace) -> int:
+    import json
+    from datetime import UTC, datetime
+
+    from .orchestrator import workflow as OW
+
+    try:
+        at = (
+            datetime.fromisoformat(args.at.replace("Z", "+00:00"))
+            if args.at
+            else datetime.now(UTC)
+        )
+        if at.tzinfo is None:
+            raise ValueError("--at must include a UTC offset")
+        command, snapshot = OW.inline_command(
+            toml_text=args.toml,
+            repository=args.repository,
+            ref=args.ref,
+            now=at,
+            runner_capacity=args.runner_capacity,
+        )
+        Path(args.command_out).write_text(
+            json.dumps(command, indent=2) + "\n", encoding="utf-8"
+        )
+        Path(args.snapshot_out).write_text(
+            json.dumps(snapshot, indent=2) + "\n", encoding="utf-8"
+        )
+    except (OSError, ValueError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+    print(f"{command['command_id']} {snapshot['version']}")
+    return 0
+
+
 def cmd_nm_matrix(args: argparse.Namespace) -> int:
     import json
 
@@ -1073,7 +1107,21 @@ def build_parser() -> argparse.ArgumentParser:
     rc.add_argument("--snapshot-out", required=True)
     rc.set_defaults(fn=cmd_nm_repository_command)
 
+    ic = nmsub.add_parser(
+        "inline-command",
+        help="create trusted planner inputs for one inline TOML batch definition",
+    )
+    ic.add_argument("--toml", required=True, help="raw batch TOML definition string")
+    ic.add_argument("--repository", required=True)
+    ic.add_argument("--ref", default="main")
+    ic.add_argument("--runner-capacity", type=int, default=12)
+    ic.add_argument("--at", default=None, help="injected ISO-8601 clock")
+    ic.add_argument("--command-out", required=True)
+    ic.add_argument("--snapshot-out", required=True)
+    ic.set_defaults(fn=cmd_nm_inline_command)
+
     mx = nmsub.add_parser("matrix", help="emit a bounded trusted Actions matrix")
+
     mx.add_argument("kind", choices=("build", "runner"))
     mx.add_argument("document")
     mx.add_argument("--limit", type=int, default=64)

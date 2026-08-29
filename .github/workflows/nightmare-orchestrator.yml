@@ -25,6 +25,10 @@ on:
         description: Committed suite for compatibility mode
         required: false
         default: overnight_locks
+      batch_toml:
+        description: Inline TOML batch definition for direct ad-hoc execution; blank uses suite
+        required: false
+        default: ''
       source_sha:
         description: Exact repository commit; blank uses the triggering commit
         required: false
@@ -114,8 +118,20 @@ jobs:
             --plan-out plan.json \
             --attempt-out attempt.json
 
+      - name: Prepare inline ad-hoc planner inputs
+        if: inputs.command_ref == '' && inputs.batch_toml != ''
+        env:
+          BATCH_TOML: ${{ inputs.batch_toml }}
+        run: |
+          python3 -m charm nightmare inline-command \
+            --toml "$BATCH_TOML" \
+            --repository "${{ github.repository }}" \
+            --ref "${{ github.ref_name }}" \
+            --command-out command.json \
+            --snapshot-out snapshot.json
+
       - name: Prepare repository-owned planner inputs
-        if: inputs.command_ref == ''
+        if: inputs.command_ref == '' && inputs.batch_toml == ''
         run: |
           python3 -m charm nightmare repository-command \
             --suite "$SUITE_ID" \
