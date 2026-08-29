@@ -731,122 +731,24 @@ def cmd_nm_aggregate(args: argparse.Namespace) -> int:
     return 0 if report.ok else 1
 
 
-def cmd_nm_recover(args: argparse.Namespace) -> int:
-    import json
-    import os
+def cmd_nm_wait_until(args: argparse.Namespace) -> int:
+    from datetime import datetime
 
-    from .orchestrator import reconciler as OR
-    from .orchestrator.coordinator import Coordinator
-    from .orchestrator.store import PostgresStore
-    from .orchestrator.transport import GitHubActionsTransport
-
-    dsn = os.environ.get(args.dsn_env, "")
-    token = os.environ.get(args.token_env, "")
-    if not dsn or not token:
-        print(
-            f"error: {args.dsn_env} and {args.token_env} must be set",
-            file=sys.stderr,
-        )
-        return 2
-    try:
-        store = PostgresStore.from_dsn(dsn)
-        store.migrate()
-        transport = GitHubActionsTransport(
-            repository=args.repository,
-            workflow=args.workflow,
-            ref=args.ref,
-            token=token,
-        )
-        coordinator = Coordinator(store, transport)
-        coordinator.deliver()
-        result = coordinator.apply(OR.Tick(idle_grace_ms=args.idle_grace_ms))
-    except (RuntimeError, ValueError) as error:
-        print(f"error: {error}", file=sys.stderr)
-        return 1
-    print(json.dumps(result.result, indent=2))
-    return 0
-
-
-def cmd_nm_prepare_execution(args: argparse.Namespace) -> int:
-    import json
-
-    from .orchestrator.http import create_operator_from_env
-    from .orchestrator.runtime import ExecutionRuntime, RuntimeError
+    from .orchestrator import workflow as OW
 
     try:
-        prepared = ExecutionRuntime(create_operator_from_env()).prepare(
-            wake_id=args.wake_id,
-            command_ref=args.command_ref,
-            owner=args.owner,
-            lease_ms=args.lease_ms,
-        )
-        outputs = {
-            Path(args.command_out): prepared.command,
-            Path(args.snapshot_out): prepared.snapshot,
-            Path(args.plan_out): prepared.plan,
-            Path(args.attempt_out): {
-                "attempt_id": prepared.attempt_id,
-                "owner": args.owner,
-            },
-        }
-        for path, document in outputs.items():
-            path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
-    except (OSError, ValueError, RuntimeError) as error:
+        target = datetime.fromisoformat(args.at.replace("Z", "+00:00"))
+        waited = OW.wait_until(target, max_wait_seconds=args.max_wait)
+        if waited > 0:
+            print(f"waited {waited:.2f}s until {target.isoformat()}")
+    except (OSError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
-    print(prepared.attempt_id)
-    return 0
-
-
-def cmd_nm_finish_execution(args: argparse.Namespace) -> int:
-    import json
-
-    from .nightmare import contracts
-    from .orchestrator.http import create_operator_from_env
-    from .orchestrator.runtime import ExecutionRuntime, RuntimeError
-
-    try:
-        attempt = _read_json_object(Path(args.attempt))
-        report = _read_json_object(Path(args.report))
-        digests: dict[str, str] = {}
-        for path in sorted(Path(args.results_dir).rglob("runner_result.json")):
-            result = _read_json_object(path)
-            manifest_id = result.get("manifest_id")
-            if isinstance(manifest_id, str):
-                digest = contracts.sha256_file(path)
-                prior = digests.setdefault(manifest_id, digest)
-                if prior != digest:
-                    raise ValueError(f"multiple result digests exist for {manifest_id}")
-        result = ExecutionRuntime(create_operator_from_env()).finish(
-            attempt_id=str(attempt["attempt_id"]),
-            report=report,
-            result_digests=digests,
-            owner=str(attempt["owner"]),
-        )
-    except (KeyError, OSError, ValueError, RuntimeError) as error:
-        print(f"error: {error}", file=sys.stderr)
-        return 2
-    print(json.dumps(result, indent=2))
-    return 0
-
-
-def cmd_nm_serve(args: argparse.Namespace) -> int:
-    from wsgiref.simple_server import make_server
-
-    from .orchestrator.http import create_application_from_env
-
-    try:
-        application = create_application_from_env()
-    except (RuntimeError, ValueError) as error:
-        print(f"error: {error}", file=sys.stderr)
-        return 2
-    print(f"serving Nightmare orchestrator on http://{args.host}:{args.port}")
-    with make_server(args.host, args.port, application) as server:
-        server.serve_forever()
     return 0
 
 
 def add_report_args(sp: argparse.ArgumentParser) -> None:
+
     sp.add_argument("--summary", help="write markdown here (append if exists)")
     sp.add_argument("--json", help="write merged JSON report here")
     sp.add_argument(
@@ -1139,46 +1041,18 @@ def build_parser() -> argparse.ArgumentParser:
     ag.add_argument("--summary", default=None)
     ag.set_defaults(fn=cmd_nm_aggregate)
 
-    rv = nmsub.add_parser(
-        "recover", help="repair expired coordinator leases and undelivered wakes"
+    wu = nmsub.add_parser(
+        "wait-until",
+        help="sleep until one future ISO-8601 timestamp before execution",
     )
-    rv.add_argument("--repository", required=True)
-    rv.add_argument("--workflow", default="nightmare-orchestrator.yml")
-    rv.add_argument("--ref", default="main")
-    rv.add_argument("--dsn-env", default="NIGHTMARE_DATABASE_DSN")
-    rv.add_argument("--token-env", default="GITHUB_TOKEN")
-    rv.add_argument("--idle-grace-ms", type=int, default=30_000)
-    rv.set_defaults(fn=cmd_nm_recover)
-
-    pe = nmsub.add_parser(
-        "prepare-execution",
-        help="acquire one durable wake and export its accepted execution plan",
+    wu.add_argument("--at", required=True, help="future ISO-8601 target time")
+    wu.add_argument(
+        "--max-wait",
+        type=int,
+        default=21600,
+        help="maximum wait window in seconds (default 6 hours)",
     )
-    pe.add_argument("--wake-id", required=True)
-    pe.add_argument("--command-ref", required=True)
-    pe.add_argument("--owner", required=True)
-    pe.add_argument("--lease-ms", type=int, default=30 * 60 * 1000)
-    pe.add_argument("--command-out", required=True)
-    pe.add_argument("--snapshot-out", required=True)
-    pe.add_argument("--plan-out", required=True)
-    pe.add_argument("--attempt-out", required=True)
-    pe.set_defaults(fn=cmd_nm_prepare_execution)
-
-    fe = nmsub.add_parser(
-        "finish-execution",
-        help="retain aggregate lifecycle and release one durable coordinator",
-    )
-    fe.add_argument("--attempt", required=True)
-    fe.add_argument("--report", required=True)
-    fe.add_argument("--results-dir", required=True)
-    fe.set_defaults(fn=cmd_nm_finish_execution)
-
-    sv = nmsub.add_parser(
-        "serve", help="serve the authenticated six-operation HTTP interface"
-    )
-    sv.add_argument("--host", default="127.0.0.1")
-    sv.add_argument("--port", type=int, default=8080)
-    sv.set_defaults(fn=cmd_nm_serve)
+    wu.set_defaults(fn=cmd_nm_wait_until)
 
     rm = nmsub.add_parser(
         "run-manifest",

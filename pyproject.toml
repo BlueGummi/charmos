@@ -23,7 +23,6 @@ dependencies = []
 # where it matters.
 [project.optional-dependencies]
 schema = ["jsonschema>=4"]
-orchestrator = ["psycopg[binary]>=3.2,<4"]
 
 [project.scripts]
 charm = "charm.cli:main"

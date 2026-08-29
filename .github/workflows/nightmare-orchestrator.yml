@@ -2,27 +2,11 @@ name: Nightmare orchestrator
 
 on:
   schedule:
-    - cron: '17 3 * * *'
+    - cron: '0 * * * *'
   workflow_dispatch:
     inputs:
-      protocol_version:
-        description: Doorbell protocol version
-        required: false
-        default: '1'
-      wake_id:
-        description: Durable wake identity
-        required: false
-        default: manual
-      reason:
-        description: commands_available, reconcile, recovery, or manual
-        required: false
-        default: manual
-      command_ref:
-        description: Durable command reference; blank uses repository compatibility mode
-        required: false
-        default: ''
       suite:
-        description: Committed suite for compatibility mode
+        description: Committed suite for scheduled/compatibility mode
         required: false
         default: overnight_locks
       batch_toml:
@@ -37,10 +21,9 @@ on:
 permissions:
   contents: read
   packages: read
-  id-token: write
 
 concurrency:
-  group: nightmare-orchestrator-${{ inputs.wake_id || github.run_id }}
+  group: nightmare-orchestrator-${{ github.ref }}
   cancel-in-progress: false
 
 env:
@@ -61,65 +44,8 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Require the narrow doorbell protocol
-        env:
-          PROTOCOL_VERSION: ${{ inputs.protocol_version || '1' }}
-          REASON: ${{ inputs.reason || 'manual' }}
-        run: |
-          test "$PROTOCOL_VERSION" = 1
-          case "$REASON" in
-            commands_available|reconcile|recovery|manual) ;;
-            *) exit 2 ;;
-          esac
-
-      - uses: actions/setup-python@v5
-        if: inputs.command_ref != ''
-        with:
-          python-version: '3.11'
-
-      - uses: aws-actions/configure-aws-credentials@v4
-        if: inputs.command_ref != ''
-        with:
-          role-to-assume: ${{ vars.NIGHTMARE_AWS_ROLE }}
-          aws-region: ${{ vars.NIGHTMARE_AWS_REGION }}
-
-      - name: Generate short-lived PostgreSQL credential
-        if: inputs.command_ref != ''
-        env:
-          DATABASE_HOST: ${{ vars.NIGHTMARE_DATABASE_HOST }}
-          DATABASE_PORT: ${{ vars.NIGHTMARE_DATABASE_PORT }}
-          DATABASE_USER: ${{ vars.NIGHTMARE_DATABASE_USER }}
-        run: |
-          token=$(aws rds generate-db-auth-token \
-            --hostname "$DATABASE_HOST" \
-            --port "$DATABASE_PORT" \
-            --username "$DATABASE_USER")
-          echo "::add-mask::$token"
-          echo "PGPASSWORD=$token" >> "$GITHUB_ENV"
-
-      - name: Install production store adapter
-        if: inputs.command_ref != ''
-        run: python3 -m pip install '.[orchestrator]'
-
-      - name: Prepare one durable accepted execution
-        if: inputs.command_ref != ''
-        env:
-          NIGHTMARE_DATABASE_DSN: ${{ vars.NIGHTMARE_DATABASE_DSN }}
-          NIGHTMARE_SOURCE_COMMIT: ${{ github.sha }}
-          NIGHTMARE_RUNNER_IMAGE: ${{ env.RUNNER_IMAGE }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          python3 -m charm nightmare prepare-execution \
-            --wake-id "${{ inputs.wake_id }}" \
-            --command-ref "${{ inputs.command_ref }}" \
-            --owner "github:${{ github.run_id }}:${{ github.run_attempt }}" \
-            --command-out command.json \
-            --snapshot-out snapshot.json \
-            --plan-out plan.json \
-            --attempt-out attempt.json
-
       - name: Prepare inline ad-hoc planner inputs
-        if: inputs.command_ref == '' && inputs.batch_toml != ''
+        if: inputs.batch_toml != ''
         env:
           BATCH_TOML: ${{ inputs.batch_toml }}
         run: |
@@ -130,8 +56,16 @@ jobs:
             --command-out command.json \
             --snapshot-out snapshot.json
 
+      - name: Wait for scheduled start time
+        if: inputs.batch_toml != ''
+        run: |
+          start_utc=$(jq -r '.payload.definition.start_utc // empty' command.json)
+          if [ -n "$start_utc" ]; then
+            python3 -m charm nightmare wait-until --at "$start_utc"
+          fi
+
       - name: Prepare repository-owned planner inputs
-        if: inputs.command_ref == '' && inputs.batch_toml == ''
+        if: inputs.batch_toml == ''
         run: |
           python3 -m charm nightmare repository-command \
             --suite "$SUITE_ID" \
@@ -141,7 +75,6 @@ jobs:
             --snapshot-out snapshot.json
 
       - name: Validate and place
-        if: inputs.command_ref == ''
         run: |
           set +e
           python3 -m charm nightmare plan command.json snapshot.json \
@@ -153,6 +86,7 @@ jobs:
           set -e
           test "$(jq -r '.kind' plan.json)" = accepted
           test "$plan_rc" -eq 0
+
 
       - name: Export the bounded accepted plan
         id: result
@@ -174,9 +108,9 @@ jobs:
               jq . plan.json
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
-          fi
             exit 1
           fi
+
 
       - name: Upload authoritative plan
         if: always()
@@ -369,62 +303,3 @@ jobs:
           if-no-files-found: warn
           retention-days: 90
 
-  finalize:
-    needs: [plan, aggregate]
-    if: always() && inputs.command_ref != '' && needs.plan.outputs.accepted == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.NIGHTMARE_AWS_ROLE }}
-          aws-region: ${{ vars.NIGHTMARE_AWS_REGION }}
-
-      - name: Generate short-lived PostgreSQL credential
-        env:
-          DATABASE_HOST: ${{ vars.NIGHTMARE_DATABASE_HOST }}
-          DATABASE_PORT: ${{ vars.NIGHTMARE_DATABASE_PORT }}
-          DATABASE_USER: ${{ vars.NIGHTMARE_DATABASE_USER }}
-        run: |
-          token=$(aws rds generate-db-auth-token \
-            --hostname "$DATABASE_HOST" \
-            --port "$DATABASE_PORT" \
-            --username "$DATABASE_USER")
-          echo "::add-mask::$token"
-          echo "PGPASSWORD=$token" >> "$GITHUB_ENV"
-
-      - name: Install production store adapter
-        run: python3 -m pip install '.[orchestrator]'
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: nightmare-plan
-          path: plan-download
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: nightmare-report
-          path: report-download
-
-      - uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          pattern: nightmare-result-*
-          path: results
-
-      - name: Retain lifecycle and release the coordinator
-        env:
-          NIGHTMARE_DATABASE_DSN: ${{ vars.NIGHTMARE_DATABASE_DSN }}
-          NIGHTMARE_SOURCE_COMMIT: ${{ github.sha }}
-          NIGHTMARE_RUNNER_IMAGE: ${{ env.RUNNER_IMAGE }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          python3 -m charm nightmare finish-execution \
-            --attempt plan-download/attempt.json \
-            --report report-download/nightmare-report.json \
-            --results-dir results

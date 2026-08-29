@@ -10,7 +10,6 @@ PROTECTED_WORKFLOWS = (
     "build.yml",
     "nightmare-contract.yml",
     "nightmare-orchestrator.yml",
-    "nightmare-recovery.yml",
     "nightmare.yml",
     "test.yml",
     "tools.yml",

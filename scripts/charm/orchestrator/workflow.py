@@ -13,6 +13,22 @@ def _instant(value: datetime) -> str:
     return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
+def wait_until(target_time: datetime, max_wait_seconds: int = 21600) -> float:
+    """If target_time is in the future, sleep until target_time (up to max_wait_seconds)."""
+    import time
+
+    now = datetime.now(UTC)
+    delay = (target_time.astimezone(UTC) - now).total_seconds()
+    if delay <= 0:
+        return 0.0
+    if delay > max_wait_seconds:
+        raise ValueError(
+            f"target time {target_time.isoformat()} exceeds maximum wait window of {max_wait_seconds}s"
+        )
+    time.sleep(delay)
+    return delay
+
+
 def repository_command(
     *,
     suite_id: str,
