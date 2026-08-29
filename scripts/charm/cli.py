@@ -502,7 +502,6 @@ def cmd_nm_plan(args: argparse.Namespace) -> int:
     import json
     from datetime import UTC, datetime
 
-    from .nightmare import domain as OD
     from .nightmare import planner as OP
 
     try:
@@ -511,7 +510,7 @@ def cmd_nm_plan(args: argparse.Namespace) -> int:
     except (OSError, ValueError, json.JSONDecodeError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
-    source = OD.Source(command.get("repository", {}).get("id", ""), args.source_commit)
+    source = OP.Source(command.get("repository", {}).get("id", ""), args.source_commit)
     result = OP.Planner(Path(args.suite_dir)).plan(
         command,
         snapshot,
@@ -526,14 +525,14 @@ def cmd_nm_plan(args: argparse.Namespace) -> int:
         Path(args.out).write_text(text, encoding="utf-8")
     else:
         sys.stdout.write(text)
-    if isinstance(result, OD.Accepted):
+    if isinstance(result, OP.Accepted):
         print(
             f"accepted {result.plan.id}: {len(result.plan.tasks)} manifest(s), "
             f"{len(result.plan.build_groups)} build group(s)",
             file=sys.stderr,
         )
         return 0
-    if isinstance(result, OD.Stale):
+    if isinstance(result, OP.Stale):
         print(f"stale: current snapshot is {result.current_version}", file=sys.stderr)
     else:
         for diagnostic in result.diagnostics:
@@ -1054,31 +1053,30 @@ def build_parser() -> argparse.ArgumentParser:
     )
     wu.set_defaults(fn=cmd_nm_wait_until)
 
+    def _add_runner_args(sp: argparse.ArgumentParser) -> None:
+        sp.add_argument(
+            "--bundle",
+            default=None,
+            help="verified compile-once build bundle (required for real boots)",
+        )
+        sp.add_argument(
+            "--allow-development-bundle",
+            action="store_true",
+            help="allow a prebuilt development bundle for local proof only",
+        )
+        sp.add_argument(
+            "--build-dir",
+            default="build",
+            help="charmOS build directory (default: build)",
+        )
+        sp.add_argument("--out-dir", default=None)
+
     rm = nmsub.add_parser(
         "run-manifest",
         help="execute one accepted runner manifest and always emit a result",
     )
     rm.add_argument("manifest", help="accepted runner manifest JSON")
-    rm.add_argument(
-        "--bundle",
-        default=None,
-        help="verified compile-once build bundle (required for real boots)",
-    )
-    rm.add_argument(
-        "--allow-development-bundle",
-        action="store_true",
-        help="allow a prebuilt development bundle for local proof only",
-    )
-    rm.add_argument(
-        "--build-dir",
-        default="build",
-        help="charmOS build directory (default: build)",
-    )
-    rm.add_argument(
-        "--out-dir",
-        default=None,
-        help="identity, copied manifest, boot evidence, and result directory",
-    )
+    _add_runner_args(rm)
     rm.set_defaults(fn=cmd_nm_run_manifest)
 
     rp = nmsub.add_parser(
@@ -1086,26 +1084,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="re-execute a manifest, prior runner result, or result directory",
     )
     rp.add_argument("source", help="manifest, runner_result.json, or result directory")
-    rp.add_argument(
-        "--bundle",
-        default=None,
-        help="verified compile-once build bundle (required for real boots)",
-    )
-    rp.add_argument(
-        "--allow-development-bundle",
-        action="store_true",
-        help="allow a prebuilt development bundle for local proof only",
-    )
-    rp.add_argument(
-        "--build-dir",
-        default="build",
-        help="charmOS build directory (default: build)",
-    )
-    rp.add_argument(
-        "--out-dir",
-        default=None,
-        help="new result directory (default: replay-results/<manifest>)",
-    )
+    _add_runner_args(rp)
     rp.set_defaults(fn=cmd_nm_replay)
 
     return ap

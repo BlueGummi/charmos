@@ -1,4 +1,4 @@
-from charm.nightmare.parity import (
+from charm.nightmare.aggregate import (
     check_execution_parity,
     normalize_signature,
     verify_finding_parity,

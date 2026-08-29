@@ -5,12 +5,169 @@ import math
 import re
 import tomllib
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from . import contracts, domain
+from . import contracts
 from . import suite as suite_model
+
+# ---------------------------------------------------------------------------
+# Domain types (inlined from domain.py)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class BatchDefinition:
+    name: str
+    start: datetime
+    window_ms: int
+    runners: int
+    color: str
+    tests: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class Source:
+    repository: str
+    commit: str
+
+
+@dataclass(frozen=True)
+class Runner:
+    id: str
+    number: int
+    state: str
+    label: str
+
+
+@dataclass(frozen=True)
+class OccupiedLease:
+    runner_ids: frozenset[str]
+    starts_at: datetime
+    ends_at: datetime
+
+
+@dataclass(frozen=True)
+class FleetSnapshot:
+    version: str
+    starts_at: datetime
+    ends_at: datetime
+    runners: tuple[Runner, ...]
+    occupied: tuple[OccupiedLease, ...]
+    document: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class RegisteredSuite:
+    id: str
+    sha256: str
+    resolved: dict[str, Any]
+    model: suite_model.Suite
+    path: Path
+
+
+@dataclass(frozen=True)
+class PlannedTask:
+    id: str
+    slice_id: str
+    manifest_id: str
+    campaign_id: str
+    suite_id: str
+    runner_id: str
+    runner_index: int
+    total_runners: int
+    instance: int | None
+    starts_at: datetime
+    nominal_ends_at: datetime
+    ends_at: datetime
+    soft_budget_ms: int
+    hard_budget_ms: int
+    actions_job_budget_ms: int
+    base_seed: int | None
+
+
+@dataclass(frozen=True)
+class BuildGroup:
+    id: str
+    request_sha256: str
+    configuration: dict[str, Any]
+    task_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class AcceptedPlan:
+    id: str
+    version: str
+    base_snapshot_version: str
+    evaluated_at: datetime
+    expires_at: datetime
+    source: Source
+    runner_image: str
+    definition: BatchDefinition
+    definition_toml: str
+    definition_sha256: str
+    ownership: str
+    batch_id: str
+    batch_version: str
+    runner_ids: tuple[str, ...]
+    tasks: tuple[PlannedTask, ...]
+    suites: tuple[RegisteredSuite, ...]
+    build_groups: tuple[BuildGroup, ...]
+    document: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class Accepted:
+    plan: AcceptedPlan
+    kind: str = "accepted"
+
+
+@dataclass(frozen=True)
+class Rejected:
+    code: str
+    message: str
+    diagnostics: tuple[dict[str, Any], ...]
+    alternatives: tuple[dict[str, Any], ...] = ()
+    kind: str = "rejected"
+
+
+@dataclass(frozen=True)
+class Stale:
+    message: str
+    current_version: str
+    code: str = "snapshot_changed"
+    kind: str = "stale"
+
+
+PlanningResult = Accepted | Rejected | Stale
+
+
+@dataclass(frozen=True)
+class BundleReceipt:
+    bundle_id: str
+    sha256: str
+    request_sha256: str
+
+
+@dataclass(frozen=True)
+class PlanBundle:
+    plan_id: str
+    build_groups: tuple[BuildGroup, ...]
+    manifests: tuple[dict[str, Any], ...]
+
+    @property
+    def matrix(self) -> tuple[dict[str, str], ...]:
+        return tuple(
+            {
+                "manifest_id": manifest["manifest_id"],
+                "manifest_artifact": manifest["result"]["artifact_name"],
+                "bundle_id": manifest["build"]["bundle_id"],
+            }
+            for manifest in self.manifests
+        )
+
 
 PLAN_TTL = timedelta(minutes=10)
 MAX_MANIFESTS = 64
@@ -36,7 +193,7 @@ def _parse_instant(value: Any, field: str) -> datetime:
     return parsed.astimezone(UTC)
 
 
-def _definition(payload: dict[str, Any]) -> domain.BatchDefinition:
+def _definition(payload: dict[str, Any]) -> BatchDefinition:
     raw = payload["definition"]
     if not isinstance(raw, dict):
         raise ValueError("definition must be an object")
@@ -65,7 +222,7 @@ def _definition(payload: dict[str, Any]) -> domain.BatchDefinition:
         or not all(isinstance(item, str) and item for item in tests)
     ):
         raise ValueError("definition.tests must be a non-empty string array")
-    return domain.BatchDefinition(
+    return BatchDefinition(
         name=name,
         start=_parse_instant(raw["start_utc"], "definition.start_utc"),
         window_ms=int(window_hours * 3_600_000),
@@ -86,7 +243,7 @@ def _toml_definition(source: str) -> dict[str, Any]:
     return batch
 
 
-def _definition_wire(definition: domain.BatchDefinition) -> dict[str, Any]:
+def _definition_wire(definition: BatchDefinition) -> dict[str, Any]:
     return {
         "name": definition.name,
         "startUtc": _instant(definition.start),
@@ -97,7 +254,7 @@ def _definition_wire(definition: domain.BatchDefinition) -> dict[str, Any]:
     }
 
 
-def _definition_toml_shape(definition: domain.BatchDefinition) -> dict[str, Any]:
+def _definition_toml_shape(definition: BatchDefinition) -> dict[str, Any]:
     return {
         "name": definition.name,
         "start_utc": _instant(definition.start),
@@ -108,7 +265,7 @@ def _definition_toml_shape(definition: domain.BatchDefinition) -> dict[str, Any]
     }
 
 
-def _snapshot(document: dict[str, Any]) -> domain.FleetSnapshot:
+def _snapshot(document: dict[str, Any]) -> FleetSnapshot:
     if document.get("schemaVersion") != 1:
         raise ValueError("snapshot.schemaVersion must be 1")
     window = document["window"]
@@ -117,7 +274,7 @@ def _snapshot(document: dict[str, Any]) -> domain.FleetSnapshot:
     if ends_at <= starts_at:
         raise ValueError("snapshot window must end after it starts")
     runners = tuple(
-        domain.Runner(item["id"], item["number"], item["state"], item["label"])
+        Runner(item["id"], item["number"], item["state"], item["label"])
         for item in sorted(document["runners"], key=lambda item: item["number"])
     )
     if not runners:
@@ -154,7 +311,7 @@ def _snapshot(document: dict[str, Any]) -> domain.FleetSnapshot:
         if lease_end <= lease_start:
             raise ValueError("snapshot lease must end after it starts")
         occupied.append(
-            domain.OccupiedLease(
+            OccupiedLease(
                 frozenset(lease_runner_ids),
                 lease_start,
                 lease_end,
@@ -163,7 +320,7 @@ def _snapshot(document: dict[str, Any]) -> domain.FleetSnapshot:
     version = document["version"]
     if not isinstance(version, str) or not version:
         raise ValueError("snapshot.version must be a non-empty string")
-    return domain.FleetSnapshot(
+    return FleetSnapshot(
         version=version,
         starts_at=starts_at,
         ends_at=ends_at,
@@ -173,12 +330,12 @@ def _snapshot(document: dict[str, Any]) -> domain.FleetSnapshot:
     )
 
 
-def _catalog(suite_dir: Path) -> dict[str, domain.RegisteredSuite]:
-    catalog: dict[str, domain.RegisteredSuite] = {}
+def _catalog(suite_dir: Path) -> dict[str, RegisteredSuite]:
+    catalog: dict[str, RegisteredSuite] = {}
     for path in sorted(suite_dir.glob("*.toml")):
         suite = suite_model.load(path)
         resolved = contracts.suite_to_dict(suite)
-        catalog[path.stem] = domain.RegisteredSuite(
+        catalog[path.stem] = RegisteredSuite(
             id=path.stem,
             sha256=contracts.sha256_json(resolved),
             resolved=resolved,
@@ -189,11 +346,11 @@ def _catalog(suite_dir: Path) -> dict[str, domain.RegisteredSuite]:
 
 
 def _available_runners(
-    snapshot: domain.FleetSnapshot,
+    snapshot: FleetSnapshot,
     start: datetime,
     end: datetime,
     count: int,
-) -> tuple[domain.Runner, ...] | None:
+) -> tuple[Runner, ...] | None:
     unavailable: set[str] = {
         runner.id for runner in snapshot.runners if runner.state == "failed"
     }
@@ -234,11 +391,11 @@ class Planner:
         command: dict[str, Any],
         snapshot_document: dict[str, Any],
         *,
-        source: domain.Source,
+        source: Source,
         runner_image: str,
         now: datetime,
         ownership: str = "ad-hoc",
-    ) -> domain.PlanningResult:
+    ) -> PlanningResult:
         try:
             snapshot = _snapshot(snapshot_document)
             payload = command["payload"]
@@ -246,14 +403,14 @@ class Planner:
             definition_toml = payload["definition_toml"]
             base_version = payload["base_snapshot_version"]
         except (KeyError, TypeError, ValueError) as error:
-            return domain.Rejected(
+            return Rejected(
                 "invalid_definition",
                 "The planning command is malformed.",
                 ({"field": "command", "message": str(error)},),
             )
 
         if base_version != snapshot.version:
-            return domain.Stale(
+            return Stale(
                 "Fleet state changed. Validate this definition again.",
                 snapshot.version,
             )
@@ -330,7 +487,7 @@ class Planner:
         except suite_model.SuiteError as error:
             diagnostics.append({"field": "tests", "message": str(error)})
             catalog = {}
-        selected: list[domain.RegisteredSuite] = []
+        selected: list[RegisteredSuite] = []
         for index, suite_id in enumerate(definition.tests):
             suite = catalog.get(suite_id)
             if suite is None:
@@ -354,7 +511,7 @@ class Planner:
                 }
             )
         if diagnostics:
-            return domain.Rejected(
+            return Rejected(
                 "invalid_definition",
                 "The batch definition is not admissible.",
                 tuple(diagnostics),
@@ -370,7 +527,7 @@ class Planner:
                 ),
                 default=end,
             )
-            return domain.Rejected(
+            return Rejected(
                 "no_capacity",
                 f"No contiguous {definition.runners}-runner range is free for the requested window.",
                 (
@@ -402,26 +559,26 @@ class Planner:
                 ownership,
             )
         except ValueError as error:
-            return domain.Rejected(
+            return Rejected(
                 "invalid_definition",
                 "The batch budget cannot be placed.",
                 ({"field": "window_hours", "message": str(error)},),
             )
-        return domain.Accepted(accepted)
+        return Accepted(accepted)
 
     def _accepted(
         self,
         command: dict[str, Any],
-        snapshot: domain.FleetSnapshot,
-        definition: domain.BatchDefinition,
+        snapshot: FleetSnapshot,
+        definition: BatchDefinition,
         definition_toml: str,
-        selected: list[domain.RegisteredSuite],
-        leased: tuple[domain.Runner, ...],
-        source: domain.Source,
+        selected: list[RegisteredSuite],
+        leased: tuple[Runner, ...],
+        source: Source,
         runner_image: str,
         now: datetime,
         ownership: str,
-    ) -> domain.AcceptedPlan:
+    ) -> AcceptedPlan:
         identity_input = {
             "command": command,
             "snapshot_version": snapshot.version,
@@ -474,7 +631,7 @@ class Planner:
         for raw_task in raw_tasks:
             by_runner[raw_task["runner"].id].append(raw_task)
 
-        planned: list[domain.PlannedTask] = []
+        planned: list[PlannedTask] = []
         for runner_id, lane in by_runner.items():
             ordered = sorted(
                 enumerate(lane), key=lambda item: (-item[1]["priority"], item[0])
@@ -518,7 +675,7 @@ class Planner:
                 ):
                     seed = None
                 planned.append(
-                    domain.PlannedTask(
+                    PlannedTask(
                         id=item["id"],
                         slice_id=item["slice_id"],
                         manifest_id=item["manifest_id"],
@@ -564,7 +721,7 @@ class Planner:
             groups_by_digest[request_digest].append(planned_task.id)
             configurations[request_digest] = configuration
         build_groups = tuple(
-            domain.BuildGroup(
+            BuildGroup(
                 id=f"build_{digest[:20]}",
                 request_sha256=digest,
                 configuration=configurations[digest],
@@ -591,7 +748,7 @@ class Planner:
             suites,
             build_groups,
         )
-        return domain.AcceptedPlan(
+        return AcceptedPlan(
             id=plan_id,
             version=plan_version,
             base_snapshot_version=snapshot.version,
@@ -620,15 +777,15 @@ class Planner:
         batch_version: str,
         base_snapshot_version: str,
         now: datetime,
-        source: domain.Source,
+        source: Source,
         runner_image: str,
-        definition: domain.BatchDefinition,
+        definition: BatchDefinition,
         definition_toml: str,
         ownership: str,
-        leased: tuple[domain.Runner, ...],
-        tasks: tuple[domain.PlannedTask, ...],
-        suites: tuple[domain.RegisteredSuite, ...],
-        build_groups: tuple[domain.BuildGroup, ...],
+        leased: tuple[Runner, ...],
+        tasks: tuple[PlannedTask, ...],
+        suites: tuple[RegisteredSuite, ...],
+        build_groups: tuple[BuildGroup, ...],
     ) -> dict[str, Any]:
         suite_by_id = {suite.id: suite for suite in suites}
         group_for_task = {
@@ -754,10 +911,10 @@ class Planner:
         }
 
 
-def render_result(result: domain.PlanningResult) -> dict[str, Any]:
-    if isinstance(result, domain.Accepted):
+def render_result(result: PlanningResult) -> dict[str, Any]:
+    if isinstance(result, Accepted):
         return {"kind": "accepted", "plan": result.plan.document}
-    if isinstance(result, domain.Stale):
+    if isinstance(result, Stale):
         return {
             "kind": "stale",
             "code": result.code,
@@ -773,7 +930,7 @@ def render_result(result: domain.PlanningResult) -> dict[str, Any]:
     }
 
 
-def write_plan(result: domain.PlanningResult, path: Path) -> None:
+def write_plan(result: PlanningResult, path: Path) -> None:
     path.write_text(
         json.dumps(render_result(result), indent=2) + "\n", encoding="utf-8"
     )

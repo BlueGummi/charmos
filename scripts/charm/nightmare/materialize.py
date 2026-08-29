@@ -4,7 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from . import contracts, domain
+from . import contracts
+from .planner import BuildGroup, BundleReceipt, PlanBundle
 
 
 class MaterializationError(ValueError):
@@ -28,10 +29,10 @@ def load_plan(path: Path) -> dict[str, Any]:
     return document
 
 
-def load_receipt(path: Path) -> domain.BundleReceipt:
+def load_receipt(path: Path) -> BundleReceipt:
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
-        return domain.BundleReceipt(
+        return BundleReceipt(
             bundle_id=document["bundle_id"],
             sha256=document["sha256"],
             request_sha256=document["request_sha256"],
@@ -44,11 +45,11 @@ def load_receipt(path: Path) -> domain.BundleReceipt:
 
 def materialize(
     plan_document: dict[str, Any],
-    receipts: tuple[domain.BundleReceipt, ...],
+    receipts: tuple[BundleReceipt, ...],
     *,
     attempt: int = 1,
     dry_run: bool = False,
-) -> domain.PlanBundle:
+) -> PlanBundle:
     """Materialize all runner manifests; no caller constructs one piecemeal."""
     plan = _accepted_plan(plan_document)
     if attempt < 1:
@@ -115,7 +116,7 @@ def materialize(
         manifests.append(manifest)
 
     build_groups = tuple(
-        domain.BuildGroup(
+        BuildGroup(
             id=group["id"],
             request_sha256=group["requestSha256"],
             configuration=group["configuration"],
@@ -123,10 +124,10 @@ def materialize(
         )
         for group in sorted(groups.values(), key=lambda item: item["id"])
     )
-    return domain.PlanBundle(plan["id"], build_groups, tuple(manifests))
+    return PlanBundle(plan["id"], build_groups, tuple(manifests))
 
 
-def write_bundle(bundle: domain.PlanBundle, out_dir: Path) -> Path:
+def write_bundle(bundle: PlanBundle, out_dir: Path) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     manifest_dir = out_dir / "manifests"
     manifest_dir.mkdir(parents=True, exist_ok=True)
