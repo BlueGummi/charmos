@@ -5,7 +5,7 @@
 __noreturn void panic_impl_default(const char *file, int line, const char *func,
                                    const char *fmt, ...);
 
-__noreturn void panic_impl_with_regs(const struct panic_regs *regs,
+__noreturn void panic_impl_with_regs(const struct crash_regs *regs,
                                      const char *file, int line,
                                      const char *func, const char *fmt, ...);
 

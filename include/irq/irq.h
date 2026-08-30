@@ -102,8 +102,8 @@ struct irq_context {
     uint64_t ss;
 };
 
-static inline void irq_context_to_panic_regs(const struct irq_context *ictx,
-                                             struct panic_regs *out) {
+static inline void irq_context_to_crash_regs(const struct irq_context *ictx,
+                                             struct crash_regs *out) {
     if (!ictx || !out)
         return;
     out->rip = ictx->rip;

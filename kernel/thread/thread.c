@@ -78,6 +78,10 @@ void thread_exit_with_status(int status) {
     struct thread *self = thread_get_current();
     thread_lock_chk_exit(self);
 
+    /* Can't be in a critical section  when we exit */
+    kassert(atomic_load_explicit(&self->rcu_nesting, memory_order_relaxed) == 0,
+            "thread exited inside an RCU read section");
+
     /* Public status and the ZOMBIE state under join_lock...
      *
      * Joiners either see ZOMBIE here are don't block, or are already
@@ -197,7 +201,10 @@ static struct thread *thread_init(struct thread *thread,
     thread->stack = (void *) stack;
     thread->flags = 0;
     thread->curr_core = -1;
-    thread->rcu_quiescent_gen = UINT64_MAX;
+    thread->rcu_nesting = 0;
+    thread->rcu_read_seq = 0;
+    thread->rcu_leaf = NULL;
+    thread->rcu_blocked_seq = 0;
     thread->id = tid_alloc(global_tid_space);
     thread->refcount = 1;
     thread->timeslice_length_raw_ms = THREAD_DEFAULT_TIMESLICE;
@@ -344,6 +351,21 @@ void thread_free(struct thread *t) {
     thread_free_stack(t);
     log_site_put(t->log_site);
     kfree(t);
+}
+
+static void thread_reap_rcu(struct rcu_cb *cb, void *arg) {
+    unused(cb);
+    reaper_enqueue(arg);
+}
+
+void thread_put(struct thread *t) {
+    if (!refcount_dec_and_test(&t->refcount))
+        return;
+
+    if (thread_get_state(t) != THREAD_STATE_ZOMBIE)
+        panic("final ref dropped while thread not zombie");
+
+    rcu_defer(&t->free_rcu, thread_reap_rcu, t);
 }
 
 void thread_queue_init(struct thread_queue *q) {

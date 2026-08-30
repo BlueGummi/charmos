@@ -92,6 +92,11 @@ void isr_standard_entry(irq_t vector, struct irq_context *irq_ctx) {
     smp_core()->irq_entered_irql = IRQL_NONE;
     smp_core()->irq_stack_scratch_buf = NULL;
 
+    /* We explicitly exclude exceptions, since the context
+     * might be anywhere, including within RCU itself */
+    if (!is_exception)
+        rcu_note_irq_exit();
+
     /* Here's an odd bit: we'll have very different
      * behavior if we came from an exception. Namely,
      * irql_lower will NOT `sti` if irq_in_interrupt()
@@ -334,6 +339,7 @@ void irq_init() {
     irq_set_chip(IRQ_TLB_SHOOTDOWN, lapic_get_chip(), NULL);
 
     irq_register("nop", IRQ_NOP, nop_handler, NULL, IRQ_FLAG_NONE);
+    irq_set_chip(IRQ_NOP, lapic_get_chip(), NULL);
     irq_register("dpc", IRQ_DPC, dpc_handler, NULL, IRQ_FLAG_NONE);
     irq_set_chip(IRQ_DPC, lapic_get_chip(), NULL);
 

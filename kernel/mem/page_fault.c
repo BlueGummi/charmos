@@ -269,8 +269,8 @@ static void __noreturn page_fault_report_crash(vaddr_t fault_addr,
     if (is_slab_exec)
         dump_slab_exec_fault(curr, irqc);
 
-    struct panic_regs pregs;
-    irq_context_to_panic_regs(irqc, &pregs);
+    struct crash_regs pregs;
+    irq_context_to_crash_regs(irqc, &pregs);
     char msg[CRASH_MSG_MAX];
     snprintf(msg, sizeof(msg),
              "Kernel Page Fault at %p (CR2: %p, ar: %s, ec: 0x%lx, thread: %s)",
@@ -279,7 +279,7 @@ static void __noreturn page_fault_report_crash(vaddr_t fault_addr,
 
     spin_unlock_raw(&pf_lock);
 
-    crash(&(struct crash_context){
+    crash_full(&(struct crash_context){
         .source = CRASH_SOURCE_CPU_EXCEPTION,
         .formats = CRASH_FMT_DEFAULT,
         .file = __FILE__,

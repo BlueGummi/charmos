@@ -8,7 +8,7 @@ void __assert_fail(const char *assertion, const char *file, unsigned int line,
     char msg[CRASH_MSG_MAX];
     snprintf(msg, sizeof(msg), "Assertion \"%s\" failed",
              assertion ? assertion : "<unknown>");
-    crash(&(struct crash_context){
+    crash_full(&(struct crash_context){
         .source = CRASH_SOURCE_ASSERT,
         .formats = CRASH_FMT_DEFAULT,
         .file = file,
@@ -26,7 +26,7 @@ __noreturn void assert_impl_default(const char *file, int line,
     vsnprintf(msg, sizeof(msg), fmt, args);
     va_end(args);
 
-    crash(&(struct crash_context){
+    crash_full(&(struct crash_context){
         .source = CRASH_SOURCE_ASSERT,
         .formats = CRASH_FMT_DEFAULT,
         .file = file,

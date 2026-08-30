@@ -349,6 +349,13 @@ void schedule(void) {
         change_tick(sched, next);
     }
 
+    /* The last known good point before next becomes current
+     *
+     * Threads still in a read-side critical section
+     * are registered here */
+    rcu_note_context_switch(curr, /* next_is_idle = */ next->state ==
+                                      THREAD_STATE_IDLE_THREAD);
+
     load_thread(sched, next, time);
 
     context_switch(curr, next);
@@ -382,8 +389,7 @@ void scheduler_switch_in() {
 }
 
 void scheduler_yield() {
-    if (scheduler_self_in_resched() || scheduler_preemption_disabled())
-        return;
+    kassert(!scheduler_self_in_resched() && !scheduler_preemption_disabled());
 
     scheduler_lock_chk_assert();
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);

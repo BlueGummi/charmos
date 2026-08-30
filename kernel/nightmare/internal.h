@@ -12,7 +12,7 @@
     do {                                                                       \
         char _nm_msg[CRASH_MSG_MAX];                                           \
         snprintf(_nm_msg, sizeof(_nm_msg), fmt, ##__VA_ARGS__);                \
-        crash(&(struct crash_context) {                                        \
+        crash_full(&(struct crash_context) {                                   \
             .source = CRASH_SOURCE_NIGHTMARE,                                  \
             .formats = CRASH_FMT_DEFAULT,                                      \
             .file = __FILE__,                                                  \

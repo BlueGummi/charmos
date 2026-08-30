@@ -59,7 +59,6 @@ struct globals {
 
     /* TODO: no more of this */
     _Atomic uint64_t next_tlb_gen;
-    _Atomic uint64_t rcu_gen;
 
     /* Per core workqueues */
     struct workqueue **workqueues;

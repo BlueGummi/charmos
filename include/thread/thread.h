@@ -18,6 +18,7 @@
 #include <structures/rbt.h>
 #include <sync/condvar.h>
 #include <sync/lock_chk_types.h>
+#include <sync/rcu.h>
 #include <sync/spinlock.h>
 #include <thread/apc_types.h>
 #include <thread/thread_types.h>
@@ -192,7 +193,7 @@ struct thread {
     struct list_head wq_list_node;       /* waitqueue list node */
     struct pairing_node wq_pairing_node; /* waitqueue pairing node */
 
-    struct list_head rcu_list_node; /* rcu list node */
+    struct list_head rcu_list_node; /* blocked reader node on RCU leaf */
 
     /* ========== State ========== */
 
@@ -279,10 +280,21 @@ struct thread {
     volatile enum wake_reason wake_reason;
     size_t wait_cookie;
 
-    /* RCU */
-    _Atomic uint32_t rcu_nesting; /* incremented by this thread only */
-    _Atomic uint64_t rcu_start_gen;
-    _Atomic uint64_t rcu_quiescent_gen;
+    /* RCU stuff:
+     *
+     * rcu_nesting and rcu_read_seq are written ONLY by this thread
+     *
+     * rcu_leaf, rcu_blocked_seq, and rcu_list_node are how readers
+     * that get preempted mid-section get registered in RCU,
+     *
+     * those are written under the leaf's lock,
+     * either by us or the CPU switching us out
+     */
+    _Atomic uint32_t rcu_nesting;  /* read section depth */
+    _Atomic uint64_t rcu_read_seq; /* GP sequence at the outermost lock */
+    struct rcu_node *rcu_leaf;     /* leaf we are registered on or NULL */
+    uint64_t rcu_blocked_seq;      /* GP we are counted against or 0 */
+    struct rcu_cb free_rcu;
 
     /* Block/sleep and wake sync. */
     _Atomic enum thread_wait_type wait_type;
@@ -518,13 +530,21 @@ static inline void thread_set_runqueue(struct thread *t, struct scheduler *s) {
 REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(thread, refcount, flags,
                                                    &THREAD_FLAG_DYING);
 void reaper_enqueue(struct thread *t);
-static inline void thread_put(struct thread *t) {
-    if (refcount_dec_and_test(&t->refcount)) {
-        if (thread_get_state(t) != THREAD_STATE_ZOMBIE)
-            panic("final ref dropped while thread not zombie");
+void thread_put(struct thread *t);
 
-        reaper_enqueue(t);
+/* RCU keeps the thread memory allocated so we inc_not_zero here
+ * and everything is fine and dandy, everything must be in a
+ * read side critical section, though */
+static inline bool thread_get_rcu(struct thread *t) {
+    if (!refcount_inc_not_zero(&t->refcount))
+        return false;
+
+    if (thread_get_flags(t) & THREAD_FLAG_DYING) {
+        thread_put(t);
+        return false;
     }
+
+    return true;
 }
 
 static inline enum irql thread_acquire(struct thread *t, bool *success) {

@@ -7,7 +7,11 @@
 struct thread;
 struct cpu_context;
 
-#ifdef DEBUG_ASAN
+/* Both ASAN and the lock validator are very eager to consume
+ * stack memory, so we'll give threads four times as many pages
+ * if either of those happen to be on, and this should
+ * give enough headroom for when both are on too */
+#if defined(DEBUG_ASAN) || defined(DEBUG_LOCK_CHK)
 #define THREAD_STACK_SIZE (PAGE_SIZE * 16)
 #else
 #define THREAD_STACK_SIZE (PAGE_SIZE * 4)

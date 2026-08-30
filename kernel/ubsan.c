@@ -27,7 +27,7 @@ typedef struct {
         char _ubsan_msg[CRASH_MSG_MAX];                                        \
         snprintf(_ubsan_msg, sizeof(_ubsan_msg), fmt, ##__VA_ARGS__);          \
         const source_location_t *_sloc = (const source_location_t *) (loc);    \
-        crash(&(struct crash_context){                                         \
+        crash_full(&(struct crash_context){                                    \
             .source = CRASH_SOURCE_UBSAN,                                      \
             .formats = CRASH_FMT_DEFAULT,                                      \
             .file = (_sloc && _sloc->filename) ? _sloc->filename : __FILE__,   \

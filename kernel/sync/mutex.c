@@ -1,6 +1,7 @@
 #include <sch/sched.h>
 #include <stddef.h>
 #include <sync/mutex.h>
+#include <sync/rcu.h>
 #include <sync/turnstile.h>
 #include <thread/thread.h>
 #include <time/spin_sleep.h>
@@ -136,6 +137,18 @@ struct thread *mutex_get_owner(struct mutex *mtx) {
     return (struct thread *) (MUTEX_READ_LOCK_WORD(mtx) & (~MUTEX_META_BITS));
 }
 
+static struct thread *mutex_get_owner_ref(struct mutex *mutex) {
+    struct thread *owner;
+
+    rcu_read_lock();
+    owner = mutex_get_owner(mutex);
+    if (owner && !thread_get_rcu(owner))
+        owner = NULL;
+    rcu_read_unlock();
+
+    return owner;
+}
+
 size_t mutex_lock_get_backoff(size_t current_backoff) {
     if (!current_backoff)
         return MUTEX_BACKOFF_DEFAULT;
@@ -148,13 +161,12 @@ size_t mutex_lock_get_backoff(size_t current_backoff) {
 }
 
 static bool mutex_owner_running(struct mutex *mutex) {
-    bool ret = false;
-
-    struct thread *owner = mutex_get_owner(mutex);
+    struct thread *owner = mutex_get_owner_ref(mutex);
     if (!owner) /* no owner, can't possibly be running */
         return false;
 
-    ret = thread_get_state(owner) == THREAD_STATE_RUNNING;
+    bool ret = thread_get_state(owner) == THREAD_STATE_RUNNING;
+    thread_put(owner);
 
     return ret;
 }
@@ -238,14 +250,22 @@ void mutex_lock_subclass_internal(struct mutex *mutex, unsigned int subclass,
 
         /* owner unchanged, waiter bit still the same...
          * time to do the slow path */
-        if (mutex_get_owner(mutex) == current_owner) {
+        struct thread *owner = mutex_get_owner_ref(mutex);
+        if (owner == current_owner) {
+            /* Turnstile chain lock stabilizes the lock word until block()
+             * publishes the waiter, so we do not pin for the entire
+             * blocking period, since unlock clears ts->owner
+             * under this same chain before owner exits */
+            thread_put(owner);
             turnstile_block(ts, TURNSTILE_WRITER_QUEUE, mutex, ts_lock_irql,
-                            current_owner);
+                            owner);
 
             /* we do the dance all over again */
             backoff = MUTEX_BACKOFF_DEFAULT;
             owner_change_count = 0;
         } else {
+            if (owner)
+                thread_put(owner);
             /* nevermind, something changed again */
             turnstile_unlock(mutex, ts_lock_irql);
         }

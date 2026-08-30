@@ -506,10 +506,6 @@ void printf(const char *format, ...) {
     bool i = are_interrupts_enabled();
     disable_interrupts();
 
-    /* Once somebody has panicked the console lock is not worth waiting on: the
-     * CPU holding it may be the one that died, or may be us one frame further
-     * down. The other CPUs are being NMI'd into a halt anyway, so the
-     * interleaving this risks costs less than a deadlocked panic screen */
     bool lock = !atomic_load_explicit(&global.panicked, memory_order_relaxed);
 
     if (lock)

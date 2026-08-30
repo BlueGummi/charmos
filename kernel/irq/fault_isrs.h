@@ -6,12 +6,12 @@
                                            struct irq_context *rsp) {          \
         (void) ctx;                                                            \
         (void) vector;                                                         \
-        struct panic_regs pregs;                                               \
-        irq_context_to_panic_regs(rsp, &pregs);                                \
+        struct crash_regs pregs;                                               \
+        irq_context_to_crash_regs(rsp, &pregs);                                \
         char msg[CRASH_MSG_MAX];                                               \
         snprintf(msg, sizeof(msg), "CPU %u fault: " message " at %p",          \
                  (uint32_t) smp_core_id(), (void *) rsp->rip);                 \
-        crash(&(struct crash_context) {                                        \
+        crash_full(&(struct crash_context) {                                   \
             .source = CRASH_SOURCE_CPU_EXCEPTION,                              \
             .formats = CRASH_FMT_DEFAULT,                                      \
             .file = __FILE__,                                                  \
@@ -63,12 +63,12 @@ enum irq_result gpf_handler(void *ctx, uint8_t vector,
         printf("  Selector:  %u (0x%x)\n", index, index);
     }
 
-    struct panic_regs pregs;
-    irq_context_to_panic_regs(rsp, &pregs);
+    struct crash_regs pregs;
+    irq_context_to_crash_regs(rsp, &pregs);
     char msg[CRASH_MSG_MAX];
     snprintf(msg, sizeof(msg), "GPF on core %u at %p (error code 0x%lx)",
              (uint32_t) core, (void *) rsp->rip, ec);
-    crash(&(struct crash_context) {
+    crash_full(&(struct crash_context) {
         .source = CRASH_SOURCE_CPU_EXCEPTION,
         .formats = CRASH_FMT_DEFAULT,
         .file = __FILE__,
@@ -111,7 +111,7 @@ enum irq_result hw_error_nmi_isr(void *ctx, uint8_t vector,
         snprintf(msg, sizeof(msg),
                  "Hardware / Memory Parity NMI Error (Port 0x61 = 0x%02x)",
                  port61);
-        crash(&(struct crash_context) {
+        crash_full(&(struct crash_context) {
             .source = CRASH_SOURCE_CPU_EXCEPTION,
             .formats = CRASH_FMT_DEFAULT,
             .file = __FILE__,

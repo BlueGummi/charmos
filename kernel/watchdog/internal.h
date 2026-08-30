@@ -9,7 +9,7 @@
     do {                                                                       \
         char _wd_msg[CRASH_MSG_MAX];                                           \
         snprintf(_wd_msg, sizeof(_wd_msg), fmt, ##__VA_ARGS__);                \
-        crash(&(struct crash_context) {                                        \
+        crash_full(&(struct crash_context) {                                   \
             .source = CRASH_SOURCE_NMI_WATCHDOG,                               \
             .formats = CRASH_FMT_DEFAULT,                                      \
             .file = __FILE__,                                                  \

@@ -26,14 +26,13 @@
 
 static _Atomic int64_t crash_owner = -1;
 static _Atomic uint32_t crash_depth = 0;
-/* Crash reporting cannot depend on instrumented lock state. */
 static struct raw_spinlock crash_lock = RAW_SPINLOCK_INIT;
 
 PERCPU_DECLARE(crash_quiesced, _Atomic uint32_t, NULL);
-PERCPU_DECLARE(crash_regs, struct panic_regs, NULL);
-static struct panic_regs boot_crash_regs = {0};
+PERCPU_DECLARE(crash_regs, struct crash_regs, NULL);
+static struct crash_regs boot_crash_regs = {0};
 
-extern void crash_capture_regs(struct panic_regs *out);
+extern void crash_capture_regs(struct crash_regs *out);
 
 bool crash_cpu_is_owner(uint64_t id) {
     return atomic_load_explicit(&crash_owner, memory_order_relaxed) ==
@@ -42,7 +41,7 @@ bool crash_cpu_is_owner(uint64_t id) {
 
 void crash_nmi_handoff(void *p, struct irq_context *irqc) {
     (void) p;
-    struct panic_regs *this_regs_buf = PERCPU_PTR(crash_regs);
+    struct crash_regs *this_regs_buf = PERCPU_PTR(crash_regs);
     this_regs_buf->r8 = irqc->r8;
     this_regs_buf->r9 = irqc->r9;
     this_regs_buf->r10 = irqc->r10;
@@ -72,7 +71,7 @@ void crash_broadcast_nmi(void) {
     panic_broadcast(smp_core_id());
 }
 
-void panic_handler(struct panic_regs *regs) {
+void panic_handler(struct crash_regs *regs) {
     disable_interrupts();
 
     if (PERCPU_READY(crash_regs)) {
@@ -87,7 +86,7 @@ void panic_handler(struct panic_regs *regs) {
     }
 }
 
-static bool crash_regs_captured(const struct panic_regs *r) {
+static bool crash_regs_captured(const struct crash_regs *r) {
     for (int i = 0; i < CRASH_REG_COUNT; i++) {
         if (r->regs[i])
             return true;
@@ -101,7 +100,7 @@ struct crash_reg_entry {
     bool ret_addr;
 };
 
-static size_t crash_regs_collect(const struct panic_regs *r,
+static size_t crash_regs_collect(const struct crash_regs *r,
                                  struct crash_reg_entry *out) {
     size_t n = 0;
     out[n++] = (struct crash_reg_entry){"rax", r->rax, false};
@@ -235,7 +234,7 @@ static void crash_rflags_decode(uint64_t f, char *out, size_t cap) {
 }
 
 static void crash_regs_panel(struct report_target *tgt,
-                             const struct panic_regs *regs) {
+                             const struct crash_regs *regs) {
     struct crash_reg_entry r[CRASH_REG_COUNT];
     size_t n;
 
@@ -258,7 +257,7 @@ static void crash_regs_panel(struct report_target *tgt,
 }
 
 static void crash_backtrace_panel(struct report_target *tgt,
-                                  const struct panic_regs *regs) {
+                                  const struct crash_regs *regs) {
     uint64_t entries[STACK_TRACE_MAX_DEPTH];
     size_t nr = 0;
 
@@ -334,7 +333,7 @@ static uint32_t crash_cpu_panes(void) {
 
 static void crash_cpu_box(struct report_target *tgt, uint64_t id,
                           uint16_t inner) {
-    const struct panic_regs *r = PERCPU_PTR_FOR_CPU(crash_regs, id);
+    const struct crash_regs *r = PERCPU_PTR_FOR_CPU(crash_regs, id);
     _Atomic uint32_t *quiesced = PERCPU_PTR_FOR_CPU(crash_quiesced, id);
     time_us_t end = time_get_us() + CRASH_WAIT_US;
     uint64_t entries[6];
@@ -554,7 +553,7 @@ NDJSON_DECLARE(panic_frame, NDJSON_SECTION_PANIC, NDJSON_KIND_FRAME, 1,
                NDJSON_U64(off), NDJSON_STR(file), NDJSON_U64(line));
 
 static void crash_emit_ndjson_records(const struct crash_context *ctx,
-                                      const struct panic_regs *regs,
+                                      const struct crash_regs *regs,
                                       uint32_t depth) {
     const char *thread = global.current_bootstage >= BOOTSTAGE_LATE
                              ? thread_get_current()->name
@@ -622,7 +621,7 @@ static const char *crash_source_name(enum crash_source s) {
 }
 
 static void crash_report_visual(const struct crash_context *ctx,
-                                const struct panic_regs *regs) {
+                                const struct crash_regs *regs) {
     struct report_target con = report_console();
     struct report_panes *panes = report_panes_panic();
 
@@ -688,7 +687,7 @@ static void crash_report_visual(const struct crash_context *ctx,
 }
 
 static void crash_report_raw_serial(const struct crash_context *ctx,
-                                    const struct panic_regs *regs) {
+                                    const struct crash_regs *regs) {
     printf_unlocked("\n*** KERNEL CRASH: %s ***\n",
                     crash_source_name(ctx->source));
     if (ctx->file || ctx->func)
@@ -706,7 +705,7 @@ static void crash_report_raw_serial(const struct crash_context *ctx,
     }
 }
 
-__noreturn void crash(const struct crash_context *ctx) {
+__noreturn void crash_full(const struct crash_context *ctx) {
     disable_interrupts();
 
     uint32_t depth =
@@ -730,7 +729,7 @@ __noreturn void crash(const struct crash_context *ctx) {
                                    (int64_t) smp_core_id());
     atomic_store(&global.panicked, true);
 
-    struct panic_regs captured_regs;
+    struct crash_regs captured_regs;
     if (ctx->regs) {
         captured_regs = *ctx->regs;
     } else {

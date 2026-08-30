@@ -66,7 +66,7 @@ Just a few things to fix up, no big deal, not really correctness.
 - [ ] 2. Buddy
 - [ ] 3. Update where relevant
 
-## `RCU1` - Scaling RCU and making it generally better (NEAR **SKETCHED** MAIN)
+## `RCU1` - Scaling RCU and making it generally better (NEAR **IN PROGRESS** MAIN)
 
 Basically the title, RCU is quite bad, and I had held off on making it better
 because it's notoriously hard, especially with edge cases. Now that we have
@@ -74,8 +74,8 @@ testing stabilizing more, I'm open to opening this up.
 
 > Start condition: nightmare test stabilization
 
-- [ ] 1. Look at what linux does
-- [ ] 2. Tree RCU
+- [x] 1. Look at what linux does
+- [x] 2. Tree RCU
 - [ ] 3. More RCU configs
 
 ## `FAKEDEV1` - Fake Devices for Testing (NEAR **SKETCHED** MAIN)

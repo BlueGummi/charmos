@@ -165,7 +165,7 @@ void lock_chk_report_failure(const struct lock_chk_failure *failure) {
                           signature_text);
     nightmare_request_external_fail("lock_chk", signature, "%s", failure->msg);
 
-    crash(&(struct crash_context){
+    crash_full(&(struct crash_context){
         .source = CRASH_SOURCE_LOCK_CHK,
         .formats = CRASH_FMT_DEFAULT,
         .file = failure->site ? failure->site->file : __RELFILE__,

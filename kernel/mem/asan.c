@@ -22,7 +22,7 @@
         snprintf(_kasan_msg, sizeof(_kasan_msg),                               \
                  "KASAN: %s at %p (size=%zu, %s)", (what), (addr),             \
                  (size_t) (size), (is_write) ? "store" : "load");              \
-        crash(&(struct crash_context){                                         \
+        crash_full(&(struct crash_context){                                    \
             .source = CRASH_SOURCE_KASAN,                                      \
             .formats = CRASH_FMT_DEFAULT,                                      \
             .file = __FILE__,                                                  \
@@ -366,7 +366,7 @@ static void __asan_report_and_panic(const char *what, const void *addr,
     char msg[CRASH_MSG_MAX];
     snprintf(msg, sizeof(msg), "KASAN: %s at %p (size=%zu, %s)",
              what ? what : "<fault>", addr, size, is_write ? "store" : "load");
-    crash(&(struct crash_context){
+    crash_full(&(struct crash_context){
         .source = CRASH_SOURCE_KASAN,
         .formats = CRASH_FMT_DEFAULT,
         .file = __FILE__,

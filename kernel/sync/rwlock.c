@@ -1,5 +1,6 @@
 #include <console/panic.h>
 #include <sch/sched.h>
+#include <sync/rcu.h>
 #include <sync/turnstile.h>
 #include <thread/thread.h>
 
@@ -42,6 +43,21 @@ static inline bool rwlock_locked_with_type(struct rwlock *lock,
                 !(word & RWLOCK_WRITER_HELD_BIT));
 
     return false;
+}
+
+static struct thread *rwlock_get_owner_ref(struct rwlock *lock) {
+    struct thread *owner;
+
+    rcu_read_lock();
+    uintptr_t word = RWLOCK_READ_LOCK_WORD(lock);
+    owner = (word & RWLOCK_WRITER_HELD_BIT)
+                ? (struct thread *) RWLOCK_GET_OWNER_FROM_WORD(word)
+                : NULL;
+    if (owner && !thread_get_rcu(owner))
+        owner = NULL;
+    rcu_read_unlock();
+
+    return owner;
 }
 
 /* get the mask to mask the lock to determine if we should try and acquire */
@@ -259,7 +275,12 @@ void rw_lock_internal(struct rwlock *lock, enum rwlock_acquire_type acq_type,
         kassert(RWLOCK_GET_PRIO_CEIL(lword) &&
                 "rwlock prio ceiling cannot be 0 (background)");
 
-        turnstile_block(ts, queue, lock, irql_out, /* owner = */ NULL);
+        struct thread *owner = rwlock_get_owner_ref(lock);
+        if (owner) {
+            /* Same idea as mutex.c */
+            thread_put(owner);
+        }
+        turnstile_block(ts, queue, lock, irql_out, owner);
 
         /* when we wake up, we will have the lock handed off to us... */
         break;
