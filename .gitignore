@@ -27,3 +27,7 @@ __pycache__/
 # Editor
 .vscode/
 .DS_Store
+
+# .envrc for direnv convenience
+.envrc
+.env
