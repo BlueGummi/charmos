@@ -325,9 +325,7 @@ static void report_unlock(struct report_guard g) {
 static void console_line(const char *s, uint8_t indent) {
     struct report_guard g = report_lock();
 
-    for (uint8_t i = 0; i < indent; i++)
-        printf_unlocked(" ");
-
+    printf_unlocked("%*s", (int) indent, "");
     printf_unlocked("%s", s);
 
     if (!term_plain())

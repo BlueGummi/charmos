@@ -101,6 +101,11 @@ struct crash_context {
 #define CRASH_MSG_MAX 256
 
 #define CRASH_PAYLOAD(c, d) ((struct crash_payload) {.code = c, .data = d})
+#define CRASH_PARAMS(c, p0, p1, p2, p3)                                        \
+    ((struct crash_payload) {.code = (c),                                      \
+                             .params = {(uintptr_t) (p0), (uintptr_t) (p1),    \
+                                        (uintptr_t) (p2), (uintptr_t) (p3)}})
+
 #define CRASH_CODE_TO_PAYLOAD(c) ((struct crash_payload) {.code = c})
 #define CRASH_CODE_CREATE(pre, del)                                            \
     ({ ((((int) (pre)) << 16) | (((int) (del)) & 0xFFFF)); })

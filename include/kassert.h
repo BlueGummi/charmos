@@ -88,7 +88,7 @@
             __typeof__(x) _kassert_res = (x);                                  \
             if (unlikely(!(_kassert_res))) {                                   \
                 assert_impl_default(payload, __FILE__, __LINE__, __func__,     \
-                                    fmt, ##__VA_ARGS__);                       \
+                                    _kassert_msg(x) ": " fmt, ##__VA_ARGS__);  \
                 __builtin_unreachable();                                       \
             }                                                                  \
             _kassert_res;                                                      \

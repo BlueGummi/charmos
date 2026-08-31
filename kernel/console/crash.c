@@ -133,14 +133,35 @@ static size_t crash_regs_collect(const struct crash_regs *r,
     return n;
 }
 
-static void crash_describe_addr(uint64_t v, char *out, size_t cap) {
-    uint64_t off = 0;
+struct crash_addr_info {
     const char *sym;
+    uint64_t offset;
+    const char *file;
+    uint32_t line;
+};
 
+static struct crash_addr_info crash_resolve_addr(uint64_t addr,
+                                                 bool is_ret_addr) {
+    struct crash_addr_info info = {0};
+    uint64_t lookup_addr = (is_ret_addr && addr) ? addr - 1 : addr;
+
+    if (addr >= (uint64_t) &__stext && addr < (uint64_t) &__etext) {
+        info.sym = debug_symbolize(lookup_addr, &info.offset);
+        info.file = debug_line_for(lookup_addr, &info.line);
+    }
+    return info;
+}
+
+static void crash_describe_addr(uint64_t v, char *out, size_t cap) {
     if (v >= (uint64_t) &__stext && v < (uint64_t) &__etext) {
-        sym = debug_symbolize(v, &off);
-        if (sym)
-            snprintf(out, (int) cap, "%s+0x%lx", sym, off);
+        struct crash_addr_info info = crash_resolve_addr(v, false);
+        if (info.sym && info.file)
+            snprintf(out, (int) cap, "%s+0x%lx at %s:%u", info.sym, info.offset,
+                     info.file, info.line);
+        else if (info.sym)
+            snprintf(out, (int) cap, "%s+0x%lx", info.sym, info.offset);
+        else if (info.file)
+            snprintf(out, (int) cap, "<text> at %s:%u", info.file, info.line);
         else
             snprintf(out, (int) cap, "<text>");
         return;
@@ -384,8 +405,16 @@ static void crash_cpu_box(struct report_target *tgt, uint64_t id,
 
     for (size_t i = 0; i < nr; i++) {
         uint64_t off = 0;
+        uint32_t line = 0;
         const char *sym = debug_symbolize(entries[i], &off);
-        if (sym)
+        const char *file = debug_line_for(entries[i] - 1, &line);
+
+        if (sym && file)
+            report_box_printf(&box, "%s#%-2zu%s %s+0x%lx %sat %s:%u%s",
+                              term_style(TERM_SEV_DIM), i, term_style_reset(),
+                              sym, off, term_style(TERM_SEV_DIM), file, line,
+                              term_style_reset());
+        else if (sym)
             report_box_printf(&box, "%s#%-2zu%s %s+0x%lx",
                               term_style(TERM_SEV_DIM), i, term_style_reset(),
                               sym, off);
@@ -458,14 +487,17 @@ static size_t crash_logo_indent(const char *logo) {
     size_t least = (size_t) -1;
     for (const char *p = logo; *p;) {
         size_t indent = 0;
+
         while (*p == ' ') {
             indent++;
             p++;
         }
+
         if (*p && *p != '\n' && indent < least)
             least = indent;
-        while (*p && *p != '\n')
-            p++;
+
+        p = strchrnul(p, '\n');
+
         if (*p)
             p++;
     }
@@ -475,15 +507,17 @@ static size_t crash_logo_indent(const char *logo) {
 static size_t crash_logo_width(const char *logo, size_t skip) {
     size_t widest = 0;
     for (const char *p = logo; *p;) {
-        size_t n = 0;
+        const char *start;
+
         for (size_t i = 0; i < skip && *p == ' '; i++)
             p++;
-        while (*p && *p != '\n') {
-            n++;
-            p++;
-        }
-        if (n > widest)
-            widest = n;
+
+        start = p;
+        p = strchrnul(p, '\n');
+
+        if ((size_t) (p - start) > widest)
+            widest = (size_t) (p - start);
+
         if (*p)
             p++;
     }
@@ -498,16 +532,27 @@ static void crash_logo_panel(struct report_target *tgt, const char *logo) {
 
     for (const char *p = logo; *p;) {
         char row[REPORT_PANE_LINE_MAX];
-        size_t n = 0;
+        const char *eol;
+        size_t n;
+
         for (size_t i = 0; i < skip && *p == ' '; i++)
             p++;
-        while (*p && *p != '\n' && n + 1 < sizeof(row))
-            row[n++] = *p++;
+
+        eol = strchrnul(p, '\n');
+        n = (size_t) (eol - p);
+        if (n + 1 > sizeof(row))
+            n = sizeof(row) - 1;
+
+        memcpy(row, p, n);
+        p = eol;
+
         while (n && row[n - 1] == ' ')
             n--;
+
         row[n] = '\0';
         if (*p)
             p++;
+
         report_printf(tgt, "%*s%s%s%s", (int) pad, "", ANSI_RED, row,
                       ANSI_RESET);
     }
@@ -677,21 +722,37 @@ static void crash_report_visual(const struct crash_context *ctx,
         crash_backtrace_panel(&right, regs);
     report_section_end();
 
-    if (facility && facility->dump) {
-        char name_top[128];
+    char name_top[128];
+    if (facility) {
         uint16_t delta = CRASH_CODE_GET_DELTA(code);
         snprintf(name_top, sizeof(name_top),
-                 "\"%s\" crashed with code 0x%x (\"%s\")",
+                 "\"%s\" " ANSI_RED "crashed" ANSI_BRIGHT_BLUE
+                 " with code " ANSI_BOLD ANSI_WHITE "0x%x" ANSI_RESET
+                 " - " ANSI_CYAN "\"%s\"" ANSI_RESET,
                  facility->name ? facility->name : "unknown", code,
                  facility->to_str ? facility->to_str(delta) : "unknown");
-        if (report_section_begin_at(&right, name_top)) {
+    } else if (code != 0) {
+        char *to_str = (char *) crash_code_to_str(code);
+        if (!to_str)
+            to_str = "unknown";
+
+        snprintf(name_top, sizeof(name_top),
+                 ANSI_RED "crashed" ANSI_BRIGHT_BLUE
+                          " with code " ANSI_BOLD ANSI_WHITE "0x%x" ANSI_RESET
+                          " - " ANSI_CYAN "\"%s\"" ANSI_RESET,
+                 code, to_str);
+    } else {
+        strcpy(name_top, "empty box");
+    }
+
+    if (report_section_begin_at(&right, name_top)) {
+        if (facility && facility->dump) {
             active_facility_target = &right;
             facility->dump(CRASH_CODE_GET_DELTA(code), ctx->payload);
             active_facility_target = NULL;
-        }
-    } else {
-        if (report_section_begin_at(&right, "empty box"))
+        } else {
             crash_empty_box_panel(&right);
+        }
     }
 
     report_section_end();
@@ -823,6 +884,9 @@ static int cmp_facility_prefix(const void *key, const void *elem) {
 
 /* bsearch __skernel_crash_facilities to __ekernel_crash_facilities */
 static struct crash_facility *facility_for(uint16_t pref) {
+    if (!pref)
+        return NULL;
+
     size_t count = __ekernel_crash_facilities - __skernel_crash_facilities;
     return bsearch(&pref, __skernel_crash_facilities, count,
                    sizeof(struct crash_facility), cmp_facility_prefix);
