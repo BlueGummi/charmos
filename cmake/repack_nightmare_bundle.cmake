@@ -21,12 +21,8 @@ set(ENV{CMDLINE} "${CMDLINE}")
 set(ENV{NIGHTMARE_TESTS} "")
 set(ENV{TESTS} "")
 set(ENV{EXTRA_CMDLINE} "")
-execute_process(
-    COMMAND "${CMAKE_COMMAND}"
-            -DIN=${_artifacts}/limine.conf
-            -DOUT=${_iso_root}/boot/limine/limine.conf
-            -P ${CMAKE_CURRENT_LIST_DIR}/gen_limine_conf.cmake
-    COMMAND_ERROR_IS_FATAL ANY)
+execute_process(COMMAND "${CMAKE_COMMAND}" -DIN=${_artifacts}/limine.conf -DOUT=${_iso_root}/boot/limine/limine.conf -P
+                        ${CMAKE_CURRENT_LIST_DIR}/gen_limine_conf.cmake COMMAND_ERROR_IS_FATAL ANY)
 
 foreach (_asset limine-bios.sys limine-bios-cd.bin limine-uefi-cd.bin)
     file(COPY_FILE "${_artifacts}/${_asset}" "${_iso_root}/boot/limine/${_asset}" ONLY_IF_DIFFERENT)
@@ -36,13 +32,10 @@ foreach (_asset BOOTX64.EFI BOOTIA32.EFI)
 endforeach ()
 
 execute_process(
-    COMMAND xorriso -as mkisofs -R -r -J
-            -b boot/limine/limine-bios-cd.bin -no-emul-boot
-            -boot-load-size 4 -boot-info-table -hfsplus -apm-block-size 2048
-            --efi-boot boot/limine/limine-uefi-cd.bin
-            -efi-boot-part --efi-boot-image --protective-msdos-label
-            "${_iso_root}" -o "${OUTPUT_ISO}"
+    COMMAND
+        xorriso -as mkisofs -R -r -J -b boot/limine/limine-bios-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table
+        -hfsplus -apm-block-size 2048 --efi-boot boot/limine/limine-uefi-cd.bin -efi-boot-part --efi-boot-image
+        --protective-msdos-label "${_iso_root}" -o "${OUTPUT_ISO}"
     OUTPUT_QUIET ERROR_QUIET COMMAND_ERROR_IS_FATAL ANY)
-execute_process(
-    COMMAND "${_artifacts}/limine" bios-install "${OUTPUT_ISO}"
-    OUTPUT_QUIET ERROR_QUIET COMMAND_ERROR_IS_FATAL ANY)
+execute_process(COMMAND "${_artifacts}/limine" bios-install "${OUTPUT_ISO}" OUTPUT_QUIET ERROR_QUIET
+                                                                            COMMAND_ERROR_IS_FATAL ANY)

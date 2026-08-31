@@ -22,24 +22,24 @@ include(flags) # compiler / linker / codegen
 add_subdirectory(kernel)
 target_include_directories(kernel PRIVATE include)
 
-set(CHARMOS_COMMIT "" CACHE STRING "Commit identity for the kernel")
-set(CHARMOS_SOURCE_ROOT "${CMAKE_SOURCE_DIR}" CACHE PATH
-    "Local source root used in terminal hyperlinks emitted by kernel tests")
+set(CHARMOS_COMMIT
+    ""
+    CACHE STRING "Commit identity for the kernel")
+set(CHARMOS_SOURCE_ROOT
+    "${CMAKE_SOURCE_DIR}"
+    CACHE PATH "Local source root used in terminal hyperlinks emitted by kernel tests")
 if (CHARMOS_COMMIT STREQUAL "")
     execute_process(
         COMMAND git rev-parse --short=12 HEAD
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         OUTPUT_VARIABLE CHARMOS_COMMIT
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        ERROR_QUIET)
+        OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
 endif ()
 if (CHARMOS_COMMIT STREQUAL "")
     set(CHARMOS_COMMIT "unknown")
 endif ()
-target_compile_definitions(
-    kernel
-    PRIVATE CHARMOS_COMMIT="${CHARMOS_COMMIT}"
-            CHARMOS_SOURCE_ROOT="${CHARMOS_SOURCE_ROOT}")
+target_compile_definitions(kernel PRIVATE CHARMOS_COMMIT="${CHARMOS_COMMIT}"
+                                          CHARMOS_SOURCE_ROOT="${CHARMOS_SOURCE_ROOT}")
 
 include(emulation)
 

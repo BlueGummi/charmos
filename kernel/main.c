@@ -10,6 +10,7 @@
 #include <cmdline.h>
 #include <compiler.h>
 #include <console/printf.h>
+#include <console/term.h>
 #include <crypto/prng.h>
 #include <drivers/iommu/iommu.h>
 #include <drivers/mmio.h>
@@ -70,8 +71,9 @@ __no_sanitize_address void k_main(void) {
     global.hhdm_offset = hhdm_request.response->offset;
     global.pt_epoch = 1;
 
-    err_facilities_init();
     printf_init(framebuffer_request.response->framebuffers[0]);
+    err_facilities_init();
+    crash_facilities_init();
     ndjson_early_init();
     bootstage_advance(BOOTSTAGE_EARLY_FB);
 
@@ -139,6 +141,7 @@ __no_sanitize_address void k_main(void) {
     dpc_init_percpu();
     smp_wake(mp_request.response);
     timekeeper_init();
+    term_probe();
 
     topology_init();
     scheduler_domains_init();

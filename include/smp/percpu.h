@@ -63,7 +63,7 @@ LINKER_SECTION_DEFINE(struct percpu_descriptor, percpu_desc);
 
 #define PERCPU_PTR_FOR_CPU(name, cpu)                                          \
     ({                                                                         \
-        (void) kassert_oops(PERCPU_READY(name));                               \
+        (void) kassert(PERCPU_READY(name));                                    \
         ((typeof(__percpu_##name) *) (__percpu_desc_ref_##name)                \
              ->percpu_ptrs[cpu]);                                              \
     })

@@ -18,8 +18,10 @@ void __assert_fail(const char *assertion, const char *file, unsigned int line,
     });
 }
 
-__noreturn void assert_impl_default(const char *file, int line,
-                                    const char *func, const char *fmt, ...) {
+__noreturn void assert_impl_default(struct crash_payload pluh, const char *file,
+                                    int line, const char *func, const char *fmt,
+                                    ...) {
+    unused(pluh);
     static char msg[CRASH_MSG_MAX];
     va_list args;
     va_start(args, fmt);

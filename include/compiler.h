@@ -132,3 +132,11 @@
      (void) (g), (void) (h))
 
 #define unused(...) _DISPATCH(_UNUSED, PP_NARG(__VA_ARGS__))(__VA_ARGS__)
+
+#define __comptime_decay(x) __typeof__(0 ? (x) : (x))
+#define __comptime_is_str(x)                                                   \
+    (__builtin_types_compatible_p(__comptime_decay(x), char *) ||              \
+     __builtin_types_compatible_p(__comptime_decay(x), const char *))
+
+#define __comptime_as_str(x) ((const char *) (uintptr_t) (x))
+#define __comptime_as_type(T, x) ((T) (uintptr_t) (x))

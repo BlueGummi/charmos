@@ -14,6 +14,7 @@
 #include <linker/symbols.h>
 #include <log.h>
 #include <logo.h>
+#include <math/sort.h>
 #include <ndjson.h>
 #include <smp/core.h>
 #include <smp/percpu.h>
@@ -777,4 +778,39 @@ __noreturn void crash_full(const struct crash_context *ctx) {
 
     while (true)
         wait_for_interrupt();
+}
+
+static int cmp_facility_prefix(const void *key, const void *elem) {
+    uint16_t pref = *(const uint16_t *) key;
+    const struct crash_facility *f = elem;
+    return (pref > f->prefix) - (pref < f->prefix);
+}
+
+/* bsearch __skernel_crash_facilities to __ekernel_crash_facilities */
+static struct crash_facility *facility_for(uint16_t pref) {
+    size_t count = __ekernel_crash_facilities - __skernel_crash_facilities;
+    return bsearch(&pref, __skernel_crash_facilities, count,
+                   sizeof(struct crash_facility), cmp_facility_prefix);
+}
+
+const char *crash_code_from_facility_to_str(enum crash_code code) {
+    uint16_t pref = CRASH_CODE_GET_FACILITY(code);
+    uint16_t del = CRASH_CODE_GET_DELTA(code);
+    kassert(pref && del);
+    struct crash_facility *this = kassert(facility_for(pref));
+    if (this->to_str)
+        return this->to_str(del);
+
+    return NULL;
+}
+
+void crash_facilities_init(void) {
+    kassert(__ekernel_crash_facilities - __skernel_crash_facilities <=
+                UINT16_MAX,
+            "too many?");
+
+    /* Simple: 1 + index in array, keeps it sorted, avoids 0 */
+    for (struct crash_facility *f = __skernel_crash_facilities;
+         f < __ekernel_crash_facilities; f++)
+        f->prefix = (f - __skernel_crash_facilities) + 1;
 }

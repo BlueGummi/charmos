@@ -91,10 +91,10 @@ enum irq_result panic_nmi_isr(void *ctx, uint8_t vector,
                               struct irq_context *rsp) {
     (void) ctx, (void) vector, (void) rsp;
     if (atomic_load(&global.panicked)) {
-        if (panic_cpu_is_owner(smp_core_id()))
+        if (crash_cpu_is_owner(smp_core_id()))
             return IRQ_HANDLED;
 
-        panic_nmi_handoff(ctx, rsp);
+        crash_nmi_handoff(ctx, rsp);
     }
 
     return IRQ_NONE;

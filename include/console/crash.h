@@ -36,7 +36,7 @@ struct crash_regs {
 static_assert_struct_size_eq(crash_regs, CRASH_REG_COUNT * 8);
 
 enum crash_code {
-    CRASH_CODE_NONE,
+    CRASH_CODE_GENERIC,
 };
 
 enum crash_source {
@@ -66,12 +66,23 @@ enum crash_format_flags {
     CRASH_FMT_MINIMAL = CRASH_FMT_RAW_SERIAL | CRASH_FMT_NDJSON,
 };
 
-/* Essentially identical to errno.h */
+struct crash_payload {
+    enum crash_code code;
+    void *data;
+    uintptr_t params[4];
+};
+
+struct report_target;
 struct crash_facility {
     uint16_t prefix;
     const char *name;
     const char *desc;
     const char *(*const to_str)(uint16_t delta);
+
+    void (*const render_visual)(uint16_t delta, struct crash_payload *pl,
+                                struct report_target *target);
+
+    void (*const emit_ndjson)(uint16_t delta, struct crash_payload *pl);
 };
 
 struct crash_context {
@@ -91,6 +102,8 @@ struct crash_context {
 #define CRASH_MAX_DEPTH 2 /* Max recursive fault depth */
 #define CRASH_MSG_MAX 256
 
+#define CRASH_PAYLOAD(c, d) ((struct crash_payload) {.code = c, .data = d})
+#define CRASH_CODE_TO_PAYLOAD(c) ((struct crash_payload) {.code = c})
 #define CRASH_CODE_CREATE(pre, del)                                            \
     ({ ((((int) (pre)) << 16) | (((int) (del)) & 0xFFFF)); })
 
@@ -109,15 +122,27 @@ struct crash_context {
     LINKER_SECTION_OBJECT(struct crash_facility, crash_facilities)             \
     __crash_facility_##n = {.name = #n, __VA_ARGS__}
 
-__noreturn void assert_impl_default(const char *file, int line,
+LINKER_SECTION_DEFINE(struct crash_facility, crash_facilities);
+
+__noreturn void assert_impl_default(struct crash_payload payload,
+                                    const char *file, int line,
                                     const char *func, const char *fmt, ...);
 __noreturn void crash_full(const struct crash_context *ctx);
 
 bool crash_cpu_is_owner(uint64_t id);
 void crash_broadcast_nmi(void);
+void crash_facilities_init(void);
+const char *crash_code_from_facility_to_str(enum crash_code code);
 __noreturn void crash_nmi_handoff(void *p, struct irq_context *ctx);
 void debug_print_stack(void);
 
 static inline void qemu_exit(int code) {
     outb(0xf4, (uint8_t) code);
+}
+
+static inline const char *crash_code_to_str(enum crash_code code) {
+    switch (code) {
+    case CRASH_CODE_GENERIC: return "Generic";
+    default: return crash_code_from_facility_to_str(code);
+    }
 }

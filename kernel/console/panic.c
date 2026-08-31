@@ -9,8 +9,10 @@
 
 static char msg[REPORT_LINE_MAX];
 static struct raw_spinlock panic_msg_lock = RAW_SPINLOCK_INIT;
-__noreturn void panic_impl_default(const char *file, int line, const char *func,
-                                   const char *fmt, ...) {
+__noreturn void panic_impl_default(struct crash_payload pluh, const char *file,
+                                   int line, const char *func, const char *fmt,
+                                   ...) {
+    unused(pluh);
     raw_spin_lock(&panic_msg_lock);
     va_list args;
     va_start(args, fmt);
@@ -25,25 +27,5 @@ __noreturn void panic_impl_default(const char *file, int line, const char *func,
         .func = func,
         .msg = msg,
         .regs = NULL,
-    });
-}
-
-__noreturn void panic_impl_with_regs(const struct crash_regs *regs,
-                                     const char *file, int line,
-                                     const char *func, const char *fmt, ...) {
-    raw_spin_lock(&panic_msg_lock);
-    va_list args;
-    va_start(args, fmt);
-    vsnprintf(msg, (int) sizeof(msg), fmt, args);
-    va_end(args);
-
-    crash_full(&(struct crash_context){
-        .source = CRASH_SOURCE_PANIC,
-        .formats = CRASH_FMT_DEFAULT,
-        .file = file,
-        .line = line,
-        .func = func,
-        .msg = msg,
-        .regs = regs,
     });
 }

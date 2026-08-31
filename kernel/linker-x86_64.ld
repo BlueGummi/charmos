@@ -196,6 +196,13 @@ SECTIONS {
         __ekernel_err_facilities = .;
         . = ALIGN(64);
     } :data
+    
+    .kernel_crash_facilities : ALIGN(64) {
+        __skernel_crash_facilities = .;
+        KEEP(*(.kernel_crash_facilities))
+        __ekernel_crash_facilities = .;
+        . = ALIGN(64);
+    } :data
 
     .kernel_inject_sites : ALIGN(64) {
         __skernel_inject_sites = .;

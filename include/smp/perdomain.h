@@ -63,7 +63,7 @@ LINKER_SECTION_DEFINE(struct perdomain_descriptor, perdomain_desc);
 
 #define PERDOMAIN_PTR_FOR_DOMAIN(name, d)                                      \
     ({                                                                         \
-        (void) kassert_oops(PERDOMAIN_READY(name));                            \
+        (void) kassert(PERDOMAIN_READY(name));                                 \
         ((typeof(__perdomain_##name) *) (__perdomain_desc_ref_##name)          \
              ->perdomain_ptrs[d]);                                             \
     })

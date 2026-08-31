@@ -224,6 +224,28 @@ function (register_run_target tgt)
 endfunction ()
 
 register_run_target(run NDJSON -serial stdio -no-shutdown -no-reboot)
-register_run_target(headless NDJSON -nographic -serial mon:stdio -no-shutdown -no-reboot)
-register_run_target(tests DEBUG_EXIT NDJSON -nographic -serial mon:stdio -no-reboot)
-register_run_target(debug NDJSON -s -S -serial stdio -no-shutdown -no-reboot)
+register_run_target(
+    headless
+    NDJSON
+    -nographic
+    -serial
+    mon:stdio
+    -no-shutdown
+    -no-reboot)
+register_run_target(
+    tests
+    DEBUG_EXIT
+    NDJSON
+    -nographic
+    -serial
+    mon:stdio
+    -no-reboot)
+register_run_target(
+    debug
+    NDJSON
+    -s
+    -S
+    -serial
+    stdio
+    -no-shutdown
+    -no-reboot)

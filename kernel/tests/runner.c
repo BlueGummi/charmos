@@ -990,7 +990,6 @@ static void tests_set_intensities() {
 
 void tests_run(void) {
 #ifdef TEST_ENABLED
-    term_probe();
     tests_resolve_imports();
     tests_check_duplicate_names();
     tests_setup_groups();
