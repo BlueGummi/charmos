@@ -78,15 +78,13 @@ struct crash_facility {
     const char *name;
     const char *desc;
     const char *(*const to_str)(uint16_t delta);
+    void (*const dump)(uint16_t delta, struct crash_payload pl);
 
-    void (*const render_visual)(uint16_t delta, struct crash_payload *pl,
-                                struct report_target *target);
-
-    void (*const emit_ndjson)(uint16_t delta, struct crash_payload *pl);
+    void (*const emit_ndjson)(uint16_t delta, struct crash_payload pl);
 };
 
 struct crash_context {
-    enum crash_code code;
+    struct crash_payload payload;
     enum crash_source source;
     enum crash_format_flags formats;
     const char *file;
@@ -97,7 +95,7 @@ struct crash_context {
     void *source_data;
 };
 
-#define CRASH_WAIT_US MS_TO_US(100) /* Quiesce timeout per peer CPU */
+#define CRASH_WAIT_US MS_TO_US(500) /* Quiesce timeout per peer CPU */
 #define CRASH_SPIN_ONE_US 5
 #define CRASH_MAX_DEPTH 2 /* Max recursive fault depth */
 #define CRASH_MSG_MAX 256
@@ -135,6 +133,7 @@ void crash_facilities_init(void);
 const char *crash_code_from_facility_to_str(enum crash_code code);
 __noreturn void crash_nmi_handoff(void *p, struct irq_context *ctx);
 void debug_print_stack(void);
+void crash_facility_printf(const char *fmt, ...);
 
 static inline void qemu_exit(int code) {
     outb(0xf4, (uint8_t) code);

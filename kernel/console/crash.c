@@ -33,7 +33,17 @@ PERCPU_DECLARE(crash_quiesced, _Atomic uint32_t, NULL);
 PERCPU_DECLARE(crash_regs, struct crash_regs, NULL);
 static struct crash_regs boot_crash_regs = {0};
 
+NDJSON_DECLARE(panic_at, NDJSON_SECTION_PANIC, NDJSON_KIND_AT, 1,
+               NDJSON_STR(file), NDJSON_U64(line), NDJSON_STR(func),
+               NDJSON_STR(msg), NDJSON_STR(bootstage), NDJSON_STR(thread),
+               NDJSON_U64(depth));
+
+NDJSON_DECLARE(panic_frame, NDJSON_SECTION_PANIC, NDJSON_KIND_FRAME, 1,
+               NDJSON_U64(idx), NDJSON_HEX(addr), NDJSON_STR(sym),
+               NDJSON_U64(off), NDJSON_STR(file), NDJSON_U64(line));
+
 extern void crash_capture_regs(struct crash_regs *out);
+static struct crash_facility *crash_facility_for(enum crash_code code);
 
 bool crash_cpu_is_owner(uint64_t id) {
     return atomic_load_explicit(&crash_owner, memory_order_relaxed) ==
@@ -544,14 +554,22 @@ static void crash_empty_box_panel(struct report_target *tgt) {
         report_puts(tgt, panic_scene[i]);
 }
 
-NDJSON_DECLARE(panic_at, NDJSON_SECTION_PANIC, NDJSON_KIND_AT, 1,
-               NDJSON_STR(file), NDJSON_U64(line), NDJSON_STR(func),
-               NDJSON_STR(msg), NDJSON_STR(bootstage), NDJSON_STR(thread),
-               NDJSON_U64(depth));
+static struct report_target *active_facility_target = NULL;
 
-NDJSON_DECLARE(panic_frame, NDJSON_SECTION_PANIC, NDJSON_KIND_FRAME, 1,
-               NDJSON_U64(idx), NDJSON_HEX(addr), NDJSON_STR(sym),
-               NDJSON_U64(off), NDJSON_STR(file), NDJSON_U64(line));
+void crash_facility_printf(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+
+    if (active_facility_target) {
+        char buf[REPORT_PANE_LINE_MAX];
+        vsnprintf(buf, sizeof(buf), fmt, ap);
+        report_wrap(active_facility_target, buf);
+    } else {
+        vprintf(NULL, fmt, ap);
+    }
+
+    va_end(ap);
+}
 
 static void crash_emit_ndjson_records(const struct crash_context *ctx,
                                       const struct crash_regs *regs,
@@ -637,6 +655,8 @@ static void crash_report_visual(const struct crash_context *ctx,
     struct report_target left = report_pane(panes, 0);
     struct report_target right = report_pane(panes, 1);
 
+    enum crash_code code = ctx->payload.code;
+    struct crash_facility *facility = crash_facility_for(code);
     crash_logo_panel(&left, OS_LOGO_PANIC_CENTERED);
     report_blank(&left);
 
@@ -657,8 +677,23 @@ static void crash_report_visual(const struct crash_context *ctx,
         crash_backtrace_panel(&right, regs);
     report_section_end();
 
-    if (report_section_begin_at(&right, "empty box"))
-        crash_empty_box_panel(&right);
+    if (facility && facility->dump) {
+        char name_top[128];
+        uint16_t delta = CRASH_CODE_GET_DELTA(code);
+        snprintf(name_top, sizeof(name_top),
+                 "\"%s\" crashed with code 0x%x (\"%s\")",
+                 facility->name ? facility->name : "unknown", code,
+                 facility->to_str ? facility->to_str(delta) : "unknown");
+        if (report_section_begin_at(&right, name_top)) {
+            active_facility_target = &right;
+            facility->dump(CRASH_CODE_GET_DELTA(code), ctx->payload);
+            active_facility_target = NULL;
+        }
+    } else {
+        if (report_section_begin_at(&right, "empty box"))
+            crash_empty_box_panel(&right);
+    }
+
     report_section_end();
 
     report_panes_flush(panes);
@@ -745,7 +780,7 @@ __noreturn void crash_full(const struct crash_context *ctx) {
 
     if (global.current_bootstage >= BOOTSTAGE_MID_MP) {
         crash_broadcast_nmi();
-        sleep_spin_ms(50);
+        sleep_spin_ms(500);
     }
 
     report_enter_panic();
@@ -791,6 +826,10 @@ static struct crash_facility *facility_for(uint16_t pref) {
     size_t count = __ekernel_crash_facilities - __skernel_crash_facilities;
     return bsearch(&pref, __skernel_crash_facilities, count,
                    sizeof(struct crash_facility), cmp_facility_prefix);
+}
+
+static struct crash_facility *crash_facility_for(enum crash_code code) {
+    return facility_for(CRASH_CODE_GET_FACILITY(code));
 }
 
 const char *crash_code_from_facility_to_str(enum crash_code code) {

@@ -20,6 +20,7 @@ __noreturn void panic_impl_default(struct crash_payload pluh, const char *file,
     va_end(args);
 
     crash_full(&(struct crash_context){
+        .payload = pluh,
         .source = CRASH_SOURCE_PANIC,
         .formats = CRASH_FMT_DEFAULT,
         .file = file,

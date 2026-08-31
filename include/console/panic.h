@@ -53,10 +53,10 @@ __noreturn void panic_impl_default(struct crash_payload payload,
                            __LINE__, __func__, __comptime_as_str(y),           \
                            ##__VA_ARGS__))
 
-#define panic(...) _panic_dispatch(CRASH_CODE_GENERIC, _panic, "", __VA_ARGS__)
+#define panic(...) _panic_dispatch(CRASH_CODE_GENERIC, _panic, __VA_ARGS__)
 #define panic_with(payload, fmt, ...)                                          \
     panic_impl_default(payload, __FILE__, __LINE__, __func__, fmt,             \
                        ##__VA_ARGS__)
 
 #define panic_with_default(default, ...)                                       \
-    _panic_dispatch(default, _panic, "", __VA_ARGS__)
+    _panic_dispatch(default, _panic, __VA_ARGS__)
