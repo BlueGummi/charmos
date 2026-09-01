@@ -1,10 +1,15 @@
 name: Nightmare orchestrator
+run-name: Nightmare · ${{ inputs.batch_id || inputs.suite || 'scheduled' }}
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '0 6 * * *'
   workflow_dispatch:
     inputs:
+      batch_id:
+        description: Stable caller-generated identity for one atomic batch
+        required: false
+        default: ''
       suite:
         description: Committed suite for scheduled/compatibility mode
         required: false
@@ -56,14 +61,6 @@ jobs:
             --command-out command.json \
             --snapshot-out snapshot.json
 
-      - name: Wait for scheduled start time
-        if: inputs.batch_toml != ''
-        run: |
-          start_utc=$(jq -r '.payload.definition.start_utc // empty' command.json)
-          if [ -n "$start_utc" ]; then
-            python3 -m charm nightmare wait-until --at "$start_utc"
-          fi
-
       - name: Prepare repository-owned planner inputs
         if: inputs.batch_toml == ''
         run: |
@@ -76,16 +73,26 @@ jobs:
 
       - name: Validate and place
         run: |
+          ownership=repository
+          if [ -n "${{ inputs.batch_toml }}" ]; then ownership=ad-hoc; fi
           set +e
           python3 -m charm nightmare plan command.json snapshot.json \
             --source-commit "$SOURCE_SHA" \
             --runner-image "$RUNNER_IMAGE" \
-            --ownership repository \
+            --ownership "$ownership" \
             --out plan.json
           plan_rc=$?
           set -e
           test "$(jq -r '.kind' plan.json)" = accepted
           test "$plan_rc" -eq 0
+
+      - name: Wait for accepted ad-hoc start time
+        if: inputs.batch_toml != ''
+        run: |
+          start_utc=$(jq -r '.payload.definition.start_utc // empty' command.json)
+          if [ -n "$start_utc" ]; then
+            python3 -m charm nightmare wait-until --at "$start_utc"
+          fi
 
 
       - name: Export the bounded accepted plan
@@ -302,4 +309,3 @@ jobs:
             nightmare-summary.md
           if-no-files-found: warn
           retention-days: 90
-

@@ -178,6 +178,16 @@ enum slab_magazine_type {
     SLAB_MAGAZINE_TYPE_COUNT,
 };
 
+enum slab_crash_code {
+    SLAB_CRASH_CHUNK = CRASH_CODE_DELTA_START,
+    SLAB_CRASH_SLAB,
+    SLAB_CRASH_FREE_QUEUE,
+    SLAB_CRASH_MAGAZINE,
+    SLAB_CRASH_GC,
+    SLAB_CRASH_UAF,
+    SLAB_CRASH_INTERNAL
+};
+
 /*
  * Memory layout of slab with N pages:
  * ┌──────────────────────────────────────┐
