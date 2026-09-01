@@ -213,6 +213,19 @@ def compile_request(
         raise BundleError(
             f"build failed with exit code {completed.returncode}\n{log[-4000:]}"
         )
+
+    limine = subprocess.run(
+        ["make", "-C", str(root / "limine")],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    log += limine.stdout + limine.stderr
+    if limine.returncode != 0:
+        raise BundleError(
+            f"limine build failed with exit code {limine.returncode}\n{log[-4000:]}"
+        )
     return log
 
 
