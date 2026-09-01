@@ -29,6 +29,41 @@ def wait_until(target_time: datetime, max_wait_seconds: int = 21600) -> float:
     return delay
 
 
+def queue_metadata(
+    command: dict[str, Any],
+    *,
+    batch_id: str,
+    source_sha: str,
+    now: datetime | None = None,
+    defer_threshold_seconds: int = 60,
+    max_defer_seconds: int = 29 * 24 * 60 * 60,
+) -> dict[str, Any]:
+    """Describe whether an accepted command should wait in the Actions queue."""
+    payload = command.get("payload")
+    definition = payload.get("definition") if isinstance(payload, dict) else None
+    start_raw = definition.get("start_utc") if isinstance(definition, dict) else None
+    if not isinstance(start_raw, str):
+        raise ValueError("command payload is missing definition.start_utc")
+    try:
+        start = datetime.fromisoformat(start_raw.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError(f"invalid definition.start_utc: {error}") from error
+    if start.tzinfo is None:
+        raise ValueError("definition.start_utc must include a UTC offset")
+    evaluated_at = (now or datetime.now(UTC)).astimezone(UTC)
+    delay = (start.astimezone(UTC) - evaluated_at).total_seconds()
+    if delay > max_defer_seconds:
+        raise ValueError("definition.start_utc exceeds the 29-day queue horizon")
+    deferred = delay > defer_threshold_seconds
+    return {
+        "schema_version": 1,
+        "batch_id": batch_id,
+        "source_sha": source_sha,
+        "start_utc": _instant(start),
+        "deferred": deferred,
+    }
+
+
 def repository_command(
     *,
     suite_id: str,

@@ -1,0 +1,33 @@
+name: Nightmare waker
+
+on:
+  schedule:
+    # Avoid the busy top-of-hour window. Due batches start on the first wake
+    # after their requested time; GitHub schedules are intentionally coarse.
+    - cron: '7/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: nightmare-waker
+  cancel-in-progress: false
+
+jobs:
+  wake:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dispatch due accepted plans
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 -m charm nightmare wake-queue \
+            --repository "$GITHUB_REPOSITORY" \
+            --workflow nightmare-orchestrator.yml \
+            --ref "$GITHUB_REF_NAME" \
+            --api-url "$GITHUB_API_URL"

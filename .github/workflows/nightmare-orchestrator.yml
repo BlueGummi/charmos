@@ -1,5 +1,5 @@
 name: Nightmare orchestrator
-run-name: Nightmare · ${{ inputs.batch_id || inputs.suite || 'scheduled' }}
+run-name: ${{ inputs.queued_run_id && format('Nightmare · {0} · claim-{1}', inputs.batch_id, inputs.queued_run_id) || format('Nightmare · {0}', inputs.batch_id || inputs.suite || 'scheduled') }}
 
 on:
   schedule:
@@ -22,8 +22,13 @@ on:
         description: Exact repository commit; blank uses the triggering commit
         required: false
         default: ''
+      queued_run_id:
+        description: Internal source run for one deferred accepted plan
+        required: false
+        default: ''
 
 permissions:
+  actions: read
   contents: read
   packages: read
 
@@ -36,12 +41,14 @@ env:
   RUNNER_IMAGE: ghcr.io/axvonx/charmos-x86-env@sha256:2f77dec0b8a479bdfb8f9237ceb0c10320e418c5725592033cd9451e63fced87
   SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
   SUITE_ID: ${{ inputs.suite || 'overnight_locks' }}
+  BATCH_ID: ${{ inputs.batch_id || format('run-{0}', github.run_id) }}
 
 jobs:
   plan:
     runs-on: ubuntu-latest
     outputs:
       accepted: ${{ steps.result.outputs.accepted }}
+      deferred: ${{ steps.result.outputs.deferred }}
       build_matrix: ${{ steps.result.outputs.build_matrix }}
       source_sha: ${{ steps.result.outputs.source_sha }}
     steps:
@@ -49,8 +56,24 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Download one claimed accepted plan
+        if: inputs.queued_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: nightmare-queue
+          path: queued-plan
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.queued_run_id }}
+
+      - name: Restore one claimed accepted plan
+        if: inputs.queued_run_id != ''
+        run: |
+          cp queued-plan/command.json command.json
+          cp queued-plan/snapshot.json snapshot.json
+          cp queued-plan/plan.json plan.json
+
       - name: Prepare inline ad-hoc planner inputs
-        if: inputs.batch_toml != ''
+        if: inputs.queued_run_id == '' && inputs.batch_toml != ''
         env:
           BATCH_TOML: ${{ inputs.batch_toml }}
         run: |
@@ -62,7 +85,7 @@ jobs:
             --snapshot-out snapshot.json
 
       - name: Prepare repository-owned planner inputs
-        if: inputs.batch_toml == ''
+        if: inputs.queued_run_id == '' && inputs.batch_toml == ''
         run: |
           python3 -m charm nightmare repository-command \
             --suite "$SUITE_ID" \
@@ -72,6 +95,7 @@ jobs:
             --snapshot-out snapshot.json
 
       - name: Validate and place
+        if: inputs.queued_run_id == ''
         run: |
           ownership=repository
           if [ -n "${{ inputs.batch_toml }}" ]; then ownership=ad-hoc; fi
@@ -86,14 +110,17 @@ jobs:
           test "$(jq -r '.kind' plan.json)" = accepted
           test "$plan_rc" -eq 0
 
-      - name: Wait for accepted ad-hoc start time
-        if: inputs.batch_toml != ''
+      - name: Classify immediate or deferred execution
+        id: timing
         run: |
-          start_utc=$(jq -r '.payload.definition.start_utc // empty' command.json)
-          if [ -n "$start_utc" ]; then
-            python3 -m charm nightmare wait-until --at "$start_utc"
+          deferred=false
+          if [ -z "${{ inputs.queued_run_id }}" ] && [ -n "${{ inputs.batch_toml }}" ]; then
+            deferred=$(python3 -m charm nightmare queue-command command.json \
+              --batch-id "$BATCH_ID" \
+              --source-sha "$(jq -r '.plan.source.commit' plan.json)" \
+              --out queue.json)
           fi
-
+          echo "deferred=$deferred" >> "$GITHUB_OUTPUT"
 
       - name: Export the bounded accepted plan
         id: result
@@ -101,6 +128,7 @@ jobs:
           kind=$(jq -r '.kind' plan.json)
           if [ "$kind" = accepted ]; then
             echo 'accepted=true' >> "$GITHUB_OUTPUT"
+            echo "deferred=${{ steps.timing.outputs.deferred }}" >> "$GITHUB_OUTPUT"
             matrix=$(python3 -m charm nightmare matrix build plan.json)
             echo "build_matrix=$matrix" >> "$GITHUB_OUTPUT"
             echo "source_sha=$(jq -r '.plan.source.commit' plan.json)" >> "$GITHUB_OUTPUT"
@@ -118,6 +146,18 @@ jobs:
             exit 1
           fi
 
+      - name: Persist deferred accepted plan for the periodic waker
+        if: steps.timing.outputs.deferred == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightmare-queue
+          path: |
+            command.json
+            snapshot.json
+            plan.json
+            queue.json
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Upload authoritative plan
         if: always()
@@ -134,7 +174,7 @@ jobs:
 
   build:
     needs: plan
-    if: needs.plan.outputs.accepted == 'true'
+    if: needs.plan.outputs.accepted == 'true' && needs.plan.outputs.deferred != 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -259,7 +299,7 @@ jobs:
 
   aggregate:
     needs: [plan, build, materialize, runner]
-    if: always() && needs.plan.outputs.accepted == 'true'
+    if: always() && needs.plan.outputs.accepted == 'true' && needs.plan.outputs.deferred != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

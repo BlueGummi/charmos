@@ -746,6 +746,58 @@ def cmd_nm_wait_until(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_nm_queue_command(args: argparse.Namespace) -> int:
+    import json
+    from datetime import UTC, datetime
+
+    from .nightmare import workflow as OW
+
+    try:
+        command = _read_json_object(Path(args.command))
+        now = (
+            datetime.fromisoformat(args.at.replace("Z", "+00:00"))
+            if args.at
+            else datetime.now(UTC)
+        )
+        metadata = OW.queue_metadata(
+            command,
+            batch_id=args.batch_id,
+            source_sha=args.source_sha,
+            now=now,
+        )
+        Path(args.out).write_text(
+            json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
+        )
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+    print("true" if metadata["deferred"] else "false")
+    return 0
+
+
+def cmd_nm_wake_queue(args: argparse.Namespace) -> int:
+    import os
+
+    from .nightmare import waker as NW
+
+    try:
+        due = NW.wake_due(
+            token=os.environ.get(args.token_env, ""),
+            repository=args.repository,
+            workflow=args.workflow,
+            ref=args.ref,
+            api_url=args.api_url,
+        )
+    except (OSError, ValueError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+    for queue in due:
+        print(f"dispatched {queue.batch_id} from queued run {queue.run_id}")
+    if not due:
+        print("no deferred Nightmare plans are due")
+    return 0
+
+
 def add_report_args(sp: argparse.ArgumentParser) -> None:
 
     sp.add_argument("--summary", help="write markdown here (append if exists)")
@@ -1052,6 +1104,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="maximum wait window in seconds (default 6 hours)",
     )
     wu.set_defaults(fn=cmd_nm_wait_until)
+
+    qc = nmsub.add_parser(
+        "queue-command", help="classify one accepted command for deferred execution"
+    )
+    qc.add_argument("command")
+    qc.add_argument("--batch-id", required=True)
+    qc.add_argument("--source-sha", required=True)
+    qc.add_argument("--out", required=True)
+    qc.add_argument("--at", default=None, help="injected ISO-8601 clock")
+    qc.set_defaults(fn=cmd_nm_queue_command)
+
+    wq = nmsub.add_parser(
+        "wake-queue", help="dispatch all due artifact-backed Nightmare plans"
+    )
+    wq.add_argument("--repository", required=True)
+    wq.add_argument("--workflow", default="nightmare-orchestrator.yml")
+    wq.add_argument("--ref", default="main")
+    wq.add_argument("--api-url", default="https://api.github.com")
+    wq.add_argument("--token-env", default="GITHUB_TOKEN")
+    wq.set_defaults(fn=cmd_nm_wake_queue)
 
     def _add_runner_args(sp: argparse.ArgumentParser) -> None:
         sp.add_argument(
