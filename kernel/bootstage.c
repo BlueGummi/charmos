@@ -5,6 +5,7 @@
 #include <log.h>
 #include <rw_once.h>
 #include <string.h>
+#include <text_patch.h>
 
 /* The standard bootstage.h API and the fancy condition stuff are both here */
 
@@ -60,6 +61,8 @@ static bool bootstage_taken(struct bootstage_condition_entry *ent,
 
 static void bootstage_patch_all(enum bootstage bs) {
     struct bootstage_condition_entry *ent;
+    struct text_patch_window window = text_patch_begin();
+
     linker_section_for_each_object(ent, bootstage_condition_entries) {
         if (bootstage_taken(ent, bs)) {
             bootstage_write_jump(ent);
@@ -67,6 +70,8 @@ static void bootstage_patch_all(enum bootstage bs) {
             bootstage_write_nop(ent);
         }
     }
+
+    text_patch_end(window);
 }
 
 void bootstage_advance(enum bootstage new) {

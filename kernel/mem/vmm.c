@@ -280,11 +280,20 @@ void vmm_init(struct limine_memmap_response *memmap,
 
     enum errno e;
 
-    /* We leave the kernel writable to do boot time patching, but
-     * TODO: lock the kernel down and make it RO later on */
+    uint64_t text_start = (uint64_t) &__stext;
+    uint64_t text_end = (uint64_t) &__etext;
+    uint64_t text_phys_start =
+        kernel_phys_start + (text_start - kernel_virt_start);
+    uint64_t text_phys_end = kernel_phys_start + (text_end - kernel_virt_start);
+
     for (uint64_t i = 0; i < kernel_size; i += PAGE_SIZE) {
-        e = vmm_map_page(kernel_virt_start + i, kernel_phys_start + i,
-                         PAGE_WRITE | PAGE_PRESENT, VMM_FLAG_NONE);
+        uint64_t virt = kernel_virt_start + i;
+        uint64_t flags = PAGE_PRESENT;
+
+        if (virt < text_start || virt >= text_end)
+            flags |= PAGE_WRITE;
+
+        e = vmm_map_page(virt, kernel_phys_start + i, flags, VMM_FLAG_NONE);
         if (e < 0)
             panic("Error %s whilst mapping kernel", errno_to_str(e));
     }
@@ -320,16 +329,24 @@ void vmm_init(struct limine_memmap_response *memmap,
         while (phys < end) {
             uint64_t virt = hhdm_paddr_to_vaddr(phys);
 
+            bool overlaps_text =
+                phys < text_phys_end && phys + PAGE_2MB > text_phys_start;
+
             bool can_use_2mb = ((phys % PAGE_2MB) == 0) &&
                                ((virt % PAGE_2MB) == 0) &&
-                               ((end - phys) >= PAGE_2MB);
+                               ((end - phys) >= PAGE_2MB) && !overlaps_text;
 
             if (can_use_2mb) {
                 e = vmm_map_page(virt, phys, flags, VMM_FLAG_NONE,
                                  VMM_MAP_PAGE_SIZE_2MB);
                 phys += PAGE_2MB;
             } else {
-                e = vmm_map_page(virt, phys, flags);
+                uint64_t page_flags = flags;
+
+                if (phys >= text_phys_start && phys < text_phys_end)
+                    page_flags &= ~PAGE_WRITE;
+
+                e = vmm_map_page(virt, phys, page_flags);
                 phys += PAGE_SIZE;
             }
             if (e < 0)
