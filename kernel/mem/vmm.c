@@ -1,5 +1,6 @@
 #include <acpi/lapic.h>
 #include <cmdline.h>
+#include <compiler.h>
 #include <console/printf.h>
 #include <global.h>
 #include <irq/idt.h>
@@ -23,6 +24,13 @@
 #include "mem/slab/internal.h"
 
 #define KERNEL_PML4_START_INDEX 256
+
+static paddr_t text_phys_start;
+static paddr_t text_phys_end;
+
+bool vmm_phys_is_kernel_text(paddr_t phys) {
+    return text_phys_end && phys >= text_phys_start && phys < text_phys_end;
+}
 
 static inline bool in_use(pte_t pte) {
     return pte_in_use((pte_atomic_t *) &pte);
@@ -282,9 +290,8 @@ void vmm_init(struct limine_memmap_response *memmap,
 
     uint64_t text_start = (uint64_t) &__stext;
     uint64_t text_end = (uint64_t) &__etext;
-    uint64_t text_phys_start =
-        kernel_phys_start + (text_start - kernel_virt_start);
-    uint64_t text_phys_end = kernel_phys_start + (text_end - kernel_virt_start);
+    text_phys_start = kernel_phys_start + (text_start - kernel_virt_start);
+    text_phys_end = kernel_phys_start + (text_end - kernel_virt_start);
 
     for (uint64_t i = 0; i < kernel_size; i += PAGE_SIZE) {
         uint64_t virt = kernel_virt_start + i;
@@ -846,6 +853,14 @@ out:
 }
 
 enum errno vmm_map_page_full(struct vmm_map_request *rq) {
+    if (unlikely(text_phys_end && (rq->page_flags & PAGE_WRITE) &&
+                 rq->phys < text_phys_end &&
+                 rq->phys + map_page_bytes(rq->page_size) > text_phys_start))
+        panic(
+            "writable alias of kernel text: virt 0x%lx phys 0x%lx flags 0x%lx",
+            (uint64_t) rq->virt, (uint64_t) rq->phys,
+            (uint64_t) rq->page_flags);
+
     return vmm_pt_apply(rq);
 }
 

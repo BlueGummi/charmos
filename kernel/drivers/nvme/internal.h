@@ -1,6 +1,8 @@
+#include <console/printf.h>
 #include <drivers/nvme.h>
 #include <log.h>
 #include <math/div.h>
+#include <mem/vmm.h>
 
 #define NVME_CMD_TIMEOUT_MS 2000    // Normal command timeout
 #define NVME_ADMIN_TIMEOUT_MS 5000  // Admin commands
@@ -16,6 +18,8 @@ LOG_HANDLE_EXTERN(nvme);
 #define NVME_COMPLETION_STATUS(cpl) (((cpl)->status >> 1) & 0x7FFF)
 
 #define NVME_DOORBELL_BASE 0x1000
+
+#define NVME_PRPS_PER_PAGE (PAGE_SIZE / sizeof(uint64_t))
 
 #define NVME_OP_ADMIN_DELETE_IOSQ 0x0
 #define NVME_OP_ADMIN_CREATE_IOSQ 0x1
@@ -34,6 +38,15 @@ LOG_HANDLE_EXTERN(nvme);
 
 #define NVME_STATUS_CONFLICTING_ATTRIBUTES 0x80
 #define NVME_STATUS_INVALID_PROT_INFO 0x81
+
+/* We funnel addresses through this so we can catch bad ones */
+static inline void nvme_check_dma_addr(uint64_t phys, const char *what) {
+    if (phys == (uint64_t) -1 || phys == 0)
+        panic("NVMe: %s has no physical mapping (0x%lx)", what, phys);
+
+    if (vmm_phys_is_kernel_text(phys))
+        panic("NVMe: %s aims at kernel text (phys 0x%lx)", what, phys);
+}
 
 bool nvme_read_sector_async(struct block_device *disk,
                             struct nvme_request *req);

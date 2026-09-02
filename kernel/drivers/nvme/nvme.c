@@ -102,6 +102,12 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     uint32_t sqs_to_make = core_count > total_sq ? total_sq : core_count;
 
     nvme->max_transfer_size = (1 << c->mdts) * PAGE_SIZE;
+
+    /* Commands describe one page via PRP1 and the rest through one
+     * PRP List page, so we just cap the transfer at that */
+    uint32_t prp_limit = NVME_PRPS_PER_PAGE * PAGE_SIZE;
+    if (nvme->max_transfer_size > prp_limit)
+        nvme->max_transfer_size = prp_limit;
     nvme_log(LOG_INFO, "Controller max transfer size is %u bytes",
              nvme->max_transfer_size);
 

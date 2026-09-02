@@ -1,5 +1,6 @@
 option(QEMU_KVM "Enable KVM acceleration" OFF)
 option(QEMU_IOMMU "Attach intel-iommu device with intremap" ON)
+option(QEMU_NIC "Let QEMU attach its default NIC (e1000 on q35)" ON)
 option(QEMU_NUMA "Configure 4-node NUMA topology" ON)
 option(QEMU_USB "Attach xHCI controller with USB kbd/mouse" ON)
 option(QEMU_NVME "Attach NVMe drive backed by disk.img" ON)
@@ -126,6 +127,10 @@ endif ()
 
 if (QEMU_IOMMU)
     list(APPEND QEMU_FLAGS -device intel-iommu,intremap=on)
+endif ()
+
+if (NOT QEMU_NIC)
+    list(APPEND QEMU_FLAGS -nic none)
 endif ()
 
 if (QEMU_NVME)

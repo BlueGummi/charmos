@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <limine.h>
 #include <mem/demand_page.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <types/types.h>
 
@@ -58,6 +59,8 @@ struct vmm_map_request {
 
 void vmm_init(struct limine_memmap_response *memmap,
               struct limine_executable_address_response *xa);
+
+bool vmm_phys_is_kernel_text(paddr_t phys);
 
 enum errno vmm_map_page_full(struct vmm_map_request *rq);
 void vmm_unmap_page_full(struct vmm_map_request *rq);

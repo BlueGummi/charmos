@@ -3,6 +3,8 @@
 #include <block/sched.h>
 #include <drivers/nvme.h>
 #include <mem/alloc.h>
+#include <mem/hhdm.h>
+#include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -36,11 +38,15 @@ static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
     if (!data->prps)
         return false;
 
-    vaddr_t vaddr = PAGE_ALIGN_DOWN(buffer);
+    /* PRP1 is the only one that can have a non-zero offset, and
+     * because the transfer begins some way into the first page, it needs
+     * to use this. Later entries describe full pages so must be page aligned */
+    vaddr_t vaddr = (vaddr_t) buffer;
 
     for (size_t i = 0; i < num_pages; i++) {
         data->prps[i] = vmm_get_phys(vaddr, VMM_FLAG_NONE);
-        vaddr += PAGE_SIZE;
+        nvme_check_dma_addr(data->prps[i], "PRP entry");
+        vaddr = PAGE_ALIGN_DOWN(vaddr) + PAGE_SIZE;
     }
 
     data->prp_count = num_pages;
@@ -48,29 +54,51 @@ static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
     return true;
 }
 
-static void nvme_setup_prps(struct nvme_command *cmd,
+static bool nvme_setup_prps(struct nvme_command *cmd,
                             struct nvme_bio_data *data) {
     kassert(data->prp_count > 0);
 
     cmd->prp1 = data->prps[0];
+    nvme_check_dma_addr(cmd->prp1, "prp1");
 
+    kassert(IS_ALIGNED(cmd->prp1, 4)); /* dword aligned */
     if (data->prp_count == 1) {
         cmd->prp2 = 0;
         goto free_prps;
     } else if (data->prp_count == 2) {
         cmd->prp2 = data->prps[1];
+        nvme_check_dma_addr(cmd->prp2, "prp2");
         goto free_prps;
-    } else {
-        cmd->prp2 = vmm_get_phys((uint64_t) (&data->prps[1]), VMM_FLAG_NONE);
     }
 
-    return;
+    /* After 2 pages PRP2 is a PRP List pointer. This means
+     * we need to provide another page for the list,
+     * with max_transfer_size always preventing too many */
+    uint64_t entries = data->prp_count - 1;
+    kassert(entries <= NVME_PRPS_PER_PAGE);
 
-    /* For when there is no need for multiple PRPs */
+    paddr_t list_phys = pmm_alloc_page();
+    if (!list_phys)
+        goto free_prps_fail;
+
+    uint64_t *list = hhdm_paddr_to_ptr(list_phys);
+    for (uint64_t i = 0; i < entries; i++)
+        list[i] = data->prps[i + 1];
+
+    data->prp_list_phys = list_phys;
+    cmd->prp2 = list_phys;
+    nvme_check_dma_addr(cmd->prp2, "PRP list pointer");
+
+    /* List page has everything needed by the controller */
 free_prps:
     kfree(data->prps);
     data->prps = NULL;
-    return;
+    return true;
+
+free_prps_fail:
+    kfree(data->prps);
+    data->prps = NULL;
+    return false;
 }
 
 static bool rw_send_command(struct block_device *disk, struct nvme_request *req,
@@ -109,7 +137,11 @@ static bool rw_send_command(struct block_device *disk, struct nvme_request *req,
     cmd.cdw11 = lba >> 32ULL;
     cmd.cdw12 = count - 1;
 
-    nvme_setup_prps(&cmd, data);
+    if (!nvme_setup_prps(&cmd, data)) {
+        req->bio_data = NULL;
+        kfree(data);
+        return false;
+    }
 
     req->lba = lba;
     req->buffer = buffer;

@@ -74,6 +74,10 @@ struct nvme_regs {
 struct nvme_bio_data {
     uint64_t *prps;
     uint64_t prp_count;
+
+    /* PRP List page handed to the controller, or just
+     * 0 when the transfer fits in PRP1/2  */
+    paddr_t prp_list_phys;
 };
 
 struct nvme_request {

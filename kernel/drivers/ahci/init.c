@@ -35,6 +35,20 @@ static void setup_port_slots(struct ahci_device *dev, uint32_t port_id) {
     }
 }
 
+/* Stop the port so it doesn't start overwriting potential kernel text */
+static void ahci_port_quiesce(struct ahci_port *port) {
+    mmio_write_32(&port->cmd, mmio_read_32(&port->cmd) & ~AHCI_CMD_ST);
+    mmio_spin_wait(&port->cmd, AHCI_CMD_CR, AHCI_CMD_TIMEOUT_MS);
+
+    mmio_write_32(&port->cmd, mmio_read_32(&port->cmd) & ~AHCI_CMD_FRE);
+    mmio_spin_wait(&port->cmd, AHCI_CMD_FR, AHCI_CMD_TIMEOUT_MS);
+
+    mmio_write_32(&port->clb, 0);
+    mmio_write_32(&port->clbu, 0);
+    mmio_write_32(&port->fb, 0);
+    mmio_write_32(&port->fbu, 0);
+}
+
 static void allocate_port(struct ahci_device *dev, struct ahci_port *port,
                           uint32_t port_num) {
     uint64_t cmdlist_phys = pmm_alloc_page();
@@ -44,10 +58,10 @@ static void allocate_port(struct ahci_device *dev, struct ahci_port *port,
     memset(cmdlist, 0, PAGE_SIZE);
     memset(fis, 0, PAGE_SIZE);
 
-    port->clb = cmdlist_phys & 0xFFFFFFFFUL;
-    port->clbu = cmdlist_phys >> 32;
-    port->fb = fis_phys & 0xFFFFFFFFUL;
-    port->fbu = fis_phys >> 32;
+    mmio_write_32(&port->clb, cmdlist_phys & 0xFFFFFFFFUL);
+    mmio_write_32(&port->clbu, cmdlist_phys >> 32);
+    mmio_write_32(&port->fb, fis_phys & 0xFFFFFFFFUL);
+    mmio_write_32(&port->fbu, fis_phys >> 32);
     struct ahci_cmd_table **arr =
         kmalloc(sizeof(struct ahci_cmd_table *) * 32, ALLOC_FLAGS_ZERO);
     struct ahci_cmd_header **hdr =
@@ -78,15 +92,7 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
 
         struct ahci_port *port = ahci_get_port(dev, i);
 
-        mmio_write_32(&port->cmd, mmio_read_32(&port->cmd) & ~AHCI_CMD_ST);
-        mmio_spin_wait(&port->cmd, AHCI_CMD_CR, AHCI_CMD_TIMEOUT_MS);
-
-        mmio_write_32(&port->cmd, mmio_read_32(&port->cmd) & ~AHCI_CMD_FRE);
-        mmio_spin_wait(&port->cmd, AHCI_CMD_FR, AHCI_CMD_TIMEOUT_MS);
-
-        uint32_t cmd = mmio_read_32(&port->cmd);
-        cmd |= AHCI_CMD_FRE | AHCI_CMD_ST;
-        mmio_write_32(&port->cmd, cmd);
+        ahci_port_quiesce(port);
 
         uint32_t ssts = mmio_read_32(&port->ssts);
         uint32_t det = ssts & 0x0F;
@@ -139,22 +145,19 @@ static struct ahci_disk *device_setup(struct ahci_device *dev,
             disks[disks_ind].port = i;
             disks[disks_ind].device = dev;
 
-            uint32_t cmd = mmio_read_32(&port->cmd);
             mmio_write_32(&port->is, 0xFFFFFFFF);
             mmio_write_32(&port->ie, 0xFFFFFFFF);
-            mmio_write_32(&port->cmd, cmd & ~(AHCI_CMD_ST | AHCI_CMD_FRE));
 
-            mmio_spin_wait(&port->cmd, AHCI_CMD_CR | AHCI_CMD_FR,
-                           AHCI_CMD_TIMEOUT_MS);
+            ahci_port_quiesce(port);
 
+            /* FRE may only be set once PxFB points at our memory */
             allocate_port(dev, port, i);
+            mmio_write_32(&port->cmd, mmio_read_32(&port->cmd) | AHCI_CMD_FRE);
 
-            cmd = mmio_read_32(&port->cmd);
-            cmd |= AHCI_CMD_FRE;
-            cmd |= AHCI_CMD_ST;
-            mmio_write_32(&port->cmd, cmd);
-
+            /* ST is set after the port slots are setup */
             setup_port_slots(dev, i);
+            mmio_write_32(&port->cmd, mmio_read_32(&port->cmd) | AHCI_CMD_ST);
+
             ahci_log(LOG_INFO, "Port %u slots set up", i);
         }
     }

@@ -254,6 +254,23 @@ static void __noreturn page_fault_report_crash(vaddr_t fault_addr,
     if (fault_addr >= protector_base && fault_addr <= protector_top)
         printf("Likely stack overflow!! Fault in protector page!!!\n");
 
+    vaddr_t code = PAGE_ALIGN_DOWN(irqc->rip);
+    if (vmm_get_phys(code, VMM_FLAG_NONE) != (paddr_t) -1) {
+        printf("\n--- Bytes at RIP %p ---\n", (void *) irqc->rip);
+
+        for (int64_t i = -16; i < 16; i++) {
+            vaddr_t at = irqc->rip + i;
+
+            if (PAGE_ALIGN_DOWN(at) != code &&
+                vmm_get_phys(at, VMM_FLAG_NONE) == (paddr_t) -1)
+                continue;
+
+            printf("%02x ", *(const uint8_t *) at);
+        }
+
+        printf("\n");
+    }
+
     printf("\n--- Stack at fault RSP ---\n");
     debug_print_stack_from((uint64_t *) irqc->rsp, 0);
 

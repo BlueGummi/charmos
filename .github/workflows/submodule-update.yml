@@ -1,0 +1,120 @@
+name: Submodule Update
+
+on:
+  schedule:
+    # Mondays 06:00 UTC
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: submodule-update-${{ github.workflow }}
+
+jobs:
+  bump:
+    name: Bump ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: uacpi
+            path: kernel/uACPI
+          - name: flanterm
+            path: kernel/flanterm
+          - name: limine
+            path: limine
+    container:
+      image: ghcr.io/axvonx/charmos-x86-env@sha256:2f77dec0b8a479bdfb8f9237ceb0c10320e418c5725592033cd9451e63fced87
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Record current pointer
+        id: before
+        run: echo "sha=$(git -C ${{ matrix.path }} rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Bump submodule
+        run: git submodule update --remote --merge -- ${{ matrix.path }}
+
+      - name: Check for update
+        id: diff
+        run: |
+          new_sha=$(git -C ${{ matrix.path }} rev-parse HEAD)
+          echo "sha=$new_sha" >> "$GITHUB_OUTPUT"
+          if [ "$new_sha" = "${{ steps.before.outputs.sha }}" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        id: build
+        if: steps.diff.outputs.changed == 'true'
+        continue-on-error: true
+        run: ./scripts/build.sh -t Debug --compiler gcc -C
+
+      - name: Test
+        id: test
+        if: steps.diff.outputs.changed == 'true' && steps.build.outcome == 'success'
+        continue-on-error: true
+        env:
+          TERM: dumb
+        run: |
+          set +e
+          timeout --foreground -k 10 300 cmake --build build --target tests
+          rc=$?
+          pkill -f qemu-system-x86_64 2>/dev/null || true
+          exit "$rc"
+
+      - name: Determine status
+        id: status
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          if [ "${{ steps.build.outcome }}" != "success" ]; then
+            echo "result=build failed" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.test.outcome }}" != "success" ]; then
+            echo "result=tests failed" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=passed" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open pull request
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "[submodule]: bump ${{ matrix.name }} to ${{ steps.diff.outputs.sha }}"
+          title: "Bump ${{ matrix.name }} submodule (${{ steps.status.outputs.result }})"
+          body: |
+            Automated weekly submodule update
+
+            - Submodule: `${{ matrix.path }}`
+            - Old: `${{ steps.before.outputs.sha }}`
+            - New: `${{ steps.diff.outputs.sha }}`
+            - Build/test: **${{ steps.status.outputs.result }}**
+
+            ${{ steps.status.outputs.result != 'passed' && 'This bump failed the check' || 'Build and tests passed' }}
+
+            Compare: https://github.com/${{ github.repository_owner }}/${{ matrix.path == 'kernel/uACPI' && 'uACPI/uACPI' || matrix.path == 'kernel/flanterm' && 'Mintsuki/Flanterm' || 'limine-bootloader/limine' }}/compare/${{ steps.before.outputs.sha }}...${{ steps.diff.outputs.sha }}
+          branch: chore/bump-${{ matrix.name }}
+          delete-branch: true
+          labels: |
+            submodule-update
+            ${{ steps.status.outputs.result != 'passed' && 'needs-attention' || '' }}
+          add-paths: |
+            ${{ matrix.path }}
