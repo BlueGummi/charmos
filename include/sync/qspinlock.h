@@ -74,8 +74,7 @@ static inline void
 qspinlock_init_chk_internal(struct qspinlock *lock,
                             const struct lock_chk_class *class,
                             enum lock_chk_flags flags);
-
-static inline bool qspin_held(const struct qspinlock *lock);
+static inline bool qspin_is_locked(const struct qspinlock *lock);
 
 #ifdef DEBUG_LOCK_CHK
 
@@ -128,7 +127,7 @@ static inline void qspinlock_shallow_init_internal(struct qspinlock *lock) {
 static inline void qspinlock_set_chk_flags(struct qspinlock *lock,
                                            enum lock_chk_flags flags) {
     kassert(lock->chk_initialized);
-    kassert(!qspin_held(lock));
+    kassert(!qspin_is_locked(lock));
     kassert(!atomic_load_explicit(&lock->chk_used, memory_order_relaxed));
     kassert((flags & ~LOCK_CHKD_FULL) == 0);
     lock->chk_flags = flags;
@@ -138,14 +137,15 @@ static inline void qspinlock_reinit_chk(struct qspinlock *lock,
                                         const struct lock_chk_class *class,
                                         enum lock_chk_flags flags) {
     kassert(lock->chk_initialized);
-    kassert(!qspin_held(lock));
+    kassert(!qspin_is_locked(lock));
     qspinlock_init_chk_internal(lock, class, flags);
 }
 
 static inline void qspinlock_note_use(struct qspinlock *lock,
                                       bool raw_operation) {
     lock_chk_note_lock_use(lock->chk_initialized, lock->chk_flags,
-                           &lock->chk_used, true, raw_operation);
+                           &lock->chk_used, /*manages_irql=*/true,
+                           raw_operation);
 }
 
 static inline bool qspinlock_order_checked(struct qspinlock *lock) {
@@ -294,9 +294,10 @@ static inline bool qspin_is_locked(const struct qspinlock *lock) {
             Q_SPIN_LOCKED_MASK) != 0;
 }
 
-static inline bool qspin_held(const struct qspinlock *lock) {
-    return qspin_is_locked(lock);
-}
+/* Same deal as SPINLOCK_ASSERT_LOCKED, just checks the bit,
+ * but that doesn't say anything about thread ownership */
+#define QSPINLOCK_ASSERT_LOCKED(l)                                             \
+    kassert(qspin_is_locked(l), "qspinlock not locked")
 
 static inline void qspinlock_restore_interrupts(bool enabled) {
     if (enabled)
@@ -611,4 +612,35 @@ static inline bool __warn_unused_result qspin_trylock_irq_disable_internal(
 #define qspin_unlock_raw(lock_)                                                \
     qspin_unlock_raw_internal((lock_), LOCK_CHK_SITE_HERE())
 
-#define QSPINLOCK_ASSERT_HELD(l) kassert(qspin_is_locked(l))
+static inline void
+qspin_assert_held_internal(struct qspinlock *lock,
+                           const struct lock_chk_site *site) {
+#ifdef DEBUG_LOCK_CHK
+    if (qspinlock_deep_checked(lock) &&
+        lock_chk_assert_held_deep(&lock->chk_map, lock, LOCK_CHK_TYPE_QSPIN,
+                                  LOCK_CHK_MODE_EXCLUSIVE, false, true, site))
+        return;
+#else
+    unused(site);
+#endif
+    QSPINLOCK_ASSERT_LOCKED(lock);
+}
+
+static inline void
+qspin_assert_not_held_internal(struct qspinlock *lock,
+                               const struct lock_chk_site *site) {
+#ifdef DEBUG_LOCK_CHK
+    if (qspinlock_deep_checked(lock) &&
+        lock_chk_assert_held_deep(&lock->chk_map, lock, LOCK_CHK_TYPE_QSPIN,
+                                  LOCK_CHK_MODE_EXCLUSIVE, false, false, site))
+        return;
+#else
+    unused(site);
+#endif
+    kassert(!qspin_is_locked(lock), "qspinlock unexpectedly locked");
+}
+
+#define QSPINLOCK_ASSERT_HELD(l)                                               \
+    qspin_assert_held_internal((l), LOCK_CHK_SITE_HERE())
+#define QSPINLOCK_ASSERT_NOT_HELD(l)                                           \
+    qspin_assert_not_held_internal((l), LOCK_CHK_SITE_HERE())

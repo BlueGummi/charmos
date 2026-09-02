@@ -28,7 +28,8 @@ static void mutex_chk_before_lock(struct mutex_chk_acquire_state *state,
                                   struct mutex *mutex, unsigned int subclass,
                                   const struct lock_chk_site *site) {
     lock_chk_note_lock_use(mutex->chk_initialized, mutex->chk_flags,
-                           &mutex->chk_used, false, false);
+                           &mutex->chk_used, /*manages_irql=*/false,
+                           /*raw_operation=*/false);
     state->request = lock_chk_acquire_request_make(
         &mutex->chk_map, mutex, site, mutex->chk_flags, LOCK_CHK_TYPE_MUTEX,
         LOCK_CHK_MODE_EXCLUSIVE, LOCK_CHK_WAIT_BLOCKING, subclass, false,
@@ -66,7 +67,7 @@ static void mutex_chk_state_init(struct mutex *mtx,
 
 void mutex_set_chk_flags(struct mutex *mtx, enum lock_chk_flags flags) {
     kassert(mtx->chk_initialized);
-    kassert(!mutex_held(mtx));
+    kassert(!mutex_locked(mtx));
     kassert(!atomic_load_explicit(&mtx->chk_used, memory_order_relaxed));
     kassert((flags & ~LOCK_CHKD_FULL) == 0);
     mtx->chk_flags = flags;
@@ -75,7 +76,7 @@ void mutex_set_chk_flags(struct mutex *mtx, enum lock_chk_flags flags) {
 void mutex_reinit_chk(struct mutex *mtx, const struct lock_chk_class *class,
                       enum lock_chk_flags flags) {
     kassert(mtx->chk_initialized);
-    kassert(!mutex_held(mtx));
+    kassert(!mutex_locked(mtx));
     mutex_init_chk_internal(mtx, class, flags);
 }
 
@@ -308,6 +309,34 @@ void mutex_unlock_internal(struct mutex *mutex,
     }
 }
 
-bool mutex_held(struct mutex *mtx) {
+bool mutex_locked(struct mutex *mtx) {
     return MUTEX_READ_LOCK_WORD(mtx) & MUTEX_HELD_BIT;
+}
+
+void mutex_assert_held_internal(struct mutex *mtx,
+                                const struct lock_chk_site *site) {
+#ifdef DEBUG_LOCK_CHK
+    if (mtx->chk_flags != LOCK_UNCHKD && lock_chk_tracking_active() &&
+        lock_chk_assert_held_deep(&mtx->chk_map, mtx, LOCK_CHK_TYPE_MUTEX,
+                                  LOCK_CHK_MODE_EXCLUSIVE, false, true, site))
+        return;
+#else
+    unused(site);
+#endif
+    kassert(mutex_get_owner(mtx) == thread_get_current(),
+            "mutex not held by current thread");
+}
+
+void mutex_assert_not_held_internal(struct mutex *mtx,
+                                    const struct lock_chk_site *site) {
+#ifdef DEBUG_LOCK_CHK
+    if (mtx->chk_flags != LOCK_UNCHKD && lock_chk_tracking_active() &&
+        lock_chk_assert_held_deep(&mtx->chk_map, mtx, LOCK_CHK_TYPE_MUTEX,
+                                  LOCK_CHK_MODE_EXCLUSIVE, false, false, site))
+        return;
+#else
+    unused(site);
+#endif
+    kassert(mutex_get_owner(mtx) != thread_get_current(),
+            "mutex unexpectedly held by current thread");
 }

@@ -233,7 +233,7 @@ static inline bool seqlock_is_writing(const struct seqlock *sl) {
 }
 
 static inline bool seqlock_held(const struct seqlock *sl) {
-    return spinlock_held((struct spinlock *) &sl->lock);
+    return spinlock_locked((struct spinlock *) &sl->lock);
 }
 
 #define SEQLOCK_ASSERT_HELD(sl) kassert(seqlock_held(sl))

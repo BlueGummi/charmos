@@ -26,6 +26,8 @@ static const char *lock_chk_fail_kind_name(enum lock_chk_failure_kind kind) {
     case LOCK_CHK_FAIL_SPIN_ORDER: return "spin_order";
     case LOCK_CHK_FAIL_CAPACITY: return "capacity";
     case LOCK_CHK_FAIL_UNINITIALIZED: return "uninitialized";
+    case LOCK_CHK_FAIL_NOT_HELD: return "not_held";
+    case LOCK_CHK_FAIL_UNEXPECTED_HELD: return "unexpected_held";
     }
     return "unknown";
 }

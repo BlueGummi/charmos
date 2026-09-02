@@ -58,7 +58,7 @@ static inline void locked_list_del(struct locked_list *ll,
 
 static inline void locked_list_del_locked(struct locked_list *ll,
                                           struct list_head *lh) {
-    kassert(spinlock_held(&ll->lock));
+    kassert(spinlock_locked(&ll->lock));
     list_del_init(lh);
     ll->num_elems--;
 }

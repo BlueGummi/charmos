@@ -66,8 +66,8 @@ void mutex_simple_set_chk_flags(struct mutex_simple *m,
     kassert(m->chk_initialized);
     kassert(m->owner == NULL);
     kassert(list_empty(&m->waiters.list));
-    kassert(!spinlock_held(&m->waiters.lock));
-    kassert(!spinlock_held(&m->lock));
+    kassert(!spinlock_locked(&m->waiters.lock));
+    kassert(!spinlock_locked(&m->lock));
     kassert(!atomic_load_explicit(&m->chk_used, memory_order_relaxed));
     kassert((flags & ~LOCK_CHKD_FULL) == 0);
     m->chk_flags = flags;
@@ -79,8 +79,8 @@ void mutex_simple_reinit_chk(struct mutex_simple *m,
     kassert(m->chk_initialized);
     kassert(m->owner == NULL);
     kassert(list_empty(&m->waiters.list));
-    kassert(!spinlock_held(&m->waiters.lock));
-    kassert(!spinlock_held(&m->lock));
+    kassert(!spinlock_locked(&m->waiters.lock));
+    kassert(!spinlock_locked(&m->lock));
     mutex_simple_init_chk_internal(m, class, flags);
 }
 
@@ -245,4 +245,43 @@ void mutex_simple_unlock_internal(struct mutex_simple *m,
     spin_unlock(&m->lock, irql);
 
     mutex_simple_chk_unlocked(&chk_state);
+}
+
+bool mutex_simple_locked(struct mutex_simple *m) {
+    return mutex_simple_get_owner(m) != NULL;
+}
+
+struct thread *mutex_simple_get_owner(struct mutex_simple *m) {
+    enum irql irql = spin_lock(&m->lock);
+    struct thread *owner = m->owner;
+    spin_unlock(&m->lock, irql);
+    return owner;
+}
+
+void mutex_simple_assert_held_internal(struct mutex_simple *m,
+                                       const struct lock_chk_site *site) {
+#ifdef DEBUG_LOCK_CHK
+    if (m->chk_flags != LOCK_UNCHKD && lock_chk_tracking_active() &&
+        lock_chk_assert_held_deep(&m->chk_map, m, LOCK_CHK_TYPE_MUTEX_SIMPLE,
+                                  LOCK_CHK_MODE_EXCLUSIVE, false, true, site))
+        return;
+#else
+    unused(site);
+#endif
+    kassert(mutex_simple_get_owner(m) == thread_get_current(),
+            "mutex_simple not held by current thread");
+}
+
+void mutex_simple_assert_not_held_internal(struct mutex_simple *m,
+                                           const struct lock_chk_site *site) {
+#ifdef DEBUG_LOCK_CHK
+    if (m->chk_flags != LOCK_UNCHKD && lock_chk_tracking_active() &&
+        lock_chk_assert_held_deep(&m->chk_map, m, LOCK_CHK_TYPE_MUTEX_SIMPLE,
+                                  LOCK_CHK_MODE_EXCLUSIVE, false, false, site))
+        return;
+#else
+    unused(site);
+#endif
+    kassert(mutex_simple_get_owner(m) != thread_get_current(),
+            "mutex_simple unexpectedly held by current thread");
 }

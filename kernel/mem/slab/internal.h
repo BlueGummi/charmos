@@ -717,7 +717,7 @@ static inline void slab_list_add(struct slab_cache *cache, struct slab *slab) {
 
 static inline void slab_move(struct slab_cache *c, struct slab *slab,
                              enum slab_state new) {
-    kassert(spinlock_held(&c->lock));
+    kassert(spinlock_locked(&c->lock));
     slab_list_del(slab);
 
     slab->state = new;

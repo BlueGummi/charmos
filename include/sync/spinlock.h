@@ -508,16 +508,20 @@ static inline bool __warn_unused_result spin_trylock_irq_disable_internal(
 #define spin_unlock_raw(lock_)                                                 \
     spin_unlock_raw_internal((lock_), LOCK_CHK_SITE_HERE())
 
-static inline bool spinlock_held(struct spinlock *lock) {
+static inline bool spinlock_locked(struct spinlock *lock) {
     return atomic_load(&lock->raw.state);
 }
+
+/* A raw check to make sure it is locked, but could be by anyone */
+#define SPINLOCK_ASSERT_LOCKED(l)                                              \
+    kassert(spinlock_locked(l), "spinlock not locked")
 
 static inline void spinlock_set_chk_flags(struct spinlock *lock,
                                           enum lock_chk_flags flags) {
 
 #ifdef DEBUG_LOCK_CHK
     kassert(lock->chk_initialized);
-    kassert(!spinlock_held(lock));
+    kassert(!spinlock_locked(lock));
     kassert(!atomic_load_explicit(&lock->chk_used, memory_order_relaxed));
     kassert((flags & ~LOCK_CHKD_FULL) == 0);
     lock->chk_flags = flags;
@@ -530,10 +534,41 @@ static inline void spinlock_reinit_chk(struct spinlock *lock,
 
 #ifdef DEBUG_LOCK_CHK
     kassert(lock->chk_initialized);
-    kassert(!spinlock_held(lock));
+    kassert(!spinlock_locked(lock));
 #endif
 
     spinlock_init_chk_internal(lock, class, flags);
 }
 
-#define SPINLOCK_ASSERT_HELD(l) kassert(spinlock_held(l))
+static inline void
+spinlock_assert_held_internal(struct spinlock *lock,
+                              const struct lock_chk_site *site) {
+#ifdef DEBUG_LOCK_CHK
+    if (spinlock_deep_checked(lock) &&
+        lock_chk_assert_held_deep(&lock->chk_map, lock, LOCK_CHK_TYPE_SPIN,
+                                  LOCK_CHK_MODE_EXCLUSIVE, false, true, site))
+        return;
+#else
+    unused(site);
+#endif
+    SPINLOCK_ASSERT_LOCKED(lock);
+}
+
+static inline void
+spinlock_assert_not_held_internal(struct spinlock *lock,
+                                  const struct lock_chk_site *site) {
+#ifdef DEBUG_LOCK_CHK
+    if (spinlock_deep_checked(lock) &&
+        lock_chk_assert_held_deep(&lock->chk_map, lock, LOCK_CHK_TYPE_SPIN,
+                                  LOCK_CHK_MODE_EXCLUSIVE, false, false, site))
+        return;
+#else
+    unused(site);
+#endif
+    kassert(!spinlock_locked(lock), "spinlock unexpectedly locked");
+}
+
+#define SPINLOCK_ASSERT_HELD(l)                                                \
+    spinlock_assert_held_internal((l), LOCK_CHK_SITE_HERE())
+#define SPINLOCK_ASSERT_NOT_HELD(l)                                            \
+    spinlock_assert_not_held_internal((l), LOCK_CHK_SITE_HERE())

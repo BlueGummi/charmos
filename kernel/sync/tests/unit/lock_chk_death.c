@@ -1,7 +1,9 @@
 #include "sync/tests/test_internal.h"
 #include <asm.h>
 #include <sync/lock_chk.h>
+#include <sync/lock_chk_assert.h>
 #include <sync/mutex.h>
+#include <sync/mutex_simple.h>
 #include <sync/qspinlock.h>
 #include <sync/rwlock.h>
 #include <sync/spinlock.h>
@@ -26,6 +28,11 @@ LOCK_CHK_CLASS_DECLARE_LOCAL(death_exit_class);
 LOCK_CHK_CLASS_DECLARE_LOCAL(death_cross_rw_class);
 LOCK_CHK_CLASS_DECLARE_LOCAL(death_upgrade_rw_class);
 LOCK_CHK_CLASS_DECLARE_LOCAL(death_exhaust_class);
+LOCK_CHK_CLASS_DECLARE_LOCAL(death_assert_held_spin_class);
+LOCK_CHK_CLASS_DECLARE_LOCAL(death_assert_not_held_mutex_class);
+LOCK_CHK_CLASS_DECLARE_LOCAL(death_assert_held_foreign_qspin_class);
+LOCK_CHK_CLASS_DECLARE_LOCAL(death_assert_held_rw_wrong_mode_class);
+LOCK_CHK_CLASS_DECLARE_LOCAL(death_assert_not_held_mutex_simple_class);
 
 /* ABBA cycle between two threads */
 static struct mutex death_abba_m1;
@@ -224,5 +231,75 @@ TEST_DECLARE_UNIT(lock_chk, death_exhaust_held_capacity,
     }
     for (int i = 32; i >= 0; i--)
         mutex_unlock(&m[i]);
+    return TEST_SUCCESS;
+}
+
+TEST_DECLARE_UNIT(lock_chk, death_assert_held_spin_unheld,
+                  .enabled = TEST_STATE_DISABLED) {
+    struct spinlock s;
+    spinlock_init_chk(&s, LOCK_CHK_CLASS(death_assert_held_spin_class),
+                      LOCK_CHKD_FULL);
+    LOCK_CHK_ASSERT_HELD(&s);
+    return TEST_SUCCESS;
+}
+
+TEST_DECLARE_UNIT(lock_chk, death_assert_not_held_mutex_while_held,
+                  .enabled = TEST_STATE_DISABLED) {
+    struct mutex m;
+    mutex_init_chk(&m, LOCK_CHK_CLASS(death_assert_not_held_mutex_class),
+                   LOCK_CHKD_FULL);
+    mutex_lock(&m);
+    MUTEX_ASSERT_NOT_HELD(&m);
+    mutex_unlock(&m);
+    return TEST_SUCCESS;
+}
+
+static struct qspinlock death_foreign_qspin;
+static _Atomic bool death_foreign_qspin_held = false;
+
+static void death_foreign_qspin_worker(void *arg) {
+    unused(arg);
+    enum irql old = qspin_lock(&death_foreign_qspin);
+    atomic_store_explicit(&death_foreign_qspin_held, true,
+                          memory_order_release);
+    sleep_spin_ms(2000);
+    qspin_unlock(&death_foreign_qspin, old);
+}
+
+TEST_DECLARE_UNIT(lock_chk, death_assert_held_qspin_foreign_owner,
+                  .enabled = TEST_STATE_DISABLED) {
+    qspinlock_init_chk(&death_foreign_qspin,
+                       LOCK_CHK_CLASS(death_assert_held_foreign_qspin_class),
+                       LOCK_CHKD_FULL);
+    thread_spawn("death_foreign_qspin_worker", death_foreign_qspin_worker,
+                 NULL);
+    while (
+        !atomic_load_explicit(&death_foreign_qspin_held, memory_order_acquire))
+        sleep_spin_ms(1);
+    QSPINLOCK_ASSERT_HELD(&death_foreign_qspin);
+    return TEST_SUCCESS;
+}
+
+TEST_DECLARE_UNIT(lock_chk, death_assert_held_rwlock_wrong_mode,
+                  .enabled = TEST_STATE_DISABLED) {
+    struct rwlock rw;
+    rwlock_init_chk(&rw, THREAD_PRIO_CLASS_TIMESHARE,
+                    LOCK_CHK_CLASS(death_assert_held_rw_wrong_mode_class),
+                    LOCK_CHKD_FULL);
+    rw_read_lock(&rw);
+    LOCK_CHK_ASSERT_HELD(&rw, RWLOCK_ACQUIRE_WRITE);
+    rw_unlock(&rw);
+    return TEST_SUCCESS;
+}
+
+TEST_DECLARE_UNIT(lock_chk, death_assert_not_held_mutex_simple_while_held,
+                  .enabled = TEST_STATE_DISABLED) {
+    struct mutex_simple m;
+    mutex_simple_init_chk(
+        &m, LOCK_CHK_CLASS(death_assert_not_held_mutex_simple_class),
+        LOCK_CHKD_FULL);
+    mutex_simple_lock(&m);
+    MUTEX_SIMPLE_ASSERT_NOT_HELD(&m);
+    mutex_simple_unlock(&m);
     return TEST_SUCCESS;
 }

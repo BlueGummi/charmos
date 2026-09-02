@@ -55,13 +55,20 @@ void rwlock_set_chk_flags(struct rwlock *lock, enum lock_chk_flags flags);
 void rwlock_reinit_chk(struct rwlock *lock, enum thread_prio_class ceiling,
                        const struct lock_chk_class *class,
                        enum lock_chk_flags flags);
-bool rwlock_held(struct rwlock *lock, enum rwlock_acquire_type type);
+bool rwlock_locked(struct rwlock *lock, enum rwlock_acquire_type type);
+void rwlock_assert_held_internal(struct rwlock *lock,
+                                 enum rwlock_acquire_type type,
+                                 const struct lock_chk_site *site);
+void rwlock_assert_not_held_internal(struct rwlock *lock,
+                                     const struct lock_chk_site *site);
 
 #define RWLOCK_ASSERT_HELD(lock, type)                                         \
-    kassert(rwlock_held((lock), (type)), "rwlock not held")
+    rwlock_assert_held_internal((lock), (type), LOCK_CHK_SITE_HERE())
 #define RWLOCK_ASSERT_READ(lock) RWLOCK_ASSERT_HELD((lock), RWLOCK_ACQUIRE_READ)
 #define RWLOCK_ASSERT_WRITE(lock)                                              \
     RWLOCK_ASSERT_HELD((lock), RWLOCK_ACQUIRE_WRITE)
+#define RWLOCK_ASSERT_NOT_HELD(lock)                                           \
+    rwlock_assert_not_held_internal((lock), LOCK_CHK_SITE_HERE())
 
 #define RWLOCK_PRIO_CEIL_SHIFT (1)
 

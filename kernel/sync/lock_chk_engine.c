@@ -363,6 +363,59 @@ void lock_chk_released(struct lock_chk_release_token *token) {
     lock_chk_leave(&guard);
 }
 
+bool lock_chk_assert_held_deep(struct lock_chk_map *map, void *instance,
+                               enum lock_chk_type type, enum lock_chk_mode mode,
+                               bool mode_specific, bool want_held,
+                               const struct lock_chk_site *site) {
+    if (!lock_chk_deep_is_active())
+        return false;
+
+    struct lock_chk_guard guard = lock_chk_enter();
+    bool handled = true;
+
+    struct thread *thread = thread_get_current();
+    if (thread == NULL) {
+        handled = false;
+        goto out;
+    }
+
+    struct lock_chk_thread_data *thread_data = &thread->lock_chk;
+    bool found = false;
+    enum lock_chk_mode found_mode = mode;
+    for (uint8_t i = 0; i < thread_data->depth; i++) {
+        struct lock_chk_held *held = &thread_data->held[i];
+        if (held->instance != instance || held->type != type)
+            continue;
+        if (mode_specific && held->mode != mode)
+            continue;
+        found = true;
+        found_mode = held->mode;
+        break;
+    }
+
+    if (found != want_held) {
+        struct lock_chk_failure fail = {
+            .kind = want_held ? LOCK_CHK_FAIL_NOT_HELD
+                              : LOCK_CHK_FAIL_UNEXPECTED_HELD,
+            .site = site,
+            .class = map ? map->class : NULL,
+            .instance = instance,
+            .type = type,
+            .mode = found_mode,
+        };
+        lock_chk_fail(&fail,
+                      want_held ? "Lock assumed held but not held by current "
+                                  "thread (instance %p)"
+                                : "Lock assumed not held but held by current "
+                                  "thread (instance %p)",
+                      instance);
+    }
+
+out:
+    lock_chk_leave(&guard);
+    return handled;
+}
+
 void lock_chk_assert_schedulable(const struct lock_chk_site *site) {
     if (!lock_chk_deep_is_active())
         return;

@@ -178,7 +178,8 @@ void rw_lock_internal(struct rwlock *lock, enum rwlock_acquire_type acq_type,
     struct lock_chk_acquire_request req;
     struct lock_chk_acquire_token token;
     lock_chk_note_lock_use(lock->chk_initialized, lock->chk_flags,
-                           &lock->chk_used, false, false);
+                           &lock->chk_used, /*manages_irql=*/false,
+                           /*raw_operation=*/false);
     bool checked_deep = lock->chk_flags != LOCK_UNCHKD;
     if (checked_deep) {
         req = lock_chk_acquire_request_make(
@@ -460,6 +461,44 @@ void rw_unlock_internal(struct rwlock *lock, const struct lock_chk_site *site) {
     thread_unboost_self();
 }
 
-bool rwlock_held(struct rwlock *lock, enum rwlock_acquire_type type) {
+bool rwlock_locked(struct rwlock *lock, enum rwlock_acquire_type type) {
     return rwlock_locked_with_type(lock, type);
+}
+
+void rwlock_assert_held_internal(struct rwlock *lock,
+                                 enum rwlock_acquire_type type,
+                                 const struct lock_chk_site *site) {
+#ifdef DEBUG_LOCK_CHK
+    enum lock_chk_mode chk_mode = type == RWLOCK_ACQUIRE_READ
+                                      ? LOCK_CHK_MODE_SHARED
+                                      : LOCK_CHK_MODE_EXCLUSIVE;
+    if (lock->chk_flags != LOCK_UNCHKD &&
+        lock_chk_assert_held_deep(&lock->chk_map, lock, LOCK_CHK_TYPE_RWLOCK,
+                                  chk_mode, true, true, site))
+        return;
+#else
+    unused(site);
+#endif
+    kassert(rwlock_locked(lock, type), "rwlock not held");
+}
+
+void rwlock_assert_not_held_internal(struct rwlock *lock,
+                                     const struct lock_chk_site *site) {
+#ifdef DEBUG_LOCK_CHK
+    if (lock->chk_flags != LOCK_UNCHKD &&
+        lock_chk_assert_held_deep(&lock->chk_map, lock, LOCK_CHK_TYPE_RWLOCK,
+                                  LOCK_CHK_MODE_SHARED, false, false, site))
+        return;
+#else
+    unused(site);
+#endif
+    /* Raw fallback can only check write mode ownership, which is
+     * a small caveat of the system here, as reads can be
+     * any reader, not necessarily "this reader".
+     *
+     * Not reporting anything at all here is better than
+     * a false positive, since it keeps the checker
+     * honest instead of spreading misinformation */
+    kassert(!rwlock_locked(lock, RWLOCK_ACQUIRE_WRITE),
+            "rwlock unexpectedly held (write) by current thread");
 }

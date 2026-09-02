@@ -33,6 +33,12 @@ void mutex_simple_unlock_internal(struct mutex_simple *m,
 void mutex_simple_lock_subclass_internal(struct mutex_simple *m,
                                          unsigned int subclass,
                                          const struct lock_chk_site *site);
+bool mutex_simple_locked(struct mutex_simple *m);
+struct thread *mutex_simple_get_owner(struct mutex_simple *m);
+void mutex_simple_assert_held_internal(struct mutex_simple *m,
+                                       const struct lock_chk_site *site);
+void mutex_simple_assert_not_held_internal(struct mutex_simple *m,
+                                           const struct lock_chk_site *site);
 
 #ifdef DEBUG_LOCK_CHK
 
@@ -102,3 +108,8 @@ void mutex_simple_lock_subclass_internal(struct mutex_simple *m,
     mutex_simple_unlock_internal((m_), LOCK_CHK_SITE_HERE())
 #define mutex_simple_lock_subclass(m_, subclass_)                              \
     mutex_simple_lock_subclass_internal((m_), (subclass_), LOCK_CHK_SITE_HERE())
+
+#define MUTEX_SIMPLE_ASSERT_HELD(m)                                            \
+    mutex_simple_assert_held_internal((m), LOCK_CHK_SITE_HERE())
+#define MUTEX_SIMPLE_ASSERT_NOT_HELD(m)                                        \
+    mutex_simple_assert_not_held_internal((m), LOCK_CHK_SITE_HERE())

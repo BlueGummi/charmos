@@ -106,6 +106,14 @@ void lock_chk_before_release(struct lock_chk_release_token *token,
                              const struct lock_chk_release_request *request);
 void lock_chk_released(struct lock_chk_release_token *token);
 
+/* LOCK_CHK_ASSERT_HELD/NOT_HELD and whatnot use this, which
+ * returns true if the engine could evaluate the assertion,
+ * and otherwise will return false, and panic if a violation is found */
+bool lock_chk_assert_held_deep(struct lock_chk_map *map, void *instance,
+                               enum lock_chk_type type, enum lock_chk_mode mode,
+                               bool mode_specific, bool want_held,
+                               const struct lock_chk_site *site);
+
 #define LOCK_CHK_MAP_VALUE_INIT(class_)                                        \
     ((struct lock_chk_map) {                                                   \
         .class = (class_),                                                     \

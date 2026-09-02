@@ -41,8 +41,12 @@ void mutex_unlock_internal(struct mutex *mutex,
 void mutex_lock_internal(struct mutex *mutex, const struct lock_chk_site *site);
 void mutex_lock_subclass_internal(struct mutex *mutex, unsigned int subclass,
                                   const struct lock_chk_site *site);
-bool mutex_held(struct mutex *mtx);
+bool mutex_locked(struct mutex *mtx);
 struct thread *mutex_get_owner(struct mutex *mtx);
+void mutex_assert_held_internal(struct mutex *mtx,
+                                const struct lock_chk_site *site);
+void mutex_assert_not_held_internal(struct mutex *mtx,
+                                    const struct lock_chk_site *site);
 
 #ifdef DEBUG_LOCK_CHK
 
@@ -94,4 +98,7 @@ struct thread *mutex_get_owner(struct mutex *mtx);
 #define mutex_unlock(mutex_)                                                   \
     mutex_unlock_internal((mutex_), LOCK_CHK_SITE_HERE())
 
-#define MUTEX_ASSERT_HELD(m) kassert(mutex_held(m))
+#define MUTEX_ASSERT_HELD(m)                                                   \
+    mutex_assert_held_internal((m), LOCK_CHK_SITE_HERE())
+#define MUTEX_ASSERT_NOT_HELD(m)                                               \
+    mutex_assert_not_held_internal((m), LOCK_CHK_SITE_HERE())
