@@ -91,6 +91,37 @@ time_ns_t timekeeper_get_ns(void) {
     return base_ns + clock_cycles_to_ns(clk, delta);
 }
 
+/* Give up instead of waiting for a writer, for the non-blocking sections */
+bool timekeeper_try_get_ns(time_ns_t *out) {
+    uint32_t seq;
+    uint64_t cycles, delta, base_ns;
+    struct clock *clk;
+    int retries = TIMEKEEPER_TRY_READ_SPINS;
+
+    do {
+        seq = seq_begin_read_raw(&timekeeper.lock);
+        if (unlikely((seq & 1) != 0))
+            continue;
+
+        clk = timekeeper.clock;
+        if (unlikely(!clk))
+            return false;
+
+        cycles = clk->read(clk);
+        delta = (cycles >= timekeeper.raw_base_cycles)
+                    ? (cycles - timekeeper.raw_base_cycles)
+                    : 0;
+        base_ns = timekeeper.base_ns;
+
+        if (!seq_read_retry(&timekeeper.lock, seq)) {
+            *out = base_ns + clock_cycles_to_ns(clk, delta);
+            return true;
+        }
+    } while (--retries > 0);
+
+    return false;
+}
+
 time_us_t timekeeper_get_us(void) {
     return NS_TO_US(timekeeper_get_ns());
 }

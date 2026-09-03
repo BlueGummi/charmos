@@ -31,9 +31,9 @@
  */
 #define _kassert_1(default, prefix, x)                                         \
     _kassert_eval(prefix, x,                                                   \
-                  assert_impl_default(CRASH_CODE_TO_PAYLOAD(default),          \
-                                      __FILE__, __LINE__, __func__, prefix,    \
-                                      _kassert_msg(x), NULL))
+                  assert_impl_assertion(CRASH_CODE_TO_PAYLOAD(default),        \
+                                        __FILE__, __LINE__, __func__, prefix,  \
+                                        _kassert_msg(x), NULL))
 
 /*
  * kassert(x, CODE)
@@ -43,15 +43,15 @@
     __builtin_choose_expr(                                                     \
         __comptime_is_str(a),                                                  \
         _kassert_eval(prefix, x,                                               \
-                      assert_impl_default(CRASH_CODE_TO_PAYLOAD(default),      \
-                                          __FILE__, __LINE__, __func__,        \
-                                          prefix, _kassert_msg(x),             \
-                                          __comptime_as_str(a))),              \
+                      assert_impl_assertion(CRASH_CODE_TO_PAYLOAD(default),    \
+                                            __FILE__, __LINE__, __func__,      \
+                                            prefix, _kassert_msg(x),           \
+                                            __comptime_as_str(a))),            \
         _kassert_eval(                                                         \
             prefix, x,                                                         \
-            assert_impl_default(CRASH_CODE_TO_PAYLOAD(_kassert_as_code(a)),    \
-                                __FILE__, __LINE__, __func__, prefix,          \
-                                _kassert_msg(x), NULL)))
+            assert_impl_assertion(CRASH_CODE_TO_PAYLOAD(_kassert_as_code(a)),  \
+                                  __FILE__, __LINE__, __func__, prefix,        \
+                                  _kassert_msg(x), NULL)))
 
 /*
  * kassert(x, "msg %d", 12)
@@ -60,18 +60,18 @@
 #define _kassert_n(default, prefix, x, a, b, ...)                              \
     __builtin_choose_expr(                                                     \
         __comptime_is_str(a), /* a is format, b is first vararg */             \
+        _kassert_eval(prefix, x,                                               \
+                      assert_impl_assertion(                                   \
+                          CRASH_CODE_TO_PAYLOAD(default), __FILE__, __LINE__,  \
+                          __func__, prefix, _kassert_msg(x),                   \
+                          __comptime_as_str(a), b,                             \
+                          ##__VA_ARGS__)), /* a is code, b is format */        \
         _kassert_eval(                                                         \
             prefix, x,                                                         \
-            assert_impl_default(CRASH_CODE_TO_PAYLOAD(default), __FILE__,      \
-                                __LINE__, __func__, prefix, _kassert_msg(x),   \
-                                __comptime_as_str(a), b,                       \
-                                ##__VA_ARGS__)), /* a is code, b is format */  \
-        _kassert_eval(                                                         \
-            prefix, x,                                                         \
-            assert_impl_default(CRASH_CODE_TO_PAYLOAD(_kassert_as_code(a)),    \
-                                __FILE__, __LINE__, __func__, prefix,          \
-                                _kassert_msg(x), __comptime_as_str(b),         \
-                                ##__VA_ARGS__)))
+            assert_impl_assertion(CRASH_CODE_TO_PAYLOAD(_kassert_as_code(a)),  \
+                                  __FILE__, __LINE__, __func__, prefix,        \
+                                  _kassert_msg(x), __comptime_as_str(b),       \
+                                  ##__VA_ARGS__)))
 
 #define _kassert_fail(c, prefix, ...)                                          \
     assert_impl_default(CRASH_CODE_TO_PAYLOAD(c), __FILE__, __LINE__,          \

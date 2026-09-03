@@ -131,6 +131,20 @@ time_ms_t time_get_ms(void) {
     return US_TO_MS(time_get_us());
 }
 
+bool time_try_get_ms(time_ms_t *out) {
+    if (global.current_bootstage < BOOTSTAGE_MID_MP) {
+        *out = NS_TO_MS(hpet_timestamp_ns());
+        return true;
+    }
+
+    time_ns_t ns;
+    if (!timekeeper_try_get_ns(&ns))
+        return false;
+
+    *out = NS_TO_MS(ns);
+    return true;
+}
+
 time_us_t time_get_us(void) {
     if (global.current_bootstage < BOOTSTAGE_MID_MP)
         return hpet_timestamp_us();

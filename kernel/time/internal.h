@@ -102,6 +102,9 @@ struct clock *hpet_clock_init(void);
 void timekeeper_init(void);
 void timekeeper_update(void);
 time_ns_t timekeeper_get_ns(void);
+
+#define TIMEKEEPER_TRY_READ_SPINS 4
+bool timekeeper_try_get_ns(time_ns_t *out);
 time_us_t timekeeper_get_us(void);
 
 struct clock *clock_get_best(void);

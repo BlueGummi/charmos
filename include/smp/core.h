@@ -1,5 +1,7 @@
 /* @title: Per-CPU structure */
 #pragma once
+#include <compiler.h>
+#include <console/panic.h>
 #include <sch/irql.h>
 #include <smp/topology.h>
 #include <stdatomic.h>
@@ -71,8 +73,10 @@ struct core {
      *
      * For exception_sync_cb, it is passed into the callback as a parameter */
     uint8_t *irq_stack_scratch_buf;
-    uint32_t interrupt_depth;
-    uint32_t nmi_depth;
+
+    /* Execution context in one word, using CTX_* below */
+    uint32_t ctx;
+
     enum irql current_irql;
 
     /* Remains valid in the top half, once the bottom half is
@@ -86,7 +90,6 @@ struct core {
 
     atomic_bool needs_resched;
     atomic_bool in_resched; /* in scheduler_yield() */
-    uint32_t preempt_disable_depth;
 
     struct domain *domain;
     struct domain_arena *domain_arena;
@@ -127,6 +130,70 @@ static inline struct core *smp_core(void) {
                  : "=r"(core)
                  : "i"(offsetof(struct core, self)));
     return (struct core *) core;
+}
+
+/* The idea with this (TODO: Consider an enum) is that if a migration happens
+ * across reads of two different words, the whole result becomes invalid,
+ * and squishing it all into one word guarantees that such behavior
+ * is not possible. We also use counters here, as opposed to flags,
+ * so reentrancy bugs can be identified from the get-go.
+ *
+ * NOTE: needs_resched is not tracked here because that's for other
+ * CPUs to write, and this is purely local
+ */
+#define CTX_PREEMPT_SHIFT 0
+#define CTX_PREEMPT_BITS 8
+#define CTX_IRQ_SHIFT 8
+#define CTX_IRQ_BITS 8
+#define CTX_NMI_SHIFT 16
+#define CTX_NMI_BITS 4
+
+#define CTX_FIELD_MAX(bits) ((1u << (bits)) - 1u)
+
+#define CTX_PREEMPT_MASK (CTX_FIELD_MAX(CTX_PREEMPT_BITS) << CTX_PREEMPT_SHIFT)
+#define CTX_IRQ_MASK (CTX_FIELD_MAX(CTX_IRQ_BITS) << CTX_IRQ_SHIFT)
+#define CTX_NMI_MASK (CTX_FIELD_MAX(CTX_NMI_BITS) << CTX_NMI_SHIFT)
+
+#define CTX_PREEMPT_ONE (1u << CTX_PREEMPT_SHIFT)
+#define CTX_IRQ_ONE (1u << CTX_IRQ_SHIFT)
+#define CTX_NMI_ONE (1u << CTX_NMI_SHIFT)
+
+/* "not plain thread context" */
+#define CTX_IN_INTERRUPT_MASK (CTX_IRQ_MASK | CTX_NMI_MASK)
+
+static inline uint32_t smp_ctx(void) {
+    return smp_core()->ctx;
+}
+
+static inline uint32_t ctx_preempt_count(uint32_t ctx) {
+    return (ctx & CTX_PREEMPT_MASK) >> CTX_PREEMPT_SHIFT;
+}
+
+static inline uint32_t ctx_irq_count(uint32_t ctx) {
+    return (ctx & CTX_IRQ_MASK) >> CTX_IRQ_SHIFT;
+}
+
+static inline uint32_t ctx_nmi_count(uint32_t ctx) {
+    return (ctx & CTX_NMI_MASK) >> CTX_NMI_SHIFT;
+}
+
+/* Add a CTX_*_ONE to its field */
+static inline uint32_t ctx_add(uint32_t one, uint32_t mask) {
+    struct core *cpu = smp_core();
+    if (unlikely((cpu->ctx & mask) == mask))
+        panic("ctx field overflow, mask %#x, ctx %#x", mask, cpu->ctx);
+
+    cpu->ctx += one;
+    return cpu->ctx;
+}
+
+static inline uint32_t ctx_sub(uint32_t one, uint32_t mask) {
+    struct core *cpu = smp_core();
+    if (unlikely((cpu->ctx & mask) == 0))
+        panic("ctx field underflow, mask %#x, ctx %#x", mask, cpu->ctx);
+
+    cpu->ctx -= one;
+    return cpu->ctx;
 }
 
 struct core *smp_bsp(void);

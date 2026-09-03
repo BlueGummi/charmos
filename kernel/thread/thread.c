@@ -108,6 +108,12 @@ void thread_exit_with_status(int status) {
 }
 
 void thread_entry_wrapper(void) {
+    /* TODO: We might want to consider refactoring
+     * the switch_in so as to not gradually bloat up
+     * both places where the "gopher pops out of the ground",
+     * i.e. a thread entering */
+    scheduler_yield_nesting_reset(thread_get_current());
+
     if (thread_get_current()->state != THREAD_STATE_IDLE_THREAD)
         atomic_fetch_add(&global.thread_count, 1);
 

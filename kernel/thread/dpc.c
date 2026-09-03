@@ -67,7 +67,11 @@ void dpc_drain_local(void) {
 void dpc_run_local(void) {
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     dpc_drain_local();
-    irql_lower(irql);
+
+    /* The raise is only used to satisfy the IRQL requirement here,
+     * and the matching lower shouldn't reschedule and recurse,
+     * as scheduler_yield() will lower its IRQL too */
+    irql_lower_no_resched(irql);
 }
 
 void dpc_run_dpcs_from_irq(void) {

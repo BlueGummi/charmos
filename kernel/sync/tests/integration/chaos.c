@@ -7,7 +7,8 @@ struct chaos_state {
     atomic_bool alive;
 };
 
-#define CHAOS_THREADS 12
+#define CHAOS_THREADS_MAX 64
+static size_t chaos_threads = 12;
 
 #if 0
 #define CHAOS_LOG(fmt, ...)                                                    \
@@ -17,20 +18,36 @@ struct chaos_state {
 #endif
 
 static size_t chaos_iters_count = 300;
-static struct chaos_state states[CHAOS_THREADS];
+static struct chaos_state states[CHAOS_THREADS_MAX];
 static atomic_bool chaos_stop = false;
 static atomic_bool starter_ok = false;
-static _Atomic uint32_t sync_chaos_left = CHAOS_THREADS;
+static _Atomic uint32_t sync_chaos_left = 0;
 
 static struct mutex chaos_fuzz_mtx = MUTEX_INIT;
 static struct rwlock chaos_fuzz_rw = RWLOCK_INIT(THREAD_PRIO_CLASS_TIMESHARE);
 static struct spinlock chaos_fuzz_spin = SPINLOCK_INIT;
 static struct qspinlock chaos_fuzz_qspin = QSPINLOCK_INIT;
 
+static _Atomic uint64_t chaos_apc_lock_taken = 0;
+static _Atomic uint64_t chaos_apc_lock_skips = 0;
+
+/* Contend on a global lock from inside the APC,
+ * as the interleaving is what we fuzz.
+ *
+ * Blocking here means we spin irq disabled,
+ * so we trylock and record skips */
 static void chaos_apc_fn(void *arg) {
     unused(arg);
     CHAOS_LOG("apc executed on %p", thread_get_current());
-    enum irql irql = spin_lock_irq_disable(&chaos_fuzz_spin);
+
+    enum irql irql;
+    if (!spin_trylock_irq_disable(&chaos_fuzz_spin, &irql)) {
+        atomic_fetch_add_explicit(&chaos_apc_lock_skips, 1,
+                                  memory_order_relaxed);
+        return;
+    }
+
+    atomic_fetch_add_explicit(&chaos_apc_lock_taken, 1, memory_order_relaxed);
     for (volatile int j = 0; j < 10; j++)
         cpu_relax();
     spin_unlock(&chaos_fuzz_spin, irql);
@@ -41,7 +58,7 @@ static void chaos_apc_spammer(void *arg) {
     CHAOS_LOG("apc spammer start");
 
     while (!atomic_load(&chaos_stop)) {
-        int id = prng_next() % CHAOS_THREADS;
+        int id = prng_next() % chaos_threads;
 
         if (!atomic_load(&states[id].alive)) {
             scheduler_yield();
@@ -117,7 +134,7 @@ static void chaos_waker(void *arg) {
     CHAOS_LOG("waker start");
 
     while (!atomic_load(&chaos_stop)) {
-        int id = prng_next() % CHAOS_THREADS;
+        int id = prng_next() % chaos_threads;
 
         if (!atomic_load(&states[id].alive)) {
             scheduler_yield();
@@ -138,22 +155,29 @@ static void chaos_waker(void *arg) {
     }
 }
 
-TEST_DECLARE_INTEGRATION(mutex, interruptible_apc_fuzz) {
+TEST_DECLARE_INTEGRATION(mutex, interruptible_apc_fuzz,
+                         TEST_INTENSITY(4, 12, CHAOS_THREADS_MAX)) {
     if (global.core_count < 2) {
         return TEST_SKIP(TEST_SKIP_NONE);
     }
 
-    for (size_t i = 0; i < CHAOS_THREADS; i++) {
+    chaos_threads = ctx->intensity_val ? ctx->intensity_val : 12;
+    if (chaos_threads > CHAOS_THREADS_MAX)
+        chaos_threads = CHAOS_THREADS_MAX;
+
+    for (size_t i = 0; i < chaos_threads; i++) {
         states[i].t = NULL;
         atomic_store(&states[i].alive, false);
     }
 
-    atomic_store(&sync_chaos_left, CHAOS_THREADS);
+    atomic_store(&sync_chaos_left, chaos_threads);
     atomic_store(&chaos_stop, false);
     atomic_store(&starter_ok, false);
+    atomic_store(&chaos_apc_lock_taken, 0);
+    atomic_store(&chaos_apc_lock_skips, 0);
 
-    struct thread *threads[CHAOS_THREADS];
-    for (size_t i = 0; i < CHAOS_THREADS; i++) {
+    struct thread *threads[CHAOS_THREADS_MAX];
+    for (size_t i = 0; i < chaos_threads; i++) {
         threads[i] = thread_create("cs", chaos_sleeper, (void *) i);
         TEST_ASSERT_NONNULL(threads[i]);
         thread_set_joinable(threads[i]);
@@ -169,7 +193,7 @@ TEST_DECLARE_INTEGRATION(mutex, interruptible_apc_fuzz) {
 
     atomic_store(&starter_ok, true);
 
-    for (size_t i = 0; i < CHAOS_THREADS; i++)
+    for (size_t i = 0; i < chaos_threads; i++)
         thread_join(threads[i]);
 
     atomic_store(&chaos_stop, true);
@@ -178,6 +202,10 @@ TEST_DECLARE_INTEGRATION(mutex, interruptible_apc_fuzz) {
     thread_join(waker);
 
     TEST_ASSERT_EQ(atomic_load(&sync_chaos_left), 0);
+
+    test_info("apc lock: %llu taken, %llu skipped",
+              (unsigned long long) atomic_load(&chaos_apc_lock_taken),
+              (unsigned long long) atomic_load(&chaos_apc_lock_skips));
 
     return TEST_SUCCESS;
 }

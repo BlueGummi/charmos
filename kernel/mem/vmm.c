@@ -82,7 +82,7 @@ bool hhdm_ptr_in_range(void *ptr) {
 static struct pt_deferred_free *pt_free_list;
 static struct spinlock pt_free_lock = SPINLOCK_INIT;
 static struct page_table *kernel_pml4 = NULL;
-static uintptr_t vmm_map_top = VMM_MAP_BASE;
+static _Atomic uintptr_t vmm_map_top = VMM_MAP_BASE;
 static void vmm_unmap_aliased(vaddr_t virt, size_t len, enum vmm_flags vflags);
 
 static inline struct page_table *alloc_pt(void) {
@@ -1116,11 +1116,15 @@ void *vmm_map_bump_internal(uintptr_t addr, uint64_t len, uint64_t flags,
     uint64_t span = total_pages * PAGE_SIZE;
     if (total_pages != 0 && span / PAGE_SIZE != total_pages)
         return NULL;
-    if (vmm_map_top > VMM_MAP_LIMIT || span > VMM_MAP_LIMIT - vmm_map_top)
-        return NULL;
 
-    uintptr_t virt_start = vmm_map_top;
-    vmm_map_top += span;
+    uintptr_t virt_start =
+        atomic_load_explicit(&vmm_map_top, memory_order_relaxed);
+    do {
+        if (virt_start > VMM_MAP_LIMIT || span > VMM_MAP_LIMIT - virt_start)
+            return NULL;
+    } while (!atomic_compare_exchange_weak_explicit(
+        &vmm_map_top, &virt_start, virt_start + span, memory_order_acq_rel,
+        memory_order_relaxed));
 
     enum errno e = ERR_OK;
     uint64_t mapped = 0;
@@ -1139,7 +1143,10 @@ unwind:
     for (uint64_t i = 0; i < mapped; i++)
         vmm_unmap_page(virt_start + i * PAGE_SIZE, vflags);
 
-    vmm_map_top = virt_start;
+    uintptr_t expected = virt_start + span;
+    atomic_compare_exchange_strong_explicit(&vmm_map_top, &expected, virt_start,
+                                            memory_order_acq_rel,
+                                            memory_order_relaxed);
 
     return NULL;
 }

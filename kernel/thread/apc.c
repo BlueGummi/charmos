@@ -17,10 +17,6 @@ static inline bool safe_to_exec_apcs(void) {
     return true;
 }
 
-static inline bool thread_has_apcs(struct thread *t) {
-    return t->apc_pending_mask != 0;
-}
-
 static inline enum apc_state apc_state_load(struct apc *a) {
     return atomic_load_explicit(&a->state, memory_order_acquire);
 }
@@ -361,22 +357,36 @@ void apc_destroy_free(struct apc *a) {
     kfree(a);
 }
 
-static void apc_rundown_queue(struct apc_queue *queue) {
+static void apc_queue_splice(struct apc_queue *from, struct apc_queue *to) {
     struct apc *a;
 
-    while ((a = apc_dequeue_head(queue))) {
+    while ((a = apc_dequeue_head(from)))
+        apc_enqueue_tail(to, a);
+}
+
+void apc_rundown_thread(struct thread *t) {
+    struct apc_queue drained = {0};
+
+    /* Every other queue mutator will hold t->lock,
+     * and rundown has to do that too */
+    enum irql irql = spin_lock_irq_disable(&t->lock);
+
+    for (size_t type = 0; type < APC_TYPE_COUNT; type++)
+        apc_queue_splice(&t->apc_head[type], &drained);
+
+    apc_queue_splice(&t->event_apcs, &drained);
+    apc_queue_splice(&t->to_exec_event_apcs, &drained);
+    atomic_store_explicit(&t->apc_pending_mask, 0, memory_order_release);
+
+    spin_unlock(&t->lock, irql);
+
+    /* We can't run the teardown from the critical section */
+    struct apc *a;
+    while ((a = apc_dequeue_head(&drained))) {
         a->owner = NULL;
         atomic_store_explicit(&a->state, APC_STATE_IDLE, memory_order_release);
         apc_put(a);
     }
-}
-
-void apc_rundown_thread(struct thread *t) {
-    for (size_t type = 0; type < APC_TYPE_COUNT; type++)
-        apc_rundown_queue(&t->apc_head[type]);
-    apc_rundown_queue(&t->event_apcs);
-    apc_rundown_queue(&t->to_exec_event_apcs);
-    atomic_store_explicit(&t->apc_pending_mask, 0, memory_order_release);
 }
 
 static void bump_counters_on_queue(struct apc_queue *from,

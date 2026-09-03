@@ -164,6 +164,10 @@ struct thread {
     void *stack;
     size_t stack_size;
 
+    /* TODO: we should isolate this into the debug nesting
+     * mode, as this helps us identify scheduler_yield() nesting */
+    uint32_t yield_nesting;
+
     /* Registers */
     struct cpu_context regs;
 
@@ -463,6 +467,42 @@ void thread_lock_thread_and_rq(struct thread *t, struct scheduler *other_rq,
 void thread_unlock_thread_and_rq(struct scheduler *thread_rq,
                                  struct scheduler *other_rq,
                                  enum irql irq_first, enum irql irq_second);
+
+/* Yield nesting work:
+ *
+ * scheduler_yield() can re-enter, and we're using this to debug,
+ * with a counter bumped per thread. The max nesting depth today
+ * is 1, and it will likely stay this way, but I'm keeping
+ * it a tunable counter in case this changes. */
+#ifndef SCHED_MAX_YIELD_NESTING
+#define SCHED_MAX_YIELD_NESTING 1
+#endif
+
+static inline uint32_t scheduler_yield_nesting(struct thread *t) {
+    return t ? t->yield_nesting : 0;
+}
+
+static inline void scheduler_yield_nesting_enter(struct thread *t) {
+    if (!t)
+        return;
+
+    t->yield_nesting++;
+#ifdef DEBUG_SCHED_NESTING
+    kassert(t->yield_nesting <= SCHED_MAX_YIELD_NESTING,
+            "scheduler_yield nested %u deep on thread '%s'", t->yield_nesting,
+            t->name);
+#endif
+}
+
+static inline void scheduler_yield_nesting_exit(struct thread *t) {
+    if (t && t->yield_nesting)
+        t->yield_nesting--;
+}
+
+static inline void scheduler_yield_nesting_reset(struct thread *t) {
+    if (t)
+        t->yield_nesting = 0;
+}
 
 static inline struct thread *thread_get_current() {
     uintptr_t thread;

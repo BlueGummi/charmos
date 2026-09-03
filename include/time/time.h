@@ -90,6 +90,9 @@ uint8_t time_get_month();
 uint8_t time_get_year();
 uint8_t time_get_century();
 time_ms_t time_get_ms(void);
+
+/* Non-blocking variant when spinning on the timekeeper is disallowed */
+bool time_try_get_ms(time_ms_t *out);
 time_ns_t time_get_ns();
 time_us_t time_get_us(void);
 freq_hz_t tsc_calibrate(void);

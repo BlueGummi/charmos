@@ -134,40 +134,33 @@ void irq_register_full(struct irq_desc *d);
 void irq_set_chip(uint8_t vector, struct irq_chip *chip, void *data);
 
 static inline uint32_t irq_mark_self_in_interrupt(bool new) {
-    uint32_t old = smp_core()->interrupt_depth;
-    if (new) {
-        kassert(old != UINT32_MAX);
-        smp_core()->interrupt_depth++;
-    } else {
-        kassert(old);
-        smp_core()->interrupt_depth--;
-    }
+    uint32_t old = ctx_irq_count(smp_ctx());
+    if (new)
+        ctx_add(CTX_IRQ_ONE, CTX_IRQ_MASK);
+    else
+        ctx_sub(CTX_IRQ_ONE, CTX_IRQ_MASK);
     return old;
 }
 
 static inline uint32_t irq_mark_self_in_nmi(bool new) {
-    uint32_t old = smp_core()->nmi_depth;
-    if (new) {
-        kassert(old != UINT32_MAX);
-        smp_core()->nmi_depth++;
-    } else {
-        kassert(old);
-        smp_core()->nmi_depth--;
-    }
+    uint32_t old = ctx_nmi_count(smp_ctx());
+    if (new)
+        ctx_add(CTX_NMI_ONE, CTX_NMI_MASK);
+    else
+        ctx_sub(CTX_NMI_ONE, CTX_NMI_MASK);
     return old;
 }
 
 static inline bool irq_in_nmi(void) {
-    return smp_core()->nmi_depth > 0;
+    return (smp_ctx() & CTX_NMI_MASK) != 0;
 }
 
 static inline bool irq_in_interrupt(void) {
-    return smp_core()->interrupt_depth > 0;
+    return (smp_ctx() & CTX_IRQ_MASK) != 0;
 }
 
 static inline bool irq_in_thread_context(void) {
-    struct core *cpu = smp_core();
-    return cpu->interrupt_depth == 0 && cpu->nmi_depth == 0;
+    return (smp_ctx() & CTX_IN_INTERRUPT_MASK) == 0;
 }
 
 static inline bool irq_vector_is_exception(uint8_t vector) {

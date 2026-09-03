@@ -163,6 +163,14 @@ enum watchdog_master_state {
 
 #define WATCHDOG_CRITICAL_TESTS_FACTOR FX(0.4)
 #define WATCHDOG_CRITICAL_PETS_FACTOR FX(0.6)
+
+/* This is the hard stall detector, only checking if the heartbeat
+ * counter has moved, and not using the incremental checks
+ * and logging that other cases do. TODO: In the future watchdog redesign,
+ * we can consider throwing out the incrementality entirely in favor of this */
+#define WATCHDOG_STALL_TIMEOUT_DEFAULT_MS 15000
+
+#define WATCHDOG_STALL_GRACE_TICKS 20
 struct watchdog_bucket {
     size_t epoch;      /* Epoch counter to see which buckets are outdated */
     size_t heartbeats; /* Heartbeats in this bucket */
@@ -221,6 +229,9 @@ struct watchdog_percpu {
 
     _Atomic size_t pets;
     _Atomic size_t anti_pets;
+
+    /* Monotonic count of heartbeats the CPU has emitted */
+    _Atomic uint64_t heartbeat_seq;
 
     struct watchdog_percpu_response response;
     struct watchdog_buckets buckets;
@@ -314,6 +325,11 @@ Score    │                             ┌─────┘ < a progressively
                                 * warn about lingerers. This notably is NOT
                                 * present for CRITICAL, because that runs
                                 * a finite amount of tests */
+
+    /* Stall detection state, used to immediately panic on
+     * completely stuck CPUs */
+    uint64_t last_seen_heartbeat; /* heartbeat_seq at last observed progress */
+    size_t last_progress_tick;    /* master tick when it last progressed */
 };
 
 struct watchdog_master {
@@ -354,6 +370,11 @@ struct watchdog_config {
 
     fx32_32_t master_critical_score; /* score >= this, we warn in logs */
 
+    /* A CPU whose heartbeat counter hasn't
+     * moved for this long panic, bypassing scoring,
+     * with zero disabling the detector */
+    time_ns_t master_stall_timeout;
+
     time_ns_t master_print_interval; /* prevents spam in some scenarios where
                                       * there might be no hangup,
                                       * just slowdowns */
@@ -366,6 +387,10 @@ struct watchdog_globals {
     /* ========== These are computed ========== */
     time_ms_t bucket_interval_ms;
     size_t expected_heartbeats_per_bucket;
+
+    /* master_stall_timeout in master ticks, with
+     * 0 indicating it's disabled */
+    size_t stall_timeout_ticks;
 
     irq_t critical_test_irq;
 };

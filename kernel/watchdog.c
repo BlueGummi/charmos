@@ -35,6 +35,7 @@ static struct watchdog_config config = {
     .master_tick_interval = MS_TO_NS(100),
     .worker_heartbeat_interval = MS_TO_NS(50),
     .master_print_interval = MS_TO_NS(250),
+    .master_stall_timeout = MS_TO_NS(WATCHDOG_STALL_TIMEOUT_DEFAULT_MS),
 
     .master_panic_score = FX(0.9), /* We missed 60% of heartbeats for a while,
                                     * AND when tested, we failed 75% */
@@ -67,7 +68,9 @@ CMDLINE_CHILDREN_DECLARE(
     CMDLINE_INNER_FX(warn_score, config.master_critical_score,
                      .range = RANGE(0, FX_ONE)),
     CMDLINE_INNER_FX(suspect_threshold, config.master_suspect_score,
-                     .range = RANGE(0, FX_ONE)));
+                     .range = RANGE(0, FX_ONE)),
+    CMDLINE_INNER_DURATION(stall_timeout, config.master_stall_timeout,
+                           .range = RANGE(0, SECONDS_TO_NS(600))));
 
 /* PERCPU_DECLARE zero-initializes, but we explicitly init buckets */
 static void watchdog_percpu_ctor(struct watchdog_percpu *pcpu, cpu_id_t cpu) {
@@ -168,6 +171,9 @@ static void watchdog_buckets_inc_heartbeat(struct watchdog_buckets *buckets,
 
 static void watchdog_do_percpu_heartbeat(time_ms_t now) {
     kassert(PERCPU_READY(watchdog_percpu));
+
+    atomic_fetch_add_explicit(&PERCPU_PTR(watchdog_percpu)->heartbeat_seq, 1,
+                              memory_order_relaxed);
 
     watchdog_buckets_inc_heartbeat(&PERCPU_READ(watchdog_percpu).buckets, now);
 }
@@ -418,8 +424,17 @@ static inline void watchdog_record_delta(struct watchdog_master_cpu *mcpu,
     mcpu->critical_tests[mcpu->critical_tests_done++] = delta;
 }
 
+/* Score pet count against the expected amount over
+ * the window */
 static inline fx32_32_t watchdog_pets_score(size_t pets) {
-    return pets > 0 ? FX(0.0) : FX_ONE;
+    size_t expected = watchdog_global.expected_heartbeats_per_bucket;
+    if (!expected)
+        return pets > 0 ? FX(0.0) : FX_ONE;
+
+    if (pets >= expected)
+        return FX(0.0);
+
+    return fx_div(fx_from_int(expected - pets), fx_from_int(expected));
 }
 
 static void watchdog_master_process_critical(time_ms_t now) {
@@ -447,11 +462,10 @@ static void watchdog_master_process_critical(time_ms_t now) {
         kassert(target_tests);
 
         struct watchdog_master_cpu *mcpu = &watchdog_master.cpus[i];
-        if (watchdog_master.tick - mcpu->critical_start_tick >=
-            WATCHDOG_CRITICAL_LOG_TICK_THRESHOLD)
-            watchdog_master_warn("CPU %zu critical for %zu ticks", mcpu->id,
-                                 watchdog_master.tick -
-                                     mcpu->critical_start_tick);
+
+        /* TODO: Logging should be safe in NMI context as
+         * the log site does not acquire locks when passthrough
+         * printing is off */
 
         /* We have to first check this condition before anything else */
         bool outstanding = false;
@@ -576,11 +590,6 @@ static void watchdog_master_process_suspect(time_ms_t now) {
             continue;
 
         ewma_update(&mcpu->lockup_ewma, new);
-        if (watchdog_master.tick - mcpu->suspect_start_tick >=
-            WATCHDOG_SUSPECT_LOG_TICK_THRESHOLD)
-            watchdog_master_warn("CPU %zu suspect for %zu ticks", mcpu->id,
-                                 watchdog_master.tick -
-                                     mcpu->suspect_start_tick);
 
         mcpu->lockup_score = mcpu->lockup_ewma.ewma;
         if (mcpu->lockup_score >= config.master_critical_score) {
@@ -618,6 +627,43 @@ static void watchdog_master_process_panic(void) {
     }
 }
 
+/* We check here if the heartbeat counter changed, measuring elapsed
+ * time in only master ticks. This is because places like time_get_ms()
+ * have a seqcount that can get stuck, and this is effectively
+ * the "quick check" for the edge case stall */
+static void watchdog_master_process_stall(void) {
+    if (!watchdog_global.stall_timeout_ticks)
+        return;
+
+    /* Give the workers time to arm their timers before judging them. */
+    if (watchdog_master.tick < WATCHDOG_STALL_GRACE_TICKS)
+        return;
+
+    for (cpu_id_t i = 0; i < global.core_count; i++) {
+        struct watchdog_master_cpu *mcpu = &watchdog_master.cpus[i];
+        struct watchdog_percpu *pcpu = PERCPU_PTR_FOR_CPU(watchdog_percpu, i);
+
+        uint64_t seen =
+            atomic_load_explicit(&pcpu->heartbeat_seq, memory_order_relaxed);
+
+        if (seen != mcpu->last_seen_heartbeat) {
+            mcpu->last_seen_heartbeat = seen;
+            mcpu->last_progress_tick = watchdog_master.tick;
+            continue;
+        }
+
+        if (watchdog_master.tick - mcpu->last_progress_tick <
+            watchdog_global.stall_timeout_ticks)
+            continue;
+
+        watchdog_panic("CPU %zu stalled: no heartbeat for %zu master ticks "
+                       "(seq stuck at %llu)",
+                       (size_t) i,
+                       watchdog_master.tick - mcpu->last_progress_tick,
+                       (unsigned long long) seen);
+    }
+}
+
 static enum irq_result watchdog_master_nmi_handler(void *ctx, irq_t irq,
                                                    struct irq_context *regs) {
     (void) ctx, (void) irq, (void) regs;
@@ -632,8 +678,17 @@ static enum irq_result watchdog_master_nmi_handler(void *ctx, irq_t irq,
     if (smp_core_id() != 0)
         return IRQ_NONE; /* Not us */
 
-    time_ms_t now = time_get_ms();
     watchdog_master.tick++;
+
+    /* Process what could've stalled before anything else */
+    watchdog_master_process_stall();
+
+    /* If anything is wedged on the timekeeper seqlock, this
+     * prevents the NMI from stalling too, so we only try_ here */
+    time_ms_t now;
+    if (!time_try_get_ms(&now))
+        return IRQ_HANDLED;
+
     watchdog_master_process_critical(now);
     watchdog_master_process_suspect(now);
     watchdog_master_process_normal();
@@ -661,7 +716,8 @@ static enum irq_result watchdog_test_handler(void *ctx, irq_t irq,
                                              struct irq_context *regs) {
     (void) ctx, (void) irq, (void) regs;
     struct watchdog_percpu *pcpu = PERCPU_PTR(watchdog_percpu);
-    if (seqcount_read_raw(&pcpu->response.seqcount)) {
+
+    if (seqcount_read_raw(&pcpu->response.seqcount) & 1) {
         pcpu->response.finished_ms = time_get_ms();
         seqcount_end_write(&pcpu->response.seqcount);
         return IRQ_HANDLED;
@@ -713,6 +769,17 @@ void watchdog_start(void) {
     watchdog_global.expected_heartbeats_per_bucket =
         watchdog_global.bucket_interval_ms /
         NS_TO_MS(config.worker_heartbeat_interval);
+
+    time_ms_t tick_ms = NS_TO_MS(config.master_tick_interval);
+    watchdog_global.stall_timeout_ticks =
+        (config.master_stall_timeout && tick_ms)
+            ? NS_TO_MS(config.master_stall_timeout) / tick_ms
+            : 0;
+
+    for (cpu_id_t i = 0; i < global.core_count; i++) {
+        watchdog_master.cpus[i].last_seen_heartbeat = 0;
+        watchdog_master.cpus[i].last_progress_tick = 0;
+    }
 
     struct watchdog_percpu *pcpu;
     percpu_for_each(watchdog_percpu, pcpu, cpu) {

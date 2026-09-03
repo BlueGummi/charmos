@@ -22,6 +22,7 @@ Implications and the AUTO state:
 
 set(DEBUG_FLAGS
     DEBUG_LOCK_CHK
+    DEBUG_SCHED_NESTING
     DEBUG_CLIMB
     DEBUG_USB
     DEBUG_USB_XHCI

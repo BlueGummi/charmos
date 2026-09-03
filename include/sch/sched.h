@@ -227,5 +227,5 @@ static inline void scheduler_force_run_dpcs(struct scheduler *sched) {
 }
 
 static inline bool scheduler_preemption_disabled(void) {
-    return smp_core()->preempt_disable_depth > 0;
+    return (smp_ctx() & CTX_PREEMPT_MASK) != 0;
 }

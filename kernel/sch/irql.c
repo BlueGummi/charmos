@@ -16,28 +16,11 @@ static enum irql irql_set(enum irql irql) {
 
 static inline uint32_t scheduler_preemption_disable(void) {
     kassert(!are_interrupts_enabled());
-    struct core *cpu = smp_core();
-
-    uint32_t old = cpu->preempt_disable_depth;
-
-    if (old == UINT32_MAX)
-        panic("overflow");
-
-    cpu->preempt_disable_depth++;
-    return old + 1;
+    return ctx_preempt_count(ctx_add(CTX_PREEMPT_ONE, CTX_PREEMPT_MASK));
 }
 
 static inline uint32_t scheduler_preemption_enable(void) {
-    struct core *cpu = smp_core();
-
-    uint32_t old = cpu->preempt_disable_depth;
-
-    if (old == 0) {
-        panic("underflow");
-    }
-
-    cpu->preempt_disable_depth--;
-    return old - 1;
+    return ctx_preempt_count(ctx_sub(CTX_PREEMPT_ONE, CTX_PREEMPT_MASK));
 }
 
 enum irql irql_raise(enum irql new_level) {
@@ -70,7 +53,7 @@ enum irql irql_raise(enum irql new_level) {
     return old;
 }
 
-void irql_lower(enum irql new_level) {
+static void irql_lower_internal(enum irql new_level, bool allow_resched) {
     BOOTSTAGE_IF_LT(BOOTSTAGE_LATE) {
         return;
     }
@@ -117,7 +100,15 @@ void irql_lower(enum irql new_level) {
         if (old >= IRQL_APC_LEVEL)
             apc_check_and_deliver(curr);
 
-        if (preempt_re_enabled)
+        if (allow_resched && preempt_re_enabled)
             scheduler_resched_if_needed();
     }
+}
+
+void irql_lower(enum irql new_level) {
+    irql_lower_internal(new_level, /* allow_resched = */ true);
+}
+
+void irql_lower_no_resched(enum irql new_level) {
+    irql_lower_internal(new_level, /* allow_resched = */ false);
 }

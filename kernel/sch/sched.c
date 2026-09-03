@@ -388,6 +388,25 @@ void scheduler_switch_in() {
     watchdog_pet();
 }
 
+/* Looping here to prevent unbounded recursion, keeping the max nesting == 1
+ * invariant upheld. Interrupt state stays uniform across
+ * iterations, and in_resched is cleared before the lower so DPCs
+ * have a chance to run */
+static void scheduler_yield_loop(void) {
+    do {
+        enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
+        scheduler_mark_self_in_resched(true);
+
+        schedule();
+
+        scheduler_switch_in();
+
+        scheduler_mark_self_in_resched(false);
+
+        irql_lower_no_resched(irql);
+    } while (scheduler_mark_self_needs_resched(false));
+}
+
 void scheduler_yield() {
 
     /* Read GS without interrupts on, a temporary HACK: */
@@ -396,7 +415,7 @@ void scheduler_yield() {
 
     struct core *c = smp_core();
     bool entry_in_resched = atomic_load(&c->in_resched);
-    uint32_t entry_depth = c->preempt_disable_depth;
+    uint32_t entry_depth = ctx_preempt_count(c->ctx);
     cpu_id_t entry_cpu = c->id;
 
     if (iflag)
@@ -407,15 +426,11 @@ void scheduler_yield() {
     kassert(entry_depth == 0, "yielding on cpu %zu with preempt depth %u",
             (size_t) entry_cpu, entry_depth);
 
+    scheduler_yield_nesting_enter(thread_get_current());
+
     scheduler_lock_chk_assert();
-    enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
-    scheduler_mark_self_in_resched(true);
+    scheduler_yield_loop();
 
-    schedule();
-
-    scheduler_switch_in();
-
-    scheduler_mark_self_in_resched(false);
-
-    irql_lower(irql);
+    /* It did the matching enter already, so we exit here */
+    scheduler_yield_nesting_exit(thread_get_current());
 }
