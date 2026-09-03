@@ -29,8 +29,8 @@
  *   There are 5 IRQLs, ordered from the least restrictive to most restrictive:
  *
  *     - PASSIVE (standard code execution, nothing blocked)
- *     - APC (APCs[^1] blocked, preemption blocked)
- *     - DISPATCH (DPCs[^2] blocked)
+ *     - APC (APCs[^1] blocked)
+ *     - DISPATCH (DPCs[^2] blocked, preemption blocked)
  *     - DEVICE (same as DISPATCH, currently reserved for future use)
  *     - HIGH (hardware interrupts blocked)
  *

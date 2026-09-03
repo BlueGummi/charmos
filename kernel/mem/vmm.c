@@ -237,13 +237,13 @@ uintptr_t vmm_make_user_pml4(void) {
 static void vmm_free_user_subtree(struct page_table *pdpt) {
     for (int i3 = 0; i3 < PT_ENTRIES; i3++) {
         pte_t e3 = pdpt->entries[i3];
-        if (!in_use(e3) || (e3 & PAGE_PAGE_SIZE))
+        if (!in_use(e3) || (e3 & PAGE_HUGE))
             continue;
 
         struct page_table *pd = pt_next_table(e3);
         for (int i2 = 0; i2 < PT_ENTRIES; i2++) {
             pte_t e2 = pd->entries[i2];
-            if (!in_use(e2) || (e2 & PAGE_2MB_page))
+            if (!in_use(e2) || (e2 & PAGE_HUGE))
                 continue;
 
             struct page_table *pt = pt_next_table(e2);
@@ -395,7 +395,7 @@ static inline pte_t build_leaf_pte(paddr_t phys, uint64_t flags,
                                    enum vmm_flags vflags) {
     uint64_t extra_flags = (vflags & VMM_FLAG_MODIFY_LEAF) ? 0 : PAGE_PRESENT;
     if (sz != VMM_MAP_PAGE_SIZE_4KB && !(vflags & VMM_FLAG_MODIFY_LEAF))
-        extra_flags |= PAGE_2MB_page;
+        extra_flags |= PAGE_HUGE;
 
     flags |= extra_flags;
     pte_t leaf = (phys & PAGE_PHYS_MASK) | flags;
@@ -470,7 +470,7 @@ static enum errno vmm_pt_apply(struct vmm_map_request *rq) {
         /* present huge leaf where table was expected is a size mismatch
          *
          * only meaningful when present as non-present can have payload there */
-        kassert(!((*entry & PAGE_PRESENT) && (*entry & PAGE_2MB_page)));
+        kassert(!((*entry & PAGE_PRESENT) && (*entry & PAGE_HUGE)));
 
         /* We can't descend through a shared table to modify a leaf, since that
          * would edit every other range aliasing with this table */
@@ -494,7 +494,7 @@ static enum errno vmm_pt_apply(struct vmm_map_request *rq) {
     /* page tables must match the caller's claims, PS bit is only meaningful
      * for present bits as tagged non-present PTEs use bit 7 */
     if (was_present) {
-        kassert((*last_entry & PAGE_2MB_page) == want_huge);
+        kassert((*last_entry & PAGE_HUGE) == want_huge);
         if (handle_exist) {
             err = ERR_EXIST;
             pte_unlock(last_entry, last_irql);
@@ -598,7 +598,7 @@ static enum errno alias_install_one(struct page_table *pml4, vaddr_t virt,
             }
         }
 
-        kassert(!((*entry & PAGE_PRESENT) && (*entry & PAGE_2MB_page)));
+        kassert(!((*entry & PAGE_PRESENT) && (*entry & PAGE_HUGE)));
         tables[level + 1] = pt_next_table(*entry);
     }
 
@@ -745,7 +745,7 @@ static void vmm_unmap_aliased(vaddr_t virt, size_t len, enum vmm_flags vflags) {
 
             pte_unlock(entry, irql);
 
-            if (!(val & PAGE_PRESENT) || (val & PAGE_2MB_page))
+            if (!(val & PAGE_PRESENT) || (val & PAGE_HUGE))
                 break;
 
             table = pt_next_table(val);
@@ -815,7 +815,7 @@ enum errno vmm_unshare_path(vaddr_t virt, enum vmm_map_page_size leaf_size,
             goto out;
         }
 
-        kassert(!((*entry & PAGE_PRESENT) && (*entry & PAGE_2MB_page)));
+        kassert(!((*entry & PAGE_PRESENT) && (*entry & PAGE_HUGE)));
 
         if (pte_is_shared(*entry)) {
             struct page_table *priv = pt_clone_shared(pt_next_table(*entry));
@@ -1007,7 +1007,7 @@ static pte_t vmm_walk_leaf(struct page_table *root, vaddr_t virt,
             goto out;
         }
 
-        if (snap & PAGE_2MB_page)
+        if (snap & PAGE_HUGE)
             goto out;
 
         table = pt_next_table(snap);
@@ -1042,7 +1042,7 @@ paddr_t vmm_get_phys_internal(uintptr_t virt, enum vmm_flags vflags) {
         return (uintptr_t) -1;
 
     if (level == PT_LEVEL_PDPT)
-        return (snap & PAGE_PHYS_MASK) + (virt & (PAGE_1GB - 1));
+        return (snap & PAGE_1GB_PHYS_MASK) + (virt & (PAGE_1GB - 1));
 
     if (level == PT_LEVEL_PD)
         return (snap & PAGE_2MB_PHYS_MASK) + (virt & (PAGE_2MB - 1));

@@ -18,20 +18,19 @@ struct folio;
 #define PAGE_PRESENT (0x1UL)
 #define PAGE_WRITE (0x2UL)
 #define PAGE_USER_ALLOWED (0x4UL)
-#define PAGE_ALL 0xFFFUL
 #define PAGE_XD (1UL << 63) // E(x)ecute (D)isable
 #define PAGE_PHYS_MASK (0x00FFFFFFF000UL)
-#define PAGE_PAGE_SIZE (1UL << 7)
-#define PAGE_UNCACHABLE ((1UL << 4) | PAGE_WRITE)
+#define PAGE_UNCACHABLE (1UL << 4) /* PCD */
 #define PAGE_NO_FLAGS (0)
 #define PAGE_WRITETHROUGH (1UL << 3)
-#define PAGE_2MB_page (1ULL << 7)
+#define PAGE_HUGE (1ULL << 7) /* PS: 2MB at the PD level, 1GB at the PDPT */
 
 /* TODO: */
 #define PAGE_PAGEABLE (0)
 #define PAGE_MOVABLE (0)
 
-#define PAGE_2MB_PHYS_MASK (~((uintptr_t) PAGE_2MB - 1))
+#define PAGE_2MB_PHYS_MASK (0x00FFFFE00000UL)
+#define PAGE_1GB_PHYS_MASK (0x00FFC0000000UL)
 #define PAGE_ALIGN_DOWN(x) ALIGN_DOWN((uintptr_t) (x), PAGE_SIZE)
 #define PAGE_ALIGN_UP(x) ALIGN_UP((uintptr_t) (x), PAGE_SIZE)
 #define IS_PAGE_ALIGNED(x) IS_ALIGNED((uintptr_t) (x), PAGE_SIZE)
@@ -53,8 +52,6 @@ struct folio;
 #define PAGE_4K_SHIFT 12
 #define PAGE_2M_SHIFT 21
 #define PAGE_1G_SHIFT 30
-#define PAGE_4K_MASK ((1ULL << PAGE_4K_SHIFT) - 1)
-#define PAGE_2M_MASK ((1ULL << PAGE_2M_SHIFT) - 1)
 
 #define PAGE_TAG_MASK 0x7ULL
 #define PAGE_PAYLOAD_ALIGNMENT 8

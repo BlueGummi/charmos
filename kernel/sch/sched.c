@@ -389,7 +389,23 @@ void scheduler_switch_in() {
 }
 
 void scheduler_yield() {
-    kassert(!scheduler_self_in_resched() && !scheduler_preemption_disabled());
+
+    /* Read GS without interrupts on, a temporary HACK: */
+    bool iflag = are_interrupts_enabled();
+    disable_interrupts();
+
+    struct core *c = smp_core();
+    bool entry_in_resched = atomic_load(&c->in_resched);
+    uint32_t entry_depth = c->preempt_disable_depth;
+    cpu_id_t entry_cpu = c->id;
+
+    if (iflag)
+        enable_interrupts();
+
+    kassert(!entry_in_resched, "yielding while already in resched on cpu %zu",
+            (size_t) entry_cpu);
+    kassert(entry_depth == 0, "yielding on cpu %zu with preempt depth %u",
+            (size_t) entry_cpu, entry_depth);
 
     scheduler_lock_chk_assert();
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
