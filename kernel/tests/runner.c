@@ -491,8 +491,9 @@ static void test_progress_paint(const struct test_group *tg,
     status_bar_progress_timed(
         test_progress.done, test_progress.total, test_progress.test_started_ms,
         test_progress.started_ms,
-        ANSI_BLUE "%s" ANSI_RESET " (%s" ANSI_RESET ") " ANSI_BOLD
-                  "%s" ANSI_RESET "%s%s%s%s",
+        ANSI_GREEN ANSI_BOLD "running" ANSI_RESET " " ANSI_BLUE "%s" ANSI_RESET
+                             " (%s" ANSI_RESET ") " ANSI_BOLD "%s" ANSI_RESET
+                             "%s%s%s%s",
         tg->name, test_tier_to_str_color(tier), test_name,
         intensity ? " [" ANSI_CYAN : "", intensity ? intensity : "",
         intensity ? ANSI_RESET "]" : "", tail);

@@ -894,14 +894,19 @@ class CampaignRunner:
         )
 
     def _run_gate_boot(self) -> BootResult:
-        gate_task = self.manifest.suite.tasks[0]
-        gate_cmdline = codec.render_gate(gate_task)
+        task = self.manifest.suite.tasks[0]
+        gate = codec.gate_task(task)
+        gate_cmdline = codec.render_gate(
+            task,
+            base_seed=self.manifest.base_seed,
+            campaign_id=self.manifest.campaign_id,
+        )
         return self.boot_runner.run_boot(
             manifest=self.manifest,
-            task=gate_task,
+            task=gate,
             boot_index=0,
             cmdline=gate_cmdline,
-            timeout_ms=gate_task.boot.host_timeout_ms,
+            timeout_ms=gate.boot.host_timeout_ms,
             out_dir=self.manifest.out_dir / "gate",
         )
 

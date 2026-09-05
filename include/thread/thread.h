@@ -168,6 +168,9 @@ struct thread {
      * mode, as this helps us identify scheduler_yield() nesting */
     uint32_t yield_nesting;
 
+    /* Preserves the highest point yield_nesting ever reached */
+    uint32_t yield_nesting_max;
+
     /* Registers */
     struct cpu_context regs;
 
@@ -221,7 +224,7 @@ struct thread {
 
     /* Flags */
     enum rt_scheduler_capability accepted_rt_caps;
-    _Atomic(enum thread_flags) flags;
+    _Atomic enum thread_flags flags;
     _Atomic size_t migration_generation;
 
     /* ======== Raw priority + timeslice data ======== */
@@ -487,11 +490,19 @@ static inline void scheduler_yield_nesting_enter(struct thread *t) {
         return;
 
     t->yield_nesting++;
+    if (t->yield_nesting > t->yield_nesting_max)
+        t->yield_nesting_max = t->yield_nesting;
 #ifdef DEBUG_SCHED_NESTING
     kassert(t->yield_nesting <= SCHED_MAX_YIELD_NESTING,
             "scheduler_yield nested %u deep on thread '%s'", t->yield_nesting,
             t->name);
 #endif
+}
+
+/* The deepest this thread's yields have ever nested. 1 is the expected value:
+ * one scheduler_yield() frame and no re-entry. */
+static inline uint32_t scheduler_yield_nesting_max(struct thread *t) {
+    return t ? t->yield_nesting_max : 0;
 }
 
 static inline void scheduler_yield_nesting_exit(struct thread *t) {
@@ -502,6 +513,10 @@ static inline void scheduler_yield_nesting_exit(struct thread *t) {
 static inline void scheduler_yield_nesting_reset(struct thread *t) {
     if (t)
         t->yield_nesting = 0;
+    /* yield_nesting_max is deliberately not reset: it is a per-thread record
+     * for the whole life of the thread, and thread_entry_wrapper() clears the
+     * live count because a thread whose stack context_switch() abandoned never
+     * ran its decrement -- that is a bookkeeping repair, not a new thread. */
 }
 
 static inline struct thread *thread_get_current() {

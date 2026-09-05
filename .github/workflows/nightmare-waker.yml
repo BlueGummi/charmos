@@ -15,6 +15,9 @@ concurrency:
   group: nightmare-waker
   cancel-in-progress: false
 
+env:
+  PYTHONPATH: scripts
+
 jobs:
   wake:
     runs-on: ubuntu-slim

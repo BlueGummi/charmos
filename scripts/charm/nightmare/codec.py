@@ -1,6 +1,6 @@
 """nightmare tasks into kernel command lines"""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +8,9 @@ from . import grammar as g
 from .suite import Build, Suite, Task
 
 ROOT = "nightmare"
+
+"""How long the gate boot runs the subject for"""
+GATE_DURATION_MS = 2000
 
 
 class CodecError(ValueError):
@@ -93,9 +96,30 @@ def _knob(value: Any, name: str) -> str:
         raise CodecError(f"{name}: {e}") from None
 
 
-def render_gate(_task: Task | None = None) -> str:
-    """command line for the gate boot"""
-    return ""
+def gate_task(task: Task) -> Task:
+    boot = replace(
+        task.boot,
+        duration_ms=GATE_DURATION_MS,
+        timeout_ms=0,  # re-derive host timeout from gate duration
+        max_boots=1,
+        min_interval_ms=0,
+    )
+    return replace(task, boot=boot)
+
+
+def render_gate(
+    task: Task,
+    *,
+    base_seed: int | None = None,
+    campaign_id: str | None = None,
+) -> str:
+    """command line for the gate boot
+
+    Must never be empty: `gen_limine_conf.cmake` rejects a blank CMDLINE file
+    """
+    gate = gate_task(task)
+    seed = base_seed if gate.nightmare.wants_seed else None
+    return render(gate, BootRequest(boot_index=0, campaign_id=campaign_id, seed=seed))
 
 
 def write(path: Path, cmdline: str) -> Path:

@@ -10,6 +10,7 @@ PROTECTED_WORKFLOWS = (
     "build.yml",
     "nightmare-contract.yml",
     "nightmare-orchestrator.yml",
+    "nightmare-waker.yml",
     "nightmare.yml",
     "test.yml",
     "tools.yml",
@@ -33,6 +34,9 @@ _RULES = (
         "use the job-scoped GITHUB_TOKEN instead of a broad registry secret",
     ),
 )
+
+_CHARM_INVOCATION = re.compile(r"\bpython3?\s+-m\s+charm\b")
+_PYTHONPATH = re.compile(r"\bPYTHONPATH\b")
 
 _RUNNER_IMAGE = re.compile(r"\bimage\s*:\s*(ghcr\.io/[^\s#]+)")
 _IMMUTABLE_IMAGE = re.compile(
@@ -72,7 +76,30 @@ def check_text(path: Path, text: str) -> list[Violation]:
         for name, pattern, message in _RULES:
             if pattern.search(line):
                 violations.append(Violation(path, line_number, name, message))
+
+    violations.extend(_check_charm_importable(path, text))
     return violations
+
+
+def _check_charm_importable(path: Path, text: str) -> list[Violation]:
+    """
+    PYTHONPATH must point at scripts/
+    """
+    if _PYTHONPATH.search(text):
+        return []
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        if line.lstrip().startswith("#"):
+            continue
+        if _CHARM_INVOCATION.search(line):
+            return [
+                Violation(
+                    path,
+                    line_number,
+                    "charm_not_importable",
+                    "workflows that run `python -m charm` must set PYTHONPATH",
+                )
+            ]
+    return []
 
 
 def protected_paths(root: Path | None = None) -> tuple[Path, ...]:

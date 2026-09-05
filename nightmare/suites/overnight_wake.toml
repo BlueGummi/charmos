@@ -1,0 +1,53 @@
+# overnight wake/sleep nightmare
+
+[suite]
+name          = "overnight_wake"
+runners       = 8
+budget_hours  = 6.0
+overlap_ratio = 0.15
+
+[build]
+compiler = "clang"
+type     = "RelWithDebInfo"
+cmake_definitions = [
+  "TEST_NIGHTMARE_ALL=OFF",
+  "TEST_NIGHTMARE_WAKE=ON",
+  "DEBUG_LOCK_CHK=ON",
+]
+smp        = { sockets = 2, cores = 2, threads = 2 }
+memory_mib = 4096
+
+[[tasks]]
+name        = "wake_storm"
+mode        = "horizontal"
+weight      = 1.5
+priority    = 1.8
+max_runners = 4
+
+  [tasks.boot]
+  duration_ms     = 300000    # five minutes
+  drain_grace_ms  = 20000
+  gate_first      = true
+  max_boots       = 500
+  min_interval_ms = 2000
+
+  [tasks.nightmare]
+  intensity = 0.5             # 2 workers per core: one waker, the rest sleepers
+  seed_mode = "split"
+  perturb   = ["waker", "apc_spammer", "migrator", "stutter"]
+
+    [tasks.nightmare.opts]
+    sleeper_stall_ms = 10000
+
+    [tasks.nightmare.perturb_opts.waker]
+    interval_us = 250
+
+    [tasks.nightmare.perturb_opts.apc_spammer]
+    interval_us = 300
+
+    [tasks.nightmare.perturb_opts.migrator]
+    interval_us = 500
+
+    [tasks.nightmare.perturb_opts.stutter]
+    period_ms = 3000
+    gap_ms    = 1000
