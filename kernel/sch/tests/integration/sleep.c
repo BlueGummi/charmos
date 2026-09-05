@@ -142,4 +142,114 @@ TEST_DECLARE_INTEGRATION(sched, sleep_interruptible_apc) {
 
     return TEST_SUCCESS;
 }
+
+static atomic_bool sub_apc_ran = false;
+static struct thread *sub_t;
+static atomic_bool sub_interrupted = false;
+static atomic_bool sub_started = false;
+
+static void apc_sub(void *apc) {
+    (void) apc;
+    atomic_store(&sub_apc_ran, true);
+}
+
+static void apc_sub_enq_thread(void *) {
+    struct apc *apc = apc_create();
+    apc_init(apc, apc_sub, NULL, apc_destroy_free);
+
+    while (!atomic_load(&sub_started))
+        cpu_relax();
+
+    if (thread_get(sub_t)) {
+        apc_enqueue(sub_t, apc, APC_TYPE_KERNEL);
+        thread_put(sub_t);
+    }
+    apc_put(apc);
+}
+
+static void sleeping_sub_thread(void *) {
+    atomic_store(&sub_started, true);
+
+    thread_prepare_to_sleep(thread_get_current(), THREAD_SLEEP_REASON_MANUAL,
+                            THREAD_WAIT_INTERRUPTIBLE, (void *) 0xdeadbeef);
+
+    enum thread_wait_status st = thread_yield_interruptible();
+    if (st == THREAD_WAIT_INTERRUPTED)
+        atomic_store(&sub_interrupted, true);
+}
+
+TEST_DECLARE_INTEGRATION(sched, wait_interruptible_substrate) {
+    if (global.core_count < 3) {
+        test_info("too few cores");
+        return TEST_SKIP(TEST_SKIP_NONE);
+    }
+
+    atomic_store(&sub_apc_ran, false);
+    atomic_store(&sub_interrupted, false);
+    atomic_store(&sub_started, false);
+
+    sub_t =
+        thread_spawn_joinable_on_core("sub_th", sleeping_sub_thread, NULL, 1);
+    struct thread *enq =
+        thread_spawn_joinable_on_core("sub_enq", apc_sub_enq_thread, NULL, 2);
+
+    TEST_ASSERT_NONNULL(sub_t);
+    TEST_ASSERT_NONNULL(enq);
+
+    thread_join(sub_t);
+    thread_join(enq);
+
+    TEST_ASSERT(atomic_load(&sub_apc_ran));
+    TEST_ASSERT(atomic_load(&sub_interrupted));
+
+    return TEST_SUCCESS;
+}
+
+static struct thread *arb_t;
+static atomic_bool arb_started = false;
+static atomic_bool arb_matched = false;
+
+static void arbitrary_sleeping_thread(void *) {
+    atomic_store(&arb_started, true);
+
+    enum thread_wait_status st =
+        thread_yield_arbitrary(THREAD_WAIT_UNINTERRUPTIBLE);
+    if (st == THREAD_WAIT_MATCHED)
+        atomic_store(&arb_matched, true);
+}
+
+static void arbitrary_waking_thread(void *) {
+    while (!atomic_load(&arb_started))
+        cpu_relax();
+
+    thread_sleep_for_ms(5);
+
+    thread_wake(arb_t, THREAD_WAKE_REASON_SLEEP_MANUAL,
+                arb_t->perceived_prio_class, (void *) 0xcafe);
+}
+
+TEST_DECLARE_INTEGRATION(sched, wait_arbitrary_any_src) {
+    if (global.core_count < 3) {
+        test_info("too few cores");
+        return TEST_SKIP(TEST_SKIP_NONE);
+    }
+
+    atomic_store(&arb_started, false);
+    atomic_store(&arb_matched, false);
+
+    arb_t = thread_spawn_joinable_on_core("arb_th", arbitrary_sleeping_thread,
+                                          NULL, 1);
+    struct thread *waker = thread_spawn_joinable_on_core(
+        "arb_waker", arbitrary_waking_thread, NULL, 2);
+
+    TEST_ASSERT_NONNULL(arb_t);
+    TEST_ASSERT_NONNULL(waker);
+
+    thread_join(arb_t);
+    thread_join(waker);
+
+    TEST_ASSERT(atomic_load(&arb_matched));
+
+    return TEST_SUCCESS;
+}
 #endif

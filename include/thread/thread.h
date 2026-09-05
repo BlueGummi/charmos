@@ -411,8 +411,18 @@ void thread_calculate_activity_data(struct thread *t);
 void thread_add_block_reason(struct thread *t, uint8_t reason);
 void thread_add_sleep_reason(struct thread *t, uint8_t reason);
 
-/* these two functions return if the thread had `wake_matched`
- * satisfied on return */
+void thread_prepare_to_wait(struct thread *t, enum thread_state state,
+                            uint8_t reason, enum thread_wait_type type,
+                            void *expect_wake_src);
+void thread_prepare_to_wait_locked(struct thread *t, enum thread_state state,
+                                   uint8_t reason, enum thread_wait_type type,
+                                   void *expect_wake_src);
+bool thread_rearm_wait(struct thread *t);
+enum thread_wait_status thread_wait_yield(void);
+void thread_yield_until_wake_match(void);
+enum thread_wait_status thread_yield_interruptible(void);
+enum thread_wait_status thread_yield_arbitrary(enum thread_wait_type type);
+
 void thread_prepare_to_block(struct thread *t, enum thread_block_reason r,
                              enum thread_wait_type wait_type,
                              void *expect_wake_src);
@@ -431,7 +441,6 @@ void thread_set_background(struct thread *t);
 void thread_wake_unlocked(struct thread *t, enum thread_wake_reason r,
                           void *wake_src);
 void thread_migrate(struct thread *t, size_t dest_core);
-void thread_yield_until_wake_match();
 enum thread_prio_class thread_unboost_self();
 enum thread_prio_class thread_boost_self(enum thread_prio_class new);
 struct scheduler *thread_get_scheduler(struct thread *t, enum irql *sirql_out);
@@ -634,14 +643,30 @@ static inline void thread_clear_wake_data_raw(struct thread *t) {
     t->wake_token = 0;
 }
 
-static inline void thread_clear_wake_data(struct thread *t) {
+static inline void thread_finish_wait_raw(struct thread *t) {
+    enum thread_state s = thread_get_state(t);
+    if (s == THREAD_STATE_BLOCKED || s == THREAD_STATE_SLEEPING)
+        thread_set_state(t, THREAD_STATE_RUNNING);
+
+    thread_clear_wake_data_raw(t);
+}
+
+static inline void thread_finish_wait_locked(struct thread *t) {
+    thread_finish_wait_raw(t);
+}
+
+static inline void thread_finish_wait(struct thread *t) {
     bool aok;
     enum irql irql = thread_acquire(t, &aok);
     kassert(aok);
 
-    thread_clear_wake_data_raw(t);
+    thread_finish_wait_locked(t);
 
     thread_release(t, irql);
+}
+
+static inline void thread_clear_wake_data(struct thread *t) {
+    thread_finish_wait(t);
 }
 
 static inline enum thread_wait_type thread_get_wait_type(struct thread *t) {

@@ -488,7 +488,8 @@ static bool set_state_and_update_reason(
 
     if (state == THREAD_STATE_READY) {
         atomic_store_explicit(&t->wake_src, wake_src, memory_order_release);
-        if (wake_src == t->expected_wake_src) {
+        if (wake_src == t->expected_wake_src ||
+            t->expected_wake_src == THREAD_WAIT_ANY_SRC) {
             t->wake_token = t->wait_token;
             thread_or_flags(t, THREAD_FLAG_WAKE_MATCHED);
         }
@@ -552,29 +553,59 @@ void thread_set_background(struct thread *t) {
     t->perceived_prio_class = THREAD_PRIO_CLASS_BACKGROUND;
 }
 
+void thread_prepare_to_wait(struct thread *t, enum thread_state state,
+                            uint8_t reason, enum thread_wait_type type,
+                            void *expect_wake_src) {
+    void (*callback)(struct thread *, uint8_t) = NULL;
+    if (state == THREAD_STATE_BLOCKED)
+        callback = thread_add_block_reason;
+    else if (state == THREAD_STATE_SLEEPING)
+        callback = thread_add_sleep_reason;
+    else
+        panic("thread_prepare_to_wait: invalid state %u", (unsigned) state);
+
+    set_state_and_update_reason(t, reason, state, callback, expect_wake_src,
+                                /*already_locked=*/false, type,
+                                /*exit_if_match=*/false);
+}
+
+void thread_prepare_to_wait_locked(struct thread *t, enum thread_state state,
+                                   uint8_t reason, enum thread_wait_type type,
+                                   void *expect_wake_src) {
+    void (*callback)(struct thread *, uint8_t) = NULL;
+    if (state == THREAD_STATE_BLOCKED)
+        callback = thread_add_block_reason;
+    else if (state == THREAD_STATE_SLEEPING)
+        callback = thread_add_sleep_reason;
+    else
+        panic("thread_prepare_to_wait_locked: invalid state %u",
+              (unsigned) state);
+
+    set_state_and_update_reason(t, reason, state, callback, expect_wake_src,
+                                /*already_locked=*/true, type,
+                                /*exit_if_match=*/false);
+}
+
 void thread_prepare_to_block(struct thread *t, enum thread_block_reason r,
                              enum thread_wait_type type,
                              void *expect_wake_src) {
-    set_state_and_update_reason(
-        t, r, THREAD_STATE_BLOCKED, thread_add_block_reason, expect_wake_src,
-        /*already_locked=*/false, type, /* exit_if_match = */ false);
+    thread_prepare_to_wait(t, THREAD_STATE_BLOCKED, (uint8_t) r, type,
+                           expect_wake_src);
 }
 
 void thread_prepare_to_block_locked(struct thread *t,
                                     enum thread_block_reason r,
                                     enum thread_wait_type type,
                                     void *expect_wake_src) {
-    set_state_and_update_reason(
-        t, r, THREAD_STATE_BLOCKED, thread_add_block_reason, expect_wake_src,
-        /*already_locked=*/true, type, /* exit_if_match = */ false);
+    thread_prepare_to_wait_locked(t, THREAD_STATE_BLOCKED, (uint8_t) r, type,
+                                  expect_wake_src);
 }
 
 void thread_prepare_to_sleep(struct thread *t, enum thread_sleep_reason r,
                              enum thread_wait_type type,
                              void *expect_wake_src) {
-    set_state_and_update_reason(
-        t, r, THREAD_STATE_SLEEPING, thread_add_sleep_reason, expect_wake_src,
-        /*already_locked=*/false, type, /* exit_if_match = */ false);
+    thread_prepare_to_wait(t, THREAD_STATE_SLEEPING, (uint8_t) r, type,
+                           expect_wake_src);
 }
 
 static bool block_interruptible(struct thread *t, enum thread_block_reason r,
@@ -593,37 +624,97 @@ static bool sleep_interruptible(struct thread *t, enum thread_sleep_reason r,
         /*already_locked=*/false, type, /* exit_if_match = */ true);
 }
 
-void thread_yield_until_wake_match(void) {
+bool thread_rearm_wait(struct thread *t) {
+    if (t->last_action != THREAD_STATE_BLOCKED &&
+        t->last_action != THREAD_STATE_SLEEPING)
+        return true;
+
+    if (t->last_action == THREAD_STATE_BLOCKED) {
+        return block_interruptible(
+            t, (enum thread_block_reason) t->last_action_reason, t->wait_type,
+            t->expected_wake_src);
+    } else {
+        return sleep_interruptible(
+            t, (enum thread_sleep_reason) t->last_action_reason, t->wait_type,
+            t->expected_wake_src);
+    }
+}
+
+enum thread_wait_status thread_wait_yield(void) {
     struct thread *curr = thread_get_current();
+    uint32_t apcs_before = curr->total_apcs_ran;
 
-    /* If our wake has matched we take the fast path down
-     * and out of the function */
-    if (!(thread_get_flags(curr) & THREAD_FLAG_WAKE_MATCHED))
-        scheduler_yield();
-
-    if (curr->last_action != THREAD_STATE_BLOCKED &&
-        curr->last_action != THREAD_STATE_SLEEPING)
-        return;
-
-    /* we can safely avoid checking the token in the loop because that will
-     * become set if wake_matched is set... */
-    while (!(thread_get_flags(curr) & THREAD_FLAG_WAKE_MATCHED)) {
-        if (curr->last_action != THREAD_STATE_BLOCKED &&
-            curr->last_action != THREAD_STATE_SLEEPING)
-            panic("uh oh");
-
-        if (curr->last_action == THREAD_STATE_BLOCKED) {
-            if (block_interruptible(curr, curr->last_action_reason,
-                                    curr->wait_type, curr->expected_wake_src))
-                break;
-        } else {
-            if (sleep_interruptible(curr, curr->last_action_reason,
-                                    curr->wait_type, curr->expected_wake_src))
-                break;
+    /* If our wake has already matched before yielding, don't yield */
+    if (!(thread_get_flags(curr) & THREAD_FLAG_WAKE_MATCHED)) {
+        if (curr->wait_type == THREAD_WAIT_INTERRUPTIBLE) {
+            if (atomic_load_explicit(&curr->apc_pending_mask,
+                                     memory_order_acquire) != 0 ||
+                curr->total_apcs_ran != apcs_before ||
+                atomic_load_explicit(&curr->wake_src, memory_order_acquire) !=
+                    NULL) {
+                return THREAD_WAIT_INTERRUPTED;
+            }
         }
 
         scheduler_yield();
     }
 
-    thread_clear_wake_data(curr);
+    if (thread_get_flags(curr) & THREAD_FLAG_WAKE_MATCHED)
+        return THREAD_WAIT_MATCHED;
+
+    if (curr->wait_type == THREAD_WAIT_INTERRUPTIBLE) {
+        if (curr->total_apcs_ran != apcs_before ||
+            atomic_load_explicit(&curr->apc_pending_mask,
+                                 memory_order_acquire) != 0 ||
+            atomic_load_explicit(&curr->wake_src, memory_order_acquire) !=
+                NULL) {
+            return THREAD_WAIT_INTERRUPTED;
+        }
+    }
+
+    return THREAD_WAIT_SPURIOUS;
+}
+
+void thread_yield_until_wake_match(void) {
+    struct thread *curr = thread_get_current();
+
+    while (true) {
+        enum thread_wait_status st = thread_wait_yield();
+        if (st == THREAD_WAIT_MATCHED)
+            break;
+
+        if (thread_rearm_wait(curr))
+            break;
+    }
+
+    thread_finish_wait(curr);
+}
+
+enum thread_wait_status thread_yield_interruptible(void) {
+    struct thread *curr = thread_get_current();
+
+    while (true) {
+        enum thread_wait_status st = thread_wait_yield();
+        if (st == THREAD_WAIT_MATCHED || st == THREAD_WAIT_INTERRUPTED) {
+            thread_finish_wait(curr);
+            return st;
+        }
+
+        if (thread_rearm_wait(curr)) {
+            thread_finish_wait(curr);
+            return THREAD_WAIT_MATCHED;
+        }
+    }
+}
+
+enum thread_wait_status thread_yield_arbitrary(enum thread_wait_type type) {
+    struct thread *curr = thread_get_current();
+    thread_prepare_to_wait(curr, THREAD_STATE_SLEEPING,
+                           THREAD_SLEEP_REASON_MANUAL, type,
+                           THREAD_WAIT_ANY_SRC);
+    if (type == THREAD_WAIT_INTERRUPTIBLE)
+        return thread_yield_interruptible();
+
+    thread_yield_until_wake_match();
+    return THREAD_WAIT_MATCHED;
 }

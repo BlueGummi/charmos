@@ -36,6 +36,15 @@ enum thread_wait_type : uint8_t {
     THREAD_WAIT_INTERRUPTIBLE, /* Can be interrupted */
 };
 
+enum thread_wait_status : uint8_t {
+    THREAD_WAIT_MATCHED = 0, /* Woken and expected_wake_src matched */
+    THREAD_WAIT_INTERRUPTED, /* Interrupted by APC, signal, or non matching wake
+                              */
+    THREAD_WAIT_SPURIOUS,    /* TODO: Start using this */
+};
+
+#define THREAD_WAIT_ANY_SRC ((void *) 0)
+
 /* thread_flags: 32 bit bitflags:
  *
  *      ┌───────────────────────────────────────────────────────────┐

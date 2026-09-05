@@ -64,6 +64,7 @@ bool thread_wake(struct thread *t, enum thread_wake_reason reason,
      */
     enum thread_wait_type wt = thread_get_wait_type(t);
     if ((wt == THREAD_WAIT_UNINTERRUPTIBLE &&
+         t->expected_wake_src != THREAD_WAIT_ANY_SRC &&
          t->expected_wake_src != wake_src) ||
         wt == THREAD_WAIT_NONE) {
         goto out;
