@@ -20,15 +20,15 @@ static inline bool vtd_pt_trylock(sl_pte_atomic_t *pte,
                                   enum irql       *irql_out) TSA_NO_ANALYSIS {
     *irql_out = irql_raise(IRQL_DISPATCH_LEVEL);
 
-    uint64_t old = atomic_load_relaxed(pte);
+    uint64_t old = atomic_load_rlx(pte);
     do {
         if (old & (SL_PTE_LOCK_BIT | SL_PTE_DEAD_BIT)) {
             irql_lower(*irql_out);
             return false;
         }
 
-    } while (!atomic_cas_weak(pte, &old, old | SL_PTE_LOCK_BIT, mo_acquire,
-                              mo_relaxed));
+    } while (
+        !atomic_cas_weak(pte, &old, old | SL_PTE_LOCK_BIT, mo_acquire, mo_rlx));
 
     return true;
 }
@@ -50,7 +50,7 @@ enum vtd_pt_lock_result {
 static inline enum vtd_pt_lock_result
 vtd_pt_lock_internal(sl_pte_atomic_t *pte) {
     while (true) {
-        uint64_t old = atomic_load_relaxed(pte);
+        uint64_t old = atomic_load_rlx(pte);
 
         if (!(old & SL_PTE_PRESENT))
             return VTD_PT_LOCK_NOT_PRESENT;
@@ -62,7 +62,7 @@ vtd_pt_lock_internal(sl_pte_atomic_t *pte) {
         }
 
         if (atomic_cas_weak(pte, &old, old | SL_PTE_LOCK_BIT, mo_acquire,
-                            mo_relaxed))
+                            mo_rlx))
             return VTD_PT_LOCK_OK;
 
         cpu_pause();
@@ -72,13 +72,13 @@ vtd_pt_lock_internal(sl_pte_atomic_t *pte) {
 static inline enum irql vtd_pt_lock(sl_pte_atomic_t *pte) TSA_NO_ANALYSIS {
     enum irql old = irql_raise(IRQL_DISPATCH_LEVEL);
     while (true) {
-        uint64_t val = atomic_load_relaxed(pte);
+        uint64_t val = atomic_load_rlx(pte);
         if (val & SL_PTE_LOCK_BIT) {
             cpu_pause();
             continue;
         }
         if (atomic_cas_weak(pte, &val, val | SL_PTE_LOCK_BIT, mo_acquire,
-                            mo_relaxed))
+                            mo_rlx))
             return old;
     }
 }

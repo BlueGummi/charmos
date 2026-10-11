@@ -82,7 +82,7 @@ static inline bool refcount_dec_and_test(refcount_t *rc) {
                                                                                \
             /* attempt to increment refcount */                                \
             if (atomic_cas_weak(&obj->__refcount_member, &old, old + 1,        \
-                                mo_acquire, mo_relaxed)) {                     \
+                                mo_acquire, mo_rlx)) {                         \
                 return true;                                                   \
             }                                                                  \
                                                                                \

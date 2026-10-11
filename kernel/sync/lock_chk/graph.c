@@ -538,7 +538,7 @@ enum lock_chk_result lock_chk_graph_prepare_acq(const struct lock_chk_ctx *ctx,
     const struct lock_chk_acq_req *request = ctx->req;
     bool irqs_enabled = raw_spin_lock_high(&graph->lock);
     uint16_t old_node_count = graph->node_count;
-    struct lock_chk_node *old_base = atomic_load_relaxed(&map->base_node);
+    struct lock_chk_node *old_base = atomic_load_rlx(&map->base_node);
     const struct lock_chk_class *class = lock_chk_map_class(map);
     struct lock_chk_node *existing_base = find_node(graph, class, 0);
     uint8_t old_context_bits =
@@ -563,7 +563,7 @@ rollback:
     rollback_nodes(graph, old_node_count);
     if (existing_base != NULL)
         existing_base->context_bits = old_context_bits;
-    atomic_store_relaxed(&map->base_node, old_base);
+    atomic_store_rlx(&map->base_node, old_base);
     *out = NULL;
     raw_spin_unlock_irq_restore(&graph->lock, irqs_enabled);
     return result;

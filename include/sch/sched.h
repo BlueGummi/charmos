@@ -177,8 +177,8 @@ static inline void scheduler_mark_self_idle(bool new) {
     struct core *c = smp_core(TOPC_IRQL); /* Only ever called from
                                            * the reschedule routine */
 
-    if (atomic_load_relaxed(&c->idle) != new) {
-        atomic_store_relaxed(&c->idle, new);
+    if (atomic_load_rlx(&c->idle) != new) {
+        atomic_store_rlx(&c->idle, new);
         topology_mark_core_idle(c->id, new);
         scheduler_domain_mark_self_idle(new);
         if (new) {

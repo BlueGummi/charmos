@@ -70,25 +70,25 @@ static inline bool bitmap_test_and_clear(bitmap_word_t *map, size_t bit) {
 static inline void bitmap_atomic_set(bitmap_word_t *map, size_t bit) {
     atomic(bitmap_word_t) *atom =
         (atomic(bitmap_word_t) *) &map[BITMAP_WORD_INDEX(bit)];
-    atomic_set_bit_relaxed(atom, BITMAP_BIT_OFFSET(bit));
+    atomic_set_bit_rlx(atom, BITMAP_BIT_OFFSET(bit));
 }
 
 static inline void bitmap_atomic_clear(bitmap_word_t *map, size_t bit) {
     atomic(bitmap_word_t) *atom =
         (atomic(bitmap_word_t) *) &map[BITMAP_WORD_INDEX(bit)];
-    atomic_clear_bit_relaxed(atom, BITMAP_BIT_OFFSET(bit));
+    atomic_clear_bit_rlx(atom, BITMAP_BIT_OFFSET(bit));
 }
 
 static inline void bitmap_atomic_toggle(bitmap_word_t *map, size_t bit) {
     atomic(bitmap_word_t) *atom =
         (atomic(bitmap_word_t) *) &map[BITMAP_WORD_INDEX(bit)];
-    atomic_toggle_bit_relaxed(atom, BITMAP_BIT_OFFSET(bit));
+    atomic_toggle_bit_rlx(atom, BITMAP_BIT_OFFSET(bit));
 }
 
 static inline bool bitmap_atomic_test(const bitmap_word_t *map, size_t bit) {
     const atomic(bitmap_word_t) *atom =
         (const atomic(bitmap_word_t) *) &map[BITMAP_WORD_INDEX(bit)];
-    return atomic_test_bit_relaxed(atom, BITMAP_BIT_OFFSET(bit));
+    return atomic_test_bit_rlx(atom, BITMAP_BIT_OFFSET(bit));
 }
 
 static inline bool bitmap_atomic_test_and_set(bitmap_word_t *map, size_t bit) {

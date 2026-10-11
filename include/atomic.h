@@ -30,7 +30,7 @@ typedef _Atomic ptrdiff_t atomic_ptrdiff_t;
 #define atomic(type) _Atomic(type)
 
 /* ==== Memory Order ==== */
-#define mo_relaxed memory_order_relaxed
+#define mo_rlx memory_order_relaxed
 #define mo_consume memory_order_consume
 #define mo_acquire memory_order_acquire
 #define mo_release memory_order_release
@@ -259,20 +259,19 @@ typedef _Atomic ptrdiff_t atomic_ptrdiff_t;
     atomic_call_internal(atomic_flag_clear, __VA_ARGS__)
 
 /* ==== Mnemonic Suffixes ==== */
-#define atomic_load_relaxed(ptr) atomic_load((ptr), mo_relaxed)
+#define atomic_load_rlx(ptr) atomic_load((ptr), mo_rlx)
 #define atomic_load_acq(ptr) atomic_load((ptr), mo_acquire)
 
-#define atomic_store_relaxed(ptr, val) atomic_store((ptr), (val), mo_relaxed)
+#define atomic_store_rlx(ptr, val) atomic_store((ptr), (val), mo_rlx)
 #define atomic_store_release(ptr, val) atomic_store((ptr), (val), mo_release)
 
-#define atomic_xchg_relaxed(ptr, val) atomic_exchange((ptr), (val), mo_relaxed)
+#define atomic_xchg_rlx(ptr, val) atomic_exchange((ptr), (val), mo_rlx)
 #define atomic_xchg_acq(ptr, val) atomic_exchange((ptr), (val), mo_acquire)
 #define atomic_xchg_release(ptr, val) atomic_exchange((ptr), (val), mo_release)
 #define atomic_xchg_acq_rel(ptr, val) atomic_exchange((ptr), (val), mo_acq_rel)
 
 /* Fetch arithmetic and bitwise shorthands */
-#define atomic_fetch_add_relaxed(ptr, val)                                     \
-    atomic_fetch_add((ptr), (val), mo_relaxed)
+#define atomic_fetch_add_rlx(ptr, val) atomic_fetch_add((ptr), (val), mo_rlx)
 #define atomic_fetch_add_acq(ptr, val)                                         \
     atomic_fetch_add((ptr), (val), mo_acquire)
 #define atomic_fetch_add_release(ptr, val)                                     \
@@ -280,8 +279,7 @@ typedef _Atomic ptrdiff_t atomic_ptrdiff_t;
 #define atomic_fetch_add_acq_rel(ptr, val)                                     \
     atomic_fetch_add((ptr), (val), mo_acq_rel)
 
-#define atomic_fetch_sub_relaxed(ptr, val)                                     \
-    atomic_fetch_sub((ptr), (val), mo_relaxed)
+#define atomic_fetch_sub_rlx(ptr, val) atomic_fetch_sub((ptr), (val), mo_rlx)
 #define atomic_fetch_sub_acq(ptr, val)                                         \
     atomic_fetch_sub((ptr), (val), mo_acquire)
 #define atomic_fetch_sub_release(ptr, val)                                     \
@@ -289,16 +287,14 @@ typedef _Atomic ptrdiff_t atomic_ptrdiff_t;
 #define atomic_fetch_sub_acq_rel(ptr, val)                                     \
     atomic_fetch_sub((ptr), (val), mo_acq_rel)
 
-#define atomic_fetch_or_relaxed(ptr, val)                                      \
-    atomic_fetch_or((ptr), (val), mo_relaxed)
+#define atomic_fetch_or_rlx(ptr, val) atomic_fetch_or((ptr), (val), mo_rlx)
 #define atomic_fetch_or_acq(ptr, val) atomic_fetch_or((ptr), (val), mo_acquire)
 #define atomic_fetch_or_release(ptr, val)                                      \
     atomic_fetch_or((ptr), (val), mo_release)
 #define atomic_fetch_or_acq_rel(ptr, val)                                      \
     atomic_fetch_or((ptr), (val), mo_acq_rel)
 
-#define atomic_fetch_and_relaxed(ptr, val)                                     \
-    atomic_fetch_and((ptr), (val), mo_relaxed)
+#define atomic_fetch_and_rlx(ptr, val) atomic_fetch_and((ptr), (val), mo_rlx)
 #define atomic_fetch_and_acq(ptr, val)                                         \
     atomic_fetch_and((ptr), (val), mo_acquire)
 #define atomic_fetch_and_release(ptr, val)                                     \
@@ -306,8 +302,7 @@ typedef _Atomic ptrdiff_t atomic_ptrdiff_t;
 #define atomic_fetch_and_acq_rel(ptr, val)                                     \
     atomic_fetch_and((ptr), (val), mo_acq_rel)
 
-#define atomic_fetch_xor_relaxed(ptr, val)                                     \
-    atomic_fetch_xor((ptr), (val), mo_relaxed)
+#define atomic_fetch_xor_rlx(ptr, val) atomic_fetch_xor((ptr), (val), mo_rlx)
 #define atomic_fetch_xor_acq(ptr, val)                                         \
     atomic_fetch_xor((ptr), (val), mo_acquire)
 #define atomic_fetch_xor_release(ptr, val)                                     \
@@ -316,22 +311,22 @@ typedef _Atomic ptrdiff_t atomic_ptrdiff_t;
     atomic_fetch_xor((ptr), (val), mo_acq_rel)
 
 /* Flag shorthands */
-#define atomic_flag_test_and_set_relaxed(ptr)                                  \
-    atomic_flag_test_and_set((ptr), mo_relaxed)
+#define atomic_flag_test_and_set_rlx(ptr)                                      \
+    atomic_flag_test_and_set((ptr), mo_rlx)
 #define atomic_flag_test_and_set_acq(ptr)                                      \
     atomic_flag_test_and_set((ptr), mo_acquire)
 #define atomic_flag_test_and_set_acq_rel(ptr)                                  \
     atomic_flag_test_and_set((ptr), mo_acq_rel)
-#define atomic_flag_clear_relaxed(ptr) atomic_flag_clear((ptr), mo_relaxed)
+#define atomic_flag_clear_rlx(ptr) atomic_flag_clear((ptr), mo_rlx)
 #define atomic_flag_clear_release(ptr) atomic_flag_clear((ptr), mo_release)
 
 /* ==== Arithmetic Shorthands ==== */
-#define atomic_inc_relaxed(ptr) atomic_inc((ptr), mo_relaxed)
+#define atomic_inc_rlx(ptr) atomic_inc((ptr), mo_rlx)
 #define atomic_inc_acq(ptr) atomic_inc((ptr), mo_acquire)
 #define atomic_inc_release(ptr) atomic_inc((ptr), mo_release)
 #define atomic_inc_acq_rel(ptr) atomic_inc((ptr), mo_acq_rel)
 
-#define atomic_dec_relaxed(ptr) atomic_dec((ptr), mo_relaxed)
+#define atomic_dec_rlx(ptr) atomic_dec((ptr), mo_rlx)
 #define atomic_dec_acq(ptr) atomic_dec((ptr), mo_acquire)
 #define atomic_dec_release(ptr) atomic_dec((ptr), mo_release)
 #define atomic_dec_acq_rel(ptr) atomic_dec((ptr), mo_acq_rel)
@@ -355,12 +350,12 @@ typedef _Atomic ptrdiff_t atomic_ptrdiff_t;
 #define atomic_dec_return(...)                                                 \
     atomic_call_internal(atomic_dec_return, __VA_ARGS__)
 
-#define atomic_inc_return_relaxed(ptr) atomic_inc_return((ptr), mo_relaxed)
+#define atomic_inc_return_rlx(ptr) atomic_inc_return((ptr), mo_rlx)
 #define atomic_inc_return_acq(ptr) atomic_inc_return((ptr), mo_acquire)
 #define atomic_inc_return_release(ptr) atomic_inc_return((ptr), mo_release)
 #define atomic_inc_return_acq_rel(ptr) atomic_inc_return((ptr), mo_acq_rel)
 
-#define atomic_dec_return_relaxed(ptr) atomic_dec_return((ptr), mo_relaxed)
+#define atomic_dec_return_rlx(ptr) atomic_dec_return((ptr), mo_rlx)
 #define atomic_dec_return_acq(ptr) atomic_dec_return((ptr), mo_acquire)
 #define atomic_dec_return_release(ptr) atomic_dec_return((ptr), mo_release)
 #define atomic_dec_return_acq_rel(ptr) atomic_dec_return((ptr), mo_acq_rel)
@@ -501,20 +496,16 @@ typedef _Atomic ptrdiff_t atomic_ptrdiff_t;
 #define atomic_test_and_clear_bit(...)                                         \
     atomic_call_internal(atomic_test_and_clear_bit, __VA_ARGS__)
 
-#define atomic_set_bit_relaxed(ptr, bit)                                       \
-    atomic_set_bit((ptr), (bit), mo_relaxed)
+#define atomic_set_bit_rlx(ptr, bit) atomic_set_bit((ptr), (bit), mo_rlx)
 #define atomic_set_bit_release(ptr, bit)                                       \
     atomic_set_bit((ptr), (bit), mo_release)
 
-#define atomic_clear_bit_relaxed(ptr, bit)                                     \
-    atomic_clear_bit((ptr), (bit), mo_relaxed)
+#define atomic_clear_bit_rlx(ptr, bit) atomic_clear_bit((ptr), (bit), mo_rlx)
 #define atomic_clear_bit_release(ptr, bit)                                     \
     atomic_clear_bit((ptr), (bit), mo_release)
 
-#define atomic_toggle_bit_relaxed(ptr, bit)                                    \
-    atomic_toggle_bit((ptr), (bit), mo_relaxed)
-#define atomic_test_bit_relaxed(ptr, bit)                                      \
-    atomic_test_bit((ptr), (bit), mo_relaxed)
+#define atomic_toggle_bit_rlx(ptr, bit) atomic_toggle_bit((ptr), (bit), mo_rlx)
+#define atomic_test_bit_rlx(ptr, bit) atomic_test_bit((ptr), (bit), mo_rlx)
 
 #define atomic_test_bit_acq(ptr, bit) atomic_test_bit((ptr), (bit), mo_acquire)
 

@@ -61,7 +61,7 @@ static void mutex_simple_chk_state_init(struct mutex_simple *m,
     kassert(flags == LOCK_UNCHKD || class != NULL);
     m->chk.flags = flags;
     m->chk.initialized = true;
-    atomic_store_relaxed(&m->chk.used, false);
+    atomic_store_rlx(&m->chk.used, false);
     lock_chk_map_runtime_init(&m->chk.map, class);
 }
 
@@ -72,7 +72,7 @@ void mutex_simple_set_chk_flags(struct mutex_simple *m,
     kassert(list_empty(&m->waiters.waiters));
     kassert(!spinlock_locked(&m->waiters.lock));
     kassert(!spinlock_locked(&m->lock));
-    kassert(!atomic_load_relaxed(&m->chk.used));
+    kassert(!atomic_load_rlx(&m->chk.used));
     kassert((flags & ~LOCK_CHKD_FULL) == 0);
     m->chk.flags = flags;
 }
@@ -162,7 +162,7 @@ static bool should_spin_on_mutex(struct mutex_simple *m) {
     enum irql irql = spin_lock(&m->lock);
     struct thread *owner = m->owner;
     bool active =
-        owner && atomic_load_relaxed(&owner->state) == THREAD_STATE_RUNNING;
+        owner && atomic_load_rlx(&owner->state) == THREAD_STATE_RUNNING;
     spin_unlock(&m->lock, irql);
     return active;
 }

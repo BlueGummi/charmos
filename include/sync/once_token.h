@@ -15,14 +15,14 @@
 #define once_token_typecheck_internal(tok) ((void) sizeof((tok)->state))
 
 #define once_token_typecheck_internal_type(tok, type)                          \
-    ct_typecheck(type, atomic_load_relaxed(&(tok)->state))
+    ct_typecheck(type, atomic_load_rlx(&(tok)->state))
 
 #define once_token_typecheck_internal_bool(tok)                                \
     once_token_typecheck_internal_type(tok, bool)
 
 #define once_token_typecheck_internal_same(tok1, tok2)                         \
-    ct_typecheck_same(atomic_load_relaxed(&(tok1)->state),                     \
-                      atomic_load_relaxed(&(tok2)->state))
+    ct_typecheck_same(atomic_load_rlx(&(tok1)->state),                         \
+                      atomic_load_rlx(&(tok2)->state))
 
 /* ===== init ===== */
 #define once_token_init_1(tok)                                                 \
@@ -38,7 +38,7 @@
     ({                                                                         \
         __auto_type __ot_tok = (tok);                                          \
         once_token_typecheck_internal(__ot_tok);                               \
-        typeof(atomic_load_relaxed(&__ot_tok->state)) __ot_val = (val);        \
+        typeof(atomic_load_rlx(&__ot_tok->state)) __ot_val = (val);            \
         atomic_init(&__ot_tok->state, __ot_val);                               \
     })
 
@@ -52,7 +52,7 @@
         __auto_type __ot_tok = (tok);                                          \
         once_token_typecheck_internal(__ot_tok);                               \
         ct_typecheck_same(from, to);                                           \
-        typeof(atomic_load_relaxed(&__ot_tok->state)) __ot_exp = (from);       \
+        typeof(atomic_load_rlx(&__ot_tok->state)) __ot_exp = (from);           \
         typeof(__ot_exp) __ot_to = (to);                                       \
         __auto_type __ot_out = (out);                                          \
         static_assert(ct_is_type(typeof(__ot_exp) *, out) ||                   \
@@ -96,7 +96,7 @@
     ({                                                                         \
         __auto_type __ot_tok = (tok);                                          \
         once_token_typecheck_internal(__ot_tok);                               \
-        typeof(atomic_load_relaxed(&__ot_tok->state)) __ot_val = (val);        \
+        typeof(atomic_load_rlx(&__ot_tok->state)) __ot_val = (val);            \
                                                                                \
         atomic_load_acq(&__ot_tok->state) == __ot_val;                         \
     })
@@ -117,7 +117,7 @@
     ({                                                                         \
         __auto_type __ot_tok = (tok);                                          \
         once_token_typecheck_internal(__ot_tok);                               \
-        typeof(atomic_load_relaxed(&__ot_tok->state)) __ot_val = (val);        \
+        typeof(atomic_load_rlx(&__ot_tok->state)) __ot_val = (val);            \
         atomic_store_release(&__ot_tok->state, __ot_val);                      \
     })
 

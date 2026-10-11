@@ -159,32 +159,32 @@ static inline size_t *domain_rr_on_this_core(void) {
 static inline void domain_stat_alloc(struct domain_buddy *d, bool remote,
                                      bool interleaved) {
 
-    atomic_inc_relaxed(&d->stats.alloc_count);
+    atomic_inc_rlx(&d->stats.alloc_count);
 
     if (remote)
-        atomic_inc_relaxed(&d->stats.remote_alloc_count);
+        atomic_inc_rlx(&d->stats.remote_alloc_count);
     if (interleaved)
-        atomic_inc_relaxed(&d->stats.interleaved_alloc_count);
+        atomic_inc_rlx(&d->stats.interleaved_alloc_count);
 }
 
 static inline void domain_stat_free(struct domain_buddy *d) {
-    atomic_inc_relaxed(&d->stats.free_count);
+    atomic_inc_rlx(&d->stats.free_count);
 }
 
 static inline void domain_stat_mark_interleaved(struct domain_buddy *d) {
-    atomic_inc_relaxed(&d->stats.interleaved_alloc_count);
+    atomic_inc_rlx(&d->stats.interleaved_alloc_count);
 }
 
 static inline void domain_stat_failed_alloc(struct domain_buddy *d) {
-    atomic_inc_relaxed(&d->stats.failed_alloc_count);
+    atomic_inc_rlx(&d->stats.failed_alloc_count);
 }
 
 static inline bool is_free_in_progress(struct domain_free_queue *fq) {
-    return atomic_load_relaxed(&fq->free_in_progress);
+    return atomic_load_rlx(&fq->free_in_progress);
 }
 
 static inline void mark_free_in_progress(struct domain_free_queue *fq, bool s) {
-    atomic_store_relaxed(&fq->free_in_progress, s);
+    atomic_store_rlx(&fq->free_in_progress, s);
 }
 
 static inline struct buddy_page *buddy_page_for_addr(paddr_t address) {
@@ -196,7 +196,7 @@ static inline void free_from_buddy_internal(struct domain_buddy *target,
                                             size_t page_count) {
     enum irql irql = spin_lock(&target->lock);
     buddy_free_pages(address, page_count, target->free_area,
-                     atomic_load_relaxed(&target->total_pages));
+                     atomic_load_rlx(&target->total_pages));
     domain_stat_free(target);
     atomic_fetch_sub(&target->pages_used, page_count);
 

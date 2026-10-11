@@ -23,7 +23,7 @@ static atomic_uint32_t slab_track_seq;
 void slab_track_event(vaddr_t addr, uint64_t ra0, uint64_t ra1, bool is_alloc) {
     struct slab_track *e = &slab_track_table[(addr >> 6) % SLAB_TRACK_SLOTS];
     e->addr = addr;
-    e->seq = atomic_fetch_add_relaxed(&slab_track_seq, 1);
+    e->seq = atomic_fetch_add_rlx(&slab_track_seq, 1);
     if (is_alloc) {
         e->alloc_ra[0] = ra0;
         e->alloc_ra[1] = ra1;

@@ -286,7 +286,7 @@ static void wake_storm_waker_main(struct nightmare_ctx *ctx,
             continue;
         }
 
-        uint64_t ops = atomic_fetch_add_relaxed(&state->wakes_issued, 1);
+        uint64_t ops = atomic_fetch_add_rlx(&state->wakes_issued, 1);
 
         /* Count a wake as issued but never actually issue it */
         bool drop = wake_storm_options.drop_wake_after_ops &&

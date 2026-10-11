@@ -227,7 +227,7 @@ size_t scheduler_try_push_to_idle_core(struct scheduler *sched) {
                 to_migrate = 1;
 
             time_ms_t idle_entry =
-                atomic_load_relaxed(&other->idle_thread_data.last_entry_ms);
+                atomic_load_rlx(&other->idle_thread_data.last_entry_ms);
             time_ms_t idle_for = time_get_ms() - idle_entry;
             if (to_migrate == 0 && count >= IDLE_MIN_MIGRATABLE &&
                 idle_for >= IDLE_LONG_ENOUGH) {

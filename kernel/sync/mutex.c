@@ -66,14 +66,14 @@ static void mutex_chk_state_init(struct mutex *mtx,
     kassert(flags == LOCK_UNCHKD || class != NULL);
     mtx->chk.flags = flags;
     mtx->chk.initialized = true;
-    atomic_store_relaxed(&mtx->chk.used, false);
+    atomic_store_rlx(&mtx->chk.used, false);
     lock_chk_map_runtime_init(&mtx->chk.map, class);
 }
 
 void mutex_set_chk_flags(struct mutex *mtx, enum lock_chk_flags flags) {
     kassert(mtx->chk.initialized);
     kassert(!mutex_locked(mtx));
-    kassert(!atomic_load_relaxed(&mtx->chk.used));
+    kassert(!atomic_load_rlx(&mtx->chk.used));
     kassert((flags & ~LOCK_CHKD_FULL) == 0);
     mtx->chk.flags = flags;
 }
@@ -134,7 +134,7 @@ void mutex_reinit_chk(struct mutex *mtx, const struct lock_chk_class *class,
 
 void mutex_init_chk_full(struct mutex *mtx, const struct lock_chk_class *class,
                          enum lock_chk_flags flags) {
-    atomic_store_relaxed(&mtx->lock_word, 0);
+    atomic_store_rlx(&mtx->lock_word, 0);
     mutex_chk_state_init(mtx, class, flags);
 }
 

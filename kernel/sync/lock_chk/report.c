@@ -87,7 +87,7 @@ static void maybe_report_degradation(const struct lock_chk_fault *fault,
                                      uint64_t signature,
                                      const char *signature_text) {
     static atomic_bool emitted = false;
-    if (atomic_xchg_relaxed(&emitted, true))
+    if (atomic_xchg_rlx(&emitted, true))
         return;
 
     printf_unlocked("\n*** LOCK_CHK WARNING: Capacity exhausted for pool '%s' "

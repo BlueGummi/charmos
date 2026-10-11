@@ -26,13 +26,13 @@ static void rwlock_panic(char *msg, struct rwlock *offending_lock) {
 
     struct rwlock *panic_expected = NULL;
     if (atomic_cas_weak(&panic_rwlock_addr, &panic_expected, offending_lock,
-                        mo_acquire, mo_relaxed))
+                        mo_acquire, mo_rlx))
         panic_rwlock = *offending_lock;
 
     if (offending_lock)
         panic_rwlock = *offending_lock;
 
-    uintptr_t v = atomic_load_relaxed(&offending_lock->lock_word);
+    uintptr_t v = atomic_load_rlx(&offending_lock->lock_word);
     panic("%s, lock = %p, contents = %p, thread = %p", msg, offending_lock,
           (void *) v, thread_get_current());
 }
@@ -112,7 +112,7 @@ static void rwlock_chk_state_init(struct rwlock *lock,
     kassert(flags == LOCK_UNCHKD || class != NULL);
     lock->chk.flags = flags;
     lock->chk.initialized = true;
-    atomic_store_relaxed(&lock->chk.used, false);
+    atomic_store_rlx(&lock->chk.used, false);
     lock_chk_map_runtime_init(&lock->chk.map, class);
 }
 
@@ -126,7 +126,7 @@ static bool rwlock_idle_for_reconfiguration(struct rwlock *lock) {
 void rwlock_set_chk_flags(struct rwlock *lock, enum lock_chk_flags flags) {
     kassert(lock->chk.initialized);
     kassert(rwlock_idle_for_reconfiguration(lock));
-    kassert(!atomic_load_relaxed(&lock->chk.used));
+    kassert(!atomic_load_rlx(&lock->chk.used));
     kassert((flags & ~LOCK_CHKD_FULL) == 0);
     lock->chk.flags = flags;
 }
@@ -162,9 +162,9 @@ void rwlock_reinit_chk(struct rwlock *lock, enum thread_prio_class ceiling,
 void rwlock_init_chk_full(struct rwlock *lock, enum thread_prio_class ceiling,
                           const struct lock_chk_class *class,
                           enum lock_chk_flags flags) {
-    atomic_store_relaxed(&lock->lock_word,
-                         ((uintptr_t) ceiling << RWLOCK_PRIO_CEIL_SHIFT) &
-                             RWLOCK_PRIO_CEIL_MASK);
+    atomic_store_rlx(&lock->lock_word,
+                     ((uintptr_t) ceiling << RWLOCK_PRIO_CEIL_SHIFT) &
+                         RWLOCK_PRIO_CEIL_MASK);
     rwlock_chk_state_init(lock, class, flags);
 }
 
@@ -403,7 +403,7 @@ void rw_unlock_full(struct rwlock *lock,
             RWLOCK_WAITER_BIT) {
             /* successful swap, we're all good */
             if (atomic_cas_weak(&lock->lock_word, &old, new, mo_release,
-                                mo_relaxed))
+                                mo_rlx))
                 break;
 
             /* unsuccessful... try again */

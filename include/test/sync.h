@@ -61,7 +61,7 @@ static inline bool test_latch_spin_timeout(struct test_latch *l,
 static inline void test_phase_init(struct test_phase *p) {
     spinlock_init(&p->lock);
     condvar_init(&p->cv);
-    atomic_store_relaxed(&p->phase, 0);
+    atomic_store_rlx(&p->phase, 0);
     atomic_store_release(&p->poisoned, false);
 }
 

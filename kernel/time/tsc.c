@@ -85,7 +85,7 @@ bool tsc_sync_check_bsp(cpu_id_t ap_cpu) {
             cpu_pause();
 
         uint64_t t1 = rdtsc_ordered();
-        uint64_t t_ap = atomic_load_relaxed(&mbox->ap_tsc);
+        uint64_t t_ap = atomic_load_rlx(&mbox->ap_tsc);
 
         uint64_t rtt = t1 - t0;
         int64_t warp = 0;
@@ -138,7 +138,7 @@ void tsc_sync_check_ap(cpu_id_t self) {
             cpu_pause();
 
         uint64_t ap = rdtsc_ordered();
-        atomic_store_relaxed(&mbox->ap_tsc, ap);
+        atomic_store_rlx(&mbox->ap_tsc, ap);
         atomic_store_release(&mbox->stage, 4);
     }
 }

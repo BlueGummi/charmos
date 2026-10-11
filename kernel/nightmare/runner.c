@@ -240,7 +240,7 @@ static void nightmare_hard_deadline(struct timer *timer) {
         .reason = "drain_timeout",
         .duration_ms = time_get_ms() - nightmare_runtime.started_ms,
         .progress = test_conc_progress_sum(),
-        .findings = atomic_load_relaxed(&nightmare_runtime.finding_count),
+        .findings = atomic_load_rlx(&nightmare_runtime.finding_count),
         .msg = "hard deadline expired before teardown completed",
     });
     nightmare_exit(NIGHTMARE_EXIT_STALL, "hard deadline");

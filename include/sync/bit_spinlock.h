@@ -28,7 +28,7 @@
 #define bit_spin_is_locked_raw(bit, ptr)                                       \
     ({                                                                         \
         BIT_SPINLOCK_CHECK(bit, ptr);                                          \
-        atomic_test_bit_relaxed((atomic(typeof(*(ptr))) *) (ptr), bit);        \
+        atomic_test_bit_rlx((atomic(typeof(*(ptr))) *) (ptr), bit);            \
     })
 
 #define bit_spin_trylock_raw(bit, ptr)                                         \
@@ -36,12 +36,12 @@
         BIT_SPINLOCK_CHECK(bit, ptr);                                          \
         atomic(typeof(*(ptr))) *__bs_ptr = (atomic(typeof(*(ptr))) *) (ptr);   \
         typeof(*(ptr)) __bs_mask = BIT_SPINLOCK_MASK(bit, ptr);                \
-        typeof(*(ptr)) __bs_old = atomic_load_relaxed(__bs_ptr);               \
+        typeof(*(ptr)) __bs_old = atomic_load_rlx(__bs_ptr);                   \
         bool __bs_acquired = false;                                            \
         if (!(__bs_old & __bs_mask)) {                                         \
             __bs_acquired = atomic_cas_weak(                                   \
                 __bs_ptr, &__bs_old, (typeof(*(ptr))) (__bs_old | __bs_mask),  \
-                mo_acquire, mo_relaxed);                                       \
+                mo_acquire, mo_rlx);                                           \
         }                                                                      \
         __bs_acquired;                                                         \
     })
@@ -52,14 +52,14 @@
         atomic(typeof(*(ptr))) *__bs_ptr = (atomic(typeof(*(ptr))) *) (ptr);   \
         typeof(*(ptr)) __bs_mask = BIT_SPINLOCK_MASK(bit, ptr);                \
         while (true) {                                                         \
-            typeof(*(ptr)) __bs_old = atomic_load_relaxed(__bs_ptr);           \
+            typeof(*(ptr)) __bs_old = atomic_load_rlx(__bs_ptr);               \
             if (__bs_old & __bs_mask) {                                        \
                 cpu_pause();                                                   \
                 continue;                                                      \
             }                                                                  \
             if (atomic_cas_weak(__bs_ptr, &__bs_old,                           \
                                 (typeof(*(ptr))) (__bs_old | __bs_mask),       \
-                                mo_acquire, mo_relaxed))                       \
+                                mo_acquire, mo_rlx))                           \
                 break;                                                         \
             cpu_pause();                                                       \
         }                                                                      \

@@ -48,9 +48,9 @@ static bool arena_valid(struct vas_arena *arena, vaddr_t base, vaddr_t limit,
         if (!seg->length || seg->start < end || seg->start >= limit ||
             seg->length > limit - seg->start || node != &seg->node)
             return false;
-        enum vas_segment_type type = atomic_load_relaxed(&seg->type);
+        enum vas_segment_type type = atomic_load_rlx(&seg->type);
         enum vas_segment_type prev_type =
-            prev ? atomic_load_relaxed(&prev->type) : VAS_SEG_BUSY;
+            prev ? atomic_load_rlx(&prev->type) : VAS_SEG_BUSY;
         if (prev && prev_type == VAS_SEG_FREE && type == VAS_SEG_FREE &&
             prev->span_start == seg->span_start && end == seg->start)
             return false;
@@ -86,7 +86,7 @@ static bool arena_valid(struct vas_arena *arena, vaddr_t base, vaddr_t limit,
         list_for_each(pos, &arena->free_bins[bin]) {
             struct vas_segment *seg =
                 list_entry(pos, struct vas_segment, bin_node);
-            if (atomic_load_relaxed(&seg->type) != VAS_SEG_FREE ||
+            if (atomic_load_rlx(&seg->type) != VAS_SEG_FREE ||
                 (63U - ci_clzll(seg->length)) != bin ||
                 rbt_search(&arena->tree, seg->start) != &seg->node)
                 return false;
@@ -135,7 +135,7 @@ static bool vas_valid(struct vas *vas, size_t expected_live) {
             if (!parent || atomic_load(&vas->chunk_owner[index]) != cpu ||
                 seg->start < seg->span_start ||
                 seg->start - seg->span_start + seg->length > VAS_CHUNK_SIZE ||
-                atomic_load_relaxed(
+                atomic_load_rlx(
                     &rbt_entry(parent, struct vas_segment, node)->type) !=
                     VAS_SEG_IMPORTED)
                 return false;
@@ -264,7 +264,7 @@ TSA_NO_ANALYSIS {
     uintptr_t token = vas_token_make(addr, VAS_MAG_CACHED);
     TEST_ASSERT(atomic_cas_strong(&slot->token, &token,
                                   vas_token_make(addr, VAS_MAG_CLAIMED),
-                                  mo_acquire, mo_relaxed));
+                                  mo_acquire, mo_rlx));
     vas_reclaim(vas);
     TEST_ASSERT_EQ(atomic_load(&vas->mag_reserved_bytes), PAGE_SIZE);
     TEST_ASSERT_EQ(rbt_search(&arena->tree, addr), &seg->node);

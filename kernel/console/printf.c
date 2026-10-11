@@ -503,7 +503,7 @@ void printf_unlocked(const char *format, ...) {
 void printf(const char *format, ...) TSA_NO_ANALYSIS {
     bool i = irq_disable_save();
 
-    bool lock = !atomic_load_relaxed(&global.panicked);
+    bool lock = !atomic_load_rlx(&global.panicked);
 
     if (lock)
         raw_spin_lock(&k_printf_lock.raw);

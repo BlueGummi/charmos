@@ -64,10 +64,10 @@ static inline void spinlock_policy_init_internal(struct spinlock *lock,
     kassert((flags & ~LOCK_CHKD_FULL) == 0);
     lock->chk.flags = flags;
     lock->chk.initialized = true;
-    atomic_store_relaxed(&lock->chk.used, false);
+    atomic_store_rlx(&lock->chk.used, false);
 }
 static inline void spinlock_shallow_init_internal(struct spinlock *lock) {
-    atomic_store_relaxed(&lock->irq_usage, LOCK_OP_IRQ_NONE);
+    atomic_store_rlx(&lock->irq_usage, LOCK_OP_IRQ_NONE);
 }
 static inline void
 spinlock_map_init_internal(struct spinlock *lock,
@@ -202,7 +202,7 @@ static inline void spinlock_assert_initialized(struct spinlock *lock) {
 static inline void spinlock_policy_set_internal(struct spinlock *lock,
                                                 enum lock_chk_flags flags) {
     kassert(lock->chk.initialized);
-    kassert(!atomic_load_relaxed(&lock->chk.used));
+    kassert(!atomic_load_rlx(&lock->chk.used));
     kassert((flags & ~LOCK_CHKD_FULL) == 0);
     lock->chk.flags = flags;
 }
@@ -566,7 +566,7 @@ spin_trylock_high_full(struct spinlock *lock, enum irql *out,
     spin_unlock_raw_full((lock_), LOCK_CHK_SITE_HERE())
 
 static inline bool spinlock_locked(struct spinlock *lock) {
-    return atomic_load_relaxed(&lock->raw.state);
+    return atomic_load_rlx(&lock->raw.state);
 }
 
 /* A raw check to make sure it is locked, but could be by anyone */

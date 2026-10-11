@@ -350,15 +350,14 @@ static inline bool log_ringbuf_try_enqueue(struct log_site *site,
     struct log_ring_slot *slot;
 
     while (true) {
-        pos = atomic_load_relaxed(&rb->head);
+        pos = atomic_load_rlx(&rb->head);
         slot = &rb->slots[pos % site->capacity];
 
         uint64_t seq = atomic_load_acq(&slot->seq);
         int64_t diff = (int64_t) seq - (int64_t) pos;
 
         if (diff == 0) {
-            if (atomic_cas_weak(&rb->head, &pos, pos + 1, mo_acq_rel,
-                                mo_relaxed)) {
+            if (atomic_cas_weak(&rb->head, &pos, pos + 1, mo_acq_rel, mo_rlx)) {
 
                 slot->rec = *rec;
 
@@ -378,15 +377,14 @@ static inline bool log_ringbuf_try_dequeue(struct log_site *site,
     struct log_ring_slot *slot;
 
     while (true) {
-        pos = atomic_load_relaxed(&rb->tail);
+        pos = atomic_load_rlx(&rb->tail);
         slot = &rb->slots[pos % site->capacity];
 
         uint64_t seq = atomic_load_acq(&slot->seq);
         int64_t diff = (int64_t) seq - (int64_t) (pos + 1);
 
         if (diff == 0) {
-            if (atomic_cas_weak(&rb->tail, &pos, pos + 1, mo_acq_rel,
-                                mo_relaxed)) {
+            if (atomic_cas_weak(&rb->tail, &pos, pos + 1, mo_acq_rel, mo_rlx)) {
 
                 *out = slot->rec;
 

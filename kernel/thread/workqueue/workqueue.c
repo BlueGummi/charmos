@@ -125,7 +125,7 @@ struct workqueue *workqueue_create_full(struct workqueue_attributes *attrs,
     INIT_LIST_HEAD(&wq->works);
 
     refcount_init(&wq->refcount, 1);
-    atomic_store_relaxed(&wq->state, WORKQUEUE_STATE_ACTIVE);
+    atomic_store_rlx(&wq->state, WORKQUEUE_STATE_ACTIVE);
 
     return wq;
 

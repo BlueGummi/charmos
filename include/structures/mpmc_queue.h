@@ -28,14 +28,13 @@ static inline cc_always_inline bool mpmc_claim(atomic_uint64_t *cursor,
                                                size_t stride, uint64_t lag,
                                                uint64_t *pos_out) {
     while (true) {
-        uint64_t pos = atomic_load_relaxed(cursor);
+        uint64_t pos = atomic_load_rlx(cursor);
         atomic_uint64_t *seq =
             (atomic_uint64_t *) ((uint8_t *) slots + (pos & mask) * stride);
         int64_t diff = (int64_t) atomic_load_acq(seq) - (int64_t) (pos + lag);
 
         if (diff == 0) {
-            if (atomic_cas_weak(cursor, &pos, pos + 1, mo_acq_rel,
-                                mo_relaxed)) {
+            if (atomic_cas_weak(cursor, &pos, pos + 1, mo_acq_rel, mo_rlx)) {
                 *pos_out = pos;
                 return true;
             }
@@ -50,7 +49,7 @@ static inline cc_always_inline bool mpmc_claim_range(struct mpmc_hdr *h,
                                                      uint64_t *first_out,
                                                      uint64_t *count_out) {
     while (true) {
-        uint64_t t = atomic_load_relaxed(&h->tail);
+        uint64_t t = atomic_load_rlx(&h->tail);
         uint64_t end = atomic_load_acq(&h->head);
 
         uint64_t p = t;
@@ -63,13 +62,13 @@ static inline cc_always_inline bool mpmc_claim_range(struct mpmc_hdr *h,
         }
 
         if (p == t) {
-            if (atomic_load_relaxed(&h->tail) != t)
+            if (atomic_load_rlx(&h->tail) != t)
                 continue;
             return false;
         }
 
         uint64_t expected = t;
-        if (atomic_cas_weak(&h->tail, &expected, p, mo_acq_rel, mo_relaxed)) {
+        if (atomic_cas_weak(&h->tail, &expected, p, mo_acq_rel, mo_rlx)) {
             *first_out = t;
             *count_out = p - t;
             return true;
@@ -78,8 +77,8 @@ static inline cc_always_inline bool mpmc_claim_range(struct mpmc_hdr *h,
 }
 
 static inline bool mpmc_hdr_empty(const struct mpmc_hdr *h) {
-    uint64_t hd = atomic_load_relaxed(&h->head);
-    uint64_t tl = atomic_load_relaxed(&h->tail);
+    uint64_t hd = atomic_load_rlx(&h->head);
+    uint64_t tl = atomic_load_rlx(&h->tail);
     return hd == tl;
 }
 

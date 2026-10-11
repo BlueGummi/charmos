@@ -40,8 +40,8 @@ static void domain_build_zonelist(struct domain_buddy *dom) {
                 global.numa_nodes[dom - global.domain_buddies].distance[i];
 
         dom->zonelist.entries[i].free_pages =
-            atomic_load_relaxed(&global.domain_buddies[i].total_pages) -
-            atomic_load_relaxed(&global.domain_buddies[i].pages_used);
+            atomic_load_rlx(&global.domain_buddies[i].total_pages) -
+            atomic_load_rlx(&global.domain_buddies[i].pages_used);
     }
 
     heapsort(dom->zonelist.entries, dom->zonelist.count,
@@ -55,8 +55,8 @@ void domain_buddy_track_pages(struct domain_buddy *dom) {
     for (size_t order = 0; order < BUDDY_MAX_ORDER; order++)
         free_pages += dom->free_area[order].nr_free << order;
 
-    atomic_store_relaxed(&dom->total_pages, total_pages);
-    atomic_store_relaxed(&dom->pages_used, total_pages - free_pages);
+    atomic_store_rlx(&dom->total_pages, total_pages);
+    atomic_store_rlx(&dom->pages_used, total_pages - free_pages);
 }
 
 static void buddy_add_block_to_global(size_t start_pfn, int order) {
@@ -302,7 +302,7 @@ void domain_buddies_init(void) {
         domain_buddy_init(dbd);
         semaphore_init(&dbd->worker.sema, 0, SEMAPHORE_INIT_NORMAL);
         dbd->worker.domain = dbd;
-        atomic_store_relaxed(&dbd->worker.enqueued, false);
+        atomic_store_rlx(&dbd->worker.enqueued, false);
         dbd->worker.stop = false;
         domain_buddy_track_pages(dbd);
         domain_build_zonelist(dbd);
@@ -324,13 +324,13 @@ void domain_buddy_dump(void) {
         struct domain_buddy_stats *stat = &dom->stats;
         printf("Domain %zu stats: %zu allocs, %zu failed, %zu interleaved, %zu "
                "remote, %zu frees, %zu pages used, %zu total pages\n",
-               i, atomic_load_relaxed(&stat->alloc_count),
-               atomic_load_relaxed(&stat->failed_alloc_count),
-               atomic_load_relaxed(&stat->interleaved_alloc_count),
-               atomic_load_relaxed(&stat->remote_alloc_count),
-               atomic_load_relaxed(&stat->free_count),
-               atomic_load_relaxed(&dom->pages_used),
-               atomic_load_relaxed(&dom->total_pages));
+               i, atomic_load_rlx(&stat->alloc_count),
+               atomic_load_rlx(&stat->failed_alloc_count),
+               atomic_load_rlx(&stat->interleaved_alloc_count),
+               atomic_load_rlx(&stat->remote_alloc_count),
+               atomic_load_rlx(&stat->free_count),
+               atomic_load_rlx(&dom->pages_used),
+               atomic_load_rlx(&dom->total_pages));
     }
 }
 

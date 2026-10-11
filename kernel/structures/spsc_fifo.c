@@ -10,8 +10,8 @@ void spsc_fifo_init_with(struct spsc_fifo *fifo, void *buffer, size_t size) {
     fifo->size = size;
     fifo->mask = size - 1;
     fifo->data = (uint8_t *) buffer;
-    atomic_store_relaxed(&fifo->head, 0);
-    atomic_store_relaxed(&fifo->tail, 0);
+    atomic_store_rlx(&fifo->head, 0);
+    atomic_store_rlx(&fifo->tail, 0);
 }
 
 bool spsc_fifo_init(struct spsc_fifo *fifo, size_t size) {
@@ -36,7 +36,7 @@ void spsc_fifo_destroy(struct spsc_fifo *fifo) {
 }
 
 size_t spsc_fifo_write(struct spsc_fifo *fifo, const void *src, size_t len) {
-    size_t head = atomic_load_relaxed(&fifo->head);
+    size_t head = atomic_load_rlx(&fifo->head);
     size_t tail = atomic_load_acq(&fifo->tail);
     size_t avail = fifo->size - (head - tail);
 
@@ -59,7 +59,7 @@ size_t spsc_fifo_write(struct spsc_fifo *fifo, const void *src, size_t len) {
 
 size_t spsc_fifo_read(struct spsc_fifo *fifo, void *dst, size_t len) {
     size_t head = atomic_load_acq(&fifo->head);
-    size_t tail = atomic_load_relaxed(&fifo->tail);
+    size_t tail = atomic_load_rlx(&fifo->tail);
     size_t in_use = head - tail;
 
     len = MIN(len, in_use);
@@ -81,7 +81,7 @@ size_t spsc_fifo_read(struct spsc_fifo *fifo, void *dst, size_t len) {
 
 size_t spsc_fifo_peek(const struct spsc_fifo *fifo, void *dst, size_t len) {
     size_t head = atomic_load_acq(&fifo->head);
-    size_t tail = atomic_load_relaxed(&fifo->tail);
+    size_t tail = atomic_load_rlx(&fifo->tail);
     size_t in_use = head - tail;
 
     len = MIN(len, in_use);

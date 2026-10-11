@@ -556,7 +556,7 @@ rt_scheduler_switch_cpu(size_t cpu, struct rt_scheduler_static *into) {
     /* It will signal us now */
     semaphore_wait(&pcpu->switch_semaphore);
 
-    enum rt_scheduler_error ret = atomic_load_relaxed(&pcpu->switch_code);
+    enum rt_scheduler_error ret = atomic_load_rlx(&pcpu->switch_code);
 
     /* Signal the waiting thread */
     semaphore_post(&pcpu->switch_semaphore);

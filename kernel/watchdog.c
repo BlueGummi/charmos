@@ -177,7 +177,7 @@ static void watchdog_buckets_inc_heartbeat(struct watchdog_buckets *buckets,
 static void watchdog_do_percpu_heartbeat(time_ms_t now) {
     kassert(PERCPU_READY(watchdog_percpu));
 
-    atomic_inc_relaxed(&PERCPU_PTR(TOPC_IRQL, watchdog_percpu)->heartbeat_seq);
+    atomic_inc_rlx(&PERCPU_PTR(TOPC_IRQL, watchdog_percpu)->heartbeat_seq);
 
     watchdog_buckets_inc_heartbeat(
         &PERCPU_READ(TOPC_IRQL, watchdog_percpu).buckets, now);
@@ -311,8 +311,8 @@ static void watchdog_start_petting(cpu_id_t cpu) {
     struct watchdog_percpu *pcpu = PERCPU_PTR_FOR(watchdog_percpu, cpu);
     if (cpu == 0) {
         pcpu->pets_enabled = true;
-        atomic_store_relaxed(&pcpu->anti_pets, 0);
-        atomic_store_relaxed(&pcpu->pets, 0);
+        atomic_store_rlx(&pcpu->anti_pets, 0);
+        atomic_store_rlx(&pcpu->pets, 0);
         return; /* We don't touch the seqcount for BSP */
     }
 
@@ -323,8 +323,8 @@ static void watchdog_start_petting(cpu_id_t cpu) {
 static void watchdog_read_pets_for(cpu_id_t cpu, size_t *out_pets,
                                    size_t *out_anti_pets) {
     struct watchdog_percpu *pcpu = PERCPU_PTR_FOR(watchdog_percpu, cpu);
-    *out_pets = atomic_load_relaxed(&pcpu->pets);
-    *out_anti_pets = atomic_load_relaxed(&pcpu->anti_pets);
+    *out_pets = atomic_load_rlx(&pcpu->pets);
+    *out_anti_pets = atomic_load_rlx(&pcpu->anti_pets);
 }
 
 /* This is the real meat and potatoes of this whole subsystem, and it
@@ -644,7 +644,7 @@ static void watchdog_master_process_stall(void) {
         struct watchdog_master_cpu *mcpu = &watchdog_master.cpus[i];
         struct watchdog_percpu *pcpu = PERCPU_PTR_FOR(watchdog_percpu, i);
 
-        uint64_t seen = atomic_load_relaxed(&pcpu->heartbeat_seq);
+        uint64_t seen = atomic_load_rlx(&pcpu->heartbeat_seq);
 
         if (seen != mcpu->last_seen_heartbeat) {
             mcpu->last_seen_heartbeat = seen;
@@ -802,7 +802,7 @@ void watchdog_pet(void) {
         /* The caller must make sure we cannot be preempted */
         if (this->pets_enabled) {
             kassert(irql_get() >= IRQL_DISPATCH_LEVEL);
-            atomic_inc_relaxed(&this->pets);
+            atomic_inc_rlx(&this->pets);
         }
     }
 }
@@ -813,7 +813,7 @@ void watchdog_anti_pet(void) {
         /* The caller must make sure we cannot be preempted */
         if (this->pets_enabled) {
             kassert(irql_get() >= IRQL_DISPATCH_LEVEL);
-            atomic_inc_relaxed(&this->anti_pets);
+            atomic_inc_rlx(&this->anti_pets);
         }
     }
 }

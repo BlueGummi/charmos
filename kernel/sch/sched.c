@@ -75,7 +75,7 @@ static inline void change_tick_duration(time_ms_t new_duration) {
         new_duration = 3;
 
     if (self->tick_duration_ms != new_duration ||
-        !atomic_load_relaxed(&self->tick_enabled)) {
+        !atomic_load_rlx(&self->tick_enabled)) {
         self->tick_duration_ms = new_duration;
         timer_modify(&self->tick, timer_delta_us(MS_TO_US(new_duration)));
         scheduler_set_tick_enabled(self, true);
@@ -231,7 +231,7 @@ static void load_thread(struct scheduler *sched, struct thread *next,
     /* Do not mark the idle thread as RUNNING because this causes
      * it to enter the runqueues, which is Very Bad™ (it gets enqueued,
      * and becomes treated like a regular thread)! */
-    if (atomic_load_relaxed(&next->state) != THREAD_STATE_IDLE_THREAD)
+    if (atomic_load_rlx(&next->state) != THREAD_STATE_IDLE_THREAD)
         thread_set_state(next, THREAD_STATE_RUNNING);
 
     thread_set_runqueue(next, sched);
@@ -251,7 +251,7 @@ static inline struct thread *load_idle_thread(struct scheduler *sched) {
 
     struct idle_thread_data *idle = smp_core_idle_thread();
 
-    atomic_store_relaxed(&idle->last_entry_ms, time_get_ms());
+    atomic_store_rlx(&idle->last_entry_ms, time_get_ms());
 
     scheduler_mark_self_idle(true);
 
@@ -313,11 +313,11 @@ static inline void context_switch(struct thread *curr, struct thread *next) {
     if (!curr)
         just_load = true;
 
-    if (curr && atomic_load_relaxed(&curr->state) == THREAD_STATE_IDLE_THREAD)
+    if (curr && atomic_load_rlx(&curr->state) == THREAD_STATE_IDLE_THREAD)
         just_load = true;
 
     if (cc_unlikely(curr &&
-                    atomic_load_relaxed(&curr->state) == THREAD_STATE_ZOMBIE)) {
+                    atomic_load_rlx(&curr->state) == THREAD_STATE_ZOMBIE)) {
         just_load = true;
         kassert(!smp_core_scheduler()->drop_last_ref);
         smp_core_scheduler()->drop_last_ref = curr;

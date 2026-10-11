@@ -32,15 +32,15 @@ completion_lock_internal(struct completion *c) TSA_NO_ANALYSIS {
 
 void completion_reinit(struct completion *c) TSA_NO_ANALYSIS {
     enum irql irql = completion_lock_internal(c);
-    atomic_store_relaxed(&c->done, 0);
+    atomic_store_rlx(&c->done, 0);
     spin_unlock(&c->lock, irql);
 }
 
 void complete(struct completion *c) TSA_NO_ANALYSIS {
     enum irql irql = completion_lock_internal(c);
 
-    if (atomic_load_relaxed(&c->done) < UINT32_MAX)
-        atomic_inc_relaxed(&c->done);
+    if (atomic_load_rlx(&c->done) < UINT32_MAX)
+        atomic_inc_rlx(&c->done);
 
     condvar_signal(&c->cv);
 
@@ -50,7 +50,7 @@ void complete(struct completion *c) TSA_NO_ANALYSIS {
 void complete_all(struct completion *c) TSA_NO_ANALYSIS {
     enum irql irql = completion_lock_internal(c);
 
-    atomic_store_relaxed(&c->done, COMPLETION_ALL);
+    atomic_store_rlx(&c->done, COMPLETION_ALL);
 
     condvar_broadcast(&c->cv);
 
@@ -60,11 +60,11 @@ void complete_all(struct completion *c) TSA_NO_ANALYSIS {
 void completion_wait(struct completion *c) TSA_NO_ANALYSIS {
     enum irql irql = completion_lock_internal(c);
 
-    while (atomic_load_relaxed(&c->done) == 0)
+    while (atomic_load_rlx(&c->done) == 0)
         condvar_wait(&c->cv, &c->lock, irql, &irql);
 
-    if (atomic_load_relaxed(&c->done) != COMPLETION_ALL)
-        atomic_dec_relaxed(&c->done);
+    if (atomic_load_rlx(&c->done) != COMPLETION_ALL)
+        atomic_dec_rlx(&c->done);
 
     spin_unlock(&c->lock, irql);
 }
@@ -73,17 +73,17 @@ bool completion_wait_timeout(struct completion *c,
                              time_ms_t timeout_ms) TSA_NO_ANALYSIS {
     enum irql irql = completion_lock_internal(c);
 
-    while (atomic_load_relaxed(&c->done) == 0) {
+    while (atomic_load_rlx(&c->done) == 0) {
         enum wake_reason wr =
             condvar_wait_timeout(&c->cv, &c->lock, timeout_ms, irql, &irql);
-        if (wr == WAKE_REASON_TIMEOUT && atomic_load_relaxed(&c->done) == 0) {
+        if (wr == WAKE_REASON_TIMEOUT && atomic_load_rlx(&c->done) == 0) {
             spin_unlock(&c->lock, irql);
             return false;
         }
     }
 
-    if (atomic_load_relaxed(&c->done) != COMPLETION_ALL)
-        atomic_dec_relaxed(&c->done);
+    if (atomic_load_rlx(&c->done) != COMPLETION_ALL)
+        atomic_dec_rlx(&c->done);
 
     spin_unlock(&c->lock, irql);
     return true;
@@ -92,18 +92,18 @@ bool completion_wait_timeout(struct completion *c,
 bool completion_try_wait(struct completion *c) TSA_NO_ANALYSIS {
     enum irql irql = completion_lock_internal(c);
 
-    if (atomic_load_relaxed(&c->done) == 0) {
+    if (atomic_load_rlx(&c->done) == 0) {
         spin_unlock(&c->lock, irql);
         return false;
     }
 
-    if (atomic_load_relaxed(&c->done) != COMPLETION_ALL)
-        atomic_dec_relaxed(&c->done);
+    if (atomic_load_rlx(&c->done) != COMPLETION_ALL)
+        atomic_dec_rlx(&c->done);
 
     spin_unlock(&c->lock, irql);
     return true;
 }
 
 bool completion_done(struct completion *c) {
-    return atomic_load_relaxed(&c->done) > 0;
+    return atomic_load_rlx(&c->done) > 0;
 }

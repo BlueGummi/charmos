@@ -181,21 +181,21 @@ static const char *locks_lane_name(enum locks_storm_lane lane) {
 }
 
 static void locks_pair_init(struct locks_storm_pair *pair) {
-    atomic_store_relaxed(&pair->value, 0);
-    atomic_store_relaxed(&pair->complement, UINT64_MAX);
+    atomic_store_rlx(&pair->value, 0);
+    atomic_store_rlx(&pair->complement, UINT64_MAX);
 }
 
 static bool locks_pair_load(const struct locks_storm_pair *pair,
                             uint64_t *value, uint64_t *complement) {
-    *value = atomic_load_relaxed(&pair->value);
-    *complement = atomic_load_relaxed(&pair->complement);
+    *value = atomic_load_rlx(&pair->value);
+    *complement = atomic_load_rlx(&pair->complement);
     return *complement == ~*value;
 }
 
 static void locks_pair_advance(struct locks_storm_pair *pair, uint64_t value) {
     value++;
-    atomic_store_relaxed(&pair->value, value);
-    atomic_store_relaxed(&pair->complement, ~value);
+    atomic_store_rlx(&pair->value, value);
+    atomic_store_rlx(&pair->complement, ~value);
 }
 
 static bool locks_record_failure(struct locks_storm_state *state,
@@ -307,8 +307,8 @@ locks_run_mutex(struct locks_storm_state *state, size_t worker) {
         bool expected = false;
         if (atomic_cas_strong(&state->corruption_injected, &expected, true,
                               mo_acq_rel, mo_acquire)) {
-            atomic_store_relaxed(&state->mutex_pair.complement,
-                                 complement ^ UINT64_C(1));
+            atomic_store_rlx(&state->mutex_pair.complement,
+                             complement ^ UINT64_C(1));
             result = LOCKS_OP_INJECTED;
         }
     }
@@ -423,8 +423,8 @@ locks_run_seq_read(struct locks_storm_state *state, size_t worker) {
     uint32_t sequence;
     do {
         sequence = seq_begin_read(&state->seqlock);
-        value = atomic_load_relaxed(&state->seq_pair.value);
-        complement = atomic_load_relaxed(&state->seq_pair.complement);
+        value = atomic_load_rlx(&state->seq_pair.value);
+        complement = atomic_load_rlx(&state->seq_pair.complement);
     } while (seq_read_retry(&state->seqlock, sequence));
 
     if (complement == ~value)
@@ -562,7 +562,7 @@ NIGHTMARE_WORKER(locks_storm_worker) {
         }
 
         atomic_inc_release(&worker_state->completed);
-        atomic_inc_relaxed(&state->total_completed);
+        atomic_inc_rlx(&state->total_completed);
         NIGHTMARE_PROGRESS();
 
         if (test_rng_next(&NM_SELF->rng) & 1)

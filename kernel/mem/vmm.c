@@ -1093,17 +1093,17 @@ void *vmm_map_bump_full(uintptr_t addr, uint64_t len, struct vmm_request rq) {
     if (total_pages != 0 && span / PAGE_SIZE != total_pages)
         return NULL;
 
-    uintptr_t virt_start = atomic_load_relaxed(&vmm_map_top);
+    uintptr_t virt_start = atomic_load_rlx(&vmm_map_top);
     do {
         if (virt_start > VMM_MAP_LIMIT || span > VMM_MAP_LIMIT - virt_start)
             return NULL;
     } while (!atomic_cas_weak(&vmm_map_top, &virt_start, virt_start + span,
-                              mo_acq_rel, mo_relaxed));
+                              mo_acq_rel, mo_rlx));
 
     if (vmm_map_pages(virt_start, phys_start, total_pages, rq) < 0) {
         uintptr_t expected = virt_start + span;
         atomic_cas_strong(&vmm_map_top, &expected, virt_start, mo_acq_rel,
-                          mo_relaxed);
+                          mo_rlx);
         return NULL;
     }
 

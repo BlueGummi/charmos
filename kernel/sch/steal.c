@@ -48,7 +48,7 @@ struct scheduler *scheduler_pick_victim(struct scheduler *self) {
         uint64_t victim_scaled = victim_thread_count * 100;
         uint64_t scaled =
             (uint64_t) self->total_thread_count *
-            (uint64_t) atomic_load_relaxed(&scheduler_data.steal_min_diff);
+            (uint64_t) atomic_load_rlx(&scheduler_data.steal_min_diff);
         bool victim_is_poor = victim_scaled < scaled;
 
         if (victim_busy || victim_is_poor)
@@ -170,10 +170,10 @@ static inline void begin_steal(struct scheduler *sched) {
 }
 
 static inline bool try_begin_steal() {
-    uint32_t current = atomic_load_relaxed(&scheduler_data.active_stealers);
+    uint32_t current = atomic_load_rlx(&scheduler_data.active_stealers);
     while (current < scheduler_data.max_concurrent_stealers) {
         if (atomic_cas_weak(&scheduler_data.active_stealers, &current,
-                            current + 1, mo_acquire, mo_relaxed)) {
+                            current + 1, mo_acquire, mo_rlx)) {
             return true;
         }
     }

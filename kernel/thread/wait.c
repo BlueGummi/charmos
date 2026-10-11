@@ -61,7 +61,7 @@ static void prepare_wait(const struct thread_wait_object *objects, size_t count,
     enum irql tirql = spin_lock_high(&t->lock);
     kassert(!t->object_wait);
     t->object_wait = true;
-    atomic_store_relaxed(&t->wait_type, type);
+    atomic_store_rlx(&t->wait_type, type);
     thread_clear_flag(t, THREAD_FLAG_YIELDED);
 
     thread_diag_record_arm(t, "wait_blocks", ci_return_address(0),
@@ -221,7 +221,7 @@ static void finish_locked(struct thread *t) {
     enum irql irql = spin_lock_high(&t->lock);
 
     t->object_wait = false;
-    atomic_store_relaxed(&t->wait_type, THREAD_WAIT_NONE);
+    atomic_store_rlx(&t->wait_type, THREAD_WAIT_NONE);
     enum thread_state state = thread_get_state(t);
 
     if (state == THREAD_STATE_BLOCKED || state == THREAD_STATE_SLEEPING)
@@ -255,7 +255,7 @@ struct thread_wait_result thread_wait_complete(void) {
         enum irql tirql = spin_lock_high(&t->lock);
 
         bool apc =
-            atomic_load_relaxed(&t->wait_type) == THREAD_WAIT_INTERRUPTIBLE &&
+            atomic_load_rlx(&t->wait_type) == THREAD_WAIT_INTERRUPTIBLE &&
             !delivered && atomic_load(&t->apc_pending_mask) != 0;
 
         thread_clear_flag(t, THREAD_FLAG_YIELDED);
@@ -287,7 +287,7 @@ void thread_wait_cancel(void) {
 
 static void deliver_alert_locked(struct thread *t) {
     if (!t->alert_pending || !t->active_wait_blocks || t->wait_done ||
-        atomic_load_relaxed(&t->wait_type) != THREAD_WAIT_INTERRUPTIBLE)
+        atomic_load_rlx(&t->wait_type) != THREAD_WAIT_INTERRUPTIBLE)
         return;
 
     unlink_blocks(t, THREAD_WAIT_KEY_NONE);

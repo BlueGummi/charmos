@@ -37,7 +37,7 @@ static inline bool mutex_try_lock(struct mutex *mtx, struct thread *self) {
         if (atomic_cas_weak(
                 &mtx->lock_word,
                 &old, /* If CAS fails, 'old' is updated to current value */
-                newval, mo_acquire, mo_relaxed)) {
+                newval, mo_acquire, mo_rlx)) {
             return true;
         }
 

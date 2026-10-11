@@ -13,11 +13,11 @@ void *mpmc_slots_alloc(struct mpmc_hdr *h, size_t cap, size_t stride) {
         return NULL;
 
     for (size_t i = 0; i < cap; i++)
-        atomic_store_relaxed((atomic_uint64_t *) (slots + i * stride), i);
+        atomic_store_rlx((atomic_uint64_t *) (slots + i * stride), i);
 
     h->mask = cap - 1;
-    atomic_store_relaxed(&h->head, 0);
-    atomic_store_relaxed(&h->tail, 0);
+    atomic_store_rlx(&h->head, 0);
+    atomic_store_rlx(&h->tail, 0);
     return slots;
 }
 

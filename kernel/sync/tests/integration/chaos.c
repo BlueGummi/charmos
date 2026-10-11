@@ -83,11 +83,11 @@ static void chaos_apc_fn(void *arg) {
 
     enum irql irql;
     if (!spin_trylock_high(&chaos_fuzz_spin, &irql)) {
-        atomic_inc_relaxed(&chaos_apc_lock_skips);
+        atomic_inc_rlx(&chaos_apc_lock_skips);
         return;
     }
 
-    atomic_inc_relaxed(&chaos_apc_lock_taken);
+    atomic_inc_rlx(&chaos_apc_lock_taken);
     for (volatile int j = 0; j < 10; j++)
         cpu_pause();
     spin_unlock(&chaos_fuzz_spin, irql);
@@ -100,7 +100,7 @@ static void chaos_apc_spammer(void *arg) {
     size_t pass = 0;
 
     while (!atomic_load(&chaos_stop)) {
-        atomic_inc_relaxed(&chaos_spammer_iters);
+        atomic_inc_rlx(&chaos_spammer_iters);
 
         if (pass++ % chaos_apc_period) {
             thread_sleep_for_ms(10);
@@ -150,7 +150,7 @@ static void chaos_sleeper(void *arg) {
         cpu_pause();
 
     for (size_t i = 0; i < chaos_iters_count; i++) {
-        atomic_inc_relaxed(&chaos_iters[id]);
+        atomic_inc_rlx(&chaos_iters[id]);
 
         /* Exercise mutex */
         mutex_lock(&chaos_fuzz_mtx);
@@ -201,7 +201,7 @@ static void chaos_waker(void *arg) {
     CHAOS_LOG("waker start");
 
     while (!atomic_load(&chaos_stop)) {
-        atomic_inc_relaxed(&chaos_waker_iters);
+        atomic_inc_rlx(&chaos_waker_iters);
         int id = prng_next() % chaos_threads;
 
         if (!atomic_load(&states[id].alive)) {
@@ -240,7 +240,7 @@ static void chaos_waker(void *arg) {
 #define CHAOS_MAX_REPORTS 2
 
 static bool chaos_progress_moved(atomic_uint64_t *counter, uint64_t *last) {
-    uint64_t now = atomic_load_relaxed(counter);
+    uint64_t now = atomic_load_rlx(counter);
     bool moved = now != *last;
     *last = now;
     return moved;
@@ -307,7 +307,7 @@ static bool chaos_join_watched(struct thread *t, const char *role, size_t idx,
                                atomic_uint64_t *counter,
                                struct thread **threads, struct thread *spammer,
                                struct thread *waker) {
-    uint64_t last = atomic_load_relaxed(counter);
+    uint64_t last = atomic_load_rlx(counter);
 
     size_t quiet = 0;
     size_t reports = 0;

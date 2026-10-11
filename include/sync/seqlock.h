@@ -42,11 +42,11 @@ typedef struct seqcount seqcount_t;
     }
 
 static inline void seqcount_init(struct seqcount *s) {
-    atomic_store_relaxed(&s->sequence, 0);
+    atomic_store_rlx(&s->sequence, 0);
 }
 
 static inline uint32_t seqcount_read_raw(const struct seqcount *s) {
-    return atomic_load_relaxed(&s->sequence);
+    return atomic_load_rlx(&s->sequence);
 }
 
 static inline uint32_t seqcount_begin_read_raw(const struct seqcount *s) {
@@ -78,14 +78,14 @@ static inline bool seqcount_read_retry(const struct seqcount *s,
 }
 
 /*
- * NOTE: the separate relaxed load and store here is intentional:
+ * NOTE: the separate rlx load and store here is intentional:
  * atomic_fetch_add is RMW, and unneeded when there is only one writer
  */
 
 /* even to odd with wmb */
 static inline void seqcount_begin_write(struct seqcount *s) {
     uint32_t seq = seqcount_read_raw(s);
-    atomic_store_relaxed(&s->sequence, seq + 1);
+    atomic_store_rlx(&s->sequence, seq + 1);
     ca_wmb();
 }
 
@@ -93,7 +93,7 @@ static inline void seqcount_begin_write(struct seqcount *s) {
 static inline void seqcount_end_write(struct seqcount *s) {
     ca_wmb();
     uint32_t seq = seqcount_read_raw(s);
-    atomic_store_relaxed(&s->sequence, seq + 1);
+    atomic_store_rlx(&s->sequence, seq + 1);
 }
 
 /*

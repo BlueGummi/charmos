@@ -53,7 +53,7 @@ void scheduler_init(void) {
         rbt_init(&s->completed_rbt, scheduler_thread_get_data,
                  scheduler_cmp_threads);
         rbt_init(&s->climb_threads, climb_get_thread_data, climb_cmp_threads);
-        atomic_store_relaxed(&s->tick_enabled, false);
+        atomic_store_rlx(&s->tick_enabled, false);
         s->current_period = 1; /* Start at period 1 to avoid
                                 * starting at 0 because
                                 * that would lead to threads
@@ -67,7 +67,7 @@ void scheduler_init(void) {
         struct thread *idle_thread =
             thread_create(("idle_thread_%zu", i), scheduler_idle_main,
                           .flags = THREAD_FLAG_PINNED);
-        atomic_store_relaxed(&idle_thread->state, THREAD_STATE_IDLE_THREAD);
+        atomic_store_rlx(&idle_thread->state, THREAD_STATE_IDLE_THREAD);
         s->idle_thread = idle_thread;
 
         INIT_LIST_HEAD(&s->rt_threads);

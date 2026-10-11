@@ -37,7 +37,7 @@ bool spsc_fifo_pop_ptr(struct spsc_fifo *fifo, void **out_ptr);
 
 static inline size_t spsc_fifo_len(const struct spsc_fifo *fifo) {
     size_t h = atomic_load_acq(&fifo->head);
-    size_t t = atomic_load_relaxed(&fifo->tail);
+    size_t t = atomic_load_rlx(&fifo->tail);
     return h - t;
 }
 
@@ -54,6 +54,6 @@ static inline bool spsc_fifo_is_full(const struct spsc_fifo *fifo) {
 }
 
 static inline void spsc_fifo_reset(struct spsc_fifo *fifo) {
-    atomic_store_relaxed(&fifo->head, 0);
-    atomic_store_relaxed(&fifo->tail, 0);
+    atomic_store_rlx(&fifo->head, 0);
+    atomic_store_rlx(&fifo->tail, 0);
 }

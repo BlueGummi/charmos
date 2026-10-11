@@ -180,7 +180,7 @@ static bool turnstile_snapshot_wait(struct thread *thread,
         block[THREAD_WAIT_BLOCK_SYNC].state == THREAD_WAIT_BLOCK_ACTIVE;
 
     if (valid) {
-        wait->ts = atomic_load_relaxed(&thread->blocked_ts);
+        wait->ts = atomic_load_rlx(&thread->blocked_ts);
         wait->lock_obj = block[THREAD_WAIT_BLOCK_SYNC].object;
         wait->epoch = block[THREAD_WAIT_BLOCK_SYNC].epoch;
         valid = wait->ts != NULL;
@@ -240,7 +240,7 @@ struct thread *turnstile_dequeue_first(struct turnstile *ts, size_t queue) {
     rbt_delete(&ts->queues[queue], last);
     struct thread *thread = thread_from_wq_rbt_node(last);
 
-    atomic_store_relaxed(&thread->blocked_ts, NULL);
+    atomic_store_rlx(&thread->blocked_ts, NULL);
 
     struct turnstile *got = ts;
     if (ts->waiters == 1) { /* last waiter, take the turnstile with you! */
@@ -360,7 +360,7 @@ turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
 static void turnstile_block_on(struct turnstile *ts, size_t queue_num) {
     struct thread *curr = thread_get_current();
 
-    atomic_store_relaxed(&curr->blocked_ts, ts);
+    atomic_store_rlx(&curr->blocked_ts, ts);
 
     thread_wait_prepare_one(&ts->wait, ts->lock_obj,
                             THREAD_WAIT_UNINTERRUPTIBLE,

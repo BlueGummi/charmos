@@ -56,7 +56,7 @@ static enum kvm_state kvm_state_get(void) {
     uint32_t features = 0;
     s = kvm_probe(&features);
 
-    atomic_store_relaxed(&kvm_features, features);
+    atomic_store_rlx(&kvm_features, features);
     atomic_store_release(&kvm_state, s);
     return s;
 }
@@ -69,7 +69,7 @@ bool kvm_has_feature(uint32_t feature) {
     if (!kvm_detect())
         return false;
 
-    return atomic_load_relaxed(&kvm_features) & BIT(feature);
+    return atomic_load_rlx(&kvm_features) & BIT(feature);
 }
 
 static enum err kvm_err(int64_t ret) {

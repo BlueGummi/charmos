@@ -15,7 +15,7 @@ static atomic_uint8_t *order_map_entry_for(vaddr_t vaddr, bool *high_bits) {
 
 uint8_t slab_order_map_get(vaddr_t vaddr) {
     bool get_high;
-    uint8_t byte = atomic_load_relaxed(order_map_entry_for(vaddr, &get_high));
+    uint8_t byte = atomic_load_rlx(order_map_entry_for(vaddr, &get_high));
     if (get_high) {
         return byte >> 4;
     } else {
@@ -32,7 +32,7 @@ void slab_order_map_set(vaddr_t vaddr, uint8_t order) {
     order = set_high ? order << 4 : order;
 
     atomic_update_explicit(bptr, old_val, (old_val & first_mask) | order,
-                           mo_release, mo_relaxed);
+                           mo_release, mo_rlx);
 }
 
 void slab_order_map_init(void) {

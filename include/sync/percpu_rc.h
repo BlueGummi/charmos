@@ -67,20 +67,20 @@ static inline bool percpu_rc_is_percpu(uintptr_t pcpu) {
  */
 static inline void percpu_rc_get(struct percpu_rc *ref) {
     rcu_read_lock();
-    uintptr_t pcpu = atomic_load_relaxed(&ref->percpu_count_ptr);
+    uintptr_t pcpu = atomic_load_rlx(&ref->percpu_count_ptr);
 
     if (cc_likely(percpu_rc_is_percpu(pcpu))) {
         int64_t *counters = PERCPU_RC_PTR(pcpu);
         counters[smp_id(TOPC_NONE)]++;
     } else {
-        atomic_inc_relaxed(&ref->count);
+        atomic_inc_rlx(&ref->count);
     }
     rcu_read_unlock();
 }
 
 static inline void percpu_rc_put(struct percpu_rc *ref) {
     rcu_read_lock();
-    uintptr_t pcpu = atomic_load_relaxed(&ref->percpu_count_ptr);
+    uintptr_t pcpu = atomic_load_rlx(&ref->percpu_count_ptr);
 
     if (cc_likely(percpu_rc_is_percpu(pcpu))) {
         int64_t *counters = PERCPU_RC_PTR(pcpu);
@@ -97,7 +97,7 @@ static inline void percpu_rc_put(struct percpu_rc *ref) {
 
 static inline bool percpu_rc_tryget(struct percpu_rc *ref) {
     rcu_read_lock();
-    uintptr_t pcpu = atomic_load_relaxed(&ref->percpu_count_ptr);
+    uintptr_t pcpu = atomic_load_rlx(&ref->percpu_count_ptr);
 
     if (cc_likely(percpu_rc_is_percpu(pcpu))) {
         int64_t *counters = PERCPU_RC_PTR(pcpu);
@@ -107,17 +107,17 @@ static inline bool percpu_rc_tryget(struct percpu_rc *ref) {
     }
 
     rcu_read_unlock();
-    int64_t c = atomic_load_relaxed(&ref->count);
+    int64_t c = atomic_load_rlx(&ref->count);
     do {
         if (c <= 0)
             return false;
-    } while (!atomic_cas_weak(&ref->count, &c, c + 1, mo_relaxed, mo_relaxed));
+    } while (!atomic_cas_weak(&ref->count, &c, c + 1, mo_rlx, mo_rlx));
     return true;
 }
 
 static inline bool percpu_rc_tryget_live(struct percpu_rc *ref) {
     rcu_read_lock();
-    uintptr_t pcpu = atomic_load_relaxed(&ref->percpu_count_ptr);
+    uintptr_t pcpu = atomic_load_rlx(&ref->percpu_count_ptr);
 
     if (cc_likely(percpu_rc_is_percpu(pcpu))) {
         int64_t *counters = PERCPU_RC_PTR(pcpu);
@@ -132,18 +132,18 @@ static inline bool percpu_rc_tryget_live(struct percpu_rc *ref) {
     }
 
     rcu_read_unlock();
-    int64_t c = atomic_load_relaxed(&ref->count);
+    int64_t c = atomic_load_rlx(&ref->count);
     do {
         if (c <= 0)
             return false;
-    } while (!atomic_cas_weak(&ref->count, &c, c + 1, mo_relaxed, mo_relaxed));
+    } while (!atomic_cas_weak(&ref->count, &c, c + 1, mo_rlx, mo_rlx));
     return true;
 }
 
 static inline bool percpu_rc_is_zero(struct percpu_rc *ref) {
-    return atomic_load_relaxed(&ref->count) == 0;
+    return atomic_load_rlx(&ref->count) == 0;
 }
 
 static inline bool percpu_rc_is_dying(struct percpu_rc *ref) {
-    return (atomic_load_relaxed(&ref->percpu_count_ptr) & PERCPU_RC_DEAD) != 0;
+    return (atomic_load_rlx(&ref->percpu_count_ptr) & PERCPU_RC_DEAD) != 0;
 }

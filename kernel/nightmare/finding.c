@@ -43,7 +43,7 @@ void nightmare_finding_at(const struct nightmare_finding_site *site,
         .site = location,
         .msg = msg,
     });
-    atomic_inc_relaxed(&nightmare_runtime.finding_count);
+    atomic_inc_rlx(&nightmare_runtime.finding_count);
 }
 
 void nightmare_request_external_fail(const char *kind, uint64_t discriminator,

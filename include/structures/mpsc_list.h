@@ -18,7 +18,7 @@ struct mpsc_slist {
 #define MPSC_SLIST(name) struct mpsc_slist name = MPSC_SLIST_INIT
 
 static inline void mpsc_slist_init(struct mpsc_slist *q) {
-    atomic_store_relaxed(&q->head, NULL);
+    atomic_store_rlx(&q->head, NULL);
 }
 
 static inline int mpsc_slist_empty(const struct mpsc_slist *q) {
@@ -28,10 +28,10 @@ static inline int mpsc_slist_empty(const struct mpsc_slist *q) {
 /* Returns true if list was previously empty */
 static inline bool mpsc_slist_push(struct mpsc_slist *q,
                                    struct mpsc_slist_node *n) {
-    struct mpsc_slist_node *old = atomic_load_relaxed(&q->head);
+    struct mpsc_slist_node *old = atomic_load_rlx(&q->head);
     do {
         n->next = old;
-    } while (!atomic_cas_weak(&q->head, &old, n, mo_release, mo_relaxed));
+    } while (!atomic_cas_weak(&q->head, &old, n, mo_release, mo_rlx));
 
     return old == NULL;
 }

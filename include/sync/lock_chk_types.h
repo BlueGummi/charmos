@@ -161,7 +161,7 @@ lock_chk_map_runtime_init(struct lock_chk_map *map,
         .file = __RELFILE__,
         .line = 0,
     };
-    atomic_store_relaxed(&map->base_node, NULL);
+    atomic_store_rlx(&map->base_node, NULL);
 }
 
 static inline struct lock_chk_acq_req

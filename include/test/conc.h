@@ -140,7 +140,7 @@ bool test_liveness_take(struct test_liveness_state *state,
 
 PERCPU_EXTERN(struct test_progress_counter, test_progress);
 static inline void test_conc_progress_tick(void) {
-    atomic_inc_relaxed(&PERCPU_PTR(TOPC_NONE, test_progress)->count);
+    atomic_inc_rlx(&PERCPU_PTR(TOPC_NONE, test_progress)->count);
 }
 
 static inline uint64_t test_rng_next(struct test_rng *rng) {

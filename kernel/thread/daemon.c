@@ -297,7 +297,7 @@ struct daemon *daemon_create_full(struct daemon_attributes *attrs,
         set_bg_present(daemon, true);
     }
 
-    atomic_store_relaxed(&daemon->state, DAEMON_STATE_ACTIVE);
+    atomic_store_rlx(&daemon->state, DAEMON_STATE_ACTIVE);
 
     va_end(args);
     return daemon;
@@ -388,12 +388,12 @@ void daemon_print(struct daemon *daemon) {
     printf("                  .max_timesharing_threads = %zu\n",
            attrs->max_timesharing_threads);
     printf("                  .idle_timesharing_threads = %zu\n",
-           atomic_load_relaxed(&attrs->idle_timesharing_threads));
+           atomic_load_rlx(&attrs->idle_timesharing_threads));
     printf("                  .timesharing_threads = %zu\n",
-           atomic_load_relaxed(&attrs->timesharing_threads));
+           atomic_load_rlx(&attrs->timesharing_threads));
     printf("                  .flags = 0b%b\n", attrs->flags);
     printf("             }\n");
     printf("    .state = %s\n",
-           daemon_state_str(atomic_load_relaxed(&daemon->state)));
+           daemon_state_str(atomic_load_rlx(&daemon->state)));
     printf("}\n");
 }

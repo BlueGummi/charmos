@@ -323,7 +323,7 @@ void apc_init(struct apc *a, apc_func_t fn, void *arg1, apc_destroy_t destroy) {
     a->next = NULL;
     a->owner = NULL;
     refcount_init(&a->refcount, 1);
-    atomic_store_relaxed(&a->state, APC_STATE_IDLE);
+    atomic_store_rlx(&a->state, APC_STATE_IDLE);
     a->destroy = destroy;
 }
 

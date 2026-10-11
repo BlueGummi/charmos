@@ -111,11 +111,11 @@ static inline struct pte_tagged pte_tagged_unpack(pte_t pte) {
 }
 
 static inline bool pte_locked(pte_atomic_t *pte) {
-    return atomic_load_relaxed(pte) & PTE_LOCK_BIT;
+    return atomic_load_rlx(pte) & PTE_LOCK_BIT;
 }
 
 static inline uint64_t pte_read(pte_atomic_t *pte) {
-    return atomic_load_relaxed(pte);
+    return atomic_load_rlx(pte);
 }
 
 static inline uint64_t pte_or(pte_atomic_t *pte, uint64_t val) {
@@ -129,15 +129,14 @@ static inline void pte_unlock_internal(pte_atomic_t *pte) {
 /* TODO: use bit_spinlock.h */
 static inline void pte_lock_internal(pte_atomic_t *pte) {
     while (true) {
-        uint64_t old = atomic_load_relaxed(pte);
+        uint64_t old = atomic_load_rlx(pte);
 
         if (old & PTE_LOCK_BIT) {
             cpu_pause();
             continue;
         }
 
-        if (atomic_cas_weak(pte, &old, old | PTE_LOCK_BIT, mo_acquire,
-                            mo_relaxed))
+        if (atomic_cas_weak(pte, &old, old | PTE_LOCK_BIT, mo_acquire, mo_rlx))
             return;
 
         cpu_pause();

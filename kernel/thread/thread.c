@@ -112,7 +112,7 @@ void thread_entry_wrapper(void) TSA_NO_ANALYSIS {
      * i.e. a thread entering */
     scheduler_yield_nesting_reset(thread_get_current());
 
-    if (atomic_load_relaxed(&thread_get_current()->state) !=
+    if (atomic_load_rlx(&thread_get_current()->state) !=
         THREAD_STATE_IDLE_THREAD)
         atomic_inc(&global.thread_count);
 

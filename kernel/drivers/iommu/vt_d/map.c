@@ -20,7 +20,7 @@ static bool vtd_pt_empty(uint64_t *pt) {
 }
 
 static uint64_t *vtd_sl_ensure_child(sl_pte_atomic_t *entry) {
-    uint64_t val = atomic_load_relaxed(entry);
+    uint64_t val = atomic_load_rlx(entry);
     val &= ~SL_PTE_LOCK_BIT;
 
     if (val & SL_PTE_READ)
@@ -206,7 +206,7 @@ static bool vtd_sl_unmap_locked(uint64_t *sl_pgd, iova_t iova,
         saved[lvl]             = vtd_pt_lock(entry);
         locked[lvl]            = entry;
 
-        uint64_t val = atomic_load_relaxed(entry);
+        uint64_t val = atomic_load_rlx(entry);
         val &= ~SL_PTE_LOCK_BIT;
 
         if (!(val & SL_PTE_READ)) {
@@ -240,7 +240,7 @@ static void vtd_sl_reclaim_walk(struct vtd_walk_state *ws) {
 
         enum irql old_irql = vtd_pt_lock(parent);
 
-        uint64_t val = atomic_load_relaxed(parent);
+        uint64_t val = atomic_load_rlx(parent);
         val &= ~SL_PTE_LOCK_BIT;
 
         if (!(val & SL_PTE_READ)) {

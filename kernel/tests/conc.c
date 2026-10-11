@@ -14,7 +14,7 @@ uint64_t test_conc_progress_sum(void) {
     uint64_t sum = 0;
     struct test_progress_counter *counter;
     percpu_for_each(counter, test_progress) {
-        sum += atomic_load_relaxed(&counter->count);
+        sum += atomic_load_rlx(&counter->count);
     }
 
     return sum;
@@ -28,10 +28,10 @@ uint64_t test_rng_seed_for(uint64_t base_seed, size_t index) {
 
 void test_conc_init(struct test_conc *c, struct test_conc_worker *workers,
                     size_t worker_count) {
-    atomic_store_relaxed(&c->stop, TEST_RUN);
-    atomic_store_relaxed(&c->quiesce_requested, false);
-    atomic_store_relaxed(&c->parked_count, 0);
-    atomic_store_relaxed(&c->aux, NULL);
+    atomic_store_rlx(&c->stop, TEST_RUN);
+    atomic_store_rlx(&c->quiesce_requested, false);
+    atomic_store_rlx(&c->parked_count, 0);
+    atomic_store_rlx(&c->aux, NULL);
     c->workers = workers;
     c->worker_count = worker_count;
     completion_init(&c->start, COMPLETION_INIT_NORMAL);

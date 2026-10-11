@@ -12,7 +12,7 @@
 #include "internal.h"
 
 void scheduler_add_thread_locked(struct scheduler *sched, struct thread *task) {
-    kassert(atomic_load_relaxed(&task->state) != THREAD_STATE_IDLE_THREAD);
+    kassert(atomic_load_rlx(&task->state) != THREAD_STATE_IDLE_THREAD);
 
     /* Runqueue logic uses queued_prio_class */
     enum thread_prio_class prio = task->perceived_prio_class;

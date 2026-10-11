@@ -59,7 +59,7 @@ void stat_series_reset(struct stat_series *s) {
 static void stat_series_advance_locked(struct stat_series *s, time_us_t now_us)
     TSA_MUST_HOLD(&s->lock) {
     /* re-evaluate based on locked state (canonical update) */
-    size_t delta = now_us - atomic_load_relaxed(&s->last_update_us);
+    size_t delta = now_us - atomic_load_rlx(&s->last_update_us);
     uint32_t steps = delta / s->bucket_us;
     if (steps == 0)
         return;
@@ -67,7 +67,7 @@ static void stat_series_advance_locked(struct stat_series *s, time_us_t now_us)
     if (steps > s->nbuckets)
         steps = s->nbuckets;
 
-    size_t series_current = atomic_load_relaxed(&s->current);
+    size_t series_current = atomic_load_rlx(&s->current);
 
     for (uint32_t i = 0; i < steps; i++) {
         /* update canonical non-atomic s->current while holding lock */
@@ -81,8 +81,8 @@ static void stat_series_advance_locked(struct stat_series *s, time_us_t now_us)
     }
 
     /* publish last_update_us atomically for lockless readers/writers */
-    atomic_store(&s->last_update_us, atomic_load_relaxed(&s->last_update_us) +
-                                         steps * s->bucket_us);
+    atomic_store(&s->last_update_us,
+                 atomic_load_rlx(&s->last_update_us) + steps * s->bucket_us);
 }
 
 void stat_series_advance(struct stat_series *s, time_us_t now_us) {

@@ -15,15 +15,14 @@ struct TSA_CAPABILITY("spinlock") raw_spinlock {
 #define RAW_SPINLOCK_DEFINE(id) struct raw_spinlock id = RAW_SPINLOCK_INIT
 
 static inline void raw_spinlock_init(struct raw_spinlock *lock) {
-    atomic_store_relaxed(&lock->state, 0);
+    atomic_store_rlx(&lock->state, 0);
 }
 
 static inline cc_warn_unused_result bool
 raw_spin_trylock(struct raw_spinlock *lock)
     TSA_TRY_ACQUIRES(true, lock) TSA_NO_ANALYSIS {
     uint8_t expected = 0;
-    return atomic_cas_strong(&lock->state, &expected, 1, mo_acquire,
-                             mo_relaxed);
+    return atomic_cas_strong(&lock->state, &expected, 1, mo_acquire, mo_rlx);
 }
 
 static inline void raw_spin_lock(struct raw_spinlock *lock)
@@ -32,7 +31,7 @@ static inline void raw_spin_lock(struct raw_spinlock *lock)
         if (raw_spin_trylock(lock))
             return;
 
-        while (atomic_load_relaxed(&lock->state) != 0)
+        while (atomic_load_rlx(&lock->state) != 0)
             cpu_pause();
     }
 }

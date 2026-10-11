@@ -56,7 +56,7 @@ static void rcu_writer_thread(void *arg) {
     cc_unused(arg);
     sleep_spin_ms(30);
 
-    struct rcu_test_data *old = atomic_load_relaxed(&shared_ptr);
+    struct rcu_test_data *old = atomic_load_rlx(&shared_ptr);
 
     struct rcu_test_data *new = valloc(sizeof(*new), ALLOC_ZERO);
     new->value = 43;
@@ -290,7 +290,7 @@ TEST_DEFINE_INTEGRATION(rcu, mt_stress, TEST_INTENSITY(200, 2000, 10000)) {
     TEST_ASSERT_EQ(atomic_load(&stress_deferred_freed),
                    atomic_load(&stress_replacements));
 
-    struct rcu_stress_node *last = atomic_load_relaxed(&stress_shared);
+    struct rcu_stress_node *last = atomic_load_rlx(&stress_shared);
     if (last) {
         rcu_synchronize();
         vfree(last);

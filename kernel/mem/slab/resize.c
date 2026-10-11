@@ -14,7 +14,7 @@ bool slab_can_resize_to(struct slab *slab, size_t new_size_pages) {
 static void slab_shrink(struct slab *slab, size_t start, size_t end,
                         bool assert_nonnull) {
     for (size_t i = start; i < end; i++) {
-        struct page *page = atomic_load_relaxed(&slab->backing_pages[i]);
+        struct page *page = atomic_load_rlx(&slab->backing_pages[i]);
         if (assert_nonnull)
             kassert(page);
 
@@ -25,7 +25,7 @@ static void slab_shrink(struct slab *slab, size_t start, size_t end,
         vaddr_t virt = (vaddr_t) slab + i * PAGE_SIZE;
         vmm_unmap_page(virt);
         pmm_free_page(phys);
-        atomic_store_relaxed(&slab->backing_pages[i], NULL);
+        atomic_store_rlx(&slab->backing_pages[i], NULL);
     }
 
     slab->page_count = start;
@@ -44,7 +44,7 @@ bool slab_resize(struct slab *slab, size_t new_size_pages) {
     /* Grow */
     if (old < new_size_pages) {
         for (size_t i = old; i < new_size_pages; i++)
-            atomic_store_relaxed(&slab->backing_pages[i], NULL);
+            atomic_store_rlx(&slab->backing_pages[i], NULL);
 
         for (size_t i = old; i < new_size_pages; i++) {
             vaddr_t virt = (vaddr_t) slab + i * PAGE_SIZE;
@@ -76,8 +76,7 @@ bool slab_resize(struct slab *slab, size_t new_size_pages) {
                     goto grow_err;
                 }
 
-                atomic_store_relaxed(&slab->backing_pages[i],
-                                     page_for_paddr(phys));
+                atomic_store_rlx(&slab->backing_pages[i], page_for_paddr(phys));
                 if (slab->type == SLAB_TYPE_NONPAGEABLE_ZERO)
                     memset(hhdm_paddr_to_ptr(phys), 0, PAGE_SIZE);
             }

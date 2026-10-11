@@ -27,7 +27,7 @@ bool domain_arena_push(struct domain_arena *arena, struct buddy_page *page) {
 
     if (success) {
         page_set_tag(BUDDY_PAGE_TO_PAGE(page), PAGE_TAG_ARENA);
-        atomic_inc_relaxed(&arena->num_pages);
+        atomic_inc_rlx(&arena->num_pages);
     }
 
     spin_unlock(&arena->lock, irql);
@@ -47,7 +47,7 @@ struct buddy_page *domain_arena_pop(struct domain_arena *arena) {
         /* Must have been cached by a push; transition back to allocated. */
         page_assert_tag(BUDDY_PAGE_TO_PAGE(page), PAGE_TAG_ARENA);
         page_set_tag(BUDDY_PAGE_TO_PAGE(page), PAGE_TAG_NONE);
-        atomic_dec_relaxed(&arena->num_pages);
+        atomic_dec_rlx(&arena->num_pages);
     }
 
     spin_unlock(&arena->lock, irql);

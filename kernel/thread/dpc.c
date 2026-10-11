@@ -16,8 +16,8 @@ static struct dpc *dpc_steal_queue(struct dpc_queue *dq) {
     struct dpc *rev = NULL;
 
     while (list) {
-        struct dpc *next = atomic_load_relaxed(&list->next);
-        atomic_store_relaxed(&list->next, rev);
+        struct dpc *next = atomic_load_rlx(&list->next);
+        atomic_store_rlx(&list->next, rev);
         rev = list;
         list = next;
     }
@@ -32,7 +32,7 @@ static void dpc_execute_all_in_queue(struct dpc_queue *dq) {
             break;
 
         while (it) {
-            struct dpc *next = atomic_load_relaxed(&it->next);
+            struct dpc *next = atomic_load_rlx(&it->next);
             atomic_store_release(&it->enqueued, false);
             it->func(it->a, it->b);
             it = next;
@@ -42,7 +42,7 @@ static void dpc_execute_all_in_queue(struct dpc_queue *dq) {
 
 void dpc_drain_local(void) {
     struct core *me = smp_core(TOPC_IRQL);
-    if (atomic_load_relaxed(&me->in_resched))
+    if (atomic_load_rlx(&me->in_resched))
         return;
 
     /* Recursion guard */
@@ -56,7 +56,7 @@ void dpc_drain_local(void) {
 
     do {
         dpc_execute_all_in_queue(&dc->queue);
-    } while (atomic_load_relaxed(&dc->queue.head) != NULL);
+    } while (atomic_load_rlx(&dc->queue.head) != NULL);
 
     atomic_store(&me->executing_dpcs, false);
 }
@@ -78,8 +78,8 @@ void dpc_run_dpcs_from_irq(void) {
 static void dpc_queue_enqueue(struct dpc_queue *dq, struct dpc *d) {
     while (true) {
         struct dpc *old_head = atomic_load_acq(&dq->head);
-        atomic_store_relaxed(&d->next, old_head);
-        if (atomic_cas_weak(&dq->head, &old_head, d, mo_release, mo_relaxed)) {
+        atomic_store_rlx(&d->next, old_head);
+        if (atomic_cas_weak(&dq->head, &old_head, d, mo_release, mo_rlx)) {
             break;
         }
         cpu_pause();
@@ -95,7 +95,7 @@ bool dpc_enqueue_on_cpu(size_t cpu, struct dpc *d) {
     struct dpc_cpu *dc = &global.dpc_data[cpu];
 
     /* Clear next pointer then push via CAS loop */
-    atomic_store_relaxed(&d->next, NULL);
+    atomic_store_rlx(&d->next, NULL);
 
     struct dpc_queue *dq = &dc->queue;
     dpc_queue_enqueue(dq, d);
@@ -117,7 +117,7 @@ void dpc_init_percpu(void) {
         valloc(sizeof(struct dpc_cpu) * global.core_count, ALLOC_ZERO);
     size_t i;
     for_each_cpu_id(i) {
-        atomic_store_relaxed(&global.dpc_data[i].queue.head, NULL);
+        atomic_store_rlx(&global.dpc_data[i].queue.head, NULL);
     }
 }
 
@@ -125,8 +125,8 @@ struct dpc *dpc_init(struct dpc *d, dpc_func_t fn, void *a, void *b) {
     d->func = fn;
     d->a = a;
     d->b = b;
-    atomic_store_relaxed(&d->next, NULL);
-    atomic_store_relaxed(&d->enqueued, false);
+    atomic_store_rlx(&d->next, NULL);
+    atomic_store_rlx(&d->enqueued, false);
     return d;
 }
 

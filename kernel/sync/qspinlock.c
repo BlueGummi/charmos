@@ -32,7 +32,7 @@ static uint32_t qspinlock_exchange_tail(struct qspinlock *lock, uint32_t tail,
 
     do {
         next = (val & ~Q_SPIN_TAIL_MASK) | tail;
-    } while (!atomic_cas_weak(&lock->val, &val, next, mo_acq_rel, mo_relaxed));
+    } while (!atomic_cas_weak(&lock->val, &val, next, mo_acq_rel, mo_rlx));
 
     return val;
 }
@@ -44,11 +44,10 @@ void qspin_lock_slowpath(struct qspinlock *lock, uint32_t val) {
         while (!(val & Q_SPIN_PENDING_MASK)) {
             uint32_t old = val;
             if (atomic_cas_weak(&lock->val, &old, val | Q_SPIN_PENDING_VAL,
-                                mo_acquire, mo_relaxed)) {
+                                mo_acquire, mo_rlx)) {
 
                 /* We are the pender, now we wait for LOCK to clear */
-                while ((val = atomic_load_relaxed(&lock->val)) &
-                       Q_SPIN_LOCKED_MASK)
+                while ((val = atomic_load_rlx(&lock->val)) & Q_SPIN_LOCKED_MASK)
                     cpu_pause();
 
                 /* pending -> locked: -0x100 + 1 */
@@ -73,8 +72,8 @@ void qspin_lock_slowpath(struct qspinlock *lock, uint32_t val) {
     struct qnode *nodes = PERCPU_READ_FOR(qnodes, cpu);
 
     struct qnode *node = &nodes[lvl];
-    atomic_store_relaxed(&node->locked, 0);
-    atomic_store_relaxed(&node->next, NULL);
+    atomic_store_rlx(&node->locked, 0);
+    atomic_store_rlx(&node->next, NULL);
 
     /* Build the tail: We encode the level and the CPU */
     uint32_t tail =
@@ -104,7 +103,7 @@ void qspin_lock_slowpath(struct qspinlock *lock, uint32_t val) {
 
     /* We're at the head now, wait for pending, at this point no new CPU
      * will be able to set PENDING as they're failing on Q_SPIN_TAIL_MASK */
-    while ((val = atomic_load_relaxed(&lock->val)) & Q_SPIN_LOCKED_PENDING_MASK)
+    while ((val = atomic_load_rlx(&lock->val)) & Q_SPIN_LOCKED_PENDING_MASK)
         cpu_pause();
 
     /* If no one new joined, clear the tail and claim the lock, or claim
@@ -112,7 +111,7 @@ void qspin_lock_slowpath(struct qspinlock *lock, uint32_t val) {
     while (true) {
         if ((val & Q_SPIN_TAIL_MASK) == tail) {
             if (atomic_cas_weak(&lock->val, &val, Q_SPIN_LOCKED_VAL, mo_acquire,
-                                mo_relaxed))
+                                mo_rlx))
                 return; /* Got it */
         } else {
             atomic_fetch_or_acq(&lock->val, Q_SPIN_LOCKED_VAL);
@@ -125,7 +124,7 @@ void qspin_lock_slowpath(struct qspinlock *lock, uint32_t val) {
     while (!atomic_load_acq(&node->next))
         cpu_pause();
 
-    struct qnode *next_node = atomic_load_relaxed(&node->next);
+    struct qnode *next_node = atomic_load_rlx(&node->next);
 
     /* "Level-triggered" "notification" */
     atomic_store_release(&next_node->locked, 1);

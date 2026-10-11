@@ -142,7 +142,7 @@ static char msg[128];
 TEST_DEFINE_INTEGRATION(slab, mt_alloc_free_stress,
                         TEST_INTENSITY(5000, 50000, 200000)) {
     memset((void *) done, 0, sizeof(done));
-    atomic_store_relaxed(&all_ready, false);
+    atomic_store_rlx(&all_ready, false);
 
     struct thread *workers[STRESS_THREADS];
     size_t iters = ctx->intensity_val ? ctx->intensity_val : 50000;

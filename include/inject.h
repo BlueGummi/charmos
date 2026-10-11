@@ -35,14 +35,14 @@ LINKER_SECTION_EXTERN(struct inject_site, inject_sites);
 
 static inline void inject_arm(struct inject_site *s, uint32_t seed,
                               uint32_t nth) {
-    atomic_store_relaxed(&s->seed, seed);
-    atomic_store_relaxed(&s->nth, nth);
-    atomic_store_relaxed(&s->counter, 0);
-    atomic_store_relaxed(&s->armed, true);
+    atomic_store_rlx(&s->seed, seed);
+    atomic_store_rlx(&s->nth, nth);
+    atomic_store_rlx(&s->counter, 0);
+    atomic_store_rlx(&s->armed, true);
 }
 
 static inline void inject_disarm(struct inject_site *s) {
-    atomic_store_relaxed(&s->armed, false);
+    atomic_store_rlx(&s->armed, false);
 }
 
 #ifdef INJECT_ENABLED
@@ -51,12 +51,12 @@ cc_warn_unused_result bool inject_fail_impl(struct inject_site *s);
 
 #define INJECT_DELAY(id)                                                       \
     do {                                                                       \
-        if (cc_unlikely(atomic_load_relaxed(&INJECT_SITE(id)->armed)))         \
+        if (cc_unlikely(atomic_load_rlx(&INJECT_SITE(id)->armed)))             \
             inject_delay_impl(INJECT_SITE(id));                                \
     } while (0)
 
 #define INJECT_FAIL(id)                                                        \
-    (cc_unlikely(atomic_load_relaxed(&INJECT_SITE(id)->armed)) &&              \
+    (cc_unlikely(atomic_load_rlx(&INJECT_SITE(id)->armed)) &&                  \
      inject_fail_impl(INJECT_SITE(id)))
 #else
 #define INJECT_DELAY(id) ((void) 0)

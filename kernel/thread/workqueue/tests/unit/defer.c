@@ -24,7 +24,7 @@ static void defer_func(void *boo, void *unused) {
 }
 
 TEST_DEFINE_UNIT(defer, delayed_work_schedule) {
-    atomic_store_relaxed(&defer_worked, false);
+    atomic_store_rlx(&defer_worked, false);
     delayed_work_init(&test_dwork, defer_func, WORK_ARGS(NULL, NULL));
     enqueue_ms = time_get_ms();
     delayed_work_schedule(&test_dwork, 5);

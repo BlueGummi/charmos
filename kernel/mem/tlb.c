@@ -50,7 +50,7 @@ static void payload_invalidate(struct tlb_payload *pl) {
 static void ring_invalidate(struct tlb_ring *ring) {
     uint64_t fr = atomic_load_acq(&ring->flush_req);
 
-    if (fr != atomic_load_relaxed(&ring->flush_done)) {
+    if (fr != atomic_load_rlx(&ring->flush_done)) {
         tlb_queue_drain(&ring->queue);
         tlb_flush();
         atomic_store_release(&ring->flush_done, fr);

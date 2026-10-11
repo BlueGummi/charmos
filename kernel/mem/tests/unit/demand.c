@@ -18,7 +18,7 @@ static void dp_hammer(void *arg) {
     /* touch every page of every buffer */
     for (size_t b = 0; b < w->nbuf; b++)
         for (size_t p = 0; p < w->pages; p++)
-            atomic_inc_relaxed(&w->bufs[b][p * DP_STRIDE]);
+            atomic_inc_rlx(&w->bufs[b][p * DP_STRIDE]);
 
     atomic_inc(w->done);
 }

@@ -654,7 +654,7 @@ extern struct page_fault_handler slab_page_fault_handler;
  * where r is the value that we are scaling with
  */
 static inline void slab_gc_update_ewma(struct slab_cache *cache) {
-    size_t free_slabs = atomic_load_relaxed(&cache->slabs_count[SLAB_FREE]);
+    size_t free_slabs = atomic_load_rlx(&cache->slabs_count[SLAB_FREE]);
 
     if (cache->ewma_free_slabs == 0) {
         cache->ewma_free_slabs = free_slabs;

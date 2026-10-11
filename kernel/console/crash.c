@@ -55,7 +55,7 @@ extern void crash_capture_regs(struct crash_regs *out);
 static struct crash_facility *crash_facility_for(enum crash_code code);
 
 bool crash_cpu_is_owner(uint64_t id) {
-    return atomic_load_relaxed(&crash_owner) == (int64_t) id;
+    return atomic_load_rlx(&crash_owner) == (int64_t) id;
 }
 
 void crash_nmi_handoff(void *p, struct irq_registers *irqc) {
@@ -819,7 +819,7 @@ cc_noreturn void crash_full(const struct crash_context *ctx) TSA_NO_ANALYSIS {
 
     irql_raise(IRQL_HIGH_LEVEL);
 
-    uint32_t depth = atomic_fetch_add_relaxed(&crash_depth, 1);
+    uint32_t depth = atomic_fetch_add_rlx(&crash_depth, 1);
 
     if (depth >= CRASH_MAX_DEPTH) {
         printf_unlocked("\n[crash depth %u, aborting report]\n", depth);

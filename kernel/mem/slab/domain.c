@@ -77,11 +77,11 @@ static size_t slab_bucket_reset(struct stat_bucket *bucket) {
 
     /* Subtract this bucket's values from the parent */
     for (size_t i = 0; i < stats_len; i++) {
-        size_t val = atomic_load_relaxed(&bucket_stats[i]);
+        size_t val = atomic_load_rlx(&bucket_stats[i]);
         atomic_size_t *parent = &parent_stats[i];
 
         /* This would underflow anyways... */
-        if (atomic_load_relaxed(parent) < val) {
+        if (atomic_load_rlx(parent) < val) {
             atomic_store(parent, 0);
         } else {
             atomic_fetch_sub(parent, val);

@@ -82,7 +82,7 @@ TEST_DEFINE_UNIT(workqueue, mt_enqueue_scaling,
 
     TEST_ASSERT_EQ(atomic_load(&threads_left), 0);
 
-    uint64_t workers = atomic_load_relaxed(&wq->num_workers);
+    uint64_t workers = atomic_load_rlx(&wq->num_workers);
 
     char *msg = valloc(100, ALLOC_ZERO);
     if (msg) {

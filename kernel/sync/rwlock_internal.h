@@ -45,7 +45,7 @@ static inline bool rwlock_try_lock_read(struct rwlock *lock) {
         uintptr_t new_state = old_state + RWLOCK_READER_COUNT_ONE;
 
         if (atomic_cas_weak(&lock->lock_word, &old_state, new_state, mo_acquire,
-                            mo_relaxed))
+                            mo_rlx))
             return true;
     }
 }
@@ -64,7 +64,7 @@ static inline bool rwlock_try_lock_write(struct rwlock *lock,
          * WANT/WAITER bits that were present with the writer word. */
 
         if (atomic_cas_weak(&lock->lock_word, &old, desired, mo_acquire,
-                            mo_relaxed))
+                            mo_rlx))
             return true;
 
         /* CAS failed: reload old and loop - but if the new old indicates busy,

@@ -46,7 +46,7 @@ mpmc_slist_load(const struct mpmc_slist *q) {
 }
 
 static inline void mpmc_slist_init(struct mpmc_slist *q) {
-    atomic_store_relaxed(&q->head, 0);
+    atomic_store_rlx(&q->head, 0);
 }
 
 static inline bool mpmc_slist_empty(const struct mpmc_slist *q) {

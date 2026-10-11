@@ -82,13 +82,13 @@ void ahci_send_command(struct ahci_disk *disk, struct ahci_full_port *port,
 
 static uint32_t try_find_slot(struct ahci_full_port *p) {
     while (true) {
-        uint32_t old = atomic_load_relaxed(&p->slot_bitmap);
+        uint32_t old = atomic_load_rlx(&p->slot_bitmap);
         for (int slot = 0; slot < AHCI_MAX_SLOTS; slot++) {
             uint32_t mask = BIT(slot);
             if (!(old & mask)) {
                 uint32_t new_bitmap = old | mask;
                 if (atomic_cas_weak(&p->slot_bitmap, &old, new_bitmap,
-                                    mo_acquire, mo_relaxed)) {
+                                    mo_acquire, mo_rlx)) {
                     return slot;
                 }
                 break;

@@ -32,7 +32,7 @@ void lock_debug_spin_classify(atomic(enum lock_op_flags) * usage,
         return;
 
     uint8_t expected = LOCK_OP_IRQ_NONE;
-    if (atomic_cas_strong(usage, &expected, requested, mo_relaxed, mo_relaxed))
+    if (atomic_cas_strong(usage, &expected, requested, mo_rlx, mo_rlx))
         return;
 
     if ((expected & LOCK_OP_IRQ_MASK) != (requested & LOCK_OP_IRQ_MASK)) {
