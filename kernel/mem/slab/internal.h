@@ -41,7 +41,7 @@ LOG_HANDLE_EXTERN(slab);
  *
  */
 
-#define KMALLOC_PAGE_MAGIC 0xC0FFEE42
+#define VALLOC_PAGE_MAGIC 0xC0FFEE42
 #define SLAB_ALLOC_BEHAVIOR_FROM_ALLOC ALLOC_BEHAVIOR_AVAIL_BIT(0)
 #define SLAB_ELCM_DEFAULT_MAX_WASTAGE_PCT 5
 
@@ -126,7 +126,7 @@ LOG_HANDLE_EXTERN(slab);
 
 #define SLAB_CHUNK_SIZE PAGE_2MB
 
-#define valloc_validate_params(size, params)                                  \
+#define valloc_validate_params(size, params)                                   \
     do {                                                                       \
         kassert(alloc_flags_valid((params).flags));                            \
         kassert(alloc_flag_behavior_verify((params)));                         \

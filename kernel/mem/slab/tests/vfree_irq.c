@@ -3,7 +3,7 @@
 #include <irq/ipi.h>
 #include <irq/irq.h>
 
-#define KFREE_IRQ_TEST_SPIN_MASK 0x3f
+#define VFREE_IRQ_TEST_SPIN_MASK 0x3f
 static void **vfree_irq_allocs = NULL;
 static size_t vfree_irq_total_allocs = 0;
 static atomic_size_t vfree_irq_test_consumed = 0;
@@ -25,7 +25,7 @@ static enum irq_result vfree_irq_test_irq(void *ctx, uint8_t vector,
         size_t idx = atomic_inc(&vfree_irq_test_consumed);
         if (idx < total) {
             vfree_defer_irq(vfree_irq_allocs[idx]);
-            int spins = prng_next() & KFREE_IRQ_TEST_SPIN_MASK;
+            int spins = prng_next() & VFREE_IRQ_TEST_SPIN_MASK;
 
             while (spins) {
                 cpu_pause();
@@ -58,7 +58,7 @@ TEST_DEFINE_INTEGRATION(slab, vfree_defer_irq, TEST_INTENSITY(256, 2048, 16384),
 
     while (atomic_load(&vfree_irq_test_consumed) < total) {
         ipi_send(3, irq);
-        int spins = prng_next() & KFREE_IRQ_TEST_SPIN_MASK;
+        int spins = prng_next() & VFREE_IRQ_TEST_SPIN_MASK;
 
         while (spins) {
             cpu_pause();

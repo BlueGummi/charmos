@@ -790,8 +790,7 @@ size_t vsize(void *ptr) {
 
     if (!in_slab) {
         struct slab_page_hdr *hdr = slab_page_hdr_for_addr(ptr);
-        kassert(hdr->magic == KMALLOC_PAGE_MAGIC, "header is 0x%lx",
-                hdr->magic);
+        kassert(hdr->magic == VALLOC_PAGE_MAGIC, "header is 0x%lx", hdr->magic);
         return hdr->pages * PAGE_SIZE - sizeof(struct slab_page_hdr);
     }
 
@@ -803,7 +802,7 @@ size_t slab_allocation_size(vaddr_t addr) {
 }
 
 void *valloc_pages_raw(struct slab_domain *parent, stack_handle_t handle,
-                        size_t size, struct alloc_params params) {
+                       size_t size, struct alloc_params params) {
     enum alloc_flags flags = params.flags;
     uint64_t total_size = size + sizeof(struct slab_page_hdr);
     uint64_t pages = PAGES_NEEDED_FOR(total_size);
@@ -821,7 +820,7 @@ void *valloc_pages_raw(struct slab_domain *parent, stack_handle_t handle,
         return NULL;
 
     struct slab_page_hdr *hdr = (struct slab_page_hdr *) vptr;
-    hdr->magic = KMALLOC_PAGE_MAGIC;
+    hdr->magic = VALLOC_PAGE_MAGIC;
     hdr->pages = pages;
     hdr->domain = parent;
     hdr->pageable = (flags & ALLOC_FLAG_PAGEABLE);
@@ -878,7 +877,7 @@ void slab_free_addr_to_cache(void *addr, enum alloc_behavior bh) {
     valloc_ptr_in_slab_validate(addr);
 
     struct slab_page_hdr *hdr_candidate = slab_page_hdr_for_addr(addr);
-    if (hdr_candidate->magic == KMALLOC_PAGE_MAGIC)
+    if (hdr_candidate->magic == VALLOC_PAGE_MAGIC)
         return slab_free_page_hdr(hdr_candidate, bh);
 
     struct slab *slab = slab_for_ptr(addr);
@@ -893,8 +892,8 @@ void vfree_old(void *ptr) {
 }
 
 static void *valloc_pages_internal(struct slab_domain *domain,
-                                    stack_handle_t handle, size_t size,
-                                    struct alloc_params params) {
+                                   stack_handle_t handle, size_t size,
+                                   struct alloc_params params) {
     void *ret = valloc_pages_raw(domain, handle, size, params);
 
     if (alloc_behavior_may_fault(params.behavior) &&
@@ -923,9 +922,9 @@ size_t slab_allocation_index(struct slab *slab, void *ptr) {
 }
 
 void *valloc_try_from_magazine(struct slab_domain *domain,
-                                struct slab_percpu_cache *pcpu,
-                                stack_handle_t handle, size_t size,
-                                enum alloc_flags flags) {
+                               struct slab_percpu_cache *pcpu,
+                               stack_handle_t handle, size_t size,
+                               enum alloc_flags flags) {
 #ifndef DEBUG_SLAB_DEEP
     cc_unused(handle);
 #endif
