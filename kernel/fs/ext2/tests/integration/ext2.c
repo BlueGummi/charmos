@@ -12,7 +12,7 @@ static void check_bcache(void) {
 
     bcache_stat(d, &bcache_total_dirty, &bcache_total_present);
 
-    char *msg = kmalloc(100);
+    char *msg = valloc(100);
     snprintf(msg, 100, "Block cache has %d dirty entries and %d total entries",
              bcache_total_dirty, bcache_total_present);
 
@@ -38,7 +38,7 @@ TEST_DEFINE_INTEGRATION(ext2, file_lifecycle, TEST_INTENSITY(1, 4, 64),
     size_t ops = ctx->intensity_val ? ctx->intensity_val : 4;
     const char *lstr = large_test_string;
     uint64_t len = strlen(lstr);
-    char *out_buf = kmalloc(len + 1, ALLOC_ZERO);
+    char *out_buf = valloc(len + 1, ALLOC_ZERO);
     TEST_ASSERT_NONNULL(out_buf);
 
     for (size_t iter = 0; iter < ops; iter++) {
@@ -74,7 +74,7 @@ TEST_DEFINE_INTEGRATION(ext2, file_lifecycle, TEST_INTENSITY(1, 4, 64),
         TEST_ASSERT_EQ_S(e, ERR_NO_ENT);
     }
 
-    kfree(out_buf);
+    vfree(out_buf);
     flush();
 
     return TEST_SUCCESS;

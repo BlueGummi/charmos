@@ -74,8 +74,8 @@ void gdt_init(struct gdt_entry *gdt, struct tss *tss) {
     tss->io_map_base = sizeof(struct tss);
 
     gdt_lgdt(gdt, GDT_ENTRIES);
-    tss->ist1 = (uint64_t) must(kmalloc_aligned(8 * PAGE_SIZE, PAGE_SIZE));
-    tss->rsp0 = (uint64_t) must(kmalloc_aligned(8 * PAGE_SIZE, PAGE_SIZE));
+    tss->ist1 = (uint64_t) must(valloc_aligned(8 * PAGE_SIZE, PAGE_SIZE));
+    tss->rsp0 = (uint64_t) must(valloc_aligned(8 * PAGE_SIZE, PAGE_SIZE));
 
     /* stacks grow down */
     tss->ist1 += 8 * PAGE_SIZE;
@@ -88,8 +88,8 @@ void gdt_init(struct gdt_entry *gdt, struct tss *tss) {
 
 void gdt_load(void) {
     struct gdt_entry *gdt =
-        kmalloc_aligned(sizeof(struct gdt_entry) * GDT_ENTRIES, 64, ALLOC_ZERO);
-    struct tss *tss = kmalloc_aligned(sizeof(struct tss), 64, ALLOC_ZERO);
+        valloc_aligned(sizeof(struct gdt_entry) * GDT_ENTRIES, 64, ALLOC_ZERO);
+    struct tss *tss = valloc_aligned(sizeof(struct tss), 64, ALLOC_ZERO);
     if (!gdt || !tss)
         panic("GDT INIT NOT OK!!!");
 

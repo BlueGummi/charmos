@@ -536,7 +536,7 @@ void nightmare_run(void) {
     size_t worker_count =
         nightmare_runtime.ctx.worker_count + nightmare_runtime.perturber_count;
     struct test_conc_worker *workers =
-        kmalloc(worker_count * sizeof(*workers), ALLOC_ZERO);
+        valloc(worker_count * sizeof(*workers), ALLOC_ZERO);
 
     nightmare_runtime.conc.workers = workers;
     nightmare_runtime.conc.worker_count = worker_count;
@@ -573,10 +573,10 @@ void nightmare_run(void) {
 
     nightmare_release_threads();
 
-    kfree(nightmare_runtime.conc.workers);
+    vfree(nightmare_runtime.conc.workers);
     nightmare_runtime.conc.workers = NULL;
     if (nightmare_runtime.ctx.private) {
-        kfree(nightmare_runtime.ctx.private);
+        vfree(nightmare_runtime.ctx.private);
         nightmare_runtime.ctx.private = NULL;
     }
 

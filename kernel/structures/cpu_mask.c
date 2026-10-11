@@ -2,11 +2,11 @@
 #include <structures/cpu_mask.h>
 
 struct cpu_mask *cpu_mask_create(void) {
-    return kmalloc(sizeof(struct cpu_mask), ALLOC_ZERO);
+    return valloc(sizeof(struct cpu_mask), ALLOC_ZERO);
 }
 
 void cpu_mask_free(struct cpu_mask *m) {
     if (m) {
-        kfree(m);
+        vfree(m);
     }
 }

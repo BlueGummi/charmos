@@ -32,9 +32,9 @@ struct cmdline_value cmdline_parse_list(const char *value, uint64_t accepted) {
     if (!parse_is_list(value, &plist))
         panic("cmdline: invalid list format in '%s'", value);
 
-    struct cmdline_list *list = must_kmalloc(sizeof(*list));
+    struct cmdline_list *list = must_valloc(sizeof(*list));
     list->count = plist.count;
-    list->items = must_kmalloc(plist.count * sizeof(*list->items));
+    list->items = must_valloc(plist.count * sizeof(*list->items));
 
     for (size_t i = 0; i < plist.count; i++) {
         list->items[i] = cmdline_parse_value_for(plist.items[i], item_mask);
@@ -42,10 +42,10 @@ struct cmdline_value cmdline_parse_list(const char *value, uint64_t accepted) {
             for (size_t k = 0; k < i; k++) {
                 if (cmdline_type_is_heap_allocated(list->items[k].type) &&
                     list->items[k].data)
-                    kfree(list->items[k].data);
+                    vfree(list->items[k].data);
             }
-            kfree(list->items);
-            kfree(list);
+            vfree(list->items);
+            vfree(list);
             parse_list_free(&plist);
             return (struct cmdline_value){.mode = CMDLINE_MODE_POLYMORPHIC,
                                           .type = CMDLINE_TYPE_ERR};
@@ -66,15 +66,15 @@ static void *allocate_parsed_value_data(const struct cmdline_type_parser *p,
         if (p->parse(&str_copy, value) == ERR_OK)
             return str_copy;
     } else if (p->type == CMDLINE_TYPE_CPU_MASK) {
-        struct cpu_mask *mask = must_kmalloc(sizeof(*mask));
+        struct cpu_mask *mask = must_valloc(sizeof(*mask));
         if (p->parse(mask, value) == ERR_OK)
             return mask;
-        kfree(mask);
+        vfree(mask);
     } else if (p->type == CMDLINE_TYPE_RANGE) {
-        struct cmdline_range *range = must_kmalloc(sizeof(*range));
+        struct cmdline_range *range = must_valloc(sizeof(*range));
         if (p->parse(range, value) == ERR_OK)
             return range;
-        kfree(range);
+        vfree(range);
     }
 
     *out_type = CMDLINE_TYPE_ERR;

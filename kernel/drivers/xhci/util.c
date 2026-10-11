@@ -81,19 +81,19 @@ void xhci_cleanup(struct xhci_device *dev, struct xhci_request *req) {
     urb->status              = xhci_rq_to_usb_status(req);
     urb->complete(urb);
 
-    kfree(req->command);
-    kfree(req);
+    vfree(req->command);
+    vfree(req);
 
     usb_device_put(udev);
 }
 
 struct xhci_ring *xhci_allocate_ring() {
-    struct xhci_trb *trbs = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO);
+    struct xhci_trb *trbs = valloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO);
     if (!trbs)
         return NULL;
 
     paddr_t           phys = vmm_get_phys((vaddr_t) trbs);
-    struct xhci_ring *ring = kmalloc(sizeof(struct xhci_ring), ALLOC_ZERO);
+    struct xhci_ring *ring = valloc(sizeof(struct xhci_ring), ALLOC_ZERO);
     if (!ring)
         return NULL;
 
@@ -115,9 +115,9 @@ struct xhci_ring *xhci_allocate_ring() {
 }
 
 struct xhci_ring *xhci_allocate_event_ring(void) {
-    struct xhci_ring *er = kmalloc(sizeof(*er), ALLOC_ZERO);
+    struct xhci_ring *er = valloc(sizeof(*er), ALLOC_ZERO);
 
-    er->trbs = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO);
+    er->trbs = valloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO);
     er->phys = vmm_get_phys((vaddr_t) er->trbs);
 
     er->size          = TRB_RING_SIZE;
@@ -130,8 +130,8 @@ void xhci_free_ring(struct xhci_ring *ring) {
     if (!ring)
         return;
 
-    kfree_aligned(ring->trbs);
-    kfree(ring);
+    vfree_aligned(ring->trbs);
+    vfree(ring);
 }
 
 void xhci_teardown_slot(struct xhci_slot *me) {

@@ -75,7 +75,7 @@ struct workqueue *workqueue_create_full(struct workqueue_attributes *attrs,
     size_t size = permanent ? sizeof(struct workqueue)
                             : PAGE_ALIGN_UP(sizeof(struct workqueue));
 
-    struct workqueue *wq = kmalloc(size, ALLOC_ZERO);
+    struct workqueue *wq = valloc(size, ALLOC_ZERO);
     if (!wq)
         goto err;
 
@@ -99,7 +99,7 @@ struct workqueue *workqueue_create_full(struct workqueue_attributes *attrs,
 
     if (attrs->flags & WORKQUEUE_FLAG_STATIC_WORKERS) {
         wq->worker_array =
-            kmalloc(sizeof(struct worker) * attrs->max_workers, ALLOC_ZERO);
+            valloc(sizeof(struct worker) * attrs->max_workers, ALLOC_ZERO);
         if (!wq->worker_array)
             goto err;
     }
@@ -112,7 +112,7 @@ struct workqueue *workqueue_create_full(struct workqueue_attributes *attrs,
         size_t needed = vsnprintf(NULL, 0, fmt, args_copy) + 1;
         va_end(args_copy);
 
-        wq->name = kmalloc(needed, ALLOC_ZERO);
+        wq->name = valloc(needed, ALLOC_ZERO);
         if (!wq->name)
             goto err;
 
@@ -131,12 +131,12 @@ struct workqueue *workqueue_create_full(struct workqueue_attributes *attrs,
 
 err:
     if (wq) {
-        kfree(wq->worker_array);
-        kfree(wq->request);
-        kfree(wq->name);
+        vfree(wq->worker_array);
+        vfree(wq->request);
+        vfree(wq->name);
     }
 
-    kfree(wq);
+    vfree(wq);
 
     return NULL;
 }
@@ -197,8 +197,8 @@ static void mark_worker_exit(struct thread *t) {
 void workqueue_free(struct workqueue *wq) {
     kassert(atomic_load(&wq->refcount) == 0);
     WORKQUEUE_STATE_SET(wq, WORKQUEUE_STATE_DEAD);
-    kfree(wq->request);
-    kfree(wq);
+    vfree(wq->request);
+    vfree(wq);
 }
 
 /* Give all threads the exit signal and clean up the structs */
@@ -236,7 +236,7 @@ struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue) {
     if (!thread)
         return NULL;
 
-    struct worker *worker = kmalloc(sizeof(struct worker), ALLOC_ZERO);
+    struct worker *worker = valloc(sizeof(struct worker), ALLOC_ZERO);
     if (!worker)
         return NULL;
 
@@ -259,7 +259,7 @@ struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue) {
 void workqueues_permanent_init(void) {
     int64_t num_workqueues = global.core_count;
     global.workqueues =
-        must_kmalloc(sizeof(struct workqueue *) * num_workqueues, ALLOC_ZERO);
+        must_valloc(sizeof(struct workqueue *) * num_workqueues, ALLOC_ZERO);
 
     for (int64_t i = 0; i < num_workqueues; i++) {
 
@@ -300,7 +300,7 @@ struct work *work_init(struct work *work, work_function fn,
 }
 
 struct work *work_create(work_function fn, struct work_args args) {
-    struct work *work = kmalloc(sizeof(struct work), ALLOC_ZERO);
+    struct work *work = valloc(sizeof(struct work), ALLOC_ZERO);
     if (!work)
         return NULL;
 

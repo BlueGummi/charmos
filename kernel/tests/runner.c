@@ -447,7 +447,7 @@ static void tests_setup_groups() {
         for (int i = 0; i < TEST_TIER_MAX; i++) {
             if (num_tests[i]) {
                 tg->tests[i] =
-                    must_kmalloc(sizeof(struct test *) * num_tests[i]);
+                    must_valloc(sizeof(struct test *) * num_tests[i]);
             }
             tg->num_tests[i] = num_tests[i];
         }
@@ -654,7 +654,7 @@ static void test_group_run(struct test_group *tg) {
 
             /* TODO: allocation failure */
             struct test_verdict *verdicts =
-                kmalloc(sizeof(struct test_verdict) * t->run_times, ALLOC_ZERO);
+                valloc(sizeof(struct test_verdict) * t->run_times, ALLOC_ZERO);
             struct test_verdict singular_verdict = {0};
 
             char intst_str[512] = {0};
@@ -833,7 +833,7 @@ static void test_group_run(struct test_group *tg) {
             for (int j = 0; j < TEST_RESULT_MAX; j++)
                 result_totals.totals[i][j] += result_times[j];
 
-            kfree(verdicts);
+            vfree(verdicts);
             if (result_times[TEST_RESULT_FAILED] && tg->incremental) {
                 stop_outer = true;
             } else if (result_times[TEST_RESULT_FAILED] && tg->exit_on_fail) {
@@ -842,7 +842,7 @@ static void test_group_run(struct test_group *tg) {
             }
         }
 
-        kfree((void *) LOG_SITE(test_harness)->name);
+        vfree((void *) LOG_SITE(test_harness)->name);
     }
 
     LOG_SITE(test_harness)->name = "test_harness";

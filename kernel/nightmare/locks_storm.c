@@ -702,7 +702,7 @@ static struct nightmare_verdict locks_storm_prepare(struct nightmare_ctx *ctx) {
 
     size_t bytes = sizeof(struct locks_storm_state) +
                    ctx->worker_count * sizeof(struct locks_storm_worker_state);
-    struct locks_storm_state *state = kmalloc(bytes, ALLOC_ZERO);
+    struct locks_storm_state *state = valloc(bytes, ALLOC_ZERO);
     if (!state)
         return NIGHTMARE_FAIL("state_alloc", "could not allocate lock state");
 

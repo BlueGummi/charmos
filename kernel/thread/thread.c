@@ -266,7 +266,7 @@ struct thread *thread_create_full(char *name, thread_entry_fn_t entry,
                                   struct thread_create_params *params,
                                   va_list args) {
     kassert(name);
-    struct thread *new_thread = kmalloc(sizeof(struct thread), ALLOC_ZERO);
+    struct thread *new_thread = valloc(sizeof(struct thread), ALLOC_ZERO);
     if (cc_unlikely(!new_thread))
         goto err;
 
@@ -276,7 +276,7 @@ struct thread *thread_create_full(char *name, thread_entry_fn_t entry,
 
     params->stack_internal = stack;
     new_thread->activity_data =
-        kmalloc(sizeof(struct thread_activity_data), ALLOC_ZERO);
+        valloc(sizeof(struct thread_activity_data), ALLOC_ZERO);
     if (cc_unlikely(!new_thread->activity_data))
         goto err;
 
@@ -285,7 +285,7 @@ struct thread *thread_create_full(char *name, thread_entry_fn_t entry,
         goto err;
 
     new_thread->activity_stats =
-        kmalloc(sizeof(struct thread_activity_stats), ALLOC_ZERO);
+        valloc(sizeof(struct thread_activity_stats), ALLOC_ZERO);
     if (cc_unlikely(!new_thread->activity_stats))
         goto err;
 
@@ -298,7 +298,7 @@ struct thread *thread_create_full(char *name, thread_entry_fn_t entry,
     size_t needed = vsnprintf(NULL, 0, name, args_copy) + 1;
     va_end(args_copy);
 
-    new_thread->name = kmalloc(needed, ALLOC_ZERO);
+    new_thread->name = valloc(needed, ALLOC_ZERO);
     if (!new_thread->name)
         goto err;
 
@@ -325,13 +325,13 @@ err:
     if (!new_thread)
         return NULL;
 
-    kfree(new_thread->turnstile);
-    kfree(new_thread->name);
-    kfree(new_thread->activity_data);
-    kfree(new_thread->activity_stats);
+    vfree(new_thread->turnstile);
+    vfree(new_thread->name);
+    vfree(new_thread->activity_data);
+    vfree(new_thread->activity_stats);
     thread_free_stack(new_thread);
     tid_free(global_tid_space, new_thread->id);
-    kfree(new_thread);
+    vfree(new_thread);
 
     return NULL;
 }
@@ -378,14 +378,14 @@ struct thread *thread_spawn_internal(thread_entry_fn_t entry,
 
 void thread_free(struct thread *t) {
     tid_free(global_tid_space, t->id);
-    kfree(t->activity_data);
-    kfree(t->activity_stats);
-    kfree(t->name);
-    kfree(t->turnstile);
+    vfree(t->activity_data);
+    vfree(t->activity_stats);
+    vfree(t->name);
+    vfree(t->turnstile);
     apc_rundown_thread(t);
     thread_free_stack(t);
     log_site_put(t->log_site);
-    kfree(t);
+    vfree(t);
 }
 
 static void thread_reap_rcu(struct rcu_cb *cb) {

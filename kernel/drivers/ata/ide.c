@@ -40,7 +40,7 @@ static void swap_str(char *dst, const uint16_t *src, uint64_t word_len) {
 }
 
 void ide_identify(struct ata_drive *drive) {
-    uint16_t *buf = must_kmalloc(256 * sizeof(uint16_t));
+    uint16_t *buf = must_valloc(256 * sizeof(uint16_t));
 
     uint16_t io = drive->io_base;
 
@@ -105,7 +105,7 @@ void ide_identify(struct ata_drive *drive) {
 
     drive->pio_mode = buf[64] & 0x03;
 out:
-    kfree(buf);
+    vfree(buf);
 }
 
 static struct bio_scheduler_ops ide_bio_ops = {
@@ -150,7 +150,7 @@ struct block_device *ide_create_generic(struct ata_drive *ide) {
     irq_set_chip(irq, lapic_get_chip(), NULL);
     ide->channel.current_drive = ide;
 
-    struct block_device *d = must_kmalloc(sizeof(struct block_device));
+    struct block_device *d = must_valloc(sizeof(struct block_device));
 
     d->driver_data      = ide;
     d->sector_size      = ide->sector_size;
@@ -160,7 +160,7 @@ struct block_device *ide_create_generic(struct ata_drive *ide) {
 
     d->flags = BDEV_FLAG_NO_COALESCE | BDEV_FLAG_NO_REORDER;
 
-    d->cache = kmalloc(sizeof(struct bcache), ALLOC_ZERO);
+    d->cache = valloc(sizeof(struct bcache), ALLOC_ZERO);
     if (!d->cache)
         panic("Could not allocate space for IDE drive block cache");
 

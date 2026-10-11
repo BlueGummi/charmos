@@ -169,7 +169,7 @@ void ahci_identify(struct ahci_disk *disk) {
     struct ahci_full_port *port = &disk->device->regs[disk->port];
     uint32_t               slot = ahci_find_slot(port);
 
-    uint8_t *buffer = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    uint8_t *buffer = valloc_aligned(PAGE_SIZE, PAGE_SIZE);
     if (!buffer)
         return;
 
@@ -196,7 +196,7 @@ void ahci_identify(struct ahci_disk *disk) {
 
     ahci_log(LOG_INFO, "Sector size is %u bytes", disk->sector_size);
 
-    kfree_aligned(buffer);
+    vfree_aligned(buffer);
 }
 
 static void ahci_on_bio_complete(struct ahci_request *req) {
@@ -208,14 +208,14 @@ static void ahci_on_bio_complete(struct ahci_request *req) {
     if (bio->on_complete)
         bio->on_complete(bio);
 
-    kfree(req);
+    vfree(req);
 }
 
 bool ahci_submit_bio_request(struct block_device *disk,
                              struct bio_request  *bio) {
     struct ahci_disk    *ahci_disk = (struct ahci_disk *) disk->driver_data;
     struct ahci_request *ahci_req =
-        kmalloc(sizeof(struct ahci_request), ALLOC_ZERO);
+        valloc(sizeof(struct ahci_request), ALLOC_ZERO);
     if (!ahci_req)
         return false;
 

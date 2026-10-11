@@ -25,12 +25,12 @@ static inline fx32_32_t hll_alpha_128_plus(size_t nr_registers) {
 
 struct hyperloglog *hyperloglog_create(uint8_t register_width) {
     size_t nr_registers = 1 << register_width;
-    uint8_t *reg_storage = kmalloc(sizeof(uint8_t) * nr_registers);
-    struct hyperloglog *hll_ret = kmalloc(sizeof(struct hyperloglog));
+    uint8_t *reg_storage = valloc(sizeof(uint8_t) * nr_registers);
+    struct hyperloglog *hll_ret = valloc(sizeof(struct hyperloglog));
 
     if (!reg_storage || !hll_ret) {
-        kfree(reg_storage);
-        kfree(hll_ret);
+        vfree(reg_storage);
+        vfree(hll_ret);
         return NULL;
     }
 
@@ -52,8 +52,8 @@ struct hyperloglog *hyperloglog_create(uint8_t register_width) {
 }
 
 void hyperloglog_destroy(struct hyperloglog *hll) {
-    kfree(hll->registers);
-    kfree(hll);
+    vfree(hll->registers);
+    vfree(hll);
 }
 
 void hyperloglog_add(struct hyperloglog *hll, uint32_t hash) {

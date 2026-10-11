@@ -84,11 +84,11 @@ TEST_DEFINE_UNIT(workqueue, mt_enqueue_scaling,
 
     uint64_t workers = atomic_load_relaxed(&wq->num_workers);
 
-    char *msg = kmalloc(100, ALLOC_ZERO);
+    char *msg = valloc(100, ALLOC_ZERO);
     if (msg) {
         snprintf(msg, 100, "There are %lu workers", workers);
         test_info(msg);
-        kfree(msg);
+        vfree(msg);
     }
 
     test_info("destroy");

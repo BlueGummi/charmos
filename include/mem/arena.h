@@ -69,7 +69,7 @@ enum arena_flags : uint64_t {
  * marks the point where anything at or greater than this
  * is a strategy registered by other code, not by default */
 enum arena_strategy {
-    /* simple, carve out from kmalloc */
+    /* simple, carve out from valloc */
     ARENA_STRATEGY_SIMPLE = 1,
 
     /* Bump allocator */

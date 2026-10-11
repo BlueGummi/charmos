@@ -25,7 +25,7 @@ TEST_DEFINE_UNIT(rbit, order_and_search, TEST_INTENSITY(32, 256, 4096)) {
     rbit_init(&tree);
 
     size_t count_n = ctx->intensity_val ? ctx->intensity_val : RBIT_N;
-    struct rbit_node *nodes = kmalloc(sizeof(*nodes) * count_n, ALLOC_ZERO);
+    struct rbit_node *nodes = valloc(sizeof(*nodes) * count_n, ALLOC_ZERO);
     TEST_ASSERT_NONNULL(nodes);
 
     size_t low = 1;
@@ -62,7 +62,7 @@ TEST_DEFINE_UNIT(rbit, order_and_search, TEST_INTENSITY(32, 256, 4096)) {
         rbit_delete(&tree, &nodes[i]);
     TEST_ASSERT(rbit_empty(&tree));
 
-    kfree(nodes);
+    vfree(nodes);
     return TEST_SUCCESS;
 }
 
@@ -71,7 +71,7 @@ TEST_DEFINE_UNIT(rbit, overlap_search, TEST_INTENSITY(200, 4000, 20000)) {
     struct rbit tree;
     rbit_init(&tree);
 
-    struct rbit_node *nodes = kmalloc(sizeof(*nodes) * RBIT_N, ALLOC_ZERO);
+    struct rbit_node *nodes = valloc(sizeof(*nodes) * RBIT_N, ALLOC_ZERO);
     TEST_ASSERT_NONNULL(nodes);
 
     /* Random (possibly overlapping) intervals in a bounded space. */
@@ -101,7 +101,7 @@ TEST_DEFINE_UNIT(rbit, overlap_search, TEST_INTENSITY(200, 4000, 20000)) {
             TEST_ASSERT(overlaps(res->interval, iv));
     }
 
-    kfree(nodes);
+    vfree(nodes);
     return TEST_SUCCESS;
 }
 
@@ -135,9 +135,9 @@ TEST_DEFINE_UNIT(rbit, augment_hook, TEST_INTENSITY(200, 4000, 20000)) {
     rbit_init(&tree);
     tree.augment = count_augment;
 
-    struct count_node *nodes = kmalloc(sizeof(*nodes) * RBIT_N, ALLOC_ZERO);
+    struct count_node *nodes = valloc(sizeof(*nodes) * RBIT_N, ALLOC_ZERO);
     TEST_ASSERT_NONNULL(nodes);
-    bool *live = kmalloc(sizeof(bool) * RBIT_N, ALLOC_ZERO);
+    bool *live = valloc(sizeof(bool) * RBIT_N, ALLOC_ZERO);
     TEST_ASSERT_NONNULL(live);
 
     for (size_t i = 0; i < RBIT_N; i++) {
@@ -164,7 +164,7 @@ TEST_DEFINE_UNIT(rbit, augment_hook, TEST_INTENSITY(200, 4000, 20000)) {
         }
     }
 
-    kfree(nodes);
-    kfree(live);
+    vfree(nodes);
+    vfree(live);
     return TEST_SUCCESS;
 }

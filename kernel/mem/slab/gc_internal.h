@@ -1,7 +1,7 @@
 #include "internal.h"
 
 /* BG and MAX both have unlimited scans. This is because they
- * are never called from kmalloc/kfree, and we can dilly dally
+ * are never called from valloc/vfree, and we can dilly dally
  * a bit due to the absence of a need for speed. */
 #define SLAB_GC_AGG_BG_SCAN_MAX SIZE_MAX
 #define SLAB_GC_AGG_RECLAIM_SCAN_MAX 32

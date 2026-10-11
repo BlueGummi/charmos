@@ -38,7 +38,7 @@ static void bm_fill_n(bitmap_word_t *map, size_t nwords) {
 TEST_DEFINE_UNIT(bitmap, set_test_clear, TEST_INTENSITY(64, 256, 4096)) {
     size_t nbits = ctx->intensity_val ? ctx->intensity_val : BM_BITS;
     size_t nwords = BITMAP_WORDS(nbits);
-    bitmap_word_t *map = kmalloc(sizeof(bitmap_word_t) * nwords, ALLOC_ZERO);
+    bitmap_word_t *map = valloc(sizeof(bitmap_word_t) * nwords, ALLOC_ZERO);
     TEST_ASSERT_NONNULL(map);
 
     for (size_t bit = 0; bit < nbits; bit++) {
@@ -55,7 +55,7 @@ TEST_DEFINE_UNIT(bitmap, set_test_clear, TEST_INTENSITY(64, 256, 4096)) {
         TEST_ASSERT(!bitmap_test(map, bit));
     }
 
-    kfree(map);
+    vfree(map);
     return TEST_SUCCESS;
 }
 
@@ -63,7 +63,7 @@ TEST_DEFINE_UNIT(bitmap, bit_isolation, TEST_INTENSITY(64, 256, 1024)) {
     size_t nbits = ctx->intensity_val ? ctx->intensity_val : BM_BITS;
     size_t nwords = BITMAP_WORDS(nbits);
     bitmap_word_t *map =
-        kmalloc(sizeof(bitmap_word_t) * nwords, .flags = ALLOC_FLAGS_NONE);
+        valloc(sizeof(bitmap_word_t) * nwords, .flags = ALLOC_FLAGS_NONE);
     TEST_ASSERT_NONNULL(map);
 
     for (size_t bit = 0; bit < nbits; bit++) {
@@ -76,7 +76,7 @@ TEST_DEFINE_UNIT(bitmap, bit_isolation, TEST_INTENSITY(64, 256, 1024)) {
         TEST_ASSERT_EQ(bitmap_weight(map, nbits), 1);
     }
 
-    kfree(map);
+    vfree(map);
     return TEST_SUCCESS;
 }
 
@@ -117,7 +117,7 @@ TEST_DEFINE_UNIT(bitmap, weight_ignores_past_end) {
 TEST_DEFINE_UNIT(bitmap, weight_counts, TEST_INTENSITY(64, 256, 4096)) {
     size_t nbits = ctx->intensity_val ? ctx->intensity_val : BM_BITS;
     size_t nwords = BITMAP_WORDS(nbits);
-    bitmap_word_t *map = kmalloc(sizeof(bitmap_word_t) * nwords, ALLOC_ZERO);
+    bitmap_word_t *map = valloc(sizeof(bitmap_word_t) * nwords, ALLOC_ZERO);
     TEST_ASSERT_NONNULL(map);
 
     for (size_t n = 0; n < nbits; n++) {
@@ -126,7 +126,7 @@ TEST_DEFINE_UNIT(bitmap, weight_counts, TEST_INTENSITY(64, 256, 4096)) {
     }
     TEST_ASSERT_EQ(bitmap_weight(map, nbits), nbits);
 
-    kfree(map);
+    vfree(map);
     return TEST_SUCCESS;
 }
 
@@ -155,7 +155,7 @@ TEST_DEFINE_UNIT(bitmap, find_first_set, TEST_INTENSITY(64, 256, 2048)) {
     size_t nbits = ctx->intensity_val ? ctx->intensity_val : BM_BITS;
     size_t nwords = BITMAP_WORDS(nbits);
     bitmap_word_t *map =
-        kmalloc(sizeof(bitmap_word_t) * nwords, .flags = ALLOC_FLAGS_NONE);
+        valloc(sizeof(bitmap_word_t) * nwords, .flags = ALLOC_FLAGS_NONE);
     TEST_ASSERT_NONNULL(map);
 
     bm_reset_n(map, nwords);
@@ -175,7 +175,7 @@ TEST_DEFINE_UNIT(bitmap, find_first_set, TEST_INTENSITY(64, 256, 2048)) {
         TEST_ASSERT_EQ(bitmap_find_first_set(map, 101), 100);
     }
 
-    kfree(map);
+    vfree(map);
     return TEST_SUCCESS;
 }
 
@@ -183,7 +183,7 @@ TEST_DEFINE_UNIT(bitmap, find_first_zero, TEST_INTENSITY(64, 256, 2048)) {
     size_t nbits = ctx->intensity_val ? ctx->intensity_val : BM_BITS;
     size_t nwords = BITMAP_WORDS(nbits);
     bitmap_word_t *map =
-        kmalloc(sizeof(bitmap_word_t) * nwords, .flags = ALLOC_FLAGS_NONE);
+        valloc(sizeof(bitmap_word_t) * nwords, .flags = ALLOC_FLAGS_NONE);
     TEST_ASSERT_NONNULL(map);
 
     bm_reset_n(map, nwords);
@@ -205,7 +205,7 @@ TEST_DEFINE_UNIT(bitmap, find_first_zero, TEST_INTENSITY(64, 256, 2048)) {
         TEST_ASSERT_EQ(bitmap_find_first_zero(map, 128), 128);
     }
 
-    kfree(map);
+    vfree(map);
     return TEST_SUCCESS;
 }
 
@@ -242,7 +242,7 @@ TEST_DEFINE_UNIT(bitmap, find_next_bit) {
 TEST_DEFINE_UNIT(bitmap, find_next_bit_walk, TEST_INTENSITY(64, 256, 4096)) {
     size_t nbits = ctx->intensity_val ? ctx->intensity_val : BM_BITS;
     size_t nwords = BITMAP_WORDS(nbits);
-    bitmap_word_t *map = kmalloc(sizeof(bitmap_word_t) * nwords, ALLOC_ZERO);
+    bitmap_word_t *map = valloc(sizeof(bitmap_word_t) * nwords, ALLOC_ZERO);
     TEST_ASSERT_NONNULL(map);
 
     for (size_t bit = 0; bit < nbits; bit += 7)
@@ -258,7 +258,7 @@ TEST_DEFINE_UNIT(bitmap, find_next_bit_walk, TEST_INTENSITY(64, 256, 4096)) {
 
     TEST_ASSERT_EQ(seen, bitmap_weight(map, nbits));
 
-    kfree(map);
+    vfree(map);
     return TEST_SUCCESS;
 }
 

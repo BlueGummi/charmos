@@ -33,8 +33,8 @@ TEST_DEFINE_INTEGRATION(bio, async_submit, TEST_INTENSITY(1, 1, 16),
 
     for (uint64_t i = 0; i < run_times; i++) {
         struct bio_request *bio =
-            kmalloc(sizeof(struct bio_request), .flags = 0);
-        uint8_t *buf = kmalloc_aligned(64 * PAGE_SIZE, PAGE_SIZE);
+            valloc(sizeof(struct bio_request), .flags = 0);
+        uint8_t *buf = valloc_aligned(64 * PAGE_SIZE, PAGE_SIZE);
         *bio = (struct bio_request){
             .lba = 0,
             .buffer = buf,
@@ -80,8 +80,8 @@ TEST_DEFINE_INTEGRATION(bio, async_submit, TEST_INTENSITY(1, 1, 16),
 
         /* Now that the request is known to be finished, its buffers can go
          * back */
-        kfree_aligned(buf);
-        kfree(bio);
+        vfree_aligned(buf);
+        vfree(bio);
     }
 
     test_info("%llu request(s), worst completion %llu ms",

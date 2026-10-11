@@ -185,7 +185,7 @@ static_assert((sizeof(struct arena_ops) -
 
 /* There's a 3-level hierarchy here:
  *
- * Bins store lockless singly linked lists of same-ksize arenas, and can be
+ * Bins store lockless singly linked lists of same-vsize arenas, and can be
  * created on demand for rapid arena reuse
  *
  * Bins must point to dumpsters, which are caches of various sized bins,

@@ -24,11 +24,11 @@ TEST_DEFINE_INTEGRATION(bio_sched, coalesce, TEST_INTENSITY(1, 2, 16),
     size_t reqs = ctx->intensity_val ? ctx->intensity_val : 2;
 
     for (size_t i = 0; i < reqs; i++) {
-        struct bio_request *req = kmalloc(sizeof(*req));
+        struct bio_request *req = valloc(sizeof(*req));
         *req = (struct bio_request){
             .lba = i,
             .disk = d,
-            .buffer = kmalloc_aligned(512, 4096),
+            .buffer = valloc_aligned(512, 4096),
             .size = 512,
             .sector_count = 1,
             .write = false,
@@ -41,7 +41,7 @@ TEST_DEFINE_INTEGRATION(bio_sched, coalesce, TEST_INTENSITY(1, 2, 16),
         bio_sched_enqueue(d, req);
     }
 
-    char *name = kmalloc(100);
+    char *name = valloc(100);
     uint64_t t = time_get_us();
     snprintf(name, 100, "enqueues took %lu us", time_get_us() - t);
     test_info(name);

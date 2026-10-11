@@ -658,7 +658,7 @@ int32_t slab_size_to_index(size_t size) {
     return (int32_t) lo;
 }
 
-static inline bool kmalloc_size_fits_in_slab(size_t size) {
+static inline bool valloc_size_fits_in_slab(size_t size) {
     return slab_size_to_index(size) >= 0;
 }
 
@@ -774,7 +774,7 @@ struct slab *slab_for_ptr(void *ptr) {
     return (struct slab *) ALIGN_DOWN(vp, align);
 }
 
-bool kmalloc_ptr_in_slab_validate(void *ptr) {
+bool valloc_ptr_in_slab_validate(void *ptr) {
     vaddr_t vaddr = (vaddr_t) ptr;
     bool in_slab = IN_RANGE(vaddr, SLAB_HEAP_START, SLAB_HEAP_END);
     bool in_page_alloc = page_alloc_vaddr_in_vas(vaddr);
@@ -783,11 +783,11 @@ bool kmalloc_ptr_in_slab_validate(void *ptr) {
     return in_slab;
 }
 
-size_t ksize(void *ptr) {
+size_t vsize(void *ptr) {
     if (!ptr)
         return 0;
 
-    bool in_slab = kmalloc_ptr_in_slab_validate(ptr);
+    bool in_slab = valloc_ptr_in_slab_validate(ptr);
 
     if (!in_slab) {
         struct slab_page_hdr *hdr = slab_page_hdr_for_addr(ptr);
@@ -800,10 +800,10 @@ size_t ksize(void *ptr) {
 }
 
 size_t slab_allocation_size(vaddr_t addr) {
-    return ksize((void *) addr);
+    return vsize((void *) addr);
 }
 
-void *kmalloc_pages_raw(struct slab_domain *parent, stack_handle_t handle,
+void *valloc_pages_raw(struct slab_domain *parent, stack_handle_t handle,
                         size_t size, struct alloc_params params) {
     enum alloc_flags flags = params.flags;
     uint64_t total_size = size + sizeof(struct slab_page_hdr);
@@ -831,19 +831,19 @@ void *kmalloc_pages_raw(struct slab_domain *parent, stack_handle_t handle,
     return (void *) (hdr + 1);
 }
 
-static void *kmalloc_old(size_t size, enum alloc_flags flags) {
+static void *valloc_old(size_t size, enum alloc_flags flags) {
     if (size == 0)
         return NULL;
 
     int idx = slab_size_to_index(size);
 
     void *ptr;
-    if (kmalloc_size_fits_in_slab(size) &&
+    if (valloc_size_fits_in_slab(size) &&
         slab_global.caches.caches[idx].objs_per_slab > 0) {
         ptr = slab_alloc_old(&slab_global.caches.caches[idx]);
     } else {
         /* we say NULL and just free these to domain 0 */
-        ptr = kmalloc_pages_raw(
+        ptr = valloc_pages_raw(
             NULL, NULL, size,
             (struct alloc_params){.flags = ALLOC_FLAGS_DEFAULT,
                                   .behavior = ALLOC_BEHAVIOR_NORMAL});
@@ -855,8 +855,8 @@ static void *kmalloc_old(size_t size, enum alloc_flags flags) {
     return ptr;
 }
 
-void *kmalloc_pages(size_t page_count, enum alloc_flags flags) {
-    void *ptr = kmalloc_pages_raw(
+void *valloc_pages(size_t page_count, enum alloc_flags flags) {
+    void *ptr = valloc_pages_raw(
         NULL, NULL, page_count * PAGE_SIZE,
         (struct alloc_params){.flags = ALLOC_FLAGS_DEFAULT,
                               .behavior = ALLOC_BEHAVIOR_NORMAL});
@@ -876,7 +876,7 @@ void slab_free_page_hdr(struct slab_page_hdr *hdr, enum alloc_behavior bh) {
 }
 
 void slab_free_addr_to_cache(void *addr, enum alloc_behavior bh) {
-    kmalloc_ptr_in_slab_validate(addr);
+    valloc_ptr_in_slab_validate(addr);
 
     struct slab_page_hdr *hdr_candidate = slab_page_hdr_for_addr(addr);
     if (hdr_candidate->magic == KMALLOC_PAGE_MAGIC)
@@ -889,14 +889,14 @@ void slab_free_addr_to_cache(void *addr, enum alloc_behavior bh) {
     slab_free_old(slab, addr);
 }
 
-void kfree_old(void *ptr) {
+void vfree_old(void *ptr) {
     slab_free_addr_to_cache(ptr, ALLOC_BEHAVIOR_NORMAL);
 }
 
-static void *kmalloc_pages_internal(struct slab_domain *domain,
+static void *valloc_pages_internal(struct slab_domain *domain,
                                     stack_handle_t handle, size_t size,
                                     struct alloc_params params) {
-    void *ret = kmalloc_pages_raw(domain, handle, size, params);
+    void *ret = valloc_pages_raw(domain, handle, size, params);
 
     if (alloc_behavior_may_fault(params.behavior) &&
         !alloc_behavior_is_fast(params.behavior)) {
@@ -923,7 +923,7 @@ size_t slab_allocation_index(struct slab *slab, void *ptr) {
     return delta / slab->parent_cache->obj_stride;
 }
 
-void *kmalloc_try_from_magazine(struct slab_domain *domain,
+void *valloc_try_from_magazine(struct slab_domain *domain,
                                 struct slab_percpu_cache *pcpu,
                                 stack_handle_t handle, size_t size,
                                 enum alloc_flags flags) {
@@ -1193,7 +1193,7 @@ void *slab_alloc_retry(struct slab_domain *domain, stack_handle_t handle,
     enum slab_gc_flags gc_flags = SLAB_GC_FLAG_AGG_EMERGENCY;
 
     /* setup our flags */
-    if (!kmalloc_size_fits_in_slab(size)) {
+    if (!valloc_size_fits_in_slab(size)) {
         gc_flags |= SLAB_GC_FLAG_FORCE_DESTROY;
         size_t needed =
             MIN(PAGES_NEEDED_FOR(size), SLAB_GC_FLAG_DESTROY_TARGET_MAX);
@@ -1208,9 +1208,9 @@ void *slab_alloc_retry(struct slab_domain *domain, stack_handle_t handle,
     slab_gc_run(&domain->slab_gc, gc_flags);
 
     /* ok now we have ran the emergency GC, let's try again... */
-    if (!kmalloc_size_fits_in_slab(size)) {
+    if (!valloc_size_fits_in_slab(size)) {
         /* here, `domain` should be the local domain... */
-        return kmalloc_pages_internal(domain, handle, size, params);
+        return valloc_pages_internal(domain, handle, size, params);
     } else {
         /* here, `domain` might be another domain */
 
@@ -1231,10 +1231,10 @@ void *slab_alloc_retry(struct slab_domain *domain, stack_handle_t handle,
     }
 }
 
-void *kmalloc_new(size_t size, struct alloc_params params) {
+void *valloc_new(size_t size, struct alloc_params params) {
     enum alloc_flags flags = params.flags;
     enum alloc_behavior behavior = params.behavior;
-    kmalloc_validate_params(size, params);
+    valloc_validate_params(size, params);
     void *ret = NULL;
     enum irql outer = irql_raise(IRQL_DISPATCH_LEVEL);
 
@@ -1251,13 +1251,13 @@ void *kmalloc_new(size_t size, struct alloc_params params) {
     slab_stat_alloc_call(local_dom);
 
     /* this has its own path */
-    if (!kmalloc_size_fits_in_slab(size)) {
-        ret = kmalloc_pages_internal(local_dom, handle, size, params);
+    if (!valloc_size_fits_in_slab(size)) {
+        ret = valloc_pages_internal(local_dom, handle, size, params);
         goto exit;
     }
 
     /* alloc fits in slab - TODO: scale size if cache alignment is requested */
-    ret = kmalloc_try_from_magazine(local_dom, pcpu, handle, size, flags);
+    ret = valloc_try_from_magazine(local_dom, pcpu, handle, size, flags);
 
     /* if the mag alloc fails, drain our full portion of the freequeue */
     size_t pct = ret ? SLAB_FREE_QUEUE_ALLOC_PCT : 100;
@@ -1266,7 +1266,7 @@ void *kmalloc_new(size_t size, struct alloc_params params) {
 
     /* did the initial allocation fail but we drained something? go again... */
     if (!ret && drained) {
-        ret = kmalloc_try_from_magazine(local_dom, pcpu, handle, size, flags);
+        ret = valloc_try_from_magazine(local_dom, pcpu, handle, size, flags);
     }
 
     /* found something -- all done, this is the fastpath.
@@ -1303,13 +1303,13 @@ exit:
         slab_stat_alloc_failure(local_dom);
 
     if (ret)
-        asan_alloc(ret, size, ksize(ret));
+        asan_alloc(ret, size, vsize(ret));
 
     irql_lower(outer);
     return ret;
 }
 
-void *kmalloc_from_domain(domain_id_t domain, size_t size) {
+void *valloc_from_domain(domain_id_t domain, size_t size) {
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
 
     size_t index = slab_size_to_index(size);
@@ -1324,7 +1324,7 @@ void *kmalloc_from_domain(domain_id_t domain, size_t size) {
 
 #ifdef DEBUG_ASAN
     if (ret)
-        asan_alloc(ret, size, ksize(ret));
+        asan_alloc(ret, size, vsize(ret));
 #endif
 
     return ret;
@@ -1337,7 +1337,7 @@ void *kmalloc_from_domain(domain_id_t domain, size_t size) {
  *
  * If the freequeue is a remote freequeue, we first try and add
  * to its ringbuffer. If this fails, then, if the allocation
- * is a slab allocation (did not come from kmalloc_pages), we
+ * is a slab allocation (did not come from valloc_pages), we
  * will add to its freequeue chain if the other allocator is busy
  * (we look at our stats and see that it is doing a LOT of work)
  *
@@ -1362,7 +1362,7 @@ bool slab_domain_busy(struct slab_domain *domain) {
     return recent_call && !idle;
 }
 
-bool kfree_free_queue_enqueue(struct slab_domain *domain, void *ptr) {
+bool vfree_free_queue_enqueue(struct slab_domain *domain, void *ptr) {
     struct slab_domain *local = slab_domain_local();
     vaddr_t vptr = (vaddr_t) ptr;
 
@@ -1375,7 +1375,7 @@ bool kfree_free_queue_enqueue(struct slab_domain *domain, void *ptr) {
     return false;
 }
 
-void kfree_pages(void *ptr, enum alloc_behavior behavior) {
+void vfree_pages(void *ptr, enum alloc_behavior behavior) {
     struct slab_page_hdr *header = slab_page_hdr_for_addr(ptr);
 
     /* early allocations do not have topology data and set their
@@ -1400,7 +1400,7 @@ void kfree_pages(void *ptr, enum alloc_behavior behavior) {
     if (!alloc_behavior_may_fault(behavior))
         kassert(!header->pageable);
 
-    if (kfree_free_queue_enqueue(owner, ptr))
+    if (vfree_free_queue_enqueue(owner, ptr))
         return;
 
     /* could not put it on the freequeue... */
@@ -1411,7 +1411,7 @@ void kfree_pages(void *ptr, enum alloc_behavior behavior) {
     slab_free_page_hdr(header, behavior);
 }
 
-static bool kfree_try_free_to_magazine(struct slab_percpu_cache *pcpu,
+static bool vfree_try_free_to_magazine(struct slab_percpu_cache *pcpu,
                                        void *ptr, size_t size) {
     struct slab *slab = slab_for_ptr(ptr);
 
@@ -1428,7 +1428,7 @@ static bool kfree_try_free_to_magazine(struct slab_percpu_cache *pcpu,
         slab_is_zeroed(slab) ? SLAB_MAGAZINE_ZERO : SLAB_MAGAZINE_NORMAL;
 
     if (mtype == SLAB_MAGAZINE_ZERO)
-        memset(ptr, 0, ksize(ptr));
+        memset(ptr, 0, vsize(ptr));
 
     struct slab_magazine *mag = &pcpu->mags[mtype][idx];
     bool ret = slab_magazine_push(mag, (vaddr_t) ptr);
@@ -1474,11 +1474,11 @@ static size_t slab_free_queue_drain_on_free(struct slab_domain *domain,
                                          behavior);
 }
 
-void kfree_new(void *ptr, enum alloc_behavior behavior) {
+void vfree_new(void *ptr, enum alloc_behavior behavior) {
     enum irql outer = irql_raise(IRQL_DISPATCH_LEVEL);
-    kmalloc_ptr_in_slab_validate(ptr);
+    valloc_ptr_in_slab_validate(ptr);
 
-    size_t size = ksize(ptr);
+    size_t size = vsize(ptr);
     int32_t idx = slab_size_to_index(size);
     struct slab_domain *local_domain = slab_domain_local();
     struct slab_percpu_cache *pcpu = slab_percpu_cache_local();
@@ -1494,20 +1494,20 @@ void kfree_new(void *ptr, enum alloc_behavior behavior) {
     asan_free(ptr, size);
 
     if (idx < 0) {
-        kfree_pages(ptr, behavior);
+        vfree_pages(ptr, behavior);
         goto garbage_collect;
     }
 
     /* nice, we freed it to the magazine and we are all good now -- fastpath,
      * so we don't try GC or any funny business */
-    if (kfree_try_free_to_magazine(pcpu, ptr, size))
+    if (vfree_try_free_to_magazine(pcpu, ptr, size))
         goto done;
 
     /* did not free to magazine - this is an alloc from a slab */
     struct slab *slab = slab_for_ptr(ptr);
     struct slab_domain *owner = slab->parent_cache->parent_domain;
 
-    if (kfree_free_queue_enqueue(owner, ptr))
+    if (vfree_free_queue_enqueue(owner, ptr))
         goto done;
 
     /* could not put on percpu cache or freequeue, now we free to
@@ -1529,29 +1529,29 @@ done:
     irql_lower(outer);
 }
 
-void *kmalloc_init(size_t size, struct alloc_params params) {
-    return kmalloc_old(size, params.flags);
+void *valloc_init(size_t size, struct alloc_params params) {
+    return valloc_old(size, params.flags);
 }
 
-void kfree_init(void *p, enum alloc_behavior b) {
+void vfree_init(void *p, enum alloc_behavior b) {
     cc_unused(b);
-    kfree_old(p);
+    vfree_old(p);
 }
 
-STATIC_CALL_DEFINE(alloc, kmalloc_init);
-STATIC_CALL_DEFINE(free, kfree_init);
+STATIC_CALL_DEFINE(alloc, valloc_init);
+STATIC_CALL_DEFINE(free, vfree_init);
 
 void slab_switch_to_domain_allocations(void) {
-    static_call_update(alloc, kmalloc_new);
-    static_call_update(free, kfree_new);
+    static_call_update(alloc, valloc_new);
+    static_call_update(free, vfree_new);
 }
 
-void *kmalloc_full(size_t size, struct alloc_params params) {
+void *valloc_full(size_t size, struct alloc_params params) {
     void *p = static_call(alloc)(size, params);
 
 #ifdef DEBUG_ASAN
     if (p)
-        asan_alloc(p, size, ksize(p));
+        asan_alloc(p, size, vsize(p));
 #endif
 
 #ifdef DEBUG_SLAB
@@ -1571,12 +1571,12 @@ void *kmalloc_full(size_t size, struct alloc_params params) {
     return p;
 }
 
-void kfree_full(void *p, enum alloc_behavior behavior) {
+void vfree_full(void *p, enum alloc_behavior behavior) {
     if (cc_unlikely(!p))
         return;
 
     if ((uint16_t) behavior == (uint16_t) ALLOC_FLAGS_DEFAULT) {
-        slab_warn("Likely incorrect arguments passed into `kfree`");
+        slab_warn("Likely incorrect arguments passed into `vfree`");
         return;
     }
 
@@ -1585,26 +1585,26 @@ void kfree_full(void *p, enum alloc_behavior behavior) {
 #endif
 
 #ifdef DEBUG_SLAB
-    memset(p, SLAB_FREE_POISON_BYTE, ksize(p));
+    memset(p, SLAB_FREE_POISON_BYTE, vsize(p));
 #endif
 
 #ifdef DEBUG_ASAN
-    asan_free(p, ksize(p));
+    asan_free(p, vsize(p));
 #endif
 
     static_call(free)(p, behavior);
 }
 
-void *krealloc_full(void *ptr, size_t size, struct alloc_params params) {
+void *vrealloc_full(void *ptr, size_t size, struct alloc_params params) {
     if (!ptr)
-        return kmalloc_full(size, params);
+        return valloc_full(size, params);
 
     if (size == 0) {
-        kfree_full(ptr, params.behavior);
+        vfree_full(ptr, params.behavior);
         return NULL;
     }
 
-    size_t old = ksize(ptr);
+    size_t old = vsize(ptr);
 
     /* Touch nothing. This can still use the same slab allocation */
     size_t old_idx = slab_size_to_index(old);
@@ -1616,14 +1616,14 @@ void *krealloc_full(void *ptr, size_t size, struct alloc_params params) {
         return ptr;
     }
 
-    void *new_ptr = kmalloc_full(size, params);
+    void *new_ptr = valloc_full(size, params);
 
     if (!new_ptr)
         return NULL;
 
     size_t to_copy = MIN(old, size);
     memcpy(new_ptr, ptr, to_copy);
-    kfree(ptr);
+    vfree(ptr);
     return new_ptr;
 }
 

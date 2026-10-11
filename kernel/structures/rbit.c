@@ -74,7 +74,7 @@ struct rbit *rbit_init(struct rbit *rbit) {
 }
 
 struct rbit *rbit_tree_create(void) {
-    struct rbit *tree = kmalloc(sizeof(struct rbit));
+    struct rbit *tree = valloc(sizeof(struct rbit));
     if (!tree)
         return NULL;
 

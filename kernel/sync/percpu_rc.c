@@ -20,7 +20,7 @@ static void percpu_rc_switch_to_atomic_rcu(struct rcu_cb *cb) {
         }
 
         if (!rc->allow_reinit) {
-            kfree(counters);
+            vfree(counters);
             atomic_store_release(&rc->percpu_count_ptr,
                                  PERCPU_RC_DEAD | PERCPU_RC_ATOMIC);
         }
@@ -48,7 +48,7 @@ int percpu_rc_init(struct percpu_rc *rc, percpu_rc_release_fn release,
     }
 
     size_t size = sizeof(int64_t) * global.core_count;
-    int64_t *counters = kmalloc(size, ALLOC_ZERO);
+    int64_t *counters = valloc(size, ALLOC_ZERO);
     if (!counters)
         return ERR_NO_MEM;
 
@@ -65,7 +65,7 @@ void percpu_rc_destroy(struct percpu_rc *ref) {
     int64_t *counters = PERCPU_RC_PTR(pcpu);
 
     if (counters) {
-        kfree(counters);
+        vfree(counters);
         atomic_store_relaxed(&ref->percpu_count_ptr,
                              PERCPU_RC_DEAD | PERCPU_RC_ATOMIC);
     }

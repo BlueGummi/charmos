@@ -20,7 +20,7 @@ TEST_DEFINE_INTEGRATION(tmpfs, file_lifecycle, TEST_INTENSITY(1, 16, 256)) {
     const char *lstr = large_test_string;
     uint64_t len = strlen(lstr);
 
-    char *out_buf = kmalloc(len + 1, ALLOC_ZERO);
+    char *out_buf = valloc(len + 1, ALLOC_ZERO);
     TEST_ASSERT_NONNULL(out_buf);
 
     for (size_t iter = 0; iter < ops; iter++) {
@@ -58,7 +58,7 @@ TEST_DEFINE_INTEGRATION(tmpfs, file_lifecycle, TEST_INTENSITY(1, 16, 256)) {
         TEST_ASSERT_EQ(strlen(out_buf), len / 2);
     }
 
-    kfree(out_buf);
+    vfree(out_buf);
     return TEST_SUCCESS;
 }
 
@@ -67,7 +67,7 @@ TEST_DEFINE_INTEGRATION(tmpfs, dir_ops, TEST_INTENSITY(1, 8, 128)) {
     const char *lstr = large_test_string;
     uint64_t len = strlen(lstr);
 
-    char *out_buf = kmalloc(len + 1, ALLOC_ZERO);
+    char *out_buf = valloc(len + 1, ALLOC_ZERO);
     TEST_ASSERT_NONNULL(out_buf);
 
     for (size_t iter = 0; iter < ops; iter++) {
@@ -99,7 +99,7 @@ TEST_DEFINE_INTEGRATION(tmpfs, dir_ops, TEST_INTENSITY(1, 8, 128)) {
         TEST_ASSERT_EQ(e, ERR_NO_ENT);
     }
 
-    kfree(out_buf);
+    vfree(out_buf);
     return TEST_SUCCESS;
 }
 
@@ -130,13 +130,13 @@ TEST_DEFINE_INTEGRATION(tmpfs, attributes_and_symlinks) {
     bang = ent.node;
     TEST_ASSERT_NONNULL(bang);
 
-    char *buf = kmalloc(10, ALLOC_ZERO);
+    char *buf = valloc(10, ALLOC_ZERO);
     TEST_ASSERT_NONNULL(buf);
 
     TEST_ASSERT(!ERR_IS_FATAL(bang->ops->readlink(bang, buf, 10)));
 
     TEST_ASSERT_STR_EQ(buf, "/tmp");
 
-    kfree(buf);
+    vfree(buf);
     return TEST_SUCCESS;
 }

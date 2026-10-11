@@ -14,11 +14,11 @@ build_domain_for_level(enum topology_level lvl) {
     size_t n = t->count[lvl];
     struct topology_node *nodes = t->level[lvl];
 
-    struct scheduler_domain *d = must_kmalloc(sizeof(*d), ALLOC_ZERO);
+    struct scheduler_domain *d = must_valloc(sizeof(*d), ALLOC_ZERO);
 
     d->level = lvl;
     d->ngroups = n;
-    d->groups = must_kmalloc(sizeof(struct scheduler_group) * n, ALLOC_ZERO);
+    d->groups = must_valloc(sizeof(struct scheduler_group) * n, ALLOC_ZERO);
 
     for (size_t i = 0; i < n; i++) {
         struct topology_node *node = &nodes[i];

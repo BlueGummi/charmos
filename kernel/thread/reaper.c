@@ -18,10 +18,10 @@ void reaper_enqueue(struct thread *t) {
 void reaper_init(void) {
     size_t reaper_count = global.domain_count;
     reapers =
-        must_kmalloc(sizeof(struct reaper_thread *) * reaper_count, ALLOC_ZERO);
+        must_valloc(sizeof(struct reaper_thread *) * reaper_count, ALLOC_ZERO);
 
     for (size_t i = 0; i < reaper_count; i++) {
-        reapers[i] = must(kmalloc_from_domain(i, sizeof(struct reaper_thread)));
+        reapers[i] = must(valloc_from_domain(i, sizeof(struct reaper_thread)));
 
         locked_list_init(&reapers[i]->list, LOCKED_LIST_INIT_IRQ_DISABLE);
         semaphore_init(&reapers[i]->sem, 1, SEMAPHORE_INIT_IRQ_DISABLE);

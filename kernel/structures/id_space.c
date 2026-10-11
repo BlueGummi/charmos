@@ -21,7 +21,7 @@ static int32_t id_space_cmp(const struct rbt_node *a,
 }
 
 struct id_space *id_space_init(uint64_t max_id) TSA_NO_ANALYSIS {
-    struct id_space *is = kmalloc(sizeof(*is), ALLOC_ZERO);
+    struct id_space *is = valloc(sizeof(*is), ALLOC_ZERO);
     if (!is) {
         return NULL;
     }
@@ -38,7 +38,7 @@ struct id_space *id_space_init(uint64_t max_id) TSA_NO_ANALYSIS {
         is->reserve_free = &is->reserve_pool[i];
     }
 
-    struct id_range *r = kmalloc(sizeof(*r), ALLOC_ZERO);
+    struct id_range *r = valloc(sizeof(*r), ALLOC_ZERO);
     if (!r) {
         if (is->reserve_free) {
             r = is->reserve_free;
@@ -57,7 +57,7 @@ struct id_space *id_space_init(uint64_t max_id) TSA_NO_ANALYSIS {
 
 static struct id_range *id_range_alloc(struct id_space *is) {
     SPINLOCK_ASSERT_HELD(&is->lock);
-    struct id_range *r = kmalloc(sizeof(*r), ALLOC_ZERO);
+    struct id_range *r = valloc(sizeof(*r), ALLOC_ZERO);
     if (r) {
         return r;
     }
@@ -79,7 +79,7 @@ static void id_range_free(struct id_space *is, struct id_range *r) {
         r->next = is->reserve_free;
         is->reserve_free = r;
     } else {
-        kfree(r);
+        vfree(r);
     }
 }
 
@@ -229,5 +229,5 @@ void id_space_destroy(struct id_space *is) {
     }
     spin_unlock(&is->lock, irql);
 
-    kfree(is);
+    vfree(is);
 }

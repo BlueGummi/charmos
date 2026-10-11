@@ -34,7 +34,7 @@ void movealloc_exec_all(void) {
 }
 
 static void change_slab_backing_page(void *ptr) {
-    if (kmalloc_ptr_in_slab_validate(ptr))
+    if (valloc_ptr_in_slab_validate(ptr))
         panic("Moved allocations cannot come from slab");
 }
 
@@ -43,7 +43,7 @@ void movealloc_full(domain_id_t new_domain, void *ptr, struct vmm_request rq) {
         panic("movealloc cannot be called after boot completes");
 
     struct domain *d = global.domains[new_domain];
-    size_t size = ksize(ptr);
+    size_t size = vsize(ptr);
     size_t pages = PAGES_NEEDED_FOR(size);
     vaddr_t aligned_down = PAGE_ALIGN_DOWN(ptr);
     paddr_t phys_addrs[pages];

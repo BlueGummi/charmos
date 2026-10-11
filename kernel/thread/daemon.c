@@ -14,9 +14,9 @@ static void daemon_put(struct daemon *d) {
         }
 
         if (d->name)
-            kfree(d->name);
+            vfree(d->name);
 
-        kfree(d);
+        vfree(d);
     }
 }
 
@@ -84,7 +84,7 @@ static void daemon_thread_exit(struct daemon *daemon,
         set_bg_present(daemon, false);
     }
 
-    kfree(self);
+    vfree(self);
 
     daemon_put(daemon);
     thread_exit();
@@ -158,7 +158,7 @@ void daemon_main(void *a) {
 
 struct daemon_thread *daemon_thread_create(struct daemon *daemon) {
     struct daemon_thread *thread =
-        kmalloc(sizeof(struct daemon_thread), ALLOC_ZERO);
+        valloc(sizeof(struct daemon_thread), ALLOC_ZERO);
     if (!thread)
         return NULL;
 
@@ -170,7 +170,7 @@ struct daemon_thread *daemon_thread_create(struct daemon *daemon) {
         daemon_main, .private = thread,
         .allowed_cpus = daemon->attrs.thread_cpu_mask);
     if (!t) {
-        kfree(thread);
+        vfree(thread);
         return NULL;
     }
 
@@ -209,7 +209,7 @@ daemon_thread_spawn(struct daemon *daemon,
 
 void daemon_thread_destroy_unsafe(struct daemon_thread *dt) {
     thread_free(dt->thread);
-    kfree(dt);
+    vfree(dt);
 }
 
 struct daemon *daemon_create_full(struct daemon_attributes *attrs,
@@ -220,7 +220,7 @@ struct daemon *daemon_create_full(struct daemon_attributes *attrs,
     va_list args;
     va_start(args, fmt);
 
-    struct daemon *daemon = kmalloc(sizeof(struct daemon), ALLOC_ZERO);
+    struct daemon *daemon = valloc(sizeof(struct daemon), ALLOC_ZERO);
     struct daemon_thread *dt = NULL, *bg = NULL;
 
     if (!daemon)
@@ -242,7 +242,7 @@ struct daemon *daemon_create_full(struct daemon_attributes *attrs,
         int needed = vsnprintf(NULL, 0, fmt, args_copy) + 1;
         va_end(args_copy);
 
-        char *name = kmalloc(needed, ALLOC_ZERO);
+        char *name = valloc(needed, ALLOC_ZERO);
         if (!name)
             goto err;
 
@@ -307,10 +307,10 @@ err:
         daemon_thread_destroy_unsafe(dt);
 
     if (daemon && daemon->name)
-        kfree(daemon->name);
+        vfree(daemon->name);
 
     if (daemon)
-        kfree(daemon);
+        vfree(daemon);
 
     va_end(args);
     return NULL;

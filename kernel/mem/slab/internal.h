@@ -126,7 +126,7 @@ LOG_HANDLE_EXTERN(slab);
 
 #define SLAB_CHUNK_SIZE PAGE_2MB
 
-#define kmalloc_validate_params(size, params)                                  \
+#define valloc_validate_params(size, params)                                  \
     do {                                                                       \
         kassert(alloc_flags_valid((params).flags));                            \
         kassert(alloc_flag_behavior_verify((params)));                         \
@@ -445,7 +445,7 @@ enum slab_gc_flags : uint32_t {
     SLAB_GC_FLAG_AGG_MAX = 5, /* Used in the OOM handler chain - this
                                * will do crazy things like page compaction,
                                * migration, etc., it is never called from
-                               * the standard kmalloc/kfree */
+                               * the standard valloc/vfree */
 
     SLAB_GC_FLAG_AGG_COUNT = 6, /* Count */
 
@@ -474,7 +474,7 @@ struct slab_gc {
  * bucket both as a `size_t` array */
 struct slab_domain_bucket {
     /* ---- Allocation path stats ---- */
-    atomic_size_t alloc_calls;         /* calls to `kmalloc` */
+    atomic_size_t alloc_calls;         /* calls to `valloc` */
     atomic_size_t alloc_magazine_hits; /* Local magazine served the alloc */
     atomic_size_t alloc_page_hits;     /* Page allocations serviced */
     atomic_size_t alloc_local_hits;  /* Local domain cache hit (not magazine) */
@@ -485,7 +485,7 @@ struct slab_domain_bucket {
     atomic_size_t alloc_failures; /* Out of memory or other failures */
 
     /* ---- Free path stats ---- */
-    atomic_size_t free_calls;   /* Total calls to kfree() */
+    atomic_size_t free_calls;   /* Total calls to vfree() */
     atomic_size_t free_to_ring; /* Freed into local freequeue ringbuffer */
     atomic_size_t free_to_local_slab;    /* Freed directly into local slab */
     atomic_size_t free_to_remote_domain; /* Freed to other domain's freelist */
@@ -633,7 +633,7 @@ vaddr_t slab_chunks_alloc(struct slab_chunks *sc, struct slab_chunk **out);
 void slab_chunks_free(struct slab_chunks *sc, struct slab_chunk *chunk,
                       vaddr_t addr);
 void slab_chunks_init(struct slab_chunks *sc, struct slab_cache *parent);
-bool kmalloc_ptr_in_slab_validate(void *ptr);
+bool valloc_ptr_in_slab_validate(void *ptr);
 
 /* Debug checks */
 #ifdef DEBUG_SLAB_DEEP

@@ -16,8 +16,8 @@ static inline char fuzzy_fold_char(char c, bool ignore_case) {
 static int64_t fuzzy_substr_distance(const char *pattern, const char *text,
                                      size_t p_len, size_t t_len,
                                      bool ignore_case) {
-    int64_t *prev = kmalloc((t_len + 1) * sizeof(int64_t));
-    int64_t *curr = kmalloc((t_len + 1) * sizeof(int64_t));
+    int64_t *prev = valloc((t_len + 1) * sizeof(int64_t));
+    int64_t *curr = valloc((t_len + 1) * sizeof(int64_t));
     int64_t best_dist = -1;
 
     if (!prev || !curr)
@@ -52,8 +52,8 @@ static int64_t fuzzy_substr_distance(const char *pattern, const char *text,
     }
 
 out:
-    kfree(prev);
-    kfree(curr);
+    vfree(prev);
+    vfree(curr);
 
     return best_dist;
 }

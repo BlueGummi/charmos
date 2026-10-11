@@ -462,7 +462,7 @@ static struct nightmare_verdict wake_storm_prepare(struct nightmare_ctx *ctx) {
 
     size_t bytes = sizeof(struct wake_storm_state) +
                    sleeper_count * sizeof(struct wake_storm_sleeper);
-    struct wake_storm_state *state = kmalloc(bytes, ALLOC_ZERO);
+    struct wake_storm_state *state = valloc(bytes, ALLOC_ZERO);
     if (!state)
         return NIGHTMARE_FAIL("state_alloc", "could not allocate wake state");
 

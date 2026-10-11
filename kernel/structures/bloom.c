@@ -91,14 +91,14 @@ struct counting_bloom_filter *cbf_create(size_t capacity,
     num_counters = ALIGN_UP(num_counters, 2);
 
     struct counting_bloom_filter *cbf =
-        kmalloc(sizeof(struct counting_bloom_filter));
+        valloc(sizeof(struct counting_bloom_filter));
     if (!cbf)
         return NULL;
 
     size_t byte_count = num_counters / COUNTERS_PER_BYTE;
-    cbf->counters = kmalloc(byte_count, ALLOC_ZERO);
+    cbf->counters = valloc(byte_count, ALLOC_ZERO);
     if (!cbf->counters) {
-        kfree(cbf);
+        vfree(cbf);
         return NULL;
     }
 
@@ -111,8 +111,8 @@ struct counting_bloom_filter *cbf_create(size_t capacity,
 
 void cbf_destroy(struct counting_bloom_filter *cbf) {
     if (cbf) {
-        kfree(cbf->counters);
-        kfree(cbf);
+        vfree(cbf->counters);
+        vfree(cbf);
     }
 }
 

@@ -114,7 +114,7 @@ bool dpc_enqueue_local(struct dpc *d) {
 
 void dpc_init_percpu(void) {
     global.dpc_data =
-        kmalloc(sizeof(struct dpc_cpu) * global.core_count, ALLOC_ZERO);
+        valloc(sizeof(struct dpc_cpu) * global.core_count, ALLOC_ZERO);
     size_t i;
     for_each_cpu_id(i) {
         atomic_store_relaxed(&global.dpc_data[i].queue.head, NULL);
@@ -132,7 +132,7 @@ struct dpc *dpc_init(struct dpc *d, dpc_func_t fn, void *a, void *b) {
 
 /* DPC creation helpers */
 struct dpc *dpc_create(dpc_func_t fn, void *a, void *b) {
-    struct dpc *d = kmalloc(sizeof(*d));
+    struct dpc *d = valloc(sizeof(*d));
     if (!d)
         return NULL;
 

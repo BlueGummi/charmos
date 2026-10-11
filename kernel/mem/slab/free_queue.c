@@ -47,7 +47,7 @@ vaddr_t slab_free_queue_dequeue(struct slab_free_queue *q) {
 
 static void slab_free_queue_free(struct slab_domain *d, void *ptr,
                                  enum alloc_behavior bh) {
-    int32_t class = slab_size_to_index(ksize(ptr));
+    int32_t class = slab_size_to_index(vsize(ptr));
     bool fits_in_slab = class >= 0;
 
     if (fits_in_slab)
@@ -118,7 +118,7 @@ size_t slab_free_queue_flush(struct slab_domain *domain,
         if (addr == 0x0)
             break;
 
-        /* kfree_pages will put page backed allocations in here too,
+        /* vfree_pages will put page backed allocations in here too,
          * so we send them to THIS free function, which sorts by class */
         slab_free_queue_free(domain, (void *) addr, bh);
         total_freed++;

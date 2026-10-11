@@ -63,8 +63,8 @@ static void nvme_process_one(struct nvme_device  *dev,
         if (req->bio_data->prp_list_phys)
             pmm_free_page(req->bio_data->prp_list_phys);
 
-        kfree(req->bio_data->prps);
-        kfree(req->bio_data);
+        vfree(req->bio_data->prps);
+        vfree(req->bio_data);
         req->done   = true;
         req->status = nvme_to_bio_status(req->status);
         if (req->on_complete)

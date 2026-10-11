@@ -298,14 +298,14 @@ void nightmare_perturb_alloc_pressure(struct nightmare_ctx *ctx,
                     break;
                 }
             }
-            kfree(slots[slot]);
+            vfree(slots[slot]);
             slots[slot] = NULL;
             slot_sizes[slot] = 0;
             slot_patterns[slot] = 0;
         } else {
             size_t size = 16 + (test_rng_next(&worker->rng) % 8176);
             uint32_t pat = (uint32_t) test_rng_next(&worker->rng);
-            void *ptr = kmalloc(size, ALLOC_ZERO);
+            void *ptr = valloc(size, ALLOC_ZERO);
             if (ptr) {
                 uint32_t *p = ptr;
                 size_t words = size / sizeof(uint32_t);
@@ -322,7 +322,7 @@ void nightmare_perturb_alloc_pressure(struct nightmare_ctx *ctx,
 
     for (size_t i = 0; i < ALLOC_PRESSURE_SLOTS; i++) {
         if (slots[i]) {
-            kfree(slots[i]);
+            vfree(slots[i]);
             slots[i] = NULL;
         }
     }

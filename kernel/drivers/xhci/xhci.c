@@ -33,7 +33,7 @@ enum usb_error xhci_address_device(struct xhci_port *p, uint8_t slot_id,
     uint8_t             port  = p->port_id;
 
     struct xhci_input_ctx *input_ctx =
-        kmalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO);
+        valloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO);
     if (!input_ctx)
         return USB_ERR_OOM;
 
@@ -41,15 +41,15 @@ enum usb_error xhci_address_device(struct xhci_port *p, uint8_t slot_id,
 
     struct xhci_ring *ring = xhci_allocate_ring();
     if (!ring) {
-        kfree_aligned(input_ctx);
+        vfree_aligned(input_ctx);
         return USB_ERR_OOM;
     }
 
     struct xhci_device_ctx *dev_ctx =
-        kmalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO);
+        valloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO);
     if (!dev_ctx) {
         xhci_free_ring(ring);
-        kfree_aligned(input_ctx);
+        vfree_aligned(input_ctx);
         return USB_ERR_OOM;
     }
 
@@ -108,12 +108,12 @@ enum usb_error xhci_address_device(struct xhci_port *p, uint8_t slot_id,
     spin_unlock(&xhci->lock, irql);
     bool ret = xhci_send_command_and_block(xhci, &cmd, NULL);
 
-    kfree_aligned(input_ctx);
+    vfree_aligned(input_ctx);
 
     if (!ret || !xhci_request_ok(&request)) {
         enum usb_error err =
             !ret ? USB_ERR_NO_DEVICE : xhci_rq_to_usb_status(&request);
-        kfree_aligned(dev_ctx);
+        vfree_aligned(dev_ctx);
         xhci_free_ring(ring);
         publish_to->ep_rings[0] = NULL;
         return err;
@@ -133,7 +133,7 @@ enum usb_error xhci_configure_device_endpoints(struct usb_device *usb) {
 
     struct xhci_device    *xhci = usb->driver_private;
     struct xhci_input_ctx *input_ctx =
-        kmalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO);
+        valloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO);
 
     uintptr_t input_ctx_phys = vmm_get_phys((uintptr_t) input_ctx);
 
@@ -198,7 +198,7 @@ enum usb_error xhci_configure_device_endpoints(struct usb_device *usb) {
 
     bool ret = xhci_send_command_and_block(xhci, &cmd, NULL);
 
-    kfree_aligned(input_ctx);
+    vfree_aligned(input_ctx);
     if (!ret)
         return USB_ERR_NO_DEVICE;
 
@@ -799,7 +799,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
     xhci_interrupt_enable_ints(dev);
 
     struct usb_controller *ctrl =
-        kmalloc(sizeof(struct usb_controller), ALLOC_ZERO);
+        valloc(sizeof(struct usb_controller), ALLOC_ZERO);
     ctrl->driver_data = dev;
     ctrl->type        = USB_CONTROLLER_XHCI;
     ctrl->ops         = &xhci_ctrl_ops;

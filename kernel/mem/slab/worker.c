@@ -41,7 +41,7 @@ static void slab_defer_free_dpc(void *unused_arg, void *unused_arg2) {
     while ((got = mpsc_slist_drain(&c->defer_frees))) {
         got = mpsc_slist_reverse(got);
         mpsc_slist_for_each_safe(iter, tmp, got) {
-            kfree(iter);
+            vfree(iter);
         }
     }
 }
@@ -97,7 +97,7 @@ void slab_domain_init_workqueue(struct slab_domain *domain) {
     }
 }
 
-void kfree_defer_irq(void *ptr) {
+void vfree_defer_irq(void *ptr) {
     kassert(irq_in_interrupt());
     if (!ptr)
         return;

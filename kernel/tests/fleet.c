@@ -73,7 +73,7 @@ static void test_fleet_deadline(struct timer *timer) {
 
 struct test_fleet *test_fleet_init(struct test_context *ctx,
                                    const struct test_fleet_opts *opts) {
-    struct test_fleet *f = kmalloc(sizeof(*f), ALLOC_ZERO);
+    struct test_fleet *f = valloc(sizeof(*f), ALLOC_ZERO);
     if (!f)
         return NULL;
 
@@ -275,7 +275,7 @@ static void test_fleet_put(struct test_fleet *f) {
 }
 
 void *test_fleet_alloc(struct test_fleet *f, size_t size) {
-    struct test_fleet_alloc *a = kmalloc(sizeof(*a) + size, ALLOC_ZERO);
+    struct test_fleet_alloc *a = valloc(sizeof(*a) + size, ALLOC_ZERO);
     if (!a)
         return NULL;
 
@@ -288,7 +288,7 @@ static void test_fleet_free_allocs(struct test_fleet *f) {
     struct test_fleet_alloc *a = f->allocs;
     while (a) {
         struct test_fleet_alloc *next = a->next;
-        kfree(a);
+        vfree(a);
         a = next;
     }
     f->allocs = NULL;
@@ -349,7 +349,7 @@ bool test_fleet_teardown(struct test_context *ctx) {
     }
 
     test_fleet_free_allocs(f);
-    kfree(f);
+    vfree(f);
     return leaked;
 }
 

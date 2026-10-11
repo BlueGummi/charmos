@@ -295,7 +295,7 @@ void smp_init(void) {
         size_t d = domain_for_cpu(i);
 
         if (i != 0) {
-            global.cores[i] = must(kmalloc_from_domain(d, sizeof(struct core)));
+            global.cores[i] = must(valloc_from_domain(d, sizeof(struct core)));
 
             memset(global.cores[i], 0, sizeof(struct core));
         }
@@ -339,14 +339,14 @@ void smp_wake(struct limine_mp_response *mpr) {
 }
 
 void smp_setup_bsp(void) {
-    struct core *c = must_kmalloc(sizeof(struct core), ALLOC_ZERO);
+    struct core *c = must_valloc(sizeof(struct core), ALLOC_ZERO);
 
     c->id = 0;
     c->self = c;
     c->current_irql = IRQL_PASSIVE_LEVEL;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
     global.cores =
-        must_kmalloc(sizeof(struct core *) * global.core_count, ALLOC_ZERO);
+        must_valloc(sizeof(struct core *) * global.core_count, ALLOC_ZERO);
 
     global.cores[0] = c;
     init_smt_info(c);

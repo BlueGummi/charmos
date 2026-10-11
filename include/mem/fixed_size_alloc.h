@@ -71,7 +71,7 @@ void fixed_size_range_init(struct fixed_size_range *fsr,
                                     size_t domain_) {                          \
         static struct fixed_size_range **__perdomain_fsrs_##name = NULL;       \
         if (!__perdomain_fsrs_##name)                                          \
-            __perdomain_fsrs_##name = kmalloc(                                 \
+            __perdomain_fsrs_##name = valloc(                                 \
                 sizeof(struct fixed_size_range *) * global.domain_count);      \
                                                                                \
         struct fixed_size_range_attributes __fsr_attrs = {__VA_ARGS__};        \

@@ -30,7 +30,7 @@ struct elcm_params {
     size_t metadata_bits_per_obj;
     size_t metadata_bytes_per_page;
 
-    /* If NULL, defaults to kmalloc */
+    /* If NULL, defaults to valloc */
     void *(*alloc_fn)(size_t size);
     void (*free_fn)(void *ptr, size_t size);
     struct elcm_candidate out;

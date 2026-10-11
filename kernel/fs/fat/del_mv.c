@@ -21,7 +21,7 @@ bool fat_delete(struct fat_fs *fs, uint32_t dir_cluster, const char *filename) {
 
     fat_free_chain(fs, start_cluster);
 
-    kfree(dirent);
+    vfree(dirent);
 
     return true;
 }
@@ -45,7 +45,7 @@ bool fat_rename(struct fat_fs *fs, uint32_t dir_cluster, const char *filename,
         return false;
     }
 
-    kfree(dirent);
+    vfree(dirent);
 
     return true;
 }

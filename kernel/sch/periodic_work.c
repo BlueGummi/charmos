@@ -55,7 +55,7 @@ static void
 attach_work_to_cpus(struct scheduler_periodic_work_linker_record *spwlo) {
     for (size_t i = 0; i < global.core_count; i++) {
         struct scheduler_periodic_work *w =
-            must_kmalloc(sizeof(struct scheduler_periodic_work), ALLOC_ZERO);
+            must_valloc(sizeof(struct scheduler_periodic_work), ALLOC_ZERO);
 
         pairing_node_init(&w->pnode);
         linker_object_work_to_work(spwlo, w);

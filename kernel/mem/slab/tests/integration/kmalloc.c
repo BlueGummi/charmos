@@ -2,14 +2,14 @@
 
 #define MT_ALLOC_TIMES 1024
 
-static atomic_int kmalloc_done = 0;
+static atomic_int valloc_done = 0;
 
-static void mt_kmalloc_worker(void *arg) {
+static void mt_valloc_worker(void *arg) {
     cc_unused(arg);
     void *ptrs[MT_ALLOC_TIMES] = {0};
 
     for (uint64_t i = 0; i < MT_ALLOC_TIMES; i++) {
-        ptrs[i] = kmalloc(64);
+        ptrs[i] = valloc(64);
         TEST_ASSERT_VOID_NONNULL(ptrs[i]);
     }
 
@@ -17,30 +17,30 @@ static void mt_kmalloc_worker(void *arg) {
         uint64_t idx = prng_next() % MT_ALLOC_TIMES;
 
         if (ptrs[idx]) {
-            kfree(ptrs[idx]);
+            vfree(ptrs[idx]);
             ptrs[idx] = NULL;
         }
     }
 
     for (uint64_t i = 0; i < MT_ALLOC_TIMES; i++) {
         if (ptrs[i]) {
-            kfree(ptrs[i]);
+            vfree(ptrs[i]);
         }
     }
 
-    atomic_inc(&kmalloc_done);
+    atomic_inc(&valloc_done);
 }
 
 TEST_DEFINE_INTEGRATION(slab, mt_alloc_free,
                         TEST_INTENSITY_CORES(1, 2, 4, "threads/core"),
                         .min_ram_mib = 8) {
     size_t nthreads = ctx->intensity_val ? ctx->intensity_val : 8;
-    struct thread **threads = kmalloc(sizeof(struct thread *) * nthreads);
+    struct thread **threads = valloc(sizeof(struct thread *) * nthreads);
     TEST_ASSERT_NONNULL(threads);
-    atomic_store(&kmalloc_done, 0);
+    atomic_store(&valloc_done, 0);
 
     for (size_t i = 0; i < nthreads; i++) {
-        threads[i] = thread_spawn("mt_kmalloc_thread", mt_kmalloc_worker,
+        threads[i] = thread_spawn("mt_valloc_thread", mt_valloc_worker,
                                   .stack_pages = 16, .joinable = true);
         TEST_ASSERT_NONNULL(threads[i]);
     }
@@ -48,8 +48,8 @@ TEST_DEFINE_INTEGRATION(slab, mt_alloc_free,
     for (size_t i = 0; i < nthreads; i++)
         thread_join(threads[i]);
 
-    TEST_ASSERT_EQ(atomic_load(&kmalloc_done), (int) nthreads);
-    kfree(threads);
+    TEST_ASSERT_EQ(atomic_load(&valloc_done), (int) nthreads);
+    vfree(threads);
     return TEST_SUCCESS;
 }
 
@@ -77,7 +77,7 @@ static void stress_worker(void *arg) {
         ;
 
     /* allocate small tracking table dynamically */
-    void **live_ptrs = kmalloc(sizeof(void *) * MAX_LIVE_ALLOCS);
+    void **live_ptrs = valloc(sizeof(void *) * MAX_LIVE_ALLOCS);
     memset(live_ptrs, 0, sizeof(void *) * MAX_LIVE_ALLOCS);
 
     for (size_t iter = 0; iter < a->iters; ++iter) {
@@ -85,7 +85,7 @@ static void stress_worker(void *arg) {
         if ((prng_next() & 7) == 0) {
             int idx = prng_next() % MAX_LIVE_ALLOCS;
             if (live_ptrs[idx]) {
-                kfree_new(live_ptrs[idx], ALLOC_BEHAVIOR_NORMAL);
+                vfree_new(live_ptrs[idx], ALLOC_BEHAVIOR_NORMAL);
                 live_ptrs[idx] = NULL;
             }
         }
@@ -108,7 +108,7 @@ static void stress_worker(void *arg) {
 
         enum alloc_behavior behavior = ALLOC_BEHAVIOR_NORMAL;
 
-        void *p = kmalloc_new(
+        void *p = valloc_new(
             sz, (struct alloc_params){.flags = flags, .behavior = behavior});
         if (!p)
             continue;
@@ -121,17 +121,17 @@ static void stress_worker(void *arg) {
         int idx = prng_next() % MAX_LIVE_ALLOCS;
 
         if (live_ptrs[idx] && SHOULD_FREE)
-            kfree_new(live_ptrs[idx], ALLOC_BEHAVIOR_NORMAL);
+            vfree_new(live_ptrs[idx], ALLOC_BEHAVIOR_NORMAL);
         live_ptrs[idx] = p;
     }
 
     /* Final cleanup */
     for (int i = 0; i < MAX_LIVE_ALLOCS; ++i) {
         if (live_ptrs[i])
-            kfree_new(live_ptrs[i], ALLOC_BEHAVIOR_NORMAL);
+            vfree_new(live_ptrs[i], ALLOC_BEHAVIOR_NORMAL);
     }
 
-    kfree(live_ptrs);
+    vfree(live_ptrs);
     *a->done_flag = 1;
 }
 
@@ -152,7 +152,7 @@ TEST_DEFINE_INTEGRATION(slab, mt_alloc_free_stress,
         args[i].id = i;
         args[i].done_flag = &done[i];
         args[i].iters = iters;
-        workers[i] = thread_spawn("kmalloc_new_stress_worker", stress_worker,
+        workers[i] = thread_spawn("valloc_new_stress_worker", stress_worker,
                                   .private = &args[i], .joinable = true);
     }
     irql_lower(irql);

@@ -26,8 +26,8 @@ enum err arena_budget_prio_scale(sz_b_t used, int scale,
 static void arena_desc_table_free_cb(struct rcu_cb *cb) {
     struct arena_desc_table *tbl =
         container_of(cb, struct arena_desc_table, rcu_cb);
-    kfree(tbl->descs);
-    kfree(tbl);
+    vfree(tbl->descs);
+    vfree(tbl);
 }
 
 static int32_t arena_desc_cmp(const void *a, const void *b) {
@@ -47,17 +47,17 @@ enum err arena_desc_register(struct arena_desc *desc) {
     size_t old_desc_count = old_tbl->desc_count;
     size_t desc_count = old_desc_count + 1;
     struct arena_desc_table *new_tbl =
-        kmalloc(sizeof(struct arena_desc_table), ALLOC_ZERO);
+        valloc(sizeof(struct arena_desc_table), ALLOC_ZERO);
     if (!new_tbl) {
         err = ERR_NO_MEM;
         goto out;
     }
 
     struct arena_desc **new_descs =
-        kmalloc(sizeof(struct arena_desc *) * desc_count, ALLOC_ZERO);
+        valloc(sizeof(struct arena_desc *) * desc_count, ALLOC_ZERO);
     if (!new_descs) {
         err = ERR_NO_MEM;
-        kfree(new_tbl);
+        vfree(new_tbl);
         goto out;
     }
 
@@ -94,7 +94,7 @@ struct arena_desc *arena_desc_lookup(enum arena_strategy strat) {
 void arena_global_init(void) {
     spinlock_init(&arena_global.tbl_lock);
     struct arena_desc_table *tbl =
-        kmalloc(sizeof(struct arena_desc_table), ALLOC_ZERO);
+        valloc(sizeof(struct arena_desc_table), ALLOC_ZERO);
 
     rcu_assign_pointer(arena_global.desc_table, tbl);
 }
@@ -139,7 +139,7 @@ struct arena *arena_create_full(struct arena_seg_desc *seg_descs,
     size_t seg_size_total = inmem_size + seg_data_size_total;
     size_t size_total = sizeof(struct arena) + seg_size_total;
 
-    struct arena *arena = kmalloc(size_total, ALLOC_ZERO);
+    struct arena *arena = valloc(size_total, ALLOC_ZERO);
     if (!arena)
         return NULL;
 

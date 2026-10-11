@@ -48,7 +48,7 @@ static void rcu_reader_thread(void *arg) {
 static atomic_bool volatile rcu_deferred_freed = false;
 
 static void rcu_free_fn(struct rcu_cb *cb) {
-    kfree(container_of(cb, struct rcu_test_data, rcu));
+    vfree(container_of(cb, struct rcu_test_data, rcu));
     atomic_store(&rcu_deferred_freed, true);
 }
 
@@ -58,7 +58,7 @@ static void rcu_writer_thread(void *arg) {
 
     struct rcu_test_data *old = atomic_load_relaxed(&shared_ptr);
 
-    struct rcu_test_data *new = kmalloc(sizeof(*new), ALLOC_ZERO);
+    struct rcu_test_data *new = valloc(sizeof(*new), ALLOC_ZERO);
     new->value = 43;
     rcu_assign_pointer(shared_ptr, new);
 
@@ -76,7 +76,7 @@ TEST_DEFINE_INTEGRATION(rcu, mt_readers_during_replace,
     atomic_store(&rcu_reads_done, 0);
     atomic_store(&rcu_deferred_freed, false);
 
-    struct rcu_test_data *initial = kmalloc(sizeof(*initial), ALLOC_ZERO);
+    struct rcu_test_data *initial = valloc(sizeof(*initial), ALLOC_ZERO);
     initial->value = 42;
     rcu_assign_pointer(shared_ptr, initial);
 
@@ -135,7 +135,7 @@ static void stress_free_cb(struct rcu_cb *cb) {
     n->freed_gen = cb->gen_when_called;
     n->enqueued_on = cb->enqueued_waiting_on_gen;
     atomic_inc(&stress_deferred_freed);
-    kfree(n);
+    vfree(n);
 }
 
 static void rcu_stress_reader(void *arg) TSA_NO_ANALYSIS {
@@ -180,10 +180,10 @@ static void rcu_stress_writer(void *arg) {
     uint64_t local_iter = 0;
 
     while (!atomic_load(&stress_stop)) {
-        struct rcu_stress_node *new = kmalloc(sizeof(*new), ALLOC_ZERO);
+        struct rcu_stress_node *new = valloc(sizeof(*new), ALLOC_ZERO);
         if (!new) {
             atomic_store(&stress_failed, true);
-            test_info("RCU stress writer kmalloc failed");
+            test_info("RCU stress writer valloc failed");
             break;
         }
 
@@ -224,7 +224,7 @@ TEST_DEFINE_INTEGRATION(rcu, mt_stress, TEST_INTENSITY(200, 2000, 10000)) {
     atomic_store(&stress_replacements, 0);
     atomic_store(&gen_freed, 0);
 
-    struct rcu_stress_node *initial = kmalloc(sizeof(*initial), ALLOC_ZERO);
+    struct rcu_stress_node *initial = valloc(sizeof(*initial), ALLOC_ZERO);
     initial->seq = 0;
     initial->value = 42;
     rcu_assign_pointer(stress_shared, initial);
@@ -293,7 +293,7 @@ TEST_DEFINE_INTEGRATION(rcu, mt_stress, TEST_INTENSITY(200, 2000, 10000)) {
     struct rcu_stress_node *last = atomic_load_relaxed(&stress_shared);
     if (last) {
         rcu_synchronize();
-        kfree(last);
+        vfree(last);
         atomic_inc(&stress_deferred_freed);
     }
 

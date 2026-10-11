@@ -15,7 +15,7 @@ void clocks_init(void) {
 }
 
 struct clock *clock_create(const char *fmt, ...) {
-    struct clock *clock = kmalloc(sizeof(struct clock), ALLOC_ZERO);
+    struct clock *clock = valloc(sizeof(struct clock), ALLOC_ZERO);
     if (!clock)
         return NULL;
 
@@ -25,7 +25,7 @@ struct clock *clock_create(const char *fmt, ...) {
     va_end(args);
 
     if (ret == ERR_NO_MEM) {
-        kfree(clock);
+        vfree(clock);
         return NULL;
     }
 

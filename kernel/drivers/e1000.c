@@ -32,7 +32,7 @@ static void e1000_setup_tx_ring(struct e1000_device *dev) {
     memset(dev->tx_descs, 0, space);
 
     for (int i = 0; i < E1000_NUM_TX_DESC; i++) {
-        dev->tx_buffers[i] = must_kmalloc(2048);
+        dev->tx_buffers[i] = must_valloc(2048);
 
         dev->tx_descs[i].addr   = vmm_get_phys((uintptr_t) dev->tx_buffers[i]);
         dev->tx_descs[i].status = E1000_TXD_STAT_DD;
@@ -61,7 +61,7 @@ static void e1000_setup_rx_ring(struct e1000_device *dev) {
     memset(dev->rx_descs, 0, space);
 
     for (int i = 0; i < E1000_NUM_RX_DESC; i++) {
-        dev->rx_buffers[i] = must_kmalloc(E1000_RX_BUF_SIZE);
+        dev->rx_buffers[i] = must_valloc(E1000_RX_BUF_SIZE);
 
         dev->rx_descs[i].addr   = vmm_get_phys((uintptr_t) dev->rx_buffers[i]);
         dev->rx_descs[i].status = 0;
@@ -212,7 +212,7 @@ static enum err e1000_pci_init(struct device *dev) {
     uint16_t           did = db->device_id;
     if (did == 0x1000 || did == 0x100E || did == 0x1010 || did == 0x1026 ||
         did == 0x10D3 || did == 0x10F5) {
-        struct e1000_device *device = must_kmalloc(sizeof(struct e1000_device));
+        struct e1000_device *device = must_valloc(sizeof(struct e1000_device));
 
         e1000_init(db, device);
     }

@@ -32,33 +32,33 @@ LOG_HANDLE_EXTERN(slab_flags);
     cc_diagnose_if((align) == 0 || ((align) & ((align) - 1)) != 0,             \
                    "alignment must be a nonzero power of two", "error")
 
-void *kmalloc_new(size_t size, struct alloc_params params) cw_alloc(1)
+void *valloc_new(size_t size, struct alloc_params params) cw_alloc(1)
     cc_warn_unused_result ALLOC_PARAMS_CONTRACT(params)
         ALLOC_SIZE_CONTRACT(size);
-void kfree_new(void *ptr, enum alloc_behavior behavior);
+void vfree_new(void *ptr, enum alloc_behavior behavior);
 
-void *kmalloc_from_domain(domain_id_t domain, size_t size) cw_alloc(2)
+void *valloc_from_domain(domain_id_t domain, size_t size) cw_alloc(2)
     cc_warn_unused_result;
 
-void *kmalloc_full(size_t size, struct alloc_params params) cw_alloc(1)
+void *valloc_full(size_t size, struct alloc_params params) cw_alloc(1)
     cc_warn_unused_result ALLOC_PARAMS_CONTRACT(params)
         ALLOC_SIZE_CONTRACT(size);
 
-void *krealloc_full(void *ptr, size_t size, struct alloc_params params)
+void *vrealloc_full(void *ptr, size_t size, struct alloc_params params)
     cc_alloc_size(2) cc_warn_unused_result ALLOC_PARAMS_CONTRACT(params);
-void kfree_full(void *ptr, enum alloc_behavior behavior);
-size_t ksize(void *ptr);
+void vfree_full(void *ptr, enum alloc_behavior behavior);
+size_t vsize(void *ptr);
 
-void *kmalloc_aligned_full(size_t size, size_t align,
+void *valloc_aligned_full(size_t size, size_t align,
                            struct alloc_params params) cw_alloc(1, 2)
     cc_warn_unused_result ALLOC_PARAMS_CONTRACT(params)
         ALLOC_SIZE_CONTRACT(size) ALLOC_ALIGN_CONTRACT(align);
-void kfree_aligned_full(void *ptr, enum alloc_behavior behavior);
-void kfree_defer_irq(void *ptr);
+void vfree_aligned_full(void *ptr, enum alloc_behavior behavior);
+void vfree_defer_irq(void *ptr);
 
-void *kmalloc_pages(size_t page_count, enum alloc_flags flags) cw_alloc()
+void *valloc_pages(size_t page_count, enum alloc_flags flags) cw_alloc()
     cc_warn_unused_result cc_diagnose_if(!ALLOC_FLAGS_VALID(flags),
                                          "alloc flags set unavailable bits",
                                          "error")
         ALLOC_SIZE_CONTRACT(page_count);
-bool kmalloc_ptr_in_slab_validate(void *ptr);
+bool valloc_ptr_in_slab_validate(void *ptr);

@@ -217,13 +217,13 @@ void slab_percpu_refill(struct slab_domain *dom,
 void slab_domain_percpu_init(struct slab_domain *domain) {
     size_t cpus = domain->domain->num_cores;
     domain->percpu_caches =
-        must_kmalloc(sizeof(struct slab_percpu_cache *) * cpus, ALLOC_ZERO);
+        must_valloc(sizeof(struct slab_percpu_cache *) * cpus, ALLOC_ZERO);
 
     for (size_t i = 0; i < cpus; i++) {
         domain->percpu_caches[i] =
-            must_kmalloc(sizeof(struct slab_percpu_cache), ALLOC_ZERO);
+            must_valloc(sizeof(struct slab_percpu_cache), ALLOC_ZERO);
         for (int j = 0; j < SLAB_MAGAZINE_TYPE_COUNT; j++) {
-            domain->percpu_caches[i]->mags[j] = must_kmalloc(
+            domain->percpu_caches[i]->mags[j] = must_valloc(
                 sizeof(struct slab_magazine) * slab_global.num_sizes,
                 ALLOC_ZERO);
             for (size_t k = 0; k < slab_global.num_sizes; k++) {

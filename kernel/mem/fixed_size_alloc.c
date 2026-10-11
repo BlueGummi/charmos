@@ -184,7 +184,7 @@ fixed_size_range_create(struct fixed_size_range_attributes *attrs) {
         vaddr_t virt = hhdm_paddr_to_vaddr(phys);
         fsr = (void *) virt;
     } else {
-        fsr = kmalloc(sizeof(struct fixed_size_range));
+        fsr = valloc(sizeof(struct fixed_size_range));
         if (!fsr)
             return NULL;
     }

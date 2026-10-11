@@ -649,7 +649,7 @@ static void space_storage_free(struct vas *vas) {
     if (vas->bootstrap_pages) {
         pmm_free_pages(hhdm_ptr_to_paddr(vas), vas->bootstrap_pages);
     } else {
-        kfree(vas);
+        vfree(vas);
     }
 }
 
@@ -696,7 +696,7 @@ static struct vas *space_create(vaddr_t base, vaddr_t limit, bool bootstrap) {
         vas = hhdm_paddr_to_ptr(phys);
         memset(vas, 0, pages * PAGE_SIZE);
     } else {
-        vas = kmalloc(bytes, ALLOC_ZERO,
+        vas = valloc(bytes, ALLOC_ZERO,
                       .behavior =
                           ALLOC_BEHAVIOR_NORMAL | ALLOC_BEHAVIOR_FLAG_MINIMAL);
         if (!vas)

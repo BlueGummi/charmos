@@ -5,7 +5,7 @@
 #include "internal.h"
 
 static atomic_uint8_t *order_map_entry_for(vaddr_t vaddr, bool *high_bits) {
-    kassert(kmalloc_ptr_in_slab_validate((void *) vaddr));
+    kassert(valloc_ptr_in_slab_validate((void *) vaddr));
     vaddr_t vptr_relative = vaddr - SLAB_HEAP_START;
     vaddr_t aligned_2mb = ALIGN_DOWN(vptr_relative, PAGE_2MB);
     vaddr_t aligned_4mb = ALIGN_DOWN(vptr_relative, PAGE_2MB * 2);

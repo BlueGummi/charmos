@@ -50,7 +50,7 @@ void rt_slot_init(size_t num_slots) {
     slot_db.num_slots = num_slots;
     spinlock_init(&slot_db.lock);
     slot_db.slots =
-        must_kmalloc(sizeof(struct rt_slot) * num_slots, ALLOC_ZERO);
+        must_valloc(sizeof(struct rt_slot) * num_slots, ALLOC_ZERO);
 
     for (size_t i = 0; i < num_slots; i++)
         slot_db.slots[i].slot_index = i;

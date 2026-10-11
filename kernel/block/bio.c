@@ -14,7 +14,7 @@ static struct bio_request *create(struct block_device *d, uint64_t lba,
                                   void (*cb)(struct bio_request *), bool write,
                                   void *user, void *buffer) {
 
-    struct bio_request *req = kmalloc(sizeof(struct bio_request), ALLOC_ZERO);
+    struct bio_request *req = valloc(sizeof(struct bio_request), ALLOC_ZERO);
     if (!req)
         return NULL;
 
@@ -24,9 +24,9 @@ static struct bio_request *create(struct block_device *d, uint64_t lba,
     req->sector_count = sec;
     req->priority = p;
     req->on_complete = cb;
-    req->buffer = buffer ? buffer : kmalloc_aligned(size, PAGE_SIZE);
+    req->buffer = buffer ? buffer : valloc_aligned(size, PAGE_SIZE);
     if (!req->buffer) {
-        kfree(req);
+        vfree(req);
         return NULL;
     }
 
@@ -54,5 +54,5 @@ struct bio_request *bio_create_write(struct block_device *d, uint64_t lba,
 }
 
 void bio_request_free(struct bio_request *req) {
-    kfree(req);
+    vfree(req);
 }

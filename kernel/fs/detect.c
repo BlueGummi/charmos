@@ -76,7 +76,7 @@ static enum err detect_mbr_partitions(struct block_device *disk,
         return ERR_IO;
 
     disk->partition_count = count;
-    disk->partitions = kmalloc(sizeof(struct partition) * count, ALLOC_ZERO);
+    disk->partitions = valloc(sizeof(struct partition) * count, ALLOC_ZERO);
     if (cc_unlikely(!disk->partitions))
         return ERR_NO_MEM;
 
@@ -124,7 +124,7 @@ static enum err detect_gpt_partitions(struct block_device *disk,
 
     disk->partition_count = valid_count;
     disk->partitions =
-        kmalloc(sizeof(struct partition) * valid_count, ALLOC_ZERO);
+        valloc(sizeof(struct partition) * valid_count, ALLOC_ZERO);
 
     int idx = 0;
     for (uint32_t i = 0; i < count; i++) {
@@ -202,7 +202,7 @@ static void assign_fs_ops(struct partition *part) {
 }
 
 enum fs_type detect_fs(struct block_device *disk) {
-    uint8_t *sector = kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    uint8_t *sector = valloc_aligned(PAGE_SIZE, PAGE_SIZE);
     if (!sector)
         return FS_UNKNOWN;
 
@@ -211,7 +211,7 @@ enum fs_type detect_fs(struct block_device *disk) {
     if (!disk->read_sector(disk, 0, sector, 1)) {
         fs_detect_info("%s has an unknown filesystem - read failed",
                        disk->name);
-        kfree_aligned(sector);
+        vfree_aligned(sector);
         return FS_UNKNOWN;
     }
 
@@ -231,7 +231,7 @@ enum fs_type detect_fs(struct block_device *disk) {
     if (found_partitions_err < 0) {
         /* No partition table - create one big partition spanning the disk */
         disk->partition_count = 1;
-        disk->partitions = kmalloc(sizeof(struct partition), ALLOC_ZERO);
+        disk->partitions = valloc(sizeof(struct partition), ALLOC_ZERO);
         if (!disk->partitions)
             return FS_UNKNOWN;
 
@@ -248,7 +248,7 @@ enum fs_type detect_fs(struct block_device *disk) {
                        detect_fstr(part->fs_type));
     }
 
-    kfree_aligned(sector);
+    vfree_aligned(sector);
 
     return disk->partition_count > 0 ? disk->partitions[0].fs_type : FS_UNKNOWN;
 }

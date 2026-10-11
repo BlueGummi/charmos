@@ -15,7 +15,7 @@ static void the_apc(void *arg) {
 
 static void the_apc_destroy(struct apc *apc) {
     atomic_inc(&apc_destroyed);
-    kfree(apc);
+    vfree(apc);
 }
 
 static void apc_thread(void *arg) {
@@ -29,10 +29,10 @@ TEST_DEFINE_INTEGRATION(apc, kernel_apc_runs_then_destroys) {
     atomic_store(&apc_ran, false);
     atomic_store(&apc_destroyed, 0);
     ted = thread_spawn("apc_test_thread", apc_thread, .joinable = true);
-    struct apc *a = kmalloc(sizeof(struct apc), ALLOC_ZERO);
+    struct apc *a = valloc(sizeof(struct apc), ALLOC_ZERO);
     if (!a || !ted) {
         if (a)
-            kfree(a);
+            vfree(a);
         if (ted)
             thread_detach(ted);
 
@@ -93,7 +93,7 @@ static void cancelled_apc(void *arg) {
 
 static void cancelled_apc_destroy(struct apc *apc) {
     atomic_inc(&apc_cancel_destroyed);
-    kfree(apc);
+    vfree(apc);
 }
 
 static void apc_cancel_target(void *arg) {
@@ -147,7 +147,7 @@ static void rundown_apc(void *arg) {
 
 static void rundown_apc_destroy(struct apc *apc) {
     atomic_inc(&apc_rundown_destroyed);
-    kfree(apc);
+    vfree(apc);
 }
 
 static void apc_rundown_target(void *arg) {
@@ -247,7 +247,7 @@ static void raced_apc(void *arg) {
 
 static void raced_apc_destroy(struct apc *apc) {
     atomic_inc(&apc_race_destroyed);
-    kfree(apc);
+    vfree(apc);
 }
 
 static void apc_race_target(void *arg) {

@@ -275,16 +275,16 @@ static cc_fn_unused void vtd_unmap(struct iommu_domain *domain, iova_t iova,
 
     size_t page_count = size / PAGE_SIZE;
 
-    struct vtd_walk_state *walks    = kmalloc(page_count * sizeof(*walks));
-    bool                  *unmapped = kmalloc(page_count * sizeof(bool));
+    struct vtd_walk_state *walks    = valloc(page_count * sizeof(*walks));
+    bool                  *unmapped = valloc(page_count * sizeof(bool));
     if (!walks || !unmapped) {
         for (size_t off = 0; off < size; off += PAGE_SIZE) {
             struct vtd_walk_state dummy;
             vtd_sl_unmap_locked(vd->sl_pgd, iova + off, &dummy);
         }
         vtd_iotlb_flush_range_batched(u, vd->domain_id, iova, size);
-        kfree(walks);
-        kfree(unmapped);
+        vfree(walks);
+        vfree(unmapped);
         return;
     }
 
@@ -302,6 +302,6 @@ static cc_fn_unused void vtd_unmap(struct iommu_domain *domain, iova_t iova,
             vtd_sl_reclaim_walk(&walks[i]);
     }
 
-    kfree(walks);
-    kfree(unmapped);
+    vfree(walks);
+    vfree(unmapped);
 }

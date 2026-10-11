@@ -10,30 +10,30 @@
                                 .priority = ALLOC_PRIORITY_DEFAULT,            \
                                 ##__VA_ARGS__}))
 
-#define kfree_1(ptr) kfree_2((ptr), ALLOC_BEHAVIOR_DEFAULT)
-#define kfree_2(ptr, bh) kfree_full((ptr), (bh))
+#define vfree_1(ptr) vfree_2((ptr), ALLOC_BEHAVIOR_DEFAULT)
+#define vfree_2(ptr, bh) vfree_full((ptr), (bh))
 
-#define kfree(...) PP_CALL(kfree, __VA_ARGS__)
+#define vfree(...) PP_CALL(vfree, __VA_ARGS__)
 
-#define kmalloc(size, ...)                                                     \
-    kmalloc_full((size), alloc_params_with_defaults(ALLOC_FLAGS_DEFAULT,       \
+#define valloc(size, ...)                                                     \
+    valloc_full((size), alloc_params_with_defaults(ALLOC_FLAGS_DEFAULT,       \
                                                     ALLOC_BEHAVIOR_DEFAULT,    \
                                                     ##__VA_ARGS__))
 
-#define kmalloc_aligned(size, align, ...)                                      \
-    kmalloc_aligned_full((size), (align),                                      \
+#define valloc_aligned(size, align, ...)                                      \
+    valloc_aligned_full((size), (align),                                      \
                          alloc_params_with_defaults(ALLOC_FLAGS_DEFAULT,       \
                                                     ALLOC_BEHAVIOR_DEFAULT,    \
                                                     ##__VA_ARGS__))
 
-#define kfree_aligned_1(ptr) kfree_aligned_2((ptr), ALLOC_BEHAVIOR_DEFAULT)
-#define kfree_aligned_2(ptr, bh) kfree_aligned_full((ptr), (bh))
-#define kfree_aligned(...) PP_CALL(kfree_aligned, __VA_ARGS__)
+#define vfree_aligned_1(ptr) vfree_aligned_2((ptr), ALLOC_BEHAVIOR_DEFAULT)
+#define vfree_aligned_2(ptr, bh) vfree_aligned_full((ptr), (bh))
+#define vfree_aligned(...) PP_CALL(vfree_aligned, __VA_ARGS__)
 
-#define krealloc(ptr, size, ...)                                               \
-    krealloc_full((ptr), (size),                                               \
+#define vrealloc(ptr, size, ...)                                               \
+    vrealloc_full((ptr), (size),                                               \
                   alloc_params_with_defaults(ALLOC_FLAGS_DEFAULT,              \
                                              ALLOC_BEHAVIOR_DEFAULT,           \
                                              ##__VA_ARGS__))
 
-#define knew(ptr, ...) ((ptr) = kmalloc(sizeof(*(ptr)), ##__VA_ARGS__))
+#define knew(ptr, ...) ((ptr) = valloc(sizeof(*(ptr)), ##__VA_ARGS__))

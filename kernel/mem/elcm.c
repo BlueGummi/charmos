@@ -264,7 +264,7 @@ enum err elcm(struct elcm_params *params) {
 
     size_t size = max_pages * sizeof(struct elcm_candidate);
     struct elcm_candidate *candidates =
-        params->alloc_fn ? params->alloc_fn(size) : must_kmalloc(size);
+        params->alloc_fn ? params->alloc_fn(size) : must_valloc(size);
 
     if (!candidates)
         return ERR_NO_MEM;
@@ -323,14 +323,14 @@ enum err elcm(struct elcm_params *params) {
     }
 
     if (cand_count == 0) {
-        params->free_fn ? params->free_fn(candidates, size) : kfree(candidates);
+        params->free_fn ? params->free_fn(candidates, size) : vfree(candidates);
         params->out = create_candidate_for_pages(params, best_possible);
         return ERR_OK;
     }
 
     if (cand_count == 1) {
         struct elcm_candidate single = candidates[0];
-        params->free_fn ? params->free_fn(candidates, size) : kfree(candidates);
+        params->free_fn ? params->free_fn(candidates, size) : vfree(candidates);
         params->out = single;
         return ERR_OK;
     }
@@ -382,7 +382,7 @@ enum err elcm(struct elcm_params *params) {
         }
     }
 
-    params->free_fn ? params->free_fn(candidates, size) : kfree(candidates);
+    params->free_fn ? params->free_fn(candidates, size) : vfree(candidates);
     params->out = best;
     return ERR_OK;
 }

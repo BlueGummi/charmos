@@ -41,7 +41,7 @@ static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
     uint64_t offset    = (uintptr_t) buffer & (PAGE_SIZE - 1);
     uint64_t num_pages = PAGES_NEEDED_FOR(offset + size);
 
-    data->prps = kmalloc(sizeof(uint64_t) * num_pages);
+    data->prps = valloc(sizeof(uint64_t) * num_pages);
     if (!data->prps)
         return false;
 
@@ -98,12 +98,12 @@ static bool nvme_setup_prps(struct nvme_command  *cmd,
 
     /* List page has everything needed by the controller */
 free_prps:
-    kfree(data->prps);
+    vfree(data->prps);
     data->prps = NULL;
     return true;
 
 free_prps_fail:
-    kfree(data->prps);
+    vfree(data->prps);
     data->prps = NULL;
     return false;
 }
@@ -127,12 +127,12 @@ static bool rw_send_command(struct block_device *disk, struct nvme_request *req,
     }
 
     struct nvme_bio_data *data =
-        kmalloc(sizeof(struct nvme_bio_data), ALLOC_ZERO);
+        valloc(sizeof(struct nvme_bio_data), ALLOC_ZERO);
     if (!data)
         return false;
 
     if (!nvme_bio_fill_prps(data, buffer, count * disk->sector_size)) {
-        kfree(data);
+        vfree(data);
         return false;
     }
 
@@ -147,7 +147,7 @@ static bool rw_send_command(struct block_device *disk, struct nvme_request *req,
 
     if (!nvme_setup_prps(&cmd, data)) {
         req->bio_data = NULL;
-        kfree(data);
+        vfree(data);
         return false;
     }
 
@@ -163,8 +163,8 @@ static bool rw_send_command(struct block_device *disk, struct nvme_request *req,
         if (data->prp_list_phys)
             pmm_free_page(data->prp_list_phys);
 
-        kfree(data->prps);
-        kfree(data);
+        vfree(data->prps);
+        vfree(data);
         req->bio_data = NULL;
 
         enqueue_request(nvme, req);

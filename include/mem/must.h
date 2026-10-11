@@ -15,5 +15,5 @@
         _p_;                                                                   \
     })
 
-#define must_kmalloc(...) must(kmalloc(__VA_ARGS__))
-#define must_krealloc(...) must(krealloc(__VA_ARGS__))
+#define must_valloc(...) must(valloc(__VA_ARGS__))
+#define must_vrealloc(...) must(vrealloc(__VA_ARGS__))

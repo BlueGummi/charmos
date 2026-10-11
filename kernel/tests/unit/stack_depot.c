@@ -141,7 +141,7 @@ TEST_DEFINE_UNIT(stack_depot, hash_bucket) {
 TEST_DEFINE_UNIT(stack_depot, bulk_save_roundtrip,
                  TEST_INTENSITY(128, 1024, 4096)) {
     size_t count = ctx->intensity_val ? ctx->intensity_val : SD_MANY;
-    stack_handle_t *handles = kmalloc(sizeof(*handles) * count, ALLOC_ZERO);
+    stack_handle_t *handles = valloc(sizeof(*handles) * count, ALLOC_ZERO);
     TEST_ASSERT_NONNULL(handles);
 
     prng_seed(SD_SEED);
@@ -154,7 +154,7 @@ TEST_DEFINE_UNIT(stack_depot, bulk_save_roundtrip,
             /* OOM? Unwind + skip */
             for (size_t j = 0; j < i; j++)
                 stack_depot_put(handles[j]);
-            kfree(handles);
+            vfree(handles);
             return TEST_SKIP(TEST_SKIP_RAM_LOW);
         }
     }
@@ -182,7 +182,7 @@ TEST_DEFINE_UNIT(stack_depot, bulk_save_roundtrip,
     for (size_t i = 0; i < count; i++)
         stack_depot_put(handles[i]);
 
-    kfree(handles);
+    vfree(handles);
     return TEST_SUCCESS;
 }
 

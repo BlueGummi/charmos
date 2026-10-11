@@ -167,7 +167,7 @@ static void usb_kbd_worker(void *arg) {
 
 struct usb_hid_keyboard *usb_keyboard_create(struct usb_device   *dev,
                                              struct usb_endpoint *ep) {
-    struct usb_hid_keyboard *kbd = kmalloc(sizeof(*kbd), ALLOC_ZERO);
+    struct usb_hid_keyboard *kbd = valloc(sizeof(*kbd), ALLOC_ZERO);
 
     kbd->dev = dev;
     kbd->ep  = ep;
@@ -203,16 +203,16 @@ enum usb_error usb_keyboard_bringup(struct usb_device *dev) {
 
     uint8_t iface_num = intf->interface_number;
 
-    uint8_t *report_buf = kmalloc_aligned(256, PAGE_SIZE, ALLOC_ZERO);
+    uint8_t *report_buf = valloc_aligned(256, PAGE_SIZE, ALLOC_ZERO);
 
     enum usb_error err = USB_OK;
     if ((err = usb_keyboard_get_descriptor(dev, iface_num, 256, report_buf)) !=
         USB_OK) {
-        kfree_aligned(report_buf);
+        vfree_aligned(report_buf);
         return err;
     }
 
-    kfree_aligned(report_buf);
+    vfree_aligned(report_buf);
 
     for (uint8_t i = 0; i < dev->num_endpoints; i++) {
         struct usb_endpoint *ep = dev->endpoints[i];
@@ -235,7 +235,7 @@ void usb_keyboard_teardown(struct usb_device *dev) {
 }
 
 void usb_keyboard_free(struct usb_device *dev) {
-    kfree(dev->driver_private);
+    vfree(dev->driver_private);
     usbkb_log(LOG_INFO, "Keyboard disconnected");
 }
 

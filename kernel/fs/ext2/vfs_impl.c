@@ -257,7 +257,7 @@ static struct vfs_node *make_vfs_node(struct ext2_fs *fs,
     if (!node || !fname || !fs)
         return NULL;
 
-    struct vfs_node *ret = kmalloc(sizeof(struct vfs_node), ALLOC_ZERO);
+    struct vfs_node *ret = valloc(sizeof(struct vfs_node), ALLOC_ZERO);
     if (!ret)
         return NULL;
 
@@ -278,7 +278,7 @@ static struct vfs_node *make_vfs_node(struct ext2_fs *fs,
 }
 
 static struct vfs_dirent *ext2_to_vfs_dirent(struct ext2_dir_entry *ext2) {
-    struct vfs_dirent *dirent = kmalloc(sizeof(struct vfs_dirent), ALLOC_ZERO);
+    struct vfs_dirent *dirent = valloc(sizeof(struct vfs_dirent), ALLOC_ZERO);
     if (!dirent)
         return NULL;
 
@@ -371,9 +371,9 @@ enum err ext2_mount(struct partition *p, struct ext2_fs *fs,
     fs->group_desc =
         (void *) ext2_block_read(fs, gdt_block, &fs->gdesc_cache_ent);
 
-    struct ext2_inode *inode = kmalloc(sizeof(struct ext2_inode), ALLOC_ZERO);
+    struct ext2_inode *inode = valloc(sizeof(struct ext2_inode), ALLOC_ZERO);
     struct ext2_full_inode *f =
-        kmalloc(sizeof(struct ext2_full_inode), ALLOC_ZERO);
+        valloc(sizeof(struct ext2_full_inode), ALLOC_ZERO);
     if (!f || !inode)
         return ERR_NO_MEM;
 
@@ -385,7 +385,7 @@ enum err ext2_mount(struct partition *p, struct ext2_fs *fs,
         return ERR_IO;
 
     if (!out_node) {
-        kfree(f);
+        vfree(f);
         bcache_ent_release(root_ent);
         return ERR_OK;
     }
@@ -393,7 +393,7 @@ enum err ext2_mount(struct partition *p, struct ext2_fs *fs,
     memcpy(&f->node, inode, sizeof(struct ext2_inode));
 
     f->inode_num = EXT2_ROOT_INODE;
-    kfree(inode);
+    vfree(inode);
 
     out_node->open_handles += 1;
     out_node->flags = ext2_to_vfs_flags(f->node.flags);
@@ -448,7 +448,7 @@ enum err ext2_vfs_readdir(struct vfs_node *node, struct vfs_dirent *out,
     struct ext2_fs *fs = node->fs_data;
 
     struct ext2_dir_entry *ext2_out =
-        kmalloc(sizeof(struct ext2_dir_entry), ALLOC_ZERO);
+        valloc(sizeof(struct ext2_dir_entry), ALLOC_ZERO);
     if (cc_unlikely(!ext2_out))
         return ERR_NO_MEM;
 

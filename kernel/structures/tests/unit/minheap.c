@@ -9,7 +9,7 @@ static void mhtest_do_inserts(struct minheap *mh, struct minheap_node **nodes,
                               size_t count) {
     for (size_t i = 0; i < count; i++) {
         struct minheap_node *mhn =
-            kmalloc(sizeof(struct minheap_node), ALLOC_ZERO);
+            valloc(sizeof(struct minheap_node), ALLOC_ZERO);
         MINHEAP_NODE_SET_KEY(mhn, count - i);
         nodes[i] = mhn;
         minheap_insert(mh, mhn, MINHEAP_NODE_KEY(mhn));
@@ -20,7 +20,7 @@ TEST_DEFINE_UNIT(minheap, insert_remove_pop_order,
                  TEST_INTENSITY(10, 50, 1024)) {
     size_t count = ctx->intensity_val ? ctx->intensity_val : 50;
     struct minheap_node **nodes =
-        kmalloc(sizeof(struct minheap_node *) * count, ALLOC_ZERO);
+        valloc(sizeof(struct minheap_node *) * count, ALLOC_ZERO);
     TEST_ASSERT_NONNULL(nodes);
 
     struct minheap *mh = minheap_create();
@@ -30,7 +30,7 @@ TEST_DEFINE_UNIT(minheap, insert_remove_pop_order,
     for (size_t i = 0; i < count; i++) {
         struct minheap_node *mhn = nodes[i];
         minheap_remove(mh, mhn);
-        kfree(mhn);
+        vfree(mhn);
         nodes[i] = NULL;
     }
 
@@ -41,6 +41,6 @@ TEST_DEFINE_UNIT(minheap, insert_remove_pop_order,
     struct minheap_node *popped = minheap_pop(mh);
     TEST_ASSERT_EQ(MINHEAP_NODE_KEY(popped), 1);
 
-    kfree(nodes);
+    vfree(nodes);
     return TEST_SUCCESS;
 }

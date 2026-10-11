@@ -27,7 +27,7 @@ TEST_DEFINE_INTEGRATION(sched, push_target, TEST_INTENSITY(32, 256, 1024),
     atomic_store(&at_least_one_migrated, false);
 
     struct thread **pushed =
-        kmalloc(sizeof(struct thread *) * count, ALLOC_ZERO);
+        valloc(sizeof(struct thread *) * count, ALLOC_ZERO);
     TEST_ASSERT_NONNULL(pushed);
 
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
@@ -45,6 +45,6 @@ TEST_DEFINE_INTEGRATION(sched, push_target, TEST_INTENSITY(32, 256, 1024),
 
     TEST_ASSERT_EQ(atomic_load(&left), 0);
 
-    kfree(pushed);
+    vfree(pushed);
     return TEST_SUCCESS;
 }

@@ -302,7 +302,7 @@ bool ext2_walk_dir(struct ext2_fs *fs, struct ext2_full_inode *dir,
                    dir_entry_callback cb, void *ctx);
 
 static inline void ext2_dealloc_inode(struct ext2_full_inode *ino) {
-    kfree(ino);
+    vfree(ino);
 }
 
 static inline uint32_t ext2_get_block_group(struct ext2_fs *fs,

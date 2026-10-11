@@ -8,7 +8,7 @@
 
 struct clock_evdev_group *clock_evdev_group_create(const char *name, ...) {
     struct clock_evdev_group *cedg =
-        kmalloc(sizeof(struct clock_evdev_group), ALLOC_ZERO);
+        valloc(sizeof(struct clock_evdev_group), ALLOC_ZERO);
 
     if (!cedg)
         return NULL;
@@ -20,7 +20,7 @@ struct clock_evdev_group *clock_evdev_group_create(const char *name, ...) {
     va_end(args);
 
     if (ret == ERR_NO_MEM) {
-        kfree(cedg);
+        vfree(cedg);
         return NULL;
     }
 
@@ -28,7 +28,7 @@ struct clock_evdev_group *clock_evdev_group_create(const char *name, ...) {
 }
 
 struct clock_evdev *clock_evdev_create(const char *name, ...) {
-    struct clock_evdev *ced = kmalloc(sizeof(struct clock_evdev), ALLOC_ZERO);
+    struct clock_evdev *ced = valloc(sizeof(struct clock_evdev), ALLOC_ZERO);
     if (!ced)
         return NULL;
 
@@ -40,7 +40,7 @@ struct clock_evdev *clock_evdev_create(const char *name, ...) {
     va_end(args);
 
     if (ret == ERR_NO_MEM) {
-        kfree(ced);
+        vfree(ced);
         return NULL;
     }
 

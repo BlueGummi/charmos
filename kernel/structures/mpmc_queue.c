@@ -8,7 +8,7 @@
 void *mpmc_slots_alloc(struct mpmc_hdr *h, size_t cap, size_t stride) {
     cap = MAX(next_pow2(cap), MPMC_QUEUE_MIN_CAPACITY);
 
-    uint8_t *slots = kmalloc(stride * cap, ALLOC_ZERO);
+    uint8_t *slots = valloc(stride * cap, ALLOC_ZERO);
     if (!slots)
         return NULL;
 
@@ -23,7 +23,7 @@ void *mpmc_slots_alloc(struct mpmc_hdr *h, size_t cap, size_t stride) {
 
 void mpmc_slots_free(struct mpmc_hdr *h, void *slots) {
     if (slots)
-        kfree(slots);
+        vfree(slots);
 
     h->mask = 0;
 }

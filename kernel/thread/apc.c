@@ -308,11 +308,11 @@ bool apc_cancel(struct thread *t, struct apc *a) {
 }
 
 struct apc *apc_create(void) {
-    return kmalloc(sizeof(struct apc));
+    return valloc(sizeof(struct apc));
 }
 
 struct event_apc *apc_event_apc_create(void) {
-    return kmalloc(sizeof(struct event_apc));
+    return valloc(sizeof(struct event_apc));
 }
 
 void apc_init(struct apc *a, apc_func_t fn, void *arg1, apc_destroy_t destroy) {
@@ -350,7 +350,7 @@ void apc_put(struct apc *a) {
 }
 
 void apc_destroy_free(struct apc *a) {
-    kfree(a);
+    vfree(a);
 }
 
 static void apc_queue_splice(struct apc_queue *from, struct apc_queue *to) {

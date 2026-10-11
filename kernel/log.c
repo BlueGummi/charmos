@@ -556,7 +556,7 @@ void log_sites_init(void) {
         refcount_init(&s->refcount, 1);
         struct log_ringbuf *lrb = &s->rb;
         kassert(s->capacity);
-        lrb->slots = must_kmalloc(sizeof(struct log_ring_slot) * s->capacity,
+        lrb->slots = must_valloc(sizeof(struct log_ring_slot) * s->capacity,
                                   ALLOC_ZERO);
 
         for (size_t i = 0; i < s->capacity; i++) {
@@ -589,13 +589,13 @@ void log_dump_panic(void) TSA_NO_ANALYSIS {
 
 void log_site_free(struct log_site *site) {
     locked_list_del(&log_global.list, &site->list);
-    kfree(site->rb.slots);
-    kfree(site->name);
-    kfree_aligned(site, _Alignof(struct log_site));
+    vfree(site->rb.slots);
+    vfree(site->name);
+    vfree_aligned(site, _Alignof(struct log_site));
 }
 
 struct log_site *log_site_create(struct log_site_options opts) {
-    struct log_site *ret = kmalloc_aligned(
+    struct log_site *ret = valloc_aligned(
         sizeof(struct log_site), _Alignof(struct log_site), ALLOC_ZERO);
     if (!ret)
         return NULL;
@@ -605,7 +605,7 @@ struct log_site *log_site_create(struct log_site_options opts) {
         goto err;
 
     struct log_ring_slot *slots =
-        kmalloc(sizeof(struct log_ring_slot) * opts.capacity, ALLOC_ZERO);
+        valloc(sizeof(struct log_ring_slot) * opts.capacity, ALLOC_ZERO);
     if (!slots)
         goto err;
 
@@ -629,11 +629,11 @@ struct log_site *log_site_create(struct log_site_options opts) {
 err:
 
     if (ret) {
-        kfree(ret->rb.slots);
-        kfree(ret->name);
+        vfree(ret->rb.slots);
+        vfree(ret->name);
     }
 
-    kfree_aligned(ret, _Alignof(struct log_site));
+    vfree_aligned(ret, _Alignof(struct log_site));
     return NULL;
 }
 

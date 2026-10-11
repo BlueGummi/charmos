@@ -5,12 +5,12 @@ TEST_DEFINE_SMOKE(slab, demand_growth) {
     void *ptrs[count];
 
     for (size_t i = 0; i < count; i++) {
-        ptrs[i] = kmalloc(512);
+        ptrs[i] = valloc(512);
         TEST_ASSERT_NONNULL(ptrs[i]);
     }
 
     for (size_t i = 0; i < count; i++) {
-        kfree(ptrs[i]);
+        vfree(ptrs[i]);
     }
 
     return TEST_SUCCESS;

@@ -560,7 +560,7 @@ static bool parse_list_internal(const char *str, struct parse_list *out) {
     if (!out)
         return true;
 
-    char **items = kmalloc(count * sizeof(char *), ALLOC_ZERO);
+    char **items = valloc(count * sizeof(char *), ALLOC_ZERO);
     if (!items)
         return false;
 
@@ -585,11 +585,11 @@ static bool parse_list_internal(const char *str, struct parse_list *out) {
                 begin++;
                 end--;
             }
-            char *text = kmalloc((size_t) (end - begin) + 1, ALLOC_ZERO);
+            char *text = valloc((size_t) (end - begin) + 1, ALLOC_ZERO);
             if (!text) {
                 for (size_t k = 0; k < item; k++)
-                    kfree(items[k]);
-                kfree(items);
+                    vfree(items[k]);
+                vfree(items);
                 return false;
             }
             parse_unescape(text, begin, end);
@@ -651,9 +651,9 @@ void parse_list_free(struct parse_list *list) {
         return;
     for (size_t i = 0; i < list->count; i++) {
         if (list->items[i])
-            kfree(list->items[i]);
+            vfree(list->items[i]);
     }
-    kfree(list->items);
+    vfree(list->items);
     list->items = NULL;
     list->count = 0;
 }

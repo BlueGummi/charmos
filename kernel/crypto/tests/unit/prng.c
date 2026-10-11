@@ -10,7 +10,7 @@ TEST_DEFINE_UNIT(prng, same_seed_replays_sequence,
     size_t samples = ctx->intensity_val ? ctx->intensity_val : 256;
     uint64_t seed_val = 0xDEADBEEFCAFEULL;
     uint64_t *seq1 =
-        kmalloc(samples * sizeof(uint64_t), .flags = ALLOC_FLAGS_NONE);
+        valloc(samples * sizeof(uint64_t), .flags = ALLOC_FLAGS_NONE);
     TEST_ASSERT_NONNULL(seq1);
 
     prng_seed(seed_val);
@@ -26,7 +26,7 @@ TEST_DEFINE_UNIT(prng, same_seed_replays_sequence,
     for (size_t i = 1; i < samples; i++)
         TEST_ASSERT_NE(seq1[i], seq1[i - 1]);
 
-    kfree(seq1);
+    vfree(seq1);
     return TEST_SUCCESS;
 }
 
@@ -34,7 +34,7 @@ TEST_DEFINE_UNIT(prng, splitmix64_determinism, TEST_INTENSITY(16, 256, 65536)) {
     size_t samples = ctx->intensity_val ? ctx->intensity_val : 256;
     uint64_t seed_val = 0x123456789ABCDEF0ULL;
     uint64_t *seq1 =
-        kmalloc(samples * sizeof(uint64_t), .flags = ALLOC_FLAGS_NONE);
+        valloc(samples * sizeof(uint64_t), .flags = ALLOC_FLAGS_NONE);
     TEST_ASSERT_NONNULL(seq1);
 
     uint64_t state1 = seed_val;
@@ -50,6 +50,6 @@ TEST_DEFINE_UNIT(prng, splitmix64_determinism, TEST_INTENSITY(16, 256, 65536)) {
     for (size_t i = 1; i < samples; i++)
         TEST_ASSERT_NE(seq1[i], seq1[i - 1]);
 
-    kfree(seq1);
+    vfree(seq1);
     return TEST_SUCCESS;
 }

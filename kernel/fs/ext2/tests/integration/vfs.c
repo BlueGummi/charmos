@@ -116,7 +116,7 @@ TEST_DEFINE_INTEGRATION(ext2, symlink, TEST_INTENSITY(1, 1, 16),
     node = ent.node;
     TEST_ASSERT_NONNULL(node);
 
-    char *buf = kmalloc(5, ALLOC_ZERO);
+    char *buf = valloc(5, ALLOC_ZERO);
     TEST_ASSERT_NONNULL(buf);
 
     TEST_ASSERT(!ERR_IS_FATAL(node->ops->readlink(node, buf, 4)));

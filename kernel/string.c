@@ -221,7 +221,7 @@ char *strdup(const char *str) {
     while (str[len] != '\0')
         len++;
 
-    char *copy = (char *) kmalloc(len + 1);
+    char *copy = (char *) valloc(len + 1);
     if (!copy)
         return NULL;
 
@@ -585,7 +585,7 @@ char *strndup(const char *str, size_t n) {
     if (!str)
         return NULL;
     size_t len = strnlen(str, n);
-    char *copy = (char *) kmalloc(len + 1);
+    char *copy = (char *) valloc(len + 1);
     if (!copy)
         return NULL;
     memcpy(copy, str, len);
@@ -827,7 +827,7 @@ int vasprintf(char **strp, const char *fmt, va_list args) {
 
     size_t size = (size_t) needed + 1;
 
-    char *buf = (char *) kmalloc(size, ALLOC_ZERO);
+    char *buf = (char *) valloc(size, ALLOC_ZERO);
     if (!buf)
         return ERR_NO_MEM;
 
@@ -836,7 +836,7 @@ int vasprintf(char **strp, const char *fmt, va_list args) {
     va_end(args_copy);
 
     if (written < 0) {
-        kfree(buf);
+        vfree(buf);
         return ERR_INVAL;
     }
 

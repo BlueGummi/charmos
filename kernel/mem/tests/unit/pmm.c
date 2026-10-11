@@ -3,7 +3,7 @@
 TEST_DEFINE_UNIT(mem, pmm_alloc_free_stress, TEST_INTENSITY(256, 2048, 32768),
                  .min_ram_mib = 8) {
     size_t iters = ctx->intensity_val ? ctx->intensity_val : 2048;
-    paddr_t *pmm_stress_test_ptrs = kmalloc(sizeof(paddr_t) * iters);
+    paddr_t *pmm_stress_test_ptrs = valloc(sizeof(paddr_t) * iters);
     TEST_ASSERT_NONNULL(pmm_stress_test_ptrs);
 
     for (size_t i = 0; i < iters; i++) {
@@ -15,6 +15,6 @@ TEST_DEFINE_UNIT(mem, pmm_alloc_free_stress, TEST_INTENSITY(256, 2048, 32768),
         pmm_free_page(pmm_stress_test_ptrs[i]);
     }
 
-    kfree(pmm_stress_test_ptrs);
+    vfree(pmm_stress_test_ptrs);
     return TEST_SUCCESS;
 }

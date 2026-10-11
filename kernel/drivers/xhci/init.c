@@ -15,7 +15,7 @@
 
 void xhci_setup_event_ring(struct xhci_device *dev) {
     struct xhci_erst_entry *erst =
-        kmalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO);
+        valloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO);
 
     paddr_t erst_phys = vmm_get_phys((vaddr_t) erst);
 
@@ -38,7 +38,7 @@ void xhci_setup_command_ring(struct xhci_device *dev) {
     uintptr_t trb_phys                = dev->cmd_ring->phys;
 
     struct xhci_dcbaa *dcbaa_virt =
-        kmalloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO);
+        valloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO);
     uintptr_t dcbaa_phys = vmm_get_phys((uintptr_t) dcbaa_virt);
 
     dev->dcbaa = dcbaa_virt;
@@ -98,7 +98,7 @@ uint8_t xhci_enable_slot(struct xhci_device *dev) {
     return TRB_SLOT(request.return_control);
 }
 
-/* kmalloc state for DISABLE SLOT command because lifetime requires this
+/* valloc state for DISABLE SLOT command because lifetime requires this
  * outlives the caller */
 struct xhci_disable_slot_async {
     struct xhci_request req;
@@ -109,7 +109,7 @@ struct xhci_disable_slot_async {
 static void xhci_disable_slot_done(struct xhci_device  *dev,
                                    struct xhci_request *req) {
     cc_unused(dev);
-    kfree(container_of(req, struct xhci_disable_slot_async, req));
+    vfree(container_of(req, struct xhci_disable_slot_async, req));
 }
 
 /* DISABLE SLOT is issued asynchronously: its completion result is never
@@ -126,7 +126,7 @@ static void xhci_disable_slot_done(struct xhci_device  *dev,
  * before any later ENABLE SLOT, so slot reuse is
  * still safe. */
 void xhci_disable_slot(struct xhci_device *dev, uint8_t slot_id) {
-    struct xhci_disable_slot_async *a = kmalloc(sizeof(*a), ALLOC_ZERO);
+    struct xhci_disable_slot_async *a = valloc(sizeof(*a), ALLOC_ZERO);
     if (!a)
         return;
 
@@ -153,7 +153,7 @@ void xhci_disable_slot(struct xhci_device *dev, uint8_t slot_id) {
     };
 
     if (!xhci_send_command(dev, &a->cmd))
-        kfree(a);
+        vfree(a);
 }
 
 static enum usb_error xhci_spin_wait_port_reset(uint32_t cc_mem_io *portsc,
@@ -319,7 +319,7 @@ void cc_mem_io *xhci_map_mmio(uint8_t bus, uint8_t slot, uint8_t func) {
 }
 
 struct xhci_device *xhci_device_create(void cc_mem_io *mmio) {
-    struct xhci_device *dev = kmalloc(sizeof(struct xhci_device), ALLOC_ZERO);
+    struct xhci_device *dev = valloc(sizeof(struct xhci_device), ALLOC_ZERO);
     if (cc_unlikely(!dev))
         panic("Could not allocate space for XHCI device");
 
@@ -381,14 +381,14 @@ enum usb_error xhci_port_init(struct xhci_port *p) {
     enum usb_error      err  = USB_OK;
     uint8_t             slot_id;
     struct usb_device  *usb;
-    if (!(usb = kmalloc(sizeof(struct usb_device), ALLOC_ZERO))) {
+    if (!(usb = valloc(sizeof(struct usb_device), ALLOC_ZERO))) {
         return USB_ERR_OOM;
     }
 
     xhci_trace("reset_port sent");
     if ((err = xhci_reset_port(dev, port)) != USB_OK) {
         xhci_trace("reset_port fail");
-        kfree(usb);
+        vfree(usb);
         return err;
     }
 
@@ -397,7 +397,7 @@ enum usb_error xhci_port_init(struct xhci_port *p) {
     xhci_trace("enable_slot sent");
     if ((slot_id = xhci_enable_slot(dev)) == 0) {
         xhci_trace("enable_slot fail");
-        kfree(usb);
+        vfree(usb);
         return USB_ERR_NO_DEVICE;
     }
     xhci_trace("enable_slot returned");
@@ -414,7 +414,7 @@ enum usb_error xhci_port_init(struct xhci_port *p) {
     if (!(xhci_read_portsc(dev, port) & PORTSC_CCS)) {
         xhci_debug("port %u departed before address_device; aborting", port);
         xhci_disable_slot(dev, slot_id);
-        kfree(usb);
+        vfree(usb);
         return USB_ERR_NO_DEVICE;
     }
 
@@ -428,7 +428,7 @@ enum usb_error xhci_port_init(struct xhci_port *p) {
         xhci_trace("disable_slot sent");
         xhci_disable_slot(dev, slot_id);
         xhci_trace("disable_slot returned");
-        kfree(usb);
+        vfree(usb);
         return err;
     }
     xhci_trace("address_device returned");
