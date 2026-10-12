@@ -139,7 +139,7 @@ struct dpc *dpc_create(dpc_func_t fn, void *a, void *b) {
 }
 
 static void dpc_fanout_wrapper(void *fn, void *latch) {
-    ((dpc_fanout_fn_t) fn)();
+    any_fn_to(any_fn_from_data(fn), dpc_fanout_fn_t)();
     once_latch_count_down((struct once_latch *) latch);
 }
 
@@ -157,7 +157,8 @@ void dpc_fanout(struct dpc *storage, struct cpu_mask cpus, dpc_fanout_fn_t fn) {
     size_t slot = 0;
     size_t cpu;
     cpu_mask_for_each(cpu, cpus) {
-        dpc_init(&storage[slot], dpc_fanout_wrapper, (void *) fn, &latch);
+        dpc_init(&storage[slot], dpc_fanout_wrapper,
+                 any_fn_to_data(any_fn_from(fn)), &latch);
         dpc_enqueue_on_cpu(cpu, &storage[slot]);
         slot++;
     }

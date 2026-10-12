@@ -74,7 +74,47 @@ typedef ptrdiff_t ssize_t;
 typedef __int128_t int128_t;
 typedef __uint128_t uint128_t;
 
-typedef void (*fn_ptr_t)(void);
+/* "generic" function pointer, our low budget "We have _Any_func at home"
+ * while C2y deliberates. Probably the only place where we typedef
+ * a struct for a piece of the kernel proper, and using an address_space
+ * on Clang */
+struct any_fn_uncallable;
+typedef struct {
+#if defined(cn_id_clang)
+    void cc_mem_any_fn *erased;
+#else
+    void (*erased)(struct any_fn_uncallable);
+#endif
+} any_fn_t;
+ct_assert_same_size(any_fn_t, uintptr_t);
+
+#define any_fn_erase(addr)                                                     \
+    ((any_fn_t) {.erased = (typeof(((any_fn_t *) 0)->erased)) (addr)})
+
+/* Constant expression for a function in static init */
+#define any_fn_from(fn)                                                        \
+    any_fn_erase(                                                              \
+        (uintptr_t) (fn) +                                                     \
+        ct_expr_assert_zero(ct_is_fn_ptr(fn), "`" #fn "` is not a function"))
+
+#define any_fn_to(any, T)                                                      \
+    (ct_typecheck(any_fn_t, any),                                              \
+     (T) ((uintptr_t) (any).erased +                                           \
+          ct_expr_assert_zero(ct_is_fn_ptr((T) 0),                             \
+                              "`" #T "` is not a function pointer type")))
+
+#define any_fn_eq(a, b)                                                        \
+    (ct_typecheck(any_fn_t, a), ct_typecheck(any_fn_t, b),                     \
+     (a).erased == (b).erased)
+
+#define any_fn_is_null(any) (ct_typecheck(any_fn_t, any), (any).erased == NULL)
+
+/* Sneak it through a void * data slot, which is ok on our targets */
+#define any_fn_to_data(any)                                                    \
+    (ct_typecheck(any_fn_t, any), (void *) (uintptr_t) (any).erased)
+
+#define any_fn_from_data(ptr)                                                  \
+    (ct_typecheck(void *, ptr), any_fn_erase((uintptr_t) (ptr)))
 
 #define CPU_PERF_MAX INT8_MAX
 #define CPU_PERF_MIN INT8_MIN

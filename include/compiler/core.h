@@ -183,6 +183,12 @@
 #define cc_mem_rcu
 #endif
 
+#if defined(cn_id_clang)
+#define cc_mem_any_fn __attribute__((address_space(3), noderef))
+#else
+#define cc_mem_any_fn
+#endif
+
 /* ==== Preprocessor Metaprogramming ==== */
 
 #define PP_ARG_N(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14,  \
@@ -344,6 +350,8 @@
 #define ct_field_offset(type, member) __builtin_offsetof(type, member)
 
 #define ct_is_pointer(x) (__builtin_classify_type(x) == 5)
+#define ct_is_fn_ptr(x)                                                        \
+    __builtin_types_compatible_p(typeof(&*(x)), typeof(&**(x)))
 #define ct_is_integral(x)                                                      \
     (__builtin_classify_type(x) == 1 &&                                        \
      !__builtin_types_compatible_p(typeof(x), bool))

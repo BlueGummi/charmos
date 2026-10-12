@@ -958,22 +958,22 @@ static void tests_resolve_imports(void) {
 
     for (const struct test_import_entry *imp = __skernel_test_imports;
          imp < __ekernel_test_imports; imp++) {
-        void *resolved = NULL;
+        any_fn_t resolved = {};
 
         for (const struct test_export_entry *exp = __skernel_test_exports;
              exp < __ekernel_test_exports; exp++) {
             if (strcmp(imp->name, exp->name) == 0) {
-                resolved = exp->fn_ptr;
+                resolved = exp->fn;
                 break;
             }
         }
 
-        if (!resolved) {
+        if (any_fn_is_null(resolved)) {
             panic("unresolved symbol '%s' imported at %s:%u!", imp->name,
                   imp->import_file, imp->import_line);
         }
 
-        *(imp->target_fn_ptr) = resolved;
+        *(imp->target_fn) = resolved;
     }
 }
 

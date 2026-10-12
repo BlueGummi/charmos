@@ -181,7 +181,7 @@ static_assert((sizeof(struct arena_ops) -
                sizeof(arena_ext_fn_t) * ARENA_MAX_EXT_FN) <
               sizeof(arena_ext_fn_t) * ARENA_MAX_FN);
 
-#define ARENA_OP_OFFSET(op) (offsetof(struct arena_ops, op) / sizeof(fn_ptr_t))
+#define ARENA_OP_OFFSET(op) (offsetof(struct arena_ops, op) / sizeof(any_fn_t))
 
 /* There's a 3-level hierarchy here:
  *
@@ -291,7 +291,7 @@ struct arena_strategy_capabilities {
 };
 
 struct arena_fn_desc {
-    void *fn;
+    any_fn_t fn;
     enum arena_fn_type type;
 };
 

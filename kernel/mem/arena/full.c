@@ -9,7 +9,8 @@
         struct arena_desc *desc = a->desc;                                                                           \
         struct arena_fn_desc *found = NULL;                                                                          \
         for (int i = 0; i < ARENA_MAX_FN; i++) {                                                                     \
-            if (a->desc->ops->fn_name == desc->fn_descs[i].fn) {                                                     \
+            if (any_fn_eq(any_fn_from(a->desc->ops->fn_name),                                                        \
+                          desc->fn_descs[i].fn)) {                                                                   \
                 enforce(!found);                                                                                     \
                 found = &desc->fn_descs[i];                                                                          \
             }                                                                                                        \
