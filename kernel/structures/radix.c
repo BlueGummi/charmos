@@ -135,6 +135,7 @@ static bool radix_verify_tree(struct radix_tree *tree) {
 }
 
 static void radix_prune_up(struct radix_node *node, struct radix_tree *tree) {
+    enforce(!tree->root || !tree->root->parent);
     while (node && node->present_mask == 0) {
         struct radix_node *parent = node->parent;
         if (!parent) {

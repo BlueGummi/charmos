@@ -47,8 +47,7 @@ static inline bool rwlock_locked_with_type(struct rwlock *lock,
                (uintptr_t) thread_get_current();
 
     if (type == RWLOCK_READ)
-        return ((word & RWLOCK_READER_COUNT_MASK) &&
-                !(word & RWLOCK_WRITER_HELD_BIT));
+        return ((word & RWLOCK_READER_COUNT_MASK) && !RWLOCK_WRITER_HELD(word));
 
     return false;
 }
@@ -58,7 +57,7 @@ static struct thread *rwlock_get_owner_ref(struct rwlock *lock) {
 
     rcu_read_lock();
     uintptr_t word = RWLOCK_READ_LOCK_WORD(lock);
-    owner = (word & RWLOCK_WRITER_HELD_BIT)
+    owner = RWLOCK_WRITER_HELD(word)
                 ? (struct thread *) RWLOCK_GET_OWNER_FROM_WORD(word)
                 : NULL;
     if (owner && !thread_get_rcu(owner))
@@ -348,7 +347,7 @@ size_t rwlock_get_readers_to_wake(struct turnstile *ts) {
 static uintptr_t rwlock_unlock_get_val_to_sub(struct rwlock *lock) {
     struct thread *current_thread = thread_get_current();
     uintptr_t lock_word = RWLOCK_READ_LOCK_WORD(lock);
-    if (lock_word & RWLOCK_WRITER_HELD_BIT) {
+    if (RWLOCK_WRITER_HELD(lock_word)) {
         if (RWLOCK_GET_OWNER_FROM_WORD(lock_word) !=
             (uintptr_t) current_thread) {
             rwlock_panic("non-owner thread unlocked as exclusive waiter", lock);

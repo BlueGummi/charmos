@@ -133,6 +133,12 @@ int isxdigit(int c) cc_constfn;
 int toupper(int c) cc_constfn;
 int tolower(int c) cc_constfn;
 
+/* This is rather funny, but clang does string matching on
+ * string.h functionality and flags a vfree as a mismatch */
+#ifdef __clang_analyzer__
+#define strdup vstrdup
+#define strndup vstrndup
+#endif
 char *strdup(const char *str) cw_alloc() cc_warn_unused_result;
 char *strndup(const char *str, size_t n) cw_alloc() cc_warn_unused_result;
 int strcasecmp(const char *s1, const char *s2) cc_pure cc_nonnull(1, 2);

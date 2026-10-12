@@ -194,7 +194,7 @@ daemon_thread_spawn(struct daemon *daemon,
     daemon_get(daemon);
     struct daemon_thread *t = create(daemon);
     if (!t) {
-        daemon_put(daemon);
+        refcount_put_not_last(&daemon->refcount);
         return NULL;
     }
 

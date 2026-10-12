@@ -23,6 +23,11 @@ if (CMAKE_C_COMPILER_ID STREQUAL "Clang")
     list(APPEND KERNEL_WARNINGS -Werror=excess-initializers)
 endif ()
 
+# for double free / use-after-free / wrong-free comptime detection
+if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    list(APPEND KERNEL_WARNINGS -Werror=use-after-free -Werror=mismatched-dealloc)
+endif ()
+
 set(KERNEL_WARNINGS_RELEASE -Wunused -Wvla -Wnull-dereference)
 
 if (CMAKE_C_COMPILER_ID STREQUAL "GNU")

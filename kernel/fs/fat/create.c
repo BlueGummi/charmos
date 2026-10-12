@@ -180,11 +180,11 @@ bool fat_create(struct fat_fs *fs, uint32_t dir_cluster, const char *filename,
         success = fat_write_cluster(fs, slot_cluster, dir_buf);
     }
 
-    vfree(dir_buf);
-
+    /* new_ent points into dir_buf */
     if (success && out_dirent)
         memcpy(out_dirent, new_ent, sizeof(struct fat_dirent));
 
+    vfree(dir_buf);
     return success;
 }
 

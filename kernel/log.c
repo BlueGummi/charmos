@@ -405,12 +405,9 @@ static bool log_ringbuf_force_enqueue(struct log_site *site,
     return log_ringbuf_try_enqueue(site, rb, rec);
 }
 
-void log_dump_site_with_opts(struct log_site *site,
-                             struct log_dump_options opts) {
+static void log_dump_site_pinned(struct log_site *site,
+                                 struct log_dump_options opts) {
     struct log_record rec;
-    if (!site || !log_site_get(site))
-        return;
-
     enum irql irql = printf_lock();
     while (log_ringbuf_try_dequeue(site, &site->rb, &rec)) {
         if (rec.level < opts.min_level)
@@ -423,7 +420,14 @@ void log_dump_site_with_opts(struct log_site *site,
         log_dump_record(site, &rec, opts, printf_unlocked);
     }
     printf_unlock(irql);
+}
 
+void log_dump_site_with_opts(struct log_site *site,
+                             struct log_dump_options opts) {
+    if (!site || !log_site_get(site))
+        return;
+
+    log_dump_site_pinned(site, opts);
     log_site_put(site);
 }
 
@@ -569,7 +573,7 @@ void log_dump_all(void) {
 
     struct log_site *site;
     list_for_each_entry(site, &log_global.list.list, list) {
-        log_dump_site(site);
+        log_dump_site_pinned(site, site->dump_opts);
     }
 
     spin_unlock(&log_global.list.lock, irql);
@@ -580,7 +584,7 @@ void log_dump_panic(void) TSA_NO_ANALYSIS {
     struct log_site *site;
     list_for_each_entry(site, &log_global.list.list, list) {
         if (site->flags & LOG_SITE_PANIC_VISIBLE)
-            log_dump_site(site);
+            log_dump_site_pinned(site, site->dump_opts);
     }
 }
 

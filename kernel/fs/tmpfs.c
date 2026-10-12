@@ -18,7 +18,7 @@ struct vfs_node *tmpfs_mkroot(const char *mount_point) {
 
     struct tmpfs_node *root = vnew(root, ALLOC_ZERO);
     if (!fs || !root)
-        return false;
+        goto err;
 
     root->type = TMPFS_DIR;
     root->name = strdup(mount_point);
@@ -28,6 +28,11 @@ struct vfs_node *tmpfs_mkroot(const char *mount_point) {
 
     struct vfs_node *vnode = tmpfs_create_vfs_node(root);
     return vnode;
+
+err:
+    vfree(root);
+    vfree(fs);
+    return NULL;
 }
 
 static uint16_t tmpfs_to_vfs_mode(enum tmpfs_type mode) {
@@ -434,10 +439,6 @@ static enum err tmpfs_destroy(struct vfs_node *node) {
         vfree(n->symlink_target);
 
     vfree(n);
-
-    n->children = NULL;
-    n->symlink_target = NULL;
-    n = NULL;
     return ERR_OK;
 }
 

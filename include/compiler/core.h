@@ -99,6 +99,16 @@
 #define cc_dealloc(fn, arg_idx)
 #endif
 
+/* clang static analyzer ownership model */
+#if defined(cn_id_clang)
+#define cc_owner_returns(tag) __attribute__((ownership_returns(tag)))
+#define cc_owner_takes(tag, arg_idx)                                           \
+    __attribute__((ownership_takes(tag, arg_idx)))
+#else
+#define cc_owner_returns(tag)
+#define cc_owner_takes(tag, arg_idx)
+#endif
+
 #define cc_error(msg) __attribute__((error(msg)))
 #define cc_warning(msg) __attribute__((warning(msg)))
 #define cc_nonnull(...) __attribute__((nonnull(__VA_ARGS__)))

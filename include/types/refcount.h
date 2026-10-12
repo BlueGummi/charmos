@@ -58,6 +58,11 @@ static inline bool refcount_dec_and_test(refcount_t *rc) {
     }
 }
 
+/* drop a reference that is known not to be the last one */
+static inline void refcount_put_not_last(refcount_t *rc) {
+    enforce(!refcount_dec_and_test(rc));
+}
+
 /* generate a _get function for a structure type, given a refcount
  * member name and a failure condition. if the failure condition (e.g. object
  * being cleaned up) is met, then the _get will return false. will panic if

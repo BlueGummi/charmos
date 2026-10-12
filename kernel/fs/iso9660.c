@@ -88,7 +88,7 @@ struct vfs_node *iso9660_mount(struct partition *p) {
         struct iso9660_fs *fs = vnew(fs, ALLOC_ZERO);
         struct iso9660_pvd *new_pvd = vnew(new_pvd, ALLOC_ZERO);
         if (!fs || !new_pvd)
-            return NULL;
+            goto err;
 
         fs->pvd = new_pvd;
         memcpy(fs->pvd, &pvd, sizeof(struct iso9660_pvd));
@@ -100,6 +100,10 @@ struct vfs_node *iso9660_mount(struct partition *p) {
         disk->fs_data = fs;
         p->fs_data = fs;
         return NULL;
+
+    err:
+        vfree(new_pvd);
+        vfree(fs);
     }
     return NULL;
 }

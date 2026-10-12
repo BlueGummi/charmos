@@ -10,9 +10,10 @@ static bool fat32_walk_cluster(struct fat_fs *fs, uint32_t cluster,
                                fat_walk_callback callback, void *ctx) {
     uint8_t *cluster_buf = valloc(fs->cluster_size);
 
+    /* on a callback hit, ownership of ret passes to the callback */
     struct fat_dirent *ret = vnew(ret);
     if (!cluster_buf || !ret)
-        return false;
+        goto out;
 
     if (fat_read_cluster(fs, cluster, cluster_buf)) {
         for (uint32_t i = 0; i < fs->cluster_size;
@@ -25,6 +26,8 @@ static bool fat32_walk_cluster(struct fat_fs *fs, uint32_t cluster,
             }
         }
     }
+
+out:
     vfree(ret);
     vfree(cluster_buf);
     return false;

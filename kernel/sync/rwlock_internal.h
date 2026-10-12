@@ -30,6 +30,8 @@ enum rwlock_bits : uintptr_t {
 #define RWLOCK_GET_OWNER_FROM_WORD(word) ((word) & RWLOCK_OWNER_MASK)
 #define RWLOCK_BUSY(lock_word, mask) (((lock_word) & (mask)))
 
+#define RWLOCK_WRITER_HELD(lock_word) (lock_word & RWLOCK_WRITER_HELD_BIT)
+
 static inline uintptr_t rwlock_make_write_word(struct rwlock *lock,
                                                struct thread *thread) {
     return (uintptr_t) (RWLOCK_READ_LOCK_WORD(lock) & RWLOCK_PRIO_CEIL_MASK) |
