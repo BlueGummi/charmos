@@ -110,3 +110,21 @@ bool lapic_icr_try_write(uint32_t dest, uint32_t lo) {
     irq_restore(iflag);
     return !busy;
 }
+
+uint32_t lapic_icr_nmi_save(void) {
+    if (x2apic_enabled || !lapic)
+        return 0;
+
+    return lapic_read(LAPIC_ICR_HIGH);
+}
+
+/* Wait on the ICR */
+void lapic_icr_nmi_restore(uint32_t high) {
+    if (x2apic_enabled || !lapic)
+        return;
+
+    while (xapic_icr_busy())
+        cpu_pause();
+
+    lapic_write(LAPIC_ICR_HIGH, high);
+}

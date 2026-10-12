@@ -74,10 +74,12 @@ static void irq_execute_vector_handlers(irq_t vector,
 void isr_nmi_entry(struct irq_registers *irq_regs) {
     /* vector == IRQ_NMI, of course */
     enforce(!irq_mark_self_in_nmi(true));
+    uint32_t icr_high = lapic_icr_nmi_save();
 
     struct irq_context irq_ctx = {.regs = irq_regs};
     irq_execute_vector_handlers(IRQ_NMI, &irq_ctx);
 
+    lapic_icr_nmi_restore(icr_high);
     enforce(irq_mark_self_in_nmi(false) == 1);
 }
 

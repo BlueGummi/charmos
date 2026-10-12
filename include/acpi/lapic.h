@@ -120,3 +120,7 @@ void lapic_icr_write(uint32_t dest, uint32_t lo);
 
 /* Same as above, just the try version */
 bool lapic_icr_try_write(uint32_t dest, uint32_t lo);
+
+/* NMIs happening between IPI sends can retarget the IPI */
+uint32_t lapic_icr_nmi_save(void);
+void lapic_icr_nmi_restore(uint32_t high);
