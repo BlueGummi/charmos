@@ -1,3 +1,4 @@
+#include <acpi/hpet.h>
 #include <acpi/lapic.h>
 #include <global.h>
 #include <irq/irq.h>
@@ -6,25 +7,48 @@
 #include <time/clock_evdev.h>
 #include <time/lapic_timer.h>
 #include <time/names.h>
-#include <time/spin_sleep.h>
+
+#define LAPIC_CALIBRATION_WINDOW_US 2000
+#define LAPIC_CALIBRATION_SAMPLES 5
+
+/* Get the actual elapsed time since vCPU descheduling and whatnot
+ * could alter the amount of time we thought passed */
+static freq_khz_t lapic_timer_calibrate_once(void) {
+    lapic_write(LAPIC_REG_TIMER_INIT, 0xFFFFFFFF);
+    uint32_t start_ticks = lapic_read(LAPIC_REG_TIMER_CUR);
+    uint64_t start_us = hpet_timestamp_us();
+
+    while (hpet_timestamp_us() - start_us < LAPIC_CALIBRATION_WINDOW_US)
+        cpu_pause();
+
+    uint32_t end_ticks = lapic_read(LAPIC_REG_TIMER_CUR);
+    uint64_t elapsed_us = hpet_timestamp_us() - start_us;
+
+    return ((uint64_t) (start_ticks - end_ticks) * 1000) / elapsed_us;
+}
+
+static freq_khz_t lapic_timer_calibrate(void) {
+    freq_khz_t samples[LAPIC_CALIBRATION_SAMPLES];
+
+    for (size_t i = 0; i < LAPIC_CALIBRATION_SAMPLES; i++) {
+        freq_khz_t s = lapic_timer_calibrate_once();
+        size_t j = i;
+        for (; j > 0 && samples[j - 1] > s; j--)
+            samples[j] = samples[j - 1];
+
+        samples[j] = s;
+    }
+
+    return samples[LAPIC_CALIBRATION_SAMPLES / 2];
+}
 
 void lapic_timer_init(cpu_id_t core_id) {
-    uint32_t calibration_sleep_ms = 2;
-
     lapic_write(LAPIC_REG_SVR, LAPIC_ENABLE | 0xFF);
     lapic_write(LAPIC_REG_TIMER_DIV, 0b0011);
     lapic_write(LAPIC_REG_LVT_TIMER,
                 IRQ_TIMER | LAPIC_LVT_MASK | TIMER_MODE_ONESHOT);
-    lapic_write(LAPIC_REG_TIMER_INIT, 0xFFFFFFFF);
 
-    sleep_spin_ms(calibration_sleep_ms);
-
-    uint32_t curr = lapic_read((LAPIC_REG_TIMER_CUR));
-    uint32_t elapsed = 0xFFFFFFFF - curr;
-
-    freq_khz_t lapic_calibrated_khz = elapsed / calibration_sleep_ms;
-
-    global.cores[core_id]->lapic_khz = lapic_calibrated_khz;
+    global.cores[core_id]->lapic_khz = lapic_timer_calibrate();
     lapic_timer_disable();
 }
 
