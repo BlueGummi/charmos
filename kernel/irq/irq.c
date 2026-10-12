@@ -137,8 +137,10 @@ void isr_standard_entry(irq_t vector, struct irq_registers *irq_regs) {
     }
 
     /* This function just raises and lowers the IRQL, because
-     * now we're irq_mark_self_in_interrupt == false */
-    if (scheduler_mark_self_needs_run_dpcs(false))
+     * now we're irq_mark_self_in_interrupt == false.
+     *
+     * No running DPCs at or above IRQL_DISPATCH_LEVEL.  */
+    if (old < IRQL_DISPATCH_LEVEL && scheduler_mark_self_needs_run_dpcs(false))
         dpc_run_dpcs_from_irq();
 
     /* in reschedule, don't check if we need to preempt */
