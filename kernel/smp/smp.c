@@ -340,14 +340,13 @@ void smp_wake(struct limine_mp_response *mpr) {
 }
 
 void smp_setup_bsp(void) {
-    struct core *c = nofail_valloc(sizeof(struct core), ALLOC_ZERO);
+    struct core *c = nofail_vnew(c, ALLOC_ZERO);
 
     c->id = 0;
     c->self = c;
     c->current_irql = IRQL_PASSIVE_LEVEL;
     wrmsr(MSR_GS_BASE, (uint64_t) c);
-    global.cores =
-        nofail_valloc(sizeof(struct core *) * global.core_count, ALLOC_ZERO);
+    global.cores = nofail_vnews(global.cores, global.core_count, ALLOC_ZERO);
 
     global.cores[0] = c;
     init_smt_info(c);

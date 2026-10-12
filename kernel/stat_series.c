@@ -25,12 +25,11 @@ void stat_series_init(struct stat_series *s, struct stat_bucket *buckets,
 struct stat_series *stat_series_create(uint32_t nbuckets, time_us_t bucket_us,
                                        stat_series_callback bucket_reset,
                                        void *private) {
-    struct stat_bucket *buckets =
-        valloc(sizeof(struct stat_bucket) * nbuckets, ALLOC_ZERO);
+    struct stat_bucket *buckets = vnews(buckets, nbuckets, ALLOC_ZERO);
     if (!buckets)
         return NULL;
 
-    struct stat_series *series = valloc(sizeof(struct stat_series), ALLOC_ZERO);
+    struct stat_series *series = vnew(series, ALLOC_ZERO);
     if (!series) {
         vfree(buckets);
         return NULL;

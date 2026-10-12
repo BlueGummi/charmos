@@ -126,7 +126,7 @@ static void xhci_disable_slot_done(struct xhci_device  *dev,
  * before any later ENABLE SLOT, so slot reuse is
  * still safe. */
 void xhci_disable_slot(struct xhci_device *dev, uint8_t slot_id) {
-    struct xhci_disable_slot_async *a = valloc(sizeof(*a), ALLOC_ZERO);
+    struct xhci_disable_slot_async *a = vnew(a, ALLOC_ZERO);
     if (!a)
         return;
 
@@ -319,7 +319,7 @@ void cc_mem_io *xhci_map_mmio(uint8_t bus, uint8_t slot, uint8_t func) {
 }
 
 struct xhci_device *xhci_device_create(void cc_mem_io *mmio) {
-    struct xhci_device *dev = valloc(sizeof(struct xhci_device), ALLOC_ZERO);
+    struct xhci_device *dev = vnew(dev, ALLOC_ZERO);
     if (cc_unlikely(!dev))
         panic("Could not allocate space for XHCI device");
 
@@ -381,7 +381,7 @@ enum usb_error xhci_port_init(struct xhci_port *p) {
     enum usb_error      err  = USB_OK;
     uint8_t             slot_id;
     struct usb_device  *usb;
-    if (!(usb = valloc(sizeof(struct usb_device), ALLOC_ZERO))) {
+    if (!(usb = vnew(usb, ALLOC_ZERO))) {
         return USB_ERR_OOM;
     }
 

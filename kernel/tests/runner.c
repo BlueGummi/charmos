@@ -446,8 +446,7 @@ static void tests_setup_groups() {
 
         for (int i = 0; i < TEST_TIER_MAX; i++) {
             if (num_tests[i]) {
-                tg->tests[i] =
-                    nofail_valloc(sizeof(struct test *) * num_tests[i]);
+                tg->tests[i] = nofail_vnews(tg->tests[i], num_tests[i]);
             }
             tg->num_tests[i] = num_tests[i];
         }
@@ -654,7 +653,7 @@ static void test_group_run(struct test_group *tg) {
 
             /* TODO: allocation failure */
             struct test_verdict *verdicts =
-                valloc(sizeof(struct test_verdict) * t->run_times, ALLOC_ZERO);
+                vnews(verdicts, t->run_times, ALLOC_ZERO);
             struct test_verdict singular_verdict = {0};
 
             char intst_str[512] = {0};

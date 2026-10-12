@@ -20,6 +20,7 @@ set(KERNEL_WARNINGS
 
 if (CMAKE_C_COMPILER_ID STREQUAL "Clang")
     list(APPEND KERNEL_WARNINGS -Wthread-safety -Werror=thread-safety -Watomic-implicit-seq-cst)
+    list(APPEND KERNEL_WARNINGS -Werror=excess-initializers)
 endif ()
 
 set(KERNEL_WARNINGS_RELEASE -Wunused -Wvla -Wnull-dereference)

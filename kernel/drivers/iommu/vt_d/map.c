@@ -275,8 +275,8 @@ static cc_fn_unused void vtd_unmap(struct iommu_domain *domain, iova_t iova,
 
     size_t page_count = size / PAGE_SIZE;
 
-    struct vtd_walk_state *walks    = valloc(page_count * sizeof(*walks));
-    bool                  *unmapped = valloc(page_count * sizeof(bool));
+    struct vtd_walk_state *walks    = vnews(walks, page_count);
+    bool                  *unmapped = vnews(unmapped, page_count);
     if (!walks || !unmapped) {
         for (size_t off = 0; off < size; off += PAGE_SIZE) {
             struct vtd_walk_state dummy;

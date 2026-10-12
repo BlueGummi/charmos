@@ -212,8 +212,7 @@ static enum err e1000_pci_init(struct device *dev) {
     uint16_t           did = db->device_id;
     if (did == 0x1000 || did == 0x100E || did == 0x1010 || did == 0x1026 ||
         did == 0x10D3 || did == 0x10F5) {
-        struct e1000_device *device =
-            nofail_valloc(sizeof(struct e1000_device));
+        struct e1000_device *device = nofail_vnew(device);
 
         e1000_init(db, device);
     }

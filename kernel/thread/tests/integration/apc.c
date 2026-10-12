@@ -29,7 +29,7 @@ TEST_DEFINE_INTEGRATION(apc, kernel_apc_runs_then_destroys) {
     atomic_store(&apc_ran, false);
     atomic_store(&apc_destroyed, 0);
     ted = thread_spawn("apc_test_thread", apc_thread, .joinable = true);
-    struct apc *a = valloc(sizeof(struct apc), ALLOC_ZERO);
+    struct apc *a = vnew(a, ALLOC_ZERO);
     if (!a || !ted) {
         if (a)
             vfree(a);

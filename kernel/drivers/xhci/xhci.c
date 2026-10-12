@@ -798,12 +798,11 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
     xhci_controller_enable_ints(dev);
     xhci_interrupt_enable_ints(dev);
 
-    struct usb_controller *ctrl =
-        valloc(sizeof(struct usb_controller), ALLOC_ZERO);
-    ctrl->driver_data = dev;
-    ctrl->type        = USB_CONTROLLER_XHCI;
-    ctrl->ops         = &xhci_ctrl_ops;
-    dev->controller   = ctrl;
+    struct usb_controller *ctrl = vnew(ctrl, ALLOC_ZERO);
+    ctrl->driver_data           = dev;
+    ctrl->type                  = USB_CONTROLLER_XHCI;
+    ctrl->ops                   = &xhci_ctrl_ops;
+    dev->controller             = ctrl;
 
     enum irql irql = spin_lock_high(&dev->lock);
     for (uint32_t port = 1; port <= dev->ports; port++) {

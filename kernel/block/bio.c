@@ -14,7 +14,7 @@ static struct bio_request *create(struct block_device *d, uint64_t lba,
                                   void (*cb)(struct bio_request *), bool write,
                                   void *user, void *buffer) {
 
-    struct bio_request *req = valloc(sizeof(struct bio_request), ALLOC_ZERO);
+    struct bio_request *req = vnew(req, ALLOC_ZERO);
     if (!req)
         return NULL;
 

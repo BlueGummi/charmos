@@ -103,7 +103,7 @@ void topology_dump(void) {
 }
 
 static size_t build_smt_nodes(size_t cpu_count) {
-    smt_nodes = valloc(cpu_count * sizeof(struct topology_node), ALLOC_ZERO);
+    smt_nodes = vnews(smt_nodes, cpu_count, ALLOC_ZERO);
 
     for (size_t i = 0; i < cpu_count; i++) {
         struct core *c = global.cores[i];
@@ -149,7 +149,7 @@ static size_t build_smt_nodes(size_t cpu_count) {
 
 static size_t build_core_nodes(size_t cpu_count) {
     size_t core_count = 0;
-    core_nodes = valloc(cpu_count * sizeof(struct topology_node), ALLOC_ZERO);
+    core_nodes = vnews(core_nodes, cpu_count, ALLOC_ZERO);
 
     for (size_t i = 0; i < cpu_count; i++) {
         struct core *c = global.cores[i];
@@ -200,8 +200,7 @@ static size_t build_numa_nodes(size_t core_count, size_t llc_count) {
             max_numa = core_nodes[i].core->numa_node;
 
     size_t numa_node_count = max_numa + 1;
-    numa_nodes =
-        valloc(numa_node_count * sizeof(struct topology_node), ALLOC_ZERO);
+    numa_nodes = vnews(numa_nodes, numa_node_count, ALLOC_ZERO);
 
     for (size_t i = 0; i < numa_node_count; i++) {
         struct topology_node *numa = &numa_nodes[i];
@@ -265,7 +264,7 @@ static size_t build_numa_nodes(size_t core_count, size_t llc_count) {
 }
 
 static size_t build_llc_nodes(size_t core_count) {
-    llc_nodes = valloc(core_count * sizeof(struct topology_node), ALLOC_ZERO);
+    llc_nodes = vnews(llc_nodes, core_count, ALLOC_ZERO);
     size_t llc_count = 0;
 
     for (size_t i = 0; i < core_count; i++) {
@@ -359,8 +358,7 @@ static size_t build_package_nodes(size_t core_count, size_t llc_count) {
             max_pkg_id = core_nodes[i].core->package_id;
 
     size_t package_count = max_pkg_id + 1;
-    package_nodes =
-        valloc(package_count * sizeof(struct topology_node), ALLOC_ZERO);
+    package_nodes = vnews(package_nodes, package_count, ALLOC_ZERO);
 
     for (size_t i = 0; i < package_count; i++) {
         struct topology_node *pkg = &package_nodes[i];

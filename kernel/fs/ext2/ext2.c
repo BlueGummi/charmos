@@ -47,7 +47,7 @@ struct vfs_node *ext2_g_mount(struct partition *p) {
 
     memset(fs->sblock, 0, PAGE_SIZE);
 
-    struct vfs_node *n = valloc(sizeof(struct vfs_node), ALLOC_ZERO);
+    struct vfs_node *n = vnew(n, ALLOC_ZERO);
 
     if (!p->fs_data || !fs->sblock | !n)
         return NULL;

@@ -49,8 +49,7 @@ SLAB_SIZE_REGISTER_FOR_STRUCT(turnstile, SLAB_OBJ_ALIGN_DEFAULT);
 LOCK_CHK_CLASS_DEFINE_LOCAL(turnstile_chain);
 
 void turnstiles_init(void) {
-    global.turnstiles =
-        nofail_valloc(sizeof(struct turnstile_hash_table), ALLOC_ZERO);
+    global.turnstiles = nofail_vnew(global.turnstiles, ALLOC_ZERO);
     for (size_t i = 0; i < TURNSTILE_HASH_SIZE; i++) {
         spinlock_init_chk(&global.turnstiles->heads[i].lock,
                           LOCK_CHK_CLASS(turnstile_chain), LOCK_CHKD_FULL);
@@ -121,7 +120,7 @@ void turnstile_destroy(struct turnstile *ts) {
 }
 
 struct turnstile *turnstile_create(void) {
-    struct turnstile *ts = valloc(sizeof(struct turnstile), ALLOC_ZERO);
+    struct turnstile *ts = vnew(ts, ALLOC_ZERO);
     if (!ts)
         return NULL;
 

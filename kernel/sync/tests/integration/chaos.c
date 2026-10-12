@@ -58,8 +58,7 @@ static void chaos_diag_attach(struct thread *t, size_t slot) {
     if (!t || chaos_diag[slot])
         return;
 
-    struct thread_diag *d =
-        nofail_valloc(sizeof(struct thread_diag), ALLOC_ZERO);
+    struct thread_diag *d = nofail_vnew(d, ALLOC_ZERO);
 
     if (!thread_diag_attach(t, d)) {
         vfree(d);
@@ -126,7 +125,7 @@ static void chaos_apc_spammer(void *arg) {
             continue;
         }
 
-        struct apc *a = valloc(sizeof(struct apc), ALLOC_ZERO);
+        struct apc *a = vnew(a, ALLOC_ZERO);
         if (a) {
             apc_init(a, chaos_apc_fn, NULL, apc_destroy_free);
             CHAOS_LOG("queue apc to %p", states[id].t);

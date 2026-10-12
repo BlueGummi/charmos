@@ -99,7 +99,7 @@ struct workqueue *workqueue_create_full(struct workqueue_attributes *attrs,
 
     if (attrs->flags & WORKQUEUE_FLAG_STATIC_WORKERS) {
         wq->worker_array =
-            valloc(sizeof(struct worker) * attrs->max_workers, ALLOC_ZERO);
+            vnews(wq->worker_array, attrs->max_workers, ALLOC_ZERO);
         if (!wq->worker_array)
             goto err;
     }
@@ -236,7 +236,7 @@ struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue) {
     if (!thread)
         return NULL;
 
-    struct worker *worker = valloc(sizeof(struct worker), ALLOC_ZERO);
+    struct worker *worker = vnew(worker, ALLOC_ZERO);
     if (!worker)
         return NULL;
 
@@ -259,7 +259,7 @@ struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue) {
 void workqueues_permanent_init(void) {
     int64_t num_workqueues = global.core_count;
     global.workqueues =
-        nofail_valloc(sizeof(struct workqueue *) * num_workqueues, ALLOC_ZERO);
+        nofail_vnews(global.workqueues, num_workqueues, ALLOC_ZERO);
 
     for (int64_t i = 0; i < num_workqueues; i++) {
 
@@ -300,7 +300,7 @@ struct work *work_init(struct work *work, work_function fn,
 }
 
 struct work *work_create(work_function fn, struct work_args args) {
-    struct work *work = valloc(sizeof(struct work), ALLOC_ZERO);
+    struct work *work = vnew(work, ALLOC_ZERO);
     if (!work)
         return NULL;
 

@@ -46,15 +46,13 @@ enum err arena_desc_register(struct arena_desc *desc) {
 
     size_t old_desc_count = old_tbl->desc_count;
     size_t desc_count = old_desc_count + 1;
-    struct arena_desc_table *new_tbl =
-        valloc(sizeof(struct arena_desc_table), ALLOC_ZERO);
+    struct arena_desc_table *new_tbl = vnew(new_tbl, ALLOC_ZERO);
     if (!new_tbl) {
         err = ERR_NO_MEM;
         goto out;
     }
 
-    struct arena_desc **new_descs =
-        valloc(sizeof(struct arena_desc *) * desc_count, ALLOC_ZERO);
+    struct arena_desc **new_descs = vnews(new_descs, desc_count, ALLOC_ZERO);
     if (!new_descs) {
         err = ERR_NO_MEM;
         vfree(new_tbl);
@@ -93,8 +91,7 @@ struct arena_desc *arena_desc_lookup(enum arena_strategy strat) {
 
 void arena_global_init(void) {
     spinlock_init(&arena_global.tbl_lock);
-    struct arena_desc_table *tbl =
-        valloc(sizeof(struct arena_desc_table), ALLOC_ZERO);
+    struct arena_desc_table *tbl = vnew(tbl, ALLOC_ZERO);
 
     rcu_assign_pointer(arena_global.desc_table, tbl);
 }

@@ -32,8 +32,7 @@ TEST_DEFINE_INTEGRATION(bio, async_submit, TEST_INTENSITY(1, 1, 16),
     irq_enable_untracked();
 
     for (uint64_t i = 0; i < run_times; i++) {
-        struct bio_request *bio =
-            valloc(sizeof(struct bio_request), .flags = 0);
+        struct bio_request *bio = vnew(bio, .flags = 0);
         uint8_t *buf = valloc_aligned(64 * PAGE_SIZE, PAGE_SIZE);
         *bio = (struct bio_request){
             .lba = 0,

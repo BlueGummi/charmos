@@ -43,7 +43,7 @@ TEST_DEFINE_INTEGRATION(bio_sched, delay_enqueue,
 
     for (uint64_t i = 0; i < test_runs; i++) {
         uint8_t *buf = valloc_aligned(PAGE_SIZE, PAGE_SIZE);
-        struct bio_request *rq = valloc(sizeof(struct bio_request), ALLOC_ZERO);
+        struct bio_request *rq = vnew(rq, ALLOC_ZERO);
         TEST_ASSERT_NONNULL(rq);
         TEST_ASSERT_NONNULL(buf);
         TEST_ASSERT(IS_PAGE_ALIGNED(buf));

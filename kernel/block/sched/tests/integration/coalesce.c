@@ -24,7 +24,7 @@ TEST_DEFINE_INTEGRATION(bio_sched, coalesce, TEST_INTENSITY(1, 2, 16),
     size_t reqs = ctx->intensity_val ? ctx->intensity_val : 2;
 
     for (size_t i = 0; i < reqs; i++) {
-        struct bio_request *req = valloc(sizeof(*req));
+        struct bio_request *req = vnew(req);
         *req = (struct bio_request){
             .lba = i,
             .disk = d,

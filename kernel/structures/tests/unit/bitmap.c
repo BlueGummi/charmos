@@ -38,7 +38,7 @@ static void bm_fill_n(bitmap_word_t *map, size_t nwords) {
 TEST_DEFINE_UNIT(bitmap, set_test_clear, TEST_INTENSITY(64, 256, 4096)) {
     size_t nbits = ctx->intensity_val ? ctx->intensity_val : BM_BITS;
     size_t nwords = BITMAP_WORDS(nbits);
-    bitmap_word_t *map = valloc(sizeof(bitmap_word_t) * nwords, ALLOC_ZERO);
+    bitmap_word_t *map = vnews(map, nwords, ALLOC_ZERO);
     TEST_ASSERT_NONNULL(map);
 
     for (size_t bit = 0; bit < nbits; bit++) {
@@ -62,8 +62,7 @@ TEST_DEFINE_UNIT(bitmap, set_test_clear, TEST_INTENSITY(64, 256, 4096)) {
 TEST_DEFINE_UNIT(bitmap, bit_isolation, TEST_INTENSITY(64, 256, 1024)) {
     size_t nbits = ctx->intensity_val ? ctx->intensity_val : BM_BITS;
     size_t nwords = BITMAP_WORDS(nbits);
-    bitmap_word_t *map =
-        valloc(sizeof(bitmap_word_t) * nwords, .flags = ALLOC_FLAGS_NONE);
+    bitmap_word_t *map = vnews(map, nwords, .flags = ALLOC_FLAGS_NONE);
     TEST_ASSERT_NONNULL(map);
 
     for (size_t bit = 0; bit < nbits; bit++) {
@@ -117,7 +116,7 @@ TEST_DEFINE_UNIT(bitmap, weight_ignores_past_end) {
 TEST_DEFINE_UNIT(bitmap, weight_counts, TEST_INTENSITY(64, 256, 4096)) {
     size_t nbits = ctx->intensity_val ? ctx->intensity_val : BM_BITS;
     size_t nwords = BITMAP_WORDS(nbits);
-    bitmap_word_t *map = valloc(sizeof(bitmap_word_t) * nwords, ALLOC_ZERO);
+    bitmap_word_t *map = vnews(map, nwords, ALLOC_ZERO);
     TEST_ASSERT_NONNULL(map);
 
     for (size_t n = 0; n < nbits; n++) {
@@ -154,8 +153,7 @@ TEST_DEFINE_UNIT(bitmap, set_clear_range) {
 TEST_DEFINE_UNIT(bitmap, find_first_set, TEST_INTENSITY(64, 256, 2048)) {
     size_t nbits = ctx->intensity_val ? ctx->intensity_val : BM_BITS;
     size_t nwords = BITMAP_WORDS(nbits);
-    bitmap_word_t *map =
-        valloc(sizeof(bitmap_word_t) * nwords, .flags = ALLOC_FLAGS_NONE);
+    bitmap_word_t *map = vnews(map, nwords, .flags = ALLOC_FLAGS_NONE);
     TEST_ASSERT_NONNULL(map);
 
     bm_reset_n(map, nwords);
@@ -182,8 +180,7 @@ TEST_DEFINE_UNIT(bitmap, find_first_set, TEST_INTENSITY(64, 256, 2048)) {
 TEST_DEFINE_UNIT(bitmap, find_first_zero, TEST_INTENSITY(64, 256, 2048)) {
     size_t nbits = ctx->intensity_val ? ctx->intensity_val : BM_BITS;
     size_t nwords = BITMAP_WORDS(nbits);
-    bitmap_word_t *map =
-        valloc(sizeof(bitmap_word_t) * nwords, .flags = ALLOC_FLAGS_NONE);
+    bitmap_word_t *map = vnews(map, nwords, .flags = ALLOC_FLAGS_NONE);
     TEST_ASSERT_NONNULL(map);
 
     bm_reset_n(map, nwords);
@@ -242,7 +239,7 @@ TEST_DEFINE_UNIT(bitmap, find_next_bit) {
 TEST_DEFINE_UNIT(bitmap, find_next_bit_walk, TEST_INTENSITY(64, 256, 4096)) {
     size_t nbits = ctx->intensity_val ? ctx->intensity_val : BM_BITS;
     size_t nwords = BITMAP_WORDS(nbits);
-    bitmap_word_t *map = valloc(sizeof(bitmap_word_t) * nwords, ALLOC_ZERO);
+    bitmap_word_t *map = vnews(map, nwords, ALLOC_ZERO);
     TEST_ASSERT_NONNULL(map);
 
     for (size_t bit = 0; bit < nbits; bit += 7)

@@ -24,8 +24,7 @@ LOG_HANDLE_DEFINE_PRINT(domain);
 
 static void init_global_domain(uint64_t domain_count) {
     global.domain_count = domain_count;
-    global.domains =
-        nofail_valloc(sizeof(struct domain *) * domain_count, ALLOC_ZERO);
+    global.domains = nofail_vnews(global.domains, domain_count, ALLOC_ZERO);
 
     for (size_t i = 0; i < domain_count; i++) {
 
@@ -48,8 +47,7 @@ static void construct_domains_from_numa_nodes(void) {
         cpu_mask_init(&cd->cpu_mask, global.core_count);
         cpu_mask_copy(&cd->cpu_mask, &nn->cpus);
         cd->associated_node = nn;
-        cd->cores =
-            nofail_valloc(sizeof(struct core *) * cd->num_cores, ALLOC_ZERO);
+        cd->cores = nofail_vnews(cd->cores, cd->num_cores, ALLOC_ZERO);
     }
 }
 
@@ -82,8 +80,7 @@ static void construct_domains_from_cores(void) {
 
             cpu_mask_set(&cd->cpu_mask, core_index);
         }
-        cd->cores = nofail_valloc(sizeof(struct core *) * cores_this_domain,
-                                  ALLOC_ZERO);
+        cd->cores = nofail_vnews(cd->cores, cores_this_domain, ALLOC_ZERO);
     }
 }
 

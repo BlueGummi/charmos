@@ -53,7 +53,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
 
     uint32_t dstrd = (cap >> 32) & 0xF;
 
-    struct nvme_device *nvme = valloc(sizeof(struct nvme_device), ALLOC_ZERO);
+    struct nvme_device *nvme = vnew(nvme, ALLOC_ZERO);
     if (!nvme)
         panic("Could not allocate space for NVMe drive");
 
@@ -64,7 +64,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme->version       = version;
     nvme->regs          = regs;
     nvme->admin_q_depth = ((nvme->cap) & 0xFFFF) + 1;
-    nvme->io_queues     = valloc(sizeof(struct nvme_queue *), ALLOC_ZERO);
+    nvme->io_queues     = vnew(nvme->io_queues, ALLOC_ZERO);
     if (!nvme->io_queues)
         panic("Could not allocate space for NVMe IO queues");
 
@@ -115,9 +115,8 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
     nvme_log(LOG_INFO, "Controller max transfer size is %u bytes",
              nvme->max_transfer_size);
 
-    nvme->isr_index = valloc(sizeof(uint8_t) * (sqs_to_make + 1), ALLOC_ZERO);
-    nvme->io_queues =
-        valloc(sizeof(struct nvme_queue *) * (sqs_to_make + 1), ALLOC_ZERO);
+    nvme->isr_index = vnews(nvme->isr_index, (sqs_to_make + 1), ALLOC_ZERO);
+    nvme->io_queues = vnews(nvme->io_queues, (sqs_to_make + 1), ALLOC_ZERO);
     if (cc_unlikely(!nvme->isr_index || !nvme->io_queues))
         panic("Could not allocate space for NVMe structures");
 
@@ -200,7 +199,7 @@ static struct bio_scheduler_ops nvme_bio_sched_ops = {
 };
 
 struct block_device *nvme_create_generic(struct nvme_device *nvme) {
-    struct block_device *d = valloc(sizeof(struct block_device), ALLOC_ZERO);
+    struct block_device *d = vnew(d, ALLOC_ZERO);
     if (!d)
         panic("Could not allocate space for NVMe device");
 
@@ -210,7 +209,7 @@ struct block_device *nvme_create_generic(struct nvme_device *nvme) {
     d->write_sector     = nvme_write_sector_wrapper;
     d->submit_bio_async = nvme_submit_bio_request;
     d->flags            = BDEV_FLAG_NO_REORDER | BDEV_FLAG_NO_COALESCE;
-    d->cache            = valloc(sizeof(struct bcache), ALLOC_ZERO);
+    d->cache            = vnew(d->cache, ALLOC_ZERO);
     if (cc_unlikely(!d->cache))
         panic("Could not allocate space for NVMe block cache");
 

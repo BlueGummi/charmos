@@ -85,9 +85,8 @@ struct vfs_node *iso9660_mount(struct partition *p) {
     struct iso9660_pvd pvd;
     struct block_device *disk = p->disk;
     if (iso9660_parse_pvd(p, &pvd)) {
-        struct iso9660_fs *fs = valloc(sizeof(struct iso9660_fs), ALLOC_ZERO);
-        struct iso9660_pvd *new_pvd =
-            valloc(sizeof(struct iso9660_pvd), ALLOC_ZERO);
+        struct iso9660_fs *fs = vnew(fs, ALLOC_ZERO);
+        struct iso9660_pvd *new_pvd = vnew(new_pvd, ALLOC_ZERO);
         if (!fs || !new_pvd)
             return NULL;
 
@@ -190,8 +189,7 @@ struct iso9660_dir_record *iso9660_find(struct iso9660_fs *fs,
             name[rec->name_len] = '\0';
 
             if (strcmp(name, target_name) == 0) {
-                struct iso9660_dir_record *found =
-                    valloc(sizeof(struct iso9660_dir_record));
+                struct iso9660_dir_record *found = vnew(found);
                 if (!found)
                     return NULL;
 

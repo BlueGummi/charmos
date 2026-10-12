@@ -41,7 +41,7 @@ static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
     uint64_t offset    = (uintptr_t) buffer & (PAGE_SIZE - 1);
     uint64_t num_pages = PAGES_NEEDED_FOR(offset + size);
 
-    data->prps = valloc(sizeof(uint64_t) * num_pages);
+    data->prps = vnews(data->prps, num_pages);
     if (!data->prps)
         return false;
 
@@ -126,8 +126,7 @@ static bool rw_send_command(struct block_device *disk, struct nvme_request *req,
         return true;
     }
 
-    struct nvme_bio_data *data =
-        valloc(sizeof(struct nvme_bio_data), ALLOC_ZERO);
+    struct nvme_bio_data *data = vnew(data, ALLOC_ZERO);
     if (!data)
         return false;
 

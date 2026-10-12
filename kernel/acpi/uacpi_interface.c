@@ -91,8 +91,7 @@ uacpi_status uacpi_kernel_io_map(uacpi_io_addr base, uacpi_size len,
         return UACPI_STATUS_INVALID_ARGUMENT;
     }
 
-    uacpi_io_handle *handle =
-        (uacpi_io_handle *) valloc(sizeof(uacpi_io_handle));
+    uacpi_io_handle *handle = vnew(handle);
     if (!handle) {
         return UACPI_STATUS_INTERNAL_ERROR;
     }
@@ -166,7 +165,7 @@ uacpi_kernel_uninstall_interrupt_handler(uacpi_interrupt_handler handler,
 }
 
 uacpi_handle uacpi_kernel_create_spinlock(void) {
-    struct spinlock *lock = valloc(sizeof(struct spinlock), ALLOC_ZERO);
+    struct spinlock *lock = vnew(lock, ALLOC_ZERO);
     spinlock_init(lock);
     return lock;
 }
@@ -176,7 +175,7 @@ void uacpi_kernel_free_spinlock(uacpi_handle a) {
 }
 
 uacpi_handle uacpi_kernel_create_mutex(void) {
-    struct mutex_simple *m = valloc(sizeof(struct mutex_simple), ALLOC_ZERO);
+    struct mutex_simple *m = vnew(m, ALLOC_ZERO);
     mutex_simple_init(m);
     return m;
 }

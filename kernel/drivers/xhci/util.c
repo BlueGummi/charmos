@@ -93,7 +93,7 @@ struct xhci_ring *xhci_allocate_ring() {
         return NULL;
 
     paddr_t           phys = vmm_get_phys((vaddr_t) trbs);
-    struct xhci_ring *ring = valloc(sizeof(struct xhci_ring), ALLOC_ZERO);
+    struct xhci_ring *ring = vnew(ring, ALLOC_ZERO);
     if (!ring)
         return NULL;
 
@@ -115,7 +115,7 @@ struct xhci_ring *xhci_allocate_ring() {
 }
 
 struct xhci_ring *xhci_allocate_event_ring(void) {
-    struct xhci_ring *er = valloc(sizeof(*er), ALLOC_ZERO);
+    struct xhci_ring *er = vnew(er, ALLOC_ZERO);
 
     er->trbs = valloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO);
     er->phys = vmm_get_phys((vaddr_t) er->trbs);

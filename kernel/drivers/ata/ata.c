@@ -128,8 +128,7 @@ bool ata_setup_drive(struct ata_drive *ide, struct pci_device *devices,
 static uint64_t ide_cnt = 1, atapi_cnt = 1;
 
 void ata_init(struct pci_device *devices, uint64_t count) {
-    struct ata_drive *drives =
-        valloc(sizeof(struct ata_drive) * 4, ALLOC_ZERO);
+    struct ata_drive *drives = vnews(drives, 4, ALLOC_ZERO);
     if (!drives)
         panic("Could not allocate space for devices");
 

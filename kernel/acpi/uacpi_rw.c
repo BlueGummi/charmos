@@ -26,7 +26,7 @@ uacpi_status uacpi_kernel_pci_device_open(uacpi_pci_address address,
     uint8_t slot = address.device;
     uint8_t func = address.function;
 
-    uacpi_pci_device *dev = valloc(sizeof(*dev), ALLOC_ZERO);
+    uacpi_pci_device *dev = vnew(dev, ALLOC_ZERO);
 
     if (!dev) {
         return UACPI_STATUS_OUT_OF_MEMORY;

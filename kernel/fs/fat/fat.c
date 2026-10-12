@@ -108,7 +108,7 @@ struct fat_bpb *fat_read_bpb(struct block_device *drive,
         if (type == 0xFF)
             continue;
 
-        struct fat_bpb *out_bpb = valloc(sizeof(struct fat_bpb));
+        struct fat_bpb *out_bpb = vnew(out_bpb);
         if (!out_bpb)
             return NULL;
 
@@ -131,7 +131,7 @@ struct vfs_node *fat_g_mount(struct partition *p) {
     if (!p || !p->disk)
         return NULL;
 
-    struct fat_fs *fs = valloc(sizeof(struct fat_fs));
+    struct fat_fs *fs = vnew(fs);
     if (!fs)
         return NULL;
 

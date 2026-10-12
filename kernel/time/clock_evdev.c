@@ -7,8 +7,7 @@
 #include "internal.h"
 
 struct clock_evdev_group *clock_evdev_group_create(const char *name, ...) {
-    struct clock_evdev_group *cedg =
-        valloc(sizeof(struct clock_evdev_group), ALLOC_ZERO);
+    struct clock_evdev_group *cedg = vnew(cedg, ALLOC_ZERO);
 
     if (!cedg)
         return NULL;
@@ -28,7 +27,7 @@ struct clock_evdev_group *clock_evdev_group_create(const char *name, ...) {
 }
 
 struct clock_evdev *clock_evdev_create(const char *name, ...) {
-    struct clock_evdev *ced = valloc(sizeof(struct clock_evdev), ALLOC_ZERO);
+    struct clock_evdev *ced = vnew(ced, ALLOC_ZERO);
     if (!ced)
         return NULL;
 

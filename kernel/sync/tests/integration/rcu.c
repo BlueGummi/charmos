@@ -58,7 +58,7 @@ static void rcu_writer_thread(void *arg) {
 
     struct rcu_test_data *old = atomic_load_rlx(&shared_ptr);
 
-    struct rcu_test_data *new = valloc(sizeof(*new), ALLOC_ZERO);
+    struct rcu_test_data *new = vnew(new, ALLOC_ZERO);
     new->value = 43;
     rcu_assign_pointer(shared_ptr, new);
 
@@ -76,7 +76,7 @@ TEST_DEFINE_INTEGRATION(rcu, mt_readers_during_replace,
     atomic_store(&rcu_reads_done, 0);
     atomic_store(&rcu_deferred_freed, false);
 
-    struct rcu_test_data *initial = valloc(sizeof(*initial), ALLOC_ZERO);
+    struct rcu_test_data *initial = vnew(initial, ALLOC_ZERO);
     initial->value = 42;
     rcu_assign_pointer(shared_ptr, initial);
 
@@ -180,7 +180,7 @@ static void rcu_stress_writer(void *arg) {
     uint64_t local_iter = 0;
 
     while (!atomic_load(&stress_stop)) {
-        struct rcu_stress_node *new = valloc(sizeof(*new), ALLOC_ZERO);
+        struct rcu_stress_node *new = vnew(new, ALLOC_ZERO);
         if (!new) {
             atomic_store(&stress_failed, true);
             test_info("RCU stress writer valloc failed");
@@ -224,7 +224,7 @@ TEST_DEFINE_INTEGRATION(rcu, mt_stress, TEST_INTENSITY(200, 2000, 10000)) {
     atomic_store(&stress_replacements, 0);
     atomic_store(&gen_freed, 0);
 
-    struct rcu_stress_node *initial = valloc(sizeof(*initial), ALLOC_ZERO);
+    struct rcu_stress_node *initial = vnew(initial, ALLOC_ZERO);
     initial->seq = 0;
     initial->value = 42;
     rcu_assign_pointer(stress_shared, initial);

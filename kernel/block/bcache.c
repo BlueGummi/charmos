@@ -45,7 +45,7 @@ static bool insert_locked(struct bcache *cache, uint64_t key,
     }
 
     /* New head */
-    struct bcache_wrapper *new_node = valloc(sizeof(struct bcache_wrapper));
+    struct bcache_wrapper *new_node = vnew(new_node);
     if (!new_node) {
         return false;
     }
@@ -178,7 +178,7 @@ static enum err prefetch(struct block_device *disk, struct bcache *cache,
     if (get(cache, base_lba))
         return ERR_EXIST;
 
-    struct bcache_pf_data *pf = valloc(sizeof(struct bcache_pf_data));
+    struct bcache_pf_data *pf = vnew(pf);
     if (!pf)
         return ERR_NO_MEM;
 
@@ -188,7 +188,7 @@ static enum err prefetch(struct block_device *disk, struct bcache *cache,
         return ERR_NO_MEM;
 
     pf->cache = cache;
-    pf->new_entry = valloc(sizeof(struct bcache_entry), ALLOC_ZERO);
+    pf->new_entry = vnew(pf->new_entry, ALLOC_ZERO);
     if (!pf->new_entry)
         return ERR_NO_MEM;
 
@@ -391,7 +391,7 @@ void *bcache_create_ent(struct block_device *disk, uint64_t lba,
             return NULL;
         }
 
-        ent = valloc(sizeof(struct bcache_entry), ALLOC_ZERO);
+        ent = vnew(ent, ALLOC_ZERO);
         if (!ent)
             return NULL;
 
@@ -420,6 +420,5 @@ void bcache_init(struct bcache *cache, uint64_t capacity) {
     spinlock_init(&cache->lock);
     cache->capacity = capacity;
     cache->count = 0;
-    cache->entries =
-        nofail_valloc(sizeof(struct bcache_wrapper *) * capacity, ALLOC_ZERO);
+    cache->entries = nofail_vnews(cache->entries, capacity, ALLOC_ZERO);
 }

@@ -2,7 +2,8 @@
 #include <structures/cpu_mask.h>
 
 struct cpu_mask *cpu_mask_create(void) {
-    return valloc(sizeof(struct cpu_mask), ALLOC_ZERO);
+    struct cpu_mask *m = vnew(m, ALLOC_ZERO);
+    return m;
 }
 
 void cpu_mask_free(struct cpu_mask *m) {

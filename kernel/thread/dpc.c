@@ -113,8 +113,7 @@ bool dpc_enqueue_local(struct dpc *d) {
 }
 
 void dpc_init_percpu(void) {
-    global.dpc_data =
-        valloc(sizeof(struct dpc_cpu) * global.core_count, ALLOC_ZERO);
+    global.dpc_data = vnews(global.dpc_data, global.core_count, ALLOC_ZERO);
     size_t i;
     for_each_cpu_id(i) {
         atomic_store_rlx(&global.dpc_data[i].queue.head, NULL);
@@ -132,7 +131,7 @@ struct dpc *dpc_init(struct dpc *d, dpc_func_t fn, void *a, void *b) {
 
 /* DPC creation helpers */
 struct dpc *dpc_create(dpc_func_t fn, void *a, void *b) {
-    struct dpc *d = valloc(sizeof(*d));
+    struct dpc *d = vnew(d);
     if (!d)
         return NULL;
 

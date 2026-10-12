@@ -251,11 +251,11 @@ enum iommu_error vtd_unit_init(struct iommu *unit) {
 
 struct iommu *vtd_unit_create(uint64_t base_phys, uint16_t segment,
                               uint8_t size_field) {
-    struct iommu *unit = valloc(sizeof(*unit));
+    struct iommu *unit = vnew(unit);
     if (!unit)
         return NULL;
 
-    struct vtd_unit *u = valloc(sizeof(*u));
+    struct vtd_unit *u = vnew(u);
     if (!u) {
         vfree(unit);
         return NULL;

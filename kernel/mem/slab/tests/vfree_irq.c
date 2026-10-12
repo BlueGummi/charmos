@@ -41,7 +41,7 @@ TEST_DEFINE_INTEGRATION(slab, vfree_defer_irq, TEST_INTENSITY(256, 2048, 16384),
                         .min_cores = 4) {
     size_t total = ctx->intensity_val ? ctx->intensity_val : 2048;
     vfree_irq_total_allocs = total;
-    vfree_irq_allocs = valloc(sizeof(void *) * total);
+    vfree_irq_allocs = vnews(vfree_irq_allocs, total);
     TEST_ASSERT_NONNULL(vfree_irq_allocs);
 
     atomic_store(&vfree_irq_test_consumed, 0);

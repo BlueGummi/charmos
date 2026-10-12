@@ -24,7 +24,7 @@ void srat_init(void) {
         log_warn_global(LOG_HANDLE(srat),
                         "SRAT table not found, assuming single NUMA node");
 
-        global.numa_nodes = nofail_valloc(sizeof(struct numa_node), ALLOC_ZERO);
+        global.numa_nodes = nofail_vnew(global.numa_nodes, ALLOC_ZERO);
 
         global.numa_nodes[0].topo = NULL;
         global.numa_nodes[0].mem_base = 0;
@@ -67,15 +67,15 @@ void srat_init(void) {
     global.numa_node_count = max_prox_domain + 1;
     size_t numa_node_count = global.numa_node_count;
     global.numa_nodes =
-        nofail_valloc(numa_node_count * sizeof(struct numa_node), ALLOC_ZERO);
+        nofail_vnews(global.numa_nodes, numa_node_count, ALLOC_ZERO);
 
     for (size_t i = 0; i < numa_node_count; i++) {
         global.numa_nodes[i].topo = NULL;
         global.numa_nodes[i].mem_base = 0;
         global.numa_nodes[i].mem_size = 0;
         global.numa_nodes[i].distances_cnt = numa_node_count;
-        global.numa_nodes[i].distance =
-            nofail_valloc(numa_node_count * sizeof(uint8_t), ALLOC_ZERO);
+        global.numa_nodes[i].distance = nofail_vnews(
+            global.numa_nodes[i].distance, numa_node_count, ALLOC_ZERO);
 
         cpu_mask_init(&global.numa_nodes[i].cpus, global.core_count);
     }

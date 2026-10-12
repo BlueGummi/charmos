@@ -10,7 +10,7 @@ static bool fat32_walk_cluster(struct fat_fs *fs, uint32_t cluster,
                                fat_walk_callback callback, void *ctx) {
     uint8_t *cluster_buf = valloc(fs->cluster_size);
 
-    struct fat_dirent *ret = valloc(sizeof(struct fat_dirent));
+    struct fat_dirent *ret = vnew(ret);
     if (!cluster_buf || !ret)
         return false;
 
@@ -56,7 +56,7 @@ static bool fat12_16_walk_cluster(struct fat_fs *fs, uint32_t cluster,
         return false;
     }
 
-    struct fat_dirent *ret = valloc(sizeof(struct fat_dirent));
+    struct fat_dirent *ret = vnew(ret);
     if (!ret) {
         vfree(sector_buf);
         return false;

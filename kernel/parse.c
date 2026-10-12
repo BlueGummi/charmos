@@ -560,7 +560,7 @@ static bool parse_list_internal(const char *str, struct parse_list *out) {
     if (!out)
         return true;
 
-    char **items = valloc(count * sizeof(char *), ALLOC_ZERO);
+    char **items = vnews(items, count, ALLOC_ZERO);
     if (!items)
         return false;
 

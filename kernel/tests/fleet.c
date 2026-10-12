@@ -73,7 +73,7 @@ static void test_fleet_deadline(struct timer *timer) {
 
 struct test_fleet *test_fleet_init(struct test_context *ctx,
                                    const struct test_fleet_opts *opts) {
-    struct test_fleet *f = valloc(sizeof(*f), ALLOC_ZERO);
+    struct test_fleet *f = vnew(f, ALLOC_ZERO);
     if (!f)
         return NULL;
 

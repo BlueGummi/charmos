@@ -37,13 +37,13 @@ void scheduler_init(void) {
     if (scheduler_data.max_concurrent_stealers == 0)
         scheduler_data.max_concurrent_stealers = 1;
 
-    global.schedulers = valloc(sizeof(struct scheduler *) * global.core_count);
+    global.schedulers = vnews(global.schedulers, global.core_count);
     if (!global.schedulers)
         panic("Could not allocate scheduler pointer array");
 
     size_t i;
     for_each_cpu_id(i) {
-        struct scheduler *s = valloc(sizeof(struct scheduler), ALLOC_ZERO);
+        struct scheduler *s = vnew(s, ALLOC_ZERO);
         if (!s)
             panic("Could not allocate scheduler %lu", i);
 

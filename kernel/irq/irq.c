@@ -178,8 +178,7 @@ void irq_register(char *name, uint8_t vector, irq_handler_t handler, void *ctx,
     if (was && !(flags & IRQ_FLAG_SHARED))
         panic("need to be shared to have many, registered by %s", me->name);
 
-    struct irq_action *act =
-        nofail_valloc(sizeof(struct irq_action), ALLOC_ZERO);
+    struct irq_action *act = nofail_vnew(act, ALLOC_ZERO);
 
     act->handler = handler;
     INIT_LIST_HEAD(&act->list);

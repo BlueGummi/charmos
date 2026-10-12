@@ -13,7 +13,7 @@
 void percpu_obj_init(void) {
     struct percpu_descriptor *d;
     linker_section_for_each_object(d, percpu_desc) {
-        d->percpu_ptrs = nofail_valloc(sizeof(void *) * global.core_count);
+        d->percpu_ptrs = nofail_vnews(d->percpu_ptrs, global.core_count);
 
         size_t cpu;
         for_each_cpu_id(cpu) {
@@ -29,7 +29,8 @@ void percpu_obj_init(void) {
 void perdomain_obj_init(void) {
     struct perdomain_descriptor *d;
     linker_section_for_each_object(d, perdomain_desc) {
-        d->perdomain_ptrs = nofail_valloc(sizeof(void *) * global.domain_count);
+        d->perdomain_ptrs =
+            nofail_vnews(d->perdomain_ptrs, global.domain_count);
 
         size_t id;
         domain_for_each_domain_id(id) {
@@ -46,7 +47,7 @@ void pertopo_obj_init(void) {
     struct pertopo_descriptor *d;
     linker_section_for_each_object(d, pertopo_desc) {
         d->pertopo_ptrs =
-            nofail_valloc(sizeof(void *) * global.topology.count[d->level]);
+            nofail_vnews(d->pertopo_ptrs, global.topology.count[d->level]);
         size_t n;
         topology_for_each_id(n, d->level) {
             d->pertopo_ptrs[n] =
@@ -75,7 +76,7 @@ size_t pertopo_node_local(struct pertopo_descriptor *desc,
 
 void **percpu_alloc_array(size_t size) {
     size_t count = global.core_count;
-    void **ret = nofail_valloc(sizeof(void *) * count, ALLOC_ZERO);
+    void **ret = nofail_vnews(ret, count, ALLOC_ZERO);
     for (size_t i = 0; i < count; i++)
         ret[i] = nofail(valloc_from_domain(domain_for_cpu(i), size));
 
@@ -84,7 +85,7 @@ void **percpu_alloc_array(size_t size) {
 
 void **perdomain_alloc_array(size_t size) {
     size_t count = global.domain_count;
-    void **ret = nofail_valloc(sizeof(void *) * count, ALLOC_ZERO);
+    void **ret = nofail_vnews(ret, count, ALLOC_ZERO);
     for (size_t i = 0; i < count; i++)
         ret[i] = nofail(valloc_from_domain(i, size));
 

@@ -214,8 +214,7 @@ static void ahci_on_bio_complete(struct ahci_request *req) {
 bool ahci_submit_bio_request(struct block_device *disk,
                              struct bio_request  *bio) {
     struct ahci_disk    *ahci_disk = (struct ahci_disk *) disk->driver_data;
-    struct ahci_request *ahci_req =
-        valloc(sizeof(struct ahci_request), ALLOC_ZERO);
+    struct ahci_request *ahci_req  = vnew(ahci_req, ALLOC_ZERO);
     if (!ahci_req)
         return false;
 

@@ -94,14 +94,13 @@ enum usb_error xhci_submit_interrupt_transfer(struct usb_request *req) {
     uint32_t control = TRB_SET_TYPE(TRB_TYPE_NORMAL);
     control |= TRB_IOC_BIT;
 
-    struct xhci_request *xreq =
-        valloc(sizeof(struct xhci_request), ALLOC_ZERO);
+    struct xhci_request *xreq = vnew(xreq, ALLOC_ZERO);
     if (!xreq) {
         return_status = USB_ERR_OOM;
         goto out;
     }
 
-    struct xhci_command *cmd = valloc(sizeof(struct xhci_command), ALLOC_ZERO);
+    struct xhci_command *cmd = vnew(cmd, ALLOC_ZERO);
 
     if (!cmd) {
         return_status = USB_ERR_OOM;
@@ -194,9 +193,9 @@ enum usb_error xhci_send_control_transfer(struct xhci_device *dev,
         return fail_control_transfer(USB_ERR_NO_DEVICE);
     }
 
-    struct xhci_request   *xreq = valloc(sizeof(*xreq), ALLOC_ZERO);
-    struct xhci_command   *cmd  = valloc(sizeof(*cmd), ALLOC_ZERO);
-    struct xhci_ctrl_emit *emit = valloc(sizeof(*emit), ALLOC_ZERO);
+    struct xhci_request   *xreq = vnew(xreq, ALLOC_ZERO);
+    struct xhci_command   *cmd  = vnew(cmd, ALLOC_ZERO);
+    struct xhci_ctrl_emit *emit = vnew(emit, ALLOC_ZERO);
 
     if (!xreq || !cmd || !emit) {
         /* drop USB dev ref, drop slot ref, dealloc, bye bye */

@@ -40,7 +40,7 @@ static void swap_str(char *dst, const uint16_t *src, uint64_t word_len) {
 }
 
 void ide_identify(struct ata_drive *drive) {
-    uint16_t *buf = nofail_valloc(256 * sizeof(uint16_t));
+    uint16_t *buf = nofail_vnews(buf, 256);
 
     uint16_t io = drive->io_base;
 
@@ -150,7 +150,7 @@ struct block_device *ide_create_generic(struct ata_drive *ide) {
     irq_set_chip(irq, lapic_get_chip(), NULL);
     ide->channel.current_drive = ide;
 
-    struct block_device *d = nofail_valloc(sizeof(struct block_device));
+    struct block_device *d = nofail_vnew(d);
 
     d->driver_data      = ide;
     d->sector_size      = ide->sector_size;
@@ -160,7 +160,7 @@ struct block_device *ide_create_generic(struct ata_drive *ide) {
 
     d->flags = BDEV_FLAG_NO_COALESCE | BDEV_FLAG_NO_REORDER;
 
-    d->cache = valloc(sizeof(struct bcache), ALLOC_ZERO);
+    d->cache = vnew(d->cache, ALLOC_ZERO);
     if (!d->cache)
         panic("Could not allocate space for IDE drive block cache");
 

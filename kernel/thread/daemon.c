@@ -157,8 +157,7 @@ void daemon_main(void *a) {
 }
 
 struct daemon_thread *daemon_thread_create(struct daemon *daemon) {
-    struct daemon_thread *thread =
-        valloc(sizeof(struct daemon_thread), ALLOC_ZERO);
+    struct daemon_thread *thread = vnew(thread, ALLOC_ZERO);
     if (!thread)
         return NULL;
 
@@ -220,7 +219,7 @@ struct daemon *daemon_create_full(struct daemon_attributes *attrs,
     va_list args;
     va_start(args, fmt);
 
-    struct daemon *daemon = valloc(sizeof(struct daemon), ALLOC_ZERO);
+    struct daemon *daemon = vnew(daemon, ALLOC_ZERO);
     struct daemon_thread *dt = NULL, *bg = NULL;
 
     if (!daemon)

@@ -167,7 +167,7 @@ static void usb_kbd_worker(void *arg) {
 
 struct usb_hid_keyboard *usb_keyboard_create(struct usb_device   *dev,
                                              struct usb_endpoint *ep) {
-    struct usb_hid_keyboard *kbd = valloc(sizeof(*kbd), ALLOC_ZERO);
+    struct usb_hid_keyboard *kbd = vnew(kbd, ALLOC_ZERO);
 
     kbd->dev = dev;
     kbd->ep  = ep;

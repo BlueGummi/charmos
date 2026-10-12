@@ -14,9 +14,9 @@
 struct vfs_node *tmpfs_create_vfs_node(struct tmpfs_node *tnode);
 
 struct vfs_node *tmpfs_mkroot(const char *mount_point) {
-    struct tmpfs_fs *fs = valloc(sizeof(struct tmpfs_fs), ALLOC_ZERO);
+    struct tmpfs_fs *fs = vnew(fs, ALLOC_ZERO);
 
-    struct tmpfs_node *root = valloc(sizeof(struct tmpfs_node), ALLOC_ZERO);
+    struct tmpfs_node *root = vnew(root, ALLOC_ZERO);
     if (!fs || !root)
         return false;
 
@@ -81,7 +81,7 @@ static enum err tmpfs_read(struct vfs_node *node, void *buf, uint64_t size,
 static enum err realloc_page_array(struct tmpfs_node *tn,
                                    size_t required_pages) {
     if (required_pages > tn->num_pages) {
-        void **new_pages = vrealloc(tn->pages, required_pages * sizeof(void *));
+        void **new_pages = vrenews(tn->pages, required_pages);
         if (!new_pages)
             return ERR_NO_MEM;
         memset(new_pages + tn->num_pages, 0,
@@ -153,9 +153,7 @@ static struct tmpfs_node *tmpfs_find_child(struct tmpfs_node *dir,
 
 static enum err tmpfs_add_child(struct tmpfs_node *parent,
                                 struct tmpfs_node *child) {
-    uint64_t needed_size = sizeof(void *) * (parent->child_count + 1);
-
-    parent->children = vrealloc(parent->children, needed_size);
+    parent->children = vrenews(parent->children, parent->child_count + 1);
 
     parent->children[parent->child_count++] = child;
     child->parent = parent;
@@ -172,7 +170,7 @@ static enum err tmpfs_create_common(struct vfs_node *parent, const char *name,
     if (tmpfs_find_child(pt, name))
         return ERR_EXIST;
 
-    struct tmpfs_node *node = valloc(sizeof(*node), ALLOC_ZERO);
+    struct tmpfs_node *node = vnew(node, ALLOC_ZERO);
     if (cc_unlikely(!node))
         return ERR_NO_MEM;
 
@@ -338,7 +336,7 @@ static enum err tmpfs_truncate(struct vfs_node *node, uint64_t length) {
     }
 
     if (new_pages != tn->num_pages) {
-        void **new_array = vrealloc(tn->pages, new_pages * sizeof(void *));
+        void **new_array = vrenews(tn->pages, new_pages);
         if (!new_array && new_pages > 0)
             return ERR_NO_MEM;
 
@@ -356,8 +354,7 @@ static enum err tmpfs_truncate(struct vfs_node *node, uint64_t length) {
 
         if (last_page_idx < new_pages) {
             if (!tn->pages[last_page_idx]) {
-                tn->pages[last_page_idx] =
-                    valloc_aligned(PAGE_SIZE, PAGE_SIZE);
+                tn->pages[last_page_idx] = valloc_aligned(PAGE_SIZE, PAGE_SIZE);
                 if (!tn->pages[last_page_idx])
                     return ERR_NO_MEM;
                 memset(tn->pages[last_page_idx], 0, PAGE_SIZE);
@@ -492,7 +489,7 @@ static const struct vfs_ops tmpfs_ops = {.read = tmpfs_read,
                                          .finddir = tmpfs_finddir};
 
 struct vfs_node *tmpfs_create_vfs_node(struct tmpfs_node *tnode) {
-    struct vfs_node *vnode = valloc(sizeof(struct vfs_node), ALLOC_ZERO);
+    struct vfs_node *vnode = vnew(vnode, ALLOC_ZERO);
     if (!vnode || !tnode)
         return NULL;
 

@@ -205,23 +205,19 @@ void usb_try_bind_driver(struct usb_device *dev) {
 static void
 usb_register_dev_interface(struct usb_device               *dev,
                            struct usb_interface_descriptor *interface) {
-    struct usb_interface_descriptor *new_int =
-        valloc(sizeof(struct usb_interface_descriptor));
+    struct usb_interface_descriptor *new_int = vnew(new_int);
     memcpy(new_int, interface, sizeof(struct usb_interface_descriptor));
 
-    size_t size = (dev->num_interfaces + 1) * sizeof(void *);
-
-    dev->interfaces                        = vrealloc(dev->interfaces, size);
+    dev->interfaces = vrenews(dev->interfaces, dev->num_interfaces + 1);
     dev->interfaces[dev->num_interfaces++] = new_int;
 }
 
 static void usb_register_dev_ep(struct usb_device              *dev,
                                 struct usb_endpoint_descriptor *endpoint) {
-    struct usb_endpoint_descriptor *new_ep =
-        valloc(sizeof(struct usb_endpoint_descriptor));
+    struct usb_endpoint_descriptor *new_ep = vnew(new_ep);
     memcpy(new_ep, endpoint, sizeof(struct usb_endpoint_descriptor));
 
-    struct usb_endpoint *ep = valloc(sizeof(struct usb_endpoint), ALLOC_ZERO);
+    struct usb_endpoint *ep = vnew(ep, ALLOC_ZERO);
 
     ep->type            = USB_ENDPOINT_ATTR_TRANS_TYPE(endpoint->attributes);
     ep->number          = USB_ENDPOINT_ADDR_EP_NUM(endpoint->address);
@@ -231,8 +227,7 @@ static void usb_register_dev_ep(struct usb_device              *dev,
 
     ep->in = USB_ENDPOINT_ADDR_EP_DIRECTION(endpoint->address);
 
-    size_t size    = (dev->num_endpoints + 1) * sizeof(void *);
-    dev->endpoints = vrealloc(dev->endpoints, size);
+    dev->endpoints = vrenews(dev->endpoints, dev->num_endpoints + 1);
     dev->endpoints[dev->num_endpoints++] = ep;
 }
 

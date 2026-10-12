@@ -554,8 +554,7 @@ void log_sites_init(void) {
         refcount_init(&s->refcount, 1);
         struct log_ringbuf *lrb = &s->rb;
         enforce(s->capacity);
-        lrb->slots = nofail_valloc(sizeof(struct log_ring_slot) * s->capacity,
-                                   ALLOC_ZERO);
+        lrb->slots = nofail_vnews(lrb->slots, s->capacity, ALLOC_ZERO);
 
         for (size_t i = 0; i < s->capacity; i++) {
             atomic_store_release(&lrb->slots[i].seq, i);
@@ -602,8 +601,7 @@ struct log_site *log_site_create(struct log_site_options opts) {
     if (!ret->name)
         goto err;
 
-    struct log_ring_slot *slots =
-        valloc(sizeof(struct log_ring_slot) * opts.capacity, ALLOC_ZERO);
+    struct log_ring_slot *slots = vnews(slots, opts.capacity, ALLOC_ZERO);
     if (!slots)
         goto err;
 

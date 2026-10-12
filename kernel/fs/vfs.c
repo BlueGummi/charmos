@@ -21,7 +21,7 @@ static void mount_table_add(struct vfs_mount *mnt) {
             (mount_table_capacity == 0) ? 4 : mount_table_capacity * 2;
 
         struct vfs_mount **new_table;
-        new_table = vrealloc(mount_table, new_capacity * sizeof(*mount_table));
+        new_table = vrenews(mount_table, new_capacity);
 
         if (!new_table)
             return;
@@ -102,7 +102,7 @@ enum err vfs_mount(struct vfs_node *mountpoint, struct vfs_node *target,
     if (mountpoint->child_mount)
         return ERR_BUSY; // Already mounted here
 
-    struct vfs_mount *mnt = valloc(sizeof(struct vfs_mount));
+    struct vfs_mount *mnt = vnew(mnt);
     if (!mnt)
         return ERR_NO_MEM;
 

@@ -100,7 +100,7 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
     if (!qid)
         panic("Can't allocate IO queue zero!");
 
-    nvme->io_queues[qid] = nofail_valloc(sizeof(struct nvme_queue), ALLOC_ZERO);
+    nvme->io_queues[qid] = nofail_vnew(nvme->io_queues[qid], ALLOC_ZERO);
 
     struct nvme_queue *this_queue = nvme->io_queues[qid];
 
@@ -138,8 +138,8 @@ void nvme_alloc_io_queues(struct nvme_device *nvme, uint32_t qid) {
 
     uint8_t this_isr = nvme->isr_index[qid];
 
-    this_queue->sq_requests = nofail_valloc(
-        sizeof(struct nvme_request *) * this_queue->sq_depth, ALLOC_ZERO);
+    this_queue->sq_requests =
+        nofail_vnews(this_queue->sq_requests, this_queue->sq_depth, ALLOC_ZERO);
 
     // complete queue
     struct nvme_command cq_cmd = {0};

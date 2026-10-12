@@ -7,7 +7,7 @@
 #include <structures/rbt.h>
 
 struct rbt *rbt_create(rbt_get_data get, rbt_compare cmp) {
-    struct rbt *tree = valloc(sizeof(struct rbt));
+    struct rbt *tree = vnew(tree);
     if (!tree)
         return NULL;
 

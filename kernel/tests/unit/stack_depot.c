@@ -141,7 +141,7 @@ TEST_DEFINE_UNIT(stack_depot, hash_bucket) {
 TEST_DEFINE_UNIT(stack_depot, bulk_save_roundtrip,
                  TEST_INTENSITY(128, 1024, 4096)) {
     size_t count = ctx->intensity_val ? ctx->intensity_val : SD_MANY;
-    stack_handle_t *handles = valloc(sizeof(*handles) * count, ALLOC_ZERO);
+    stack_handle_t *handles = vnews(handles, count, ALLOC_ZERO);
     TEST_ASSERT_NONNULL(handles);
 
     prng_seed(SD_SEED);

@@ -217,15 +217,15 @@ void slab_percpu_refill(struct slab_domain *dom,
 void slab_domain_percpu_init(struct slab_domain *domain) {
     size_t cpus = domain->domain->num_cores;
     domain->percpu_caches =
-        nofail_valloc(sizeof(struct slab_percpu_cache *) * cpus, ALLOC_ZERO);
+        nofail_vnews(domain->percpu_caches, cpus, ALLOC_ZERO);
 
     for (size_t i = 0; i < cpus; i++) {
         domain->percpu_caches[i] =
-            nofail_valloc(sizeof(struct slab_percpu_cache), ALLOC_ZERO);
+            nofail_vnew(domain->percpu_caches[i], ALLOC_ZERO);
         for (int j = 0; j < SLAB_MAGAZINE_TYPE_COUNT; j++) {
-            domain->percpu_caches[i]->mags[j] = nofail_valloc(
-                sizeof(struct slab_magazine) * slab_global.num_sizes,
-                ALLOC_ZERO);
+            domain->percpu_caches[i]->mags[j] =
+                nofail_vnews(domain->percpu_caches[i]->mags[j],
+                             slab_global.num_sizes, ALLOC_ZERO);
             for (size_t k = 0; k < slab_global.num_sizes; k++) {
                 domain->percpu_caches[i]->mags[j][k].type = j;
                 domain->percpu_caches[i]->mags[j][k].obj_size =

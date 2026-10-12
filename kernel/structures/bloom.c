@@ -90,8 +90,7 @@ struct counting_bloom_filter *cbf_create(size_t capacity,
     CLAMP(num_hashes, CBF_HASHES_MIN, CBF_HASHES_MAX);
     num_counters = ALIGN_UP(num_counters, 2);
 
-    struct counting_bloom_filter *cbf =
-        valloc(sizeof(struct counting_bloom_filter));
+    struct counting_bloom_filter *cbf = vnew(cbf);
     if (!cbf)
         return NULL;
 

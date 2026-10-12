@@ -84,7 +84,8 @@ struct worker *workqueue_worker_create(struct workqueue *queue) {
         spin_unlock(&queue->worker_array_lock, irql);
         return ret;
     } else {
-        return valloc(sizeof(struct worker), ALLOC_ZERO);
+        struct worker *w = vnew(w, ALLOC_ZERO);
+        return w;
     }
 }
 

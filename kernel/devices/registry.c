@@ -23,7 +23,7 @@ static struct disk_node *disk_list = NULL;
 static uint64_t disk_count = 0;
 
 void registry_register(struct block_device *disk) {
-    struct disk_node *node = valloc(sizeof(struct disk_node));
+    struct disk_node *node = vnew(node);
     if (!node)
         return;
 

@@ -3,7 +3,8 @@
 TEST_DEFINE_UNIT(slab, random_free_stress, TEST_INTENSITY(256, 2048, 32768),
                  .min_ram_mib = 8) {
     size_t n = ctx->intensity_val ? ctx->intensity_val : 2048;
-    void **stress_alloc_free_ptrs = valloc(sizeof(void *) * n, ALLOC_ZERO);
+    void **stress_alloc_free_ptrs =
+        vnews(stress_alloc_free_ptrs, n, ALLOC_ZERO);
     TEST_ASSERT_NONNULL(stress_alloc_free_ptrs);
 
     for (size_t i = 0; i < n; i++) {
@@ -32,7 +33,7 @@ TEST_DEFINE_UNIT(slab, random_free_stress, TEST_INTENSITY(256, 2048, 32768),
 TEST_DEFINE_UNIT(slab, bulk_alloc_free_stress, TEST_INTENSITY(256, 2048, 16384),
                  .min_ram_mib = 8) {
     size_t n = ctx->intensity_val ? ctx->intensity_val : 2048;
-    void **mixed_stress_test_ptrs = valloc(sizeof(void *) * n);
+    void **mixed_stress_test_ptrs = vnews(mixed_stress_test_ptrs, n);
     TEST_ASSERT_NONNULL(mixed_stress_test_ptrs);
 
     for (size_t i = 0; i < n; i++) {

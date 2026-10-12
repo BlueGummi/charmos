@@ -25,7 +25,7 @@ static void nvme_on_bio_complete(struct nvme_request *req) {
 
 bool nvme_submit_bio_request(struct block_device *disk,
                              struct bio_request *bio) {
-    struct nvme_request *req = valloc(sizeof(struct nvme_request), ALLOC_ZERO);
+    struct nvme_request *req = vnew(req, ALLOC_ZERO);
     if (!req)
         return false;
 

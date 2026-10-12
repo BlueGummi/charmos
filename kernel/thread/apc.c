@@ -308,11 +308,13 @@ bool apc_cancel(struct thread *t, struct apc *a) {
 }
 
 struct apc *apc_create(void) {
-    return valloc(sizeof(struct apc));
+    struct apc *a = vnew(a);
+    return a;
 }
 
 struct event_apc *apc_event_apc_create(void) {
-    return valloc(sizeof(struct event_apc));
+    struct event_apc *a = vnew(a);
+    return a;
 }
 
 void apc_init(struct apc *a, apc_func_t fn, void *arg1, apc_destroy_t destroy) {

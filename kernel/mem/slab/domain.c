@@ -13,8 +13,8 @@ void slab_domain_build_locality_lists(struct slab_domain *sdom) {
 
     for (int i = 0; i < SLAB_TYPE_COUNT; i++) {
         sdom->zonelists[i].count = zl->count;
-        sdom->zonelists[i].entries = nofail_valloc(
-            sizeof(struct slab_cache_ref) * zl->count, ALLOC_ZERO);
+        sdom->zonelists[i].entries =
+            nofail_vnews(sdom->zonelists[i].entries, zl->count, ALLOC_ZERO);
         for (size_t j = 0; j < zl->count; j++) {
             struct domain_zonelist_entry *zent = &zl->entries[j];
             struct domain_buddy *bd = zent->domain;
@@ -50,8 +50,7 @@ void slab_domain_link_caches(struct slab_domain *domain,
 
 static void slab_domain_init_cache(struct slab_domain *dom,
                                    enum slab_type type) {
-    struct slab_caches *caches =
-        nofail_valloc(sizeof(struct slab_caches), ALLOC_ZERO);
+    struct slab_caches *caches = nofail_vnew(caches, ALLOC_ZERO);
 
     dom->caches[type] = caches;
     dom->caches[type]->caches = nofail(slab_caches_alloc());
@@ -99,8 +98,7 @@ void slab_domain_init_stats(struct slab_domain *domain) {
 
     domain->stats->private = domain;
     domain->buckets =
-        valloc(sizeof(struct slab_domain_bucket) * SLAB_STAT_SERIES_CAPACITY,
-               ALLOC_ZERO);
+        vnews(domain->buckets, SLAB_STAT_SERIES_CAPACITY, ALLOC_ZERO);
 
     if (!domain->stats || !domain->stats->buckets || !domain->buckets)
         panic("Failed to create domain stat series");
@@ -139,8 +137,7 @@ void slab_domain_move_slabs(void) {
 void slab_domain_init(void) {
     for (size_t i = 0; i < global.domain_count; i++) {
         struct domain *domain = global.domains[i];
-        struct slab_domain *sdomain =
-            nofail_valloc(sizeof(struct slab_domain), ALLOC_ZERO);
+        struct slab_domain *sdomain = nofail_vnew(sdomain, ALLOC_ZERO);
 
         sdomain->domain = domain;
         domain->slab_domain = sdomain;

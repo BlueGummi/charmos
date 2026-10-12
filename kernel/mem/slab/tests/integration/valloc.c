@@ -35,7 +35,7 @@ TEST_DEFINE_INTEGRATION(slab, mt_alloc_free,
                         TEST_INTENSITY_CORES(1, 2, 4, "threads/core"),
                         .min_ram_mib = 8) {
     size_t nthreads = ctx->intensity_val ? ctx->intensity_val : 8;
-    struct thread **threads = valloc(sizeof(struct thread *) * nthreads);
+    struct thread **threads = vnews(threads, nthreads);
     TEST_ASSERT_NONNULL(threads);
     atomic_store(&valloc_done, 0);
 
@@ -77,7 +77,7 @@ static void stress_worker(void *arg) {
         ;
 
     /* allocate small tracking table dynamically */
-    void **live_ptrs = valloc(sizeof(void *) * MAX_LIVE_ALLOCS);
+    void **live_ptrs = vnews(live_ptrs, MAX_LIVE_ALLOCS);
     memset(live_ptrs, 0, sizeof(void *) * MAX_LIVE_ALLOCS);
 
     for (size_t iter = 0; iter < a->iters; ++iter) {

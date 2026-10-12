@@ -37,8 +37,7 @@ void cmdline_check_for_duplicates(void) {
     if (count == 0)
         return;
 
-    char (*names)[CMDLINE_ENTRY_NAME_LEN_MAX] =
-        nofail_valloc(count * sizeof(*names));
+    char (*names)[CMDLINE_ENTRY_NAME_LEN_MAX] = nofail_vnews(names, count);
 
     for (size_t i = 0; i < count; i++) {
         cmdline_functional_name(&__skernel_cmdline_entries[i], names[i]);

@@ -266,7 +266,7 @@ struct thread *thread_create_full(char *name, thread_entry_fn_t entry,
                                   struct thread_create_params *params,
                                   va_list args) {
     enforce(name);
-    struct thread *new_thread = valloc(sizeof(struct thread), ALLOC_ZERO);
+    struct thread *new_thread = vnew(new_thread, ALLOC_ZERO);
     if (cc_unlikely(!new_thread))
         goto err;
 
@@ -275,8 +275,7 @@ struct thread *thread_create_full(char *name, thread_entry_fn_t entry,
         goto err;
 
     params->stack_internal = stack;
-    new_thread->activity_data =
-        valloc(sizeof(struct thread_activity_data), ALLOC_ZERO);
+    new_thread->activity_data = vnew(new_thread->activity_data, ALLOC_ZERO);
     if (cc_unlikely(!new_thread->activity_data))
         goto err;
 
@@ -284,8 +283,7 @@ struct thread *thread_create_full(char *name, thread_entry_fn_t entry,
     if (cc_unlikely(!new_thread->turnstile))
         goto err;
 
-    new_thread->activity_stats =
-        valloc(sizeof(struct thread_activity_stats), ALLOC_ZERO);
+    new_thread->activity_stats = vnew(new_thread->activity_stats, ALLOC_ZERO);
     if (cc_unlikely(!new_thread->activity_stats))
         goto err;
 

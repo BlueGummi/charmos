@@ -16,4 +16,8 @@
     })
 
 #define nofail_valloc(...) nofail(valloc(__VA_ARGS__))
+#define nofail_vnew(...) nofail(vnew(__VA_ARGS__))
+#define nofail_vnews(...) nofail(vnews(__VA_ARGS__))
+#define nofail_vnew_flex(...) nofail(vnew_flex(__VA_ARGS__))
 #define nofail_vrealloc(...) nofail(vrealloc(__VA_ARGS__))
+#define nofail_vrenews(...) nofail(vrenews(__VA_ARGS__))
