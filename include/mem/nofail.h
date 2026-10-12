@@ -4,10 +4,10 @@
 #include <global.h>
 #include <log.h>
 
-#define must(expr)                                                             \
+#define nofail(expr)                                                           \
     ({                                                                         \
         if (global.current_bootstage >= BOOTSTAGE_COMPLETE)                    \
-            log_msg_once(LOG_WARN, "must() invoked after boot");               \
+            log_msg_once(LOG_WARN, "nofail() invoked after boot");             \
         typeof(expr) _p_ = (expr);                                             \
         if (cc_unlikely(!_p_))                                                 \
             panic("OOM: %s == NULL, bootstage: %s", #expr,                     \
@@ -15,5 +15,5 @@
         _p_;                                                                   \
     })
 
-#define must_valloc(...) must(valloc(__VA_ARGS__))
-#define must_vrealloc(...) must(vrealloc(__VA_ARGS__))
+#define nofail_valloc(...) nofail(valloc(__VA_ARGS__))
+#define nofail_vrealloc(...) nofail(vrealloc(__VA_ARGS__))

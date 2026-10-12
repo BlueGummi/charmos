@@ -4,7 +4,7 @@
 #include <math/sort.h>
 #include <mem/alloc.h>
 #include <mem/buddy.h>
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <mem/numa.h>
 #include <mem/page_alloc.h>
 #include <mem/pmm.h>
@@ -142,7 +142,7 @@ static void domain_buddy_init(struct domain_buddy *dom) {
 }
 
 static void *alloc_up(size_t size) {
-    return must(valloc_pages(PAGES_NEEDED_FOR(size), ALLOC_FLAGS_ZERO));
+    return nofail(valloc_pages(PAGES_NEEDED_FOR(size), ALLOC_FLAGS_ZERO));
 }
 
 static void domain_structs_init(struct domain_buddy *dom, size_t arena_capacity,

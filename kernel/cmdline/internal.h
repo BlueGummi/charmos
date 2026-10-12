@@ -13,7 +13,7 @@
 #include <math/fixed.h>
 #include <math/range.h>
 #include <mem/alloc.h>
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <parse.h>
 #include <string.h>
 #include <stringify.h>

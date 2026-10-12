@@ -4,7 +4,7 @@
 #include <console/panic.h>
 #include <math/align.h>
 #include <mem/alloc.h>
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -381,7 +381,7 @@ void *bcache_create_ent(struct block_device *disk, uint64_t lba,
     if (!ent) {
         uint8_t *buf =
             valloc_aligned(PAGE_SIZE, PAGE_SIZE, .flags = ALLOC_FLAGS_PAGEABLE,
-                            .behavior = ALLOC_BEHAVIOR_NORMAL);
+                           .behavior = ALLOC_BEHAVIOR_NORMAL);
         if (!buf)
             return NULL;
 
@@ -421,5 +421,5 @@ void bcache_init(struct bcache *cache, uint64_t capacity) {
     cache->capacity = capacity;
     cache->count = 0;
     cache->entries =
-        must_valloc(sizeof(struct bcache_wrapper *) * capacity, ALLOC_ZERO);
+        nofail_valloc(sizeof(struct bcache_wrapper *) * capacity, ALLOC_ZERO);
 }

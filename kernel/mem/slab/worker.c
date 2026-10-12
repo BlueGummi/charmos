@@ -1,5 +1,5 @@
 /* Implements slab workers and daemon threads */
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <smp/domain.h>
 #include <thread/daemon.h>
 #include <thread/workqueue.h>

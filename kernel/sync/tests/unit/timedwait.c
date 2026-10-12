@@ -1,5 +1,5 @@
 #include "sync/tests/test_internal.h"
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <sync/completion.h>
 #include <sync/condvar.h>
 #include <sync/semaphore.h>
@@ -119,7 +119,7 @@ TEST_DEFINE_UNIT(semaphore, timedwait_standard) {
         .delay_ms = 20,
     };
     struct thread *t =
-        must(thread_create("sem_poster", timed_sem_poster, .arg = &a));
+        nofail(thread_create("sem_poster", timed_sem_poster, .arg = &a));
     thread_enqueue(t);
 
     TEST_ASSERT(semaphore_timedwait(&s, 200));
@@ -142,14 +142,14 @@ TEST_DEFINE_UNIT(completion, wait_timeout_standard) {
         .delay_ms = 20,
     };
     struct thread *t =
-        must(thread_create("comp_signaler", timed_comp_signaler, .arg = &a));
+        nofail(thread_create("comp_signaler", timed_comp_signaler, .arg = &a));
     thread_enqueue(t);
 
     TEST_ASSERT(completion_wait_timeout(&c, 200));
     TEST_ASSERT(!completion_done(&c));
 
     struct thread *t2 =
-        must(thread_create("comp_all", timed_comp_all_signaler, .arg = &a));
+        nofail(thread_create("comp_all", timed_comp_all_signaler, .arg = &a));
     thread_enqueue(t2);
 
     TEST_ASSERT(completion_wait_timeout(&c, 200));

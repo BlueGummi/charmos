@@ -4,7 +4,7 @@
 #include <log.h>
 #include <math/bit.h>
 #include <mem/alloc.h>
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <smp/percpu.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -160,7 +160,7 @@ struct clock *tsc_clock_init(freq_hz_t freq_hz) {
     if (freq_hz == 0)
         freq_hz = tsc_calibrate_hpet();
 
-    struct clock *clk = must(clock_create(CLOCK_NAME_TSC));
+    struct clock *clk = nofail(clock_create(CLOCK_NAME_TSC));
 
     clk->read = tsc_clock_read;
     clk->frequency_khz = HZ_TO_KHZ(freq_hz);

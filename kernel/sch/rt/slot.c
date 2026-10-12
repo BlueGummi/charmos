@@ -1,5 +1,5 @@
 #include <mem/alloc.h>
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <sch/irql.h>
 #include <sch/rt_sched.h>
 #include <sync/spinlock.h>
@@ -50,7 +50,7 @@ void rt_slot_init(size_t num_slots) {
     slot_db.num_slots = num_slots;
     spinlock_init(&slot_db.lock);
     slot_db.slots =
-        must_valloc(sizeof(struct rt_slot) * num_slots, ALLOC_ZERO);
+        nofail_valloc(sizeof(struct rt_slot) * num_slots, ALLOC_ZERO);
 
     for (size_t i = 0; i < num_slots; i++)
         slot_db.slots[i].slot_index = i;

@@ -1,7 +1,7 @@
 #include <kassert.h>
 #include <math/min_max.h>
 #include <mem/alloc.h>
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <mem/slab.h> /* to get SLAB_OBJ_ALIGN */
 #include <sch/sched.h>
 #include <sync/rcu.h>
@@ -50,7 +50,7 @@ LOCK_CHK_CLASS_DEFINE_LOCAL(turnstile_chain);
 
 void turnstiles_init(void) {
     global.turnstiles =
-        must_valloc(sizeof(struct turnstile_hash_table), ALLOC_ZERO);
+        nofail_valloc(sizeof(struct turnstile_hash_table), ALLOC_ZERO);
     for (size_t i = 0; i < TURNSTILE_HASH_SIZE; i++) {
         spinlock_init_chk(&global.turnstiles->heads[i].lock,
                           LOCK_CHK_CLASS(turnstile_chain), LOCK_CHKD_FULL);

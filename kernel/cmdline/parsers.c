@@ -105,7 +105,7 @@ enum err cmdline_parse_string(void *write_to, const char *text) {
     if (!text)
         return ERR_INVAL;
     size_t len = strlen(text);
-    char *copy = must_valloc(len + 1);
+    char *copy = nofail_valloc(len + 1);
     memcpy(copy, text, len + 1);
     *(char **) write_to = copy;
     return ERR_OK;

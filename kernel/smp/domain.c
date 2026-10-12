@@ -2,7 +2,7 @@
 #include <global.h>
 #include <log.h>
 #include <mem/alloc.h>
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <mem/numa.h>
 #include <mem/page.h>
 #include <sch/sched.h>
@@ -25,13 +25,13 @@ LOG_HANDLE_DEFINE_PRINT(domain);
 static void init_global_domain(uint64_t domain_count) {
     global.domain_count = domain_count;
     global.domains =
-        must_valloc(sizeof(struct domain *) * domain_count, ALLOC_ZERO);
+        nofail_valloc(sizeof(struct domain *) * domain_count, ALLOC_ZERO);
 
     for (size_t i = 0; i < domain_count; i++) {
 
         /* We align this up to the page so that they can all be
          * migrated later on to pages on each domain... */
-        global.domains[i] = must(valloc_pages(
+        global.domains[i] = nofail(valloc_pages(
             PAGES_NEEDED_FOR(sizeof(struct domain)), ALLOC_FLAGS_ZERO));
 
         global.domains[i]->id = i;
@@ -49,7 +49,7 @@ static void construct_domains_from_numa_nodes(void) {
         cpu_mask_copy(&cd->cpu_mask, &nn->cpus);
         cd->associated_node = nn;
         cd->cores =
-            must_valloc(sizeof(struct core *) * cd->num_cores, ALLOC_ZERO);
+            nofail_valloc(sizeof(struct core *) * cd->num_cores, ALLOC_ZERO);
     }
 }
 
@@ -82,8 +82,8 @@ static void construct_domains_from_cores(void) {
 
             cpu_mask_set(&cd->cpu_mask, core_index);
         }
-        cd->cores =
-            must_valloc(sizeof(struct core *) * cores_this_domain, ALLOC_ZERO);
+        cd->cores = nofail_valloc(sizeof(struct core *) * cores_this_domain,
+                                  ALLOC_ZERO);
     }
 }
 

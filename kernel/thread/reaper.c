@@ -1,5 +1,5 @@
 #include <mem/alloc.h>
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <sch/sched.h>
 #include <thread/daemon.h>
 #include <thread/reaper.h>
@@ -17,15 +17,16 @@ void reaper_enqueue(struct thread *t) {
 
 void reaper_init(void) {
     size_t reaper_count = global.domain_count;
-    reapers =
-        must_valloc(sizeof(struct reaper_thread *) * reaper_count, ALLOC_ZERO);
+    reapers = nofail_valloc(sizeof(struct reaper_thread *) * reaper_count,
+                            ALLOC_ZERO);
 
     for (size_t i = 0; i < reaper_count; i++) {
-        reapers[i] = must(valloc_from_domain(i, sizeof(struct reaper_thread)));
+        reapers[i] =
+            nofail(valloc_from_domain(i, sizeof(struct reaper_thread)));
 
         locked_list_init(&reapers[i]->list, LOCKED_LIST_INIT_IRQ_DISABLE);
         semaphore_init(&reapers[i]->sem, 1, SEMAPHORE_INIT_IRQ_DISABLE);
-        reapers[i]->thread = must(thread_spawn(
+        reapers[i]->thread = nofail(thread_spawn(
             "reaper_thread", reaper_thread_main, .private = reapers[i],
             .allowed_cpus = global.domains[i]->cpu_mask));
     }

@@ -1,5 +1,5 @@
 #include <math/align.h>
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <mem/page.h>
 
 #include "internal.h"
@@ -39,7 +39,7 @@ void slab_order_map_init(void) {
     size_t range = SLAB_HEAP_END - SLAB_HEAP_START;
     size_t n4mb_blocks = range / (PAGE_2MB * 2);
     size_t bytes_needed = n4mb_blocks;
-    slab_global.order_map = must(simple_alloc(slab_global.vas, bytes_needed));
+    slab_global.order_map = nofail(simple_alloc(slab_global.vas, bytes_needed));
 
     uint8_t set_to = SLAB_POW2_ORDER_EMPTY << 4 | SLAB_POW2_ORDER_EMPTY;
     memset(slab_global.order_map, set_to, bytes_needed);

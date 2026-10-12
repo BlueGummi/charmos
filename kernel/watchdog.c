@@ -3,7 +3,7 @@
 #include <irq/ipi.h>
 #include <irq/irq.h>
 #include <math/min_max.h>
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <pit.h>
 #include <smp/percpu.h>
 #include <string.h>
@@ -737,7 +737,7 @@ void watchdog_init(void) {
     cpu_mask_init(&watchdog_master.scratch_mask, global.core_count);
 
     cpu_mask_set_all(&watchdog_master.cpu_masks[WATCHDOG_STATE_NORMAL]);
-    watchdog_master.cpus = must_valloc(
+    watchdog_master.cpus = nofail_valloc(
         sizeof(struct watchdog_master_cpu) * global.core_count, ALLOC_ZERO);
 
     watchdog_global.critical_test_irq = irq_alloc_entry();

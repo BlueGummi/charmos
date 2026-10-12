@@ -1,5 +1,5 @@
 #include <mem/alloc.h>
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <stdarg.h>
 #include <string.h>
 #include <time/clock_evdev.h>

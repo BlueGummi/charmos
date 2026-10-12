@@ -137,7 +137,7 @@ static struct clock_evdev *lapic_clock_evdev_create(cpu_id_t core_id) {
 
 void lapic_clock_evdev_group_init(void) {
     struct clock_evdev_group *cedg =
-        must(clock_evdev_group_create(CLOCK_NAME_LAPIC));
+        nofail(clock_evdev_group_create(CLOCK_NAME_LAPIC));
 
     /* No need to set evdev_for_cpu if CLOCK_EVDEV_GROUP_PERCPU set */
     cedg->flags = CLOCK_EVDEV_GROUP_PERCPU;

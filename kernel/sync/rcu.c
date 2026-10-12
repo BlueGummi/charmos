@@ -32,7 +32,7 @@
 #include <math/align.h>
 #include <math/min_max.h>
 #include <mem/alloc.h>
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <sch/sched.h>
 #include <smp/core.h>
 #include <structures/list.h>
@@ -616,7 +616,7 @@ static void rcu_build_tree(void) {
     for (size_t i = 0; i < levels; i++)
         total += counts[i];
 
-    rcu.nodes = must_valloc(total * sizeof(struct rcu_node), ALLOC_ZERO);
+    rcu.nodes = nofail_valloc(total * sizeof(struct rcu_node), ALLOC_ZERO);
     rcu.node_count = total;
 
     /* Root first so forward pass initializes parents before children */
@@ -679,7 +679,7 @@ void rcu_init(void) {
     rcu_build_tree();
 
     rcu.cpus =
-        must_valloc(global.core_count * sizeof(struct rcu_cpu), ALLOC_ZERO);
+        nofail_valloc(global.core_count * sizeof(struct rcu_cpu), ALLOC_ZERO);
     for (cpu_id_t cpu = 0; cpu < global.core_count; cpu++) {
         spinlock_init(&rcu.cpus[cpu].lock);
         INIT_LIST_HEAD(&rcu.cpus[cpu].list);

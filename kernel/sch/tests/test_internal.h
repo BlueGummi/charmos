@@ -3,7 +3,7 @@
 
 #include "import.h"
 #include "sch/internal.h"
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <sch/sched.h>
 #include <string.h>
 #include <thread/apc.h>

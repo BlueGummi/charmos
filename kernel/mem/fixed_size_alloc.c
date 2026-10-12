@@ -3,7 +3,7 @@
 #include <mem/alloc.h>
 #include <mem/fixed_size_alloc.h>
 #include <mem/hhdm.h>
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <mem/pmm.h>
 #include <string.h>
 
@@ -180,7 +180,7 @@ fixed_size_range_create(struct fixed_size_range_attributes *attrs) {
     struct fixed_size_range *fsr;
     kassert(attrs);
     if (attrs->bootstrap_mode) {
-        paddr_t phys = must(pmm_alloc_page());
+        paddr_t phys = nofail(pmm_alloc_page());
         vaddr_t virt = hhdm_paddr_to_vaddr(phys);
         fsr = (void *) virt;
     } else {

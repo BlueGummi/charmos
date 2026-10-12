@@ -1,5 +1,5 @@
 #include "sync/tests/test_internal.h"
-#include <mem/must.h>
+#include <mem/nofail.h>
 
 struct chaos_state {
     struct thread_wait_header wait;
@@ -59,7 +59,7 @@ static void chaos_diag_attach(struct thread *t, size_t slot) {
         return;
 
     struct thread_diag *d =
-        must_valloc(sizeof(struct thread_diag), ALLOC_ZERO);
+        nofail_valloc(sizeof(struct thread_diag), ALLOC_ZERO);
 
     if (!thread_diag_attach(t, d)) {
         vfree(d);

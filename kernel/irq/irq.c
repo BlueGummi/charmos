@@ -7,7 +7,7 @@
 #include <irq/exception_sync_cb.h>
 #include <irq/idt.h>
 #include <mem/alloc.h>
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <mem/page_fault.h>
 #include <mem/tlb.h>
 #include <mem/vmm.h>
@@ -179,7 +179,7 @@ void irq_register(char *name, uint8_t vector, irq_handler_t handler, void *ctx,
         panic("need to be shared to have many, registered by %s", me->name);
 
     struct irq_action *act =
-        must_valloc(sizeof(struct irq_action), ALLOC_ZERO);
+        nofail_valloc(sizeof(struct irq_action), ALLOC_ZERO);
 
     act->handler = handler;
     INIT_LIST_HEAD(&act->list);

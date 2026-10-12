@@ -2,7 +2,7 @@
 #include <math/fixed.h>
 #include <math/units.h>
 #include <mem/alloc.h>
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <parse.h>
 #include <string.h>
 

@@ -3,7 +3,7 @@
 #include <console/panic.h>
 #include <console/printf.h>
 #include <mem/alloc.h>
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <mem/page.h>
 #include <stdint.h>
 #include <string.h>
@@ -74,8 +74,8 @@ void gdt_init(struct gdt_entry *gdt, struct tss *tss) {
     tss->io_map_base = sizeof(struct tss);
 
     gdt_lgdt(gdt, GDT_ENTRIES);
-    tss->ist1 = (uint64_t) must(valloc_aligned(8 * PAGE_SIZE, PAGE_SIZE));
-    tss->rsp0 = (uint64_t) must(valloc_aligned(8 * PAGE_SIZE, PAGE_SIZE));
+    tss->ist1 = (uint64_t) nofail(valloc_aligned(8 * PAGE_SIZE, PAGE_SIZE));
+    tss->rsp0 = (uint64_t) nofail(valloc_aligned(8 * PAGE_SIZE, PAGE_SIZE));
 
     /* stacks grow down */
     tss->ist1 += 8 * PAGE_SIZE;

@@ -1,7 +1,7 @@
 #include <compiler/core.h>
 #include <kassert.h>
 #include <mem/alloc.h>
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <sch/sched.h>
 #include <smp/domain.h>
 #include <stdarg.h>
@@ -259,7 +259,7 @@ struct worker *workqueue_spawn_permanent_worker(struct workqueue *queue) {
 void workqueues_permanent_init(void) {
     int64_t num_workqueues = global.core_count;
     global.workqueues =
-        must_valloc(sizeof(struct workqueue *) * num_workqueues, ALLOC_ZERO);
+        nofail_valloc(sizeof(struct workqueue *) * num_workqueues, ALLOC_ZERO);
 
     for (int64_t i = 0; i < num_workqueues; i++) {
 

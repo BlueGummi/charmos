@@ -2,7 +2,7 @@
 #include <log.h>
 #include <math/fixed.h>
 #include <mem/alloc.h>
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <sch/rt_sched.h>
 #include <sch/sched.h>
 #include <smp/core.h>
@@ -16,7 +16,7 @@ LOG_SITE_DEFINE(rt_sched, .flags = LOG_SITE_DEFAULT,
 
 static void init_scheduler_boot(struct scheduler *sched) {
     struct rt_scheduler_percpu *pcpu =
-        must_valloc(sizeof(struct rt_scheduler_percpu), ALLOC_ZERO);
+        nofail_valloc(sizeof(struct rt_scheduler_percpu), ALLOC_ZERO);
 
     struct log_site_options opts = {
         .name = "rt_sched",
@@ -26,7 +26,7 @@ static void init_scheduler_boot(struct scheduler *sched) {
         .flags = LOG_SITE_DEFAULT,
     };
 
-    pcpu->log_site = must(log_site_create(opts));
+    pcpu->log_site = nofail(log_site_create(opts));
 
     pcpu->log_handle = LOG_HANDLE_DEFAULT;
     pcpu->perms.allowed_capabilities = UINT16_MAX;
@@ -37,9 +37,9 @@ static void init_scheduler_boot(struct scheduler *sched) {
     semaphore_init(&pcpu->switch_semaphore, 1, SEMAPHORE_INIT_IRQ_DISABLE);
 
     struct rt_scheduler *rts =
-        must_valloc(sizeof(struct rt_scheduler), ALLOC_ZERO);
+        nofail_valloc(sizeof(struct rt_scheduler), ALLOC_ZERO);
 
-    rts->log_site = must(log_site_create(opts));
+    rts->log_site = nofail(log_site_create(opts));
 
     rts->log_handle = LOG_HANDLE_DEFAULT;
     spinlock_init(&rts->lock);
@@ -51,11 +51,11 @@ static void init_scheduler_boot(struct scheduler *sched) {
 }
 
 void rt_scheduler_boot_init() {
-    rt_wq = must(workqueue_create_default("rt_wq"));
+    rt_wq = nofail(workqueue_create_default("rt_wq"));
 
     locked_list_init(&rt_global.static_list, LOCKED_LIST_INIT_IRQ_DISABLE);
     spinlock_init(&rt_global.switch_lock);
-    rt_global.sch_pool = must_valloc(
+    rt_global.sch_pool = nofail_valloc(
         sizeof(struct locked_list) * global.domain_count, ALLOC_ZERO);
 
     struct domain *d;

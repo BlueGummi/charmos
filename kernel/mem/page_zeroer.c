@@ -1,4 +1,4 @@
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <mem/page_zeroer.h>
 #include <smp/domain.h>
 #include <smp/perdomain.h>
@@ -46,8 +46,9 @@ static void page_zeroer_perdomain_init(struct page_zeroer *pz,
                  WORKQUEUE_FLAG_NAMED | WORKQUEUE_FLAG_NO_WORKER_GC,
     };
 
-    must(pz->daemon = daemon_create(("page_zeroer_daemon_%zu", domain), &attrs,
-                                    &pz_ts_work, &pz_bg_work, &wqattrs));
+    nofail(pz->daemon =
+               daemon_create(("page_zeroer_daemon_%zu", domain), &attrs,
+                             &pz_ts_work, &pz_bg_work, &wqattrs));
 }
 
 PERDOMAIN_DEFINE(struct page_zeroer, page_zeroers, page_zeroer_perdomain_init);

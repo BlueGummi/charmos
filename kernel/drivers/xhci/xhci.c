@@ -7,7 +7,7 @@
 #include <math/bit.h>
 #include <math/min_max.h>
 #include <mem/alloc.h>
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <mem/page.h>
 #include <mem/vmm.h>
 #include <stdbool.h>

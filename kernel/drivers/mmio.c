@@ -1,6 +1,6 @@
 #include <drivers/mmio.h>
 #include <mem/address_range.h>
-#include <mem/must.h>
+#include <mem/nofail.h>
 #include <mem/page.h>
 #include <mem/vas.h>
 #include <mem/vmm.h>
@@ -10,7 +10,7 @@ ADDRESS_RANGE_DEFINE(mmio, .align = PAGE_1GB, .flags = ADDRESS_RANGE_DYNAMIC,
                      .size = MMIO_RANGE_SIZE);
 
 void mmio_init() {
-    mmio_vas_space = must(vas_from(&ADDRESS_RANGE(mmio)));
+    mmio_vas_space = nofail(vas_from(&ADDRESS_RANGE(mmio)));
 }
 
 static inline cc_always_inline void *mmio_map_raw(paddr_t phys, size_t size,
