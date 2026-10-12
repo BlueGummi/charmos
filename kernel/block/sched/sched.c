@@ -46,7 +46,7 @@ static bool try_early_submit(struct bio_scheduler *sched,
 }
 
 void bio_sched_enqueue(struct block_device *disk, struct bio_request *req) {
-    kassert(req->disk == disk);
+    enforce(req->disk == disk);
 
     struct bio_scheduler *sched = disk->scheduler;
 

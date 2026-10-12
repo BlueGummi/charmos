@@ -250,7 +250,7 @@ static void detect_cpu_capability(struct core *c) {
 
 static struct core *setup_cpu(uint64_t cpu) {
     struct core *c = global.cores[cpu];
-    kassert(c->id == cpu);
+    enforce(c->id == cpu);
     c->self = c;
     c->current_irql = IRQL_PASSIVE_LEVEL;
     c->tsc_hz = tsc_calibrate();
@@ -414,5 +414,5 @@ void smp_caller_verify(enum topology_caller caller) {
     };
 
     bool valid = topology_contract_verify(tct);
-    kassert(valid, "Caller 0x%lx was not satisfied", caller);
+    enforce(valid, "Caller 0x%lx was not satisfied", caller);
 }

@@ -16,7 +16,7 @@ static void slab_shrink(struct slab *slab, size_t start, size_t end,
     for (size_t i = start; i < end; i++) {
         struct page *page = atomic_load_rlx(&slab->backing_pages[i]);
         if (assert_nonnull)
-            kassert(page);
+            enforce(page);
 
         if (!page)
             return;
@@ -33,7 +33,7 @@ static void slab_shrink(struct slab *slab, size_t start, size_t end,
 
 /* returns if the resize was successful or not needed */
 bool slab_resize(struct slab *slab, size_t new_size_pages) {
-    kassert(slab_can_resize_to(slab, new_size_pages));
+    enforce(slab_can_resize_to(slab, new_size_pages));
     size_t old = slab->page_count;
 
     if (old == new_size_pages)

@@ -42,7 +42,7 @@ enum err arena_desc_register(struct arena_desc *desc) {
     enum irql irql = spin_lock(&arena_global.tbl_lock);
 
     struct arena_desc_table *old_tbl = rcu_dereference(arena_global.desc_table);
-    kassert(old_tbl);
+    enforce(old_tbl);
 
     size_t old_desc_count = old_tbl->desc_count;
     size_t desc_count = old_desc_count + 1;
@@ -116,19 +116,19 @@ struct arena *arena_create_full(struct arena_seg_desc *seg_descs,
     struct arena_seg_desc *large_desc = NULL;
     BITMAP_DECLARE(seen_id_bitmap, ARENA_MAX_SEG) = {0};
     for (size_t i = 0; i < seg_count; i++) {
-        kassert(seg_descs[i].size);
+        enforce(seg_descs[i].size);
 
         /* It's fine if a large segment is smaller than ARENA_SEG_MAX_SIZE */
         if (seg_descs[i].large) {
-            kassert(!large_desc, "more than one large segment exists");
+            enforce(!large_desc, "more than one large segment exists");
             large_desc = &seg_descs[i];
         }
 
         if (seg_descs[i].size >= ARENA_SEG_MAX_SIZE)
-            kassert(seg_descs[i].large, "large segment id %u must set .large",
+            enforce(seg_descs[i].large, "large segment id %u must set .large",
                     seg_descs[i].id);
 
-        kassert(!bitmap_test_and_set(seen_id_bitmap, seg_descs[i].id),
+        enforce(!bitmap_test_and_set(seen_id_bitmap, seg_descs[i].id),
                 "duplicate id %hu", seg_descs[i].id);
 
         seg_data_size_total += ALIGN_UP(seg_descs[i].size, ARENA_SEG_ALIGN);
@@ -205,7 +205,7 @@ size_t arena_seg_count(struct arena *a) {
     struct arena_seg_inmem_desc *descs = arena_get_inmem_descs(a);
 
 #ifdef DEBUG_ARENA
-    kassert(a->seg_count,
+    enforce(a->seg_count,
             "attempted to count segments of arena with no segments");
 #endif
 
@@ -230,7 +230,7 @@ struct arena_seg arena_seg_lookup(struct arena *a, uint16_t seg_id) {
             found = true;
     }
 
-    kassert(found, "segment %u not found", seg_id);
+    enforce(found, "segment %u not found", seg_id);
 #endif
 
     size_t cc_maybe_unused cursor = 0;
@@ -248,7 +248,7 @@ struct arena_seg arena_seg_lookup(struct arena *a, uint16_t seg_id) {
 
 struct arena_seg arena_seg_for_idx(struct arena *a, uint16_t idx) {
 #ifdef DEBUG_ARENA
-    kassert(idx < a->seg_count, "index %u out of bounds of %u", idx,
+    enforce(idx < a->seg_count, "index %u out of bounds of %u", idx,
             a->seg_count);
 #endif
 
@@ -273,7 +273,7 @@ static struct arena_bucket *get_bucket(struct arena_dumpster *ad,
     size_t idx = hash % ad->bucket_count;
 
     struct arena_bucket *bkt = &ad->buckets[idx];
-    return kassert(bkt);
+    return enforce(bkt);
 }
 
 static struct arena_bin *bucket_id_lookup(struct arena_bucket *bkt,
@@ -381,7 +381,7 @@ void arena_dumpster_delete_bin(struct arena_dumpster *ad,
     mutex_guard(mtx);
 
     struct arena_bin *leader = bucket_id_lookup(bkt, ab->identity);
-    kassert(leader, "likely double delete");
+    enforce(leader, "likely double delete");
 
     list_del_rcu(&ab->bin_list);
     if (leader == ab) {

@@ -1,4 +1,4 @@
-#include <kassert.h>
+#include <enforce.h>
 #include <structures/pairing_heap.h>
 
 void pairing_heap_init(struct pairing_heap *h, pairing_cmp_t cmp) {

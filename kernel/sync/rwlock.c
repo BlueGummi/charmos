@@ -108,8 +108,8 @@ size_t rwlock_get_backoff(size_t current_backoff) {
 static void rwlock_chk_state_init(struct rwlock *lock,
                                   const struct lock_chk_class *class,
                                   enum lock_chk_flags flags) {
-    kassert((flags & ~LOCK_CHKD_FULL) == 0);
-    kassert(flags == LOCK_UNCHKD || class != NULL);
+    enforce((flags & ~LOCK_CHKD_FULL) == 0);
+    enforce(flags == LOCK_UNCHKD || class != NULL);
     lock->chk.flags = flags;
     lock->chk.initialized = true;
     atomic_store_rlx(&lock->chk.used, false);
@@ -124,18 +124,18 @@ static bool rwlock_idle_for_reconfiguration(struct rwlock *lock) {
 }
 
 void rwlock_set_chk_flags(struct rwlock *lock, enum lock_chk_flags flags) {
-    kassert(lock->chk.initialized);
-    kassert(rwlock_idle_for_reconfiguration(lock));
-    kassert(!atomic_load_rlx(&lock->chk.used));
-    kassert((flags & ~LOCK_CHKD_FULL) == 0);
+    enforce(lock->chk.initialized);
+    enforce(rwlock_idle_for_reconfiguration(lock));
+    enforce(!atomic_load_rlx(&lock->chk.used));
+    enforce((flags & ~LOCK_CHKD_FULL) == 0);
     lock->chk.flags = flags;
 }
 
 void rwlock_reinit_chk(struct rwlock *lock, enum thread_prio_class ceiling,
                        const struct lock_chk_class *class,
                        enum lock_chk_flags flags) {
-    kassert(lock->chk.initialized);
-    kassert(rwlock_idle_for_reconfiguration(lock));
+    enforce(lock->chk.initialized);
+    enforce(rwlock_idle_for_reconfiguration(lock));
     rwlock_init_chk_full(lock, ceiling, class, flags);
 }
 
@@ -172,11 +172,11 @@ void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type acq_type,
                   uint8_t subclass,
                   const struct lock_chk_site *site) TSA_NO_ANALYSIS {
     cc_unused(site);
-    kassert(subclass < LOCK_CHK_MAX_SUBCLASSES);
-    kassert(acq_type == RWLOCK_READ || acq_type == RWLOCK_WRITE);
+    enforce(subclass < LOCK_CHK_MAX_SUBCLASSES);
+    enforce(acq_type == RWLOCK_READ || acq_type == RWLOCK_WRITE);
 
-    kassert(irq_not_in_interrupt());
-    kassert(irql_get() <= IRQL_APC_LEVEL);
+    enforce(irq_not_in_interrupt());
+    enforce(irql_get() <= IRQL_APC_LEVEL);
 
 #ifdef DEBUG_LOCK_CHK
     enum lock_chk_mode chk_mode = acq_type == RWLOCK_READ
@@ -196,7 +196,7 @@ void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type acq_type,
 #endif
 
     uintptr_t lword = RWLOCK_READ_LOCK_WORD(lock);
-    kassert(RWLOCK_GET_PRIO_CEIL(lword) != 0 &&
+    enforce(RWLOCK_GET_PRIO_CEIL(lword) != 0 &&
             "rwlock prio ceiling cannot be 0 (background)");
 
     struct thread *curr = thread_get_current();
@@ -278,8 +278,8 @@ void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type acq_type,
         /* okay we could not get the lock */
 
         /* make sure we've set the lock bits */
-        kassert(RWLOCK_READ_LOCK_WORD(lock) & wait_bits);
-        kassert(RWLOCK_GET_PRIO_CEIL(lword) &&
+        enforce(RWLOCK_READ_LOCK_WORD(lock) & wait_bits);
+        enforce(RWLOCK_GET_PRIO_CEIL(lword) &&
                 "rwlock prio ceiling cannot be 0 (background)");
 
         struct thread *owner = rwlock_get_owner_ref(lock);
@@ -294,7 +294,7 @@ void rw_lock_full(struct rwlock *lock, enum rwlock_acquire_type acq_type,
     }
 
     /* make sure nothing funny happened */
-    kassert(rwlock_locked_with_type(lock, acq_type));
+    enforce(rwlock_locked_with_type(lock, acq_type));
     thread_boost_self(RWLOCK_GET_PRIO_CEIL(lword));
 
 #ifdef DEBUG_LOCK_CHK
@@ -320,7 +320,7 @@ size_t rwlock_get_readers_to_wake(struct turnstile *ts) {
     rnode = rbt_last(&ts->queues[TURNSTILE_READER_QUEUE]);
 
     /* verify that somebody is on the queues */
-    kassert(wnode || rnode);
+    enforce(wnode || rnode);
 
     if (wnode)
         writer = thread_from_wq_rbt_node(wnode);
@@ -366,8 +366,8 @@ static uintptr_t rwlock_unlock_get_val_to_sub(struct rwlock *lock) {
 void rw_unlock_full(struct rwlock *lock,
                     const struct lock_chk_site *site) TSA_NO_ANALYSIS {
     cc_unused(site);
-    kassert(irq_not_in_interrupt());
-    kassert(irql_get() <= IRQL_APC_LEVEL);
+    enforce(irq_not_in_interrupt());
+    enforce(irql_get() <= IRQL_APC_LEVEL);
 
 #ifdef DEBUG_LOCK_CHK
     uintptr_t lock_word = RWLOCK_READ_LOCK_WORD(lock);
@@ -486,7 +486,7 @@ void rwlock_assert_held_full(struct rwlock *lock, enum rwlock_acquire_type type,
 #else
     cc_unused(site);
 #endif
-    kassert(rwlock_locked(lock, type), "rwlock not held");
+    enforce(rwlock_locked(lock, type), "rwlock not held");
 }
 
 void rwlock_assert_not_held_full(struct rwlock *lock,
@@ -507,6 +507,6 @@ void rwlock_assert_not_held_full(struct rwlock *lock,
      * Not reporting anything at all here is better than
      * a false positive, since it keeps the checker
      * honest instead of spreading misinformation */
-    kassert(!rwlock_locked(lock, RWLOCK_WRITE),
+    enforce(!rwlock_locked(lock, RWLOCK_WRITE),
             "rwlock unexpectedly held (write) by current thread");
 }

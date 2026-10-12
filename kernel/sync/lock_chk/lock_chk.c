@@ -1,7 +1,7 @@
 #include <atomic.h>
 #include <bootstage.h>
 #include <cmdline.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <sync/lock_chk.h>
 
 #ifdef DEBUG_LOCK_CHK
@@ -25,7 +25,7 @@ CMDLINE_CHILDREN_DEFINE(
         .desc = "Panic when lock validator capacity is exhausted (alias)"));
 
 void lock_chk_init(void) {
-    kassert(bootstage_get() >= BOOTSTAGE_LATE);
+    enforce(bootstage_get() >= BOOTSTAGE_LATE);
     lock_chk_deep_activate();
     lock_debug_activate();
     atomic_store_release(&lock_chk_global.state, LOCK_CHK_ACTIVE);
@@ -41,10 +41,10 @@ void lock_chk_note_use(struct lock_chk_lock *lock, enum lock_op_flags flags) {
 
     bool manages_irql = (flags & LOCK_OP_IRQ_MASK) != 0;
     bool raw = flags & LOCK_OP_RAW;
-    kassert(lock->initialized);
-    kassert((lock->flags & ~LOCK_CHKD_FULL) == 0);
+    enforce(lock->initialized);
+    enforce((lock->flags & ~LOCK_CHKD_FULL) == 0);
     if (manages_irql && !raw)
-        kassert((lock->flags & LOCK_CHKD_THREAD) == 0 ||
+        enforce((lock->flags & LOCK_CHKD_THREAD) == 0 ||
                 (lock->flags & LOCK_CHKD_ORDER) != 0);
 
     atomic_store_release(&lock->used, true);

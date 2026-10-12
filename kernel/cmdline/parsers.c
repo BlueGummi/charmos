@@ -307,7 +307,7 @@ const char *cmdline_intern_composite_arg(uint64_t mask,
             return auto_arg_pool[i].str;
     }
 
-    kassert(auto_arg_pool_count < CMDLINE_AUTO_ARG_POOL_MAX);
+    enforce(auto_arg_pool_count < CMDLINE_AUTO_ARG_POOL_MAX);
     struct cmdline_auto_arg_entry *slot = &auto_arg_pool[auto_arg_pool_count++];
     slot->mask = mask;
 

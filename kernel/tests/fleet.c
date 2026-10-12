@@ -125,7 +125,7 @@ static bool test_fleet_attach(struct test_fleet *f, struct test_conc_worker *w,
         return false;
     }
 
-    kassert(thread_get(t));
+    enforce(thread_get(t));
     atomic_store_release(&w->th, t);
     return true;
 }
@@ -163,7 +163,7 @@ struct test_conc_worker *test_fleet_spawn_on_core(struct test_fleet *f,
         return NULL;
     }
 
-    kassert(thread_get(t));
+    enforce(thread_get(t));
     atomic_store_release(&w->th, t);
     thread_enqueue_on_core(t, core_id);
     return w;

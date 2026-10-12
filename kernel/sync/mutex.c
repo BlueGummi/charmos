@@ -62,8 +62,8 @@ static void mutex_chk_unlocked(struct mutex_chk_rel_state *state) {
 static void mutex_chk_state_init(struct mutex *mtx,
                                  const struct lock_chk_class *class,
                                  enum lock_chk_flags flags) {
-    kassert((flags & ~LOCK_CHKD_FULL) == 0);
-    kassert(flags == LOCK_UNCHKD || class != NULL);
+    enforce((flags & ~LOCK_CHKD_FULL) == 0);
+    enforce(flags == LOCK_UNCHKD || class != NULL);
     mtx->chk.flags = flags;
     mtx->chk.initialized = true;
     atomic_store_rlx(&mtx->chk.used, false);
@@ -71,17 +71,17 @@ static void mutex_chk_state_init(struct mutex *mtx,
 }
 
 void mutex_set_chk_flags(struct mutex *mtx, enum lock_chk_flags flags) {
-    kassert(mtx->chk.initialized);
-    kassert(!mutex_locked(mtx));
-    kassert(!atomic_load_rlx(&mtx->chk.used));
-    kassert((flags & ~LOCK_CHKD_FULL) == 0);
+    enforce(mtx->chk.initialized);
+    enforce(!mutex_locked(mtx));
+    enforce(!atomic_load_rlx(&mtx->chk.used));
+    enforce((flags & ~LOCK_CHKD_FULL) == 0);
     mtx->chk.flags = flags;
 }
 
 void mutex_reinit_chk(struct mutex *mtx, const struct lock_chk_class *class,
                       enum lock_chk_flags flags) {
-    kassert(mtx->chk.initialized);
-    kassert(!mutex_locked(mtx));
+    enforce(mtx->chk.initialized);
+    enforce(!mutex_locked(mtx));
     mutex_init_chk_full(mtx, class, flags);
 }
 
@@ -177,14 +177,14 @@ static bool mutex_owner_running(struct mutex *mutex) {
 }
 
 static void mutex_sanity_check(void) {
-    kassert(irq_not_in_interrupt());
-    kassert(irql_get() <= IRQL_APC_LEVEL);
+    enforce(irq_not_in_interrupt());
+    enforce(irql_get() <= IRQL_APC_LEVEL);
 }
 
 void mutex_lock_subclass_full(struct mutex *mutex, uint8_t subclass,
                               const struct lock_chk_site *site)
     TSA_NO_ANALYSIS {
-    kassert(subclass < LOCK_CHK_MAX_SUBCLASSES);
+    enforce(subclass < LOCK_CHK_MAX_SUBCLASSES);
     mutex_sanity_check();
 
     struct mutex_chk_acq_state chk_state;
@@ -280,7 +280,7 @@ void mutex_lock_subclass_full(struct mutex *mutex, uint8_t subclass,
     }
 
     /* hey ho! we got the mutex! */
-    kassert(mutex_read_owner(mutex) == current_thread);
+    enforce(mutex_read_owner(mutex) == current_thread);
     mutex_chk_locked(&chk_state);
     crash_unwind_enter_mutex(mutex);
 }
@@ -333,7 +333,7 @@ void mutex_assert_held_full(struct mutex *mtx,
 #else
     cc_unused(site);
 #endif
-    kassert(mutex_read_owner(mtx) == thread_get_current(),
+    enforce(mutex_read_owner(mtx) == thread_get_current(),
             "mutex not held by current thread");
 }
 
@@ -348,6 +348,6 @@ void mutex_assert_not_held_full(struct mutex *mtx,
 #else
     cc_unused(site);
 #endif
-    kassert(mutex_read_owner(mtx) != thread_get_current(),
+    enforce(mutex_read_owner(mtx) != thread_get_current(),
             "mutex unexpectedly held by current thread");
 }

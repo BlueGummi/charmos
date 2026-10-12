@@ -1,5 +1,5 @@
 #include <console/printf.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <math/align.h>
 #include <math/min_max.h>
 #include <mem/alloc.h>
@@ -192,7 +192,7 @@ void buddy_free_pages(paddr_t addr, size_t count,
         return;
 
     uint64_t pfn = PAGE_TO_PFN(addr);
-    kassert(pfn < total_pages);
+    enforce(pfn < total_pages);
 
     uint64_t order = 0, size = 1;
     while (size < count) {

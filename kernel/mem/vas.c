@@ -1,6 +1,6 @@
 #include <compiler/intrinsic.h>
 #include <console/panic.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <math/align.h>
 #include <math/bit.h>
 #include <mem/address_range.h>
@@ -129,7 +129,7 @@ static int32_t segment_cmp(const struct rbt_node *a, const struct rbt_node *b) {
 }
 
 static uint32_t size_to_bin(size_t size) {
-    kassert(size);
+    enforce(size);
     return 63U - ci_clzll(size);
 }
 
@@ -409,7 +409,7 @@ static void reclaim_locked(struct vas *vas) {
 
             vaddr_t start = seg->start;
             struct vas_segment *parent = segment_find(&vas->global, start);
-            kassert(parent && parent->start == start &&
+            enforce(parent && parent->start == start &&
                     parent->length == VAS_CHUNK_SIZE &&
                     atomic_load_rlx(&parent->type) == VAS_SEG_IMPORTED);
 
@@ -550,7 +550,7 @@ static enum irql vas_lock_owner(struct vas *vas, vaddr_t addr,
     size_t index = owner_index(vas, addr);
     while (true) {
         cpu_id_t owner = atomic_load_acq(&vas->chunk_owner[index]);
-        kassert(owner == VAS_OWNER_GLOBAL || owner < global.core_count);
+        enforce(owner == VAS_OWNER_GLOBAL || owner < global.core_count);
         struct vas_arena *arena =
             owner == VAS_OWNER_GLOBAL ? &vas->global : &vas->local[owner];
         enum irql irql = spin_lock(&arena->lock);
@@ -669,7 +669,7 @@ bool vas_destroy(struct vas *vas) {
 }
 
 static struct vas *space_create(vaddr_t base, vaddr_t limit, bool bootstrap) {
-    kassert(global.core_count && global.core_count < VAS_OWNER_GLOBAL);
+    enforce(global.core_count && global.core_count < VAS_OWNER_GLOBAL);
     if (!base || limit <= base)
         return NULL;
 
@@ -696,8 +696,8 @@ static struct vas *space_create(vaddr_t base, vaddr_t limit, bool bootstrap) {
         memset(vas, 0, pages * PAGE_SIZE);
     } else {
         vas = valloc(bytes, ALLOC_ZERO,
-                      .behavior =
-                          ALLOC_BEHAVIOR_NORMAL | ALLOC_BEHAVIOR_FLAG_MINIMAL);
+                     .behavior =
+                         ALLOC_BEHAVIOR_NORMAL | ALLOC_BEHAVIOR_FLAG_MINIMAL);
         if (!vas)
             return NULL;
     }

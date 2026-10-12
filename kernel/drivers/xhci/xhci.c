@@ -370,7 +370,7 @@ static void xhci_process_single(struct xhci_device  *dev,
                                 struct xhci_request *request) {
     struct xhci_slot *rslot = request->command->slot;
 
-    kassert(request->callback);
+    enforce(request->callback);
     request->callback(dev, request);
 
     if (rslot)
@@ -437,7 +437,7 @@ static void xhci_worker(void *arg) {
 
 static struct xhci_request *xhci_lookup_trb(struct xhci_device *dev,
                                             struct xhci_trb    *trb) {
-    kassert(TRB_TYPE(trb->control) == TRB_TYPE_TRANSFER_EVENT ||
+    enforce(TRB_TYPE(trb->control) == TRB_TYPE_TRANSFER_EVENT ||
             TRB_TYPE(trb->control) == TRB_TYPE_COMMAND_COMPLETION);
 
     paddr_t phys = trb->parameter;
@@ -456,7 +456,7 @@ static struct xhci_request *xhci_lookup_trb(struct xhci_device *dev,
 
 void xhci_request_move(struct xhci_device *dev, struct xhci_request *req,
                        enum xhci_request_list new_list) {
-    kassert(req->list_owner != new_list);
+    enforce(req->list_owner != new_list);
     /* remove from old list */
     if (req->list_owner != XHCI_REQ_LIST_NONE) {
         list_del_init(&req->list);

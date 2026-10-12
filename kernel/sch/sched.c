@@ -173,7 +173,7 @@ static struct thread *pick_from_special_queues(struct scheduler *sched,
                                                enum thread_prio_class prio) {
     struct list_head *q = scheduler_get_this_thread_queue(sched, prio);
     struct list_head *node = list_pop_front_init(q);
-    kassert(node);
+    enforce(node);
 
     return thread_from_rq_list_node(node);
 }
@@ -209,8 +209,8 @@ static struct thread *pick_thread(struct scheduler *sched, time_ms_t now_ms) {
         next = pick_from_regular_queues(sched, now_ms);
     }
 
-    kassert(next); /* cannot be NULL - if it is the bitmap is lying */
-    kassert(next->queued_prio_class == prio,
+    enforce(next); /* cannot be NULL - if it is the bitmap is lying */
+    enforce(next->queued_prio_class == prio,
             "picked a %d thread off the %d queue",
             (int) next->queued_prio_class, (int) prio);
     scheduler_decrement_thread_count(sched, next);
@@ -226,7 +226,7 @@ static void load_thread(struct scheduler *sched, struct thread *next,
     sched->current = next;
     smp_core(TOPC_IRQL)->current_thread = next;
 
-    kassert(next);
+    enforce(next);
 
     /* Do not mark the idle thread as RUNNING because this causes
      * it to enter the runqueues, which is Very Bad™ (it gets enqueued,
@@ -290,11 +290,11 @@ static inline void assert_switch_ctx(const char *where) {
         return;
     }
 
-    kassert(irql_get() >= IRQL_DISPATCH_LEVEL, "%s at %s, want >= %s", where,
+    enforce(irql_get() >= IRQL_DISPATCH_LEVEL, "%s at %s, want >= %s", where,
             irql_to_str(irql_get()), irql_to_str(IRQL_DISPATCH_LEVEL));
-    kassert(scheduler_preemption_disabled(TOPC_NONE),
+    enforce(scheduler_preemption_disabled(TOPC_NONE),
             "%s with preemption enabled", where);
-    kassert(!irqs_enabled(), "%s with interrupts enabled", where);
+    enforce(!irqs_enabled(), "%s with interrupts enabled", where);
 }
 
 static inline void context_switch(struct thread *curr, struct thread *next) {
@@ -319,7 +319,7 @@ static inline void context_switch(struct thread *curr, struct thread *next) {
     if (cc_unlikely(curr &&
                     atomic_load_rlx(&curr->state) == THREAD_STATE_ZOMBIE)) {
         just_load = true;
-        kassert(!smp_core_scheduler()->drop_last_ref);
+        enforce(!smp_core_scheduler()->drop_last_ref);
         smp_core_scheduler()->drop_last_ref = curr;
     }
 
@@ -392,7 +392,7 @@ void scheduler_switch_in() TSA_NO_ANALYSIS {
     struct scheduler *other = us->other_locked;
     us->other_locked = NULL;
 
-    kassert(us != other);
+    enforce(us != other);
 
     if (!other) {
         /* guaranteed to be the last IRQL, we always
@@ -428,7 +428,7 @@ static void scheduler_yield_loop(void) {
 
         scheduler_switch_in();
 
-        kassert(irql == IRQL_NONE || irql_get() == IRQL_DISPATCH_LEVEL,
+        enforce(irql == IRQL_NONE || irql_get() == IRQL_DISPATCH_LEVEL,
                 "resumed at %s, want %s", irql_to_str(irql_get()),
                 irql_to_str(IRQL_DISPATCH_LEVEL));
 
@@ -439,7 +439,7 @@ static void scheduler_yield_loop(void) {
         /* we store irql on the stack here, i.e. T1 entering the routine
          * will "pop out" on the switch_in path on T2, and irql will
          * be T2's entry value, which should match the current state */
-        kassert(irql == IRQL_NONE || irql_get() == irql,
+        enforce(irql == IRQL_NONE || irql_get() == irql,
                 "resumed at %s, entered at %s", irql_to_str(irql_get()),
                 irql_to_str(irql));
     } while (scheduler_mark_self_needs_resched(false));
@@ -452,10 +452,10 @@ void scheduler_yield(void) {
     cpu_id_t entry_cpu = c->id;
 
     if (cc_likely(entry_cpu == smp_core(TOPC_NONE)->id)) {
-        kassert(!entry_in_resched,
+        enforce(!entry_in_resched,
                 "yielding while already in resched on cpu %zu",
                 (size_t) entry_cpu);
-        kassert(entry_depth == 0, "yielding on cpu %zu with preempt depth %u",
+        enforce(entry_depth == 0, "yielding on cpu %zu with preempt depth %u",
                 (size_t) entry_cpu, entry_depth);
     }
 

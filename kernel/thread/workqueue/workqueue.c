@@ -1,5 +1,5 @@
 #include <compiler/core.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <mem/alloc.h>
 #include <mem/nofail.h>
 #include <sch/sched.h>
@@ -60,7 +60,7 @@ enum workqueue_error workqueue_add_remote(struct work *work) {
 }
 
 void work_execute(struct work *task) {
-    kassert(task);
+    enforce(task);
     task->func(task->args.arg1, task->args.arg2);
     atomic_exchange(&task->active, false);
 }
@@ -95,7 +95,7 @@ struct workqueue *workqueue_create_full(struct workqueue_attributes *attrs,
 
     wq->attrs = *attrs;
     condvar_init(&wq->queue_cv);
-    kassert(THREAD_NICENESS_VALID(attrs->worker_niceness));
+    enforce(THREAD_NICENESS_VALID(attrs->worker_niceness));
 
     if (attrs->flags & WORKQUEUE_FLAG_STATIC_WORKERS) {
         wq->worker_array =
@@ -105,7 +105,7 @@ struct workqueue *workqueue_create_full(struct workqueue_attributes *attrs,
     }
 
     if (attrs->flags & WORKQUEUE_FLAG_NAMED) {
-        kassert(fmt);
+        enforce(fmt);
 
         va_list args_copy;
         va_copy(args_copy, args);
@@ -195,7 +195,7 @@ static void mark_worker_exit(struct thread *t) {
 }
 
 void workqueue_free(struct workqueue *wq) {
-    kassert(atomic_load(&wq->refcount) == 0);
+    enforce(atomic_load(&wq->refcount) == 0);
     WORKQUEUE_STATE_SET(wq, WORKQUEUE_STATE_DEAD);
     vfree(wq->request);
     vfree(wq);
@@ -203,7 +203,7 @@ void workqueue_free(struct workqueue *wq) {
 
 /* Give all threads the exit signal and clean up the structs */
 void workqueue_destroy(struct workqueue *queue) {
-    kassert(queue);
+    enforce(queue);
 
     WORKQUEUE_STATE_SET(queue, WORKQUEUE_STATE_DESTROYING);
     atomic_store(&queue->ignore_timeouts, true);

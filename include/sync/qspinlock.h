@@ -6,8 +6,8 @@
 #include <bootstage.h>
 #include <compiler/core.h>
 #include <console/panic.h>
+#include <enforce.h>
 #include <irq/irq.h>
-#include <kassert.h>
 #include <sch/irql.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -99,7 +99,7 @@ static inline bool qspin_is_locked(const struct qspinlock *lock);
 
 static inline void qspinlock_policy_init_internal(struct qspinlock *lock,
                                                   enum lock_chk_flags flags) {
-    kassert((flags & ~LOCK_CHKD_FULL) == 0);
+    enforce((flags & ~LOCK_CHKD_FULL) == 0);
     lock->chk.flags = flags;
     lock->chk.initialized = true;
     atomic_store_rlx(&lock->chk.used, false);
@@ -109,7 +109,7 @@ static inline void
 qspinlock_map_init_internal(struct qspinlock *lock,
                             const struct lock_chk_class *class,
                             enum lock_chk_flags flags) {
-    kassert(flags == LOCK_UNCHKD || class != NULL);
+    enforce(flags == LOCK_UNCHKD || class != NULL);
     lock_chk_map_runtime_init(&lock->chk.map, class);
 }
 
@@ -119,18 +119,18 @@ static inline void qspinlock_shallow_init_internal(struct qspinlock *lock) {
 
 static inline void qspinlock_set_chk_flags(struct qspinlock *lock,
                                            enum lock_chk_flags flags) {
-    kassert(lock->chk.initialized);
-    kassert(!qspin_is_locked(lock));
-    kassert(!atomic_load_rlx(&lock->chk.used));
-    kassert((flags & ~LOCK_CHKD_FULL) == 0);
+    enforce(lock->chk.initialized);
+    enforce(!qspin_is_locked(lock));
+    enforce(!atomic_load_rlx(&lock->chk.used));
+    enforce((flags & ~LOCK_CHKD_FULL) == 0);
     lock->chk.flags = flags;
 }
 
 static inline void qspinlock_reinit_chk(struct qspinlock *lock,
                                         const struct lock_chk_class *class,
                                         enum lock_chk_flags flags) {
-    kassert(lock->chk.initialized);
-    kassert(!qspin_is_locked(lock));
+    enforce(lock->chk.initialized);
+    enforce(!qspin_is_locked(lock));
     qspinlock_init_chk_full(lock, class, flags);
 }
 
@@ -422,7 +422,7 @@ static inline bool qspin_is_locked(const struct qspinlock *lock) {
 /* Same deal as SPINLOCK_ASSERT_LOCKED, just checks the bit,
  * but that doesn't say anything about thread ownership */
 #define QSPINLOCK_ASSERT_LOCKED(l)                                             \
-    kassert(qspin_is_locked(l), "qspinlock not locked")
+    enforce(qspin_is_locked(l), "qspinlock not locked")
 
 static inline cc_warn_unused_result bool
 qspin_trylock_raw_full(struct qspinlock *lock, const struct lock_chk_site *site)
@@ -502,7 +502,7 @@ static inline cc_warn_unused_result enum irql
 qspin_lock_subclass_full(struct qspinlock *lock, uint8_t subclass,
                          const struct lock_chk_site *site)
     TSA_ACQUIRES_SPIN(lock) TSA_NO_ANALYSIS {
-    kassert(subclass < LOCK_CHK_MAX_SUBCLASSES);
+    enforce(subclass < LOCK_CHK_MAX_SUBCLASSES);
     if (bootstage_get() >= BOOTSTAGE_MID_MP &&
         (irq_in_interrupt() || irq_in_nmi()))
         panic(
@@ -520,7 +520,7 @@ qspin_lock_subclass_full(struct qspinlock *lock, uint8_t subclass,
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
     qspin_lock_physical(lock);
 
-    kassert(irqs_enabled());
+    enforce(irqs_enabled());
     irq_disable();
 
     if (checked_shallow)
@@ -586,7 +586,7 @@ qspin_trylock_full(struct qspinlock *lock, enum irql *out,
 
     *out = irql_raise(IRQL_DISPATCH_LEVEL);
     if (qspin_trylock_physical(lock)) {
-        kassert(irqs_enabled()); /* Should not go false */
+        enforce(irqs_enabled()); /* Should not go false */
         irq_disable();
         if (checked_shallow)
             qspinlock_shallow_push(lock, *out, site);
@@ -670,7 +670,7 @@ qspin_assert_not_held_full(struct qspinlock *lock,
         return;
 
     if (bootstage_get() < BOOTSTAGE_EARLY_DEVICES)
-        kassert(!qspin_is_locked(lock), "qspinlock unexpectedly locked");
+        enforce(!qspin_is_locked(lock), "qspinlock unexpectedly locked");
 }
 
 #define QSPINLOCK_ASSERT_HELD(l)                                               \

@@ -1,7 +1,7 @@
 /* @title: Range and Interval Operations */
 #pragma once
 #include <compiler/core.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -18,7 +18,7 @@
         __ir_t __ir_v = (__ir_t) __ir_x;                                       \
         __ir_t __ir_l = (__ir_t) __ir_lo;                                      \
         __ir_t __ir_h = (__ir_t) __ir_hi;                                      \
-        (void) kassert(__ir_l <= __ir_h);                                      \
+        (void) enforce(__ir_l <= __ir_h);                                      \
         (__ir_v >= __ir_l) && (__ir_v <= __ir_h);                              \
     })
 

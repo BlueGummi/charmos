@@ -339,7 +339,7 @@ static inline size_t lock_chk_class_hash(const struct lock_chk_class *class,
 }
 
 static inline uint16_t lock_chk_mode_bit(enum lock_chk_mode mode) {
-    kassert(mode == LOCK_CHK_MODE_SHARED || mode == LOCK_CHK_MODE_EXCLUSIVE);
+    enforce(mode == LOCK_CHK_MODE_SHARED || mode == LOCK_CHK_MODE_EXCLUSIVE);
     return mode == LOCK_CHK_MODE_EXCLUSIVE ? 1 : 0;
 }
 

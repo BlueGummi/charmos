@@ -2,7 +2,7 @@
 #pragma once
 #include <compiler/core.h>
 #include <compiler/intrinsic.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <stdbool.h>
 
 #define abs(N)                                                                 \
@@ -13,7 +13,7 @@
         if (__abs_n < 0) {                                                     \
             bool __abs_overflow =                                              \
                 ci_sub_overflow((typeof(__abs_n)) 0, __abs_n, &__abs_result);  \
-            (void) kassert(!__abs_overflow);                                   \
+            (void) enforce(!__abs_overflow);                                   \
         }                                                                      \
         __abs_result;                                                          \
     })
@@ -31,12 +31,12 @@
         __cl_t __cl_v = (__cl_t) * __cl_p;                                     \
         __cl_t __cl_l = (__cl_t) __cl_lo;                                      \
         __cl_t __cl_h = (__cl_t) __cl_hi;                                      \
-        (void) kassert(__cl_l <= __cl_h);                                      \
+        (void) enforce(__cl_l <= __cl_h);                                      \
         if (__cl_v > __cl_h)                                                   \
             __cl_v = __cl_h;                                                   \
         if (__cl_v < __cl_l)                                                   \
             __cl_v = __cl_l;                                                   \
-        (void) kassert((__cl_t) (typeof(*__cl_p)) __cl_v == __cl_v);           \
+        (void) enforce((__cl_t) (typeof(*__cl_p)) __cl_v == __cl_v);           \
         *__cl_p = (typeof(*__cl_p)) __cl_v;                                    \
     } while (0)
 

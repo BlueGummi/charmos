@@ -421,12 +421,12 @@ static void tests_apply_filters() {
         CMDLINE_EXTRACT(&filter->value, filter_one);
         test_filter_enable(filter_one);
     } else {
-        kassert(filter->value.type == CMDLINE_TYPE_LIST);
+        enforce(filter->value.type == CMDLINE_TYPE_LIST);
         struct cmdline_list list;
         CMDLINE_EXTRACT(&filter->value, list);
         struct cmdline_value val;
         cmdline_list_for_each(val, &list) {
-            kassert(val.type == CMDLINE_TYPE_STRING);
+            enforce(val.type == CMDLINE_TYPE_STRING);
             char *filter_one;
             CMDLINE_EXTRACT(&val, filter_one);
             test_filter_enable(filter_one);
@@ -610,7 +610,7 @@ static void test_group_run(struct test_group *tg) {
 
         const char *tier_name = test_tier_to_str_color(i);
 
-        kassert(asprintf(&LOG_SITE(test_harness)->name,
+        enforce(asprintf(&LOG_SITE(test_harness)->name,
                          "%s " ANSI_RESET "(%s" ANSI_RESET ")", tg->name,
                          tier_name));
 

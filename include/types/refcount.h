@@ -3,7 +3,7 @@
 #include <atomic.h>
 #include <console/panic.h>
 #include <console/printf.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <types/types.h>
@@ -90,4 +90,4 @@ static inline bool refcount_dec_and_test(refcount_t *rc) {
         }                                                                      \
     }
 
-#define REFCOUNT_ASSERT_ZERO(rc) (kassert(atomic_load(&rc) == 0))
+#define REFCOUNT_ASSERT_ZERO(rc) (enforce(atomic_load(&rc) == 0))

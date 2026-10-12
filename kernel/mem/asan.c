@@ -1,7 +1,7 @@
 #include <console/crash.h>
 #include <dbg.h>
+#include <enforce.h>
 #include <global.h>
-#include <kassert.h>
 #include <math/align.h>
 #include <math/min_max.h>
 #include <mem/asan.h>
@@ -66,7 +66,7 @@ static inline size_t asan_shadow_span(const void *addr, size_t size) {
 }
 
 static void asan_mark_valid(void *addr, size_t size) {
-    kassert(IS_ALIGNED((uintptr_t) addr, ASAN_GRANULE));
+    enforce(IS_ALIGNED((uintptr_t) addr, ASAN_GRANULE));
 
     uint8_t *shadow = asan_shadow_for_internal(addr);
     size_t full = size >> ASAN_SHADOW_SCALE;
@@ -78,7 +78,7 @@ static void asan_mark_valid(void *addr, size_t size) {
 }
 
 static void asan_mark_poisoned(void *addr, size_t size, uint8_t value) {
-    kassert(IS_ALIGNED((uintptr_t) addr, ASAN_GRANULE));
+    enforce(IS_ALIGNED((uintptr_t) addr, ASAN_GRANULE));
 
     memset(asan_shadow_for_internal(addr), value, asan_shadow_span(addr, size));
 }
@@ -89,7 +89,7 @@ void asan_alloc(void *addr, size_t requested, size_t slot) {
     if (!slot || !asan_addr_covered((uintptr_t) addr, slot))
         return;
 
-    kassert(requested && requested <= slot);
+    enforce(requested && requested <= slot);
 
     asan_mark_valid(addr, requested);
 

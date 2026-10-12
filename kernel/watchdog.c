@@ -175,7 +175,7 @@ static void watchdog_buckets_inc_heartbeat(struct watchdog_buckets *buckets,
 }
 
 static void watchdog_do_percpu_heartbeat(time_ms_t now) {
-    kassert(PERCPU_READY(watchdog_percpu));
+    enforce(PERCPU_READY(watchdog_percpu));
 
     atomic_inc_rlx(&PERCPU_PTR(TOPC_IRQL, watchdog_percpu)->heartbeat_seq);
 
@@ -225,9 +225,9 @@ bool watchdog_count_heartbeats_at(const struct watchdog_buckets *buckets,
     if (!watchdog_buckets_snapshot(buckets, &snap))
         return false;
 
-    kassert(window_buckets && window_buckets <= WATCHDOG_NUM_BUCKETS);
-    kassert(bucket_interval_ms);
-    kassert(expected_per_bucket);
+    enforce(window_buckets && window_buckets <= WATCHDOG_NUM_BUCKETS);
+    enforce(bucket_interval_ms);
+    enforce(expected_per_bucket);
 
     if (snap.last_heartbeat_ms == 0)
         goto not_ready;
@@ -237,7 +237,7 @@ bool watchdog_count_heartbeats_at(const struct watchdog_buckets *buckets,
     size_t cursor = snap.curr_epoch * WATCHDOG_NUM_BUCKETS + snap.idx;
     size_t last_bucket = snap.last_heartbeat_ms / bucket_interval_ms;
     size_t now_bucket = now / bucket_interval_ms;
-    kassert(last_bucket >= cursor);
+    enforce(last_bucket >= cursor);
 
     size_t first_bucket = last_bucket - cursor;
     size_t completed = MIN(now_bucket - first_bucket, window_buckets);
@@ -261,7 +261,7 @@ bool watchdog_count_heartbeats_at(const struct watchdog_buckets *buckets,
 
     /* If we're here, out_expect should never be zero, since one tick
      * must fire for something to enter SUSPECT */
-    kassert(total_expect);
+    enforce(total_expect);
 
     if (out_score)
         *out_score = fx_div(fx_from_int(total_expect - total),
@@ -289,7 +289,7 @@ not_ready:
 }
 
 static void watchdog_worker_timer_func(struct timer *t) {
-    kassert(irq_in_interrupt());
+    enforce(irq_in_interrupt());
 
     struct watchdog_percpu *pcpu = PERCPU_PTR(TOPC_IRQ, watchdog_percpu);
     enum irql irql = spin_lock_high(&pcpu->callback_list.lock);
@@ -343,7 +343,7 @@ static void watchdog_read_pets_for(cpu_id_t cpu, size_t *out_pets,
  */
 static void watchdog_cpu_promote(cpu_id_t cpu,
                                  enum watchdog_master_state new_state) {
-    kassert(cpu_mask_test(&watchdog_master.cpu_masks[new_state - 1], cpu));
+    enforce(cpu_mask_test(&watchdog_master.cpu_masks[new_state - 1], cpu));
     cpu_mask_clear(&watchdog_master.cpu_masks[new_state - 1], cpu);
     cpu_mask_set(&watchdog_master.cpu_masks[new_state], cpu);
     watchdog_master.cpus[cpu].state = new_state;
@@ -351,7 +351,7 @@ static void watchdog_cpu_promote(cpu_id_t cpu,
 
 static void watchdog_cpu_demote(cpu_id_t cpu,
                                 enum watchdog_master_state new_state) {
-    kassert(cpu_mask_test(&watchdog_master.cpu_masks[new_state + 1], cpu));
+    enforce(cpu_mask_test(&watchdog_master.cpu_masks[new_state + 1], cpu));
     cpu_mask_clear(&watchdog_master.cpu_masks[new_state + 1], cpu);
     cpu_mask_set(&watchdog_master.cpu_masks[new_state], cpu);
     watchdog_master.cpus[cpu].state = new_state;
@@ -372,7 +372,7 @@ static void watchdog_start_test_on(struct watchdog_master_cpu *cpu,
     struct watchdog_percpu_response *resp = &pcpu->response;
 
     /* If odd, it's mid-test, cannot start another */
-    kassert(!(seqcount_read_raw(&resp->seqcount) & 1));
+    enforce(!(seqcount_read_raw(&resp->seqcount) & 1));
     seqcount_begin_write(&resp->seqcount);
     cpu->critical_test_start = now;
 
@@ -393,7 +393,7 @@ static time_ms_t watchdog_spin_for_response(struct watchdog_master_cpu *cpu) {
             continue;
         }
 
-        kassert(resp->finished_ms >= cpu->critical_test_start);
+        enforce(resp->finished_ms >= cpu->critical_test_start);
         return resp->finished_ms - cpu->critical_test_start;
 
     } while ((seqcount_read_retry(&resp->seqcount, seq) || (seq & 1)) &&
@@ -405,7 +405,7 @@ static time_ms_t watchdog_spin_for_response(struct watchdog_master_cpu *cpu) {
 static void watchdog_enter_suspect(cpu_id_t cpu) {
     struct watchdog_master_cpu *mcpu = &watchdog_master.cpus[cpu];
 
-    kassert(mcpu->state == WATCHDOG_STATE_CRITICAL ||
+    enforce(mcpu->state == WATCHDOG_STATE_CRITICAL ||
             mcpu->state == WATCHDOG_STATE_NORMAL);
 
     if (mcpu->state == WATCHDOG_STATE_NORMAL) {
@@ -460,7 +460,7 @@ static void watchdog_master_process_critical(time_ms_t now) {
             target_tests = WATCHDOG_CRITICAL_IPI_TESTS / 2;
         }
 
-        kassert(target_tests);
+        enforce(target_tests);
 
         struct watchdog_master_cpu *mcpu = &watchdog_master.cpus[i];
 
@@ -488,7 +488,7 @@ static void watchdog_master_process_critical(time_ms_t now) {
          * NOTE: the promotion process to CRITICAL will have started the first
          * test in the sequence, we don't handle that here */
         time_ms_t finished = watchdog_finished_time(mcpu);
-        kassert(finished >= mcpu->critical_test_start);
+        enforce(finished >= mcpu->critical_test_start);
 
         time_ms_t delta = finished - mcpu->critical_test_start;
 
@@ -527,7 +527,7 @@ static void watchdog_master_process_critical(time_ms_t now) {
         fx32_32_t pet_part =
             fx_mul(watchdog_pets_score(pets), WATCHDOG_CRITICAL_PETS_FACTOR);
         fx32_32_t total = test_part + pet_part;
-        kassert(total < FX_ONE);
+        enforce(total < FX_ONE);
 
         if (total == 0) {
             watchdog_enter_suspect(i);
@@ -536,7 +536,7 @@ static void watchdog_master_process_critical(time_ms_t now) {
             fx32_32_t mapped =
                 fx_map(total, 0, FX_ONE, config.master_critical_score, FX_ONE);
 
-            kassert(IN_RANGE(mapped, config.master_critical_score, FX_ONE));
+            enforce(IN_RANGE(mapped, config.master_critical_score, FX_ONE));
             mcpu->lockup_score = mapped;
 
             /* Panic promotion only bothers with a bitmap,
@@ -728,7 +728,7 @@ static enum irq_result watchdog_test_handler(void *ctx, irq_t irq,
 
 /* We'll want to set up the master and all the workers */
 void watchdog_init(void) {
-    kassert(PERCPU_READY(watchdog_percpu));
+    enforce(PERCPU_READY(watchdog_percpu));
 
     for (int i = 0; i < WATCHDOG_STATE_MAX; i++) {
         cpu_mask_init(&watchdog_master.cpu_masks[i], global.core_count);
@@ -801,7 +801,7 @@ void watchdog_pet(void) {
         struct watchdog_percpu *this = PERCPU_PTR(TOPC_NONE, watchdog_percpu);
         /* The caller must make sure we cannot be preempted */
         if (this->pets_enabled) {
-            kassert(irql_get() >= IRQL_DISPATCH_LEVEL);
+            enforce(irql_get() >= IRQL_DISPATCH_LEVEL);
             atomic_inc_rlx(&this->pets);
         }
     }
@@ -812,7 +812,7 @@ void watchdog_anti_pet(void) {
         struct watchdog_percpu *this = PERCPU_PTR(TOPC_NONE, watchdog_percpu);
         /* The caller must make sure we cannot be preempted */
         if (this->pets_enabled) {
-            kassert(irql_get() >= IRQL_DISPATCH_LEVEL);
+            enforce(irql_get() >= IRQL_DISPATCH_LEVEL);
             atomic_inc_rlx(&this->anti_pets);
         }
     }

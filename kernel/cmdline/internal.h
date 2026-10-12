@@ -5,9 +5,9 @@
 #include <compiler/intrinsic.h>
 #include <console/panic.h>
 #include <console/printf.h>
+#include <enforce.h>
 #include <err.h>
 #include <global.h>
-#include <kassert.h>
 #include <log.h>
 #include <math/bit.h>
 #include <math/fixed.h>
@@ -119,7 +119,7 @@ cmdline_type_enum_to_cmdline_type(enum type_enum t) {
 static inline uint64_t
 cmdline_entry_get_accepted_mask(const struct cmdline_entry *e) {
     if (e->types >= BIT(CMDLINE_TYPE_OFFSET)) {
-        kassert((e->types & (BIT(CMDLINE_TYPE_OFFSET) - 1)) == 0);
+        enforce((e->types & (BIT(CMDLINE_TYPE_OFFSET) - 1)) == 0);
         return e->types;
     }
     if (e->types >= CMDLINE_TYPE_OFFSET && e->types < CMDLINE_TYPE_NONE) {

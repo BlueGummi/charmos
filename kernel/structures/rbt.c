@@ -1,6 +1,6 @@
 #include <console/panic.h>
 #include <console/printf.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <mem/alloc.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -223,7 +223,7 @@ static void fix_deletion(struct rbt *tree, struct rbt_node *x,
 }
 
 void rbt_delete(struct rbt *tree, struct rbt_node *z) {
-    kassert(z->parent != NULL || z == tree->root,
+    enforce(z->parent != NULL || z == tree->root,
             "rbt_delete: node %p is not linked into tree %p (root %p)", z, tree,
             tree->root);
 
@@ -421,7 +421,7 @@ void rbt_insert(struct rbt *tree, struct rbt_node *new_node) {
     fix_insertion(tree, new_node);
 
     if (parent)
-        kassert(!(parent->color == TREE_NODE_RED &&
+        enforce(!(parent->color == TREE_NODE_RED &&
                   new_node->color == TREE_NODE_RED));
 }
 

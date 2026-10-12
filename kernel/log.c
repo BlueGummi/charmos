@@ -286,7 +286,7 @@ static void log_emit_ndjson_record(const struct log_site *site,
         return;
 
     char msg_buf[256];
-    kassert(rec->fmt);
+    enforce(rec->fmt);
     snprintf_from_log(msg_buf, sizeof(msg_buf), rec->fmt, rec->args,
                       rec->nargs);
 
@@ -324,7 +324,7 @@ static void log_dump_record(const struct log_site *site,
         print("irql=%d ", rec->logged_at_irql);
 
     /* message */
-    kassert(rec->fmt);
+    enforce(rec->fmt);
     k_printf_from_log(rec->fmt, rec->args, rec->nargs, print);
 
     if (opts.show_caller) {
@@ -553,7 +553,7 @@ void log_sites_init(void) {
         INIT_LIST_HEAD(&s->list);
         refcount_init(&s->refcount, 1);
         struct log_ringbuf *lrb = &s->rb;
-        kassert(s->capacity);
+        enforce(s->capacity);
         lrb->slots = nofail_valloc(sizeof(struct log_ring_slot) * s->capacity,
                                    ALLOC_ZERO);
 

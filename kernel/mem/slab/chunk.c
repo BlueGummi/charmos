@@ -23,7 +23,7 @@ static void validate_ptr_in_chunk(struct slab_chunk *chunk, void *ptr) {
     vaddr_t vaddr = (vaddr_t) ptr;
     vaddr_t min = base_addr_to_vaddr(chunk->base_addr);
     vaddr_t max = base_addr_to_vaddr(chunk->base_addr) + SLAB_CHUNK_SIZE;
-    kassert(IN_RANGE(vaddr, min, max));
+    enforce(IN_RANGE(vaddr, min, max));
 }
 
 static struct list_head *chunk_list_for(struct slab_chunks *sc,
@@ -38,7 +38,7 @@ static struct list_head *chunk_list_for(struct slab_chunks *sc,
 static void destroy_chunk(struct slab_chunks *sc, struct slab_chunk *c) {
     vaddr_t vaddr = base_addr_to_vaddr(c->base_addr);
     uint8_t curr = slab_order_map_get(vaddr);
-    kassert(curr != SLAB_POW2_ORDER_EMPTY);
+    enforce(curr != SLAB_POW2_ORDER_EMPTY);
 
 #ifdef DEBUG_ASAN
     asan_free((void *) vaddr, SLAB_CHUNK_SIZE);
@@ -53,7 +53,7 @@ static void destroy_chunk(struct slab_chunks *sc, struct slab_chunk *c) {
 
 static bool move_to(struct slab_chunks *sc, struct slab_chunk *c,
                     enum slab_chunk_state s) {
-    kassert(c->state != s);
+    enforce(c->state != s);
     list_del_init(&c->list);
     if (s == SLAB_CHUNK_FREE) {
         destroy_chunk(sc, c);
@@ -72,7 +72,7 @@ static struct slab_chunk *alloc_chunk(struct slab_chunks *sc,
         return NULL;
 
     uint8_t curr = slab_order_map_get(base);
-    kassert(curr == SLAB_POW2_ORDER_EMPTY);
+    enforce(curr == SLAB_POW2_ORDER_EMPTY);
     slab_order_map_set(base, sc->pow2_order);
 
     spin_unlock(&sc->lock, *lirql);
@@ -133,15 +133,15 @@ static void free_to(struct slab_chunks *chunks, struct slab_chunk *chunk,
                     vaddr_t v) {
     validate_ptr_in_chunk(chunk, (void *) v);
     uint64_t offset = v - base_addr_to_vaddr(chunk->base_addr);
-    kassert(offset % (PAGE_SIZE * chunks->page_stride) == 0);
+    enforce(offset % (PAGE_SIZE * chunks->page_stride) == 0);
     uint64_t i = offset / (PAGE_SIZE * chunks->page_stride);
 
     uint64_t *bm = (uint64_t *) chunk->bitmap;
-    kassert(i < chunks->bitmap_bits);
+    enforce(i < chunks->bitmap_bits);
 
     size_t w = i / 64;
     size_t b = i % 64;
-    kassert(SLAB_BITMAP_TEST(bm[w], BIT(b)));
+    enforce(SLAB_BITMAP_TEST(bm[w], BIT(b)));
     SLAB_BITMAP_UNSET(bm[w], BIT(b));
     chunk->used--;
 }
@@ -159,7 +159,7 @@ static vaddr_t chunk_alloc(struct slab_chunks *chunks,
 static bool chunk_free(struct slab_chunks *chunks, struct slab_chunk *chunk,
                        vaddr_t v) {
     enum slab_chunk_state last = chunk->state;
-    kassert(last != SLAB_CHUNK_FREE);
+    enforce(last != SLAB_CHUNK_FREE);
     free_to(chunks, chunk, v);
 
     if (last == SLAB_CHUNK_USED) {

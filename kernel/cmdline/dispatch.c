@@ -512,7 +512,7 @@ static bool schema_dispatch(const char *var, const char *val,
 void cmdline_dispatch(const char *var, const char *val) {
     for (struct cmdline_entry *e = __skernel_cmdline_entries;
          e < __ekernel_cmdline_entries; e++) {
-        kassert(e->name);
+        enforce(e->name);
 
         if (e->flags & CMDLINE_ENTRY_SYMBOLIC)
             continue;

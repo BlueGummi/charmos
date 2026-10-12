@@ -89,12 +89,12 @@ static inline void page_set_folio(struct page *p, struct folio *f) {
 }
 
 static inline struct folio *page_get_folio(const struct page *p) {
-    kassert(page_get_tag(p) == PAGE_TAG_FOLIO);
+    enforce(page_get_tag(p) == PAGE_TAG_FOLIO);
     return (struct folio *) page_get_payload(p);
 }
 
 static inline void page_clear_folio(struct page *p) {
-    kassert(page_get_tag(p) == PAGE_TAG_FOLIO);
+    enforce(page_get_tag(p) == PAGE_TAG_FOLIO);
     page_set_payload(p, 0);
     page_set_tag(p, PAGE_TAG_NONE);
 }
@@ -190,7 +190,7 @@ static inline void folio_mark_uptodate(struct folio *f) {
 
 static inline void folio_set_anon(struct folio *f, struct anon_vma *av,
                                   pgoff_t index) {
-    kassert(!folio_test_set_flag(f, FOLIO_FLAG_ANON));
+    enforce(!folio_test_set_flag(f, FOLIO_FLAG_ANON));
     f->mapping = av;
     f->index = index;
     folio_set_tag(f, FOLIO_TAG_ANON);
@@ -206,13 +206,13 @@ static inline bool folio_is_file_vma_range(const struct folio *f) {
 }
 
 static inline struct anon_vma *folio_get_anon_vma(const struct folio *f) {
-    kassert(folio_is_anon(f));
+    enforce(folio_is_anon(f));
     return (struct anon_vma *) ((uintptr_t) f->mapping & ~FOLIO_TAG_BITS);
 }
 
 static inline struct file_vma_range *
 folio_get_file_vma_range(const struct folio *f) {
-    kassert(folio_is_file_vma_range(f));
+    enforce(folio_is_file_vma_range(f));
     return f->mapping;
 }
 

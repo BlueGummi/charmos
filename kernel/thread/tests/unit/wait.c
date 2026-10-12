@@ -78,7 +78,7 @@ TEST_DEFINE_UNIT(wait_block, mt_wait_any) {
         racers[i] = (struct wait_racer){&headers[i], &go, &wins};
         wakers[i] = thread_spawn("wait_racer", race_satisfy, .arg = &racers[i],
                                  .joinable = true);
-        kassert(wakers[i]);
+        enforce(wakers[i]);
     }
     thread_wait_prepare(objects, 2, NULL, THREAD_WAIT_UNINTERRUPTIBLE,
                         THREAD_BLOCK_REASON_MANUAL);
@@ -136,7 +136,7 @@ TEST_DEFINE_UNIT(wait_block, apc_preserves_registration) {
     while (!atomic_load(&c.armed))
         scheduler_yield();
     for (size_t i = 0; i < 5; i++) {
-        kassert(apc_enqueue(t, &apc, APC_TYPE_KERNEL));
+        enforce(apc_enqueue(t, &apc, APC_TYPE_KERNEL));
         while (atomic_load_acq(&apc.state) != APC_STATE_IDLE)
             scheduler_yield();
     }

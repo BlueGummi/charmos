@@ -1,7 +1,7 @@
 /* @title: IRQs */
 #pragma once
 #include <console/crash.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <smp/core.h>
 #include <stdbool.h>
 #include <stdint.h>

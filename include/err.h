@@ -2,7 +2,7 @@
 #pragma once
 #include <compiler/core.h>
 #include <console/panic.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <linker/symbols.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -68,20 +68,20 @@ struct err_facility {
 /* Deltas must always be positive */
 #define ERR_CREATE(pre, del)                                                   \
     ({                                                                         \
-        kassert((del & 0xFFFF) == del);                                        \
-        kassert(del > 0);                                                      \
+        enforce((del & 0xFFFF) == del);                                        \
+        enforce(del > 0);                                                      \
         -((((int) (pre)) << 16) | (((int) (del)) & 0xFFFF));                   \
     })
 
 #define ERR_GET_FACILITY(e)                                                    \
     ({                                                                         \
-        kassert(e < 0);                                                        \
+        enforce(e < 0);                                                        \
         ((-(e)) >> 16) & 0xFFFF;                                               \
     })
 
 #define ERR_GET_DELTA(e)                                                       \
     ({                                                                         \
-        kassert(e < 0);                                                        \
+        enforce(e < 0);                                                        \
         ((-(e)) & 0xFFFF);                                                     \
     })
 

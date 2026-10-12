@@ -48,7 +48,7 @@ struct clock_evdev *clock_evdev_create(const char *name, ...) {
 }
 
 void clock_evdev_register(struct clock_evdev *ced) {
-    kassert(!ced->in_global_list);
+    enforce(!ced->in_global_list);
     ced->in_global_list = true;
     locked_list_add(&clock_global.clock_evdevs, &ced->list_internal);
 }

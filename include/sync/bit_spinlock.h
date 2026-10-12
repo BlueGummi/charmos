@@ -4,7 +4,7 @@
 #include <atomic.h>
 #include <compiler/core.h>
 #include <compiler/intrinsic.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <math/bit.h>
 #include <sch/irql.h>
 #include <stdbool.h>
@@ -21,7 +21,7 @@
         static_assert(                                                         \
             ci_constant_p(bit) ? ((size_t) (bit) < sizeof(*(ptr)) * 8) : 1,    \
             "bit index exceeds type width");                                   \
-        kassert((size_t) (bit) < sizeof(*(ptr)) * 8,                           \
+        enforce((size_t) (bit) < sizeof(*(ptr)) * 8,                           \
                 "bit index out of bounds for pointer type");                   \
     } while (0)
 
@@ -68,7 +68,7 @@
 #define bit_spin_unlock_raw(bit, ptr)                                          \
     do {                                                                       \
         BIT_SPINLOCK_CHECK(bit, ptr);                                          \
-        kassert(atomic_test_and_clear_bit_release(                             \
+        enforce(atomic_test_and_clear_bit_release(                             \
                     (atomic(typeof(*(ptr))) *) (ptr), bit),                    \
                 "bit spinlock unlock on unheld lock");                         \
     } while (0)
@@ -120,7 +120,7 @@
     })
 
 #define BIT_SPIN_LOCK_ASSERT_HELD(bit, ptr)                                    \
-    kassert(bit_spin_is_locked_raw(bit, ptr), "bitlock not held")
+    enforce(bit_spin_is_locked_raw(bit, ptr), "bitlock not held")
 
 struct bit_spinlock_guard {
     void *ptr;

@@ -59,7 +59,7 @@ TEST_DEFINE_INTEGRATION(sched, short_sleep_lost_wake) {
     if (!joined) {
         atomic_store(&short_sleep_stop, true);
         /* alert must not rescue a uninterruptible wait */
-        kassert(joined, "short timed sleep lost its object completion");
+        enforce(joined, "short timed sleep lost its object completion");
         thread_join(t);
     }
 

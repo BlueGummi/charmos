@@ -1,7 +1,7 @@
 #include <asm.h>
 #include <block/sched.h>
 #include <drivers/nvme.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <mem/alloc.h>
 #include <mem/vmm.h>
 #include <thread/workqueue.h>

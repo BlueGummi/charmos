@@ -1,5 +1,5 @@
 #include <cmdline.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <string.h>
 #include <sync/seqlock.h>
 #include <time/clock.h>
@@ -44,7 +44,7 @@ static struct clock *timekeeper_get_clock(void) {
 }
 
 void timekeeper_init(void) {
-    struct clock *clk = kassert(timekeeper_get_clock());
+    struct clock *clk = enforce(timekeeper_get_clock());
 
     enum irql irql = seq_write_lock(&timekeeper.lock);
     timekeeper.clock = clk;
@@ -54,7 +54,7 @@ void timekeeper_init(void) {
 }
 
 void timekeeper_set_clock(struct clock *clk) {
-    kassert(clk != NULL, "timekeeper_set_clock called with NULL clock");
+    enforce(clk != NULL, "timekeeper_set_clock called with NULL clock");
 
     enum irql irql = seq_write_lock_high(&timekeeper.lock);
     if (timekeeper.clock) {

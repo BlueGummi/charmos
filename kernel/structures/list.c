@@ -1,4 +1,4 @@
-#include <kassert.h>
+#include <enforce.h>
 #include <math/align.h>
 #include <mem/address_range.h>
 #include <structures/list.h>

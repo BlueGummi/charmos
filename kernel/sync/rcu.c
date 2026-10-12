@@ -24,10 +24,10 @@
 #include <atomic.h>
 #include <compiler/atomic.h>
 #include <console/printf.h>
+#include <enforce.h>
 #include <global.h>
 #include <irq/ipi.h>
 #include <irq/irq.h>
-#include <kassert.h>
 #include <log.h>
 #include <math/align.h>
 #include <math/min_max.h>
@@ -75,7 +75,7 @@ static void rcu_propagate_done(struct rcu_node *node, uint64_t seq,
             return;
         }
 
-        kassert(seq > node->completed_seq);
+        enforce(seq > node->completed_seq);
         node->completed_seq = seq;
 
         struct rcu_node *parent = node->parent;
@@ -121,10 +121,10 @@ void rcu_read_lock(void) TSA_NO_ANALYSIS {
     if (cc_unlikely(!t))
         return;
 
-    kassert_debug(!irq_in_nmi(), "RCU read section in NMI context");
+    debug_enforce(!irq_in_nmi(), "RCU read section in NMI context");
 
     uint32_t nesting = ca_read_once(t->rcu_nesting);
-    kassert(nesting != UINT32_MAX, "RCU nesting overflow");
+    enforce(nesting != UINT32_MAX, "RCU nesting overflow");
 
     if (cc_likely(nesting != 0)) {
         ca_write_once(t->rcu_nesting, nesting + 1);
@@ -154,7 +154,7 @@ static void rcu_unregister_reader(struct thread *t) TSA_NO_ANALYSIS {
         t->rcu_blocked_seq = 0;
 
         if (bseq != 0 && bseq == leaf->gp_seq) {
-            kassert(leaf->blocked_count != 0, "RCU blocked reader underflow");
+            enforce(leaf->blocked_count != 0, "RCU blocked reader underflow");
             leaf->blocked_count--;
             rcu_propagate_done(leaf, bseq, irql);
         } else {
@@ -171,7 +171,7 @@ void rcu_read_unlock(void) TSA_NO_ANALYSIS {
         return;
 
     uint32_t nesting = ca_read_once(t->rcu_nesting);
-    kassert(nesting != 0, "RCU nesting underflow");
+    enforce(nesting != 0, "RCU nesting underflow");
 
     if (cc_likely(nesting > 1)) {
         ca_write_once(t->rcu_nesting, nesting - 1);
@@ -230,7 +230,7 @@ void rcu_note_irq_exit(void) TSA_NO_ANALYSIS {
     if (!rcu.ready)
         return;
 
-    kassert(irq_in_interrupt());
+    enforce(irq_in_interrupt());
     struct thread *t = thread_get_current();
 
     /* Just report when the interrupted context isn't holding an unregistered
@@ -264,7 +264,7 @@ void rcu_idle_enter(void) {
     if (!rcu.ready)
         return;
 
-    kassert(!irqs_enabled());
+    enforce(!irqs_enabled());
 
     atomic_store_release(&rcu.cpus[smp_id(TOPC_IFLAG)].idle, true);
 }
@@ -281,7 +281,7 @@ void rcu_idle_exit(void) {
 }
 
 void rcu_defer(struct rcu_cb *cb, rcu_fn func) {
-    kassert(cb && func);
+    enforce(cb && func);
 
     cb->fn = func;
 
@@ -459,7 +459,7 @@ static uint64_t rcu_gp_start(struct list_head *batch) TSA_NO_ANALYSIS {
     atomic_store_rlx(&rcu.gp_requests, 0);
 
     uint64_t prev = atomic_load_rlx(&rcu.gp_seq);
-    kassert(prev != UINT64_MAX, "RCU GP seq wrap");
+    enforce(prev != UINT64_MAX, "RCU GP seq wrap");
     uint64_t seq = prev + 1;
 
 #ifdef TEST_ENABLED
@@ -578,10 +578,10 @@ static void rcu_gp_worker(void *unused_arg) {
 void rcu_synchronize(void) {
     struct thread *t = thread_get_current();
 
-    kassert(!irq_in_interrupt() && !irq_in_nmi());
-    kassert(irql_get() <= IRQL_APC_LEVEL);
-    kassert(!t || t->rcu_nesting == 0);
-    kassert(!rcu.ready || t != rcu.worker);
+    enforce(!irq_in_interrupt() && !irq_in_nmi());
+    enforce(irql_get() <= IRQL_APC_LEVEL);
+    enforce(!t || t->rcu_nesting == 0);
+    enforce(!rcu.ready || t != rcu.worker);
 
     if (!rcu.ready)
         return;
@@ -603,11 +603,11 @@ static void rcu_build_tree(void) {
     size_t levels = 0;
 
     size_t n = global.core_count;
-    kassert(n > 0);
+    enforce(n > 0);
 
     do {
         n = DIV_ROUND_UP(n, RCU_FANOUT);
-        kassert(levels < RCU_MAX_LEVELS, "RCU tree deeper than RCU_MAX_LEVELS");
+        enforce(levels < RCU_MAX_LEVELS, "RCU tree deeper than RCU_MAX_LEVELS");
         counts[levels++] = n;
     } while (n > 1);
 

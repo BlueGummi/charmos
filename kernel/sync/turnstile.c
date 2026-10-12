@@ -1,4 +1,4 @@
-#include <kassert.h>
+#include <enforce.h>
 #include <math/min_max.h>
 #include <mem/alloc.h>
 #include <mem/nofail.h>
@@ -142,7 +142,7 @@ static void turnstile_insert_to_freelist(struct turnstile *parent,
 
 static struct turnstile *turnstile_freelist_pop(struct turnstile *ts) {
     struct list_head *lh = list_pop_front_init(&ts->freelist);
-    kassert(lh); /* we are not to call this if the freelist is empty */
+    enforce(lh); /* we are not to call this if the freelist is empty */
     struct turnstile *ret = turnstile_from_freelist(lh);
     ret->state = TURNSTILE_STATE_UNUSED;
     return ret;
@@ -245,12 +245,12 @@ struct thread *turnstile_dequeue_first(struct turnstile *ts, size_t queue) {
     struct turnstile *got = ts;
     if (ts->waiters == 1) { /* last waiter, take the turnstile with you! */
         /* you're taking the turnstile */
-        kassert(list_empty(&ts->freelist));
+        enforce(list_empty(&ts->freelist));
         turnstile_remove(chain, ts);
     } else {
         /* not the last waiter, take one from the freelist */
-        kassert(!list_empty(&ts->freelist));
-        got = kassert(turnstile_freelist_pop(ts));
+        enforce(!list_empty(&ts->freelist));
+        got = enforce(turnstile_freelist_pop(ts));
     }
 
     /* you take this turnstile with you as you wake up please */
@@ -277,7 +277,7 @@ void turnstile_wake(struct turnstile *ts, size_t queue, size_t num_threads,
     while (num_threads-- > 0) {
         /* wake the one of highest priority */
         struct thread *to_wake = turnstile_dequeue_first(ts, queue);
-        kassert(
+        enforce(
             thread_wait_satisfy(&to_wake->wait_blocks[THREAD_WAIT_BLOCK_SYNC],
                                 THREAD_WAKE_REASON_BLOCKING_MANUAL, NULL));
     }
@@ -381,19 +381,19 @@ struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
 
     struct turnstile *my_turnstile = current_thread->turnstile;
 
-    kassert(my_turnstile);
+    enforce(my_turnstile);
 
     /* turnstile donation */
     if (!ts) {
         /* no turnstile to block on, give it ours */
         ts = my_turnstile;
         turnstile_insert(chain, ts, lock_obj);
-        kassert(ts->waiters == 0);
+        enforce(ts->waiters == 0);
     } else {
         /* someone else has donated a turnstile, put ours on the freelist */
         turnstile_insert_to_freelist(ts, my_turnstile);
-        kassert(ts->waiters > 0);
-        kassert(ts->lock_obj == lock_obj);
+        enforce(ts->waiters > 0);
+        enforce(ts->lock_obj == lock_obj);
     }
 
     current_thread->turnstile = NULL;

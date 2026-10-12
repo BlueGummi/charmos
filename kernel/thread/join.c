@@ -1,14 +1,14 @@
 #include <thread/thread.h>
 
 static void join_check(struct thread *t) {
-    kassert(t);
-    kassert(t != thread_get_current(), "thread '%s' joined itself", t->name);
-    kassert(irql_get() == IRQL_PASSIVE_LEVEL, "thread_join() blocks");
+    enforce(t);
+    enforce(t != thread_get_current(), "thread '%s' joined itself", t->name);
+    enforce(irql_get() == IRQL_PASSIVE_LEVEL, "thread_join() blocks");
 
     enum thread_flags f = thread_or_flags(t, THREAD_FLAG_JOINED);
-    kassert(f & THREAD_FLAG_JOINABLE, "join on a detached thread '%s'",
+    enforce(f & THREAD_FLAG_JOINABLE, "join on a detached thread '%s'",
             t->name);
-    kassert(!(f & THREAD_FLAG_JOINED), "thread '%s' joined twice", t->name);
+    enforce(!(f & THREAD_FLAG_JOINED), "thread '%s' joined twice", t->name);
 }
 
 int thread_join(struct thread *t) {
@@ -54,8 +54,8 @@ bool thread_join_timeout(struct thread *t, time_ms_t timeout_ms,
 
 void thread_detach(struct thread *t) {
     enum thread_flags f = thread_and_flags(t, ~THREAD_FLAG_JOINABLE);
-    kassert(f & THREAD_FLAG_JOINABLE);
-    kassert(!(f & THREAD_FLAG_JOINED), "detach races an in-flight join");
+    enforce(f & THREAD_FLAG_JOINABLE);
+    enforce(!(f & THREAD_FLAG_JOINED), "detach races an in-flight join");
 
     thread_put(t);
 }

@@ -1,6 +1,6 @@
 #include <compiler/core.h>
 #include <compiler/intrinsic.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <math/align.h>
 #include <math/arith.h>
 #include <math/bit.h>
@@ -47,8 +47,8 @@ static fx32_32_t pow2_proximity(size_t n) {
  * lcsf(m, M, n) = ln(e - { [ (e - 1)  * (n - m) ] / r})
  */
 static fx32_32_t log_clamped_scale_factor(size_t min, size_t max, size_t n) {
-    kassert(max > min);
-    kassert(IN_RANGE(n, min, max));
+    enforce(max > min);
+    enforce(IN_RANGE(n, min, max));
 
     fx32_32_t f_max = fx_from_int(max);
     fx32_32_t f_min = fx_from_int(min);
@@ -78,7 +78,7 @@ static fx32_32_t pow2_proximity_scaled(size_t min, size_t max, size_t n) {
  */
 static fx32_32_t candidate_score(const struct elcm_candidate *c, size_t mind,
                                  size_t maxd, fx32_32_t max_wastage) {
-    kassert(c->wasted);
+    enforce(c->wasted);
     fx32_32_t wastage_scaled = fx_div(c->wastage, max_wastage);
 
     size_t n = mind + maxd - c->distance;
@@ -246,10 +246,10 @@ enum err elcm(struct elcm_params *params) {
     size_t metadata_bytes_per_page = params->metadata_bytes_per_page;
     bool bias_towards_pow2 = params->bias_towards_pow2;
 
-    kassert(obj_size > 0 && "Object size must be greater than 0");
-    kassert(page_size > 0 && "Page size must be greater than 0");
-    kassert(obj_alignment <= page_size && "Alignment cannot exceed page size");
-    kassert(max_wastage_pct <= 100 &&
+    enforce(obj_size > 0 && "Object size must be greater than 0");
+    enforce(page_size > 0 && "Page size must be greater than 0");
+    enforce(obj_alignment <= page_size && "Alignment cannot exceed page size");
+    enforce(max_wastage_pct <= 100 &&
             "Max wastage percentage must be between 0 and 100");
 
     size_t best_possible = find_best(params);
@@ -316,8 +316,8 @@ enum err elcm(struct elcm_params *params) {
             if (i < min_pages_seen)
                 min_pages_seen = i;
 
-            kassert(candidate_valid(&cand));
-            kassert(used_bytes <= total_bytes);
+            enforce(candidate_valid(&cand));
+            enforce(used_bytes <= total_bytes);
             candidates[cand_count++] = cand;
         }
     }

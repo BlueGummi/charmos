@@ -73,12 +73,12 @@ static void irq_execute_vector_handlers(irq_t vector,
  * trampoline to handle cases where IRQs fire in NMIs due to the IRET issue */
 void isr_nmi_entry(struct irq_registers *irq_regs) {
     /* vector == IRQ_NMI, of course */
-    kassert(!irq_mark_self_in_nmi(true));
+    enforce(!irq_mark_self_in_nmi(true));
 
     struct irq_context irq_ctx = {.regs = irq_regs};
     irq_execute_vector_handlers(IRQ_NMI, &irq_ctx);
 
-    kassert(irq_mark_self_in_nmi(false) == 1);
+    enforce(irq_mark_self_in_nmi(false) == 1);
 }
 
 void isr_standard_entry(irq_t vector, struct irq_registers *irq_regs) {
@@ -93,7 +93,7 @@ void isr_standard_entry(irq_t vector, struct irq_registers *irq_regs) {
     uint8_t scratch_buf[EXCEPTION_SYNC_CB_SCRATCH_BUFFER_SIZE] = {0};
 
     if (!is_exception)
-        kassert(old != IRQL_HIGH_LEVEL);
+        enforce(old != IRQL_HIGH_LEVEL);
 
     struct irq_context irq_ctx = {.irq_entered_irql = old,
                                   .irq_stack_scratch_buf = scratch_buf,
@@ -152,7 +152,7 @@ void isr_standard_entry(irq_t vector, struct irq_registers *irq_regs) {
         if (curr)
             curr->preemptions++;
 
-        kassert(old != IRQL_DISPATCH_LEVEL);
+        enforce(old != IRQL_DISPATCH_LEVEL);
         scheduler_yield();
     }
 }
@@ -295,7 +295,7 @@ void irq_vector_enable(irq_t irq) {
 static void exception_sync_cbs_init() {
     struct exception_sync_cb *esc;
     linker_section_for_each_object(esc, exception_sync_cbs) {
-        kassert(exception_cbs[esc->vector].vector == 0);
+        enforce(exception_cbs[esc->vector].vector == 0);
         exception_cbs[esc->vector] = *esc;
     }
 }

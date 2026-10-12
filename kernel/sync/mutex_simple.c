@@ -57,8 +57,8 @@ mutex_simple_chk_unlocked(struct mutex_simple_chk_release_state *state) {
 static void mutex_simple_chk_state_init(struct mutex_simple *m,
                                         const struct lock_chk_class *class,
                                         enum lock_chk_flags flags) {
-    kassert((flags & ~LOCK_CHKD_FULL) == 0);
-    kassert(flags == LOCK_UNCHKD || class != NULL);
+    enforce((flags & ~LOCK_CHKD_FULL) == 0);
+    enforce(flags == LOCK_UNCHKD || class != NULL);
     m->chk.flags = flags;
     m->chk.initialized = true;
     atomic_store_rlx(&m->chk.used, false);
@@ -67,24 +67,24 @@ static void mutex_simple_chk_state_init(struct mutex_simple *m,
 
 void mutex_simple_set_chk_flags(struct mutex_simple *m,
                                 enum lock_chk_flags flags) {
-    kassert(m->chk.initialized);
-    kassert(m->owner == NULL);
-    kassert(list_empty(&m->waiters.waiters));
-    kassert(!spinlock_locked(&m->waiters.lock));
-    kassert(!spinlock_locked(&m->lock));
-    kassert(!atomic_load_rlx(&m->chk.used));
-    kassert((flags & ~LOCK_CHKD_FULL) == 0);
+    enforce(m->chk.initialized);
+    enforce(m->owner == NULL);
+    enforce(list_empty(&m->waiters.waiters));
+    enforce(!spinlock_locked(&m->waiters.lock));
+    enforce(!spinlock_locked(&m->lock));
+    enforce(!atomic_load_rlx(&m->chk.used));
+    enforce((flags & ~LOCK_CHKD_FULL) == 0);
     m->chk.flags = flags;
 }
 
 void mutex_simple_reinit_chk(struct mutex_simple *m,
                              const struct lock_chk_class *class,
                              enum lock_chk_flags flags) {
-    kassert(m->chk.initialized);
-    kassert(m->owner == NULL);
-    kassert(list_empty(&m->waiters.waiters));
-    kassert(!spinlock_locked(&m->waiters.lock));
-    kassert(!spinlock_locked(&m->lock));
+    enforce(m->chk.initialized);
+    enforce(m->owner == NULL);
+    enforce(list_empty(&m->waiters.waiters));
+    enforce(!spinlock_locked(&m->waiters.lock));
+    enforce(!spinlock_locked(&m->lock));
     mutex_simple_init_chk_full(m, class, flags);
 }
 
@@ -142,8 +142,8 @@ void mutex_simple_reinit_chk(struct mutex_simple *m,
 #endif /* DEBUG_LOCK_CHK */
 
 static void mutex_simple_sanity_check(void) {
-    kassert(irq_not_in_interrupt());
-    kassert(irql_get() <= IRQL_APC_LEVEL);
+    enforce(irq_not_in_interrupt());
+    enforce(irql_get() <= IRQL_APC_LEVEL);
 }
 
 static bool try_acquire_simple_mutex(struct mutex_simple *m,
@@ -220,7 +220,7 @@ void mutex_simple_lock_subclass_full(struct mutex_simple *m, uint8_t subclass,
         block_on_simple_mutex(m);
     }
 
-    kassert(m->owner == curr);
+    enforce(m->owner == curr);
     mutex_simple_chk_locked(&chk_state);
 }
 
@@ -278,7 +278,7 @@ void mutex_simple_assert_held_full(struct mutex_simple *m,
 #else
     cc_unused(site);
 #endif
-    kassert(mutex_simple_get_owner(m) == thread_get_current(),
+    enforce(mutex_simple_get_owner(m) == thread_get_current(),
             "mutex_simple not held by current thread");
 }
 
@@ -293,6 +293,6 @@ void mutex_simple_assert_not_held_full(struct mutex_simple *m,
 #else
     cc_unused(site);
 #endif
-    kassert(mutex_simple_get_owner(m) != thread_get_current(),
+    enforce(mutex_simple_get_owner(m) != thread_get_current(),
             "mutex_simple unexpectedly held by current thread");
 }

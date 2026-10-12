@@ -42,7 +42,7 @@ set(DEBUG_FLAGS
     # Misc.
     DEBUG_LIST
     DEBUG_CMDLINE
-    DEBUG_ASSERT # Debug assertions
+    DEBUG_ENFORCE # Debug enforcement
 )
 
 set(PROFILING_FLAGS PROFILING_SCHED)

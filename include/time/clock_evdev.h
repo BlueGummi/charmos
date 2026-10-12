@@ -93,17 +93,17 @@ static inline void clock_evdev_group_add(struct clock_evdev_group *cedg,
 static inline struct clock_evdev *
 clock_evdev_for_cpu(struct clock_evdev_group *cedg, cpu_id_t cpu) {
     if (!(cedg->flags & CLOCK_EVDEV_GROUP_PERCPU) || cedg->evdev_for_cpu)
-        return kassert(cedg->evdev_for_cpu(cedg, cpu));
+        return enforce(cedg->evdev_for_cpu(cedg, cpu));
 
     struct clock_evdev *iter, *found = NULL;
     list_for_each_entry(iter, &cedg->clock_evdevs, group_list) {
         if (iter->bound_to_cpu == cpu) {
 
             /* sanity check */
-            kassert(!found, "only one CED per CEDG per CPU allowed");
+            enforce(!found, "only one CED per CEDG per CPU allowed");
             found = iter;
         }
     }
 
-    return kassert(found);
+    return enforce(found);
 }

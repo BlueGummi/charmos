@@ -2,7 +2,7 @@
 
 #include <asm.h>
 #include <atomic.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <smp/percpu.h>
 #include <sync/lock_chk.h>
 
@@ -15,12 +15,12 @@ static bool debug_is_active(void) {
 }
 
 static struct lock_debug_cpu *debug_cpu_here(void) {
-    kassert(!irqs_enabled());
+    enforce(!irqs_enabled());
     return PERCPU_PTR(TOPC_IFLAG, lock_debug_cpu);
 }
 
 void lock_debug_activate(void) {
-    kassert(PERCPU_READY(lock_debug_cpu));
+    enforce(PERCPU_READY(lock_debug_cpu));
     atomic_store_release(&lock_chk_global.debug, LOCK_CHK_ACTIVE);
 }
 
@@ -102,10 +102,10 @@ void lock_debug_spin_pop(struct lock_chk_lock *lock) {
         return;
 
     struct lock_debug_cpu *cpu = debug_cpu_here();
-    kassert(cpu->depth != 0);
+    enforce(cpu->depth != 0);
     struct lock_debug_spin_entry *top = &cpu->stack[cpu->depth - 1];
-    kassert(top->instance == lock->instance);
-    kassert(top->type == lock->type);
+    enforce(top->instance == lock->instance);
+    enforce(top->type == lock->type);
     cpu->depth--;
 }
 

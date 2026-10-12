@@ -15,7 +15,7 @@ static void elcm_simple_free(void *ptr, size_t size) {
 }
 
 struct slab_elcm_candidate slab_elcm(size_t obj_size, size_t obj_alignment) {
-    kassert(obj_size && obj_alignment);
+    enforce(obj_size && obj_alignment);
     struct elcm_params params = {
         .metadata_size_bytes = sizeof(struct slab),
 #ifdef DEBUG_SLAB_DEEP

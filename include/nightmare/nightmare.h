@@ -5,7 +5,7 @@
 #include <compiler/core.h>
 #include <compiler/diagnostic.h>
 #include <crypto/prng.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <linker/symbols.h>
 #include <math/fixed.h>
 #include <scaled_param.h>

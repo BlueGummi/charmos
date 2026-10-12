@@ -24,7 +24,7 @@ static cc_noreturn void impl_default(struct crash_payload pluh,
 
     crash_full(&(struct crash_context){
         .payload = pluh,
-        .source = CRASH_SOURCE_ASSERT,
+        .source = CRASH_SOURCE_ENFORCE,
         .formats = CRASH_FMT_DEFAULT,
         .file = file,
         .line = line,
@@ -33,16 +33,16 @@ static cc_noreturn void impl_default(struct crash_payload pluh,
     });
 }
 
-static cc_noreturn void impl_assertion(struct crash_payload pluh,
-                                       const char *file, int line,
-                                       const char *func, const char *prefix,
-                                       const char *assertion, const char *fmt,
-                                       va_list args) {
+static cc_noreturn void impl_enforce_expr(struct crash_payload pluh,
+                                          const char *file, int line,
+                                          const char *func, const char *prefix,
+                                          const char *expr,
+                                          const char *fmt, va_list args) {
     cc_unused(pluh);
     static char msg[CRASH_MSG_MAX];
 
     int n = snprintf(msg, sizeof(msg), "%s%s", prefix ? prefix : "",
-                     assertion ? assertion : "");
+                     expr ? expr : "");
 
     if (n < 0)
         n = 0;
@@ -59,7 +59,7 @@ static cc_noreturn void impl_assertion(struct crash_payload pluh,
 
     crash_full(&(struct crash_context){
         .payload = pluh,
-        .source = CRASH_SOURCE_ASSERT,
+        .source = CRASH_SOURCE_ENFORCE,
         .formats = CRASH_FMT_DEFAULT,
         .file = file,
         .line = line,
@@ -68,16 +68,16 @@ static cc_noreturn void impl_assertion(struct crash_payload pluh,
     });
 }
 
-cc_noreturn void assert_impl_default(struct crash_payload pluh,
-                                     const char *file, int line,
-                                     const char *func, const char *prefix,
-                                     const char *assertion, const char *fmt,
-                                     ...) {
+cc_noreturn void enforce_impl_default(struct crash_payload pluh,
+                                      const char *file, int line,
+                                      const char *func, const char *prefix,
+                                      const char *expr, const char *fmt,
+                                      ...) {
     va_list args;
     va_start(args, fmt);
 
-    if (assertion && strlen(assertion) > 0) {
-        impl_assertion(pluh, file, line, func, prefix, assertion, fmt, args);
+    if (expr && strlen(expr) > 0) {
+        impl_enforce_expr(pluh, file, line, func, prefix, expr, fmt, args);
     } else {
         impl_default(pluh, file, line, func, prefix, fmt, args);
     }

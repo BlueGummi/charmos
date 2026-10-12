@@ -380,7 +380,7 @@ TEST_DEFINE_INTEGRATION(mutex, interruptible_apc_fuzz,
         threads[i] = thread_create("cs", chaos_sleeper, .arg = (void *) i,
                                    .joinable = true);
         TEST_ASSERT_NONNULL(threads[i]);
-        kassert(thread_get(threads[i]));
+        enforce(thread_get(threads[i]));
         chaos_diag_attach(threads[i], i);
         thread_enqueue(threads[i]);
     }

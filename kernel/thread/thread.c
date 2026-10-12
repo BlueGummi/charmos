@@ -77,7 +77,7 @@ void thread_exit_with_status(int status) {
     thread_lock_chk_exit(self);
 
     /* Can't be in a critical section  when we exit */
-    kassert(self->rcu_nesting == 0, "thread exited inside an RCU read section");
+    enforce(self->rcu_nesting == 0, "thread exited inside an RCU read section");
 
     /* Public status and the ZOMBIE state under join_lock...
      *
@@ -124,7 +124,7 @@ void thread_entry_wrapper(void) TSA_NO_ANALYSIS {
 
     scheduler_switch_in();
 
-    kassert(bootstage_get() < BOOTSTAGE_LATE ||
+    enforce(bootstage_get() < BOOTSTAGE_LATE ||
                 irql_get() == IRQL_DISPATCH_LEVEL,
             "entered thread at %s, want %s", irql_to_str(irql_get()),
             irql_to_str(IRQL_DISPATCH_LEVEL));
@@ -132,7 +132,7 @@ void thread_entry_wrapper(void) TSA_NO_ANALYSIS {
     scheduler_mark_self_in_resched(false);
 
     irql_lower(IRQL_PASSIVE_LEVEL);
-    kassert(entry);
+    enforce(entry);
     entry(arg);
     thread_exit();
 }
@@ -147,7 +147,7 @@ void *thread_allocate_stack(size_t pages) {
     virt_base += PAGE_SIZE;
     for (size_t i = 0; i < pages; i++) {
         vaddr_t virt = virt_base + (i * PAGE_SIZE);
-        paddr_t phys = kassert(pmm_alloc_page());
+        paddr_t phys = enforce(pmm_alloc_page());
         vmm_map_page(virt, phys,
                      .page_flags = PAGE_PRESENT | PAGE_WRITE | PAGE_XD);
     }
@@ -160,7 +160,7 @@ void thread_free_stack(struct thread *thread) {
     for (size_t i = 0; i < pages; i++) {
         vaddr_t virt = (vaddr_t) thread->stack + i * PAGE_SIZE;
         paddr_t phys = vmm_get_phys(virt);
-        kassert(phys != (paddr_t) -1);
+        enforce(phys != (paddr_t) -1);
         vmm_unmap_page(virt);
         pmm_free_page(phys);
     }
@@ -265,7 +265,7 @@ static struct thread *thread_init(struct thread *thread,
 struct thread *thread_create_full(char *name, thread_entry_fn_t entry,
                                   struct thread_create_params *params,
                                   va_list args) {
-    kassert(name);
+    enforce(name);
     struct thread *new_thread = valloc(sizeof(struct thread), ALLOC_ZERO);
     if (cc_unlikely(!new_thread))
         goto err;
@@ -338,8 +338,8 @@ err:
 
 /* TODO: This funny business is not needed with RCU */
 void thread_set_joinable(struct thread *t) {
-    kassert(!(thread_get_flags(t) & THREAD_FLAG_JOINABLE));
-    kassert(refcount_inc(&t->refcount));
+    enforce(!(thread_get_flags(t) & THREAD_FLAG_JOINABLE));
+    enforce(refcount_inc(&t->refcount));
     thread_set_flag(t, THREAD_FLAG_JOINABLE);
 }
 

@@ -57,8 +57,8 @@ bool slab_magazine_push(struct slab_magazine *mag, vaddr_t obj) {
         panic("buffer of size %zu is not uniform\n", mag->obj_size);
 #endif
 
-    kassert(mag->parent == slab_percpu_cache_local());
-    kassert(!slab_magazine_has(mag, obj));
+    enforce(mag->parent == slab_percpu_cache_local());
+    enforce(!slab_magazine_has(mag, obj));
     slab_magazine_zero_check(mag);
 
     if (mag->count < SLAB_MAG_ENTRIES) {
@@ -70,7 +70,7 @@ bool slab_magazine_push(struct slab_magazine *mag, vaddr_t obj) {
 }
 
 vaddr_t slab_magazine_pop(struct slab_magazine *mag) {
-    kassert(mag->parent == slab_percpu_cache_local());
+    enforce(mag->parent == slab_percpu_cache_local());
 
     vaddr_t ret = 0x0;
 
@@ -80,7 +80,7 @@ vaddr_t slab_magazine_pop(struct slab_magazine *mag) {
     }
 
     if (ret)
-        kassert(!slab_magazine_has(mag, ret));
+        enforce(!slab_magazine_has(mag, ret));
 
     slab_magazine_zero_check(mag);
     return ret;
@@ -95,7 +95,7 @@ static size_t slab_cache_bulk_alloc(struct slab_cache *cache,
 
         /* We don't allow allocations of new slabs - that
          * is not the point of our percpu caches */
-        kassert(!(behavior & SLAB_ALLOC_BEHAVIOR_FROM_ALLOC));
+        enforce(!(behavior & SLAB_ALLOC_BEHAVIOR_FROM_ALLOC));
         void *obj = slab_alloc(cache, /*handle=*/NULL, behavior);
         if (!obj)
             break;
@@ -151,10 +151,10 @@ static vaddr_t slab_percpu_refill_for_mag_and_cache(
     if (space == 0)
         space = 1; /* we still want 1 so we can return an object */
 
-    kassert(space <= SLAB_MAG_ENTRIES);
+    enforce(space <= SLAB_MAG_ENTRIES);
 
     if (mag->type == SLAB_MAGAZINE_ZERO)
-        kassert(cache->type == SLAB_TYPE_PAGEABLE_ZERO ||
+        enforce(cache->type == SLAB_TYPE_PAGEABLE_ZERO ||
                 cache->type == SLAB_TYPE_NONPAGEABLE_ZERO);
 
     size_t want = space;
@@ -165,7 +165,7 @@ static vaddr_t slab_percpu_refill_for_mag_and_cache(
     size_t can_insert = SLAB_MAG_ENTRIES - mag->count;
     size_t to_insert = got > 0 ? MIN(got - 1, can_insert) : 0;
 
-    kassert(mag->obj_size == cache->obj_size);
+    enforce(mag->obj_size == cache->obj_size);
     vaddr_t first = pc->shadow_objs[0];
 
     for (size_t i = 1; i <= to_insert; i++) {

@@ -39,9 +39,9 @@ static void prepare_wait(const struct thread_wait_object *objects, size_t count,
                          struct thread_wait_block *storage,
                          enum thread_wait_type type, thread_act_reason_t reason,
                          enum thread_state state) {
-    kassert(count <= UINT16_MAX);
-    kassert(type != THREAD_WAIT_NONE);
-    kassert(storage || count <= THREAD_NUM_WAIT_BLOCKS);
+    enforce(count <= UINT16_MAX);
+    enforce(type != THREAD_WAIT_NONE);
+    enforce(storage || count <= THREAD_NUM_WAIT_BLOCKS);
 
     struct thread *t = thread_get_current();
     if (!storage)
@@ -49,7 +49,7 @@ static void prepare_wait(const struct thread_wait_object *objects, size_t count,
                                    * wait blocks, we'll take 0 for now */
 
     enum irql irql = spin_lock_high(&t->wait_lock);
-    kassert(!t->active_wait_blocks);
+    enforce(!t->active_wait_blocks);
     t->active_wait_blocks = storage;
     t->wait_block_count = count;
     t->wait_key = THREAD_WAIT_KEY_NONE;
@@ -59,7 +59,7 @@ static void prepare_wait(const struct thread_wait_object *objects, size_t count,
     t->wait_state = state;
 
     enum irql tirql = spin_lock_high(&t->lock);
-    kassert(!t->object_wait);
+    enforce(!t->object_wait);
     t->object_wait = true;
     atomic_store_rlx(&t->wait_type, type);
     thread_clear_flag(t, THREAD_FLAG_YIELDED);
@@ -82,7 +82,7 @@ static void prepare_wait(const struct thread_wait_object *objects, size_t count,
 
     for (size_t i = 0; i < count; i++) {
         struct thread_wait_block *b = &storage[i];
-        kassert(objects[i].header);
+        enforce(objects[i].header);
         *b = (struct thread_wait_block){.thread = t,
                                         .object = objects[i].object,
                                         .key = i,
@@ -201,7 +201,7 @@ struct thread *thread_wait_header_satisfy(struct thread_wait_header *header,
         uint64_t epoch = b->epoch;
         uint16_t key = b->key;
 
-        kassert(thread_get(t));
+        enforce(thread_get(t));
         spin_unlock(&header->lock, irql);
 
         irql = spin_lock_high(&t->wait_lock);
@@ -240,7 +240,7 @@ struct thread_wait_result thread_wait_complete(void) {
 
     while (true) {
         enum irql irql = spin_lock_high(&t->wait_lock);
-        kassert(t->active_wait_blocks);
+        enforce(t->active_wait_blocks);
 
         if (t->wait_done) {
             struct thread_wait_result result = {.status = t->wait_status,
@@ -279,7 +279,7 @@ struct thread_wait_result thread_wait_complete(void) {
 void thread_wait_cancel(void) {
     struct thread *t = thread_get_current();
     enum irql irql = spin_lock_high(&t->wait_lock);
-    kassert(t->active_wait_blocks);
+    enforce(t->active_wait_blocks);
     unlink_blocks(t, THREAD_WAIT_KEY_NONE);
     finish_locked(t);
     spin_unlock(&t->wait_lock, irql);
@@ -304,7 +304,7 @@ static void deliver_alert_locked(struct thread *t) {
 }
 
 void thread_alert(struct thread *t) {
-    kassert(t);
+    enforce(t);
     enum irql irql = spin_lock_high(&t->wait_lock);
 
     if (!thread_test_flag(t, THREAD_FLAG_DYING)) {

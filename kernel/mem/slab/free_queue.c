@@ -60,7 +60,7 @@ static void slab_free_queue_free(struct slab_domain *d, void *ptr,
 size_t slab_free_queue_drain(struct slab_percpu_cache *cache,
                              struct slab_free_queue *queue, size_t target,
                              enum alloc_behavior bh) {
-    kassert(cache == slab_percpu_cache_local());
+    enforce(cache == slab_percpu_cache_local());
     size_t drained_to_magazine = 0; /* Return value */
     size_t addrs_dequeued = 0;      /* Used to check against `target` */
 

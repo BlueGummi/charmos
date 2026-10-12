@@ -17,8 +17,8 @@ static struct err_facility *facility_for(uint16_t pref) {
 const char *err_facility_to_str(enum err e) {
     uint16_t pref = ERR_GET_FACILITY(e);
     uint16_t del = ERR_GET_DELTA(e);
-    kassert(pref && del);
-    struct err_facility *this = kassert(facility_for(pref));
+    enforce(pref && del);
+    struct err_facility *this = enforce(facility_for(pref));
     if (this->to_str)
         return this->to_str(del);
 
@@ -26,7 +26,7 @@ const char *err_facility_to_str(enum err e) {
 }
 
 void err_facilities_init() {
-    kassert(__ekernel_err_facilities - __skernel_err_facilities <= UINT16_MAX,
+    enforce(__ekernel_err_facilities - __skernel_err_facilities <= UINT16_MAX,
             "too many?");
 
     /* Simple: 1 + index in array, keeps it sorted, avoids 0 */

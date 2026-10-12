@@ -2,7 +2,7 @@
 #pragma once
 #include <compiler/core.h>
 #include <compiler/intrinsic.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -18,7 +18,7 @@
 
 #define _ALIGN_CAPTURE(x, align)                                               \
     _ALIGN_CAPTURE_UNCHECKED(x, align);                                        \
-    (void) kassert(__aln_align > 0 && (__aln_align & (__aln_align - 1)) == 0)
+    (void) enforce(__aln_align > 0 && (__aln_align & (__aln_align - 1)) == 0)
 
 #define IS_POW2(x)                                                             \
     ({                                                                         \
@@ -50,7 +50,7 @@
 #define ALIGN_UP(x, align)                                                     \
     ({                                                                         \
         _ALIGN_UP_CAPTURE(x, align);                                           \
-        (void) kassert(__aln_align > 0 &&                                      \
+        (void) enforce(__aln_align > 0 &&                                      \
                        (__aln_align & (__aln_align - 1)) == 0 &&               \
                        !__aln_overflow);                                       \
         (typeof(__aln_x)) (__aln_sum & ~__aln_mask);                           \
@@ -78,6 +78,6 @@
         ct_typecheck_unsigned_as(__div_n, n);                                  \
         ct_typecheck_widenable_to(__div_n, d);                                 \
         typeof(__div_n) __div_d = (typeof(__div_n)) __div_src_d;               \
-        (void) kassert(__div_d > 0);                                           \
+        (void) enforce(__div_d > 0);                                           \
         (typeof(__div_n)) (__div_n / __div_d + (__div_n % __div_d != 0));      \
     })

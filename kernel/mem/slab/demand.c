@@ -37,7 +37,7 @@ static bool slab_pf_update(vaddr_t vaddr, struct page *p) {
 }
 
 static paddr_t slab_pf_alloc_pages(vaddr_t vaddr, uint8_t order) {
-    kassert(order == 0);
+    enforce(order == 0);
     struct slab *s = slab_for_ptr((void *) vaddr);
     return domain_alloc_from_domain(s->parent_cache->parent_domain->domain, 1);
 }

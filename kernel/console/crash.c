@@ -671,7 +671,7 @@ static void crash_emit_ndjson_records(const struct crash_context *ctx,
 static const char *crash_source_title(enum crash_source s) {
     switch (s) {
     case CRASH_SOURCE_PANIC: return "kernel panic";
-    case CRASH_SOURCE_ASSERT: return "assertion failure";
+    case CRASH_SOURCE_ENFORCE: return "enforcement failure";
     case CRASH_SOURCE_KASAN: return "kasan fault";
     case CRASH_SOURCE_UBSAN: return "ubsan violation";
     case CRASH_SOURCE_NMI_WATCHDOG: return "watchdog lockup";
@@ -685,7 +685,7 @@ static const char *crash_source_title(enum crash_source s) {
 static const char *crash_source_name(enum crash_source s) {
     switch (s) {
     case CRASH_SOURCE_PANIC: return "PANIC";
-    case CRASH_SOURCE_ASSERT: return "ASSERTION FAILED";
+    case CRASH_SOURCE_ENFORCE: return "ENFORCEMENT FAILED";
     case CRASH_SOURCE_KASAN: return "KASAN";
     case CRASH_SOURCE_UBSAN: return "UBSAN";
     case CRASH_SOURCE_NMI_WATCHDOG: return "WATCHDOG";
@@ -911,8 +911,8 @@ static struct crash_facility *crash_facility_for(enum crash_code code) {
 const char *crash_code_from_facility_to_str(enum crash_code code) {
     uint16_t pref = CRASH_CODE_GET_FACILITY(code);
     uint16_t del = CRASH_CODE_GET_DELTA(code);
-    kassert(pref && del);
-    struct crash_facility *this = kassert(facility_for(pref));
+    enforce(pref && del);
+    struct crash_facility *this = enforce(facility_for(pref));
     if (this->to_str)
         return this->to_str(del);
 
@@ -920,7 +920,7 @@ const char *crash_code_from_facility_to_str(enum crash_code code) {
 }
 
 void crash_facilities_init(void) {
-    kassert(__ekernel_crash_facilities - __skernel_crash_facilities <=
+    enforce(__ekernel_crash_facilities - __skernel_crash_facilities <=
                 UINT16_MAX,
             "too many?");
 
@@ -948,7 +948,7 @@ unwind_node_alloc(struct thread *t, enum crash_unwind_type type) {
 
     struct crash_unwind_node *node =
         container_of(n, struct crash_unwind_node, list);
-    kassert(node->type == CRASH_UNWIND_NONE);
+    enforce(node->type == CRASH_UNWIND_NONE);
     node->type = type;
     return node;
 }
@@ -965,7 +965,7 @@ static void unwind_node_free(struct thread *t, struct crash_unwind_node *n) {
 static void crash_unwind_node_add(struct crash_unwind_node_data *data,
                                   enum crash_unwind_type type) {
     struct thread *t = thread_get_current();
-    kassert(!t->crash_data.unwinding);
+    enforce(!t->crash_data.unwinding);
     if (type == CRASH_UNWIND_RCU) {
         struct crash_unwind_node *n;
         list_for_each_entry_rev(n, &t->crash_data.unwind.in_use, list) {
@@ -989,7 +989,7 @@ static void crash_unwind_node_add(struct crash_unwind_node_data *data,
 static void crash_unwind_node_remove(struct crash_unwind_node_data *data,
                                      enum crash_unwind_type type) {
     struct thread *t = thread_get_current();
-    kassert(!t->crash_data.unwinding);
+    enforce(!t->crash_data.unwinding);
     bool found = false;
 
     if (type == CRASH_UNWIND_RCU) {
@@ -1021,7 +1021,7 @@ static void crash_unwind_node_remove(struct crash_unwind_node_data *data,
     }
 
 out:
-    kassert(found, "Likely double remove");
+    enforce(found, "Likely double remove");
 }
 
 static void unwind_rcu(struct crash_unwind_node_data *d) TSA_NO_ANALYSIS {
@@ -1074,7 +1074,7 @@ void crash_unwind(void) TSA_NO_ANALYSIS {
     struct crash_unwind_perthread *upt = &pt->unwind;
     struct crash_unwind_node *cun, *tmp;
     list_for_each_entry_safe_rev(cun, tmp, &upt->in_use, list) {
-        kassert(cun->type != CRASH_UNWIND_NONE);
+        enforce(cun->type != CRASH_UNWIND_NONE);
         thread_warn("unwinding %s (%p)", crash_unwind_type_to_str(cun->type),
                     cun->data.ptr);
         unwind_cbs[cun->type](&cun->data);

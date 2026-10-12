@@ -103,7 +103,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
 
     uint64_t supported_sqs    = total_sq;
     uint64_t sqs_to_make_wide = MIN(core_count, supported_sqs);
-    kassert(sqs_to_make_wide <= UINT32_MAX);
+    enforce(sqs_to_make_wide <= UINT32_MAX);
     uint32_t sqs_to_make = (uint32_t) sqs_to_make_wide;
 
     nvme->max_transfer_size = BIT(c->mdts) * PAGE_SIZE;

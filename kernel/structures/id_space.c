@@ -1,4 +1,4 @@
-#include <kassert.h>
+#include <enforce.h>
 #include <mem/alloc.h>
 #include <string.h>
 #include <structures/id_space.h>

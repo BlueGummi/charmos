@@ -1,6 +1,6 @@
 #include <console/panic.h>
+#include <enforce.h>
 #include <global.h>
-#include <kassert.h>
 #include <log.h>
 #include <mem/alloc.h>
 #include <mem/nofail.h>
@@ -69,7 +69,7 @@ static void map_cpus_to_groups(void) {
                     break;
                 }
             }
-            kassert(found != -1);
+            enforce(found != -1);
             c->group_index[i] = found;
         }
     }
@@ -169,13 +169,13 @@ void scheduler_domain_mark_self_idle(bool idle) {
     for (size_t lvl = 0; lvl < TOPOLOGY_LEVEL_MAX; lvl++) {
         struct scheduler_domain *d = c->domains[lvl];
         size_t g = c->group_index[lvl];
-        kassert(c->group_index[lvl] >= 0);
-        kassert((size_t) c->group_index[lvl] < d->ngroups);
+        enforce(c->group_index[lvl] >= 0);
+        enforce((size_t) c->group_index[lvl] < d->ngroups);
 
         struct scheduler_group *grp = &d->groups[g];
 
-        kassert(cpu < global.core_count);
-        kassert(cpu_mask_test(&grp->cpus, cpu));
+        enforce(cpu < global.core_count);
+        enforce(cpu_mask_test(&grp->cpus, cpu));
 
         if (idle)
             cpu_mask_set_atomic(&grp->idle, cpu);

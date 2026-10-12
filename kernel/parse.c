@@ -1,4 +1,4 @@
-#include <kassert.h>
+#include <enforce.h>
 #include <math/fixed.h>
 #include <math/units.h>
 #include <mem/alloc.h>

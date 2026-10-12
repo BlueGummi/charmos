@@ -288,7 +288,7 @@ static bool nightmare_spawn_threads(void) {
             .arg = worker, .joinable = true);
         if (!thread)
             goto fail;
-        kassert(thread_get(thread));
+        enforce(thread_get(thread));
         atomic_store_release(&worker->th, thread);
         created++;
     }
@@ -298,7 +298,7 @@ static bool nightmare_spawn_threads(void) {
         "nightmare_heartbeat", nightmare_heartbeat_main, .joinable = true);
     if (!heartbeat)
         goto fail;
-    kassert(thread_get(heartbeat));
+    enforce(thread_get(heartbeat));
     atomic_store_release(&nightmare_runtime.conc.aux, heartbeat);
     return true;
 

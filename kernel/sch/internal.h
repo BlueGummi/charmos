@@ -1,6 +1,6 @@
 #include <compiler/core.h>
 #include <compiler/intrinsic.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <math/bit.h>
 #include <math/min_max.h>
 #include <sch/sched.h>
@@ -101,7 +101,7 @@ static inline void dequeue_from_tree(struct scheduler *sched,
 
 /* The `thread_rbt` should be NULL here */
 static inline void swap_queues(struct scheduler *sched) {
-    kassert(sched->thread_rbt.root == NULL);
+    enforce(sched->thread_rbt.root == NULL);
     sched->thread_rbt.root = sched->completed_rbt.root;
     sched->completed_rbt.root = NULL;
 }
@@ -180,7 +180,7 @@ static inline void
 scheduler_acquire_two_locks(struct scheduler *a, struct scheduler *b,
                             enum irql *a_irql_out,
                             enum irql *b_irql_out) TSA_NO_ANALYSIS {
-    kassert(a != b);
+    enforce(a != b);
     if (a < b) {
         *a_irql_out = spin_lock_high(&a->lock);
         *b_irql_out = spin_lock_high(&b->lock);
@@ -211,7 +211,7 @@ scheduler_release_two_locks(struct scheduler *a, struct scheduler *b,
 static inline void
 scheduler_acquire_two_raw_locks(struct scheduler *a,
                                 struct scheduler *b) TSA_NO_ANALYSIS {
-    kassert(a != b);
+    enforce(a != b);
     if (a < b) {
         spin_lock_raw(&a->lock);
         spin_lock_raw(&b->lock);
@@ -224,7 +224,7 @@ scheduler_acquire_two_raw_locks(struct scheduler *a,
 static inline void
 scheduler_release_two_raw_locks(struct scheduler *a,
                                 struct scheduler *b) TSA_NO_ANALYSIS {
-    kassert(a != b);
+    enforce(a != b);
     if (a > b) {
         spin_unlock_raw(&a->lock);
         spin_unlock_raw(&b->lock);

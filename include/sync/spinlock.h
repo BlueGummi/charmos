@@ -4,8 +4,8 @@
 #include <bootstage.h>
 #include <compiler/core.h>
 #include <console/panic.h>
+#include <enforce.h>
 #include <irq/irq.h>
-#include <kassert.h>
 #include <sch/irql.h>
 #include <smp/core.h>
 #include <stdbool.h>
@@ -61,7 +61,7 @@ static inline void spinlock_init_chk_full(struct spinlock *lock,
 
 static inline void spinlock_policy_init_internal(struct spinlock *lock,
                                                  enum lock_chk_flags flags) {
-    kassert((flags & ~LOCK_CHKD_FULL) == 0);
+    enforce((flags & ~LOCK_CHKD_FULL) == 0);
     lock->chk.flags = flags;
     lock->chk.initialized = true;
     atomic_store_rlx(&lock->chk.used, false);
@@ -73,7 +73,7 @@ static inline void
 spinlock_map_init_internal(struct spinlock *lock,
                            const struct lock_chk_class *class,
                            enum lock_chk_flags flags) {
-    kassert(flags == LOCK_UNCHKD || class != NULL);
+    enforce(flags == LOCK_UNCHKD || class != NULL);
     lock_chk_map_runtime_init(&lock->chk.map, class);
 }
 
@@ -196,14 +196,14 @@ static inline bool spinlock_assert_held_deep(struct spinlock *lock,
 }
 
 static inline void spinlock_assert_initialized(struct spinlock *lock) {
-    kassert(lock->chk.initialized);
+    enforce(lock->chk.initialized);
 }
 
 static inline void spinlock_policy_set_internal(struct spinlock *lock,
                                                 enum lock_chk_flags flags) {
-    kassert(lock->chk.initialized);
-    kassert(!atomic_load_rlx(&lock->chk.used));
-    kassert((flags & ~LOCK_CHKD_FULL) == 0);
+    enforce(lock->chk.initialized);
+    enforce(!atomic_load_rlx(&lock->chk.used));
+    enforce((flags & ~LOCK_CHKD_FULL) == 0);
     lock->chk.flags = flags;
 }
 
@@ -421,7 +421,7 @@ static inline cc_warn_unused_result enum irql
 spin_lock_subclass_full(struct spinlock *lock, uint8_t subclass,
                         const struct lock_chk_site *site)
     TSA_ACQUIRES_SPIN(lock) TSA_NO_ANALYSIS {
-    kassert(subclass < LOCK_CHK_MAX_SUBCLASSES);
+    enforce(subclass < LOCK_CHK_MAX_SUBCLASSES);
     if (bootstage_get() >= BOOTSTAGE_MID_MP &&
         (irq_in_interrupt() || irq_in_nmi()))
         panic("Attempted to take non-ISR safe spinlock outside thread context");
@@ -571,18 +571,18 @@ static inline bool spinlock_locked(struct spinlock *lock) {
 
 /* A raw check to make sure it is locked, but could be by anyone */
 #define SPINLOCK_ASSERT_LOCKED(l)                                              \
-    kassert(spinlock_locked(l), "spinlock not locked")
+    enforce(spinlock_locked(l), "spinlock not locked")
 
 static inline void spinlock_set_chk_flags(struct spinlock *lock,
                                           enum lock_chk_flags flags) {
-    kassert(!spinlock_locked(lock));
+    enforce(!spinlock_locked(lock));
     spinlock_policy_set_internal(lock, flags);
 }
 
 static inline void spinlock_reinit_chk(struct spinlock *lock,
                                        const struct lock_chk_class *class,
                                        enum lock_chk_flags flags) {
-    kassert(!spinlock_locked(lock));
+    enforce(!spinlock_locked(lock));
     spinlock_assert_initialized(lock);
     spinlock_init_chk_full(lock, class, flags);
 }
@@ -604,7 +604,7 @@ spinlock_assert_not_held_full(struct spinlock *lock,
 
     /* Cannot check here */
     if (bootstage_get() < BOOTSTAGE_EARLY_DEVICES)
-        kassert(!spinlock_locked(lock), "spinlock unexpectedly locked");
+        enforce(!spinlock_locked(lock), "spinlock unexpectedly locked");
 }
 
 #define SPINLOCK_ASSERT_HELD(l)                                                \

@@ -61,7 +61,7 @@ void pertopo_obj_init(void) {
 size_t pertopo_node_local(struct pertopo_descriptor *desc,
                           enum topology_caller c) {
     enum topology_level l = desc->level;
-    kassert(topology_contract_verify(
+    enforce(topology_contract_verify(
         (struct topology_contract){.caller = c, .scope = l}));
 
     struct core *self = smp_core_raw();

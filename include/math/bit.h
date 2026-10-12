@@ -3,7 +3,7 @@
 #include <compiler/core.h>
 #include <compiler/intrinsic.h>
 #include <compiler/wrapper.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <math/bit_api_internal.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -23,7 +23,7 @@
     __auto_type __bit_n = (n);                                                 \
     ct_typecheck_integer_as(__bit_v, val);                                     \
     ct_typecheck_integer_as(__bit_n, n);                                       \
-    (void) kassert(__bit_index_ok(__bit_n, sizeof(__bit_v) * __CHAR_BIT__))
+    (void) enforce(__bit_index_ok(__bit_n, sizeof(__bit_v) * __CHAR_BIT__))
 
 #define BIT_SET(val, n)                                                        \
     ({                                                                         \
@@ -57,7 +57,7 @@
         __auto_type __msk_hi = (hi);                                           \
         ct_typecheck_integer_as(__msk_lo, lo);                                 \
         ct_typecheck_integer_as(__msk_hi, hi);                                 \
-        (void) kassert(__bit_index_ok(__msk_hi, 64) &&                         \
+        (void) enforce(__bit_index_ok(__msk_hi, 64) &&                         \
                        (__UINTMAX_TYPE__) (__INTMAX_TYPE__) __msk_lo <=        \
                            (__UINTMAX_TYPE__) (__INTMAX_TYPE__) __msk_hi);     \
         uint32_t __msk_l = (uint32_t) __msk_lo;                                \
@@ -71,7 +71,7 @@
         uint32_t __fld_l = (uint32_t) (lo);                                    \
         uint32_t __fld_h = (uint32_t) (hi);                                    \
         ct_typecheck_integer_as(__fld_v, val);                                 \
-        (void) kassert(__fld_l <= __fld_h &&                                   \
+        (void) enforce(__fld_l <= __fld_h &&                                   \
                        __fld_h < (sizeof(__fld_v) * __CHAR_BIT__));            \
         (typeof(__fld_v)) (((uint64_t) __fld_v >> __fld_l) &                   \
                            (~UINT64_C(0) >> (63u - (__fld_h - __fld_l))));     \
@@ -84,7 +84,7 @@
         uint32_t __fld_l = (uint32_t) (lo);                                    \
         uint32_t __fld_h = (uint32_t) (hi);                                    \
         ct_typecheck_integer_as(__fld_v, val);                                 \
-        (void) kassert(__fld_l <= __fld_h &&                                   \
+        (void) enforce(__fld_l <= __fld_h &&                                   \
                        __fld_h < (sizeof(__fld_v) * __CHAR_BIT__));            \
         uint64_t __fld_mask = (~UINT64_C(0) >> (63u - (__fld_h - __fld_l)))    \
                               << __fld_l;                                      \
@@ -121,7 +121,7 @@
     ({                                                                         \
         uint32_t __w_l = (uint32_t) (lo);                                      \
         uint32_t __w_h = (uint32_t) (hi);                                      \
-        (void) kassert(__w_l <= __w_h);                                        \
+        (void) enforce(__w_l <= __w_h);                                        \
         ((__w_h - __w_l) + 1u);                                                \
     })
 

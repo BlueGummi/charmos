@@ -118,7 +118,7 @@ struct test_group {
  * msg_hint fuzzy matches against the message, if any, and
  * stmt_hint fuzzy matches against the statement, if any, e.g.
  *
- * kassert(my_var) would have the 'stmt' of my_var
+ * enforce(my_var) would have the 'stmt' of my_var
  */
 struct test_death {
     enum crash_code expect;

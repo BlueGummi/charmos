@@ -32,7 +32,7 @@ TEST_DEFINE_INTEGRATION(daemon, timesharing_worker) {
     struct daemon *daemon =
         daemon_create("daemon_test", &attrs, &dwork, NULL, NULL);
 
-    kassert(daemon);
+    enforce(daemon);
 
     daemon_wake_timesharing_worker(daemon);
     while (!atomic_load(&daemon_work_run))

@@ -1,7 +1,7 @@
 #include <console/panic.h>
 #include <console/printf.h>
+#include <enforce.h>
 #include <global.h>
-#include <kassert.h>
 #include <math/sort.h>
 #include <mem/alloc.h>
 #include <mem/numa.h>

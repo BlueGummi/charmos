@@ -83,7 +83,7 @@ struct rt_scheduler_mapping *rt_lookup_mapping(struct rt_scheduler_static *rts,
         container_of(found, struct rt_scheduler_mapping, tree_node);
 
     /* Must be set */
-    kassert(cpu_mask_test(&mapping->members, c->id));
+    enforce(cpu_mask_test(&mapping->members, c->id));
 
     return mapping;
 }
@@ -93,7 +93,7 @@ enum rt_scheduler_error rt_build_mapping(struct rt_scheduler_static *rts) {
     struct rt_scheduler_ops *ops = &rts->ops;
     struct core *iter;
 
-    kassert(rts->mappings_internal.root == NULL);
+    enforce(rts->mappings_internal.root == NULL);
 
     /* Let's go through every CPU on the system and then make a node
      * for all of them, or add them to an existing node's bitmap */
@@ -128,13 +128,13 @@ static void reset_summary(struct rt_thread_summary *sum) {
 static void reset_shed_request(struct rt_thread_shed_request *rtsr) {
     rtsr->urgency = FX(0.0);
     rtsr->threads_available = 0;
-    kassert(list_empty(&rtsr->threads));
+    enforce(list_empty(&rtsr->threads));
     INIT_LIST_HEAD(&rtsr->threads);
     rtsr->on = false;
 }
 
 static void reset_scheduler(struct rt_scheduler *rts) {
-    kassert(rts->thread_count == 0);
+    enforce(rts->thread_count == 0);
     rts->mapping_source = NULL;
     reset_summary(&rts->summary);
     reset_shed_request(&rts->shed_request);
@@ -205,7 +205,7 @@ static void rt_scheduler_destroy_internal(struct rt_scheduler_static *rts) {
     /* Assert that the refs are gone, lock, unload, teardown */
     enum irql outer = spin_lock(&rt_global.static_list.lock);
     enum irql irql = spin_lock(&rts->state_change_lock);
-    kassert(refcount_read(&rts->refcount) == 0);
+    enforce(refcount_read(&rts->refcount) == 0);
     rt_scheduler_static_set_state(rts, RT_SCHEDULER_STATIC_UNLOADED);
 
     rts->ops.on_unload(rts);
@@ -242,7 +242,7 @@ static inline bool needs_migrate(struct rt_scheduler_static *rts,
 
 static ssize_t find_migration_target(struct thread *t) {
     size_t iter;
-    kassert(cpu_mask_popcount(&t->allowed_cpus));
+    enforce(cpu_mask_popcount(&t->allowed_cpus));
     cpu_mask_for_each(iter, t->allowed_cpus) {
         struct rt_scheduler_percpu *pcpu = global.schedulers[iter]->rt;
         struct rt_scheduler_static *rts = pcpu->active_mapping->static_bptr;
@@ -267,7 +267,7 @@ static void send_to_compatible_cpu(struct thread *t) {
      * stuff.
      *
      * THIS IS TEMPORARY */
-    kassert(is_compatible(next->mapping_source->static_bptr, t));
+    enforce(is_compatible(next->mapping_source->static_bptr, t));
     next->mapping_source->static_bptr->ops.add_thread(next, t);
 
     spin_unlock(&next->lock, irql);
@@ -297,7 +297,7 @@ static bool try_migrate_all_before_switch(struct rt_scheduler *rts,
     if (list_empty(thread_list)) {
         /* TODO: Find a better way to wrap around assertions made
          * after a RT scheduler op so we don't crash the kernel */
-        kassert(old == 0);
+        enforce(old == 0);
         return true; /* No threads, no one can be unhoused! */
     }
 
@@ -351,8 +351,8 @@ static void re_enqueue_threads(struct rt_scheduler *rts,
 
 static void setup_new_rt_scheduler(struct rt_scheduler *rts,
                                    struct rt_scheduler_mapping *rtm) {
-    kassert(rts->thread_count == 0);
-    kassert(!rts->failed_internal);
+    enforce(rts->thread_count == 0);
+    enforce(!rts->failed_internal);
     rts->mapping_source = rtm;
     log(rts->log_site, &rts->log_handle, LOG_TRACE, "rts %p setting up by %zu",
         rts, smp_id(TOPC_IRQL));
@@ -385,7 +385,7 @@ static struct rt_scheduler *get_new_rt_scheduler(domain_id_t domain) {
     }
 
 out:
-    kassert(got);
+    enforce(got);
     return container_of(got, struct rt_scheduler, list);
 }
 
@@ -460,7 +460,7 @@ void rt_scheduler_switch() {
      * a safe place to get migrated to. If they DO NOT, then
      * we FAIL the migration with IMPOSSIBLE
      */
-    kassert(cpu_mask_test(&curr->active, smp_id(TOPC_IRQL)));
+    enforce(cpu_mask_test(&curr->active, smp_id(TOPC_IRQL)));
     bool only_cpu = cpu_mask_popcount(&curr->active) == 1;
 
     bool can_switch = true;
@@ -489,7 +489,7 @@ void rt_scheduler_switch() {
      *
      */
 
-    kassert(check_active(curr));
+    enforce(check_active(curr));
     unmark_active(curr);
     if (only_cpu)
         reset_scheduler(curr->rts);
@@ -526,7 +526,7 @@ void rt_scheduler_switch() {
          * not have taken anything from our rt_scheduler. need_new
          * requires us to NOT be the only CPU, so we do not drain
          * the runqueue of our mapping here */
-        kassert(list_empty(&thread_list));
+        enforce(list_empty(&thread_list));
         setup_new_rt_scheduler(next_rts, next);
     } else {
         re_enqueue_threads(next_rts, &thread_list);
@@ -550,7 +550,7 @@ rt_scheduler_switch_cpu(size_t cpu, struct rt_scheduler_static *into) {
     struct rt_scheduler_percpu *pcpu = global.schedulers[cpu]->rt;
     semaphore_wait(&pcpu->switch_semaphore);
 
-    kassert(!atomic_exchange(&pcpu->switch_into, into));
+    enforce(!atomic_exchange(&pcpu->switch_into, into));
     scheduler_force_resched(global.schedulers[cpu]);
 
     /* It will signal us now */

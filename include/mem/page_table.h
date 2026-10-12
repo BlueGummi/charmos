@@ -83,8 +83,8 @@ struct pte_tagged {
 };
 
 static inline void pte_tagged_check(struct pte_tagged *pt) {
-    kassert(pt->type != PTE_TAG_TYPE_NONE);
-    kassert((pt->payload >> PTE_TAGGED_PAYLOAD_BITS) == 0);
+    enforce(pt->type != PTE_TAG_TYPE_NONE);
+    enforce((pt->payload >> PTE_TAGGED_PAYLOAD_BITS) == 0);
 }
 
 static inline uint64_t pte_tagged_pack(struct pte_tagged *pt) {
@@ -123,7 +123,7 @@ static inline uint64_t pte_or(pte_atomic_t *pte, uint64_t val) {
 }
 
 static inline void pte_unlock_internal(pte_atomic_t *pte) {
-    kassert(atomic_fetch_and_release(pte, ~PTE_LOCK_BIT) & PTE_LOCK_BIT);
+    enforce(atomic_fetch_and_release(pte, ~PTE_LOCK_BIT) & PTE_LOCK_BIT);
 }
 
 /* TODO: use bit_spinlock.h */
@@ -156,21 +156,21 @@ static inline void pte_unlock_irql(pte_atomic_t *pte,
 }
 
 static inline bool pte_has_tag(pte_atomic_t *pte) {
-    kassert(!(pte_read(pte) & PAGE_PRESENT));
+    enforce(!(pte_read(pte) & PAGE_PRESENT));
     return (pte_read(pte) & ~(PAGE_PRESENT | PTE_LOCK_BIT | PTE_AVAIL2_BIT)) !=
            0;
 }
 
 static inline uint64_t pte_tag_pte(pte_atomic_t *pte, struct pte_tagged *ptag) {
-    kassert(pte_locked(pte));
-    kassert(!pte_has_tag(pte));
+    enforce(pte_locked(pte));
+    enforce(!pte_has_tag(pte));
     pte_tagged_check(ptag);
     uint64_t packed = pte_tagged_pack(ptag);
     return pte_or(pte, packed);
 }
 
 static inline struct pte_tagged pte_read_tag(pte_atomic_t *pte) {
-    kassert(pte_has_tag(pte));
+    enforce(pte_has_tag(pte));
     return pte_tagged_unpack(pte_read(pte));
 }
 

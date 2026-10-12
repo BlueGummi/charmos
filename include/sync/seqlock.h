@@ -3,7 +3,7 @@
 #include <atomic.h>
 #include <compiler/atomic.h>
 #include <compiler/core.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <sch/irql.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -242,7 +242,7 @@ static inline bool seqlock_held(const struct seqlock *sl) {
     return spinlock_locked((struct spinlock *) &sl->lock);
 }
 
-#define SEQLOCK_ASSERT_HELD(sl) kassert(seqlock_held(sl))
+#define SEQLOCK_ASSERT_HELD(sl) enforce(seqlock_held(sl))
 
 static inline cc_always_inline
 cc_maybe_unused void seqcount_write_guard_exit(struct seqcount **s) {

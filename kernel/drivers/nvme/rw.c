@@ -63,12 +63,12 @@ static bool nvme_bio_fill_prps(struct nvme_bio_data *data, const void *buffer,
 
 static bool nvme_setup_prps(struct nvme_command  *cmd,
                             struct nvme_bio_data *data) {
-    kassert(data->prp_count > 0);
+    enforce(data->prp_count > 0);
 
     cmd->prp1 = data->prps[0];
     nvme_check_dma_addr(cmd->prp1, "prp1");
 
-    kassert(IS_ALIGNED(cmd->prp1, 4)); /* dword aligned */
+    enforce(IS_ALIGNED(cmd->prp1, 4)); /* dword aligned */
     if (data->prp_count == 1) {
         cmd->prp2 = 0;
         goto free_prps;
@@ -82,7 +82,7 @@ static bool nvme_setup_prps(struct nvme_command  *cmd,
      * we need to provide another page for the list,
      * with max_transfer_size always preventing too many */
     uint64_t entries = data->prp_count - 1;
-    kassert(entries <= NVME_PRPS_PER_PAGE);
+    enforce(entries <= NVME_PRPS_PER_PAGE);
 
     paddr_t list_phys = pmm_alloc_page();
     if (!list_phys)
@@ -208,7 +208,7 @@ static bool rw_wrapper(struct block_device *disk, uint64_t lba, uint8_t *buf,
                        uint64_t cnt, sync_fn function) {
     struct nvme_device *nvme = (struct nvme_device *) disk->driver_data;
     uint64_t max_sectors     = nvme->max_transfer_size / disk->sector_size;
-    kassert(max_sectors > 0 && max_sectors <= UINT16_MAX);
+    enforce(max_sectors > 0 && max_sectors <= UINT16_MAX);
     struct io_wait_token iowt = IO_WAIT_TOKEN_EMPTY;
 
     while (cnt > 0) {

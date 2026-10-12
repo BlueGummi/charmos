@@ -78,7 +78,7 @@ static inline void async_prepare(
     if (type == ASYNC_COMPLETION_APC) {
         apc_init(&ac->apc, async_apc_callback_internal, ac, NULL);
         ac->thread = thread_get_current();
-        kassert(thread_get(ac->thread));
+        enforce(thread_get(ac->thread));
     }
 
     ac->callback = cb;

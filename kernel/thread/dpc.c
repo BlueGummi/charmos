@@ -1,5 +1,5 @@
 #include <atomic.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <mem/alloc.h>
 #include <sch/sched.h>
 #include <smp/core.h>
@@ -49,7 +49,7 @@ void dpc_drain_local(void) {
     if (atomic_exchange(&me->executing_dpcs, true))
         return;
 
-    kassert(irql_get() == IRQL_DISPATCH_LEVEL);
+    enforce(irql_get() == IRQL_DISPATCH_LEVEL);
 
     size_t cpu = me->id;
     struct dpc_cpu *dc = &global.dpc_data[cpu];
@@ -87,7 +87,7 @@ static void dpc_queue_enqueue(struct dpc_queue *dq, struct dpc *d) {
 }
 
 bool dpc_enqueue_on_cpu(size_t cpu, struct dpc *d) {
-    kassert(d);
+    enforce(d);
 
     if (atomic_xchg_acq_rel(&d->enqueued, true))
         return false;
@@ -145,8 +145,8 @@ static void dpc_fanout_wrapper(void *fn, void *latch) {
 }
 
 void dpc_fanout(struct dpc *storage, struct cpu_mask cpus, dpc_fanout_fn_t fn) {
-    kassert(storage);
-    kassert(fn);
+    enforce(storage);
+    enforce(fn);
 
     size_t count = cpu_mask_popcount(&cpus);
     if (!count)
@@ -163,6 +163,6 @@ void dpc_fanout(struct dpc *storage, struct cpu_mask cpus, dpc_fanout_fn_t fn) {
         slot++;
     }
 
-    kassert(slot == count);
+    enforce(slot == count);
     once_latch_spin_wait(&latch);
 }

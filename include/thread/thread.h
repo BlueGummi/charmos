@@ -519,7 +519,7 @@ static inline void scheduler_yield_nesting_enter(struct thread *t) {
     if (t->yield_nesting > t->yield_nesting_max)
         t->yield_nesting_max = t->yield_nesting;
 #ifdef DEBUG_SCHED_NESTING
-    kassert(t->yield_nesting <= SCHED_MAX_YIELD_NESTING,
+    enforce(t->yield_nesting <= SCHED_MAX_YIELD_NESTING,
             "scheduler_yield nested %u deep on thread '%s'", t->yield_nesting,
             t->name);
 #endif
@@ -534,7 +534,7 @@ static inline void scheduler_yield_nesting_exit(struct thread *t) {
         return;
 
 #ifdef DEBUG_SCHED_NESTING
-    kassert(t->yield_nesting > 0,
+    enforce(t->yield_nesting > 0,
             "scheduler_yield nesting underflow on thread '%s'", t->name);
 #endif
 

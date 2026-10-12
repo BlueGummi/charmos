@@ -26,7 +26,7 @@ struct scheduler *scheduler_select_best_for_thread(struct thread *t) {
         }
     }
 
-    return kassert(
+    return enforce(
         sched, "No scheduler was found, likely due to allowed_cpus being 0");
 }
 
@@ -46,7 +46,7 @@ static void resume_thread(struct thread *t, enum thread_resume_reason reason,
 
     enum thread_state state = thread_get_state(t);
     if (completion) {
-        kassert(t->object_wait);
+        enforce(t->object_wait);
     } else if (!t->object_wait ||
                thread_get_wait_type(t) != THREAD_WAIT_INTERRUPTIBLE) {
 

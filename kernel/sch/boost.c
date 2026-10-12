@@ -22,7 +22,7 @@ static bool scheduler_boost_thread_internal(struct thread *boosted,
      * attach it to `boosted` and apply relevant boosts */
 
     struct climb_handle *h = &from->climb_state.handle;
-    kassert(!h->given_to || h->given_to == boosted);
+    enforce(!h->given_to || h->given_to == boosted);
     if (h->given_to == boosted)
         goto ok;
 

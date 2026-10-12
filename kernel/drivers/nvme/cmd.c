@@ -5,8 +5,8 @@
 #include <console/printf.h>
 #include <drivers/mmio.h>
 #include <drivers/nvme.h>
+#include <enforce.h>
 #include <irq/idt.h>
-#include <kassert.h>
 #include <math/bit.h>
 #include <mem/alloc.h>
 #include <mem/pmm.h>

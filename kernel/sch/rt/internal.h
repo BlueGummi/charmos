@@ -99,7 +99,7 @@ REFCOUNT_GENERATE_GET_FOR_STRUCT_WITH_FAILURE_COND(
 
 static inline void rt_scheduler_static_put(struct rt_scheduler_static *rts) {
     if (refcount_dec_and_test(&rts->refcount)) {
-        kassert(rt_scheduler_static_get_state(rts) ==
+        enforce(rt_scheduler_static_get_state(rts) ==
                 RT_SCHEDULER_STATIC_DESTROYING);
         rt_scheduler_static_destroy_work_enqueue(rts);
     }

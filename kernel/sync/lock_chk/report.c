@@ -3,7 +3,7 @@
 #include <atomic.h>
 #include <console/crash.h>
 #include <console/printf.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <ndjson.h>
 #include <nightmare/nightmare.h>
 

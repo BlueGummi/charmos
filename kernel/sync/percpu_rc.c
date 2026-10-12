@@ -1,6 +1,6 @@
+#include <enforce.h>
 #include <err.h>
 #include <global.h>
-#include <kassert.h>
 #include <mem/alloc.h>
 #include <sync/percpu_rc.h>
 #include <sync/rcu.h>
@@ -84,12 +84,12 @@ void percpu_rc_kill(struct percpu_rc *ref) {
 }
 
 void percpu_rc_reinit(struct percpu_rc *rc) {
-    kassert(rc->allow_reinit,
+    enforce(rc->allow_reinit,
             "percpu_rc was not initialized with allow_reinit");
 
     uintptr_t pcpu = atomic_load_rlx(&rc->percpu_count_ptr);
     int64_t *counters = PERCPU_RC_PTR(pcpu);
-    kassert(counters, "percpu_rc counters missing during reinit");
+    enforce(counters, "percpu_rc counters missing during reinit");
 
     atomic_store_rlx(&rc->count, 1 + PERCPU_COUNT_BIAS);
     atomic_store_release(&rc->percpu_count_ptr, (uintptr_t) counters);

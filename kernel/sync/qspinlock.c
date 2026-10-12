@@ -1,5 +1,5 @@
 #include <compiler/core.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <smp/core.h>
 #include <smp/percpu.h>
 #include <sync/qspinlock.h>

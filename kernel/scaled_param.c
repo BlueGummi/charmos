@@ -1,5 +1,5 @@
+#include <enforce.h>
 #include <global.h>
-#include <kassert.h>
 #include <math/fixed.h>
 #include <math/min_max.h>
 #include <math/range.h>
@@ -15,7 +15,7 @@ static size_t geom_interp(size_t a, size_t b, fx32_32_t t) {
     if (a == b)
         return a;
 
-    kassert(a <= INT64_MAX && b <= INT64_MAX);
+    enforce(a <= INT64_MAX && b <= INT64_MAX);
     int64_t lower = (int64_t) a;
     int64_t upper = (int64_t) b;
     fx32_32_t ln_a = fx_ln(fx_from_int(lower));
@@ -35,7 +35,7 @@ static size_t linear_interp(size_t a, size_t b, fx32_32_t t) {
     if (a == b)
         return a;
 
-    kassert(a <= INT64_MAX && b <= INT64_MAX);
+    enforce(a <= INT64_MAX && b <= INT64_MAX);
     int64_t lower = (int64_t) a;
     int64_t upper = (int64_t) b;
     fx32_32_t span = fx_from_int(upper - lower);
@@ -88,7 +88,7 @@ size_t scaled_param_eval(const struct scaled_param *desc, fx32_32_t value) {
                                         desc->max_val)
                    : desc->def_val;
 
-    kassert(IN_RANGE(desc->curve, SCALE_NONE, SCALE_CUSTOM));
+    enforce(IN_RANGE(desc->curve, SCALE_NONE, SCALE_CUSTOM));
     scaling_fn_t fn = scale_lut[desc->curve];
     return fn ? fn(value, desc->min_val, desc->def_val, desc->max_val)
               : desc->def_val;

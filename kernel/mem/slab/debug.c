@@ -215,7 +215,7 @@ cc_no_asan void slab_dump_corruption(void *obj,
 }
 
 stack_handle_t slab_stack_handle_for(void *ptr) {
-    kassert(slab_ptr_in_slab(ptr));
+    enforce(slab_ptr_in_slab(ptr));
     struct slab *s = slab_for_ptr(ptr);
     size_t idx = slab_allocation_index(s, ptr);
     return s->traces[idx];

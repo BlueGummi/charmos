@@ -232,5 +232,5 @@ void domain_caller_verify(enum topology_caller caller) {
     };
 
     bool valid = topology_contract_verify(tct);
-    kassert(valid, "Caller 0x%lx was not satisfied", caller);
+    enforce(valid, "Caller 0x%lx was not satisfied", caller);
 }

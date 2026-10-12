@@ -2,7 +2,7 @@
 #pragma once
 #include <atomic.h>
 #include <compiler/core.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <math/bit.h>
 #include <smp/core.h>
 #include <stdbool.h>

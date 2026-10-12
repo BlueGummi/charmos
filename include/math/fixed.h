@@ -1,6 +1,6 @@
 /* @title: Fixed Point Arithmetic */
 #pragma once
-#include <kassert.h>
+#include <enforce.h>
 #include <math/align.h>
 #include <math/min_max.h>
 #include <stdbool.h>
@@ -54,7 +54,7 @@ static inline fx32_32_t fx_mul(fx32_32_t a, fx32_32_t b) {
 }
 
 static inline fx32_32_t fx_div(fx32_32_t a, fx32_32_t b) {
-    kassert(b);
+    enforce(b);
     bool neg = (a ^ b) < 0;
     uint64_t ua = (uint64_t) (a < 0 ? -a : a);
     uint64_t ub = (uint64_t) (b < 0 ? -b : b);

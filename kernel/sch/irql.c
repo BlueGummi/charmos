@@ -19,7 +19,7 @@ static void irql_set(enum irql irql) {
 }
 
 static inline uint32_t scheduler_preemption_disable(void) {
-    kassert(!irqs_enabled());
+    enforce(!irqs_enabled());
 
     /* We enforce that interrupts are disabled upon raise, no migration */
     return smp_ctx_preempt_count(

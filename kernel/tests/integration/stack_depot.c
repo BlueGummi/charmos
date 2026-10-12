@@ -162,7 +162,7 @@ static struct test_verdict sd_mt_join(void) {
     } while (0)
 
 static void sd_mt_spawn(char *name, void (*fn)(void *), size_t n) {
-    kassert(n <= SD_MT_THREADS);
+    enforce(n <= SD_MT_THREADS);
     sd_mt.nthreads = n;
 
     /* Raise to spawn a bunch */

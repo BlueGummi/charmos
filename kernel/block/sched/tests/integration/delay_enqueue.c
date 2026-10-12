@@ -29,7 +29,7 @@ TEST_DEFINE_INTEGRATION(bio_sched, delay_enqueue,
     EXT2_ROOT;
     struct ext2_fs *fs = root->fs_data;
     struct block_device *d = fs->drive;
-    kassert(d);
+    enforce(d);
 
     size_t test_runs = MIN(ctx->intensity_val ? ctx->intensity_val : 1024,
                            BIO_SCHED_TEST_RUNS_MAX);
@@ -43,8 +43,7 @@ TEST_DEFINE_INTEGRATION(bio_sched, delay_enqueue,
 
     for (uint64_t i = 0; i < test_runs; i++) {
         uint8_t *buf = valloc_aligned(PAGE_SIZE, PAGE_SIZE);
-        struct bio_request *rq =
-            valloc(sizeof(struct bio_request), ALLOC_ZERO);
+        struct bio_request *rq = valloc(sizeof(struct bio_request), ALLOC_ZERO);
         TEST_ASSERT_NONNULL(rq);
         TEST_ASSERT_NONNULL(buf);
         TEST_ASSERT(IS_PAGE_ALIGNED(buf));
@@ -74,7 +73,7 @@ TEST_DEFINE_INTEGRATION(bio_sched, delay_enqueue,
             return TEST_SUCCESS;
         }
 
-        kassert(rqs[i]->disk);
+        enforce(rqs[i]->disk);
     }
 
     uint64_t ms = time_get_ms();

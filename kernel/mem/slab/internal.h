@@ -1,7 +1,7 @@
 #pragma once
 #include <atomic.h>
 #include <container_of.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <math/align.h>
 #include <math/bit.h>
 #include <math/range.h>
@@ -128,9 +128,9 @@ LOG_HANDLE_EXTERN(slab);
 
 #define valloc_validate_params(size, params)                                   \
     do {                                                                       \
-        kassert(alloc_flags_valid((params).flags));                            \
-        kassert(alloc_flag_behavior_verify((params)));                         \
-        kassert((size) != 0);                                                  \
+        enforce(alloc_flags_valid((params).flags));                            \
+        enforce(alloc_flag_behavior_verify((params)));                         \
+        enforce((size) != 0);                                                  \
     } while (0)
 
 /* This value determines the scale at which cores in a slab domain
@@ -600,7 +600,7 @@ size_t slab_free_queue_drain_limited(struct slab_percpu_cache *pc,
 
 /* Check */
 bool slab_check(struct slab *slab);
-#define slab_check_assert(slab) kassert(slab_check(slab))
+#define slab_check_assert(slab) enforce(slab_check(slab))
 
 /* GC */
 
@@ -727,7 +727,7 @@ static inline void slab_list_add(struct slab_cache *cache, struct slab *slab) {
 
 static inline void slab_move(struct slab_cache *c, struct slab *slab,
                              enum slab_state new) {
-    kassert(spinlock_locked(&c->lock));
+    enforce(spinlock_locked(&c->lock));
     slab_list_del(slab);
 
     slab->state = new;
@@ -780,7 +780,7 @@ static inline uint8_t *slab_get_bitmap_location(struct slab *s) {
 
 static inline uint64_t slab_page_flags(enum slab_type type) {
     uint64_t pflags = PAGE_PRESENT | PAGE_WRITE | PAGE_XD;
-    kassert(type != SLAB_TYPE_NONE);
+    enforce(type != SLAB_TYPE_NONE);
     if (type == SLAB_TYPE_PAGEABLE || type == SLAB_TYPE_PAGEABLE_ZERO)
         pflags |= PAGE_PAGEABLE;
 

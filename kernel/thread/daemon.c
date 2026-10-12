@@ -9,7 +9,7 @@ static void daemon_put(struct daemon *d) {
         atomic_store(&d->state, DAEMON_STATE_DEAD);
 
         if (d->workqueue) {
-            kassert(DAEMON_FLAG_TEST(d, DAEMON_FLAG_HAS_WORKQUEUE));
+            enforce(DAEMON_FLAG_TEST(d, DAEMON_FLAG_HAS_WORKQUEUE));
             workqueue_destroy(d->workqueue);
         }
 
@@ -21,7 +21,7 @@ static void daemon_put(struct daemon *d) {
 }
 
 static void daemon_get(struct daemon *d) {
-    kassert(refcount_inc_not_zero(&d->refcount));
+    enforce(refcount_inc_not_zero(&d->refcount));
 }
 
 static struct daemon_thread *current_daemon_thread(void) {
@@ -228,12 +228,12 @@ struct daemon *daemon_create_full(struct daemon_attributes *attrs,
 
     daemon->attrs = *attrs;
 
-    kassert(!cpu_mask_empty(&attrs->thread_cpu_mask),
+    enforce(!cpu_mask_empty(&attrs->thread_cpu_mask),
             "please set a valid CPU mask");
-    kassert(attrs->min_timesharing_threads <= attrs->max_timesharing_threads);
+    enforce(attrs->min_timesharing_threads <= attrs->max_timesharing_threads);
 
     if (!DAEMON_FLAG_TEST(daemon, DAEMON_FLAG_NO_TS_THREADS))
-        kassert(attrs->min_timesharing_threads,
+        enforce(attrs->min_timesharing_threads,
                 "needs min timesharing threads");
 
     if (DAEMON_FLAG_TEST(daemon, DAEMON_FLAG_HAS_NAME)) {
@@ -358,7 +358,7 @@ struct daemon_thread *daemon_spawn_worker(struct daemon *daemon) {
 
 enum workqueue_error daemon_submit_work(struct daemon *daemon,
                                         struct work *work) {
-    kassert(daemon->workqueue &&
+    enforce(daemon->workqueue &&
             DAEMON_FLAG_TEST(daemon, DAEMON_FLAG_HAS_WORKQUEUE));
     return workqueue_enqueue(daemon->workqueue, work);
 }

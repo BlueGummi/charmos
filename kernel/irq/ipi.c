@@ -1,9 +1,9 @@
 #include <acpi/lapic.h>
 #include <asm.h>
 #include <atomic.h>
+#include <enforce.h>
 #include <global.h>
 #include <irq/ipi.h>
-#include <kassert.h>
 #include <log.h>
 #include <math/bit.h>
 #include <sch/irql.h>
@@ -34,7 +34,7 @@ bool ipi_send_try(cpu_id_t cpu, uint8_t vector) {
 }
 
 void nmi_send(cpu_id_t cpu) {
-    kassert(cpu != smp_id(TOPC_NONE)); /* NMI'ing ourselves is a MASSIVE
+    enforce(cpu != smp_id(TOPC_NONE)); /* NMI'ing ourselves is a MASSIVE
                                         * risk, likely buggy code, panic */
 
     lapic_icr_write(smp_apic_id(cpu), LAPIC_DELIVERY_NMI | LAPIC_LEVEL_ASSERT |

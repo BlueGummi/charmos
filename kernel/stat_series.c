@@ -1,4 +1,4 @@
-#include <kassert.h>
+#include <enforce.h>
 #include <mem/alloc.h>
 #include <stat_series.h>
 #include <sync/lock_chk_assert.h>
@@ -30,8 +30,7 @@ struct stat_series *stat_series_create(uint32_t nbuckets, time_us_t bucket_us,
     if (!buckets)
         return NULL;
 
-    struct stat_series *series =
-        valloc(sizeof(struct stat_series), ALLOC_ZERO);
+    struct stat_series *series = valloc(sizeof(struct stat_series), ALLOC_ZERO);
     if (!series) {
         vfree(buckets);
         return NULL;

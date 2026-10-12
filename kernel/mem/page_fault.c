@@ -88,8 +88,8 @@ page_fault_sync_cb(struct exception_sync_cb *this, struct irq_context *irqc,
 
     /* it just needs to exist */
     struct page_fault_handler *pfh = adr->page_fault_handler;
-    kassert(pfh);
-    kassert(pfh->ops && pfh->ops->is_valid_fault);
+    enforce(pfh);
+    enforce(pfh->ops && pfh->ops->is_valid_fault);
 
     if (!pfh->ops->is_valid_fault(&pfi))
         goto crash;
@@ -105,8 +105,8 @@ page_fault_sync_cb(struct exception_sync_cb *this, struct irq_context *irqc,
         goto done;
 
     struct pte_tagged ptag = pte_tagged_unpack(pte);
-    kassert(ptag.type == PTE_TAG_TYPE_DEMAND_PAGED);
-    kassert((ptag.payload & DEMAND_PAGE_FLAG_ZERO_MEMORY) ||
+    enforce(ptag.type == PTE_TAG_TYPE_DEMAND_PAGED);
+    enforce((ptag.payload & DEMAND_PAGE_FLAG_ZERO_MEMORY) ||
             (ptag.payload & DEMAND_PAGE_FLAG_NONE));
     bool zeroed_out = ptag.payload & DEMAND_PAGE_FLAG_ZERO_MEMORY;
     paddr_t paddr;
@@ -119,7 +119,7 @@ page_fault_sync_cb(struct exception_sync_cb *this, struct irq_context *irqc,
         paddr = pfh->ops->alloc_pages(vaddr, 0);
     }
 
-    kassert(paddr); /* TODO: might be recoverable? many say no */
+    enforce(paddr); /* TODO: might be recoverable? many say no */
 
     if (zeroed_out)
         memset(hhdm_paddr_to_ptr(paddr), 0, PAGE_SIZE);

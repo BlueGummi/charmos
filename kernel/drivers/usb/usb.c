@@ -387,7 +387,7 @@ enum usb_error usb_init_device(struct usb_device *dev) {
 
 out:
     if (err != USB_OK) {
-        kassert(thread_get_current()->perceived_prio_class ==
+        enforce(thread_get_current()->perceived_prio_class ==
                 THREAD_PRIO_CLASS_TIMESHARE);
         usb_trace("reset_slot");
         dev->host->ops->reset_slot(dev);

@@ -1,6 +1,6 @@
 #include <atomic.h>
+#include <enforce.h>
 #include <irq/idt.h>
-#include <kassert.h>
 #include <sch/sched.h>
 #include <smp/core.h>
 #include <stdbool.h>
@@ -12,7 +12,7 @@
 #include "internal.h"
 
 void scheduler_add_thread_locked(struct scheduler *sched, struct thread *task) {
-    kassert(atomic_load_rlx(&task->state) != THREAD_STATE_IDLE_THREAD);
+    enforce(atomic_load_rlx(&task->state) != THREAD_STATE_IDLE_THREAD);
 
     /* Runqueue logic uses queued_prio_class */
     enum thread_prio_class prio = task->perceived_prio_class;
@@ -50,7 +50,7 @@ void scheduler_add_thread(struct scheduler *sched, struct thread *task) {
 }
 
 void scheduler_remove_thread_locked(struct scheduler *sched, struct thread *t) {
-    kassert(thread_get_state(t) == THREAD_STATE_READY);
+    enforce(thread_get_state(t) == THREAD_STATE_READY);
 
     if (t->queued_prio_class == THREAD_PRIO_CLASS_TIMESHARE) {
         dequeue_from_tree(sched, t);
@@ -68,7 +68,7 @@ void scheduler_remove_thread(struct scheduler *sched, struct thread *t) {
 }
 
 void thread_enqueue(struct thread *t) {
-    kassert(!cpu_mask_empty(&t->allowed_cpus));
+    enforce(!cpu_mask_empty(&t->allowed_cpus));
 
     struct scheduler *s = scheduler_select_best_for_thread(t);
 

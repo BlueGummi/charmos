@@ -108,9 +108,9 @@ void worker_main(void *unused) TSA_NO_ANALYSIS {
 
     struct worker *w = thread_get_current()->private;
     struct workqueue *queue = w->workqueue;
-    kassert(w);
+    enforce(w);
 
-    kassert(workqueue_get(queue));
+    enforce(workqueue_get(queue));
 
     while (true) {
 

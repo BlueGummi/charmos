@@ -123,7 +123,7 @@
 #include <compiler/core.h>
 #include <compiler/intrinsic.h>
 #include <console/printf.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <math/align.h>
 #include <math/arith.h>
 #include <math/bit.h>
@@ -184,7 +184,7 @@ static void *slab_map_new(struct slab_cache *cache,
     struct slab_domain *domain = cache->parent_domain;
     size_t pages = cache->pages_per_slab;
     enum slab_type type = cache->type;
-    kassert(pages <= SLAB_MAX_PAGES);
+    enforce(pages <= SLAB_MAX_PAGES);
 
     memset(phys_out, 0, pages * sizeof(paddr_t));
     size_t pages_mapped = 0;
@@ -335,7 +335,7 @@ void slab_cache_init(size_t order, struct slab_cache *cache,
     cache->slab_metadata_size =
         ALIGN_UP(cache->slab_metadata_size, sizeof(uint64_t));
 
-    kassert(cache->objs_per_slab * cache->obj_stride +
+    enforce(cache->objs_per_slab * cache->obj_stride +
                 cache->slab_metadata_size <=
             cache->pages_per_slab * PAGE_SIZE);
 
@@ -344,7 +344,7 @@ void slab_cache_init(size_t order, struct slab_cache *cache,
      * in the future if we somehow get GARGANTUAN slabs we can
      * handle cases where this is more than one page. But I'll
      * leave that as an optional TODO: */
-    kassert(cache->slab_metadata_size <= PAGE_SIZE);
+    enforce(cache->slab_metadata_size <= PAGE_SIZE);
 
     INIT_LIST_HEAD(&cache->slabs[SLAB_FREE]);
     INIT_LIST_HEAD(&cache->slabs[SLAB_PARTIAL]);
@@ -355,7 +355,7 @@ void slab_cache_init(size_t order, struct slab_cache *cache,
 static void slab_zero_out(struct slab *slab, size_t page_count) {
     void *start = (void *) slab->mem;
     size_t non_data = slab->mem - (vaddr_t) slab;
-    kassert(page_count);
+    enforce(page_count);
     size_t len = page_count * PAGE_SIZE - non_data;
     memset(start, 0, len);
 }
@@ -445,7 +445,7 @@ struct slab *slab_create(struct slab_cache *cache,
                          enum alloc_behavior behavior) {
     struct slab *slab = NULL;
     struct slab_domain *local = slab_domain_local();
-    kassert(cache->type != SLAB_TYPE_NONE);
+    enforce(cache->type != SLAB_TYPE_NONE);
 
     /* This is only searched if we are allowed to fault -
      * iteration through GC slabs may touch pageable slabs and
@@ -484,7 +484,7 @@ static void *slab_alloc_from(struct slab_cache *cache, stack_handle_t handle,
     slab_check_assert(slab);
 
     SPINLOCK_ASSERT_HELD(&cache->lock);
-    kassert(slab->state != SLAB_FULL);
+    enforce(slab->state != SLAB_FULL);
 
     uint64_t *bm = (uint64_t *) slab->bitmap;
     size_t nwords = DIV_ROUND_UP(cache->objs_per_slab, sizeof(uint64_t) * 8);
@@ -502,7 +502,7 @@ static void *slab_alloc_from(struct slab_cache *cache, stack_handle_t handle,
             slab->used++;
 
 #ifdef DEBUG_SLAB_DEEP
-            kassert(&slab->traces[i] < (stack_handle_t *) slab->mem);
+            enforce(&slab->traces[i] < (stack_handle_t *) slab->mem);
             if (slab->traces[i])
                 stack_depot_put(slab->traces[i]);
 
@@ -516,7 +516,7 @@ static void *slab_alloc_from(struct slab_cache *cache, stack_handle_t handle,
             }
 
             vaddr_t ret = slab->mem + i * cache->obj_stride;
-            kassert(ret > (vaddr_t) slab &&
+            enforce(ret > (vaddr_t) slab &&
                     ret < (vaddr_t) slab + cache->pages_per_slab * PAGE_SIZE);
 
             slab_check_assert(slab);
@@ -696,7 +696,7 @@ void slab_allocator_init() {
 
     struct slab_size_constant *staging =
         simple_alloc(slab_global.vas, total_input * sizeof(*staging));
-    kassert(staging);
+    enforce(staging);
     slab_order_map_init();
 
     size_t sidx = 0;
@@ -716,13 +716,13 @@ void slab_allocator_init() {
             .align = ssc->align,
         };
     }
-    kassert(sidx == total_input);
+    enforce(sidx == total_input);
 
     heapsort(staging, total_input, sizeof(*staging), slab_class_sort_cmp);
 
     struct slab_size_constant *tmp =
         simple_alloc(slab_global.vas, total_input * sizeof(*tmp));
-    kassert(tmp);
+    enforce(tmp);
 
     size_t out = 0;
     for (size_t i = 0; i < total_input; i++) {
@@ -739,7 +739,7 @@ void slab_allocator_init() {
     slab_global.class_sizes =
         simple_alloc(slab_global.vas,
                      slab_global.num_sizes * sizeof(*slab_global.class_sizes));
-    kassert(slab_global.class_sizes);
+    enforce(slab_global.class_sizes);
     memcpy(slab_global.class_sizes, tmp,
            slab_global.num_sizes * sizeof(*slab_global.class_sizes));
     slab_global.caches.caches = slab_caches_alloc();
@@ -764,10 +764,10 @@ void slab_allocator_init() {
 }
 
 struct slab *slab_for_ptr(void *ptr) {
-    kassert(slab_ptr_in_slab(ptr));
+    enforce(slab_ptr_in_slab(ptr));
     vaddr_t vp = (vaddr_t) ptr;
     uint8_t pow2_order = slab_order_map_get(vp);
-    kassert(pow2_order != SLAB_POW2_ORDER_EMPTY);
+    enforce(pow2_order != SLAB_POW2_ORDER_EMPTY);
 
     size_t align = ipow(2, pow2_order) * PAGE_SIZE;
     return (struct slab *) ALIGN_DOWN(vp, align);
@@ -777,7 +777,7 @@ bool valloc_ptr_in_slab_validate(void *ptr) {
     vaddr_t vaddr = (vaddr_t) ptr;
     bool in_slab = IN_RANGE(vaddr, SLAB_HEAP_START, SLAB_HEAP_END);
     bool in_page_alloc = page_alloc_vaddr_in_vas(vaddr);
-    kassert(in_slab || in_page_alloc, "invalid pointer");
+    enforce(in_slab || in_page_alloc, "invalid pointer");
 
     return in_slab;
 }
@@ -790,7 +790,7 @@ size_t vsize(void *ptr) {
 
     if (!in_slab) {
         struct slab_page_hdr *hdr = slab_page_hdr_for_addr(ptr);
-        kassert(hdr->magic == VALLOC_PAGE_MAGIC, "header is 0x%lx", hdr->magic);
+        enforce(hdr->magic == VALLOC_PAGE_MAGIC, "header is 0x%lx", hdr->magic);
         return hdr->pages * PAGE_SIZE - sizeof(struct slab_page_hdr);
     }
 
@@ -945,7 +945,7 @@ void *valloc_try_from_magazine(struct slab_domain *domain,
         uint64_t byte_idx;
         uint8_t bit_mask;
         slab_index_and_mask(slab, ret, &byte_idx, &bit_mask);
-        kassert(
+        enforce(
             SLAB_BITMAP_TEST(slab_for_ptr(ret)->bitmap[byte_idx], bit_mask));
 
 #ifdef DEBUG_SLAB_DEEP
@@ -1241,7 +1241,7 @@ void *valloc_new(size_t size, struct alloc_params params) {
     struct slab_domain *selected_dom = local_dom;
 
 #ifdef DEBUG_SLAB_DEEP
-    stack_handle_t handle = kassert(stack_depot_save_current());
+    stack_handle_t handle = enforce(stack_depot_save_current());
 #else
     stack_handle_t handle = NULL;
 #endif
@@ -1396,7 +1396,7 @@ void vfree_pages(void *ptr, enum alloc_behavior behavior) {
 
     /* no touchy */
     if (!alloc_behavior_may_fault(behavior))
-        kassert(!header->pageable);
+        enforce(!header->pageable);
 
     if (vfree_free_queue_enqueue(owner, ptr))
         return;
@@ -1417,7 +1417,7 @@ static bool vfree_try_free_to_magazine(struct slab_percpu_cache *pcpu,
     if (slab->parent_cache->parent_domain != pcpu->domain)
         return false;
 
-    kassert(slab->type != SLAB_TYPE_NONE);
+    enforce(slab->type != SLAB_TYPE_NONE);
     if (slab_is_pageable(slab))
         return false;
 
@@ -1557,7 +1557,7 @@ void *valloc_full(size_t size, struct alloc_params params) {
      * in non-fatal assertions/debug only assertions, this should
      * get changed so as to not make the code be slower than a memset 0 */
     if (p && (params.flags & ALLOC_FLAG_ZERO_ON_ALLOC))
-        kassert(is_buffer_uniform(p, size, 0));
+        enforce(is_buffer_uniform(p, size, 0));
 #endif
 
 #ifdef DEBUG_SLAB_DEEP

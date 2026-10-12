@@ -1,5 +1,5 @@
 #include <acpi/hpet.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <time/clock.h>
 #include <time/names.h>
 

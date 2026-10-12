@@ -9,7 +9,7 @@ void cmdline_functional_name(const struct cmdline_entry *ent,
 
     for (const struct cmdline_entry *curr = ent; curr != NULL;
          curr = curr->parent) {
-        kassert(depth < CMDLINE_MAX_TREE_DEPTH);
+        enforce(depth < CMDLINE_MAX_TREE_DEPTH);
         chain[depth++] = curr;
     }
 

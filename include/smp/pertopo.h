@@ -71,7 +71,7 @@ LINKER_SECTION_EXTERN(struct pertopo_descriptor, pertopo_desc);
 
 #define PERTOPO_PTR_FOR(name, node)                                            \
     ({                                                                         \
-        (void) kassert_debug(PERTOPO_READY(name));                             \
+        (void) debug_enforce(PERTOPO_READY(name));                             \
         ((typeof(__pertopo_##name) *) (__pertopo_desc_ref_##name)              \
              ->pertopo_ptrs[node]);                                            \
     })

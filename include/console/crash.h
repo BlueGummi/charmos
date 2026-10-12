@@ -50,7 +50,7 @@ enum crash_code {
 
 enum crash_source {
     CRASH_SOURCE_PANIC = 0,     /* panic() call */
-    CRASH_SOURCE_ASSERT,        /* assertion failure */
+    CRASH_SOURCE_ENFORCE,       /* enforce() failure */
     CRASH_SOURCE_KASAN,         /* ASAN check failure */
     CRASH_SOURCE_UBSAN,         /* UBSAN failure */
     CRASH_SOURCE_NMI_WATCHDOG,  /* Watchdog / Liveness monitor hard stall */
@@ -269,11 +269,10 @@ struct crash_context {
 
 LINKER_SECTION_EXTERN(struct crash_facility, crash_facilities);
 
-cc_noreturn void assert_impl_default(struct crash_payload payload,
-                                     const char *file, int line,
-                                     const char *func, const char *prefix,
-                                     const char *assertion, const char *fmt,
-                                     ...);
+cc_noreturn void enforce_impl_default(struct crash_payload payload,
+                                      const char *file, int line,
+                                      const char *func, const char *prefix,
+                                      const char *expr, const char *fmt, ...);
 
 cc_noreturn void crash_full(const struct crash_context *ctx);
 

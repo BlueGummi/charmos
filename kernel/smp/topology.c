@@ -1,9 +1,9 @@
 #include <asm.h>
 #include <atomic.h>
 #include <console/printf.h>
+#include <enforce.h>
 #include <global.h>
 #include <irq/idt.h>
-#include <kassert.h>
 #include <limine.h>
 #include <math/align.h>
 #include <math/bit.h>
@@ -465,7 +465,7 @@ void topology_mark_core_idle(cpu_id_t cpu_id, bool idle) {
 
 struct core *topology_find_idle_core(struct core *local_core,
                                      enum topology_level max_search) {
-    kassert(max_search >
+    enforce(max_search >
             TOPOLOGY_LEVEL_SMT); /* 'SMT' will be the core itself.
                                   * It has no neighbors, and thus
                                   * cannot be searched through (one core) */

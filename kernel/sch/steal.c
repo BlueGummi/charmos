@@ -118,7 +118,7 @@ static struct thread *steal_from_special_threads(struct scheduler *victim,
             continue;
         }
 
-        kassert(thread_get_state(t) == THREAD_STATE_READY);
+        enforce(thread_get_state(t) == THREAD_STATE_READY);
 
         list_del_init(&t->rq_list_node);
 

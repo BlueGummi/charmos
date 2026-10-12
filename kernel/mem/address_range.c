@@ -131,7 +131,7 @@ static bool gap_fits(vaddr_t need_align, size_t need_size, vaddr_t gap_base,
 }
 
 static void add_dynamic_address_range(struct address_range *ar) {
-    kassert(ar->base == 0);
+    enforce(ar->base == 0);
     vaddr_t need_align = ar->align;
     size_t need_size = ar->size;
 

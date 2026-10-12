@@ -12,7 +12,7 @@ void *simple_alloc(struct vas *space, size_t size) {
 
     for (size_t i = 0; i < pages; i++) {
         vaddr_t virt = virt_base + (i * PAGE_SIZE);
-        paddr_t phys = kassert(pmm_alloc_page());
+        paddr_t phys = enforce(pmm_alloc_page());
         vmm_map_page(virt, phys,
                      .page_flags = PAGE_PRESENT | PAGE_WRITE | PAGE_XD);
     }
@@ -28,7 +28,7 @@ void simple_free(struct vas *space, void *ptr, size_t size) {
     for (size_t i = 0; i < pages; i++) {
         vaddr_t virt = (vaddr_t) real_virt + i * PAGE_SIZE;
         paddr_t phys = vmm_get_phys(virt);
-        kassert(phys != (paddr_t) -1);
+        enforce(phys != (paddr_t) -1);
         vmm_unmap_page(virt);
         pmm_free_page(phys);
     }

@@ -5,7 +5,7 @@
 void io_wait_begin(struct io_wait_token *out,
                    struct thread_wait_header *request) {
     struct thread *t = thread_get_current();
-    kassert(!out->active);
+    enforce(!out->active);
     out->active = true;
     list_add_tail(&out->list, &t->io_wait_tokens);
 
@@ -16,8 +16,8 @@ void io_wait_begin(struct io_wait_token *out,
 }
 
 void io_wait_complete(struct io_wait_token *t) {
-    kassert(t->active && t->block.thread == thread_get_current());
-    kassert(thread_get_current()->active_wait_blocks == &t->block);
+    enforce(t->active && t->block.thread == thread_get_current());
+    enforce(thread_get_current()->active_wait_blocks == &t->block);
     thread_wait_complete();
 }
 
@@ -27,7 +27,7 @@ void io_wait_signal(struct thread_wait_header *request) {
 
 void io_wait_end(struct io_wait_token *t, enum io_wait_end_action act) {
     struct thread *c = thread_get_current();
-    kassert(t->active && t->block.thread == c);
+    enforce(t->active && t->block.thread == c);
 
     /* submission failures can end registrations without yielding */
     if (c->active_wait_blocks == &t->block)

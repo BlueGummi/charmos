@@ -1,4 +1,4 @@
-#include <kassert.h>
+#include <enforce.h>
 #include <mem/anon_vma.h>
 #include <mem/avc.h>
 #include <mem/folio.h>
@@ -45,11 +45,11 @@ void rmap_walk_anon(struct folio *f, rmap_visit_fn visit, void *private) {
  * range's anon_vma, gaining first mapper */
 void folio_add_anon_rmap_new(struct folio *f, struct vma_range *vr,
                              vaddr_t va) {
-    kassert(vr->anon_vma);
+    enforce(vr->anon_vma);
 
     /* TODO: we might consider returning errors for this because
      * the refcount get might fail? */
-    kassert(anon_vma_get(vr->anon_vma));
+    enforce(anon_vma_get(vr->anon_vma));
     folio_set_anon(f, vr->anon_vma, va_to_index(vr, va));
     folio_set_flag(f, FOLIO_FLAG_MAPPED);
     folio_mapcount_inc(f);
@@ -57,10 +57,10 @@ void folio_add_anon_rmap_new(struct folio *f, struct vma_range *vr,
 
 /* New PTE maps already anon folio at `va`, which is already anon */
 void folio_add_anon_rmap(struct folio *f, struct vma_range *vr, vaddr_t va) {
-    kassert(folio_is_anon(f));
+    enforce(folio_is_anon(f));
 
     pgoff_t idx = va_to_index(vr, va);
-    kassert(idx >= f->index && idx < f->index + folio_nr_pages(f));
+    enforce(idx >= f->index && idx < f->index + folio_nr_pages(f));
 
     folio_mapcount_inc(f);
 }
@@ -68,14 +68,14 @@ void folio_add_anon_rmap(struct folio *f, struct vma_range *vr, vaddr_t va) {
 /* e.g. fork: parent and child keep the PTE, folio gains a mapper */
 void folio_add_anon_rmap_shared(struct folio *f, struct vma_range *vr) {
     cc_unused(vr);
-    kassert(folio_is_anon(f));
+    enforce(folio_is_anon(f));
 
     folio_mapcount_inc(f);
 }
 
 void folio_remove_rmap(struct folio *f, struct vma_range *vr) {
     cc_unused(vr);
-    kassert(folio_is_anon(f));
+    enforce(folio_is_anon(f));
 
     folio_mapcount_dec(f); /* true at 0 -> folio is no longer mapped anywhere */
 }

@@ -1,5 +1,5 @@
 #include <console/panic.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <math/min_max.h>
 #include <mem/alloc.h>
 #include <stddef.h>
@@ -355,8 +355,8 @@ static size_t validate_rbit(struct rbit_node *node, size_t *black_height) {
 }
 
 void rbit_delete(struct rbit *tree, struct rbit_node *z) {
-    kassert(z != NULL);
-    kassert(rbit_has_node(tree, z));
+    enforce(z != NULL);
+    enforce(rbit_has_node(tree, z));
     rbit_check_cycle(tree->root, __func__);
     struct rbit_node *y = z;
     struct rbit_node *x = NULL;
@@ -414,7 +414,7 @@ void rbit_delete(struct rbit *tree, struct rbit_node *z) {
     z->parent = NULL;
 
     size_t dummy_bh = 0;
-    kassert(validate_rbit(tree->root, &dummy_bh));
+    enforce(validate_rbit(tree->root, &dummy_bh));
 }
 
 struct rbit_node *rbit_search(struct rbit_node *root, struct interval iv) {
@@ -496,8 +496,8 @@ static void fix_insertion(struct rbit *tree, struct rbit_node *node) {
 }
 
 void rbit_insert(struct rbit *tree, struct rbit_node *new_node) {
-    kassert(new_node != NULL);
-    kassert(!rbit_has_node(tree, new_node));
+    enforce(new_node != NULL);
+    enforce(!rbit_has_node(tree, new_node));
     rbit_check_cycle(tree->root, __func__);
     new_node->left = NULL;
     new_node->right = NULL;
@@ -532,8 +532,8 @@ void rbit_insert(struct rbit *tree, struct rbit_node *new_node) {
     fix_insertion(tree, new_node);
 
     if (parent)
-        kassert(!(parent->color == RBIT_RED && new_node->color == RBIT_RED));
+        enforce(!(parent->color == RBIT_RED && new_node->color == RBIT_RED));
 
     size_t dummy_bh = 0;
-    kassert(validate_rbit(tree->root, &dummy_bh));
+    enforce(validate_rbit(tree->root, &dummy_bh));
 }

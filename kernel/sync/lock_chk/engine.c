@@ -4,8 +4,8 @@
 #include <atomic.h>
 #include <console/panic.h>
 #include <console/printf.h>
+#include <enforce.h>
 #include <irq/irq.h>
-#include <kassert.h>
 #include <smp/core.h>
 #include <smp/percpu.h>
 #include <string.h>
@@ -27,7 +27,7 @@ struct lock_chk_guard lock_chk_enter(void) {
 }
 
 void lock_chk_leave(const struct lock_chk_guard *guard) {
-    kassert(*guard->depth == 1);
+    enforce(*guard->depth == 1);
     *guard->depth = 0;
     irq_restore(guard->irqs_enabled);
 }
@@ -67,7 +67,7 @@ validate_acq(const struct lock_chk_acq_req *request,
 }
 
 void lock_chk_deep_activate(void) {
-    kassert(PERCPU_READY(lock_chk_recursion_depth));
+    enforce(PERCPU_READY(lock_chk_recursion_depth));
     lock_chk_graph_init(&lock_chk_global.graph);
     atomic_store_release(&lock_chk_global.deep, LOCK_CHK_ACTIVE);
 }
@@ -86,7 +86,7 @@ static void lock_chk_note_capacity_exhausted(enum lock_chk_result result) {
 static void lock_chk_do_graph_fail(enum lock_chk_result result,
                                    const struct lock_chk_acq_req *request,
                                    struct lock_chk_fault *fault) {
-    kassert(result != LOCK_CHK_RESULT_CYCLE &&
+    enforce(result != LOCK_CHK_RESULT_CYCLE &&
             result != LOCK_CHK_RESULT_EDGE_CAPACITY);
 
     if (result == LOCK_CHK_RESULT_BAD_CONTEXT) {
@@ -154,7 +154,7 @@ void lock_chk_before_acq(struct lock_chk_acq_token *token,
 
     struct lock_chk_guard guard = lock_chk_enter();
 
-    struct thread *thread = kassert(thread_get_current());
+    struct thread *thread = enforce(thread_get_current());
     struct lock_chk_thread_data *thread_data = &thread->lock_chk;
     enum lock_chk_result result = validate_acq(request, thread_data);
     if (result != LOCK_CHK_RESULT_OK) {
@@ -204,7 +204,7 @@ void lock_chk_acqd(struct lock_chk_acq_token *token) {
 
     const struct lock_chk_acq_req *request = token->request;
     struct lock_chk_thread_data *thread_data = token->thread_data;
-    kassert(thread_data->depth < LOCK_CHK_MAX_HELD_LOCKS);
+    enforce(thread_data->depth < LOCK_CHK_MAX_HELD_LOCKS);
 
     thread_data->held[thread_data->depth++] = (struct lock_chk_held){
         .node = token->node,
@@ -244,7 +244,7 @@ void lock_chk_before_rel(struct lock_chk_rel_token *token,
 
     struct lock_chk_guard guard = lock_chk_enter();
 
-    struct thread *thread = kassert(thread_get_current());
+    struct thread *thread = enforce(thread_get_current());
 
     struct lock_chk_thread_data *thread_data = &thread->lock_chk;
     struct lock_chk_held *held = lock_chk_find_held(
@@ -275,16 +275,16 @@ void lock_chk_reld(struct lock_chk_rel_token *token) {
     struct lock_chk_guard guard = lock_chk_enter();
 
     struct lock_chk_thread_data *thread_data = token->thread_data;
-    kassert(token->held_index < thread_data->depth);
+    enforce(token->held_index < thread_data->depth);
     struct lock_chk_held released = thread_data->held[token->held_index];
-    kassert(released.lock.instance == token->instance);
+    enforce(released.lock.instance == token->instance);
 
     if ((released.lock.flags & LOCK_CHKD_THREAD) != 0) {
-        kassert(thread_data->thread_checked_depth != 0);
+        enforce(thread_data->thread_checked_depth != 0);
         thread_data->thread_checked_depth--;
         if (!released.raw_operation &&
             lock_chk_type_is_spin(released.lock.type)) {
-            kassert(thread_data->thread_checked_spin_depth != 0);
+            enforce(thread_data->thread_checked_spin_depth != 0);
             thread_data->thread_checked_spin_depth--;
         }
     }

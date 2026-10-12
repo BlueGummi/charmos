@@ -132,13 +132,13 @@ void fixed_size_free(struct fixed_size_range *fsr, void *obj) {
     struct fixed_size_page_hdr *hdr = fixed_size_page_of(obj);
     domain_id_t domain = hdr->domain;
     if (!fsr->perdomain_fsrs) {
-        kassert(domain == DOMAIN_ID_NONE);
+        enforce(domain == DOMAIN_ID_NONE);
 
         /* Just one */
         return fixed_size_free_internal(fsr, obj);
     }
 
-    kassert(fsr->perdomain_fsrs[domain]->domain == domain);
+    enforce(fsr->perdomain_fsrs[domain]->domain == domain);
     return fixed_size_free_internal(fsr->perdomain_fsrs[domain], obj);
 }
 
@@ -161,7 +161,7 @@ void fixed_size_reclaim_freelist_pages(struct fixed_size_range *fsr) {
 
 void fixed_size_range_init(struct fixed_size_range *fsr,
                            struct fixed_size_range_attributes *attrs) {
-    kassert(attrs->obj_size && attrs->obj_align, "Fill the fields out");
+    enforce(attrs->obj_size && attrs->obj_align, "Fill the fields out");
     spinlock_init(&fsr->lock);
     fsr->attrs = *attrs;
     INIT_LIST_HEAD(&fsr->freelist);
@@ -178,7 +178,7 @@ void fixed_size_range_init(struct fixed_size_range *fsr,
 struct fixed_size_range *
 fixed_size_range_create(struct fixed_size_range_attributes *attrs) {
     struct fixed_size_range *fsr;
-    kassert(attrs);
+    enforce(attrs);
     if (attrs->bootstrap_mode) {
         paddr_t phys = nofail(pmm_alloc_page());
         vaddr_t virt = hhdm_paddr_to_vaddr(phys);

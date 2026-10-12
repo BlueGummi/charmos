@@ -1,6 +1,6 @@
 #include <asm.h>
+#include <enforce.h>
 #include <err.h>
-#include <kassert.h>
 #include <math/align.h>
 #include <mem/anon_vma.h>
 #include <mem/fixed_size_alloc.h>
@@ -113,7 +113,7 @@ struct mm *mm_alloc(void) {
 }
 
 void mm_free(struct mm *mm) {
-    kassert(rbit_empty(&mm->vma_range_tree));
+    enforce(rbit_empty(&mm->vma_range_tree));
     mm_pgtable_free(mm);
     FSR_PERDOMAIN_FREE(mm, mm);
 }
@@ -160,7 +160,7 @@ struct vma_range *mm_vma_range_find_intersection(struct mm *mm, vaddr_t s,
 
 void mm_vma_range_insert(struct mm *mm, struct vma_range *vma_range) {
     /* vma_range_init() already set the interval; rbit_insert() does the rest */
-    kassert(!mm_vma_range_find_intersection(mm, vma_range_start(vma_range),
+    enforce(!mm_vma_range_find_intersection(mm, vma_range_start(vma_range),
                                             vma_range_end(vma_range)));
     rbit_insert(&mm->vma_range_tree, &vma_range->mm_node);
 }
@@ -234,7 +234,7 @@ static vaddr_t gap_search(struct rbit_node *n, vaddr_t *floor,
 
 vaddr_t mm_vma_range_find_gap(struct mm *mm, size_t len, size_t align,
                               vaddr_t low, vaddr_t high) {
-    kassert(IS_POW2(align));
+    enforce(IS_POW2(align));
     if (len == 0 || high <= low || high - low < len)
         return 0;
 

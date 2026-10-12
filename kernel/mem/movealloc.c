@@ -65,7 +65,7 @@ void movealloc_full(domain_id_t new_domain, void *ptr, struct vmm_request rq) {
         void *pnew_virt = (void *) new_virt;
         memcpy(pnew_virt, pvaddr, PAGE_SIZE);
         vmm_map_page_full(vaddr, new_phys, remap_rq);
-        kassert(vmm_get_phys_full(vaddr, rq) == new_phys);
+        enforce(vmm_get_phys_full(vaddr, rq) == new_phys);
 
         phys_addrs[i] = paddr;
     }

@@ -1,7 +1,7 @@
 #ifdef DEBUG_LOCK_CHK
 
+#include <enforce.h>
 #include <irq/irq.h>
-#include <kassert.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -51,7 +51,7 @@ static enum lock_chk_result record_ctx(struct lock_chk_node *base_node,
     } else if ((request->op_flags & LOCK_OP_IRQ_MASK) == LOCK_OP_IRQ_HIGH) {
         ctx = LOCK_CHK_CTX_SPIN_HIGH;
     } else {
-        kassert(request->op_flags & LOCK_OP_IRQ_MASK);
+        enforce(request->op_flags & LOCK_OP_IRQ_MASK);
         ctx = LOCK_CHK_CTX_SPIN_DISPATCH;
     }
 

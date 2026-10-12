@@ -174,7 +174,7 @@ void vmm_reclaim_page_tables(void) {
     if (smp_read(TOPC_IRQL, reclaiming_page_tables))
         return;
 
-    kassert(irql_get() == IRQL_DISPATCH_LEVEL);
+    enforce(irql_get() == IRQL_DISPATCH_LEVEL);
     smp_write(TOPC_IRQL, reclaiming_page_tables, true);
 
     uint64_t min_epoch = UINT64_MAX;
@@ -467,11 +467,11 @@ static enum err vmm_pt_apply(struct vmm_map_request *rq) {
         /* present huge leaf where table was expected is a size mismatch
          *
          * only meaningful when present as non-present can have payload there */
-        kassert(!((*entry & PAGE_PRESENT) && (*entry & PAGE_HUGE)));
+        enforce(!((*entry & PAGE_PRESENT) && (*entry & PAGE_HUGE)));
 
         /* We can't descend through a shared table to modify a leaf, since that
          * would edit every other range aliasing with this table */
-        kassert(!pte_is_shared(*entry));
+        enforce(!pte_is_shared(*entry));
 
         tables[level + 1] = pt_next_table(*entry);
     }
@@ -491,7 +491,7 @@ static enum err vmm_pt_apply(struct vmm_map_request *rq) {
     /* page tables must match the caller's claims, PS bit is only meaningful
      * for present bits as tagged non-present PTEs use bit 7 */
     if (was_present) {
-        kassert((*last_entry & PAGE_HUGE) == want_huge);
+        enforce((*last_entry & PAGE_HUGE) == want_huge);
         if (handle_exist) {
             err = ERR_EXIST;
             pte_unlock(last_entry, last_irql);
@@ -593,7 +593,7 @@ static enum err alias_install_one(struct page_table *pml4, vaddr_t virt,
             }
         }
 
-        kassert(!((*entry & PAGE_PRESENT) && (*entry & PAGE_HUGE)));
+        enforce(!((*entry & PAGE_PRESENT) && (*entry & PAGE_HUGE)));
         tables[level + 1] = pt_next_table(*entry);
     }
 
@@ -810,7 +810,7 @@ enum err vmm_unshare_path_full(vaddr_t virt, struct vmm_request rq) {
             goto out;
         }
 
-        kassert(!((*entry & PAGE_PRESENT) && (*entry & PAGE_HUGE)));
+        enforce(!((*entry & PAGE_PRESENT) && (*entry & PAGE_HUGE)));
 
         if (pte_is_shared(*entry)) {
             struct page_table *priv = pt_clone_shared(pt_next_table(*entry));

@@ -65,7 +65,7 @@ void folio_zero(struct folio *f) {
 }
 
 void folio_copy(const struct folio *src, struct folio *dst) {
-    kassert(src->order == dst->order);
+    enforce(src->order == dst->order);
     size_t nr_pages = folio_nr_pages(src);
     for (size_t i = 0; i < nr_pages; i++) {
         vaddr_t src_vaddr = folio_get_vaddr_for(src, i);

@@ -167,7 +167,7 @@ static void timer_dpc(void *ctx, void *unused) {
         base->running = timer;
         spin_unlock(&base->lock, birql);
 
-        kassert(!(timer->flags & TIMER_FLAG_IRQ));
+        enforce(!(timer->flags & TIMER_FLAG_IRQ));
         timer_fn_call(timer);
 
         birql = spin_lock_high(&base->lock);
@@ -190,7 +190,7 @@ static void timer_expire_bucket(struct timer_base *base,
             hlist_entry(head->first, struct timer, hlist_node);
         timer_list_del(timer);
 
-        kassert(timer->func);
+        enforce(timer->func);
 
         if (timer->flags & TIMER_FLAG_IRQ) {
             base->running = timer;
@@ -608,7 +608,7 @@ enum irq_result timer_isr(void *ctx, uint8_t vec, struct irq_context *rsp) {
 
 static void timers_init(cpu_id_t cpu) {
     struct clock_evdev_group *cedg =
-        kassert(clock_evdev_group_search_for(clock_global.timer_clock_evdev));
+        enforce(clock_evdev_group_search_for(clock_global.timer_clock_evdev));
 
     /* Called in early boot */
     struct timer_percpu *this = PERCPU_PTR_FOR(timer_percpu, cpu);

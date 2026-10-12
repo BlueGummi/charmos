@@ -10,11 +10,11 @@
         struct arena_fn_desc *found = NULL;                                                                          \
         for (int i = 0; i < ARENA_MAX_FN; i++) {                                                                     \
             if (a->desc->ops->fn_name == desc->fn_descs[i].fn) {                                                     \
-                kassert(!found);                                                                                     \
+                enforce(!found);                                                                                     \
                 found = &desc->fn_descs[i];                                                                          \
             }                                                                                                        \
         }                                                                                                            \
-        kassert(found);                                                                                              \
+        enforce(found);                                                                                              \
         if (found->type ==                                                                                           \
             ARENA_FN_PARAMS) { /* We notably allow NULL pointers to pass, since those are often used as sentinels */ \
             if (ptr && !IN_RANGE((uintptr_t) ptr, THREAD_STACKS_HEAP_START,                                          \

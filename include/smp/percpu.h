@@ -65,7 +65,7 @@ LINKER_SECTION_EXTERN(struct percpu_descriptor, percpu_desc);
 
 #define PERCPU_PTR_FOR(name, cpu)                                              \
     ({                                                                         \
-        (void) kassert_debug(PERCPU_READY(name));                              \
+        (void) debug_enforce(PERCPU_READY(name));                              \
         ((typeof(__percpu_##name) *) (__percpu_desc_ref_##name)                \
              ->percpu_ptrs[cpu]);                                              \
     })

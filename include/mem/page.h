@@ -93,7 +93,7 @@ static inline void page_set_payload(struct page *p, uint64_t payload) {
 
 static inline void page_assert_tag(const struct page *p,
                                    enum page_tag expected) {
-    kassert(page_get_tag(p) == expected);
+    enforce(page_get_tag(p) == expected);
 }
 
 static inline struct page *page_for_pfn(pfn_t pfn) {

@@ -9,7 +9,7 @@ static struct reaper_thread **reapers = NULL;
 static atomic_size_t reaped_threads = ATOMIC_VAR_INIT(0);
 
 void reaper_enqueue(struct thread *t) {
-    kassert(reapers);
+    enforce(reapers);
     size_t d = domain_local_id(TOPC_NONE);
     locked_list_add(&reapers[d]->list, &t->reaper_list);
     semaphore_post(&reapers[d]->sem);
@@ -55,7 +55,7 @@ void reaper_thread_main(void *unused) {
         while ((lh = list_pop_front_init(&local)) != NULL) {
             struct thread *t = container_of(lh, struct thread, reaper_list);
 
-            kassert(refcount_read(&t->refcount) == 0);
+            enforce(refcount_read(&t->refcount) == 0);
             thread_free(t);
             atomic_inc(&reaped_threads);
         }

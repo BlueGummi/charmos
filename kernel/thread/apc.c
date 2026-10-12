@@ -1,6 +1,6 @@
 #include <compiler/core.h>
 #include <compiler/intrinsic.h>
-#include <kassert.h>
+#include <enforce.h>
 #include <math/bit.h>
 #include <sch/sched.h>
 #include <smp/core.h>
@@ -107,7 +107,7 @@ static bool thread_apc_sanity_check(struct thread *t) {
 }
 
 static void apc_execute(struct apc *a) {
-    kassert(irql_get() == IRQL_APC_LEVEL);
+    enforce(irql_get() == IRQL_APC_LEVEL);
 
     struct thread *curr = thread_get_current();
 
@@ -142,8 +142,8 @@ static void deliver_apc_type(struct thread *t, enum apc_type type) {
             return;
         }
 
-        kassert(apc->owner == t);
-        kassert(apc_state_load(apc) == APC_STATE_QUEUED);
+        enforce(apc->owner == t);
+        enforce(apc_state_load(apc) == APC_STATE_QUEUED);
         apc->owner = NULL;
         atomic_store_release(&apc->state, APC_STATE_EXECUTING);
 
@@ -195,7 +195,7 @@ bool apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
         return false;
     }
 
-    kassert(a->owner == NULL);
+    enforce(a->owner == NULL);
     add_apc_to_thread(t, a, type);
     thread_release(t, irql);
 
@@ -211,7 +211,7 @@ bool apc_enqueue(struct thread *t, struct apc *a, enum apc_type type) {
 
 /* We can only enqueue and run from ourselves, no sync needed */
 bool apc_enqueue_event_apc(struct event_apc *a, struct apc_event_desc *desc) {
-    kassert(desc);
+    enforce(desc);
     if (!a || !apc_get(&a->apc))
         return false;
 
@@ -222,7 +222,7 @@ bool apc_enqueue_event_apc(struct event_apc *a, struct apc_event_desc *desc) {
         return false;
     }
 
-    kassert(!a->apc.owner);
+    enforce(!a->apc.owner);
 
     a->desc = desc;
 
@@ -251,8 +251,8 @@ static bool try_cancel_from_queue(struct thread *t, struct apc *a,
         struct apc *next = curr->next;
 
         if (curr == a) {
-            kassert(curr->owner == t);
-            kassert(apc_state_load(curr) == APC_STATE_QUEUED);
+            enforce(curr->owner == t);
+            enforce(apc_state_load(curr) == APC_STATE_QUEUED);
             if (prev)
                 prev->next = next;
             else
@@ -316,8 +316,8 @@ struct event_apc *apc_event_apc_create(void) {
 }
 
 void apc_init(struct apc *a, apc_func_t fn, void *arg1, apc_destroy_t destroy) {
-    kassert(a);
-    kassert(fn);
+    enforce(a);
+    enforce(fn);
     a->func = fn;
     a->ctx = arg1;
     a->next = NULL;
@@ -338,13 +338,13 @@ bool apc_get(struct apc *a) {
 }
 
 void apc_put(struct apc *a) {
-    kassert(a);
+    enforce(a);
     if (!refcount_dec_and_test(&a->refcount))
         return;
 
-    kassert(apc_state_load(a) == APC_STATE_IDLE);
-    kassert(a->owner == NULL);
-    kassert(a->next == NULL);
+    enforce(apc_state_load(a) == APC_STATE_IDLE);
+    enforce(a->owner == NULL);
+    enforce(a->next == NULL);
     if (a->destroy)
         a->destroy(a);
 }
@@ -423,7 +423,7 @@ static void bump_counters_on_queue(struct apc_queue *from,
 }
 
 static void apc_execute_event(struct apc *a) {
-    kassert(apc_state_load(a) == APC_STATE_QUEUED);
+    enforce(apc_state_load(a) == APC_STATE_QUEUED);
     atomic_store_release(&a->state, APC_STATE_EXECUTING);
     apc_execute(a);
     atomic_store_release(&a->state, APC_STATE_QUEUED);
@@ -441,7 +441,7 @@ void apc_event_signal(struct apc_event_desc *desc) {
     struct thread *curr = thread_get_current();
 
     if (safe_to_exec_apcs() && curr->kernel_apc_disable == 0) {
-        kassert(apc_queue_empty(&curr->to_exec_event_apcs));
+        enforce(apc_queue_empty(&curr->to_exec_event_apcs));
 
         enum irql irql = irql_raise(IRQL_APC_LEVEL);
 
@@ -473,7 +473,7 @@ void thread_exec_event_apcs(struct thread *t) {
 
     while ((a = apc_dequeue_head(&t->to_exec_event_apcs))) {
         struct event_apc *eapc = container_of(a, struct event_apc, apc);
-        kassert(eapc->execute_times);
+        enforce(eapc->execute_times);
 
         for (size_t i = 0; i < eapc->execute_times; i++)
             apc_execute_event(a);
@@ -496,7 +496,7 @@ void apc_disable_special() {
 
 void apc_enable_special() {
     struct thread *t = thread_get_current();
-    kassert(t->special_apc_disable > 0);
+    enforce(t->special_apc_disable > 0);
 
     if (--t->special_apc_disable == 0)
         apc_check_and_deliver(t);
@@ -508,7 +508,7 @@ void apc_disable_kernel() {
 
 void apc_enable_kernel() {
     struct thread *t = thread_get_current();
-    kassert(t->kernel_apc_disable > 0);
+    enforce(t->kernel_apc_disable > 0);
 
     if (--t->kernel_apc_disable == 0)
         apc_check_and_deliver(t);

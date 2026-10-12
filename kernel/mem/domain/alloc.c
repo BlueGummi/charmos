@@ -1,4 +1,4 @@
-#include <kassert.h>
+#include <enforce.h>
 #include <mem/pmm.h>
 #include <mem/vmm.h>
 #include <smp/domain.h>
@@ -256,7 +256,7 @@ struct domain *domain_alloc_pick_best_domain(struct domain *local, size_t pages,
         }
     }
 
-    kassert(best);
+    enforce(best);
     return best->domain;
 }
 
@@ -309,7 +309,7 @@ static paddr_t alloc_with_locality(size_t pages, bool flexible_locality,
 }
 
 paddr_t domain_alloc(size_t pages, enum alloc_flags flags) {
-    kassert(pages != 0);
+    enforce(pages != 0);
     /* pin our core and disable preemption */
     enum irql irql = irql_raise(IRQL_DISPATCH_LEVEL);
 

@@ -1,5 +1,5 @@
+#include <enforce.h>
 #include <err.h>
-#include <kassert.h>
 #include <mem/anon_vma.h>
 #include <mem/avc.h>
 #include <mem/fixed_size_alloc.h>
@@ -41,7 +41,7 @@ struct vma_range *vma_range_alloc(struct mm *mm, vaddr_t start, vaddr_t end,
 }
 
 void vma_range_free(struct vma_range *vma_range) {
-    kassert(list_empty(&vma_range->anon_vma_chain));
+    enforce(list_empty(&vma_range->anon_vma_chain));
     FSR_PERDOMAIN_FREE(vma_range, vma_range);
 }
 

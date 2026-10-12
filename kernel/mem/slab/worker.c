@@ -98,7 +98,7 @@ void slab_domain_init_workqueue(struct slab_domain *domain) {
 }
 
 void vfree_defer_irq(void *ptr) {
-    kassert(irq_in_interrupt());
+    enforce(irq_in_interrupt());
     if (!ptr)
         return;
 

@@ -1,6 +1,6 @@
 /* @title: Locked list */
 #pragma once
-#include <kassert.h>
+#include <enforce.h>
 #include <structures/list.h>
 #include <sync/spinlock.h>
 
@@ -60,7 +60,7 @@ static inline void locked_list_del(struct locked_list *ll,
 
 static inline void locked_list_del_locked(struct locked_list *ll,
                                           struct list_head *lh) {
-    kassert(spinlock_locked(&ll->lock));
+    enforce(spinlock_locked(&ll->lock));
     list_del_init(lh);
     ll->num_elems--;
 }

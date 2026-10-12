@@ -15,7 +15,7 @@ void mmio_init() {
 
 static inline cc_always_inline void *mmio_map_raw(paddr_t phys, size_t size,
                                                   bool cacheable) {
-    kassert(mmio_vas_space);
+    enforce(mmio_vas_space);
     return vas_map(mmio_vas_space, phys, size,
                    .page_flags =
                        PAGE_WRITE | (cacheable ? PAGE_UNCACHABLE : 0));
@@ -30,6 +30,6 @@ void *mmio_map_dma(paddr_t phys, size_t size) {
 }
 
 void mmio_unmap(void cc_mem_io *vaddr, size_t size) {
-    kassert(mmio_vas_space);
+    enforce(mmio_vas_space);
     vas_unmap(mmio_vas_space, (void *) vaddr, size);
 }

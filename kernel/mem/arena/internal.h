@@ -23,7 +23,7 @@ struct arena_globals {
 extern struct arena_globals arena_global;
 
 bool arena_check(struct arena *a);
-#define arena_check_assert(a) kassert(arena_check(a))
+#define arena_check_assert(a) enforce(arena_check(a))
 
 static inline struct arena_seg_inmem_desc *
 arena_get_inmem_descs(struct arena *a) {
