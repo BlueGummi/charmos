@@ -32,13 +32,13 @@ LOG_HANDLE_EXTERN(slab_flags);
     cc_diagnose_if((align) == 0 || ((align) & ((align) - 1)) != 0,             \
                    "alignment must be a nonzero power of two", "error")
 
-void *valloc_new(size_t size, struct alloc_params params) cw_alloc(1)
-    cc_warn_unused_result ALLOC_PARAMS_CONTRACT(params)
+void *cc_nullable valloc_new(size_t size, struct alloc_params params)
+    cw_alloc(1) cc_warn_unused_result ALLOC_PARAMS_CONTRACT(params)
         ALLOC_SIZE_CONTRACT(size);
 void vfree_new(void *ptr, enum alloc_behavior behavior);
 
-void *valloc_from_domain(domain_id_t domain, size_t size) cw_alloc(2)
-    cc_warn_unused_result;
+void *cc_nullable valloc_from_domain(domain_id_t domain, size_t size)
+    cw_alloc(2) cc_warn_unused_result;
 
 void vfree_full(void *ptr, enum alloc_behavior behavior)
     cc_owner_takes(valloc, 1);
@@ -46,24 +46,26 @@ void vfree_defer_irq(void *ptr) cc_owner_takes(valloc, 1);
 void vfree_aligned_full(void *ptr, enum alloc_behavior behavior)
     cc_owner_takes(valloc_aligned, 1);
 
-void *valloc_full(size_t size, struct alloc_params params) cw_alloc(1)
-    cc_dealloc(vfree_full, 1) cc_dealloc(vfree_defer_irq, 1)
+void *cc_nullable valloc_full(size_t size, struct alloc_params params)
+    cw_alloc(1) cc_dealloc(vfree_full, 1) cc_dealloc(vfree_defer_irq, 1)
     cc_owner_returns(valloc) cc_warn_unused_result ALLOC_PARAMS_CONTRACT(params)
         ALLOC_SIZE_CONTRACT(size);
 
-void *vrealloc_full(void *ptr, size_t size, struct alloc_params params)
-    cc_alloc_size(2) cc_warn_unused_result ALLOC_PARAMS_CONTRACT(params);
+void *cc_nullable vrealloc_full(void *ptr, size_t size,
+                                struct alloc_params params) cc_alloc_size(2)
+cc_warn_unused_result ALLOC_PARAMS_CONTRACT(params);
 size_t vsize(void *ptr);
 
-void *valloc_aligned_full(size_t size, size_t align, struct alloc_params params)
-    cw_alloc(1, 2) cc_dealloc(vfree_aligned_full, 1)
-    cc_owner_returns(valloc_aligned)
+void *cc_nullable valloc_aligned_full(size_t size, size_t align,
+                                      struct alloc_params params) cw_alloc(1, 2)
+    cc_dealloc(vfree_aligned_full, 1) cc_owner_returns(valloc_aligned)
         cc_warn_unused_result ALLOC_PARAMS_CONTRACT(params)
             ALLOC_SIZE_CONTRACT(size) ALLOC_ALIGN_CONTRACT(align);
 
-void *valloc_pages(size_t page_count, enum alloc_flags flags) cw_alloc()
-    cc_warn_unused_result cc_diagnose_if(!ALLOC_FLAGS_VALID(flags),
-                                         "alloc flags set unavailable bits",
-                                         "error")
-        ALLOC_SIZE_CONTRACT(page_count);
+void *cc_nullable valloc_pages(size_t page_count, enum alloc_flags flags)
+    cw_alloc()
+        cc_warn_unused_result cc_diagnose_if(!ALLOC_FLAGS_VALID(flags),
+                                             "alloc flags set unavailable bits",
+                                             "error")
+            ALLOC_SIZE_CONTRACT(page_count);
 bool valloc_ptr_in_slab_validate(void *ptr);
