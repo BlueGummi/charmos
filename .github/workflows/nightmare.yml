@@ -78,7 +78,7 @@ jobs:
           echo "seed=0x${{ github.run_id }}${{ github.run_attempt }}" \
               >> "$GITHUB_OUTPUT"
 
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
 
       - name: Compile
         run: |
@@ -118,7 +118,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
 
       - name: Download all results
         uses: actions/download-artifact@v8
