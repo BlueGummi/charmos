@@ -100,14 +100,16 @@ static struct ahci_disk *device_setup(struct ahci_device               *dev,
             continue;
 
         uint32_t sig = mmio_read_32(&port->sig);
-        ahci_log(LOG_INFO, "Controller port %u has signature %p", i, sig);
+        ahci_log(LOG_INFO, "Controller port %u has signature 0x%08x", i, sig);
 
         if (sig == 0xFFFFFFFF)
             continue;
 
         if (sig != 0x00000101) {
-            ahci_log(LOG_WARN, "Controller port %u is not an HDD, skipping...",
-                     i, sig);
+            ahci_log(
+                LOG_WARN,
+                "Controller port %u is not an HDD (sig 0x%08x), skipping...", i,
+                sig);
             continue;
         }
 

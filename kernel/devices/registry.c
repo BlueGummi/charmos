@@ -105,7 +105,7 @@ void registry_setup() {
     uint64_t count;
 
     pci_scan_devices(&devices, &count);
-    log_info_global(LOG_HANDLE(pci), "Found %u devices", count);
+    log_info_global(LOG_HANDLE(pci), "Found %lu devices", count);
 
     pci_init_devices(devices, count);
     ata_init(devices, count);

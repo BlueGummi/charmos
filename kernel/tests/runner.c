@@ -1066,14 +1066,14 @@ void tests_run(void) {
     char *fail_color = all_ok ? ANSI_GREEN : ANSI_RED;
     char *skip_color = all_ok ? ANSI_GREEN : ANSI_GRAY;
 
-    test_harness_info("%llu " ANSI_CYAN "total" ANSI_RESET
-                      " tests, %llu " ANSI_GREEN "passed" ANSI_RESET
-                      ", %llu %sfailed" ANSI_RESET ", %llu %sskipped" ANSI_RESET
+    test_harness_info("%zu " ANSI_CYAN "total" ANSI_RESET
+                      " tests, %zu " ANSI_GREEN "passed" ANSI_RESET
+                      ", %zu %sfailed" ANSI_RESET ", %zu %sskipped" ANSI_RESET
                       "\n",
                       test_global.total_tests_enabled, pass_count, fail_count,
                       fail_color, skip_count, skip_color);
 
-    test_harness_info("%s%s" ANSI_RESET " (%llu ms)\n", color, msg, total_time);
+    test_harness_info("%s%s" ANSI_RESET " (%lu ms)\n", color, msg, total_time);
 
     ndjson_emit(test_totals, .total = test_global.total_tests_enabled,
                 .passed = pass_count, .failed = fail_count,

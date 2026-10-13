@@ -224,7 +224,7 @@ static void test_fleet_dump_worker(const struct test_conc_worker *w) {
 static void test_fleet_dump(struct test_fleet *f,
                             const struct test_stall_evidence *ev) {
     if (ev)
-        test_err("fleet stalled: silent_ms=%lu progress=%lu observer_cpu=%u",
+        test_err("fleet stalled: silent_ms=%lu progress=%lu",
                  (unsigned long) ev->silent_ms, (unsigned long) ev->progress);
 
     test_err("fleet: %zu worker(s), started=%zu finished=%zu stop=%s", f->count,

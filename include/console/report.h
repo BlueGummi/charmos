@@ -41,7 +41,8 @@ void report_line_reset(struct report_line *l);
 void report_line_puts(struct report_line *l, const char *s);
 cc_printf_like(2, 3) void report_line_printf(struct report_line *l,
                                              const char *fmt, ...);
-void report_line_vprintf(struct report_line *l, const char *fmt, va_list ap);
+void report_line_vprintf(struct report_line *l, const char *fmt, va_list ap)
+    cc_printf_like(2, 0);
 
 /* Spaces out to a display column */
 void report_line_pad_to(struct report_line *l, size_t col);

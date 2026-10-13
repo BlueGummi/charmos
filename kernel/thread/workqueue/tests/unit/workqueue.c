@@ -87,7 +87,7 @@ TEST_DEFINE_UNIT(workqueue, mt_enqueue_scaling,
     char *msg = valloc(100, ALLOC_ZERO);
     if (msg) {
         snprintf(msg, 100, "There are %lu workers", workers);
-        test_info(msg);
+        test_info("%s", msg);
         vfree(msg);
     }
 

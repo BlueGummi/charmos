@@ -169,7 +169,7 @@ TEST_DEFINE_INTEGRATION(slab, mt_alloc_free_stress,
 
         if (!thread_join_timeout(workers[i], left, NULL)) {
             snprintf(msg, sizeof(msg), "thread %d did not complete in time", i);
-            test_info(msg);
+            test_info("%s", msg);
 
             /* still running, and we are done waiting on it */
             for (int j = i; j < STRESS_THREADS; ++j)
@@ -180,7 +180,7 @@ TEST_DEFINE_INTEGRATION(slab, mt_alloc_free_stress,
 
         if (!done[i]) {
             snprintf(msg, sizeof(msg), "thread %d exited without finishing", i);
-            test_info(msg);
+            test_info("%s", msg);
 
             for (int j = i + 1; j < STRESS_THREADS; ++j)
                 thread_detach(workers[j]);

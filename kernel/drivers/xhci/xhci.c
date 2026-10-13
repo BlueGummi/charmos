@@ -795,7 +795,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
     void cc_mem_io *mmio = xhci_map_mmio(bus, slot, func);
 
     struct xhci_device *dev = xhci_device_create(mmio);
-    xhci_info("Device at %p, offset is %u", dev,
+    xhci_info("Device at %p, offset is %zu", dev,
               offsetof(struct xhci_request, list));
 
     semaphore_init(&dev->sem, 0, SEMAPHORE_INIT_IRQ_DISABLE);

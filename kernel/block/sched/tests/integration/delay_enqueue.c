@@ -65,11 +65,11 @@ TEST_DEFINE_INTEGRATION(bio_sched, delay_enqueue,
     for (size_t i = 0; i < test_runs; i++)
         for (size_t j = 0; j < test_runs; j++)
             if (i != j && rqs[i] == rqs[j])
-                test_err("duplicate at %u and %u\n", i, j);
+                test_err("duplicate at %zu and %zu\n", i, j);
 
     for (size_t i = 0; i < test_runs; i++) {
         if (!rqs[i]->disk) {
-            test_err("rq %p %u\n", rqs[i], i);
+            test_err("rq %p %zu\n", rqs[i], i);
             return TEST_SUCCESS;
         }
 
@@ -88,7 +88,7 @@ TEST_DEFINE_INTEGRATION(bio_sched, delay_enqueue,
     char *msg = valloc(100);
     TEST_ASSERT_NONNULL(msg);
     snprintf(msg, 100, "Total time spent enqueuing is %lu ms", ms);
-    test_info(msg);
+    test_info("%s", msg);
 
     bio_sched_dispatch_all(d);
 
@@ -104,14 +104,14 @@ TEST_DEFINE_INTEGRATION(bio_sched, delay_enqueue,
         TEST_ASSERT_NONNULL(lvl_msg);
         snprintf(lvl_msg, 100, "Average completion time of level %lu is %lu ms",
                  i, avg_complete_time[i]);
-        test_info(lvl_msg);
+        test_info("%s", lvl_msg);
     }
 
     char *m2 = valloc(100);
     TEST_ASSERT_NONNULL(m2);
     snprintf(m2, 100, "Runs is %d, test_runs is %zu", atomic_load(&runs),
              test_runs);
-    test_info(m2);
+    test_info("%s", m2);
     TEST_ASSERT_LE(atomic_load(&runs), test_runs);
 
     return TEST_SUCCESS;

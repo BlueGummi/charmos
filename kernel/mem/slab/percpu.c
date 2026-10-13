@@ -22,7 +22,7 @@ static cc_no_asan void slab_magazine_zero_check(struct slab_magazine *mag) {
                 uint64_t byte_idx;
                 uint8_t bit_mask;
                 slab_index_and_mask(s, (void *) obj, &byte_idx, &bit_mask);
-                slab_err("CORRUPT parked obj %p mag_objsize=%zu", obj,
+                slab_err("CORRUPT parked obj %p mag_objsize=%zu", (void *) obj,
                          mag->obj_size);
                 slab_err("  slab=%p type=%d obj_size=%zu page_count=%zu "
                          "used=%zu bit_set=%d",

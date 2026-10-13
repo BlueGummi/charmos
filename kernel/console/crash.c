@@ -908,15 +908,15 @@ static struct crash_facility *crash_facility_for(enum crash_code code) {
     return facility_for(CRASH_CODE_GET_FACILITY(code));
 }
 
+/* Can't crash in here,
+ * TODO: Consider supporting crashing in here*/
 const char *crash_code_from_facility_to_str(enum crash_code code) {
-    uint16_t pref = CRASH_CODE_GET_FACILITY(code);
     uint16_t del = CRASH_CODE_GET_DELTA(code);
-    enforce(pref && del);
-    struct crash_facility *this = enforce(facility_for(pref));
-    if (this->to_str)
-        return this->to_str(del);
+    struct crash_facility *this = crash_facility_for(code);
+    if (!del || !this || !this->to_str)
+        return NULL;
 
-    return NULL;
+    return this->to_str(del);
 }
 
 void crash_facilities_init(void) {

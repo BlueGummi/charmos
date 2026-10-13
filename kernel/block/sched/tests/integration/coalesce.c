@@ -45,7 +45,7 @@ TEST_DEFINE_INTEGRATION(bio_sched, coalesce, TEST_INTENSITY(1, 2, 16),
     char *name = valloc(100);
     uint64_t t = time_get_us();
     snprintf(name, 100, "enqueues took %lu us", time_get_us() - t);
-    test_info(name);
+    test_info("%s", name);
 
     bio_sched_dispatch_all(d);
 

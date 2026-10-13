@@ -112,7 +112,7 @@ struct nvme_device *nvme_discover_device(uint8_t bus, uint8_t slot,
      * PRP List page, so we just cap the transfer at that */
     uint64_t prp_limit      = NVME_PRPS_PER_PAGE * PAGE_SIZE;
     nvme->max_transfer_size = MIN(nvme->max_transfer_size, prp_limit);
-    nvme_log(LOG_INFO, "Controller max transfer size is %u bytes",
+    nvme_log(LOG_INFO, "Controller max transfer size is %lu bytes",
              nvme->max_transfer_size);
 
     nvme->isr_index = vnews(nvme->isr_index, (sqs_to_make + 1), ALLOC_ZERO);

@@ -269,10 +269,16 @@ struct crash_context {
 
 LINKER_SECTION_EXTERN(struct crash_facility, crash_facilities);
 
-cc_noreturn void enforce_impl_default(struct crash_payload payload,
-                                      const char *file, int line,
-                                      const char *func, const char *prefix,
-                                      const char *expr, const char *fmt, ...);
+cc_noreturn void enforce_impl_msg(const char *file, int line, const char *func,
+                                  const char *prefix, const char *expr,
+                                  const char *fmt, ...) cc_printf_like(6, 7);
+cc_noreturn void enforce_impl_code(const char *file, int line, const char *func,
+                                   const char *prefix, const char *expr,
+                                   enum crash_code code, const char *fmt, ...)
+    cc_printf_like(7, 8);
+cc_noreturn void enforce_impl_code_only(const char *file, int line,
+                                        const char *func, const char *prefix,
+                                        const char *expr, enum crash_code code);
 
 cc_noreturn void crash_full(const struct crash_context *ctx);
 
@@ -282,7 +288,7 @@ void crash_facilities_init(void);
 const char *crash_code_from_facility_to_str(enum crash_code code);
 void crash_nmi_handoff(void *p, struct irq_registers *irqc);
 void debug_print_stack(void);
-void crash_facility_printf(const char *fmt, ...);
+void crash_facility_printf(const char *fmt, ...) cc_printf_like(1, 2);
 void crash_perthread_init(struct thread *t);
 void crash_unwind(void);
 

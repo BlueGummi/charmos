@@ -4,55 +4,48 @@
 #include <compiler/intrinsic.h>
 #include <console/crash.h>
 
-cc_noreturn cc_cold cc_printf_like(5, 6) cc_nonnull(2, 4, 5) void
-panic_impl_default(struct crash_payload payload, const char *file, int line,
-                   const char *func, const char *fmt, ...);
+cc_noreturn cc_cold cc_printf_like(4, 5) cc_nonnull(1, 3, 4) void
+panic_impl_msg(const char *file, int line, const char *func, const char *fmt,
+               ...);
+cc_noreturn cc_cold cc_printf_like(5, 6) cc_nonnull(1, 3, 5) void
+panic_impl_code(const char *file, int line, const char *func,
+                enum crash_code code, const char *fmt, ...);
+cc_noreturn cc_cold cc_nonnull(1, 3) void
+panic_impl_code_only(const char *file, int line, const char *func,
+                     enum crash_code code);
 
-#define _panic_pick(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, NAME, ...)   \
+#define _panic_pick(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12,     \
+                    _13, _14, _15, _16, NAME, ...)                             \
     NAME
 
-#define _panic_dispatch(default, name, ...)                                    \
-    _panic_pick(__VA_ARGS__, name##_n, name##_n, name##_n, name##_n, name##_n, \
-                name##_n, name##_n, name##_n, name##_n, name##_2,              \
-                name##_1)(default, __VA_ARGS__)
+#define _panic_arity(...)                                                      \
+    _panic_pick(_, ##__VA_ARGS__, _panic_n, _panic_n, _panic_n, _panic_n,      \
+                _panic_n, _panic_n, _panic_n, _panic_n, _panic_n, _panic_n,    \
+                _panic_n, _panic_n, _panic_n, _panic_n, _panic_n, _panic_1,    \
+                _panic_0)
 
-#define _panic_as_code(x) ct_as_type(enum crash_code, x)
+#define _panic_fn(a, code_fn)                                                  \
+    _Generic((a),                                                              \
+        char *: panic_impl_msg,                                                \
+        const char *: panic_impl_msg,                                          \
+        default: code_fn)
+
+/* panic() */
+#define _panic_0()                                                             \
+    panic_impl_code_only(__FILE__, __LINE__, __func__, CRASH_CODE_GENERIC)
 
 /*
  * panic(CODE)
  * panic("msg")
  */
-#define _panic_1(default, x)                                                   \
-    ci_choose_expr(                                                            \
-        ct_is_str(x),                                                          \
-        panic_impl_default(CRASH_CODE_TO_PAYLOAD(default), __FILE__, __LINE__, \
-                           __func__, ct_as_str(x)),                            \
-        panic_impl_default(CRASH_CODE_TO_PAYLOAD(_panic_as_code(x)), __FILE__, \
-                           __LINE__, __func__, "%s", "No message supplied"))
+#define _panic_1(a)                                                            \
+    _panic_fn(a, panic_impl_code_only)(__FILE__, __LINE__, __func__, a)
+
 /*
- * panic(CODE, "msg")
  * panic("msg %d", 12)
+ * panic(CODE, "msg %d", 12)
  */
-#define _panic_2(default, x, y)                                                \
-    ci_choose_expr(                                                            \
-        ct_is_str(x),                                                          \
-        panic_impl_default(CRASH_CODE_TO_PAYLOAD(default), __FILE__, __LINE__, \
-                           __func__, ct_as_str(x),                             \
-                           y), /* x is format, y is first vararg */            \
-        panic_impl_default(CRASH_CODE_TO_PAYLOAD(_panic_as_code(x)), __FILE__, \
-                           __LINE__, __func__, "%s", ct_as_str(y)))
+#define _panic_n(a, ...)                                                       \
+    _panic_fn(a, panic_impl_code)(__FILE__, __LINE__, __func__, a, __VA_ARGS__)
 
-/*
- * panic("msg %d %d", 12, 13)
- */
-#define _panic_n(default, fmt, ...)                                            \
-    panic_impl_default(CRASH_CODE_TO_PAYLOAD(default), __FILE__, __LINE__,     \
-                       __func__, fmt, __VA_ARGS__)
-
-#define panic(...) _panic_dispatch(CRASH_CODE_GENERIC, _panic, __VA_ARGS__)
-#define panic_with(payload, fmt, ...)                                          \
-    panic_impl_default(payload, __FILE__, __LINE__, __func__, fmt,             \
-                       ##__VA_ARGS__)
-
-#define panic_with_default(default, ...)                                       \
-    _panic_dispatch(default, _panic, __VA_ARGS__)
+#define panic(...) _panic_arity(__VA_ARGS__)(__VA_ARGS__)

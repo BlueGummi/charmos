@@ -751,7 +751,7 @@ void slab_allocator_init() {
         sc->parent_domain = NULL;
         sc->type = SLAB_TYPE_NONPAGEABLE;
         sc->parent = &slab_global.caches;
-        slab_info("Slab cache s=%u a=%u \"%s\", o=%u, p=%zu",
+        slab_info("Slab cache s=%zu a=%zu \"%s\", o=%lu, p=%zu",
                   slab_global.class_sizes[i].size,
                   slab_global.class_sizes[i].align,
                   slab_global.class_sizes[i].name,
@@ -790,7 +790,7 @@ size_t vsize(void *ptr) {
 
     if (!in_slab) {
         struct slab_page_hdr *hdr = slab_page_hdr_for_addr(ptr);
-        enforce(hdr->magic == VALLOC_PAGE_MAGIC, "header is 0x%lx", hdr->magic);
+        enforce(hdr->magic == VALLOC_PAGE_MAGIC, "header is 0x%x", hdr->magic);
         return hdr->pages * PAGE_SIZE - sizeof(struct slab_page_hdr);
     }
 
@@ -1144,14 +1144,14 @@ out:
             size_t obj_idx = ((vaddr_t) ret - dslab->mem) / cache->obj_stride;
 
             slab_err(
-                "NON-UNIFORM ZERO BUF: sz=%zu type=%d ppslab=%zu stride=%u",
+                "NON-UNIFORM ZERO BUF: sz=%zu type=%d ppslab=%zu stride=%lu",
                 cache->obj_size, (int) cache->type, cache->pages_per_slab,
                 cache->obj_stride);
-            slab_err("  ret=%p slab=%p slaboff=%zu page=%zu objidx=%zu used=%u "
-                     "badoff=%zu badval=0x%02x",
-                     ret, (void *) dslab, (size_t) soff,
-                     (size_t) (soff / PAGE_SIZE), obj_idx, dslab->used, bad,
-                     bb[bad]);
+            slab_err(
+                "  ret=%p slab=%p slaboff=%zu page=%zu objidx=%zu used=%zu "
+                "badoff=%zu badval=0x%02x",
+                ret, (void *) dslab, (size_t) soff, (size_t) (soff / PAGE_SIZE),
+                obj_idx, dslab->used, bad, bb[bad]);
 
             for (size_t i = 0; i < cache->obj_size; i += 16) {
                 uint8_t r[16] = {0};

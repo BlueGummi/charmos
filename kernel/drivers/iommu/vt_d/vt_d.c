@@ -70,7 +70,7 @@ enum iommu_error vtd_iq_init(struct vtd_unit *u) {
     vtd_write_gcmd(u, GCMD_QUEUED_INVAL_ENABLE);
     vtd_wait_gsts(u, GSTS_QUEUED_INVAL_ENABLED, true);
 
-    vtd_info("IQ initialized: phys=0x%llx entries=%u", phys, u->iq_size);
+    vtd_info("IQ initialized: phys=0x%lx entries=%u", phys, u->iq_size);
     return IOMMU_ERR_OK;
 }
 
@@ -114,7 +114,7 @@ enum iommu_error vtd_root_table_init(struct vtd_unit *u) {
     vtd_iq_submit(u, IOTLB_INVAL_DESC_GLOBAL);
     vtd_iq_flush(u);
 
-    vtd_info("root table initialized: phys=0x%llx", phys);
+    vtd_info("root table initialized: phys=0x%lx", phys);
     return IOMMU_ERR_OK;
 }
 
@@ -199,7 +199,7 @@ static enum iommu_error vtd_passthrough_all_devices(struct vtd_unit *u) {
     vtd_iq_flush(u);
 
     vtd_info("passthrough identity domain installed for all devices (dom=%u "
-             "sl=0x%llx)",
+             "sl=0x%lx)",
              domain_id, sl_phys);
     return IOMMU_ERR_OK;
 }
@@ -208,11 +208,11 @@ enum iommu_error vtd_unit_init(struct iommu *unit) {
     struct vtd_unit *u = unit->private;
 
     vtd_info("initializing VT-d unit seg=%u regs=%p", u->segment, u->regs);
-    vtd_info("  CAP:  SAGAW=%02x MGAW=%u CM=%u RWBF=%u domains=%u",
+    vtd_info("  CAP:  SAGAW=%02lx MGAW=%lu CM=%lu RWBF=%lu domains=%u",
              CAP_SUPPORTED_ADDR_WIDTHS(u->cap), CAP_MAX_ADDR_WIDTH(u->cap),
              CAP_CACHING_MODE(u->cap), CAP_REQUIRES_WRITE_BUF_FLUSH(u->cap),
              vtd_cap_domain_count(u->cap));
-    vtd_info("  ECAP: QI=%u IR=%u PT=%u SC=%u C=%u",
+    vtd_info("  ECAP: QI=%lu IR=%lu PT=%lu SC=%lu C=%lu",
              ECAP_QUEUED_INVALIDATION(u->ecap),
              ECAP_INTERRUPT_REMAPPING(u->ecap), ECAP_PASS_THROUGH(u->ecap),
              ECAP_SNOOP_CONTROL(u->ecap), ECAP_COHERENCY(u->ecap));

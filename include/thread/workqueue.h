@@ -232,7 +232,8 @@ struct workqueue *workqueue_create_internal(struct workqueue_attributes *attrs,
 
 #define workqueue_create(name, attrs)                                          \
     workqueue_create_internal((attrs), PP_UNPAREN(name))
-struct workqueue *workqueue_create_default(const char *fmt, ...);
+struct workqueue *workqueue_create_default(const char *fmt, ...)
+    cc_printf_like(1, 2);
 struct work *work_create(work_function func, struct work_args args);
 struct work *work_init(struct work *work, work_function fn,
                        struct work_args args);

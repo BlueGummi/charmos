@@ -501,11 +501,7 @@ void rwlock_assert_not_held_full(struct rwlock *lock,
 #endif
     /* Raw fallback can only check write mode ownership, which is
      * a small caveat of the system here, as reads can be
-     * any reader, not necessarily "this reader".
-     *
-     * Not reporting anything at all here is better than
-     * a false positive, since it keeps the checker
-     * honest instead of spreading misinformation */
+     * any reader, not necessarily "this reader" */
     enforce(!rwlock_locked(lock, RWLOCK_WRITE),
             "rwlock unexpectedly held (write) by current thread");
 }

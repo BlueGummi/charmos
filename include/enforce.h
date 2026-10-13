@@ -4,15 +4,6 @@
 #include <console/crash.h>
 #include <console/panic.h>
 
-#define _enforce_pick(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, NAME, ...) \
-    NAME
-
-#define _enforce_dispatch(default, name, prefix, ...)                          \
-    _enforce_pick(__VA_ARGS__, name##_n, name##_n, name##_n, name##_n,         \
-                  name##_n, name##_n, name##_n, name##_n, name##_n, name##_2,  \
-                  name##_1)(default, prefix, __VA_ARGS__)
-
-#define _enforce_as_code(x) ct_as_type(enum crash_code, x)
 #define _enforce_msg(x) "Enforcement \"" #x "\" failed"
 
 #define _debug_enforce_off_dispatch(first, ...)                                \
@@ -39,80 +30,62 @@
         }                                                                      \
         res_;                                                                  \
     })
-/*
- * enforce(x)
- */
-#define _enforce_1(default, prefix, x)                                         \
-    _enforce_eval(x, enforce_impl_default(CRASH_CODE_TO_PAYLOAD(default),      \
-                                          __FILE__, __LINE__, __func__,        \
-                                          prefix, _enforce_msg(x), NULL))
+
+#define _enforce_pick(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12,   \
+                      _13, _14, _15, _16, NAME, ...)                           \
+    NAME
+
+#define _enforce_arity(...)                                                    \
+    _enforce_pick(_, ##__VA_ARGS__, _enforce_n, _enforce_n, _enforce_n,        \
+                  _enforce_n, _enforce_n, _enforce_n, _enforce_n, _enforce_n,  \
+                  _enforce_n, _enforce_n, _enforce_n, _enforce_n, _enforce_n,  \
+                  _enforce_n, _enforce_n, _enforce_1, _enforce_0)
+
+#define _enforce_fn(a, code_fn)                                                \
+    _Generic((a),                                                              \
+        char *: enforce_impl_msg,                                              \
+        const char *: enforce_impl_msg,                                        \
+        default: code_fn)
+
+#define _enforce_ctx(prefix, x)                                                \
+    __FILE__, __LINE__, __func__, prefix, _enforce_msg(x)
+
+/* enforce(x) */
+#define _enforce_0(prefix, x)                                                  \
+    _enforce_eval(x, enforce_impl_code_only(_enforce_ctx(prefix, x),           \
+                                            CRASH_CODE_GENERIC))
 
 /*
  * enforce(x, CODE)
  * enforce(x, "msg")
  */
-#define _enforce_2(default, prefix, x, a)                                      \
+#define _enforce_1(prefix, x, a)                                               \
     _enforce_eval(                                                             \
-        x, ci_choose_expr(                                                     \
-               ct_is_str(a),                                                   \
-               enforce_impl_default(CRASH_CODE_TO_PAYLOAD(default), __FILE__,  \
-                                    __LINE__, __func__, prefix,                \
-                                    _enforce_msg(x), ct_as_str(a)),            \
-               enforce_impl_default(                                           \
-                   CRASH_CODE_TO_PAYLOAD(_enforce_as_code(a)), __FILE__,       \
-                   __LINE__, __func__, prefix, _enforce_msg(x), NULL)))
+        x, _enforce_fn(a, enforce_impl_code_only)(_enforce_ctx(prefix, x), a))
 
 /*
  * enforce(x, "msg %d", 12)
  * enforce(x, CODE, "msg %d", 12)
  */
-#define _enforce_n(default, prefix, x, a, b, ...)                              \
-    _enforce_eval(x, ci_choose_expr(                                           \
-                         ct_is_str(a), /* a is format, b is first vararg */    \
-                         enforce_impl_default(CRASH_CODE_TO_PAYLOAD(default),  \
-                                              __FILE__, __LINE__, __func__,    \
-                                              prefix, _enforce_msg(x),         \
-                                              ct_as_str(a), b, ##__VA_ARGS__), \
-                         enforce_impl_default(                                 \
-                             CRASH_CODE_TO_PAYLOAD(_enforce_as_code(a)),       \
-                             __FILE__, __LINE__, __func__, prefix,             \
-                             _enforce_msg(x), ct_as_str(b), ##__VA_ARGS__)))
+#define _enforce_n(prefix, x, a, ...)                                          \
+    _enforce_eval(x, _enforce_fn(a, enforce_impl_code)(                        \
+                         _enforce_ctx(prefix, x), a, __VA_ARGS__))
 
-#define _enforce_fail(c, prefix, ...)                                          \
-    enforce_impl_default(CRASH_CODE_TO_PAYLOAD(c), __FILE__, __LINE__,         \
-                         __func__, prefix, NULL, "" __VA_ARGS__)
+#define _enforce_fail(prefix, ...)                                             \
+    enforce_impl_msg(__FILE__, __LINE__, __func__, prefix, NULL, "" __VA_ARGS__)
 
-#define enforce_with_default(default, ...)                                     \
-    _enforce_dispatch(default, "", __VA_ARGS__)
-#define enforce(...)                                                           \
-    _enforce_dispatch(CRASH_CODE_GENERIC, _enforce, "", __VA_ARGS__)
+#define enforce(x, ...) _enforce_arity(__VA_ARGS__)("", x, ##__VA_ARGS__)
 
-#define enforce_with(x, payload, fmt, ...)                                     \
-    ({                                                                         \
-        ct_decay(x) _enforce_res = (x);                                        \
-        if (cc_unlikely(!(_enforce_res))) {                                    \
-            enforce_impl_default(payload, __FILE__, __LINE__, __func__, "",    \
-                                 _enforce_msg(x), fmt, ##__VA_ARGS__);         \
-            ci_unreachable();                                                  \
-        }                                                                      \
-        _enforce_res;                                                          \
-    })
+#define unimplemented(...) _enforce_fail("unimplemented! ", ##__VA_ARGS__)
 
-#define unimplemented(...)                                                     \
-    _enforce_fail(CRASH_CODE_GENERIC, "unimplemented! ", ##__VA_ARGS__)
+#define todo(...) _enforce_fail("TODO: ", ##__VA_ARGS__)
 
-#define todo(...) _enforce_fail(CRASH_CODE_GENERIC, "TODO: ", ##__VA_ARGS__)
-
-#define unreachable(...)                                                       \
-    _enforce_fail(CRASH_CODE_GENERIC, "unreachable! ", ##__VA_ARGS__)
+#define unreachable(...) _enforce_fail("unreachable! ", ##__VA_ARGS__)
 
 #ifdef DEBUG_ENFORCE
 
-#define debug_enforce_with_default(default, ...)                               \
-    _enforce_dispatch(default, _enforce, "DEBUG ", __VA_ARGS__)
-
-#define debug_enforce(...)                                                     \
-    _enforce_dispatch(CRASH_CODE_GENERIC, _enforce, "DEBUG ", __VA_ARGS__)
+#define debug_enforce(x, ...)                                                  \
+    _enforce_arity(__VA_ARGS__)("DEBUG ", x, ##__VA_ARGS__)
 
 #else
 

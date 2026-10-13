@@ -416,8 +416,5 @@ struct turnstile *turnstile_block(struct turnstile *ts, size_t queue_num,
 
 size_t turnstile_get_waiter_count(void *lock_obj) {
     struct turnstile *ts = turnstile_lookup_internal(lock_obj);
-    if (ts)
-        return ts->waiters;
-
-    return 0;
+    return ts ? ts->waiters : 0;
 }

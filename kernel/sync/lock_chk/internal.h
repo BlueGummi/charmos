@@ -226,8 +226,8 @@ static inline void lock_chk_report_release(void) {
     atomic_store_release(&lock_chk_global.report_busy, false);
 }
 
-static inline void lock_chk_fail(struct lock_chk_fault *fault, const char *fmt,
-                                 ...) {
+cc_printf_like(2, 3) static inline void
+lock_chk_fail(struct lock_chk_fault *fault, const char *fmt, ...) {
     fault->report = lock_chk_report_claim();
     if (fault->report != NULL) {
         va_list args;

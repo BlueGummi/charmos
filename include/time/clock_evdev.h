@@ -74,8 +74,10 @@ struct clock_evdev_group {
     struct list_head list_internal; /* Global list as well */
 };
 
-struct clock_evdev_group *clock_evdev_group_create(const char *fmt, ...);
-struct clock_evdev *clock_evdev_create(const char *fmt, ...);
+struct clock_evdev_group *clock_evdev_group_create(const char *fmt, ...)
+    cc_printf_like(1, 2);
+struct clock_evdev *clock_evdev_create(const char *fmt, ...)
+    cc_printf_like(1, 2);
 
 struct clock_evdev_group *clock_evdev_group_search_for(const char *name);
 void clock_evdev_register(struct clock_evdev *ced);

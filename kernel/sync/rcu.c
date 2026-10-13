@@ -409,7 +409,7 @@ static void rcu_report_stall(uint64_t seq, time_ms_t elapsed) {
     struct rcu_stall_blocker blockers[RCU_STALL_MAX_REPORTED];
     size_t nblockers = 0;
 
-    rcu_warn("grace period %llu stalled for %llu ms\n", seq, elapsed);
+    rcu_warn("grace period %lu stalled for %lu ms\n", seq, elapsed);
 
     for (size_t l = 0; l < rcu.leaf_count; l++) {
         struct rcu_node *leaf = &rcu.leaves[l];
@@ -441,14 +441,14 @@ static void rcu_report_stall(uint64_t seq, time_ms_t elapsed) {
         spin_unlock(&leaf->lock, irql);
 
         if (!cpu_mask_empty(&pending) || blocked)
-            rcu_warn("leaf %zu: cpus %#llx pending, %u blocking reader(s)\n", l,
+            rcu_warn("leaf %zu: cpus %#lx pending, %u blocking reader(s)\n", l,
 
                      pending.bits[leaf->cpu_base / BITMAP_BITS_PER_WORD],
                      blocked);
     }
 
     for (size_t i = 0; i < nblockers; i++)
-        rcu_warn("tid %llu \"%s\" state %d read_seq %llu\n", blockers[i].id,
+        rcu_warn("tid %zu \"%s\" state %d read_seq %lu\n", blockers[i].id,
                  blockers[i].name ? blockers[i].name : "?", blockers[i].state,
                  blockers[i].read_seq);
 }

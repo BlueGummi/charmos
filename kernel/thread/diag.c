@@ -107,11 +107,11 @@ void thread_dump_wait_trace(struct thread *t, const char *role, size_t idx,
 
     uint64_t count = d->wait_arm_count;
 
-    log_msg(LOG_ERROR, "  %s[%zu]   arms=%llu (%llu distinct)", role, idx,
+    log_msg(LOG_ERROR, "  %s[%zu]   arms=%lu (%lu distinct)", role, idx,
             d->wait_arm_total, count);
 
     log_msg(LOG_ERROR,
-            "  %s[%zu]   apc: entries=%llu max_burst=%llu deliver_ra=%p", role,
+            "  %s[%zu]   apc: entries=%lu max_burst=%lu deliver_ra=%p", role,
             idx, d->apc_deliver_entries, d->apc_deliver_max,
             d->apc_last_deliver_ra);
 
@@ -123,12 +123,12 @@ void thread_dump_wait_trace(struct thread *t, const char *role, size_t idx,
         struct thread_wait_arm *e =
             &d->wait_trace[seq % THREAD_WAIT_TRACE_DEPTH];
 
-        log_msg(LOG_ERROR, "  %s[%zu]   arm#%llu %s ra=%p x%llu", role, idx,
-                seq, e->site ? e->site : "?", e->ra, e->repeats);
+        log_msg(LOG_ERROR, "  %s[%zu]   arm#%lu %s ra=%p x%lu", role, idx, seq,
+                e->site ? e->site : "?", e->ra, e->repeats);
 
         log_msg(LOG_ERROR,
                 "  %s[%zu]     -> state=%d %s object=%p reason=%u "
-                "epoch=%llu..%llu last=%llums blocks=%u",
+                "epoch=%lu..%lu last=%lums blocks=%u",
                 role, idx, (int) e->state, thread_wait_type_str(e->wait_type),
                 e->object, (unsigned) e->reason, e->first_epoch, e->last_epoch,
                 e->last_ms, e->block_count);

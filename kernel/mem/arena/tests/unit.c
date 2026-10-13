@@ -23,7 +23,7 @@ TEST_DEFINE_UNIT(arena, create_lookup_basic) {
 
     struct arena_seg_inmem_desc *imds = arena_get_inmem_descs(a);
     for (uint16_t i = 0; i < a->seg_count; i++)
-        test_info("desc %u id %u sz %zu", i, imds[i].id, imds[i].size);
+        test_info("desc %u id %u sz %u", i, imds[i].id, imds[i].size);
 
     for (uint16_t i = 0; i < a->seg_count; i++) {
         if (imds[i].id == 3)

@@ -127,4 +127,4 @@ enum wake_reason {
 
 struct thread *thread_create_full(char *name, thread_entry_fn_t entry,
                                   struct thread_create_params *params,
-                                  va_list args);
+                                  va_list args) cc_printf_like(1, 0);

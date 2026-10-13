@@ -23,7 +23,11 @@ set(KERNEL_WARNINGS
     -Werror=sign-compare
     -Werror=shift-count-overflow
     -Werror=shift-count-negative
-    -Werror=shift-negative-value)
+    -Werror=shift-negative-value
+    -Werror=format
+    -Werror=format-extra-args
+    -Werror=format-security
+    -Wno-format-zero-length)
 
 if (CMAKE_C_COMPILER_ID STREQUAL "Clang")
     list(APPEND KERNEL_WARNINGS -Wthread-safety -Werror=thread-safety -Watomic-implicit-seq-cst)

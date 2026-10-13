@@ -19,7 +19,7 @@ static void defer_func(void *boo, void *unused) {
              enqueue_ms, finish_ms, finish_ms - enqueue_ms);
 
     test_info("Delayed work complete");
-    test_info(msg);
+    test_info("%s", msg);
     atomic_store_release(&defer_worked, true);
 }
 

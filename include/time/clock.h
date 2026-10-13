@@ -60,7 +60,7 @@ struct clock {
     void *private;
 };
 
-struct clock *clock_create(const char *fmt, ...);
+struct clock *clock_create(const char *fmt, ...) cc_printf_like(1, 2);
 void clock_register(struct clock *c);
 void clock_unregister(struct clock *c);
 void clock_suspend_all(void);

@@ -313,7 +313,7 @@ TSA_NO_ANALYSIS {
             TEST_ASSERT(vas_valid(vas, 0));
             TEST_ASSERT(vas_destroy(vas));
             irql_lower(old);
-            test_info("size=%zu align=%zu cached=%u ticks/pair=%llu "
+            test_info("size=%zu align=%zu cached=%u ticks/pair=%lu "
                       "retained=%zu hits=%u/%u",
                       sizes[cls], align, cached, ticks / iterations, retained,
                       cached ? iterations : 0, iterations);
@@ -626,7 +626,7 @@ TEST_DEFINE_UNIT(vas, seeded_churn_against_interval_oracle) {
                         TEST_ASSERT_MSG(addr + size <= slots[j].addr ||
                                             slots[j].addr + slots[j].size <=
                                                 addr,
-                                        "overlap seed=%llu op=%zu", seed, op);
+                                        "overlap seed=%lu op=%zu", seed, op);
                 slots[slot].addr = addr;
                 slots[slot].size = size;
                 live += size;
@@ -635,7 +635,7 @@ TEST_DEFINE_UNIT(vas, seeded_churn_against_interval_oracle) {
         }
         if (op % 29 == 0)
             vas_reclaim(vas);
-        TEST_ASSERT_MSG(vas_valid(vas, live), "seed=%llu op=%zu", seed, op);
+        TEST_ASSERT_MSG(vas_valid(vas, live), "seed=%lu op=%zu", seed, op);
     }
     for (size_t i = 0; i < SLOTS; i++)
         if (slots[i].addr)

@@ -413,5 +413,5 @@ void smp_caller_verify(enum topology_caller caller) {
     };
 
     bool valid = topology_contract_verify(tct);
-    enforce(valid, "Caller 0x%lx was not satisfied", caller);
+    enforce(valid, "Caller 0x%x was not satisfied", caller);
 }

@@ -15,7 +15,7 @@ void numa_dump(void) {
     }
 
     log_msg(LOG_INFO, "NUMA distance matrix (%zu nodes):", n);
-    log_msg(LOG_INFO, "Displayed as distance (relative distance):", n);
+    log_msg(LOG_INFO, "Displayed as distance (relative distance):");
 
     printf("     ");
     for (size_t j = 0; j < n; j++)

@@ -64,7 +64,7 @@ struct log_dump_options {
 
 struct log_handle {
     void (*print)(const struct log_site *site, const struct log_record *rec,
-                  void (*print)(const char *fmt, ...));
+                  void (*print)(const char *fmt, ...) cc_printf_like(1, 2));
     enum log_handle_flags flags;
     atomic_uint32_t seen_internal;
     atomic_uint64_t last_ts_internal;
@@ -171,7 +171,8 @@ static inline bool log_site_enabled(const struct log_site *ss, uint8_t level) {
 
 void log_emit_full(struct log_site *, struct log_handle *, enum log_level,
                    const char *func, const char *fname, int32_t line,
-                   uintptr_t ip, uint8_t nargs, char *fmt, ...);
+                   uintptr_t ip, uint8_t nargs, char *fmt, ...)
+    cc_printf_like(9, 10);
 void log_dump_site_with_opts(struct log_site *, struct log_dump_options opts);
 void log_dump_site(struct log_site *site);
 void log_dump_site_default(struct log_site *);

@@ -18,7 +18,7 @@ TEST_DEFINE_SMOKE(slab, alloc_free) {
 
     snprintf(hooray, 128, "allocated %p and free took %lu ms", p, ms);
 
-    test_info(hooray);
+    test_info("%s", hooray);
     return TEST_SUCCESS;
 }
 
@@ -29,9 +29,9 @@ TEST_DEFINE_SMOKE(slab, alloc_free) {
 static char a_msg[128];
 TEST_DEFINE_SMOKE(slab, pattern_integrity) {
 
-    void *p1 = valloc_new(
-        1, (struct alloc_params){.flags = ALLOC_FLAGS_DEFAULT,
-                                 .behavior = ALLOC_BEHAVIOR_NORMAL});
+    void *p1 =
+        valloc_new(1, (struct alloc_params){.flags = ALLOC_FLAGS_DEFAULT,
+                                            .behavior = ALLOC_BEHAVIOR_NORMAL});
     void *p2 = valloc_new(
         64, (struct alloc_params){.flags = ALLOC_FLAGS_DEFAULT,
                                   .behavior = ALLOC_BEHAVIOR_NORMAL});
@@ -64,6 +64,6 @@ TEST_DEFINE_SMOKE(slab, pattern_integrity) {
 
     snprintf(a_msg, sizeof(a_msg), "basic alloc/free OK (free took %u ms)",
              (unsigned) elapsed);
-    test_info(a_msg);
+    test_info("%s", a_msg);
     return TEST_SUCCESS;
 }

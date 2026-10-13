@@ -182,7 +182,7 @@ static void apply_handle_pressures(struct thread *t, struct climb_handle *ch) {
 
         ch->applied_pressure_internal = newp - old;
         enforce(newp - old);
-        climb_info("Applying pressure %u to %p", newp - old, cts);
+        climb_info("Applying pressure %ld to %p", newp - old, cts);
         cts->direct_pressure = newp;
         return;
     }
@@ -201,7 +201,7 @@ static void apply_handle_pressures(struct thread *t, struct climb_handle *ch) {
 
     ch->applied_pressure_internal = newp - old;
     enforce(newp - old);
-    climb_info("Applying pressure %u to %p", newp - old, cts);
+    climb_info("Applying pressure %ld to %p", newp - old, cts);
     cts->indirect_pressure = newp;
 }
 
@@ -213,7 +213,7 @@ static void apply_handle(struct thread *t, struct climb_handle *ch) {
     apply_handle_pressures(t, ch);
     struct climb_thread_state *cts = &t->climb_state;
 
-    climb_info("Apply handle on %p, %u", cts, climb_count_handles(cts));
+    climb_info("Apply handle on %p, %zu", cts, climb_count_handles(cts));
 
     /* If there was already a giver, like with indirect boosts, we don't
      * change it. Otherwise, we do, and say we are the giver */
@@ -264,7 +264,7 @@ static void remove_handle(struct thread *t, struct climb_handle *ch) {
     ch->applied_pressure_internal = 0;
     list_del_init(&ch->list);
 
-    climb_info("Remove handle on %p (thread %p), %u left", cts, t,
+    climb_info("Remove handle on %p (thread %p), %zu left", cts, t,
                climb_count_handles(cts));
 
     if (list_empty(&cts->handles)) {

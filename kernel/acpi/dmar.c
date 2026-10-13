@@ -41,8 +41,8 @@ static void handle_drhd(const struct acpi_dmar_drhd *drhd) {
     bool include_all = (drhd->flags & ACPI_INCLUDE_PCI_ALL) != 0;
     uint32_t reg_size = 1u << (drhd->size + 12);
 
-    dmar_info("DRHD base=0x%016llx size=0x%x seg=%u %s", drhd->address,
-              reg_size, drhd->segment, include_all ? "(INCLUDE_ALL)" : "");
+    dmar_info("DRHD base=0x%016lx size=0x%x seg=%u %s", drhd->address, reg_size,
+              drhd->segment, include_all ? "(INCLUDE_ALL)" : "");
 
     struct vtd_regs cc_mem_io *regs = mmio_map(drhd->address, PAGE_SIZE);
 
@@ -52,12 +52,12 @@ static void handle_drhd(const struct acpi_dmar_drhd *drhd) {
     dmar_info("  VT-d ver=%u.%u domains=%u", (regs->version >> 4) & 0xF,
               regs->version & 0xF, vtd_cap_domain_count(cap));
 
-    dmar_info("  CAP:  SAGAW=%02x MGAW=%u FRO=0x%x NFR=%u CM=%u RWBF=%u",
+    dmar_info("  CAP:  SAGAW=%02lx MGAW=%lu FRO=0x%lx NFR=%lu CM=%lu RWBF=%lu",
               CAP_SUPPORTED_ADDR_WIDTHS(cap), CAP_MAX_ADDR_WIDTH(cap),
               CAP_FAULT_RECORD_OFFSET(cap), CAP_NUM_FAULT_RECORDS(cap),
               CAP_CACHING_MODE(cap), CAP_REQUIRES_WRITE_BUF_FLUSH(cap));
 
-    dmar_info("  ECAP: QI=%u IR=%u PT=%u SC=%u C=%u IRO=0x%x",
+    dmar_info("  ECAP: QI=%lu IR=%lu PT=%lu SC=%lu C=%lu IRO=0x%lx",
               ECAP_QUEUED_INVALIDATION(ecap), ECAP_INTERRUPT_REMAPPING(ecap),
               ECAP_PASS_THROUGH(ecap), ECAP_SNOOP_CONTROL(ecap),
               ECAP_COHERENCY(ecap), ECAP_IOTLB_REGISTER_OFFSET(ecap));
@@ -71,14 +71,14 @@ static void handle_drhd(const struct acpi_dmar_drhd *drhd) {
     struct iommu *unit =
         vtd_unit_create(drhd->address, drhd->segment, drhd->size);
     if (!unit) {
-        dmar_warn("failed to create VT-d unit for DRHD at 0x%llx",
+        dmar_warn("failed to create VT-d unit for DRHD at 0x%lx",
                   drhd->address);
         return;
     }
 }
 
 static void handle_rmrr(const struct acpi_dmar_rmrr *rmrr) {
-    dmar_info("RMRR base=0x%016llx limit=0x%016llx seg=%u\n", rmrr->base,
+    dmar_info("RMRR base=0x%016lx limit=0x%016lx seg=%u\n", rmrr->base,
               rmrr->limit, rmrr->segment);
 
     const uint8_t *scope_ptr = (const uint8_t *) rmrr + sizeof(*rmrr);
@@ -154,8 +154,8 @@ bool dmar_init(void) {
         ptr += rs->length;
     }
 
-    dmar_info("DMAR Summary: %d DRHD, %d RMRR, %d ATSR, %d unknown", drhd_count,
-              rmrr_count, atsr_count, unknown_count);
+    dmar_info("DMAR Summary: %zu DRHD, %zu RMRR, %zu ATSR, %zu unknown",
+              drhd_count, rmrr_count, atsr_count, unknown_count);
 
     if (drhd_count == 0) {
         log_warn_global(LOG_HANDLE(dmar),
