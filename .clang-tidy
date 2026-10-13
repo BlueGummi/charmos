@@ -1,0 +1,15 @@
+# false positive suppression: // NOLINTNEXTLINE(clang-analyzer-<check>): <reason>
+Checks: >
+  -*,
+  clang-analyzer-core.*,
+  clang-analyzer-nullability.*,
+  clang-analyzer-unix.*,
+  clang-analyzer-security.ArrayBound
+WarningsAsErrors: >
+  clang-analyzer-core.*,
+  clang-analyzer-nullability.*
+HeaderFilterRegex: '.*/(include|kernel)/.*'
+ExcludeHeaderFilterRegex: '.*/kernel/(uACPI|flanterm)/.*'
+CheckOptions:
+  # cc_owner_returns / cc_owner_takes
+  clang-analyzer-unix.DynamicMemoryModeling:Optimistic: true

@@ -83,7 +83,9 @@ void entropy_pool_seed(struct entropy_pool *pool) {
         return;
     }
 
-    entropy_pool_extract(pool, chacha_key, 32);
+    if (entropy_pool_extract(pool, chacha_key, 32) != 32)
+        return;
+
     memset(chacha_nonce, 0, sizeof(chacha_nonce));
     chacha_counter = 0;
 }
@@ -91,7 +93,9 @@ void entropy_pool_seed(struct entropy_pool *pool) {
 void entropy_pool_reseed(struct entropy_pool *pool) {
     if (entropy_pool_bits(pool) >= 128 && chacha_reseed_counter++ > 10000) {
         uint8_t seed[32];
-        entropy_pool_extract(pool, seed, 32);
+        if (entropy_pool_extract(pool, seed, 32) != 32)
+            return;
+
         for (int i = 0; i < 32; i++) {
             chacha_key[i] ^= seed[i];
         }

@@ -651,9 +651,8 @@ static void test_group_run(struct test_group *tg) {
 
             size_t result_times[TEST_RESULT_MAX] = {0}, run_times = 0;
 
-            /* TODO: allocation failure */
             struct test_verdict *verdicts =
-                vnews(verdicts, t->run_times, ALLOC_ZERO);
+                nofail_vnews(verdicts, t->run_times, ALLOC_ZERO);
             struct test_verdict singular_verdict = {0};
 
             char intst_str[512] = {0};

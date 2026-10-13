@@ -165,9 +165,11 @@ static void usb_kbd_worker(void *arg) {
     atomic_store(&kbd->worker_here, false);
 }
 
-struct usb_hid_keyboard *usb_keyboard_create(struct usb_device   *dev,
-                                             struct usb_endpoint *ep) {
+struct usb_hid_keyboard *cc_nullable
+usb_keyboard_create(struct usb_device *dev, struct usb_endpoint *ep) {
     struct usb_hid_keyboard *kbd = vnew(kbd, ALLOC_ZERO);
+    if (!kbd)
+        return NULL;
 
     kbd->dev = dev;
     kbd->ep  = ep;
@@ -204,6 +206,8 @@ enum usb_error usb_keyboard_bringup(struct usb_device *dev) {
     uint8_t iface_num = intf->interface_number;
 
     uint8_t *report_buf = valloc_aligned(256, PAGE_SIZE, ALLOC_ZERO);
+    if (!report_buf)
+        return USB_ERR_OOM;
 
     enum usb_error err = USB_OK;
     if ((err = usb_keyboard_get_descriptor(dev, iface_num, 256, report_buf)) !=
@@ -220,7 +224,7 @@ enum usb_error usb_keyboard_bringup(struct usb_device *dev) {
             ep->type == USB_ENDPOINT_ATTR_TRANS_TYPE_INTERRUPT) {
 
             dev->driver_private = usb_keyboard_create(dev, ep);
-            return USB_OK;
+            return dev->driver_private ? USB_OK : USB_ERR_OOM;
         }
     }
 
@@ -230,6 +234,9 @@ enum usb_error usb_keyboard_bringup(struct usb_device *dev) {
 
 void usb_keyboard_teardown(struct usb_device *dev) {
     struct usb_hid_keyboard *kb = dev->driver_private;
+    if (!kb)
+        return;
+
     while (atomic_load(&kb->worker_here))
         scheduler_yield();
 }

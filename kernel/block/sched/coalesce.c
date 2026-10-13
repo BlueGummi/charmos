@@ -28,7 +28,7 @@ static bool try_merge_candidates(struct block_device *disk,
                                  struct bio_request *iter,
                                  struct bio_request *start,
                                  struct bio_rqueue *queue) {
-    struct bio_request *candidate = NULL, *tmp;
+    struct bio_request *candidate = iter, *tmp;
     bool merged = false;
     uint8_t coalesces_left = BIO_SCHED_MAX_COALESCES;
 

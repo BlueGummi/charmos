@@ -198,6 +198,9 @@ static bool sd_dedup_body(size_t tid, stack_handle_t *held, size_t *held_n) {
         SD_WORKER_CHECK(h == held[0]);
     }
 
+    if (*held_n == 0)
+        return false;
+
     sd_dedup_handles[tid] = held[0];
     return true;
 }

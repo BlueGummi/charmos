@@ -99,6 +99,8 @@ enum usb_error usb_get_string_descriptor(struct usb_device *dev,
 
     struct usb_controller *ctrl = dev->host;
     uint8_t               *desc = valloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    if (!desc)
+        return USB_ERR_OOM;
 
     struct usb_setup_packet setup = {
         .bitmap_request_type = usb_get_desc_bitmap(),
@@ -116,11 +118,14 @@ enum usb_error usb_get_string_descriptor(struct usb_device *dev,
 
     struct io_wait_token tok = IO_WAIT_TOKEN_EMPTY;
     if ((err = usb_transfer_sync(ctrl->ops->submit_control_transfer, &req,
-                                 &tok)) != USB_OK)
+                                 &tok)) != USB_OK) {
+        vfree_aligned(desc);
         return err;
+    }
 
     uint8_t bLength = desc[0];
     if (bLength < 2) {
+        vfree_aligned(desc);
         io_wait_end(&tok, IO_WAIT_END_YIELD);
         return USB_ERR_INVALID_ARGUMENT;
     }
@@ -138,6 +143,8 @@ enum usb_error usb_get_string_descriptor(struct usb_device *dev,
 
 enum usb_error usb_get_device_descriptor(struct usb_device *dev) {
     uint8_t *desc = valloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    if (!desc)
+        return USB_ERR_OOM;
 
     struct usb_setup_packet setup = {
         .bitmap_request_type = usb_get_desc_bitmap(),
@@ -158,6 +165,7 @@ enum usb_error usb_get_device_descriptor(struct usb_device *dev) {
     enum usb_error err;
     if ((err = usb_transfer_sync(ctrl->ops->submit_control_transfer, &request,
                                  NULL)) != USB_OK) {
+        vfree_aligned(desc);
         return err;
     }
 
@@ -202,22 +210,33 @@ void usb_try_bind_driver(struct usb_device *dev) {
         match_interfaces(d, dev);
 }
 
-static void
+static enum usb_error
 usb_register_dev_interface(struct usb_device               *dev,
                            struct usb_interface_descriptor *interface) {
     struct usb_interface_descriptor *new_int = vnew(new_int);
+    if (!new_int)
+        return USB_ERR_OOM;
     memcpy(new_int, interface, sizeof(struct usb_interface_descriptor));
 
-    dev->interfaces = vrenews(dev->interfaces, dev->num_interfaces + 1);
+    /* on failure vrenews leaves the old array in place */
+    struct usb_interface_descriptor **grown =
+        vrenews(dev->interfaces, dev->num_interfaces + 1);
+    if (!grown) {
+        vfree(new_int);
+        return USB_ERR_OOM;
+    }
+
+    dev->interfaces                        = grown;
     dev->interfaces[dev->num_interfaces++] = new_int;
+    return USB_OK;
 }
 
-static void usb_register_dev_ep(struct usb_device              *dev,
-                                struct usb_endpoint_descriptor *endpoint) {
-    struct usb_endpoint_descriptor *new_ep = vnew(new_ep);
-    memcpy(new_ep, endpoint, sizeof(struct usb_endpoint_descriptor));
-
+static enum usb_error
+usb_register_dev_ep(struct usb_device              *dev,
+                    struct usb_endpoint_descriptor *endpoint) {
     struct usb_endpoint *ep = vnew(ep, ALLOC_ZERO);
+    if (!ep)
+        return USB_ERR_OOM;
 
     ep->type            = USB_ENDPOINT_ATTR_TRANS_TYPE(endpoint->attributes);
     ep->number          = USB_ENDPOINT_ADDR_EP_NUM(endpoint->address);
@@ -227,30 +246,44 @@ static void usb_register_dev_ep(struct usb_device              *dev,
 
     ep->in = USB_ENDPOINT_ADDR_EP_DIRECTION(endpoint->address);
 
-    dev->endpoints = vrenews(dev->endpoints, dev->num_endpoints + 1);
+    struct usb_endpoint **grown =
+        vrenews(dev->endpoints, dev->num_endpoints + 1);
+    if (!grown) {
+        vfree(ep);
+        return USB_ERR_OOM;
+    }
+
+    dev->endpoints                       = grown;
     dev->endpoints[dev->num_endpoints++] = ep;
+    return USB_OK;
 }
 
-static void setup_config_descriptor(struct usb_device *dev, uint8_t *ptr,
-                                    uint8_t *end) {
-    while (ptr < end) {
+static enum usb_error setup_config_descriptor(struct usb_device *dev,
+                                              uint8_t *ptr, uint8_t *end) {
+    enum usb_error err = USB_OK;
+
+    while (ptr < end && err == USB_OK) {
         uint8_t len   = ptr[0];
         uint8_t dtype = ptr[1];
 
         if (dtype == USB_DESC_TYPE_INTERFACE) {
             struct usb_interface_descriptor *iface = (void *) ptr;
-            usb_register_dev_interface(dev, iface);
+            err = usb_register_dev_interface(dev, iface);
         } else if (dtype == USB_DESC_TYPE_ENDPOINT) {
             struct usb_endpoint_descriptor *epd = (void *) ptr;
-            usb_register_dev_ep(dev, epd);
+            err                                 = usb_register_dev_ep(dev, epd);
         }
 
         ptr += len;
     }
+
+    return err;
 }
 
 enum usb_error usb_parse_config_descriptor(struct usb_device *dev) {
     uint8_t *desc = valloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    if (!desc)
+        return USB_ERR_OOM;
 
     struct usb_setup_packet setup = {
         .bitmap_request_type = usb_get_desc_bitmap(),
@@ -297,10 +330,10 @@ enum usb_error usb_parse_config_descriptor(struct usb_device *dev) {
         return err;
     }
 
-    setup_config_descriptor(dev, desc, desc + total_len);
+    err = setup_config_descriptor(dev, desc, desc + total_len);
     vfree_aligned(desc);
     io_wait_end(&iowt, IO_WAIT_END_YIELD);
-    return USB_OK;
+    return err;
 }
 
 enum usb_error usb_set_configuration(struct usb_device *dev) {

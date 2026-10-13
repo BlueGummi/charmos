@@ -2,6 +2,7 @@
 #include <acpi/lapic.h>
 #include <irq/ipi.h>
 #include <irq/irq.h>
+#include <mem/nofail.h>
 
 TEST_GROUP_DEFINE(rcu, .intensity_desc = {
                            .curve = SCALE_PIECEWISE_LOG,
@@ -58,7 +59,7 @@ static void rcu_writer_thread(void *arg) {
 
     struct rcu_test_data *old = atomic_load_rlx(&shared_ptr);
 
-    struct rcu_test_data *new = vnew(new, ALLOC_ZERO);
+    struct rcu_test_data *new = nofail_vnew(new, ALLOC_ZERO);
     new->value = 43;
     rcu_assign_pointer(shared_ptr, new);
 
@@ -77,10 +78,12 @@ TEST_DEFINE_INTEGRATION(rcu, mt_readers_during_replace,
     atomic_store(&rcu_deferred_freed, false);
 
     struct rcu_test_data *initial = vnew(initial, ALLOC_ZERO);
+    TEST_ASSERT_NONNULL(initial);
     initial->value = 42;
     rcu_assign_pointer(shared_ptr, initial);
 
     struct thread *readers[NUM_RCU_READERS];
+    memset(readers, 0, sizeof(readers));
     for (uint64_t i = 0; i < NUM_RCU_READERS; i++)
         readers[i] = thread_spawn("rcu_reader_test", rcu_reader_thread,
                                   .joinable = true);
@@ -225,12 +228,15 @@ TEST_DEFINE_INTEGRATION(rcu, mt_stress, TEST_INTENSITY(200, 2000, 10000)) {
     atomic_store(&gen_freed, 0);
 
     struct rcu_stress_node *initial = vnew(initial, ALLOC_ZERO);
+    TEST_ASSERT_NONNULL(initial);
     initial->seq = 0;
     initial->value = 42;
     rcu_assign_pointer(stress_shared, initial);
 
     struct thread *readers[STRESS_NUM_READERS];
     struct thread *writers[STRESS_NUM_WRITERS];
+    memset(readers, 0, sizeof(readers));
+    memset(writers, 0, sizeof(writers));
 
     for (uint32_t i = 0; i < STRESS_NUM_READERS; ++i) {
         readers[i] = thread_spawn(("rcu_stread_%u", i), rcu_stress_reader,

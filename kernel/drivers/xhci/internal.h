@@ -32,8 +32,8 @@ enum usb_error xhci_address_device(struct xhci_port *p, uint8_t slot_id,
 void xhci_teardown_slot(struct xhci_slot *me);
 void xhci_wake_waiter(struct xhci_device *dev, struct xhci_request *request);
 void xhci_cleanup(struct xhci_device *dev, struct xhci_request *req);
-struct xhci_ring *xhci_allocate_ring();
-struct xhci_ring *xhci_allocate_event_ring(void);
+struct xhci_ring *cc_nullable xhci_allocate_ring();
+struct xhci_ring *cc_nullable xhci_allocate_event_ring(void);
 void xhci_free_ring(struct xhci_ring *ring);
 void cc_mem_io *xhci_map_mmio(uint8_t bus, uint8_t slot, uint8_t func);
 struct xhci_device *xhci_device_create(void cc_mem_io *mmio);
@@ -180,7 +180,7 @@ static inline void xhci_request_init(struct xhci_request           *req,
     req->urb      = rq;
     req->private  = NULL;
     req->callback = xhci_cleanup;
-    req->port     = rq->dev->port;
+    req->port     = rq ? rq->dev->port : 0;
 }
 
 static inline void xhci_clear_usbsts_ei(struct xhci_device *dev) {

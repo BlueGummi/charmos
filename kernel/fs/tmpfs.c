@@ -158,8 +158,12 @@ static struct tmpfs_node *tmpfs_find_child(struct tmpfs_node *dir,
 
 static enum err tmpfs_add_child(struct tmpfs_node *parent,
                                 struct tmpfs_node *child) {
-    parent->children = vrenews(parent->children, parent->child_count + 1);
+    struct tmpfs_node **grown =
+        vrenews(parent->children, parent->child_count + 1);
+    if (!grown)
+        return ERR_NO_MEM;
 
+    parent->children = grown;
     parent->children[parent->child_count++] = child;
     child->parent = parent;
     return ERR_OK;
@@ -182,6 +186,10 @@ static enum err tmpfs_create_common(struct vfs_node *parent, const char *name,
     node->type = type;
     node->name = strdup(name);
     node->mode = mode;
+    if (cc_unlikely(!node->name)) {
+        vfree(node);
+        return ERR_NO_MEM;
+    }
 
     if (type == TMPFS_FILE) {
         node->pages = NULL;
@@ -189,7 +197,13 @@ static enum err tmpfs_create_common(struct vfs_node *parent, const char *name,
         node->size = 0;
     }
 
-    tmpfs_add_child(pt, node);
+    enum err err = tmpfs_add_child(pt, node);
+    if (err != ERR_OK) {
+        vfree(node->name);
+        vfree(node);
+        return err;
+    }
+
     if (out)
         *out = node;
     return ERR_OK;
@@ -308,6 +322,16 @@ static enum err tmpfs_rename(struct vfs_node *old_parent, const char *old_name,
     if (!node)
         return ERR_NO_ENT;
 
+    char *name = strdup(new_name);
+    if (!name)
+        return ERR_NO_MEM;
+
+    enum err err = tmpfs_add_child(new_pt, node);
+    if (err != ERR_OK) {
+        vfree(name);
+        return err;
+    }
+
     for (uint64_t i = 0; i < old_pt->child_count; i++) {
         if (old_pt->children[i] == node) {
             memmove(&old_pt->children[i], &old_pt->children[i + 1],
@@ -318,8 +342,7 @@ static enum err tmpfs_rename(struct vfs_node *old_parent, const char *old_name,
     }
 
     vfree(node->name);
-    node->name = strdup(new_name);
-    tmpfs_add_child(new_pt, node);
+    node->name = name;
     return ERR_OK;
 }
 

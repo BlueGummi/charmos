@@ -126,14 +126,27 @@ static uint8_t xhci_ep_to_input_ctx_idx(struct usb_endpoint *ep) {
     return ep->number * 2 - (ep->in ? 0 : 1);
 }
 
+/* free the rings `copy` holds that `orig` doesn't */
+static void xhci_free_new_rings(struct xhci_slot *orig,
+                                struct xhci_slot *copy) {
+    for (size_t i = 0; i < ct_array_size(copy->ep_rings); i++)
+        if (copy->ep_rings[i] && copy->ep_rings[i] != orig->ep_rings[i])
+            xhci_free_ring(copy->ep_rings[i]);
+}
+
 enum usb_error xhci_configure_device_endpoints(struct usb_device *usb) {
     struct xhci_slot *xslot = usb->slot;
     if (!xhci_slot_get(xslot))
         return USB_ERR_NO_DEVICE;
 
+    enum usb_error         err  = USB_OK;
     struct xhci_device    *xhci = usb->driver_private;
     struct xhci_input_ctx *input_ctx =
         valloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO);
+    if (!input_ctx) {
+        xhci_slot_put(xslot);
+        return USB_ERR_OOM;
+    }
 
     uintptr_t input_ctx_phys = vmm_get_phys((uintptr_t) input_ctx);
 
@@ -143,8 +156,14 @@ enum usb_error xhci_configure_device_endpoints(struct usb_device *usb) {
     struct xhci_slot local_copy = *xslot;
 
     for (size_t i = 0; i < usb->num_endpoints; i++) {
-        struct usb_endpoint *ep       = usb->endpoints[i];
-        uint8_t              ep_index = get_ep_index(ep);
+        struct usb_endpoint *ep = usb->endpoints[i];
+        /* endpoint 0 is the default control pipe */
+        if (ep->number == 0) {
+            err = USB_ERR_INVALID_ARGUMENT;
+            goto err_free;
+        }
+
+        uint8_t ep_index = get_ep_index(ep);
 
         uint8_t input_ctx_idx = xhci_ep_to_input_ctx_idx(ep);
 
@@ -163,6 +182,10 @@ enum usb_error xhci_configure_device_endpoints(struct usb_device *usb) {
         ep_ctx->max_burst_size = 0;
 
         struct xhci_ring *ring = xhci_allocate_ring();
+        if (!ring) {
+            err = USB_ERR_OOM;
+            goto err_free;
+        }
 
         ep_ctx->dequeue_ptr_raw = ring->phys | TRB_CYCLE_BIT;
         ep_ctx->ep_state        = 1;
@@ -216,6 +239,12 @@ enum usb_error xhci_configure_device_endpoints(struct usb_device *usb) {
     }
 
     return USB_OK;
+
+err_free:
+    xhci_free_new_rings(xslot, &local_copy);
+    vfree_aligned(input_ctx);
+    xhci_slot_put(xslot);
+    return err;
 }
 
 static void xhci_work_port_disconnect(void *arg1) {
@@ -798,7 +827,7 @@ void xhci_init(uint8_t bus, uint8_t slot, uint8_t func,
     xhci_controller_enable_ints(dev);
     xhci_interrupt_enable_ints(dev);
 
-    struct usb_controller *ctrl = vnew(ctrl, ALLOC_ZERO);
+    struct usb_controller *ctrl = nofail_vnew(ctrl, ALLOC_ZERO);
     ctrl->driver_data           = dev;
     ctrl->type                  = USB_CONTROLLER_XHCI;
     ctrl->ops                   = &xhci_ctrl_ops;

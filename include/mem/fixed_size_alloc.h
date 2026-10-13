@@ -2,6 +2,7 @@
 #pragma once
 #include <compiler/core.h>
 #include <mem/alloc.h>
+#include <mem/nofail.h>
 #include <mem/page.h>
 #include <smp/perdomain.h>
 #include <structures/list.h>
@@ -72,7 +73,7 @@ void fixed_size_range_init(struct fixed_size_range *fsr,
         static struct fixed_size_range **__perdomain_fsrs_##name = NULL;       \
         if (!__perdomain_fsrs_##name)                                          \
             __perdomain_fsrs_##name =                                          \
-                vnews(__perdomain_fsrs_##name, global.domain_count);           \
+                nofail_vnews(__perdomain_fsrs_##name, global.domain_count);    \
                                                                                \
         struct fixed_size_range_attributes __fsr_attrs = {__VA_ARGS__};        \
         fixed_size_range_init(fsr_, &__fsr_attrs);                             \

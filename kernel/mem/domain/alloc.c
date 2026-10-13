@@ -202,6 +202,7 @@ static paddr_t zonelist_alloc_fallback(struct domain_zonelist *zl,
     for (size_t i = 0; i < max_scan; i++) {
         struct domain_zonelist_entry *entry = &zl->entries[i];
         struct domain_buddy *candidate = entry->domain;
+        enforce(candidate);
 
         if (candidate == best)
             continue;

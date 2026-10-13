@@ -111,6 +111,22 @@ if (CCACHE_PROGRAM)
 endif ()
 set(CMAKE_COLOR_DIAGNOSTICS ON CACHE BOOL "colored diagnostics")
 
+option(CHARMOS_CLANG_TIDY "Run clang-tidy" ON)
+if (CHARMOS_CLANG_TIDY AND CMAKE_C_COMPILER_ID STREQUAL "Clang")
+    get_filename_component(_clang_dir "${CMAKE_C_COMPILER}" DIRECTORY)
+    string(REGEX MATCH "^[0-9]+" _clang_major "${CMAKE_C_COMPILER_VERSION}")
+    find_program(
+        CLANG_TIDY_PROGRAM
+        NAMES clang-tidy clang-tidy-${_clang_major}
+        HINTS ${_clang_dir})
+    if (CLANG_TIDY_PROGRAM)
+        set(CMAKE_C_CLANG_TIDY "${CLANG_TIDY_PROGRAM}" --quiet)
+        message(STATUS "clang-tidy    : ${CLANG_TIDY_PROGRAM}")
+    else ()
+        message(WARNING "clang-tidy not found: static analysis is off for this build")
+    endif ()
+endif ()
+
 if (APPLE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -target x86_64-unknown-unknown")
     set(CMAKE_LINKER "x86_64-elf-ld")

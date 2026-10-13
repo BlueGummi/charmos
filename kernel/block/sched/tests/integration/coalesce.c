@@ -1,4 +1,5 @@
 #include "block/sched/tests/test_internal.h"
+#include <mem/nofail.h>
 
 TEST_GROUP_DEFINE(bio_sched, .intensity_desc = {
                                  .curve = SCALE_PIECEWISE_LOG,
@@ -24,11 +25,11 @@ TEST_DEFINE_INTEGRATION(bio_sched, coalesce, TEST_INTENSITY(1, 2, 16),
     size_t reqs = ctx->intensity_val ? ctx->intensity_val : 2;
 
     for (size_t i = 0; i < reqs; i++) {
-        struct bio_request *req = vnew(req);
+        struct bio_request *req = nofail_vnew(req);
         *req = (struct bio_request){
             .lba = i,
             .disk = d,
-            .buffer = valloc_aligned(512, 4096),
+            .buffer = nofail(valloc_aligned(512, 4096)),
             .size = 512,
             .sector_count = 1,
             .write = false,

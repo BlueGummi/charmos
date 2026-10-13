@@ -107,9 +107,12 @@ message(STATUS "Symbol table  : stamped post-link, ${KERNEL_SYMS_RESERVE} bytes 
 
 add_executable(kernel ${C_SOURCES} ${ASM_SOURCES} ${NASM_SOURCES})
 
-if (DEBUG_ASAN)
-    file(GLOB_RECURSE FLANTERM_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/kernel/flanterm/*.c)
+file(GLOB_RECURSE FLANTERM_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/kernel/flanterm/*.c)
 
+# third-party and generated code is compiled but not linted
+set_source_files_properties(${UACPI_SOURCES} ${FLANTERM_SOURCES} ${SYMS_SOURCE} PROPERTIES SKIP_LINTING ON)
+
+if (DEBUG_ASAN)
     set_source_files_properties(${EARLY_INIT_FILES} ${UACPI_SOURCES} ${FLANTERM_SOURCES}
                                 PROPERTIES COMPILE_OPTIONS "-fno-sanitize=kernel-address")
 endif ()

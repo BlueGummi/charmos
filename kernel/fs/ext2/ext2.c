@@ -41,22 +41,28 @@ struct vfs_node *ext2_g_mount(struct partition *p) {
     if (!p)
         return NULL;
 
-    p->fs_data = valloc_aligned(PAGE_SIZE, PAGE_SIZE);
-    struct ext2_fs *fs = p->fs_data;
-    fs->sblock = valloc_aligned(PAGE_SIZE, PAGE_SIZE);
-
-    memset(fs->sblock, 0, PAGE_SIZE);
-
+    struct ext2_fs *fs = valloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    struct ext2_sblock *sblock = valloc_aligned(PAGE_SIZE, PAGE_SIZE);
     struct vfs_node *n = vnew(n, ALLOC_ZERO);
+    if (!fs || !sblock || !n)
+        goto err;
 
-    if (!p->fs_data || !fs->sblock | !n)
-        return NULL;
+    memset(sblock, 0, PAGE_SIZE);
+    p->fs_data = fs;
+    fs->sblock = sblock;
 
-    if (!ext2_read_superblock(p, fs->sblock))
-        return NULL;
+    if (!ext2_read_superblock(p, sblock))
+        goto err;
 
-    ext2_mount(p, fs, fs->sblock, n);
+    ext2_mount(p, fs, sblock, n);
     return n;
+
+err:
+    p->fs_data = NULL;
+    vfree(n);
+    vfree_aligned(sblock);
+    vfree_aligned(fs);
+    return NULL;
 }
 
 void ext2_g_print(struct partition *p) {

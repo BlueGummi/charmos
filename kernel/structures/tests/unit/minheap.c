@@ -22,6 +22,7 @@ TEST_DEFINE_UNIT(minheap, insert_remove_pop_order,
     TEST_ASSERT_NONNULL(nodes);
 
     struct minheap *mh = minheap_create();
+    TEST_ASSERT_NONNULL(mh);
     mhtest_do_inserts(mh, nodes, count);
     TEST_ASSERT_EQ(MINHEAP_SIZE(mh), count);
 

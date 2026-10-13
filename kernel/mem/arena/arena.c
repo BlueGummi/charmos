@@ -391,8 +391,8 @@ void arena_dumpster_delete_bin(struct arena_dumpster *ad,
             }
         }
 
-        /* Make the new one visible, then unpublish the old one */
-        hlist_add_head_rcu(&next->hlist_node, &bkt->bins);
+        if (next)
+            hlist_add_head_rcu(&next->hlist_node, &bkt->bins);
         hlist_del_rcu(&ab->hlist_node);
     }
 }

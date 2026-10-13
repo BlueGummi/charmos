@@ -1,4 +1,5 @@
 #include "mem/slab/tests/test_internal.h"
+#include <mem/nofail.h>
 
 #define MT_ALLOC_TIMES 1024
 
@@ -77,7 +78,7 @@ static void stress_worker(void *arg) {
         ;
 
     /* allocate small tracking table dynamically */
-    void **live_ptrs = vnews(live_ptrs, MAX_LIVE_ALLOCS);
+    void **live_ptrs = nofail_vnews(live_ptrs, MAX_LIVE_ALLOCS);
     memset(live_ptrs, 0, sizeof(void *) * MAX_LIVE_ALLOCS);
 
     for (size_t iter = 0; iter < a->iters; ++iter) {

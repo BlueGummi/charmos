@@ -335,10 +335,10 @@ turnstile_propagate_boost(struct turnstile_hash_chain *locked_chain,
 
         bool ts_valid = cur_ts == next_wait.ts;
         bool snapshot = turnstile_snapshot_wait(owner, &current_wait);
-        bool curr_valid =
-            current_wait.ts == cur_ts && current_wait.epoch == next_wait.epoch;
+        bool curr_valid = snapshot && current_wait.ts == cur_ts &&
+                          current_wait.epoch == next_wait.epoch;
 
-        if (!ts_valid || !snapshot || !curr_valid)
+        if (!ts_valid || !curr_valid)
             break;
 
         if (owner->perceived_prio_class != old_class)

@@ -5,6 +5,7 @@
 #include <drivers/pci.h>
 #include <drivers/usb/xhci.h>
 #include <mem/alloc.h>
+#include <mem/nofail.h>
 #include <mem/page.h>
 #include <mem/vmm.h>
 #include <stdbool.h>
@@ -15,11 +16,11 @@
 
 void xhci_setup_event_ring(struct xhci_device *dev) {
     struct xhci_erst_entry *erst =
-        valloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO);
+        nofail(valloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO));
 
     paddr_t erst_phys = vmm_get_phys((vaddr_t) erst);
 
-    dev->event_ring           = xhci_allocate_event_ring();
+    dev->event_ring           = nofail(xhci_allocate_event_ring());
     erst[0].ring_segment_base = dev->event_ring->phys;
     erst[0].ring_segment_size = dev->event_ring->size;
     erst[0].reserved          = 0;
@@ -34,11 +35,11 @@ void xhci_setup_event_ring(struct xhci_device *dev) {
 
 void xhci_setup_command_ring(struct xhci_device *dev) {
     struct xhci_op_regs cc_mem_io *op = dev->op_regs;
-    dev->cmd_ring                     = xhci_allocate_ring();
+    dev->cmd_ring                     = nofail(xhci_allocate_ring());
     uintptr_t trb_phys                = dev->cmd_ring->phys;
 
     struct xhci_dcbaa *dcbaa_virt =
-        valloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO);
+        nofail(valloc_aligned(PAGE_SIZE, PAGE_SIZE, ALLOC_ZERO));
     uintptr_t dcbaa_phys = vmm_get_phys((uintptr_t) dcbaa_virt);
 
     dev->dcbaa = dcbaa_virt;

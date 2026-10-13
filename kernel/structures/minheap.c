@@ -52,9 +52,17 @@ static void minheap_sift_down(struct minheap *heap, uint32_t idx) {
 
 struct minheap *minheap_create(void) {
     struct minheap *heap = vnew(heap);
+    if (!heap)
+        return NULL;
+
     MINHEAP_SET_CAPACITY(heap, MINHEAP_INIT_CAP);
     MINHEAP_SET_SIZE(heap, 0);
     heap->nodes = vnews(heap->nodes, MINHEAP_CAPACITY(heap), ALLOC_ZERO);
+    if (!heap->nodes) {
+        vfree(heap);
+        return NULL;
+    }
+
     spinlock_init(&heap->lock);
     return heap;
 }

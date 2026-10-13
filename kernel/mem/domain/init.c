@@ -280,7 +280,7 @@ static void late_init_non_numa(size_t domain_count) {
 void domain_buddies_init(void) {
     size_t domain_count = global.domain_count;
     global.domain_buddies =
-        vnews(global.domain_buddies, domain_count, ALLOC_ZERO);
+        nofail_vnews(global.domain_buddies, domain_count, ALLOC_ZERO);
 
     if (global.numa_node_count > 1) {
         late_init_from_numa(domain_count);

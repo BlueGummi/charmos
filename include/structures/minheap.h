@@ -25,7 +25,7 @@ struct minheap {
     struct spinlock lock;
 };
 
-struct minheap *minheap_create(void);
+struct minheap *cc_nullable minheap_create(void);
 void minheap_insert(struct minheap *heap, struct minheap_node *node,
                     uint64_t key);
 void minheap_remove(struct minheap *heap, struct minheap_node *node);
