@@ -15,9 +15,6 @@ concurrency:
   group: nightmare-waker
   cancel-in-progress: false
 
-env:
-  PYTHONPATH: scripts
-
 jobs:
   wake:
     runs-on: ubuntu-slim
@@ -25,11 +22,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - uses: astral-sh/setup-uv@v10
+
       - name: Dispatch due accepted plans
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          python3 -m charm nightmare wake-queue \
+          uv run --locked charm nightmare wake-queue \
             --repository "$GITHUB_REPOSITORY" \
             --workflow nightmare-orchestrator.yml \
             --ref "$GITHUB_REF_NAME" \

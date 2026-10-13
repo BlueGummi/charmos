@@ -148,7 +148,7 @@ def test_repack_restores_the_installer_exec_bit_before_use(
     cmdline = tmp_path / "cmdline"
     cmdline.write_text("nightmare=harness_smoke\n", encoding="utf-8")
 
-    measurement = build_bundle.repack(received, cmdline=cmdline, out_dir=out_dir)
+    iso_path = build_bundle.repack(received, cmdline=cmdline, out_dir=out_dir)
 
     assert executable_when_called == [True, True]
-    assert measurement.iso_path == out_dir.resolve() / "charmos-x86_64.iso"
+    assert iso_path == out_dir.resolve() / "charmos-x86_64.iso"

@@ -167,6 +167,86 @@ class DiagnosticTests(unittest.TestCase):
         self.assertIn("tasks[0].nightmare.opts.weird", [d.path for d in diags])
 
 
+def base(**overrides) -> dict:
+    doc = {
+        "suite": {"name": "x", "runners": 1, "budget_hours": 1.0},
+        "build": {},
+        "tasks": [{"name": "t", "boot": {"duration_ms": 10000}}],
+    }
+    doc.update(overrides)
+    return doc
+
+
+DELETE = object()
+
+
+def edit(path: str, value: object) -> dict:
+    """base() with `value` set at a dotted path; DELETE removes the key"""
+    doc = base()
+    *parents, leaf = path.split(".")
+    node: dict | list = doc
+    for key in parents:
+        node = node[int(key)] if isinstance(node, list) else node[key]
+    if value is DELETE:
+        del node[leaf]
+    else:
+        node[leaf] = value
+    return doc
+
+
+REJECTIONS = [
+    ("unknown top-level key", base(surprise={}), "surprise"),
+    ("unknown suite key", edit("suite.budget_days", 3), "suite.budget_days"),
+    (
+        "unknown boot key",
+        edit("tasks.0.boot.duration_sec", 3),
+        "tasks[0].boot.duration_sec",
+    ),
+    ("capitalised name", edit("suite.name", "Overnight_Locks"), "suite.name"),
+    ("zero runners", edit("suite.runners", 0), "suite.runners"),
+    (
+        "intensity above one",
+        edit("tasks.0.nightmare", {"intensity": 1.5}),
+        "tasks[0].nightmare.intensity",
+    ),
+    (
+        "unknown service",
+        edit("tasks.0.nightmare", {"perturb": ["teleporter"]}),
+        "tasks[0].nightmare.perturb[0]",
+    ),
+    (
+        "duplicated service",
+        edit("tasks.0.nightmare", {"perturb": ["migrator", "migrator"]}),
+        "tasks[0].nightmare.perturb[1]",
+    ),
+    ("empty task list", base(tasks=[]), "tasks"),
+    (
+        "cmake definition without a value",
+        edit("build.cmake_definitions", ["DEBUG_ASAN"]),
+        "build.cmake_definitions[0]",
+    ),
+    ("missing required field", edit("suite.runners", DELETE), "suite.runners"),
+    (
+        "string where a number belongs",
+        edit("tasks.0.boot.duration_ms", "10s"),
+        "tasks[0].boot.duration_ms",
+    ),
+    (
+        "bool where a number belongs",
+        edit("tasks.0.boot.duration_ms", True),
+        "tasks[0].boot.duration_ms",
+    ),
+]
+
+
+class RejectionTests(unittest.TestCase):
+    def test_each_bad_document_is_rejected_at_its_path(self) -> None:
+        for why, doc, expect_path in REJECTIONS:
+            with self.subTest(why), self.assertRaises(S.SuiteError) as cm:
+                S.from_dict(doc)
+            self.assertIn(expect_path, [d.path for d in cm.exception.diagnostics])
+
+
 class KnobTypingTests(unittest.TestCase):
     def test_a_us_suffix_becomes_a_microsecond_duration(self) -> None:
         self.assertEqual(S.render_knob(500, "interval_us"), "500us")

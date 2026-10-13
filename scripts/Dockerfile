@@ -11,7 +11,7 @@ RUN apt update -y && apt upgrade -y && \
          > /etc/apt/sources.list.d/llvm.list && \
     apt update -y && \
     apt install -y xorriso nasm qemu-system gdb make gcc gcc-${GCC_VERSION} git cmake binutils \
-                   python3 python3-jsonschema nodejs \
+                   python3 nodejs \
                    clang-${LLVM_VERSION} lld-${LLVM_VERSION} llvm-${LLVM_VERSION} && \
     update-alternatives \
         --install /usr/bin/clang clang /usr/bin/clang-${LLVM_VERSION} 100 \

@@ -81,7 +81,7 @@ def materialize(
             "schema_version": 1,
             "manifest_id": request["manifestId"],
             "plan_id": plan["id"],
-            "batch_id": plan["batch"]["id"],
+            "batch_id": plan["batchId"],
             "task_id": request["taskId"],
             "attempt": attempt,
             "source": plan["source"],

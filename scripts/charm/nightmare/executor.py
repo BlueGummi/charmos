@@ -34,50 +34,23 @@ def _copy_manifest(source: Path, destination: Path) -> None:
     shutil.copy2(source, destination)
 
 
-def _identity(
+def identity(
     *,
     manifest_sha256: str,
     manifest: contract_model.RunnerManifest | None = None,
 ) -> dict[str, Any]:
-    document: dict[str, Any] = {
+    """The sidecar that ties a result directory to the manifest it ran"""
+    return {
         "schema_version": 1,
-        "manifest_id": None,
+        "manifest_id": manifest and manifest.manifest_id,
         "manifest_sha256": manifest_sha256,
-        "source": None,
-        "suite": None,
-        "build": None,
+        "source": manifest and manifest.source.document,
+        "suite": manifest and manifest.suite.model_dump(include={"id", "sha256"}),
+        "build": manifest and manifest.build.document,
     }
-    if manifest is not None:
-        document.update(
-            {
-                "manifest_id": manifest.manifest_id,
-                "source": {
-                    "repository": manifest.source.repository,
-                    "commit": manifest.source.commit,
-                },
-                "suite": {
-                    "id": manifest.suite.id,
-                    "sha256": manifest.suite.sha256,
-                },
-                "build": {
-                    "bundle_id": manifest.build.bundle_id,
-                    "sha256": manifest.build.sha256,
-                    "runner_image": manifest.build.runner_image,
-                },
-            }
-        )
-    return document
 
 
-def _replay_argv() -> list[str]:
-    return [
-        "python3",
-        "-m",
-        "charm",
-        "nightmare",
-        "replay",
-        MANIFEST_NAME,
-    ]
+REPLAY_ARGV = ("uv", "run", "charm", "nightmare", "replay", MANIFEST_NAME)
 
 
 def _result_document(
@@ -121,7 +94,7 @@ def _result_document(
                 "campaign_summary.md" if campaign is not None else None
             ),
         },
-        "replay": {"argv": _replay_argv()},
+        "replay": {"argv": list(REPLAY_ARGV)},
     }
 
 
@@ -156,7 +129,7 @@ def execute_manifest(
     result_path = out_dir / RESULT_NAME
     _write_json(
         identity_path,
-        _identity(
+        identity(
             manifest_sha256=manifest_sha256,
         ),
     )
@@ -183,7 +156,7 @@ def execute_manifest(
     # This replaces the provisional sidecar before any boot-capable code runs.
     _write_json(
         identity_path,
-        _identity(
+        identity(
             manifest_sha256=manifest_sha256,
             manifest=manifest,
         ),
@@ -193,7 +166,7 @@ def execute_manifest(
         suite=manifest.suite.model,
         runner_index=manifest.campaign.runner_index,
         total_runners=manifest.campaign.total_runners,
-        base_seed=manifest.campaign.base_seed,
+        base_seed=manifest.campaign.seed,
         campaign_id=manifest.campaign.campaign_id,
         budget_ms=manifest.campaign.soft_budget_ms,
         build_dir=build_dir,

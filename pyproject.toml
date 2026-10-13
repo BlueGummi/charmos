@@ -8,10 +8,17 @@ name = "charmos-tools"
 version = "0.1.0"
 description = "Host-side tooling for the charmOS kernel"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "cyclopts>=5",
+    "pydantic>=2.12",
+]
 
-[project.optional-dependencies]
-schema = ["jsonschema>=4"]
+[dependency-groups]
+dev = [
+    "mypy",
+    "pytest",
+    "ruff",
+]
 
 [project.scripts]
 charm = "charm.cli:main"
@@ -49,3 +56,4 @@ files = ["scripts/charm"]
 python_version = "3.11"
 ignore_missing_imports = true
 warn_unused_ignores = true
+plugins = ["pydantic.mypy"]

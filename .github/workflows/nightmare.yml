@@ -21,7 +21,6 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PYTHONPATH: scripts
   COMPILER: ${{ github.event.inputs.compiler || 'clang' }}
 
 jobs:
@@ -79,20 +78,7 @@ jobs:
           echo "seed=0x${{ github.run_id }}${{ github.run_attempt }}" \
               >> "$GITHUB_OUTPUT"
 
-      - name: Verify clang toolchain
-        if: steps.cfg.outputs.compiler == 'clang'
-        run: |
-          set -euo pipefail
-          for t in clang ld.lld; do
-            command -v "$t" >/dev/null 2>&1 || {
-              echo "::error::$t missing from the runner image"; exit 1; }
-          done
-          major="$(clang -dumpversion | cut -d. -f1)"
-          if [ "$major" -lt 22 ]; then
-            echo "::error::clang $major is too old: charmOS needs clang >= 22"
-            exit 1
-          fi
-          clang --version | head -1
+      - uses: astral-sh/setup-uv@v10
 
       - name: Compile
         run: |
@@ -101,45 +87,19 @@ jobs:
             -- ${{ matrix.scenario.flags }} \
                -DMACHINE_SMP="${{ matrix.scenario.smp }}"
 
+      # Booting and running the harness takes about a minute
       - name: Boot and run the harness
         env:
           TERM: dumb
-        run: |
-          set -uo pipefail
-          # GitHub runs under bash -e, capturing a non-zero return code
-          # from timeout/QEMU requires errexit off
-          set +e
-          mkdir -p results
-          start=$(date +%s)
-
-          # Booting and running the harness takes about a minute
-          timeout --foreground -k 30 600 \
-              cmake --build build --target tests
-          rc=$?
-          pkill -f qemu-system-x86_64 2>/dev/null || true
-          end=$(date +%s)
-
-          cp build/output.log results/run.log 2>/dev/null || \
-              echo "(no serial log produced)" > results/run.log
-          # stderr (QEMU), kept out of the guest log
-          cp build/output.stderr.log results/run.stderr.log 2>/dev/null || true
-          cp build/ndjson.log results/run.nd.log 2>/dev/null || true
-
-          {
-            echo "SHARD=${{ matrix.scenario.name }}"
-            echo "COMPILER=${{ steps.cfg.outputs.compiler }}"
-            echo "SCENARIO=${{ matrix.scenario.name }}"
-            echo "SEED=${{ steps.cfg.outputs.seed }}"
-            echo "EXIT_CODE=$rc"
-            echo "DURATION_S=$((end - start))"
-            echo "SHA=${{ github.sha }}"
-            echo "CONFIG=smp=${{ matrix.scenario.smp }}"
-          } > results/run.env
-
-          tail -60 results/run.log || true
-          gzip -9 results/*.log
-
-          exit 0
+        run: >
+          uv run --locked charm boot
+          --timeout 600
+          --out-dir results
+          --shard ${{ matrix.scenario.name }}
+          --scenario ${{ matrix.scenario.name }}
+          --seed ${{ steps.cfg.outputs.seed }}
+          --compiler ${{ steps.cfg.outputs.compiler }}
+          --config "smp=${{ matrix.scenario.smp }}"
 
       - name: Upload results
         if: always()
@@ -158,22 +118,21 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v7
 
+      - uses: astral-sh/setup-uv@v10
+
       - name: Download all results
         uses: actions/download-artifact@v8
         with:
           pattern: nightmare-*
           path: artifacts
 
+      # --fail-on-error is what turns a failed shard into a failed run
       - name: Parse and aggregate
-        run: |
-          # --fail-on-error is what makes this workflow able to report a
-          # failure at all: without it every shard could fail and the run would
-          # still be green, because the boot step swallows its own exit code so
-          # that a failing shard still uploads its logs
-          python3 -m charm ci ingest artifacts \
-            --summary "$GITHUB_STEP_SUMMARY" \
-            --json report.json \
-            --fail-on-error
+        run: >
+          uv run --locked charm ci aggregate 'artifacts/**/*.ndjson'
+          --summary "$GITHUB_STEP_SUMMARY"
+          --json report.json
+          --fail-on-error
 
       - name: Upload report
         if: always()

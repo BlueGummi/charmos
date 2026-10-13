@@ -13,7 +13,8 @@ on:
       - 'kernel/cmdline/**'
       - 'kernel/parse.c'
       - 'pyproject.toml'
-      - '.github/workflows/tools.yml'
+      - 'uv.lock'
+      - '.github/workflows/**'
   pull_request:
     paths:
       - 'scripts/**'
@@ -23,7 +24,8 @@ on:
       - 'kernel/cmdline/**'
       - 'kernel/parse.c'
       - 'pyproject.toml'
-      - '.github/workflows/tools.yml'
+      - 'uv.lock'
+      - '.github/workflows/**'
   workflow_dispatch:
 
 permissions:
@@ -40,53 +42,25 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Symlink node for act
-        run: ln -sf $(which node) /usr/local/bin/node || true
-
-      - uses: actions/setup-python@v7
+      - uses: astral-sh/setup-uv@v10
         with:
           python-version: '3.11'
 
-      - name: Install linters
-        run: pip install ruff mypy pytest jsonschema
+      - name: Symlink node for act
+        run: ln -sf $(which node) /usr/local/bin/node || true
 
       - name: Lint
-        run: ruff check scripts
+        run: uv run --locked ruff check scripts
 
       - name: Format check
-        run: ruff format --check scripts
+        run: uv run --locked ruff format --check scripts
 
       - name: Types
-        run: mypy
+        run: uv run --locked mypy
 
+      # includes the CLI smoke tests and the workflow policy
       - name: Tests
-        run: pytest -q
-
-      - name: Workflow policy
-        run: PYTHONPATH=scripts python3 -m charm ci workflow-policy
-
-      - name: Runs uninstalled
-        run: PYTHONPATH=scripts python3 -m charm ci protocol > /dev/null
-
-      - name: Validate nightmare suites
-        run: |
-          PYTHONPATH=scripts python3 -m charm nightmare validate \
-            --require-schema \
-            nightmare/suites/*.toml \
-            nightmare/fixtures/suites/valid/*.toml
-
-      - name: CLI smoke tests
-        run: |
-          set -euo pipefail
-          export PYTHONPATH=scripts
-          python3 -m charm --help > /dev/null
-          python3 -m charm ci --help > /dev/null
-          python3 -m charm ci protocol > /dev/null
-          python3 -m charm nightmare --help > /dev/null
-          python3 -m charm nightmare show nightmare/suites/overnight_locks.toml > /dev/null
-          python3 -m charm nightmare render nightmare/suites/overnight_locks.toml --seed 0x1234 > /dev/null
-          python3 -m charm nightmare build nightmare/suites/overnight_locks.toml > /dev/null
-          python3 -m charm nightmare run nightmare/suites/overnight_locks.toml --dry-run > /dev/null
+        run: uv run --locked pytest -q
 
   shell:
     name: Shell

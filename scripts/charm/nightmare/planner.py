@@ -1,9 +1,6 @@
 """Deterministic admission and placement behind one planning interface."""
 
-import json
-import math
 import re
-import tomllib
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -16,16 +13,6 @@ from . import suite as suite_model
 # ---------------------------------------------------------------------------
 # Domain types (inlined from domain.py)
 # ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class BatchDefinition:
-    name: str
-    start: datetime
-    window_ms: int
-    runners: int
-    color: str
-    tests: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -99,21 +86,8 @@ class BuildGroup:
 @dataclass(frozen=True)
 class AcceptedPlan:
     id: str
-    version: str
-    base_snapshot_version: str
-    evaluated_at: datetime
-    expires_at: datetime
-    source: Source
-    runner_image: str
-    definition: BatchDefinition
-    definition_toml: str
-    definition_sha256: str
-    ownership: str
     batch_id: str
-    batch_version: str
-    runner_ids: tuple[str, ...]
     tasks: tuple[PlannedTask, ...]
-    suites: tuple[RegisteredSuite, ...]
     build_groups: tuple[BuildGroup, ...]
     document: dict[str, Any]
 
@@ -169,12 +143,10 @@ class PlanBundle:
         )
 
 
-PLAN_TTL = timedelta(minutes=10)
 MAX_MANIFESTS = 64
 _COMMIT = re.compile(r"^[0-9a-f]{40}$")
 _IMAGE = re.compile(r"^ghcr\.io/[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@sha256:[0-9a-f]{64}$")
 _REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
-_COLOR = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
 
 def _parse_instant(value: Any, field: str) -> datetime:
@@ -187,78 +159,6 @@ def _parse_instant(value: Any, field: str) -> datetime:
     if parsed.tzinfo is None:
         raise ValueError(f"{field} must include a UTC offset")
     return parsed.astimezone(UTC)
-
-
-def _definition(payload: dict[str, Any]) -> BatchDefinition:
-    raw = payload["definition"]
-    if not isinstance(raw, dict):
-        raise ValueError("definition must be an object")
-    name = raw["name"]
-    window_hours = raw["window_hours"]
-    runners = raw["runners"]
-    color = raw["color"]
-    tests = raw["tests"]
-    if not isinstance(name, str) or not name or len(name) > 128:
-        raise ValueError("definition.name must be a non-empty string")
-    if (
-        isinstance(window_hours, bool)
-        or not isinstance(window_hours, (int, float))
-        or not math.isfinite(window_hours)
-        or window_hours <= 0
-        or window_hours > 168
-    ):
-        raise ValueError("definition.window_hours must be in (0, 168]")
-    if type(runners) is not int or runners < 1 or runners > 256:
-        raise ValueError("definition.runners must be an integer in [1, 256]")
-    if not isinstance(color, str) or not _COLOR.fullmatch(color):
-        raise ValueError("definition.color must be a six-digit hex color")
-    if (
-        not isinstance(tests, list)
-        or not tests
-        or not all(isinstance(item, str) and item for item in tests)
-    ):
-        raise ValueError("definition.tests must be a non-empty string array")
-    return BatchDefinition(
-        name=name,
-        start=_parse_instant(raw["start_utc"], "definition.start_utc"),
-        window_ms=int(window_hours * 3_600_000),
-        runners=runners,
-        color=color,
-        tests=tuple(tests),
-    )
-
-
-def _toml_definition(source: str) -> dict[str, Any]:
-    try:
-        root = tomllib.loads(source)
-    except tomllib.TOMLDecodeError as error:
-        raise ValueError(f"definition_toml is invalid: {error}") from None
-    batch = root.get("batch")
-    if not isinstance(batch, dict):
-        raise ValueError("definition_toml must contain [batch]")
-    return batch
-
-
-def _definition_wire(definition: BatchDefinition) -> dict[str, Any]:
-    return {
-        "name": definition.name,
-        "startUtc": contracts.instant(definition.start),
-        "windowHours": definition.window_ms / 3_600_000,
-        "runners": definition.runners,
-        "color": definition.color,
-        "tests": list(definition.tests),
-    }
-
-
-def _definition_toml_shape(definition: BatchDefinition) -> dict[str, Any]:
-    return {
-        "name": definition.name,
-        "start_utc": contracts.instant(definition.start),
-        "window_hours": definition.window_ms / 3_600_000,
-        "runners": definition.runners,
-        "color": definition.color,
-        "tests": list(definition.tests),
-    }
 
 
 def _snapshot(document: dict[str, Any]) -> FleetSnapshot:
@@ -330,7 +230,7 @@ def _catalog(suite_dir: Path) -> dict[str, RegisteredSuite]:
     catalog: dict[str, RegisteredSuite] = {}
     for path in sorted(suite_dir.glob("*.toml")):
         suite = suite_model.load(path)
-        resolved = contracts.suite_to_dict(suite)
+        resolved = suite.resolved()
         catalog[path.stem] = RegisteredSuite(
             id=path.stem,
             sha256=contracts.sha256_json(resolved),
@@ -395,8 +295,7 @@ class Planner:
         try:
             snapshot = _snapshot(snapshot_document)
             payload = command["payload"]
-            definition = _definition(payload)
-            definition_toml = payload["definition_toml"]
+            definition = contracts.BatchDefinition.model_validate(payload["definition"])
             base_version = payload["base_snapshot_version"]
         except (KeyError, TypeError, ValueError) as error:
             return Rejected(
@@ -449,18 +348,6 @@ class Planner:
             diagnostics.append(
                 {"field": "evaluated_at", "message": "must include a UTC offset"}
             )
-
-        try:
-            parsed_toml = _toml_definition(definition_toml)
-            if parsed_toml != _definition_toml_shape(definition):
-                diagnostics.append(
-                    {
-                        "field": "definition_toml",
-                        "message": "does not match the normalized definition",
-                    }
-                )
-        except ValueError as error:
-            diagnostics.append({"field": "definition_toml", "message": str(error)})
 
         end = definition.start + timedelta(milliseconds=definition.window_ms)
         if definition.start < snapshot.starts_at or end > snapshot.ends_at:
@@ -546,7 +433,6 @@ class Planner:
                 command,
                 snapshot,
                 definition,
-                definition_toml,
                 selected,
                 leased,
                 source,
@@ -566,8 +452,7 @@ class Planner:
         self,
         command: dict[str, Any],
         snapshot: FleetSnapshot,
-        definition: BatchDefinition,
-        definition_toml: str,
+        definition: contracts.BatchDefinition,
         selected: list[RegisteredSuite],
         leased: tuple[Runner, ...],
         source: Source,
@@ -586,8 +471,6 @@ class Planner:
         root_digest = contracts.sha256_json(identity_input)
         plan_id = f"plan_{root_digest[:20]}"
         batch_id = f"batch_{root_digest[20:40]}"
-        plan_version = f"planv_{root_digest[40:56]}"
-        batch_version = f"batchv_{root_digest[48:64]}"
 
         occurrences = Counter(definition.tests)
         seen: Counter[str] = Counter()
@@ -729,38 +612,19 @@ class Planner:
         suites = tuple({suite.id: suite for suite in selected}.values())
         document = self._wire(
             plan_id,
-            plan_version,
             batch_id,
-            batch_version,
-            snapshot.version,
             now,
             source,
             runner_image,
-            definition,
-            definition_toml,
             ownership,
-            leased,
             tuple(planned),
             suites,
             build_groups,
         )
         return AcceptedPlan(
             id=plan_id,
-            version=plan_version,
-            base_snapshot_version=snapshot.version,
-            evaluated_at=now,
-            expires_at=now + PLAN_TTL,
-            source=source,
-            runner_image=runner_image,
-            definition=definition,
-            definition_toml=definition_toml,
-            definition_sha256=contracts.sha256_json(_definition_wire(definition)),
-            ownership=ownership,
             batch_id=batch_id,
-            batch_version=batch_version,
-            runner_ids=tuple(runner.id for runner in leased),
             tasks=tuple(planned),
-            suites=suites,
             build_groups=build_groups,
             document=document,
         )
@@ -768,61 +632,40 @@ class Planner:
     def _wire(
         self,
         plan_id: str,
-        plan_version: str,
         batch_id: str,
-        batch_version: str,
-        base_snapshot_version: str,
         now: datetime,
         source: Source,
         runner_image: str,
-        definition: BatchDefinition,
-        definition_toml: str,
         ownership: str,
-        leased: tuple[Runner, ...],
         tasks: tuple[PlannedTask, ...],
         suites: tuple[RegisteredSuite, ...],
         build_groups: tuple[BuildGroup, ...],
     ) -> dict[str, Any]:
-        suite_by_id = {suite.id: suite for suite in suites}
         group_for_task = {
             task_id: group.id for group in build_groups for task_id in group.task_ids
         }
-        batch_tasks = []
-        manifest_requests = []
-        for task in tasks:
-            suite = suite_by_id[task.suite_id]
-            ratio = suite.model.meta.overlap_ratio
-            batch_tasks.append(
+        return {
+            "schemaVersion": 1,
+            "id": plan_id,
+            "batchId": batch_id,
+            "evaluatedAt": contracts.instant(now),
+            "ownership": ownership,
+            "source": {"repository": source.repository, "commit": source.commit},
+            "runnerImage": runner_image,
+            "suites": [
+                {"id": suite.id, "sha256": suite.sha256, "resolved": suite.resolved}
+                for suite in suites
+            ],
+            "buildGroups": [
                 {
-                    "id": task.id,
-                    "name": task.suite_id,
-                    "family": task.suite_id.split("_", 1)[0],
-                    "instance": task.instance,
-                    "runnerId": task.runner_id,
-                    "state": "idle",
-                    "health": "healthy",
-                    "color": definition.color,
-                    "started": False,
-                    "cancelled": False,
-                    "slice": {
-                        "id": task.slice_id,
-                        "taskId": task.id,
-                        "runnerId": task.runner_id,
-                        "startsAt": contracts.instant(task.starts_at),
-                        "endsAt": contracts.instant(task.ends_at),
-                        "nominalEndsAt": contracts.instant(task.nominal_ends_at),
-                        "immutable": False,
-                        "trace": [],
-                    },
-                    "elasticBuffer": {
-                        "startsAt": contracts.instant(task.nominal_ends_at),
-                        "endsAt": contracts.instant(task.ends_at),
-                        "ratio": ratio,
-                        "immutable": True,
-                    },
+                    "id": group.id,
+                    "requestSha256": group.request_sha256,
+                    "configuration": group.configuration,
+                    "taskIds": list(group.task_ids),
                 }
-            )
-            manifest_requests.append(
+                for group in build_groups
+            ],
+            "manifests": [
                 {
                     "manifestId": task.manifest_id,
                     "taskId": task.id,
@@ -839,71 +682,8 @@ class Planner:
                     "hardBudgetMs": task.hard_budget_ms,
                     "actionsJobBudgetMs": task.actions_job_budget_ms,
                 }
-            )
-
-        start = definition.start
-        end = start + timedelta(milliseconds=definition.window_ms)
-        definition_wire = _definition_wire(definition)
-        return {
-            "schemaVersion": 1,
-            "id": plan_id,
-            "version": plan_version,
-            "baseSnapshotVersion": base_snapshot_version,
-            "evaluatedAt": contracts.instant(now),
-            "expiresAt": contracts.instant(now + PLAN_TTL),
-            "source": {"repository": source.repository, "commit": source.commit},
-            "runnerImage": runner_image,
-            "definition": {
-                "ownership": ownership,
-                "toml": definition_toml,
-                "sha256": contracts.sha256_json(definition_wire),
-                "normalized": definition_wire,
-            },
-            "suites": [
-                {"id": suite.id, "sha256": suite.sha256, "resolved": suite.resolved}
-                for suite in suites
+                for task in tasks
             ],
-            "buildGroups": [
-                {
-                    "id": group.id,
-                    "requestSha256": group.request_sha256,
-                    "configuration": group.configuration,
-                    "taskIds": list(group.task_ids),
-                }
-                for group in build_groups
-            ],
-            "manifests": manifest_requests,
-            "batch": {
-                "id": batch_id,
-                "version": batch_version,
-                "name": definition.name,
-                "color": definition.color,
-                "lifecycle": "draft",
-                "health": "healthy",
-                "ownership": ownership,
-                "template": "Custom"
-                if ownership == "ad-hoc"
-                else "Repository schedule",
-                "definitionToml": definition_toml,
-                "lease": {
-                    "runnerIds": [runner.id for runner in leased],
-                    "startsAt": contracts.instant(start),
-                    "endsAt": contracts.instant(end),
-                    "policyReserveMinutes": 0,
-                },
-                "tasks": batch_tasks,
-                "startedPrefixTaskIds": [],
-                "residualTail": (
-                    {
-                        "startsAt": contracts.instant(start),
-                        "endsAt": contracts.instant(end),
-                        "mutableTaskIds": [task.id for task in tasks],
-                    }
-                    if ownership == "ad-hoc"
-                    else None
-                ),
-                "updatedAt": contracts.instant(now),
-            },
         }
 
 
@@ -924,9 +704,3 @@ def render_result(result: PlanningResult) -> dict[str, Any]:
         "diagnostics": list(result.diagnostics),
         "alternatives": list(result.alternatives),
     }
-
-
-def write_plan(result: PlanningResult, path: Path) -> None:
-    path.write_text(
-        json.dumps(render_result(result), indent=2) + "\n", encoding="utf-8"
-    )

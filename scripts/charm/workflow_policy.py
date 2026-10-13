@@ -8,7 +8,6 @@ from .paths import repo_root
 
 EXECUTION_WORKFLOWS = (
     "build.yml",
-    "nightmare-contract.yml",
     "nightmare-orchestrator.yml",
     "nightmare-waker.yml",
     "nightmare.yml",
@@ -41,7 +40,6 @@ _UNIVERSAL_RULES = (
 )
 
 _CHARM_INVOCATION = re.compile(r"\bpython3?\s+-m\s+charm\b")
-_PYTHONPATH = re.compile(r"\bPYTHONPATH\b")
 
 _PERMISSIONS_BLOCK = re.compile(r"^\s*permissions\s*:\s*$", re.M)
 _PACKAGES_SCOPE = re.compile(r"^\s+packages\s*:\s*(?:read|write)\s*$", re.M)
@@ -115,8 +113,6 @@ def _check_container_can_pull(path: Path, text: str) -> list[Violation]:
 
 
 def _check_charm_importable(path: Path, text: str) -> list[Violation]:
-    if _PYTHONPATH.search(text):
-        return []
     for line_number, line in enumerate(text.splitlines(), start=1):
         if line.lstrip().startswith("#"):
             continue
@@ -126,7 +122,7 @@ def _check_charm_importable(path: Path, text: str) -> list[Violation]:
                     path,
                     line_number,
                     "charm_not_importable",
-                    "workflows that run `python -m charm` must set PYTHONPATH",
+                    "run charm as `uv run --locked charm` so its locked dependencies are present",
                 )
             ]
     return []

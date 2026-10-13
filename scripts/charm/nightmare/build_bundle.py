@@ -1,14 +1,12 @@
 import json
-import re
 import shutil
 import subprocess
-import tarfile
-import tempfile
-import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, Literal
+
+from pydantic import AwareDatetime, Field, ValidationError
 
 from ..paths import repo_root as default_repo_root
 from . import contracts
@@ -16,30 +14,6 @@ from . import suite as suite_model
 
 METADATA_NAME = "bundle.json"
 ARTIFACT_DIR = "artifacts"
-
-LIMINE_BOOT_ASSETS = ("limine-bios.sys", "limine-bios-cd.bin", "limine-uefi-cd.bin")
-EFI_ASSETS = ("BOOTX64.EFI", "BOOTIA32.EFI")
-XORRISO_FLAGS = (
-    "-as",
-    "mkisofs",
-    "-R",
-    "-r",
-    "-J",
-    "-b",
-    "boot/limine/limine-bios-cd.bin",
-    "-no-emul-boot",
-    "-boot-load-size",
-    "4",
-    "-boot-info-table",
-    "-hfsplus",
-    "-apm-block-size",
-    "2048",
-    "--efi-boot",
-    "boot/limine/limine-uefi-cd.bin",
-    "-efi-boot-part",
-    "--efi-boot-image",
-    "--protective-msdos-label",
-)
 
 
 class BundleError(ValueError):
@@ -80,13 +54,6 @@ class VerifiedBundle:
     @property
     def production_ready(self) -> bool:
         return self.document.get("provenance", {}).get("mode") == "compiled_clean"
-
-
-@dataclass(frozen=True)
-class RepackMeasurement:
-    iso_path: Path
-    repack_ms: float
-    iso_size_bytes: int
 
 
 def request_from_plan(plan: dict[str, Any], group_id: str) -> BuildRequest:
@@ -250,69 +217,37 @@ def _bundle_digest(document: dict[str, Any]) -> str:
     return contracts.sha256_json(payload)
 
 
-_DEFINITION_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=[^\s]*$")
-_PROVENANCE = ({"mode": "compiled_clean"}, {"mode": "prebuilt_development"})
+class Artifact(contracts.Contract):
+    name: str
+    path: str
+    sha256: contracts.Sha256
 
 
-def _one_of(allowed: tuple[Any, ...]) -> contracts.Rule:
-    return lambda value: None if value in allowed else "is not allowlisted"
+class Provenance(contracts.Contract):
+    mode: Literal["compiled_clean", "prebuilt_development"]
 
 
-def _definitions(value: Any) -> str | None:
-    if not isinstance(value, list) or not all(
-        isinstance(item, str) and _DEFINITION_RE.fullmatch(item) for item in value
-    ):
-        return "expected a list of NAME=VALUE definitions"
-    if len(value) != len(set(value)):
-        return "contains duplicates"
-    return None
+class BundleMetadata(contracts.Contract):
+    schema_version: Literal[1]
+    bundle_id: contracts.Id
+    request_sha256: contracts.Sha256
+    sha256: contracts.Sha256
+    source: contracts.SourceIdentity
+    runner_image: contracts.Image
+    configuration: suite_model.Build
+    provenance: Provenance
+    artifacts: list[Artifact] = Field(min_length=1)
+    created_at: AwareDatetime = Field(strict=False)
 
 
-def _created_at(value: Any) -> str | None:
+def _validate_metadata(document: dict[str, Any]) -> BundleMetadata:
     try:
-        instant = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except (AttributeError, ValueError):
-        return "expected an ISO-8601 timestamp"
-    return None if instant.tzinfo is not None else "must include a UTC offset"
-
-
-def _artifact_list(value: Any) -> str | None:
-    return None if isinstance(value, list) and value else "expected a non-empty list"
-
-
-_METADATA_SHAPE: contracts.Shape = {
-    "schema_version": contracts.constant(1),
-    "bundle_id": contracts.string(contracts.ID_RE),
-    "request_sha256": contracts.string(contracts.SHA256_RE),
-    "sha256": contracts.string(contracts.SHA256_RE),
-    "source": {
-        "repository": contracts.string(contracts.REPOSITORY_RE),
-        "commit": contracts.string(contracts.COMMIT_RE),
-    },
-    "runner_image": contracts.string(contracts.IMAGE_RE),
-    "configuration": {
-        "compiler": _one_of(suite_model.COMPILERS),
-        "type": _one_of(suite_model.BUILD_TYPES),
-        "cmake_definitions": _definitions,
-        "smp": {
-            "sockets": contracts.integer(minimum=1),
-            "cores": contracts.integer(minimum=1),
-            "threads": contracts.integer(minimum=1),
-        },
-        "memory_mib": contracts.integer(minimum=64),
-    },
-    "provenance": _one_of(_PROVENANCE),
-    "artifacts": _artifact_list,
-    "created_at": _created_at,
-}
-
-
-def _validate_metadata(document: dict[str, Any]) -> None:
-    diagnostics = contracts.check_shape(document, _METADATA_SHAPE, "bundle")
-    if diagnostics:
+        metadata = BundleMetadata.model_validate(document)
+    except ValidationError as error:
+        diagnostics = suite_model.diagnostics_of(error, "bundle")
         raise BundleError(
             "bundle metadata is invalid: " + "; ".join(map(str, diagnostics))
-        )
+        ) from None
     request_digest = contracts.sha256_json(
         {
             "source": document["source"],
@@ -320,8 +255,9 @@ def _validate_metadata(document: dict[str, Any]) -> None:
             "configuration": document["configuration"],
         }
     )
-    if document["request_sha256"] != request_digest:
+    if metadata.request_sha256 != request_digest:
         raise BundleError("bundle request digest does not match its content")
+    return metadata
 
 
 def create_bundle(
@@ -418,7 +354,7 @@ def verify_bundle(
     digest = _bundle_digest(document)
     if document.get("sha256") != digest:
         raise BundleError("bundle metadata digest mismatch")
-    _validate_metadata(document)
+    metadata = _validate_metadata(document)
     if expected_sha256 is not None and digest != expected_sha256:
         raise BundleError(
             f"bundle content digest mismatch: expected {expected_sha256}, got {digest}"
@@ -442,38 +378,21 @@ def verify_bundle(
 
     declared: set[Path] = set()
     names: set[str] = set()
-    artifacts = document.get("artifacts")
-    if not isinstance(artifacts, list) or not artifacts:
-        raise BundleError("bundle must declare at least one artifact")
-    for artifact in artifacts:
-        if not isinstance(artifact, dict) or set(artifact) != {
-            "name",
-            "path",
-            "sha256",
-        }:
-            raise BundleError("malformed artifact record")
-        try:
-            name = artifact["name"]
-            path = _safe_artifact_path(root, artifact["path"])
-            expected_digest = artifact["sha256"]
-        except (KeyError, TypeError) as error:
-            raise BundleError(f"malformed artifact record: {error}") from None
-        if not isinstance(name, str):
-            raise BundleError("invalid artifact name")
-        if not isinstance(expected_digest, str):
-            raise BundleError(f"invalid artifact digest: {name}")
+    for artifact in metadata.artifacts:
+        name = artifact.name
+        path = _safe_artifact_path(root, artifact.path)
         if name in names:
             raise BundleError(f"duplicate artifact name: {name}")
         if name not in _EXPECTED_ARTIFACTS:
             raise BundleError(f"unexpected bundle artifact name: {name}")
-        if artifact["path"] != _EXPECTED_ARTIFACTS[name]:
+        if artifact.path != _EXPECTED_ARTIFACTS[name]:
             raise BundleError(f"bundle artifact path is invalid for {name}")
         if path in declared:
-            raise BundleError(f"duplicate artifact path: {artifact['path']}")
+            raise BundleError(f"duplicate artifact path: {artifact.path}")
         if not path.is_file():
-            raise BundleError(f"bundle artifact is missing: {artifact['path']}")
-        if contracts.sha256_file(path) != expected_digest:
-            raise BundleError(f"artifact digest mismatch: {artifact['path']}")
+            raise BundleError(f"bundle artifact is missing: {artifact.path}")
+        if contracts.sha256_file(path) != artifact.sha256:
+            raise BundleError(f"artifact digest mismatch: {artifact.path}")
         names.add(name)
         declared.add(path)
     if names != set(_EXPECTED_ARTIFACTS):
@@ -504,53 +423,23 @@ def restore_executable_bits(bundle: VerifiedBundle) -> None:
         path.chmod(path.stat().st_mode | 0o111)
 
 
-def _run_cmd(command: list[str]) -> None:
-    completed = subprocess.run(command, capture_output=True, text=True, check=False)
-    if completed.returncode != 0:
-        raise BundleError(
-            f"{Path(command[0]).name} failed with exit code {completed.returncode}: "
-            f"{completed.stdout}{completed.stderr}"
-        )
-
-
 def repack_iso(
     bundle_dir: Path, cmdline: Path, output_iso: Path, work_dir: Path
 ) -> None:
-    import gen_limine_conf
+    import mkiso
 
     artifacts = bundle_dir / ARTIFACT_DIR
-    iso_root = work_dir / "iso_root"
-
-    shutil.rmtree(iso_root, ignore_errors=True)
-    (iso_root / "boot" / "limine").mkdir(parents=True)
-    (iso_root / "EFI" / "BOOT").mkdir(parents=True)
-
-    shutil.copyfile(artifacts / "kernel", iso_root / "boot" / "kernel")
-
     try:
-        line = gen_limine_conf.resolve_cmdline(
-            {
-                "CMDLINE": str(cmdline),
-                "NIGHTMARE_TESTS": "",
-                "TESTS": "",
-                "EXTRA_CMDLINE": "",
-            }
+        mkiso.build(
+            artifacts / "kernel",
+            artifacts / "limine.conf",
+            artifacts,
+            output_iso,
+            mkiso.resolve_cmdline({"CMDLINE": str(cmdline)}),
+            work_dir,
         )
-    except gen_limine_conf.ConfError as error:
+    except mkiso.ConfError as error:
         raise BundleError(str(error)) from error
-
-    conf = (artifacts / "limine.conf").read_text(encoding="utf-8")
-    destination = iso_root / "boot" / "limine" / "limine.conf"
-    destination.write_text(gen_limine_conf.render(conf, line), encoding="utf-8")
-
-    for asset in LIMINE_BOOT_ASSETS:
-        shutil.copyfile(artifacts / asset, iso_root / "boot" / "limine" / asset)
-    for asset in EFI_ASSETS:
-        shutil.copyfile(artifacts / asset, iso_root / "EFI" / "BOOT" / asset)
-
-    output_iso.parent.mkdir(parents=True, exist_ok=True)
-    _run_cmd(["xorriso", *XORRISO_FLAGS, str(iso_root), "-o", str(output_iso)])
-    _run_cmd([str(artifacts / "limine"), "bios-install", str(output_iso)])
 
 
 def repack(
@@ -558,21 +447,20 @@ def repack(
     *,
     cmdline: Path,
     out_dir: Path,
-) -> RepackMeasurement:
+) -> Path:
+    """The bundle's ISO rebuilt around one kernel command line"""
     verify_bundle(bundle.root, expected_sha256=bundle.sha256)
     restore_executable_bits(bundle)
     out_dir = out_dir.resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
     iso_path = out_dir / "charmos-x86_64.iso"
-    started = time.perf_counter()
     repack_iso(
         bundle.root,
         cmdline=cmdline.resolve(),
         output_iso=iso_path,
         work_dir=out_dir / "repack-work",
     )
-    elapsed_ms = (time.perf_counter() - started) * 1000
-    return RepackMeasurement(iso_path, elapsed_ms, iso_path.stat().st_size)
+    return iso_path
 
 
 def qemu_command(
@@ -603,43 +491,6 @@ def qemu_command(
             sockets=smp["sockets"], cores=smp["cores"], threads=smp["threads"]
         ),
     )
-
-
-def measure_transport(bundle: VerifiedBundle, out_dir: Path) -> dict[str, Any]:
-    """Measure local archive pack/unpack as the baseline"""
-    out_dir.mkdir(parents=True, exist_ok=True)
-    archive = out_dir / f"{bundle.bundle_id}.tar.gz"
-    pack_started = time.perf_counter()
-    with tarfile.open(archive, "w:gz") as handle:
-        handle.add(bundle.root, arcname=bundle.bundle_id)
-    pack_ms = (time.perf_counter() - pack_started) * 1000
-    with tempfile.TemporaryDirectory(prefix="charmos-bundle-measure-") as temp:
-        transport_root = Path(temp)
-        uploaded = transport_root / "artifact-store.tar.gz"
-        upload_started = time.perf_counter()
-        shutil.copyfile(archive, uploaded)
-        upload_ms = (time.perf_counter() - upload_started) * 1000
-        downloaded = transport_root / "runner-download.tar.gz"
-        download_started = time.perf_counter()
-        shutil.copyfile(uploaded, downloaded)
-        download_ms = (time.perf_counter() - download_started) * 1000
-        if contracts.sha256_file(downloaded) != contracts.sha256_file(archive):
-            raise BundleError("transported bundle archive digest mismatch")
-        unpack_started = time.perf_counter()
-        with tarfile.open(downloaded, "r:gz") as handle:
-            handle.extractall(transport_root / "unpacked", filter="data")
-        unpack_ms = (time.perf_counter() - unpack_started) * 1000
-    return {
-        "transport": "local_tar_gzip_proxy",
-        "bundle_size_bytes": sum(
-            path.stat().st_size for path in bundle.root.rglob("*") if path.is_file()
-        ),
-        "archive_size_bytes": archive.stat().st_size,
-        "pack_ms": round(pack_ms, 3),
-        "upload_ms": round(upload_ms, 3),
-        "download_ms": round(download_ms, 3),
-        "unpack_ms": round(unpack_ms, 3),
-    }
 
 
 def receipt(bundle: VerifiedBundle) -> dict[str, str]:

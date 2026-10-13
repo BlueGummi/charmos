@@ -26,7 +26,6 @@ concurrency:
 env:
   TEST_TIMEOUT: 300
   ITERATIONS: 4
-  PYTHONPATH: scripts
 
 jobs:
   test:
@@ -50,31 +49,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v7
 
-      - name: Verify clang toolchain
-        if: matrix.compiler == 'clang'
-        run: |
-          set -euo pipefail
-          for t in clang ld.lld; do
-            command -v "$t" >/dev/null 2>&1 || {
-              echo "::error::$t missing from the runner image"; exit 1; }
-          done
-          major="$(clang -dumpversion | cut -d. -f1)"
-          if [ "$major" -lt 22 ]; then
-            echo "::error::clang $major is too old: charmOS needs clang >= 22"
-            exit 1
-          fi
-          clang --version | head -1
-
-      - name: Verify gcc toolchain
-        if: matrix.compiler == 'gcc' && runner.arch == 'X64'
-        run: |
-          set -euo pipefail
-          major="$(gcc -dumpversion | cut -d. -f1)"
-          if [ "$major" -lt 14 ]; then
-            echo "::error::gcc $major is too old: charmOS needs gcc >= 14"
-            exit 1
-          fi
-          gcc --version | head -1
+      - uses: astral-sh/setup-uv@v10
 
       - name: Compile
         run: ./scripts/build.sh -t RelWithDebInfo --compiler ${{ matrix.compiler }} -C
@@ -89,54 +64,13 @@ jobs:
       - name: Run tests
         env:
           TERM: dumb
-        run: |
-          set -uo pipefail
-          # GitHub runs under bash -e, capturing a non-zero return code
-          # from timeout/QEMU requires errexit off
-          set +e
-          mkdir -p results
-          overall=0
-
-          for i in $(seq 1 "$ITERATIONS"); do
-            echo "::group::iteration $i/$ITERATIONS (${{ matrix.compiler }})"
-            start=$(date +%s)
-
-            # --foreground lets timeout signal the whole thing
-            timeout --foreground -k 10 "$TEST_TIMEOUT" \
-                cmake --build build --target tests
-            rc=$?
-            pkill -f qemu-system-x86_64 2>/dev/null || true
-
-            end=$(date +%s)
-            cp build/output.log "results/iter-$i.log" 2>/dev/null || \
-                echo "(no serial log produced)" > "results/iter-$i.log"
-            cp build/output.stderr.log "results/iter-$i.stderr.log" 2>/dev/null || true
-            cp build/ndjson.log "results/iter-$i.nd.log" 2>/dev/null || true
-
-            # Parsing happens in the report job, where every shard's
-            # artifacts are visible at once
-            {
-              echo "SHARD=${{ matrix.compiler }}-iter$i"
-              echo "COMPILER=${{ matrix.compiler }}"
-              echo "SCENARIO=gate"
-              echo "SEED="
-              echo "EXIT_CODE=$rc"
-              echo "DURATION_S=$((end - start))"
-              echo "SHA=${{ github.sha }}"
-            } > "results/iter-$i.env"
-
-            tail -40 "results/iter-$i.log" || true
-            echo "::endgroup::"
-
-            if [ "$rc" -ne 0 ]; then
-              echo "::error::iteration $i failed (exit $rc)"
-              overall=$rc
-              break
-            fi
-          done
-
-          gzip -9 results/*.log
-          exit "$overall"
+        run: >
+          uv run --locked charm boot "$ITERATIONS"
+          --timeout "$TEST_TIMEOUT"
+          --out-dir results
+          --shard ${{ matrix.compiler }}
+          --scenario gate
+          --compiler ${{ matrix.compiler }}
 
       - name: Upload results
         if: always()
@@ -155,6 +89,8 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v7
 
+      - uses: astral-sh/setup-uv@v10
+
       - name: Download all results
         uses: actions/download-artifact@v8
         with:
@@ -163,7 +99,7 @@ jobs:
 
       - name: Parse and aggregate
         run: |
-          python3 -m charm ci ingest artifacts \
+          uv run --locked charm ci aggregate 'artifacts/**/*.ndjson' \
             --summary "$GITHUB_STEP_SUMMARY" \
             --json report.json \
             --fail-on-error

@@ -61,6 +61,8 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - uses: astral-sh/setup-uv@v10
+
       - name: Build
         id: build
         if: steps.diff.outputs.changed == 'true'
@@ -73,12 +75,7 @@ jobs:
         continue-on-error: true
         env:
           TERM: dumb
-        run: |
-          set +e
-          timeout --foreground -k 10 300 cmake --build build --target tests
-          rc=$?
-          pkill -f qemu-system-x86_64 2>/dev/null || true
-          exit "$rc"
+        run: uv run --locked charm boot --timeout 300
 
       - name: Determine status
         id: status

@@ -1,6 +1,5 @@
 """Merge per-run result records into markdown and JSON reports."""
 
-import argparse
 import html
 import json
 import re
@@ -368,20 +367,3 @@ def render_json(rep: Record) -> str:
         "warnings": rep["warnings"],
     }
     return f"{json.dumps(report_json, indent=2, sort_keys=True)}\n"
-
-
-def add_report_args(sp: argparse.ArgumentParser) -> None:
-    sp.add_argument("--summary", help="write markdown here (append if exists)")
-    sp.add_argument("--json", help="write merged JSON report here")
-    sp.add_argument(
-        "--repro-template",
-        default="",
-        help="shell snippet shown for reproducing a crash, with {seed} and "
-        "{scenario} substituted",
-    )
-    sp.add_argument(
-        "--fail-on-error",
-        action="store_true",
-        help="exit 1 if any shard failed (gate jobs want this; hunt jobs "
-        "generally do not, since a finding is an issue and not a red X)",
-    )

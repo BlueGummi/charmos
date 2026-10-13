@@ -1,6 +1,6 @@
 """nightmare tasks into kernel command lines"""
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -97,14 +97,15 @@ def _knob(value: Any, name: str) -> str:
 
 
 def gate_task(task: Task) -> Task:
-    boot = replace(
-        task.boot,
-        duration_ms=GATE_DURATION_MS,
-        timeout_ms=0,  # re-derive host timeout from gate duration
-        max_boots=1,
-        min_interval_ms=0,
+    boot = task.boot.model_copy(
+        update={
+            "duration_ms": GATE_DURATION_MS,
+            "timeout_ms": 0,  # re-derive host timeout from gate duration
+            "max_boots": 1,
+            "min_interval_ms": 0,
+        }
     )
-    return replace(task, boot=boot)
+    return task.model_copy(update={"boot": boot})
 
 
 def render_gate(
@@ -115,7 +116,7 @@ def render_gate(
 ) -> str:
     """command line for the gate boot
 
-    Must never be empty: `gen_limine_conf.py` rejects a blank CMDLINE file
+    Must never be empty: `mkiso.py` rejects a blank CMDLINE file
     """
     gate = gate_task(task)
     seed = base_seed if gate.nightmare.wants_seed else None
@@ -123,7 +124,7 @@ def render_gate(
 
 
 def write(path: Path, cmdline: str) -> Path:
-    """the artifact gen_limine_conf.py reads via CMDLINE=<path>"""
+    """the artifact mkiso.py reads via CMDLINE=<path>"""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(cmdline + "\n", encoding="utf-8")
     return path

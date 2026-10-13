@@ -6,7 +6,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .. import report as RP
-from . import build_bundle, contracts
+from . import build_bundle, contracts, executor
 
 
 class AggregateError(ValueError):
@@ -24,6 +24,10 @@ class AggregateReport:
     @property
     def partial(self) -> bool:
         return bool(self.document["partial"])
+
+
+def _issue(code: str, subject: object, message: str) -> dict[str, str]:
+    return {"code": code, "subject": str(subject), "message": message}
 
 
 def _read_object(path: Path) -> dict[str, Any]:
@@ -68,22 +72,20 @@ def _expected_manifests(
     issues: list[dict[str, str]] = []
     if plan_bundle_path is None or not plan_bundle_path.is_file():
         issues.append(
-            {
-                "code": "missing_plan_bundle",
-                "subject": plan["id"],
-                "message": "accepted plan was not materialized",
-            }
+            _issue(
+                "missing_plan_bundle", plan["id"], "accepted plan was not materialized"
+            )
         )
         return expected, issues
 
     index = _read_object(plan_bundle_path)
     if index.get("planId") != plan["id"]:
         issues.append(
-            {
-                "code": "plan_identity_mismatch",
-                "subject": str(index.get("planId")),
-                "message": "materialized plan ID does not match the accepted plan",
-            }
+            _issue(
+                "plan_identity_mismatch",
+                str(index.get("planId")),
+                "materialized plan ID does not match the accepted plan",
+            )
         )
         return expected, issues
     seen: set[str] = set()
@@ -91,61 +93,49 @@ def _expected_manifests(
         manifest_id = item.get("manifestId")
         if manifest_id in seen:
             issues.append(
-                {
-                    "code": "duplicate_manifest",
-                    "subject": str(manifest_id),
-                    "message": "manifest appears more than once in the plan bundle",
-                }
+                _issue(
+                    "duplicate_manifest",
+                    str(manifest_id),
+                    "manifest appears more than once in the plan bundle",
+                )
             )
             continue
         seen.add(manifest_id)
         if manifest_id not in expected:
             issues.append(
-                {
-                    "code": "unexpected_manifest",
-                    "subject": str(manifest_id),
-                    "message": "plan bundle contains an unplanned manifest",
-                }
+                _issue(
+                    "unexpected_manifest",
+                    str(manifest_id),
+                    "plan bundle contains an unplanned manifest",
+                )
             )
             continue
         try:
             path = _safe_relative(plan_bundle_path.parent, item["path"])
         except (KeyError, TypeError, AggregateError) as error:
-            issues.append(
-                {
-                    "code": "invalid_manifest_path",
-                    "subject": str(manifest_id),
-                    "message": str(error),
-                }
-            )
+            issues.append(_issue("invalid_manifest_path", str(manifest_id), str(error)))
             continue
         if not path.is_file() or contracts.sha256_file(path) != item.get("sha256"):
             issues.append(
-                {
-                    "code": "manifest_digest_mismatch",
-                    "subject": str(manifest_id),
-                    "message": "materialized manifest is missing or has the wrong digest",
-                }
+                _issue(
+                    "manifest_digest_mismatch",
+                    str(manifest_id),
+                    "materialized manifest is missing or has the wrong digest",
+                )
             )
             continue
         try:
             manifest = contracts.load_manifest(path)
         except contracts.ContractError as error:
-            issues.append(
-                {
-                    "code": "invalid_manifest",
-                    "subject": str(manifest_id),
-                    "message": str(error),
-                }
-            )
+            issues.append(_issue("invalid_manifest", str(manifest_id), str(error)))
             continue
         if manifest.manifest_id != manifest_id:
             issues.append(
-                {
-                    "code": "manifest_identity_mismatch",
-                    "subject": str(manifest_id),
-                    "message": "manifest content has a different identity",
-                }
+                _issue(
+                    "manifest_identity_mismatch",
+                    str(manifest_id),
+                    "manifest content has a different identity",
+                )
             )
             continue
         expected[manifest_id].update(
@@ -158,11 +148,11 @@ def _expected_manifests(
         )
     for manifest_id in sorted(set(expected) - seen):
         issues.append(
-            {
-                "code": "missing_manifest",
-                "subject": manifest_id,
-                "message": "accepted manifest is absent from the plan bundle",
-            }
+            _issue(
+                "missing_manifest",
+                manifest_id,
+                "accepted manifest is absent from the plan bundle",
+            )
         )
     return expected, issues
 
@@ -175,11 +165,11 @@ def _check_builds(
     expected = {group["id"]: group for group in plan["buildGroups"]}
     if builds_dir is None or not builds_dir.is_dir():
         return [
-            {
-                "code": "missing_build_bundle",
-                "subject": group_id,
-                "message": "accepted build group has no downloaded bundle",
-            }
+            _issue(
+                "missing_build_bundle",
+                group_id,
+                "accepted build group has no downloaded bundle",
+            )
             for group_id in sorted(expected)
         ]
     issues: list[dict[str, str]] = []
@@ -189,39 +179,35 @@ def _check_builds(
             verified = build_bundle.verify_bundle(metadata_path.parent)
         except build_bundle.BundleError as error:
             issues.append(
-                {
-                    "code": "invalid_build_bundle",
-                    "subject": str(metadata_path.parent),
-                    "message": str(error),
-                }
+                _issue("invalid_build_bundle", str(metadata_path.parent), str(error))
             )
             continue
         if verified.bundle_id in seen:
             issues.append(
-                {
-                    "code": "duplicate_build_bundle",
-                    "subject": verified.bundle_id,
-                    "message": "build identity was downloaded more than once",
-                }
+                _issue(
+                    "duplicate_build_bundle",
+                    verified.bundle_id,
+                    "build identity was downloaded more than once",
+                )
             )
             continue
         seen.add(verified.bundle_id)
         group = expected.get(verified.bundle_id)
         if group is None:
             issues.append(
-                {
-                    "code": "unexpected_build_bundle",
-                    "subject": verified.bundle_id,
-                    "message": "bundle was not declared by the accepted plan",
-                }
+                _issue(
+                    "unexpected_build_bundle",
+                    verified.bundle_id,
+                    "bundle was not declared by the accepted plan",
+                )
             )
         elif verified.request_sha256 != group["requestSha256"]:
             issues.append(
-                {
-                    "code": "build_request_mismatch",
-                    "subject": verified.bundle_id,
-                    "message": "bundle request digest differs from the accepted group",
-                }
+                _issue(
+                    "build_request_mismatch",
+                    verified.bundle_id,
+                    "bundle request digest differs from the accepted group",
+                )
             )
         else:
             content_digests = {
@@ -232,19 +218,19 @@ def _check_builds(
             }
             if content_digests and content_digests != {verified.sha256}:
                 issues.append(
-                    {
-                        "code": "build_content_mismatch",
-                        "subject": verified.bundle_id,
-                        "message": "downloaded bundle differs from the manifest identity",
-                    }
+                    _issue(
+                        "build_content_mismatch",
+                        verified.bundle_id,
+                        "downloaded bundle differs from the manifest identity",
+                    )
                 )
     for group_id in sorted(set(expected) - seen):
         issues.append(
-            {
-                "code": "missing_build_bundle",
-                "subject": group_id,
-                "message": "accepted build group has no downloaded bundle",
-            }
+            _issue(
+                "missing_build_bundle",
+                group_id,
+                "accepted build group has no downloaded bundle",
+            )
         )
     return issues
 
@@ -268,22 +254,16 @@ def aggregate(
         try:
             document = _read_object(path)
         except AggregateError as error:
-            issues.append(
-                {
-                    "code": "invalid_runner_result",
-                    "subject": str(path),
-                    "message": str(error),
-                }
-            )
+            issues.append(_issue("invalid_runner_result", str(path), str(error)))
             continue
         manifest_id = document.get("manifest_id")
         if not isinstance(manifest_id, str):
             issues.append(
-                {
-                    "code": "invalid_runner_result",
-                    "subject": str(path),
-                    "message": "runner result has no manifest identity",
-                }
+                _issue(
+                    "invalid_runner_result",
+                    str(path),
+                    "runner result has no manifest identity",
+                )
             )
             continue
         results_by_manifest.setdefault(manifest_id, []).append((path, document))
@@ -296,21 +276,21 @@ def aggregate(
         matches = results_by_manifest.pop(manifest_id, [])
         if not matches:
             issues.append(
-                {
-                    "code": "missing_runner_result",
-                    "subject": manifest_id,
-                    "message": "no runner result was retained",
-                }
+                _issue(
+                    "missing_runner_result",
+                    manifest_id,
+                    "no runner result was retained",
+                )
             )
             rows.append({"manifest_id": manifest_id, "state": "missing"})
             continue
         if len(matches) > 1:
             issues.append(
-                {
-                    "code": "duplicate_runner_result",
-                    "subject": manifest_id,
-                    "message": f"found {len(matches)} results for one manifest",
-                }
+                _issue(
+                    "duplicate_runner_result",
+                    manifest_id,
+                    f"found {len(matches)} results for one manifest",
+                )
             )
         path, result = matches[0]
         if result.get("schema_version") != 1 or result.get("lifecycle") not in (
@@ -319,22 +299,22 @@ def aggregate(
             "cancelled",
         ):
             issues.append(
-                {
-                    "code": "invalid_runner_result",
-                    "subject": manifest_id,
-                    "message": "runner result has an invalid version or lifecycle",
-                }
+                _issue(
+                    "invalid_runner_result",
+                    manifest_id,
+                    "runner result has an invalid version or lifecycle",
+                )
             )
         if (
             manifest_expected["sha256"] is not None
             and result.get("manifest_sha256") != manifest_expected["sha256"]
         ):
             issues.append(
-                {
-                    "code": "result_identity_mismatch",
-                    "subject": manifest_id,
-                    "message": "runner result names a different manifest digest",
-                }
+                _issue(
+                    "result_identity_mismatch",
+                    manifest_id,
+                    "runner result names a different manifest digest",
+                )
             )
         copied_manifest = path.parent / "manifest.json"
         if manifest_expected["sha256"] is not None and (
@@ -342,41 +322,27 @@ def aggregate(
             or contracts.sha256_file(copied_manifest) != manifest_expected["sha256"]
         ):
             issues.append(
-                {
-                    "code": "result_manifest_mismatch",
-                    "subject": manifest_id,
-                    "message": "retained manifest does not match the planned manifest",
-                }
+                _issue(
+                    "result_manifest_mismatch",
+                    manifest_id,
+                    "retained manifest does not match the planned manifest",
+                )
             )
         try:
             identity = _read_object(path.parent / "identity.json")
         except AggregateError as error:
-            issues.append(
-                {
-                    "code": "missing_identity",
-                    "subject": manifest_id,
-                    "message": str(error),
-                }
-            )
+            issues.append(_issue("missing_identity", manifest_id, str(error)))
         else:
-            planned: contracts.RunnerManifest | None = manifest_expected["manifest"]
-            expected_identity = planned and {
-                "manifest_id": manifest_id,
-                "manifest_sha256": manifest_expected["sha256"],
-                "source": planned.document["source"],
-                "suite": {"id": planned.suite.id, "sha256": planned.suite.sha256},
-                "build": planned.document["build"],
-            }
-            if expected_identity and any(
-                identity.get(field) != value
-                for field, value in expected_identity.items()
+            planned = manifest_expected["manifest"]
+            if planned and identity != executor.identity(
+                manifest_sha256=manifest_expected["sha256"], manifest=planned
             ):
                 issues.append(
-                    {
-                        "code": "identity_sidecar_mismatch",
-                        "subject": manifest_id,
-                        "message": "runner identity sidecar differs from the accepted manifest",
-                    }
+                    _issue(
+                        "identity_sidecar_mismatch",
+                        manifest_id,
+                        "runner identity sidecar differs from the accepted manifest",
+                    )
                 )
         execution_value = result.get("execution")
         execution: dict[str, Any] = (
@@ -390,11 +356,11 @@ def aggregate(
         lifecycle = result.get("lifecycle", "failed")
         if health != "healthy" or lifecycle != "completed":
             issues.append(
-                {
-                    "code": "runner_infrastructure",
-                    "subject": manifest_id,
-                    "message": f"lifecycle={lifecycle}, health={health}, code={execution.get('code')}",
-                }
+                _issue(
+                    "runner_infrastructure",
+                    manifest_id,
+                    f"lifecycle={lifecycle}, health={health}, code={execution.get('code')}",
+                )
             )
         campaign_value = result.get("campaign")
         campaign: dict[str, Any] = (
@@ -447,18 +413,18 @@ def aggregate(
     for manifest_id, matches in sorted(results_by_manifest.items()):
         for path, _document in matches:
             issues.append(
-                {
-                    "code": "unexpected_runner_result",
-                    "subject": manifest_id,
-                    "message": f"unplanned result at {path}",
-                }
+                _issue(
+                    "unexpected_runner_result",
+                    manifest_id,
+                    f"unplanned result at {path}",
+                )
             )
 
     partial = bool(issues)
     document = {
         "schema_version": 1,
         "plan_id": plan["id"],
-        "batch_id": plan["batch"]["id"],
+        "batch_id": plan["batchId"],
         "ok": not partial,
         "partial": partial,
         "expected_manifests": len(expected),

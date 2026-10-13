@@ -1,3 +1,10 @@
+set(_min_GNU 14)
+set(_min_Clang 22)
+set(_min "${_min_${CMAKE_C_COMPILER_ID}}")
+if (_min AND CMAKE_C_COMPILER_VERSION VERSION_LESS _min)
+    message(FATAL_ERROR "charmOS needs ${CMAKE_C_COMPILER_ID} >= ${_min}, found ${CMAKE_C_COMPILER_VERSION}")
+endif ()
+
 string(TOUPPER "${CMAKE_BUILD_TYPE}" _BUILD_TYPE_UPPER)
 if (_BUILD_TYPE_UPPER STREQUAL "DEBUG")
     add_compile_definitions(BUILD_DEBUG)

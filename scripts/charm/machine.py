@@ -3,10 +3,13 @@
 definition (scripts/machines/*.toml)
 """
 
+import argparse
 import re
 import shutil
 import subprocess
+import sys
 import tomllib
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -35,6 +38,10 @@ def parse_memory(text: str | int) -> int:
 
 @dataclass(frozen=True)
 class Smp:
+    # read by pydantic when a suite embeds one; a plain dict keeps this module
+    # importable without it
+    __pydantic_config__ = {"extra": "forbid"}  # noqa: RUF012
+
     sockets: int = 1
     cores: int = 1
     threads: int = 1
@@ -307,3 +314,94 @@ def render(
 
     argv += _mode_wiring(mode, machine_log, gdb)
     return argv
+
+
+def _cmd_list(_args: argparse.Namespace) -> None:
+    directory = machines_dir()
+    for path in sorted(directory.glob("*.toml")):
+        m = load(path.stem, directory=directory)
+        modes = ", ".join(sorted(m.modes))
+        print(f"{m.name:<12} {m.arch:<8} {m.type:<14} qemu>={m.min_qemu}  [{modes}]")
+
+
+def _cmd_resolve(args: argparse.Namespace) -> None:
+    print(resolve_machine_type(load(args.profile)))
+
+
+def _cmd_render(args: argparse.Namespace) -> None:
+    m = load(args.profile)
+    if args.check_version:
+        check_qemu_version(m)
+    smp = None
+    if args.smp:
+        fields = dict(
+            part.split("=", 1) for part in args.smp.replace(" ", "").split(",")
+        )
+        smp = Smp(**{k: int(v) for k, v in fields.items()})
+    argv = render(
+        m,
+        args.mode,
+        iso=args.iso,
+        disk=args.disk,
+        qmp_socket=args.qmp_socket,
+        machine_log=args.machine_log,
+        trace_log=args.trace_log,
+        acpi_dir=args.acpi_dir,
+        memory_mib=parse_memory(args.memory) if args.memory else None,
+        smp=smp,
+        kvm=args.kvm,
+        gdb="wait" if args.gdb_wait else None,
+    )
+    text = "\n".join(argv) + "\n"
+    if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.out).write_text(text, encoding="utf-8")
+    else:
+        sys.stdout.write(text)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """`charm machine`, stdlib-only so CMake can run it at configure time"""
+    ap = argparse.ArgumentParser(
+        prog="charm machine", description="the guest QEMU boots"
+    )
+    sub = ap.add_subparsers(dest="command", required=True)
+
+    sub.add_parser("list", help="every profile and the modes it defines").set_defaults(
+        fn=_cmd_list
+    )
+
+    rv = sub.add_parser("resolve", help="what the profile's machine type means here")
+    rv.add_argument("--profile", default="default")
+    rv.set_defaults(fn=_cmd_resolve)
+
+    rd = sub.add_parser("render", help="one profile and mode -> a QEMU argv")
+    rd.add_argument("--profile", default="default")
+    rd.add_argument("--mode", required=True)
+    rd.add_argument("--iso", required=True)
+    rd.add_argument("--disk")
+    rd.add_argument("--qmp-socket", required=True)
+    rd.add_argument("--machine-log")
+    rd.add_argument("--trace-log")
+    rd.add_argument("--acpi-dir", type=Path)
+    rd.add_argument("--memory", help="override, e.g. 4G")
+    rd.add_argument("--smp", help="override, e.g. sockets=1,cores=2,threads=1")
+    rd.add_argument("--kvm", action="store_true")
+    rd.add_argument("--gdb-wait", action="store_true", help="halt at startup (-S)")
+    rd.add_argument(
+        "--check-version", action="store_true", help="refuse a QEMU below min_qemu"
+    )
+    rd.add_argument("--out", help="write here instead of stdout")
+    rd.set_defaults(fn=_cmd_render)
+
+    args = ap.parse_args(argv)
+    try:
+        args.fn(args)
+    except MachineError as error:
+        print(f"charm machine: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

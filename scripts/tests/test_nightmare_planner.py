@@ -30,7 +30,6 @@ tests = ["overnight_locks"]
     )
 
     assert isinstance(result, planner.Accepted)
-    assert result.plan.document["batch"]["id"] == result.plan.batch_id
-    assert result.plan.document["batch"]["residualTail"] is not None
+    assert result.plan.document["batchId"] == result.plan.batch_id
     assert len(result.plan.tasks) == 3
     assert {task.suite_id for task in result.plan.tasks} == {"overnight_locks"}

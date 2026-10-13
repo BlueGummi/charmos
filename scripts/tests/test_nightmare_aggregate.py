@@ -75,7 +75,7 @@ class DiscoveryRollupTests(unittest.TestCase):
             "kind": "accepted",
             "plan": {
                 "id": "plan_0",
-                "batch": {"id": "batch_0"},
+                "batchId": "batch_0",
                 "manifests": [
                     {"manifestId": r["manifest_id"], "buildGroupId": "build_0"}
                     for r in results

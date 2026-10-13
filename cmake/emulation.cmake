@@ -50,7 +50,7 @@ endif ()
 foreach (_mode run headless tests debug tests-debug)
     execute_process(
         COMMAND
-            ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}/scripts ${Python3_EXECUTABLE} -m charm machine
+            ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}/scripts ${Python3_EXECUTABLE} -m charm.machine
             render --profile ${MACHINE_PROFILE} --mode ${_mode} --iso ${IMAGE_NAME}.iso --disk disk.img --qmp-socket
             ${QMP_SOCKET} --machine-log ${NDJSON_LOG} --trace-log trace.log --acpi-dir ${CMAKE_BINARY_DIR}/acpi
             --out ${MACHINE_ARGS_DIR}/${_mode}.args ${MACHINE_RENDER_ARGS}
@@ -65,26 +65,10 @@ endforeach ()
 add_custom_target(
     iso
     DEPENDS kernel
-    COMMAND ${CMAKE_COMMAND} -E rm -rf iso_root
-    COMMAND ${CMAKE_COMMAND} -E make_directory iso_root/boot
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:kernel> iso_root/boot/
-    COMMAND ${CMAKE_COMMAND} -E make_directory iso_root/boot/limine
-    COMMAND
-        ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/gen_limine_conf.py ${CMAKE_SOURCE_DIR}/kernel/limine.conf
-        ${CMAKE_BINARY_DIR}/iso_root/boot/limine/limine.conf
-    COMMAND ${CMAKE_COMMAND} -E make_directory iso_root/EFI/BOOT
-    COMMAND
-        ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/limine/limine-bios.sys
-        ${CMAKE_SOURCE_DIR}/limine/limine-bios-cd.bin ${CMAKE_SOURCE_DIR}/limine/limine-uefi-cd.bin
-        iso_root/boot/limine/
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/limine/BOOTX64.EFI iso_root/EFI/BOOT/
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/limine/BOOTIA32.EFI iso_root/EFI/BOOT/
-    COMMAND
-        xorriso -as mkisofs -R -r -J -b boot/limine/limine-bios-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table
-        -hfsplus -apm-block-size 2048 --efi-boot boot/limine/limine-uefi-cd.bin -efi-boot-part --efi-boot-image
-        --protective-msdos-label iso_root -o ${IMAGE_NAME}.iso > /dev/null 2>&1
     COMMAND make -C ${CMAKE_SOURCE_DIR}/limine
-    COMMAND ${CMAKE_SOURCE_DIR}/limine/limine bios-install ${IMAGE_NAME}.iso
+    COMMAND
+        ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/mkiso.py $<TARGET_FILE:kernel>
+        ${CMAKE_SOURCE_DIR}/kernel/limine.conf ${CMAKE_SOURCE_DIR}/limine ${IMAGE_NAME}.iso
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMENT "Building bootable ISO: ${IMAGE_NAME}.iso")
 
@@ -132,7 +116,7 @@ register_run_target(debug debug 0)
 register_run_target(tests-debug tests-debug 0)
 
 execute_process(
-    COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}/scripts ${Python3_EXECUTABLE} -m charm machine
+    COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_SOURCE_DIR}/scripts ${Python3_EXECUTABLE} -m charm.machine
             resolve --profile ${MACHINE_PROFILE}
     OUTPUT_VARIABLE MACHINE_TYPE_RESOLVED
     OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)

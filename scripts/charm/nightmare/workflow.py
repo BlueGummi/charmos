@@ -1,28 +1,12 @@
 """Trusted file adapters for the immutable GitHub Actions execution graph"""
 
-import json
+import tomllib
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from . import contracts
 from . import suite as suite_model
-
-
-def wait_until(target_time: datetime, max_wait_seconds: int = 21600) -> float:
-    """If target_time is in the future, sleep until target_time (up to max_wait_seconds)."""
-    import time
-
-    now = datetime.now(UTC)
-    delay = (target_time.astimezone(UTC) - now).total_seconds()
-    if delay <= 0:
-        return 0.0
-    if delay > max_wait_seconds:
-        raise ValueError(
-            f"target time {target_time.isoformat()} exceeds maximum wait window of {max_wait_seconds}s"
-        )
-    time.sleep(delay)
-    return delay
 
 
 def queue_metadata(
@@ -35,29 +19,66 @@ def queue_metadata(
     max_defer_seconds: int = 29 * 24 * 60 * 60,
 ) -> dict[str, Any]:
     """Describe whether an accepted command should wait in the Actions queue."""
-    payload = command.get("payload")
-    definition = payload.get("definition") if isinstance(payload, dict) else None
-    start_raw = definition.get("start_utc") if isinstance(definition, dict) else None
-    if not isinstance(start_raw, str):
-        raise ValueError("command payload is missing definition.start_utc")
-    try:
-        start = datetime.fromisoformat(start_raw.replace("Z", "+00:00"))
-    except ValueError as error:
-        raise ValueError(f"invalid definition.start_utc: {error}") from error
-    if start.tzinfo is None:
-        raise ValueError("definition.start_utc must include a UTC offset")
+    start = contracts.BatchDefinition.model_validate(
+        command["payload"]["definition"]
+    ).start
     evaluated_at = (now or datetime.now(UTC)).astimezone(UTC)
-    delay = (start.astimezone(UTC) - evaluated_at).total_seconds()
+    delay = (start - evaluated_at).total_seconds()
     if delay > max_defer_seconds:
         raise ValueError("definition.start_utc exceeds the 29-day queue horizon")
-    deferred = delay > defer_threshold_seconds
     return {
         "schema_version": 1,
         "batch_id": batch_id,
         "source_sha": source_sha,
         "start_utc": contracts.instant(start),
-        "deferred": deferred,
+        "deferred": delay > defer_threshold_seconds,
     }
+
+
+def _planner_inputs(
+    definition: contracts.BatchDefinition,
+    *,
+    actor: str,
+    identity: dict[str, Any],
+    repository: str,
+    ref: str,
+    evaluated_at: datetime,
+    runner_capacity: int,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """One validate_batch command and the idle fleet snapshot it plans against"""
+    wire = definition.model_dump(mode="json")
+    snapshot_version = f"fleet_{contracts.sha256_json(identity)[:20]}"
+    command_digest = contracts.sha256_json(
+        {"snapshot": snapshot_version, "definition": wire}
+    )
+    command = {
+        "schema_version": 1,
+        "command_id": f"command_{command_digest[:20]}",
+        "operation": "validate_batch",
+        "idempotency_key": f"{actor}-{command_digest[:24]}",
+        "repository": {"id": repository, "ref": ref},
+        "payload": {"definition": wire, "base_snapshot_version": snapshot_version},
+    }
+    snapshot_end = definition.start + timedelta(hours=definition.window_hours + 1)
+    snapshot = {
+        "schemaVersion": 1,
+        "version": snapshot_version,
+        "window": {
+            "startsAt": contracts.instant(evaluated_at),
+            "endsAt": contracts.instant(snapshot_end),
+        },
+        "runners": [
+            {
+                "id": f"runner_{index}",
+                "number": index,
+                "state": "idle",
+                "label": f"Runner {index}",
+            }
+            for index in range(1, runner_capacity + 1)
+        ],
+        "batches": [],
+    }
+    return command, snapshot
 
 
 def repository_command(
@@ -70,84 +91,31 @@ def repository_command(
     runner_capacity: int = 12,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Translate one committed schedule selection into planner input files."""
-    suite_path = suite_dir / f"{suite_id}.toml"
-    suite = suite_model.load(suite_path)
+    suite = suite_model.load(suite_dir / f"{suite_id}.toml")
     if suite.meta.name != suite_id:
         raise ValueError(f"suite ID {suite_id!r} does not match {suite.meta.name!r}")
     evaluated_at = now.astimezone(UTC)
-    start = evaluated_at + timedelta(minutes=5)
-    window_hours = suite.meta.budget_hours
-    runners = suite.meta.runners
-    snapshot_end = start + timedelta(hours=window_hours + 1)
-    definition = {
-        "name": f"Repository {suite_id}",
-        "start_utc": contracts.instant(start),
-        "window_hours": window_hours,
-        "runners": runners,
-        "color": "#a7c080",
-        "tests": [suite_id],
-    }
-    definition_toml = (
-        "[batch]\n"
-        f'name = "Repository {suite_id}"\n'
-        f'start_utc = "{contracts.instant(start)}"\n'
-        f"window_hours = {window_hours}\n"
-        f"runners = {runners}\n"
-        'color = "#a7c080"\n'
-        f'tests = ["{suite_id}"]\n'
+    definition = contracts.BatchDefinition(
+        name=f"Repository {suite_id}",
+        start_utc=evaluated_at + timedelta(minutes=5),
+        window_hours=suite.meta.budget_hours,
+        runners=suite.meta.runners,
+        tests=[suite_id],
     )
-    snapshot_identity = {
-        "repository": repository,
-        "evaluated_at": contracts.instant(evaluated_at),
-        "suite": suite_id,
-        "capacity": runner_capacity,
-    }
-    snapshot_version = f"fleet_{contracts.sha256_json(snapshot_identity)[:20]}"
-    command_digest = contracts.sha256_json(
-        {"snapshot": snapshot_version, "definition": definition}
+    return _planner_inputs(
+        definition,
+        actor="repository",
+        identity={
+            "repository": repository,
+            "evaluated_at": contracts.instant(evaluated_at),
+            "suite": suite_id,
+            "capacity": runner_capacity,
+        },
+        repository=repository,
+        ref=ref,
+        evaluated_at=evaluated_at,
+        runner_capacity=runner_capacity,
     )
-    command = {
-        "schema_version": 1,
-        "command_id": f"command_{command_digest[:20]}",
-        "operation": "validate_batch",
-        "idempotency_key": f"repository-{command_digest[:24]}",
-        "actor": {"id": "repository-schedule", "login": "github-actions"},
-        "repository": {"id": repository, "ref": ref},
-        "payload": {
-            "definition": definition,
-            "definition_toml": definition_toml,
-            "base_snapshot_version": snapshot_version,
-        },
-    }
-    owner, name = repository.split("/", 1)
-    snapshot = {
-        "schemaVersion": 1,
-        "version": snapshot_version,
-        "evaluatedAt": contracts.instant(evaluated_at),
-        "window": {
-            "startsAt": contracts.instant(evaluated_at),
-            "endsAt": contracts.instant(snapshot_end),
-        },
-        "repository": {
-            "id": name,
-            "owner": owner,
-            "name": name,
-            "ref": ref,
-            "refs": [ref],
-        },
-        "runners": [
-            {
-                "id": f"runner_{index}",
-                "number": index,
-                "state": "idle",
-                "label": f"Runner {index}",
-            }
-            for index in range(1, runner_capacity + 1)
-        ],
-        "batches": [],
-        "partial": False,
-    }
-    return command, snapshot
 
 
 def inline_command(
@@ -159,125 +127,31 @@ def inline_command(
     runner_capacity: int = 12,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Translate inline TOML batch definition into planner input files."""
-    import tomllib
-
     try:
-        raw = tomllib.loads(toml_text)
+        batch = tomllib.loads(toml_text).get("batch")
     except tomllib.TOMLDecodeError as error:
         raise ValueError(f"invalid batch TOML: {error}") from error
-
-    batch = raw.get("batch")
     if not isinstance(batch, dict):
         raise ValueError("batch TOML missing [batch] table")
-
-    name = batch.get("name")
-    if not isinstance(name, str) or not name.strip():
-        raise ValueError("[batch].name must be a non-empty string")
-
     evaluated_at = now.astimezone(UTC)
-    start_str = batch.get("start_utc")
-    if isinstance(start_str, str):
-        try:
-            start = datetime.fromisoformat(start_str.replace("Z", "+00:00")).astimezone(
-                UTC
-            )
-        except ValueError as error:
-            raise ValueError(f"invalid start_utc: {error}") from error
-    else:
-        start = evaluated_at + timedelta(minutes=5)
-
-    window_hours = batch.get("window_hours")
-    if not isinstance(window_hours, int) or window_hours < 1:
-        raise ValueError("[batch].window_hours must be a positive integer")
-
-    runners = batch.get("runners")
-    if not isinstance(runners, int) or runners < 1:
-        raise ValueError("[batch].runners must be a positive integer")
-
-    color = str(batch.get("color") or "#a7c080")
-    tests = batch.get("tests")
-    if (
-        not isinstance(tests, list)
-        or not tests
-        or not all(isinstance(t, str) for t in tests)
-    ):
-        raise ValueError("[batch].tests must be a non-empty list of test/suite names")
-
-    snapshot_end = start + timedelta(hours=window_hours + 1)
-    definition = {
-        "name": name,
-        "start_utc": contracts.instant(start),
-        "window_hours": window_hours,
-        "runners": runners,
-        "color": color,
-        "tests": tests,
-    }
-    tests_repr = json.dumps(tests)
-    definition_toml = (
-        "[batch]\n"
-        f'name = "{name}"\n'
-        f'start_utc = "{contracts.instant(start)}"\n'
-        f"window_hours = {window_hours}\n"
-        f"runners = {runners}\n"
-        f'color = "{color}"\n'
-        f"tests = {tests_repr}\n"
+    definition = contracts.BatchDefinition.model_validate(
+        {"start_utc": evaluated_at + timedelta(minutes=5), **batch}
     )
-
-    snapshot_identity = {
-        "repository": repository,
-        "evaluated_at": contracts.instant(evaluated_at),
-        "ad_hoc": True,
-        "name": name,
-        "capacity": runner_capacity,
-    }
-    snapshot_version = f"fleet_{contracts.sha256_json(snapshot_identity)[:20]}"
-    command_digest = contracts.sha256_json(
-        {"snapshot": snapshot_version, "definition": definition}
+    return _planner_inputs(
+        definition,
+        actor="adhoc",
+        identity={
+            "repository": repository,
+            "evaluated_at": contracts.instant(evaluated_at),
+            "ad_hoc": True,
+            "name": definition.name,
+            "capacity": runner_capacity,
+        },
+        repository=repository,
+        ref=ref,
+        evaluated_at=evaluated_at,
+        runner_capacity=runner_capacity,
     )
-    command = {
-        "schema_version": 1,
-        "command_id": f"command_{command_digest[:20]}",
-        "operation": "validate_batch",
-        "idempotency_key": f"adhoc-{command_digest[:24]}",
-        "actor": {"id": "adhoc-dispatch", "login": "github-actions"},
-        "repository": {"id": repository, "ref": ref},
-        "payload": {
-            "definition": definition,
-            "definition_toml": definition_toml,
-            "base_snapshot_version": snapshot_version,
-        },
-    }
-    owner, repo_name = (
-        repository.split("/", 1) if "/" in repository else ("local", repository)
-    )
-    snapshot = {
-        "schemaVersion": 1,
-        "version": snapshot_version,
-        "evaluatedAt": contracts.instant(evaluated_at),
-        "window": {
-            "startsAt": contracts.instant(evaluated_at),
-            "endsAt": contracts.instant(snapshot_end),
-        },
-        "repository": {
-            "id": repo_name,
-            "owner": owner,
-            "name": repo_name,
-            "ref": ref,
-            "refs": [ref],
-        },
-        "runners": [
-            {
-                "id": f"runner_{index}",
-                "number": index,
-                "state": "idle",
-                "label": f"Runner {index}",
-            }
-            for index in range(1, runner_capacity + 1)
-        ],
-        "batches": [],
-        "partial": False,
-    }
-    return command, snapshot
 
 
 def build_matrix(plan_result: dict[str, Any], limit: int = 64) -> list[dict[str, str]]:

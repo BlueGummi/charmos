@@ -93,11 +93,19 @@ foreach (_dir ${_test_dirs})
 
     if (TEST_ALL OR ${_flag})
         list(APPEND TEST_FLAGS_ENABLED "${_flag}")
-    else ()
-        # Whatever's in kernel/tests is the framework and they have to #ifdef themselves
-        foreach (_tier ${TEST_TIERS})
-            list(APPEND TEST_DIRS_DISABLED "${_dir}/${_tier}")
+    elseif (_dir STREQUAL "${TEST_TREE_ROOT}/tests")
+        file(
+            GLOB _framework_tests
+            LIST_DIRECTORIES true
+            "${_dir}/*")
+        foreach (_sub ${_framework_tests})
+            if (IS_DIRECTORY "${_sub}")
+                list(APPEND TEST_DIRS_DISABLED "${_sub}")
+            endif ()
         endforeach ()
+        list(APPEND TEST_FLAGS_DISABLED "${_flag}")
+    else ()
+        list(APPEND TEST_DIRS_DISABLED "${_dir}")
         list(APPEND TEST_FLAGS_DISABLED "${_flag}")
     endif ()
 endforeach ()

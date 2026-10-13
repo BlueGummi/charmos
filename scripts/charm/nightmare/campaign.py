@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import time
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -21,10 +21,6 @@ from .contracts import DiscoveryKind, ExecutionHealth
 from .suite import FLUSH_MARGIN_MS, Suite, Task
 
 CONFIDENT_FINDING_CAP = 5
-
-
-class CampaignError(ValueError):
-    pass
 
 
 class CampaignStatus(StrEnum):
@@ -95,19 +91,7 @@ class FindingSummary:
         return len(self.repro_boots)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "sig": self.sig,
-            "tier": self.tier,
-            "kind": self.kind,
-            "site": self.site,
-            "msg": self.msg,
-            "occurrences": self.occurrences,
-            "repro_boots": self.repro_boots,
-            "first_boot": self.first_boot,
-            "last_boot": self.last_boot,
-            "evidence_count": len(self.evidence),
-            "evidence": self.evidence,
-        }
+        return {**asdict(self), "evidence_count": len(self.evidence)}
 
 
 @dataclass(frozen=True)
@@ -119,13 +103,7 @@ class TraceSample:
     is_boundary: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "at_ms": self.at_ms,
-            "cumulative_progress": self.cumulative_progress,
-            "boot_index": self.boot_index,
-            "task_name": self.task_name,
-            "is_boundary": self.is_boundary,
-        }
+        return asdict(self)
 
 
 @dataclass
@@ -857,7 +835,7 @@ class BundleBootRunner:
         # Keeping one copy per boot made result artifacts several gigabytes large
         with tempfile.TemporaryDirectory(prefix="runtime-", dir=boot_dir) as temp:
             runtime_dir = Path(temp)
-            repacked = bundle_model.repack(
+            iso_path = bundle_model.repack(
                 self.bundle,
                 cmdline=cmdline_path,
                 out_dir=runtime_dir,
@@ -866,7 +844,7 @@ class BundleBootRunner:
             qmp_socket = runtime_dir / "qmp.sock"
             command = bundle_model.qemu_command(
                 self.bundle,
-                iso_path=repacked.iso_path,
+                iso_path=iso_path,
                 disk_path=disk_path,
                 machine_log=machine_log_path,
                 trace_log=boot_dir / "trace.log",

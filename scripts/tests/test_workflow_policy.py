@@ -115,14 +115,12 @@ jobs:
     assert [(v.line, v.rule) for v in violations] == [(5, "charm_not_importable")]
 
 
-def test_charm_invocation_with_pythonpath_is_clean() -> None:
+def test_charm_invocation_through_uv_is_clean() -> None:
     text = """
-env:
-  PYTHONPATH: scripts
 jobs:
   wake:
     steps:
-      - run: python3 -m charm nightmare wake-queue
+      - run: uv run --locked charm nightmare wake-queue
 """
     assert WP.check_text(Path("workflow.yml"), text) == []
 

@@ -5,7 +5,7 @@ suite TOML  ──►  suite.load()   the model, defaults, validation
                  codec.write()  the n.txt artifact
                       │
                       ▼   CMDLINE=n.txt
-            scripts/gen_limine_conf.py  ──► limine.conf ──► iso ──► boot
+            scripts/mkiso.py  ──► limine.conf ──► iso ──► boot
 """
 
 from .codec import BootRequest, CodecError, build_args, build_command, render, write
